@@ -4915,7 +4915,8 @@
     stop(sprintf("%s requires one operator per column", where))
 
   bw.scale <- 1.0
-  if (bws$ncon > 0L) {
+  if (bws$ncon > 0L &&
+      !identical(bws[["ckertype", exact = TRUE]], "beta")) {
     con.ops <- operator[bws$icon]
     if (any(con.ops == "normal"))
       bw.scale <- prod(bws$bw[bws$icon][con.ops == "normal"])
@@ -4939,7 +4940,7 @@
     bws = bws,
     txdat = xdat,
     exdat = exdat,
-    bandwidth.divide = TRUE,
+    bandwidth.divide = !identical(bws[["ckertype", exact = TRUE]], "beta"),
     operator = op.info$operator
   )
 

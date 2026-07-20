@@ -309,7 +309,14 @@ Further arguments are passed to \code{\link{npregbw}} when bandwidths are comput
 
   The beta regression route requires \code{regtype="lc"},
   \code{ckerorder} in \code{c(2,4,6,8)}, finite fixed or sample-range bounds,
-  continuous predictors only, and \code{gradients=FALSE}. Manual and
+  and continuous predictors only. First derivatives requested with
+  \code{gradients=TRUE} are analytic C implementations; \code{gerr} uses the
+  derivative of the normalized local-constant weights together with the beta
+  route's local residual-variance convention. At exact support endpoints,
+  normalized numerator/denominator jumps are cancelled first. A genuine
+  estimator jump is returned as a signed infinity with \code{gerr=NA}; an
+  indeterminate numerical cancellation is returned as \code{NA} with a
+  warning. Manual and
   cross-validated bandwidth objects support fixed, generalized-NN, and
   adaptive-NN modes. Categorical predictors and local-linear/local-polynomial
   fits fail explicitly. An evaluation point

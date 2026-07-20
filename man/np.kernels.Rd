@@ -88,13 +88,40 @@
   (\code{ckerbound="fixed"}) or the exact training-sample range
   (\code{ckerbound="range"}); all active beta bounds must be finite.
   The beta routes currently require continuous variables only. Regression and
-  conditional estimators additionally require \code{regtype="lc"} and
-  \code{gradients=FALSE}; if either conditional side uses beta, all X and Y
-  coordinates must be continuous. \code{npksum} requires
-  \code{bandwidth.divide=FALSE}, \code{kernel.pow=1}, and normal, integral, or
-  convolution operators. Unsupported derivative, score, OCG, permutation,
-  categorical-product, and local-polynomial combinations fail explicitly
-  rather than falling through a legacy kernel code.
+  conditional estimators additionally require \code{regtype="lc"}; if either
+  conditional side uses beta, all X and Y coordinates must be continuous.
+  \code{npksum} requires \code{bandwidth.divide=FALSE} and
+  \code{kernel.pow=1}. Normal, integral, convolution, and one-coordinate
+  PDF-derivative operators are supported;
+  \code{permutation.operator="derivative"} returns every continuous first
+  derivative. Score, OCG, categorical-product, higher/mixed derivative, and
+  local-polynomial combinations fail explicitly rather than falling through
+  a legacy kernel code.
+
+  For scale component \eqn{s}, put \eqn{\tau_s=\tau/s},
+  \eqn{\alpha_s=1+t\tau_s}, and \eqn{\beta_s=1+(1-t)\tau_s}. At an interior
+  observation \eqn{0<z_i<1}, its evaluation-coordinate derivative is
+  \deqn{\frac{\partial K_s}{\partial x}=\frac{\tau_s}{L}K_s
+    \left\{\log z_i-\log(1-z_i)-\psi(\alpha_s)+\psi(\beta_s)\right\},}
+  where \eqn{\psi} is the digamma function. Higher-order derivatives use the
+  same signed multiscale coefficients as the PDF. Bandwidths are held fixed
+  while differentiating: this includes the evaluation bandwidth selected by a
+  generalized-NN rule and each observation bandwidth selected by an
+  adaptive-NN rule. These are derivatives of the fitted smoother conditional
+  on its realized bandwidths, not derivatives of the NN selection map.
+
+  An observation exactly equal to the lower (upper) support endpoint makes
+  its matching scalar PDF contribution jump downward (upward) when the target
+  crosses that endpoint. The scalar derivative is consequently reported as
+  \eqn{-\infty} at a matching lower endpoint and \eqn{+\infty} at a matching
+  upper endpoint; nonmatching endpoint contributions have derivative zero.
+  Local-constant regression and conditional estimators cancel numerator and
+  denominator jumps before classifying their gradient, so a normalized ratio
+  may still have a finite derivative (and a constant response or constant Y
+  factor gives exactly zero). A genuine ratio jump is returned as a signed
+  infinity. Numerically indeterminate cancellation is returned as \code{NA}
+  with a warning. Derivative hat matrices cannot encode response-specific
+  cancellation and therefore mark an affected endpoint row \code{NA}.
 
   For nearest-neighbor modes, the
   existing observation-support nearest-neighbor engine supplies the
@@ -146,6 +173,14 @@
   decreases as large as approximately \eqn{8.6\times 10^{-5}}. The
   implementation neither clips nor monotonizes those values. Inversion-based
   uses therefore remain outside this generalized-NN CDF contract.
+
+  The beta derivative operator differentiates the PDF contribution with
+  respect to its evaluation coordinate. It does not differentiate the
+  observation-centered CDF factor with respect to Y, and it is not a
+  bandwidth score. As with existing higher-order kernels and local-polynomial
+  derivatives, signed kernels can yield non-proper density or distribution
+  estimates; derivative output is not clipped, monotonized, or otherwise
+  repaired.
 
   The beta \code{"convolution"} operator is the analytic overlap of two
   associated beta density weights in their common observation coordinate. If

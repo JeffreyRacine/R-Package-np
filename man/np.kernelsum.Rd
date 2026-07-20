@@ -348,6 +348,17 @@ Further arguments passed to the default kernel-sum method.
   \code{operator = c("normal","derivative")}. This makes the computation
   of gradients much easier.
 
+  For \code{ckertype="beta"}, \code{operator="derivative"} is the analytic
+  first derivative of the associated PDF contribution with respect to its
+  evaluation coordinate. A direct operator vector may contain one derivative
+  coordinate, while \code{permutation.operator="derivative"} returns one
+  derivative product per continuous coordinate. Set
+  \code{bandwidth.divide=FALSE}; beta contributions already carry their
+  original-scale units. Generalized- and adaptive-NN bandwidths are held fixed
+  during differentiation. Exact matching support endpoints can produce signed
+  infinite scalar derivatives; see \code{\link{np.kernels}} for the endpoint
+  and ratio-cancellation conventions.
+
   The option \code{compute.score=} can be used to compute the gradients
   with respect to \eqn{h} in addition to the normal kernel sum. Like
   permutations, the additional results are returned in the

@@ -230,7 +230,7 @@
     bws = op.info$bws,
     txdat = txdat,
     exdat = exdat,
-    bandwidth.divide = TRUE,
+    bandwidth.divide = !identical(op.info$bws[["ckertype", exact = TRUE]], "beta"),
     operator = op.info$operator
   )
 
@@ -261,7 +261,7 @@
     bws = op.info$bws,
     txdat = txdat,
     exdat = exdat,
-    bandwidth.divide = TRUE,
+    bandwidth.divide = !identical(op.info$bws[["ckertype", exact = TRUE]], "beta"),
     operator = op.info$operator
   )
 
@@ -330,7 +330,8 @@
     kerneval = switch(bws$ckertype,
       gaussian = CKER_GAUSS + bws$ckerorder / 2 - 1,
       epanechnikov = CKER_EPAN + bws$ckerorder / 2 - 1,
-      uniform = CKER_UNI
+      uniform = CKER_UNI,
+      beta = CKER_COORDINATE
     ),
     ukerneval = switch(bws$ukertype,
       aitchisonaitken = UKER_AIT,
@@ -344,11 +345,19 @@
     ),
     miss.ex = FALSE,
     leave.one.out = FALSE,
-    bandwidth.divide = TRUE,
+    bandwidth.divide = !identical(bws[["ckertype", exact = TRUE]], "beta"),
     mcv.numRow = attr(bws$xmcv, "num.row"),
     wncol = 0L,
     yncol = ncol(rhs),
-    int_do_tree = npDoTreeOrCategoricalCompress(ncon = bws$yncon + bws$xncon, ncat = bws$ynuno + bws$ynord + bws$xnuno + bws$xnord, bws = bws),
+    int_do_tree = if (identical(bws[["ckertype", exact = TRUE]], "beta")) {
+      DO_TREE_NO
+    } else {
+      npDoTreeOrCategoricalCompress(
+        ncon = bws$ncon,
+        ncat = bws$nuno + bws$nord,
+        bws = bws
+      )
+    },
     return.kernel.weights = isTRUE(return.kernel.weights),
     permutation.operator = PERMUTATION_OPERATORS[["none"]],
     compute.score = FALSE,

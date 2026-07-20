@@ -74,6 +74,12 @@ multivariate problem, returns the hat operator for that component of the
 conditional-distribution gradient. This derivative route is intended to match
 \code{npcdist(..., gradients = TRUE)$congrad}.
 
+For local-constant beta X kernels, first derivatives use the analytic beta
+PDF derivative; the beta Y CDF factor is not differentiated. Exact
+support-endpoint rows whose raw X weights jump are returned as \code{NA},
+because a response-free hat matrix cannot perform the Y-factor-specific
+ratio cancellation available to the fitted conditional-distribution route.
+
 This helper is intended for object-fed repeated evaluation once a bandwidth
 object has already been constructed. It does not perform bandwidth selection.
 }

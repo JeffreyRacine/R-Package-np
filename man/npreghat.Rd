@@ -126,6 +126,13 @@ e.g. \code{H \%*\% y}. Attributes on the matrix store metadata used by
 For \code{output = "apply"}, the function returns \code{H^{(s)} y} directly and
 accepts matrix right-hand sides for one-shot bootstrap-style calculations.
 
+For local-constant beta kernels, one first derivative is evaluated by the
+same analytic C kernel used by \code{npreg(..., gradients=TRUE)}. If an exact
+support endpoint creates a raw-kernel jump, the hat operator cannot know
+whether a future response will cancel it in the normalized ratio; the entire
+affected row is therefore returned as \code{NA} with a warning. The compiled
+estimator route can still return a finite response-specific gradient.
+
 For \code{output = "constraint"}, the function returns \code{t(H^{(s)}) * y},
 the row-weighted transpose commonly used as the design matrix in
 shape-constrained quadratic-programming examples. This is a convenience route

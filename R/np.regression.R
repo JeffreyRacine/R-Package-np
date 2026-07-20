@@ -290,10 +290,6 @@ npreg.rbandwidth <-
       where = "beta regression",
       regtype = bws[["regtype", exact = TRUE]]
     )
-    if (beta.kernel && gradients)
-      stop("beta regression gradients are not yet available; use gradients = FALSE",
-           call. = FALSE)
-
     npValidateRegressionNnLowerBound(bws, where = "npreg")
     npValidateRegressionExtendedNn(
       bws,

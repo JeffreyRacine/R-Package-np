@@ -42,6 +42,20 @@ typedef struct {
   int observation_endpoint;
 } np_beta_shape;
 
+/*
+ * Derivatives of an observation-centred beta kernel can have an ordinary
+ * one-sided derivative and, only when an observation exactly matches a
+ * support endpoint, a jump at that endpoint.  Keeping both pieces in signed
+ * log form lets ratio estimators cancel endpoint jumps before deciding
+ * whether their public derivative is finite or infinite.
+ */
+typedef struct {
+  double regular_log_absolute;
+  double jump_log_absolute;
+  int regular_sign;
+  int jump_sign;
+} np_beta_derivative;
+
 np_beta_status np_beta_shape_init(double evaluation,
                                   double observation,
                                   double bandwidth,
@@ -86,6 +100,22 @@ double np_beta_log_abs_pdf_order(double evaluation,
                                  int order,
                                  int *sign,
                                  np_beta_status *status);
+
+np_beta_status np_beta_pdf_derivative_order(double evaluation,
+                                            double observation,
+                                            double bandwidth,
+                                            double lower,
+                                            double upper,
+                                            int order,
+                                            np_beta_derivative *derivative);
+
+double np_beta_derivative_regular_value(
+  const np_beta_derivative *derivative,
+  np_beta_status *status);
+
+double np_beta_derivative_public_value(
+  const np_beta_derivative *derivative,
+  np_beta_status *status);
 
 double np_beta_cdf_order2(double evaluation,
                           double observation,
