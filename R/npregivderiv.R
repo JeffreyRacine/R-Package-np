@@ -36,6 +36,18 @@
 ## where the local polynomial estimator is ill-conditioned (sparse
 ## data, small h etc.).
 
+.npregivderiv_select_stop_index <- function(norm.stop) {
+  if(is.monotone.increasing(norm.stop)) {
+    return(list(index=1L, monotone.failure=TRUE))
+  }
+
+  N <- 1L
+  while(N < length(norm.stop) && norm.stop[N+1L] >= norm.stop[N]) N <- N+1L
+  while(N < length(norm.stop) && norm.stop[N+1L] < norm.stop[N]) N <- N+1L
+
+  list(index=N, monotone.failure=FALSE)
+}
+
 npregivderiv <- function(y,
                          z,
                          w,
@@ -186,20 +198,13 @@ npregivderiv <- function(y,
 
   phi <- integrate.trapezoidal.internal(phi.prime)
 
-  starting.values.phi <- phi
-  starting.values.phi.prime <- phi.prime
-
   ## In the definition of phi we have the integral minus the mean of
   ## the integral with respect to z, so subtract the mean here
 
   phi <- phi - mean(phi) + mean(y)
 
-  phi.mat <- matrix(NA, length(phi), iterate.max)
-  phi.mat[,1] <- phi
-  phi.prime.mat <- matrix(NA, length(phi.prime), iterate.max)
-  phi.prime.mat[,1] <- phi.prime
-
-  norm.stop <- numeric(iterate.max)
+  starting.values.phi <- phi
+  starting.values.phi.prime <- phi.prime
 
   ## Now we compute mu.0 (a residual of sorts)
 
@@ -210,7 +215,7 @@ npregivderiv <- function(y,
   progress <- .np_progress_begin("Iterating Landweber-Fridman derivative solve", surface = "iv_solve")
 
   if(smooth.residuals) {
-    progress <- .np_progress_step(progress, done = 1, detail = "updating E(mu|w)")
+    progress <- .np_progress_step(progress, done = 0, detail = "initializing E(mu|w)")
 
     ## Additional smoothing on top of the stopping rule required, but
     ## we have computed the stopping rule so reuse the bandwidth
@@ -239,9 +244,6 @@ npregivderiv <- function(y,
 
   }
 
-
-  norm.stop[1] <- sum(predicted.E.mu.w^2)/NZD_pos(sum(E.y.w^2))
-  
   ## We again require the mean of the fitted values
 
   mean.predicted.E.mu.w <- mean(predicted.E.mu.w)
@@ -276,28 +278,19 @@ npregivderiv <- function(y,
 
   T.star.mu <- (survivor.weighted.average-S.z*mean.predicted.E.mu.w)/NZD(f.z)
 
-  ## Now we update phi.prime.0, this provides phi.prime.1, and now
-  ## we can iterate until convergence... note we replace phi.prime.0
-  ## with phi.prime.1 (i.e. overwrite phi.prime)
-
-  phi.prime <- phi.prime + constant*T.star.mu
-
   phi.mat <- matrix(NA, length(phi), iterate.max)
-  phi.mat[,1] <- phi
   phi.prime.mat <- matrix(NA, length(phi.prime), iterate.max)
-  phi.prime.mat[,1] <- phi.prime
-
   norm.stop <- numeric(iterate.max)
-  norm.stop[1] <- sum(predicted.E.mu.w^2)/NZD_pos(sum(E.y.w^2))
-  
-  ## We again require the mean of the fitted values
+  convergence <- "ITERATE_MAX"
+  N.evaluated <- 0L
 
-  mean.predicted.E.mu.w <- mean(predicted.E.mu.w)
+  ## Column N records the complete state after N derivative updates:
+  ## phi_N, phi'_N, and the stopping rule evaluated at phi_N.
 
-  ## This we iterate...
+  for(N in seq_len(iterate.max)) {
+    progress <- .np_progress_step(progress, done = N, detail = "updating phi")
 
-  for(j in 2:iterate.max) {
-    progress <- .np_progress_step(progress, done = j, detail = "updating phi")
+    phi.prime <- phi.prime + constant*T.star.mu
 
     ## NOTE - this presumes univariate z case... in general this would
     ## be a continuous variable's index
@@ -318,7 +311,7 @@ npregivderiv <- function(y,
     mean.mu <- mean(mu)
 
     if(smooth.residuals) {
-      progress <- .np_progress_step(progress, done = j, detail = "updating E(mu|w)")
+      progress <- .np_progress_step(progress, done = N, detail = "updating E(mu|w)")
 
 
       ## Additional smoothing on top of the stopping rule required, but
@@ -354,24 +347,10 @@ npregivderiv <- function(y,
 
     }
 
-    norm.stop[j] <- j*sum(predicted.E.mu.w^2)/NZD_pos(sum(E.y.w^2))
-    
-    mean.predicted.E.mu.w <- mean(predicted.E.mu.w)
-
-    ## Now we compute T^* applied to mu
-
-    cdf.weighted.average <- cdf.weighted.average.apply(predicted.E.mu.w)
-
-    survivor.weighted.average <- mean.predicted.E.mu.w - cdf.weighted.average
-
-    T.star.mu <- (survivor.weighted.average-S.z*mean.mu)/NZD(f.z)
-
-    ## Now we update, this provides phi.prime.1, and now we can
-    ## iterate until convergence...
-
-    phi.prime <- phi.prime + constant*T.star.mu
-    phi.mat[,j] <- phi
-    phi.prime.mat[,j] <- phi.prime
+    norm.stop[N] <- N*sum(predicted.E.mu.w^2)/NZD_pos(sum(E.y.w^2))
+    phi.mat[,N] <- phi
+    phi.prime.mat[,N] <- phi.prime
+    N.evaluated <- N
 
     ## The number of iterations in LF is asymptotically equivalent to
     ## 1/alpha (where alpha is the regularization parameter in
@@ -385,29 +364,43 @@ npregivderiv <- function(y,
     ## N^0.5. Note that derivative estimation seems to require more
     ## iterations hence the heuristic sqrt(N)
 
-    if(j > round(sqrt(nrow(z))) &&
-       !is.monotone.increasing(norm.stop[seq_len(j)])) {
+    should.break <- FALSE
+    if(N > round(sqrt(nrow(z))) &&
+       !is.monotone.increasing(norm.stop[seq_len(N)])) {
 
       ## If stopping rule criterion increases or we are below stopping
       ## tolerance then break
 
-      if(stop.on.increase && norm.stop[j] > norm.stop[j-1]) {
+      if(stop.on.increase && norm.stop[N] > norm.stop[N-1L]) {
         convergence <- "STOP_ON_INCREASE"
-        if(iterate.break) break()
+        should.break <- isTRUE(iterate.break)
       }
 
     }
 
+    if(should.break) break
+
     convergence <- "ITERATE_MAX"
+
+    ## The current state's residual supplies the adjoint for update N+1.
+    ## Do not compute it when state N is the terminal iterate.max state.
+
+    if(N < iterate.max) {
+      mean.predicted.E.mu.w <- mean(predicted.E.mu.w)
+
+      cdf.weighted.average <- cdf.weighted.average.apply(predicted.E.mu.w)
+
+      survivor.weighted.average <- mean.predicted.E.mu.w - cdf.weighted.average
+
+      T.star.mu <- (survivor.weighted.average-S.z*mean.mu)/NZD(f.z)
+    }
 
   }
 
   ## Trim matrices and norm.stop to the actual number of iterations performed
-  if(j < iterate.max) {
-      phi.mat <- phi.mat[, 1:j, drop=FALSE]
-      phi.prime.mat <- phi.prime.mat[, 1:j, drop=FALSE]
-      norm.stop <- norm.stop[1:j]
-  }
+  phi.mat <- phi.mat[, seq_len(N.evaluated), drop=FALSE]
+  phi.prime.mat <- phi.prime.mat[, seq_len(N.evaluated), drop=FALSE]
+  norm.stop <- norm.stop[seq_len(N.evaluated)]
 
   ## Extract minimum, and check for monotone increasing function and
   ## issue warning in that case. Otherwise allow for an increasing
@@ -416,34 +409,26 @@ npregivderiv <- function(y,
   ## and take the min from where the initial inflection point occurs
   ## to the length of norm.stop.
 
-  if(is.monotone.increasing(norm.stop)) {
+  stop.pick <- .npregivderiv_select_stop_index(norm.stop)
+  N.selected <- stop.pick$index
+
+  if(stop.pick$monotone.failure) {
     .np_warning("Stopping rule increases monotonically (consult model$norm.stop):\nThis could be the result of an inspired initial value (unlikely)\nNote: we suggest manually choosing phi.0 and restarting (e.g., instead set `start.from' to EEywz or provide a vector of starting values")
     convergence <- "FAILURE_MONOTONE_INCREASING"
-    j <- length(norm.stop)
-    phi <- phi.mat[,1]
-    phi.prime <- phi.prime.mat[,1]
-  } else {
-    ## Ignore the initial increasing portion, take the min to the
-    ## right of where the initial inflection point occurs.
-    j <- 1
-    ## Climb the initial hill...
-    while(norm.stop[j+1] >= norm.stop[j] && j < length(norm.stop)) j <- j + 1
-    ## Descend into the first valley
-    while(norm.stop[j+1] < norm.stop[j] && j < length(norm.stop)) j <- j + 1
-    ## When you start to climb again, stop, previous location was min
-    phi <- phi.mat[,j-1]
-    phi.prime <- phi.prime.mat[,j-1]
   }
+
+  phi <- phi.mat[,N.selected]
+  phi.prime <- phi.prime.mat[,N.selected]
 
   progress <- .np_progress_end(progress, detail = "updating E(mu|w)")
 
-  if(j == iterate.max) .np_warning(" iterate.max reached: increase iterate.max or inspect norm.stop vector")
+  if(N.evaluated == iterate.max) .np_warning(" iterate.max reached: increase iterate.max or inspect norm.stop vector")
 
   ret <- list(phi=phi,
               phi.prime=phi.prime,
               phi.mat=phi.mat,
               phi.prime.mat=phi.prime.mat,
-              num.iterations=j,
+              num.iterations=N.selected,
               norm.stop=norm.stop,
               convergence=convergence,
               starting.values.phi=starting.values.phi,
@@ -496,7 +481,7 @@ summary.npregivderiv <- function(object, ...) {
 
   cat(paste("\n\nRegularization method: Landweber-Fridman",sep=""))
   cat(paste("\nNumber of iterations: ", format(object$num.iterations), sep=""))
-  cat(paste("\nStopping rule value: ", format(object$norm.stop[length(object$norm.stop)],digits=8), sep=""))
+  cat(paste("\nStopping rule value: ", format(object$norm.stop[object$num.iterations],digits=8), sep=""))
 
   w.names <- if(!is.null(object$w)) colnames(object$w) else NULL
   z.names <- if(!is.null(object$z)) colnames(object$z) else NULL
