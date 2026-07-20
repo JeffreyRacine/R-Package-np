@@ -249,15 +249,16 @@ Further arguments passed to the default kernel-sum method.
 
   A variety of kernels may be specified by the user. Kernels implemented
   for continuous data types include the second, fourth, sixth, and
-  eighth order Gaussian and Epanechnikov kernels, and the uniform
-  kernel. A second-order beta associated kernel is also available on the
-  restricted fixed-known-support route described below. Unordered discrete data types use a variation on Aitchison and
+  eighth order Gaussian, Epanechnikov, and beta associated kernels, and the
+  uniform kernel. The beta family uses finite-support coordinate-aware routes
+  described below. Unordered discrete data types use a variation on Aitchison and
   Aitken's (1976) kernel, while ordered data types use a variation of
   the Wang and van Ryzin (1981) kernel (see \code{\link{np}} for
   details).
 
-  For \code{ckertype="beta"}, \code{npksum} evaluates Chen's second-order
-  associated PDF kernel on each declared interval.  If \eqn{L=b-a}, its
+  For \code{ckertype="beta"}, \code{npksum} uses Chen's second-order
+  associated PDF kernel as the base contribution on each declared interval.
+  If \eqn{L=b-a}, its
   per-observation contribution is
   \deqn{\frac{1}{L}\,\mathrm{BetaPDF}\left(
     \frac{x_i-a}{L};
@@ -269,6 +270,12 @@ Further arguments passed to the default kernel-sum method.
   Local-constant regression uses the ordinary ratio of beta-weighted response
   and unit sums.  Do not set \code{bandwidth.divide=TRUE}; that legacy
   normalization is intentionally rejected for beta kernels.
+
+  For order \eqn{2m}, the PDF and CDF operators use
+  \eqn{\sum_{s=1}^m(-1)^{s+1}{m\choose s}K_2(h\sqrt{s})}. Thus the coefficient
+  vectors for orders 2, 4, 6, and 8 are \eqn{(1)}, \eqn{(2,-1)},
+  \eqn{(3,-3,1)}, and \eqn{(4,-6,4,-1)}. Higher-order PDF and CDF
+  contributions are signed and are returned without clipping.
 
   For \code{operator="integral"}, the univariate beta contribution is
   \deqn{I_{(x-a)/L}\left(1+\frac{x_i-a}{L}\left(\frac{L}{h}\right)^2,
@@ -296,8 +303,8 @@ Further arguments passed to the default kernel-sum method.
   dimensions.
 
   This beta surface requires continuous \code{txdat},
-  \code{ckerorder=2},
-  \code{ckerbound="fixed"}, finite lower and upper bounds for every
+  \code{ckerorder} in \code{c(2,4,6,8)},
+  \code{ckerbound="fixed"} or \code{"range"}, finite lower and upper bounds for every
   dimension, \code{operator="normal"}, \code{operator="integral"}, and/or
   \code{operator="convolution"}, and \code{kernel.pow=1}. It supports
   multiple continuous dimensions, response and case-weight columns,
@@ -313,10 +320,11 @@ Further arguments passed to the default kernel-sum method.
   bandwidth. Fixed and adaptive order-2 CDF factors are monotone in their
   target. Generalized-NN CDF factors remain in \eqn{[0,1]} with exact
   endpoints, but their target-varying bandwidth can produce local
-  nonmonotonicity; no clipping or monotone repair is applied. Derivative,
-  sample-range support, categorical-product, score, OCG, permutation, and
-  higher-order beta operations are not yet available and fail with an
-  explicit condition. See \code{\link{np.kernels}}
+  nonmonotonicity. Orders 4, 6, and 8 may additionally leave \eqn{[0,1]} or
+  be locally nonmonotone in every bandwidth mode; no clipping or monotone
+  repair is applied. Derivative, categorical-product, score, OCG, and
+  permutation beta operations are not available and fail with an explicit
+  condition. See \code{\link{np.kernels}}
   for the bandwidth convention, orientation, and references.
 
   The option \code{operator=} can be used to \sQuote{mix and match}

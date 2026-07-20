@@ -205,6 +205,17 @@ Further arguments are passed to \code{\link{npcdistbw}} when bandwidths are comp
   \code{condbandwidth} object, \code{npcdist} estimates with the stored
   bandwidth metadata in that object.
 
+  Beta associated kernels may be selected independently for explanatory X
+  coordinates (\code{cxkertype="beta"}) and response Y coordinates
+  (\code{cykertype="beta"}). Orders 2, 4, 6, and 8, fixed/generalized-NN/
+  adaptive-NN bandwidths, explicit finite bounds, sample-range bounds, and
+  automatic \code{cv.ls} bandwidth selection are supported. If either side
+  uses beta, all X and Y coordinates must be continuous and the fit must be
+  local constant with \code{gradients=FALSE}. Fixed/adaptive order-2 Y CDF
+  factors are proper on their declared support; generalized-NN order-2 curves
+  may be locally nonmonotone, and signed orders 4, 6, and 8 may also leave
+  \eqn{[0,1]}. No clipping or monotone repair is applied.
+
   With finite continuous response bounds, \code{npcdist} uses the
   observation-centered truncated-kernel CDF documented in
   \code{\link{np.kernels}}. Each response contribution is exactly zero
@@ -324,6 +335,19 @@ Further arguments are passed to \code{\link{npcdistbw}} when bandwidths are comp
 
   Aitchison, J. and C.G.G. Aitken (1976), \dQuote{Multivariate binary
     discrimination by the kernel method,} Biometrika, 63, 413-420.
+
+  Chen, S.X. (1999), \dQuote{Beta kernel estimators for density functions,}
+  Computational Statistics & Data Analysis, 31(2), 131--145.
+  doi:10.1016/S0167-9473(99)00010-9.
+
+  Igarashi, G. and Kakizawa, Y. (2020), \dQuote{Higher-order bias corrections
+  for asymmetric kernel density estimators,} Journal of Nonparametric
+  Statistics, 32(3), 716--752. doi:10.1080/10485252.2020.1770754.
+
+  Mansouri, B., Rastin, A., and Allah Mombeni, H. (2024), \dQuote{Beta Kernel
+  Estimator for a Cumulative Distribution Function with Bounded Support,}
+  Journal of Sciences, Islamic Republic of Iran, 34(4), 349--361.
+  doi:10.22059/jsciences.2024.367933.1007836.
 
   Hall, P. and J.S. Racine and Q. Li (2004), \dQuote{Cross-validation and the
     estimation of conditional probability densities,} Journal of the

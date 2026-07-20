@@ -205,6 +205,18 @@ Further arguments are passed to \code{\link{npcdensbw}} when bandwidths are comp
   \code{conbandwidth} object, \code{npcdens} estimates with the stored
   bandwidth metadata in that object.
 
+  Beta associated kernels may be selected independently for explanatory X
+  coordinates (\code{cxkertype="beta"}) and response Y coordinates
+  (\code{cykertype="beta"}). Orders 2, 4, 6, and 8, fixed/generalized-NN/
+  adaptive-NN bandwidths, explicit finite bounds, sample-range bounds, and
+  automatic \code{cv.ml}/\code{cv.ls} bandwidth selection are supported.
+  If either side uses beta, all X and Y coordinates must be continuous and the
+  fit must be local constant with \code{gradients=FALSE}. Higher-order fits
+  are signed and need not be proper densities; no positivity repair is
+  applied. Bounded beta-response \code{cv.ls} integrates the actual
+  conditional estimator over the Y support and does not replace that integral
+  by the public observation-coordinate beta overlap.
+
   Argument groups for bandwidth selection are documented on
   \code{\link{npcdensbw}}. The most common workflow is to choose data
   and bandwidth inputs first, then bandwidth criterion and
@@ -317,6 +329,14 @@ Further arguments are passed to \code{\link{npcdensbw}} when bandwidths are comp
 
   Aitchison, J. and C.G.G. Aitken (1976), \dQuote{Multivariate binary
     discrimination by the kernel method,} Biometrika, 63, 413-420.
+
+  Chen, S.X. (1999), \dQuote{Beta kernel estimators for density functions,}
+  Computational Statistics & Data Analysis, 31(2), 131--145.
+  doi:10.1016/S0167-9473(99)00010-9.
+
+  Igarashi, G. and Kakizawa, Y. (2020), \dQuote{Higher-order bias corrections
+  for asymmetric kernel density estimators,} Journal of Nonparametric
+  Statistics, 32(3), 716--752. doi:10.1080/10485252.2020.1770754.
 
   Hall, P. and J.S. Racine and Q. Li (2004), \dQuote{Cross-validation and the
     estimation of conditional probability densities,} Journal of the

@@ -108,12 +108,14 @@ Further arguments are passed to \code{\link{npudensbw}} when bandwidths are comp
   \code{bandwidth} object, \code{npudens} estimates with the stored
   bandwidth metadata in that object.
 
-  The second-order beta associated density described in
-  \code{\link{np.kernels}} is available when a manual metric bandwidth is
-  supplied. It currently requires continuous data only,
-  \code{ckertype="beta"}, \code{ckerorder=2}, \code{bwtype="fixed"}, and
-  \code{ckerbound="fixed"} with finite lower and upper bounds covering every
-  training and evaluation value. For example:
+  The beta associated density described in \code{\link{np.kernels}} is
+  available for continuous data at orders 2, 4, 6, and 8 with manual or
+  cross-validated metric bandwidths. Fixed, generalized-NN, and adaptive-NN
+  bandwidths are supported. Use \code{ckertype="beta"} and either
+  \code{ckerbound="fixed"} with finite lower and upper bounds or
+  \code{ckerbound="range"} for the exact training-sample range. Every
+  training and evaluation value must lie within the resulting support. For
+  example:
   \preformatted{
     fhat <- npudens(tdat=data.frame(x), edat=data.frame(x=x.eval),
                     bws=0.12, ckertype="beta", ckerorder=2,
@@ -121,9 +123,12 @@ Further arguments are passed to \code{\link{npudensbw}} when bandwidths are comp
   }
   The beta contribution already includes its complete original-scale density
   normalization. No additional division by the bandwidth is performed.
-  Automatic beta bandwidth selection, nearest-neighbor bandwidths, empirical
-  range support, categorical products, and higher beta orders are not yet
-  available and fail explicitly.
+  Beta density routes currently require continuous data only and reject
+  normal-reference selection. Cross-validated \code{cv.ml} and bounded
+  target-coordinate \code{cv.ls} are available; the latter integrates the
+  actual estimator and does not substitute the public beta-overlap operator.
+  Orders 4, 6, and 8 are signed and can produce negative density estimates;
+  no positivity repair is applied.
 
   Because an associated beta kernel has target-dependent shape and roughness,
   its reported standard error does not substitute a translation-invariant
@@ -264,6 +269,10 @@ Further arguments are passed to \code{\link{npudensbw}} when bandwidths are comp
   Chen, S.X. (1999), \dQuote{Beta kernel estimators for density functions,}
   Computational Statistics & Data Analysis, 31(2), 131--145.
   doi:10.1016/S0167-9473(99)00010-9.
+
+  Igarashi, G. and Kakizawa, Y. (2020), \dQuote{Higher-order bias corrections
+  for asymmetric kernel density estimators,} Journal of Nonparametric
+  Statistics, 32(3), 716--752. doi:10.1080/10485252.2020.1770754.
 }
 \author{
     Tristen Hayfield \email{tristen.hayfield@gmail.com}, Jeffrey S. Racine

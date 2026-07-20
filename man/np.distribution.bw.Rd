@@ -382,8 +382,8 @@ These controls choose continuous, unordered, and ordered kernels.
   \item{ckertype}{
     character string used to specify the continuous kernel type.
     Can be set as \code{gaussian}, \code{epanechnikov}, or
-    \code{uniform}. The value \code{beta} is additionally accepted for the
-    manual order-2 fixed-known-support route described in Details. Defaults to
+    \code{uniform}, or \code{beta}. See Details for the finite-support beta
+    contract. Defaults to
     \code{gaussian}.
   }
 
@@ -598,15 +598,13 @@ or standard-deviation factors.
   kernel. Ordered data types use a variation of the Wang and van Ryzin
   (1981) kernel.
 
-  The order-2 beta associated CDF can be configured only as an explicit
-  bandwidth object: supply \code{bws}, set
-  \code{bandwidth.compute=FALSE}, \code{ckertype="beta"},
-  \code{ckerorder=2}, \code{bwtype="fixed"}, and
-  \code{ckerbound="fixed"}, and provide finite \code{ckerlb} and
-  \code{ckerub} for every continuous coordinate. Data must be continuous and
-  lie within those supports. Automatic selection, nearest-neighbor bandwidths,
-  sample-range bounds, categorical products, and higher beta orders are not
-  yet available. Unsupported specifications fail explicitly. The bandwidth
+  The beta associated CDF supports orders 2, 4, 6, and 8, explicit bandwidth
+  objects and automatic \code{cv.ls} selection, and fixed, generalized-NN,
+  and adaptive-NN bandwidths. Set \code{ckertype="beta"} and use
+  \code{ckerbound="fixed"} with finite \code{ckerlb}/\code{ckerub}, or
+  \code{ckerbound="range"}. Data must be continuous and lie within those
+  supports. Normal-reference selection and categorical products are not
+  supported. Unsupported specifications fail explicitly. The bandwidth
   \eqn{h} remains in the coordinate's original units and maps to beta
   precision \eqn{((b-a)/h)^2}. See \code{\link{np.kernels}} and
   \code{\link{npudist}} for the exact observation-centered CDF contribution.
@@ -671,9 +669,11 @@ or standard-deviation factors.
 
   Higher-order continuous CDF kernels can yield estimates that are not
   globally monotone and may fall outside \eqn{[0,1]} at some evaluation
-  points. Returned values are not silently clamped. The implemented order-2
-  beta CDF remains monotone and in \eqn{[0,1]}; the same user-beware behavior
-  will apply if signed higher-order beta CDFs are later exposed.
+  points. Returned values are not silently clamped. Fixed and adaptive
+  order-2 beta CDFs remain monotone and in \eqn{[0,1]}; generalized-NN
+  order-2 curves can be locally nonmonotone because the bandwidth changes with
+  the target. Signed beta orders 4, 6, and 8 may additionally leave
+  \eqn{[0,1]} or be locally nonmonotone in any bandwidth mode.
 
   For book-length derivations, see Li and Racine (2007), Chapter 1
   \emph{Density Estimation}, especially Sections 1.4 and 1.5, and Chapter
