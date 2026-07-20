@@ -201,6 +201,14 @@ int np_bounded_cvls_build_conditional_grid_1d_extern(
   double *grid,
   double *weights,
   int *actual_points);
+void np_bounded_cvls_conditional_effective_integration_bounds_extern(
+  int num_continuous,
+  double **train_continuous,
+  int num_obs,
+  const double *support_lower,
+  const double *support_upper,
+  double *quadrature_lower,
+  double *quadrature_upper);
 int np_shadow_proof_conditional_x_weights_dense(double *vector_scale_factor, double *weights_out);
 int np_shadow_proof_conditional_x_weight_row_fixed(double *vector_scale_factor, int eval_idx, double *row_out);
 int np_shadow_proof_conditional_x_weight_row_full(double *vector_scale_factor, int eval_idx, double *row_out);

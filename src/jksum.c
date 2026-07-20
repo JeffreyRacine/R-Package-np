@@ -24155,7 +24155,7 @@ static int np_bounded_cvls_bound_is_effectively_infinite(const double x){
     (fabs(ax - route_sentinel) <= route_sentinel*(8.0*DBL_EPSILON));
 }
 
-static void np_bounded_cvls_conditional_effective_integration_bounds(const int ncon,
+void np_bounded_cvls_conditional_effective_integration_bounds_extern(const int ncon,
                                                                      double **train_continuous,
                                                                      const int num_obs,
                                                                      const double *support_lb,
@@ -24709,7 +24709,7 @@ int np_bounded_cvls_conditional_quad_context_prepare_extern(void){
     return 1;
   }
 
-  np_bounded_cvls_conditional_effective_integration_bounds(
+  np_bounded_cvls_conditional_effective_integration_bounds_extern(
     1,
     matrix_Y_continuous_train_extern,
     num_obs,
@@ -25334,7 +25334,7 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_row_stream(double *
     goto cleanup_bounded_cvls_quad;
 
   if(!use_quad_context){
-    np_bounded_cvls_conditional_effective_integration_bounds(
+    np_bounded_cvls_conditional_effective_integration_bounds_extern(
       1,
       matrix_Y_continuous_train_extern,
       num_obs,
@@ -25495,7 +25495,7 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_general_row_stream(
      ((i1_mode == NP_BOUNDED_CVLS_I1_MODE_FULL) && (xblock_full == NULL)))
     goto cleanup_bounded_cvls_quad_general;
 
-  np_bounded_cvls_conditional_effective_integration_bounds(
+  np_bounded_cvls_conditional_effective_integration_bounds_extern(
     ncon,
     matrix_Y_continuous_train_extern,
     num_obs,

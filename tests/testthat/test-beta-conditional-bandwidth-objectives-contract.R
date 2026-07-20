@@ -161,6 +161,102 @@ test_that("conditional beta CVLS honors the bounded quadrature grid controls", {
   expect_gt(max(objectives) - min(objectives), 1e-10)
 })
 
+test_that("beta X with unbounded Gaussian Y uses the analytic CVLS overlap", {
+  x <- c(0.02, 0.07, 0.16, 0.31, 0.5, 0.69, 0.84, 0.96)
+  y <- c(-1.4, -0.92, -0.41, -0.08, 0.25, 0.61, 1.05, 1.48)
+  hx <- 0.17
+  hy <- 0.38
+  wx <- conditional_beta_bw_weights(x, x, hx, "fixed")
+  wy <- outer(y, y, function(train, evaluation) {
+    dnorm((evaluation - train) / hy) / hy
+  })
+  overlap <- outer(y, y, function(first, second) {
+    dnorm((first - second) / (sqrt(2) * hy)) / (sqrt(2) * hy)
+  })
+  oracle <- 0
+  for (i in seq_along(x)) {
+    keep <- setdiff(seq_along(x), i)
+    xweight <- wx[keep, i]
+    denominator <- sum(xweight)
+    integrated.square <- sum(
+      (xweight %o% xweight) * overlap[keep, keep, drop = FALSE]
+    ) / denominator^2
+    cross.fit <- sum(xweight * wy[keep, i]) / denominator
+    oracle <- oracle + integrated.square - 2 * cross.fit
+  }
+  oracle <- oracle / length(x)
+  bw <- conditional_beta_manual_bw(
+    x, y, hx, hy, method = "cv.ls",
+    xkernel = "beta", ykernel = "gaussian"
+  )
+  native <- npRmpi:::.npcdensbw_eval_only(
+    data.frame(x = x), data.frame(y = y), bw
+  )$objective
+
+  expect_equal(native, -oracle, tolerance = 5e-10)
+
+  for (bwtype in c("generalized_nn", "adaptive_nn")) {
+    nn.bw <- conditional_beta_manual_bw(
+      x, y, 3, 3, method = "cv.ls", bwtype = bwtype,
+      xkernel = "beta", ykernel = "gaussian"
+    )
+    expect_true(is.finite(npRmpi:::.npcdensbw_eval_only(
+      data.frame(x = x), data.frame(y = y), nn.bw
+    )$objective))
+  }
+})
+
+test_that("beta X with one-sided Gaussian Y uses effective bounded quadrature", {
+  x <- c(0.02, 0.07, 0.16, 0.31, 0.5, 0.69, 0.84, 0.96)
+  y <- c(0.12, 0.23, 0.41, 0.72, 1.08, 1.51, 2.04, 2.7)
+  hx <- 0.17
+  hy <- 0.38
+  points <- 21L
+  upper <- max(y) + diff(range(y))
+  grid <- seq(0, upper, length.out = points)
+  weights <- rep(diff(grid)[1L], points)
+  weights[c(1L, points)] <- weights[c(1L, points)] / 2
+  wx <- conditional_beta_bw_weights(x, x, hx, "fixed")
+  y.args <- list(
+    txdat = data.frame(y = y), bws = hy, bwtype = "fixed",
+    ckertype = "gaussian", ckerorder = 2,
+    ckerbound = "fixed", ckerlb = 0, ckerub = Inf,
+    return.kernel.weights = TRUE
+  )
+  wy.train <- do.call(npksum, c(
+    y.args, list(exdat = data.frame(y = y))
+  ))$kw / hy
+  wy.grid <- do.call(npksum, c(
+    y.args, list(exdat = data.frame(y = grid))
+  ))$kw / hy
+  oracle <- 0
+  for (i in seq_along(x)) {
+    keep <- setdiff(seq_along(x), i)
+    denominator <- sum(wx[keep, i])
+    fit.grid <- colSums(wx[keep, i] * wy.grid[keep, , drop = FALSE]) /
+      denominator
+    fit.at.yi <- sum(wx[keep, i] * wy.train[keep, i]) / denominator
+    oracle <- oracle + sum(weights * fit.grid^2) - 2 * fit.at.yi
+  }
+  oracle <- oracle / length(x)
+  bw <- npcdensbw(
+    xdat = data.frame(x = x), ydat = data.frame(y = y),
+    bws = c(hy, hx), bandwidth.compute = FALSE,
+    bwmethod = "cv.ls", bwtype = "fixed", bwscaling = FALSE,
+    cxkertype = "beta", cxkerorder = 2,
+    cxkerbound = "fixed", cxkerlb = 0, cxkerub = 1,
+    cykertype = "gaussian", cykerorder = 2,
+    cykerbound = "fixed", cykerlb = 0, cykerub = Inf,
+    cvls.quadrature.grid = "uniform",
+    cvls.quadrature.points = c(points, 11L)
+  )
+  native <- npRmpi:::.npcdensbw_eval_only(
+    data.frame(x = x), data.frame(y = y), bw
+  )$objective
+
+  expect_equal(native, -oracle, tolerance = 5e-10)
+})
+
 test_that("sample-grid conditional beta CVLS uses its actual generalized-NN grid", {
   x <- c(0.02, 0.07, 0.13, 0.26, 0.44, 0.67, 0.85, 0.97)
   y <- c(0.01, 0.03, 0.08, 0.19, 0.42, 0.7, 0.91, 0.99)
@@ -274,6 +370,25 @@ test_that("conditional beta objectives cover all orders and mixed sides", {
   expect_true(is.finite(npRmpi:::.npcdensbw_eval_only(
     data.frame(x = qnorm(x)), data.frame(y = y), beta.y
   )$objective))
+
+  for (order in c(2L, 4L, 6L, 8L)) {
+    beta.x.ls <- conditional_beta_manual_bw(
+      x, qnorm(y), 0.18, 0.3, method = "cv.ls",
+      xkernel = "beta", ykernel = "gaussian",
+      xorder = order, yorder = order
+    )
+    beta.y.ls <- conditional_beta_manual_bw(
+      qnorm(x), y, 0.3, 0.16, method = "cv.ls",
+      xkernel = "gaussian", ykernel = "beta",
+      xorder = order, yorder = order
+    )
+    expect_true(is.finite(npRmpi:::.npcdensbw_eval_only(
+      data.frame(x = x), data.frame(y = qnorm(y)), beta.x.ls
+    )$objective))
+    expect_true(is.finite(npRmpi:::.npcdensbw_eval_only(
+      data.frame(x = qnorm(x)), data.frame(y = y), beta.y.ls
+    )$objective))
+  }
 })
 
 test_that("automatic conditional beta selection returns usable bandwidths", {
