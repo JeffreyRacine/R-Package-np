@@ -306,8 +306,6 @@ npregivderiv <- function(y,
 
     ## Now we repeat this entire process using mu = y = phi.0 rather than y
 
-    mean.mu <- mean(mu)
-
     if(smooth.residuals) {
       progress <- .np_progress_step(progress, done = N, detail = "updating E(mu|w)")
 
@@ -390,7 +388,10 @@ npregivderiv <- function(y,
 
       survivor.weighted.average <- mean.predicted.E.mu.w - cdf.weighted.average
 
-      T.star.mu <- (survivor.weighted.average-S.z*mean.mu)/NZD(f.z)
+      ## Equation (14) uses the same fitted conditional-residual vector in
+      ## both empirical-adjoint terms.
+
+      T.star.mu <- (survivor.weighted.average-S.z*mean.predicted.E.mu.w)/NZD(f.z)
     }
 
   }
