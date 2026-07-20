@@ -87,9 +87,18 @@ test_that("empirical-range beta gradients retain sample-boundary jumps", {
         bws = bandwidth, bwtype = bwtype, gradients = TRUE,
         regtype = "lc", ckertype = "beta", ckerorder = order
       )
-      empirical <- suppressWarnings(do.call(
-        npreg, c(common, list(ckerbound = "range"))
-      ))
+      empirical.warnings <- capture_warnings(
+        empirical <- do.call(
+          npreg, c(common, list(ckerbound = "range"))
+        )
+      )
+      expect_identical(
+        empirical.warnings,
+        paste0(
+          "beta regression gradient produced 2 infinite endpoint value(s) ",
+          "and 0 undefined cancellation(s)"
+        )
+      )
       explicit <- suppressWarnings(do.call(npreg, c(common, list(
         ckerbound = "fixed", ckerlb = -2, ckerub = 3
       ))))
