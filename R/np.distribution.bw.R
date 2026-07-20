@@ -723,6 +723,7 @@ npudistbw.dbandwidth <-
            tol = 1.490116e-04,
            transform.bounds = FALSE,
            eval.only = FALSE,
+           .beta.range.certify = TRUE,
            ...,
            nomad.opts = list()){
 
@@ -730,6 +731,15 @@ npudistbw.dbandwidth <-
     dot.args <- list(...)
     if (length(nomad.opts))
       dot.args$nomad.opts <- nomad.opts
+    certification.call <- match.call(expand.dots = FALSE)
+    certification.names <- setdiff(
+      names(certification.call)[-1L], c("...", ".beta.range.certify")
+    )
+    certification.args <- mget(
+      certification.names, envir = environment(), inherits = FALSE
+    )
+    if (length(dot.args))
+      certification.args[names(dot.args)] <- dot.args
     elapsed.start <- proc.time()[3]
 
     dat = toFrame(dat)
@@ -1037,7 +1047,15 @@ npudistbw.dbandwidth <-
                       timing = tbw$timing,
                       total.time = tbw$total.time)
     tbw <- npSetScaleFactorSearchLower(tbw, scale.factor.search.lower)
-    
+
+    if (isTRUE(.beta.range.certify)) {
+      tbw <- npBetaRangeCertifySelector(
+        ordinary = tbw, args = certification.args,
+        selector = npudistbw.dbandwidth, method = "cv.cdf",
+        direction = "min", elapsed.start = elapsed.start,
+        where = "beta range distribution CDF certification"
+      )
+    }
     tbw
   }
 
@@ -1158,18 +1176,9 @@ npudistbw.default <-
     if (length(dotted.arg.names)) {
       bwsel.args[dotted.arg.names] <- dots[dotted.arg.names]
     }
-    selection.start <- proc.time()[3L]
     tbw <- .np_progress_select_bandwidth_enhanced(
       "Selecting distribution bandwidth",
-      {
-        ordinary <- do.call(npudistbw.dbandwidth, bwsel.args)
-        npBetaRangeCertifySelector(
-          ordinary = ordinary, args = bwsel.args,
-          selector = npudistbw.dbandwidth, method = "cv.cdf",
-          direction = "min", elapsed.start = selection.start,
-          where = "beta range distribution CDF certification"
-        )
-      }
+      do.call(npudistbw.dbandwidth, bwsel.args)
     )
 
     mc <- match.call(expand.dots = FALSE)

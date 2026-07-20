@@ -613,7 +613,8 @@ or standard-deviation factors.
   searches with Powell, the ordinary result is also checked against the
   deterministic uniform-limit certificate documented in
   \code{\link{np.kernels}}. This does not replace or reduce the user's
-  \code{nmulti} search.
+  \code{nmulti} search, and the same check applies when automatic selection is
+  restarted from an eligible beta range bandwidth object.
 
   The optimizer invoked for search is Powell's conjugate direction
   method which requires the setting of (non-random) initial values and

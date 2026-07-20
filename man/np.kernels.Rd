@@ -118,7 +118,9 @@
   official objective among the ordinary, tail, and refined candidates is
   returned. The ordinary search uses the user's unchanged \code{nmulti}; the
   certification and any refinement are separately counted in the bandwidth
-  summary. This safeguard does not apply to explicit fixed bounds, CVML,
+  summary. Cold starts and automatic restarts from a beta range bandwidth
+  object use this same single-certification contract. This safeguard does not
+  apply to explicit fixed bounds, CVML,
   orders 4--8, nearest-neighbour or multivariate searches, or non-Powell
   solvers.
 
