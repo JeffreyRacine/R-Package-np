@@ -1492,6 +1492,8 @@
      "degree.start", "degree.restarts", "degree.max.cycles", "degree.verify",
      "nomad.nmulti", "nomad.opts",
      "bwmethod", "bwtype", "bwscaling", "do.full.integral",
+     "cvls.quadrature.grid", "cvls.quadrature.extend.factor",
+     "cvls.quadrature.points", "cvls.quadrature.ratios",
      "ckertype", "ckerorder", "ckerbound", "ckerlb", "ckerub",
      "cxkertype", "cxkerorder", "cxkerbound", "cxkerlb", "cxkerub",
      "cykertype", "cykerorder", "cykerbound", "cykerlb", "cykerub",
