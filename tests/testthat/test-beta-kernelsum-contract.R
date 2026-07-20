@@ -100,6 +100,6 @@ test_that("unsupported beta npksum surfaces fail explicitly", {
   expect_error(do.call(npksum, c(args, list(kernel.pow = 2))),
                "require kernel.pow = 1", fixed = TRUE)
   expect_error(npksum(0.1, args$txdat, ckertype = "beta",
-                     ckerbound = "range"),
-               "require ckerbound = \"fixed\"", fixed = TRUE)
+                     ckerbound = "none"),
+               "require ckerbound = \"fixed\" or \"range\"", fixed = TRUE)
 })

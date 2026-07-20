@@ -136,9 +136,9 @@ test_that("unsupported beta regression surfaces fail explicitly", {
   expect_error(
     suppressWarnings(npreg(
       bws = 0.1, txdat = training, tydat = response,
-      ckertype = "beta", ckerbound = "range"
+      ckertype = "beta", ckerbound = "none"
     )),
-    "require ckerbound = \"fixed\"",
+    "require ckerbound = \"fixed\" or \"range\"",
     fixed = TRUE
   )
   expect_error(

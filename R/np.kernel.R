@@ -251,10 +251,10 @@ npksum.default <-
         stop("beta kernel sums require a recognized bandwidth mode")
       if (!(as.integer(bws$ckerorder) %in% c(2L, 4L, 6L, 8L)))
         stop("beta kernel sums require order 2, 4, 6, or 8")
-      if (!identical(bws$ckerbound, "fixed") ||
+      if (!(bws$ckerbound %in% c("fixed", "range")) ||
           any(!is.finite(bws$ckerlb[bws$icon])) ||
           any(!is.finite(bws$ckerub[bws$icon])))
-        stop("beta kernel sums require finite fixed bounds")
+        stop("beta kernel sums require finite fixed or empirical-range bounds")
       if (bws$nuno != 0L || bws$nord != 0L)
         stop("beta kernel sums currently support continuous variables only")
       if (any(!operator %in% c("normal", "convolution", "integral")))

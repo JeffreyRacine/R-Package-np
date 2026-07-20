@@ -74,9 +74,9 @@ test_that("unsupported beta distribution surfaces fail explicitly", {
   expect_error(
     suppressWarnings(npudist(
       bws = 0.1, tdat = training, ckertype = "beta",
-      ckerbound = "range"
+      ckerbound = "none"
     )),
-    "require ckerbound = \"fixed\"",
+    "require ckerbound = \"fixed\" or \"range\"",
     fixed = TRUE
   )
   expect_error(
