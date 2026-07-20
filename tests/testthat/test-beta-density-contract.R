@@ -67,13 +67,13 @@ test_that("manual beta density supports formulas, objects, and dimensions", {
   expect_equal(se(object_fit), se(direct), tolerance = 2e-12)
 })
 
-test_that("beta density keeps unsupported bounded routes closed", {
+test_that("beta density keeps unsupported support routes closed", {
   training <- data.frame(x = c(0, 0.05, 0.25, 0.6, 1))
 
   expect_error(
     suppressWarnings(npudens(tdat = training, bws = 0.1, ckertype = "beta",
-                             ckerbound = "range")),
-    "require ckerbound = \"fixed\"",
+                             ckerbound = "none")),
+    "require ckerbound = \"fixed\" or \"range\"",
     fixed = TRUE
   )
   expect_error(

@@ -1612,8 +1612,8 @@ npValidateBetaKernelSpecification <- function(ckertype,
   if (!(bwtype %in% c("fixed", "generalized_nn", "adaptive_nn")))
     stop("beta kernels require a recognized fixed or nearest-neighbor bandwidth mode",
          call. = FALSE)
-  if (!identical(ckerbound, "fixed"))
-    stop("beta kernels require ckerbound = \"fixed\" with finite ckerlb and ckerub",
+  if (!(ckerbound %in% c("fixed", "range")))
+    stop("beta kernels require ckerbound = \"fixed\" or \"range\" with finite lower and upper bounds",
          call. = FALSE)
 
   icon <- dati$icon
