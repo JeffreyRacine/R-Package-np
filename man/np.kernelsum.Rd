@@ -253,11 +253,76 @@ Further arguments passed to the default kernel-sum method.
 
   A variety of kernels may be specified by the user. Kernels implemented
   for continuous data types include the second, fourth, sixth, and
-  eighth order Gaussian and Epanechnikov kernels, and the uniform
-  kernel. Unordered discrete data types use a variation on Aitchison and
+  eighth order Gaussian, Epanechnikov, and beta associated kernels, and the
+  uniform kernel. The beta family uses finite-support coordinate-aware routes
+  described below. Unordered discrete data types use a variation on Aitchison and
   Aitken's (1976) kernel, while ordered data types use a variation of
   the Wang and van Ryzin (1981) kernel (see \code{\link{npRmpi}} for
   details).
+
+  For \code{ckertype="beta"}, \code{npksum} uses Chen's second-order
+  associated PDF kernel as the base contribution on each declared interval.
+  If \eqn{L=b-a}, its per-observation contribution is
+  \deqn{\frac{1}{L}\,\mathrm{BetaPDF}\left(
+    \frac{x_i-a}{L};
+    1+\frac{x-a}{L}\left(\frac{L}{h}\right)^2,
+    1+\frac{b-x}{L}\left(\frac{L}{h}\right)^2\right).}
+  The complete density scaling \eqn{1/L} is part of this contribution.
+  Consequently, a univariate beta density estimate is
+  \code{npksum(...)$ksum/n}, not \code{npksum(...)$ksum/(n*h)}.
+  Local-constant regression uses the ordinary ratio of beta-weighted response
+  and unit sums. Do not set \code{bandwidth.divide=TRUE}; that legacy
+  normalization is intentionally rejected for beta kernels.
+
+  For order \eqn{2m}, the PDF and CDF operators use
+  \eqn{\sum_{s=1}^m(-1)^{s+1}{m\choose s}K_2(h\sqrt{s})}. Thus the coefficient
+  vectors for orders 2, 4, 6, and 8 are \eqn{(1)}, \eqn{(2,-1)},
+  \eqn{(3,-3,1)}, and \eqn{(4,-6,4,-1)}. Higher-order PDF and CDF
+  contributions are signed and are returned without clipping.
+
+  For \code{operator="integral"}, the univariate beta contribution is
+  \deqn{I_{(x-a)/L}\left(1+\frac{x_i-a}{L}\left(\frac{L}{h}\right)^2,
+    1+\frac{b-x_i}{L}\left(\frac{L}{h}\right)^2\right).}
+  This observation-centered analytic CDF is not the integral of the
+  evaluation-centered PDF contribution with respect to \eqn{x}. It is exactly
+  zero and one at the declared endpoints, is monotone for order 2, and has the
+  uniform-CDF limit as \eqn{h} diverges. In several dimensions,
+  \code{operator} may mix \code{"normal"}, \code{"integral"}, and
+  \code{"convolution"} beta factors coordinate by coordinate.
+
+  For \code{operator="convolution"}, the training and evaluation values are
+  interpreted as the centers of two associated beta weights in the common
+  observation coordinate. If their shapes are
+  \eqn{(\alpha_1,\beta_1)} and \eqn{(\alpha_2,\beta_2)}, the returned factor is
+  \deqn{\frac{1}{L}\frac{B(\alpha_1+\alpha_2-1,
+                                  \beta_1+\beta_2-1)}
+                             {B(\alpha_1,\beta_1)B(\alpha_2,\beta_2)}.}
+  This symmetric analytic \eqn{L^2} overlap includes its complete
+  original-scale \eqn{1/L} normalization. Its diagonal is the local beta
+  roughness. It is neither a translation convolution nor the
+  target-coordinate integrated-square term used by bounded density
+  \code{cv.ls}; those objectives retain their existing quadrature of the
+  actual estimator. Beta PDF, CDF, and overlap factors may be mixed across
+  dimensions.
+
+  This beta surface requires continuous \code{txdat}, \code{ckerorder} in
+  \code{c(2,4,6,8)}, \code{ckerbound="fixed"} or \code{"range"}, finite
+  lower and upper bounds for every dimension, \code{operator="normal"},
+  \code{operator="integral"}, and/or \code{operator="convolution"}, and
+  \code{kernel.pow=1}. It supports multiple continuous dimensions, response
+  and case-weight columns, leave-one-out sums, returned kernel weights, and
+  fixed/generalized-NN/adaptive-NN bandwidths. Generalized overlap evaluates
+  generalized-NN distances at both centers. Adaptive overlap keeps adaptive
+  bandwidths attached to training centers; a genuinely new evaluation center
+  uses the established generalized-NN auxiliary bandwidth. Fixed and adaptive
+  order-2 CDF factors are monotone in their target. Generalized-NN order-2 CDF
+  factors retain exact endpoints and contribution-wise range but can be
+  locally nonmonotone. Orders 4, 6, and 8 may additionally leave \eqn{[0,1]}
+  or be locally nonmonotone in every bandwidth mode; no clipping or monotone
+  repair is applied. Derivative, categorical-product, score, OCG, and
+  permutation beta operations are unavailable and fail explicitly. See
+  \code{\link{np.kernels}} for the bandwidth convention, orientation, and
+  references.
 
   The option \code{operator=} can be used to \sQuote{mix and match}
   operator strings to create a \sQuote{hybrid} kernel provided they

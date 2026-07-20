@@ -52,8 +52,8 @@
   \deqn{K_U(u)=\frac{1}{2}\mathbf{1}(|u|<1)}
   via \code{ckertype="uniform"} (order ignored).
 
-  The second-order beta associated kernel is available through
-  \code{npksum} for continuous data with known finite support.  For an
+  The beta associated-kernel family is available for continuous data with
+  finite support. For an
   evaluation point \eqn{x}, observation \eqn{x_i}, fixed support
   \eqn{[a,b]}, \eqn{L=b-a}, and public metric bandwidth \eqn{h}, define
   \deqn{t=\frac{x-a}{L},\quad z_i=\frac{x_i-a}{L},\quad
@@ -70,21 +70,34 @@
   so callers must not apply either an additional \eqn{1/h} factor or the
   generic bounded-kernel normalization below.
 
-  In the present implementation this beta option is available through
-  \code{npksum}, manual-bandwidth \code{npudens}, manual-bandwidth
-  \code{npudist}, and manual-bandwidth local-constant \code{npreg} with
-  \code{ckerorder=2}, \code{bwtype="fixed"},
-  \code{ckerbound="fixed"}, finite \code{ckerlb}/\code{ckerub}, continuous
-  variables only, and \code{operator="normal"} or
-  \code{operator="integral"} as appropriate.  \code{npreg} additionally
-  requires \code{regtype="lc"} and \code{gradients=FALSE}. It requires
-  \code{bandwidth.divide=FALSE} and \code{kernel.pow=1}.  Integral/CDF,
-  operations are available in \code{npksum} and \code{npudist}, and analytic
-  beta-weight overlap is available through
-  \code{npksum(operator="convolution")}.  In addition,
-  \code{npksum(operator="normal")} and
-  \code{npksum(operator="convolution")} support
-  \code{bwtype="generalized_nn"} and \code{bwtype="adaptive_nn"}; the
+  Orders 4, 6, and 8 use the additive higher-order construction of Igarashi
+  and Kakizawa (2020). For public order \eqn{2m},
+  \deqn{K_{\mathit{Beta},2m}(x_i;x,h)=
+    \sum_{s=1}^m c_{m,s}K_{\mathit{Beta},2}(x_i;x,h\sqrt{s}),
+    \qquad c_{m,s}=(-1)^{s+1}{m\choose s}.}
+  The coefficient vectors for orders 2, 4, 6, and 8 are respectively
+  \eqn{(1)}, \eqn{(2,-1)}, \eqn{(3,-3,1)}, and
+  \eqn{(4,-6,4,-1)}. The construction preserves unit mass and the original
+  support while deliberately producing signed kernels above order 2.
+
+  In the present implementation orders 2, 4, 6, and 8 are available through
+  \code{npksum}, \code{npudens}, \code{npudist}, local-constant
+  \code{npreg}, and the local-constant conditional density/distribution
+  families. Manual and cross-validated bandwidth objects support
+  \code{bwtype="fixed"}, \code{"generalized_nn"}, and
+  \code{"adaptive_nn"}. Bounds may be explicit
+  (\code{ckerbound="fixed"}) or the exact training-sample range
+  (\code{ckerbound="range"}); all active beta bounds must be finite.
+  The beta routes currently require continuous variables only. Regression and
+  conditional estimators additionally require \code{regtype="lc"} and
+  \code{gradients=FALSE}; if either conditional side uses beta, all X and Y
+  coordinates must be continuous. \code{npksum} requires
+  \code{bandwidth.divide=FALSE}, \code{kernel.pow=1}, and normal, integral, or
+  convolution operators. Unsupported derivative, score, OCG, permutation,
+  categorical-product, and local-polynomial combinations fail explicitly
+  rather than falling through a legacy kernel code.
+
+  For nearest-neighbor modes, the
   existing observation-support nearest-neighbor engine supplies the
   evaluation-specific metric bandwidth \eqn{h(x)} or observation-specific
   metric bandwidth \eqn{h_i}, after which the same beta concentration
@@ -92,12 +105,7 @@
   For overlap, generalized bandwidths are evaluated at both centers;
   adaptive bandwidths remain attached to training centers, while a genuinely
   new evaluation center receives the established generalized-NN auxiliary
-  bandwidth. The CDF operator supports both NN modes as well. Other beta
-  estimator routes remain fixed-bandwidth only. Derivative, sample-range
-  support, mixed-data, automatic
-  bandwidth selection, and higher-order beta routes are not yet exposed.
-  Unsupported combinations
-  fail explicitly rather than falling through a legacy kernel code.  See
+  bandwidth. PDF, CDF, and overlap operators support both NN modes. See
   \code{\link{npksum}} for the exact kernel-sum normalization and
   \code{\link{npudens}} and \code{\link{npudist}} for estimator-specific
   standard errors and examples.
@@ -108,7 +116,7 @@
     I_t(1+z_i\tau,1+(1-z_i)\tau),}
   where \eqn{I_t(\alpha,\beta)} is the regularized incomplete beta function.
   It is evaluated as an analytic incomplete-beta probability, with a
-  symmetry transformation in the upper tail. Thus every second-order
+  symmetry transformation in the upper tail. Thus every order-2
   contribution is in \eqn{[0,1]}, and with fixed or adaptive bandwidth is
   nondecreasing in \eqn{x}; it is exactly
   zero at \eqn{a}, exactly one at \eqn{b}, and tends to
@@ -122,10 +130,13 @@
   (2024). The orientation was selected because it preserves the essential
   empirical-CDF contribution limit as \eqn{h\to0}, exact endpoint behavior,
   monotonicity for order 2, and a direct analytic implementation suitable for
-  the existing kernel-sum architecture. Signed higher-order beta CDFs, if
-  enabled in a later release, may overshoot \eqn{[0,1]} or be locally
-  nonmonotone, just as existing higher-order distribution kernels may; values
-  will not be silently clamped.
+  the existing kernel-sum architecture. Orders 4, 6, and 8 apply the same
+  signed multiscale coefficients to these incomplete-beta factors. The
+  Igarashi--Kakizawa density theorem does not establish a corresponding CDF
+  bias order; the public order identifies the construction. Signed
+  higher-order beta CDFs may overshoot \eqn{[0,1]} or be locally nonmonotone,
+  just as existing higher-order distribution kernels may. Values are not
+  silently clipped or monotonized.
 
   With \code{bwtype="generalized_nn"}, the CDF bandwidth changes with the
   target. Every returned order-2 contribution remains an incomplete-beta
@@ -281,10 +292,11 @@
   \emph{Journal of Nonparametric Statistics}, \bold{32}(3), 716--752.
   doi:10.1080/10485252.2020.1770754
 
-  Mansouri, E., Rastin, S., and Mombeni, H. A. (2024),
-  \dQuote{A new beta kernel estimator of the distribution function for
-  bounded data,}
-  \emph{Journal of Sciences, Islamic Republic of Iran}.
+  Mansouri, B., Rastin, A., and Allah Mombeni, H. (2024),
+  \dQuote{Beta Kernel Estimator for a Cumulative Distribution Function with
+  Bounded Support,}
+  \emph{Journal of Sciences, Islamic Republic of Iran}, \bold{34}(4), 349--361
+  (volume dated 2023; accepted and DOI registered in 2024).
   doi:10.22059/jsciences.2024.367933.1007836
 
   Hall, P., Racine, J. S., and Li, Q. (2004),

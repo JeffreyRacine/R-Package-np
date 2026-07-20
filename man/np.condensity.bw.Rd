@@ -446,7 +446,7 @@ These controls choose continuous, unordered, and ordered kernels for \code{xdat}
   \item{cxkertype}{
     character string used to specify the continuous kernel type for
     \code{xdat}.  Can be set as \code{gaussian},
-    \code{epanechnikov}, or \code{uniform}. Defaults to \code{gaussian}.
+    \code{epanechnikov}, \code{uniform}, or \code{beta}. Defaults to \code{gaussian}.
   }
 
   \item{cykerorder}{
@@ -460,8 +460,8 @@ These controls choose continuous, unordered, and ordered kernels for \code{xdat}
   \item{cykertype}{
     character string used to specify the continuous kernel type for
     \code{ydat}.
-    Can be set as \code{gaussian}, \code{epanechnikov}, or
-    \code{uniform}. Defaults to \code{gaussian}.
+    Can be set as \code{gaussian}, \code{epanechnikov}, \code{uniform}, or
+    \code{beta}. Defaults to \code{gaussian}.
   }
 
   \item{oxkertype}{
@@ -755,6 +755,17 @@ These arguments collect remaining controls passed through S3 methods.
 }
 
 \details{
+
+  Beta associated kernels may be selected independently with
+  \code{cxkertype="beta"} and \code{cykertype="beta"}. Orders 2, 4, 6,
+  and 8, fixed/generalized-NN/adaptive-NN bandwidths,
+  \code{cxkerbound}/\code{cykerbound} equal to \code{"fixed"} or
+  \code{"range"}, explicit bandwidth objects, and automatic
+  \code{cv.ml}/\code{cv.ls} search are supported. Normal-reference selection
+  is not. If either side uses beta, all X and Y coordinates must be continuous
+  and \code{regtype="lc"}; beta gradients are unavailable. Bounded
+  beta-response \code{cv.ls} uses Y-support quadrature of the actual estimator
+  with cached X weights. Signed orders 4, 6, and 8 are not positivity-repaired.
 
 The \code{scale.factor.*} controls are dimensionless search
 controls. The package converts scale factors to bandwidths using the

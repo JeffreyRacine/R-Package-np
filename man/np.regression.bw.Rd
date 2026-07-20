@@ -151,8 +151,7 @@ These arguments identify the data and whether bandwidths are supplied or compute
     bandwidths or not. If set to \code{FALSE}, a \code{rbandwidth} object
     will be returned with bandwidths set to those specified
     in \code{bws}. Defaults to \code{TRUE}. The beta associated-kernel route
-    currently requires \code{bandwidth.compute=FALSE} and explicit
-    bandwidths.
+    supports both automatic cross-validation and explicit bandwidth objects.
   }
 
 \subsection{Local-Polynomial And NOMAD Controls}{
@@ -413,9 +412,9 @@ These controls set numerical search starts, kernel choices, and support bounds.
 
   \item{ckertype}{
     character string used to specify the continuous kernel type.
-    Can be set as \code{gaussian}, \code{epanechnikov}, or
-    \code{uniform}; \code{beta} is additionally available under the restricted
-    manual local-constant contract in Details. Defaults to \code{gaussian}.
+    Can be set as \code{gaussian}, \code{epanechnikov}, \code{uniform}, or
+    \code{beta}; see Details for the local-constant finite-support beta
+    contract. Defaults to \code{gaussian}.
   }
 
   \item{ckerub}{
@@ -676,10 +675,22 @@ The \code{scale.factor.*} controls are dimensionless search controls. The packag
 
   A variety of kernels may be specified by the user. Kernels implemented
   for continuous data types include the second, fourth, sixth, and eighth
-  order Gaussian and Epanechnikov kernels, and the uniform
-  kernel. Unordered discrete data types use a variation on Aitchison and
+  order Gaussian and Epanechnikov kernels, and the uniform kernel. Beta
+  associated kernels of orders 2, 4, 6, and 8 are additionally available for
+  local-constant bandwidth objects. Unordered discrete data types use a variation on Aitchison and
   Aitken's (1976) kernel, while ordered data types use a variation of the
   Wang and van Ryzin (1981) kernel.
+
+  The beta contract requires \code{ckertype="beta"}, \code{ckerorder} in
+  \code{c(2,4,6,8)}, \code{regtype="lc"}, finite
+  \code{ckerbound="fixed"} bounds or \code{ckerbound="range"}, continuous
+  predictors only, and no gradient request. Explicit bandwidth objects and
+  automatic \code{cv.ls}/\code{cv.aic} search support fixed,
+  generalized-NN, and adaptive-NN modes. Normal-reference selection,
+  categorical predictors, and local-linear/local-polynomial regression are
+  not silently approximated; unsupported combinations fail explicitly. See
+  \code{\link{npreg}} and \code{\link{np.kernels}} for the exact beta weight,
+  bandwidth convention, ratio estimator, and standard-error definition.
 
   When \code{regtype="lp"} and \code{degree.select != "manual"},
   \code{npregbw} can jointly determine the continuous-predictor degree

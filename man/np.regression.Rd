@@ -269,8 +269,8 @@ Further arguments are passed to \code{\link{npregbw}} when bandwidths are comput
   A variety of kernels may be specified by the user. Kernels implemented
   for continuous data types include the second, fourth, sixth, and eighth
   order Gaussian and Epanechnikov kernels, and the uniform
-  kernel. A second-order beta associated kernel is also available for the
-  manual, fixed-bandwidth local-constant route described below. Unordered
+  kernel. Beta associated kernels of orders 2, 4, 6, and 8 are also available
+  for the local-constant route described below. Unordered
   discrete data types use a variation on Aitchison and
   Aitken's (1976) kernel, while ordered data types use a variation of the
   Wang and van Ryzin (1981) kernel.
@@ -296,6 +296,12 @@ Further arguments are passed to \code{\link{npregbw}} when bandwidths are comput
   local-constant numerator/denominator ratios, the beta kernel is not merely
   such a correction: its shape parameters change with the evaluation point.
 
+  At orders 4, 6, and 8, each displayed order-2 coordinate factor is replaced
+  by the signed Igarashi--Kakizawa multiscale combination documented in
+  \code{\link{np.kernels}}. The resulting product weights and denominator may
+  be signed; no absolute-value, order-2 substitution, or positivity repair is
+  applied.
+
   Products and ratios are evaluated in the log domain, so representable beta
   regression results are retained even when every unscaled product would
   underflow to zero. If \eqn{\ell_i=K_i/\sum_r K_r}, the reported beta-route
@@ -305,13 +311,12 @@ Further arguments are passed to \code{\link{npregbw}} when bandwidths are comput
   preserving the established uncorrected local-variance convention while
   using the exact effective-sample factor for these associated weights.
 
-  The present beta regression route requires \code{regtype="lc"},
-  \code{ckerorder=2}, \code{bwtype="fixed"},
-  \code{ckerbound="fixed"}, explicit finite \code{ckerlb}/\code{ckerub},
-  continuous predictors only, manual bandwidths, and
-  \code{gradients=FALSE}. Automatic bandwidth selection,
-  nearest-neighbour bandwidths, sample-range support, categorical predictors,
-  and local-linear/local-polynomial fits fail explicitly. An evaluation point
+  The beta regression route requires \code{regtype="lc"},
+  \code{ckerorder} in \code{c(2,4,6,8)}, finite fixed or sample-range bounds,
+  continuous predictors only, and \code{gradients=FALSE}. Manual and
+  cross-validated bandwidth objects support fixed, generalized-NN, and
+  adaptive-NN modes. Categorical predictors and local-linear/local-polynomial
+  fits fail explicitly. An evaluation point
   with no supported observation weight also produces an explicit error.
 
   When bandwidths are obtained with \code{regtype="lp"}, C-level
@@ -456,6 +461,10 @@ Further arguments are passed to \code{\link{npregbw}} when bandwidths are comput
 
   Chen, S.X. (2000), \dQuote{Beta kernel smoothers for regression curves,}
   Statistica Sinica, 10, 73-91.
+
+  Igarashi, G. and Kakizawa, Y. (2020), \dQuote{Higher-order bias corrections
+  for asymmetric kernel density estimators,} Journal of Nonparametric
+  Statistics, 32(3), 716--752. doi:10.1080/10485252.2020.1770754.
 
   Cohen, A. and G. Migliorati (2018), \dQuote{Multivariate approximation
   in downward closed polynomial spaces,} in R. Cools and D. Nuyens (eds.),

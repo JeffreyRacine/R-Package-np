@@ -122,14 +122,14 @@ Further arguments are passed to \code{\link{npudistbw}} when bandwidths are comp
   lower and upper endpoints and has the linear uniform-CDF limit as the
   bandwidth diverges.
 
-  The order-2 beta associated CDF is available with explicit metric
-  bandwidths by setting \code{ckertype="beta"}, \code{ckerorder=2},
-  \code{bwtype="fixed"}, \code{ckerbound="fixed"}, and finite
-  \code{ckerlb}/\code{ckerub}. The data must be continuous and all training
-  and evaluation values must lie within their declared supports. Automatic
-  bandwidth selection, nearest-neighbor bandwidths, sample-range support,
-  categorical products, and higher beta orders are not yet available and
-  fail explicitly.
+  The beta associated CDF is available at orders 2, 4, 6, and 8 with manual
+  or cross-validated metric bandwidths. Fixed, generalized-NN, and adaptive-NN
+  modes are supported. Set \code{ckertype="beta"} and use either
+  \code{ckerbound="fixed"} with finite \code{ckerlb}/\code{ckerub}, or
+  \code{ckerbound="range"} for the exact training-sample range. The data must
+  be continuous and all training and evaluation values must lie within the
+  resulting supports. Categorical products and normal-reference selection are
+  not supported.
 
   For observation \eqn{x_i}, target \eqn{x}, support \eqn{[a,b]},
   \eqn{L=b-a}, \eqn{z_i=(x_i-a)/L}, \eqn{t=(x-a)/L}, and
@@ -143,10 +143,12 @@ Further arguments are passed to \code{\link{npudistbw}} when bandwidths are comp
   integral of Chen's evaluation-centered beta density kernel. See
   \code{\link{np.kernels}} for the design rationale and references.
 
-  Order-2 beta CDF estimates are proper CDFs on the declared support.
-  Existing signed higher-order kernel CDFs can overshoot \eqn{[0,1]} or be
-  locally nonmonotone and are not silently clamped. The same user-beware rule
-  will apply if signed higher-order beta CDFs are introduced.
+  Fixed and adaptive order-2 beta CDF estimates are proper CDFs on the
+  declared support. A generalized-NN order-2 curve retains exact endpoints
+  and contribution-wise range but may be locally nonmonotone because its
+  bandwidth changes with the target. Orders 4, 6, and 8 are signed and may
+  overshoot \eqn{[0,1]} or be locally nonmonotone in any bandwidth mode.
+  Returned values are not silently clipped or monotonized.
 
   Argument groups for bandwidth selection are documented on
   \code{\link{npudistbw}}. The most common workflow is to choose data
@@ -287,9 +289,15 @@ Further arguments are passed to \code{\link{npudistbw}} when bandwidths are comp
   Computational Statistics & Data Analysis, 31(2), 131--145.
   doi:10.1016/S0167-9473(99)00010-9.
 
-  Mansouri, E., Rastin, S., and Mombeni, H.A. (2024),
-  \dQuote{A new beta kernel estimator of the distribution function for
-  bounded data,} Journal of Sciences, Islamic Republic of Iran.
+  Igarashi, G. and Kakizawa, Y. (2020), \dQuote{Higher-order bias corrections
+  for asymmetric kernel density estimators,} Journal of Nonparametric
+  Statistics, 32(3), 716--752. doi:10.1080/10485252.2020.1770754.
+
+  Mansouri, B., Rastin, A., and Allah Mombeni, H. (2024),
+  \dQuote{Beta Kernel Estimator for a Cumulative Distribution Function with
+  Bounded Support,} Journal of Sciences, Islamic Republic of Iran,
+  \bold{34}(4), 349--361 (volume dated 2023; accepted and DOI registered in
+  2024).
   doi:10.22059/jsciences.2024.367933.1007836.
 
   Ouyang, D. and Q. Li and J.S. Racine (2006), \dQuote{Cross-validation
