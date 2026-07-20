@@ -126,7 +126,7 @@ Further arguments are passed to \code{\link{npudistbw}} when bandwidths are comp
   or cross-validated metric bandwidths. Fixed, generalized-NN, and adaptive-NN
   modes are supported. Set \code{ckertype="beta"} and use either
   \code{ckerbound="fixed"} with finite \code{ckerlb}/\code{ckerub}, or
-  \code{ckerbound="range"} for the exact training-sample range. The data must
+  \code{ckerbound="range"} for beta outer half-spacing sample bounds. The data must
   be continuous and all training and evaluation values must lie within the
   resulting supports. Categorical products and normal-reference selection are
   not supported.

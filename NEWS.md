@@ -13,6 +13,14 @@
   automatic-degree NOMAD routes are documented and fail explicitly instead
   of being silently accepted or approximated.
 
+* Beta associated kernels now interpret \code{ckerbound="range"} using
+  outer half-spacing bounds based on the two smallest and two largest distinct
+  training values. This keeps every observation strictly inside the fitted
+  support, removes empirical-extremum jumps and infinite raw-extremum
+  derivatives, and preserves tied-extremum multiplicity. Explicit fixed beta
+  bounds remain literal, while every non-beta range route continues to use
+  exact sample minima and maxima.
+
 * Corrected recursive fitted-value centering in `npregivderiv()` so both
   empirical terms of the Equation (14) adjoint use the same fitted
   conditional-residual vector. The recursive path had instead centered its

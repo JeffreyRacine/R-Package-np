@@ -122,7 +122,8 @@ Further arguments are passed to \code{\link{npudensbw}} when bandwidths are comp
   cross-validated metric bandwidths. Fixed, generalized-NN, and adaptive-NN
   bandwidths are supported. Use \code{ckertype="beta"} and either
   \code{ckerbound="fixed"} with finite lower and upper bounds or
-  \code{ckerbound="range"} for the exact training-sample range. Every
+  \code{ckerbound="range"} for beta outer half-spacing sample bounds as
+  defined in \code{\link{np.kernels}}. Every
   training and evaluation value must lie within the resulting support. For
   example:
   \preformatted{
