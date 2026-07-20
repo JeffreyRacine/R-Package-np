@@ -530,7 +530,7 @@ npRmpi.init(nslaves=1)
 # ## <samuele.centorrino@univ-tlse1.fr>
 # 
 # set.seed(42)
-# n <- 1500
+# n <- 500
 # 
 # ## The DGP is as follows:
 # 

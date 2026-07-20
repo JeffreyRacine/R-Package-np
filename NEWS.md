@@ -1,5 +1,13 @@
 # npRmpi 0.70-6
 
+* Corrected recursive fitted-value centering in `npregivderiv()` so both
+  empirical terms of the Equation (14) adjoint use the same fitted
+  conditional-residual vector. The recursive path had instead centered its
+  second term on the raw residual even though its first term used the fitted
+  residual. Serial and MPI autodispatch routes share the corrected contract.
+  The `npregiv()` and `npregivderiv()` examples now both use `n = 500`, for
+  which the documented seed produces stable estimates.
+
 * Corrected Landweber-Fridman state indexing in `npregivderiv()`. Iteration
   `N` now consistently denotes `N` completed derivative updates: column `N`
   of `phi.prime.mat` and `phi.mat`, `norm.stop[N]`, `num.iterations`, and the
