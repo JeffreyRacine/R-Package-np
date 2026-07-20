@@ -1104,6 +1104,11 @@ npudistbw.default <-
     ## bandwidth() call
 
     mc.names <- names(match.call(expand.dots = FALSE))
+    npWarnIgnoredUniformKernelOrder(
+      call.names = mc.names,
+      kernel.type = if ("ckertype" %in% mc.names) ckertype else "gaussian",
+      order.arg = "ckerorder"
+    )
     margs <- c("bwmethod", "bwscaling", "bwtype", "ckertype", "ckerorder",
                "ckerbound", "ckerlb", "ckerub", "okertype")
 

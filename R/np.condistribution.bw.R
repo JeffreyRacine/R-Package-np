@@ -2448,6 +2448,16 @@ npcdistbw.default <-
 
     mc <- match.call(expand.dots = FALSE)
     mc.names <- names(mc)
+    npWarnIgnoredUniformKernelOrder(
+      call.names = mc.names,
+      kernel.type = if ("cxkertype" %in% mc.names) cxkertype else "gaussian",
+      order.arg = "cxkerorder"
+    )
+    npWarnIgnoredUniformKernelOrder(
+      call.names = mc.names,
+      kernel.type = if ("cykertype" %in% mc.names) cykertype else "gaussian",
+      order.arg = "cykerorder"
+    )
     nomad.shortcut <- .np_prepare_nomad_shortcut(
       nomad = nomad,
       call_names = mc.names,

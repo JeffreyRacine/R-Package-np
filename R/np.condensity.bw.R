@@ -3462,6 +3462,16 @@ npcdensbw.default <-
 
     mc <- match.call(expand.dots = FALSE)
     mc.names <- names(mc)
+    npWarnIgnoredUniformKernelOrder(
+      call.names = mc.names,
+      kernel.type = if ("cxkertype" %in% mc.names) cxkertype else "gaussian",
+      order.arg = "cxkerorder"
+    )
+    npWarnIgnoredUniformKernelOrder(
+      call.names = mc.names,
+      kernel.type = if ("cykertype" %in% mc.names) cykertype else "gaussian",
+      order.arg = "cykerorder"
+    )
     cvls.quadrature.grid <- .npcdensbw_resolve_cvls_quadrature_grid(
       if ("cvls.quadrature.grid" %in% mc.names) cvls.quadrature.grid else NULL,
       fallback = .npcdensbw_cvls_quadrature_grid_fallback(sum(y.info$icon)),
