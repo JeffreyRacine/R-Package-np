@@ -907,7 +907,8 @@ npreghat <-
     txdat = txdat,
     exdat = exdat,
     leave.one.out = FALSE,
-    bandwidth.divide = identical(bws$type, "adaptive_nn"),
+    bandwidth.divide = identical(bws$type, "adaptive_nn") &&
+      !identical(bws$ckertype, "beta"),
     kernel.pow = 1.0
   )
   kw.sum <- colSums(kw)

@@ -77,7 +77,7 @@ test_that("beta regression supports formula, object, prediction, and residual ro
   ), args))
   object_fit <- npreg(bws = bw, txdat = training["x"],
                       tydat = training$y, exdat = evaluation)
-  direct_helper <- np:::.np_regression_direct(
+  direct_helper <- npRmpi:::.np_regression_direct(
     bws = bw, txdat = training["x"], tydat = training$y,
     exdat = evaluation
   )
