@@ -74,6 +74,46 @@ test_that("empirical-range beta metadata and unconditional estimators are exact"
   expect_equal(fitted(endpoint), c(0, 1), tolerance = 0)
 })
 
+test_that("empirical-range beta gradients retain sample-boundary jumps", {
+  training <- data.frame(x = c(-2, -1.86, -1.3, -0.35, 0.8, 2.2, 3))
+  evaluation <- data.frame(x = c(-2, -0.4, 3))
+  response <- c(0.2, 0.5, -0.1, 0.8, 1.4, 1.1, 2.3)
+
+  for (order in c(2L, 4L, 6L, 8L)) {
+    for (bwtype in c("fixed", "generalized_nn", "adaptive_nn")) {
+      bandwidth <- if (identical(bwtype, "fixed")) 0.55 else 3
+      common <- list(
+        txdat = training, tydat = response, exdat = evaluation,
+        bws = bandwidth, bwtype = bwtype, gradients = TRUE,
+        regtype = "lc", ckertype = "beta", ckerorder = order
+      )
+      empirical <- suppressWarnings(do.call(
+        npreg, c(common, list(ckerbound = "range"))
+      ))
+      explicit <- suppressWarnings(do.call(npreg, c(common, list(
+        ckerbound = "fixed", ckerlb = -2, ckerub = 3
+      ))))
+
+      expect_identical(fitted(empirical), fitted(explicit))
+      expect_identical(gradients(empirical), gradients(explicit))
+      expect_identical(empirical$gerr, explicit$gerr)
+      expect_true(all(is.infinite(gradients(empirical)[c(1L, 3L), 1L])))
+      expect_true(is.finite(gradients(empirical)[2L, 1L]))
+      expect_true(all(is.na(empirical$gerr[c(1L, 3L), 1L])))
+      expect_true(is.finite(empirical$gerr[2L, 1L]))
+    }
+  }
+
+  constant <- suppressWarnings(npreg(
+    bws = 0.55, txdat = training, tydat = rep(7, nrow(training)),
+    exdat = evaluation[c(1L, 3L), , drop = FALSE], gradients = TRUE,
+    regtype = "lc", ckertype = "beta", ckerorder = 8,
+    ckerbound = "range"
+  ))
+  expect_identical(as.double(gradients(constant)), c(0, 0))
+  expect_identical(as.double(constant$gerr), c(0, 0))
+})
+
 test_that("empirical-range conditional beta resolves X and Y independently", {
   training.x <- data.frame(x = c(-2, -1.7, -1.05, -0.2, 0.9, 2.1, 3))
   training.y <- data.frame(y = c(10, 10.3, 11.1, 12.4, 13.8, 15.2, 16))
