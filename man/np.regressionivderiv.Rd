@@ -1,5 +1,12 @@
 \name{npregivderiv}
 \alias{npregivderiv}
+\alias{npregivderiv.default}
+\alias{npregivderiv.formula}
+\alias{summary.npregivderiv}
+\alias{print.summary.npregivderiv}
+\alias{fitted.npregivderiv}
+\alias{gradients.npregivderiv}
+\alias{residuals.npregivderiv}
 
 \title{
 Nonparametric Instrumental Derivatives
@@ -16,7 +23,9 @@ function \eqn{\varphi'}{phi'} is the solution of an ill-posed inverse
 problem, and is computed using Landweber-Fridman regularization.
 }
 \usage{
-npregivderiv(y,
+npregivderiv(y, \dots)
+
+\method{npregivderiv}{default}(y,
              z,
              w,
              x = NULL,
@@ -32,12 +41,47 @@ npregivderiv(y,
              start.from = c("Eyz","EEywz"),
              starting.values = NULL,
              stop.on.increase = TRUE,
+             regtype = NULL,
+             degree = NULL,
+             nomad = FALSE,
+             ...)
+
+\method{npregivderiv}{formula}(y,
+             data = NULL,
+             subset,
+             na.action,
+             newdata = NULL,
+             zeval = NULL,
+             weval = NULL,
+             xeval = NULL,
              ...)
 }
 \arguments{
 \subsection{Data, Bandwidth Inputs And Formula Interface}{
 These arguments identify the response, endogenous variables, instruments, exogenous covariates, and evaluation data.
 }
+
+  \item{data}{
+    an optional data frame used with the formula interface. This estimator
+    accepts \code{y ~ z | w}. The shared parser recognizes the optional
+    \code{| x} partition but this univariate derivative operator rejects it
+    explicitly; see Details.
+  }
+
+  \item{subset}{
+    an optional expression selecting training rows in the formula interface.
+  }
+
+  \item{na.action}{
+    a function specifying missing-value handling for the formula model frame.
+  }
+
+  \item{newdata}{
+    an optional data frame supplying fit-time formula evaluation data.
+    Explicit \code{zeval}, \code{weval}, and \code{xeval} take precedence.
+    The derivative algorithm currently requires evaluation and training data
+    to have the same number of rows.
+  }
 
   \item{w}{
     a \eqn{q}-variate data frame of instruments. The data types may be
@@ -52,22 +96,21 @@ These arguments identify the response, endogenous variables, instruments, exogen
   }
 
   \item{x}{
-    an \eqn{r}-variate data frame of exogenous regressors. The data
-    types may be continuous, discrete (unordered and ordered factors),
-    or some combination thereof.
+    reserved for interface compatibility. The present derivative estimator
+    supports one univariate endogenous \code{z} and does not yet support a
+    separate exogenous \code{x}; a non-\code{NULL} value fails explicitly.
   }
 
   \item{xeval}{
-    an \eqn{r}-variate data frame of exogenous regressors on which the
-    regression will be estimated (evaluation data). By default,
-    evaluation takes place on the data provided by \code{x}.
+    reserved with \code{x}; it is not available until the derivative operator
+    supports separate exogenous regressors.
   }
 
 
   \item{y}{
-    a one (1) dimensional numeric or integer vector of dependent data, each
-    element \eqn{i} corresponding to each observation (row) \eqn{i} of
-    \code{z}.
+    a one (1) dimensional numeric or integer vector of dependent data, or a
+    formula using the explicit IV grammar described under \code{data}. Each
+    response element \eqn{i} corresponds to row \eqn{i} of \code{z}.
   }
 
 
@@ -150,6 +193,28 @@ These arguments control residual smoothing and the initial derivative path.
     but increased).
   }
 
+\subsection{Regression Smoothing Controls}{
+These arguments control all internal \code{npreg} stages consistently.
+}
+
+  \item{regtype}{
+    an optional fixed regression type: \code{"lc"}, \code{"ll"}, or
+    \code{"lp"}. When omitted, the established \code{npreg} default remains
+    local constant, degree zero.
+  }
+
+  \item{degree}{
+    one nonnegative integer required with \code{regtype="lp"}. It is expanded
+    only across the continuous coordinates of each internal regression stage;
+    vectors are not recycled across heterogeneous stages.
+  }
+
+  \item{nomad}{
+    logical or \code{"auto"}. Only \code{FALSE} is currently supported for
+    the multi-stage derivative estimator. Other values fail explicitly until
+    the stage-wise search/state contract is validated.
+  }
+
 
 \subsection{Additional Arguments}{
 Further arguments are passed to \code{\link{npreg}} and \code{\link{npksum}}.
@@ -167,6 +232,20 @@ Further arguments are passed to \code{\link{npreg}} and \code{\link{npksum}}.
 }
 \details{
   Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{plot}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup. See \code{\link{npRmpi.init}} details for performance tradeoffs (message passing/startup mode) and the \code{inst/Rprofile} manual-broadcast template.
+
+  The formula interface uses explicit role order:
+  \code{y ~ z | w} and \code{y ~ z | w | x}. Additive transformations and
+  factors are retained through \code{model.frame}. Dot expansion and formula
+  interaction operators are rejected because they do not identify a unique
+  mixed-data kernel role; create an explicit transformed variable (for example
+  with \code{I(a * b)}) instead. Native vector/data-frame calls remain
+  supported unchanged.
+
+  The current derivative operator is univariate in \code{z}. Consequently,
+  although the shared parser recognizes the package-wide optional \code{| x}
+  partition, \code{npregivderiv} rejects it explicitly rather than silently
+  changing the derivative target. Post-fit \code{predict()} is not available;
+  use fit-time \code{newdata} or the native evaluation arguments.
 
 
   Let \eqn{\varphi'_0}{phi'[0]} denote the initialization derivative,
@@ -216,8 +295,15 @@ Further arguments are passed to \code{\link{npreg}} and \code{\link{npksum}}.
 \value{
 
   \code{npregivderiv} returns a \code{npregivderiv} object.  The
-    generic functions \code{\link{print}}, \code{\link{summary}}, and
-    \code{\link{plot}} support objects of this type.
+    generic functions \code{\link{print}}, \code{\link{summary}},
+    \code{\link{plot}}, \code{\link{fitted}}, \code{\link{residuals}}, and
+    \code{\link{gradients}} support objects of this type. \code{fitted}
+    returns the reconstructed structural function while \code{gradients}
+    returns the primary derivative estimate. Residuals are available only for
+    training-row evaluation. For formula fits using an exclusion-style
+    \code{na.action}, these accessors restore omitted rows. \code{summary}
+    returns a structured
+    \code{summary.npregivderiv} object with a dedicated print method.
 
   \code{npregivderiv} returns a list with components \code{phi.prime},
   \code{phi}, \code{phi.prime.mat}, \code{phi.mat},
@@ -225,7 +311,10 @@ Further arguments are passed to \code{\link{npreg}} and \code{\link{npksum}}.
   initialization components \code{starting.values.phi.prime} and
   \code{starting.values.phi}. \code{num.iterations} is the selected state
   returned in \code{phi.prime} and \code{phi}; the number of states evaluated,
-  including any stopping-rule overshoot, is \code{length(norm.stop)}.
+  including any stopping-rule overshoot, is \code{length(norm.stop)}. The
+  compact \code{bws}, \code{smoothing.spec}, and \code{stage.specs}
+  components record stage bandwidth payloads and requested/effective
+  fixed-degree smoothing state without replacing the legacy bandwidth fields.
   
 }
 
@@ -362,7 +451,7 @@ npRmpi.init(nslaves=1)
 # ivdata <- ivdata[order(ivdata$z),]
 # rm(y,z,w,u,v)
 # 
-# model.ivderiv <- with(ivdata, npregivderiv(y=y, z=z, w=w))
+# model.ivderiv <- npregivderiv(y ~ z | w, data=ivdata)
 # 
 # ylim <-c(quantile(model.ivderiv$phi.prime,trim),
 #          quantile(model.ivderiv$phi.prime,1-trim))

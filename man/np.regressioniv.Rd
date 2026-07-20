@@ -1,5 +1,12 @@
 \name{npregiv}
 \alias{npregiv}
+\alias{npregiv.default}
+\alias{npregiv.formula}
+\alias{summary.npregiv}
+\alias{print.summary.npregiv}
+\alias{fitted.npregiv}
+\alias{gradients.npregiv}
+\alias{residuals.npregiv}
 
 \title{
 Nonparametric Instrumental Regression
@@ -22,7 +29,9 @@ below for details). When \code{method="Landweber-Fridman"},
 polynomial kernel regression (Horowitz uses B-spline weighting).
 }
 \usage{
-npregiv(y,
+npregiv(y, \dots)
+
+\method{npregiv}{default}(y,
         z,
         w,
         x = NULL,
@@ -56,12 +65,44 @@ npregiv(y,
         start.from = c("Eyz","EEywz"),
         starting.values  = NULL,
         stop.on.increase = TRUE,
+        regtype = NULL,
+        degree = NULL,
+        nomad = FALSE,
+        \dots)
+
+\method{npregiv}{formula}(y,
+        data = NULL,
+        subset,
+        na.action,
+        newdata = NULL,
+        zeval = NULL,
+        xeval = NULL,
         \dots)
 }
 \arguments{
 \subsection{Data, Bandwidth Inputs And Formula Interface}{
 These arguments identify the response, endogenous variables, instruments, exogenous covariates, and evaluation data.
 }
+
+  \item{data}{
+    an optional data frame used with the formula interface. Formula roles are
+    written explicitly as \code{y ~ z | w} or \code{y ~ z | w | x}.
+  }
+
+  \item{subset}{
+    an optional expression selecting training rows in the formula interface.
+  }
+
+  \item{na.action}{
+    a function specifying missing-value handling for the formula model frame.
+  }
+
+  \item{newdata}{
+    an optional data frame supplying fit-time evaluation values for the
+    formula \code{z} and, when present, \code{x} partitions. Explicit
+    \code{zeval} and \code{xeval} take precedence. This is fit-time evaluation,
+    not a post-fit \code{predict()} method.
+  }
 
   \item{w}{
     a \eqn{q}-variate data frame of instruments. The data types may be
@@ -83,9 +124,9 @@ These arguments identify the response, endogenous variables, instruments, exogen
 
 
   \item{y}{
-    a one (1) dimensional numeric or integer vector of dependent data, each
-    element \eqn{i} corresponding to each observation (row) \eqn{i} of
-    \code{z}.
+    a one (1) dimensional numeric or integer vector of dependent data, or a
+    formula using the explicit IV grammar described under \code{data}. Each
+    response element \eqn{i} corresponds to row \eqn{i} of \code{z}.
   }
 
 
@@ -156,7 +197,7 @@ These arguments control numerical optimization for the inverse problem.
 
   \item{optim.maxattempts}{
     maximum number of attempts taken trying to achieve successful
-    convergence in \code{\link{optim}}. Defaults to \code{100}.
+    convergence in \code{\link{optim}}. Defaults to \code{10}.
   }
 
   \item{optim.maxit}{
@@ -196,7 +237,27 @@ These arguments control numerical optimization for the inverse problem.
 
   \item{p}{
     the order of the local polynomial regression (defaults to
-    \code{p=1}, i.e. local linear).
+    \code{p=1}, i.e. local linear). This legacy argument is retained. If it is
+    supplied together with modern smoothing controls, the specifications must
+    be equivalent.
+  }
+
+  \item{regtype}{
+    an optional modern fixed-degree spelling: \code{"lc"}, \code{"ll"}, or
+    \code{"lp"}. Omitting both \code{regtype} and \code{degree} preserves the
+    historical \code{p=1} default exactly.
+  }
+
+  \item{degree}{
+    one nonnegative integer supplied with \code{regtype="lp"}. The scalar
+    controls the existing local-polynomial \code{p} engine; vectors are not
+    recycled across IV stages.
+  }
+
+  \item{nomad}{
+    logical or \code{"auto"}. Only \code{FALSE} is currently supported by the
+    bespoke \code{npregiv} objective. \code{TRUE} and \code{"auto"} fail
+    explicitly rather than being silently ignored.
   }
 
 
@@ -313,6 +374,14 @@ Further arguments are passed to lower-level kernel-sum and estimation routines.
 \details{
   Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{plot}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup. See \code{\link{npRmpi.init}} details for performance tradeoffs (message passing/startup mode) and the \code{inst/Rprofile} manual-broadcast template.
 
+  The formula interface uses explicit role order:
+  \code{y ~ z | w} and \code{y ~ z | w | x}. Additive transformations and
+  factors are retained through \code{model.frame}. Dot expansion and formula
+  interaction operators are rejected because they do not identify a unique
+  mixed-data kernel role; create an explicit transformed variable (for example
+  with \code{I(a * b)}) instead. Native vector/data-frame calls remain
+  supported unchanged.
+
   Tikhonov regularization requires computation of weight matrices of
   dimension \eqn{n\times n}{n x n} which can be computationally costly
   in terms of memory requirements and may be unsuitable for large
@@ -419,13 +488,22 @@ Further arguments are passed to lower-level kernel-sum and estimation routines.
 \value{
 
   \code{npregiv} returns a \code{npregiv} object.  The generic
-    functions \code{\link{print}}, \code{\link{summary}}, and
-    \code{\link{plot}} support objects of this type.
+    functions \code{\link{print}}, \code{\link{summary}},
+    \code{\link{plot}}, \code{\link{fitted}}, \code{\link{residuals}}, and
+    \code{\link{gradients}} support objects of this type. \code{fitted}
+    returns the selected structural function and \code{gradients} returns its
+    stored first derivatives. Residuals are available only for training-row
+    evaluation. For formula fits using an exclusion-style \code{na.action},
+    these accessors restore omitted rows. \code{summary} returns a structured
+    \code{summary.npregiv} object with a dedicated print method.
 
   \code{npregiv} returns a list with components \code{phi},
   \code{phi.mat} and either \code{alpha} when \code{method="Tikhonov"}
   or \code{norm.index}, \code{norm.stop} and \code{convergence} when
-  \code{method="Landweber-Fridman"}, among others.
+  \code{method="Landweber-Fridman"}, among others. The compact
+  \code{bws}, \code{smoothing.spec}, and \code{stage.specs} components record
+  stage bandwidth payloads and requested/effective fixed-degree smoothing
+  state without replacing the legacy bandwidth fields.
 
   In addition, if any of \code{return.weights.*} are invoked
   (\code{*=1,2}), then \code{phi.weights} and \code{phi.deriv.*.weights}
@@ -576,7 +654,7 @@ npRmpi.init(nslaves=1)
 # ivdata <- ivdata[order(ivdata$z),]
 # rm(y,z,w)
 # 
-# model.iv <- with(ivdata, npregiv(y=y, z=z, w=w))
+# model.iv <- npregiv(y ~ z | w, data=ivdata, regtype="ll")
 # phi.iv <- model.iv$phi
 # 
 # ## Now the non-iv local linear estimator of E(y|z)

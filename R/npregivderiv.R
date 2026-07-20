@@ -48,7 +48,9 @@
   list(index=N, monotone.failure=FALSE)
 }
 
-npregivderiv <- function(y,
+npregivderiv <- function(y, ...) UseMethod("npregivderiv")
+
+npregivderiv.default <- function(y,
                          z,
                          w,
                          x=NULL,
@@ -64,13 +66,38 @@ npregivderiv <- function(y,
                          start.from=c("Eyz","EEywz"),
                          starting.values=NULL,
                          stop.on.increase=TRUE,
+                         regtype=NULL,
+                         degree=NULL,
+                         nomad=FALSE,
                          ...) {
   .npRmpi_require_active_slave_pool(where = "npregivderiv()")
-  if (.npRmpi_autodispatch_active())
-    return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+  if (.npRmpi_autodispatch_active()) {
+    dispatch.call <- match.call()
+    dispatch.call[[1L]] <- quote(npregivderiv)
+    return(.npRmpi_autodispatch_call(dispatch.call, parent.frame()))
+  }
 
   ptm.start <- proc.time()
+  regtype.missing <- missing(regtype)
+  degree.missing <- missing(degree)
+  nomad.missing <- missing(nomad)
   cl <- match.call()
+  cl[[1L]] <- quote(npregivderiv)
+  if(any(c("data", "newdata", "subset", "na.action") %in% names(cl)))
+    stop("data, newdata, subset, and na.action require the formula interface",
+         call. = FALSE)
+  smoothing.spec <- .np_iv_resolve_deriv_smoothing(
+    regtype = regtype,
+    degree = degree,
+    nomad = nomad,
+    regtype.missing = regtype.missing,
+    degree.missing = degree.missing,
+    nomad.missing = nomad.missing
+  )
+  iv.npreg <- function(...) {
+    args <- list(...)
+    do.call(npreg, c(args, .np_iv_deriv_stage_args(smoothing.spec, args$txdat)))
+  }
 
   ## Basic error checking
 
@@ -88,12 +115,24 @@ npregivderiv <- function(y,
   if(NCOL(y) > 1) stop("y must be univariate")
   if(NROW(y) != NROW(z) || NROW(y) != NROW(w)) stop("y, z, and w have differing numbers of rows")
   if(!is.null(x) && NROW(y) != NROW(x)) stop("y and x have differing numbers of rows")
+  if(!is.null(x))
+    stop("npregivderiv currently supports one univariate endogenous z and does not support a separate exogenous x",
+         call. = FALSE)
 
   ## Check for evaluation data
 
+  trainiseval <- is.null(zeval) && is.null(weval) && is.null(xeval)
+  if(is.null(x) && !is.null(xeval))
+    stop("xeval requires exogenous training data x", call. = FALSE)
   if(is.null(zeval)) zeval <- z
   if(is.null(weval)) weval <- w
-  if(is.null(weval)) xeval <- x
+  if(is.null(xeval)) xeval <- x
+
+  if(NROW(zeval) != NROW(y) || NROW(weval) != NROW(y) ||
+     (!is.null(xeval) && NROW(xeval) != NROW(y))) {
+    stop("npregivderiv evaluation data must have the same number of rows as the training data",
+         call. = FALSE)
+  }
 
   if(!is.null(starting.values) && (NROW(starting.values) != NROW(zeval))) stop(paste("starting.values must be of length",NROW(zeval)))
 
@@ -121,7 +160,9 @@ npregivderiv <- function(y,
   ## Note - here I am only treating the univariate case, so let's
   ## throw a stop with warning for now...
 
-  if(NCOL(z) > 1) stop(" This version supports univariate z only (beta after all)")
+  if(NCOL(z) > 1)
+    stop("npregivderiv currently supports one univariate endogenous z",
+         call. = FALSE)
 
   ## For all results we need the density function for Z and the
   ## survivor function for Z (1-CDF of Z)
@@ -140,7 +181,7 @@ npregivderiv <- function(y,
 
   ## For stopping rule...
 
-  model.E.y.w <- .np_progress_with_legacy_suppressed(npreg(tydat=y,
+  model.E.y.w <- .np_progress_with_legacy_suppressed(iv.npreg(tydat=y,
                                                            txdat=w,
                                                            exdat=weval,
                                                            nmulti=nmulti,
@@ -153,7 +194,7 @@ npregivderiv <- function(y,
 
   if(is.null(starting.values)) {
 
-    model.phi.prime <- .np_progress_with_legacy_suppressed(npreg(tydat=if(start.from=="Eyz") y else E.y.w,
+    model.phi.prime <- .np_progress_with_legacy_suppressed(iv.npreg(tydat=if(start.from=="Eyz") y else E.y.w,
                                                                  txdat=z,
                                                                  exdat=zeval,
                                                                  gradients=TRUE,
@@ -224,7 +265,7 @@ npregivderiv <- function(y,
 
     ## Next, we regress require \mu_{0,i} W using bws optimal for phi on w
 
-    model.mu.w <- .np_progress_with_legacy_suppressed(npreg(tydat=mu,
+    model.mu.w <- .np_progress_with_legacy_suppressed(iv.npreg(tydat=mu,
                                                             txdat=w,
                                                             exdat=weval,
                                                             ...))
@@ -233,7 +274,7 @@ npregivderiv <- function(y,
 
   } else {
 
-    model.phi.w <- .np_progress_with_legacy_suppressed(npreg(tydat=phi,
+    model.phi.w <- .np_progress_with_legacy_suppressed(iv.npreg(tydat=phi,
                                                              txdat=w,
                                                              exdat=weval,
                                                              ...))
@@ -319,7 +360,7 @@ npregivderiv <- function(y,
 
       ## Next, we regress require \mu_{0,i} W using bws optimal for phi on w
 
-      model.mu.w <- .np_progress_with_legacy_suppressed(npreg(tydat=mu,
+      model.mu.w <- .np_progress_with_legacy_suppressed(iv.npreg(tydat=mu,
                                                               txdat=w,
                                                               eydat=mu,
                                                               exdat=weval,
@@ -331,7 +372,7 @@ npregivderiv <- function(y,
 
     } else {
 
-      model.phi.w <- .np_progress_with_legacy_suppressed(npreg(tydat=phi,
+      model.phi.w <- .np_progress_with_legacy_suppressed(iv.npreg(tydat=phi,
                                                                txdat=w,
                                                                eydat=phi,
                                                                exdat=weval,
@@ -444,6 +485,15 @@ npregivderiv <- function(y,
               zeval=zeval,
               weval=weval,
               xeval=xeval,
+              bws=list(E.y.w=.np_iv_bw_payload(bw.E.y.w),
+                       E.y.z=.np_iv_bw_payload(bw.E.y.z),
+                       residual.w=.np_iv_bw_payload(bw.mu.w)),
+              smoothing.spec=smoothing.spec,
+              stage.specs=list(
+                E.y.w=.np_iv_stage_spec("E.y.w", smoothing.spec, w),
+                E.y.z=.np_iv_stage_spec("E.y.z", smoothing.spec, z),
+                residual.w=.np_iv_stage_spec("residual.w", smoothing.spec, w)),
+              trainiseval=trainiseval,
               nmulti=nmulti,
               ptm=proc.time() - ptm.start)
   class(ret) <- "npregivderiv"
@@ -452,46 +502,14 @@ npregivderiv <- function(y,
 }
 
 print.npregivderiv <- function(x, ...) {
-  summary.npregivderiv(x, ...)
+  print(summary.npregivderiv(x, ...))
   invisible(x)
 }
 
 summary.npregivderiv <- function(object, ...) {
-  format_bw <- function(bw, label, names = NULL) {
-    if(is.null(bw)) return()
-    if(is.matrix(bw)) bw <- bw[nrow(bw), , drop = TRUE]
-    bw <- as.numeric(bw)
-    if(!is.null(names) && length(names) == length(bw)) {
-      vals <- paste(paste(names, formatC(bw, digits=8, format="g"), sep=": "), collapse=", ")
-    } else {
-      vals <- paste(formatC(bw, digits=8, format="g"), collapse=", ")
-    }
-    cat(paste("\n", label, " ", vals, sep=""))
-  }
-
-  cat("Call:\n")
-  print(object$call)
-
-  cat("\nNonparametric Instrumental Kernel Derivative Estimation\n",sep="")
-
-  cat(paste("\nNumber of continuous endogenous predictors: ",format(NCOL(object$z)),sep=""),sep="")
-  cat(paste("\nNumber of continuous instruments: ",format(NCOL(object$w)),sep=""),sep="")
-  if(!is.null(object$x)) cat(paste("\nNumber of continuous exogenous predictors: ",format(NCOL(object$x)),sep=""),sep="")
-
-  cat(paste("\nTraining observations: ", format(NROW(object$y)), sep=""))
-
-  cat(paste("\n\nRegularization method: Landweber-Fridman",sep=""))
-  cat(paste("\nNumber of iterations: ", format(object$num.iterations), sep=""))
-  cat(paste("\nStopping rule value: ", format(object$norm.stop[object$num.iterations],digits=8), sep=""))
-
-  w.names <- if(!is.null(object$w)) colnames(object$w) else NULL
-  z.names <- if(!is.null(object$z)) colnames(object$z) else NULL
-  format_bw(object$bw.E.y.w, "Bandwidth for E(y|w):", w.names)
-  format_bw(object$bw.E.y.z, "Bandwidth for E(y|z):", z.names)
-
-  cat(paste("\nNumber of multistarts: ", format(object$nmulti), sep=""))
-  cat(paste("\nEstimation time: ", formatC(object$ptm[1],digits=1,format="f"), " seconds",sep=""))
-  cat("\n\n")
+  ans <- .np_iv_summary_payload(object, derivative = TRUE)
+  class(ans) <- "summary.npregivderiv"
+  ans
 }
 
 plot.npregivderiv <- function(x,
@@ -518,7 +536,8 @@ plot.npregivderiv <- function(x,
   ## We only support univariate endogenous predictor z
   if(NCOL(object$z) > 1) stop(" only univariate z is supported")
 
-  z <- object$z[,1]
+  z.eval <- if (is.null(object$zeval)) object$z else object$zeval
+  z <- z.eval[,1]
   y <- object$y
   zname <- names(object$z)[1]
   yname <- "y"
@@ -539,6 +558,9 @@ plot.npregivderiv <- function(x,
   }
 
   if(plot.data) {
+    if (!.np_iv_object_trainiseval(object))
+      stop("plot.data=TRUE is available only for training-row evaluation",
+           call. = FALSE)
     plot.type <- take_arg("type", "p")
     plot.xlab <- take_arg("xlab", zname)
     plot.ylab <- take_arg("ylab", yname)
