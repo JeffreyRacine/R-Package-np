@@ -61,6 +61,40 @@ np_beta_conditional_lc(const double *train_x,
                        np_beta_status *kernel_status,
                        np_beta_kernelsum_progress_callback progress_callback);
 
+np_beta_conditional_status
+np_beta_conditional_lc_gradient(const double *train_x,
+                                const double *train_y,
+                                const double *eval_x,
+                                const double *eval_y,
+                                const double *bandwidth_eval_x,
+                                const double *bandwidth_train_x,
+                                const double *bandwidth_eval_y,
+                                const double *bandwidth_train_y,
+                                const double *lower_x,
+                                const double *upper_x,
+                                const double *lower_y,
+                                const double *upper_y,
+                                np_continuous_kernel_family family_x,
+                                int kernel_code_x,
+                                int order_x,
+                                np_continuous_kernel_family family_y,
+                                int kernel_code_y,
+                                int order_y,
+                                np_beta_bandwidth_mode bandwidth_mode,
+                                int do_distribution,
+                                int num_train,
+                                int num_eval,
+                                int num_x,
+                                int num_y,
+                                int train_is_eval,
+                                double *gradient,
+                                double *gradient_stderr,
+                                int *infinite_count,
+                                int *undefined_count,
+                                int *bad_evaluation,
+                                int *bad_dimension,
+                                np_beta_status *kernel_status);
+
 const char *np_beta_conditional_status_message(
   np_beta_conditional_status status);
 

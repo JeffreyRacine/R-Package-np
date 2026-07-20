@@ -209,10 +209,6 @@ npcdens.conbandwidth <- function(bws,
   beta.kernel <- identical(bws[["cxkertype", exact = TRUE]], "beta") ||
     identical(bws[["cykertype", exact = TRUE]], "beta")
   npValidateConditionalBetaBandwidthObject(bws, where = "npcdens")
-  if (beta.kernel && gradients)
-    stop("beta conditional-density gradients are not yet available; use gradients = FALSE",
-         call. = FALSE)
-
   if ((any(bws$ixcon) &&
        !all(vapply(txdat[, bws$ixcon, drop = FALSE], inherits, logical(1), c("integer", "numeric")))) ||
       (any(bws$ixord) &&

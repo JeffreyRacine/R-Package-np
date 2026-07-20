@@ -16,7 +16,8 @@ typedef void (*np_beta_kernelsum_progress_callback)(int done,
 typedef enum {
   NP_BETA_OPERATOR_PDF = 0,
   NP_BETA_OPERATOR_CDF = 1,
-  NP_BETA_OPERATOR_OVERLAP = 2
+  NP_BETA_OPERATOR_OVERLAP = 2,
+  NP_BETA_OPERATOR_DERIVATIVE = 3
 } np_beta_operator;
 
 typedef enum {
@@ -77,6 +78,34 @@ np_beta_kernelsum_fixed(const double *train_continuous,
                         int *bad_dimension,
                         np_beta_status *kernel_status,
                         np_beta_kernelsum_progress_callback progress_callback);
+
+np_beta_kernelsum_status
+np_beta_kernelsum_derivative(const double *train_continuous,
+                             const double *eval_continuous,
+                             const double *response,
+                             const double *weights,
+                             const double *bandwidth_eval,
+                             const double *bandwidth_train,
+                             const double *lower,
+                             const double *upper,
+                             const np_beta_operator *operators,
+                             int derivative_dimension,
+                             np_beta_bandwidth_mode bandwidth_mode,
+                             int order,
+                             int num_train,
+                             int num_eval,
+                             int num_continuous,
+                             int num_response_columns,
+                             int num_weight_columns,
+                             int train_is_eval,
+                             int leave_one_out,
+                             int return_kernel_weights,
+                             double *weighted_sum,
+                             double *kernel_weights,
+                             int *undefined_count,
+                             int *bad_dimension,
+                             np_beta_status *kernel_status,
+                             np_beta_kernelsum_progress_callback progress_callback);
 
 np_beta_kernelsum_status
 np_beta_kernelsum_fixed_pdf(const double *train_continuous,

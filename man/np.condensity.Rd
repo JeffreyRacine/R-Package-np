@@ -211,7 +211,14 @@ Further arguments are passed to \code{\link{npcdensbw}} when bandwidths are comp
   adaptive-NN bandwidths, explicit finite bounds, sample-range bounds, and
   automatic \code{cv.ml}/\code{cv.ls} bandwidth selection are supported.
   If either side uses beta, all X and Y coordinates must be continuous and the
-  fit must be local constant with \code{gradients=FALSE}. Higher-order fits
+  fit must be local constant. Analytic first derivatives with respect to the
+  continuous X coordinates are available with \code{gradients=TRUE}, including
+  beta-X/legacy-Y, legacy-X/beta-Y, fixed, generalized-NN, and adaptive-NN
+  combinations. NN bandwidths are held fixed while differentiating. Exact
+  beta-X endpoint jumps are cancelled in the normalized ratio before a
+  gradient is classified; genuine jumps are signed infinities, while
+  indeterminate cancellation is \code{NA}, both with an explanatory warning.
+  Higher-order fits
   are signed and need not be proper densities; no positivity repair is
   applied. Bounded beta-response \code{cv.ls} integrates the actual
   conditional estimator over the Y support and does not replace that integral

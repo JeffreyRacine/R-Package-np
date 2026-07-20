@@ -576,6 +576,178 @@ double np_beta_log_abs_pdf_order(double evaluation,
   return (difference_status == NP_BETA_OK) ? log_absolute : NAN;
 }
 
+static void np_beta_derivative_zero(np_beta_derivative *derivative)
+{
+  derivative->regular_log_absolute = -INFINITY;
+  derivative->jump_log_absolute = -INFINITY;
+  derivative->regular_sign = 0;
+  derivative->jump_sign = 0;
+}
+
+static np_beta_status np_beta_derivative_accumulate(double log_term,
+                                                    int sign,
+                                                    double *positive_log,
+                                                    double *negative_log)
+{
+  if(ISNAN(log_term) || (sign != -1 && sign != 1))
+    return NP_BETA_ERR_NUMERIC;
+  if(log_term == -INFINITY)
+    return NP_BETA_OK;
+  if(log_term == INFINITY)
+    return NP_BETA_ERR_RANGE;
+  if(sign > 0)
+    *positive_log = np_beta_log_add(*positive_log, log_term);
+  else
+    *negative_log = np_beta_log_add(*negative_log, log_term);
+  return NP_BETA_OK;
+}
+
+np_beta_status np_beta_pdf_derivative_order(double evaluation,
+                                            double observation,
+                                            double bandwidth,
+                                            double lower,
+                                            double upper,
+                                            int order,
+                                            np_beta_derivative *derivative)
+{
+  const int *coefficients = NULL;
+  const int component_count =
+    np_beta_order_coefficients(order, &coefficients);
+  double regular_positive_log = -INFINITY;
+  double regular_negative_log = -INFINITY;
+  double jump_positive_log = -INFINITY;
+  double jump_negative_log = -INFINITY;
+  int component;
+
+  if(derivative == NULL)
+    return NP_BETA_ERR_NUMERIC;
+  np_beta_derivative_zero(derivative);
+  if(component_count == 0)
+    return NP_BETA_ERR_SCALE;
+
+  for(component = 0; component < component_count; ++component) {
+    np_beta_shape shape;
+    np_beta_status status = np_beta_shape_init(
+      evaluation, observation, bandwidth, lower, upper,
+      component + 1, &shape);
+    double log_pdf;
+    double score;
+    double log_term;
+    int term_sign;
+
+    if(status != NP_BETA_OK)
+      return status;
+    if(shape.eval_location != NP_BETA_EVAL_INSIDE ||
+       shape.concentration == 0.0)
+      continue;
+
+    /* Exact matching endpoints are jump discontinuities.  Their regular
+     * one-sided derivative is zero; the signed jump is retained so ratio
+     * estimators can cancel it structurally. */
+    if((evaluation == lower && observation == lower) ||
+       (evaluation == upper && observation == upper)) {
+      log_pdf = np_beta_log_pdf_scale(&shape, &status);
+      if(status != NP_BETA_OK)
+        return status;
+      log_term = log_pdf + log((double)abs(coefficients[component]));
+      term_sign = (coefficients[component] > 0) ? 1 : -1;
+      if(evaluation == lower)
+        term_sign = -term_sign;
+      status = np_beta_derivative_accumulate(
+        log_term, term_sign, &jump_positive_log, &jump_negative_log);
+      if(status != NP_BETA_OK)
+        return status;
+      continue;
+    }
+
+    log_pdf = np_beta_log_pdf_scale(&shape, &status);
+    if(status != NP_BETA_OK)
+      return status;
+    if(log_pdf == -INFINITY)
+      continue;
+
+    score = (shape.concentration / shape.support_length) *
+      (shape.log_observation_unit -
+       shape.log_observation_complement_unit -
+       digamma(1.0 + shape.target_unit * shape.concentration) +
+       digamma(1.0 + shape.target_complement_unit * shape.concentration));
+    if(ISNAN(score))
+      return NP_BETA_ERR_NUMERIC;
+    if(score == 0.0)
+      continue;
+    if(!R_FINITE(score))
+      return NP_BETA_ERR_RANGE;
+
+    log_term = log_pdf + log(fabs(score)) +
+      log((double)abs(coefficients[component]));
+    term_sign = ((coefficients[component] > 0) ? 1 : -1) *
+      ((score > 0.0) ? 1 : -1);
+    status = np_beta_derivative_accumulate(
+      log_term, term_sign, &regular_positive_log, &regular_negative_log);
+    if(status != NP_BETA_OK)
+      return status;
+  }
+
+  {
+    np_beta_status status = np_beta_signed_log_absolute(
+      regular_positive_log, regular_negative_log,
+      &derivative->regular_log_absolute, &derivative->regular_sign);
+    if(status != NP_BETA_OK)
+      return status;
+    status = np_beta_signed_log_absolute(
+      jump_positive_log, jump_negative_log,
+      &derivative->jump_log_absolute, &derivative->jump_sign);
+    return status;
+  }
+}
+
+static double np_beta_signed_log_value(double log_absolute,
+                                       int sign,
+                                       np_beta_status *status)
+{
+  if(sign == 0 || log_absolute == -INFINITY) {
+    np_beta_set_status(status, NP_BETA_OK);
+    return 0.0;
+  }
+  if((sign != -1 && sign != 1) || ISNAN(log_absolute)) {
+    np_beta_set_status(status, NP_BETA_ERR_NUMERIC);
+    return NAN;
+  }
+  if(log_absolute > log(DBL_MAX)) {
+    np_beta_set_status(status, NP_BETA_ERR_RANGE);
+    return (sign > 0) ? INFINITY : -INFINITY;
+  }
+  np_beta_set_status(status, NP_BETA_OK);
+  return (sign > 0) ? exp(log_absolute) : -exp(log_absolute);
+}
+
+double np_beta_derivative_regular_value(
+  const np_beta_derivative *derivative,
+  np_beta_status *status)
+{
+  if(derivative == NULL) {
+    np_beta_set_status(status, NP_BETA_ERR_NUMERIC);
+    return NAN;
+  }
+  return np_beta_signed_log_value(derivative->regular_log_absolute,
+                                  derivative->regular_sign, status);
+}
+
+double np_beta_derivative_public_value(
+  const np_beta_derivative *derivative,
+  np_beta_status *status)
+{
+  if(derivative == NULL) {
+    np_beta_set_status(status, NP_BETA_ERR_NUMERIC);
+    return NAN;
+  }
+  if(derivative->jump_sign != 0) {
+    np_beta_set_status(status, NP_BETA_OK);
+    return (derivative->jump_sign > 0) ? INFINITY : -INFINITY;
+  }
+  return np_beta_derivative_regular_value(derivative, status);
+}
+
 double np_beta_log_pdf_order2(double evaluation,
                               double observation,
                               double bandwidth,

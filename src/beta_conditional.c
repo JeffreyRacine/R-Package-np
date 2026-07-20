@@ -10,6 +10,7 @@
 
 double kernel(int kernel_code, double value);
 double cdf_kernel(int kernel_code, double value);
+double kernel_deriv(int kernel_code, double value);
 
 static double np_beta_conditional_log_add(double accumulator, double term)
 {
@@ -28,6 +29,25 @@ static double np_beta_conditional_log_add(double accumulator, double term)
 static int np_beta_conditional_finite_bound(double value)
 {
   return R_FINITE(value) && fabs(value) < 0.5 * DBL_MAX;
+}
+
+static int np_beta_conditional_rescale(double scaled_value,
+                                       double log_scale,
+                                       double *value)
+{
+  double log_absolute;
+
+  if(value == NULL || !R_FINITE(scaled_value) || ISNAN(log_scale))
+    return 0;
+  if(scaled_value == 0.0 || log_scale == -INFINITY) {
+    *value = 0.0;
+    return 1;
+  }
+  log_absolute = log(fabs(scaled_value)) + log_scale;
+  if(ISNAN(log_absolute) || log_absolute > log(DBL_MAX))
+    return 0;
+  *value = copysign(exp(log_absolute), scaled_value);
+  return R_FINITE(*value);
 }
 
 static double np_beta_conditional_legacy_pdf(int kernel_code,
@@ -483,6 +503,464 @@ np_beta_conditional_lc(const double *train_x,
                              DBL_MIN : conditional[evaluation_index]);
     if(progress_callback != NULL)
       progress_callback(evaluation_index + 1, num_eval);
+  }
+
+  free(workspace);
+  return NP_BETA_CONDITIONAL_OK;
+}
+
+static np_beta_conditional_status
+np_beta_conditional_legacy_pdf_derivative(int kernel_code,
+                                          double evaluation,
+                                          double observation,
+                                          double bandwidth,
+                                          double lower,
+                                          double upper,
+                                          double *log_absolute,
+                                          int *sign)
+{
+  const int finite_lower = np_beta_conditional_finite_bound(lower);
+  const int finite_upper = np_beta_conditional_finite_bound(upper);
+  double denominator = 1.0;
+  double value;
+
+  *log_absolute = -INFINITY;
+  *sign = 0;
+  if(!R_FINITE(evaluation) || !R_FINITE(observation) ||
+     !R_FINITE(bandwidth) || bandwidth <= 0.0)
+    return NP_BETA_CONDITIONAL_ERR_KERNEL;
+  if(finite_lower || finite_upper) {
+    const double lower_mass = finite_lower ?
+      cdf_kernel(kernel_code, (lower - evaluation) / bandwidth) : 0.0;
+    const double upper_mass = finite_upper ?
+      cdf_kernel(kernel_code, (upper - evaluation) / bandwidth) : 1.0;
+    denominator = upper_mass - lower_mass;
+  }
+  if(!R_FINITE(denominator) || denominator <= 0.0)
+    return NP_BETA_CONDITIONAL_ERR_KERNEL;
+
+  /* The derivative of the bounded normalizer is common to every
+   * observation and therefore cancels exactly in a normalized conditional
+   * ratio.  Retaining only the observation-varying term is both sufficient
+   * and consistent with the established legacy local-constant route. */
+  value = kernel_deriv(kernel_code,
+                       (evaluation - observation) / bandwidth) /
+    (bandwidth * bandwidth * denominator);
+  if(!R_FINITE(value))
+    return NP_BETA_CONDITIONAL_ERR_KERNEL;
+  if(value != 0.0) {
+    *log_absolute = log(fabs(value));
+    *sign = (value > 0.0) ? 1 : -1;
+  }
+  return NP_BETA_CONDITIONAL_OK;
+}
+
+np_beta_conditional_status
+np_beta_conditional_lc_gradient(const double *train_x,
+                                const double *train_y,
+                                const double *eval_x,
+                                const double *eval_y,
+                                const double *bandwidth_eval_x,
+                                const double *bandwidth_train_x,
+                                const double *bandwidth_eval_y,
+                                const double *bandwidth_train_y,
+                                const double *lower_x,
+                                const double *upper_x,
+                                const double *lower_y,
+                                const double *upper_y,
+                                np_continuous_kernel_family family_x,
+                                int kernel_code_x,
+                                int order_x,
+                                np_continuous_kernel_family family_y,
+                                int kernel_code_y,
+                                int order_y,
+                                np_beta_bandwidth_mode bandwidth_mode,
+                                int do_distribution,
+                                int num_train,
+                                int num_eval,
+                                int num_x,
+                                int num_y,
+                                int train_is_eval,
+                                double *gradient,
+                                double *gradient_stderr,
+                                int *infinite_count,
+                                int *undefined_count,
+                                int *bad_evaluation,
+                                int *bad_dimension,
+                                np_beta_status *kernel_status)
+{
+  double *workspace;
+  double *level_log;
+  double *regular_log;
+  double *jump_log;
+  double *y_log;
+  double *level_sign;
+  double *regular_sign;
+  double *jump_sign;
+  double *y_sign;
+  int evaluation_index;
+  int derivative_dimension;
+
+  if(infinite_count != NULL) *infinite_count = 0;
+  if(undefined_count != NULL) *undefined_count = 0;
+  if(bad_evaluation != NULL) *bad_evaluation = -1;
+  if(bad_dimension != NULL) *bad_dimension = -1;
+  if(kernel_status != NULL) *kernel_status = NP_BETA_OK;
+  if(train_x == NULL || train_y == NULL || lower_x == NULL ||
+     upper_x == NULL || lower_y == NULL || upper_y == NULL ||
+     gradient == NULL || gradient_stderr == NULL || num_train <= 0 ||
+     num_eval <= 0 || num_x <= 0 || num_y <= 0 ||
+     (!train_is_eval && (eval_x == NULL || eval_y == NULL)) ||
+     (train_is_eval && num_train != num_eval) ||
+     !np_beta_order_supported(order_x) ||
+     !np_beta_order_supported(order_y) ||
+     (bandwidth_mode != NP_BETA_BANDWIDTH_FIXED &&
+      bandwidth_mode != NP_BETA_BANDWIDTH_GENERALIZED_NN &&
+      bandwidth_mode != NP_BETA_BANDWIDTH_ADAPTIVE_NN) ||
+     (bandwidth_mode != NP_BETA_BANDWIDTH_ADAPTIVE_NN &&
+      (bandwidth_eval_x == NULL || bandwidth_eval_y == NULL)) ||
+     (bandwidth_mode == NP_BETA_BANDWIDTH_ADAPTIVE_NN &&
+      (bandwidth_train_x == NULL || bandwidth_train_y == NULL)))
+    return NP_BETA_CONDITIONAL_ERR_LAYOUT;
+  if((size_t)num_train > SIZE_MAX / (8U * sizeof(double)))
+    return NP_BETA_CONDITIONAL_ERR_MEMORY;
+  workspace = (double *)malloc(8U * (size_t)num_train * sizeof(double));
+  if(workspace == NULL)
+    return NP_BETA_CONDITIONAL_ERR_MEMORY;
+  level_log = workspace;
+  regular_log = level_log + num_train;
+  jump_log = regular_log + num_train;
+  y_log = jump_log + num_train;
+  level_sign = y_log + num_train;
+  regular_sign = level_sign + num_train;
+  jump_sign = regular_sign + num_train;
+  y_sign = jump_sign + num_train;
+
+  for(evaluation_index = 0; evaluation_index < num_eval; ++evaluation_index) {
+    for(derivative_dimension = 0; derivative_dimension < num_x;
+        ++derivative_dimension) {
+      double maximum_x_log = -INFINITY;
+      double maximum_y_log = -INFINITY;
+      double total_weight = 0.0;
+      double weighted_y = 0.0;
+      double regular_total = 0.0;
+      double regular_y = 0.0;
+      double jump_total = 0.0;
+      double jump_y = 0.0;
+      int observation_index;
+
+      for(observation_index = 0; observation_index < num_train;
+          ++observation_index) {
+        double other_x_log = 0.0;
+        int other_x_sign = 1;
+        double derivative_level_log = -INFINITY;
+        int derivative_level_sign = 0;
+        np_beta_derivative derivative;
+        int dimension;
+
+        derivative.regular_log_absolute = -INFINITY;
+        derivative.jump_log_absolute = -INFINITY;
+        derivative.regular_sign = 0;
+        derivative.jump_sign = 0;
+        for(dimension = 0; dimension < num_x; ++dimension) {
+          const double evaluation = train_is_eval ?
+            train_x[dimension * num_train + evaluation_index] :
+            eval_x[dimension * num_eval + evaluation_index];
+          const double observation =
+            train_x[dimension * num_train + observation_index];
+          const double bandwidth = np_beta_conditional_bandwidth(
+            bandwidth_mode, bandwidth_eval_x, bandwidth_train_x,
+            dimension, evaluation_index, observation_index,
+            num_eval, num_train);
+          double scalar_log = -INFINITY;
+          int scalar_sign = 0;
+          np_beta_conditional_status status =
+            np_beta_conditional_scalar_log(
+              family_x, kernel_code_x, order_x, 0,
+              evaluation, observation, bandwidth,
+              lower_x[dimension], upper_x[dimension],
+              &scalar_log, &scalar_sign, kernel_status);
+
+          if(status == NP_BETA_CONDITIONAL_OK &&
+             dimension == derivative_dimension) {
+            derivative_level_log = scalar_log;
+            derivative_level_sign = scalar_sign;
+            if(family_x == NP_CKERNEL_FAMILY_BETA) {
+              const np_beta_status beta_status =
+                np_beta_pdf_derivative_order(
+                  evaluation, observation, bandwidth,
+                  lower_x[dimension], upper_x[dimension],
+                  order_x, &derivative);
+              if(beta_status != NP_BETA_OK) {
+                if(kernel_status != NULL) *kernel_status = beta_status;
+                status = NP_BETA_CONDITIONAL_ERR_KERNEL;
+              }
+            } else {
+              status = np_beta_conditional_legacy_pdf_derivative(
+                kernel_code_x, evaluation, observation, bandwidth,
+                lower_x[dimension], upper_x[dimension],
+                &derivative.regular_log_absolute,
+                &derivative.regular_sign);
+            }
+          } else if(status == NP_BETA_CONDITIONAL_OK) {
+            if(scalar_sign == 0)
+              other_x_sign = 0;
+            else if(other_x_sign != 0) {
+              other_x_sign *= scalar_sign;
+              other_x_log += scalar_log;
+            }
+          }
+          if(status != NP_BETA_CONDITIONAL_OK) {
+            free(workspace);
+            if(bad_evaluation != NULL) *bad_evaluation = evaluation_index;
+            if(bad_dimension != NULL) *bad_dimension = dimension;
+            return status;
+          }
+        }
+
+        if(other_x_sign == 0 || derivative_level_sign == 0) {
+          level_log[observation_index] = -INFINITY;
+          level_sign[observation_index] = 0.0;
+        } else {
+          level_log[observation_index] =
+            other_x_log + derivative_level_log;
+          level_sign[observation_index] =
+            (double)(other_x_sign * derivative_level_sign);
+          maximum_x_log = fmax(maximum_x_log, level_log[observation_index]);
+        }
+        if(other_x_sign == 0 || derivative.regular_sign == 0) {
+          regular_log[observation_index] = -INFINITY;
+          regular_sign[observation_index] = 0.0;
+        } else {
+          regular_log[observation_index] =
+            other_x_log + derivative.regular_log_absolute;
+          regular_sign[observation_index] =
+            (double)(other_x_sign * derivative.regular_sign);
+          maximum_x_log = fmax(maximum_x_log, regular_log[observation_index]);
+        }
+        if(other_x_sign == 0 || derivative.jump_sign == 0) {
+          jump_log[observation_index] = -INFINITY;
+          jump_sign[observation_index] = 0.0;
+        } else {
+          jump_log[observation_index] =
+            other_x_log + derivative.jump_log_absolute;
+          jump_sign[observation_index] =
+            (double)(other_x_sign * derivative.jump_sign);
+          maximum_x_log = fmax(maximum_x_log, jump_log[observation_index]);
+        }
+
+        {
+          double product_y_log = 0.0;
+          int product_y_sign = 1;
+          for(dimension = 0; dimension < num_y; ++dimension) {
+            const double evaluation = train_is_eval ?
+              train_y[dimension * num_train + evaluation_index] :
+              eval_y[dimension * num_eval + evaluation_index];
+            const double observation =
+              train_y[dimension * num_train + observation_index];
+            const double bandwidth = np_beta_conditional_bandwidth(
+              bandwidth_mode, bandwidth_eval_y, bandwidth_train_y,
+              dimension, evaluation_index, observation_index,
+              num_eval, num_train);
+            double scalar_log = -INFINITY;
+            int scalar_sign = 0;
+            const np_beta_conditional_status status =
+              np_beta_conditional_scalar_log(
+                family_y, kernel_code_y, order_y, do_distribution,
+                evaluation, observation, bandwidth,
+                lower_y[dimension], upper_y[dimension],
+                &scalar_log, &scalar_sign, kernel_status);
+            if(status != NP_BETA_CONDITIONAL_OK) {
+              free(workspace);
+              if(bad_evaluation != NULL) *bad_evaluation = evaluation_index;
+              if(bad_dimension != NULL) *bad_dimension = num_x + dimension;
+              return status;
+            }
+            if(scalar_sign == 0) {
+              product_y_sign = 0;
+              product_y_log = -INFINITY;
+              break;
+            }
+            product_y_sign *= scalar_sign;
+            product_y_log += scalar_log;
+          }
+          y_log[observation_index] = product_y_log;
+          y_sign[observation_index] = (double)product_y_sign;
+          if(product_y_sign != 0 &&
+             (level_sign[observation_index] != 0.0 ||
+              regular_sign[observation_index] != 0.0 ||
+              jump_sign[observation_index] != 0.0))
+            maximum_y_log = fmax(maximum_y_log, product_y_log);
+        }
+      }
+
+      if(maximum_x_log == -INFINITY) {
+        free(workspace);
+        if(bad_evaluation != NULL) *bad_evaluation = evaluation_index;
+        return NP_BETA_CONDITIONAL_ERR_ZERO_WEIGHT;
+      }
+      for(observation_index = 0; observation_index < num_train;
+          ++observation_index) {
+        double q = 0.0;
+        const double w = (level_sign[observation_index] == 0.0) ? 0.0 :
+          level_sign[observation_index] *
+          exp(level_log[observation_index] - maximum_x_log);
+        const double d = (regular_sign[observation_index] == 0.0) ? 0.0 :
+          regular_sign[observation_index] *
+          exp(regular_log[observation_index] - maximum_x_log);
+        const double j = (jump_sign[observation_index] == 0.0) ? 0.0 :
+          jump_sign[observation_index] *
+          exp(jump_log[observation_index] - maximum_x_log);
+        if(y_sign[observation_index] != 0.0 &&
+           (w != 0.0 || d != 0.0 || j != 0.0))
+          q = y_sign[observation_index] *
+            exp(y_log[observation_index] - maximum_y_log);
+        total_weight += w;
+        weighted_y += w * q;
+        regular_total += d;
+        regular_y += d * q;
+        jump_total += j;
+        jump_y += j * q;
+      }
+
+      {
+        const double evaluation = train_is_eval ?
+          train_x[derivative_dimension * num_train + evaluation_index] :
+          eval_x[derivative_dimension * num_eval + evaluation_index];
+        const int at_lower = family_x == NP_CKERNEL_FAMILY_BETA &&
+          evaluation == lower_x[derivative_dimension];
+        const int at_upper = family_x == NP_CKERNEL_FAMILY_BETA &&
+          evaluation == upper_x[derivative_dimension];
+        const double side_orientation = at_upper ? -1.0 : 1.0;
+        double side_weight = total_weight;
+        double side_y = weighted_y;
+        double base_value;
+        double side_value;
+        double gradient_value;
+        int q_is_constant = 1;
+        int have_active = 0;
+        double first_q = 0.0;
+
+        if(!R_FINITE(total_weight) || total_weight == 0.0 ||
+           !R_FINITE(weighted_y)) {
+          free(workspace);
+          if(bad_evaluation != NULL) *bad_evaluation = evaluation_index;
+          return NP_BETA_CONDITIONAL_ERR_NUMERIC;
+        }
+        base_value = weighted_y / total_weight;
+        if(at_lower || at_upper) {
+          side_weight += side_orientation * jump_total;
+          side_y += side_orientation * jump_y;
+        }
+        if(!R_FINITE(side_weight) || side_weight == 0.0 ||
+           !R_FINITE(side_y)) {
+          gradient[derivative_dimension * num_eval + evaluation_index] = NA_REAL;
+          gradient_stderr[derivative_dimension * num_eval + evaluation_index] = NA_REAL;
+          if(undefined_count != NULL) ++*undefined_count;
+          continue;
+        }
+        side_value = side_y / side_weight;
+
+        for(observation_index = 0; observation_index < num_train;
+            ++observation_index) {
+          double q = 0.0;
+          const double w = (level_sign[observation_index] == 0.0) ? 0.0 :
+            level_sign[observation_index] *
+            exp(level_log[observation_index] - maximum_x_log);
+          const double j = (jump_sign[observation_index] == 0.0) ? 0.0 :
+            jump_sign[observation_index] *
+            exp(jump_log[observation_index] - maximum_x_log);
+          if(y_sign[observation_index] != 0.0 &&
+             (w != 0.0 || j != 0.0))
+            q = y_sign[observation_index] *
+              exp(y_log[observation_index] - maximum_y_log);
+          if(w != 0.0 || j != 0.0) {
+            if(!have_active) {
+              first_q = q;
+              have_active = 1;
+            } else if(q != first_q) {
+              q_is_constant = 0;
+            }
+          }
+        }
+
+        if(q_is_constant) {
+          gradient[derivative_dimension * num_eval + evaluation_index] = 0.0;
+          gradient_stderr[derivative_dimension * num_eval + evaluation_index] = 0.0;
+          continue;
+        }
+
+        if((at_lower || at_upper) && side_value != base_value) {
+          const double jump_in_ratio = side_orientation *
+            (side_value - base_value);
+          const double tolerance = 128.0 * DBL_EPSILON *
+            fmax(1.0, fmax(fabs(side_value), fabs(base_value)));
+          if(fabs(jump_in_ratio) <= tolerance) {
+            gradient[derivative_dimension * num_eval + evaluation_index] = NA_REAL;
+            gradient_stderr[derivative_dimension * num_eval + evaluation_index] = NA_REAL;
+            if(undefined_count != NULL) ++*undefined_count;
+          } else {
+            gradient[derivative_dimension * num_eval + evaluation_index] =
+              (jump_in_ratio > 0.0) ? INFINITY : -INFINITY;
+            gradient_stderr[derivative_dimension * num_eval + evaluation_index] = NA_REAL;
+            if(infinite_count != NULL) ++*infinite_count;
+          }
+          continue;
+        }
+
+        gradient_value = (regular_y - side_value * regular_total) /
+          side_weight;
+        if(num_train <= 1) {
+          gradient_stderr[derivative_dimension * num_eval + evaluation_index] = 0.0;
+        } else {
+          double influence_square_sum = 0.0;
+          for(observation_index = 0; observation_index < num_train;
+              ++observation_index) {
+            double q = 0.0;
+            const double w = (level_sign[observation_index] == 0.0) ? 0.0 :
+              level_sign[observation_index] *
+              exp(level_log[observation_index] - maximum_x_log);
+            const double d = (regular_sign[observation_index] == 0.0) ? 0.0 :
+              regular_sign[observation_index] *
+              exp(regular_log[observation_index] - maximum_x_log);
+            const double j = (jump_sign[observation_index] == 0.0) ? 0.0 :
+              jump_sign[observation_index] *
+              exp(jump_log[observation_index] - maximum_x_log);
+            const double side_w = w +
+              ((at_lower || at_upper) ? side_orientation * j : 0.0);
+            const double a = side_w / side_weight;
+            const double aprime =
+              (d * side_weight - side_w * regular_total) /
+              (side_weight * side_weight);
+            double influence;
+            if(y_sign[observation_index] != 0.0 &&
+               (w != 0.0 || d != 0.0 || j != 0.0))
+              q = y_sign[observation_index] *
+                exp(y_log[observation_index] - maximum_y_log);
+            influence = aprime * (q - side_value) - gradient_value * a;
+            influence_square_sum += influence * influence;
+          }
+          gradient_stderr[derivative_dimension * num_eval + evaluation_index] =
+            sqrt(influence_square_sum / (double)(num_train - 1));
+        }
+        if(!R_FINITE(gradient_value) ||
+           !R_FINITE(gradient_stderr[derivative_dimension * num_eval +
+                                     evaluation_index]) ||
+           !np_beta_conditional_rescale(
+             gradient_value, maximum_y_log,
+             &gradient[derivative_dimension * num_eval + evaluation_index]) ||
+           !np_beta_conditional_rescale(
+             gradient_stderr[derivative_dimension * num_eval +
+                             evaluation_index],
+             maximum_y_log,
+             &gradient_stderr[derivative_dimension * num_eval +
+                              evaluation_index])) {
+          gradient[derivative_dimension * num_eval + evaluation_index] = NA_REAL;
+          gradient_stderr[derivative_dimension * num_eval + evaluation_index] = NA_REAL;
+          if(undefined_count != NULL) ++*undefined_count;
+        }
+      }
+    }
   }
 
   free(workspace);

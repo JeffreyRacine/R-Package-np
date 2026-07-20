@@ -286,12 +286,13 @@ npreghat <-
 }
 
 .npreghat_exact_lc_matrix_from_kernel_weights <- function(bws, txdat, exdat = NULL) {
+  beta.kernel <- identical(bws[["ckertype", exact = TRUE]], "beta")
   kw <- .np_kernel_weights_direct(
     bws = bws,
     txdat = txdat,
     exdat = exdat,
     leave.one.out = FALSE,
-    bandwidth.divide = TRUE,
+    bandwidth.divide = !beta.kernel,
     kernel.pow = 1.0
   )
 
@@ -319,17 +320,19 @@ npreghat <-
   eval.data <- if (no.ex) txdat else exdat
   ntrain <- nrow(txdat)
   neval <- nrow(eval.data)
+  beta.kernel <- identical(bws[["ckertype", exact = TRUE]], "beta")
 
   if (identical(bws$type, "adaptive_nn")) {
-    out <- npksum.default(
+    call <- quote(npksum.default(
       bws = bws,
       txdat = txdat,
       exdat = if (no.ex) txdat else eval.data,
-      bandwidth.divide = TRUE,
+      bandwidth.divide = !beta.kernel,
       return.kernel.weights = TRUE,
       return.derivative.kernel.weights = TRUE,
       permutation.operator = "derivative"
-    )
+    ))
+    out <- if (beta.kernel) suppressWarnings(eval(call)) else eval(call)
 
     kw <- out$kw
     pkw <- out$p.kw
@@ -354,15 +357,28 @@ npreghat <-
     }
     dsk <- as.vector(dsk)
 
-    return(t(
+    H <- t(
       sweep(pkw, 2L, sk, "/") -
       sweep(kw, 2L, dsk / (sk^2), "*")
-    ))
+    )
+    if (beta.kernel) {
+      undefined.rows <- !is.finite(sk) | !is.finite(dsk) |
+        apply(!is.finite(pkw), 2L, any)
+      if (any(undefined.rows)) {
+        H[undefined.rows, ] <- NA_real_
+        warning(sprintf(
+          "beta derivative hat matrix contains %d undefined endpoint row(s)",
+          sum(undefined.rows)
+        ), call. = FALSE)
+      }
+    }
+    return(H)
   }
 
   block.size <- min(512L, ntrain)
   ones <- rep.int(1.0, ntrain)
   H <- matrix(0.0, nrow = neval, ncol = ntrain)
+  undefined.rows <- rep.int(FALSE, neval)
 
   for (start in seq.int(1L, ntrain, by = block.size)) {
     stop.col <- min(ntrain, start + block.size - 1L)
@@ -373,15 +389,16 @@ npreghat <-
     W[, ib + 1L] <- 1.0
 
     # The derivative call already returns both ksum and p.ksum.
-    out <- npksum.default(
+    call <- quote(npksum.default(
       bws = bws,
       txdat = txdat,
       exdat = if (no.ex) txdat else eval.data,
       tydat = ones,
       weights = W,
-      bandwidth.divide = TRUE,
+      bandwidth.divide = !beta.kernel,
       permutation.operator = "derivative"
-    )
+    ))
+    out <- if (beta.kernel) suppressWarnings(eval(call)) else eval(call)
 
     ks <- out$ksum
     ps <- out$p.ksum
@@ -456,10 +473,22 @@ npreghat <-
     sk <- ks[nrow(ks), ]
     dsk <- ps[nrow(ps), ]
 
+    if (beta.kernel)
+      undefined.rows <- undefined.rows | !is.finite(sk) | !is.finite(dsk) |
+        apply(!is.finite(ps), 2L, any)
+
     H[, cols] <- t(
       (ps[seq_len(ib), , drop = FALSE] / rep(sk, each = ib)) -
       (ks[seq_len(ib), , drop = FALSE] * rep(dsk / (sk^2), each = ib))
     )
+  }
+
+  if (beta.kernel && any(undefined.rows)) {
+    H[undefined.rows, ] <- NA_real_
+    warning(sprintf(
+      "beta derivative hat matrix contains %d undefined endpoint row(s)",
+      sum(undefined.rows)
+    ), call. = FALSE)
   }
 
   H
@@ -1013,10 +1042,6 @@ npreghat <-
     where = ".np_regression_direct",
     regtype = bws[["regtype", exact = TRUE]]
   )
-  if (beta.kernel && gradients)
-    stop("beta regression gradients are not yet available; use gradients = FALSE",
-         call. = FALSE)
-
   regtype <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
   basis <- npValidateLpBasis(regtype = regtype, basis = bws$basis)
   degree <- npValidateGlpDegree(regtype = regtype,
@@ -1141,6 +1166,7 @@ npreghat <-
   grad.override <- isTRUE(gradients) &&
     identical(regtype, "lc") &&
     identical(bws$type, "adaptive_nn") &&
+    !beta.kernel &&
     (bws$ncon > 0L)
   txdat.frame <- txdat
   exdat.frame <- if (no.ex) NULL else exdat

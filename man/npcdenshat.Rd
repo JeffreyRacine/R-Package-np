@@ -69,6 +69,12 @@ returns the hat operator for that component of the conditional-density
 gradient. This derivative route is intended to match
 \code{npcdens(..., gradients = TRUE)$congrad}.
 
+For local-constant beta X kernels, first derivatives use the analytic beta
+PDF derivative. Exact support-endpoint rows whose raw weights jump are
+returned as \code{NA}, because a response-free hat matrix cannot perform the
+response-specific numerator/denominator cancellation available to the fitted
+conditional-density estimator.
+
 This helper is intended for object-fed repeated evaluation once a bandwidth
 object has already been constructed. It does not perform bandwidth selection.
 }

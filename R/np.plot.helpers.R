@@ -8900,14 +8900,18 @@
     bws = den.info$bws,
     txdat = xdat,
     exdat = exdat,
-    bandwidth.divide = TRUE,
+    bandwidth.divide = !identical(
+      den.info$bws[["ckertype", exact = TRUE]], "beta"
+    ),
     operator = den.info$operator
   )
   Knum <- .np_plot_kernel_weights_direct(
     bws = num.info$bws,
     txdat = data.frame(xdat, ydat),
     exdat = data.frame(exdat, eydat),
-    bandwidth.divide = TRUE,
+    bandwidth.divide = !identical(
+      num.info$bws[["ckertype", exact = TRUE]], "beta"
+    ),
     operator = num.info$operator
   )
 
@@ -8943,7 +8947,8 @@
   ncon <- if (!is.null(bws$ncon)) bws$ncon else sum(icon)
 
   bw.scale <- 1.0
-  if (ncon > 0L) {
+  if (ncon > 0L &&
+      !identical(bws[["ckertype", exact = TRUE]], "beta")) {
     con.ops <- operator[icon]
     if (any(con.ops == "normal"))
       bw.scale <- prod(bws$bw[icon][con.ops == "normal"])
@@ -8967,7 +8972,9 @@
     bws = bws,
     txdat = xdat,
     exdat = exdat,
-    bandwidth.divide = TRUE,
+    bandwidth.divide = !identical(
+      bws[["ckertype", exact = TRUE]], "beta"
+    ),
     operator = op.info$operator
   )
 

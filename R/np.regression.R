@@ -466,10 +466,6 @@ npreg.rbandwidth <-
       where = "beta regression",
       regtype = bws[["regtype", exact = TRUE]]
     )
-    if (beta.kernel && gradients)
-      stop("beta regression gradients are not yet available; use gradients = FALSE",
-           call. = FALSE)
-
     npValidateRegressionNnLowerBound(bws, where = "npreg")
     npValidateRegressionExtendedNn(
       bws,
@@ -701,6 +697,7 @@ npreg.rbandwidth <-
     grad.override <- isTRUE(gradients) &&
       identical(bws$regtype, "lc") &&
       identical(bws$type, "adaptive_nn") &&
+      !beta.kernel &&
       (bws$ncon > 0L)
     txdat.frame <- txdat
     exdat.frame <- if (no.ex) NULL else exdat

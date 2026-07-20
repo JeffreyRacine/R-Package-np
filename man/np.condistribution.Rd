@@ -219,10 +219,17 @@ Further arguments are passed to \code{\link{npcdistbw}} when bandwidths are comp
   adaptive-NN bandwidths, explicit finite bounds, sample-range bounds, and
   automatic \code{cv.ls} bandwidth selection are supported. If either side
   uses beta, all X and Y coordinates must be continuous and the fit must be
-  local constant with \code{gradients=FALSE}. Fixed/adaptive order-2 Y CDF
+  local constant. Analytic first derivatives with respect to continuous X
+  coordinates are available with \code{gradients=TRUE}; the Y-side CDF factor
+  itself is not differentiated. Fixed/adaptive order-2 Y CDF
   factors are proper on their declared support; generalized-NN order-2 curves
   may be locally nonmonotone, and signed orders 4, 6, and 8 may also leave
-  \eqn{[0,1]}. No clipping or monotone repair is applied.
+  \eqn{[0,1]}. No clipping or monotone repair is applied. At exact beta-X
+  endpoints, numerator and denominator jumps are cancelled before classifying
+  the conditional-distribution gradient. A constant Y CDF factor (in
+  particular at its exact support endpoints) gives a structural zero
+  gradient. Genuine ratio jumps are reported as signed infinities and
+  indeterminate numerical cancellations as \code{NA}, with warnings.
 
   With finite continuous response bounds, \code{npcdist} uses the
   observation-centered truncated-kernel CDF documented in

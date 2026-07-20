@@ -156,11 +156,10 @@ test_that("unsupported beta regression surfaces fail explicitly", {
     bandwidth.compute = FALSE, regtype = "lc",
     ckertype = "beta", ckerbound = "fixed", ckerlb = 0, ckerub = 1
   )
-  expect_error(
-    npreg(bws = bw, txdat = training, tydat = response, gradients = TRUE),
-    "gradients are not yet available",
-    fixed = TRUE
-  )
+  gradient_fit <- suppressWarnings(npreg(
+    bws = bw, txdat = training, tydat = response, gradients = TRUE
+  ))
+  expect_equal(dim(gradients(gradient_fit)), c(nrow(training), 1L))
   expect_error(
     npreg(bws = bw, txdat = training, tydat = response,
           exdat = data.frame(x = 1.01)),

@@ -94,8 +94,8 @@ test_that("unsupported beta npksum surfaces fail explicitly", {
 
   expect_error(do.call(npksum, c(args, list(bandwidth.divide = TRUE))),
                "bandwidth.divide = TRUE", fixed = TRUE)
-  expect_error(do.call(npksum, c(args, list(operator = "derivative"))),
-               "only operator = \"normal\", \"convolution\", or \"integral\"",
+  expect_error(do.call(npksum, c(args, list(permutation.operator = "normal"))),
+               "only derivative permutation operators",
                fixed = TRUE)
   expect_error(do.call(npksum, c(args, list(kernel.pow = 2))),
                "require kernel.pow = 1", fixed = TRUE)

@@ -257,18 +257,23 @@ npksum.default <-
         stop("beta kernel sums require finite fixed or empirical-range bounds")
       if (bws$nuno != 0L || bws$nord != 0L)
         stop("beta kernel sums currently support continuous variables only")
-      if (any(!operator %in% c("normal", "convolution", "integral")))
-        stop("beta kernel sums currently support only operator = \"normal\", \"convolution\", or \"integral\"")
+      if (any(!operator %in% c("normal", "convolution", "derivative", "integral")))
+        stop("beta kernel sums support operator = \"normal\", \"convolution\", \"derivative\", or \"integral\"")
+      if (sum(operator == "derivative") > 1L)
+        stop("beta kernel sums support one direct derivative dimension at a time")
       if (!identical(as.double(kernel.pow), 1.0))
         stop("beta kernel sums currently require kernel.pow = 1")
       if (isTRUE(bandwidth.divide))
         stop("bandwidth.divide = TRUE is not defined for beta kernels")
-      if (compute.score || compute.ocg || permutation.operator != "none")
-        stop("beta kernel sums do not yet support permutation, score, or OCG operators")
+      if (compute.score || compute.ocg ||
+          !permutation.operator %in% c("none", "derivative"))
+        stop("beta kernel sums support only derivative permutation operators")
+      if (any(operator == "derivative") && permutation.operator == "derivative")
+        stop("direct and permutation beta derivatives cannot be combined")
       if (internal.power12)
         stop("beta kernels do not support the internal dual-power route")
     }
-    
+
     if ((any(bws$icon) &&
          !all(vapply(txdat[, bws$icon, drop = FALSE], inherits, logical(1), c("integer", "numeric")))) ||
         (any(bws$iord) &&

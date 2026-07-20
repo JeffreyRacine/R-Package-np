@@ -7124,6 +7124,8 @@ SEXP C_np_regression(SEXP tuno,
     const double *truth = NULL;
     int bad_evaluation = -1;
     int bad_dimension = -1;
+    int infinite_count = 0;
+    int undefined_count = 0;
     int i;
 
     if(INTEGER(myopti_i)[REG_NUNOI] != 0 ||
@@ -7135,8 +7137,8 @@ SEXP C_np_regression(SEXP tuno,
       error("C_np_regression: invalid beta bandwidth mode");
     if(INTEGER(myopti_i)[REG_LL] != LL_LC)
       error("C_np_regression: beta regression currently supports only local-constant fitting");
-    if(do_grad || INTEGER(myopti_i)[REG_GRAD] != 0)
-      error("C_np_regression: beta regression gradients are not yet available");
+    if(do_grad != (INTEGER(myopti_i)[REG_GRAD] != 0))
+      error("C_np_regression: inconsistent beta gradient flags");
     if(num_train <= 0 || num_eval <= 0 || en != num_eval ||
        ncon <= 0 || nc != ncon)
       error("C_np_regression: invalid beta regression dimensions");
@@ -7203,8 +7205,28 @@ SEXP C_np_regression(SEXP tuno,
             np_beta_regression_status_message(beta_status));
     }
 
-    REAL(out_g)[0] = 0.0;
-    REAL(out_gerr)[0] = 0.0;
+    if(do_grad) {
+      beta_status = np_beta_regression_lc_gradient(
+        REAL(tcon_r), train_is_eval ? NULL : REAL(econ_r), REAL(ty_r),
+        beta_bandwidth_eval, beta_bandwidth_train, ckerlb_p, ckerub_p,
+        beta_bandwidth_mode, descriptor.order,
+        num_train, num_eval, ncon, train_is_eval,
+        REAL(out_g), REAL(out_gerr), &infinite_count, &undefined_count,
+        &bad_evaluation, &bad_dimension, &scalar_status);
+      if(beta_status == NP_BETA_REGRESSION_ERR_KERNEL)
+        error("C_np_regression: beta gradient failed at evaluation %d, continuous dimension %d: %s",
+              bad_evaluation + 1, bad_dimension + 1,
+              np_beta_status_message(scalar_status));
+      if(beta_status != NP_BETA_REGRESSION_OK)
+        error("C_np_regression: %s",
+              np_beta_regression_status_message(beta_status));
+      if(infinite_count > 0 || undefined_count > 0)
+        warning("beta regression gradient produced %d infinite endpoint value(s) and %d undefined cancellation(s)",
+                infinite_count, undefined_count);
+    } else {
+      REAL(out_g)[0] = 0.0;
+      REAL(out_gerr)[0] = 0.0;
+    }
     if(!ey_is_ty)
       truth = REAL(ey_r);
     else if(train_is_eval)
@@ -7589,6 +7611,8 @@ SEXP C_np_density_conditional(SEXP tyuno,
     np_beta_status scalar_status = NP_BETA_OK;
     int bad_evaluation = -1;
     int bad_dimension = -1;
+    int infinite_count = 0;
+    int undefined_count = 0;
     int i;
 
     if(INTEGER(myopti_i)[CD_CNUNOI] != 0 ||
@@ -7601,8 +7625,6 @@ SEXP C_np_density_conditional(SEXP tyuno,
       error("C_np_density_conditional: invalid beta conditional-estimator dimensions");
     if(int_ll_extern != LL_LC)
       error("C_np_density_conditional: beta conditional estimators currently support only local-constant fitting");
-    if(INTEGER(myopti_i)[CD_GRAD] != 0)
-      error("C_np_density_conditional: beta conditional gradients are not yet available");
     if(bandwidth_code != BW_FIXED && bandwidth_code != BW_GEN_NN &&
        bandwidth_code != BW_ADAP_NN)
       error("C_np_density_conditional: invalid beta bandwidth mode");
@@ -7684,9 +7706,36 @@ SEXP C_np_density_conditional(SEXP tyuno,
       error("C_np_density_conditional: %s",
             np_beta_conditional_status_message(conditional_status));
     }
-    for(i = 0; i < (int)gsize; ++i) {
-      REAL(out_grad)[i] = 0.0;
-      REAL(out_gerr)[i] = 0.0;
+    if(INTEGER(myopti_i)[CD_GRAD] != 0) {
+      conditional_status = np_beta_conditional_lc_gradient(
+        REAL(txcon_r), REAL(tycon_r),
+        train_is_eval ? NULL : REAL(excon_r),
+        train_is_eval ? NULL : REAL(eycon_r),
+        bandwidth_eval_x, bandwidth_train_x,
+        bandwidth_eval_y, bandwidth_train_y,
+        cxkerlb_p, cxkerub_p, cykerlb_p, cykerub_p,
+        x_descriptor.family, x_descriptor.legacy_code, x_descriptor.order,
+        y_descriptor.family, y_descriptor.legacy_code, y_descriptor.order,
+        bandwidth_mode, do_distribution,
+        num_train, num_eval, ncon_x, ncon_y, train_is_eval,
+        REAL(out_grad), REAL(out_gerr),
+        &infinite_count, &undefined_count,
+        &bad_evaluation, &bad_dimension, &scalar_status);
+      if(conditional_status == NP_BETA_CONDITIONAL_ERR_KERNEL)
+        error("C_np_density_conditional: gradient kernel failed at evaluation %d, continuous dimension %d: %s",
+              bad_evaluation + 1, bad_dimension + 1,
+              np_beta_status_message(scalar_status));
+      if(conditional_status != NP_BETA_CONDITIONAL_OK)
+        error("C_np_density_conditional: %s",
+              np_beta_conditional_status_message(conditional_status));
+      if(infinite_count > 0 || undefined_count > 0)
+        warning("beta conditional gradient produced %d infinite endpoint value(s) and %d undefined cancellation(s)",
+                infinite_count, undefined_count);
+    } else {
+      for(i = 0; i < (int)gsize; ++i) {
+        REAL(out_grad)[i] = 0.0;
+        REAL(out_gerr)[i] = 0.0;
+      }
     }
   } else {
     np_density_conditional(REAL(tyuno_r), REAL(tyord_r), REAL(tycon_r),
@@ -10641,6 +10690,8 @@ SEXP C_np_kernelsum(SEXP tuno,
     int beta_bandwidth_code = INTEGER(myopti_i)[KWS_BWI];
     int bad_dimension = -1;
     int has_overlap = 0;
+    int derivative_dimension = -1;
+    int undefined_count = 0;
     int i;
 
     if(nuno != 0 || nord != 0)
@@ -10651,8 +10702,9 @@ SEXP C_np_kernelsum(SEXP tuno,
       error("C_np_kernelsum: invalid beta bandwidth mode");
     if(INTEGER(myopti_i)[KWS_BDIVI] != 0)
       error("C_np_kernelsum: bandwidth.divide = TRUE is not defined for beta kernels");
-    if(p_operator != OP_NOOP || do_score || do_ocg || n_pksum != 0 || n_pkw != 0)
-      error("C_np_kernelsum: beta kernels do not yet support permutation or score operators");
+    if((p_operator != OP_NOOP && p_operator != OP_DERIVATIVE) ||
+       do_score || do_ocg)
+      error("C_np_kernelsum: beta kernels support only derivative permutation operators");
     if(XLENGTH(kpow_r) != 1 || REAL(kpow_r)[0] != 1.0)
       error("C_np_kernelsum: beta kernels currently require kernel.pow = 1");
     if(XLENGTH(op_i) != ncon)
@@ -10668,9 +10720,17 @@ SEXP C_np_kernelsum(SEXP tuno,
       }
       else if(INTEGER(op_i)[i] == OP_INTEGRAL)
         beta_operators[i] = NP_BETA_OPERATOR_CDF;
+      else if(INTEGER(op_i)[i] == OP_DERIVATIVE) {
+        if(derivative_dimension >= 0)
+          error("C_np_kernelsum: beta kernels support one direct derivative dimension at a time");
+        derivative_dimension = i;
+        beta_operators[i] = NP_BETA_OPERATOR_DERIVATIVE;
+      }
       else
-        error("C_np_kernelsum: beta kernels currently support only 'normal', 'convolution', and 'integral' operators");
+        error("C_np_kernelsum: unsupported beta operator");
     }
+    if(derivative_dimension >= 0 && p_operator == OP_DERIVATIVE)
+      error("C_np_kernelsum: direct and permutation beta derivatives cannot be combined");
     if(num_train <= 0 || num_eval <= 0 || ncon <= 0 ||
        num_response_columns < 0 || num_weight_columns < 0)
       error("C_np_kernelsum: invalid beta kernel-sum dimensions");
@@ -10714,25 +10774,84 @@ SEXP C_np_kernelsum(SEXP tuno,
       error("C_np_kernelsum: beta kernel-sum output buffer has the wrong length");
     if(return_kernel_weights && n_kw != expected_weights)
       error("C_np_kernelsum: beta kernel-weight buffer has the wrong length");
+    if(p_operator == OP_DERIVATIVE &&
+       n_pksum != (R_xlen_t)ncon * expected_sum)
+      error("C_np_kernelsum: beta derivative-sum buffer has the wrong length");
+    if(p_operator == OP_NOOP && n_pksum != 0)
+      error("C_np_kernelsum: unexpected beta permutation-sum buffer");
+    if(p_operator == OP_DERIVATIVE && return_kernel_weights &&
+       n_pkw != (R_xlen_t)ncon * expected_weights)
+      error("C_np_kernelsum: beta derivative-weight buffer has the wrong length");
 
-    beta_status = np_beta_kernelsum(
-      REAL(tcon_r), train_is_eval ? NULL : REAL(econ_r),
-      REAL(ty_r), REAL(weights_r), beta_bandwidth_eval,
-      beta_bandwidth_train, ckerlb_p, ckerub_p, beta_operators,
-      beta_bandwidth_mode,
-      descriptor.order,
-      num_train, num_eval, ncon, num_response_columns, num_weight_columns,
-      train_is_eval, leave_one_out, return_kernel_weights,
-      REAL(out_ksum), return_kernel_weights ? REAL(out_kw) : NULL,
-      NULL,
-      NULL,
-      &bad_dimension, &scalar_status, NULL);
+    if(derivative_dimension >= 0) {
+      beta_status = np_beta_kernelsum_derivative(
+        REAL(tcon_r), train_is_eval ? NULL : REAL(econ_r),
+        REAL(ty_r), REAL(weights_r), beta_bandwidth_eval,
+        beta_bandwidth_train, ckerlb_p, ckerub_p, beta_operators,
+        derivative_dimension, beta_bandwidth_mode, descriptor.order,
+        num_train, num_eval, ncon, num_response_columns, num_weight_columns,
+        train_is_eval, leave_one_out, return_kernel_weights,
+        REAL(out_ksum), return_kernel_weights ? REAL(out_kw) : NULL,
+        &undefined_count, &bad_dimension, &scalar_status, NULL);
+    } else {
+      beta_status = np_beta_kernelsum(
+        REAL(tcon_r), train_is_eval ? NULL : REAL(econ_r),
+        REAL(ty_r), REAL(weights_r), beta_bandwidth_eval,
+        beta_bandwidth_train, ckerlb_p, ckerub_p, beta_operators,
+        beta_bandwidth_mode, descriptor.order,
+        num_train, num_eval, ncon, num_response_columns, num_weight_columns,
+        train_is_eval, leave_one_out, return_kernel_weights,
+        REAL(out_ksum), return_kernel_weights ? REAL(out_kw) : NULL,
+        NULL, NULL, &bad_dimension, &scalar_status, NULL);
+    }
     if(beta_status == NP_BETA_KERNELSUM_ERR_KERNEL)
       error("C_np_kernelsum: beta scalar operator failed in continuous dimension %d: %s",
             bad_dimension + 1, np_beta_status_message(scalar_status));
     if(beta_status != NP_BETA_KERNELSUM_OK)
       error("C_np_kernelsum: %s",
             np_beta_kernelsum_status_message(beta_status));
+
+    if(p_operator == OP_DERIVATIVE) {
+      for(i = 0; i < ncon; ++i) {
+        int local_undefined_count = 0;
+        beta_status = np_beta_kernelsum_derivative(
+          REAL(tcon_r), train_is_eval ? NULL : REAL(econ_r),
+          REAL(ty_r), REAL(weights_r), beta_bandwidth_eval,
+          beta_bandwidth_train, ckerlb_p, ckerub_p, beta_operators,
+          i, beta_bandwidth_mode, descriptor.order,
+          num_train, num_eval, ncon, num_response_columns, num_weight_columns,
+          train_is_eval, leave_one_out, return_kernel_weights,
+          REAL(out_pksum) + (R_xlen_t)i * expected_sum,
+          return_kernel_weights ?
+          REAL(out_pkw) + (R_xlen_t)i * expected_weights : NULL,
+          &local_undefined_count, &bad_dimension, &scalar_status, NULL);
+        undefined_count += local_undefined_count;
+        if(beta_status == NP_BETA_KERNELSUM_ERR_KERNEL)
+          error("C_np_kernelsum: beta derivative failed in continuous dimension %d: %s",
+                bad_dimension + 1, np_beta_status_message(scalar_status));
+        if(beta_status != NP_BETA_KERNELSUM_OK)
+          error("C_np_kernelsum: %s",
+                np_beta_kernelsum_status_message(beta_status));
+      }
+    }
+
+    if(derivative_dimension >= 0 || p_operator == OP_DERIVATIVE) {
+      int infinite_count = 0;
+      R_xlen_t aggregate_index;
+      const R_xlen_t aggregate_length =
+        (R_xlen_t)n_ksum + (R_xlen_t)n_pksum;
+      for(aggregate_index = 0; aggregate_index < aggregate_length;
+          ++aggregate_index) {
+        const double value = (aggregate_index < n_ksum) ?
+          REAL(out_ksum)[aggregate_index] :
+          REAL(out_pksum)[aggregate_index - n_ksum];
+        if(!ISNA(value) && !R_FINITE(value))
+          ++infinite_count;
+      }
+      if(infinite_count > 0 || undefined_count > 0)
+        warning("beta derivative produced %d infinite endpoint value(s) and %d undefined cancellation(s)",
+                infinite_count, undefined_count);
+    }
   } else {
     np_kernelsum(REAL(tuno_r), REAL(tord_r), REAL(tcon_r),
                  REAL(ty_r), REAL(weights_r),
