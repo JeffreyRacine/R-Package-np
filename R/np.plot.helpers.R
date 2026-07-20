@@ -9128,6 +9128,8 @@
   if (nrow(weights) != tnrow)
     stop("exact ksum state apply requires one weight per training row")
 
+  beta.kernel <- identical(cker.type, "beta")
+
   myopti <- list(
     num_obs_train = tnrow,
     num_obs_eval = state$enrow,
@@ -9144,7 +9146,8 @@
     kerneval = switch(cker.type,
       gaussian = CKER_GAUSS + cker.order / 2 - 1,
       epanechnikov = CKER_EPAN + cker.order / 2 - 1,
-      uniform = CKER_UNI
+      uniform = CKER_UNI,
+      beta = CKER_COORDINATE
     ),
     ukerneval = switch(uker.type,
       aitchisonaitken = UKER_AIT,
@@ -9158,15 +9161,16 @@
     ),
     miss.ex = FALSE,
     leave.one.out = FALSE,
-    bandwidth.divide = TRUE,
+    bandwidth.divide = !beta.kernel,
     mcv.numRow = attr(state$bws$xmcv, "num.row"),
     wncol = 1L,
     yncol = 1L,
-    int_do_tree = npDoTreeOrCategoricalCompress(
-      ncon = state$bws$ncon,
-      ncat = state$bws$nuno + state$bws$nord,
-      bws = state$bws
-    ),
+    int_do_tree = if (beta.kernel) DO_TREE_NO else
+      npDoTreeOrCategoricalCompress(
+        ncon = state$bws$ncon,
+        ncat = state$bws$nuno + state$bws$nord,
+        bws = state$bws
+      ),
     return.kernel.weights = FALSE,
     permutation.operator = PERMUTATION_OPERATORS[["none"]],
     compute.score = FALSE,
@@ -9251,7 +9255,7 @@
       bws = kbx,
       weights = weights,
       operator = xop,
-      bandwidth.divide = TRUE
+      bandwidth.divide = !identical(kbx$ckertype, "beta")
     )$ksum
   )) / n.total
   num <- as.numeric(.np_plot_with_local_compiled_eval(
@@ -9262,7 +9266,7 @@
       bws = kbxy,
       weights = weights,
       operator = xyop,
-      bandwidth.divide = TRUE
+      bandwidth.divide = !identical(kbxy$ckertype, "beta")
     )$ksum
   )) / n.total
 
@@ -9307,7 +9311,7 @@
       bws = kbx,
       weights = weights,
       operator = xop,
-      bandwidth.divide = TRUE
+      bandwidth.divide = !identical(kbx$ckertype, "beta")
     )$ksum
   )) / n.total
   num <- as.numeric(.np_plot_with_local_compiled_eval(
@@ -9318,7 +9322,7 @@
       bws = kbxy,
       weights = weights,
       operator = xyop,
-      bandwidth.divide = TRUE
+      bandwidth.divide = !identical(kbxy$ckertype, "beta")
     )$ksum
   )) / n.total
 
@@ -11295,6 +11299,8 @@ plotFactor <- function(f, y, ...){
   }
   basis.code <- as.integer(npLpBasisCode(basis.engine))
   do.compiled.gradients <- isTRUE(gradients) && !glp.gradient.partial
+  beta.kernel <- identical(bws$cxkertype, "beta") ||
+    identical(bws$cykertype, "beta")
 
   myopti <- list(
     num_obs_train = tnrow,
@@ -11309,12 +11315,14 @@ plotFactor <- function(f, y, ...){
     xkerneval = switch(bws$cxkertype,
       gaussian = CKER_GAUSS + bws$cxkerorder / 2 - 1,
       epanechnikov = CKER_EPAN + bws$cxkerorder / 2 - 1,
-      uniform = CKER_UNI
+      uniform = CKER_UNI,
+      beta = CKER_COORDINATE
     ),
     ykerneval = switch(bws$cykertype,
       gaussian = CKER_GAUSS + bws$cykerorder / 2 - 1,
       epanechnikov = CKER_EPAN + bws$cykerorder / 2 - 1,
-      uniform = CKER_UNI
+      uniform = CKER_UNI,
+      beta = CKER_COORDINATE
     ),
     uxkerneval = switch(bws$uxkertype,
       aitchisonaitken = UKER_AIT,
@@ -11345,12 +11353,14 @@ plotFactor <- function(f, y, ...){
     ymcv.numRow = attr(bws$ymcv, "num.row"),
     xmcv.numRow = attr(bws$xmcv, "num.row"),
     densOrDist = if (isTRUE(cdf)) NP_DO_DIST else NP_DO_DENS,
-    int_do_tree = npDoTreeOrCategoricalCompress(
-      ncon = bws$yncon + bws$xncon,
-      ncat = bws$ynuno + bws$ynord + bws$xnuno + bws$xnord,
-      bws = bws
-    )
+    int_do_tree = if (beta.kernel) DO_TREE_NO else
+      npDoTreeOrCategoricalCompress(
+        ncon = bws$yncon + bws$xncon,
+        ncat = bws$ynuno + bws$ynord + bws$xnuno + bws$xnord,
+        bws = bws
+      )
   )
+  myopti <- c(myopti, npConditionalKernelDescriptorOptions(bws))
 
   cxker.bounds.c <- npKernelBoundsMarshal(bws$cxkerlb[bws$ixcon], bws$cxkerub[bws$ixcon])
   cyker.bounds.c <- npKernelBoundsMarshal(bws$cykerlb[bws$iycon], bws$cykerub[bws$iycon])

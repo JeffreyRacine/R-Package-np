@@ -160,3 +160,35 @@ test_that("conditional beta endpoint gradients have finite one-sided limits", {
     expect_lt(max(abs(actual - oracle) / pmax(1, abs(actual))), 1e-4)
   }
 })
+
+test_that("beta derivative plot-data routes retain native kernel descriptors", {
+  x <- data.frame(x = c(.04, .1, .18, .29, .43, .58, .7, .82, .91, .97))
+  y <- sin(2.7 * x$x) + .2 * x$x^2
+  cy <- data.frame(y = c(.07, .2, .13, .38, .49, .45, .73, .66, .86, .94))
+  rbw <- npregbw(
+    xdat = x, ydat = y, bws = .16, bandwidth.compute = FALSE,
+    regtype = "lc", ckertype = "beta", ckerorder = 8,
+    ckerbound = "fixed", ckerlb = 0, ckerub = 1
+  )
+  regression <- plot(
+    rbw, xdat = x, ydat = y, gradients = TRUE, errors = "none",
+    output = "data", neval = 11L
+  )
+  expect_true(is.list(regression) && length(regression) > 0L)
+
+  for (bwfun in list(npcdensbw, npcdistbw)) {
+    bw <- bwfun(
+      xdat = x, ydat = cy, bws = c(.18, .16),
+      bandwidth.compute = FALSE,
+      cxkertype = "beta", cxkerorder = 8,
+      cxkerbound = "fixed", cxkerlb = 0, cxkerub = 1,
+      cykertype = "beta", cykerorder = 8,
+      cykerbound = "fixed", cykerlb = 0, cykerub = 1
+    )
+    conditional <- plot(
+      bw, xdat = x, ydat = cy, gradients = TRUE, errors = "none",
+      output = "data", neval = 11L
+    )
+    expect_true(is.list(conditional) && length(conditional) > 0L)
+  }
+})
