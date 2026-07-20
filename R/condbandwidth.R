@@ -111,14 +111,18 @@ condbandwidth <-
     kerbound = cxkerbound,
     kerlb = cxkerlb,
     kerub = cxkerub,
-    argprefix = "cxker")
+    argprefix = "cxker",
+    range.policy = if (identical(cxkertype, "beta"))
+      "beta_half_spacing" else "exact")
   cybounds <- npKernelBoundsResolve(
     dati = ydati,
     varnames = ynames,
     kerbound = cykerbound,
     kerlb = cykerlb,
     kerub = cykerub,
-    argprefix = "cyker")
+    argprefix = "cyker",
+    range.policy = if (identical(cykertype, "beta"))
+      "beta_half_spacing" else "exact")
   beta.prototype <- list(
     cxkertype = cxkertype, cxkerorder = cxkerorder,
     cxkerbound = cxbounds$bound, cxkerlb = cxbounds$lb,

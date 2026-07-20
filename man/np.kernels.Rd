@@ -91,12 +91,21 @@
   families. Manual and cross-validated bandwidth objects support
   \code{bwtype="fixed"}, \code{"generalized_nn"}, and
   \code{"adaptive_nn"}. Bounds may be explicit
-  (\code{ckerbound="fixed"}) or the exact training-sample range
+  (\code{ckerbound="fixed"}) or inferred from the training sample
   (\code{ckerbound="range"}); all active beta bounds must be finite.
-  With sample-range bounds, training extrema lie exactly on the declared
-  endpoints. Ordinary PDF/CDF estimation uses the analytic endpoint branches;
-  PDF derivatives at a matching endpoint therefore follow the extended-real
-  convention described below rather than moving the support outward.
+  For sorted distinct values \eqn{u_1<\cdots<u_m}, beta range bounds are
+  \deqn{A^*=u_1-(u_2-u_1)/2,\qquad
+    B^*=u_m+(u_m-u_{m-1})/2.}
+  Thus every training value is strictly inside the fitted support, including
+  tied extrema, and raw-extremum PDF derivatives are finite. At least two
+  distinct finite values are required per continuous coordinate. This is an
+  empirical continuity convention, not an estimate of physical support: it
+  may extend beyond a known population bound. Use \code{ckerbound="fixed"}
+  when bounds are known; fixed bounds are always used literally and retain the
+  documented extended-real derivative convention when observations equal an
+  endpoint. Non-beta \code{ckerbound="range"} continues to use exact sample
+  minima and maxima. Rounded or atomic variables should be modelled with the
+  package's discrete kernels rather than made continuous by range padding.
   The beta routes currently require continuous variables only. Regression and
   conditional estimators additionally require \code{regtype="lc"}; if either
   conditional side uses beta, all X and Y coordinates must be continuous.

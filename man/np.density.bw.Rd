@@ -263,7 +263,8 @@ These controls choose and parameterize bounded support for continuous kernels.
   \item{ckerbound}{
     character string controlling continuous-kernel support handling.
     Can be set as \code{none} (default kernel on full support),
-    \code{range} (use sample min/max), or \code{fixed} (use
+    \code{range} (use sample min/max, except that beta kernels use the
+    outer half-spacing rule in \code{\link{np.kernels}}), or \code{fixed} (use
     \code{ckerlb}/\code{ckerub}). The bounded-kernel route reuses the selected continuous kernel and renormalizes it on the chosen support; see \code{\link{np.kernels}}.
   }
 

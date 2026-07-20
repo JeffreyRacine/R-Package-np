@@ -368,7 +368,8 @@ These controls choose and parameterize bounded support for continuous kernels.
   \item{cxkerbound}{
     character string controlling continuous-kernel support handling for
     \code{xdat}. Can be set as \code{none} (default kernel on full support),
-    \code{range} (use sample min/max), or \code{fixed} (use
+    \code{range} (use sample min/max, except that beta kernels use the
+    outer half-spacing rule in \code{\link{np.kernels}}), or \code{fixed} (use
     \code{cxkerlb}/\code{cxkerub}). The bounded-kernel route reuses the selected continuous kernel and renormalizes it on the chosen support; see \code{\link{np.kernels}}.
   }
 
@@ -389,7 +390,8 @@ These controls choose and parameterize bounded support for continuous kernels.
   \item{cykerbound}{
     character string controlling continuous-kernel support handling for
     \code{ydat}. Can be set as \code{none} (default kernel on full support),
-    \code{range} (use sample min/max), or \code{fixed} (use
+    \code{range} (use sample min/max, except that beta kernels use the
+    outer half-spacing rule in \code{\link{np.kernels}}), or \code{fixed} (use
     \code{cykerlb}/\code{cykerub}). For the response-side distribution
     operator, the selected continuous kernel is integrated after
     observation-centered truncation and normalization on the chosen support;

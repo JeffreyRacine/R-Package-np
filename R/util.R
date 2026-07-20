@@ -1445,6 +1445,36 @@ untangle <- function(frame){
     t.ret
   })
 
+  all.min.next <- lapply(frame, function(y) {
+    t.ret <- NULL
+    if (is.numeric(y)) {
+      finite <- y[is.finite(y)]
+      if (length(finite)) {
+        lower <- min(finite)
+        above <- finite[finite > lower]
+        t.ret <- if (length(above)) min(above) else NA_real_
+      } else {
+        t.ret <- NA_real_
+      }
+    }
+    t.ret
+  })
+
+  all.max.prev <- lapply(frame, function(y) {
+    t.ret <- NULL
+    if (is.numeric(y)) {
+      finite <- y[is.finite(y)]
+      if (length(finite)) {
+        upper <- max(finite)
+        below <- finite[finite < upper]
+        t.ret <- if (length(below)) max(below) else NA_real_
+      } else {
+        t.ret <- NA_real_
+      }
+    }
+    t.ret
+  })
+
   list(iord = iord,
        iuno = iuno,
        icon = icon,
@@ -1454,7 +1484,9 @@ untangle <- function(frame){
        all.dlev = all.dlev,
        all.nlev = all.nlev,
        all.min = all.min,
-       all.max = all.max)
+       all.max = all.max,
+       all.min.next = all.min.next,
+       all.max.prev = all.max.prev)
 }
 
 npKernelBoundsResolve <- function(dati,
@@ -1462,8 +1494,10 @@ npKernelBoundsResolve <- function(dati,
                                   kerbound = c("none", "range", "fixed"),
                                   kerlb = NULL,
                                   kerub = NULL,
-                                  argprefix = "cker") {
+                                  argprefix = "cker",
+                                  range.policy = c("exact", "beta_half_spacing")) {
   kerbound <- match.arg(kerbound)
+  range.policy <- match.arg(range.policy)
   icon.idx <- which(dati$icon)
   ncon <- length(icon.idx)
   if (is.null(varnames) || length(varnames) != length(dati$icon))
@@ -1503,6 +1537,39 @@ npKernelBoundsResolve <- function(dati,
   } else if (kerbound == "range") {
     lb <- mins
     ub <- maxs
+    if (identical(range.policy, "beta_half_spacing") &&
+        !is.null(dati$all.min.next) && !is.null(dati$all.max.prev)) {
+      nexts <- unlist(dati$all.min.next[icon.idx], use.names = FALSE)
+      prevs <- unlist(dati$all.max.prev[icon.idx], use.names = FALSE)
+      distinct.ok <- length(nexts) == ncon && length(prevs) == ncon &&
+        is.finite(nexts) & is.finite(prevs) &
+        nexts > mins & prevs < maxs
+      if (any(!distinct.ok)) {
+        bad.vars <- paste(cnames[!distinct.ok], collapse = ", ")
+        stop(sprintf(
+          paste0(
+            "Beta '%s = \"range\"' half-spacing bounds require at least ",
+            "two distinct finite training values for each continuous variable. ",
+            "Violations: %s"
+          ),
+          paste0(argprefix, "bound"), bad.vars
+        ), call. = FALSE)
+      }
+      lb <- mins - (nexts - mins) / 2
+      ub <- maxs + (maxs - prevs) / 2
+      representable <- is.finite(lb) & is.finite(ub) &
+        lb < mins & ub > maxs
+      if (any(!representable)) {
+        bad.vars <- paste(cnames[!representable], collapse = ", ")
+        stop(sprintf(
+          paste0(
+            "Beta '%s = \"range\"' half-spacing bounds are not finite ",
+            "and strictly outside the training extrema. Violations: %s"
+          ),
+          paste0(argprefix, "bound"), bad.vars
+        ), call. = FALSE)
+      }
+    }
   } else {
     lb <- recycleBounds(kerlb, paste0(argprefix, "lb"))
     ub <- recycleBounds(kerub, paste0(argprefix, "ub"))

@@ -69,7 +69,9 @@ kbandwidth.numeric <-
       kerbound = ckerbound,
       kerlb = ckerlb,
       kerub = ckerub,
-      argprefix = "cker")
+      argprefix = "cker",
+      range.policy = if (identical(ckertype, "beta"))
+        "beta_half_spacing" else "exact")
     npValidateBetaKernelSpecification(
       ckertype = ckertype,
       ckerorder = ckerorder,
