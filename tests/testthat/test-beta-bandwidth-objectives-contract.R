@@ -8,7 +8,7 @@ beta_density_objective <- function(x, bandwidth, method = c("cv.ml", "cv.ls"),
     ckertype = "beta", ckerorder = order,
     ckerbound = "fixed", ckerlb = 0, ckerub = 1
   )
-  out <- np:::npudensbw.bandwidth(
+  out <- npRmpi:::npudensbw.bandwidth(
     dat = x, bws = bws, bandwidth.compute = TRUE,
     eval.only = TRUE, nmulti = 1L, invalid.penalty = "dbmax"
   )
@@ -24,7 +24,7 @@ beta_distribution_objective <- function(x, bandwidth, order = 2L,
     bwtype = bwtype, ckertype = "beta", ckerorder = order,
     ckerbound = "fixed", ckerlb = 0, ckerub = 1
   )
-  out <- np:::npudistbw.dbandwidth(
+  out <- npRmpi:::npudistbw.dbandwidth(
     dat = x, bws = bws, gdat = gdat,
     bandwidth.compute = TRUE, eval.only = TRUE, nmulti = 1L,
     do.full.integral = do.full.integral, ngrid = ngrid,
@@ -43,7 +43,7 @@ beta_regression_objective <- function(x, y, bandwidth,
     ckertype = "beta", ckerorder = order,
     ckerbound = "fixed", ckerlb = 0, ckerub = 1
   )
-  as.numeric(np:::.npregbw_eval_only(
+  as.numeric(npRmpi:::.npregbw_eval_only(
     xdat = x, ydat = y, bws = bws, invalid.penalty = "dbmax"
   )$objective[1L])
 }

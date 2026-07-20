@@ -1491,7 +1491,7 @@
      "degree.select", "search.engine", "degree.min", "degree.max",
      "degree.start", "degree.restarts", "degree.max.cycles", "degree.verify",
      "nomad.nmulti", "nomad.opts",
-     "bwmethod", "bwtype", "bwscaling",
+     "bwmethod", "bwtype", "bwscaling", "do.full.integral",
      "ckertype", "ckerorder", "ckerbound", "ckerlb", "ckerub",
      "cxkertype", "cxkerorder", "cxkerbound", "cxkerlb", "cxkerub",
      "cykertype", "cykerorder", "cykerbound", "cykerlb", "cykerub",
