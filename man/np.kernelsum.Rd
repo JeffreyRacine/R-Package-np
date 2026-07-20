@@ -319,10 +319,11 @@ Further arguments passed to the default kernel-sum method.
   factors retain exact endpoints and contribution-wise range but can be
   locally nonmonotone. Orders 4, 6, and 8 may additionally leave \eqn{[0,1]}
   or be locally nonmonotone in every bandwidth mode; no clipping or monotone
-  repair is applied. Derivative, categorical-product, score, OCG, and
-  permutation beta operations are unavailable and fail explicitly. See
-  \code{\link{np.kernels}} for the bandwidth convention, orientation, and
-  references.
+  repair is applied. One-coordinate analytic first derivatives and their
+  continuous-coordinate permutations are available as documented below.
+  Higher and mixed derivatives, categorical-product, score, OCG, and other
+  unsupported beta operations fail explicitly. See \code{\link{np.kernels}}
+  for the bandwidth convention, orientation, and references.
 
   The option \code{operator=} can be used to \sQuote{mix and match}
   operator strings to create a \sQuote{hybrid} kernel provided they
@@ -354,7 +355,9 @@ Further arguments passed to the default kernel-sum method.
   original-scale units. Generalized- and adaptive-NN bandwidths are held fixed
   during differentiation. Exact matching support endpoints can produce signed
   infinite scalar derivatives; see \code{\link{np.kernels}} for the endpoint
-  and ratio-cancellation conventions.
+  and ratio-cancellation conventions. Signed infinities are returned as
+  \code{-Inf}/\code{Inf}, not recoded as missing values; \code{NA_real_} is
+  reserved for unavailable or indeterminate results.
 
   The option \code{compute.score=} can be used to compute the gradients
   with respect to \eqn{h} in addition to the normal kernel sum. Like

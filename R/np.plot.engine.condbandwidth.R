@@ -1015,7 +1015,7 @@
               plot.args$x <- ei
             }
             if (!(xi.factor && plot.bootstrap && plot.bxp))
-              plot.args$y <- temp.dens
+              plot.args$y <- .np_plot_geometry_values(temp.dens)
             panel.ylim <- if (plot.errors) {
               .np_plot_panel_error_range(
                 estimate = temp.dens,
@@ -1454,8 +1454,9 @@
             y.max <- max(y.max, range.k[2], na.rm = TRUE)
           }
           if (!is.finite(y.min) || !is.finite(y.max)) {
-            y.min <- min(na.omit(as.double(data.eval)))
-            y.max <- max(na.omit(as.double(data.eval)))
+            y.range <- .np_plot_finite_range(data.eval)
+            y.min <- y.range[1L]
+            y.max <- y.range[2L]
           }
         } else {
           y.min <- Inf
@@ -1475,8 +1476,9 @@
             y.max <- max(y.max, range.k[2L], na.rm = TRUE)
           }
           if (!is.finite(y.min) || !is.finite(y.max)) {
-            y.min <- min(na.omit(as.double(data.eval)))
-            y.max <- max(na.omit(as.double(data.eval)))
+            y.range <- .np_plot_finite_range(data.eval)
+            y.min <- y.range[1L]
+            y.max <- y.range[2L]
           }
         }
 
@@ -1512,7 +1514,7 @@
               plot.args$x <- allei[,plot.index]
             }
             if (!(xi.factor && plot.bootstrap && plot.bxp))
-              plot.args$y <- data.eval[,idx]
+              plot.args$y <- .np_plot_geometry_values(data.eval[,idx])
             plot.args$ylim <- c(y.min, y.max)
             plot.args$xlab <- scalar_default(xlab, gen.label(if (xOrY == "x") bws$xnames[i] else bws$ynames[i], paste(toupper(xOrY), i, sep = "")))
             plot.args$ylab <- scalar_default(ylab, if (gradients) conditional_gradient_axis_label(grad.j) else tylabE)

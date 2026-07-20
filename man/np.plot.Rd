@@ -409,6 +409,19 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   distance on the lower limit of the interval. \code{plot} uses an
   analogous procedure to extend the upper limit of the interval.
 
+  Numeric estimator output follows R's extended-real conventions:
+  mathematically defined one-sided limits are retained as \code{-Inf} or
+  \code{Inf}, while unavailable or indeterminate values are returned as
+  \code{NA_real_}. Plotting does not rewrite the estimator object or values
+  returned with \code{output="data"}. Instead, a temporary graphics-only copy
+  maps every non-finite coordinate to missing geometry. Consequently lines
+  break at an infinite or unavailable point, interval segments at that point
+  are omitted, and axis limits are computed from finite values. If a panel has
+  no finite geometry, a finite fallback scale is used unless the user supplies
+  \code{ylim}. This allows exact beta endpoint derivatives and other
+  extended-real estimates to retain their mathematical meaning without
+  passing invalid coordinates or limits to a graphics backend.
+
   Plot interval/error types are:
   \preformatted{
   "pmzsd"        : point estimate +/- z_(1-alpha/2) * standard error

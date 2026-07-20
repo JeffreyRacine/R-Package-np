@@ -846,7 +846,7 @@
             plot.args$x <- ei
           }
           if (!(xi.factor && plot.bootstrap && plot.bxp))
-            plot.args$y <- temp.mean
+            plot.args$y <- .np_plot_geometry_values(temp.mean)
           panel.ylim <- NULL
           if (plot.errors)
             panel.ylim <- .np_plot_panel_error_range(
@@ -929,7 +929,7 @@
             axis.at <- seq_along(axis.labels)
             add.axis <- is.null(plot.user.args$xaxt)
             base.args <- list(x = as.numeric(ei),
-                              y = temp.mean,
+                              y = .np_plot_geometry_values(temp.mean),
                               type = "n",
                               xlab = plot.args$xlab,
                               ylab = plot.args$ylab,
@@ -958,9 +958,10 @@
             } else {
               l.f <- rep(ei, each = 3)
               l.f[3 * seq_along(ei)] <- NA
-              l.y <- unlist(lapply(temp.mean, function(p) c(0, p, NA)))
+              plot.mean <- .np_plot_geometry_values(temp.mean)
+              l.y <- unlist(lapply(plot.mean, function(p) c(0, p, NA)))
               lines(x = l.f, y = l.y, lty = .np_plot_lty("interval"))
-              point.args <- list(x = ei, y = temp.mean)
+              point.args <- list(x = ei, y = plot.mean)
               if (!is.null(col)) point.args$col <- col
               if (!is.null(points.user.args$pch))
                 point.args$pch <- points.user.args$pch
@@ -1077,8 +1078,6 @@
       }
       
       if (common.scale && (plot.behavior != "data")){
-        jj = seq_len(bws$ndim)*3
-
         if (plot.errors) {
           y.min <- Inf
           y.max <- -Inf
@@ -1095,19 +1094,14 @@
             y.max <- max(y.max, range.k[2], na.rm = TRUE)
           }
           if (!is.finite(y.min) || !is.finite(y.max)) {
-            if (plot.errors.center == "estimate") {
-              y.max = max(na.omit(as.double(data.eval)) + na.omit(as.double(data.err[,jj-1])))
-              y.min = min(na.omit(as.double(data.eval)) - na.omit(as.double(data.err[,jj-2])))
-            } else {
-              y.max = max(na.omit(as.double(data.err[,jj] + data.err[,jj-1])))
-              y.min = min(na.omit(as.double(data.err[,jj] - data.err[,jj-2])))
-            }
+            y.range <- .np_plot_finite_range(data.eval)
+            y.min <- y.range[1L]
+            y.max <- y.range[2L]
           }
         } else {
-          y.max = max(na.omit(as.double(data.eval)) +
-            0)
-          y.min = min(na.omit(as.double(data.eval)) -
-            0)
+          y.range <- .np_plot_finite_range(data.eval)
+          y.min <- y.range[1L]
+          y.max <- y.range[2L]
         }
 
         if (overlay.ok) {
@@ -1139,7 +1133,7 @@
             plot.args$x <- allei[,i]
           }
           if (!(xi.factor && plot.bootstrap && plot.bxp))
-            plot.args$y <- data.eval[,i]
+            plot.args$y <- .np_plot_geometry_values(data.eval[,i])
           plot.args$ylim <- c(y.min, y.max)
           plot.args$xlab <- scalar_default(xlab, gen.label(bws$xnames[i], paste("X", i, sep = "")))
           response.label <- gen.label(bws$ynames, "Conditional Mean")
@@ -1205,7 +1199,7 @@
             axis.at <- seq_along(axis.labels)
             add.axis <- is.null(plot.user.args$xaxt)
             base.args <- list(x = as.numeric(allei[,i]),
-                              y = data.eval[,i],
+                              y = .np_plot_geometry_values(data.eval[,i]),
                               type = "n",
                               xlab = plot.args$xlab,
                               ylab = plot.args$ylab,
@@ -1233,9 +1227,10 @@
             } else {
               l.f <- rep(allei[,i], each = 3)
               l.f[3 * seq_along(allei[,i])] <- NA
-              l.y <- unlist(lapply(data.eval[,i], function(p) c(0, p, NA)))
+              plot.mean <- .np_plot_geometry_values(data.eval[,i])
+              l.y <- unlist(lapply(plot.mean, function(p) c(0, p, NA)))
               lines(x = l.f, y = l.y, lty = .np_plot_lty("interval"))
-              point.args <- list(x = allei[,i], y = data.eval[,i])
+              point.args <- list(x = allei[,i], y = plot.mean)
               if (!is.null(col)) point.args$col <- col
               if (!is.null(points.user.args$pch))
                 point.args$pch <- points.user.args$pch

@@ -230,6 +230,9 @@ Further arguments are passed to \code{\link{npcdistbw}} when bandwidths are comp
   particular at its exact support endpoints) gives a structural zero
   gradient. Genuine ratio jumps are reported as signed infinities and
   indeterminate numerical cancellations as \code{NA}, with warnings.
+  Returned infinities retain that extended-real meaning. Plot methods convert
+  them to missing geometry only in a temporary drawing copy, leaving fitted
+  and plot-data objects unchanged.
 
   With finite continuous response bounds, \code{npcdist} uses the
   observation-centered truncated-kernel CDF documented in

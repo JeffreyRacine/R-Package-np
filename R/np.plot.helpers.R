@@ -10958,6 +10958,29 @@ gen.label = function(label, altlabel){
   )
 }
 
+.np_plot_geometry_values <- function(x) {
+  if (!is.numeric(x))
+    return(x)
+
+  out <- x
+  out[!is.finite(out)] <- NA_real_
+  out
+}
+
+.np_plot_finite_range <- function(x, fallback = c(-1, 1)) {
+  values <- as.double(x)
+  keep <- is.finite(values)
+  if (any(keep))
+    return(range(values[keep]))
+
+  fallback <- as.double(fallback)
+  if (length(fallback) != 2L || !all(is.finite(fallback)) ||
+      fallback[1L] == fallback[2L])
+    stop("internal plot fallback must contain two distinct finite values",
+         call. = FALSE)
+  fallback
+}
+
 draw.error.bands = function(ex, ely, ehy, lty = .np_plot_lty("interval"), col = par("col")){
   lines(ex,ely,lty=lty,col=col)
   lines(ex,ehy,lty=lty,col=col)
@@ -11012,6 +11035,20 @@ draw.errors =
            plot.errors.bar.num,
            lty,
            col = par("col")){
+    n <- min(length(ex), length(ely), length(ehy))
+    if (!n)
+      return(invisible(NULL))
+    idx <- seq_len(n)
+    ex <- as.double(ex[idx])
+    ely <- as.double(ely[idx])
+    ehy <- as.double(ehy[idx])
+    keep <- is.finite(ex) & is.finite(ely) & is.finite(ehy)
+    if (!any(keep))
+      return(invisible(NULL))
+    ex <- ex[keep]
+    ely <- ely[keep]
+    ehy <- ehy[keep]
+
     if (plot.errors.style == "bar"){
       ei = seq(1,length(ex),length.out = min(length(ex),plot.errors.bar.num))
       draw.error.bars(ex = ex[ei],
@@ -11047,9 +11084,12 @@ draw.all.error.types <- function(ex, center, all.err,
     if (is.null(err)) return(invisible(NULL))
     lower <- center - err[,1]
     upper <- center + err[,2]
-    good <- complete.cases(ex, lower, upper)
+    n <- min(length(ex), length(lower), length(upper))
+    if (!n) return(invisible(NULL))
+    idx <- seq_len(n)
+    good <- is.finite(ex[idx]) & is.finite(lower[idx]) & is.finite(upper[idx])
     if (!any(good)) return(invisible(NULL))
-    draw.errors(ex = ex[good], ely = lower[good], ehy = upper[good],
+    draw.errors(ex = ex[idx][good], ely = lower[idx][good], ehy = upper[idx][good],
                 plot.errors.style = plot.errors.style,
                 plot.errors.bar = plot.errors.bar,
                 plot.errors.bar.num = plot.errors.bar.num,
@@ -11094,6 +11134,9 @@ plotFactor <- function(f, y, ...){
   has.user.xlim <- !is.null(dot.names) && any(dot.names == "xlim")
   add.axis <- is.fac && !has.user.xaxt
   x.pos <- if (is.fac) as.numeric(f) else f
+  y <- .np_plot_geometry_values(y)
+  if (!any(is.finite(y)) && is.null(dot.args$ylim))
+    dot.args$ylim <- c(-1, 1)
 
   base.args <- c(list(x = x.pos, y = y), dot.args)
   if (add.axis)
@@ -15363,7 +15406,7 @@ compute.default.error.range <- function(center, err) {
       center[idx[keep]] <- corrected[idx[keep]]
     }
   }
-  center
+  .np_plot_geometry_values(center)
 }
 
 .np_plot_error_bounds <- function(estimate, err, plotOnEstimate = TRUE) {

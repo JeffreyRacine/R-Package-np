@@ -218,6 +218,9 @@ Further arguments are passed to \code{\link{npcdensbw}} when bandwidths are comp
   beta-X endpoint jumps are cancelled in the normalized ratio before a
   gradient is classified; genuine jumps are signed infinities, while
   indeterminate cancellation is \code{NA}, both with an explanatory warning.
+  Returned infinities retain that extended-real meaning. Plot methods convert
+  them to missing geometry only in a temporary drawing copy, leaving fitted
+  and plot-data objects unchanged.
   Higher-order fits
   are signed and need not be proper densities; no positivity repair is
   applied. Bounded beta-response \code{cv.ls} integrates the actual
