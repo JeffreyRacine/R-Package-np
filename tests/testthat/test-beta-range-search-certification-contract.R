@@ -82,6 +82,41 @@ test_that("beta range certification retains an ordinary winner", {
   expect_true(certified$num.feval.certified > 0)
 })
 
+test_that("bandwidth-object restarts receive exactly one certification", {
+  set.seed(4010007)
+  x <- sort(runif(250))
+  density.start <- npudensbw(
+    ~x, bws = 0.25, bandwidth.compute = FALSE,
+    ckertype = "beta", ckerbound = "range", bwmethod = "cv.ls"
+  )
+  density <- npudensbw(
+    dat = data.frame(x = x), bws = density.start,
+    bandwidth.compute = TRUE, nmulti = 1
+  )
+  expect_true(density$beta.range.certification$triggered)
+  expect_identical(density$beta.range.certification$selected, "asymptotic")
+  expect_equal(
+    density$bw, density$beta.range.certification$tail.metric,
+    tolerance = 2e-8
+  )
+
+  set.seed(5010001)
+  x <- sort(runif(250))
+  distribution.start <- npudistbw(
+    ~x, bws = 0.25, bandwidth.compute = FALSE,
+    ckertype = "beta", ckerbound = "range", bwmethod = "cv.cdf"
+  )
+  distribution <- npudistbw(
+    dat = data.frame(x = x), bws = distribution.start,
+    bandwidth.compute = TRUE, nmulti = 1
+  )
+  expect_true(distribution$beta.range.certification$triggered)
+  expect_identical(
+    distribution$beta.range.certification$selected, "refinement"
+  )
+  expect_equal(distribution$bw, 4.45267153258119, tolerance = 2e-7)
+})
+
 test_that("beta range certification is isolated from adjacent routes", {
   set.seed(4010007)
   x <- sort(runif(250))

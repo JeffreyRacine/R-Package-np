@@ -685,12 +685,22 @@ npudensbw.bandwidth <-
            tol = 1.490116e-04,
            transform.bounds = FALSE,
            eval.only = FALSE,
+           .beta.range.certify = TRUE,
            ...,
            nomad.opts = list()){
     nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npudensbw")
     dot.args <- list(...)
     if (length(nomad.opts))
       dot.args$nomad.opts <- nomad.opts
+    certification.call <- match.call(expand.dots = FALSE)
+    certification.names <- setdiff(
+      names(certification.call)[-1L], c("...", ".beta.range.certify")
+    )
+    certification.args <- mget(
+      certification.names, envir = environment(), inherits = FALSE
+    )
+    if (length(dot.args))
+      certification.args[names(dot.args)] <- dot.args
     elapsed.start <- proc.time()[3]
     bandwidth.compute <- npValidateScalarLogical(bandwidth.compute, "bandwidth.compute")
     bwsolver <- npValidateBwsolver(bwsolver)
@@ -983,6 +993,14 @@ npudensbw.bandwidth <-
                      total.time = tbw$total.time)
     tbw <- npSetScaleFactorSearchLower(tbw, scale.factor.search.lower)
 
+    if (isTRUE(.beta.range.certify)) {
+      tbw <- npBetaRangeCertifySelector(
+        ordinary = tbw, args = certification.args,
+        selector = npudensbw.bandwidth, method = "cv.ls",
+        direction = "max", elapsed.start = elapsed.start,
+        where = "beta range density CVLS certification"
+      )
+    }
     tbw
   }
 
@@ -1111,18 +1129,9 @@ npudensbw.default <-
     if (length(dotted.arg.names)) {
       bwsel.args[dotted.arg.names] <- dots[dotted.arg.names]
     }
-    selection.start <- proc.time()[3L]
     tbw <- .np_progress_select_bandwidth_enhanced(
       "Selecting density bandwidth",
-      {
-        ordinary <- do.call(npudensbw.bandwidth, bwsel.args)
-        npBetaRangeCertifySelector(
-          ordinary = ordinary, args = bwsel.args,
-          selector = npudensbw.bandwidth, method = "cv.ls",
-          direction = "max", elapsed.start = selection.start,
-          where = "beta range density CVLS certification"
-        )
-      }
+      do.call(npudensbw.bandwidth, bwsel.args)
     )
 
     mc <- match.call(expand.dots = FALSE)

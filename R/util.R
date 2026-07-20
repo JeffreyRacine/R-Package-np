@@ -2034,6 +2034,7 @@ npBetaRangeCertifySelector <- function(ordinary,
     candidate.args$eval.only <- eval.only
     candidate.args$nmulti <- 1L
     candidate.args$bwsolver <- "powell"
+    candidate.args$.beta.range.certify <- FALSE
     do.call(selector, candidate.args)
   }
   npBetaRangeCertifySearch(

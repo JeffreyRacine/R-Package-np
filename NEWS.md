@@ -26,7 +26,8 @@
   double-precision uniform-limit objective. A material improvement triggers
   one deterministic Powell refinement from the resolved support width, and
   the best material candidate is retained. The user's ordinary search and
-  \code{nmulti} setting are unchanged; summaries report the additional
+  \code{nmulti} setting are unchanged, and cold starts and restarts from
+  bandwidth objects share the same contract; summaries report the additional
   certification evaluations. Explicit fixed bounds, CVML, higher beta orders,
   nearest-neighbour modes, multivariate searches, and non-Powell solvers are
   unchanged.
