@@ -31,6 +31,25 @@ static int np_beta_conditional_finite_bound(double value)
   return R_FINITE(value) && fabs(value) < 0.5 * DBL_MAX;
 }
 
+static int np_beta_conditional_rescale(double scaled_value,
+                                       double log_scale,
+                                       double *value)
+{
+  double log_absolute;
+
+  if(value == NULL || !R_FINITE(scaled_value) || ISNAN(log_scale))
+    return 0;
+  if(scaled_value == 0.0 || log_scale == -INFINITY) {
+    *value = 0.0;
+    return 1;
+  }
+  log_absolute = log(fabs(scaled_value)) + log_scale;
+  if(ISNAN(log_absolute) || log_absolute > log(DBL_MAX))
+    return 0;
+  *value = copysign(exp(log_absolute), scaled_value);
+  return R_FINITE(*value);
+}
+
 static double np_beta_conditional_legacy_pdf(int kernel_code,
                                              double evaluation,
                                              double observation,
@@ -621,6 +640,7 @@ np_beta_conditional_lc_gradient(const double *train_x,
     for(derivative_dimension = 0; derivative_dimension < num_x;
         ++derivative_dimension) {
       double maximum_x_log = -INFINITY;
+      double maximum_y_log = -INFINITY;
       double total_weight = 0.0;
       double weighted_y = 0.0;
       double regular_total = 0.0;
@@ -766,6 +786,11 @@ np_beta_conditional_lc_gradient(const double *train_x,
           }
           y_log[observation_index] = product_y_log;
           y_sign[observation_index] = (double)product_y_sign;
+          if(product_y_sign != 0 &&
+             (level_sign[observation_index] != 0.0 ||
+              regular_sign[observation_index] != 0.0 ||
+              jump_sign[observation_index] != 0.0))
+            maximum_y_log = fmax(maximum_y_log, product_y_log);
         }
       }
 
@@ -786,14 +811,10 @@ np_beta_conditional_lc_gradient(const double *train_x,
         const double j = (jump_sign[observation_index] == 0.0) ? 0.0 :
           jump_sign[observation_index] *
           exp(jump_log[observation_index] - maximum_x_log);
-        if(y_sign[observation_index] != 0.0) {
-          if(y_log[observation_index] > log(DBL_MAX)) {
-            free(workspace);
-            if(bad_evaluation != NULL) *bad_evaluation = evaluation_index;
-            return NP_BETA_CONDITIONAL_ERR_NUMERIC;
-          }
-          q = y_sign[observation_index] * exp(y_log[observation_index]);
-        }
+        if(y_sign[observation_index] != 0.0 &&
+           (w != 0.0 || d != 0.0 || j != 0.0))
+          q = y_sign[observation_index] *
+            exp(y_log[observation_index] - maximum_y_log);
         total_weight += w;
         weighted_y += w * q;
         regular_total += d;
@@ -849,8 +870,10 @@ np_beta_conditional_lc_gradient(const double *train_x,
           const double j = (jump_sign[observation_index] == 0.0) ? 0.0 :
             jump_sign[observation_index] *
             exp(jump_log[observation_index] - maximum_x_log);
-          if(y_sign[observation_index] != 0.0)
-            q = y_sign[observation_index] * exp(y_log[observation_index]);
+          if(y_sign[observation_index] != 0.0 &&
+             (w != 0.0 || j != 0.0))
+            q = y_sign[observation_index] *
+              exp(y_log[observation_index] - maximum_y_log);
           if(w != 0.0 || j != 0.0) {
             if(!have_active) {
               first_q = q;
@@ -887,8 +910,6 @@ np_beta_conditional_lc_gradient(const double *train_x,
 
         gradient_value = (regular_y - side_value * regular_total) /
           side_weight;
-        gradient[derivative_dimension * num_eval + evaluation_index] =
-          gradient_value;
         if(num_train <= 1) {
           gradient_stderr[derivative_dimension * num_eval + evaluation_index] = 0.0;
         } else {
@@ -912,8 +933,10 @@ np_beta_conditional_lc_gradient(const double *train_x,
               (d * side_weight - side_w * regular_total) /
               (side_weight * side_weight);
             double influence;
-            if(y_sign[observation_index] != 0.0)
-              q = y_sign[observation_index] * exp(y_log[observation_index]);
+            if(y_sign[observation_index] != 0.0 &&
+               (w != 0.0 || d != 0.0 || j != 0.0))
+              q = y_sign[observation_index] *
+                exp(y_log[observation_index] - maximum_y_log);
             influence = aprime * (q - side_value) - gradient_value * a;
             influence_square_sum += influence * influence;
           }
@@ -922,7 +945,16 @@ np_beta_conditional_lc_gradient(const double *train_x,
         }
         if(!R_FINITE(gradient_value) ||
            !R_FINITE(gradient_stderr[derivative_dimension * num_eval +
-                                     evaluation_index])) {
+                                     evaluation_index]) ||
+           !np_beta_conditional_rescale(
+             gradient_value, maximum_y_log,
+             &gradient[derivative_dimension * num_eval + evaluation_index]) ||
+           !np_beta_conditional_rescale(
+             gradient_stderr[derivative_dimension * num_eval +
+                             evaluation_index],
+             maximum_y_log,
+             &gradient_stderr[derivative_dimension * num_eval +
+                              evaluation_index])) {
           gradient[derivative_dimension * num_eval + evaluation_index] = NA_REAL;
           gradient_stderr[derivative_dimension * num_eval + evaluation_index] = NA_REAL;
           if(undefined_count != NULL) ++*undefined_count;

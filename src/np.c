@@ -11187,11 +11187,14 @@ SEXP C_np_kernelsum(SEXP tuno,
 
     if(derivative_dimension >= 0 || p_operator == OP_DERIVATIVE) {
       int infinite_count = 0;
+      R_xlen_t aggregate_index;
       const R_xlen_t aggregate_length =
         (R_xlen_t)n_ksum + (R_xlen_t)n_pksum;
-      for(i = 0; i < aggregate_length; ++i) {
-        const double value = (i < n_ksum) ? REAL(out_ksum)[i] :
-          REAL(out_pksum)[i - n_ksum];
+      for(aggregate_index = 0; aggregate_index < aggregate_length;
+          ++aggregate_index) {
+        const double value = (aggregate_index < n_ksum) ?
+          REAL(out_ksum)[aggregate_index] :
+          REAL(out_pksum)[aggregate_index - n_ksum];
         if(!ISNA(value) && !R_FINITE(value))
           ++infinite_count;
       }

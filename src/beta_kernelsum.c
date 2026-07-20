@@ -567,7 +567,6 @@ np_beta_kernelsum_derivative(const double *train_continuous,
 
       if(return_kernel_weights) {
         double value = 0.0;
-        int undefined = 0;
         if(other_sign != 0 && derivative.jump_sign != 0)
           value = (other_sign * derivative.jump_sign > 0) ?
             INFINITY : -INFINITY;
@@ -580,10 +579,6 @@ np_beta_kernelsum_derivative(const double *train_continuous,
           else
             value = (other_sign * derivative.regular_sign > 0) ?
               exp(log_absolute) : -exp(log_absolute);
-        }
-        if(undefined) {
-          value = NA_REAL;
-          if(undefined_count != NULL) ++*undefined_count;
         }
         kernel_weights[evaluation_index * num_train + observation_index] = value;
       }

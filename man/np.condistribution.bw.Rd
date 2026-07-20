@@ -746,7 +746,12 @@ These arguments collect remaining controls passed through S3 methods.
   \code{"range"}, explicit bandwidth objects, and automatic \code{cv.ls}
   search are supported. Normal-reference selection is not. If either side
   uses beta, all X and Y coordinates must be continuous and
-  \code{regtype="lc"}; beta gradients are unavailable. Order-2 CDF factors
+  \code{regtype="lc"}. Local-constant gradients with respect to X are
+  available: a beta X coordinate uses its analytic evaluation-coordinate PDF
+  derivative, while the beta or legacy Y CDF factor is held fixed. Exact
+  matching beta-X endpoints use structural cancellation in the normalized
+  ratio and can yield signed infinity or \code{NA} when a finite derivative
+  does not exist. Order-2 CDF factors
   use the observation-centered incomplete-beta construction, while orders 4,
   6, and 8 use its signed multiscale extension. See \code{\link{np.kernels}}
   for the orientation, warnings, and references.

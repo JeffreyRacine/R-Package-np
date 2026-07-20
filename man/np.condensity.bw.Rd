@@ -759,7 +759,12 @@ These arguments collect remaining controls passed through S3 methods.
   \code{"range"}, explicit bandwidth objects, and automatic
   \code{cv.ml}/\code{cv.ls} search are supported. Normal-reference selection
   is not. If either side uses beta, all X and Y coordinates must be continuous
-  and \code{regtype="lc"}; beta gradients are unavailable. Bounded
+  and \code{regtype="lc"}. Local-constant gradients with respect to X are
+  available: a beta X coordinate uses its analytic evaluation-coordinate PDF
+  derivative, while the beta or legacy Y density factor is held fixed. Exact
+  matching beta-X endpoints use structural cancellation in the normalized
+  ratio and can yield signed infinity or \code{NA} when a finite derivative
+  does not exist. Bounded
   beta-response \code{cv.ls} uses Y-support quadrature of the actual estimator
   with cached X weights. Signed orders 4, 6, and 8 are not positivity-repaired.
 

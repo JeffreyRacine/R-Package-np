@@ -5524,14 +5524,18 @@
     bws = den.info$bws,
     txdat = xdat,
     exdat = exdat,
-    bandwidth.divide = TRUE,
+    bandwidth.divide = !identical(
+      den.info$bws[["ckertype", exact = TRUE]], "beta"
+    ),
     operator = den.info$operator
   )
   Knum <- .np_kernel_weights_direct(
     bws = num.info$bws,
     txdat = data.frame(xdat, ydat),
     exdat = data.frame(exdat, eydat),
-    bandwidth.divide = TRUE,
+    bandwidth.divide = !identical(
+      num.info$bws[["ckertype", exact = TRUE]], "beta"
+    ),
     operator = num.info$operator
   )
 
