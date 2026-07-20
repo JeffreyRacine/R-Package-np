@@ -2941,6 +2941,8 @@ int KERNEL_den_extern=0;
 int KERNEL_den_unordered_extern=0;
 int KERNEL_den_ordered_extern=0;
 int np_beta_bw_order_extern=2;
+int np_beta_cx_bw_order_extern=2;
+int np_beta_cy_bw_order_extern=2;
 int BANDWIDTH_reg_extern;
 int BANDWIDTH_den_extern;
 
@@ -3603,6 +3605,9 @@ static int np_conditional_density_nomad_shadow_prepare_internal(double *c_uno,
   KERNEL_reg_ordered_extern = myopti[CBW_OXKRNEVI];
   KERNEL_den_ordered_extern = myopti[CBW_OYKRNEVI];
 
+  np_beta_cx_bw_order_extern = 2;
+  np_beta_cy_bw_order_extern = 2;
+
   np_conditional_density_nomad_shadow.num_all_var = num_all_var;
   np_conditional_density_nomad_shadow.num_reg_continuous = num_reg_continuous_extern;
   np_conditional_density_nomad_shadow.num_var_continuous = num_var_continuous_extern;
@@ -3650,6 +3655,33 @@ static int np_conditional_density_nomad_shadow_prepare_internal(double *c_uno,
   int_cyker_bound_extern = np_has_finite_cker_bounds(vector_cykerlb_extern,
                                                      vector_cykerub_extern,
                                                      num_var_continuous_extern);
+
+  if(KERNEL_reg_extern == NP_CKERNEL_COORDINATE_CODE ||
+     KERNEL_den_extern == NP_CKERNEL_COORDINATE_CODE) {
+    const int num_unordered = num_reg_unordered_extern +
+      num_var_unordered_extern;
+    const int num_ordered = num_reg_ordered_extern +
+      num_var_ordered_extern;
+
+    if(*regtype != LL_LC || num_unordered != 0 || num_ordered != 0)
+      goto fail;
+    if(KERNEL_reg_extern == NP_CKERNEL_COORDINATE_CODE)
+      np_beta_cx_bw_order_extern = np_bandwidth_kernel_descriptor_or_error(
+        myopti[CBW_CXFAMILYI], KERNEL_reg_extern, myopti[CBW_CXORDERI],
+        num_reg_continuous_extern, num_unordered, num_ordered,
+        vector_cxkerlb_extern, vector_cxkerub_extern,
+        "C_np_density_conditional_nomad_native_search (X)").order;
+    else
+      np_beta_cx_bw_order_extern = myopti[CBW_CXORDERI];
+    if(KERNEL_den_extern == NP_CKERNEL_COORDINATE_CODE)
+      np_beta_cy_bw_order_extern = np_bandwidth_kernel_descriptor_or_error(
+        myopti[CBW_CYFAMILYI], KERNEL_den_extern, myopti[CBW_CYORDERI],
+        num_var_continuous_extern, num_unordered, num_ordered,
+        vector_cykerlb_extern, vector_cykerub_extern,
+        "C_np_density_conditional_nomad_native_search (Y)").order;
+    else
+      np_beta_cy_bw_order_extern = myopti[CBW_CYORDERI];
+  }
 
   if (num_all_cvar > 0) {
     np_conditional_density_nomad_shadow.cxykerlb = alloc_vecd(num_all_cvar);
@@ -3717,6 +3749,9 @@ static int np_conditional_density_nomad_shadow_prepare_internal(double *c_uno,
   np_conditional_density_nomad_shadow.penalty_multiplier = penalty_mult[0];
 
   int_TREE_XY = int_TREE_Y = int_TREE_X = myopti[CBW_TREEI];
+  if(KERNEL_reg_extern == NP_CKERNEL_COORDINATE_CODE ||
+     KERNEL_den_extern == NP_CKERNEL_COORDINATE_CODE)
+    int_TREE_XY = int_TREE_Y = int_TREE_X = NP_TREE_FALSE;
   if(int_ll_extern == LL_LP){
     int_TREE_Y = NP_TREE_FALSE;
     int_TREE_XY = NP_TREE_FALSE;
@@ -4231,7 +4266,10 @@ SEXP C_np_density_conditional_nomad_shadow_prepare(SEXP c_uno,
   PROTECT(cykerub_r = coerceVector(cykerub, REALSXP));
 
   if (XLENGTH(myopti_i) <= CBW_CVLS_QUAD_POINTSI ||
-      XLENGTH(myoptd_r) <= CBW_QUAD_EXTD) {
+      XLENGTH(myoptd_r) <= CBW_QUAD_EXTD ||
+      ((INTEGER(myopti_i)[CBW_CXKRNEVI] == NP_CKERNEL_COORDINATE_CODE ||
+        INTEGER(myopti_i)[CBW_CYKRNEVI] == NP_CKERNEL_COORDINATE_CODE) &&
+       XLENGTH(myopti_i) <= CBW_CYORDERI)) {
     ok = 0;
   } else {
     ok = np_conditional_density_nomad_shadow_prepare_internal(REAL(c_uno_r),
@@ -9911,11 +9949,15 @@ static SEXP C_np_density_conditional_bw_common(SEXP c_uno,
 
   if (XLENGTH(myopti_i) <= CBW_CVLS_QUAD_POINTSI)
     error("C_np_density_conditional_bw: myopti is missing cvls.quadrature grid/points");
+  if ((INTEGER(myopti_i)[CBW_CXKRNEVI] == NP_CKERNEL_COORDINATE_CODE ||
+       INTEGER(myopti_i)[CBW_CYKRNEVI] == NP_CKERNEL_COORDINATE_CODE) &&
+      XLENGTH(myopti_i) <= CBW_CYORDERI)
+    error("C_np_density_conditional_bw: continuous-kernel descriptors are missing");
   if (XLENGTH(myoptd_r) <= CBW_QUAD_EXTD)
     error("C_np_density_conditional_bw: myoptd is missing cvls.quadrature.extend.factor");
 
-  ncon_x = (int)INTEGER(myopti_i)[CDBW_UNCONI];
-  ncon_y = (int)INTEGER(myopti_i)[CDBW_CNCONI];
+  ncon_x = (int)INTEGER(myopti_i)[CBW_UNCONI];
+  ncon_y = (int)INTEGER(myopti_i)[CBW_CNCONI];
   resolve_bounds_or_default(cxkerlb_r, cxkerub_r, ncon_x, &cxkerlb_p, &cxkerub_p);
   resolve_bounds_or_default(cykerlb_r, cykerub_r, ncon_y, &cykerlb_p, &cykerub_p);
 
@@ -10033,8 +10075,15 @@ static SEXP C_np_distribution_conditional_bw_common(SEXP c_uno,
   PROTECT(cykerlb_r = coerceVector(cykerlb, REALSXP));
   PROTECT(cykerub_r = coerceVector(cykerub, REALSXP));
 
-  ncon_x = (int)INTEGER(myopti_i)[CBW_UNCONI];
-  ncon_y = (int)INTEGER(myopti_i)[CBW_CNCONI];
+  if (XLENGTH(myopti_i) <= CDBW_TBNDI)
+    error("C_np_distribution_conditional_bw: myopti is incomplete");
+  if ((INTEGER(myopti_i)[CDBW_CXKRNEVI] == NP_CKERNEL_COORDINATE_CODE ||
+       INTEGER(myopti_i)[CDBW_CYKRNEVI] == NP_CKERNEL_COORDINATE_CODE) &&
+      XLENGTH(myopti_i) <= CDBW_CYORDERI)
+    error("C_np_distribution_conditional_bw: continuous-kernel descriptors are missing");
+
+  ncon_x = (int)INTEGER(myopti_i)[CDBW_UNCONI];
+  ncon_y = (int)INTEGER(myopti_i)[CDBW_CNCONI];
   resolve_bounds_or_default(cxkerlb_r, cxkerub_r, ncon_x, &cxkerlb_p, &cxkerub_p);
   resolve_bounds_or_default(cykerlb_r, cykerub_r, ncon_y, &cykerlb_p, &cykerub_p);
 
@@ -13141,6 +13190,33 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   vector_cykerub_extern = cykerub;
   int_cyker_bound_extern = np_has_finite_cker_bounds(cykerlb, cykerub, num_var_continuous_extern);
 
+  if(KERNEL_reg_extern == NP_CKERNEL_COORDINATE_CODE ||
+     KERNEL_den_extern == NP_CKERNEL_COORDINATE_CODE) {
+    const int num_unordered = num_reg_unordered_extern +
+      num_var_unordered_extern;
+    const int num_ordered = num_reg_ordered_extern +
+      num_var_ordered_extern;
+
+    if(*regtype != LL_LC)
+      error("C_np_density_conditional_bw: beta bandwidth selection supports only local-constant fitting");
+    if(num_unordered != 0 || num_ordered != 0)
+      error("C_np_density_conditional_bw: beta bandwidth selection requires continuous X and Y variables only");
+    if(KERNEL_reg_extern == NP_CKERNEL_COORDINATE_CODE)
+      np_beta_cx_bw_order_extern = np_bandwidth_kernel_descriptor_or_error(
+        myopti[CBW_CXFAMILYI], KERNEL_reg_extern, myopti[CBW_CXORDERI],
+        num_reg_continuous_extern, num_unordered, num_ordered,
+        cxkerlb, cxkerub, "C_np_density_conditional_bw (X)").order;
+    else
+      np_beta_cx_bw_order_extern = myopti[CBW_CXORDERI];
+    if(KERNEL_den_extern == NP_CKERNEL_COORDINATE_CODE)
+      np_beta_cy_bw_order_extern = np_bandwidth_kernel_descriptor_or_error(
+        myopti[CBW_CYFAMILYI], KERNEL_den_extern, myopti[CBW_CYORDERI],
+        num_var_continuous_extern, num_unordered, num_ordered,
+        cykerlb, cykerub, "C_np_density_conditional_bw (Y)").order;
+    else
+      np_beta_cy_bw_order_extern = myopti[CBW_CYORDERI];
+  }
+
   if((num_reg_continuous_extern + num_var_continuous_extern) > 0){
     cxylb = alloc_vecd(num_reg_continuous_extern + num_var_continuous_extern);
     cxyub = alloc_vecd(num_reg_continuous_extern + num_var_continuous_extern);
@@ -13173,6 +13249,10 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   old_cdens = myopti[CBW_OLDI];
   int_TREE_XY = int_TREE_Y = int_TREE_X = myopti[CBW_TREEI];
   int_TREE_PROFILE_X = myopti[CBW_TREEI];
+  if(KERNEL_reg_extern == NP_CKERNEL_COORDINATE_CODE ||
+     KERNEL_den_extern == NP_CKERNEL_COORDINATE_CODE)
+    int_TREE_XY = int_TREE_Y = int_TREE_X = int_TREE_PROFILE_X =
+      NP_TREE_FALSE;
   scale_cat = myopti[CBW_SCATI];
   bwm_use_transform = 0;
   
@@ -14357,6 +14437,9 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   KERNEL_reg_ordered_extern = myopti[CDBW_OXKRNEVI];
   KERNEL_den_ordered_extern = myopti[CDBW_OYKRNEVI];
 
+  np_beta_cx_bw_order_extern = 2;
+  np_beta_cy_bw_order_extern = 2;
+
   vector_cxkerlb_extern = cxkerlb;
   vector_cxkerub_extern = cxkerub;
   int_cxker_bound_extern = np_has_finite_cker_bounds(cxkerlb, cxkerub, num_reg_continuous_extern);
@@ -14364,6 +14447,35 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   vector_cykerlb_extern = cykerlb;
   vector_cykerub_extern = cykerub;
   int_cyker_bound_extern = np_has_finite_cker_bounds(cykerlb, cykerub, num_var_continuous_extern);
+
+  if(KERNEL_reg_extern == NP_CKERNEL_COORDINATE_CODE ||
+     KERNEL_den_extern == NP_CKERNEL_COORDINATE_CODE) {
+    const int num_unordered = num_reg_unordered_extern +
+      num_var_unordered_extern;
+    const int num_ordered = num_reg_ordered_extern +
+      num_var_ordered_extern;
+
+    if(*regtype != LL_LC)
+      error("C_np_distribution_conditional_bw: beta bandwidth selection supports only local-constant fitting");
+    if(num_unordered != 0 || num_ordered != 0)
+      error("C_np_distribution_conditional_bw: beta bandwidth selection requires continuous X and Y variables only");
+    if(KERNEL_reg_extern == NP_CKERNEL_COORDINATE_CODE)
+      np_beta_cx_bw_order_extern = np_bandwidth_kernel_descriptor_or_error(
+        myopti[CDBW_CXFAMILYI], KERNEL_reg_extern,
+        myopti[CDBW_CXORDERI], num_reg_continuous_extern,
+        num_unordered, num_ordered, cxkerlb, cxkerub,
+        "C_np_distribution_conditional_bw (X)").order;
+    else
+      np_beta_cx_bw_order_extern = myopti[CDBW_CXORDERI];
+    if(KERNEL_den_extern == NP_CKERNEL_COORDINATE_CODE)
+      np_beta_cy_bw_order_extern = np_bandwidth_kernel_descriptor_or_error(
+        myopti[CDBW_CYFAMILYI], KERNEL_den_extern,
+        myopti[CDBW_CYORDERI], num_var_continuous_extern,
+        num_unordered, num_ordered, cykerlb, cykerub,
+        "C_np_distribution_conditional_bw (Y)").order;
+    else
+      np_beta_cy_bw_order_extern = myopti[CDBW_CYORDERI];
+  }
 
   if((num_reg_continuous_extern + num_var_continuous_extern) > 0){
     cxylb = alloc_vecd(num_reg_continuous_extern + num_var_continuous_extern);
@@ -14402,6 +14514,10 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
 
   int_TREE_XY = int_TREE_Y = int_TREE_X = myopti[CDBW_TREEI];
   int_TREE_PROFILE_X = myopti[CDBW_TREEI];
+  if(KERNEL_reg_extern == NP_CKERNEL_COORDINATE_CODE ||
+     KERNEL_den_extern == NP_CKERNEL_COORDINATE_CODE)
+    int_TREE_XY = int_TREE_Y = int_TREE_X = int_TREE_PROFILE_X =
+      NP_TREE_FALSE;
   if(int_ll_extern == LL_LP){
     int_TREE_Y = NP_TREE_FALSE;
     int_TREE_XY = NP_TREE_FALSE;

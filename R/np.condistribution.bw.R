@@ -454,16 +454,8 @@ npcdistbw.condbandwidth <-
         itmax=itmax, int_RESTART_FROM_MIN=(if (remin) RE_MIN_TRUE else RE_MIN_FALSE),
         int_MINIMIZE_IO=if (isTRUE(getOption("np.messages"))) IO_MIN_FALSE else IO_MIN_TRUE,
         bwmethod = .npcdistbw_method_code(bws),
-        xkerneval = switch(bws$cxkertype,
-          gaussian = CKER_GAUSS + bws$cxkerorder/2 - 1,
-          epanechnikov = CKER_EPAN + bws$cxkerorder/2 - 1,
-          uniform = CKER_UNI
-),
-        ykerneval = switch(bws$cykertype,
-          gaussian = CKER_GAUSS + bws$cykerorder/2 - 1,
-          epanechnikov = CKER_EPAN + bws$cykerorder/2 - 1,
-          uniform = CKER_UNI
-),
+        xkerneval = npConditionalContinuousKernelCode(bws, "x"),
+        ykerneval = npConditionalContinuousKernelCode(bws, "y"),
         uxkerneval = switch(bws$uxkertype,
           aitchisonaitken = UKER_AIT,
           liracine = UKER_LR),
@@ -491,7 +483,11 @@ npcdistbw.condbandwidth <-
           ncat = dim(yuno)[2] + dim(yord)[2] + dim(xuno)[2] + dim(xord)[2]),
         scale.init.categorical.sample=scale.init.categorical.sample,
         dfc.dir = dfc.dir,
-        transform.bounds = transform.bounds)
+        transform.bounds = transform.bounds,
+        continuous.x.kernel.family = if (identical(bws$cxkertype, "beta")) CKER_FAMILY_BETA else CKER_FAMILY_LEGACY,
+        continuous.x.kernel.order = as.integer(bws$cxkerorder),
+        continuous.y.kernel.family = if (identical(bws$cykertype, "beta")) CKER_FAMILY_BETA else CKER_FAMILY_LEGACY,
+        continuous.y.kernel.order = as.integer(bws$cykerorder))
       
       myoptd = list(ftol=ftol, tol=tol, small=small, memfac = memfac,
         lbc.dir = lbc.dir, cfac.dir = cfac.dir, initc.dir = initc.dir, 
@@ -816,16 +812,8 @@ npcdistbw.condbandwidth <-
     int_RESTART_FROM_MIN = RE_MIN_FALSE,
     int_MINIMIZE_IO = IO_MIN_TRUE,
     bwmethod = CDBWM_CVLS,
-    xkerneval = switch(bws$cxkertype,
-      gaussian = CKER_GAUSS + bws$cxkerorder/2 - 1,
-      epanechnikov = CKER_EPAN + bws$cxkerorder/2 - 1,
-      uniform = CKER_UNI
-),
-    ykerneval = switch(bws$cykertype,
-      gaussian = CKER_GAUSS + bws$cykerorder/2 - 1,
-      epanechnikov = CKER_EPAN + bws$cykerorder/2 - 1,
-      uniform = CKER_UNI
-),
+    xkerneval = npConditionalContinuousKernelCode(bws, "x"),
+    ykerneval = npConditionalContinuousKernelCode(bws, "y"),
     uxkerneval = switch(bws$uxkertype,
       aitchisonaitken = UKER_AIT,
       liracine = UKER_LR),
@@ -853,7 +841,11 @@ npcdistbw.condbandwidth <-
       ncat = dim(yuno)[2] + dim(yord)[2] + dim(xuno)[2] + dim(xord)[2]),
     scale.init.categorical.sample = FALSE,
     dfc.dir = 0L,
-    transform.bounds = FALSE
+    transform.bounds = FALSE,
+    continuous.x.kernel.family = if (identical(bws$cxkertype, "beta")) CKER_FAMILY_BETA else CKER_FAMILY_LEGACY,
+    continuous.x.kernel.order = as.integer(bws$cxkerorder),
+    continuous.y.kernel.family = if (identical(bws$cykertype, "beta")) CKER_FAMILY_BETA else CKER_FAMILY_LEGACY,
+    continuous.y.kernel.order = as.integer(bws$cykerorder)
   )
 
   myoptd <- list(
@@ -1105,16 +1097,8 @@ npcdistbw.condbandwidth <-
     int_RESTART_FROM_MIN = RE_MIN_FALSE,
     int_MINIMIZE_IO = IO_MIN_TRUE,
     bwmethod = CDBWM_CVLS,
-    xkerneval = switch(bws$cxkertype,
-      gaussian = CKER_GAUSS + bws$cxkerorder/2 - 1,
-      epanechnikov = CKER_EPAN + bws$cxkerorder/2 - 1,
-      uniform = CKER_UNI
-),
-    ykerneval = switch(bws$cykertype,
-      gaussian = CKER_GAUSS + bws$cykerorder/2 - 1,
-      epanechnikov = CKER_EPAN + bws$cykerorder/2 - 1,
-      uniform = CKER_UNI
-),
+    xkerneval = npConditionalContinuousKernelCode(bws, "x"),
+    ykerneval = npConditionalContinuousKernelCode(bws, "y"),
     uxkerneval = switch(bws$uxkertype,
       aitchisonaitken = UKER_AIT,
       liracine = UKER_LR),
@@ -1142,7 +1126,11 @@ npcdistbw.condbandwidth <-
       ncat = dim(yuno)[2] + dim(yord)[2] + dim(xuno)[2] + dim(xord)[2]),
     scale.init.categorical.sample = scale.init.categorical.sample,
     dfc.dir = 0L,
-    transform.bounds = transform.bounds
+    transform.bounds = transform.bounds,
+    continuous.x.kernel.family = if (identical(bws$cxkertype, "beta")) CKER_FAMILY_BETA else CKER_FAMILY_LEGACY,
+    continuous.x.kernel.order = as.integer(bws$cxkerorder),
+    continuous.y.kernel.family = if (identical(bws$cykertype, "beta")) CKER_FAMILY_BETA else CKER_FAMILY_LEGACY,
+    continuous.y.kernel.order = as.integer(bws$cykerorder)
   )
 
   myoptd <- list(
@@ -1259,7 +1247,8 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
     xdat = xdat,
     ydat = ydat,
     bws = bws,
-    bandwidth.compute = FALSE,
+    bandwidth.compute = identical(reg.args$cxkertype, "beta") ||
+      identical(reg.args$cykertype, "beta"),
     reg.args = reg.args
   )
   if (!(template$type %in% c("fixed", "generalized_nn", "adaptive_nn")))
@@ -2554,9 +2543,15 @@ npcdistbw.default <-
       where = "npcdistbw"
     )
     public.spec <- spec
+    beta.kernel.requested <-
+      ("cxkertype" %in% mc.names &&
+         identical(as.character(cxkertype)[1L], "beta")) ||
+      ("cykertype" %in% mc.names &&
+         identical(as.character(cykertype)[1L], "beta"))
     lc.lp0.search.engine <- isTRUE(bandwidth.compute) &&
       identical(spec$regtype, "lc") &&
       sum(x.info$icon) > 0L &&
+      !beta.kernel.requested &&
       (!("bwmethod" %in% mc.names) || identical(as.character(bwmethod)[1L], "cv.ls")) &&
       (!("bwtype" %in% mc.names) || identical(as.character(bwtype)[1L], "fixed"))
     if (isTRUE(lc.lp0.search.engine)) {

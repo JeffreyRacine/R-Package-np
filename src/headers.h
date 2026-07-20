@@ -186,6 +186,15 @@ int np_glp_cv_degree_admissible_extern(const int num_obs, const int ncon, const 
 void np_reg_cv_core_clear_extern(void);
 int np_bounded_cvls_conditional_quad_context_prepare_extern(void);
 void np_bounded_cvls_conditional_quad_context_clear_extern(void);
+int np_bounded_cvls_build_conditional_grid_1d_extern(
+  const double *train_y,
+  int num_obs,
+  double lower,
+  double upper,
+  int target_points,
+  double *grid,
+  double *weights,
+  int *actual_points);
 int np_shadow_proof_cv_con_density_ml(double *vector_scale_factor, double *cv);
 int np_shadow_proof_cv_con_density_ls(double *vector_scale_factor, double *cv);
 int np_shadow_proof_cv_con_distribution_ls(double *vector_scale_factor, double *cv);
@@ -569,6 +578,10 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 4, 8, 12 };
 #define CBW_TBNDI 26
 #define CBW_CVLS_QUAD_GRIDI 27
 #define CBW_CVLS_QUAD_POINTSI 28
+#define CBW_CXFAMILYI 29
+#define CBW_CXORDERI 30
+#define CBW_CYFAMILYI 31
+#define CBW_CYORDERI 32
 
 #define CBW_FTOLD  0
 #define CBW_TOLD   1
@@ -632,6 +645,10 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 4, 8, 12 };
 #define CDBW_SCATI 25
 #define CDBW_DFC_DIRI 26
 #define CDBW_TBNDI 27
+#define CDBW_CXFAMILYI 28
+#define CDBW_CXORDERI 29
+#define CDBW_CYFAMILYI 30
+#define CDBW_CYORDERI 31
 
 #define CDBW_FTOLD  0
 #define CDBW_TOLD   1

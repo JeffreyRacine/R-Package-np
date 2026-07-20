@@ -128,8 +128,15 @@ extern int cdfontrain_extern;
 // timing
 extern double timing_extern;
 extern int np_beta_bw_order_extern;
+extern int np_beta_cx_bw_order_extern;
+extern int np_beta_cy_bw_order_extern;
 extern double *vector_ckerlb_extern;
 extern double *vector_ckerub_extern;
+extern double *vector_cxkerlb_extern;
+extern double *vector_cxkerub_extern;
+extern double *vector_cykerlb_extern;
+extern double *vector_cykerub_extern;
+extern int int_bounded_cvls_quadrature_points_extern;
 
 #define LL_LC  0
 #define LL_LL  1
@@ -137,6 +144,42 @@ extern double *vector_ckerub_extern;
 #define BW_FIXED   0
 #define BW_GEN_NN  1
 #define BW_ADAP_NN 2
+
+static int np_beta_conditional_bw_active(void)
+{
+  return KERNEL_reg_extern == NP_CKERNEL_COORDINATE_CODE ||
+    KERNEL_den_extern == NP_CKERNEL_COORDINATE_CODE;
+}
+
+static double np_beta_conditional_density_bw_objective(
+  double *vector_scale_factor,
+  int use_ls)
+{
+  if(use_ls)
+    return np_beta_objective_conditional_density_ls(
+      BANDWIDTH_den_extern,
+      KERNEL_reg_extern, np_beta_cx_bw_order_extern,
+      KERNEL_den_extern, np_beta_cy_bw_order_extern,
+      int_bounded_cvls_quadrature_points_extern,
+      num_obs_train_extern,
+      num_reg_continuous_extern, num_var_continuous_extern,
+      matrix_X_continuous_train_extern,
+      matrix_Y_continuous_train_extern,
+      &vector_scale_factor[1],
+      vector_cxkerlb_extern, vector_cxkerub_extern,
+      vector_cykerlb_extern, vector_cykerub_extern);
+  return np_beta_objective_conditional_density_ml(
+    BANDWIDTH_den_extern,
+    KERNEL_reg_extern, np_beta_cx_bw_order_extern,
+    KERNEL_den_extern, np_beta_cy_bw_order_extern,
+    num_obs_train_extern,
+    num_reg_continuous_extern, num_var_continuous_extern,
+    matrix_X_continuous_train_extern,
+    matrix_Y_continuous_train_extern,
+    &vector_scale_factor[1],
+    vector_cxkerlb_extern, vector_cxkerub_extern,
+    vector_cykerlb_extern, vector_cykerub_extern);
+}
 
 
 double cv_func_regression_categorical_ls(double *vector_scale_factor){
@@ -540,6 +583,26 @@ double cv_func_con_distribution_categorical_ls(double *vector_scale_factor)
     double cv = 0.0;
     clock_t start, diff;
 
+    if(np_beta_conditional_bw_active()) {
+      start = clock();
+      cv = np_beta_objective_conditional_distribution_ls(
+        BANDWIDTH_den_extern,
+        KERNEL_reg_extern, np_beta_cx_bw_order_extern,
+        KERNEL_den_extern, np_beta_cy_bw_order_extern,
+        num_obs_train_extern, num_obs_eval_extern,
+        num_reg_continuous_extern, num_var_continuous_extern,
+        cdfontrain_extern,
+        matrix_X_continuous_train_extern,
+        matrix_Y_continuous_train_extern,
+        matrix_Y_continuous_eval_extern,
+        &vector_scale_factor[1],
+        vector_cxkerlb_extern, vector_cxkerub_extern,
+        vector_cykerlb_extern, vector_cykerub_extern);
+      diff = clock() - start;
+      timing_extern = ((double)diff) / ((double)CLOCKS_PER_SEC);
+      return cv;
+    }
+
     if(check_valid_scale_factor_cv(
         KERNEL_den_extern,
         KERNEL_reg_unordered_extern, /* Only for conditioning vars in conditional den */
@@ -631,6 +694,10 @@ double cv_func_con_density_categorical_ml(double *vector_scale_factor)
 
     double cv = 0.0;
 
+    if(np_beta_conditional_bw_active())
+      return np_beta_conditional_density_bw_objective(
+        vector_scale_factor, 0);
+
     if(check_valid_scale_factor_cv(
         KERNEL_den_extern,
         KERNEL_reg_unordered_extern, /* Only for conditioning vars in conditional den */
@@ -690,6 +757,14 @@ double np_cv_func_con_density_categorical_ml(double *vector_scale_factor){
 
     double cv = 0.0;
     clock_t start, diff;
+
+    if(np_beta_conditional_bw_active()) {
+      start = clock();
+      cv = np_beta_conditional_density_bw_objective(vector_scale_factor, 0);
+      diff = clock() - start;
+      timing_extern = ((double)diff) / ((double)CLOCKS_PER_SEC);
+      return cv;
+    }
 
     if(check_valid_scale_factor_cv(
         KERNEL_den_extern,
@@ -774,6 +849,9 @@ double np_cv_func_con_density_categorical_ls(double *vector_scale_factor){
 
   double cv = 0.0;
 
+  if(np_beta_conditional_bw_active())
+    return np_beta_conditional_density_bw_objective(vector_scale_factor, 1);
+
   if(check_valid_scale_factor_cv(KERNEL_den_extern,
                                  KERNEL_reg_unordered_extern,  /* Only for conditioning vars in conditional den */
                                  BANDWIDTH_den_extern,
@@ -848,6 +926,14 @@ double np_cv_func_con_density_categorical_ls_npksum(double *vector_scale_factor)
 
   double cv = 0.0;
   clock_t start, diff;
+
+  if(np_beta_conditional_bw_active()) {
+    start = clock();
+    cv = np_beta_conditional_density_bw_objective(vector_scale_factor, 1);
+    diff = clock() - start;
+    timing_extern = ((double)diff) / ((double)CLOCKS_PER_SEC);
+    return cv;
+  }
 
   if(check_valid_scale_factor_cv(KERNEL_den_extern,
                                  KERNEL_reg_unordered_extern,  /* Only for conditioning vars in conditional den */
@@ -930,6 +1016,10 @@ double cv_func_con_density_categorical_ls(double *vector_scale_factor)
 /* Declarations */
 
     double cv = 0.0;
+
+    if(np_beta_conditional_bw_active())
+      return np_beta_conditional_density_bw_objective(
+        vector_scale_factor, 1);
 
     if(check_valid_scale_factor_cv(
         KERNEL_den_extern,

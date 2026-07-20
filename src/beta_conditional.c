@@ -94,7 +94,7 @@ static double np_beta_conditional_legacy_cdf(int kernel_code,
   return (evaluation_mass - lower_mass) / denominator;
 }
 
-static np_beta_conditional_status
+np_beta_conditional_status
 np_beta_conditional_scalar_log(np_continuous_kernel_family family,
                                int kernel_code,
                                int order,

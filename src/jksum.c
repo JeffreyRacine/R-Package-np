@@ -22627,7 +22627,7 @@ static void np_bounded_cvls_split_hybrid_counts(const int q_target,
   *q_gl = c2;
 }
 
-static int np_bounded_cvls_build_conditional_grid_1d(const double *train_y,
+int np_bounded_cvls_build_conditional_grid_1d_extern(const double *train_y,
                                                      const int num_obs,
                                                      const double lb,
                                                      const double ub,
@@ -22862,7 +22862,7 @@ int np_bounded_cvls_conditional_quad_context_prepare_extern(void){
     np_bounded_cvls_conditional_quad_ctx.quad_ub
   );
 
-  if(np_bounded_cvls_build_conditional_grid_1d(
+  if(np_bounded_cvls_build_conditional_grid_1d_extern(
        matrix_Y_continuous_train_extern[0],
        num_obs,
        np_bounded_cvls_conditional_quad_ctx.quad_lb[0],
@@ -23455,7 +23455,7 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_row_stream(double *
 
     /* Evaluate the bounded I1 term by integrating the pointwise estimator itself,
        bypassing the suspect bounded-convolution shortcut on this narrow surface. */
-    if(np_bounded_cvls_build_conditional_grid_1d(
+    if(np_bounded_cvls_build_conditional_grid_1d_extern(
          matrix_Y_continuous_train_extern[0],
          num_obs,
          quad_lb[0],
@@ -23607,7 +23607,7 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_general_row_stream(
   if((ncon == 1) &&
      (int_bounded_cvls_quadrature_grid_extern != NP_BOUNDED_CVLS_GRID_UNIFORM)){
     int q_actual = 0;
-    if(np_bounded_cvls_build_conditional_grid_1d(
+    if(np_bounded_cvls_build_conditional_grid_1d_extern(
          matrix_Y_continuous_train_extern[0],
          num_obs,
          quad_lb[0],

@@ -617,16 +617,8 @@ npcdensbw.conbandwidth <-
         bwmethod = switch(bws$method,
           cv.ml = CBWM_CVML,
           cv.ls = CBWM_CVLS),        
-        xkerneval = switch(bws$cxkertype,
-          gaussian = CKER_GAUSS + bws$cxkerorder/2 - 1,
-          epanechnikov = CKER_EPAN + bws$cxkerorder/2 - 1,
-          uniform = CKER_UNI
-),
-        ykerneval = switch(bws$cykertype,
-          gaussian = CKER_GAUSS + bws$cykerorder/2 - 1,
-          epanechnikov = CKER_EPAN + bws$cykerorder/2 - 1,
-          uniform = CKER_UNI
-),
+        xkerneval = npConditionalContinuousKernelCode(bws, "x"),
+        ykerneval = npConditionalContinuousKernelCode(bws, "y"),
         uxkerneval = switch(bws$uxkertype,
           aitchisonaitken = UKER_AIT,
           liracine = UKER_LR),
@@ -657,7 +649,11 @@ npcdensbw.conbandwidth <-
         transform.bounds = transform.bounds,
         cvls.quadrature.grid = .npcdensbw_cvls_quadrature_grid_code(tbw$cvls.quadrature.grid),
         cvls.quadrature.points =
-          .npcdensbw_effective_cvls_quadrature_points(tbw$cvls.quadrature.points, tbw$yncon))
+          .npcdensbw_effective_cvls_quadrature_points(tbw$cvls.quadrature.points, tbw$yncon),
+        continuous.x.kernel.family = if (identical(bws$cxkertype, "beta")) CKER_FAMILY_BETA else CKER_FAMILY_LEGACY,
+        continuous.x.kernel.order = as.integer(bws$cxkerorder),
+        continuous.y.kernel.family = if (identical(bws$cykertype, "beta")) CKER_FAMILY_BETA else CKER_FAMILY_LEGACY,
+        continuous.y.kernel.order = as.integer(bws$cykerorder))
       
       myoptd = list(ftol=ftol, tol=tol, small=small, memfac = memfac,
         lbc.dir = lbc.dir, cfac.dir = cfac.dir, initc.dir = initc.dir, 
@@ -1116,16 +1112,8 @@ npcdensbw.conbandwidth <-
     bwmethod = switch(bws$method,
       cv.ml = CBWM_CVML,
       cv.ls = CBWM_CVLS),
-    xkerneval = switch(bws$cxkertype,
-      gaussian = CKER_GAUSS + bws$cxkerorder/2 - 1,
-      epanechnikov = CKER_EPAN + bws$cxkerorder/2 - 1,
-      uniform = CKER_UNI
-),
-    ykerneval = switch(bws$cykertype,
-      gaussian = CKER_GAUSS + bws$cykerorder/2 - 1,
-      epanechnikov = CKER_EPAN + bws$cykerorder/2 - 1,
-      uniform = CKER_UNI
-),
+    xkerneval = npConditionalContinuousKernelCode(bws, "x"),
+    ykerneval = npConditionalContinuousKernelCode(bws, "y"),
     uxkerneval = switch(bws$uxkertype,
       aitchisonaitken = UKER_AIT,
       liracine = UKER_LR),
@@ -1156,7 +1144,11 @@ npcdensbw.conbandwidth <-
     transform.bounds = FALSE,
     cvls.quadrature.grid = .npcdensbw_cvls_quadrature_grid_code(cvls.quadrature.grid),
     cvls.quadrature.points =
-      .npcdensbw_effective_cvls_quadrature_points(cvls.quadrature.points, bws$yncon)
+      .npcdensbw_effective_cvls_quadrature_points(cvls.quadrature.points, bws$yncon),
+    continuous.x.kernel.family = if (identical(bws$cxkertype, "beta")) CKER_FAMILY_BETA else CKER_FAMILY_LEGACY,
+    continuous.x.kernel.order = as.integer(bws$cxkerorder),
+    continuous.y.kernel.family = if (identical(bws$cykertype, "beta")) CKER_FAMILY_BETA else CKER_FAMILY_LEGACY,
+    continuous.y.kernel.order = as.integer(bws$cykerorder)
   )
 
   myoptd <- list(
@@ -1581,16 +1573,8 @@ npNomadShadowClearConditionalDensity <- function() {
     bwmethod = switch(bws$method,
       cv.ml = CBWM_CVML,
       cv.ls = CBWM_CVLS),
-    xkerneval = switch(bws$cxkertype,
-      gaussian = CKER_GAUSS + bws$cxkerorder/2 - 1,
-      epanechnikov = CKER_EPAN + bws$cxkerorder/2 - 1,
-      uniform = CKER_UNI
-),
-    ykerneval = switch(bws$cykertype,
-      gaussian = CKER_GAUSS + bws$cykerorder/2 - 1,
-      epanechnikov = CKER_EPAN + bws$cykerorder/2 - 1,
-      uniform = CKER_UNI
-),
+    xkerneval = npConditionalContinuousKernelCode(bws, "x"),
+    ykerneval = npConditionalContinuousKernelCode(bws, "y"),
     uxkerneval = switch(bws$uxkertype,
       aitchisonaitken = UKER_AIT,
       liracine = UKER_LR),
@@ -1621,7 +1605,11 @@ npNomadShadowClearConditionalDensity <- function() {
     transform.bounds = FALSE,
     cvls.quadrature.grid = .npcdensbw_cvls_quadrature_grid_code(cvls.quadrature.grid),
     cvls.quadrature.points =
-      .npcdensbw_effective_cvls_quadrature_points(cvls.quadrature.points, bws$yncon)
+      .npcdensbw_effective_cvls_quadrature_points(cvls.quadrature.points, bws$yncon),
+    continuous.x.kernel.family = if (identical(bws$cxkertype, "beta")) CKER_FAMILY_BETA else CKER_FAMILY_LEGACY,
+    continuous.x.kernel.order = as.integer(bws$cxkerorder),
+    continuous.y.kernel.family = if (identical(bws$cykertype, "beta")) CKER_FAMILY_BETA else CKER_FAMILY_LEGACY,
+    continuous.y.kernel.order = as.integer(bws$cykerorder)
   )
 
   myoptd <- list(
@@ -2267,7 +2255,8 @@ npNomadShadowSearchConditionalDensity <- function(template,
     xdat = xdat,
     ydat = ydat,
     bws = bws,
-    bandwidth.compute = FALSE,
+    bandwidth.compute = identical(reg.args$cxkertype, "beta") ||
+      identical(reg.args$cykertype, "beta"),
     reg.args = reg.args
   )
   if (!(template$type %in% c("fixed", "generalized_nn", "adaptive_nn")))
