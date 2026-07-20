@@ -18,14 +18,20 @@ test_that("bandwidth predict methods forward object through bws", {
   nd.xw <- data.frame(x = c(0.2, 0.5, 0.8), w = c(0.1, 0.4, 0.7))
 
   bw.udens <- npudensbw(dat = x, bws = 0.25, bandwidth.compute = FALSE)
-  check_numeric_equal(predict(bw.udens)$dens, npudens(bws = bw.udens)$dens)
+  fit.udens <- predict(bw.udens)
+  expect_s3_class(fit.udens, "npdensity")
+  expect_true(is.numeric(fitted(fit.udens)))
+  check_numeric_equal(fit.udens$dens, npudens(bws = bw.udens)$dens)
   check_numeric_equal(
     predict(bw.udens, newdata = nd)$dens,
     npudens(bws = bw.udens, newdata = nd)$dens
   )
 
   bw.udist <- npudistbw(dat = x, bws = 0.25, bandwidth.compute = FALSE)
-  check_numeric_equal(predict(bw.udist)$dist, npudist(bws = bw.udist)$dist)
+  fit.udist <- predict(bw.udist)
+  expect_s3_class(fit.udist, "npdistribution")
+  expect_true(is.numeric(fitted(fit.udist)))
+  check_numeric_equal(fit.udist$dist, npudist(bws = bw.udist)$dist)
   check_numeric_equal(
     predict(bw.udist, newdata = nd)$dist,
     npudist(bws = bw.udist, newdata = nd)$dist
@@ -37,7 +43,10 @@ test_that("bandwidth predict methods forward object through bws", {
     bws = c(0.25, 0.2),
     bandwidth.compute = FALSE
   )
-  check_numeric_equal(predict(bw.cdens)$condens, npcdens(bws = bw.cdens)$condens)
+  fit.cdens <- predict(bw.cdens)
+  expect_s3_class(fit.cdens, "condensity")
+  expect_true(is.numeric(fitted(fit.cdens)))
+  check_numeric_equal(fit.cdens$condens, npcdens(bws = bw.cdens)$condens)
   check_numeric_equal(
     predict(bw.cdens, newdata = nd.yx)$condens,
     npcdens(bws = bw.cdens, newdata = nd.yx)$condens
@@ -49,18 +58,56 @@ test_that("bandwidth predict methods forward object through bws", {
     bws = c(0.25, 0.2),
     bandwidth.compute = FALSE
   )
-  check_numeric_equal(predict(bw.cdist)$condist, npcdist(bws = bw.cdist)$condist)
+  fit.cdist <- predict(bw.cdist)
+  expect_s3_class(fit.cdist, "condistribution")
+  expect_true(is.numeric(fitted(fit.cdist)))
+  check_numeric_equal(fit.cdist$condist, npcdist(bws = bw.cdist)$condist)
   check_numeric_equal(
     predict(bw.cdist, newdata = nd.yx)$condist,
     npcdist(bws = bw.cdist, newdata = nd.yx)$condist
   )
 
   bw.reg <- npregbw(xdat = x, ydat = y, bws = 0.25, bandwidth.compute = FALSE)
-  check_numeric_equal(predict(bw.reg)$mean, npreg(bws = bw.reg)$mean)
+  fit.reg <- predict(bw.reg)
+  expect_s3_class(fit.reg, "npregression")
+  expect_true(is.numeric(fitted(fit.reg)))
+  expect_true(is.numeric(residuals(fit.reg)))
+  check_numeric_equal(fit.reg$mean, npreg(bws = bw.reg)$mean)
   check_numeric_equal(
     predict(bw.reg, newdata = nd)$mean,
     npreg(bws = bw.reg, newdata = nd)$mean
   )
+
+  formula.data <- data.frame(y = y, x = x$x)
+  formula.fits <- list(
+    regression = predict(npregbw(
+      y ~ x, data = formula.data, bws = 0.25,
+      bandwidth.compute = FALSE
+    )),
+    density = predict(npudensbw(
+      ~ x, data = formula.data, bws = 0.25,
+      bandwidth.compute = FALSE
+    )),
+    distribution = predict(npudistbw(
+      ~ x, data = formula.data, bws = 0.25,
+      bandwidth.compute = FALSE
+    )),
+    conditional_density = predict(npcdensbw(
+      y ~ x, data = formula.data, bws = c(0.25, 0.2),
+      bandwidth.compute = FALSE
+    )),
+    conditional_distribution = predict(npcdistbw(
+      y ~ x, data = formula.data, bws = c(0.25, 0.2),
+      bandwidth.compute = FALSE
+    ))
+  )
+  expect_s3_class(formula.fits$regression, "npregression")
+  expect_s3_class(formula.fits$density, "npdensity")
+  expect_s3_class(formula.fits$distribution, "npdistribution")
+  expect_s3_class(formula.fits$conditional_density, "condensity")
+  expect_s3_class(formula.fits$conditional_distribution, "condistribution")
+  for (fit in formula.fits)
+    expect_true(is.numeric(fitted(fit)))
 
   bw.si <- npindexbw(
     xdat = data.frame(x = x$x, w = w$w),

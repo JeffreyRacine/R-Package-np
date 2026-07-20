@@ -944,8 +944,21 @@ or standard-deviation factors.
   continuous variables while the discrete kernel bandwidths are returned
   for the discrete variables.
 
-  The functions \code{\link{predict}}, \code{\link{summary}} and \code{\link{plot}} support
-  objects of type \code{condbandwidth}.
+  Prediction follows a two-stage contract. Calling \code{predict(bw)}
+  on the returned bandwidth object is a convenience forwarder for
+  \code{npcdist(bws = bw)} and returns a fitted \code{condistribution}
+  object; it does not return a numeric vector of conditional-distribution
+  estimates. Call \code{fitted(fit)} or
+  \code{predict(fit, newdata = ...)} on that fitted object to obtain
+  numeric results. The canonical workflow is
+  \preformatted{
+    bw <- npcdistbw(y ~ x, data = mydata)
+    fit <- predict(bw)             # equivalent to npcdist(bws = bw)
+    fitted(fit)
+    predict(fit, newdata = newdata)
+  }
+  The functions \code{\link{summary}} and \code{\link{plot}} also
+  support \code{condbandwidth} objects.
 }
 
 \section{Book And Method Pointers}{

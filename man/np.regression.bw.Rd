@@ -869,8 +869,22 @@ or standard-deviation factors.
   element \eqn{i} corresponding to column \eqn{i} of input data
   \code{xdat}.
 
-  The functions \code{\link{predict}}, \code{\link{summary}}, and \code{\link{plot}} support
-  objects of this class.
+  Prediction follows a two-stage contract. Calling \code{predict(bw)}
+  on the returned bandwidth object is a convenience forwarder for
+  \code{npreg(bws = bw)} and returns a fitted \code{npregression}
+  object; it does not return a numeric vector of predictions. Call
+  \code{fitted(fit)}, \code{residuals(fit)}, or
+  \code{predict(fit, newdata = ...)} on that fitted object to obtain
+  numeric results. The canonical workflow is
+  \preformatted{
+    bw <- npregbw(y ~ x, data = mydata)
+    fit <- predict(bw)             # equivalent to npreg(bws = bw)
+    fitted(fit)
+    residuals(fit)
+    predict(fit, newdata = newdata)
+  }
+  The functions \code{\link{summary}} and \code{\link{plot}} also
+  support \code{rbandwidth} objects.
 }
 
 \section{Book And Method Pointers}{
