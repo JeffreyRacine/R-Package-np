@@ -282,6 +282,16 @@ test_that("empirical-range beta preserves exact range failure contracts", {
     "half-spacing bounds require at least two distinct finite training values",
     fixed = TRUE
   )
+  expect_error(
+    npudensbw(
+      dat = data.frame(x = c(-.Machine$double.xmax, 0,
+                             .Machine$double.xmax)),
+      bws = 1, bandwidth.compute = FALSE,
+      ckertype = "beta", ckerbound = "range"
+    ),
+    "half-spacing bounds are not finite and strictly outside",
+    fixed = TRUE
+  )
 })
 
 test_that("beta half-spacing uses distinct extrema and is affine equivariant", {
