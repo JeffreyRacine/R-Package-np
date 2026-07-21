@@ -509,6 +509,257 @@ np_beta_conditional_lc(const double *train_x,
   return NP_BETA_CONDITIONAL_OK;
 }
 
+np_beta_conditional_status
+np_beta_conditional_lc_counts(const double *train_x,
+                              const double *train_y,
+                              const double *eval_x,
+                              const double *eval_y,
+                              const double *bandwidth_eval_x,
+                              const double *bandwidth_train_x,
+                              const double *bandwidth_eval_y,
+                              const double *bandwidth_train_y,
+                              const double *lower_x,
+                              const double *upper_x,
+                              const double *lower_y,
+                              const double *upper_y,
+                              np_continuous_kernel_family family_x,
+                              int kernel_code_x,
+                              int order_x,
+                              np_continuous_kernel_family family_y,
+                              int kernel_code_y,
+                              int order_y,
+                              np_beta_bandwidth_mode bandwidth_mode,
+                              int do_distribution,
+                              const double *counts,
+                              int num_train,
+                              int num_eval,
+                              int num_x,
+                              int num_y,
+                              int num_replicates,
+                              double *conditional,
+                              int *bad_evaluation,
+                              int *bad_replicate,
+                              int *bad_dimension,
+                              np_beta_status *kernel_status,
+                              np_beta_kernelsum_progress_callback progress_callback)
+{
+  double *workspace;
+  double *x_log;
+  double *y_log;
+  double *x_sign;
+  double *y_sign;
+  int evaluation_index;
+
+  if(bad_evaluation != NULL)
+    *bad_evaluation = -1;
+  if(bad_replicate != NULL)
+    *bad_replicate = -1;
+  if(bad_dimension != NULL)
+    *bad_dimension = -1;
+  if(kernel_status != NULL)
+    *kernel_status = NP_BETA_OK;
+
+  if(train_x == NULL || train_y == NULL || eval_x == NULL || eval_y == NULL ||
+     lower_x == NULL || upper_x == NULL || lower_y == NULL ||
+     upper_y == NULL || counts == NULL || conditional == NULL ||
+     num_train <= 0 || num_eval <= 0 || num_x <= 0 || num_y <= 0 ||
+     num_replicates <= 0 || !np_beta_order_supported(order_x) ||
+     !np_beta_order_supported(order_y) ||
+     (bandwidth_mode != NP_BETA_BANDWIDTH_FIXED &&
+      bandwidth_mode != NP_BETA_BANDWIDTH_GENERALIZED_NN &&
+      bandwidth_mode != NP_BETA_BANDWIDTH_ADAPTIVE_NN) ||
+     (bandwidth_mode != NP_BETA_BANDWIDTH_ADAPTIVE_NN &&
+      (bandwidth_eval_x == NULL || bandwidth_eval_y == NULL)) ||
+     (bandwidth_mode == NP_BETA_BANDWIDTH_ADAPTIVE_NN &&
+      (bandwidth_train_x == NULL || bandwidth_train_y == NULL)))
+    return NP_BETA_CONDITIONAL_ERR_LAYOUT;
+
+  if((size_t)num_train > SIZE_MAX / (4U * sizeof(double)))
+    return NP_BETA_CONDITIONAL_ERR_MEMORY;
+  workspace = (double *)malloc(4U * (size_t)num_train * sizeof(double));
+  if(workspace == NULL)
+    return NP_BETA_CONDITIONAL_ERR_MEMORY;
+  x_log = workspace;
+  y_log = workspace + num_train;
+  x_sign = workspace + 2 * num_train;
+  y_sign = workspace + 3 * num_train;
+
+  for(evaluation_index = 0; evaluation_index < num_eval; ++evaluation_index) {
+    int observation_index;
+    int replicate_index;
+
+    for(observation_index = 0; observation_index < num_train;
+        ++observation_index) {
+      double log_product_x = 0.0;
+      double log_product_y = 0.0;
+      int product_sign_x = 1;
+      int product_sign_y = 1;
+      int dimension;
+
+      for(dimension = 0; dimension < num_x; ++dimension) {
+        const double bandwidth = np_beta_conditional_bandwidth(
+          bandwidth_mode, bandwidth_eval_x, bandwidth_train_x,
+          dimension, evaluation_index, observation_index,
+          num_eval, num_train);
+        double scalar_log = -INFINITY;
+        int scalar_sign = 0;
+        const np_beta_conditional_status scalar_status =
+          np_beta_conditional_scalar_log(
+            family_x, kernel_code_x, order_x, 0,
+            eval_x[dimension * num_eval + evaluation_index],
+            train_x[dimension * num_train + observation_index],
+            bandwidth, lower_x[dimension], upper_x[dimension],
+            &scalar_log, &scalar_sign, kernel_status);
+
+        if(scalar_status != NP_BETA_CONDITIONAL_OK) {
+          free(workspace);
+          if(bad_evaluation != NULL)
+            *bad_evaluation = evaluation_index;
+          if(bad_dimension != NULL)
+            *bad_dimension = dimension;
+          return scalar_status;
+        }
+        if(scalar_sign == 0) {
+          log_product_x = -INFINITY;
+          product_sign_x = 0;
+          break;
+        }
+        log_product_x += scalar_log;
+        product_sign_x *= scalar_sign;
+      }
+
+      for(dimension = 0; dimension < num_y; ++dimension) {
+        const double bandwidth = np_beta_conditional_bandwidth(
+          bandwidth_mode, bandwidth_eval_y, bandwidth_train_y,
+          dimension, evaluation_index, observation_index,
+          num_eval, num_train);
+        double scalar_log = -INFINITY;
+        int scalar_sign = 0;
+        const np_beta_conditional_status scalar_status =
+          np_beta_conditional_scalar_log(
+            family_y, kernel_code_y, order_y, do_distribution,
+            eval_y[dimension * num_eval + evaluation_index],
+            train_y[dimension * num_train + observation_index],
+            bandwidth, lower_y[dimension], upper_y[dimension],
+            &scalar_log, &scalar_sign, kernel_status);
+
+        if(scalar_status != NP_BETA_CONDITIONAL_OK) {
+          free(workspace);
+          if(bad_evaluation != NULL)
+            *bad_evaluation = evaluation_index;
+          if(bad_dimension != NULL)
+            *bad_dimension = num_x + dimension;
+          return scalar_status;
+        }
+        if(scalar_sign == 0) {
+          log_product_y = -INFINITY;
+          product_sign_y = 0;
+          break;
+        }
+        log_product_y += scalar_log;
+        product_sign_y *= scalar_sign;
+      }
+
+      x_log[observation_index] = log_product_x;
+      y_log[observation_index] = log_product_y;
+      x_sign[observation_index] = (double)product_sign_x;
+      y_sign[observation_index] = (double)product_sign_y;
+    }
+
+    for(replicate_index = 0; replicate_index < num_replicates;
+        ++replicate_index) {
+      double denominator_positive = -INFINITY;
+      double denominator_negative = -INFINITY;
+      double numerator_positive = -INFINITY;
+      double numerator_negative = -INFINITY;
+      double denominator_log = -INFINITY;
+      double numerator_log = -INFINITY;
+      int denominator_sign = 0;
+      int numerator_sign = 0;
+      int conditional_sign;
+
+      for(observation_index = 0; observation_index < num_train;
+          ++observation_index) {
+        const double count =
+          counts[(size_t)observation_index +
+                 (size_t)num_train * (size_t)replicate_index];
+        const int observation_x_sign = (int)x_sign[observation_index];
+        const int observation_y_sign = (int)y_sign[observation_index];
+        double count_log;
+
+        if(count == 0.0 || observation_x_sign == 0)
+          continue;
+        count_log = log(count);
+        if(observation_x_sign > 0)
+          denominator_positive = np_beta_conditional_log_add(
+            denominator_positive, x_log[observation_index] + count_log);
+        else
+          denominator_negative = np_beta_conditional_log_add(
+            denominator_negative, x_log[observation_index] + count_log);
+
+        if(observation_y_sign != 0) {
+          const double joint_log = x_log[observation_index] +
+            y_log[observation_index] + count_log;
+          const int joint_sign = observation_x_sign * observation_y_sign;
+          if(joint_sign > 0)
+            numerator_positive = np_beta_conditional_log_add(
+              numerator_positive, joint_log);
+          else
+            numerator_negative = np_beta_conditional_log_add(
+              numerator_negative, joint_log);
+        }
+      }
+
+      if(np_beta_signed_log_absolute(
+           denominator_positive, denominator_negative,
+           &denominator_log, &denominator_sign) != NP_BETA_OK ||
+         denominator_sign == 0) {
+        free(workspace);
+        if(bad_evaluation != NULL)
+          *bad_evaluation = evaluation_index;
+        if(bad_replicate != NULL)
+          *bad_replicate = replicate_index;
+        return NP_BETA_CONDITIONAL_ERR_ZERO_WEIGHT;
+      }
+      if(np_beta_signed_log_absolute(
+           numerator_positive, numerator_negative,
+           &numerator_log, &numerator_sign) != NP_BETA_OK) {
+        free(workspace);
+        if(bad_evaluation != NULL)
+          *bad_evaluation = evaluation_index;
+        if(bad_replicate != NULL)
+          *bad_replicate = replicate_index;
+        return NP_BETA_CONDITIONAL_ERR_NUMERIC;
+      }
+
+      conditional_sign = numerator_sign * denominator_sign;
+      if(conditional_sign == 0) {
+        conditional[(size_t)replicate_index +
+                    (size_t)num_replicates * (size_t)evaluation_index] = 0.0;
+      } else {
+        const double conditional_log = numerator_log - denominator_log;
+        if(!R_FINITE(conditional_log) || conditional_log > log(DBL_MAX)) {
+          free(workspace);
+          if(bad_evaluation != NULL)
+            *bad_evaluation = evaluation_index;
+          if(bad_replicate != NULL)
+            *bad_replicate = replicate_index;
+          return NP_BETA_CONDITIONAL_ERR_NUMERIC;
+        }
+        conditional[(size_t)replicate_index +
+                    (size_t)num_replicates * (size_t)evaluation_index] =
+          (conditional_sign > 0 ? 1.0 : -1.0) * exp(conditional_log);
+      }
+    }
+
+    if(progress_callback != NULL)
+      progress_callback(evaluation_index + 1, num_eval);
+  }
+
+  free(workspace);
+  return NP_BETA_CONDITIONAL_OK;
+}
+
 static np_beta_conditional_status
 np_beta_conditional_legacy_pdf_derivative(int kernel_code,
                                           double evaluation,

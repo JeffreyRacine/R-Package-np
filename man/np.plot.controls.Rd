@@ -21,7 +21,10 @@ np_render_control(style = c("band", "bar"),
                   bar_num = NULL)
 }
 \arguments{
-  \item{nonfixed}{Bootstrap refit behavior for non-fixed bandwidth routes.}
+  \item{nonfixed}{Bootstrap behavior for non-fixed bandwidth routes.
+    \code{"exact"} reconstructs each duplicate-row resample and recomputes
+    nearest-neighbour bandwidths; \code{"frozen"} reuses the bandwidths from
+    the fitted object.}
   \item{wild}{Wild-bootstrap multiplier distribution.}
   \item{blocklen}{Optional block length for block bootstrap methods.}
   \item{xtrim}{Optional two-element trim range for evaluation grids.}
@@ -41,6 +44,13 @@ np_render_control(style = c("band", "bar"),
   controls such as \code{data_overlay}, \code{data_rug}, \code{layout}, and
   \code{output} are supplied directly to \code{plot(...)} rather than through
   \code{np_render_control()}.
+
+  Conditional density and distribution level bootstraps permit different
+  supported continuous kernel families and orders on the X and Y sides,
+  including beta on either side. Beta-containing routes remain limited to
+  continuous X and Y with local-constant fitting and retain the resolved
+  support bounds stored in the bandwidth object. The \code{nonfixed} choice
+  changes nearest-neighbour bandwidth replay, not those fitted support bounds.
 }
 \value{
   A small classed list consumed by \code{plot} methods.

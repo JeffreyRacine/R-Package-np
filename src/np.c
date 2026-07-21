@@ -7468,6 +7468,205 @@ SEXP C_np_density(SEXP tuno,
   return out;
 }
 
+SEXP C_np_beta_conditional_bootstrap(SEXP txcon,
+                                     SEXP tycon,
+                                     SEXP excon,
+                                     SEXP eycon,
+                                     SEXP rbwx,
+                                     SEXP rbwy,
+                                     SEXP ckerlbx,
+                                     SEXP ckerubx,
+                                     SEXP ckerlby,
+                                     SEXP ckeruby,
+                                     SEXP familyx,
+                                     SEXP codex,
+                                     SEXP orderx,
+                                     SEXP familyy,
+                                     SEXP codey,
+                                     SEXP ordery,
+                                     SEXP bandwidth_mode_sexp,
+                                     SEXP do_distribution_sexp,
+                                     SEXP counts)
+{
+  SEXP txcon_r = R_NilValue, tycon_r = R_NilValue;
+  SEXP excon_r = R_NilValue, eycon_r = R_NilValue;
+  SEXP rbwx_r = R_NilValue, rbwy_r = R_NilValue;
+  SEXP ckerlbx_r = R_NilValue, ckerubx_r = R_NilValue;
+  SEXP ckerlby_r = R_NilValue, ckeruby_r = R_NilValue;
+  SEXP counts_r = R_NilValue, out = R_NilValue;
+  int num_train_x, num_x, num_train_y, num_y;
+  int num_eval_x, num_eval_x_columns;
+  int num_eval_y, num_eval_y_columns;
+  int counts_rows, num_replicates;
+  int bandwidth_mode_code = asInteger(bandwidth_mode_sexp);
+  int do_distribution = asLogical(do_distribution_sexp);
+  np_beta_bandwidth_mode bandwidth_mode;
+  np_continuous_kernel_descriptor x_descriptor;
+  np_continuous_kernel_descriptor y_descriptor;
+  const double *bandwidth_eval_x;
+  const double *bandwidth_train_x;
+  const double *bandwidth_eval_y;
+  const double *bandwidth_train_y;
+  np_beta_conditional_status conditional_status;
+  np_beta_status scalar_status = NP_BETA_OK;
+  int bad_evaluation = -1;
+  int bad_replicate = -1;
+  int bad_dimension = -1;
+  int replicate_index;
+
+  PROTECT(txcon_r = coerceVector(txcon, REALSXP));
+  PROTECT(tycon_r = coerceVector(tycon, REALSXP));
+  PROTECT(excon_r = coerceVector(excon, REALSXP));
+  PROTECT(eycon_r = coerceVector(eycon, REALSXP));
+  PROTECT(rbwx_r = coerceVector(rbwx, REALSXP));
+  PROTECT(rbwy_r = coerceVector(rbwy, REALSXP));
+  PROTECT(ckerlbx_r = coerceVector(ckerlbx, REALSXP));
+  PROTECT(ckerubx_r = coerceVector(ckerubx, REALSXP));
+  PROTECT(ckerlby_r = coerceVector(ckerlby, REALSXP));
+  PROTECT(ckeruby_r = coerceVector(ckeruby, REALSXP));
+  PROTECT(counts_r = coerceVector(counts, REALSXP));
+
+  np_shadow_matrix_dims(txcon_r, &num_train_x, &num_x);
+  np_shadow_matrix_dims(tycon_r, &num_train_y, &num_y);
+  np_shadow_matrix_dims(excon_r, &num_eval_x, &num_eval_x_columns);
+  np_shadow_matrix_dims(eycon_r, &num_eval_y, &num_eval_y_columns);
+  np_shadow_matrix_dims(counts_r, &counts_rows, &num_replicates);
+  if(num_train_x <= 0 || num_x <= 0 || num_train_y != num_train_x ||
+     num_y <= 0 || num_eval_x <= 0 || num_eval_y != num_eval_x ||
+     num_eval_x_columns != num_x || num_eval_y_columns != num_y ||
+     counts_rows != num_train_x || num_replicates <= 0)
+    error("C_np_beta_conditional_bootstrap: invalid matrix dimensions");
+  if(XLENGTH(rbwx_r) != num_x || XLENGTH(rbwy_r) != num_y ||
+     XLENGTH(ckerlbx_r) != num_x || XLENGTH(ckerubx_r) != num_x ||
+     XLENGTH(ckerlby_r) != num_y || XLENGTH(ckeruby_r) != num_y)
+    error("C_np_beta_conditional_bootstrap: bandwidth or bound length does not match its continuous side");
+  if(do_distribution == NA_LOGICAL)
+    error("C_np_beta_conditional_bootstrap: distribution flag must be TRUE or FALSE");
+  if((R_xlen_t)num_replicates > R_XLEN_T_MAX / (R_xlen_t)num_eval_x)
+    error("C_np_beta_conditional_bootstrap: result dimensions overflow R's vector limit");
+  if((size_t)num_x > SIZE_MAX / (size_t)num_eval_x ||
+     (size_t)num_x > SIZE_MAX / (size_t)num_train_x ||
+     (size_t)num_y > SIZE_MAX / (size_t)num_eval_y ||
+     (size_t)num_y > SIZE_MAX / (size_t)num_train_y)
+    error("C_np_beta_conditional_bootstrap: bandwidth workspace dimensions overflow");
+
+  x_descriptor = np_continuous_kernel_descriptor_or_error(
+    asInteger(familyx), asInteger(codex), asInteger(orderx),
+    "C_np_beta_conditional_bootstrap x kernel");
+  y_descriptor = np_continuous_kernel_descriptor_or_error(
+    asInteger(familyy), asInteger(codey), asInteger(ordery),
+    "C_np_beta_conditional_bootstrap y kernel");
+  if(x_descriptor.family != NP_CKERNEL_FAMILY_BETA &&
+     y_descriptor.family != NP_CKERNEL_FAMILY_BETA)
+    error("C_np_beta_conditional_bootstrap: at least one continuous side must use the beta family");
+
+  if(bandwidth_mode_code == NP_BETA_BANDWIDTH_FIXED)
+    bandwidth_mode = NP_BETA_BANDWIDTH_FIXED;
+  else if(bandwidth_mode_code == NP_BETA_BANDWIDTH_GENERALIZED_NN)
+    bandwidth_mode = NP_BETA_BANDWIDTH_GENERALIZED_NN;
+  else if(bandwidth_mode_code == NP_BETA_BANDWIDTH_ADAPTIVE_NN)
+    bandwidth_mode = NP_BETA_BANDWIDTH_ADAPTIVE_NN;
+  else
+    error("C_np_beta_conditional_bootstrap: invalid bandwidth mode");
+
+  for(replicate_index = 0; replicate_index < num_replicates;
+      ++replicate_index) {
+    double count_sum = 0.0;
+    int observation_index;
+    for(observation_index = 0; observation_index < num_train_x;
+        ++observation_index) {
+      const double count = REAL(counts_r)[
+        (size_t)observation_index +
+        (size_t)num_train_x * (size_t)replicate_index];
+      if(!R_FINITE(count) || count < 0.0 || count != floor(count) ||
+         count > (double)num_train_x)
+        error("C_np_beta_conditional_bootstrap: counts must be finite nonnegative integer multiplicities");
+      count_sum += count;
+    }
+    if(count_sum != (double)num_train_x)
+      error("C_np_beta_conditional_bootstrap: every count column must sum to the training sample size");
+  }
+
+  bandwidth_eval_x = REAL(rbwx_r);
+  bandwidth_train_x = REAL(rbwx_r);
+  bandwidth_eval_y = REAL(rbwy_r);
+  bandwidth_train_y = REAL(rbwy_r);
+  if(bandwidth_mode != NP_BETA_BANDWIDTH_FIXED) {
+    const int need_eval = bandwidth_mode == NP_BETA_BANDWIDTH_GENERALIZED_NN;
+    const int need_train = bandwidth_mode == NP_BETA_BANDWIDTH_ADAPTIVE_NN;
+    double *bandwidth_eval_x_storage = need_eval ?
+      (double *)R_alloc((size_t)num_x * (size_t)num_eval_x,
+                        sizeof(double)) : NULL;
+    double *bandwidth_train_x_storage = need_train ?
+      (double *)R_alloc((size_t)num_x * (size_t)num_train_x,
+                        sizeof(double)) : NULL;
+    double *bandwidth_eval_y_storage = need_eval ?
+      (double *)R_alloc((size_t)num_y * (size_t)num_eval_y,
+                        sizeof(double)) : NULL;
+    double *bandwidth_train_y_storage = need_train ?
+      (double *)R_alloc((size_t)num_y * (size_t)num_train_y,
+                        sizeof(double)) : NULL;
+    np_beta_bandwidth_prepare_status bandwidth_status;
+
+    /*
+     * Bootstrap replicate chunks are evaluated rank-locally.  Suppress the
+     * collective NN bandwidth path so neither the master center calculation
+     * nor a worker payload attempts nested MPI participation.
+     */
+    bandwidth_status = np_beta_bandwidth_prepare(
+      bandwidth_mode, REAL(txcon_r), REAL(excon_r), REAL(rbwx_r),
+      num_train_x, num_eval_x, num_x, 0,
+      need_eval, need_train, 1,
+      bandwidth_eval_x_storage, bandwidth_train_x_storage);
+    if(bandwidth_status != NP_BETA_BANDWIDTH_PREPARE_OK)
+      error("C_np_beta_conditional_bootstrap: x-side %s",
+            np_beta_bandwidth_prepare_status_message(bandwidth_status));
+    bandwidth_status = np_beta_bandwidth_prepare(
+      bandwidth_mode, REAL(tycon_r), REAL(eycon_r), REAL(rbwy_r),
+      num_train_y, num_eval_y, num_y, 0,
+      need_eval, need_train, 1,
+      bandwidth_eval_y_storage, bandwidth_train_y_storage);
+    if(bandwidth_status != NP_BETA_BANDWIDTH_PREPARE_OK)
+      error("C_np_beta_conditional_bootstrap: y-side %s",
+            np_beta_bandwidth_prepare_status_message(bandwidth_status));
+
+    bandwidth_eval_x = bandwidth_eval_x_storage;
+    bandwidth_train_x = bandwidth_train_x_storage;
+    bandwidth_eval_y = bandwidth_eval_y_storage;
+    bandwidth_train_y = bandwidth_train_y_storage;
+  }
+
+  PROTECT(out = allocMatrix(REALSXP, num_replicates, num_eval_x));
+  conditional_status = np_beta_conditional_lc_counts(
+    REAL(txcon_r), REAL(tycon_r), REAL(excon_r), REAL(eycon_r),
+    bandwidth_eval_x, bandwidth_train_x,
+    bandwidth_eval_y, bandwidth_train_y,
+    REAL(ckerlbx_r), REAL(ckerubx_r),
+    REAL(ckerlby_r), REAL(ckeruby_r),
+    x_descriptor.family, x_descriptor.legacy_code, x_descriptor.order,
+    y_descriptor.family, y_descriptor.legacy_code, y_descriptor.order,
+    bandwidth_mode, do_distribution, REAL(counts_r),
+    num_train_x, num_eval_x, num_x, num_y, num_replicates,
+    REAL(out), &bad_evaluation, &bad_replicate, &bad_dimension,
+    &scalar_status, NULL);
+
+  if(conditional_status == NP_BETA_CONDITIONAL_ERR_KERNEL)
+    error("C_np_beta_conditional_bootstrap: scalar kernel failed at evaluation %d, continuous dimension %d: %s",
+          bad_evaluation + 1, bad_dimension + 1,
+          np_beta_status_message(scalar_status));
+  if(conditional_status != NP_BETA_CONDITIONAL_OK) {
+    if(bad_replicate >= 0 && bad_evaluation >= 0)
+      error("C_np_beta_conditional_bootstrap: %s at bootstrap replicate %d, evaluation %d",
+            np_beta_conditional_status_message(conditional_status),
+            bad_replicate + 1, bad_evaluation + 1);
+    error("C_np_beta_conditional_bootstrap: %s",
+          np_beta_conditional_status_message(conditional_status));
+  }
+
+  UNPROTECT(12);
+  return out;
+}
+
 SEXP C_np_density_conditional(SEXP tyuno,
                               SEXP tyord,
                               SEXP tycon,
