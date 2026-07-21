@@ -733,16 +733,24 @@ npudistbw.dbandwidth <-
            tol = 1.490116e-04,
            transform.bounds = FALSE,
            eval.only = FALSE,
-           .beta.range.certify = TRUE,
            ...,
            nomad.opts = list()){
     nomad.opts <- .np_nomad_normalize_user_opts(nomad.opts, "npudistbw")
     dot.args <- list(...)
+    internal.certify <- dot.args[[".beta.range.certify", exact = TRUE]]
+    beta.range.certify <- if (is.null(internal.certify)) {
+      TRUE
+    } else {
+      npValidateScalarLogical(
+        internal.certify, ".beta.range.certify"
+      )
+    }
+    dot.args[[".beta.range.certify"]] <- NULL
     if (length(nomad.opts))
       dot.args$nomad.opts <- nomad.opts
     certification.call <- match.call(expand.dots = FALSE)
     certification.names <- setdiff(
-      names(certification.call)[-1L], c("...", ".beta.range.certify")
+      names(certification.call)[-1L], "..."
     )
     certification.args <- mget(
       certification.names, envir = environment(), inherits = FALSE
@@ -1072,7 +1080,7 @@ npudistbw.dbandwidth <-
                       total.time = tbw$total.time)
     tbw <- npSetScaleFactorSearchLower(tbw, scale.factor.search.lower)
 
-    if (isTRUE(.beta.range.certify)) {
+    if (isTRUE(beta.range.certify)) {
       tbw <- npBetaRangeCertifySelector(
         ordinary = tbw, args = certification.args,
         selector = npudistbw.dbandwidth, method = "cv.cdf",
