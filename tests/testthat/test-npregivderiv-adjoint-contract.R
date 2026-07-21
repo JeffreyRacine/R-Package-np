@@ -3,17 +3,31 @@ test_that("npregivderiv owns ordinary-CDF adjoint normalization", {
   skip_if_not(file.exists(src_path), "source R files unavailable")
   src <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
 
-  expect_match(
-    src,
-    "npksum\\.dots <- npksum\\.dots\\[names\\(npksum\\.dots\\) != \\\"bandwidth\\.divide\\\"\\]",
-    perl = TRUE
-  )
+  expect_match(src, "\\.np_iv_deriv_adjoint_dots\\(list\\(\\.\\.\\.\\)\\)",
+               perl = TRUE)
   expect_match(src, "bandwidth\\.divide=TRUE", perl = TRUE)
+  expect_match(src, "ukertype=\"liracine\"", fixed = TRUE)
+  expect_match(src, "okertype=\"liracine\"", fixed = TRUE)
   expect_length(gregexpr(
     "cdf\\.weighted\\.average <- cdf\\.weighted\\.average\\.apply",
     src,
     perl = TRUE
   )[[1L]], 2L)
+})
+
+test_that("npregivderiv adjoint dots remove only operator-owned names", {
+  filter.dots <- getFromNamespace(".np_iv_deriv_adjoint_dots", "npRmpi")
+  dots <- structure(
+    list(1, "user-u", 2, "user-o", 3, FALSE, 4, 5),
+    names = c("", "ukertype", "other", "okertype", NA_character_,
+              "bandwidth.divide", "other", "")
+  )
+
+  observed <- filter.dots(dots)
+  expected <- dots[c(1L, 3L, 5L, 7L, 8L)]
+
+  expect_identical(observed, expected)
+  expect_identical(filter.dots(unname(dots)), unname(dots))
 })
 
 test_that("npregivderiv monotonicity guard uses only computed norms", {
