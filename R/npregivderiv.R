@@ -91,7 +91,7 @@ npregivderiv.default <- function(y,
                          start.from=c("Eyz","EEywz"),
                          starting.values=NULL,
                          stop.on.increase=TRUE,
-                         regtype=NULL,
+                         regtype=c("ll","lc","lp"),
                          degree=NULL,
                          nomad=FALSE,
                          ...) {

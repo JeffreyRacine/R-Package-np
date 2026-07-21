@@ -367,8 +367,8 @@ npregivderiv.formula <- function(y, data = NULL, subset, na.action,
   if (regtype.missing && degree.missing) {
     return(list(
       requested = list(regtype = NULL, degree = NULL, nomad = nomad.mode),
-      effective = list(regtype = "lc", degree = 0L,
-                       source = "npreg-default"),
+      effective = list(regtype = "ll", degree = 1L,
+                       source = "derivative-default"),
       explicit = FALSE
     ))
   }
@@ -404,13 +404,13 @@ npregivderiv.formula <- function(y, data = NULL, subset, na.action,
 }
 
 .np_iv_deriv_stage_args <- function(spec, txdat) {
-  if (!isTRUE(spec$explicit))
-    return(list())
+  txdat <- toFrame(txdat)
+  ncon <- sum(vapply(txdat, is.numeric, logical(1L)))
+  if (ncon == 0L)
+    return(list(regtype = "lc"))
   ans <- list(regtype = spec$effective$regtype)
   if (identical(spec$effective$regtype, "lp")) {
-    txdat <- toFrame(txdat)
-    ncon <- sum(vapply(txdat, is.numeric, logical(1L)))
-    ans$degree <- if (ncon == 0L) 0L else rep.int(spec$effective$degree, ncon)
+    ans$degree <- rep.int(spec$effective$degree, ncon)
   }
   ans
 }
@@ -418,14 +418,15 @@ npregivderiv.formula <- function(y, data = NULL, subset, na.action,
 .np_iv_stage_spec <- function(name, spec, txdat) {
   txdat <- toFrame(txdat)
   ncon <- sum(vapply(txdat, is.numeric, logical(1L)))
-  degree <- if (identical(spec$effective$regtype, "lp")) {
-    if (ncon == 0L) integer(0L) else rep.int(spec$effective$degree, ncon)
-  } else if (identical(spec$effective$regtype, "ll")) {
-    if (ncon == 0L) integer(0L) else rep.int(1L, ncon)
+  stage.regtype <- if (ncon == 0L) "lc" else spec$effective$regtype
+  degree <- if (identical(stage.regtype, "lp")) {
+    rep.int(spec$effective$degree, ncon)
+  } else if (identical(stage.regtype, "ll")) {
+    rep.int(1L, ncon)
   } else {
-    if (ncon == 0L) integer(0L) else rep.int(0L, ncon)
+    rep.int(0L, ncon)
   }
-  list(name = name, regtype = spec$effective$regtype, degree = degree,
+  list(name = name, regtype = stage.regtype, degree = degree,
        ncon = ncon)
 }
 

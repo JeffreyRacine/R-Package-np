@@ -1,5 +1,15 @@
 # np 0.70-6
 
+* The omitted regression-smoothing choice in `npregivderiv()` is now local
+  linear (`regtype = "ll"`, degree one), matching the longstanding `p = 1`
+  default of `npregiv()`. Explicit `regtype = "lc"` reproduces the former
+  omitted-default computation, while `regtype = "lp", degree = ...` remains
+  available. Local-polynomial order applies only to continuous predictors;
+  categorical-only internal stages use the equivalent local-constant route.
+  This intentional default change can alter derivative paths, stopping states,
+  and fitted structural functions for calls that previously omitted
+  `regtype`.
+
 * `npregivderiv()` now forwards user-supplied unordered and ordered
   categorical regression kernels to its internal regression stages without
   colliding with the private Equation (14) adjoint. The adjoint continues to

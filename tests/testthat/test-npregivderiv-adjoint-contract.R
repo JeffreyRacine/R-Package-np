@@ -139,6 +139,80 @@ test_that("categorical regression kernels do not collide with the adjoint", {
   }, logical(1L))))
 })
 
+test_that("npregivderiv keeps normal-reference operator bandwidths private", {
+  real.npudensbw <- getFromNamespace("npudensbw", "np")
+  real.npudens <- getFromNamespace("npudens", "np")
+  real.npudist <- getFromNamespace("npudist", "np")
+  real.npksum <- getFromNamespace("npksum", "np")
+  bw.calls <- list()
+  density.bws <- list()
+  distribution.bws <- list()
+  adjoint.calls <- list()
+
+  local_mocked_bindings(
+    npudensbw = function(...) {
+      args <- list(...)
+      value <- do.call(real.npudensbw, args)
+      if(identical(args$bwmethod, "normal-reference"))
+        bw.calls[[length(bw.calls) + 1L]] <<-
+          list(args = args, bw = value$bw)
+      value
+    },
+    npudens = function(...) {
+      args <- list(...)
+      if(is.numeric(args$bws) && !is.list(args$bws))
+        density.bws[[length(density.bws) + 1L]] <<- args$bws
+      do.call(real.npudens, args)
+    },
+    npudist = function(...) {
+      args <- list(...)
+      if(is.numeric(args$bws) && !is.list(args$bws))
+        distribution.bws[[length(distribution.bws) + 1L]] <<- args$bws
+      do.call(real.npudist, args)
+    },
+    npksum = function(...) {
+      args <- list(...)
+      if(identical(args$operator, "integral"))
+        adjoint.calls[[length(adjoint.calls) + 1L]] <<- args
+      do.call(real.npksum, args)
+    },
+    .package = "np"
+  )
+
+  set.seed(433)
+  n <- 42L
+  w <- rnorm(n)
+  z <- 0.4 * w + rnorm(n, sd = 0.25)
+  y <- z^2 + rnorm(n, sd = 0.06)
+
+  for(regtype in list(NULL, "lc", "ll")) {
+    args <- list(y = y, z = z, w = w, iterate.max = 2L, nmulti = 1L)
+    if(!is.null(regtype)) args$regtype <- regtype
+    suppressWarnings(suppressMessages(do.call(npregivderiv, args)))
+  }
+
+  expect_length(bw.calls, 3L)
+  expect_true(all(vapply(bw.calls, function(x) {
+    identical(names(x$args), c("dat", "bwmethod")) &&
+      identical(x$args$bwmethod, "normal-reference")
+  }, logical(1L))))
+  expect_length(density.bws, 3L)
+  expect_length(distribution.bws, 3L)
+  expect_length(adjoint.calls, 6L)
+  for(i in seq_len(3L)) {
+    expect_identical(density.bws[[i]], bw.calls[[i]]$bw)
+    expect_identical(distribution.bws[[i]], bw.calls[[i]]$bw)
+    for(j in (2L * i - 1L):(2L * i)) {
+      expect_identical(adjoint.calls[[j]]$bws, bw.calls[[i]]$bw)
+      expect_identical(adjoint.calls[[j]]$bandwidth.divide, TRUE)
+      expect_identical(adjoint.calls[[j]]$ukertype, "liracine")
+      expect_identical(adjoint.calls[[j]]$okertype, "liracine")
+    }
+  }
+  expect_identical(bw.calls[[1L]]$bw, bw.calls[[2L]]$bw)
+  expect_identical(bw.calls[[1L]]$bw, bw.calls[[3L]]$bw)
+})
+
 test_that("npregivderiv monotonicity guard uses only computed norms", {
   src_path <- testthat::test_path("..", "..", "R", "npregivderiv.R")
   skip_if_not(file.exists(src_path), "source R files unavailable")

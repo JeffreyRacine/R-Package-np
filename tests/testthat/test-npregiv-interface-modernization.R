@@ -106,9 +106,20 @@ test_that("npregivderiv formula and regression-consistent accessors preserve sta
     y ~ z | w, data = dat,
     nmulti = 1L, iterate.max = 2L
   ))
+  explicit.ll <- suppressWarnings(npregivderiv(
+    y = dat$y, z = dat$z, w = dat$w, regtype = "ll",
+    nmulti = 1L, iterate.max = 2L
+  ))
+  explicit.lc <- suppressWarnings(npregivderiv(
+    y = dat$y, z = dat$z, w = dat$w, regtype = "lc",
+    nmulti = 1L, iterate.max = 2L
+  ))
 
   expect_identical(formula$phi, native$phi)
   expect_identical(formula$phi.prime, native$phi.prime)
+  expect_identical(explicit.ll$phi, native$phi)
+  expect_identical(explicit.ll$phi.prime, native$phi.prime)
+  expect_identical(explicit.ll$bws, native$bws)
   expect_identical(formula$call[[1L]], quote(npregivderiv))
   expect_false("..." %in% names(formula$call))
   expect_null(attr(formula$call, ".Environment"))
@@ -120,7 +131,18 @@ test_that("npregivderiv formula and regression-consistent accessors preserve sta
   expect_output(print(summary(formula)),
                 "Instrumental Kernel Derivative Estimation", fixed = TRUE)
   expect_output(print(summary(formula)), "States evaluated", fixed = TRUE)
-  expect_identical(formula$smoothing.spec$effective$regtype, "lc")
+  expect_identical(
+    eval(formals(npregivderiv.default)$regtype),
+    c("ll", "lc", "lp")
+  )
+  expect_null(formula$smoothing.spec$requested$regtype)
+  expect_identical(formula$smoothing.spec$effective$regtype, "ll")
+  expect_identical(formula$smoothing.spec$effective$degree, 1L)
+  expect_identical(formula$smoothing.spec$effective$source,
+                   "derivative-default")
+  expect_identical(explicit.ll$smoothing.spec$requested$regtype, "ll")
+  expect_identical(explicit.ll$smoothing.spec$effective$source, "explicit")
+  expect_identical(explicit.lc$smoothing.spec$effective$regtype, "lc")
   expect_error(
     npregivderiv(y = dat$y, z = dat$z, w = dat$w,
                  nomad = "auto", nmulti = 1L, iterate.max = 2L),
@@ -130,4 +152,24 @@ test_that("npregivderiv formula and regression-consistent accessors preserve sta
     npregivderiv(y = dat$y, z = dat$z, w = dat$w, x = dat$w),
     "does not support a separate exogenous x", fixed = TRUE
   )
+})
+
+test_that("npregivderiv uses LC only for categorical-only internal stages", {
+  if (identical(iv_interface_package(), "npRmpi"))
+    skip("installed MPI route sentinel owns npRmpi numerical coverage")
+  dat <- iv_interface_fixture(36L)
+  dat$wf <- factor(ifelse(dat$w > 0, "high", "low"))
+
+  fit <- suppressWarnings(npregivderiv(
+    y = dat$y, z = dat$z, w = dat["wf"],
+    nmulti = 1L, iterate.max = 2L
+  ))
+
+  expect_s3_class(fit, "npregivderiv")
+  expect_identical(fit$smoothing.spec$effective$regtype, "ll")
+  expect_identical(fit$stage.specs$E.y.z$regtype, "ll")
+  expect_identical(fit$stage.specs$E.y.w$regtype, "lc")
+  expect_identical(fit$stage.specs$residual.w$regtype, "lc")
+  expect_identical(fit$stage.specs$E.y.w$degree, integer())
+  expect_identical(fit$stage.specs$residual.w$degree, integer())
 })
