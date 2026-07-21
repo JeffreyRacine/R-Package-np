@@ -11,6 +11,31 @@ iv_interface_package <- function() {
   if ("npRmpi" %in% loadedNamespaces()) "npRmpi" else "np"
 }
 
+test_that("npregivderiv resolves the LL default stage by stage", {
+  pkg <- iv_interface_package()
+  method <- getFromNamespace("npregivderiv.default", pkg)
+  resolver <- getFromNamespace(".np_iv_resolve_deriv_smoothing", pkg)
+  stage.args <- getFromNamespace(".np_iv_deriv_stage_args", pkg)
+  stage.spec <- getFromNamespace(".np_iv_stage_spec", pkg)
+
+  expect_identical(eval(formals(method)$regtype), c("ll", "lc", "lp"))
+  spec <- resolver(
+    regtype = c("ll", "lc", "lp"), degree = NULL, nomad = FALSE,
+    regtype.missing = TRUE, degree.missing = TRUE, nomad.missing = TRUE
+  )
+  expect_null(spec$requested$regtype)
+  expect_identical(spec$effective$regtype, "ll")
+  expect_identical(spec$effective$degree, 1L)
+  expect_identical(spec$effective$source, "derivative-default")
+  expect_identical(stage.args(spec, data.frame(x = 1:3)),
+                   list(regtype = "ll"))
+  expect_identical(stage.args(spec, data.frame(x = factor(c("a", "b", "a")))),
+                   list(regtype = "lc"))
+  expect_identical(stage.spec(
+    "factor", spec, data.frame(x = factor(c("a", "b", "a")))
+  )$regtype, "lc")
+})
+
 test_that("IV formula grammar is explicit and transformation safe", {
   dat <- iv_interface_fixture()
   parse.iv <- getFromNamespace(".np_iv_parse_formula", iv_interface_package())
@@ -120,7 +145,7 @@ test_that("npregivderiv formula and regression-consistent accessors preserve sta
   expect_output(print(summary(formula)),
                 "Instrumental Kernel Derivative Estimation", fixed = TRUE)
   expect_output(print(summary(formula)), "States evaluated", fixed = TRUE)
-  expect_identical(formula$smoothing.spec$effective$regtype, "lc")
+  expect_identical(formula$smoothing.spec$effective$regtype, "ll")
   expect_error(
     npregivderiv(y = dat$y, z = dat$z, w = dat$w,
                  nomad = "auto", nmulti = 1L, iterate.max = 2L),

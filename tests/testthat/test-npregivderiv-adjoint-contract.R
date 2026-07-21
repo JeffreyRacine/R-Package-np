@@ -15,6 +15,23 @@ test_that("npregivderiv owns ordinary-CDF adjoint normalization", {
   )[[1L]], 2L)
 })
 
+test_that("npregivderiv keeps the normal-reference operator route private", {
+  src_path <- testthat::test_path("..", "..", "R", "npregivderiv.R")
+  skip_if_not(file.exists(src_path), "source R files unavailable")
+  src <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
+
+  expect_match(src,
+               "npudensbw\\(dat=z, bwmethod=\"normal-reference\"\\)",
+               perl = TRUE)
+  expect_match(src, "npudens\\(tdat=z, bws=bw\\$bw\\)", perl = TRUE)
+  expect_match(src, "npudist\\(tdat=z, bws=bw\\$bw\\)", perl = TRUE)
+  expect_match(src, "bws=bw\\$bw,\\s*bandwidth.divide=TRUE", perl = TRUE)
+  expect_false(grepl(
+    "npudensbw\\(dat=z, bwmethod=\"normal-reference\",\\s*\\.\\.\\.",
+    src, perl = TRUE
+  ))
+})
+
 test_that("npregivderiv adjoint dots remove only operator-owned names", {
   filter.dots <- getFromNamespace(".np_iv_deriv_adjoint_dots", "npRmpi")
   dots <- structure(

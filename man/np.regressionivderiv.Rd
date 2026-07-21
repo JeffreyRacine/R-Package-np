@@ -41,7 +41,7 @@ npregivderiv(y, \dots)
              start.from = c("Eyz","EEywz"),
              starting.values = NULL,
              stop.on.increase = TRUE,
-             regtype = NULL,
+             regtype = c("ll","lc","lp"),
              degree = NULL,
              nomad = FALSE,
              ...)
@@ -198,15 +198,20 @@ These arguments control all internal \code{npreg} stages consistently.
 }
 
   \item{regtype}{
-    an optional fixed regression type: \code{"lc"}, \code{"ll"}, or
-    \code{"lp"}. When omitted, the established \code{npreg} default remains
-    local constant, degree zero.
+    a fixed regression type: \code{"ll"} (the default), \code{"lc"}, or
+    \code{"lp"}. The default applies local-linear, degree-one smoothing to
+    every internal stage containing continuous predictors, matching the
+    default polynomial order of \code{npregiv}. A categorical-only internal
+    stage uses local constant because no continuous polynomial term exists.
+    Supply \code{regtype="lc"} to recover the former omitted-default
+    computation.
   }
 
   \item{degree}{
     one nonnegative integer required with \code{regtype="lp"}. It is expanded
     only across the continuous coordinates of each internal regression stage;
-    vectors are not recycled across heterogeneous stages.
+    vectors are not recycled across heterogeneous stages, and a
+    categorical-only stage uses local constant.
   }
 
   \item{nomad}{
