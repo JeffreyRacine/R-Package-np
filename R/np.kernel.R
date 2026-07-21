@@ -132,6 +132,20 @@ npksum.default <-
     dots$.np.internal.power12.weighted <- NULL
     return.derivative.kernel.weights <- isTRUE(dots$return.derivative.kernel.weights)
 
+    bandwidth.divide <- npValidateScalarLogical(bandwidth.divide, "bandwidth.divide")
+    compute.ocg <- npValidateScalarLogical(compute.ocg, "compute.ocg")
+    compute.score <- npValidateScalarLogical(compute.score, "compute.score")
+    leave.one.out <- npValidateScalarLogical(leave.one.out, "leave.one.out")
+    return.kernel.weights <-
+      npValidateScalarLogical(return.kernel.weights, "return.kernel.weights")
+
+    if (!is.numeric(kernel.pow) || length(kernel.pow) != 1L ||
+        is.na(kernel.pow) || !is.finite(kernel.pow) ||
+        kernel.pow != floor(kernel.pow) ||
+        abs(kernel.pow) > .Machine$integer.max)
+      stop("'kernel.pow' must be one finite integer")
+    kernel.pow <- as.integer(kernel.pow)
+
     miss.ty <- missing(tydat)
     miss.ex <- missing(exdat)
     miss.weights <- missing(weights)
@@ -208,6 +222,8 @@ npksum.default <-
 
     if(compute.score && compute.ocg)
       stop("compute.score and compute.ocg are mutually exclusive, and cannot be enabled simultaneously")
+    if(compute.score && permutation.operator != "none")
+      stop("compute.score cannot be combined with a permutation operator")
     if(!all(operator[bws$iuno | bws$iord] %in% uo.operators) && !compute.score)
       stop("unordered and ordered variables may only make use of 'normal', 'convolution' and 'integral' operator types")
     
@@ -253,11 +269,6 @@ npksum.default <-
 
     if (!miss.ty && (nrow(txdat) != nrow(tydat)))
       stop("number of explanatory data 'txdat' and dependent data 'tydat' do not match")
-
-    integer.pow = identical(as.double(as.integer(kernel.pow)),as.double(kernel.pow))
-    
-    if(!integer.pow)
-      stop("'kernel.pow' is not an integer")
 
     if (!miss.ex && leave.one.out)
       stop("you may not specify 'leave.one.out = TRUE' and provide evaluation data")
@@ -311,7 +322,7 @@ npksum.default <-
     length.out = prod(dim.out[which(dim.out > 0)])
 
     has.permutation <- permutation.operator != "none"
-    has.pksum <- has.permutation || compute.ocg
+    has.pksum <- has.permutation || compute.score || compute.ocg
 
     if (has.pksum){
       npvar <- (if (has.permutation) bws$ncon else 0L) +
@@ -526,7 +537,13 @@ npksum.default <-
           ip <- c(ip,which(bws$iord))
       }
 
-      p.myout[,ip] <- p.myout
+      if(length(ip) != npvar)
+        stop("internal kernel-sum permutation dimension mismatch")
+
+      block.order <- order(ip)
+      p.myout <- p.myout[, block.order, drop = FALSE]
+      if(!is.null(p.kw) && npvar > 1L)
+        p.kw <- p.kw[, , block.order, drop = FALSE]
 
       p.myout <- array(data = as.vector(p.myout), dim = dim.p)
     } else {

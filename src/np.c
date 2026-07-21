@@ -10998,6 +10998,11 @@ SEXP C_np_kernelsum(SEXP tuno,
   PROTECT(ckerlb_r = coerceVector(ckerlb, REALSXP));
   PROTECT(ckerub_r = coerceVector(ckerub, REALSXP));
 
+  if(XLENGTH(kpow_r) != 1 || !R_FINITE(REAL(kpow_r)[0]) ||
+     REAL(kpow_r)[0] != floor(REAL(kpow_r)[0]) ||
+     fabs(REAL(kpow_r)[0]) > INT_MAX)
+    error("C_np_kernelsum: kernel.pow must be one finite integer");
+
   descriptor = np_kernelsum_descriptor_or_error(myopti_i, "C_np_kernelsum");
 
   ncon = (int)INTEGER(myopti_i)[KWS_NCONI];
@@ -18323,7 +18328,7 @@ static void np_kernelsum_common(double * tuno, double * tord, double * tcon,
     }
   }
 
-  if((p_operator != OP_NOOP) || do_ocg){
+  if((p_operator != OP_NOOP) || do_score || do_ocg){
     p_nvar = ((p_operator != OP_NOOP) ? num_reg_continuous_extern : 0) + ((do_score || do_ocg) ? num_reg_unordered_extern + num_reg_ordered_extern : 0);
     if(!use_tree && (num_obs_eval_alloc == num_obs_eval_extern)){
       p_ksum = weighted_p_sum;

@@ -7759,11 +7759,11 @@ const NP_DualPowerCtx * const dual_power_ctx){
       ps_okernel = (int *) malloc(num_reg_ordered*sizeof(int));
 
       for(i = 0; i < num_reg_unordered; i++){
-        ps_ukernel[i] = KERNEL_unordered_reg[i] + OP_UFUN_OFFSETS[permutation_operator];
+        ps_ukernel[i] = KERNEL_unordered_reg[i] + OP_UFUN_OFFSETS[OP_DERIVATIVE];
       }
 
       for(i = 0; i < num_reg_ordered; i++){
-        ps_okernel[i] = KERNEL_ordered_reg[i] + OP_OFUN_OFFSETS[permutation_operator];
+        ps_okernel[i] = KERNEL_ordered_reg[i] + OP_OFUN_OFFSETS[OP_DERIVATIVE];
       }
     } else if(do_ocg) {
       ps_ukernel = KERNEL_unordered_reg;
@@ -8811,8 +8811,10 @@ const NP_DualPowerCtx * const dual_power_ctx){
     } else {
       /* unordered second */
       for(i=0; i < num_reg_unordered; i++, l++, ip += doscoreocg){
-        if(doscoreocg){
-          np_p_ukernelv(KERNEL_unordered_reg_np[i], ps_ukernel[i], k, p_nvar, xtu[i], num_xt, l, xu[i][j], 
+        if(p_nvar > 0){
+          const int p_kernel = doscoreocg ?
+            ps_ukernel[i] : KERNEL_unordered_reg_np[i];
+          np_p_ukernelv(KERNEL_unordered_reg_np[i], p_kernel, k, p_nvar, xtu[i], num_xt, l, xu[i][j],
                         lambda[i], num_categories[i], matrix_categorical_vals[i][0], tprod, tprod_mp, pxl, (p_pxl == NULL ? NULL : p_pxl + k), swap_xxt, (bpso[l] ? do_ocg : 0), bpso[l], perm_kbuf);
         } else {
           if((p_nvar == 0) && (disc_uno_const_ok != NULL) && disc_uno_const_ok[i]){
@@ -8832,9 +8834,8 @@ const NP_DualPowerCtx * const dual_power_ctx){
 
       /* ordered third */
       for(i=0; i < num_reg_ordered; i++, l++, ip += doscoreocg){
-        if(!doscoreocg){
-          if((p_nvar == 0) &&
-             (disc_ord_const_ok != NULL) && disc_ord_const_ok[i] &&
+        if(p_nvar == 0){
+          if((disc_ord_const_ok != NULL) && disc_ord_const_ok[i] &&
              (ps_ok_nli || (operator[l] != OP_CONVOLUTION))){
             deferred_const *= disc_ord_const[i];
             deferred_const_active = 1;
@@ -8857,12 +8858,17 @@ const NP_DualPowerCtx * const dual_power_ctx){
             tprod_has_vals = 1;
           }
         } else {
-          np_p_okernelv(KERNEL_ordered_reg_np[i], ps_okernel[i], k, p_nvar, xto[i], num_xt, l,
+          const int p_kernel = doscoreocg ?
+            ps_okernel[i] : KERNEL_ordered_reg_np[i];
+          const int this_do_ocg = bpso[l] ? do_ocg : 0;
+          const int swapped_index = (this_do_ocg && !swap_xxt) ?
+            matrix_ordered_indices[i][j] : 0;
+          np_p_okernelv(KERNEL_ordered_reg_np[i], p_kernel, k, p_nvar, xto[i], num_xt, l,
                         xo[i][j], lambda[num_reg_unordered+i], 
                         (matrix_categorical_vals != NULL) ? matrix_categorical_vals[i+num_reg_unordered] : NULL, 
                         (num_categories != NULL) ? num_categories[i+num_reg_unordered] : 0,
-                        tprod, tprod_mp, pxl, (p_pxl == NULL ? NULL : p_pxl + k), swap_xxt, (bpso[l] ? do_ocg : 0), bpso[l],
-                        matrix_ordered_indices[i], (swap_xxt ? 0 : matrix_ordered_indices[i][j]),
+                        tprod, tprod_mp, pxl, (p_pxl == NULL ? NULL : p_pxl + k), swap_xxt, this_do_ocg, bpso[l],
+                        matrix_ordered_indices == NULL ? NULL : matrix_ordered_indices[i], swapped_index,
                         perm_kbuf);
         }
         k += bpso[l];
