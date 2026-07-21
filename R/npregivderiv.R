@@ -48,6 +48,24 @@
   list(index=N, monotone.failure=FALSE)
 }
 
+.npregivderiv_progress_stage <- function(state,
+                                         label,
+                                         iteration=NULL,
+                                         show.now=FALSE,
+                                         force=FALSE) {
+  state$current_detail <- label
+  if(isTRUE(show.now)) {
+    return(.np_progress_show_now(state, done=iteration, detail=label))
+  }
+
+  .np_progress_step_at(
+    state=state,
+    now=.np_progress_now(),
+    done=iteration,
+    detail=label,
+    force=force)
+}
+
 npregivderiv <- function(y, ...) UseMethod("npregivderiv")
 
 npregivderiv.default <- function(y,
@@ -161,7 +179,7 @@ npregivderiv.default <- function(y,
   ## For all results we need the density function for Z and the
   ## survivor function for Z (1-CDF of Z)
 
-  .np_progress_note("Preparing IV derivative regression")
+  .np_progress_note("Preparing f_Z(z), S_Z(z)")
 
   ## Let's compute the bandwidth object for the unconditional
   ## density for the moment. Use the normal-reference rule for speed
@@ -172,6 +190,17 @@ npregivderiv.default <- function(y,
   f.z <- predict(model.fz, newdata=zeval)
   model.Sz <- .np_progress_with_legacy_suppressed(npudist(tdat=z, bws=bw$bw))
   S.z <- 1-predict(model.Sz, newdata=zeval)
+
+  progress <- .np_progress_begin("IV derivative", surface = "iv_solve")
+  progress.finished <- FALSE
+  on.exit({
+    if(!isTRUE(progress.finished)) .np_progress_abort(progress)
+  }, add = TRUE)
+
+  progress <- .npregivderiv_progress_stage(
+    progress,
+    label="E[y|w]",
+    show.now=TRUE)
 
   ## For stopping rule...
 
@@ -187,6 +216,11 @@ npregivderiv.default <- function(y,
   ## npregiv). Here we start with E(Y|Z) rather than zero
 
   if(is.null(starting.values)) {
+
+    progress <- .npregivderiv_progress_stage(
+      progress,
+      label=if(start.from=="Eyz") "d/dz E[y|z]" else "d/dz E[E[y|w]|z]",
+      force=TRUE)
 
     model.phi.prime <- .np_progress_with_legacy_suppressed(iv.npreg(tydat=if(start.from=="Eyz") y else E.y.w,
                                                                  txdat=z,
@@ -247,10 +281,11 @@ npregivderiv.default <- function(y,
 
   ## Now we repeat this entire process using mu = y = phi.0 rather than y
 
-  progress <- .np_progress_begin("Iterating Landweber-Fridman derivative solve", surface = "iv_solve")
-
   if(smooth.residuals) {
-    progress <- .np_progress_step(progress, done = 0, detail = "initializing E(mu|w)")
+    progress <- .npregivderiv_progress_stage(
+      progress,
+      label="E[y-phi_0(z)|w]",
+      force=TRUE)
 
     ## Additional smoothing on top of the stopping rule required, but
     ## we have computed the stopping rule so reuse the bandwidth
@@ -267,6 +302,11 @@ npregivderiv.default <- function(y,
     bw.mu.w <- model.mu.w$bws
 
   } else {
+
+    progress <- .npregivderiv_progress_stage(
+      progress,
+      label="E[phi_0(z)|w]",
+      force=TRUE)
 
     model.phi.w <- .np_progress_with_legacy_suppressed(iv.npreg(tydat=phi,
                                                              txdat=w,
@@ -307,6 +347,10 @@ npregivderiv.default <- function(y,
 
   ## Now we compute T^* applied to mu
 
+  progress <- .npregivderiv_progress_stage(
+    progress,
+    label="T*{E[y-phi_0(z)|w]}",
+    force=TRUE)
   cdf.weighted.average <- cdf.weighted.average.apply(predicted.E.mu.w)
 
   survivor.weighted.average <- mean.predicted.E.mu.w - cdf.weighted.average
@@ -323,8 +367,6 @@ npregivderiv.default <- function(y,
   ## phi_N, phi'_N, and the stopping rule evaluated at phi_N.
 
   for(N in seq_len(iterate.max)) {
-
-    progress <- .np_progress_step(progress, done = N, detail = "updating phi")
 
     phi.prime <- phi.prime + constant*T.star.mu
 
@@ -345,7 +387,10 @@ npregivderiv.default <- function(y,
     ## Now we repeat this entire process using mu = y = phi.0 rather than y
 
     if(smooth.residuals) {
-      progress <- .np_progress_step(progress, done = N, detail = "updating E(mu|w)")
+      progress <- .npregivderiv_progress_stage(
+        progress,
+        label="E[y-phi(z)|w]",
+        iteration=N)
 
 
       ## Additional smoothing on top of the stopping rule required, but
@@ -366,6 +411,11 @@ npregivderiv.default <- function(y,
       bw.mu.w <- model.mu.w$bws
 
     } else {
+
+      progress <- .npregivderiv_progress_stage(
+        progress,
+        label="E[phi(z)|w]",
+        iteration=N)
 
       model.phi.w <- .np_progress_with_legacy_suppressed(iv.npreg(tydat=phi,
                                                                txdat=w,
@@ -422,6 +472,10 @@ npregivderiv.default <- function(y,
     if(N < iterate.max) {
       mean.predicted.E.mu.w <- mean(predicted.E.mu.w)
 
+      progress <- .npregivderiv_progress_stage(
+        progress,
+        label="T*{E[y-phi(z)|w]}",
+        iteration=N)
       cdf.weighted.average <- cdf.weighted.average.apply(predicted.E.mu.w)
 
       survivor.weighted.average <- mean.predicted.E.mu.w - cdf.weighted.average
@@ -457,7 +511,8 @@ npregivderiv.default <- function(y,
   phi <- phi.mat[,N.selected]
   phi.prime <- phi.prime.mat[,N.selected]
   
-  progress <- .np_progress_end(progress, detail = "updating E(mu|w)")
+  progress <- .np_progress_end(progress, detail=progress$current_detail)
+  progress.finished <- TRUE
 
   if(N.evaluated == iterate.max) .np_warning(" iterate.max reached: increase iterate.max or inspect norm.stop vector")
 

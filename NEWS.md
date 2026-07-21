@@ -1,5 +1,11 @@
 # np 0.70-6
 
+* `npregivderiv()` progress now identifies the mathematical object being
+  computed, including `E[y|w]`, initialization derivatives, conditional
+  residuals, and the derivative adjoint `T*{E[y-phi(z)|w]}`. State-zero work
+  is distinguished from work at completed iteration `N`; estimator results,
+  stopping behavior, and smoothing choices are unchanged.
+
 * Modernized the public `npregiv()` and `npregivderiv()` interfaces while
   preserving their established numerical defaults. Both now support explicit
   IV formulas (`y ~ z | w`, with optional `| x` where the estimator supports
