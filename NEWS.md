@@ -1,5 +1,11 @@
 # npRmpi 0.70-6
 
+* `npregivderiv()` progress now identifies the mathematical object being
+  computed, including `E[y|w]`, initialization derivatives, conditional
+  residuals, and the derivative adjoint `T*{E[y-phi(z)|w]}`. State-zero work
+  is distinguished from work at completed iteration `N`; estimator results,
+  stopping behavior, smoothing choices, and MPI lifecycle are unchanged.
+
 * Modernized the public `npregiv()` and `npregivderiv()` interfaces in parity
   with serial `np` while preserving their established numerical defaults.
   Both now support explicit IV formulas (`y ~ z | w`, with optional `| x`
