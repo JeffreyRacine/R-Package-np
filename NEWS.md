@@ -1,5 +1,12 @@
 # np 0.70-6
 
+* `npregivderiv()` now forwards user-supplied unordered and ordered
+  categorical regression kernels to its internal regression stages without
+  colliding with the private Equation (14) adjoint. The adjoint continues to
+  own its required Li--Racine categorical kernels and ordinary-CDF
+  normalization; previously successful calls and estimator defaults are
+  unchanged.
+
 * `npregivderiv()` progress now identifies the mathematical object being
   computed, including `E[y|w]`, initialization derivatives, conditional
   residuals, and the derivative adjoint `T*{E[y-phi(z)|w]}`. State-zero work

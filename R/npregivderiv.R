@@ -68,6 +68,13 @@
 
 npregivderiv <- function(y, ...) UseMethod("npregivderiv")
 
+.np_iv_deriv_adjoint_dots <- function(dots) {
+  dot.names <- names(dots)
+  if(is.null(dot.names)) return(dots)
+  owned <- c("bandwidth.divide", "ukertype", "okertype")
+  dots[!(!is.na(dot.names) & dot.names %in% owned)]
+}
+
 npregivderiv.default <- function(y,
                          z,
                          w,
@@ -327,10 +334,7 @@ npregivderiv.default <- function(y,
   ## bandwidth.divide in ... available to the regression calls above, but do
   ## not allow it to change the normalization of this private adjoint.
 
-  npksum.dots <- list(...)
-  if("bandwidth.divide" %in% names(npksum.dots)) {
-    npksum.dots <- npksum.dots[names(npksum.dots) != "bandwidth.divide"]
-  }
+  npksum.dots <- .np_iv_deriv_adjoint_dots(list(...))
 
   cdf.weighted.average.apply <- function(rhs) {
     do.call(npksum,

@@ -226,7 +226,10 @@ Further arguments are passed to \code{\link{npreg}} and \code{\link{npksum}}.
     adjoint always uses \code{bandwidth.divide = TRUE}, as required for the
     ordinary CDF normalization; a \code{bandwidth.divide} value in
     \code{...} continues to be supplied to \code{npreg} but does not override
-    this internal normalization.
+    this internal normalization. Likewise, \code{ukertype} and
+    \code{okertype} in \code{...} control applicable internal regressions,
+    while the private adjoint retains its required
+    \code{ukertype = "liracine"} and \code{okertype = "liracine"}.
   }
 
 }

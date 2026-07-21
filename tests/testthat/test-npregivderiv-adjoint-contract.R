@@ -61,6 +61,84 @@ test_that("npregivderiv owns ordinary-CDF adjoint normalization", {
   expect_true(all(integral_bandwidth_divide))
 })
 
+test_that("npregivderiv adjoint dots remove only operator-owned names", {
+  filter.dots <- getFromNamespace(".np_iv_deriv_adjoint_dots", "np")
+  dots <- structure(
+    list(1, "user-u", 2, "user-o", 3, FALSE, 4, 5),
+    names = c("", "ukertype", "other", "okertype", NA_character_,
+              "bandwidth.divide", "other", "")
+  )
+
+  observed <- filter.dots(dots)
+  expected <- dots[c(1L, 3L, 5L, 7L, 8L)]
+
+  expect_identical(observed, expected)
+  expect_identical(filter.dots(unname(dots)), unname(dots))
+})
+
+test_that("categorical regression kernels do not collide with the adjoint", {
+  real.npreg <- getFromNamespace("npreg", "np")
+  real.npksum <- getFromNamespace("npksum", "np")
+  regression.kernels <- list()
+  adjoint.names <- list()
+  adjoint.values <- list()
+
+  local_mocked_bindings(
+    npreg = function(...) {
+      args <- list(...)
+      regression.kernels[[length(regression.kernels) + 1L]] <<-
+        args[c("ukertype", "okertype")]
+      do.call(real.npreg, args)
+    },
+    npksum = function(...) {
+      args <- list(...)
+      if(identical(args$operator, "integral")) {
+        adjoint.names[[length(adjoint.names) + 1L]] <<- names(args)
+        adjoint.values[[length(adjoint.values) + 1L]] <<-
+          args[c("bandwidth.divide", "ukertype", "okertype")]
+      }
+      do.call(real.npksum, args)
+    },
+    .package = "np"
+  )
+
+  set.seed(432)
+  n <- 48L
+  latent <- rnorm(n)
+  z <- 0.4 * latent + rnorm(n, sd = 0.25)
+  y <- z^2 + rnorm(n, sd = 0.06)
+  w <- data.frame(
+    wc = latent,
+    wu = factor(ifelse(latent > 0, "high", "low")),
+    wo = ordered(cut(latent, c(-Inf, -0.3, 0.3, Inf),
+                     labels = c("low", "mid", "high")))
+  )
+
+  fit <- suppressWarnings(suppressMessages(npregivderiv(
+    y, z, w, iterate.max = 2L, nmulti = 1L,
+    ukertype = "aitchisonaitken", okertype = "wangvanryzin"
+  )))
+
+  expect_s3_class(fit, "npregivderiv")
+  expect_true(length(regression.kernels) >= 4L)
+  expect_true(all(vapply(
+    regression.kernels,
+    function(x) identical(x$ukertype, "aitchisonaitken") &&
+      identical(x$okertype, "wangvanryzin"),
+    logical(1L)
+  )))
+  expect_length(adjoint.names, 2L)
+  expect_true(all(vapply(adjoint.names, function(x) {
+    sum(x == "bandwidth.divide") == 1L &&
+      sum(x == "ukertype") == 1L && sum(x == "okertype") == 1L
+  }, logical(1L))))
+  expect_true(all(vapply(adjoint.values, function(x) {
+    identical(x$bandwidth.divide, TRUE) &&
+      identical(x$ukertype, "liracine") &&
+      identical(x$okertype, "liracine")
+  }, logical(1L))))
+})
+
 test_that("npregivderiv monotonicity guard uses only computed norms", {
   src_path <- testthat::test_path("..", "..", "R", "npregivderiv.R")
   skip_if_not(file.exists(src_path), "source R files unavailable")
