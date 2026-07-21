@@ -16,6 +16,17 @@ test_that("autodispatch materialization preserves explicit argument expressions"
   expect_false(identical(prepared$tmpvals[[bws.ref]], bws))
 })
 
+test_that("autodispatch remote references are reused only while value-current", {
+  tag <- getFromNamespace(".npRmpi_autodispatch_tag_result", "npRmpi")
+  current <- getFromNamespace(".npRmpi_autodispatch_ref_is_current", "npRmpi")
+
+  value <- tag(list(norm.index = 2L, phi = c(1, 2)),
+               remote = ".__npRmpi_test_remote")
+  expect_true(current(value))
+  value$norm.index <- 1L
+  expect_false(current(value))
+})
+
 test_that("autodispatch materialization resolves ..n placeholders by argument name", {
   materialize <- getFromNamespace(".npRmpi_autodispatch_materialize_call", "npRmpi")
 

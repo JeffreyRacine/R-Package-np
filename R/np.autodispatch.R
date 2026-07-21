@@ -169,13 +169,18 @@
   FALSE
 }
 
-.npRmpi_autodispatch_can_reuse_bws_ref <- function(val, call.base) {
+.npRmpi_autodispatch_ref_is_current <- function(val) {
   if (is.null(.npRmpi_autodispatch_remote_ref(val)))
     return(FALSE)
   fp <- tryCatch(attr(val, "npRmpi.autodispatch.fingerprint", exact = TRUE), error = function(e) NULL)
   if (!is.character(fp) || length(fp) != 1L || is.na(fp) ||
       !identical(fp, .npRmpi_autodispatch_fingerprint(val)))
     return(FALSE)
+  TRUE
+}
+
+.npRmpi_autodispatch_can_reuse_bws_ref <- function(val, call.base) {
+  if (!.npRmpi_autodispatch_ref_is_current(val)) return(FALSE)
 
   allowed <- list(
     npreg = "rbandwidth",
@@ -1653,7 +1658,7 @@
       }
     }
     ref <- .npRmpi_autodispatch_remote_ref(val)
-    if (!is.null(ref) &&
+    if (!is.null(ref) && .npRmpi_autodispatch_ref_is_current(val) &&
         (!identical(nm, "bws") || .npRmpi_autodispatch_can_reuse_bws_ref(val, call.base))) {
       out[[i]] <- as.name(ref)
       next

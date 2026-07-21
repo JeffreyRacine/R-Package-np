@@ -7,6 +7,7 @@
 \alias{fitted.npregivderiv}
 \alias{gradients.npregivderiv}
 \alias{residuals.npregivderiv}
+\alias{plot.npregivderiv}
 
 \title{
 Nonparametric Instrumental Derivatives
@@ -55,6 +56,8 @@ npregivderiv(y, \dots)
              weval = NULL,
              xeval = NULL,
              ...)
+
+\method{plot}{npregivderiv}(x, plot.data = FALSE, phi = FALSE, ...)
 }
 \arguments{
 \subsection{Data, Bandwidth Inputs And Formula Interface}{
@@ -77,10 +80,9 @@ These arguments identify the response, endogenous variables, instruments, exogen
   }
 
   \item{newdata}{
-    an optional data frame supplying fit-time formula evaluation data.
-    Explicit \code{zeval}, \code{weval}, and \code{xeval} take precedence.
-    The derivative algorithm currently requires evaluation and training data
-    to have the same number of rows.
+    an optional data frame supplying fit-time values of formula variable
+    \code{z} at which to evaluate the structural derivative. It may contain
+    any positive number of rows. Explicit \code{zeval} takes precedence.
   }
 
   \item{w}{
@@ -90,15 +92,16 @@ These arguments identify the response, endogenous variables, instruments, exogen
   }
 
   \item{weval}{
-    a \eqn{q}-variate data frame of instruments on which the regression
-    will be estimated (evaluation data). By default, evaluation
-    takes place on the data provided by \code{w}.
+    retained for compatibility. The inverse problem is defined on the
+    training instruments, so a supplied value must equal \code{w}; use
+    \code{zeval} to request derivative evaluation.
   }
 
   \item{x}{
-    reserved for interface compatibility. The present derivative estimator
+    for \code{npregivderiv.default}, reserved for interface compatibility. The present derivative estimator
     supports one univariate endogenous \code{z} and does not yet support a
-    separate exogenous \code{x}; a non-\code{NULL} value fails explicitly.
+    separate exogenous \code{x}; a non-\code{NULL} value fails explicitly. For
+    \code{plot.npregivderiv}, an \code{npregivderiv} object.
   }
 
   \item{xeval}{
@@ -115,15 +118,26 @@ These arguments identify the response, endogenous variables, instruments, exogen
 
 
   \item{z}{
-    a \eqn{p}-variate data frame of endogenous regressors. The data
-    types may be continuous, discrete (unordered and ordered factors),
-    or some combination thereof.
+    one finite continuous numeric endogenous regressor with at least two
+    distinct support points.
   }
 
   \item{zeval}{
-    a \eqn{p}-variate data frame of endogenous regressors on which the
-    regression will be estimated (evaluation data). By default, evaluation
-    takes place on the data provided by \code{z}.
+    finite values of the endogenous regressor at which to evaluate the
+    structural derivative. The training inverse problem, residuals, centering,
+    stopping rule, and selected state remain based on \code{z} and \code{w}.
+    By default no separate evaluation surface is stored.
+  }
+
+  \item{plot.data}{
+    logical; when \code{phi=TRUE}, add the selected training structural curve
+    to a plot of the training response. It is ignored for derivative plots.
+  }
+
+  \item{phi}{
+    logical; plot the reconstructed training structural function instead of
+    the structural derivative. Derivative plots use \code{zeval} and
+    \code{phi.prime.eval} when a separate evaluation grid was supplied.
   }
 
 \subsection{Iteration Controls}{
@@ -176,14 +190,16 @@ These arguments control residual smoothing and the initial derivative path.
 
 
 \item{start.from}{ a character string indicating whether to start from
-  \eqn{E(Y|z)} (default, \code{"Eyz"}) or from \eqn{E(E(Y|z)|z)} (this can
+  \eqn{E(Y|z)} (default, \code{"Eyz"}) or from \eqn{E(E(Y|w)|z)} (this can
   be overridden by providing \code{starting.values} below)
 }  
 
 \item{starting.values}{ an optional vector supplying the derivative
   immediately before the first reported Landweber-Fridman update. When
   omitted, the initialization derivative is obtained from \code{start.from}
-  (see details below).
+  (see details below). A separate \code{zeval} grid is not accepted with a
+  supplied initialization because no interpolation rule for the externally
+  supplied derivative has been declared.
 }
 
   \item{stop.on.increase}{
@@ -234,7 +250,9 @@ Further arguments are passed to \code{\link{npreg}} and \code{\link{npksum}}.
     this internal normalization. Likewise, \code{ukertype} and
     \code{okertype} in \code{...} control applicable internal regressions,
     while the private adjoint retains its required
-    \code{ukertype = "liracine"} and \code{okertype = "liracine"}.
+    \code{ukertype = "liracine"} and \code{okertype = "liracine"}. For the
+    plot method, graphical arguments are passed to \code{plot} and
+    \code{lines} as applicable.
   }
 
 }
@@ -254,6 +272,16 @@ Further arguments are passed to \code{\link{npreg}} and \code{\link{npksum}}.
   partition, \code{npregivderiv} rejects it explicitly rather than silently
   changing the derivative target. Post-fit \code{predict()} is not available;
   use fit-time \code{newdata} or the native evaluation arguments.
+
+  Fit-time evaluation is output-only. Conditional regressions, the empirical
+  adjoint, fitted-residual centering, structural integration, stopping values,
+  and state selection are always computed on aligned training rows. A separate
+  \code{zeval} accumulates the derivative corrections from those same training
+  states into \code{phi.prime.eval} and \code{phi.prime.eval.mat}; it cannot
+  change \code{phi}, \code{phi.prime}, their training paths, or
+  \code{norm.stop}. Structural levels at arbitrary new points are not returned
+  because this derivative estimator's integration and centering normalization
+  is defined on the training support.
 
 
   Let \eqn{\varphi'_0}{phi'[0]} denote the initialization derivative,
@@ -292,13 +320,10 @@ Further arguments are passed to \code{\link{npreg}} and \code{\link{npksum}}.
   as the residuals evolve incrementally while still guarding against
   local optima.
 
-  Iteration will terminate when either the change in the value of
-  \eqn{||(E(y|w)-E(\varphi_k(z,x)|w))/E(y|w)||^2
-  }{||(E(y|w)-E(phi(z,x)|w))/E(y|w)||^2 } from iteration to iteration is
-  less than \code{iterate.diff.tol} or we hit \code{iterate.max} or
-  \eqn{||(E(y|w)-E(\varphi_k(z,x)|w))/E(y|w)||^2
-  }{||(E(y|w)-E(phi(z,x)|w))/E(y|w)||^2 } stops falling in value and
-  starts rising.  }
+  With \code{iterate.break=TRUE}, iteration can stop after the stopping rule
+  turns upward once the initial guard interval has passed; otherwise all
+  states through \code{iterate.max} are evaluated. The selected state is then
+  obtained from the computed stopping profile.  }
 
 \value{
 
@@ -306,15 +331,18 @@ Further arguments are passed to \code{\link{npreg}} and \code{\link{npksum}}.
     generic functions \code{\link{print}}, \code{\link{summary}},
     \code{\link{plot}}, \code{\link{fitted}}, \code{\link{residuals}}, and
     \code{\link{gradients}} support objects of this type. \code{fitted}
-    returns the reconstructed structural function while \code{gradients}
-    returns the primary derivative estimate. Residuals are available only for
-    training-row evaluation. For formula fits using an exclusion-style
+    returns the reconstructed training structural function while \code{gradients}
+    returns the training derivative estimate. Residuals use the aligned
+    training structural curve even when a separate evaluation grid was
+    supplied. For formula fits using an exclusion-style
     \code{na.action}, these accessors restore omitted rows. \code{summary}
     returns a structured
     \code{summary.npregivderiv} object with a dedicated print method.
 
   \code{npregivderiv} returns a list with components \code{phi.prime},
-  \code{phi}, \code{phi.prime.mat}, \code{phi.mat},
+  \code{phi}, \code{phi.prime.mat}, \code{phi.mat}, and, when a separate
+  evaluation grid was supplied, \code{phi.prime.eval} and
+  \code{phi.prime.eval.mat},
   \code{num.iterations}, \code{norm.stop}, \code{convergence}, and the
   initialization components \code{starting.values.phi.prime} and
   \code{starting.values.phi}. \code{num.iterations} is the selected state

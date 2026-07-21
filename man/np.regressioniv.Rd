@@ -7,6 +7,7 @@
 \alias{fitted.npregiv}
 \alias{gradients.npregiv}
 \alias{residuals.npregiv}
+\alias{plot.npregiv}
 
 \title{
 Nonparametric Instrumental Regression
@@ -78,6 +79,8 @@ npregiv(y, \dots)
         zeval = NULL,
         xeval = NULL,
         \dots)
+
+\method{plot}{npregiv}(x, plot.data = FALSE, deriv = FALSE, \dots)
 }
 \arguments{
 \subsection{Data, Bandwidth Inputs And Formula Interface}{
@@ -111,9 +114,10 @@ These arguments identify the response, endogenous variables, instruments, exogen
   }
 
   \item{x}{
-    an \eqn{r}-variate data frame of exogenous regressors. The data
+    for \code{npregiv.default}, an \eqn{r}-variate data frame of exogenous regressors. The data
     types may be continuous, discrete (unordered and ordered factors),
-    or some combination thereof.
+    or some combination thereof. For \code{plot.npregiv}, an
+    \code{npregiv} object.
   }
 
   \item{xeval}{
@@ -142,6 +146,18 @@ These arguments identify the response, endogenous variables, instruments, exogen
     takes place on the data provided by \code{z}.
   }
 
+  \item{plot.data}{
+    logical; plot the training response and selected training structural
+    function. This overrides a fit-time evaluation grid for the displayed
+    structural level.
+  }
+
+  \item{deriv}{
+    logical; plot the stored first partial derivative instead of the
+    structural function. The current plot method supports one endogenous
+    coordinate.
+  }
+
 \subsection{Landweber-Fridman Iteration Controls}{
 These arguments control the Landweber-Fridman iteration path.
 }
@@ -162,13 +178,15 @@ These arguments control the Landweber-Fridman iteration path.
   }
 
   \item{iterate.Tikhonov}{
-    a logical value indicating whether to use iterated Tikhonov (one
-    iteration) or not when using \code{method="Tikhonov"}.
+    a logical value controlling whether \code{alpha} is reselected after the
+    first response-adaptive bandwidth/operator refinement. It does not change
+    the order of the fixed order-two criterion used to select \code{alpha}.
   }
 
   \item{iterate.Tikhonov.num}{
-    an integer indicating the number of iterations to conduct when using
-    \code{method="Tikhonov"}.
+    a positive integer giving the number of outer response-adaptive
+    bandwidth/operator refinement cycles. It is not the order of iterated
+    Tikhonov regularization.
   }
 
   \item{method}{
@@ -285,14 +303,18 @@ These arguments control returned kernel weights, starting values, residual smoot
     a logical value (defaults to \code{FALSE}) indicating whether to
     return the weight matrix which when postmultiplied by the response
     \eqn{y} delivers the first partial derivative of the instrumental
-    regression with respect to \eqn{z}
+    regression with respect to \eqn{z}. For more than one continuous
+    coordinate, the returned component is a named list containing one weight
+    matrix per pure coordinate partial.
   }
 
   \item{return.weights.phi.deriv.2}{
     a logical value (defaults to \code{FALSE}) indicating whether to
     return the weight matrix which when postmultiplied by the response
     \eqn{y} delivers the second partial derivative of the instrumental
-    regression with respect to \eqn{z}
+    regression with respect to \eqn{z}. For more than one continuous
+    coordinate, the returned component is a named list containing one weight
+    matrix per pure coordinate partial.
   }
 
   \item{smooth.residuals}{ a logical value indicating whether to
@@ -303,15 +325,15 @@ These arguments control returned kernel weights, starting values, residual smoot
   }
 
   \item{start.from}{ a character string indicating whether to start from
-    \eqn{E(Y|z)} (default, \code{"Eyz"}) or from \eqn{E(E(Y|z)|z)} (this can
+    \eqn{E(Y|z)} (default, \code{"Eyz"}) or from \eqn{E(E(Y|w)|z)} (this can
     be overridden by providing \code{starting.values} below)
   }  
 
-  \item{starting.values}{ a value indicating whether to commence
-    Landweber-Fridman assuming
-    \eqn{\varphi_{-1}=starting.values}{phi[-1]=starting.values} (proper
-    Landweber-Fridman) or instead begin from \eqn{E(y|z)} (defaults to
-    \code{NULL}, see details below)
+  \item{starting.values}{ an optional finite numeric vector supplying the
+    training-row structural initialization. Its derivative state is estimated
+    from the corresponding local-polynomial interpolant using the selected
+    smoothing contract; it is not set to zero. When weights are requested,
+    this supplied initialization is treated as fixed with respect to \eqn{y}.
   }
 
   \item{stop.on.increase}{
@@ -332,9 +354,9 @@ These arguments control Tikhonov regularization and its bandwidth.
     }
 
   \item{alpha.iter}{
-    a numeric scalar that, if supplied, is used for iterated Tikhonov
-    rather than numerically solving for \code{alpha}, when using
-    \code{method="Tikhonov"}.
+    a positive numeric scalar that, if supplied, is used for the ordinary
+    Tikhonov solve after the outer bandwidth/operator refinement rather than
+    selecting a refined regularization parameter numerically.
   }
 
   \item{alpha.max}{
@@ -358,7 +380,10 @@ These arguments control Tikhonov regularization and its bandwidth.
     (obtained from a previous invocation of \code{npregiv}) required to
     re-compute the estimator without having to re-run cross-validation
     and/or numerical optimization which is particularly costly in this
-    setting (see details below for an illustration of its use)
+    setting (see details below for an illustration of its use). A
+    Landweber-Fridman replay returns the recomputed stopping diagnostics and
+    uses \code{convergence="BANDWIDTH_REPLAY"}, including when
+    \code{norm.index=1}.
   }
 
 
@@ -367,7 +392,14 @@ Further arguments are passed to lower-level kernel-sum and estimation routines.
 }
 
   \item{\dots}{
-    additional arguments supplied to \code{\link{npksum}}.
+    additional kernel and bandwidth-scaling arguments supplied to the private
+    IV regression and kernel-sum stages. In particular,
+    \code{bandwidth.divide}, \code{ukertype}, and \code{okertype} retain their
+    ordinary lower-level meanings and are owned once per call, avoiding
+    duplicate-argument collisions. Categorical bandwidth searches use the
+    valid upper bound for the selected categorical kernel. For the plot
+    method, graphical arguments are passed to \code{plot} and \code{lines} as
+    applicable.
   }
 
 }
@@ -381,6 +413,30 @@ Further arguments are passed to lower-level kernel-sum and estimation routines.
   mixed-data kernel role; create an explicit transformed variable (for example
   with \code{I(a * b)}) instead. Native vector/data-frame calls remain
   supported unchanged.
+
+  For Landweber-Fridman regularization, state \eqn{N}{N} means the complete
+  state after exactly \eqn{N}{N} residual-correction updates. Column
+  \eqn{N}{N} of \code{phi.mat}, \code{norm.stop[N]}, \code{norm.index}, the
+  returned structural curve, derivatives, and optional weights therefore all
+  refer to that same state. With \code{penalize.iteration=TRUE}, the stopping
+  value is \eqn{N}{N} times the normalized squared conditional-residual norm
+  evaluated at state \eqn{N}{N}.
+
+  Multivariate derivative components are pure coordinate partials in the
+  order of the continuous columns in the augmented structural block
+  \code{data.frame(z, x)}. Thus the first-derivative matrix has one named
+  column per continuous endogenous or appended exogenous coordinate; it does
+  not contain a mixed derivative.
+
+  The Tikhonov route solves the Darolles et al. operator equation with
+  \eqn{r=E[Y|W]}{r=E[Y|W]} and right-hand side \eqn{T^*r}{T* r}. Its default
+  data-driven \eqn{\alpha}{alpha} selector is the fixed order-two criterion of
+  Feve and Florens (2010), Equation (3.10); the returned curve is the ordinary
+  Tikhonov solution. \code{iterate.Tikhonov.num} counts outer bandwidth and
+  operator refinements. The current implementation selects \code{alpha.iter}
+  during the first outer cycle and reuses it in later cycles; it does not
+  implement a per-cycle alpha policy or the alternative Darolles extended-
+  residual selector.
 
   Tikhonov regularization requires computation of weight matrices of
   dimension \eqn{n\times n}{n x n} which can be computationally costly
@@ -492,8 +548,10 @@ Further arguments are passed to lower-level kernel-sum and estimation routines.
     \code{\link{plot}}, \code{\link{fitted}}, \code{\link{residuals}}, and
     \code{\link{gradients}} support objects of this type. \code{fitted}
     returns the selected structural function and \code{gradients} returns its
-    stored first derivatives. Residuals are available only for training-row
-    evaluation. For formula fits using an exclusion-style \code{na.action},
+    stored first derivatives. Both are training-row accessors even when
+    fit-time evaluation data were supplied; evaluation results remain in the
+    \code{phi.eval} and \code{phi.deriv.eval.*} fields. Residuals use the
+    aligned training structural curve. For formula fits using an exclusion-style \code{na.action},
     these accessors restore omitted rows. \code{summary} returns a structured
     \code{summary.npregiv} object with a dedicated print method.
 

@@ -1,3 +1,35 @@
+.np_iv_validate_flag <- function(x, name) {
+  if (!is.logical(x) || length(x) != 1L || is.na(x))
+    stop(sprintf("%s must be TRUE or FALSE", name), call. = FALSE)
+  x
+}
+
+.np_iv_validate_number <- function(x, name, lower = -Inf, upper = Inf,
+                                   lower.open = FALSE, upper.open = FALSE) {
+  valid <- is.numeric(x) && length(x) == 1L && !is.na(x) && is.finite(x)
+  if (valid) {
+    valid <- if (lower.open) x > lower else x >= lower
+    valid <- valid && if (upper.open) x < upper else x <= upper
+  }
+  if (!valid) {
+    interval <- paste0(if (lower.open) "(" else "[", lower, ", ", upper,
+                       if (upper.open) ")" else "]")
+    stop(sprintf("%s must be one finite number in %s", name, interval),
+         call. = FALSE)
+  }
+  as.numeric(x)
+}
+
+.np_iv_validate_integer <- function(x, name, lower = -Inf, upper = Inf) {
+  valid <- is.numeric(x) && length(x) == 1L && !is.na(x) && is.finite(x) &&
+    x == trunc(x) && x >= lower && x <= upper && x <= .Machine$integer.max
+  if (!valid) {
+    stop(sprintf("%s must be one integer between %s and %s",
+                 name, lower, upper), call. = FALSE)
+  }
+  as.integer(x)
+}
+
 .np_iv_pipe_parts <- function(expr) {
   if (is.call(expr) && identical(expr[[1L]], as.name("|")))
     return(c(.np_iv_pipe_parts(expr[[2L]]), list(expr[[3L]])))
@@ -226,10 +258,9 @@ npregivderiv.formula <- function(y, data = NULL, subset, na.action,
 
   eval.frame <- NULL
   formula.zeval <- NULL
-  formula.weval <- NULL
   formula.xeval <- NULL
   if (!is.null(newdata)) {
-    eval.roles <- c(if (is.null(zeval)) "z", if (is.null(weval)) "w",
+    eval.roles <- c(if (is.null(zeval)) "z",
                     if (!is.null(parsed$roles$x) && is.null(xeval)) "x")
     if (length(eval.roles)) {
       eval.frame <- .np_iv_eval_frame(
@@ -239,8 +270,6 @@ npregivderiv.formula <- function(y, data = NULL, subset, na.action,
       )
       if ("z" %in% eval.roles)
         formula.zeval <- .np_iv_role_frame(eval.frame, parsed$roles$z, where)
-      if ("w" %in% eval.roles)
-        formula.weval <- .np_iv_role_frame(eval.frame, parsed$roles$w, where)
       if ("x" %in% eval.roles)
         formula.xeval <- .np_iv_role_frame(eval.frame, parsed$roles$x, where)
     }
@@ -250,12 +279,11 @@ npregivderiv.formula <- function(y, data = NULL, subset, na.action,
   if (!is.null(xdat))
     native.args$x <- xdat
   effective.zeval <- if (!is.null(zeval)) zeval else formula.zeval
-  effective.weval <- if (!is.null(weval)) weval else formula.weval
   effective.xeval <- if (!is.null(xeval)) xeval else formula.xeval
   if (!is.null(effective.zeval))
     native.args$zeval <- effective.zeval
-  if (!is.null(effective.weval))
-    native.args$weval <- effective.weval
+  if (!is.null(weval))
+    native.args$weval <- weval
   if (!is.null(effective.xeval))
     native.args$xeval <- effective.xeval
 
@@ -263,8 +291,7 @@ npregivderiv.formula <- function(y, data = NULL, subset, na.action,
   .np_iv_formula_metadata(
     fit = fit, parsed = parsed, train.frame = train.frame,
     eval.frame = eval.frame, call = mc,
-    trainiseval = is.null(effective.zeval) && is.null(effective.weval) &&
-      is.null(effective.xeval)
+    trainiseval = is.null(effective.zeval) && is.null(effective.xeval)
   )
 }
 
@@ -467,8 +494,23 @@ npregivderiv.formula <- function(y, data = NULL, subset, na.action,
 .np_iv_summary_payload <- function(object, derivative = FALSE) {
   is.tikhonov <- !derivative && !is.null(object$alpha)
   nx <- if (is.null(object$x)) 0L else NCOL(object$x)
-  nz <- max(0L, NCOL(object$z) - nx)
-  nw <- max(0L, NCOL(object$w) - nx)
+  z.endogenous <- if(NCOL(object$z) > nx) {
+    object$z[, seq_len(NCOL(object$z) - nx), drop=FALSE]
+  } else {
+    object$z[, FALSE, drop=FALSE]
+  }
+  w.instruments <- if(NCOL(object$w) > nx) {
+    object$w[, seq_len(NCOL(object$w) - nx), drop=FALSE]
+  } else {
+    object$w[, FALSE, drop=FALSE]
+  }
+  nz <- sum(vapply(z.endogenous, is.numeric, logical(1)))
+  nw <- sum(vapply(w.instruments, is.numeric, logical(1)))
+  nz.categorical <- NCOL(z.endogenous) - nz
+  nw.categorical <- NCOL(w.instruments) - nw
+  nx.continuous <- if(is.null(object$x)) 0L else
+    sum(vapply(object$x, is.numeric, logical(1)))
+  nx.categorical <- nx - nx.continuous
   selected <- if (derivative) object$num.iterations else object$norm.index
   stopping <- if (!is.null(selected) && length(object$norm.stop) >= selected) {
     object$norm.stop[[selected]]
@@ -504,7 +546,10 @@ npregivderiv.formula <- function(y, data = NULL, subset, na.action,
     tikhonov = is.tikhonov,
     nz = nz,
     nw = nw,
-    nx = nx,
+    nx = nx.continuous,
+    nz.categorical = nz.categorical,
+    nw.categorical = nw.categorical,
+    nx.categorical = nx.categorical,
     ntrain = NROW(object$y),
     p = object$p,
     smoothing.spec = object$smoothing.spec,
@@ -521,7 +566,7 @@ npregivderiv.formula <- function(y, data = NULL, subset, na.action,
     capabilities = list(
       fitted = !is.null(object$phi),
       gradients = if (derivative) !is.null(object$phi.prime) else !is.null(object$phi.deriv.1),
-      residuals = .np_iv_object_trainiseval(object),
+      residuals = NROW(object$y) == length(object$phi),
       predict = FALSE,
       se = FALSE
     )
@@ -550,9 +595,18 @@ npregivderiv.formula <- function(y, data = NULL, subset, na.action,
   print(x$call)
   cat("\n", x$title, "\n", sep = "")
   cat("\nNumber of continuous endogenous predictors: ", format(x$nz), sep = "")
+  if (x$nz.categorical > 0L)
+    cat("\nNumber of categorical endogenous predictors: ",
+        format(x$nz.categorical), sep = "")
   cat("\nNumber of continuous instruments: ", format(x$nw), sep = "")
+  if (x$nw.categorical > 0L)
+    cat("\nNumber of categorical instruments: ",
+        format(x$nw.categorical), sep = "")
   if (x$nx > 0L)
     cat("\nNumber of continuous exogenous predictors: ", format(x$nx), sep = "")
+  if (x$nx.categorical > 0L)
+    cat("\nNumber of categorical exogenous predictors: ",
+        format(x$nx.categorical), sep = "")
   if (!is.null(x$p))
     cat("\nLocal polynomial order (p): ", format(x$p), sep = "")
   if (!is.null(x$smoothing.spec$effective$regtype)) {
@@ -587,7 +641,10 @@ npregivderiv.formula <- function(y, data = NULL, subset, na.action,
   } else {
     .np_iv_print_bandwidth(x$bws$E.y.w, "Bandwidth for E(y|w):", x$bw.names$w)
     .np_iv_print_bandwidth(x$bws$E.y.z, "Bandwidth for E(y|z):", x$bw.names$z)
-    if (!isTRUE(x$derivative)) {
+    if (isTRUE(x$derivative)) {
+      .np_iv_print_bandwidth(x$bws$residual.w,
+                             "Bandwidth for E(y-phi(z)|w):", x$bw.names$w)
+    } else {
       .np_iv_print_bandwidth(x$bws$resid.w, "Bandwidth for E(y-phi(z)|w):", x$bw.names$w)
       .np_iv_print_bandwidth(x$bws$resid.fitted.w.z,
                              "Bandwidth for E(E(y-phi(z)|w)|z):", x$bw.names$z)
@@ -599,13 +656,16 @@ npregivderiv.formula <- function(y, data = NULL, subset, na.action,
   invisible(x)
 }
 
-.np_iv_output_omit <- function(object) {
-  if (.np_iv_object_trainiseval(object)) object$omit else object$eval.omit
+.np_iv_restore_omit <- function(object, value) {
+  omit <- object$omit
+  if (is.null(omit)) value else napredict(omit, value)
 }
 
-.np_iv_restore_omit <- function(object, value) {
-  omit <- .np_iv_output_omit(object)
-  if (is.null(omit)) value else napredict(omit, value)
+.np_iv_plot_line_dots <- function(dots) {
+  dot.names <- names(dots)
+  if (is.null(dot.names)) return(list())
+  allowed <- c("col", "lty", "lwd", "pch", "type", "cex", "bg")
+  dots[nzchar(dot.names) & dot.names %in% allowed]
 }
 
 fitted.npregiv <- function(object, ...) {
@@ -620,8 +680,8 @@ gradients.npregiv <- function(x, ...) {
 }
 
 residuals.npregiv <- function(object, ...) {
-  if (!.np_iv_object_trainiseval(object) || NROW(object$y) != length(object$phi))
-    stop("residuals are available only when the structural function was evaluated on the training rows",
+  if (NROW(object$y) != length(object$phi))
+    stop("the stored structural function is not aligned with the training rows",
          call. = FALSE)
   ans <- as.vector(object$y) - as.vector(object$phi)
   if (is.null(object$omit)) ans else naresid(object$omit, ans)
@@ -639,8 +699,8 @@ gradients.npregivderiv <- function(x, ...) {
 }
 
 residuals.npregivderiv <- function(object, ...) {
-  if (!.np_iv_object_trainiseval(object) || NROW(object$y) != length(object$phi))
-    stop("residuals are available only when the structural function was evaluated on the training rows",
+  if (NROW(object$y) != length(object$phi))
+    stop("the stored structural function is not aligned with the training rows",
          call. = FALSE)
   ans <- as.vector(object$y) - as.vector(object$phi)
   if (is.null(object$omit)) ans else naresid(object$omit, ans)
