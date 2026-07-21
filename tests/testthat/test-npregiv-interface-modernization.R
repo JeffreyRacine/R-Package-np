@@ -131,8 +131,9 @@ test_that("npregivderiv formula and regression-consistent accessors preserve sta
   expect_output(print(summary(formula)),
                 "Instrumental Kernel Derivative Estimation", fixed = TRUE)
   expect_output(print(summary(formula)), "States evaluated", fixed = TRUE)
+  method <- getFromNamespace("npregivderiv.default", iv_interface_package())
   expect_identical(
-    eval(formals(npregivderiv.default)$regtype),
+    eval(formals(method)$regtype),
     c("ll", "lc", "lp")
   )
   expect_null(formula$smoothing.spec$requested$regtype)

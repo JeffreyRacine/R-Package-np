@@ -24,6 +24,40 @@
 
 npregiv <- function(y, ...) UseMethod("npregiv")
 
+.npregiv_select_stop_index <- function(norm.stop) {
+  if(!length(norm.stop))
+    stop("norm.stop must contain at least one value", call.=FALSE)
+
+  monotone.failure <- is.monotone.increasing(norm.stop)
+  norm.value <- norm.stop/seq_along(norm.stop)
+  criterion <- if(monotone.failure) norm.value else norm.stop
+
+  first.candidate <- 1L
+  while(first.candidate < length(criterion) &&
+        criterion[first.candidate + 1L] > criterion[first.candidate]) {
+    first.candidate <- first.candidate + 1L
+  }
+
+  candidates <- seq.int(first.candidate, length(criterion))
+  selected <- candidates[which.min(criterion[candidates])]
+
+  list(index=as.integer(selected),
+       monotone.failure=monotone.failure,
+       norm.value=norm.value)
+}
+
+.np_iv_partial_orders <- function(dimension, derivative) {
+  if(length(dimension) != 1L || !is.numeric(dimension) || is.na(dimension) ||
+     dimension != as.integer(dimension) || dimension < 1L)
+    stop("dimension must be one positive integer", call.=FALSE)
+  if(length(derivative) != 1L || !is.numeric(derivative) ||
+     is.na(derivative) || derivative != as.integer(derivative) ||
+     derivative < 1L)
+    stop("derivative must be one positive integer", call.=FALSE)
+  diag(as.integer(derivative), nrow=as.integer(dimension),
+       ncol=as.integer(dimension))
+}
+
 npregiv.default <- function(y,
                     z,
                     w,
@@ -78,6 +112,37 @@ npregiv.default <- function(y,
     nomad = nomad
   )
   p <- smoothing.spec$p
+  iterate.Tikhonov <- .np_iv_validate_flag(iterate.Tikhonov, "iterate.Tikhonov")
+  penalize.iteration <- .np_iv_validate_flag(penalize.iteration, "penalize.iteration")
+  return.weights.phi <- .np_iv_validate_flag(return.weights.phi, "return.weights.phi")
+  return.weights.phi.deriv.1 <- .np_iv_validate_flag(
+    return.weights.phi.deriv.1, "return.weights.phi.deriv.1")
+  return.weights.phi.deriv.2 <- .np_iv_validate_flag(
+    return.weights.phi.deriv.2, "return.weights.phi.deriv.2")
+  smooth.residuals <- .np_iv_validate_flag(smooth.residuals, "smooth.residuals")
+  stop.on.increase <- .np_iv_validate_flag(stop.on.increase, "stop.on.increase")
+  constant <- .np_iv_validate_number(constant, "constant", 0, 1, TRUE, TRUE)
+  iterate.diff.tol <- .np_iv_validate_number(
+    iterate.diff.tol, "iterate.diff.tol", 0)
+  iterate.max <- .np_iv_validate_integer(iterate.max, "iterate.max", 2)
+  iterate.Tikhonov.num <- .np_iv_validate_integer(
+    iterate.Tikhonov.num, "iterate.Tikhonov.num", 1)
+  p <- .np_iv_validate_integer(p, "p", 0)
+  random.seed <- .np_iv_validate_integer(random.seed, "random.seed", 0)
+  alpha.min <- .np_iv_validate_number(alpha.min, "alpha.min", 0, Inf, TRUE)
+  alpha.max <- .np_iv_validate_number(alpha.max, "alpha.max", 0, Inf, TRUE)
+  alpha.tol <- .np_iv_validate_number(alpha.tol, "alpha.tol", 0, Inf, TRUE)
+  if (alpha.min >= alpha.max)
+    stop("alpha.min must be less than alpha.max", call. = FALSE)
+  if (!is.null(alpha))
+    alpha <- .np_iv_validate_number(alpha, "alpha", 0, Inf, TRUE)
+  if (!is.null(alpha.iter))
+    alpha.iter <- .np_iv_validate_number(alpha.iter, "alpha.iter", 0, Inf, TRUE)
+  optim.abstol <- .np_iv_validate_number(optim.abstol, "optim.abstol", 0)
+  optim.reltol <- .np_iv_validate_number(optim.reltol, "optim.reltol", 0)
+  optim.maxattempts <- .np_iv_validate_integer(
+    optim.maxattempts, "optim.maxattempts", 0)
+  optim.maxit <- .np_iv_validate_integer(optim.maxit, "optim.maxit", 1)
   trainiseval <- is.null(zeval)
   if(!is.null(nmulti)) nmulti <- npValidateNmulti(nmulti)
 
@@ -218,6 +283,7 @@ npregiv.default <- function(y,
   ## the derivative stuff.
 
   Kmat.lp <- function(deriv=0,
+                      deriv.index=1L,
                       mydata.train=NULL,
                       mydata.eval=NULL,
                       bws=NULL,
@@ -259,6 +325,19 @@ npregiv.default <- function(y,
 
       k <- ncol(as.data.frame(X.train[,X.col.numeric]))
 
+      if(deriv > 0 &&
+         (length(deriv.index) != 1L || !is.numeric(deriv.index) ||
+          is.na(deriv.index) || deriv.index != as.integer(deriv.index) ||
+          deriv.index < 1L || deriv.index > k)) {
+          stop("deriv.index must identify one continuous predictor")
+      }
+
+      derivative.order <- if(deriv > 0) {
+        .np_iv_partial_orders(k, deriv)[, as.integer(deriv.index)]
+      } else {
+        integer(k)
+      }
+
       if(k > 0) {
           X.train.numeric <- as.data.frame(X.train[,X.col.numeric])
           X.eval.numeric <- as.data.frame(X.eval[,X.col.numeric])
@@ -290,15 +369,15 @@ npregiv.default <- function(y,
 
           } else if(deriv==1) {
 
-              ## Note this is not general XXX Feb 25 2015, for
-              ## univariate z only
-
+              derivative.operator <- rep.int("normal", ncol(X.train))
+              target.column <- which(X.col.numeric)[as.integer(deriv.index)]
+              derivative.operator[target.column] <- "derivative"
               K.x.deriv <- npksum(txdat=X.train,
                                   exdat=X.eval,
                                   bws=bws,
                                   return.kernel.weights=TRUE,
-                                  operator="derivative",
-                                  ...)$kw/NZD(bws)
+                                  operator=derivative.operator,
+                                  ...)$kw/NZD(bws[target.column])
 
               rSk <- NZD(rowSums(t(K.x)))
 
@@ -386,7 +465,7 @@ npregiv.default <- function(y,
               W.z.deriv.1 <- W.lp(xdat=X.train.numeric,
                                          exdat=as.matrix(X.eval.numeric),
                                          degree=rep(p,NCOL(X.train.numeric)),
-                                         gradient.vec = 1)
+                                         gradient.vec=derivative.order)
 
               Kmat <- matrix(NA, n.eval, n.train)
               for(i in seq_len(n.eval)) {
@@ -411,7 +490,7 @@ npregiv.default <- function(y,
               W.z.deriv.1 <- W.lp(xdat=X.train.numeric,
                                          exdat=as.matrix(X.eval.numeric),
                                          degree=rep(p,NCOL(X.train.numeric)),
-                                         gradient.vec = 1)
+                                         gradient.vec=derivative.order)
 
               for(i in seq_len(n.eval)) {
                   Kmat[i,] <- W.z.deriv.1[i,,drop=FALSE]%*%WzkWz.inv[[i]]%*%t(W.z)*K.x[,i]
@@ -424,7 +503,7 @@ npregiv.default <- function(y,
               W.z.deriv.2 <- W.lp(xdat=X.train.numeric,
                                          exdat=as.matrix(X.eval.numeric),
                                          degree=rep(p,NCOL(X.train.numeric)),
-                                         gradient.vec = 2)
+                                         gradient.vec=derivative.order)
 
               for(i in seq_len(n.eval)) {
                   Kmat[i,] <- W.z.deriv.2[i,,drop=FALSE]%*%WzkWz.inv[[i]]%*%t(W.z)*K.x[,i]
@@ -437,6 +516,42 @@ npregiv.default <- function(y,
       return(Kmat)
   }
 
+  Kmat.lp.partials <- function(deriv,
+                               mydata.train,
+                               mydata.eval=NULL,
+                               ...) {
+    training <- as.data.frame(mydata.train)
+    numeric.columns <- vapply(seq_len(ncol(training)),
+                              function(i) is.numeric(training[,i]),
+                              logical(1))
+    partials <- lapply(seq_len(sum(numeric.columns)), function(variable) {
+      Kmat.lp(deriv=deriv,
+              deriv.index=variable,
+              mydata.train=mydata.train,
+              mydata.eval=mydata.eval,
+              ...)
+    })
+    if(length(partials) > 1L)
+      names(partials) <- names(training)[numeric.columns]
+    partials
+  }
+
+  tikh.partial.values <- function(partials, alpha, CZ, CY, r) {
+    values <- vapply(partials, function(CY.eval) {
+      as.vector(tikh.eval(alpha, CZ=CZ, CY=CY, CY.eval=CY.eval, r=r))
+    }, numeric(nrow(partials[[1L]])))
+    values <- matrix(values, nrow=nrow(partials[[1L]]), ncol=length(partials))
+    if(length(partials) > 1L) colnames(values) <- names(partials)
+    values
+  }
+
+  tikh.partial.weights <- function(partials, inverse.operator, response.map) {
+    weights <- lapply(partials, function(partial) {
+      partial%*%inverse.operator%*%response.map
+    })
+    if(length(weights) == 1L) weights[[1L]] else weights
+  }
+
   glpreg <- function(tydat=NULL,
                      txdat=NULL,
                      exdat=NULL,
@@ -444,6 +559,9 @@ npregiv.default <- function(y,
                      degree=NULL,
                      leave.one.out=FALSE,
                      deriv=1,
+                     bandwidth.divide=TRUE,
+                     ukertype="liracine",
+                     okertype="liracine",
                      ...) {
 
     ## Don't think this error checking is robust
@@ -463,6 +581,11 @@ npregiv.default <- function(y,
 
     txdat <- as.data.frame(txdat)
     exdat <- as.data.frame(exdat)
+
+    txdat.numeric <- vapply(seq_len(ncol(txdat)),
+                            function(i) is.numeric(txdat[,i]),
+                            logical(1))
+    num.numeric <- sum(txdat.numeric)
 
     maxPenalty <- sqrt(.Machine$double.xmax)
 
@@ -488,10 +611,10 @@ npregiv.default <- function(y,
                       weights = as.matrix(data.frame(1,tydat)),
                       tydat = rep(1,length(tydat)),
                       bws = bws,
-                      bandwidth.divide = TRUE,
+                      bandwidth.divide=bandwidth.divide,
                       leave.one.out = leave.one.out,
-                      ukertype="liracine",
-                      okertype="liracine",
+                      ukertype=ukertype,
+                      okertype=okertype,
                       ...)$ksum
 
       } else {
@@ -501,10 +624,10 @@ npregiv.default <- function(y,
                       weights = as.matrix(data.frame(1,tydat)),
                       tydat = rep(1,length(tydat)),
                       bws = bws,
-                      bandwidth.divide = TRUE,
+                      bandwidth.divide=bandwidth.divide,
                       leave.one.out = leave.one.out,
-                      ukertype="liracine",
-                      okertype="liracine",
+                      ukertype=ukertype,
+                      okertype=okertype,
                       ...)$ksum
       }
 
@@ -519,10 +642,12 @@ npregiv.default <- function(y,
                               txdat=txdat,
                               exdat = exdat,
                               bws = bws,
-                              ukertype="liracine",
-                              okertype="liracine",
+                              ukertype=ukertype,
+                              okertype=okertype,
                               gradients=TRUE,
                               ...))
+      grad <- matrix(as.numeric(grad), nrow=n.eval, ncol=num.numeric)
+      if(num.numeric > 1L) colnames(grad) <- names(txdat)[txdat.numeric]
 
       return(list(mean = mhat,
                   grad = grad))
@@ -536,10 +661,13 @@ npregiv.default <- function(y,
                             exdat=exdat,
                             degree=degree)
 
-      W.eval.deriv <- W.lp(xdat=txdat,
-                                  exdat=exdat,
-                                  degree=degree,
-                                  gradient.vec=rep(deriv,NCOL(txdat)))
+      partial.orders <- .np_iv_partial_orders(num.numeric, deriv)
+      W.eval.deriv <- lapply(seq_len(num.numeric), function(variable) {
+        W.lp(xdat=txdat,
+             exdat=exdat,
+             degree=degree,
+             gradient.vec=partial.orders[,variable])
+      })
 
       ## Local polynomial via smooth coefficient formulation and one
       ## call to npksum
@@ -553,10 +681,10 @@ npregiv.default <- function(y,
                       tydat = as.matrix(cbind(tydat,W)),
                       weights = W,
                       bws = bws,
-                      bandwidth.divide = TRUE,
+                      bandwidth.divide=bandwidth.divide,
                       leave.one.out = leave.one.out,
-                      ukertype="liracine",
-                      okertype="liracine",
+                      ukertype=ukertype,
+                      okertype=okertype,
                       ...)$ksum
 
       } else {
@@ -566,16 +694,18 @@ npregiv.default <- function(y,
                       tydat = as.matrix(cbind(tydat,W)),
                       weights = W,
                       bws = bws,
-                      bandwidth.divide = TRUE,
+                      bandwidth.divide=bandwidth.divide,
                       leave.one.out = leave.one.out,
-                      ukertype="liracine",
-                      okertype="liracine",
+                      ukertype=ukertype,
+                      okertype=okertype,
                       ...)$ksum
 
       }
 
-      tyw <- array(tww,dim = c(ncol(W)+1,ncol(W),n.eval))[1,,]
-      tww <- array(tww,dim = c(ncol(W)+1,ncol(W),n.eval))[-1,,]
+      tww.array <- array(tww, dim=c(ncol(W)+1,ncol(W),n.eval))
+      tyw <- matrix(tww.array[1,,,drop=FALSE],
+                    nrow=ncol(W), ncol=n.eval)
+      tww <- tww.array[-1,,,drop=FALSE]
 
       coef.mat <- matrix(maxPenalty, ncol(W), n.eval)
       ridge.grid <- npRidgeSequenceAdditive(n.train = n.eval, cap = 1.0)
@@ -584,7 +714,7 @@ npregiv.default <- function(y,
       ridge.lc.mean <- double(n.eval)
       doridge <- rep.int(TRUE, n.eval)
 
-      nc <- ncol(tww[,,1])
+      nc <- dim(tww)[1L]
       I.nc <- diag(nc)
 
       ## Test for singularity of the local polynomial (regtype = "lp")
@@ -613,7 +743,13 @@ npregiv.default <- function(y,
           ridge.alpha[i] * ridge.lc.mean[i]
       })
 
-      grad <- sapply(seq_len(n.eval), function(i) {W.eval.deriv[i,-1, drop = FALSE] %*% coef.mat[-1,i]})
+      grad <- vapply(seq_len(num.numeric), function(variable) {
+        vapply(seq_len(n.eval), function(i) {
+          W.eval.deriv[[variable]][i,-1,drop=FALSE] %*% coef.mat[-1,i]
+        }, numeric(1))
+      }, numeric(n.eval))
+      grad <- matrix(grad, nrow=n.eval, ncol=num.numeric)
+      if(num.numeric > 1L) colnames(grad) <- names(txdat)[txdat.numeric]
 
       return(list(mean = mhat,
                   grad = grad))
@@ -627,6 +763,9 @@ npregiv.default <- function(y,
                              xdat=NULL,
                              degree=NULL,
                              W=NULL,
+                             bandwidth.divide=TRUE,
+                             ukertype="liracine",
+                             okertype="liracine",
                              ...) {
 
     ## Don't think this error checking is robust
@@ -658,9 +797,9 @@ npregiv.default <- function(y,
                       tydat = rep(1,n),
                       bws = bws,
                       leave.one.out = TRUE,
-                      bandwidth.divide = TRUE,
-                      ukertype="liracine",
-                      okertype="liracine",
+                      bandwidth.divide=bandwidth.divide,
+                      ukertype=ukertype,
+                      okertype=okertype,
                       ...)$ksum
 
         mean.loo <- tww[2,]/NZD(tww[1,])
@@ -683,9 +822,9 @@ npregiv.default <- function(y,
                       weights = W,
                       bws = bws,
                       leave.one.out = TRUE,
-                      bandwidth.divide = TRUE,
-                      ukertype="liracine",
-                      okertype="liracine",
+                      bandwidth.divide=bandwidth.divide,
+                      ukertype=ukertype,
+                      okertype=okertype,
                       ...)$ksum
 
         tyw <- array(tww,dim = c(ncol(W)+1,ncol(W),n))[1,,]
@@ -741,6 +880,9 @@ npregiv.default <- function(y,
                               xdat=NULL,
                               degree=NULL,
                               W=NULL,
+                              bandwidth.divide=TRUE,
+                              ukertype="liracine",
+                              okertype="liracine",
                               ...) {
 
     ## Don't think this error checking is robust
@@ -769,9 +911,9 @@ npregiv.default <- function(y,
                               weights = as.matrix(data.frame(1,ydat)[1,]),
                               tydat = 1,
                               bws = bws,
-                              bandwidth.divide = TRUE,
-                              ukertype="liracine",
-                              okertype="liracine",
+                              bandwidth.divide=bandwidth.divide,
+                              ukertype=ukertype,
+                              okertype=okertype,
                               ...)$ksum[1,1]
 
       if(all(degree == 0)) {
@@ -782,9 +924,9 @@ npregiv.default <- function(y,
                       weights = as.matrix(data.frame(1,ydat)),
                       tydat = rep(1,n),
                       bws = bws,
-                      bandwidth.divide = TRUE,
-                      ukertype="liracine",
-                      okertype="liracine",
+                      bandwidth.divide=bandwidth.divide,
+                      ukertype=ukertype,
+                      okertype=okertype,
                       ...)$ksum
 
         ghat <- tww[2,]/NZD(tww[1,])
@@ -810,9 +952,9 @@ npregiv.default <- function(y,
                       tydat = as.matrix(cbind(ydat,W)),
                       weights = W,
                       bws = bws,
-                      bandwidth.divide = TRUE,
-                      ukertype="liracine",
-                      okertype="liracine",
+                      bandwidth.divide=bandwidth.divide,
+                      ukertype=ukertype,
+                      okertype=okertype,
                       ...)$ksum
 
         tyw <- array(tww,dim = c(ncol(W)+1,ncol(W),n))[1,,]
@@ -895,6 +1037,9 @@ npregiv.default <- function(y,
                     optim.maxit=500,
                     debug=FALSE,
                     bw.init=NULL,
+                    bandwidth.divide=TRUE,
+                    ukertype="liracine",
+                    okertype="liracine",
                     ...) {
 
     ## Save seed prior to setting
@@ -917,6 +1062,14 @@ npregiv.default <- function(y,
     if(!is.null(nmulti)) nmulti <- npValidateNmulti(nmulti)
 
     bwmethod = match.arg(bwmethod)
+    ukertype <- match.arg(ukertype, c("aitchisonaitken", "liracine"))
+    okertype <- match.arg(okertype,
+                         c("liracine", "wangvanryzin", "racineliyan",
+                           "nliracine"))
+    if(length(bandwidth.divide) != 1L || !is.logical(bandwidth.divide) ||
+       is.na(bandwidth.divide)) {
+      stop("bandwidth.divide must be TRUE or FALSE", call.=FALSE)
+    }
 
     optim.method <- match.arg(optim.method)
     optim.control <- list(abstol = optim.abstol,
@@ -934,6 +1087,30 @@ npregiv.default <- function(y,
     ## Which variables are categorical, which are discrete...
 
     xdat.numeric <- sapply(seq_len(ncol(xdat)),function(i){is.numeric(xdat[,i])})
+
+    bandwidth.upper <- rep(Inf, ncol(xdat))
+    for(i in seq_len(ncol(xdat))) {
+      if(!xdat.numeric[i]) {
+        bandwidth.upper[i] <- if(is.ordered(xdat[,i])) {
+          oMaxL(nlevels(xdat[,i]), okertype)
+        } else {
+          uMaxL(nlevels(xdat[,i]), ukertype)
+        }
+      }
+    }
+
+    random.search.start <- function() {
+      start <- runif(ncol(xdat), 0, 1)
+      for(i in seq_len(ncol(xdat))) {
+        if(xdat.numeric[i]) {
+          start[i] <- runif(1, .5, 1.5)*EssDee(xdat[,i])*
+            nrow(xdat)^{-1/(4+num.numeric)}
+        } else {
+          start[i] <- start[i]*bandwidth.upper[i]
+        }
+      }
+      start
+    }
 
     ## First initialize initial search values of the vector of
     ## bandwidths to lie in [0,1]
@@ -959,8 +1136,11 @@ npregiv.default <- function(y,
       ## to the liracine kernel (0<=lambda<=1) and test for proper
       ## bounds in sum.lscv.
 
-      if(all(bw.gamma>=0)&&all(bw.gamma[!xdat.numeric]<=1)) {
-        lscv <- minimand.cv.ls(bws=bw.gamma,ydat=ydat,xdat=xdat,...)
+      if(all(bw.gamma>=0)&&
+         all(bw.gamma[!xdat.numeric]<=bandwidth.upper[!xdat.numeric])) {
+        lscv <- minimand.cv.ls(bws=bw.gamma,ydat=ydat,xdat=xdat,
+                               bandwidth.divide=bandwidth.divide,
+                               ukertype=ukertype,okertype=okertype,...)
       } else {
         lscv <- maxPenalty
       }
@@ -980,8 +1160,11 @@ npregiv.default <- function(y,
       ## to the liracine kernel (0<=lambda<=1) and test for proper
       ## bounds in sum.lscv.
 
-      if(all(bw.gamma>=0)&&all(bw.gamma[!xdat.numeric]<=1)) {
-        aicc <- minimand.cv.aic(bws=bw.gamma,ydat=ydat,xdat=xdat,...)
+      if(all(bw.gamma>=0)&&
+         all(bw.gamma[!xdat.numeric]<=bandwidth.upper[!xdat.numeric])) {
+        aicc <- minimand.cv.aic(bws=bw.gamma,ydat=ydat,xdat=xdat,
+                                bandwidth.divide=bandwidth.divide,
+                                ukertype=ukertype,okertype=okertype,...)
       } else {
         aicc <- maxPenalty
       }
@@ -1007,13 +1190,7 @@ npregiv.default <- function(y,
 
         ## First initialize to values for factors (`liracine' kernel)
 
-        init.search.vals <- runif(ncol(xdat),0,1)
-
-        for(i in seq_len(ncol(xdat))) {
-          if(xdat.numeric[i]==TRUE) {
-            init.search.vals[i] <- runif(1,.5,1.5)*EssDee(xdat[,i])*nrow(xdat)^{-1/(4+num.numeric)}
-          }
-        }
+        init.search.vals <- random.search.start()
       }
 
       ## Initialize `best' values prior to search
@@ -1037,10 +1214,7 @@ npregiv.default <- function(y,
 
         attempts <- 0
         while((optim.return$convergence != 0) && (attempts <= optim.maxattempts)) {
-          init.search.vals <- runif(ncol(xdat),0,1)
-          if(xdat.numeric[i]==TRUE) {
-            init.search.vals[i] <- runif(1,.5,1.5)*EssDee(xdat[,i])*nrow(xdat)^{-1/(4+num.numeric)}
-          }
+          init.search.vals <- random.search.start()
           attempts <- attempts + 1
           optim.control$abstol <- optim.control$abstol * 10.0
           optim.control$reltol <- optim.control$reltol * 10.0
@@ -1066,10 +1240,7 @@ npregiv.default <- function(y,
 
         attempts <- 0
         while((optim.return$convergence != 0) && (attempts <= optim.maxattempts)) {
-          init.search.vals <- runif(ncol(xdat),0,1)
-          if(xdat.numeric[i]==TRUE) {
-            init.search.vals[i] <- runif(1,.5,1.5)*EssDee(xdat[,i])*nrow(xdat)^{-1/(4+num.numeric)}
-          }
+          init.search.vals <- random.search.start()
           attempts <- attempts + 1
           optim.control$abstol <- optim.control$abstol * 10.0
           optim.control$reltol <- optim.control$reltol * 10.0
@@ -1142,14 +1313,6 @@ npregiv.default <- function(y,
     if(!is.null(zeval) && NROW(zeval) != NROW(xeval))
       stop("zeval and xeval have differing numbers of rows", call. = FALSE)
   }
-  if(iterate.max < 2) stop("iterate.max must be at least 2")
-  if(iterate.diff.tol < 0) stop("iterate.diff.tol must be non-negative")
-  if(constant <= 0 || constant >=1) stop("constant must lie in (0,1)")
-  if(p < 0) stop("p must be a non-negative integer")
-
-  if(!is.null(alpha) && alpha <= 0) stop("alpha must be positive")
-  if(!is.null(alpha.iter) && alpha.iter <= 0) stop("alpha.iter must be positive")
-
   if(return.weights.phi.deriv.1 && !return.weights.phi) stop("must use return.weights.phi=TRUE when using return.weights.phi.deriv.1=TRUE")
   if(return.weights.phi.deriv.2 && !return.weights.phi) stop("must use return.weights.phi=TRUE when using return.weights.phi.deriv.2=TRUE")
   if(return.weights.phi.deriv.2 && p<2) stop("must use p >= 2 when using return.weights.phi.deriv.2=TRUE")
@@ -1382,11 +1545,14 @@ npregiv.default <- function(y,
           bw.E.E.phi.w.z <- bw$bw.E.E.phi.w.z
       }
 
-      E.E.phi.w.z <- .np_progress_with_legacy_suppressed(glpreg(tydat=E.y.w,
-                                                                txdat=z,
-                                                                bws=bw.E.E.phi.w.z,
-                                                                degree=rep(p, num.z.numeric),
-                                                                ...))$mean
+      ## The updated bandwidth is selected from E[phi(z)|w], but the
+      ## Tikhonov right-hand side remains T* r with r = E[y|w].
+      iv_set_stage("T*E[y|w]", iteration = iter.label)
+      T.star.r <- .np_progress_with_legacy_suppressed(glpreg(tydat=E.y.w,
+                                                             txdat=z,
+                                                             bws=bw.E.E.phi.w.z,
+                                                             degree=rep(p, num.z.numeric),
+                                                             ...))$mean
       
       KPHIW <- Kmat.lp(mydata.train=data.frame(w),
                        bws=bw.E.phi.w,
@@ -1419,7 +1585,7 @@ npregiv.default <- function(y,
                   .np_objective_exact_cache_put(alpha.iter.cache, cache.hit$token, value)
                   value
               }
-              alpha.iter <- optimize(alpha.iter.objective, c(alpha.min, alpha.max), tol = alpha.tol, CZ = KPHIW, CY = KPHIWZ, Cr.r = E.E.phi.w.z, r = E.y.w)$minimum
+              alpha.iter <- optimize(alpha.iter.objective, c(alpha.min, alpha.max), tol = alpha.tol, CZ = KPHIW, CY = KPHIWZ, Cr.r = T.star.r, r = E.y.w)$minimum
           }
       }
 
@@ -1432,22 +1598,29 @@ npregiv.default <- function(y,
 
       H <- NULL
       if(return.weights.phi) {
-          H <- KPHIWZ%*%solve(alpha.iter*diag(nrow(KPHIWZ)) + KPHIW%*%KPHIWZ)%*%KYW
+          inverse.operator <- solve(alpha.iter*diag(nrow(KPHIWZ)) + KPHIW%*%KPHIWZ)
+          H <- KPHIWZ%*%inverse.operator%*%KYW
       }
       
       ## First derivative
       
-      KPHIWZ.deriv.1 <- Kmat.lp(deriv=1,
-                                mydata.train=data.frame(z),
-                                bws=bw.E.E.phi.w.z,
-                                p=rep(p, num.z.numeric),
-                                ...)
+      KPHIWZ.deriv.1 <- Kmat.lp.partials(deriv=1,
+                                         mydata.train=data.frame(z),
+                                         bws=bw.E.E.phi.w.z,
+                                         p=rep(p, num.z.numeric),
+                                         ...)
       
-      phi.deriv.1 <- as.vector(tikh.eval(alpha.iter, CZ = KPHIW, CY = KPHIWZ, CY.eval = KPHIWZ.deriv.1, r = E.y.w))
+      phi.deriv.1 <- tikh.partial.values(KPHIWZ.deriv.1,
+                                         alpha=alpha.iter,
+                                         CZ=KPHIW,
+                                         CY=KPHIWZ,
+                                         r=E.y.w)
       
       H.deriv.1 <- NULL
       if(return.weights.phi.deriv.1) {
-          H.deriv.1 <- KPHIWZ.deriv.1%*%solve(alpha.iter*diag(nrow(KPHIWZ)) + KPHIW%*%KPHIWZ)%*%KYW
+          H.deriv.1 <- tikh.partial.weights(KPHIWZ.deriv.1,
+                                            inverse.operator,
+                                            KYW)
       }
       
       ## Second derivative
@@ -1457,17 +1630,23 @@ npregiv.default <- function(y,
       
       if(p >= 2) {
           
-          KPHIWZ.deriv.2 <- Kmat.lp(deriv=2,
-                                    mydata.train=data.frame(z),
-                                    bws=bw.E.E.phi.w.z,
-                                    p=rep(p, num.z.numeric),
-                                    ...)
+          KPHIWZ.deriv.2 <- Kmat.lp.partials(deriv=2,
+                                             mydata.train=data.frame(z),
+                                             bws=bw.E.E.phi.w.z,
+                                             p=rep(p, num.z.numeric),
+                                             ...)
           
-          phi.deriv.2 <- as.vector(tikh.eval(alpha.iter, CZ = KPHIW, CY = KPHIWZ, CY.eval = KPHIWZ.deriv.2, r = E.y.w))
+          phi.deriv.2 <- tikh.partial.values(KPHIWZ.deriv.2,
+                                             alpha=alpha.iter,
+                                             CZ=KPHIW,
+                                             CY=KPHIWZ,
+                                             r=E.y.w)
           
           
           if(return.weights.phi.deriv.2) {
-              H.deriv.2 <- KPHIWZ.deriv.2%*%solve(alpha.iter*diag(nrow(KPHIWZ)) + KPHIW%*%KPHIWZ)%*%KYW
+              H.deriv.2 <- tikh.partial.weights(KPHIWZ.deriv.2,
+                                                inverse.operator,
+                                                KYW)
           }
           
       }
@@ -1498,32 +1677,44 @@ npregiv.default <- function(y,
               H.eval <- KPHIWZ.eval%*%solve(alpha.iter*diag(nrow(KPHIWZ)) + KPHIW%*%KPHIWZ)%*%KYW
           }
           
-          KPHIWZ.eval.deriv.1 <- Kmat.lp(deriv=1,
-                                         mydata.train=data.frame(z),
-                                         mydata.eval=data.frame(z=zeval),
-                                         bws=bw.E.E.phi.w.z,
-                                         p=rep(p, num.z.numeric),
-                                         ...)
+          KPHIWZ.eval.deriv.1 <- Kmat.lp.partials(deriv=1,
+                                                  mydata.train=data.frame(z),
+                                                  mydata.eval=data.frame(z=zeval),
+                                                  bws=bw.E.E.phi.w.z,
+                                                  p=rep(p, num.z.numeric),
+                                                  ...)
           
-          phi.deriv.eval.1 <- as.vector(tikh.eval(alpha.iter, CZ = KPHIW, CY = KPHIWZ, CY.eval = KPHIWZ.eval.deriv.1, r = E.y.w))
+          phi.deriv.eval.1 <- tikh.partial.values(KPHIWZ.eval.deriv.1,
+                                                  alpha=alpha.iter,
+                                                  CZ=KPHIW,
+                                                  CY=KPHIWZ,
+                                                  r=E.y.w)
           
           if(return.weights.phi.deriv.1) {
-              H.deriv.eval.1 <- KPHIWZ.eval.deriv.1%*%solve(alpha.iter*diag(nrow(KPHIWZ)) + KPHIW%*%KPHIWZ)%*%KYW
+              H.deriv.eval.1 <- tikh.partial.weights(KPHIWZ.eval.deriv.1,
+                                                     inverse.operator,
+                                                     KYW)
           }
           
           if(p >= 2) {
               
-              KPHIWZ.eval.deriv.2 <- Kmat.lp(deriv=2,
-                                             mydata.train=data.frame(z),
-                                             mydata.eval=data.frame(z=zeval),
-                                             bws=bw.E.E.phi.w.z,
-                                             p=rep(p, num.z.numeric),
-                                             ...)
+              KPHIWZ.eval.deriv.2 <- Kmat.lp.partials(deriv=2,
+                                                      mydata.train=data.frame(z),
+                                                      mydata.eval=data.frame(z=zeval),
+                                                      bws=bw.E.E.phi.w.z,
+                                                      p=rep(p, num.z.numeric),
+                                                      ...)
               
-              phi.deriv.eval.2 <- as.vector(tikh.eval(alpha.iter, CZ = KPHIW, CY = KPHIWZ, CY.eval = KPHIWZ.eval.deriv.2, r = E.y.w))
+              phi.deriv.eval.2 <- tikh.partial.values(KPHIWZ.eval.deriv.2,
+                                                      alpha=alpha.iter,
+                                                      CZ=KPHIW,
+                                                      CY=KPHIWZ,
+                                                      r=E.y.w)
               
               if(return.weights.phi.deriv.2) {
-                  H.deriv.eval.2 <- KPHIWZ.eval.deriv.2%*%solve(alpha.iter*diag(nrow(KPHIWZ)) + KPHIW%*%KPHIWZ)%*%KYW
+                  H.deriv.eval.2 <- tikh.partial.weights(KPHIWZ.eval.deriv.2,
+                                                        inverse.operator,
+                                                        KYW)
               }
               
           }
@@ -1568,10 +1759,8 @@ npregiv.default <- function(y,
                          E.E.phi.w.z=bw.E.E.phi.w.z),
                 smoothing.spec=smoothing.spec,
                 stage.specs=list(
-                  w=list(regtype=smoothing.spec$effective$regtype,
-                         degree=rep.int(p, num.w.numeric)),
-                  z=list(regtype=smoothing.spec$effective$regtype,
-                         degree=rep.int(p, num.z.numeric))),
+                  w=.np_iv_stage_spec("w", smoothing.spec, w),
+                  z=.np_iv_stage_spec("z", smoothing.spec, z)),
                 trainiseval=trainiseval,
                 nmulti=nmulti,
                 method=method,
@@ -1584,6 +1773,12 @@ npregiv.default <- function(y,
     ## Landweber-Fridman
 
     norm.stop <- numeric()
+
+    if(!is.null(bw)) {
+      replay.iterations <- .np_iv_validate_integer(
+        bw[["norm.index"]], "bw$norm.index", 1)
+      iterate.max <- replay.iterations
+    }
 
     iv_set_stage("E[y|w]")
     if(is.null(bw)) {
@@ -1608,6 +1803,29 @@ npregiv.default <- function(y,
                                                         bws=bw.E.y.w,
                                                         degree=rep(p, num.w.numeric),
                                                         ...))$mean
+
+    ## State N is the complete state after exactly N Landweber-Fridman
+    ## updates. Evaluate its stopping residual with the residual bandwidth
+    ## selected for update N so norm.stop[N], phi.mat[, N], and the returned
+    ## estimate all identify that same state.
+
+    lf_stopping_residual <- function(phi.state, bws) {
+      if(smooth.residuals) {
+        return(.np_progress_with_legacy_suppressed(glpreg(
+          tydat=y-phi.state,
+          txdat=w,
+          bws=bws,
+          degree=rep(p, num.w.numeric),
+          ...))$mean)
+      }
+
+      E.y.w - .np_progress_with_legacy_suppressed(glpreg(
+        tydat=phi.state,
+        txdat=w,
+        bws=bws,
+        degree=rep(p, num.w.numeric),
+        ...))$mean
+    }
 
     if(return.weights.phi) {
 
@@ -1768,10 +1986,93 @@ npregiv.default <- function(y,
 
       ## Starting values input by user
 
-      phi.0 <- starting.values
+      if(!is.numeric(starting.values) || length(starting.values) != nrow(z) ||
+         anyNA(starting.values) || any(!is.finite(starting.values))) {
+        stop("starting.values must be a finite numeric vector with one value per training row",
+             call.=FALSE)
+      }
+      phi.0 <- as.numeric(starting.values)
 
-      if(return.weights.phi)  H <- NULL
-      bw.E.y.z <- NULL
+      ## A supplied curve still needs derivative states for LL/LP iteration.
+      ## Differentiate its local-polynomial interpolant using the same
+      ## smoothing contract used for automatically constructed starts.
+
+      iv_set_stage("starting values")
+      if(is.null(bw)) {
+        h <- .np_progress_with_legacy_suppressed(glpcv(
+          ydat=phi.0,
+          xdat=z,
+          degree=rep(p, num.z.numeric),
+          nmulti=nmulti,
+          random.seed=random.seed,
+          optim.maxattempts=optim.maxattempts,
+          optim.method=optim.method,
+          optim.reltol=optim.reltol,
+          optim.abstol=optim.abstol,
+          optim.maxit=optim.maxit,
+          ...))
+        bw.E.y.z <- h$bw
+      } else {
+        bw.E.y.z <- bw$bw.E.y.z
+      }
+
+      g <- .np_progress_with_legacy_suppressed(glpreg(
+        tydat=phi.0,
+        txdat=z,
+        bws=bw.E.y.z,
+        degree=rep(p, num.z.numeric),
+        ...))
+      phi.0.deriv.1 <- g$grad
+      if(p >= 2) {
+        phi.0.deriv.2 <- .np_progress_with_legacy_suppressed(glpreg(
+          tydat=phi.0,
+          txdat=z,
+          bws=bw.E.y.z,
+          degree=rep(p, num.z.numeric),
+          deriv=2,
+          ...))$grad
+      }
+
+      if(!is.null(zeval)) {
+        g.eval <- .np_progress_with_legacy_suppressed(glpreg(
+          tydat=phi.0,
+          txdat=z,
+          exdat=zeval,
+          bws=bw.E.y.z,
+          degree=rep(p, num.z.numeric),
+          ...))
+        phi.eval.0 <- g.eval$mean
+        phi.eval.0.deriv.1 <- g.eval$grad
+        if(p >= 2) {
+          phi.eval.0.deriv.2 <- .np_progress_with_legacy_suppressed(glpreg(
+            tydat=phi.0,
+            txdat=z,
+            exdat=zeval,
+            bws=bw.E.y.z,
+            degree=rep(p, num.z.numeric),
+            deriv=2,
+            ...))$grad
+        }
+      } else {
+        phi.eval.0 <- NULL
+        phi.eval.0.deriv.1 <- NULL
+        phi.eval.0.deriv.2 <- NULL
+      }
+
+      if(return.weights.phi) {
+        H <- matrix(0, nrow(z), length(y))
+        if(!is.null(zeval)) H.eval <- matrix(0, nrow(zeval), length(y))
+        if(return.weights.phi.deriv.1) {
+          H.deriv.1 <- matrix(0, nrow(z), length(y))
+          if(!is.null(zeval))
+            H.deriv.eval.1 <- matrix(0, nrow(zeval), length(y))
+        }
+        if(p > 1 && return.weights.phi.deriv.2) {
+          H.deriv.2 <- matrix(0, nrow(z), length(y))
+          if(!is.null(zeval))
+            H.deriv.eval.2 <- matrix(0, nrow(zeval), length(y))
+        }
+      }
 
     }
 
@@ -1842,8 +2143,6 @@ npregiv.default <- function(y,
 
     }
 
-    norm.stop[1] <- sum(resid.fitted^2)/NZD_pos(sum(E.y.w^2))
-
     iv_set_stage(iv_adjoint_stage_label(smooth.residuals), iteration = 1L)
 
     if(is.null(bw)) {
@@ -1893,6 +2192,9 @@ npregiv.default <- function(y,
                                                                                             ...))$grad
         phi.deriv.2.list[[1]] <- phi.deriv.2
     }
+
+    stopping.residual <- lf_stopping_residual(phi, bw.resid.w)
+    norm.stop[1] <- sum(stopping.residual^2)/NZD_pos(sum(E.y.w^2))
 
     if(!is.null(zeval)) {
         g <- .np_progress_with_legacy_suppressed(glpreg(tydat=resid.fitted,
@@ -2051,13 +2353,13 @@ npregiv.default <- function(y,
 
     }
 
-    if(!is.null(bw)) iterate.max <- bw$norm.index
+    iterations.evaluated <- 1L
 
     ## In what follows we rbind() bandwidths to return and are careful
     ## about which ones are used when fed in, so we use h$bw below
     ## (but above all are named).
 
-    for(j in 2:iterate.max) {
+    if(iterate.max >= 2L) for(j in seq.int(2L, iterate.max)) {
       iv_set_stage(iv_residual_stage_label(smooth.residuals), iteration = j)
 
       if(smooth.residuals) {
@@ -2128,8 +2430,6 @@ npregiv.default <- function(y,
 
       }
 
-      norm.stop[j] <- if (penalize.iteration) j*sum(resid.fitted^2)/NZD_pos(sum(E.y.w^2)) else sum(resid.fitted^2)/NZD_pos(sum(E.y.w^2))
-
       iv_set_stage(iv_adjoint_stage_label(smooth.residuals), iteration = j)
 
       if(is.null(bw)) {
@@ -2168,6 +2468,13 @@ npregiv.default <- function(y,
                                                                                             deriv=2,
                                                                                             ...))$grad
           phi.deriv.2.list[[j]] <- phi.deriv.2
+      }
+
+      stopping.residual <- lf_stopping_residual(phi, bw.resid.w.mat[j,])
+      norm.stop[j] <- if(penalize.iteration) {
+        j*sum(stopping.residual^2)/NZD_pos(sum(E.y.w^2))
+      } else {
+        sum(stopping.residual^2)/NZD_pos(sum(E.y.w^2))
       }
 
       if(!is.null(zeval)) {
@@ -2304,6 +2611,8 @@ npregiv.default <- function(y,
 
       }
 
+      iterations.evaluated <- j
+
       ## The number of iterations in LF is asymptotically equivalent
       ## to 1/alpha (where alpha is the regularization parameter in
       ## Tikhonov).  Plus the criterion function we use is increasing
@@ -2338,6 +2647,8 @@ npregiv.default <- function(y,
       }
 
     }
+
+    j <- iterations.evaluated
 
     ## Trim matrices and lists to the actual number of iterations performed
     if(j < iterate.max) {
@@ -2377,49 +2688,28 @@ npregiv.default <- function(y,
 
     if(is.null(bw))  {
 
-      norm.value <- norm.stop/seq_along(norm.stop)
+      stop.pick <- .npregiv_select_stop_index(norm.stop)
+      norm.value <- stop.pick$norm.value
+      j <- stop.pick$index
 
-      if(which.min(norm.stop) == 1 && is.monotone.increasing(norm.stop)) {
+      if(stop.pick$monotone.failure) {
           .np_warning("Stopping rule increases monotonically (consult model$norm.stop):\nThis could be the result of an inspired initial value (unlikely)\nNote: we suggest manually choosing phi.0 and restarting (e.g. instead set `starting.values' to E[E(Y|w)|z])")
           convergence <- "FAILURE_MONOTONE_INCREASING"
-          phi <- starting.values.phi
-          j <- 1
-          while(norm.value[j+1] > norm.value[j]) j <- j + 1
-          j <- j-1 + which.min(norm.value[j:length(norm.value)])
-          phi <- phi.mat[,j]
-          if(p>0) phi.deriv.1 <- phi.deriv.1.list[[j]]
-          if(p>=2) phi.deriv.2 <- phi.deriv.2.list[[j]]
-          if(return.weights.phi) phi.weights <- phi.weights.list[[j]]
-          if(return.weights.phi.deriv.1) phi.deriv.1.weights <- phi.deriv.1.weights.list[[j]]
-          if(p>=2 && return.weights.phi.deriv.2) phi.deriv.2.weights <- phi.deriv.2.weights.list[[j]]
-          if(!is.null(zeval)) {
-              phi.eval <- phi.eval.mat[,j]
-              if(p>0) phi.deriv.eval.1 <- phi.deriv.eval.1.list[[j]]
-              if(p>=2) phi.deriv.eval.2 <- phi.deriv.eval.2.list[[j]]
-              if(return.weights.phi) phi.eval.weights <- phi.eval.weights.list[[j]]
-              if(return.weights.phi.deriv.1) phi.deriv.eval.1.weights <- phi.deriv.eval.1.weights.list[[j]]
-              if(p>=2 && return.weights.phi.deriv.2) phi.deriv.eval.2.weights <- phi.deriv.eval.2.weights.list[[j]]    
-          }
-      } else {
-          ## Ignore the initial increasing portion, take the min to the
-          ## right of where the initial inflection point occurs
-          j <- 1
-          while(norm.stop[j+1] > norm.stop[j]) j <- j + 1
-          j <- j-1 + which.min(norm.stop[j:length(norm.stop)])
-          phi <- phi.mat[,j]
-          if(p>0) phi.deriv.1 <- phi.deriv.1.list[[j]]
-          if(p>=2) phi.deriv.2 <- phi.deriv.2.list[[j]]
-          if(return.weights.phi) phi.weights <- phi.weights.list[[j]]
-          if(return.weights.phi.deriv.1) phi.deriv.1.weights <- phi.deriv.1.weights.list[[j]]
-          if(p>=2 && return.weights.phi.deriv.2) phi.deriv.2.weights <- phi.deriv.2.weights.list[[j]]
-          if(!is.null(zeval)) {
-              phi.eval <- phi.eval.mat[,j]
-              if(p>0) phi.deriv.eval.1 <- phi.deriv.eval.1.list[[j]]
-              if(p>=2) phi.deriv.eval.2 <- phi.deriv.eval.2.list[[j]]
-              if(return.weights.phi) phi.eval.weights <- phi.eval.weights.list[[j]]
-              if(return.weights.phi.deriv.1) phi.deriv.eval.1.weights <- phi.deriv.eval.1.weights.list[[j]]
-              if(p>=2 && return.weights.phi.deriv.2) phi.deriv.eval.2.weights <- phi.deriv.eval.2.weights.list[[j]]    
-          }
+      }
+
+      phi <- phi.mat[,j]
+      if(p>0) phi.deriv.1 <- phi.deriv.1.list[[j]]
+      if(p>=2) phi.deriv.2 <- phi.deriv.2.list[[j]]
+      if(return.weights.phi) phi.weights <- phi.weights.list[[j]]
+      if(return.weights.phi.deriv.1) phi.deriv.1.weights <- phi.deriv.1.weights.list[[j]]
+      if(p>=2 && return.weights.phi.deriv.2) phi.deriv.2.weights <- phi.deriv.2.weights.list[[j]]
+      if(!is.null(zeval)) {
+          phi.eval <- phi.eval.mat[,j]
+          if(p>0) phi.deriv.eval.1 <- phi.deriv.eval.1.list[[j]]
+          if(p>=2) phi.deriv.eval.2 <- phi.deriv.eval.2.list[[j]]
+          if(return.weights.phi) phi.eval.weights <- phi.eval.weights.list[[j]]
+          if(return.weights.phi.deriv.1) phi.deriv.eval.1.weights <- phi.deriv.eval.1.weights.list[[j]]
+          if(p>=2 && return.weights.phi.deriv.2) phi.deriv.eval.2.weights <- phi.deriv.eval.2.weights.list[[j]]
       }
       if(j == iterate.max) .np_warning("iterate.max reached: increase iterate.max or inspect norm.stop vector")      
     } else {
@@ -2439,9 +2729,8 @@ npregiv.default <- function(y,
             if(return.weights.phi.deriv.1) phi.deriv.eval.1.weights <- phi.deriv.eval.1.weights.list[[j]]
             if(p>=2 && return.weights.phi.deriv.2) phi.deriv.eval.2.weights <- phi.deriv.eval.2.weights.list[[j]]    
         }
-        norm.value <- NULL
-        norm.stop <- NULL
-        convergence <- NULL
+        norm.value <- norm.stop/seq_along(norm.stop)
+        convergence <- "BANDWIDTH_REPLAY"
     }
     
     ret <- list(phi=phi,
@@ -2482,10 +2771,8 @@ npregiv.default <- function(y,
                          resid.fitted.w.z=as.matrix(bw.resid.fitted.w.z)),
                 smoothing.spec=smoothing.spec,
                 stage.specs=list(
-                  w=list(regtype=smoothing.spec$effective$regtype,
-                         degree=rep.int(p, num.w.numeric)),
-                  z=list(regtype=smoothing.spec$effective$regtype,
-                         degree=rep.int(p, num.z.numeric))),
+                  w=.np_iv_stage_spec("w", smoothing.spec, w),
+                  z=.np_iv_stage_spec("z", smoothing.spec, z)),
                 trainiseval=trainiseval,
                 nmulti=nmulti,
                 method=method,
@@ -2516,9 +2803,6 @@ summary.npregiv <- function(object, ...) {
   arg.names <- names(call.args)
   if (is.null(arg.names))
     arg.names <- rep.int("", length(call.args))
-  if (sum(!nzchar(arg.names)) > 1L)
-    stop(sprintf("unnamed plot arguments are not supported for %s", context),
-         call. = FALSE)
   allowed <- unique(c("x", method_args, .np_plot_graphics_arg_names()))
   bad <- setdiff(arg.names[nzchar(arg.names)], allowed)
   .np_plot_stop_unused_args(bad, allowed)
@@ -2549,16 +2833,19 @@ plot.npregiv <- function(x,
   ## We only support univariate endogenous predictor z
   if(NCOL(object$z) > 1) stop(" only univariate z is supported")
 
-  z.eval <- if (is.null(object$zeval)) object$z else object$zeval
-  z <- z.eval[,1]
   y <- object$y
-  phi <- object$phi
 
   zname <- names(object$z)[1]
   yname <- "y" ## Default
 
   if(deriv) {
-    phi.prime <- object$phi.deriv.1[,1]
+    evaluated <- !is.null(object$zeval) && !is.null(object$phi.deriv.eval.1)
+    z <- if(evaluated) object$zeval[,1] else object$z[,1]
+    phi.prime <- if(evaluated) {
+      object$phi.deriv.eval.1[,1]
+    } else {
+      object$phi.deriv.1[,1]
+    }
 
     plot.type <- take_arg("type", "l")
     plot.xlab <- take_arg("xlab", zname)
@@ -2573,9 +2860,8 @@ plot.npregiv <- function(x,
   } else {
 
     if(plot.data) {
-      if (!.np_iv_object_trainiseval(object))
-        stop("plot.data=TRUE is available only for training-row evaluation",
-             call. = FALSE)
+      z <- object$z[,1]
+      phi <- object$phi
       plot.type <- take_arg("type", "p")
       plot.xlab <- take_arg("xlab", zname)
       plot.ylab <- take_arg("ylab", yname)
@@ -2595,8 +2881,11 @@ plot.npregiv <- function(x,
       if (!is.null(user.col)) {
         line.args$col <- user.col
       }
-      do.call(lines, c(line.args, dots))
+      do.call(lines, c(line.args, .np_iv_plot_line_dots(dots)))
     } else {
+      evaluated <- !is.null(object$zeval) && !is.null(object$phi.eval)
+      z <- if(evaluated) object$zeval[,1] else object$z[,1]
+      phi <- if(evaluated) object$phi.eval else object$phi
       plot.type <- take_arg("type", "l")
       plot.xlab <- take_arg("xlab", zname)
       plot.ylab <- take_arg("ylab", yname)

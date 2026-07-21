@@ -235,13 +235,9 @@ test_that("npregivderiv centers both adjoint terms on the fitted residual", {
   skip_if_not(file.exists(src_path), "source R files unavailable")
   src <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
 
-  fitted_second_term <- gregexpr(
-    "S\\.z\\*mean\\.predicted\\.E\\.mu\\.w",
-    src,
-    perl = TRUE
-  )[[1L]]
-
-  expect_length(fitted_second_term[fitted_second_term > 0L], 2L)
-  expect_false(grepl("S\\.z\\*mean\\.mu", src, perl = TRUE))
+  expect_match(src, "rhs\\.mean <- mean\\(rhs\\)", perl = TRUE)
+  expect_match(src, "survivor\\.average <- rhs\\.mean - cdf\\.average", perl = TRUE)
+  expect_match(src, "survivor\\*rhs\\.mean", perl = TRUE)
+  expect_match(src, "adjoint\\.apply\\(predicted\\.E\\.mu\\.w", perl = TRUE)
   expect_false(grepl("mean\\.mu <- mean\\(mu\\)", src, perl = TRUE))
 })

@@ -16,6 +16,37 @@
   process-level crash, fail during R reconstruction, or return an incomplete
   mixed-data derivative.
 
+* Corrected Landweber--Fridman state coherence in `npregiv()`: state `N`
+  now means exactly `N` completed updates, and `phi.mat[, N]`,
+  `norm.stop[N]`, `norm.index`, the returned curve, derivatives, and optional
+  weights refer to that same state. This can change the selected iteration and
+  returned estimate. Bandwidth replay is now boundary-safe at `norm.index = 1`
+  and retains recomputed stopping diagnostics. Documented numeric
+  `starting.values` now initialize a complete level-and-derivative state.
+
+* Corrected multivariate `npregiv()` derivatives to return one named pure
+  coordinate partial per continuous structural coordinate. Local-constant
+  Tikhonov derivative weights now use the derivative operator and bandwidth
+  for the requested coordinate instead of combining coordinates or recycling
+  bandwidth divisors. Univariate Tikhonov results are unchanged.
+
+* Separated `npregivderiv()` training and evaluation state. A fit-time
+  `zeval`/formula `newdata` grid now affects only `phi.prime.eval` and its path;
+  training operators, residuals, centering, stopping, selected state, fitted
+  values, and training gradients remain unchanged. Arbitrary positive grid
+  sizes are supported, while a different `weval` is rejected because the
+  inverse problem is defined on the training instruments. The default Issue
+  57 local-linear training route is numerically unchanged.
+
+* Hardened the IV public surface: ordinary IV regression stages now own
+  `bandwidth.divide`, `ukertype`, and `okertype` without duplicate-argument
+  failures and use kernel-appropriate categorical search bounds;
+  `npregivderiv(random.seed=)` now controls its internal bandwidth searches;
+  scalar controls fail early; summaries report continuous and categorical
+  counts and derivative residual bandwidths; and `fitted()`, `residuals()`,
+  `gradients()`, and plot methods consistently distinguish training from
+  evaluation fields. Post-fit `predict()` remains deliberately unavailable.
+
 * The omitted regression-smoothing choice in `npregivderiv()` is now local
   linear (`regtype = "ll"`, degree one), matching the longstanding `p = 1`
   default of `npregiv()`. Explicit `regtype = "lc"` reproduces the former

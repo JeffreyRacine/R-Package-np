@@ -113,20 +113,21 @@ npregivderiv.default <- function(y,
     degree.missing = degree.missing,
     nomad.missing = nomad.missing
   )
+  iterate.break <- .np_iv_validate_flag(iterate.break, "iterate.break")
+  smooth.residuals <- .np_iv_validate_flag(smooth.residuals, "smooth.residuals")
+  stop.on.increase <- .np_iv_validate_flag(stop.on.increase, "stop.on.increase")
+  constant <- .np_iv_validate_number(constant, "constant", 0, 1, TRUE, TRUE)
+  iterate.max <- .np_iv_validate_integer(iterate.max, "iterate.max", 2)
+  random.seed <- .np_iv_validate_integer(random.seed, "random.seed", 0)
   iv.npreg <- function(...) {
     args <- list(...)
+    if(is.null(args$bws)) args$random.seed <- random.seed
     do.call(npreg, c(args, .np_iv_deriv_stage_args(smoothing.spec, args$txdat)))
   }
 
   ## Basic error checking
 
-  if(!is.logical(stop.on.increase)) stop("stop.on.increase must be logical (TRUE/FALSE)")
-  if(!is.logical(smooth.residuals)) stop("smooth.residuals must be logical (TRUE/FALSE)")
-
   start.from <- match.arg(start.from)
-
-  if(iterate.max < 2) stop("iterate.max must be at least 2")
-  if(constant <= 0 || constant >= 1) stop("constant must lie in the range (0,1)")
 
   if(missing(y)) stop("You must provide y")
   if(missing(z)) stop("You must provide z")
@@ -138,27 +139,39 @@ npregivderiv.default <- function(y,
     stop("npregivderiv currently supports one univariate endogenous z and does not support a separate exogenous x",
          call. = FALSE)
 
-  ## Check for evaluation data
+  ## The inverse problem is always solved on training rows. zeval is an
+  ## output grid for the structural derivative only; instrument evaluation
+  ## does not define a separate estimand.
 
-  trainiseval <- is.null(zeval) && is.null(weval) && is.null(xeval)
+  evaluation.requested <- !is.null(zeval)
+  trainiseval <- !evaluation.requested
   if(is.null(x) && !is.null(xeval))
     stop("xeval requires exogenous training data x", call. = FALSE)
+  if(!is.null(weval) &&
+     !identical(as.data.frame(weval), as.data.frame(w))) {
+    stop("weval cannot differ from the training instruments; use zeval to evaluate the structural derivative",
+         call.=FALSE)
+  }
   if(is.null(zeval)) zeval <- z
-  if(is.null(weval)) weval <- w
+  weval <- w
   if(is.null(xeval)) xeval <- x
 
-  if(NROW(zeval) != NROW(y) || NROW(weval) != NROW(y) ||
-     (!is.null(xeval) && NROW(xeval) != NROW(y))) {
-    stop("npregivderiv evaluation data must have the same number of rows as the training data",
-         call. = FALSE)
-  }
+  if(NROW(zeval) < 1L)
+    stop("zeval must contain at least one evaluation row", call.=FALSE)
 
-  if(!is.null(starting.values) && (NROW(starting.values) != NROW(zeval))) stop(paste("starting.values must be of length",NROW(zeval)))
+  if(!is.null(starting.values) &&
+     (!is.numeric(starting.values) || !is.null(dim(starting.values)) ||
+      length(starting.values) != NROW(y) || anyNA(starting.values) ||
+      any(!is.finite(starting.values)))) {
+    stop("starting.values must be a finite numeric vector with one value per training row",
+         call.=FALSE)
+  }
 
   ## Need to determine how many x, w, z are numeric
 
   z <- data.frame(z)
   w <- data.frame(w)
+  zeval <- data.frame(zeval)
   if(!is.null(x)) z <- data.frame(z,x)
   if(!is.null(xeval)) zeval <- data.frame(zeval,xeval)
 
@@ -182,6 +195,24 @@ npregivderiv.default <- function(y,
   if(NCOL(z) > 1)
     stop("npregivderiv currently supports one univariate endogenous z",
          call. = FALSE)
+  if(NCOL(zeval) != 1L || !is.numeric(zeval[[1L]]))
+    stop("zeval must contain one continuous numeric endogenous variable",
+         call.=FALSE)
+  if(!is.numeric(z[[1L]]))
+    stop("npregivderiv requires one continuous numeric endogenous z",
+         call.=FALSE)
+  if(anyNA(z[[1L]]) || any(!is.finite(z[[1L]])) ||
+     length(unique(z[[1L]])) < 2L) {
+    stop("npregivderiv requires finite z values with at least two distinct support points",
+         call.=FALSE)
+  }
+  if(anyNA(zeval[[1L]]) || any(!is.finite(zeval[[1L]])))
+    stop("zeval must contain only finite values", call.=FALSE)
+  if(!is.null(starting.values) && evaluation.requested &&
+     !identical(as.numeric(zeval[[1L]]), as.numeric(z[[1L]]))) {
+    stop("starting.values with a separate zeval grid is not supported; fit the training state first",
+         call.=FALSE)
+  }
 
   ## For all results we need the density function for Z and the
   ## survivor function for Z (1-CDF of Z)
@@ -194,9 +225,15 @@ npregivderiv.default <- function(y,
 
   bw <- .np_progress_with_legacy_suppressed(npudensbw(dat=z, bwmethod="normal-reference"))
   model.fz <- .np_progress_with_legacy_suppressed(npudens(tdat=z, bws=bw$bw))
-  f.z <- predict(model.fz, newdata=zeval)
+  f.z <- predict(model.fz, newdata=z)
   model.Sz <- .np_progress_with_legacy_suppressed(npudist(tdat=z, bws=bw$bw))
-  S.z <- 1-predict(model.Sz, newdata=zeval)
+  S.z <- 1-predict(model.Sz, newdata=z)
+  f.z.eval <- if(evaluation.requested) predict(model.fz, newdata=zeval) else NULL
+  S.z.eval <- if(evaluation.requested) {
+    1-predict(model.Sz, newdata=zeval)
+  } else {
+    NULL
+  }
 
   progress <- .np_progress_begin("IV derivative", surface = "iv_solve")
   progress.finished <- FALSE
@@ -213,7 +250,7 @@ npregivderiv.default <- function(y,
 
   model.E.y.w <- .np_progress_with_legacy_suppressed(iv.npreg(tydat=y,
                                                            txdat=w,
-                                                           exdat=weval,
+                                                           exdat=w,
                                                            nmulti=nmulti,
                                                            ...))
   E.y.w <- model.E.y.w$mean
@@ -231,16 +268,30 @@ npregivderiv.default <- function(y,
 
     model.phi.prime <- .np_progress_with_legacy_suppressed(iv.npreg(tydat=if(start.from=="Eyz") y else E.y.w,
                                                                  txdat=z,
-                                                                 exdat=zeval,
+                                                                 exdat=z,
                                                                  gradients=TRUE,
                                                                  nmulti=nmulti,
                                                                  ...))
     phi.prime <- model.phi.prime$grad[,1]
     bw.E.y.z <- model.phi.prime$bws
 
+    phi.prime.eval <- if(evaluation.requested) {
+      .np_progress_with_legacy_suppressed(iv.npreg(
+        tydat=if(start.from=="Eyz") y else E.y.w,
+        txdat=z,
+        exdat=zeval,
+        bws=bw.E.y.z,
+        gradients=TRUE,
+        nmulti=nmulti.loop,
+        ...))$grad[,1]
+    } else {
+      NULL
+    }
+
   } else {
 
     phi.prime <- starting.values
+    phi.prime.eval <- if(evaluation.requested) starting.values else NULL
     bw.E.y.z <- NULL
 
   }
@@ -303,7 +354,7 @@ npregivderiv.default <- function(y,
 
     model.mu.w <- .np_progress_with_legacy_suppressed(iv.npreg(tydat=mu,
                                                             txdat=w,
-                                                            exdat=weval,
+                                                            exdat=w,
                                                             ...))
     predicted.E.mu.w <- model.mu.w$mean
     bw.mu.w <- model.mu.w$bws
@@ -317,7 +368,7 @@ npregivderiv.default <- function(y,
 
     model.phi.w <- .np_progress_with_legacy_suppressed(iv.npreg(tydat=phi,
                                                              txdat=w,
-                                                             exdat=weval,
+                                                             exdat=w,
                                                              ...))
     E.phi.w <- model.phi.w$mean
     bw.mu.w <- model.phi.w$bws
@@ -326,20 +377,16 @@ npregivderiv.default <- function(y,
 
   }
 
-  ## We again require the mean of the fitted values
-
-  mean.predicted.E.mu.w <- mean(predicted.E.mu.w)
-
   ## Equation (14) requires an ordinary CDF-weighted average. Keep
   ## bandwidth.divide in ... available to the regression calls above, but do
   ## not allow it to change the normalization of this private adjoint.
 
   npksum.dots <- .np_iv_deriv_adjoint_dots(list(...))
 
-  cdf.weighted.average.apply <- function(rhs) {
+  cdf.weighted.average.apply <- function(rhs, evaluation) {
     do.call(npksum,
             c(list(txdat=z,
-                   exdat=zeval,
+                   exdat=evaluation,
                    tydat=as.matrix(rhs),
                    operator="integral",
                    ukertype="liracine",
@@ -349,20 +396,33 @@ npregivderiv.default <- function(y,
               npksum.dots))$ksum/length(y)
   }
 
+  adjoint.apply <- function(rhs, evaluation, density, survivor) {
+    rhs.mean <- mean(rhs)
+    cdf.average <- cdf.weighted.average.apply(rhs, evaluation)
+    survivor.average <- rhs.mean - cdf.average
+    (survivor.average-survivor*rhs.mean)/NZD(density)
+  }
+
   ## Now we compute T^* applied to mu
 
   progress <- .npregivderiv_progress_stage(
     progress,
     label="T*{E[y-phi_0(z)|w]}",
     force=TRUE)
-  cdf.weighted.average <- cdf.weighted.average.apply(predicted.E.mu.w)
-
-  survivor.weighted.average <- mean.predicted.E.mu.w - cdf.weighted.average
-
-  T.star.mu <- (survivor.weighted.average-S.z*mean.predicted.E.mu.w)/NZD(f.z)
+  T.star.mu <- adjoint.apply(predicted.E.mu.w, z, f.z, S.z)
+  T.star.mu.eval <- if(evaluation.requested) {
+    adjoint.apply(predicted.E.mu.w, zeval, f.z.eval, S.z.eval)
+  } else {
+    NULL
+  }
 
   phi.mat <- matrix(NA, length(phi), iterate.max)
   phi.prime.mat <- matrix(NA, length(phi.prime), iterate.max)
+  phi.prime.eval.mat <- if(evaluation.requested) {
+    matrix(NA, length(phi.prime.eval), iterate.max)
+  } else {
+    NULL
+  }
   norm.stop <- numeric(iterate.max)
   convergence <- "ITERATE_MAX"
   N.evaluated <- 0L
@@ -373,6 +433,8 @@ npregivderiv.default <- function(y,
   for(N in seq_len(iterate.max)) {
 
     phi.prime <- phi.prime + constant*T.star.mu
+    if(evaluation.requested)
+      phi.prime.eval <- phi.prime.eval + constant*T.star.mu.eval
 
     ## NOTE - this presumes univariate z case... in general this would
     ## be a continuous variable's index
@@ -407,7 +469,7 @@ npregivderiv.default <- function(y,
       model.mu.w <- .np_progress_with_legacy_suppressed(iv.npreg(tydat=mu,
                                                               txdat=w,
                                                               eydat=mu,
-                                                              exdat=weval,
+                                                              exdat=w,
                                                               bws=bw.mu.w,
                                                               nmulti=nmulti.loop,
                                                               ...))
@@ -424,7 +486,7 @@ npregivderiv.default <- function(y,
       model.phi.w <- .np_progress_with_legacy_suppressed(iv.npreg(tydat=phi,
                                                                txdat=w,
                                                                eydat=phi,
-                                                               exdat=weval,
+                                                               exdat=w,
                                                                bws=bw.mu.w,
                                                                nmulti=nmulti.loop,
                                                                ...))
@@ -438,6 +500,7 @@ npregivderiv.default <- function(y,
     norm.stop[N] <- N*sum(predicted.E.mu.w^2)/NZD_pos(sum(E.y.w^2))
     phi.mat[,N] <- phi
     phi.prime.mat[,N] <- phi.prime
+    if(evaluation.requested) phi.prime.eval.mat[,N] <- phi.prime.eval
     N.evaluated <- N
 
     ## The number of iterations in LF is asymptotically equivalent to
@@ -474,20 +537,20 @@ npregivderiv.default <- function(y,
     ## Do not compute it when state N is the terminal iterate.max state.
 
     if(N < iterate.max) {
-      mean.predicted.E.mu.w <- mean(predicted.E.mu.w)
-
       progress <- .npregivderiv_progress_stage(
         progress,
         label="T*{E[y-phi(z)|w]}",
         iteration=N)
-      cdf.weighted.average <- cdf.weighted.average.apply(predicted.E.mu.w)
-
-      survivor.weighted.average <- mean.predicted.E.mu.w - cdf.weighted.average
-
       ## Equation (14) uses the same fitted conditional-residual vector in
       ## both empirical-adjoint terms.
 
-      T.star.mu <- (survivor.weighted.average-S.z*mean.predicted.E.mu.w)/NZD(f.z)
+      T.star.mu <- adjoint.apply(predicted.E.mu.w, z, f.z, S.z)
+      if(evaluation.requested) {
+        T.star.mu.eval <- adjoint.apply(predicted.E.mu.w,
+                                        zeval,
+                                        f.z.eval,
+                                        S.z.eval)
+      }
     }
 
   }
@@ -495,6 +558,8 @@ npregivderiv.default <- function(y,
   ## Trim matrices and norm.stop to the actual number of iterations performed
   phi.mat <- phi.mat[, seq_len(N.evaluated), drop=FALSE]
   phi.prime.mat <- phi.prime.mat[, seq_len(N.evaluated), drop=FALSE]
+  if(evaluation.requested)
+    phi.prime.eval.mat <- phi.prime.eval.mat[, seq_len(N.evaluated), drop=FALSE]
   norm.stop <- norm.stop[seq_len(N.evaluated)]
 
   ## Extract minimum, and check for monotone increasing function and
@@ -514,6 +579,11 @@ npregivderiv.default <- function(y,
 
   phi <- phi.mat[,N.selected]
   phi.prime <- phi.prime.mat[,N.selected]
+  phi.prime.eval <- if(evaluation.requested) {
+    phi.prime.eval.mat[,N.selected]
+  } else {
+    NULL
+  }
   
   progress <- .np_progress_end(progress, detail=progress$current_detail)
   progress.finished <- TRUE
@@ -522,8 +592,10 @@ npregivderiv.default <- function(y,
 
   ret <- list(phi=phi,
               phi.prime=phi.prime,
+              phi.prime.eval=phi.prime.eval,
               phi.mat=phi.mat,
               phi.prime.mat=phi.prime.mat,
+              phi.prime.eval.mat=phi.prime.eval.mat,
               num.iterations=N.selected,
               norm.stop=norm.stop,
               convergence=convergence,
@@ -590,19 +662,24 @@ plot.npregivderiv <- function(x,
   ## We only support univariate endogenous predictor z
   if(NCOL(object$z) > 1) stop(" only univariate z is supported")
 
-  z.eval <- if (is.null(object$zeval)) object$z else object$zeval
-  z <- z.eval[,1]
   y <- object$y
   zname <- names(object$z)[1]
   yname <- "y"
 
   if(phi) {
     ## Plot the structural function phi
+    z <- object$z[,1]
     fit <- object$phi
     ylab <- yname
   } else {
     ## Plot the derivative phi.prime (default for npregivderiv)
-    fit <- object$phi.prime
+    z.eval <- if (is.null(object$phi.prime.eval)) object$z else object$zeval
+    z <- z.eval[,1]
+    fit <- if (is.null(object$phi.prime.eval)) {
+      object$phi.prime
+    } else {
+      object$phi.prime.eval
+    }
     ylab <- paste("d", yname, "/d", zname, sep="")
   }
 
@@ -612,9 +689,6 @@ plot.npregivderiv <- function(x,
   }
 
   if(plot.data) {
-    if (!.np_iv_object_trainiseval(object))
-      stop("plot.data=TRUE is available only for training-row evaluation",
-           call. = FALSE)
     plot.type <- take_arg("type", "p")
     plot.xlab <- take_arg("xlab", zname)
     plot.ylab <- take_arg("ylab", yname)
@@ -634,7 +708,7 @@ plot.npregivderiv <- function(x,
     if (!is.null(user.col)) {
       line.args$col <- user.col
     }
-    do.call(lines, c(line.args, dots))
+    do.call(lines, c(line.args, .np_iv_plot_line_dots(dots)))
   } else {
     plot.type <- take_arg("type", "l")
     plot.xlab <- take_arg("xlab", zname)
