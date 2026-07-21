@@ -590,6 +590,60 @@ npregivderiv.formula <- function(y, data = NULL, subset, na.action,
   invisible(NULL)
 }
 
+.np_iv_regression_summary_text <- function(smoothing.spec,
+                                           p = NULL,
+                                           family = c("npregiv",
+                                                      "npregivderiv")) {
+  family <- match.arg(family)
+  effective <- if (is.list(smoothing.spec)) {
+    smoothing.spec[["effective"]]
+  } else {
+    NULL
+  }
+
+  has.effective <- !is.null(effective)
+  if (has.effective && !is.list(effective))
+    return("")
+  regtype <- if (has.effective) effective[["regtype"]] else NULL
+  degree <- if (has.effective) effective[["degree"]] else NULL
+  valid.degree <- is.numeric(degree) && length(degree) == 1L &&
+    !is.na(degree) && is.finite(degree) && degree >= 0 &&
+    degree == floor(degree) && degree <= .Machine$integer.max
+  valid.effective <- is.character(regtype) && length(regtype) == 1L &&
+    !is.na(regtype) && regtype %in% c("lc", "ll", "lp") &&
+    valid.degree &&
+    (identical(regtype, "lp") ||
+       (identical(regtype, "lc") && degree == 0) ||
+       (identical(regtype, "ll") && degree == 1))
+
+  if (has.effective && !valid.effective)
+    return("")
+
+  if (!has.effective) {
+    valid.p <- identical(family, "npregiv") && is.numeric(p) &&
+      length(p) == 1L && !is.na(p) && is.finite(p) && p >= 0 &&
+      p == floor(p) && p <= .Machine$integer.max
+    if (!valid.p)
+      return("")
+    degree <- as.integer(p)
+    regtype <- .np_iv_p_regtype(degree)
+  } else {
+    degree <- as.integer(degree)
+  }
+
+  formatter.input <- list(
+    regtype = regtype,
+    pregtype = switch(regtype,
+                      lc = "Local-Constant",
+                      ll = "Local-Linear",
+                      lp = "Local-Polynomial"),
+    degree = degree,
+    basis = "glp",
+    bernstein.basis = identical(family, "npregiv")
+  )
+  genRegEstStr(formatter.input)
+}
+
 .np_iv_print_summary <- function(x) {
   cat("Call:\n")
   print(x$call)
@@ -607,15 +661,11 @@ npregivderiv.formula <- function(y, data = NULL, subset, na.action,
   if (x$nx.categorical > 0L)
     cat("\nNumber of categorical exogenous predictors: ",
         format(x$nx.categorical), sep = "")
-  if (!is.null(x$p))
-    cat("\nLocal polynomial order (p): ", format(x$p), sep = "")
-  if (!is.null(x$smoothing.spec$effective$regtype)) {
-    cat("\nRegression smoothing type: ",
-        x$smoothing.spec$effective$regtype, sep = "")
-    if (!is.null(x$smoothing.spec$effective$degree))
-      cat("\nRegression smoothing degree: ",
-          format(x$smoothing.spec$effective$degree), sep = "")
-  }
+  cat(.np_iv_regression_summary_text(
+    smoothing.spec = x[["smoothing.spec"]],
+    p = x[["p"]],
+    family = if (isTRUE(x[["derivative"]])) "npregivderiv" else "npregiv"
+  ))
   cat("\nTraining observations: ", format(x$ntrain), sep = "")
 
   if (isTRUE(x$tikhonov)) {

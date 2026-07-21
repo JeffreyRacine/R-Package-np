@@ -1,5 +1,12 @@
 # npRmpi 0.70-6
 
+* Aligned `npregiv()` and `npregivderiv()` summary output with `npreg()`.
+  Fixed smoothing now uses the canonical `Kernel Regression Estimator:`
+  description (`Local-Constant`, `Local-Linear`, or the local-polynomial
+  degree and basis details) instead of separately printing the legacy `p`,
+  regression type, and degree fields. This is a reporting-only change;
+  fitted objects, smoothing choices, and numerical results are unchanged.
+
 * MPI result simplification now applies one explicit scalar-logical contract
   at master-side ingress. Vector, empty, and missing `simplify` values are
   rejected before remote execution, parallel apply/replication, or simulation

@@ -553,7 +553,12 @@ Further arguments are passed to lower-level kernel-sum and estimation routines.
     \code{phi.eval} and \code{phi.deriv.eval.*} fields. Residuals use the
     aligned training structural curve. For formula fits using an exclusion-style \code{na.action},
     these accessors restore omitted rows. \code{summary} returns a structured
-    \code{summary.npregiv} object with a dedicated print method.
+    \code{summary.npregiv} object with a dedicated print method. The printed
+    smoothing description reports the effective continuous-stage policy using
+    the same \code{Kernel Regression Estimator:} labels as \code{npreg}:
+    \code{Local-Constant}, \code{Local-Linear}, or, for
+    \code{regtype="lp"}, the local-polynomial degree and basis details. The
+    retained legacy \code{p} field is not printed separately.
 
   \code{npregiv} returns a list with components \code{phi},
   \code{phi.mat} and either \code{alpha} when \code{method="Tikhonov"}

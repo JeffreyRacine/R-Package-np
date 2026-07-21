@@ -337,7 +337,11 @@ Further arguments are passed to \code{\link{npreg}} and \code{\link{npksum}}.
     supplied. For formula fits using an exclusion-style
     \code{na.action}, these accessors restore omitted rows. \code{summary}
     returns a structured
-    \code{summary.npregivderiv} object with a dedicated print method.
+    \code{summary.npregivderiv} object with a dedicated print method. The
+    printed smoothing description reports the effective continuous-stage
+    policy using the same \code{Kernel Regression Estimator:} labels as
+    \code{npreg}: \code{Local-Constant}, \code{Local-Linear}, or, for
+    \code{regtype="lp"}, the local-polynomial degree and basis details.
 
   \code{npregivderiv} returns a list with components \code{phi.prime},
   \code{phi}, \code{phi.prime.mat}, \code{phi.mat}, and, when a separate
