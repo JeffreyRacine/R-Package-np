@@ -371,119 +371,55 @@ Further arguments are passed to \code{\link{npreg}} and \code{\link{npksum}}.
 }
 \examples{
 \dontrun{
-## Not run in checks: excluded to keep MPI examples stable and check times short.
-## The following example is adapted for interactive parallel execution
-## in R. Here we spawn 1 slave so that there will be two compute nodes
-## (master and slave).  Kindly see the batch examples in the demos
-## directory (npRmpi/demos) and study them carefully. Also kindly see
-## the more extensive examples in the np package itself. See the npRmpi
-## vignette for further details on running parallel np programs via
-## vignette("npRmpi_getting_started", package = "npRmpi").
+## This illustration was made possible by Samuele Centorrino
+## <samuele.centorrino@univ-tlse1.fr>
 
-## Start npRmpi for interactive execution. If slaves are already running and
-## `options(npRmpi.reuse.slaves=TRUE)` (default on some systems), this will
-## reuse the existing pool instead of respawning. To change the number of
-## slaves, call `npRmpi.quit(force=TRUE)` then restart.
+npRmpi.init(nslaves = 1)
 
-force.run <- nzchar(Sys.getenv("NP_RMPI_RUN_MPI_EXAMPLES_IN_CHECK"))
+set.seed(42)
+n <- 500
+trim <- 0.005
 
-in.check <- !force.run && (
-            nzchar(Sys.getenv("_R_CHECK_PACKAGE_NAME_")) ||
-            nzchar(Sys.getenv("_R_CHECK_INTERNALS2_")) ||
-            nzchar(Sys.getenv("_R_CHECK_CRAN_INCOMING_")) ||
-            nzchar(Sys.getenv("_R_CHECK_EXAMPLE_TIMING_THRESHOLD_"))
-          )
-
-if (!in.check) {
-npRmpi.init(nslaves=1)
-
-# ## This illustration was made possible by Samuele Centorrino
-# ## <samuele.centorrino@univ-tlse1.fr>
-# 
-# set.seed(42)
-# n <- 500
-# 
-# ## For trimming the plot (trim .5\% from each tail)
-# 
-# trim <- 0.005
-# 
-# ## The DGP is as follows:
-# 
-# ## 1) y = phi(z) + u
-# 
-# ## 2) E(u|z) != 0 (endogeneity present)
-# 
-# ## 3) Suppose there exists an instrument w such that z = f(w) + v and
-# ## E(u|w) = 0
-# 
-# ## 4) We generate v, w, and generate u such that u and z are
-# ## correlated. To achieve this we express u as a function of v (i.e. u =
-# ## gamma v + eps)
-# 
-# v <- rnorm(n,mean=0,sd=0.27)
-# eps <- rnorm(n,mean=0,sd=0.05)
-# u <- -0.5*v + eps
-# w <- rnorm(n,mean=0,sd=1)
-# 
-# ## In Darolles et al (2011) there exist two DGPs. The first is
-# ## phi(z)=z^2 and the second is phi(z)=exp(-abs(z)) (which is
-# ## discontinuous and has a kink at zero).
-# 
-# fun1 <- function(z) { z^2 }
-# fun2 <- function(z) { exp(-abs(z)) }
-# 
-# z <- 0.2*w + v
-# 
-# ## Generate two y vectors for each function.
-# 
-# y1 <- fun1(z) + u
-# y2 <- fun2(z) + u
-# 
-# ## You set y to be either y1 or y2 (ditto for phi) depending on which
-# ## DGP you are considering:
-# 
-# y <- y1
-# phi <- fun1
-# 
-# ## Sort on z (for plotting)
-# 
-# ivdata <- data.frame(y,z,w,u,v)
-# ivdata <- ivdata[order(ivdata$z),]
-# rm(y,z,w,u,v)
-# 
-# model.ivderiv <- npregivderiv(y ~ z | w, data=ivdata)
-# 
-# ylim <-c(quantile(model.ivderiv$phi.prime,trim),
-#          quantile(model.ivderiv$phi.prime,1-trim))
-# 
-# plot(z,model.ivderiv$phi.prime,
-#      xlim=quantile(z,c(trim,1-trim)),
-#      main="",
-#      ylim=ylim,
-#      xlab="Z",
-#      ylab="Derivative",
-#      type="l",
-#      lwd=2)
-# rug(z)     
-# 
-## For the interactive run only we close the slaves perhaps to proceed
-## with other examples and so forth. This is redundant in batch mode.
-
-## Note: on some systems (notably macOS+MPICH), repeatedly spawning and
-## tearing down slaves in the same R session can lead to hangs/crashes.
-## npRmpi may therefore keep slave daemons alive by default and
-## `npRmpi.quit()` performs a "soft close". Use `force=TRUE` to
-## actually shut down the slaves.
+## Endogenous-regressor DGP:
 ##
-## You can disable reuse via `options(npRmpi.reuse.slaves=FALSE)` or by
-## setting the environment variable `NP_RMPI_NO_REUSE_SLAVES=1` before
-## loading the package.
+## y = phi(z) + u
+## E(u | z) != 0
+## z = 0.2 w + v
+## E(u | w) = 0
 
-npRmpi.quit()               ## soft close (may keep slaves alive)
-## npRmpi.quit(force=TRUE)  ## hard close
-} else {
-  message("Skipping MPI spawn in check context (set NP_RMPI_RUN_MPI_EXAMPLES_IN_CHECK=1).")
-}
+v <- rnorm(n, mean = 0, sd = 0.27)
+eps <- rnorm(n, mean = 0, sd = 0.05)
+u <- -0.5 * v + eps
+w <- rnorm(n)
+
+phi <- function(z) z^2
+phi.prime <- function(z) 2 * z
+
+z <- 0.2 * w + v
+y <- phi(z) + u
+
+ivdata <- data.frame(y, z, w)
+ivdata <- ivdata[order(ivdata$z), ]
+
+model.ivderiv <- npregivderiv(y ~ z | w, data = ivdata)
+deriv.iv <- gradients(model.ivderiv)
+
+## Restrict the display to the central 99 percent of the z observations.
+
+zlim <- quantile(ivdata$z, c(trim, 1 - trim))
+keep <- ivdata$z >= zlim[1L] & ivdata$z <= zlim[2L]
+
+plot(ivdata$z[keep], deriv.iv[keep],
+     main = "",
+     xlab = "Z",
+     ylab = "Derivative",
+     type = "l",
+     lwd = 2)
+
+curve(phi.prime(x), add = TRUE, col = 2, lty = 2, lwd = 2)
+rug(ivdata$z[keep])
+
+npRmpi.quit()
 } % enddontrun
 }
 \keyword{ instrument }

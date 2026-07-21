@@ -578,135 +578,71 @@ This function should be considered to be in \sQuote{beta test} status until furt
 }
 \examples{
 \dontrun{
-## Not run in checks: excluded to keep MPI examples stable and check times short.
-## The following example is adapted for interactive parallel execution
-## in R. Here we spawn 1 slave so that there will be two compute nodes
-## (master and slave).  Kindly see the batch examples in the demos
-## directory (npRmpi/demos) and study them carefully. Also kindly see
-## the more extensive examples in the np package itself. See the npRmpi
-## vignette for further details on running parallel np programs via
-## vignette("npRmpi_getting_started", package = "npRmpi").
+## This illustration was made possible by Samuele Centorrino
+## <samuele.centorrino@univ-tlse1.fr>
 
-## Start npRmpi for interactive execution. If slaves are already running and
-## `options(npRmpi.reuse.slaves=TRUE)` (default on some systems), this will
-## reuse the existing pool instead of respawning. To change the number of
-## slaves, call `npRmpi.quit(force=TRUE)` then restart.
+npRmpi.init(nslaves = 1)
 
-force.run <- nzchar(Sys.getenv("NP_RMPI_RUN_MPI_EXAMPLES_IN_CHECK"))
+set.seed(42)
+n <- 500
+trim <- 0.005
 
-in.check <- !force.run && (
-            nzchar(Sys.getenv("_R_CHECK_PACKAGE_NAME_")) ||
-            nzchar(Sys.getenv("_R_CHECK_INTERNALS2_")) ||
-            nzchar(Sys.getenv("_R_CHECK_CRAN_INCOMING_")) ||
-            nzchar(Sys.getenv("_R_CHECK_EXAMPLE_TIMING_THRESHOLD_"))
-          )
-
-if (!in.check) {
-npRmpi.init(nslaves=1)
-
-# ## This illustration was made possible by Samuele Centorrino
-# ## <samuele.centorrino@univ-tlse1.fr>
-# 
-# set.seed(42)
-# n <- 500
-# 
-# ## The DGP is as follows:
-# 
-# ## 1) y = phi(z) + u
-# 
-# ## 2) E(u|z) != 0 (endogeneity present)
-# 
-# ## 3) Suppose there exists an instrument w such that z = f(w) + v and
-# ## E(u|w) = 0
-# 
-# ## 4) We generate v, w, and generate u such that u and z are
-# ## correlated. To achieve this we express u as a function of v (i.e. u =
-# ## gamma v + eps)
-# 
-# v <- rnorm(n,mean=0,sd=0.27)
-# eps <- rnorm(n,mean=0,sd=0.05)
-# u <- -0.5*v + eps
-# w <- rnorm(n,mean=0,sd=1)
-# 
-# ## In Darolles et al (2011) there exist two DGPs. The first is
-# ## phi(z)=z^2 and the second is phi(z)=exp(-abs(z)) (which is
-# ## discontinuous and has a kink at zero).
-# 
-# fun1 <- function(z) { z^2 }
-# fun2 <- function(z) { exp(-abs(z)) }
-# 
-# z <- 0.2*w + v
-# 
-# ## Generate two y vectors for each function.
-# 
-# y1 <- fun1(z) + u
-# y2 <- fun2(z) + u
-# 
-# ## You set y to be either y1 or y2 (ditto for phi) depending on which
-# ## DGP you are considering:
-# 
-# y <- y1
-# phi <- fun1
-# 
-# ## Sort on z (for plotting)
-# 
-# ivdata <- data.frame(y,z,w)
-# ivdata <- ivdata[order(ivdata$z),]
-# rm(y,z,w)
-# 
-# model.iv <- npregiv(y ~ z | w, data=ivdata, regtype="ll")
-# phi.iv <- model.iv$phi
-# 
-# ## Now the non-iv local linear estimator of E(y|z)
-# 
-# ll.mean <- with(ivdata, fitted(npreg(y~z, regtype="ll")))
-# 
-# ## For the plots, restrict focal attention to the bulk of the data
-# ## (i.e. for the plotting area trim out 1/4 of one percent from each
-# ## tail of y and z)
-# 
-# trim <- 0.0025
-# 
-# curve(phi,min(z),max(z),
-#       xlim=quantile(z,c(trim,1-trim)),
-#       ylim=quantile(y,c(trim,1-trim)),
-#       ylab="Y",
-#       xlab="Z",
-#       main="Nonparametric Instrumental Kernel Regression",
-#       lwd=2,lty=1)
-# 
-# points(z,y,type="p",cex=.25,col="grey")
-# 
-# lines(z,phi.iv,col="blue",lwd=2,lty=2)
-# 
-# lines(z,ll.mean,col="red",lwd=2,lty=4)
-# 
-# legend(quantile(z,trim),quantile(y,1-trim),
-#        c(expression(paste(varphi(z))),
-#          expression(paste("Nonparametric ",hat(varphi)(z))),
-#          "Nonparametric E(y|z)"),
-#        lty=c(1,2,4),
-#        col=c("black","blue","red"),
-#        lwd=c(2,2,2))
-# 
-## For the interactive run only we close the slaves perhaps to proceed
-## with other examples and so forth. This is redundant in batch mode.
-
-## Note: on some systems (notably macOS+MPICH), repeatedly spawning and
-## tearing down slaves in the same R session can lead to hangs/crashes.
-## npRmpi may therefore keep slave daemons alive by default and
-## `npRmpi.quit()` performs a "soft close". Use `force=TRUE` to
-## actually shut down the slaves.
+## Endogenous-regressor DGP:
 ##
-## You can disable reuse via `options(npRmpi.reuse.slaves=FALSE)` or by
-## setting the environment variable `NP_RMPI_NO_REUSE_SLAVES=1` before
-## loading the package.
+## y = phi(z) + u
+## E(u | z) != 0
+## z = 0.2 w + v
+## E(u | w) = 0
 
-npRmpi.quit()               ## soft close (may keep slaves alive)
-## npRmpi.quit(force=TRUE)  ## hard close
-} else {
-  message("Skipping MPI spawn in check context (set NP_RMPI_RUN_MPI_EXAMPLES_IN_CHECK=1).")
-}
-} % enddontrun     
+v <- rnorm(n, mean = 0, sd = 0.27)
+eps <- rnorm(n, mean = 0, sd = 0.05)
+u <- -0.5 * v + eps
+w <- rnorm(n)
+
+phi <- function(z) z^2
+
+z <- 0.2 * w + v
+y <- phi(z) + u
+
+ivdata <- data.frame(y, z, w)
+ivdata <- ivdata[order(ivdata$z), ]
+
+model.iv <- npregiv(y ~ z | w, data = ivdata, regtype = "ll")
+phi.iv <- fitted(model.iv)
+
+## Compare with the non-IV local-linear estimator of E(y | z).
+
+model.noniv <- npreg(y ~ z, data = ivdata, regtype = "ll")
+mean.noniv <- fitted(model.noniv)
+
+## Restrict the display to the central 99 percent of the z observations.
+
+zlim <- quantile(ivdata$z, c(trim, 1 - trim))
+keep <- ivdata$z >= zlim[1L] & ivdata$z <= zlim[2L]
+ylim <- range(ivdata$y[keep], phi.iv[keep], mean.noniv[keep])
+
+plot(ivdata$z[keep], phi(ivdata$z[keep]),
+     ylim = ylim,
+     ylab = "Y",
+     xlab = "Z",
+     main = "Nonparametric Instrumental Kernel Regression",
+     type = "l",
+     lwd = 2)
+
+points(ivdata$z[keep], ivdata$y[keep], cex = 0.25, col = "grey")
+lines(ivdata$z[keep], phi.iv[keep], col = "blue", lwd = 2, lty = 2)
+lines(ivdata$z[keep], mean.noniv[keep], col = "red", lwd = 2, lty = 4)
+
+legend("topright",
+       c(expression(varphi(z)),
+         expression(paste("Nonparametric ", hat(varphi)(z))),
+         "Nonparametric E(y | z)"),
+       lty = c(1, 2, 4),
+       col = c("black", "blue", "red"),
+       lwd = c(2, 2, 2),
+       bty = "n")
+
+npRmpi.quit()
+} % enddontrun
 }
 \keyword{ instrument }
