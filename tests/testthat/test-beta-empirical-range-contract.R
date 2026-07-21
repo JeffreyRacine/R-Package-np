@@ -328,10 +328,10 @@ test_that("exact fixed and legacy stored beta bounds are not padded", {
   expect_identical(unname(fixed$ckerlb[fixed$icon]), -2)
   expect_identical(unname(fixed$ckerub[fixed$icon]), 3)
 
-  legacy <- np:::untangle(x)
+  legacy <- npRmpi:::untangle(x)
   legacy$all.min.next <- NULL
   legacy$all.max.prev <- NULL
-  resolved <- np:::npKernelBoundsResolve(
+  resolved <- npRmpi:::npKernelBoundsResolve(
     dati = legacy, varnames = "x", kerbound = "range",
     range.policy = "beta_half_spacing"
   )

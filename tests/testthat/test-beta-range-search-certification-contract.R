@@ -153,14 +153,14 @@ test_that("beta range certification is isolated from adjacent routes", {
 
 test_that("asymptotic candidate conversion respects bandwidth scaling", {
   x <- data.frame(x = seq(0.05, 0.95, length.out = 40))
-  dati <- np:::untangle(x)
-  bws <- np:::bandwidth(
+  dati <- npRmpi:::untangle(x)
+  bws <- npRmpi:::bandwidth(
     bw = 0.5, bwmethod = "cv.ls", bwscaling = TRUE,
     ckertype = "beta", ckerbound = "range", xdati = dati,
     xnames = "x", nobs = nrow(x), sdev = sd(x$x),
     nconfac = nrow(x)^(-1 / 5), bandwidth.compute = TRUE
   )
-  converted <- np:::npBetaRangeCertificationBandwidths(
+  converted <- npRmpi:::npBetaRangeCertificationBandwidths(
     bws, where = "test"
   )
   width <- bws$ckerub[bws$icon] - bws$ckerlb[bws$icon]
