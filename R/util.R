@@ -1733,8 +1733,16 @@ npKernelBoundsResolve <- function(dati,
         !is.null(dati$all.min.next) && !is.null(dati$all.max.prev)) {
       nexts <- unlist(dati$all.min.next[icon.idx], use.names = FALSE)
       prevs <- unlist(dati$all.max.prev[icon.idx], use.names = FALSE)
-      distinct.ok <- length(nexts) == ncon && length(prevs) == ncon &&
-        is.finite(nexts) & is.finite(prevs) &
+      if (length(nexts) != ncon || length(prevs) != ncon) {
+        stop(sprintf(
+          paste0(
+            "Internal beta range metadata inconsistency: expected %d entries ",
+            "in 'all.min.next' and 'all.max.prev'; found %d and %d"
+          ),
+          ncon, length(nexts), length(prevs)
+        ), call. = FALSE)
+      }
+      distinct.ok <- is.finite(nexts) & is.finite(prevs) &
         nexts > mins & prevs < maxs
       if (any(!distinct.ok)) {
         bad.vars <- paste(cnames[!distinct.ok], collapse = ", ")
