@@ -96,6 +96,10 @@
   For sorted distinct values \eqn{u_1<\cdots<u_m}, beta range bounds are
   \deqn{A^*=u_1-(u_2-u_1)/2,\qquad
     B^*=u_m+(u_m-u_{m-1})/2.}
+  Consequently, beta \code{ckerbound="range"} is not equivalent to
+  \code{ckerbound="fixed"} at the raw sample minima and maxima; its exact
+  fixed-bound equivalent uses the coordinatewise padded bounds \eqn{A^*} and
+  \eqn{B^*}.
   Thus every training value is strictly inside the fitted support, including
   tied extrema, and raw-extremum PDF derivatives are finite. At least two
   distinct finite values are required per continuous coordinate. This is an

@@ -26,6 +26,11 @@
   bounds remain literal, while every non-beta range route continues to use
   exact sample minima and maxima.
 
+* Beta range resolution now validates distinct-extrema metadata coordinate by
+  coordinate. This fixes an unreleased 0.70-6 development defect in which two
+  or more continuous beta coordinates failed during support resolution because
+  vector and scalar logical operators were mixed.
+
 * Automatic univariate second-order beta range searches now certify fixed-
   bandwidth density CVLS and distribution CDF solutions against the
   double-precision uniform-limit objective. A material improvement triggers
