@@ -44,7 +44,9 @@ Internal communicator, dispatch, worker, and result-simplification inputs.
   \item{n}{number of tasks.}
   \item{tag}{an MPI tag.}
   \item{ret}{logical; whether to return a value.}
-  \item{simplify}{logical; whether to simplify the result.}
+  \item{simplify}{a single, non-missing logical value (or a value coercible
+  to one); whether to simplify the result. Malformed values are rejected on
+  the master before MPI dispatch.}
   \item{nsim}{number of simulations.}
   \item{run}{run indicator.}
   \item{answer}{a result list.}
@@ -71,6 +73,10 @@ Internal helpers; return values vary by function:
 }
 \details{
   These functions are required for internal MPI communication and slave execution.
+  Direct calls to \code{.simplify()} and the master-side remote-execution,
+  parallel-apply, replication, and simulation helpers share the same scalar
+  \code{simplify} contract. Valid scalar values preserve the established MPI
+  transport and result-assembly paths.
 }
 \author{
 Hao Yu and Jeffrey Racine

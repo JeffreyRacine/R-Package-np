@@ -168,9 +168,10 @@ mpi.spawn.Rslaves <-
 mpi.remote.exec <- function(cmd, ...,  simplify=TRUE, comm=1, ret=TRUE){
     if (mpi.comm.size(comm) < 2)
     stop("It seems no slaves running.")
-    tag <- floor(runif(1,20000,30000))
     scmd <- substitute(cmd)
     arg <-list(...)
+    simplify <- npValidateScalarLogical(simplify, "simplify")
+    tag <- floor(runif(1,20000,30000))
     .npRmpi_transport_trace(
         role = "master",
         event = "remote.exec.start",
@@ -647,6 +648,7 @@ mpi.parSim <- function(n=100,rand.gen=rnorm, rand.arg=NULL,
                 length(sim.seq)!=slave.num*run)
             stop("sim.seq is not in right order")
 
+    simplify <- npValidateScalarLogical(simplify, "simplify")
     mpi.bcast.cmd(.mpi.worker.sim, n=n, nsim=nsim, run=run, comm=comm)  
     mpi.bcast.Robj(list(rand.gen=rand.gen, rand.arg=rand.arg,
                         stat=statistic, stat.arg=list(...)), comm=comm)
@@ -981,6 +983,7 @@ mpi.iapplyLB <- function(X, FUN, ...,  apply.seq=NULL, comm=1, sleep=0.01){
 #}
 
 .simplify <- function(n, answer, simplify, len=1, recursive=FALSE){
+    simplify <- npValidateScalarLogical(simplify, "simplify")
     if (simplify && length(answer)&&length(common.len <- unique(unlist(lapply(answer, 
         length)))) == 1 ) {
         if (common.len == len) 
@@ -1016,6 +1019,7 @@ mpi.parSapply <- function (X, FUN, ..., job.num=mpi.comm.size(comm)-1, apply.seq
                 simplify = TRUE, USE.NAMES = TRUE, comm=1) 
 {
     FUN <- match.fun(FUN)
+    simplify <- npValidateScalarLogical(simplify, "simplify")
     answer <- mpi.parLapply(as.list(X),FUN,...,job.num=job.num,apply.seq=apply.seq,comm=comm)
     if (USE.NAMES && is.character(X) && is.null(names(answer))) 
         names(answer) <- X
@@ -1026,6 +1030,7 @@ mpi.iparSapply <- function (X, FUN, ..., job.num=mpi.comm.size(comm)-1, apply.se
                 simplify = TRUE, USE.NAMES = TRUE, comm=1,sleep=0.01) 
 {
     FUN <- match.fun(FUN)
+    simplify <- npValidateScalarLogical(simplify, "simplify")
     answer <- mpi.iparLapply(as.list(X),FUN,...,job.num=job.num,apply.seq=apply.seq,comm=comm,sleep=sleep)
     if (USE.NAMES && is.character(X) && is.null(names(answer))) 
         names(answer) <- X

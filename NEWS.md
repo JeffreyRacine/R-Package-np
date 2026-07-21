@@ -1,5 +1,12 @@
 # npRmpi 0.70-6
 
+* MPI result simplification now applies one explicit scalar-logical contract
+  at master-side ingress. Vector, empty, and missing `simplify` values are
+  rejected before remote execution, parallel apply/replication, or simulation
+  work is dispatched, preventing rank divergence and an unusable worker pool.
+  Scalar logical values and numeric `0`/`1` retain their established results
+  and MPI transport paths.
+
 * `npksum()` now validates its public logical controls and `kernel.pow` before
   MPI or native dispatch. This prevents malformed scalar controls from being
   masked by short-circuit evaluation and prevents empty, missing, non-finite,
