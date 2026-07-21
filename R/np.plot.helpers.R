@@ -7600,7 +7600,9 @@
       bws = bws,
       weights = weights,
       operator = operator,
-      bandwidth.divide = TRUE
+      bandwidth.divide = !identical(
+        bws[["ckertype", exact = TRUE]], "beta"
+      )
     )$ksum
   )) / n.total
 }
