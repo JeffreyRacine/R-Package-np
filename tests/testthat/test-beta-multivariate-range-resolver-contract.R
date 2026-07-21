@@ -20,9 +20,9 @@
 test_that("beta range resolves multiple coordinates independently", {
   training <- .beta_multivariate_training()
   expected <- .beta_multivariate_bounds(training)
-  dati <- np:::untangle(training)
+  dati <- npRmpi:::untangle(training)
 
-  resolved <- np:::npKernelBoundsResolve(
+  resolved <- npRmpi:::npKernelBoundsResolve(
     dati = dati,
     varnames = names(training),
     kerbound = "range",
@@ -92,10 +92,10 @@ test_that("beta range separates data and metadata failures by coordinate", {
     fixed = TRUE
   )
 
-  malformed <- np:::untangle(training)
+  malformed <- npRmpi:::untangle(training)
   malformed$all.min.next <- malformed$all.min.next[1L]
   expect_error(
-    np:::npKernelBoundsResolve(
+    npRmpi:::npKernelBoundsResolve(
       dati = malformed,
       varnames = names(training),
       kerbound = "range",
