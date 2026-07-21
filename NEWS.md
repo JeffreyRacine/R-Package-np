@@ -1,5 +1,26 @@
 # npRmpi 0.70-6
 
+* `npksum()` now validates its public logical controls and `kernel.pow` before
+  MPI or native dispatch. This prevents malformed scalar controls from being
+  masked by short-circuit evaluation and prevents empty, missing, non-finite,
+  or vector-valued kernel powers from reaching C; an empty kernel power could
+  previously terminate the R process. Documented scalar inputs and valid
+  integer powers retain their established behavior.
+
+* Repaired `npksum()` score and OCG output for mixed data. `compute.score=TRUE`
+  now allocates its native result buffer, and packed score, OCG, and continuous
+  permutation blocks (including derivative kernel weights) are returned in
+  original data-column order. Categorical base-kernel factors are now retained
+  in mixed-data continuous permutation blocks, and score-only ordered kernels
+  no longer dereference OCG-only state. MPI ranks now also assemble their
+  disjoint derivative kernel-weight slices before returning `p.kw`, including
+  uneven fixed/generalized-NN partitions and adaptive-NN training-row
+  partitions. Uneven fixed/generalized-NN partitions now also use exact
+  per-rank receive counts, preventing padding from one packed `p.ksum` block
+  from overwriting the first element of the next. The defects could previously
+  cause a process-level crash, fail during R reconstruction, or return an
+  incomplete mixed-data derivative or derivative-weight array.
+
 * The omitted regression-smoothing choice in `npregivderiv()` is now local
   linear (`regtype = "ll"`, degree one), matching the longstanding `p = 1`
   default of `npregiv()`. Explicit `regtype = "lc"` reproduces the former

@@ -7999,11 +7999,11 @@ const int keep_kw_owner_local){
       ps_okernel = (int *) malloc(num_reg_ordered*sizeof(int));
 
       for(i = 0; i < num_reg_unordered; i++){
-        ps_ukernel[i] = KERNEL_unordered_reg[i] + OP_UFUN_OFFSETS[permutation_operator];
+        ps_ukernel[i] = KERNEL_unordered_reg[i] + OP_UFUN_OFFSETS[OP_DERIVATIVE];
       }
 
       for(i = 0; i < num_reg_ordered; i++){
-        ps_okernel[i] = KERNEL_ordered_reg[i] + OP_OFUN_OFFSETS[permutation_operator];
+        ps_okernel[i] = KERNEL_ordered_reg[i] + OP_OFUN_OFFSETS[OP_DERIVATIVE];
       }
     } else if(do_ocg) {
       ps_ukernel = KERNEL_unordered_reg;
@@ -8397,6 +8397,18 @@ const int keep_kw_owner_local){
     }
   }
 
+  if((kernel_weighted_sum_pkw_extern != NULL) &&
+     (kernel_weighted_sum_pkw_nvar_extern > 0)){
+    const size_t pkw_count =
+      np_jksum_size_mul3_or_die((size_t)kernel_weighted_sum_pkw_nvar_extern,
+                                (size_t)num_obs_eval,
+                                (size_t)num_xt,
+                                "derivative kernel-weight initialization");
+    memset(kernel_weighted_sum_pkw_extern, 0,
+           np_jksum_size_mul_or_die(pkw_count, sizeof(double),
+                                    "derivative kernel-weight initialization"));
+  }
+
   if (BANDWIDTH_reg == BW_FIXED || BANDWIDTH_reg == BW_GEN_NN){
 #ifdef MPI2
     if((!suppress_parallel) && (!gather_scatter)){
@@ -8413,23 +8425,23 @@ const int keep_kw_owner_local){
         p_ws = NULL;
       }
 
-      // hopefully this now handles the case where there are more processors than observations
-      for(i = 0, ii = 0; ii*stride < num_obs_eval; ii++){
-        igatherv[ii] = stride*sum_element_length;
-        idisplsv[ii] = i;
-        i += stride*sum_element_length;
-      }
-      
-      if(i < num_obs_eval*sum_element_length){
-        const int de1 = (num_obs_eval - (ii-1)*stride)*sum_element_length;
-        igatherv[ii] = de1;
-        idisplsv[ii++] = i;
-        i += de1;
-      }
-
-      for(; ii < iNum_Processors; ii++){
-        igatherv[ii] = 0;
-        idisplsv[ii] = i;
+      for(ii = 0; ii < iNum_Processors; ii++){
+        const size_t rank_start = MIN((size_t)ii*(size_t)stride,
+                                      (size_t)num_obs_eval);
+        const size_t rank_rows = MIN((size_t)stride,
+                                     (size_t)num_obs_eval - rank_start);
+        igatherv[ii] =
+          np_jksum_mpi_count_or_die(
+            np_jksum_size_mul_or_die(rank_rows,
+                                     (size_t)sum_element_length,
+                                     "weighted_permutation_sum MPI_Allgatherv count"),
+            "weighted_permutation_sum MPI_Allgatherv count");
+        idisplsv[ii] =
+          np_jksum_mpi_count_or_die(
+            np_jksum_size_mul_or_die(rank_start,
+                                     (size_t)sum_element_length,
+                                     "weighted_permutation_sum MPI_Allgatherv displacement"),
+            "weighted_permutation_sum MPI_Allgatherv displacement");
       }
 
 
@@ -9052,8 +9064,10 @@ const int keep_kw_owner_local){
     } else {
       /* unordered second */
       for(i=0; i < num_reg_unordered; i++, l++, ip += doscoreocg){
-        if(doscoreocg){
-          np_p_ukernelv(KERNEL_unordered_reg_np[i], ps_ukernel[i], k, p_nvar, xtu[i], num_xt, l, xu[i][j], 
+        if(p_nvar > 0){
+          const int p_kernel = doscoreocg ?
+            ps_ukernel[i] : KERNEL_unordered_reg_np[i];
+          np_p_ukernelv(KERNEL_unordered_reg_np[i], p_kernel, k, p_nvar, xtu[i], num_xt, l, xu[i][j],
                         lambda[i], num_categories[i], matrix_categorical_vals[i][0], tprod, tprod_mp, pxl, (p_pxl == NULL ? NULL : p_pxl + k), swap_xxt, (bpso[l] ? do_ocg : 0), bpso[l], perm_kbuf);
         } else {
           if((p_nvar == 0) && (disc_uno_const_ok != NULL) && disc_uno_const_ok[i]){
@@ -9073,9 +9087,8 @@ const int keep_kw_owner_local){
 
       /* ordered third */
       for(i=0; i < num_reg_ordered; i++, l++, ip += doscoreocg){
-        if(!doscoreocg){
-          if((p_nvar == 0) &&
-             (disc_ord_const_ok != NULL) && disc_ord_const_ok[i] &&
+        if(p_nvar == 0){
+          if((disc_ord_const_ok != NULL) && disc_ord_const_ok[i] &&
              (ps_ok_nli || (operator[l] != OP_CONVOLUTION))){
             deferred_const *= disc_ord_const[i];
             deferred_const_active = 1;
@@ -9098,12 +9111,17 @@ const int keep_kw_owner_local){
             tprod_has_vals = 1;
           }
         } else {
-          np_p_okernelv(KERNEL_ordered_reg_np[i], ps_okernel[i], k, p_nvar, xto[i], num_xt, l,
+          const int p_kernel = doscoreocg ?
+            ps_okernel[i] : KERNEL_ordered_reg_np[i];
+          const int this_do_ocg = bpso[l] ? do_ocg : 0;
+          const int swapped_index = (this_do_ocg && !swap_xxt) ?
+            matrix_ordered_indices[i][j] : 0;
+          np_p_okernelv(KERNEL_ordered_reg_np[i], p_kernel, k, p_nvar, xto[i], num_xt, l,
                         xo[i][j], lambda[num_reg_unordered+i], 
                         (matrix_categorical_vals != NULL) ? matrix_categorical_vals[i+num_reg_unordered] : NULL, 
                         (num_categories != NULL) ? num_categories[i+num_reg_unordered] : 0,
-                        tprod, tprod_mp, pxl, (p_pxl == NULL ? NULL : p_pxl + k), swap_xxt, (bpso[l] ? do_ocg : 0), bpso[l],
-                        matrix_ordered_indices[i], (swap_xxt ? 0 : matrix_ordered_indices[i][j]),
+                        tprod, tprod_mp, pxl, (p_pxl == NULL ? NULL : p_pxl + k), swap_xxt, this_do_ocg, bpso[l],
+                        matrix_ordered_indices == NULL ? NULL : matrix_ordered_indices[i], swapped_index,
                         perm_kbuf);
         }
         k += bpso[l];
@@ -9240,6 +9258,20 @@ const int keep_kw_owner_local){
                                                            "kw_work MPI_Allgather"),
                                   "kw_work MPI_Allgather");
       MPI_Allgather(MPI_IN_PLACE, kw_count, MPI_DOUBLE, kw_work, kw_count, MPI_DOUBLE, comm[1]);
+    }
+
+    if((kernel_weighted_sum_pkw_extern != NULL) &&
+       (kernel_weighted_sum_pkw_nvar_extern > 0)){
+      const int pkw_count =
+        np_jksum_mpi_count_or_die(
+          np_jksum_size_mul3_or_die(
+            (size_t)kernel_weighted_sum_pkw_nvar_extern,
+            (size_t)num_obs_eval,
+            (size_t)num_xt,
+            "derivative kernel weights MPI_Allreduce"),
+          "derivative kernel weights MPI_Allreduce");
+      MPI_Allreduce(MPI_IN_PLACE, kernel_weighted_sum_pkw_extern,
+                    pkw_count, MPI_DOUBLE, MPI_SUM, comm[1]);
     }
 
     if(p_nvar > 0){

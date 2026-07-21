@@ -89,35 +89,35 @@ evaluation, operator variants, and returned kernel weights.
 }
 
   \item{bandwidth.divide}{
-    a logical specifying whether or not to divide continuous kernel
-    weights by their bandwidths. Use this with nearest-neighbor
-    methods. Defaults to \code{FALSE}.
+    a single, non-missing logical specifying whether or not to divide
+    continuous kernel weights by their bandwidths. Use this with
+    nearest-neighbor methods. Defaults to \code{FALSE}.
   }
 
   \item{compute.ocg}{
-    a logical specifying whether or not to return a separate result for
-    each unordered and ordered dimension, where the product kernel term
-    for that dimension is evaluated at an appropriate reference
-    category. This is used primarily in \code{npRmpi} to compute ordered and
-    unordered categorical gradients. See details.
+    a single, non-missing logical specifying whether or not to return a
+    separate result for each unordered and ordered dimension, where the
+    product kernel term for that dimension is evaluated at an appropriate
+    reference category. This is used primarily in \code{npRmpi} to compute
+    ordered and unordered categorical gradients. See details.
   }
 
   \item{compute.score}{
-    a logical specifying whether or not to return the score
-    (the \sQuote{grad h} terms) for each dimension in addition to the kernel
-    sum. Cannot be \code{TRUE} if a permutation operator other than
-    \code{"none"} is selected. 
+    a single, non-missing logical specifying whether or not to return the
+    score (the \sQuote{grad h} terms) for each dimension in addition to the
+    kernel sum. Cannot be \code{TRUE} if a permutation operator other
+    than \code{"none"} is selected.
   }
 
   \item{kernel.pow}{
-    an integer specifying the power to which the kernels will be raised
-    in the sum. Defaults to \code{1}.
+    a single, finite integer specifying the power to which the kernels
+    will be raised in the sum. Defaults to \code{1}.
   }
 
   \item{leave.one.out}{
-    a logical value to specify whether or not to compute the leave one
-    out sums. Will not work if \code{exdat} is specified. Defaults to
-    \code{FALSE}.
+    a single, non-missing logical value specifying whether or not to
+    compute the leave one out sums. Will not work if \code{exdat} is
+    specified. Defaults to \code{FALSE}.
   }
 
   \item{operator}{
@@ -138,9 +138,9 @@ evaluation, operator variants, and returned kernel weights.
   }
 
   \item{return.kernel.weights}{
-    a logical specifying whether or not to return the matrix of
-    generalized product kernel weights. Defaults to \code{FALSE}. See
-    details.
+    a single, non-missing logical specifying whether or not to return the
+    matrix of generalized product kernel weights. Defaults to
+    \code{FALSE}. See details.
     }
 
 \subsection{Formula Interface}{
@@ -373,6 +373,11 @@ Further arguments passed to the default kernel-sum method.
   category is selected. These additional data are returned in the
   \code{p.ksum} member. This option can be set simultaneously with
   \code{permutation.operator}.
+
+  When a permutation, score, or OCG operation selects only a subset of
+  variables, the corresponding blocks in \code{p.ksum} and, when requested
+  internally, derivative kernel weights are packed without empty coordinates
+  and follow the original data-column order among the selected variables.
   
   The option \code{return.kernel.weights=TRUE} returns a matrix of
   dimension \sQuote{number of training observations} by \sQuote{number
@@ -395,6 +400,7 @@ Further arguments passed to the default kernel-sum method.
   \item{ksum}{ the sum at the evaluation points }
   \item{kw}{ the kernel weights (when \code{return.kernel.weights=TRUE}
   is specified)}
+  \item{p.ksum}{ packed permutation, score, or OCG sums, when requested }
 }
 \references{
   Aitchison, J. and C.G.G. Aitken (1976), \dQuote{ Multivariate binary
