@@ -1,5 +1,12 @@
 # np 0.70-6
 
+* Aligned `npregiv()` and `npregivderiv()` summary output with `npreg()`.
+  Fixed smoothing now uses the canonical `Kernel Regression Estimator:`
+  description (`Local-Constant`, `Local-Linear`, or the local-polynomial
+  degree and basis details) instead of separately printing the legacy `p`,
+  regression type, and degree fields. This is a reporting-only change;
+  fitted objects, smoothing choices, and numerical results are unchanged.
+
 * `npksum()` now validates its public logical controls and `kernel.pow` before
   native dispatch. This prevents malformed scalar controls from being masked
   by short-circuit evaluation and prevents empty, missing, non-finite, or
