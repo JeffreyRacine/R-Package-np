@@ -225,6 +225,18 @@ Further arguments are passed to \code{\link{npcdistbw}} when bandwidths are comp
   Returned infinities retain that extended-real meaning. Plot methods convert
   them to missing geometry only in a temporary drawing copy, leaving fitted
   and plot-data objects unchanged.
+  For ordinary conditional-distribution level plots, bootstrap intervals
+  support different continuous X- and Y-side kernel families or orders,
+  including beta on either side. Beta-containing bootstrap levels use the
+  same signed log-domain conditional ratio as the fitted estimator. With
+  non-fixed bandwidths, \code{np_boot_control(nonfixed="exact")} reconstructs
+  each duplicate-row resample and recomputes its nearest-neighbour bandwidths,
+  while \code{nonfixed="frozen"} keeps the original fitted bandwidths. In both
+  modes, resolved beta \code{"range"} support bounds are replayed from the
+  bandwidth object rather than recomputed from bootstrap counts. This
+  mixed-family level-bootstrap support does not extend beta estimation beyond
+  continuous X and Y with local-constant fitting, and it does not alter the
+  separate restrictions on gradient, quantile, or bias-corrected centers.
 
   With finite continuous response bounds, \code{npcdist} uses the
   observation-centered truncated-kernel CDF documented in

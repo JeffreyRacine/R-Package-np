@@ -1,5 +1,17 @@
 # np 0.70-6
 
+* Conditional density and distribution level plots now support bootstrap
+  intervals when the continuous X and Y sides use different kernel families
+  or orders, including beta on either side. Beta-containing bootstrap levels
+  use the same signed log-domain numerator/denominator accumulation as the
+  fitted estimator; this also corrects same-family higher-order beta
+  bootstrap values when a finite negative or extremely small explanatory
+  kernel sum was previously replaced by a positive machine-epsilon guard.
+  Fixed, frozen generalized/adaptive nearest-neighbour, and exact
+  nearest-neighbour refit semantics are covered. Matching legacy-kernel paths,
+  estimator fits, gradients, bandwidth selection, and public defaults are
+  unchanged.
+
 * Aligned `npregiv()` and `npregivderiv()` summary output with `npreg()`.
   Fixed smoothing now uses the canonical `Kernel Regression Estimator:`
   description (`Local-Constant`, `Local-Linear`, or the local-polynomial

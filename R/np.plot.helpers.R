@@ -5207,6 +5207,22 @@
     isTRUE(identical(bws$oxkertype, bws$oykertype))
 }
 
+.np_con_has_beta_kernel <- function(bws) {
+  isTRUE(identical(bws$cxkertype, "beta")) ||
+    isTRUE(identical(bws$cykertype, "beta"))
+}
+
+.np_con_continuous_lc_level_eligible <- function(bws) {
+  isTRUE(identical(.np_con_xregtype(bws), "lc")) &&
+    isTRUE(bws$xncon > 0L) && isTRUE(bws$yncon > 0L) &&
+    isTRUE((bws$xnuno + bws$xnord + bws$ynuno + bws$ynord) == 0L)
+}
+
+.np_con_level_bootstrap_eligible <- function(bws) {
+  isTRUE(.np_con_inid_ksum_eligible(bws)) ||
+    isTRUE(.np_con_continuous_lc_level_eligible(bws))
+}
+
 .np_con_xregtype <- function(bws) {
   regtype <- if (is.null(bws$regtype.engine)) bws$regtype else bws$regtype.engine
   if (is.null(regtype)) "lc" else as.character(regtype)
@@ -5939,6 +5955,231 @@
   )
 }
 
+.np_beta_conditional_bootstrap_levels <- function(xdat,
+                                                   ydat,
+                                                   exdat,
+                                                   eydat,
+                                                   bws,
+                                                   cdf,
+                                                   counts) {
+  xdat <- toFrame(xdat)
+  ydat <- toFrame(ydat)
+  exdat <- toFrame(exdat)
+  eydat <- toFrame(eydat)
+  counts <- .np_inid_counts_matrix(
+    n = nrow(xdat), B = ncol(as.matrix(counts)), counts = counts
+  )
+
+  if (!.np_con_has_beta_kernel(bws))
+    stop("beta conditional bootstrap evaluator requires a beta kernel side",
+         call. = FALSE)
+  if (!.np_con_continuous_lc_level_eligible(bws))
+    stop("beta conditional bootstrap evaluator requires continuous X and Y with local-constant fitting",
+         call. = FALSE)
+  if (nrow(ydat) != nrow(xdat) || nrow(exdat) != nrow(eydat))
+    stop("beta conditional bootstrap evaluator requires aligned training and evaluation rows",
+         call. = FALSE)
+
+  txcon <- as.matrix(xdat[, bws$ixcon, drop = FALSE])
+  tycon <- as.matrix(ydat[, bws$iycon, drop = FALSE])
+  excon <- as.matrix(exdat[, bws$ixcon, drop = FALSE])
+  eycon <- as.matrix(eydat[, bws$iycon, drop = FALSE])
+  storage.mode(txcon) <- "double"
+  storage.mode(tycon) <- "double"
+  storage.mode(excon) <- "double"
+  storage.mode(eycon) <- "double"
+
+  .Call(
+    "C_np_beta_conditional_bootstrap",
+    txcon, tycon, excon, eycon,
+    as.double(bws$xbw[bws$ixcon]),
+    as.double(bws$ybw[bws$iycon]),
+    as.double(bws$cxkerlb[bws$ixcon]),
+    as.double(bws$cxkerub[bws$ixcon]),
+    as.double(bws$cykerlb[bws$iycon]),
+    as.double(bws$cykerub[bws$iycon]),
+    as.integer(if (identical(bws$cxkertype, "beta"))
+      CKER_FAMILY_BETA else CKER_FAMILY_LEGACY),
+    as.integer(npConditionalContinuousKernelCode(bws, side = "x")),
+    as.integer(bws$cxkerorder),
+    as.integer(if (identical(bws$cykertype, "beta"))
+      CKER_FAMILY_BETA else CKER_FAMILY_LEGACY),
+    as.integer(npConditionalContinuousKernelCode(bws, side = "y")),
+    as.integer(bws$cykerorder),
+    as.integer(switch(bws$type,
+      fixed = BW_FIXED,
+      generalized_nn = BW_GEN_NN,
+      adaptive_nn = BW_ADAP_NN,
+      stop("invalid beta conditional bootstrap bandwidth type", call. = FALSE)
+    )),
+    as.logical(cdf),
+    counts,
+    PACKAGE = "np"
+  )
+}
+
+.np_inid_boot_from_conditional_count_evaluator <- function(n,
+                                                            neval,
+                                                            B,
+                                                            evaluator,
+                                                            counts = NULL,
+                                                            counts.drawer = NULL,
+                                                            progress.label = NULL) {
+  n <- as.integer(n)
+  neval <- as.integer(neval)
+  B <- as.integer(B)
+  if (n < 1L || neval < 1L || B < 1L || !is.function(evaluator))
+    stop("invalid conditional count-bootstrap evaluator state", call. = FALSE)
+  ones <- matrix(1, nrow = n, ncol = 1L)
+
+  if (!is.null(counts)) {
+    counts.mat <- .np_inid_counts_matrix(n = n, B = B, counts = counts)
+    levels <- evaluator(cbind(ones, counts.mat))
+    if (!is.matrix(levels) ||
+        !identical(dim(levels), c(B + 1L, neval)))
+      stop("conditional count-bootstrap evaluator returned unexpected output shape",
+           call. = FALSE)
+    return(list(
+      t = levels[-1L, , drop = FALSE],
+      t0 = as.numeric(levels[1L, ])
+    ))
+  }
+
+  center <- evaluator(ones)
+  if (!is.matrix(center) || !identical(dim(center), c(1L, neval)))
+    stop("conditional count-bootstrap center returned unexpected output shape",
+         call. = FALSE)
+  t0 <- as.numeric(center[1L, ])
+  chunk.size <- .np_inid_chunk_size(
+    n = n, B = B, progress_cap = !is.null(counts.drawer)
+  )
+  tmat <- matrix(NA_real_, nrow = B, ncol = neval)
+  progress.label <- if (is.null(progress.label)) {
+    if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+  } else {
+    progress.label
+  }
+  progress <- .np_plot_bootstrap_progress_begin(total = B, label = progress.label)
+  on.exit(.np_plot_progress_end(progress), add = TRUE)
+  chunk.controller <- .np_plot_progress_chunk_controller(
+    chunk.size = chunk.size, progress = progress
+  )
+
+  start <- 1L
+  while (start <= B) {
+    stopi <- min(B, start + chunk.controller$chunk.size - 1L)
+    bsz <- stopi - start + 1L
+    chunk.started <- .np_progress_now()
+    counts.chunk <- if (!is.null(counts.drawer)) {
+      .np_inid_counts_matrix(
+        n = n, B = bsz, counts = counts.drawer(start, stopi)
+      )
+    } else {
+      stats::rmultinom(n = bsz, size = n, prob = rep.int(1 / n, n))
+    }
+    levels <- evaluator(counts.chunk)
+    if (!is.matrix(levels) || !identical(dim(levels), c(bsz, neval)))
+      stop("conditional count-bootstrap evaluator returned unexpected output shape",
+           call. = FALSE)
+    tmat[start:stopi, ] <- levels
+    progress <- .np_plot_progress_tick(state = progress, done = stopi)
+    chunk.controller <- .np_plot_progress_chunk_observe(
+      controller = chunk.controller,
+      bsz = bsz,
+      elapsed.sec = .np_progress_now() - chunk.started
+    )
+    start <- stopi + 1L
+  }
+
+  list(t = tmat, t0 = t0)
+}
+
+.np_inid_boot_from_beta_conditional_counts <- function(xdat,
+                                                        ydat,
+                                                        exdat,
+                                                        eydat,
+                                                        bws,
+                                                        B,
+                                                        cdf,
+                                                        counts = NULL,
+                                                        counts.drawer = NULL,
+                                                        progress.label = NULL) {
+  xdat <- toFrame(xdat)
+  ydat <- toFrame(ydat)
+  exdat <- toFrame(exdat)
+  eydat <- toFrame(eydat)
+  evaluator <- function(counts.mat) {
+    .np_beta_conditional_bootstrap_levels(
+      xdat = xdat, ydat = ydat, exdat = exdat, eydat = eydat,
+      bws = bws, cdf = cdf, counts = counts.mat
+    )
+  }
+
+  .np_inid_boot_from_conditional_count_evaluator(
+    n = nrow(xdat),
+    neval = nrow(exdat),
+    B = B,
+    evaluator = evaluator,
+    counts = counts,
+    counts.drawer = counts.drawer,
+    progress.label = progress.label
+  )
+}
+
+.np_conditional_side_operators <- function(xdat,
+                                           ydat,
+                                           exdat,
+                                           eydat,
+                                           bws,
+                                           cdf) {
+  xkbw <- .npcdhat_make_xkbw(bws = bws, txdat = xdat)
+  ykbw <- .npcdhat_make_ybw(bws = bws, tydat = ydat)
+  Kx <- .npcdhat_make_kernel_matrix(
+    kbw = xkbw, txdat = xdat, exdat = exdat,
+    operator = rep.int("normal", ncol(xdat))
+  )
+  Ky <- .npcdhat_make_kernel_matrix(
+    kbw = ykbw, txdat = ydat, exdat = eydat,
+    operator = rep.int(if (cdf) "integral" else "normal", ncol(ydat))
+  )
+  list(den = Kx, num = Kx * Ky)
+}
+
+.np_inid_boot_from_side_conditional_counts <- function(xdat,
+                                                        ydat,
+                                                        exdat,
+                                                        eydat,
+                                                        bws,
+                                                        B,
+                                                        cdf,
+                                                        counts = NULL,
+                                                        counts.drawer = NULL,
+                                                        progress.label = NULL) {
+  xdat <- toFrame(xdat)
+  ydat <- toFrame(ydat)
+  exdat <- toFrame(exdat)
+  eydat <- toFrame(eydat)
+  ops <- .np_conditional_side_operators(
+    xdat = xdat, ydat = ydat, exdat = exdat, eydat = eydat,
+    bws = bws, cdf = cdf
+  )
+  evaluator <- function(counts.mat) {
+    den <- t(ops$den %*% counts.mat)
+    num <- t(ops$num %*% counts.mat)
+    num / NZD(den)
+  }
+
+  .np_inid_boot_from_conditional_count_evaluator(
+    n = nrow(xdat),
+    neval = nrow(exdat),
+    B = B,
+    evaluator = evaluator,
+    counts = counts,
+    counts.drawer = counts.drawer,
+    progress.label = progress.label
+  )
+}
+
 .np_inid_boot_from_ksum_conditional_exact <- function(xdat,
                                                       ydat,
                                                       exdat,
@@ -5960,10 +6201,59 @@
     stop("conditional exact bootstrap helper requires aligned x/y training and evaluation rows")
   if (n < 1L || nrow(exdat) < 1L || B < 1L)
     stop("invalid conditional exact bootstrap dimensions")
-  if (!.np_con_inid_ksum_eligible(bws))
+  joint.eligible <- .np_con_inid_ksum_eligible(bws)
+  any.beta <- .np_con_has_beta_kernel(bws)
+  mixed.continuous <- .np_con_continuous_lc_level_eligible(bws)
+  if (!joint.eligible && !mixed.continuous)
     return(NULL)
 
   fit_one <- function(x.train, y.train) {
+    if (any.beta) {
+      fit.expr <- function() {
+        as.numeric(.np_beta_conditional_bootstrap_levels(
+          xdat = x.train,
+          ydat = y.train,
+          exdat = exdat,
+          eydat = eydat,
+          bws = bws,
+          cdf = cdf,
+          counts = matrix(1, nrow = nrow(x.train), ncol = 1L)
+        )[1L, ])
+      }
+      if (identical(bws$type, "adaptive_nn")) {
+        return(.np_conditional_exact_fit_or_stop(
+          fit.expr = fit.expr,
+          bws = bws,
+          x.train = x.train,
+          y.train = y.train
+        ))
+      }
+      return(fit.expr())
+    }
+
+    if (!joint.eligible) {
+      fit.expr <- function() {
+        ops <- .np_conditional_side_operators(
+          xdat = x.train,
+          ydat = y.train,
+          exdat = exdat,
+          eydat = eydat,
+          bws = bws,
+          cdf = cdf
+        )
+        rowSums(ops$num) / NZD(rowSums(ops$den))
+      }
+      if (identical(bws$type, "adaptive_nn")) {
+        return(.np_conditional_exact_fit_or_stop(
+          fit.expr = fit.expr,
+          bws = bws,
+          x.train = x.train,
+          y.train = y.train
+        ))
+      }
+      return(fit.expr())
+    }
+
     kbx <- tryCatch(.np_con_make_kbandwidth_x(bws = bws, xdat = x.train),
                     error = function(e) NULL)
     kbxy <- tryCatch(.np_con_make_kbandwidth_xy(bws = bws, xdat = x.train, ydat = y.train),
@@ -6097,6 +6387,35 @@
     stop("conditional inid helper path requires aligned x/y training and evaluation rows")
   if (n < 1L || neval < 1L || B < 1L)
     stop("invalid conditional inid bootstrap dimensions")
+  if (.np_con_has_beta_kernel(bws)) {
+    return(.np_inid_boot_from_beta_conditional_counts(
+      xdat = xdat,
+      ydat = ydat,
+      exdat = exdat,
+      eydat = eydat,
+      bws = bws,
+      B = B,
+      cdf = cdf,
+      counts = counts,
+      counts.drawer = counts.drawer,
+      progress.label = progress.label
+    ))
+  }
+  if (!.np_con_inid_ksum_eligible(bws) &&
+      .np_con_continuous_lc_level_eligible(bws)) {
+    return(.np_inid_boot_from_side_conditional_counts(
+      xdat = xdat,
+      ydat = ydat,
+      exdat = exdat,
+      eydat = eydat,
+      bws = bws,
+      B = B,
+      cdf = cdf,
+      counts = counts,
+      counts.drawer = counts.drawer,
+      progress.label = progress.label
+    ))
+  }
   if (!.np_con_inid_ksum_eligible(bws))
     return(NULL)
 
@@ -6182,6 +6501,36 @@
     stop("conditional frozen bootstrap helper requires aligned x/y training and evaluation rows")
   if (n < 1L || neval < 1L || B < 1L)
     stop("invalid conditional frozen bootstrap dimensions")
+
+  if (.np_con_has_beta_kernel(bws)) {
+    return(.np_inid_boot_from_beta_conditional_counts(
+      xdat = xdat,
+      ydat = ydat,
+      exdat = exdat,
+      eydat = eydat,
+      bws = bws,
+      B = B,
+      cdf = cdf,
+      counts = counts,
+      counts.drawer = counts.drawer,
+      progress.label = progress.label
+    ))
+  }
+  if (!.np_con_inid_ksum_eligible(bws) &&
+      .np_con_continuous_lc_level_eligible(bws)) {
+    return(.np_inid_boot_from_side_conditional_counts(
+      xdat = xdat,
+      ydat = ydat,
+      exdat = exdat,
+      eydat = eydat,
+      bws = bws,
+      B = B,
+      cdf = cdf,
+      counts = counts,
+      counts.drawer = counts.drawer,
+      progress.label = progress.label
+    ))
+  }
 
   operator <- if (isTRUE(cdf)) "integral" else "normal"
   xkbw <- .npcdhat_make_xkbw(bws = bws, txdat = xdat)
@@ -12563,11 +12912,11 @@ compute.bootstrap.errors.conbandwidth =
     fast.inid <- isTRUE(is.inid) &&
       isTRUE(!quantreg) &&
       isTRUE(!gradients) &&
-      isTRUE(frozen.nonfixed.ok || .np_con_inid_ksum_eligible(bws))
+      isTRUE(frozen.nonfixed.ok || .np_con_level_bootstrap_eligible(bws))
     fast.block <- isTRUE(is.block) &&
       isTRUE(!quantreg) &&
       isTRUE(!gradients) &&
-      isTRUE(frozen.nonfixed.ok || .np_con_inid_ksum_eligible(bws))
+      isTRUE(frozen.nonfixed.ok || .np_con_level_bootstrap_eligible(bws))
     quantile.level.local.ok <- isTRUE(quantreg) && isTRUE(!gradients)
     gradient.local.ok <- isTRUE(!quantreg) && isTRUE(gradients)
     quantile.gradient.local.ok <- isTRUE(quantreg) && isTRUE(gradients)
