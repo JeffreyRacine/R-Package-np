@@ -376,71 +376,46 @@ Further arguments are passed to \code{\link{npreg}} and \code{\link{npksum}}.
 
 set.seed(42)
 n <- 500
-
-## For trimming the plot (trim .5\% from each tail)
-
 trim <- 0.005
 
-## The DGP is as follows:
+## Endogenous-regressor DGP:
+##
+## y = phi(z) + u
+## E(u | z) != 0
+## z = 0.2 w + v
+## E(u | w) = 0
 
-## 1) y = phi(z) + u
+v <- rnorm(n, mean = 0, sd = 0.27)
+eps <- rnorm(n, mean = 0, sd = 0.05)
+u <- -0.5 * v + eps
+w <- rnorm(n)
 
-## 2) E(u|z) != 0 (endogeneity present)
+phi <- function(z) z^2
+phi.prime <- function(z) 2 * z
 
-## 3) Suppose there exists an instrument w such that z = f(w) + v and
-## E(u|w) = 0
+z <- 0.2 * w + v
+y <- phi(z) + u
 
-## 4) We generate v, w, and generate u such that u and z are
-## correlated. To achieve this we express u as a function of v (i.e. u =
-## gamma v + eps)
+ivdata <- data.frame(y, z, w)
+ivdata <- ivdata[order(ivdata$z), ]
 
-v <- rnorm(n,mean=0,sd=0.27)
-eps <- rnorm(n,mean=0,sd=0.05)
-u <- -0.5*v + eps
-w <- rnorm(n,mean=0,sd=1)
+model.ivderiv <- npregivderiv(y ~ z | w, data = ivdata)
+deriv.iv <- gradients(model.ivderiv)
 
-## In Darolles et al (2011) there exist two DGPs. The first is
-## phi(z)=z^2 and the second is phi(z)=exp(-abs(z)) (which is
-## discontinuous and has a kink at zero).
+## Restrict the display to the central 99 percent of the z observations.
 
-fun1 <- function(z) { z^2 }
-fun2 <- function(z) { exp(-abs(z)) }
+zlim <- quantile(ivdata$z, c(trim, 1 - trim))
+keep <- ivdata$z >= zlim[1L] & ivdata$z <= zlim[2L]
 
-z <- 0.2*w + v
+plot(ivdata$z[keep], deriv.iv[keep],
+     main = "",
+     xlab = "Z",
+     ylab = "Derivative",
+     type = "l",
+     lwd = 2)
 
-## Generate two y vectors for each function.
-
-y1 <- fun1(z) + u
-y2 <- fun2(z) + u
-
-## You set y to be either y1 or y2 (ditto for phi) depending on which
-## DGP you are considering:
-
-y <- y1
-phi <- fun1
-
-## Sort on z (for plotting)
-
-ivdata <- data.frame(y,z,w,u,v)
-ivdata <- ivdata[order(ivdata$z),]
-rm(y,z,w,u,v)
-with(ivdata, {
-
-model.ivderiv <- npregivderiv(y ~ z | w, data=ivdata)
-
-ylim <-c(quantile(model.ivderiv$phi.prime,trim),
-         quantile(model.ivderiv$phi.prime,1-trim))
-
-plot(z,model.ivderiv$phi.prime,
-     xlim=quantile(z,c(trim,1-trim)),
-     main="",
-     ylim=ylim,
-     xlab="Z",
-     ylab="Derivative",
-     type="l",
-     lwd=2)
-rug(z)     
-})
+curve(phi.prime(x), add = TRUE, col = 2, lty = 2, lwd = 2)
+rug(ivdata$z[keep])
 } % enddontrun
 }
 \keyword{ instrument }
