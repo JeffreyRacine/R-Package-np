@@ -647,91 +647,24 @@ summary.npregivderiv <- function(object, ...) {
 }
 
 plot.npregivderiv <- function(x,
-                              plot.data = FALSE,
-                              phi = FALSE,
+                              gradients = TRUE,
+                              data_overlay = TRUE,
+                              data_rug = FALSE,
                               ...) {
-
-  object <- x
+  matched.call <- match.call(expand.dots = FALSE)
   .np_plot_validate_npregiv_call(
     sys.call(),
-    method_args = c("plot.data", "phi"),
-    context = "plot.npregivderiv"
+    method_args = c("gradients", "data_overlay", "data_rug"),
+    context = "plot.npregivderiv",
+    dots_call = matched.call[["..."]]
   )
-  dots <- list(...)
-  take_arg <- function(name, default = NULL) {
-    if (!is.null(dots[[name]])) {
-      val <- dots[[name]]
-      dots[[name]] <<- NULL
-      return(val)
-    }
-    default
-  }
-
-  ## We only support univariate endogenous predictor z
-  if(NCOL(object$z) > 1) stop(" only univariate z is supported")
-
-  y <- object$y
-  zname <- names(object$z)[1]
-  yname <- "y"
-
-  if(phi) {
-    ## Plot the structural function phi
-    z <- object$z[,1]
-    fit <- object$phi
-    ylab <- yname
-  } else {
-    ## Plot the derivative phi.prime (default for npregivderiv)
-    z.eval <- if (is.null(object$phi.prime.eval)) object$z else object$zeval
-    z <- z.eval[,1]
-    fit <- if (is.null(object$phi.prime.eval)) {
-      object$phi.prime
-    } else {
-      object$phi.prime.eval
-    }
-    ylab <- paste("d", yname, "/d", zname, sep="")
-  }
-
-  if(plot.data && !phi) {
-      ## Scatter data doesn't make sense for derivative plots directly
-      plot.data <- FALSE
-  }
-
-  if(plot.data) {
-    plot.type <- take_arg("type", "p")
-    plot.xlab <- take_arg("xlab", zname)
-    plot.ylab <- take_arg("ylab", yname)
-    user.col <- take_arg("col", NULL)
-    line.lwd <- take_arg("lwd", 2)
-    plot.args <- c(list(x = z,
-                        y = y,
-                        xlab = plot.xlab,
-                        ylab = plot.ylab,
-                        type = plot.type,
-                        col = if (is.null(user.col)) "lightgrey" else user.col),
-                   dots)
-    do.call(plot, plot.args)
-    line.args <- list(x = z[order(z)],
-                      y = fit[order(z)],
-                      lwd = line.lwd)
-    if (!is.null(user.col)) {
-      line.args$col <- user.col
-    }
-    do.call(lines, c(line.args, .np_iv_plot_line_dots(dots)))
-  } else {
-    plot.type <- take_arg("type", "l")
-    plot.xlab <- take_arg("xlab", zname)
-    plot.ylab <- take_arg("ylab", ylab)
-    user.col <- take_arg("col", NULL)
-    line.lwd <- take_arg("lwd", 2)
-    plot.args <- list(x = z[order(z)],
-                      y = fit[order(z)],
-                      type = plot.type,
-                      xlab = plot.xlab,
-                      ylab = plot.ylab,
-                      lwd = line.lwd)
-    if (!is.null(user.col)) {
-      plot.args$col <- user.col
-    }
-    do.call(plot, c(plot.args, dots))
-  }
+  spec <- .np_iv_plot_spec(
+    object = x,
+    family = "npregivderiv",
+    gradients = gradients,
+    data_overlay = data_overlay,
+    data_rug = data_rug,
+    dots = list(...)
+  )
+  .np_iv_plot_render(spec)
 }

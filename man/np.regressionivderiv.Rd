@@ -57,7 +57,8 @@ npregivderiv(y, \dots)
              xeval = NULL,
              ...)
 
-\method{plot}{npregivderiv}(x, plot.data = FALSE, phi = FALSE, ...)
+\method{plot}{npregivderiv}(x, gradients = TRUE,
+             data_overlay = TRUE, data_rug = FALSE, ...)
 }
 \arguments{
 \subsection{Data, Bandwidth Inputs And Formula Interface}{
@@ -129,15 +130,25 @@ These arguments identify the response, endogenous variables, instruments, exogen
     By default no separate evaluation surface is stored.
   }
 
-  \item{plot.data}{
-    logical; when \code{phi=TRUE}, add the selected training structural curve
-    to a plot of the training response. It is ignored for derivative plots.
+  \item{gradients}{
+    logical; display the structural derivative when \code{TRUE}, the default,
+    or the reconstructed training structural function when \code{FALSE}.
+    Derivative displays use \code{zeval} and \code{phi.prime.eval} when a
+    separate evaluation grid was supplied.
   }
 
-  \item{phi}{
-    logical; plot the reconstructed training structural function instead of
-    the structural derivative. Derivative plots use \code{zeval} and
-    \code{phi.prime.eval} when a separate evaluation grid was supplied.
+  \item{data_overlay}{
+    logical; overlay the training response on a structural-function display.
+    The default is \code{TRUE}, as for \code{plot.npregression}. It is ignored
+    when \code{gradients=TRUE} because response values and derivatives do not
+    share a common vertical scale. When limits are not supplied, the structural
+    curve and response are both included in the displayed range.
+  }
+
+  \item{data_rug}{
+    logical; add a rug showing the training \code{z} support. The default is
+    \code{FALSE}, and it applies to both derivative and structural-function
+    displays.
   }
 
 \subsection{Iteration Controls}{
@@ -251,8 +262,9 @@ Further arguments are passed to \code{\link{npreg}} and \code{\link{npksum}}.
     \code{okertype} in \code{...} control applicable internal regressions,
     while the private adjoint retains its required
     \code{ukertype = "liracine"} and \code{okertype = "liracine"}. For the
-    plot method, graphical arguments are passed to \code{plot} and
-    \code{lines} as applicable.
+    plot method, graphical arguments control the fitted curve and base-graphics
+    frame as applicable. Explicit \code{xlim} and \code{ylim} are honored;
+    automatic limits include every active curve, overlay, and rug layer.
   }
 
 }
@@ -342,6 +354,12 @@ Further arguments are passed to \code{\link{npreg}} and \code{\link{npksum}}.
     policy using the same \code{Kernel Regression Estimator:} labels as
     \code{npreg}: \code{Local-Constant}, \code{Local-Linear}, or, for
     \code{regtype="lp"}, the local-polynomial degree and basis details.
+
+    The plot method displays the derivative by default, preserving the
+    estimator family's primary target. Set \code{gradients=FALSE} to display
+    the reconstructed training structural function. The training response is
+    overlaid only on that level display; \code{data_rug=TRUE} adds the training
+    support without replacing an available derivative evaluation curve.
 
   \code{npregivderiv} returns a list with components \code{phi.prime},
   \code{phi}, \code{phi.prime.mat}, \code{phi.mat}, and, when a separate

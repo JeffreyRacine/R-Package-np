@@ -80,7 +80,8 @@ npregiv(y, \dots)
         xeval = NULL,
         \dots)
 
-\method{plot}{npregiv}(x, plot.data = FALSE, deriv = FALSE, \dots)
+\method{plot}{npregiv}(x, gradients = FALSE,
+        data_overlay = TRUE, data_rug = FALSE, \dots)
 }
 \arguments{
 \subsection{Data, Bandwidth Inputs And Formula Interface}{
@@ -146,16 +147,24 @@ These arguments identify the response, endogenous variables, instruments, exogen
     takes place on the data provided by \code{z}.
   }
 
-  \item{plot.data}{
-    logical; plot the training response and selected training structural
-    function. This overrides a fit-time evaluation grid for the displayed
-    structural level.
+  \item{gradients}{
+    logical; display the stored first partial derivative instead of the
+    structural function. The current plot method supports one endogenous
+    coordinate. The default is \code{FALSE}.
   }
 
-  \item{deriv}{
-    logical; plot the stored first partial derivative instead of the
-    structural function. The current plot method supports one endogenous
-    coordinate.
+  \item{data_overlay}{
+    logical; overlay the training response on a structural-function display.
+    The default is \code{TRUE}, as for \code{plot.npregression}. It is ignored
+    for derivative displays because response values and derivatives do not
+    share a common vertical scale. When limits are not supplied, the structural
+    curve and response are both included in the displayed range.
+  }
+
+  \item{data_rug}{
+    logical; add a rug showing the training \code{z} support. The default is
+    \code{FALSE}. A rug may accompany either structural-function or derivative
+    displays; categorical endogenous coordinates omit the numerical rug.
   }
 
 \subsection{Landweber-Fridman Iteration Controls}{
@@ -398,8 +407,9 @@ Further arguments are passed to lower-level kernel-sum and estimation routines.
     ordinary lower-level meanings and are owned once per call, avoiding
     duplicate-argument collisions. Categorical bandwidth searches use the
     valid upper bound for the selected categorical kernel. For the plot
-    method, graphical arguments are passed to \code{plot} and \code{lines} as
-    applicable.
+    method, graphical arguments control the fitted curve and base-graphics
+    frame as applicable. Explicit \code{xlim} and \code{ylim} are honored;
+    automatic limits include every active curve, overlay, and rug layer.
   }
 
 }
@@ -559,6 +569,12 @@ Further arguments are passed to lower-level kernel-sum and estimation routines.
     \code{Local-Constant}, \code{Local-Linear}, or, for
     \code{regtype="lp"}, the local-polynomial degree and basis details. The
     retained legacy \code{p} field is not printed separately.
+
+    The plot method displays the structural level by default, uses a separate
+    fit-time evaluation grid when \code{phi.eval} is available, and overlays
+    the training response by default without replacing that evaluation curve.
+    Set \code{gradients=TRUE} for the first derivative and
+    \code{data_rug=TRUE} for the training-support rug.
 
   \code{npregiv} returns a list with components \code{phi},
   \code{phi.mat} and either \code{alpha} when \code{method="Tikhonov"}
