@@ -18434,6 +18434,36 @@ double *cv){
 
 // estimation functions
 
+static void np_lp_power2_moments_from_kernel_row(double **basis,
+                                                  const int nterms,
+                                                  double *kernel_row,
+                                                  const int num_obs_train,
+                                                  const double bandwidth_product,
+                                                  double *moments)
+{
+  memset(moments, 0,
+         (size_t)nterms*(size_t)nterms*sizeof(double));
+  np_outer_weighted_sum(basis,
+                        NULL,
+                        nterms,
+                        basis,
+                        nterms,
+                        kernel_row,
+                        num_obs_train,
+                        0,
+                        0,
+                        2,
+                        0,
+                        0,
+                        0,
+                        0,
+                        1,
+                        bandwidth_product,
+                        moments,
+                        NULL,
+                        NULL);
+}
+
 int kernel_estimate_regression_categorical_tree_np(
 int int_ll,
 int KERNEL_reg,
@@ -19368,7 +19398,7 @@ double *SIGN){
     double **matrix_bandwidth_eval = NULL;
     double **TCON = NULL, **TUNO = NULL, **TORD = NULL;
     double **Ycols = NULL, **Wcols = NULL;
-    double *y2 = NULL, *out = NULL, *out2 = NULL;
+    double *y2 = NULL, *out = NULL, *out2 = NULL, *fit_kw = NULL;
     double *xj = NULL;
     NPGLPBasisCtx *basis_ctx = NULL;
     double *eval_basis = NULL, *eval_deriv = NULL;
@@ -19376,6 +19406,13 @@ double *SIGN){
     const double epsilon = 1.0/(double)MAX(1, num_obs_train);
     int raw_degree1_glp = (!use_bernstein) && (int_glp_basis_extern == 1);
     int use_ll_compatible_gnn_se = 0;
+    const int reuse_fit_kernel_row =
+      (BANDWIDTH_reg == BW_FIXED) &&
+      (int_TREE_X != NP_TREE_TRUE) &&
+      (num_reg_unordered == 0) &&
+      (num_reg_ordered == 0) &&
+      (!use_bernstein) &&
+      (!int_cker_bound_extern);
 
     if((vector_glp_degree_extern == NULL) || (num_reg_continuous <= 0))
       error("glp degree vector unavailable");
@@ -19410,6 +19447,8 @@ double *SIGN){
     out2 = (double *)malloc((size_t)glp_nterms*(size_t)glp_nterms*sizeof(double));
     if(!use_bernstein)
       xj = (double *)malloc((size_t)num_reg_continuous*sizeof(double));
+    if(reuse_fit_kernel_row)
+      fit_kw = (double *)malloc((size_t)num_obs_train*sizeof(double));
     tmp_v = (double *)malloc((size_t)glp_nterms*sizeof(double));
     tmp_w = (double *)malloc((size_t)glp_nterms*sizeof(double));
     eval_basis = (double *)malloc((size_t)glp_nterms*sizeof(double));
@@ -19427,6 +19466,7 @@ double *SIGN){
       (Ycols != NULL) && (Wcols != NULL) && (y2 != NULL) && (out != NULL) &&
       (out2 != NULL) && (tmp_v != NULL) && (tmp_w != NULL) &&
       (use_bernstein || (xj != NULL)) &&
+      ((!reuse_fit_kernel_row) || (fit_kw != NULL)) &&
       (eval_basis != NULL) && (eval_deriv != NULL) &&
       (!use_bernstein || (basis_ctx != NULL))))
       error("memory allocation failed in glp path");
@@ -19852,7 +19892,7 @@ double *SIGN){
                              NULL,
                              out,
                              NULL,
-                             NULL,
+                             reuse_fit_kernel_row ? fit_kw : NULL,
                              est_gate_ctx_ptr);
 
       for(i = 0; i < glp_nterms; i++){
@@ -19904,6 +19944,14 @@ double *SIGN){
           Wcols[l] = basis[l];
         }
 
+        if(reuse_fit_kernel_row)
+          np_lp_power2_moments_from_kernel_row(basis,
+                                                glp_nterms,
+                                                fit_kw,
+                                                num_obs_train,
+                                                hprod,
+                                                out2);
+        else
         kernel_weighted_sum_np_ctx(kernel_c,
                              kernel_u,
                              kernel_o,
@@ -20069,6 +20117,7 @@ double *SIGN){
     free(out);
     free(out2);
     if(xj != NULL) free(xj);
+    if(fit_kw != NULL) free(fit_kw);
     free(tmp_v);
     free(tmp_w);
     if(use_bernstein){
