@@ -1,5 +1,16 @@
 # np 0.70-6
 
+* Aligned the dedicated `plot()` methods for `npregiv` and
+  `npregivderiv` with the package-wide regression plotting vocabulary. They
+  now use `gradients`, `data_overlay`, and `data_rug`; `npregiv` defaults to
+  its structural level with the training response overlaid, while
+  `npregivderiv` continues to default to its derivative. Automatic limits
+  include every active curve, response overlay, and training-support rug,
+  without replacing available fit-time evaluation curves. The experimental
+  plot-only controls `plot.data`, `deriv`, and `phi` have been removed and now
+  fail with migration guidance. Estimator objects and numerical results are
+  unchanged.
+
 * Conditional density and distribution level plots now support bootstrap
   intervals when the continuous X and Y sides use different kernel families
   or orders, including beta on either side. Beta-containing bootstrap levels

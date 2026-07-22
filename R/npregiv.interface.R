@@ -711,11 +711,269 @@ npregivderiv.formula <- function(y, data = NULL, subset, na.action,
   if (is.null(omit)) value else napredict(omit, value)
 }
 
-.np_iv_plot_line_dots <- function(dots) {
+.np_iv_plot_column <- function(value, field) {
+  if (is.null(value))
+    stop(sprintf("the stored plot field '%s' is missing", field), call. = FALSE)
+
+  if (is.data.frame(value)) {
+    if (ncol(value) != 1L)
+      stop(sprintf("the stored plot field '%s' must have one column", field),
+           call. = FALSE)
+    return(value[[1L]])
+  }
+
+  dims <- dim(value)
+  if (!is.null(dims)) {
+    if (length(dims) != 2L || dims[[2L]] != 1L)
+      stop(sprintf("the stored plot field '%s' must have one column", field),
+           call. = FALSE)
+    return(value[, 1L])
+  }
+
+  as.vector(value)
+}
+
+.np_iv_plot_curve <- function(object,
+                              training.field,
+                              evaluation.field = NULL,
+                              first.column = FALSE) {
+  evaluation <- if (is.null(evaluation.field)) NULL else
+    object[[evaluation.field]]
+
+  if (!is.null(evaluation)) {
+    if (is.null(object[["zeval"]]))
+      stop(sprintf("'%s' is present but its evaluation coordinate 'zeval' is missing",
+                   evaluation.field),
+           call. = FALSE)
+    x <- .np_iv_plot_column(object[["zeval"]], "zeval")
+    y <- if (isTRUE(first.column)) {
+      .np_iv_plot_column(evaluation, evaluation.field)
+    } else {
+      as.vector(evaluation)
+    }
+  } else {
+    x <- .np_iv_plot_column(object[["z"]], "z")
+    training <- object[[training.field]]
+    y <- if (isTRUE(first.column)) {
+      .np_iv_plot_column(training, training.field)
+    } else {
+      as.vector(training)
+    }
+  }
+
+  if (length(x) != length(y))
+    stop(sprintf("stored plot coordinates and '%s' have different lengths",
+                 if (is.null(evaluation)) training.field else evaluation.field),
+         call. = FALSE)
+
+  list(x = x, y = y, evaluated = !is.null(evaluation))
+}
+
+.np_iv_plot_auto_range <- function(values, axis, logged = FALSE) {
+  values <- suppressWarnings(as.double(values))
+  keep <- is.finite(values)
+  if (isTRUE(logged))
+    keep <- keep & values > 0
+  if (!any(keep)) {
+    qualifier <- if (isTRUE(logged)) "finite positive" else "finite"
+    stop(sprintf("no %s values are available for the automatic %s-axis limits",
+                 qualifier, axis),
+         call. = FALSE)
+  }
+  range(values[keep])
+}
+
+.np_iv_plot_spec <- function(object,
+                             family = c("npregiv", "npregivderiv"),
+                             gradients,
+                             data_overlay,
+                             data_rug,
+                             dots) {
+  family <- match.arg(family)
+  gradients <- npValidateScalarLogical(gradients, "gradients")
+  data_overlay <- npValidateScalarLogical(data_overlay, "data_overlay")
+  data_rug <- npValidateScalarLogical(data_rug, "data_rug")
+
+  z <- object[["z"]]
+  if (is.null(z) || NCOL(z) != 1L)
+    stop("only univariate z is supported", call. = FALSE)
+  training.x <- .np_iv_plot_column(z, "z")
+  zname <- names(z)[[1L]]
+  if (is.null(zname) || is.na(zname) || !nzchar(zname))
+    zname <- "z"
+
+  if (identical(family, "npregiv")) {
+    curve <- if (isTRUE(gradients)) {
+      .np_iv_plot_curve(object,
+                        training.field = "phi.deriv.1",
+                        evaluation.field = "phi.deriv.eval.1",
+                        first.column = TRUE)
+    } else {
+      .np_iv_plot_curve(object,
+                        training.field = "phi",
+                        evaluation.field = "phi.eval")
+    }
+  } else {
+    curve <- if (isTRUE(gradients)) {
+      .np_iv_plot_curve(object,
+                        training.field = "phi.prime",
+                        evaluation.field = "phi.prime.eval")
+    } else {
+      .np_iv_plot_curve(object, training.field = "phi")
+    }
+  }
+
   dot.names <- names(dots)
-  if (is.null(dot.names)) return(list())
-  allowed <- c("col", "lty", "lwd", "pch", "type", "cex", "bg")
-  dots[nzchar(dot.names) & dot.names %in% allowed]
+  take <- function(name, default = NULL) {
+    index <- which(dot.names == name)
+    if (!length(index))
+      return(default)
+    value <- dots[[index[[1L]]]]
+    dots <<- dots[-index[[1L]]]
+    dot.names <<- dot.names[-index[[1L]]]
+    value
+  }
+
+  plot.type <- take("type", "l")
+  plot.xlab <- take("xlab", zname)
+  plot.ylab <- take(
+    "ylab",
+    if (isTRUE(gradients)) {
+      .np_plot_gradient_axis_label(target = "y", predictor = zname)
+    } else {
+      "y"
+    }
+  )
+  user.xlim <- take("xlim", NULL)
+  user.ylim <- take("ylim", NULL)
+  user.col <- take("col", NULL)
+  user.lty <- take("lty", NULL)
+  user.lwd <- take("lwd", 2)
+  user.pch <- take("pch", NULL)
+  user.cex <- take("cex", NULL)
+  user.bg <- take("bg", NULL)
+
+  overlay <- isTRUE(data_overlay) && !isTRUE(gradients)
+  continuous <- is.numeric(curve$x) && is.numeric(training.x) &&
+    !is.factor(curve$x) && !is.ordered(curve$x) &&
+    !is.factor(training.x) && !is.ordered(training.x)
+  rug <- isTRUE(data_rug) && isTRUE(continuous)
+
+  training.y <- NULL
+  if (isTRUE(overlay)) {
+    training.y <- as.vector(object[["y"]])
+    if (length(training.x) != length(training.y))
+      stop("stored training coordinates and responses have different lengths",
+           call. = FALSE)
+  }
+
+  log.value <- dots[["log"]]
+  valid.log <- is.character(log.value) && length(log.value) == 1L &&
+    !is.na(log.value)
+  log.x <- valid.log && grepl("x", log.value, fixed = TRUE)
+  log.y <- valid.log && grepl("y", log.value, fixed = TRUE)
+
+  resolved.xlim <- user.xlim
+  if (is.null(resolved.xlim) && isTRUE(continuous)) {
+    x.values <- curve$x
+    if (isTRUE(overlay) || isTRUE(rug))
+      x.values <- c(x.values, training.x)
+    resolved.xlim <- .np_iv_plot_auto_range(x.values, "x", logged = log.x)
+  }
+
+  resolved.ylim <- user.ylim
+  if (is.null(resolved.ylim)) {
+    y.values <- curve$y
+    if (isTRUE(overlay))
+      y.values <- c(y.values, training.y)
+    resolved.ylim <- .np_iv_plot_auto_range(y.values, "y", logged = log.y)
+  }
+
+  curve.order <- order(curve$x, na.last = TRUE)
+  curve.args <- list(
+    x = curve$x[curve.order],
+    y = curve$y[curve.order],
+    type = plot.type,
+    xlab = plot.xlab,
+    ylab = plot.ylab,
+    lwd = user.lwd
+  )
+  if (!is.null(resolved.xlim)) curve.args[["xlim"]] <- resolved.xlim
+  if (!is.null(resolved.ylim)) curve.args[["ylim"]] <- resolved.ylim
+  if (!is.null(user.col)) curve.args[["col"]] <- user.col
+  if (!is.null(user.lty)) curve.args[["lty"]] <- user.lty
+  if (!isTRUE(overlay)) {
+    if (!is.null(user.pch)) curve.args[["pch"]] <- user.pch
+    if (!is.null(user.cex)) curve.args[["cex"]] <- user.cex
+    if (!is.null(user.bg)) curve.args[["bg"]] <- user.bg
+  }
+
+  overlay.args <- list()
+  if (!is.null(user.col)) overlay.args[["col"]] <- user.col
+  if (!is.null(user.pch)) overlay.args[["pch"]] <- user.pch
+  if (!is.null(user.cex)) overlay.args[["cex"]] <- user.cex
+  if (!is.null(user.bg)) overlay.args[["bg"]] <- user.bg
+
+  list(
+    family = family,
+    gradients = gradients,
+    evaluated = curve$evaluated,
+    continuous = continuous,
+    overlay = overlay,
+    rug = rug,
+    curve.args = curve.args,
+    frame.args = dots,
+    overlay.x = training.x,
+    overlay.y = training.y,
+    overlay.args = overlay.args,
+    rug.x = training.x
+  )
+}
+
+.np_iv_plot_render <- function(spec) {
+  curve.args <- spec[["curve.args"]]
+  frame.args <- spec[["frame.args"]]
+
+  if (isTRUE(spec[["overlay"]])) {
+    if (isTRUE(spec[["continuous"]])) {
+      initial.args <- curve.args
+      initial.args[["type"]] <- "n"
+      initial.args[["col"]] <- NULL
+      initial.args[["lty"]] <- NULL
+      initial.args[["lwd"]] <- NULL
+      do.call(plot, c(initial.args, frame.args))
+      do.call(
+        .np_plot_overlay_points_1d,
+        c(list(x = spec[["overlay.x"]], y = spec[["overlay.y"]]),
+          spec[["overlay.args"]])
+      )
+      line.args <- curve.args[c("x", "y", "type", "col", "lty", "lwd")]
+      line.args <- line.args[!vapply(line.args, is.null, logical(1L))]
+      do.call(lines, line.args)
+    } else {
+      initial.args <- list(
+        x = spec[["overlay.x"]],
+        y = spec[["overlay.y"]],
+        type = "p",
+        xlab = curve.args[["xlab"]],
+        ylab = curve.args[["ylab"]],
+        xlim = curve.args[["xlim"]],
+        ylim = curve.args[["ylim"]]
+      )
+      initial.args <- c(initial.args, spec[["overlay.args"]], frame.args)
+      do.call(plot, initial.args)
+      line.args <- curve.args[c("x", "y", "type", "col", "lty", "lwd")]
+      line.args <- line.args[!vapply(line.args, is.null, logical(1L))]
+      do.call(lines, line.args)
+    }
+  } else {
+    do.call(plot, c(curve.args, frame.args))
+  }
+
+  if (isTRUE(spec[["rug"]]))
+    .np_plot_draw_rug_1d(x = spec[["rug.x"]])
+
+  invisible(NULL)
 }
 
 fitted.npregiv <- function(object, ...) {

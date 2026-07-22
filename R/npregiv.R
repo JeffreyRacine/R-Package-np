@@ -2798,11 +2798,36 @@ summary.npregiv <- function(object, ...) {
 
 .np_plot_validate_npregiv_call <- function(call,
                                            method_args,
-                                           context) {
+                                           context,
+                                           dots_call = NULL) {
   call.args <- as.list(call)[-1L]
   arg.names <- names(call.args)
   if (is.null(arg.names))
     arg.names <- rep.int("", length(call.args))
+
+  dot.names <- .np_plot_dot_names(dots_call)
+  if (any(!nzchar(dot.names)))
+    stop(sprintf("unnamed plot arguments are not supported for %s", context),
+         call. = FALSE)
+  duplicate.names <- unique(dot.names[duplicated(dot.names)])
+  if (length(duplicate.names))
+    stop(sprintf("plot argument supplied more than once: %s",
+                 paste(duplicate.names, collapse = ", ")),
+         call. = FALSE)
+
+  supplied <- unique(c(arg.names[nzchar(arg.names)],
+                       dot.names[nzchar(dot.names)]))
+  if ("plot.data" %in% supplied)
+    stop("plot.data has been removed; use data_overlay", call. = FALSE)
+  if ("deriv" %in% supplied)
+    stop("deriv has been removed; use gradients", call. = FALSE)
+  if ("phi" %in% supplied) {
+    replacement <- if (identical(context, "plot.npregivderiv"))
+      "; use gradients = FALSE" else ""
+    stop(paste0("phi is not a supported IV plot argument", replacement),
+         call. = FALSE)
+  }
+
   allowed <- unique(c("x", method_args, .np_plot_graphics_arg_names()))
   bad <- setdiff(arg.names[nzchar(arg.names)], allowed)
   .np_plot_stop_unused_args(bad, allowed)
@@ -2810,98 +2835,24 @@ summary.npregiv <- function(object, ...) {
 }
 
 plot.npregiv <- function(x,
-                         plot.data = FALSE,
-                         deriv = FALSE,
+                         gradients = FALSE,
+                         data_overlay = TRUE,
+                         data_rug = FALSE,
                          ...) {
-
-  object <- x
+  matched.call <- match.call(expand.dots = FALSE)
   .np_plot_validate_npregiv_call(
     sys.call(),
-    method_args = c("plot.data", "deriv"),
-    context = "plot.npregiv"
+    method_args = c("gradients", "data_overlay", "data_rug"),
+    context = "plot.npregiv",
+    dots_call = matched.call[["..."]]
   )
-  dots <- list(...)
-  take_arg <- function(name, default = NULL) {
-    if (!is.null(dots[[name]])) {
-      val <- dots[[name]]
-      dots[[name]] <<- NULL
-      return(val)
-    }
-    default
-  }
-
-  ## We only support univariate endogenous predictor z
-  if(NCOL(object$z) > 1) stop(" only univariate z is supported")
-
-  y <- object$y
-
-  zname <- names(object$z)[1]
-  yname <- "y" ## Default
-
-  if(deriv) {
-    evaluated <- !is.null(object$zeval) && !is.null(object$phi.deriv.eval.1)
-    z <- if(evaluated) object$zeval[,1] else object$z[,1]
-    phi.prime <- if(evaluated) {
-      object$phi.deriv.eval.1[,1]
-    } else {
-      object$phi.deriv.1[,1]
-    }
-
-    plot.type <- take_arg("type", "l")
-    plot.xlab <- take_arg("xlab", zname)
-    plot.ylab <- take_arg("ylab", paste("d", yname, "/d", zname, sep=""))
-    do.call(plot, c(list(x = z[order(z)],
-                         y = phi.prime[order(z)],
-                         type = plot.type,
-                         xlab = plot.xlab,
-                         ylab = plot.ylab),
-                    dots))
-
-  } else {
-
-    if(plot.data) {
-      z <- object$z[,1]
-      phi <- object$phi
-      plot.type <- take_arg("type", "p")
-      plot.xlab <- take_arg("xlab", zname)
-      plot.ylab <- take_arg("ylab", yname)
-      user.col <- take_arg("col", NULL)
-      line.lwd <- take_arg("lwd", 2)
-      plot.args <- c(list(x = z,
-                          y = y,
-                          xlab = plot.xlab,
-                          ylab = plot.ylab,
-                          type = plot.type,
-                          col = if (is.null(user.col)) "lightgrey" else user.col),
-                     dots)
-      do.call(plot, plot.args)
-      line.args <- list(x = z[order(z)],
-                        y = phi[order(z)],
-                        lwd = line.lwd)
-      if (!is.null(user.col)) {
-        line.args$col <- user.col
-      }
-      do.call(lines, c(line.args, .np_iv_plot_line_dots(dots)))
-    } else {
-      evaluated <- !is.null(object$zeval) && !is.null(object$phi.eval)
-      z <- if(evaluated) object$zeval[,1] else object$z[,1]
-      phi <- if(evaluated) object$phi.eval else object$phi
-      plot.type <- take_arg("type", "l")
-      plot.xlab <- take_arg("xlab", zname)
-      plot.ylab <- take_arg("ylab", yname)
-      user.col <- take_arg("col", NULL)
-      line.lwd <- take_arg("lwd", 2)
-      plot.args <- list(x = z[order(z)],
-                        y = phi[order(z)],
-                        type = plot.type,
-                        xlab = plot.xlab,
-                        ylab = plot.ylab,
-                        lwd = line.lwd)
-      if (!is.null(user.col)) {
-        plot.args$col <- user.col
-      }
-      do.call(plot, c(plot.args, dots))
-    }
-  }
-
+  spec <- .np_iv_plot_spec(
+    object = x,
+    family = "npregiv",
+    gradients = gradients,
+    data_overlay = data_overlay,
+    data_rug = data_rug,
+    dots = list(...)
+  )
+  .np_iv_plot_render(spec)
 }
