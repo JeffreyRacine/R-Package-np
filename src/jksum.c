@@ -25,6 +25,7 @@
 #include "headers.h"
 #include "linalg.h"
 #include "gsl_bspline.h"
+#include "jksum_lp_row.h"
 
 #include "hash.h"
 #include "tree.h"
@@ -12788,94 +12789,47 @@ static NPRegCvLpResult np_regression_cv_lp_rawbasis_fixed(
             sj[a*nterms+b] += w*bia*basis[b][ii];
         }
       }
-    } else if(nterms >= 3){
-      for(i = 0; i < nsub; i++){
-        const int orig_ii = j + 1 + i;
-        const int ii = use_tree ? ipt_lookup_extern_X[orig_ii] : orig_ii;
-        const int widx = use_tree ? ii : i;
-        const double w = kw[widx];
-
-        if(w == 0.0)
-          continue;
-
-        if(track_lowsupport){
-          np_lp_cvls_support_add(j,
-                                  orig_ii,
-                                  ii,
-                                  w,
-                                  nterms,
-                                  support_count_acc,
-                                  support_orig_acc,
-                                  support_data_acc,
-                                  support_weight_acc);
-          np_lp_cvls_support_add(orig_ii,
-                                  j,
-                                  eval_idx,
-                                  w,
-                                  nterms,
-                                  support_count_acc,
-                                  support_orig_acc,
-                                  support_data_acc,
-                                  support_weight_acc);
-        }
-        np_lp_accumulate_pair(nterms,
-                               basis,
-                               vector_Y,
-                               moments_acc,
-                               rhs_acc,
-                               j,
-                               eval_ybasis,
-                               eval_outer,
-                               orig_ii,
-                               ii,
-                               w);
-      }
+    } else if(nterms == 3){
+      np_lp_accumulate_dense_resident_row3(
+        j,
+        nsub,
+        use_tree,
+        eval_idx,
+        track_lowsupport,
+        ipt_lookup_extern_X,
+        kw,
+        basis,
+        vector_Y,
+        moments_acc,
+        rhs_acc,
+        eval_ybasis,
+        eval_outer,
+        support_count_acc,
+        support_orig_acc,
+        support_data_acc,
+        support_weight_acc);
     } else {
-      for(i = 0; i < nsub; i++){
-        const int orig_ii = j + 1 + i;
-        const int ii = use_tree ? ipt_lookup_extern_X[orig_ii] : orig_ii;
-        const int widx = use_tree ? ii : i;
-        const double w = kw[widx];
-        const double yi = vector_Y[ii];
-        double * const sj = moments_acc + (size_t)j*(size_t)nterms*(size_t)nterms;
-        double * const si = moments_acc + (size_t)orig_ii*(size_t)nterms*(size_t)nterms;
-        double * const tj = rhs_acc + (size_t)j*(size_t)nterms;
-        double * const ti = rhs_acc + (size_t)orig_ii*(size_t)nterms;
-
-        if(w == 0.0)
-          continue;
-
-        if(track_lowsupport){
-          np_lp_cvls_support_add(j,
-                                  orig_ii,
-                                  ii,
-                                  w,
-                                  nterms,
-                                  support_count_acc,
-                                  support_orig_acc,
-                                  support_data_acc,
-                                  support_weight_acc);
-          np_lp_cvls_support_add(orig_ii,
-                                  j,
-                                  eval_idx,
-                                  w,
-                                  nterms,
-                                  support_count_acc,
-                                  support_orig_acc,
-                                  support_data_acc,
-                                  support_weight_acc);
-        }
-        for(a = 0; a < nterms; a++){
-          const double bia = basis[a][ii];
-          const double bja = basis[a][eval_idx];
-          tj[a] += w*bia*yi;
-          ti[a] += w*bja*yj;
-          for(b = 0; b < nterms; b++){
-            sj[a*nterms+b] += w*bia*basis[b][ii];
-            si[a*nterms+b] += w*bja*basis[b][eval_idx];
-          }
-        }
-      }
+      const NPLPDenseRowContext row_context = {
+        nterms,
+        j,
+        nsub,
+        use_tree,
+        eval_idx,
+        track_lowsupport,
+        ipt_lookup_extern_X,
+        kw,
+        basis,
+        vector_Y,
+        moments_acc,
+        rhs_acc,
+        eval_ybasis,
+        eval_outer,
+        support_count_acc,
+        support_orig_acc,
+        support_data_acc,
+        support_weight_acc
+      };
+      np_lp_accumulate_dense_resident_row(&row_context);
     }
   }
 
