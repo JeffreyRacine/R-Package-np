@@ -7637,6 +7637,10 @@ static int kernel_weighted_sum_pkw_nvar_extern = 0;
 typedef struct {
   double *weighted_sum;
   int kernel_pow;
+  double **matrix_Y;
+  double **matrix_W;
+  int ncol_Y;
+  int ncol_W;
 } NP_DualPowerCtx;
 
 static int np_hot_loop_interrupt_stride(const int total)
@@ -7798,6 +7802,18 @@ const int keep_kw_owner_local){
   const int nws = (weighted_sum == NULL);
   const int do_dual_power =
     (dual_power_ctx != NULL) && (dual_power_ctx->weighted_sum != NULL);
+  const int dual_ncol_Y =
+    (do_dual_power && dual_power_ctx->matrix_Y != NULL) ?
+    dual_power_ctx->ncol_Y : ncol_Y;
+  const int dual_ncol_W =
+    (do_dual_power && dual_power_ctx->matrix_W != NULL) ?
+    dual_power_ctx->ncol_W : ncol_W;
+  double ** const dual_matrix_Y =
+    (do_dual_power && dual_power_ctx->matrix_Y != NULL) ?
+    dual_power_ctx->matrix_Y : matrix_Y;
+  double ** const dual_matrix_W =
+    (do_dual_power && dual_power_ctx->matrix_W != NULL) ?
+    dual_power_ctx->matrix_W : matrix_W;
   
   assert(!(do_score && do_ocg));
   assert(!(gather_scatter && is_adaptive));
@@ -7868,6 +7884,8 @@ const int keep_kw_owner_local){
   const int progress_total = is_adaptive ? num_obs_train : num_obs_eval;
   const int ws_step = is_adaptive? 0 :
                                  (MAX(ncol_Y, 1) * MAX(ncol_W, 1));
+  const int dual_ws_step = is_adaptive ? 0 :
+    (MAX(dual_ncol_Y, 1) * MAX(dual_ncol_W, 1));
 
   double *lambda = NULL, **matrix_bandwidth = NULL, **matrix_alt_bandwidth = NULL, **m = NULL;
   double *tprod = NULL, dband, *ws, *ws2 = NULL, * p_ws, * tprod_mp = NULL, * p_dband = NULL;
@@ -7972,6 +7990,8 @@ const int keep_kw_owner_local){
 
   sum_element_length = MAX(ncol_Y, 1) * 
     MAX(ncol_W, 1);
+  const int dual_sum_element_length =
+    MAX(dual_ncol_Y, 1) * MAX(dual_ncol_W, 1);
 
   /* assert(!(BANDWIDTH_reg == BW_ADAP_NN)); */
   /* Conduct the estimation */
@@ -8388,7 +8408,7 @@ const int keep_kw_owner_local){
     }
 
   if(!gather_scatter && do_dual_power)
-    for(i = 0; i < num_obs_eval_alloc*sum_element_length; i++){
+    for(i = 0; i < num_obs_eval_alloc*dual_sum_element_length; i++){
       dual_power_ctx->weighted_sum[i] = 0.0;
     }
 
@@ -8418,7 +8438,7 @@ const int keep_kw_owner_local){
 
       ws = nws ? NULL : weighted_sum + js*sum_element_length;
       ws2 = do_dual_power ?
-        dual_power_ctx->weighted_sum + js*sum_element_length : NULL;
+        dual_power_ctx->weighted_sum + js*dual_sum_element_length : NULL;
 
       if(weighted_permutation_sum != NULL){
         p_ws = weighted_permutation_sum +js*sum_element_length;
@@ -8592,7 +8612,7 @@ const int keep_kw_owner_local){
     /* do sums */
   for(j=js; j <= je; j++,
       ws = (ws==NULL ? NULL : ws+ws_step),
-      ws2 = (ws2==NULL ? NULL : ws2+ws_step),
+      ws2 = (ws2==NULL ? NULL : ws2+dual_ws_step),
       p_ws=(p_ws == NULL ? NULL : p_ws+ws_step)){
     if(((j - js) & 31) == 0)
       np_progress_bandwidth_loop_step();
@@ -9151,8 +9171,8 @@ const int keep_kw_owner_local){
       }
 
       if(do_dual_power){
-        np_outer_weighted_sum(matrix_W, sgn, ncol_W,
-                              matrix_Y, ncol_Y,
+        np_outer_weighted_sum(dual_matrix_W, sgn, dual_ncol_W,
+                              dual_matrix_Y, dual_ncol_Y,
                               tprod, num_xt,
                               leave_or_drop, lod,
                               dual_power_ctx->kernel_pow,
@@ -9234,7 +9254,7 @@ const int keep_kw_owner_local){
       if (BANDWIDTH_reg == BW_FIXED || BANDWIDTH_reg == BW_GEN_NN){
         const int dual_count =
           np_jksum_mpi_count_or_die(np_jksum_size_mul_or_die((size_t)stride,
-                                                             (size_t)sum_element_length,
+                                                             (size_t)dual_sum_element_length,
                                                              "dual power weighted_sum MPI_Allgather"),
                                     "dual power weighted_sum MPI_Allgather");
         MPI_Allgather(MPI_IN_PLACE, dual_count, MPI_DOUBLE,
@@ -9243,7 +9263,7 @@ const int keep_kw_owner_local){
       } else if(BANDWIDTH_reg == BW_ADAP_NN){
         const int dual_count =
           np_jksum_mpi_count_or_die(np_jksum_size_mul_or_die((size_t)num_obs_eval,
-                                                             (size_t)sum_element_length,
+                                                             (size_t)dual_sum_element_length,
                                                              "dual power weighted_sum MPI_Allreduce"),
                                     "dual power weighted_sum MPI_Allreduce");
         MPI_Allreduce(MPI_IN_PLACE, dual_power_ctx->weighted_sum,
@@ -9560,7 +9580,9 @@ double * const pkw){
   double * old_pkw = kernel_weighted_sum_pkw_extern;
   int old_pkw_nvar = kernel_weighted_sum_pkw_nvar_extern;
   int status = 0;
-  const NP_DualPowerCtx dual_power_ctx = {weighted_sum_power2, 2};
+  const NP_DualPowerCtx dual_power_ctx = {
+    weighted_sum_power2, 2, NULL, NULL, 0, 0
+  };
 
   kernel_weighted_sum_pkw_extern = pkw;
   kernel_weighted_sum_pkw_nvar_extern = (pkw == NULL) ? 0 :
@@ -19400,6 +19422,9 @@ double *SIGN){
     double **Ycols = NULL, **Wcols = NULL;
     double *y2 = NULL, *out = NULL, *out2 = NULL, *fit_kw = NULL;
     double *xj = NULL;
+    NP_DualPowerCtx fit_dual_power_ctx = {
+      NULL, 2, NULL, NULL, 0, 0
+    };
     NPGLPBasisCtx *basis_ctx = NULL;
     double *eval_basis = NULL, *eval_deriv = NULL;
     double *tmp_v = NULL, *tmp_w = NULL;
@@ -19413,6 +19438,9 @@ double *SIGN){
       (num_reg_ordered == 0) &&
       (!use_bernstein) &&
       (!int_cker_bound_extern);
+    const int fit_tree_active =
+      (BANDWIDTH_reg != BW_ADAP_NN) && (int_TREE_X == NP_TREE_TRUE);
+    int reuse_fit_dual_power = 0;
 
     if((vector_glp_degree_extern == NULL) || (num_reg_continuous <= 0))
       error("glp degree vector unavailable");
@@ -19423,6 +19451,9 @@ double *SIGN){
       }
     }
     use_ll_compatible_gnn_se = raw_degree1_glp && (BANDWIDTH_reg == BW_GEN_NN);
+    reuse_fit_dual_power =
+      (!reuse_fit_kernel_row) && (!fit_tree_active) &&
+      (!use_ll_compatible_gnn_se);
 
     if(!np_glp_build_terms(num_reg_continuous, vector_glp_degree_extern, int_glp_basis_extern, &glp_terms, &glp_nterms))
       error("failed to build glp basis terms");
@@ -19447,6 +19478,11 @@ double *SIGN){
     out2 = (double *)malloc((size_t)glp_nterms*(size_t)glp_nterms*sizeof(double));
     if(!use_bernstein)
       xj = (double *)malloc((size_t)num_reg_continuous*sizeof(double));
+    fit_dual_power_ctx.weighted_sum = out2;
+    fit_dual_power_ctx.matrix_Y = basis;
+    fit_dual_power_ctx.matrix_W = basis;
+    fit_dual_power_ctx.ncol_Y = glp_nterms;
+    fit_dual_power_ctx.ncol_W = glp_nterms;
     if(reuse_fit_kernel_row)
       fit_kw = (double *)malloc((size_t)num_obs_train*sizeof(double));
     tmp_v = (double *)malloc((size_t)glp_nterms*sizeof(double));
@@ -19843,7 +19879,7 @@ double *SIGN){
         Wcols[l] = basis[l];
       }
 
-      kernel_weighted_sum_np_ctx(kernel_c,
+      kernel_weighted_sum_np_ctx_ex(kernel_c,
                              kernel_u,
                              kernel_o,
                              BANDWIDTH_reg,
@@ -19893,7 +19929,9 @@ double *SIGN){
                              out,
                              NULL,
                              reuse_fit_kernel_row ? fit_kw : NULL,
-                             est_gate_ctx_ptr);
+                             est_gate_ctx_ptr,
+                             reuse_fit_dual_power ? &fit_dual_power_ctx : NULL,
+                             0);
 
       for(i = 0; i < glp_nterms; i++){
         /* np_outer_weighted_sum lays out result as [W x Y], row-major by W term. */
@@ -19951,7 +19989,7 @@ double *SIGN){
                                                 num_obs_train,
                                                 hprod,
                                                 out2);
-        else
+        else if(!reuse_fit_dual_power)
         kernel_weighted_sum_np_ctx(kernel_c,
                              kernel_u,
                              kernel_o,
