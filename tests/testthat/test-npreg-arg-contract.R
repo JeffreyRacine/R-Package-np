@@ -28,6 +28,8 @@ test_that("lp regtype remains lp internally for degree 0/1", {
 
   expect_identical(npRegtypeToC(regtype = "lp", degree = 0L, ncon = 1L)$code, REGTYPE_LP)
   expect_identical(npRegtypeToC(regtype = "lp", degree = 1L, ncon = 1L)$code, REGTYPE_LP)
+  expect_identical(npRegtypeToC(regtype = "ll", degree = NULL, ncon = 2L),
+                   list(code = REGTYPE_LP, degree = c(1L, 1L)))
 })
 
 test_that("lp degree-0 gradients allow first derivatives and reject higher orders", {

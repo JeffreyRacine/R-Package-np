@@ -34,7 +34,7 @@ locate_kernelcv_c <- function() {
   hits[[1L]]
 }
 
-test_that("CVLS LL/LP route predicate is centralized in one helper", {
+test_that("canonical LP CV route predicates remain centralized", {
   src_file <- locate_jksum_c()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
 
@@ -49,13 +49,13 @@ test_that("CVLS LL/LP route predicate is centralized in one helper", {
   expect_equal(sum(grepl("np_glp_fill_shift_raw_from_center", lines, fixed = TRUE)), 0L)
   expect_equal(sum(grepl("np_glp_binom_coeff", lines, fixed = TRUE)), 0L)
   expect_equal(sum(grepl("np_reg_use_canonical_glp_degree1_estimation", lines, fixed = TRUE)), 0L)
-  expect_equal(sum(grepl("? LL_LL : int_ll", lines, fixed = TRUE)), 0L)
+  expect_equal(sum(grepl("LL_LL", lines, fixed = TRUE)), 0L)
   expect_equal(sum(grepl("const int int_ll_est = int_ll;", lines, fixed = TRUE)), 1L)
   expect_equal(sum(grepl("if(kpow == 2)", lines, fixed = TRUE)), 1L)
   expect_equal(sum(grepl("wbuf[k] = (weights[k] == 0.0) ? 0.0 : wk*wk;", lines, fixed = TRUE)), 1L)
 
   helper_start <- grep("^static inline int np_reg_cv_use_symmetric_dropone_path\\(", lines)
-  helper_stop <- grep("^static inline int np_reg_cv_use_canonical_ll_degree1_lp_objective\\(", lines)
+  helper_stop <- grep("^static int np_lp_fixed_tree_sparse_supported\\(", lines)
   expect_length(helper_start, 1L)
   expect_length(helper_stop, 1L)
   expect_lt(helper_start, helper_stop)
@@ -66,10 +66,42 @@ test_that("CVLS LL/LP route predicate is centralized in one helper", {
   expect_true(grepl("BANDWIDTH_reg == BW_ADAP_NN", helper_body, fixed = TRUE))
 
   helper_calls <- sum(grepl("np_reg_cv_use_symmetric_dropone_path\\(", lines))
-  expect_gte(helper_calls, 3L)
+  expect_gte(helper_calls, 2L)
 
   canonical_lp_calls <- sum(grepl("np_reg_cv_use_canonical_lp_fixed_kernel\\(", lines))
-  expect_gte(canonical_lp_calls, 3L)
+  expect_gte(canonical_lp_calls, 2L)
+})
+
+test_that("legacy LL compute engines and restoration switches are absent", {
+  src_file <- locate_jksum_c()
+  skip_if(is.null(src_file), "package C sources unavailable in this test context")
+
+  src_dir <- dirname(src_file)
+  source_files <- file.path(src_dir, c(
+    "headers.h", "jksum.c", "kernelcv.c", "kernele.c", "np.c"
+  ))
+  skip_if_not(all(file.exists(source_files)), "complete package C sources unavailable")
+
+  source <- paste(unlist(lapply(source_files, readLines, warn = FALSE)),
+                  collapse = "\n")
+  forbidden <- c(
+    "LL_LL",
+    "REGTYPE_LL",
+    "REG_OLDREGI",
+    "old_reg",
+    "kernel_estimate_regression_categorical_leave_one_out",
+    "kernel_estimate_regression_categorical_no_stderr",
+    "kernel_estimate_regression_categorical_aic_c",
+    "kernel_estimate_categorical_gradient_ocg_fast"
+  )
+  for (token in forbidden)
+    expect_false(grepl(token, source, fixed = TRUE), info = token)
+
+  expect_false(grepl(
+    "int_ll_extern == LL_LP) ? LL_LP : LL_LC",
+    source,
+    fixed = TRUE
+  ))
 })
 
 test_that("fixed resident-row LP CV solves and projects the uncentered basis", {

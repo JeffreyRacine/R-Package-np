@@ -135,6 +135,13 @@ static int np_int_product3_overflows(int a, int b, int c)
     np_int_product_overflows(a * b, c);
 }
 
+static int np_regression_engine_or_error(int code, const char *where)
+{
+  if((code != LL_LC) && (code != LL_LP))
+    error("%s: invalid internal regression engine", where);
+  return code;
+}
+
 static void np_load_crs_namespace(void)
 {
   SEXP pkg;
@@ -3717,7 +3724,9 @@ static int np_conditional_density_nomad_shadow_prepare_internal(double *c_uno,
   np_conditional_density_nomad_shadow.old_cdens = myopti[CBW_OLDI];
 
   ibwmfunc = myopti[CBW_MI];
-  int_ll_extern = ((ibwmfunc == CBWM_CVML) || (ibwmfunc == CBWM_CVLS)) ? *regtype : LL_LC;
+  int_ll_extern = np_regression_engine_or_error(
+    ((ibwmfunc == CBWM_CVML) || (ibwmfunc == CBWM_CVLS)) ? *regtype : LL_LC,
+    "np_conditional_density_bw");
   degree_key_len = (int_ll_extern == LL_LP) ? num_reg_continuous_extern : 0;
   bwm_num_extra_params = degree_key_len;
   vector_glp_gradient_order_extern = NULL;
@@ -7020,7 +7029,8 @@ SEXP C_np_density_conditional(SEXP tyuno,
     has_kernel_descriptors = 1;
   }
 
-  int_ll_extern = asInteger(regtype_i);
+  int_ll_extern = np_regression_engine_or_error(
+    asInteger(regtype_i), "C_np_conditional_density_bw");
   if ((int_ll_extern == LL_LP) && (ncon_x > 0)) {
     if ((int)XLENGTH(glp_degree_i) != ncon_x)
       error("C_np_density_conditional: length(glp_degree) must equal number of continuous x variables");
@@ -7423,7 +7433,8 @@ SEXP C_np_shadow_cv_density_conditional(SEXP tyuno,
                              num_categories_extern_Y,
                              matrix_categorical_vals_extern_Y);
 
-  int_ll_extern = asInteger(regtype);
+  int_ll_extern = np_regression_engine_or_error(
+    asInteger(regtype), "C_np_conditional_density");
   if((int_ll_extern == LL_LP) && (num_reg_continuous_extern > 0)){
     if((int)XLENGTH(degree_i) != num_reg_continuous_extern)
       error("C_np_shadow_cv_density_conditional: glp_degree length mismatch");
@@ -7798,7 +7809,8 @@ SEXP C_np_shadow_cv_xweights_conditional(SEXP tyuno,
                              num_categories_extern_X,
                              matrix_categorical_vals_extern_X);
 
-  int_ll_extern = asInteger(regtype);
+  int_ll_extern = np_regression_engine_or_error(
+    asInteger(regtype), "C_np_conditional_distribution_bw");
   if((int_ll_extern == LL_LP) && (num_reg_continuous_extern > 0)){
     if((int)XLENGTH(degree_i) != num_reg_continuous_extern)
       error("C_np_shadow_cv_xweights_conditional: glp_degree length mismatch");
@@ -8230,7 +8242,8 @@ SEXP C_np_shadow_cv_xweights_full_conditional(SEXP tyuno,
                              num_categories_extern_X,
                              matrix_categorical_vals_extern_X);
 
-  int_ll_extern = asInteger(regtype);
+  int_ll_extern = np_regression_engine_or_error(
+    asInteger(regtype), "C_np_conditional_distribution");
   if((int_ll_extern == LL_LP) && (num_reg_continuous_extern > 0)){
     if((int)XLENGTH(degree_i) != num_reg_continuous_extern)
       error("C_np_shadow_cv_xweights_full_conditional: glp_degree length mismatch");
@@ -8706,7 +8719,8 @@ SEXP C_np_shadow_cv_distribution_conditional(SEXP tyuno,
                              num_categories_extern_Y,
                              matrix_categorical_vals_extern_Y);
 
-  int_ll_extern = asInteger(regtype);
+  int_ll_extern = np_regression_engine_or_error(
+    asInteger(regtype), "C_np_shadow_cv_distribution_conditional");
   if((int_ll_extern == LL_LP) && (num_reg_continuous_extern > 0)){
     if((int)XLENGTH(degree_i) != num_reg_continuous_extern)
       error("C_np_shadow_cv_distribution_conditional: glp_degree length mismatch");
@@ -10164,7 +10178,8 @@ static SEXP C_np_density_conditional_bw_common(SEXP c_uno,
   double pmult = asReal(penalty_mult);
   int bern = asInteger(glp_bernstein);
   int basis = asInteger(glp_basis);
-  int ll_mode = asInteger(regtype);
+  int ll_mode = np_regression_engine_or_error(
+    asInteger(regtype), "C_np_density_conditional_bw");
   int ncon_x = 0;
   int ncon_y = 0;
   double * cxkerlb_p = NULL;
@@ -10289,7 +10304,8 @@ static SEXP C_np_distribution_conditional_bw_common(SEXP c_uno,
   double pmult = asReal(penalty_mult);
   int bern = asInteger(glp_bernstein);
   int basis = asInteger(glp_basis);
-  int ll_mode = asInteger(regtype);
+  int ll_mode = np_regression_engine_or_error(
+    asInteger(regtype), "C_np_distribution_conditional_bw");
   int ncon_x = 0;
   int ncon_y = 0;
   double * cxkerlb_p = NULL;
@@ -10930,7 +10946,8 @@ SEXP C_np_distribution_conditional_nomad_native_search(SEXP c_uno,
   context.degree = INTEGER(degree_i);
   context.bernstein = asInteger(glp_bernstein);
   context.basis = asInteger(glp_basis);
-  context.regtype = asInteger(regtype);
+  context.regtype = np_regression_engine_or_error(
+    asInteger(regtype), "C_np_conditional_nomad_native");
   context.cxkerlb = REAL(cxkerlb_r);
   context.cxkerub = REAL(cxkerub_r);
   context.cykerlb = REAL(cykerlb_r);
@@ -13577,7 +13594,9 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   bwm_use_transform = 0;
   
   ibwmfunc = myopti[CBW_MI];
-  int_ll_extern = ((ibwmfunc == CBWM_CVML) || (ibwmfunc == CBWM_CVLS)) ? *regtype : LL_LC;
+  int_ll_extern = np_regression_engine_or_error(
+    ((ibwmfunc == CBWM_CVML) || (ibwmfunc == CBWM_CVLS)) ? *regtype : LL_LC,
+    "np_conditional_density_bw_legacy");
   vector_glp_degree_extern = (((ibwmfunc == CBWM_CVML) || (ibwmfunc == CBWM_CVLS)) && (int_ll_extern == LL_LP)) ? glp_degree : NULL;
   vector_glp_gradient_order_extern = NULL;
   int_glp_bernstein_extern = (((ibwmfunc == CBWM_CVML) || (ibwmfunc == CBWM_CVLS)) && (int_ll_extern == LL_LP)) ? *glp_bernstein : 0;
@@ -14826,7 +14845,9 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
 
   itmax=myopti[CDBW_ITMAXI];
   ibwmfunc = myopti[CDBW_MI];
-  int_ll_extern = (ibwmfunc == CDBWM_CVLS) ? *regtype : LL_LC;
+  int_ll_extern = np_regression_engine_or_error(
+    (ibwmfunc == CDBWM_CVLS) ? *regtype : LL_LC,
+    "np_conditional_distribution_bw_legacy");
   vector_glp_degree_extern = ((ibwmfunc == CDBWM_CVLS) && (int_ll_extern == LL_LP)) ? glp_degree : NULL;
   vector_glp_gradient_order_extern = NULL;
   int_glp_bernstein_extern = ((ibwmfunc == CDBWM_CVLS) && (int_ll_extern == LL_LP)) ? *glp_bernstein : 0;
@@ -17019,7 +17040,8 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   int_RESTART_FROM_MIN = myopti[RBW_REMINI];
   int_MINIMIZE_IO = myopti[RBW_MINIOI];
 
-  int_ll_extern = myopti[RBW_LL];
+  int_ll_extern = np_regression_engine_or_error(
+    myopti[RBW_LL], "C_np_regression_bw");
   if(KERNEL_reg_extern == NP_CKERNEL_COORDINATE_CODE &&
      (int_ll_extern != LL_LC || lsq_check_mode))
     error("C_np_regression_bw: beta bandwidth selection supports only local-constant mean regression");
@@ -17910,11 +17932,10 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
                    double * ckerlb, double * ckerub){
 
   double * vector_scale_factor, * ecm = NULL, * ecmerr = NULL, ** eg = NULL, **egerr = NULL;
-  double * lambda, ** matrix_bandwidth;
   double RS, MSE, MAE, MAPE, CORR, SIGN, pad_num;
 
   int i,j, num_var;
-  int ey_is_ty, do_grad, train_is_eval, num_obs_eval_alloc, max_lev, old_reg;
+  int ey_is_ty, do_grad, train_is_eval, num_obs_eval_alloc, max_lev;
 
   int * ipt = NULL, * ipe = NULL;  // point permutation, see tree.c
   /* match integer options with their globals */
@@ -17950,7 +17971,8 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
   BANDWIDTH_reg_extern = myopti[REG_BWI];
 
   do_grad = myopti[REG_GRAD];
-  int_ll_extern = myopti[REG_LL];
+  int_ll_extern = np_regression_engine_or_error(
+    myopti[REG_LL], "C_np_regression");
   vector_glp_degree_extern = glp_degree;
   vector_glp_gradient_order_extern = glp_gradient_order;
   int_glp_bernstein_extern = *glp_bernstein;
@@ -17964,7 +17986,6 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
 
   int_TREE_X = myopti[REG_DOTREEI];
   int_TREE_PROFILE_X = myopti[REG_DOTREEI];
-  old_reg = myopti[REG_OLDREGI];
 
 #ifdef MPI2
   num_obs_eval_alloc = MAX((int)ceil((double) num_obs_eval_extern / (double) iNum_Processors),1)*iNum_Processors;
@@ -18013,10 +18034,6 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
   num_categories_extern = alloc_vecu(num_reg_unordered_extern+num_reg_ordered_extern);
   vector_scale_factor = alloc_vecd(num_var + 1);
   matrix_categorical_vals_extern = alloc_matd(max_lev, num_reg_unordered_extern + num_reg_ordered_extern);
-
-  lambda =  alloc_vecd(num_reg_unordered_extern+num_reg_ordered_extern);
-  matrix_bandwidth = alloc_matd((BANDWIDTH_reg_extern==BW_GEN_NN)?num_obs_eval_extern:
-                                ((BANDWIDTH_reg_extern==BW_ADAP_NN)?num_obs_train_extern:1),num_reg_continuous_extern);  
 
   vector_continuous_stddev_extern = mysd;
   /* train */
@@ -18148,97 +18165,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
      - they have only one kernel type each at the moment 
   */
 
-  if(old_reg){
-    kernel_estimate_regression_categorical(int_ll_extern,
-                                           KERNEL_reg_extern,
-                                           KERNEL_reg_unordered_extern,
-                                           KERNEL_reg_ordered_extern,
-                                           BANDWIDTH_reg_extern,
-                                           num_obs_train_extern,
-                                           num_obs_eval_extern,
-                                           num_reg_unordered_extern,
-                                           num_reg_ordered_extern,
-                                           num_reg_continuous_extern,
-                                           /* Train */
-                                           matrix_X_unordered_train_extern,
-                                           matrix_X_ordered_train_extern,
-                                           matrix_X_continuous_train_extern,
-                                           /* Eval */
-                                           matrix_X_unordered_eval_extern,
-                                           matrix_X_ordered_eval_extern,
-                                           matrix_X_continuous_eval_extern,
-                                           /* Bandwidth */
-                                           matrix_X_continuous_train_extern,
-                                           vector_Y_extern,
-                                           vector_Y_eval_extern,
-                                           &vector_scale_factor[1],
-                                           num_categories_extern,
-                                           ecm,
-                                           eg,
-                                           ecmerr,
-                                           egerr,
-                                           &RS,
-                                           &MSE,
-                                           &MAE,
-                                           &MAPE,
-                                           &CORR,
-                                           &SIGN);
-
-    if (do_grad){
-      kernel_bandwidth_mean(KERNEL_reg_extern,
-                            BANDWIDTH_reg_extern,
-                            num_obs_train_extern,
-                            num_obs_eval_extern,
-                            0,
-                            0,
-                            0,
-                            num_reg_continuous_extern,
-                            num_reg_unordered_extern,
-                            num_reg_ordered_extern,
-                            0, // do not suppress_parallel
-                            &vector_scale_factor[1],
-                            /* Not used */
-                            matrix_Y_continuous_train_extern,
-                            /* Not used */
-                            matrix_Y_continuous_train_extern,
-                            matrix_X_continuous_train_extern,
-                            matrix_X_continuous_eval_extern,
-                            matrix_bandwidth,/* Not used */
-                            matrix_bandwidth,
-                            lambda);
-      kernel_estimate_categorical_gradient_ocg_fast(1,
-                                                    NULL,
-                                                    0,
-                                                    KERNEL_reg_extern,
-                                                    KERNEL_reg_unordered_extern,
-                                                    KERNEL_reg_ordered_extern,
-                                                    BANDWIDTH_reg_extern,
-                                                    int_ll_extern,
-                                                    0,
-                                                    num_obs_train_extern,
-                                                    num_obs_eval_extern,
-                                                    num_reg_unordered_extern,
-                                                    num_reg_ordered_extern,
-                                                    num_reg_continuous_extern,
-                                                    vector_Y_extern,
-                                                    matrix_X_unordered_train_extern,
-                                                    matrix_X_ordered_train_extern,
-                                                    matrix_X_continuous_train_extern,
-                                                    matrix_X_unordered_eval_extern,
-                                                    matrix_X_ordered_eval_extern,
-                                                    matrix_X_continuous_eval_extern,
-                                                    matrix_bandwidth,
-                                                    NULL,
-                                                    lambda,
-                                                    num_categories_extern,
-                                                    matrix_categorical_vals_extern,
-                                                    ecm,
-                                                    &eg[num_reg_continuous_extern]);
-
-    }
-  } else {
-
-    kernel_estimate_regression_categorical_tree_np(int_ll_extern,
+  kernel_estimate_regression_categorical_tree_np(int_ll_extern,
                                                    KERNEL_reg_extern,
                                                    KERNEL_reg_unordered_extern,
                                                    KERNEL_reg_ordered_extern,
@@ -18272,8 +18199,6 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
                                                    &CORR,
                                                    &SIGN);
 
-
-  }
 
   for(i=0;i<num_obs_eval_extern;i++)
     cm[ipe[i]] = ecm[i];
@@ -18328,8 +18253,6 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
   free_mat(eg, num_var);
   free_mat(egerr, num_var);
   
-  free_mat(matrix_bandwidth, num_reg_continuous_extern);
-
   free_mat(matrix_categorical_vals_extern, num_reg_unordered_extern+num_reg_ordered_extern);
 
   safe_free(vector_Y_extern);
@@ -18342,8 +18265,6 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
   safe_free(num_categories_extern);
   safe_free(vector_scale_factor);
   np_clear_estimator_extern_aliases();
-
-  safe_free(lambda);
 
   int_cker_bound_extern = 0;
   vector_ckerlb_extern = NULL;
