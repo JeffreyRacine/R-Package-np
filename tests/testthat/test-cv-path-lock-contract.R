@@ -104,7 +104,7 @@ test_that("legacy LL compute engines and restoration switches are absent", {
   ))
 })
 
-test_that("fixed resident-row LP CV solves and projects the uncentered basis", {
+test_that("fixed resident-row LP CV uses the reusable uncentered solve workspace", {
   src_file <- locate_jksum_c()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
 
@@ -123,20 +123,26 @@ test_that("fixed resident-row LP CV solves and projects the uncentered basis", {
 
   helper_body <- paste(lines[helper_start:(helper_stop - 1L)], collapse = "\n")
   expect_true(grepl(
-    "KWM[a][b] = sj[a*nterms+b];",
+    "solve_workspace.gram_source[a + b*nterms] = sj[a*nterms+b];",
     helper_body,
     fixed = TRUE
   ))
   expect_true(grepl(
-    "fit += eval_basis[a]*DELTA[a][0];",
+    "fit += eval_basis[a]*solve_workspace.rhs_work[a];",
     helper_body,
     fixed = TRUE
   ))
   expect_true(grepl(
-    "hii += eval_basis[a]*DELTA[a][0];",
+    "hii += eval_basis[a]*solve_workspace.rhs_work[a];",
     helper_body,
     fixed = TRUE
   ))
+  expect_true(grepl(
+    "np_lp_solve_workspace_solve(&solve_workspace, nterms, 1)",
+    helper_body,
+    fixed = TRUE
+  ))
+  expect_false(grepl("mat_solve(", helper_body, fixed = TRUE))
   expect_false(grepl("fit = DELTA[0][0];", helper_body, fixed = TRUE))
   expect_false(grepl("center_raw", helper_body, fixed = TRUE))
   expect_false(grepl("SHIFT", helper_body, fixed = TRUE))
