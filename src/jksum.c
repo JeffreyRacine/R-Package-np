@@ -11275,11 +11275,12 @@ static int np_extendednn_lc_fast_objective(const int bwm,
   return 1;
 }
 
-/* Canonical selector for CVLS route between full symmetric drop-one and reduced branch. */
+/* Canonical selector for regression CV between full drop-one and reduced branch. */
 static inline int np_reg_cv_use_symmetric_dropone_path(const int bwm,
                                                        const int ks_tree_use,
                                                        const int BANDWIDTH_reg){
-  return (bwm == RBWM_CVLS) || (bwm == RBWM_CVCHECK) ||
+  return (bwm == RBWM_CVLS) || (bwm == RBWM_CVAIC) ||
+    (bwm == RBWM_CVCHECK) ||
     (bwm == RBWM_CVKS) ||
     ks_tree_use || (BANDWIDTH_reg == BW_ADAP_NN);
 }
@@ -11328,8 +11329,7 @@ static inline int np_reg_cv_use_canonical_lp_fixed_kernel(const int int_ll,
     return 0;
 
   if(bwm == RBWM_CVAIC)
-    return (int_ll == LL_LP) &&
-      (int_glp_basis_extern == 1);
+    return int_ll == LL_LP;
 
   if((bwm != RBWM_CVLS) && (bwm != RBWM_CVCHECK) &&
      (bwm != RBWM_CVKS))
@@ -12527,6 +12527,16 @@ static NPRegCvLpResult np_regression_cv_lp_rawbasis_fixed(
       NP_LP_CV_FAIL();
     }
     int_LARGE_SF = tsf;
+
+    /*
+      The resident fixed-bandwidth accumulator stores K_h weights, including
+      division by the continuous bandwidth product. Keep the restored self
+      observation on that same scale. A common scalar weight cancels from
+      fitted values and leverage, but mixing scaled off-diagonal rows with an
+      unscaled diagonal changes both.
+    */
+    for(l = 0; l < num_reg_continuous; l++)
+      aicc /= matrix_bandwidth[l][0];
   }
 
 #ifdef MPI2
@@ -13705,9 +13715,17 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
             pnh /= matrix_bandwidth[l][j];
         }
 
+        for(i = 0; i < nrc1; i++)
+          evalv[i] = basis[i][j];
+
         if(bwm == RBWM_CVAIC){
-          KWM[0][0] += pnh*aicc;
-          XTKY[0][0] += pnh*aicc*vector_Y[j];
+          const double self_weight = pnh*aicc;
+          for(i = 0; i < nrc1; i++){
+            const double bi = evalv[i];
+            XTKY[i][0] += self_weight*bi*vector_Y[j];
+            for(int k = 0; k < nrc1; k++)
+              KWM[i][k] += self_weight*bi*evalv[k];
+          }
         }
 
         while(mat_solve(KWM, XTKY, DELTA) == NULL){
@@ -13724,8 +13742,6 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
           }
         }
 
-        for(i = 0; i < nrc1; i++)
-          evalv[i] = basis[i][j];
         {
           double mhat = 0.0;
           for(i = 0; i < nrc1; i++)
