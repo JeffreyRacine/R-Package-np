@@ -339,9 +339,9 @@
   if (identical(regtype, "lc")) {
     den <- pmax(colSums(kw), .Machine$double.eps)
     if (identical(output, "matrix"))
-      return(sweep(t(kw), 1L, den, "/", check.margin = FALSE))
+      return(.np_lc_hat_normalize(kw, den))
 
-    out <- sweep(t(kw), 1L, den, "/", check.margin = FALSE) %*% y
+    out <- .np_lc_hat_normalize(kw, den) %*% y
     return(if (ncol(out) == 1L) as.vector(out) else out)
   }
 
@@ -457,12 +457,9 @@
     idx.train = idx.train,
     idx.eval = idx.eval
   )
-  H <- sweep(
-    t(kw),
-    1L,
-    pmax(colSums(kw), .Machine$double.eps),
-    "/",
-    check.margin = FALSE
+  H <- .np_lc_hat_normalize(
+    kw,
+    pmax(colSums(kw), .Machine$double.eps)
   )
 
   if (identical(output, "matrix"))

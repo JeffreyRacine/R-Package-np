@@ -285,6 +285,15 @@ npreghat <-
   H
 }
 
+.np_lc_hat_normalize <- function(kw, denominator) {
+  .Call(
+    "C_np_lc_hat_normalize",
+    kw,
+    denominator,
+    PACKAGE = "npRmpi"
+  )
+}
+
 .npreghat_exact_lc_matrix_from_kernel_weights <- function(bws, txdat, exdat = NULL) {
   beta.kernel <- identical(bws[["ckertype", exact = TRUE]], "beta")
   kw <- .np_kernel_weights_direct(
@@ -298,7 +307,7 @@ npreghat <-
 
   denom <- colSums(kw)
   denom[denom == 0.0] <- .Machine$double.xmin
-  sweep(t(kw), 1L, denom, "/")
+  .np_lc_hat_normalize(kw, denom)
 }
 
 .npreghat_exact_lc_derivative_matrix_from_npksum_chunked <- function(bws,
