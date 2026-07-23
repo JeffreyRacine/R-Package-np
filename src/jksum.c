@@ -7574,6 +7574,7 @@ const NP_DualPowerCtx * const dual_power_ctx){
   int np_ks_tree_use = (int_TREE == NP_TREE_TRUE);
   int any_convolution = 0;
   int is_adaptive = (BANDWIDTH_reg == BW_ADAP_NN);
+  int tree_pkw_sparse = 0;
 
   int lod = 0;
 
@@ -8175,6 +8176,33 @@ const NP_DualPowerCtx * const dual_power_ctx){
   if(!gather_scatter){
     for(i = 0; i < num_obs_eval_alloc*sum_element_length*p_nvar; i++){
       weighted_permutation_sum[i] = 0.0;
+    }
+  }
+
+  if(np_ks_tree_use && !is_adaptive &&
+     (kernel_weighted_sum_pkw_extern != NULL) &&
+     (kernel_weighted_sum_pkw_nvar_extern > 0)){
+    for(i = 0; i < num_reg_continuous; i++){
+      const int kernel = KERNEL_reg_np[i];
+      const int p_kernel = (do_perm && bpso[i]) ? permutation_kernel[i] : kernel;
+      tree_pkw_sparse =
+        (fabs(cksup[kernel][0]) < 0.5*DBL_MAX) ||
+        (fabs(cksup[kernel][1]) < 0.5*DBL_MAX) ||
+        (fabs(cksup[p_kernel][0]) < 0.5*DBL_MAX) ||
+        (fabs(cksup[p_kernel][1]) < 0.5*DBL_MAX);
+      if(tree_pkw_sparse)
+        break;
+    }
+
+    if(tree_pkw_sparse){
+      const size_t pkw_count =
+        np_jksum_size_mul3_or_die((size_t)kernel_weighted_sum_pkw_nvar_extern,
+                                  (size_t)num_obs_eval,
+                                  (size_t)num_xt,
+                                  "tree derivative kernel-weight initialization");
+      memset(kernel_weighted_sum_pkw_extern, 0,
+             np_jksum_size_mul_or_die(pkw_count, sizeof(double),
+                                      "tree derivative kernel-weight initialization"));
     }
   }
 
@@ -8960,7 +8988,31 @@ const NP_DualPowerCtx * const dual_power_ctx){
 
     if((kernel_weighted_sum_pkw_extern != NULL) && (kernel_weighted_sum_pkw_nvar_extern > 0)){
       for(ii = 0; ii < kernel_weighted_sum_pkw_nvar_extern; ii++){
-        if(bandwidth_divide_weights)
+        if(tree_pkw_sparse && (p_pxl != NULL)){
+          const size_t dst_offset =
+            (size_t)ii*(size_t)num_obs_eval*(size_t)num_xt +
+            (size_t)j*(size_t)num_xt;
+          const size_t src_offset = (size_t)ii*(size_t)num_xt;
+
+          for(int support = 0; support < p_pxl[ii].n; support++){
+            const int istart = p_pxl[ii].istart[support];
+            const int nlev = p_pxl[ii].nlev[support];
+            const int iend = istart + nlev;
+
+            if(istart < 0 || nlev < 0 || iend < istart || iend > num_xt)
+              error("invalid tree derivative kernel-weight support interval");
+
+            if(bandwidth_divide_weights){
+              for(i = istart; i < iend; i++)
+                kernel_weighted_sum_pkw_extern[dst_offset + (size_t)i] =
+                  tprod_mp[src_offset + (size_t)i]/p_dband[ii];
+            } else {
+              for(i = istart; i < iend; i++)
+                kernel_weighted_sum_pkw_extern[dst_offset + (size_t)i] =
+                  tprod_mp[src_offset + (size_t)i];
+            }
+          }
+        } else if(bandwidth_divide_weights)
           for(i = 0; i < num_xt; i++)
             kernel_weighted_sum_pkw_extern[ii*num_obs_eval*num_xt + j*num_xt + i] =
               tprod_mp[ii*num_xt + i]/p_dband[ii];
