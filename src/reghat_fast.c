@@ -28,6 +28,52 @@ static int np_matrix_dims(SEXP x, int *nr, int *nc)
   return (*nr >= 0) && (*nc >= 0);
 }
 
+/*
+ * Exact compiled counterpart of
+ *
+ *   sweep(t(kw), 1L, denominator, "/")
+ *
+ * Callers retain ownership of the denominator calculation and any zero-floor
+ * policy.  This helper changes only the transpose/allocation traversal.  The
+ * scalar division for every output element is therefore identical to the R
+ * route, while small tiles keep both the strided input and contiguous output
+ * writes resident in cache.
+ */
+SEXP C_np_lc_hat_normalize(SEXP kw, SEXP denominator)
+{
+  const int tile = 32;
+  int ntrain = 0, neval = 0;
+  const double *kw_p = NULL;
+  const double *denominator_p = NULL;
+  double *out_p = NULL;
+  SEXP out = R_NilValue;
+
+  if((TYPEOF(kw) != REALSXP) || (TYPEOF(denominator) != REALSXP) ||
+     !np_matrix_dims(kw, &ntrain, &neval) ||
+     (XLENGTH(denominator) != (R_xlen_t)neval))
+    error("invalid LC hat normalization input");
+
+  kw_p = REAL(kw);
+  denominator_p = REAL(denominator);
+  out = PROTECT(allocMatrix(REALSXP, neval, ntrain));
+  out_p = REAL(out);
+
+  for(int jb = 0; jb < neval; jb += tile){
+    const int jend = (jb + tile < neval) ? jb + tile : neval;
+    for(int ib = 0; ib < ntrain; ib += tile){
+      const int iend = (ib + tile < ntrain) ? ib + tile : ntrain;
+      for(int i = ib; i < iend; i++)
+        for(int j = jb; j < jend; j++)
+          out_p[j + (size_t)neval*(size_t)i] =
+            kw_p[i + (size_t)ntrain*(size_t)j]/denominator_p[j];
+    }
+    R_CheckUserInterrupt();
+  }
+
+  UNPROTECT(1);
+  return out;
+}
+
 static int np_reghat_solve_system(const int nterms,
                                   const double * const matrix,
                                   const double * const rhs,

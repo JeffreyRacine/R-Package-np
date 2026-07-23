@@ -3076,8 +3076,10 @@
     stop("single-index inid helper kernel-weight matrix shape mismatch")
 
   if (identical(regtype, "lc")) {
-    H <- sweep(t(kw), 1L, pmax(colSums(kw), .Machine$double.eps), "/",
-               check.margin = FALSE)
+    H <- .np_lc_hat_normalize(
+      kw,
+      pmax(colSums(kw), .Machine$double.eps)
+    )
     return(.np_inid_lc_boot_from_hat(
       H = H,
       ydat = y.num,
