@@ -10879,88 +10879,6 @@ static inline int np_reg_use_canonical_glp_degree1_estimation(const int int_ll,
   return 1;
 }
 
-static inline double np_glp_binom_coeff(const int n, const int k){
-  int i, kk;
-  double c = 1.0;
-  if((k < 0) || (k > n))
-    return 0.0;
-  kk = MIN(k, n-k);
-  for(i = 1; i <= kk; i++)
-    c *= ((double)(n - kk + i))/((double)i);
-  return c;
-}
-
-static void np_glp_fill_shift_raw_from_center(const int ncon,
-                                              const int *terms,
-                                              const int nterms,
-                                              const double *xj,
-                                              MATRIX SHIFT){
-  int r, c, j;
-  for(r = 0; r < nterms; r++){
-    const int *alpha = terms + r*ncon;
-    for(c = 0; c < nterms; c++){
-      const int *beta = terms + c*ncon;
-      double coef = 1.0;
-      int ok = 1;
-      for(j = 0; j < ncon; j++){
-        const int aj = alpha[j];
-        const int bj = beta[j];
-        if(bj > aj){
-          ok = 0;
-          break;
-        }
-        coef *= np_glp_binom_coeff(aj, bj)*ipow(xj[j], aj - bj);
-      }
-      SHIFT[r][c] = ok ? coef : 0.0;
-    }
-  }
-}
-
-static int np_glp_center_raw_moments_at_eval(const int ncon,
-                                             const int *terms,
-                                             const int nterms,
-                                             const double *xj,
-                                             const double *raw_s,
-                                             const double *raw_t,
-                                             MATRIX SHIFT,
-                                             MATRIX SHIFTINV,
-                                             MATRIX TMP,
-                                             MATRIX KWM,
-                                             MATRIX XTKY){
-  int a, b, c;
-
-  np_glp_fill_shift_raw_from_center(ncon, terms, nterms, xj, SHIFT);
-  if(mat_inv(SHIFT, SHIFTINV) == NULL)
-    return 0;
-
-  for(a = 0; a < nterms; a++){
-    double ta = 0.0;
-    for(c = 0; c < nterms; c++)
-      ta += SHIFTINV[a][c]*raw_t[c];
-    XTKY[a][0] = ta;
-  }
-
-  for(a = 0; a < nterms; a++){
-    for(b = 0; b < nterms; b++){
-      double sab = 0.0;
-      for(c = 0; c < nterms; c++)
-        sab += SHIFTINV[a][c]*raw_s[c*nterms+b];
-      TMP[a][b] = sab;
-    }
-  }
-
-  for(a = 0; a < nterms; a++){
-    for(b = 0; b < nterms; b++){
-      double sab = 0.0;
-      for(c = 0; c < nterms; c++)
-        sab += TMP[a][c]*SHIFTINV[b][c];
-      KWM[a][b] = sab;
-    }
-  }
-
-  return 1;
-}
-
 static int np_lp_fixed_tree_sparse_supported(const int num_reg_unordered,
                                               const int num_reg_ordered,
                                               const int num_reg_continuous,
@@ -11866,7 +11784,6 @@ static NPRegCvLpResult np_regression_cv_lp_rawbasis_fixed(
     int *operator,
     double *lambda,
     double **matrix_bandwidth,
-    const int *glp_terms_in,
     const int glp_nterms_in,
     double **glp_basis_in,
     const int use_tree){
@@ -11874,13 +11791,11 @@ static NPRegCvLpResult np_regression_cv_lp_rawbasis_fixed(
   const double epsilon = 1.0/(double)MAX(1, num_obs);
   int i, j, a, b, l, sf_flag = 0;
   int nterms = glp_nterms_in;
-  const int *terms = glp_terms_in;
   double **basis = glp_basis_in;
-  int *terms_local = NULL;
   double **basis_local = NULL;
   int *support_count = NULL, *support_orig = NULL, *support_data = NULL;
   double *ones = NULL;
-  double *moments = NULL, *rhs = NULL, *kw = NULL, *xj = NULL;
+  double *moments = NULL, *rhs = NULL, *kw = NULL;
   double *support_weight = NULL;
   double *eval_basis = NULL;
   double *eval_ybasis = NULL, *eval_outer = NULL;
@@ -11888,12 +11803,11 @@ static NPRegCvLpResult np_regression_cv_lp_rawbasis_fixed(
   double **train_u = NULL, **train_o = NULL, **train_c = NULL;
   MATRIX eval_u = NULL, eval_o = NULL, eval_c = NULL;
   MATRIX matrix_bandwidth_eval = NULL;
-  MATRIX KWM = NULL, XTKY = NULL, DELTA = NULL, SHIFT = NULL, SHIFTINV = NULL, TMP = NULL;
+  MATRIX KWM = NULL, XTKY = NULL, DELTA = NULL;
   double mean_dummy = 0.0;
   double aicc = 0.0;
   int use_sparse_tree = 0;
   int tsf = 0;
-  const int center_raw_basis = (int_glp_bernstein_extern == 0) && (int_glp_basis_extern == 1);
   const int track_lowsupport = (bwm == RBWM_CVLS) || (bwm == RBWM_CVCHECK) ||
     (bwm == RBWM_CVKS);
 
@@ -11902,23 +11816,20 @@ static NPRegCvLpResult np_regression_cv_lp_rawbasis_fixed(
 
   if(int_ll == LL_LL){
     nterms = num_reg_continuous + 1;
-    terms_local = (int *)calloc((size_t)nterms*(size_t)num_reg_continuous, sizeof(int));
     basis_local = (double **)malloc((size_t)nterms*sizeof(double *));
     ones = alloc_vecd(num_obs);
-    if((terms_local == NULL) || (basis_local == NULL) || (ones == NULL))
+    if((basis_local == NULL) || (ones == NULL))
       goto cleanup_lp_cv;
     for(i = 0; i < num_obs; i++)
       ones[i] = 1.0;
     basis_local[0] = ones;
     for(l = 0; l < num_reg_continuous; l++){
-      terms_local[(l+1)*num_reg_continuous + l] = 1;
       basis_local[l+1] = matrix_X_continuous[l];
     }
-    terms = terms_local;
     basis = basis_local;
   }
 
-  if((terms == NULL) || (basis == NULL) || (nterms <= 0))
+  if((basis == NULL) || (nterms <= 0))
     goto cleanup_lp_cv;
 
   if(nterms > INT_MAX/nterms)
@@ -11952,7 +11863,6 @@ static NPRegCvLpResult np_regression_cv_lp_rawbasis_fixed(
     support_data = (int *)malloc((size_t)num_obs*(size_t)nterms*sizeof(int));
     support_weight = (double *)malloc((size_t)num_obs*(size_t)nterms*sizeof(double));
   }
-  xj = (double *)malloc((size_t)num_reg_continuous*sizeof(double));
   eval_basis = alloc_vecd(MAX(1, nterms));
 
   if(!use_sparse_tree){
@@ -11973,22 +11883,18 @@ static NPRegCvLpResult np_regression_cv_lp_rawbasis_fixed(
   KWM = mat_creat(nterms, nterms, UNDEFINED);
   XTKY = mat_creat(nterms, 1, UNDEFINED);
   DELTA = mat_creat(nterms, 1, UNDEFINED);
-  SHIFT = mat_creat(nterms, nterms, UNDEFINED);
-  SHIFTINV = mat_creat(nterms, nterms, UNDEFINED);
-  TMP = mat_creat(nterms, nterms, UNDEFINED);
 
   if((moments == NULL) || (rhs == NULL) ||
      (track_lowsupport &&
       ((support_count == NULL) || (support_orig == NULL) ||
        (support_data == NULL) || (support_weight == NULL))) ||
-     (xj == NULL) || (eval_basis == NULL) ||
+     (eval_basis == NULL) ||
      (!use_sparse_tree && ((kw == NULL) ||
                            (train_u == NULL) || (train_o == NULL) || (train_c == NULL) ||
                            (eval_u == NULL) || (eval_o == NULL) || (eval_c == NULL) ||
                            (matrix_bandwidth_eval == NULL) ||
                            ((nterms >= 3) && ((eval_ybasis == NULL) || (eval_outer == NULL))))) ||
-     (KWM == NULL) || (XTKY == NULL) ||
-     (DELTA == NULL) || (SHIFT == NULL) || (SHIFTINV == NULL) || (TMP == NULL))
+     (KWM == NULL) || (XTKY == NULL) || (DELTA == NULL))
     goto cleanup_lp_cv;
 
   if(use_tree &&
@@ -12238,43 +12144,21 @@ static NPRegCvLpResult np_regression_cv_lp_rawbasis_fixed(
     double nepsilon = 0.0;
     double fit = 0.0;
 
-    for(l = 0; l < num_reg_continuous; l++)
-      xj[l] = matrix_X_continuous[l][eval_idx];
     for(a = 0; a < nterms; a++)
       eval_basis[a] = basis[a][eval_idx];
 
-    if(center_raw_basis){
-      if(!np_glp_center_raw_moments_at_eval(num_reg_continuous,
-                                            terms,
-                                            nterms,
-                                            xj,
-                                            sj,
-                                            tj,
-                                            SHIFT,
-                                            SHIFTINV,
-                                            TMP,
-                                            KWM,
-                                            XTKY))
-        goto cleanup_lp_cv;
-    } else {
-      for(a = 0; a < nterms; a++){
-        XTKY[a][0] = tj[a];
-        for(b = 0; b < nterms; b++)
-          KWM[a][b] = sj[a*nterms+b];
-      }
+    for(a = 0; a < nterms; a++){
+      XTKY[a][0] = tj[a];
+      for(b = 0; b < nterms; b++)
+        KWM[a][b] = sj[a*nterms+b];
     }
 
     if(bwm == RBWM_CVAIC){
-      if(center_raw_basis){
-        KWM[0][0] += aicc;
-        XTKY[0][0] += aicc*vector_Y[eval_idx];
-      } else {
-        for(a = 0; a < nterms; a++){
-          const double ba = eval_basis[a];
-          XTKY[a][0] += aicc*ba*vector_Y[eval_idx];
-          for(b = 0; b < nterms; b++)
-            KWM[a][b] += aicc*ba*eval_basis[b];
-        }
+      for(a = 0; a < nterms; a++){
+        const double ba = eval_basis[a];
+        XTKY[a][0] += aicc*ba*vector_Y[eval_idx];
+        for(b = 0; b < nterms; b++)
+          KWM[a][b] += aicc*ba*eval_basis[b];
       }
     }
 
@@ -12306,12 +12190,8 @@ static NPRegCvLpResult np_regression_cv_lp_rawbasis_fixed(
         goto cleanup_lp_cv;
     }
 
-    if(center_raw_basis){
-      fit = DELTA[0][0];
-    } else {
-      for(a = 0; a < nterms; a++)
-        fit += eval_basis[a]*DELTA[a][0];
-    }
+    for(a = 0; a < nterms; a++)
+      fit += eval_basis[a]*DELTA[a][0];
     }
 
     {
@@ -12324,19 +12204,12 @@ static NPRegCvLpResult np_regression_cv_lp_rawbasis_fixed(
 
     if(bwm == RBWM_CVAIC){
       double hii = 0.0;
-      if(center_raw_basis){
-        int ok00 = 0;
-        hii = mat_inv00(KWM, &ok00);
-        if(!ok00)
-          goto cleanup_lp_cv;
-      } else {
-        for(a = 0; a < nterms; a++)
-          XTKY[a][0] = eval_basis[a];
-        if(mat_solve(KWM, XTKY, DELTA) == NULL)
-          goto cleanup_lp_cv;
-        for(a = 0; a < nterms; a++)
-          hii += eval_basis[a]*DELTA[a][0];
-      }
+      for(a = 0; a < nterms; a++)
+        XTKY[a][0] = eval_basis[a];
+      if(mat_solve(KWM, XTKY, DELTA) == NULL)
+        goto cleanup_lp_cv;
+      for(a = 0; a < nterms; a++)
+        hii += eval_basis[a]*DELTA[a][0];
       result.traceH += hii*aicc;
     }
   }
@@ -12354,21 +12227,16 @@ cleanup_lp_cv:
   if(KWM != NULL) mat_free(KWM);
   if(XTKY != NULL) mat_free(XTKY);
   if(DELTA != NULL) mat_free(DELTA);
-  if(SHIFT != NULL) mat_free(SHIFT);
-  if(SHIFTINV != NULL) mat_free(SHIFTINV);
-  if(TMP != NULL) mat_free(TMP);
   if(moments != NULL) free(moments);
   if(rhs != NULL) free(rhs);
   if(support_count != NULL) free(support_count);
   if(support_orig != NULL) free(support_orig);
   if(support_data != NULL) free(support_data);
   if(support_weight != NULL) free(support_weight);
-  if(xj != NULL) free(xj);
   if(eval_basis != NULL) free(eval_basis);
   if(kw != NULL) free(kw);
   if(eval_ybasis != NULL) free(eval_ybasis);
   if(eval_outer != NULL) free(eval_outer);
-  if(terms_local != NULL) free(terms_local);
   if(basis_local != NULL) free(basis_local);
   if(ones != NULL) free(ones);
   if(sf_flag){
@@ -12502,7 +12370,6 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
                                                    operator,
                                                    lambda,
                                                    matrix_bandwidth,
-                                                   glp_terms,
                                                    glp_nterms,
                                                    basis,
                                                    ks_tree_use);
@@ -13338,7 +13205,6 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                                           operator,
                                           lambda,
                                           matrix_bandwidth,
-                                          NULL,
                                           0,
                                           NULL,
                                           ks_tree_use);
