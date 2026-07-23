@@ -48,6 +48,9 @@ test_that("CVLS LL/LP route predicate is centralized in one helper", {
   expect_equal(sum(grepl("np_glp_center_raw_moments_at_eval", lines, fixed = TRUE)), 0L)
   expect_equal(sum(grepl("np_glp_fill_shift_raw_from_center", lines, fixed = TRUE)), 0L)
   expect_equal(sum(grepl("np_glp_binom_coeff", lines, fixed = TRUE)), 0L)
+  expect_equal(sum(grepl("np_reg_use_canonical_glp_degree1_estimation", lines, fixed = TRUE)), 0L)
+  expect_equal(sum(grepl("? LL_LL : int_ll", lines, fixed = TRUE)), 0L)
+  expect_equal(sum(grepl("const int int_ll_est = int_ll;", lines, fixed = TRUE)), 1L)
 
   helper_start <- grep("^static inline int np_reg_cv_use_symmetric_dropone_path\\(", lines)
   helper_stop <- grep("^static inline int np_reg_cv_use_canonical_ll_degree1_lp_objective\\(", lines)

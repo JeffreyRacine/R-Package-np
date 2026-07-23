@@ -10858,27 +10858,6 @@ static inline int np_reg_cv_use_canonical_ll_degree1_lp_objective(const int int_
     (!ks_tree_use);
 }
 
-static inline int np_reg_use_canonical_glp_degree1_estimation(const int int_ll,
-                                                              const int BANDWIDTH_reg,
-                                                              const int num_reg_continuous){
-  int i;
-
-  if((int_ll != LL_LP) ||
-     (BANDWIDTH_reg != BW_GEN_NN) ||
-     (num_reg_continuous <= 0) ||
-     (vector_glp_degree_extern == NULL) ||
-     (int_glp_basis_extern != 1) ||
-     (int_glp_bernstein_extern != 0))
-    return 0;
-
-  for(i = 0; i < num_reg_continuous; i++){
-    if(vector_glp_degree_extern[i] != 1)
-      return 0;
-  }
-
-  return 1;
-}
-
 static int np_lp_fixed_tree_sparse_supported(const int num_reg_unordered,
                                               const int num_reg_ordered,
                                               const int num_reg_continuous,
@@ -17607,10 +17586,7 @@ double *SIGN){
 
   const int do_grad = (gradient != NULL); 
   const int do_gerr = (gradient_stderr != NULL);
-  const int int_ll_est =
-    np_reg_use_canonical_glp_degree1_estimation(int_ll,
-                                                BANDWIDTH_reg,
-                                                num_reg_continuous) ? LL_LL : int_ll;
+  const int int_ll_est = int_ll;
   np_gate_ctx_clear(&gate_ctx_local);
 
   struct th_table * otabs = NULL;
