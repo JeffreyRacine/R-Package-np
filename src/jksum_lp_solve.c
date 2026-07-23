@@ -1,11 +1,14 @@
 /* Reusable contiguous LAPACK workspace for canonical local-polynomial solves. */
 
 #include <limits.h>
+#include <float.h>
+#include <math.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include <R_ext/Arith.h>
+#include <R_ext/Applic.h>
 #include <R_ext/Lapack.h>
 
 #include "jksum_lp_solve.h"
@@ -126,4 +129,131 @@ int np_lp_solve_workspace_solve(NPLPSolveWorkspace *workspace,
     if(!R_FINITE(workspace->rhs_work[i]))
       return 0;
   return 1;
+}
+
+void np_glp_qr_drop_workspace_init(NPGLPQRDropWorkspace *workspace)
+{
+  if(workspace == NULL)
+    return;
+  memset(workspace, 0, sizeof(*workspace));
+}
+
+void np_glp_qr_drop_workspace_clear(NPGLPQRDropWorkspace *workspace)
+{
+  if(workspace == NULL)
+    return;
+  free(workspace->xqr);
+  free(workspace->qraux);
+  free(workspace->work);
+  free(workspace->y);
+  free(workspace->qy);
+  free(workspace->pivot);
+  np_glp_qr_drop_workspace_init(workspace);
+}
+
+int np_glp_qr_drop_workspace_reserve(NPGLPQRDropWorkspace *workspace,
+                                     int n,
+                                     int p)
+{
+  size_t xqr_elements, xqr_bytes, n_bytes, p_bytes;
+  size_t work_elements, work_bytes, pivot_bytes;
+  double *xqr = NULL, *qraux = NULL, *work = NULL;
+  double *y = NULL, *qy = NULL;
+  int *pivot = NULL;
+
+  if((workspace == NULL) || (n <= 0) || (p <= 0))
+    return 0;
+  if((workspace->n_capacity >= n) && (workspace->p_capacity >= p))
+    return 1;
+  if(!np_lp_size_product((size_t)n, (size_t)p, &xqr_elements) ||
+     !np_lp_double_bytes(xqr_elements, &xqr_bytes) ||
+     !np_lp_double_bytes((size_t)n, &n_bytes) ||
+     !np_lp_double_bytes((size_t)p, &p_bytes) ||
+     !np_lp_size_product((size_t)2, (size_t)p, &work_elements) ||
+     !np_lp_double_bytes(work_elements, &work_bytes) ||
+     !np_lp_size_product((size_t)p, sizeof(int), &pivot_bytes))
+    return 0;
+
+  xqr = (double *)malloc(xqr_bytes);
+  qraux = (double *)malloc(p_bytes);
+  work = (double *)malloc(work_bytes);
+  y = (double *)malloc(n_bytes);
+  qy = (double *)malloc(n_bytes);
+  pivot = (int *)malloc(pivot_bytes);
+  if((xqr == NULL) || (qraux == NULL) || (work == NULL) ||
+     (y == NULL) || (qy == NULL) || (pivot == NULL)){
+    free(xqr);
+    free(qraux);
+    free(work);
+    free(y);
+    free(qy);
+    free(pivot);
+    return 0;
+  }
+
+  np_glp_qr_drop_workspace_clear(workspace);
+  workspace->n_capacity = n;
+  workspace->p_capacity = p;
+  workspace->xqr_capacity = xqr_elements;
+  workspace->xqr = xqr;
+  workspace->qraux = qraux;
+  workspace->work = work;
+  workspace->y = y;
+  workspace->qy = qy;
+  workspace->pivot = pivot;
+  return 1;
+}
+
+int np_glp_qr_drop_workspace_apply(NPGLPQRDropWorkspace *workspace,
+                                   double **basis,
+                                   int n,
+                                   int p,
+                                   const double *kw,
+                                   int eval_pos,
+                                   double *row_out)
+{
+  const double tol = 1.0e-7;
+  int ldx = n, rank = 0, ny = 1;
+  int i, j;
+
+  if((workspace == NULL) || (basis == NULL) || (kw == NULL) ||
+     (row_out == NULL) || (n <= 0) || (p <= 0) ||
+     (eval_pos < 0) || (eval_pos >= n) ||
+     !np_glp_qr_drop_workspace_reserve(workspace, n, p))
+    return 1;
+
+  memset(workspace->y, 0, (size_t)n*sizeof(double));
+  for(j = 0; j < p; j++){
+    workspace->pivot[j] = j + 1;
+    for(i = 0; i < n; i++){
+      const double w = kw[i];
+      workspace->xqr[i + j*n] =
+        ((w > 0.0) ? sqrt(w) : 0.0) * basis[j][i];
+    }
+  }
+
+  F77_NAME(dqrdc2)(workspace->xqr, &ldx, &n, &p, (double *)&tol,
+                   &rank, workspace->qraux, workspace->pivot,
+                   workspace->work);
+  if((rank < 0) || (rank > p) || (rank < p))
+    return 1;
+
+  for(i = 0; i < rank; i++){
+    double s = basis[i][eval_pos];
+    for(j = 0; j < i; j++)
+      s -= workspace->xqr[j + i*n]*workspace->y[j];
+    if(fabs(workspace->xqr[i + i*n]) <= DBL_MIN)
+      return 1;
+    workspace->y[i] = s/workspace->xqr[i + i*n];
+  }
+
+  F77_NAME(dqrqy)(workspace->xqr, &n, &p, workspace->qraux,
+                  workspace->y, &ny, workspace->qy);
+
+  for(i = 0; i < n; i++){
+    const double w = kw[i];
+    row_out[i] = ((w > 0.0) ? sqrt(w) : 0.0) * workspace->qy[i];
+  }
+
+  return 0;
 }
