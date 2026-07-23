@@ -7633,6 +7633,34 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
 
 static double * kernel_weighted_sum_pkw_extern = NULL;
 static int kernel_weighted_sum_pkw_nvar_extern = 0;
+static int kernel_weighted_sum_pkw_sparse_extern = 0;
+
+static int np_jksum_tree_pkw_is_sparse(
+const int * const KERNEL_reg,
+const int BANDWIDTH_reg,
+const int num_reg_continuous,
+const int * const operator,
+const int permutation_operator,
+const int * const bpso,
+const int int_TREE){
+  if(int_TREE != NP_TREE_TRUE || BANDWIDTH_reg == BW_ADAP_NN)
+    return 0;
+
+  for(int i = 0; i < num_reg_continuous; i++){
+    const int kernel = KERNEL_reg[i] + OP_CFUN_OFFSETS[operator[i]];
+    const int p_kernel =
+      (permutation_operator != OP_NOOP && bpso != NULL && bpso[i]) ?
+      KERNEL_reg[i] + OP_CFUN_OFFSETS[permutation_operator] : kernel;
+
+    if((fabs(cksup[kernel][0]) < 0.5*DBL_MAX) ||
+       (fabs(cksup[kernel][1]) < 0.5*DBL_MAX) ||
+       (fabs(cksup[p_kernel][0]) < 0.5*DBL_MAX) ||
+       (fabs(cksup[p_kernel][1]) < 0.5*DBL_MAX))
+      return 1;
+  }
+
+  return 0;
+}
 
 typedef struct {
   double *weighted_sum;
@@ -9213,7 +9241,31 @@ const int keep_kw_owner_local){
 
     if((kernel_weighted_sum_pkw_extern != NULL) && (kernel_weighted_sum_pkw_nvar_extern > 0)){
       for(ii = 0; ii < kernel_weighted_sum_pkw_nvar_extern; ii++){
-        if(bandwidth_divide_weights)
+        if(kernel_weighted_sum_pkw_sparse_extern && (p_pxl != NULL)){
+          const size_t dst_offset =
+            (size_t)ii*(size_t)num_obs_eval*(size_t)num_xt +
+            (size_t)j*(size_t)num_xt;
+          const size_t src_offset = (size_t)ii*(size_t)num_xt;
+
+          for(int support = 0; support < p_pxl[ii].n; support++){
+            const int istart = p_pxl[ii].istart[support];
+            const int nlev = p_pxl[ii].nlev[support];
+            const int iend = istart + nlev;
+
+            if(istart < 0 || nlev < 0 || iend < istart || iend > num_xt)
+              error("invalid tree derivative kernel-weight support interval");
+
+            if(bandwidth_divide_weights){
+              for(i = istart; i < iend; i++)
+                kernel_weighted_sum_pkw_extern[dst_offset + (size_t)i] =
+                  tprod_mp[src_offset + (size_t)i]/p_dband[ii];
+            } else {
+              for(i = istart; i < iend; i++)
+                kernel_weighted_sum_pkw_extern[dst_offset + (size_t)i] =
+                  tprod_mp[src_offset + (size_t)i];
+            }
+          }
+        } else if(bandwidth_divide_weights)
           for(i = 0; i < num_xt; i++)
             kernel_weighted_sum_pkw_extern[ii*num_obs_eval*num_xt + j*num_xt + i] =
               tprod_mp[ii*num_xt + i]/p_dband[ii];
@@ -9707,10 +9759,15 @@ double * const kw,
 double * const pkw){
   double * old_pkw = kernel_weighted_sum_pkw_extern;
   int old_pkw_nvar = kernel_weighted_sum_pkw_nvar_extern;
+  int old_pkw_sparse = kernel_weighted_sum_pkw_sparse_extern;
   int status = 0;
 
   kernel_weighted_sum_pkw_extern = pkw;
   kernel_weighted_sum_pkw_nvar_extern = (pkw == NULL) ? 0 : (((permutation_operator != OP_NOOP) ? num_reg_continuous : 0) + ((do_score || do_ocg) ? num_reg_unordered + num_reg_ordered : 0));
+  kernel_weighted_sum_pkw_sparse_extern = (pkw == NULL) ? 0 :
+    np_jksum_tree_pkw_is_sparse(KERNEL_reg, BANDWIDTH_reg,
+                                num_reg_continuous, operator,
+                                permutation_operator, bpso, int_TREE);
 
   status = kernel_weighted_sum_np_ctx(KERNEL_reg,
                                     KERNEL_unordered_reg,
@@ -9767,6 +9824,7 @@ double * const pkw){
                                     NULL);
   kernel_weighted_sum_pkw_extern = old_pkw;
   kernel_weighted_sum_pkw_nvar_extern = old_pkw_nvar;
+  kernel_weighted_sum_pkw_sparse_extern = old_pkw_sparse;
   return status;
 }
 
