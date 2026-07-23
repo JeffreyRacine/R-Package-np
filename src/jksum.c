@@ -18515,8 +18515,6 @@ double *SIGN){
     int *glp_terms = NULL;
     int glp_nterms = 0;
     const int use_bernstein = (int_glp_bernstein_extern != 0);
-    MATRIX KWM = NULL, XTKY = NULL, DELTA = NULL;
-    MATRIX KWM2 = NULL, KWM_INV = NULL, IDEN = NULL;
     double **basis = NULL;
     double **matrix_bandwidth_eval = NULL;
     double **TCON = NULL, **TUNO = NULL, **TORD = NULL;
@@ -18526,7 +18524,8 @@ double *SIGN){
       NULL, 2, NULL, NULL, 0, 0
     };
     NPGLPBasisCtx *basis_ctx = NULL;
-    double *eval_basis = NULL, *eval_deriv = NULL;
+    NPLPSolveWorkspace solve_workspace;
+    double *beta = NULL, *eval_basis = NULL, *eval_deriv = NULL;
     double *tmp_v = NULL, *tmp_w = NULL;
     const double epsilon = 1.0/(double)MAX(1, num_obs_train);
     const int reuse_fit_kernel_row =
@@ -18540,6 +18539,8 @@ double *SIGN){
       (BANDWIDTH_reg != BW_ADAP_NN) && (int_TREE_X == NP_TREE_TRUE);
     int reuse_fit_dual_power = 0;
 
+    np_lp_solve_workspace_init(&solve_workspace);
+
     if((vector_glp_degree_extern == NULL) || (num_reg_continuous <= 0))
       error("glp degree vector unavailable");
     reuse_fit_dual_power = (!reuse_fit_kernel_row) && (!fit_tree_active);
@@ -18549,12 +18550,10 @@ double *SIGN){
     if(glp_nterms <= 0)
       error("invalid glp basis dimension");
 
-    KWM = mat_creat(glp_nterms, glp_nterms, UNDEFINED);
-    XTKY = mat_creat(glp_nterms, 1, UNDEFINED);
-    DELTA = mat_creat(glp_nterms, 1, UNDEFINED);
-    KWM2 = mat_creat(glp_nterms, glp_nterms, UNDEFINED);
-    KWM_INV = mat_creat(glp_nterms, glp_nterms, UNDEFINED);
-    IDEN = mat_creat(glp_nterms, glp_nterms, UNDEFINED);
+    if(!np_lp_solve_workspace_reserve(&solve_workspace,
+                                      glp_nterms,
+                                      glp_nterms))
+      error("memory allocation failed in glp solve workspace");
     basis = alloc_matd(num_obs_train, glp_nterms);
     matrix_bandwidth_eval = alloc_tmatd(1, num_reg_continuous);
     TCON = alloc_matd(1, num_reg_continuous);
@@ -18572,6 +18571,7 @@ double *SIGN){
     fit_dual_power_ctx.ncol_W = glp_nterms;
     if(reuse_fit_kernel_row)
       fit_kw = (double *)malloc((size_t)num_obs_train*sizeof(double));
+    beta = (double *)malloc((size_t)glp_nterms*sizeof(double));
     tmp_v = (double *)malloc((size_t)glp_nterms*sizeof(double));
     tmp_w = (double *)malloc((size_t)glp_nterms*sizeof(double));
     eval_basis = (double *)malloc((size_t)glp_nterms*sizeof(double));
@@ -18579,15 +18579,15 @@ double *SIGN){
     if(use_bernstein)
       basis_ctx = (NPGLPBasisCtx *)calloc((size_t)num_reg_continuous, sizeof(NPGLPBasisCtx));
 
-    if(!((KWM != NULL) && (XTKY != NULL) && (DELTA != NULL) &&
-      (KWM2 != NULL) && (KWM_INV != NULL) && (IDEN != NULL) &&
+    if(!((solve_workspace.gram_source != NULL) &&
+      (solve_workspace.rhs_source != NULL) &&
       (basis != NULL) &&
       ((num_reg_continuous == 0) || (matrix_bandwidth_eval != NULL)) &&
       ((num_reg_continuous == 0) || (TCON != NULL)) &&
       ((num_reg_unordered == 0) || (TUNO != NULL)) &&
       ((num_reg_ordered == 0) || (TORD != NULL)) &&
       (Ycols != NULL) && (Wcols != NULL) && (y2 != NULL) && (out != NULL) &&
-      (out2 != NULL) && (tmp_v != NULL) && (tmp_w != NULL) &&
+      (out2 != NULL) && (beta != NULL) && (tmp_v != NULL) && (tmp_w != NULL) &&
       ((!reuse_fit_kernel_row) || (fit_kw != NULL)) &&
       (eval_basis != NULL) && (eval_deriv != NULL) &&
       (!use_bernstein || (basis_ctx != NULL))))
@@ -18739,21 +18739,30 @@ double *SIGN){
 
 	          for(i = 0; i < glp_nterms; i++){
 	            const int base = i*(glp_nterms + 2);
-	            XTKY[i][0] = out[base + 1];
+	            solve_workspace.rhs_source[i] = out[base + 1];
 	            for(l = 0; l < glp_nterms; l++)
-	              KWM[i][l] = out[base + (l + 2)];
+	              solve_workspace.gram_source[i+l*glp_nterms] =
+	                out[base + (l + 2)];
 	          }
-	          while(mat_solve(KWM, XTKY, DELTA) == NULL){
+	          while(!np_lp_solve_workspace_solve(&solve_workspace,
+	                                             glp_nterms,
+	                                             1)){
 	            for(i = 0; i < glp_nterms; i++)
-	              KWM[i][i] += epsilon;
+	              solve_workspace.gram_source[i+i*glp_nterms] += epsilon;
 	            nepsilon_owner += epsilon;
 	          }
 
-	          XTKY[0][0] += nepsilon_owner*XTKY[0][0]/NZD_POS(KWM[0][0]);
+	          solve_workspace.rhs_source[0] +=
+	            nepsilon_owner*solve_workspace.rhs_source[0]/
+	            NZD_POS(solve_workspace.gram_source[0]);
 	          if(nepsilon_owner > 0.0){
-	            if(mat_solve(KWM, XTKY, DELTA) == NULL)
+	            if(!np_lp_solve_workspace_solve(&solve_workspace,
+	                                            glp_nterms,
+	                                            1))
 	              error("mat_solve failed in glp owner path");
 	          }
+	          for(i = 0; i < glp_nterms; i++)
+	            beta[i] = solve_workspace.rhs_work[i];
 
 	          if(use_bernstein)
 	            np_glp_fill_basis_eval(num_reg_continuous,
@@ -18773,7 +18782,7 @@ double *SIGN){
 
 	          out_owner[opos] = 0.0;
 	          for(i = 0; i < glp_nterms; i++)
-	            out_owner[opos] += eval_basis[i]*DELTA[i][0];
+	            out_owner[opos] += eval_basis[i]*beta[i];
 	          opos++;
 
 	          sk_owner = copysign(DBL_MIN, out[2]) + out[2];
@@ -18786,12 +18795,8 @@ double *SIGN){
 	          }
 	          sigma2_owner = (sigma2_owner <= 0.0) ? 0.0 : sigma2_owner;
 
-	          for(i = 0; i < glp_nterms; i++){
-	            for(l = 0; l < glp_nterms; l++){
-	              KWM2[i][l] = 0.0;
-	              IDEN[i][l] = (i == l) ? 1.0 : 0.0;
-	            }
-	          }
+	          for(i = 0; i < glp_nterms*glp_nterms; i++)
+	            out2[i] = 0.0;
 
 	          for(i = 0; i < num_obs_train; i++){
 	            const double w = kw_owner[i];
@@ -18801,10 +18806,16 @@ double *SIGN){
 	            for(int a = 0; a < glp_nterms; a++){
 	              const double za = basis[a][i];
 	              for(int b = 0; b < glp_nterms; b++)
-	                KWM2[a][b] += za*basis[b][i]*w2;
+	                out2[a*glp_nterms+b] += za*basis[b][i]*w2;
 	            }
 	          }
-	          if(mat_solve(KWM, IDEN, KWM_INV) != NULL)
+	          for(l = 0; l < glp_nterms; l++)
+	            for(i = 0; i < glp_nterms; i++)
+	              solve_workspace.rhs_source[i+l*glp_nterms] =
+	                (i == l) ? 1.0 : 0.0;
+	          if(np_lp_solve_workspace_solve(&solve_workspace,
+	                                         glp_nterms,
+	                                         glp_nterms))
 	            have_vcov_owner = 1;
 
 	          if(have_vcov_owner){
@@ -18812,13 +18823,14 @@ double *SIGN){
 	            for(i = 0; i < glp_nterms; i++){
 	              double vv = 0.0;
 	              for(int ii = 0; ii < glp_nterms; ii++)
-	                vv += KWM_INV[i][ii]*eval_basis[ii];
+	                vv += solve_workspace.rhs_work[i+ii*glp_nterms]*
+	                  eval_basis[ii];
 	              tmp_v[i] = vv;
 	            }
 	            for(i = 0; i < glp_nterms; i++){
 	              double ww = 0.0;
 	              for(int ii = 0; ii < glp_nterms; ii++)
-	                ww += KWM2[i][ii]*tmp_v[ii];
+	                ww += out2[i*glp_nterms+ii]*tmp_v[ii];
 	              tmp_w[i] = ww;
 	            }
 	            for(i = 0; i < glp_nterms; i++)
@@ -18857,7 +18869,7 @@ double *SIGN){
 	                                                jj,
 	                                                eval_deriv);
 	              for(i = 0; i < glp_nterms; i++)
-	                grad_value += eval_deriv[i]*DELTA[i][0];
+	                grad_value += eval_deriv[i]*beta[i];
 	              out_owner[opos++] = grad_value;
 
 	              if(do_gerr){
@@ -18867,13 +18879,14 @@ double *SIGN){
 	                  for(i = 0; i < glp_nterms; i++){
 	                    double vv = 0.0;
 	                    for(int ii = 0; ii < glp_nterms; ii++)
-	                      vv += KWM_INV[i][ii]*eval_deriv[ii];
+	                      vv += solve_workspace.rhs_work[i+ii*glp_nterms]*
+	                        eval_deriv[ii];
 	                    tmp_v[i] = vv;
 	                  }
 	                  for(i = 0; i < glp_nterms; i++){
 	                    double ww = 0.0;
 	                    for(int ii = 0; ii < glp_nterms; ii++)
-	                      ww += KWM2[i][ii]*tmp_v[ii];
+	                      ww += out2[i*glp_nterms+ii]*tmp_v[ii];
 	                    tmp_w[i] = ww;
 	                  }
 	                  for(i = 0; i < glp_nterms; i++)
@@ -19004,21 +19017,26 @@ double *SIGN){
       for(i = 0; i < glp_nterms; i++){
         /* np_outer_weighted_sum lays out result as [W x Y], row-major by W term. */
         const int base = i*(glp_nterms + 2);
-        XTKY[i][0] = out[base + 1]; /* Y column 1 is y */
+        solve_workspace.rhs_source[i] = out[base + 1]; /* Y column 1 is y */
         for(l = 0; l < glp_nterms; l++)
-          KWM[i][l] = out[base + (l + 2)]; /* Y columns 2.. are basis terms */
+          solve_workspace.gram_source[i+l*glp_nterms] =
+            out[base + (l + 2)]; /* Y columns 2.. are basis terms */
       }
-      while(mat_solve(KWM, XTKY, DELTA) == NULL){
+      while(!np_lp_solve_workspace_solve(&solve_workspace, glp_nterms, 1)){
         for(i = 0; i < glp_nterms; i++)
-          KWM[i][i] += epsilon;
+          solve_workspace.gram_source[i+i*glp_nterms] += epsilon;
         nepsilon += epsilon;
       }
 
-      XTKY[0][0] += nepsilon*XTKY[0][0]/NZD_POS(KWM[0][0]);
+      solve_workspace.rhs_source[0] +=
+        nepsilon*solve_workspace.rhs_source[0]/
+        NZD_POS(solve_workspace.gram_source[0]);
       if(nepsilon > 0.0){
-        if(mat_solve(KWM, XTKY, DELTA) == NULL)
+        if(!np_lp_solve_workspace_solve(&solve_workspace, glp_nterms, 1))
           error("mat_solve failed in glp path");
       }
+      for(i = 0; i < glp_nterms; i++)
+        beta[i] = solve_workspace.rhs_work[i];
 
       if(use_bernstein)
         np_glp_fill_basis_eval(num_reg_continuous,
@@ -19037,7 +19055,7 @@ double *SIGN){
                                    eval_basis);
       mean[j] = 0.0;
       for(i = 0; i < glp_nterms; i++)
-        mean[j] += eval_basis[i]*DELTA[i][0];
+        mean[j] += eval_basis[i]*beta[i];
       /* Row 0 corresponds to the constant basis term W0. */
       sk = copysign(DBL_MIN, out[2]) + out[2]; /* sum K * W0 * W0 */
       ey = out[1]/sk;  /* sum K * W0 * y / sk */
@@ -19111,14 +19129,13 @@ double *SIGN){
                              NULL,
                              est_gate_ctx_ptr);
 
-      for(i = 0; i < glp_nterms; i++){
-        const int base = i*glp_nterms;
-        for(l = 0; l < glp_nterms; l++){
-          KWM2[i][l] = out2[base + l];
-          IDEN[i][l] = (i == l) ? 1.0 : 0.0;
-        }
-      }
-      if(mat_solve(KWM, IDEN, KWM_INV) != NULL)
+      for(l = 0; l < glp_nterms; l++)
+        for(i = 0; i < glp_nterms; i++)
+          solve_workspace.rhs_source[i+l*glp_nterms] =
+            (i == l) ? 1.0 : 0.0;
+      if(np_lp_solve_workspace_solve(&solve_workspace,
+                                     glp_nterms,
+                                     glp_nterms))
         have_vcov = 1;
 
       if(have_vcov){
@@ -19126,13 +19143,13 @@ double *SIGN){
         for(i = 0; i < glp_nterms; i++){
           double vv = 0.0;
           for(int ii = 0; ii < glp_nterms; ii++)
-            vv += KWM_INV[i][ii]*eval_basis[ii];
+            vv += solve_workspace.rhs_work[i+ii*glp_nterms]*eval_basis[ii];
           tmp_v[i] = vv;
         }
         for(i = 0; i < glp_nterms; i++){
           double ww = 0.0;
           for(int ii = 0; ii < glp_nterms; ii++)
-            ww += KWM2[i][ii]*tmp_v[ii];
+            ww += out2[i*glp_nterms+ii]*tmp_v[ii];
           tmp_w[i] = ww;
         }
         for(i = 0; i < glp_nterms; i++)
@@ -19168,20 +19185,21 @@ double *SIGN){
                                              eval_deriv);
           gradient[l][j] = 0.0;
           for(i = 0; i < glp_nterms; i++)
-            gradient[l][j] += eval_deriv[i]*DELTA[i][0];
+            gradient[l][j] += eval_deriv[i]*beta[i];
           if(do_gerr){
             if(have_vcov){
               double q = 0.0;
               for(i = 0; i < glp_nterms; i++){
                 double vv = 0.0;
                 for(int ii = 0; ii < glp_nterms; ii++)
-                  vv += KWM_INV[i][ii]*eval_deriv[ii];
+                  vv += solve_workspace.rhs_work[i+ii*glp_nterms]*
+                    eval_deriv[ii];
                 tmp_v[i] = vv;
               }
               for(i = 0; i < glp_nterms; i++){
                 double ww = 0.0;
                 for(int ii = 0; ii < glp_nterms; ii++)
-                  ww += KWM2[i][ii]*tmp_v[ii];
+                  ww += out2[i*glp_nterms+ii]*tmp_v[ii];
                 tmp_w[i] = ww;
               }
               for(i = 0; i < glp_nterms; i++)
@@ -19205,12 +19223,7 @@ double *SIGN){
         np_progress_fit_loop_step(j + 1, fit_progress_total);
     }
 
-    mat_free(KWM);
-    mat_free(XTKY);
-    mat_free(DELTA);
-    mat_free(KWM2);
-    mat_free(KWM_INV);
-    mat_free(IDEN);
+    np_lp_solve_workspace_clear(&solve_workspace);
     free_mat(basis, glp_nterms);
     if(matrix_bandwidth_eval != NULL) free_tmat(matrix_bandwidth_eval);
     if((TCON != NULL) && (num_reg_continuous > 0)) free_mat(TCON, num_reg_continuous);
@@ -19222,6 +19235,7 @@ double *SIGN){
     free(out);
     free(out2);
     if(fit_kw != NULL) free(fit_kw);
+    free(beta);
     free(tmp_v);
     free(tmp_w);
     if(use_bernstein){
