@@ -70,6 +70,41 @@ test_that("canonical LP CV route predicates remain centralized", {
 
   canonical_lp_calls <- sum(grepl("np_reg_cv_use_canonical_lp_fixed_kernel\\(", lines))
   expect_gte(canonical_lp_calls, 2L)
+
+  canonical_start <- grep(
+    "^static inline int np_reg_cv_use_canonical_lp_fixed_kernel\\(",
+    lines
+  )
+  canonical_stop <- grep(
+    "^static int np_lp_fixed_tree_sparse_supported\\(",
+    lines
+  )
+  expect_length(canonical_start, 1L)
+  expect_length(canonical_stop, 1L)
+  expect_lt(canonical_start, canonical_stop)
+
+  canonical_body <- paste(
+    lines[canonical_start:(canonical_stop - 1L)],
+    collapse = "\n"
+  )
+  expect_true(grepl("const int nterms", canonical_body, fixed = TRUE))
+  expect_true(any(grepl(
+    "NP_REG_CV_LP_RESIDENT_MAX_TERMS = 5",
+    lines,
+    fixed = TRUE
+  )))
+  expect_true(grepl(
+    "return nterms <= NP_REG_CV_LP_RESIDENT_MAX_TERMS;",
+    canonical_body,
+    fixed = TRUE
+  ))
+  expect_true(grepl("return bwm == RBWM_CVAIC;", canonical_body, fixed = TRUE))
+  expect_false(grepl("use_bernstein", canonical_body, fixed = TRUE))
+  expect_false(any(grepl(
+    "np_regression_cv_lp_rawbasis_fixed",
+    lines,
+    fixed = TRUE
+  )))
 })
 
 test_that("legacy LL compute engines and restoration switches are absent", {
@@ -110,7 +145,7 @@ test_that("fixed resident-row LP CV uses the reusable uncentered solve workspace
 
   lines <- readLines(src_file, warn = FALSE)
   helper_start <- grep(
-    "^static NPRegCvLpResult np_regression_cv_lp_rawbasis_fixed\\(",
+    "^static NPRegCvLpResult np_regression_cv_lp_basis_fixed\\(",
     lines
   )
   helper_stop <- grep(
