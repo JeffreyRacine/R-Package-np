@@ -10854,10 +10854,10 @@ SEXP C_np_kernelsum(SEXP tuno,
   p_nvar = ((p_operator != OP_NOOP) ? ncon : 0) + ((do_score || do_ocg) ? (nuno + nord) : 0);
   n_pkw = (return_kernel_weights && (p_nvar > 0)) ? ((R_xlen_t)n_kw * (R_xlen_t)p_nvar) : 0;
   myopti_p = INTEGER(myopti_i);
-  if(XLENGTH(myopti_i) <= KWS_SPARI){
+  if(XLENGTH(myopti_i) <= KWS_BDIVWI){
     int i;
-    int * myopti_tmp = (int *)R_alloc((size_t)(KWS_SPARI + 1), sizeof(int));
-    for(i = 0; i <= KWS_SPARI; i++)
+    int * myopti_tmp = (int *)R_alloc((size_t)(KWS_BDIVWI + 1), sizeof(int));
+    for(i = 0; i <= KWS_BDIVWI; i++)
       myopti_tmp[i] = 0;
     for(i = 0; i < XLENGTH(myopti_i); i++)
       myopti_tmp[i] = myopti_p[i];
@@ -11112,6 +11112,7 @@ SEXP C_np_kernelsum_power12(SEXP tuno,
   int n_pksum = asInteger(pksum_len);
   int n_kw = asInteger(kw_len);
   int ncon = 0, nuno = 0, nord = 0, i = 0;
+  int * myopti_p = NULL;
   double * ckerlb_p = NULL;
   double * ckerub_p = NULL;
   np_continuous_kernel_descriptor descriptor;
@@ -11146,6 +11147,16 @@ SEXP C_np_kernelsum_power12(SEXP tuno,
   if(XLENGTH(kpow_r) != 1 || REAL(kpow_r)[0] != 1.0)
     error("C_np_kernelsum_power12: internal route requires kernel.pow = 1");
 
+  myopti_p = INTEGER(myopti_i);
+  if(XLENGTH(myopti_i) <= KWS_BDIVWI){
+    int * myopti_tmp = (int *)R_alloc((size_t)(KWS_BDIVWI + 1), sizeof(int));
+    for(i = 0; i <= KWS_BDIVWI; i++)
+      myopti_tmp[i] = 0;
+    for(i = 0; i < XLENGTH(myopti_i); i++)
+      myopti_tmp[i] = myopti_p[i];
+    myopti_p = myopti_tmp;
+  }
+
   ncon = (int)INTEGER(myopti_i)[KWS_NCONI];
   nuno = (int)INTEGER(myopti_i)[KWS_NUNOI];
   nord = (int)INTEGER(myopti_i)[KWS_NORDI];
@@ -11173,7 +11184,7 @@ SEXP C_np_kernelsum_power12(SEXP tuno,
                        REAL(euno_r), REAL(eord_r), REAL(econ_r),
                        REAL(bw_r),
                        REAL(mcv_r), REAL(padnum_r),
-                       INTEGER(op_i), INTEGER(myopti_i), REAL(kpow_r),
+                       INTEGER(op_i), myopti_p, REAL(kpow_r),
                        REAL(out_ksum), REAL(out_ksum_power2),
                        NULL, NULL, NULL,
                        ckerlb_p, ckerub_p);
@@ -18087,6 +18098,7 @@ static void np_kernelsum_common(double * tuno, double * tord, double * tcon,
   double * vector_scale_factor, * ksum, * ksum2 = NULL, * p_ksum = NULL, pad_num, * kw = NULL, * pkw = NULL;
   int i,j,k, num_var, num_obs_eval_alloc;
   int no_y, leave_one_out, train_is_eval, do_divide_bw;
+  int do_divide_returned_weights, do_divide_returned_bw;
   int max_lev, no_weights, sum_element_length, return_kernel_weights;
   int p_operator, do_score, do_ocg, p_nvar = 0;
   int suppress_parallel_ksum = 0;
@@ -18132,6 +18144,10 @@ static void np_kernelsum_common(double * tuno, double * tord, double * tcon,
   // no_y = myopti[KWS_NOYI];
   leave_one_out = myopti[KWS_LOOI];
   do_divide_bw = myopti[KWS_BDIVI];
+  do_divide_returned_weights = myopti[KWS_BDIVWI];
+  do_divide_returned_bw =
+    (do_divide_returned_weights || BANDWIDTH_reg_extern == BW_ADAP_NN) ?
+      do_divide_bw : 0;
   
   max_lev = myopti[KWS_MLEVI];
   pad_num = *padnum;
@@ -18535,7 +18551,7 @@ static void np_kernelsum_common(double * tuno, double * tord, double * tcon,
                                       leave_one_out,
                                       0,
                                       do_divide_bw,
-                                      (BANDWIDTH_reg_extern == BW_ADAP_NN) ? do_divide_bw : 0,
+                                      do_divide_returned_bw,
                                       0, //not symmetric
                                       0, //disable 'twisting'
                                       0, // do not drop train
@@ -18587,7 +18603,7 @@ static void np_kernelsum_common(double * tuno, double * tord, double * tcon,
                                       0,
                                       (int)(*kpow),
                                       do_divide_bw,
-                                      (BANDWIDTH_reg_extern == BW_ADAP_NN) ? do_divide_bw : 0,
+                                      do_divide_returned_bw,
                                       0, //not symmetric
                                       0, //disable 'twisting'
                                       0, // do not drop train
