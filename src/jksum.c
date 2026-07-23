@@ -10391,28 +10391,6 @@ static void np_glp_fill_basis_raw_train(const int ncon,
   }
 }
 
-static void np_glp_fill_basis_raw_train_centered(const int ncon,
-                                                 const int *terms,
-                                                 const int nterms,
-                                                 double **matrix_X_continuous_train,
-                                                 const double *x0,
-                                                 const int num_obs_train,
-                                                 double **basis){
-  int t, i, j;
-  for(t = 0; t < nterms; t++){
-    const int *et = terms + t*ncon;
-    for(i = 0; i < num_obs_train; i++){
-      double b = 1.0;
-      for(j = 0; j < ncon; j++){
-        const int p = et[j];
-        if(p > 0)
-          b *= ipow(matrix_X_continuous_train[j][i] - x0[j], p);
-      }
-      basis[t][i] = b;
-    }
-  }
-}
-
 static void np_glp_fill_basis_eval_raw(const int ncon,
                                        const int *terms,
                                        const int nterms,
@@ -10468,49 +10446,6 @@ static void np_glp_fill_basis_eval_deriv_raw(const int which_var,
       }
     }
     eval_deriv[t] = b;
-  }
-}
-
-static void np_glp_fill_basis_eval_raw_centered(const int ncon,
-                                                const int *terms,
-                                                const int nterms,
-                                                double *eval_basis){
-  int t, j;
-  for(t = 0; t < nterms; t++){
-    const int *et = terms + t*ncon;
-    int is_const = 1;
-    for(j = 0; j < ncon; j++){
-      if(et[j] != 0){
-        is_const = 0;
-        break;
-      }
-    }
-    eval_basis[t] = is_const ? 1.0 : 0.0;
-  }
-}
-
-static void np_glp_fill_basis_eval_deriv_raw_centered(const int which_var,
-                                                      const int deriv_order,
-                                                      const int ncon,
-                                                      const int *terms,
-                                                      const int nterms,
-                                                      double *eval_deriv){
-  int t, j;
-  for(t = 0; t < nterms; t++){
-    const int *et = terms + t*ncon;
-    int ok = 1;
-    for(j = 0; j < ncon; j++){
-      if(j == which_var){
-        if(et[j] != deriv_order){
-          ok = 0;
-          break;
-        }
-      } else if(et[j] != 0){
-        ok = 0;
-        break;
-      }
-    }
-    eval_deriv[t] = ok ? np_glp_falling_factorial(deriv_order, deriv_order) : 0.0;
   }
 }
 
@@ -19345,7 +19280,6 @@ double *SIGN){
     double **TCON = NULL, **TUNO = NULL, **TORD = NULL;
     double **Ycols = NULL, **Wcols = NULL;
     double *y2 = NULL, *out = NULL, *out2 = NULL, *fit_kw = NULL;
-    double *xj = NULL;
     NP_DualPowerCtx fit_dual_power_ctx = {
       NULL, 2, NULL, NULL, 0, 0
     };
@@ -19353,8 +19287,6 @@ double *SIGN){
     double *eval_basis = NULL, *eval_deriv = NULL;
     double *tmp_v = NULL, *tmp_w = NULL;
     const double epsilon = 1.0/(double)MAX(1, num_obs_train);
-    int raw_degree1_glp = (!use_bernstein) && (int_glp_basis_extern == 1);
-    int use_ll_compatible_gnn_se = 0;
     const int reuse_fit_kernel_row =
       (BANDWIDTH_reg == BW_FIXED) &&
       (int_TREE_X != NP_TREE_TRUE) &&
@@ -19368,16 +19300,7 @@ double *SIGN){
 
     if((vector_glp_degree_extern == NULL) || (num_reg_continuous <= 0))
       error("glp degree vector unavailable");
-    for(l = 0; l < num_reg_continuous; l++){
-      if(vector_glp_degree_extern[l] != 1){
-        raw_degree1_glp = 0;
-        break;
-      }
-    }
-    use_ll_compatible_gnn_se = raw_degree1_glp && (BANDWIDTH_reg == BW_GEN_NN);
-    reuse_fit_dual_power =
-      (!reuse_fit_kernel_row) && (!fit_tree_active) &&
-      (!use_ll_compatible_gnn_se);
+    reuse_fit_dual_power = (!reuse_fit_kernel_row) && (!fit_tree_active);
 
     if(!np_glp_build_terms(num_reg_continuous, vector_glp_degree_extern, int_glp_basis_extern, &glp_terms, &glp_nterms))
       error("failed to build glp basis terms");
@@ -19400,8 +19323,6 @@ double *SIGN){
     y2 = (double *)malloc((size_t)num_obs_train*sizeof(double));
     out = (double *)malloc((size_t)(glp_nterms + 2)*(size_t)glp_nterms*sizeof(double));
     out2 = (double *)malloc((size_t)glp_nterms*(size_t)glp_nterms*sizeof(double));
-    if(!use_bernstein)
-      xj = (double *)malloc((size_t)num_reg_continuous*sizeof(double));
     fit_dual_power_ctx.weighted_sum = out2;
     fit_dual_power_ctx.matrix_Y = basis;
     fit_dual_power_ctx.matrix_W = basis;
@@ -19425,7 +19346,6 @@ double *SIGN){
       ((num_reg_ordered == 0) || (TORD != NULL)) &&
       (Ycols != NULL) && (Wcols != NULL) && (y2 != NULL) && (out != NULL) &&
       (out2 != NULL) && (tmp_v != NULL) && (tmp_w != NULL) &&
-      (use_bernstein || (xj != NULL)) &&
       ((!reuse_fit_kernel_row) || (fit_kw != NULL)) &&
       (eval_basis != NULL) && (eval_deriv != NULL) &&
       (!use_bernstein || (basis_ctx != NULL))))
@@ -19507,8 +19427,6 @@ double *SIGN){
 
 	          for(l = 0; l < num_reg_continuous; l++){
 	            TCON[l][0] = matrix_X_continuous_eval[l][jj];
-	            if(!use_bernstein)
-	              xj[l] = TCON[l][0];
 	            matrix_bandwidth_eval[l][0] =
 	              (BANDWIDTH_reg == BW_GEN_NN) ? matrix_bandwidth[l][jj] :
 	              ((BANDWIDTH_reg == BW_FIXED) ? matrix_bandwidth[l][0] : 0.0);
@@ -19517,15 +19435,6 @@ double *SIGN){
 	            TUNO[l][0] = matrix_X_unordered_eval[l][jj];
 	          for(l = 0; l < num_reg_ordered; l++)
 	            TORD[l][0] = matrix_X_ordered_eval[l][jj];
-
-	          if(!use_bernstein)
-	            np_glp_fill_basis_raw_train_centered(num_reg_continuous,
-	                                                 glp_terms,
-	                                                 glp_nterms,
-	                                                 matrix_X_continuous_train,
-	                                                 xj,
-	                                                 num_obs_train,
-	                                                 basis);
 
 	          Ycols[0] = y2;
 	          Ycols[1] = vector_Y;
@@ -19613,10 +19522,12 @@ double *SIGN){
 	                                   basis_ctx,
 	                                   eval_basis);
 	          else
-	            np_glp_fill_basis_eval_raw_centered(num_reg_continuous,
-	                                                glp_terms,
-	                                                glp_nterms,
-	                                                eval_basis);
+	            np_glp_fill_basis_eval_raw(num_reg_continuous,
+	                                       glp_terms,
+	                                       glp_nterms,
+	                                       matrix_X_continuous_eval,
+	                                       jj,
+	                                       eval_basis);
 
 	          out_owner[opos] = 0.0;
 	          for(i = 0; i < glp_nterms; i++)
@@ -19695,12 +19606,14 @@ double *SIGN){
 	                                             basis_ctx,
 	                                             eval_deriv);
 	              else
-	                np_glp_fill_basis_eval_deriv_raw_centered(l,
-	                                                          grad_order,
-	                                                          num_reg_continuous,
-	                                                          glp_terms,
-	                                                          glp_nterms,
-	                                                          eval_deriv);
+	                np_glp_fill_basis_eval_deriv_raw(l,
+	                                                grad_order,
+	                                                num_reg_continuous,
+	                                                glp_terms,
+	                                                glp_nterms,
+	                                                matrix_X_continuous_eval,
+	                                                jj,
+	                                                eval_deriv);
 	              for(i = 0; i < glp_nterms; i++)
 	                grad_value += eval_deriv[i]*DELTA[i][0];
 	              out_owner[opos++] = grad_value;
@@ -19776,8 +19689,6 @@ double *SIGN){
 
 	      for(l = 0; l < num_reg_continuous; l++){
 	        TCON[l][0] = matrix_X_continuous_eval[l][j];
-	        if(!use_bernstein)
-	          xj[l] = TCON[l][0];
 	        matrix_bandwidth_eval[l][0] =
 	          (BANDWIDTH_reg == BW_GEN_NN) ? matrix_bandwidth[l][j] :
 	          ((BANDWIDTH_reg == BW_FIXED) ? matrix_bandwidth[l][0] : 0.0);
@@ -19786,15 +19697,6 @@ double *SIGN){
         TUNO[l][0] = matrix_X_unordered_eval[l][j];
       for(l = 0; l < num_reg_ordered; l++)
         TORD[l][0] = matrix_X_ordered_eval[l][j];
-
-      if(!use_bernstein)
-        np_glp_fill_basis_raw_train_centered(num_reg_continuous,
-                                             glp_terms,
-                                             glp_nterms,
-                                             matrix_X_continuous_train,
-                                             xj,
-                                             num_obs_train,
-                                             basis);
 
       Ycols[0] = y2;
       Ycols[1] = vector_Y;
@@ -19885,10 +19787,12 @@ double *SIGN){
                                basis_ctx,
                                eval_basis);
       else
-        np_glp_fill_basis_eval_raw_centered(num_reg_continuous,
-                                            glp_terms,
-                                            glp_nterms,
-                                            eval_basis);
+        np_glp_fill_basis_eval_raw(num_reg_continuous,
+                                   glp_terms,
+                                   glp_nterms,
+                                   matrix_X_continuous_eval,
+                                   j,
+                                   eval_basis);
       mean[j] = 0.0;
       for(i = 0; i < glp_nterms; i++)
         mean[j] += eval_basis[i]*DELTA[i][0];
@@ -19900,20 +19804,19 @@ double *SIGN){
       mean_stderr[j] = (sigma2hat <= 0.0) ? 0.0 : sqrt(sigma2hat * K_INT_KERNEL_P / (sk*hprod));
       sigma2hat = (sigma2hat <= 0.0) ? 0.0 : sigma2hat;
 
-      if(!use_ll_compatible_gnn_se){
-        for(l = 0; l < glp_nterms; l++){
-          Ycols[l] = basis[l];
-          Wcols[l] = basis[l];
-        }
+      for(l = 0; l < glp_nterms; l++){
+        Ycols[l] = basis[l];
+        Wcols[l] = basis[l];
+      }
 
-        if(reuse_fit_kernel_row)
-          np_lp_power2_moments_from_kernel_row(basis,
-                                                glp_nterms,
-                                                fit_kw,
-                                                num_obs_train,
-                                                hprod,
-                                                out2);
-        else if(!reuse_fit_dual_power)
+      if(reuse_fit_kernel_row)
+        np_lp_power2_moments_from_kernel_row(basis,
+                                              glp_nterms,
+                                              fit_kw,
+                                              num_obs_train,
+                                              hprod,
+                                              out2);
+      else if(!reuse_fit_dual_power)
         kernel_weighted_sum_np_ctx(kernel_c,
                              kernel_u,
                              kernel_o,
@@ -19966,16 +19869,15 @@ double *SIGN){
                              NULL,
                              est_gate_ctx_ptr);
 
-        for(i = 0; i < glp_nterms; i++){
-          const int base = i*glp_nterms;
-          for(l = 0; l < glp_nterms; l++){
-            KWM2[i][l] = out2[base + l];
-            IDEN[i][l] = (i == l) ? 1.0 : 0.0;
-          }
+      for(i = 0; i < glp_nterms; i++){
+        const int base = i*glp_nterms;
+        for(l = 0; l < glp_nterms; l++){
+          KWM2[i][l] = out2[base + l];
+          IDEN[i][l] = (i == l) ? 1.0 : 0.0;
         }
-        if(mat_solve(KWM, IDEN, KWM_INV) != NULL)
-          have_vcov = 1;
       }
+      if(mat_solve(KWM, IDEN, KWM_INV) != NULL)
+        have_vcov = 1;
 
       if(have_vcov){
         double q = 0.0;
@@ -20014,20 +19916,19 @@ double *SIGN){
                                          basis_ctx,
                                          eval_deriv);
           else
-            np_glp_fill_basis_eval_deriv_raw_centered(l,
-                                                      grad_order,
-                                                      num_reg_continuous,
-                                                      glp_terms,
-                                                      glp_nterms,
-                                                      eval_deriv);
+            np_glp_fill_basis_eval_deriv_raw(l,
+                                             grad_order,
+                                             num_reg_continuous,
+                                             glp_terms,
+                                             glp_nterms,
+                                             matrix_X_continuous_eval,
+                                             j,
+                                             eval_deriv);
           gradient[l][j] = 0.0;
           for(i = 0; i < glp_nterms; i++)
             gradient[l][j] += eval_deriv[i]*DELTA[i][0];
           if(do_gerr){
-            if(use_ll_compatible_gnn_se){
-              gradient_stderr[l][j] =
-                gfac*mean_stderr[j]/((BANDWIDTH_reg == BW_GEN_NN) ? matrix_bandwidth[l][j] : matrix_bandwidth[l][0]);
-            } else if(have_vcov){
+            if(have_vcov){
               double q = 0.0;
               for(i = 0; i < glp_nterms; i++){
                 double vv = 0.0;
@@ -20078,7 +19979,6 @@ double *SIGN){
     free(y2);
     free(out);
     free(out2);
-    if(xj != NULL) free(xj);
     if(fit_kw != NULL) free(fit_kw);
     free(tmp_v);
     free(tmp_w);
