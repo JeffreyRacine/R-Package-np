@@ -780,7 +780,7 @@ npreg.rbandwidth <-
       mcv.numRow = attr(bws$xmcv, "num.row"),
       int_do_tree = if (beta.kernel) DO_TREE_NO else
         .npreg_fit_tree_code(bws, ncon = bws$ncon, ncat = bws$nuno + bws$nord),
-      old.reg = FALSE)
+      reserved.reg.engine = FALSE)
     myopti <- c(myopti, npContinuousKernelDescriptorOptions(bws))
 
     cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])

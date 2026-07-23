@@ -10753,23 +10753,15 @@ static int np_glp_cv_cache_prepare(const int int_ll,
   int l, i;
   int *terms = NULL;
   int nterms = 0;
-  int implicit_degree[MAX(1, ncon)];
   const int *degree_vec = vector_glp_degree_extern;
-  const int use_bernstein =
-    ((int_ll == LL_LP) && (int_ll_extern == LL_LL)) ? 0 : (int_glp_bernstein_extern != 0);
-  const int basis_mode =
-    ((int_ll == LL_LP) && (int_ll_extern == LL_LL)) ? 1 : int_glp_basis_extern;
+  const int use_bernstein = (int_glp_bernstein_extern != 0);
+  const int basis_mode = int_glp_basis_extern;
   double **basis = NULL;
   NPGLPBasisCtx *basis_ctx = NULL;
 
   np_glp_cv_cache_clear();
 
   if(int_ll != LL_LP) return 1;
-  if((int_ll_extern == LL_LL) && (ncon > 0)){
-    for(l = 0; l < ncon; l++)
-      implicit_degree[l] = 1;
-    degree_vec = implicit_degree;
-  }
   if((degree_vec == NULL) || (ncon <= 0) || (num_obs <= 0))
     return 0;
   if(!np_glp_build_terms(ncon, degree_vec, basis_mode, &terms, &nterms))
@@ -11319,48 +11311,29 @@ static inline double np_regression_cv_loss_value(const int bwm,
     residual*residual;
 }
 
-static inline int np_reg_cv_use_canonical_lp_fixed_kernel(const int int_ll,
-                                                           const int bwm,
+static inline int np_reg_cv_use_canonical_lp_fixed_kernel(const int bwm,
                                                            const int BANDWIDTH_reg,
                                                            const int num_reg_continuous,
-                                                           const int ks_tree_use,
                                                            const int use_bernstein){
   if((BANDWIDTH_reg != BW_FIXED) || (num_reg_continuous <= 0))
     return 0;
 
   if(bwm == RBWM_CVAIC)
-    return int_ll == LL_LP;
+    return 1;
 
   if((bwm != RBWM_CVLS) && (bwm != RBWM_CVCHECK) &&
      (bwm != RBWM_CVKS))
     return 0;
 
-  if(int_ll == LL_LL)
-    return 1;
-
   /*
     Bernstein LP fixed-kernel objectives are faster through the packed BLAS
     basis path below.
   */
-  if((int_ll == LL_LP) &&
-     (!use_bernstein) &&
+  if((!use_bernstein) &&
      (int_glp_basis_extern == 1))
     return 1;
 
   return 0;
-}
-
-static inline int np_reg_cv_use_canonical_ll_degree1_lp_objective(const int int_ll,
-                                                                  const int bwm,
-                                                                  const int BANDWIDTH_reg,
-                                                                  const int num_reg_continuous,
-                                                                  const int ks_tree_use){
-  return (int_ll == LL_LL) &&
-    ((bwm == RBWM_CVLS) || (bwm == RBWM_CVCHECK) ||
-     (bwm == RBWM_CVKS)) &&
-    (BANDWIDTH_reg == BW_FIXED) &&
-    (num_reg_continuous > 0) &&
-    (!ks_tree_use);
 }
 
 static int np_lp_fixed_tree_sparse_supported(const int num_reg_unordered,
@@ -12304,7 +12277,6 @@ cleanup_sparse:
 
 
 static NPRegCvLpResult np_regression_cv_lp_rawbasis_fixed(
-    const int int_ll,
     const int bwm,
     const int num_obs,
     const int num_reg_unordered,
@@ -12331,12 +12303,10 @@ static NPRegCvLpResult np_regression_cv_lp_rawbasis_fixed(
   int local_fail = 0;
   int nterms = glp_nterms_in;
   double **basis = glp_basis_in;
-  double **basis_local = NULL;
   int *support_count = NULL, *support_orig = NULL, *support_data = NULL;
 #ifdef MPI2
   int *support_count_local = NULL, *support_orig_local = NULL, *support_data_local = NULL;
 #endif
-  double *ones = NULL;
   double *moments = NULL, *rhs = NULL, *kw = NULL;
   double *moments_local = NULL, *rhs_local = NULL;
   double *support_weight = NULL;
@@ -12366,21 +12336,6 @@ static NPRegCvLpResult np_regression_cv_lp_rawbasis_fixed(
 
   if((num_obs <= 0) || (num_reg_continuous <= 0))
     return result;
-
-  if(int_ll == LL_LL){
-    nterms = num_reg_continuous + 1;
-    basis_local = (double **)malloc((size_t)nterms*sizeof(double *));
-    ones = alloc_vecd(num_obs);
-    if((basis_local == NULL) || (ones == NULL))
-      NP_LP_CV_FAIL();
-    for(i = 0; i < num_obs; i++)
-      ones[i] = 1.0;
-    basis_local[0] = ones;
-    for(l = 0; l < num_reg_continuous; l++){
-      basis_local[l+1] = matrix_X_continuous[l];
-    }
-    basis = basis_local;
-  }
 
   if((basis == NULL) || (nterms <= 0))
     NP_LP_CV_FAIL();
@@ -12927,8 +12882,6 @@ cleanup_lp_cv:
   if(kw != NULL) free(kw);
   if(eval_ybasis != NULL) free(eval_ybasis);
   if(eval_outer != NULL) free(eval_outer);
-  if(basis_local != NULL) free(basis_local);
-  if(ones != NULL) free(ones);
   if(sf_flag){
     int_LARGE_SF = 0;
     free(vsf);
@@ -12994,23 +12947,9 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                                    num_reg_unordered,
                                    num_reg_ordered))
     return DBL_MAX;
-  /* Canonical CVAIC parity: LP(degree=1) should follow the LL-equivalent
-     objective branch for bandwidth search. */
-  int int_ll_cv = int_ll;
-  if((int_ll == LL_LP) &&
-     (bwm == RBWM_CVAIC) &&
-     (vector_glp_degree_extern != NULL) &&
-     (num_reg_continuous > 0)){
-    int all_deg_one = 1;
-    for(i = 0; i < num_reg_continuous; i++){
-      if(vector_glp_degree_extern[i] != 1){
-        all_deg_one = 0;
-        break;
-      }
-    }
-    if(all_deg_one)
-      int_ll_cv = LL_LL;
-  }
+
+  if((int_ll != LL_LC) && (int_ll != LL_LP))
+    error("invalid internal regression engine");
 
   operator = np_reg_cv_core_cache.operator;
   kernel_c = np_reg_cv_core_cache.kernel_c;
@@ -13026,13 +12965,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
     num_obs_eval_alloc = num_obs;
 #endif
 
-    int ks_tree_use = (int_TREE_X == NP_TREE_TRUE) && (!((BANDWIDTH_reg == BW_ADAP_NN) && (int_ll_cv == LL_LL)));
-    if(np_reg_cv_use_canonical_ll_degree1_lp_objective(int_ll,
-                                                       bwm,
-                                                       BANDWIDTH_reg,
-                                                       num_reg_continuous,
-                                                       ks_tree_use))
-      int_ll_cv = LL_LP;
+    int ks_tree_use = (int_TREE_X == NP_TREE_TRUE);
 
   if(kernel_bandwidth_mean(KERNEL_reg,
                            BANDWIDTH_reg,
@@ -13058,7 +12991,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
   }
   if((bwm != RBWM_CVKS) &&
      np_extendednn_mpi_lc_all_large_gate(BANDWIDTH_reg,
-                                      int_ll_cv,
+                                      int_ll,
                                       num_obs,
                                       num_reg_continuous,
                                       num_reg_unordered,
@@ -13075,7 +13008,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
       goto finish_cv_path;
     }
   }
-  if(int_ll_cv == LL_LP){
+  if(int_ll == LL_LP){
     const int use_bernstein = (int_glp_bernstein_extern != 0);
     const int *glp_terms = NULL;
     int glp_nterms = 0;
@@ -13097,7 +13030,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
        (np_glp_cv_cache.num_obs != num_obs) ||
        (np_glp_cv_cache.ncon != num_reg_continuous) ||
        (np_glp_cv_cache.matrix_X_continuous_train_ptr != matrix_X_continuous)){
-      if(!np_glp_cv_cache_prepare(int_ll_cv, num_obs, num_reg_continuous, matrix_X_continuous)){
+      if(!np_glp_cv_cache_prepare(int_ll, num_obs, num_reg_continuous, matrix_X_continuous)){
         cv = DBL_MAX;
         goto finish_cv_path;
       }
@@ -13117,11 +13050,9 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
 
     {
       const int use_canonical_lp_kernel =
-        np_reg_cv_use_canonical_lp_fixed_kernel(LL_LP,
-                                                 bwm,
+        np_reg_cv_use_canonical_lp_fixed_kernel(bwm,
                                                  BANDWIDTH_reg,
                                                  num_reg_continuous,
-                                                 ks_tree_use,
                                                  use_bernstein);
       const int all_large_gate = (bwm != RBWM_CVKS) &&
         np_reg_cv_all_large_gate(BANDWIDTH_reg,
@@ -13143,8 +13074,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                                                           &ov_cont_from_cache);
       if(use_canonical_lp_kernel && !all_large_gate){
         NPRegCvLpResult lp_result =
-          np_regression_cv_lp_rawbasis_fixed(LL_LP,
-                                              bwm,
+          np_regression_cv_lp_rawbasis_fixed(bwm,
                                               num_obs,
                                               num_reg_unordered,
                                               num_reg_ordered,
@@ -13805,7 +13735,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
     goto finish_cv_path;
   }
 
-  if(((bwm == RBWM_CVLS) || (bwm == RBWM_CVAIC)) && (int_ll_cv == LL_LC)){
+  if((bwm == RBWM_CVLS) || (bwm == RBWM_CVAIC)){
     double profile_cv = DBL_MAX;
     double profile_traceH = 0.0;
     if(np_regression_categorical_profile_cv(kernel_c,
@@ -13839,8 +13769,8 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
     when every active kernel component is effectively constant, the estimator
     collapses to a global least-squares fit.
 
-    - LC: intercept-only global mean model
-    - LL: global linear model on continuous regressors (matches current LL path)
+    The only route reaching this block is LC, so it is the intercept-only
+    global mean model.
 
     Then:
     - CVLS: exact LOOCV via e_i/(1-h_ii)
@@ -13867,7 +13797,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                                                         &ov_cont_from_cache);
 
     if(all_large_gate){
-      const int k = (int_ll_cv == LL_LC) ? 1 : (num_reg_continuous + 1);
+      const int k = 1;
       MATRIX XtX = mat_creat(k, k, UNDEFINED);
       MATRIX XtXINV = mat_creat(k, k, UNDEFINED);
       MATRIX XtY = mat_creat(k, 1, UNDEFINED);
@@ -13888,25 +13818,6 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
         for(i = 0; i < num_obs; i++){
           XtX[0][0] += 1.0;
           XtY[0][0] += vector_Y[i];
-          if(k > 1){
-            for(j = 0; j < num_reg_continuous; j++){
-              const double xj = matrix_X_continuous[j][i];
-              const int cj = j + 1;
-              XtX[0][cj] += xj;
-              XtX[cj][0] += xj;
-              XtY[cj][0] += xj*vector_Y[i];
-            }
-            for(int a = 0; a < num_reg_continuous; a++){
-              const double xa = matrix_X_continuous[a][i];
-              const int ca = a + 1;
-              for(int b = a; b < num_reg_continuous; b++){
-                const double xb = matrix_X_continuous[b][i];
-                const int cb = b + 1;
-                XtX[ca][cb] += xa*xb;
-                if(cb != ca) XtX[cb][ca] += xa*xb;
-              }
-            }
-          }
         }
 
         while(mat_inv(XtX, XtXINV) == NULL){
@@ -13932,23 +13843,6 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
           for(i = 0; i < num_obs; i++){
             double yhat = BETA[0][0];
             double hii = XtXINV[0][0];
-            if(k > 1){
-              for(j = 0; j < num_reg_continuous; j++){
-                const double xj = matrix_X_continuous[j][i];
-                yhat += BETA[j+1][0]*xj;
-              }
-              for(j = 0; j < num_reg_continuous; j++){
-                const double xj = matrix_X_continuous[j][i];
-                hii += 2.0*xj*XtXINV[0][j+1];
-              }
-              for(int a = 0; a < num_reg_continuous; a++){
-                const double xa = matrix_X_continuous[a][i];
-                for(int b = 0; b < num_reg_continuous; b++){
-                  const double xb = matrix_X_continuous[b][i];
-                  hii += xa*XtXINV[a+1][b+1]*xb;
-                }
-              }
-            }
 
             const double loss_y =
               (bwm == RBWM_CVCHECK && vector_lsq_loss_extern != NULL) ?
@@ -13979,39 +13873,6 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
         goto finish_cv_path;
       }
     }
-  }
-
-  if(np_reg_cv_use_canonical_lp_fixed_kernel(int_ll_cv,
-                                              bwm,
-                                              BANDWIDTH_reg,
-                                              num_reg_continuous,
-                                              ks_tree_use,
-                                              0)){
-    NPRegCvLpResult lp_result =
-      np_regression_cv_lp_rawbasis_fixed(int_ll_cv,
-                                          bwm,
-                                          num_obs,
-                                          num_reg_unordered,
-                                          num_reg_ordered,
-                                          num_reg_continuous,
-                                          matrix_X_unordered,
-                                          matrix_X_ordered,
-                                          matrix_X_continuous,
-                                          vector_Y,
-                                          vector_scale_factor,
-                                          num_categories,
-                                          kernel_c,
-                                          kernel_u,
-                                          kernel_o,
-                                          operator,
-                                          lambda,
-                                          matrix_bandwidth,
-                                          0,
-                                          NULL,
-                                          ks_tree_use);
-    cv = lp_result.cv;
-    traceH = lp_result.traceH;
-    goto finish_cv_path;
   }
 
   if(bwm == RBWM_CVAIC){
@@ -14084,7 +13945,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
 
   // Conduct the estimation 
 
-  if(int_ll_cv == LL_LC) { // local constant
+  { // local constant
     // Nadaraya-Watson
     // Generate bandwidth vector given scale factors, nearest neighbors, or lambda 
 
@@ -14178,542 +14039,6 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
 
     free(lc_Y[1]);
     free(mean);
-  } else { // Local Linear 
-
-    // because we manipulate the training data scale factors can be wrong
-
-    if((sf_flag = (int_LARGE_SF == 0))){ 
-      int_LARGE_SF = 1;
-      vsf = (double *)malloc(num_reg_continuous*sizeof(double));
-      for(int ii = 0; ii < num_reg_continuous; ii++)
-        vsf[ii] = matrix_bandwidth[ii][0];
-    } else {
-      vsf = vector_scale_factor;
-    }
-
-    MATRIX XTKX = mat_creat( num_reg_continuous + 2, num_obs, UNDEFINED );
-    MATRIX XTKXINV = mat_creat( num_reg_continuous + 1, num_reg_continuous + 1, UNDEFINED );
-    MATRIX XTKY = mat_creat( num_reg_continuous + 1, 1, UNDEFINED );
-    MATRIX DELTA = mat_creat( num_reg_continuous + 1, 1, UNDEFINED );
-
-    MATRIX KWM = mat_creat( num_reg_continuous + 1, num_reg_continuous + 1, UNDEFINED );
-    // Generate bandwidth vector given scale factors, nearest neighbors, or lambda 
-    
-    MATRIX TCON = mat_creat(num_reg_continuous, 1, UNDEFINED);
-    MATRIX TUNO = mat_creat(num_reg_unordered, 1, UNDEFINED);
-    MATRIX TORD = mat_creat(num_reg_ordered, 1, UNDEFINED);
-
-    const int nrc2 = (num_reg_continuous+2);
-    const int nrc1 = (num_reg_continuous+1);
-    const int nrcc22 = nrc2*nrc2;
-
-    double ** matrix_bandwidth_eval = NULL;
-
-    double * PKWM[nrc1], * PXTKY[nrc1], * PXTKX[nrc2];
-
-    double * PXC[MAX(1,num_reg_continuous)]; 
-    double * PXU[MAX(1,num_reg_unordered)];
-    double * PXO[MAX(1,num_reg_ordered)];
-
-    PXC[0] = NULL;
-    PXU[0] = NULL;
-    PXO[0] = NULL;
-
-    for(l = 0; l < num_reg_continuous; l++)
-      PXC[l] = matrix_X_continuous[l];
-
-    for(l = 0; l < num_reg_unordered; l++)
-      PXU[l] = matrix_X_unordered[l];
-
-    for(l = 0; l < num_reg_ordered; l++)
-      PXO[l] = matrix_X_ordered[l];
-
-    const size_t kwm_len = (size_t)nrcc22*(size_t)num_obs_eval_alloc;
-    double * kwm = (double *)malloc(kwm_len*sizeof(double));
-
-    for(size_t ii = 0; ii < kwm_len; ii++)
-      kwm[ii] = 0.0;
-
-    double * sgn = (double *)malloc((nrc2)*sizeof(double));
-
-    sgn[0] = sgn[1] = 1.0;
-    
-    for(int ii = 0; ii < (num_reg_continuous); ii++)
-      sgn[ii+2] = -1.0;
-    
-    for(int ii = 0; ii < (nrc2); ii++)
-      PXTKX[ii] = XTKX[ii];
-    
-    for(int ii = 0; ii < (nrc1); ii++){
-      PKWM[ii] = KWM[ii];
-      PXTKY[ii] = XTKY[ii];
-
-      KWM[ii] = &kwm[(ii+1)*(nrc2)+1];
-      XTKY[ii] = &kwm[ii+1];
-
-    }
-
-    matrix_bandwidth_eval = alloc_tmatd(1,num_reg_continuous);
-
-
-    const double epsilon = 1.0/num_obs;
-    double nepsilon;
-
-    //    matrix_bandwidth = alloc_matd(num_obs,num_reg_continuous);
-
-    // populate the xtkx matrix first 
-    
-    for(i = 0; i < num_obs; i++){
-      XTKX[0][i] = vector_Y[i];
-      XTKX[1][i] = 1.0;
-    }
-
-
-    for(j = 0; j < num_obs; j++){ // main loop
-      if((j & 31) == 0)
-        np_progress_bandwidth_loop_step();
-
-      nepsilon = 0.0;
-
-      for(l = 0; l < (nrc1); l++){
-        KWM[l] = &kwm[j*nrcc22+(l+1)*(nrc2)+1];
-        XTKY[l] = &kwm[j*nrcc22+l+1];
-      }
-
-#ifdef MPI2
-      if(np_reg_cv_use_symmetric_dropone_path(bwm, ks_tree_use, BANDWIDTH_reg)){
-        if((j % iNum_Processors) == 0){
-          if((j+my_rank) < (num_obs)){
-            for(l = 0; l < num_reg_continuous; l++){
-          
-              for(i = 0; i < num_obs; i++){
-                XTKX[l+2][i] = matrix_X_continuous[l][i]-matrix_X_continuous[l][j+my_rank];
-              }
-              TCON[l][0] = matrix_X_continuous[l][j+my_rank]; // temporary storage
-
-              if(BANDWIDTH_reg == BW_GEN_NN)
-                matrix_bandwidth_eval[l][0] = matrix_bandwidth[l][j+my_rank]; // temporary storage
-            }
-
-
-            for(l = 0; l < num_reg_unordered; l++)
-              TUNO[l][0] = matrix_X_unordered[l][j+my_rank];
-
-            for(l = 0; l < num_reg_ordered; l++)
-              TORD[l][0] = matrix_X_ordered[l][j+my_rank];
-
-            kernel_weighted_sum_np_ctx(kernel_c,
-                                   kernel_u,
-                                   kernel_o,
-                                   BANDWIDTH_reg,
-                                   num_obs,
-                                   1,
-                                   num_reg_unordered,
-                                   num_reg_ordered,
-                                   num_reg_continuous,
-                                   0, 
-                                   0,
-                                   1, // kernel_pow = 1
-                                   (BANDWIDTH_reg == BW_ADAP_NN)?1:0, // bandwidth_divide = FALSE when not adaptive
-                                   0, 
-                                   1, // symmetric
-                                   0, // NO gather-scatter sum
-                                   1, // drop train
-                                   j+my_rank, // drop this training datum
-                                   operator, // no convolution
-                                   OP_NOOP, // no permutations
-                                   0, // no score
-                                   0, // no ocg
-                                   NULL,
-                                   1, // explicitly suppress parallel
-                                   nrc2, // nrc2 cols in Y
-                                   nrc2, // nrc2 cols in W
-                                   (BANDWIDTH_reg == BW_ADAP_NN) ? NP_TREE_FALSE : int_TREE_X,
-                                   0,
-                                   (BANDWIDTH_reg == BW_ADAP_NN) ? NULL : kdt_extern_X,
-                                   NULL,
-                                   NULL,
-                                   NULL,
-                                   PXU, // TRAIN
-                                   PXO, 
-                                   PXC,
-                                   TUNO, // EVAL
-                                   TORD,
-                                   TCON,
-                                   XTKX,
-                                   XTKX,
-                                   NULL,
-                                   vsf,
-                                   1,
-                                   matrix_bandwidth,
-                                   matrix_bandwidth_eval,
-                                   lambda,
-                                   num_categories,
-                                   matrix_categorical_vals_extern,
-                                   NULL,
-                                   kwm+(j+my_rank)*nrcc22,  // weighted sum
-                                   NULL, // no permutations
-                                   NULL, // do not return kernel weights
-                                   NULL);
-
-          }
-          // synchro step
-          MPI_Allgather(MPI_IN_PLACE, nrcc22, MPI_DOUBLE, kwm+j*nrcc22, nrcc22, MPI_DOUBLE, comm[1]);
-        }
-      } else {
-        if((j % iNum_Processors) == 0){
-
-          // some guys have to sit out the last calculation, but
-          // they still sync up afterwards
-          if((j+my_rank) < (num_obs-1)){
-
-            for(l = 0; l < (nrc2); l++){
-              XTKX[l] = PXTKX[l] + j + my_rank + 1;
-            }
-
-            for(l = 0; l < num_reg_continuous; l++)
-              PXC[l] = matrix_X_continuous[l] + j + my_rank + 1;
-
-            for(l = 0; l < num_reg_unordered; l++)
-              PXU[l] = matrix_X_unordered[l] + j + my_rank + 1;
-
-            for(l = 0; l < num_reg_ordered; l++)
-              PXO[l] = matrix_X_ordered[l] + j + my_rank + 1;
-        
-            for(l = 0; l < num_reg_continuous; l++){
-        
-              for(i = 0; i < (num_obs-j-1-my_rank); i++){
-                XTKX[l+2][i] = matrix_X_continuous[l][i+j+1+my_rank]-matrix_X_continuous[l][j+my_rank];
-              }
-              TCON[l][0] = matrix_X_continuous[l][j+my_rank]; // temporary storage
-
-              if(BANDWIDTH_reg == BW_GEN_NN)
-                matrix_bandwidth_eval[l][0] = matrix_bandwidth[l][j+my_rank]; // temporary storage
-            }
-
-            for(l = 0; l < num_reg_unordered; l++)
-              TUNO[l][0] = matrix_X_unordered[l][j+my_rank];
-
-            for(l = 0; l < num_reg_ordered; l++)
-              TORD[l][0] = matrix_X_ordered[l][j+my_rank];
-
-            kernel_weighted_sum_np_ctx(kernel_c,
-                                   kernel_u,
-                                   kernel_o,
-                                   BANDWIDTH_reg,
-                                   num_obs-j-my_rank-1,
-                                   1,
-                                   num_reg_unordered,
-                                   num_reg_ordered,
-                                   num_reg_continuous,
-                                   0, // we leave one out via the weight matrix
-                                   0,
-                                   1, // kernel_pow = 1
-                                   (BANDWIDTH_reg == BW_ADAP_NN)?1:0, // bandwidth_divide = FALSE when not adaptive
-                                   0, 
-                                   1, // symmetric
-                                   1, // gather-scatter sum
-                                   0, // do not drop train
-                                   0, // do not drop train
-                                   operator, // no convolution
-                                   OP_NOOP, // no permutations
-                                   0, // no score
-                                   0, // no ocg
-                                   NULL,
-                                   1, // explicitly suppress parallel
-                                   nrc2, // cols in Y
-                                   nrc2, // cols in W
-                                   0, // no tree?
-                                   0,
-                                   NULL, NULL, NULL, NULL,
-                                   PXU, // TRAIN
-                                   PXO, 
-                                   PXC,
-                                   TUNO, // EVAL
-                                   TORD,
-                                   TCON,
-                                   XTKX,
-                                   XTKX,
-                                   sgn,
-                                   vsf,
-                                   1,
-                                   matrix_bandwidth,
-                                   matrix_bandwidth_eval,
-                                   lambda,
-                                   num_categories,
-                                   matrix_categorical_vals_extern,
-                                   NULL,
-                                   kwm+(j+my_rank)*nrcc22,  // weighted sum
-                                   NULL, // no permutations
-                                   NULL, // do not return kernel weights
-                                   NULL);
-
-            // need to use reference weight to fix weight sum
-            for(int jj = j+my_rank+1; jj < num_obs; jj++){
-              const double RW = kwm[jj*nrcc22+nrc1]*(XTKX[0][-1]-XTKX[0][jj-j-my_rank-1]);
-              for(int ii = 1; ii < nrc2; ii++){
-                kwm[jj*nrcc22+ii*nrc2] += RW*XTKX[ii][jj-j-my_rank-1]*sgn[ii];
-              }
-            }
-          }
-          // reduce all work arrays
-          const int nrem = num_obs % iNum_Processors;
-          const int nred = ((j+iNum_Processors) > num_obs) ? nrem : iNum_Processors;
-
-          MPI_Allreduce(MPI_IN_PLACE, kwm+j*nrcc22, nred*nrcc22, MPI_DOUBLE, MPI_SUM, comm[1]);
-        }
-
-        // due to a quirk of the algorithm in parallel, always need to re-symmetrise array
-        
-        double * const tpk = kwm+j*nrcc22;
-        for (int jj = 0; jj < (nrc2); jj++){
-          for (int ii = (nrc1); ii > jj; ii--){
-            tpk[jj*(nrc2)+ii] = tpk[ii*(nrc2)+jj];
-          }
-        }
-      }
-
-#else
-      if(np_reg_cv_use_symmetric_dropone_path(bwm, ks_tree_use, BANDWIDTH_reg)){
-
-        for(l = 0; l < num_reg_continuous; l++){
-          
-          for(i = 0; i < num_obs; i++){
-            XTKX[l+2][i] = matrix_X_continuous[l][i]-matrix_X_continuous[l][j];
-          }
-          TCON[l][0] = matrix_X_continuous[l][j]; // temporary storage
-
-          if(BANDWIDTH_reg == BW_GEN_NN)
-            matrix_bandwidth_eval[l][0] = matrix_bandwidth[l][j]; // temporary storage
-        }
-
-
-        for(l = 0; l < num_reg_unordered; l++)
-          TUNO[l][0] = matrix_X_unordered[l][j];
-
-        for(l = 0; l < num_reg_ordered; l++)
-          TORD[l][0] = matrix_X_ordered[l][j];
-
-        kernel_weighted_sum_np_ctx(kernel_c,
-                               kernel_u,
-                               kernel_o,
-                               BANDWIDTH_reg,
-                               num_obs,
-                               1,
-                               num_reg_unordered,
-                               num_reg_ordered,
-                               num_reg_continuous,
-                               0, // we leave one out via the weight matrix
-                               0, 
-                               1, // kernel_pow = 1
-                               (BANDWIDTH_reg == BW_ADAP_NN)?1:0, // bandwidth_divide = FALSE when not adaptive
-                               0, 
-                               1, // symmetric
-                               0, // gather-scatter sum
-                               1, // do not drop train
-                               j, // do not drop train
-                               operator, // no convolution
-                               OP_NOOP, // no permutations
-                               0, // no score
-                               0, // no ocg
-                               NULL,
-                               0, // don't explicity suppress parallel
-                               nrc2,
-                               nrc2,
-                               (BANDWIDTH_reg == BW_ADAP_NN) ? NP_TREE_FALSE : int_TREE_X,
-                               0,
-                               (BANDWIDTH_reg == BW_ADAP_NN) ? NULL : kdt_extern_X,
-                               NULL, NULL, NULL,
-                               PXU, // TRAIN
-                               PXO, 
-                               PXC,
-                               TUNO, // EVAL
-                               TORD,
-                               TCON,
-                               XTKX,
-                               XTKX,
-                               NULL,
-                               vsf,
-                               1,
-                               matrix_bandwidth,
-                               matrix_bandwidth_eval,
-                               lambda,
-                               num_categories,
-                               matrix_categorical_vals_extern,
-                               NULL,
-                               kwm+j*nrcc22,  // weighted sum
-                               NULL, // no permutations
-                               NULL, // do not return kernel weights
-                               NULL);
-
-      } else {
-        if(j < (num_obs-1)){
-
-          for(l = 0; l < (nrc2); l++){
-            XTKX[l]++;
-          }
-
-          for(l = 0; l < num_reg_continuous; l++)
-            PXC[l]++;
-
-          for(l = 0; l < num_reg_unordered; l++)
-            PXU[l]++;
-
-          for(l = 0; l < num_reg_ordered; l++)
-            PXO[l]++;
-
-          for(l = 0; l < num_reg_continuous; l++){
-          
-            for(i = 0; i < (num_obs-j-1); i++){
-              XTKX[l+2][i] = matrix_X_continuous[l][i+j+1]-matrix_X_continuous[l][j];
-            }
-            TCON[l][0] = matrix_X_continuous[l][j]; // temporary storage
-
-            if(BANDWIDTH_reg == BW_GEN_NN)
-              matrix_bandwidth_eval[l][0] = matrix_bandwidth[l][j]; // temporary storage
-          }
-
-      
-          for(l = 0; l < num_reg_unordered; l++)
-            TUNO[l][0] = matrix_X_unordered[l][j];
-
-          for(l = 0; l < num_reg_ordered; l++)
-            TORD[l][0] = matrix_X_ordered[l][j];
-      
-          kernel_weighted_sum_np_ctx(kernel_c,
-                                 kernel_u,
-                                 kernel_o,
-                                 BANDWIDTH_reg,
-                                 num_obs-j-1,
-                                 1,
-                                 num_reg_unordered,
-                                 num_reg_ordered,
-                                 num_reg_continuous,
-                                 0, // we leave one out via the weight matrix
-                                 0,
-                                 1, // kernel_pow = 1
-                                 (BANDWIDTH_reg == BW_ADAP_NN)?1:0, // bandwidth_divide = FALSE when not adaptive
-                                 0, 
-                                 1, // symmetric
-                                 1, // gather-scatter sum
-                                 0, // do not drop train
-                                 0, // do not drop train
-                                 operator, // no convolution
-                                 OP_NOOP, // no permutations
-                                 0, // no score
-                                 0, // no ocg
-                                 NULL,
-                                 0, // don't explicity suppress parallel
-                                 nrc2,
-                                 nrc2,
-                                 0, // no trees
-                                 0,
-                                 NULL, NULL, NULL, NULL,
-                                 PXU, // TRAIN
-                                 PXO, 
-                                 PXC,
-                                 TUNO, // EVAL
-                                 TORD,
-                                 TCON,
-                                 XTKX,
-                                 XTKX,
-                                 sgn,
-                                 vsf,
-                                 1,
-                                 matrix_bandwidth,
-                                 matrix_bandwidth_eval,
-                                 lambda,
-                                 num_categories,
-                                 matrix_categorical_vals_extern,
-                                 NULL,
-                                 kwm+j*nrcc22, // weighted sum
-                                 NULL, // no permutations
-                                 NULL,  // no kernel weights
-                                 NULL);
-
-          // need to use reference weight to fix weight sum
-          for(int jj = j+1; jj < num_obs; jj++){
-            const double RW = kwm[jj*nrcc22+nrc1]*(XTKX[0][-1]-XTKX[0][jj-j-1]);
-            for(int ii = 1; ii < nrc2; ii++){
-              kwm[jj*nrcc22+ii*nrc2] += RW*XTKX[ii][jj-j-1]*sgn[ii];
-            }
-          }
-        } else { // because we skip the last call to npksum, we need to copy L to U for last observation
-          double * const tpk = kwm+j*nrcc22;
-          for (int jj = 0; jj < (nrc2); jj++){
-            for (int ii = (nrc1); ii > jj; ii--){
-              tpk[jj*(nrc2)+ii] = tpk[ii*(nrc2)+jj];
-            }
-          }
-        }
-      }
-#endif
-      double pnh = 1.0;
-
-      if((BANDWIDTH_reg == BW_ADAP_NN)&&(bwm == RBWM_CVAIC)){
-        for(int jj = 0; jj < num_reg_continuous; jj++)
-          pnh /= matrix_bandwidth[jj][j];
-      }
-
-      // need to manipulate KWM pointers and XTKY - done
-      if(bwm == RBWM_CVAIC){
-        KWM[0][0] += pnh*aicc;
-        XTKY[0][0] += pnh*aicc*vector_Y[j];
-      }
-
-      while(mat_solve(KWM, XTKY, DELTA) == NULL){ // singular = ridge about
-        for(int ii = 0; ii < (nrc1); ii++)
-          KWM[ii][ii] += epsilon;
-        nepsilon += epsilon;
-      }
-
-      if(bwm == RBWM_CVAIC){
-        int ok00 = 0;
-        const double inv00 = mat_inv00(KWM, &ok00);
-        if(!ok00)
-          error("mat_inv00 failed after ridge adjustment");
-        traceH += inv00*pnh*aicc;
-      }
-
-      XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(KWM[0][0]);
-      if(nepsilon > 0.0){
-        if(mat_solve(KWM, XTKY, DELTA) == NULL)
-          error("mat_solve failed after ridge adjustment");
-      }
-      const double loss_y =
-        (bwm == RBWM_CVCHECK && vector_lsq_loss_extern != NULL) ?
-        vector_lsq_loss_extern[j] :
-        vector_Y[j];
-      cv += np_regression_cv_loss_value(bwm, DELTA[0][0], loss_y);
-    }
-
-    for(int ii = 0; ii < (nrc1); ii++){
-      KWM[ii] = PKWM[ii];
-      XTKY[ii] = PXTKY[ii];
-    }
-
-    for(int ii = 0; ii < (nrc2); ii++)
-      XTKX[ii] = PXTKX[ii];
-
-    if(sf_flag){
-      int_LARGE_SF = 0;
-      free(vsf);
-    }
-
-    
-    mat_free(XTKX);
-    mat_free(XTKXINV);
-    mat_free(XTKY);
-    mat_free(DELTA);
-    mat_free(KWM);
-
-    mat_free(TCON);
-    mat_free(TUNO);
-    mat_free(TORD);
-
-    free(kwm);
-    free(sgn);
-    free_tmat(matrix_bandwidth_eval);
   }
 
 finish_cv_path:
@@ -18401,7 +17726,7 @@ double *CORR,
 double *SIGN){
 
   // note that mean has 2*num_obs allocated for npksum
-  int i, j, l, sf_flag = 0;
+  int i, j, l;
 
 	double INT_KERNEL_P;					 /* Integral of K(z)^2 */
 	double K_INT_KERNEL_P;				 /*  K^p */
@@ -18410,7 +17735,7 @@ double *SIGN){
 	double DIFF_KER_PPM = 0.0;		 /* Difference between int K(z)^p and int K(z-.5)K(z+.5) */
   double hprod;
 
-  double * lambda = NULL, * vsf = NULL;
+  double * lambda = NULL;
   double ** matrix_bandwidth = NULL;
   double ** matrix_bandwidth_deriv = NULL;
   int * operator = NULL;
@@ -18438,6 +17763,8 @@ double *SIGN){
   const int do_grad = (gradient != NULL); 
   const int do_gerr = (gradient_stderr != NULL);
   const int int_ll_est = int_ll;
+  if((int_ll_est != LL_LC) && (int_ll_est != LL_LP))
+    error("invalid internal regression engine");
   np_gate_ctx_clear(&gate_ctx_local);
   const NP_GateOverrideCtx * const est_gate_ctx_ptr = &gate_ctx_local;
 
@@ -18720,7 +18047,7 @@ double *SIGN){
     }
 
     if(all_large_gate &&
-       ((int_ll_est == LL_LC) || (int_ll_est == LL_LL) || (int_ll_est == LL_LP))){
+       ((int_ll_est == LL_LC) || (int_ll_est == LL_LP))){
       double kconst = 1.0;
       int kconst_ok = 1;
       const double ridge_eps = 1.0/(double)MAX(1, num_obs_train);
@@ -18771,106 +18098,6 @@ double *SIGN){
         }
 
         estimation_shortcut_done = 1;
-      } else if(kconst_ok && int_ll_est == LL_LL){
-        const int k = num_reg_continuous + 1;
-        MATRIX XtX = mat_creat(k, k, UNDEFINED);
-        MATRIX XtXINV = mat_creat(k, k, UNDEFINED);
-        MATRIX XtY = mat_creat(k, 1, UNDEFINED);
-        MATRIX BETA = mat_creat(k, 1, UNDEFINED);
-        int fast_ok = (XtX != NULL) && (XtXINV != NULL) && (XtY != NULL) && (BETA != NULL);
-
-        if(fast_ok){
-          int ridge_it = 0;
-          const double sk = ((double)num_obs_train)*kconst;
-          const double sefac = (sk*hprod > 0.0) ? sqrt(MAX(0.0, sigma2hat) * K_INT_KERNEL_P / (sk*hprod)) : 0.0;
-
-          for(i = 0; i < k; i++){
-            XtY[i][0] = 0.0;
-            BETA[i][0] = 0.0;
-            for(j = 0; j < k; j++)
-              XtX[i][j] = 0.0;
-          }
-
-          for(i = 0; i < num_obs_train; i++){
-            const double yi = vector_Y[i];
-            XtX[0][0] += 1.0;
-            XtY[0][0] += yi;
-            for(j = 0; j < num_reg_continuous; j++){
-              const double xj = matrix_X_continuous_train[j][i];
-              const int cj = j + 1;
-              XtX[0][cj] += xj;
-              XtX[cj][0] += xj;
-              XtY[cj][0] += xj*yi;
-            }
-            for(int a = 0; a < num_reg_continuous; a++){
-              const double xa = matrix_X_continuous_train[a][i];
-              const int ca = a + 1;
-              for(int b = a; b < num_reg_continuous; b++){
-                const double xb = matrix_X_continuous_train[b][i];
-                const int cb = b + 1;
-                XtX[ca][cb] += xa*xb;
-                if(cb != ca) XtX[cb][ca] += xa*xb;
-              }
-            }
-          }
-
-          while(mat_inv(XtX, XtXINV) == NULL){
-            for(i = 0; i < k; i++)
-              XtX[i][i] += ridge_eps;
-            ridge_it++;
-            if(ridge_it > 64){
-              fast_ok = 0;
-              break;
-            }
-          }
-
-          if(fast_ok){
-            for(i = 0; i < k; i++){
-              double s = 0.0;
-              for(j = 0; j < k; j++)
-                s += XtXINV[i][j]*XtY[j][0];
-              BETA[i][0] = s;
-            }
-
-            for(i = 0; i < num_obs_eval; i++){
-              double yhat = BETA[0][0];
-              for(j = 0; j < num_reg_continuous; j++)
-                yhat += BETA[j+1][0]*matrix_X_continuous_eval[j][i];
-              mean[i] = yhat;
-              mean_stderr[i] = sefac;
-              if (fit_progress_active)
-                np_progress_fit_loop_step(i + 1, fit_progress_total);
-            }
-
-            if(do_grad){
-              const int nvars = num_reg_continuous + num_reg_unordered + num_reg_ordered;
-              for(j = 0; j < num_reg_continuous; j++){
-                const double bj = BETA[j+1][0];
-                for(i = 0; i < num_obs_eval; i++){
-                  gradient[j][i] = bj;
-                  if(do_gerr){
-                    gradient_stderr[j][i] = gfac*mean_stderr[i]/
-                      ((BANDWIDTH_reg == BW_ADAP_NN) ? 1.0 :
-                       ((BANDWIDTH_reg == BW_GEN_NN) ? matrix_bandwidth[j][i] : matrix_bandwidth[j][0]));
-                  }
-                }
-              }
-
-              for(j = num_reg_continuous; j < nvars; j++){
-                for(i = 0; i < num_obs_eval; i++){
-                  gradient[j][i] = 0.0;
-                  if(do_gerr) gradient_stderr[j][i] = 0.0;
-                }
-              }
-            }
-            estimation_shortcut_done = 1;
-          }
-        }
-
-        if(XtX != NULL) mat_free(XtX);
-        if(XtXINV != NULL) mat_free(XtXINV);
-        if(XtY != NULL) mat_free(XtY);
-        if(BETA != NULL) mat_free(BETA);
       } else if(kconst_ok && int_ll_est == LL_LP &&
                 (vector_glp_degree_extern != NULL) && (num_reg_continuous > 0)){
         const int use_bernstein = (int_glp_bernstein_extern != 0);
@@ -20012,769 +19239,6 @@ double *SIGN){
     free(eval_deriv);
     free(glp_terms);
 
-  } else { // Local Linear 
-
-    // because we manipulate the training data scale factors can be wrong
-
-    if((sf_flag = (int_LARGE_SF == 0)) && (BANDWIDTH_reg == BW_FIXED)){ 
-      int_LARGE_SF = 1;
-      vsf = (double *)malloc(num_reg_continuous*sizeof(double));
-      for(int ii = 0; ii < num_reg_continuous; ii++)
-        vsf[ii] = matrix_bandwidth[ii][0];
-    } else {
-      vsf = vector_scale_factor;
-    }
-
-    MATRIX XTKX = mat_creat( num_reg_continuous + 3, num_obs_train, UNDEFINED );
-    MATRIX XTKY = mat_creat( num_reg_continuous + 1, 1, UNDEFINED );
-    MATRIX DELTA = mat_creat( num_reg_continuous + 1, 1, UNDEFINED );
-
-    MATRIX KWM = mat_creat( num_reg_continuous + 1, num_reg_continuous + 1, UNDEFINED );
-    // Generate bandwidth vector given scale factors, nearest neighbors, or lambda 
-    
-    MATRIX TCON = mat_creat(num_reg_continuous, 1, UNDEFINED);
-    MATRIX TUNO = mat_creat(num_reg_unordered, 1, UNDEFINED);
-    MATRIX TORD = mat_creat(num_reg_ordered, 1, UNDEFINED);
-
-    const int nrc3 = (num_reg_continuous+3);
-    const int nrc1 = (num_reg_continuous+1);
-    const int nrcc33 = nrc3*nrc3;
-
-    double ** matrix_bandwidth_eval = NULL;
-
-    double * PKWM[nrc1], * PXTKY[nrc1], * PXTKX[nrc3];
-
-    double * PXC[MAX(1,num_reg_continuous)]; 
-    double * PXU[MAX(1,num_reg_unordered)];
-    double * PXO[MAX(1,num_reg_ordered)];
-
-    PXC[0] = NULL;
-    PXU[0] = NULL;
-    PXO[0] = NULL;
-
-    for(l = 0; l < num_reg_continuous; l++)
-      PXC[l] = matrix_X_continuous_train[l];
-
-    for(l = 0; l < num_reg_unordered; l++)
-      PXU[l] = matrix_X_unordered_train[l];
-
-    for(l = 0; l < num_reg_ordered; l++)
-      PXO[l] = matrix_X_ordered_train[l];
-
-    const size_t kwm_len = (size_t)nrcc33*(size_t)num_obs_eval_alloc;
-    double * kwm = (double *)malloc(kwm_len*sizeof(double));
-
-    for(size_t ii = 0; ii < kwm_len; ii++)
-      kwm[ii] = 0.0;
-
-    // with local linear, we already have the gradients of the continuous components
-    // so we only need to worry about unordered + ordered comps
-
-    double * permy = NULL;
-    int ** moo = NULL;
-
-    int p_nvar = do_grad ? (num_reg_unordered + num_reg_ordered) : 0;
-    int do_ocg = do_grad && (p_nvar > 0);
-
-    if(do_ocg){
-      const size_t permy_len = kwm_len*(size_t)p_nvar;
-      permy = (double *)malloc(permy_len*sizeof(double));
-      if(permy == NULL)
-        error("\n** Error: memory allocation failed.");
-    }
-
-    double * sgn = (double *)malloc((nrc3)*sizeof(double));
-
-    sgn[0] = sgn[1] = sgn[2] = 1.0;
-    
-    for(int ii = 0; ii < (num_reg_continuous); ii++)
-      sgn[ii+3] = -1.0;
-    
-    for(int ii = 0; ii < (nrc3); ii++)
-      PXTKX[ii] = XTKX[ii];
-    
-    for(int ii = 0; ii < (nrc1); ii++){
-      PKWM[ii] = KWM[ii];
-      PXTKY[ii] = XTKY[ii];
-
-      KWM[ii] = &kwm[(ii+2)*(nrc3)+2];
-      XTKY[ii] = &kwm[ii+nrc3+2];
-    }
-
-    matrix_bandwidth_eval = alloc_tmatd(1,num_reg_continuous);
-
-    const double epsilon = 1.0/num_obs_train;
-    double nepsilon;
-
-    // populate the xtkx matrix first 
-    
-    for(i = 0; i < num_obs_train; i++){
-      const double vyi = vector_Y[i];
-      XTKX[0][i] = vyi*vyi;
-      XTKX[1][i] = vyi;
-      XTKX[2][i] = 1.0;
-    }
-
-    if(do_ocg){
-      moo = (int **)malloc(num_reg_ordered*sizeof(int *));
-      for(l = 0; l < num_reg_ordered; l++){
-        moo[l] = matrix_ordered_indices[l];
-      }
-    }
-#ifdef MPI2
-    const int use_mpi_owner_reduce_ll =
-      (iNum_Processors > 1) &&
-      (!np_mpi_local_regression_active()) &&
-      (BANDWIDTH_reg == BW_FIXED);
-    const int owner_chunk_rows_ll =
-      np_reg_mpi_owner_chunk_rows(num_obs_eval,
-                                  2 + (do_grad ?
-                                       (num_reg_continuous + num_reg_unordered + num_reg_ordered)*
-                                       (1 + (do_gerr ? 1 : 0)) : 0));
-#endif
-    for(j = 0; j < num_obs_eval; j++){ // main loop
-      nepsilon = 0.0;
-
-      for(l = 0; l < (nrc1); l++){
-        KWM[l] = &kwm[j*nrcc33+(l+2)*(nrc3)+2];
-        XTKY[l] = &kwm[j*nrcc33+l+nrc3+2];
-      }
-
-#ifdef MPI2
-
-      if(use_mpi_owner_reduce_ll && ((j % owner_chunk_rows_ll) == 0)){
-        const int chunk_start = j;
-        const int chunk_end = MIN(num_obs_eval, chunk_start + owner_chunk_rows_ll);
-        const int owner_row_width_ll = 2 + (do_grad ?
-          (num_reg_continuous + num_reg_unordered + num_reg_ordered)*
-          (1 + (do_gerr ? 1 : 0)) : 0);
-        NPRegMpiOwnerChunk owner_chunk;
-        double *kwm2_owner = NULL;
-        double *kw_owner = NULL;
-        MATRIX KWM2_OWNER = NULL;
-        MATRIX KWM_INV_OWNER = NULL;
-        MATRIX IDEN_OWNER = NULL;
-        double *tmp_v_owner = NULL;
-        double *tmp_w_owner = NULL;
-        int local_pos = 0;
-
-        np_reg_mpi_owner_chunk_init(&owner_chunk,
-                                    chunk_start,
-                                    chunk_end,
-                                    owner_row_width_ll,
-                                    "npreg LL");
-        kwm2_owner = (double *)malloc((size_t)nrcc33*sizeof(double));
-        kw_owner = (double *)malloc((size_t)num_obs_train*sizeof(double));
-        KWM2_OWNER = mat_creat(nrc1, nrc1, UNDEFINED);
-        KWM_INV_OWNER = mat_creat(nrc1, nrc1, UNDEFINED);
-        IDEN_OWNER = mat_creat(nrc1, nrc1, UNDEFINED);
-        tmp_v_owner = (double *)malloc((size_t)nrc1*sizeof(double));
-        tmp_w_owner = (double *)malloc((size_t)nrc1*sizeof(double));
-        if((kwm2_owner == NULL) || (kw_owner == NULL) ||
-           (KWM2_OWNER == NULL) || (KWM_INV_OWNER == NULL) ||
-           (IDEN_OWNER == NULL) || (tmp_v_owner == NULL) ||
-           (tmp_w_owner == NULL))
-          error("\n** Error: memory allocation failed.");
-
-        local_pos = 0;
-        for(int jj = chunk_start + my_rank; jj < chunk_end; jj += iNum_Processors){
-          for(l = 0; l < num_reg_continuous; l++){
-            for(i = 0; i < num_obs_train; i++){
-              XTKX[l+3][i] = matrix_X_continuous_train[l][i]-matrix_X_continuous_eval[l][jj];
-            }
-            TCON[l][0] = matrix_X_continuous_eval[l][jj];
-          }
-
-          for(l = 0; l < num_reg_unordered; l++)
-            TUNO[l][0] = matrix_X_unordered_eval[l][jj];
-
-          for(l = 0; l < num_reg_ordered; l++)
-            TORD[l][0] = matrix_X_ordered_eval[l][jj];
-
-          kernel_weighted_sum_np_ctx(kernel_c,
-                                 kernel_u,
-                                 kernel_o,
-                                 BANDWIDTH_reg,
-                                 num_obs_train,
-                                 1,
-                                 num_reg_unordered,
-                                 num_reg_ordered,
-                                 num_reg_continuous,
-                                 0,
-                                 0,
-                                 1,
-                                 1,
-                                 1,
-                                 1,
-                                 0,
-                                 0,
-                                 0,
-                                 operator,
-                                 OP_NOOP,
-                                 0,
-                                 0,
-                                 NULL,
-                                 1,
-                                 nrc3,
-                                 nrc3,
-                                 int_TREE_X,
-                                 0,
-                                 kdt_extern_X,
-                                 NULL, NULL, NULL,
-                                 PXU,
-                                 PXO,
-                                 PXC,
-                                 TUNO,
-                                 TORD,
-                                 TCON,
-                                 XTKX,
-                                 XTKX,
-                                 NULL,
-                                 vsf,
-                                 1,
-                                 matrix_bandwidth,
-                                 matrix_bandwidth_eval,
-                                 lambda,
-                                 num_categories,
-                                 matrix_categorical_vals,
-                                 moo,
-                                 kwm+(size_t)jj*(size_t)nrcc33,
-                                 do_ocg ? (permy+(size_t)jj*(size_t)nrcc33*(size_t)p_nvar) : NULL,
-                                 kw_owner,
-                                 est_gate_ctx_ptr);
-          for(l = 0; l < (nrc1); l++){
-            KWM[l] = &kwm[(size_t)jj*(size_t)nrcc33+(l+2)*(nrc3)+2];
-            XTKY[l] = &kwm[(size_t)jj*(size_t)nrcc33+l+nrc3+2];
-          }
-
-          {
-            double nepsilon_owner = 0.0;
-            while(mat_solve(KWM, XTKY, DELTA) == NULL){
-              for(int ii = 0; ii < (nrc1); ii++)
-                KWM[ii][ii] += epsilon;
-              nepsilon_owner += epsilon;
-            }
-
-            XTKY[0][0] += nepsilon_owner*XTKY[0][0]/NZD_POS(KWM[0][0]);
-            if(nepsilon_owner > 0.0){
-              if(mat_solve(KWM, XTKY, DELTA) == NULL)
-                error("mat_solve failed after ridge adjustment");
-            }
-
-            double * const out = owner_chunk.sendbuf + (size_t)local_pos*(size_t)owner_row_width_ll;
-            const double * const row = kwm+(size_t)jj*(size_t)nrcc33;
-            const double sk = copysign(DBL_MIN, row[2*nrc3+2]) + row[2*nrc3+2];
-            const double ey = row[nrc3+2]/sk;
-            const double ey2 = row[nrc3+1]/sk;
-            double sigma2_owner = ey2 - ey*ey;
-            const double v = sigma2_owner*K_INT_KERNEL_P / (sk*hprod);
-            double mean_se_owner = (v <= 0.0) ? 0.0 : sqrt(v);
-            int opos = 0;
-
-            sigma2_owner = (sigma2_owner <= 0.0) ? 0.0 : sigma2_owner;
-
-            for(int ii = 0; ii < nrcc33; ii++)
-              kwm2_owner[ii] = 0.0;
-
-            for(int kk = 0; kk < num_obs_train; kk++){
-              const double w = kw_owner[kk];
-              const double w2 = w*w;
-              if(w2 == 0.0)
-                continue;
-              for(int ii = 0; ii < nrc1; ii++){
-                const double zi = XTKX[ii+2][kk];
-                const int irow = (ii+2)*nrc3;
-                for(int mm = 0; mm < nrc1; mm++)
-                  kwm2_owner[irow + (mm+2)] += zi*XTKX[mm+2][kk]*w2;
-              }
-            }
-
-            for(int ii = 0; ii < nrc1; ii++){
-              for(int kk = 0; kk < nrc1; kk++){
-                KWM2_OWNER[ii][kk] = kwm2_owner[(ii+2)*nrc3 + (kk+2)];
-                IDEN_OWNER[ii][kk] = (ii == kk) ? 1.0 : 0.0;
-              }
-            }
-
-            if(mat_solve(KWM, IDEN_OWNER, KWM_INV_OWNER) != NULL){
-              double q = 0.0;
-              for(int ii = 0; ii < nrc1; ii++){
-                const double vv = KWM_INV_OWNER[ii][0];
-                tmp_v_owner[ii] = vv;
-              }
-              for(int ii = 0; ii < nrc1; ii++){
-                double ww = 0.0;
-                for(int kk = 0; kk < nrc1; kk++)
-                  ww += KWM2_OWNER[ii][kk]*tmp_v_owner[kk];
-                tmp_w_owner[ii] = ww;
-              }
-              for(int ii = 0; ii < nrc1; ii++)
-                q += tmp_v_owner[ii]*tmp_w_owner[ii];
-              {
-                const double mv = sigma2_owner*q;
-                if((mv > 0.0) && isfinite(mv))
-                  mean_se_owner = sqrt(mv);
-              }
-            }
-
-            out[opos++] = DELTA[0][0];
-            out[opos++] = mean_se_owner;
-
-            if(do_grad){
-              for(int ii = 0; ii < num_reg_continuous; ii++){
-                out[opos++] = DELTA[ii+1][0];
-                if(do_gerr){
-                  double grad_se_owner = 0.0;
-                  if(mat_solve(KWM, IDEN_OWNER, KWM_INV_OWNER) != NULL){
-                    double qg = 0.0;
-                    for(int kk = 0; kk < nrc1; kk++)
-                      tmp_v_owner[kk] = KWM_INV_OWNER[kk][ii+1];
-                    for(int kk = 0; kk < nrc1; kk++){
-                      double ww = 0.0;
-                      for(int mm = 0; mm < nrc1; mm++)
-                        ww += KWM2_OWNER[kk][mm]*tmp_v_owner[mm];
-                      tmp_w_owner[kk] = ww;
-                    }
-                    for(int kk = 0; kk < nrc1; kk++)
-                      qg += tmp_v_owner[kk]*tmp_w_owner[kk];
-                    {
-                      const double gv = sigma2_owner*qg;
-                      grad_se_owner = (gv > 0.0 && isfinite(gv)) ? sqrt(gv) : 0.0;
-                    }
-                  }
-                  out[opos++] = grad_se_owner;
-                }
-              }
-              for(int ii = 0; ii < num_reg_unordered; ii++){
-                const int ojp = ((size_t)jj*(size_t)nrcc33*(size_t)p_nvar) +
-                  ((size_t)ii*(size_t)nrcc33);
-
-                for(int kk = 0; kk < nrc1; kk++){
-                  KWM[kk] = &permy[ojp + (size_t)(kk+2)*(size_t)nrc3 + 2];
-                  XTKY[kk] = &permy[ojp + kk + nrc3 + 2];
-                }
-
-                nepsilon_owner = 0.0;
-                while(mat_solve(KWM, XTKY, DELTA) == NULL){
-                  for(int kk = 0; kk < nrc1; kk++)
-                    KWM[kk][kk] += epsilon;
-                  nepsilon_owner += epsilon;
-                }
-
-                XTKY[0][0] += nepsilon_owner*XTKY[0][0]/NZD_POS(KWM[0][0]);
-                if(nepsilon_owner > 0.0){
-                  if(mat_solve(KWM, XTKY, DELTA) == NULL)
-                    error("mat_solve failed after unordered gradient ridge adjustment");
-                }
-
-                out[opos++] = out[0] - DELTA[0][0];
-
-                if(do_gerr){
-                  const double * const prow = permy + ojp;
-                  const double skg = copysign(DBL_MIN, prow[2*nrc3+2]) + prow[2*nrc3+2];
-                  const double eyg = prow[nrc3+2]/skg;
-                  const double ey2g = prow[nrc3+1]/skg;
-                  const double se2 = (ey2g - eyg*eyg)*K_INT_KERNEL_P / (skg*hprod);
-                  out[opos++] = sqrt(mean_se_owner*mean_se_owner + se2);
-                }
-              }
-              for(int ii = 0; ii < num_reg_ordered; ii++){
-                const int dl = num_reg_unordered + ii;
-                const int ojp = ((size_t)jj*(size_t)nrcc33*(size_t)p_nvar) +
-                  ((size_t)dl*(size_t)nrcc33);
-
-                for(int kk = 0; kk < nrc1; kk++){
-                  KWM[kk] = &permy[ojp + (size_t)(kk+2)*(size_t)nrc3 + 2];
-                  XTKY[kk] = &permy[ojp + kk + nrc3 + 2];
-                }
-
-                nepsilon_owner = 0.0;
-                while(mat_solve(KWM, XTKY, DELTA) == NULL){
-                  for(int kk = 0; kk < nrc1; kk++)
-                    KWM[kk][kk] += epsilon;
-                  nepsilon_owner += epsilon;
-                }
-
-                XTKY[0][0] += nepsilon_owner*XTKY[0][0]/NZD_POS(KWM[0][0]);
-                if(nepsilon_owner > 0.0){
-                  if(mat_solve(KWM, XTKY, DELTA) == NULL)
-                    error("mat_solve failed after ordered gradient ridge adjustment");
-                }
-
-                out[opos++] = (out[0] - DELTA[0][0])*
-                  ((matrix_ordered_indices[ii][jj] != 0) ? 1.0 : -1.0);
-
-                if(do_gerr){
-                  const double * const prow = permy + ojp;
-                  const double skg = copysign(DBL_MIN, prow[2*nrc3+2]) + prow[2*nrc3+2];
-                  const double eyg = prow[nrc3+2]/skg;
-                  const double ey2g = prow[nrc3+1]/skg;
-                  const double se2 = (ey2g - eyg*eyg)*K_INT_KERNEL_P / (skg*hprod);
-                  out[opos++] = sqrt(mean_se_owner*mean_se_owner + se2);
-                }
-              }
-            }
-          }
-          local_pos++;
-        }
-
-        np_reg_mpi_owner_chunk_allgather(&owner_chunk);
-
-        for(i = 0; i < iNum_Processors; i++){
-          int pos_i = 0;
-          for(int jj = chunk_start + i; jj < chunk_end; jj += iNum_Processors){
-            const double * const in =
-              np_reg_mpi_owner_chunk_recv_ptr(&owner_chunk, i, pos_i);
-            int ipos = 0;
-            mean[jj] = in[ipos++];
-            mean_stderr[jj] = in[ipos++];
-            if(do_grad){
-              for(l = 0; l < num_reg_continuous; l++){
-                gradient[l][jj] = in[ipos++];
-                if(do_gerr)
-                  gradient_stderr[l][jj] = in[ipos++];
-              }
-              for(l = num_reg_continuous;
-                  l < (num_reg_continuous + num_reg_unordered + num_reg_ordered);
-                  l++){
-                gradient[l][jj] = in[ipos++];
-                if(do_gerr)
-                  gradient_stderr[l][jj] = in[ipos++];
-              }
-            }
-            pos_i++;
-          }
-        }
-
-        np_reg_mpi_owner_chunk_free(&owner_chunk);
-        free(kwm2_owner);
-        free(kw_owner);
-        mat_free(KWM2_OWNER);
-        mat_free(KWM_INV_OWNER);
-        mat_free(IDEN_OWNER);
-        free(tmp_v_owner);
-        free(tmp_w_owner);
-      }
-
-      if((!use_mpi_owner_reduce_ll) && ((j % iNum_Processors) == 0)){
-        if((j+my_rank) < (num_obs_eval)){
-          for(l = 0; l < num_reg_continuous; l++){
-          
-            for(i = 0; i < num_obs_train; i++){
-              XTKX[l+3][i] = matrix_X_continuous_train[l][i]-matrix_X_continuous_eval[l][j+my_rank];
-            }
-            TCON[l][0] = matrix_X_continuous_eval[l][j+my_rank]; // temporary storage
-
-            if(BANDWIDTH_reg == BW_GEN_NN)
-              matrix_bandwidth_eval[l][0] = matrix_bandwidth[l][j+my_rank]; // temporary storage
-
-          }
-
-
-          for(l = 0; l < num_reg_unordered; l++)
-            TUNO[l][0] = matrix_X_unordered_eval[l][j+my_rank];
-
-          for(l = 0; l < num_reg_ordered; l++)
-            TORD[l][0] = matrix_X_ordered_eval[l][j+my_rank];
-
-          kernel_weighted_sum_np_ctx(kernel_c,
-                                 kernel_u,
-                                 kernel_o,
-                                 BANDWIDTH_reg,
-                                 num_obs_train,
-                                 1,
-                                 num_reg_unordered,
-                                 num_reg_ordered,
-                                 num_reg_continuous,
-                                 0, 
-                                 0,
-                                 1, // kernel_pow = 1
-                                 1, // bandwidth_divide = FALSE when not adaptive
-                                 0, 
-                                 1, // symmetric
-                                 0, // NO gather-scatter sum
-                                 0, // do not drop train
-                                 0, // do not drop train
-                                 operator, // no convolution
-                                 OP_NOOP, // no permutations
-                                 0, // no score
-                                 do_ocg, // ocg
-                                 NULL,
-                                 1, // explicity suppress parallel
-                                 nrc3,
-                                 nrc3,
-                                 (BANDWIDTH_reg == BW_ADAP_NN) ? NP_TREE_FALSE : int_TREE_X,
-                                 0,
-                                 (BANDWIDTH_reg == BW_ADAP_NN) ? NULL : kdt_extern_X,
-                                 NULL, NULL, NULL,
-                                 PXU, // TRAIN
-                                 PXO, 
-                                 PXC,
-                                 TUNO, // EVAL
-                                 TORD,
-                                 TCON,
-                                 XTKX,
-                                 XTKX,
-                                 NULL,
-                                 vsf,
-                                 1,
-                                 matrix_bandwidth,
-                                 matrix_bandwidth_eval,
-                                 lambda,
-                                 num_categories,
-                                 matrix_categorical_vals,
-                                 moo,
-                                 kwm+(j+my_rank)*nrcc33,  // weighted sum
-                                 do_ocg ? (permy+(j+my_rank)*nrcc33*p_nvar) : NULL, // ocg
-                                 NULL, // do not return kernel weights
-                                 est_gate_ctx_ptr);
-
-        }
-        // synchro step
-        if(!np_mpi_local_regression_active()){
-          MPI_Allgather(MPI_IN_PLACE, nrcc33, MPI_DOUBLE, kwm+j*nrcc33, nrcc33, MPI_DOUBLE, comm[1]);          
-          if(do_ocg){
-            MPI_Allgather(MPI_IN_PLACE, nrcc33*p_nvar, MPI_DOUBLE, permy+j*nrcc33*p_nvar, nrcc33*p_nvar, MPI_DOUBLE, comm[1]);
-          }
-        }
-      }
-      
-#else
-
-
-      for(l = 0; l < num_reg_continuous; l++){
-          
-        for(i = 0; i < num_obs_train; i++){
-          XTKX[l+3][i] = matrix_X_continuous_train[l][i]-matrix_X_continuous_eval[l][j];
-        }
-        TCON[l][0] = matrix_X_continuous_eval[l][j]; // temporary storage
-
-        if(BANDWIDTH_reg == BW_GEN_NN)
-          matrix_bandwidth_eval[l][0] = matrix_bandwidth[l][j]; // temporary storage
-
-      }
-
-
-      for(l = 0; l < num_reg_unordered; l++)
-        TUNO[l][0] = matrix_X_unordered_eval[l][j];
-
-      for(l = 0; l < num_reg_ordered; l++)
-        TORD[l][0] = matrix_X_ordered_eval[l][j];
-
-      kernel_weighted_sum_np_ctx(kernel_c,
-                             kernel_u,
-                             kernel_o,
-                             BANDWIDTH_reg,
-                             num_obs_train,
-                             1,
-                             num_reg_unordered,
-                             num_reg_ordered,
-                             num_reg_continuous,
-                             0, // we leave one out via the weight matrix
-                             0,
-                             1, // kernel_pow = 1
-                             1, // bandwidth_divide = FALSE when not adaptive
-                             0, 
-                             1, // symmetric
-                             0, // gather-scatter sum
-                             0, // do not drop train
-                             0, // do not drop train
-                             operator, // no convolution
-                             OP_NOOP, // no permutations
-                             0, // no score
-                             do_ocg, // no ocg
-                             NULL,
-                             1, //  explicity suppress parallel
-                             nrc3,
-                             nrc3,
-                             (BANDWIDTH_reg == BW_ADAP_NN) ? NP_TREE_FALSE : int_TREE_X,
-                             0,
-                             (BANDWIDTH_reg == BW_ADAP_NN) ? NULL : kdt_extern_X,
-                             NULL, NULL, NULL,
-                             PXU, // TRAIN
-                             PXO, 
-                             PXC,
-                             TUNO, // EVAL
-                             TORD,
-                             TCON,
-                             XTKX,
-                             XTKX,
-                             NULL,
-                             vsf,
-                             1,
-                             matrix_bandwidth,
-                             matrix_bandwidth_eval,
-                             lambda,
-                             num_categories,
-                             matrix_categorical_vals,
-                             moo,
-                             kwm+j*nrcc33,  // weighted sum
-                             do_ocg ? (permy+j*nrcc33*p_nvar) : NULL, // no permutations
-                             NULL, // do not return kernel weights
-                             est_gate_ctx_ptr);
-
-#endif
-
-#ifdef MPI2
-      if(use_mpi_owner_reduce_ll){
-        if (fit_progress_active)
-          np_progress_fit_loop_step(j + 1, fit_progress_total);
-        continue;
-      }
-#endif
-
-      if(do_ocg){
-        for(l = 0; l < num_reg_ordered; l++){
-          moo[l]++;
-        }
-      }
-
-      while(mat_solve(KWM, XTKY, DELTA) == NULL){ // singular = ridge about
-        for(int ii = 0; ii < (nrc1); ii++)
-          KWM[ii][ii] += epsilon;
-        nepsilon += epsilon;
-      }
-
-      XTKY[0][0] += nepsilon*XTKY[0][0]/NZD_POS(KWM[0][0]);
-      if(nepsilon > 0.0){
-        if(mat_solve(KWM, XTKY, DELTA) == NULL)
-          error("mat_solve failed after ridge adjustment");
-      }
-      mean[j] = DELTA[0][0];
-
-      const double sk = copysign(DBL_MIN, (kwm+j*nrcc33)[2*nrc3+2]) + (kwm+j*nrcc33)[2*nrc3+2];
-      const double ey = (kwm+j*nrcc33)[nrc3+2]/sk;
-      const double ey2 = (kwm+j*nrcc33)[nrc3+1]/sk;
-
-      {
-        const double v = (ey2 - ey*ey)*K_INT_KERNEL_P / (sk*hprod);
-        mean_stderr[j] = (v <= 0.0) ? 0.0 : sqrt(v);
-      }
-
-      if(do_grad){
-        for(int ii = 0; ii < num_reg_continuous; ii++){
-          gradient[ii][j] = DELTA[ii+1][0];
-          if(do_gerr)
-            gradient_stderr[ii][j] = gfac*mean_stderr[j]/((BANDWIDTH_reg == BW_ADAP_NN) ? 1.0 : ((BANDWIDTH_reg == BW_GEN_NN) ? matrix_bandwidth[ii][j]:matrix_bandwidth[ii][0]));
-        }
-        
-        // we need to do new matrix inversions here for the unordered + ordered data
-        // we can safely taint KWM , DELTA, and XTKY here
-        for(l = num_reg_continuous; l < (num_reg_continuous + num_reg_unordered); l++){
-          const int dl = l - num_reg_continuous;
-          const int ojp = j*nrcc33*p_nvar + dl*nrcc33;
-
-          for(int ii = 0; ii < nrc1; ii++){
-            KWM[ii] = &permy[ojp +(ii+2)*(nrc3)+2];
-            XTKY[ii] = &permy[ojp + ii + nrc3 + 2];
-          }
-
-          nepsilon = 0.0;
-          while(mat_solve(KWM, XTKY, DELTA) == NULL){ // singular = ridge about
-            for(int ii = 0; ii < (nrc1); ii++)
-              KWM[ii][ii] += epsilon;
-            nepsilon += epsilon;
-          }
-
-          XTKY[0][0] += nepsilon*XTKY[0][0]/NZD_POS(KWM[0][0]);
-          if(nepsilon > 0.0){
-            if(mat_solve(KWM, XTKY, DELTA) == NULL)
-              error("mat_solve failed after ridge adjustment");
-          }
-
-          gradient[l][j] = mean[j] - DELTA[0][0];
-          
-          if(do_gerr){
-            const double skg = copysign(DBL_MIN, (permy+ojp)[2*nrc3+2]) + (permy+ojp)[2*nrc3+2];
-            const double eyg = (permy+ojp)[nrc3+2]/skg;
-            const double ey2g = (permy+ojp)[nrc3+1]/skg;
-
-            const double se2 = (ey2g - eyg*eyg)*K_INT_KERNEL_P / (skg*hprod);
-
-            gradient_stderr[l][j] = sqrt(mean_stderr[j]*mean_stderr[j] + se2);
-          } else {
-            gradient_stderr[l][j] = 0.0;
-          }
-        }
-
-        // we need to do new matrix inversions here for the unordered + ordered data
-        // we can safely taint KWM , DELTA, and XTKY here
-        for(l = num_reg_continuous + num_reg_unordered; l < (num_reg_continuous + num_reg_unordered + num_reg_ordered); l++){
-
-          const int dl = l - num_reg_continuous;
-          const int ojp = j*nrcc33*p_nvar + dl*nrcc33;
-
-          for(int ii = 0; ii < nrc1; ii++){
-            KWM[ii] = &permy[ojp +(ii+2)*(nrc3)+2];
-            XTKY[ii] = &permy[ojp + ii + nrc3 + 2];
-          }
-
-          nepsilon = 0.0;
-          while(mat_solve(KWM, XTKY, DELTA) == NULL){ // singular = ridge about
-            for(int ii = 0; ii < (nrc1); ii++)
-              KWM[ii][ii] += epsilon;
-            nepsilon += epsilon;
-          }
-
-          XTKY[0][0] += nepsilon*XTKY[0][0]/NZD_POS(KWM[0][0]);
-          if(nepsilon > 0.0){
-            if(mat_solve(KWM, XTKY, DELTA) == NULL)
-              error("mat_solve failed after ridge adjustment");
-          }
-
-          gradient[l][j] = (mean[j] - DELTA[0][0])*((matrix_ordered_indices[l - num_reg_continuous - num_reg_unordered][j] != 0) ? 1.0 : -1.0);
-          
-          if(do_gerr){
-
-            const double skg = copysign(DBL_MIN, (permy+ojp)[2*nrc3+2]) + (permy+ojp)[2*nrc3+2];
-            const double eyg = (permy+ojp)[nrc3+2]/skg;
-            const double ey2g = (permy+ojp)[nrc3+1]/skg;
-
-            const double se2 = (ey2g - eyg*eyg)*K_INT_KERNEL_P / (skg*hprod);
-
-            gradient_stderr[l][j] = sqrt(mean_stderr[j]*mean_stderr[j] + se2);
-          } else {
-            gradient_stderr[l][j] = 0.0;
-          }
-        }
-
-      }
-
-      if (fit_progress_active)
-        np_progress_fit_loop_step(j + 1, fit_progress_total);
-    }
-    
-    for(int ii = 0; ii < (nrc1); ii++){
-      KWM[ii] = PKWM[ii];
-      XTKY[ii] = PXTKY[ii];
-    }
-
-    for(int ii = 0; ii < (nrc3); ii++)
-      XTKX[ii] = PXTKX[ii];
-
-    if(sf_flag){
-      int_LARGE_SF = 0;
-      free(vsf);
-    }
-
-    
-    mat_free(XTKX);
-    mat_free(XTKY);
-    mat_free(DELTA);
-    mat_free(KWM);
-
-    mat_free(TCON);
-    mat_free(TUNO);
-    mat_free(TORD);
-
-    free(kwm);
-    free(sgn);
-
-    if(do_ocg){
-      free(permy);
-      free(moo);
-    }
-    free_tmat(matrix_bandwidth_eval);
   }
 
 finish_regression_estimation:
@@ -21213,7 +19677,7 @@ static int np_shadow_conditional_build_x_weights_core(double *vector_scale_facto
                                                       double *weights_out){
   const int num_train = num_obs_train_extern;
   const int num_reg_tot = num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern;
-  const int ll_mode = (int_ll_extern == LL_LP) ? LL_LP : LL_LC;
+  const int ll_mode = int_ll_extern;
   const int bw_rows = (BANDWIDTH_den_extern == BW_FIXED) ? 1 : num_train;
   int *kernel_cx = NULL, *kernel_ux = NULL, *kernel_ox = NULL, *x_operator = NULL;
   double *vsfx = NULL, *lambdax = NULL, *kw = NULL, *mean_row = NULL;
@@ -21540,7 +20004,7 @@ static int np_conditional_xrow_ctx_prepare(double *vector_scale_factor,
                                            NPConditionalXRowCtx *ctx){
   const int num_train = num_obs_train_extern;
   const int num_reg_tot = num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern;
-  const int ll_mode = (int_ll_extern == LL_LP) ? LL_LP : LL_LC;
+  const int ll_mode = int_ll_extern;
   const int bw_rows = (BANDWIDTH_den_extern == BW_FIXED) ? 1 : num_train;
   int i;
 
@@ -22703,7 +21167,7 @@ static int np_conditional_x_weight_row_stream_core_impl(double *vector_scale_fac
                                                         double *row_out){
   const int num_train = num_obs_train_extern;
   const int num_reg_tot = num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern;
-  const int ll_mode = (int_ll_extern == LL_LP) ? LL_LP : LL_LC;
+  const int ll_mode = int_ll_extern;
   const int bw_rows = (BANDWIDTH_den_extern == BW_FIXED) ? 1 : num_train;
   int *kernel_cx = NULL, *kernel_ux = NULL, *kernel_ox = NULL, *x_operator = NULL;
   double *vsfx = NULL, *lambdax = NULL, *kw = NULL, *mean_row = NULL;
@@ -23330,7 +21794,7 @@ static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_f
                                                           double **rows_out){
   const int num_train = num_obs_train_extern;
   const int num_reg_tot = num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern;
-  const int ll_mode = (int_ll_extern == LL_LP) ? LL_LP : LL_LC;
+  const int ll_mode = int_ll_extern;
   const int bw_rows = (BANDWIDTH_den_extern == BW_FIXED) ? 1 : block_rows;
   int *kernel_cx = NULL, *kernel_ux = NULL, *kernel_ox = NULL, *x_operator = NULL;
   double *vsfx = NULL, *lambdax = NULL, *kw = NULL, *mean_row = NULL;

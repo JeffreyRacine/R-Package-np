@@ -139,7 +139,6 @@ extern double *vector_cykerub_extern;
 extern int int_bounded_cvls_quadrature_points_extern;
 
 #define LL_LC  0
-#define LL_LL  1
 
 #define BW_FIXED   0
 #define BW_GEN_NN  1
@@ -364,83 +363,6 @@ double cv_func_lsqregression_categorical_check(double *vector_scale_factor){
 
   return(cv);
 }
-
-double cv_func_regression_categorical_ls_nn(double *vector_scale_factor)
-{
-
-/* Numerical recipes wrapper function for least squares regression
-                    cross-validation */
-
-/* Declarations */
-
-    double cv = 0.0;
-
-    int i;
-
-    double *mean;
-
-    double *py;
-    double *pm;
-
-#ifdef MPI2
-    int stride;
-#endif
-
-/* Allocate memory for objects */
-
-#ifndef MPI2
-    mean = alloc_vecd(num_obs_train_extern);
-#endif
-
-#ifdef MPI2
-
-    stride = (int)ceil((double) num_obs_train_extern / (double) iNum_Processors);
-    if(stride < 1) stride = 1;
-    mean = alloc_vecd(stride*iNum_Processors);
-#endif
-
-/* Compute the cross-validation function */
-
-    if(kernel_estimate_regression_categorical_leave_one_out(
-        int_ll_extern,
-        KERNEL_reg_extern,
-        KERNEL_reg_unordered_extern,
-        KERNEL_reg_ordered_extern,
-        BANDWIDTH_reg_extern,
-        num_obs_train_extern,
-        num_reg_unordered_extern,
-        num_reg_ordered_extern,
-        num_reg_continuous_extern,
-        matrix_X_unordered_train_extern,
-        matrix_X_ordered_train_extern,
-        matrix_X_continuous_train_extern,
-        vector_Y_extern,
-        &vector_scale_factor[1],
-        num_categories_extern,
-        mean)==1)
-    {
-        free(mean);
-        return(DBL_MAX);
-    }
-
-    py = &vector_Y_extern[0];
-    pm = &mean[0];
-
-    for(i=0;i<num_obs_train_extern;i++)
-    {
-        cv += ipow((*py++ - *pm++),2);
-    }
-
-    cv /= (double) num_obs_train_extern;
-
-
-    free(mean);
-
-    return(cv);
-
-}
-
-
 
 double cv_func_density_categorical_ml(double *vector_scale_factor)
 {
