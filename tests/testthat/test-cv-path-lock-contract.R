@@ -309,6 +309,59 @@ test_that("canonical LP hat and apply routes avoid legacy solve marshalling", {
   }
 })
 
+test_that("conditional LP LOO QR rows reuse the canonical workspace", {
+  src_file <- locate_jksum_c()
+  skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
+
+  lines <- readLines(src_file, warn = FALSE)
+  source <- paste(lines, collapse = "\n")
+  solve_file <- file.path(dirname(src_file), "jksum_lp_solve.c")
+  skip_if_not(file.exists(solve_file), "source file src/jksum_lp_solve.c unavailable")
+  solve_lines <- readLines(solve_file, warn = FALSE)
+
+  expect_false(grepl("np_glp_qr_drop_row_bkcde", source, fixed = TRUE))
+  expect_equal(
+    sum(grepl("np_glp_qr_drop_workspace_apply\\(", lines)),
+    5L
+  )
+
+  apply_start <- grep(
+    "^int np_glp_qr_drop_workspace_apply\\(",
+    solve_lines
+  )
+  expect_length(apply_start, 1L)
+  apply_stop <- grep("^}$", solve_lines)
+  apply_stop <- apply_stop[apply_stop > apply_start][1L]
+  expect_length(apply_stop, 1L)
+  apply_body <- paste(solve_lines[apply_start:apply_stop], collapse = "\n")
+
+  expect_true(grepl(
+    "np_glp_qr_drop_workspace_reserve(workspace, n, p)",
+    apply_body,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
+    "workspace->xqr[i + j*n] =",
+    apply_body,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
+    "((w > 0.0) ? sqrt(w) : 0.0) * basis[j][i];",
+    apply_body,
+    fixed = TRUE
+  ))
+  expect_true(grepl("F77_NAME(dqrdc2)", apply_body, fixed = TRUE))
+  expect_true(grepl("F77_NAME(dqrqy)", apply_body, fixed = TRUE))
+  expect_true(grepl(
+    "row_out[i] = ((w > 0.0) ? sqrt(w) : 0.0) * workspace->qy[i];",
+    apply_body,
+    fixed = TRUE
+  ))
+  expect_false(grepl("malloc(", apply_body, fixed = TRUE))
+  expect_false(grepl("calloc(", apply_body, fixed = TRUE))
+  expect_false(grepl("free(", apply_body, fixed = TRUE))
+})
+
 test_that("density CV tree-bypass predicate is centralized in one helper", {
   src_file <- locate_jksum_c()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")

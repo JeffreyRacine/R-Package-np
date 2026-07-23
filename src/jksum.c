@@ -18384,76 +18384,6 @@ static int np_shadow_conditional_kernel_row_raw(const int *kernel_c,
                                                mean_out);
 }
 
-static int np_glp_qr_drop_row_bkcde(double **basis,
-                                    int num_train,
-                                    int k,
-                                    const double *kw,
-                                    int eval_pos,
-                                    double *row_out){
-  const double tol = 1.0e-7;
-  double *xqr = NULL, *qraux = NULL, *work = NULL, *y = NULL, *qy = NULL;
-  int *pivot = NULL;
-  int ldx = num_train, n = num_train, p = k, rank = 0, ny = 1;
-  int i, j;
-  int status = 1;
-
-  if((basis == NULL) || (kw == NULL) || (row_out == NULL) || (num_train <= 0) || (k <= 0))
-    return 1;
-  if((eval_pos < 0) || (eval_pos >= num_train))
-    return 1;
-
-  xqr = (double *)malloc((size_t)num_train*(size_t)k*sizeof(double));
-  qraux = (double *)malloc((size_t)k*sizeof(double));
-  work = (double *)malloc((size_t)(2*k)*sizeof(double));
-  y = (double *)calloc((size_t)num_train, sizeof(double));
-  qy = (double *)malloc((size_t)num_train*sizeof(double));
-  pivot = (int *)malloc((size_t)k*sizeof(int));
-  if((xqr == NULL) || (qraux == NULL) || (work == NULL) ||
-     (y == NULL) || (qy == NULL) || (pivot == NULL))
-    goto cleanup_glp_qr_drop;
-
-  for(j = 0; j < k; j++){
-    pivot[j] = j + 1;
-    for(i = 0; i < num_train; i++){
-      const double w = kw[i];
-      xqr[i + j*num_train] = ((w > 0.0) ? sqrt(w) : 0.0) * basis[j][i];
-    }
-  }
-
-  F77_NAME(dqrdc2)(xqr, &ldx, &n, &p, (double *)&tol, &rank, qraux, pivot, work);
-  if((rank < 0) || (rank > k))
-    goto cleanup_glp_qr_drop;
-  if(rank < k)
-    goto cleanup_glp_qr_drop;
-
-  for(i = 0; i < rank; i++){
-    double s = basis[i][eval_pos];
-    for(j = 0; j < i; j++)
-      s -= xqr[j + i*num_train]*y[j];
-    if(fabs(xqr[i + i*num_train]) <= DBL_MIN)
-      goto cleanup_glp_qr_drop;
-    y[i] = s/xqr[i + i*num_train];
-  }
-
-  F77_NAME(dqrqy)(xqr, &n, &p, qraux, y, &ny, qy);
-
-  for(i = 0; i < num_train; i++){
-    const double w = kw[i];
-    row_out[i] = ((w > 0.0) ? sqrt(w) : 0.0) * qy[i];
-  }
-
-  status = 0;
-
-cleanup_glp_qr_drop:
-  if(xqr != NULL) free(xqr);
-  if(qraux != NULL) free(qraux);
-  if(work != NULL) free(work);
-  if(y != NULL) free(y);
-  if(qy != NULL) free(qy);
-  if(pivot != NULL) free(pivot);
-  return status;
-}
-
 static int np_mat_bad_rcond_sym(MATRIX A, double min_rcond){
   const int n = MatRow(A);
   char jobz = 'N';
@@ -18522,10 +18452,12 @@ static int np_shadow_conditional_build_x_weights_core(double *vector_scale_facto
   double **matrix_bandwidth_x = NULL, **matrix_bandwidth_eval_one = NULL;
   double **eval_xuno_one = NULL, **eval_xord_one = NULL, **eval_xcon_one = NULL;
   MATRIX KWM = NULL, RHS = NULL, SOL = NULL;
+  NPGLPQRDropWorkspace qr_workspace;
   NPConditionalBoundState bounds_state;
   int i, j, l;
   int status = 1;
 
+  np_glp_qr_drop_workspace_init(&qr_workspace);
   if((BANDWIDTH_den_extern != BW_FIXED) &&
      (BANDWIDTH_den_extern != BW_GEN_NN) &&
      (BANDWIDTH_den_extern != BW_ADAP_NN))
@@ -18695,12 +18627,13 @@ static int np_shadow_conditional_build_x_weights_core(double *vector_scale_facto
         goto cleanup_xweights;
 
       if(drop_eval_self){
-        if(np_glp_qr_drop_row_bkcde(np_glp_cv_cache.basis,
-                                    num_train,
-                                    k,
-                                    kw,
-                                    i,
-                                    mean_row) != 0)
+        if(np_glp_qr_drop_workspace_apply(&qr_workspace,
+                                          np_glp_cv_cache.basis,
+                                          num_train,
+                                          k,
+                                          kw,
+                                          i,
+                                          mean_row) != 0)
           goto cleanup_xweights;
 
         for(j = 0; j < num_train; j++){
@@ -18752,6 +18685,7 @@ static int np_shadow_conditional_build_x_weights_core(double *vector_scale_facto
   status = 0;
 
 cleanup_xweights:
+  np_glp_qr_drop_workspace_clear(&qr_workspace);
   if(KWM != NULL) mat_free(KWM);
   if(RHS != NULL) mat_free(RHS);
   if(SOL != NULL) mat_free(SOL);
@@ -19131,6 +19065,7 @@ typedef struct {
   double **eval_xuno_one;
   double **eval_xord_one;
   double **eval_xcon_one;
+  NPGLPQRDropWorkspace qr_workspace;
 } NPConditionalXRowCtx;
 
 typedef struct {
@@ -19167,6 +19102,7 @@ static void np_conditional_xrow_ctx_clear(NPConditionalXRowCtx *ctx){
   if(ctx->kernel_ux != NULL) free(ctx->kernel_ux);
   if(ctx->kernel_ox != NULL) free(ctx->kernel_ox);
   if(ctx->x_operator != NULL) free(ctx->x_operator);
+  np_glp_qr_drop_workspace_clear(&ctx->qr_workspace);
   memset(ctx, 0, sizeof(*ctx));
 }
 
@@ -19279,6 +19215,11 @@ static int np_conditional_xrow_ctx_prepare(double *vector_scale_factor,
                                   matrix_X_continuous_train_extern))
         goto fail_xrow_ctx_prepare;
     }
+    if((np_glp_cv_cache.nterms <= 0) ||
+       !np_glp_qr_drop_workspace_reserve(&ctx->qr_workspace,
+                                         num_train,
+                                         np_glp_cv_cache.nterms))
+      goto fail_xrow_ctx_prepare;
   }
 
   ctx->ready = 1;
@@ -19394,12 +19335,13 @@ static int np_conditional_xrow_from_ctx_impl(NPConditionalXRowCtx *ctx,
       goto cleanup_xrow_from_ctx;
 
     if(drop_eval_self){
-      if(np_glp_qr_drop_row_bkcde(np_glp_cv_cache.basis,
-                                  num_train,
-                                  k,
-                                  ctx->kw,
-                                  eval_pos,
-                                  ctx->mean_row) != 0)
+      if(np_glp_qr_drop_workspace_apply(&ctx->qr_workspace,
+                                        np_glp_cv_cache.basis,
+                                        num_train,
+                                        k,
+                                        ctx->kw,
+                                        eval_pos,
+                                        ctx->mean_row) != 0)
         goto cleanup_xrow_from_ctx;
 
       for(j = 0; j < num_train; j++){
@@ -20333,11 +20275,13 @@ static int np_conditional_x_weight_row_stream_core_impl(double *vector_scale_fac
   double **matrix_bandwidth_x = NULL, **matrix_bandwidth_eval_one = NULL;
   double **eval_xuno_one = NULL, **eval_xord_one = NULL, **eval_xcon_one = NULL;
   MATRIX KWM = NULL, RHS = NULL, SOL = NULL;
+  NPGLPQRDropWorkspace qr_workspace;
   NPConditionalBoundState bounds_state;
   int eval_pos = eval_idx;
   int i, j, l;
   int status = 1;
 
+  np_glp_qr_drop_workspace_init(&qr_workspace);
   if((row_out == NULL) || (vector_scale_factor == NULL))
     return 1;
   if((BANDWIDTH_den_extern != BW_FIXED) &&
@@ -20507,12 +20451,13 @@ static int np_conditional_x_weight_row_stream_core_impl(double *vector_scale_fac
       goto cleanup_xweight_row;
 
     if(drop_eval_self){
-      if(np_glp_qr_drop_row_bkcde(np_glp_cv_cache.basis,
-                                  num_train,
-                                  k,
-                                  kw,
-                                  eval_pos,
-                                  mean_row) != 0)
+      if(np_glp_qr_drop_workspace_apply(&qr_workspace,
+                                        np_glp_cv_cache.basis,
+                                        num_train,
+                                        k,
+                                        kw,
+                                        eval_pos,
+                                        mean_row) != 0)
         goto cleanup_xweight_row;
 
       for(j = 0; j < num_train; j++){
@@ -20558,6 +20503,7 @@ static int np_conditional_x_weight_row_stream_core_impl(double *vector_scale_fac
   status = 0;
 
 cleanup_xweight_row:
+  np_glp_qr_drop_workspace_clear(&qr_workspace);
   if(KWM != NULL) mat_free(KWM);
   if(RHS != NULL) mat_free(RHS);
   if(SOL != NULL) mat_free(SOL);
@@ -22612,6 +22558,7 @@ static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_f
   double **eval_xuno_one = NULL, **eval_xord_one = NULL, **eval_xcon_one = NULL;
   double **matrix_X_continuous_eval_block = NULL;
   MATRIX KWM = NULL, RHS = NULL, SOL = NULL;
+  NPGLPQRDropWorkspace qr_workspace;
   NPConditionalBoundState bounds_state;
   int i, j, l;
   int status = 1;
@@ -22619,6 +22566,7 @@ static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_f
     (bwctx->eval_start == eval_start) &&
     (bwctx->block_rows == block_rows);
 
+  np_glp_qr_drop_workspace_init(&qr_workspace);
   if((rows_out == NULL) || (vector_scale_factor == NULL))
     return 1;
   if((BANDWIDTH_den_extern != BW_FIXED) &&
@@ -22826,12 +22774,13 @@ static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_f
       const int k = np_glp_cv_cache.nterms;
 
       if(drop_eval_self){
-        if(np_glp_qr_drop_row_bkcde(np_glp_cv_cache.basis,
-                                    num_train,
-                                    k,
-                                    kw,
-                                    eval_pos,
-                                    mean_row) != 0)
+        if(np_glp_qr_drop_workspace_apply(&qr_workspace,
+                                          np_glp_cv_cache.basis,
+                                          num_train,
+                                          k,
+                                          kw,
+                                          eval_pos,
+                                          mean_row) != 0)
           goto cleanup_xweight_block;
 
         for(j = 0; j < num_train; j++){
@@ -22878,6 +22827,7 @@ static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_f
   status = 0;
 
 cleanup_xweight_block:
+  np_glp_qr_drop_workspace_clear(&qr_workspace);
   if(KWM != NULL) mat_free(KWM);
   if(RHS != NULL) mat_free(RHS);
   if(SOL != NULL) mat_free(SOL);
@@ -22937,6 +22887,7 @@ static int np_conditional_x_weight_block_pair_stream_core(double *vector_scale_f
   double **eval_xuno_one = NULL, **eval_xord_one = NULL, **eval_xcon_one = NULL;
   double **matrix_X_continuous_eval_block = NULL;
   MATRIX KWM = NULL, RHS = NULL, SOL = NULL;
+  NPGLPQRDropWorkspace qr_workspace;
   NPConditionalBoundState bounds_state;
   int i, j, l;
   int status = 1;
@@ -22944,6 +22895,7 @@ static int np_conditional_x_weight_block_pair_stream_core(double *vector_scale_f
     (bwctx->eval_start == eval_start) &&
     (bwctx->block_rows == block_rows);
 
+  np_glp_qr_drop_workspace_init(&qr_workspace);
   /*
    * Fixed-bandwidth CVLS only: construct the raw X-kernel row once, then
    * preserve the existing leave-one-out and full-row consumer arithmetic.
@@ -23134,12 +23086,13 @@ static int np_conditional_x_weight_block_pair_stream_core(double *vector_scale_f
 
     self_weight = kw[eval_pos];
     kw[eval_pos] = 0.0;
-    if(np_glp_qr_drop_row_bkcde(np_glp_cv_cache.basis,
-                                num_train,
-                                k,
-                                kw,
-                                eval_pos,
-                                mean_row) != 0)
+    if(np_glp_qr_drop_workspace_apply(&qr_workspace,
+                                      np_glp_cv_cache.basis,
+                                      num_train,
+                                      k,
+                                      kw,
+                                      eval_pos,
+                                      mean_row) != 0)
       goto cleanup_xweight_block_pair;
 
     for(j = 0; j < num_train; j++){
@@ -23185,6 +23138,7 @@ static int np_conditional_x_weight_block_pair_stream_core(double *vector_scale_f
   status = 0;
 
 cleanup_xweight_block_pair:
+  np_glp_qr_drop_workspace_clear(&qr_workspace);
   if(KWM != NULL) mat_free(KWM);
   if(RHS != NULL) mat_free(RHS);
   if(SOL != NULL) mat_free(SOL);
