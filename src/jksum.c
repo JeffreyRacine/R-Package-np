@@ -26,6 +26,7 @@
 #include "linalg.h"
 #include "gsl_bspline.h"
 #include "jksum_lp_row.h"
+#include "jksum_lp_solve.h"
 
 #include "hash.h"
 #include "tree.h"
@@ -12319,7 +12320,7 @@ static NPRegCvLpResult np_regression_cv_lp_rawbasis_fixed(
   double **train_u = NULL, **train_o = NULL, **train_c = NULL;
   MATRIX eval_u = NULL, eval_o = NULL, eval_c = NULL;
   MATRIX matrix_bandwidth_eval = NULL;
-  MATRIX KWM = NULL, XTKY = NULL, DELTA = NULL;
+  NPLPSolveWorkspace solve_workspace;
   double mean_dummy = 0.0;
   double aicc = 0.0;
   int use_sparse_tree = 0;
@@ -12333,6 +12334,8 @@ static NPRegCvLpResult np_regression_cv_lp_rawbasis_fixed(
 #endif
 
 #define NP_LP_CV_FAIL() do { local_fail = 1; goto lp_cv_collective_gate; } while(0)
+
+  np_lp_solve_workspace_init(&solve_workspace);
 
   if((num_obs <= 0) || (num_reg_continuous <= 0))
     return result;
@@ -12395,9 +12398,8 @@ static NPRegCvLpResult np_regression_cv_lp_rawbasis_fixed(
       eval_outer = alloc_vecd(MAX(1, nterms*nterms));
     }
   }
-  KWM = mat_creat(nterms, nterms, UNDEFINED);
-  XTKY = mat_creat(nterms, 1, UNDEFINED);
-  DELTA = mat_creat(nterms, 1, UNDEFINED);
+  if(!np_lp_solve_workspace_reserve(&solve_workspace, nterms, 1))
+    NP_LP_CV_FAIL();
 
   if((moments == NULL) || (rhs == NULL) ||
      (track_lowsupport &&
@@ -12416,7 +12418,8 @@ static NPRegCvLpResult np_regression_cv_lp_rawbasis_fixed(
                            (matrix_bandwidth_eval == NULL) ||
                            ((!use_mpi_transport) && (nterms >= 3) &&
                             ((eval_ybasis == NULL) || (eval_outer == NULL))))) ||
-     (KWM == NULL) || (XTKY == NULL) || (DELTA == NULL))
+     (solve_workspace.gram_source == NULL) ||
+     (solve_workspace.rhs_source == NULL))
     NP_LP_CV_FAIL();
 
   if(use_tree &&
@@ -12784,18 +12787,19 @@ lp_cv_collective_gate:
     for(a = 0; a < nterms; a++)
       eval_basis[a] = basis[a][eval_idx];
 
-    for(a = 0; a < nterms; a++){
-      XTKY[a][0] = tj[a];
-      for(b = 0; b < nterms; b++)
-        KWM[a][b] = sj[a*nterms+b];
-    }
+    for(a = 0; a < nterms; a++)
+      solve_workspace.rhs_source[a] = tj[a];
+    for(b = 0; b < nterms; b++)
+      for(a = 0; a < nterms; a++)
+        solve_workspace.gram_source[a + b*nterms] = sj[a*nterms+b];
 
     if(bwm == RBWM_CVAIC){
       for(a = 0; a < nterms; a++){
         const double ba = eval_basis[a];
-        XTKY[a][0] += aicc*ba*vector_Y[eval_idx];
+        solve_workspace.rhs_source[a] += aicc*ba*vector_Y[eval_idx];
         for(b = 0; b < nterms; b++)
-          KWM[a][b] += aicc*ba*eval_basis[b];
+          solve_workspace.gram_source[a + b*nterms] +=
+            aicc*ba*eval_basis[b];
       }
     }
 
@@ -12813,22 +12817,24 @@ lp_cv_collective_gate:
                                   &fit)){
       nepsilon = 0.0;
     } else {
-    while(mat_solve(KWM, XTKY, DELTA) == NULL){
+    while(!np_lp_solve_workspace_solve(&solve_workspace, nterms, 1)){
       for(a = 0; a < nterms; a++)
-        KWM[a][a] += epsilon;
+        solve_workspace.gram_source[a + a*nterms] += epsilon;
       nepsilon += epsilon;
       if(nepsilon > 128.0*epsilon)
         goto cleanup_lp_cv;
     }
 
-    XTKY[0][0] += nepsilon*XTKY[0][0]/NZD_POS(KWM[0][0]);
+    solve_workspace.rhs_source[0] +=
+      nepsilon*solve_workspace.rhs_source[0]/
+      NZD_POS(solve_workspace.gram_source[0]);
     if(nepsilon > 0.0){
-      if(mat_solve(KWM, XTKY, DELTA) == NULL)
+      if(!np_lp_solve_workspace_solve(&solve_workspace, nterms, 1))
         goto cleanup_lp_cv;
     }
 
     for(a = 0; a < nterms; a++)
-      fit += eval_basis[a]*DELTA[a][0];
+      fit += eval_basis[a]*solve_workspace.rhs_work[a];
     }
 
     {
@@ -12842,11 +12848,11 @@ lp_cv_collective_gate:
     if(bwm == RBWM_CVAIC){
       double hii = 0.0;
       for(a = 0; a < nterms; a++)
-        XTKY[a][0] = eval_basis[a];
-      if(mat_solve(KWM, XTKY, DELTA) == NULL)
+        solve_workspace.rhs_source[a] = eval_basis[a];
+      if(!np_lp_solve_workspace_solve(&solve_workspace, nterms, 1))
         goto cleanup_lp_cv;
       for(a = 0; a < nterms; a++)
-        hii += eval_basis[a]*DELTA[a][0];
+        hii += eval_basis[a]*solve_workspace.rhs_work[a];
       result.traceH += hii*aicc;
     }
   }
@@ -12861,9 +12867,7 @@ cleanup_lp_cv:
   if(eval_o != NULL) mat_free(eval_o);
   if(eval_c != NULL) mat_free(eval_c);
   if(matrix_bandwidth_eval != NULL) free_tmat(matrix_bandwidth_eval);
-  if(KWM != NULL) mat_free(KWM);
-  if(XTKY != NULL) mat_free(XTKY);
-  if(DELTA != NULL) mat_free(DELTA);
+  np_lp_solve_workspace_clear(&solve_workspace);
   if(moments != NULL) free(moments);
   if(moments_local != NULL) free(moments_local);
   if(rhs != NULL) free(rhs);
