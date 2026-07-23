@@ -20391,7 +20391,7 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
   double *vsfx = NULL, *lambdax = NULL;
   double **matrix_bandwidth_x = NULL;
   double **TCON = NULL, **TUNO = NULL, **TORD = NULL;
-  MATRIX KWM = NULL, XTKY = NULL, DELTA = NULL;
+  NPLPSolveWorkspace solve_workspace;
   double **Ycols = NULL, **Wcols = NULL;
   double *out = NULL, *eval_basis = NULL;
   int i, j, l;
@@ -20421,6 +20421,7 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
     }
   }
 
+  np_lp_solve_workspace_init(&solve_workspace);
   memset(fitted_out, 0, (size_t)num_eval*(size_t)n_rhs*sizeof(double));
 
   vsfx = alloc_vecd(MAX(1, num_reg_tot));
@@ -20512,16 +20513,17 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
     goto cleanup_lp_apply;
   }
 
-  KWM = mat_creat(np_glp_cv_cache.nterms, np_glp_cv_cache.nterms, UNDEFINED);
-  XTKY = mat_creat(np_glp_cv_cache.nterms, n_rhs, UNDEFINED);
-  DELTA = mat_creat(np_glp_cv_cache.nterms, n_rhs, UNDEFINED);
+  if(!np_lp_solve_workspace_reserve(&solve_workspace,
+                                    np_glp_cv_cache.nterms,
+                                    n_rhs))
+    goto cleanup_lp_apply;
   Ycols = (double **)malloc((size_t)(n_rhs + np_glp_cv_cache.nterms)*sizeof(double *));
   Wcols = (double **)malloc((size_t)np_glp_cv_cache.nterms*sizeof(double *));
   out = (double *)malloc((size_t)(n_rhs + np_glp_cv_cache.nterms)*(size_t)np_glp_cv_cache.nterms*sizeof(double));
   eval_basis = (double *)malloc((size_t)np_glp_cv_cache.nterms*sizeof(double));
 
-  if((KWM == NULL) || (XTKY == NULL) || (DELTA == NULL) ||
-     (Ycols == NULL) || (Wcols == NULL) || (out == NULL) || (eval_basis == NULL))
+  if((Ycols == NULL) || (Wcols == NULL) ||
+     (out == NULL) || (eval_basis == NULL))
     goto cleanup_lp_apply;
 
   for(i = 0; i < n_rhs; i++)
@@ -20597,21 +20599,35 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
     for(i = 0; i < np_glp_cv_cache.nterms; i++){
       const int base = i*(n_rhs + np_glp_cv_cache.nterms);
       for(int rhs_idx = 0; rhs_idx < n_rhs; rhs_idx++)
-        XTKY[i][rhs_idx] = out[base + rhs_idx];
+        solve_workspace.rhs_source[
+          i+rhs_idx*np_glp_cv_cache.nterms
+        ] = out[base + rhs_idx];
       for(l = 0; l < np_glp_cv_cache.nterms; l++)
-        KWM[i][l] = out[base + n_rhs + l];
+        solve_workspace.gram_source[
+          i+l*np_glp_cv_cache.nterms
+        ] = out[base + n_rhs + l];
     }
 
-    while(mat_solve(KWM, XTKY, DELTA) == NULL){
+    while(!np_lp_solve_workspace_solve(&solve_workspace,
+                                       np_glp_cv_cache.nterms,
+                                       n_rhs)){
       for(i = 0; i < np_glp_cv_cache.nterms; i++)
-        KWM[i][i] += epsilon;
+        solve_workspace.gram_source[
+          i+i*np_glp_cv_cache.nterms
+        ] += epsilon;
       nepsilon += epsilon;
     }
 
     if(nepsilon > 0.0){
       for(int rhs_idx = 0; rhs_idx < n_rhs; rhs_idx++)
-        XTKY[0][rhs_idx] += nepsilon*XTKY[0][rhs_idx]/NZD_POS(KWM[0][0]);
-      if(mat_solve(KWM, XTKY, DELTA) == NULL)
+        solve_workspace.rhs_source[
+          rhs_idx*np_glp_cv_cache.nterms
+        ] += nepsilon*solve_workspace.rhs_source[
+          rhs_idx*np_glp_cv_cache.nterms
+        ]/NZD_POS(solve_workspace.gram_source[0]);
+      if(!np_lp_solve_workspace_solve(&solve_workspace,
+                                      np_glp_cv_cache.nterms,
+                                      n_rhs))
         goto cleanup_lp_apply;
     }
 
@@ -20655,7 +20671,9 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
     for(int rhs_idx = 0; rhs_idx < n_rhs; rhs_idx++){
       double fit = 0.0;
       for(i = 0; i < np_glp_cv_cache.nterms; i++)
-        fit += eval_basis[i]*DELTA[i][rhs_idx];
+        fit += eval_basis[i]*solve_workspace.rhs_work[
+          i+rhs_idx*np_glp_cv_cache.nterms
+        ];
       fitted_out[(size_t)j + (size_t)num_eval*(size_t)rhs_idx] = fit;
     }
   }
@@ -20663,9 +20681,7 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
   status = 0;
 
 cleanup_lp_apply:
-  if(KWM != NULL) mat_free(KWM);
-  if(XTKY != NULL) mat_free(XTKY);
-  if(DELTA != NULL) mat_free(DELTA);
+  np_lp_solve_workspace_clear(&solve_workspace);
   if(matrix_bandwidth_x != NULL) free_tmat(matrix_bandwidth_x);
   if((TCON != NULL) && (num_reg_continuous_extern > 0)) free_mat(TCON, num_reg_continuous_extern);
   if((TUNO != NULL) && (num_reg_unordered_extern > 0)) free_mat(TUNO, num_reg_unordered_extern);
