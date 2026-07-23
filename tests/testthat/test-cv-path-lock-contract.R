@@ -272,6 +272,43 @@ test_that("canonical LP fit and evaluation avoid legacy solve marshalling", {
   expect_false(grepl("SHIFT", helper_body, fixed = TRUE))
 })
 
+test_that("canonical LP hat and apply routes avoid legacy solve marshalling", {
+  src_file <- locate_jksum_c()
+  skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
+
+  lines <- readLines(src_file, warn = FALSE)
+  hat_start <- grep("^int np_regression_lp_hat_matrix\\(", lines)
+  hat_stop <- grep("^typedef struct \\{$", lines)
+  hat_stop <- hat_stop[hat_stop > hat_start][1L]
+  apply_start <- grep("^int np_regression_lp_apply_matrix\\(", lines)
+  apply_stop <- grep("^static void np_conditional_yrow_ctx_clear\\(", lines)
+  expect_length(hat_start, 1L)
+  expect_length(hat_stop, 1L)
+  expect_length(apply_start, 1L)
+  expect_length(apply_stop, 1L)
+  expect_lt(hat_start, hat_stop)
+  expect_lt(apply_start, apply_stop)
+
+  hat_body <- paste(lines[hat_start:(hat_stop - 1L)], collapse = "\n")
+  apply_body <- paste(lines[apply_start:(apply_stop - 1L)], collapse = "\n")
+  for (helper_body in list(hat_body, apply_body)) {
+    expect_true(grepl(
+      "np_lp_solve_workspace_reserve(&solve_workspace,",
+      helper_body,
+      fixed = TRUE
+    ))
+    expect_true(grepl(
+      "np_lp_solve_workspace_solve(&solve_workspace,",
+      helper_body,
+      fixed = TRUE
+    ))
+    expect_false(grepl("mat_solve(", helper_body, fixed = TRUE))
+    expect_false(grepl("MATRIX KWM", helper_body, fixed = TRUE))
+    expect_false(grepl("MATRIX XTKY", helper_body, fixed = TRUE))
+    expect_false(grepl("DELTA", helper_body, fixed = TRUE))
+  }
+})
+
 test_that("density CV tree-bypass predicate is centralized in one helper", {
   src_file <- locate_jksum_c()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")

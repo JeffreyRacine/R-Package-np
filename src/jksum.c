@@ -18802,7 +18802,7 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
   double *vsfx = NULL, *lambdax = NULL, *kw = NULL, *mean_row = NULL, *out2 = NULL;
   double **matrix_bandwidth_x = NULL, **matrix_bandwidth_eval_one = NULL;
   double **eval_xuno_one = NULL, **eval_xord_one = NULL, **eval_xcon_one = NULL;
-  MATRIX KWM = NULL, RHS = NULL, SOL = NULL;
+  NPLPSolveWorkspace solve_workspace;
   double *eval_basis = NULL;
   NPConditionalBoundState bounds_state;
   int i, j, l;
@@ -18819,6 +18819,7 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
   if((deriv_var < 0) || (deriv_var > num_reg_continuous_extern) || (deriv_order < 0))
     return 1;
 
+  np_lp_solve_workspace_init(&solve_workspace);
   memset(weights_out, 0, (size_t)num_eval*(size_t)num_train*sizeof(double));
 
   vsfx = alloc_vecd(MAX(1, num_reg_tot));
@@ -18898,13 +18899,13 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
      (np_glp_cv_cache.terms == NULL))
     goto cleanup_lp_hat;
 
-  KWM = mat_creat(np_glp_cv_cache.nterms, np_glp_cv_cache.nterms, UNDEFINED);
-  RHS = mat_creat(np_glp_cv_cache.nterms, 1, UNDEFINED);
-  SOL = mat_creat(np_glp_cv_cache.nterms, 1, UNDEFINED);
+  if(!np_lp_solve_workspace_reserve(&solve_workspace,
+                                    np_glp_cv_cache.nterms,
+                                    1))
+    goto cleanup_lp_hat;
   out2 = alloc_vecd(MAX(1, np_glp_cv_cache.nterms*np_glp_cv_cache.nterms));
   eval_basis = alloc_vecd(MAX(1, np_glp_cv_cache.nterms));
-  if((KWM == NULL) || (RHS == NULL) || (SOL == NULL) ||
-     (out2 == NULL) || (eval_basis == NULL))
+  if((out2 == NULL) || (eval_basis == NULL))
     goto cleanup_lp_hat;
 
   for(i = 0; i < num_eval; i++){
@@ -19055,20 +19056,29 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
 
     for(l = 0; l < np_glp_cv_cache.nterms; l++){
       const int base = l*np_glp_cv_cache.nterms;
-      RHS[l][0] = eval_basis[l];
+      solve_workspace.rhs_source[l] = eval_basis[l];
       for(j = 0; j < np_glp_cv_cache.nterms; j++)
-        KWM[l][j] = out2[base + j];
+        solve_workspace.gram_source[l+j*np_glp_cv_cache.nterms] =
+          out2[base + j];
     }
 
-    while(mat_solve(KWM, RHS, SOL) == NULL){
+    while(!np_lp_solve_workspace_solve(&solve_workspace,
+                                       np_glp_cv_cache.nterms,
+                                       1)){
       for(l = 0; l < np_glp_cv_cache.nterms; l++)
-        KWM[l][l] += epsilon;
+        solve_workspace.gram_source[
+          l+l*np_glp_cv_cache.nterms
+        ] += epsilon;
       nepsilon += epsilon;
     }
 
     if(nepsilon > 0.0){
-      RHS[0][0] += nepsilon*RHS[0][0]/NZD_POS(KWM[0][0]);
-      if(mat_solve(KWM, RHS, SOL) == NULL)
+      solve_workspace.rhs_source[0] +=
+        nepsilon*solve_workspace.rhs_source[0]/
+        NZD_POS(solve_workspace.gram_source[0]);
+      if(!np_lp_solve_workspace_solve(&solve_workspace,
+                                      np_glp_cv_cache.nterms,
+                                      1))
         goto cleanup_lp_hat;
     }
 
@@ -19076,7 +19086,7 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
       double zju = 0.0;
       const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
       for(l = 0; l < np_glp_cv_cache.nterms; l++)
-        zju += np_glp_cv_cache.basis[l][j]*SOL[l][0];
+        zju += np_glp_cv_cache.basis[l][j]*solve_workspace.rhs_work[l];
       weights_out[(size_t)i*(size_t)num_train + (size_t)orig_j] = kw[j]*zju;
     }
   }
@@ -19084,9 +19094,7 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
   status = 0;
 
 cleanup_lp_hat:
-  if(KWM != NULL) mat_free(KWM);
-  if(RHS != NULL) mat_free(RHS);
-  if(SOL != NULL) mat_free(SOL);
+  np_lp_solve_workspace_clear(&solve_workspace);
   if(vsfx != NULL) free(vsfx);
   if(lambdax != NULL) free(lambdax);
   if(kw != NULL) free(kw);
@@ -19544,7 +19552,7 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
   double *vsfx = NULL, *lambdax = NULL;
   double **matrix_bandwidth_x = NULL;
   double **TCON = NULL, **TUNO = NULL, **TORD = NULL;
-  MATRIX KWM = NULL, XTKY = NULL, DELTA = NULL;
+  NPLPSolveWorkspace solve_workspace;
   double **Ycols = NULL, **Wcols = NULL;
   double *out = NULL, *eval_basis = NULL;
   int i, j, l;
@@ -19574,6 +19582,7 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
     }
   }
 
+  np_lp_solve_workspace_init(&solve_workspace);
   memset(fitted_out, 0, (size_t)num_eval*(size_t)n_rhs*sizeof(double));
 
   vsfx = alloc_vecd(MAX(1, num_reg_tot));
@@ -19665,16 +19674,17 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
     goto cleanup_lp_apply;
   }
 
-  KWM = mat_creat(np_glp_cv_cache.nterms, np_glp_cv_cache.nterms, UNDEFINED);
-  XTKY = mat_creat(np_glp_cv_cache.nterms, n_rhs, UNDEFINED);
-  DELTA = mat_creat(np_glp_cv_cache.nterms, n_rhs, UNDEFINED);
+  if(!np_lp_solve_workspace_reserve(&solve_workspace,
+                                    np_glp_cv_cache.nterms,
+                                    n_rhs))
+    goto cleanup_lp_apply;
   Ycols = (double **)malloc((size_t)(n_rhs + np_glp_cv_cache.nterms)*sizeof(double *));
   Wcols = (double **)malloc((size_t)np_glp_cv_cache.nterms*sizeof(double *));
   out = (double *)malloc((size_t)(n_rhs + np_glp_cv_cache.nterms)*(size_t)np_glp_cv_cache.nterms*sizeof(double));
   eval_basis = (double *)malloc((size_t)np_glp_cv_cache.nterms*sizeof(double));
 
-  if((KWM == NULL) || (XTKY == NULL) || (DELTA == NULL) ||
-     (Ycols == NULL) || (Wcols == NULL) || (out == NULL) || (eval_basis == NULL))
+  if((Ycols == NULL) || (Wcols == NULL) ||
+     (out == NULL) || (eval_basis == NULL))
     goto cleanup_lp_apply;
 
   for(i = 0; i < n_rhs; i++)
@@ -19750,21 +19760,35 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
     for(i = 0; i < np_glp_cv_cache.nterms; i++){
       const int base = i*(n_rhs + np_glp_cv_cache.nterms);
       for(int rhs_idx = 0; rhs_idx < n_rhs; rhs_idx++)
-        XTKY[i][rhs_idx] = out[base + rhs_idx];
+        solve_workspace.rhs_source[
+          i+rhs_idx*np_glp_cv_cache.nterms
+        ] = out[base + rhs_idx];
       for(l = 0; l < np_glp_cv_cache.nterms; l++)
-        KWM[i][l] = out[base + n_rhs + l];
+        solve_workspace.gram_source[
+          i+l*np_glp_cv_cache.nterms
+        ] = out[base + n_rhs + l];
     }
 
-    while(mat_solve(KWM, XTKY, DELTA) == NULL){
+    while(!np_lp_solve_workspace_solve(&solve_workspace,
+                                       np_glp_cv_cache.nterms,
+                                       n_rhs)){
       for(i = 0; i < np_glp_cv_cache.nterms; i++)
-        KWM[i][i] += epsilon;
+        solve_workspace.gram_source[
+          i+i*np_glp_cv_cache.nterms
+        ] += epsilon;
       nepsilon += epsilon;
     }
 
     if(nepsilon > 0.0){
       for(int rhs_idx = 0; rhs_idx < n_rhs; rhs_idx++)
-        XTKY[0][rhs_idx] += nepsilon*XTKY[0][rhs_idx]/NZD_POS(KWM[0][0]);
-      if(mat_solve(KWM, XTKY, DELTA) == NULL)
+        solve_workspace.rhs_source[
+          rhs_idx*np_glp_cv_cache.nterms
+        ] += nepsilon*solve_workspace.rhs_source[
+          rhs_idx*np_glp_cv_cache.nterms
+        ]/NZD_POS(solve_workspace.gram_source[0]);
+      if(!np_lp_solve_workspace_solve(&solve_workspace,
+                                      np_glp_cv_cache.nterms,
+                                      n_rhs))
         goto cleanup_lp_apply;
     }
 
@@ -19808,7 +19832,9 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
     for(int rhs_idx = 0; rhs_idx < n_rhs; rhs_idx++){
       double fit = 0.0;
       for(i = 0; i < np_glp_cv_cache.nterms; i++)
-        fit += eval_basis[i]*DELTA[i][rhs_idx];
+        fit += eval_basis[i]*solve_workspace.rhs_work[
+          i+rhs_idx*np_glp_cv_cache.nterms
+        ];
       fitted_out[(size_t)j + (size_t)num_eval*(size_t)rhs_idx] = fit;
     }
   }
@@ -19816,9 +19842,7 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
   status = 0;
 
 cleanup_lp_apply:
-  if(KWM != NULL) mat_free(KWM);
-  if(XTKY != NULL) mat_free(XTKY);
-  if(DELTA != NULL) mat_free(DELTA);
+  np_lp_solve_workspace_clear(&solve_workspace);
   if(matrix_bandwidth_x != NULL) free_tmat(matrix_bandwidth_x);
   if((TCON != NULL) && (num_reg_continuous_extern > 0)) free_mat(TCON, num_reg_continuous_extern);
   if((TUNO != NULL) && (num_reg_unordered_extern > 0)) free_mat(TUNO, num_reg_unordered_extern);
