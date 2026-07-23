@@ -6933,8 +6933,14 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
   if(use_wpow){
     wbuf = (double *)malloc((size_t)num_weights*sizeof(double));
     if(wbuf == NULL) error("memory allocation failed");
-    for(k = 0; k < num_weights; k++){
-      wbuf[k] = (weights[k] == 0.0) ? 0.0 : ipow(weights[k]/db, kpow);
+    if(kpow == 2){
+      for(k = 0; k < num_weights; k++){
+        const double wk = weights[k]/db;
+        wbuf[k] = (weights[k] == 0.0) ? 0.0 : wk*wk;
+      }
+    } else {
+      for(k = 0; k < num_weights; k++)
+        wbuf[k] = (weights[k] == 0.0) ? 0.0 : ipow(weights[k]/db, kpow);
     }
   }
 
