@@ -297,7 +297,9 @@ npreghat <-
       bws[["ckertype", exact = TRUE]],
       "uniform"
     )
-    uniform.warning <- "[np] ignoring kernel order specified with uniform kernel type"
+    uniform.warning <- unname(.np_io_prefix_text(
+      "ignoring kernel order specified with uniform kernel type"
+    ))
     call_npksum <- function(call) {
       if (uniform.kernel && use.tree) {
         old.tree.option <- options(np.tree = FALSE)
