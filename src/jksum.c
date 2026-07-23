@@ -11312,29 +11312,27 @@ static inline double np_regression_cv_loss_value(const int bwm,
     residual*residual;
 }
 
+/*
+  This performance-only cutoff is basis-neutral.  Retained paired objective
+  timings favor resident rows through width 5 and packed BLAS from width 6.
+*/
+enum { NP_REG_CV_LP_RESIDENT_MAX_TERMS = 5 };
+
 static inline int np_reg_cv_use_canonical_lp_fixed_kernel(const int bwm,
                                                            const int BANDWIDTH_reg,
                                                            const int num_reg_continuous,
-                                                           const int use_bernstein){
+                                                           const int nterms){
   if((BANDWIDTH_reg != BW_FIXED) || (num_reg_continuous <= 0))
     return 0;
 
-  if(bwm == RBWM_CVAIC)
-    return 1;
-
-  if((bwm != RBWM_CVLS) && (bwm != RBWM_CVCHECK) &&
-     (bwm != RBWM_CVKS))
+  if((bwm != RBWM_CVLS) && (bwm != RBWM_CVAIC) &&
+     (bwm != RBWM_CVCHECK) && (bwm != RBWM_CVKS))
     return 0;
 
-  /*
-    Bernstein LP fixed-kernel objectives are faster through the packed BLAS
-    basis path below.
-  */
-  if((!use_bernstein) &&
-     (int_glp_basis_extern == 1))
-    return 1;
+  if(int_glp_basis_extern != 1)
+    return bwm == RBWM_CVAIC;
 
-  return 0;
+  return nterms <= NP_REG_CV_LP_RESIDENT_MAX_TERMS;
 }
 
 static int np_lp_fixed_tree_sparse_supported(const int num_reg_unordered,
@@ -12277,7 +12275,7 @@ cleanup_sparse:
 }
 
 
-static NPRegCvLpResult np_regression_cv_lp_rawbasis_fixed(
+static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
     const int bwm,
     const int num_obs,
     const int num_reg_unordered,
@@ -13057,7 +13055,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
         np_reg_cv_use_canonical_lp_fixed_kernel(bwm,
                                                  BANDWIDTH_reg,
                                                  num_reg_continuous,
-                                                 use_bernstein);
+                                                 glp_nterms);
       const int all_large_gate = (bwm != RBWM_CVKS) &&
         np_reg_cv_all_large_gate(BANDWIDTH_reg,
                                                           num_obs,
@@ -13078,7 +13076,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                                                           &ov_cont_from_cache);
       if(use_canonical_lp_kernel && !all_large_gate){
         NPRegCvLpResult lp_result =
-          np_regression_cv_lp_rawbasis_fixed(bwm,
+          np_regression_cv_lp_basis_fixed(bwm,
                                               num_obs,
                                               num_reg_unordered,
                                               num_reg_ordered,
