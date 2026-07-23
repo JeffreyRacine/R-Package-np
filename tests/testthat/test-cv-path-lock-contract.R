@@ -45,6 +45,9 @@ test_that("CVLS LL/LP route predicate is centralized in one helper", {
   expect_equal(sum(grepl("np_reg_cv_use_degree1_rawbasis_kernel", lines, fixed = TRUE)), 0L)
   expect_equal(sum(grepl("np_regression_cv_degree1_rawbasis_fixed", lines, fixed = TRUE)), 0L)
   expect_equal(sum(grepl("np_reg_degree1_center_raw_moments_at_eval", lines, fixed = TRUE)), 0L)
+  expect_equal(sum(grepl("np_glp_center_raw_moments_at_eval", lines, fixed = TRUE)), 0L)
+  expect_equal(sum(grepl("np_glp_fill_shift_raw_from_center", lines, fixed = TRUE)), 0L)
+  expect_equal(sum(grepl("np_glp_binom_coeff", lines, fixed = TRUE)), 0L)
 
   helper_start <- grep("^static inline int np_reg_cv_use_symmetric_dropone_path\\(", lines)
   helper_stop <- grep("^static inline int np_reg_cv_use_canonical_ll_degree1_lp_objective\\(", lines)
@@ -62,6 +65,45 @@ test_that("CVLS LL/LP route predicate is centralized in one helper", {
 
   canonical_lp_calls <- sum(grepl("np_reg_cv_use_canonical_lp_fixed_kernel\\(", lines))
   expect_gte(canonical_lp_calls, 3L)
+})
+
+test_that("fixed resident-row LP CV solves and projects the uncentered basis", {
+  src_file <- locate_jksum_c()
+  skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
+
+  lines <- readLines(src_file, warn = FALSE)
+  helper_start <- grep(
+    "^static NPRegCvLpResult np_regression_cv_lp_rawbasis_fixed\\(",
+    lines
+  )
+  helper_stop <- grep(
+    "^double np_kernel_estimate_regression_categorical_ls_aic\\(",
+    lines
+  )
+  expect_length(helper_start, 1L)
+  expect_length(helper_stop, 1L)
+  expect_lt(helper_start, helper_stop)
+
+  helper_body <- paste(lines[helper_start:(helper_stop - 1L)], collapse = "\n")
+  expect_true(grepl(
+    "KWM[a][b] = sj[a*nterms+b];",
+    helper_body,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
+    "fit += eval_basis[a]*DELTA[a][0];",
+    helper_body,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
+    "hii += eval_basis[a]*DELTA[a][0];",
+    helper_body,
+    fixed = TRUE
+  ))
+  expect_false(grepl("fit = DELTA[0][0];", helper_body, fixed = TRUE))
+  expect_false(grepl("center_raw", helper_body, fixed = TRUE))
+  expect_false(grepl("SHIFT", helper_body, fixed = TRUE))
+  expect_false(grepl("mat_inv00", helper_body, fixed = TRUE))
 })
 
 test_that("density CV tree-bypass predicate is centralized in one helper", {
