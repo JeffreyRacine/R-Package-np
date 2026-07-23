@@ -422,6 +422,141 @@ npreghat <-
     return(H)
   }
 
+  if (identical(bws$type, "generalized_nn") &&
+      !identical(bws[["ckertype", exact = TRUE]], "uniform")) {
+    eval.chunk.size <- min(256L, neval)
+    H <- matrix(0.0, nrow = neval, ncol = ntrain)
+    undefined.rows <- rep.int(FALSE, neval)
+    use.tree <- identical(
+      npDoTreeOrCategoricalCompress(
+        ncon = bws$ncon,
+        ncat = bws$nuno + bws$nord,
+        bws = bws
+      ),
+      DO_TREE_YES
+    )
+    epan.tree <- use.tree && identical(
+      bws[["ckertype", exact = TRUE]],
+      "epanechnikov"
+    )
+    uniform.kernel <- identical(
+      bws[["ckertype", exact = TRUE]],
+      "uniform"
+    )
+    uniform.warning <- unname(.np_io_prefix_text(
+      "ignoring kernel order specified with uniform kernel type"
+    ))
+    call_npksum <- function(call) {
+      if (uniform.kernel && use.tree) {
+        old.tree.option <- options(np.tree = FALSE)
+        on.exit(options(old.tree.option), add = TRUE)
+      }
+      if (!uniform.kernel)
+        return(eval(call))
+      withCallingHandlers(
+        eval(call),
+        warning = function(w) {
+          if (identical(conditionMessage(w), uniform.warning))
+            invokeRestart("muffleWarning")
+        }
+      )
+    }
+
+    for (start in seq.int(1L, neval, by = eval.chunk.size)) {
+      rows <- seq.int(start, min(neval, start + eval.chunk.size - 1L))
+      eval.chunk <- eval.data[rows, , drop = FALSE]
+
+      if (epan.tree) {
+        normal.call <- quote(npksum.default(
+          bws = bws,
+          txdat = txdat,
+          exdat = eval.chunk,
+          bandwidth.divide = TRUE,
+          return.kernel.weights = TRUE,
+          .np.internal.bandwidth.divide.weights = TRUE,
+          operator = rep.int("normal", ncol(txdat))
+        ))
+        derivative.operator <- rep.int("normal", ncol(txdat))
+        derivative.operator[which(bws$icon)[target.cont]] <- "derivative"
+        derivative.call <- quote(npksum.default(
+          bws = bws,
+          txdat = txdat,
+          exdat = eval.chunk,
+          bandwidth.divide = TRUE,
+          return.kernel.weights = TRUE,
+          .np.internal.bandwidth.divide.weights = TRUE,
+          operator = derivative.operator
+        ))
+        normal.out <- call_npksum(normal.call)
+        derivative.out <- call_npksum(derivative.call)
+        kw <- normal.out$kw
+        pkw <- derivative.out$kw
+        sk <- as.vector(normal.out$ksum)
+        dsk <- as.vector(derivative.out$ksum)
+      } else {
+        call <- quote(npksum.default(
+          bws = bws,
+          txdat = txdat,
+          exdat = eval.chunk,
+          bandwidth.divide = !beta.kernel,
+          return.kernel.weights = TRUE,
+          return.derivative.kernel.weights = TRUE,
+          .np.internal.bandwidth.divide.weights = !beta.kernel,
+          permutation.operator = "derivative"
+        ))
+        out <- if (beta.kernel) suppressWarnings(eval(call)) else call_npksum(call)
+        kw <- out$kw
+        pkw <- out$p.kw
+        if (!is.matrix(kw))
+          kw <- matrix(kw, nrow = ntrain, ncol = length(rows))
+        if (length(dim(pkw)) == 3L) {
+          pkw <- pkw[, , target.cont, drop = TRUE]
+        } else {
+          pkw <- as.matrix(pkw)
+        }
+        if (!is.matrix(pkw))
+          pkw <- matrix(pkw, nrow = ntrain, ncol = length(rows))
+        if (beta.kernel || use.tree) {
+          sk <- as.vector(out$ksum)
+          dsk <- out$p.ksum
+          if (length(dim(dsk)) == 3L) {
+            dsk <- dsk[, 1L, target.cont, drop = TRUE]
+          } else if (is.matrix(dsk)) {
+            dsk <- dsk[, target.cont, drop = TRUE]
+          } else if (length(rows) == 1L && length(dsk) == bws$ncon) {
+            dsk <- dsk[[target.cont]]
+          }
+          dsk <- as.vector(dsk)
+        } else {
+          sk <- colSums(kw)
+          dsk <- colSums(pkw)
+        }
+      }
+
+      H[rows, ] <- t(
+        sweep(pkw, 2L, sk, "/") -
+          sweep(kw, 2L, dsk / (sk^2), "*")
+      )
+      if (beta.kernel) {
+        undefined.rows[rows] <- !is.finite(sk) | !is.finite(dsk) |
+          apply(!is.finite(pkw), 2L, any)
+      }
+    }
+
+    if (uniform.kernel) {
+      for (j in seq_len(ceiling(ntrain / min(512L, ntrain))))
+        .np_warning("ignoring kernel order specified with uniform kernel type")
+    }
+    if (beta.kernel && any(undefined.rows)) {
+      H[undefined.rows, ] <- NA_real_
+      warning(sprintf(
+        "beta derivative hat matrix contains %d undefined endpoint row(s)",
+        sum(undefined.rows)
+      ), call. = FALSE)
+    }
+    return(H)
+  }
+
   block.size <- min(512L, ntrain)
   ones <- rep.int(1.0, ntrain)
   H <- matrix(0.0, nrow = neval, ncol = ntrain)
@@ -990,6 +1125,7 @@ npreghat <-
     compute.ocg = FALSE
   )
   myopti <- c(myopti, npContinuousKernelDescriptorOptions(bws))
+  myopti <- c(myopti, list(divide.returned.kernel.weights = FALSE))
 
   cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
 

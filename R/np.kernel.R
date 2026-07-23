@@ -130,6 +130,9 @@ npksum.default <-
     internal.power12.weighted <-
       isTRUE(dots$.np.internal.power12.weighted)
     dots$.np.internal.power12.weighted <- NULL
+    internal.bandwidth.divide.weights <-
+      isTRUE(dots$.np.internal.bandwidth.divide.weights)
+    dots$.np.internal.bandwidth.divide.weights <- NULL
     return.derivative.kernel.weights <- isTRUE(dots$return.derivative.kernel.weights)
 
     bandwidth.divide <- npValidateScalarLogical(bandwidth.divide, "bandwidth.divide")
@@ -161,6 +164,10 @@ npksum.default <-
 
     if (internal.power12.weighted && !internal.power12)
       stop("invalid use of the internal weighted dual-power kernel-sum route")
+
+    if (internal.bandwidth.divide.weights &&
+        (!return.kernel.weights || !bandwidth.divide))
+      stop("invalid use of the internal divided kernel-weight route")
 
     invalid.power12.response <- if (internal.power12.weighted) {
       is.null(tydat) || !is.null(weights)
@@ -428,6 +435,9 @@ npksum.default <-
 	      compute.score = compute.score,
 	      compute.ocg = compute.ocg)
       myopti <- c(myopti, npContinuousKernelDescriptorOptions(bws))
+      myopti <- c(myopti, list(
+        divide.returned.kernel.weights = internal.bandwidth.divide.weights
+      ))
 
 	    cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
     

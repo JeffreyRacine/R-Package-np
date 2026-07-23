@@ -11192,6 +11192,8 @@ SEXP C_np_kernelsum(SEXP tuno,
   PROTECT(ckerlb_r = coerceVector(ckerlb, REALSXP));
   PROTECT(ckerub_r = coerceVector(ckerub, REALSXP));
 
+  if(XLENGTH(myopti_i) <= KWS_BDIVWI)
+    error("C_np_kernelsum: invalid internal option vector");
   if(XLENGTH(kpow_r) != 1 || !R_FINITE(REAL(kpow_r)[0]) ||
      REAL(kpow_r)[0] != floor(REAL(kpow_r)[0]) ||
      fabs(REAL(kpow_r)[0]) > INT_MAX)
@@ -11486,7 +11488,7 @@ SEXP C_np_kernelsum_power12(SEXP tuno,
   if(descriptor.family != NP_CKERNEL_FAMILY_LEGACY)
     error("C_np_kernelsum_power12: beta kernels do not support the internal dual-power route");
 
-  if(XLENGTH(myopti_i) <= KWS_CKORDERI)
+  if(XLENGTH(myopti_i) <= KWS_BDIVWI)
     error("C_np_kernelsum_power12: invalid internal option vector");
   if(XLENGTH(kpow_r) != 1 || REAL(kpow_r)[0] != 1.0)
     error("C_np_kernelsum_power12: internal route requires kernel.pow = 1");
@@ -18377,6 +18379,7 @@ static void np_kernelsum_common(double * tuno, double * tord, double * tcon,
   double * vector_scale_factor, * ksum, * ksum2 = NULL, * p_ksum = NULL, pad_num, * kw = NULL, * pkw = NULL;
   int i,j,k, num_var, num_obs_eval_alloc;
   int no_y, leave_one_out, train_is_eval, do_divide_bw;
+  int do_divide_returned_weights, do_divide_returned_bw;
   int max_lev, no_weights, sum_element_length, return_kernel_weights;
   int p_operator, do_score, do_ocg, p_nvar = 0;
 
@@ -18421,6 +18424,10 @@ static void np_kernelsum_common(double * tuno, double * tord, double * tcon,
   // no_y = myopti[KWS_NOYI];
   leave_one_out = myopti[KWS_LOOI];
   do_divide_bw = myopti[KWS_BDIVI];
+  do_divide_returned_weights = myopti[KWS_BDIVWI];
+  do_divide_returned_bw =
+    (do_divide_returned_weights || BANDWIDTH_reg_extern == BW_ADAP_NN) ?
+      do_divide_bw : 0;
   
   max_lev = myopti[KWS_MLEVI];
   pad_num = *padnum;
@@ -18823,7 +18830,7 @@ static void np_kernelsum_common(double * tuno, double * tord, double * tcon,
                                       leave_one_out,
                                       0,
                                       do_divide_bw,
-                                      (BANDWIDTH_reg_extern == BW_ADAP_NN) ? do_divide_bw : 0,
+                                      do_divide_returned_bw,
                                       0, //not symmetric
                                       0, //disable 'twisting'
                                       0, // do not drop train
@@ -18873,7 +18880,7 @@ static void np_kernelsum_common(double * tuno, double * tord, double * tcon,
                                       0,
                                       (int)(*kpow),
                                       do_divide_bw,
-                                      (BANDWIDTH_reg_extern == BW_ADAP_NN) ? do_divide_bw : 0,
+                                      do_divide_returned_bw,
                                       0, //not symmetric
                                       0, //disable 'twisting'
                                       0, // do not drop train

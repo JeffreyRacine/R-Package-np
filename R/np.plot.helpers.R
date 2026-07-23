@@ -5397,6 +5397,7 @@
     compute.ocg = FALSE
   )
   myopti <- c(myopti, npContinuousKernelDescriptorOptions(state$bws))
+  myopti <- c(myopti, list(divide.returned.kernel.weights = FALSE))
 
   asDouble <- function(data) {
     if (is.null(data)) {

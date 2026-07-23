@@ -364,6 +364,7 @@
     compute.ocg = FALSE
   )
   myopti <- c(myopti, npContinuousKernelDescriptorOptions(bws))
+  myopti <- c(myopti, list(divide.returned.kernel.weights = FALSE))
 
   cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
 
