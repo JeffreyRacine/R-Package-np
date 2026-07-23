@@ -13015,11 +13015,13 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
     const int *glp_terms = NULL;
     int glp_nterms = 0;
     double **basis = NULL;
-    MATRIX XTKY = NULL, DELTA = NULL, KWM = NULL;
     MATRIX TCON = NULL, TUNO = NULL, TORD = NULL;
     double ** matrix_bandwidth_eval = NULL;
     double ** XTKX = NULL;
+    NPLPSolveWorkspace solve_workspace;
     int glp_ok = 1;
+
+    np_lp_solve_workspace_init(&solve_workspace);
 
     if((vector_glp_degree_extern == NULL) || (num_reg_continuous <= 0)){
       cv = DBL_MAX;
@@ -13199,7 +13201,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
     const int nrc1 = glp_nterms;
     const int nrc2 = nrc1 + 1;
     const int nrcc22 = nrc2*nrc2;
-    double * PKWM[nrc1], * PXTKY[nrc1], * PXTKX[nrc2];
+    double * PXTKX[nrc2];
 
     double * PXC[MAX(1,num_reg_continuous)];
     double * PXU[MAX(1,num_reg_unordered)];
@@ -13225,9 +13227,6 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
       vsf = vector_scale_factor;
     }
 
-    XTKY = mat_creat(nrc1, 1, UNDEFINED);
-    DELTA = mat_creat(nrc1, 1, UNDEFINED);
-    KWM = mat_creat(nrc1, nrc1, UNDEFINED);
     TCON = mat_creat(num_reg_continuous, 1, UNDEFINED);
     TUNO = mat_creat(num_reg_unordered, 1, UNDEFINED);
     TORD = mat_creat(num_reg_ordered, 1, UNDEFINED);
@@ -13239,7 +13238,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
     double * sgn = (double *)malloc((size_t)nrc2*sizeof(double));
     double * evalv = (double *)malloc((size_t)nrc1*sizeof(double));
 
-    glp_ok = (XTKY != NULL) && (DELTA != NULL) && (KWM != NULL) &&
+    glp_ok = np_lp_solve_workspace_reserve(&solve_workspace, nrc1, 1) &&
       (TCON != NULL) && (TUNO != NULL) && (TORD != NULL) &&
       (matrix_bandwidth_eval != NULL) && (XTKX != NULL) &&
       (kwm != NULL) && (sgn != NULL) && (evalv != NULL);
@@ -13259,13 +13258,6 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
 
       for(i = 0; i < nrc2; i++)
         PXTKX[i] = XTKX[i];
-
-      for(i = 0; i < nrc1; i++){
-        PKWM[i] = KWM[i];
-        PXTKY[i] = XTKY[i];
-        KWM[i] = &kwm[(i+1)*nrc2 + 1];
-        XTKY[i] = &kwm[i+1];
-      }
 
       if(bwm == RBWM_CVAIC){
         tsf = int_LARGE_SF;
@@ -13327,11 +13319,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
       for(j = 0; j < num_obs; j++){
         double nepsilon = 0.0;
         double pnh = 1.0;
-
-        for(i = 0; i < nrc1; i++){
-          KWM[i] = &kwm[j*nrcc22+(i+1)*nrc2+1];
-          XTKY[i] = &kwm[j*nrcc22+i+1];
-        }
+        double * const row_kwm = kwm + (size_t)j*(size_t)nrcc22;
 
 #ifdef MPI2
         if(np_reg_cv_use_symmetric_dropone_path(bwm, ks_tree_use, BANDWIDTH_reg)){
@@ -13654,21 +13642,31 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
           const double self_weight = pnh*aicc;
           for(i = 0; i < nrc1; i++){
             const double bi = evalv[i];
-            XTKY[i][0] += self_weight*bi*vector_Y[j];
+            row_kwm[i+1] += self_weight*bi*vector_Y[j];
             for(int k = 0; k < nrc1; k++)
-              KWM[i][k] += self_weight*bi*evalv[k];
+              row_kwm[(i+1)*nrc2+k+1] += self_weight*bi*evalv[k];
           }
         }
 
-        while(mat_solve(KWM, XTKY, DELTA) == NULL){
+        for(i = 0; i < nrc1; i++)
+          solve_workspace.rhs_source[i] = row_kwm[i+1];
+        for(int k = 0; k < nrc1; k++)
           for(i = 0; i < nrc1; i++)
-            KWM[i][i] += epsilon;
+            solve_workspace.gram_source[i+k*nrc1] =
+              row_kwm[(i+1)*nrc2+k+1];
+
+        while(!np_lp_solve_workspace_solve(&solve_workspace, nrc1, 1)){
+          for(i = 0; i < nrc1; i++){
+            row_kwm[(i+1)*nrc2+i+1] += epsilon;
+            solve_workspace.gram_source[i+i*nrc1] += epsilon;
+          }
           nepsilon += epsilon;
         }
 
-        XTKY[0][0] += nepsilon*XTKY[0][0]/NZD_POS(KWM[0][0]);
+        row_kwm[1] += nepsilon*row_kwm[1]/NZD_POS(row_kwm[nrc2+1]);
+        solve_workspace.rhs_source[0] = row_kwm[1];
         if(nepsilon > 0.0){
-          if(mat_solve(KWM, XTKY, DELTA) == NULL){
+          if(!np_lp_solve_workspace_solve(&solve_workspace, nrc1, 1)){
             glp_ok = 0;
             break;
           }
@@ -13677,7 +13675,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
         {
           double mhat = 0.0;
           for(i = 0; i < nrc1; i++)
-            mhat += evalv[i]*DELTA[i][0];
+            mhat += evalv[i]*solve_workspace.rhs_work[i];
           {
             const double loss_y =
               (bwm == RBWM_CVCHECK && vector_lsq_loss_extern != NULL) ?
@@ -13688,32 +13686,24 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
         }
 
         if(bwm == RBWM_CVAIC){
-          for(i = 0; i < nrc1; i++)
-            XTKY[i][0] = evalv[i];
-          if(mat_solve(KWM, XTKY, DELTA) == NULL){
+          for(i = 0; i < nrc1; i++){
+            row_kwm[i+1] = evalv[i];
+            solve_workspace.rhs_source[i] = evalv[i];
+          }
+          if(!np_lp_solve_workspace_solve(&solve_workspace, nrc1, 1)){
             glp_ok = 0;
             break;
           }
           {
             double hii = 0.0;
             for(i = 0; i < nrc1; i++)
-              hii += evalv[i]*DELTA[i][0];
+              hii += evalv[i]*solve_workspace.rhs_work[i];
             traceH += hii*pnh*aicc;
           }
         }
       }
     }
 
-    if((XTKY != NULL) && (KWM != NULL)){
-      for(i = 0; i < nrc1; i++){
-        KWM[i] = PKWM[i];
-        XTKY[i] = PXTKY[i];
-      }
-    }
-
-    if(XTKY != NULL) mat_free(XTKY);
-    if(DELTA != NULL) mat_free(DELTA);
-    if(KWM != NULL) mat_free(KWM);
     if(TCON != NULL) mat_free(TCON);
     if(TUNO != NULL) mat_free(TUNO);
     if(TORD != NULL) mat_free(TORD);
@@ -13722,6 +13712,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
     if(kwm != NULL) free(kwm);
     if(sgn != NULL) free(sgn);
     if(evalv != NULL) free(evalv);
+    np_lp_solve_workspace_clear(&solve_workspace);
 
     if(sf_flag){
       int_LARGE_SF = 0;
