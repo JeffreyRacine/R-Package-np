@@ -528,3 +528,23 @@ int np_lp_full_row_workspace_invert_retryable(
 
   return 0;
 }
+
+int np_lp_full_row_workspace_pack_inverse_rows(
+  NPLPFullRowWorkspace *workspace,
+  int p)
+{
+  int i, j;
+
+  if((workspace == NULL) || (p <= 0) ||
+     (workspace->p_capacity < p) ||
+     (workspace->gram == NULL) ||
+     (workspace->matrix_copy == NULL))
+    return 0;
+
+  for(i = 0; i < p; i++)
+    for(j = 0; j < p; j++)
+      workspace->matrix_copy[i*p + j] =
+        workspace->gram[i + j*p];
+
+  return 1;
+}

@@ -17254,25 +17254,28 @@ double *SIGN){
         double **basis = NULL;
         NPGLPBasisCtx *basis_ctx = NULL;
         double *eval_basis = NULL, *eval_deriv = NULL;
-        MATRIX XtX = NULL, XtXINV = NULL, XtY = NULL, BETA = NULL;
-        int fast_ok = np_glp_build_terms(num_reg_continuous,
-                                         vector_glp_degree_extern,
-                                         int_glp_basis_extern,
-                                         &glp_terms,
-                                         &glp_nterms);
+        NPLPFullRowWorkspace inverse_workspace;
+        double *beta = NULL;
+        int fast_ok;
+
+        np_lp_full_row_workspace_init(&inverse_workspace);
+        fast_ok = np_glp_build_terms(num_reg_continuous,
+                                     vector_glp_degree_extern,
+                                     int_glp_basis_extern,
+                                     &glp_terms,
+                                     &glp_nterms);
         if(fast_ok && (glp_nterms > 0)){
           basis = alloc_matd(num_obs_train, glp_nterms);
-          XtX = mat_creat(glp_nterms, glp_nterms, UNDEFINED);
-          XtXINV = mat_creat(glp_nterms, glp_nterms, UNDEFINED);
-          XtY = mat_creat(glp_nterms, 1, UNDEFINED);
-          BETA = mat_creat(glp_nterms, 1, UNDEFINED);
+          fast_ok = np_lp_full_row_workspace_reserve(
+            &inverse_workspace, glp_nterms, 1);
+          beta = (double *)malloc((size_t)glp_nterms*sizeof(double));
           eval_basis = (double *)malloc((size_t)glp_nterms*sizeof(double));
           if(do_grad)
             eval_deriv = (double *)malloc((size_t)glp_nterms*sizeof(double));
           if(use_bernstein)
             basis_ctx = (NPGLPBasisCtx *)calloc((size_t)num_reg_continuous, sizeof(NPGLPBasisCtx));
-          fast_ok = (basis != NULL) && (XtX != NULL) && (XtXINV != NULL) &&
-            (XtY != NULL) && (BETA != NULL) && (eval_basis != NULL) &&
+          fast_ok = fast_ok && (basis != NULL) && (beta != NULL) &&
+            (eval_basis != NULL) &&
             ((!do_grad) || (eval_deriv != NULL)) &&
             (!use_bernstein || (basis_ctx != NULL));
         } else {
@@ -17318,47 +17321,44 @@ double *SIGN){
         }
 
         if(fast_ok){
-          int ridge_it = 0;
           const double sk = ((double)num_obs_train)*kconst;
           const double se_default = (sk*hprod > 0.0) ?
             sqrt(MAX(0.0, sigma2hat) * K_INT_KERNEL_P / (sk*hprod)) : 0.0;
 
           for(i = 0; i < glp_nterms; i++){
-            XtY[i][0] = 0.0;
-            BETA[i][0] = 0.0;
+            inverse_workspace.rhs[i] = 0.0;
+            beta[i] = 0.0;
             for(j = 0; j < glp_nterms; j++)
-              XtX[i][j] = 0.0;
+              inverse_workspace.matrix_copy[i + j*glp_nterms] = 0.0;
           }
 
           for(i = 0; i < num_obs_train; i++){
             const double yi = vector_Y[i];
             for(int a = 0; a < glp_nterms; a++){
               const double za = basis[a][i];
-              XtY[a][0] += za*yi;
+              inverse_workspace.rhs[a] += za*yi;
               for(int b = a; b < glp_nterms; b++){
                 const double zb = basis[b][i];
-                XtX[a][b] += za*zb;
-                if(b != a) XtX[b][a] += za*zb;
+                inverse_workspace.matrix_copy[a + b*glp_nterms] += za*zb;
+                if(b != a)
+                  inverse_workspace.matrix_copy[b + a*glp_nterms] += za*zb;
               }
             }
           }
 
-          while(mat_inv(XtX, XtXINV) == NULL){
-            for(i = 0; i < glp_nterms; i++)
-              XtX[i][i] += ridge_eps;
-            ridge_it++;
-            if(ridge_it > 64){
-              fast_ok = 0;
-              break;
-            }
-          }
+          fast_ok = np_lp_full_row_workspace_invert_retryable(
+            &inverse_workspace, glp_nterms, ridge_eps, 64);
+          if(fast_ok)
+            fast_ok = np_lp_full_row_workspace_pack_inverse_rows(
+              &inverse_workspace, glp_nterms);
 
           if(fast_ok){
             for(i = 0; i < glp_nterms; i++){
               double s = 0.0;
               for(j = 0; j < glp_nterms; j++)
-                s += XtXINV[i][j]*XtY[j][0];
-              BETA[i][0] = s;
+                s += inverse_workspace.matrix_copy[i*glp_nterms + j] *
+                  inverse_workspace.rhs[j];
+              beta[i] = s;
             }
 
             for(i = 0; i < num_obs_eval; i++){
@@ -17383,11 +17383,13 @@ double *SIGN){
               }
 
               for(j = 0; j < glp_nterms; j++)
-                yhat += eval_basis[j]*BETA[j][0];
+                yhat += eval_basis[j]*beta[j];
               for(j = 0; j < glp_nterms; j++){
                 const double zj = eval_basis[j];
                 for(int b = 0; b < glp_nterms; b++)
-                  q += zj*XtXINV[j][b]*eval_basis[b];
+                  q += zj *
+                    inverse_workspace.matrix_copy[j*glp_nterms + b] *
+                    eval_basis[b];
               }
 
               mean[i] = yhat;
@@ -17427,14 +17429,16 @@ double *SIGN){
                   }
 
                   for(j = 0; j < glp_nterms; j++)
-                    dg += eval_deriv[j]*BETA[j][0];
+                    dg += eval_deriv[j]*beta[j];
                   gradient[l][i] = dg;
 
                   if(do_gerr){
                     for(j = 0; j < glp_nterms; j++){
                       const double dj = eval_deriv[j];
                       for(int b = 0; b < glp_nterms; b++)
-                        qg += dj*XtXINV[j][b]*eval_deriv[b];
+                        qg += dj *
+                          inverse_workspace.matrix_copy[j*glp_nterms + b] *
+                          eval_deriv[b];
                     }
                     {
                       const double gv = sigma2hat*qg;
@@ -17460,10 +17464,8 @@ double *SIGN){
         }
         if(eval_basis != NULL) free(eval_basis);
         if(eval_deriv != NULL) free(eval_deriv);
-        if(BETA != NULL) mat_free(BETA);
-        if(XtY != NULL) mat_free(XtY);
-        if(XtXINV != NULL) mat_free(XtXINV);
-        if(XtX != NULL) mat_free(XtX);
+        free(beta);
+        np_lp_full_row_workspace_clear(&inverse_workspace);
         if(basis != NULL) free_mat(basis, glp_nterms);
         if(glp_terms != NULL) free(glp_terms);
       }
