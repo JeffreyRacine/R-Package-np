@@ -24814,6 +24814,217 @@ cleanup_cvls_lp_adap_block:
 static int np_conditional_density_cvls_categorical_profile_stream(double *vector_scale_factor,
                                                                   double *cv);
 
+/*
+ * Reuse each Y-convolution tile across two adjacent non-tree LP X blocks.
+ * Buffer lifetimes keep the incumbent workspace bound: after a block's linear
+ * term is complete, its LOO-X and ordinary-Y matrices are dead and can hold
+ * the second block's LOO-X and full-X matrices.  Per-block accumulation order
+ * and the final order of cv updates are unchanged.
+ */
+static int np_conditional_density_cvls_lp_supertile2_stream(
+    double *vector_scale_factor,
+    double *cv)
+{
+  const int num_obs = num_obs_train_extern;
+  const int block_size =
+    MIN(np_conditional_lp_cvls_block_size(num_obs), MAX(1, num_obs));
+  double **loo_or_second = NULL;
+  double **first_full = NULL;
+  double **y_or_second_full = NULL;
+  double **yconv_or_second_y = NULL;
+  double *quad_cross = NULL;
+  NPConditionalXBlockBwCtx xbwctx = {0};
+  NPConditionalYRowCtx yconvctx = {0};
+  int i0, j0, ii, jj;
+  int status = 1;
+
+  if((cv == NULL) || (vector_scale_factor == NULL) ||
+     (num_obs <= block_size) || (int_ll_extern != LL_LP))
+    return 1;
+  if((num_reg_continuous_extern <= 0) ||
+     (vector_glp_degree_extern == NULL))
+    return 1;
+  if((BANDWIDTH_den_extern != BW_FIXED) &&
+     (BANDWIDTH_den_extern != BW_GEN_NN))
+    return 1;
+  if((int_TREE_X == NP_TREE_TRUE) || (int_TREE_Y == NP_TREE_TRUE))
+    return 1;
+
+  loo_or_second = alloc_tmatd(num_obs, block_size);
+  first_full = alloc_tmatd(num_obs, block_size);
+  y_or_second_full = alloc_tmatd(num_obs, block_size);
+  yconv_or_second_y = alloc_tmatd(num_obs, block_size);
+  quad_cross = alloc_vecd(block_size*block_size);
+  if((loo_or_second == NULL) || (first_full == NULL) ||
+     (y_or_second_full == NULL) || (yconv_or_second_y == NULL) ||
+     (quad_cross == NULL))
+    goto cleanup_cvls_lp_supertile2;
+
+  if((BANDWIDTH_den_extern == BW_GEN_NN) &&
+     (np_conditional_yrow_ctx_prepare(vector_scale_factor,
+                                      OP_CONVOLUTION,
+                                      &yconvctx) != 0))
+    goto cleanup_cvls_lp_supertile2;
+
+  *cv = 0.0;
+  for(i0 = 0; i0 < num_obs; i0 += 2*block_size){
+    const int ib_first = MIN(block_size, num_obs - i0);
+    const int second_start = i0 + ib_first;
+    const int ib_second =
+      MIN(block_size, MAX(0, num_obs - second_start));
+    double lin_first = 0.0;
+    double quad_first = 0.0;
+    double lin_second = 0.0;
+    double quad_second = 0.0;
+
+    if(BANDWIDTH_den_extern == BW_GEN_NN){
+      if(np_conditional_x_block_bw_ctx_prepare(vector_scale_factor,
+                                               i0,
+                                               ib_first,
+                                               &xbwctx) != 0)
+        goto cleanup_cvls_lp_supertile2;
+      if(np_conditional_x_weight_block_pair_gnn_stream_core(
+           vector_scale_factor,
+           i0,
+           ib_first,
+           &xbwctx,
+           loo_or_second,
+           first_full) != 0)
+        goto cleanup_cvls_lp_supertile2;
+      np_conditional_x_block_bw_ctx_clear(&xbwctx);
+    } else {
+      if(np_conditional_x_weight_block_pair_stream_core(vector_scale_factor,
+                                                        i0,
+                                                        ib_first,
+                                                        NULL,
+                                                        loo_or_second,
+                                                        first_full) != 0)
+        goto cleanup_cvls_lp_supertile2;
+    }
+
+    if(np_conditional_y_block_stream_op_core(vector_scale_factor,
+                                             i0,
+                                             ib_first,
+                                             OP_NORMAL,
+                                             y_or_second_full) != 0)
+      goto cleanup_cvls_lp_supertile2;
+    for(ii = 0; ii < ib_first; ii++)
+      lin_first += np_blas_ddot_int(num_obs,
+                                    loo_or_second[ii],
+                                    y_or_second_full[ii]);
+
+    if(ib_second > 0){
+      if(BANDWIDTH_den_extern == BW_GEN_NN){
+        if(np_conditional_x_block_bw_ctx_prepare(vector_scale_factor,
+                                                 second_start,
+                                                 ib_second,
+                                                 &xbwctx) != 0)
+          goto cleanup_cvls_lp_supertile2;
+        if(np_conditional_x_weight_block_pair_gnn_stream_core(
+             vector_scale_factor,
+             second_start,
+             ib_second,
+             &xbwctx,
+             loo_or_second,
+             y_or_second_full) != 0)
+          goto cleanup_cvls_lp_supertile2;
+        np_conditional_x_block_bw_ctx_clear(&xbwctx);
+      } else {
+        if(np_conditional_x_weight_block_pair_stream_core(
+             vector_scale_factor,
+             second_start,
+             ib_second,
+             NULL,
+             loo_or_second,
+             y_or_second_full) != 0)
+          goto cleanup_cvls_lp_supertile2;
+      }
+
+      if(np_conditional_y_block_stream_op_core(vector_scale_factor,
+                                               second_start,
+                                               ib_second,
+                                               OP_NORMAL,
+                                               yconv_or_second_y) != 0)
+        goto cleanup_cvls_lp_supertile2;
+      for(ii = 0; ii < ib_second; ii++)
+        lin_second += np_blas_ddot_int(num_obs,
+                                      loo_or_second[ii],
+                                      yconv_or_second_y[ii]);
+    }
+
+    for(j0 = 0; j0 < num_obs; j0 += block_size){
+      const int jb = MIN(block_size, num_obs - j0);
+
+      if(BANDWIDTH_den_extern == BW_GEN_NN){
+        for(jj = 0; jj < jb; jj++)
+          if(np_conditional_yrow_from_ctx(&yconvctx,
+                                          j0 + jj,
+                                          yconv_or_second_y[jj]) != 0)
+            goto cleanup_cvls_lp_supertile2;
+      } else {
+        if(np_conditional_y_block_stream_op_core(vector_scale_factor,
+                                                 j0,
+                                                 jb,
+                                                 OP_CONVOLUTION,
+                                                 yconv_or_second_y) != 0)
+          goto cleanup_cvls_lp_supertile2;
+      }
+
+      np_blas_dgemm_tn_int(ib_first,
+                           jb,
+                           num_obs,
+                           first_full[0],
+                           yconv_or_second_y[0],
+                           quad_cross);
+      for(ii = 0; ii < ib_first; ii++){
+        double * const ai = first_full[ii];
+        for(jj = 0; jj < jb; jj++){
+          const double aij = ai[j0 + jj];
+          if(aij == 0.0)
+            continue;
+          quad_first += aij*quad_cross[ii + jj*ib_first];
+        }
+      }
+
+      if(ib_second > 0){
+        np_blas_dgemm_tn_int(ib_second,
+                             jb,
+                             num_obs,
+                             y_or_second_full[0],
+                             yconv_or_second_y[0],
+                             quad_cross);
+        for(ii = 0; ii < ib_second; ii++){
+          double * const ai = y_or_second_full[ii];
+          for(jj = 0; jj < jb; jj++){
+            const double aij = ai[j0 + jj];
+            if(aij == 0.0)
+              continue;
+            quad_second += aij*quad_cross[ii + jj*ib_second];
+          }
+        }
+      }
+    }
+
+    *cv += quad_first - 2.0*lin_first;
+    if(ib_second > 0)
+      *cv += quad_second - 2.0*lin_second;
+  }
+
+  *cv /= (double)num_obs;
+  status = 0;
+
+cleanup_cvls_lp_supertile2:
+  np_conditional_x_block_bw_ctx_clear(&xbwctx);
+  np_conditional_yrow_ctx_clear(&yconvctx);
+  if(loo_or_second != NULL) free_tmat(loo_or_second);
+  if(first_full != NULL) free_tmat(first_full);
+  if(y_or_second_full != NULL) free_tmat(y_or_second_full);
+  if(yconv_or_second_y != NULL) free_tmat(yconv_or_second_y);
+  if(quad_cross != NULL) free(quad_cross);
+  np_glp_cv_clear_extern();
+  return status;
+}
+
 int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
                                           double *cv){
   const int num_obs = num_obs_train_extern;
@@ -24864,6 +25075,15 @@ int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
   if(((int_TREE_X == NP_TREE_TRUE) || (int_TREE_Y == NP_TREE_TRUE)) &&
      (BANDWIDTH_den_extern != BW_FIXED))
     return np_conditional_density_cvls_lp_row_stream(vector_scale_factor, cv);
+
+  if((int_ll_extern == LL_LP) &&
+     (num_reg_continuous_extern > 0) &&
+     (vector_glp_degree_extern != NULL) &&
+     (int_TREE_X != NP_TREE_TRUE) &&
+     (int_TREE_Y != NP_TREE_TRUE) &&
+     (num_obs > block_size))
+    return np_conditional_density_cvls_lp_supertile2_stream(vector_scale_factor,
+                                                            cv);
 
   xblock = alloc_tmatd(num_obs, block_size);
   xblock_full = alloc_tmatd(num_obs, block_size);
