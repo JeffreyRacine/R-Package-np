@@ -45,9 +45,9 @@ test_that("fixed CVLS row reuse stays fixed-LP-only and preserves consumer order
   markers <- c(
     "self_weight = kw[eval_pos]",
     "kw[eval_pos] = 0.0",
-    "np_glp_qr_drop_row_bkcde",
+    "np_glp_qr_drop_workspace_apply",
     "kw[eval_pos] = self_weight",
-    "mat_solve(KWM, RHS, SOL)"
+    "np_lp_full_row_workspace_solve"
   )
   positions <- vapply(markers, function(marker) {
     regexpr(marker, body, fixed = TRUE)[[1L]]
