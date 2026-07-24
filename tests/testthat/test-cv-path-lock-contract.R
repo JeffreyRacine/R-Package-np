@@ -189,7 +189,7 @@ test_that("fixed resident-row LP CV uses the reusable uncentered solve workspace
   expect_false(grepl("mat_inv00", helper_body, fixed = TRUE))
 })
 
-test_that("packed and nearest-neighbor LP CV avoid legacy solve marshalling", {
+test_that("all-large, packed, and nearest-neighbor LP CV avoid legacy solve marshalling", {
   src_file <- locate_jksum_c()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
 
@@ -206,7 +206,31 @@ test_that("packed and nearest-neighbor LP CV avoid legacy solve marshalling", {
   expect_length(helper_stop, 1L)
   expect_lt(helper_start, helper_stop)
 
-  helper_body <- paste(lines[helper_start:(helper_stop - 1L)], collapse = "\n")
+  helper_lines <- lines[helper_start:(helper_stop - 1L)]
+  helper_body <- paste(helper_lines, collapse = "\n")
+  lp_gate_anchor <- grep(
+    "if\\(use_canonical_lp_kernel && !all_large_gate\\)",
+    helper_lines
+  )
+  lp_alllarge_start <- grep(
+    "^      if\\(all_large_gate\\)\\{$",
+    helper_lines
+  )
+  lp_alllarge_start <- lp_alllarge_start[
+    lp_alllarge_start > lp_gate_anchor
+  ][1L]
+  lp_alllarge_stop <- grep(
+    "^    const int nrc1 = glp_nterms;$",
+    helper_lines
+  )
+  expect_length(lp_gate_anchor, 1L)
+  expect_length(lp_alllarge_start, 1L)
+  expect_length(lp_alllarge_stop, 1L)
+  expect_lt(lp_alllarge_start, lp_alllarge_stop)
+  lp_alllarge_body <- paste(
+    helper_lines[lp_alllarge_start:(lp_alllarge_stop - 1L)],
+    collapse = "\n"
+  )
   expect_true(grepl(
     "np_lp_solve_workspace_reserve(&solve_workspace, nrc1, 1)",
     helper_body,
@@ -227,7 +251,24 @@ test_that("packed and nearest-neighbor LP CV avoid legacy solve marshalling", {
     helper_body,
     fixed = TRUE
   ))
+  expect_true(grepl(
+    "np_lp_full_row_workspace_reserve(&inverse_workspace, k, 1)",
+    lp_alllarge_body,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
+    "np_lp_full_row_workspace_invert_retryable(",
+    lp_alllarge_body,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
+    "inverse_workspace.matrix_copy[a + b*k] += za*zb;",
+    lp_alllarge_body,
+    fixed = TRUE
+  ))
   expect_false(grepl("mat_solve(", helper_body, fixed = TRUE))
+  expect_false(grepl("mat_inv(", lp_alllarge_body, fixed = TRUE))
+  expect_false(grepl("MATRIX XtX", lp_alllarge_body, fixed = TRUE))
   expect_false(grepl("MATRIX XTKY", helper_body, fixed = TRUE))
   expect_false(grepl("DELTA", helper_body, fixed = TRUE))
   expect_false(grepl("MATRIX KWM", helper_body, fixed = TRUE))
