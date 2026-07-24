@@ -18384,62 +18384,6 @@ static int np_shadow_conditional_kernel_row_raw(const int *kernel_c,
                                                mean_out);
 }
 
-static int np_mat_bad_rcond_sym(MATRIX A, double min_rcond){
-  const int n = MatRow(A);
-  char jobz = 'N';
-  char uplo = 'U';
-  int i, j;
-  int info = 0;
-  int lwork = -1;
-  double work_query = 0.0;
-  double max_eval = 0.0, min_eval = DBL_MAX;
-  double *Ac = NULL, *eval = NULL, *work = NULL;
-  int bad = 1;
-
-  if((A == NULL) || (MatCol(A) != n) || (n <= 0))
-    return 1;
-
-  Ac = (double *)malloc((size_t)n*(size_t)n*sizeof(double));
-  eval = (double *)malloc((size_t)n*sizeof(double));
-  if((Ac == NULL) || (eval == NULL))
-    goto cleanup_bad_rcond;
-
-  for(j = 0; j < n; j++)
-    for(i = 0; i < n; i++)
-      Ac[i + j*n] = A[i][j];
-
-  F77_CALL(dsyev)(&jobz, &uplo, &n, Ac, &n, eval, &work_query, &lwork, &info FCONE FCONE);
-  if(info != 0)
-    goto cleanup_bad_rcond;
-
-  lwork = MAX(1, (int)work_query);
-  work = (double *)malloc((size_t)lwork*sizeof(double));
-  if(work == NULL)
-    goto cleanup_bad_rcond;
-
-  F77_CALL(dsyev)(&jobz, &uplo, &n, Ac, &n, eval, work, &lwork, &info FCONE FCONE);
-  if(info != 0)
-    goto cleanup_bad_rcond;
-
-  for(i = 0; i < n; i++){
-    if(!R_FINITE(eval[i]))
-      goto cleanup_bad_rcond;
-    max_eval = MAX(max_eval, fabs(eval[i]));
-    min_eval = MIN(min_eval, fabs(eval[i]));
-  }
-
-  if(!(max_eval > 0.0))
-    goto cleanup_bad_rcond;
-
-  bad = ((min_eval / max_eval) < min_rcond);
-
-cleanup_bad_rcond:
-  if(Ac != NULL) free(Ac);
-  if(eval != NULL) free(eval);
-  if(work != NULL) free(work);
-  return bad;
-}
-
 static int np_shadow_conditional_build_x_weights_core(double *vector_scale_factor,
                                                       int drop_eval_self,
                                                       double *weights_out){
@@ -23353,9 +23297,9 @@ typedef struct {
   int num_train;
   int nterms;
   double **basis;
-  MATRIX XtXINV;
+  NPLPFullRowWorkspace inverse_workspace;
   double *hdiag;
-  MATRIX XtXINV_original_order;
+  NPLPFullRowWorkspace inverse_original_workspace;
   double **basis_original_order;
   double *hdiag_original_order;
 } NPConditionalLpAllLargeCtx;
@@ -23363,9 +23307,9 @@ typedef struct {
 static void np_conditional_lp_all_large_ctx_clear(NPConditionalLpAllLargeCtx *ctx){
   if(ctx == NULL)
     return;
-  if(ctx->XtXINV != NULL) mat_free(ctx->XtXINV);
+  np_lp_full_row_workspace_clear(&ctx->inverse_workspace);
   if(ctx->hdiag != NULL) free(ctx->hdiag);
-  if(ctx->XtXINV_original_order != NULL) mat_free(ctx->XtXINV_original_order);
+  np_lp_full_row_workspace_clear(&ctx->inverse_original_workspace);
   if(ctx->basis_original_order != NULL) free_mat(ctx->basis_original_order, ctx->nterms);
   if(ctx->hdiag_original_order != NULL) free(ctx->hdiag_original_order);
   memset(ctx, 0, sizeof(*ctx));
@@ -23382,8 +23326,6 @@ static int np_conditional_lp_all_large_ctx_prepare_core(double *vector_scale_fac
   int *ov_cont_ok = NULL;
   double *vsfx = NULL, *lambdax = NULL, *ov_cont_hmin = NULL, *ov_cont_k0 = NULL;
   double **matrix_bandwidth_x = NULL;
-  MATRIX XtX = NULL;
-  MATRIX XtX_original = NULL;
   int ov_cont_from_cache = 0;
   int i, a, b;
   int status = 1;
@@ -23492,41 +23434,48 @@ static int np_conditional_lp_all_large_ctx_prepare_core(double *vector_scale_fac
   if((np_glp_cv_cache.nterms <= 0) || (np_glp_cv_cache.basis == NULL))
     goto cleanup_all_large_prepare;
 
-  XtX = mat_creat(np_glp_cv_cache.nterms, np_glp_cv_cache.nterms, UNDEFINED);
-  ctx->XtXINV = mat_creat(np_glp_cv_cache.nterms, np_glp_cv_cache.nterms, UNDEFINED);
+  ctx->num_train = num_train;
+  ctx->nterms = np_glp_cv_cache.nterms;
+  ctx->basis = np_glp_cv_cache.basis;
+
+  if(!np_lp_full_row_workspace_reserve(&ctx->inverse_workspace,
+                                       ctx->nterms,
+                                       1))
+    goto cleanup_all_large_prepare;
   ctx->hdiag = alloc_vecd(MAX(1, num_train));
-  if((XtX == NULL) || (ctx->XtXINV == NULL) || (ctx->hdiag == NULL))
+  if(ctx->hdiag == NULL)
     goto cleanup_all_large_prepare;
 
-  for(a = 0; a < np_glp_cv_cache.nterms; a++){
-    for(b = 0; b < np_glp_cv_cache.nterms; b++)
-      XtX[a][b] = 0.0;
+  for(a = 0; a < ctx->nterms; a++){
+    for(b = 0; b < ctx->nterms; b++)
+      ctx->inverse_workspace.gram[a + b*ctx->nterms] = 0.0;
   }
 
   for(i = 0; i < num_train; i++){
-    for(a = 0; a < np_glp_cv_cache.nterms; a++){
-      const double za = np_glp_cv_cache.basis[a][i];
-      for(b = a; b < np_glp_cv_cache.nterms; b++){
-        const double zb = np_glp_cv_cache.basis[b][i];
-        XtX[a][b] += za*zb;
+    for(a = 0; a < ctx->nterms; a++){
+      const double za = ctx->basis[a][i];
+      for(b = a; b < ctx->nterms; b++){
+        const double zb = ctx->basis[b][i];
+        ctx->inverse_workspace.gram[a + b*ctx->nterms] += za*zb;
         if(b != a)
-          XtX[b][a] += za*zb;
+          ctx->inverse_workspace.gram[b + a*ctx->nterms] += za*zb;
       }
     }
   }
 
-  if(np_mat_bad_rcond_sym(XtX, 1.0e-10))
-    goto cleanup_all_large_prepare;
-  if(mat_inv(XtX, ctx->XtXINV) == NULL)
+  if(!np_lp_full_row_workspace_invert(&ctx->inverse_workspace,
+                                      ctx->nterms,
+                                      1.0e-10))
     goto cleanup_all_large_prepare;
 
   for(i = 0; i < num_train; i++){
     double hii = 0.0;
-    for(a = 0; a < np_glp_cv_cache.nterms; a++){
+    for(a = 0; a < ctx->nterms; a++){
       double s = 0.0;
-      for(b = 0; b < np_glp_cv_cache.nterms; b++)
-        s += ctx->XtXINV[a][b]*np_glp_cv_cache.basis[b][i];
-      hii += np_glp_cv_cache.basis[a][i]*s;
+      for(b = 0; b < ctx->nterms; b++)
+        s += ctx->inverse_workspace.gram[a + b*ctx->nterms]*
+          ctx->basis[b][i];
+      hii += ctx->basis[a][i]*s;
     }
     if((!isfinite(hii)) || (hii >= 1.0))
       goto cleanup_all_large_prepare;
@@ -23536,48 +23485,49 @@ static int np_conditional_lp_all_large_ctx_prepare_core(double *vector_scale_fac
   if(build_original_order && (int_TREE_X == NP_TREE_TRUE) && (ipt_extern_X != NULL)){
     ctx->basis_original_order = alloc_matd(num_train, np_glp_cv_cache.nterms);
     ctx->hdiag_original_order = alloc_vecd(MAX(1, num_train));
-    XtX_original = mat_creat(np_glp_cv_cache.nterms, np_glp_cv_cache.nterms, UNDEFINED);
-    ctx->XtXINV_original_order = mat_creat(np_glp_cv_cache.nterms, np_glp_cv_cache.nterms, UNDEFINED);
+    if(!np_lp_full_row_workspace_reserve(&ctx->inverse_original_workspace,
+                                         ctx->nterms,
+                                         1))
+      goto cleanup_all_large_prepare;
     if((ctx->basis_original_order == NULL) ||
-       (ctx->hdiag_original_order == NULL) ||
-       (XtX_original == NULL) ||
-       (ctx->XtXINV_original_order == NULL))
+       (ctx->hdiag_original_order == NULL))
       goto cleanup_all_large_prepare;
 
     for(i = 0; i < num_train; i++){
       const int orig_i = ipt_extern_X[i];
-      for(a = 0; a < np_glp_cv_cache.nterms; a++)
+      for(a = 0; a < ctx->nterms; a++)
         ctx->basis_original_order[a][orig_i] = np_glp_cv_cache.basis[a][i];
     }
 
-    for(a = 0; a < np_glp_cv_cache.nterms; a++){
-      for(b = 0; b < np_glp_cv_cache.nterms; b++)
-        XtX_original[a][b] = 0.0;
+    for(a = 0; a < ctx->nterms; a++){
+      for(b = 0; b < ctx->nterms; b++)
+        ctx->inverse_original_workspace.gram[a + b*ctx->nterms] = 0.0;
     }
 
     for(i = 0; i < num_train; i++){
-      for(a = 0; a < np_glp_cv_cache.nterms; a++){
+      for(a = 0; a < ctx->nterms; a++){
         const double za = ctx->basis_original_order[a][i];
-        for(b = a; b < np_glp_cv_cache.nterms; b++){
+        for(b = a; b < ctx->nterms; b++){
           const double zb = ctx->basis_original_order[b][i];
-          XtX_original[a][b] += za*zb;
+          ctx->inverse_original_workspace.gram[a + b*ctx->nterms] += za*zb;
           if(b != a)
-            XtX_original[b][a] += za*zb;
+            ctx->inverse_original_workspace.gram[b + a*ctx->nterms] += za*zb;
         }
       }
     }
 
-    if(np_mat_bad_rcond_sym(XtX_original, 1.0e-10))
-      goto cleanup_all_large_prepare;
-    if(mat_inv(XtX_original, ctx->XtXINV_original_order) == NULL)
+    if(!np_lp_full_row_workspace_invert(&ctx->inverse_original_workspace,
+                                        ctx->nterms,
+                                        1.0e-10))
       goto cleanup_all_large_prepare;
 
     for(i = 0; i < num_train; i++){
       double hii = 0.0;
-      for(a = 0; a < np_glp_cv_cache.nterms; a++){
+      for(a = 0; a < ctx->nterms; a++){
         double s = 0.0;
-        for(b = 0; b < np_glp_cv_cache.nterms; b++)
-          s += ctx->XtXINV_original_order[a][b]*ctx->basis_original_order[b][i];
+        for(b = 0; b < ctx->nterms; b++)
+          s += ctx->inverse_original_workspace.gram[a + b*ctx->nterms]*
+            ctx->basis_original_order[b][i];
         hii += ctx->basis_original_order[a][i]*s;
       }
       if((!isfinite(hii)) || (hii >= 1.0))
@@ -23587,14 +23537,9 @@ static int np_conditional_lp_all_large_ctx_prepare_core(double *vector_scale_fac
   }
 
   ctx->ready = 1;
-  ctx->num_train = num_train;
-  ctx->nterms = np_glp_cv_cache.nterms;
-  ctx->basis = np_glp_cv_cache.basis;
   status = 0;
 
 cleanup_all_large_prepare:
-  if(XtX != NULL) mat_free(XtX);
-  if(XtX_original != NULL) mat_free(XtX_original);
   if(vsfx != NULL) free(vsfx);
   if(lambdax != NULL) free(lambdax);
   if(matrix_bandwidth_x != NULL) free_tmat(matrix_bandwidth_x);
@@ -23622,7 +23567,7 @@ static int np_conditional_lp_all_large_ctx_prepare_cvls_tree(double *vector_scal
 }
 
 static double np_conditional_lp_all_large_row_fit_basis(const NPConditionalLpAllLargeCtx *ctx,
-                                                        MATRIX XtXINV,
+                                                        const double *XtXINV,
                                                         double **basis,
                                                         const double *hdiag,
                                                         const double *rhs_row,
@@ -23638,7 +23583,7 @@ static double np_conditional_lp_all_large_row_fit(const NPConditionalLpAllLargeC
                                                   double *beta,
                                                   const int leave_one_out){
   return np_conditional_lp_all_large_row_fit_basis(ctx,
-                                                   ctx->XtXINV,
+                                                   ctx->inverse_workspace.gram,
                                                    ctx->basis,
                                                    ctx->hdiag,
                                                    rhs_row,
@@ -23649,7 +23594,7 @@ static double np_conditional_lp_all_large_row_fit(const NPConditionalLpAllLargeC
 }
 
 static double np_conditional_lp_all_large_row_fit_basis(const NPConditionalLpAllLargeCtx *ctx,
-                                                        MATRIX XtXINV,
+                                                        const double *XtXINV,
                                                         double **basis,
                                                         const double *hdiag,
                                                         const double *rhs_row,
@@ -23666,7 +23611,7 @@ static double np_conditional_lp_all_large_row_fit_basis(const NPConditionalLpAll
   for(a = 0; a < ctx->nterms; a++){
     double s = 0.0;
     for(b = 0; b < ctx->nterms; b++)
-      s += XtXINV[a][b]*cross_terms[b];
+      s += XtXINV[a + b*ctx->nterms]*cross_terms[b];
     beta[a] = s;
     fit += basis[a][eval_pos]*s;
   }
@@ -23734,7 +23679,7 @@ static int np_conditional_lp_all_large_build_conv_quad(double *vector_scale_fact
     for(b = 0; b < ctx->nterms; b++){
       double s = 0.0;
       for(c = 0; c < ctx->nterms; c++)
-        s += ctx->XtXINV[a][c]*moment[c][b];
+        s += ctx->inverse_workspace.gram[a + c*ctx->nterms]*moment[c][b];
       temp[a][b] = s;
     }
   }
@@ -23743,7 +23688,8 @@ static int np_conditional_lp_all_large_build_conv_quad(double *vector_scale_fact
     for(b = 0; b < ctx->nterms; b++){
       double s = 0.0;
       for(c = 0; c < ctx->nterms; c++)
-        s += temp[a][c]*ctx->XtXINV[c][b];
+        s += temp[a][c]*
+          ctx->inverse_workspace.gram[c + b*ctx->nterms];
       quad_mat[a][b] = s;
     }
   }
@@ -23806,11 +23752,11 @@ static int np_conditional_density_cvml_lp_all_large_stream(double *vector_scale_
       goto cleanup_cvml_all_large;
 
     if((int_TREE_X == NP_TREE_TRUE) &&
-       (ctx.XtXINV_original_order != NULL) &&
+       (ctx.inverse_original_workspace.gram != NULL) &&
        (ctx.basis_original_order != NULL) &&
        (ctx.hdiag_original_order != NULL)){
       fit = np_conditional_lp_all_large_row_fit_basis(&ctx,
-                                                      ctx.XtXINV_original_order,
+                                                      ctx.inverse_original_workspace.gram,
                                                       ctx.basis_original_order,
                                                       ctx.hdiag_original_order,
                                                       yrow,

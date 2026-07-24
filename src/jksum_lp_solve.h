@@ -33,12 +33,14 @@ typedef struct {
   size_t gram_capacity;
   size_t rhs_capacity;
   int rcond_lwork_capacity;
+  int inverse_lwork_capacity;
   double *gram;
   double *rhs;
   int *ipiv;
   double *rcond_matrix;
   double *rcond_values;
   double *rcond_work;
+  double *inverse_work;
 } NPLPFullRowWorkspace;
 
 /*
@@ -91,5 +93,14 @@ int np_lp_full_row_workspace_solve(NPLPFullRowWorkspace *workspace,
                                    int p,
                                    int nrhs,
                                    double min_rcond);
+
+/*
+ * Invert the symmetric Gram buffer in place after the same dsyev rcond gate.
+ * The retained inverse remains in gram; pivot, eigen, and dgetri work storage
+ * are workspace-owned and reusable.
+ */
+int np_lp_full_row_workspace_invert(NPLPFullRowWorkspace *workspace,
+                                    int p,
+                                    double min_rcond);
 
 #endif

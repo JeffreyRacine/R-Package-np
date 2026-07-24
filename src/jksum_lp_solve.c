@@ -275,6 +275,7 @@ void np_lp_full_row_workspace_clear(NPLPFullRowWorkspace *workspace)
   free(workspace->rcond_matrix);
   free(workspace->rcond_values);
   free(workspace->rcond_work);
+  free(workspace->inverse_work);
   np_lp_full_row_workspace_init(workspace);
 }
 
@@ -424,6 +425,63 @@ int np_lp_full_row_workspace_solve(NPLPFullRowWorkspace *workspace,
     return 0;
   for(i = 0; i < rhs_elements; i++)
     if(!R_FINITE(workspace->rhs[i]))
+      return 0;
+  return 1;
+}
+
+int np_lp_full_row_workspace_invert(NPLPFullRowWorkspace *workspace,
+                                    int p,
+                                    double min_rcond)
+{
+  size_t gram_elements;
+  size_t i;
+  int info = 0;
+
+  if(!np_lp_full_row_workspace_reserve(workspace, p, 1) ||
+     np_lp_full_row_bad_rcond(workspace, p, min_rcond) ||
+     !np_lp_size_product((size_t)p, (size_t)p, &gram_elements) ||
+     (gram_elements > workspace->gram_capacity))
+    return 0;
+
+  F77_CALL(dgetrf)(&p, &p,
+                   workspace->gram, &p,
+                   workspace->ipiv,
+                   &info);
+  if(info != 0)
+    return 0;
+
+  if((workspace->inverse_work == NULL) ||
+     (workspace->inverse_lwork_capacity <= 0)){
+    int lwork_query = -1;
+    double work_query = 0.0;
+    int requested_lwork;
+    double *inverse_work;
+
+    F77_CALL(dgetri)(&p,
+                     workspace->gram, &p,
+                     workspace->ipiv,
+                     &work_query, &lwork_query,
+                     &info);
+    if(info != 0)
+      return 0;
+    requested_lwork = ((int)work_query > p) ? (int)work_query : p;
+    inverse_work = (double *)malloc((size_t)requested_lwork*sizeof(double));
+    if(inverse_work == NULL)
+      return 0;
+    workspace->inverse_work = inverse_work;
+    workspace->inverse_lwork_capacity = requested_lwork;
+  }
+
+  F77_CALL(dgetri)(&p,
+                   workspace->gram, &p,
+                   workspace->ipiv,
+                   workspace->inverse_work,
+                   &workspace->inverse_lwork_capacity,
+                   &info);
+  if(info != 0)
+    return 0;
+  for(i = 0; i < gram_elements; i++)
+    if(!R_FINITE(workspace->gram[i]))
       return 0;
   return 1;
 }
