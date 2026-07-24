@@ -23468,13 +23468,16 @@ static int np_conditional_lp_all_large_ctx_prepare_core(double *vector_scale_fac
                                       ctx->nterms,
                                       1.0e-10))
     goto cleanup_all_large_prepare;
+  if(!np_lp_full_row_workspace_pack_inverse_rows(&ctx->inverse_workspace,
+                                                 ctx->nterms))
+    goto cleanup_all_large_prepare;
 
   for(i = 0; i < num_train; i++){
     double hii = 0.0;
     for(a = 0; a < ctx->nterms; a++){
       double s = 0.0;
       for(b = 0; b < ctx->nterms; b++)
-        s += ctx->inverse_workspace.gram[a + b*ctx->nterms]*
+        s += ctx->inverse_workspace.matrix_copy[a*ctx->nterms + b]*
           ctx->basis[b][i];
       hii += ctx->basis[a][i]*s;
     }
@@ -23521,13 +23524,17 @@ static int np_conditional_lp_all_large_ctx_prepare_core(double *vector_scale_fac
                                         ctx->nterms,
                                         1.0e-10))
       goto cleanup_all_large_prepare;
+    if(!np_lp_full_row_workspace_pack_inverse_rows(
+         &ctx->inverse_original_workspace,
+         ctx->nterms))
+      goto cleanup_all_large_prepare;
 
     for(i = 0; i < num_train; i++){
       double hii = 0.0;
       for(a = 0; a < ctx->nterms; a++){
         double s = 0.0;
         for(b = 0; b < ctx->nterms; b++)
-          s += ctx->inverse_original_workspace.gram[a + b*ctx->nterms]*
+          s += ctx->inverse_original_workspace.matrix_copy[a*ctx->nterms + b]*
             ctx->basis_original_order[b][i];
         hii += ctx->basis_original_order[a][i]*s;
       }
@@ -23568,7 +23575,7 @@ static int np_conditional_lp_all_large_ctx_prepare_cvls_tree(double *vector_scal
 }
 
 static double np_conditional_lp_all_large_row_fit_basis(const NPConditionalLpAllLargeCtx *ctx,
-                                                        const double *XtXINV,
+                                                        const double *XtXINVRows,
                                                         double **basis,
                                                         const double *hdiag,
                                                         const double *rhs_row,
@@ -23584,7 +23591,7 @@ static double np_conditional_lp_all_large_row_fit(const NPConditionalLpAllLargeC
                                                   double *beta,
                                                   const int leave_one_out){
   return np_conditional_lp_all_large_row_fit_basis(ctx,
-                                                   ctx->inverse_workspace.gram,
+                                                   ctx->inverse_workspace.matrix_copy,
                                                    ctx->basis,
                                                    ctx->hdiag,
                                                    rhs_row,
@@ -23595,7 +23602,7 @@ static double np_conditional_lp_all_large_row_fit(const NPConditionalLpAllLargeC
 }
 
 static double np_conditional_lp_all_large_row_fit_basis(const NPConditionalLpAllLargeCtx *ctx,
-                                                        const double *XtXINV,
+                                                        const double *XtXINVRows,
                                                         double **basis,
                                                         const double *hdiag,
                                                         const double *rhs_row,
@@ -23612,7 +23619,7 @@ static double np_conditional_lp_all_large_row_fit_basis(const NPConditionalLpAll
   for(a = 0; a < ctx->nterms; a++){
     double s = 0.0;
     for(b = 0; b < ctx->nterms; b++)
-      s += XtXINV[a + b*ctx->nterms]*cross_terms[b];
+      s += XtXINVRows[a*ctx->nterms + b]*cross_terms[b];
     beta[a] = s;
     fit += basis[a][eval_pos]*s;
   }
@@ -23753,11 +23760,11 @@ static int np_conditional_density_cvml_lp_all_large_stream(double *vector_scale_
       goto cleanup_cvml_all_large;
 
     if((int_TREE_X == NP_TREE_TRUE) &&
-       (ctx.inverse_original_workspace.gram != NULL) &&
+       (ctx.inverse_original_workspace.matrix_copy != NULL) &&
        (ctx.basis_original_order != NULL) &&
        (ctx.hdiag_original_order != NULL)){
       fit = np_conditional_lp_all_large_row_fit_basis(&ctx,
-                                                      ctx.inverse_original_workspace.gram,
+                                                      ctx.inverse_original_workspace.matrix_copy,
                                                       ctx.basis_original_order,
                                                       ctx.hdiag_original_order,
                                                       yrow,
