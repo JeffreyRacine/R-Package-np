@@ -257,3 +257,173 @@ int np_glp_qr_drop_workspace_apply(NPGLPQRDropWorkspace *workspace,
 
   return 0;
 }
+
+void np_lp_full_row_workspace_init(NPLPFullRowWorkspace *workspace)
+{
+  if(workspace == NULL)
+    return;
+  memset(workspace, 0, sizeof(*workspace));
+}
+
+void np_lp_full_row_workspace_clear(NPLPFullRowWorkspace *workspace)
+{
+  if(workspace == NULL)
+    return;
+  free(workspace->gram);
+  free(workspace->rhs);
+  free(workspace->ipiv);
+  free(workspace->rcond_matrix);
+  free(workspace->rcond_values);
+  free(workspace->rcond_work);
+  np_lp_full_row_workspace_init(workspace);
+}
+
+int np_lp_full_row_workspace_reserve(NPLPFullRowWorkspace *workspace,
+                                     int p,
+                                     int nrhs)
+{
+  size_t gram_elements, rhs_elements;
+  size_t gram_bytes, rhs_bytes, pivot_bytes, values_bytes;
+  double *gram = NULL, *rhs = NULL;
+  int *ipiv = NULL;
+  double *rcond_matrix = NULL, *rcond_values = NULL;
+
+  if((workspace == NULL) || (p <= 0) || (nrhs <= 0))
+    return 0;
+  if((workspace->p_capacity >= p) &&
+     (workspace->nrhs_capacity >= nrhs) &&
+     (workspace->gram != NULL) &&
+     (workspace->rhs != NULL) &&
+     (workspace->ipiv != NULL) &&
+     (workspace->rcond_matrix != NULL) &&
+     (workspace->rcond_values != NULL))
+    return 1;
+  if(!np_lp_size_product((size_t)p, (size_t)p, &gram_elements) ||
+     !np_lp_size_product((size_t)p, (size_t)nrhs, &rhs_elements) ||
+     !np_lp_double_bytes(gram_elements, &gram_bytes) ||
+     !np_lp_double_bytes(rhs_elements, &rhs_bytes) ||
+     !np_lp_size_product((size_t)p, sizeof(int), &pivot_bytes) ||
+     !np_lp_double_bytes((size_t)p, &values_bytes))
+    return 0;
+
+  gram = (double *)malloc(gram_bytes);
+  rhs = (double *)malloc(rhs_bytes);
+  ipiv = (int *)malloc(pivot_bytes);
+  rcond_matrix = (double *)malloc(gram_bytes);
+  rcond_values = (double *)malloc(values_bytes);
+  if((gram == NULL) || (rhs == NULL) || (ipiv == NULL) ||
+     (rcond_matrix == NULL) || (rcond_values == NULL)){
+    free(gram);
+    free(rhs);
+    free(ipiv);
+    free(rcond_matrix);
+    free(rcond_values);
+    return 0;
+  }
+
+  np_lp_full_row_workspace_clear(workspace);
+  workspace->p_capacity = p;
+  workspace->nrhs_capacity = nrhs;
+  workspace->gram_capacity = gram_elements;
+  workspace->rhs_capacity = rhs_elements;
+  workspace->gram = gram;
+  workspace->rhs = rhs;
+  workspace->ipiv = ipiv;
+  workspace->rcond_matrix = rcond_matrix;
+  workspace->rcond_values = rcond_values;
+  return 1;
+}
+
+static int np_lp_full_row_bad_rcond(NPLPFullRowWorkspace *workspace,
+                                    int p,
+                                    double min_rcond)
+{
+  char jobz = 'N';
+  char uplo = 'U';
+  int i, j;
+  int info = 0;
+  double max_eval = 0.0, min_eval = DBL_MAX;
+
+  if((workspace == NULL) || (p <= 0) ||
+     (workspace->p_capacity < p) ||
+     (workspace->rcond_matrix == NULL) ||
+     (workspace->rcond_values == NULL) ||
+     (workspace->gram == NULL))
+    return 1;
+
+  for(j = 0; j < p; j++)
+    for(i = 0; i < p; i++)
+      workspace->rcond_matrix[i + j*p] =
+        workspace->gram[i + j*p];
+
+  if((workspace->rcond_work == NULL) ||
+     (workspace->rcond_lwork_capacity <= 0)){
+    int lwork_query = -1;
+    double work_query = 0.0;
+    int requested_lwork;
+    double *rcond_work;
+
+    F77_CALL(dsyev)(&jobz, &uplo, &p,
+                    workspace->rcond_matrix, &p,
+                    workspace->rcond_values,
+                    &work_query, &lwork_query, &info FCONE FCONE);
+    if(info != 0)
+      return 1;
+    requested_lwork = ((int)work_query > 1) ? (int)work_query : 1;
+    rcond_work = (double *)malloc((size_t)requested_lwork*sizeof(double));
+    if(rcond_work == NULL)
+      return 1;
+    workspace->rcond_work = rcond_work;
+    workspace->rcond_lwork_capacity = requested_lwork;
+  }
+
+  F77_CALL(dsyev)(&jobz, &uplo, &p,
+                  workspace->rcond_matrix, &p,
+                  workspace->rcond_values,
+                  workspace->rcond_work,
+                  &workspace->rcond_lwork_capacity, &info FCONE FCONE);
+  if(info != 0)
+    return 1;
+
+  for(i = 0; i < p; i++){
+    if(!R_FINITE(workspace->rcond_values[i]))
+      return 1;
+    {
+      const double abs_eval = fabs(workspace->rcond_values[i]);
+      if(abs_eval > max_eval)
+        max_eval = abs_eval;
+      if(abs_eval < min_eval)
+        min_eval = abs_eval;
+    }
+  }
+  if(!(max_eval > 0.0))
+    return 1;
+  return ((min_eval / max_eval) < min_rcond);
+}
+
+int np_lp_full_row_workspace_solve(NPLPFullRowWorkspace *workspace,
+                                   int p,
+                                   int nrhs,
+                                   double min_rcond)
+{
+  size_t rhs_elements;
+  size_t i;
+  int info = 0;
+
+  if(!np_lp_full_row_workspace_reserve(workspace, p, nrhs) ||
+     np_lp_full_row_bad_rcond(workspace, p, min_rcond) ||
+     !np_lp_size_product((size_t)p, (size_t)nrhs, &rhs_elements) ||
+     (rhs_elements > workspace->rhs_capacity))
+    return 0;
+  F77_CALL(dgesv)(&p, &nrhs,
+                  workspace->gram, &p,
+                  workspace->ipiv,
+                  workspace->rhs, &p,
+                  &info);
+  if(info != 0)
+    return 0;
+  for(i = 0; i < rhs_elements; i++)
+    if(!R_FINITE(workspace->rhs[i]))
+      return 0;
+  return 1;
+}
