@@ -23799,6 +23799,40 @@ static double np_conditional_lp_all_large_row_fit_basis(const NPConditionalLpAll
                                                 leave_one_out);
 }
 
+static double np_conditional_lp_all_large_row_fit_basis_dgemv(
+  const NPConditionalLpAllLargeCtx *ctx,
+  const double *XtXINVRows,
+  double **basis,
+  const int basis_stride,
+  const double *hdiag,
+  const double *rhs_row,
+  const int eval_pos,
+  double *cross_terms,
+  double *beta,
+  const int leave_one_out){
+  /*
+   * Contiguous-basis sibling only.  Keep the established DDOT and primary
+   * cached-basis routes unchanged so tree-CVML activation has no adjacent
+   * arithmetic or dispatch blast radius.
+   */
+  np_blas_dgemv_t_int(ctx->num_train,
+                      ctx->nterms,
+                      basis[0],
+                      basis_stride,
+                      rhs_row,
+                      cross_terms);
+
+  return np_conditional_lp_all_large_row_finish(ctx,
+                                                XtXINVRows,
+                                                basis,
+                                                hdiag,
+                                                rhs_row,
+                                                eval_pos,
+                                                cross_terms,
+                                                beta,
+                                                leave_one_out);
+}
+
 static int np_conditional_lp_all_large_moment_ddot(
   double *vector_scale_factor,
   const NPConditionalLpAllLargeCtx *ctx,
@@ -23965,13 +23999,17 @@ static int np_conditional_density_cvml_lp_all_large_stream(double *vector_scale_
                                                            double *cv){
   NPConditionalLpAllLargeCtx ctx = {0};
   double *yrow = NULL, *yrow_xorder = NULL, *cross_terms = NULL, *beta = NULL;
-  int i, j;
+  int i, j, use_original_dgemv = 0;
   int status = 1;
 
   if((cv == NULL) || (vector_scale_factor == NULL))
     return 1;
   if(np_conditional_lp_all_large_ctx_prepare_cvml(vector_scale_factor, &ctx) != 0)
     goto cleanup_cvml_all_large;
+  use_original_dgemv =
+    np_glp_dgemv_profitable(ctx.num_train, ctx.nterms) &&
+    (ctx.basis_original_order != NULL) &&
+    (ctx.basis_original_stride >= ctx.num_train);
 
   yrow = alloc_vecd(MAX(1, ctx.num_train));
   if(int_TREE_X == NP_TREE_TRUE)
@@ -23996,15 +24034,29 @@ static int np_conditional_density_cvml_lp_all_large_stream(double *vector_scale_
        (ctx.inverse_original_workspace.matrix_copy != NULL) &&
        (ctx.basis_original_order != NULL) &&
        (ctx.hdiag_original_order != NULL)){
-      fit = np_conditional_lp_all_large_row_fit_basis(&ctx,
-                                                      ctx.inverse_original_workspace.matrix_copy,
-                                                      ctx.basis_original_order,
-                                                      ctx.hdiag_original_order,
-                                                      yrow,
-                                                      i,
-                                                      cross_terms,
-                                                      beta,
-                                                      1);
+      if(use_original_dgemv)
+        fit = np_conditional_lp_all_large_row_fit_basis_dgemv(
+          &ctx,
+          ctx.inverse_original_workspace.matrix_copy,
+          ctx.basis_original_order,
+          ctx.basis_original_stride,
+          ctx.hdiag_original_order,
+          yrow,
+          i,
+          cross_terms,
+          beta,
+          1);
+      else
+        fit = np_conditional_lp_all_large_row_fit_basis(
+          &ctx,
+          ctx.inverse_original_workspace.matrix_copy,
+          ctx.basis_original_order,
+          ctx.hdiag_original_order,
+          yrow,
+          i,
+          cross_terms,
+          beta,
+          1);
     } else {
       if(int_TREE_X == NP_TREE_TRUE){
         if((ipt_extern_X == NULL) || (ipt_lookup_extern_X == NULL))
