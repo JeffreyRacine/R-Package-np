@@ -25599,7 +25599,6 @@ static int np_conditional_density_cvls_lp_supertile2_stream(
   double **first_full = NULL;
   double **y_or_second_full = NULL;
   double **yconv_or_second_y = NULL;
-  double *quad_cross = NULL;
   double *block_terms = NULL;
   NPConditionalXBlockBwCtx xbwctx = {0};
   NPConditionalYRowCtx yconvctx = {0};
@@ -25626,12 +25625,10 @@ static int np_conditional_density_cvls_lp_supertile2_stream(
   first_full = alloc_tmatd(num_obs, block_size);
   y_or_second_full = alloc_tmatd(num_obs, block_size);
   yconv_or_second_y = alloc_tmatd(num_obs, block_size);
-  quad_cross = alloc_vecd(block_size*block_size);
   if(use_parallel_blocks)
     block_terms = (double *)calloc((size_t)nblocks, sizeof(double));
   if((loo_or_second == NULL) || (first_full == NULL) ||
      (y_or_second_full == NULL) || (yconv_or_second_y == NULL) ||
-     (quad_cross == NULL) ||
      (use_parallel_blocks && (block_terms == NULL)))
     local_fail = 1;
 
@@ -25757,6 +25754,12 @@ static int np_conditional_density_cvls_lp_supertile2_stream(
                                       yconv_or_second_y[ii]);
     }
 
+    /*
+     * Both LOO linear consumers are complete, so this contiguous slab is
+     * dead. The route requires num_obs > block_size, hence its
+     * num_obs*block_size cells can hold the largest block_size^2 GEMM tile.
+     */
+    double * const quad_cross = loo_or_second[0];
     for(j0 = 0; j0 < num_obs; j0 += block_size){
       const int jb = MIN(block_size, num_obs - j0);
 
@@ -25869,7 +25872,6 @@ cleanup_cvls_lp_supertile2:
   if(first_full != NULL) free_tmat(first_full);
   if(y_or_second_full != NULL) free_tmat(y_or_second_full);
   if(yconv_or_second_y != NULL) free_tmat(yconv_or_second_y);
-  if(quad_cross != NULL) free(quad_cross);
   if(block_terms != NULL) free(block_terms);
   np_glp_cv_clear_extern();
   return status;
