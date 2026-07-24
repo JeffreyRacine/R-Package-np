@@ -11890,6 +11890,7 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
   int tsf = 0;
   const int track_lowsupport = (bwm == RBWM_CVLS) || (bwm == RBWM_CVCHECK) ||
     (bwm == RBWM_CVKS);
+  const int solve_nrhs = (bwm == RBWM_CVAIC) ? 2 : 1;
 
   np_lp_solve_workspace_init(&solve_workspace);
 
@@ -11947,7 +11948,7 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
     }
   }
 
-  if(!np_lp_solve_workspace_reserve(&solve_workspace, nterms, 1))
+  if(!np_lp_solve_workspace_reserve(&solve_workspace, nterms, solve_nrhs))
     error("np_regression_cv_lp_basis_fixed: workspace allocation failed\n");
 
   if((moments == NULL) || (rhs == NULL) ||
@@ -12233,6 +12234,7 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
     if(bwm == RBWM_CVAIC){
       for(a = 0; a < nterms; a++){
         const double ba = eval_basis[a];
+        solve_workspace.rhs_source[nterms + a] = ba;
         solve_workspace.rhs_source[a] += aicc*ba*vector_Y[eval_idx];
         for(b = 0; b < nterms; b++)
           solve_workspace.gram_source[a + b*nterms] +=
@@ -12254,7 +12256,9 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
                                   &fit)){
       nepsilon = 0.0;
     } else {
-    while(!np_lp_solve_workspace_solve(&solve_workspace, nterms, 1)){
+    while(!np_lp_solve_workspace_solve(&solve_workspace,
+                                        nterms,
+                                        solve_nrhs)){
       for(a = 0; a < nterms; a++)
         solve_workspace.gram_source[a + a*nterms] += epsilon;
       nepsilon += epsilon;
@@ -12266,7 +12270,9 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
       nepsilon*solve_workspace.rhs_source[0]/
       NZD_POS(solve_workspace.gram_source[0]);
     if(nepsilon > 0.0){
-      if(!np_lp_solve_workspace_solve(&solve_workspace, nterms, 1))
+      if(!np_lp_solve_workspace_solve(&solve_workspace,
+                                       nterms,
+                                       solve_nrhs))
         goto cleanup_lp_cv;
     }
 
@@ -12285,11 +12291,7 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
     if(bwm == RBWM_CVAIC){
       double hii = 0.0;
       for(a = 0; a < nterms; a++)
-        solve_workspace.rhs_source[a] = eval_basis[a];
-      if(!np_lp_solve_workspace_solve(&solve_workspace, nterms, 1))
-        goto cleanup_lp_cv;
-      for(a = 0; a < nterms; a++)
-        hii += eval_basis[a]*solve_workspace.rhs_work[a];
+        hii += eval_basis[a]*solve_workspace.rhs_work[nterms + a];
       result.traceH += hii*aicc;
     }
   }
@@ -12546,6 +12548,7 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
     const int nrc1 = glp_nterms;
     const int nrc2 = nrc1 + 1;
     const int nrcc22 = nrc2*nrc2;
+    const int solve_nrhs = (bwm == RBWM_CVAIC) ? 2 : 1;
     double *PXC[MAX(1,num_reg_continuous)];
     double *PXU[MAX(1,num_reg_unordered)];
     double *PXO[MAX(1,num_reg_ordered)];
@@ -12587,7 +12590,10 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
     sgn = (double *)malloc((size_t)nrc2*sizeof(double));
     evalv = (double *)malloc((size_t)nrc1*sizeof(double));
 
-    glp_ok = np_lp_solve_workspace_reserve(&solve_workspace, nrc1, 1) &&
+    glp_ok = np_lp_solve_workspace_reserve(
+      &solve_workspace,
+      nrc1,
+      solve_nrhs) &&
       (TCON != NULL) && (TUNO != NULL) && (TORD != NULL) &&
       (matrix_bandwidth_eval != NULL) && (XTKX != NULL) &&
       (kwm != NULL) && (sgn != NULL) && (evalv != NULL);
@@ -12833,6 +12839,7 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
           const double self_weight = pnh*aicc;
           for(i = 0; i < nrc1; i++){
             const double bi = evalv[i];
+            solve_workspace.rhs_source[nrc1 + i] = bi;
             row_kwm[i+1] += self_weight*bi*vector_Y[j];
             for(int k = 0; k < nrc1; k++)
               row_kwm[(i+1)*nrc2+k+1] += self_weight*bi*evalv[k];
@@ -12846,7 +12853,10 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
             solve_workspace.gram_source[i+k*nrc1] =
               row_kwm[(i+1)*nrc2+k+1];
 
-        while(!np_lp_solve_workspace_solve(&solve_workspace, nrc1, 1)){
+        while(!np_lp_solve_workspace_solve(
+          &solve_workspace,
+          nrc1,
+          solve_nrhs)){
           for(i = 0; i < nrc1; i++){
             row_kwm[(i+1)*nrc2+i+1] += epsilon;
             solve_workspace.gram_source[i+i*nrc1] += epsilon;
@@ -12857,7 +12867,10 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
         row_kwm[1] += nepsilon*row_kwm[1]/NZD_POS(row_kwm[nrc2+1]);
         solve_workspace.rhs_source[0] = row_kwm[1];
         if(nepsilon > 0.0){
-          if(!np_lp_solve_workspace_solve(&solve_workspace, nrc1, 1)){
+          if(!np_lp_solve_workspace_solve(
+            &solve_workspace,
+            nrc1,
+            solve_nrhs)){
             glp_ok = 0;
             break;
           }
@@ -12877,18 +12890,10 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
         }
 
         if(bwm == RBWM_CVAIC){
-          for(i = 0; i < nrc1; i++){
-            row_kwm[i+1] = evalv[i];
-            solve_workspace.rhs_source[i] = evalv[i];
-          }
-          if(!np_lp_solve_workspace_solve(&solve_workspace, nrc1, 1)){
-            glp_ok = 0;
-            break;
-          }
           {
             double hii = 0.0;
             for(i = 0; i < nrc1; i++)
-              hii += evalv[i]*solve_workspace.rhs_work[i];
+              hii += evalv[i]*solve_workspace.rhs_work[nrc1 + i];
             result.traceH += hii*pnh*aicc;
           }
         }
