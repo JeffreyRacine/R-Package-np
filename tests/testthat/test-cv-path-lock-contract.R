@@ -515,6 +515,55 @@ test_that("conditional LP block rows reuse full-row solve storage", {
   expect_false(grepl("np_mat_bad_rcond_sym(", helper_body, fixed = TRUE))
 })
 
+test_that("conditional LP dense shadow rows reuse full-row solve storage", {
+  src_file <- locate_jksum_c()
+  skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
+
+  lines <- readLines(src_file, warn = FALSE)
+  helper_start <- grep(
+    "^static int np_shadow_conditional_build_x_weights_core\\(",
+    lines
+  )
+  helper_stop <- grep(
+    "^static int np_shadow_conditional_build_x_weights\\(",
+    lines
+  )
+  expect_length(helper_start, 1L)
+  expect_length(helper_stop, 1L)
+  expect_lt(helper_start, helper_stop)
+
+  helper_body <- paste(lines[helper_start:(helper_stop - 1L)], collapse = "\n")
+  expect_true(grepl(
+    "NPLPFullRowWorkspace full_row_workspace;",
+    helper_body,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
+    "if((!drop_eval_self) &&",
+    helper_body,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
+    "np_lp_full_row_workspace_reserve(&full_row_workspace,",
+    helper_body,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
+    "np_lp_full_row_workspace_solve(&full_row_workspace,",
+    helper_body,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
+    "full_row_workspace.gram[a + b*k] += wj*za*zb;",
+    helper_body,
+    fixed = TRUE
+  ))
+  expect_false(grepl("MATRIX KWM", helper_body, fixed = TRUE))
+  expect_false(grepl("mat_creat(", helper_body, fixed = TRUE))
+  expect_false(grepl("mat_solve(", helper_body, fixed = TRUE))
+  expect_false(grepl("np_mat_bad_rcond_sym(", helper_body, fixed = TRUE))
+})
+
 test_that("density CV tree-bypass predicate is centralized in one helper", {
   src_file <- locate_jksum_c()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")

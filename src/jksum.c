@@ -18451,13 +18451,14 @@ static int np_shadow_conditional_build_x_weights_core(double *vector_scale_facto
   double *vsfx = NULL, *lambdax = NULL, *kw = NULL, *mean_row = NULL;
   double **matrix_bandwidth_x = NULL, **matrix_bandwidth_eval_one = NULL;
   double **eval_xuno_one = NULL, **eval_xord_one = NULL, **eval_xcon_one = NULL;
-  MATRIX KWM = NULL, RHS = NULL, SOL = NULL;
   NPGLPQRDropWorkspace qr_workspace;
+  NPLPFullRowWorkspace full_row_workspace;
   NPConditionalBoundState bounds_state;
   int i, j, l;
   int status = 1;
 
   np_glp_qr_drop_workspace_init(&qr_workspace);
+  np_lp_full_row_workspace_init(&full_row_workspace);
   if((BANDWIDTH_den_extern != BW_FIXED) &&
      (BANDWIDTH_den_extern != BW_GEN_NN) &&
      (BANDWIDTH_den_extern != BW_ADAP_NN))
@@ -18551,6 +18552,11 @@ static int np_shadow_conditional_build_x_weights_core(double *vector_scale_facto
                                  num_reg_continuous_extern,
                                  matrix_X_continuous_train_extern))
       goto cleanup_xweights;
+    if((!drop_eval_self) &&
+       !np_lp_full_row_workspace_reserve(&full_row_workspace,
+                                         np_glp_cv_cache.nterms,
+                                         1))
+      goto cleanup_xweights;
   }
 
   for(i = 0; i < num_train; i++){
@@ -18620,12 +18626,6 @@ static int np_shadow_conditional_build_x_weights_core(double *vector_scale_facto
       if((k <= 0) || (np_glp_cv_cache.basis == NULL))
         goto cleanup_xweights;
 
-      KWM = mat_creat(k, k, UNDEFINED);
-      RHS = mat_creat(k, 1, UNDEFINED);
-      SOL = mat_creat(k, 1, UNDEFINED);
-      if((KWM == NULL) || (RHS == NULL) || (SOL == NULL))
-        goto cleanup_xweights;
-
       if(drop_eval_self){
         if(np_glp_qr_drop_workspace_apply(&qr_workspace,
                                           np_glp_cv_cache.basis,
@@ -18642,9 +18642,10 @@ static int np_shadow_conditional_build_x_weights_core(double *vector_scale_facto
         }
       } else {
         for(l = 0; l < k; l++){
-          RHS[l][0] = np_glp_cv_cache.basis[l][i];
+          full_row_workspace.rhs[l] =
+            np_glp_cv_cache.basis[l][i];
           for(j = 0; j < k; j++)
-            KWM[l][j] = 0.0;
+            full_row_workspace.gram[l + j*k] = 0.0;
         }
 
         for(j = 0; j < num_train; j++){
@@ -18655,30 +18656,29 @@ static int np_shadow_conditional_build_x_weights_core(double *vector_scale_facto
             const double za = np_glp_cv_cache.basis[a][j];
             for(int b = a; b < k; b++){
               const double zb = np_glp_cv_cache.basis[b][j];
-              KWM[a][b] += wj*za*zb;
-              if(b != a) KWM[b][a] += wj*za*zb;
+              full_row_workspace.gram[a + b*k] += wj*za*zb;
+              if(b != a)
+                full_row_workspace.gram[b + a*k] += wj*za*zb;
             }
           }
         }
 
-        if(np_mat_bad_rcond_sym(KWM, 1.0e-10))
-          goto cleanup_xweights;
-        if(mat_solve(KWM, RHS, SOL) == NULL)
+        if(!np_lp_full_row_workspace_solve(&full_row_workspace,
+                                           k,
+                                           1,
+                                           1.0e-10))
           goto cleanup_xweights;
 
         for(j = 0; j < num_train; j++){
           double zju = 0.0;
           const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
           for(l = 0; l < k; l++)
-            zju += np_glp_cv_cache.basis[l][j]*SOL[l][0];
+            zju += np_glp_cv_cache.basis[l][j]*
+              full_row_workspace.rhs[l];
           weights_out[(size_t)orig_i*(size_t)num_train + (size_t)orig_j] = kw[j]*zju;
         }
       }
 
-      mat_free(KWM);
-      mat_free(RHS);
-      mat_free(SOL);
-      KWM = RHS = SOL = NULL;
     }
   }
 
@@ -18686,9 +18686,7 @@ static int np_shadow_conditional_build_x_weights_core(double *vector_scale_facto
 
 cleanup_xweights:
   np_glp_qr_drop_workspace_clear(&qr_workspace);
-  if(KWM != NULL) mat_free(KWM);
-  if(RHS != NULL) mat_free(RHS);
-  if(SOL != NULL) mat_free(SOL);
+  np_lp_full_row_workspace_clear(&full_row_workspace);
   if(vsfx != NULL) free(vsfx);
   if(lambdax != NULL) free(lambdax);
   if(kw != NULL) free(kw);
