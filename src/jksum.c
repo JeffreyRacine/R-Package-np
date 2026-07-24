@@ -18110,9 +18110,9 @@ double *SIGN){
           solve_workspace.rhs_source[i+l*glp_nterms] =
             (i == l) ? 1.0 : 0.0;
 
-      if(np_lp_solve_workspace_solve(&solve_workspace,
-                                     glp_nterms,
-                                     glp_nterms))
+      if(np_lp_solve_workspace_solve_factored(&solve_workspace,
+                                              glp_nterms,
+                                              glp_nterms))
         have_vcov = 1;
 
       if(have_vcov){

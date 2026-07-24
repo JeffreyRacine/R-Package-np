@@ -13,6 +13,8 @@ typedef struct {
   double *gram_work;
   double *rhs_work;
   int *ipiv;
+  int factor_ready;
+  int factor_p;
 } NPLPSolveWorkspace;
 
 typedef struct {
@@ -58,6 +60,15 @@ int np_lp_solve_workspace_reserve(NPLPSolveWorkspace *workspace,
 int np_lp_solve_workspace_solve(NPLPSolveWorkspace *workspace,
                                 int p,
                                 int nrhs);
+
+/*
+ * Solve new pristine RHS columns with the LU/pivots retained by the most
+ * recent successful solve.  This never refactorizes or changes the source
+ * Gram and is valid only until reserve, clear, or another solve.
+ */
+int np_lp_solve_workspace_solve_factored(NPLPSolveWorkspace *workspace,
+                                         int p,
+                                         int nrhs);
 
 /*
  * Reusable QR workspace for a leave-one-out local-polynomial influence row.

@@ -56,6 +56,8 @@ int np_lp_solve_workspace_reserve(NPLPSolveWorkspace *workspace,
 
   if((workspace == NULL) || (p <= 0) || (nrhs <= 0))
     return 0;
+  workspace->factor_ready = 0;
+  workspace->factor_p = 0;
   if((workspace->p_capacity >= p) && (workspace->nrhs_capacity >= nrhs))
     return 1;
   if(!np_lp_size_product((size_t)p, (size_t)p, &gram_elements) ||
@@ -101,6 +103,10 @@ int np_lp_solve_workspace_solve(NPLPSolveWorkspace *workspace,
   int info = 0;
   size_t i;
 
+  if(workspace != NULL){
+    workspace->factor_ready = 0;
+    workspace->factor_p = 0;
+  }
   if((workspace == NULL) || (p <= 0) || (nrhs <= 0) ||
      (workspace->p_capacity < p) || (workspace->nrhs_capacity < nrhs) ||
      (workspace->gram_source == NULL) || (workspace->rhs_source == NULL) ||
@@ -123,6 +129,43 @@ int np_lp_solve_workspace_solve(NPLPSolveWorkspace *workspace,
                   workspace->ipiv,
                   workspace->rhs_work, &p,
                   &info);
+  if(info != 0)
+    return 0;
+  for(i = 0; i < rhs_elements; i++)
+    if(!R_FINITE(workspace->rhs_work[i]))
+      return 0;
+  workspace->factor_ready = 1;
+  workspace->factor_p = p;
+  return 1;
+}
+
+int np_lp_solve_workspace_solve_factored(NPLPSolveWorkspace *workspace,
+                                         int p,
+                                         int nrhs)
+{
+  const char trans = 'N';
+  size_t rhs_elements;
+  int info = 0;
+  size_t i;
+
+  if((workspace == NULL) || (p <= 0) || (nrhs <= 0) ||
+     (!workspace->factor_ready) || (workspace->factor_p != p) ||
+     (workspace->p_capacity < p) || (workspace->nrhs_capacity < nrhs) ||
+     (workspace->rhs_source == NULL) || (workspace->gram_work == NULL) ||
+     (workspace->rhs_work == NULL) || (workspace->ipiv == NULL) ||
+     !np_lp_size_product((size_t)p, (size_t)nrhs, &rhs_elements) ||
+     (rhs_elements > workspace->rhs_capacity))
+    return 0;
+
+  memcpy(workspace->rhs_work,
+         workspace->rhs_source,
+         rhs_elements*sizeof(double));
+  F77_CALL(dgetrs)(&trans, &p, &nrhs,
+                   workspace->gram_work, &p,
+                   workspace->ipiv,
+                   workspace->rhs_work, &p,
+                   &info
+                   FCONE);
   if(info != 0)
     return 0;
   for(i = 0; i < rhs_elements; i++)
