@@ -11,8 +11,6 @@
 #include <R_ext/Utils.h>
 
 #include "headers.h"
-#include "linalg.h"
-
 #ifdef MPI2
 
 #include "mpi.h"
@@ -9534,4 +9532,3 @@ double  initd_dir)
 	return(0);
 
 }
-
