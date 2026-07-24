@@ -11,7 +11,6 @@
 #include <R_ext/Utils.h>
 
 #include "headers.h"
-#include "linalg.h"
 
 #ifdef MPI2
 

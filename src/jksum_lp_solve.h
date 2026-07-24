@@ -93,7 +93,7 @@ int np_glp_qr_drop_workspace_apply(NPGLPQRDropWorkspace *workspace,
  * The row owner reconstructs Gram and RHS before every call, so dgesv may
  * overwrite them directly.  The rcond gate uses the same dsyev eigenvalue
  * ratio and the solve uses the same dgesv transcript as the historical
- * MATRIX-based route.
+ * row-fragmented historical route.
  */
 void np_lp_full_row_workspace_init(NPLPFullRowWorkspace *workspace);
 void np_lp_full_row_workspace_clear(NPLPFullRowWorkspace *workspace);
@@ -118,7 +118,7 @@ int np_lp_full_row_workspace_invert(NPLPFullRowWorkspace *workspace,
  * Retry an ungated retained inverse while preserving the source Gram in
  * matrix_copy.  The caller fills matrix_copy; each attempt copies it into the
  * destructive LAPACK buffer, and a failed attempt adds one fixed ridge step
- * to the preserved source.  This matches legacy mat_inv() retry ownership
+ * to the preserved source. This preserves the historical retry ownership
  * without row-fragmented matrices or per-attempt allocation.
  */
 int np_lp_full_row_workspace_invert_retryable(

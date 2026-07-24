@@ -27,15 +27,11 @@ test_that("mat_vec allocation helpers free partial state before error", {
   expect_true(grepl("free_mat(m, i);", src, fixed = TRUE))
 })
 
-test_that("linalg helpers clean up audited allocations before malloc errors", {
-  src_file <- locate_native_source("linalg.c")
-  skip_if(is.null(src_file), "source file src/linalg.c unavailable in this test context")
+test_that("the retired legacy linear-algebra source does not return", {
+  marker <- locate_native_source("mat_vec.c")
+  skip_if(is.null(marker), "package native source unavailable in this test context")
+  src_dir <- dirname(marker)
 
-  src <- paste(readLines(src_file, warn = FALSE), collapse = "\n")
-
-  expect_true(grepl("while \\(--i >= 0\\)\\s*free\\(\\*\\(\\(double \\*\\*\\)\\(&mat->matrix\\) \\+ i\\)\\);\\s*free\\(mat\\);\\s*error\\(\"mat: malloc error\\\\n\" \\);", src))
-  expect_true(grepl("free\\(A\\);\\s*free\\(ipiv\\);\\s*error\\(\"mat_inv: malloc error\\\\n\"\\);", src))
-  expect_true(grepl("free\\(Ac\\);\\s*free\\(Bc\\);\\s*free\\(ipiv\\);\\s*error\\(\"mat_solve: malloc error\\\\n\"\\);", src))
-  expect_true(grepl("free\\(Ac\\);\\s*free\\(ipiv\\);\\s*error\\(\"mat_is_nonsingular: malloc error\\\\n\"\\);", src))
-  expect_true(grepl("free\\(Ac\\);\\s*free\\(bc\\);\\s*free\\(ipiv\\);\\s*error\\(\"mat_inv00: malloc error\\\\n\"\\);", src))
+  expect_false(file.exists(file.path(src_dir, paste0("lin", "alg.c"))))
+  expect_false(file.exists(file.path(src_dir, paste0("lin", "alg.h"))))
 })
