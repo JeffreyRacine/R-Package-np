@@ -23,7 +23,6 @@
 #include <Rinternals.h>
 
 #include "headers.h"
-#include "linalg.h"
 #include "gsl_bspline.h"
 #include "jksum_lp_row.h"
 #include "jksum_lp_solve.h"
@@ -12045,8 +12044,8 @@ static int np_lp_fixed_tree_sparse_accumulate(
   int oracle_token = 1;
   int oracle_rows = 0, oracle_pairs = 0, oracle_missing = 0, oracle_mismatch = 0;
   double oracle_max_abs = 0.0;
-  MATRIX oracle_eval_u = NULL, oracle_eval_o = NULL, oracle_eval_c = NULL;
-  MATRIX oracle_bw_eval = NULL;
+  double **oracle_eval_u = NULL, **oracle_eval_o = NULL, **oracle_eval_c = NULL;
+  double **oracle_bw_eval = NULL;
   double oracle_mean_dummy = 0.0;
   double *eval_ybasis = NULL;
   double *eval_outer = NULL;
@@ -12074,9 +12073,9 @@ static int np_lp_fixed_tree_sparse_accumulate(
   if(do_oracle){
     kw_oracle = alloc_vecd(num_obs);
     oracle_mark = (int *)calloc((size_t)num_obs, sizeof(int));
-    oracle_eval_u = mat_creat(num_reg_unordered, 1, UNDEFINED);
-    oracle_eval_o = mat_creat(num_reg_ordered, 1, UNDEFINED);
-    oracle_eval_c = mat_creat(num_reg_continuous, 1, UNDEFINED);
+    oracle_eval_u = alloc_tmatd(1, MAX(1, num_reg_unordered));
+    oracle_eval_o = alloc_tmatd(1, MAX(1, num_reg_ordered));
+    oracle_eval_c = alloc_tmatd(1, MAX(1, num_reg_continuous));
     oracle_bw_eval = alloc_tmatd(1, num_reg_continuous);
     if((kw_oracle == NULL) ||
        (oracle_mark == NULL) ||
@@ -12393,9 +12392,9 @@ cleanup_sparse:
   np_lp_tree_support_ctx_free(&sctx);
   if(kw_oracle != NULL) free(kw_oracle);
   if(oracle_mark != NULL) free(oracle_mark);
-  if(oracle_eval_u != NULL) mat_free(oracle_eval_u);
-  if(oracle_eval_o != NULL) mat_free(oracle_eval_o);
-  if(oracle_eval_c != NULL) mat_free(oracle_eval_c);
+  if(oracle_eval_u != NULL) free_tmat(oracle_eval_u);
+  if(oracle_eval_o != NULL) free_tmat(oracle_eval_o);
+  if(oracle_eval_c != NULL) free_tmat(oracle_eval_c);
   if(oracle_bw_eval != NULL) free_tmat(oracle_bw_eval);
   return status;
 }
@@ -12442,8 +12441,8 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
   double *eval_ybasis = NULL, *eval_outer = NULL;
   double *vsf = NULL;
   double **train_u = NULL, **train_o = NULL, **train_c = NULL;
-  MATRIX eval_u = NULL, eval_o = NULL, eval_c = NULL;
-  MATRIX matrix_bandwidth_eval = NULL;
+  double **eval_u = NULL, **eval_o = NULL, **eval_c = NULL;
+  double **matrix_bandwidth_eval = NULL;
   NPLPSolveWorkspace solve_workspace;
   double mean_dummy = 0.0;
   double aicc = 0.0;
@@ -12514,9 +12513,9 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
     train_u = (double **)malloc((size_t)MAX(1, num_reg_unordered)*sizeof(double *));
     train_o = (double **)malloc((size_t)MAX(1, num_reg_ordered)*sizeof(double *));
     train_c = (double **)malloc((size_t)MAX(1, num_reg_continuous)*sizeof(double *));
-    eval_u = mat_creat(num_reg_unordered, 1, UNDEFINED);
-    eval_o = mat_creat(num_reg_ordered, 1, UNDEFINED);
-    eval_c = mat_creat(num_reg_continuous, 1, UNDEFINED);
+    eval_u = alloc_tmatd(1, MAX(1, num_reg_unordered));
+    eval_o = alloc_tmatd(1, MAX(1, num_reg_ordered));
+    eval_c = alloc_tmatd(1, MAX(1, num_reg_continuous));
     matrix_bandwidth_eval = alloc_tmatd(1, num_reg_continuous);
     if((!use_mpi_transport) && (nterms >= 3)){
       eval_ybasis = alloc_vecd(MAX(1, nterms));
@@ -12989,9 +12988,9 @@ cleanup_lp_cv:
   if(train_u != NULL) free(train_u);
   if(train_o != NULL) free(train_o);
   if(train_c != NULL) free(train_c);
-  if(eval_u != NULL) mat_free(eval_u);
-  if(eval_o != NULL) mat_free(eval_o);
-  if(eval_c != NULL) mat_free(eval_c);
+  if(eval_u != NULL) free_tmat(eval_u);
+  if(eval_o != NULL) free_tmat(eval_o);
+  if(eval_c != NULL) free_tmat(eval_c);
   if(matrix_bandwidth_eval != NULL) free_tmat(matrix_bandwidth_eval);
   np_lp_solve_workspace_clear(&solve_workspace);
   if(moments != NULL) free(moments);
@@ -13143,7 +13142,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
     const int *glp_terms = NULL;
     int glp_nterms = 0;
     double **basis = NULL;
-    MATRIX TCON = NULL, TUNO = NULL, TORD = NULL;
+    double **TCON = NULL, **TUNO = NULL, **TORD = NULL;
     double ** matrix_bandwidth_eval = NULL;
     double ** XTKX = NULL;
     NPLPSolveWorkspace solve_workspace;
@@ -13355,9 +13354,9 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
       vsf = vector_scale_factor;
     }
 
-    TCON = mat_creat(num_reg_continuous, 1, UNDEFINED);
-    TUNO = mat_creat(num_reg_unordered, 1, UNDEFINED);
-    TORD = mat_creat(num_reg_ordered, 1, UNDEFINED);
+    TCON = alloc_tmatd(1, MAX(1, num_reg_continuous));
+    TUNO = alloc_tmatd(1, MAX(1, num_reg_unordered));
+    TORD = alloc_tmatd(1, MAX(1, num_reg_ordered));
     matrix_bandwidth_eval = alloc_tmatd(1, num_reg_continuous);
     XTKX = (double **)malloc((size_t)nrc2*sizeof(double *));
 
@@ -13834,9 +13833,9 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
       }
     }
 
-    if(TCON != NULL) mat_free(TCON);
-    if(TUNO != NULL) mat_free(TUNO);
-    if(TORD != NULL) mat_free(TORD);
+    if(TCON != NULL) free_tmat(TCON);
+    if(TUNO != NULL) free_tmat(TUNO);
+    if(TORD != NULL) free_tmat(TORD);
     if(matrix_bandwidth_eval != NULL) free_tmat(matrix_bandwidth_eval);
     if(XTKX != NULL) free(XTKX);
     if(kwm != NULL) free(kwm);
@@ -13920,76 +13919,56 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                                                         &ov_cont_from_cache);
 
     if(all_large_gate){
-      const int k = 1;
-      MATRIX XtX = mat_creat(k, k, UNDEFINED);
-      MATRIX XtXINV = mat_creat(k, k, UNDEFINED);
-      MATRIX XtY = mat_creat(k, 1, UNDEFINED);
-      MATRIX BETA = mat_creat(k, 1, UNDEFINED);
-      int fast_ok = (XtX != NULL) && (XtXINV != NULL) && (XtY != NULL) && (BETA != NULL);
+      const double ridge_eps = 1.0/(double)MAX(1, num_obs);
+      double xtx = 0.0;
+      double xtxinv = 0.0;
+      double xty = 0.0;
+      double beta = 0.0;
+      int ridge_it = 0;
+      int fast_ok = (num_obs > 0);
+
+      for(i = 0; i < num_obs; i++){
+        xtx += 1.0;
+        xty += vector_Y[i];
+      }
 
       if(fast_ok){
-        const double ridge_eps = 1.0/(double)MAX(1, num_obs);
-        int ridge_it = 0;
-
-        for(i = 0; i < k; i++){
-          XtY[i][0] = 0.0;
-          BETA[i][0] = 0.0;
-          for(j = 0; j < k; j++)
-            XtX[i][j] = 0.0;
-        }
-
-        for(i = 0; i < num_obs; i++){
-          XtX[0][0] += 1.0;
-          XtY[0][0] += vector_Y[i];
-        }
-
-        while(mat_inv(XtX, XtXINV) == NULL){
-          for(i = 0; i < k; i++)
-            XtX[i][i] += ridge_eps;
+        xtxinv = 1.0/xtx;
+        while(!isfinite(xtxinv)){
+          xtx += ridge_eps;
           ridge_it++;
           if(ridge_it > 64){
             fast_ok = 0;
             break;
           }
-        }
-
-        if(fast_ok){
-          for(i = 0; i < k; i++){
-            double s = 0.0;
-            for(j = 0; j < k; j++)
-              s += XtXINV[i][j]*XtY[j][0];
-            BETA[i][0] = s;
-          }
-
-          cv = 0.0;
-          traceH = 0.0;
-          for(i = 0; i < num_obs; i++){
-            double yhat = BETA[0][0];
-            double hii = XtXINV[0][0];
-
-            const double loss_y =
-              (bwm == RBWM_CVCHECK && vector_lsq_loss_extern != NULL) ?
-              vector_lsq_loss_extern[i] :
-              vector_Y[i];
-            const double err = loss_y - yhat;
-            if((bwm == RBWM_CVLS) || (bwm == RBWM_CVCHECK)){
-              const double den = NZD_POS(1.0 - hii);
-              const double err_loo = err/den;
-              cv += (bwm == RBWM_CVCHECK) ?
-                np_check_loss_value(err_loo, np_lsq_tau_extern) :
-                err_loo*err_loo;
-            } else {
-              cv += err*err;
-              traceH += hii;
-            }
-          }
+          xtxinv = 1.0/xtx;
         }
       }
 
-      if(XtX != NULL) mat_free(XtX);
-      if(XtXINV != NULL) mat_free(XtXINV);
-      if(XtY != NULL) mat_free(XtY);
-      if(BETA != NULL) mat_free(BETA);
+      if(fast_ok){
+        beta += xtxinv*xty;
+        cv = 0.0;
+        traceH = 0.0;
+        for(i = 0; i < num_obs; i++){
+          const double yhat = beta;
+          const double hii = xtxinv;
+          const double loss_y =
+            (bwm == RBWM_CVCHECK && vector_lsq_loss_extern != NULL) ?
+            vector_lsq_loss_extern[i] :
+            vector_Y[i];
+          const double err = loss_y - yhat;
+          if((bwm == RBWM_CVLS) || (bwm == RBWM_CVCHECK)){
+            const double den = NZD_POS(1.0 - hii);
+            const double err_loo = err/den;
+            cv += (bwm == RBWM_CVCHECK) ?
+              np_check_loss_value(err_loo, np_lsq_tau_extern) :
+              err_loo*err_loo;
+          } else {
+            cv += err*err;
+            traceH += hii;
+          }
+        }
+      }
 
       if(fast_ok){
         np_fastcv_alllarge_hits++;
@@ -18891,7 +18870,7 @@ double *SIGN){
 	            if(!np_lp_solve_workspace_solve(&solve_workspace,
 	                                            glp_nterms,
 	                                            1))
-	              error("mat_solve failed in glp owner path");
+	              error("LP solve failed in glp owner path");
 	          }
 	          for(i = 0; i < glp_nterms; i++)
 	            beta[i] = solve_workspace.rhs_work[i];
@@ -19165,7 +19144,7 @@ double *SIGN){
         NZD_POS(solve_workspace.gram_source[0]);
       if(nepsilon > 0.0){
         if(!np_lp_solve_workspace_solve(&solve_workspace, glp_nterms, 1))
-          error("mat_solve failed in glp path");
+          error("LP solve failed in glp path");
       }
       for(i = 0; i < glp_nterms; i++)
         beta[i] = solve_workspace.rhs_work[i];
@@ -24840,7 +24819,7 @@ static double np_conditional_lp_all_large_row_fit_basis_dgemv(
 static int np_conditional_lp_all_large_moment_ddot(
   double *vector_scale_factor,
   const NPConditionalLpAllLargeCtx *ctx,
-  MATRIX moment,
+  double *moment,
   double *yconv,
   double *yconv_xorder,
   double *cross_terms){
@@ -24867,7 +24846,7 @@ static int np_conditional_lp_all_large_moment_ddot(
     for(a = 0; a < ctx->nterms; a++){
       const double za = ctx->basis[a][j];
       for(b = 0; b < ctx->nterms; b++)
-        moment[a][b] += za*cross_terms[b];
+        moment[a*ctx->nterms+b] += za*cross_terms[b];
     }
   }
 
@@ -24877,7 +24856,7 @@ static int np_conditional_lp_all_large_moment_ddot(
 static int np_conditional_lp_all_large_moment_dgemv(
   double *vector_scale_factor,
   const NPConditionalLpAllLargeCtx *ctx,
-  MATRIX moment,
+  double *moment,
   double *yconv,
   double *yconv_xorder,
   double *cross_terms){
@@ -24907,7 +24886,7 @@ static int np_conditional_lp_all_large_moment_dgemv(
     for(a = 0; a < ctx->nterms; a++){
       const double za = ctx->basis[a][j];
       for(b = 0; b < ctx->nterms; b++)
-        moment[a][b] += za*cross_terms[b];
+        moment[a*ctx->nterms+b] += za*cross_terms[b];
     }
   }
 
@@ -24916,17 +24895,19 @@ static int np_conditional_lp_all_large_moment_dgemv(
 
 static int np_conditional_lp_all_large_build_conv_quad(double *vector_scale_factor,
                                                        const NPConditionalLpAllLargeCtx *ctx,
-                                                       MATRIX quad_mat){
-  MATRIX moment = NULL, temp = NULL;
+                                                       double *quad_mat){
+  double *moment = NULL, *temp = NULL;
   double *yconv = NULL, *yconv_xorder = NULL, *cross_terms = NULL;
   int a, b, c;
   int status = 1;
 
   if((vector_scale_factor == NULL) || (ctx == NULL) || (!ctx->ready) || (quad_mat == NULL))
     return 1;
+  if((ctx->nterms <= 0) || (ctx->nterms > INT_MAX/ctx->nterms))
+    return 1;
 
-  moment = mat_creat(ctx->nterms, ctx->nterms, UNDEFINED);
-  temp = mat_creat(ctx->nterms, ctx->nterms, UNDEFINED);
+  moment = alloc_vecd(ctx->nterms*ctx->nterms);
+  temp = alloc_vecd(ctx->nterms*ctx->nterms);
   yconv = alloc_vecd(MAX(1, ctx->num_train));
   if(int_TREE_X == NP_TREE_TRUE)
     yconv_xorder = alloc_vecd(MAX(1, ctx->num_train));
@@ -24938,7 +24919,7 @@ static int np_conditional_lp_all_large_build_conv_quad(double *vector_scale_fact
 
   for(a = 0; a < ctx->nterms; a++)
     for(b = 0; b < ctx->nterms; b++)
-      moment[a][b] = 0.0;
+      moment[a*ctx->nterms+b] = 0.0;
 
   if((int_TREE_X == NP_TREE_TRUE) &&
      ((ipt_extern_X == NULL) || (ipt_lookup_extern_X == NULL)))
@@ -24958,8 +24939,9 @@ static int np_conditional_lp_all_large_build_conv_quad(double *vector_scale_fact
     for(b = 0; b < ctx->nterms; b++){
       double s = 0.0;
       for(c = 0; c < ctx->nterms; c++)
-        s += ctx->inverse_workspace.gram[a + c*ctx->nterms]*moment[c][b];
-      temp[a][b] = s;
+        s += ctx->inverse_workspace.gram[a + c*ctx->nterms]*
+          moment[c*ctx->nterms+b];
+      temp[a*ctx->nterms+b] = s;
     }
   }
 
@@ -24967,17 +24949,17 @@ static int np_conditional_lp_all_large_build_conv_quad(double *vector_scale_fact
     for(b = 0; b < ctx->nterms; b++){
       double s = 0.0;
       for(c = 0; c < ctx->nterms; c++)
-        s += temp[a][c]*
+        s += temp[a*ctx->nterms+c]*
           ctx->inverse_workspace.gram[c + b*ctx->nterms];
-      quad_mat[a][b] = s;
+      quad_mat[a*ctx->nterms+b] = s;
     }
   }
 
   status = 0;
 
 cleanup_all_large_quad:
-  if(moment != NULL) mat_free(moment);
-  if(temp != NULL) mat_free(temp);
+  if(moment != NULL) free(moment);
+  if(temp != NULL) free(temp);
   if(yconv != NULL) free(yconv);
   if(yconv_xorder != NULL) free(yconv_xorder);
   if(cross_terms != NULL) free(cross_terms);
@@ -24985,7 +24967,7 @@ cleanup_all_large_quad:
 }
 
 static double np_conditional_lp_all_large_quad_eval(const NPConditionalLpAllLargeCtx *ctx,
-                                                    MATRIX quad_mat,
+                                                    const double *quad_mat,
                                                     const int eval_pos){
   double quad = 0.0;
   int a, b;
@@ -24993,7 +24975,7 @@ static double np_conditional_lp_all_large_quad_eval(const NPConditionalLpAllLarg
   for(a = 0; a < ctx->nterms; a++){
     const double za = ctx->basis[a][eval_pos];
     for(b = 0; b < ctx->nterms; b++)
-      quad += za*quad_mat[a][b]*ctx->basis[b][eval_pos];
+      quad += za*quad_mat[a*ctx->nterms+b]*ctx->basis[b][eval_pos];
   }
 
   return quad;
@@ -25090,7 +25072,7 @@ cleanup_cvml_all_large:
 static int np_conditional_density_cvls_lp_all_large_stream(double *vector_scale_factor,
                                                            double *cv){
   NPConditionalLpAllLargeCtx ctx = {0};
-  MATRIX quad_mat = NULL;
+  double *quad_mat = NULL;
   double *yrow = NULL, *yrow_xorder = NULL, *cross_terms = NULL, *beta = NULL;
   int i, j;
   int status = 1;
@@ -25100,7 +25082,9 @@ static int np_conditional_density_cvls_lp_all_large_stream(double *vector_scale_
   if(np_conditional_lp_all_large_ctx_prepare_cvls_tree(vector_scale_factor, &ctx) != 0)
     goto cleanup_cvls_all_large;
 
-  quad_mat = mat_creat(ctx.nterms, ctx.nterms, UNDEFINED);
+  if((ctx.nterms <= 0) || (ctx.nterms > INT_MAX/ctx.nterms))
+    goto cleanup_cvls_all_large;
+  quad_mat = alloc_vecd(ctx.nterms*ctx.nterms);
   yrow = alloc_vecd(MAX(1, ctx.num_train));
   if(int_TREE_X == NP_TREE_TRUE)
     yrow_xorder = alloc_vecd(MAX(1, ctx.num_train));
@@ -25142,7 +25126,7 @@ static int np_conditional_density_cvls_lp_all_large_stream(double *vector_scale_
   status = 0;
 
 cleanup_cvls_all_large:
-  if(quad_mat != NULL) mat_free(quad_mat);
+  if(quad_mat != NULL) free(quad_mat);
   if(yrow != NULL) free(yrow);
   if(yrow_xorder != NULL) free(yrow_xorder);
   if(cross_terms != NULL) free(cross_terms);
