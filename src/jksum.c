@@ -19066,6 +19066,7 @@ typedef struct {
   double **eval_xord_one;
   double **eval_xcon_one;
   NPGLPQRDropWorkspace qr_workspace;
+  NPLPFullRowWorkspace full_row_workspace;
 } NPConditionalXRowCtx;
 
 typedef struct {
@@ -19103,6 +19104,7 @@ static void np_conditional_xrow_ctx_clear(NPConditionalXRowCtx *ctx){
   if(ctx->kernel_ox != NULL) free(ctx->kernel_ox);
   if(ctx->x_operator != NULL) free(ctx->x_operator);
   np_glp_qr_drop_workspace_clear(&ctx->qr_workspace);
+  np_lp_full_row_workspace_clear(&ctx->full_row_workspace);
   memset(ctx, 0, sizeof(*ctx));
 }
 
@@ -19218,7 +19220,10 @@ static int np_conditional_xrow_ctx_prepare(double *vector_scale_factor,
     if((np_glp_cv_cache.nterms <= 0) ||
        !np_glp_qr_drop_workspace_reserve(&ctx->qr_workspace,
                                          num_train,
-                                         np_glp_cv_cache.nterms))
+                                         np_glp_cv_cache.nterms) ||
+       !np_lp_full_row_workspace_reserve(&ctx->full_row_workspace,
+                                         np_glp_cv_cache.nterms,
+                                         1))
       goto fail_xrow_ctx_prepare;
   }
 
@@ -19236,7 +19241,6 @@ static int np_conditional_xrow_from_ctx_impl(NPConditionalXRowCtx *ctx,
                                              double *row_out){
   const int num_train = num_obs_train_extern;
   int eval_pos = eval_idx;
-  MATRIX KWM = NULL, RHS = NULL, SOL = NULL;
   NPConditionalBoundState bounds_state;
   int j, l;
   int status = 1;
@@ -19328,12 +19332,6 @@ static int np_conditional_xrow_from_ctx_impl(NPConditionalXRowCtx *ctx,
     if((k <= 0) || (np_glp_cv_cache.basis == NULL))
       goto cleanup_xrow_from_ctx;
 
-    KWM = mat_creat(k, k, UNDEFINED);
-    RHS = mat_creat(k, 1, UNDEFINED);
-    SOL = mat_creat(k, 1, UNDEFINED);
-    if((KWM == NULL) || (RHS == NULL) || (SOL == NULL))
-      goto cleanup_xrow_from_ctx;
-
     if(drop_eval_self){
       if(np_glp_qr_drop_workspace_apply(&ctx->qr_workspace,
                                         np_glp_cv_cache.basis,
@@ -19350,9 +19348,10 @@ static int np_conditional_xrow_from_ctx_impl(NPConditionalXRowCtx *ctx,
       }
     } else {
       for(l = 0; l < k; l++){
-        RHS[l][0] = np_glp_cv_cache.basis[l][eval_pos];
+        ctx->full_row_workspace.rhs[l] =
+          np_glp_cv_cache.basis[l][eval_pos];
         for(j = 0; j < k; j++)
-          KWM[l][j] = 0.0;
+          ctx->full_row_workspace.gram[l + j*k] = 0.0;
       }
 
       for(j = 0; j < num_train; j++){
@@ -19363,22 +19362,25 @@ static int np_conditional_xrow_from_ctx_impl(NPConditionalXRowCtx *ctx,
           const double za = np_glp_cv_cache.basis[a][j];
           for(int b = a; b < k; b++){
             const double zb = np_glp_cv_cache.basis[b][j];
-            KWM[a][b] += wj*za*zb;
-            if(b != a) KWM[b][a] += wj*za*zb;
+            ctx->full_row_workspace.gram[a + b*k] += wj*za*zb;
+            if(b != a)
+              ctx->full_row_workspace.gram[b + a*k] += wj*za*zb;
           }
         }
       }
 
-      if(np_mat_bad_rcond_sym(KWM, 1.0e-10))
-        goto cleanup_xrow_from_ctx;
-      if(mat_solve(KWM, RHS, SOL) == NULL)
+      if(!np_lp_full_row_workspace_solve(&ctx->full_row_workspace,
+                                         k,
+                                         1,
+                                         1.0e-10))
         goto cleanup_xrow_from_ctx;
 
       for(j = 0; j < num_train; j++){
         double zju = 0.0;
         const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
         for(l = 0; l < k; l++)
-          zju += np_glp_cv_cache.basis[l][j]*SOL[l][0];
+          zju += np_glp_cv_cache.basis[l][j]*
+            ctx->full_row_workspace.rhs[l];
         row_out[orig_j] = ctx->kw[j]*zju;
       }
     }
@@ -19387,9 +19389,6 @@ static int np_conditional_xrow_from_ctx_impl(NPConditionalXRowCtx *ctx,
   status = 0;
 
 cleanup_xrow_from_ctx:
-  if(KWM != NULL) mat_free(KWM);
-  if(RHS != NULL) mat_free(RHS);
-  if(SOL != NULL) mat_free(SOL);
   return status;
 }
 
