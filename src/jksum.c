@@ -22472,6 +22472,15 @@ cleanup_xweight_block_pair:
   return status;
 }
 
+static int np_conditional_x_weight_block_pair_gnn_stream_core(
+  double *vector_scale_factor,
+  int eval_start,
+  int block_rows,
+  int suppress_nn_parallel,
+  const NPConditionalXBlockBwCtx *bwctx,
+  double **loo_rows_out,
+  double **full_rows_out);
+
 static int np_conditional_y_block_stream_op_core(double *vector_scale_factor,
                                                  int eval_start,
                                                  int block_rows,
@@ -25676,13 +25685,41 @@ int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
         local_fail = 1;
         break;
       }
-      if(np_conditional_x_weight_block_stream_core_impl(vector_scale_factor, i0, ib, 1, use_parallel_blocks, &xbwctx, xblock) != 0){
-        local_fail = 1;
-        break;
-      }
-      if(np_conditional_x_weight_block_stream_core_impl(vector_scale_factor, i0, ib, 0, use_parallel_blocks, &xbwctx, xblock_full) != 0){
-        local_fail = 1;
-        break;
+      if(int_ll_extern == LL_LP){
+        if(np_conditional_x_weight_block_pair_gnn_stream_core(
+             vector_scale_factor,
+             i0,
+             ib,
+             use_parallel_blocks,
+             &xbwctx,
+             xblock,
+             xblock_full) != 0){
+          local_fail = 1;
+          break;
+        }
+      } else {
+        if(np_conditional_x_weight_block_stream_core_impl(
+             vector_scale_factor,
+             i0,
+             ib,
+             1,
+             use_parallel_blocks,
+             &xbwctx,
+             xblock) != 0){
+          local_fail = 1;
+          break;
+        }
+        if(np_conditional_x_weight_block_stream_core_impl(
+             vector_scale_factor,
+             i0,
+             ib,
+             0,
+             use_parallel_blocks,
+             &xbwctx,
+             xblock_full) != 0){
+          local_fail = 1;
+          break;
+        }
       }
       np_conditional_x_block_bw_ctx_clear(&xbwctx);
     } else {
@@ -30714,3 +30751,270 @@ void np_kernelop_xy(const int kernel_var_continuous,
   }
 
 }
+
+/*
+ * Keep the generalized-NN definition separate from the established fixed
+ * helper's source body. Compiler/linker placement is deliberately not assumed;
+ * timing gates remain the authority for adjacent-route effects.
+ */
+static int np_conditional_x_weight_block_pair_gnn_stream_core(
+  double *vector_scale_factor,
+  int eval_start,
+  int block_rows,
+  int suppress_nn_parallel,
+  const NPConditionalXBlockBwCtx *bwctx,
+  double **loo_rows_out,
+  double **full_rows_out)
+{
+  const int num_train = num_obs_train_extern;
+  const int num_reg_tot =
+    num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern;
+  const int bw_rows = block_rows;
+  int *kernel_cx = NULL, *kernel_ux = NULL, *kernel_ox = NULL;
+  int *x_operator = NULL;
+  double *vsfx = NULL, *lambdax = NULL, *kw = NULL, *mean_row = NULL;
+  double **matrix_bandwidth_x = NULL, **matrix_bandwidth_eval_one = NULL;
+  double **eval_xuno_one = NULL, **eval_xord_one = NULL;
+  double **eval_xcon_one = NULL;
+  NPGLPQRDropWorkspace qr_workspace;
+  NPLPFullRowWorkspace full_row_workspace;
+  NPConditionalBoundState bounds_state;
+  int i, j, l;
+  int status = 1;
+
+  np_glp_qr_drop_workspace_init(&qr_workspace);
+  np_lp_full_row_workspace_init(&full_row_workspace);
+  /*
+   * Generalized-NN sibling of the fixed paired helper. The bandwidth row is
+   * selected at compile-isolated source sites so the established fixed hot
+   * loop retains no generalized-NN branch or indexing cost. MPI block
+   * ownership and the caller's collective reductions remain outside.
+   */
+  if((loo_rows_out == NULL) || (full_rows_out == NULL) ||
+     (vector_scale_factor == NULL) || (int_ll_extern != LL_LP))
+    return 1;
+  if(BANDWIDTH_den_extern != BW_GEN_NN)
+    return 1;
+  if(int_TREE_X == NP_TREE_TRUE)
+    return 1;
+  if((bwctx == NULL) || (!bwctx->ready) ||
+     (bwctx->eval_start != eval_start) ||
+     (bwctx->block_rows != block_rows) ||
+     (bwctx->bw_rows != block_rows) ||
+     (bwctx->suppress_nn_parallel != suppress_nn_parallel) ||
+     (bwctx->vsfx == NULL) || (bwctx->lambdax == NULL) ||
+     (bwctx->matrix_bandwidth_x == NULL))
+    return 1;
+  if((eval_start < 0) || (block_rows <= 0) ||
+     ((eval_start + block_rows) > num_train))
+    return 1;
+  if((num_reg_tot <= 0) || (num_reg_continuous_extern <= 0) ||
+     (vector_glp_degree_extern == NULL))
+    return 1;
+
+  vsfx = alloc_vecd(MAX(1, num_reg_tot));
+  lambdax = alloc_vecd(
+    MAX(1, num_reg_unordered_extern + num_reg_ordered_extern)
+  );
+  matrix_bandwidth_x = alloc_tmatd(bw_rows, num_reg_continuous_extern);
+  kw = alloc_vecd(MAX(1, num_train));
+  mean_row = alloc_vecd(MAX(1, num_train));
+  matrix_bandwidth_eval_one = alloc_tmatd(1, num_reg_continuous_extern);
+  if(num_reg_unordered_extern > 0)
+    eval_xuno_one = alloc_matd(1, num_reg_unordered_extern);
+  if(num_reg_ordered_extern > 0)
+    eval_xord_one = alloc_matd(1, num_reg_ordered_extern);
+  if(num_reg_continuous_extern > 0)
+    eval_xcon_one = alloc_matd(1, num_reg_continuous_extern);
+
+  kernel_cx = (int *)calloc(
+    (size_t)MAX(1, num_reg_continuous_extern), sizeof(int)
+  );
+  kernel_ux = (int *)calloc(
+    (size_t)MAX(1, num_reg_unordered_extern), sizeof(int)
+  );
+  kernel_ox = (int *)calloc(
+    (size_t)MAX(1, num_reg_ordered_extern), sizeof(int)
+  );
+  x_operator = (int *)calloc((size_t)MAX(1, num_reg_tot), sizeof(int));
+
+  if((vsfx == NULL) || (lambdax == NULL) || (kw == NULL) ||
+     (mean_row == NULL) || (matrix_bandwidth_x == NULL) ||
+     (matrix_bandwidth_eval_one == NULL) ||
+     ((num_reg_unordered_extern > 0) && (eval_xuno_one == NULL)) ||
+     ((num_reg_ordered_extern > 0) && (eval_xord_one == NULL)) ||
+     ((num_reg_continuous_extern > 0) && (eval_xcon_one == NULL)) ||
+     (kernel_cx == NULL) || (kernel_ux == NULL) || (kernel_ox == NULL) ||
+     (x_operator == NULL))
+    goto cleanup_xweight_block_pair_gnn;
+
+  for(i = 0; i < num_reg_tot; i++)
+    vsfx[i] = bwctx->vsfx[i];
+  for(i = 0; i < (num_reg_unordered_extern + num_reg_ordered_extern); i++)
+    lambdax[i] = bwctx->lambdax[i];
+  for(l = 0; l < num_reg_continuous_extern; l++)
+    for(i = 0; i < bw_rows; i++)
+      matrix_bandwidth_x[l][i] = bwctx->matrix_bandwidth_x[l][i];
+
+  for(i = 0; i < num_reg_continuous_extern; i++)
+    kernel_cx[i] = KERNEL_reg_extern;
+  for(i = 0; i < num_reg_unordered_extern; i++)
+    kernel_ux[i] = KERNEL_reg_unordered_extern;
+  for(i = 0; i < num_reg_ordered_extern; i++)
+    kernel_ox[i] = KERNEL_reg_ordered_extern;
+  for(i = 0; i < num_reg_tot; i++)
+    x_operator[i] = OP_NORMAL;
+
+  {
+    const int use_bernstein = (int_glp_bernstein_extern != 0);
+
+    if(!np_glp_cv_cache.ready ||
+       (np_glp_cv_cache.use_bernstein != use_bernstein) ||
+       (np_glp_cv_cache.basis_mode != int_glp_basis_extern) ||
+       (np_glp_cv_cache.num_obs != num_train) ||
+       (np_glp_cv_cache.ncon != num_reg_continuous_extern) ||
+       (np_glp_cv_cache.matrix_X_continuous_train_ptr !=
+        matrix_X_continuous_train_extern)){
+      if(!np_glp_cv_cache_prepare(LL_LP,
+                                  num_train,
+                                  num_reg_continuous_extern,
+                                  matrix_X_continuous_train_extern))
+        goto cleanup_xweight_block_pair_gnn;
+    }
+  }
+
+  if((np_glp_cv_cache.nterms <= 0) || (np_glp_cv_cache.basis == NULL))
+    goto cleanup_xweight_block_pair_gnn;
+  if(!np_lp_full_row_workspace_reserve(&full_row_workspace,
+                                       np_glp_cv_cache.nterms,
+                                       1))
+    goto cleanup_xweight_block_pair_gnn;
+
+  for(i = 0; i < block_rows; i++){
+    const int eval_idx = eval_start + i;
+    const int eval_pos = eval_idx;
+    const int k = np_glp_cv_cache.nterms;
+    double self_weight;
+
+    memset(loo_rows_out[i], 0, (size_t)num_train*sizeof(double));
+    memset(full_rows_out[i], 0, (size_t)num_train*sizeof(double));
+    for(l = 0; l < num_reg_unordered_extern; l++)
+      eval_xuno_one[l][0] = matrix_X_unordered_train_extern[l][eval_pos];
+    for(l = 0; l < num_reg_ordered_extern; l++)
+      eval_xord_one[l][0] = matrix_X_ordered_train_extern[l][eval_pos];
+    for(l = 0; l < num_reg_continuous_extern; l++){
+      eval_xcon_one[l][0] = matrix_X_continuous_train_extern[l][eval_pos];
+      matrix_bandwidth_eval_one[l][0] = matrix_bandwidth_x[l][i];
+    }
+
+    np_conditional_push_bounds(int_cxker_bound_extern,
+                               vector_cxkerlb_extern,
+                               vector_cxkerub_extern,
+                               &bounds_state);
+    if(np_shadow_conditional_kernel_row_raw(kernel_cx,
+                                            kernel_ux,
+                                            kernel_ox,
+                                            x_operator,
+                                            BANDWIDTH_den_extern,
+                                            num_train,
+                                            num_reg_unordered_extern,
+                                            num_reg_ordered_extern,
+                                            num_reg_continuous_extern,
+                                            matrix_X_unordered_train_extern,
+                                            matrix_X_ordered_train_extern,
+                                            matrix_X_continuous_train_extern,
+                                            eval_xuno_one,
+                                            eval_xord_one,
+                                            eval_xcon_one,
+                                            vsfx,
+                                            1,
+                                            matrix_bandwidth_x,
+                                            matrix_bandwidth_eval_one,
+                                            lambdax,
+                                            num_categories_extern_X,
+                                            matrix_categorical_vals_extern_X,
+                                            int_TREE_X,
+                                            kdt_extern_X,
+                                            kw,
+                                            mean_row) != 0){
+      np_conditional_pop_bounds(&bounds_state);
+      goto cleanup_xweight_block_pair_gnn;
+    }
+    np_conditional_pop_bounds(&bounds_state);
+
+    self_weight = kw[eval_pos];
+    kw[eval_pos] = 0.0;
+    if(np_glp_qr_drop_workspace_apply(&qr_workspace,
+                                      np_glp_cv_cache.basis,
+                                      num_train,
+                                      k,
+                                      kw,
+                                      eval_pos,
+                                      mean_row) != 0)
+      goto cleanup_xweight_block_pair_gnn;
+
+    for(j = 0; j < num_train; j++)
+      loo_rows_out[i][j] = mean_row[j];
+
+    kw[eval_pos] = self_weight;
+    for(l = 0; l < k; l++){
+      full_row_workspace.rhs[l] = np_glp_cv_cache.basis[l][eval_pos];
+      for(j = 0; j < k; j++)
+        full_row_workspace.gram[l + j*k] = 0.0;
+    }
+
+    for(j = 0; j < num_train; j++){
+      const double wj = kw[j];
+      if(wj == 0.0)
+        continue;
+      for(int a = 0; a < k; a++){
+        const double za = np_glp_cv_cache.basis[a][j];
+        for(int b = a; b < k; b++){
+          const double zb = np_glp_cv_cache.basis[b][j];
+          full_row_workspace.gram[a + b*k] += wj*za*zb;
+          if(b != a)
+            full_row_workspace.gram[b + a*k] += wj*za*zb;
+        }
+      }
+    }
+
+    if(!np_lp_full_row_workspace_solve(&full_row_workspace,
+                                       k,
+                                       1,
+                                       1.0e-10))
+      goto cleanup_xweight_block_pair_gnn;
+
+    for(j = 0; j < num_train; j++){
+      double zju = 0.0;
+      for(l = 0; l < k; l++)
+        zju += np_glp_cv_cache.basis[l][j]*
+          full_row_workspace.rhs[l];
+      full_rows_out[i][j] = kw[j]*zju;
+    }
+  }
+
+  status = 0;
+
+cleanup_xweight_block_pair_gnn:
+  np_glp_qr_drop_workspace_clear(&qr_workspace);
+  np_lp_full_row_workspace_clear(&full_row_workspace);
+  if(vsfx != NULL) free(vsfx);
+  if(lambdax != NULL) free(lambdax);
+  if(kw != NULL) free(kw);
+  if(mean_row != NULL) free(mean_row);
+  if(matrix_bandwidth_x != NULL) free_tmat(matrix_bandwidth_x);
+  if(matrix_bandwidth_eval_one != NULL) free_tmat(matrix_bandwidth_eval_one);
+  if(eval_xuno_one != NULL)
+    free_mat(eval_xuno_one, num_reg_unordered_extern);
+  if(eval_xord_one != NULL)
+    free_mat(eval_xord_one, num_reg_ordered_extern);
+  if(eval_xcon_one != NULL)
+    free_mat(eval_xcon_one, num_reg_continuous_extern);
+  if(kernel_cx != NULL) free(kernel_cx);
+  if(kernel_ux != NULL) free(kernel_ux);
+  if(kernel_ox != NULL) free(kernel_ox);
+  if(x_operator != NULL) free(x_operator);
+  return status;
+}
+
+/* NP_CONDITIONAL_X_WEIGHT_BLOCK_PAIR_GNN_STREAM_CORE_END */
