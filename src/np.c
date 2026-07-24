@@ -1119,6 +1119,7 @@ typedef struct {
   int need_y_side;
   int old_cdens;
   int penalty_mode;
+  int glp_original_order;
   double penalty_multiplier;
   int *glp_degree;
   int *ipt_x;
@@ -1138,7 +1139,7 @@ typedef struct {
 } NPConditionalDensityNomadShadowCtx;
 
 static NPConditionalDensityNomadShadowCtx np_conditional_density_nomad_shadow =
-  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.0, NULL, NULL, NULL, NULL, NULL, NULL,
+  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.0, NULL, NULL, NULL, NULL, NULL, NULL,
    NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL};
 
 static void np_regression_nomad_shadow_clear_internal(void);
@@ -4912,6 +4913,7 @@ static void np_conditional_density_nomad_shadow_clear_internal(void)
   np_conditional_density_nomad_shadow.need_y_side = 0;
   np_conditional_density_nomad_shadow.old_cdens = 0;
   np_conditional_density_nomad_shadow.penalty_mode = 0;
+  np_conditional_density_nomad_shadow.glp_original_order = 0;
   np_conditional_density_nomad_shadow.penalty_multiplier = 0.0;
 }
 
@@ -4971,6 +4973,10 @@ static int np_conditional_density_nomad_shadow_refresh_degree(const int *degree)
                                 num_obs_train_extern,
                                 num_reg_continuous_extern,
                                 matrix_X_continuous_train_extern))
+    return 0;
+  if (np_conditional_density_nomad_shadow.glp_original_order &&
+      (int_TREE_X == NP_TREE_TRUE) &&
+      (!np_glp_cv_prepare_original_order_extern(ipt_extern_X)))
     return 0;
 
   return 1;
@@ -5149,6 +5155,8 @@ static int np_conditional_density_nomad_shadow_prepare_internal(double *c_uno,
   np_conditional_density_nomad_shadow.old_cdens = myopti[CBW_OLDI];
 
   ibwmfunc = myopti[CBW_MI];
+  np_conditional_density_nomad_shadow.glp_original_order =
+    (ibwmfunc == CBWM_CVML);
   int_ll_extern = np_regression_engine_or_error(
     ((ibwmfunc == CBWM_CVML) || (ibwmfunc == CBWM_CVLS)) ? *regtype : LL_LC,
     "np_conditional_density_bw");
@@ -5484,6 +5492,11 @@ static int np_conditional_density_nomad_shadow_prepare_internal(double *c_uno,
                                  num_obs_train_extern,
                                  num_reg_continuous_extern,
                                  matrix_X_continuous_train_extern)))
+    goto fail;
+  if ((int_ll_extern == LL_LP) &&
+      (ibwmfunc == CBWM_CVML) &&
+      (int_TREE_X == NP_TREE_TRUE) &&
+      (!np_glp_cv_prepare_original_order_extern(ipt_extern_X)))
     goto fail;
 
   if ((ibwmfunc == CBWM_CVLS) && (int_ll_extern == LL_LP) &&

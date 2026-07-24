@@ -10766,8 +10766,11 @@ typedef struct {
   int ncon;
   int nterms;
   int basis_stride;
+  int basis_original_stride;
   int *terms;
   double **basis;
+  double **basis_original_order;
+  const int *basis_original_ipt_ptr;
   NPGLPBasisCtx *basis_ctx;
   double **matrix_X_continuous_train_ptr;
 } NPGLPCVCache;
@@ -10780,13 +10783,15 @@ typedef struct {
  */
 enum { NP_GLP_BASIS_PAD_DOUBLES = 8 };
 
-static NPGLPCVCache np_glp_cv_cache = {0, 0, 1, 0, 0, 0, 0,
-                                      NULL, NULL, NULL, NULL};
+static NPGLPCVCache np_glp_cv_cache = {0, 0, 1, 0, 0, 0, 0, 0,
+                                      NULL, NULL, NULL, NULL, NULL, NULL};
 
 static void np_glp_cv_cache_clear(void){
   int l;
   if(np_glp_cv_cache.basis != NULL)
     free_tmat(np_glp_cv_cache.basis);
+  if(np_glp_cv_cache.basis_original_order != NULL)
+    free_tmat(np_glp_cv_cache.basis_original_order);
   if(np_glp_cv_cache.basis_ctx != NULL){
     for(l = 0; l < np_glp_cv_cache.ncon; l++)
       np_glp_basis_ctx_free(&np_glp_cv_cache.basis_ctx[l]);
@@ -10800,8 +10805,11 @@ static void np_glp_cv_cache_clear(void){
   np_glp_cv_cache.ncon = 0;
   np_glp_cv_cache.nterms = 0;
   np_glp_cv_cache.basis_stride = 0;
+  np_glp_cv_cache.basis_original_stride = 0;
   np_glp_cv_cache.terms = NULL;
   np_glp_cv_cache.basis = NULL;
+  np_glp_cv_cache.basis_original_order = NULL;
+  np_glp_cv_cache.basis_original_ipt_ptr = NULL;
   np_glp_cv_cache.basis_ctx = NULL;
   np_glp_cv_cache.matrix_X_continuous_train_ptr = NULL;
 }
@@ -10886,11 +10894,63 @@ static int np_glp_cv_cache_prepare(const int int_ll,
   return 1;
 }
 
+static int np_glp_cv_cache_prepare_original_order(const int *ipt){
+  double **basis_original_order = NULL;
+  int i, a;
+
+  /*
+   * The tree permutation is fixed for the lifetime of the GLP cache.  Retain
+   * one padded original-order view so CVML does not allocate and permute the
+   * hoisted basis inside every objective evaluation.
+   */
+  if((!np_glp_cv_cache.ready) ||
+     (np_glp_cv_cache.basis == NULL) ||
+     (np_glp_cv_cache.nterms <= 0) ||
+     (np_glp_cv_cache.num_obs <= 0) ||
+     (np_glp_cv_cache.basis_stride <= np_glp_cv_cache.num_obs) ||
+     (ipt == NULL))
+    return 0;
+
+  if((np_glp_cv_cache.basis_original_order != NULL) &&
+     (np_glp_cv_cache.basis_original_ipt_ptr == ipt))
+    return 1;
+
+  if(np_glp_cv_cache.basis_original_order != NULL)
+    free_tmat(np_glp_cv_cache.basis_original_order);
+  np_glp_cv_cache.basis_original_order = NULL;
+  np_glp_cv_cache.basis_original_stride = 0;
+  np_glp_cv_cache.basis_original_ipt_ptr = NULL;
+
+  basis_original_order = alloc_tmatd(np_glp_cv_cache.basis_stride,
+                                     np_glp_cv_cache.nterms);
+  if(basis_original_order == NULL)
+    return 0;
+
+  for(i = 0; i < np_glp_cv_cache.num_obs; i++){
+    const int orig_i = ipt[i];
+    if((orig_i < 0) || (orig_i >= np_glp_cv_cache.num_obs)){
+      free_tmat(basis_original_order);
+      return 0;
+    }
+    for(a = 0; a < np_glp_cv_cache.nterms; a++)
+      basis_original_order[a][orig_i] = np_glp_cv_cache.basis[a][i];
+  }
+
+  np_glp_cv_cache.basis_original_stride = np_glp_cv_cache.basis_stride;
+  np_glp_cv_cache.basis_original_order = basis_original_order;
+  np_glp_cv_cache.basis_original_ipt_ptr = ipt;
+  return 1;
+}
+
 int np_glp_cv_prepare_extern(const int int_ll,
                              const int num_obs,
                              const int ncon,
                              double **matrix_X_continuous_train){
   return np_glp_cv_cache_prepare(int_ll, num_obs, ncon, matrix_X_continuous_train);
+}
+
+int np_glp_cv_prepare_original_order_extern(const int *ipt){
+  return np_glp_cv_cache_prepare_original_order(ipt);
 }
 
 void np_glp_cv_clear_extern(void){
@@ -24358,7 +24418,9 @@ typedef struct {
   NPLPFullRowWorkspace inverse_workspace;
   double *hdiag;
   NPLPFullRowWorkspace inverse_original_workspace;
+  /* Borrowed from np_glp_cv_cache; the context does not own this storage. */
   double **basis_original_order;
+  int basis_original_stride;
   double *hdiag_original_order;
 } NPConditionalLpAllLargeCtx;
 
@@ -24368,7 +24430,6 @@ static void np_conditional_lp_all_large_ctx_clear(NPConditionalLpAllLargeCtx *ct
   np_lp_full_row_workspace_clear(&ctx->inverse_workspace);
   if(ctx->hdiag != NULL) free(ctx->hdiag);
   np_lp_full_row_workspace_clear(&ctx->inverse_original_workspace);
-  if(ctx->basis_original_order != NULL) free_mat(ctx->basis_original_order, ctx->nterms);
   if(ctx->hdiag_original_order != NULL) free(ctx->hdiag_original_order);
   memset(ctx, 0, sizeof(*ctx));
 }
@@ -24545,7 +24606,10 @@ static int np_conditional_lp_all_large_ctx_prepare_core(double *vector_scale_fac
   }
 
   if(build_original_order && (int_TREE_X == NP_TREE_TRUE) && (ipt_extern_X != NULL)){
-    ctx->basis_original_order = alloc_matd(num_train, np_glp_cv_cache.nterms);
+    if(!np_glp_cv_cache_prepare_original_order(ipt_extern_X))
+      goto cleanup_all_large_prepare;
+    ctx->basis_original_order = np_glp_cv_cache.basis_original_order;
+    ctx->basis_original_stride = np_glp_cv_cache.basis_original_stride;
     ctx->hdiag_original_order = alloc_vecd(MAX(1, num_train));
     if(!np_lp_full_row_workspace_reserve(&ctx->inverse_original_workspace,
                                          ctx->nterms,
@@ -24554,12 +24618,6 @@ static int np_conditional_lp_all_large_ctx_prepare_core(double *vector_scale_fac
     if((ctx->basis_original_order == NULL) ||
        (ctx->hdiag_original_order == NULL))
       goto cleanup_all_large_prepare;
-
-    for(i = 0; i < num_train; i++){
-      const int orig_i = ipt_extern_X[i];
-      for(a = 0; a < ctx->nterms; a++)
-        ctx->basis_original_order[a][orig_i] = np_glp_cv_cache.basis[a][i];
-    }
 
     for(a = 0; a < ctx->nterms; a++){
       for(b = 0; b < ctx->nterms; b++)
