@@ -377,6 +377,54 @@ static double np_blas_ddot_i64(const int64_t n, const double *x, const double *y
   return np_blas_ddot_i64_stride(n, x, 1, y, 1);
 }
 
+#define NP_GLP_DGEMV_MIN_ROWS 4096
+#define NP_GLP_DGEMV_MIN_TERMS 20
+
+static int np_glp_dgemv_profitable(const int nrows, const int nterms){
+#if NP_ACCEL_GAUSS_COMPILED
+  /*
+   * Accelerate's transpose-GEMV kernel overtakes separate DDOT calls only
+   * beyond a sharp size boundary.  Keep the exact established reduction
+   * everywhere else, including unmeasured BLAS implementations.
+   */
+  return (nrows >= NP_GLP_DGEMV_MIN_ROWS) &&
+    (nterms >= NP_GLP_DGEMV_MIN_TERMS);
+#else
+  (void)nrows;
+  (void)nterms;
+  return 0;
+#endif
+}
+
+static void np_blas_dgemv_t_int(const int nrows,
+                                const int ncols,
+                                const double *matrix,
+                                const int leading_dim,
+                                const double *vector,
+                                double *result){
+  const char trans = 'T';
+  const double alpha = 1.0;
+  const double beta = 0.0;
+  const int inc = 1;
+
+  if((nrows <= 0) || (ncols <= 0) || (leading_dim < nrows) ||
+     (matrix == NULL) || (vector == NULL) || (result == NULL))
+    return;
+
+  F77_CALL(dgemv)(&trans,
+                  &nrows,
+                  &ncols,
+                  &alpha,
+                  matrix,
+                  &leading_dim,
+                  vector,
+                  &inc,
+                  &beta,
+                  result,
+                  &inc
+                  FCONE);
+}
+
 static void np_blas_dgemm_tn_int(const int m,
                                  const int n,
                                  const int k,
@@ -24305,6 +24353,7 @@ typedef struct {
   int ready;
   int num_train;
   int nterms;
+  int basis_stride;
   double **basis;
   NPLPFullRowWorkspace inverse_workspace;
   double *hdiag;
@@ -24445,6 +24494,7 @@ static int np_conditional_lp_all_large_ctx_prepare_core(double *vector_scale_fac
 
   ctx->num_train = num_train;
   ctx->nterms = np_glp_cv_cache.nterms;
+  ctx->basis_stride = np_glp_cv_cache.basis_stride;
   ctx->basis = np_glp_cv_cache.basis;
 
   if(!np_lp_full_row_workspace_reserve(&ctx->inverse_workspace,
@@ -24638,12 +24688,89 @@ static double np_conditional_lp_all_large_row_fit_basis(const NPConditionalLpAll
   return fit;
 }
 
+static int np_conditional_lp_all_large_moment_ddot(
+  double *vector_scale_factor,
+  const NPConditionalLpAllLargeCtx *ctx,
+  MATRIX moment,
+  double *yconv,
+  double *yconv_xorder,
+  double *cross_terms){
+  int j, a, b;
+
+  for(j = 0; j < ctx->num_train; j++){
+    const int eval_orig = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
+    const double *rhs_row = yconv;
+
+    if(np_conditional_y_row_stream_op_core(
+         vector_scale_factor, eval_orig, OP_CONVOLUTION, yconv) != 0)
+      return 1;
+
+    if(int_TREE_X == NP_TREE_TRUE){
+      for(int jj = 0; jj < ctx->num_train; jj++)
+        yconv_xorder[jj] = yconv[ipt_extern_X[jj]];
+      rhs_row = yconv_xorder;
+    }
+
+    for(b = 0; b < ctx->nterms; b++)
+      cross_terms[b] =
+        np_blas_ddot_int(ctx->num_train, rhs_row, ctx->basis[b]);
+
+    for(a = 0; a < ctx->nterms; a++){
+      const double za = ctx->basis[a][j];
+      for(b = 0; b < ctx->nterms; b++)
+        moment[a][b] += za*cross_terms[b];
+    }
+  }
+
+  return 0;
+}
+
+static int np_conditional_lp_all_large_moment_dgemv(
+  double *vector_scale_factor,
+  const NPConditionalLpAllLargeCtx *ctx,
+  MATRIX moment,
+  double *yconv,
+  double *yconv_xorder,
+  double *cross_terms){
+  int j, a, b;
+
+  for(j = 0; j < ctx->num_train; j++){
+    const int eval_orig = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
+    const double *rhs_row = yconv;
+
+    if(np_conditional_y_row_stream_op_core(
+         vector_scale_factor, eval_orig, OP_CONVOLUTION, yconv) != 0)
+      return 1;
+
+    if(int_TREE_X == NP_TREE_TRUE){
+      for(int jj = 0; jj < ctx->num_train; jj++)
+        yconv_xorder[jj] = yconv[ipt_extern_X[jj]];
+      rhs_row = yconv_xorder;
+    }
+
+    np_blas_dgemv_t_int(ctx->num_train,
+                        ctx->nterms,
+                        ctx->basis[0],
+                        ctx->basis_stride,
+                        rhs_row,
+                        cross_terms);
+
+    for(a = 0; a < ctx->nterms; a++){
+      const double za = ctx->basis[a][j];
+      for(b = 0; b < ctx->nterms; b++)
+        moment[a][b] += za*cross_terms[b];
+    }
+  }
+
+  return 0;
+}
+
 static int np_conditional_lp_all_large_build_conv_quad(double *vector_scale_factor,
                                                        const NPConditionalLpAllLargeCtx *ctx,
                                                        MATRIX quad_mat){
   MATRIX moment = NULL, temp = NULL;
   double *yconv = NULL, *yconv_xorder = NULL, *cross_terms = NULL;
-  int j, a, b, c;
+  int a, b, c;
   int status = 1;
 
   if((vector_scale_factor == NULL) || (ctx == NULL) || (!ctx->ready) || (quad_mat == NULL))
@@ -24668,27 +24795,14 @@ static int np_conditional_lp_all_large_build_conv_quad(double *vector_scale_fact
      ((ipt_extern_X == NULL) || (ipt_lookup_extern_X == NULL)))
     goto cleanup_all_large_quad;
 
-  for(j = 0; j < ctx->num_train; j++){
-    const int eval_orig = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
-    const double *rhs_row = yconv;
-
-    if(np_conditional_y_row_stream_op_core(vector_scale_factor, eval_orig, OP_CONVOLUTION, yconv) != 0)
+  if(np_glp_dgemv_profitable(ctx->num_train, ctx->nterms)){
+    if(np_conditional_lp_all_large_moment_dgemv(
+         vector_scale_factor, ctx, moment, yconv, yconv_xorder, cross_terms) != 0)
       goto cleanup_all_large_quad;
-
-    if(int_TREE_X == NP_TREE_TRUE){
-      for(int jj = 0; jj < ctx->num_train; jj++)
-        yconv_xorder[jj] = yconv[ipt_extern_X[jj]];
-      rhs_row = yconv_xorder;
-    }
-
-    for(b = 0; b < ctx->nterms; b++)
-      cross_terms[b] = np_blas_ddot_int(ctx->num_train, rhs_row, ctx->basis[b]);
-
-    for(a = 0; a < ctx->nterms; a++){
-      const double za = ctx->basis[a][j];
-      for(b = 0; b < ctx->nterms; b++)
-        moment[a][b] += za*cross_terms[b];
-    }
+  } else {
+    if(np_conditional_lp_all_large_moment_ddot(
+         vector_scale_factor, ctx, moment, yconv, yconv_xorder, cross_terms) != 0)
+      goto cleanup_all_large_quad;
   }
 
   for(a = 0; a < ctx->nterms; a++){
