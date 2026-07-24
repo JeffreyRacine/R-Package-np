@@ -10342,18 +10342,28 @@ typedef struct {
   int num_obs;
   int ncon;
   int nterms;
+  int basis_stride;
   int *terms;
   double **basis;
   NPGLPBasisCtx *basis_ctx;
   double **matrix_X_continuous_train_ptr;
 } NPGLPCVCache;
 
-static NPGLPCVCache np_glp_cv_cache = {0, 0, 1, 0, 0, 0, NULL, NULL, NULL, NULL};
+/*
+ * Keep adjacent basis columns from sharing the same cache-set mapping when
+ * num_obs is a power of two.  One 64-byte cache-line of padding preserves the
+ * existing double ** interface and arithmetic order while making the backing
+ * store contiguous for subsequent BLAS consumers.
+ */
+enum { NP_GLP_BASIS_PAD_DOUBLES = 8 };
+
+static NPGLPCVCache np_glp_cv_cache = {0, 0, 1, 0, 0, 0, 0,
+                                      NULL, NULL, NULL, NULL};
 
 static void np_glp_cv_cache_clear(void){
   int l;
   if(np_glp_cv_cache.basis != NULL)
-    free_mat(np_glp_cv_cache.basis, np_glp_cv_cache.nterms);
+    free_tmat(np_glp_cv_cache.basis);
   if(np_glp_cv_cache.basis_ctx != NULL){
     for(l = 0; l < np_glp_cv_cache.ncon; l++)
       np_glp_basis_ctx_free(&np_glp_cv_cache.basis_ctx[l]);
@@ -10366,6 +10376,7 @@ static void np_glp_cv_cache_clear(void){
   np_glp_cv_cache.num_obs = 0;
   np_glp_cv_cache.ncon = 0;
   np_glp_cv_cache.nterms = 0;
+  np_glp_cv_cache.basis_stride = 0;
   np_glp_cv_cache.terms = NULL;
   np_glp_cv_cache.basis = NULL;
   np_glp_cv_cache.basis_ctx = NULL;
@@ -10379,6 +10390,7 @@ static int np_glp_cv_cache_prepare(const int int_ll,
   int l, i;
   int *terms = NULL;
   int nterms = 0;
+  int basis_stride = 0;
   const int *degree_vec = vector_glp_degree_extern;
   const int use_bernstein = (int_glp_bernstein_extern != 0);
   const int basis_mode = int_glp_basis_extern;
@@ -10396,8 +10408,13 @@ static int np_glp_cv_cache_prepare(const int int_ll,
     free(terms);
     return 0;
   }
+  if(num_obs > INT_MAX - NP_GLP_BASIS_PAD_DOUBLES){
+    free(terms);
+    return 0;
+  }
+  basis_stride = num_obs + NP_GLP_BASIS_PAD_DOUBLES;
 
-  basis = alloc_matd(num_obs, nterms);
+  basis = alloc_tmatd(basis_stride, nterms);
   if(basis == NULL){
     free(terms);
     return 0;
@@ -10406,7 +10423,7 @@ static int np_glp_cv_cache_prepare(const int int_ll,
   if(use_bernstein){
     basis_ctx = (NPGLPBasisCtx *)calloc((size_t)ncon, sizeof(NPGLPBasisCtx));
     if(basis_ctx == NULL){
-      free_mat(basis, nterms);
+      free_tmat(basis);
       free(terms);
       return 0;
     }
@@ -10422,7 +10439,7 @@ static int np_glp_cv_cache_prepare(const int int_ll,
                                 basis_mode == 1)){
         for(i = 0; i <= l; i++) np_glp_basis_ctx_free(&basis_ctx[i]);
         free(basis_ctx);
-        free_mat(basis, nterms);
+        free_tmat(basis);
         free(terms);
         return 0;
       }
@@ -10438,6 +10455,7 @@ static int np_glp_cv_cache_prepare(const int int_ll,
   np_glp_cv_cache.num_obs = num_obs;
   np_glp_cv_cache.ncon = ncon;
   np_glp_cv_cache.nterms = nterms;
+  np_glp_cv_cache.basis_stride = basis_stride;
   np_glp_cv_cache.terms = terms;
   np_glp_cv_cache.basis = basis;
   np_glp_cv_cache.basis_ctx = basis_ctx;
