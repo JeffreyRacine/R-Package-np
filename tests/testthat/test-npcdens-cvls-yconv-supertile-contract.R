@@ -48,10 +48,12 @@ test_that("CVLS Y convolution supertile is memory bounded and topology isolated"
     body,
     gregexpr("alloc_tmatd\\(num_obs, block_size\\)", body, perl = TRUE)
   )), 4L)
-  expect_equal(lengths(regmatches(
+  expect_false(grepl("alloc_vecd\\(block_size\\*block_size\\)", body))
+  expect_match(
     body,
-    gregexpr("alloc_vecd\\(block_size\\*block_size\\)", body, perl = TRUE)
-  )), 1L)
+    "double * const quad_cross = loo_or_second[0];",
+    fixed = TRUE
+  )
   expect_false(grepl("num_obs\\*num_obs", body))
   expect_false(grepl("num_obs \\* num_obs", body, fixed = TRUE))
 })
