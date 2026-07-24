@@ -184,7 +184,7 @@ test_that("fixed resident-row LP CV uses the reusable uncentered solve workspace
   expect_false(grepl("mat_inv00", helper_body, fixed = TRUE))
 })
 
-test_that("packed and nearest-neighbor LP CV avoid legacy solve marshalling", {
+test_that("all-large, packed, and nearest-neighbor LP CV avoid legacy solve marshalling", {
   src_file <- locate_jksum_c()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
 
@@ -222,7 +222,24 @@ test_that("packed and nearest-neighbor LP CV avoid legacy solve marshalling", {
     helper_body,
     fixed = TRUE
   ))
+  expect_true(grepl(
+    "np_lp_full_row_workspace_reserve(&inverse_workspace, k, 1)",
+    helper_body,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
+    "np_lp_full_row_workspace_invert_retryable(",
+    helper_body,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
+    "inverse_workspace.matrix_copy[a + b*k] += za*zb;",
+    helper_body,
+    fixed = TRUE
+  ))
   expect_false(grepl("mat_solve(", helper_body, fixed = TRUE))
+  expect_false(grepl("mat_inv(", helper_body, fixed = TRUE))
+  expect_false(grepl("MATRIX XtX", helper_body, fixed = TRUE))
   expect_false(grepl("MATRIX XTKY", helper_body, fixed = TRUE))
   expect_false(grepl("DELTA", helper_body, fixed = TRUE))
   expect_false(grepl("MATRIX KWM", helper_body, fixed = TRUE))

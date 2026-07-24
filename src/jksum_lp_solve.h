@@ -37,7 +37,7 @@ typedef struct {
   double *gram;
   double *rhs;
   int *ipiv;
-  double *rcond_matrix;
+  double *matrix_copy;
   double *rcond_values;
   double *rcond_work;
   double *inverse_work;
@@ -102,5 +102,18 @@ int np_lp_full_row_workspace_solve(NPLPFullRowWorkspace *workspace,
 int np_lp_full_row_workspace_invert(NPLPFullRowWorkspace *workspace,
                                     int p,
                                     double min_rcond);
+
+/*
+ * Retry an ungated retained inverse while preserving the source Gram in
+ * matrix_copy.  The caller fills matrix_copy; each attempt copies it into the
+ * destructive LAPACK buffer, and a failed attempt adds one fixed ridge step
+ * to the preserved source.  This matches legacy mat_inv() retry ownership
+ * without row-fragmented matrices or per-attempt allocation.
+ */
+int np_lp_full_row_workspace_invert_retryable(
+  NPLPFullRowWorkspace *workspace,
+  int p,
+  double ridge_increment,
+  int max_ridge_steps);
 
 #endif

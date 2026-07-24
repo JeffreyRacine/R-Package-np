@@ -12321,52 +12321,53 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
 
     if(all_large_gate){
       const int k = glp_nterms;
-      MATRIX XtX = mat_creat(k, k, UNDEFINED);
-      MATRIX XtXINV = mat_creat(k, k, UNDEFINED);
-      MATRIX XtY = mat_creat(k, 1, UNDEFINED);
-      MATRIX BETA = mat_creat(k, 1, UNDEFINED);
-      int fast_ok = (XtX != NULL) && (XtXINV != NULL) && (XtY != NULL) && (BETA != NULL);
+      NPLPFullRowWorkspace inverse_workspace;
+      double *beta = NULL;
+      int fast_ok;
+
+      np_lp_full_row_workspace_init(&inverse_workspace);
+      fast_ok = np_lp_full_row_workspace_reserve(&inverse_workspace, k, 1);
+      if(fast_ok)
+        beta = (double *)malloc((size_t)k*sizeof(double));
+      fast_ok = fast_ok && (beta != NULL);
 
       if(fast_ok){
         const double ridge_eps = 1.0/(double)MAX(1, num_obs);
-        int ridge_it = 0;
 
         for(i = 0; i < k; i++){
-          XtY[i][0] = 0.0;
-          BETA[i][0] = 0.0;
+          inverse_workspace.rhs[i] = 0.0;
+          beta[i] = 0.0;
           for(j = 0; j < k; j++)
-            XtX[i][j] = 0.0;
+            inverse_workspace.matrix_copy[i + j*k] = 0.0;
         }
 
         for(i = 0; i < num_obs; i++){
           const double yi = vector_Y[i];
           for(int a = 0; a < k; a++){
             const double za = basis[a][i];
-            XtY[a][0] += za*yi;
+            inverse_workspace.rhs[a] += za*yi;
             for(int b = a; b < k; b++){
               const double zb = basis[b][i];
-              XtX[a][b] += za*zb;
-              if(b != a) XtX[b][a] += za*zb;
+              inverse_workspace.matrix_copy[a + b*k] += za*zb;
+              if(b != a)
+                inverse_workspace.matrix_copy[b + a*k] += za*zb;
             }
           }
         }
 
-        while(mat_inv(XtX, XtXINV) == NULL){
-          for(i = 0; i < k; i++)
-            XtX[i][i] += ridge_eps;
-          ridge_it++;
-          if(ridge_it > 64){
-            fast_ok = 0;
-            break;
-          }
-        }
+        fast_ok = np_lp_full_row_workspace_invert_retryable(
+          &inverse_workspace,
+          k,
+          ridge_eps,
+          64);
 
         if(fast_ok){
           for(i = 0; i < k; i++){
             double s = 0.0;
             for(j = 0; j < k; j++)
-              s += XtXINV[i][j]*XtY[j][0];
-            BETA[i][0] = s;
+              s += inverse_workspace.gram[i + j*k]*
+                inverse_workspace.rhs[j];
+            beta[i] = s;
           }
 
           result.cv = 0.0;
@@ -12376,12 +12377,12 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
             double hii = 0.0;
             for(j = 0; j < k; j++){
               const double zj = basis[j][i];
-              yhat += BETA[j][0]*zj;
+              yhat += beta[j]*zj;
             }
             for(j = 0; j < k; j++){
               const double zj = basis[j][i];
               for(int b = 0; b < k; b++)
-                hii += zj*XtXINV[j][b]*basis[b][i];
+                hii += zj*inverse_workspace.gram[j + b*k]*basis[b][i];
             }
             {
               const double loss_y =
@@ -12404,10 +12405,8 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
         }
       }
 
-      if(XtX != NULL) mat_free(XtX);
-      if(XtXINV != NULL) mat_free(XtXINV);
-      if(XtY != NULL) mat_free(XtY);
-      if(BETA != NULL) mat_free(BETA);
+      if(beta != NULL) free(beta);
+      np_lp_full_row_workspace_clear(&inverse_workspace);
 
       if(fast_ok){
         np_fastcv_alllarge_hits++;

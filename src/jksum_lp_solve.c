@@ -272,7 +272,7 @@ void np_lp_full_row_workspace_clear(NPLPFullRowWorkspace *workspace)
   free(workspace->gram);
   free(workspace->rhs);
   free(workspace->ipiv);
-  free(workspace->rcond_matrix);
+  free(workspace->matrix_copy);
   free(workspace->rcond_values);
   free(workspace->rcond_work);
   free(workspace->inverse_work);
@@ -287,7 +287,7 @@ int np_lp_full_row_workspace_reserve(NPLPFullRowWorkspace *workspace,
   size_t gram_bytes, rhs_bytes, pivot_bytes, values_bytes;
   double *gram = NULL, *rhs = NULL;
   int *ipiv = NULL;
-  double *rcond_matrix = NULL, *rcond_values = NULL;
+  double *matrix_copy = NULL, *rcond_values = NULL;
 
   if((workspace == NULL) || (p <= 0) || (nrhs <= 0))
     return 0;
@@ -296,7 +296,7 @@ int np_lp_full_row_workspace_reserve(NPLPFullRowWorkspace *workspace,
      (workspace->gram != NULL) &&
      (workspace->rhs != NULL) &&
      (workspace->ipiv != NULL) &&
-     (workspace->rcond_matrix != NULL) &&
+     (workspace->matrix_copy != NULL) &&
      (workspace->rcond_values != NULL))
     return 1;
   if(!np_lp_size_product((size_t)p, (size_t)p, &gram_elements) ||
@@ -310,14 +310,14 @@ int np_lp_full_row_workspace_reserve(NPLPFullRowWorkspace *workspace,
   gram = (double *)malloc(gram_bytes);
   rhs = (double *)malloc(rhs_bytes);
   ipiv = (int *)malloc(pivot_bytes);
-  rcond_matrix = (double *)malloc(gram_bytes);
+  matrix_copy = (double *)malloc(gram_bytes);
   rcond_values = (double *)malloc(values_bytes);
   if((gram == NULL) || (rhs == NULL) || (ipiv == NULL) ||
-     (rcond_matrix == NULL) || (rcond_values == NULL)){
+     (matrix_copy == NULL) || (rcond_values == NULL)){
     free(gram);
     free(rhs);
     free(ipiv);
-    free(rcond_matrix);
+    free(matrix_copy);
     free(rcond_values);
     return 0;
   }
@@ -330,7 +330,7 @@ int np_lp_full_row_workspace_reserve(NPLPFullRowWorkspace *workspace,
   workspace->gram = gram;
   workspace->rhs = rhs;
   workspace->ipiv = ipiv;
-  workspace->rcond_matrix = rcond_matrix;
+  workspace->matrix_copy = matrix_copy;
   workspace->rcond_values = rcond_values;
   return 1;
 }
@@ -347,14 +347,14 @@ static int np_lp_full_row_bad_rcond(NPLPFullRowWorkspace *workspace,
 
   if((workspace == NULL) || (p <= 0) ||
      (workspace->p_capacity < p) ||
-     (workspace->rcond_matrix == NULL) ||
+     (workspace->matrix_copy == NULL) ||
      (workspace->rcond_values == NULL) ||
      (workspace->gram == NULL))
     return 1;
 
   for(j = 0; j < p; j++)
     for(i = 0; i < p; i++)
-      workspace->rcond_matrix[i + j*p] =
+      workspace->matrix_copy[i + j*p] =
         workspace->gram[i + j*p];
 
   if((workspace->rcond_work == NULL) ||
@@ -365,7 +365,7 @@ static int np_lp_full_row_bad_rcond(NPLPFullRowWorkspace *workspace,
     double *rcond_work;
 
     F77_CALL(dsyev)(&jobz, &uplo, &p,
-                    workspace->rcond_matrix, &p,
+                    workspace->matrix_copy, &p,
                     workspace->rcond_values,
                     &work_query, &lwork_query, &info FCONE FCONE);
     if(info != 0)
@@ -379,7 +379,7 @@ static int np_lp_full_row_bad_rcond(NPLPFullRowWorkspace *workspace,
   }
 
   F77_CALL(dsyev)(&jobz, &uplo, &p,
-                  workspace->rcond_matrix, &p,
+                  workspace->matrix_copy, &p,
                   workspace->rcond_values,
                   workspace->rcond_work,
                   &workspace->rcond_lwork_capacity, &info FCONE FCONE);
@@ -429,16 +429,18 @@ int np_lp_full_row_workspace_solve(NPLPFullRowWorkspace *workspace,
   return 1;
 }
 
-int np_lp_full_row_workspace_invert(NPLPFullRowWorkspace *workspace,
-                                    int p,
-                                    double min_rcond)
+static int np_lp_full_row_workspace_factor_invert(
+  NPLPFullRowWorkspace *workspace,
+  int p)
 {
   size_t gram_elements;
   size_t i;
   int info = 0;
 
-  if(!np_lp_full_row_workspace_reserve(workspace, p, 1) ||
-     np_lp_full_row_bad_rcond(workspace, p, min_rcond) ||
+  if((workspace == NULL) || (p <= 0) ||
+     (workspace->p_capacity < p) ||
+     (workspace->gram == NULL) ||
+     (workspace->ipiv == NULL) ||
      !np_lp_size_product((size_t)p, (size_t)p, &gram_elements) ||
      (gram_elements > workspace->gram_capacity))
     return 0;
@@ -484,4 +486,45 @@ int np_lp_full_row_workspace_invert(NPLPFullRowWorkspace *workspace,
     if(!R_FINITE(workspace->gram[i]))
       return 0;
   return 1;
+}
+
+int np_lp_full_row_workspace_invert(NPLPFullRowWorkspace *workspace,
+                                    int p,
+                                    double min_rcond)
+{
+  if(!np_lp_full_row_workspace_reserve(workspace, p, 1) ||
+     np_lp_full_row_bad_rcond(workspace, p, min_rcond))
+    return 0;
+  return np_lp_full_row_workspace_factor_invert(workspace, p);
+}
+
+int np_lp_full_row_workspace_invert_retryable(
+  NPLPFullRowWorkspace *workspace,
+  int p,
+  double ridge_increment,
+  int max_ridge_steps)
+{
+  size_t gram_elements;
+  int attempt, i;
+
+  if(!np_lp_full_row_workspace_reserve(workspace, p, 1) ||
+     (workspace->matrix_copy == NULL) ||
+     (!R_FINITE(ridge_increment)) ||
+     (ridge_increment < 0.0) ||
+     (max_ridge_steps < 0) ||
+     !np_lp_size_product((size_t)p, (size_t)p, &gram_elements) ||
+     (gram_elements > workspace->gram_capacity))
+    return 0;
+
+  for(attempt = 0; attempt <= max_ridge_steps; attempt++){
+    memcpy(workspace->gram,
+           workspace->matrix_copy,
+           gram_elements*sizeof(double));
+    if(np_lp_full_row_workspace_factor_invert(workspace, p))
+      return 1;
+    for(i = 0; i < p; i++)
+      workspace->matrix_copy[i + i*p] += ridge_increment;
+  }
+
+  return 0;
 }
