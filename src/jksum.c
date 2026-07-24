@@ -25344,6 +25344,7 @@ int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
   double *quad_cross = NULL;
   double *block_terms = NULL;
   NPConditionalXBlockBwCtx xbwctx = {0};
+  NPConditionalYRowCtx yconvctx = {0};
   int i0, j0, ii, jj;
   int status = 1;
   int local_fail = 0;
@@ -25403,6 +25404,13 @@ int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
   }
   if((xblock == NULL) || (xblock_full == NULL) || (yblock == NULL) || (yconvblock == NULL) ||
      (quad_cross == NULL) || (use_parallel_blocks && (block_terms == NULL)))
+    local_fail = 1;
+
+  if((!local_fail) &&
+     (BANDWIDTH_den_extern == BW_GEN_NN) &&
+     (np_conditional_yrow_ctx_prepare(vector_scale_factor,
+                                      OP_CONVOLUTION,
+                                      &yconvctx) != 0))
     local_fail = 1;
 
   *cv = 0.0;
@@ -25475,9 +25483,27 @@ int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
     for(j0 = 0; j0 < num_obs; j0 += block_size){
       const int jb = MIN(block_size, num_obs - j0);
 
-      if(np_conditional_y_block_stream_op_core(vector_scale_factor, j0, jb, OP_CONVOLUTION, use_parallel_blocks, yconvblock) != 0){
-        local_fail = 1;
-        break;
+      if(BANDWIDTH_den_extern == BW_GEN_NN){
+        for(jj = 0; jj < jb; jj++){
+          if(np_conditional_yrow_from_ctx(&yconvctx,
+                                          j0 + jj,
+                                          yconvblock[jj]) != 0){
+            local_fail = 1;
+            break;
+          }
+        }
+        if(local_fail)
+          break;
+      } else {
+        if(np_conditional_y_block_stream_op_core(vector_scale_factor,
+                                                 j0,
+                                                 jb,
+                                                 OP_CONVOLUTION,
+                                                 use_parallel_blocks,
+                                                 yconvblock) != 0){
+          local_fail = 1;
+          break;
+        }
       }
 
       np_blas_dgemm_tn_int(ib, jb, num_obs, xblock_full[0], yconvblock[0], quad_cross);
@@ -25525,6 +25551,7 @@ int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
 
 cleanup_cvls_lp_block:
   np_conditional_x_block_bw_ctx_clear(&xbwctx);
+  np_conditional_yrow_ctx_clear(&yconvctx);
   if(xblock != NULL) free_tmat(xblock);
   if(xblock_full != NULL) free_tmat(xblock_full);
   if(yblock != NULL) free_tmat(yblock);

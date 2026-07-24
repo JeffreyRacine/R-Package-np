@@ -132,3 +132,32 @@ test_that("phase1 npcdensbw cv.ls generalized-nn avoids search-boundary collapse
   expect_true(all(bw$xbw < n))
   expect_true(all(bw$ybw < n))
 })
+
+test_that("generalized-nn CVLS remains finite beyond one convolution block", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(), add = TRUE)
+
+  set.seed(20260723)
+  n <- 1025L
+  x <- data.frame(x1 = runif(n), x2 = runif(n))
+  mu <- sin(2 * pi * x$x1) * cos(2 * pi * x$x2)
+  y <- data.frame(y1 = mu + rnorm(n, sd = 0.35))
+  bw <- npcdensbw(
+    xdat = x,
+    ydat = y,
+    bws = rep.int(205L, 3L),
+    bandwidth.compute = FALSE,
+    bwtype = "generalized_nn",
+    bwmethod = "cv.ls",
+    regtype = "lp",
+    basis = "glp",
+    degree = c(1L, 1L)
+  )
+
+  first <- npRmpi:::.npcdensbw_eval_only(x, y, bws = bw)$objective
+  second <- npRmpi:::.npcdensbw_eval_only(x, y, bws = bw)$objective
+
+  expect_true(is.finite(first))
+  expect_identical(first, second)
+  expect_false(identical(first, -1e7))
+})
