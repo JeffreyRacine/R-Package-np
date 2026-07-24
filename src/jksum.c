@@ -23652,21 +23652,68 @@ static double np_conditional_lp_all_large_row_fit_basis(const NPConditionalLpAll
                                                         double *beta,
                                                         const int leave_one_out);
 
+static inline double np_conditional_lp_all_large_row_finish(
+  const NPConditionalLpAllLargeCtx *ctx,
+  const double *XtXINVRows,
+  double **basis,
+  const double *hdiag,
+  const double *rhs_row,
+  const int eval_pos,
+  const double *cross_terms,
+  double *beta,
+  const int leave_one_out){
+  double fit = 0.0;
+  int a, b;
+
+  for(a = 0; a < ctx->nterms; a++){
+    double s = 0.0;
+    for(b = 0; b < ctx->nterms; b++)
+      s += XtXINVRows[a*ctx->nterms + b]*cross_terms[b];
+    beta[a] = s;
+    fit += basis[a][eval_pos]*s;
+  }
+
+  if(leave_one_out)
+    fit = (fit - hdiag[eval_pos]*rhs_row[eval_pos]) /
+      NZD_POS(1.0 - hdiag[eval_pos]);
+
+  return fit;
+}
+
 static double np_conditional_lp_all_large_row_fit(const NPConditionalLpAllLargeCtx *ctx,
                                                   const double *rhs_row,
                                                   const int eval_pos,
                                                   double *cross_terms,
                                                   double *beta,
                                                   const int leave_one_out){
-  return np_conditional_lp_all_large_row_fit_basis(ctx,
-                                                   ctx->inverse_workspace.matrix_copy,
-                                                   ctx->basis,
-                                                   ctx->hdiag,
-                                                   rhs_row,
-                                                   eval_pos,
-                                                   cross_terms,
-                                                   beta,
-                                                   leave_one_out);
+  if(!np_glp_dgemv_profitable(ctx->num_train, ctx->nterms))
+    return np_conditional_lp_all_large_row_fit_basis(ctx,
+                                                     ctx->inverse_workspace.matrix_copy,
+                                                     ctx->basis,
+                                                     ctx->hdiag,
+                                                     rhs_row,
+                                                     eval_pos,
+                                                     cross_terms,
+                                                     beta,
+                                                     leave_one_out);
+
+  np_blas_dgemv_t_int(ctx->num_train,
+                      ctx->nterms,
+                      ctx->basis[0],
+                      ctx->basis_stride,
+                      rhs_row,
+                      cross_terms);
+
+  return np_conditional_lp_all_large_row_finish(
+    ctx,
+    ctx->inverse_workspace.matrix_copy,
+    ctx->basis,
+    ctx->hdiag,
+    rhs_row,
+    eval_pos,
+    cross_terms,
+    beta,
+    leave_one_out);
 }
 
 static double np_conditional_lp_all_large_row_fit_basis(const NPConditionalLpAllLargeCtx *ctx,
@@ -23678,24 +23725,20 @@ static double np_conditional_lp_all_large_row_fit_basis(const NPConditionalLpAll
                                                         double *cross_terms,
                                                         double *beta,
                                                         const int leave_one_out){
-  double fit = 0.0;
-  int a, b;
+  int a;
 
   for(a = 0; a < ctx->nterms; a++)
     cross_terms[a] = np_blas_ddot_int(ctx->num_train, rhs_row, basis[a]);
 
-  for(a = 0; a < ctx->nterms; a++){
-    double s = 0.0;
-    for(b = 0; b < ctx->nterms; b++)
-      s += XtXINVRows[a*ctx->nterms + b]*cross_terms[b];
-    beta[a] = s;
-    fit += basis[a][eval_pos]*s;
-  }
-
-  if(leave_one_out)
-    fit = (fit - hdiag[eval_pos]*rhs_row[eval_pos]) / NZD_POS(1.0 - hdiag[eval_pos]);
-
-  return fit;
+  return np_conditional_lp_all_large_row_finish(ctx,
+                                                XtXINVRows,
+                                                basis,
+                                                hdiag,
+                                                rhs_row,
+                                                eval_pos,
+                                                cross_terms,
+                                                beta,
+                                                leave_one_out);
 }
 
 static int np_conditional_lp_all_large_moment_ddot(
