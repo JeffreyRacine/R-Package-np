@@ -116,4 +116,13 @@ int np_lp_full_row_workspace_invert_retryable(
   double ridge_increment,
   int max_ridge_steps);
 
+/*
+ * After a successful retained inversion, reuse matrix_copy as a row-major
+ * inverse view for row-oriented fitted-value and quadratic-form consumers.
+ * No additional p-by-p storage is allocated.
+ */
+int np_lp_full_row_workspace_pack_inverse_rows(
+  NPLPFullRowWorkspace *workspace,
+  int p);
+
 #endif

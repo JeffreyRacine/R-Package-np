@@ -279,6 +279,42 @@ test_that("canonical LP fit and evaluation avoid legacy solve marshalling", {
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
 
   lines <- readLines(src_file, warn = FALSE)
+  shortcut_start <- grep(
+    "^int kernel_estimate_regression_categorical_tree_np\\(",
+    lines
+  )
+  shortcut_stop <- grep("^  if\\(estimation_shortcut_done\\)$", lines)
+  expect_length(shortcut_start, 1L)
+  expect_length(shortcut_stop, 1L)
+  expect_lt(shortcut_start, shortcut_stop)
+
+  shortcut_body <- paste(
+    lines[shortcut_start:(shortcut_stop - 1L)],
+    collapse = "\n"
+  )
+  expect_true(grepl(
+    "np_lp_full_row_workspace_reserve(",
+    shortcut_body,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
+    "np_lp_full_row_workspace_invert_retryable(",
+    shortcut_body,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
+    "np_lp_full_row_workspace_pack_inverse_rows(",
+    shortcut_body,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
+    "inverse_workspace.matrix_copy[a + b*glp_nterms] += za*zb;",
+    shortcut_body,
+    fixed = TRUE
+  ))
+  expect_false(grepl("mat_inv(", shortcut_body, fixed = TRUE))
+  expect_false(grepl("MATRIX XtX", shortcut_body, fixed = TRUE))
+
   helper_start <- grep(
     "^  } else if\\(int_ll_est == LL_LP\\) \\{ // local polynomial \\(regtype = \"lp\"\\)$",
     lines
