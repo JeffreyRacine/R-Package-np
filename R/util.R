@@ -1027,16 +1027,49 @@ npCheckRegressionDesignCondition <- function(reg.code,
 
 npRegtypeToC <- function(regtype, degree, ncon, context = "npreg") {
   # Internal regression-type codes:
-  # lc -> REGTYPE_LC; ll and lp -> the one canonical REGTYPE_LP engine.
+  # Public lc and explicit all-zero lp share the canonical scalar LP0 engine.
+  # Positive-degree ll/lp use the general LP engine.
   if (identical(regtype, "lc"))
-    return(list(code = REGTYPE_LC, degree = NULL))
+    return(list(code = REGTYPE_LP0, degree = rep.int(0L, ncon)))
 
   if (identical(regtype, "ll"))
     return(list(code = REGTYPE_LP, degree = rep.int(1L, ncon)))
 
   degree <- npValidateGlpDegree(regtype, degree, ncon)
 
-  list(code = REGTYPE_LP, degree = degree)
+  list(
+    code = if (length(degree) == 0L || all(degree == 0L))
+      REGTYPE_LP0
+    else
+      REGTYPE_LP,
+    degree = degree
+  )
+}
+
+npIsCanonicalLp0 <- function(regtype.engine, degree.engine, ncon) {
+  ncon <- npValidateNonNegativeInteger(ncon, "ncon")
+  degree.engine <- as.integer(degree.engine)
+
+  identical(as.character(regtype.engine), "lc") ||
+    (ncon == 0L && length(degree.engine) == 0L) ||
+    (length(degree.engine) == ncon && all(degree.engine == 0L))
+}
+
+npIsCanonicalLp0Spec <- function(spec, ncon) {
+  npIsCanonicalLp0(
+    regtype.engine = spec$regtype.engine,
+    degree.engine = spec$degree.engine,
+    ncon = ncon
+  )
+}
+
+npConditionalRegtypeCode <- function(regtype.engine, degree.engine, ncon) {
+  if (npIsCanonicalLp0(regtype.engine = regtype.engine,
+                       degree.engine = degree.engine,
+                       ncon = ncon))
+    REGTYPE_LP0
+  else
+    REGTYPE_LP
 }
 
 npCanonicalConditionalRegSpec <- function(regtype = c("lc", "ll", "lp"),
@@ -4330,7 +4363,7 @@ DBWM_CVLS = 0
 BWM_CVAIC = 0
 RBWM_CVKS = 3L
 
-REGTYPE_LC = 0
+REGTYPE_LP0 = 0
 REGTYPE_LP = 2
 # legacy alias retained for internal/backward compatibility
 REGTYPE_GLP = REGTYPE_LP

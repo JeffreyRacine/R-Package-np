@@ -125,7 +125,11 @@
   regtype <- if (is.null(bws$regtype.engine)) bws$regtype else bws$regtype.engine
   identical(bws$type, "adaptive_nn") &&
     !.npcdhat_has_x_derivative(x.s) &&
-    identical(as.character(regtype), "lc")
+    npIsCanonicalLp0(
+      regtype.engine = regtype,
+      degree.engine = if (is.null(bws$degree.engine)) bws$degree else bws$degree.engine,
+      ncon = bws$xncon
+    )
 }
 
 .npcdhat_make_xhat_matrix <- function(bws, txdat, exdat, s = NULL) {
@@ -151,7 +155,11 @@
     isTRUE(xbw$bernstein.basis.engine)
   }
 
-  if (identical(regtype, "lc")) {
+  if (npIsCanonicalLp0(
+        regtype.engine = regtype,
+        degree.engine = degree,
+        ncon = xbw$ncon
+      )) {
     if (.npcdhat_has_x_derivative(s)) {
       return(.npreghat_exact_lc_derivative_matrix_from_npksum_chunked(
         bws = xbw,

@@ -152,7 +152,7 @@ extern double **matrix_X_continuous_quantile_extern;
 extern double **matrix_X_unordered_quantile_extern;
 extern double **matrix_X_ordered_quantile_extern;
 
-extern int int_ll_extern;
+extern int np_lp_engine_extern;
 extern int *vector_glp_degree_extern;
 extern int *vector_glp_gradient_order_extern;
 extern int int_glp_bernstein_extern;
@@ -1560,7 +1560,7 @@ static int np_regression_categorical_profile_fit(
 int *kernel_c,
 int *kernel_u,
 int *kernel_o,
-const int int_ll,
+const int lp_engine,
 const int BANDWIDTH_reg,
 const int num_obs_train,
 const int num_obs_eval,
@@ -1602,7 +1602,7 @@ double *mean_stderr){
      (operator == NULL))
     return 0;
 
-  if((int_ll != LL_LC) && (int_ll != LL_LP))
+  if((lp_engine != NP_LP_ENGINE_SCALAR) && (lp_engine != NP_LP_ENGINE_GENERAL))
     return 0;
 
   for(i = 0; i < (num_reg_unordered + num_reg_ordered); i++)
@@ -10438,7 +10438,7 @@ static void np_glp_cv_cache_clear(void){
   np_glp_cv_cache.matrix_X_continuous_train_ptr = NULL;
 }
 
-static int np_glp_cv_cache_prepare(const int int_ll,
+static int np_glp_cv_cache_prepare(const int lp_engine,
                                    const int num_obs,
                                    const int ncon,
                                    double **matrix_X_continuous_train){
@@ -10454,7 +10454,7 @@ static int np_glp_cv_cache_prepare(const int int_ll,
 
   np_glp_cv_cache_clear();
 
-  if(int_ll != LL_LP) return 1;
+  if(lp_engine != NP_LP_ENGINE_GENERAL) return 1;
   if((degree_vec == NULL) || (ncon <= 0) || (num_obs <= 0))
     return 0;
   if(!np_glp_build_terms(ncon, degree_vec, basis_mode, &terms, &nterms))
@@ -10566,11 +10566,11 @@ static int np_glp_cv_cache_prepare_original_order(const int *ipt){
   return 1;
 }
 
-int np_glp_cv_prepare_extern(const int int_ll,
+int np_glp_cv_prepare_extern(const int lp_engine,
                              const int num_obs,
                              const int ncon,
                              double **matrix_X_continuous_train){
-  return np_glp_cv_cache_prepare(int_ll, num_obs, ncon, matrix_X_continuous_train);
+  return np_glp_cv_cache_prepare(lp_engine, num_obs, ncon, matrix_X_continuous_train);
 }
 
 int np_glp_cv_prepare_original_order_extern(const int *ipt){
@@ -12399,7 +12399,7 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
      (np_glp_cv_cache.num_obs != num_obs) ||
      (np_glp_cv_cache.ncon != num_reg_continuous) ||
      (np_glp_cv_cache.matrix_X_continuous_train_ptr != matrix_X_continuous)){
-    if(!np_glp_cv_cache_prepare(LL_LP, num_obs, num_reg_continuous, matrix_X_continuous))
+    if(!np_glp_cv_cache_prepare(NP_LP_ENGINE_GENERAL, num_obs, num_reg_continuous, matrix_X_continuous))
       goto cleanup_lp_cv;
   }
 
@@ -12961,7 +12961,7 @@ cleanup_lp_cv:
 // The LL/LP branches solve weighted normal equations with ridge fallback if singular.
 
 double np_kernel_estimate_regression_categorical_ls_aic(
-int int_ll,
+int lp_engine,
 int bwm,
 int KERNEL_reg,
 int KERNEL_unordered_reg,
@@ -13008,7 +13008,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                                    num_reg_ordered))
     return DBL_MAX;
 
-  if((int_ll != LL_LC) && (int_ll != LL_LP))
+  if((lp_engine != NP_LP_ENGINE_SCALAR) && (lp_engine != NP_LP_ENGINE_GENERAL))
     error("invalid internal regression engine");
 
   operator = np_reg_cv_core_cache.operator;
@@ -13050,7 +13050,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
     return(DBL_MAX);
   }
 
-  if(int_ll == LL_LP){
+  if(lp_engine == NP_LP_ENGINE_GENERAL){
     NPRegCvLpResult lp_result = np_regression_cv_lp_objective(bwm,
                                                               BANDWIDTH_reg,
                                                               num_obs,
@@ -13075,7 +13075,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
     goto finish_cv_path;
   }
 
-  if(((bwm == RBWM_CVLS) || (bwm == RBWM_CVAIC)) && (int_ll == LL_LC)){
+  if(((bwm == RBWM_CVLS) || (bwm == RBWM_CVAIC)) && (lp_engine == NP_LP_ENGINE_SCALAR)){
     double profile_cv = DBL_MAX;
     double profile_traceH = 0.0;
     if(np_regression_categorical_profile_cv(kernel_c,
@@ -13263,7 +13263,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
 
   // Conduct the estimation 
 
-  if(int_ll == LL_LC) { // local constant
+  if(lp_engine == NP_LP_ENGINE_SCALAR) { // canonical scalar LP0
     // Nadaraya-Watson
     // Generate bandwidth vector given scale factors, nearest neighbors, or lambda 
 
@@ -14048,7 +14048,7 @@ double *cv){
   }
 
   if(((BANDWIDTH_den == BW_FIXED) || (BANDWIDTH_den == BW_GEN_NN) || (BANDWIDTH_den == BW_ADAP_NN)) &&
-     (int_ll_extern == LL_LP))
+     (np_lp_engine_extern == NP_LP_ENGINE_GENERAL))
     return np_conditional_distribution_cvls_lp_stream(vector_scale_factor, cv);
 
   int indy;
@@ -16982,7 +16982,7 @@ static void np_lp_power2_moments_from_kernel_row(double **basis,
 }
 
 int kernel_estimate_regression_categorical_tree_np(
-int int_ll,
+int lp_engine,
 int KERNEL_reg,
 int KERNEL_unordered_reg,
 int KERNEL_ordered_reg,
@@ -17051,8 +17051,8 @@ double *SIGN){
 
   const int do_grad = (gradient != NULL); 
   const int do_gerr = (gradient_stderr != NULL);
-  const int int_ll_est = int_ll;
-  if((int_ll_est != LL_LC) && (int_ll_est != LL_LP))
+  const int lp_engine_est = lp_engine;
+  if((lp_engine_est != NP_LP_ENGINE_SCALAR) && (lp_engine_est != NP_LP_ENGINE_GENERAL))
     error("invalid internal regression engine");
   np_gate_ctx_clear(&gate_ctx_local);
 
@@ -17338,7 +17338,7 @@ double *SIGN){
     }
 
     if(all_large_gate &&
-       ((int_ll_est == LL_LC) || (int_ll_est == LL_LP))){
+       ((lp_engine_est == NP_LP_ENGINE_SCALAR) || (lp_engine_est == NP_LP_ENGINE_GENERAL))){
       double kconst = 1.0;
       int kconst_ok = 1;
       const double ridge_eps = 1.0/(double)MAX(1, num_obs_train);
@@ -17370,7 +17370,7 @@ double *SIGN){
       if(!isfinite(kconst) || (kconst <= 0.0))
         kconst_ok = 0;
 
-      if(kconst_ok && (int_ll_est == LL_LC) && (!do_grad)){
+      if(kconst_ok && (lp_engine_est == NP_LP_ENGINE_SCALAR) && (!do_grad)){
         const double sk = ((double)num_obs_train)*kconst;
         const double sefac = (sk*hprod > 0.0) ?
           sqrt(MAX(0.0, sigma2hat) * K_INT_KERNEL_P / (sk*hprod)) : 0.0;
@@ -17382,7 +17382,7 @@ double *SIGN){
         }
 
         estimation_shortcut_done = 1;
-      } else if(kconst_ok && int_ll_est == LL_LP &&
+      } else if(kconst_ok && lp_engine_est == NP_LP_ENGINE_GENERAL &&
                 (vector_glp_degree_extern != NULL) && (num_reg_continuous > 0)){
         const int use_bernstein = (int_glp_bernstein_extern != 0);
         int *glp_terms = NULL;
@@ -17613,7 +17613,7 @@ double *SIGN){
 
   // Conduct the estimation 
 
-  if(int_ll_est == LL_LC) { // local constant
+  if(lp_engine_est == NP_LP_ENGINE_SCALAR) { // canonical scalar LP0
     // Nadaraya-Watson
     // Generate bandwidth vector given scale factors, nearest neighbors, or lambda 
 
@@ -17652,7 +17652,7 @@ double *SIGN){
        np_regression_categorical_profile_fit(kernel_c,
                                              kernel_u,
                                              kernel_o,
-                                             int_ll_est,
+                                             lp_engine_est,
                                              BANDWIDTH_reg,
                                              num_obs_train,
                                              num_obs_eval,
@@ -17803,7 +17803,7 @@ double *SIGN){
     free(lc_Y[1]);
     free(lc_Y[2]);
 #undef NCOL_Y
-  } else if(int_ll_est == LL_LP) { // local polynomial (regtype = "lp")
+  } else if(lp_engine_est == NP_LP_ENGINE_GENERAL) { // local polynomial (regtype = "lp")
     int *glp_terms = NULL;
     int glp_nterms = 0;
     const int use_bernstein = (int_glp_bernstein_extern != 0);
@@ -18545,7 +18545,7 @@ static int np_shadow_conditional_build_x_weights_core(double *vector_scale_facto
                                                       double *weights_out){
   const int num_train = num_obs_train_extern;
   const int num_reg_tot = num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern;
-  const int ll_mode = int_ll_extern;
+  const int lp_engine = np_lp_engine_extern;
   const int bw_rows = (BANDWIDTH_den_extern == BW_FIXED) ? 1 : num_train;
   int *kernel_cx = NULL, *kernel_ux = NULL, *kernel_ox = NULL, *x_operator = NULL;
   double *vsfx = NULL, *lambdax = NULL, *kw = NULL, *mean_row = NULL;
@@ -18644,10 +18644,10 @@ static int np_shadow_conditional_build_x_weights_core(double *vector_scale_facto
                            lambdax) == 1)
     goto cleanup_xweights;
 
-  if(ll_mode == LL_LP){
+  if(lp_engine == NP_LP_ENGINE_GENERAL){
     if((vector_glp_degree_extern == NULL) || (num_reg_continuous_extern <= 0))
       goto cleanup_xweights;
-    if(!np_glp_cv_prepare_extern(LL_LP,
+    if(!np_glp_cv_prepare_extern(NP_LP_ENGINE_GENERAL,
                                  num_train,
                                  num_reg_continuous_extern,
                                  matrix_X_continuous_train_extern))
@@ -18711,7 +18711,7 @@ static int np_shadow_conditional_build_x_weights_core(double *vector_scale_facto
     if(drop_eval_self)
       kw[i] = 0.0;
 
-    if(ll_mode == LL_LC){
+    if(lp_engine == NP_LP_ENGINE_SCALAR){
       for(j = 0; j < num_train; j++)
         row_sum += kw[j];
       if(!(row_sum > DBL_MIN))
@@ -18840,7 +18840,7 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
   int i, j, l;
   int status = 1;
 
-  if(int_ll_extern != LL_LP)
+  if(np_lp_engine_extern != NP_LP_ENGINE_GENERAL)
     return 1;
   if((BANDWIDTH_den_extern != BW_FIXED) &&
      (BANDWIDTH_den_extern != BW_GEN_NN) &&
@@ -18921,7 +18921,7 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
 
   if((vector_glp_degree_extern == NULL) || (num_reg_continuous_extern <= 0))
     goto cleanup_lp_hat;
-  if(!np_glp_cv_prepare_extern(LL_LP,
+  if(!np_glp_cv_prepare_extern(NP_LP_ENGINE_GENERAL,
                                num_train,
                                num_reg_continuous_extern,
                                matrix_X_continuous_train_extern))
@@ -19157,7 +19157,7 @@ cleanup_lp_hat:
 
 typedef struct {
   int ready;
-  int ll_mode;
+  int lp_engine;
   int num_train;
   int num_reg_tot;
   int *kernel_cx;
@@ -19220,7 +19220,7 @@ static int np_conditional_xrow_ctx_prepare(double *vector_scale_factor,
                                            NPConditionalXRowCtx *ctx){
   const int num_train = num_obs_train_extern;
   const int num_reg_tot = num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern;
-  const int ll_mode = int_ll_extern;
+  const int lp_engine = np_lp_engine_extern;
   const int bw_rows = (BANDWIDTH_den_extern == BW_FIXED) ? 1 : num_train;
   int i;
 
@@ -19234,7 +19234,7 @@ static int np_conditional_xrow_ctx_prepare(double *vector_scale_factor,
     return 1;
 
   memset(ctx, 0, sizeof(*ctx));
-  ctx->ll_mode = ll_mode;
+  ctx->lp_engine = lp_engine;
   ctx->num_train = num_train;
   ctx->num_reg_tot = num_reg_tot;
 
@@ -19308,7 +19308,7 @@ static int np_conditional_xrow_ctx_prepare(double *vector_scale_factor,
                            ctx->lambdax) == 1)
     goto fail_xrow_ctx_prepare;
 
-  if(ll_mode == LL_LP){
+  if(lp_engine == NP_LP_ENGINE_GENERAL){
     const int use_bernstein = (int_glp_bernstein_extern != 0);
 
     if((vector_glp_degree_extern == NULL) || (num_reg_continuous_extern <= 0))
@@ -19319,7 +19319,7 @@ static int np_conditional_xrow_ctx_prepare(double *vector_scale_factor,
        (np_glp_cv_cache.num_obs != num_train) ||
        (np_glp_cv_cache.ncon != num_reg_continuous_extern) ||
        (np_glp_cv_cache.matrix_X_continuous_train_ptr != matrix_X_continuous_train_extern)){
-      if(!np_glp_cv_cache_prepare(LL_LP,
+      if(!np_glp_cv_cache_prepare(NP_LP_ENGINE_GENERAL,
                                   num_train,
                                   num_reg_continuous_extern,
                                   matrix_X_continuous_train_extern))
@@ -19420,9 +19420,9 @@ static int np_conditional_xrow_from_ctx_impl(NPConditionalXRowCtx *ctx,
   if(drop_eval_self)
     ctx->kw[eval_pos] = 0.0;
 
-  if((ctx->ll_mode == LL_LC) ||
+  if((ctx->lp_engine == NP_LP_ENGINE_SCALAR) ||
      ((BANDWIDTH_den_extern == BW_ADAP_NN) &&
-      (ctx->ll_mode == LL_LP) &&
+      (ctx->lp_engine == NP_LP_ENGINE_GENERAL) &&
       np_glp_cv_cache.ready &&
       (np_glp_cv_cache.nterms == 1))){
     double row_sum = 0.0;
@@ -19611,7 +19611,7 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
 
   if((vector_scale_factor == NULL) || (rhs_cols == NULL) || (fitted_out == NULL))
     return 1;
-  if(int_ll_extern != LL_LP)
+  if(np_lp_engine_extern != NP_LP_ENGINE_GENERAL)
     return 1;
   if((BANDWIDTH_den_extern != BW_FIXED) &&
      (BANDWIDTH_den_extern != BW_GEN_NN))
@@ -19700,7 +19700,7 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
      (np_glp_cv_cache.num_obs != num_train) ||
      (np_glp_cv_cache.ncon != num_reg_continuous_extern) ||
      (np_glp_cv_cache.matrix_X_continuous_train_ptr != matrix_X_continuous_train_extern)){
-    if(!np_glp_cv_cache_prepare(LL_LP,
+    if(!np_glp_cv_cache_prepare(NP_LP_ENGINE_GENERAL,
                                 num_train,
                                 num_reg_continuous_extern,
                                 matrix_X_continuous_train_extern))
@@ -20385,7 +20385,7 @@ static int np_conditional_x_weight_row_stream_core_impl(double *vector_scale_fac
                                                         double *row_out){
   const int num_train = num_obs_train_extern;
   const int num_reg_tot = num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern;
-  const int ll_mode = int_ll_extern;
+  const int lp_engine = np_lp_engine_extern;
   const int bw_rows = (BANDWIDTH_den_extern == BW_FIXED) ? 1 : num_train;
   int *kernel_cx = NULL, *kernel_ux = NULL, *kernel_ox = NULL, *x_operator = NULL;
   double *vsfx = NULL, *lambdax = NULL, *kw = NULL, *mean_row = NULL;
@@ -20488,10 +20488,10 @@ static int np_conditional_x_weight_row_stream_core_impl(double *vector_scale_fac
                            lambdax) == 1)
     goto cleanup_xweight_row;
 
-  if(ll_mode == LL_LP){
+  if(lp_engine == NP_LP_ENGINE_GENERAL){
     if((vector_glp_degree_extern == NULL) || (num_reg_continuous_extern <= 0))
       goto cleanup_xweight_row;
-    if(!np_glp_cv_prepare_extern(LL_LP,
+    if(!np_glp_cv_prepare_extern(NP_LP_ENGINE_GENERAL,
                                  num_train,
                                  num_reg_continuous_extern,
                                  matrix_X_continuous_train_extern))
@@ -20551,7 +20551,7 @@ static int np_conditional_x_weight_row_stream_core_impl(double *vector_scale_fac
   if(drop_eval_self)
     kw[eval_pos] = 0.0;
 
-  if(ll_mode == LL_LC){
+  if(lp_engine == NP_LP_ENGINE_SCALAR){
     double row_sum = 0.0;
     for(j = 0; j < num_train; j++)
       row_sum += kw[j];
@@ -22669,7 +22669,7 @@ static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_f
                                                           double **rows_out){
   const int num_train = num_obs_train_extern;
   const int num_reg_tot = num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern;
-  const int ll_mode = int_ll_extern;
+  const int lp_engine = np_lp_engine_extern;
   const int bw_rows = (BANDWIDTH_den_extern == BW_FIXED) ? 1 : block_rows;
   int *kernel_cx = NULL, *kernel_ux = NULL, *kernel_ox = NULL, *x_operator = NULL;
   double *vsfx = NULL, *lambdax = NULL, *kw = NULL, *mean_row = NULL;
@@ -22797,7 +22797,7 @@ static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_f
       goto cleanup_xweight_block;
   }
 
-  if(ll_mode == LL_LP){
+  if(lp_engine == NP_LP_ENGINE_GENERAL){
     const int use_bernstein = (int_glp_bernstein_extern != 0);
 
     if((vector_glp_degree_extern == NULL) || (num_reg_continuous_extern <= 0))
@@ -22808,7 +22808,7 @@ static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_f
        (np_glp_cv_cache.num_obs != num_train) ||
        (np_glp_cv_cache.ncon != num_reg_continuous_extern) ||
        (np_glp_cv_cache.matrix_X_continuous_train_ptr != matrix_X_continuous_train_extern)){
-      if(!np_glp_cv_cache_prepare(LL_LP,
+      if(!np_glp_cv_cache_prepare(NP_LP_ENGINE_GENERAL,
                                   num_train,
                                   num_reg_continuous_extern,
                                   matrix_X_continuous_train_extern))
@@ -22880,7 +22880,7 @@ static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_f
     if(drop_eval_self)
       kw[eval_pos] = 0.0;
 
-    if(ll_mode == LL_LC){
+    if(lp_engine == NP_LP_ENGINE_SCALAR){
       double row_sum = 0.0;
       for(j = 0; j < num_train; j++)
         row_sum += kw[j];
@@ -23027,7 +23027,7 @@ static int np_conditional_x_weight_block_pair_stream_core(double *vector_scale_f
    * timing proof.
    */
   if((loo_rows_out == NULL) || (full_rows_out == NULL) ||
-     (vector_scale_factor == NULL) || (int_ll_extern != LL_LP))
+     (vector_scale_factor == NULL) || (np_lp_engine_extern != NP_LP_ENGINE_GENERAL))
     return 1;
   if(BANDWIDTH_den_extern != BW_FIXED)
     return 1;
@@ -23135,7 +23135,7 @@ static int np_conditional_x_weight_block_pair_stream_core(double *vector_scale_f
        (np_glp_cv_cache.num_obs != num_train) ||
        (np_glp_cv_cache.ncon != num_reg_continuous_extern) ||
        (np_glp_cv_cache.matrix_X_continuous_train_ptr != matrix_X_continuous_train_extern)){
-      if(!np_glp_cv_cache_prepare(LL_LP,
+      if(!np_glp_cv_cache_prepare(NP_LP_ENGINE_GENERAL,
                                   num_train,
                                   num_reg_continuous_extern,
                                   matrix_X_continuous_train_extern))
@@ -23315,7 +23315,7 @@ static int np_conditional_x_weight_block_pair_gnn_stream_core(
    * loop retains no generalized-NN branch or indexing cost.
    */
   if((loo_rows_out == NULL) || (full_rows_out == NULL) ||
-     (vector_scale_factor == NULL) || (int_ll_extern != LL_LP))
+     (vector_scale_factor == NULL) || (np_lp_engine_extern != NP_LP_ENGINE_GENERAL))
     return 1;
   if(BANDWIDTH_den_extern != BW_GEN_NN)
     return 1;
@@ -23398,7 +23398,7 @@ static int np_conditional_x_weight_block_pair_gnn_stream_core(
        (np_glp_cv_cache.ncon != num_reg_continuous_extern) ||
        (np_glp_cv_cache.matrix_X_continuous_train_ptr !=
         matrix_X_continuous_train_extern)){
-      if(!np_glp_cv_cache_prepare(LL_LP,
+      if(!np_glp_cv_cache_prepare(NP_LP_ENGINE_GENERAL,
                                   num_train,
                                   num_reg_continuous_extern,
                                   matrix_X_continuous_train_extern))
@@ -23770,7 +23770,7 @@ static int np_conditional_lp_all_large_ctx_prepare_core(double *vector_scale_fac
 
   np_conditional_lp_all_large_ctx_clear(ctx);
 
-  if(int_ll_extern != LL_LP)
+  if(np_lp_engine_extern != NP_LP_ENGINE_GENERAL)
     return 1;
   if(BANDWIDTH_den_extern != BW_FIXED)
     return 1;
@@ -23859,7 +23859,7 @@ static int np_conditional_lp_all_large_ctx_prepare_core(double *vector_scale_fac
      (np_glp_cv_cache.num_obs != num_train) ||
      (np_glp_cv_cache.ncon != num_reg_continuous_extern) ||
      (np_glp_cv_cache.matrix_X_continuous_train_ptr != matrix_X_continuous_train_extern)){
-    if(!np_glp_cv_cache_prepare(LL_LP,
+    if(!np_glp_cv_cache_prepare(NP_LP_ENGINE_GENERAL,
                                 num_train,
                                 num_reg_continuous_extern,
                                 matrix_X_continuous_train_extern))
@@ -24638,7 +24638,7 @@ static int np_conditional_density_cvml_lp_block_stream(double *vector_scale_fact
 
   if((cv == NULL) || (vector_scale_factor == NULL) || (num_obs <= 0))
     return 1;
-  if(int_ll_extern != LL_LP)
+  if(np_lp_engine_extern != NP_LP_ENGINE_GENERAL)
     return 1;
   if((BANDWIDTH_den_extern != BW_FIXED) &&
      (BANDWIDTH_den_extern != BW_GEN_NN))
@@ -24887,7 +24887,7 @@ static int np_conditional_density_cvls_lp_supertile2_stream(
   int status = 1;
 
   if((cv == NULL) || (vector_scale_factor == NULL) ||
-     (num_obs <= block_size) || (int_ll_extern != LL_LP))
+     (num_obs <= block_size) || (np_lp_engine_extern != NP_LP_ENGINE_GENERAL))
     return 1;
   if((num_reg_continuous_extern <= 0) ||
      (vector_glp_degree_extern == NULL))
@@ -25127,7 +25127,7 @@ int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
      (BANDWIDTH_den_extern != BW_FIXED))
     return np_conditional_density_cvls_lp_row_stream(vector_scale_factor, cv);
 
-  if((int_ll_extern == LL_LP) &&
+  if((np_lp_engine_extern == NP_LP_ENGINE_GENERAL) &&
      (num_reg_continuous_extern > 0) &&
      (vector_glp_degree_extern != NULL) &&
      (int_TREE_X != NP_TREE_TRUE) &&
@@ -25161,7 +25161,7 @@ int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
        (num_reg_continuous_extern > 0)){
       if(np_conditional_x_block_bw_ctx_prepare(vector_scale_factor, i0, ib, &xbwctx) != 0)
         goto cleanup_cvls_lp_block;
-      if(int_ll_extern == LL_LP){
+      if(np_lp_engine_extern == NP_LP_ENGINE_GENERAL){
         if(np_conditional_x_weight_block_pair_gnn_stream_core(vector_scale_factor,
                                                               i0,
                                                               ib,
@@ -25187,7 +25187,7 @@ int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
       }
       np_conditional_x_block_bw_ctx_clear(&xbwctx);
     } else {
-      if((int_ll_extern == LL_LP) && (BANDWIDTH_den_extern == BW_FIXED)){
+      if((np_lp_engine_extern == NP_LP_ENGINE_GENERAL) && (BANDWIDTH_den_extern == BW_FIXED)){
         if(np_conditional_x_weight_block_pair_stream_core(vector_scale_factor,
                                                           i0,
                                                           ib,
@@ -27908,7 +27908,7 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
   const int use_lp_stream = (((BANDWIDTH_den == BW_FIXED) ||
                               (BANDWIDTH_den == BW_GEN_NN) ||
                               (BANDWIDTH_den == BW_ADAP_NN)) &&
-                             (int_ll_extern == LL_LP));
+                             (np_lp_engine_extern == NP_LP_ENGINE_GENERAL));
   const int bwmdim = (BANDWIDTH_den==BW_GEN_NN)?num_obs:
     ((BANDWIDTH_den==BW_ADAP_NN)?num_obs:1);
 

@@ -793,7 +793,7 @@ np_beta_conditional_legacy_pdf_derivative(int kernel_code,
   /* The derivative of the bounded normalizer is common to every
    * observation and therefore cancels exactly in a normalized conditional
    * ratio.  Retaining only the observation-varying term is both sufficient
-   * and consistent with the established legacy local-constant route. */
+   * and consistent with the canonical scalar LP0 route. */
   value = kernel_deriv(kernel_code,
                        (evaluation - observation) / bandwidth) /
     (bandwidth * bandwidth * denominator);

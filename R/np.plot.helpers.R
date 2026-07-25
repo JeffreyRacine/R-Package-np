@@ -2585,6 +2585,11 @@
     stop("invalid inid regression bootstrap dimensions")
 
   regtype <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
+  constant.basis <- npIsCanonicalLp0(
+    regtype.engine = if (is.null(bws$regtype.engine)) regtype else bws$regtype.engine,
+    degree.engine = if (is.null(bws$degree.engine)) bws$degree else bws$degree.engine,
+    ncon = bws$ncon
+  )
   if (!identical(bws$type, "fixed")) {
     return(.np_inid_boot_from_reghat_exact(
       xdat = xdat,
@@ -2684,7 +2689,7 @@
     ))
   }
 
-  if (identical(regtype, "lc")) {
+  if (constant.basis) {
     H <- suppressWarnings(
       tryCatch(
         npreghat.rbandwidth(
@@ -3075,7 +3080,7 @@
   if (nrow(kw) != n || ncol(kw) != neval)
     stop("single-index inid helper kernel-weight matrix shape mismatch")
 
-  if (identical(regtype, "lc")) {
+  if (npIsCanonicalLp0Spec(spec, ncon = 1L)) {
     H <- .np_lc_hat_normalize(
       kw,
       pmax(colSums(kw), .Machine$double.eps)
@@ -4132,7 +4137,7 @@
     ))
   }
 
-  if (!identical(spec$regtype.engine, "lc") &&
+  if (!npIsCanonicalLp0Spec(spec, ncon = bws$ncon) &&
       (identical(mode, "frozen") || identical(bws$type, "fixed"))) {
     return(.np_inid_boot_from_scoef_localpoly_fixed(
       txdat = txdat,

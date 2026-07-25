@@ -446,7 +446,10 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
     ## construct 'W' matrix
 
     spec <- .npscoef_canonical_spec(source = bws, zdat = tzdat, where = "npscoef")
-    reg.engine <- spec$regtype.engine
+    reg.engine <- if (npIsCanonicalLp0Spec(spec, ncon = bws$ncon))
+      "lc"
+    else
+      spec$regtype.engine
     W.train <- W <- as.matrix(data.frame(1,txdat))
     maxPenalty <- sqrt(.Machine$double.xmax)
     tnrow <- nrow(txdat)

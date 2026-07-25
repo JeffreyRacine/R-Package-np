@@ -564,7 +564,7 @@
     ))
   }
 
-  if (identical(regtype.engine, "lc")) {
+  if (npIsCanonicalLp0Spec(spec, ncon = 1L)) {
     if (s == 1L) {
       return(.np_indexhat_lc_derivative(
         bws = bws,
@@ -755,7 +755,7 @@
     leave.one.out = leave.one.out
   )
 
-  if (identical(spec$regtype.engine, "lc")) {
+  if (npIsCanonicalLp0Spec(spec, ncon = bws$ncon)) {
     state$z.train <- adjustLevels(tzdat, bws$zdati)
     state$z.eval <- if (leave.one.out) state$z.train else adjustLevels(ezdat, bws$zdati, allowNewCells = TRUE)
     return(state)
@@ -883,7 +883,10 @@
     where = "npscoefhat"
   )
   state$bws <- bws
-  state$regtype <- state$spec$regtype.engine
+  state$regtype <- if (npIsCanonicalLp0Spec(state$spec, ncon = bws$ncon))
+    "lc"
+  else
+    state$spec$regtype.engine
   state
 }
 
@@ -999,7 +1002,7 @@ npindexhat <-
     idx.eval <- data.frame(index = index.eval)
     spec <- .npindex_resolve_spec(bws, where = "npindexhat")
 
-    if (identical(spec$regtype.engine, "lc")) {
+    if (npIsCanonicalLp0Spec(spec, ncon = 1L)) {
       H <- .np_indexhat_exact(
         bws = bws,
         idx.train = idx.train,
@@ -1346,7 +1349,7 @@ npscoefhat <-
       stop("argument 'y' is required when output='constraint'")
 
     cat.profile.apply.eligible <- identical(output, "apply") &&
-      identical(spec$regtype.engine, "lc") &&
+      npIsCanonicalLp0Spec(spec, ncon = bws$ncon) &&
       !leave.one.out &&
       identical(bws$type, "fixed") &&
       npUseCategoricalCompress(ncon = bws$ncon,
@@ -1437,7 +1440,7 @@ npscoefhat <-
       }
       out <- matrix(0.0, nrow = m, ncol = ncol(yy))
 
-      if (identical(spec$regtype.engine, "lc")) {
+      if (npIsCanonicalLp0Spec(spec, ncon = bws$ncon)) {
         state <- .npscoef_effective_weight_state(
           bws = bws,
           tzdat = tzdat,
@@ -1547,7 +1550,7 @@ npscoefhat <-
 
     H <- matrix(0.0, nrow = m, ncol = n)
 
-    if (identical(spec$regtype.engine, "lc")) {
+    if (npIsCanonicalLp0Spec(spec, ncon = bws$ncon)) {
       state <- .npscoef_effective_weight_state(
         bws = bws,
         tzdat = tzdat,

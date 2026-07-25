@@ -52,7 +52,11 @@ adaptive_shadow_bwtype <- function(bw) {
 }
 
 adaptive_shadow_regtype <- function(bw) {
-  if (identical(bw$regtype.engine, "lp")) 2L else 0L
+  getFromNamespace("npConditionalRegtypeCode", "np")(
+    bw$regtype.engine,
+    bw$degree.engine,
+    bw$xncon
+  )
 }
 
 adaptive_shadow_degree <- function(bw) {

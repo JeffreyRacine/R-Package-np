@@ -93,7 +93,7 @@ extern double **matrix_X_continuous_quantile_extern;
 extern double **matrix_X_unordered_quantile_extern;
 extern double **matrix_X_ordered_quantile_extern;
 
-extern int int_ll_extern;
+extern int np_lp_engine_extern;
 
 extern int KERNEL_reg_extern;
 extern int KERNEL_reg_unordered_extern;
@@ -138,7 +138,7 @@ extern double *vector_cykerlb_extern;
 extern double *vector_cykerub_extern;
 extern int int_bounded_cvls_quadrature_points_extern;
 
-#define LL_LC  0
+#define NP_LP_ENGINE_SCALAR  0
 
 #define BW_FIXED   0
 #define BW_GEN_NN  1
@@ -224,7 +224,7 @@ double cv_func_regression_categorical_ls(double *vector_scale_factor){
     start = clock();
 
     cv = (np_kernel_estimate_regression_categorical_ls_aic(
-                                                            int_ll_extern,
+                                                            np_lp_engine_extern,
                                                             RBWM_CVLS,
                                                             KERNEL_reg_extern,
                                                             KERNEL_reg_unordered_extern,
@@ -273,7 +273,7 @@ double cv_func_regression_categorical_ks(double *vector_scale_factor){
     start = clock();
 
     cv = (np_kernel_estimate_regression_categorical_ls_aic(
-                                                            int_ll_extern,
+                                                            np_lp_engine_extern,
                                                             RBWM_CVKS,
                                                             KERNEL_reg_extern,
                                                             KERNEL_reg_unordered_extern,
@@ -341,7 +341,7 @@ double cv_func_lsqregression_categorical_check(double *vector_scale_factor){
 
   start = clock();
   cv = (np_kernel_estimate_regression_categorical_ls_aic(
-                                                          int_ll_extern,
+                                                          np_lp_engine_extern,
                                                           RBWM_CVCHECK,
                                                           KERNEL_reg_extern,
                                                           KERNEL_reg_unordered_extern,
@@ -1383,7 +1383,7 @@ double cv_func_regression_categorical_aic_c(double *vector_scale_factor)
 
     start = clock();
 
-    cv = (np_kernel_estimate_regression_categorical_ls_aic(int_ll_extern,
+    cv = (np_kernel_estimate_regression_categorical_ls_aic(np_lp_engine_extern,
                                                             RBWM_CVAIC,
                                                             KERNEL_reg_extern,
                                                             KERNEL_reg_unordered_extern,
