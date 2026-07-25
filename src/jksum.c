@@ -12255,14 +12255,21 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
                                   &fit)){
       nepsilon = 0.0;
     } else {
-    while(!np_lp_solve_workspace_solve(&solve_workspace,
-                                        nterms,
-                                        solve_nrhs)){
-      for(a = 0; a < nterms; a++)
-        solve_workspace.gram_source[a + a*nterms] += epsilon;
-      nepsilon += epsilon;
-      if(nepsilon > 128.0*epsilon)
-        goto cleanup_lp_cv;
+    {
+      int ridge_steps = 0;
+      while(!np_lp_solve_workspace_solve(&solve_workspace,
+                                         nterms,
+                                         solve_nrhs)){
+        if((ridge_steps >= NP_LP_SOLVE_MAX_RIDGE_STEPS) ||
+           !np_lp_solve_workspace_sources_finite(&solve_workspace,
+                                                 nterms,
+                                                 solve_nrhs))
+          goto cleanup_lp_cv;
+        for(a = 0; a < nterms; a++)
+          solve_workspace.gram_source[a + a*nterms] += epsilon;
+        nepsilon += epsilon;
+        ridge_steps++;
+      }
     }
 
     solve_workspace.rhs_source[0] +=
@@ -12676,6 +12683,7 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
       for(j = 0; j < num_obs; j++){
         double nepsilon = 0.0;
         double pnh = 1.0;
+        int ridge_steps = 0;
         double * const row_kwm = kwm + (size_t)j*(size_t)nrcc22;
 
         if(np_reg_cv_use_symmetric_dropone_path(bwm, ks_tree_use, BANDWIDTH_reg)){
@@ -12856,12 +12864,22 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
           &solve_workspace,
           nrc1,
           solve_nrhs)){
+          if((ridge_steps >= NP_LP_SOLVE_MAX_RIDGE_STEPS) ||
+             !np_lp_solve_workspace_sources_finite(&solve_workspace,
+                                                   nrc1,
+                                                   solve_nrhs)){
+            glp_ok = 0;
+            break;
+          }
           for(i = 0; i < nrc1; i++){
             row_kwm[(i+1)*nrc2+i+1] += epsilon;
             solve_workspace.gram_source[i+i*nrc1] += epsilon;
           }
           nepsilon += epsilon;
+          ridge_steps++;
         }
+        if(!glp_ok)
+          break;
 
         row_kwm[1] += nepsilon*row_kwm[1]/NZD_POS(row_kwm[nrc2+1]);
         solve_workspace.rhs_source[0] = row_kwm[1];
@@ -17977,10 +17995,21 @@ double *SIGN){
             out[base + (l + 2)]; /* Y columns 2.. are basis terms */
       }
 
-      while(!np_lp_solve_workspace_solve(&solve_workspace, glp_nterms, 1)){
-        for(i = 0; i < glp_nterms; i++)
-          solve_workspace.gram_source[i+i*glp_nterms] += epsilon;
-        nepsilon += epsilon;
+      {
+        int ridge_steps = 0;
+        while(!np_lp_solve_workspace_solve(&solve_workspace,
+                                           glp_nterms,
+                                           1)){
+          if((ridge_steps >= NP_LP_SOLVE_MAX_RIDGE_STEPS) ||
+             !np_lp_solve_workspace_sources_finite(&solve_workspace,
+                                                   glp_nterms,
+                                                   1))
+            error("LP solve failed in glp path");
+          for(i = 0; i < glp_nterms; i++)
+            solve_workspace.gram_source[i+i*glp_nterms] += epsilon;
+          nepsilon += epsilon;
+          ridge_steps++;
+        }
       }
 
       solve_workspace.rhs_source[0] +=
@@ -19049,14 +19078,24 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
           out2[base + j];
     }
 
-    while(!np_lp_solve_workspace_solve(&solve_workspace,
-                                       np_glp_cv_cache.nterms,
-                                       1)){
-      for(l = 0; l < np_glp_cv_cache.nterms; l++)
-        solve_workspace.gram_source[
-          l+l*np_glp_cv_cache.nterms
-        ] += epsilon;
-      nepsilon += epsilon;
+    {
+      int ridge_steps = 0;
+      while(!np_lp_solve_workspace_solve(&solve_workspace,
+                                         np_glp_cv_cache.nterms,
+                                         1)){
+        if((ridge_steps >= NP_LP_SOLVE_MAX_RIDGE_STEPS) ||
+           !np_lp_solve_workspace_sources_finite(
+             &solve_workspace,
+             np_glp_cv_cache.nterms,
+             1))
+          goto cleanup_lp_hat;
+        for(l = 0; l < np_glp_cv_cache.nterms; l++)
+          solve_workspace.gram_source[
+            l+l*np_glp_cv_cache.nterms
+          ] += epsilon;
+        nepsilon += epsilon;
+        ridge_steps++;
+      }
     }
 
     if(nepsilon > 0.0){
@@ -19763,14 +19802,24 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
         ] = out[base + n_rhs + l];
     }
 
-    while(!np_lp_solve_workspace_solve(&solve_workspace,
-                                       np_glp_cv_cache.nterms,
-                                       n_rhs)){
-      for(i = 0; i < np_glp_cv_cache.nterms; i++)
-        solve_workspace.gram_source[
-          i+i*np_glp_cv_cache.nterms
-        ] += epsilon;
-      nepsilon += epsilon;
+    {
+      int ridge_steps = 0;
+      while(!np_lp_solve_workspace_solve(&solve_workspace,
+                                         np_glp_cv_cache.nterms,
+                                         n_rhs)){
+        if((ridge_steps >= NP_LP_SOLVE_MAX_RIDGE_STEPS) ||
+           !np_lp_solve_workspace_sources_finite(
+             &solve_workspace,
+             np_glp_cv_cache.nterms,
+             n_rhs))
+          goto cleanup_lp_apply;
+        for(i = 0; i < np_glp_cv_cache.nterms; i++)
+          solve_workspace.gram_source[
+            i+i*np_glp_cv_cache.nterms
+          ] += epsilon;
+        nepsilon += epsilon;
+        ridge_steps++;
+      }
     }
 
     if(nepsilon > 0.0){

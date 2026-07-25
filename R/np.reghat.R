@@ -843,16 +843,20 @@ npreghat <-
     solved <- tryCatch(solve(A.base, rhs), error = function(e) NULL)
 
     if (is.null(solved) || !all(is.finite(solved))) {
+      if (any(!is.finite(A.base)) || any(!is.finite(rhs)))
+        stop("LP solve failed in R hat-matrix path: non-finite system")
       A.try <- A.base
       nepsilon <- 0.0
 
-      repeat {
+      for (ridge.step in seq_len(128L)) {
         diag(A.try) <- diag(A.try) + eps
         nepsilon <- nepsilon + eps
         solved <- tryCatch(solve(A.try, rhs), error = function(e) NULL)
         if (!is.null(solved) && all(is.finite(solved)))
           break
       }
+      if (is.null(solved) || !all(is.finite(solved)))
+        stop("LP solve failed in R hat-matrix path after bounded ridging")
 
       denom <- A.try[1L, 1L]
       if (!is.finite(denom) || abs(denom) < .Machine$double.xmin)

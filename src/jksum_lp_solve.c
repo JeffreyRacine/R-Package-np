@@ -26,6 +26,55 @@ static int np_lp_double_bytes(size_t elements, size_t *bytes)
   return np_lp_size_product(elements, sizeof(double), bytes);
 }
 
+static int np_lp_solve_workspace_shape(
+  const NPLPSolveWorkspace *workspace,
+  int p,
+  int nrhs,
+  size_t *gram_elements,
+  size_t *rhs_elements)
+{
+  size_t gram_count, rhs_count;
+
+  if((workspace == NULL) || (p <= 0) || (nrhs <= 0) ||
+     (workspace->p_capacity < p) || (workspace->nrhs_capacity < nrhs) ||
+     (workspace->gram_source == NULL) || (workspace->rhs_source == NULL) ||
+     (workspace->gram_work == NULL) || (workspace->rhs_work == NULL) ||
+     (workspace->ipiv == NULL) ||
+     !np_lp_size_product((size_t)p, (size_t)p, &gram_count) ||
+     !np_lp_size_product((size_t)p, (size_t)nrhs, &rhs_count) ||
+     (gram_count > workspace->gram_capacity) ||
+     (rhs_count > workspace->rhs_capacity))
+    return 0;
+
+  if(gram_elements != NULL)
+    *gram_elements = gram_count;
+  if(rhs_elements != NULL)
+    *rhs_elements = rhs_count;
+  return 1;
+}
+
+int np_lp_solve_workspace_sources_finite(
+  const NPLPSolveWorkspace *workspace,
+  int p,
+  int nrhs)
+{
+  size_t gram_elements, rhs_elements, i;
+
+  if(!np_lp_solve_workspace_shape(workspace,
+                                  p,
+                                  nrhs,
+                                  &gram_elements,
+                                  &rhs_elements))
+    return 0;
+  for(i = 0; i < gram_elements; i++)
+    if(!R_FINITE(workspace->gram_source[i]))
+      return 0;
+  for(i = 0; i < rhs_elements; i++)
+    if(!R_FINITE(workspace->rhs_source[i]))
+      return 0;
+  return 1;
+}
+
 void np_lp_solve_workspace_init(NPLPSolveWorkspace *workspace)
 {
   if(workspace == NULL)

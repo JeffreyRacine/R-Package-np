@@ -45,6 +45,8 @@ typedef struct {
   double *inverse_work;
 } NPLPFullRowWorkspace;
 
+#define NP_LP_SOLVE_MAX_RIDGE_STEPS 128
+
 /*
  * The caller owns the workspace and its lifetime.  gram_source/rhs_source are
  * the caller-mutable pristine system; solve copies them to gram_work/rhs_work,
@@ -60,6 +62,17 @@ int np_lp_solve_workspace_reserve(NPLPSolveWorkspace *workspace,
 int np_lp_solve_workspace_solve(NPLPSolveWorkspace *workspace,
                                 int p,
                                 int nrhs);
+/* Cold-path validation used only after an ordinary solve has failed. */
+#if defined(__GNUC__) || defined(__clang__)
+#define NP_LP_COLD_PATH __attribute__((cold))
+#else
+#define NP_LP_COLD_PATH
+#endif
+int np_lp_solve_workspace_sources_finite(
+  const NPLPSolveWorkspace *workspace,
+  int p,
+  int nrhs) NP_LP_COLD_PATH;
+#undef NP_LP_COLD_PATH
 
 /*
  * Solve new pristine RHS columns with the LU/pivots retained by the most
