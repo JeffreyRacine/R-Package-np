@@ -72,6 +72,23 @@ test_that("all canonical LP solve retries are bounded", {
     )),
     5L
   )
+  expect_equal(
+    lengths(regmatches(
+      jksum,
+      gregexpr(
+        "estimation_shortcut_done = -1",
+        jksum,
+        fixed = TRUE
+      )
+    )),
+    2L
+  )
+  expect_true(grepl("cleanup_glp_fit:", jksum, fixed = TRUE))
+  expect_true(grepl(
+    'if(estimation_shortcut_done < 0)',
+    jksum,
+    fixed = TRUE
+  ))
   expect_true(grepl(
     "#define NP_LP_SOLVE_MAX_RIDGE_STEPS 128",
     solve.h,

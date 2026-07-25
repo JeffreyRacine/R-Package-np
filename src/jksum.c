@@ -18003,8 +18003,10 @@ double *SIGN){
           if((ridge_steps >= NP_LP_SOLVE_MAX_RIDGE_STEPS) ||
              !np_lp_solve_workspace_sources_finite(&solve_workspace,
                                                    glp_nterms,
-                                                   1))
-            error("LP solve failed in glp path");
+                                                   1)){
+            estimation_shortcut_done = -1;
+            goto cleanup_glp_fit;
+          }
           for(i = 0; i < glp_nterms; i++)
             solve_workspace.gram_source[i+i*glp_nterms] += epsilon;
           nepsilon += epsilon;
@@ -18016,8 +18018,10 @@ double *SIGN){
         nepsilon*solve_workspace.rhs_source[0]/
         NZD_POS(solve_workspace.gram_source[0]);
       if(nepsilon > 0.0){
-        if(!np_lp_solve_workspace_solve(&solve_workspace, glp_nterms, 1))
-          error("LP solve failed in glp path");
+        if(!np_lp_solve_workspace_solve(&solve_workspace, glp_nterms, 1)){
+          estimation_shortcut_done = -1;
+          goto cleanup_glp_fit;
+        }
       }
       for(i = 0; i < glp_nterms; i++)
         beta[i] = solve_workspace.rhs_work[i];
@@ -18206,6 +18210,7 @@ double *SIGN){
       np_progress_fit_loop_step(j + 1, fit_progress_total);
     }
 
+cleanup_glp_fit:
     np_lp_solve_workspace_clear(&solve_workspace);
     free_mat(basis, glp_nterms);
     if(matrix_bandwidth_eval != NULL) free_tmat(matrix_bandwidth_eval);
@@ -18265,6 +18270,9 @@ finish_regression_estimation:
   free(lambda);
   free_tmat(matrix_bandwidth);
   free_mat(matrix_bandwidth_deriv,num_reg_continuous);
+
+  if(estimation_shortcut_done < 0)
+    error("LP solve failed in glp path");
 
 	if(vector_Y_eval != NULL)
 	{
