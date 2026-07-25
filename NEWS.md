@@ -16,9 +16,10 @@
 
 * Local-polynomial solve retries are now bounded across objective, fit,
   prediction/evaluation, and hat-matrix paths. Non-finite or unrecoverable
-  systems fail collectively instead of retrying indefinitely; ordinary
-  successful systems retain their established solve, ridge sequence, and
-  MPI ownership.
+  systems fail collectively instead of retrying indefinitely, and the fit
+  route releases its native workspace before reporting failure; ordinary
+  successful systems retain their established solve, ridge sequence, and MPI
+  ownership.
 
 * Aligned the dedicated `plot()` methods for `npregiv` and
   `npregivderiv` with the package-wide regression plotting vocabulary. They
