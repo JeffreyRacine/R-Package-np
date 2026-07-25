@@ -916,7 +916,8 @@ npreghat <-
   )
 
   matprod.mode <- getOption("matprod")
-  H.fast <- if (identical(matprod.mode, "default") ||
+  H.fast <- if (ncol(W.train) == 1L ||
+                identical(matprod.mode, "default") ||
                 identical(matprod.mode, "blas")) {
     .Call(
       "C_np_reghat_lp_matrix_fast",

@@ -75,3 +75,23 @@ test_that("compiled LP hat matrix preserves the incumbent ridge sequence", {
   )
   expect_identical(compiled, reference)
 })
+
+test_that("width-one scalar hats retain signed higher-order kernel weights", {
+  set.seed(2026072504L)
+  n <- 97L
+  neval <- 19L
+  x <- runif(n)
+  xe <- seq(0.05, 0.95, length.out = neval)
+  distance <- outer(x, xe, "-") / 0.19
+  kw <- exp(-0.5 * distance^2) * (1.5 - distance^2)
+  W.train <- matrix(1.0, nrow = n, ncol = 1L)
+  W.eval <- matrix(1.0, nrow = neval, ncol = 1L)
+
+  expect_true(any(kw < 0.0))
+  reference <- .np_test_lp_hat_matrix_reference(kw, W.train, W.eval)
+  compiled <- .Call(
+    "C_np_reghat_lp_matrix_fast",
+    as.matrix(kw), as.matrix(W.train), as.matrix(W.eval), PACKAGE = "npRmpi"
+  )
+  expect_equal(compiled, reference, tolerance = 5e-15)
+})

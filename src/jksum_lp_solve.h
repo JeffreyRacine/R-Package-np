@@ -86,6 +86,22 @@ int np_lp_solve_workspace_solve_factored(NPLPSolveWorkspace *workspace,
                                          int nrhs);
 
 /*
+ * Exact basis-general influence row for a one-column weighted design:
+ * w_i z_i z_eval / sum_j(w_j z_j^2).  positive_weights_only preserves the
+ * QR owner's historical treatment of nonpositive weights; otherwise signed
+ * higher-order kernel weights are retained.  output_stride permits both
+ * contiguous native rows and strided R column-major matrix rows.  Returns
+ * zero on success; it never allocates or calls BLAS/LAPACK.
+ */
+int np_lp_width_one_influence_row(const double *basis_train,
+                                  int n,
+                                  const double *kw,
+                                  double basis_eval,
+                                  double *row_out,
+                                  size_t output_stride,
+                                  int positive_weights_only);
+
+/*
  * Reusable QR workspace for a leave-one-out local-polynomial influence row.
  * Width one computes the exact scalar influence row directly without QR
  * allocation or LAPACK.  Wider arithmetic and the dqrdc2/dqrqy transcript

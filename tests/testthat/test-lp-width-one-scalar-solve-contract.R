@@ -140,7 +140,7 @@ test_that("leave-one-out width-one influence rows never enter QR", {
 
   scalar <- lp_width_one_region(
     source,
-    "static inline int np_glp_width_one_influence_row(",
+    "int np_lp_width_one_influence_row(",
     "int np_glp_qr_drop_workspace_apply("
   )
   qr <- lp_width_one_region(
@@ -155,15 +155,17 @@ test_that("leave-one-out width-one influence rows never enter QR", {
     fixed = TRUE
   ))
   expect_true(grepl(
-    "active_weight*basis[0][i]*projection",
+    "active_weight*basis_train[i]*projection",
     scalar,
     fixed = TRUE
   ))
+  expect_true(grepl("positive_weights_only", scalar, fixed = TRUE))
   expect_false(grepl("F77_", scalar, fixed = TRUE))
   expect_false(grepl("np_glp_qr_drop_workspace_reserve", scalar, fixed = TRUE))
 
   expect_true(grepl("if(p == 1)", qr, fixed = TRUE))
-  expect_true(grepl("np_glp_width_one_influence_row(", qr, fixed = TRUE))
+  expect_true(grepl("np_lp_width_one_influence_row(", qr, fixed = TRUE))
+  expect_true(grepl("1U,\n                                         1)", qr, fixed = TRUE))
   expect_lt(
     regexpr("if(p == 1)", qr, fixed = TRUE),
     regexpr("np_glp_qr_drop_workspace_reserve(", qr, fixed = TRUE)
@@ -171,5 +173,40 @@ test_that("leave-one-out width-one influence rows never enter QR", {
   expect_lt(
     regexpr("if(p == 1)", qr, fixed = TRUE),
     regexpr("F77_NAME(dqrdc2)", qr, fixed = TRUE)
+  )
+})
+
+test_that("compiled width-one hats reuse the scalar influence primitive", {
+  hat_file <- locate_lp_width_one_source("reghat_fast.c")
+  skip_if(is.null(hat_file), "source file src/reghat_fast.c unavailable")
+  source <- paste(readLines(hat_file, warn = FALSE), collapse = "\n")
+
+  solve <- lp_width_one_region(
+    source,
+    "static int np_reghat_solve_system(",
+    "static int np_reghat_sources_finite("
+  )
+  hat_start <- regexpr("SEXP C_np_reghat_lp_matrix_fast(", source, fixed = TRUE)
+  expect_gt(hat_start, 0L)
+  hat <- substr(source, hat_start, nchar(source))
+
+  expect_true(grepl("if(nterms == 1)", solve, fixed = TRUE))
+  expect_true(grepl("rhs[0]/matrix[0]", solve, fixed = TRUE))
+  expect_lt(
+    regexpr("if(nterms == 1)", solve, fixed = TRUE),
+    regexpr("F77_CALL(dlange)", solve, fixed = TRUE)
+  )
+  expect_lt(
+    regexpr("if(nterms == 1)", solve, fixed = TRUE),
+    regexpr("F77_CALL(dgesv)", solve, fixed = TRUE)
+  )
+
+  expect_true(grepl("if((nterms == 1)", hat, fixed = TRUE))
+  expect_true(grepl("np_lp_width_one_influence_row(", hat, fixed = TRUE))
+  expect_true(grepl("(size_t)neval,\n                                      0)", hat,
+                    fixed = TRUE))
+  expect_lt(
+    regexpr("np_lp_width_one_influence_row(", hat, fixed = TRUE),
+    regexpr("F77_CALL(dgemm)", hat, fixed = TRUE)
   )
 })
