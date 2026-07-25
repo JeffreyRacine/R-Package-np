@@ -14,10 +14,11 @@
 
 /*
  * Exact compiled counterpart of the R loop in
- * .npreghat_exact_lp_matrix_from_kernel_weights().  The caller limits this
- * route to R's BLAS-backed matprod modes.  Matrix products, LAPACK condition
- * checks, ridge increments, and final row construction deliberately retain
- * the incumbent operation order.
+ * .npreghat_exact_lp_matrix_from_kernel_weights().  Width one is scalar and
+ * independent of R's matprod mode; wider systems retain the incumbent
+ * BLAS-backed route.  Matrix products, LAPACK condition checks, ridge
+ * increments, and final row construction deliberately retain the incumbent
+ * operation order for those wider systems.
  */
 
 static int np_matrix_dims(SEXP x, int *nr, int *nc)
@@ -90,6 +91,14 @@ static int np_reghat_solve_system(const int nterms,
   int info = 0;
   double anorm = 0.0;
   double rcond = 0.0;
+
+  if(nterms == 1){
+    const double scalar_solution = rhs[0]/matrix[0];
+    if(!isfinite(scalar_solution))
+      return 0;
+    solution[0] = scalar_solution;
+    return 1;
+  }
 
   memcpy(matrix_work, matrix,
          (size_t)nterms*(size_t)nterms*sizeof(double));
@@ -183,6 +192,16 @@ SEXP C_np_reghat_lp_matrix_fast(SEXP kw, SEXP wtrain, SEXP weval)
 
     if((j == 0) || (j + 1 == neval) || ((j % 32) == 0))
       R_CheckUserInterrupt();
+
+    if((nterms == 1) &&
+       (np_lp_width_one_influence_row(REAL(wtrain),
+                                      ntrain,
+                                      weights,
+                                      REAL(weval)[j],
+                                      REAL(out) + j,
+                                      (size_t)neval,
+                                      0) == 0))
+      continue;
 
     for(int term = 0; term < nterms; term++){
       const double * const src = REAL(wtrain) + (size_t)term*(size_t)ntrain;

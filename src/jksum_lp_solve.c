@@ -352,33 +352,40 @@ int np_glp_qr_drop_workspace_reserve(NPGLPQRDropWorkspace *workspace,
  * dqrdc2/dqrqy.  Nonpositive weights retain the incumbent zero-weight
  * treatment.
  */
-static inline int np_glp_width_one_influence_row(double **basis,
-                                                 int n,
-                                                 const double *kw,
-                                                 int eval_pos,
-                                                 double *row_out)
+int np_lp_width_one_influence_row(const double *basis_train,
+                                  int n,
+                                  const double *kw,
+                                  double basis_eval,
+                                  double *row_out,
+                                  size_t output_stride,
+                                  int positive_weights_only)
 {
-  const double eval_basis = basis[0][eval_pos];
   double denominator = 0.0;
   double projection;
   int i;
 
+  if((basis_train == NULL) || (kw == NULL) || (row_out == NULL) ||
+     (n <= 0) || (output_stride == 0U))
+    return 1;
+
   for(i = 0; i < n; i++){
-    const double active_weight = (kw[i] > 0.0) ? kw[i] : 0.0;
-    const double zi = basis[0][i];
+    const double active_weight =
+      positive_weights_only ? ((kw[i] > 0.0) ? kw[i] : 0.0) : kw[i];
+    const double zi = basis_train[i];
     denominator += active_weight*zi*zi;
   }
 
-  projection = eval_basis/denominator;
+  projection = basis_eval/denominator;
   if(!R_FINITE(projection))
     return 1;
 
   for(i = 0; i < n; i++){
-    const double active_weight = (kw[i] > 0.0) ? kw[i] : 0.0;
-    const double value = active_weight*basis[0][i]*projection;
+    const double active_weight =
+      positive_weights_only ? ((kw[i] > 0.0) ? kw[i] : 0.0) : kw[i];
+    const double value = active_weight*basis_train[i]*projection;
     if(!R_FINITE(value))
       return 1;
-    row_out[i] = value;
+    row_out[(size_t)i*output_stride] = value;
   }
 
   return 0;
@@ -402,11 +409,13 @@ int np_glp_qr_drop_workspace_apply(NPGLPQRDropWorkspace *workspace,
     return 1;
 
   if(p == 1)
-    return np_glp_width_one_influence_row(basis,
-                                          n,
-                                          kw,
-                                          eval_pos,
-                                          row_out);
+    return np_lp_width_one_influence_row(basis[0],
+                                         n,
+                                         kw,
+                                         basis[0][eval_pos],
+                                         row_out,
+                                         1U,
+                                         1);
 
   if(!np_glp_qr_drop_workspace_reserve(workspace, n, p))
     return 1;

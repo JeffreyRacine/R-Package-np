@@ -100,3 +100,56 @@ test_that("compiled LP hat matrix preserves the incumbent ridge sequence", {
   )
   expect_identical(compiled, reference)
 })
+
+test_that("width-one scalar hats retain signed higher-order kernel weights", {
+  old <- getOption("matprod")
+  on.exit(options(matprod = old), add = TRUE)
+
+  set.seed(2026072504L)
+  n <- 97L
+  tx <- data.frame(x1 = runif(n), x2 = runif(n))
+  ex <- tx[seq_len(19L), , drop = FALSE]
+  y <- sin(tx$x1) - cos(tx$x2) + rnorm(n, sd = 0.1)
+  bw <- npregbw(
+    xdat = tx, ydat = y, regtype = "lp", degree = c(0L, 0L),
+    degree.select = "manual", basis = "glp", bernstein.basis = FALSE,
+    bwmethod = "cv.ls", bwtype = "fixed", ckertype = "gaussian",
+    ckerorder = 4L, bws = c(0.24, 0.29), bandwidth.compute = FALSE
+  )
+  kw <- suppressWarnings(np:::.np_kernel_weights_direct(
+    bws = bw, txdat = tx, exdat = ex, bandwidth.divide = TRUE,
+    kernel.pow = 1.0,
+    int.do.tree = np:::.npreg_fit_tree_code(
+      bw, ncon = bw$ncon, ncat = bw$nuno + bw$nord
+    )
+  ))
+  W.train <- np:::W.lp(
+    xdat = tx, degree = c(0L, 0L), basis = "glp",
+    bernstein.basis = FALSE
+  )
+  W.eval <- np:::W.lp(
+    xdat = ex, degree = c(0L, 0L), basis = "glp",
+    bernstein.basis = FALSE
+  )
+
+  expect_true(any(kw < 0.0))
+  reference <- .np_test_lp_hat_matrix_reference(kw, W.train, W.eval)
+  compiled <- .Call(
+    "C_np_reghat_lp_matrix_fast",
+    as.matrix(kw), as.matrix(W.train), as.matrix(W.eval), PACKAGE = "np"
+  )
+  expect_equal(compiled, reference, tolerance = 5e-15)
+
+  options(matprod = "internal")
+  internal <- npreghat(
+    bws = bw, txdat = tx, exdat = ex, output = "matrix", s = 0L
+  )
+  options(matprod = "default")
+  default <- npreghat(
+    bws = bw, txdat = tx, exdat = ex, output = "matrix", s = 0L
+  )
+  expect_identical(dim(internal), dim(compiled))
+  expect_identical(dim(default), dim(compiled))
+  expect_identical(as.double(internal), as.double(compiled))
+  expect_identical(as.double(default), as.double(compiled))
+})
