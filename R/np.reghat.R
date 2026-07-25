@@ -122,6 +122,16 @@ npreghat <-
   solved <- FALSE
   ridge <- ridge.grid[1L]
 
+  if (p == 1L) {
+    for (ridge.try in ridge.grid) {
+      denominator <- XtWX.diag[1L] + ridge.try
+      v <- w.eval[1L] / denominator
+      if (is.finite(denominator) && is.finite(v))
+        return(list(v = v, ridge = ridge.try))
+    }
+    return(NULL)
+  }
+
   for (ridge.try in ridge.grid) {
     ridge <- ridge.try
     A <- XtWX
