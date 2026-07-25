@@ -11232,6 +11232,14 @@ static inline void np_lp_accumulate_pair(const int nterms,
   double * const tj = rhs + (size_t)row_j*(size_t)nterms;
   double * const ti = rhs + (size_t)orig_ii*(size_t)nterms;
 
+  if(nterms == 1){
+    tj[0] += w*yi;
+    ti[0] += w*eval_ybasis[0];
+    sj[0] += w;
+    si[0] += w;
+    return;
+  }
+
   if(nterms == 2){
     const double b0 = basis[0][tree_ii];
     const double b1 = basis[1][tree_ii];

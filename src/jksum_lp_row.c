@@ -34,6 +34,72 @@ static inline void np_lp_dense_support_add(const int row,
   support_count[row] = count + 1;
 }
 
+/*
+  A one-column LP basis is the degree-zero constant basis.  Keep its resident
+  row scalar and implicit: no basis loads or general outer-product algebra.
+  The wider generated siblings below retain their incumbent transcript.
+*/
+static void np_lp_accumulate_dense_row_1(
+    const NPLPDenseRowContext *ctx)
+{
+  int i;
+  double * const stored_moment = ctx->moments + (size_t)ctx->row_j;
+  double * const stored_rhs = ctx->rhs + (size_t)ctx->row_j;
+  const double eval_response = ctx->response[ctx->eval_idx];
+  double fixed_moment = *stored_moment;
+  double fixed_rhs = *stored_rhs;
+
+  if(!ctx->use_tree){
+    for(i = 0; i < ctx->nsub; i++){
+      const int orig_ii = ctx->row_j + 1 + i;
+      const double weight = ctx->weights[i];
+
+      if(weight == 0.0)
+        continue;
+
+      if(ctx->track_lowsupport){
+        np_lp_dense_support_add(ctx->row_j, orig_ii, orig_ii, weight, 1,
+                                ctx->support_count, ctx->support_orig,
+                                ctx->support_data, ctx->support_weight);
+        np_lp_dense_support_add(orig_ii, ctx->row_j, ctx->eval_idx, weight, 1,
+                                ctx->support_count, ctx->support_orig,
+                                ctx->support_data, ctx->support_weight);
+      }
+
+      fixed_rhs += weight*ctx->response[orig_ii];
+      ctx->rhs[orig_ii] += weight*eval_response;
+      fixed_moment += weight;
+      ctx->moments[orig_ii] += weight;
+    }
+  } else {
+    for(i = 0; i < ctx->nsub; i++){
+      const int orig_ii = ctx->row_j + 1 + i;
+      const int ii = ctx->tree_lookup[orig_ii];
+      const double weight = ctx->weights[ii];
+
+      if(weight == 0.0)
+        continue;
+
+      if(ctx->track_lowsupport){
+        np_lp_dense_support_add(ctx->row_j, orig_ii, ii, weight, 1,
+                                ctx->support_count, ctx->support_orig,
+                                ctx->support_data, ctx->support_weight);
+        np_lp_dense_support_add(orig_ii, ctx->row_j, ctx->eval_idx, weight, 1,
+                                ctx->support_count, ctx->support_orig,
+                                ctx->support_data, ctx->support_weight);
+      }
+
+      fixed_rhs += weight*ctx->response[ii];
+      ctx->rhs[orig_ii] += weight*eval_response;
+      fixed_moment += weight;
+      ctx->moments[orig_ii] += weight;
+    }
+  }
+
+  *stored_rhs = fixed_rhs;
+  *stored_moment = fixed_moment;
+}
+
 #define NP_LP_DEFINE_RESIDENT_WIDTH(WIDTH)                                  \
 static void np_lp_accumulate_dense_row_##WIDTH(                             \
     const NPLPDenseRowContext *ctx)                                         \
@@ -111,7 +177,6 @@ static void np_lp_accumulate_dense_row_##WIDTH(                             \
   }                                                                          \
 }
 
-NP_LP_DEFINE_RESIDENT_WIDTH(1)
 NP_LP_DEFINE_RESIDENT_WIDTH(2)
 NP_LP_DEFINE_RESIDENT_WIDTH(4)
 NP_LP_DEFINE_RESIDENT_WIDTH(5)
