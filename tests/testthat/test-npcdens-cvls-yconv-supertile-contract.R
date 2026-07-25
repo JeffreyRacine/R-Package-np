@@ -35,7 +35,7 @@ test_that("CVLS Y convolution supertile is memory bounded and topology isolated"
   )
 
   expect_match(body, "num_obs <= block_size", fixed = TRUE)
-  expect_match(body, "int_ll_extern != LL_LP", fixed = TRUE)
+  expect_match(body, "np_lp_engine_extern != NP_LP_ENGINE_GENERAL", fixed = TRUE)
   expect_match(body, "num_reg_continuous_extern <= 0", fixed = TRUE)
   expect_match(body, "vector_glp_degree_extern == NULL", fixed = TRUE)
   expect_match(body, "BANDWIDTH_den_extern != BW_FIXED", fixed = TRUE)
@@ -104,7 +104,7 @@ test_that("CVLS Y convolution supertile dispatch leaves excluded routes intact",
   )
 
   dispatch <- paste(
-    "if((int_ll_extern == LL_LP) &&",
+    "if((np_lp_engine_extern == NP_LP_ENGINE_GENERAL) &&",
     "(num_reg_continuous_extern > 0) &&",
     "(vector_glp_degree_extern != NULL) &&",
     "(int_TREE_X != NP_TREE_TRUE) &&",

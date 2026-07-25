@@ -96,7 +96,7 @@ test_that("CVLS row reuse covers fixed and generalized NN but not npcdist", {
   )), 1L)
   expect_match(
     density_body,
-    "(int_ll_extern == LL_LP) && (BANDWIDTH_den_extern == BW_FIXED)",
+    "(np_lp_engine_extern == NP_LP_ENGINE_GENERAL) && (BANDWIDTH_den_extern == BW_FIXED)",
     fixed = TRUE
   )
   expect_false(grepl(
@@ -111,7 +111,7 @@ test_that("CVLS row reuse covers fixed and generalized NN but not npcdist", {
     fixed = TRUE
   )[[1L]]
   fixed_start <- regexpr(
-    "if((int_ll_extern == LL_LP) && (BANDWIDTH_den_extern == BW_FIXED))",
+    "if((np_lp_engine_extern == NP_LP_ENGINE_GENERAL) && (BANDWIDTH_den_extern == BW_FIXED))",
     density_body,
     fixed = TRUE
   )[[1L]]
@@ -123,7 +123,9 @@ test_that("CVLS row reuse covers fixed and generalized NN but not npcdist", {
     generalized_block,
     fixed = TRUE
   ))
-  expect_match(generalized_block, "if(int_ll_extern == LL_LP)", fixed = TRUE)
+  expect_match(generalized_block,
+               "if(np_lp_engine_extern == NP_LP_ENGINE_GENERAL)",
+               fixed = TRUE)
   expect_equal(lengths(regmatches(
     generalized_block,
     gregexpr("np_conditional_x_weight_block_stream_core_impl\\(", generalized_block, perl = TRUE)

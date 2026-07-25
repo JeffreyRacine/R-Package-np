@@ -50,7 +50,7 @@ test_that("canonical LP CV route predicates remain centralized", {
   expect_equal(sum(grepl("np_glp_binom_coeff", lines, fixed = TRUE)), 0L)
   expect_equal(sum(grepl("np_reg_use_canonical_glp_degree1_estimation", lines, fixed = TRUE)), 0L)
   expect_equal(sum(grepl("LL_LL", lines, fixed = TRUE)), 0L)
-  expect_equal(sum(grepl("const int int_ll_est = int_ll;", lines, fixed = TRUE)), 1L)
+  expect_equal(sum(grepl("const int lp_engine_est = lp_engine;", lines, fixed = TRUE)), 1L)
   expect_equal(sum(grepl("if(kpow == 2)", lines, fixed = TRUE)), 1L)
   expect_equal(sum(grepl("wbuf[k] = (weights[k] == 0.0) ? 0.0 : wk*wk;", lines, fixed = TRUE)), 1L)
 
@@ -132,11 +132,10 @@ test_that("legacy LL compute engines and restoration switches are absent", {
   for (token in forbidden)
     expect_false(grepl(token, source, fixed = TRUE), info = token)
 
-  expect_false(grepl(
-    "int_ll_extern == LL_LP) ? LL_LP : LL_LC",
-    source,
-    fixed = TRUE
-  ))
+  for (token in c("LL_LC", "LL_LP", "LL_GLP", "int_ll", "int_ll_extern"))
+    expect_false(grepl(token, source, fixed = TRUE), info = token)
+  expect_true(grepl("NP_LP_ENGINE_SCALAR", source, fixed = TRUE))
+  expect_true(grepl("NP_LP_ENGINE_GENERAL", source, fixed = TRUE))
 })
 
 test_that("fixed resident-row LP CV uses the reusable uncentered solve workspace", {
@@ -298,7 +297,7 @@ test_that("canonical LP fit and evaluation avoid legacy solve marshalling", {
   expect_false(grepl("MATRIX XtX", shortcut_body, fixed = TRUE))
 
   helper_start <- grep(
-    "^  } else if\\(int_ll_est == LL_LP\\) \\{ // local polynomial \\(regtype = \"lp\"\\)$",
+    "^  } else if\\(lp_engine_est == NP_LP_ENGINE_GENERAL\\) \\{ // local polynomial \\(regtype = \"lp\"\\)$",
     lines
   )
   helper_stop <- grep("^finish_regression_estimation:$", lines)
