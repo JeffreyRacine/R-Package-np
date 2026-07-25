@@ -11731,6 +11731,14 @@ static inline void np_lp_accumulate_pair(const int nterms,
   double * const tj = rhs + (size_t)row_j*(size_t)nterms;
   double * const ti = rhs + (size_t)orig_ii*(size_t)nterms;
 
+  if(nterms == 1){
+    tj[0] += w*yi;
+    ti[0] += w*eval_ybasis[0];
+    sj[0] += w;
+    si[0] += w;
+    return;
+  }
+
   if(nterms == 2){
     const double b0 = basis[0][tree_ii];
     const double b1 = basis[1][tree_ii];
@@ -11992,6 +12000,12 @@ static inline void np_lp_accumulate_row(const int nterms,
   const double yi = vector_Y[tree_ii];
   double * const sj = moments + (size_t)row_j*(size_t)nterms*(size_t)nterms;
   double * const tj = rhs + (size_t)row_j*(size_t)nterms;
+
+  if(nterms == 1){
+    tj[0] += w*yi;
+    sj[0] += w;
+    return;
+  }
 
   for(a = 0; a < nterms; a++){
     const double bia = basis[a][tree_ii];
@@ -12782,30 +12796,60 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
       double * const sj = moments_acc + (size_t)j*(size_t)nterms*(size_t)nterms;
       double * const tj = rhs_acc + (size_t)j*(size_t)nterms;
 
-      for(i = 0; i < num_obs; i++){
-        const int ii = use_tree ? ipt_lookup_extern_X[i] : i;
-        const double w = kw[ii];
-        const double yi = vector_Y[ii];
+      if(nterms == 1){
+        double sj0 = sj[0];
+        double tj0 = tj[0];
 
-        if((i == j) || (w == 0.0))
-          continue;
+        for(i = 0; i < num_obs; i++){
+          const int ii = use_tree ? ipt_lookup_extern_X[i] : i;
+          const double w = kw[ii];
 
-        if(track_lowsupport)
-          np_lp_cvls_support_add(j,
-                                  i,
-                                  ii,
-                                  w,
-                                  nterms,
-                                  support_count_acc,
-                                  support_orig_acc,
-                                  support_data_acc,
-                                  support_weight_acc);
+          if((i == j) || (w == 0.0))
+            continue;
 
-        for(a = 0; a < nterms; a++){
-          const double bia = basis[a][ii];
-          tj[a] += w*bia*yi;
-          for(b = 0; b < nterms; b++)
-            sj[a*nterms+b] += w*bia*basis[b][ii];
+          if(track_lowsupport)
+            np_lp_cvls_support_add(j,
+                                    i,
+                                    ii,
+                                    w,
+                                    1,
+                                    support_count_acc,
+                                    support_orig_acc,
+                                    support_data_acc,
+                                    support_weight_acc);
+
+          tj0 += w*vector_Y[ii];
+          sj0 += w;
+        }
+
+        tj[0] = tj0;
+        sj[0] = sj0;
+      } else {
+        for(i = 0; i < num_obs; i++){
+          const int ii = use_tree ? ipt_lookup_extern_X[i] : i;
+          const double w = kw[ii];
+          const double yi = vector_Y[ii];
+
+          if((i == j) || (w == 0.0))
+            continue;
+
+          if(track_lowsupport)
+            np_lp_cvls_support_add(j,
+                                    i,
+                                    ii,
+                                    w,
+                                    nterms,
+                                    support_count_acc,
+                                    support_orig_acc,
+                                    support_data_acc,
+                                    support_weight_acc);
+
+          for(a = 0; a < nterms; a++){
+            const double bia = basis[a][ii];
+            tj[a] += w*bia*yi;
+            for(b = 0; b < nterms; b++)
+              sj[a*nterms+b] += w*bia*basis[b][ii];
+          }
         }
       }
     } else if(nterms == 3){
