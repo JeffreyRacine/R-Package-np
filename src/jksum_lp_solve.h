@@ -87,8 +87,10 @@ int np_lp_solve_workspace_solve_factored(NPLPSolveWorkspace *workspace,
 
 /*
  * Reusable QR workspace for a leave-one-out local-polynomial influence row.
- * The arithmetic and dqrdc2/dqrqy transcript match the historical helper;
- * only allocation ownership moves from each row to the enclosing owner.
+ * Width one computes the exact scalar influence row directly without QR
+ * allocation or LAPACK.  Wider arithmetic and the dqrdc2/dqrqy transcript
+ * match the historical helper; only allocation ownership moves from each row
+ * to the enclosing owner.
  */
 void np_glp_qr_drop_workspace_init(NPGLPQRDropWorkspace *workspace);
 void np_glp_qr_drop_workspace_clear(NPGLPQRDropWorkspace *workspace);
