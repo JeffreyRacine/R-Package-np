@@ -489,6 +489,12 @@ static int np_lp_full_row_bad_rcond(NPLPFullRowWorkspace *workspace,
      (workspace->gram == NULL))
     return 1;
 
+  if(p == 1){
+    const double gram = workspace->gram[0];
+    return (!R_FINITE(gram) || !(fabs(gram) > 0.0) ||
+            (1.0 < min_rcond));
+  }
+
   for(j = 0; j < p; j++)
     for(i = 0; i < p; i++)
       workspace->matrix_copy[i + j*p] =
@@ -553,6 +559,11 @@ int np_lp_full_row_workspace_solve(NPLPFullRowWorkspace *workspace,
      !np_lp_size_product((size_t)p, (size_t)nrhs, &rhs_elements) ||
      (rhs_elements > workspace->rhs_capacity))
     return 0;
+  if(p == 1)
+    return np_lp_solve_width_one(workspace->gram[0],
+                                 workspace->rhs,
+                                 workspace->rhs,
+                                 nrhs);
   F77_CALL(dgesv)(&p, &nrhs,
                   workspace->gram, &p,
                   workspace->ipiv,
@@ -632,6 +643,13 @@ int np_lp_full_row_workspace_invert(NPLPFullRowWorkspace *workspace,
   if(!np_lp_full_row_workspace_reserve(workspace, p, 1) ||
      np_lp_full_row_bad_rcond(workspace, p, min_rcond))
     return 0;
+  if(p == 1){
+    const double inverse = 1.0/workspace->gram[0];
+    if(!R_FINITE(inverse))
+      return 0;
+    workspace->gram[0] = inverse;
+    return 1;
+  }
   return np_lp_full_row_workspace_factor_invert(workspace, p);
 }
 
@@ -657,8 +675,16 @@ int np_lp_full_row_workspace_invert_retryable(
     memcpy(workspace->gram,
            workspace->matrix_copy,
            gram_elements*sizeof(double));
-    if(np_lp_full_row_workspace_factor_invert(workspace, p))
-      return 1;
+    if(p == 1){
+      const double inverse = 1.0/workspace->gram[0];
+      if(R_FINITE(inverse)){
+        workspace->gram[0] = inverse;
+        return 1;
+      }
+    } else {
+      if(np_lp_full_row_workspace_factor_invert(workspace, p))
+        return 1;
+    }
     for(i = 0; i < p; i++)
       workspace->matrix_copy[i + i*p] += ridge_increment;
   }
