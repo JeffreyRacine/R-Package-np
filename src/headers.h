@@ -214,6 +214,8 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor, double **rhs_cols
 int np_conditional_density_cvml_lp_stream(double *vector_scale_factor, double *cv);
 int np_conditional_density_cvls_lp_stream(double *vector_scale_factor, double *cv);
 int np_conditional_distribution_cvls_lp_stream(double *vector_scale_factor, double *cv);
+int np_conditional_lp_stream_engine_supported(void);
+int np_conditional_density_cvml_stream_engine_supported(void);
 void np_bwm_set_deferred_error(const char *msg);
 const char *np_bwm_get_deferred_error(void);
 void np_bwm_clear_deferred_error(void);

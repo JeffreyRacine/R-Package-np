@@ -10961,6 +10961,25 @@ static inline int np_reg_cv_use_canonical_lp_fixed_kernel(const int bwm,
   return nterms <= NP_REG_CV_LP_RESIDENT_MAX_TERMS;
 }
 
+/*
+ * Width-one fixed objectives use two canonical scalar siblings.  Dense rows
+ * and compact-support trees in one or two continuous dimensions favor the
+ * symmetric resident-row traversal.  From three tree dimensions onward the
+ * directed scalar traversal below is faster because it keeps one complete
+ * fitted row local and avoids sparse partner-row traffic.  The selector is
+ * topology-only: public LC and explicit LP0 reach the same sibling.
+ */
+static inline int np_reg_cv_scalar_use_resident_fixed(
+    const int bwm,
+    const int BANDWIDTH_reg,
+    const int num_reg_continuous,
+    const int ks_tree_use){
+  return (BANDWIDTH_reg == BW_FIXED) &&
+    (num_reg_continuous > 0) &&
+    ((bwm == RBWM_CVLS) || (bwm == RBWM_CVAIC)) &&
+    ((!ks_tree_use) || (num_reg_continuous <= 2));
+}
+
 static int np_lp_fixed_tree_sparse_supported(const int num_reg_unordered,
                                               const int num_reg_ordered,
                                               const int num_reg_continuous,
@@ -11214,6 +11233,26 @@ static inline double np_lp_tree_support_weight(const NPLPTreeSupportCtx *ctx,
   return w;
 }
 
+static inline void np_lp_accumulate_pair_width_one(
+                                          double *vector_Y,
+                                          double *moments,
+                                          double *rhs,
+                                          double *row_moment,
+                                          double *row_rhs,
+                                          const double eval_y,
+                                          const int orig_ii,
+                                          const int tree_ii,
+                                          const double w){
+  const double yi = vector_Y[tree_ii];
+  double * const si = moments + (size_t)orig_ii;
+  double * const ti = rhs + (size_t)orig_ii;
+
+  *row_rhs += w*yi;
+  ti[0] += w*eval_y;
+  *row_moment += w;
+  si[0] += w;
+}
+
 static inline void np_lp_accumulate_pair(const int nterms,
                                           double **basis,
                                           double *vector_Y,
@@ -11426,6 +11465,14 @@ static int np_lp_cvls_lowsupport_fit(const int nterms,
   if((m <= 0) || (m > nterms))
     return 0;
 
+  if(nterms == 1){
+    const double value = vector_Y[support_data[0]];
+    if(!isfinite(value))
+      return 0;
+    *fit = value;
+    return 1;
+  }
+
   order = (int *)malloc((size_t)m*(size_t)2*sizeof(int));
   A = (double *)calloc((size_t)lda*(size_t)nterms, sizeof(double));
   B = (double *)calloc((size_t)ldb, sizeof(double));
@@ -11575,14 +11622,23 @@ static int np_lp_fixed_tree_sparse_accumulate(
   for(j = 0; j < num_obs - 1; j++){
     const int eval_idx = ipt_lookup_extern_X[j];
     const double yj = vector_Y[eval_idx];
+    double scalar_moment = 0.0;
+    double scalar_rhs = 0.0;
     int a, b;
 
-    for(a = 0; a < nterms; a++){
-      const double bja = basis[a][eval_idx];
-      const int aoff = a*nterms;
-      eval_ybasis[a] = bja*yj;
-      for(b = 0; b < nterms; b++)
-        eval_outer[aoff+b] = bja*basis[b][eval_idx];
+    if(nterms == 1){
+      eval_ybasis[0] = yj;
+      eval_outer[0] = 1.0;
+      scalar_moment = moments[j];
+      scalar_rhs = rhs[j];
+    } else {
+      for(a = 0; a < nterms; a++){
+        const double bja = basis[a][eval_idx];
+        const int aoff = a*nterms;
+        eval_ybasis[a] = bja*yj;
+        for(b = 0; b < nterms; b++)
+          eval_outer[aoff+b] = bja*basis[b][eval_idx];
+      }
     }
 
     if(!np_lp_tree_support_prepare_row(&sctx,
@@ -11719,19 +11775,35 @@ static int np_lp_fixed_tree_sparse_accumulate(
                                       support_data,
                                       support_weight);
             }
-            np_lp_accumulate_pair(nterms,
-                                   basis,
-                                   vector_Y,
-                                   moments,
-                                   rhs,
-                                   j,
-                                   eval_ybasis,
-                                   eval_outer,
-                                   orig_ii,
-                                   ii,
-                                   w);
+            if(nterms == 1){
+              np_lp_accumulate_pair_width_one(vector_Y,
+                                               moments,
+                                               rhs,
+                                               &scalar_moment,
+                                               &scalar_rhs,
+                                               yj,
+                                               orig_ii,
+                                               ii,
+                                               w);
+            } else {
+              np_lp_accumulate_pair(nterms,
+                                     basis,
+                                     vector_Y,
+                                     moments,
+                                     rhs,
+                                     j,
+                                     eval_ybasis,
+                                     eval_outer,
+                                     orig_ii,
+                                     ii,
+                                     w);
+            }
           }
         }
+      }
+      if(nterms == 1){
+        moments[j] = scalar_moment;
+        rhs[j] = scalar_rhs;
       }
       continue;
     }
@@ -11803,19 +11875,36 @@ static int np_lp_fixed_tree_sparse_accumulate(
             if(absdiff > tol)
               oracle_mismatch++;
           }
-          np_lp_accumulate_pair(nterms,
-                                 basis,
-                                 vector_Y,
-                                 moments,
-                                 rhs,
-                                 j,
-                                 eval_ybasis,
-                                 eval_outer,
-                                 orig_ii,
-                                 ii,
-                                 w);
+          if(nterms == 1){
+            np_lp_accumulate_pair_width_one(vector_Y,
+                                             moments,
+                                             rhs,
+                                             &scalar_moment,
+                                             &scalar_rhs,
+                                             yj,
+                                             orig_ii,
+                                             ii,
+                                             w);
+          } else {
+            np_lp_accumulate_pair(nterms,
+                                   basis,
+                                   vector_Y,
+                                   moments,
+                                   rhs,
+                                   j,
+                                   eval_ybasis,
+                                   eval_outer,
+                                   orig_ii,
+                                   ii,
+                                   w);
+          }
         }
       }
+    }
+
+    if(nterms == 1){
+      moments[j] = scalar_moment;
+      rhs[j] = scalar_rhs;
     }
 
     if(do_oracle){
@@ -11904,7 +11993,7 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
   if((num_obs <= 0) || (num_reg_continuous <= 0))
     return result;
 
-  if((basis == NULL) || (nterms <= 0))
+  if((nterms <= 0) || ((nterms > 1) && (basis == NULL)))
     goto cleanup_lp_cv;
 
   if(nterms > INT_MAX/nterms)
@@ -12229,8 +12318,12 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
     double nepsilon = 0.0;
     double fit = 0.0;
 
-    for(a = 0; a < nterms; a++)
-      eval_basis[a] = basis[a][eval_idx];
+    if(nterms == 1){
+      eval_basis[0] = 1.0;
+    } else {
+      for(a = 0; a < nterms; a++)
+        eval_basis[a] = basis[a][eval_idx];
+    }
 
     for(a = 0; a < nterms; a++)
       solve_workspace.rhs_source[a] = tj[a];
@@ -13193,6 +13286,37 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
     }
   }
 
+  if((lp_engine == NP_LP_ENGINE_SCALAR) &&
+     np_reg_cv_scalar_use_resident_fixed(bwm,
+                                         BANDWIDTH_reg,
+                                         num_reg_continuous,
+                                         ks_tree_use)){
+    const NPRegCvLpResult lp0_result =
+      np_regression_cv_lp_basis_fixed(bwm,
+                                      num_obs,
+                                      num_reg_unordered,
+                                      num_reg_ordered,
+                                      num_reg_continuous,
+                                      matrix_X_unordered,
+                                      matrix_X_ordered,
+                                      matrix_X_continuous,
+                                      vector_Y,
+                                      vector_scale_factor,
+                                      num_categories,
+                                      kernel_c,
+                                      kernel_u,
+                                      kernel_o,
+                                      operator,
+                                      lambda,
+                                      matrix_bandwidth,
+                                      1,
+                                      NULL,
+                                      ks_tree_use);
+    cv = lp0_result.cv;
+    traceH = lp0_result.traceH;
+    goto finish_cv_path;
+  }
+
   if(bwm == RBWM_CVAIC){
     // compute normalisation constant
 
@@ -14048,7 +14172,7 @@ double *cv){
   }
 
   if(((BANDWIDTH_den == BW_FIXED) || (BANDWIDTH_den == BW_GEN_NN) || (BANDWIDTH_den == BW_ADAP_NN)) &&
-     (np_lp_engine_extern == NP_LP_ENGINE_GENERAL))
+     np_conditional_lp_stream_engine_supported())
     return np_conditional_distribution_cvls_lp_stream(vector_scale_factor, cv);
 
   int indy;
@@ -22666,7 +22790,8 @@ static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_f
                                                           int block_rows,
                                                           int drop_eval_self,
                                                           const NPConditionalXBlockBwCtx *bwctx,
-                                                          double **rows_out){
+                                                          double **rows_out,
+                                                          double **paired_full_rows_out){
   const int num_train = num_obs_train_extern;
   const int num_reg_tot = num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern;
   const int lp_engine = np_lp_engine_extern;
@@ -22877,18 +23002,37 @@ static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_f
     }
     np_conditional_pop_bounds(&bounds_state);
 
-    if(drop_eval_self)
+    if(drop_eval_self && (paired_full_rows_out == NULL))
       kw[eval_pos] = 0.0;
 
     if(lp_engine == NP_LP_ENGINE_SCALAR){
-      double row_sum = 0.0;
-      for(j = 0; j < num_train; j++)
-        row_sum += kw[j];
-      if(!(row_sum > DBL_MIN))
-        goto cleanup_xweight_block;
-      for(j = 0; j < num_train; j++){
-        const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
-        rows_out[i][orig_j] = kw[j]/row_sum;
+      if(paired_full_rows_out != NULL){
+        double loo_sum = 0.0;
+        double full_sum = 0.0;
+
+        for(j = 0; j < num_train; j++){
+          full_sum += kw[j];
+          if(j != eval_pos)
+            loo_sum += kw[j];
+        }
+        if(!(loo_sum > DBL_MIN) || !(full_sum > DBL_MIN))
+          goto cleanup_xweight_block;
+        for(j = 0; j < num_train; j++){
+          const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
+          rows_out[i][orig_j] =
+            (j == eval_pos) ? 0.0 : kw[j]/loo_sum;
+          paired_full_rows_out[i][orig_j] = kw[j]/full_sum;
+        }
+      } else {
+        double row_sum = 0.0;
+        for(j = 0; j < num_train; j++)
+          row_sum += kw[j];
+        if(!(row_sum > DBL_MIN))
+          goto cleanup_xweight_block;
+        for(j = 0; j < num_train; j++){
+          const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
+          rows_out[i][orig_j] = kw[j]/row_sum;
+        }
       }
     } else {
       const int k = np_glp_cv_cache.nterms;
@@ -22979,7 +23123,8 @@ static int np_conditional_x_weight_block_stream_core(double *vector_scale_factor
                                                         block_rows,
                                                         1,
                                                         NULL,
-                                                        rows_out);
+                                                        rows_out,
+                                                        NULL);
 }
 
 static int np_conditional_x_weight_block_full_stream_core(double *vector_scale_factor,
@@ -22991,7 +23136,34 @@ static int np_conditional_x_weight_block_full_stream_core(double *vector_scale_f
                                                         block_rows,
                                                         0,
                                                         NULL,
-                                                        rows_out);
+                                                        rows_out,
+                                                        NULL);
+}
+
+static int np_conditional_x_weight_block_pair_scalar_stream_core(
+    double *vector_scale_factor,
+    int eval_start,
+    int block_rows,
+    const NPConditionalXBlockBwCtx *bwctx,
+    double **loo_rows_out,
+    double **full_rows_out)
+{
+  if((np_lp_engine_extern != NP_LP_ENGINE_SCALAR) ||
+     (loo_rows_out == NULL) || (full_rows_out == NULL))
+    return 1;
+
+  /*
+   * Width one needs no factorization. Build the raw row once and normalize
+   * its full and LOO consumers independently. This avoids cancellation when
+   * the diagonal dominates while keeping scalar LP out of QR/LAPACK.
+   */
+  return np_conditional_x_weight_block_stream_core_impl(vector_scale_factor,
+                                                        eval_start,
+                                                        block_rows,
+                                                        1,
+                                                        bwctx,
+                                                        loo_rows_out,
+                                                        full_rows_out);
 }
 
 static int np_conditional_x_weight_block_pair_stream_core(double *vector_scale_factor,
@@ -23538,6 +23710,45 @@ cleanup_xweight_block_pair_gnn:
   if(kernel_ox != NULL) free(kernel_ox);
   if(x_operator != NULL) free(x_operator);
   return status;
+}
+
+static int np_conditional_x_weight_block_pair_selected_stream_core(
+    double *vector_scale_factor,
+    int eval_start,
+    int block_rows,
+    const NPConditionalXBlockBwCtx *bwctx,
+    double **loo_rows_out,
+    double **full_rows_out)
+{
+  if(np_lp_engine_extern == NP_LP_ENGINE_SCALAR)
+    return np_conditional_x_weight_block_pair_scalar_stream_core(
+      vector_scale_factor,
+      eval_start,
+      block_rows,
+      bwctx,
+      loo_rows_out,
+      full_rows_out);
+
+  if(np_lp_engine_extern != NP_LP_ENGINE_GENERAL)
+    return 1;
+  if(BANDWIDTH_den_extern == BW_GEN_NN)
+    return np_conditional_x_weight_block_pair_gnn_stream_core(
+      vector_scale_factor,
+      eval_start,
+      block_rows,
+      bwctx,
+      loo_rows_out,
+      full_rows_out);
+  if(BANDWIDTH_den_extern == BW_FIXED)
+    return np_conditional_x_weight_block_pair_stream_core(
+      vector_scale_factor,
+      eval_start,
+      block_rows,
+      bwctx,
+      loo_rows_out,
+      full_rows_out);
+
+  return 1;
 }
 
 static int np_conditional_y_block_stream_op_core(double *vector_scale_factor,
@@ -24551,6 +24762,20 @@ cleanup_cdist_all_large:
 static int np_conditional_density_cvml_lp_block_stream(double *vector_scale_factor,
                                                        double *cv);
 
+int np_conditional_lp_stream_engine_supported(void){
+  return (np_lp_engine_extern == NP_LP_ENGINE_GENERAL) ||
+    ((np_lp_engine_extern == NP_LP_ENGINE_SCALAR) &&
+     (num_reg_continuous_extern > 0) &&
+     (BANDWIDTH_den_extern != BW_ADAP_NN));
+}
+
+int np_conditional_density_cvml_stream_engine_supported(void){
+  return (np_lp_engine_extern == NP_LP_ENGINE_GENERAL) ||
+    ((np_lp_engine_extern == NP_LP_ENGINE_SCALAR) &&
+     (num_reg_continuous_extern > 1) &&
+     (BANDWIDTH_den_extern != BW_ADAP_NN));
+}
+
 int np_conditional_density_cvml_lp_stream(double *vector_scale_factor,
                                           double *cv){
   const int num_obs = num_obs_train_extern;
@@ -24638,7 +24863,7 @@ static int np_conditional_density_cvml_lp_block_stream(double *vector_scale_fact
 
   if((cv == NULL) || (vector_scale_factor == NULL) || (num_obs <= 0))
     return 1;
-  if(np_lp_engine_extern != NP_LP_ENGINE_GENERAL)
+  if(!np_conditional_density_cvml_stream_engine_supported())
     return 1;
   if((BANDWIDTH_den_extern != BW_FIXED) &&
      (BANDWIDTH_den_extern != BW_GEN_NN))
@@ -24887,10 +25112,11 @@ static int np_conditional_density_cvls_lp_supertile2_stream(
   int status = 1;
 
   if((cv == NULL) || (vector_scale_factor == NULL) ||
-     (num_obs <= block_size) || (np_lp_engine_extern != NP_LP_ENGINE_GENERAL))
+     (num_obs <= block_size) || !np_conditional_lp_stream_engine_supported())
     return 1;
   if((num_reg_continuous_extern <= 0) ||
-     (vector_glp_degree_extern == NULL))
+     ((np_lp_engine_extern == NP_LP_ENGINE_GENERAL) &&
+      (vector_glp_degree_extern == NULL)))
     return 1;
   if((BANDWIDTH_den_extern != BW_FIXED) &&
      (BANDWIDTH_den_extern != BW_GEN_NN))
@@ -24929,7 +25155,7 @@ static int np_conditional_density_cvls_lp_supertile2_stream(
                                                ib_first,
                                                &xbwctx) != 0)
         goto cleanup_cvls_lp_supertile2;
-      if(np_conditional_x_weight_block_pair_gnn_stream_core(
+      if(np_conditional_x_weight_block_pair_selected_stream_core(
            vector_scale_factor,
            i0,
            ib_first,
@@ -24939,12 +25165,13 @@ static int np_conditional_density_cvls_lp_supertile2_stream(
         goto cleanup_cvls_lp_supertile2;
       np_conditional_x_block_bw_ctx_clear(&xbwctx);
     } else {
-      if(np_conditional_x_weight_block_pair_stream_core(vector_scale_factor,
-                                                        i0,
-                                                        ib_first,
-                                                        NULL,
-                                                        loo_or_second,
-                                                        first_full) != 0)
+      if(np_conditional_x_weight_block_pair_selected_stream_core(
+           vector_scale_factor,
+           i0,
+           ib_first,
+           NULL,
+           loo_or_second,
+           first_full) != 0)
         goto cleanup_cvls_lp_supertile2;
     }
 
@@ -24966,7 +25193,7 @@ static int np_conditional_density_cvls_lp_supertile2_stream(
                                                  ib_second,
                                                  &xbwctx) != 0)
           goto cleanup_cvls_lp_supertile2;
-        if(np_conditional_x_weight_block_pair_gnn_stream_core(
+        if(np_conditional_x_weight_block_pair_selected_stream_core(
              vector_scale_factor,
              second_start,
              ib_second,
@@ -24976,7 +25203,7 @@ static int np_conditional_density_cvls_lp_supertile2_stream(
           goto cleanup_cvls_lp_supertile2;
         np_conditional_x_block_bw_ctx_clear(&xbwctx);
       } else {
-        if(np_conditional_x_weight_block_pair_stream_core(
+        if(np_conditional_x_weight_block_pair_selected_stream_core(
              vector_scale_factor,
              second_start,
              ib_second,
@@ -25127,9 +25354,10 @@ int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
      (BANDWIDTH_den_extern != BW_FIXED))
     return np_conditional_density_cvls_lp_row_stream(vector_scale_factor, cv);
 
-  if((np_lp_engine_extern == NP_LP_ENGINE_GENERAL) &&
+  if(np_conditional_lp_stream_engine_supported() &&
      (num_reg_continuous_extern > 0) &&
-     (vector_glp_degree_extern != NULL) &&
+     ((np_lp_engine_extern == NP_LP_ENGINE_SCALAR) ||
+      (vector_glp_degree_extern != NULL)) &&
      (int_TREE_X != NP_TREE_TRUE) &&
      (int_TREE_Y != NP_TREE_TRUE) &&
      (num_obs > block_size))
@@ -25161,39 +25389,26 @@ int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
        (num_reg_continuous_extern > 0)){
       if(np_conditional_x_block_bw_ctx_prepare(vector_scale_factor, i0, ib, &xbwctx) != 0)
         goto cleanup_cvls_lp_block;
-      if(np_lp_engine_extern == NP_LP_ENGINE_GENERAL){
-        if(np_conditional_x_weight_block_pair_gnn_stream_core(vector_scale_factor,
-                                                              i0,
-                                                              ib,
-                                                              &xbwctx,
-                                                              xblock,
-                                                              xblock_full) != 0)
-          goto cleanup_cvls_lp_block;
-      } else {
-        if(np_conditional_x_weight_block_stream_core_impl(vector_scale_factor,
-                                                          i0,
-                                                          ib,
-                                                          1,
-                                                          &xbwctx,
-                                                          xblock) != 0)
-          goto cleanup_cvls_lp_block;
-        if(np_conditional_x_weight_block_stream_core_impl(vector_scale_factor,
-                                                          i0,
-                                                          ib,
-                                                          0,
-                                                          &xbwctx,
-                                                          xblock_full) != 0)
-          goto cleanup_cvls_lp_block;
-      }
+      if(np_conditional_x_weight_block_pair_selected_stream_core(
+           vector_scale_factor,
+           i0,
+           ib,
+           &xbwctx,
+           xblock,
+           xblock_full) != 0)
+        goto cleanup_cvls_lp_block;
       np_conditional_x_block_bw_ctx_clear(&xbwctx);
     } else {
-      if((np_lp_engine_extern == NP_LP_ENGINE_GENERAL) && (BANDWIDTH_den_extern == BW_FIXED)){
-        if(np_conditional_x_weight_block_pair_stream_core(vector_scale_factor,
-                                                          i0,
-                                                          ib,
-                                                          NULL,
-                                                          xblock,
-                                                          xblock_full) != 0)
+      if((BANDWIDTH_den_extern == BW_FIXED) &&
+         ((np_lp_engine_extern == NP_LP_ENGINE_GENERAL) ||
+          (np_lp_engine_extern == NP_LP_ENGINE_SCALAR))){
+        if(np_conditional_x_weight_block_pair_selected_stream_core(
+             vector_scale_factor,
+             i0,
+             ib,
+             NULL,
+             xblock,
+             xblock_full) != 0)
           goto cleanup_cvls_lp_block;
       } else {
         if(np_conditional_x_weight_block_stream_core(vector_scale_factor, i0, ib, xblock) != 0)
@@ -27908,7 +28123,7 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
   const int use_lp_stream = (((BANDWIDTH_den == BW_FIXED) ||
                               (BANDWIDTH_den == BW_GEN_NN) ||
                               (BANDWIDTH_den == BW_ADAP_NN)) &&
-                             (np_lp_engine_extern == NP_LP_ENGINE_GENERAL));
+                             np_conditional_density_cvml_stream_engine_supported());
   const int bwmdim = (BANDWIDTH_den==BW_GEN_NN)?num_obs:
     ((BANDWIDTH_den==BW_ADAP_NN)?num_obs:1);
 

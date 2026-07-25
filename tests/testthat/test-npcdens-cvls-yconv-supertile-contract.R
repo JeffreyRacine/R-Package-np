@@ -35,9 +35,17 @@ test_that("CVLS Y convolution supertile is memory bounded and topology isolated"
   )
 
   expect_match(body, "num_obs <= block_size", fixed = TRUE)
-  expect_match(body, "np_lp_engine_extern != NP_LP_ENGINE_GENERAL", fixed = TRUE)
+  expect_match(
+    body,
+    "!np_conditional_lp_stream_engine_supported()",
+    fixed = TRUE
+  )
   expect_match(body, "num_reg_continuous_extern <= 0", fixed = TRUE)
-  expect_match(body, "vector_glp_degree_extern == NULL", fixed = TRUE)
+  expect_match(
+    gsub("[[:space:]]+", " ", body),
+    "((np_lp_engine_extern == NP_LP_ENGINE_GENERAL) && (vector_glp_degree_extern == NULL))",
+    fixed = TRUE
+  )
   expect_match(body, "BANDWIDTH_den_extern != BW_FIXED", fixed = TRUE)
   expect_match(body, "BANDWIDTH_den_extern != BW_GEN_NN", fixed = TRUE)
   expect_match(body, "int_TREE_X == NP_TREE_TRUE", fixed = TRUE)
@@ -104,9 +112,10 @@ test_that("CVLS Y convolution supertile dispatch leaves excluded routes intact",
   )
 
   dispatch <- paste(
-    "if((np_lp_engine_extern == NP_LP_ENGINE_GENERAL) &&",
+    "if(np_conditional_lp_stream_engine_supported() &&",
     "(num_reg_continuous_extern > 0) &&",
-    "(vector_glp_degree_extern != NULL) &&",
+    "((np_lp_engine_extern == NP_LP_ENGINE_SCALAR) ||",
+    "(vector_glp_degree_extern != NULL)) &&",
     "(int_TREE_X != NP_TREE_TRUE) &&",
     "(int_TREE_Y != NP_TREE_TRUE) &&",
     "(num_obs > block_size))"
