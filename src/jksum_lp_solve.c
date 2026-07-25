@@ -53,6 +53,33 @@ static int np_lp_solve_workspace_shape(
   return 1;
 }
 
+/*
+ * A one-term local-polynomial system is an exact scalar problem.  Keep this
+ * specialization inside the shared solve workspace so all of its width-one
+ * consumers use the same algebra and cannot fall through to LAPACK or a
+ * legacy LC evaluator.  Widths greater than one retain the existing LAPACK
+ * transcript.
+ */
+static inline int np_lp_solve_width_one(const double gram,
+                                        const double *rhs_source,
+                                        double *rhs_work,
+                                        int nrhs)
+{
+  int i;
+
+  if((rhs_source == NULL) || (rhs_work == NULL) || (nrhs <= 0))
+    return 0;
+
+  for(i = 0; i < nrhs; i++){
+    const double solution = rhs_source[i]/gram;
+    if(!R_FINITE(solution))
+      return 0;
+    rhs_work[i] = solution;
+  }
+
+  return 1;
+}
+
 int np_lp_solve_workspace_sources_finite(
   const NPLPSolveWorkspace *workspace,
   int p,
@@ -167,6 +194,18 @@ int np_lp_solve_workspace_solve(NPLPSolveWorkspace *workspace,
      (rhs_elements > workspace->rhs_capacity))
     return 0;
 
+  if(p == 1){
+    workspace->gram_work[0] = workspace->gram_source[0];
+    if(!np_lp_solve_width_one(workspace->gram_source[0],
+                              workspace->rhs_source,
+                              workspace->rhs_work,
+                              nrhs))
+      return 0;
+    workspace->factor_ready = 1;
+    workspace->factor_p = 1;
+    return 1;
+  }
+
   memcpy(workspace->gram_work,
          workspace->gram_source,
          gram_elements*sizeof(double));
@@ -205,6 +244,12 @@ int np_lp_solve_workspace_solve_factored(NPLPSolveWorkspace *workspace,
      !np_lp_size_product((size_t)p, (size_t)nrhs, &rhs_elements) ||
      (rhs_elements > workspace->rhs_capacity))
     return 0;
+
+  if(p == 1)
+    return np_lp_solve_width_one(workspace->gram_work[0],
+                                 workspace->rhs_source,
+                                 workspace->rhs_work,
+                                 nrhs);
 
   memcpy(workspace->rhs_work,
          workspace->rhs_source,

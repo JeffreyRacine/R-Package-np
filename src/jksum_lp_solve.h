@@ -49,10 +49,12 @@ typedef struct {
 
 /*
  * The caller owns the workspace and its lifetime.  gram_source/rhs_source are
- * the caller-mutable pristine system; solve copies them to gram_work/rhs_work,
- * lets LAPACK overwrite only the work buffers, and returns the solution in
- * rhs_work.  This preserves the source system for ridge retries and additional
- * right-hand sides without process-global scratch or per-solve allocation.
+ * the caller-mutable pristine system.  Width one is solved directly as scalar
+ * algebra; it never enters LAPACK.  Wider systems copy into
+ * gram_work/rhs_work and let LAPACK overwrite only the work buffers.  Both
+ * paths return the solution in rhs_work and preserve the source system for
+ * ridge retries and additional right-hand sides without process-global
+ * scratch or per-solve allocation.
  */
 void np_lp_solve_workspace_init(NPLPSolveWorkspace *workspace);
 void np_lp_solve_workspace_clear(NPLPSolveWorkspace *workspace);
