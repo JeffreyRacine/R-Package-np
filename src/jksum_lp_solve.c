@@ -341,6 +341,49 @@ int np_glp_qr_drop_workspace_reserve(NPGLPQRDropWorkspace *workspace,
   return 1;
 }
 
+/*
+ * A one-column weighted design has the exact influence row
+ *
+ *   w_i z_i z_eval / sum_j(w_j z_j^2).
+ *
+ * Compute it directly in training-row order.  This covers the implicit unit
+ * basis used by LP0 without assuming that the sole basis column is constant,
+ * and it prevents width one from allocating QR storage or entering
+ * dqrdc2/dqrqy.  Nonpositive weights retain the incumbent zero-weight
+ * treatment.
+ */
+static inline int np_glp_width_one_influence_row(double **basis,
+                                                 int n,
+                                                 const double *kw,
+                                                 int eval_pos,
+                                                 double *row_out)
+{
+  const double eval_basis = basis[0][eval_pos];
+  double denominator = 0.0;
+  double projection;
+  int i;
+
+  for(i = 0; i < n; i++){
+    const double active_weight = (kw[i] > 0.0) ? kw[i] : 0.0;
+    const double zi = basis[0][i];
+    denominator += active_weight*zi*zi;
+  }
+
+  projection = eval_basis/denominator;
+  if(!R_FINITE(projection))
+    return 1;
+
+  for(i = 0; i < n; i++){
+    const double active_weight = (kw[i] > 0.0) ? kw[i] : 0.0;
+    const double value = active_weight*basis[0][i]*projection;
+    if(!R_FINITE(value))
+      return 1;
+    row_out[i] = value;
+  }
+
+  return 0;
+}
+
 int np_glp_qr_drop_workspace_apply(NPGLPQRDropWorkspace *workspace,
                                    double **basis,
                                    int n,
@@ -355,8 +398,17 @@ int np_glp_qr_drop_workspace_apply(NPGLPQRDropWorkspace *workspace,
 
   if((workspace == NULL) || (basis == NULL) || (kw == NULL) ||
      (row_out == NULL) || (n <= 0) || (p <= 0) ||
-     (eval_pos < 0) || (eval_pos >= n) ||
-     !np_glp_qr_drop_workspace_reserve(workspace, n, p))
+     (eval_pos < 0) || (eval_pos >= n))
+    return 1;
+
+  if(p == 1)
+    return np_glp_width_one_influence_row(basis,
+                                          n,
+                                          kw,
+                                          eval_pos,
+                                          row_out);
+
+  if(!np_glp_qr_drop_workspace_reserve(workspace, n, p))
     return 1;
 
   memset(workspace->y, 0, (size_t)n*sizeof(double));

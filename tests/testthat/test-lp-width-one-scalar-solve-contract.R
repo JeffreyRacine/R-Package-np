@@ -132,3 +132,44 @@ test_that("full-row workspace dispatches width one before every LAPACK owner", {
     fixed = TRUE
   ))
 })
+
+test_that("leave-one-out width-one influence rows never enter QR", {
+  solve_file <- locate_lp_width_one_source("jksum_lp_solve.c")
+  skip_if(is.null(solve_file), "source file src/jksum_lp_solve.c unavailable")
+  source <- paste(readLines(solve_file, warn = FALSE), collapse = "\n")
+
+  scalar <- lp_width_one_region(
+    source,
+    "static inline int np_glp_width_one_influence_row(",
+    "int np_glp_qr_drop_workspace_apply("
+  )
+  qr <- lp_width_one_region(
+    source,
+    "int np_glp_qr_drop_workspace_apply(",
+    "void np_lp_full_row_workspace_init("
+  )
+
+  expect_true(grepl(
+    "active_weight*zi*zi",
+    scalar,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
+    "active_weight*basis[0][i]*projection",
+    scalar,
+    fixed = TRUE
+  ))
+  expect_false(grepl("F77_", scalar, fixed = TRUE))
+  expect_false(grepl("np_glp_qr_drop_workspace_reserve", scalar, fixed = TRUE))
+
+  expect_true(grepl("if(p == 1)", qr, fixed = TRUE))
+  expect_true(grepl("np_glp_width_one_influence_row(", qr, fixed = TRUE))
+  expect_lt(
+    regexpr("if(p == 1)", qr, fixed = TRUE),
+    regexpr("np_glp_qr_drop_workspace_reserve(", qr, fixed = TRUE)
+  )
+  expect_lt(
+    regexpr("if(p == 1)", qr, fixed = TRUE),
+    regexpr("F77_NAME(dqrdc2)", qr, fixed = TRUE)
+  )
+})
