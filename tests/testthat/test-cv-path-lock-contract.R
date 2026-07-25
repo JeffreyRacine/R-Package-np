@@ -173,12 +173,17 @@ test_that("fixed resident-row LP CV uses the reusable uncentered solve workspace
     fixed = TRUE
   ))
   expect_true(grepl(
-    "hii += eval_basis[a]*solve_workspace.rhs_work[a];",
+    "hii += eval_basis[a]*solve_workspace.rhs_work[nterms + a];",
     helper_body,
     fixed = TRUE
   ))
   expect_true(grepl(
-    "np_lp_solve_workspace_solve(&solve_workspace, nterms, 1)",
+    "np_lp_solve_workspace_sources_finite(",
+    helper_body,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
+    "ridge_steps >= NP_LP_SOLVE_MAX_RIDGE_STEPS",
     helper_body,
     fixed = TRUE
   ))
@@ -232,7 +237,13 @@ test_that("all-large, packed, and nearest-neighbor LP CV avoid legacy solve mars
     collapse = "\n"
   )
   expect_true(grepl(
-    "np_lp_solve_workspace_reserve(&solve_workspace, nrc1, 1)",
+    paste(
+      "np_lp_solve_workspace_reserve(",
+      "      &solve_workspace,",
+      "      nrc1,",
+      "      solve_nrhs)",
+      sep = "\n"
+    ),
     helper_body,
     fixed = TRUE
   ))
@@ -247,7 +258,7 @@ test_that("all-large, packed, and nearest-neighbor LP CV avoid legacy solve mars
     fixed = TRUE
   ))
   expect_true(grepl(
-    "hii += evalv[i]*solve_workspace.rhs_work[i];",
+    "hii += evalv[i]*solve_workspace.rhs_work[nrc1 + i];",
     helper_body,
     fixed = TRUE
   ))
@@ -367,7 +378,7 @@ test_that("conditional LP LOO QR rows reuse the canonical workspace", {
   expect_false(grepl("np_glp_qr_drop_row_bkcde", source, fixed = TRUE))
   expect_equal(
     sum(grepl("np_glp_qr_drop_workspace_apply\\(", lines)),
-    5L
+    6L
   )
 
   apply_start <- grep(

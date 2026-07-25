@@ -10,6 +10,8 @@
 #include <R_ext/Utils.h>
 #include <Rinternals.h>
 
+#include "jksum_lp_solve.h"
+
 /*
  * Exact compiled counterpart of the R loop in
  * .npreghat_exact_lp_matrix_from_kernel_weights().  The caller limits this
@@ -109,6 +111,21 @@ static int np_reghat_solve_system(const int nterms,
   return 1;
 }
 
+static int np_reghat_sources_finite(const int nterms,
+                                    const double * const matrix,
+                                    const double * const rhs)
+{
+  const size_t matrix_elements = (size_t)nterms*(size_t)nterms;
+
+  for(size_t i = 0; i < matrix_elements; i++)
+    if(!isfinite(matrix[i]))
+      return 0;
+  for(int i = 0; i < nterms; i++)
+    if(!isfinite(rhs[i]))
+      return 0;
+  return 1;
+}
+
 SEXP C_np_reghat_lp_matrix_fast(SEXP kw, SEXP wtrain, SEXP weval)
 {
   int ntrain = 0, neval = 0, kw_neval = 0;
@@ -185,13 +202,25 @@ SEXP C_np_reghat_lp_matrix_fast(SEXP kw, SEXP wtrain, SEXP weval)
 
     if(!np_reghat_solve_system(nterms, gram, rhs, gram_work, solution,
                                pivot, condition_work, condition_iwork)){
-      do {
+      int solved = 0;
+
+      if(!np_reghat_sources_finite(nterms, gram, rhs))
+        error("LP solve failed in compiled hat-matrix path: non-finite system");
+      for(int ridge_step = 0;
+          ridge_step < NP_LP_SOLVE_MAX_RIDGE_STEPS;
+          ridge_step++){
         for(int term = 0; term < nterms; term++)
           gram[term + (size_t)nterms*(size_t)term] += epsilon;
         nepsilon += epsilon;
         R_CheckUserInterrupt();
-      } while(!np_reghat_solve_system(nterms, gram, rhs, gram_work, solution,
-                                      pivot, condition_work, condition_iwork));
+        if(np_reghat_solve_system(nterms, gram, rhs, gram_work, solution,
+                                  pivot, condition_work, condition_iwork)){
+          solved = 1;
+          break;
+        }
+      }
+      if(!solved)
+        error("LP solve failed in compiled hat-matrix path after bounded ridging");
 
       {
         double denom = gram[0];

@@ -12942,14 +12942,21 @@ lp_cv_collective_gate:
                                   &fit)){
       nepsilon = 0.0;
     } else {
-    while(!np_lp_solve_workspace_solve(&solve_workspace,
-                                        nterms,
-                                        solve_nrhs)){
-      for(a = 0; a < nterms; a++)
-        solve_workspace.gram_source[a + a*nterms] += epsilon;
-      nepsilon += epsilon;
-      if(nepsilon > 128.0*epsilon)
-        goto cleanup_lp_cv;
+    {
+      int ridge_steps = 0;
+      while(!np_lp_solve_workspace_solve(&solve_workspace,
+                                         nterms,
+                                         solve_nrhs)){
+        if((ridge_steps >= NP_LP_SOLVE_MAX_RIDGE_STEPS) ||
+           !np_lp_solve_workspace_sources_finite(&solve_workspace,
+                                                 nterms,
+                                                 solve_nrhs))
+          goto cleanup_lp_cv;
+        for(a = 0; a < nterms; a++)
+          solve_workspace.gram_source[a + a*nterms] += epsilon;
+        nepsilon += epsilon;
+        ridge_steps++;
+      }
     }
 
     solve_workspace.rhs_source[0] +=
@@ -13449,6 +13456,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
       for(j = 0; j < num_obs; j++){
         double nepsilon = 0.0;
         double pnh = 1.0;
+        int ridge_steps = 0;
         double * const row_kwm = kwm + (size_t)j*(size_t)nrcc22;
 
 #ifdef MPI2
@@ -13790,12 +13798,22 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
           &solve_workspace,
           nrc1,
           solve_nrhs)){
+          if((ridge_steps >= NP_LP_SOLVE_MAX_RIDGE_STEPS) ||
+             !np_lp_solve_workspace_sources_finite(&solve_workspace,
+                                                   nrc1,
+                                                   solve_nrhs)){
+            glp_ok = 0;
+            break;
+          }
           for(i = 0; i < nrc1; i++){
             row_kwm[(i+1)*nrc2+i+1] += epsilon;
             solve_workspace.gram_source[i+i*nrc1] += epsilon;
           }
           nepsilon += epsilon;
+          ridge_steps++;
         }
+        if(!glp_ok)
+          break;
 
         row_kwm[1] += nepsilon*row_kwm[1]/NZD_POS(row_kwm[nrc2+1]);
         solve_workspace.rhs_source[0] = row_kwm[1];
@@ -18760,6 +18778,7 @@ double *SIGN){
 	        NPRegMpiOwnerChunk owner_chunk;
 	        double *kw_owner = NULL;
 	        int local_pos = 0;
+	        int owner_solve_failed = 0;
 
 	        np_reg_mpi_owner_chunk_init(&owner_chunk,
 	                                    chunk_start,
@@ -18855,12 +18874,28 @@ double *SIGN){
 	              solve_workspace.gram_source[i+l*glp_nterms] =
 	                out[base + (l + 2)];
 	          }
-	          while(!np_lp_solve_workspace_solve(&solve_workspace,
-	                                             glp_nterms,
-	                                             1)){
-	            for(i = 0; i < glp_nterms; i++)
-	              solve_workspace.gram_source[i+i*glp_nterms] += epsilon;
-	            nepsilon_owner += epsilon;
+	          {
+	            int ridge_steps = 0;
+	            while(!np_lp_solve_workspace_solve(&solve_workspace,
+	                                               glp_nterms,
+	                                               1)){
+	              if((ridge_steps >= NP_LP_SOLVE_MAX_RIDGE_STEPS) ||
+	                 !np_lp_solve_workspace_sources_finite(
+	                   &solve_workspace,
+	                   glp_nterms,
+	                   1)){
+	                owner_solve_failed = 1;
+	                break;
+	              }
+	              for(i = 0; i < glp_nterms; i++)
+	                solve_workspace.gram_source[
+	                  i+i*glp_nterms
+	                ] += epsilon;
+	              nepsilon_owner += epsilon;
+	              ridge_steps++;
+	            }
+	            if(owner_solve_failed)
+	              break;
 	          }
 
 	          solve_workspace.rhs_source[0] +=
@@ -18869,8 +18904,10 @@ double *SIGN){
 	          if(nepsilon_owner > 0.0){
 	            if(!np_lp_solve_workspace_solve(&solve_workspace,
 	                                            glp_nterms,
-	                                            1))
-	              error("LP solve failed in glp owner path");
+	                                            1)){
+	              owner_solve_failed = 1;
+	              break;
+	            }
 	          }
 	          for(i = 0; i < glp_nterms; i++)
 	            beta[i] = solve_workspace.rhs_work[i];
@@ -19014,36 +19051,59 @@ double *SIGN){
 	          local_pos++;
 	        }
 
+	        if(owner_solve_failed){
+	          for(int pos = local_pos; pos < owner_chunk.local_rows; pos++){
+	            double * const failed_row =
+	              owner_chunk.sendbuf + (size_t)pos*(size_t)owner_row_width_lp;
+	            for(int col = 0; col < owner_row_width_lp; col++)
+	              failed_row[col] = 0.0;
+	          }
+	          owner_chunk.sendbuf[0] = NAN;
+	        }
+
 	        np_reg_mpi_owner_chunk_allgather(&owner_chunk);
 
-	        for(i = 0; i < iNum_Processors; i++){
-	          int pos_i = 0;
-	          for(int jj = chunk_start + i; jj < chunk_end; jj += iNum_Processors){
-	            const double * const in =
-	              np_reg_mpi_owner_chunk_recv_ptr(&owner_chunk, i, pos_i);
-	            int ipos = 0;
-	            mean[jj] = in[ipos++];
-	            mean_stderr[jj] = in[ipos++];
-	            if(do_grad){
-	              for(l = 0; l < num_reg_continuous; l++){
-	                gradient[l][jj] = in[ipos++];
-	                if(do_gerr)
-	                  gradient_stderr[l][jj] = in[ipos++];
+	        owner_solve_failed = 0;
+	        for(i = 0; i < iNum_Processors; i++)
+	          if((owner_chunk.recvcounts[i] > 0) &&
+	             !isfinite(np_reg_mpi_owner_chunk_recv_ptr(
+	               &owner_chunk,
+	               i,
+	               0)[0]))
+	            owner_solve_failed = 1;
+
+	        if(!owner_solve_failed){
+	          for(i = 0; i < iNum_Processors; i++){
+	            int pos_i = 0;
+	            for(int jj = chunk_start + i; jj < chunk_end; jj += iNum_Processors){
+	              const double * const in =
+	                np_reg_mpi_owner_chunk_recv_ptr(&owner_chunk, i, pos_i);
+	              int ipos = 0;
+	              mean[jj] = in[ipos++];
+	              mean_stderr[jj] = in[ipos++];
+	              if(do_grad){
+	                for(l = 0; l < num_reg_continuous; l++){
+	                  gradient[l][jj] = in[ipos++];
+	                  if(do_gerr)
+	                    gradient_stderr[l][jj] = in[ipos++];
+	                }
+	                for(l = num_reg_continuous;
+	                    l < (num_reg_continuous + num_reg_unordered + num_reg_ordered);
+	                    l++){
+	                  gradient[l][jj] = 0.0;
+	                  if(do_gerr)
+	                    gradient_stderr[l][jj] = 0.0;
+	                }
 	              }
-	              for(l = num_reg_continuous;
-	                  l < (num_reg_continuous + num_reg_unordered + num_reg_ordered);
-	                  l++){
-	                gradient[l][jj] = 0.0;
-	                if(do_gerr)
-	                  gradient_stderr[l][jj] = 0.0;
-	              }
+	              pos_i++;
 	            }
-	            pos_i++;
 	          }
 	        }
 
 	        np_reg_mpi_owner_chunk_free(&owner_chunk);
 	        free(kw_owner);
+	        if(owner_solve_failed)
+	          error("LP solve failed in glp MPI owner path after bounded ridging");
 	      }
 
 	      if(use_mpi_owner_reduce_lp){
@@ -19133,10 +19193,21 @@ double *SIGN){
           solve_workspace.gram_source[i+l*glp_nterms] =
             out[base + (l + 2)]; /* Y columns 2.. are basis terms */
       }
-      while(!np_lp_solve_workspace_solve(&solve_workspace, glp_nterms, 1)){
-        for(i = 0; i < glp_nterms; i++)
-          solve_workspace.gram_source[i+i*glp_nterms] += epsilon;
-        nepsilon += epsilon;
+      {
+        int ridge_steps = 0;
+        while(!np_lp_solve_workspace_solve(&solve_workspace,
+                                           glp_nterms,
+                                           1)){
+          if((ridge_steps >= NP_LP_SOLVE_MAX_RIDGE_STEPS) ||
+             !np_lp_solve_workspace_sources_finite(&solve_workspace,
+                                                   glp_nterms,
+                                                   1))
+            error("LP solve failed in glp path");
+          for(i = 0; i < glp_nterms; i++)
+            solve_workspace.gram_source[i+i*glp_nterms] += epsilon;
+          nepsilon += epsilon;
+          ridge_steps++;
+        }
       }
 
       solve_workspace.rhs_source[0] +=
@@ -20602,14 +20673,24 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
         ] = out[base + n_rhs + l];
     }
 
-    while(!np_lp_solve_workspace_solve(&solve_workspace,
-                                       np_glp_cv_cache.nterms,
-                                       n_rhs)){
-      for(i = 0; i < np_glp_cv_cache.nterms; i++)
-        solve_workspace.gram_source[
-          i+i*np_glp_cv_cache.nterms
-        ] += epsilon;
-      nepsilon += epsilon;
+    {
+      int ridge_steps = 0;
+      while(!np_lp_solve_workspace_solve(&solve_workspace,
+                                         np_glp_cv_cache.nterms,
+                                         n_rhs)){
+        if((ridge_steps >= NP_LP_SOLVE_MAX_RIDGE_STEPS) ||
+           !np_lp_solve_workspace_sources_finite(
+             &solve_workspace,
+             np_glp_cv_cache.nterms,
+             n_rhs))
+          goto cleanup_lp_apply;
+        for(i = 0; i < np_glp_cv_cache.nterms; i++)
+          solve_workspace.gram_source[
+            i+i*np_glp_cv_cache.nterms
+          ] += epsilon;
+        nepsilon += epsilon;
+        ridge_steps++;
+      }
     }
 
     if(nepsilon > 0.0){
