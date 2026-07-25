@@ -79,3 +79,56 @@ test_that("canonical solve workspace dispatches width one only to scalar algebra
     regexpr("F77_CALL(dgetrs)", factored, fixed = TRUE)
   )
 })
+
+test_that("full-row workspace dispatches width one before every LAPACK owner", {
+  solve_file <- locate_lp_width_one_source("jksum_lp_solve.c")
+  skip_if(is.null(solve_file), "source file src/jksum_lp_solve.c unavailable")
+  source <- paste(readLines(solve_file, warn = FALSE), collapse = "\n")
+
+  rcond <- lp_width_one_region(
+    source,
+    "static int np_lp_full_row_bad_rcond(",
+    "int np_lp_full_row_workspace_solve("
+  )
+  solve <- lp_width_one_region(
+    source,
+    "int np_lp_full_row_workspace_solve(",
+    "static int np_lp_full_row_workspace_factor_invert("
+  )
+  invert <- lp_width_one_region(
+    source,
+    "int np_lp_full_row_workspace_invert(",
+    "int np_lp_full_row_workspace_invert_retryable("
+  )
+  retry <- lp_width_one_region(
+    source,
+    "int np_lp_full_row_workspace_invert_retryable(",
+    "int np_lp_full_row_workspace_pack_inverse_rows("
+  )
+
+  expect_true(grepl("if(p == 1)", rcond, fixed = TRUE))
+  expect_lt(
+    regexpr("if(p == 1)", rcond, fixed = TRUE),
+    regexpr("F77_CALL(dsyev)", rcond, fixed = TRUE)
+  )
+
+  expect_true(grepl("if(p == 1)", solve, fixed = TRUE))
+  expect_true(grepl("np_lp_solve_width_one(", solve, fixed = TRUE))
+  expect_lt(
+    regexpr("if(p == 1)", solve, fixed = TRUE),
+    regexpr("F77_CALL(dgesv)", solve, fixed = TRUE)
+  )
+
+  expect_true(grepl("if(p == 1)", invert, fixed = TRUE))
+  expect_true(grepl("1.0/workspace->gram[0]", invert, fixed = TRUE))
+  expect_false(grepl("F77_", invert, fixed = TRUE))
+
+  expect_true(grepl("if(p == 1)", retry, fixed = TRUE))
+  expect_true(grepl("1.0/workspace->gram[0]", retry, fixed = TRUE))
+  expect_true(grepl("} else {", retry, fixed = TRUE))
+  expect_true(grepl(
+    "np_lp_full_row_workspace_factor_invert(workspace, p)",
+    retry,
+    fixed = TRUE
+  ))
+})

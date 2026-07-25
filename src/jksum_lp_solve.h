@@ -105,10 +105,11 @@ int np_glp_qr_drop_workspace_apply(NPGLPQRDropWorkspace *workspace,
 
 /*
  * Reusable contiguous Gram/RHS/rcond/solve storage for full-weight LP rows.
- * The row owner reconstructs Gram and RHS before every call, so dgesv may
- * overwrite them directly.  The rcond gate uses the same dsyev eigenvalue
- * ratio and the solve uses the same dgesv transcript as the historical
- * row-fragmented historical route.
+ * Width one uses scalar condition, solve, and inverse algebra and never
+ * enters LAPACK.  The row owner reconstructs wider Gram and RHS buffers
+ * before every call, so dgesv may overwrite them directly.  Wider systems
+ * retain the same dsyev eigenvalue-ratio gate and dgesv transcript as the
+ * historical row-fragmented route.
  */
 void np_lp_full_row_workspace_init(NPLPFullRowWorkspace *workspace);
 void np_lp_full_row_workspace_clear(NPLPFullRowWorkspace *workspace);
