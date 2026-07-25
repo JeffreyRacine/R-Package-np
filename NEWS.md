@@ -1,5 +1,25 @@
 # npRmpi 0.70-6
 
+* Completed the migration to one canonical, uncentered local-polynomial
+  compute engine across cross-validation, fitting, prediction/evaluation,
+  gradients, standard errors, and hat/apply helpers. Raw and Bernstein bases
+  now use the same basis-neutral solve machinery; the obsolete centered and
+  Numerical Recipes matrix engines, including `linalg.c`, have been removed
+  in favor of bounded-workspace BLAS/LAPACK implementations.
+
+* Corrected canonical local-polynomial CVAIC diagonal restoration and
+  assembly for degrees greater than one, generalized-nearest-neighbor
+  degree-one fitting and standard errors, and generalized-nearest-neighbor
+  conditional-density CVLS convolution-bandwidth ownership. These are
+  intentional numerical corrections and can change affected 0.70-6 results
+  relative to 0.70-5.
+
+* Local-polynomial solve retries are now bounded across objective, fit,
+  prediction/evaluation, and hat-matrix paths. Non-finite or unrecoverable
+  systems fail collectively instead of retrying indefinitely; ordinary
+  successful systems retain their established solve, ridge sequence, and
+  MPI ownership.
+
 * Aligned the dedicated `plot()` methods for `npregiv` and
   `npregivderiv` with the package-wide regression plotting vocabulary. They
   now use `gradients`, `data_overlay`, and `data_rug`; `npregiv` defaults to
