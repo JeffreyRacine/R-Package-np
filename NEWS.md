@@ -18,6 +18,12 @@
   its historical general-LP row omitted observation-specific X-bandwidth
   divisors and could differ from the equivalent local-constant objective.
 
+* Generic local-polynomial CV objectives now pack their immutable
+  response-plus-basis operand once per objective evaluation for eligible
+  full drop-one rows, instead of repacking it for every observation.
+  Adaptive-nearest-neighbour, tree, reduced-row, and specialized resident-row
+  routes are unchanged, as are objective values.
+
 * Corrected canonical local-polynomial CVAIC diagonal restoration and
   assembly for degrees greater than one, generalized-nearest-neighbor
   degree-one fitting and standard errors, and generalized-nearest-neighbor

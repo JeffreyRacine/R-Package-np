@@ -7476,6 +7476,15 @@ typedef struct {
   int ncol_W;
 } NP_DualPowerCtx;
 
+typedef struct {
+  const double *data;
+  double * const *matrix_W;
+  int ncol_W;
+  int ncol_Y;
+  int num_weights;
+  int symmetric;
+} NP_OuterPackCtx;
+
 static int np_hot_loop_interrupt_stride(const int total)
 {
   if(total <= 16)
@@ -7550,7 +7559,8 @@ double * const weighted_sum,
 double * const weighted_permutation_sum,
 double * const kw,
 const NP_GateOverrideCtx * const gate_override_ctx,
-const NP_DualPowerCtx * const dual_power_ctx){
+const NP_DualPowerCtx * const dual_power_ctx,
+const NP_OuterPackCtx * const outer_pack_ctx){
   const NP_GateOverrideCtx * const gate_ctx_raw =
     (gate_override_ctx != NULL) ? gate_override_ctx : &np_gate_override_ctx;
   const NP_GateOverrideCtx gate_ctx_empty = {0};
@@ -7722,7 +7732,8 @@ const NP_DualPowerCtx * const dual_power_ctx){
   double *perm_kbuf = NULL;
   double **bounded_cdf_lower_fixed = NULL;
   double **bounded_cdf_den_fixed = NULL;
-  double *blas_Apack = NULL;
+  double *blas_Apack_owned = NULL;
+  const double *blas_Apack = NULL;
   int use_disc_profile_cache = 0, disc_nprof = 0, disc_mark_token = 1;
   int disc_profile_from_override = 0;
   int disc_profile_from_global_cache = 0;
@@ -8431,9 +8442,25 @@ const NP_DualPowerCtx * const dual_power_ctx){
   if((!nws) && (!do_psum) && (!gather_scatter) && (sgn == NULL) &&
      (!np_ks_tree_use) && (ncol_W > 0) &&
      np_outer_weighted_sum_blas_eligible(MAX(ncol_W, 1), MAX(ncol_Y, 1),
+                                         num_xt, symmetric, NULL, NULL, NULL) &&
+     (outer_pack_ctx != NULL) &&
+     (outer_pack_ctx->data != NULL) &&
+     (outer_pack_ctx->matrix_W == matrix_W) &&
+     (outer_pack_ctx->ncol_W == ncol_W) &&
+     (outer_pack_ctx->ncol_Y == ncol_Y) &&
+     (outer_pack_ctx->num_weights == num_xt) &&
+     (outer_pack_ctx->symmetric == symmetric))
+    blas_Apack = outer_pack_ctx->data;
+
+  if((blas_Apack == NULL) &&
+     (!nws) && (!do_psum) && (!gather_scatter) && (sgn == NULL) &&
+     (!np_ks_tree_use) && (ncol_W > 0) &&
+     np_outer_weighted_sum_blas_eligible(MAX(ncol_W, 1), MAX(ncol_Y, 1),
                                          num_xt, symmetric, NULL, NULL, NULL)){
-    blas_Apack = np_outer_weighted_sum_pack_A(matrix_W, 1, MAX(ncol_W, 1),
-                                             MAX(ncol_Y, 1), num_xt, symmetric);
+    blas_Apack_owned =
+      np_outer_weighted_sum_pack_A(matrix_W, 1, MAX(ncol_W, 1),
+                                   MAX(ncol_Y, 1), num_xt, symmetric);
+    blas_Apack = blas_Apack_owned;
   }
 
   const int interrupt_total = (je >= js) ? (je - js + 1) : 0;
@@ -9144,7 +9171,7 @@ cleanup:
 
   free(tprod);
   free(bpow);
-  if(blas_Apack != NULL) free(blas_Apack);
+  if(blas_Apack_owned != NULL) free(blas_Apack_owned);
   
   clean_xl(pxl);
   clean_nl(&nls);
@@ -9311,6 +9338,7 @@ const NP_GateOverrideCtx * const gate_override_ctx){
     weighted_permutation_sum,
     kw,
     gate_override_ctx,
+    NULL,
     NULL);
 }
 
@@ -9434,7 +9462,8 @@ double * const pkw){
     weighted_permutation_sum,
     kw,
     NULL,
-    &dual_power_ctx);
+    &dual_power_ctx,
+    NULL);
 
   kernel_weighted_sum_pkw_extern = old_pkw;
   kernel_weighted_sum_pkw_nvar_extern = old_pkw_nvar;
@@ -12660,6 +12689,8 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
     double *PXU[MAX(1,num_reg_unordered)];
     double *PXO[MAX(1,num_reg_ordered)];
     double *kwm = NULL, *sgn = NULL, *evalv = NULL;
+    double *objective_Apack = NULL;
+    NP_OuterPackCtx objective_pack_ctx = {NULL, NULL, 0, 0, 0, 0};
 
     PXC[0] = NULL;
     PXU[0] = NULL;
@@ -12719,6 +12750,33 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
     XTKX[0] = vector_Y;
     for(i = 0; i < nrc1; i++)
       XTKX[i+1] = basis[i];
+
+    /*
+      Full drop-one rows repeatedly use this unchanged response-plus-basis
+      matrix as the packed-BLAS left operand.  Pack it once at objective scope;
+      reduced triangular rows advance the source pointers and cannot reuse it.
+    */
+    if((BANDWIDTH_reg != BW_ADAP_NN) &&
+       !ks_tree_use &&
+       np_reg_cv_use_symmetric_dropone_path(bwm,
+                                             ks_tree_use,
+                                             BANDWIDTH_reg)){
+      objective_Apack =
+        np_outer_weighted_sum_pack_A(XTKX,
+                                     1,
+                                     nrc2,
+                                     nrc2,
+                                     num_obs,
+                                     1);
+      if(objective_Apack != NULL){
+        objective_pack_ctx.data = objective_Apack;
+        objective_pack_ctx.matrix_W = XTKX;
+        objective_pack_ctx.ncol_W = nrc2;
+        objective_pack_ctx.ncol_Y = nrc2;
+        objective_pack_ctx.num_weights = num_obs;
+        objective_pack_ctx.symmetric = 1;
+      }
+    }
 
     if(bwm == RBWM_CVAIC){
       tsf = int_LARGE_SF;
@@ -12798,7 +12856,7 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
           for(l = 0; l < num_reg_ordered; l++)
             TORD[l][0] = matrix_X_ordered[l][j];
 
-          kernel_weighted_sum_np_ctx(kernel_c,
+          kernel_weighted_sum_np_ctx_ex(kernel_c,
                                      kernel_u,
                                      kernel_o,
                                      BANDWIDTH_reg,
@@ -12848,7 +12906,10 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
                                      kwm+j*nrcc22,
                                      NULL,
                                      NULL,
-                                     NULL);
+                                     NULL,
+                                     NULL,
+                                     (objective_Apack != NULL) ?
+                                     &objective_pack_ctx : NULL);
         } else {
           if(j < (num_obs-1)){
             for(l = 0; l < nrc2; l++)
@@ -13027,6 +13088,7 @@ cleanup_lp_work:
     if(kwm != NULL) free(kwm);
     if(sgn != NULL) free(sgn);
     if(evalv != NULL) free(evalv);
+    if(objective_Apack != NULL) free(objective_Apack);
   }
 
 cleanup_lp_cv:
@@ -18116,7 +18178,8 @@ double *SIGN){
                              NULL,
                              reuse_fit_kernel_row ? fit_kw : NULL,
                              &gate_ctx_local,
-                             reuse_fit_dual_power ? &fit_dual_power_ctx : NULL);
+                             reuse_fit_dual_power ? &fit_dual_power_ctx : NULL,
+                             NULL);
 
       for(i = 0; i < glp_nterms; i++){
         /* np_outer_weighted_sum lays out result as [W x Y], row-major by W term. */
