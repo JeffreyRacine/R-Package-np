@@ -177,25 +177,24 @@ attribute_hidden int np_fixed_gaussian_density_cvls_pair_try(
     vDSP_vsqD(kernel_value, 1, difference, 1,
               (np_vDSP_Length)num_obs);
 
-    vDSP_vsmulD(kernel_value, 1, &convolution_scale,
-                kernel_value, 1, (np_vDSP_Length)num_obs);
     vDSP_sveD(kernel_value, 1, &convolution_sum,
               (np_vDSP_Length)num_obs);
 #ifdef MPI2
-    convolution_rows[eval_index] = convolution_sum/bandwidth_product;
+    convolution_rows[eval_index] =
+      convolution_scale*convolution_sum/bandwidth_product;
 #else
-    convolution_total += convolution_sum/bandwidth_product;
+    convolution_total +=
+      convolution_scale*convolution_sum/bandwidth_product;
 #endif
 
-    vDSP_vsmulD(difference, 1, &kernel_scale,
-                difference, 1, (np_vDSP_Length)num_obs);
     difference[eval_index] = zero;
     vDSP_sveD(difference, 1, &kernel_sum,
               (np_vDSP_Length)num_obs);
 #ifdef MPI2
-    kernel_rows[eval_index] = kernel_sum/bandwidth_product;
+    kernel_rows[eval_index] =
+      kernel_scale*kernel_sum/bandwidth_product;
 #else
-    kernel_total += kernel_sum/bandwidth_product;
+    kernel_total += kernel_scale*kernel_sum/bandwidth_product;
 #endif
   }
 
