@@ -12041,6 +12041,72 @@ static inline void np_lp_cvls_support_add(const int row,
   support_count[row] = count + 1;
 }
 
+/*
+ * Ordinary fixed Gaussian weights are strictly positive mathematically, but
+ * the low-support fallback is keyed to the computed weight being nonzero.
+ * Certify a conservative normal-range lower bound before eliding its tracking
+ * arrays and branches. Any unsupported topology or doubtful range retains
+ * the incumbent tracked path.
+ */
+static int np_lp_fixed_gaussian_full_support_certified(
+    const int num_obs,
+    const int nterms,
+    const int num_reg_unordered,
+    const int num_reg_ordered,
+    const int num_reg_continuous,
+    double **matrix_X_continuous,
+    int *kernel_c,
+    int *operator,
+    double **matrix_bandwidth)
+{
+  int l, i;
+  double log_kernel_lower = 0.0;
+  double log_dband = 0.0;
+  const double log_safe_min = log(DBL_MIN) + 8.0;
+
+  if((num_obs - 1 <= nterms) ||
+     (num_reg_unordered != 0) || (num_reg_ordered != 0) ||
+     (num_reg_continuous <= 0) || int_cker_bound_extern ||
+     (matrix_X_continuous == NULL) || (kernel_c == NULL) ||
+     (operator == NULL) || (matrix_bandwidth == NULL))
+    return 0;
+
+  for(l = 0; l < num_reg_continuous; l++){
+    double xmin, xmax, h, zmax;
+
+    if((kernel_c[l] != CK_GAUSS2) || (operator[l] != OP_NORMAL) ||
+       (matrix_X_continuous[l] == NULL) ||
+       (matrix_bandwidth[l] == NULL))
+      return 0;
+
+    h = matrix_bandwidth[l][0];
+    xmin = matrix_X_continuous[l][0];
+    xmax = xmin;
+    if((!isfinite(h)) || (h <= 0.0) || (!isfinite(xmin)))
+      return 0;
+
+    for(i = 1; i < num_obs; i++){
+      const double x = matrix_X_continuous[l][i];
+      if(!isfinite(x))
+        return 0;
+      xmin = MIN(xmin, x);
+      xmax = MAX(xmax, x);
+    }
+
+    zmax = (xmax - xmin)/h;
+    if(!isfinite(zmax))
+      return 0;
+    log_kernel_lower +=
+      log(ONE_OVER_SQRT_TWO_PI) - 0.5*zmax*zmax;
+    log_dband += log(h);
+    if((!isfinite(log_kernel_lower)) || (!isfinite(log_dband)))
+      return 0;
+  }
+
+  return (log_kernel_lower > log_safe_min) &&
+    (log_kernel_lower - log_dband > log_safe_min);
+}
+
 static int np_glp_support_order_cmp(const void *pa, const void *pb){
   const int *a = (const int *)pa;
   const int *b = (const int *)pb;
@@ -12620,8 +12686,9 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
   double aicc = 0.0;
   int use_sparse_tree = 0;
   int tsf = 0;
-  const int track_lowsupport = (bwm == RBWM_CVLS) || (bwm == RBWM_CVCHECK) ||
-    (bwm == RBWM_CVKS);
+  const int track_lowsupport_requested =
+    (bwm == RBWM_CVLS) || (bwm == RBWM_CVCHECK) || (bwm == RBWM_CVKS);
+  int track_lowsupport = track_lowsupport_requested;
   const int solve_nrhs = (bwm == RBWM_CVAIC) ? 2 : 1;
 #ifdef MPI2
   const int use_mpi_transport = (iNum_Processors > 1);
@@ -12641,6 +12708,18 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
 
   if(nterms > INT_MAX/nterms)
     NP_LP_CV_FAIL();
+
+  if(track_lowsupport &&
+     np_lp_fixed_gaussian_full_support_certified(num_obs,
+                                                  nterms,
+                                                  num_reg_unordered,
+                                                  num_reg_ordered,
+                                                  num_reg_continuous,
+                                                  matrix_X_continuous,
+                                                  kernel_c,
+                                                  operator,
+                                                  matrix_bandwidth))
+    track_lowsupport = 0;
 
   use_sparse_tree = use_tree &&
     np_lp_fixed_tree_sparse_supported(num_reg_unordered,
