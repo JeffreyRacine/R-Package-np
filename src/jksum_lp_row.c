@@ -35,6 +35,81 @@ static inline void np_lp_dense_support_add(const int row,
 }
 
 /*
+  MPI transport assigns a complete evaluation row to one rank.  For widths
+  2--5, retain that row in local accumulators across the observation sweep and
+  write it once.  The arithmetic sequence within every cell is unchanged.
+  Width one remains in the caller's basis-free scalar route; wider rows retain
+  the generic fallback.
+*/
+#define NP_LP_DEFINE_OWNED_WIDTH(WIDTH)                                     \
+static void np_lp_accumulate_owned_row_##WIDTH(                             \
+    const NPLPOwnedRowContext *ctx)                                         \
+{                                                                            \
+  int i, a, b;                                                               \
+  double fixed_moments[(WIDTH)*(WIDTH)];                                     \
+  double fixed_rhs[(WIDTH)];                                                 \
+  double * const stored_moments =                                           \
+    ctx->moments + (size_t)ctx->row_j*(size_t)(WIDTH)*(size_t)(WIDTH);       \
+  double * const stored_rhs =                                               \
+    ctx->rhs + (size_t)ctx->row_j*(size_t)(WIDTH);                           \
+                                                                             \
+  for(a = 0; a < (WIDTH); a++){                                              \
+    fixed_rhs[a] = stored_rhs[a];                                            \
+    for(b = 0; b < (WIDTH); b++)                                             \
+      fixed_moments[a*(WIDTH)+b] = stored_moments[a*(WIDTH)+b];              \
+  }                                                                          \
+                                                                             \
+  for(i = 0; i < ctx->nobs; i++){                                            \
+    const int ii = ctx->use_tree ? ctx->tree_lookup[i] : i;                 \
+    const double weight = ctx->weights[ii];                                 \
+    double yi;                                                               \
+                                                                             \
+    if((i == ctx->row_j) || (weight == 0.0))                                \
+      continue;                                                              \
+                                                                             \
+    if(ctx->track_lowsupport)                                                \
+      np_lp_dense_support_add(ctx->row_j, i, ii, weight, (WIDTH),           \
+                              ctx->support_count, ctx->support_orig,          \
+                              ctx->support_data, ctx->support_weight);        \
+                                                                             \
+    yi = ctx->response[ii];                                                   \
+    for(a = 0; a < (WIDTH); a++){                                            \
+      const double bia = ctx->basis[a][ii];                                 \
+      const double weighted_bia = weight*bia;                               \
+      fixed_rhs[a] += weighted_bia*yi;                                      \
+      for(b = 0; b < (WIDTH); b++)                                          \
+        fixed_moments[a*(WIDTH)+b] +=                                       \
+          weighted_bia*ctx->basis[b][ii];                                   \
+    }                                                                        \
+  }                                                                          \
+                                                                             \
+  for(a = 0; a < (WIDTH); a++){                                              \
+    stored_rhs[a] = fixed_rhs[a];                                            \
+    for(b = 0; b < (WIDTH); b++)                                             \
+      stored_moments[a*(WIDTH)+b] = fixed_moments[a*(WIDTH)+b];              \
+  }                                                                          \
+}
+
+NP_LP_DEFINE_OWNED_WIDTH(2)
+NP_LP_DEFINE_OWNED_WIDTH(3)
+NP_LP_DEFINE_OWNED_WIDTH(4)
+NP_LP_DEFINE_OWNED_WIDTH(5)
+
+#undef NP_LP_DEFINE_OWNED_WIDTH
+
+attribute_hidden int
+np_lp_accumulate_owned_resident_row(const NPLPOwnedRowContext *ctx)
+{
+  switch(ctx->nterms){
+  case 2: np_lp_accumulate_owned_row_2(ctx); return 1;
+  case 3: np_lp_accumulate_owned_row_3(ctx); return 1;
+  case 4: np_lp_accumulate_owned_row_4(ctx); return 1;
+  case 5: np_lp_accumulate_owned_row_5(ctx); return 1;
+  default: return 0;
+  }
+}
+
+/*
   A one-column LP basis is the degree-zero constant basis.  Keep its resident
   row scalar and implicit: no basis loads or general outer-product algebra.
   The wider generated siblings below retain their incumbent transcript.

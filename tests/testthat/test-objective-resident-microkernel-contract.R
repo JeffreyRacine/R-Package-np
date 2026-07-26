@@ -16,3 +16,30 @@ test_that("fixed width-three LP CV accumulates one triangle before solving", {
   expect_false(grepl("sj7 += wb2*b1;", row_text, fixed = TRUE))
   expect_match(sum_text, "np_lp_mirror_dense_moments_row3\\(moments, num_obs\\)")
 })
+
+test_that("MPI owned rows specialize widths two through five only", {
+  src_dir <- file.path(testthat::test_path("..", ".."), "src")
+  row_file <- file.path(src_dir, "jksum_lp_row.c")
+  sum_file <- file.path(src_dir, "jksum.c")
+  skip_if_not(file.exists(row_file) && file.exists(sum_file),
+              "package C sources unavailable")
+
+  row_text <- paste(readLines(row_file, warn = FALSE), collapse = "\n")
+  sum_text <- paste(readLines(sum_file, warn = FALSE), collapse = "\n")
+  expect_match(
+    row_text,
+    "attribute_hidden int\\s+np_lp_accumulate_owned_resident_row"
+  )
+  for (width in 2:5)
+    expect_match(
+      row_text,
+      paste0("NP_LP_DEFINE_OWNED_WIDTH\\(", width, "\\)")
+    )
+  expect_false(grepl("NP_LP_DEFINE_OWNED_WIDTH(1)", row_text, fixed = TRUE))
+  expect_false(grepl("NP_LP_DEFINE_OWNED_WIDTH(6)", row_text, fixed = TRUE))
+  expect_match(sum_text, "if\\(nterms == 1\\)")
+  expect_match(
+    sum_text,
+    "if\\(!np_lp_accumulate_owned_resident_row\\(&owned_context\\)\\)"
+  )
+})

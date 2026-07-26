@@ -12983,30 +12983,50 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
         tj[0] = tj0;
         sj[0] = sj0;
       } else {
-        for(i = 0; i < num_obs; i++){
-          const int ii = use_tree ? ipt_lookup_extern_X[i] : i;
-          const double w = kw[ii];
-          const double yi = vector_Y[ii];
+        const NPLPOwnedRowContext owned_context = {
+          nterms,
+          j,
+          num_obs,
+          use_tree,
+          track_lowsupport,
+          ipt_lookup_extern_X,
+          kw,
+          basis,
+          vector_Y,
+          moments_acc,
+          rhs_acc,
+          support_count_acc,
+          support_orig_acc,
+          support_data_acc,
+          support_weight_acc
+        };
 
-          if((i == j) || (w == 0.0))
-            continue;
+        if(!np_lp_accumulate_owned_resident_row(&owned_context)){
+          for(i = 0; i < num_obs; i++){
+            const int ii = use_tree ? ipt_lookup_extern_X[i] : i;
+            const double w = kw[ii];
+            const double yi = vector_Y[ii];
 
-          if(track_lowsupport)
-            np_lp_cvls_support_add(j,
-                                    i,
-                                    ii,
-                                    w,
-                                    nterms,
-                                    support_count_acc,
-                                    support_orig_acc,
-                                    support_data_acc,
-                                    support_weight_acc);
+            if((i == j) || (w == 0.0))
+              continue;
 
-          for(a = 0; a < nterms; a++){
-            const double bia = basis[a][ii];
-            tj[a] += w*bia*yi;
-            for(b = 0; b < nterms; b++)
-              sj[a*nterms+b] += w*bia*basis[b][ii];
+            if(track_lowsupport)
+              np_lp_cvls_support_add(j,
+                                      i,
+                                      ii,
+                                      w,
+                                      nterms,
+                                      support_count_acc,
+                                      support_orig_acc,
+                                      support_data_acc,
+                                      support_weight_acc);
+
+            for(a = 0; a < nterms; a++){
+              const double bia = basis[a][ii];
+              tj[a] += w*bia*yi;
+              for(b = 0; b < nterms; b++)
+                sj[a*nterms+b] += w*bia*basis[b][ii];
+            }
           }
         }
       }
