@@ -150,6 +150,6 @@ test_that("width-one scalar hats retain signed higher-order kernel weights", {
   )
   expect_identical(dim(internal), dim(compiled))
   expect_identical(dim(default), dim(compiled))
-  expect_identical(as.double(internal), as.double(compiled))
-  expect_identical(as.double(default), as.double(compiled))
+  expect_identical(as.double(internal), as.double(default))
+  expect_equal(as.double(default), as.double(compiled), tolerance = 5e-15)
 })

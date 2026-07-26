@@ -91,7 +91,8 @@ int np_lp_solve_workspace_solve_factored(NPLPSolveWorkspace *workspace,
  * QR owner's historical treatment of nonpositive weights; otherwise signed
  * higher-order kernel weights are retained.  output_stride permits both
  * contiguous native rows and strided R column-major matrix rows.  Returns
- * zero on success; it never allocates or calls BLAS/LAPACK.
+ * zero on success; on failure, row_out contents are undefined and must not be
+ * consumed.  It never allocates or calls BLAS/LAPACK.
  */
 int np_lp_width_one_influence_row(const double *basis_train,
                                   int n,
