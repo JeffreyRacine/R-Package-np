@@ -1215,6 +1215,20 @@ static void np_reset_y_side_extern(void)
   matrix_categorical_vals_extern_Y = NULL;
 }
 
+/*
+ * Keep Y-side workspace ownership aligned with the objective engine that will
+ * actually run.  Scalar conditional-density CVML uses the stream engine when
+ * it is profitable (currently fixed/generalized-NN with more than one
+ * continuous X variable), and that engine consumes the same Y-only
+ * categorical metadata as the general LP stream.
+ */
+static int np_conditional_density_objective_needs_y_side(const int objective)
+{
+  return (objective == CBWM_CVLS) ||
+    ((objective == CBWM_CVML) &&
+     np_conditional_density_cvml_stream_engine_supported());
+}
+
 static void np_shadow_matrix_dims(SEXP x, int *nrow, int *ncol)
 {
   SEXP dim = getAttrib(x, R_DimSymbol);
@@ -5190,7 +5204,7 @@ static int np_conditional_density_nomad_shadow_prepare_internal(double *c_uno,
     vector_glp_degree_extern = NULL;
   }
 
-  need_y_side = (ibwmfunc == CBWM_CVLS) || ((ibwmfunc == CBWM_CVML) && (np_lp_engine_extern == NP_LP_ENGINE_GENERAL));
+  need_y_side = np_conditional_density_objective_needs_y_side(ibwmfunc);
   np_conditional_density_nomad_shadow.need_y_side = need_y_side;
   np_conditional_density_nomad_shadow.penalty_mode = penalty_mode[0];
   np_conditional_density_nomad_shadow.penalty_multiplier = penalty_mult[0];
@@ -5769,12 +5783,16 @@ static int np_density_conditional_nomad_shadow_eval_native_raw(const double *rbw
 
   if (!np_conditional_density_nomad_shadow.active)
     return 1;
-  if (rbw == NULL || glp_degree == NULL || out == NULL)
+  if (rbw == NULL || out == NULL)
+    return 1;
+  if (np_lp_engine_extern == NP_LP_ENGINE_GENERAL && glp_degree == NULL)
     return 1;
 
   rbw_work = NP_NOMAD_CALLBACK_CALLOC(np_conditional_density_nomad_shadow.num_all_var, double);
-  degree_work = NP_NOMAD_CALLBACK_CALLOC(np_conditional_density_nomad_shadow.num_reg_continuous, int);
-  if (rbw_work == NULL || degree_work == NULL) {
+  if (np_lp_engine_extern == NP_LP_ENGINE_GENERAL)
+    degree_work = NP_NOMAD_CALLBACK_CALLOC(np_conditional_density_nomad_shadow.num_reg_continuous, int);
+  if (rbw_work == NULL ||
+      (np_lp_engine_extern == NP_LP_ENGINE_GENERAL && degree_work == NULL)) {
     if (rbw_work != NULL)
       NP_NOMAD_CALLBACK_FREE(rbw_work);
     if (degree_work != NULL)
@@ -5783,8 +5801,10 @@ static int np_density_conditional_nomad_shadow_eval_native_raw(const double *rbw
   }
   for (i = 0; i < np_conditional_density_nomad_shadow.num_all_var; i++)
     rbw_work[i] = rbw[i];
-  for (i = 0; i < np_conditional_density_nomad_shadow.num_reg_continuous; i++)
-    degree_work[i] = glp_degree[i];
+  if (np_lp_engine_extern == NP_LP_ENGINE_GENERAL) {
+    for (i = 0; i < np_conditional_density_nomad_shadow.num_reg_continuous; i++)
+      degree_work[i] = glp_degree[i];
+  }
 
 #ifdef MPI2
   if (comm != NULL && comm[1] != MPI_COMM_NULL) {
@@ -5941,8 +5961,9 @@ static int np_cdens_native_search_callback(int n,
 
   degree_len = (context->ndegree > 0) ? context->ndegree : context->nfixed_degree;
   flat_bw = NP_NOMAD_CALLBACK_CALLOC(context->nbw_flat, double);
-  degree = NP_NOMAD_CALLBACK_CALLOC(degree_len, int);
-  if (flat_bw == NULL || degree == NULL) {
+  if (degree_len > 0)
+    degree = NP_NOMAD_CALLBACK_CALLOC(degree_len, int);
+  if (flat_bw == NULL || (degree_len > 0 && degree == NULL)) {
     if (flat_bw != NULL)
       NP_NOMAD_CALLBACK_FREE(flat_bw);
     if (degree != NULL)
@@ -13234,7 +13255,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   int_bounded_cvls_quadrature_points_extern = myopti[CBW_CVLS_QUAD_POINTSI];
   if (int_bounded_cvls_quadrature_points_extern < 2)
     int_bounded_cvls_quadrature_points_extern = 0;
-  need_y_side = (ibwmfunc == CBWM_CVLS) || ((ibwmfunc == CBWM_CVML) && (np_lp_engine_extern == NP_LP_ENGINE_GENERAL));
+  need_y_side = np_conditional_density_objective_needs_y_side(ibwmfunc);
   bwm_use_transform = myopti[CBW_TBNDI];
   if (BANDWIDTH_den_extern != BW_FIXED)
     bwm_use_transform = 0;

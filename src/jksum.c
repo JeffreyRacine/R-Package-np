@@ -7896,6 +7896,15 @@ const int keep_kw_owner_local){
      (simply compute the kernel sum). This function will allow users
      to `roll their own' with mixed data leave-one out kernel sums. */
 
+  /*
+   * Every categorical kernel consumes its category-count metadata.  Reject
+   * an incomplete internal context before entering the hot loop so an owner
+   * allocation defect cannot become a null dereference.
+   */
+  if(((num_reg_unordered > 0) || (num_reg_ordered > 0)) &&
+     (num_categories == NULL))
+    return 1;
+
   /* Declarations */
 
   int i, ii, j, kk, k, l, mstep, js, je, num_obs_eval_alloc, sum_element_length, ip;
