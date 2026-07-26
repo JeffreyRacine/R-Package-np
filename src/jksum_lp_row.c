@@ -2,6 +2,13 @@
 
 #include <stddef.h>
 
+#if defined(__aarch64__) && defined(NP_USE_ACCELERATE_GAUSS) && NP_USE_ACCELERATE_GAUSS
+#include <arm_neon.h>
+#define NP_LP_ROW3_NEON 1
+#else
+#define NP_LP_ROW3_NEON 0
+#endif
+
 #include "jksum_lp_row.h"
 
 static inline void np_lp_dense_support_add(const int row,
@@ -223,6 +230,11 @@ void np_lp_accumulate_dense_resident_row3(
   double sj0 = sj[0], sj1 = sj[1], sj2 = sj[2];
   double sj4 = sj[4], sj5 = sj[5], sj8 = sj[8];
   double tj0 = tj[0], tj1 = tj[1], tj2 = tj[2];
+#if NP_LP_ROW3_NEON
+  const float64x2_t eval_y01 = vld1q_f64(eval_ybasis);
+  const float64x2_t eval_outer01 = vld1q_f64(eval_outer);
+  const float64x2_t eval_outer45 = vld1q_f64(eval_outer + 4);
+#endif
 
   for(i = 0; i < nsub; i++){
     const int orig_ii = row_j + 1 + i;
@@ -256,9 +268,6 @@ void np_lp_accumulate_dense_resident_row3(
       tj0 += wb0*yi;
       tj1 += wb1*yi;
       tj2 += wb2*yi;
-      ti[0] += w*eval_ybasis[0];
-      ti[1] += w*eval_ybasis[1];
-      ti[2] += w*eval_ybasis[2];
 
       sj0 += wb0*b0;
       sj1 += wb0*b1;
@@ -267,12 +276,30 @@ void np_lp_accumulate_dense_resident_row3(
       sj5 += wb1*b2;
       sj8 += wb2*b2;
 
+#if NP_LP_ROW3_NEON
+      {
+        const float64x2_t vw = vdupq_n_f64(w);
+        vst1q_f64(ti,
+                  vfmaq_f64(vld1q_f64(ti), vw, eval_y01));
+        vst1q_f64(si,
+                  vfmaq_f64(vld1q_f64(si), vw, eval_outer01));
+        vst1q_f64(si + 4,
+                  vfmaq_f64(vld1q_f64(si + 4), vw, eval_outer45));
+        ti[2] += w*eval_ybasis[2];
+        si[2] += w*eval_outer[2];
+        si[8] += w*eval_outer[8];
+      }
+#else
+      ti[0] += w*eval_ybasis[0];
+      ti[1] += w*eval_ybasis[1];
+      ti[2] += w*eval_ybasis[2];
       si[0] += w*eval_outer[0];
       si[1] += w*eval_outer[1];
       si[2] += w*eval_outer[2];
       si[4] += w*eval_outer[4];
       si[5] += w*eval_outer[5];
       si[8] += w*eval_outer[8];
+#endif
     }
   }
 
