@@ -13,6 +13,7 @@
 
 #include "headers.h"
 #include "beta_objectives.h"
+#include "jksum_gaussian_density.h"
 #include "kernel_registry.h"
 
 #include <R.h>
@@ -1173,6 +1174,22 @@ double np_cv_func_density_categorical_ls(double *vector_scale_factor){
 
 /* Compute the cross-validation function */
     start = clock();
+
+    if(np_fixed_gaussian_density_cvls_pair_dispatch_try(
+        KERNEL_den_extern,
+        BANDWIDTH_den_extern,
+        num_obs_train_extern,
+        num_reg_unordered_extern,
+        num_reg_ordered_extern,
+        num_reg_continuous_extern,
+        matrix_X_continuous_train_extern,
+        &vector_scale_factor[1],
+        &cv))
+    {
+        diff = clock() - start;
+        timing_extern = ((double)diff)/((double)CLOCKS_PER_SEC);
+        return(cv);
+    }
 
     if(np_kernel_estimate_density_categorical_convolution_cv(KERNEL_den_extern,
         KERNEL_den_unordered_extern,
