@@ -40,6 +40,13 @@
   implementation. The formulas are mathematically identical but can differ
   in their last floating-point bits.
 
+* Fixed-bandwidth fourth- and sixth-order Gaussian convolution rows now hoist
+  bandwidth- and evaluation-point-invariant polynomial terms outside their
+  observation loop. The isolated helper preserves the established formulas,
+  dimension-product order, and objective bytes; ordinary Gaussian,
+  nearest-neighbour, bounded, score, permutation, and non-convolution routes
+  retain their existing direct implementations.
+
 * Corrected canonical local-polynomial CVAIC diagonal restoration and
   assembly for degrees greater than one, generalized-nearest-neighbor
   degree-one fitting and standard errors, and generalized-nearest-neighbor

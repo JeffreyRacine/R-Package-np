@@ -24,6 +24,7 @@
 
 #include "headers.h"
 #include "gsl_bspline.h"
+#include "jksum_gaussian_fixed.h"
 #include "jksum_lp_row.h"
 #include "jksum_lp_solve.h"
 
@@ -8181,6 +8182,7 @@ const int keep_kw_owner_local){
   int *tree_active_dims = NULL;
   int cont_largeh_all_fixed = 0, cont_largeh_fixed_ready = 0;
   int cont_largeh_any_fixed = 0;
+  int fused_gaussian_fixed_higher_convolution_eligible = 0;
 #if NP_ACCEL_GAUSS_COMPILED
   int fused_gaussian_product_eligible = 0;
   int fused_gaussian_convolution_kind = 0;
@@ -8523,6 +8525,23 @@ const int keep_kw_owner_local){
 
   if(np_ks_tree_use && (!tree_alllarge_bypass) && (num_reg_continuous > 0)){
     tree_active_dims = (int *)malloc((size_t)num_reg_continuous*sizeof(int));
+  }
+
+  if(any_convolution &&
+     (!doscoreocg) &&
+     (!do_perm) &&
+     (p_nvar == 0) &&
+     (!int_cker_bound_extern) &&
+     (BANDWIDTH_reg == BW_FIXED) &&
+     (num_reg_continuous > 0)){
+    fused_gaussian_fixed_higher_convolution_eligible = 1;
+    for(i = 0; i < num_reg_continuous; i++){
+      if((operator[i] != OP_CONVOLUTION) ||
+         ((KERNEL_reg[i] != 1) && (KERNEL_reg[i] != 2))){
+        fused_gaussian_fixed_higher_convolution_eligible = 0;
+        break;
+      }
+    }
   }
 
 #if NP_ACCEL_GAUSS_COMPILED
@@ -9218,9 +9237,9 @@ const int keep_kw_owner_local){
         }
       }
     } else {
-#if NP_ACCEL_GAUSS_COMPILED
       int fused_gaussian_convolution = 0;
 
+#if NP_ACCEL_GAUSS_COMPILED
       if(fused_gaussian_convolution_kind != 0){
         if(fused_gaussian_convolution_kind == 1)
           fused_gaussian_convolution =
@@ -9232,7 +9251,13 @@ const int keep_kw_owner_local){
             np_accel_gauss_nn_convolution_product_try(
               xtc, xc, m, matrix_alt_bandwidth, bpow,
               num_reg_continuous, num_xt, j, jbw, tprod);
-      }
+      } else
+#endif
+      if(fused_gaussian_fixed_higher_convolution_eligible)
+        fused_gaussian_convolution =
+          np_fixed_gaussian_convolution_product_try(
+            KERNEL_reg, xtc, xc, m, matrix_alt_bandwidth, bpow,
+            num_reg_continuous, num_xt, j, jbw, tprod);
 
       if(fused_gaussian_convolution){
         tprod_has_vals = 1;
@@ -9243,7 +9268,6 @@ const int keep_kw_owner_local){
           k += bpso[l];
         }
       } else
-#endif
       {
         for(i = 0, l = 0, ip = 0, k = 0;
             i < num_reg_continuous;
