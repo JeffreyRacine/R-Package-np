@@ -7550,6 +7550,7 @@ typedef struct {
   int ncol_Y;
   int num_weights;
   int symmetric;
+  int runtime_options_frozen;
 } NP_OuterPackCtx;
 
 static int np_hot_loop_interrupt_stride(const int total)
@@ -7671,7 +7672,8 @@ const NP_OuterPackCtx * const outer_pack_ctx){
 
   if(!np_runtime_tol_cache_ready)
     np_refresh_runtime_tolerances();
-  np_refresh_mseries_accelerate_option();
+  if((outer_pack_ctx == NULL) || !outer_pack_ctx->runtime_options_frozen)
+    np_refresh_mseries_accelerate_option();
 
   if(no_bpso){
     bpso = (int *)malloc((num_reg_unordered + num_reg_ordered + num_reg_continuous)*sizeof(int));
@@ -12202,6 +12204,9 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
   double aicc = 0.0;
   int use_sparse_tree = 0;
   int tsf = 0;
+  const NP_OuterPackCtx frozen_runtime_options = {
+    .runtime_options_frozen = 1
+  };
   const int track_lowsupport_requested =
     (bwm == RBWM_CVLS) || (bwm == RBWM_CVCHECK) || (bwm == RBWM_CVKS);
   int track_lowsupport = track_lowsupport_requested;
@@ -12238,6 +12243,9 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
                                        kernel_u,
                                        kernel_o,
                                        operator);
+
+  if((!use_sparse_tree) || (bwm == RBWM_CVAIC))
+    np_refresh_mseries_accelerate_option();
 
   if((sf_flag = (int_LARGE_SF == 0))){
     int_LARGE_SF = 1;
@@ -12301,7 +12309,7 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
   if(bwm == RBWM_CVAIC){
     tsf = int_LARGE_SF;
     int_LARGE_SF = 1;
-    if(kernel_weighted_sum_np_ctx(kernel_c,
+    if(kernel_weighted_sum_np_ctx_ex(kernel_c,
                                   kernel_u,
                                   kernel_o,
                                   BW_FIXED,
@@ -12350,7 +12358,9 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
                                   &aicc,
                                   NULL,
                                   NULL,
-                                  NULL) != 0){
+                                  NULL,
+                                  NULL,
+                                  &frozen_runtime_options) != 0){
       int_LARGE_SF = tsf;
       goto cleanup_lp_cv;
     }
@@ -12435,7 +12445,7 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
 
     memset(kw, 0, (size_t)MAX(1, train_count)*sizeof(double));
 
-    if(kernel_weighted_sum_np_ctx(kernel_c,
+    if(kernel_weighted_sum_np_ctx_ex(kernel_c,
                                   kernel_u,
                                   kernel_o,
                                   BW_FIXED,
@@ -12487,7 +12497,9 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
                                   &mean_dummy,
                                   NULL,
                                   kw,
-                                  NULL) != 0)
+                                  NULL,
+                                  NULL,
+                                  &frozen_runtime_options) != 0)
       goto cleanup_lp_cv;
 
     if(nterms == 3){
@@ -12895,7 +12907,15 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
     double *PXO[MAX(1,num_reg_ordered)];
     double *kwm = NULL, *sgn = NULL, *evalv = NULL;
     double *objective_Apack = NULL;
-    NP_OuterPackCtx objective_pack_ctx = {NULL, NULL, 0, 0, 0, 0};
+    NP_OuterPackCtx objective_pack_ctx = {
+      .runtime_options_frozen = 1
+    };
+
+    /*
+     * R options cannot change while this native objective call is executing.
+     * Read the Apple-acceleration option once here instead of once per row.
+     */
+    np_refresh_mseries_accelerate_option();
 
     PXC[0] = NULL;
     PXU[0] = NULL;
@@ -12986,7 +13006,7 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
     if(bwm == RBWM_CVAIC){
       tsf = int_LARGE_SF;
       int_LARGE_SF = 1;
-      kernel_weighted_sum_np_ctx(kernel_c,
+      kernel_weighted_sum_np_ctx_ex(kernel_c,
                                  kernel_u,
                                  kernel_o,
                                  BANDWIDTH_reg,
@@ -13035,7 +13055,9 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
                                  &aicc,
                                  NULL,
                                  NULL,
-                                 NULL);
+                                 NULL,
+                                 NULL,
+                                 &objective_pack_ctx);
       int_LARGE_SF = tsf;
     }
 
@@ -13113,8 +13135,7 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
                                      NULL,
                                      NULL,
                                      NULL,
-                                     (objective_Apack != NULL) ?
-                                     &objective_pack_ctx : NULL);
+                                     &objective_pack_ctx);
         } else {
           if(j < (num_obs-1)){
             for(l = 0; l < nrc2; l++)
