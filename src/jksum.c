@@ -5578,6 +5578,74 @@ static int np_accel_gauss_scratch_ensure(const int n)
   return 1;
 }
 
+/*
+  Form a fixed-bandwidth product of ordinary Gaussian kernels with one vector
+  exponential:
+
+    prod_d c*exp(-u_d^2/2) = c^ndim*exp(-sum_d u_d^2/2).
+
+  This deliberately reassociates floating-point operations.  Callers must
+  restrict it to the prequalified ordinary-Gaussian route and fall back to the
+  incumbent per-dimension loop whenever this helper returns zero.
+*/
+static int np_accel_gauss_product_try(double * const * const xt,
+                                      double * const * const xeval,
+                                      double * const * const bandwidth,
+                                      const int ndim,
+                                      const int n,
+                                      const int eval_index,
+                                      const int bandwidth_index,
+                                      const double coef,
+                                      double * const out)
+{
+  const double minus_one = -1.0;
+  const double minus_half = -0.5;
+  const double zero = 0.0;
+  const int ni = n;
+
+  if((!np_mseries_accelerate_enabled_cache) ||
+     (xt == NULL) || (xeval == NULL) || (bandwidth == NULL) ||
+     (out == NULL) || (ndim < 2) || (n < 256) ||
+     (!np_accel_gauss_resolve()) ||
+     (!np_accel_gauss_scratch_ensure(n)))
+    return 0;
+
+  for(int d = 0; d < ndim; d++){
+    double h;
+    double x;
+    double zscale;
+
+    if((xt[d] == NULL) || (xeval[d] == NULL) || (bandwidth[d] == NULL))
+      return 0;
+
+    h = bandwidth[d][bandwidth_index];
+    x = xeval[d][eval_index];
+    if((!isfinite(h)) || (h == 0.0))
+      return 0;
+
+    zscale = 1.0/h;
+    np_accel_vsmsaD(xt[d], 1, &minus_one, &x,
+                    np_accel_gauss_tmp, 1, (np_vDSP_Length)n);
+    np_accel_vsmulD(np_accel_gauss_tmp, 1, &zscale,
+                    np_accel_gauss_tmp, 1, (np_vDSP_Length)n);
+    np_accel_vsqD(np_accel_gauss_tmp, 1,
+                  np_accel_gauss_tmp, 1, (np_vDSP_Length)n);
+
+    if(d == 0)
+      memcpy(np_accel_gauss_arg, np_accel_gauss_tmp,
+             (size_t)n*sizeof(double));
+    else
+      np_accel_vaddD(np_accel_gauss_arg, 1, np_accel_gauss_tmp, 1,
+                     np_accel_gauss_arg, 1, (np_vDSP_Length)n);
+  }
+
+  np_accel_vsmsaD(np_accel_gauss_arg, 1, &minus_half, &zero,
+                  np_accel_gauss_arg, 1, (np_vDSP_Length)n);
+  np_accel_vvexp(out, np_accel_gauss_arg, &ni);
+  np_accel_vsmulD(out, 1, &coef, out, 1, (np_vDSP_Length)n);
+  return 1;
+}
+
 static int np_accel_gauss_has_zero_weight(const double * const w, const int n)
 {
   for(int i = 0; i < n; i++)
@@ -8002,6 +8070,10 @@ const int keep_kw_owner_local){
   int *tree_active_dims = NULL;
   int cont_largeh_all_fixed = 0, cont_largeh_fixed_ready = 0;
   int cont_largeh_any_fixed = 0;
+#if NP_ACCEL_GAUSS_COMPILED
+  int fused_gaussian_product_eligible = 0;
+  double fused_gaussian_product_coef = 1.0;
+#endif
   int tree_alllarge_bypass = 0;
   int cont_largeh_from_override = 0;
   int cont_largeh_from_global_cache = 0;
@@ -8340,6 +8412,26 @@ const int keep_kw_owner_local){
   if(np_ks_tree_use && (!tree_alllarge_bypass) && (num_reg_continuous > 0)){
     tree_active_dims = (int *)malloc((size_t)num_reg_continuous*sizeof(int));
   }
+
+#if NP_ACCEL_GAUSS_COMPILED
+  if(lean_reg_cont_loop &&
+     (BANDWIDTH_reg == BW_FIXED) &&
+     (num_reg_continuous >= 2) &&
+     (num_xt >= 256) &&
+     (pxl == NULL) &&
+     (!cont_largeh_any_fixed) &&
+     np_mseries_accelerate_enabled_cache &&
+     np_accel_gauss_resolve()){
+    fused_gaussian_product_eligible = 1;
+    for(i = 0; i < num_reg_continuous; i++){
+      if(KERNEL_reg_np[i] != 0){
+        fused_gaussian_product_eligible = 0;
+        break;
+      }
+      fused_gaussian_product_coef *= ONE_OVER_SQRT_TWO_PI;
+    }
+  }
+#endif
 
   if((!disable_gate_features) && (num_reg_unordered > 0)){
     if((gate_ctx->active == NP_GATE_CTX_OVERRIDE) &&
@@ -8935,21 +9027,45 @@ const int keep_kw_owner_local){
     /* for the first iteration, no weights */
     /* for the rest, the accumulated products are the weights */
     if(lean_reg_cont_loop){
-      for(i = 0, l = 0, ip = 0, k = 0; i < num_reg_continuous; i++, l++, ip += do_perm){
-        const int use_largeh = any_cont_largeh && (cont_largeh_active != NULL) ? cont_largeh_active[i] : 0;
+#if NP_ACCEL_GAUSS_COMPILED
+      int fused_gaussian_product = 0;
 
-        if(use_largeh){
-          deferred_const *= cont_largeh_k0[i];
-          deferred_const_active = 1;
-        } else {
-          np_ckernelv(KERNEL_reg_np[i], xtc[i], num_xt, tprod_has_vals,
-                      xc[i][j], m[i][jbw], tprod, pxl, swap_xxt, 1, 1.0,
-                      0, R_NegInf, R_PosInf, NULL, NULL);
-          tprod_has_vals = 1;
+      if(fused_gaussian_product_eligible)
+        fused_gaussian_product =
+          np_accel_gauss_product_try(xtc, xc, m, num_reg_continuous,
+                                     num_xt, j, jbw,
+                                     fused_gaussian_product_coef, tprod);
+
+      if(fused_gaussian_product){
+        tprod_has_vals = 1;
+        for(i = 0, l = 0, ip = 0, k = 0;
+            i < num_reg_continuous;
+            i++, l++, ip += do_perm){
+          dband *= ipow(m[i][jbw], bpow[i]);
+          k += bpso[l];
         }
+      } else
+#endif
+      {
+        for(i = 0, l = 0, ip = 0, k = 0;
+            i < num_reg_continuous;
+            i++, l++, ip += do_perm){
+          const int use_largeh = any_cont_largeh &&
+            (cont_largeh_active != NULL) ? cont_largeh_active[i] : 0;
 
-        dband *= ipow(m[i][jbw], bpow[i]);
-        k += bpso[l];
+          if(use_largeh){
+            deferred_const *= cont_largeh_k0[i];
+            deferred_const_active = 1;
+          } else {
+            np_ckernelv(KERNEL_reg_np[i], xtc[i], num_xt, tprod_has_vals,
+                        xc[i][j], m[i][jbw], tprod, pxl, swap_xxt, 1, 1.0,
+                        0, R_NegInf, R_PosInf, NULL, NULL);
+            tprod_has_vals = 1;
+          }
+
+          dband *= ipow(m[i][jbw], bpow[i]);
+          k += bpso[l];
+        }
       }
     } else {
       for(i = 0, l = 0, ip = 0, k = 0; i < num_reg_continuous; i++, l++, ip += do_perm){
