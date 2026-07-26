@@ -129,6 +129,7 @@ npreghat <-
     ncon = ncon,
     where = "npreghat"
   )
+  constant.basis <- npIsCanonicalLp0Spec(reg.spec, ncon = ncon)
 
   first.derivative.request <- (sum(s) == 1L) && all(s %in% c(0L, 1L))
   simple.operator.request <- (sum(s) == 0L) || first.derivative.request
@@ -153,7 +154,7 @@ npreghat <-
     lp.degree0.lc.derivative.route ||
     (any(s > 0L) && all(reg.spec$degree.engine == 1L))
 
-  lc.derivative.exact.route <- identical(regtype, "lc") &&
+  lc.derivative.exact.route <- constant.basis &&
     first.derivative.request
 
   list(
@@ -164,6 +165,7 @@ npreghat <-
     bernstein.basis = bernstein.basis,
     s = s,
     reg.spec = reg.spec,
+    constant.basis = constant.basis,
     first.derivative.request = first.derivative.request,
     simple.operator.request = simple.operator.request,
     lp.degree0.lc.derivative.route = lp.degree0.lc.derivative.route,
@@ -1938,6 +1940,7 @@ npreghat.rbandwidth <-
     bernstein.basis <- operator.spec$bernstein.basis
     s <- operator.spec$s
     reg.spec <- operator.spec$reg.spec
+    constant.basis <- operator.spec$constant.basis
     first.derivative.request <- operator.spec$first.derivative.request
     simple.operator.request <- operator.spec$simple.operator.request
     lp.degree0.lc.derivative.route <- operator.spec$lp.degree0.lc.derivative.route
@@ -1954,7 +1957,7 @@ npreghat.rbandwidth <-
 
     exact.lc.kernel.route <- !isTRUE(leave.one.out) &&
       !any(s > 0L) &&
-      identical(regtype, "lc") &&
+      constant.basis &&
       (bws$ncon > 0L)
 
     exact.ll.kernel.route <- !isTRUE(leave.one.out) &&
@@ -1966,6 +1969,7 @@ npreghat.rbandwidth <-
       simple.operator.request &&
       identical(regtype, "lp") &&
       identical(reg.spec$regtype.engine, "lp") &&
+      !constant.basis &&
       !lp.degree0.lc.derivative.route &&
       (bws$ncon > 0L)
 
@@ -2033,14 +2037,7 @@ npreghat.rbandwidth <-
     }
 
     if (exact.core.route) {
-      H <- if (lp.degree0.lc.derivative.route) {
-        .npreghat_exact_matrix_from_core(
-          bws = bws,
-          txdat = txdat,
-          exdat = if (no.ex) NULL else exdat,
-          s = s
-        )
-      } else if (lc.derivative.exact.route) {
+      H <- if (lc.derivative.exact.route) {
         .npRmpi_with_local_regression(.npreghat_exact_lc_derivative_matrix_from_npksum_chunked(
           bws = bws,
           txdat = txdat,

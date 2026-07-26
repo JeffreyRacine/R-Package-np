@@ -7,6 +7,17 @@
   Numerical Recipes matrix engines, including `linalg.c`, have been removed
   in favor of bounded-workspace BLAS/LAPACK implementations.
 
+* Local-constant smoothing and explicit all-zero-degree local-polynomial
+  smoothing now share the canonical implicit width-one LP engine throughout
+  conditional objectives, fitting/evaluation, derivatives, hats, and helper
+  routes. The scalar specialization constructs no unit basis and performs no
+  BLAS/LAPACK solve; categorical-only routes continue to honor
+  `np.categorical.compress = TRUE` and `FALSE`. Public regression-type
+  metadata and estimator definitions are unchanged. This also corrects
+  adaptive-nearest-neighbor conditional-density CVML for explicit degree zero:
+  its historical general-LP row omitted observation-specific X-bandwidth
+  divisors and could differ from the equivalent local-constant objective.
+
 * Corrected canonical local-polynomial CVAIC diagonal restoration and
   assembly for degrees greater than one, generalized-nearest-neighbor
   degree-one fitting and standard errors, and generalized-nearest-neighbor

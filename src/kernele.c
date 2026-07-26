@@ -82,7 +82,7 @@ extern double **matrix_X_continuous_quantile_extern;
 extern double **matrix_X_unordered_quantile_extern;
 extern double **matrix_X_ordered_quantile_extern;
 
-extern int int_ll_extern;
+extern int np_lp_engine_extern;
 
 extern int KERNEL_reg_extern;
 extern int KERNEL_reg_unordered_extern;

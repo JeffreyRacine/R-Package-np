@@ -600,7 +600,9 @@ npcdensbw.conbandwidth <-
     tbw$basis.engine <- spec$basis.engine
     tbw$degree.engine <- spec$degree.engine
     tbw$bernstein.basis.engine <- spec$bernstein.basis.engine
-    reg.code <- if (identical(spec$regtype.engine, "lp")) REGTYPE_LP else REGTYPE_LC
+    reg.code <- npConditionalRegtypeCode(spec$regtype.engine,
+                                         spec$degree.engine,
+                                         tbw$xncon)
     degree.code <- if (tbw$xncon > 0L) as.integer(spec$degree.engine) else integer(0)
     basis.code <- as.integer(npLpBasisCode(spec$basis.engine))
     bernstein.engine <- isTRUE(spec$bernstein.basis.engine)
@@ -1227,7 +1229,9 @@ npcdensbw.conbandwidth <-
   )
 
   penalty_mode <- if (invalid.penalty == "baseline") 1L else 0L
-  reg.code <- if (identical(bws$regtype.engine, "lp")) REGTYPE_LP else REGTYPE_LC
+  reg.code <- npConditionalRegtypeCode(bws$regtype.engine,
+                                       bws$degree.engine,
+                                       bws$xncon)
   degree.code <- if (bws$xncon > 0L) as.integer(bws$degree.engine) else integer(0L)
   basis.code <- as.integer(npLpBasisCode(bws$basis.engine))
   bernstein.engine <- isTRUE(bws$bernstein.basis.engine)
@@ -1706,7 +1710,9 @@ npRmpiNomadShadowClearConditionalDensity <- function() {
   )
 
   penalty_mode <- if (invalid.penalty == "baseline") 1L else 0L
-  reg.code <- if (identical(bws$regtype.engine, "lp")) REGTYPE_LP else REGTYPE_LC
+  reg.code <- npConditionalRegtypeCode(bws$regtype.engine,
+                                       bws$degree.engine,
+                                       bws$xncon)
   degree.code <- if (bws$xncon > 0L) as.integer(bws$degree.engine) else integer(0L)
   basis.code <- as.integer(npLpBasisCode(bws$basis.engine))
   bernstein.engine <- isTRUE(bws$bernstein.basis.engine)

@@ -120,3 +120,199 @@ test_that("raw and Bernstein degree-zero objectives retain one scalar result", {
   bernstein <- eval_only(x, y, make_bw(TRUE))$objective
   expect_identical(raw, bernstein)
 })
+
+test_that("MPI scalar fixed objectives use the batch sibling without LAPACK", {
+  candidates <- c(
+    test_path("..", "..", "src", "jksum.c"),
+    test_path("..", "..", "..", "src", "jksum.c"),
+    file.path(Sys.getenv("R_PACKAGE_DIR", ""), "src", "jksum.c"),
+    file.path(Sys.getenv("R_PACKAGE_SOURCE", ""), "src", "jksum.c"),
+    file.path(getwd(), "src", "jksum.c"),
+    file.path(getwd(), "..", "src", "jksum.c")
+  )
+  hits <- unique(candidates[nzchar(candidates) & file.exists(candidates)])
+  skip_if(!length(hits), "source file src/jksum.c unavailable")
+  source <- paste(readLines(hits[[1L]], warn = FALSE), collapse = "\n")
+
+  fixed_start <- regexpr(
+    "static NPRegCvLpResult np_regression_cv_lp_basis_fixed(",
+    source,
+    fixed = TRUE
+  )
+  objective_start <- regexpr(
+    "double np_kernel_estimate_regression_categorical_ls_aic(",
+    source,
+    fixed = TRUE
+  )
+  objective_end <- regexpr(
+    "int kernel_estimate_regression_categorical_tree_np(",
+    source,
+    fixed = TRUE
+  )
+  expect_gt(fixed_start, 0L)
+  expect_gt(objective_start, fixed_start)
+  expect_gt(objective_end, objective_start)
+  fixed_owner <- substr(source, fixed_start, objective_start - 1L)
+  objective <- substr(source, objective_start, objective_end - 1L)
+
+  expect_true(grepl(
+    "if((nterms <= 0) || ((nterms > 1) && (basis == NULL)))",
+    fixed_owner,
+    fixed = TRUE
+  ))
+  expect_true(grepl("eval_basis[0] = 1.0", fixed_owner, fixed = TRUE))
+
+  general_start <- regexpr(
+    "if(lp_engine == NP_LP_ENGINE_GENERAL){",
+    objective,
+    fixed = TRUE
+  )
+  scalar_start <- regexpr(
+    "Canonical width-one scalar LP objective.",
+    objective,
+    fixed = TRUE
+  )
+  expect_gt(general_start, 0L)
+  expect_gt(scalar_start, general_start)
+  scalar_owner <- substr(objective, scalar_start, nchar(objective))
+  expect_true(grepl(
+    "kernel_weighted_sum_np_ctx(kernel_c,",
+    scalar_owner,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
+    "double * lc_Y[2];",
+    scalar_owner,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
+    "2, // 2 cols in Y",
+    scalar_owner,
+    fixed = TRUE
+  ))
+  expect_false(grepl(
+    "np_reg_cv_scalar_use_resident_fixed",
+    objective,
+    fixed = TRUE
+  ))
+  expect_false(grepl(
+    "np_regression_cv_lp_basis_fixed(bwm",
+    substr(objective, 1L, general_start - 1L),
+    fixed = TRUE
+  ))
+  expect_false(grepl("F77_", scalar_owner, fixed = TRUE))
+})
+
+test_that("conditional width-one blocks share one raw row without LAPACK", {
+  candidates <- c(
+    test_path("..", "..", "src", "jksum.c"),
+    test_path("..", "..", "..", "src", "jksum.c"),
+    file.path(Sys.getenv("R_PACKAGE_DIR", ""), "src", "jksum.c"),
+    file.path(Sys.getenv("R_PACKAGE_SOURCE", ""), "src", "jksum.c"),
+    file.path(getwd(), "src", "jksum.c"),
+    file.path(getwd(), "..", "src", "jksum.c")
+  )
+  hits <- unique(candidates[nzchar(candidates) & file.exists(candidates)])
+  skip_if(!length(hits), "source file src/jksum.c unavailable")
+  source <- paste(readLines(hits[[1L]], warn = FALSE), collapse = "\n")
+
+  scalar_start <- regexpr(
+    "static int np_conditional_x_weight_block_pair_scalar_stream_core(",
+    source,
+    fixed = TRUE
+  )
+  general_start <- regexpr(
+    "static int np_conditional_x_weight_block_pair_stream_core(",
+    source,
+    fixed = TRUE
+  )
+  expect_gt(scalar_start, 0L)
+  expect_gt(general_start, scalar_start)
+  scalar <- substr(source, scalar_start, general_start - 1L)
+
+  expect_true(grepl(
+    "np_conditional_x_weight_block_stream_core_impl(",
+    scalar,
+    fixed = TRUE
+  ))
+  expect_true(grepl("suppress_nn_parallel", scalar, fixed = TRUE))
+  expect_true(grepl("loo_rows_out,", scalar, fixed = TRUE))
+  expect_true(grepl("full_rows_out);", scalar, fixed = TRUE))
+  expect_false(grepl("np_lp_full_row_workspace", scalar, fixed = TRUE))
+  expect_false(grepl("np_glp_qr_drop_workspace", scalar, fixed = TRUE))
+  expect_false(grepl("F77_", scalar, fixed = TRUE))
+
+  expect_true(grepl("double loo_sum = 0.0", source, fixed = TRUE))
+  expect_true(grepl("double full_sum = 0.0", source, fixed = TRUE))
+  expect_true(grepl(
+    "paired_full_rows_out[i][orig_j] = kw[j]/full_sum",
+    source,
+    fixed = TRUE
+  ))
+})
+
+test_that("conditional scalar CVLS and CVML use their MPI-optimal siblings", {
+  candidates <- c(
+    test_path("..", "..", "src", "jksum.c"),
+    test_path("..", "..", "..", "src", "jksum.c"),
+    file.path(Sys.getenv("R_PACKAGE_DIR", ""), "src", "jksum.c"),
+    file.path(Sys.getenv("R_PACKAGE_SOURCE", ""), "src", "jksum.c"),
+    file.path(getwd(), "src", "jksum.c"),
+    file.path(getwd(), "..", "src", "jksum.c")
+  )
+  hits <- unique(candidates[nzchar(candidates) & file.exists(candidates)])
+  skip_if(!length(hits), "source file src/jksum.c unavailable")
+  source <- paste(readLines(hits[[1L]], warn = FALSE), collapse = "\n")
+
+  support_start <- regexpr(
+    "int np_conditional_lp_stream_engine_supported(void){",
+    source,
+    fixed = TRUE
+  )
+  cvml_start <- regexpr(
+    "int np_conditional_density_cvml_lp_stream(",
+    source,
+    fixed = TRUE
+  )
+  expect_gt(support_start, 0L)
+  expect_gt(cvml_start, support_start)
+  support <- substr(source, support_start, cvml_start - 1L)
+  expect_true(grepl(
+    "np_lp_engine_extern == NP_LP_ENGINE_SCALAR",
+    support,
+    fixed = TRUE
+  ))
+  expect_true(grepl("num_reg_continuous_extern > 0", support, fixed = TRUE))
+  expect_true(grepl(
+    "BANDWIDTH_den_extern != BW_ADAP_NN",
+    support,
+    fixed = TRUE
+  ))
+  cvml_support_start <- regexpr(
+    "int np_conditional_density_cvml_stream_engine_supported(void){",
+    support,
+    fixed = TRUE
+  )
+  expect_gt(cvml_support_start, 0L)
+  cvml_support <- substr(support, cvml_support_start, nchar(support))
+  expect_true(grepl(
+    "return np_lp_engine_extern == NP_LP_ENGINE_GENERAL;",
+    cvml_support,
+    fixed = TRUE
+  ))
+  expect_false(grepl(
+    "np_lp_engine_extern == NP_LP_ENGINE_SCALAR",
+    cvml_support,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
+    "if(!np_conditional_density_cvml_stream_engine_supported())",
+    source,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
+    "np_conditional_x_weight_block_pair_selected_stream_core(",
+    source,
+    fixed = TRUE
+  ))
+})

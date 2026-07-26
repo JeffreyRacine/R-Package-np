@@ -177,8 +177,8 @@ int np_kernel_estimate_density_categorical_leave_one_out_cv(int KERNEL_den, int 
 
 int kernel_estimate_distribution_categorical(int KERNEL_den, int KERNEL_unordered_den, int KERNEL_ordered_den, int BANDWIDTH_den, int num_obs_train, int num_obs_eval, int num_reg_unordered, int num_reg_ordered, int num_reg_continuous, double **matrix_X_unordered_train, double **matrix_X_ordered_train, double **matrix_X_continuous_train, double **matrix_X_unordered_eval, double **matrix_X_ordered_eval, double **matrix_X_continuous_eval, double *vector_scale_factor, int *num_categories, double **matrix_categorical_vals, double *cdf, double *cdf_stderr, double small, int itmax);
 
-double np_kernel_estimate_regression_categorical_ls_aic(int int_ll, int bwm, int KERNEL_reg, int KERNEL_unordered_reg, int KERNEL_ordered_reg, int BANDWIDTH_reg, int num_obs, int num_reg_unordered, int num_reg_ordered, int num_reg_continuous, double **matrix_X_unordered, double **matrix_X_ordered, double **matrix_X_continuous, double *vector_Y, double *vector_scale_factor, int *num_categories);
-int np_glp_cv_prepare_extern(const int int_ll, const int num_obs, const int ncon, double **matrix_X_continuous_train);
+double np_kernel_estimate_regression_categorical_ls_aic(int lp_engine, int bwm, int KERNEL_reg, int KERNEL_unordered_reg, int KERNEL_ordered_reg, int BANDWIDTH_reg, int num_obs, int num_reg_unordered, int num_reg_ordered, int num_reg_continuous, double **matrix_X_unordered, double **matrix_X_ordered, double **matrix_X_continuous, double *vector_Y, double *vector_scale_factor, int *num_categories);
+int np_glp_cv_prepare_extern(const int lp_engine, const int num_obs, const int ncon, double **matrix_X_continuous_train);
 int np_glp_cv_prepare_original_order_extern(const int *ipt);
 void np_glp_cv_clear_extern(void);
 int np_glp_cv_degree_admissible_extern(const int num_obs, const int ncon, const int *degree, const int basis_mode);
@@ -214,6 +214,8 @@ int np_shadow_proof_conditional_y_row_stream(double *vector_scale_factor, int ev
 int np_conditional_density_cvml_lp_stream(double *vector_scale_factor, double *cv);
 int np_conditional_density_cvls_lp_stream(double *vector_scale_factor, double *cv);
 int np_conditional_distribution_cvls_lp_stream(double *vector_scale_factor, double *cv);
+int np_conditional_lp_stream_engine_supported(void);
+int np_conditional_density_cvml_stream_engine_supported(void);
 void np_bwm_set_deferred_error(const char *msg);
 const char *np_bwm_get_deferred_error(void);
 void np_bwm_clear_deferred_error(void);
@@ -247,7 +249,7 @@ int kernel_weights_conditional_convolution_cv(int int_WEIGHTS, int KERNEL_den, i
 
 int check_valid_scale_factor_cv(int KERNEL, int KERNEL_unordered_liracine, int BANDWIDTH, int BANDWIDTH_den_ml, int REGRESSION_ML, int num_obs, int num_var_continuous, int num_var_unordered, int num_var_ordered, int num_reg_continuous, int num_reg_unordered, int num_reg_ordered, int *num_categories, double *vector_scale_factor);
 
-int kernel_estimate_regression_categorical_tree_np(int int_ll,int KERNEL_reg,int KERNEL_unordered_reg,int KERNEL_ordered_reg,int BANDWIDTH_reg,int num_obs_train,int num_obs_eval,int num_reg_unordered,int num_reg_ordered,int num_reg_continuous,double **matrix_X_unordered_train,double **matrix_X_ordered_train,double **matrix_X_continuous_train,double **matrix_X_unordered_eval,double **matrix_X_ordered_eval,double **matrix_X_continuous_eval,double *vector_Y,double *vector_Y_eval,double *vector_scale_factor,int *num_categories, double ** matrix_categorical_vals, double *mean,double **gradient,double *mean_stderr,double **gradient_stderr,double *R_squared,double *MSE,double *MAE,double *MAPE,double *CORR,double *SIGN);
+int kernel_estimate_regression_categorical_tree_np(int lp_engine,int KERNEL_reg,int KERNEL_unordered_reg,int KERNEL_ordered_reg,int BANDWIDTH_reg,int num_obs_train,int num_obs_eval,int num_reg_unordered,int num_reg_ordered,int num_reg_continuous,double **matrix_X_unordered_train,double **matrix_X_ordered_train,double **matrix_X_continuous_train,double **matrix_X_unordered_eval,double **matrix_X_ordered_eval,double **matrix_X_continuous_eval,double *vector_Y,double *vector_Y_eval,double *vector_scale_factor,int *num_categories, double ** matrix_categorical_vals, double *mean,double **gradient,double *mean_stderr,double **gradient_stderr,double *R_squared,double *MSE,double *MAE,double *MAPE,double *CORR,double *SIGN);
 
 double func_con_density_quantile(double *quantile);
 
@@ -350,11 +352,9 @@ double max_unordered_bw(int num_categories,
 #define IO_MIN_TRUE  1
 #define IO_MIN_FALSE 0
 
-/* Regression engine codes: lc (0), canonical lp (2). */
-#define LL_LC  0
-#define LL_LP  2
-/* Historical generalized-LP spelling; this is the canonical LP engine. */
-#define LL_GLP LL_LP
+/* Canonical local-polynomial compute engines. */
+#define NP_LP_ENGINE_SCALAR  0
+#define NP_LP_ENGINE_GENERAL  2
 
 #define OCG_UNO 0
 #define OCG_ORD 1

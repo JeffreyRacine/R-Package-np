@@ -36,9 +36,17 @@ test_that("MPI CVLS Y convolution supertile is memory bounded and isolated", {
   )
 
   expect_match(body, "nblocks <= 1", fixed = TRUE)
-  expect_match(body, "int_ll_extern != LL_LP", fixed = TRUE)
+  expect_match(
+    body,
+    "!np_conditional_lp_stream_engine_supported()",
+    fixed = TRUE
+  )
   expect_match(body, "num_reg_continuous_extern <= 0", fixed = TRUE)
-  expect_match(body, "vector_glp_degree_extern == NULL", fixed = TRUE)
+  expect_match(
+    gsub("[[:space:]]+", " ", body),
+    "((np_lp_engine_extern == NP_LP_ENGINE_GENERAL) && (vector_glp_degree_extern == NULL))",
+    fixed = TRUE
+  )
   expect_match(body, "BANDWIDTH_den_extern != BW_FIXED", fixed = TRUE)
   expect_match(body, "BANDWIDTH_den_extern != BW_GEN_NN", fixed = TRUE)
   expect_match(body, "int_TREE_X == NP_TREE_TRUE", fixed = TRUE)
@@ -57,6 +65,14 @@ test_that("MPI CVLS Y convolution supertile is memory bounded and isolated", {
   )
   expect_false(grepl("num_obs\\*num_obs", body))
   expect_false(grepl("num_obs \\* num_obs", body, fixed = TRUE))
+  expect_equal(lengths(regmatches(
+    body,
+    gregexpr(
+      "np_conditional_x_weight_block_pair_selected_stream_core\\(",
+      body,
+      perl = TRUE
+    )
+  )), 4L)
 })
 
 test_that("MPI CVLS supertile retains rank ownership and block-order reduction", {
@@ -130,9 +146,10 @@ test_that("MPI CVLS supertile dispatch leaves no-gain and excluded routes intact
   )
 
   dispatch <- paste(
-    "if((int_ll_extern == LL_LP) &&",
+    "if(np_conditional_lp_stream_engine_supported() &&",
     "(num_reg_continuous_extern > 0) &&",
-    "(vector_glp_degree_extern != NULL) &&",
+    "((np_lp_engine_extern == NP_LP_ENGINE_SCALAR) ||",
+    "(vector_glp_degree_extern != NULL)) &&",
     "(int_TREE_X != NP_TREE_TRUE) &&",
     "(int_TREE_Y != NP_TREE_TRUE) &&",
     "(nblocks > 1) &&",

@@ -1742,7 +1742,10 @@ npscoefbw.scbandwidth <-
       zdat = if (miss.z) xdat else zdat,
       where = "npscoefbw"
     )
-    reg.engine <- spec$regtype.engine
+    reg.engine <- if (npIsCanonicalLp0Spec(spec, ncon = bws$ncon))
+      "lc"
+    else
+      spec$regtype.engine
     if (!identical(reg.engine, "lc") && cv.iterate)
       stop("cv.iterate currently supports regtype='lc' for npscoefbw")
     .npRmpi_require_active_slave_pool(where = "npscoefbw()")

@@ -138,7 +138,7 @@ static int np_int_product_overflows(int a, int b)
 
 static int np_regression_engine_or_error(int code, const char *where)
 {
-  if ((code != LL_LC) && (code != LL_LP))
+  if ((code != NP_LP_ENGINE_SCALAR) && (code != NP_LP_ENGINE_GENERAL))
     error("%s: invalid internal regression engine code %d", where, code);
   return code;
 }
@@ -3143,7 +3143,7 @@ double np_lsq_delta_lower_extern=DBL_EPSILON;
 double np_lsq_delta_upper_extern=1.0-DBL_EPSILON;
 
 
-int int_ll_extern=0;
+int np_lp_engine_extern=0;
 int *vector_glp_degree_extern=NULL;
 int *vector_glp_gradient_order_extern=NULL;
 int int_glp_bernstein_extern=0;
@@ -3468,7 +3468,7 @@ static void np_shadow_reset_state_internal(void)
   num_reg_unordered_extern = 0;
   num_reg_ordered_extern = 0;
   num_reg_continuous_extern = 0;
-  int_ll_extern = LL_LC;
+  np_lp_engine_extern = NP_LP_ENGINE_SCALAR;
   vector_glp_degree_extern = NULL;
   vector_glp_gradient_order_extern = NULL;
   int_glp_bernstein_extern = 0;
@@ -3634,7 +3634,7 @@ static int np_regression_nomad_shadow_refresh_degree(const int *degree)
   if (degree == NULL || np_regression_nomad_shadow.glp_degree == NULL)
     return 0;
 
-  if ((int_ll_extern == LL_LP) &&
+  if ((np_lp_engine_extern == NP_LP_ENGINE_GENERAL) &&
       (!np_glp_cv_degree_admissible_extern(num_obs_train_extern,
                                            num_reg_continuous_extern,
                                            degree,
@@ -3657,8 +3657,8 @@ static int np_regression_nomad_shadow_refresh_degree(const int *degree)
   vector_glp_degree_extern = np_regression_nomad_shadow.glp_degree;
   np_glp_cv_clear_extern();
 
-  if ((int_ll_extern == LL_LP) &&
-      (!np_glp_cv_prepare_extern(int_ll_extern,
+  if ((np_lp_engine_extern == NP_LP_ENGINE_GENERAL) &&
+      (!np_glp_cv_prepare_extern(np_lp_engine_extern,
                                  num_obs_train_extern,
                                  num_reg_continuous_extern,
                                  matrix_X_continuous_train_extern)))
@@ -3744,9 +3744,9 @@ static int np_regression_nomad_shadow_prepare_internal(double *runo,
   int_RESTART_FROM_MIN = RE_MIN_FALSE;
   int_MINIMIZE_IO = IO_MIN_TRUE;
 
-  int_ll_extern = np_regression_engine_or_error(
+  np_lp_engine_extern = np_regression_engine_or_error(
     myopti[RBW_LL], "np_regression_nomad_shadow");
-  degree_key_len = (int_ll_extern == LL_LP) ? num_reg_continuous_extern : 0;
+  degree_key_len = (np_lp_engine_extern == NP_LP_ENGINE_GENERAL) ? num_reg_continuous_extern : 0;
   bwm_num_extra_params = degree_key_len;
   vector_glp_gradient_order_extern = NULL;
   int_glp_bernstein_extern = *glp_bernstein;
@@ -3926,8 +3926,8 @@ static int np_regression_nomad_shadow_prepare_internal(double *runo,
                              num_categories_extern,
                              matrix_categorical_vals_extern);
 
-  if ((int_ll_extern == LL_LP) &&
-      (!np_glp_cv_prepare_extern(int_ll_extern,
+  if ((np_lp_engine_extern == NP_LP_ENGINE_GENERAL) &&
+      (!np_glp_cv_prepare_extern(np_lp_engine_extern,
                                  num_obs_train_extern,
                                  num_reg_continuous_extern,
                                  matrix_X_continuous_train_extern)))
@@ -4884,7 +4884,7 @@ static void np_conditional_density_nomad_shadow_clear_internal(void)
   int_conditional_nomad_shadow_extern = 0;
   int_glp_bernstein_extern = 0;
   int_glp_basis_extern = 1;
-  int_ll_extern = LL_LC;
+  np_lp_engine_extern = NP_LP_ENGINE_SCALAR;
   int_nn_k_min_extern = 1;
   np_conditional_density_nomad_shadow.extendednn_upper = NULL;
   BANDWIDTH_den_extern = 0;
@@ -4942,7 +4942,7 @@ static int np_conditional_density_nomad_shadow_refresh_degree(const int *degree)
   int i;
   int changed = 0;
 
-  if (int_ll_extern != LL_LP || np_conditional_density_nomad_shadow.num_reg_continuous <= 0)
+  if (np_lp_engine_extern != NP_LP_ENGINE_GENERAL || np_conditional_density_nomad_shadow.num_reg_continuous <= 0)
     return 1;
   if (degree == NULL || np_conditional_density_nomad_shadow.glp_degree == NULL)
     return 0;
@@ -4969,7 +4969,7 @@ static int np_conditional_density_nomad_shadow_refresh_degree(const int *degree)
   vector_glp_degree_extern = np_conditional_density_nomad_shadow.glp_degree;
   np_glp_cv_clear_extern();
 
-  if (!np_glp_cv_prepare_extern(int_ll_extern,
+  if (!np_glp_cv_prepare_extern(np_lp_engine_extern,
                                 num_obs_train_extern,
                                 num_reg_continuous_extern,
                                 matrix_X_continuous_train_extern))
@@ -5101,7 +5101,7 @@ static int np_conditional_density_nomad_shadow_prepare_internal(double *c_uno,
     const int num_ordered = num_reg_ordered_extern +
       num_var_ordered_extern;
 
-    if(*regtype != LL_LC || num_unordered != 0 || num_ordered != 0)
+    if(*regtype != NP_LP_ENGINE_SCALAR || num_unordered != 0 || num_ordered != 0)
       goto fail;
     if(KERNEL_reg_extern == NP_CKERNEL_COORDINATE_CODE)
       np_beta_cx_bw_order_extern = np_bandwidth_kernel_descriptor_or_error(
@@ -5157,14 +5157,14 @@ static int np_conditional_density_nomad_shadow_prepare_internal(double *c_uno,
   ibwmfunc = myopti[CBW_MI];
   np_conditional_density_nomad_shadow.glp_original_order =
     (ibwmfunc == CBWM_CVML);
-  int_ll_extern = np_regression_engine_or_error(
-    ((ibwmfunc == CBWM_CVML) || (ibwmfunc == CBWM_CVLS)) ? *regtype : LL_LC,
+  np_lp_engine_extern = np_regression_engine_or_error(
+    ((ibwmfunc == CBWM_CVML) || (ibwmfunc == CBWM_CVLS)) ? *regtype : NP_LP_ENGINE_SCALAR,
     "np_conditional_density_bw");
-  degree_key_len = (int_ll_extern == LL_LP) ? num_reg_continuous_extern : 0;
+  degree_key_len = (np_lp_engine_extern == NP_LP_ENGINE_GENERAL) ? num_reg_continuous_extern : 0;
   bwm_num_extra_params = degree_key_len;
   vector_glp_gradient_order_extern = NULL;
-  int_glp_bernstein_extern = ((ibwmfunc == CBWM_CVML) || (ibwmfunc == CBWM_CVLS)) && (int_ll_extern == LL_LP) ? *glp_bernstein : 0;
-  int_glp_basis_extern = ((ibwmfunc == CBWM_CVML) || (ibwmfunc == CBWM_CVLS)) && (int_ll_extern == LL_LP) ? *glp_basis : 1;
+  int_glp_bernstein_extern = ((ibwmfunc == CBWM_CVML) || (ibwmfunc == CBWM_CVLS)) && (np_lp_engine_extern == NP_LP_ENGINE_GENERAL) ? *glp_bernstein : 0;
+  int_glp_basis_extern = ((ibwmfunc == CBWM_CVML) || (ibwmfunc == CBWM_CVLS)) && (np_lp_engine_extern == NP_LP_ENGINE_GENERAL) ? *glp_basis : 1;
   int_bounded_cvls_quadrature_grid_extern = myopti[CBW_CVLS_QUAD_GRIDI];
   if ((int_bounded_cvls_quadrature_grid_extern < 0) ||
       (int_bounded_cvls_quadrature_grid_extern > 2))
@@ -5174,7 +5174,7 @@ static int np_conditional_density_nomad_shadow_prepare_internal(double *c_uno,
     int_bounded_cvls_quadrature_points_extern = 0;
   int_nn_k_min_extern = 1;
 
-  if ((int_ll_extern == LL_LP) && (num_reg_continuous_extern > 0)) {
+  if ((np_lp_engine_extern == NP_LP_ENGINE_GENERAL) && (num_reg_continuous_extern > 0)) {
     np_conditional_density_nomad_shadow.glp_degree = alloc_vecu(num_reg_continuous_extern);
     if (np_conditional_density_nomad_shadow.glp_degree == NULL)
       goto fail;
@@ -5185,7 +5185,7 @@ static int np_conditional_density_nomad_shadow_prepare_internal(double *c_uno,
     vector_glp_degree_extern = NULL;
   }
 
-  need_y_side = (ibwmfunc == CBWM_CVLS) || ((ibwmfunc == CBWM_CVML) && (int_ll_extern == LL_LP));
+  need_y_side = (ibwmfunc == CBWM_CVLS) || ((ibwmfunc == CBWM_CVML) && (np_lp_engine_extern == NP_LP_ENGINE_GENERAL));
   np_conditional_density_nomad_shadow.need_y_side = need_y_side;
   np_conditional_density_nomad_shadow.penalty_mode = penalty_mode[0];
   np_conditional_density_nomad_shadow.penalty_multiplier = penalty_mult[0];
@@ -5194,7 +5194,7 @@ static int np_conditional_density_nomad_shadow_prepare_internal(double *c_uno,
   if(KERNEL_reg_extern == NP_CKERNEL_COORDINATE_CODE ||
      KERNEL_den_extern == NP_CKERNEL_COORDINATE_CODE)
     int_TREE_XY = int_TREE_Y = int_TREE_X = NP_TREE_FALSE;
-  if(int_ll_extern == LL_LP){
+  if(np_lp_engine_extern == NP_LP_ENGINE_GENERAL){
     int_TREE_Y = NP_TREE_FALSE;
     int_TREE_XY = NP_TREE_FALSE;
   }
@@ -5487,19 +5487,19 @@ static int np_conditional_density_nomad_shadow_prepare_internal(double *c_uno,
   int_extendednn_upper_num_extern =
     (vector_extendednn_upper_extern != NULL) ? num_all_cvar : 0;
 
-  if ((int_ll_extern == LL_LP) &&
-      (!np_glp_cv_prepare_extern(int_ll_extern,
+  if ((np_lp_engine_extern == NP_LP_ENGINE_GENERAL) &&
+      (!np_glp_cv_prepare_extern(np_lp_engine_extern,
                                  num_obs_train_extern,
                                  num_reg_continuous_extern,
                                  matrix_X_continuous_train_extern)))
     goto fail;
-  if ((int_ll_extern == LL_LP) &&
+  if ((np_lp_engine_extern == NP_LP_ENGINE_GENERAL) &&
       (ibwmfunc == CBWM_CVML) &&
       (int_TREE_X == NP_TREE_TRUE) &&
       (!np_glp_cv_prepare_original_order_extern(ipt_extern_X)))
     goto fail;
 
-  if ((ibwmfunc == CBWM_CVLS) && (int_ll_extern == LL_LP) &&
+  if ((ibwmfunc == CBWM_CVLS) && (np_lp_engine_extern == NP_LP_ENGINE_GENERAL) &&
       (np_bounded_cvls_conditional_quad_context_prepare_extern() != 0))
     goto fail;
 
@@ -7158,7 +7158,7 @@ SEXP C_np_regression(SEXP tuno,
        beta_bandwidth_code != BW_GEN_NN &&
        beta_bandwidth_code != BW_ADAP_NN)
       error("C_np_regression: invalid beta bandwidth mode");
-    if(INTEGER(myopti_i)[REG_LL] != LL_LC)
+    if(INTEGER(myopti_i)[REG_LL] != NP_LP_ENGINE_SCALAR)
       error("C_np_regression: beta regression currently supports only local-constant fitting");
     if(do_grad != (INTEGER(myopti_i)[REG_GRAD] != 0))
       error("C_np_regression: inconsistent beta gradient flags");
@@ -7797,9 +7797,9 @@ SEXP C_np_density_conditional(SEXP tyuno,
     has_kernel_descriptors = 1;
   }
 
-  int_ll_extern = np_regression_engine_or_error(
+  np_lp_engine_extern = np_regression_engine_or_error(
     asInteger(regtype_i), "C_np_conditional_density_bw");
-  if ((int_ll_extern == LL_LP) && (ncon_x > 0)) {
+  if ((np_lp_engine_extern == NP_LP_ENGINE_GENERAL) && (ncon_x > 0)) {
     if ((int)XLENGTH(glp_degree_i) != ncon_x)
       error("C_np_density_conditional: length(glp_degree) must equal number of continuous x variables");
     vector_glp_degree_extern = INTEGER(glp_degree_i);
@@ -7846,7 +7846,7 @@ SEXP C_np_density_conditional(SEXP tyuno,
     if(ncon_x <= 0 || ncon_y <= 0 || num_train <= 0 || num_eval <= 0 ||
        en != num_eval || xd != ncon_x)
       error("C_np_density_conditional: invalid beta conditional-estimator dimensions");
-    if(int_ll_extern != LL_LC)
+    if(np_lp_engine_extern != NP_LP_ENGINE_SCALAR)
       error("C_np_density_conditional: beta conditional estimators currently support only local-constant fitting");
     if(bandwidth_code != BW_FIXED && bandwidth_code != BW_GEN_NN &&
        bandwidth_code != BW_ADAP_NN)
@@ -7990,7 +7990,7 @@ SEXP C_np_density_conditional(SEXP tyuno,
   vector_glp_degree_extern = NULL;
   int_glp_bernstein_extern = 0;
   int_glp_basis_extern = 1;
-  int_ll_extern = LL_LC;
+  np_lp_engine_extern = NP_LP_ENGINE_SCALAR;
 
   UNPROTECT(36);
   return out;
@@ -9805,9 +9805,9 @@ SEXP C_np_shadow_cv_xweights_conditional(SEXP tyuno,
                              num_categories_extern_X,
                              matrix_categorical_vals_extern_X);
 
-  int_ll_extern = np_regression_engine_or_error(
+  np_lp_engine_extern = np_regression_engine_or_error(
     asInteger(regtype), "C_np_shadow_cv_xweights_conditional");
-  if((int_ll_extern == LL_LP) && (num_reg_continuous_extern > 0)){
+  if((np_lp_engine_extern == NP_LP_ENGINE_GENERAL) && (num_reg_continuous_extern > 0)){
     if((int)XLENGTH(degree_i) != num_reg_continuous_extern)
       error("C_np_shadow_cv_xweights_conditional: glp_degree length mismatch");
     vector_glp_degree_extern = INTEGER(degree_i);
@@ -9849,7 +9849,7 @@ SEXP C_np_shadow_cv_xweights_conditional(SEXP tyuno,
   matrix_categorical_vals_extern_X = NULL;
   ipt_extern_X = NULL;
   ipt_lookup_extern_X = NULL;
-  int_ll_extern = LL_LC;
+  np_lp_engine_extern = NP_LP_ENGINE_SCALAR;
   vector_glp_degree_extern = NULL;
   int_glp_bernstein_extern = 0;
   int_glp_basis_extern = 1;
@@ -10034,7 +10034,7 @@ SEXP C_np_regression_lp_apply_conditional(SEXP txuno,
                              num_categories_extern_X,
                              matrix_categorical_vals_extern_X);
 
-  int_ll_extern = LL_LP;
+  np_lp_engine_extern = NP_LP_ENGINE_GENERAL;
   if((int)XLENGTH(degree_i) != num_reg_continuous_extern)
     error("C_np_regression_lp_apply_conditional: glp_degree length mismatch");
   if((XLENGTH(grad_i) != 0) && ((int)XLENGTH(grad_i) != num_reg_continuous_extern))
@@ -10085,7 +10085,7 @@ SEXP C_np_regression_lp_apply_conditional(SEXP txuno,
   matrix_categorical_vals_extern_X = NULL;
   ipt_extern_X = NULL;
   ipt_lookup_extern_X = NULL;
-  int_ll_extern = LL_LC;
+  np_lp_engine_extern = NP_LP_ENGINE_SCALAR;
   vector_glp_degree_extern = NULL;
   vector_glp_gradient_order_extern = NULL;
   int_glp_bernstein_extern = 0;
@@ -10353,7 +10353,7 @@ static int np_cdist_native_search_callback(int n,
     degree_work = context->degree;
   }
 
-  if (context->regtype == LL_LP &&
+  if (context->regtype == NP_LP_ENGINE_GENERAL &&
       !np_glp_cv_degree_admissible_extern(context->myopti[CDBW_NOBSI],
                                           context->ndegree,
                                           degree_work,
@@ -13155,7 +13155,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
     const int num_ordered = num_reg_ordered_extern +
       num_var_ordered_extern;
 
-    if(*regtype != LL_LC)
+    if(*regtype != NP_LP_ENGINE_SCALAR)
       error("C_np_density_conditional_bw: beta bandwidth selection supports only local-constant fitting");
     if(num_unordered != 0 || num_ordered != 0)
       error("C_np_density_conditional_bw: beta bandwidth selection requires continuous X and Y variables only");
@@ -13215,13 +13215,13 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   bwm_use_transform = 0;
   
   ibwmfunc = myopti[CBW_MI];
-  int_ll_extern = np_regression_engine_or_error(
-    ((ibwmfunc == CBWM_CVML) || (ibwmfunc == CBWM_CVLS)) ? *regtype : LL_LC,
+  np_lp_engine_extern = np_regression_engine_or_error(
+    ((ibwmfunc == CBWM_CVML) || (ibwmfunc == CBWM_CVLS)) ? *regtype : NP_LP_ENGINE_SCALAR,
     "np_conditional_density_bw_legacy");
-  vector_glp_degree_extern = (((ibwmfunc == CBWM_CVML) || (ibwmfunc == CBWM_CVLS)) && (int_ll_extern == LL_LP)) ? glp_degree : NULL;
+  vector_glp_degree_extern = (((ibwmfunc == CBWM_CVML) || (ibwmfunc == CBWM_CVLS)) && (np_lp_engine_extern == NP_LP_ENGINE_GENERAL)) ? glp_degree : NULL;
   vector_glp_gradient_order_extern = NULL;
-  int_glp_bernstein_extern = (((ibwmfunc == CBWM_CVML) || (ibwmfunc == CBWM_CVLS)) && (int_ll_extern == LL_LP)) ? *glp_bernstein : 0;
-  int_glp_basis_extern = (((ibwmfunc == CBWM_CVML) || (ibwmfunc == CBWM_CVLS)) && (int_ll_extern == LL_LP)) ? *glp_basis : 1;
+  int_glp_bernstein_extern = (((ibwmfunc == CBWM_CVML) || (ibwmfunc == CBWM_CVLS)) && (np_lp_engine_extern == NP_LP_ENGINE_GENERAL)) ? *glp_bernstein : 0;
+  int_glp_basis_extern = (((ibwmfunc == CBWM_CVML) || (ibwmfunc == CBWM_CVLS)) && (np_lp_engine_extern == NP_LP_ENGINE_GENERAL)) ? *glp_basis : 1;
   int_bounded_cvls_quadrature_grid_extern = myopti[CBW_CVLS_QUAD_GRIDI];
   if ((int_bounded_cvls_quadrature_grid_extern < 0) ||
       (int_bounded_cvls_quadrature_grid_extern > 2))
@@ -13229,7 +13229,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   int_bounded_cvls_quadrature_points_extern = myopti[CBW_CVLS_QUAD_POINTSI];
   if (int_bounded_cvls_quadrature_points_extern < 2)
     int_bounded_cvls_quadrature_points_extern = 0;
-  need_y_side = (ibwmfunc == CBWM_CVLS) || ((ibwmfunc == CBWM_CVML) && (int_ll_extern == LL_LP));
+  need_y_side = (ibwmfunc == CBWM_CVLS) || ((ibwmfunc == CBWM_CVML) && (np_lp_engine_extern == NP_LP_ENGINE_GENERAL));
   bwm_use_transform = myopti[CBW_TBNDI];
   if (BANDWIDTH_den_extern != BW_FIXED)
     bwm_use_transform = 0;
@@ -13623,7 +13623,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
     (vector_extendednn_upper_extern != NULL) ?
     (num_reg_continuous_extern + num_var_continuous_extern) : 0;
 
-  if((ibwmfunc == CBWM_CVLS) && (int_ll_extern == LL_LP)){
+  if((ibwmfunc == CBWM_CVLS) && (np_lp_engine_extern == NP_LP_ENGINE_GENERAL)){
     if(np_bounded_cvls_conditional_quad_context_prepare_extern() != 0){
       bw_error_msg = "C_np_density_conditional_bw: failed to prepare bounded cv.ls quadrature context";
       goto cleanup_np_density_conditional_bw;
@@ -14282,7 +14282,7 @@ cleanup_np_density_conditional_bw:
   int_cxker_bound_extern = 0;
   int_cyker_bound_extern = 0;
   int_cxyker_bound_extern = 0;
-  int_ll_extern = LL_LC;
+  np_lp_engine_extern = NP_LP_ENGINE_SCALAR;
   vector_glp_degree_extern = NULL;
   int_glp_bernstein_extern = 0;
   int_glp_basis_extern = 1;
@@ -14411,7 +14411,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
     const int num_ordered = num_reg_ordered_extern +
       num_var_ordered_extern;
 
-    if(*regtype != LL_LC)
+    if(*regtype != NP_LP_ENGINE_SCALAR)
       error("C_np_distribution_conditional_bw: beta bandwidth selection supports only local-constant fitting");
     if(num_unordered != 0 || num_ordered != 0)
       error("C_np_distribution_conditional_bw: beta bandwidth selection requires continuous X and Y variables only");
@@ -14462,13 +14462,13 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
 
   itmax=myopti[CDBW_ITMAXI];
   ibwmfunc = myopti[CDBW_MI];
-  int_ll_extern = np_regression_engine_or_error(
-    (ibwmfunc == CDBWM_CVLS) ? *regtype : LL_LC,
+  np_lp_engine_extern = np_regression_engine_or_error(
+    (ibwmfunc == CDBWM_CVLS) ? *regtype : NP_LP_ENGINE_SCALAR,
     "np_conditional_distribution_bw_legacy");
-  vector_glp_degree_extern = ((ibwmfunc == CDBWM_CVLS) && (int_ll_extern == LL_LP)) ? glp_degree : NULL;
+  vector_glp_degree_extern = ((ibwmfunc == CDBWM_CVLS) && (np_lp_engine_extern == NP_LP_ENGINE_GENERAL)) ? glp_degree : NULL;
   vector_glp_gradient_order_extern = NULL;
-  int_glp_bernstein_extern = ((ibwmfunc == CDBWM_CVLS) && (int_ll_extern == LL_LP)) ? *glp_bernstein : 0;
-  int_glp_basis_extern = ((ibwmfunc == CDBWM_CVLS) && (int_ll_extern == LL_LP)) ? *glp_basis : 1;
+  int_glp_bernstein_extern = ((ibwmfunc == CDBWM_CVLS) && (np_lp_engine_extern == NP_LP_ENGINE_GENERAL)) ? *glp_bernstein : 0;
+  int_glp_basis_extern = ((ibwmfunc == CDBWM_CVLS) && (np_lp_engine_extern == NP_LP_ENGINE_GENERAL)) ? *glp_basis : 1;
 
   int_TREE_XY = int_TREE_Y = int_TREE_X = myopti[CDBW_TREEI];
   int_TREE_PROFILE_X = myopti[CDBW_TREEI];
@@ -14476,7 +14476,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
      KERNEL_den_extern == NP_CKERNEL_COORDINATE_CODE)
     int_TREE_XY = int_TREE_Y = int_TREE_X = int_TREE_PROFILE_X =
       NP_TREE_FALSE;
-  if(int_ll_extern == LL_LP){
+  if(np_lp_engine_extern == NP_LP_ENGINE_GENERAL){
     int_TREE_Y = NP_TREE_FALSE;
     int_TREE_XY = NP_TREE_FALSE;
   }
@@ -15469,7 +15469,7 @@ cleanup_np_distribution_conditional_bw:
   int_cxker_bound_extern = 0;
   int_cyker_bound_extern = 0;
   int_cxyker_bound_extern = 0;
-  int_ll_extern = LL_LC;
+  np_lp_engine_extern = NP_LP_ENGINE_SCALAR;
   vector_glp_degree_extern = NULL;
   int_glp_bernstein_extern = 0;
   int_glp_basis_extern = 1;
@@ -15524,7 +15524,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
   int * ipt_XY = NULL, *ipe_XY = NULL;
   int operator;
 
-  int int_ll_eff;
+  int lp_engine_eff;
   int ycat_offset;
   int xcat_offset;
   int saved_cker_bound;
@@ -15840,14 +15840,14 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
     }
   }
 
-  int_ll_eff = int_ll_extern;
-  if((int_ll_eff == LL_LP) && (num_reg_continuous_extern == 0))
-    int_ll_eff = LL_LC;
+  lp_engine_eff = np_lp_engine_extern;
+  if((lp_engine_eff == NP_LP_ENGINE_GENERAL) && (num_reg_continuous_extern == 0))
+    lp_engine_eff = NP_LP_ENGINE_SCALAR;
 
-  if(int_ll_eff == LL_LC){
+  if(lp_engine_eff == NP_LP_ENGINE_SCALAR){
     int lc_owner_done = 0;
 #ifdef MPI2
-    if((int_ll_eff == LL_LC) &&
+    if((lp_engine_eff == NP_LP_ENGINE_SCALAR) &&
        (BANDWIDTH_den_extern == BW_FIXED) &&
        (iNum_Processors > 1) &&
        !np_mpi_local_regression_active()){
@@ -15959,7 +15959,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
     }
 #endif
 
-    if((int_ll_eff == LL_LP) &&
+    if((lp_engine_eff == NP_LP_ENGINE_GENERAL) &&
        ((vector_glp_degree_extern == NULL) || (num_reg_continuous_extern <= 0)))
       error("np_density_conditional: LP conditional path requires continuous x variables and GLP degree metadata");
 
@@ -16128,7 +16128,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
       vector_ckerub_extern = vector_cxkerub_extern;
 
       if(status == 0){
-        status = kernel_estimate_regression_categorical_tree_np(int_ll_eff,
+        status = kernel_estimate_regression_categorical_tree_np(lp_engine_eff,
                                                                  KERNEL_reg_extern,
                                                                  KERNEL_reg_unordered_extern,
                                                                  KERNEL_reg_ordered_extern,
@@ -16775,10 +16775,10 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   int_RESTART_FROM_MIN = myopti[RBW_REMINI];
   int_MINIMIZE_IO = myopti[RBW_MINIOI];
 
-  int_ll_extern = np_regression_engine_or_error(
+  np_lp_engine_extern = np_regression_engine_or_error(
     myopti[RBW_LL], "C_np_regression_bw");
   if(KERNEL_reg_extern == NP_CKERNEL_COORDINATE_CODE &&
-     (int_ll_extern != LL_LC || lsq_check_mode))
+     (np_lp_engine_extern != NP_LP_ENGINE_SCALAR || lsq_check_mode))
     error("C_np_regression_bw: beta bandwidth selection supports only local-constant mean regression");
   vector_glp_degree_extern = glp_degree;
   vector_glp_gradient_order_extern = NULL;
@@ -16989,8 +16989,8 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
                              num_categories_extern,
                              matrix_categorical_vals_extern);
 
-  if((int_ll_extern == LL_LP) &&
-     (!np_glp_cv_prepare_extern(int_ll_extern,
+  if((np_lp_engine_extern == NP_LP_ENGINE_GENERAL) &&
+     (!np_glp_cv_prepare_extern(np_lp_engine_extern,
                                 num_obs_train_extern,
                                 num_reg_continuous_extern,
                                 matrix_X_continuous_train_extern))){
@@ -17701,7 +17701,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
   BANDWIDTH_reg_extern = myopti[REG_BWI];
 
   do_grad = myopti[REG_GRAD];
-  int_ll_extern = np_regression_engine_or_error(
+  np_lp_engine_extern = np_regression_engine_or_error(
     myopti[REG_LL], "C_np_regression");
   vector_glp_degree_extern = glp_degree;
   vector_glp_gradient_order_extern = glp_gradient_order;
@@ -17896,7 +17896,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
   */
 
 
-  kernel_estimate_regression_categorical_tree_np(int_ll_extern,
+  kernel_estimate_regression_categorical_tree_np(np_lp_engine_extern,
                                                    KERNEL_reg_extern,
                                                    KERNEL_reg_unordered_extern,
                                                    KERNEL_reg_ordered_extern,
