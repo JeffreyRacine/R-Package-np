@@ -8147,11 +8147,11 @@ const NP_OuterPackCtx * const outer_pack_ctx){
 
 #if NP_ACCEL_GAUSS_COMPILED
   if(lean_reg_cont_loop &&
-     (BANDWIDTH_reg == BW_FIXED) &&
+     ((BANDWIDTH_reg == BW_FIXED) || (BANDWIDTH_reg == BW_GEN_NN)) &&
      (num_reg_continuous >= 2) &&
      (num_xt >= 256) &&
      (pxl == NULL) &&
-     (!cont_largeh_any_fixed) &&
+     ((BANDWIDTH_reg != BW_FIXED) || (!cont_largeh_any_fixed)) &&
      np_mseries_accelerate_enabled_cache){
     fused_gaussian_product_eligible = 1;
     for(i = 0; i < num_reg_continuous; i++){
@@ -8776,7 +8776,7 @@ const NP_OuterPackCtx * const outer_pack_ctx){
 #if NP_ACCEL_GAUSS_COMPILED
       int fused_gaussian_product = 0;
 
-      if(fused_gaussian_product_eligible)
+      if(fused_gaussian_product_eligible && (!any_cont_largeh))
         fused_gaussian_product =
           np_accel_gauss_product_try(xtc, xc, m, num_reg_continuous,
                                      num_xt, j, jbw,

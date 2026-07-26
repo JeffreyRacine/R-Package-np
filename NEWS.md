@@ -24,12 +24,13 @@
   Adaptive-nearest-neighbour, tree, reduced-row, and specialized resident-row
   routes are unchanged, as are objective values.
 
-* On Apple ARM64, eligible fixed-bandwidth products of two or more ordinary
-  Gaussian continuous kernels now use one vector exponential of the summed
-  squared standardized distances. Non-Apple, one-dimensional, tree, bounded,
-  higher-order, nearest-neighbour, convolution, score, and permutation routes
-  retain the established implementation. The formulas are mathematically
-  identical but can differ in their last floating-point bits.
+* On Apple ARM64, eligible fixed and generalized-nearest-neighbour products of
+  two or more ordinary Gaussian continuous kernels now use one vector
+  exponential of the summed squared standardized distances. Non-Apple,
+  one-dimensional, tree, bounded, higher-order, adaptive-nearest-neighbour,
+  convolution, score, permutation, and generalized-NN large-bandwidth
+  shortcut routes retain the established implementation. The formulas are
+  mathematically identical but can differ in their last floating-point bits.
 
 * Corrected canonical local-polynomial CVAIC diagonal restoration and
   assembly for degrees greater than one, generalized-nearest-neighbor
