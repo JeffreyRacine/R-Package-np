@@ -57,6 +57,12 @@ extern void vvrec(double *, const double *, const int *);
 #else
 #define NP_ACCEL_GAUSS_COMPILED 0
 #endif
+
+#if defined(__GNUC__) || defined(__clang__)
+#define NP_NOINLINE __attribute__((noinline))
+#else
+#define NP_NOINLINE
+#endif
 #ifdef MPI2
 
 #include "mpi.h"
@@ -5445,6 +5451,93 @@ static int np_accel_gauss_product_try(double * const * const xt,
   return 1;
 }
 
+/*
+  Form a fixed-bandwidth product of ordinary Gaussian convolutions with one
+  vector exponential. Each dimension has
+
+    h*hy*phi((x-X)/sqrt(h^2+hy^2)) /
+      (sqrt(h^2+hy^2)*hy^bpow).
+
+  The caller proves ordinary Gaussian convolution in every continuous
+  dimension and falls back unchanged if any runtime prerequisite is absent.
+*/
+static int NP_NOINLINE np_accel_gauss_convolution_product_try(
+  double * const * const xt,
+  double * const * const xeval,
+  double * const * const bandwidth,
+  double * const * const alt_bandwidth,
+  const int * const bandwidth_power,
+  const int ndim,
+  const int n,
+  const int eval_index,
+  const int bandwidth_index,
+  double * const out)
+{
+  const double minus_one = -1.0;
+  const int ni = n;
+  double scale_product = 1.0;
+
+  if((!np_mseries_accelerate_enabled_cache) ||
+     (xt == NULL) || (xeval == NULL) || (bandwidth == NULL) ||
+     (alt_bandwidth == NULL) || (bandwidth_power == NULL) ||
+     (out == NULL) || (ndim < 2) || (n < 256) ||
+     (!np_accel_gauss_scratch_ensure(n)))
+    return 0;
+
+  for(int d = 0; d < ndim; d++){
+    double h;
+    double hy;
+    double h2;
+    double sqrt_h2;
+    double exponent;
+    double dimension_scale;
+    double x;
+
+    if((xt[d] == NULL) || (xeval[d] == NULL) ||
+       (bandwidth[d] == NULL) || (alt_bandwidth[d] == NULL))
+      return 0;
+
+    h = bandwidth[d][bandwidth_index];
+    hy = alt_bandwidth[d][0];
+    h2 = h*h + hy*hy;
+    sqrt_h2 = sqrt(h2);
+    if((!isfinite(h)) || (!isfinite(hy)) || (!isfinite(h2)) ||
+       (!isfinite(sqrt_h2)) || (h2 <= 0.0) || (sqrt_h2 <= 0.0) ||
+       (hy == 0.0))
+      return 0;
+
+    exponent = -0.5/h2;
+    dimension_scale =
+      (0.3989422803*h*hy)/
+      (sqrt_h2*ipow(hy, bandwidth_power[d]));
+    if(!isfinite(dimension_scale))
+      return 0;
+    scale_product *= dimension_scale;
+    if(!isfinite(scale_product))
+      return 0;
+
+    x = xeval[d][eval_index];
+    vDSP_vsmsaD(xt[d], 1, &minus_one, &x,
+                np_accel_gauss_tmp, 1, (np_vDSP_Length)n);
+    vDSP_vsqD(np_accel_gauss_tmp, 1,
+              np_accel_gauss_tmp, 1, (np_vDSP_Length)n);
+    if(d == 0){
+      vDSP_vsmulD(np_accel_gauss_tmp, 1, &exponent,
+                  np_accel_gauss_arg, 1, (np_vDSP_Length)n);
+    } else {
+      vDSP_vsmulD(np_accel_gauss_tmp, 1, &exponent,
+                  np_accel_gauss_tmp, 1, (np_vDSP_Length)n);
+      vDSP_vaddD(np_accel_gauss_arg, 1, np_accel_gauss_tmp, 1,
+                 np_accel_gauss_arg, 1, (np_vDSP_Length)n);
+    }
+  }
+
+  vvexp(out, np_accel_gauss_arg, &ni);
+  vDSP_vsmulD(out, 1, &scale_product,
+              out, 1, (np_vDSP_Length)n);
+  return 1;
+}
+
 static int np_accel_gauss_has_zero_weight(const double * const w, const int n)
 {
   for(int i = 0; i < n; i++)
@@ -5981,12 +6074,6 @@ void np_accel_gauss_release_buffers(void)
   np_accel_gauss_capacity = 0;
 #endif
 }
-
-#if defined(__GNUC__) || defined(__clang__)
-#define NP_NOINLINE __attribute__((noinline))
-#else
-#define NP_NOINLINE
-#endif
 
 static int NP_NOINLINE np_ckernelv_accel_try(const int KERNEL,
                                              const double * const xt,
@@ -7830,6 +7917,7 @@ const NP_OuterPackCtx * const outer_pack_ctx){
   int cont_largeh_any_fixed = 0;
 #if NP_ACCEL_GAUSS_COMPILED
   int fused_gaussian_product_eligible = 0;
+  int fused_gaussian_convolution_eligible = 0;
   double fused_gaussian_product_coef = 1.0;
 #endif
   int tree_alllarge_bypass = 0;
@@ -8171,6 +8259,24 @@ const NP_OuterPackCtx * const outer_pack_ctx){
         break;
       }
       fused_gaussian_product_coef *= ONE_OVER_SQRT_TWO_PI;
+    }
+  }
+
+  if((num_reg_continuous >= 2) &&
+     (BANDWIDTH_reg == BW_FIXED) &&
+     any_convolution &&
+     (!doscoreocg) &&
+     (!do_perm) &&
+     (p_nvar == 0) &&
+     (!int_cker_bound_extern) &&
+     (num_xt >= 256) &&
+     np_mseries_accelerate_enabled_cache){
+    fused_gaussian_convolution_eligible = 1;
+    for(i = 0; i < num_reg_continuous; i++){
+      if((operator[i] != OP_CONVOLUTION) || (KERNEL_reg[i] != 0)){
+        fused_gaussian_convolution_eligible = 0;
+        break;
+      }
     }
   }
 #endif
@@ -8825,7 +8931,29 @@ const NP_OuterPackCtx * const outer_pack_ctx){
         }
       }
     } else {
-      for(i = 0, l = 0, ip = 0, k = 0; i < num_reg_continuous; i++, l++, ip += do_perm){
+#if NP_ACCEL_GAUSS_COMPILED
+      int fused_gaussian_convolution = 0;
+
+      if(fused_gaussian_convolution_eligible)
+        fused_gaussian_convolution =
+          np_accel_gauss_convolution_product_try(
+            xtc, xc, m, matrix_alt_bandwidth, bpow,
+            num_reg_continuous, num_xt, j, jbw, tprod);
+
+      if(fused_gaussian_convolution){
+        tprod_has_vals = 1;
+        for(i = 0, l = 0, ip = 0, k = 0;
+            i < num_reg_continuous;
+            i++, l++, ip += do_perm){
+          dband *= ipow(m[i][jbw], bpow[i]);
+          k += bpso[l];
+        }
+      } else
+#endif
+      {
+        for(i = 0, l = 0, ip = 0, k = 0;
+            i < num_reg_continuous;
+            i++, l++, ip += do_perm){
         const int kbase_i = KERNEL_reg_np[i] % 10;
         const int p_kbase_i = (do_perm ? permutation_kernel[i] : KERNEL_reg_np[i]) % 10;
         const int use_bounds_i = int_cker_bound_extern &&
@@ -8923,6 +9051,7 @@ const NP_OuterPackCtx * const outer_pack_ctx){
         }
         k += bpso[l];
       }
+    }
     }
 
 
