@@ -12447,6 +12447,9 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
   }
   }
 
+  if((!use_sparse_tree) && (nterms == 3))
+    np_lp_mirror_dense_moments_row3(moments, num_obs);
+
   result.cv = 0.0;
   result.traceH = 0.0;
 
