@@ -59,3 +59,21 @@ test_that("resident npcdens cache keys bandwidths and polynomial degree", {
   expect_false(isTRUE(all.equal(cached[1L], cached[2L], tolerance = 1e-8)))
   expect_identical(cached[1L], cached[4L])
 })
+
+test_that("resident npcdens shadow bounds degree writes by allocated key length", {
+  src <- readLines(file.path(testthat::test_path("..", ".."), "src", "np.c"),
+                   warn = FALSE)
+  text <- paste(src, collapse = "\n")
+  expect_match(
+    text,
+    "np_conditional_density_nomad_shadow\\.degree_key_len = degree_key_len"
+  )
+  expect_match(
+    text,
+    "i < np_conditional_density_nomad_shadow\\.degree_key_len"
+  )
+  expect_match(
+    text,
+    "np_conditional_density_nomad_shadow.num_all_var \\+ i \\+ 1"
+  )
+})

@@ -450,6 +450,7 @@ typedef struct {
   int owned;
   int num_all_var;
   int num_reg_continuous;
+  int degree_key_len;
   int num_var_continuous;
   int num_reg_unordered;
   int num_var_unordered;
@@ -478,8 +479,7 @@ typedef struct {
 } NPConditionalDensityNomadShadowCtx;
 
 static NPConditionalDensityNomadShadowCtx np_conditional_density_nomad_shadow =
-  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.0, NULL, NULL, NULL, NULL, NULL, NULL,
-   NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL};
+  {0};
 
 static void np_conditional_density_nomad_shadow_clear_internal(void);
 static void np_conditional_density_nomad_shadow_refresh_penalty(void);
@@ -3440,6 +3440,7 @@ static void np_conditional_density_nomad_shadow_clear_internal(void)
   np_conditional_density_nomad_shadow.owned = 0;
   np_conditional_density_nomad_shadow.num_all_var = 0;
   np_conditional_density_nomad_shadow.num_reg_continuous = 0;
+  np_conditional_density_nomad_shadow.degree_key_len = 0;
   np_conditional_density_nomad_shadow.num_var_continuous = 0;
   np_conditional_density_nomad_shadow.num_reg_unordered = 0;
   np_conditional_density_nomad_shadow.num_var_unordered = 0;
@@ -3736,6 +3737,7 @@ static int np_conditional_density_nomad_shadow_prepare_internal(double *c_uno,
     ((ibwmfunc == CBWM_CVML) || (ibwmfunc == CBWM_CVLS)) ? *regtype : NP_LP_ENGINE_SCALAR,
     "np_conditional_density_bw");
   degree_key_len = (np_lp_engine_extern == NP_LP_ENGINE_GENERAL) ? num_reg_continuous_extern : 0;
+  np_conditional_density_nomad_shadow.degree_key_len = degree_key_len;
   bwm_num_extra_params = degree_key_len;
   vector_glp_gradient_order_extern = NULL;
   int_glp_bernstein_extern = ((ibwmfunc == CBWM_CVML) || (ibwmfunc == CBWM_CVLS)) && (np_lp_engine_extern == NP_LP_ENGINE_GENERAL) ? *glp_bernstein : 0;
@@ -4370,7 +4372,7 @@ static int np_density_conditional_nomad_shadow_eval_native_raw(const double *rbw
 
   for (i = 0; i < np_conditional_density_nomad_shadow.num_all_var; i++)
     np_conditional_density_nomad_shadow.vector_scale_factor[i + 1] = rbw_work[i];
-  for (i = 0; i < np_conditional_density_nomad_shadow.num_reg_continuous; i++)
+  for (i = 0; i < np_conditional_density_nomad_shadow.degree_key_len; i++)
     np_conditional_density_nomad_shadow.vector_scale_factor[
       np_conditional_density_nomad_shadow.num_all_var + i + 1] =
       (double)degree_work[i];
