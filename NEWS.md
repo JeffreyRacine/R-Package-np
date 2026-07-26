@@ -18,6 +18,13 @@
   its historical general-LP row omitted observation-specific X-bandwidth
   divisors and could differ from the equivalent local-constant objective.
 
+* Corrected conditional-density CVML workspace ownership for categorical
+  responses when the scalar streaming objective is selected with multiple
+  continuous predictors. Affected bandwidth searches, including
+  `npconmode()` workflows, could previously abort the R process. Native MADS
+  callbacks for the same scalar route also no longer allocate or read a
+  nonexistent local-polynomial degree vector.
+
 * Generic local-polynomial CV objectives now pack their immutable
   response-plus-basis operand once per objective evaluation for eligible
   full drop-one rows, instead of repacking it for every observation.
