@@ -13096,6 +13096,9 @@ lp_cv_collective_gate:
   if(local_fail)
     goto cleanup_lp_cv;
 
+  if((!use_sparse_tree) && (!use_mpi_transport) && (nterms == 3))
+    np_lp_mirror_dense_moments_row3(moments, num_obs);
+
   result.cv = 0.0;
   result.traceH = 0.0;
 

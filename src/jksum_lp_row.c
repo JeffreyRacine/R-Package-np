@@ -213,12 +213,15 @@ void np_lp_accumulate_dense_resident_row3(
     int *support_data,
     double *support_weight)
 {
+  /*
+   * Keep the unique upper triangle resident in the non-MPI pairwise route.
+   * The caller mirrors it after every unordered pair has been accumulated.
+   */
   int i;
   double * const sj = moments + (size_t)row_j*9;
   double * const tj = rhs + (size_t)row_j*3;
   double sj0 = sj[0], sj1 = sj[1], sj2 = sj[2];
-  double sj3 = sj[3], sj4 = sj[4], sj5 = sj[5];
-  double sj6 = sj[6], sj7 = sj[7], sj8 = sj[8];
+  double sj4 = sj[4], sj5 = sj[5], sj8 = sj[8];
   double tj0 = tj[0], tj1 = tj[1], tj2 = tj[2];
 
   for(i = 0; i < nsub; i++){
@@ -260,21 +263,15 @@ void np_lp_accumulate_dense_resident_row3(
       sj0 += wb0*b0;
       sj1 += wb0*b1;
       sj2 += wb0*b2;
-      sj3 += wb1*b0;
       sj4 += wb1*b1;
       sj5 += wb1*b2;
-      sj6 += wb2*b0;
-      sj7 += wb2*b1;
       sj8 += wb2*b2;
 
       si[0] += w*eval_outer[0];
       si[1] += w*eval_outer[1];
       si[2] += w*eval_outer[2];
-      si[3] += w*eval_outer[3];
       si[4] += w*eval_outer[4];
       si[5] += w*eval_outer[5];
-      si[6] += w*eval_outer[6];
-      si[7] += w*eval_outer[7];
       si[8] += w*eval_outer[8];
     }
   }
@@ -285,12 +282,22 @@ void np_lp_accumulate_dense_resident_row3(
   sj[0] = sj0;
   sj[1] = sj1;
   sj[2] = sj2;
-  sj[3] = sj3;
   sj[4] = sj4;
   sj[5] = sj5;
-  sj[6] = sj6;
-  sj[7] = sj7;
   sj[8] = sj8;
+}
+
+attribute_hidden void
+np_lp_mirror_dense_moments_row3(double *moments, const int nrows)
+{
+  int row;
+
+  for(row = 0; row < nrows; row++){
+    double * const s = moments + (size_t)row*9;
+    s[3] = s[1];
+    s[6] = s[2];
+    s[7] = s[5];
+  }
 }
 
 static void np_lp_accumulate_dense_row_generic(
