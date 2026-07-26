@@ -7800,6 +7800,7 @@ typedef struct {
   int ncol_Y;
   int num_weights;
   int symmetric;
+  int runtime_options_frozen;
 } NP_OuterPackCtx;
 
 static int np_hot_loop_interrupt_stride(const int total)
@@ -7922,7 +7923,8 @@ const int keep_kw_owner_local){
 
   if(!np_runtime_tol_cache_ready)
     np_refresh_runtime_tolerances();
-  np_refresh_mseries_accelerate_option();
+  if((outer_pack_ctx == NULL) || !outer_pack_ctx->runtime_options_frozen)
+    np_refresh_mseries_accelerate_option();
 
   if(no_bpso){
     bpso = (int *)malloc((num_reg_unordered + num_reg_ordered + num_reg_continuous)*sizeof(int));
@@ -12695,6 +12697,9 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
   double aicc = 0.0;
   int use_sparse_tree = 0;
   int tsf = 0;
+  const NP_OuterPackCtx frozen_runtime_options = {
+    .runtime_options_frozen = 1
+  };
   const int track_lowsupport_requested =
     (bwm == RBWM_CVLS) || (bwm == RBWM_CVCHECK) || (bwm == RBWM_CVKS);
   int track_lowsupport = track_lowsupport_requested;
@@ -12738,6 +12743,9 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
                                        kernel_u,
                                        kernel_o,
                                        operator);
+
+  if((!use_sparse_tree) || (bwm == RBWM_CVAIC))
+    np_refresh_mseries_accelerate_option();
 
   if((sf_flag = (int_LARGE_SF == 0))){
     int_LARGE_SF = 1;
@@ -12815,7 +12823,7 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
   if(bwm == RBWM_CVAIC){
     tsf = int_LARGE_SF;
     int_LARGE_SF = 1;
-    if(kernel_weighted_sum_np_ctx(kernel_c,
+    if(kernel_weighted_sum_np_ctx_ex(kernel_c,
                                   kernel_u,
                                   kernel_o,
                                   BW_FIXED,
@@ -12864,7 +12872,10 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
                                   &aicc,
                                   NULL,
                                   NULL,
-                                  NULL) != 0){
+                                  NULL,
+                                  NULL,
+                                  &frozen_runtime_options,
+                                  0) != 0){
       int_LARGE_SF = tsf;
       NP_LP_CV_FAIL();
     }
@@ -12983,7 +12994,7 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
 
     memset(kw, 0, (size_t)MAX(1, num_obs)*sizeof(double));
 
-    if(kernel_weighted_sum_np_ctx(kernel_c,
+    if(kernel_weighted_sum_np_ctx_ex(kernel_c,
                                   kernel_u,
                                   kernel_o,
                                   BW_FIXED,
@@ -13035,7 +13046,10 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
                                   &mean_dummy,
                                   NULL,
                                   kw,
-                                  NULL) != 0)
+                                  NULL,
+                                  NULL,
+                                  &frozen_runtime_options,
+                                  0) != 0)
       NP_LP_CV_FAIL();
 
     if(use_mpi_transport){
@@ -13690,7 +13704,15 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
     double * sgn = (double *)malloc((size_t)nrc2*sizeof(double));
     double * evalv = (double *)malloc((size_t)nrc1*sizeof(double));
     double *objective_Apack = NULL;
-    NP_OuterPackCtx objective_pack_ctx = {NULL, NULL, 0, 0, 0, 0};
+    NP_OuterPackCtx objective_pack_ctx = {
+      .runtime_options_frozen = 1
+    };
+
+    /*
+     * Every rank observes the same immutable option state throughout one
+     * native objective evaluation. Read it once per rank, not once per row.
+     */
+    np_refresh_mseries_accelerate_option();
 
     glp_ok = np_lp_solve_workspace_reserve(
       &solve_workspace,
@@ -13747,7 +13769,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
       if(bwm == RBWM_CVAIC){
         tsf = int_LARGE_SF;
         int_LARGE_SF = 1;
-        kernel_weighted_sum_np_ctx(kernel_c,
+        kernel_weighted_sum_np_ctx_ex(kernel_c,
                                    kernel_u,
                                    kernel_o,
                                    BANDWIDTH_reg,
@@ -13796,7 +13818,10 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                                    &aicc,
                                    NULL,
                                    NULL,
-                                   NULL);
+                                   NULL,
+                                   NULL,
+                                   &objective_pack_ctx,
+                                   0);
         int_LARGE_SF = tsf;
       }
 
@@ -13873,8 +13898,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                                          NULL,
                                          NULL,
                                          NULL,
-                                         (objective_Apack != NULL) ?
-                                         &objective_pack_ctx : NULL,
+                                         &objective_pack_ctx,
                                          0);
             }
             MPI_Allgather(MPI_IN_PLACE, nrcc22, MPI_DOUBLE, kwm+j*nrcc22, nrcc22, MPI_DOUBLE, comm[1]);
@@ -14034,8 +14058,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                                      NULL,
                                      NULL,
                                      NULL,
-                                     (objective_Apack != NULL) ?
-                                     &objective_pack_ctx : NULL,
+                                     &objective_pack_ctx,
                                      0);
         } else {
           if(j < (num_obs-1)){
