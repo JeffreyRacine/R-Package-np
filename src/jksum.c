@@ -20,6 +20,7 @@
 
 #include "headers.h"
 #include "gsl_bspline.h"
+#include "jksum_gaussian_density.h"
 #include "jksum_gaussian_fixed.h"
 #include "jksum_lp_row.h"
 #include "jksum_lp_solve.h"
@@ -30691,4 +30692,92 @@ void np_kernelop_xy(const int kernel_var_continuous,
       operator_xy[i] = operator_var;
   }
 
+}
+
+attribute_hidden int np_fixed_gaussian_density_cvls_pair_dispatch_try(
+  const int KERNEL_den,
+  const int BANDWIDTH_den,
+  const int num_obs,
+  const int num_reg_unordered,
+  const int num_reg_ordered,
+  const int num_reg_continuous,
+  double ** const matrix_X_continuous,
+  double * const vector_scale_factor,
+  double * const cv)
+{
+  if((KERNEL_den == 0) &&
+     (BANDWIDTH_den == BW_FIXED) &&
+     (num_obs >= 256) &&
+     (num_reg_continuous > 0) &&
+     (num_reg_unordered == 0) &&
+     (num_reg_ordered == 0) &&
+     (!int_cker_bound_extern) &&
+     (int_TREE_X != NP_TREE_TRUE)){
+    double **matrix_bandwidth = NULL;
+    double *lambda = NULL;
+    int *kernel_c = NULL;
+    int paired_ok = 0;
+
+    np_refresh_mseries_accelerate_option();
+    if(np_mseries_accelerate_enabled_cache){
+      matrix_bandwidth = alloc_matd(1, num_reg_continuous);
+      lambda = alloc_vecd(0);
+      kernel_c = (int *)calloc((size_t)num_reg_continuous, sizeof(int));
+
+      if((matrix_bandwidth != NULL) && (kernel_c != NULL) &&
+         (kernel_bandwidth_mean(KERNEL_den,
+                                BANDWIDTH_den,
+                                num_obs,
+                                num_obs,
+                                0, 0, 0,
+                                num_reg_continuous,
+                                0,
+                                0,
+                                0,
+                                vector_scale_factor,
+                                NULL, NULL,
+                                matrix_X_continuous,
+                                matrix_X_continuous,
+                                NULL,
+                                matrix_bandwidth,
+                                lambda) == 0)){
+        if(np_density_categorical_profile_cv(kernel_c,
+                                             NULL,
+                                             NULL,
+                                             1,
+                                             BANDWIDTH_den,
+                                             num_obs,
+                                             0,
+                                             0,
+                                             num_reg_continuous,
+                                             NULL,
+                                             NULL,
+                                             vector_scale_factor,
+                                             lambda,
+                                             NULL,
+                                             NULL,
+                                             cv)){
+          np_fastcv_alllarge_hits++;
+          paired_ok = 1;
+        } else {
+          paired_ok = np_fixed_gaussian_density_cvls_pair_try(
+            1,
+            num_obs,
+            num_reg_continuous,
+            matrix_X_continuous,
+            matrix_bandwidth,
+            cv);
+        }
+      }
+
+      free(kernel_c);
+      free(lambda);
+      if(matrix_bandwidth != NULL)
+        free_mat(matrix_bandwidth, num_reg_continuous);
+    }
+
+    return paired_ok;
+  }
+
+  return 0;
 }
