@@ -7725,6 +7725,15 @@ typedef struct {
   int ncol_W;
 } NP_DualPowerCtx;
 
+typedef struct {
+  const double *data;
+  double * const *matrix_W;
+  int ncol_W;
+  int ncol_Y;
+  int num_weights;
+  int symmetric;
+} NP_OuterPackCtx;
+
 static int np_hot_loop_interrupt_stride(const int total)
 {
   if(total <= 16)
@@ -7800,6 +7809,7 @@ double * const weighted_permutation_sum,
 double * const kw,
 const NP_GateOverrideCtx * const gate_override_ctx,
 const NP_DualPowerCtx * const dual_power_ctx,
+const NP_OuterPackCtx * const outer_pack_ctx,
 const int keep_kw_owner_local){
   const NP_GateOverrideCtx * const gate_ctx_raw =
     (gate_override_ctx != NULL) ? gate_override_ctx : &np_gate_override_ctx;
@@ -7974,7 +7984,8 @@ const int keep_kw_owner_local){
   double *perm_kbuf = NULL, *kw_work = NULL;
   double **bounded_cdf_lower_fixed = NULL;
   double **bounded_cdf_den_fixed = NULL;
-  double *blas_Apack = NULL;
+  double *blas_Apack_owned = NULL;
+  const double *blas_Apack = NULL;
   int use_disc_profile_cache = 0, disc_nprof = 0, disc_mark_token = 1;
   int disc_profile_from_override = 0;
   int disc_profile_from_global_cache = 0;
@@ -8683,9 +8694,25 @@ const int keep_kw_owner_local){
   if((!nws) && (!do_psum) && (!gather_scatter) && (sgn == NULL) &&
      (!np_ks_tree_use) && (ncol_W > 0) &&
      np_outer_weighted_sum_blas_eligible(MAX(ncol_W, 1), MAX(ncol_Y, 1),
+                                         num_xt, symmetric, NULL, NULL, NULL) &&
+     (outer_pack_ctx != NULL) &&
+     (outer_pack_ctx->data != NULL) &&
+     (outer_pack_ctx->matrix_W == matrix_W) &&
+     (outer_pack_ctx->ncol_W == ncol_W) &&
+     (outer_pack_ctx->ncol_Y == ncol_Y) &&
+     (outer_pack_ctx->num_weights == num_xt) &&
+     (outer_pack_ctx->symmetric == symmetric))
+    blas_Apack = outer_pack_ctx->data;
+
+  if((blas_Apack == NULL) &&
+     (!nws) && (!do_psum) && (!gather_scatter) && (sgn == NULL) &&
+     (!np_ks_tree_use) && (ncol_W > 0) &&
+     np_outer_weighted_sum_blas_eligible(MAX(ncol_W, 1), MAX(ncol_Y, 1),
                                          num_xt, symmetric, NULL, NULL, NULL)){
-    blas_Apack = np_outer_weighted_sum_pack_A(matrix_W, 1, MAX(ncol_W, 1),
-                                             MAX(ncol_Y, 1), num_xt, symmetric);
+    blas_Apack_owned =
+      np_outer_weighted_sum_pack_A(matrix_W, 1, MAX(ncol_W, 1),
+                                   MAX(ncol_Y, 1), num_xt, symmetric);
+    blas_Apack = blas_Apack_owned;
   }
 
   const int interrupt_total = (je >= js) ? (je - js + 1) : 0;
@@ -9454,7 +9481,7 @@ cleanup:
 
   free(tprod);
   free(bpow);
-  if(blas_Apack != NULL) free(blas_Apack);
+  if(blas_Apack_owned != NULL) free(blas_Apack_owned);
 
   clean_xl(pxl);
   clean_nl(&nls);
@@ -9626,6 +9653,7 @@ const NP_GateOverrideCtx * const gate_override_ctx){
     kw,
     gate_override_ctx,
     NULL,
+    NULL,
     0);
 }
 
@@ -9750,6 +9778,7 @@ double * const pkw){
     kw,
     NULL,
     &dual_power_ctx,
+    NULL,
     0);
 
   kernel_weighted_sum_pkw_extern = old_pkw;
@@ -13433,6 +13462,8 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
     double * kwm = (double *)malloc(kwm_len*sizeof(double));
     double * sgn = (double *)malloc((size_t)nrc2*sizeof(double));
     double * evalv = (double *)malloc((size_t)nrc1*sizeof(double));
+    double *objective_Apack = NULL;
+    NP_OuterPackCtx objective_pack_ctx = {NULL, NULL, 0, 0, 0, 0};
 
     glp_ok = np_lp_solve_workspace_reserve(
       &solve_workspace,
@@ -13457,6 +13488,34 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
 
       for(i = 0; i < nrc2; i++)
         PXTKX[i] = XTKX[i];
+
+      /*
+        Full drop-one rows repeatedly use this unchanged response-plus-basis
+        matrix as the packed-BLAS left operand.  Pack it once per rank at
+        objective scope; reduced triangular rows advance the source pointers
+        and cannot reuse it.
+      */
+      if((BANDWIDTH_reg != BW_ADAP_NN) &&
+         !ks_tree_use &&
+         np_reg_cv_use_symmetric_dropone_path(bwm,
+                                               ks_tree_use,
+                                               BANDWIDTH_reg)){
+        objective_Apack =
+          np_outer_weighted_sum_pack_A(XTKX,
+                                       1,
+                                       nrc2,
+                                       nrc2,
+                                       num_obs,
+                                       1);
+        if(objective_Apack != NULL){
+          objective_pack_ctx.data = objective_Apack;
+          objective_pack_ctx.matrix_W = XTKX;
+          objective_pack_ctx.ncol_W = nrc2;
+          objective_pack_ctx.ncol_Y = nrc2;
+          objective_pack_ctx.num_weights = num_obs;
+          objective_pack_ctx.symmetric = 1;
+        }
+      }
 
       if(bwm == RBWM_CVAIC){
         tsf = int_LARGE_SF;
@@ -13535,7 +13594,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
               for(l = 0; l < num_reg_ordered; l++)
                 TORD[l][0] = matrix_X_ordered[l][j+my_rank];
 
-              kernel_weighted_sum_np_ctx(kernel_c,
+              kernel_weighted_sum_np_ctx_ex(kernel_c,
                                          kernel_u,
                                          kernel_o,
                                          BANDWIDTH_reg,
@@ -13585,7 +13644,11 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                                          kwm+(j+my_rank)*nrcc22,
                                          NULL,
                                          NULL,
-                                         NULL);
+                                         NULL,
+                                         NULL,
+                                         (objective_Apack != NULL) ?
+                                         &objective_pack_ctx : NULL,
+                                         0);
             }
             MPI_Allgather(MPI_IN_PLACE, nrcc22, MPI_DOUBLE, kwm+j*nrcc22, nrcc22, MPI_DOUBLE, comm[1]);
           }
@@ -13692,7 +13755,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
           for(l = 0; l < num_reg_ordered; l++)
             TORD[l][0] = matrix_X_ordered[l][j];
 
-          kernel_weighted_sum_np_ctx(kernel_c,
+          kernel_weighted_sum_np_ctx_ex(kernel_c,
                                      kernel_u,
                                      kernel_o,
                                      BANDWIDTH_reg,
@@ -13742,7 +13805,11 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                                      kwm+j*nrcc22,
                                      NULL,
                                      NULL,
-                                     NULL);
+                                     NULL,
+                                     NULL,
+                                     (objective_Apack != NULL) ?
+                                     &objective_pack_ctx : NULL,
+                                     0);
         } else {
           if(j < (num_obs-1)){
             for(l = 0; l < nrc2; l++)
@@ -13921,6 +13988,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
     if(kwm != NULL) free(kwm);
     if(sgn != NULL) free(sgn);
     if(evalv != NULL) free(evalv);
+    if(objective_Apack != NULL) free(objective_Apack);
     np_lp_solve_workspace_clear(&solve_workspace);
 
     if(sf_flag){
@@ -14809,6 +14877,7 @@ double * cv){
                               NULL, // no permutations
                               kwx,
                               &gate_ctx_local,
+                              NULL,
                               NULL,
                               1);
     
@@ -19253,6 +19322,7 @@ double *SIGN){
                              reuse_fit_kernel_row ? fit_kw : NULL,
                              est_gate_ctx_ptr,
                              reuse_fit_dual_power ? &fit_dual_power_ctx : NULL,
+                             NULL,
                              0);
 
       for(i = 0; i < glp_nterms; i++){
