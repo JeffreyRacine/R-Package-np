@@ -14879,7 +14879,7 @@ double * cv){
     np_fastcv_alllarge_hits++;
 
   
-  *cv = 0;
+  double cv_accumulator = 0.0;
 
   const int use_continuous_q123 =
     np_mseries_accelerate_enabled_cache &&
@@ -14960,7 +14960,7 @@ double * cv){
       if(num_reg_continuous >= 2){
         for(j = wxo; j < (wxo + dwx); j++){
           const int64_t jo = j - wxo;
-          *cv = np_distribution_cvls_continuous_q123_neon(
+          cv_accumulator = np_distribution_cvls_continuous_q123_neon(
             num_reg_continuous,
             BANDWIDTH_den,
             j,
@@ -14974,14 +14974,14 @@ double * cv){
             mean[jo],
             ofac,
             kwx,
-            *cv);
+            cv_accumulator);
         }
       } else
 #endif
       {
       for(j = wxo; j < (wxo + dwx); j++){
         const int64_t jo = j - wxo;
-        *cv = np_distribution_cvls_continuous_q123(
+        cv_accumulator = np_distribution_cvls_continuous_q123(
           num_reg_continuous,
           BANDWIDTH_den,
           j,
@@ -14995,7 +14995,7 @@ double * cv){
           mean[jo],
           ofac,
           kwx,
-          *cv);
+          cv_accumulator);
         }
       }
     } else {
@@ -15012,15 +15012,16 @@ double * cv){
           }
           if(BANDWIDTH_den != BW_ADAP_NN){
             const double tvd = (indy - mean[jo]/ofac + kwx[jo*num_obs_train + i]/ofac);
-            *cv += tvd*tvd;
+            cv_accumulator += tvd*tvd;
           } else {
             const double tvd = (indy - mean[jo]/ofac + kwx[i*dwx + jo]/ofac);
-            *cv += tvd*tvd;
+            cv_accumulator += tvd*tvd;
           }
         }
       }
     }
   }
+  *cv = cv_accumulator;
 #ifdef MPI2
   MPI_Allreduce(MPI_IN_PLACE, cv, 1, MPI_DOUBLE, MPI_SUM, comm[1]);
 #endif
