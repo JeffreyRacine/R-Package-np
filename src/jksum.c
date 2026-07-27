@@ -24347,7 +24347,7 @@ cleanup_xweight_block_pair:
   return status;
 }
 
-static int np_conditional_x_weight_block_pair_gnn_stream_core(
+static int NP_NOINLINE np_conditional_x_weight_block_pair_gnn_stream_core(
   double *vector_scale_factor,
   int eval_start,
   int block_rows,
@@ -24365,18 +24365,17 @@ static int np_conditional_x_weight_block_pair_gnn_stream_core(
   double **matrix_bandwidth_x = NULL, **matrix_bandwidth_eval_one = NULL;
   double **eval_xuno_one = NULL, **eval_xord_one = NULL;
   double **eval_xcon_one = NULL;
-  NPGLPQRDropWorkspace qr_workspace;
   NPLPFullRowWorkspace full_row_workspace;
   NPConditionalBoundState bounds_state;
   int i, j, l;
   int status = 1;
 
-  np_glp_qr_drop_workspace_init(&qr_workspace);
   np_lp_full_row_workspace_init(&full_row_workspace);
   /*
-   * Generalized-NN sibling of the fixed paired helper. The bandwidth row is
-   * selected at compile-isolated source sites so the established fixed hot
-   * loop retains no generalized-NN branch or indexing cost.
+   * Generalized-NN sibling of the fixed paired helper.  Each evaluation
+   * bandwidth row is frozen before constructing the full smoother row.  The
+   * exact deleted-observation row is H_ij/(1-H_ii), j != i, so derive it from
+   * that full row without an independent QR factorization.
    */
   if((loo_rows_out == NULL) || (full_rows_out == NULL) ||
      (vector_scale_factor == NULL) || (np_lp_engine_extern != NP_LP_ENGINE_GENERAL))
@@ -24481,7 +24480,6 @@ static int np_conditional_x_weight_block_pair_gnn_stream_core(
     const int eval_idx = eval_start + i;
     const int eval_pos = eval_idx;
     const int k = np_glp_cv_cache.nterms;
-    double self_weight;
 
     memset(loo_rows_out[i], 0, (size_t)num_train*sizeof(double));
     memset(full_rows_out[i], 0, (size_t)num_train*sizeof(double));
@@ -24529,21 +24527,6 @@ static int np_conditional_x_weight_block_pair_gnn_stream_core(
     }
     np_conditional_pop_bounds(&bounds_state);
 
-    self_weight = kw[eval_pos];
-    kw[eval_pos] = 0.0;
-    if(np_glp_qr_drop_workspace_apply(&qr_workspace,
-                                      np_glp_cv_cache.basis,
-                                      num_train,
-                                      k,
-                                      kw,
-                                      eval_pos,
-                                      mean_row) != 0)
-      goto cleanup_xweight_block_pair_gnn;
-
-    for(j = 0; j < num_train; j++)
-      loo_rows_out[i][j] = mean_row[j];
-
-    kw[eval_pos] = self_weight;
     for(l = 0; l < k; l++){
       full_row_workspace.rhs[l] = np_glp_cv_cache.basis[l][eval_pos];
       for(j = 0; j < k; j++)
@@ -24578,12 +24561,18 @@ static int np_conditional_x_weight_block_pair_gnn_stream_core(
           full_row_workspace.rhs[l];
       full_rows_out[i][j] = kw[j]*zju;
     }
+    {
+      const double den = NZD_POS(1.0 - full_rows_out[i][eval_idx]);
+
+      for(j = 0; j < num_train; j++)
+        loo_rows_out[i][j] =
+          (j == eval_pos) ? 0.0 : full_rows_out[i][j]/den;
+    }
   }
 
   status = 0;
 
 cleanup_xweight_block_pair_gnn:
-  np_glp_qr_drop_workspace_clear(&qr_workspace);
   np_lp_full_row_workspace_clear(&full_row_workspace);
   if(vsfx != NULL) free(vsfx);
   if(lambdax != NULL) free(lambdax);
@@ -24639,7 +24628,6 @@ static int np_conditional_x_weight_block_pair_selected_stream_core(
       bwctx,
       loo_rows_out,
       full_rows_out);
-
   return 1;
 }
 
