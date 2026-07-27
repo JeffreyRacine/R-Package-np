@@ -23313,7 +23313,6 @@ static int np_conditional_x_weight_block_pair_stream_core(double *vector_scale_f
   double **matrix_bandwidth_x = NULL, **matrix_bandwidth_eval_one = NULL;
   double **eval_xuno_one = NULL, **eval_xord_one = NULL, **eval_xcon_one = NULL;
   double **matrix_X_continuous_eval_block = NULL;
-  NPGLPQRDropWorkspace qr_workspace;
   NPLPFullRowWorkspace full_row_workspace;
   NPConditionalBoundState bounds_state;
   int i, j, l;
@@ -23323,14 +23322,13 @@ static int np_conditional_x_weight_block_pair_stream_core(double *vector_scale_f
     (bwctx->block_rows == block_rows) &&
     (bwctx->suppress_nn_parallel == suppress_nn_parallel);
 
-  np_glp_qr_drop_workspace_init(&qr_workspace);
   np_lp_full_row_workspace_init(&full_row_workspace);
   /*
-   * Fixed-bandwidth CVLS only: construct the raw X-kernel row once, then
-   * preserve the existing leave-one-out and full-row consumer arithmetic.
-   * Keep both consumers aligned with np_conditional_x_weight_block_stream_core_impl;
-   * broadening this helper to NN bandwidths requires separate numerical and
-   * timing proof.
+   * Fixed-bandwidth CVLS only: construct and solve the full X-smoother row
+   * once.  For a linear smoother H, its exact deleted-observation row is
+   * H_ij/(1-H_ii), j != i, with a zero diagonal.  Derive that consumer from
+   * the full row instead of independently refactoring the deleted weighted
+   * design.  NN bandwidths require separate numerical and timing proof.
    */
   if((loo_rows_out == NULL) || (full_rows_out == NULL) ||
      (vector_scale_factor == NULL) || (np_lp_engine_extern != NP_LP_ENGINE_GENERAL))
@@ -23461,7 +23459,6 @@ static int np_conditional_x_weight_block_pair_stream_core(double *vector_scale_f
     const int eval_idx = eval_start + i;
     int eval_pos = eval_idx;
     const int k = np_glp_cv_cache.nterms;
-    double self_weight;
 
     if((int_TREE_X == NP_TREE_TRUE) && (ipt_lookup_extern_X != NULL))
       eval_pos = ipt_lookup_extern_X[eval_idx];
@@ -23512,23 +23509,6 @@ static int np_conditional_x_weight_block_pair_stream_core(double *vector_scale_f
     }
     np_conditional_pop_bounds(&bounds_state);
 
-    self_weight = kw[eval_pos];
-    kw[eval_pos] = 0.0;
-    if(np_glp_qr_drop_workspace_apply(&qr_workspace,
-                                      np_glp_cv_cache.basis,
-                                      num_train,
-                                      k,
-                                      kw,
-                                      eval_pos,
-                                      mean_row) != 0)
-      goto cleanup_xweight_block_pair;
-
-    for(j = 0; j < num_train; j++){
-      const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
-      loo_rows_out[i][orig_j] = mean_row[j];
-    }
-
-    kw[eval_pos] = self_weight;
     for(l = 0; l < k; l++){
       full_row_workspace.rhs[l] =
         np_glp_cv_cache.basis[l][eval_pos];
@@ -23565,12 +23545,20 @@ static int np_conditional_x_weight_block_pair_stream_core(double *vector_scale_f
           full_row_workspace.rhs[l];
       full_rows_out[i][orig_j] = kw[j]*zju;
     }
+    {
+      const double den = NZD_POS(1.0 - full_rows_out[i][eval_idx]);
+
+      for(j = 0; j < num_train; j++){
+        const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
+        loo_rows_out[i][orig_j] =
+          (j == eval_pos) ? 0.0 : full_rows_out[i][orig_j]/den;
+      }
+    }
   }
 
   status = 0;
 
 cleanup_xweight_block_pair:
-  np_glp_qr_drop_workspace_clear(&qr_workspace);
   np_lp_full_row_workspace_clear(&full_row_workspace);
   if(vsfx != NULL) free(vsfx);
   if(lambdax != NULL) free(lambdax);
