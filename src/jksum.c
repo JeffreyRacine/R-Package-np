@@ -26587,8 +26587,228 @@ cleanup_cdist_lp_adap_block:
   return status;
 }
 
-static int np_conditional_distribution_cvls_lp_block_stream(double *vector_scale_factor,
-                                                            double *cv){
+/*
+ * Allocate a free_tmat()-compatible contiguous matrix without raising an R
+ * error. This is used only for an optional acceleration slab: overflow or
+ * allocation failure must retain the incumbent one-block traversal.
+ */
+static double **np_optional_tmatd(const int nrows, const int ncols){
+  const size_t rows = (size_t)nrows;
+  const size_t cols = (size_t)ncols;
+  size_t cells;
+  double **matrix;
+  double *data;
+  int col;
+
+  if((nrows <= 0) || (ncols <= 0) ||
+     (cols > ((size_t)-1)/sizeof(double *)) ||
+     (rows > ((size_t)-1)/cols))
+    return NULL;
+
+  cells = rows*cols;
+  if(cells > ((size_t)-1)/sizeof(double))
+    return NULL;
+
+  matrix = (double **)malloc(cols*sizeof(double *));
+  if(matrix == NULL)
+    return NULL;
+  data = (double *)malloc(cells*sizeof(double));
+  if(data == NULL){
+    free(matrix);
+    return NULL;
+  }
+
+  matrix[0] = data;
+  for(col = 1; col < ncols; col++)
+    matrix[col] = matrix[col - 1] + nrows;
+
+  return matrix;
+}
+
+/*
+ * Return 2 only when the optional second slab is unavailable. The dispatcher
+ * then calls the isolated incumbent one-block microkernel below.
+ */
+static int np_conditional_distribution_cvls_lp_block_supertile(double *vector_scale_factor,
+                                                               double *cv){
+  const int num_train = num_obs_train_extern;
+  const int num_eval = num_obs_eval_extern;
+  const int block_size = MIN(np_conditional_lp_cvls_block_size(num_train), MAX(1, num_train));
+  double **xblock = NULL, **xblock_second = NULL, **yintblock = NULL;
+  double *fit_cross = NULL;
+  int i0, j0, ii, jj;
+  int status = 1;
+
+  if((cv == NULL) || (vector_scale_factor == NULL) || (num_train <= 0) || (num_eval <= 0))
+    return 1;
+  if((BANDWIDTH_den_extern != BW_FIXED) &&
+     (BANDWIDTH_den_extern != BW_GEN_NN) &&
+     (BANDWIDTH_den_extern != BW_ADAP_NN))
+    return 1;
+
+  if(BANDWIDTH_den_extern == BW_ADAP_NN)
+    return np_conditional_distribution_cvls_lp_adap_block_stream(vector_scale_factor, cv);
+
+  if(((int_TREE_X == NP_TREE_TRUE) || (int_TREE_Y == NP_TREE_TRUE)) &&
+     (BANDWIDTH_den_extern != BW_FIXED))
+    return np_conditional_distribution_cvls_lp_row_stream(vector_scale_factor, cv);
+
+  xblock = alloc_tmatd(num_train, block_size);
+  yintblock = alloc_tmatd(num_train, block_size);
+  fit_cross = alloc_vecd(block_size*block_size);
+  if((xblock == NULL) || (yintblock == NULL) || (fit_cross == NULL))
+    goto cleanup_cdist_lp_block;
+
+  /*
+   * A Y-integral tile is independent of the X evaluation row. Retain two
+   * adjacent X blocks when the bounded extra slab is available, then use the
+   * same Y tile in two unchanged B-by-B GEMMs. Separate block sums preserve
+   * the incumbent within-block and final cv accumulation order. Allocation
+   * failure retains the original single-X-block traversal.
+   */
+  xblock_second = np_optional_tmatd(num_train, block_size);
+  if(xblock_second == NULL){
+    status = 2;
+    goto cleanup_cdist_lp_block;
+  }
+
+  *cv = 0.0;
+  for(i0 = 0; i0 < num_train; i0 += 2*block_size){
+    const int ib_first = MIN(block_size, num_train - i0);
+    const int second_start = i0 + ib_first;
+    const int ib_second = MIN(block_size, MAX(0, num_train - second_start));
+    double block_sum_first = 0.0;
+    double block_sum_second = 0.0;
+
+    if(np_conditional_x_weight_block_stream_core(vector_scale_factor,
+                                                 i0,
+                                                 ib_first,
+                                                 xblock) != 0)
+      goto cleanup_cdist_lp_block;
+    if((ib_second > 0) &&
+       (np_conditional_x_weight_block_stream_core(vector_scale_factor,
+                                                  second_start,
+                                                  ib_second,
+                                                  xblock_second) != 0))
+      goto cleanup_cdist_lp_block;
+
+    for(j0 = 0; j0 < num_eval; j0 += block_size){
+      const int jb = MIN(block_size, num_eval - j0);
+
+      if(np_conditional_y_eval_block_stream_op_core(vector_scale_factor,
+                                                    j0,
+                                                    jb,
+                                                    OP_INTEGRAL,
+                                                    matrix_Y_unordered_eval_extern,
+                                                    matrix_Y_ordered_eval_extern,
+                                                    matrix_Y_continuous_eval_extern,
+                                                    num_eval,
+                                                    yintblock) != 0)
+        goto cleanup_cdist_lp_block;
+
+      np_blas_dgemm_tn_int(ib_first,
+                           jb,
+                           num_train,
+                           xblock[0],
+                           yintblock[0],
+                           fit_cross);
+      for(ii = 0; ii < ib_first; ii++){
+        const int train_i = i0 + ii;
+
+        for(jj = 0; jj < jb; jj++){
+          const int eval_j = j0 + jj;
+          double fit;
+          int indy;
+
+          if(cdfontrain_extern && (train_i == eval_j))
+            continue;
+
+          fit = fit_cross[ii + jj*ib_first];
+          indy = np_conditional_indicator_row_core(train_i,
+                                                   eval_j,
+                                                   cdfontrain_extern,
+                                                   matrix_Y_ordered_train_extern,
+                                                   matrix_Y_continuous_train_extern,
+                                                   matrix_Y_ordered_eval_extern,
+                                                   matrix_Y_continuous_eval_extern,
+                                                   num_var_ordered_extern,
+                                                   num_var_continuous_extern);
+          {
+            const double tvd = ((double)indy) - fit;
+            block_sum_first += tvd*tvd;
+          }
+        }
+      }
+
+      if(ib_second > 0){
+        np_blas_dgemm_tn_int(ib_second,
+                             jb,
+                             num_train,
+                             xblock_second[0],
+                             yintblock[0],
+                             fit_cross);
+        for(ii = 0; ii < ib_second; ii++){
+          const int train_i = second_start + ii;
+
+          for(jj = 0; jj < jb; jj++){
+            const int eval_j = j0 + jj;
+            double fit;
+            int indy;
+
+            if(cdfontrain_extern && (train_i == eval_j))
+              continue;
+
+            fit = fit_cross[ii + jj*ib_second];
+            indy = np_conditional_indicator_row_core(train_i,
+                                                     eval_j,
+                                                     cdfontrain_extern,
+                                                     matrix_Y_ordered_train_extern,
+                                                     matrix_Y_continuous_train_extern,
+                                                     matrix_Y_ordered_eval_extern,
+                                                     matrix_Y_continuous_eval_extern,
+                                                     num_var_ordered_extern,
+                                                     num_var_continuous_extern);
+            {
+              const double tvd = ((double)indy) - fit;
+              block_sum_second += tvd*tvd;
+            }
+          }
+        }
+      }
+    }
+
+    *cv += block_sum_first;
+    if(ib_second > 0)
+      *cv += block_sum_second;
+  }
+
+  *cv /= ((double)num_train*(double)MAX(1, num_eval));
+  status = 0;
+
+cleanup_cdist_lp_block:
+  if(xblock != NULL) free_tmat(xblock);
+  if(xblock_second != NULL) free_tmat(xblock_second);
+  if(yintblock != NULL) free_tmat(yintblock);
+  if(fit_cross != NULL) free(fit_cross);
+  if(status != 2)
+    np_glp_cv_clear_extern();
+  return status;
+}
+
+/*
+ * Incumbent one-block microkernel. Keep it out of line and branch-free so
+ * boundary, adaptive, tree-fallback, and allocation-fallback routes do not
+ * pay for the optional two-block acceleration.
+ */
+#if defined(__clang__) || defined(__GNUC__)
+# define NP_CDIST_ONEBLOCK_ALIGN __attribute__((aligned(256)))
+#else
+# define NP_CDIST_ONEBLOCK_ALIGN
+#endif
+
+static int NP_NOINLINE NP_CDIST_ONEBLOCK_ALIGN
+np_conditional_distribution_cvls_lp_block_one(double *vector_scale_factor,
+                                               double *cv){
   const int num_train = num_obs_train_extern;
   const int num_eval = num_obs_eval_extern;
   const int block_size = MIN(np_conditional_lp_cvls_block_size(num_train), MAX(1, num_train));
@@ -26615,7 +26835,7 @@ static int np_conditional_distribution_cvls_lp_block_stream(double *vector_scale
   yintblock = alloc_tmatd(num_train, block_size);
   fit_cross = alloc_vecd(block_size*block_size);
   if((xblock == NULL) || (yintblock == NULL) || (fit_cross == NULL))
-    goto cleanup_cdist_lp_block;
+    goto cleanup_cdist_lp_block_one;
 
   *cv = 0.0;
   for(i0 = 0; i0 < num_train; i0 += block_size){
@@ -26623,7 +26843,7 @@ static int np_conditional_distribution_cvls_lp_block_stream(double *vector_scale
     double block_sum = 0.0;
 
     if(np_conditional_x_weight_block_stream_core(vector_scale_factor, i0, ib, xblock) != 0)
-      goto cleanup_cdist_lp_block;
+      goto cleanup_cdist_lp_block_one;
 
     for(j0 = 0; j0 < num_eval; j0 += block_size){
       const int jb = MIN(block_size, num_eval - j0);
@@ -26637,7 +26857,7 @@ static int np_conditional_distribution_cvls_lp_block_stream(double *vector_scale
                                                     matrix_Y_continuous_eval_extern,
                                                     num_eval,
                                                     yintblock) != 0)
-        goto cleanup_cdist_lp_block;
+        goto cleanup_cdist_lp_block_one;
 
       np_blas_dgemm_tn_int(ib, jb, num_train, xblock[0], yintblock[0], fit_cross);
       for(ii = 0; ii < ib; ii++){
@@ -26675,12 +26895,50 @@ static int np_conditional_distribution_cvls_lp_block_stream(double *vector_scale
   *cv /= ((double)num_train*(double)MAX(1, num_eval));
   status = 0;
 
-cleanup_cdist_lp_block:
+cleanup_cdist_lp_block_one:
   if(xblock != NULL) free_tmat(xblock);
   if(yintblock != NULL) free_tmat(yintblock);
   if(fit_cross != NULL) free(fit_cross);
   np_glp_cv_clear_extern();
   return status;
+}
+
+#undef NP_CDIST_ONEBLOCK_ALIGN
+
+static int np_conditional_distribution_cvls_lp_block_stream(double *vector_scale_factor,
+                                                            double *cv){
+  const int num_train = num_obs_train_extern;
+  const int num_eval = num_obs_eval_extern;
+
+  if((cv == NULL) || (vector_scale_factor == NULL) ||
+     (num_train <= 0) || (num_eval <= 0))
+    return 1;
+  if((BANDWIDTH_den_extern != BW_FIXED) &&
+     (BANDWIDTH_den_extern != BW_GEN_NN) &&
+     (BANDWIDTH_den_extern != BW_ADAP_NN))
+    return 1;
+
+  if(BANDWIDTH_den_extern == BW_ADAP_NN)
+    return np_conditional_distribution_cvls_lp_adap_block_stream(vector_scale_factor, cv);
+
+  if(((int_TREE_X == NP_TREE_TRUE) || (int_TREE_Y == NP_TREE_TRUE)) &&
+     (BANDWIDTH_den_extern != BW_FIXED))
+    return np_conditional_distribution_cvls_lp_row_stream(vector_scale_factor, cv);
+
+  if((num_train > 0) &&
+     (num_train > np_conditional_lp_cvls_block_size(num_train)) &&
+     ((BANDWIDTH_den_extern == BW_FIXED) ||
+      (BANDWIDTH_den_extern == BW_GEN_NN)) &&
+     !(((int_TREE_X == NP_TREE_TRUE) || (int_TREE_Y == NP_TREE_TRUE)) &&
+       (BANDWIDTH_den_extern != BW_FIXED))){
+    const int status =
+      np_conditional_distribution_cvls_lp_block_supertile(vector_scale_factor, cv);
+
+    if(status != 2)
+      return status;
+  }
+
+  return np_conditional_distribution_cvls_lp_block_one(vector_scale_factor, cv);
 }
 
 static int np_conditional_density_cvls_categorical_profile_stream(
