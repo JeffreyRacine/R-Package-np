@@ -6372,11 +6372,36 @@ static int NP_NOINLINE np_ckernelv_accel_try(const int KERNEL,
         np_accel_gauss_vector(KERNEL, xt, num_xt, x, zscale, coef, result);
       return 1;
     }
+    if(KERNEL == 30) {
+      int have_nonunit_weight = 0;
+      for(int i = 0; i < num_xt; i++)
+        if(xw[i] != 0.0 && xw[i] != 1.0) {
+          have_nonunit_weight = 1;
+          break;
+        }
+      /*
+         A delete-one univariate row contains only zeros and ones.  Its scalar
+         CDF loop is faster than staging a vector row, so retain that route.
+      */
+      if(!have_nonunit_weight)
+        return 0;
+      np_accel_gauss_cdf2_vector(xt, num_xt, x, zscale, coef,
+                                 np_accel_gauss_val);
+      /*
+         The scalar weighted loop skips exact-zero lanes. Preserve that
+         contract before the vector multiply so a non-finite kernel value
+         cannot turn an existing signed zero into NaN.
+      */
+      for(int i = 0; i < num_xt; i++)
+        if(xw[i] == 0.0)
+          np_accel_gauss_val[i] = 1.0;
+      np_accel_vmulD(np_accel_gauss_val, 1, xw, 1, result, 1,
+                     (np_vDSP_Length)num_xt);
+      return 1;
+    }
     if(!np_accel_gauss_has_zero_weight(xw, num_xt)) {
-      if(KERNEL == 30)
-        np_accel_gauss_cdf2_vector(xt, num_xt, x, zscale, coef, np_accel_gauss_val);
-      else
-        np_accel_gauss_vector(KERNEL, xt, num_xt, x, zscale, coef, np_accel_gauss_val);
+      np_accel_gauss_vector(KERNEL, xt, num_xt, x, zscale, coef,
+                            np_accel_gauss_val);
       np_accel_vmulD(np_accel_gauss_val, 1, xw, 1, result, 1, (np_vDSP_Length)num_xt);
       return 1;
     }
