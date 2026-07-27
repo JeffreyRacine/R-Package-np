@@ -5727,6 +5727,8 @@ static void np_accel_gauss_cdf2_vector(const double * const xt,
   const double half = 0.5;
   const double offset = 0.5;
   const double zcoef = sqrt_half*zscale;
+  const double output_scale = half*coef;
+  const double output_offset = offset*coef;
 
   vDSP_vsmsaD(xt, 1, &minus_one, &x,
               np_accel_gauss_tmp, 1, (np_vDSP_Length)n);
@@ -5737,9 +5739,7 @@ static void np_accel_gauss_cdf2_vector(const double * const xt,
                            np_accel_gauss_work,
                            np_accel_gauss_poly,
                            np_accel_gauss_val);
-  vDSP_vsmsaD(out, 1, &half, &offset,
-              out, 1, (np_vDSP_Length)n);
-  vDSP_vsmulD(out, 1, &coef,
+  vDSP_vsmsaD(out, 1, &output_scale, &output_offset,
               out, 1, (np_vDSP_Length)n);
 }
 
