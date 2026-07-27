@@ -6361,7 +6361,6 @@ static int NP_NOINLINE np_ckernelv_accel_try(const int KERNEL,
      ((KERNEL >= 0 && KERNEL <= 3) || KERNEL == 30) &&
      xl == NULL &&
      num_xt >= 256 &&
-     (KERNEL != 30 || num_xt <= 8192) &&
      np_accel_gauss_resolve() &&
      np_accel_gauss_scratch_ensure(num_xt)) {
     const double coef = (KERNEL == 30) ? invnorm : invnorm*ONE_OVER_SQRT_TWO_PI;

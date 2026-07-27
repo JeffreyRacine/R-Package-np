@@ -12,7 +12,7 @@ locate_cdf_vector_source <- function() {
   if (!length(hits)) NULL else hits[[1L]]
 }
 
-test_that("ordinary Gaussian CDF weighted rows preserve zero-lane semantics", {
+test_that("Gaussian CDF weighted rows preserve zero lanes without a length cap", {
   src_file <- locate_cdf_vector_source()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable")
   source <- paste(readLines(src_file, warn = FALSE), collapse = "\n")
@@ -26,7 +26,11 @@ test_that("ordinary Gaussian CDF weighted rows preserve zero-lane semantics", {
   expect_gt(stop, start)
   helper <- substr(source, start, stop - 1L)
 
-  expect_match(helper, "(KERNEL != 30 || num_xt <= 8192)", fixed = TRUE)
+  expect_false(grepl(
+    "(KERNEL != 30 || num_xt <= 8192)",
+    helper,
+    fixed = TRUE
+  ))
   expect_match(helper, "if(KERNEL == 30)", fixed = TRUE)
   expect_match(helper, "xw[i] != 0.0 && xw[i] != 1.0", fixed = TRUE)
   expect_match(helper, "if(!have_nonunit_weight)", fixed = TRUE)
