@@ -15638,7 +15638,7 @@ double * cv){
     np_fastcv_alllarge_hits++;
 
   
-  *cv = 0;
+  double cv_accumulator = 0.0;
 
 #ifdef MPI2
   const int use_continuous_q123 =
@@ -15730,7 +15730,7 @@ double * cv){
         if(num_reg_continuous >= 2){
           for(j = js_local_eval; j <= je_local_eval; j++){
             const int64_t j_global = wxo + j;
-            *cv = np_distribution_cvls_continuous_q123_neon(
+            cv_accumulator = np_distribution_cvls_continuous_q123_neon(
               num_reg_continuous,
               BANDWIDTH_den,
               j_global,
@@ -15744,14 +15744,14 @@ double * cv){
               mean[j],
               ofac,
               kwx,
-              *cv);
+              cv_accumulator);
           }
         } else
 #endif
         {
         for(j = js_local_eval; j <= je_local_eval; j++){
           const int64_t j_global = wxo + j;
-          *cv = np_distribution_cvls_continuous_q123(
+          cv_accumulator = np_distribution_cvls_continuous_q123(
             num_reg_continuous,
             BANDWIDTH_den,
             j_global,
@@ -15765,7 +15765,7 @@ double * cv){
             mean[j],
             ofac,
             kwx,
-            *cv);
+            cv_accumulator);
           }
         }
       } else {
@@ -15783,10 +15783,10 @@ double * cv){
             }
             if(BANDWIDTH_den != BW_ADAP_NN){
               const double tvd = (indy - mean[j]/ofac + kwx[j*num_obs_train + i]/ofac);
-              *cv += tvd*tvd;
+              cv_accumulator += tvd*tvd;
             } else {
               const double tvd = (indy - mean[j]/ofac + kwx[i*dwx + j]/ofac);
-              *cv += tvd*tvd;
+              cv_accumulator += tvd*tvd;
             }
           }
         }
@@ -15806,15 +15806,16 @@ double * cv){
         }
         if(BANDWIDTH_den != BW_ADAP_NN){
           const double tvd = (indy - mean[jo]/ofac + kwx[jo*num_obs_train + i]/ofac);
-          *cv += tvd*tvd;
+          cv_accumulator += tvd*tvd;
         } else {
           const double tvd = (indy - mean[jo]/ofac + kwx[i*dwx + jo]/ofac);
-          *cv += tvd*tvd;
+          cv_accumulator += tvd*tvd;
         }
       }
     }
 #endif
   }
+  *cv = cv_accumulator;
 #ifdef MPI2
   MPI_Allreduce(MPI_IN_PLACE, cv, 1, MPI_DOUBLE, MPI_SUM, comm[1]);
 #endif
