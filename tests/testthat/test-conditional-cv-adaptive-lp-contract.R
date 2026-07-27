@@ -159,7 +159,10 @@ adaptive_cv_fixture <- function(seed) {
     y = y,
     degree1 = rep.int(1L, ncol(x)),
     degree2 = rep.int(2L, ncol(x)),
-    bws = c(5, 7, 6)
+    # The degree-(2,2) generalized basis has nine terms. Keep every adaptive
+    # neighborhood comfortably identified; the retired QR path could return a
+    # finite value for the old 5--7-neighbor, underdetermined fixture.
+    bws = c(18, 20, 19)
   )
 }
 

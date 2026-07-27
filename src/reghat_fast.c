@@ -199,8 +199,7 @@ SEXP C_np_reghat_lp_matrix_fast(SEXP kw, SEXP wtrain, SEXP weval)
                                       weights,
                                       REAL(weval)[j],
                                       REAL(out) + j,
-                                      (size_t)neval,
-                                      0) == 0))
+                                      (size_t)neval) == 0))
       continue;
 
     for(int term = 0; term < nterms; term++){

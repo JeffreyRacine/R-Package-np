@@ -113,3 +113,70 @@ test_that("higher-order fixed and generalized-NN CVLS match signed-WLS oracles",
     expect_equal(as.numeric(objective), case$oracle, tolerance = 2e-8)
   }
 })
+
+test_that("remaining conditional higher-order LOO routes match signed-WLS oracles", {
+  skip_if_not_installed("np")
+  suppressPackageStartupMessages(library(np))
+  old <- options(np.messages = FALSE, np.tree = FALSE)
+  on.exit(options(old), add = TRUE)
+
+  set.seed(2026072702L)
+  n <- 72L
+  xdat <- data.frame(
+    x1 = runif(n, 0.05, 0.95),
+    x2 = runif(n, 0.05, 0.95)
+  )
+  ydat <- data.frame(
+    y = 0.4 + 0.3 * sin(2 * pi * xdat$x1) * cos(pi * xdat$x2) +
+      rnorm(n, sd = 0.09)
+  )
+  cases <- list(
+    list(
+      route = "cdens", method = "cv.ml", bwtype = "fixed",
+      kernel = "gaussian", order = 4L, bernstein = FALSE,
+      degree = c(1L, 1L), bws = c(0.25, 0.29, 0.27),
+      oracle = -1391.733240027958
+    ),
+    list(
+      route = "cdens", method = "cv.ls", bwtype = "adaptive_nn",
+      kernel = "epanechnikov", order = 8L, bernstein = TRUE,
+      degree = c(2L, 2L), bws = c(25L, 29L, 27L),
+      oracle = 3.640094182334874
+    ),
+    list(
+      route = "cdist", method = "cv.ls", bwtype = "generalized_nn",
+      kernel = "gaussian", order = 8L, bernstein = FALSE,
+      degree = c(1L, 1L), bws = c(25L, 29L, 27L),
+      oracle = 0.1435309775161671
+    )
+  )
+
+  for (case in cases) {
+    constructor <- if (identical(case$route, "cdens")) npcdensbw else npcdistbw
+    bw <- constructor(
+      xdat = xdat,
+      ydat = ydat,
+      bws = case$bws,
+      bandwidth.compute = FALSE,
+      bwmethod = case$method,
+      bwtype = case$bwtype,
+      regtype = "lp",
+      basis = "glp",
+      degree = case$degree,
+      bernstein.basis = case$bernstein,
+      cxkertype = case$kernel,
+      cxkerorder = case$order,
+      cykertype = "gaussian",
+      cykerorder = 2L
+    )
+    objective <- if (identical(case$route, "cdens")) {
+      np:::.npcdensbw_eval_only(xdat, ydat, bw)$objective
+    } else {
+      np:::.npcdistbw_eval_only(
+        xdat, ydat, bws = bw, do.full.integral = TRUE
+      )$objective
+    }
+    expect_true(is.finite(objective))
+    expect_equal(as.numeric(objective), case$oracle, tolerance = 5e-8)
+  }
+})

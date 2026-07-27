@@ -31,11 +31,13 @@
   Adaptive-nearest-neighbour, tree, reduced-row, and specialized resident-row
   routes are unchanged, as are objective values.
 
-* Conditional-density CVLS now preserves the sign of the exact
-  full-row-to-delete-one denominator for fixed and generalized-nearest-
-  neighbour local-polynomial rows. This corrects higher-order predictor-kernel
-  objectives when the valid denominator is negative; ordinary second-order
-  results are unchanged.
+* Conditional-density and conditional-distribution local-polynomial
+  cross-validation now retain signed higher-order predictor-kernel weights in
+  every delete-one X row. The obsolete QR route silently discarded negative
+  weights; it has been removed in favor of the canonical signed full-row solve
+  and exact diagonal deletion, with a sign-preserving denominator. This
+  intentionally corrects affected higher-order CVLS and CVML objectives;
+  ordinary second-order results are unchanged.
 
 * On Apple ARM64, eligible fixed and generalized-nearest-neighbour products of
   two or more ordinary Gaussian continuous kernels now use one vector

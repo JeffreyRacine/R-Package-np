@@ -19579,13 +19579,11 @@ static int np_shadow_conditional_build_x_weights_core(double *vector_scale_facto
   double *vsfx = NULL, *lambdax = NULL, *kw = NULL, *mean_row = NULL;
   double **matrix_bandwidth_x = NULL, **matrix_bandwidth_eval_one = NULL;
   double **eval_xuno_one = NULL, **eval_xord_one = NULL, **eval_xcon_one = NULL;
-  NPGLPQRDropWorkspace qr_workspace;
   NPLPFullRowWorkspace full_row_workspace;
   NPConditionalBoundState bounds_state;
   int i, j, l;
   int status = 1;
 
-  np_glp_qr_drop_workspace_init(&qr_workspace);
   np_lp_full_row_workspace_init(&full_row_workspace);
   if((BANDWIDTH_den_extern != BW_FIXED) &&
      (BANDWIDTH_den_extern != BW_GEN_NN) &&
@@ -19680,8 +19678,7 @@ static int np_shadow_conditional_build_x_weights_core(double *vector_scale_facto
                                  num_reg_continuous_extern,
                                  matrix_X_continuous_train_extern))
       goto cleanup_xweights;
-    if((!drop_eval_self) &&
-       !np_lp_full_row_workspace_reserve(&full_row_workspace,
+    if(!np_lp_full_row_workspace_reserve(&full_row_workspace,
                                          np_glp_cv_cache.nterms,
                                          1))
       goto cleanup_xweights;
@@ -19736,13 +19733,13 @@ static int np_shadow_conditional_build_x_weights_core(double *vector_scale_facto
     }
     np_conditional_pop_bounds(&bounds_state);
 
-    if(drop_eval_self)
+    if(drop_eval_self && (lp_engine == NP_LP_ENGINE_SCALAR))
       kw[i] = 0.0;
 
     if(lp_engine == NP_LP_ENGINE_SCALAR){
       for(j = 0; j < num_train; j++)
         row_sum += kw[j];
-      if(!(row_sum > DBL_MIN))
+      if(!(fabs(row_sum) > DBL_MIN))
         goto cleanup_xweights;
       for(j = 0; j < num_train; j++){
         const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
@@ -19754,66 +19751,58 @@ static int np_shadow_conditional_build_x_weights_core(double *vector_scale_facto
       if((k <= 0) || (np_glp_cv_cache.basis == NULL))
         goto cleanup_xweights;
 
-      if(drop_eval_self){
-        if(np_glp_qr_drop_workspace_apply(&qr_workspace,
-                                          np_glp_cv_cache.basis,
-                                          num_train,
-                                          k,
-                                          kw,
-                                          i,
-                                          mean_row) != 0)
-          goto cleanup_xweights;
+      for(l = 0; l < k; l++){
+        full_row_workspace.rhs[l] =
+          np_glp_cv_cache.basis[l][i];
+        for(j = 0; j < k; j++)
+          full_row_workspace.gram[l + j*k] = 0.0;
+      }
 
-        for(j = 0; j < num_train; j++){
-          const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
-          weights_out[(size_t)orig_i*(size_t)num_train + (size_t)orig_j] = mean_row[j];
-        }
-      } else {
-        for(l = 0; l < k; l++){
-          full_row_workspace.rhs[l] =
-            np_glp_cv_cache.basis[l][i];
-          for(j = 0; j < k; j++)
-            full_row_workspace.gram[l + j*k] = 0.0;
-        }
-
-        for(j = 0; j < num_train; j++){
-          const double wj = kw[j];
-          if(wj == 0.0)
-            continue;
-          for(int a = 0; a < k; a++){
-            const double za = np_glp_cv_cache.basis[a][j];
-            for(int b = a; b < k; b++){
-              const double zb = np_glp_cv_cache.basis[b][j];
-              full_row_workspace.gram[a + b*k] += wj*za*zb;
-              if(b != a)
-                full_row_workspace.gram[b + a*k] += wj*za*zb;
-            }
+      for(j = 0; j < num_train; j++){
+        const double wj = kw[j];
+        if(wj == 0.0)
+          continue;
+        for(int a = 0; a < k; a++){
+          const double za = np_glp_cv_cache.basis[a][j];
+          for(int b = a; b < k; b++){
+            const double zb = np_glp_cv_cache.basis[b][j];
+            full_row_workspace.gram[a + b*k] += wj*za*zb;
+            if(b != a)
+              full_row_workspace.gram[b + a*k] += wj*za*zb;
           }
-        }
-
-        if(!np_lp_full_row_workspace_solve(&full_row_workspace,
-                                           k,
-                                           1,
-                                           1.0e-10))
-          goto cleanup_xweights;
-
-        for(j = 0; j < num_train; j++){
-          double zju = 0.0;
-          const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
-          for(l = 0; l < k; l++)
-            zju += np_glp_cv_cache.basis[l][j]*
-              full_row_workspace.rhs[l];
-          weights_out[(size_t)orig_i*(size_t)num_train + (size_t)orig_j] = kw[j]*zju;
         }
       }
 
+      if(!np_lp_full_row_workspace_solve(&full_row_workspace,
+                                         k,
+                                         1,
+                                         1.0e-10))
+        goto cleanup_xweights;
+
+      for(j = 0; j < num_train; j++){
+        double zju = 0.0;
+        const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
+        for(l = 0; l < k; l++)
+          zju += np_glp_cv_cache.basis[l][j]*
+            full_row_workspace.rhs[l];
+        weights_out[(size_t)orig_i*(size_t)num_train + (size_t)orig_j] = kw[j]*zju;
+      }
+
+      if(drop_eval_self){
+        const size_t row_offset = (size_t)orig_i*(size_t)num_train;
+        const double den = NZD(1.0 - weights_out[row_offset + (size_t)orig_i]);
+        for(j = 0; j < num_train; j++){
+          const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
+          weights_out[row_offset + (size_t)orig_j] =
+            (j == i) ? 0.0 : weights_out[row_offset + (size_t)orig_j]/den;
+        }
+      }
     }
   }
 
   status = 0;
 
 cleanup_xweights:
-  np_glp_qr_drop_workspace_clear(&qr_workspace);
   np_lp_full_row_workspace_clear(&full_row_workspace);
   if(vsfx != NULL) free(vsfx);
   if(lambdax != NULL) free(lambdax);
@@ -20201,7 +20190,6 @@ typedef struct {
   double **eval_xuno_one;
   double **eval_xord_one;
   double **eval_xcon_one;
-  NPGLPQRDropWorkspace qr_workspace;
   NPLPFullRowWorkspace full_row_workspace;
 } NPConditionalXRowCtx;
 
@@ -20239,7 +20227,6 @@ static void np_conditional_xrow_ctx_clear(NPConditionalXRowCtx *ctx){
   if(ctx->kernel_ux != NULL) free(ctx->kernel_ux);
   if(ctx->kernel_ox != NULL) free(ctx->kernel_ox);
   if(ctx->x_operator != NULL) free(ctx->x_operator);
-  np_glp_qr_drop_workspace_clear(&ctx->qr_workspace);
   np_lp_full_row_workspace_clear(&ctx->full_row_workspace);
   memset(ctx, 0, sizeof(*ctx));
 }
@@ -20354,9 +20341,6 @@ static int np_conditional_xrow_ctx_prepare(double *vector_scale_factor,
         goto fail_xrow_ctx_prepare;
     }
     if((np_glp_cv_cache.nterms <= 0) ||
-       !np_glp_qr_drop_workspace_reserve(&ctx->qr_workspace,
-                                         num_train,
-                                         np_glp_cv_cache.nterms) ||
        !np_lp_full_row_workspace_reserve(&ctx->full_row_workspace,
                                          np_glp_cv_cache.nterms,
                                          1))
@@ -20445,44 +20429,33 @@ static int np_conditional_xrow_from_ctx_impl(NPConditionalXRowCtx *ctx,
   }
   np_conditional_pop_bounds(&bounds_state);
 
-  if(drop_eval_self)
-    ctx->kw[eval_pos] = 0.0;
+  {
+    const int scalar_row =
+      (ctx->lp_engine == NP_LP_ENGINE_SCALAR) ||
+      ((BANDWIDTH_den_extern == BW_ADAP_NN) &&
+       (ctx->lp_engine == NP_LP_ENGINE_GENERAL) &&
+       np_glp_cv_cache.ready &&
+       (np_glp_cv_cache.nterms == 1));
 
-  if((ctx->lp_engine == NP_LP_ENGINE_SCALAR) ||
-     ((BANDWIDTH_den_extern == BW_ADAP_NN) &&
-      (ctx->lp_engine == NP_LP_ENGINE_GENERAL) &&
-      np_glp_cv_cache.ready &&
-      (np_glp_cv_cache.nterms == 1))){
-    double row_sum = 0.0;
-    for(j = 0; j < num_train; j++)
-      row_sum += ctx->kw[j];
-    if(!(row_sum > DBL_MIN))
-      goto cleanup_xrow_from_ctx;
-    for(j = 0; j < num_train; j++){
-      const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
-      row_out[orig_j] = ctx->kw[j]/row_sum;
-    }
-  } else {
-    const int k = np_glp_cv_cache.nterms;
+    if(drop_eval_self && scalar_row)
+      ctx->kw[eval_pos] = 0.0;
 
-    if((k <= 0) || (np_glp_cv_cache.basis == NULL))
-      goto cleanup_xrow_from_ctx;
-
-    if(drop_eval_self){
-      if(np_glp_qr_drop_workspace_apply(&ctx->qr_workspace,
-                                        np_glp_cv_cache.basis,
-                                        num_train,
-                                        k,
-                                        ctx->kw,
-                                        eval_pos,
-                                        ctx->mean_row) != 0)
+    if(scalar_row){
+      double row_sum = 0.0;
+      for(j = 0; j < num_train; j++)
+        row_sum += ctx->kw[j];
+      if(!(fabs(row_sum) > DBL_MIN))
         goto cleanup_xrow_from_ctx;
-
       for(j = 0; j < num_train; j++){
         const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
-        row_out[orig_j] = ctx->mean_row[j];
+        row_out[orig_j] = ctx->kw[j]/row_sum;
       }
     } else {
+      const int k = np_glp_cv_cache.nterms;
+
+      if((k <= 0) || (np_glp_cv_cache.basis == NULL))
+        goto cleanup_xrow_from_ctx;
+
       for(l = 0; l < k; l++){
         ctx->full_row_workspace.rhs[l] =
           np_glp_cv_cache.basis[l][eval_pos];
@@ -20518,6 +20491,15 @@ static int np_conditional_xrow_from_ctx_impl(NPConditionalXRowCtx *ctx,
           zju += np_glp_cv_cache.basis[l][j]*
             ctx->full_row_workspace.rhs[l];
         row_out[orig_j] = ctx->kw[j]*zju;
+      }
+
+      if(drop_eval_self){
+        const double den = NZD(1.0 - row_out[eval_idx]);
+        for(j = 0; j < num_train; j++){
+          const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
+          row_out[orig_j] =
+            (j == eval_pos) ? 0.0 : row_out[orig_j]/den;
+        }
       }
     }
   }
@@ -21419,14 +21401,12 @@ static int np_conditional_x_weight_row_stream_core_impl(double *vector_scale_fac
   double *vsfx = NULL, *lambdax = NULL, *kw = NULL, *mean_row = NULL;
   double **matrix_bandwidth_x = NULL, **matrix_bandwidth_eval_one = NULL;
   double **eval_xuno_one = NULL, **eval_xord_one = NULL, **eval_xcon_one = NULL;
-  NPGLPQRDropWorkspace qr_workspace;
   NPLPFullRowWorkspace full_row_workspace;
   NPConditionalBoundState bounds_state;
   int eval_pos = eval_idx;
   int i, j, l;
   int status = 1;
 
-  np_glp_qr_drop_workspace_init(&qr_workspace);
   np_lp_full_row_workspace_init(&full_row_workspace);
   if((row_out == NULL) || (vector_scale_factor == NULL))
     return 1;
@@ -21524,8 +21504,7 @@ static int np_conditional_x_weight_row_stream_core_impl(double *vector_scale_fac
                                  num_reg_continuous_extern,
                                  matrix_X_continuous_train_extern))
       goto cleanup_xweight_row;
-    if((!drop_eval_self) &&
-       !np_lp_full_row_workspace_reserve(&full_row_workspace,
+    if(!np_lp_full_row_workspace_reserve(&full_row_workspace,
                                          np_glp_cv_cache.nterms,
                                          1))
       goto cleanup_xweight_row;
@@ -21576,14 +21555,14 @@ static int np_conditional_x_weight_row_stream_core_impl(double *vector_scale_fac
   }
   np_conditional_pop_bounds(&bounds_state);
 
-  if(drop_eval_self)
+  if(drop_eval_self && (lp_engine == NP_LP_ENGINE_SCALAR))
     kw[eval_pos] = 0.0;
 
   if(lp_engine == NP_LP_ENGINE_SCALAR){
     double row_sum = 0.0;
     for(j = 0; j < num_train; j++)
       row_sum += kw[j];
-    if(!(row_sum > DBL_MIN))
+    if(!(fabs(row_sum) > DBL_MIN))
       goto cleanup_xweight_row;
     for(j = 0; j < num_train; j++){
       const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
@@ -21595,56 +21574,49 @@ static int np_conditional_x_weight_row_stream_core_impl(double *vector_scale_fac
     if((k <= 0) || (np_glp_cv_cache.basis == NULL))
       goto cleanup_xweight_row;
 
-    if(drop_eval_self){
-      if(np_glp_qr_drop_workspace_apply(&qr_workspace,
-                                        np_glp_cv_cache.basis,
-                                        num_train,
-                                        k,
-                                        kw,
-                                        eval_pos,
-                                        mean_row) != 0)
-        goto cleanup_xweight_row;
+    for(l = 0; l < k; l++){
+      full_row_workspace.rhs[l] =
+        np_glp_cv_cache.basis[l][eval_pos];
+      for(j = 0; j < k; j++)
+        full_row_workspace.gram[l + j*k] = 0.0;
+    }
 
-      for(j = 0; j < num_train; j++){
-        const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
-        row_out[orig_j] = mean_row[j];
-      }
-    } else {
-      for(l = 0; l < k; l++){
-        full_row_workspace.rhs[l] =
-          np_glp_cv_cache.basis[l][eval_pos];
-        for(j = 0; j < k; j++)
-          full_row_workspace.gram[l + j*k] = 0.0;
-      }
-
-      for(j = 0; j < num_train; j++){
-        const double wj = kw[j];
-        if(wj == 0.0)
-          continue;
-        for(int a = 0; a < k; a++){
-          const double za = np_glp_cv_cache.basis[a][j];
-          for(int b = a; b < k; b++){
-            const double zb = np_glp_cv_cache.basis[b][j];
-            full_row_workspace.gram[a + b*k] += wj*za*zb;
-            if(b != a)
-              full_row_workspace.gram[b + a*k] += wj*za*zb;
-          }
+    for(j = 0; j < num_train; j++){
+      const double wj = kw[j];
+      if(wj == 0.0)
+        continue;
+      for(int a = 0; a < k; a++){
+        const double za = np_glp_cv_cache.basis[a][j];
+        for(int b = a; b < k; b++){
+          const double zb = np_glp_cv_cache.basis[b][j];
+          full_row_workspace.gram[a + b*k] += wj*za*zb;
+          if(b != a)
+            full_row_workspace.gram[b + a*k] += wj*za*zb;
         }
       }
+    }
 
-      if(!np_lp_full_row_workspace_solve(&full_row_workspace,
-                                         k,
-                                         1,
-                                         1.0e-10))
-        goto cleanup_xweight_row;
+    if(!np_lp_full_row_workspace_solve(&full_row_workspace,
+                                       k,
+                                       1,
+                                       1.0e-10))
+      goto cleanup_xweight_row;
 
+    for(j = 0; j < num_train; j++){
+      double zju = 0.0;
+      const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
+      for(l = 0; l < k; l++)
+        zju += np_glp_cv_cache.basis[l][j]*
+          full_row_workspace.rhs[l];
+      row_out[orig_j] = kw[j]*zju;
+    }
+
+    if(drop_eval_self){
+      const double den = NZD(1.0 - row_out[eval_idx]);
       for(j = 0; j < num_train; j++){
-        double zju = 0.0;
         const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
-        for(l = 0; l < k; l++)
-          zju += np_glp_cv_cache.basis[l][j]*
-            full_row_workspace.rhs[l];
-        row_out[orig_j] = kw[j]*zju;
+        row_out[orig_j] =
+          (j == eval_pos) ? 0.0 : row_out[orig_j]/den;
       }
     }
   }
@@ -21652,7 +21624,6 @@ static int np_conditional_x_weight_row_stream_core_impl(double *vector_scale_fac
   status = 0;
 
 cleanup_xweight_row:
-  np_glp_qr_drop_workspace_clear(&qr_workspace);
   np_lp_full_row_workspace_clear(&full_row_workspace);
   if(vsfx != NULL) free(vsfx);
   if(lambdax != NULL) free(lambdax);
@@ -23705,7 +23676,6 @@ static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_f
   double **matrix_bandwidth_x = NULL, **matrix_bandwidth_eval_one = NULL;
   double **eval_xuno_one = NULL, **eval_xord_one = NULL, **eval_xcon_one = NULL;
   double **matrix_X_continuous_eval_block = NULL;
-  NPGLPQRDropWorkspace qr_workspace;
   NPLPFullRowWorkspace full_row_workspace;
   NPConditionalBoundState bounds_state;
   int i, j, l;
@@ -23714,7 +23684,6 @@ static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_f
     (bwctx->eval_start == eval_start) &&
     (bwctx->block_rows == block_rows);
 
-  np_glp_qr_drop_workspace_init(&qr_workspace);
   np_lp_full_row_workspace_init(&full_row_workspace);
   if((rows_out == NULL) || (vector_scale_factor == NULL))
     return 1;
@@ -23846,8 +23815,7 @@ static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_f
     if((np_glp_cv_cache.nterms <= 0) || (np_glp_cv_cache.basis == NULL))
       goto cleanup_xweight_block;
 
-    if((!drop_eval_self) &&
-       !np_lp_full_row_workspace_reserve(&full_row_workspace,
+    if(!np_lp_full_row_workspace_reserve(&full_row_workspace,
                                          np_glp_cv_cache.nterms,
                                          1))
       goto cleanup_xweight_block;
@@ -23906,7 +23874,9 @@ static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_f
     }
     np_conditional_pop_bounds(&bounds_state);
 
-    if(drop_eval_self && (paired_full_rows_out == NULL))
+    if(drop_eval_self &&
+       (lp_engine == NP_LP_ENGINE_SCALAR) &&
+       (paired_full_rows_out == NULL))
       kw[eval_pos] = 0.0;
 
     if(lp_engine == NP_LP_ENGINE_SCALAR){
@@ -23919,7 +23889,7 @@ static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_f
           if(j != eval_pos)
             loo_sum += kw[j];
         }
-        if(!(loo_sum > DBL_MIN) || !(full_sum > DBL_MIN))
+        if(!(fabs(loo_sum) > DBL_MIN) || !(fabs(full_sum) > DBL_MIN))
           goto cleanup_xweight_block;
         for(j = 0; j < num_train; j++){
           const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
@@ -23931,7 +23901,7 @@ static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_f
         double row_sum = 0.0;
         for(j = 0; j < num_train; j++)
           row_sum += kw[j];
-        if(!(row_sum > DBL_MIN))
+        if(!(fabs(row_sum) > DBL_MIN))
           goto cleanup_xweight_block;
         for(j = 0; j < num_train; j++){
           const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
@@ -23941,56 +23911,49 @@ static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_f
     } else {
       const int k = np_glp_cv_cache.nterms;
 
-      if(drop_eval_self){
-        if(np_glp_qr_drop_workspace_apply(&qr_workspace,
-                                          np_glp_cv_cache.basis,
-                                          num_train,
-                                          k,
-                                          kw,
-                                          eval_pos,
-                                          mean_row) != 0)
-          goto cleanup_xweight_block;
+      for(l = 0; l < k; l++){
+        full_row_workspace.rhs[l] =
+          np_glp_cv_cache.basis[l][eval_pos];
+        for(j = 0; j < k; j++)
+          full_row_workspace.gram[l + j*k] = 0.0;
+      }
 
-        for(j = 0; j < num_train; j++){
-          const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
-          rows_out[i][orig_j] = mean_row[j];
-        }
-      } else {
-        for(l = 0; l < k; l++){
-          full_row_workspace.rhs[l] =
-            np_glp_cv_cache.basis[l][eval_pos];
-          for(j = 0; j < k; j++)
-            full_row_workspace.gram[l + j*k] = 0.0;
-        }
-
-        for(j = 0; j < num_train; j++){
-          const double wj = kw[j];
-          if(wj == 0.0)
-            continue;
-          for(int a = 0; a < k; a++){
-            const double za = np_glp_cv_cache.basis[a][j];
-            for(int b = a; b < k; b++){
-              const double zb = np_glp_cv_cache.basis[b][j];
-              full_row_workspace.gram[a + b*k] += wj*za*zb;
-              if(b != a)
-                full_row_workspace.gram[b + a*k] += wj*za*zb;
-            }
+      for(j = 0; j < num_train; j++){
+        const double wj = kw[j];
+        if(wj == 0.0)
+          continue;
+        for(int a = 0; a < k; a++){
+          const double za = np_glp_cv_cache.basis[a][j];
+          for(int b = a; b < k; b++){
+            const double zb = np_glp_cv_cache.basis[b][j];
+            full_row_workspace.gram[a + b*k] += wj*za*zb;
+            if(b != a)
+              full_row_workspace.gram[b + a*k] += wj*za*zb;
           }
         }
+      }
 
-        if(!np_lp_full_row_workspace_solve(&full_row_workspace,
-                                           k,
-                                           1,
-                                           1.0e-10))
-          goto cleanup_xweight_block;
+      if(!np_lp_full_row_workspace_solve(&full_row_workspace,
+                                         k,
+                                         1,
+                                         1.0e-10))
+        goto cleanup_xweight_block;
 
+      for(j = 0; j < num_train; j++){
+        double zju = 0.0;
+        const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
+        for(l = 0; l < k; l++)
+          zju += np_glp_cv_cache.basis[l][j]*
+            full_row_workspace.rhs[l];
+        rows_out[i][orig_j] = kw[j]*zju;
+      }
+
+      if(drop_eval_self){
+        const double den = NZD(1.0 - rows_out[i][eval_idx]);
         for(j = 0; j < num_train; j++){
-          double zju = 0.0;
           const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
-          for(l = 0; l < k; l++)
-            zju += np_glp_cv_cache.basis[l][j]*
-              full_row_workspace.rhs[l];
-          rows_out[i][orig_j] = kw[j]*zju;
+          rows_out[i][orig_j] =
+            (j == eval_pos) ? 0.0 : rows_out[i][orig_j]/den;
         }
       }
     }
@@ -23999,7 +23962,6 @@ static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_f
   status = 0;
 
 cleanup_xweight_block:
-  np_glp_qr_drop_workspace_clear(&qr_workspace);
   np_lp_full_row_workspace_clear(&full_row_workspace);
   if(vsfx != NULL) free(vsfx);
   if(lambdax != NULL) free(lambdax);

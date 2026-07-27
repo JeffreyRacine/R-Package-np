@@ -18,18 +18,6 @@ typedef struct {
 } NPLPSolveWorkspace;
 
 typedef struct {
-  int n_capacity;
-  int p_capacity;
-  size_t xqr_capacity;
-  double *xqr;
-  double *qraux;
-  double *work;
-  double *y;
-  double *qy;
-  int *pivot;
-} NPGLPQRDropWorkspace;
-
-typedef struct {
   int p_capacity;
   int nrhs_capacity;
   size_t gram_capacity;
@@ -86,12 +74,10 @@ int np_lp_solve_workspace_solve_factored(NPLPSolveWorkspace *workspace,
                                          int nrhs);
 
 /*
- * Exact basis-general influence row for a one-column weighted design:
- * w_i z_i z_eval / sum_j(w_j z_j^2).  positive_weights_only preserves the
- * QR owner's historical treatment of nonpositive weights; otherwise signed
- * higher-order kernel weights are retained.  output_stride permits both
- * contiguous native rows and strided R column-major matrix rows.  Returns
- * zero on success; on failure, row_out contents are undefined and must not be
+ * Exact basis-general influence row for a one-column signed weighted design:
+ * w_i z_i z_eval / sum_j(w_j z_j^2).  output_stride permits both contiguous
+ * native rows and strided R column-major matrix rows.  Returns zero on
+ * success; on failure, row_out contents are undefined and must not be
  * consumed.  It never allocates or calls BLAS/LAPACK.
  */
 int np_lp_width_one_influence_row(const double *basis_train,
@@ -99,28 +85,7 @@ int np_lp_width_one_influence_row(const double *basis_train,
                                   const double *kw,
                                   double basis_eval,
                                   double *row_out,
-                                  size_t output_stride,
-                                  int positive_weights_only);
-
-/*
- * Reusable QR workspace for a leave-one-out local-polynomial influence row.
- * Width one computes the exact scalar influence row directly without QR
- * allocation or LAPACK.  Wider arithmetic and the dqrdc2/dqrqy transcript
- * match the historical helper; only allocation ownership moves from each row
- * to the enclosing owner.
- */
-void np_glp_qr_drop_workspace_init(NPGLPQRDropWorkspace *workspace);
-void np_glp_qr_drop_workspace_clear(NPGLPQRDropWorkspace *workspace);
-int np_glp_qr_drop_workspace_reserve(NPGLPQRDropWorkspace *workspace,
-                                     int n,
-                                     int p);
-int np_glp_qr_drop_workspace_apply(NPGLPQRDropWorkspace *workspace,
-                                   double **basis,
-                                   int n,
-                                   int p,
-                                   const double *kw,
-                                   int eval_pos,
-                                   double *row_out);
+                                  size_t output_stride);
 
 /*
  * Reusable contiguous Gram/RHS/rcond/solve storage for full-weight LP rows.
