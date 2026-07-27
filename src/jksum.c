@@ -26261,8 +26261,10 @@ static int np_conditional_distribution_cvls_lp_all_large_stream(double *vector_s
                                                                 double *cv){
   NPConditionalLpAllLargeCtx ctx = {0};
   const int num_eval = num_obs_eval_extern;
+  double cv_accumulator = 0.0;
   double *yint = NULL, *yint_xorder = NULL, *cross_terms = NULL, *beta = NULL;
   int i, j;
+  int cv_started = 0;
   int status = 1;
 
   if((cv == NULL) || (vector_scale_factor == NULL))
@@ -26280,7 +26282,9 @@ static int np_conditional_distribution_cvls_lp_all_large_stream(double *vector_s
      (cross_terms == NULL) || (beta == NULL))
     goto cleanup_cdist_all_large;
 
+  cv_accumulator = 0.0;
   *cv = 0.0;
+  cv_started = 1;
   for(j = 0; j < num_eval; j++){
     if(np_conditional_y_eval_row_stream_op_core(vector_scale_factor,
                                                 j,
@@ -26331,15 +26335,17 @@ static int np_conditional_distribution_cvls_lp_all_large_stream(double *vector_s
 
       {
         const double tvd = ((double)indy) - fit;
-        *cv += tvd*tvd;
+        cv_accumulator += tvd*tvd;
       }
     }
   }
 
-  *cv /= ((double)ctx.num_train*(double)MAX(1, num_eval));
+  cv_accumulator /= ((double)ctx.num_train*(double)MAX(1, num_eval));
   status = 0;
 
 cleanup_cdist_all_large:
+  if(cv_started)
+    *cv = cv_accumulator;
   if(yint != NULL) free(yint);
   if(yint_xorder != NULL) free(yint_xorder);
   if(cross_terms != NULL) free(cross_terms);
