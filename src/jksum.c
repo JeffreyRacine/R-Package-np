@@ -86,6 +86,8 @@ extern int int_TAYLOR;
 extern int int_WEIGHTS;
 extern int int_LARGE_SF;
 
+static int np_mseries_accelerate_enabled_cache = 0;
+
 extern int int_TREE_X;
 extern int int_TREE_Y;
 extern int int_TREE_XY;
@@ -463,6 +465,15 @@ static double *np_outer_weighted_sum_pack_A(double * const * const pmat_A,
   return Apack;
 }
 
+static int np_outer_weighted_sum_pack_B_accel_try(
+  double * const * const pmat_B,
+  const int have_B,
+  const int max_B,
+  const double * const weights,
+  const int num_weights,
+  const double db,
+  double * const Bpack);
+
 static int np_outer_weighted_sum_blas(double * const * const pmat_A,
                                       const int have_A,
                                       const int max_A,
@@ -510,12 +521,16 @@ static int np_outer_weighted_sum_blas(double * const * const pmat_A,
     Ause = Apack;
   }
 
-  for(int i = 0; i < max_B; i++){
-    double * const Bi = Bpack + (size_t)i*(size_t)num_weights;
-    const double * const srcB = pmat_B[i];
-    for(int k = 0; k < num_weights; k++)
-      Bi[k] = (weights[k] == 0.0) ? 0.0 : srcB[k*have_B]*weights[k]/db;
-  }
+  if((!have_B) || (!np_mseries_accelerate_enabled_cache) ||
+     !np_outer_weighted_sum_pack_B_accel_try(
+       pmat_B, have_B, max_B, weights, num_weights, db, Bpack))
+    for(int i = 0; i < max_B; i++){
+      double * const Bi = Bpack + (size_t)i*(size_t)num_weights;
+      const double * const srcB = pmat_B[i];
+      for(int k = 0; k < num_weights; k++)
+        Bi[k] = (weights[k] == 0.0) ?
+          0.0 : srcB[k*have_B]*weights[k]/db;
+    }
 
   np_blas_dgemm_tn_int(max_A, max_B, num_weights, Ause, Bpack, C);
 
@@ -2416,7 +2431,6 @@ static uint64_t np_guarded_cvml_hits = 0;
 static int np_runtime_tol_cache_ready = 0;
 static int np_largeh_enabled_cache = 1;
 static int np_largelambda_enabled_cache = 1;
-static int np_mseries_accelerate_enabled_cache = 0;
 static double np_largeh_rel_tol_cache = 1e-3;
 static double np_disc_rel_tol_cache = 1e-2;
 /*
@@ -7696,7 +7710,18 @@ static inline void np_hot_loop_check_interrupt(const int pos,
     R_CheckUserInterrupt();
 }
 
-static int kernel_weighted_sum_np_ctx_ex(
+/*
+  Keep this adjacent hot engine on a stable cache-line boundary.  Adding the
+  out-of-line Apple-arm64 pack helper otherwise displaced it enough to cause a
+  reproducible regression in an inactive conditional-density control.
+*/
+#if NP_ACCEL_GAUSS_COMPILED && (defined(__clang__) || defined(__GNUC__))
+# define NP_OUTER_PACK_ADJACENT_HOT_ALIGN __attribute__((aligned(256)))
+#else
+# define NP_OUTER_PACK_ADJACENT_HOT_ALIGN
+#endif
+
+static int NP_OUTER_PACK_ADJACENT_HOT_ALIGN kernel_weighted_sum_np_ctx_ex(
 int * KERNEL_reg,
 int * KERNEL_unordered_reg,
 int * KERNEL_ordered_reg,
@@ -9568,6 +9593,8 @@ cleanup:
 
   return(status);
 }
+
+#undef NP_OUTER_PACK_ADJACENT_HOT_ALIGN
 
 #if NP_ACCEL_GAUSS_COMPILED
 /*
@@ -31098,4 +31125,58 @@ attribute_hidden int np_fixed_gaussian_density_cvls_pair_dispatch_try(
   }
 
   return 0;
+}
+
+static int np_outer_weighted_sum_pack_B_accel_try(
+  double * const * const pmat_B,
+  const int have_B,
+  const int max_B,
+  const double * const weights,
+  const int num_weights,
+  const double db,
+  double * const Bpack){
+#if NP_ACCEL_GAUSS_COMPILED
+  /*
+    Vectorize only construction of the mutable right operand.  BLAS shape,
+    storage order, zero-weight semantics, and the subsequent reduction remain
+    those of np_outer_weighted_sum_blas().
+  */
+  if((!np_mseries_accelerate_enabled_cache) ||
+     (pmat_B == NULL) || (weights == NULL) || (Bpack == NULL) ||
+     (!have_B) || (max_B <= 0) || (num_weights < 64))
+    return 0;
+
+  const float64x2_t zero = vdupq_n_f64(0.0);
+  const float64x2_t dbv = vdupq_n_f64(db);
+
+  for(int i = 0; i < max_B; i++){
+    double * const Bi = Bpack + (size_t)i*(size_t)num_weights;
+    const double * const srcB = pmat_B[i];
+    int k = 0;
+
+    for(; (k + 1) < num_weights; k += 2){
+      const float64x2_t weight = vld1q_f64(weights + k);
+      const float64x2_t source = vld1q_f64(srcB + k);
+      const float64x2_t scaled =
+        vdivq_f64(vmulq_f64(source, weight), dbv);
+      const uint64x2_t zero_weight = vceqq_f64(weight, zero);
+      vst1q_f64(Bi + k, vbslq_f64(zero_weight, zero, scaled));
+    }
+
+    if(k < num_weights)
+      Bi[k] = (weights[k] == 0.0) ?
+        0.0 : srcB[k]*weights[k]/db;
+  }
+
+  return 1;
+#else
+  (void)pmat_B;
+  (void)have_B;
+  (void)max_B;
+  (void)weights;
+  (void)num_weights;
+  (void)db;
+  (void)Bpack;
+  return 0;
+#endif
 }
