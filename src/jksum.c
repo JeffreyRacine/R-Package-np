@@ -14342,6 +14342,96 @@ cleanup_profile_cdf:
   return status;
 }
 
+/*
+ * Continuous-only CVCDF loss for the common q = 1..3 cases.
+ *
+ * This is deliberately a scalar specialization.  It preserves the incumbent
+ * observation order and the exact loss expression while removing the tiny
+ * per-observation dimension loop.  The caller retains the generic path for
+ * categorical data, q >= 4, non-Gaussian kernels, and acceleration-disabled
+ * runs.
+ */
+static double np_distribution_cvls_continuous_q123(
+  const int q,
+  const int BANDWIDTH_den,
+  const int64_t j,
+  const int64_t jo,
+  const int64_t is,
+  const int64_t ie,
+  const int64_t dwx,
+  const int64_t num_obs_train,
+  double * const * const matrix_X_continuous_train,
+  double * const * const matrix_X_continuous_eval,
+  const double mean_jo,
+  const double ofac,
+  const double * const kwx,
+  double cv_accumulator)
+{
+  int64_t i;
+  const double eval0 = matrix_X_continuous_eval[0][j];
+  const double eval1 = (q >= 2) ? matrix_X_continuous_eval[1][j] : 0.0;
+  const double eval2 = (q >= 3) ? matrix_X_continuous_eval[2][j] : 0.0;
+
+#define NP_CVCDF_ACCUMULATE_Q123(INDICATOR, WEIGHT) do {                 \
+    for(i = is; i <= ie; i++){                                          \
+      if(j == i) continue;                                               \
+      const int indy_q123 = (INDICATOR);                                 \
+      const double tvd_q123 =                                            \
+        (indy_q123 - mean_jo/ofac + (WEIGHT)/ofac);                      \
+      cv_accumulator += tvd_q123*tvd_q123;                               \
+    }                                                                    \
+  } while(0)
+
+  if(BANDWIDTH_den != BW_ADAP_NN){
+    const double * const kwrow = kwx + jo*num_obs_train;
+    switch(q){
+      case 1:
+        NP_CVCDF_ACCUMULATE_Q123(
+          matrix_X_continuous_train[0][i] <= eval0,
+          kwrow[i]);
+        break;
+      case 2:
+        NP_CVCDF_ACCUMULATE_Q123(
+          (matrix_X_continuous_train[0][i] <= eval0) &&
+          (matrix_X_continuous_train[1][i] <= eval1),
+          kwrow[i]);
+        break;
+      default:
+        NP_CVCDF_ACCUMULATE_Q123(
+          (matrix_X_continuous_train[0][i] <= eval0) &&
+          (matrix_X_continuous_train[1][i] <= eval1) &&
+          (matrix_X_continuous_train[2][i] <= eval2),
+          kwrow[i]);
+        break;
+    }
+  } else {
+    switch(q){
+      case 1:
+        NP_CVCDF_ACCUMULATE_Q123(
+          matrix_X_continuous_train[0][i] <= eval0,
+          kwx[i*dwx + jo]);
+        break;
+      case 2:
+        NP_CVCDF_ACCUMULATE_Q123(
+          (matrix_X_continuous_train[0][i] <= eval0) &&
+          (matrix_X_continuous_train[1][i] <= eval1),
+          kwx[i*dwx + jo]);
+        break;
+      default:
+        NP_CVCDF_ACCUMULATE_Q123(
+          (matrix_X_continuous_train[0][i] <= eval0) &&
+          (matrix_X_continuous_train[1][i] <= eval1) &&
+          (matrix_X_continuous_train[2][i] <= eval2),
+          kwx[i*dwx + jo]);
+        break;
+    }
+  }
+
+#undef NP_CVCDF_ACCUMULATE_Q123
+
+  return cv_accumulator;
+}
+
 double np_kernel_estimate_distribution_ls_cv( 
 int KERNEL_den,
 int KERNEL_den_unordered,
@@ -14587,6 +14677,15 @@ double * cv){
   
   *cv = 0;
 
+  const int use_continuous_q123 =
+    np_mseries_accelerate_enabled_cache &&
+    (KERNEL_den == 0) &&
+    cdfontrain &&
+    (num_reg_unordered == 0) &&
+    (num_reg_ordered == 0) &&
+    (num_reg_continuous >= 1) &&
+    (num_reg_continuous <= 3);
+
   double * kwx = (double *)np_jksum_malloc_array3_or_die((size_t)num_obs_train_alloc, (size_t)num_obs_wx_alloc, sizeof(double), "np_kernel_estimate_density_categorical_leave_one_out_cv kwx");
 
   for(iwx = 0; iwx < nwx; iwx++){
@@ -14652,25 +14751,45 @@ double * cv){
                            kwx,
                            &gate_ctx_local);
     
-    for(j = wxo; j < (wxo + dwx); j++){
-      const int64_t jo = j - wxo;
-      for(i = is; i <= ie; i++){
-        if(cdfontrain && (j == i)) continue;
-        indy = 1;
-        for(l = 0; (l < num_reg_ordered) && (indy != 0); l++){
-          indy *= (matrix_X_ordered_train[l][i] <= matrix_X_ordered_eval[l][j]);
+    if(use_continuous_q123){
+      for(j = wxo; j < (wxo + dwx); j++){
+        const int64_t jo = j - wxo;
+        *cv = np_distribution_cvls_continuous_q123(
+          num_reg_continuous,
+          BANDWIDTH_den,
+          j,
+          jo,
+          is,
+          ie,
+          dwx,
+          num_obs_train,
+          matrix_X_continuous_train,
+          matrix_X_continuous_eval,
+          mean[jo],
+          ofac,
+          kwx,
+          *cv);
+      }
+    } else {
+      for(j = wxo; j < (wxo + dwx); j++){
+        const int64_t jo = j - wxo;
+        for(i = is; i <= ie; i++){
+          if(cdfontrain && (j == i)) continue;
+          indy = 1;
+          for(l = 0; (l < num_reg_ordered) && (indy != 0); l++){
+            indy *= (matrix_X_ordered_train[l][i] <= matrix_X_ordered_eval[l][j]);
+          }
+          for(l = 0; (l < num_reg_continuous) && (indy != 0); l++){
+            indy *= (matrix_X_continuous_train[l][i] <= matrix_X_continuous_eval[l][j]);
+          }
+          if(BANDWIDTH_den != BW_ADAP_NN){
+            const double tvd = (indy - mean[jo]/ofac + kwx[jo*num_obs_train + i]/ofac);
+            *cv += tvd*tvd;
+          } else {
+            const double tvd = (indy - mean[jo]/ofac + kwx[i*dwx + jo]/ofac);
+            *cv += tvd*tvd;
+          }
         }
-        for(l = 0; (l < num_reg_continuous) && (indy != 0); l++){
-          indy *= (matrix_X_continuous_train[l][i] <= matrix_X_continuous_eval[l][j]);
-        }
-        if(BANDWIDTH_den != BW_ADAP_NN){
-          const double tvd = (indy - mean[jo]/ofac + kwx[jo*num_obs_train + i]/ofac);
-          *cv += tvd*tvd;
-        } else {
-          const double tvd = (indy - mean[jo]/ofac + kwx[i*dwx + jo]/ofac);
-          *cv += tvd*tvd;
-        }
-
       }
     }
   }
