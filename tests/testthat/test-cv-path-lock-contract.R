@@ -364,7 +364,7 @@ test_that("canonical LP fit and evaluation avoid legacy solve marshalling", {
   expect_false(grepl("SHIFT", helper_body, fixed = TRUE))
 })
 
-test_that("conditional LP LOO QR rows reuse the canonical workspace", {
+test_that("conditional LP LOO rows use signed full-row deletion and no QR", {
   src_file <- locate_jksum_c()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
 
@@ -372,49 +372,45 @@ test_that("conditional LP LOO QR rows reuse the canonical workspace", {
   source <- paste(lines, collapse = "\n")
   solve_file <- file.path(dirname(src_file), "jksum_lp_solve.c")
   skip_if_not(file.exists(solve_file), "source file src/jksum_lp_solve.c unavailable")
-  solve_lines <- readLines(solve_file, warn = FALSE)
+  solve_source <- paste(readLines(solve_file, warn = FALSE), collapse = "\n")
+  header_file <- file.path(dirname(src_file), "jksum_lp_solve.h")
+  skip_if_not(file.exists(header_file), "source file src/jksum_lp_solve.h unavailable")
+  header_source <- paste(readLines(header_file, warn = FALSE), collapse = "\n")
 
-  expect_false(grepl("np_glp_qr_drop_row_bkcde", source, fixed = TRUE))
+  for (obsolete in c(
+    "NPGLPQRDropWorkspace",
+    "np_glp_qr_drop_workspace_",
+    "dqrdc2",
+    "dqrqy",
+    "positive_weights_only"
+  )) {
+    expect_false(grepl(obsolete, source, fixed = TRUE))
+    expect_false(grepl(obsolete, solve_source, fixed = TRUE))
+    expect_false(grepl(obsolete, header_source, fixed = TRUE))
+  }
+
   expect_equal(
-    sum(grepl("np_glp_qr_drop_workspace_apply\\(", lines)),
+    sum(grepl("const double den = NZD\\(1\\.0 - ", lines)),
     6L
   )
-
-  apply_start <- grep(
-    "^int np_glp_qr_drop_workspace_apply\\(",
-    solve_lines
+  expect_equal(
+    sum(grepl("fabs\\(row_sum\\) > DBL_MIN", lines)),
+    4L
   )
-  expect_length(apply_start, 1L)
-  apply_stop <- grep("^}$", solve_lines)
-  apply_stop <- apply_stop[apply_stop > apply_start][1L]
-  expect_length(apply_stop, 1L)
-  apply_body <- paste(solve_lines[apply_start:apply_stop], collapse = "\n")
-
+  expect_equal(sum(grepl(
+    "fabs\\(loo_sum\\) > DBL_MIN.*fabs\\(full_sum\\) > DBL_MIN",
+    lines
+  )), 1L)
   expect_true(grepl(
-    "np_glp_qr_drop_workspace_reserve(workspace, n, p)",
-    apply_body,
+    "denominator += kw[i]*zi*zi;",
+    solve_source,
     fixed = TRUE
   ))
   expect_true(grepl(
-    "workspace->xqr[i + j*n] =",
-    apply_body,
+    "const double value = kw[i]*basis_train[i]*projection;",
+    solve_source,
     fixed = TRUE
   ))
-  expect_true(grepl(
-    "((w > 0.0) ? sqrt(w) : 0.0) * basis[j][i];",
-    apply_body,
-    fixed = TRUE
-  ))
-  expect_true(grepl("F77_NAME(dqrdc2)", apply_body, fixed = TRUE))
-  expect_true(grepl("F77_NAME(dqrqy)", apply_body, fixed = TRUE))
-  expect_true(grepl(
-    "row_out[i] = ((w > 0.0) ? sqrt(w) : 0.0) * workspace->qy[i];",
-    apply_body,
-    fixed = TRUE
-  ))
-  expect_false(grepl("malloc(", apply_body, fixed = TRUE))
-  expect_false(grepl("calloc(", apply_body, fixed = TRUE))
-  expect_false(grepl("free(", apply_body, fixed = TRUE))
 })
 
 test_that("fixed conditional LP paired rows reuse the canonical full-row workspace", {
@@ -545,11 +541,7 @@ test_that("conditional LP block rows reuse full-row solve storage", {
     helper_body,
     fixed = TRUE
   ))
-  expect_true(grepl(
-    "if((!drop_eval_self) &&",
-    helper_body,
-    fixed = TRUE
-  ))
+  expect_false(grepl("if((!drop_eval_self) &&", helper_body, fixed = TRUE))
   expect_true(grepl(
     "np_lp_full_row_workspace_reserve(&full_row_workspace,",
     helper_body,
@@ -594,11 +586,7 @@ test_that("conditional LP dense shadow rows reuse full-row solve storage", {
     helper_body,
     fixed = TRUE
   ))
-  expect_true(grepl(
-    "if((!drop_eval_self) &&",
-    helper_body,
-    fixed = TRUE
-  ))
+  expect_false(grepl("if((!drop_eval_self) &&", helper_body, fixed = TRUE))
   expect_true(grepl(
     "np_lp_full_row_workspace_reserve(&full_row_workspace,",
     helper_body,
@@ -643,11 +631,7 @@ test_that("conditional LP row-stream rows use bounded full-row solve storage", {
     helper_body,
     fixed = TRUE
   ))
-  expect_true(grepl(
-    "if((!drop_eval_self) &&",
-    helper_body,
-    fixed = TRUE
-  ))
+  expect_false(grepl("if((!drop_eval_self) &&", helper_body, fixed = TRUE))
   expect_true(grepl(
     "np_lp_full_row_workspace_reserve(&full_row_workspace,",
     helper_body,

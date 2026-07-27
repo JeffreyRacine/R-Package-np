@@ -40,7 +40,7 @@ test_that("canonical solve workspace dispatches width one only to scalar algebra
   factored <- lp_width_one_region(
     source,
     "int np_lp_solve_workspace_solve_factored(",
-    "void np_glp_qr_drop_workspace_init("
+    "int np_lp_width_one_influence_row("
   )
 
   expect_true(grepl("rhs_source[i]/gram", scalar, fixed = TRUE))
@@ -133,7 +133,7 @@ test_that("full-row workspace dispatches width one before every LAPACK owner", {
   ))
 })
 
-test_that("leave-one-out width-one influence rows never enter QR", {
+test_that("width-one influence rows retain signed weights without LAPACK", {
   solve_file <- locate_lp_width_one_source("jksum_lp_solve.c")
   skip_if(is.null(solve_file), "source file src/jksum_lp_solve.c unavailable")
   source <- paste(readLines(solve_file, warn = FALSE), collapse = "\n")
@@ -141,39 +141,23 @@ test_that("leave-one-out width-one influence rows never enter QR", {
   scalar <- lp_width_one_region(
     source,
     "int np_lp_width_one_influence_row(",
-    "int np_glp_qr_drop_workspace_apply("
-  )
-  qr <- lp_width_one_region(
-    source,
-    "int np_glp_qr_drop_workspace_apply(",
     "void np_lp_full_row_workspace_init("
   )
 
   expect_true(grepl(
-    "active_weight*zi*zi",
+    "denominator += kw[i]*zi*zi",
     scalar,
     fixed = TRUE
   ))
   expect_true(grepl(
-    "active_weight*basis_train[i]*projection",
+    "kw[i]*basis_train[i]*projection",
     scalar,
     fixed = TRUE
   ))
-  expect_true(grepl("positive_weights_only", scalar, fixed = TRUE))
+  expect_false(grepl("positive_weights_only", scalar, fixed = TRUE))
   expect_false(grepl("F77_", scalar, fixed = TRUE))
-  expect_false(grepl("np_glp_qr_drop_workspace_reserve", scalar, fixed = TRUE))
-
-  expect_true(grepl("if(p == 1)", qr, fixed = TRUE))
-  expect_true(grepl("np_lp_width_one_influence_row(", qr, fixed = TRUE))
-  expect_true(grepl("1U,\n                                         1)", qr, fixed = TRUE))
-  expect_lt(
-    regexpr("if(p == 1)", qr, fixed = TRUE),
-    regexpr("np_glp_qr_drop_workspace_reserve(", qr, fixed = TRUE)
-  )
-  expect_lt(
-    regexpr("if(p == 1)", qr, fixed = TRUE),
-    regexpr("F77_NAME(dqrdc2)", qr, fixed = TRUE)
-  )
+  expect_false(grepl("sqrt(", scalar, fixed = TRUE))
+  expect_false(grepl("malloc(", scalar, fixed = TRUE))
 })
 
 test_that("compiled width-one hats reuse the scalar influence primitive", {
@@ -203,8 +187,9 @@ test_that("compiled width-one hats reuse the scalar influence primitive", {
 
   expect_true(grepl("if((nterms == 1)", hat, fixed = TRUE))
   expect_true(grepl("np_lp_width_one_influence_row(", hat, fixed = TRUE))
-  expect_true(grepl("(size_t)neval,\n                                      0)", hat,
+  expect_true(grepl("(size_t)neval)", hat,
                     fixed = TRUE))
+  expect_false(grepl("positive_weights_only", hat, fixed = TRUE))
   expect_lt(
     regexpr("np_lp_width_one_influence_row(", hat, fixed = TRUE),
     regexpr("F77_CALL(dgemm)", hat, fixed = TRUE)
