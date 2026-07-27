@@ -38,6 +38,7 @@
 
 #if defined(NP_USE_ACCELERATE_GAUSS) && defined(__APPLE__) && defined(__arm64__)
 #define NP_ACCEL_GAUSS_COMPILED 1
+#include <arm_neon.h>
 typedef long np_vDSP_Stride;
 typedef unsigned long np_vDSP_Length;
 typedef void (*np_vDSP_vsmsaD_fn)(const double *, np_vDSP_Stride,
@@ -5840,6 +5841,68 @@ static void np_accel_gauss_vector(const int KERNEL,
   np_accel_vsmulD(out, 1, &coef, out, 1, (np_vDSP_Length)n);
 }
 
+#pragma clang fp contract(off)
+static void np_accel_erf_horner_vector(const double * const tbuf,
+                                       const int n,
+                                       double * const polybuf)
+{
+  const double c8 = 0.17087277;
+  const double c7 = -0.82215223;
+  const double c6 = 1.48851587;
+  const double c5 = -1.13520398;
+  const double c4 = 0.27886807;
+  const double c3 = -0.18628806;
+  const double c2 = 0.09678418;
+  const double c1 = 0.37409196;
+  const double c0 = 1.00002368;
+  const float64x2_t c8v = vdupq_n_f64(c8);
+  const float64x2_t c7v = vdupq_n_f64(c7);
+  const float64x2_t c6v = vdupq_n_f64(c6);
+  const float64x2_t c5v = vdupq_n_f64(c5);
+  const float64x2_t c4v = vdupq_n_f64(c4);
+  const float64x2_t c3v = vdupq_n_f64(c3);
+  const float64x2_t c2v = vdupq_n_f64(c2);
+  const float64x2_t c1v = vdupq_n_f64(c1);
+  const float64x2_t c0v = vdupq_n_f64(c0);
+  int i = 0;
+
+  for(; i + 1 < n; i += 2){
+    const float64x2_t t = vld1q_f64(tbuf + i);
+    float64x2_t poly = vfmaq_f64(c7v, c8v, t);
+
+    poly = vaddq_f64(vmulq_f64(poly, t), c6v);
+    poly = vaddq_f64(vmulq_f64(poly, t), c5v);
+    poly = vaddq_f64(vmulq_f64(poly, t), c4v);
+    poly = vaddq_f64(vmulq_f64(poly, t), c3v);
+    poly = vaddq_f64(vmulq_f64(poly, t), c2v);
+    poly = vaddq_f64(vmulq_f64(poly, t), c1v);
+    poly = vaddq_f64(vmulq_f64(poly, t), c0v);
+    vst1q_f64(polybuf + i, poly);
+  }
+
+  for(; i < n; i++){
+    const double t = tbuf[i];
+    double poly = fma(c8, t, c7);
+
+    poly *= t;
+    poly += c6;
+    poly *= t;
+    poly += c5;
+    poly *= t;
+    poly += c4;
+    poly *= t;
+    poly += c3;
+    poly *= t;
+    poly += c2;
+    poly *= t;
+    poly += c1;
+    poly *= t;
+    poly += c0;
+    polybuf[i] = poly;
+  }
+}
+#pragma clang fp contract(on)
+
 static void np_accel_erfun_np_vector(const double * const in,
                                      const int n,
                                      double * const out,
@@ -5859,48 +5922,7 @@ static void np_accel_erfun_np_vector(const double * const in,
                   tbuf, 1, (np_vDSP_Length)n);
   np_accel_vvrec(tbuf, tbuf, &ni);
 
-  {
-    const double c8 = 0.17087277;
-    const double c7 = -0.82215223;
-    const double c6 = 1.48851587;
-    const double c5 = -1.13520398;
-    const double c4 = 0.27886807;
-    const double c3 = -0.18628806;
-    const double c2 = 0.09678418;
-    const double c1 = 0.37409196;
-    const double c0 = 1.00002368;
-
-    np_accel_vsmsaD(tbuf, 1, &c8, &c7,
-                    polybuf, 1, (np_vDSP_Length)n);
-    np_accel_vmulD(polybuf, 1, tbuf, 1,
-                   polybuf, 1, (np_vDSP_Length)n);
-    np_accel_vsmsaD(polybuf, 1, &one, &c6,
-                    polybuf, 1, (np_vDSP_Length)n);
-    np_accel_vmulD(polybuf, 1, tbuf, 1,
-                   polybuf, 1, (np_vDSP_Length)n);
-    np_accel_vsmsaD(polybuf, 1, &one, &c5,
-                    polybuf, 1, (np_vDSP_Length)n);
-    np_accel_vmulD(polybuf, 1, tbuf, 1,
-                   polybuf, 1, (np_vDSP_Length)n);
-    np_accel_vsmsaD(polybuf, 1, &one, &c4,
-                    polybuf, 1, (np_vDSP_Length)n);
-    np_accel_vmulD(polybuf, 1, tbuf, 1,
-                   polybuf, 1, (np_vDSP_Length)n);
-    np_accel_vsmsaD(polybuf, 1, &one, &c3,
-                    polybuf, 1, (np_vDSP_Length)n);
-    np_accel_vmulD(polybuf, 1, tbuf, 1,
-                   polybuf, 1, (np_vDSP_Length)n);
-    np_accel_vsmsaD(polybuf, 1, &one, &c2,
-                    polybuf, 1, (np_vDSP_Length)n);
-    np_accel_vmulD(polybuf, 1, tbuf, 1,
-                   polybuf, 1, (np_vDSP_Length)n);
-    np_accel_vsmsaD(polybuf, 1, &one, &c1,
-                    polybuf, 1, (np_vDSP_Length)n);
-    np_accel_vmulD(polybuf, 1, tbuf, 1,
-                   polybuf, 1, (np_vDSP_Length)n);
-    np_accel_vsmsaD(polybuf, 1, &one, &c0,
-                    polybuf, 1, (np_vDSP_Length)n);
-  }
+  np_accel_erf_horner_vector(tbuf, n, polybuf);
 
   np_accel_vsqD(absbuf, 1, argbuf, 1, (np_vDSP_Length)n);
   np_accel_vsmsaD(argbuf, 1, &minus_one, &c_arg,
