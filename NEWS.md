@@ -31,6 +31,12 @@
   observation. Adaptive-nearest-neighbour, tree, reduced-row, and specialized
   resident-row routes are unchanged, as are objective values.
 
+* Conditional-density CVLS now preserves the sign of the exact
+  full-row-to-delete-one denominator for fixed and generalized-nearest-
+  neighbour local-polynomial rows on every rank. This corrects higher-order
+  predictor-kernel objectives when the valid denominator is negative;
+  ordinary second-order results and MPI ownership are unchanged.
+
 * On Apple ARM64, eligible fixed and generalized-nearest-neighbour products of
   two or more ordinary Gaussian continuous kernels now use one vector
   exponential of the summed squared standardized distances on each rank.

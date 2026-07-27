@@ -23546,7 +23546,7 @@ static int np_conditional_x_weight_block_pair_stream_core(double *vector_scale_f
       full_rows_out[i][orig_j] = kw[j]*zju;
     }
     {
-      const double den = NZD_POS(1.0 - full_rows_out[i][eval_idx]);
+      const double den = NZD(1.0 - full_rows_out[i][eval_idx]);
 
       for(j = 0; j < num_train; j++){
         const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
@@ -32745,7 +32745,7 @@ static int np_conditional_x_weight_block_pair_gnn_stream_core(
       full_rows_out[i][j] = kw[j]*zju;
     }
     {
-      const double den = NZD_POS(1.0 - full_rows_out[i][eval_idx]);
+      const double den = NZD(1.0 - full_rows_out[i][eval_idx]);
 
       for(j = 0; j < num_train; j++)
         loo_rows_out[i][j] =
