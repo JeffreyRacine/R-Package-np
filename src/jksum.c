@@ -15122,6 +15122,159 @@ cleanup_profile_cdf:
 }
 
 #ifdef MPI2
+#if NP_ACCEL_GAUSS_COMPILED
+static inline float64x2_t np_cvcdf_adaptive_weight_pair(
+  const double * const kwx,
+  const int64_t i,
+  const int64_t dwx,
+  const int64_t j_weight)
+{
+  float64x2_t weight = vdupq_n_f64(kwx[i*dwx + j_weight]);
+  return vsetq_lane_f64(kwx[(i + 1)*dwx + j_weight], weight, 1);
+}
+
+/*
+ * Process two rank-local observations per iteration on Apple ARM64.  Vector
+ * division retains the incumbent per-observation division, while the two
+ * scalar fma calls preserve rank-local observation and accumulation order.
+ */
+static double np_distribution_cvls_continuous_q123_neon(
+  const int q,
+  const int BANDWIDTH_den,
+  const int64_t j_eval,
+  const int64_t j_weight,
+  const int64_t is,
+  const int64_t ie,
+  const int64_t dwx,
+  const int64_t num_obs_train,
+  double * const * const matrix_X_continuous_train,
+  double * const * const matrix_X_continuous_eval,
+  const double mean_j,
+  const double ofac,
+  const double * const kwx,
+  double cv_accumulator)
+{
+  int64_t i;
+  const int64_t first_end = MIN(ie, j_eval - 1);
+  const int64_t second_start = MAX(is, j_eval + 1);
+  const double eval0 = matrix_X_continuous_eval[0][j_eval];
+  const double eval1 = (q >= 2) ? matrix_X_continuous_eval[1][j_eval] : 0.0;
+  const double eval2 = (q >= 3) ? matrix_X_continuous_eval[2][j_eval] : 0.0;
+  const double mean_scaled = mean_j/ofac;
+  const float64x2_t eval0v = vdupq_n_f64(eval0);
+  const float64x2_t eval1v = vdupq_n_f64(eval1);
+  const float64x2_t eval2v = vdupq_n_f64(eval2);
+  const float64x2_t meanv = vdupq_n_f64(mean_scaled);
+  const float64x2_t ofacv = vdupq_n_f64(ofac);
+  const uint64x2_t one_bits =
+    vreinterpretq_u64_f64(vdupq_n_f64(1.0));
+  const double * const train0 = matrix_X_continuous_train[0];
+  const double * const train1 =
+    (q >= 2) ? matrix_X_continuous_train[1] : NULL;
+  const double * const train2 =
+    (q >= 3) ? matrix_X_continuous_train[2] : NULL;
+
+#define NP_CVCDF_NEON_RANGE(START, END, MASK_EXPR, WEIGHT_EXPR,             \
+                            INDICATOR_EXPR, WEIGHT_SCALAR_EXPR) do {         \
+    const int64_t np_range_end = (END);                                     \
+    for(i = (START); i + 1 <= np_range_end; i += 2){                        \
+      const uint64x2_t indicator_mask = (MASK_EXPR);                        \
+      const float64x2_t indicator =                                         \
+        vreinterpretq_f64_u64(vandq_u64(indicator_mask, one_bits));         \
+      const float64x2_t weight = (WEIGHT_EXPR);                             \
+      const float64x2_t residual = vaddq_f64(                               \
+        vsubq_f64(indicator, meanv),                                        \
+        vdivq_f64(weight, ofacv));                                          \
+      const double residual0 = vgetq_lane_f64(residual, 0);                 \
+      const double residual1 = vgetq_lane_f64(residual, 1);                 \
+      cv_accumulator = fma(residual0, residual0, cv_accumulator);           \
+      cv_accumulator = fma(residual1, residual1, cv_accumulator);           \
+    }                                                                       \
+    if(i <= np_range_end){                                                   \
+      const double residual =                                               \
+        ((INDICATOR_EXPR) - mean_scaled + (WEIGHT_SCALAR_EXPR)/ofac);       \
+      cv_accumulator = fma(residual, residual, cv_accumulator);             \
+    }                                                                       \
+  } while(0)
+
+#define NP_CVCDF_NEON_TWO_RANGES(MASK_EXPR, WEIGHT_EXPR,                    \
+                                  INDICATOR_EXPR, WEIGHT_SCALAR_EXPR) do {   \
+    NP_CVCDF_NEON_RANGE(is, first_end, MASK_EXPR, WEIGHT_EXPR,              \
+                        INDICATOR_EXPR, WEIGHT_SCALAR_EXPR);                 \
+    NP_CVCDF_NEON_RANGE(second_start, ie, MASK_EXPR, WEIGHT_EXPR,           \
+                        INDICATOR_EXPR, WEIGHT_SCALAR_EXPR);                 \
+  } while(0)
+
+  if(BANDWIDTH_den != BW_ADAP_NN){
+    const double * const kwrow = kwx + j_weight*num_obs_train;
+    switch(q){
+      case 1:
+        NP_CVCDF_NEON_TWO_RANGES(
+          vcleq_f64(vld1q_f64(train0 + i), eval0v),
+          vld1q_f64(kwrow + i),
+          train0[i] <= eval0,
+          kwrow[i]);
+        break;
+      case 2:
+        NP_CVCDF_NEON_TWO_RANGES(
+          vandq_u64(vcleq_f64(vld1q_f64(train0 + i), eval0v),
+                    vcleq_f64(vld1q_f64(train1 + i), eval1v)),
+          vld1q_f64(kwrow + i),
+          (train0[i] <= eval0) && (train1[i] <= eval1),
+          kwrow[i]);
+        break;
+      default:
+        NP_CVCDF_NEON_TWO_RANGES(
+          vandq_u64(
+            vandq_u64(vcleq_f64(vld1q_f64(train0 + i), eval0v),
+                      vcleq_f64(vld1q_f64(train1 + i), eval1v)),
+            vcleq_f64(vld1q_f64(train2 + i), eval2v)),
+          vld1q_f64(kwrow + i),
+          (train0[i] <= eval0) &&
+          (train1[i] <= eval1) &&
+          (train2[i] <= eval2),
+          kwrow[i]);
+        break;
+    }
+  } else {
+    switch(q){
+      case 1:
+        NP_CVCDF_NEON_TWO_RANGES(
+          vcleq_f64(vld1q_f64(train0 + i), eval0v),
+          np_cvcdf_adaptive_weight_pair(kwx, i, dwx, j_weight),
+          train0[i] <= eval0,
+          kwx[i*dwx + j_weight]);
+        break;
+      case 2:
+        NP_CVCDF_NEON_TWO_RANGES(
+          vandq_u64(vcleq_f64(vld1q_f64(train0 + i), eval0v),
+                    vcleq_f64(vld1q_f64(train1 + i), eval1v)),
+          np_cvcdf_adaptive_weight_pair(kwx, i, dwx, j_weight),
+          (train0[i] <= eval0) && (train1[i] <= eval1),
+          kwx[i*dwx + j_weight]);
+        break;
+      default:
+        NP_CVCDF_NEON_TWO_RANGES(
+          vandq_u64(
+            vandq_u64(vcleq_f64(vld1q_f64(train0 + i), eval0v),
+                      vcleq_f64(vld1q_f64(train1 + i), eval1v)),
+            vcleq_f64(vld1q_f64(train2 + i), eval2v)),
+          np_cvcdf_adaptive_weight_pair(kwx, i, dwx, j_weight),
+          (train0[i] <= eval0) &&
+          (train1[i] <= eval1) &&
+          (train2[i] <= eval2),
+          kwx[i*dwx + j_weight]);
+        break;
+    }
+  }
+
+#undef NP_CVCDF_NEON_TWO_RANGES
+#undef NP_CVCDF_NEON_RANGE
+
+  return cv_accumulator;
+}
+#endif
+
 /*
  * Rank-local continuous-only CVCDF loss for the common q = 1..3 cases.
  *
@@ -15535,6 +15688,29 @@ double * cv){
       const int64_t je_local_eval = MIN(dwx - 1, js_local_eval + stride_local_eval - 1);
 
       if(use_continuous_q123){
+#if NP_ACCEL_GAUSS_COMPILED
+        if(num_reg_continuous >= 2){
+          for(j = js_local_eval; j <= je_local_eval; j++){
+            const int64_t j_global = wxo + j;
+            *cv = np_distribution_cvls_continuous_q123_neon(
+              num_reg_continuous,
+              BANDWIDTH_den,
+              j_global,
+              j,
+              0,
+              num_obs_train - 1,
+              dwx,
+              num_obs_train,
+              matrix_X_continuous_train,
+              matrix_X_continuous_eval,
+              mean[j],
+              ofac,
+              kwx,
+              *cv);
+          }
+        } else
+#endif
+        {
         for(j = js_local_eval; j <= je_local_eval; j++){
           const int64_t j_global = wxo + j;
           *cv = np_distribution_cvls_continuous_q123(
@@ -15552,6 +15728,7 @@ double * cv){
             ofac,
             kwx,
             *cv);
+          }
         }
       } else {
         for(j = js_local_eval; j <= je_local_eval; j++){
