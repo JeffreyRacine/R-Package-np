@@ -16,7 +16,7 @@ locate_dead_output_source <- function() {
 
 dead_output_body <- function(lines) {
   start <- grep(
-    "^static int np_conditional_density_cvls_lp_supertile2_stream\\(",
+    "^np_conditional_density_cvls_lp_supertile2_stream\\(",
     lines
   )
   stop <- grep("^int np_conditional_density_cvls_lp_stream\\(", lines)
