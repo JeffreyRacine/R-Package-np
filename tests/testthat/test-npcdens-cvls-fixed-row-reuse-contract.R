@@ -24,7 +24,7 @@ cvls_source_body <- function(lines, start_pattern, stop_pattern) {
   paste(lines[start:(stop - 1L)], collapse = "\n")
 }
 
-test_that("fixed and generalized-NN CVLS siblings preserve consumer order", {
+test_that("fixed CVLS derives LOO from its full row while generalized-NN preserves consumer order", {
   src_file <- locate_cvls_row_reuse_source()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
   lines <- readLines(src_file, warn = FALSE)
@@ -49,25 +49,37 @@ test_that("fixed and generalized-NN CVLS siblings preserve consumer order", {
     "matrix_bandwidth_eval_one[l][0] = matrix_bandwidth_x[l][i]",
     fixed = TRUE
   )
-  for (body in list(fixed_body, gnn_body)) {
+  for (body in list(fixed_body, gnn_body))
     expect_equal(lengths(regmatches(
       body,
       gregexpr("np_shadow_conditional_kernel_row_raw\\(", body, perl = TRUE)
     )), 1L)
 
-    markers <- c(
-      "self_weight = kw[eval_pos]",
-      "kw[eval_pos] = 0.0",
-      "np_glp_qr_drop_workspace_apply",
-      "kw[eval_pos] = self_weight",
-      "np_lp_full_row_workspace_solve"
-    )
-    positions <- vapply(markers, function(marker) {
-      regexpr(marker, body, fixed = TRUE)[[1L]]
-    }, integer(1L))
-    expect_true(all(positions > 0L))
-    expect_true(all(diff(positions) > 0L))
-  }
+  expect_false(grepl("np_glp_qr_drop_workspace_apply", fixed_body, fixed = TRUE))
+  expect_false(grepl("self_weight = kw[eval_pos]", fixed_body, fixed = TRUE))
+  fixed_markers <- c(
+    "np_lp_full_row_workspace_solve",
+    "den = NZD_POS(1.0 - full_rows_out[i][eval_idx])",
+    "loo_rows_out[i][orig_j] ="
+  )
+  fixed_positions <- vapply(fixed_markers, function(marker) {
+    regexpr(marker, fixed_body, fixed = TRUE)[[1L]]
+  }, integer(1L))
+  expect_true(all(fixed_positions > 0L))
+  expect_true(all(diff(fixed_positions) > 0L))
+
+  gnn_markers <- c(
+    "self_weight = kw[eval_pos]",
+    "kw[eval_pos] = 0.0",
+    "np_glp_qr_drop_workspace_apply",
+    "kw[eval_pos] = self_weight",
+    "np_lp_full_row_workspace_solve"
+  )
+  gnn_positions <- vapply(gnn_markers, function(marker) {
+    regexpr(marker, gnn_body, fixed = TRUE)[[1L]]
+  }, integer(1L))
+  expect_true(all(gnn_positions > 0L))
+  expect_true(all(diff(gnn_positions) > 0L))
 })
 
 test_that("CVLS row reuse selects scalar, fixed, and generalized-NN siblings centrally", {
