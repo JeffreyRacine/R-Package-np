@@ -1,4 +1,7 @@
-/* Fixed-row-resident accumulation for dense raw-basis regression CV. */
+/*
+ * Shared local-polynomial row utilities and fixed-row-resident regression
+ * accumulation kernels.
+ */
 
 #include <stddef.h>
 
@@ -9,6 +12,7 @@
 #define NP_LP_ROW3_NEON 0
 #endif
 
+#include "headers.h"
 #include "jksum_lp_row.h"
 
 static inline void np_lp_dense_support_add(const int row,
@@ -406,4 +410,27 @@ void np_lp_accumulate_dense_resident_row(const NPLPDenseRowContext *ctx)
   case 16: np_lp_accumulate_dense_row_16(ctx); return;
   default: np_lp_accumulate_dense_row_generic(ctx); return;
   }
+}
+
+int np_lp_delete_smoother_row(const double *full_row,
+                              const int n,
+                              const int eval_idx,
+                              double *loo_row)
+{
+  double den;
+  int j;
+
+  if((full_row == NULL) || (loo_row == NULL) ||
+     (n <= 0) || (eval_idx < 0) || (eval_idx >= n))
+    return 1;
+
+  /*
+   * Exact delete-one identity for a linear smoother with its bandwidth row
+   * held fixed. NZD retains the sign of every finite deletion denominator.
+   */
+  den = NZD(1.0 - full_row[eval_idx]);
+  for(j = 0; j < n; j++)
+    loo_row[j] = (j == eval_idx) ? 0.0 : full_row[j]/den;
+
+  return 0;
 }

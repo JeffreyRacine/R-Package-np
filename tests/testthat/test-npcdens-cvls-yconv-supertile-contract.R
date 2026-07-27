@@ -30,7 +30,7 @@ test_that("CVLS Y convolution supertile is memory bounded and topology isolated"
   lines <- readLines(src_file, warn = FALSE)
   body <- yconv_source_body(
     lines,
-    "^static int np_conditional_density_cvls_lp_supertile2_stream\\(",
+    "^np_conditional_density_cvls_lp_supertile2_stream\\(",
     "^int np_conditional_density_cvls_lp_stream\\("
   )
 
@@ -72,7 +72,7 @@ test_that("CVLS Y convolution supertile preserves per-block consumer order", {
   lines <- readLines(src_file, warn = FALSE)
   body <- yconv_source_body(
     lines,
-    "^static int np_conditional_density_cvls_lp_supertile2_stream\\(",
+    "^np_conditional_density_cvls_lp_supertile2_stream\\(",
     "^int np_conditional_density_cvls_lp_stream\\("
   )
 

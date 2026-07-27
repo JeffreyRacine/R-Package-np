@@ -25783,10 +25783,19 @@ static int np_conditional_density_cvls_lp_row_stream(double *vector_scale_factor
     double quad = 0.0;
 
     if(use_row_ctx){
-      if(np_conditional_xrow_from_ctx(&xctx, i, xrow) != 0)
-        goto cleanup_cvls_lp_stream;
-      if(np_conditional_xrow_full_from_ctx(&xctx, i, xrow_full) != 0)
-        goto cleanup_cvls_lp_stream;
+      if(np_lp_engine_extern == NP_LP_ENGINE_GENERAL){
+        if((np_conditional_xrow_full_from_ctx(&xctx, i, xrow_full) != 0) ||
+           (np_lp_delete_smoother_row(xrow_full,
+                                      num_obs,
+                                      i,
+                                      xrow) != 0))
+          goto cleanup_cvls_lp_stream;
+      } else {
+        if(np_conditional_xrow_from_ctx(&xctx, i, xrow) != 0)
+          goto cleanup_cvls_lp_stream;
+        if(np_conditional_xrow_full_from_ctx(&xctx, i, xrow_full) != 0)
+          goto cleanup_cvls_lp_stream;
+      }
       if(np_conditional_yrow_from_ctx(&yctx, i, yrow) != 0)
         goto cleanup_cvls_lp_stream;
     } else {
@@ -25876,10 +25885,21 @@ static int np_conditional_density_cvls_lp_adap_block_stream(double *vector_scale
 
     for(ii = 0; ii < ib; ii++){
       const int i = i0 + ii;
-      if(np_conditional_xrow_from_ctx(&xctx, i, xblock[ii]) != 0)
-        goto cleanup_cvls_lp_adap_block;
-      if(np_conditional_xrow_full_from_ctx(&xctx, i, xblock_full[ii]) != 0)
-        goto cleanup_cvls_lp_adap_block;
+      if(np_lp_engine_extern == NP_LP_ENGINE_GENERAL){
+        if((np_conditional_xrow_full_from_ctx(&xctx,
+                                              i,
+                                              xblock_full[ii]) != 0) ||
+           (np_lp_delete_smoother_row(xblock_full[ii],
+                                      num_obs,
+                                      i,
+                                      xblock[ii]) != 0))
+          goto cleanup_cvls_lp_adap_block;
+      } else {
+        if(np_conditional_xrow_from_ctx(&xctx, i, xblock[ii]) != 0)
+          goto cleanup_cvls_lp_adap_block;
+        if(np_conditional_xrow_full_from_ctx(&xctx, i, xblock_full[ii]) != 0)
+          goto cleanup_cvls_lp_adap_block;
+      }
       if(np_conditional_yrow_from_ctx(&yctx, i, yblock[ii]) != 0)
         goto cleanup_cvls_lp_adap_block;
     }
@@ -25937,7 +25957,14 @@ static int np_conditional_density_cvls_categorical_profile_stream(double *vector
  * the second block's LOO-X and full-X matrices.  Per-block accumulation order
  * and the final order of cv updates are unchanged.
  */
-static int np_conditional_density_cvls_lp_supertile2_stream(
+#if defined(__clang__) || defined(__GNUC__)
+# define NP_CDENS_SUPERTILE_ALIGN __attribute__((aligned(256)))
+#else
+# define NP_CDENS_SUPERTILE_ALIGN
+#endif
+
+static int NP_CDENS_SUPERTILE_ALIGN
+np_conditional_density_cvls_lp_supertile2_stream(
     double *vector_scale_factor,
     double *cv)
 {
@@ -26144,6 +26171,8 @@ cleanup_cvls_lp_supertile2:
   np_glp_cv_clear_extern();
   return status;
 }
+
+#undef NP_CDENS_SUPERTILE_ALIGN
 
 int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
                                           double *cv){
