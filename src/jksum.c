@@ -28351,8 +28351,9 @@ static double **np_optional_tmatd(const int nrows, const int ncols){
 }
 
 /*
- * Return 2 only when the optional second rank-owned slab is unavailable. The
- * public dispatcher then calls the isolated incumbent one-block microkernel.
+ * Return 2 only when no optional rank-owned slab is available on every rank.
+ * The public dispatcher then calls the isolated incumbent one-block
+ * microkernel.
  */
 static int np_conditional_distribution_cvls_lp_supertile(double *vector_scale_factor,
                                                          double *cv){
@@ -28360,17 +28361,26 @@ static int np_conditional_distribution_cvls_lp_supertile(double *vector_scale_fa
   const int num_eval = num_obs_eval_extern;
   const int block_size = MIN(np_conditional_lp_cvls_block_size(num_train), MAX(1, num_train));
   const int nblocks = (num_train + block_size - 1)/block_size;
-  double **xblock = NULL, **xblock_second = NULL, **yintblock = NULL;
+  double **xblocks[4] = {NULL, NULL, NULL, NULL};
+  double **yintblock = NULL;
   double *fit_cross = NULL;
   double *block_terms = NULL;
-  int j0, ii, jj;
+  int j0, ii, jj, g;
+  int group_width = 2;
+  int local_group_width = 1;
   int status = 1;
   int local_fail = 0;
 #ifdef MPI2
   const int use_parallel_blocks = (iNum_Processors > 1) && !np_mpi_local_regression_active();
+  const int owned_stride = use_parallel_blocks ? iNum_Processors : 1;
 #else
   const int use_parallel_blocks = 0;
+  const int owned_stride = 1;
 #endif
+  const int requested_group_width =
+    MIN(4,
+        (nblocks / owned_stride) +
+        ((nblocks % owned_stride) != 0));
 
   if((cv == NULL) || (vector_scale_factor == NULL) || (num_train <= 0) || (num_eval <= 0))
     return 1;
@@ -28400,67 +28410,96 @@ static int np_conditional_distribution_cvls_lp_supertile(double *vector_scale_fa
      (BANDWIDTH_den_extern != BW_FIXED))
     return np_conditional_distribution_cvls_lp_row_stream(vector_scale_factor, cv);
 
-  xblock = alloc_tmatd(num_train, block_size);
+  xblocks[0] = alloc_tmatd(num_train, block_size);
   yintblock = alloc_tmatd(num_train, block_size);
   fit_cross = alloc_vecd(block_size*block_size);
   if(use_parallel_blocks)
     block_terms = (double *)calloc((size_t)nblocks, sizeof(double));
-  if((xblock == NULL) || (yintblock == NULL) || (fit_cross == NULL) ||
+  if((xblocks[0] == NULL) || (yintblock == NULL) || (fit_cross == NULL) ||
      (use_parallel_blocks && (block_terms == NULL)))
     goto cleanup_cdist_lp_block;
 
   /*
-   * A Y-integral tile is independent of the X evaluation block. Retain two
-   * rank-owned X blocks when the bounded extra slab is available, then use
-   * the same Y tile in two unchanged B-by-B GEMMs. MPI ownership remains
+   * A Y-integral tile is independent of the X evaluation block. Retain up to
+   * four rank-owned X blocks while bounded optional slabs are available, then
+   * use the same Y tile in unchanged B-by-B GEMMs. MPI ownership remains
    * block_id modulo processor count; separate block sums retain the incumbent
-   * final ascending block reduction. Allocation failure retains the original
-   * one-X-block traversal independently on each rank.
+   * final ascending block reduction. All ranks agree on the widest available
+   * group before entering the block loop, so an asymmetric allocation failure
+   * cannot create divergent MPI traversal.
    */
-  xblock_second = np_optional_tmatd(num_train, block_size);
-  if(xblock_second == NULL){
+  xblocks[1] = np_optional_tmatd(num_train, block_size);
+  if(xblocks[1] != NULL){
+    local_group_width = 2;
+    if(requested_group_width >= 3){
+      xblocks[2] = np_optional_tmatd(num_train, block_size);
+      if(xblocks[2] != NULL){
+        local_group_width = 3;
+        if(requested_group_width >= 4){
+          xblocks[3] = np_optional_tmatd(num_train, block_size);
+          if(xblocks[3] != NULL)
+            local_group_width = 4;
+        }
+      }
+    }
+  }
+
+#ifdef MPI2
+  if(use_parallel_blocks)
+    MPI_Allreduce(&local_group_width,
+                  &group_width,
+                  1,
+                  MPI_INT,
+                  MPI_MIN,
+                  comm[1]);
+  else
+#endif
+    group_width = local_group_width;
+
+  if(group_width < 2){
     status = 2;
     goto cleanup_cdist_lp_block;
+  }
+  for(g = group_width; g < 4; g++){
+    if(xblocks[g] != NULL){
+      free_tmat(xblocks[g]);
+      xblocks[g] = NULL;
+    }
   }
 
   *cv = 0.0;
   {
-    const int owned_stride = use_parallel_blocks ? iNum_Processors : 1;
     const int first_owned_block = use_parallel_blocks ? my_rank : 0;
-    const int block_step = 2*owned_stride;
+    const int block_step = group_width*owned_stride;
     int first_block;
 
     for(first_block = first_owned_block;
         first_block < nblocks && !local_fail;
         first_block += block_step){
-      const int second_block = first_block + owned_stride;
-      const int first_start = first_block*block_size;
-      const int second_start = second_block*block_size;
-      const int ib_first = MIN(block_size, num_train - first_start);
-      const int ib_second = (second_block < nblocks) ?
-        MIN(block_size, num_train - second_start) : 0;
-      double block_sum_first = 0.0;
-      double block_sum_second = 0.0;
+      int block_id[4] = {0, 0, 0, 0};
+      int block_start[4] = {0, 0, 0, 0};
+      int block_rows[4] = {0, 0, 0, 0};
+      double block_sum[4] = {0.0, 0.0, 0.0, 0.0};
 
-      if(np_conditional_x_weight_block_stream_core_suppress(
-           vector_scale_factor,
-           first_start,
-           ib_first,
-           use_parallel_blocks,
-           xblock) != 0){
-        local_fail = 1;
-        break;
+      for(g = 0; g < group_width; g++){
+        block_id[g] = first_block + g*owned_stride;
+        if(block_id[g] < nblocks){
+          block_start[g] = block_id[g]*block_size;
+          block_rows[g] =
+            MIN(block_size, num_train - block_start[g]);
+          if(np_conditional_x_weight_block_stream_core_suppress(
+               vector_scale_factor,
+               block_start[g],
+               block_rows[g],
+               use_parallel_blocks,
+               xblocks[g]) != 0){
+            local_fail = 1;
+            break;
+          }
+        }
       }
-      if((ib_second > 0) &&
-         (np_conditional_x_weight_block_stream_core_suppress(
-            vector_scale_factor,
-            second_start,
-            ib_second,
-            use_parallel_blocks,
-            xblock_second) != 0)){
-        local_fail = 1;
+      if(local_fail)
         break;
-      }
 
       for(j0 = 0; j0 < num_eval; j0 += block_size){
         const int jb = MIN(block_size, num_eval - j0);
@@ -28480,50 +28519,19 @@ static int np_conditional_distribution_cvls_lp_supertile(double *vector_scale_fa
           break;
         }
 
-        np_blas_dgemm_tn_int(ib_first,
-                             jb,
-                             num_train,
-                             xblock[0],
-                             yintblock[0],
-                             fit_cross);
-        for(ii = 0; ii < ib_first; ii++){
-          const int train_i = first_start + ii;
+        for(g = 0; g < group_width; g++){
+          const int ib = block_rows[g];
 
-          for(jj = 0; jj < jb; jj++){
-            const int eval_j = j0 + jj;
-            double fit;
-            int indy;
-
-            if(cdfontrain_extern && (train_i == eval_j))
-              continue;
-
-            fit = fit_cross[ii + jj*ib_first];
-            indy = np_conditional_indicator_row_core(
-              train_i,
-              eval_j,
-              cdfontrain_extern,
-              matrix_Y_ordered_train_extern,
-              matrix_Y_continuous_train_extern,
-              matrix_Y_ordered_eval_extern,
-              matrix_Y_continuous_eval_extern,
-              num_var_ordered_extern,
-              num_var_continuous_extern);
-            {
-              const double tvd = ((double)indy) - fit;
-              block_sum_first += tvd*tvd;
-            }
-          }
-        }
-
-        if(ib_second > 0){
-          np_blas_dgemm_tn_int(ib_second,
+          if(ib <= 0)
+            continue;
+          np_blas_dgemm_tn_int(ib,
                                jb,
                                num_train,
-                               xblock_second[0],
+                               xblocks[g][0],
                                yintblock[0],
                                fit_cross);
-          for(ii = 0; ii < ib_second; ii++){
-            const int train_i = second_start + ii;
+          for(ii = 0; ii < ib; ii++){
+            const int train_i = block_start[g] + ii;
 
             for(jj = 0; jj < jb; jj++){
               const int eval_j = j0 + jj;
@@ -28533,7 +28541,7 @@ static int np_conditional_distribution_cvls_lp_supertile(double *vector_scale_fa
               if(cdfontrain_extern && (train_i == eval_j))
                 continue;
 
-              fit = fit_cross[ii + jj*ib_second];
+              fit = fit_cross[ii + jj*ib];
               indy = np_conditional_indicator_row_core(
                 train_i,
                 eval_j,
@@ -28546,7 +28554,7 @@ static int np_conditional_distribution_cvls_lp_supertile(double *vector_scale_fa
                 num_var_continuous_extern);
               {
                 const double tvd = ((double)indy) - fit;
-                block_sum_second += tvd*tvd;
+                block_sum[g] += tvd*tvd;
               }
             }
           }
@@ -28554,13 +28562,13 @@ static int np_conditional_distribution_cvls_lp_supertile(double *vector_scale_fa
       }
 
       if(use_parallel_blocks){
-        block_terms[first_block] = block_sum_first;
-        if(ib_second > 0)
-          block_terms[second_block] = block_sum_second;
+        for(g = 0; g < group_width; g++)
+          if(block_rows[g] > 0)
+            block_terms[block_id[g]] = block_sum[g];
       } else {
-        *cv += block_sum_first;
-        if(ib_second > 0)
-          *cv += block_sum_second;
+        for(g = 0; g < group_width; g++)
+          if(block_rows[g] > 0)
+            *cv += block_sum[g];
       }
     }
   }
@@ -28587,8 +28595,8 @@ static int np_conditional_distribution_cvls_lp_supertile(double *vector_scale_fa
   status = 0;
 
 cleanup_cdist_lp_block:
-  if(xblock != NULL) free_tmat(xblock);
-  if(xblock_second != NULL) free_tmat(xblock_second);
+  for(g = 0; g < 4; g++)
+    if(xblocks[g] != NULL) free_tmat(xblocks[g]);
   if(yintblock != NULL) free_tmat(yintblock);
   if(fit_cross != NULL) free(fit_cross);
   if(block_terms != NULL) free(block_terms);
@@ -28600,7 +28608,7 @@ cleanup_cdist_lp_block:
 /*
  * Incumbent one-block microkernel. Keep it out of line and branch-free so
  * boundary, adaptive, tree-fallback, and allocation-fallback routes do not
- * pay for the optional rank-owned two-block acceleration.
+ * pay for the optional rank-owned grouped acceleration.
  */
 #if defined(__clang__) || defined(__GNUC__)
 # define NP_CDIST_ONEBLOCK_ALIGN __attribute__((aligned(256)))
