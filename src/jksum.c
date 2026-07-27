@@ -26632,9 +26632,15 @@ static int np_conditional_distribution_cvls_lp_block_supertile(double *vector_sc
   const int num_train = num_obs_train_extern;
   const int num_eval = num_obs_eval_extern;
   const int block_size = MIN(np_conditional_lp_cvls_block_size(num_train), MAX(1, num_train));
-  double **xblock = NULL, **xblock_second = NULL, **yintblock = NULL;
+  double **xblocks[4] = {NULL, NULL, NULL, NULL};
+  double **yintblock = NULL;
   double *fit_cross = NULL;
-  int i0, j0, ii, jj;
+  const int requested_group_width =
+    MIN(4,
+        (num_train / block_size) +
+        ((num_train % block_size) != 0));
+  int i0, j0, ii, jj, g;
+  int group_width = 2;
   int status = 1;
 
   if((cv == NULL) || (vector_scale_factor == NULL) || (num_train <= 0) || (num_eval <= 0))
@@ -26651,44 +26657,59 @@ static int np_conditional_distribution_cvls_lp_block_supertile(double *vector_sc
      (BANDWIDTH_den_extern != BW_FIXED))
     return np_conditional_distribution_cvls_lp_row_stream(vector_scale_factor, cv);
 
-  xblock = alloc_tmatd(num_train, block_size);
+  xblocks[0] = alloc_tmatd(num_train, block_size);
   yintblock = alloc_tmatd(num_train, block_size);
   fit_cross = alloc_vecd(block_size*block_size);
-  if((xblock == NULL) || (yintblock == NULL) || (fit_cross == NULL))
+  if((xblocks[0] == NULL) || (yintblock == NULL) || (fit_cross == NULL))
     goto cleanup_cdist_lp_block;
 
   /*
    * A Y-integral tile is independent of the X evaluation row. Retain two
-   * adjacent X blocks when the bounded extra slab is available, then use the
-   * same Y tile in two unchanged B-by-B GEMMs. Separate block sums preserve
-   * the incumbent within-block and final cv accumulation order. Allocation
-   * failure retains the original single-X-block traversal.
+   * adjacent X blocks when the first bounded extra slab is available and
+   * retain further adjacent blocks while two more bounded slabs are
+   * available. The same Y tile then feeds two, three, or four unchanged
+   * B-by-B GEMMs. Separate block sums
+   * preserve the incumbent within-block and final cv accumulation order.
+   * Allocation failure of the first optional slab retains the original
+   * single-X-block traversal; later failures retain the widest available
+   * two- or three-block traversal. Do not allocate slabs beyond the number
+   * of X blocks present.
    */
-  xblock_second = np_optional_tmatd(num_train, block_size);
-  if(xblock_second == NULL){
+  xblocks[1] = np_optional_tmatd(num_train, block_size);
+  if(xblocks[1] == NULL){
     status = 2;
     goto cleanup_cdist_lp_block;
   }
+  if(requested_group_width >= 3){
+    xblocks[2] = np_optional_tmatd(num_train, block_size);
+    if(xblocks[2] != NULL){
+      group_width = 3;
+      if(requested_group_width >= 4){
+        xblocks[3] = np_optional_tmatd(num_train, block_size);
+        if(xblocks[3] != NULL)
+          group_width = 4;
+      }
+    }
+  }
 
   *cv = 0.0;
-  for(i0 = 0; i0 < num_train; i0 += 2*block_size){
-    const int ib_first = MIN(block_size, num_train - i0);
-    const int second_start = i0 + ib_first;
-    const int ib_second = MIN(block_size, MAX(0, num_train - second_start));
-    double block_sum_first = 0.0;
-    double block_sum_second = 0.0;
+  for(i0 = 0; i0 < num_train; i0 += group_width*block_size){
+    int block_start[4] = {
+      i0, i0 + block_size, i0 + 2*block_size, i0 + 3*block_size
+    };
+    int block_rows[4] = {0, 0, 0, 0};
+    double block_sum[4] = {0.0, 0.0, 0.0, 0.0};
 
-    if(np_conditional_x_weight_block_stream_core(vector_scale_factor,
-                                                 i0,
-                                                 ib_first,
-                                                 xblock) != 0)
-      goto cleanup_cdist_lp_block;
-    if((ib_second > 0) &&
-       (np_conditional_x_weight_block_stream_core(vector_scale_factor,
-                                                  second_start,
-                                                  ib_second,
-                                                  xblock_second) != 0))
-      goto cleanup_cdist_lp_block;
+    for(g = 0; g < group_width; g++){
+      block_rows[g] =
+        MIN(block_size, MAX(0, num_train - block_start[g]));
+      if((block_rows[g] > 0) &&
+         (np_conditional_x_weight_block_stream_core(vector_scale_factor,
+                                                    block_start[g],
+                                                    block_rows[g],
+                                                    xblocks[g]) != 0))
+        goto cleanup_cdist_lp_block;
+    }
 
     for(j0 = 0; j0 < num_eval; j0 += block_size){
       const int jb = MIN(block_size, num_eval - j0);
@@ -26704,49 +26725,19 @@ static int np_conditional_distribution_cvls_lp_block_supertile(double *vector_sc
                                                     yintblock) != 0)
         goto cleanup_cdist_lp_block;
 
-      np_blas_dgemm_tn_int(ib_first,
-                           jb,
-                           num_train,
-                           xblock[0],
-                           yintblock[0],
-                           fit_cross);
-      for(ii = 0; ii < ib_first; ii++){
-        const int train_i = i0 + ii;
+      for(g = 0; g < group_width; g++){
+        const int ib = block_rows[g];
 
-        for(jj = 0; jj < jb; jj++){
-          const int eval_j = j0 + jj;
-          double fit;
-          int indy;
-
-          if(cdfontrain_extern && (train_i == eval_j))
-            continue;
-
-          fit = fit_cross[ii + jj*ib_first];
-          indy = np_conditional_indicator_row_core(train_i,
-                                                   eval_j,
-                                                   cdfontrain_extern,
-                                                   matrix_Y_ordered_train_extern,
-                                                   matrix_Y_continuous_train_extern,
-                                                   matrix_Y_ordered_eval_extern,
-                                                   matrix_Y_continuous_eval_extern,
-                                                   num_var_ordered_extern,
-                                                   num_var_continuous_extern);
-          {
-            const double tvd = ((double)indy) - fit;
-            block_sum_first += tvd*tvd;
-          }
-        }
-      }
-
-      if(ib_second > 0){
-        np_blas_dgemm_tn_int(ib_second,
+        if(ib <= 0)
+          continue;
+        np_blas_dgemm_tn_int(ib,
                              jb,
                              num_train,
-                             xblock_second[0],
+                             xblocks[g][0],
                              yintblock[0],
                              fit_cross);
-        for(ii = 0; ii < ib_second; ii++){
-          const int train_i = second_start + ii;
+        for(ii = 0; ii < ib; ii++){
+          const int train_i = block_start[g] + ii;
 
           for(jj = 0; jj < jb; jj++){
             const int eval_j = j0 + jj;
@@ -26756,7 +26747,7 @@ static int np_conditional_distribution_cvls_lp_block_supertile(double *vector_sc
             if(cdfontrain_extern && (train_i == eval_j))
               continue;
 
-            fit = fit_cross[ii + jj*ib_second];
+            fit = fit_cross[ii + jj*ib];
             indy = np_conditional_indicator_row_core(train_i,
                                                      eval_j,
                                                      cdfontrain_extern,
@@ -26768,24 +26759,24 @@ static int np_conditional_distribution_cvls_lp_block_supertile(double *vector_sc
                                                      num_var_continuous_extern);
             {
               const double tvd = ((double)indy) - fit;
-              block_sum_second += tvd*tvd;
+              block_sum[g] += tvd*tvd;
             }
           }
         }
       }
     }
 
-    *cv += block_sum_first;
-    if(ib_second > 0)
-      *cv += block_sum_second;
+    for(g = 0; g < group_width; g++)
+      if(block_rows[g] > 0)
+        *cv += block_sum[g];
   }
 
   *cv /= ((double)num_train*(double)MAX(1, num_eval));
   status = 0;
 
 cleanup_cdist_lp_block:
-  if(xblock != NULL) free_tmat(xblock);
-  if(xblock_second != NULL) free_tmat(xblock_second);
+  for(g = 0; g < 4; g++)
+    if(xblocks[g] != NULL) free_tmat(xblocks[g]);
   if(yintblock != NULL) free_tmat(yintblock);
   if(fit_cross != NULL) free(fit_cross);
   if(status != 2)
