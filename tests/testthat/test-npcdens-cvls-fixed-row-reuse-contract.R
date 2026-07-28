@@ -31,12 +31,12 @@ test_that("fixed and generalized-NN CVLS derive LOO from their full rows", {
 
   fixed_body <- cvls_source_body(
     lines,
-    "^static int np_conditional_x_weight_block_pair_stream_core\\(",
-    "^static int (NP_NOINLINE )?np_conditional_x_weight_block_pair_gnn_stream_core\\("
+    "^static int (NP_NOINLINE )?np_conditional_x_weight_block_pair_stream_core\\(",
+    "^static int (NP_NOINLINE )?(NP_HOT_ALIGN )?np_conditional_x_weight_block_pair_gnn_stream_core\\("
   )
   gnn_body <- cvls_source_body(
     lines,
-    "^static int (NP_NOINLINE )?np_conditional_x_weight_block_pair_gnn_stream_core\\(",
+    "^static int (NP_NOINLINE )?(NP_HOT_ALIGN )?np_conditional_x_weight_block_pair_gnn_stream_core\\(",
     "^static int np_conditional_y_block_stream_op_core\\("
   )
 

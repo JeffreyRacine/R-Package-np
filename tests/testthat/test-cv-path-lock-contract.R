@@ -427,7 +427,7 @@ test_that("fixed conditional LP paired rows reuse the canonical full-row workspa
 
   lines <- readLines(src_file, warn = FALSE)
   helper_start <- grep(
-    "^static int np_conditional_x_weight_block_pair_stream_core\\(",
+    "^static int (NP_NOINLINE )?np_conditional_x_weight_block_pair_stream_core\\(",
     lines
   )
   helper_stop <- grep(
