@@ -5857,8 +5857,8 @@ static int NP_NOINLINE np_accel_gauss_adaptive_row_try(
 }
 
 /*
-  Form a fixed-bandwidth product of ordinary Gaussian kernels with one vector
-  exponential:
+  Form an ordinary-Gaussian product with scalar bandwidths per dimension and
+  one vector exponential:
 
     prod_d c*exp(-u_d^2/2) = c^ndim*exp(-sum_d u_d^2/2).
 
@@ -8863,7 +8863,8 @@ const int keep_kw_owner_local){
 
 #if NP_ACCEL_GAUSS_COMPILED
   if(lean_reg_cont_loop &&
-     ((BANDWIDTH_reg == BW_FIXED) || (BANDWIDTH_reg == BW_GEN_NN)) &&
+     ((BANDWIDTH_reg == BW_FIXED) || (BANDWIDTH_reg == BW_GEN_NN) ||
+      (BANDWIDTH_reg == BW_ADAP_NN)) &&
      (num_reg_continuous >= 2) &&
      (num_xt >= 256) &&
      (pxl == NULL) &&
