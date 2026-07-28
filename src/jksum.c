@@ -403,6 +403,7 @@ static double np_blas_ddot_i64(const int64_t n, const double *x, const double *y
 #define NP_GLP_DGEMV_MIN_ROWS 4096
 #define NP_GLP_DGEMV_MIN_TERMS 20
 #define NP_CONDITIONAL_X_WEIGHTED_BLAS_MIN_ROWS 2048
+#define NP_ADAPTIVE_HIGHER_GAUSS_MIN_ROWS 1
 #define NP_CONDITIONAL_X_WEIGHTED_BLAS_MAX_BYTES \
   ((size_t)64*(size_t)1024*(size_t)1024)
 #define NP_REG_ALLLARGE_BLAS_MIN_ROWS 2048
@@ -5901,6 +5902,112 @@ static NP_ALWAYS_INLINE void np_accel_gauss_polynomial_vector(
       break;
     }
   }
+}
+
+/*
+  Form one complete adaptive-NN higher-order Gaussian row:
+
+    prod_d phi((x_d-X_di)/h_di) P_d(((x_d-X_di)/h_di)^2)
+
+  and, when requested, divide lane i by prod_d h_di.  The signed polynomial
+  product remains separate from the nonnegative common exponential until the
+  final multiplication.  Callers retain the scalar kernel engine as an
+  independent fallback.
+*/
+static int NP_NOINLINE np_accel_gauss_adaptive_higher_row_try(
+  const int * const kernel_c,
+  const int * const operator,
+  double * const * const train,
+  double * const * const eval_one,
+  double * const * const bandwidth,
+  const int ndim,
+  const int n,
+  const int divide_by_bandwidth_product,
+  double * const out)
+{
+  const double minus_one = -1.0;
+  const double minus_half = -0.5;
+  const double zero = 0.0;
+  const int ni = n;
+  double coefficient = 1.0;
+
+  if((!np_mseries_accelerate_enabled_cache) ||
+     (kernel_c == NULL) || (operator == NULL) ||
+     (train == NULL) || (eval_one == NULL) || (bandwidth == NULL) ||
+     (out == NULL) || (ndim < 2) ||
+     (n < NP_ADAPTIVE_HIGHER_GAUSS_MIN_ROWS) ||
+     (!np_accel_gauss_resolve()) ||
+     (!np_accel_gauss_scratch_ensure(n)))
+    return 0;
+
+  /*
+   * Validate every input row before writing the caller-owned output.  A late
+   * non-finite result zeros the row before scalar fallback.
+   */
+  for(int d = 0; d < ndim; d++){
+    if((kernel_c[d] < 1) || (kernel_c[d] > 3) ||
+       (operator[d] != OP_NORMAL) ||
+       (train[d] == NULL) || (eval_one[d] == NULL) ||
+       (bandwidth[d] == NULL))
+      return 0;
+    coefficient *= ONE_OVER_SQRT_TWO_PI;
+  }
+
+  for(int d = 0; d < ndim; d++){
+    const double x = eval_one[d][0];
+
+    np_accel_vsmsaD(train[d], 1, &minus_one, &x,
+                    np_accel_gauss_tmp, 1, (np_vDSP_Length)n);
+    np_accel_vdivD(bandwidth[d], 1, np_accel_gauss_tmp, 1,
+                   np_accel_gauss_val, 1, (np_vDSP_Length)n);
+    np_accel_vsqD(np_accel_gauss_val, 1,
+                  np_accel_gauss_tmp, 1, (np_vDSP_Length)n);
+
+    if(d == 0){
+      memcpy(np_accel_gauss_arg, np_accel_gauss_tmp,
+             (size_t)n*sizeof(double));
+      if(divide_by_bandwidth_product)
+        memcpy(np_accel_gauss_poly, bandwidth[d],
+               (size_t)n*sizeof(double));
+    } else {
+      np_accel_vaddD(np_accel_gauss_arg, 1, np_accel_gauss_tmp, 1,
+                     np_accel_gauss_arg, 1, (np_vDSP_Length)n);
+      if(divide_by_bandwidth_product)
+        np_accel_vmulD(np_accel_gauss_poly, 1, bandwidth[d], 1,
+                       np_accel_gauss_poly, 1, (np_vDSP_Length)n);
+    }
+
+    np_accel_gauss_polynomial_vector(
+      kernel_c[d], np_accel_gauss_tmp, n, np_accel_gauss_work);
+    if(d == 0)
+      memcpy(out, np_accel_gauss_work, (size_t)n*sizeof(double));
+    else
+      np_accel_vmulD(out, 1, np_accel_gauss_work, 1,
+                     out, 1, (np_vDSP_Length)n);
+  }
+
+  np_accel_vsmsaD(np_accel_gauss_arg, 1, &minus_half, &zero,
+                  np_accel_gauss_arg, 1, (np_vDSP_Length)n);
+  np_accel_vvexp(np_accel_gauss_tmp, np_accel_gauss_arg, &ni);
+  np_accel_vmulD(out, 1, np_accel_gauss_tmp, 1,
+                 out, 1, (np_vDSP_Length)n);
+  np_accel_vsmulD(out, 1, &coefficient,
+                  out, 1, (np_vDSP_Length)n);
+
+  if(divide_by_bandwidth_product){
+    np_accel_vdivD(np_accel_gauss_poly, 1, out, 1,
+                   np_accel_gauss_val, 1, (np_vDSP_Length)n);
+    memcpy(out, np_accel_gauss_val, (size_t)n*sizeof(double));
+  }
+
+  for(int i = 0; i < n; i++){
+    if(!isfinite(out[i])){
+      memset(out, 0, (size_t)n*sizeof(double));
+      return 0;
+    }
+  }
+
+  return 1;
 }
 
 /*
@@ -22421,6 +22528,23 @@ static int NP_NOINLINE NP_HOT_ALIGN np_conditional_xrow_from_ctx_impl(
                                     num_train,
                                     0,
                                     ctx->kw);
+  if(!adaptive_gaussian_row &&
+     (BANDWIDTH_den_extern == BW_ADAP_NN) &&
+     (num_reg_unordered_extern == 0) &&
+     (num_reg_ordered_extern == 0) &&
+     (!int_cxker_bound_extern) &&
+     (int_TREE_X != NP_TREE_TRUE))
+    adaptive_gaussian_row =
+      np_accel_gauss_adaptive_higher_row_try(
+        ctx->kernel_cx,
+        ctx->x_operator,
+        matrix_X_continuous_train_extern,
+        ctx->eval_xcon_one,
+        ctx->matrix_bandwidth_x,
+        num_reg_continuous_extern,
+        num_train,
+        0,
+        ctx->kw);
 #endif
   if(!adaptive_gaussian_row &&
      np_shadow_conditional_kernel_row_raw(ctx->kernel_cx,
