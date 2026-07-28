@@ -25,7 +25,7 @@ xrow_weighted_blas_source_body <- function(lines, start_pattern, stop_pattern) {
   paste(lines[start:(stop - 1L)], collapse = "\n")
 }
 
-test_that("MPI fixed CVLS weighted BLAS gate is narrow and memory bounded", {
+test_that("MPI conditional CVLS weighted BLAS gate is narrow and memory bounded", {
   src_file <- locate_xrow_weighted_blas_source()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
   lines <- readLines(src_file, warn = FALSE)
@@ -149,7 +149,7 @@ test_that("MPI fixed CVLS weighted BLAS preserves signed row algebra and fallbac
   )
 })
 
-test_that("MPI weighted BLAS remains isolated from NN and selector topology", {
+test_that("MPI generalized-NN CVLS reuses rank-local weighted BLAS", {
   src_file <- locate_xrow_weighted_blas_source()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
   lines <- readLines(src_file, warn = FALSE)
@@ -168,13 +168,60 @@ test_that("MPI weighted BLAS remains isolated from NN and selector topology", {
     lines[gnn_start:(gnn_stop - 1L)],
     collapse = "\n"
   )
+  compact <- gsub("[[:space:]]+", " ", gnn_body)
 
-  expect_false(grepl("weighted_design", gnn_body, fixed = TRUE))
-  expect_false(grepl(
-    "np_conditional_x_weighted_blas_profitable",
+  expect_match(gnn_body, "BANDWIDTH_den_extern != BW_GEN_NN", fixed = TRUE)
+  expect_match(gnn_body, "suppress_nn_parallel", fixed = TRUE)
+  expect_false(grepl("MPI_", gnn_body, fixed = TRUE))
+  expect_match(
     gnn_body,
+    "np_conditional_x_weighted_blas_profitable",
     fixed = TRUE
-  ))
+  )
+  expect_match(
+    compact,
+    "weighted_design = (double *)malloc(weighted_count*sizeof(double));",
+    fixed = TRUE
+  )
+  expect_match(
+    gnn_body,
+    "use_weighted_blas = (weighted_design != NULL);",
+    fixed = TRUE
+  )
+  expect_match(
+    gnn_body,
+    "weighted_row[j] = basis_row[j]*kw[j];",
+    fixed = TRUE
+  )
+  expect_match(gnn_body, "F77_CALL(dgemm)", fixed = TRUE)
+  expect_match(gnn_body, "F77_CALL(dgemv)", fixed = TRUE)
+  expect_match(
+    gnn_body,
+    "full_rows_out[i][j] = kw[j]*mean_row[j];",
+    fixed = TRUE
+  )
+  expect_match(
+    gnn_body,
+    "den = NZD(1.0 - full_rows_out[i][eval_idx])",
+    fixed = TRUE
+  )
+  expect_match(
+    gnn_body,
+    "if(weighted_design != NULL) free(weighted_design);",
+    fixed = TRUE
+  )
+  expect_false(grepl("num_train\\*num_train", gnn_body))
+  expect_match(
+    compact,
+    "} else { for(l = 0; l < k; l++) for(j = 0; j < k; j++) full_row_workspace.gram[l + j*k] = 0.0;",
+    fixed = TRUE
+  )
+  expect_match(
+    compact,
+    "} else { for(j = 0; j < num_train; j++){ double zju = 0.0;",
+    fixed = TRUE
+  )
+
   expect_match(
     all_source,
     "static int NP_NOINLINE NP_HOT_ALIGN np_conditional_x_weight_block_pair_gnn_stream_core(",
