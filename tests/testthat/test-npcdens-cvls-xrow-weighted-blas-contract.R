@@ -235,6 +235,57 @@ test_that("generalized-NN CVLS reuses signed weighted BLAS with scalar fallback"
   )
 })
 
+test_that("shared conditional full-row blocks reuse bounded weighted BLAS", {
+  src_file <- locate_xrow_weighted_blas_source()
+  skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
+  lines <- readLines(src_file, warn = FALSE)
+  body <- xrow_weighted_blas_source_body(
+    lines,
+    "^static int np_conditional_x_weight_block_stream_core_impl\\(",
+    "^static int np_conditional_x_weight_block_stream_core\\("
+  )
+  compact <- gsub("[[:space:]]+", " ", body)
+
+  expect_match(
+    body,
+    "np_conditional_x_weighted_blas_profitable(",
+    fixed = TRUE
+  )
+  expect_match(
+    compact,
+    "weighted_design = (double *)malloc(weighted_count*sizeof(double));",
+    fixed = TRUE
+  )
+  expect_match(body, "use_weighted_blas = (weighted_design != NULL);", fixed = TRUE)
+  expect_match(body, "weighted_row[j] = basis_row[j]*kw[j];", fixed = TRUE)
+  expect_match(body, "F77_CALL(dgemm)", fixed = TRUE)
+  expect_match(body, "F77_CALL(dgemv)", fixed = TRUE)
+  expect_match(body, "rows_out[i][orig_j] = kw[j]*mean_row[j];", fixed = TRUE)
+  expect_match(body, "if(weighted_design != NULL) free(weighted_design);", fixed = TRUE)
+  expect_false(grepl("num_train\\*num_train", body))
+
+  expect_match(
+    compact,
+    "if(use_weighted_blas){ const char trans_t",
+    fixed = TRUE
+  )
+  expect_match(
+    compact,
+    "} else { for(l = 0; l < k; l++) for(j = 0; j < k; j++) full_row_workspace.gram[l + j*k] = 0.0;",
+    fixed = TRUE
+  )
+  expect_match(
+    compact,
+    "} else { for(j = 0; j < num_train; j++){ double zju = 0.0;",
+    fixed = TRUE
+  )
+  expect_match(
+    body,
+    "np_lp_delete_denominator(rows_out[i][eval_idx], &den)",
+    fixed = TRUE
+  )
+})
+
 test_that("weighted BLAS remains isolated from adjacent conditional routes", {
   src_file <- locate_xrow_weighted_blas_source()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
