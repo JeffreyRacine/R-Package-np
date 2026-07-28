@@ -21081,6 +21081,7 @@ typedef struct {
   double *lambdax;
   double *kw;
   double *mean_row;
+  double *weighted_design;
   double **matrix_bandwidth_x;
   double **matrix_bandwidth_eval_one;
   double **eval_xuno_one;
@@ -21114,6 +21115,7 @@ static void np_conditional_xrow_ctx_clear(NPConditionalXRowCtx *ctx){
   if(ctx->lambdax != NULL) free(ctx->lambdax);
   if(ctx->kw != NULL) free(ctx->kw);
   if(ctx->mean_row != NULL) free(ctx->mean_row);
+  if(ctx->weighted_design != NULL) free(ctx->weighted_design);
   if(ctx->matrix_bandwidth_x != NULL) free_tmat(ctx->matrix_bandwidth_x);
   if(ctx->matrix_bandwidth_eval_one != NULL) free_tmat(ctx->matrix_bandwidth_eval_one);
   if(ctx->eval_xuno_one != NULL) free_mat(ctx->eval_xuno_one, num_reg_unordered_extern);
@@ -21241,6 +21243,25 @@ static int np_conditional_xrow_ctx_prepare(double *vector_scale_factor,
                                          np_glp_cv_cache.nterms,
                                          1))
       goto fail_xrow_ctx_prepare;
+
+    /*
+     * Adaptive-NN changes the bandwidth attached to each training point, not
+     * the signed weighted-LP algebra. Keep one bounded slab resident in this
+     * objective-wide row context and retain the incumbent scalar transcript
+     * when the measured Accelerate gate is inactive or allocation fails.
+     */
+    if((np_glp_cv_cache.nterms >= 4) &&
+       np_conditional_x_weighted_blas_profitable(
+         num_train,
+         np_glp_cv_cache.nterms,
+         np_glp_cv_cache.basis_stride)){
+      const size_t weighted_count =
+        (size_t)np_glp_cv_cache.basis_stride*
+        (size_t)np_glp_cv_cache.nterms;
+
+      ctx->weighted_design =
+        (double *)malloc(weighted_count*sizeof(double));
+    }
   }
 
   ctx->ready = 1;
@@ -21354,24 +21375,57 @@ static int NP_NOINLINE NP_HOT_ALIGN np_conditional_xrow_from_ctx_impl(
       if((k <= 0) || (np_glp_cv_cache.basis == NULL))
         goto cleanup_xrow_from_ctx;
 
-      for(l = 0; l < k; l++){
+      for(l = 0; l < k; l++)
         ctx->full_row_workspace.rhs[l] =
           np_glp_cv_cache.basis[l][eval_pos];
-        for(j = 0; j < k; j++)
-          ctx->full_row_workspace.gram[l + j*k] = 0.0;
-      }
 
-      for(j = 0; j < num_train; j++){
-        const double wj = ctx->kw[j];
-        if(wj == 0.0)
-          continue;
-        for(int a = 0; a < k; a++){
-          const double za = np_glp_cv_cache.basis[a][j];
-          for(int b = a; b < k; b++){
-            const double zb = np_glp_cv_cache.basis[b][j];
-            ctx->full_row_workspace.gram[a + b*k] += wj*za*zb;
-            if(b != a)
-              ctx->full_row_workspace.gram[b + a*k] += wj*za*zb;
+      if(ctx->weighted_design != NULL){
+        const char trans_t = 'T';
+        const char trans_n = 'N';
+        const double alpha = 1.0;
+        const double beta = 0.0;
+        const int basis_stride = np_glp_cv_cache.basis_stride;
+
+        for(l = 0; l < k; l++){
+          const double * const basis_row = np_glp_cv_cache.basis[l];
+          double * const weighted_row =
+            ctx->weighted_design + (size_t)l*(size_t)basis_stride;
+
+          for(j = 0; j < num_train; j++)
+            weighted_row[j] = basis_row[j]*ctx->kw[j];
+        }
+
+        F77_CALL(dgemm)(&trans_t,
+                        &trans_n,
+                        &k,
+                        &k,
+                        &num_train,
+                        &alpha,
+                        np_glp_cv_cache.basis[0],
+                        &basis_stride,
+                        ctx->weighted_design,
+                        &basis_stride,
+                        &beta,
+                        ctx->full_row_workspace.gram,
+                        &k
+                        FCONE FCONE);
+      } else {
+        for(l = 0; l < k; l++)
+          for(j = 0; j < k; j++)
+            ctx->full_row_workspace.gram[l + j*k] = 0.0;
+
+        for(j = 0; j < num_train; j++){
+          const double wj = ctx->kw[j];
+          if(wj == 0.0)
+            continue;
+          for(int a = 0; a < k; a++){
+            const double za = np_glp_cv_cache.basis[a][j];
+            for(int b = a; b < k; b++){
+              const double zb = np_glp_cv_cache.basis[b][j];
+              ctx->full_row_workspace.gram[a + b*k] += wj*za*zb;
+              if(b != a)
+                ctx->full_row_workspace.gram[b + a*k] += wj*za*zb;
+            }
           }
         }
       }
@@ -21382,13 +21436,40 @@ static int NP_NOINLINE NP_HOT_ALIGN np_conditional_xrow_from_ctx_impl(
                                          1.0e-10))
         goto cleanup_xrow_from_ctx;
 
-      for(j = 0; j < num_train; j++){
-        double zju = 0.0;
-        const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
-        for(l = 0; l < k; l++)
-          zju += np_glp_cv_cache.basis[l][j]*
-            ctx->full_row_workspace.rhs[l];
-        row_out[orig_j] = ctx->kw[j]*zju;
+      if(ctx->weighted_design != NULL){
+        const char trans_n = 'N';
+        const double alpha = 1.0;
+        const double beta = 0.0;
+        const int one = 1;
+        const int basis_stride = np_glp_cv_cache.basis_stride;
+
+        F77_CALL(dgemv)(&trans_n,
+                        &num_train,
+                        &k,
+                        &alpha,
+                        np_glp_cv_cache.basis[0],
+                        &basis_stride,
+                        ctx->full_row_workspace.rhs,
+                        &one,
+                        &beta,
+                        ctx->mean_row,
+                        &one
+                        FCONE);
+        for(j = 0; j < num_train; j++){
+          const int orig_j =
+            (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
+          row_out[orig_j] = ctx->kw[j]*ctx->mean_row[j];
+        }
+      } else {
+        for(j = 0; j < num_train; j++){
+          double zju = 0.0;
+          const int orig_j =
+            (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
+          for(l = 0; l < k; l++)
+            zju += np_glp_cv_cache.basis[l][j]*
+              ctx->full_row_workspace.rhs[l];
+          row_out[orig_j] = ctx->kw[j]*zju;
+        }
       }
 
       if(drop_eval_self){
