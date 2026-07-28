@@ -222,9 +222,12 @@ test_that("conditional width-one blocks share one raw row without LAPACK", {
     fixed = TRUE
   )
   general_start <- regexpr(
-    "static int np_conditional_x_weight_block_pair_stream_core(",
+    paste0(
+      "static int[^\\n]*",
+      "np_conditional_x_weight_block_pair_stream_core\\("
+    ),
     source,
-    fixed = TRUE
+    perl = TRUE
   )
   expect_gt(scalar_start, 0L)
   expect_gt(general_start, scalar_start)
