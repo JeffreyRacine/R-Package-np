@@ -13796,7 +13796,7 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
       }
     }
 
-    if(BANDWIDTH_reg == BW_ADAP_NN){
+    if((BANDWIDTH_reg == BW_ADAP_NN) && (glp_nterms >= 4)){
       NPRegCvLpResult adaptive_result =
         np_regression_cv_lp_basis_adaptive_blas(
           bwm,

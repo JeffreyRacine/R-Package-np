@@ -112,6 +112,7 @@ test_that("adaptive regression BLAS allocation and solve failures fall back", {
     "^static NPRegCvLpResult np_regression_cv_lp_objective\\(",
     "^double np_kernel_estimate_regression_categorical_ls_aic\\("
   )
+  owner_compact <- gsub("[[:space:]]+", " ", owner)
 
   expect_match(allocator, "if(matrix == NULL)", fixed = TRUE)
   expect_match(allocator, "if(storage == NULL)", fixed = TRUE)
@@ -123,6 +124,11 @@ test_that("adaptive regression BLAS allocation and solve failures fall back", {
   expect_match(
     owner,
     "if(adaptive_result.ok){",
+    fixed = TRUE
+  )
+  expect_match(
+    owner_compact,
+    "(BANDWIDTH_reg == BW_ADAP_NN) && (glp_nterms >= 4)",
     fixed = TRUE
   )
   expect_match(
