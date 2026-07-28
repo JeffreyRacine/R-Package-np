@@ -13538,7 +13538,7 @@ static double **np_regression_adaptive_one_row_matrix(const int ncols){
   return matrix;
 }
 
-static NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas(
+static NP_NOINLINE NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas(
     const int bwm,
     const int num_obs,
     const int num_reg_unordered,
@@ -13582,13 +13582,13 @@ static NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas(
      (basis == NULL) || (basis_stride < num_obs))
     goto cleanup_adaptive_blas;
   /*
-   * Restrict this arithmetic reassociation to nonnegative continuous
-   * kernels.  Higher-order signed kernels can make the WLS moment system
-   * cancellation-sensitive even when the final delete-one denominator is
-   * well separated from zero; those routes retain the incumbent transcript.
+   * The weighted-design transcript is signed algebra: B' diag(w) B and
+   * B' diag(w) y remain valid for higher-order Gaussian weights.  Keep the
+   * established explicit supported-kernel gate; row formation remains on its
+   * incumbent owner in this checkpoint.
    */
   for(l = 0; l < num_reg_continuous; l++){
-    if((kernel_c[l] != 0) && (kernel_c[l] != 4) && (kernel_c[l] != 8))
+    if(((kernel_c[l] < 0) || (kernel_c[l] > 4)) && (kernel_c[l] != 8))
       goto cleanup_adaptive_blas;
   }
   if((bwm != RBWM_CVLS) && (bwm != RBWM_CVAIC) &&
