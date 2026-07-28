@@ -71,9 +71,11 @@ extern void vvrec(double *, const double *, const int *);
  */
 #if defined(__GNUC__) || defined(__clang__)
 #define NP_NOINLINE __attribute__((noinline))
+#define NP_ALWAYS_INLINE inline __attribute__((always_inline))
 #define NP_HOT_ALIGN __attribute__((aligned(256)))
 #else
 #define NP_NOINLINE
+#define NP_ALWAYS_INLINE inline
 #define NP_HOT_ALIGN
 #endif
 #ifdef MPI2
@@ -5650,6 +5652,84 @@ static int NP_NOINLINE np_accel_gauss_adaptive_row_try(
 }
 
 /*
+  Evaluate only the signed polynomial factor of a higher-order Gaussian
+  kernel.  Both the single-dimension vector path and the fused product path
+  use this implementation so their order-specific constants and Horner
+  arithmetic cannot drift.
+*/
+static NP_ALWAYS_INLINE void np_accel_gauss_polynomial_vector(
+  const int kernel,
+  const double * const z2,
+  const int n,
+  double * const out)
+{
+  const double one = 1.0;
+
+  switch(kernel){
+    case 1: {
+      const double c1 = -0.5;
+      const double c0 = 1.5;
+      vDSP_vsmsaD(z2, 1, &c1, &c0, out, 1, (np_vDSP_Length)n);
+      break;
+    }
+    case 2: {
+      const double c2 = 0.125;
+      const double c1 = -1.25;
+      const double c0 = 1.875;
+      vDSP_vsmsaD(z2, 1, &c2, &c1, out, 1, (np_vDSP_Length)n);
+      vDSP_vmulD(out, 1, z2, 1, out, 1, (np_vDSP_Length)n);
+      vDSP_vsmsaD(out, 1, &one, &c0, out, 1, (np_vDSP_Length)n);
+      break;
+    }
+    case 3: {
+      const double c3 = -0.02083333333;
+      const double c2 = 0.4375;
+      const double c1 = -2.1875;
+      const double c0 = 2.1875;
+      vDSP_vsmsaD(z2, 1, &c3, &c2, out, 1, (np_vDSP_Length)n);
+      vDSP_vmulD(out, 1, z2, 1, out, 1, (np_vDSP_Length)n);
+      vDSP_vsmsaD(out, 1, &one, &c1, out, 1, (np_vDSP_Length)n);
+      vDSP_vmulD(out, 1, z2, 1, out, 1, (np_vDSP_Length)n);
+      vDSP_vsmsaD(out, 1, &one, &c0, out, 1, (np_vDSP_Length)n);
+      break;
+    }
+  }
+}
+
+/*
+  Classify one complete Gaussian product outside the large kernel-sum
+  function's register-allocation graph.  Return 1 for ordinary Gaussian, 2
+  for a product of higher-order Gaussian factors, and 0 for every mixed or
+  unsupported family.
+*/
+static int NP_NOINLINE np_accel_gauss_product_kind(
+  const int * const kernel,
+  const int ndim,
+  double * const coefficient)
+{
+  int kind;
+  double coef = 1.0;
+
+  if((kernel == NULL) || (coefficient == NULL) || (ndim < 2))
+    return 0;
+
+  kind = (kernel[0] == 0) ? 1 :
+    (((kernel[0] >= 1) && (kernel[0] <= 3)) ? 2 : 0);
+  if(kind == 0)
+    return 0;
+
+  for(int d = 0; d < ndim; d++){
+    if(((kind == 1) && (kernel[d] != 0)) ||
+       ((kind == 2) && ((kernel[d] < 1) || (kernel[d] > 3))))
+      return 0;
+    coef *= ONE_OVER_SQRT_TWO_PI;
+  }
+
+  *coefficient = coef;
+  return kind;
+}
+
+/*
   Form an ordinary-Gaussian product with scalar bandwidths per dimension and
   one vector exponential:
 
@@ -5659,25 +5739,24 @@ static int NP_NOINLINE np_accel_gauss_adaptive_row_try(
   restrict it to the prequalified ordinary-Gaussian route and fall back to the
   incumbent per-dimension loop whenever this helper returns zero.
 */
-static int np_accel_gauss_product_try(double * const * const xt,
-                                      double * const * const xeval,
-                                      double * const * const bandwidth,
-                                      const int ndim,
-                                      const int n,
-                                      const int eval_index,
-                                      const int bandwidth_index,
-                                      const double coef,
-                                      double * const out)
+static int NP_NOINLINE np_accel_gauss_product_try(
+  double * const * const xt,
+  double * const * const xeval,
+  double * const * const bandwidth,
+  const int ndim,
+  const int n,
+  const int eval_index,
+  const int bandwidth_index,
+  const double coef,
+  double * const out)
 {
   const double minus_one = -1.0;
   const double minus_half = -0.5;
   const double zero = 0.0;
   const int ni = n;
 
-  if((!np_mseries_accelerate_enabled_cache) ||
-     (xt == NULL) || (xeval == NULL) || (bandwidth == NULL) ||
-     (out == NULL) || (ndim < 2) || (n < 256) ||
-     (!np_accel_gauss_scratch_ensure(n)))
+  if((xt == NULL) || (xeval == NULL) || (bandwidth == NULL) ||
+     (out == NULL) || (ndim < 2) || (n < 256))
     return 0;
 
   for(int d = 0; d < ndim; d++){
@@ -5712,6 +5791,90 @@ static int np_accel_gauss_product_try(double * const * const xt,
   vDSP_vsmsaD(np_accel_gauss_arg, 1, &minus_half, &zero,
               np_accel_gauss_arg, 1, (np_vDSP_Length)n);
   vvexp(out, np_accel_gauss_arg, &ni);
+  vDSP_vsmulD(out, 1, &coef, out, 1, (np_vDSP_Length)n);
+  return 1;
+}
+
+/*
+  Form a product of fourth-, sixth-, or eighth-order Gaussian kernels with one
+  vector exponential:
+
+    prod_d phi(u_d) P_d(u_d^2)
+      = phi(0)^ndim exp(-sum_d u_d^2/2) prod_d P_d(u_d^2).
+
+  The caller proves that every dimension is an ordinary higher-order Gaussian
+  kernel.  Polynomial factors can be signed, so they are accumulated
+  separately from the nonnegative exponential.  The existing bounded O(n)
+  Gaussian scratch owns both products; all unsupported inputs retain the
+  incumbent per-dimension fallback.
+*/
+static int NP_NOINLINE np_accel_gauss_higher_product_try(
+  const int * const kernel,
+  double * const * const xt,
+  double * const * const xeval,
+  double * const * const bandwidth,
+  const int ndim,
+  const int n,
+  const int eval_index,
+  const int bandwidth_index,
+  const double coef,
+  double * const out)
+{
+  const double minus_one = -1.0;
+  const double minus_half = -0.5;
+  const double zero = 0.0;
+  const int ni = n;
+
+  if((kernel == NULL) || (xt == NULL) || (xeval == NULL) ||
+     (bandwidth == NULL) || (out == NULL) ||
+     (ndim < 2) || (n < 256))
+    return 0;
+
+  for(int d = 0; d < ndim; d++){
+    double h;
+    double x;
+    double zscale;
+
+    if((kernel[d] < 1) || (kernel[d] > 3) ||
+       (xt[d] == NULL) || (xeval[d] == NULL) ||
+       (bandwidth[d] == NULL))
+      return 0;
+
+    h = bandwidth[d][bandwidth_index];
+    x = xeval[d][eval_index];
+    if((!isfinite(h)) || (h == 0.0))
+      return 0;
+
+    zscale = 1.0/h;
+    vDSP_vsmsaD(xt[d], 1, &minus_one, &x,
+                np_accel_gauss_tmp, 1, (np_vDSP_Length)n);
+    vDSP_vsmulD(np_accel_gauss_tmp, 1, &zscale,
+                np_accel_gauss_tmp, 1, (np_vDSP_Length)n);
+    vDSP_vsqD(np_accel_gauss_tmp, 1,
+              np_accel_gauss_tmp, 1, (np_vDSP_Length)n);
+
+    if(d == 0){
+      memcpy(np_accel_gauss_arg, np_accel_gauss_tmp,
+             (size_t)n*sizeof(double));
+    } else {
+      vDSP_vaddD(np_accel_gauss_arg, 1, np_accel_gauss_tmp, 1,
+                 np_accel_gauss_arg, 1, (np_vDSP_Length)n);
+    }
+
+    np_accel_gauss_polynomial_vector(
+      kernel[d], np_accel_gauss_tmp, n, np_accel_gauss_work);
+    if(d == 0)
+      memcpy(out, np_accel_gauss_work, (size_t)n*sizeof(double));
+    else
+      vDSP_vmulD(out, 1, np_accel_gauss_work, 1,
+                 out, 1, (np_vDSP_Length)n);
+  }
+
+  vDSP_vsmsaD(np_accel_gauss_arg, 1, &minus_half, &zero,
+              np_accel_gauss_arg, 1, (np_vDSP_Length)n);
+  vvexp(np_accel_gauss_tmp, np_accel_gauss_arg, &ni);
+  vDSP_vmulD(out, 1, np_accel_gauss_tmp, 1,
+             out, 1, (np_vDSP_Length)n);
   vDSP_vsmulD(out, 1, &coef, out, 1, (np_vDSP_Length)n);
   return 1;
 }
@@ -5838,7 +6001,6 @@ static void np_accel_gauss_vector(const int KERNEL,
                                   const double coef,
                                   double * const out)
 {
-  const double one = 1.0;
   const double minus_one = -1.0;
   const double minus_half = -0.5;
   const double zero = 0.0;
@@ -5854,48 +6016,11 @@ static void np_accel_gauss_vector(const int KERNEL,
               np_accel_gauss_arg, 1, (np_vDSP_Length)n);
   vvexp(out, np_accel_gauss_arg, &ni);
 
-  switch(KERNEL) {
-    case 1: {
-      const double c0 = 1.5;
-      vDSP_vsmsaD(np_accel_gauss_tmp, 1, &minus_half, &c0,
-                  np_accel_gauss_work, 1, (np_vDSP_Length)n);
-      vDSP_vmulD(out, 1, np_accel_gauss_work, 1,
-                 out, 1, (np_vDSP_Length)n);
-      break;
-    }
-    case 2: {
-      const double c2 = 0.125;
-      const double c1 = -1.25;
-      const double c0 = 1.875;
-      vDSP_vsmsaD(np_accel_gauss_tmp, 1, &c2, &c1,
-                  np_accel_gauss_work, 1, (np_vDSP_Length)n);
-      vDSP_vmulD(np_accel_gauss_work, 1, np_accel_gauss_tmp, 1,
-                 np_accel_gauss_work, 1, (np_vDSP_Length)n);
-      vDSP_vsmsaD(np_accel_gauss_work, 1, &one, &c0,
-                  np_accel_gauss_work, 1, (np_vDSP_Length)n);
-      vDSP_vmulD(out, 1, np_accel_gauss_work, 1,
-                 out, 1, (np_vDSP_Length)n);
-      break;
-    }
-    case 3: {
-      const double c3 = -0.02083333333;
-      const double c2 = 0.4375;
-      const double c1 = -2.1875;
-      const double c0 = 2.1875;
-      vDSP_vsmsaD(np_accel_gauss_tmp, 1, &c3, &c2,
-                  np_accel_gauss_work, 1, (np_vDSP_Length)n);
-      vDSP_vmulD(np_accel_gauss_work, 1, np_accel_gauss_tmp, 1,
-                 np_accel_gauss_work, 1, (np_vDSP_Length)n);
-      vDSP_vsmsaD(np_accel_gauss_work, 1, &one, &c1,
-                  np_accel_gauss_work, 1, (np_vDSP_Length)n);
-      vDSP_vmulD(np_accel_gauss_work, 1, np_accel_gauss_tmp, 1,
-                 np_accel_gauss_work, 1, (np_vDSP_Length)n);
-      vDSP_vsmsaD(np_accel_gauss_work, 1, &one, &c0,
-                  np_accel_gauss_work, 1, (np_vDSP_Length)n);
-      vDSP_vmulD(out, 1, np_accel_gauss_work, 1,
-                 out, 1, (np_vDSP_Length)n);
-      break;
-    }
+  if(KERNEL >= 1 && KERNEL <= 3){
+    np_accel_gauss_polynomial_vector(
+      KERNEL, np_accel_gauss_tmp, n, np_accel_gauss_work);
+    vDSP_vmulD(out, 1, np_accel_gauss_work, 1,
+               out, 1, (np_vDSP_Length)n);
   }
 
   vDSP_vsmulD(out, 1, &coef, out, 1, (np_vDSP_Length)n);
@@ -8250,6 +8375,7 @@ const NP_OuterPackCtx * const outer_pack_ctx){
   int cont_largeh_any_fixed = 0;
   int fused_gaussian_fixed_higher_convolution_eligible = 0;
 #if NP_ACCEL_GAUSS_COMPILED
+  /* 0 = none, 1 = ordinary Gaussian, 2 = higher-order Gaussian. */
   int fused_gaussian_product_eligible = 0;
   int fused_gaussian_convolution_kind = 0;
   double fused_gaussian_product_coef = 1.0;
@@ -8603,15 +8729,12 @@ const NP_OuterPackCtx * const outer_pack_ctx){
      (num_xt >= 256) &&
      (pxl == NULL) &&
      ((BANDWIDTH_reg != BW_FIXED) || (!cont_largeh_any_fixed)) &&
-     np_mseries_accelerate_enabled_cache){
-    fused_gaussian_product_eligible = 1;
-    for(i = 0; i < num_reg_continuous; i++){
-      if(KERNEL_reg_np[i] != 0){
-        fused_gaussian_product_eligible = 0;
-        break;
-      }
-      fused_gaussian_product_coef *= ONE_OVER_SQRT_TWO_PI;
-    }
+     np_mseries_accelerate_enabled_cache &&
+     ((KERNEL_reg_np[0] >= 0) && (KERNEL_reg_np[0] <= 3)) &&
+     np_accel_gauss_scratch_ensure(num_xt)){
+    fused_gaussian_product_eligible =
+      np_accel_gauss_product_kind(
+        KERNEL_reg_np, num_reg_continuous, &fused_gaussian_product_coef);
   }
 
   if((num_reg_continuous >= 2) &&
@@ -9264,11 +9387,16 @@ const NP_OuterPackCtx * const outer_pack_ctx){
 #if NP_ACCEL_GAUSS_COMPILED
       int fused_gaussian_product = 0;
 
-      if(fused_gaussian_product_eligible && (!any_cont_largeh))
+      if((fused_gaussian_product_eligible == 1) && (!any_cont_largeh))
         fused_gaussian_product =
           np_accel_gauss_product_try(xtc, xc, m, num_reg_continuous,
                                      num_xt, j, jbw,
                                      fused_gaussian_product_coef, tprod);
+      else if((fused_gaussian_product_eligible == 2) && (!any_cont_largeh))
+        fused_gaussian_product =
+          np_accel_gauss_higher_product_try(
+            KERNEL_reg_np, xtc, xc, m, num_reg_continuous,
+            num_xt, j, jbw, fused_gaussian_product_coef, tprod);
 
       if(fused_gaussian_product){
         tprod_has_vals = 1;
