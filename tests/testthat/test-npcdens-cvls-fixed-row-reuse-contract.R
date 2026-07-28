@@ -63,13 +63,13 @@ test_that("fixed and generalized-NN CVLS derive LOO from their full rows", {
     expect_false(grepl("self_weight = kw[eval_pos]", body, fixed = TRUE))
     expect_match(
       body,
-      "den = NZD(1.0 - full_rows_out[i][eval_idx])",
+      "np_lp_delete_denominator(full_rows_out[i][eval_idx], &den)",
       fixed = TRUE
     )
   }
   fixed_markers <- c(
     "np_lp_full_row_workspace_solve",
-    "den = NZD(1.0 - full_rows_out[i][eval_idx])",
+    "np_lp_delete_denominator(full_rows_out[i][eval_idx], &den)",
     "loo_rows_out[i][orig_j] ="
   )
   fixed_positions <- vapply(fixed_markers, function(marker) {
@@ -82,7 +82,7 @@ test_that("fixed and generalized-NN CVLS derive LOO from their full rows", {
     "matrix_bandwidth_eval_one[l][0] = matrix_bandwidth_x[l][i]",
     "np_shadow_conditional_kernel_row_raw",
     "np_lp_full_row_workspace_solve",
-    "den = NZD(1.0 - full_rows_out[i][eval_idx])",
+    "np_lp_delete_denominator(full_rows_out[i][eval_idx], &den)",
     "loo_rows_out[i][j] ="
   )
   gnn_positions <- vapply(gnn_markers, function(marker) {

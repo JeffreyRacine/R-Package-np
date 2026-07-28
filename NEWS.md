@@ -40,6 +40,13 @@
   CVML objectives; ordinary second-order results and MPI ownership are
   unchanged.
 
+* Conditional local-polynomial full-row deletion now preserves every finite,
+  nonzero signed `1 - H_ii` denominator exactly rather than replacing
+  sub-machine-epsilon values by a fixed floor. Exactly zero or non-finite
+  denominators fail through the existing clean objective path because the
+  corresponding deleted system has no valid finite row. Ordinary
+  non-singular objectives and MPI ownership are unchanged.
+
 * On Apple ARM64, eligible fixed and generalized-nearest-neighbour products of
   two or more ordinary Gaussian continuous kernels now use one vector
   exponential of the summed squared standardized distances on each rank.

@@ -112,7 +112,7 @@ test_that("MPI fixed CVLS weighted BLAS preserves signed row algebra and fallbac
   )
   expect_match(
     body,
-    "den = NZD(1.0 - full_rows_out[i][eval_idx])",
+    "np_lp_delete_denominator(full_rows_out[i][eval_idx], &den)",
     fixed = TRUE
   )
   expect_match(
@@ -129,7 +129,7 @@ test_that("MPI fixed CVLS weighted BLAS preserves signed row algebra and fallbac
     "np_lp_full_row_workspace_solve",
     "F77_CALL(dgemv)",
     "full_rows_out[i][orig_j] = kw[j]*mean_row[j]",
-    "den = NZD(1.0 - full_rows_out[i][eval_idx])"
+    "np_lp_delete_denominator(full_rows_out[i][eval_idx], &den)"
   )
   positions <- vapply(markers, function(marker) {
     regexpr(marker, body, fixed = TRUE)[[1L]]
@@ -202,7 +202,7 @@ test_that("MPI generalized-NN CVLS reuses rank-local weighted BLAS", {
   )
   expect_match(
     gnn_body,
-    "den = NZD(1.0 - full_rows_out[i][eval_idx])",
+    "np_lp_delete_denominator(full_rows_out[i][eval_idx], &den)",
     fixed = TRUE
   )
   expect_match(
