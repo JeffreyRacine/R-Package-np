@@ -57,22 +57,30 @@ test_that("MPI CVLS Y convolution supertile is memory bounded and isolated", {
     body,
     gregexpr("alloc_tmatd\\(num_obs, block_size\\)", body, perl = TRUE)
   )), 4L)
+  expect_equal(lengths(regmatches(
+    body,
+    gregexpr("np_optional_tmatd\\(num_obs, block_size\\)", body,
+             perl = TRUE)
+  )), 2L)
+  expect_match(body, "const int requested_group_width =", fixed = TRUE)
+  expect_match(body, "MIN(4,", fixed = TRUE)
+  expect_match(body, "int group_width = 2;", fixed = TRUE)
+  expect_match(body, "int local_group_width = 2;", fixed = TRUE)
+  expect_match(body, "local_group_width = 3;", fixed = TRUE)
+  expect_match(body, "local_group_width = 4;", fixed = TRUE)
+  expect_match(
+    gsub("[[:space:]]+", " ", body),
+    "MPI_Allreduce(&local_group_width, &group_width, 1, MPI_INT, MPI_MIN, comm[1]);",
+    fixed = TRUE
+  )
   expect_false(grepl("alloc_vecd\\(block_size\\*block_size\\)", body))
   expect_match(
     body,
-    "double * const quad_cross = loo_or_second[0];",
+    "double * const quad_cross = loo_work[0];",
     fixed = TRUE
   )
   expect_false(grepl("num_obs\\*num_obs", body))
   expect_false(grepl("num_obs \\* num_obs", body, fixed = TRUE))
-  expect_equal(lengths(regmatches(
-    body,
-    gregexpr(
-      "np_conditional_x_weight_block_pair_selected_stream_core\\(",
-      body,
-      perl = TRUE
-    )
-  )), 4L)
 })
 
 test_that("MPI CVLS supertile retains rank ownership and block-order reduction", {
@@ -93,33 +101,26 @@ test_that("MPI CVLS supertile retains rank ownership and block-order reduction",
   expect_match(body, "use_parallel_blocks ? my_rank : 0", fixed = TRUE)
   expect_match(
     body,
-    "first_block_id += 2*ownership_stride",
+    "first_block_id += group_width*ownership_stride",
     fixed = TRUE
   )
   expect_match(
     body,
-    "second_block_id = first_block_id + ownership_stride",
+    "block_id[g] = first_block_id + g*ownership_stride",
     fixed = TRUE
   )
   expect_match(
     body,
-    "block_terms[first_block_id]",
-    fixed = TRUE
-  )
-  expect_match(
-    body,
-    "block_terms[second_block_id]",
+    "block_terms[block_id[g]]",
     fixed = TRUE
   )
 
   markers <- c(
-    "lin_first += np_blas_ddot_int",
-    "lin_second += np_blas_ddot_int",
+    "lin[g] += np_blas_ddot_int",
+    "double * const quad_cross = loo_work[0]",
     "for(j0 = 0; j0 < num_obs; j0 += block_size)",
-    "quad_first += aij*quad_cross",
-    "quad_second += aij*quad_cross",
-    "block_terms[first_block_id]",
-    "block_terms[second_block_id]",
+    "quad[g] += aij*quad_cross",
+    "block_terms[block_id[g]]",
     "MPI_Allreduce(&local_fail, &any_fail",
     "MPI_Allreduce(MPI_IN_PLACE",
     "for(ii = 0; ii < nblocks; ii++)"
@@ -132,7 +133,20 @@ test_that("MPI CVLS supertile retains rank ownership and block-order reduction",
   expect_equal(lengths(regmatches(
     body,
     gregexpr("MPI_Allreduce\\(", body, perl = TRUE)
-  )), 2L)
+  )), 3L)
+  expect_equal(lengths(regmatches(
+    body,
+    gregexpr("np_blas_dgemm_tn_int\\(", body, perl = TRUE)
+  )), 1L)
+  expect_gte(lengths(regmatches(
+    body,
+    gregexpr("for\\(g = 0; g < group_width; g\\+\\+\\)", body,
+             perl = TRUE)
+  )), 3L)
+  expect_equal(lengths(regmatches(
+    body,
+    gregexpr("np_conditional_yrow_from_ctx\\(", body, perl = TRUE)
+  )), 1L)
 })
 
 test_that("MPI CVLS supertile dispatch leaves no-gain and excluded routes intact", {

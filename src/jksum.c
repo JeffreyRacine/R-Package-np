@@ -26739,12 +26739,15 @@ cleanup_cvls_lp_adap_block:
 static int np_conditional_density_cvls_categorical_profile_stream(double *vector_scale_factor,
                                                                   double *cv);
 
+static double **np_optional_tmatd(const int nrows, const int ncols);
+
 /*
- * Reuse each Y-convolution tile across two LP X blocks already owned by the
- * same rank.  Rank ownership is unchanged: parallel blocks are paired at the
- * incumbent iNum_Processors stride, while serial blocks are paired adjacently.
- * Dead LOO-X and ordinary-Y buffers hold the second block, so workspace stays
- * at the incumbent four block matrices plus one GEMM output tile.
+ * Reuse each Y-convolution tile across two to four LP X blocks already owned
+ * by the same rank. Rank ownership is unchanged: parallel blocks are grouped
+ * at the incumbent iNum_Processors stride, while serial blocks are grouped
+ * adjacently. The incumbent four slabs provide width two; optional bounded
+ * full-X slabs extend the group to width three or four. All ranks agree on
+ * the minimum available width before traversal.
  */
 #if defined(__clang__) || defined(__GNUC__)
 # define NP_CDENS_SUPERTILE_ALIGN __attribute__((aligned(256)))
@@ -26766,14 +26769,19 @@ np_conditional_density_cvls_lp_supertile2_stream(
     use_parallel_blocks ? iNum_Processors : 1;
   const int first_owned_block =
     use_parallel_blocks ? my_rank : 0;
-  double **loo_or_second = NULL;
-  double **first_full = NULL;
-  double **y_or_second_full = NULL;
-  double **yconv_or_second_y = NULL;
+  const int requested_group_width =
+    MIN(4,
+        (nblocks / ownership_stride) +
+        ((nblocks % ownership_stride) != 0));
+  double **loo_work = NULL;
+  double **full_blocks[4] = {NULL, NULL, NULL, NULL};
+  double **shared_y = NULL;
   double *block_terms = NULL;
   NPConditionalXBlockBwCtx xbwctx = {0};
   NPConditionalYRowCtx yconvctx = {0};
-  int first_block_id, j0, ii, jj;
+  int first_block_id, j0, ii, jj, g;
+  int group_width = 2;
+  int local_group_width = 2;
   int status = 1;
   int local_fail = 0;
 
@@ -26793,16 +26801,47 @@ np_conditional_density_cvls_lp_supertile2_stream(
      (use_parallel_blocks && (nblocks <= ownership_stride)))
     return 1;
 
-  loo_or_second = alloc_tmatd(num_obs, block_size);
-  first_full = alloc_tmatd(num_obs, block_size);
-  y_or_second_full = alloc_tmatd(num_obs, block_size);
-  yconv_or_second_y = alloc_tmatd(num_obs, block_size);
+  loo_work = alloc_tmatd(num_obs, block_size);
+  full_blocks[0] = alloc_tmatd(num_obs, block_size);
+  full_blocks[1] = alloc_tmatd(num_obs, block_size);
+  shared_y = alloc_tmatd(num_obs, block_size);
   if(use_parallel_blocks)
     block_terms = (double *)calloc((size_t)nblocks, sizeof(double));
-  if((loo_or_second == NULL) || (first_full == NULL) ||
-     (y_or_second_full == NULL) || (yconv_or_second_y == NULL) ||
+  if((loo_work == NULL) || (full_blocks[0] == NULL) ||
+     (full_blocks[1] == NULL) || (shared_y == NULL) ||
      (use_parallel_blocks && (block_terms == NULL)))
     local_fail = 1;
+
+  if(!local_fail && (requested_group_width >= 3)){
+    full_blocks[2] = np_optional_tmatd(num_obs, block_size);
+    if(full_blocks[2] != NULL){
+      local_group_width = 3;
+      if(requested_group_width >= 4){
+        full_blocks[3] = np_optional_tmatd(num_obs, block_size);
+        if(full_blocks[3] != NULL)
+          local_group_width = 4;
+      }
+    }
+  }
+
+#ifdef MPI2
+  if(use_parallel_blocks)
+    MPI_Allreduce(&local_group_width,
+                  &group_width,
+                  1,
+                  MPI_INT,
+                  MPI_MIN,
+                  comm[1]);
+  else
+#endif
+    group_width = local_group_width;
+
+  for(g = group_width; g < 4; g++){
+    if(full_blocks[g] != NULL){
+      free_tmat(full_blocks[g]);
+      full_blocks[g] = NULL;
+    }
+  }
 
   if((!local_fail) &&
      (BANDWIDTH_den_extern == BW_GEN_NN) &&
@@ -26814,73 +26853,24 @@ np_conditional_density_cvls_lp_supertile2_stream(
   *cv = 0.0;
   for(first_block_id = first_owned_block;
       (first_block_id < nblocks) && (!local_fail);
-      first_block_id += 2*ownership_stride){
-    const int second_block_id = first_block_id + ownership_stride;
-    const int have_second = (second_block_id < nblocks);
-    const int first_start = first_block_id*block_size;
-    const int ib_first = MIN(block_size, num_obs - first_start);
-    const int second_start = second_block_id*block_size;
-    const int ib_second =
-      have_second ? MIN(block_size, num_obs - second_start) : 0;
-    double lin_first = 0.0;
-    double quad_first = 0.0;
-    double lin_second = 0.0;
-    double quad_second = 0.0;
+      first_block_id += group_width*ownership_stride){
+    int block_id[4] = {0, 0, 0, 0};
+    int block_start[4] = {0, 0, 0, 0};
+    int block_rows[4] = {0, 0, 0, 0};
+    double lin[4] = {0.0, 0.0, 0.0, 0.0};
+    double quad[4] = {0.0, 0.0, 0.0, 0.0};
 
-    if(BANDWIDTH_den_extern == BW_GEN_NN){
-      if(np_conditional_x_block_bw_ctx_prepare(vector_scale_factor,
-                                               first_start,
-                                               ib_first,
-                                               use_parallel_blocks,
-                                               &xbwctx) != 0){
-        local_fail = 1;
-        break;
-      }
-      if(np_conditional_x_weight_block_pair_selected_stream_core(
-           vector_scale_factor,
-           first_start,
-           ib_first,
-           use_parallel_blocks,
-           &xbwctx,
-           loo_or_second,
-           first_full) != 0){
-        local_fail = 1;
-        break;
-      }
-      np_conditional_x_block_bw_ctx_clear(&xbwctx);
-    } else {
-      if(np_conditional_x_weight_block_pair_selected_stream_core(
-           vector_scale_factor,
-           first_start,
-           ib_first,
-           use_parallel_blocks,
-           NULL,
-           loo_or_second,
-           first_full) != 0){
-        local_fail = 1;
-        break;
-      }
-    }
+    for(g = 0; g < group_width; g++){
+      block_id[g] = first_block_id + g*ownership_stride;
+      if(block_id[g] >= nblocks)
+        continue;
+      block_start[g] = block_id[g]*block_size;
+      block_rows[g] = MIN(block_size, num_obs - block_start[g]);
 
-    if(np_conditional_y_block_stream_op_core(vector_scale_factor,
-                                             first_start,
-                                             ib_first,
-                                             OP_NORMAL,
-                                             use_parallel_blocks,
-                                             y_or_second_full) != 0){
-      local_fail = 1;
-      break;
-    }
-    for(ii = 0; ii < ib_first; ii++)
-      lin_first += np_blas_ddot_int(num_obs,
-                                    loo_or_second[ii],
-                                    y_or_second_full[ii]);
-
-    if(have_second){
       if(BANDWIDTH_den_extern == BW_GEN_NN){
         if(np_conditional_x_block_bw_ctx_prepare(vector_scale_factor,
-                                                 second_start,
-                                                 ib_second,
+                                                 block_start[g],
+                                                 block_rows[g],
                                                  use_parallel_blocks,
                                                  &xbwctx) != 0){
           local_fail = 1;
@@ -26888,12 +26878,12 @@ np_conditional_density_cvls_lp_supertile2_stream(
         }
         if(np_conditional_x_weight_block_pair_selected_stream_core(
              vector_scale_factor,
-             second_start,
-             ib_second,
+             block_start[g],
+             block_rows[g],
              use_parallel_blocks,
              &xbwctx,
-             loo_or_second,
-             y_or_second_full) != 0){
+             loo_work,
+             full_blocks[g]) != 0){
           local_fail = 1;
           break;
         }
@@ -26901,38 +26891,40 @@ np_conditional_density_cvls_lp_supertile2_stream(
       } else {
         if(np_conditional_x_weight_block_pair_selected_stream_core(
              vector_scale_factor,
-             second_start,
-             ib_second,
+             block_start[g],
+             block_rows[g],
              use_parallel_blocks,
              NULL,
-             loo_or_second,
-             y_or_second_full) != 0){
+             loo_work,
+             full_blocks[g]) != 0){
           local_fail = 1;
           break;
         }
       }
 
       if(np_conditional_y_block_stream_op_core(vector_scale_factor,
-                                               second_start,
-                                               ib_second,
+                                               block_start[g],
+                                               block_rows[g],
                                                OP_NORMAL,
                                                use_parallel_blocks,
-                                               yconv_or_second_y) != 0){
+                                               shared_y) != 0){
         local_fail = 1;
         break;
       }
-      for(ii = 0; ii < ib_second; ii++)
-        lin_second += np_blas_ddot_int(num_obs,
-                                      loo_or_second[ii],
-                                      yconv_or_second_y[ii]);
+      for(ii = 0; ii < block_rows[g]; ii++)
+        lin[g] += np_blas_ddot_int(num_obs,
+                                   loo_work[ii],
+                                   shared_y[ii]);
     }
+    if(local_fail)
+      break;
 
     /*
-     * Both LOO linear consumers are complete, so this contiguous slab is
+     * All LOO linear consumers are complete, so this contiguous slab is
      * dead. The route requires num_obs > block_size, hence its
      * num_obs*block_size cells can hold the largest block_size^2 GEMM tile.
      */
-    double * const quad_cross = loo_or_second[0];
+    double * const quad_cross = loo_work[0];
     for(j0 = 0; j0 < num_obs; j0 += block_size){
       const int jb = MIN(block_size, num_obs - j0);
 
@@ -26940,7 +26932,7 @@ np_conditional_density_cvls_lp_supertile2_stream(
         for(jj = 0; jj < jb; jj++){
           if(np_conditional_yrow_from_ctx(&yconvctx,
                                           j0 + jj,
-                                          yconv_or_second_y[jj]) != 0){
+                                          shared_y[jj]) != 0){
             local_fail = 1;
             break;
           }
@@ -26953,42 +26945,30 @@ np_conditional_density_cvls_lp_supertile2_stream(
                                                  jb,
                                                  OP_CONVOLUTION,
                                                  use_parallel_blocks,
-                                                 yconv_or_second_y) != 0){
+                                                 shared_y) != 0){
           local_fail = 1;
           break;
         }
       }
 
-      np_blas_dgemm_tn_int(ib_first,
-                           jb,
-                           num_obs,
-                           first_full[0],
-                           yconv_or_second_y[0],
-                           quad_cross);
-      for(ii = 0; ii < ib_first; ii++){
-        double * const ai = first_full[ii];
-        for(jj = 0; jj < jb; jj++){
-          const double aij = ai[j0 + jj];
-          if(aij == 0.0)
-            continue;
-          quad_first += aij*quad_cross[ii + jj*ib_first];
-        }
-      }
+      for(g = 0; g < group_width; g++){
+        const int ib = block_rows[g];
 
-      if(have_second){
-        np_blas_dgemm_tn_int(ib_second,
+        if(ib <= 0)
+          continue;
+        np_blas_dgemm_tn_int(ib,
                              jb,
                              num_obs,
-                             y_or_second_full[0],
-                             yconv_or_second_y[0],
+                             full_blocks[g][0],
+                             shared_y[0],
                              quad_cross);
-        for(ii = 0; ii < ib_second; ii++){
-          double * const ai = y_or_second_full[ii];
+        for(ii = 0; ii < ib; ii++){
+          double * const ai = full_blocks[g][ii];
           for(jj = 0; jj < jb; jj++){
             const double aij = ai[j0 + jj];
             if(aij == 0.0)
               continue;
-            quad_second += aij*quad_cross[ii + jj*ib_second];
+            quad[g] += aij*quad_cross[ii + jj*ib];
           }
         }
       }
@@ -26997,15 +26977,14 @@ np_conditional_density_cvls_lp_supertile2_stream(
     if(local_fail)
       break;
     if(use_parallel_blocks){
-      block_terms[first_block_id] =
-        quad_first - 2.0*lin_first;
-      if(have_second)
-        block_terms[second_block_id] =
-          quad_second - 2.0*lin_second;
+      for(g = 0; g < group_width; g++)
+        if(block_rows[g] > 0)
+          block_terms[block_id[g]] =
+            quad[g] - 2.0*lin[g];
     } else {
-      *cv += quad_first - 2.0*lin_first;
-      if(have_second)
-        *cv += quad_second - 2.0*lin_second;
+      for(g = 0; g < group_width; g++)
+        if(block_rows[g] > 0)
+          *cv += quad[g] - 2.0*lin[g];
     }
   }
 
@@ -27041,10 +27020,10 @@ np_conditional_density_cvls_lp_supertile2_stream(
 cleanup_cvls_lp_supertile2:
   np_conditional_x_block_bw_ctx_clear(&xbwctx);
   np_conditional_yrow_ctx_clear(&yconvctx);
-  if(loo_or_second != NULL) free_tmat(loo_or_second);
-  if(first_full != NULL) free_tmat(first_full);
-  if(y_or_second_full != NULL) free_tmat(y_or_second_full);
-  if(yconv_or_second_y != NULL) free_tmat(yconv_or_second_y);
+  if(loo_work != NULL) free_tmat(loo_work);
+  for(g = 0; g < 4; g++)
+    if(full_blocks[g] != NULL) free_tmat(full_blocks[g]);
+  if(shared_y != NULL) free_tmat(shared_y);
   if(block_terms != NULL) free(block_terms);
   np_glp_cv_clear_extern();
   return status;
@@ -28314,8 +28293,8 @@ cleanup_cat_cdist:
 
 /*
  * Allocate a free_tmat()-compatible contiguous matrix without raising an R
- * error. This is used only for an optional acceleration slab: overflow or
- * allocation failure must retain the incumbent one-block traversal.
+ * error. This is used only for optional bounded acceleration slabs: overflow
+ * or allocation failure must retain the widest incumbent-safe traversal.
  */
 static double **np_optional_tmatd(const int nrows, const int ncols){
   const size_t rows = (size_t)nrows;
