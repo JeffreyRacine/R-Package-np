@@ -34,38 +34,30 @@ test_that("quadratic output reuses the dead LOO block without changing GEMMs", {
   expect_false(grepl("alloc_vecd\\(block_size\\*block_size\\)", body))
   expect_match(
     body,
-    "double * const quad_cross = loo_or_second[0];",
+    "double * const quad_cross = loo_work[0];",
     fixed = TRUE
   )
   expect_equal(lengths(regmatches(
     body,
     gregexpr("np_blas_dgemm_tn_int\\(", body, perl = TRUE)
-  )), 2L)
+  )), 1L)
   expect_match(
     body,
-    "np_blas_dgemm_tn_int(ib_first",
-    fixed = TRUE
-  )
-  expect_match(
-    body,
-    "np_blas_dgemm_tn_int(ib_second",
+    "np_blas_dgemm_tn_int(ib,",
     fixed = TRUE
   )
 })
 
-test_that("dead-output alias begins only after both LOO linear consumers", {
+test_that("dead-output alias begins only after all LOO linear consumers", {
   src_file <- locate_dead_output_source()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable")
   body <- dead_output_body(readLines(src_file, warn = FALSE))
 
   markers <- c(
-    "lin_first += np_blas_ddot_int",
-    "lin_second += np_blas_ddot_int",
-    "double * const quad_cross = loo_or_second[0]",
-    "np_blas_dgemm_tn_int(ib_first",
-    "np_blas_dgemm_tn_int(ib_second",
-    "*cv += quad_first - 2.0*lin_first",
-    "*cv += quad_second - 2.0*lin_second"
+    "lin[g] += np_blas_ddot_int",
+    "double * const quad_cross = loo_work[0]",
+    "np_blas_dgemm_tn_int(ib,",
+    "*cv += quad[g] - 2.0*lin[g]"
   )
   positions <- vapply(markers, function(marker) {
     regexpr(marker, body, fixed = TRUE)[[1L]]

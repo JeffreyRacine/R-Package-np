@@ -56,10 +56,20 @@ test_that("CVLS Y convolution supertile is memory bounded and topology isolated"
     body,
     gregexpr("alloc_tmatd\\(num_obs, block_size\\)", body, perl = TRUE)
   )), 4L)
+  expect_equal(lengths(regmatches(
+    body,
+    gregexpr("np_optional_tmatd\\(num_obs, block_size\\)", body,
+             perl = TRUE)
+  )), 2L)
+  expect_match(body, "const int requested_group_width =", fixed = TRUE)
+  expect_match(body, "MIN(4,", fixed = TRUE)
+  expect_match(body, "int group_width = 2;", fixed = TRUE)
+  expect_match(body, "group_width = 3;", fixed = TRUE)
+  expect_match(body, "group_width = 4;", fixed = TRUE)
   expect_false(grepl("alloc_vecd\\(block_size\\*block_size\\)", body))
   expect_match(
     body,
-    "double * const quad_cross = loo_or_second[0];",
+    "double * const quad_cross = loo_work[0];",
     fixed = TRUE
   )
   expect_false(grepl("num_obs\\*num_obs", body))
@@ -77,13 +87,11 @@ test_that("CVLS Y convolution supertile preserves per-block consumer order", {
   )
 
   markers <- c(
-    "lin_first += np_blas_ddot_int",
-    "lin_second += np_blas_ddot_int",
+    "lin[g] += np_blas_ddot_int",
+    "double * const quad_cross = loo_work[0]",
     "for(j0 = 0; j0 < num_obs; j0 += block_size)",
-    "quad_first += aij*quad_cross",
-    "quad_second += aij*quad_cross",
-    "*cv += quad_first - 2.0*lin_first",
-    "*cv += quad_second - 2.0*lin_second"
+    "quad[g] += aij*quad_cross",
+    "*cv += quad[g] - 2.0*lin[g]"
   )
   positions <- vapply(markers, function(marker) {
     regexpr(marker, body, fixed = TRUE)[[1L]]
@@ -94,7 +102,12 @@ test_that("CVLS Y convolution supertile preserves per-block consumer order", {
   expect_equal(lengths(regmatches(
     body,
     gregexpr("np_blas_dgemm_tn_int\\(", body, perl = TRUE)
-  )), 2L)
+  )), 1L)
+  expect_gte(lengths(regmatches(
+    body,
+    gregexpr("for\\(g = 0; g < group_width; g\\+\\+\\)", body,
+             perl = TRUE)
+  )), 3L)
   expect_equal(lengths(regmatches(
     body,
     gregexpr("np_conditional_yrow_from_ctx\\(", body, perl = TRUE)
