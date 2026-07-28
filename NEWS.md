@@ -47,6 +47,15 @@
   corresponding deleted system has no valid finite row. Ordinary
   non-singular objectives and MPI ownership are unchanged.
 
+* Eligible fixed and generalized-nearest-neighbour conditional
+  local-polynomial full-row blocks now reuse the bounded weighted-design
+  BLAS assembly already used by conditional-density CVLS. This accelerates
+  conditional-density likelihood cross-validation and conditional-
+  distribution least-squares cross-validation without changing the scalar
+  width-one, adaptive-nearest-neighbour, non-Accelerate, or allocation-
+  fallback paths. The formulas and MPI ownership are unchanged, but BLAS
+  reassociation can change last floating-point bits.
+
 * On Apple ARM64, eligible fixed and generalized-nearest-neighbour products of
   two or more ordinary Gaussian continuous kernels now use one vector
   exponential of the summed squared standardized distances on each rank.

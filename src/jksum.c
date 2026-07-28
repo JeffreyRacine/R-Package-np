@@ -22951,12 +22951,14 @@ static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_f
   const int bw_rows = (BANDWIDTH_den_extern == BW_FIXED) ? 1 : block_rows;
   int *kernel_cx = NULL, *kernel_ux = NULL, *kernel_ox = NULL, *x_operator = NULL;
   double *vsfx = NULL, *lambdax = NULL, *kw = NULL, *mean_row = NULL;
+  double *weighted_design = NULL;
   double **matrix_bandwidth_x = NULL, **matrix_bandwidth_eval_one = NULL;
   double **eval_xuno_one = NULL, **eval_xord_one = NULL, **eval_xcon_one = NULL;
   double **matrix_X_continuous_eval_block = NULL;
   NPLPFullRowWorkspace full_row_workspace;
   NPConditionalBoundState bounds_state;
   int i, j, l;
+  int use_weighted_blas = 0;
   int status = 1;
   const int use_bwctx = (bwctx != NULL) && bwctx->ready &&
     (bwctx->eval_start == eval_start) &&
@@ -23098,6 +23100,24 @@ static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_f
                                          np_glp_cv_cache.nterms,
                                          1))
       goto cleanup_xweight_block;
+
+    /*
+     * The rank-owned fixed/generalized-NN paired CVLS helpers already
+     * qualify this bounded signed weighted-design algebra. Reuse it for the
+     * shared full-row consumer without adding any collective.
+     */
+    if(np_conditional_x_weighted_blas_profitable(
+         num_train,
+         np_glp_cv_cache.nterms,
+         np_glp_cv_cache.basis_stride)){
+      const size_t weighted_count =
+        (size_t)np_glp_cv_cache.basis_stride*
+        (size_t)np_glp_cv_cache.nterms;
+
+      weighted_design =
+        (double *)malloc(weighted_count*sizeof(double));
+      use_weighted_blas = (weighted_design != NULL);
+    }
   }
 
   for(i = 0; i < block_rows; i++){
@@ -23190,24 +23210,57 @@ static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_f
     } else {
       const int k = np_glp_cv_cache.nterms;
 
-      for(l = 0; l < k; l++){
+      for(l = 0; l < k; l++)
         full_row_workspace.rhs[l] =
           np_glp_cv_cache.basis[l][eval_pos];
-        for(j = 0; j < k; j++)
-          full_row_workspace.gram[l + j*k] = 0.0;
-      }
 
-      for(j = 0; j < num_train; j++){
-        const double wj = kw[j];
-        if(wj == 0.0)
-          continue;
-        for(int a = 0; a < k; a++){
-          const double za = np_glp_cv_cache.basis[a][j];
-          for(int b = a; b < k; b++){
-            const double zb = np_glp_cv_cache.basis[b][j];
-            full_row_workspace.gram[a + b*k] += wj*za*zb;
-            if(b != a)
-              full_row_workspace.gram[b + a*k] += wj*za*zb;
+      if(use_weighted_blas){
+        const char trans_t = 'T';
+        const char trans_n = 'N';
+        const double alpha = 1.0;
+        const double beta = 0.0;
+        const int basis_stride = np_glp_cv_cache.basis_stride;
+
+        for(l = 0; l < k; l++){
+          const double * const basis_row = np_glp_cv_cache.basis[l];
+          double * const weighted_row =
+            weighted_design + (size_t)l*(size_t)basis_stride;
+
+          for(j = 0; j < num_train; j++)
+            weighted_row[j] = basis_row[j]*kw[j];
+        }
+
+        F77_CALL(dgemm)(&trans_t,
+                        &trans_n,
+                        &k,
+                        &k,
+                        &num_train,
+                        &alpha,
+                        np_glp_cv_cache.basis[0],
+                        &basis_stride,
+                        weighted_design,
+                        &basis_stride,
+                        &beta,
+                        full_row_workspace.gram,
+                        &k
+                        FCONE FCONE);
+      } else {
+        for(l = 0; l < k; l++)
+          for(j = 0; j < k; j++)
+            full_row_workspace.gram[l + j*k] = 0.0;
+
+        for(j = 0; j < num_train; j++){
+          const double wj = kw[j];
+          if(wj == 0.0)
+            continue;
+          for(int a = 0; a < k; a++){
+            const double za = np_glp_cv_cache.basis[a][j];
+            for(int b = a; b < k; b++){
+              const double zb = np_glp_cv_cache.basis[b][j];
+              full_row_workspace.gram[a + b*k] += wj*za*zb;
+              if(b != a)
+                full_row_workspace.gram[b + a*k] += wj*za*zb;
+            }
           }
         }
       }
@@ -23218,13 +23271,40 @@ static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_f
                                          1.0e-10))
         goto cleanup_xweight_block;
 
-      for(j = 0; j < num_train; j++){
-        double zju = 0.0;
-        const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
-        for(l = 0; l < k; l++)
-          zju += np_glp_cv_cache.basis[l][j]*
-            full_row_workspace.rhs[l];
-        rows_out[i][orig_j] = kw[j]*zju;
+      if(use_weighted_blas){
+        const char trans_n = 'N';
+        const double alpha = 1.0;
+        const double beta = 0.0;
+        const int one = 1;
+        const int basis_stride = np_glp_cv_cache.basis_stride;
+
+        F77_CALL(dgemv)(&trans_n,
+                        &num_train,
+                        &k,
+                        &alpha,
+                        np_glp_cv_cache.basis[0],
+                        &basis_stride,
+                        full_row_workspace.rhs,
+                        &one,
+                        &beta,
+                        mean_row,
+                        &one
+                        FCONE);
+        for(j = 0; j < num_train; j++){
+          const int orig_j =
+            (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
+          rows_out[i][orig_j] = kw[j]*mean_row[j];
+        }
+      } else {
+        for(j = 0; j < num_train; j++){
+          double zju = 0.0;
+          const int orig_j =
+            (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
+          for(l = 0; l < k; l++)
+            zju += np_glp_cv_cache.basis[l][j]*
+              full_row_workspace.rhs[l];
+          rows_out[i][orig_j] = kw[j]*zju;
+        }
       }
 
       if(drop_eval_self){
@@ -23248,6 +23328,7 @@ cleanup_xweight_block:
   if(lambdax != NULL) free(lambdax);
   if(kw != NULL) free(kw);
   if(mean_row != NULL) free(mean_row);
+  if(weighted_design != NULL) free(weighted_design);
   if(matrix_bandwidth_x != NULL) free_tmat(matrix_bandwidth_x);
   if(matrix_bandwidth_eval_one != NULL) free_tmat(matrix_bandwidth_eval_one);
   if(eval_xuno_one != NULL) free_mat(eval_xuno_one, num_reg_unordered_extern);
