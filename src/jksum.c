@@ -26668,7 +26668,9 @@ int np_conditional_density_cvml_stream_engine_supported(void){
 int np_conditional_density_cvml_lp_stream(double *vector_scale_factor,
                                           double *cv){
   const int num_obs = num_obs_train_extern;
-  const int use_cached_gnn = (BANDWIDTH_den_extern == BW_GEN_NN);
+  const int use_xrow_ctx =
+    (BANDWIDTH_den_extern == BW_GEN_NN) ||
+    (BANDWIDTH_den_extern == BW_ADAP_NN);
   NPConditionalXRowCtx xctx = {0};
   NPConditionalYRowCtx yctx = {0};
   double *xrow = NULL, *yrow = NULL;
@@ -26711,7 +26713,7 @@ int np_conditional_density_cvml_lp_stream(double *vector_scale_factor,
   if((xrow == NULL) || (yrow == NULL))
     goto cleanup_cvml_lp_stream;
 
-  if(use_cached_gnn){
+  if(use_xrow_ctx){
     if(np_conditional_xrow_ctx_prepare(vector_scale_factor, &xctx) != 0)
       goto cleanup_cvml_lp_stream;
     if(np_conditional_yrow_ctx_prepare(vector_scale_factor, OP_NORMAL, &yctx) != 0)
@@ -26724,7 +26726,7 @@ int np_conditional_density_cvml_lp_stream(double *vector_scale_factor,
     if(use_parallel_rows && ((i % iNum_Processors) != my_rank))
       continue;
 
-    if(use_cached_gnn){
+    if(use_xrow_ctx){
       if(np_conditional_xrow_from_ctx(&xctx, i, xrow) != 0){
         local_fail = 1;
         break;

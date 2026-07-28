@@ -116,3 +116,42 @@ test_that("MPI adaptive acceleration does not enter the dense shadow oracle", {
   expect_false(grepl("weighted_design", shadow, fixed = TRUE))
   expect_false(grepl("F77_CALL(dgemm)", shadow, fixed = TRUE))
 })
+
+test_that("MPI adaptive density CVML reuses rank-local row contexts", {
+  src_file <- locate_adaptive_xrow_blas_source()
+  skip_if(is.null(src_file), "source file src/jksum.c unavailable")
+  lines <- readLines(src_file, warn = FALSE)
+  body <- adaptive_xrow_source_body(
+    lines,
+    "^int np_conditional_density_cvml_lp_stream\\(",
+    "^static int np_conditional_density_cvml_lp_block_stream\\("
+  )
+  compact <- gsub("[[:space:]]+", " ", body)
+
+  expect_match(
+    compact,
+    "const int use_xrow_ctx = (BANDWIDTH_den_extern == BW_GEN_NN) || (BANDWIDTH_den_extern == BW_ADAP_NN);",
+    fixed = TRUE
+  )
+  expect_match(
+    body,
+    "np_conditional_xrow_ctx_prepare(vector_scale_factor, &xctx)",
+    fixed = TRUE
+  )
+  expect_match(
+    body,
+    "np_conditional_yrow_ctx_prepare(vector_scale_factor, OP_NORMAL, &yctx)",
+    fixed = TRUE
+  )
+  expect_match(
+    body,
+    "np_conditional_xrow_from_ctx(&xctx, i, xrow)",
+    fixed = TRUE
+  )
+  expect_match(
+    body,
+    "np_conditional_yrow_from_ctx(&yctx, i, yrow)",
+    fixed = TRUE
+  )
+  expect_match(body, "MPI_Allreduce(&local_cv", fixed = TRUE)
+})

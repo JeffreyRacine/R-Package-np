@@ -65,6 +65,12 @@
   least-squares cross-validation; formulas, rank ownership, and collectives
   are unchanged, but BLAS reassociation can change last floating-point bits.
 
+* Adaptive-nearest-neighbour conditional-density likelihood
+  cross-validation now reuses its rank-local X- and Y-row contexts across
+  observations, matching the existing adaptive least-squares architecture.
+  This removes repeated bandwidth and workspace setup without changing row
+  ownership, reductions, or estimator formulas.
+
 * On Apple ARM64, eligible fixed and generalized-nearest-neighbour products of
   two or more ordinary Gaussian continuous kernels now use one vector
   exponential of the summed squared standardized distances on each rank.
