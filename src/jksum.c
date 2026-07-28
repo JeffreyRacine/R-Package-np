@@ -64,6 +64,10 @@ typedef void (*np_vDSP_vaddD_fn)(const double *, np_vDSP_Stride,
                                  const double *, np_vDSP_Stride,
                                  double *, np_vDSP_Stride,
                                  np_vDSP_Length);
+typedef void (*np_vDSP_vdivD_fn)(const double *, np_vDSP_Stride,
+                                 const double *, np_vDSP_Stride,
+                                 double *, np_vDSP_Stride,
+                                 np_vDSP_Length);
 typedef void (*np_vvexp_fn)(double *, const double *, const int *);
 typedef void (*np_vvfabs_fn)(double *, const double *, const int *);
 typedef void (*np_vvrec_fn)(double *, const double *, const int *);
@@ -5639,6 +5643,7 @@ static np_vDSP_vmulD_fn np_accel_vmulD = NULL;
 static np_vDSP_sveD_fn np_accel_sveD = NULL;
 static np_vDSP_dotprD_fn np_accel_dotprD = NULL;
 static np_vDSP_vaddD_fn np_accel_vaddD = NULL;
+static np_vDSP_vdivD_fn np_accel_vdivD = NULL;
 static np_vvexp_fn np_accel_vvexp = NULL;
 static np_vvfabs_fn np_accel_vvfabs = NULL;
 static np_vvrec_fn np_accel_vvrec = NULL;
@@ -5671,6 +5676,8 @@ static int np_accel_gauss_resolve(void)
     (np_vDSP_dotprD_fn)dlsym(np_accel_gauss_handle, "vDSP_dotprD");
   np_accel_vaddD =
     (np_vDSP_vaddD_fn)dlsym(np_accel_gauss_handle, "vDSP_vaddD");
+  np_accel_vdivD =
+    (np_vDSP_vdivD_fn)dlsym(np_accel_gauss_handle, "vDSP_vdivD");
   np_accel_vvexp =
     (np_vvexp_fn)dlsym(np_accel_gauss_handle, "vvexp");
   np_accel_vvfabs =
@@ -5685,6 +5692,7 @@ static int np_accel_gauss_resolve(void)
      np_accel_sveD == NULL ||
      np_accel_dotprD == NULL ||
      np_accel_vaddD == NULL ||
+     np_accel_vdivD == NULL ||
      np_accel_vvexp == NULL ||
      np_accel_vvfabs == NULL ||
      np_accel_vvrec == NULL) {
@@ -5697,6 +5705,7 @@ static int np_accel_gauss_resolve(void)
     np_accel_sveD = NULL;
     np_accel_dotprD = NULL;
     np_accel_vaddD = NULL;
+    np_accel_vdivD = NULL;
     np_accel_vvexp = NULL;
     np_accel_vvfabs = NULL;
     np_accel_vvrec = NULL;
@@ -5745,6 +5754,105 @@ static int np_accel_gauss_scratch_ensure(const int n)
   np_accel_gauss_poly = poly;
 
   np_accel_gauss_capacity = n;
+  return 1;
+}
+
+/*
+  Form one complete adaptive-NN ordinary-Gaussian row:
+
+    prod_d phi((x_d-X_di)/h_di)
+
+  and, when requested, divide lane i by prod_d h_di.  Unlike the fixed/GNN
+  fusion below, each adaptive bandwidth is attached to a training
+  observation, so bandwidth[d] is a vector rather than a scalar.  Callers
+  retain the scalar kernel engine as an independent fallback.
+*/
+static int NP_NOINLINE np_accel_gauss_adaptive_row_try(
+  const int * const kernel_c,
+  const int * const operator,
+  double * const * const train,
+  double * const * const eval_one,
+  double * const * const bandwidth,
+  const int ndim,
+  const int n,
+  const int divide_by_bandwidth_product,
+  double * const out)
+{
+  const double minus_one = -1.0;
+  const double minus_half = -0.5;
+  const double zero = 0.0;
+  const int ni = n;
+  double coefficient = 1.0;
+
+  if((!np_mseries_accelerate_enabled_cache) ||
+     (kernel_c == NULL) || (operator == NULL) ||
+     (train == NULL) || (eval_one == NULL) || (bandwidth == NULL) ||
+     (out == NULL) || (ndim <= 0) ||
+     (n < NP_CONDITIONAL_X_WEIGHTED_BLAS_MIN_ROWS) ||
+     (!np_accel_gauss_resolve()) ||
+     (!np_accel_gauss_scratch_ensure(n)))
+    return 0;
+
+  /*
+   * Validate every input row before writing the caller-owned output.  A late
+   * non-finite exponential still zeros the row before scalar fallback.
+   */
+  for(int d = 0; d < ndim; d++){
+    if((kernel_c[d] != 0) || (operator[d] != OP_NORMAL) ||
+       (train[d] == NULL) || (eval_one[d] == NULL) ||
+       (bandwidth[d] == NULL))
+      return 0;
+    coefficient *= ONE_OVER_SQRT_TWO_PI;
+  }
+
+  for(int d = 0; d < ndim; d++){
+    const double x = eval_one[d][0];
+
+    np_accel_vsmsaD(train[d], 1, &minus_one, &x,
+                    np_accel_gauss_tmp, 1, (np_vDSP_Length)n);
+    /*
+     * vDSP_vdivD stores its second vector divided by its first vector:
+     * tmp / bandwidth.
+     */
+    np_accel_vdivD(bandwidth[d], 1, np_accel_gauss_tmp, 1,
+                   np_accel_gauss_val, 1, (np_vDSP_Length)n);
+    np_accel_vsqD(np_accel_gauss_val, 1,
+                  np_accel_gauss_tmp, 1, (np_vDSP_Length)n);
+
+    if(d == 0){
+      memcpy(np_accel_gauss_arg, np_accel_gauss_tmp,
+             (size_t)n*sizeof(double));
+      if(divide_by_bandwidth_product)
+        memcpy(np_accel_gauss_work, bandwidth[d],
+               (size_t)n*sizeof(double));
+    } else {
+      np_accel_vaddD(np_accel_gauss_arg, 1, np_accel_gauss_tmp, 1,
+                     np_accel_gauss_arg, 1, (np_vDSP_Length)n);
+      if(divide_by_bandwidth_product)
+        np_accel_vmulD(np_accel_gauss_work, 1, bandwidth[d], 1,
+                       np_accel_gauss_work, 1, (np_vDSP_Length)n);
+    }
+  }
+
+  np_accel_vsmsaD(np_accel_gauss_arg, 1, &minus_half, &zero,
+                  np_accel_gauss_arg, 1, (np_vDSP_Length)n);
+  np_accel_vvexp(out, np_accel_gauss_arg, &ni);
+  np_accel_vsmulD(out, 1, &coefficient,
+                  out, 1, (np_vDSP_Length)n);
+
+  if(divide_by_bandwidth_product){
+    np_accel_vdivD(np_accel_gauss_work, 1, out, 1,
+                   np_accel_gauss_val, 1, (np_vDSP_Length)n);
+    memcpy(out, np_accel_gauss_val, (size_t)n*sizeof(double));
+  }
+
+  for(int i = 0; i < n; i++){
+    if(!isfinite(out[i])){
+      memset(out, 0, (size_t)n*sizeof(double));
+      return 0;
+    }
+  }
+
   return 1;
 }
 
@@ -6486,6 +6594,7 @@ void np_accel_gauss_release_buffers(void)
   np_accel_sveD = NULL;
   np_accel_dotprD = NULL;
   np_accel_vaddD = NULL;
+  np_accel_vdivD = NULL;
   np_accel_vvexp = NULL;
   np_accel_vvfabs = NULL;
   np_accel_vvrec = NULL;
@@ -14052,6 +14161,7 @@ static NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas(
     double self_weight;
     double nepsilon = 0.0;
     int ridge_steps = 0;
+    int adaptive_gaussian_row = 0;
 
     if((j & 31) == 0)
       np_progress_bandwidth_loop_step();
@@ -14068,7 +14178,23 @@ static NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas(
       eval_basis[l] = basis[l][j];
 
     memset(kw, 0, (size_t)num_obs*sizeof(double));
-    if(kernel_weighted_sum_np_ctx_ex(kernel_c,
+#if NP_ACCEL_GAUSS_COMPILED
+    adaptive_gaussian_row =
+      (num_reg_unordered == 0) &&
+      (num_reg_ordered == 0) &&
+      (!int_cker_bound_extern) &&
+      np_accel_gauss_adaptive_row_try(kernel_c,
+                                      operator,
+                                      matrix_X_continuous,
+                                      eval_c,
+                                      matrix_bandwidth,
+                                      num_reg_continuous,
+                                      num_obs,
+                                      1,
+                                      kw);
+#endif
+    if(!adaptive_gaussian_row &&
+       kernel_weighted_sum_np_ctx_ex(kernel_c,
                                      kernel_u,
                                      kernel_o,
                                      BW_ADAP_NN,
@@ -22116,6 +22242,7 @@ static int NP_NOINLINE NP_HOT_ALIGN np_conditional_xrow_from_ctx_impl(
   NPConditionalBoundState bounds_state;
   int j, l;
   int status = 1;
+  int adaptive_gaussian_row = 0;
 
   if((ctx == NULL) || (!ctx->ready) || (row_out == NULL))
     return 1;
@@ -22150,7 +22277,25 @@ static int NP_NOINLINE NP_HOT_ALIGN np_conditional_xrow_from_ctx_impl(
                              vector_cxkerlb_extern,
                              vector_cxkerub_extern,
                              &bounds_state);
-  if(np_shadow_conditional_kernel_row_raw(ctx->kernel_cx,
+#if NP_ACCEL_GAUSS_COMPILED
+  adaptive_gaussian_row =
+    (BANDWIDTH_den_extern == BW_ADAP_NN) &&
+    (num_reg_unordered_extern == 0) &&
+    (num_reg_ordered_extern == 0) &&
+    (!int_cxker_bound_extern) &&
+    (int_TREE_X != NP_TREE_TRUE) &&
+    np_accel_gauss_adaptive_row_try(ctx->kernel_cx,
+                                    ctx->x_operator,
+                                    matrix_X_continuous_train_extern,
+                                    ctx->eval_xcon_one,
+                                    ctx->matrix_bandwidth_x,
+                                    num_reg_continuous_extern,
+                                    num_train,
+                                    0,
+                                    ctx->kw);
+#endif
+  if(!adaptive_gaussian_row &&
+     np_shadow_conditional_kernel_row_raw(ctx->kernel_cx,
                                           ctx->kernel_ux,
                                           ctx->kernel_ox,
                                           ctx->x_operator,
