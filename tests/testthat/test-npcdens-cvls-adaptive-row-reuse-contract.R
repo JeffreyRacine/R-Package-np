@@ -94,10 +94,10 @@ test_that("shared deletion utility is hidden, signed, bounded, and allocation-fr
   )
   expect_match(
     implementation,
-    "den = NZD(1.0 - full_row[eval_idx])",
+    "if(!np_lp_delete_denominator(full_row[eval_idx], &den))",
     fixed = TRUE
   )
-  expect_false(grepl("NZD_POS", implementation, fixed = TRUE))
+  expect_false(grepl("NZD", implementation, fixed = TRUE))
   expect_match(
     implementation,
     "(j == eval_idx) ? 0.0 : full_row[j]/den",

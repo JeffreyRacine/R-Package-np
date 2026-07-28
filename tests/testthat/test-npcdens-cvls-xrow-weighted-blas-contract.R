@@ -114,7 +114,7 @@ test_that("fixed CVLS weighted BLAS preserves signed row algebra and fallback", 
   )
   expect_match(
     body,
-    "den = NZD(1.0 - full_rows_out[i][eval_idx])",
+    "np_lp_delete_denominator(full_rows_out[i][eval_idx], &den)",
     fixed = TRUE
   )
   expect_match(body, "if(weighted_design != NULL) free(weighted_design);", fixed = TRUE)
@@ -128,7 +128,7 @@ test_that("fixed CVLS weighted BLAS preserves signed row algebra and fallback", 
     "np_lp_full_row_workspace_solve",
     "F77_CALL(dgemv)",
     "full_rows_out[i][orig_j] = kw[j]*mean_row[j]",
-    "den = NZD(1.0 - full_rows_out[i][eval_idx])"
+    "np_lp_delete_denominator(full_rows_out[i][eval_idx], &den)"
   )
   positions <- vapply(markers, function(marker) {
     regexpr(marker, body, fixed = TRUE)[[1L]]
@@ -196,7 +196,7 @@ test_that("generalized-NN CVLS reuses signed weighted BLAS with scalar fallback"
   )
   expect_match(
     body,
-    "den = NZD(1.0 - full_rows_out[i][eval_idx])",
+    "np_lp_delete_denominator(full_rows_out[i][eval_idx], &den)",
     fixed = TRUE
   )
   expect_match(body, "if(weighted_design != NULL) free(weighted_design);", fixed = TRUE)
@@ -210,7 +210,7 @@ test_that("generalized-NN CVLS reuses signed weighted BLAS with scalar fallback"
     "np_lp_full_row_workspace_solve",
     "F77_CALL(dgemv)",
     "full_rows_out[i][j] = kw[j]*mean_row[j]",
-    "den = NZD(1.0 - full_rows_out[i][eval_idx])"
+    "np_lp_delete_denominator(full_rows_out[i][eval_idx], &den)"
   )
   positions <- vapply(markers, function(marker) {
     regexpr(marker, body, fixed = TRUE)[[1L]]

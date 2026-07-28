@@ -13,25 +13,31 @@ locate_signed_delete_sources <- function() {
   list(
     jksum = file.path(roots[[1L]], "src", "jksum.c"),
     row = file.path(roots[[1L]], "src", "jksum_lp_row.c"),
-    header = file.path(roots[[1L]], "src", "headers.h")
+    row_header = file.path(roots[[1L]], "src", "jksum_lp_row.h")
   )
 }
 
-test_that("LP delete-row denominators use the shared signed guard", {
+test_that("LP delete-row denominators retain every finite nonzero signed value", {
   paths <- locate_signed_delete_sources()
   skip_if(is.null(paths), "package C sources unavailable in this test context")
 
-  header <- paste(readLines(paths$header, warn = FALSE), collapse = "\n")
+  header <- paste(readLines(paths$row_header, warn = FALSE), collapse = "\n")
+  row <- paste(readLines(paths$row, warn = FALSE), collapse = "\n")
 
-  expect_match(header, "static inline double NZD(const double a)", fixed = TRUE)
+  expect_match(header, "static inline int np_lp_delete_denominator", fixed = TRUE)
+  expect_match(header, "*denominator = 1.0 - leverage;", fixed = TRUE)
+  expect_match(header, "isfinite(*denominator)", fixed = TRUE)
+  expect_match(header, "(*denominator != 0.0)", fixed = TRUE)
+  expect_false(grepl("DBL_EPSILON", header, fixed = TRUE))
   expect_match(
-    header,
-    "return (a < 0.0) ? MIN(-DBL_EPSILON, a) : MAX(DBL_EPSILON, a);",
+    row,
+    "if(!np_lp_delete_denominator(full_row[eval_idx], &den))",
     fixed = TRUE
   )
+  expect_false(grepl("NZD(1.0 - full_row[eval_idx])", row, fixed = TRUE))
 })
 
-test_that("promoted conditional CVLS paired rows use signed deletion", {
+test_that("promoted conditional CVLS paired rows use exact signed deletion", {
   paths <- locate_signed_delete_sources()
   skip_if(is.null(paths), "package C sources unavailable in this test context")
 
@@ -39,11 +45,16 @@ test_that("promoted conditional CVLS paired rows use signed deletion", {
   expect_equal(lengths(regmatches(
     source,
     gregexpr(
-      "NZD\\(1\\.0 - full_rows_out\\[i\\]\\[eval_idx\\]\\)",
+      "np_lp_delete_denominator\\(full_rows_out\\[i\\]\\[eval_idx\\], &den\\)",
       source,
       perl = TRUE
     )
   )), 2L)
+  expect_false(grepl(
+    "NZD(1.0 - full_rows_out[i][eval_idx])",
+    source,
+    fixed = TRUE
+  ))
   expect_false(grepl(
     "NZD_POS(1.0 - full_rows_out[i][eval_idx])",
     source,

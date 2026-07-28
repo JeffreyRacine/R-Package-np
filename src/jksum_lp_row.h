@@ -1,7 +1,22 @@
 #ifndef NP_JKSUM_LP_ROW_H
 #define NP_JKSUM_LP_ROW_H
 
+#include <math.h>
 #include <R_ext/Visibility.h>
+
+/*
+ * Exact denominator contract for the full-row/delete-one LP identity.
+ * Every finite nonzero signed denominator is valid and remains unchanged;
+ * zero and non-finite values denote a failed deleted system.
+ */
+static inline int np_lp_delete_denominator(const double leverage,
+                                           double *denominator)
+{
+  if(denominator == NULL)
+    return 0;
+  *denominator = 1.0 - leverage;
+  return isfinite(*denominator) && (*denominator != 0.0);
+}
 
 typedef struct {
   int nterms;

@@ -426,9 +426,10 @@ int np_lp_delete_smoother_row(const double *full_row,
 
   /*
    * Exact delete-one identity for a linear smoother with its bandwidth row
-   * held fixed. NZD retains the sign of every finite deletion denominator.
+   * held fixed. Do not replace a valid small signed denominator by a floor.
    */
-  den = NZD(1.0 - full_row[eval_idx]);
+  if(!np_lp_delete_denominator(full_row[eval_idx], &den))
+    return 1;
   for(j = 0; j < n; j++)
     loo_row[j] = (j == eval_idx) ? 0.0 : full_row[j]/den;
 

@@ -398,7 +398,7 @@ test_that("conditional LP LOO rows use signed full-row deletion and no QR", {
   }
 
   expect_equal(
-    sum(grepl("const double den = NZD\\(1\\.0 - ", lines)),
+    sum(grepl("if\\(!np_lp_delete_denominator\\(", lines)),
     6L
   )
   expect_equal(

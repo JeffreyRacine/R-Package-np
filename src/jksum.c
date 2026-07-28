@@ -19848,7 +19848,10 @@ static int np_shadow_conditional_build_x_weights_core(double *vector_scale_facto
 
       if(drop_eval_self){
         const size_t row_offset = (size_t)orig_i*(size_t)num_train;
-        const double den = NZD(1.0 - weights_out[row_offset + (size_t)orig_i]);
+        double den;
+        if(!np_lp_delete_denominator(
+             weights_out[row_offset + (size_t)orig_i], &den))
+          goto cleanup_xweights;
         for(j = 0; j < num_train; j++){
           const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
           weights_out[row_offset + (size_t)orig_j] =
@@ -20552,7 +20555,9 @@ static int np_conditional_xrow_from_ctx_impl(NPConditionalXRowCtx *ctx,
       }
 
       if(drop_eval_self){
-        const double den = NZD(1.0 - row_out[eval_idx]);
+        double den;
+        if(!np_lp_delete_denominator(row_out[eval_idx], &den))
+          goto cleanup_xrow_from_ctx;
         for(j = 0; j < num_train; j++){
           const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
           row_out[orig_j] =
@@ -21670,7 +21675,9 @@ static int np_conditional_x_weight_row_stream_core_impl(double *vector_scale_fac
     }
 
     if(drop_eval_self){
-      const double den = NZD(1.0 - row_out[eval_idx]);
+      double den;
+      if(!np_lp_delete_denominator(row_out[eval_idx], &den))
+        goto cleanup_xweight_row;
       for(j = 0; j < num_train; j++){
         const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
         row_out[orig_j] =
@@ -24007,7 +24014,9 @@ static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_f
       }
 
       if(drop_eval_self){
-        const double den = NZD(1.0 - rows_out[i][eval_idx]);
+        double den;
+        if(!np_lp_delete_denominator(rows_out[i][eval_idx], &den))
+          goto cleanup_xweight_block;
         for(j = 0; j < num_train; j++){
           const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
           rows_out[i][orig_j] =
@@ -24419,7 +24428,9 @@ static int NP_NOINLINE np_conditional_x_weight_block_pair_stream_core(
       }
     }
     {
-      const double den = NZD(1.0 - full_rows_out[i][eval_idx]);
+      double den;
+      if(!np_lp_delete_denominator(full_rows_out[i][eval_idx], &den))
+        goto cleanup_xweight_block_pair;
 
       for(j = 0; j < num_train; j++){
         const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
@@ -24742,7 +24753,9 @@ static int NP_NOINLINE NP_HOT_ALIGN np_conditional_x_weight_block_pair_gnn_strea
       }
     }
     {
-      const double den = NZD(1.0 - full_rows_out[i][eval_idx]);
+      double den;
+      if(!np_lp_delete_denominator(full_rows_out[i][eval_idx], &den))
+        goto cleanup_xweight_block_pair_gnn;
 
       for(j = 0; j < num_train; j++)
         loo_rows_out[i][j] =
