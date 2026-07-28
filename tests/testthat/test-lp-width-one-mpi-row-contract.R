@@ -31,7 +31,10 @@ test_that("MPI directed width-one rows use implicit scalar accumulation", {
   owner_source <- substr(source, owner_start, nchar(source))
   scalar_start <- regexpr("if(nterms == 1){", owner_source, fixed = TRUE)
   wider_start <- regexpr(
-    "} else {\n        for(i = 0; i < num_obs; i++)",
+    paste0(
+      "} else {\n",
+      "        const NPLPOwnedRowContext owned_context"
+    ),
     owner_source,
     fixed = TRUE
   )
