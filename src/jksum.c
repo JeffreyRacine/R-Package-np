@@ -399,6 +399,10 @@ static double np_blas_ddot_i64(const int64_t n, const double *x, const double *y
 #define NP_CONDITIONAL_X_WEIGHTED_BLAS_MIN_ROWS 2048
 #define NP_CONDITIONAL_X_WEIGHTED_BLAS_MAX_BYTES \
   ((size_t)64*(size_t)1024*(size_t)1024)
+#define NP_REG_ALLLARGE_BLAS_MIN_ROWS 2048
+#define NP_REG_ALLLARGE_BLAS_MIN_TERMS 6
+#define NP_REG_ALLLARGE_PROJECTION_MAX_BYTES \
+  ((size_t)8*(size_t)1024*(size_t)1024)
 
 static int np_glp_dgemv_profitable(const int nrows, const int nterms){
 #if NP_ACCEL_GAUSS_COMPILED
@@ -439,6 +443,23 @@ static int np_conditional_x_weighted_blas_profitable(
 #endif
 }
 
+static int np_reg_alllarge_blas_profitable(const int nrows,
+                                           const int nterms,
+                                           const int basis_stride)
+{
+#if NP_ACCEL_GAUSS_COMPILED
+  return np_mseries_accelerate_enabled_cache &&
+    (nrows >= NP_REG_ALLLARGE_BLAS_MIN_ROWS) &&
+    (nterms >= NP_REG_ALLLARGE_BLAS_MIN_TERMS) &&
+    (basis_stride >= nrows);
+#else
+  (void)nrows;
+  (void)nterms;
+  (void)basis_stride;
+  return 0;
+#endif
+}
+
 static void np_blas_dgemv_t_int(const int nrows,
                                 const int ncols,
                                 const double *matrix,
@@ -466,6 +487,97 @@ static void np_blas_dgemv_t_int(const int nrows,
                   result,
                   &inc
                   FCONE);
+}
+
+static void np_blas_dgemv_n_int(const int nrows,
+                                const int ncols,
+                                const double *matrix,
+                                const int leading_dim,
+                                const double *vector,
+                                double *result){
+  const char trans = 'N';
+  const double alpha = 1.0;
+  const double beta = 0.0;
+  const int inc = 1;
+
+  if((nrows <= 0) || (ncols <= 0) || (leading_dim < nrows) ||
+     (matrix == NULL) || (vector == NULL) || (result == NULL))
+    return;
+
+  F77_CALL(dgemv)(&trans,
+                  &nrows,
+                  &ncols,
+                  &alpha,
+                  matrix,
+                  &leading_dim,
+                  vector,
+                  &inc,
+                  &beta,
+                  result,
+                  &inc
+                  FCONE);
+}
+
+static void np_blas_gram_int(const int nrows,
+                             const int nterms,
+                             const double *basis,
+                             const int basis_stride,
+                             double *gram){
+  const char transa = 'T';
+  const char transb = 'N';
+  const double alpha = 1.0;
+  const double beta = 0.0;
+
+  if((nrows <= 0) || (nterms <= 0) || (basis_stride < nrows) ||
+     (basis == NULL) || (gram == NULL))
+    return;
+
+  F77_CALL(dgemm)(&transa,
+                  &transb,
+                  &nterms,
+                  &nterms,
+                  &nrows,
+                  &alpha,
+                  basis,
+                  &basis_stride,
+                  basis,
+                  &basis_stride,
+                  &beta,
+                  gram,
+                  &nterms
+                  FCONE FCONE);
+}
+
+static void np_blas_project_inverse_block_int(
+  const int nrows,
+  const int nterms,
+  const double *basis,
+  const int basis_stride,
+  const double *inverse,
+  double *projection){
+  const char transa = 'N';
+  const char transb = 'N';
+  const double alpha = 1.0;
+  const double beta = 0.0;
+
+  if((nrows <= 0) || (nterms <= 0) || (basis_stride < nrows) ||
+     (basis == NULL) || (inverse == NULL) || (projection == NULL))
+    return;
+
+  F77_CALL(dgemm)(&transa,
+                  &transb,
+                  &nrows,
+                  &nterms,
+                  &nterms,
+                  &alpha,
+                  basis,
+                  &basis_stride,
+                  inverse,
+                  &nterms,
+                  &beta,
+                  projection,
+                  &nrows
+                  FCONE FCONE);
 }
 
 static void np_blas_dgemm_tn_int(const int m,
@@ -13937,37 +14049,86 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
 
       if(all_large_gate){
         const int k = glp_nterms;
+        const int basis_stride = np_glp_cv_cache.basis_stride;
         NPLPFullRowWorkspace inverse_workspace;
         double *beta = NULL;
+        double *yhat_all = NULL;
+        double *hdiag_all = NULL;
+        double *projection_block = NULL;
+        int projection_block_rows = 0;
+        int use_projection_blas = 0;
         int fast_ok;
 
         np_lp_full_row_workspace_init(&inverse_workspace);
         fast_ok = np_lp_full_row_workspace_reserve(&inverse_workspace, k, 1);
-        if(fast_ok){
+        if(fast_ok)
           beta = (double *)malloc((size_t)k*sizeof(double));
-          fast_ok = (beta != NULL);
-        }
+        fast_ok = fast_ok && (beta != NULL);
 
         if(fast_ok){
           const double ridge_eps = 1.0/(double)MAX(1, num_obs);
 
-          for(i = 0; i < k; i++){
-            inverse_workspace.rhs[i] = 0.0;
-            beta[i] = 0.0;
-            for(j = 0; j < k; j++)
-              inverse_workspace.matrix_copy[i + j*k] = 0.0;
+          np_refresh_mseries_accelerate_option();
+          use_projection_blas =
+            np_reg_alllarge_blas_profitable(num_obs, k, basis_stride);
+          if(use_projection_blas){
+            const size_t projection_max_elements =
+              NP_REG_ALLLARGE_PROJECTION_MAX_BYTES/sizeof(double);
+            const size_t block_rows =
+              MIN((size_t)num_obs, projection_max_elements/(size_t)k);
+
+            if((block_rows == 0) || (block_rows > (size_t)INT_MAX)){
+              use_projection_blas = 0;
+            } else {
+              projection_block_rows = (int)block_rows;
+              yhat_all = (double *)malloc((size_t)num_obs*sizeof(double));
+              hdiag_all = (double *)malloc((size_t)num_obs*sizeof(double));
+              projection_block = (double *)malloc(
+                block_rows*(size_t)k*sizeof(double));
+              if((yhat_all == NULL) || (hdiag_all == NULL) ||
+                 (projection_block == NULL)){
+                free(yhat_all);
+                free(hdiag_all);
+                free(projection_block);
+                yhat_all = NULL;
+                hdiag_all = NULL;
+                projection_block = NULL;
+                projection_block_rows = 0;
+                use_projection_blas = 0;
+              }
+            }
           }
 
-          for(i = 0; i < num_obs; i++){
-            const double yi = vector_Y[i];
-            for(int a = 0; a < k; a++){
-              const double za = basis[a][i];
-              inverse_workspace.rhs[a] += za*yi;
-              for(int b = a; b < k; b++){
-                const double zb = basis[b][i];
-                inverse_workspace.matrix_copy[a + b*k] += za*zb;
-                if(b != a)
-                  inverse_workspace.matrix_copy[b + a*k] += za*zb;
+          if(use_projection_blas){
+            np_blas_gram_int(num_obs,
+                             k,
+                             basis[0],
+                             basis_stride,
+                             inverse_workspace.matrix_copy);
+            np_blas_dgemv_t_int(num_obs,
+                                k,
+                                basis[0],
+                                basis_stride,
+                                vector_Y,
+                                inverse_workspace.rhs);
+          } else {
+            for(i = 0; i < k; i++){
+              inverse_workspace.rhs[i] = 0.0;
+              for(j = 0; j < k; j++)
+                inverse_workspace.matrix_copy[i + j*k] = 0.0;
+            }
+
+            for(i = 0; i < num_obs; i++){
+              const double yi = vector_Y[i];
+              for(int a = 0; a < k; a++){
+                const double za = basis[a][i];
+                inverse_workspace.rhs[a] += za*yi;
+                for(int b = a; b < k; b++){
+                  const double zb = basis[b][i];
+                  inverse_workspace.matrix_copy[a + b*k] += za*zb;
+                  if(b != a)
+                    inverse_workspace.matrix_copy[b + a*k] += za*zb;
+                }
               }
             }
           }
@@ -13976,27 +14137,69 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
             &inverse_workspace, k, ridge_eps, 64);
 
           if(fast_ok){
-            for(i = 0; i < k; i++){
-              double s = 0.0;
-              for(j = 0; j < k; j++)
-                s += inverse_workspace.gram[i + j*k] *
-                  inverse_workspace.rhs[j];
-              beta[i] = s;
+            if(use_projection_blas){
+              np_blas_dgemv_n_int(k,
+                                  k,
+                                  inverse_workspace.gram,
+                                  k,
+                                  inverse_workspace.rhs,
+                                  beta);
+              np_blas_dgemv_n_int(num_obs,
+                                  k,
+                                  basis[0],
+                                  basis_stride,
+                                  beta,
+                                  yhat_all);
+              for(i = 0; i < num_obs; i += projection_block_rows){
+                const int nblock =
+                  MIN(projection_block_rows, num_obs - i);
+
+                np_blas_project_inverse_block_int(
+                  nblock,
+                  k,
+                  basis[0] + i,
+                  basis_stride,
+                  inverse_workspace.gram,
+                  projection_block);
+                for(int row = 0; row < nblock; row++){
+                  double hii = 0.0;
+                  for(j = 0; j < k; j++)
+                    hii += basis[j][i + row] *
+                      projection_block[row + j*nblock];
+                  hdiag_all[i + row] = hii;
+                }
+              }
+            } else {
+              for(i = 0; i < k; i++){
+                double s = 0.0;
+                for(j = 0; j < k; j++)
+                  s += inverse_workspace.gram[i + j*k] *
+                    inverse_workspace.rhs[j];
+                beta[i] = s;
+              }
             }
 
             cv = 0.0;
             traceH = 0.0;
             for(i = 0; i < num_obs; i++){
-              double yhat = 0.0;
-              double hii = 0.0;
-              for(j = 0; j < k; j++){
-                const double zj = basis[j][i];
-                yhat += beta[j]*zj;
-              }
-              for(j = 0; j < k; j++){
-                const double zj = basis[j][i];
-                for(int b = 0; b < k; b++)
-                  hii += zj*inverse_workspace.gram[j + b*k]*basis[b][i];
+              double yhat;
+              double hii;
+
+              if(use_projection_blas){
+                yhat = yhat_all[i];
+                hii = hdiag_all[i];
+              } else {
+                yhat = 0.0;
+                hii = 0.0;
+                for(j = 0; j < k; j++){
+                  const double zj = basis[j][i];
+                  yhat += beta[j]*zj;
+                }
+                for(j = 0; j < k; j++){
+                  const double zj = basis[j][i];
+                  for(int b = 0; b < k; b++)
+                    hii += zj*inverse_workspace.gram[j + b*k]*basis[b][i];
+                }
               }
               {
                 const double loss_y =
@@ -14019,7 +14222,10 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
           }
         }
 
-        free(beta);
+        free(projection_block);
+        free(hdiag_all);
+        free(yhat_all);
+        if(beta != NULL) free(beta);
         np_lp_full_row_workspace_clear(&inverse_workspace);
 
         if(fast_ok){
