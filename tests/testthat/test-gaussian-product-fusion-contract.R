@@ -4,7 +4,10 @@ test_that("ordinary-Gaussian fusion admits all scalar-bandwidth row owners", {
   src <- readLines(test_path("..", "..", "src", "jksum.c"), warn = FALSE)
   text <- paste(src, collapse = "\n")
 
-  expect_match(text, "static int np_accel_gauss_product_try", fixed = TRUE)
+  expect_match(
+    text, "static int NP_NOINLINE np_accel_gauss_product_try",
+    fixed = TRUE
+  )
   expect_match(
     text,
     paste0(
@@ -21,10 +24,13 @@ test_that("ordinary-Gaussian fusion admits all scalar-bandwidth row owners", {
     "((BANDWIDTH_reg != BW_FIXED) || (!cont_largeh_any_fixed))",
     fixed = TRUE
   )
-  expect_match(text, "if(KERNEL_reg_np[i] != 0)", fixed = TRUE)
+  expect_match(
+    text, "((kind == 1) && (kernel[d] != 0))",
+    fixed = TRUE
+  )
   expect_match(
     text,
-    "if(fused_gaussian_product_eligible && (!any_cont_largeh))",
+    "if((fused_gaussian_product_eligible == 1) && (!any_cont_largeh))",
     fixed = TRUE
   )
   expect_match(
