@@ -419,7 +419,7 @@ test_that("fixed conditional LP paired rows reuse the canonical full-row workspa
 
   lines <- readLines(src_file, warn = FALSE)
   helper_start <- grep(
-    "^static int np_conditional_x_weight_block_pair_stream_core\\(",
+    "^static int (NP_NOINLINE )?np_conditional_x_weight_block_pair_stream_core\\(",
     lines
   )
   helper_stop <- grep(
@@ -469,7 +469,10 @@ test_that("conditional LP row contexts own reusable full-row solve storage", {
   lines <- readLines(src_file, warn = FALSE)
   struct_start <- grep("^typedef struct \\{$", lines)
   struct_stop <- grep("^} NPConditionalXRowCtx;$", lines)
-  impl_start <- grep("^static int np_conditional_xrow_from_ctx_impl\\(", lines)
+  impl_start <- grep(
+    "^static int (NP_NOINLINE )?(NP_HOT_ALIGN )?np_conditional_xrow_from_ctx_impl\\(",
+    lines
+  )
   prepare_start <- grep("^static int np_conditional_xrow_ctx_prepare\\(", lines)
   clear_start <- grep("^static void np_conditional_xrow_ctx_clear\\(", lines)
   wrapper_start <- grep("^static int np_conditional_xrow_from_ctx\\(", lines)
