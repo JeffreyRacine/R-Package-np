@@ -55,6 +55,15 @@
   fallback paths. The formulas are unchanged but BLAS reassociation can
   change last floating-point bits.
 
+* Adaptive-nearest-neighbour conditional local-polynomial objectives now
+  reuse the same bounded weighted-design BLAS assembly when the basis has at
+  least four terms. Widths one through three retain their established scalar
+  transcript, as do small-sample, non-Accelerate, and allocation-fallback
+  routes. This accelerates conditional-density likelihood and least-squares
+  cross-validation and conditional-distribution least-squares
+  cross-validation; the formulas are unchanged but BLAS reassociation can
+  change last floating-point bits.
+
 * On Apple ARM64, eligible fixed and generalized-nearest-neighbour products of
   two or more ordinary Gaussian continuous kernels now use one vector
   exponential of the summed squared standardized distances. Non-Apple,
