@@ -76,7 +76,7 @@ test_that("adaptive Gaussian row fusion has exactly two objective consumers", {
 
   regression <- adaptive_gaussian_row_source_body(
     lines,
-    "^static NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas\\(",
+    "^static (NP_NOINLINE )?NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas\\(",
     paste0(
       "^static (NPRegCvLpResult np_regression_cv_lp_objective|",
       "int np_distribution_cvls_ordered_profile_stream)\\("
