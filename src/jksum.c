@@ -403,6 +403,8 @@ static double np_blas_ddot_i64(const int64_t n, const double *x, const double *y
 #define NP_REG_ALLLARGE_BLAS_MIN_TERMS 6
 #define NP_REG_ALLLARGE_PROJECTION_MAX_BYTES \
   ((size_t)8*(size_t)1024*(size_t)1024)
+/* Bound both scratch space and work completed before fit progress resumes. */
+#define NP_REG_ALLLARGE_FIT_BLOCK_MAX_ROWS 8192
 
 static int np_glp_dgemv_profitable(const int nrows, const int nterms){
 #if NP_ACCEL_GAUSS_COMPILED
@@ -19488,6 +19490,12 @@ double *SIGN){
         double *eval_basis = NULL, *eval_deriv = NULL;
         NPLPFullRowWorkspace inverse_workspace;
         double *beta = NULL;
+        double *eval_basis_block = NULL;
+        double *projection_block = NULL;
+        double *yhat_block = NULL;
+        int eval_block_rows = 0;
+        int basis_is_contiguous = 0;
+        int use_fit_projection_blas = 0;
         int fast_ok;
 
         np_lp_full_row_workspace_init(&inverse_workspace);
@@ -19497,7 +19505,18 @@ double *SIGN){
                                      &glp_terms,
                                      &glp_nterms);
         if(fast_ok && (glp_nterms > 0)){
-          basis = alloc_matd(num_obs_train, glp_nterms);
+          np_refresh_mseries_accelerate_option();
+          basis_is_contiguous =
+            (!do_grad) &&
+            np_reg_alllarge_blas_profitable(num_obs_train,
+                                            glp_nterms,
+                                            num_obs_train) &&
+            np_reg_alllarge_blas_profitable(num_obs_eval,
+                                            glp_nterms,
+                                            num_obs_eval);
+          basis = basis_is_contiguous ?
+            alloc_tmatd(num_obs_train, glp_nterms) :
+            alloc_matd(num_obs_train, glp_nterms);
           fast_ok = np_lp_full_row_workspace_reserve(
             &inverse_workspace, glp_nterms, 1);
           beta = (double *)malloc((size_t)glp_nterms*sizeof(double));
@@ -19557,23 +19576,69 @@ double *SIGN){
           const double se_default = (sk*hprod > 0.0) ?
             sqrt(MAX(0.0, sigma2hat) * K_INT_KERNEL_P / (sk*hprod)) : 0.0;
 
-          for(i = 0; i < glp_nterms; i++){
-            inverse_workspace.rhs[i] = 0.0;
-            beta[i] = 0.0;
-            for(j = 0; j < glp_nterms; j++)
-              inverse_workspace.matrix_copy[i + j*glp_nterms] = 0.0;
+          use_fit_projection_blas = basis_is_contiguous;
+          if(use_fit_projection_blas){
+            const size_t projection_max_elements =
+              NP_REG_ALLLARGE_PROJECTION_MAX_BYTES/sizeof(double);
+            const size_t block_rows =
+              MIN((size_t)NP_REG_ALLLARGE_FIT_BLOCK_MAX_ROWS,
+                  MIN((size_t)num_obs_eval,
+                      projection_max_elements/(size_t)glp_nterms));
+
+            if((block_rows == 0) || (block_rows > (size_t)INT_MAX)){
+              use_fit_projection_blas = 0;
+            } else {
+              eval_block_rows = (int)block_rows;
+              eval_basis_block = (double *)malloc(
+                block_rows*(size_t)glp_nterms*sizeof(double));
+              projection_block = (double *)malloc(
+                block_rows*(size_t)glp_nterms*sizeof(double));
+              yhat_block = (double *)malloc(block_rows*sizeof(double));
+              if((eval_basis_block == NULL) ||
+                 (projection_block == NULL) ||
+                 (yhat_block == NULL)){
+                free(eval_basis_block);
+                free(projection_block);
+                free(yhat_block);
+                eval_basis_block = NULL;
+                projection_block = NULL;
+                yhat_block = NULL;
+                eval_block_rows = 0;
+                use_fit_projection_blas = 0;
+              }
+            }
           }
 
-          for(i = 0; i < num_obs_train; i++){
-            const double yi = vector_Y[i];
-            for(int a = 0; a < glp_nterms; a++){
-              const double za = basis[a][i];
-              inverse_workspace.rhs[a] += za*yi;
-              for(int b = a; b < glp_nterms; b++){
-                const double zb = basis[b][i];
-                inverse_workspace.matrix_copy[a + b*glp_nterms] += za*zb;
-                if(b != a)
-                  inverse_workspace.matrix_copy[b + a*glp_nterms] += za*zb;
+          if(use_fit_projection_blas){
+            np_blas_gram_int(num_obs_train,
+                             glp_nterms,
+                             basis[0],
+                             num_obs_train,
+                             inverse_workspace.matrix_copy);
+            np_blas_dgemv_t_int(num_obs_train,
+                                glp_nterms,
+                                basis[0],
+                                num_obs_train,
+                                vector_Y,
+                                inverse_workspace.rhs);
+          } else {
+            for(i = 0; i < glp_nterms; i++){
+              inverse_workspace.rhs[i] = 0.0;
+              for(j = 0; j < glp_nterms; j++)
+                inverse_workspace.matrix_copy[i + j*glp_nterms] = 0.0;
+            }
+
+            for(i = 0; i < num_obs_train; i++){
+              const double yi = vector_Y[i];
+              for(int a = 0; a < glp_nterms; a++){
+                const double za = basis[a][i];
+                inverse_workspace.rhs[a] += za*yi;
+                for(int b = a; b < glp_nterms; b++){
+                  const double zb = basis[b][i];
+                  inverse_workspace.matrix_copy[a + b*glp_nterms] += za*zb;
+                  if(b != a)
+                    inverse_workspace.matrix_copy[b + a*glp_nterms] += za*zb;
+                }
               }
             }
           }
@@ -19585,107 +19650,183 @@ double *SIGN){
               &inverse_workspace, glp_nterms);
 
           if(fast_ok){
-            for(i = 0; i < glp_nterms; i++){
-              double s = 0.0;
-              for(j = 0; j < glp_nterms; j++)
-                s += inverse_workspace.matrix_copy[i*glp_nterms + j] *
-                  inverse_workspace.rhs[j];
-              beta[i] = s;
+            if(use_fit_projection_blas){
+              np_blas_dgemv_n_int(glp_nterms,
+                                  glp_nterms,
+                                  inverse_workspace.gram,
+                                  glp_nterms,
+                                  inverse_workspace.rhs,
+                                  beta);
+            } else {
+              for(i = 0; i < glp_nterms; i++){
+                double s = 0.0;
+                for(j = 0; j < glp_nterms; j++)
+                  s += inverse_workspace.matrix_copy[i*glp_nterms + j] *
+                    inverse_workspace.rhs[j];
+                beta[i] = s;
+              }
             }
 
-            for(i = 0; i < num_obs_eval; i++){
-              double yhat = 0.0;
-              double q = 0.0;
+            if(use_fit_projection_blas){
+              for(i = 0; i < num_obs_eval; i += eval_block_rows){
+                const int nblock = MIN(eval_block_rows, num_obs_eval - i);
 
-              if(use_bernstein){
-                np_glp_fill_basis_eval(num_reg_continuous,
-                                       glp_terms,
-                                       glp_nterms,
-                                       matrix_X_continuous_eval,
-                                       i,
-                                       basis_ctx,
-                                       eval_basis);
-              } else {
-                np_glp_fill_basis_eval_raw(num_reg_continuous,
+                /*
+                 * Keep the fixed leading dimension for every basis block.
+                 * The projection helper returns its nblock-by-k result with
+                 * leading dimension nblock, including the final short block.
+                 */
+                for(int row = 0; row < nblock; row++){
+                  if(use_bernstein){
+                    np_glp_fill_basis_eval(num_reg_continuous,
                                            glp_terms,
                                            glp_nterms,
                                            matrix_X_continuous_eval,
-                                           i,
+                                           i + row,
+                                           basis_ctx,
                                            eval_basis);
-              }
-
-              for(j = 0; j < glp_nterms; j++)
-                yhat += eval_basis[j]*beta[j];
-              for(j = 0; j < glp_nterms; j++){
-                const double zj = eval_basis[j];
-                for(int b = 0; b < glp_nterms; b++)
-                  q += zj *
-                    inverse_workspace.matrix_copy[j*glp_nterms + b] *
-                    eval_basis[b];
-              }
-
-              mean[i] = yhat;
-              {
-                const double mv = sigma2hat*q;
-                mean_stderr[i] = (mv > 0.0 && isfinite(mv)) ? sqrt(mv) : se_default;
-              }
-
-              if(do_grad){
-                const int nvars = num_reg_continuous + num_reg_unordered + num_reg_ordered;
-                for(l = 0; l < num_reg_continuous; l++){
-                  const int grad_order =
-                    (vector_glp_gradient_order_extern != NULL) ?
-                    MAX(1, vector_glp_gradient_order_extern[l]) : 1;
-                  double qg = 0.0;
-                  double dg = 0.0;
-
-                  if(use_bernstein){
-                    np_glp_fill_basis_eval_deriv(l,
-                                                 grad_order,
-                                                 num_reg_continuous,
-                                                 glp_terms,
-                                                 glp_nterms,
-                                                 matrix_X_continuous_eval,
-                                                 i,
-                                                 basis_ctx,
-                                                 eval_deriv);
                   } else {
-                    np_glp_fill_basis_eval_deriv_raw(l,
-                                                     grad_order,
-                                                     num_reg_continuous,
-                                                     glp_terms,
-                                                     glp_nterms,
-                                                     matrix_X_continuous_eval,
-                                                     i,
-                                                     eval_deriv);
+                    np_glp_fill_basis_eval_raw(num_reg_continuous,
+                                               glp_terms,
+                                               glp_nterms,
+                                               matrix_X_continuous_eval,
+                                               i + row,
+                                               eval_basis);
                   }
-
                   for(j = 0; j < glp_nterms; j++)
-                    dg += eval_deriv[j]*beta[j];
-                  gradient[l][i] = dg;
-
-                  if(do_gerr){
-                    for(j = 0; j < glp_nterms; j++){
-                      const double dj = eval_deriv[j];
-                      for(int b = 0; b < glp_nterms; b++)
-                        qg += dj *
-                          inverse_workspace.matrix_copy[j*glp_nterms + b] *
-                          eval_deriv[b];
-                    }
-                    {
-                      const double gv = sigma2hat*qg;
-                      gradient_stderr[l][i] = (gv > 0.0 && isfinite(gv)) ? sqrt(gv) : 0.0;
-                    }
-                  }
+                    eval_basis_block[j*eval_block_rows + row] =
+                      eval_basis[j];
                 }
 
-                for(l = num_reg_continuous; l < nvars; l++){
-                  gradient[l][i] = 0.0;
-                  if(do_gerr) gradient_stderr[l][i] = 0.0;
+                np_blas_dgemv_n_int(nblock,
+                                    glp_nterms,
+                                    eval_basis_block,
+                                    eval_block_rows,
+                                    beta,
+                                    yhat_block);
+                np_blas_project_inverse_block_int(
+                  nblock,
+                  glp_nterms,
+                  eval_basis_block,
+                  eval_block_rows,
+                  inverse_workspace.gram,
+                  projection_block);
+
+                for(int row = 0; row < nblock; row++){
+                  double q = 0.0;
+                  for(j = 0; j < glp_nterms; j++)
+                    q += eval_basis_block[j*eval_block_rows + row] *
+                      projection_block[j*nblock + row];
+                  mean[i + row] = yhat_block[row];
+                  {
+                    const double mv = sigma2hat*q;
+                    mean_stderr[i + row] =
+                      (mv > 0.0 && isfinite(mv)) ?
+                      sqrt(mv) : se_default;
+                  }
+                  if(fit_progress_active)
+                    np_progress_fit_loop_step(i + row + 1,
+                                              fit_progress_total);
                 }
               }
-              if (fit_progress_active)
-                np_progress_fit_loop_step(i + 1, fit_progress_total);
+            } else {
+              for(i = 0; i < num_obs_eval; i++){
+                double yhat = 0.0;
+                double q = 0.0;
+
+                if(use_bernstein){
+                  np_glp_fill_basis_eval(num_reg_continuous,
+                                         glp_terms,
+                                         glp_nterms,
+                                         matrix_X_continuous_eval,
+                                         i,
+                                         basis_ctx,
+                                         eval_basis);
+                } else {
+                  np_glp_fill_basis_eval_raw(num_reg_continuous,
+                                             glp_terms,
+                                             glp_nterms,
+                                             matrix_X_continuous_eval,
+                                             i,
+                                             eval_basis);
+                }
+
+                for(j = 0; j < glp_nterms; j++)
+                  yhat += eval_basis[j]*beta[j];
+                for(j = 0; j < glp_nterms; j++){
+                  const double zj = eval_basis[j];
+                  for(int b = 0; b < glp_nterms; b++)
+                    q += zj *
+                      inverse_workspace.matrix_copy[j*glp_nterms + b] *
+                      eval_basis[b];
+                }
+
+                mean[i] = yhat;
+                {
+                  const double mv = sigma2hat*q;
+                  mean_stderr[i] = (mv > 0.0 && isfinite(mv)) ?
+                    sqrt(mv) : se_default;
+                }
+
+                if(do_grad){
+                  const int nvars = num_reg_continuous + num_reg_unordered + num_reg_ordered;
+                  for(l = 0; l < num_reg_continuous; l++){
+                    const int grad_order =
+                      (vector_glp_gradient_order_extern != NULL) ?
+                      MAX(1, vector_glp_gradient_order_extern[l]) : 1;
+                    double qg = 0.0;
+                    double dg = 0.0;
+
+                    if(use_bernstein){
+                      np_glp_fill_basis_eval_deriv(l,
+                                                   grad_order,
+                                                   num_reg_continuous,
+                                                   glp_terms,
+                                                   glp_nterms,
+                                                   matrix_X_continuous_eval,
+                                                   i,
+                                                   basis_ctx,
+                                                   eval_deriv);
+                    } else {
+                      np_glp_fill_basis_eval_deriv_raw(l,
+                                                       grad_order,
+                                                       num_reg_continuous,
+                                                       glp_terms,
+                                                       glp_nterms,
+                                                       matrix_X_continuous_eval,
+                                                       i,
+                                                       eval_deriv);
+                    }
+
+                    for(j = 0; j < glp_nterms; j++)
+                      dg += eval_deriv[j]*beta[j];
+                    gradient[l][i] = dg;
+
+                    if(do_gerr){
+                      for(j = 0; j < glp_nterms; j++){
+                        const double dj = eval_deriv[j];
+                        for(int b = 0; b < glp_nterms; b++)
+                          qg += dj *
+                            inverse_workspace.matrix_copy[j*glp_nterms + b] *
+                            eval_deriv[b];
+                      }
+                      {
+                        const double gv = sigma2hat*qg;
+                        gradient_stderr[l][i] =
+                          (gv > 0.0 && isfinite(gv)) ?
+                          sqrt(gv) : 0.0;
+                      }
+                    }
+                  }
+
+                  for(l = num_reg_continuous; l < nvars; l++){
+                    gradient[l][i] = 0.0;
+                    if(do_gerr) gradient_stderr[l][i] = 0.0;
+                  }
+                }
+                if(fit_progress_active)
+                  np_progress_fit_loop_step(i + 1, fit_progress_total);
+              }
             }
             estimation_shortcut_done = 1;
           }
@@ -19695,11 +19836,19 @@ double *SIGN){
           for(l = 0; l < num_reg_continuous; l++) np_glp_basis_ctx_free(&basis_ctx[l]);
           free(basis_ctx);
         }
+        free(eval_basis_block);
+        free(projection_block);
+        free(yhat_block);
         if(eval_basis != NULL) free(eval_basis);
         if(eval_deriv != NULL) free(eval_deriv);
         free(beta);
         np_lp_full_row_workspace_clear(&inverse_workspace);
-        if(basis != NULL) free_mat(basis, glp_nterms);
+        if(basis != NULL){
+          if(basis_is_contiguous)
+            free_tmat(basis);
+          else
+            free_mat(basis, glp_nterms);
+        }
         if(glp_terms != NULL) free(glp_terms);
       }
     }
