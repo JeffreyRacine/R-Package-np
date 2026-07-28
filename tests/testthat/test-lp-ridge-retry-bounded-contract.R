@@ -56,21 +56,21 @@ test_that("all canonical LP solve retries are bounded", {
         jksum
       )
     )),
-    5L
+    6L
   )
   expect_equal(
     lengths(regmatches(
       jksum,
       gregexpr("np_lp_solve_workspace_sources_finite\\(", jksum)
     )),
-    5L
+    6L
   )
   expect_equal(
     lengths(regmatches(
       jksum,
       gregexpr("ridge_steps >= NP_LP_SOLVE_MAX_RIDGE_STEPS", jksum)
     )),
-    5L
+    6L
   )
   expect_equal(
     lengths(regmatches(

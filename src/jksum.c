@@ -13844,6 +13844,455 @@ cleanup_lp_cv:
   return result;
 }
 
+/*
+ * Adaptive-NN presents one training-point weight at a time to the generic
+ * weighted-outer-product owner. For sufficiently wide rows on Accelerate,
+ * materialize the unchanged kernel row and assemble its signed WLS system
+ * with one bounded weighted-design slab.
+ *
+ * MPI ranks own complete evaluation rows. Row losses are exchanged in O(n)
+ * buffers and summed in observation order on every rank, preserving the
+ * serial candidate's objective transcript instead of reducing rank-local
+ * scalar partial sums.
+ */
+static double **np_regression_adaptive_one_row_matrix(const int ncols){
+  double **matrix;
+  double *storage;
+  int col;
+
+  if((ncols <= 0) ||
+     ((size_t)ncols > SIZE_MAX/sizeof(double *)) ||
+     ((size_t)ncols > SIZE_MAX/sizeof(double)))
+    return NULL;
+  matrix = (double **)malloc((size_t)ncols*sizeof(double *));
+  if(matrix == NULL)
+    return NULL;
+  storage = (double *)malloc((size_t)ncols*sizeof(double));
+  if(storage == NULL){
+    free(matrix);
+    return NULL;
+  }
+  for(col = 0; col < ncols; col++)
+    matrix[col] = storage + col;
+  return matrix;
+}
+
+static NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas(
+    const int bwm,
+    const int num_obs,
+    const int num_reg_unordered,
+    const int num_reg_ordered,
+    const int num_reg_continuous,
+    double **matrix_X_unordered,
+    double **matrix_X_ordered,
+    double **matrix_X_continuous,
+    double *vector_Y,
+    double *vector_scale_factor,
+    int *num_categories,
+    int *kernel_c,
+    int *kernel_u,
+    int *kernel_o,
+    int *operator,
+    double *lambda,
+    double **matrix_bandwidth,
+    const int nterms,
+    double **basis){
+  NPRegCvLpResult result = {DBL_MAX, 0.0, 0};
+  const int solve_nrhs = (bwm == RBWM_CVAIC) ? 2 : 1;
+  const int basis_stride = np_glp_cv_cache.basis_stride;
+  const double epsilon = 1.0/(double)MAX(1, num_obs);
+  const NP_OuterPackCtx frozen_runtime_options = {
+    .runtime_options_frozen = 1
+  };
+  NPLPSolveWorkspace solve_workspace;
+  double **eval_u = NULL, **eval_o = NULL, **eval_c = NULL;
+  double **matrix_bandwidth_eval = NULL;
+  double *weighted_design = NULL;
+  double *eval_basis = NULL;
+  double *kw = NULL;
+  double *vsf = NULL;
+#ifdef MPI2
+  double *cv_rows = NULL;
+  double *trace_rows = NULL;
+#endif
+  int sf_flag = 0;
+  int local_fail = 0;
+  int i, j, l;
+
+  np_lp_solve_workspace_init(&solve_workspace);
+
+  if((num_obs < NP_CONDITIONAL_X_WEIGHTED_BLAS_MIN_ROWS) ||
+     (num_reg_continuous <= 0) || (nterms < 4) ||
+     (basis == NULL) || (basis_stride < num_obs))
+    goto cleanup_adaptive_blas;
+  /*
+   * Higher-order signed kernels can make the moment system
+   * cancellation-sensitive even with a well-separated final delete-one
+   * denominator. They retain the incumbent arithmetic transcript.
+   */
+  for(l = 0; l < num_reg_continuous; l++){
+    if((kernel_c[l] != 0) && (kernel_c[l] != 4) && (kernel_c[l] != 8))
+      goto cleanup_adaptive_blas;
+  }
+  if((bwm != RBWM_CVLS) && (bwm != RBWM_CVAIC) &&
+     (bwm != RBWM_CVCHECK) && (bwm != RBWM_CVKS))
+    goto cleanup_adaptive_blas;
+
+#ifdef MPI2
+  {
+    int local_probe = !np_mpi_rank_failure_injected(
+      "NP_RMPI_INJECT_REG_ADAPTIVE_BLAS_FAIL_RANK");
+    int all_probe = 0;
+
+    MPI_Allreduce(&local_probe,
+                  &all_probe,
+                  1,
+                  MPI_INT,
+                  MPI_MIN,
+                  comm[1]);
+    if(!all_probe)
+      goto cleanup_adaptive_blas;
+  }
+#endif
+
+  np_refresh_mseries_accelerate_option();
+#ifdef MPI2
+  {
+    int local_eligible =
+      np_mseries_accelerate_enabled_cache &&
+      np_conditional_x_weighted_blas_profitable(
+        num_obs, nterms, basis_stride);
+    int all_eligible = 0;
+
+    MPI_Allreduce(&local_eligible,
+                  &all_eligible,
+                  1,
+                  MPI_INT,
+                  MPI_MIN,
+                  comm[1]);
+    if(!all_eligible)
+      goto cleanup_adaptive_blas;
+  }
+#else
+  if(!np_mseries_accelerate_enabled_cache ||
+     !np_conditional_x_weighted_blas_profitable(
+       num_obs, nterms, basis_stride))
+    goto cleanup_adaptive_blas;
+#endif
+
+  if((size_t)basis_stride > SIZE_MAX/(size_t)nterms)
+    goto cleanup_adaptive_blas;
+
+  weighted_design = (double *)malloc(
+    (size_t)basis_stride*(size_t)nterms*sizeof(double));
+  kw = (double *)malloc((size_t)num_obs*sizeof(double));
+  eval_basis = (double *)malloc((size_t)nterms*sizeof(double));
+  eval_u =
+    np_regression_adaptive_one_row_matrix(MAX(1, num_reg_unordered));
+  eval_o =
+    np_regression_adaptive_one_row_matrix(MAX(1, num_reg_ordered));
+  eval_c =
+    np_regression_adaptive_one_row_matrix(MAX(1, num_reg_continuous));
+  matrix_bandwidth_eval =
+    np_regression_adaptive_one_row_matrix(num_reg_continuous);
+#ifdef MPI2
+  cv_rows = (double *)calloc((size_t)num_obs, sizeof(double));
+  if(bwm == RBWM_CVAIC)
+    trace_rows = (double *)calloc((size_t)num_obs, sizeof(double));
+#endif
+
+  {
+    int local_ready =
+      (weighted_design != NULL) && (kw != NULL) &&
+      (eval_basis != NULL) && (eval_u != NULL) &&
+      (eval_o != NULL) && (eval_c != NULL) &&
+      (matrix_bandwidth_eval != NULL) &&
+      np_lp_solve_workspace_reserve(
+        &solve_workspace, nterms, solve_nrhs);
+#ifdef MPI2
+    int all_ready = 0;
+    local_ready = local_ready && (cv_rows != NULL) &&
+      ((bwm != RBWM_CVAIC) || (trace_rows != NULL));
+    MPI_Allreduce(&local_ready,
+                  &all_ready,
+                  1,
+                  MPI_INT,
+                  MPI_MIN,
+                  comm[1]);
+    if(!all_ready)
+      goto cleanup_adaptive_blas;
+#else
+    if(!local_ready)
+      goto cleanup_adaptive_blas;
+#endif
+  }
+
+  if((sf_flag = (int_LARGE_SF == 0))){
+    int_LARGE_SF = 1;
+    vsf = (double *)malloc((size_t)num_reg_continuous*sizeof(double));
+    if(vsf == NULL){
+      local_fail = 1;
+      goto adaptive_blas_collective_gate;
+    }
+    for(l = 0; l < num_reg_continuous; l++)
+      vsf[l] = matrix_bandwidth[l][0];
+  } else {
+    vsf = vector_scale_factor;
+  }
+
+  result.cv = 0.0;
+  result.traceH = 0.0;
+
+#ifdef MPI2
+  for(j = my_rank; j < num_obs; j += iNum_Processors){
+#else
+  for(j = 0; j < num_obs; j++){
+#endif
+    const double yj = vector_Y[j];
+    double self_weight;
+    double nepsilon = 0.0;
+    int ridge_steps = 0;
+
+    if((j & 31) == 0)
+      np_progress_bandwidth_loop_step();
+
+    for(l = 0; l < num_reg_unordered; l++)
+      eval_u[l][0] = matrix_X_unordered[l][j];
+    for(l = 0; l < num_reg_ordered; l++)
+      eval_o[l][0] = matrix_X_ordered[l][j];
+    for(l = 0; l < num_reg_continuous; l++){
+      eval_c[l][0] = matrix_X_continuous[l][j];
+      matrix_bandwidth_eval[l][0] = matrix_bandwidth[l][j];
+    }
+    for(l = 0; l < nterms; l++)
+      eval_basis[l] = basis[l][j];
+
+    memset(kw, 0, (size_t)num_obs*sizeof(double));
+    if(kernel_weighted_sum_np_ctx_ex(kernel_c,
+                                     kernel_u,
+                                     kernel_o,
+                                     BW_ADAP_NN,
+                                     num_obs,
+                                     1,
+                                     num_reg_unordered,
+                                     num_reg_ordered,
+                                     num_reg_continuous,
+                                     0,
+                                     0,
+                                     1,
+                                     1,
+                                     1,
+                                     0,
+                                     0,
+                                     0,
+                                     0,
+                                     operator,
+                                     OP_NOOP,
+                                     0,
+                                     0,
+                                     NULL,
+                                     1,
+                                     0,
+                                     0,
+                                     NP_TREE_FALSE,
+                                     0,
+                                     NULL, NULL, NULL, NULL,
+                                     matrix_X_unordered,
+                                     matrix_X_ordered,
+                                     matrix_X_continuous,
+                                     eval_u,
+                                     eval_o,
+                                     eval_c,
+                                     NULL,
+                                     NULL,
+                                     NULL,
+                                     vsf,
+                                     1,
+                                     matrix_bandwidth,
+                                     matrix_bandwidth_eval,
+                                     lambda,
+                                     num_categories,
+                                     matrix_categorical_vals_extern,
+                                     NULL,
+                                     NULL,
+                                     NULL,
+                                     kw,
+                                     NULL,
+                                     NULL,
+                                     &frozen_runtime_options,
+                                     0) != 0){
+      local_fail = 1;
+      goto adaptive_blas_collective_gate;
+    }
+
+    self_weight = kw[j];
+    kw[j] = 0.0;
+
+    for(l = 0; l < nterms; l++){
+      const double * const basis_col = basis[l];
+      double * const weighted_col =
+        weighted_design + (size_t)l*(size_t)basis_stride;
+      for(i = 0; i < num_obs; i++)
+        weighted_col[i] = basis_col[i]*kw[i];
+    }
+
+    {
+      const char trans_t = 'T';
+      const char trans_n = 'N';
+      const double alpha = 1.0;
+      const double beta = 0.0;
+
+      F77_CALL(dgemm)(&trans_t,
+                      &trans_n,
+                      &nterms,
+                      &nterms,
+                      &num_obs,
+                      &alpha,
+                      basis[0],
+                      &basis_stride,
+                      weighted_design,
+                      &basis_stride,
+                      &beta,
+                      solve_workspace.gram_source,
+                      &nterms
+                      FCONE FCONE);
+      np_blas_dgemv_t_int(num_obs,
+                          nterms,
+                          weighted_design,
+                          basis_stride,
+                          vector_Y,
+                          solve_workspace.rhs_source);
+    }
+
+    if(bwm == RBWM_CVAIC){
+      for(l = 0; l < nterms; l++){
+        const double bl = eval_basis[l];
+        solve_workspace.rhs_source[nterms + l] = bl;
+        solve_workspace.rhs_source[l] += self_weight*bl*yj;
+        for(i = 0; i < nterms; i++)
+          solve_workspace.gram_source[l + i*nterms] +=
+            self_weight*bl*eval_basis[i];
+      }
+    }
+
+    while(!np_lp_solve_workspace_solve(
+      &solve_workspace, nterms, solve_nrhs)){
+      if((ridge_steps >= NP_LP_SOLVE_MAX_RIDGE_STEPS) ||
+         !np_lp_solve_workspace_sources_finite(
+           &solve_workspace, nterms, solve_nrhs)){
+        local_fail = 1;
+        goto adaptive_blas_collective_gate;
+      }
+      for(l = 0; l < nterms; l++)
+        solve_workspace.gram_source[l + l*nterms] += epsilon;
+      nepsilon += epsilon;
+      ridge_steps++;
+    }
+
+    solve_workspace.rhs_source[0] +=
+      nepsilon*solve_workspace.rhs_source[0]/
+      NZD_POS(solve_workspace.gram_source[0]);
+    if(nepsilon > 0.0){
+      if(!np_lp_solve_workspace_solve(
+        &solve_workspace, nterms, solve_nrhs)){
+        local_fail = 1;
+        goto adaptive_blas_collective_gate;
+      }
+    }
+
+    {
+      double fit = 0.0;
+      double row_loss;
+
+      for(l = 0; l < nterms; l++)
+        fit += eval_basis[l]*solve_workspace.rhs_work[l];
+      row_loss = np_regression_cv_loss_value(bwm, fit,
+        (bwm == RBWM_CVCHECK && vector_lsq_loss_extern != NULL) ?
+        vector_lsq_loss_extern[j] : yj);
+#ifdef MPI2
+      cv_rows[j] = row_loss;
+#else
+      result.cv += row_loss;
+#endif
+    }
+
+    if(bwm == RBWM_CVAIC){
+      double hii = 0.0;
+      for(l = 0; l < nterms; l++)
+        hii += eval_basis[l]*solve_workspace.rhs_work[nterms + l];
+#ifdef MPI2
+      trace_rows[j] = self_weight*hii;
+#else
+      result.traceH += self_weight*hii;
+#endif
+    }
+  }
+
+adaptive_blas_collective_gate:
+#ifdef MPI2
+  {
+    int any_fail = 0;
+    MPI_Allreduce(&local_fail,
+                  &any_fail,
+                  1,
+                  MPI_INT,
+                  MPI_MAX,
+                  comm[1]);
+    if(any_fail)
+      goto cleanup_adaptive_blas;
+  }
+  MPI_Allreduce(MPI_IN_PLACE,
+                cv_rows,
+                num_obs,
+                MPI_DOUBLE,
+                MPI_SUM,
+                comm[1]);
+  if(bwm == RBWM_CVAIC)
+    MPI_Allreduce(MPI_IN_PLACE,
+                  trace_rows,
+                  num_obs,
+                  MPI_DOUBLE,
+                  MPI_SUM,
+                  comm[1]);
+  result.cv = 0.0;
+  result.traceH = 0.0;
+  for(j = 0; j < num_obs; j++){
+    result.cv += cv_rows[j];
+    if(bwm == RBWM_CVAIC)
+      result.traceH += trace_rows[j];
+  }
+#else
+  if(local_fail)
+    goto cleanup_adaptive_blas;
+#endif
+
+  result.ok = 1;
+
+cleanup_adaptive_blas:
+  if(sf_flag){
+    int_LARGE_SF = 0;
+    free(vsf);
+  }
+  if(weighted_design != NULL) free(weighted_design);
+  if(kw != NULL) free(kw);
+  if(eval_basis != NULL) free(eval_basis);
+  if(eval_u != NULL) free_tmat(eval_u);
+  if(eval_o != NULL) free_tmat(eval_o);
+  if(eval_c != NULL) free_tmat(eval_c);
+  if(matrix_bandwidth_eval != NULL) free_tmat(matrix_bandwidth_eval);
+#ifdef MPI2
+  if(cv_rows != NULL) free(cv_rows);
+  if(trace_rows != NULL) free(trace_rows);
+#endif
+  np_lp_solve_workspace_clear(&solve_workspace);
+
+  if(!result.ok){
+    result.cv = DBL_MAX;
+    result.traceH = 0.0;
+  }
+  return result;
+}
+
 // Regression CV objective for local polynomial regression:
 // lc (degree 0), ll (degree 1), and lp (general degree vector).
 // The LL/LP branches solve weighted normal equations with ridge fallback if singular.
@@ -14232,6 +14681,35 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
 
         if(fast_ok){
           np_fastcv_alllarge_hits++;
+          goto finish_cv_path;
+        }
+      }
+
+      if((BANDWIDTH_reg == BW_ADAP_NN) && (glp_nterms >= 4)){
+        NPRegCvLpResult adaptive_result =
+          np_regression_cv_lp_basis_adaptive_blas(
+            bwm,
+            num_obs,
+            num_reg_unordered,
+            num_reg_ordered,
+            num_reg_continuous,
+            matrix_X_unordered,
+            matrix_X_ordered,
+            matrix_X_continuous,
+            vector_Y,
+            vector_scale_factor,
+            num_categories,
+            kernel_c,
+            kernel_u,
+            kernel_o,
+            operator,
+            lambda,
+            matrix_bandwidth,
+            glp_nterms,
+            basis);
+        if(adaptive_result.ok){
+          cv = adaptive_result.cv;
+          traceH = adaptive_result.traceH;
           goto finish_cv_path;
         }
       }
