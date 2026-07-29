@@ -79,3 +79,42 @@ test_that("npscoef width-one and width-two systems cannot enter batch solve", {
     )
   }
 })
+
+test_that("npscoef batch projection matches incumbent row crossproducts numerically", {
+  set.seed(163L)
+  for (nbasis in c(1L, 3L, 6L, 9L, 15L, 26L)) {
+    neval <- 37L
+    pcoef <- 3L
+    theta <- matrix(
+      rnorm(nbasis * pcoef * neval),
+      nrow = nbasis * pcoef,
+      ncol = neval
+    )
+    Wz.eval <- matrix(
+      runif(neval * nbasis, -1, 1),
+      nrow = neval,
+      ncol = nbasis
+    )
+    expected <- vapply(seq_len(neval), function(ii) {
+      as.vector(crossprod(
+        Wz.eval[ii, ],
+        matrix(theta[, ii], nrow = nbasis, ncol = pcoef)
+      ))
+    }, numeric(pcoef))
+    actual <- npRmpi:::.npscoef_batch_project(theta, Wz.eval)
+    expect_equal(actual, expected, tolerance = 1e-14)
+    expect_lte(max(abs(actual - expected)), 1e-14)
+  }
+})
+
+test_that("npscoef batch projection rejects incompatible internal shapes", {
+  expect_error(
+    .Call(
+      "C_np_npscoef_batch_project",
+      matrix(1.0, nrow = 5L, ncol = 3L),
+      matrix(1.0, nrow = 3L, ncol = 2L),
+      PACKAGE = "npRmpi"
+    ),
+    "incompatible dimensions"
+  )
+})

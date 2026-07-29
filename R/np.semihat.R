@@ -743,6 +743,15 @@
   )
 }
 
+.npscoef_batch_project <- function(theta, Wz.eval) {
+  .Call(
+    "C_np_npscoef_batch_project",
+    theta,
+    Wz.eval,
+    PACKAGE = "npRmpi"
+  )
+}
+
 .npscoef_lp_state <- function(bws, tzdat, ezdat, leave.one.out = FALSE, where = "npscoef") {
   tzdat <- toFrame(tzdat)
   ezdat <- toFrame(ezdat)

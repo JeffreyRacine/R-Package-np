@@ -3,12 +3,15 @@
 * Smooth-coefficient local-polynomial cross-validation and fitting now solve
   common stable zero-ridge row systems through one registered rank-local
   native entry, reusing a bounded `O(p^2 + p)` LAPACK workspace instead of
-  making one R-to-LAPACK transition per owned evaluation row. Width-one and
-  width-two explicit solvers are unchanged; if any wider row in a local batch
-  is non-finite, singular, or ill-conditioned, that complete batch returns to
-  the established R ridge loop. Estimator formulas, ridge policy, rank
-  ownership, and collectives are unchanged, although LAPACK workspace
-  alignment can change last floating-point bits.
+  making one R-to-LAPACK transition per owned evaluation row. Successful
+  wider batches also project their hoisted basis rows in ascending basis order
+  through one register-local native entry instead of slicing, reshaping, and
+  dispatching every row in R. Width-one and width-two explicit solvers are
+  unchanged; if any wider row in a local batch is non-finite, singular, or
+  ill-conditioned, that complete batch returns to the established R ridge
+  loop. Estimator formulas, ridge policy, rank ownership, and collectives are
+  unchanged, although LAPACK workspace alignment and projection reassociation
+  can change last floating-point bits.
 
 * Completed the migration to one canonical, uncentered local-polynomial
   compute engine across cross-validation, fitting, prediction/evaluation,
