@@ -166,19 +166,19 @@ test_that("adaptive CVLS width four is an isolated pass-saving sibling", {
     body,
     fixed = TRUE
   )[[1L]]
-  width3_alloc <- regexpr(
-    "full_blocks[2] = np_optional_tmatd(num_obs, block_size);",
-    body,
-    fixed = TRUE
-  )[[1L]]
-  width4_alloc <- regexpr(
-    "full_blocks[3] = np_optional_tmatd(num_obs, block_size);",
+  optional_alloc <- regexpr(
+    "optional_blocks = np_optional_tmatd(num_obs, 2*block_size);",
     body,
     fixed = TRUE
   )[[1L]]
   expect_gt(incumbent_alloc, 0L)
-  expect_gt(width3_alloc, incumbent_alloc)
-  expect_gt(width4_alloc, width3_alloc)
+  expect_gt(optional_alloc, incumbent_alloc)
+  expect_match(body, "full_blocks[2] = optional_blocks;", fixed = TRUE)
+  expect_match(
+    body,
+    "full_blocks[3] = optional_blocks + block_size;",
+    fixed = TRUE
+  )
   expect_match(body, "i0 += 4*block_size", fixed = TRUE)
   expect_match(body, "for(g = 0; g < 4; g++)", fixed = TRUE)
   expect_match(

@@ -33355,6 +33355,7 @@ np_conditional_density_cvls_lp_adap_block4_stream(
     (nblocks / 4) + ((nblocks % 4) != 0);
   double **loo_work = NULL;
   double **full_blocks[4] = {NULL, NULL, NULL, NULL};
+  double **optional_blocks = NULL;
   double **shared_y = NULL;
   NPConditionalXRowCtx xctx = {0};
   NPConditionalYRowCtx yctx = {0}, yconvctx = {0};
@@ -33388,16 +33389,13 @@ np_conditional_density_cvls_lp_adap_block4_stream(
                                      &yconvctx) != 0)
     goto cleanup_cvls_lp_adap_block4;
 
-  full_blocks[2] = np_optional_tmatd(num_obs, block_size);
-  if(full_blocks[2] == NULL){
+  optional_blocks = np_optional_tmatd(num_obs, 2*block_size);
+  if(optional_blocks == NULL){
     status = NP_CDENS_ADAP_WIDTH4_UNAVAILABLE;
     goto cleanup_cvls_lp_adap_block4;
   }
-  full_blocks[3] = np_optional_tmatd(num_obs, block_size);
-  if(full_blocks[3] == NULL){
-    status = NP_CDENS_ADAP_WIDTH4_UNAVAILABLE;
-    goto cleanup_cvls_lp_adap_block4;
-  }
+  full_blocks[2] = optional_blocks;
+  full_blocks[3] = optional_blocks + block_size;
 
   *cv = 0.0;
   for(i0 = 0; i0 < num_obs; i0 += 4*block_size){
@@ -33492,8 +33490,9 @@ cleanup_cvls_lp_adap_block4:
   np_conditional_yrow_ctx_clear(&yctx);
   np_conditional_yrow_ctx_clear(&yconvctx);
   if(loo_work != NULL) free_tmat(loo_work);
-  for(g = 0; g < 4; g++)
+  for(g = 0; g < 2; g++)
     if(full_blocks[g] != NULL) free_tmat(full_blocks[g]);
+  if(optional_blocks != NULL) free_tmat(optional_blocks);
   if(shared_y != NULL) free_tmat(shared_y);
   np_glp_cv_clear_extern();
   return status;
