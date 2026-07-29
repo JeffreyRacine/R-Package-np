@@ -28982,7 +28982,7 @@ static int np_conditional_distribution_cvls_lp_adap_block_stream(double *vector_
   const int num_train = num_obs_train_extern;
   const int num_eval = num_obs_eval_extern;
   const int block_size = MIN(np_conditional_lp_cvls_block_size(num_train), MAX(1, num_train));
-  double **xblocks[3] = {NULL, NULL, NULL};
+  double **xblocks[4] = {NULL, NULL, NULL, NULL};
   double **yintblock = NULL;
   double *fit_cross = NULL;
   NPConditionalXRowCtx xctx = {0};
@@ -29016,10 +29016,10 @@ static int np_conditional_distribution_cvls_lp_adap_block_stream(double *vector_
   /*
    * A response-integral tile is independent of the adaptive X row. Retain
    * two adjacent X blocks when one bounded optional slab is available and
-   * three when a second bounded optional slab is also available, then feed
-   * the shared Y tile to unchanged B-by-B GEMMs. Separate block sums preserve
-   * the incumbent within-block and final cv accumulation order. Allocation
-   * failure retains the widest available one- or two-X-block traversal.
+   * three or four when further bounded optional slabs are also available,
+   * then feed the shared Y tile to unchanged B-by-B GEMMs. Separate block
+   * sums preserve the incumbent within-block and final cv accumulation order.
+   * Allocation failure retains the widest available traversal.
    */
   if(num_train > block_size){
     xblocks[1] = np_optional_tmatd(num_train, block_size);
@@ -29027,17 +29027,25 @@ static int np_conditional_distribution_cvls_lp_adap_block_stream(double *vector_
       group_width = 2;
       if(num_train > 2*block_size){
         xblocks[2] = np_optional_tmatd(num_train, block_size);
-        if(xblocks[2] != NULL)
+        if(xblocks[2] != NULL){
           group_width = 3;
+          if(num_train > 3*block_size){
+            xblocks[3] = np_optional_tmatd(num_train, block_size);
+            if(xblocks[3] != NULL)
+              group_width = 4;
+          }
+        }
       }
     }
   }
 
   *cv = 0.0;
   for(i0 = 0; i0 < num_train; i0 += group_width*block_size){
-    int block_start[3] = {i0, i0 + block_size, i0 + 2*block_size};
-    int block_rows[3] = {0, 0, 0};
-    double block_sum[3] = {0.0, 0.0, 0.0};
+    int block_start[4] = {
+      i0, i0 + block_size, i0 + 2*block_size, i0 + 3*block_size
+    };
+    int block_rows[4] = {0, 0, 0, 0};
+    double block_sum[4] = {0.0, 0.0, 0.0, 0.0};
 
     for(g = 0; g < group_width; g++){
       block_rows[g] =
@@ -29111,7 +29119,7 @@ static int np_conditional_distribution_cvls_lp_adap_block_stream(double *vector_
 cleanup_cdist_lp_adap_block:
   np_conditional_xrow_ctx_clear(&xctx);
   np_conditional_yrow_ctx_clear(&yintctx);
-  for(g = 0; g < 3; g++)
+  for(g = 0; g < 4; g++)
     if(xblocks[g] != NULL) free_tmat(xblocks[g]);
   if(yintblock != NULL) free_tmat(yintblock);
   if(fit_cross != NULL) free(fit_cross);
