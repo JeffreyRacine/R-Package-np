@@ -47,11 +47,11 @@ test_that("MPI adaptive signed regression uses the isolated weighted-design owne
     "kernel_weighted_sum_np_ctx_ex(kernel_c,",
     fixed = TRUE
   )
-  expect_false(grepl(
-    "np_accel_gauss_adaptive_higher_row_try\\(",
+  expect_match(
     body,
-    perl = TRUE
-  ))
+    "np_accel_gauss_adaptive_higher_row_try(kernel_c,",
+    fixed = TRUE
+  )
   expect_match(
     body,
     "MPI_Allreduce(&local_eligible,",

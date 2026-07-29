@@ -60,12 +60,30 @@ test_that("adaptive higher-order Gaussian row fusion is narrow and bounded", {
   calls <- gregexpr(
     "np_accel_gauss_adaptive_higher_row_try\\(", text, perl = TRUE
   )[[1L]]
-  expect_length(calls[calls > 0L], 2L)
+  expect_length(calls[calls > 0L], 3L)
 
+  regression <- adaptive_higher_gaussian_body(
+    lines,
+    "^static NP_NOINLINE NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas\\(",
+    "^double np_kernel_estimate_regression_categorical_ls_aic\\("
+  )
   conditional <- adaptive_higher_gaussian_body(
     lines,
     "^static int .*np_conditional_xrow_from_ctx_impl\\(",
     "^static int np_conditional_xrow_from_ctx\\("
+  )
+  expect_match(regression, "num_reg_unordered == 0", fixed = TRUE)
+  expect_match(regression, "num_reg_ordered == 0", fixed = TRUE)
+  expect_match(regression, "!int_cker_bound_extern", fixed = TRUE)
+  expect_match(
+    regression,
+    "np_accel_gauss_adaptive_higher_row_try(kernel_c,",
+    fixed = TRUE
+  )
+  expect_match(
+    regression,
+    "kernel_weighted_sum_np_ctx_ex(kernel_c,",
+    fixed = TRUE
   )
   expect_match(
     conditional, "BANDWIDTH_den_extern == BW_ADAP_NN", fixed = TRUE
