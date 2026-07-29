@@ -22474,6 +22474,7 @@ static int np_conditional_yrow_from_ctx(NPConditionalYRowCtx *ctx,
   const int num_train = num_obs_train_extern;
   int eval_pos = eval_idx;
   NPConditionalBoundState bounds_state;
+  int adaptive_gaussian_row = 0;
   int j, l;
 
   if((ctx == NULL) || (!ctx->ready) || (row_out == NULL))
@@ -22516,32 +22517,54 @@ static int np_conditional_yrow_from_ctx(NPConditionalYRowCtx *ctx,
                              vector_cykerlb_extern,
                              vector_cykerub_extern,
                              &bounds_state);
-  if(np_shadow_conditional_kernel_row(ctx->kernel_cy,
-                                      ctx->kernel_uy,
-                                      ctx->kernel_oy,
-                                      ctx->operator_y,
-                                      BANDWIDTH_den_extern,
-                                      num_train,
-                                      num_var_unordered_extern,
-                                      num_var_ordered_extern,
-                                      num_var_continuous_extern,
-                                      matrix_Y_unordered_train_extern,
-                                      matrix_Y_ordered_train_extern,
-                                      matrix_Y_continuous_train_extern,
-                                      ctx->eval_yuno_one,
-                                      ctx->eval_yord_one,
-                                      ctx->eval_ycon_one,
-                                      ctx->vsfy,
-                                      1,
-                                      ctx->matrix_bandwidth_y,
-                                      ctx->matrix_bandwidth_eval_one,
-                                      ctx->lambday,
-                                      num_categories_extern_Y,
-                                      matrix_categorical_vals_extern_Y,
-                                      int_TREE_Y,
-                                      kdt_extern_Y,
-                                      ctx->kw,
-                                      NULL) != 0){
+#if NP_ACCEL_GAUSS_COMPILED
+  if((BANDWIDTH_den_extern == BW_ADAP_NN) &&
+     (num_var_unordered_extern == 0) &&
+     (num_var_ordered_extern == 0) &&
+     (num_var_continuous_extern > 0) &&
+     (ctx->kernel_cy[0] == 0) &&
+     (ctx->operator_y[0] == OP_NORMAL) &&
+     (!int_cyker_bound_extern) &&
+     (int_TREE_Y != NP_TREE_TRUE))
+    adaptive_gaussian_row =
+      np_accel_gauss_adaptive_row_try(
+        ctx->kernel_cy,
+        ctx->operator_y,
+        matrix_Y_continuous_train_extern,
+        ctx->eval_ycon_one,
+        ctx->matrix_bandwidth_y,
+        num_var_continuous_extern,
+        num_train,
+        1,
+        ctx->kw);
+#endif
+  if(!adaptive_gaussian_row &&
+     (np_shadow_conditional_kernel_row(ctx->kernel_cy,
+                                       ctx->kernel_uy,
+                                       ctx->kernel_oy,
+                                       ctx->operator_y,
+                                       BANDWIDTH_den_extern,
+                                       num_train,
+                                       num_var_unordered_extern,
+                                       num_var_ordered_extern,
+                                       num_var_continuous_extern,
+                                       matrix_Y_unordered_train_extern,
+                                       matrix_Y_ordered_train_extern,
+                                       matrix_Y_continuous_train_extern,
+                                       ctx->eval_yuno_one,
+                                       ctx->eval_yord_one,
+                                       ctx->eval_ycon_one,
+                                       ctx->vsfy,
+                                       1,
+                                       ctx->matrix_bandwidth_y,
+                                       ctx->matrix_bandwidth_eval_one,
+                                       ctx->lambday,
+                                       num_categories_extern_Y,
+                                       matrix_categorical_vals_extern_Y,
+                                       int_TREE_Y,
+                                       kdt_extern_Y,
+                                       ctx->kw,
+                                       NULL) != 0)){
     np_conditional_pop_bounds(&bounds_state);
     return 1;
   }
