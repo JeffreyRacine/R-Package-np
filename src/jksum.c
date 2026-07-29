@@ -28134,11 +28134,13 @@ static int np_conditional_distribution_cvls_lp_adap_block_stream(double *vector_
   const int num_train = num_obs_train_extern;
   const int num_eval = num_obs_eval_extern;
   const int block_size = MIN(np_conditional_lp_cvls_block_size(num_train), MAX(1, num_train));
-  double **xblock = NULL, **yintblock = NULL;
+  double **xblocks[2] = {NULL, NULL};
+  double **yintblock = NULL;
   double *fit_cross = NULL;
   NPConditionalXRowCtx xctx = {0};
   NPConditionalYRowCtx yintctx = {0};
-  int i0, j0, ii, jj;
+  int i0, j0, ii, jj, g;
+  int group_width = 1;
   int status = 1;
 
   if((cv == NULL) || (vector_scale_factor == NULL) || (num_train <= 0) || (num_eval <= 0))
@@ -28146,10 +28148,10 @@ static int np_conditional_distribution_cvls_lp_adap_block_stream(double *vector_
   if(BANDWIDTH_den_extern != BW_ADAP_NN)
     return 1;
 
-  xblock = alloc_tmatd(num_train, block_size);
+  xblocks[0] = alloc_tmatd(num_train, block_size);
   yintblock = alloc_tmatd(num_train, block_size);
   fit_cross = alloc_vecd(block_size*block_size);
-  if((xblock == NULL) || (yintblock == NULL) || (fit_cross == NULL))
+  if((xblocks[0] == NULL) || (yintblock == NULL) || (fit_cross == NULL))
     goto cleanup_cdist_lp_adap_block;
 
   if(np_conditional_xrow_ctx_prepare(vector_scale_factor, &xctx) != 0)
@@ -28163,15 +28165,34 @@ static int np_conditional_distribution_cvls_lp_adap_block_stream(double *vector_
                                           &yintctx) != 0)
     goto cleanup_cdist_lp_adap_block;
 
-  *cv = 0.0;
-  for(i0 = 0; i0 < num_train; i0 += block_size){
-    const int ib = MIN(block_size, num_train - i0);
-    double block_sum = 0.0;
+  /*
+   * A response-integral tile is independent of the adaptive X row. Retain
+   * exactly two adjacent X blocks when one bounded optional slab is available,
+   * then feed the shared Y tile to two unchanged B-by-B GEMMs. Separate block
+   * sums preserve the incumbent within-block and final cv accumulation order.
+   * A one-block problem or optional allocation failure retains the incumbent
+   * one-X-block traversal.
+   */
+  if(num_train > block_size){
+    xblocks[1] = np_optional_tmatd(num_train, block_size);
+    if(xblocks[1] != NULL)
+      group_width = 2;
+  }
 
-    for(ii = 0; ii < ib; ii++){
-      const int i = i0 + ii;
-      if(np_conditional_xrow_from_ctx(&xctx, i, xblock[ii]) != 0)
-        goto cleanup_cdist_lp_adap_block;
+  *cv = 0.0;
+  for(i0 = 0; i0 < num_train; i0 += group_width*block_size){
+    int block_start[2] = {i0, i0 + block_size};
+    int block_rows[2] = {0, 0};
+    double block_sum[2] = {0.0, 0.0};
+
+    for(g = 0; g < group_width; g++){
+      block_rows[g] =
+        MIN(block_size, MAX(0, num_train - block_start[g]));
+      for(ii = 0; ii < block_rows[g]; ii++){
+        const int i = block_start[g] + ii;
+        if(np_conditional_xrow_from_ctx(&xctx, i, xblocks[g][ii]) != 0)
+          goto cleanup_cdist_lp_adap_block;
+      }
     }
 
     for(j0 = 0; j0 < num_eval; j0 += block_size){
@@ -28190,37 +28211,44 @@ static int np_conditional_distribution_cvls_lp_adap_block_stream(double *vector_
           goto cleanup_cdist_lp_adap_block;
       }
 
-      np_blas_dgemm_tn_int(ib, jb, num_train, xblock[0], yintblock[0], fit_cross);
-      for(ii = 0; ii < ib; ii++){
-        const int train_i = i0 + ii;
+      for(g = 0; g < group_width; g++){
+        const int ib = block_rows[g];
+        if(ib <= 0)
+          continue;
 
-        for(jj = 0; jj < jb; jj++){
-          const int eval_j = j0 + jj;
-          double fit;
-          int indy;
+        np_blas_dgemm_tn_int(ib, jb, num_train, xblocks[g][0], yintblock[0], fit_cross);
+        for(ii = 0; ii < ib; ii++){
+          const int train_i = block_start[g] + ii;
 
-          if(cdfontrain_extern && (train_i == eval_j))
-            continue;
+          for(jj = 0; jj < jb; jj++){
+            const int eval_j = j0 + jj;
+            double fit;
+            int indy;
 
-          fit = fit_cross[ii + jj*ib];
-          indy = np_conditional_indicator_row_core(train_i,
-                                                   eval_j,
-                                                   cdfontrain_extern,
-                                                   matrix_Y_ordered_train_extern,
-                                                   matrix_Y_continuous_train_extern,
-                                                   matrix_Y_ordered_eval_extern,
-                                                   matrix_Y_continuous_eval_extern,
-                                                   num_var_ordered_extern,
-                                                   num_var_continuous_extern);
-          {
-            const double tvd = ((double)indy) - fit;
-            block_sum += tvd*tvd;
+            if(cdfontrain_extern && (train_i == eval_j))
+              continue;
+
+            fit = fit_cross[ii + jj*ib];
+            indy = np_conditional_indicator_row_core(train_i,
+                                                     eval_j,
+                                                     cdfontrain_extern,
+                                                     matrix_Y_ordered_train_extern,
+                                                     matrix_Y_continuous_train_extern,
+                                                     matrix_Y_ordered_eval_extern,
+                                                     matrix_Y_continuous_eval_extern,
+                                                     num_var_ordered_extern,
+                                                     num_var_continuous_extern);
+            {
+              const double tvd = ((double)indy) - fit;
+              block_sum[g] += tvd*tvd;
+            }
           }
         }
       }
     }
 
-    *cv += block_sum;
+    for(g = 0; g < group_width; g++)
+      *cv += block_sum[g];
   }
 
   *cv /= ((double)num_train*(double)MAX(1, num_eval));
@@ -28229,7 +28257,8 @@ static int np_conditional_distribution_cvls_lp_adap_block_stream(double *vector_
 cleanup_cdist_lp_adap_block:
   np_conditional_xrow_ctx_clear(&xctx);
   np_conditional_yrow_ctx_clear(&yintctx);
-  if(xblock != NULL) free_tmat(xblock);
+  for(g = 0; g < 2; g++)
+    if(xblocks[g] != NULL) free_tmat(xblocks[g]);
   if(yintblock != NULL) free_tmat(yintblock);
   if(fit_cross != NULL) free(fit_cross);
   np_glp_cv_clear_extern();
