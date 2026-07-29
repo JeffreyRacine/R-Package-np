@@ -21453,6 +21453,11 @@ cleanup_lp_hat:
 }
 
 typedef struct {
+  NPAdaptiveBandwidthReciprocalWorkspace workspace;
+  double storage[];
+} NPConditionalXRowReciprocalCache;
+
+typedef struct {
   int ready;
   int lp_engine;
   int num_train;
@@ -21466,6 +21471,7 @@ typedef struct {
   double *kw;
   double *mean_row;
   double *weighted_design;
+  NPConditionalXRowReciprocalCache *reciprocal_cache;
   double **matrix_bandwidth_x;
   double **matrix_bandwidth_eval_one;
   double **eval_xuno_one;
@@ -21473,6 +21479,9 @@ typedef struct {
   double **eval_xcon_one;
   NPLPFullRowWorkspace full_row_workspace;
 } NPConditionalXRowCtx;
+
+static int NP_NOINLINE np_conditional_xrow_reciprocal_cache_try(
+  NPConditionalXRowCtx *ctx);
 
 typedef struct {
   int ready;
@@ -21500,6 +21509,7 @@ static void np_conditional_xrow_ctx_clear(NPConditionalXRowCtx *ctx){
   if(ctx->kw != NULL) free(ctx->kw);
   if(ctx->mean_row != NULL) free(ctx->mean_row);
   if(ctx->weighted_design != NULL) free(ctx->weighted_design);
+  if(ctx->reciprocal_cache != NULL) free(ctx->reciprocal_cache);
   if(ctx->matrix_bandwidth_x != NULL) free_tmat(ctx->matrix_bandwidth_x);
   if(ctx->matrix_bandwidth_eval_one != NULL) free_tmat(ctx->matrix_bandwidth_eval_one);
   if(ctx->eval_xuno_one != NULL) free_mat(ctx->eval_xuno_one, num_reg_unordered_extern);
@@ -21672,6 +21682,17 @@ static int np_conditional_xrow_from_ctx_impl(NPConditionalXRowCtx *ctx,
   if((eval_idx < 0) || (eval_idx >= num_train))
     return 1;
 
+  /*
+   * Every admitted objective begins its row traversal at zero.  Prepare the
+   * optional sidecar lazily here so the shared context constructor and all
+   * earlier fixed/generalized-NN owners retain their exact machine layout.
+   * A nonzero first row simply keeps the incumbent division path.
+   */
+  if((eval_idx == 0) &&
+     (BANDWIDTH_den_extern == BW_ADAP_NN) &&
+     (ctx->reciprocal_cache == NULL))
+    (void)np_conditional_xrow_reciprocal_cache_try(ctx);
+
   memset(row_out, 0, (size_t)num_train*sizeof(double));
 
   if((int_TREE_X == NP_TREE_TRUE) && (ipt_lookup_extern_X != NULL))
@@ -21729,7 +21750,10 @@ static int np_conditional_xrow_from_ctx_impl(NPConditionalXRowCtx *ctx,
         matrix_X_continuous_train_extern,
         ctx->eval_xcon_one,
         ctx->matrix_bandwidth_x,
-        NULL,
+        (ctx->reciprocal_cache != NULL) &&
+          ctx->reciprocal_cache->workspace.ready ?
+          ctx->reciprocal_cache->workspace.reciprocal_storage :
+          NULL,
         NULL,
         num_reg_continuous_extern,
         num_train,
@@ -33500,3 +33524,63 @@ cleanup_cvls_lp_adap_block4:
 
 #undef NP_CDENS_ADAP_WIDTH4_NOINLINE
 #undef NP_CDENS_ADAP_WIDTH4_UNAVAILABLE
+
+/*
+ * Optional adaptive-only sidecar.  Keep this constructor out of line and
+ * after the established hot owners so fixed, generalized-NN, narrow, and
+ * portable routes retain their incumbent code layout and allocation graph.
+ */
+static int NP_NOINLINE np_conditional_xrow_reciprocal_cache_try(
+  NPConditionalXRowCtx *ctx)
+{
+  const int num_train = num_obs_train_extern;
+  const int ndim = num_reg_continuous_extern;
+  NPConditionalXRowReciprocalCache *cache = NULL;
+  size_t reciprocal_count;
+  size_t allocation_bytes;
+
+  if((ctx == NULL) || (ctx->reciprocal_cache != NULL) ||
+     (BANDWIDTH_den_extern != BW_ADAP_NN) ||
+     (ctx->lp_engine != NP_LP_ENGINE_GENERAL) ||
+     (!np_glp_cv_cache.ready) || (np_glp_cv_cache.nterms < 4) ||
+     (num_train <= 0) || (ndim < 2) ||
+     (num_reg_unordered_extern != 0) ||
+     (num_reg_ordered_extern != 0) ||
+     int_cxker_bound_extern ||
+     (int_TREE_X == NP_TREE_TRUE) ||
+     (!np_mseries_accelerate_enabled_cache) ||
+     (ctx->kernel_cx == NULL) ||
+     (ctx->matrix_bandwidth_x == NULL))
+    return 0;
+
+  for(int d = 0; d < ndim; d++)
+    if((ctx->kernel_cx[d] < 1) || (ctx->kernel_cx[d] > 3))
+      return 0;
+
+  if((size_t)ndim >= SIZE_MAX/(size_t)num_train)
+    return 0;
+  reciprocal_count = ((size_t)ndim + 1)*(size_t)num_train;
+  if(reciprocal_count >
+     (SIZE_MAX - sizeof(*cache))/sizeof(double))
+    return 0;
+  allocation_bytes =
+    sizeof(*cache) + reciprocal_count*sizeof(double);
+
+  cache = (NPConditionalXRowReciprocalCache *)malloc(allocation_bytes);
+  if(cache == NULL)
+    return 0;
+  np_adaptive_bandwidth_reciprocal_workspace_init(&cache->workspace);
+  if(!np_adaptive_bandwidth_reciprocal_workspace_prepare(
+       &cache->workspace,
+       ctx->matrix_bandwidth_x,
+       ndim,
+       num_train,
+       cache->storage,
+       reciprocal_count)){
+    free(cache);
+    return 0;
+  }
+
+  ctx->reciprocal_cache = cache;
+  return 1;
+}

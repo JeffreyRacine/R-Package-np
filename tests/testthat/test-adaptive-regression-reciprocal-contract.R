@@ -68,7 +68,7 @@ test_that("adaptive regression reciprocal workspace is objective-owned and bound
     text,
     perl = TRUE
   )[[1L]]
-  expect_length(prepare_calls[prepare_calls > 0L], 2L)
+  expect_length(prepare_calls[prepare_calls > 0L], 3L)
   expect_match(
     owner,
     "np_adaptive_bandwidth_reciprocal_workspace_prepare(",
@@ -121,7 +121,7 @@ test_that("adaptive regression reciprocal workspace is objective-owned and bound
   )
 })
 
-test_that("reciprocal row use is optional and conditional arithmetic stays unchanged", {
+test_that("reciprocal row use is optional in regression and conditional rows", {
   src_file <- locate_adaptive_regression_reciprocal_source()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable")
   lines <- readLines(src_file, warn = FALSE)
@@ -161,7 +161,13 @@ test_that("reciprocal row use is optional and conditional arithmetic stays uncha
   expect_false(grepl("malloc|calloc|realloc", helper))
   expect_match(
     conditional_compact,
-    "ctx->matrix_bandwidth_x, NULL, NULL, num_reg_continuous_extern",
+    paste(
+      "ctx->matrix_bandwidth_x,",
+      "(ctx->reciprocal_cache != NULL) &&",
+      "ctx->reciprocal_cache->workspace.ready ?",
+      "ctx->reciprocal_cache->workspace.reciprocal_storage :",
+      "NULL, NULL, num_reg_continuous_extern"
+    ),
     fixed = TRUE
   )
 })
