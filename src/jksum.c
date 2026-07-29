@@ -21505,6 +21505,7 @@ typedef struct {
   double **eval_yord_one;
   double **eval_ycon_one;
   NPConditionalYRowReciprocalCache *reciprocal_cache;
+  int reciprocal_cache_attempted;
 } NPConditionalYRowCtx;
 
 static int NP_NOINLINE np_conditional_yrow_reciprocal_cache_try(
@@ -22530,14 +22531,16 @@ static int np_conditional_yrow_from_ctx(NPConditionalYRowCtx *ctx,
     return 1;
 
   /*
-   * Preserve the constructor and every inactive allocation graph.  Admitted
-   * objective traversals start at row zero; if they do not, the incumbent
-   * division transcript remains in force.
+   * Attempt the optional sidecar once on first local use.  Serial traversals
+   * start at row zero, while an MPI sibling may first see a nonzero global
+   * row.  Keeping the attempt state in the context makes both traversal
+   * shapes explicit without retrying an ineligible or failed allocation.
    */
-  if((eval_idx == 0) &&
-     (BANDWIDTH_den_extern == BW_ADAP_NN) &&
-     (ctx->reciprocal_cache == NULL))
+  if((BANDWIDTH_den_extern == BW_ADAP_NN) &&
+     (!ctx->reciprocal_cache_attempted)){
+    ctx->reciprocal_cache_attempted = 1;
     (void)np_conditional_yrow_reciprocal_cache_try(ctx);
+  }
 
   memset(row_out, 0, (size_t)num_train*sizeof(double));
 
