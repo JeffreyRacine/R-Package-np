@@ -29,14 +29,16 @@ adaptive_cdist_supertile_body <- function(lines) {
   paste(lines[start:(stop - 1L)], collapse = "\n")
 }
 
-test_that("adaptive cdist CVLS reuses one Y-integral tile across two X blocks", {
+test_that("adaptive cdist CVLS reuses one Y-integral tile across three X blocks", {
   src_file <- locate_adaptive_cdist_supertile_source()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable")
   body <- adaptive_cdist_supertile_body(readLines(src_file, warn = FALSE))
 
-  expect_match(body, "double **xblocks[2] = {NULL, NULL};", fixed = TRUE)
+  expect_match(body, "double **xblocks[3] = {NULL, NULL, NULL};", fixed = TRUE)
   expect_match(body, "xblocks[1] = np_optional_tmatd(", fixed = TRUE)
+  expect_match(body, "xblocks[2] = np_optional_tmatd(", fixed = TRUE)
   expect_match(body, "group_width = 2;", fixed = TRUE)
+  expect_match(body, "group_width = 3;", fixed = TRUE)
   expect_match(body, "i0 += group_width*block_size", fixed = TRUE)
   expect_match(body, "for(g = 0; g < group_width; g++)", fixed = TRUE)
   expect_match(
