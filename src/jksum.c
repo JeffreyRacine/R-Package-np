@@ -22279,6 +22279,24 @@ static int np_shadow_conditional_build_x_weights_full(double *vector_scale_facto
 
 typedef struct {
   int ready;
+  double storage[];
+} NPConditionalXRowReciprocalCache;
+
+#if NP_ACCEL_GAUSS_COMPILED
+static int NP_NOINLINE
+np_accel_gauss_adaptive_higher_row_reciprocal_try(
+  const int *kernel_c,
+  const int *operator,
+  double * const *train,
+  double * const *eval_one,
+  const double *bandwidth_reciprocal,
+  int ndim,
+  int n,
+  double *out);
+#endif
+
+typedef struct {
+  int ready;
   int ll_mode;
   int num_train;
   int num_reg_tot;
@@ -22291,6 +22309,7 @@ typedef struct {
   double *kw;
   double *mean_row;
   double *weighted_design;
+  NPConditionalXRowReciprocalCache *reciprocal_cache;
   double **matrix_bandwidth_x;
   double **matrix_bandwidth_eval_one;
   double **eval_xuno_one;
@@ -22298,6 +22317,9 @@ typedef struct {
   double **eval_xcon_one;
   NPLPFullRowWorkspace full_row_workspace;
 } NPConditionalXRowCtx;
+
+static int NP_NOINLINE np_conditional_xrow_reciprocal_cache_try(
+  NPConditionalXRowCtx *ctx);
 
 typedef struct {
   int ready;
@@ -22325,6 +22347,7 @@ static void np_conditional_xrow_ctx_clear(NPConditionalXRowCtx *ctx){
   if(ctx->kw != NULL) free(ctx->kw);
   if(ctx->mean_row != NULL) free(ctx->mean_row);
   if(ctx->weighted_design != NULL) free(ctx->weighted_design);
+  if(ctx->reciprocal_cache != NULL) free(ctx->reciprocal_cache);
   if(ctx->matrix_bandwidth_x != NULL) free_tmat(ctx->matrix_bandwidth_x);
   if(ctx->matrix_bandwidth_eval_one != NULL) free_tmat(ctx->matrix_bandwidth_eval_one);
   if(ctx->eval_xuno_one != NULL) free_mat(ctx->eval_xuno_one, num_reg_unordered_extern);
@@ -22499,6 +22522,16 @@ static int NP_NOINLINE NP_HOT_ALIGN np_conditional_xrow_from_ctx_impl(
   if((eval_idx < 0) || (eval_idx >= num_train))
     return 1;
 
+  /*
+   * Every admitted objective begins its row traversal at zero. Build the
+   * optional sidecar lazily so the shared constructor and all inactive
+   * fixed/generalized-NN owners retain their incumbent allocation graph.
+   */
+  if((eval_idx == 0) &&
+     (BANDWIDTH_den_extern == BW_ADAP_NN) &&
+     (ctx->reciprocal_cache == NULL))
+    (void)np_conditional_xrow_reciprocal_cache_try(ctx);
+
   memset(row_out, 0, (size_t)num_train*sizeof(double));
 
   if((int_TREE_X == NP_TREE_TRUE) && (ipt_lookup_extern_X != NULL))
@@ -22548,18 +22581,33 @@ static int NP_NOINLINE NP_HOT_ALIGN np_conditional_xrow_from_ctx_impl(
      (num_reg_unordered_extern == 0) &&
      (num_reg_ordered_extern == 0) &&
      (!int_cxker_bound_extern) &&
-     (int_TREE_X != NP_TREE_TRUE))
-    adaptive_gaussian_row =
-      np_accel_gauss_adaptive_higher_row_try(
-        ctx->kernel_cx,
-        ctx->x_operator,
-        matrix_X_continuous_train_extern,
-        ctx->eval_xcon_one,
-        ctx->matrix_bandwidth_x,
-        num_reg_continuous_extern,
-        num_train,
-        0,
-        ctx->kw);
+     (int_TREE_X != NP_TREE_TRUE)){
+    if((ctx->reciprocal_cache != NULL) &&
+       ctx->reciprocal_cache->ready){
+      adaptive_gaussian_row =
+        np_accel_gauss_adaptive_higher_row_reciprocal_try(
+          ctx->kernel_cx,
+          ctx->x_operator,
+          matrix_X_continuous_train_extern,
+          ctx->eval_xcon_one,
+          ctx->reciprocal_cache->storage,
+          num_reg_continuous_extern,
+          num_train,
+          ctx->kw);
+    } else {
+      adaptive_gaussian_row =
+        np_accel_gauss_adaptive_higher_row_try(
+          ctx->kernel_cx,
+          ctx->x_operator,
+          matrix_X_continuous_train_extern,
+          ctx->eval_xcon_one,
+          ctx->matrix_bandwidth_x,
+          num_reg_continuous_extern,
+          num_train,
+          0,
+          ctx->kw);
+    }
+  }
 #endif
   if(!adaptive_gaussian_row &&
      np_shadow_conditional_kernel_row_raw(ctx->kernel_cx,
@@ -35063,3 +35111,166 @@ cleanup_cvls_lp_adap_block4:
 
 #undef NP_CDENS_ADAP_WIDTH4_NOINLINE
 #undef NP_CDENS_ADAP_WIDTH4_UNAVAILABLE
+
+/*
+ * Optional adaptive-only sidecar. Keep this constructor out of line and
+ * after the established hot owners so fixed, generalized-NN, narrow, and
+ * portable routes retain their incumbent allocation graph.
+ */
+static int NP_NOINLINE np_conditional_xrow_reciprocal_cache_try(
+  NPConditionalXRowCtx *ctx)
+{
+  const int num_train = num_obs_train_extern;
+  const int ndim = num_reg_continuous_extern;
+  NPConditionalXRowReciprocalCache *cache = NULL;
+  size_t reciprocal_count;
+  size_t allocation_bytes;
+
+  if((ctx == NULL) || (ctx->reciprocal_cache != NULL) ||
+     (BANDWIDTH_den_extern != BW_ADAP_NN) ||
+     (ctx->ll_mode != NP_LP_ENGINE_GENERAL) ||
+     (!np_glp_cv_cache.ready) || (np_glp_cv_cache.nterms < 4) ||
+     (num_train <= 0) || (ndim < 2) ||
+     (num_reg_unordered_extern != 0) ||
+     (num_reg_ordered_extern != 0) ||
+     int_cxker_bound_extern ||
+     (int_TREE_X == NP_TREE_TRUE) ||
+     (!np_mseries_accelerate_enabled_cache) ||
+     (ctx->kernel_cx == NULL) ||
+     (ctx->matrix_bandwidth_x == NULL))
+    return 0;
+
+  for(int d = 0; d < ndim; d++)
+    if((ctx->kernel_cx[d] < 1) || (ctx->kernel_cx[d] > 3))
+      return 0;
+
+  if((size_t)ndim > SIZE_MAX/(size_t)num_train)
+    return 0;
+  reciprocal_count = (size_t)ndim*(size_t)num_train;
+  if(reciprocal_count >
+     (SIZE_MAX - sizeof(*cache))/sizeof(double))
+    return 0;
+  allocation_bytes =
+    sizeof(*cache) + reciprocal_count*sizeof(double);
+
+  cache = (NPConditionalXRowReciprocalCache *)malloc(allocation_bytes);
+  if(cache == NULL)
+    return 0;
+
+  for(int d = 0; d < ndim; d++){
+    if(ctx->matrix_bandwidth_x[d] == NULL)
+      goto fail_reciprocal_cache;
+    for(int i = 0; i < num_train; i++){
+      const double h = ctx->matrix_bandwidth_x[d][i];
+      const double reciprocal = 1.0/h;
+
+      if(!(h > 0.0) || !isfinite(h) || !isfinite(reciprocal))
+        goto fail_reciprocal_cache;
+      cache->storage[
+        (size_t)d*(size_t)num_train + (size_t)i
+      ] = reciprocal;
+    }
+  }
+
+  cache->ready = 1;
+  ctx->reciprocal_cache = cache;
+  return 1;
+
+fail_reciprocal_cache:
+  free(cache);
+  return 0;
+}
+
+/*
+ * Conditional-only reciprocal sibling. The shared adaptive higher-order
+ * helper remains byte-for-byte unchanged for regression and every other
+ * division consumer.
+ */
+#if NP_ACCEL_GAUSS_COMPILED
+static int NP_NOINLINE
+np_accel_gauss_adaptive_higher_row_reciprocal_try(
+  const int * const kernel_c,
+  const int * const operator,
+  double * const * const train,
+  double * const * const eval_one,
+  const double * const bandwidth_reciprocal,
+  const int ndim,
+  const int n,
+  double * const out)
+{
+  const double minus_one = -1.0;
+  const double minus_half = -0.5;
+  const double zero = 0.0;
+  const int ni = n;
+  double coefficient = 1.0;
+
+  if((!np_mseries_accelerate_enabled_cache) ||
+     (kernel_c == NULL) || (operator == NULL) ||
+     (train == NULL) || (eval_one == NULL) ||
+     (bandwidth_reciprocal == NULL) || (out == NULL) ||
+     (ndim < 2) || (n < NP_ADAPTIVE_HIGHER_GAUSS_MIN_ROWS) ||
+     (!np_accel_gauss_resolve()) ||
+     (!np_accel_gauss_scratch_ensure(n)))
+    return 0;
+
+  for(int d = 0; d < ndim; d++){
+    if((kernel_c[d] < 1) || (kernel_c[d] > 3) ||
+       (operator[d] != OP_NORMAL) ||
+       (train[d] == NULL) || (eval_one[d] == NULL))
+      return 0;
+    coefficient *= ONE_OVER_SQRT_TWO_PI;
+  }
+
+  for(int d = 0; d < ndim; d++){
+    const double x = eval_one[d][0];
+
+    np_accel_vsmsaD(train[d], 1, &minus_one, &x,
+                    np_accel_gauss_tmp, 1, (np_vDSP_Length)n);
+    np_accel_vmulD(
+      np_accel_gauss_tmp,
+      1,
+      bandwidth_reciprocal + (size_t)d*(size_t)n,
+      1,
+      np_accel_gauss_val,
+      1,
+      (np_vDSP_Length)n
+    );
+    np_accel_vsqD(np_accel_gauss_val, 1,
+                  np_accel_gauss_tmp, 1, (np_vDSP_Length)n);
+
+    if(d == 0)
+      memcpy(np_accel_gauss_arg, np_accel_gauss_tmp,
+             (size_t)n*sizeof(double));
+    else
+      np_accel_vaddD(np_accel_gauss_arg, 1,
+                     np_accel_gauss_tmp, 1,
+                     np_accel_gauss_arg, 1,
+                     (np_vDSP_Length)n);
+
+    np_accel_gauss_polynomial_vector(
+      kernel_c[d], np_accel_gauss_tmp, n, np_accel_gauss_work);
+    if(d == 0)
+      memcpy(out, np_accel_gauss_work, (size_t)n*sizeof(double));
+    else
+      np_accel_vmulD(out, 1, np_accel_gauss_work, 1,
+                     out, 1, (np_vDSP_Length)n);
+  }
+
+  np_accel_vsmsaD(np_accel_gauss_arg, 1, &minus_half, &zero,
+                  np_accel_gauss_arg, 1, (np_vDSP_Length)n);
+  np_accel_vvexp(np_accel_gauss_tmp, np_accel_gauss_arg, &ni);
+  np_accel_vmulD(out, 1, np_accel_gauss_tmp, 1,
+                 out, 1, (np_vDSP_Length)n);
+  np_accel_vsmulD(out, 1, &coefficient,
+                  out, 1, (np_vDSP_Length)n);
+
+  for(int i = 0; i < n; i++){
+    if(!isfinite(out[i])){
+      memset(out, 0, (size_t)n*sizeof(double));
+      return 0;
+    }
+  }
+
+  return 1;
+}
+#endif
