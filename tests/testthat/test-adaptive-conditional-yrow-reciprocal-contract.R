@@ -23,6 +23,7 @@ test_that("MPI adaptive conditional response reciprocals are a lazy sidecar", {
     "NPConditionalYRowReciprocalCache *reciprocal_cache;",
     fixed = TRUE
   )
+  expect_match(source, "int reciprocal_cache_attempted;", fixed = TRUE)
   expect_match(
     source,
     "if(ctx->reciprocal_cache != NULL) free(ctx->reciprocal_cache);",
@@ -69,7 +70,16 @@ test_that("MPI adaptive conditional response reciprocals are a lazy sidecar", {
   )
   expect_gt(row_end, row_start)
   row <- substr(source, row_start, row_end - 1L)
-  expect_match(row, "(eval_idx == 0)", fixed = TRUE)
+  expect_match(
+    row,
+    "(!ctx->reciprocal_cache_attempted)",
+    fixed = TRUE
+  )
+  expect_match(
+    row,
+    "ctx->reciprocal_cache_attempted = 1;",
+    fixed = TRUE
+  )
   expect_match(
     row,
     "(void)np_conditional_yrow_reciprocal_cache_try(ctx);",
