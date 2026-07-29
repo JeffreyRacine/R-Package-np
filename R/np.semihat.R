@@ -732,6 +732,17 @@
   )
 }
 
+.npscoef_batch_zero_solve <- function(tyw, tww) {
+  if (nrow(tyw) <= 2L)
+    return(NULL)
+  .Call(
+    "C_np_npscoef_batch_zero_solve",
+    tww,
+    tyw,
+    PACKAGE = "npRmpi"
+  )
+}
+
 .npscoef_lp_state <- function(bws, tzdat, ezdat, leave.one.out = FALSE, where = "npscoef") {
   tzdat <- toFrame(tzdat)
   ezdat <- toFrame(ezdat)

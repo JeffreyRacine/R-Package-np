@@ -47,6 +47,7 @@ extern SEXP C_np_regression(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP
 extern SEXP C_np_regression_lp_apply_conditional(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_lc_hat_normalize(SEXP, SEXP);
 extern SEXP C_np_reghat_lp_matrix_fast(SEXP, SEXP, SEXP);
+extern SEXP C_np_npscoef_batch_zero_solve(SEXP, SEXP);
 extern SEXP C_np_progress_signal(SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_mpi_interrupt_state(SEXP);
 extern SEXP C_np_mpi_interrupt_scope(SEXP);
@@ -180,6 +181,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"C_np_regression_lp_apply_conditional",(DL_FUNC) &C_np_regression_lp_apply_conditional,17},
     {"C_np_lc_hat_normalize",             (DL_FUNC) &C_np_lc_hat_normalize,              2},
     {"C_np_reghat_lp_matrix_fast",       (DL_FUNC) &C_np_reghat_lp_matrix_fast,        3},
+    {"C_np_npscoef_batch_zero_solve",    (DL_FUNC) &C_np_npscoef_batch_zero_solve,     2},
     {"C_np_set_seed",                  (DL_FUNC) &C_np_set_seed,                   1},
     {"C_np_shadow_reset_state",        (DL_FUNC) &C_np_shadow_reset_state,         0},
     {"C_np_set_local_regression_mode", (DL_FUNC) &C_np_set_local_regression_mode,  1},

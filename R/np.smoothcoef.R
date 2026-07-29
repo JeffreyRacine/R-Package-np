@@ -533,6 +533,30 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
       pcoef <- ncol(W.eval.design)
       coef.out <- matrix(maxPenalty, nrow = pcoef, ncol = neval.local)
       theta.out <- if (is.null(Wz.eval)) NULL else matrix(NA_real_, nrow = ncoef, ncol = neval.local)
+      theta.batch <- .npscoef_batch_zero_solve(tyw = tyw, tww = tww)
+      if (!is.null(theta.batch)) {
+        for (ii in seq_len(neval.local)) {
+          theta.ii <- theta.batch[, ii]
+          if (is.null(Wz.eval)) {
+            coef.out[, ii] <- theta.ii
+          } else {
+            theta.out[, ii] <- theta.ii
+            coef.out[, ii] <- as.vector(crossprod(
+              Wz.eval[ii, ],
+              matrix(theta.ii,
+                     nrow = ncol(Wz.eval),
+                     ncol = pcoef)
+            ))
+          }
+          if (!is.null(fit.progress.step))
+            fit.progress.step(progress_detail)
+        }
+        return(list(
+          coef = coef.out,
+          theta = theta.out,
+          ridge = rep.int(0.0, neval.local)
+        ))
+      }
       ridge.grid <- npRidgeSequenceAdditive(n.train = tnrow, cap = 1.0)
       ridge <- rep.int(ridge.grid[1L], neval.local)
       ridge.idx <- rep.int(1L, neval.local)
