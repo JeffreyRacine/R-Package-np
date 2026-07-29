@@ -27536,6 +27536,19 @@ np_conditional_density_cvls_lp_adap_block3_stream(
     double *vector_scale_factor,
     double *cv);
 
+#define NP_CDENS_ADAP_WIDTH4_UNAVAILABLE 2
+
+#if defined(__clang__) || defined(__GNUC__)
+# define NP_CDENS_ADAP_WIDTH4_NOINLINE __attribute__((noinline))
+#else
+# define NP_CDENS_ADAP_WIDTH4_NOINLINE
+#endif
+
+static int NP_CDENS_ADAP_WIDTH4_NOINLINE
+np_conditional_density_cvls_lp_adap_block4_stream(
+    double *vector_scale_factor,
+    double *cv);
+
 static int np_conditional_density_cvls_lp_adap_block_stream(double *vector_scale_factor,
                                                             double *cv){
   const int num_obs = num_obs_train_extern;
@@ -27720,6 +27733,14 @@ np_conditional_density_cvls_lp_adap_block3_stream(
   if((BANDWIDTH_den_extern != BW_ADAP_NN) ||
      (int_cyker_bound_extern != 0))
     return 1;
+  {
+    const int width4_status =
+      np_conditional_density_cvls_lp_adap_block4_stream(
+        vector_scale_factor,
+        cv);
+    if(width4_status != NP_CDENS_ADAP_WIDTH4_UNAVAILABLE)
+      return width4_status;
+  }
   if(width3_passes >= width2_passes)
     return NP_CDENS_ADAP_WIDTH3_UNAVAILABLE;
 
@@ -33311,3 +33332,172 @@ static int np_outer_weighted_sum_pack_B_accel_try(
   return 0;
 #endif
 }
+
+/*
+ * Width-four adaptive conditional-density sibling. It is entered only when
+ * four blocks reduce the number of response-convolution passes versus the
+ * incumbent width-three owner. Incumbent C152 buffers and row contexts are
+ * allocated first and in the same order; the fourth full-X slab is optional.
+ */
+static int NP_CDENS_ADAP_WIDTH4_NOINLINE
+np_conditional_density_cvls_lp_adap_block4_stream(
+    double *vector_scale_factor,
+    double *cv)
+{
+  const int num_obs = num_obs_train_extern;
+  const int block_size =
+    MIN(np_conditional_lp_cvls_block_size(num_obs), MAX(1, num_obs));
+  const int nblocks =
+    (num_obs / block_size) + ((num_obs % block_size) != 0);
+  const int width3_passes =
+    (nblocks / 3) + ((nblocks % 3) != 0);
+  const int width4_passes =
+    (nblocks / 4) + ((nblocks % 4) != 0);
+  double **loo_work = NULL;
+  double **full_blocks[4] = {NULL, NULL, NULL, NULL};
+  double **shared_y = NULL;
+  NPConditionalXRowCtx xctx = {0};
+  NPConditionalYRowCtx yctx = {0}, yconvctx = {0};
+  int i0, j0, ii, jj, g;
+  int status = 1;
+
+  if((cv == NULL) || (vector_scale_factor == NULL) || (num_obs <= 0))
+    return 1;
+  if((BANDWIDTH_den_extern != BW_ADAP_NN) ||
+     (int_cyker_bound_extern != 0))
+    return 1;
+  if(width4_passes >= width3_passes)
+    return NP_CDENS_ADAP_WIDTH4_UNAVAILABLE;
+
+  loo_work = alloc_tmatd(num_obs, block_size);
+  full_blocks[0] = alloc_tmatd(num_obs, block_size);
+  full_blocks[1] = alloc_tmatd(num_obs, block_size);
+  shared_y = alloc_tmatd(num_obs, block_size);
+  if((loo_work == NULL) || (full_blocks[0] == NULL) ||
+     (full_blocks[1] == NULL) || (shared_y == NULL))
+    goto cleanup_cvls_lp_adap_block4;
+
+  if(np_conditional_xrow_ctx_prepare(vector_scale_factor, &xctx) != 0)
+    goto cleanup_cvls_lp_adap_block4;
+  if(np_conditional_yrow_ctx_prepare(vector_scale_factor,
+                                     OP_NORMAL,
+                                     &yctx) != 0)
+    goto cleanup_cvls_lp_adap_block4;
+  if(np_conditional_yrow_ctx_prepare(vector_scale_factor,
+                                     OP_CONVOLUTION,
+                                     &yconvctx) != 0)
+    goto cleanup_cvls_lp_adap_block4;
+
+  full_blocks[2] = np_optional_tmatd(num_obs, block_size);
+  if(full_blocks[2] == NULL){
+    status = NP_CDENS_ADAP_WIDTH4_UNAVAILABLE;
+    goto cleanup_cvls_lp_adap_block4;
+  }
+  full_blocks[3] = np_optional_tmatd(num_obs, block_size);
+  if(full_blocks[3] == NULL){
+    status = NP_CDENS_ADAP_WIDTH4_UNAVAILABLE;
+    goto cleanup_cvls_lp_adap_block4;
+  }
+
+  *cv = 0.0;
+  for(i0 = 0; i0 < num_obs; i0 += 4*block_size){
+    int block_start[4] = {
+      i0, i0 + block_size, i0 + 2*block_size, i0 + 3*block_size
+    };
+    int block_rows[4] = {0, 0, 0, 0};
+    double lin[4] = {0.0, 0.0, 0.0, 0.0};
+    double quad[4] = {0.0, 0.0, 0.0, 0.0};
+
+    for(g = 0; g < 4; g++){
+      const int ib =
+        MIN(block_size, MAX(0, num_obs - block_start[g]));
+      block_rows[g] = ib;
+
+      if(ib <= 0)
+        continue;
+      for(ii = 0; ii < ib; ii++){
+        const int i = block_start[g] + ii;
+        if(np_lp_engine_extern == NP_LP_ENGINE_GENERAL){
+          if((np_conditional_xrow_full_from_ctx(&xctx,
+                                                i,
+                                                full_blocks[g][ii]) != 0) ||
+             (np_lp_delete_smoother_row(full_blocks[g][ii],
+                                        num_obs,
+                                        i,
+                                        loo_work[ii]) != 0))
+            goto cleanup_cvls_lp_adap_block4;
+        } else {
+          if(np_conditional_xrow_from_ctx(&xctx, i, loo_work[ii]) != 0)
+            goto cleanup_cvls_lp_adap_block4;
+          if(np_conditional_xrow_full_from_ctx(&xctx,
+                                               i,
+                                               full_blocks[g][ii]) != 0)
+            goto cleanup_cvls_lp_adap_block4;
+        }
+        if(np_conditional_yrow_from_ctx(&yctx, i, shared_y[ii]) != 0)
+          goto cleanup_cvls_lp_adap_block4;
+      }
+
+      for(ii = 0; ii < ib; ii++)
+        lin[g] += np_blas_ddot_int(num_obs, loo_work[ii], shared_y[ii]);
+    }
+
+    {
+      double * const quad_cross = loo_work[0];
+      for(j0 = 0; j0 < num_obs; j0 += block_size){
+        const int jb = MIN(block_size, num_obs - j0);
+
+        for(jj = 0; jj < jb; jj++){
+          const int j = j0 + jj;
+          if(np_conditional_yrow_from_ctx(&yconvctx,
+                                          j,
+                                          shared_y[jj]) != 0)
+            goto cleanup_cvls_lp_adap_block4;
+        }
+
+        for(g = 0; g < 4; g++){
+          const int ib = block_rows[g];
+
+          if(ib <= 0)
+            continue;
+          np_blas_dgemm_tn_int(ib,
+                               jb,
+                               num_obs,
+                               full_blocks[g][0],
+                               shared_y[0],
+                               quad_cross);
+          for(ii = 0; ii < ib; ii++){
+            double * const ai = full_blocks[g][ii];
+            for(jj = 0; jj < jb; jj++){
+              const double aij = ai[j0 + jj];
+              if(aij == 0.0)
+                continue;
+              quad[g] += aij*quad_cross[ii + jj*ib];
+            }
+          }
+        }
+      }
+    }
+
+    for(g = 0; g < 4; g++)
+      if(block_rows[g] > 0)
+        *cv += quad[g] - 2.0*lin[g];
+  }
+
+  *cv /= (double)num_obs;
+  status = 0;
+
+cleanup_cvls_lp_adap_block4:
+  np_conditional_xrow_ctx_clear(&xctx);
+  np_conditional_yrow_ctx_clear(&yctx);
+  np_conditional_yrow_ctx_clear(&yconvctx);
+  if(loo_work != NULL) free_tmat(loo_work);
+  for(g = 0; g < 4; g++)
+    if(full_blocks[g] != NULL) free_tmat(full_blocks[g]);
+  if(shared_y != NULL) free_tmat(shared_y);
+  np_glp_cv_clear_extern();
+  return status;
+}
+
+#undef NP_CDENS_ADAP_WIDTH4_NOINLINE
+#undef NP_CDENS_ADAP_WIDTH4_UNAVAILABLE
