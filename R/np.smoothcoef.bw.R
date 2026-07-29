@@ -674,14 +674,7 @@ npscoefbw.scbandwidth <-
         if (is.null(Wz.eval)) {
           coef.out[,] <- theta.batch
         } else {
-          for (ii in seq_len(neval)) {
-            coef.out[, ii] <- as.vector(crossprod(
-              Wz.eval[ii, ],
-              matrix(theta.batch[, ii],
-                     nrow = ncol(Wz.eval),
-                     ncol = pcoef)
-            ))
-          }
+          coef.out[,] <- .npscoef_batch_project(theta.batch, Wz.eval)
         }
         return(coef.out)
       }

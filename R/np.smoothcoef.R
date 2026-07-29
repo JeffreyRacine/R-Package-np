@@ -512,22 +512,15 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
       theta.out <- if (is.null(Wz.eval)) NULL else matrix(NA_real_, nrow = ncoef, ncol = neval.local)
       theta.batch <- .npscoef_batch_zero_solve(tyw = tyw, tww = tww)
       if (!is.null(theta.batch)) {
-        for (ii in seq_len(neval.local)) {
-          theta.ii <- theta.batch[, ii]
-          if (is.null(Wz.eval)) {
-            coef.out[, ii] <- theta.ii
-          } else {
-            theta.out[, ii] <- theta.ii
-            coef.out[, ii] <- as.vector(crossprod(
-              Wz.eval[ii, ],
-              matrix(theta.ii,
-                     nrow = ncol(Wz.eval),
-                     ncol = pcoef)
-            ))
-          }
-          if (!is.null(fit.progress.step))
-            fit.progress.step(progress_detail)
+        if (is.null(Wz.eval)) {
+          coef.out[,] <- theta.batch
+        } else {
+          theta.out[,] <- theta.batch
+          coef.out[,] <- .npscoef_batch_project(theta.batch, Wz.eval)
         }
+        if (!is.null(fit.progress.step))
+          for (ii in seq_len(neval.local))
+            fit.progress.step(progress_detail)
         return(list(
           coef = coef.out,
           theta = theta.out,

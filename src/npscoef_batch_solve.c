@@ -135,3 +135,63 @@ SEXP C_np_npscoef_batch_zero_solve(SEXP tww_r, SEXP tyw_r)
   UNPROTECT(1);
   return answer;
 }
+
+/*
+ * Project each stable batch-solution column through its corresponding
+ * hoisted basis row.  Basis terms remain in ascending order while the
+ * register-local loop avoids both R slice/reshape work and tiny-BLAS dispatch.
+ */
+SEXP C_np_npscoef_batch_project(SEXP theta_r, SEXP wz_r)
+{
+  SEXP theta_dim;
+  SEXP wz_dim;
+  SEXP answer;
+  const double *theta;
+  const double *wz;
+  double *coef;
+  int ncoef;
+  int neval;
+  int nbasis;
+  int pcoef;
+  int row;
+  int col;
+  int k;
+
+  if((TYPEOF(theta_r) != REALSXP) || (TYPEOF(wz_r) != REALSXP))
+    error("internal npscoef batch projection requires double matrices");
+
+  theta_dim = getAttrib(theta_r, R_DimSymbol);
+  wz_dim = getAttrib(wz_r, R_DimSymbol);
+  if((TYPEOF(theta_dim) != INTSXP) || (XLENGTH(theta_dim) != 2) ||
+     (TYPEOF(wz_dim) != INTSXP) || (XLENGTH(wz_dim) != 2))
+    error("internal npscoef batch projection received invalid dimensions");
+
+  ncoef = INTEGER(theta_dim)[0];
+  neval = INTEGER(theta_dim)[1];
+  nbasis = INTEGER(wz_dim)[1];
+  if((ncoef <= 0) || (neval <= 0) || (nbasis <= 0) ||
+     (INTEGER(wz_dim)[0] != neval) || ((ncoef % nbasis) != 0))
+    error("internal npscoef batch projection received incompatible dimensions");
+  pcoef = ncoef/nbasis;
+
+  answer = PROTECT(allocMatrix(REALSXP, pcoef, neval));
+  theta = REAL(theta_r);
+  wz = REAL(wz_r);
+  coef = REAL(answer);
+
+  for(row = 0; row < neval; row++){
+    if((row & 63) == 0)
+      R_CheckUserInterrupt();
+    for(col = 0; col < pcoef; col++){
+      const double *theta_col =
+        theta + (size_t)row*(size_t)ncoef + (size_t)col*(size_t)nbasis;
+      double value = 0.0;
+      for(k = 0; k < nbasis; k++)
+        value += wz[row + (size_t)k*(size_t)neval] * theta_col[k];
+      coef[col + (size_t)row*(size_t)pcoef] = value;
+    }
+  }
+
+  UNPROTECT(1);
+  return answer;
+}
