@@ -39,7 +39,7 @@ test_that("adaptive CVLS derives deleted rows only from completed full rows", {
   expect_equal(lengths(regmatches(
     source,
     gregexpr("np_lp_delete_smoother_row\\(", source, perl = TRUE)
-  )), 2L)
+  )), 4L)
 
   row_body <- adaptive_source_body(
     jksum,
