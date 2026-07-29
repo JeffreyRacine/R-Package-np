@@ -5713,6 +5713,8 @@ static int NP_NOINLINE np_accel_gauss_adaptive_higher_row_try(
   double * const * const train,
   double * const * const eval_one,
   double * const * const bandwidth,
+  const double * const bandwidth_reciprocal,
+  const double * const bandwidth_product_reciprocal,
   const int ndim,
   const int n,
   const int divide_by_bandwidth_product,
@@ -5722,6 +5724,10 @@ static int NP_NOINLINE np_accel_gauss_adaptive_higher_row_try(
   const double minus_half = -0.5;
   const double zero = 0.0;
   const int ni = n;
+  const int use_reciprocal =
+    (bandwidth_reciprocal != NULL) &&
+    ((!divide_by_bandwidth_product) ||
+     (bandwidth_product_reciprocal != NULL));
   double coefficient = 1.0;
 
   if((!np_mseries_accelerate_enabled_cache) ||
@@ -5750,21 +5756,26 @@ static int NP_NOINLINE np_accel_gauss_adaptive_higher_row_try(
 
     vDSP_vsmsaD(train[d], 1, &minus_one, &x,
                 np_accel_gauss_tmp, 1, (np_vDSP_Length)n);
-    vDSP_vdivD(bandwidth[d], 1, np_accel_gauss_tmp, 1,
-               np_accel_gauss_val, 1, (np_vDSP_Length)n);
+    if(use_reciprocal)
+      vDSP_vmulD(np_accel_gauss_tmp, 1,
+                 bandwidth_reciprocal + (size_t)d*(size_t)n, 1,
+                 np_accel_gauss_val, 1, (np_vDSP_Length)n);
+    else
+      vDSP_vdivD(bandwidth[d], 1, np_accel_gauss_tmp, 1,
+                 np_accel_gauss_val, 1, (np_vDSP_Length)n);
     vDSP_vsqD(np_accel_gauss_val, 1,
               np_accel_gauss_tmp, 1, (np_vDSP_Length)n);
 
     if(d == 0){
       memcpy(np_accel_gauss_arg, np_accel_gauss_tmp,
              (size_t)n*sizeof(double));
-      if(divide_by_bandwidth_product)
+      if(divide_by_bandwidth_product && !use_reciprocal)
         memcpy(np_accel_gauss_poly, bandwidth[d],
                (size_t)n*sizeof(double));
     } else {
       vDSP_vaddD(np_accel_gauss_arg, 1, np_accel_gauss_tmp, 1,
                  np_accel_gauss_arg, 1, (np_vDSP_Length)n);
-      if(divide_by_bandwidth_product)
+      if(divide_by_bandwidth_product && !use_reciprocal)
         vDSP_vmulD(np_accel_gauss_poly, 1, bandwidth[d], 1,
                    np_accel_gauss_poly, 1, (np_vDSP_Length)n);
     }
@@ -5787,9 +5798,14 @@ static int NP_NOINLINE np_accel_gauss_adaptive_higher_row_try(
               out, 1, (np_vDSP_Length)n);
 
   if(divide_by_bandwidth_product){
-    vDSP_vdivD(np_accel_gauss_poly, 1, out, 1,
-               np_accel_gauss_val, 1, (np_vDSP_Length)n);
-    memcpy(out, np_accel_gauss_val, (size_t)n*sizeof(double));
+    if(use_reciprocal)
+      vDSP_vmulD(out, 1, bandwidth_product_reciprocal, 1,
+                 out, 1, (np_vDSP_Length)n);
+    else {
+      vDSP_vdivD(np_accel_gauss_poly, 1, out, 1,
+                 np_accel_gauss_val, 1, (np_vDSP_Length)n);
+      memcpy(out, np_accel_gauss_val, (size_t)n*sizeof(double));
+    }
   }
 
   for(int i = 0; i < n; i++){
@@ -13538,6 +13554,93 @@ static double **np_regression_adaptive_one_row_matrix(const int ncols){
   return matrix;
 }
 
+typedef struct {
+  int ready;
+  double *reciprocal_storage;
+  double *product_reciprocal;
+} NPAdaptiveBandwidthReciprocalWorkspace;
+
+static void np_adaptive_bandwidth_reciprocal_workspace_init(
+  NPAdaptiveBandwidthReciprocalWorkspace * const workspace)
+{
+  if(workspace != NULL)
+    memset(workspace, 0, sizeof(*workspace));
+}
+
+static void np_adaptive_bandwidth_reciprocal_workspace_clear(
+  NPAdaptiveBandwidthReciprocalWorkspace * const workspace)
+{
+  if(workspace == NULL)
+    return;
+  memset(workspace, 0, sizeof(*workspace));
+}
+
+/*
+ * Adaptive-NN bandwidths are invariant across all evaluation rows in one
+ * objective. Cache their reciprocals once so the admitted vector row engine
+ * can multiply instead of repeating p vector divisions and rebuilding the
+ * pointwise bandwidth product for every row. The storage is the tail of the
+ * already-qualified weighted-design slab, so no additional allocation or
+ * allocation-failure contract is introduced. Any invalid input leaves the
+ * caller on the incumbent division transcript.
+ */
+static int np_adaptive_bandwidth_reciprocal_workspace_prepare(
+  NPAdaptiveBandwidthReciprocalWorkspace * const workspace,
+  double * const * const bandwidth,
+  const int ndim,
+  const int n,
+  double * const storage,
+  const size_t storage_count)
+{
+  size_t reciprocal_count;
+
+  if((workspace == NULL) || (bandwidth == NULL) ||
+     (ndim <= 0) || (n <= 0) || (storage == NULL))
+    return 0;
+  if((size_t)ndim > (SIZE_MAX/(size_t)n) - 1)
+    return 0;
+
+  reciprocal_count = ((size_t)ndim + 1)*(size_t)n;
+  if(storage_count < reciprocal_count)
+    return 0;
+
+  workspace->reciprocal_storage = storage;
+  workspace->product_reciprocal =
+    storage + (size_t)ndim*(size_t)n;
+
+  for(int d = 0; d < ndim; d++){
+    if(bandwidth[d] == NULL)
+      goto fail_reciprocal_prepare;
+  }
+
+  for(int i = 0; i < n; i++){
+    double product = 1.0;
+
+    for(int d = 0; d < ndim; d++){
+      const double h = bandwidth[d][i];
+      const double reciprocal = 1.0/h;
+
+      if(!(h > 0.0) || !isfinite(h) || !isfinite(reciprocal))
+        goto fail_reciprocal_prepare;
+      workspace->reciprocal_storage[
+        (size_t)d*(size_t)n + (size_t)i] = reciprocal;
+      product *= h;
+    }
+    if(!(product > 0.0) || !isfinite(product))
+      goto fail_reciprocal_prepare;
+    workspace->product_reciprocal[i] = 1.0/product;
+    if(!isfinite(workspace->product_reciprocal[i]))
+      goto fail_reciprocal_prepare;
+  }
+
+  workspace->ready = 1;
+  return 1;
+
+fail_reciprocal_prepare:
+  np_adaptive_bandwidth_reciprocal_workspace_clear(workspace);
+  return 0;
+}
+
 static NP_NOINLINE NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas(
     const int bwm,
     const int num_obs,
@@ -13566,16 +13669,22 @@ static NP_NOINLINE NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas(
     .runtime_options_frozen = 1
   };
   NPLPSolveWorkspace solve_workspace;
+  NPAdaptiveBandwidthReciprocalWorkspace reciprocal_workspace;
   double **eval_u = NULL, **eval_o = NULL, **eval_c = NULL;
   double **matrix_bandwidth_eval = NULL;
   double *weighted_design = NULL;
   double *eval_basis = NULL;
   double *kw = NULL;
   double *vsf = NULL;
+  size_t weighted_count = 0;
+  size_t reciprocal_count = 0;
+  size_t allocation_count = 0;
   int sf_flag = 0;
+  int reciprocal_eligible = 1;
   int i, j, l;
 
   np_lp_solve_workspace_init(&solve_workspace);
+  np_adaptive_bandwidth_reciprocal_workspace_init(&reciprocal_workspace);
 
   if((num_obs < NP_CONDITIONAL_X_WEIGHTED_BLAS_MIN_ROWS) ||
      (num_reg_continuous <= 0) || (nterms < 4) ||
@@ -13590,7 +13699,14 @@ static NP_NOINLINE NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas(
   for(l = 0; l < num_reg_continuous; l++){
     if(((kernel_c[l] < 0) || (kernel_c[l] > 4)) && (kernel_c[l] != 8))
       goto cleanup_adaptive_blas;
+    if((kernel_c[l] < 1) || (kernel_c[l] > 3))
+      reciprocal_eligible = 0;
   }
+  reciprocal_eligible =
+    reciprocal_eligible &&
+    (num_reg_unordered == 0) &&
+    (num_reg_ordered == 0) &&
+    (!int_cker_bound_extern);
   if((bwm != RBWM_CVLS) && (bwm != RBWM_CVAIC) &&
      (bwm != RBWM_CVCHECK) && (bwm != RBWM_CVKS))
     goto cleanup_adaptive_blas;
@@ -13604,8 +13720,30 @@ static NP_NOINLINE NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas(
   if((size_t)basis_stride > SIZE_MAX/(size_t)nterms)
     goto cleanup_adaptive_blas;
 
-  weighted_design = (double *)malloc(
-    (size_t)basis_stride*(size_t)nterms*sizeof(double));
+  weighted_count = (size_t)basis_stride*(size_t)nterms;
+  if(weighted_count > SIZE_MAX/sizeof(double))
+    goto cleanup_adaptive_blas;
+  allocation_count = weighted_count;
+  if(reciprocal_eligible){
+    if(((size_t)num_reg_continuous >
+        (SIZE_MAX/(size_t)num_obs) - 1) ||
+       (((size_t)num_reg_continuous + 1)*(size_t)num_obs >
+        SIZE_MAX - allocation_count)){
+      reciprocal_eligible = 0;
+    } else {
+      reciprocal_count =
+        ((size_t)num_reg_continuous + 1)*(size_t)num_obs;
+      allocation_count += reciprocal_count;
+      if(allocation_count > SIZE_MAX/sizeof(double)){
+        reciprocal_eligible = 0;
+        reciprocal_count = 0;
+        allocation_count = weighted_count;
+      }
+    }
+  }
+
+  weighted_design =
+    (double *)malloc(allocation_count*sizeof(double));
   kw = (double *)malloc((size_t)num_obs*sizeof(double));
   eval_basis = (double *)malloc((size_t)nterms*sizeof(double));
   eval_u =
@@ -13634,6 +13772,15 @@ static NP_NOINLINE NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas(
   } else {
     vsf = vector_scale_factor;
   }
+
+  if(reciprocal_eligible)
+    (void)np_adaptive_bandwidth_reciprocal_workspace_prepare(
+      &reciprocal_workspace,
+      matrix_bandwidth,
+      num_reg_continuous,
+      num_obs,
+      weighted_design + weighted_count,
+      reciprocal_count);
 
   result.cv = 0.0;
   result.traceH = 0.0;
@@ -13684,6 +13831,12 @@ static NP_NOINLINE NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas(
                                                matrix_X_continuous,
                                                eval_c,
                                                matrix_bandwidth,
+                                               reciprocal_workspace.ready ?
+                                                 reciprocal_workspace.reciprocal_storage :
+                                                 NULL,
+                                               reciprocal_workspace.ready ?
+                                                 reciprocal_workspace.product_reciprocal :
+                                                 NULL,
                                                num_reg_continuous,
                                                num_obs,
                                                1,
@@ -13846,6 +13999,7 @@ cleanup_adaptive_blas:
   if(eval_o != NULL) free_tmat(eval_o);
   if(eval_c != NULL) free_tmat(eval_c);
   if(matrix_bandwidth_eval != NULL) free_tmat(matrix_bandwidth_eval);
+  np_adaptive_bandwidth_reciprocal_workspace_clear(&reciprocal_workspace);
   np_lp_solve_workspace_clear(&solve_workspace);
 
   if(!result.ok){
@@ -21575,6 +21729,8 @@ static int np_conditional_xrow_from_ctx_impl(NPConditionalXRowCtx *ctx,
         matrix_X_continuous_train_extern,
         ctx->eval_xcon_one,
         ctx->matrix_bandwidth_x,
+        NULL,
+        NULL,
         num_reg_continuous_extern,
         num_train,
         0,
