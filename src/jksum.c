@@ -13674,6 +13674,20 @@ static NP_NOINLINE NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas(
                                       num_obs,
                                       1,
                                       kw);
+    if(!adaptive_gaussian_row &&
+       (num_reg_unordered == 0) &&
+       (num_reg_ordered == 0) &&
+       (!int_cker_bound_extern))
+      adaptive_gaussian_row =
+        np_accel_gauss_adaptive_higher_row_try(kernel_c,
+                                               operator,
+                                               matrix_X_continuous,
+                                               eval_c,
+                                               matrix_bandwidth,
+                                               num_reg_continuous,
+                                               num_obs,
+                                               1,
+                                               kw);
 #endif
     if(!adaptive_gaussian_row &&
        kernel_weighted_sum_np_ctx_ex(kernel_c,
