@@ -28394,10 +28394,6 @@ np_conditional_density_cvls_lp_adap_block3_stream(
   if(width3_passes >= width2_passes)
     return NP_CDENS_ADAP_WIDTH3_UNAVAILABLE;
 
-  full_blocks[2] = np_optional_tmatd(num_obs, block_size);
-  if(full_blocks[2] == NULL)
-    return NP_CDENS_ADAP_WIDTH3_UNAVAILABLE;
-
   loo_work = alloc_tmatd(num_obs, block_size);
   full_blocks[0] = alloc_tmatd(num_obs, block_size);
   full_blocks[1] = alloc_tmatd(num_obs, block_size);
@@ -28416,6 +28412,12 @@ np_conditional_density_cvls_lp_adap_block3_stream(
                                      OP_CONVOLUTION,
                                      &yconvctx) != 0)
     goto cleanup_cvls_lp_adap_block3;
+
+  full_blocks[2] = np_optional_tmatd(num_obs, block_size);
+  if(full_blocks[2] == NULL){
+    status = NP_CDENS_ADAP_WIDTH3_UNAVAILABLE;
+    goto cleanup_cvls_lp_adap_block3;
+  }
 
   *cv = 0.0;
   for(i0 = 0; i0 < num_obs; i0 += 3*block_size){
