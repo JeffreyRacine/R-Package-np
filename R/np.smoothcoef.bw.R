@@ -669,6 +669,22 @@ npscoefbw.scbandwidth <-
       ncoef <- nrow(tyw)
       pcoef <- ncol(W.eval.design)
       coef.out <- matrix(maxPenalty, nrow = pcoef, ncol = neval)
+      theta.batch <- .npscoef_batch_zero_solve(tyw = tyw, tww = tww)
+      if (!is.null(theta.batch)) {
+        if (is.null(Wz.eval)) {
+          coef.out[,] <- theta.batch
+        } else {
+          for (ii in seq_len(neval)) {
+            coef.out[, ii] <- as.vector(crossprod(
+              Wz.eval[ii, ],
+              matrix(theta.batch[, ii],
+                     nrow = ncol(Wz.eval),
+                     ncol = pcoef)
+            ))
+          }
+        }
+        return(coef.out)
+      }
       ridge.grid <- npRidgeSequenceAdditive(n.train = n, cap = 1.0)
       ridge <- rep.int(ridge.grid[1L], neval)
       ridge.idx <- rep.int(1L, neval)
