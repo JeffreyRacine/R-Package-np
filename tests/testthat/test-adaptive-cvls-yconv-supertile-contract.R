@@ -29,12 +29,38 @@ adaptive_cvls_supertile_body <- function(lines) {
   paste(lines[start:(stop - 1L)], collapse = "\n")
 }
 
-test_that("adaptive CVLS reuses one Y-convolution tile across two X blocks", {
+adaptive_cvls_width3_body <- function(lines) {
+  start <- tail(grep(
+    "^np_conditional_density_cvls_lp_adap_block3_stream\\(",
+    lines
+  ), 1L)
+  stop <- grep(
+    "^#undef NP_CDENS_ADAP_WIDTH3_NOINLINE$",
+    lines
+  )
+  expect_length(start, 1L)
+  stop <- stop[stop > start][1L]
+  expect_true(is.finite(stop))
+  paste(lines[start:(stop - 1L)], collapse = "\n")
+}
+
+test_that("adaptive CVLS dispatches width three inside its width-two owner", {
   src_file <- locate_adaptive_cvls_supertile_source()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable")
   body <- adaptive_cvls_supertile_body(readLines(src_file, warn = FALSE))
 
   expect_match(body, "double **full_blocks[2] = {NULL, NULL};", fixed = TRUE)
+  expect_match(
+    body,
+    "np_conditional_density_cvls_lp_adap_block3_stream(",
+    fixed = TRUE
+  )
+  expect_match(
+    body,
+    "width3_status != NP_CDENS_ADAP_WIDTH3_UNAVAILABLE",
+    fixed = TRUE
+  )
+  expect_match(body, "return width3_status;", fixed = TRUE)
   expect_match(body, "i0 += 2*block_size", fixed = TRUE)
   expect_match(body, "for(g = 0; g < 2; g++)", fixed = TRUE)
   expect_match(
@@ -48,6 +74,37 @@ test_that("adaptive CVLS reuses one Y-convolution tile across two X blocks", {
     fixed = TRUE
   )
   expect_match(body, "full_blocks[g][0]", fixed = TRUE)
+  expect_match(body, "*cv += quad[g] - 2.0*lin[g];", fixed = TRUE)
+})
+
+test_that("adaptive CVLS width three is an isolated pass-saving sibling", {
+  src_file <- locate_adaptive_cvls_supertile_source()
+  skip_if(is.null(src_file), "source file src/jksum.c unavailable")
+  body <- adaptive_cvls_width3_body(readLines(src_file, warn = FALSE))
+
+  expect_match(
+    body,
+    "double **full_blocks[3] = {NULL, NULL, NULL};",
+    fixed = TRUE
+  )
+  expect_match(body, "width3_passes >= width2_passes", fixed = TRUE)
+  expect_match(
+    body,
+    "return NP_CDENS_ADAP_WIDTH3_UNAVAILABLE;",
+    fixed = TRUE
+  )
+  expect_match(
+    body,
+    "full_blocks[2] = np_optional_tmatd(num_obs, block_size);",
+    fixed = TRUE
+  )
+  expect_match(body, "i0 += 3*block_size", fixed = TRUE)
+  expect_match(body, "for(g = 0; g < 3; g++)", fixed = TRUE)
+  expect_match(
+    body,
+    "double * const quad_cross = loo_work[0];",
+    fixed = TRUE
+  )
   expect_match(body, "*cv += quad[g] - 2.0*lin[g];", fixed = TRUE)
 })
 
