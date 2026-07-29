@@ -64,6 +64,14 @@
   cross-validation; the formulas are unchanged but BLAS reassociation can
   change last floating-point bits.
 
+* Eligible adaptive-nearest-neighbour conditional-density objectives now
+  cache ordinary-Gaussian response-bandwidth reciprocals in their existing
+  row context, replacing repeated vector divisions with multiplications.
+  Non-Gaussian, higher-order, bounded, mixed-response, tree, non-Accelerate,
+  and allocation-fallback routes retain the established implementation. The
+  formulas are unchanged but reciprocal multiplication can change last
+  floating-point bits.
+
 * On Apple ARM64, eligible fixed and generalized-nearest-neighbour products of
   two or more ordinary Gaussian continuous kernels now use one vector
   exponential of the summed squared standardized distances. Non-Apple,
