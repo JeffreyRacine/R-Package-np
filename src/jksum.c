@@ -28,6 +28,7 @@
 #include "jksum_gaussian_fixed.h"
 #include "jksum_lp_row.h"
 #include "jksum_lp_solve.h"
+#include "np_native_safety.h"
 
 #include "hash.h"
 #include "tree.h"
@@ -14695,6 +14696,7 @@ int *num_categories){
 
   // note that mean has 2*num_obs allocated for npksum
   int i, j, l, sf_flag = 0, num_obs_eval_alloc, tsf;
+  int objective_storage_ok = 1;
   double cv = 0.0;
   double * lambda = NULL, * vsf = NULL;
   double ** matrix_bandwidth = NULL;
@@ -14731,8 +14733,19 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
   matrix_bandwidth = np_reg_cv_core_cache.matrix_bandwidth;
 
 #ifdef MPI2
-    int stride = MAX((int)ceil((double) num_obs / (double) iNum_Processors),1);
-    num_obs_eval_alloc = stride*iNum_Processors;
+    int stride = 0;
+    size_t num_obs_eval_alloc_size = 0;
+
+    if(!np_int_ceil_div_nonnegative(num_obs, iNum_Processors, &stride))
+      return DBL_MAX;
+    if(stride == 0)
+      stride = 1;
+    if(!np_size_mul_checked((size_t)stride,
+                            (size_t)iNum_Processors,
+                            &num_obs_eval_alloc_size) ||
+       !np_size_to_int_checked(num_obs_eval_alloc_size,
+                               &num_obs_eval_alloc))
+      return DBL_MAX;
 #else
     num_obs_eval_alloc = num_obs;
 #endif
@@ -15092,10 +15105,39 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
     }
 
     const int nrc1 = glp_nterms;
-    const int nrc2 = nrc1 + 1;
-    const int nrcc22 = nrc2*nrc2;
+    int nrc2 = 0;
+    int nrcc22 = 0;
+    size_t nrc2_size = 0;
+    size_t nrcc22_size = 0;
+    size_t kwm_len = 0;
+    size_t xtkx_pointer_count = 0;
+    size_t mpi_reduction_count_size = 0;
     const int solve_nrhs = (bwm == RBWM_CVAIC) ? 2 : 1;
-    double * PXTKX[nrc2];
+    double **PXTKX = NULL;
+    double *kwm = NULL;
+    double *sgn = NULL;
+    double *evalv = NULL;
+    double *objective_Apack = NULL;
+    NP_OuterPackCtx objective_pack_ctx = {
+      .runtime_options_frozen = 1
+    };
+
+    if(!np_size_add_checked((size_t)nrc1, 1U, &nrc2_size) ||
+       !np_size_mul_checked(nrc2_size, nrc2_size, &nrcc22_size) ||
+       !np_size_mul_checked(nrcc22_size,
+                            (size_t)num_obs_eval_alloc,
+                            &kwm_len) ||
+       !np_size_mul_checked(nrc2_size, 2U, &xtkx_pointer_count) ||
+       !np_size_mul_checked(nrcc22_size,
+                            (size_t)iNum_Processors,
+                            &mpi_reduction_count_size) ||
+       !np_size_to_int_checked(nrc2_size, &nrc2) ||
+       !np_size_to_int_checked(nrcc22_size, &nrcc22) ||
+       (mpi_reduction_count_size > (size_t)INT_MAX)){
+      np_lp_solve_workspace_clear(&solve_workspace);
+      cv = DBL_MAX;
+      goto finish_cv_path;
+    }
 
     double * PXC[MAX(1,num_reg_continuous)];
     double * PXU[MAX(1,num_reg_unordered)];
@@ -15114,9 +15156,13 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
 
     if((sf_flag = (int_LARGE_SF == 0))){
       int_LARGE_SF = 1;
-      vsf = (double *)malloc(num_reg_continuous*sizeof(double));
-      for(i = 0; i < num_reg_continuous; i++)
-        vsf[i] = matrix_bandwidth[i][0];
+      glp_ok =
+        np_native_malloc_array((void **)&vsf,
+                               (size_t)num_reg_continuous,
+                               sizeof(double)) == NP_NATIVE_ALLOC_OK;
+      if(glp_ok)
+        for(i = 0; i < num_reg_continuous; i++)
+          vsf[i] = matrix_bandwidth[i][0];
     } else {
       vsf = vector_scale_factor;
     }
@@ -15125,16 +15171,21 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
     TUNO = alloc_tmatd(1, MAX(1, num_reg_unordered));
     TORD = alloc_tmatd(1, MAX(1, num_reg_ordered));
     matrix_bandwidth_eval = alloc_tmatd(1, num_reg_continuous);
-    XTKX = (double **)malloc((size_t)nrc2*sizeof(double *));
-
-    const size_t kwm_len = (size_t)nrcc22*(size_t)num_obs_eval_alloc;
-    double * kwm = (double *)malloc(kwm_len*sizeof(double));
-    double * sgn = (double *)malloc((size_t)nrc2*sizeof(double));
-    double * evalv = (double *)malloc((size_t)nrc1*sizeof(double));
-    double *objective_Apack = NULL;
-    NP_OuterPackCtx objective_pack_ctx = {
-      .runtime_options_frozen = 1
-    };
+    glp_ok = glp_ok &&
+      (np_native_malloc_array((void **)&XTKX,
+                              xtkx_pointer_count,
+                              sizeof(double *)) == NP_NATIVE_ALLOC_OK) &&
+      (np_native_malloc_array((void **)&kwm,
+                              kwm_len,
+                              sizeof(double)) == NP_NATIVE_ALLOC_OK) &&
+      (np_native_malloc_array((void **)&sgn,
+                              nrc2_size,
+                              sizeof(double)) == NP_NATIVE_ALLOC_OK) &&
+      (np_native_malloc_array((void **)&evalv,
+                              (size_t)nrc1,
+                              sizeof(double)) == NP_NATIVE_ALLOC_OK);
+    if(XTKX != NULL)
+      PXTKX = XTKX + nrc2;
 
     /*
      * Every rank observes the same immutable option state throughout one
@@ -15142,13 +15193,23 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
      */
     np_refresh_mseries_accelerate_option();
 
-    glp_ok = np_lp_solve_workspace_reserve(
+    glp_ok = glp_ok && np_lp_solve_workspace_reserve(
       &solve_workspace,
       nrc1,
       solve_nrhs) &&
       (TCON != NULL) && (TUNO != NULL) && (TORD != NULL) &&
       (matrix_bandwidth_eval != NULL) && (XTKX != NULL) &&
       (kwm != NULL) && (sgn != NULL) && (evalv != NULL);
+
+    {
+      int local_glp_ok = glp_ok;
+      MPI_Allreduce(&local_glp_ok,
+                    &glp_ok,
+                    1,
+                    MPI_INT,
+                    MPI_MIN,
+                    comm[1]);
+    }
 
     if(!glp_ok){
       cv = DBL_MAX;
@@ -15883,12 +15944,42 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
      */
     // Generate bandwidth vector given scale factors, nearest neighbors, or lambda 
 
-    double * lc_Y[2];
-    double * mean = (double *)malloc(2*num_obs_eval_alloc*sizeof(double));
+    double *lc_Y[2] = {NULL, NULL};
+    double *mean = NULL;
+    size_t mean_count = 0;
+    int local_storage_ok =
+      (num_obs >= 0) && (num_obs_eval_alloc >= 0) &&
+      np_size_add_checked((size_t)num_obs_eval_alloc,
+                          (size_t)num_obs_eval_alloc,
+                          &mean_count) &&
+      (np_native_malloc_array((void **)&mean,
+                              mean_count,
+                              sizeof(double)) == NP_NATIVE_ALLOC_OK) &&
+      (np_native_malloc_array((void **)&lc_Y[1],
+                              (size_t)num_obs,
+                              sizeof(double)) == NP_NATIVE_ALLOC_OK);
 
     lc_Y[0] = vector_Y;
-      
-    lc_Y[1] = (double *)malloc(num_obs*sizeof(double));
+
+#ifdef MPI2
+    {
+      int all_storage_ok = 0;
+      MPI_Allreduce(&local_storage_ok,
+                    &all_storage_ok,
+                    1,
+                    MPI_INT,
+                    MPI_MIN,
+                    comm[1]);
+      local_storage_ok = all_storage_ok;
+    }
+#endif
+    if(!local_storage_ok){
+      free(lc_Y[1]);
+      free(mean);
+      objective_storage_ok = 0;
+      goto finish_cv_path;
+    }
+
     for(int ii = 0; ii < num_obs; ii++)
       lc_Y[1][ii] = 1.0;
 
@@ -15979,6 +16070,9 @@ finish_cv_path:
   if((ov_cont_ok != NULL) && (!ov_cont_from_cache)) free(ov_cont_ok);
   if((ov_cont_hmin != NULL) && (!ov_cont_from_cache)) free(ov_cont_hmin);
   if((ov_cont_k0 != NULL) && (!ov_cont_from_cache)) free(ov_cont_k0);
+
+  if(!objective_storage_ok)
+    return DBL_MAX;
 
 	/* Negative penalties are treated as infinite: Hurvich et al pg 277 */
 

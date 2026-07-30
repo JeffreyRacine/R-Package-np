@@ -4,6 +4,7 @@
 
 #include "headers.h"
 #include "jksum_gaussian_density.h"
+#include "np_native_safety.h"
 
 #if defined(NP_USE_ACCELERATE_GAUSS) && defined(__APPLE__) && defined(__arm64__)
 #define NP_GAUSSIAN_DENSITY_PAIR_COMPILED 1
@@ -60,6 +61,8 @@ attribute_hidden int np_fixed_gaussian_density_cvls_pair_try(
 #ifdef MPI2
   int stride = 0;
   size_t row_capacity = 0;
+  size_t eval_start_size = 0;
+  size_t eval_end_size = 0;
   double *convolution_rows = NULL;
   double *kernel_rows = NULL;
 #endif
@@ -103,28 +106,44 @@ attribute_hidden int np_fixed_gaussian_density_cvls_pair_try(
   exponent = (double *)malloc(scratch_length*sizeof(double));
   kernel_value = (double *)malloc(scratch_length*sizeof(double));
 #ifdef MPI2
-  stride = (num_obs + iNum_Processors - 1)/iNum_Processors;
-  if((stride <= 0) || (iNum_Processors <= 0) ||
-     ((size_t)stride > SIZE_MAX/(size_t)iNum_Processors)){
-    free(difference);
-    free(exponent);
-    free(kernel_value);
-    return 0;
-  }
-  row_capacity = (size_t)stride*(size_t)iNum_Processors;
-  if(row_capacity > SIZE_MAX/sizeof(double)){
-    free(difference);
-    free(exponent);
-    free(kernel_value);
-    return 0;
-  }
-  convolution_rows = (double *)calloc(row_capacity, sizeof(double));
-  kernel_rows = (double *)calloc(row_capacity, sizeof(double));
   {
-    const int local_failure =
+    int arithmetic_ok =
+      (my_rank >= 0) && (my_rank < iNum_Processors) &&
+      np_int_ceil_div_nonnegative(num_obs, iNum_Processors, &stride) &&
+      (stride > 0) &&
+      np_size_mul_checked((size_t)stride,
+                          (size_t)iNum_Processors,
+                          &row_capacity) &&
+      np_size_mul_checked((size_t)stride,
+                          (size_t)my_rank,
+                          &eval_start_size) &&
+      np_size_add_checked(eval_start_size,
+                          (size_t)stride,
+                          &eval_end_size);
+    int local_failure;
+    int any_failure = 0;
+
+    if(arithmetic_ok){
+      if(eval_end_size > (size_t)num_obs)
+        eval_end_size = (size_t)num_obs;
+      arithmetic_ok =
+        np_size_to_int_checked(eval_start_size, &eval_start) &&
+        np_size_to_int_checked(eval_end_size, &eval_end);
+    }
+    if(arithmetic_ok){
+      arithmetic_ok =
+        (np_native_calloc_array((void **)&convolution_rows,
+                                row_capacity,
+                                sizeof(double)) == NP_NATIVE_ALLOC_OK) &&
+        (np_native_calloc_array((void **)&kernel_rows,
+                                row_capacity,
+                                sizeof(double)) == NP_NATIVE_ALLOC_OK);
+    }
+
+    local_failure =
+      !arithmetic_ok ||
       (difference == NULL) || (exponent == NULL) || (kernel_value == NULL) ||
       (convolution_rows == NULL) || (kernel_rows == NULL);
-    int any_failure = 0;
     MPI_Allreduce(&local_failure, &any_failure, 1, MPI_INT, MPI_MAX, comm[1]);
     if(any_failure){
       free(difference);
@@ -135,10 +154,6 @@ attribute_hidden int np_fixed_gaussian_density_cvls_pair_try(
       return 0;
     }
   }
-  eval_start = stride*my_rank;
-  eval_end = eval_start + stride;
-  if(eval_end > num_obs)
-    eval_end = num_obs;
 #else
   if((difference == NULL) || (exponent == NULL) || (kernel_value == NULL)){
     free(difference);
