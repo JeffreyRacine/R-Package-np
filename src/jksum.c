@@ -17205,11 +17205,19 @@ double *cv){
   int64_t js, je;
 
 #ifdef MPI2
-  int64_t stride_t = MAX((int64_t)ceil((double) num_obs_train / (double) iNum_Processors),1);
-  int64_t stride_e = MAX((int64_t)ceil((double) num_obs_eval / (double) iNum_Processors),1);
-
-  num_obs_train_alloc = stride_t*iNum_Processors;
-  num_obs_eval_alloc = stride_e*iNum_Processors;
+  int64_t stride_t = 0;
+  int64_t stride_e = 0;
+  if(!np_int64_padded_count_nonnegative(num_obs_train,
+                                        iNum_Processors,
+                                        1,
+                                        &stride_t,
+                                        &num_obs_train_alloc) ||
+     !np_int64_padded_count_nonnegative(num_obs_eval,
+                                        iNum_Processors,
+                                        1,
+                                        &stride_e,
+                                        &num_obs_eval_alloc))
+    error("conditional-distribution CVLS partition exceeds native integer limits");
 
 #else
   num_obs_train_alloc = num_obs_train;
@@ -17240,11 +17248,19 @@ double *cv){
   }
 
 #ifdef MPI2
-  int64_t stride_wx = MAX((int64_t)ceil((double)wx / (double) iNum_Processors),1);
-  int64_t stride_wy = MAX((int64_t)ceil((double)wy / (double) iNum_Processors),1);
-
-  num_obs_wx_alloc = stride_wx*iNum_Processors;
-  num_obs_wy_alloc = stride_wy*iNum_Processors;
+  int64_t stride_wx = 0;
+  int64_t stride_wy = 0;
+  if(!np_int64_padded_count_nonnegative(wx,
+                                        iNum_Processors,
+                                        1,
+                                        &stride_wx,
+                                        &num_obs_wx_alloc) ||
+     !np_int64_padded_count_nonnegative(wy,
+                                        iNum_Processors,
+                                        1,
+                                        &stride_wy,
+                                        &num_obs_wy_alloc))
+    error("conditional-distribution CVLS block partition exceeds native integer limits");
 
   js = stride_wy*my_rank;
   je = MIN(wy, js + stride_wy);
@@ -32429,9 +32445,13 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
   int num_obs_alloc;
 
 #ifdef MPI2
-  int stride_t = MAX((int)ceil((double) num_obs / (double) iNum_Processors),1);
-  
-  num_obs_alloc = stride_t*iNum_Processors;
+  int stride_t = 0;
+  if(!np_int_padded_count_nonnegative(num_obs,
+                                      iNum_Processors,
+                                      1,
+                                      &stride_t,
+                                      &num_obs_alloc))
+    error("conditional-density CVML partition exceeds native integer limits");
 #else
   num_obs_alloc = num_obs;
 #endif

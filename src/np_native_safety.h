@@ -99,6 +99,12 @@ int np_int_padded_count_nonnegative(int count,
                                     int *stride,
                                     int *padded_count);
 
+int np_int64_padded_count_nonnegative(int64_t count,
+                                      int partitions,
+                                      int minimum_one_per_partition,
+                                      int64_t *stride,
+                                      int64_t *padded_count);
+
 static inline NPNativeAllocStatus
 np_native_malloc_array(void **result, size_t count, size_t element_size)
 {
