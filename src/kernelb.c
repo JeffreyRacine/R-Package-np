@@ -16,6 +16,7 @@
 #ifdef MPI2
 
 #include "mpi.h"
+#include "np_native_safety.h"
 
 extern  int my_rank;
 extern  int source;
@@ -147,10 +148,25 @@ double **matrix_bandwidth_deriv)
 	int int_nn_k;
 
 #ifdef MPI2 
-	int stride;
+	int nn_distance_alloc = 0;
 #endif
 
 	if(num_obs_train == 0) return(1);
+
+#ifdef MPI2
+	if((BANDWIDTH == 1) || (BANDWIDTH == 2))
+	{
+		int stride_ignored = 0;
+		const int nn_count = (BANDWIDTH == 1) ? num_obs_eval : num_obs_train;
+
+		if(!np_int_padded_count_nonnegative(nn_count,
+		                                    iNum_Processors,
+		                                    1,
+		                                    &stride_ignored,
+		                                    &nn_distance_alloc))
+			return(1);
+	}
+#endif
 
 /* Don't compute unnecessary standard deviations  */
 
@@ -209,16 +225,12 @@ double **matrix_bandwidth_deriv)
 
 	if(BANDWIDTH == 1)
 	{
-		stride = (int)ceil((double) num_obs_eval / (double) iNum_Processors);
-		if(stride < 1) stride = 1;
-		nn_distance = alloc_vecd(stride*iNum_Processors);
+		nn_distance = alloc_vecd(nn_distance_alloc);
 	}
 
 	if(BANDWIDTH == 2)
 	{
-		stride = (int)ceil((double) num_obs_train / (double) iNum_Processors);
-		if(stride < 1) stride = 1;
-		nn_distance = alloc_vecd(stride*iNum_Processors);
+		nn_distance = alloc_vecd(nn_distance_alloc);
 	}
 
 #endif
@@ -621,10 +633,25 @@ int kernel_bandwidth_mean(int KERNEL,
 	int int_nn_k;
 
 #ifdef MPI2
-	int stride;
+	int nn_distance_alloc = 0;
 #endif
 
 	if(num_obs_train == 0) return(1);
+
+#ifdef MPI2
+	if((BANDWIDTH == 1) || (BANDWIDTH == 2))
+	{
+		int stride_ignored = 0;
+		const int nn_count = (BANDWIDTH == 1) ? num_obs_eval : num_obs_train;
+
+		if(!np_int_padded_count_nonnegative(nn_count,
+		                                    iNum_Processors,
+		                                    1,
+		                                    &stride_ignored,
+		                                    &nn_distance_alloc))
+			return(1);
+	}
+#endif
 
 /* Don't compute unnecessary standard deviations  */
 
@@ -686,16 +713,12 @@ fact constant. */
 
 	if(BANDWIDTH == 1)
 	{
-		stride = (int)ceil((double) num_obs_eval / (double) iNum_Processors);
-		if(stride < 1) stride = 1;
-		nn_distance = alloc_vecd(stride*iNum_Processors);
+		nn_distance = alloc_vecd(nn_distance_alloc);
 	}
 
 	if(BANDWIDTH == 2)
 	{
-		stride = (int)ceil((double) num_obs_train / (double) iNum_Processors);
-		if(stride < 1) stride = 1;
-		nn_distance = alloc_vecd(stride*iNum_Processors);
+		nn_distance = alloc_vecd(nn_distance_alloc);
 	}
 
 #endif
