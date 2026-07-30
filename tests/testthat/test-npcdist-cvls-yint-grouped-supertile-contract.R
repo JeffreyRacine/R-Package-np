@@ -39,7 +39,7 @@ test_that("conditional-distribution grouped supertile is bounded and progressive
   expect_match(body, "group_width = 4;", fixed = TRUE)
   expect_equal(lengths(regmatches(
     body,
-    gregexpr("np_optional_tmatd\\(num_train, block_size\\)", body, perl = TRUE)
+    gregexpr("&xblocks\\[[123]\\]", body, perl = TRUE)
   )), 3L)
   expect_match(body, "if(requested_group_width >= 3)", fixed = TRUE)
   expect_match(body, "if(requested_group_width >= 4)", fixed = TRUE)

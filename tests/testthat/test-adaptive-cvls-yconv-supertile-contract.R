@@ -72,7 +72,7 @@ test_that("adaptive CVLS dispatches width three inside its width-two owner", {
   )
   expect_match(
     body,
-    "width3_status != NP_CDENS_ADAP_WIDTH3_UNAVAILABLE",
+    "width3_status != NP_CDENS_ADAP_WIDTH3_NOT_BENEFICIAL",
     fixed = TRUE
   )
   expect_match(body, "return width3_status;", fixed = TRUE)
@@ -105,7 +105,7 @@ test_that("adaptive CVLS width three is an isolated pass-saving sibling", {
   expect_match(body, "width3_passes >= width2_passes", fixed = TRUE)
   expect_match(
     body,
-    "return NP_CDENS_ADAP_WIDTH3_UNAVAILABLE;",
+    "return NP_CDENS_ADAP_WIDTH3_NOT_BENEFICIAL;",
     fixed = TRUE
   )
   expect_match(
@@ -115,21 +115,21 @@ test_that("adaptive CVLS width three is an isolated pass-saving sibling", {
   )
   expect_match(
     body,
-    "width4_status != NP_CDENS_ADAP_WIDTH4_UNAVAILABLE",
+    "width4_status != NP_CDENS_ADAP_WIDTH4_NOT_BENEFICIAL",
     fixed = TRUE
   )
   expect_match(
     body,
-    "full_blocks[2] = np_optional_tmatd(num_obs, block_size);",
+    "&full_blocks[2]",
     fixed = TRUE
   )
   incumbent_alloc <- regexpr(
-    "loo_work = alloc_tmatd(num_obs, block_size);",
+    "&loo_work",
     body,
     fixed = TRUE
   )[[1L]]
   optional_alloc <- regexpr(
-    "full_blocks[2] = np_optional_tmatd(num_obs, block_size);",
+    "&full_blocks[2]",
     body,
     fixed = TRUE
   )[[1L]]
@@ -158,16 +158,16 @@ test_that("adaptive CVLS width four is an isolated pass-saving sibling", {
   expect_match(body, "width4_passes >= width3_passes", fixed = TRUE)
   expect_match(
     body,
-    "return NP_CDENS_ADAP_WIDTH4_UNAVAILABLE;",
+    "return NP_CDENS_ADAP_WIDTH4_NOT_BENEFICIAL;",
     fixed = TRUE
   )
   incumbent_alloc <- regexpr(
-    "loo_work = alloc_tmatd(num_obs, block_size);",
+    "&loo_work",
     body,
     fixed = TRUE
   )[[1L]]
   optional_alloc <- regexpr(
-    "optional_blocks = np_optional_tmatd(num_obs, 2*block_size);",
+    "&optional_blocks",
     body,
     fixed = TRUE
   )[[1L]]

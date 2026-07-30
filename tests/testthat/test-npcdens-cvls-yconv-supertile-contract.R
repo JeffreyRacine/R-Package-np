@@ -54,14 +54,15 @@ test_that("CVLS Y convolution supertile is memory bounded and topology isolated"
 
   expect_equal(lengths(regmatches(
     body,
-    gregexpr("alloc_tmatd\\(num_obs, block_size\\)", body, perl = TRUE)
-  )), 4L)
-  expect_equal(lengths(regmatches(
-    body,
-    gregexpr("np_optional_tmatd\\(num_obs, block_size\\)", body,
-             perl = TRUE)
-  )), 2L)
-  expect_match(body, "const int requested_group_width =", fixed = TRUE)
+    gregexpr("np_cvls_workspace_matrix_try\\(", body, perl = TRUE)
+  )), 6L)
+  expect_match(body, "&loo_work", fixed = TRUE)
+  expect_match(body, "&full_blocks[0]", fixed = TRUE)
+  expect_match(body, "&full_blocks[1]", fixed = TRUE)
+  expect_match(body, "&full_blocks[2]", fixed = TRUE)
+  expect_match(body, "&full_blocks[3]", fixed = TRUE)
+  expect_match(body, "&shared_y", fixed = TRUE)
+  expect_match(body, "int requested_group_width;", fixed = TRUE)
   expect_match(body, "MIN(4,", fixed = TRUE)
   expect_match(body, "int group_width = 2;", fixed = TRUE)
   expect_match(body, "group_width = 3;", fixed = TRUE)
@@ -154,12 +155,12 @@ test_that("CVLS Y convolution supertile dispatch leaves excluded routes intact",
     fixed = TRUE
   )[[1L]]
   supertile_pos <- regexpr(
-    "return np_conditional_density_cvls_lp_supertile2_stream",
+    "np_conditional_density_cvls_lp_supertile2_stream",
     body,
     fixed = TRUE
   )[[1L]]
   allocation_pos <- regexpr(
-    "xblock = alloc_tmatd",
+    "np_cvls_workspace_matrix_try(num_obs",
     body,
     fixed = TRUE
   )[[1L]]

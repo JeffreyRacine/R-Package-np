@@ -21949,7 +21949,7 @@ cleanup_yweight_eval_block:
   return status;
 }
 
-static int np_conditional_lp_cvls_block_size(const int n){
+static int np_conditional_lp_cvls_preferred_block_size(const int n){
   const size_t target_bytes = (size_t)256 * (size_t)1024 * (size_t)1024;
   const size_t denom = (size_t)32 * (size_t)MAX(1, n);
   size_t block = (denom > 0) ? target_bytes / denom : (size_t)64;
@@ -21960,6 +21960,68 @@ static int np_conditional_lp_cvls_block_size(const int n){
   if(block >= 128) return 128;
   return 64;
 }
+
+#define NP_CONDITIONAL_LP_TILE_BUDGET_BYTES \
+  ((size_t)512 * (size_t)1024 * (size_t)1024)
+
+static int
+np_conditional_lp_cvls_block_size_with_fixed(
+    const int n,
+    const size_t linear_matrix_count,
+    const size_t square_matrix_count,
+    const size_t fixed_vector_count)
+{
+  size_t fixed_cells;
+  size_t fixed_bytes;
+
+  if(n <= 0)
+    return 0;
+  if(!np_size_mul_checked((size_t)n,
+                          fixed_vector_count,
+                          &fixed_cells) ||
+     !np_size_array_bytes_checked(fixed_cells,
+                                  sizeof(double),
+                                  &fixed_bytes))
+    return 0;
+  return np_native_bounded_tile_width(
+    (size_t)n,
+    np_conditional_lp_cvls_preferred_block_size(n),
+    linear_matrix_count,
+    square_matrix_count,
+    fixed_bytes,
+    NP_CONDITIONAL_LP_TILE_BUDGET_BYTES
+  );
+}
+
+static int
+np_conditional_lp_cvls_block_size(const int n,
+                                  const size_t linear_matrix_count,
+                                  const size_t square_matrix_count)
+{
+  return np_conditional_lp_cvls_block_size_with_fixed(
+    n,
+    linear_matrix_count,
+    square_matrix_count,
+    0U
+  );
+}
+
+typedef enum {
+  NP_CVLS_WORKSPACE_OK = 0,
+  NP_CVLS_WORKSPACE_UNAVAILABLE = 1,
+  NP_CVLS_WORKSPACE_ERROR = 2
+} NPCVLSWorkspaceStatus;
+
+static NPCVLSWorkspaceStatus
+np_cvls_workspace_matrix_try(const int nrows,
+                             const int ncols,
+                             double ***result);
+
+static NPCVLSWorkspaceStatus
+np_cvls_workspace_vector_try(const size_t count, double **result);
+
+static NPCVLSWorkspaceStatus
+np_cvls_workspace_square_try(const int width, double **result);
 
 #define NP_BOUNDED_CVLS_I1_GRID_POINTS 81
 #define NP_BOUNDED_CVLS_I1_GRID_POINTS_2D 31
@@ -23071,7 +23133,7 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_row_stream(double *
   const int num_obs = num_obs_train_extern;
   const NPBoundedCVLSConditionalQuadContext *quad_ctx =
     &np_bounded_cvls_conditional_quad_ctx;
-  const int block_size = MAX(1, MIN(np_conditional_lp_cvls_block_size(num_obs), 64));
+  const int block_size = MAX(1, MIN(np_conditional_lp_cvls_preferred_block_size(num_obs), 64));
   int q = 0;
   int use_quad_context = 0;
   double quad_lb[2] = {0.0, 0.0};
@@ -23247,7 +23309,7 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_general_row_stream(
   const int nuno = num_var_unordered_extern;
   const int nord = num_var_ordered_extern;
   int q = np_bounded_cvls_conditional_grid_points(ncon);
-  const int block_size = MAX(1, MIN(np_conditional_lp_cvls_block_size(num_obs), 64));
+  const int block_size = MAX(1, MIN(np_conditional_lp_cvls_preferred_block_size(num_obs), 64));
   size_t total_eval = 0;
   NPConditionalYRowCtx yctx = {0};
   double *yrow = NULL, *eval_weight = NULL, *fit_block = NULL, *lin_block = NULL, *quad_block = NULL;
@@ -25820,13 +25882,17 @@ cleanup_cvml_lp_stream:
 static int np_conditional_density_cvml_lp_block_stream(double *vector_scale_factor,
                                                        double *cv){
   const int num_obs = num_obs_train_extern;
-  const int block_size = MIN(np_conditional_lp_cvls_block_size(num_obs), MAX(1, num_obs));
+  const int block_size = MIN(np_conditional_lp_cvls_block_size(num_obs, 2U, 0U),
+                             MAX(1, num_obs));
   double **xblock = NULL, **yblock = NULL;
   int i0, ii;
   int status = 1;
+  NPCVLSWorkspaceStatus workspace_status = NP_CVLS_WORKSPACE_OK;
 
   if((cv == NULL) || (vector_scale_factor == NULL) || (num_obs <= 0))
     return 1;
+  if(block_size <= 0)
+    return 2;
   if(!np_conditional_density_cvml_stream_engine_supported())
     return 1;
   if((BANDWIDTH_den_extern != BW_FIXED) &&
@@ -25836,9 +25902,12 @@ static int np_conditional_density_cvml_lp_block_stream(double *vector_scale_fact
      (BANDWIDTH_den_extern != BW_FIXED))
     return 1;
 
-  xblock = alloc_tmatd(num_obs, block_size);
-  yblock = alloc_tmatd(num_obs, block_size);
-  if((xblock == NULL) || (yblock == NULL))
+  workspace_status =
+    np_cvls_workspace_matrix_try(num_obs, block_size, &xblock);
+  if(workspace_status == NP_CVLS_WORKSPACE_OK)
+    workspace_status =
+      np_cvls_workspace_matrix_try(num_obs, block_size, &yblock);
+  if(workspace_status != NP_CVLS_WORKSPACE_OK)
     goto cleanup_cvml_lp_block;
 
   *cv = 0.0;
@@ -25863,6 +25932,8 @@ cleanup_cvml_lp_block:
   if(xblock != NULL) free_tmat(xblock);
   if(yblock != NULL) free_tmat(yblock);
   np_glp_cv_clear_extern();
+  if(workspace_status == NP_CVLS_WORKSPACE_UNAVAILABLE)
+    return 2;
   return status;
 }
 
@@ -25965,7 +26036,8 @@ cleanup_cvls_lp_stream:
   return status;
 }
 
-#define NP_CDENS_ADAP_WIDTH3_UNAVAILABLE 2
+#define NP_CDENS_ADAP_WIDTH3_NOT_BENEFICIAL 2
+#define NP_CDENS_ADAP_WIDTH3_ALLOC_UNAVAILABLE 3
 
 #if defined(__clang__) || defined(__GNUC__)
 # define NP_CDENS_ADAP_WIDTH3_NOINLINE __attribute__((noinline))
@@ -25978,7 +26050,8 @@ np_conditional_density_cvls_lp_adap_block3_stream(
     double *vector_scale_factor,
     double *cv);
 
-#define NP_CDENS_ADAP_WIDTH4_UNAVAILABLE 2
+#define NP_CDENS_ADAP_WIDTH4_NOT_BENEFICIAL 2
+#define NP_CDENS_ADAP_WIDTH4_ALLOC_UNAVAILABLE 3
 
 #if defined(__clang__) || defined(__GNUC__)
 # define NP_CDENS_ADAP_WIDTH4_NOINLINE __attribute__((noinline))
@@ -25994,7 +26067,8 @@ np_conditional_density_cvls_lp_adap_block4_stream(
 static int np_conditional_density_cvls_lp_adap_block_stream(double *vector_scale_factor,
                                                             double *cv){
   const int num_obs = num_obs_train_extern;
-  const int block_size = MIN(np_conditional_lp_cvls_block_size(num_obs), MAX(1, num_obs));
+  const int block_size = MIN(np_conditional_lp_cvls_block_size(num_obs, 6U, 0U),
+                             MAX(1, num_obs));
   double **loo_work = NULL;
   double **full_blocks[2] = {NULL, NULL};
   double **shared_y = NULL;
@@ -26002,9 +26076,12 @@ static int np_conditional_density_cvls_lp_adap_block_stream(double *vector_scale
   NPConditionalYRowCtx yctx = {0}, yconvctx = {0};
   int i0, j0, ii, jj, g;
   int status = 1;
+  NPCVLSWorkspaceStatus workspace_status = NP_CVLS_WORKSPACE_OK;
 
   if((cv == NULL) || (vector_scale_factor == NULL) || (num_obs <= 0))
     return 1;
+  if(block_size <= 0)
+    return np_conditional_density_cvls_lp_row_stream(vector_scale_factor, cv);
   if(BANDWIDTH_den_extern != BW_ADAP_NN)
     return 1;
   if(int_cyker_bound_extern != 0)
@@ -26019,16 +26096,24 @@ static int np_conditional_density_cvls_lp_adap_block_stream(double *vector_scale
       np_conditional_density_cvls_lp_adap_block3_stream(
         vector_scale_factor,
         cv);
-    if(width3_status != NP_CDENS_ADAP_WIDTH3_UNAVAILABLE)
+    if(width3_status == NP_CDENS_ADAP_WIDTH3_ALLOC_UNAVAILABLE)
+      return np_conditional_density_cvls_lp_row_stream(vector_scale_factor, cv);
+    if(width3_status != NP_CDENS_ADAP_WIDTH3_NOT_BENEFICIAL)
       return width3_status;
   }
 
-  loo_work = alloc_tmatd(num_obs, block_size);
-  full_blocks[0] = alloc_tmatd(num_obs, block_size);
-  full_blocks[1] = alloc_tmatd(num_obs, block_size);
-  shared_y = alloc_tmatd(num_obs, block_size);
-  if((loo_work == NULL) || (full_blocks[0] == NULL) ||
-     (full_blocks[1] == NULL) || (shared_y == NULL))
+  workspace_status =
+    np_cvls_workspace_matrix_try(num_obs, block_size, &loo_work);
+  if(workspace_status == NP_CVLS_WORKSPACE_OK)
+    workspace_status =
+      np_cvls_workspace_matrix_try(num_obs, block_size, &full_blocks[0]);
+  if(workspace_status == NP_CVLS_WORKSPACE_OK)
+    workspace_status =
+      np_cvls_workspace_matrix_try(num_obs, block_size, &full_blocks[1]);
+  if(workspace_status == NP_CVLS_WORKSPACE_OK)
+    workspace_status =
+      np_cvls_workspace_matrix_try(num_obs, block_size, &shared_y);
+  if(workspace_status != NP_CVLS_WORKSPACE_OK)
     goto cleanup_cvls_lp_adap_block;
 
   if(np_conditional_xrow_ctx_prepare(vector_scale_factor, &xctx) != 0)
@@ -26134,19 +26219,71 @@ cleanup_cvls_lp_adap_block:
     if(full_blocks[g] != NULL) free_tmat(full_blocks[g]);
   if(shared_y != NULL) free_tmat(shared_y);
   np_glp_cv_clear_extern();
+  if(workspace_status == NP_CVLS_WORKSPACE_UNAVAILABLE)
+    return np_conditional_density_cvls_lp_row_stream(vector_scale_factor, cv);
   return status;
 }
 
 static int np_conditional_density_cvls_categorical_profile_stream(double *vector_scale_factor,
                                                                   double *cv);
 
-static double **np_optional_tmatd(const int nrows, const int ncols);
+static NPCVLSWorkspaceStatus
+np_cvls_workspace_matrix_try(const int nrows,
+                             const int ncols,
+                             double ***result)
+{
+  const NPNativeAllocStatus status =
+    np_native_malloc_column_matrix(result, nrows, ncols);
+
+  if(status == NP_NATIVE_ALLOC_OK)
+    return NP_CVLS_WORKSPACE_OK;
+  if(status == NP_NATIVE_ALLOC_UNAVAILABLE)
+    return NP_CVLS_WORKSPACE_UNAVAILABLE;
+  np_bwm_set_deferred_error(
+    "conditional LP CV tile workspace dimensions are invalid or overflow"
+  );
+  return NP_CVLS_WORKSPACE_ERROR;
+}
+
+static NPCVLSWorkspaceStatus
+np_cvls_workspace_vector_try(const size_t count, double **result)
+{
+  const NPNativeAllocStatus status =
+    np_native_malloc_array((void **)result, count, sizeof(**result));
+
+  if(status == NP_NATIVE_ALLOC_OK)
+    return NP_CVLS_WORKSPACE_OK;
+  if(status == NP_NATIVE_ALLOC_UNAVAILABLE)
+    return NP_CVLS_WORKSPACE_UNAVAILABLE;
+  np_bwm_set_deferred_error(
+    "conditional LP CV tile workspace dimensions are invalid or overflow"
+  );
+  return NP_CVLS_WORKSPACE_ERROR;
+}
+
+static NPCVLSWorkspaceStatus
+np_cvls_workspace_square_try(const int width, double **result)
+{
+  size_t count = 0;
+
+  if((width <= 0) ||
+     !np_size_mul_checked((size_t)width, (size_t)width, &count)){
+    if(result != NULL)
+      *result = NULL;
+    np_bwm_set_deferred_error(
+      "conditional LP CV square tile dimensions are invalid or overflow"
+    );
+    return NP_CVLS_WORKSPACE_ERROR;
+  }
+
+  return np_cvls_workspace_vector_try(count, result);
+}
 
 /*
  * Width-three adaptive sibling. It is entered only when three blocks reduce
  * the number of response-convolution passes versus the incumbent width-two
- * owner. Optional allocation failure is the sole unavailable status; all
- * other failures remain failures and must not fall back.
+ * owner. Allocation unavailability is distinguished from invalid dimensions:
+ * only the former may select the canonical row-stream implementation.
  */
 static int NP_CDENS_ADAP_WIDTH3_NOINLINE
 np_conditional_density_cvls_lp_adap_block3_stream(
@@ -26155,13 +26292,11 @@ np_conditional_density_cvls_lp_adap_block3_stream(
 {
   const int num_obs = num_obs_train_extern;
   const int block_size =
-    MIN(np_conditional_lp_cvls_block_size(num_obs), MAX(1, num_obs));
-  const int nblocks =
-    (num_obs / block_size) + ((num_obs % block_size) != 0);
-  const int width2_passes =
-    (nblocks / 2) + ((nblocks % 2) != 0);
-  const int width3_passes =
-    (nblocks / 3) + ((nblocks % 3) != 0);
+    MIN(np_conditional_lp_cvls_block_size(num_obs, 6U, 0U),
+        MAX(1, num_obs));
+  int nblocks;
+  int width2_passes;
+  int width3_passes;
   double **loo_work = NULL;
   double **full_blocks[3] = {NULL, NULL, NULL};
   double **shared_y = NULL;
@@ -26169,9 +26304,15 @@ np_conditional_density_cvls_lp_adap_block3_stream(
   NPConditionalYRowCtx yctx = {0}, yconvctx = {0};
   int i0, j0, ii, jj, g;
   int status = 1;
+  NPCVLSWorkspaceStatus workspace_status = NP_CVLS_WORKSPACE_OK;
 
   if((cv == NULL) || (vector_scale_factor == NULL) || (num_obs <= 0))
     return 1;
+  if(block_size <= 0)
+    return NP_CDENS_ADAP_WIDTH3_ALLOC_UNAVAILABLE;
+  nblocks = (num_obs / block_size) + ((num_obs % block_size) != 0);
+  width2_passes = (nblocks / 2) + ((nblocks % 2) != 0);
+  width3_passes = (nblocks / 3) + ((nblocks % 3) != 0);
   if((BANDWIDTH_den_extern != BW_ADAP_NN) ||
      (int_cyker_bound_extern != 0))
     return 1;
@@ -26180,19 +26321,30 @@ np_conditional_density_cvls_lp_adap_block3_stream(
       np_conditional_density_cvls_lp_adap_block4_stream(
         vector_scale_factor,
         cv);
-    if(width4_status != NP_CDENS_ADAP_WIDTH4_UNAVAILABLE)
+    if(width4_status == NP_CDENS_ADAP_WIDTH4_ALLOC_UNAVAILABLE)
+      return NP_CDENS_ADAP_WIDTH3_ALLOC_UNAVAILABLE;
+    if(width4_status != NP_CDENS_ADAP_WIDTH4_NOT_BENEFICIAL)
       return width4_status;
   }
   if(width3_passes >= width2_passes)
-    return NP_CDENS_ADAP_WIDTH3_UNAVAILABLE;
+    return NP_CDENS_ADAP_WIDTH3_NOT_BENEFICIAL;
 
-  loo_work = alloc_tmatd(num_obs, block_size);
-  full_blocks[0] = alloc_tmatd(num_obs, block_size);
-  full_blocks[1] = alloc_tmatd(num_obs, block_size);
-  shared_y = alloc_tmatd(num_obs, block_size);
-  if((loo_work == NULL) || (full_blocks[0] == NULL) ||
-     (full_blocks[1] == NULL) || (shared_y == NULL))
+  workspace_status =
+    np_cvls_workspace_matrix_try(num_obs, block_size, &loo_work);
+  if(workspace_status == NP_CVLS_WORKSPACE_OK)
+    workspace_status =
+      np_cvls_workspace_matrix_try(num_obs, block_size, &full_blocks[0]);
+  if(workspace_status == NP_CVLS_WORKSPACE_OK)
+    workspace_status =
+      np_cvls_workspace_matrix_try(num_obs, block_size, &full_blocks[1]);
+  if(workspace_status == NP_CVLS_WORKSPACE_OK)
+    workspace_status =
+      np_cvls_workspace_matrix_try(num_obs, block_size, &shared_y);
+  if(workspace_status != NP_CVLS_WORKSPACE_OK){
+    if(workspace_status == NP_CVLS_WORKSPACE_UNAVAILABLE)
+      status = NP_CDENS_ADAP_WIDTH3_ALLOC_UNAVAILABLE;
     goto cleanup_cvls_lp_adap_block3;
+  }
 
   if(np_conditional_xrow_ctx_prepare(vector_scale_factor, &xctx) != 0)
     goto cleanup_cvls_lp_adap_block3;
@@ -26205,9 +26357,11 @@ np_conditional_density_cvls_lp_adap_block3_stream(
                                      &yconvctx) != 0)
     goto cleanup_cvls_lp_adap_block3;
 
-  full_blocks[2] = np_optional_tmatd(num_obs, block_size);
-  if(full_blocks[2] == NULL){
-    status = NP_CDENS_ADAP_WIDTH3_UNAVAILABLE;
+  workspace_status =
+    np_cvls_workspace_matrix_try(num_obs, block_size, &full_blocks[2]);
+  if(workspace_status != NP_CVLS_WORKSPACE_OK){
+    if(workspace_status == NP_CVLS_WORKSPACE_UNAVAILABLE)
+      status = NP_CDENS_ADAP_WIDTH3_ALLOC_UNAVAILABLE;
     goto cleanup_cvls_lp_adap_block3;
   }
 
@@ -26312,7 +26466,8 @@ cleanup_cvls_lp_adap_block3:
 }
 
 #undef NP_CDENS_ADAP_WIDTH3_NOINLINE
-#undef NP_CDENS_ADAP_WIDTH3_UNAVAILABLE
+#undef NP_CDENS_ADAP_WIDTH3_ALLOC_UNAVAILABLE
+#undef NP_CDENS_ADAP_WIDTH3_NOT_BENEFICIAL
 
 /*
  * Reuse each Y-convolution tile across two to four adjacent non-tree LP X
@@ -26335,23 +26490,28 @@ np_conditional_density_cvls_lp_supertile2_stream(
 {
   const int num_obs = num_obs_train_extern;
   const int block_size =
-    MIN(np_conditional_lp_cvls_block_size(num_obs), MAX(1, num_obs));
+    MIN(np_conditional_lp_cvls_block_size(num_obs, 6U, 0U),
+        MAX(1, num_obs));
   double **loo_work = NULL;
   double **full_blocks[4] = {NULL, NULL, NULL, NULL};
   double **shared_y = NULL;
-  const int requested_group_width =
-    MIN(4,
-        (num_obs / block_size) +
-        ((num_obs % block_size) != 0));
+  int requested_group_width;
   NPConditionalXBlockBwCtx xbwctx = {0};
   NPConditionalYRowCtx yconvctx = {0};
   int i0, j0, ii, jj, g;
   int group_width = 2;
   int status = 1;
+  NPCVLSWorkspaceStatus workspace_status = NP_CVLS_WORKSPACE_OK;
 
   if((cv == NULL) || (vector_scale_factor == NULL) ||
      (num_obs <= block_size) || !np_conditional_lp_stream_engine_supported())
     return 1;
+  if(block_size <= 0)
+    return 2;
+  requested_group_width =
+    MIN(4,
+        (num_obs / block_size) +
+        ((num_obs % block_size) != 0));
   if((num_reg_continuous_extern <= 0) ||
      ((np_lp_engine_extern == NP_LP_ENGINE_GENERAL) &&
       (vector_glp_degree_extern == NULL)))
@@ -26362,23 +26522,41 @@ np_conditional_density_cvls_lp_supertile2_stream(
   if((int_TREE_X == NP_TREE_TRUE) || (int_TREE_Y == NP_TREE_TRUE))
     return 1;
 
-  loo_work = alloc_tmatd(num_obs, block_size);
-  full_blocks[0] = alloc_tmatd(num_obs, block_size);
-  full_blocks[1] = alloc_tmatd(num_obs, block_size);
-  shared_y = alloc_tmatd(num_obs, block_size);
-  if((loo_work == NULL) || (full_blocks[0] == NULL) ||
-     (full_blocks[1] == NULL) || (shared_y == NULL))
+  workspace_status =
+    np_cvls_workspace_matrix_try(num_obs, block_size, &loo_work);
+  if(workspace_status == NP_CVLS_WORKSPACE_OK)
+    workspace_status =
+      np_cvls_workspace_matrix_try(num_obs, block_size, &full_blocks[0]);
+  if(workspace_status == NP_CVLS_WORKSPACE_OK)
+    workspace_status =
+      np_cvls_workspace_matrix_try(num_obs, block_size, &full_blocks[1]);
+  if(workspace_status == NP_CVLS_WORKSPACE_OK)
+    workspace_status =
+      np_cvls_workspace_matrix_try(num_obs, block_size, &shared_y);
+  if(workspace_status != NP_CVLS_WORKSPACE_OK){
+    if(workspace_status == NP_CVLS_WORKSPACE_UNAVAILABLE)
+      status = 2;
     goto cleanup_cvls_lp_supertile2;
+  }
 
   if(requested_group_width >= 3){
-    full_blocks[2] = np_optional_tmatd(num_obs, block_size);
-    if(full_blocks[2] != NULL){
-      group_width = 3;
-      if(requested_group_width >= 4){
-        full_blocks[3] = np_optional_tmatd(num_obs, block_size);
-        if(full_blocks[3] != NULL)
-          group_width = 4;
+    workspace_status =
+      np_cvls_workspace_matrix_try(num_obs, block_size, &full_blocks[2]);
+    if(workspace_status != NP_CVLS_WORKSPACE_OK){
+      if(workspace_status == NP_CVLS_WORKSPACE_UNAVAILABLE)
+        status = 2;
+      goto cleanup_cvls_lp_supertile2;
+    }
+    group_width = 3;
+    if(requested_group_width >= 4){
+      workspace_status =
+        np_cvls_workspace_matrix_try(num_obs, block_size, &full_blocks[3]);
+      if(workspace_status != NP_CVLS_WORKSPACE_OK){
+        if(workspace_status == NP_CVLS_WORKSPACE_UNAVAILABLE)
+          status = 2;
+        goto cleanup_cvls_lp_supertile2;
       }
+      group_width = 4;
     }
   }
 
@@ -26512,13 +26690,15 @@ cleanup_cvls_lp_supertile2:
 int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
                                           double *cv){
   const int num_obs = num_obs_train_extern;
-  const int block_size = MIN(np_conditional_lp_cvls_block_size(num_obs), MAX(1, num_obs));
+  const int block_size = MIN(np_conditional_lp_cvls_block_size(num_obs, 6U, 0U),
+                             MAX(1, num_obs));
   double **xblock = NULL, **xblock_full = NULL, **yblock = NULL, **yconvblock = NULL;
   double *quad_cross = NULL;
   NPConditionalXBlockBwCtx xbwctx = {0};
   NPConditionalYRowCtx yconvctx = {0};
   int i0, j0, ii, jj;
   int status = 1;
+  NPCVLSWorkspaceStatus workspace_status = NP_CVLS_WORKSPACE_OK;
 
   if((cv == NULL) || (vector_scale_factor == NULL) || (num_obs <= 0))
     return 1;
@@ -26560,23 +26740,39 @@ int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
      (BANDWIDTH_den_extern != BW_FIXED))
     return np_conditional_density_cvls_lp_row_stream(vector_scale_factor, cv);
 
+  if(block_size <= 0)
+    return np_conditional_density_cvls_lp_row_stream(vector_scale_factor, cv);
+
   if(np_conditional_lp_stream_engine_supported() &&
      (num_reg_continuous_extern > 0) &&
      ((np_lp_engine_extern == NP_LP_ENGINE_SCALAR) ||
       (vector_glp_degree_extern != NULL)) &&
      (int_TREE_X != NP_TREE_TRUE) &&
      (int_TREE_Y != NP_TREE_TRUE) &&
-     (num_obs > block_size))
-    return np_conditional_density_cvls_lp_supertile2_stream(vector_scale_factor,
-                                                            cv);
+     (num_obs > block_size)){
+    const int supertile_status =
+      np_conditional_density_cvls_lp_supertile2_stream(vector_scale_factor,
+                                                       cv);
+    if(supertile_status != 2)
+      return supertile_status;
+    return np_conditional_density_cvls_lp_row_stream(vector_scale_factor, cv);
+  }
 
-  xblock = alloc_tmatd(num_obs, block_size);
-  xblock_full = alloc_tmatd(num_obs, block_size);
-  yblock = alloc_tmatd(num_obs, block_size);
-  yconvblock = alloc_tmatd(num_obs, block_size);
-  quad_cross = alloc_vecd(block_size*block_size);
-  if((xblock == NULL) || (xblock_full == NULL) || (yblock == NULL) ||
-     (yconvblock == NULL) || (quad_cross == NULL))
+  workspace_status =
+    np_cvls_workspace_matrix_try(num_obs, block_size, &xblock);
+  if(workspace_status == NP_CVLS_WORKSPACE_OK)
+    workspace_status =
+      np_cvls_workspace_matrix_try(num_obs, block_size, &xblock_full);
+  if(workspace_status == NP_CVLS_WORKSPACE_OK)
+    workspace_status =
+      np_cvls_workspace_matrix_try(num_obs, block_size, &yblock);
+  if(workspace_status == NP_CVLS_WORKSPACE_OK)
+    workspace_status =
+      np_cvls_workspace_matrix_try(num_obs, block_size, &yconvblock);
+  if(workspace_status == NP_CVLS_WORKSPACE_OK)
+    workspace_status =
+      np_cvls_workspace_square_try(block_size, &quad_cross);
+  if(workspace_status != NP_CVLS_WORKSPACE_OK)
     goto cleanup_cvls_lp_block;
 
   if((BANDWIDTH_den_extern == BW_GEN_NN) &&
@@ -26674,6 +26870,8 @@ cleanup_cvls_lp_block:
   if(yconvblock != NULL) free_tmat(yconvblock);
   if(quad_cross != NULL) free(quad_cross);
   np_glp_cv_clear_extern();
+  if(workspace_status == NP_CVLS_WORKSPACE_UNAVAILABLE)
+    return np_conditional_density_cvls_lp_row_stream(vector_scale_factor, cv);
   return status;
 }
 
@@ -26786,7 +26984,8 @@ static int np_conditional_distribution_cvls_lp_adap_block_stream(double *vector_
                                                                  double *cv){
   const int num_train = num_obs_train_extern;
   const int num_eval = num_obs_eval_extern;
-  const int block_size = MIN(np_conditional_lp_cvls_block_size(num_train), MAX(1, num_train));
+  const int block_size = MIN(np_conditional_lp_cvls_block_size(num_train, 5U, 1U),
+                             MAX(1, num_train));
   double **xblocks[4] = {NULL, NULL, NULL, NULL};
   double **yintblock = NULL;
   double *fit_cross = NULL;
@@ -26795,16 +26994,24 @@ static int np_conditional_distribution_cvls_lp_adap_block_stream(double *vector_
   int i0, j0, ii, jj, g;
   int group_width = 1;
   int status = 1;
+  NPCVLSWorkspaceStatus workspace_status = NP_CVLS_WORKSPACE_OK;
 
   if((cv == NULL) || (vector_scale_factor == NULL) || (num_train <= 0) || (num_eval <= 0))
     return 1;
+  if(block_size <= 0)
+    return np_conditional_distribution_cvls_lp_row_stream(vector_scale_factor, cv);
   if(BANDWIDTH_den_extern != BW_ADAP_NN)
     return 1;
 
-  xblocks[0] = alloc_tmatd(num_train, block_size);
-  yintblock = alloc_tmatd(num_train, block_size);
-  fit_cross = alloc_vecd(block_size*block_size);
-  if((xblocks[0] == NULL) || (yintblock == NULL) || (fit_cross == NULL))
+  workspace_status =
+    np_cvls_workspace_matrix_try(num_train, block_size, &xblocks[0]);
+  if(workspace_status == NP_CVLS_WORKSPACE_OK)
+    workspace_status =
+      np_cvls_workspace_matrix_try(num_train, block_size, &yintblock);
+  if(workspace_status == NP_CVLS_WORKSPACE_OK)
+    workspace_status =
+      np_cvls_workspace_square_try(block_size, &fit_cross);
+  if(workspace_status != NP_CVLS_WORKSPACE_OK)
     goto cleanup_cdist_lp_adap_block;
 
   if(np_conditional_xrow_ctx_prepare(vector_scale_factor, &xctx) != 0)
@@ -26824,22 +27031,26 @@ static int np_conditional_distribution_cvls_lp_adap_block_stream(double *vector_
    * three or four when further bounded optional slabs are also available,
    * then feed the shared Y tile to unchanged B-by-B GEMMs. Separate block
    * sums preserve the incumbent within-block and final cv accumulation order.
-   * Allocation failure retains the widest available traversal.
+   * If any acceleration slab is unavailable, use the canonical row stream.
    */
   if(num_train > block_size){
-    xblocks[1] = np_optional_tmatd(num_train, block_size);
-    if(xblocks[1] != NULL){
-      group_width = 2;
-      if(num_train > 2*block_size){
-        xblocks[2] = np_optional_tmatd(num_train, block_size);
-        if(xblocks[2] != NULL){
-          group_width = 3;
-          if(num_train > 3*block_size){
-            xblocks[3] = np_optional_tmatd(num_train, block_size);
-            if(xblocks[3] != NULL)
-              group_width = 4;
-          }
-        }
+    workspace_status =
+      np_cvls_workspace_matrix_try(num_train, block_size, &xblocks[1]);
+    if(workspace_status != NP_CVLS_WORKSPACE_OK)
+      goto cleanup_cdist_lp_adap_block;
+    group_width = 2;
+    if(num_train > 2*block_size){
+      workspace_status =
+        np_cvls_workspace_matrix_try(num_train, block_size, &xblocks[2]);
+      if(workspace_status != NP_CVLS_WORKSPACE_OK)
+        goto cleanup_cdist_lp_adap_block;
+      group_width = 3;
+      if(num_train > 3*block_size){
+        workspace_status =
+          np_cvls_workspace_matrix_try(num_train, block_size, &xblocks[3]);
+        if(workspace_status != NP_CVLS_WORKSPACE_OK)
+          goto cleanup_cdist_lp_adap_block;
+        group_width = 4;
       }
     }
   }
@@ -26929,69 +27140,39 @@ cleanup_cdist_lp_adap_block:
   if(yintblock != NULL) free_tmat(yintblock);
   if(fit_cross != NULL) free(fit_cross);
   np_glp_cv_clear_extern();
+  if(workspace_status == NP_CVLS_WORKSPACE_UNAVAILABLE)
+    return np_conditional_distribution_cvls_lp_row_stream(vector_scale_factor,
+                                                          cv);
   return status;
 }
 
 /*
- * Allocate a free_tmat()-compatible contiguous matrix without raising an R
- * error. This is used only for optional bounded acceleration slabs: overflow
- * or allocation failure must retain the widest incumbent-safe traversal.
- */
-static double **np_optional_tmatd(const int nrows, const int ncols){
-  const size_t rows = (size_t)nrows;
-  const size_t cols = (size_t)ncols;
-  size_t cells;
-  double **matrix;
-  double *data;
-  int col;
-
-  if((nrows <= 0) || (ncols <= 0) ||
-     (cols > ((size_t)-1)/sizeof(double *)) ||
-     (rows > ((size_t)-1)/cols))
-    return NULL;
-
-  cells = rows*cols;
-  if(cells > ((size_t)-1)/sizeof(double))
-    return NULL;
-
-  matrix = (double **)malloc(cols*sizeof(double *));
-  if(matrix == NULL)
-    return NULL;
-  data = (double *)malloc(cells*sizeof(double));
-  if(data == NULL){
-    free(matrix);
-    return NULL;
-  }
-
-  matrix[0] = data;
-  for(col = 1; col < ncols; col++)
-    matrix[col] = matrix[col - 1] + nrows;
-
-  return matrix;
-}
-
-/*
- * Return 2 only when the optional second slab is unavailable. The dispatcher
- * then calls the isolated incumbent one-block microkernel below.
+ * Return 2 only when an acceleration slab is unavailable. The dispatcher then
+ * selects the canonical row-stream implementation.
  */
 static int np_conditional_distribution_cvls_lp_block_supertile(double *vector_scale_factor,
                                                                double *cv){
   const int num_train = num_obs_train_extern;
   const int num_eval = num_obs_eval_extern;
-  const int block_size = MIN(np_conditional_lp_cvls_block_size(num_train), MAX(1, num_train));
+  const int block_size = MIN(np_conditional_lp_cvls_block_size(num_train, 5U, 1U),
+                             MAX(1, num_train));
   double **xblocks[4] = {NULL, NULL, NULL, NULL};
   double **yintblock = NULL;
   double *fit_cross = NULL;
-  const int requested_group_width =
-    MIN(4,
-        (num_train / block_size) +
-        ((num_train % block_size) != 0));
+  int requested_group_width;
   int i0, j0, ii, jj, g;
   int group_width = 2;
   int status = 1;
+  NPCVLSWorkspaceStatus workspace_status = NP_CVLS_WORKSPACE_OK;
 
   if((cv == NULL) || (vector_scale_factor == NULL) || (num_train <= 0) || (num_eval <= 0))
     return 1;
+  if(block_size <= 0)
+    return 2;
+  requested_group_width =
+    MIN(4,
+        (num_train / block_size) +
+        ((num_train % block_size) != 0));
   if((BANDWIDTH_den_extern != BW_FIXED) &&
      (BANDWIDTH_den_extern != BW_GEN_NN) &&
      (BANDWIDTH_den_extern != BW_ADAP_NN))
@@ -27004,11 +27185,19 @@ static int np_conditional_distribution_cvls_lp_block_supertile(double *vector_sc
      (BANDWIDTH_den_extern != BW_FIXED))
     return np_conditional_distribution_cvls_lp_row_stream(vector_scale_factor, cv);
 
-  xblocks[0] = alloc_tmatd(num_train, block_size);
-  yintblock = alloc_tmatd(num_train, block_size);
-  fit_cross = alloc_vecd(block_size*block_size);
-  if((xblocks[0] == NULL) || (yintblock == NULL) || (fit_cross == NULL))
+  workspace_status =
+    np_cvls_workspace_matrix_try(num_train, block_size, &xblocks[0]);
+  if(workspace_status == NP_CVLS_WORKSPACE_OK)
+    workspace_status =
+      np_cvls_workspace_matrix_try(num_train, block_size, &yintblock);
+  if(workspace_status == NP_CVLS_WORKSPACE_OK)
+    workspace_status =
+      np_cvls_workspace_square_try(block_size, &fit_cross);
+  if(workspace_status != NP_CVLS_WORKSPACE_OK){
+    if(workspace_status == NP_CVLS_WORKSPACE_UNAVAILABLE)
+      status = 2;
     goto cleanup_cdist_lp_block;
+  }
 
   /*
    * A Y-integral tile is independent of the X evaluation row. Retain two
@@ -27022,20 +27211,31 @@ static int np_conditional_distribution_cvls_lp_block_supertile(double *vector_sc
    * two- or three-block traversal. Do not allocate slabs beyond the number
    * of X blocks present.
    */
-  xblocks[1] = np_optional_tmatd(num_train, block_size);
-  if(xblocks[1] == NULL){
-    status = 2;
+  workspace_status =
+    np_cvls_workspace_matrix_try(num_train, block_size, &xblocks[1]);
+  if(workspace_status != NP_CVLS_WORKSPACE_OK){
+    if(workspace_status == NP_CVLS_WORKSPACE_UNAVAILABLE)
+      status = 2;
     goto cleanup_cdist_lp_block;
   }
   if(requested_group_width >= 3){
-    xblocks[2] = np_optional_tmatd(num_train, block_size);
-    if(xblocks[2] != NULL){
-      group_width = 3;
-      if(requested_group_width >= 4){
-        xblocks[3] = np_optional_tmatd(num_train, block_size);
-        if(xblocks[3] != NULL)
-          group_width = 4;
+    workspace_status =
+      np_cvls_workspace_matrix_try(num_train, block_size, &xblocks[2]);
+    if(workspace_status != NP_CVLS_WORKSPACE_OK){
+      if(workspace_status == NP_CVLS_WORKSPACE_UNAVAILABLE)
+        status = 2;
+      goto cleanup_cdist_lp_block;
+    }
+    group_width = 3;
+    if(requested_group_width >= 4){
+      workspace_status =
+        np_cvls_workspace_matrix_try(num_train, block_size, &xblocks[3]);
+      if(workspace_status != NP_CVLS_WORKSPACE_OK){
+        if(workspace_status == NP_CVLS_WORKSPACE_UNAVAILABLE)
+          status = 2;
+        goto cleanup_cdist_lp_block;
       }
+      group_width = 4;
     }
   }
 
@@ -27133,8 +27333,8 @@ cleanup_cdist_lp_block:
 
 /*
  * Incumbent one-block microkernel. Keep it out of line and branch-free so
- * boundary, adaptive, tree-fallback, and allocation-fallback routes do not
- * pay for the optional two-block acceleration.
+ * boundary, adaptive, and tree-fallback routes do not pay for the optional
+ * two-block acceleration.
  */
 #if defined(__clang__) || defined(__GNUC__)
 # define NP_CDIST_ONEBLOCK_ALIGN __attribute__((aligned(256)))
@@ -27147,14 +27347,18 @@ np_conditional_distribution_cvls_lp_block_one(double *vector_scale_factor,
                                                double *cv){
   const int num_train = num_obs_train_extern;
   const int num_eval = num_obs_eval_extern;
-  const int block_size = MIN(np_conditional_lp_cvls_block_size(num_train), MAX(1, num_train));
+  const int block_size = MIN(np_conditional_lp_cvls_block_size(num_train, 5U, 1U),
+                             MAX(1, num_train));
   double **xblock = NULL, **yintblock = NULL;
   double *fit_cross = NULL;
   int i0, j0, ii, jj;
   int status = 1;
+  NPCVLSWorkspaceStatus workspace_status = NP_CVLS_WORKSPACE_OK;
 
   if((cv == NULL) || (vector_scale_factor == NULL) || (num_train <= 0) || (num_eval <= 0))
     return 1;
+  if(block_size <= 0)
+    return np_conditional_distribution_cvls_lp_row_stream(vector_scale_factor, cv);
   if((BANDWIDTH_den_extern != BW_FIXED) &&
      (BANDWIDTH_den_extern != BW_GEN_NN) &&
      (BANDWIDTH_den_extern != BW_ADAP_NN))
@@ -27167,10 +27371,15 @@ np_conditional_distribution_cvls_lp_block_one(double *vector_scale_factor,
      (BANDWIDTH_den_extern != BW_FIXED))
     return np_conditional_distribution_cvls_lp_row_stream(vector_scale_factor, cv);
 
-  xblock = alloc_tmatd(num_train, block_size);
-  yintblock = alloc_tmatd(num_train, block_size);
-  fit_cross = alloc_vecd(block_size*block_size);
-  if((xblock == NULL) || (yintblock == NULL) || (fit_cross == NULL))
+  workspace_status =
+    np_cvls_workspace_matrix_try(num_train, block_size, &xblock);
+  if(workspace_status == NP_CVLS_WORKSPACE_OK)
+    workspace_status =
+      np_cvls_workspace_matrix_try(num_train, block_size, &yintblock);
+  if(workspace_status == NP_CVLS_WORKSPACE_OK)
+    workspace_status =
+      np_cvls_workspace_square_try(block_size, &fit_cross);
+  if(workspace_status != NP_CVLS_WORKSPACE_OK)
     goto cleanup_cdist_lp_block_one;
 
   *cv = 0.0;
@@ -27236,6 +27445,9 @@ cleanup_cdist_lp_block_one:
   if(yintblock != NULL) free_tmat(yintblock);
   if(fit_cross != NULL) free(fit_cross);
   np_glp_cv_clear_extern();
+  if(workspace_status == NP_CVLS_WORKSPACE_UNAVAILABLE)
+    return np_conditional_distribution_cvls_lp_row_stream(vector_scale_factor,
+                                                          cv);
   return status;
 }
 
@@ -27262,7 +27474,7 @@ static int np_conditional_distribution_cvls_lp_block_stream(double *vector_scale
     return np_conditional_distribution_cvls_lp_row_stream(vector_scale_factor, cv);
 
   if((num_train > 0) &&
-     (num_train > np_conditional_lp_cvls_block_size(num_train)) &&
+     (num_train > np_conditional_lp_cvls_block_size(num_train, 5U, 1U)) &&
      ((BANDWIDTH_den_extern == BW_FIXED) ||
       (BANDWIDTH_den_extern == BW_GEN_NN)) &&
      !(((int_TREE_X == NP_TREE_TRUE) || (int_TREE_Y == NP_TREE_TRUE)) &&
@@ -27272,6 +27484,8 @@ static int np_conditional_distribution_cvls_lp_block_stream(double *vector_scale
 
     if(status != 2)
       return status;
+    return np_conditional_distribution_cvls_lp_row_stream(vector_scale_factor,
+                                                          cv);
   }
 
   return np_conditional_distribution_cvls_lp_block_one(vector_scale_factor, cv);
@@ -31788,13 +32002,11 @@ np_conditional_density_cvls_lp_adap_block4_stream(
 {
   const int num_obs = num_obs_train_extern;
   const int block_size =
-    MIN(np_conditional_lp_cvls_block_size(num_obs), MAX(1, num_obs));
-  const int nblocks =
-    (num_obs / block_size) + ((num_obs % block_size) != 0);
-  const int width3_passes =
-    (nblocks / 3) + ((nblocks % 3) != 0);
-  const int width4_passes =
-    (nblocks / 4) + ((nblocks % 4) != 0);
+    MIN(np_conditional_lp_cvls_block_size(num_obs, 6U, 0U),
+        MAX(1, num_obs));
+  int nblocks;
+  int width3_passes;
+  int width4_passes;
   double **loo_work = NULL;
   double **full_blocks[4] = {NULL, NULL, NULL, NULL};
   double **optional_blocks = NULL;
@@ -31803,22 +32015,37 @@ np_conditional_density_cvls_lp_adap_block4_stream(
   NPConditionalYRowCtx yctx = {0}, yconvctx = {0};
   int i0, j0, ii, jj, g;
   int status = 1;
+  NPCVLSWorkspaceStatus workspace_status = NP_CVLS_WORKSPACE_OK;
 
   if((cv == NULL) || (vector_scale_factor == NULL) || (num_obs <= 0))
     return 1;
+  if(block_size <= 0)
+    return NP_CDENS_ADAP_WIDTH4_ALLOC_UNAVAILABLE;
+  nblocks = (num_obs / block_size) + ((num_obs % block_size) != 0);
+  width3_passes = (nblocks / 3) + ((nblocks % 3) != 0);
+  width4_passes = (nblocks / 4) + ((nblocks % 4) != 0);
   if((BANDWIDTH_den_extern != BW_ADAP_NN) ||
      (int_cyker_bound_extern != 0))
     return 1;
   if(width4_passes >= width3_passes)
-    return NP_CDENS_ADAP_WIDTH4_UNAVAILABLE;
+    return NP_CDENS_ADAP_WIDTH4_NOT_BENEFICIAL;
 
-  loo_work = alloc_tmatd(num_obs, block_size);
-  full_blocks[0] = alloc_tmatd(num_obs, block_size);
-  full_blocks[1] = alloc_tmatd(num_obs, block_size);
-  shared_y = alloc_tmatd(num_obs, block_size);
-  if((loo_work == NULL) || (full_blocks[0] == NULL) ||
-     (full_blocks[1] == NULL) || (shared_y == NULL))
+  workspace_status =
+    np_cvls_workspace_matrix_try(num_obs, block_size, &loo_work);
+  if(workspace_status == NP_CVLS_WORKSPACE_OK)
+    workspace_status =
+      np_cvls_workspace_matrix_try(num_obs, block_size, &full_blocks[0]);
+  if(workspace_status == NP_CVLS_WORKSPACE_OK)
+    workspace_status =
+      np_cvls_workspace_matrix_try(num_obs, block_size, &full_blocks[1]);
+  if(workspace_status == NP_CVLS_WORKSPACE_OK)
+    workspace_status =
+      np_cvls_workspace_matrix_try(num_obs, block_size, &shared_y);
+  if(workspace_status != NP_CVLS_WORKSPACE_OK){
+    if(workspace_status == NP_CVLS_WORKSPACE_UNAVAILABLE)
+      status = NP_CDENS_ADAP_WIDTH4_ALLOC_UNAVAILABLE;
     goto cleanup_cvls_lp_adap_block4;
+  }
 
   if(np_conditional_xrow_ctx_prepare(vector_scale_factor, &xctx) != 0)
     goto cleanup_cvls_lp_adap_block4;
@@ -31831,9 +32058,13 @@ np_conditional_density_cvls_lp_adap_block4_stream(
                                      &yconvctx) != 0)
     goto cleanup_cvls_lp_adap_block4;
 
-  optional_blocks = np_optional_tmatd(num_obs, 2*block_size);
-  if(optional_blocks == NULL){
-    status = NP_CDENS_ADAP_WIDTH4_UNAVAILABLE;
+  workspace_status =
+    np_cvls_workspace_matrix_try(num_obs,
+                                 2*block_size,
+                                 &optional_blocks);
+  if(workspace_status != NP_CVLS_WORKSPACE_OK){
+    if(workspace_status == NP_CVLS_WORKSPACE_UNAVAILABLE)
+      status = NP_CDENS_ADAP_WIDTH4_ALLOC_UNAVAILABLE;
     goto cleanup_cvls_lp_adap_block4;
   }
   full_blocks[2] = optional_blocks;
@@ -31941,7 +32172,8 @@ cleanup_cvls_lp_adap_block4:
 }
 
 #undef NP_CDENS_ADAP_WIDTH4_NOINLINE
-#undef NP_CDENS_ADAP_WIDTH4_UNAVAILABLE
+#undef NP_CDENS_ADAP_WIDTH4_ALLOC_UNAVAILABLE
+#undef NP_CDENS_ADAP_WIDTH4_NOT_BENEFICIAL
 
 /*
  * Optional adaptive-only sidecar.  Keep this constructor out of line and
