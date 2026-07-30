@@ -119,6 +119,32 @@ np_int_padded_count_nonnegative(int count,
   return 1;
 }
 
+static inline int
+np_int64_padded_count_nonnegative(int64_t count,
+                                  int partitions,
+                                  int minimum_one_per_partition,
+                                  int64_t *stride,
+                                  int64_t *padded_count)
+{
+  int64_t local_stride;
+
+  if((stride == NULL) || (padded_count == NULL) ||
+     (count < 0) || (partitions <= 0) ||
+     ((minimum_one_per_partition != 0) &&
+      (minimum_one_per_partition != 1)))
+    return 0;
+  local_stride = count/(int64_t)partitions;
+  if(count%(int64_t)partitions != 0)
+    local_stride++;
+  if(minimum_one_per_partition && (local_stride == 0))
+    local_stride = 1;
+  if(local_stride > INT64_MAX/(int64_t)partitions)
+    return 0;
+  *stride = local_stride;
+  *padded_count = local_stride*(int64_t)partitions;
+  return 1;
+}
+
 static inline NPNativeAllocStatus
 np_native_malloc_array(void **result, size_t count, size_t element_size)
 {
