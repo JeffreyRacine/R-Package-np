@@ -153,3 +153,32 @@ test_that("width-one scalar hats retain signed higher-order kernel weights", {
   expect_identical(as.double(internal), as.double(default))
   expect_equal(as.double(default), as.double(compiled), tolerance = 5e-15)
 })
+
+test_that("width-one scalar hats own degenerate and non-finite systems", {
+  scalar_hat <- function(weights, basis.eval = 1.0) {
+    .Call(
+      "C_np_reghat_lp_matrix_fast",
+      matrix(as.double(weights), ncol = 1L),
+      matrix(1.0, nrow = length(weights), ncol = 1L),
+      matrix(as.double(basis.eval), nrow = 1L, ncol = 1L),
+      PACKAGE = "np"
+    )
+  }
+
+  expect_identical(scalar_hat(c(0.0, 0.0)), matrix(c(0.0, 0.0), 1L))
+  expect_identical(scalar_hat(c(1.0, -1.0)), matrix(c(4.0, -4.0), 1L))
+  expect_identical(
+    scalar_hat(c(1.0, -1.0 + 2^-50)),
+    matrix(c(2^50, -2^50 + 1.0), 1L)
+  )
+  expect_error(
+    scalar_hat(c(1.0, NaN)),
+    "non-finite system",
+    fixed = TRUE
+  )
+  expect_error(
+    scalar_hat(c(1.0, 1.0), basis.eval = Inf),
+    "non-finite system",
+    fixed = TRUE
+  )
+})

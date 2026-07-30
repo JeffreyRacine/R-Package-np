@@ -35,6 +35,13 @@ typedef struct {
 
 #define NP_LP_SOLVE_MAX_RIDGE_STEPS 128
 
+typedef enum {
+  NP_LP_WIDTH_ONE_OK = 0,
+  NP_LP_WIDTH_ONE_INVALID,
+  NP_LP_WIDTH_ONE_NONFINITE,
+  NP_LP_WIDTH_ONE_RIDGE_FAILED
+} NPLPWidthOneStatus;
+
 /*
  * The caller owns the workspace and its lifetime.  gram_source/rhs_source are
  * the caller-mutable pristine system.  Width one is solved directly as scalar
@@ -76,16 +83,20 @@ int np_lp_solve_workspace_solve_factored(NPLPSolveWorkspace *workspace,
 /*
  * Exact basis-general influence row for a one-column signed weighted design:
  * w_i z_i z_eval / sum_j(w_j z_j^2).  output_stride permits both contiguous
- * native rows and strided R column-major matrix rows.  Returns zero on
- * success; on failure, row_out contents are undefined and must not be
- * consumed.  It never allocates or calls BLAS/LAPACK.
+ * native rows and strided R column-major matrix rows.  A finite zero
+ * denominator follows the canonical bounded scalar ridge transcript used by
+ * the hat owner; a nonzero finite denominator is never thresholded or
+ * perturbed.  Returns NP_LP_WIDTH_ONE_OK on success and a typed failure
+ * status otherwise.  On failure, row_out contents are undefined and must not
+ * be consumed.  It never allocates or calls BLAS/LAPACK.
  */
-int np_lp_width_one_influence_row(const double *basis_train,
-                                  int n,
-                                  const double *kw,
-                                  double basis_eval,
-                                  double *row_out,
-                                  size_t output_stride);
+NPLPWidthOneStatus np_lp_width_one_influence_row(
+  const double *basis_train,
+  int n,
+  const double *kw,
+  double basis_eval,
+  double *row_out,
+  size_t output_stride);
 
 /*
  * Reusable contiguous Gram/RHS/rcond/solve storage for full-weight LP rows.

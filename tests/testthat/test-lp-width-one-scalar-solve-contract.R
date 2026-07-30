@@ -40,7 +40,7 @@ test_that("canonical solve workspace dispatches width one only to scalar algebra
   factored <- lp_width_one_region(
     source,
     "int np_lp_solve_workspace_solve_factored(",
-    "int np_lp_width_one_influence_row("
+    "NPLPWidthOneStatus np_lp_width_one_influence_row("
   )
 
   expect_true(grepl("rhs_source[i]/gram", scalar, fixed = TRUE))
@@ -140,7 +140,7 @@ test_that("width-one influence rows retain signed weights without LAPACK", {
 
   scalar <- lp_width_one_region(
     source,
-    "int np_lp_width_one_influence_row(",
+    "NPLPWidthOneStatus np_lp_width_one_influence_row(",
     "void np_lp_full_row_workspace_init("
   )
 
@@ -158,6 +158,9 @@ test_that("width-one influence rows retain signed weights without LAPACK", {
   expect_false(grepl("F77_", scalar, fixed = TRUE))
   expect_false(grepl("sqrt(", scalar, fixed = TRUE))
   expect_false(grepl("malloc(", scalar, fixed = TRUE))
+  expect_true(grepl("NP_LP_SOLVE_MAX_RIDGE_STEPS", scalar, fixed = TRUE))
+  expect_true(grepl("NP_LP_WIDTH_ONE_NONFINITE", scalar, fixed = TRUE))
+  expect_true(grepl("NP_LP_WIDTH_ONE_RIDGE_FAILED", scalar, fixed = TRUE))
 })
 
 test_that("compiled width-one hats reuse the scalar influence primitive", {
@@ -165,33 +168,25 @@ test_that("compiled width-one hats reuse the scalar influence primitive", {
   skip_if(is.null(hat_file), "source file src/reghat_fast.c unavailable")
   source <- paste(readLines(hat_file, warn = FALSE), collapse = "\n")
 
-  solve <- lp_width_one_region(
+  scalar_hat <- lp_width_one_region(
     source,
-    "static int np_reghat_solve_system(",
-    "static int np_reghat_sources_finite("
+    "static SEXP np_reghat_width_one_matrix(",
+    "static int np_reghat_solve_system("
   )
   hat_start <- regexpr("SEXP C_np_reghat_lp_matrix_fast(", source, fixed = TRUE)
   expect_gt(hat_start, 0L)
   hat <- substr(source, hat_start, nchar(source))
 
-  expect_true(grepl("if(nterms == 1)", solve, fixed = TRUE))
-  expect_true(grepl("rhs[0]/matrix[0]", solve, fixed = TRUE))
-  expect_lt(
-    regexpr("if(nterms == 1)", solve, fixed = TRUE),
-    regexpr("F77_CALL(dlange)", solve, fixed = TRUE)
-  )
-  expect_lt(
-    regexpr("if(nterms == 1)", solve, fixed = TRUE),
-    regexpr("F77_CALL(dgesv)", solve, fixed = TRUE)
-  )
-
-  expect_true(grepl("if((nterms == 1)", hat, fixed = TRUE))
-  expect_true(grepl("np_lp_width_one_influence_row(", hat, fixed = TRUE))
-  expect_true(grepl("(size_t)neval)", hat,
+  expect_true(grepl("np_lp_width_one_influence_row(", scalar_hat,
                     fixed = TRUE))
-  expect_false(grepl("positive_weights_only", hat, fixed = TRUE))
+  expect_true(grepl("NP_LP_WIDTH_ONE_OK", scalar_hat, fixed = TRUE))
+  expect_false(grepl("R_alloc(", scalar_hat, fixed = TRUE))
+  expect_false(grepl("F77_CALL(", scalar_hat, fixed = TRUE))
+  expect_false(grepl("positive_weights_only", scalar_hat, fixed = TRUE))
+  expect_true(grepl("if(nterms == 1)", hat, fixed = TRUE))
   expect_lt(
-    regexpr("np_lp_width_one_influence_row(", hat, fixed = TRUE),
-    regexpr("F77_CALL(dgemm)", hat, fixed = TRUE)
+    regexpr("if(nterms == 1)", hat, fixed = TRUE),
+    regexpr("weighted_design = (double *)R_alloc", hat, fixed = TRUE)
   )
+  expect_false(grepl("if((nterms == 1)", hat, fixed = TRUE))
 })
