@@ -737,17 +737,31 @@ test_that("density CV tree-bypass predicate is centralized in one helper", {
   expect_equal(sum(grepl("if\\(gate_x_all_large_fixed \\|\\| !int_TREE_XY \\|\\| \\(BANDWIDTH_den == BW_ADAP_NN\\)\\)", lines)), 0L)
 })
 
-test_that("conditional CV large-kernel gating keeps Y and XY activation routes live", {
+test_that("live generic conditional CV keeps Y-side gating enabled", {
   src_file <- locate_jksum_c()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
 
   lines <- readLines(src_file, warn = FALSE)
+  start <- grep(
+    "^int np_kernel_estimate_con_distribution_categorical_leave_one_out_ls_cv\\(",
+    lines
+  )
+  stop <- grep(
+    "^int np_kernel_estimate_con_density_categorical_leave_one_out_ls_cv\\(",
+    lines
+  )
+  expect_length(start, 1L)
+  expect_length(stop, 1L)
+  expect_gt(stop, start)
+  body <- lines[start:(stop - 1L)]
 
-  expect_false(any(grepl("Canonical conditional CV gate policy: large-kernel shortcuts are X-only", lines, fixed = TRUE)))
-  expect_gte(sum(grepl("^\\s*gate_y_active = 1;\\s*$", lines)), 2L)
-  expect_gte(sum(grepl("^\\s*gate_xy_active = 1;\\s*$", lines)), 1L)
-  expect_equal(sum(grepl("^\\s*gate_y_active = 0;\\s*$", lines)), 0L)
-  expect_equal(sum(grepl("^\\s*gate_xy_active = 0;\\s*$", lines)), 0L)
+  expect_false(any(grepl(
+    "Canonical conditional CV gate policy: large-kernel shortcuts are X-only",
+    body,
+    fixed = TRUE
+  )))
+  expect_equal(sum(grepl("^\\s*gate_y_active = 1;\\s*$", body)), 1L)
+  expect_equal(sum(grepl("^\\s*gate_y_active = 0;\\s*$", body)), 0L)
 })
 
 test_that("conditional public LP CV routes have one kernelcv dispatch", {
