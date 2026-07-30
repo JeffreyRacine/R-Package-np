@@ -55,22 +55,23 @@ test_that("MPI CVLS Y convolution supertile is memory bounded and isolated", {
 
   expect_equal(lengths(regmatches(
     body,
-    gregexpr("alloc_tmatd\\(num_obs, block_size\\)", body, perl = TRUE)
-  )), 4L)
-  expect_equal(lengths(regmatches(
-    body,
-    gregexpr("np_optional_tmatd\\(num_obs, block_size\\)", body,
-             perl = TRUE)
-  )), 2L)
-  expect_match(body, "const int requested_group_width =", fixed = TRUE)
+    gregexpr("np_cvls_workspace_matrix_try\\(", body, perl = TRUE)
+  )), 6L)
+  expect_match(body, "&loo_work", fixed = TRUE)
+  expect_match(body, "&full_blocks[0]", fixed = TRUE)
+  expect_match(body, "&full_blocks[1]", fixed = TRUE)
+  expect_match(body, "&full_blocks[2]", fixed = TRUE)
+  expect_match(body, "&full_blocks[3]", fixed = TRUE)
+  expect_match(body, "&shared_y", fixed = TRUE)
+  expect_match(body, "int requested_group_width;", fixed = TRUE)
   expect_match(body, "MIN(4,", fixed = TRUE)
   expect_match(body, "int group_width = 2;", fixed = TRUE)
   expect_match(body, "int local_group_width = 2;", fixed = TRUE)
   expect_match(body, "local_group_width = 3;", fixed = TRUE)
   expect_match(body, "local_group_width = 4;", fixed = TRUE)
   expect_match(
-    gsub("[[:space:]]+", " ", body),
-    "MPI_Allreduce(&local_group_width, &group_width, 1, MPI_INT, MPI_MIN, comm[1]);",
+    body,
+    "np_cvls_workspace_collective_status(workspace_status)",
     fixed = TRUE
   )
   expect_false(grepl("alloc_vecd\\(block_size\\*block_size\\)", body))
@@ -133,7 +134,12 @@ test_that("MPI CVLS supertile retains rank ownership and block-order reduction",
   expect_equal(lengths(regmatches(
     body,
     gregexpr("MPI_Allreduce\\(", body, perl = TRUE)
-  )), 3L)
+  )), 2L)
+  expect_match(
+    body,
+    "np_cvls_workspace_collective_status(workspace_status)",
+    fixed = TRUE
+  )
   expect_equal(lengths(regmatches(
     body,
     gregexpr("np_blas_dgemm_tn_int\\(", body, perl = TRUE)
@@ -190,12 +196,12 @@ test_that("MPI CVLS supertile dispatch leaves no-gain and excluded routes intact
     fixed = TRUE
   )[[1L]]
   supertile_pos <- regexpr(
-    "return np_conditional_density_cvls_lp_supertile2_stream",
+    "np_conditional_density_cvls_lp_supertile2_stream",
     body,
     fixed = TRUE
   )[[1L]]
   allocation_pos <- regexpr(
-    "xblock = alloc_tmatd",
+    "np_cvls_workspace_matrix_try(num_obs",
     body,
     fixed = TRUE
   )[[1L]]

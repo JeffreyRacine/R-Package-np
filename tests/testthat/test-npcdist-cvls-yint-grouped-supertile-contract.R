@@ -38,14 +38,14 @@ test_that("MPI conditional-distribution grouped supertile is bounded and progres
   expect_match(body, "group_width = local_group_width;", fixed = TRUE)
   expect_equal(lengths(regmatches(
     body,
-    gregexpr("np_optional_tmatd\\(num_train, block_size\\)", body, perl = TRUE)
+    gregexpr("&xblocks\\[[123]\\]", body, perl = TRUE)
   )), 3L)
   expect_match(body, "if(requested_group_width >= 3)", fixed = TRUE)
   expect_match(body, "if(requested_group_width >= 4)", fixed = TRUE)
   expect_false(grepl("num_train\\s*\\*\\s*num_train", body, perl = TRUE))
 })
 
-test_that("MPI grouped supertile agrees on one allocation width across ranks", {
+test_that("MPI grouped supertile agrees on allocation capability across ranks", {
   src_file <- locate_mpi_cdist_grouped_supertile_source()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable")
   body <- mpi_cdist_grouped_supertile_body(readLines(src_file, warn = FALSE))
@@ -53,10 +53,14 @@ test_that("MPI grouped supertile agrees on one allocation width across ranks", {
 
   expect_match(
     flat,
-    "MPI_Allreduce(&local_group_width, &group_width, 1, MPI_INT, MPI_MIN, comm[1]);",
+    "workspace_status = np_cvls_workspace_collective_status(workspace_status);",
     fixed = TRUE
   )
-  expect_match(body, "if(group_width < 2)", fixed = TRUE)
+  expect_match(
+    body,
+    "workspace_status == NP_CVLS_WORKSPACE_UNAVAILABLE",
+    fixed = TRUE
+  )
   expect_match(body, "status = 2;", fixed = TRUE)
   expect_match(body, "first_block + g*owned_stride", fixed = TRUE)
   expect_match(body, "group_width*owned_stride", fixed = TRUE)

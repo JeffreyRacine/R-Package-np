@@ -39,9 +39,9 @@ test_that("adaptive cdist CVLS reuses one Y-integral tile across four X blocks",
     "double **xblocks[4] = {NULL, NULL, NULL, NULL};",
     fixed = TRUE
   )
-  expect_match(body, "xblocks[1] = np_optional_tmatd(", fixed = TRUE)
-  expect_match(body, "xblocks[2] = np_optional_tmatd(", fixed = TRUE)
-  expect_match(body, "xblocks[3] = np_optional_tmatd(", fixed = TRUE)
+  expect_match(body, "&xblocks[1]", fixed = TRUE)
+  expect_match(body, "&xblocks[2]", fixed = TRUE)
+  expect_match(body, "&xblocks[3]", fixed = TRUE)
   expect_match(body, "group_width = 2;", fixed = TRUE)
   expect_match(body, "group_width = 3;", fixed = TRUE)
   expect_match(body, "group_width = 4;", fixed = TRUE)
@@ -66,6 +66,16 @@ test_that("adaptive cdist CVLS supertile remains bounded and fallback-safe", {
   expect_match(body, "NPConditionalXRowCtx xctx = {0};", fixed = TRUE)
   expect_match(body, "NPConditionalYRowCtx yintctx = {0};", fixed = TRUE)
   expect_match(body, "np_blas_dgemm_tn_int(", fixed = TRUE)
+  expect_match(
+    body,
+    "workspace_status == NP_CVLS_WORKSPACE_UNAVAILABLE",
+    fixed = TRUE
+  )
+  expect_match(
+    body,
+    "return np_conditional_distribution_cvls_lp_row_stream",
+    fixed = TRUE
+  )
   expect_false(grepl("alloc_tmatd\\(num_train, num_train\\)", body))
   expect_false(grepl("malloc|calloc|realloc", body))
 })
