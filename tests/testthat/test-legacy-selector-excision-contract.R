@@ -26,6 +26,10 @@ test_that("retired density selectors cannot restore a second engine", {
     readLines(file.path(root, "src", "np.c"), warn = FALSE),
     collapse = "\n"
   )
+  registration <- paste(
+    readLines(file.path(root, "src", "np_init.c"), warn = FALSE),
+    collapse = "\n"
+  )
   r_sources <- paste(
     unlist(lapply(
       c(
@@ -57,6 +61,19 @@ test_that("retired density selectors cannot restore a second engine", {
   }
   expect_false(grepl("old.dens =", r_sources, fixed = TRUE))
   expect_false(grepl("old.cdens =", r_sources, fixed = TRUE))
+  expect_false(grepl("compare_old", native, fixed = TRUE))
+  expect_false(grepl("do_old", native, fixed = TRUE))
+  expect_false(grepl("mkChar(\"old\")", native, fixed = TRUE))
+  expect_match(
+    registration,
+    "{\"C_np_shadow_cv_density_conditional\",(DL_FUNC) &C_np_shadow_cv_density_conditional,20}",
+    fixed = TRUE
+  )
+  expect_match(
+    registration,
+    "{\"C_np_shadow_cv_distribution_conditional\",(DL_FUNC) &C_np_shadow_cv_distribution_conditional,23}",
+    fixed = TRUE
+  )
 
   expect_match(
     native,

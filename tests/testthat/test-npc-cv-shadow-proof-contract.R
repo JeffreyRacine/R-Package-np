@@ -82,7 +82,7 @@ shadow_safe_call <- function(name, ...) {
 }
 
 call_shadow_density <- function(bw, x, y, criterion = c("cv.ml", "cv.ls"),
-                                use_tree = FALSE, compare_old = TRUE) {
+                                use_tree = FALSE) {
   criterion <- match.arg(criterion)
   n <- nrow(x)
   shadow_safe_call(
@@ -102,14 +102,12 @@ call_shadow_density <- function(bw, x, y, criterion = c("cv.ml", "cv.ls"),
     shadow_reg_code(bw),
     shadow_degree(bw),
     isTRUE(bw$bernstein.basis.engine),
-    shadow_basis_code(bw$basis.engine),
-    compare_old
+    shadow_basis_code(bw$basis.engine)
   )
 }
 
 call_shadow_distribution <- function(bw, x, ytrain, yeval = ytrain,
-                                     use_tree = FALSE, cdfontrain = FALSE,
-                                     compare_old = TRUE) {
+                                     use_tree = FALSE, cdfontrain = FALSE) {
   n <- nrow(x)
   ne <- nrow(yeval)
   shadow_safe_call(
@@ -130,8 +128,7 @@ call_shadow_distribution <- function(bw, x, ytrain, yeval = ytrain,
     shadow_degree(bw),
     isTRUE(bw$bernstein.basis.engine),
     shadow_basis_code(bw$basis.engine),
-    cdfontrain,
-    compare_old
+    cdfontrain
   )
 }
 
@@ -160,7 +157,7 @@ test_that("shadow reset state is a harmless no-op when inactive", {
   expect_null(.Call("C_np_shadow_reset_state", PACKAGE = "np"))
 })
 
-test_that("shadow density lc matches legacy cv objectives", {
+test_that("shadow density lc proof matches the canonical objectives", {
   set.seed(42)
   n <- 40L
   x <- data.frame(x1 = runif(n), x2 = runif(n))
@@ -173,11 +170,11 @@ test_that("shadow density lc matches legacy cv objectives", {
     regtype = "lc"
   )
 
-  res_ml <- call_shadow_density(bw, x, y, criterion = "cv.ml", compare_old = TRUE)
-  res_ls <- call_shadow_density(bw, x, y, criterion = "cv.ls", compare_old = TRUE)
+  res_ml <- call_shadow_density(bw, x, y, criterion = "cv.ml")
+  res_ls <- call_shadow_density(bw, x, y, criterion = "cv.ls")
 
-  expect_equal(res_ml$new, res_ml$old, tolerance = 1e-12)
-  expect_equal(res_ls$new, res_ls$old, tolerance = 2e-3)
+  expect_equal(res_ml$proof, res_ml$prod, tolerance = 1e-12)
+  expect_equal(res_ls$proof, res_ls$prod, tolerance = 1e-12)
 })
 
 test_that("shadow density lp preserves ll canonicalization and tree parity", {
@@ -204,23 +201,23 @@ test_that("shadow density lp preserves ll canonicalization and tree parity", {
     degree = degree
   )
 
-  ll_ml <- call_shadow_density(bw.ll, x, y, criterion = "cv.ml", compare_old = FALSE)
-  lp_ml <- call_shadow_density(bw.lp, x, y, criterion = "cv.ml", compare_old = FALSE)
-  ll_ls <- call_shadow_density(bw.ll, x, y, criterion = "cv.ls", compare_old = FALSE)
-  lp_ls <- call_shadow_density(bw.lp, x, y, criterion = "cv.ls", compare_old = FALSE)
-  lp_ml_tree <- call_shadow_density(bw.lp, x, y, criterion = "cv.ml", use_tree = TRUE, compare_old = FALSE)
-  lp_ls_tree <- call_shadow_density(bw.lp, x, y, criterion = "cv.ls", use_tree = TRUE, compare_old = FALSE)
+  ll_ml <- call_shadow_density(bw.ll, x, y, criterion = "cv.ml")
+  lp_ml <- call_shadow_density(bw.lp, x, y, criterion = "cv.ml")
+  ll_ls <- call_shadow_density(bw.ll, x, y, criterion = "cv.ls")
+  lp_ls <- call_shadow_density(bw.lp, x, y, criterion = "cv.ls")
+  lp_ml_tree <- call_shadow_density(bw.lp, x, y, criterion = "cv.ml", use_tree = TRUE)
+  lp_ls_tree <- call_shadow_density(bw.lp, x, y, criterion = "cv.ls", use_tree = TRUE)
 
-  expect_equal(ll_ml$new, lp_ml$new, tolerance = 1e-12)
-  expect_equal(ll_ls$new, lp_ls$new, tolerance = 1e-12)
-  expect_equal(lp_ml_tree$new, lp_ml$new, tolerance = 1e-10)
-  expect_equal(lp_ls_tree$new, lp_ls$new, tolerance = 1e-12)
-  expect_equal(ll_ml$prod, ll_ml$new, tolerance = 1e-12)
-  expect_equal(lp_ml$prod, lp_ml$new, tolerance = 1e-12)
-  expect_equal(lp_ml_tree$prod, lp_ml_tree$new, tolerance = 1e-10)
-  expect_equal(ll_ls$prod, ll_ls$new, tolerance = 1e-12)
-  expect_equal(lp_ls$prod, lp_ls$new, tolerance = 1e-12)
-  expect_equal(lp_ls_tree$prod, lp_ls_tree$new, tolerance = 1e-12)
+  expect_equal(ll_ml$proof, lp_ml$proof, tolerance = 1e-12)
+  expect_equal(ll_ls$proof, lp_ls$proof, tolerance = 1e-12)
+  expect_equal(lp_ml_tree$proof, lp_ml$proof, tolerance = 1e-10)
+  expect_equal(lp_ls_tree$proof, lp_ls$proof, tolerance = 1e-12)
+  expect_equal(ll_ml$prod, ll_ml$proof, tolerance = 1e-12)
+  expect_equal(lp_ml$prod, lp_ml$proof, tolerance = 1e-12)
+  expect_equal(lp_ml_tree$prod, lp_ml_tree$proof, tolerance = 1e-10)
+  expect_equal(ll_ls$prod, ll_ls$proof, tolerance = 1e-12)
+  expect_equal(lp_ls$prod, lp_ls$proof, tolerance = 1e-12)
+  expect_equal(lp_ls_tree$prod, lp_ls_tree$proof, tolerance = 1e-12)
 })
 
 test_that("shadow density cvml preserves the large-kernel X collapse", {
@@ -237,10 +234,10 @@ test_that("shadow density cvml preserves the large-kernel X collapse", {
     regtype = "lc"
   )
 
-  res <- call_shadow_density(bw, x, y, criterion = "cv.ml", compare_old = FALSE)
+  res <- call_shadow_density(bw, x, y, criterion = "cv.ml")
   collapsed <- -n * log(mean(dnorm(outer(y$y1, y$y1, "-"), sd = big)))
 
-  expect_equal(res$new, collapsed, tolerance = 1e-9)
+  expect_equal(res$proof, collapsed, tolerance = 1e-9)
 })
 
 test_that("shadow density generalized-nn cvml preserves ll canonicalization", {
@@ -269,12 +266,12 @@ test_that("shadow density generalized-nn cvml preserves ll canonicalization", {
     degree = degree
   )
 
-  ll_ml <- call_shadow_density(bw.ll, x, y, criterion = "cv.ml", compare_old = FALSE)
-  lp_ml <- call_shadow_density(bw.lp, x, y, criterion = "cv.ml", compare_old = FALSE)
+  ll_ml <- call_shadow_density(bw.ll, x, y, criterion = "cv.ml")
+  lp_ml <- call_shadow_density(bw.lp, x, y, criterion = "cv.ml")
 
-  expect_true(is.finite(ll_ml$new))
-  expect_true(is.finite(lp_ml$new))
-  expect_equal(ll_ml$new, lp_ml$new, tolerance = 1e-10)
+  expect_true(is.finite(ll_ml$proof))
+  expect_true(is.finite(lp_ml$proof))
+  expect_equal(ll_ml$proof, lp_ml$proof, tolerance = 1e-10)
   expect_true(is.finite(ll_ml$prod))
   expect_true(is.finite(lp_ml$prod))
   expect_equal(ll_ml$prod, lp_ml$prod, tolerance = 1e-10)
@@ -306,15 +303,15 @@ test_that("shadow density generalized-nn LP cures the legacy penalty collapse", 
     degree = degree
   )
 
-  ll_ls <- call_shadow_density(bw.ll, x, y, criterion = "cv.ls", compare_old = FALSE)
-  lp_ls <- call_shadow_density(bw.lp, x, y, criterion = "cv.ls", compare_old = FALSE)
+  ll_ls <- call_shadow_density(bw.ll, x, y, criterion = "cv.ls")
+  lp_ls <- call_shadow_density(bw.lp, x, y, criterion = "cv.ls")
 
-  expect_true(is.finite(ll_ls$new))
-  expect_true(is.finite(lp_ls$new))
-  expect_equal(ll_ls$new, lp_ls$new, tolerance = 1e-10)
-  expect_equal(ll_ls$prod, ll_ls$new, tolerance = 1e-10)
-  expect_equal(lp_ls$prod, lp_ls$new, tolerance = 1e-10)
-  expect_gt(ll_ls$new, -1e6)
+  expect_true(is.finite(ll_ls$proof))
+  expect_true(is.finite(lp_ls$proof))
+  expect_equal(ll_ls$proof, lp_ls$proof, tolerance = 1e-10)
+  expect_equal(ll_ls$prod, ll_ls$proof, tolerance = 1e-10)
+  expect_equal(lp_ls$prod, lp_ls$proof, tolerance = 1e-10)
+  expect_gt(ll_ls$proof, -1e6)
 })
 
 test_that("shadow fixed-bandwidth X-side row helper matches dense oracle and leaves self out", {
@@ -558,8 +555,8 @@ test_that("shadow LP objectives are sensitive to degree on oracle cells", {
     basis = "glp",
     degree = rep.int(2L, ncol(x))
   )
-  dens.d1 <- call_shadow_density(bw.d1, x, y, criterion = "cv.ml", compare_old = FALSE)
-  dens.d2 <- call_shadow_density(bw.d2, x, y, criterion = "cv.ml", compare_old = FALSE)
+  dens.d1 <- call_shadow_density(bw.d1, x, y, criterion = "cv.ml")
+  dens.d2 <- call_shadow_density(bw.d2, x, y, criterion = "cv.ml")
 
   bw.c1 <- npcdistbw(
     xdat = x,
@@ -579,14 +576,14 @@ test_that("shadow LP objectives are sensitive to degree on oracle cells", {
     basis = "glp",
     degree = rep.int(2L, ncol(x))
   )
-  dist.d1 <- call_shadow_distribution(bw.c1, x, y, compare_old = FALSE)
-  dist.d2 <- call_shadow_distribution(bw.c2, x, y, compare_old = FALSE)
+  dist.d1 <- call_shadow_distribution(bw.c1, x, y)
+  dist.d2 <- call_shadow_distribution(bw.c2, x, y)
 
-  expect_gt(abs(dens.d2$new - dens.d1$new), 1e-6)
-  expect_gt(abs(dist.d2$new - dist.d1$new), 1e-8)
+  expect_gt(abs(dens.d2$proof - dens.d1$proof), 1e-6)
+  expect_gt(abs(dist.d2$proof - dist.d1$proof), 1e-8)
 })
 
-test_that("shadow distribution lc matches legacy cvls for both cdfontrain modes", {
+test_that("shadow distribution lc proof matches canonical CVLS", {
   set.seed(55)
   n <- 28L
   x <- data.frame(x1 = runif(n), x2 = runif(n))
@@ -599,11 +596,11 @@ test_that("shadow distribution lc matches legacy cvls for both cdfontrain modes"
     regtype = "lc"
   )
 
-  res_false <- call_shadow_distribution(bw, x, y, cdfontrain = FALSE, compare_old = TRUE)
-  res_true <- call_shadow_distribution(bw, x, y, cdfontrain = TRUE, compare_old = TRUE)
+  res_false <- call_shadow_distribution(bw, x, y, cdfontrain = FALSE)
+  res_true <- call_shadow_distribution(bw, x, y, cdfontrain = TRUE)
 
-  expect_equal(res_false$new, res_false$old, tolerance = 1e-12)
-  expect_equal(res_true$new, res_true$old, tolerance = 1e-12)
+  expect_equal(res_false$proof, res_false$prod, tolerance = 1e-12)
+  expect_equal(res_true$proof, res_true$prod, tolerance = 1e-12)
 })
 
 test_that("shadow distribution generalized-nn LP preserves ll canonicalization", {
@@ -632,14 +629,14 @@ test_that("shadow distribution generalized-nn LP preserves ll canonicalization",
     degree = degree
   )
 
-  dist.ll <- call_shadow_distribution(bw.ll, x, y, compare_old = FALSE)
-  dist.lp <- call_shadow_distribution(bw.lp, x, y, compare_old = FALSE)
+  dist.ll <- call_shadow_distribution(bw.ll, x, y)
+  dist.lp <- call_shadow_distribution(bw.lp, x, y)
 
-  expect_true(is.finite(dist.ll$new))
-  expect_true(is.finite(dist.lp$new))
-  expect_equal(dist.ll$new, dist.lp$new, tolerance = 1e-10)
-  expect_equal(dist.ll$prod, dist.ll$new, tolerance = 1e-10)
-  expect_equal(dist.lp$prod, dist.lp$new, tolerance = 1e-10)
+  expect_true(is.finite(dist.ll$proof))
+  expect_true(is.finite(dist.lp$proof))
+  expect_equal(dist.ll$proof, dist.lp$proof, tolerance = 1e-10)
+  expect_equal(dist.ll$prod, dist.ll$proof, tolerance = 1e-10)
+  expect_equal(dist.lp$prod, dist.lp$proof, tolerance = 1e-10)
 })
 
 test_that("shadow distribution lp preserves ll canonicalization and tree parity", {
@@ -666,14 +663,14 @@ test_that("shadow distribution lp preserves ll canonicalization and tree parity"
     degree = degree
   )
 
-  ll_res <- call_shadow_distribution(bw.ll, x, y, compare_old = FALSE)
-  lp_res <- call_shadow_distribution(bw.lp, x, y, compare_old = FALSE)
-  lp_tree <- call_shadow_distribution(bw.lp, x, y, use_tree = TRUE, compare_old = FALSE)
+  ll_res <- call_shadow_distribution(bw.ll, x, y)
+  lp_res <- call_shadow_distribution(bw.lp, x, y)
+  lp_tree <- call_shadow_distribution(bw.lp, x, y, use_tree = TRUE)
 
-  expect_equal(ll_res$new, lp_res$new, tolerance = 1e-12)
-  expect_equal(lp_tree$new, lp_res$new, tolerance = 1e-12)
-  expect_equal(ll_res$prod, ll_res$new, tolerance = 1e-12)
-  expect_equal(lp_res$prod, lp_res$new, tolerance = 1e-12)
+  expect_equal(ll_res$proof, lp_res$proof, tolerance = 1e-12)
+  expect_equal(lp_tree$proof, lp_res$proof, tolerance = 1e-12)
+  expect_equal(ll_res$prod, ll_res$proof, tolerance = 1e-12)
+  expect_equal(lp_res$prod, lp_res$proof, tolerance = 1e-12)
 })
 
 test_that("fixed-bandwidth cdist cvls LP stream avoids dense row storage", {
@@ -767,20 +764,20 @@ test_that("shadow density LP all-large fixed objectives stay exact and count fas
     bwmethod = "cv.ls"
   )
 
-  sh.ll.ml <- call_shadow_density(bw.ll.ml, x, y, criterion = "cv.ml", compare_old = FALSE)
-  sh.lp.ml <- call_shadow_density(bw.lp.ml, x, y, criterion = "cv.ml", compare_old = FALSE)
-  sh.ll.ls <- call_shadow_density(bw.ll.ls, x, y, criterion = "cv.ls", compare_old = FALSE)
-  sh.lp.ls <- call_shadow_density(bw.lp.ls, x, y, criterion = "cv.ls", compare_old = FALSE)
+  sh.ll.ml <- call_shadow_density(bw.ll.ml, x, y, criterion = "cv.ml")
+  sh.lp.ml <- call_shadow_density(bw.lp.ml, x, y, criterion = "cv.ml")
+  sh.ll.ls <- call_shadow_density(bw.ll.ls, x, y, criterion = "cv.ls")
+  sh.lp.ls <- call_shadow_density(bw.lp.ls, x, y, criterion = "cv.ls")
 
   ev.ll.ml <- np:::.npcdensbw_eval_only(x, y, bw.ll.ml)
   ev.lp.ml <- np:::.npcdensbw_eval_only(x, y, bw.lp.ml)
   ev.ll.ls <- np:::.npcdensbw_eval_only(x, y, bw.ll.ls)
   ev.lp.ls <- np:::.npcdensbw_eval_only(x, y, bw.lp.ls)
 
-  expect_equal(-ev.ll.ml$objective, sh.ll.ml$new, tolerance = 1e-10)
-  expect_equal(-ev.lp.ml$objective, sh.lp.ml$new, tolerance = 1e-10)
-  expect_equal(-ev.ll.ls$objective, sh.ll.ls$new, tolerance = 1e-10)
-  expect_equal(-ev.lp.ls$objective, sh.lp.ls$new, tolerance = 1e-10)
+  expect_equal(-ev.ll.ml$objective, sh.ll.ml$proof, tolerance = 1e-10)
+  expect_equal(-ev.lp.ml$objective, sh.lp.ml$proof, tolerance = 1e-10)
+  expect_equal(-ev.ll.ls$objective, sh.ll.ls$proof, tolerance = 1e-10)
+  expect_equal(-ev.lp.ls$objective, sh.lp.ls$proof, tolerance = 1e-10)
   expect_equal(ev.ll.ml$objective, ev.lp.ml$objective, tolerance = 1e-10)
   expect_equal(ev.ll.ls$objective, ev.lp.ls$objective, tolerance = 1e-10)
   expect_gt(ev.ll.ml$num.feval.fast, 0)
@@ -818,23 +815,21 @@ test_that("shadow distribution LP all-large fixed objective stays exact and coun
     x,
     y,
     yeval = y,
-    cdfontrain = TRUE,
-    compare_old = FALSE
+    cdfontrain = TRUE
   )
   sh.lp <- call_shadow_distribution(
     bw.lp,
     x,
     y,
     yeval = y,
-    cdfontrain = TRUE,
-    compare_old = FALSE
+    cdfontrain = TRUE
   )
 
   ev.ll <- np:::.npcdistbw_eval_only(x, y, bws = bw.ll, do.full.integral = TRUE)
   ev.lp <- np:::.npcdistbw_eval_only(x, y, bws = bw.lp, do.full.integral = TRUE)
 
-  expect_equal(ev.ll$objective, sh.ll$new, tolerance = 1e-10)
-  expect_equal(ev.lp$objective, sh.lp$new, tolerance = 1e-10)
+  expect_equal(ev.ll$objective, sh.ll$proof, tolerance = 1e-10)
+  expect_equal(ev.lp$objective, sh.lp$proof, tolerance = 1e-10)
   expect_equal(ev.ll$objective, ev.lp$objective, tolerance = 1e-10)
   expect_gt(ev.ll$num.feval.fast, 0)
   expect_gt(ev.lp$num.feval.fast, 0)

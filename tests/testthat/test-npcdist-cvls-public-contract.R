@@ -81,8 +81,7 @@ call_public_cdist_cvls_shadow <- function(bw, x, ytrain, yeval = ytrain, cdfontr
     integer(0),
     FALSE,
     0L,
-    cdfontrain,
-    TRUE
+    cdfontrain
   )
 }
 
@@ -95,7 +94,7 @@ public_cdist_eval_grid <- function(ydat, ngrid = 100L) {
   evy
 }
 
-test_that("public npcdistbw cv.ls keeps lc on the legacy objective", {
+test_that("public npcdistbw cv.ls lc matches the canonical objective", {
   set.seed(303)
   n <- 32L
   x <- data.frame(x1 = runif(n), x2 = runif(n))
@@ -111,7 +110,7 @@ test_that("public npcdistbw cv.ls keeps lc on the legacy objective", {
   )
   shadow <- call_public_cdist_cvls_shadow(bw.lc, x, y, yeval = public_cdist_eval_grid(y))
 
-  expect_equal(bw.lc$fval, shadow$old, tolerance = 1e-10)
+  expect_equal(bw.lc$fval, shadow$prod, tolerance = 1e-10)
 })
 
 test_that("public npcdistbw cv.ls fixed LP/LL route activates with ll == lp parity", {

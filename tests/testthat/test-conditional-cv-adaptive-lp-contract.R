@@ -104,8 +104,7 @@ call_adaptive_density_shadow <- function(bw, x, y, criterion = c("cv.ml", "cv.ls
     adaptive_shadow_regtype(bw),
     adaptive_shadow_degree(bw),
     isTRUE(bw$bernstein.basis.engine),
-    adaptive_shadow_basis(bw$basis.engine, bw$regtype.engine),
-    identical(bw$regtype.engine, "lc")
+    adaptive_shadow_basis(bw$basis.engine, bw$regtype.engine)
   )
 }
 
@@ -130,8 +129,7 @@ call_adaptive_distribution_shadow <- function(bw, x, ytrain, yeval = ytrain, cdf
     adaptive_shadow_degree(bw),
     isTRUE(bw$bernstein.basis.engine),
     adaptive_shadow_basis(bw$basis.engine, bw$regtype.engine),
-    cdfontrain,
-    identical(bw$regtype.engine, "lc")
+    cdfontrain
   )
 }
 
@@ -211,14 +209,14 @@ test_that("adaptive conditional density shadow CV LS activates LP production rou
   shadow.lp1 <- call_adaptive_density_shadow(bw.lp1, fixture$x, fixture$y, criterion = "cv.ls")
   shadow.lp2 <- call_adaptive_density_shadow(bw.lp2, fixture$x, fixture$y, criterion = "cv.ls")
 
-  expect_true(is.finite(shadow.ll$new))
-  expect_true(is.finite(shadow.lp1$new))
-  expect_true(is.finite(shadow.lp2$new))
+  expect_true(is.finite(shadow.ll$proof))
+  expect_true(is.finite(shadow.lp1$proof))
+  expect_true(is.finite(shadow.lp2$proof))
   expect_true(is.finite(shadow.lp1$prod))
-  expect_equal(shadow.ll$new, shadow.lp1$new, tolerance = 1e-10)
+  expect_equal(shadow.ll$proof, shadow.lp1$proof, tolerance = 1e-10)
   expect_equal(shadow.ll$prod, shadow.lp1$prod, tolerance = 1e-10)
-  expect_gt(abs(shadow.lc$new - shadow.lp1$new), 1e-6)
-  expect_gt(abs(shadow.lp2$new - shadow.lp1$new), 1e-6)
+  expect_gt(abs(shadow.lc$proof - shadow.lp1$proof), 1e-6)
+  expect_gt(abs(shadow.lp2$proof - shadow.lp1$proof), 1e-6)
 })
 
 test_that("adaptive conditional density shadow CV ML activates LP production route", {
@@ -233,14 +231,14 @@ test_that("adaptive conditional density shadow CV ML activates LP production rou
   shadow.lp1 <- call_adaptive_density_shadow(bw.lp1, fixture$x, fixture$y, criterion = "cv.ml")
   shadow.lp2 <- call_adaptive_density_shadow(bw.lp2, fixture$x, fixture$y, criterion = "cv.ml")
 
-  expect_true(is.finite(shadow.ll$new))
-  expect_true(is.finite(shadow.lp1$new))
-  expect_true(is.finite(shadow.lp2$new))
+  expect_true(is.finite(shadow.ll$proof))
+  expect_true(is.finite(shadow.lp1$proof))
+  expect_true(is.finite(shadow.lp2$proof))
   expect_true(is.finite(shadow.lp1$prod))
-  expect_equal(shadow.ll$new, shadow.lp1$new, tolerance = 1e-10)
+  expect_equal(shadow.ll$proof, shadow.lp1$proof, tolerance = 1e-10)
   expect_equal(shadow.ll$prod, shadow.lp1$prod, tolerance = 1e-10)
-  expect_gt(abs(shadow.lc$new - shadow.lp1$new), 1e-6)
-  expect_gt(abs(shadow.lp2$new - shadow.lp1$new), 1e-6)
+  expect_gt(abs(shadow.lc$proof - shadow.lp1$proof), 1e-6)
+  expect_gt(abs(shadow.lp2$proof - shadow.lp1$proof), 1e-6)
 })
 
 test_that("adaptive conditional distribution shadow CV LS activates LP production route", {
@@ -256,14 +254,14 @@ test_that("adaptive conditional distribution shadow CV LS activates LP productio
   shadow.lp1 <- call_adaptive_distribution_shadow(bw.lp1, fixture$x, fixture$y, yeval = yeval)
   shadow.lp2 <- call_adaptive_distribution_shadow(bw.lp2, fixture$x, fixture$y, yeval = yeval)
 
-  expect_true(is.finite(shadow.ll$new))
-  expect_true(is.finite(shadow.lp1$new))
-  expect_true(is.finite(shadow.lp2$new))
+  expect_true(is.finite(shadow.ll$proof))
+  expect_true(is.finite(shadow.lp1$proof))
+  expect_true(is.finite(shadow.lp2$proof))
   expect_true(is.finite(shadow.lp1$prod))
-  expect_equal(shadow.ll$new, shadow.lp1$new, tolerance = 1e-10)
-  expect_equal(shadow.lp1$new, shadow.lp1$prod, tolerance = 1e-10)
-  expect_gt(abs(shadow.lc$new - shadow.lp1$new), 1e-6)
-  expect_gt(abs(shadow.lp2$new - shadow.lp1$new), 1e-6)
+  expect_equal(shadow.ll$proof, shadow.lp1$proof, tolerance = 1e-10)
+  expect_equal(shadow.lp1$proof, shadow.lp1$prod, tolerance = 1e-10)
+  expect_gt(abs(shadow.lc$proof - shadow.lp1$proof), 1e-6)
+  expect_gt(abs(shadow.lp2$proof - shadow.lp1$proof), 1e-6)
 })
 
 test_that("adaptive public conditional density CV LS separates lc from LP while preserving ll canonicalization", {

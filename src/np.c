@@ -7266,25 +7266,23 @@ SEXP C_np_shadow_cv_density_conditional(SEXP tyuno,
                                         SEXP regtype,
                                         SEXP glp_degree,
                                         SEXP glp_bernstein,
-                                        SEXP glp_basis,
-                                        SEXP compare_old)
+                                        SEXP glp_basis)
 {
   SEXP tyuno_r=R_NilValue, tyord_r=R_NilValue, tycon_r=R_NilValue;
   SEXP txuno_r=R_NilValue, txord_r=R_NilValue, txcon_r=R_NilValue;
   SEXP rbw_r=R_NilValue, degree_i=R_NilValue;
-  SEXP out=R_NilValue, out_names=R_NilValue, out_old=R_NilValue, out_new=R_NilValue, out_prod=R_NilValue;
+  SEXP out=R_NilValue, out_names=R_NilValue, out_proof=R_NilValue, out_prod=R_NilValue;
   int nrow_yuno = 0, ncol_yuno = 0, nrow_yord = 0, ncol_yord = 0, nrow_ycon = 0, ncol_ycon = 0;
   int nrow_xuno = 0, ncol_xuno = 0, nrow_xord = 0, ncol_xord = 0, nrow_xcon = 0, ncol_xcon = 0;
   int num_obs = 0;
   int tree_flag = asLogical(use_tree);
-  int do_old = asLogical(compare_old);
   int criterion_i = asInteger(criterion);
   int int_large_sf_save = int_LARGE_SF;
   double nconfac_save = nconfac_extern;
   double ncatfac_save = ncatfac_extern;
   double *vector_continuous_stddev_save = vector_continuous_stddev_extern;
   double *shadow_continuous_stddev = NULL;
-  double old_cv = NA_REAL, new_cv = NA_REAL, prod_cv = NA_REAL;
+  double proof_cv = NA_REAL, prod_cv = NA_REAL;
   int i, nscale = 0;
   double *prod_vsf = NULL;
 
@@ -7466,7 +7464,12 @@ SEXP C_np_shadow_cv_density_conditional(SEXP tyuno,
     int_glp_basis_extern = 1;
   }
 
-  if(do_old && !tree_flag && (np_lp_engine_extern == NP_LP_ENGINE_SCALAR)){
+  /*
+   * Scalar shadow proofs exercise canonical generic helpers that consume the
+   * combined X/Y view. Build that linear-size view explicitly; it is context
+   * setup, not a second estimator or historical comparison engine.
+   */
+  if(np_lp_engine_extern == NP_LP_ENGINE_SCALAR){
     num_categories_extern = alloc_vecu(num_var_unordered_extern + num_var_ordered_extern +
                                        num_reg_unordered_extern + num_reg_ordered_extern);
     matrix_categorical_vals_extern = alloc_matd(num_obs, num_var_unordered_extern + num_var_ordered_extern +
@@ -7513,69 +7516,14 @@ SEXP C_np_shadow_cv_density_conditional(SEXP tyuno,
                           NULL, NULL, NULL,
                           NULL, NULL, num_categories_extern_XY,
                           NULL, NULL, matrix_categorical_vals_extern_XY);
-    if(criterion_i == CBWM_CVML){
-      if(np_kernel_estimate_con_density_categorical_leave_one_out_cv(KERNEL_den_extern,
-                                                                     KERNEL_den_unordered_extern,
-                                                                     KERNEL_den_ordered_extern,
-                                                                     KERNEL_reg_extern,
-                                                                     KERNEL_reg_unordered_extern,
-                                                                     KERNEL_reg_ordered_extern,
-                                                                     BANDWIDTH_den_extern,
-                                                                     num_obs_train_extern,
-                                                                     num_var_unordered_extern,
-                                                                     num_var_ordered_extern,
-                                                                     num_var_continuous_extern,
-                                                                     num_reg_unordered_extern,
-                                                                     num_reg_ordered_extern,
-                                                                     num_reg_continuous_extern,
-                                                                     matrix_Y_unordered_train_extern,
-                                                                     matrix_Y_ordered_train_extern,
-                                                                     matrix_Y_continuous_train_extern,
-                                                                     matrix_X_unordered_train_extern,
-                                                                     matrix_X_ordered_train_extern,
-                                                                     matrix_X_continuous_train_extern,
-                                                                     matrix_XY_unordered_train_extern,
-                                                                     matrix_XY_ordered_train_extern,
-                                                                     matrix_XY_continuous_train_extern,
-                                                                     REAL(rbw_r),
-                                                                     num_categories_extern,
-                                                                     &old_cv) != 0)
-        old_cv = NA_REAL;
-    } else if(criterion_i == CBWM_CVLS){
-      if(kernel_estimate_con_density_categorical_convolution_cv(KERNEL_den_extern,
-                                                                KERNEL_den_unordered_extern,
-                                                                KERNEL_den_ordered_extern,
-                                                                KERNEL_reg_extern,
-                                                                KERNEL_reg_unordered_extern,
-                                                                KERNEL_reg_ordered_extern,
-                                                                BANDWIDTH_den_extern,
-                                                                num_obs_train_extern,
-                                                                num_var_unordered_extern,
-                                                                num_var_ordered_extern,
-                                                                num_var_continuous_extern,
-                                                                num_reg_unordered_extern,
-                                                                num_reg_ordered_extern,
-                                                                num_reg_continuous_extern,
-                                                                matrix_Y_unordered_train_extern,
-                                                                matrix_Y_ordered_train_extern,
-                                                                matrix_Y_continuous_train_extern,
-                                                                matrix_X_unordered_train_extern,
-                                                                matrix_X_ordered_train_extern,
-                                                                matrix_X_continuous_train_extern,
-                                                                REAL(rbw_r),
-                                                                num_categories_extern,
-                                                                matrix_categorical_vals_extern,
-                                                                &old_cv) != 0)
-        old_cv = NA_REAL;
-    }
   }
 
   if(criterion_i == CBWM_CVML){
-    if(np_shadow_proof_cv_con_density_ml(REAL(rbw_r), &new_cv) != 0)
-      new_cv = NA_REAL;
+    if(np_shadow_proof_cv_con_density_ml(REAL(rbw_r), &proof_cv) != 0)
+      proof_cv = NA_REAL;
   } else if(criterion_i == CBWM_CVLS){
-    if(np_shadow_proof_cv_con_density_ls(REAL(rbw_r), &new_cv) != 0)
-      new_cv = NA_REAL;
+    if(np_shadow_proof_cv_con_density_ls(REAL(rbw_r), &proof_cv) != 0)
+      proof_cv = NA_REAL;
   } else {
     error("C_np_shadow_cv_density_conditional: unsupported criterion");
   }
@@ -7609,17 +7557,14 @@ SEXP C_np_shadow_cv_density_conditional(SEXP tyuno,
     }
   }
 
-  out_old = PROTECT(ScalarReal(old_cv));
-  out_new = PROTECT(ScalarReal(new_cv));
+  out_proof = PROTECT(ScalarReal(proof_cv));
   out_prod = PROTECT(ScalarReal(prod_cv));
-  out = PROTECT(allocVector(VECSXP, 3));
-  SET_VECTOR_ELT(out, 0, out_old);
-  SET_VECTOR_ELT(out, 1, out_new);
-  SET_VECTOR_ELT(out, 2, out_prod);
-  out_names = PROTECT(allocVector(STRSXP, 3));
-  SET_STRING_ELT(out_names, 0, mkChar("old"));
-  SET_STRING_ELT(out_names, 1, mkChar("new"));
-  SET_STRING_ELT(out_names, 2, mkChar("prod"));
+  out = PROTECT(allocVector(VECSXP, 2));
+  SET_VECTOR_ELT(out, 0, out_proof);
+  SET_VECTOR_ELT(out, 1, out_prod);
+  out_names = PROTECT(allocVector(STRSXP, 2));
+  SET_STRING_ELT(out_names, 0, mkChar("proof"));
+  SET_STRING_ELT(out_names, 1, mkChar("prod"));
   setAttrib(out, R_NamesSymbol, out_names);
 
   if(kdt_extern_X != NULL) free_kdtree(&kdt_extern_X);
@@ -7664,7 +7609,7 @@ SEXP C_np_shadow_cv_density_conditional(SEXP tyuno,
   np_shadow_state_active = 0;
   np_bwm_clear_deferred_error();
 
-  UNPROTECT(13);
+  UNPROTECT(12);
   return out;
 }
 
@@ -8561,27 +8506,25 @@ SEXP C_np_shadow_cv_distribution_conditional(SEXP tyuno,
                                              SEXP glp_degree,
                                              SEXP glp_bernstein,
                                              SEXP glp_basis,
-                                             SEXP cdfontrain,
-                                             SEXP compare_old)
+                                             SEXP cdfontrain)
 {
   SEXP tyuno_r=R_NilValue, tyord_r=R_NilValue, tycon_r=R_NilValue;
   SEXP eyuno_r=R_NilValue, eyord_r=R_NilValue, eycon_r=R_NilValue;
   SEXP txuno_r=R_NilValue, txord_r=R_NilValue, txcon_r=R_NilValue;
   SEXP rbw_r=R_NilValue, degree_i=R_NilValue;
-  SEXP out=R_NilValue, out_names=R_NilValue, out_old=R_NilValue, out_new=R_NilValue, out_prod=R_NilValue;
+  SEXP out=R_NilValue, out_names=R_NilValue, out_proof=R_NilValue, out_prod=R_NilValue;
   int nrow_tyuno = 0, ncol_tyuno = 0, nrow_tyord = 0, ncol_tyord = 0, nrow_tycon = 0, ncol_tycon = 0;
   int nrow_eyuno = 0, ncol_eyuno = 0, nrow_eyord = 0, ncol_eyord = 0, nrow_eycon = 0, ncol_eycon = 0;
   int nrow_xuno = 0, ncol_xuno = 0, nrow_xord = 0, ncol_xord = 0, nrow_xcon = 0, ncol_xcon = 0;
   int num_obs_train = 0, num_obs_eval = 0;
   int tree_flag = asLogical(use_tree);
-  int do_old = asLogical(compare_old);
   int int_large_sf_save = int_LARGE_SF;
   int cdfontrain_save = cdfontrain_extern;
   double nconfac_save = nconfac_extern;
   double ncatfac_save = ncatfac_extern;
   double *vector_continuous_stddev_save = vector_continuous_stddev_extern;
   double *shadow_continuous_stddev = NULL;
-  double old_cv = NA_REAL, new_cv = NA_REAL, prod_cv = NA_REAL;
+  double proof_cv = NA_REAL, prod_cv = NA_REAL;
   int i, nscale = 0;
   double *prod_vsf = NULL;
 
@@ -8753,7 +8696,12 @@ SEXP C_np_shadow_cv_distribution_conditional(SEXP tyuno,
     int_glp_basis_extern = 1;
   }
 
-  if(do_old && !tree_flag && (np_lp_engine_extern == NP_LP_ENGINE_SCALAR)){
+  /*
+   * The scalar distribution proof and canonical generic fallback consume a
+   * combined X/Y view. This linear-size context is shared input state, not a
+   * historical estimator or comparison route.
+   */
+  if(np_lp_engine_extern == NP_LP_ENGINE_SCALAR){
     num_categories_extern = alloc_vecu(num_var_unordered_extern + num_var_ordered_extern +
                                        num_reg_unordered_extern + num_reg_ordered_extern);
     matrix_categorical_vals_extern = alloc_matd(num_obs_train, num_var_unordered_extern + num_var_ordered_extern +
@@ -8784,44 +8732,10 @@ SEXP C_np_shadow_cv_distribution_conditional(SEXP tyuno,
       memcpy(matrix_XY_continuous_train_extern[i], matrix_X_continuous_train_extern[i], (size_t)num_obs_train*sizeof(double));
     for(i = 0; i < num_var_continuous_extern; i++)
       memcpy(matrix_XY_continuous_train_extern[num_reg_continuous_extern + i], matrix_Y_continuous_train_extern[i], (size_t)num_obs_train*sizeof(double));
-    if(np_kernel_estimate_con_distribution_categorical_leave_one_out_ls_cv(KERNEL_den_extern,
-                                                                           KERNEL_den_unordered_extern,
-                                                                           KERNEL_den_ordered_extern,
-                                                                           KERNEL_reg_extern,
-                                                                           KERNEL_reg_unordered_extern,
-                                                                           KERNEL_reg_ordered_extern,
-                                                                           BANDWIDTH_den_extern,
-                                                                           num_obs_train_extern,
-                                                                           num_obs_eval_extern,
-                                                                           num_var_unordered_extern,
-                                                                           num_var_ordered_extern,
-                                                                           num_var_continuous_extern,
-                                                                           num_reg_unordered_extern,
-                                                                           num_reg_ordered_extern,
-                                                                           num_reg_continuous_extern,
-                                                                           cdfontrain_extern,
-                                                                           dbl_memfac_ccdf_extern,
-                                                                           matrix_Y_unordered_train_extern,
-                                                                           matrix_Y_ordered_train_extern,
-                                                                           matrix_Y_continuous_train_extern,
-                                                                           matrix_X_unordered_train_extern,
-                                                                           matrix_X_ordered_train_extern,
-                                                                           matrix_X_continuous_train_extern,
-                                                                           matrix_XY_unordered_train_extern,
-                                                                           matrix_XY_ordered_train_extern,
-                                                                           matrix_XY_continuous_train_extern,
-                                                                           matrix_Y_unordered_eval_extern,
-                                                                           matrix_Y_ordered_eval_extern,
-                                                                           matrix_Y_continuous_eval_extern,
-                                                                           REAL(rbw_r),
-                                                                           num_categories_extern,
-                                                                           matrix_categorical_vals_extern,
-                                                                           &old_cv) != 0)
-      old_cv = NA_REAL;
   }
 
-  if(np_shadow_proof_cv_con_distribution_ls(REAL(rbw_r), &new_cv) != 0)
-    new_cv = NA_REAL;
+  if(np_shadow_proof_cv_con_distribution_ls(REAL(rbw_r), &proof_cv) != 0)
+    proof_cv = NA_REAL;
 
   if(np_conditional_lp_stream_engine_supported() &&
      ((BANDWIDTH_den_extern == BW_FIXED) || (BANDWIDTH_den_extern == BW_GEN_NN) ||
@@ -8841,17 +8755,14 @@ SEXP C_np_shadow_cv_distribution_conditional(SEXP tyuno,
     prod_vsf = NULL;
   }
 
-  out_old = PROTECT(ScalarReal(old_cv));
-  out_new = PROTECT(ScalarReal(new_cv));
+  out_proof = PROTECT(ScalarReal(proof_cv));
   out_prod = PROTECT(ScalarReal(prod_cv));
-  out = PROTECT(allocVector(VECSXP, 3));
-  SET_VECTOR_ELT(out, 0, out_old);
-  SET_VECTOR_ELT(out, 1, out_new);
-  SET_VECTOR_ELT(out, 2, out_prod);
-  out_names = PROTECT(allocVector(STRSXP, 3));
-  SET_STRING_ELT(out_names, 0, mkChar("old"));
-  SET_STRING_ELT(out_names, 1, mkChar("new"));
-  SET_STRING_ELT(out_names, 2, mkChar("prod"));
+  out = PROTECT(allocVector(VECSXP, 2));
+  SET_VECTOR_ELT(out, 0, out_proof);
+  SET_VECTOR_ELT(out, 1, out_prod);
+  out_names = PROTECT(allocVector(STRSXP, 2));
+  SET_STRING_ELT(out_names, 0, mkChar("proof"));
+  SET_STRING_ELT(out_names, 1, mkChar("prod"));
   setAttrib(out, R_NamesSymbol, out_names);
 
   if(kdt_extern_X != NULL) free_kdtree(&kdt_extern_X);
@@ -8895,7 +8806,7 @@ SEXP C_np_shadow_cv_distribution_conditional(SEXP tyuno,
   np_glp_cv_clear_extern();
   np_shadow_state_active = 0;
 
-  UNPROTECT(16);
+  UNPROTECT(15);
   return out;
 }
 

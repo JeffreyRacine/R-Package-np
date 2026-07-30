@@ -80,7 +80,7 @@ public_shadow_safe_call <- function(name, ...) {
   .Call(name, ..., PACKAGE = "np")
 }
 
-call_public_cvml_shadow <- function(bw, x, y, tree = FALSE, compare_old = TRUE) {
+call_public_cvml_shadow <- function(bw, x, y, tree = FALSE) {
   n <- nrow(x)
   public_shadow_safe_call(
     "C_np_shadow_cv_density_conditional",
@@ -99,12 +99,11 @@ call_public_cvml_shadow <- function(bw, x, y, tree = FALSE, compare_old = TRUE) 
     public_shadow_regtype(bw),
     public_shadow_degree(bw),
     isTRUE(bw$bernstein.basis.engine),
-    public_shadow_basis(bw$basis.engine, bw$regtype.engine),
-    compare_old
+    public_shadow_basis(bw$basis.engine, bw$regtype.engine)
   )
 }
 
-test_that("public npcdensbw cv.ml keeps lc on the legacy objective", {
+test_that("public npcdensbw cv.ml lc matches the canonical objective", {
   set.seed(202)
   n <- 32L
   x <- data.frame(x1 = runif(n), x2 = runif(n))
@@ -113,7 +112,7 @@ test_that("public npcdensbw cv.ml keeps lc on the legacy objective", {
   bw.lc <- npcdensbw(xdat = x, ydat = y, regtype = "lc", bwmethod = "cv.ml", nmulti = 1)
   shadow <- call_public_cvml_shadow(bw.lc, x, y)
 
-  expect_equal(-bw.lc$fval, shadow$old, tolerance = 1e-10)
+  expect_equal(-bw.lc$fval, shadow$prod, tolerance = 1e-10)
 })
 
 test_that("public npcdensbw cv.ml fixed LP/LL route activates with ll == lp parity", {

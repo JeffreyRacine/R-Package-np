@@ -174,11 +174,10 @@ test_that("admitted adaptive Gaussian CVML matches the dense signed-WLS oracle",
     as.integer(bw$degree.engine),
     as.integer(FALSE),
     as.integer(np:::npLpBasisCode(bw$basis.engine)),
-    FALSE,
     PACKAGE = "np"
   )
 
-  expect_true(is.finite(result$new))
+  expect_true(is.finite(result$proof))
   expect_true(is.finite(result$prod))
-  expect_equal(result$prod, result$new, tolerance = 5e-8)
+  expect_equal(result$prod, result$proof, tolerance = 5e-8)
 })
