@@ -11,6 +11,7 @@
 #ifdef MPI2
 
 #include "mpi.h"
+#include "np_native_safety.h"
 
 extern  int my_rank;
 extern  int source;
@@ -751,10 +752,13 @@ int int_k_nn, double *nn_distance)
 {
 
 #ifdef MPI2
-    int stride = (int)ceil((double) num_obs / (double) iNum_Processors);
-		int return_flag = 0;
-		int return_flag_MPI = 0;
-    if(stride < 1) stride = 1;
+    int stride = 0;
+    int return_flag = 0;
+    int return_flag_MPI = 0;
+    if(!np_int_ceil_div_nonnegative(num_obs, iNum_Processors, &stride))
+      return 1;
+    if(stride < 1)
+      stride = 1;
 
     int is, ie;
 #endif
@@ -831,10 +835,15 @@ int compute_nn_distance_train_eval(int num_obs_train,
                                    double *nn_distance){
 
 #ifdef MPI2
-    int stride = (int)ceil((double) num_obs_eval / (double) iNum_Processors);
-		int return_flag = 0;
-		int return_flag_MPI = 0;
-    if(stride < 1) stride = 1;
+    int stride = 0;
+    int return_flag = 0;
+    int return_flag_MPI = 0;
+    if(!np_int_ceil_div_nonnegative(num_obs_eval,
+                                    iNum_Processors,
+                                    &stride))
+      return 1;
+    if(stride < 1)
+      stride = 1;
     int is, ie;
 #endif
 
