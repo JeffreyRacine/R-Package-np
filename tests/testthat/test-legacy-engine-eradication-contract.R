@@ -71,3 +71,41 @@ test_that("legacy density translation unit and engines are absent", {
     1L
   )
 })
+
+test_that("conditional-density CVLS wrapper has no dormant second engine", {
+  root <- locate_engine_sources()
+  skip_if(is.null(root), "package sources unavailable")
+
+  lines <- readLines(file.path(root, "src", "jksum.c"), warn = FALSE)
+  start <- grep(
+    "^int np_kernel_estimate_con_density_categorical_leave_one_out_ls_cv\\(",
+    lines
+  )
+  stop <- grep(
+    "^static void np_lp_power2_moments_from_kernel_row\\(",
+    lines
+  )
+  expect_length(start, 1L)
+  expect_length(stop, 1L)
+  expect_gt(stop, start)
+
+  wrapper <- lines[start:(stop - 1L)]
+  expect_lt(length(wrapper), 60L)
+  expect_equal(
+    sum(grepl(
+      "return np_conditional_density_cvls_lp_stream(vector_scale_factor, cv);",
+      wrapper,
+      fixed = TRUE
+    )),
+    1L
+  )
+  expect_true(all(vapply(
+    c("BW_FIXED", "BW_GEN_NN", "BW_ADAP_NN"),
+    function(topology) any(grepl(topology, wrapper, fixed = TRUE)),
+    logical(1)
+  )))
+  expect_false(any(grepl(
+    "NP_GateOverrideCtx|np_gate_ctx_|alloc_matd|np_kernel_weighted_sum",
+    wrapper
+  )))
+})
