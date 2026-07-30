@@ -9251,14 +9251,12 @@ double  initd_dir)
 
 	#ifdef MPI2
 	int stride = 0;
-	int num_obs_eval_padded = 0;
-	if(!np_int_padded_count_nonnegative(num_obs_eval,
-	                                    iNum_Processors,
-	                                    1,
-	                                    &stride,
-	                                    &num_obs_eval_padded))
+	if(!np_int_ceil_div_nonnegative(num_obs_eval,
+	                                iNum_Processors,
+	                                &stride))
 		error("quantile evaluation partition exceeds native integer limits");
-	(void)num_obs_eval_padded;
+	if(stride < 1)
+		stride = 1;
 	#endif
 
 	if(gradient_compute == 1)
