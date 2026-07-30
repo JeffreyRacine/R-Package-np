@@ -14,6 +14,7 @@
 #ifdef MPI2
 
 #include "mpi.h"
+#include "np_native_safety.h"
 
 extern  int my_rank;
 extern  int source;
@@ -9249,8 +9250,15 @@ double  initd_dir)
 	double **matrix_bandwidth_reg = NULL;
 
 	#ifdef MPI2
-	int stride = (int)ceil((double) num_obs_eval / (double) iNum_Processors);
-	if(stride < 1) stride = 1;
+	int stride = 0;
+	int num_obs_eval_padded = 0;
+	if(!np_int_padded_count_nonnegative(num_obs_eval,
+	                                    iNum_Processors,
+	                                    1,
+	                                    &stride,
+	                                    &num_obs_eval_padded))
+		error("quantile evaluation partition exceeds native integer limits");
+	(void)num_obs_eval_padded;
 	#endif
 
 	if(gradient_compute == 1)
