@@ -93,6 +93,32 @@ np_int_ceil_div_nonnegative(int numerator, int denominator, int *result)
   return 1;
 }
 
+static inline int
+np_int_padded_count_nonnegative(int count,
+                                int partitions,
+                                int minimum_one_per_partition,
+                                int *stride,
+                                int *padded_count)
+{
+  int local_stride;
+  size_t padded_size;
+
+  if((stride == NULL) || (padded_count == NULL) ||
+     ((minimum_one_per_partition != 0) &&
+      (minimum_one_per_partition != 1)) ||
+     !np_int_ceil_div_nonnegative(count, partitions, &local_stride))
+    return 0;
+  if(minimum_one_per_partition && (local_stride == 0))
+    local_stride = 1;
+  if(!np_size_mul_checked((size_t)local_stride,
+                          (size_t)partitions,
+                          &padded_size) ||
+     !np_size_to_int_checked(padded_size, padded_count))
+    return 0;
+  *stride = local_stride;
+  return 1;
+}
+
 static inline NPNativeAllocStatus
 np_native_malloc_array(void **result, size_t count, size_t element_size)
 {
