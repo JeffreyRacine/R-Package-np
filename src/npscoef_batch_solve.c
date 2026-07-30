@@ -39,8 +39,9 @@ SEXP C_np_npscoef_batch_zero_solve(SEXP tww_r, SEXP tyw_r)
   if((TYPEOF(tww_r) != REALSXP) || (TYPEOF(tyw_r) != REALSXP))
     error("internal npscoef batch solve requires double arrays");
 
-  tww_dim = getAttrib(tww_r, R_DimSymbol);
-  tyw_dim = getAttrib(tyw_r, R_DimSymbol);
+  /* Protect each attribute result across the following allocating API call. */
+  tww_dim = PROTECT(getAttrib(tww_r, R_DimSymbol));
+  tyw_dim = PROTECT(getAttrib(tyw_r, R_DimSymbol));
   if((TYPEOF(tww_dim) != INTSXP) || (XLENGTH(tww_dim) != 3) ||
      (TYPEOF(tyw_dim) != INTSXP) || (XLENGTH(tyw_dim) != 2))
     error("internal npscoef batch solve received invalid dimensions");
@@ -86,19 +87,19 @@ SEXP C_np_npscoef_batch_zero_solve(SEXP tww_r, SEXP tyw_r)
 
     for(j = 0; j < gram_count; j++)
       if(!R_FINITE(gram_source[j])){
-        UNPROTECT(1);
+        UNPROTECT(3);
         return R_NilValue;
       }
     for(j = 0; j < (size_t)p; j++)
       if(!R_FINITE(rhs_source[j])){
-        UNPROTECT(1);
+        UNPROTECT(3);
         return R_NilValue;
       }
 
     anorm = F77_CALL(dlange)(&norm, &p, &p, gram_source, &p,
                              (double *)NULL FCONE);
     if(!R_FINITE(anorm) || (anorm <= 0.0)){
-      UNPROTECT(1);
+      UNPROTECT(3);
       return R_NilValue;
     }
 
@@ -106,33 +107,33 @@ SEXP C_np_npscoef_batch_zero_solve(SEXP tww_r, SEXP tyw_r)
     memcpy(rhs, rhs_source, (size_t)p*sizeof(double));
     F77_CALL(dgesv)(&p, &one, gram, &p, ipiv, rhs, &p, &info);
     if(info != 0){
-      UNPROTECT(1);
+      UNPROTECT(3);
       return R_NilValue;
     }
 
     for(j = 0; j < gram_count; j++)
       if(!R_FINITE(gram[j])){
-        UNPROTECT(1);
+        UNPROTECT(3);
         return R_NilValue;
       }
 
     F77_CALL(dgecon)(&norm, &p, gram, &p, &anorm, &rcond,
                      condition_work, ipiv, &info FCONE);
     if((info != 0) || !R_FINITE(rcond) || (rcond < DBL_EPSILON)){
-      UNPROTECT(1);
+      UNPROTECT(3);
       return R_NilValue;
     }
 
     for(j = 0; j < (size_t)p; j++){
       if(!R_FINITE(rhs[j])){
-        UNPROTECT(1);
+        UNPROTECT(3);
         return R_NilValue;
       }
       solution[j + (size_t)row*(size_t)p] = rhs[j];
     }
   }
 
-  UNPROTECT(1);
+  UNPROTECT(3);
   return answer;
 }
 
@@ -160,8 +161,9 @@ SEXP C_np_npscoef_batch_project(SEXP theta_r, SEXP wz_r)
   if((TYPEOF(theta_r) != REALSXP) || (TYPEOF(wz_r) != REALSXP))
     error("internal npscoef batch projection requires double matrices");
 
-  theta_dim = getAttrib(theta_r, R_DimSymbol);
-  wz_dim = getAttrib(wz_r, R_DimSymbol);
+  /* Protect each attribute result across the following allocating API call. */
+  theta_dim = PROTECT(getAttrib(theta_r, R_DimSymbol));
+  wz_dim = PROTECT(getAttrib(wz_r, R_DimSymbol));
   if((TYPEOF(theta_dim) != INTSXP) || (XLENGTH(theta_dim) != 2) ||
      (TYPEOF(wz_dim) != INTSXP) || (XLENGTH(wz_dim) != 2))
     error("internal npscoef batch projection received invalid dimensions");
@@ -192,6 +194,6 @@ SEXP C_np_npscoef_batch_project(SEXP theta_r, SEXP wz_r)
     }
   }
 
-  UNPROTECT(1);
+  UNPROTECT(3);
   return answer;
 }

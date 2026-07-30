@@ -118,3 +118,38 @@ test_that("npscoef batch projection rejects incompatible internal shapes", {
     "incompatible dimensions"
   )
 })
+
+test_that("npscoef native dimension attributes remain protected", {
+  candidates <- unique(c(
+    test_path("..", "..", "src", "npscoef_batch_solve.c"),
+    test_path("..", "..", "..", "src", "npscoef_batch_solve.c"),
+    file.path(Sys.getenv("R_PACKAGE_SOURCE", ""), "src",
+              "npscoef_batch_solve.c"),
+    file.path(getwd(), "src", "npscoef_batch_solve.c"),
+    file.path(getwd(), "..", "src", "npscoef_batch_solve.c")
+  ))
+  source_file <- candidates[nzchar(candidates) & file.exists(candidates)][1L]
+  skip_if(is.na(source_file), "source file unavailable")
+  source <- paste(readLines(source_file, warn = FALSE), collapse = "\n")
+
+  expect_match(
+    source,
+    "tww_dim = PROTECT(getAttrib(tww_r, R_DimSymbol));",
+    fixed = TRUE
+  )
+  expect_match(
+    source,
+    "tyw_dim = PROTECT(getAttrib(tyw_r, R_DimSymbol));",
+    fixed = TRUE
+  )
+  expect_match(
+    source,
+    "theta_dim = PROTECT(getAttrib(theta_r, R_DimSymbol));",
+    fixed = TRUE
+  )
+  expect_match(
+    source,
+    "wz_dim = PROTECT(getAttrib(wz_r, R_DimSymbol));",
+    fixed = TRUE
+  )
+})
