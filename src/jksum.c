@@ -968,8 +968,16 @@ double *kernel_sum)
 	double *py;
 
 #ifdef MPI2
-	int stride = (int)ceil((double) num_obs_eval / (double) iNum_Processors);
-	if(stride < 1) stride = 1;
+	int stride = 0;
+	int num_obs_eval_padded = 0;
+
+	if(!np_int_padded_count_nonnegative(num_obs_eval,
+	                                    iNum_Processors,
+	                                    1,
+	                                    &stride,
+	                                    &num_obs_eval_padded))
+		return 1;
+	(void)num_obs_eval_padded;
 #endif
 
 	/* Allocate memory for objects */
@@ -8561,6 +8569,12 @@ const int keep_kw_owner_local){
   int i, ii, j, kk, k, l, mstep, js, je, num_obs_eval_alloc, sum_element_length, ip;
   int status = 0;
   int do_psum, swap_xxt;
+#ifdef MPI2
+  int stride = 0;
+  int loop_stride = 0;
+  int num_obs_eval_padded = 0;
+  int num_obs_train_padded = 0;
+#endif
 
   int * permutation_kernel = NULL;
   int doscoreocg = do_score || do_ocg;
@@ -8570,6 +8584,27 @@ const int keep_kw_owner_local){
   const int no_bpso = (NULL == bpso);
 
   int p_nvar;
+  const int is_adaptive = (BANDWIDTH_reg == BW_ADAP_NN);
+
+#ifdef MPI2
+  if(!np_int_padded_count_nonnegative(num_obs_eval,
+                                      iNum_Processors,
+                                      1,
+                                      &stride,
+                                      &num_obs_eval_padded))
+    return 1;
+  if(is_adaptive){
+    if(!np_int_padded_count_nonnegative(num_obs_train,
+                                        iNum_Processors,
+                                        1,
+                                        &loop_stride,
+                                        &num_obs_train_padded))
+      return 1;
+  } else {
+    loop_stride = stride;
+    num_obs_train_padded = num_obs_eval_padded;
+  }
+#endif
 
   if(!np_runtime_tol_cache_ready)
     np_refresh_runtime_tolerances();
@@ -8616,7 +8651,6 @@ const int keep_kw_owner_local){
   /* Trees are currently not compatible with all operations */
   int np_ks_tree_use = (int_TREE == NP_TREE_TRUE);
   int any_convolution = 0;
-  int is_adaptive = (BANDWIDTH_reg == BW_ADAP_NN);
 
   int lod = 0;
 
@@ -8667,18 +8701,14 @@ const int keep_kw_owner_local){
 
 #ifdef MPI2
   // switch parallelisation strategies based on biggest stride
- 
-  int stride = MAX((int)ceil((double) num_obs_eval / (double) iNum_Processors),1);
-  int loop_stride = is_adaptive
-    ? MAX((int)ceil((double) num_obs_train / (double) iNum_Processors),1)
-    : stride;
-  num_obs_eval_alloc = suppress_parallel ? num_obs_eval : (stride*iNum_Processors);
+
+  num_obs_eval_alloc = suppress_parallel ? num_obs_eval : num_obs_eval_padded;
 
   int * igatherv = NULL, * idisplsv = NULL;
 
-  igatherv = (int *)malloc(iNum_Processors*sizeof(int));
+  igatherv = (int *)malloc((size_t)iNum_Processors*sizeof(int));
   if(igatherv == NULL) error("memory allocation failed");
-  idisplsv = (int *)malloc(iNum_Processors*sizeof(int));
+  idisplsv = (int *)malloc((size_t)iNum_Processors*sizeof(int));
   if(idisplsv == NULL) error("memory allocation failed");
 #else
   num_obs_eval_alloc = num_obs_eval;
@@ -8764,8 +8794,16 @@ const int keep_kw_owner_local){
 
 #ifdef MPI2
   if((kw != NULL) && (!suppress_parallel)){
-    const int kw_rows_alloc = is_adaptive ? loop_stride*iNum_Processors : num_obs_eval_alloc;
-    kw_work = (double *)calloc((size_t)kw_rows_alloc*(size_t)num_xt, sizeof(double));
+    const int kw_rows_alloc =
+      is_adaptive ? num_obs_train_padded : num_obs_eval_alloc;
+    size_t kw_count = 0U;
+    if(!np_size_mul_checked((size_t)kw_rows_alloc,
+                            (size_t)num_xt,
+                            &kw_count)){
+      status = KWSNP_ERR_BADINVOC;
+      goto cleanup;
+    }
+    kw_work = (double *)calloc(kw_count, sizeof(double));
     if(kw_work == NULL){
       status = KWSNP_ERR_BADINVOC;
       goto cleanup;
@@ -16663,11 +16701,22 @@ double * cv){
   size_t Nm = MIN((size_t)ceil(memfac*300000.0), (size_t)SIZE_MAX/10);
 
 #ifdef MPI2
-  int64_t stride_t = MAX((int64_t)ceil((double) num_obs_train / (double) iNum_Processors),1);
-  int64_t stride_e = MAX((int64_t)ceil((double) num_obs_eval / (double) iNum_Processors),1);
-  
-  num_obs_train_alloc = stride_t*iNum_Processors;
-  num_obs_eval_alloc = stride_e*iNum_Processors;
+  int partition_stride = 0;
+  int num_obs_train_padded = 0;
+  int num_obs_eval_padded = 0;
+  if(!np_int_padded_count_nonnegative(num_obs_train,
+                                      iNum_Processors,
+                                      1,
+                                      &partition_stride,
+                                      &num_obs_train_padded) ||
+     !np_int_padded_count_nonnegative(num_obs_eval,
+                                      iNum_Processors,
+                                      1,
+                                      &partition_stride,
+                                      &num_obs_eval_padded))
+    error("distribution CV partition exceeds native integer limits");
+  num_obs_train_alloc = (int64_t)num_obs_train_padded;
+  num_obs_eval_alloc = (int64_t)num_obs_eval_padded;
 #else
   num_obs_train_alloc = num_obs_train;
   num_obs_eval_alloc = num_obs_eval;
@@ -16688,9 +16737,16 @@ double * cv){
   }
 
 #ifdef MPI2
-  int64_t stride_wx = MAX((int64_t)ceil((double)wx / (double) iNum_Processors),1);
-
-  num_obs_wx_alloc = stride_wx*iNum_Processors;
+  int stride_wx_ignored = 0;
+  int num_obs_wx_padded = 0;
+  if((wx > (int64_t)INT_MAX) ||
+     !np_int_padded_count_nonnegative((int)wx,
+                                      iNum_Processors,
+                                      1,
+                                      &stride_wx_ignored,
+                                      &num_obs_wx_padded))
+    error("distribution CV block partition exceeds native integer limits");
+  num_obs_wx_alloc = (int64_t)num_obs_wx_padded;
 #else
   num_obs_wx_alloc = wx;
 #endif
@@ -16910,9 +16966,19 @@ double * cv){
     
 #ifdef MPI2
     {
-      const int64_t stride_local_eval = MAX((int64_t)ceil((double) dwx / (double) iNum_Processors), 1);
+      int stride_local_eval_int = 0;
+      int dwx_padded = 0;
+      if((dwx > (int64_t)INT_MAX) ||
+         !np_int_padded_count_nonnegative((int)dwx,
+                                          iNum_Processors,
+                                          1,
+                                          &stride_local_eval_int,
+                                          &dwx_padded))
+        error("distribution CV local block exceeds native integer limits");
+      const int64_t stride_local_eval = (int64_t)stride_local_eval_int;
       const int64_t js_local_eval = stride_local_eval * my_rank;
       const int64_t je_local_eval = MIN(dwx - 1, js_local_eval + stride_local_eval - 1);
+      (void)dwx_padded;
 
       if(use_continuous_q123){
 #if NP_ACCEL_GAUSS_COMPILED
@@ -20077,18 +20143,24 @@ double *SIGN){
   int ov_cont_from_cache = 0;
   int estimation_shortcut_done = 0;
 
-  operator = (int *)malloc(sizeof(int)*(num_reg_continuous+num_reg_unordered+num_reg_ordered));
-
-  for(i = 0; i < (num_reg_continuous+num_reg_unordered+num_reg_ordered); i++)
-    operator[i] = OP_NORMAL;
-
 #ifdef MPI2
-  int stride_e = MAX((int)ceil((double) num_obs_eval / (double) iNum_Processors),1);
-  int num_obs_eval_alloc = stride_e*iNum_Processors;
+  int stride_e = 0;
+  int num_obs_eval_alloc = 0;
+  if(!np_int_padded_count_nonnegative(num_obs_eval,
+                                      iNum_Processors,
+                                      1,
+                                      &stride_e,
+                                      &num_obs_eval_alloc))
+    error("regression evaluation partition exceeds native integer limits");
 
 #else
   int num_obs_eval_alloc = num_obs_eval;
 #endif
+
+  operator = (int *)malloc(sizeof(int)*(num_reg_continuous+num_reg_unordered+num_reg_ordered));
+
+  for(i = 0; i < (num_reg_continuous+num_reg_unordered+num_reg_ordered); i++)
+    operator[i] = OP_NORMAL;
 
   const int do_grad = (gradient != NULL); 
   const int do_gerr = (gradient_stderr != NULL);
@@ -31199,9 +31271,13 @@ double *cv){
   int num_obs_alloc;
 
 #ifdef MPI2
-  int stride_t = MAX((int)ceil((double) num_obs / (double) iNum_Processors),1);
-  
-  num_obs_alloc = stride_t*iNum_Processors;
+  int stride_t = 0;
+  if(!np_int_padded_count_nonnegative(num_obs,
+                                      iNum_Processors,
+                                      1,
+                                      &stride_t,
+                                      &num_obs_alloc))
+    error("density CV partition exceeds native integer limits");
 #else
   num_obs_alloc = num_obs;
 #endif
@@ -31562,9 +31638,13 @@ double *cv){
   int num_obs_alloc;
 
 #ifdef MPI2
-  int stride_t = MAX((int)ceil((double) num_obs / (double) iNum_Processors),1);
-  
-  num_obs_alloc = stride_t*iNum_Processors;
+  int stride_t = 0;
+  if(!np_int_padded_count_nonnegative(num_obs,
+                                      iNum_Processors,
+                                      1,
+                                      &stride_t,
+                                      &num_obs_alloc))
+    error("density convolution CV partition exceeds native integer limits");
 #else
   num_obs_alloc = num_obs;
 #endif
@@ -33557,9 +33637,13 @@ double * log_likelihood
   int num_obs_eval_alloc;
 
 #ifdef MPI2
-  int stride_t = MAX((int)ceil((double) num_obs_eval / (double) iNum_Processors),1);
-  
-  num_obs_eval_alloc = stride_t*iNum_Processors;
+  int stride_t = 0;
+  if(!np_int_padded_count_nonnegative(num_obs_eval,
+                                      iNum_Processors,
+                                      1,
+                                      &stride_t,
+                                      &num_obs_eval_alloc))
+    error("conditional evaluation partition exceeds native integer limits");
 #else
   num_obs_eval_alloc = num_obs_eval;
 #endif
