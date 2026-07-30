@@ -1152,7 +1152,6 @@ typedef struct {
   int num_reg_ordered;
   int num_var_ordered;
   int need_y_side;
-  int old_cdens;
   int penalty_mode;
   int glp_original_order;
   double penalty_multiplier;
@@ -4962,7 +4961,6 @@ static void np_conditional_density_nomad_shadow_clear_internal(void)
   np_conditional_density_nomad_shadow.num_reg_ordered = 0;
   np_conditional_density_nomad_shadow.num_var_ordered = 0;
   np_conditional_density_nomad_shadow.need_y_side = 0;
-  np_conditional_density_nomad_shadow.old_cdens = 0;
   np_conditional_density_nomad_shadow.penalty_mode = 0;
   np_conditional_density_nomad_shadow.glp_original_order = 0;
   np_conditional_density_nomad_shadow.penalty_multiplier = 0.0;
@@ -5203,7 +5201,8 @@ static int np_conditional_density_nomad_shadow_prepare_internal(double *c_uno,
   int_RESTART_FROM_MIN = RE_MIN_FALSE;
   int_MINIMIZE_IO = IO_MIN_TRUE;
   int_WEIGHTS = 0;
-  np_conditional_density_nomad_shadow.old_cdens = myopti[CBW_OLDI];
+  if (myopti[CBW_RESERVED_LEGACYI] != 0)
+    error("C_np_density_conditional_nomad_native_search: reserved legacy selector must be zero");
 
   ibwmfunc = myopti[CBW_MI];
   np_conditional_density_nomad_shadow.glp_original_order =
@@ -5626,31 +5625,15 @@ static int np_conditional_density_nomad_shadow_prepare_internal(double *c_uno,
                            matrix_X_continuous_train_extern,
                            matrix_Y_continuous_train_extern);
 
-  if (np_conditional_density_nomad_shadow.old_cdens) {
-    switch (ibwmfunc) {
-      case CBWM_CVML:
-        bwmfunc_raw = cv_func_con_density_categorical_ml;
-        break;
-      case CBWM_CVLS:
-        bwmfunc_raw = cv_func_con_density_categorical_ls;
-        break;
-      case CBWM_NPLS:
-        bwmfunc_raw = np_cv_func_con_density_categorical_ls;
-        break;
-      default:
-        error("np.c: invalid bandwidth selection method.");
-    }
-  } else {
-    switch (ibwmfunc) {
-      case CBWM_CVML:
-        bwmfunc_raw = np_cv_func_con_density_categorical_ml;
-        break;
-      case CBWM_CVLS:
-        bwmfunc_raw = np_cv_func_con_density_categorical_ls_npksum;
-        break;
-      default:
-        error("np.c: invalid bandwidth selection method.");
-    }
+  switch (ibwmfunc) {
+    case CBWM_CVML:
+      bwmfunc_raw = np_cv_func_con_density_categorical_ml;
+      break;
+    case CBWM_CVLS:
+      bwmfunc_raw = np_cv_func_con_density_categorical_ls_npksum;
+      break;
+    default:
+      error("np.c: invalid bandwidth selection method.");
   }
 
   bwm_num_reg_continuous = num_all_cvar;
@@ -11433,7 +11416,6 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   const char *bw_error_msg = NULL;
 
   int * ipt = NULL;  // point permutation, see tree.c
-  int old_bw;
 
 
   num_reg_unordered_extern = myopti[BW_NUNOI];
@@ -11473,7 +11455,8 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   int_MINIMIZE_IO = myopti[BW_MINIOI];
 
   itmax=myopti[BW_ITMAXI];
-  old_bw=myopti[BW_OLDBW];
+  if (myopti[BW_RESERVED_LEGACYI] != 0)
+    error("C_np_density_bw: reserved legacy selector must be zero");
   int_TREE_X = myopti[BW_DOTREEI];
   int_TREE_PROFILE_X = myopti[BW_DOTREEI];
   if(KERNEL_den_extern == NP_CKERNEL_COORDINATE_CODE) {
@@ -11707,24 +11690,12 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   /* Conduct direction set search */
 
   /* assign the function to be optimized */
-  if(old_bw){
-    switch(myopti[BW_MI]){
-    case BWM_CVML : bwmfunc = cv_func_density_categorical_ml; break;
-    case BWM_CVLS : bwmfunc = cv_func_density_categorical_ls; break;
-      //case BWM_CVML_NP : bwmfunc = cv_func_np_density_categorical_ml; break;
-    default : REprintf("np.c: invalid bandwidth selection method.");
-      bw_error_msg = "np.c: invalid bandwidth selection method.";
-      goto cleanup_np_density_bw;
-    }
-  } else {
-    switch(myopti[BW_MI]){
-    case BWM_CVML : bwmfunc = np_cv_func_density_categorical_ml; break;
-    case BWM_CVLS : bwmfunc = np_cv_func_density_categorical_ls; break;
-    default : REprintf("np.c: invalid bandwidth selection method.");
-      bw_error_msg = "np.c: invalid bandwidth selection method.";
-      goto cleanup_np_density_bw;
-    }
-
+  switch(myopti[BW_MI]){
+  case BWM_CVML : bwmfunc = np_cv_func_density_categorical_ml; break;
+  case BWM_CVLS : bwmfunc = np_cv_func_density_categorical_ls; break;
+  default : REprintf("np.c: invalid bandwidth selection method.");
+    bw_error_msg = "np.c: invalid bandwidth selection method.";
+    goto cleanup_np_density_bw;
   }
 
   if (bwm_use_transform &&
@@ -13158,7 +13129,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   int enforce_fixed_feasibility;
   int have_start_best, have_multistart_best;
   int itmax, iter;
-  int int_use_starting_values, ibwmfunc, old_cdens, scale_cat;
+  int int_use_starting_values, ibwmfunc, scale_cat;
   const char *bw_error_msg = NULL;
 
   int num_all_cvar, num_all_uvar, num_all_ovar;
@@ -13263,7 +13234,8 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 
   itmax=myopti[CBW_ITMAXI];
   int_WEIGHTS = 0;
-  old_cdens = myopti[CBW_OLDI];
+  if (myopti[CBW_RESERVED_LEGACYI] != 0)
+    error("C_np_density_conditional_bw: reserved legacy selector must be zero");
   int_TREE_XY = int_TREE_Y = int_TREE_X = myopti[CBW_TREEI];
   int_TREE_PROFILE_X = myopti[CBW_TREEI];
   if(KERNEL_reg_extern == NP_CKERNEL_COORDINATE_CODE ||
@@ -13352,9 +13324,6 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   ncatfac_extern = myoptd[CBW_NCATFD];
 
 /* Allocate memory for objects */
-
-  //if((BANDWIDTH_den_extern != BW_FIXED) && (ibwmfunc == CBWM_CVLS))
-  //old_cdens = 1;
 
   matrix_Y_unordered_train_extern = alloc_matd(num_obs_train_extern, num_var_unordered_extern);
   matrix_Y_ordered_train_extern = alloc_matd(num_obs_train_extern, num_var_ordered_extern);
@@ -13767,25 +13736,12 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 
   /* assign the function to be optimized */
 
-  /* 7/2/2010 */  
-  if(old_cdens){
-    switch(ibwmfunc){
-    case CBWM_CVML : bwmfunc = cv_func_con_density_categorical_ml; break;
-    case CBWM_CVLS : bwmfunc = cv_func_con_density_categorical_ls; break;
-    case CBWM_NPLS : bwmfunc = np_cv_func_con_density_categorical_ls;break;
-    case CBWM_CCDF : bwmfunc = cv_func_con_distribution_categorical_ccdf; break;
-    default : REprintf("np.c: invalid bandwidth selection method.");
-      bw_error_msg = "np.c: invalid bandwidth selection method.";
-      goto cleanup_np_density_conditional_bw;
-    }
-  } else {
-    switch(ibwmfunc){
-    case CBWM_CVML : bwmfunc = np_cv_func_con_density_categorical_ml; break;
-    case CBWM_CVLS : bwmfunc = np_cv_func_con_density_categorical_ls_npksum; break;
-    default : REprintf("np.c: invalid bandwidth selection method.");
-      bw_error_msg = "np.c: invalid bandwidth selection method.";
-      goto cleanup_np_density_conditional_bw;
-    }
+  switch(ibwmfunc){
+  case CBWM_CVML : bwmfunc = np_cv_func_con_density_categorical_ml; break;
+  case CBWM_CVLS : bwmfunc = np_cv_func_con_density_categorical_ls_npksum; break;
+  default : REprintf("np.c: invalid bandwidth selection method.");
+    bw_error_msg = "np.c: invalid bandwidth selection method.";
+    goto cleanup_np_density_conditional_bw;
   }
 
   if (bwm_use_transform &&
@@ -16406,13 +16362,11 @@ void np_density(double * tuno, double * tord, double * tcon,
                 double * ckerlb, double * ckerub){
 
 
-  double small = 1.0e-16;
   double * vector_scale_factor, * pdf, * pdf_stderr, log_likelihood = 0.0;
   double pad_num;
 
-  int itmax = 10000;
   int i,j;
-  int num_var, num_obs_eval_alloc, max_lev, train_is_eval, dens_or_dist, old_dens;
+  int num_var, num_obs_eval_alloc, max_lev, train_is_eval, dens_or_dist;
 
   int * ipt = NULL, * ipe = NULL;
   
@@ -16449,7 +16403,8 @@ void np_density(double * tuno, double * tord, double * tcon,
   ncatfac_extern = *ncatfac;
 
   dens_or_dist = myopti[DEN_DODENI];
-  old_dens = myopti[DEN_OLDI];
+  if (myopti[DEN_RESERVED_LEGACYI] != 0)
+    error("C_np_density: reserved legacy selector must be zero");
   int_TREE_X = myopti[DEN_TREEI];
   int_TREE_PROFILE_X = myopti[DEN_TREEI];
 
@@ -16597,86 +16552,34 @@ void np_density(double * tuno, double * tord, double * tcon,
 
   /* Conduct estimation */
   
-  if(old_dens){
-    if (dens_or_dist == NP_DO_DENS){
-      /* nb - KERNEL_(|un)ordered_den are set to zero upon declaration 
-         - they have only one kernel type each at the moment */
-      kernel_estimate_density_categorical(KERNEL_den_extern,
-                                          KERNEL_den_unordered_extern,
-                                          KERNEL_den_ordered_extern,
-                                          BANDWIDTH_den_extern,
-                                          num_obs_train_extern,
-                                          num_obs_eval_extern,
-                                          num_reg_unordered_extern,
-                                          num_reg_ordered_extern,
-                                          num_reg_continuous_extern,
-                                          /* Train */
-                                          matrix_X_unordered_train_extern,
-                                          matrix_X_ordered_train_extern,
-                                          matrix_X_continuous_train_extern,
-                                          /* Eval */
-                                          matrix_X_unordered_eval_extern,
-                                          matrix_X_ordered_eval_extern,
-                                          matrix_X_continuous_eval_extern,
-                                          &vector_scale_factor[1],
-                                          num_categories_extern,
-                                          pdf,
-                                          pdf_stderr,
-                                          &log_likelihood);
-    } else if (dens_or_dist == NP_DO_DIST) {
-      kernel_estimate_distribution_categorical(KERNEL_den_extern,
-                                               KERNEL_den_unordered_extern,
-                                               KERNEL_den_ordered_extern,
-                                               BANDWIDTH_den_extern,
-                                               num_obs_train_extern,
-                                               num_obs_eval_extern,
-                                               num_reg_unordered_extern,
-                                               num_reg_ordered_extern,
-                                               num_reg_continuous_extern,
-                                               /* Train */
-                                               matrix_X_unordered_train_extern,
-                                               matrix_X_ordered_train_extern,
-                                               matrix_X_continuous_train_extern,
-                                               /* Eval */
-                                               matrix_X_unordered_eval_extern,
-                                               matrix_X_ordered_eval_extern,
-                                               matrix_X_continuous_eval_extern,
-                                               &vector_scale_factor[1],
-                                               num_categories_extern,
-                                               matrix_categorical_vals_extern,
-                                               pdf,
-                                               pdf_stderr,
-                                               small, itmax);
-
-    }
-  } else {
+  {
     const int dop = (dens_or_dist == NP_DO_DENS) ? OP_NORMAL : OP_INTEGRAL;
 
-      np_progress_fit_set_offset(0);
-      kernel_estimate_dens_dist_categorical_np(KERNEL_den_extern,
-                                               KERNEL_den_unordered_extern,
-                                               KERNEL_den_ordered_extern,
-                                               BANDWIDTH_den_extern,
-                                               num_obs_train_extern,
-                                               num_obs_eval_extern,
-                                               num_reg_unordered_extern,
-                                               num_reg_ordered_extern,
-                                               num_reg_continuous_extern,
-                                               dop,
-                                               /* Train */
-                                               matrix_X_unordered_train_extern,
-                                               matrix_X_ordered_train_extern,
-                                               matrix_X_continuous_train_extern,
-                                               /* Eval */
-                                               matrix_X_unordered_eval_extern,
-                                               matrix_X_ordered_eval_extern,
-                                               matrix_X_continuous_eval_extern,
-                                               &vector_scale_factor[1],
-                                               num_categories_extern,
-                                               matrix_categorical_vals_extern,
-                                               pdf,
-                                               pdf_stderr,
-                                               &log_likelihood);
+    np_progress_fit_set_offset(0);
+    kernel_estimate_dens_dist_categorical_np(KERNEL_den_extern,
+                                             KERNEL_den_unordered_extern,
+                                             KERNEL_den_ordered_extern,
+                                             BANDWIDTH_den_extern,
+                                             num_obs_train_extern,
+                                             num_obs_eval_extern,
+                                             num_reg_unordered_extern,
+                                             num_reg_ordered_extern,
+                                             num_reg_continuous_extern,
+                                             dop,
+                                             /* Train */
+                                             matrix_X_unordered_train_extern,
+                                             matrix_X_ordered_train_extern,
+                                             matrix_X_continuous_train_extern,
+                                             /* Eval */
+                                             matrix_X_unordered_eval_extern,
+                                             matrix_X_ordered_eval_extern,
+                                             matrix_X_continuous_eval_extern,
+                                             &vector_scale_factor[1],
+                                             num_categories_extern,
+                                             matrix_categorical_vals_extern,
+                                             pdf,
+                                             pdf_stderr,
+                                             &log_likelihood);
   }
   
   

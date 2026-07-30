@@ -472,7 +472,7 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 4, 8, 12 };
 #define BW_NUNOI 13
 #define BW_NORDI 14
 #define BW_NCONI 15
-#define BW_OLDBW 16
+#define BW_RESERVED_LEGACYI 16
 #define BW_DOTREEI 17
 #define BW_SCATI 18
 #define BW_DFC_DIRI 19
@@ -571,7 +571,7 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 4, 8, 12 };
 #define CBW_UNUNOI 19
 #define CBW_UNORDI 20
 #define CBW_UNCONI 21
-#define CBW_OLDI 22
+#define CBW_RESERVED_LEGACYI 22
 #define CBW_TREEI 23
 #define CBW_SCATI 24
 #define CBW_DFC_DIRI 25
@@ -716,7 +716,7 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 4, 8, 12 };
 #define DEN_TISEI 11
 #define DEN_MLEVI 12
 #define DEN_DODENI 13
-#define DEN_OLDI 14
+#define DEN_RESERVED_LEGACYI 14
 #define DEN_TREEI 15
 #define DEN_CKFAMILYI 16
 #define DEN_CKORDERI 17

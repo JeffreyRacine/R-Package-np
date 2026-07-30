@@ -220,7 +220,7 @@ npudens.bandwidth <-
     no.e = no.e,
     mcv.numRow = attr(bws$xmcv, "num.row"),
       densOrDist = NP_DO_DENS,
-      old.dens = FALSE,
+      reserved.legacy = FALSE,
       int_do_tree = if (beta.kernel) DO_TREE_NO else
         npDoTreeOrCategoricalCompress(ncon = bws$ncon,
                                       ncat = bws$nuno + bws$nord,

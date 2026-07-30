@@ -273,7 +273,7 @@ npudensbw.NULL <-
     nuno = dim(duno)[2L],
     nord = dim(dord)[2L],
     ncon = dim(dcon)[2L],
-    old.dens = FALSE,
+    reserved.legacy = FALSE,
     int_do_tree = npDoTreeOrCategoricalCompress(
       ncon = dim(dcon)[2L],
       ncat = dim(duno)[2L] + dim(dord)[2L],
@@ -854,7 +854,7 @@ npudensbw.bandwidth <-
         nuno = dim(duno)[2],
         nord = dim(dord)[2],
         ncon = dim(dcon)[2],
-        old.dens = FALSE,
+        reserved.legacy = FALSE,
         int_do_tree = npDoTreeOrCategoricalCompress(
           ncon = dim(dcon)[2],
           ncat = dim(duno)[2] + dim(dord)[2],

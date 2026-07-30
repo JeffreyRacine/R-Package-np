@@ -658,7 +658,7 @@ npcdensbw.conbandwidth <-
         xnuno = dim(xuno)[2],
         xnord = dim(xord)[2],
         xncon = dim(xcon)[2],
-        old.cdens = FALSE,
+        reserved.legacy = FALSE,
         int_do_tree = .npcdensbw_tree_code(
           bws = bws,
           ncon = dim(ycon)[2] + dim(xcon)[2],
@@ -1276,7 +1276,7 @@ npcdensbw.conbandwidth <-
     xnuno = dim(xuno)[2],
     xnord = dim(xord)[2],
     xncon = dim(xcon)[2],
-    old.cdens = FALSE,
+    reserved.legacy = FALSE,
     int_do_tree = .npcdensbw_tree_code(
       bws = bws,
       ncon = dim(ycon)[2] + dim(xcon)[2],
@@ -1755,7 +1755,7 @@ npRmpiNomadShadowClearConditionalDensity <- function() {
     xnuno = dim(xuno)[2],
     xnord = dim(xord)[2],
     xncon = dim(xcon)[2],
-    old.cdens = FALSE,
+    reserved.legacy = FALSE,
     int_do_tree = .npcdensbw_tree_code(
       bws = bws,
       ncon = dim(ycon)[2] + dim(xcon)[2],
