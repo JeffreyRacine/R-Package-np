@@ -726,17 +726,18 @@ test_that("conditional CV large-kernel gating keeps Y and XY activation routes l
   expect_equal(sum(grepl("^\\s*gate_xy_active = 0;\\s*$", lines)), 0L)
 })
 
-test_that("conditional public LP CV routes stay thin kernelcv dispatches", {
+test_that("conditional public LP CV routes have one kernelcv dispatch", {
   src_file <- locate_kernelcv_c()
   skip_if(is.null(src_file), "source file src/kernelcv.c unavailable in this test context")
 
   lines <- readLines(src_file, warn = FALSE)
 
-  expect_equal(sum(grepl("^double cv_func_con_density_categorical_ml\\(", lines)), 1L)
-  expect_equal(sum(grepl("^double cv_func_con_density_categorical_ls\\(", lines)), 1L)
+  expect_equal(sum(grepl("^double cv_func_con_density_categorical_ml\\(", lines)), 0L)
+  expect_equal(sum(grepl("^double cv_func_con_density_categorical_ls\\(", lines)), 0L)
   expect_equal(sum(grepl("^double cv_func_con_distribution_categorical_ls\\(", lines)), 1L)
   expect_equal(sum(grepl("^double np_cv_func_con_density_categorical_ml\\(", lines)), 1L)
-  expect_equal(sum(grepl("^double np_cv_func_con_density_categorical_ls\\(", lines)), 1L)
+  expect_equal(sum(grepl("^double np_cv_func_con_density_categorical_ls\\(", lines)), 0L)
+  expect_equal(sum(grepl("^double np_cv_func_con_density_categorical_ls_npksum\\(", lines)), 1L)
   expect_false(any(grepl("np_shadow_proof_cv_con_density_ml\\(", lines)))
   expect_false(any(grepl("np_shadow_proof_cv_con_density_ls\\(", lines)))
   expect_false(any(grepl("np_shadow_proof_cv_con_distribution_ls\\(", lines)))
