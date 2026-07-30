@@ -277,38 +277,66 @@ int np_lp_solve_workspace_solve_factored(NPLPSolveWorkspace *workspace,
  * retains signed higher-order kernel weights, and prevents width one from
  * allocating solver storage or entering LAPACK.
  */
-int np_lp_width_one_influence_row(const double *basis_train,
-                                  int n,
-                                  const double *kw,
-                                  double basis_eval,
-                                  double *row_out,
-                                  size_t output_stride)
+NPLPWidthOneStatus np_lp_width_one_influence_row(
+  const double *basis_train,
+  int n,
+  const double *kw,
+  double basis_eval,
+  double *row_out,
+  size_t output_stride)
 {
   double denominator = 0.0;
   double projection;
+  double ridge_total = 0.0;
   int i;
 
   if((basis_train == NULL) || (kw == NULL) || (row_out == NULL) ||
      (n <= 0) || (output_stride == 0U))
-    return 1;
+    return NP_LP_WIDTH_ONE_INVALID;
 
   for(i = 0; i < n; i++){
     const double zi = basis_train[i];
     denominator += kw[i]*zi*zi;
   }
 
+  if(!R_FINITE(denominator) || !R_FINITE(basis_eval))
+    return NP_LP_WIDTH_ONE_NONFINITE;
+
   projection = basis_eval/denominator;
-  if(!R_FINITE(projection))
-    return 1;
+  if(!R_FINITE(projection)){
+    const double ridge_increment = 1.0/(double)n;
+    int solved = 0;
+
+    for(i = 0; i < NP_LP_SOLVE_MAX_RIDGE_STEPS; i++){
+      denominator += ridge_increment;
+      ridge_total += ridge_increment;
+      projection = basis_eval/denominator;
+      if(R_FINITE(projection)){
+        solved = 1;
+        break;
+      }
+    }
+    if(!solved)
+      return NP_LP_WIDTH_ONE_RIDGE_FAILED;
+
+    {
+      double correction_denominator = denominator;
+      if(fabs(correction_denominator) < DBL_MIN)
+        correction_denominator = DBL_MIN;
+      projection *= 1.0 + ridge_total/correction_denominator;
+    }
+    if(!R_FINITE(projection))
+      return NP_LP_WIDTH_ONE_RIDGE_FAILED;
+  }
 
   for(i = 0; i < n; i++){
     const double value = kw[i]*basis_train[i]*projection;
     if(!R_FINITE(value))
-      return 1;
+      return NP_LP_WIDTH_ONE_NONFINITE;
     row_out[(size_t)i*output_stride] = value;
   }
 
-  return 0;
+  return NP_LP_WIDTH_ONE_OK;
 }
 
 void np_lp_full_row_workspace_init(NPLPFullRowWorkspace *workspace)

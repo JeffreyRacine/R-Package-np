@@ -77,6 +77,43 @@ SEXP C_np_lc_hat_normalize(SEXP kw, SEXP denominator)
   return out;
 }
 
+static SEXP np_reghat_width_one_matrix(SEXP kw,
+                                       SEXP wtrain,
+                                       SEXP weval,
+                                       const int ntrain,
+                                       const int neval)
+{
+  SEXP out = PROTECT(allocMatrix(REALSXP, neval, ntrain));
+
+  for(int j = 0; j < neval; j++){
+    const double * const weights = REAL(kw) + (size_t)j*(size_t)ntrain;
+    NPLPWidthOneStatus status;
+
+    if((j == 0) || (j + 1 == neval) || ((j % 32) == 0))
+      R_CheckUserInterrupt();
+
+    status = np_lp_width_one_influence_row(
+      REAL(wtrain),
+      ntrain,
+      weights,
+      REAL(weval)[j],
+      REAL(out) + j,
+      (size_t)neval
+    );
+
+    if(status == NP_LP_WIDTH_ONE_OK)
+      continue;
+    if(status == NP_LP_WIDTH_ONE_NONFINITE)
+      error("LP solve failed in compiled hat-matrix path: non-finite system");
+    if(status == NP_LP_WIDTH_ONE_RIDGE_FAILED)
+      error("LP solve failed in compiled hat-matrix path after bounded ridging");
+    error("invalid width-one compiled hat-matrix input");
+  }
+
+  UNPROTECT(1);
+  return out;
+}
+
 static int np_reghat_solve_system(const int nterms,
                                   const double * const matrix,
                                   const double * const rhs,
@@ -91,14 +128,6 @@ static int np_reghat_solve_system(const int nterms,
   int info = 0;
   double anorm = 0.0;
   double rcond = 0.0;
-
-  if(nterms == 1){
-    const double scalar_solution = rhs[0]/matrix[0];
-    if(!isfinite(scalar_solution))
-      return 0;
-    solution[0] = scalar_solution;
-    return 1;
-  }
 
   memcpy(matrix_work, matrix,
          (size_t)nterms*(size_t)nterms*sizeof(double));
@@ -161,6 +190,9 @@ SEXP C_np_reghat_lp_matrix_fast(SEXP kw, SEXP wtrain, SEXP weval)
     return R_NilValue;
 
   neval = kw_neval;
+  if(nterms == 1)
+    return np_reghat_width_one_matrix(kw, wtrain, weval, ntrain, neval);
+
   if(((size_t)nterms > SIZE_MAX/sizeof(double)) ||
      ((size_t)ntrain > SIZE_MAX/((size_t)nterms*sizeof(double))) ||
      ((size_t)nterms > SIZE_MAX/((size_t)nterms*sizeof(double))) ||
@@ -192,15 +224,6 @@ SEXP C_np_reghat_lp_matrix_fast(SEXP kw, SEXP wtrain, SEXP weval)
 
     if((j == 0) || (j + 1 == neval) || ((j % 32) == 0))
       R_CheckUserInterrupt();
-
-    if((nterms == 1) &&
-       (np_lp_width_one_influence_row(REAL(wtrain),
-                                      ntrain,
-                                      weights,
-                                      REAL(weval)[j],
-                                      REAL(out) + j,
-                                      (size_t)neval) == 0))
-      continue;
 
     for(int term = 0; term < nterms; term++){
       const double * const src = REAL(wtrain) + (size_t)term*(size_t)ntrain;
