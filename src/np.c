@@ -45,6 +45,7 @@ extern MPI_Comm	*comm;
 /* headers.h has all definitions of routines used by main() and related modules */
 
 #include "headers.h"
+#include "np_native_safety.h"
 #include "beta_kernelsum.h"
 #include "beta_bandwidth.h"
 #include "beta_regression.h"
@@ -71,6 +72,38 @@ np_bandwidth_kernel_descriptor_or_error(int family,
 
 // categorical hashing
 #include "hash.h"
+
+#ifdef MPI2
+static int
+np_mpi_padded_count_or_error(int count, const char *where)
+{
+  int stride;
+  int padded_count;
+
+  if(!np_int_padded_count_nonnegative(count,
+                                      iNum_Processors,
+                                      1,
+                                      &stride,
+                                      &padded_count))
+    error("%s: evaluation partition exceeds native integer limits", where);
+  return padded_count;
+}
+
+static int
+np_mpi_partition_stride_or_error(int count, const char *where)
+{
+  int stride;
+  int padded_count;
+
+  if(!np_int_padded_count_nonnegative(count,
+                                      iNum_Processors,
+                                      1,
+                                      &stride,
+                                      &padded_count))
+    error("%s: evaluation partition exceeds native integer limits", where);
+  return stride;
+}
+#endif
 
 static void *np_nomad_callback_calloc(size_t count, size_t size)
 {
@@ -15646,7 +15679,9 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
   operator = (dens_or_dist == NP_DO_DENS) ? OP_NORMAL : OP_INTEGRAL;
 
 #ifdef MPI2
-  num_obs_eval_alloc = MAX(ceil((double) num_obs_eval_extern / (double) iNum_Processors),1)*iNum_Processors;
+  num_obs_eval_alloc =
+    np_mpi_padded_count_or_error(num_obs_eval_extern,
+                                 "np_density_conditional");
 #else
   num_obs_eval_alloc = num_obs_eval_extern;
 #endif
@@ -15966,10 +16001,13 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
 #endif
 
 #ifdef MPI2
-    lp_eval_alloc = MAX((int)ceil(1.0 / (double)iNum_Processors), 1) * iNum_Processors;
+    lp_eval_alloc =
+      np_mpi_padded_count_or_error(1, "np_density_conditional LP");
     lp_owner_blocks = (iNum_Processors > 1) && !np_mpi_local_regression_active();
     if(lp_owner_blocks){
-      const int lp_stride = MAX((int)ceil((double)num_obs_eval_extern / (double)iNum_Processors), 1);
+      const int lp_stride =
+        np_mpi_partition_stride_or_error(num_obs_eval_extern,
+                                         "np_density_conditional LP");
       lp_loop_start = MIN(num_obs_eval_extern, my_rank * lp_stride);
       lp_loop_stop = MIN(num_obs_eval_extern, lp_loop_start + lp_stride);
       for(i = 0; i < num_obs_eval_extern; i++){
@@ -16416,7 +16454,8 @@ void np_density(double * tuno, double * tord, double * tcon,
   int_TREE_PROFILE_X = myopti[DEN_TREEI];
 
 #ifdef MPI2
-  num_obs_eval_alloc = MAX(ceil((double) num_obs_eval_extern / (double) iNum_Processors),1)*iNum_Processors;
+  num_obs_eval_alloc =
+    np_mpi_padded_count_or_error(num_obs_eval_extern, "np_density");
 #else
   num_obs_eval_alloc = num_obs_eval_extern;
 #endif
@@ -17744,7 +17783,8 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
   int_TREE_PROFILE_X = myopti[REG_DOTREEI];
 
 #ifdef MPI2
-  num_obs_eval_alloc = MAX((int)ceil((double) num_obs_eval_extern / (double) iNum_Processors),1)*iNum_Processors;
+  num_obs_eval_alloc =
+    np_mpi_padded_count_or_error(num_obs_eval_extern, "np_regression");
 #else
   num_obs_eval_alloc = num_obs_eval_extern;
 #endif
@@ -18130,7 +18170,8 @@ static void np_kernelsum_common(double * tuno, double * tord, double * tcon,
   use_tree = (int_TREE_X == NP_TREE_TRUE);
 
 #ifdef MPI2
-  num_obs_eval_alloc = MAX(ceil((double) num_obs_eval_extern / (double) iNum_Processors),1)*iNum_Processors;
+  num_obs_eval_alloc =
+    np_mpi_padded_count_or_error(num_obs_eval_extern, "np_kernelsum");
 #else
   num_obs_eval_alloc = num_obs_eval_extern;
 #endif
@@ -18863,7 +18904,9 @@ void np_quantile_conditional(double * tc_con,
   vector_continuous_stddev_extern = mysd;
 
 #ifdef MPI2
-  num_obs_eval_alloc = MAX(ceil((double) num_obs_eval_extern / (double) iNum_Processors),1)*iNum_Processors;
+  num_obs_eval_alloc =
+    np_mpi_padded_count_or_error(num_obs_eval_extern,
+                                 "np_quantile_conditional");
 #else
   num_obs_eval_alloc = num_obs_eval_extern;
 #endif
