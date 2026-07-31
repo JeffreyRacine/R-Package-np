@@ -115,12 +115,22 @@ test_that("scalar native CVML callbacks do not manufacture a degree buffer", {
   evaluator <- substr(source, start, stop - 1L)
 
   expect_true(grepl(
-    "if (np_lp_engine_extern == NP_LP_ENGINE_GENERAL && glp_degree == NULL)",
+    "if (np_conditional_density_nomad_shadow.degree_key_len > 0 &&\n      glp_degree == NULL)",
     evaluator,
     fixed = TRUE
   ))
   expect_true(grepl(
-    "if (np_lp_engine_extern == NP_LP_ENGINE_GENERAL)\n    degree_work =",
+    "if (np_conditional_density_nomad_shadow.degree_key_len > 0)\n    degree_work =",
+    evaluator,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
+    "if (np_conditional_density_nomad_shadow.degree_key_len > 0)\n      MPI_Bcast(degree_work,",
+    evaluator,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
+    "if (degree_refresh_needed)\n    degree_refresh_ok = np_mpi_comm1_all_ok(degree_refresh_ok);",
     evaluator,
     fixed = TRUE
   ))

@@ -183,6 +183,7 @@ test_that("session nplsqreg NOMAD vector tau summary reports per-tau degrees", {
       "stopifnot(any(grepl('tau=0.50', out.fit, fixed = TRUE)))",
       "stopifnot(any(grepl('x1', out.fit, fixed = TRUE)))",
       "stopifnot(any(grepl('x2', out.fit, fixed = TRUE)))",
+      "stopifnot(all(vapply(fit$bws$tau.bws, function(bw) { reg.bw <- bw$reg.bws; spec <- npRmpi:::npValidatedConditionalRegSpec(reg.bw, where = 'nplsqreg test', ncon.field = 'ncon'); identical(spec$regtype.engine, 'lp') && identical(as.integer(spec$degree.engine), as.integer(reg.bw$degree)) }, logical(1L))))",
       "cat('NPLSQREG_NOMAD_DEGREE_SUMMARY_OK\\n')"
     ),
     timeout = 90L,
