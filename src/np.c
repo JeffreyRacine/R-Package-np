@@ -265,6 +265,7 @@ static int nomad_degree_progress_active = 0;
 
 static void np_progress_signal(const char *event, const char *surface, const int current, const int total)
 {
+  SEXP package = R_NilValue;
   SEXP ns = R_NilValue;
   SEXP fn = R_NilValue;
   SEXP event_s = R_NilValue;
@@ -277,14 +278,15 @@ static void np_progress_signal(const char *event, const char *surface, const int
   if (event == NULL || surface == NULL)
     return;
 
-  PROTECT(ns = R_FindNamespace(Rf_ScalarString(Rf_mkChar("npRmpi"))));
+  PROTECT(package = Rf_mkString("npRmpi"));
+  PROTECT(ns = R_FindNamespace(package));
   if (ns == R_NilValue) {
-    UNPROTECT(1);
+    UNPROTECT(2);
     return;
   }
 
   if (!np_namespace_has(ns, ".np_progress_signal_from_c")) {
-    UNPROTECT(1);
+    UNPROTECT(2);
     return;
   }
 
@@ -296,7 +298,7 @@ static void np_progress_signal(const char *event, const char *surface, const int
   PROTECT(total_s = Rf_ScalarInteger(total));
   PROTECT(call = Rf_lang5(fn, event_s, surface_s, current_s, total_s));
   R_tryEval(call, ns, &err);
-  UNPROTECT(7);
+  UNPROTECT(8);
 }
 
 static int np_nomad_degree_progress_due(const int current_eval,
@@ -342,6 +344,7 @@ static void np_progress_nomad_degree_step(const int current_eval,
                                           clock_t *last_clock,
                                           time_t *last_wall)
 {
+  SEXP package = R_NilValue;
   SEXP ns = R_NilValue;
   SEXP fn = R_NilValue;
   SEXP iter_s = R_NilValue;
@@ -354,14 +357,15 @@ static void np_progress_nomad_degree_step(const int current_eval,
   if (!np_nomad_degree_progress_due(current_eval, last_eval, last_clock, last_wall))
     return;
 
-  PROTECT(ns = R_FindNamespace(Rf_ScalarString(Rf_mkChar("npRmpi"))));
+  PROTECT(package = Rf_mkString("npRmpi"));
+  PROTECT(ns = R_FindNamespace(package));
   if (ns == R_NilValue) {
-    UNPROTECT(1);
+    UNPROTECT(2);
     return;
   }
 
   if (!np_namespace_has(ns, ".np_progress_nomad_native_step_from_c")) {
-    UNPROTECT(1);
+    UNPROTECT(2);
     return;
   }
 
@@ -376,7 +380,7 @@ static void np_progress_nomad_degree_step(const int current_eval,
   PROTECT(best_objective_s = Rf_ScalarReal(best_objective));
   PROTECT(call = Rf_lang5(fn, iter_s, current_degree_s, best_degree_s, best_objective_s));
   R_tryEval(call, ns, &err);
-  UNPROTECT(7);
+  UNPROTECT(8);
 
   *last_eval = current_eval;
   *last_clock = clock();

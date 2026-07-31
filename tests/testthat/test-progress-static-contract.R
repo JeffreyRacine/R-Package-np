@@ -231,3 +231,27 @@ test_that("plot helpers use append-only progress core", {
   expect_true(grepl("\\.np_progress_step\\(", src))
   expect_true(grepl("\\.np_progress_end\\(", src))
 })
+
+test_that("compiled progress namespace lookup protects its package key", {
+  src_path <- testthat::test_path("..", "..", "src", "np.c")
+  skip_if_not(file.exists(src_path), "source C files unavailable in installed test context")
+  src <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
+
+  expect_false(grepl(
+    "R_FindNamespace\\s*\\(\\s*Rf_ScalarString",
+    src,
+    perl = TRUE
+  ))
+  package_keys <- gregexpr(
+    "PROTECT\\(package = Rf_mkString\\(\"npRmpi\"\\)\\)",
+    src,
+    perl = TRUE
+  )[[1L]]
+  namespace_lookups <- gregexpr(
+    "PROTECT\\(ns = R_FindNamespace\\(package\\)\\)",
+    src,
+    perl = TRUE
+  )[[1L]]
+  expect_gte(length(package_keys), 5L)
+  expect_identical(length(namespace_lookups), length(package_keys))
+})
