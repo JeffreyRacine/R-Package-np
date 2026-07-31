@@ -16570,8 +16570,19 @@ typedef enum {
   NP_CONDITIONAL_PROFILE_CV_FAILURE = 2
 } NPConditionalProfileCvStatus;
 
+#ifndef NP_CONDITIONAL_PROFILE_CV_KERNEL_MAX_BYTES
+# define NP_CONDITIONAL_PROFILE_CV_KERNEL_MAX_BYTES \
+  ((size_t)64U*(size_t)1024U*(size_t)1024U)
+#endif
+#ifndef NP_CDENS_PROFILE_GROUP_WIDTH
+# define NP_CDENS_PROFILE_GROUP_WIDTH 32
+#endif
+#if NP_CDENS_PROFILE_GROUP_WIDTH < 1
+# error "NP_CDENS_PROFILE_GROUP_WIDTH must be positive"
+#endif
+
 static const size_t np_conditional_profile_cv_kernel_max_bytes =
-  (size_t)64U*(size_t)1024U*(size_t)1024U;
+  NP_CONDITIONAL_PROFILE_CV_KERNEL_MAX_BYTES;
 
 typedef struct {
   int profile_id;
@@ -26591,8 +26602,10 @@ cleanup_cvls_lp_adap_block:
   return status;
 }
 
-static int np_conditional_density_cvls_categorical_profile_stream(double *vector_scale_factor,
-                                                                  double *cv);
+static NPConditionalProfileCvStatus
+np_conditional_density_cvls_categorical_profile_stream(
+  double *vector_scale_factor,
+  double *cv);
 
 static NPCVLSWorkspaceStatus
 np_cvls_workspace_matrix_try(const int nrows,
@@ -27087,10 +27100,20 @@ int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
     return 1;
   }
 
-  if((BANDWIDTH_den_extern == BW_FIXED) &&
-     (np_conditional_density_cvls_categorical_profile_stream(vector_scale_factor, cv) == 0)){
-    np_glp_cv_clear_extern();
-    return 0;
+  if(BANDWIDTH_den_extern == BW_FIXED){
+    const NPConditionalProfileCvStatus profile_status =
+      np_conditional_density_cvls_categorical_profile_stream(
+        vector_scale_factor,
+        cv);
+
+    if(profile_status == NP_CONDITIONAL_PROFILE_CV_SUCCESS){
+      np_glp_cv_clear_extern();
+      return 0;
+    }
+    if(profile_status == NP_CONDITIONAL_PROFILE_CV_FAILURE){
+      np_glp_cv_clear_extern();
+      return 1;
+    }
   }
 
   if((BANDWIDTH_den_extern == BW_FIXED) &&
@@ -27858,7 +27881,8 @@ static int np_conditional_distribution_cvls_lp_block_stream(double *vector_scale
   return np_conditional_distribution_cvls_lp_block_one(vector_scale_factor, cv);
 }
 
-static int np_conditional_density_cvls_categorical_profile_stream(
+static NPConditionalProfileCvStatus
+np_conditional_density_cvls_categorical_profile_stream(
 double *vector_scale_factor,
 double *cv){
 
@@ -27877,16 +27901,35 @@ double *cv){
   double **xy_uno = NULL, **xy_ord = NULL;
   double **profile_x_uno = NULL, **profile_x_ord = NULL;
   double **profile_y_uno = NULL, **profile_y_ord = NULL;
-  double *counts_x = NULL, *counts_y = NULL, *counts_xy = NULL;
+  double *counts_x = NULL, *counts_xy = NULL;
   double *kx = NULL, *kyn = NULL, *kyc = NULL;
+  double *kx_cache = NULL, *kyn_cache = NULL, *kyc_cache = NULL;
+  double *kernel_workspace = NULL;
   double *den_full = NULL;
+  double *lambda_x = NULL, *lambda_y = NULL;
   double *vsfx = NULL, *vsfy = NULL;
+  int *x_cache_slot = NULL, *x_cache_owner = NULL;
+  int *yn_cache_slot = NULL, *yn_cache_owner = NULL;
+  int *yc_cache_slot = NULL, *yc_cache_owner = NULL;
+  NPConditionalProfileCachePriority *x_cache_priority = NULL;
+  NPConditionalProfileCachePriority *y_cache_priority = NULL;
   int *op_x = NULL, *op_y_norm = NULL, *op_y_conv = NULL;
   int *kernel_ux = NULL, *kernel_ox = NULL, *kernel_uy = NULL, *kernel_oy = NULL;
-  int ok = 0;
+  size_t kx_cells = 0U, kyn_cells = 0U, kyc_cells = 0U;
+  size_t kx_alloc_cells = 0U, kyn_alloc_cells = 0U, kyc_alloc_cells = 0U;
+  size_t kernel_cells = 0U, kernel_bytes = 0U, max_kernel_cells = 0U;
+  int use_x_cache = 0, use_yn_cache = 0, use_yc_cache = 0;
+  int x_cache_rows = 0, yn_cache_rows = 0, yc_cache_rows = 0;
+  int profile_group_width = 1;
+  int x_scratch_rows = 1, yn_scratch_rows = 1;
+  NPCategoricalProfileKernelSpec x_profile_spec = {0};
+  NPCategoricalProfileKernelSpec yn_profile_spec = {0};
+  NPCategoricalProfileKernelSpec yc_profile_spec = {0};
+  NPConditionalProfileCvStatus result =
+    NP_CONDITIONAL_PROFILE_CV_FAILURE;
 
   if((cv == NULL) || (vector_scale_factor == NULL))
-    return 1;
+    return NP_CONDITIONAL_PROFILE_CV_FAILURE;
   if((int_TREE_PROFILE_X != NP_TREE_TRUE) ||
      (BANDWIDTH_den_extern != BW_FIXED) ||
      (num_obs <= 0) ||
@@ -27894,7 +27937,7 @@ double *cv){
      (num_var_continuous_extern != 0) ||
      (num_x <= 0) ||
      (num_y <= 0))
-    return 1;
+    return NP_CONDITIONAL_PROFILE_CV_NOT_APPLICABLE;
 
   xy_uno = alloc_matd(num_obs, num_xyu);
   xy_ord = alloc_matd(num_obs, num_xyo);
@@ -27940,22 +27983,223 @@ double *cv){
     goto cleanup_cat_cvls;
 
   if((nprof_x <= 0) || (nprof_y <= 0) || (nprof_xy <= 0) ||
-     (4*nprof_x > 3*num_obs) ||
-     (4*nprof_y > 3*num_obs) ||
-     (4*nprof_xy > 3*num_obs))
+     ((int64_t)4*nprof_x > (int64_t)3*num_obs) ||
+     ((int64_t)4*nprof_y > (int64_t)3*num_obs) ||
+     ((int64_t)4*nprof_xy > (int64_t)3*num_obs)){
+    result = NP_CONDITIONAL_PROFILE_CV_NOT_APPLICABLE;
     goto cleanup_cat_cvls;
+  }
+
+  if(!np_size_mul_checked((size_t)nprof_x,
+                          (size_t)nprof_x,
+                          &kx_cells) ||
+     !np_size_mul_checked((size_t)nprof_y,
+                          (size_t)nprof_y,
+                          &kyn_cells) ||
+     !np_size_mul_checked((size_t)nprof_y,
+                          (size_t)nprof_y,
+                          &kyc_cells) ||
+     !np_size_add_checked(kx_cells, kyn_cells, &kernel_cells) ||
+     !np_size_add_checked(kernel_cells, kyc_cells, &kernel_cells) ||
+     !np_size_array_bytes_checked(kernel_cells,
+                                  sizeof(double),
+                                  &kernel_bytes)){
+    result = NP_CONDITIONAL_PROFILE_CV_NOT_APPLICABLE;
+    goto cleanup_cat_cvls;
+  }
+
+  x_cache_rows = nprof_x;
+  yn_cache_rows = nprof_y;
+  yc_cache_rows = nprof_y;
+  if(kernel_bytes > np_conditional_profile_cv_kernel_max_bytes){
+    size_t cells_used;
+    size_t cells_remaining;
+    size_t extra_rows;
+
+    max_kernel_cells =
+      np_conditional_profile_cv_kernel_max_bytes/sizeof(double);
+    if(!np_size_add_checked((size_t)nprof_x,
+                            (size_t)nprof_y,
+                            &cells_used) ||
+       !np_size_add_checked(cells_used,
+                            (size_t)nprof_y,
+                            &cells_used) ||
+       (cells_used > max_kernel_cells)){
+      result = NP_CONDITIONAL_PROFILE_CV_NOT_APPLICABLE;
+      goto cleanup_cat_cvls;
+    }
+
+    x_cache_rows = 1;
+    yn_cache_rows = 1;
+    yc_cache_rows = 1;
+    cells_remaining = max_kernel_cells - cells_used;
+
+    /*
+     * A convolution row is requested for each response profile inside every
+     * joint-profile quadratic traversal.  Give it first claim on resident
+     * storage, then retain X and normal-response rows according to their
+     * joint-profile reuse.
+     */
+    extra_rows =
+      MIN((size_t)(nprof_y - 1), cells_remaining/(size_t)nprof_y);
+    yc_cache_rows += (int)extra_rows;
+    cells_remaining -= extra_rows*(size_t)nprof_y;
+    extra_rows =
+      MIN((size_t)(nprof_x - 1), cells_remaining/(size_t)nprof_x);
+    x_cache_rows += (int)extra_rows;
+    cells_remaining -= extra_rows*(size_t)nprof_x;
+    extra_rows =
+      MIN((size_t)(nprof_y - 1), cells_remaining/(size_t)nprof_y);
+    yn_cache_rows += (int)extra_rows;
+
+    use_x_cache = (x_cache_rows < nprof_x);
+    use_yn_cache = (yn_cache_rows < nprof_y);
+    use_yc_cache = (yc_cache_rows < nprof_y);
+
+    if(use_yc_cache){
+      size_t x_scratch_cells;
+      size_t yn_scratch_cells;
+
+      /*
+       * A partial convolution cache would otherwise regenerate every missing
+       * row once per joint profile.  Reserve independent X/normal-Y scratch
+       * rows for a small group so each missing convolution row is generated
+       * once per group while every group's scalar h/j order remains intact.
+       */
+      profile_group_width =
+        MIN(NP_CDENS_PROFILE_GROUP_WIDTH, nprof_xy);
+      for(;;){
+        x_scratch_rows = MIN(profile_group_width, nprof_x);
+        yn_scratch_rows = MIN(profile_group_width, nprof_y);
+        if(np_size_mul_checked((size_t)x_scratch_rows,
+                               (size_t)nprof_x,
+                               &x_scratch_cells) &&
+           np_size_mul_checked((size_t)yn_scratch_rows,
+                               (size_t)nprof_y,
+                               &yn_scratch_cells) &&
+           np_size_add_checked(x_scratch_cells,
+                               yn_scratch_cells,
+                               &cells_used) &&
+           np_size_add_checked(cells_used,
+                               (size_t)nprof_y,
+                               &cells_used) &&
+           (cells_used <= max_kernel_cells))
+          break;
+        if(profile_group_width <= 1){
+          result = NP_CONDITIONAL_PROFILE_CV_NOT_APPLICABLE;
+          goto cleanup_cat_cvls;
+        }
+        profile_group_width /= 2;
+      }
+
+      x_cache_rows = x_scratch_rows;
+      yn_cache_rows = yn_scratch_rows;
+      yc_cache_rows = 1;
+      cells_remaining = max_kernel_cells - cells_used;
+      extra_rows =
+        MIN((size_t)(nprof_y - 1), cells_remaining/(size_t)nprof_y);
+      yc_cache_rows += (int)extra_rows;
+      cells_remaining -= extra_rows*(size_t)nprof_y;
+      extra_rows =
+        MIN((size_t)(nprof_x - x_cache_rows),
+            cells_remaining/(size_t)nprof_x);
+      x_cache_rows += (int)extra_rows;
+      cells_remaining -= extra_rows*(size_t)nprof_x;
+      extra_rows =
+        MIN((size_t)(nprof_y - yn_cache_rows),
+            cells_remaining/(size_t)nprof_y);
+      yn_cache_rows += (int)extra_rows;
+
+      use_x_cache = (x_cache_rows < nprof_x);
+      use_yn_cache = (yn_cache_rows < nprof_y);
+      use_yc_cache = (yc_cache_rows < nprof_y);
+    }
+  }
+  if(!use_x_cache && !use_yn_cache && !use_yc_cache)
+    profile_group_width =
+      MIN(NP_CDENS_PROFILE_GROUP_WIDTH, nprof_xy);
+
+  if(!np_size_mul_checked((size_t)x_cache_rows,
+                          (size_t)nprof_x,
+                          &kx_alloc_cells) ||
+     !np_size_mul_checked((size_t)yn_cache_rows,
+                          (size_t)nprof_y,
+                          &kyn_alloc_cells) ||
+     !np_size_mul_checked((size_t)yc_cache_rows,
+                          (size_t)nprof_y,
+                          &kyc_alloc_cells) ||
+     !np_size_add_checked(kx_alloc_cells,
+                          kyn_alloc_cells,
+                          &kernel_cells) ||
+     !np_size_add_checked(kernel_cells,
+                          kyc_alloc_cells,
+                          &kernel_cells) ||
+     !np_size_array_bytes_checked(kernel_cells,
+                                  sizeof(double),
+                                  &kernel_bytes) ||
+     (kernel_bytes > np_conditional_profile_cv_kernel_max_bytes)){
+    result = NP_CONDITIONAL_PROFILE_CV_NOT_APPLICABLE;
+    goto cleanup_cat_cvls;
+  }
 
   profile_x_uno = alloc_tmatd(nprof_x, num_xu);
   profile_x_ord = alloc_tmatd(nprof_x, num_xo);
   profile_y_uno = alloc_tmatd(nprof_y, num_yu);
   profile_y_ord = alloc_tmatd(nprof_y, num_yo);
   counts_x = alloc_vecd(nprof_x);
-  counts_y = alloc_vecd(nprof_y);
   counts_xy = alloc_vecd(nprof_xy);
-  kx = alloc_vecd(nprof_x*nprof_x);
-  kyn = alloc_vecd(nprof_y*nprof_y);
-  kyc = alloc_vecd(nprof_y*nprof_y);
+  (void)np_native_malloc_array((void **)&kernel_workspace,
+                               kernel_cells,
+                               sizeof(*kernel_workspace));
+  if(kernel_workspace != NULL){
+    if(use_x_cache)
+      kx_cache = kernel_workspace;
+    else
+      kx = kernel_workspace;
+    if(use_yn_cache)
+      kyn_cache = kernel_workspace + kx_alloc_cells;
+    else
+      kyn = kernel_workspace + kx_alloc_cells;
+    if(use_yc_cache)
+      kyc_cache = kernel_workspace + kx_alloc_cells + kyn_alloc_cells;
+    else
+      kyc = kernel_workspace + kx_alloc_cells + kyn_alloc_cells;
+  }
   den_full = alloc_vecd(nprof_x);
+  if(use_x_cache){
+    lambda_x = alloc_vecd(num_x);
+    (void)np_native_malloc_array((void **)&x_cache_slot,
+                                 (size_t)nprof_x,
+                                 sizeof(*x_cache_slot));
+    (void)np_native_malloc_array((void **)&x_cache_owner,
+                                 (size_t)x_cache_rows,
+                                 sizeof(*x_cache_owner));
+    (void)np_native_malloc_array((void **)&x_cache_priority,
+                                 (size_t)nprof_x,
+                                 sizeof(*x_cache_priority));
+  }
+  if(use_yn_cache){
+    (void)np_native_malloc_array((void **)&yn_cache_slot,
+                                 (size_t)nprof_y,
+                                 sizeof(*yn_cache_slot));
+    (void)np_native_malloc_array((void **)&yn_cache_owner,
+                                 (size_t)yn_cache_rows,
+                                 sizeof(*yn_cache_owner));
+  }
+  if(use_yc_cache){
+    (void)np_native_malloc_array((void **)&yc_cache_slot,
+                                 (size_t)nprof_y,
+                                 sizeof(*yc_cache_slot));
+    (void)np_native_malloc_array((void **)&yc_cache_owner,
+                                 (size_t)yc_cache_rows,
+                                 sizeof(*yc_cache_owner));
+  }
+  if(use_yn_cache || use_yc_cache){
+    lambda_y = alloc_vecd(num_y);
+    (void)np_native_malloc_array((void **)&y_cache_priority,
+                                 (size_t)nprof_y,
+                                 sizeof(*y_cache_priority));
+  }
   vsfx = alloc_vecd(MAX(1, num_x));
   vsfy = alloc_vecd(MAX(1, num_y));
   op_x = (int *)calloc((size_t)MAX(1, num_x), sizeof(int));
@@ -27970,8 +28214,17 @@ double *cv){
      ((num_xo > 0) && (profile_x_ord == NULL)) ||
      ((num_yu > 0) && (profile_y_uno == NULL)) ||
      ((num_yo > 0) && (profile_y_ord == NULL)) ||
-     (counts_x == NULL) || (counts_y == NULL) || (counts_xy == NULL) ||
-     (kx == NULL) || (kyn == NULL) || (kyc == NULL) || (den_full == NULL) ||
+     (counts_x == NULL) || (counts_xy == NULL) ||
+     (kernel_workspace == NULL) || (den_full == NULL) ||
+     (use_x_cache &&
+      ((lambda_x == NULL) || (x_cache_slot == NULL) ||
+       (x_cache_owner == NULL) || (x_cache_priority == NULL))) ||
+     (use_yn_cache &&
+      ((yn_cache_slot == NULL) || (yn_cache_owner == NULL))) ||
+     (use_yc_cache &&
+      ((yc_cache_slot == NULL) || (yc_cache_owner == NULL))) ||
+     ((use_yn_cache || use_yc_cache) &&
+      ((lambda_y == NULL) || (y_cache_priority == NULL))) ||
      (vsfx == NULL) || (vsfy == NULL) ||
      (op_x == NULL) || (op_y_norm == NULL) || (op_y_conv == NULL) ||
      (kernel_ux == NULL) || (kernel_ox == NULL) || (kernel_uy == NULL) || (kernel_oy == NULL))
@@ -28000,7 +28253,6 @@ double *cv){
   }
   for(g = 0; g < nprof_y; g++){
     const int rep = y_rep[g];
-    counts_y[g] = 0.0;
     for(j = 0; j < num_yu; j++) profile_y_uno[j][g] = matrix_Y_unordered_train_extern[j][rep];
     for(j = 0; j < num_yo; j++) profile_y_ord[j][g] = matrix_Y_ordered_train_extern[j][rep];
   }
@@ -28008,7 +28260,6 @@ double *cv){
     counts_xy[g] = 0.0;
   for(i = 0; i < num_obs; i++){
     counts_x[x_id[i]] += 1.0;
-    counts_y[y_id[i]] += 1.0;
     counts_xy[xy_id[i]] += 1.0;
   }
 
@@ -28022,221 +28273,634 @@ double *cv){
     op_y_conv[j] = OP_CONVOLUTION;
   }
 
-  status = kernel_weighted_sum_np(NULL,
-                                  kernel_ux,
-                                  kernel_ox,
-                                  BANDWIDTH_den_extern,
-                                  nprof_x,
-                                  nprof_x,
-                                  num_xu,
-                                  num_xo,
-                                  0,
-                                  0,
-                                  0,
-                                  1,
-                                  1,
-                                  0,
-                                  0,
-                                  0,
-                                  0,
-                                  0,
-                                  op_x,
-                                  OP_NOOP,
-                                  0,
-                                  0,
-                                  NULL,
-                                  1,
-                                  0,
-                                  0,
-                                  NP_TREE_FALSE,
-                                  0,
-                                  NULL,
-                                  NULL, NULL, NULL,
-                                  profile_x_uno,
-                                  profile_x_ord,
-                                  NULL,
-                                  profile_x_uno,
-                                  profile_x_ord,
-                                  NULL,
-                                  NULL,
-                                  NULL,
-                                  NULL,
-                                  vsfx,
-                                  0,
-                                  NULL,
-                                  NULL,
-                                  NULL,
-                                  num_categories_extern_X,
-                                  matrix_categorical_vals_extern_X,
-                                  NULL,
-                                  NULL,
-                                  NULL,
-                                  kx,
-                                  NULL);
-  if(status != 0)
-    goto cleanup_cat_cvls;
-
-  status = kernel_weighted_sum_np(NULL,
-                                  kernel_uy,
-                                  kernel_oy,
-                                  BANDWIDTH_den_extern,
-                                  nprof_y,
-                                  nprof_y,
-                                  num_yu,
-                                  num_yo,
-                                  0,
-                                  0,
-                                  0,
-                                  1,
-                                  1,
-                                  0,
-                                  0,
-                                  0,
-                                  0,
-                                  0,
-                                  op_y_norm,
-                                  OP_NOOP,
-                                  0,
-                                  0,
-                                  NULL,
-                                  1,
-                                  0,
-                                  0,
-                                  NP_TREE_FALSE,
-                                  0,
-                                  NULL,
-                                  NULL, NULL, NULL,
-                                  profile_y_uno,
-                                  profile_y_ord,
-                                  NULL,
-                                  profile_y_uno,
-                                  profile_y_ord,
-                                  NULL,
-                                  NULL,
-                                  NULL,
-                                  NULL,
-                                  vsfy,
-                                  0,
-                                  NULL,
-                                  NULL,
-                                  NULL,
-                                  num_categories_extern_Y,
-                                  matrix_categorical_vals_extern_Y,
-                                  NULL,
-                                  NULL,
-                                  NULL,
-                                  kyn,
-                                  NULL);
-  if(status != 0)
-    goto cleanup_cat_cvls;
-
-  status = kernel_weighted_sum_np(NULL,
-                                  kernel_uy,
-                                  kernel_oy,
-                                  BANDWIDTH_den_extern,
-                                  nprof_y,
-                                  nprof_y,
-                                  num_yu,
-                                  num_yo,
-                                  0,
-                                  0,
-                                  0,
-                                  1,
-                                  1,
-                                  0,
-                                  0,
-                                  0,
-                                  0,
-                                  0,
-                                  op_y_conv,
-                                  OP_NOOP,
-                                  0,
-                                  0,
-                                  NULL,
-                                  1,
-                                  0,
-                                  0,
-                                  NP_TREE_FALSE,
-                                  0,
-                                  NULL,
-                                  NULL, NULL, NULL,
-                                  profile_y_uno,
-                                  profile_y_ord,
-                                  NULL,
-                                  profile_y_uno,
-                                  profile_y_ord,
-                                  NULL,
-                                  NULL,
-                                  NULL,
-                                  NULL,
-                                  vsfy,
-                                  0,
-                                  NULL,
-                                  NULL,
-                                  NULL,
-                                  num_categories_extern_Y,
-                                  matrix_categorical_vals_extern_Y,
-                                  NULL,
-                                  NULL,
-                                  NULL,
-                                  kyc,
-                                  NULL);
-  if(status != 0)
-    goto cleanup_cat_cvls;
-
-  for(g = 0; g < nprof_x; g++){
-    den_full[g] = 0.0;
-    for(h = 0; h < nprof_x; h++)
-      den_full[g] += counts_x[h]*kx[g*nprof_x + h];
-    if(!(den_full[g] > DBL_MIN) || (!R_FINITE(den_full[g])))
+  if(!use_x_cache){
+    status = kernel_weighted_sum_np(NULL,
+                                    kernel_ux,
+                                    kernel_ox,
+                                    BANDWIDTH_den_extern,
+                                    nprof_x,
+                                    nprof_x,
+                                    num_xu,
+                                    num_xo,
+                                    0,
+                                    0,
+                                    0,
+                                    1,
+                                    1,
+                                    0,
+                                    0,
+                                    0,
+                                    0,
+                                    0,
+                                    op_x,
+                                    OP_NOOP,
+                                    0,
+                                    0,
+                                    NULL,
+                                    1,
+                                    0,
+                                    0,
+                                    NP_TREE_FALSE,
+                                    0,
+                                    NULL,
+                                    NULL, NULL, NULL,
+                                    profile_x_uno,
+                                    profile_x_ord,
+                                    NULL,
+                                    profile_x_uno,
+                                    profile_x_ord,
+                                    NULL,
+                                    NULL,
+                                    NULL,
+                                    NULL,
+                                    vsfx,
+                                    0,
+                                    NULL,
+                                    NULL,
+                                    NULL,
+                                    num_categories_extern_X,
+                                    matrix_categorical_vals_extern_X,
+                                    NULL,
+                                    NULL,
+                                    NULL,
+                                    kx,
+                                    NULL);
+    if(status != 0)
       goto cleanup_cat_cvls;
+  } else {
+    if(kernel_bandwidth_mean(KERNEL_reg_extern,
+                             BANDWIDTH_den_extern,
+                             nprof_x,
+                             nprof_x,
+                             0,
+                             0,
+                             0,
+                             0,
+                             num_xu,
+                             num_xo,
+                             1,
+                             vsfx,
+                             NULL,
+                             NULL,
+                             NULL,
+                             NULL,
+                             NULL,
+                             NULL,
+                             lambda_x) == 1)
+      goto cleanup_cat_cvls;
+
+    x_profile_spec.ntrain = nprof_x;
+    x_profile_spec.neval = nprof_x;
+    x_profile_spec.nunordered = num_xu;
+    x_profile_spec.nordered = num_xo;
+    x_profile_spec.train_unordered = profile_x_uno;
+    x_profile_spec.train_ordered = profile_x_ord;
+    x_profile_spec.eval_unordered = profile_x_uno;
+    x_profile_spec.eval_ordered = profile_x_ord;
+    x_profile_spec.kernel_unordered = kernel_ux;
+    x_profile_spec.kernel_ordered = kernel_ox;
+    x_profile_spec.operator_code = op_x;
+    x_profile_spec.lambda = lambda_x;
+    x_profile_spec.num_categories = num_categories_extern_X;
+    x_profile_spec.category_values = matrix_categorical_vals_extern_X;
+    if(np_categorical_profile_spec_validate(&x_profile_spec) !=
+       NP_PROFILE_TILE_OK)
+      goto cleanup_cat_cvls;
+
+    for(g = 0; g < nprof_x; g++){
+      x_cache_slot[g] = -1;
+      den_full[g] = R_NaN;
+      x_cache_priority[g].profile_id = g;
+      x_cache_priority[g].joint_reuse = 0;
+    }
+    for(g = 0; g < nprof_xy; g++){
+      const int rep = xy_rep[g];
+      x_cache_priority[x_id[rep]].joint_reuse++;
+    }
+    qsort(x_cache_priority,
+          (size_t)nprof_x,
+          sizeof(*x_cache_priority),
+          np_conditional_profile_cache_priority_compare);
+    for(g = 0; g < x_cache_rows - x_scratch_rows; g++)
+      x_cache_slot[x_cache_priority[g].profile_id] = g;
+    for(g = 0; g < x_cache_rows; g++)
+      x_cache_owner[g] = -1;
   }
 
+  if(use_yn_cache || use_yc_cache){
+    if(kernel_bandwidth_mean(KERNEL_den_extern,
+                             BANDWIDTH_den_extern,
+                             nprof_y,
+                             nprof_y,
+                             0,
+                             0,
+                             0,
+                             0,
+                             num_yu,
+                             num_yo,
+                             1,
+                             vsfy,
+                             NULL,
+                             NULL,
+                             NULL,
+                             NULL,
+                             NULL,
+                             NULL,
+                             lambda_y) == 1)
+      goto cleanup_cat_cvls;
+
+    for(g = 0; g < nprof_y; g++){
+      y_cache_priority[g].profile_id = g;
+      y_cache_priority[g].joint_reuse = 0;
+    }
+    for(g = 0; g < nprof_xy; g++){
+      const int rep = xy_rep[g];
+      y_cache_priority[y_id[rep]].joint_reuse++;
+    }
+    qsort(y_cache_priority,
+          (size_t)nprof_y,
+          sizeof(*y_cache_priority),
+          np_conditional_profile_cache_priority_compare);
+  }
+
+  if(!use_yn_cache){
+    status = kernel_weighted_sum_np(NULL,
+                                    kernel_uy,
+                                    kernel_oy,
+                                    BANDWIDTH_den_extern,
+                                    nprof_y,
+                                    nprof_y,
+                                    num_yu,
+                                    num_yo,
+                                    0,
+                                    0,
+                                    0,
+                                    1,
+                                    1,
+                                    0,
+                                    0,
+                                    0,
+                                    0,
+                                    0,
+                                    op_y_norm,
+                                    OP_NOOP,
+                                    0,
+                                    0,
+                                    NULL,
+                                    1,
+                                    0,
+                                    0,
+                                    NP_TREE_FALSE,
+                                    0,
+                                    NULL,
+                                    NULL, NULL, NULL,
+                                    profile_y_uno,
+                                    profile_y_ord,
+                                    NULL,
+                                    profile_y_uno,
+                                    profile_y_ord,
+                                    NULL,
+                                    NULL,
+                                    NULL,
+                                    NULL,
+                                    vsfy,
+                                    0,
+                                    NULL,
+                                    NULL,
+                                    NULL,
+                                    num_categories_extern_Y,
+                                    matrix_categorical_vals_extern_Y,
+                                    NULL,
+                                    NULL,
+                                    NULL,
+                                    kyn,
+                                    NULL);
+    if(status != 0)
+      goto cleanup_cat_cvls;
+  } else {
+    yn_profile_spec.ntrain = nprof_y;
+    yn_profile_spec.neval = nprof_y;
+    yn_profile_spec.nunordered = num_yu;
+    yn_profile_spec.nordered = num_yo;
+    yn_profile_spec.train_unordered = profile_y_uno;
+    yn_profile_spec.train_ordered = profile_y_ord;
+    yn_profile_spec.eval_unordered = profile_y_uno;
+    yn_profile_spec.eval_ordered = profile_y_ord;
+    yn_profile_spec.kernel_unordered = kernel_uy;
+    yn_profile_spec.kernel_ordered = kernel_oy;
+    yn_profile_spec.operator_code = op_y_norm;
+    yn_profile_spec.lambda = lambda_y;
+    yn_profile_spec.num_categories = num_categories_extern_Y;
+    yn_profile_spec.category_values = matrix_categorical_vals_extern_Y;
+    if(np_categorical_profile_spec_validate(&yn_profile_spec) !=
+       NP_PROFILE_TILE_OK)
+      goto cleanup_cat_cvls;
+
+    for(g = 0; g < nprof_y; g++)
+      yn_cache_slot[g] = -1;
+    for(g = 0; g < yn_cache_rows - yn_scratch_rows; g++)
+      yn_cache_slot[y_cache_priority[g].profile_id] = g;
+    for(g = 0; g < yn_cache_rows; g++)
+      yn_cache_owner[g] = -1;
+  }
+
+  if(!use_yc_cache){
+    status = kernel_weighted_sum_np(NULL,
+                                    kernel_uy,
+                                    kernel_oy,
+                                    BANDWIDTH_den_extern,
+                                    nprof_y,
+                                    nprof_y,
+                                    num_yu,
+                                    num_yo,
+                                    0,
+                                    0,
+                                    0,
+                                    1,
+                                    1,
+                                    0,
+                                    0,
+                                    0,
+                                    0,
+                                    0,
+                                    op_y_conv,
+                                    OP_NOOP,
+                                    0,
+                                    0,
+                                    NULL,
+                                    1,
+                                    0,
+                                    0,
+                                    NP_TREE_FALSE,
+                                    0,
+                                    NULL,
+                                    NULL, NULL, NULL,
+                                    profile_y_uno,
+                                    profile_y_ord,
+                                    NULL,
+                                    profile_y_uno,
+                                    profile_y_ord,
+                                    NULL,
+                                    NULL,
+                                    NULL,
+                                    NULL,
+                                    vsfy,
+                                    0,
+                                    NULL,
+                                    NULL,
+                                    NULL,
+                                    num_categories_extern_Y,
+                                    matrix_categorical_vals_extern_Y,
+                                    NULL,
+                                    NULL,
+                                    NULL,
+                                    kyc,
+                                    NULL);
+    if(status != 0)
+      goto cleanup_cat_cvls;
+  } else {
+    yc_profile_spec.ntrain = nprof_y;
+    yc_profile_spec.neval = nprof_y;
+    yc_profile_spec.nunordered = num_yu;
+    yc_profile_spec.nordered = num_yo;
+    yc_profile_spec.train_unordered = profile_y_uno;
+    yc_profile_spec.train_ordered = profile_y_ord;
+    yc_profile_spec.eval_unordered = profile_y_uno;
+    yc_profile_spec.eval_ordered = profile_y_ord;
+    yc_profile_spec.kernel_unordered = kernel_uy;
+    yc_profile_spec.kernel_ordered = kernel_oy;
+    yc_profile_spec.operator_code = op_y_conv;
+    yc_profile_spec.lambda = lambda_y;
+    yc_profile_spec.num_categories = num_categories_extern_Y;
+    yc_profile_spec.category_values = matrix_categorical_vals_extern_Y;
+    if(np_categorical_profile_spec_validate(&yc_profile_spec) !=
+       NP_PROFILE_TILE_OK)
+      goto cleanup_cat_cvls;
+
+    for(g = 0; g < nprof_y; g++)
+      yc_cache_slot[g] = -1;
+    for(g = 0; g < yc_cache_rows - 1; g++)
+      yc_cache_slot[y_cache_priority[g].profile_id] = g;
+    for(g = 0; g < yc_cache_rows; g++)
+      yc_cache_owner[g] = -1;
+  }
+
+  if(!use_x_cache)
+    for(g = 0; g < nprof_x; g++){
+      den_full[g] = 0.0;
+      for(h = 0; h < nprof_x; h++)
+        den_full[g] += counts_x[h]*kx[g*nprof_x + h];
+      if(!(den_full[g] > DBL_MIN) || (!R_FINITE(den_full[g])))
+        goto cleanup_cat_cvls;
+    }
+
+  const int profile_interrupt_stride =
+    np_hot_loop_interrupt_stride(nprof_xy);
+
   *cv = 0.0;
-  for(g = 0; g < nprof_xy; g++){
+  if(profile_group_width <= 1){
+    for(g = 0; g < nprof_xy; g++){
     const int rep_g = xy_rep[g];
     const int xg = x_id[rep_g];
     const int yg = y_id[rep_g];
     const double cxg = counts_xy[g];
-    const double den_loo = den_full[xg] - kx[xg*nprof_x + xg];
+    double *kx_row;
+    double *kyn_row;
+    double den_loo;
     double lin_num = 0.0;
     double quad_num = 0.0;
 
     if(cxg <= 0.0)
       continue;
+    np_hot_loop_check_interrupt(g,
+                                nprof_xy,
+                                profile_interrupt_stride);
+
+    if(use_x_cache){
+      int cache_index = x_cache_slot[xg];
+
+      if(cache_index < 0)
+        cache_index = x_cache_rows - 1;
+      kx_row =
+        kx_cache + (size_t)cache_index*(size_t)nprof_x;
+      if(x_cache_owner[cache_index] != xg){
+        NPCategoricalProfileTileStatus tile_status;
+
+        tile_status =
+          np_categorical_profile_tile_fill_prevalidated(
+            &x_profile_spec,
+            xg,
+            1,
+            kx_row,
+            (size_t)nprof_x);
+        if(tile_status != NP_PROFILE_TILE_OK)
+          goto cleanup_cat_cvls;
+        x_cache_owner[cache_index] = xg;
+      }
+      if(!R_FINITE(den_full[xg])){
+        den_full[xg] = 0.0;
+        for(h = 0; h < nprof_x; h++)
+          den_full[xg] += counts_x[h]*kx_row[h];
+        if(!(den_full[xg] > DBL_MIN) ||
+           (!R_FINITE(den_full[xg])))
+          goto cleanup_cat_cvls;
+      }
+    } else {
+      kx_row = kx + (size_t)xg*(size_t)nprof_x;
+    }
+    den_loo = den_full[xg] - kx_row[xg];
     if(!(den_loo > DBL_MIN) || (!R_FINITE(den_loo)))
       goto cleanup_cat_cvls;
 
-    for(h = 0; h < nprof_xy; h++){
-      const int rep_h = xy_rep[h];
-      const int xh = x_id[rep_h];
-      const int yh = y_id[rep_h];
-      lin_num += counts_xy[h]*kx[xg*nprof_x + xh]*kyn[yg*nprof_y + yh];
+    if(use_yn_cache){
+      int cache_index = yn_cache_slot[yg];
+
+      if(cache_index < 0)
+        cache_index = yn_cache_rows - 1;
+      kyn_row =
+        kyn_cache + (size_t)cache_index*(size_t)nprof_y;
+      if(yn_cache_owner[cache_index] != yg){
+        NPCategoricalProfileTileStatus tile_status;
+
+        tile_status =
+          np_categorical_profile_tile_fill_prevalidated(
+            &yn_profile_spec,
+            yg,
+            1,
+            kyn_row,
+            (size_t)nprof_y);
+        if(tile_status != NP_PROFILE_TILE_OK)
+          goto cleanup_cat_cvls;
+        yn_cache_owner[cache_index] = yg;
+      }
+    } else {
+      kyn_row = kyn + (size_t)yg*(size_t)nprof_y;
     }
-    lin_num -= kx[xg*nprof_x + xg]*kyn[yg*nprof_y + yg];
 
     for(h = 0; h < nprof_xy; h++){
       const int rep_h = xy_rep[h];
       const int xh = x_id[rep_h];
       const int yh = y_id[rep_h];
-      const double wxh = kx[xg*nprof_x + xh];
+      lin_num += counts_xy[h]*kx_row[xh]*kyn_row[yh];
+    }
+    lin_num -= kx_row[xg]*kyn_row[yg];
+
+    for(h = 0; h < nprof_xy; h++){
+      const int rep_h = xy_rep[h];
+      const int xh = x_id[rep_h];
+      const int yh = y_id[rep_h];
+      const double wxh = kx_row[xh];
+      double *kyc_row;
+
       if(wxh == 0.0)
         continue;
+      if(use_yc_cache){
+        int cache_index = yc_cache_slot[yh];
+
+        if(cache_index < 0)
+          cache_index = yc_cache_rows - 1;
+        kyc_row =
+          kyc_cache + (size_t)cache_index*(size_t)nprof_y;
+        if(yc_cache_owner[cache_index] != yh){
+          NPCategoricalProfileTileStatus tile_status;
+
+          tile_status =
+            np_categorical_profile_tile_fill_prevalidated(
+              &yc_profile_spec,
+              yh,
+              1,
+              kyc_row,
+              (size_t)nprof_y);
+          if(tile_status != NP_PROFILE_TILE_OK)
+            goto cleanup_cat_cvls;
+          yc_cache_owner[cache_index] = yh;
+        }
+      } else {
+        kyc_row = kyc + (size_t)yh*(size_t)nprof_y;
+      }
       for(j = 0; j < nprof_xy; j++){
         const int rep_j = xy_rep[j];
         const int xj = x_id[rep_j];
         const int yj = y_id[rep_j];
         quad_num += counts_xy[h]*counts_xy[j]*wxh*
-          kx[xg*nprof_x + xj]*kyc[yh*nprof_y + yj];
+          kx_row[xj]*kyc_row[yj];
       }
     }
 
     *cv += cxg*((quad_num/(den_full[xg]*den_full[xg])) -
                 2.0*(lin_num/den_loo));
+    }
+  } else {
+    int g0;
+
+    for(g0 = 0; g0 < nprof_xy; g0 += profile_group_width){
+      const int group_count =
+        MIN(profile_group_width, nprof_xy - g0);
+      int group_xg[NP_CDENS_PROFILE_GROUP_WIDTH];
+      int group_yg[NP_CDENS_PROFILE_GROUP_WIDTH];
+      double group_cxg[NP_CDENS_PROFILE_GROUP_WIDTH];
+      double group_den_loo[NP_CDENS_PROFILE_GROUP_WIDTH];
+      double group_lin[NP_CDENS_PROFILE_GROUP_WIDTH] = {0.0};
+      double group_quad[NP_CDENS_PROFILE_GROUP_WIDTH] = {0.0};
+      double *group_kx[NP_CDENS_PROFILE_GROUP_WIDTH];
+      double *group_kyn[NP_CDENS_PROFILE_GROUP_WIDTH];
+      int q;
+
+      for(q = 0; q < group_count; q++){
+        const int gq = g0 + q;
+        const int rep_g = xy_rep[gq];
+        const int xg = x_id[rep_g];
+        const int yg = y_id[rep_g];
+        const double cxg = counts_xy[gq];
+        double *kx_row;
+        double *kyn_row;
+
+        np_hot_loop_check_interrupt(gq,
+                                    nprof_xy,
+                                    profile_interrupt_stride);
+        group_xg[q] = xg;
+        group_yg[q] = yg;
+        group_cxg[q] = cxg;
+
+        if(use_x_cache){
+          int cache_index = x_cache_slot[xg];
+
+          if(cache_index < 0)
+            cache_index = x_cache_rows - x_scratch_rows + q;
+          kx_row =
+            kx_cache + (size_t)cache_index*(size_t)nprof_x;
+          if(x_cache_owner[cache_index] != xg){
+            NPCategoricalProfileTileStatus tile_status;
+
+            tile_status =
+              np_categorical_profile_tile_fill_prevalidated(
+                &x_profile_spec,
+                xg,
+                1,
+                kx_row,
+                (size_t)nprof_x);
+            if(tile_status != NP_PROFILE_TILE_OK)
+              goto cleanup_cat_cvls;
+            x_cache_owner[cache_index] = xg;
+          }
+          if(!R_FINITE(den_full[xg])){
+            den_full[xg] = 0.0;
+            for(h = 0; h < nprof_x; h++)
+              den_full[xg] += counts_x[h]*kx_row[h];
+            if(!(den_full[xg] > DBL_MIN) ||
+               (!R_FINITE(den_full[xg])))
+              goto cleanup_cat_cvls;
+          }
+        } else {
+          kx_row = kx + (size_t)xg*(size_t)nprof_x;
+        }
+        group_den_loo[q] = den_full[xg] - kx_row[xg];
+        if(!(group_den_loo[q] > DBL_MIN) ||
+           (!R_FINITE(group_den_loo[q])))
+          goto cleanup_cat_cvls;
+
+        if(use_yn_cache){
+          int cache_index = yn_cache_slot[yg];
+
+          if(cache_index < 0)
+            cache_index = yn_cache_rows - yn_scratch_rows + q;
+          kyn_row =
+            kyn_cache + (size_t)cache_index*(size_t)nprof_y;
+          if(yn_cache_owner[cache_index] != yg){
+            NPCategoricalProfileTileStatus tile_status;
+
+            tile_status =
+              np_categorical_profile_tile_fill_prevalidated(
+                &yn_profile_spec,
+                yg,
+                1,
+                kyn_row,
+                (size_t)nprof_y);
+            if(tile_status != NP_PROFILE_TILE_OK)
+              goto cleanup_cat_cvls;
+            yn_cache_owner[cache_index] = yg;
+          }
+        } else {
+          kyn_row = kyn + (size_t)yg*(size_t)nprof_y;
+        }
+        group_kx[q] = kx_row;
+        group_kyn[q] = kyn_row;
+
+        for(h = 0; h < nprof_xy; h++){
+          const int rep_h = xy_rep[h];
+          const int xh = x_id[rep_h];
+          const int yh = y_id[rep_h];
+          group_lin[q] +=
+            counts_xy[h]*kx_row[xh]*kyn_row[yh];
+        }
+        group_lin[q] -= kx_row[xg]*kyn_row[yg];
+      }
+
+      for(h = 0; h < nprof_xy; h++){
+        const int rep_h = xy_rep[h];
+        const int xh = x_id[rep_h];
+        const int yh = y_id[rep_h];
+        double *kyc_row;
+        int any_nonzero = 0;
+
+        for(q = 0; q < group_count; q++)
+          if(group_kx[q][xh] != 0.0){
+            any_nonzero = 1;
+            break;
+          }
+        if(!any_nonzero)
+          continue;
+
+        if(use_yc_cache){
+          int cache_index = yc_cache_slot[yh];
+
+          if(cache_index < 0)
+            cache_index = yc_cache_rows - 1;
+          kyc_row =
+            kyc_cache + (size_t)cache_index*(size_t)nprof_y;
+          if(yc_cache_owner[cache_index] != yh){
+            NPCategoricalProfileTileStatus tile_status;
+
+            tile_status =
+              np_categorical_profile_tile_fill_prevalidated(
+                &yc_profile_spec,
+                yh,
+                1,
+                kyc_row,
+                (size_t)nprof_y);
+            if(tile_status != NP_PROFILE_TILE_OK)
+              goto cleanup_cat_cvls;
+            yc_cache_owner[cache_index] = yh;
+          }
+        } else {
+          kyc_row = kyc + (size_t)yh*(size_t)nprof_y;
+        }
+
+        for(q = 0; q < group_count; q++){
+          const double wxh = group_kx[q][xh];
+
+          if(wxh == 0.0)
+            continue;
+          for(j = 0; j < nprof_xy; j++){
+            const int rep_j = xy_rep[j];
+            const int xj = x_id[rep_j];
+            const int yj = y_id[rep_j];
+            group_quad[q] += counts_xy[h]*counts_xy[j]*wxh*
+              group_kx[q][xj]*kyc_row[yj];
+          }
+        }
+      }
+
+      for(q = 0; q < group_count; q++)
+        *cv += group_cxg[q]*
+          ((group_quad[q]/
+            (den_full[group_xg[q]]*den_full[group_xg[q]])) -
+           2.0*(group_lin[q]/group_den_loo[q]));
+    }
   }
 
   *cv /= (double)num_obs;
-  ok = 1;
+  result = NP_CONDITIONAL_PROFILE_CV_SUCCESS;
 
 cleanup_cat_cvls:
   if(x_id != NULL) free(x_id);
@@ -28252,12 +28916,19 @@ cleanup_cat_cvls:
   if(profile_y_uno != NULL) free_tmat(profile_y_uno);
   if(profile_y_ord != NULL) free_tmat(profile_y_ord);
   if(counts_x != NULL) free(counts_x);
-  if(counts_y != NULL) free(counts_y);
   if(counts_xy != NULL) free(counts_xy);
-  if(kx != NULL) free(kx);
-  if(kyn != NULL) free(kyn);
-  if(kyc != NULL) free(kyc);
+  if(kernel_workspace != NULL) free(kernel_workspace);
   if(den_full != NULL) free(den_full);
+  if(lambda_x != NULL) free(lambda_x);
+  if(lambda_y != NULL) free(lambda_y);
+  if(x_cache_slot != NULL) free(x_cache_slot);
+  if(x_cache_owner != NULL) free(x_cache_owner);
+  if(yn_cache_slot != NULL) free(yn_cache_slot);
+  if(yn_cache_owner != NULL) free(yn_cache_owner);
+  if(yc_cache_slot != NULL) free(yc_cache_slot);
+  if(yc_cache_owner != NULL) free(yc_cache_owner);
+  if(x_cache_priority != NULL) free(x_cache_priority);
+  if(y_cache_priority != NULL) free(y_cache_priority);
   if(vsfx != NULL) free(vsfx);
   if(vsfy != NULL) free(vsfy);
   if(op_x != NULL) free(op_x);
@@ -28267,7 +28938,7 @@ cleanup_cat_cvls:
   if(kernel_ox != NULL) free(kernel_ox);
   if(kernel_uy != NULL) free(kernel_uy);
   if(kernel_oy != NULL) free(kernel_oy);
-  return ok ? 0 : 1;
+  return result;
 }
 
 static NPConditionalProfileCvStatus
