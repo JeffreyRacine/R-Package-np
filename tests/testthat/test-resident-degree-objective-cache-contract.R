@@ -61,8 +61,7 @@ test_that("resident npcdens cache keys bandwidths and polynomial degree", {
 })
 
 test_that("resident npcdens shadow bounds degree writes by allocated key length", {
-  src <- readLines(file.path(testthat::test_path("..", ".."), "src", "np.c"),
-                   warn = FALSE)
+  src <- readLines(np_test_source_path("src", "np.c"), warn = FALSE)
   text <- paste(src, collapse = "\n")
   expect_match(
     text,

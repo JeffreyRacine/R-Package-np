@@ -43,6 +43,24 @@ np_namespace_hygiene_root <- function() {
   stop("Could not locate np package root for namespace hygiene checks", call. = FALSE)
 }
 
+np_test_source_path <- function(...) {
+  root <- tryCatch(
+    np_namespace_hygiene_root(),
+    error = function(e) NULL
+  )
+  testthat::skip_if(
+    is.null(root),
+    "np package source is unavailable in this test context"
+  )
+
+  path <- file.path(root, ...)
+  testthat::skip_if_not(
+    file.exists(path),
+    paste("np package source file is unavailable:", path)
+  )
+  path
+}
+
 np_namespace_hygiene_scan <- function(root = np_namespace_hygiene_root(), pkg = "np") {
   root <- normalizePath(root, mustWork = TRUE)
 
