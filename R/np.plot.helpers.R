@@ -7801,11 +7801,7 @@
       adaptive_nn = BW_ADAP_NN
     ),
     int_MINIMIZE_IO = if (isTRUE(getOption("np.messages"))) IO_MIN_FALSE else IO_MIN_TRUE,
-    kerneval = switch(bws$ckertype,
-      gaussian = CKER_GAUSS + bws$ckerorder / 2 - 1,
-      epanechnikov = CKER_EPAN + bws$ckerorder / 2 - 1,
-      uniform = CKER_UNI
-    ),
+    kerneval = npContinuousKernelCode(bws),
     ukerneval = switch(bws$ukertype,
       aitchisonaitken = UKER_AIT,
       liracine = UKER_LR
@@ -7833,6 +7829,8 @@
     compute.ocg = FALSE,
     suppress.parallel = TRUE
   )
+  myopti <- c(myopti, npContinuousKernelDescriptorOptions(bws))
+  myopti <- c(myopti, list(divide.returned.kernel.weights = FALSE))
 
   cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
   asDouble <- function(data) if (is.null(data)) as.double(0.0) else as.double(data)
