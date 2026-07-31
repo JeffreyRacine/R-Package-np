@@ -7314,9 +7314,8 @@ void np_p_ukernelv(const int KERNEL,
   double (* const k[])(int, double, int) = { np_uaa, np_unli_racine,
                                              np_econvol_uaa, np_econvol_unli_racine,
                                              np_score_uaa, np_score_unli_racine };
-  const int nk = (int)(sizeof(k)/sizeof(k[0]));
-  const int kernel = (KERNEL >= 0 && KERNEL < nk) ? KERNEL : 0;
-  const int p_kernel = (P_KERNEL >= 0 && P_KERNEL < nk) ? P_KERNEL : 0;
+  const int kernel = KERNEL;
+  const int p_kernel = P_KERNEL;
 
   /* Unordered kernels depend only on same/different category; cache both values once. */
   const double kn_same = k[kernel](1, lambda, ncat);
@@ -7428,10 +7427,26 @@ void np_ukernelv(const int KERNEL,
   double * const xw = (bin_do_xw ? result : &unit_weight);
   double (* const k[])(int, double, int) = { np_uaa, np_unli_racine,
                                              np_econvol_uaa, np_econvol_unli_racine };
-  const int nk = (int)(sizeof(k)/sizeof(k[0]));
-  const int kernel = (KERNEL >= 0 && KERNEL < nk) ? KERNEL : 0;
-  const double kn_same = k[kernel](1, lambda, ncat);
-  const double kn_diff = k[kernel](0, lambda, ncat);
+  const int kernel = KERNEL;
+  double kn_same;
+  double kn_diff;
+  if((unsigned int)kernel < (unsigned int)(sizeof(k)/sizeof(k[0]))){
+    kn_same = k[kernel](1, lambda, ncat);
+    kn_diff = k[kernel](0, lambda, ncat);
+  } else {
+    switch(kernel){
+      case 4:
+        kn_same = np_score_uaa(1, lambda, ncat);
+        kn_diff = np_score_uaa(0, lambda, ncat);
+        break;
+      case 5:
+        kn_same = np_score_unli_racine(1, lambda, ncat);
+        kn_diff = np_score_unli_racine(0, lambda, ncat);
+        break;
+      default:
+        error("unsupported unordered kernel code");
+    }
+  }
   const int use_const_k = (!skip_upper_gate) &&
     np_disc_near_upper(kernel, lambda, ncat) &&
     np_disc_near_const_kernel(kn_same, kn_diff);
@@ -7532,7 +7547,6 @@ void np_p_okernelv(const int KERNEL,
     np_score_owang_van_ryzin, np_score_oli_racine, np_score_onli_racine, np_score_oracine_li_yan,
     np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine, np_cdf_oracine_li_yan
   };
-
   double *kbuf = scratch_kbuf;
   const int own_kbuf = (kbuf == NULL);
   if(own_kbuf){
@@ -7808,69 +7822,8 @@ void np_okernelv(const int KERNEL,
     case 13: NP_OKERNELV_APPLY(np_cdf_oli_racine); break;
     case 14: NP_OKERNELV_APPLY(np_cdf_onli_racine); break;
     case 15: NP_OKERNELV_APPLY(np_cdf_oracine_li_yan); break;
-    default: {
-      double (* const k[])(double, double, double, double, double) = {
-        np_owang_van_ryzin, np_oli_racine, np_onli_racine, np_oracine_li_yan,
-        np_econvol_owang_van_ryzin, np_onull, np_econvol_onli_racine, np_econvol_oracine_li_yan,
-        np_score_owang_van_ryzin, np_score_oli_racine, np_score_onli_racine, np_score_oracine_li_yan,
-        np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine, np_cdf_oracine_li_yan
-      };
-      const int kernel = (KERNEL >= 0 && KERNEL < (int)(sizeof(k)/sizeof(k[0]))) ? KERNEL : 0;
-
-      if(!swap_xxt){
-        if(xl == NULL){
-          if(!bin_do_xw){
-            for(i = 0; i < num_xt; i++)
-              result[i] = k[kernel](xt[i], x, lambda, cl, ch);
-          } else {
-            for(i = 0; i < num_xt; i++){
-              if(xw[i] == 0.0) continue;
-              result[i] = xw[i]*k[kernel](xt[i], x, lambda, cl, ch);
-            }
-          }
-        } else {
-          for(int m = 0; m < xl->n; m++){
-            const int istart = xl->istart[m];
-            const int nlev = xl->nlev[m];
-            if(!bin_do_xw){
-              for(i = istart; i < istart+nlev; i++)
-                result[i] = k[kernel](xt[i], x, lambda, cl, ch);
-            } else {
-              for(i = istart; i < istart+nlev; i++){
-                if(xw[i] == 0.0) continue;
-                result[i] = xw[i]*k[kernel](xt[i], x, lambda, cl, ch);
-              }
-            }
-          }
-        }
-      } else {
-        if(xl == NULL){
-          if(!bin_do_xw){
-            for(i = 0; i < num_xt; i++)
-              result[i] = k[kernel](x, xt[i], lambda, cl, ch);
-          } else {
-            for(i = 0; i < num_xt; i++){
-              if(xw[i] == 0.0) continue;
-              result[i] = xw[i]*k[kernel](x, xt[i], lambda, cl, ch);
-            }
-          }
-        } else {
-          for(int m = 0; m < xl->n; m++){
-            const int istart = xl->istart[m];
-            const int nlev = xl->nlev[m];
-            if(!bin_do_xw){
-              for(i = istart; i < istart+nlev; i++)
-                result[i] = k[kernel](x, xt[i], lambda, cl, ch);
-            } else {
-              for(i = istart; i < istart+nlev; i++){
-                if(xw[i] == 0.0) continue;
-                result[i] = xw[i]*k[kernel](x, xt[i], lambda, cl, ch);
-              }
-            }
-          }
-        }
-      }
-    }
+    default:
+      error("unsupported ordered kernel code");
   }
 
 #undef NP_OKERNELV_APPLY
@@ -8730,6 +8683,20 @@ const int keep_kw_owner_local){
   // todo - add (better) support for ordered integral / convolution kernels
   for(l = (num_reg_continuous+num_reg_unordered); l < (num_reg_continuous + num_reg_unordered + num_reg_ordered); l++)
     KERNEL_ordered_reg_np[l - (num_reg_continuous + num_reg_unordered)] = KERNEL_ordered_reg[l - (num_reg_continuous + num_reg_unordered)] + OP_OFUN_OFFSETS[operator[l]];
+
+  /*
+   * Validate categorical operator dispatch once at the map-construction
+   * boundary. The vector microkernels are hot and may then index their
+   * canonical tables directly without per-row fallback branches.
+   */
+  for(l = 0; l < num_reg_unordered; l++)
+    if((KERNEL_unordered_reg_np[l] < 0) ||
+       (KERNEL_unordered_reg_np[l] > 5))
+      error("unsupported unordered kernel/operator combination");
+  for(l = 0; l < num_reg_ordered; l++)
+    if((KERNEL_ordered_reg_np[l] < 0) ||
+       (KERNEL_ordered_reg_np[l] > 15))
+      error("unsupported ordered kernel/operator combination");
 
   const int num_xt = is_adaptive?num_obs_eval:num_obs_train;
   const int progress_total = is_adaptive ? num_obs_train : num_obs_eval;
@@ -10045,9 +10012,6 @@ const int keep_kw_owner_local){
         np_score_owang_van_ryzin, np_score_oli_racine, np_score_onli_racine, np_score_oracine_li_yan,
         np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine, np_cdf_oracine_li_yan
       };
-      const int nuk = (int)(sizeof(ukf)/sizeof(ukf[0]));
-      const int nok = (int)(sizeof(okf)/sizeof(okf[0]));
-
       for(i = 0; i < nplist; i++){
         const int pid = disc_prof_list[i];
         const int ridx = disc_prof_rep[pid];
@@ -10055,8 +10019,7 @@ const int keep_kw_owner_local){
 
         for(kk = 0; kk < num_reg_unordered; kk++){
           if((disc_uno_const_ok != NULL) && disc_uno_const_ok[kk]) continue;
-          const int ku = (KERNEL_unordered_reg_np[kk] >= 0 && KERNEL_unordered_reg_np[kk] < nuk)
-            ? KERNEL_unordered_reg_np[kk] : 0;
+          const int ku = KERNEL_unordered_reg_np[kk];
           dprod *= ukf[ku]((xtu[kk][ridx] == xu[kk][j]), lambda[kk], num_categories[kk]);
           if(dprod == 0.0) break;
         }
@@ -10067,8 +10030,7 @@ const int keep_kw_owner_local){
             if((disc_ord_const_ok != NULL) && disc_ord_const_ok[kk] &&
                (ps_ok_nli || (operator[opidx] != OP_CONVOLUTION)))
               continue;
-            const int ko = (KERNEL_ordered_reg_np[kk] >= 0 && KERNEL_ordered_reg_np[kk] < nok)
-              ? KERNEL_ordered_reg_np[kk] : 0;
+            const int ko = KERNEL_ordered_reg_np[kk];
             const double c1 = swap_xxt ? xo[kk][j] : xto[kk][ridx];
             const double c2 = swap_xxt ? xto[kk][ridx] : xo[kk][j];
             dprod *= okf[ko](c1, c2, lambda[num_reg_unordered + kk], disc_ord_cl[kk], disc_ord_ch[kk]);
