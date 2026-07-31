@@ -25,6 +25,7 @@
 #include "jksum_lp_row.h"
 #include "jksum_lp_solve.h"
 #include "np_native_safety.h"
+#include "categorical_profile_tile.h"
 
 #include "hash.h"
 #include "tree.h"
@@ -74,10 +75,12 @@ extern void vvrec(double *, const double *, const int *);
 #define NP_NOINLINE __attribute__((noinline))
 #define NP_ALWAYS_INLINE inline __attribute__((always_inline))
 #define NP_HOT_ALIGN __attribute__((aligned(256)))
+#define NP_UNLIKELY(value) __builtin_expect(!!(value), 0)
 #else
 #define NP_NOINLINE
 #define NP_ALWAYS_INLINE inline
 #define NP_HOT_ALIGN
+#define NP_UNLIKELY(value) (value)
 #endif
 #ifdef MPI2
 
@@ -8153,6 +8156,31 @@ typedef struct {
   int ncol_W;
 } NP_DualPowerCtx;
 
+typedef int (*NP_KernelRowTileConsumerFn)(
+  void *state,
+  int eval_start,
+  int eval_count,
+  const double *weights,
+  int num_weights,
+  const double *weighted_sum,
+  int weighted_sum_length);
+
+/*
+ * Optional bounded output sink for consumers that need complete kernel rows
+ * but must not retain the full evaluation-by-training matrix. The caller owns
+ * the row-major weight buffer and its state; that buffer is also the engine's
+ * kw destination. Only serial, non-tree traversal is currently supported.
+ */
+typedef struct {
+  NP_KernelRowTileConsumerFn consume;
+  void *state;
+  double *weights;
+  size_t weight_elements;
+  int capacity_rows;
+  int count_rows;
+  int eval_start;
+} NP_KernelRowTileSink;
+
 typedef struct {
   const double *data;
   double * const *matrix_W;
@@ -8161,6 +8189,7 @@ typedef struct {
   int num_weights;
   int symmetric;
   int runtime_options_frozen;
+  NP_KernelRowTileSink *row_tile_sink;
 } NP_OuterPackCtx;
 
 static int np_hot_loop_interrupt_stride(const int total)
@@ -9256,6 +9285,27 @@ const NP_OuterPackCtx * const outer_pack_ctx){
 
   const int interrupt_total = (je >= js) ? (je - js + 1) : 0;
   const int interrupt_stride = np_hot_loop_interrupt_stride(interrupt_total);
+  NP_KernelRowTileSink * const row_tile_sink =
+    (outer_pack_ctx == NULL) ? NULL : outer_pack_ctx->row_tile_sink;
+
+  if((row_tile_sink != NULL) &&
+     ((row_tile_sink->consume == NULL) ||
+      (row_tile_sink->weights == NULL) ||
+      (row_tile_sink->weight_elements == 0U) ||
+      (row_tile_sink->capacity_rows <= 0) ||
+      (num_xt <= 0) ||
+      ((size_t)row_tile_sink->capacity_rows >
+       SIZE_MAX/(size_t)num_xt) ||
+      ((size_t)row_tile_sink->capacity_rows*(size_t)num_xt >
+       row_tile_sink->weight_elements) ||
+      (row_tile_sink->count_rows != 0) ||
+      (weighted_sum == NULL) ||
+      (kw != row_tile_sink->weights) ||
+      np_ks_tree_use ||
+      (!suppress_parallel))){
+    status = KWSNP_ERR_BADINVOC;
+    goto cleanup;
+  }
 
     /* do sums */
   for(j=js; j <= je; j++,
@@ -9907,14 +9957,47 @@ const NP_OuterPackCtx * const outer_pack_ctx){
 
     }
 
-    if(kw != NULL){ 
-      // if using adaptive bandwidths, kw is returned transposed
-      if(bandwidth_divide_weights)
-        for(i = 0; i < num_xt; i++)
-          kw[j*num_xt + i] = tprod[i]/dband;
-      else
-        for(i = 0; i < num_xt; i++)
-          kw[j*num_xt + i] = tprod[i];
+    if(kw != NULL){
+      if(NP_UNLIKELY(row_tile_sink != NULL)){
+        NP_KernelRowTileSink * const sink = row_tile_sink;
+        double * const tile_row =
+          sink->weights + (size_t)sink->count_rows*(size_t)num_xt;
+
+        if(sink->count_rows == 0)
+          sink->eval_start = j;
+        if(bandwidth_divide_weights)
+          for(i = 0; i < num_xt; i++)
+            tile_row[i] = tprod[i]/dband;
+        else
+          for(i = 0; i < num_xt; i++)
+            tile_row[i] = tprod[i];
+        sink->count_rows++;
+
+        if((sink->count_rows == sink->capacity_rows) || (j == je)){
+          const double * const tile_weighted_sum =
+            weighted_sum +
+            (size_t)sink->eval_start*(size_t)sum_element_length;
+          if(sink->consume(sink->state,
+                           sink->eval_start,
+                           sink->count_rows,
+                           sink->weights,
+                           num_xt,
+                           tile_weighted_sum,
+                           sum_element_length) != 0){
+            status = KWSNP_ERR_BADINVOC;
+            goto cleanup;
+          }
+          sink->count_rows = 0;
+        }
+      } else {
+        // if using adaptive bandwidths, kw is returned transposed
+        if(bandwidth_divide_weights)
+          for(i = 0; i < num_xt; i++)
+            kw[j*num_xt + i] = tprod[i]/dband;
+        else
+          for(i = 0; i < num_xt; i++)
+            kw[j*num_xt + i] = tprod[i];
+      }
     }
 
     if((kernel_weighted_sum_pkw_extern != NULL) && (kernel_weighted_sum_pkw_nvar_extern > 0)){
@@ -15284,7 +15367,233 @@ finish_cv_path:
   return(cv);
 }
 
-static int np_distribution_cvls_ordered_profile_stream(
+typedef struct {
+  int nprof_train;
+  int nprof_eval;
+  int num_reg_ordered;
+  int cdfontrain;
+  int num_obs_train;
+  const double *counts_train;
+  const double *counts_eval;
+  double * const *profile_train;
+  double * const *profile_eval;
+  double cv;
+} NPDistributionProfileCvConsumer;
+
+typedef enum {
+  NP_DISTRIBUTION_PROFILE_CV_SUCCESS = 0,
+  NP_DISTRIBUTION_PROFILE_CV_NOT_APPLICABLE = 1,
+  NP_DISTRIBUTION_PROFILE_CV_FAILURE = 2
+} NPDistributionProfileCvStatus;
+
+/*
+ * Keep the compressed ordered-profile CVLS workspace absolutely bounded.
+ * The 64 MiB serial budget retained the gain across q = 1..5 and is
+ * independent of n and p.
+ */
+static const size_t np_distribution_profile_cv_serial_tile_max_bytes =
+  (size_t)64U*(size_t)1024U*(size_t)1024U;
+
+static NP_ALWAYS_INLINE double np_distribution_profile_cv_update(
+double cv,
+double count_train,
+double count_eval,
+int delete_profile,
+int indicator,
+double fitted_cdf_sum,
+double profile_weight,
+double denominator){
+  double multiplicity = count_train*count_eval;
+
+  if(delete_profile)
+    multiplicity -= count_train;
+  if(multiplicity > 0.0){
+    const double tvd =
+      ((double)indicator) -
+      (fitted_cdf_sum - profile_weight)/denominator;
+    cv += multiplicity*tvd*tvd;
+  }
+  return cv;
+}
+
+static int np_distribution_profile_cv_consume_tile(
+void *state,
+int eval_start,
+int eval_count,
+const double *weights,
+int num_weights,
+const double *weighted_sum,
+int weighted_sum_length){
+  NPDistributionProfileCvConsumer * const consumer =
+    (NPDistributionProfileCvConsumer *)state;
+  const double *counts_train;
+  const double *counts_eval;
+  double * const *profile_train;
+  double * const *profile_eval;
+  double denominator;
+  double cv;
+  int nprof_train, num_reg_ordered, cdfontrain;
+  int row, g, l;
+
+  if((consumer == NULL) ||
+     (weights == NULL) ||
+     (weighted_sum == NULL) ||
+     (weighted_sum_length != 1) ||
+     (num_weights != consumer->nprof_train) ||
+     (eval_start < 0) ||
+     (eval_count <= 0) ||
+     (eval_count > consumer->nprof_eval) ||
+     (eval_start > consumer->nprof_eval - eval_count))
+    return 1;
+
+  counts_train = consumer->counts_train;
+  counts_eval = consumer->counts_eval;
+  profile_train = consumer->profile_train;
+  profile_eval = consumer->profile_eval;
+  denominator = (double)consumer->num_obs_train - 1.0;
+  nprof_train = consumer->nprof_train;
+  num_reg_ordered = consumer->num_reg_ordered;
+  cdfontrain = consumer->cdfontrain;
+  cv = consumer->cv;
+  if(num_reg_ordered == 1){
+    const double * const train0 = profile_train[0];
+    const double * const eval0 = profile_eval[0];
+
+    for(row = 0; row < eval_count; row++){
+      const int eval_index = eval_start + row;
+      const double * const row_weights =
+        weights + (size_t)row*(size_t)num_weights;
+      const double fitted_cdf_sum =
+        weighted_sum[(size_t)row*(size_t)weighted_sum_length];
+
+      for(g = 0; g < nprof_train; g++)
+        cv = np_distribution_profile_cv_update(
+          cv,
+          counts_train[g],
+          counts_eval[eval_index],
+          cdfontrain && (g == eval_index),
+          train0[g] <= eval0[eval_index],
+          fitted_cdf_sum,
+          row_weights[g],
+          denominator);
+    }
+  } else if(num_reg_ordered == 2){
+    const double * const train0 = profile_train[0];
+    const double * const train1 = profile_train[1];
+    const double * const eval0 = profile_eval[0];
+    const double * const eval1 = profile_eval[1];
+
+    for(row = 0; row < eval_count; row++){
+      const int eval_index = eval_start + row;
+      const double * const row_weights =
+        weights + (size_t)row*(size_t)num_weights;
+      const double fitted_cdf_sum =
+        weighted_sum[(size_t)row*(size_t)weighted_sum_length];
+
+      for(g = 0; g < nprof_train; g++)
+        cv = np_distribution_profile_cv_update(
+          cv,
+          counts_train[g],
+          counts_eval[eval_index],
+          cdfontrain && (g == eval_index),
+          (train0[g] <= eval0[eval_index]) &&
+          (train1[g] <= eval1[eval_index]),
+          fitted_cdf_sum,
+          row_weights[g],
+          denominator);
+    }
+  } else if(num_reg_ordered == 3){
+    const double * const train0 = profile_train[0];
+    const double * const train1 = profile_train[1];
+    const double * const train2 = profile_train[2];
+    const double * const eval0 = profile_eval[0];
+    const double * const eval1 = profile_eval[1];
+    const double * const eval2 = profile_eval[2];
+
+    for(row = 0; row < eval_count; row++){
+      const int eval_index = eval_start + row;
+      const double * const row_weights =
+        weights + (size_t)row*(size_t)num_weights;
+      const double fitted_cdf_sum =
+        weighted_sum[(size_t)row*(size_t)weighted_sum_length];
+
+      for(g = 0; g < nprof_train; g++)
+        cv = np_distribution_profile_cv_update(
+          cv,
+          counts_train[g],
+          counts_eval[eval_index],
+          cdfontrain && (g == eval_index),
+          (train0[g] <= eval0[eval_index]) &&
+          (train1[g] <= eval1[eval_index]) &&
+          (train2[g] <= eval2[eval_index]),
+          fitted_cdf_sum,
+          row_weights[g],
+          denominator);
+    }
+  } else if(num_reg_ordered == 4){
+    const double * const train0 = profile_train[0];
+    const double * const train1 = profile_train[1];
+    const double * const train2 = profile_train[2];
+    const double * const train3 = profile_train[3];
+    const double * const eval0 = profile_eval[0];
+    const double * const eval1 = profile_eval[1];
+    const double * const eval2 = profile_eval[2];
+    const double * const eval3 = profile_eval[3];
+
+    for(row = 0; row < eval_count; row++){
+      const int eval_index = eval_start + row;
+      const double * const row_weights =
+        weights + (size_t)row*(size_t)num_weights;
+      const double fitted_cdf_sum =
+        weighted_sum[(size_t)row*(size_t)weighted_sum_length];
+
+      for(g = 0; g < nprof_train; g++)
+        cv = np_distribution_profile_cv_update(
+          cv,
+          counts_train[g],
+          counts_eval[eval_index],
+          cdfontrain && (g == eval_index),
+          (train0[g] <= eval0[eval_index]) &&
+          (train1[g] <= eval1[eval_index]) &&
+          (train2[g] <= eval2[eval_index]) &&
+          (train3[g] <= eval3[eval_index]),
+          fitted_cdf_sum,
+          row_weights[g],
+          denominator);
+    }
+  } else {
+    for(row = 0; row < eval_count; row++){
+      const int eval_index = eval_start + row;
+      const double * const row_weights =
+        weights + (size_t)row*(size_t)num_weights;
+      const double fitted_cdf_sum =
+        weighted_sum[(size_t)row*(size_t)weighted_sum_length];
+
+      for(g = 0; g < nprof_train; g++){
+        int indy = 1;
+
+        for(l = 0; (l < num_reg_ordered) && (indy != 0); l++)
+          indy *=
+            (profile_train[l][g] <= profile_eval[l][eval_index]);
+        cv = np_distribution_profile_cv_update(
+          cv,
+          counts_train[g],
+          counts_eval[eval_index],
+          cdfontrain && (g == eval_index),
+          indy,
+          fitted_cdf_sum,
+          row_weights[g],
+          denominator);
+      }
+    }
+  }
+  consumer->cv = cv;
+
+  return 0;
+}
+
+static NPDistributionProfileCvStatus
+np_distribution_cvls_ordered_profile_stream(
 int KERNEL_den,
 int KERNEL_den_unordered,
 int KERNEL_den_ordered,
@@ -15306,13 +15615,28 @@ int * num_categories,
 double ** matrix_categorical_vals,
 double * cv){
 
-  int g, h, l, status = 1;
+  int g, h, l, engine_status;
+  int profile_build_ok;
+  int storage_ok;
+  NPDistributionProfileCvStatus result =
+    NP_DISTRIBUTION_PROFILE_CV_FAILURE;
   int *train_id = NULL, *train_rep = NULL, *eval_id = NULL, *eval_rep = NULL;
   int nprof_train = 0, nprof_eval = 0;
   int *kernel_o = NULL, *operator = NULL;
   double **profile_train = NULL, **profile_eval = NULL;
-  double *lambda = NULL, *counts_train = NULL, *counts_eval = NULL, *cdf_sum = NULL, *kw = NULL;
+  double *lambda = NULL, *counts_train = NULL, *counts_eval = NULL;
+  double *cdf_sum = NULL, *kw_tile = NULL;
+  size_t row_elements = 0U, row_bytes = 0U;
+  size_t tile_elements = 0U, tile_bytes = 0U;
+  const size_t tile_max_bytes =
+    np_distribution_profile_cv_serial_tile_max_bytes;
+  size_t tile_capacity_rows;
+  int tile_rows;
+  NPCategoricalProfileTileStatus tile_status;
   double *profile_y[1];
+  NPDistributionProfileCvConsumer consumer = {0};
+  NP_KernelRowTileSink row_tile_sink = {0};
+  NP_OuterPackCtx execution_ctx = {.row_tile_sink = &row_tile_sink};
 
   (void)KERNEL_den_unordered;
   (void)matrix_X_unordered_train;
@@ -15321,48 +15645,85 @@ double * cv){
   (void)matrix_X_continuous_eval;
 
   if((cv == NULL) || (vsf == NULL))
-    return 1;
+    return NP_DISTRIBUTION_PROFILE_CV_FAILURE;
   if((int_TREE_PROFILE_X != NP_TREE_TRUE) ||
      (BANDWIDTH_den != BW_FIXED) ||
      (num_obs_train <= 1) ||
      (num_reg_unordered != 0) ||
      (num_reg_continuous != 0) ||
      (num_reg_ordered <= 0))
-    return 1;
+    return NP_DISTRIBUTION_PROFILE_CV_NOT_APPLICABLE;
   if((!cdfontrain) && (num_obs_eval <= 0))
-    return 1;
+    return NP_DISTRIBUTION_PROFILE_CV_NOT_APPLICABLE;
 
-  if(!np_build_discrete_profile_index(num_obs_train,
-                                      0,
-                                      num_reg_ordered,
-                                      NULL,
-                                      matrix_X_ordered_train,
-                                      &train_id,
-                                      &train_rep,
-                                      &nprof_train))
+  profile_build_ok =
+    np_build_discrete_profile_index(num_obs_train,
+                                    0,
+                                    num_reg_ordered,
+                                    NULL,
+                                    matrix_X_ordered_train,
+                                    &train_id,
+                                    &train_rep,
+                                    &nprof_train);
+  if(!profile_build_ok)
     goto cleanup_profile_cdf;
 
   if(cdfontrain){
     eval_id = train_id;
     eval_rep = train_rep;
     nprof_eval = nprof_train;
-  } else if(!np_build_discrete_profile_index(num_obs_eval,
-                                             0,
-                                             num_reg_ordered,
-                                             NULL,
-                                             matrix_X_ordered_eval,
-                                             &eval_id,
-                                             &eval_rep,
-                                             &nprof_eval)){
-    goto cleanup_profile_cdf;
+  } else {
+    profile_build_ok =
+      np_build_discrete_profile_index(num_obs_eval,
+                                      0,
+                                      num_reg_ordered,
+                                      NULL,
+                                      matrix_X_ordered_eval,
+                                      &eval_id,
+                                      &eval_rep,
+                                      &nprof_eval);
+    if(!profile_build_ok)
+      goto cleanup_profile_cdf;
   }
 
   if((nprof_train <= 0) || (nprof_eval <= 0) ||
-     (4*nprof_train > 3*num_obs_train) ||
-     ((!cdfontrain) && (4*nprof_eval > 3*num_obs_eval)))
+     ((int64_t)4*nprof_train > (int64_t)3*num_obs_train) ||
+     ((!cdfontrain) &&
+      ((int64_t)4*nprof_eval > (int64_t)3*num_obs_eval))){
+    result = NP_DISTRIBUTION_PROFILE_CV_NOT_APPLICABLE;
     goto cleanup_profile_cdf;
-  if(((double)nprof_train * (double)nprof_eval) > (double)INT_MAX)
+  }
+
+  tile_status =
+    np_categorical_profile_tile_bytes((size_t)nprof_train,
+                                      1U,
+                                      &row_elements,
+                                      &row_bytes);
+  if((tile_status != NP_PROFILE_TILE_OK) ||
+     (row_elements != (size_t)nprof_train) ||
+     (row_bytes > tile_max_bytes)){
+    result = NP_DISTRIBUTION_PROFILE_CV_NOT_APPLICABLE;
     goto cleanup_profile_cdf;
+  }
+  tile_capacity_rows = tile_max_bytes/row_bytes;
+  if(tile_capacity_rows > (size_t)nprof_eval)
+    tile_capacity_rows = (size_t)nprof_eval;
+  if((tile_capacity_rows == 0U) ||
+     (tile_capacity_rows > (size_t)INT_MAX)){
+    result = NP_DISTRIBUTION_PROFILE_CV_NOT_APPLICABLE;
+    goto cleanup_profile_cdf;
+  }
+  tile_rows = (int)tile_capacity_rows;
+  tile_status =
+    np_categorical_profile_tile_bytes((size_t)nprof_train,
+                                      tile_capacity_rows,
+                                      &tile_elements,
+                                      &tile_bytes);
+  if((tile_status != NP_PROFILE_TILE_OK) ||
+     (tile_bytes > tile_max_bytes)){
+    result = NP_DISTRIBUTION_PROFILE_CV_NOT_APPLICABLE;
+    goto cleanup_profile_cdf;
+  }
 
   profile_train = alloc_tmatd(nprof_train, num_reg_ordered);
   profile_eval = cdfontrain ? profile_train : alloc_tmatd(nprof_eval, num_reg_ordered);
@@ -15372,17 +15733,19 @@ double * cv){
   counts_train = alloc_vecd(nprof_train);
   counts_eval = alloc_vecd(nprof_eval);
   cdf_sum = alloc_vecd(nprof_eval);
-  kw = alloc_vecd(nprof_eval*nprof_train);
+  kw_tile = (double *)malloc(tile_bytes);
 
-  if((profile_train == NULL) ||
-     ((!cdfontrain) && (profile_eval == NULL)) ||
-     (kernel_o == NULL) ||
-     (operator == NULL) ||
-     (lambda == NULL) ||
-     (counts_train == NULL) ||
-     (counts_eval == NULL) ||
-     (cdf_sum == NULL) ||
-     (kw == NULL))
+  storage_ok =
+    (profile_train != NULL) &&
+    (cdfontrain || (profile_eval != NULL)) &&
+    (kernel_o != NULL) &&
+    (operator != NULL) &&
+    (lambda != NULL) &&
+    (counts_train != NULL) &&
+    (counts_eval != NULL) &&
+    (cdf_sum != NULL) &&
+    (kw_tile != NULL);
+  if(!storage_ok)
     goto cleanup_profile_cdf;
 
   for(g = 0; g < nprof_train; g++){
@@ -15441,84 +15804,83 @@ double * cv){
                            lambda) == 1)
     goto cleanup_profile_cdf;
 
-  status = kernel_weighted_sum_np(NULL,
-                                  NULL,
-                                  kernel_o,
-                                  BANDWIDTH_den,
-                                  nprof_train,
-                                  nprof_eval,
-                                  0,
-                                  num_reg_ordered,
-                                  0,
-                                  0,
-                                  0,
-                                  1,
-                                  1,
-                                  0,
-                                  0,
-                                  0,
-                                  0,
-                                  0,
-                                  operator,
-                                  OP_NOOP,
-                                  0,
-                                  0,
-                                  NULL,
-                                  1,
-                                  1,
-                                  0,
-                                  NP_TREE_FALSE,
-                                  0,
-                                  NULL,
-                                  NULL, NULL, NULL,
-                                  NULL,
-                                  profile_train,
-                                  NULL,
-                                  NULL,
-                                  profile_eval,
-                                  NULL,
-                                  profile_y,
-                                  NULL,
-                                  NULL,
-                                  vsf,
-                                  1,
-                                  NULL,
-                                  NULL,
-                                  lambda,
-                                  num_categories,
-                                  matrix_categorical_vals,
-                                  NULL,
-                                  cdf_sum,
-                                  NULL,
-                                  kw,
-                                  NULL);
-  if(status != 0)
+  consumer.nprof_train = nprof_train;
+  consumer.nprof_eval = nprof_eval;
+  consumer.num_reg_ordered = num_reg_ordered;
+  consumer.cdfontrain = cdfontrain;
+  consumer.num_obs_train = num_obs_train;
+  consumer.counts_train = counts_train;
+  consumer.counts_eval = counts_eval;
+  consumer.profile_train = profile_train;
+  consumer.profile_eval = profile_eval;
+  consumer.cv = 0.0;
+  row_tile_sink.consume = np_distribution_profile_cv_consume_tile;
+  row_tile_sink.state = &consumer;
+  row_tile_sink.weights = kw_tile;
+  row_tile_sink.weight_elements = tile_elements;
+  row_tile_sink.capacity_rows = tile_rows;
+
+  engine_status = kernel_weighted_sum_np_ctx_ex(NULL,
+                                         NULL,
+                                         kernel_o,
+                                         BANDWIDTH_den,
+                                         nprof_train,
+                                         nprof_eval,
+                                         0,
+                                         num_reg_ordered,
+                                         0,
+                                         0,
+                                         0,
+                                         1,
+                                         1,
+                                         0,
+                                         0,
+                                         0,
+                                         0,
+                                         0,
+                                         operator,
+                                         OP_NOOP,
+                                         0,
+                                         0,
+                                         NULL,
+                                         1,
+                                         1,
+                                         0,
+                                         NP_TREE_FALSE,
+                                         0,
+                                         NULL,
+                                         NULL, NULL, NULL,
+                                         NULL,
+                                         profile_train,
+                                         NULL,
+                                         NULL,
+                                         profile_eval,
+                                         NULL,
+                                         profile_y,
+                                         NULL,
+                                         NULL,
+                                         vsf,
+                                         1,
+                                         NULL,
+                                         NULL,
+                                         lambda,
+                                         num_categories,
+                                         matrix_categorical_vals,
+                                         NULL,
+                                         cdf_sum,
+                                         NULL,
+                                         kw_tile,
+                                         NULL,
+                                         NULL,
+                                         &execution_ctx);
+  if((engine_status != 0) || (row_tile_sink.count_rows != 0))
     goto cleanup_profile_cdf;
 
-  *cv = 0.0;
-  for(h = 0; h < nprof_eval; h++){
-    for(g = 0; g < nprof_train; g++){
-      double multiplicity = counts_train[g]*counts_eval[h];
-      if(cdfontrain && (g == h))
-        multiplicity -= counts_train[g];
-      if(multiplicity <= 0.0)
-        continue;
-
-      {
-        int indy = 1;
-        double tvd;
-        for(l = 0; (l < num_reg_ordered) && (indy != 0); l++)
-          indy *= (profile_train[l][g] <= profile_eval[l][h]);
-        tvd = ((double)indy) - (cdf_sum[h] - kw[h*nprof_train + g])/((double)num_obs_train - 1.0);
-        *cv += multiplicity*tvd*tvd;
-      }
-    }
-  }
-
+  *cv = consumer.cv;
   *cv /= (double)num_obs_train*(double)(cdfontrain ? num_obs_train : num_obs_eval);
   if(R_FINITE(*cv)){
     np_fastcv_alllarge_hits++;
-    status = 0;
+    result = NP_DISTRIBUTION_PROFILE_CV_SUCCESS;
   }
 
 cleanup_profile_cdf:
@@ -15534,9 +15896,9 @@ cleanup_profile_cdf:
   if(counts_train != NULL) free(counts_train);
   if(counts_eval != NULL) free(counts_eval);
   if(cdf_sum != NULL) free(cdf_sum);
-  if(kw != NULL) free(kw);
+  if(kw_tile != NULL) free(kw_tile);
 
-  return status;
+  return result;
 }
 
 /*
@@ -15804,7 +16166,8 @@ double * vsf,
 int * num_categories,
 double ** matrix_categorical_vals,
 double * cv){
-  if(np_distribution_cvls_ordered_profile_stream(KERNEL_den,
+  const NPDistributionProfileCvStatus profile_status =
+    np_distribution_cvls_ordered_profile_stream(KERNEL_den,
                                                  KERNEL_den_unordered,
                                                  KERNEL_den_ordered,
                                                  BANDWIDTH_den,
@@ -15823,8 +16186,11 @@ double * cv){
                                                  vsf,
                                                  num_categories,
                                                  matrix_categorical_vals,
-                                                 cv) == 0)
+                                                 cv);
+  if(profile_status == NP_DISTRIBUTION_PROFILE_CV_SUCCESS)
     return 0;
+  if(profile_status == NP_DISTRIBUTION_PROFILE_CV_FAILURE)
+    return 1;
 
   NP_GateOverrideCtx gate_ctx_local;
   np_gate_ctx_clear(&gate_ctx_local);

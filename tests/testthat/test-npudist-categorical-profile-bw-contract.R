@@ -111,3 +111,61 @@ test_that("npudist generated ordered grids preserve interval-labelled levels", {
   )
   expect_true(is.finite(bw$fval))
 })
+
+test_that("npudist fixed profile objective covers scalar and generic dimensions", {
+  old.options <- options(
+    np.messages = FALSE,
+    np.tree = TRUE,
+    np.categorical.compress = FALSE
+  )
+  on.exit(options(old.options), add = TRUE)
+
+  make_data <- function(dimensions, value.count, seed) {
+    set.seed(seed)
+    values <- seq_len(value.count)
+    result <- replicate(
+      dimensions,
+      ordered(sample(values, 480L, replace = TRUE), levels = values),
+      simplify = FALSE
+    )
+    names(result) <- paste0("o", seq_len(dimensions))
+    as.data.frame(result)
+  }
+  evaluate <- function(dat, kernel, compress, cdf.on.train) {
+    options(np.categorical.compress = compress)
+    gdat <- if (cdf.on.train) NULL else dat[seq_len(240L), , drop = FALSE]
+    bandwidth <- npudistbw(
+      dat = dat,
+      gdat = gdat,
+      bws = seq(0.19, 0.31, length.out = ncol(dat)),
+      bwmethod = "cv.cdf",
+      bwtype = "fixed",
+      okertype = kernel,
+      do.full.integral = cdf.on.train,
+      bandwidth.compute = FALSE
+    )
+    npudistbw(
+      dat = dat,
+      gdat = gdat,
+      bws = bandwidth,
+      do.full.integral = cdf.on.train,
+      eval.only = TRUE
+    )
+  }
+
+  cases <- list(
+    make_data(1L, 8L, 2026073011L),
+    make_data(5L, 3L, 2026073015L)
+  )
+  for (dat in cases) {
+    for (kernel in c("wangvanryzin", "liracine", "racineliyan")) {
+      for (cdf.on.train in c(FALSE, TRUE)) {
+        dense <- evaluate(dat, kernel, FALSE, cdf.on.train)
+        profile <- evaluate(dat, kernel, TRUE, cdf.on.train)
+
+        expect_equal(profile$fval, dense$fval, tolerance = 1e-12)
+        expect_gt(profile$num.feval.fast, 0)
+      }
+    }
+  }
+})
