@@ -51,6 +51,7 @@ extern MPI_Comm	*comm;
 #include "beta_regression.h"
 #include "beta_conditional.h"
 #include "kernel_registry.h"
+#include "np_native_safety.h"
 #include "tree.h"
 
 static np_continuous_kernel_descriptor
@@ -119,6 +120,11 @@ static void *np_nomad_callback_calloc(size_t count, size_t size)
 #define NP_NOMAD_CALLBACK_CALLOC(count, type) \
   ((type *) np_nomad_callback_calloc((size_t)(count), sizeof(type)))
 #define NP_NOMAD_CALLBACK_FREE(ptr) free(ptr)
+
+#ifndef NP_BWM_CACHE_MAX_BYTES
+#define NP_BWM_CACHE_MAX_BYTES \
+  ((size_t)64U*(size_t)1024U*(size_t)1024U)
+#endif
 
 
 int int_DEBUG;
@@ -1094,9 +1100,13 @@ static int bwm_nn_cache_bandwidth_key_len = 0;
 static int bwm_nn_cache_integer_extra_params = 0;
 static size_t bwm_nn_cache_capacity = 0;
 static size_t bwm_nn_cache_size = 0;
+static size_t bwm_nn_cache_growth_size = 0;
 static int *bwm_nn_cache_keys = NULL;
 static double *bwm_nn_cache_values = NULL;
 static unsigned char *bwm_nn_cache_used = NULL;
+static int *bwm_nn_cache_dynamic_key = NULL;
+static int bwm_nn_cache_requested = 0;
+static int bwm_nn_cache_insert_enabled = 0;
 static double bwm_nn_cache_visits = 0.0;
 static double bwm_nn_cache_unique = 0.0;
 static double bwm_nn_cache_repeats = 0.0;
@@ -1108,9 +1118,12 @@ static int bwm_objective_cache_active = 0;
 static int bwm_objective_cache_key_len = 0;
 static size_t bwm_objective_cache_capacity = 0;
 static size_t bwm_objective_cache_size = 0;
+static size_t bwm_objective_cache_growth_size = 0;
 static double *bwm_objective_cache_keys = NULL;
 static double *bwm_objective_cache_values = NULL;
 static unsigned char *bwm_objective_cache_used = NULL;
+static int bwm_objective_cache_requested = 0;
+static int bwm_objective_cache_insert_enabled = 0;
 static double bwm_objective_cache_visits = 0.0;
 static double bwm_objective_cache_unique = 0.0;
 static double bwm_objective_cache_repeats = 0.0;
@@ -1929,11 +1942,16 @@ static void bwm_nn_cache_free(void)
   safe_free(bwm_nn_cache_keys);
   safe_free(bwm_nn_cache_values);
   safe_free(bwm_nn_cache_used);
+  safe_free(bwm_nn_cache_dynamic_key);
   bwm_nn_cache_keys = NULL;
   bwm_nn_cache_values = NULL;
   bwm_nn_cache_used = NULL;
+  bwm_nn_cache_dynamic_key = NULL;
   bwm_nn_cache_capacity = 0;
   bwm_nn_cache_size = 0;
+  bwm_nn_cache_growth_size = 0;
+  bwm_nn_cache_requested = 0;
+  bwm_nn_cache_insert_enabled = 0;
 }
 
 static void bwm_nn_cache_reset_stats(void)
@@ -1957,6 +1975,9 @@ static void bwm_objective_cache_free(void)
   bwm_objective_cache_used = NULL;
   bwm_objective_cache_capacity = 0;
   bwm_objective_cache_size = 0;
+  bwm_objective_cache_growth_size = 0;
+  bwm_objective_cache_requested = 0;
+  bwm_objective_cache_insert_enabled = 0;
 }
 
 static void bwm_objective_cache_reset_stats(void)
@@ -1999,24 +2020,95 @@ static void bwm_objective_cache_callback_option_end(void)
   bwm_objective_cache_callback_option_active = 0;
 }
 
-static int bwm_nn_cache_collective_enabled(int local_enabled)
+static int bwm_cache_key_length_checked(int first,
+                                        int second,
+                                        int third,
+                                        int fourth,
+                                        int *result)
 {
-#ifdef MPI2
-  int global_enabled = local_enabled ? 1 : 0;
-  if (comm[1] != MPI_COMM_NULL)
-    MPI_Allreduce(MPI_IN_PLACE, &global_enabled, 1, MPI_INT, MPI_MIN, comm[1]);
-  return global_enabled;
-#else
-  return local_enabled ? 1 : 0;
-#endif
+  size_t total;
+
+  if ((result == NULL) || (first < 0) || (second < 0) ||
+      (third < 0) || (fourth < 0) ||
+      !np_size_add_checked((size_t)first, (size_t)second, &total) ||
+      !np_size_add_checked(total, (size_t)third, &total) ||
+      !np_size_add_checked(total, (size_t)fourth, &total) ||
+      !np_size_to_int_checked(total, result))
+    return 0;
+  return 1;
+}
+
+static int bwm_cache_allocate_arrays(size_t capacity,
+                                     int key_len,
+                                     size_t key_element_size,
+                                     size_t fixed_bytes,
+                                     void **keys,
+                                     double **values,
+                                     unsigned char **used)
+{
+  size_t key_count;
+  size_t table_bytes;
+  NPNativeAllocStatus keys_status;
+  NPNativeAllocStatus values_status;
+  NPNativeAllocStatus used_status;
+
+  if ((keys == NULL) || (values == NULL) || (used == NULL))
+    return 0;
+  *keys = NULL;
+  *values = NULL;
+  *used = NULL;
+  if ((key_len <= 0) || (capacity == 0U) ||
+      ((capacity & (capacity - 1U)) != 0U) ||
+      !np_native_cache_table_bytes(capacity,
+                                   (size_t)key_len,
+                                   key_element_size,
+                                   fixed_bytes,
+                                   &table_bytes) ||
+      (table_bytes > NP_BWM_CACHE_MAX_BYTES) ||
+      !np_size_mul_checked(capacity, (size_t)key_len, &key_count))
+    return 0;
+
+  keys_status = np_native_calloc_array(keys, key_count, key_element_size);
+  values_status = keys_status == NP_NATIVE_ALLOC_OK
+    ? np_native_calloc_array((void **)values,
+                             capacity,
+                             sizeof(**values))
+    : keys_status;
+  used_status = values_status == NP_NATIVE_ALLOC_OK
+    ? np_native_calloc_array((void **)used,
+                             capacity,
+                             sizeof(**used))
+    : values_status;
+  if ((keys_status != NP_NATIVE_ALLOC_OK) ||
+      (values_status != NP_NATIVE_ALLOC_OK) ||
+      (used_status != NP_NATIVE_ALLOC_OK)) {
+    safe_free(*keys);
+    safe_free(*values);
+    safe_free(*used);
+    *keys = NULL;
+    *values = NULL;
+    *used = NULL;
+    return 0;
+  }
+  return 1;
 }
 
 static int bwm_nn_cache_collective_hit(int local_hit)
 {
 #ifdef MPI2
   int global_hit = local_hit ? 1 : 0;
-  if (bwm_nn_cache_active && comm[1] != MPI_COMM_NULL)
-    MPI_Allreduce(MPI_IN_PLACE, &global_hit, 1, MPI_INT, MPI_MIN, comm[1]);
+
+  /*
+   * Eligibility is rank-common. Keep every eligible rank in the incumbent
+   * one-integer hit consensus even if one rank could not allocate its table.
+   */
+  if (bwm_nn_cache_requested && comm[1] != MPI_COMM_NULL)
+    MPI_Allreduce(MPI_IN_PLACE,
+                  &global_hit,
+                  1,
+                  MPI_INT,
+                  MPI_MIN,
+                  comm[1]);
   return global_hit;
 #else
   return local_hit ? 1 : 0;
@@ -2027,8 +2119,14 @@ static int bwm_objective_cache_collective_hit(int local_hit)
 {
 #ifdef MPI2
   int global_hit = local_hit ? 1 : 0;
+
   if (comm[1] != MPI_COMM_NULL)
-    MPI_Allreduce(MPI_IN_PLACE, &global_hit, 1, MPI_INT, MPI_MIN, comm[1]);
+    MPI_Allreduce(MPI_IN_PLACE,
+                  &global_hit,
+                  1,
+                  MPI_INT,
+                  MPI_MIN,
+                  comm[1]);
   return global_hit;
 #else
   return local_hit ? 1 : 0;
@@ -2060,65 +2158,122 @@ static int bwm_nn_cache_key_equal(const int *stored, const int *key, int key_len
 
 static int bwm_nn_cache_alloc_table(size_t capacity)
 {
-  size_t nkey;
-  if (bwm_nn_cache_key_len <= 0)
-    return 0;
-  nkey = capacity * (size_t)bwm_nn_cache_key_len;
-  bwm_nn_cache_keys = (int *)calloc(nkey, sizeof(int));
-  bwm_nn_cache_values = (double *)calloc(capacity, sizeof(double));
-  bwm_nn_cache_used = (unsigned char *)calloc(capacity, sizeof(unsigned char));
-  if ((bwm_nn_cache_keys == NULL) ||
-      (bwm_nn_cache_values == NULL) ||
-      (bwm_nn_cache_used == NULL)) {
-    bwm_nn_cache_free();
+  int *keys = NULL;
+  double *values = NULL;
+  unsigned char *used = NULL;
+  int *dynamic_key = NULL;
+  size_t dynamic_key_bytes = 0U;
+  size_t growth_size;
+  int local_available;
+
+  if (!np_native_cache_growth_size(capacity, &growth_size) ||
+      ((bwm_nn_cache_key_len > 16) &&
+       !np_size_array_bytes_checked((size_t)bwm_nn_cache_key_len,
+                                    sizeof(*dynamic_key),
+                                    &dynamic_key_bytes)))
+    local_available = 0;
+  else
+    local_available =
+      bwm_cache_allocate_arrays(capacity,
+                                bwm_nn_cache_key_len,
+                                sizeof(*keys),
+                                dynamic_key_bytes,
+                                (void **)&keys,
+                                &values,
+                                &used);
+  if (local_available && (dynamic_key_bytes > 0U))
+    local_available =
+      np_native_malloc_array((void **)&dynamic_key,
+                             (size_t)bwm_nn_cache_key_len,
+                             sizeof(*dynamic_key)) == NP_NATIVE_ALLOC_OK;
+  if (!local_available) {
+    safe_free(keys);
+    safe_free(values);
+    safe_free(used);
+    safe_free(dynamic_key);
     bwm_nn_cache_alloc_failed = 1;
     bwm_nn_cache_active = 0;
     return 0;
   }
+
+  bwm_nn_cache_keys = keys;
+  bwm_nn_cache_values = values;
+  bwm_nn_cache_used = used;
+  bwm_nn_cache_dynamic_key = dynamic_key;
   bwm_nn_cache_capacity = capacity;
   bwm_nn_cache_size = 0;
+  bwm_nn_cache_growth_size = growth_size;
+  bwm_nn_cache_insert_enabled = 1;
   return 1;
 }
 
 static int bwm_nn_cache_rehash(size_t new_capacity)
 {
-  int *old_keys = bwm_nn_cache_keys;
-  double *old_values = bwm_nn_cache_values;
-  unsigned char *old_used = bwm_nn_cache_used;
-  size_t old_capacity = bwm_nn_cache_capacity;
+  int *new_keys = NULL;
+  double *new_values = NULL;
+  unsigned char *new_used = NULL;
+  size_t peak_bytes;
   size_t i;
+  size_t dynamic_key_bytes = 0U;
+  size_t new_growth_size;
+  int local_available;
 
-  bwm_nn_cache_keys = NULL;
-  bwm_nn_cache_values = NULL;
-  bwm_nn_cache_used = NULL;
-  bwm_nn_cache_capacity = 0;
-  bwm_nn_cache_size = 0;
-  if (!bwm_nn_cache_alloc_table(new_capacity)) {
-    safe_free(old_keys);
-    safe_free(old_values);
-    safe_free(old_used);
+  if (!np_native_cache_growth_size(new_capacity, &new_growth_size) ||
+      ((bwm_nn_cache_key_len > 16) &&
+       !np_size_array_bytes_checked((size_t)bwm_nn_cache_key_len,
+                                    sizeof(*bwm_nn_cache_dynamic_key),
+                                    &dynamic_key_bytes)))
+    local_available = 0;
+  else
+    local_available =
+      np_native_cache_rehash_peak_bytes(bwm_nn_cache_capacity,
+                                        new_capacity,
+                                        (size_t)bwm_nn_cache_key_len,
+                                        sizeof(*new_keys),
+                                        dynamic_key_bytes,
+                                        &peak_bytes) &&
+      (peak_bytes <= NP_BWM_CACHE_MAX_BYTES) &&
+      bwm_cache_allocate_arrays(new_capacity,
+                                bwm_nn_cache_key_len,
+                                sizeof(*new_keys),
+                                0U,
+                                (void **)&new_keys,
+                                &new_values,
+                                &new_used);
+
+  if (!local_available) {
+    safe_free(new_keys);
+    safe_free(new_values);
+    safe_free(new_used);
+    bwm_nn_cache_alloc_failed = 1;
+    bwm_nn_cache_insert_enabled = 0;
     return 0;
   }
 
-  for (i = 0; i < old_capacity; i++) {
-    if (old_used[i]) {
-      const int *key = old_keys + i * (size_t)bwm_nn_cache_key_len;
+  for (i = 0; i < bwm_nn_cache_capacity; i++) {
+    if (bwm_nn_cache_used[i]) {
+      const int *key =
+        bwm_nn_cache_keys + i * (size_t)bwm_nn_cache_key_len;
       uint64_t h = bwm_nn_cache_hash_key(key, bwm_nn_cache_key_len);
-      size_t slot = (size_t)(h & (uint64_t)(bwm_nn_cache_capacity - 1));
-      while (bwm_nn_cache_used[slot])
-        slot = (slot + 1) & (bwm_nn_cache_capacity - 1);
-      memcpy(bwm_nn_cache_keys + slot * (size_t)bwm_nn_cache_key_len,
+      size_t slot = (size_t)(h & (uint64_t)(new_capacity - 1U));
+      while (new_used[slot])
+        slot = (slot + 1U) & (new_capacity - 1U);
+      memcpy(new_keys + slot * (size_t)bwm_nn_cache_key_len,
              key,
              (size_t)bwm_nn_cache_key_len * sizeof(int));
-      bwm_nn_cache_values[slot] = old_values[i];
-      bwm_nn_cache_used[slot] = 1;
-      bwm_nn_cache_size++;
+      new_values[slot] = bwm_nn_cache_values[i];
+      new_used[slot] = 1;
     }
   }
 
-  safe_free(old_keys);
-  safe_free(old_values);
-  safe_free(old_used);
+  safe_free(bwm_nn_cache_keys);
+  safe_free(bwm_nn_cache_values);
+  safe_free(bwm_nn_cache_used);
+  bwm_nn_cache_keys = new_keys;
+  bwm_nn_cache_values = new_values;
+  bwm_nn_cache_used = new_used;
+  bwm_nn_cache_capacity = new_capacity;
+  bwm_nn_cache_growth_size = new_growth_size;
   return 1;
 }
 
@@ -2149,12 +2304,26 @@ static int bwm_nn_cache_insert(const int *key, double value)
 {
   uint64_t h;
   size_t slot;
+  size_t new_capacity;
 
   if (!bwm_nn_cache_active || bwm_nn_cache_capacity == 0)
     return 0;
+  if (!bwm_nn_cache_insert_enabled)
+    return 0;
 
-  if ((bwm_nn_cache_size + 1) * 10 >= bwm_nn_cache_capacity * 7) {
-    if (!bwm_nn_cache_rehash(bwm_nn_cache_capacity * 2))
+  if ((bwm_nn_cache_growth_size >= bwm_nn_cache_capacity) ||
+      (bwm_nn_cache_size > bwm_nn_cache_growth_size)) {
+    bwm_nn_cache_alloc_failed = 1;
+    bwm_nn_cache_insert_enabled = 0;
+    return 0;
+  }
+  if (bwm_nn_cache_size == bwm_nn_cache_growth_size) {
+    if (!np_size_mul_checked(bwm_nn_cache_capacity, 2U, &new_capacity)) {
+      bwm_nn_cache_alloc_failed = 1;
+      bwm_nn_cache_insert_enabled = 0;
+      return 0;
+    }
+    if (!bwm_nn_cache_rehash(new_capacity))
       return 0;
   }
 
@@ -2202,65 +2371,98 @@ static int bwm_objective_cache_key_equal(const double *stored,
 
 static int bwm_objective_cache_alloc_table(size_t capacity)
 {
-  size_t nkey;
-  if (bwm_objective_cache_key_len <= 0)
-    return 0;
-  nkey = capacity * (size_t)bwm_objective_cache_key_len;
-  bwm_objective_cache_keys = (double *)calloc(nkey, sizeof(double));
-  bwm_objective_cache_values = (double *)calloc(capacity, sizeof(double));
-  bwm_objective_cache_used = (unsigned char *)calloc(capacity, sizeof(unsigned char));
-  if ((bwm_objective_cache_keys == NULL) ||
-      (bwm_objective_cache_values == NULL) ||
-      (bwm_objective_cache_used == NULL)) {
-    bwm_objective_cache_free();
+  double *keys = NULL;
+  double *values = NULL;
+  unsigned char *used = NULL;
+  size_t growth_size;
+  const int local_available =
+    np_native_cache_growth_size(capacity, &growth_size) &&
+    bwm_cache_allocate_arrays(capacity,
+                              bwm_objective_cache_key_len,
+                              sizeof(*keys),
+                              0U,
+                              (void **)&keys,
+                              &values,
+                              &used);
+
+  if (!local_available) {
+    safe_free(keys);
+    safe_free(values);
+    safe_free(used);
     bwm_objective_cache_alloc_failed = 1;
     bwm_objective_cache_active = 0;
     return 0;
   }
+
+  bwm_objective_cache_keys = keys;
+  bwm_objective_cache_values = values;
+  bwm_objective_cache_used = used;
   bwm_objective_cache_capacity = capacity;
   bwm_objective_cache_size = 0;
+  bwm_objective_cache_growth_size = growth_size;
+  bwm_objective_cache_insert_enabled = 1;
   return 1;
 }
 
 static int bwm_objective_cache_rehash(size_t new_capacity)
 {
-  double *old_keys = bwm_objective_cache_keys;
-  double *old_values = bwm_objective_cache_values;
-  unsigned char *old_used = bwm_objective_cache_used;
-  size_t old_capacity = bwm_objective_cache_capacity;
+  double *new_keys = NULL;
+  double *new_values = NULL;
+  unsigned char *new_used = NULL;
+  size_t peak_bytes;
   size_t i;
+  size_t new_growth_size;
+  const int local_available =
+    np_native_cache_growth_size(new_capacity, &new_growth_size) &&
+    np_native_cache_rehash_peak_bytes(bwm_objective_cache_capacity,
+                                      new_capacity,
+                                      (size_t)bwm_objective_cache_key_len,
+                                      sizeof(*new_keys),
+                                      0U,
+                                      &peak_bytes) &&
+    (peak_bytes <= NP_BWM_CACHE_MAX_BYTES) &&
+    bwm_cache_allocate_arrays(new_capacity,
+                              bwm_objective_cache_key_len,
+                              sizeof(*new_keys),
+                              0U,
+                              (void **)&new_keys,
+                              &new_values,
+                              &new_used);
 
-  bwm_objective_cache_keys = NULL;
-  bwm_objective_cache_values = NULL;
-  bwm_objective_cache_used = NULL;
-  bwm_objective_cache_capacity = 0;
-  bwm_objective_cache_size = 0;
-  if (!bwm_objective_cache_alloc_table(new_capacity)) {
-    safe_free(old_keys);
-    safe_free(old_values);
-    safe_free(old_used);
+  if (!local_available) {
+    safe_free(new_keys);
+    safe_free(new_values);
+    safe_free(new_used);
+    bwm_objective_cache_alloc_failed = 1;
+    bwm_objective_cache_insert_enabled = 0;
     return 0;
   }
 
-  for (i = 0; i < old_capacity; i++) {
-    if (old_used[i]) {
-      const double *key = old_keys + i * (size_t)bwm_objective_cache_key_len;
+  for (i = 0; i < bwm_objective_cache_capacity; i++) {
+    if (bwm_objective_cache_used[i]) {
+      const double *key =
+        bwm_objective_cache_keys +
+        i * (size_t)bwm_objective_cache_key_len;
       uint64_t h = bwm_objective_cache_hash_key(key, bwm_objective_cache_key_len);
-      size_t slot = (size_t)(h & (uint64_t)(bwm_objective_cache_capacity - 1));
-      while (bwm_objective_cache_used[slot])
-        slot = (slot + 1) & (bwm_objective_cache_capacity - 1);
-      memcpy(bwm_objective_cache_keys + slot * (size_t)bwm_objective_cache_key_len,
+      size_t slot = (size_t)(h & (uint64_t)(new_capacity - 1U));
+      while (new_used[slot])
+        slot = (slot + 1U) & (new_capacity - 1U);
+      memcpy(new_keys + slot * (size_t)bwm_objective_cache_key_len,
              key,
              (size_t)bwm_objective_cache_key_len * sizeof(double));
-      bwm_objective_cache_values[slot] = old_values[i];
-      bwm_objective_cache_used[slot] = 1;
-      bwm_objective_cache_size++;
+      new_values[slot] = bwm_objective_cache_values[i];
+      new_used[slot] = 1;
     }
   }
 
-  safe_free(old_keys);
-  safe_free(old_values);
-  safe_free(old_used);
+  safe_free(bwm_objective_cache_keys);
+  safe_free(bwm_objective_cache_values);
+  safe_free(bwm_objective_cache_used);
+  bwm_objective_cache_keys = new_keys;
+  bwm_objective_cache_values = new_values;
+  bwm_objective_cache_used = new_used;
+  bwm_objective_cache_capacity = new_capacity;
+  bwm_objective_cache_growth_size = new_growth_size;
   return 1;
 }
 
@@ -2291,12 +2493,31 @@ static int bwm_objective_cache_insert(const double *key, double value)
 {
   uint64_t h;
   size_t slot;
+  size_t new_capacity;
 
   if (!bwm_objective_cache_active || bwm_objective_cache_capacity == 0)
     return 0;
+  if (!bwm_objective_cache_insert_enabled)
+    return 0;
 
-  if ((bwm_objective_cache_size + 1) * 10 >= bwm_objective_cache_capacity * 7) {
-    if (!bwm_objective_cache_rehash(bwm_objective_cache_capacity * 2))
+  if ((bwm_objective_cache_growth_size >=
+       bwm_objective_cache_capacity) ||
+      (bwm_objective_cache_size >
+       bwm_objective_cache_growth_size)) {
+    bwm_objective_cache_alloc_failed = 1;
+    bwm_objective_cache_insert_enabled = 0;
+    return 0;
+  }
+  if (bwm_objective_cache_size ==
+      bwm_objective_cache_growth_size) {
+    if (!np_size_mul_checked(bwm_objective_cache_capacity,
+                             2U,
+                             &new_capacity)) {
+      bwm_objective_cache_alloc_failed = 1;
+      bwm_objective_cache_insert_enabled = 0;
+      return 0;
+    }
+    if (!bwm_objective_cache_rehash(new_capacity))
       return 0;
   }
 
@@ -2349,16 +2570,22 @@ static void bwm_nn_cache_configure_for_powell(
   bwm_objective_cache_active = 0;
   bwm_objective_cache_key_len = 0;
 
-  objective_cache_enabled =
-    bwm_nn_cache_collective_enabled(bwm_objective_cache_user_enabled());
+  objective_cache_enabled = bwm_objective_cache_user_enabled();
 
   if (!eval_only && objective_cache_enabled) {
-    objective_key_len = num_continuous + num_unordered + num_ordered + extra_params;
-    if (objective_key_len > 0) {
+    bwm_objective_cache_requested = 1;
+    if (bwm_cache_key_length_checked(num_continuous,
+                                     num_unordered,
+                                     num_ordered,
+                                     extra_params,
+                                     &objective_key_len) &&
+        (objective_key_len > 0)) {
       bwm_objective_cache_key_len = objective_key_len;
       bwm_objective_cache_active = 1;
       if (!bwm_objective_cache_alloc_table(2048))
         bwm_objective_cache_key_len = 0;
+    } else {
+      bwm_objective_cache_alloc_failed = 1;
     }
   }
 
@@ -2368,6 +2595,7 @@ static void bwm_nn_cache_configure_for_powell(
   if (!objective_cache_enabled)
     return;
 
+  bwm_nn_cache_requested = 1;
   bwm_nn_cache_key_len = num_continuous;
   bwm_nn_cache_bandwidth_key_len = num_continuous;
   bwm_nn_cache_active = 1;
@@ -2390,16 +2618,29 @@ static void bwm_nn_cache_configure_for_degree_search(
                                     num_unordered,
                                     num_ordered);
 
-  if (eval_only || degree_params <= 0 || !bwm_objective_cache_active)
+  if (eval_only || degree_params <= 0 ||
+      !bwm_objective_cache_requested)
     return;
   if (!((bandwidth == BW_GEN_NN) || (bandwidth == BW_ADAP_NN)))
     return;
   if (num_continuous <= 0 || num_unordered != 0 || num_ordered != 0)
     return;
 
+  bwm_nn_cache_requested = 1;
+  if (!bwm_objective_cache_active)
+    return;
+
   bwm_nn_cache_bandwidth_key_len = num_continuous;
   bwm_nn_cache_integer_extra_params = degree_params;
-  bwm_nn_cache_key_len = num_continuous + degree_params;
+  if (!bwm_cache_key_length_checked(num_continuous,
+                                    degree_params,
+                                    0,
+                                    0,
+                                    &bwm_nn_cache_key_len)) {
+    bwm_nn_cache_alloc_failed = 1;
+    bwm_nn_cache_active = 0;
+    return;
+  }
   bwm_nn_cache_active = 1;
   if (!bwm_nn_cache_alloc_table(2048))
     return;
@@ -2408,16 +2649,11 @@ static void bwm_nn_cache_configure_for_degree_search(
 static int bwm_nn_cache_make_key(double *p, int **key_out, int *stack_key)
 {
   int i;
-  int *key = stack_key;
+  int *key =
+    (bwm_nn_cache_key_len > 16) ? bwm_nn_cache_dynamic_key : stack_key;
 
-  if (bwm_nn_cache_key_len > 16) {
-    key = (int *)malloc((size_t)bwm_nn_cache_key_len * sizeof(int));
-    if (key == NULL) {
-      bwm_nn_cache_alloc_failed = 1;
-      bwm_nn_cache_active = 0;
-      return 0;
-    }
-  }
+  if (key == NULL)
+    return 0;
 
   for (i = 0; i < bwm_nn_cache_bandwidth_key_len; i++)
     key[i] = np_fround(p[i + 1]);
@@ -2431,8 +2667,8 @@ static int bwm_nn_cache_make_key(double *p, int **key_out, int *stack_key)
 
 static void bwm_nn_cache_free_key(int *key, int *stack_key)
 {
-  if (key != stack_key)
-    free(key);
+  (void)key;
+  (void)stack_key;
 }
 
 static void bwm_nn_cache_note_raw_eval(void)
@@ -2546,8 +2782,29 @@ static void bwm_objective_cache_put(const double *p, double value)
   bwm_objective_cache_insert(p + 1, value);
 }
 
+static void bwm_cache_sync_failure_stats(void)
+{
+#ifdef MPI2
+  int failed[2];
+
+  /* Report any rank's failure once, without widening the hot-loop reduction. */
+  failed[0] = bwm_nn_cache_alloc_failed ? 1 : 0;
+  failed[1] = bwm_objective_cache_alloc_failed ? 1 : 0;
+  if (comm[1] != MPI_COMM_NULL)
+    MPI_Allreduce(MPI_IN_PLACE,
+                  failed,
+                  2,
+                  MPI_INT,
+                  MPI_MAX,
+                  comm[1]);
+  bwm_nn_cache_alloc_failed = failed[0];
+  bwm_objective_cache_alloc_failed = failed[1];
+#endif
+}
+
 static void bwm_nn_cache_write_stats(double *out)
 {
+  bwm_cache_sync_failure_stats();
   out[0] = bwm_nn_cache_active ? 1.0 : 0.0;
   out[1] = (double)bwm_nn_cache_key_len;
   out[2] = bwm_nn_cache_visits;

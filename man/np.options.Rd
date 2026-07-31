@@ -82,6 +82,13 @@
       \code{\link{optim}} evaluations. Set
       \code{options(np.objective.cache = FALSE)} to force repeated eligible
       candidates through the evaluator for diagnostic timing comparisons.
+      Each rank-local native Powell-side cache has an independent 64 MiB peak
+      workspace ceiling, including replacement storage during growth. If one
+      rank reaches the ceiling or cannot allocate a replacement, that rank
+      retains its existing entries. The existing all-rank cache-hit agreement
+      ensures that a candidate cached on only some ranks is evaluated normally;
+      the selected search continues, and diagnostics aggregate any rank's
+      failure through \code{allocation.failed}.
       This option is synchronized to MPI workers in
       autodispatch sessions. MADS/NOMAD solver caching is separate and is not
       controlled by this option, and the saturated extended-NN distance cache is

@@ -68,6 +68,82 @@ np_size_accumulate_array_bytes(size_t *total,
 }
 
 static inline int
+np_native_cache_table_bytes(size_t capacity,
+                            size_t key_width,
+                            size_t key_element_size,
+                            size_t fixed_bytes,
+                            size_t *result)
+{
+  size_t key_count;
+  size_t total = fixed_bytes;
+
+  if((result == NULL) || (capacity == 0U) || (key_width == 0U) ||
+     (key_element_size == 0U) ||
+     !np_size_mul_checked(capacity, key_width, &key_count) ||
+     !np_size_accumulate_array_bytes(&total, key_count, key_element_size) ||
+     !np_size_accumulate_array_bytes(&total, capacity, sizeof(double)) ||
+     !np_size_accumulate_array_bytes(&total,
+                                     capacity,
+                                     sizeof(unsigned char)))
+    return 0;
+  *result = total;
+  return 1;
+}
+
+static inline int
+np_native_cache_rehash_peak_bytes(size_t old_capacity,
+                                  size_t new_capacity,
+                                  size_t key_width,
+                                  size_t key_element_size,
+                                  size_t fixed_bytes,
+                                  size_t *result)
+{
+  size_t old_bytes;
+  size_t new_bytes;
+  size_t peak_bytes;
+
+  if((result == NULL) || (old_capacity == 0U) ||
+     !np_native_cache_table_bytes(old_capacity,
+                                  key_width,
+                                  key_element_size,
+                                  0U,
+                                  &old_bytes) ||
+     !np_native_cache_table_bytes(new_capacity,
+                                  key_width,
+                                  key_element_size,
+                                  0U,
+                                  &new_bytes) ||
+     !np_size_add_checked(old_bytes, new_bytes, &peak_bytes) ||
+     !np_size_add_checked(peak_bytes, fixed_bytes, result))
+    return 0;
+  return 1;
+}
+
+static inline int
+np_native_cache_growth_size(size_t capacity, size_t *result)
+{
+  size_t capacity_scaled;
+  size_t prospective_size;
+
+  if((result == NULL) || (capacity == 0U) ||
+     !np_size_mul_checked(capacity, 7U, &capacity_scaled))
+    return 0;
+  /*
+   * Preserve `(size + 1) * 10 >= capacity * 7`, but compute the
+   * overflow-checked current-size threshold once outside the insertion path.
+   */
+  prospective_size = capacity_scaled/10U;
+  if(capacity_scaled%10U != 0U) {
+    if(!np_size_add_checked(prospective_size, 1U, &prospective_size))
+      return 0;
+  }
+  if((prospective_size == 0U) || (prospective_size > capacity))
+    return 0;
+  *result = prospective_size - 1U;
+  return 1;
+}
+
+static inline int
 np_size_to_int_checked(size_t value, int *result)
 {
   if((result == NULL) || (value > (size_t)INT_MAX))

@@ -1,5 +1,14 @@
 # npRmpi 0.70-6
 
+* Rank-local Powell-side objective caches now use checked capacity, key-width,
+  load-factor, and rehash arithmetic under an independent 64 MiB peak ceiling
+  per native table. Growth is transactional on each rank, and the existing
+  all-rank cache-hit agreement prevents a candidate cached on only some ranks
+  from bypassing evaluation. Allocation-failure diagnostics are aggregated
+  once when the search returns, avoiding new hot-loop synchronization. Cache
+  keys, objective values, optimizer behavior, and the strict
+  `np.objective.cache` option contract are unchanged.
+
 * Smooth-coefficient local-polynomial cross-validation and fitting now solve
   common stable zero-ridge row systems through one registered rank-local
   native entry, reusing a bounded `O(p^2 + p)` LAPACK workspace instead of
