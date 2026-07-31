@@ -243,10 +243,15 @@ test_that("compiled progress bridge is registered narrowly", {
   expect_true(grepl("\"C_np_progress_signal\"", src, fixed = TRUE))
 })
 
-test_that("compiled working-status redraw is removed", {
-  src_path <- testthat::test_path("..", "..", "src", "kernele.c")
-  skip_if_not(file.exists(src_path), "source C files unavailable in installed test context")
-  src <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
+test_that("compiled working-status redraw is absent from native sources", {
+  src_dir <- testthat::test_path("..", "..", "src")
+  skip_if_not(dir.exists(src_dir), "source C directory unavailable in installed test context")
+  src_paths <- list.files(src_dir, pattern = "\\.c$", full.names = TRUE)
+  expect_gt(length(src_paths), 0L)
+  src <- paste(
+    unlist(lapply(src_paths, readLines, warn = FALSE)),
+    collapse = "\n"
+  )
 
   expect_false(grepl("REprintf\\(\"\\\\rWorking\\.\\.\\.", src))
 })
