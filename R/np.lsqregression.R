@@ -461,13 +461,10 @@ nplsqregbw <-
   nconfac <- nrow^(-1.0 / (2.0 * bws$ckerorder + bws$ncon))
   ncatfac <- nrow^(-2.0 / (2.0 * bws$ckerorder + bws$ncon))
 
-  reg.spec <- npCanonicalConditionalRegSpec(
-    regtype = bws$regtype,
-    basis = bws$basis,
-    degree = bws$degree,
-    bernstein.basis = bws$bernstein.basis,
-    ncon = bws$ncon,
-    where = "nplsqregbw"
+  reg.spec <- npValidatedConditionalRegSpec(
+    bws,
+    where = "nplsqregbw",
+    ncon.field = "ncon"
   )
   reg.c <- npRegtypeToC(regtype = reg.spec$regtype.engine,
                         degree = reg.spec$degree.engine,
@@ -522,7 +519,8 @@ nplsqregbw <-
     ncon = bws$ncon,
     regtype = reg.c$code,
     int_do_tree = .npregbw_tree_code(bws, ncon = bws$ncon,
-                                     ncat = bws$nuno + bws$nord),
+                                     ncat = bws$nuno + bws$nord,
+                                     regtype.engine = reg.spec$regtype.engine),
     scale.init.categorical.sample = scale.init.categorical.sample,
     dfc.dir = opt.value("dfc.dir", 3),
     transform.bounds = transform.bounds

@@ -2584,12 +2584,13 @@
   if (n < 1L || neval < 1L || B < 1L)
     stop("invalid inid regression bootstrap dimensions")
 
-  regtype <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
-  constant.basis <- npIsCanonicalLp0(
-    regtype.engine = if (is.null(bws$regtype.engine)) regtype else bws$regtype.engine,
-    degree.engine = if (is.null(bws$degree.engine)) bws$degree else bws$degree.engine,
-    ncon = bws$ncon
+  reg.spec <- npValidatedConditionalRegSpec(
+    bws,
+    where = ".np_inid_boot_from_regression",
+    ncon.field = "ncon"
   )
+  regtype <- reg.spec$regtype
+  constant.basis <- npIsCanonicalLp0Spec(reg.spec, ncon = bws$ncon)
   if (!identical(bws$type, "fixed")) {
     return(.np_inid_boot_from_reghat_exact(
       xdat = xdat,

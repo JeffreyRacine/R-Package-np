@@ -1025,6 +1025,65 @@ npConditionalRegEngineSpec <- function(bws,
   )
 }
 
+npValidatedConditionalRegSpec <- function(bws,
+                                          where = "conditional estimator",
+                                          ncon.field = "xncon",
+                                          ncon = NULL) {
+  state <- if (is.null(ncon)) {
+    npConditionalRegEngineSpec(
+      bws = bws,
+      where = where,
+      ncon.field = ncon.field
+    )
+  } else {
+    npValidateConditionalRegEngineState(
+      regtype.engine = npExactRequiredField(
+        bws, "regtype.engine", where
+      ),
+      basis.engine = npExactRequiredField(
+        bws, "basis.engine", where
+      ),
+      degree.engine = npExactRequiredField(
+        bws, "degree.engine", where
+      ),
+      bernstein.basis.engine = npExactRequiredField(
+        bws, "bernstein.basis.engine", where
+      ),
+      ncon = ncon,
+      where = where
+    )
+  }
+
+  spec <- npCanonicalConditionalRegSpec(
+    regtype = npExactRequiredField(bws, "regtype", where),
+    basis = npExactRequiredField(bws, "basis", where),
+    degree = npExactRequiredField(bws, "degree", where),
+    bernstein.basis = npExactRequiredField(
+      bws, "bernstein.basis", where
+    ),
+    ncon = state$ncon,
+    where = where
+  )
+
+  expected <- list(
+    regtype.engine = state$reg.engine,
+    basis.engine = state$basis.engine,
+    degree.engine = state$degree.engine,
+    bernstein.basis.engine = state$bernstein.engine
+  )
+  for (field in names(expected)) {
+    if (!identical(spec[[field]], expected[[field]])) {
+      stop(sprintf(
+        "%s has incoherent public and canonical engine metadata for field '%s'",
+        where,
+        field
+      ), call. = FALSE)
+    }
+  }
+
+  spec
+}
+
 npConditionalGradientOrder <- function(bws,
                                        reg.engine,
                                        gradient.order,

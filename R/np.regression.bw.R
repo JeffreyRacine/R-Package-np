@@ -245,13 +245,10 @@ npregbw.NULL <-
   cont_scale <- mysd * nconfac
   bandwidth.scale.categorical <- 1e4
 
-  reg.spec <- npCanonicalConditionalRegSpec(
-    regtype = bws$regtype,
-    basis = bws$basis,
-    degree = bws$degree,
-    bernstein.basis = bws$bernstein.basis,
-    ncon = bws$ncon,
-    where = "npregbw"
+  reg.spec <- npValidatedConditionalRegSpec(
+    bws,
+    where = "npregbw",
+    ncon.field = "ncon"
   )
   reg.c <- npRegtypeToC(regtype = reg.spec$regtype.engine,
                         degree = reg.spec$degree.engine,
@@ -287,7 +284,12 @@ npregbw.NULL <-
     nord = bws$nord,
     ncon = bws$ncon,
     regtype = reg.c$code,
-    int_do_tree = .npregbw_tree_code(bws, ncon = bws$ncon, ncat = bws$nuno + bws$nord),
+    int_do_tree = .npregbw_tree_code(
+      bws,
+      ncon = bws$ncon,
+      ncat = bws$nuno + bws$nord,
+      regtype.engine = reg.spec$regtype.engine
+    ),
     scale.init.categorical.sample = scale.init.categorical.sample,
     dfc.dir = 3L,
     transform.bounds = transform.bounds
@@ -519,20 +521,10 @@ npregbw.rbandwidth <-
     rord = xdat[, bws$iord, drop = FALSE]
 
     tbw <- bws
-    tbw$basis <- npValidateLpBasis(regtype = tbw$regtype,
-                                   basis = tbw$basis)
-    tbw$degree <- npValidateGlpDegree(regtype = tbw$regtype,
-                                          degree = tbw$degree,
-                                          ncon = tbw$ncon)
-    tbw$bernstein.basis <- npValidateGlpBernstein(regtype = tbw$regtype,
-                                                bernstein.basis = tbw$bernstein.basis)
-    reg.spec <- npCanonicalConditionalRegSpec(
-      regtype = tbw$regtype,
-      basis = tbw$basis,
-      degree = tbw$degree,
-      bernstein.basis = tbw$bernstein.basis,
-      ncon = tbw$ncon,
-      where = "npregbw"
+    reg.spec <- npValidatedConditionalRegSpec(
+      tbw,
+      where = "npregbw",
+      ncon.field = "ncon"
     )
 
     mysd <- EssDee(rcon)
@@ -649,7 +641,12 @@ npregbw.rbandwidth <-
         nord = bws$nord,
         ncon = bws$ncon,
         regtype = reg.c$code,
-        int_do_tree = .npregbw_tree_code(bws, ncon = bws$ncon, ncat = bws$nuno + bws$nord),
+        int_do_tree = .npregbw_tree_code(
+          bws,
+          ncon = bws$ncon,
+          ncat = bws$nuno + bws$nord,
+          regtype.engine = reg.spec$regtype.engine
+        ),
         scale.init.categorical.sample = scale.init.categorical.sample,
         dfc.dir = dfc.dir,
         transform.bounds = transform.bounds)
@@ -798,7 +795,14 @@ npregbw.rbandwidth <-
   out
 }
 
-.npregbw_tree_code <- function(bws, ncon, ncat) {
+.npregbw_tree_code <- function(bws, ncon, ncat, regtype.engine) {
+  if (!is.character(regtype.engine) ||
+      length(regtype.engine) != 1L ||
+      is.na(regtype.engine) ||
+      !(regtype.engine %in% c("lc", "lp"))) {
+    stop("npregbw tree routing requires canonical regtype.engine state",
+         call. = FALSE)
+  }
   code <- npDoTreeOrCategoricalCompress(ncon = ncon, ncat = ncat, bws = bws)
 
   if (!identical(code, DO_TREE_YES))
@@ -814,17 +818,9 @@ npregbw.rbandwidth <-
   } else {
     "fixed"
   }
-  regtype <- if (!is.null(bws$regtype.engine) && length(bws$regtype.engine)) {
-    as.character(bws$regtype.engine[1L])
-  } else if (!is.null(bws$regtype) && length(bws$regtype)) {
-    as.character(bws$regtype[1L])
-  } else {
-    "lc"
-  }
-
   if (ncon > 0L &&
       bwtype %in% c("generalized_nn", "adaptive_nn") &&
-      !identical(regtype, "lc")) {
+      !identical(regtype.engine, "lc")) {
     return(DO_TREE_NO)
   }
 
@@ -936,13 +932,10 @@ npregbw.rbandwidth <-
   ncatfac <- nrow^(-2.0 / (2.0 * bws$ckerorder + bws$ncon))
 
   penalty_mode <- if (invalid.penalty == "baseline") 1L else 0L
-  reg.spec <- npCanonicalConditionalRegSpec(
-    regtype = bws$regtype,
-    basis = bws$basis,
-    degree = bws$degree,
-    bernstein.basis = bws$bernstein.basis,
-    ncon = bws$ncon,
-    where = "npregbw"
+  reg.spec <- npValidatedConditionalRegSpec(
+    bws,
+    where = "npregbw",
+    ncon.field = "ncon"
   )
   reg.c <- npRegtypeToC(regtype = reg.spec$regtype.engine,
                         degree = reg.spec$degree.engine,
@@ -979,7 +972,12 @@ npregbw.rbandwidth <-
     nord = bws$nord,
     ncon = bws$ncon,
     regtype = reg.c$code,
-    int_do_tree = .npregbw_tree_code(bws, ncon = bws$ncon, ncat = bws$nuno + bws$nord),
+    int_do_tree = .npregbw_tree_code(
+      bws,
+      ncon = bws$ncon,
+      ncat = bws$nuno + bws$nord,
+      regtype.engine = reg.spec$regtype.engine
+    ),
     scale.init.categorical.sample = scale.init.categorical.sample,
     dfc.dir = dfc.dir,
     transform.bounds = transform.bounds

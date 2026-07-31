@@ -94,26 +94,11 @@ npindexbw.NULL <-
   }
 
 .npindex_resolve_spec <- function(source, where = "npindex") {
-  if (!is.null(source$regtype.engine)) {
-    return(list(
-      regtype = if (is.null(source$regtype)) "lc" else as.character(source$regtype),
-      basis = if (is.null(source$basis)) "glp" else as.character(source$basis),
-      degree = if (is.null(source$degree)) integer(0) else as.integer(source$degree),
-      bernstein.basis = isTRUE(source$bernstein.basis),
-      regtype.engine = as.character(source$regtype.engine),
-      basis.engine = if (is.null(source$basis.engine)) "glp" else as.character(source$basis.engine),
-      degree.engine = if (is.null(source$degree.engine)) integer(0) else as.integer(source$degree.engine),
-      bernstein.basis.engine = isTRUE(source$bernstein.basis.engine)
-    ))
-  }
-
-  npCanonicalConditionalRegSpec(
-    regtype = if (is.null(source$regtype)) "lc" else as.character(source$regtype),
-    basis = if (is.null(source$basis)) "glp" else as.character(source$basis),
-    degree = source$degree,
-    bernstein.basis = isTRUE(source$bernstein.basis),
+  npValidatedConditionalRegSpec(
+    source,
+    where = where,
     ncon = 1L,
-    where = where
+    ncon.field = NULL
   )
 }
 
@@ -550,12 +535,7 @@ npindexbw.NULL <-
                                                 bws,
                                                 spec) {
   index.df <- data.frame(index = as.double(index))
-  engine.regtype <- if (is.null(spec$regtype.engine) ||
-                        !length(spec$regtype.engine)) {
-    "lc"
-  } else {
-    as.character(spec$regtype.engine[1L])
-  }
+  engine.regtype <- spec$regtype.engine
   engine.basis <- if (identical(engine.regtype, "lp")) {
     as.character(spec$basis.engine)
   } else {

@@ -23,20 +23,17 @@ npreg <-
   }
 
 .npreg_fit_tree_code <- function(bws, ncon, ncat) {
+  reg.spec <- npValidatedConditionalRegSpec(
+    bws,
+    where = "npreg tree routing",
+    ncon.field = "ncon"
+  )
   code <- npDoTreeOrCategoricalCompress(ncon = ncon, ncat = ncat, bws = bws)
 
   if (!identical(code, DO_TREE_YES))
     return(code)
 
-  regtype <- if (!is.null(bws$regtype.engine) && length(bws$regtype.engine)) {
-    as.character(bws$regtype.engine[1L])
-  } else if (!is.null(bws$regtype) && length(bws$regtype)) {
-    as.character(bws$regtype[1L])
-  } else {
-    "lc"
-  }
-
-  if (!identical(regtype, "lc"))
+  if (!identical(reg.spec$regtype.engine, "lc"))
     return(DO_TREE_NO)
 
   code
@@ -297,20 +294,10 @@ npreg.rbandwidth <-
       bandwidth.compute = FALSE
     )
 
-    bws$basis <- npValidateLpBasis(regtype = bws$regtype,
-                                   basis = bws$basis)
-    bws$degree <- npValidateGlpDegree(regtype = bws$regtype,
-                                      degree = bws$degree,
-                                      ncon = bws$ncon)
-    bws$bernstein.basis <- npValidateGlpBernstein(regtype = bws$regtype,
-                                                  bernstein.basis = bws$bernstein.basis)
-    reg.spec <- npCanonicalConditionalRegSpec(
-      regtype = bws$regtype,
-      basis = bws$basis,
-      degree = bws$degree,
-      bernstein.basis = bws$bernstein.basis,
-      ncon = bws$ncon,
-      where = "npreg"
+    reg.spec <- npValidatedConditionalRegSpec(
+      bws,
+      where = "npreg",
+      ncon.field = "ncon"
     )
     if (isTRUE(gradients) && identical(bws$regtype, "lc")) {
       npValidateLcGradientOrder(

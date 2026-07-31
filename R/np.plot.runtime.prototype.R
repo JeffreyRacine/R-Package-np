@@ -615,13 +615,11 @@
                                                      xtrim) {
   if (!inherits(bws, "rbandwidth"))
     stop("prototype route requires a regression bandwidth object", call. = FALSE)
-  regtype.engine <- if (is.null(bws$regtype.engine)) {
-    if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
-  } else {
-    as.character(bws$regtype.engine)
-  }
-  if (!is.element(regtype.engine, c("lc", "lp")))
-    stop("prototype route currently supports regtype='lc', 'll', or 'lp' only", call. = FALSE)
+  npValidatedConditionalRegSpec(
+    bws,
+    where = "regression plot prototype",
+    ncon.field = "ncon"
+  )
   if (!identical(as.character(bws$type), "fixed"))
     stop("prototype route currently supports fixed bandwidths only", call. = FALSE)
   if (bws$ndim != 2L)
@@ -914,13 +912,7 @@
                                                     neval) {
   if (!inherits(bws, "sibandwidth"))
     stop("prototype route requires a single-index bandwidth object", call. = FALSE)
-  regtype.engine <- if (is.null(bws$regtype.engine)) {
-    if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
-  } else {
-    as.character(bws$regtype.engine)
-  }
-  if (!is.element(regtype.engine, c("lc", "lp")))
-    stop("prototype route currently supports regtype='lc', 'll', or 'lp' only", call. = FALSE)
+  .npindex_resolve_spec(bws, where = "single-index plot prototype")
   if (!identical(as.character(bws$type), "fixed"))
     stop("prototype route currently supports fixed bandwidths only", call. = FALSE)
   if (bws$nuno != 0L)

@@ -1215,21 +1215,12 @@ npreghat <-
     where = ".np_regression_direct",
     regtype = bws[["regtype", exact = TRUE]]
   )
-  regtype <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
-  basis <- npValidateLpBasis(regtype = regtype, basis = bws$basis)
-  degree <- npValidateGlpDegree(regtype = regtype,
-                                degree = bws$degree,
-                                ncon = bws$ncon)
-  bernstein.basis <- npValidateGlpBernstein(regtype = regtype,
-                                            bernstein.basis = bws$bernstein.basis)
-  reg.spec <- npCanonicalConditionalRegSpec(
-    regtype = regtype,
-    basis = basis,
-    degree = degree,
-    bernstein.basis = bernstein.basis,
-    ncon = bws$ncon,
-    where = ".np_regression_direct"
+  reg.spec <- npValidatedConditionalRegSpec(
+    bws,
+    where = ".np_regression_direct",
+    ncon.field = "ncon"
   )
+  regtype <- reg.spec$regtype
   if (isTRUE(gradients) && identical(regtype, "lc")) {
     npValidateLcGradientOrder(
       regtype = regtype,
@@ -1613,7 +1604,12 @@ npreghat.rbandwidth <-
       exdat <- exdat[keep.eval, , drop = FALSE]
     }
 
-    regtype <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
+    base.spec <- npValidatedConditionalRegSpec(
+      bws,
+      where = "npreghat",
+      ncon.field = "ncon"
+    )
+    regtype <- base.spec$regtype
     ncon <- bws$ncon
     con.names <- names(txdat)[which(bws$icon)]
 
@@ -1623,23 +1619,19 @@ npreghat.rbandwidth <-
       rep.int(1L, ncon)
     } else {
       npValidateGlpDegree(regtype = "lp",
-                          degree = if (is.null(degree)) bws$degree else degree,
+                          degree = if (is.null(degree)) base.spec$degree else degree,
                           ncon = ncon)
     }
 
     basis <- npValidateLpBasis(
       regtype = "lp",
-      basis = if (is.null(basis)) {
-        if (is.null(bws$basis)) "glp" else bws$basis
-      } else {
-        basis
-      }
+      basis = if (is.null(basis)) base.spec$basis else basis
     )
 
     bernstein.basis <- npValidateGlpBernstein(
       regtype = "lp",
       bernstein.basis = if (is.null(bernstein.basis)) {
-        isTRUE(bws$bernstein.basis)
+        base.spec$bernstein.basis
       } else {
         bernstein.basis
       }
