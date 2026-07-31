@@ -118,7 +118,7 @@ test_that("legacy LL compute engines and restoration switches are absent", {
 
   src_dir <- dirname(src_file)
   source_files <- file.path(src_dir, c(
-    "headers.h", "jksum.c", "kernelcv.c", "kernele.c", "np.c"
+    "headers.h", "jksum.c", "kernelcv.c", "np.c"
   ))
   skip_if_not(all(file.exists(source_files)), "complete package C sources unavailable")
 

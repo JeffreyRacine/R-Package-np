@@ -1,11 +1,11 @@
 test_that("compute sources no longer own MPI finalization", {
-  files <- c(
-    testthat::test_path("..", "..", "src", "jksum.c"),
-    testthat::test_path("..", "..", "src", "kernelb.c"),
-    testthat::test_path("..", "..", "src", "kernele.c"),
-    testthat::test_path("..", "..", "src", "statmods.c")
+  src_dir <- testthat::test_path("..", "..", "src")
+  skip_if_not(dir.exists(src_dir), "source C directory unavailable in installed test context")
+  files <- setdiff(
+    list.files(src_dir, pattern = "\\.c$", full.names = TRUE),
+    file.path(src_dir, "Rmpi.c")
   )
-  skip_if_not(all(file.exists(files)), "source C files unavailable in installed test context")
+  expect_gt(length(files), 0L)
 
   for (path in files) {
     text <- paste(readLines(path, warn = FALSE), collapse = "\n")
