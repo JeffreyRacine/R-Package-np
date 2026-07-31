@@ -6448,7 +6448,15 @@ static int np_density_conditional_nomad_shadow_eval_native_raw(const double *rbw
   degree_refresh_ok =
     np_conditional_density_nomad_shadow_refresh_degree(degree_work);
 #ifdef MPI2
-  if (degree_refresh_needed)
+  /*
+   * Automatic degree search must have a rank-invariant collective schedule.
+   * Refresh preparation can fail rank-locally, so whether a particular rank
+   * believes its cached state changed is not a safe condition for entering an
+   * MPI collective.  Fixed-degree shadows retain the incumbent no-collective
+   * fast return once their rank-symmetric preparation is complete.
+   */
+  if (np_conditional_density_nomad_shadow.degree_search ||
+      degree_refresh_needed)
     degree_refresh_ok = np_mpi_comm1_all_ok(degree_refresh_ok);
 #endif
 

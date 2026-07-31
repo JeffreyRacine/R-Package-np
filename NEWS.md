@@ -1,5 +1,15 @@
 # npRmpi 0.70-6
 
+* Corrected native automatic-degree search for conditional density and
+  distribution bandwidths so every callback selects the canonical scalar
+  degree-zero or general positive-degree local-polynomial engine from that
+  callback's degree. Returned bandwidth objects now reproduce their stored
+  objectives at the selected degree. Least-squares quantile degree search now
+  updates public and engine metadata atomically, including singleton and
+  Powell-refinement routes, instead of producing an inadmissible first
+  objective from mixed legacy state. Automatic conditional-density callbacks
+  also use a rank-invariant transition-consensus schedule.
+
 * Conditional estimators and their gradient, hat, plotting, quantile, mode,
   and progress helpers now read canonical local-polynomial engine metadata by
   exact field name and validate the fields jointly. Malformed or mutated

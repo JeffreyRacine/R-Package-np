@@ -73,4 +73,13 @@ test_that("resident shadows bound degree cache writes by allocated key length", 
   )
   expect_match(text, "np_regression_nomad_shadow.num_var \\+ i \\+ 1")
   expect_match(text, "np_conditional_density_nomad_shadow.num_all_var \\+ i \\+ 1")
+  expect_match(
+    text,
+    paste0(
+      "if \\(np_conditional_density_nomad_shadow\\.degree_search \\|\\|",
+      "\\s+degree_refresh_needed\\)\\s+",
+      "degree_refresh_ok = np_mpi_comm1_all_ok\\(degree_refresh_ok\\)"
+    ),
+    perl = TRUE
+  )
 })
