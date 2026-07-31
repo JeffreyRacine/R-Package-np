@@ -1,5 +1,14 @@
 # npRmpi 0.70-6
 
+* Fixed-bandwidth categorical conditional-distribution CVLS now bounds its
+  aggregate predictor- and response-profile kernel workspace at 64 MiB for
+  serial/rank-one execution and 256 MiB under active MPI. Problems that fit
+  retain the established dense arithmetic exactly; larger profile topologies
+  use stable reuse-priority resident rows plus one scratch row, filled through
+  the shared categorical-profile kernel engine. Objective accumulation order
+  and values are unchanged, and route readiness and committed failure are
+  rank-symmetric.
+
 * Fixed-bandwidth ordered-categorical unconditional-distribution CVLS now
   consumes compressed kernel rows through a checked, caller-owned tile capped
   at 64 MiB for serial/rank-one execution and 256 MiB under active MPI instead

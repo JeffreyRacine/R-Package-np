@@ -552,15 +552,36 @@ test_that("categorical profile implementation and native sink are bounded", {
     "if(profile_status == NP_DISTRIBUTION_PROFILE_CV_FAILURE)",
     fixed = TRUE
   )
-  expect_match(
+  ordered_profile_start <- regexpr(
+    paste0(
+      "static NPDistributionProfileCvStatus\n",
+      "np_distribution_cvls_ordered_profile_stream("
+    ),
     jksum,
+    fixed = TRUE
+  )[[1L]]
+  expect_gt(ordered_profile_start, 0L)
+  ordered_profile_tail <- substring(jksum, ordered_profile_start)
+  ordered_profile_end <- regexpr(
+    "\n#ifdef MPI2\n#if NP_ACCEL_GAUSS_COMPILED",
+    ordered_profile_tail,
+    fixed = TRUE
+  )[[1L]]
+  expect_gt(ordered_profile_end, 0L)
+  ordered_profile_impl <- substring(
+    ordered_profile_tail,
+    1L,
+    ordered_profile_end - 1L
+  )
+  expect_match(
+    ordered_profile_impl,
     "MPI_Allreduce(&local_preflight_status",
     fixed = TRUE
   )
   expect_length(
     gregexpr(
       "MPI_Allreduce(&local_preflight_status",
-      jksum,
+      ordered_profile_impl,
       fixed = TRUE
     )[[1L]],
     1L
