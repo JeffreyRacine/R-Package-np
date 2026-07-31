@@ -1,63 +1,16 @@
-shadow_conditional_xweights_lp <- function(bw, xdat, ydat, row_index) {
-  make_mat <- function(z) {
-    z <- as.matrix(z)
-    storage.mode(z) <- "double"
-    z
-  }
+independent_lp_delete_one_weights <- function(xdat,
+                                              bandwidth,
+                                              degree,
+                                              row_index) {
+  x <- as.numeric(xdat[[1L]])
+  powers <- 0L:as.integer(degree)
+  basis <- outer(x, powers, `^`)
+  weights <- dnorm((x[[row_index]] - x) / bandwidth)
+  weights[[row_index]] <- 0
 
-  xmat <- np:::toMatrix(xdat)
-  ymat <- np:::toMatrix(np:::toFrame(ydat))
-  ycon <- make_mat(ymat[, bw$iycon, drop = FALSE])
-  yuno <- make_mat(ymat[, bw$iyuno, drop = FALSE])
-  yord <- make_mat(ymat[, bw$iyord, drop = FALSE])
-  xcon <- make_mat(xmat[, bw$ixcon, drop = FALSE])
-  xuno <- make_mat(xmat[, bw$ixuno, drop = FALSE])
-  xord <- make_mat(xmat[, bw$ixord, drop = FALSE])
-
-  bw_vec <- c(
-    bw$xbw[bw$ixcon],
-    bw$ybw[bw$iycon],
-    bw$ybw[bw$iyuno],
-    bw$ybw[bw$iyord],
-    bw$xbw[bw$ixuno],
-    bw$xbw[bw$ixord]
-  )
-
-  .Call(
-    "C_np_shadow_cv_xweights_conditional",
-    yuno,
-    yord,
-    ycon,
-    xuno,
-    xord,
-    xcon,
-    as.double(bw_vec),
-    as.integer(np:::BW_FIXED),
-    as.integer(switch(
-      bw$cxkertype,
-      gaussian = np:::CKER_GAUSS + bw$cxkerorder / 2 - 1,
-      epanechnikov = np:::CKER_EPAN + bw$cxkerorder / 2 - 1,
-      uniform = np:::CKER_UNI
-    )),
-    as.integer(switch(
-      bw$uxkertype,
-      aitchisonaitken = np:::UKER_AIT,
-      liracine = np:::UKER_LR
-    )),
-    as.integer(switch(
-      bw$oxkertype,
-      wangvanryzin = np:::OKER_WANG,
-      liracine = np:::OKER_LR,
-      racineliyan = np:::OKER_RLY
-    )),
-    as.integer(FALSE),
-    as.integer(np:::REGTYPE_LP),
-    as.integer(bw$degree.engine),
-    as.integer(isTRUE(bw$bernstein.basis.engine)),
-    as.integer(np:::npLpBasisCode(bw$basis.engine)),
-    as.integer(row_index),
-    PACKAGE = "np"
-  )$streamed
+  gram <- crossprod(basis, basis * weights)
+  projection <- solve(gram, basis[row_index, ])
+  as.numeric(weights * (basis %*% projection))
 }
 
 bounded_gaussian_kernel <- function(x0, X, h, lower, upper) {
@@ -101,7 +54,12 @@ test_that("npcdensbw cv.ml LP degree-0 bounded objective matches delete-one reco
   )
 
   manual_rows <- vapply(seq_len(n), function(i) {
-    weights <- shadow_conditional_xweights_lp(bw, xdat, ydat, i)
+    weights <- independent_lp_delete_one_weights(
+      xdat,
+      bandwidth = bw$xbw[[1L]],
+      degree = bw$degree.engine[[1L]],
+      row_index = i
+    )
     ky <- bounded_gaussian_kernel(
       ydat[i],
       ydat,
@@ -142,7 +100,12 @@ test_that("npcdensbw cv.ml LP objective uses smooth penalty for negative delete-
   )
 
   manual_rows <- vapply(seq_len(n), function(i) {
-    weights <- shadow_conditional_xweights_lp(bw, xdat, ydat, i)
+    weights <- independent_lp_delete_one_weights(
+      xdat,
+      bandwidth = bw$xbw[[1L]],
+      degree = bw$degree.engine[[1L]],
+      row_index = i
+    )
     ky <- bounded_gaussian_kernel(
       ydat[i],
       ydat,
