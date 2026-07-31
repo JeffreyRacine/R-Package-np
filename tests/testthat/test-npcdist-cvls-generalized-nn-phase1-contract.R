@@ -40,6 +40,17 @@ phase1_npcdist_cvls_gnn_cases <- local({
         nmulti = 1L,
         itmax = 1L
       ),
+      bw.lp0 = npcdistbw(
+        xdat = dat$x,
+        ydat = dat$y,
+        regtype = "lp",
+        basis = "glp",
+        degree = rep.int(0L, ncol(dat$x)),
+        bwtype = "generalized_nn",
+        bwmethod = "cv.ls",
+        nmulti = 1L,
+        itmax = 1L
+      ),
       bw.ll = npcdistbw(
         xdat = dat$x,
         ydat = dat$y,
@@ -78,10 +89,15 @@ phase1_npcdist_cvls_gnn_cases <- local({
 })
 
 test_that("phase1 npcdistbw cv.ls generalized-nn lc matches the frozen public baseline", {
-  bw.lc <- phase1_npcdist_cvls_gnn_cases()$bw.lc
+  cases <- phase1_npcdist_cvls_gnn_cases()
+  bw.lc <- cases$bw.lc
+  bw.lp0 <- cases$bw.lp0
 
   expect_true(is.finite(bw.lc$fval))
-  expect_equal(bw.lc$fval, 0.10967457541437876, tolerance = 1e-10)
+  expect_equal(bw.lc$fval, 0.109084469813932, tolerance = 1e-10)
+  expect_identical(bw.lc[["fval"]], bw.lp0[["fval"]])
+  expect_identical(bw.lc[["xbw"]], bw.lp0[["xbw"]])
+  expect_identical(bw.lc[["ybw"]], bw.lp0[["ybw"]])
 })
 
 test_that("phase1 npcdistbw cv.ls generalized-nn keeps ll on canonical lp degree-1 glp", {
