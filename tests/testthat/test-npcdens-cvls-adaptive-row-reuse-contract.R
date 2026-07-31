@@ -49,7 +49,7 @@ test_that("adaptive CVLS derives deleted rows only from completed full rows", {
   block_body <- adaptive_source_body(
     jksum,
     "^static int np_conditional_density_cvls_lp_adap_block_stream\\(",
-    "^static int np_conditional_density_cvls_categorical_profile_stream\\("
+    "^np_conditional_density_cvls_categorical_profile_stream\\("
   )
 
   for (body in list(row_body, block_body)) {

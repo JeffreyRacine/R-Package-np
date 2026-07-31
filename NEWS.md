@@ -1,5 +1,16 @@
 # npRmpi 0.70-6
 
+* Fixed-bandwidth categorical conditional-density CVLS now bounds its three
+  predictor, response, and response-convolution profile matrices within one
+  checked workspace: 64 MiB for rank-one execution and 256 MiB for active
+  MPI. Above the ceiling, stable resident rows and dedicated scratch rows are
+  filled through the shared categorical-profile kernel engine. A 32-profile
+  convolution supertile preserves every scalar accumulation order while
+  reusing each response-convolution row across the group, reducing
+  representative objective time without changing objective bytes. Rank-local
+  readiness is agreed before collective traversal, and internal failure after
+  route commitment is terminal rather than a silent fallback.
+
 * Fixed-bandwidth categorical conditional-distribution CVLS now bounds its
   aggregate predictor- and response-profile kernel workspace at 64 MiB for
   serial/rank-one execution and 256 MiB under active MPI. Problems that fit
