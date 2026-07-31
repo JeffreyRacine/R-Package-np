@@ -94,8 +94,7 @@ test_that("categorical kernel rows reject missing category metadata", {
   source <- npcdens_y_side_source("jksum.c")
   skip_if(is.null(source), "source file src/jksum.c unavailable")
 
-  start <- regexpr("static int kernel_weighted_sum_np_ctx_ex(", source,
-                   fixed = TRUE)
+  start <- regexpr("kernel_weighted_sum_np_ctx_ex\\(", source)
   stop <- regexpr("int kernel_weighted_sum_np_ctx(", source,
                   fixed = TRUE)
   expect_gt(start, 0L)
@@ -109,7 +108,7 @@ test_that("categorical kernel rows reject missing category metadata", {
   expect_true(grepl("(num_categories == NULL)", owner, fixed = TRUE))
 })
 
-test_that("scalar native CVML callbacks do not manufacture a degree buffer", {
+test_that("native CVML degree buffers follow the resident degree-key contract", {
   source <- npcdens_y_side_source("np.c")
   skip_if(is.null(source), "source file src/np.c unavailable")
 
@@ -128,12 +127,12 @@ test_that("scalar native CVML callbacks do not manufacture a degree buffer", {
   evaluator <- substr(source, start, stop - 1L)
 
   expect_true(grepl(
-    "if (np_lp_engine_extern == NP_LP_ENGINE_GENERAL && glp_degree == NULL)",
+    "if (np_conditional_density_nomad_shadow.degree_key_len > 0 &&\n      glp_degree == NULL)",
     evaluator,
     fixed = TRUE
   ))
   expect_true(grepl(
-    "if (np_lp_engine_extern == NP_LP_ENGINE_GENERAL)\n    degree_work =",
+    "if (np_conditional_density_nomad_shadow.degree_key_len > 0)\n    degree_work =",
     evaluator,
     fixed = TRUE
   ))

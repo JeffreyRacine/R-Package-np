@@ -12,7 +12,7 @@ test_that("resident npcdens cache keys bandwidths and polynomial degree", {
     xdat = xdat,
     ydat = ydat,
     regtype = "lp",
-    degree = 2L,
+    degree = 0L,
     bwtype = "fixed",
     bwmethod = "cv.ls",
     bws = c(0.24, 0.31),
@@ -24,7 +24,8 @@ test_that("resident npcdens cache keys bandwidths and polynomial degree", {
     bws = bw,
     start.bw = NULL,
     invalid.penalty = "baseline",
-    penalty.multiplier = 10
+    penalty.multiplier = 10,
+    degree.search = TRUE
   )
   points <- data.frame(
     xbw = c(0.24, 0.24, 0.41, 0.24),
@@ -55,7 +56,24 @@ test_that("resident npcdens cache keys bandwidths and polynomial degree", {
 
   cached <- evaluate(TRUE)
   uncached <- evaluate(FALSE)
+  direct <- vapply(seq_len(nrow(points)), function(i) {
+    candidate <- bw
+    candidate$regtype <- "lp"
+    candidate$pregtype <- "Local-Polynomial"
+    candidate$regtype.engine <- "lp"
+    candidate$degree <- as.integer(points$degree[i])
+    candidate$degree.engine <- as.integer(points$degree[i])
+    candidate$xbw[candidate$ixcon] <- points$xbw[i]
+    candidate$ybw[candidate$iycon] <- points$ybw[i]
+    np:::.npcdensbw_eval_only(
+      xdat = xdat,
+      ydat = ydat,
+      bws = candidate
+    )$objective
+  }, numeric(1L))
+
   expect_equal(cached, uncached, tolerance = 1e-13)
+  expect_equal(cached, direct, tolerance = 1e-13)
   expect_false(isTRUE(all.equal(cached[1L], cached[2L], tolerance = 1e-8)))
   expect_identical(cached[1L], cached[4L])
 })

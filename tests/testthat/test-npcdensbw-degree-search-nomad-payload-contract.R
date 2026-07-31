@@ -105,4 +105,9 @@ test_that("npcdens NOMAD accounting is owner-level on fast-path fits", {
 
   expect_equal(as.numeric(ev$num.feval), 1)
   expect_equal(as.numeric(ev$num.feval.fast), 1)
+  expect_equal(
+    as.numeric(fit$bws$fval[1L]),
+    as.numeric(ev$objective[1L]),
+    tolerance = 1e-12
+  )
 })
