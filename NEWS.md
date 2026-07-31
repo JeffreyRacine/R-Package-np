@@ -1,5 +1,12 @@
 # np 0.70-6
 
+* Powell-side objective caches now use checked capacity, key-width,
+  load-factor, and rehash arithmetic under an independent 64 MiB peak ceiling
+  per native table. If a table cannot grow, its existing entries remain
+  available while the selected optimizer continues without further insertion.
+  Cache keys, objective values, optimizer behavior, and the strict
+  `np.objective.cache` option contract are unchanged.
+
 * Smooth-coefficient local-polynomial cross-validation and fitting now solve
   the common stable zero-ridge row systems through one registered native
   entry, reusing a bounded `O(p^2 + p)` LAPACK workspace instead of making one

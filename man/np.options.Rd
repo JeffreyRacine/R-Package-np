@@ -79,6 +79,11 @@
       \code{\link{optim}} evaluations. Set
       \code{options(np.objective.cache = FALSE)} to force repeated eligible
       candidates through the evaluator for diagnostic timing comparisons.
+      Each native Powell-side cache has an independent 64 MiB peak workspace
+      ceiling, including replacement storage during growth. If the ceiling or
+      an allocation prevents growth, existing entries remain available and
+      the selected search continues without inserting new entries; bandwidth
+      cache diagnostics report this through \code{allocation.failed}.
       MADS/NOMAD solver caching is separate and is not
       controlled by this option, and the saturated extended-NN distance cache is
       governed by \code{np.extendednn}. Bandwidth summaries keep
