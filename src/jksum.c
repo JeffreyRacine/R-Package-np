@@ -11946,13 +11946,6 @@ static inline int np_reg_cv_use_symmetric_dropone_path(const int bwm,
     ks_tree_use || (BANDWIDTH_reg == BW_ADAP_NN);
 }
 
-/* Canonical selector for density CV tree bypass in all-large/adaptive regimes. */
-static inline int np_den_cv_use_tree_bypass_path(const int gate_x_all_large_fixed,
-                                                 const int int_TREE_XY,
-                                                 const int BANDWIDTH_den){
-  return gate_x_all_large_fixed || !int_TREE_XY || (BANDWIDTH_den == BW_ADAP_NN);
-}
-
 typedef struct {
   double cv;
   double traceH;
