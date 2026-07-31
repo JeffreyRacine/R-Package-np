@@ -346,6 +346,10 @@ npcdensbw.conbandwidth <-
     elapsed.start <- proc.time()[3]
     ydat = toFrame(ydat)
     xdat = toFrame(xdat)
+    bws.reg.spec <- npConditionalRegEngineSpec(
+      bws,
+      where = "npcdensbw"
+    )
 
     mc.expanded <- match.call(expand.dots = TRUE)
     if ("cvls.i1.rescue" %in% names(mc.expanded))
@@ -431,10 +435,10 @@ npcdensbw.conbandwidth <-
       bws.basis <- if (is.null(bws$basis)) "glp" else bws$basis
       bws.degree <- if (is.null(bws$degree)) NULL else bws$degree
       bws.bernstein <- isTRUE(bws$bernstein.basis)
-      bws.regtype.engine <- if (is.null(bws$regtype.engine)) bws.regtype else bws$regtype.engine
-      bws.basis.engine <- if (is.null(bws$basis.engine)) bws.basis else bws$basis.engine
-      bws.degree.engine <- if (is.null(bws$degree.engine)) bws.degree else bws$degree.engine
-      bws.bernstein.engine <- isTRUE(bws$bernstein.basis.engine)
+      bws.regtype.engine <- bws.reg.spec$reg.engine
+      bws.basis.engine <- bws.reg.spec$basis.engine
+      bws.degree.engine <- bws.reg.spec$degree.engine
+      bws.bernstein.engine <- bws.reg.spec$bernstein.engine
 
       return(.npcdensbw_run_fixed_degree_mads(
         xdat = xdat,

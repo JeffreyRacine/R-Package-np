@@ -56,12 +56,20 @@ test_that("npconmode rejects non-categorical responses before modal fitting", {
 
 test_that("npconmode proper defaults follow the canonical regression type", {
   effective <- getFromNamespace(".npConmodeEffectiveProper", "npRmpi")
+  state <- function(regtype.engine, degree.engine) {
+    list(
+      regtype.engine = regtype.engine,
+      basis.engine = "glp",
+      degree.engine = degree.engine,
+      bernstein.basis.engine = FALSE,
+      xncon = 1L
+    )
+  }
 
-  expect_false(effective(list(regtype = "lc"), NULL))
-  expect_true(effective(list(regtype = "ll"), NULL))
-  expect_true(effective(list(regtype = "lp"), NULL))
-  expect_false(effective(list(regtype = "lp", regtype.engine = "lc"), NULL))
-  expect_true(effective(list(regtype = "lc", regtype.engine = "lp"), NULL))
+  expect_false(effective(state("lc", 0L), NULL))
+  expect_true(effective(state("lp", 1L), NULL))
+  expect_false(effective(state("lc", 0L), NULL))
+  expect_true(effective(state("lp", 2L), NULL))
   expect_false(effective(list(regtype = "lp"), FALSE))
   expect_true(effective(list(regtype = "lc"), TRUE))
 })

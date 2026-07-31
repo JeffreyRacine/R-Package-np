@@ -1999,13 +1999,12 @@
 }
 
 .np_condensdist_fit_total <- function(bws, tnrow, enrow) {
-  reg.engine <- if (is.null(bws$regtype.engine)) {
-    if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
-  } else {
-    as.character(bws$regtype.engine)
-  }
+  reg.spec <- npConditionalRegEngineSpec(
+    bws,
+    where = "conditional fit progress"
+  )
   base.total <- .np_densdist_fit_total(bws = bws, tnrow = tnrow, enrow = enrow)
-  lp.route <- identical(reg.engine, "lp") && isTRUE(bws$xncon > 0L)
+  lp.route <- identical(reg.spec$reg.engine, "lp")
 
   if (isTRUE(lp.route)) {
     as.integer(enrow)

@@ -1070,48 +1070,131 @@ npValidateGlpGradientDegree <- function(regtype.engine,
   invisible(gradient.order)
 }
 
-npConditionalRegEngineSpec <- function(bws, where = "conditional estimator") {
-  reg.engine <- if (is.null(bws$regtype.engine)) {
-    if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
+npExactRequiredField <- function(object, field, where) {
+  if (!is.list(object))
+    stop(sprintf("%s must be a list-like bandwidth object", where),
+         call. = FALSE)
+
+  object.names <- names(object)
+  matches <- if (is.null(object.names)) {
+    integer(0L)
   } else {
-    as.character(bws$regtype.engine)
+    which(!is.na(object.names) & object.names == field)
   }
-  basis.engine <- if (is.null(bws$basis.engine)) {
-    if (is.null(bws$basis)) "glp" else bws$basis
-  } else {
-    bws$basis.engine
+  if (length(matches) == 0L) {
+    stop(sprintf("%s is missing required field '%s'", where, field),
+         call. = FALSE)
   }
-  degree.engine <- if (is.null(bws$degree.engine)) {
-    if (bws$xncon > 0L) {
-      if (identical(reg.engine, "lc")) {
-        rep.int(0L, bws$xncon)
-      } else {
-        npValidateGlpDegree(
-          regtype = "lp",
-          degree = bws$degree,
-          ncon = bws$xncon
-        )
-      }
-    } else {
-      integer(0)
-    }
-  } else {
-    as.integer(bws$degree.engine)
-  }
-  bernstein.engine <- if (is.null(bws$bernstein.basis.engine)) {
-    isTRUE(bws$bernstein.basis)
-  } else {
-    isTRUE(bws$bernstein.basis.engine)
+  if (length(matches) > 1L) {
+    stop(sprintf("%s contains duplicate field '%s'", where, field),
+         call. = FALSE)
   }
 
-  if (!identical(reg.engine, "lp") && bws$xncon > 0L)
-    degree.engine <- rep.int(if (identical(reg.engine, "ll")) 1L else 0L, bws$xncon)
+  object[[matches[[1L]]]]
+}
+
+npValidateConditionalRegEngineState <- function(regtype.engine,
+                                                 basis.engine,
+                                                 degree.engine,
+                                                 bernstein.basis.engine,
+                                                 ncon,
+                                                 where = "conditional estimator") {
+  ncon <- npValidateNonNegativeInteger(ncon, paste0(where, " ncon"))
+
+  if (!is.character(regtype.engine) ||
+      length(regtype.engine) != 1L ||
+      is.na(regtype.engine) ||
+      !(regtype.engine %in% c("lc", "lp"))) {
+    stop(sprintf(
+      "%s field 'regtype.engine' must be exactly 'lc' or 'lp'",
+      where
+    ), call. = FALSE)
+  }
+
+  if (!is.character(basis.engine) ||
+      length(basis.engine) != 1L ||
+      is.na(basis.engine) ||
+      !(basis.engine %in% c("glp", "additive", "tensor"))) {
+    stop(sprintf(
+      "%s field 'basis.engine' must be exactly 'glp', 'additive', or 'tensor'",
+      where
+    ), call. = FALSE)
+  }
+
+  if (!is.numeric(degree.engine) ||
+      length(degree.engine) != ncon ||
+      anyNA(degree.engine) ||
+      any(!is.finite(degree.engine)) ||
+      any(degree.engine < 0) ||
+      any(degree.engine != floor(degree.engine)) ||
+      any(degree.engine > .np_glp_degree_hard_max)) {
+    stop(sprintf(
+      "%s field 'degree.engine' must contain %d finite non-negative integer value(s) in [0,%d]",
+      where,
+      ncon,
+      .np_glp_degree_hard_max
+    ), call. = FALSE)
+  }
+  degree.engine <- as.integer(degree.engine)
+
+  if (!is.logical(bernstein.basis.engine) ||
+      length(bernstein.basis.engine) != 1L ||
+      is.na(bernstein.basis.engine)) {
+    stop(sprintf(
+      "%s field 'bernstein.basis.engine' must be TRUE or FALSE",
+      where
+    ), call. = FALSE)
+  }
+
+  if (identical(regtype.engine, "lc")) {
+    if (any(degree.engine != 0L)) {
+      stop(sprintf(
+        "%s has incoherent local-constant engine state: 'degree.engine' must be all zero",
+        where
+      ), call. = FALSE)
+    }
+    if (isTRUE(bernstein.basis.engine)) {
+      stop(sprintf(
+        "%s has incoherent local-constant engine state: 'bernstein.basis.engine' must be FALSE",
+        where
+      ), call. = FALSE)
+    }
+  } else if (ncon == 0L) {
+    stop(sprintf(
+      "%s has incoherent local-polynomial engine state: 'lp' requires at least one continuous predictor",
+      where
+    ), call. = FALSE)
+  }
 
   list(
-    reg.engine = reg.engine,
+    reg.engine = regtype.engine,
     basis.engine = basis.engine,
     degree.engine = degree.engine,
-    bernstein.engine = bernstein.engine
+    bernstein.engine = bernstein.basis.engine,
+    ncon = ncon
+  )
+}
+
+npConditionalRegEngineSpec <- function(bws,
+                                       where = "conditional estimator",
+                                       ncon.field = "xncon") {
+  npValidateConditionalRegEngineState(
+    regtype.engine = npExactRequiredField(
+      bws, "regtype.engine", where
+    ),
+    basis.engine = npExactRequiredField(
+      bws, "basis.engine", where
+    ),
+    degree.engine = npExactRequiredField(
+      bws, "degree.engine", where
+    ),
+    bernstein.basis.engine = npExactRequiredField(
+      bws, "bernstein.basis.engine", where
+    ),
+    ncon = npExactRequiredField(
+      bws, ncon.field, where
+    ),
+    where = where
   )
 }
 
@@ -1220,18 +1303,27 @@ npRegtypeToC <- function(regtype, degree, ncon, context = "npreg") {
 }
 
 npIsCanonicalLp0 <- function(regtype.engine, degree.engine, ncon) {
-  ncon <- npValidateNonNegativeInteger(ncon, "ncon")
-  degree.engine <- as.integer(degree.engine)
+  state <- npValidateConditionalRegEngineState(
+    regtype.engine = regtype.engine,
+    basis.engine = "glp",
+    degree.engine = degree.engine,
+    bernstein.basis.engine = FALSE,
+    ncon = ncon,
+    where = "conditional local-polynomial state"
+  )
 
-  identical(as.character(regtype.engine), "lc") ||
-    (ncon == 0L && length(degree.engine) == 0L) ||
-    (length(degree.engine) == ncon && all(degree.engine == 0L))
+  identical(state$reg.engine, "lc") ||
+    all(state$degree.engine == 0L)
 }
 
 npIsCanonicalLp0Spec <- function(spec, ncon) {
   npIsCanonicalLp0(
-    regtype.engine = spec$regtype.engine,
-    degree.engine = spec$degree.engine,
+    regtype.engine = npExactRequiredField(
+      spec, "regtype.engine", "conditional local-polynomial specification"
+    ),
+    degree.engine = npExactRequiredField(
+      spec, "degree.engine", "conditional local-polynomial specification"
+    ),
     ncon = ncon
   )
 }

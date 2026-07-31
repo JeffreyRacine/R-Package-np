@@ -1,14 +1,17 @@
 .npcdhat_make_xbw <- function(bws, txdat) {
-  regtype <- if (is.null(bws$regtype.engine)) bws$regtype else bws$regtype.engine
-  basis <- if (is.null(bws$basis.engine)) bws$basis else bws$basis.engine
-  degree <- if (is.null(bws$degree.engine)) bws$degree else bws$degree.engine
-  bernstein <- if (is.null(bws$bernstein.basis.engine)) bws$bernstein.basis else bws$bernstein.basis.engine
+  spec <- npConditionalRegEngineSpec(
+    bws,
+    where = "conditional hat"
+  )
 
   xbw.args <- list(
     xdat = txdat,
     ydat = rep.int(0.0, nrow(txdat)),
     bws = bws$xbw,
-    regtype = regtype,
+    regtype = spec$reg.engine,
+    basis = spec$basis.engine,
+    degree = spec$degree.engine,
+    bernstein.basis = spec$bernstein.engine,
     bwtype = bws$type,
     bandwidth.compute = FALSE,
     ckertype = bws$cxkertype,
@@ -19,13 +22,6 @@
     ukertype = bws$uxkertype,
     okertype = bws$oxkertype
   )
-
-  if (!is.null(basis))
-    xbw.args$basis <- basis
-  if (!is.null(degree))
-    xbw.args$degree <- degree
-  if (!is.null(bernstein))
-    xbw.args$bernstein.basis <- bernstein
 
   do.call(npregbw, xbw.args)
 }
@@ -122,38 +118,27 @@
 }
 
 .npcdhat_use_adaptive_ratio <- function(bws, x.s = NULL) {
-  regtype <- if (is.null(bws$regtype.engine)) bws$regtype else bws$regtype.engine
+  spec <- npConditionalRegEngineSpec(
+    bws,
+    where = "conditional hat adaptive ratio"
+  )
   identical(bws$type, "adaptive_nn") &&
     !.npcdhat_has_x_derivative(x.s) &&
-    npIsCanonicalLp0(
-      regtype.engine = regtype,
-      degree.engine = if (is.null(bws$degree.engine)) bws$degree else bws$degree.engine,
-      ncon = bws$xncon
-    )
+    (identical(spec$reg.engine, "lc") ||
+       all(spec$degree.engine == 0L))
 }
 
 .npcdhat_make_xhat_matrix <- function(bws, txdat, exdat, s = NULL) {
   xbw <- .npcdhat_make_xbw(bws = bws, txdat = txdat)
-  spec <- npCanonicalConditionalRegSpec(
-    regtype = if (is.null(xbw$regtype)) "lc" else as.character(xbw$regtype),
-    basis = if (is.null(xbw$basis)) "glp" else xbw$basis,
-    degree = xbw$degree,
-    bernstein.basis = isTRUE(xbw$bernstein.basis),
-    ncon = xbw$ncon,
-    where = "npcdhat"
+  spec <- npConditionalRegEngineSpec(
+    xbw,
+    where = "conditional hat regression bandwidth",
+    ncon.field = "ncon"
   )
-  regtype <- if (is.null(xbw$regtype.engine)) {
-    as.character(spec$regtype.engine)
-  } else {
-    as.character(xbw$regtype.engine)
-  }
-  basis <- if (is.null(xbw$basis.engine)) spec$basis.engine else xbw$basis.engine
-  degree <- if (is.null(xbw$degree.engine)) as.integer(spec$degree.engine) else as.integer(xbw$degree.engine)
-  bernstein <- if (is.null(xbw$bernstein.basis.engine)) {
-    isTRUE(spec$bernstein.basis.engine)
-  } else {
-    isTRUE(xbw$bernstein.basis.engine)
-  }
+  regtype <- spec$reg.engine
+  basis <- spec$basis.engine
+  degree <- spec$degree.engine
+  bernstein <- spec$bernstein.engine
 
   if (npIsCanonicalLp0(
         regtype.engine = regtype,

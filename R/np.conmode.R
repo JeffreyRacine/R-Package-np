@@ -125,10 +125,11 @@ npconmode.condbandwidth <-
     return(proper)
   }
 
-  regtype <- bws$regtype
-  if (!is.null(bws$regtype.engine))
-    regtype <- bws$regtype.engine
-  !identical(as.character(regtype)[1L], "lc")
+  reg.spec <- npConditionalRegEngineSpec(
+    bws,
+    where = "npconmode"
+  )
+  !identical(reg.spec$reg.engine, "lc")
 }
 
 .npConmodeProjectSimplexVector <- function(x) {
