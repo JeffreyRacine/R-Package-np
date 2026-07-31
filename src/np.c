@@ -7435,7 +7435,11 @@ static SEXP C_np_regression_bw_common(SEXP runo,
       INTEGER(myopti_i)[RBW_CKRNEVI] == NP_CKERNEL_COORDINATE_CODE)
     error("C_np_regression_bw: continuous-kernel descriptor is missing");
 
-  ncon = (int)INTEGER(myopti_i)[REG_NCONI];
+  ncon = (int)INTEGER(myopti_i)[RBW_NCONI];
+  if (ncon < 0)
+    error("C_np_regression_bw: invalid number of continuous regressors");
+  if (ncon > 0 && XLENGTH(degree_i) != (R_xlen_t)ncon)
+    error("C_np_regression_bw: glp_degree length mismatch");
   resolve_bounds_or_default(ckerlb_r, ckerub_r, ncon, &ckerlb_p, &ckerub_p);
 
   PROTECT(out_bw = allocVector(REALSXP, XLENGTH(rbw_r)));
