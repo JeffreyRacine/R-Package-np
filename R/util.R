@@ -4829,7 +4829,6 @@ REGTYPE_GLP = REGTYPE_LP
 ##conditional density/distribution
 CBWM_CVML = 0
 CBWM_CVLS = 1
-CBWM_NPLS = 2
 CBWM_CCDF = 3 # Added 7/2/2010 jracine
 
 ##conditional distribution
