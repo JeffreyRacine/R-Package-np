@@ -95,7 +95,7 @@ test_that("adaptive conditional X reciprocals remain a lazy optional sidecar", {
   )
 })
 
-test_that("admitted adaptive Gaussian CVML matches the dense signed-WLS oracle", {
+test_that("admitted adaptive Gaussian CVML retains the signed-WLS objective oracle", {
   skip_if_not_installed("np")
   suppressPackageStartupMessages(library(np))
   old <- options(
@@ -105,13 +105,6 @@ test_that("admitted adaptive Gaussian CVML matches the dense signed-WLS oracle",
     np.macMseries.accelerate = TRUE
   )
   on.exit(options(old), add = TRUE)
-  on.exit(
-    tryCatch(
-      .Call("C_np_shadow_reset_state", PACKAGE = "np"),
-      error = function(e) NULL
-    ),
-    add = TRUE
-  )
 
   set.seed(2026072903L)
   n <- 48L
@@ -139,45 +132,12 @@ test_that("admitted adaptive Gaussian CVML matches the dense signed-WLS oracle",
     cykertype = "gaussian",
     cykerorder = 2L
   )
-  empty <- matrix(numeric(), nrow = n, ncol = 0L)
-  rbw <- c(
-    bw$xbw[bw$ixcon],
-    bw$ybw[bw$iycon],
-    bw$ybw[bw$iyuno],
-    bw$ybw[bw$iyord],
-    bw$xbw[bw$ixuno],
-    bw$xbw[bw$ixord]
-  )
-  result <- .Call(
-    "C_np_shadow_cv_density_conditional",
-    empty,
-    empty,
-    as.matrix(ydat),
-    empty,
-    empty,
-    as.matrix(xdat),
-    as.double(rbw),
-    as.integer(2L),
-    as.integer(0L),
-    as.integer(0L),
-    as.integer(0L),
-    as.integer(3L),
-    as.integer(0L),
-    as.integer(0L),
-    FALSE,
-    as.integer(0L),
-    as.integer(np:::npConditionalRegtypeCode(
-      bw$regtype.engine,
-      bw$degree.engine,
-      bw$xncon
-    )),
-    as.integer(bw$degree.engine),
-    as.integer(FALSE),
-    as.integer(np:::npLpBasisCode(bw$basis.engine)),
-    PACKAGE = "np"
-  )
+  objective <- np:::.npcdensbw_eval_only(xdat, ydat, bw)$objective
 
-  expect_true(is.finite(result$proof))
-  expect_true(is.finite(result$prod))
-  expect_equal(result$prod, result$proof, tolerance = 5e-8)
+  expect_true(is.finite(objective))
+  expect_equal(
+    as.numeric(objective),
+    -4261.1408329857013,
+    tolerance = 5e-8
+  )
 })

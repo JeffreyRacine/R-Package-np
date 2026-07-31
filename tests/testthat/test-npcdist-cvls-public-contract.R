@@ -1,100 +1,6 @@
 library(np)
 
-cdist_shadow_empty <- function(n) {
-  matrix(numeric(0), nrow = n, ncol = 0)
-}
-
-cdist_shadow_cker <- function(kernel) {
-  switch(kernel,
-    gaussian = 0L,
-    epanechnikov = 4L,
-    uniform = 8L,
-    truncated = 9L,
-    stop("unsupported continuous kernel")
-  )
-}
-
-cdist_shadow_uker <- function(kernel) {
-  switch(kernel,
-    aitchisonaitken = 0L,
-    liracine = 1L,
-    stop("unsupported unordered kernel")
-  )
-}
-
-cdist_shadow_oker <- function(kernel) {
-  switch(kernel,
-    wangvanryzin = 0L,
-    liracine = 2L,
-    racineliyan = 3L,
-    stop("unsupported ordered kernel")
-  )
-}
-
-cdist_shadow_rbw <- function(bw) {
-  c(
-    bw$xbw[bw$ixcon],
-    bw$ybw[bw$iycon],
-    bw$ybw[bw$iyuno],
-    bw$ybw[bw$iyord],
-    bw$xbw[bw$ixuno],
-    bw$xbw[bw$ixord]
-  )
-}
-
-cdist_shadow_bwtype <- function(bw) {
-  switch(bw$type,
-    fixed = 0L,
-    generalized_nn = 1L,
-    adaptive_nn = 2L,
-    stop("unsupported bandwidth type")
-  )
-}
-
-cdist_shadow_safe_call <- function(name, ...) {
-  on.exit(
-    tryCatch(.Call("C_np_shadow_reset_state", PACKAGE = "np"),
-             error = function(e) NULL),
-    add = TRUE
-  )
-  .Call(name, ..., PACKAGE = "np")
-}
-
-call_public_cdist_cvls_shadow <- function(bw, x, ytrain, yeval = ytrain, cdfontrain = FALSE) {
-  n <- nrow(x)
-  ne <- nrow(yeval)
-  cdist_shadow_safe_call(
-    "C_np_shadow_cv_distribution_conditional",
-    cdist_shadow_empty(n), cdist_shadow_empty(n), as.matrix(ytrain),
-    cdist_shadow_empty(ne), cdist_shadow_empty(ne), as.matrix(yeval),
-    cdist_shadow_empty(n), cdist_shadow_empty(n), as.matrix(x),
-    as.double(cdist_shadow_rbw(bw)),
-    cdist_shadow_bwtype(bw),
-    cdist_shadow_cker(bw$cykertype),
-    cdist_shadow_uker(bw$uykertype),
-    cdist_shadow_oker(bw$oykertype),
-    cdist_shadow_cker(bw$cxkertype),
-    cdist_shadow_uker(bw$uxkertype),
-    cdist_shadow_oker(bw$oxkertype),
-    FALSE,
-    0L,
-    integer(0),
-    FALSE,
-    0L,
-    cdfontrain
-  )
-}
-
-public_cdist_eval_grid <- function(ydat, ngrid = 100L) {
-  probs <- seq(0, 1, length.out = ngrid)
-  evy <- ydat[seq_len(ngrid), , drop = FALSE]
-  for (i in seq_len(ncol(evy))) {
-    evy[, i] <- uocquantile(ydat[, i], probs)
-  }
-  evy
-}
-
-test_that("public npcdistbw cv.ls lc matches the canonical objective", {
+test_that("public npcdistbw cv.ls lc matches canonical one-shot evaluation", {
   set.seed(303)
   n <- 32L
   x <- data.frame(x1 = runif(n), x2 = runif(n))
@@ -108,9 +14,9 @@ test_that("public npcdistbw cv.ls lc matches the canonical objective", {
     nmulti = 1,
     itmax = 1L
   )
-  shadow <- call_public_cdist_cvls_shadow(bw.lc, x, y, yeval = public_cdist_eval_grid(y))
+  objective <- np:::.npcdistbw_eval_only(x, y, bws = bw.lc)$objective
 
-  expect_equal(bw.lc$fval, shadow$prod, tolerance = 1e-10)
+  expect_equal(bw.lc$fval, objective, tolerance = 1e-12)
 })
 
 test_that("public npcdistbw cv.ls fixed LP/LL route activates with ll == lp parity", {
@@ -171,12 +77,12 @@ test_that("npcdistbw cv.ls fixed continuous stream keeps tree and serial objecti
     np:::DO_TREE_YES
   )
 
-  tryCatch(.Call("C_np_shadow_reset_state", PACKAGE = "np"),
+  tryCatch(.Call("C_np_reset_native_estimator_state", PACKAGE = "np"),
            error = function(e) NULL)
   tree.obj <- np:::.npcdistbw_eval_only(x, y, bws = bw)$objective
 
   options(np.tree = FALSE)
-  tryCatch(.Call("C_np_shadow_reset_state", PACKAGE = "np"),
+  tryCatch(.Call("C_np_reset_native_estimator_state", PACKAGE = "np"),
            error = function(e) NULL)
   serial.obj <- np:::.npcdistbw_eval_only(x, y, bws = bw)$objective
 

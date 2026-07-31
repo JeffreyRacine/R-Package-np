@@ -1,118 +1,15 @@
 library(np)
 
-cvls_shadow_empty <- function(n) {
-  matrix(numeric(0), nrow = n, ncol = 0)
-}
-
-cvls_shadow_cker <- function(kernel) {
-  switch(kernel,
-    gaussian = 0L,
-    epanechnikov = 4L,
-    uniform = 8L,
-    truncated = 9L,
-    stop("unsupported continuous kernel")
-  )
-}
-
-cvls_shadow_uker <- function(kernel) {
-  switch(kernel,
-    aitchisonaitken = 0L,
-    liracine = 1L,
-    stop("unsupported unordered kernel")
-  )
-}
-
-cvls_shadow_oker <- function(kernel) {
-  switch(kernel,
-    wangvanryzin = 0L,
-    liracine = 2L,
-    racineliyan = 3L,
-    stop("unsupported ordered kernel")
-  )
-}
-
-cvls_shadow_rbw <- function(bw) {
-  c(
-    bw$xbw[bw$ixcon],
-    bw$ybw[bw$iycon],
-    bw$ybw[bw$iyuno],
-    bw$ybw[bw$iyord],
-    bw$xbw[bw$ixuno],
-    bw$xbw[bw$ixord]
-  )
-}
-
-cvls_shadow_bwtype <- function(bw) {
-  switch(bw$type,
-    fixed = 0L,
-    generalized_nn = 1L,
-    adaptive_nn = 2L,
-    stop("unsupported bandwidth type")
-  )
-}
-
-cvls_shadow_regtype <- function(bw) {
-  if (identical(bw$regtype.engine, "lp")) 2L else 0L
-}
-
-cvls_shadow_degree <- function(bw) {
-  if (identical(bw$regtype.engine, "lp")) as.integer(bw$degree.engine) else integer(0)
-}
-
-cvls_shadow_basis <- function(basis_engine, regtype_engine) {
-  if (!identical(regtype_engine, "lp")) {
-    return(0L)
-  }
-  switch(basis_engine,
-    additive = 0L,
-    glp = 1L,
-    tensor = 2L,
-    stop("unsupported LP basis")
-  )
-}
-
-cvls_shadow_safe_call <- function(name, ...) {
-  on.exit(
-    tryCatch(.Call("C_np_shadow_reset_state", PACKAGE = "np"),
-             error = function(e) NULL),
-    add = TRUE
-  )
-  .Call(name, ..., PACKAGE = "np")
-}
-
-call_public_cvls_shadow <- function(bw, x, y) {
-  n <- nrow(x)
-  cvls_shadow_safe_call(
-    "C_np_shadow_cv_density_conditional",
-    cvls_shadow_empty(n), cvls_shadow_empty(n), as.matrix(y),
-    cvls_shadow_empty(n), cvls_shadow_empty(n), as.matrix(x),
-    as.double(cvls_shadow_rbw(bw)),
-    cvls_shadow_bwtype(bw),
-    cvls_shadow_cker(bw$cykertype),
-    cvls_shadow_uker(bw$uykertype),
-    cvls_shadow_oker(bw$oykertype),
-    cvls_shadow_cker(bw$cxkertype),
-    cvls_shadow_uker(bw$uxkertype),
-    cvls_shadow_oker(bw$oxkertype),
-    FALSE,
-    1L,
-    cvls_shadow_regtype(bw),
-    cvls_shadow_degree(bw),
-    isTRUE(bw$bernstein.basis.engine),
-    cvls_shadow_basis(bw$basis.engine, bw$regtype.engine)
-  )
-}
-
-test_that("public npcdensbw cv.ls lc matches the production fixed-point objective", {
+test_that("public npcdensbw cv.ls lc matches canonical one-shot evaluation", {
   set.seed(222)
   n <- 32L
   x <- data.frame(x1 = runif(n), x2 = runif(n))
   y <- data.frame(y1 = rnorm(n))
 
   bw.lc <- npcdensbw(xdat = x, ydat = y, regtype = "lc", bwmethod = "cv.ls", nmulti = 1)
-  shadow <- call_public_cvls_shadow(bw.lc, x, y)
+  objective <- np:::.npcdensbw_eval_only(x, y, bw.lc)$objective
 
-  expect_equal(bw.lc$fval, -shadow$prod, tolerance = 1e-10)
+  expect_equal(bw.lc$fval, objective, tolerance = 1e-12)
 })
 
 test_that("provided fixed lc cv.ls eval_only remains finite", {

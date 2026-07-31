@@ -19372,27 +19372,7 @@ static int np_conditional_indicator_row_core(const int train_idx,
   return indy;
 }
 
-static int np_shadow_conditional_indicator_row(const int train_idx,
-                                               const int eval_idx,
-                                               const int cdfontrain,
-                                               double **matrix_Y_ordered_train,
-                                               double **matrix_Y_continuous_train,
-                                               double **matrix_Y_ordered_eval,
-                                               double **matrix_Y_continuous_eval,
-                                               const int num_var_ordered,
-                                               const int num_var_continuous){
-  return np_conditional_indicator_row_core(train_idx,
-                                           eval_idx,
-                                           cdfontrain,
-                                           matrix_Y_ordered_train,
-                                           matrix_Y_continuous_train,
-                                           matrix_Y_ordered_eval,
-                                           matrix_Y_continuous_eval,
-                                           num_var_ordered,
-                                           num_var_continuous);
-}
-
-static int np_shadow_conditional_kernel_row_core(const int *kernel_c,
+static int np_conditional_kernel_row_core(const int *kernel_c,
                                                  const int *kernel_u,
                                                  const int *kernel_o,
                                                  const int *operator,
@@ -19474,7 +19454,7 @@ static int np_shadow_conditional_kernel_row_core(const int *kernel_c,
                                     NULL);
 }
 
-static int np_shadow_conditional_kernel_row(const int *kernel_c,
+static int np_conditional_kernel_row(const int *kernel_c,
                                             const int *kernel_u,
                                             const int *kernel_o,
                                             const int *operator,
@@ -19500,7 +19480,7 @@ static int np_shadow_conditional_kernel_row(const int *kernel_c,
                                             KDT *kdt,
                                             double *kw_out,
                                             double *mean_out){
-  return np_shadow_conditional_kernel_row_core(kernel_c,
+  return np_conditional_kernel_row_core(kernel_c,
                                                kernel_u,
                                                kernel_o,
                                                operator,
@@ -19529,7 +19509,7 @@ static int np_shadow_conditional_kernel_row(const int *kernel_c,
                                                mean_out);
 }
 
-static int np_shadow_conditional_kernel_row_raw(const int *kernel_c,
+static int np_conditional_kernel_row_raw(const int *kernel_c,
                                                 const int *kernel_u,
                                                 const int *kernel_o,
                                                 const int *operator,
@@ -19555,7 +19535,7 @@ static int np_shadow_conditional_kernel_row_raw(const int *kernel_c,
                                                 KDT *kdt,
                                                 double *kw_out,
                                                 double *mean_out){
-  return np_shadow_conditional_kernel_row_core(kernel_c,
+  return np_conditional_kernel_row_core(kernel_c,
                                                kernel_u,
                                                kernel_o,
                                                operator,
@@ -19582,276 +19562,6 @@ static int np_shadow_conditional_kernel_row_raw(const int *kernel_c,
                                                0,
                                                kw_out,
                                                mean_out);
-}
-
-static int np_shadow_conditional_build_x_weights_core(double *vector_scale_factor,
-                                                      int drop_eval_self,
-                                                      double *weights_out){
-  const int num_train = num_obs_train_extern;
-  const int num_reg_tot = num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern;
-  const int lp_engine = np_lp_engine_extern;
-  const int bw_rows = (BANDWIDTH_den_extern == BW_FIXED) ? 1 : num_train;
-  int *kernel_cx = NULL, *kernel_ux = NULL, *kernel_ox = NULL, *x_operator = NULL;
-  double *vsfx = NULL, *lambdax = NULL, *kw = NULL, *mean_row = NULL;
-  double **matrix_bandwidth_x = NULL, **matrix_bandwidth_eval_one = NULL;
-  double **eval_xuno_one = NULL, **eval_xord_one = NULL, **eval_xcon_one = NULL;
-  NPLPFullRowWorkspace full_row_workspace;
-  NPConditionalBoundState bounds_state;
-  int i, j, l;
-  int status = 1;
-
-  np_lp_full_row_workspace_init(&full_row_workspace);
-  if((BANDWIDTH_den_extern != BW_FIXED) &&
-     (BANDWIDTH_den_extern != BW_GEN_NN) &&
-     (BANDWIDTH_den_extern != BW_ADAP_NN))
-    return 1;
-
-  if(num_train <= 0)
-    return 1;
-
-  memset(weights_out, 0, (size_t)num_train*(size_t)num_train*sizeof(double));
-
-  if(num_reg_tot <= 0){
-    const double denom = drop_eval_self ? ((double)(num_train - 1)) : ((double)num_train);
-    const double w = (denom > 0.0) ? 1.0/denom : 0.0;
-    for(i = 0; i < num_train; i++)
-      for(j = 0; j < num_train; j++)
-        if((!drop_eval_self) || (i != j))
-          weights_out[(size_t)i*(size_t)num_train + (size_t)j] = w;
-    return 0;
-  }
-
-  vsfx = alloc_vecd(MAX(1, num_reg_tot));
-  lambdax = alloc_vecd(MAX(1, num_reg_unordered_extern + num_reg_ordered_extern));
-  kw = alloc_vecd(MAX(1, num_train));
-  mean_row = alloc_vecd(MAX(1, num_train));
-  matrix_bandwidth_x = alloc_tmatd(bw_rows, num_reg_continuous_extern);
-  matrix_bandwidth_eval_one = alloc_tmatd(1, num_reg_continuous_extern);
-  if(num_reg_unordered_extern > 0) eval_xuno_one = alloc_matd(1, num_reg_unordered_extern);
-  if(num_reg_ordered_extern > 0) eval_xord_one = alloc_matd(1, num_reg_ordered_extern);
-  if(num_reg_continuous_extern > 0) eval_xcon_one = alloc_matd(1, num_reg_continuous_extern);
-
-  kernel_cx = (int *)calloc((size_t)MAX(1, num_reg_continuous_extern), sizeof(int));
-  kernel_ux = (int *)calloc((size_t)MAX(1, num_reg_unordered_extern), sizeof(int));
-  kernel_ox = (int *)calloc((size_t)MAX(1, num_reg_ordered_extern), sizeof(int));
-  x_operator = (int *)calloc((size_t)MAX(1, num_reg_tot), sizeof(int));
-
-  if((vsfx == NULL) || (lambdax == NULL) || (kw == NULL) || (mean_row == NULL) ||
-     ((num_reg_continuous_extern > 0) && (matrix_bandwidth_x == NULL)) ||
-     ((num_reg_continuous_extern > 0) && (matrix_bandwidth_eval_one == NULL)) ||
-     ((num_reg_unordered_extern > 0) && (eval_xuno_one == NULL)) ||
-     ((num_reg_ordered_extern > 0) && (eval_xord_one == NULL)) ||
-     ((num_reg_continuous_extern > 0) && (eval_xcon_one == NULL)) ||
-     (kernel_cx == NULL) || (kernel_ux == NULL) || (kernel_ox == NULL) || (x_operator == NULL))
-    goto cleanup_xweights;
-
-  np_splitxy_vsf_mcv_nc(num_var_unordered_extern,
-                        num_var_ordered_extern,
-                        num_var_continuous_extern,
-                        num_reg_unordered_extern,
-                        num_reg_ordered_extern,
-                        num_reg_continuous_extern,
-                        vector_scale_factor,
-                        NULL,
-                        NULL,
-                        vsfx,
-                        NULL,
-                        NULL,
-                        NULL, NULL, NULL,
-                        NULL, NULL, NULL);
-
-  for(i = 0; i < num_reg_continuous_extern; i++) kernel_cx[i] = KERNEL_reg_extern;
-  for(i = 0; i < num_reg_unordered_extern; i++) kernel_ux[i] = KERNEL_reg_unordered_extern;
-  for(i = 0; i < num_reg_ordered_extern; i++) kernel_ox[i] = KERNEL_reg_ordered_extern;
-  for(i = 0; i < num_reg_tot; i++) x_operator[i] = OP_NORMAL;
-
-  if(kernel_bandwidth_mean(KERNEL_reg_extern,
-                           BANDWIDTH_den_extern,
-                           num_train,
-                           num_train,
-                           0,
-                           0,
-                           0,
-                           num_reg_continuous_extern,
-                           num_reg_unordered_extern,
-                           num_reg_ordered_extern,
-                           0,
-                           vsfx,
-                           NULL,
-                           NULL,
-                           matrix_X_continuous_train_extern,
-                           matrix_X_continuous_train_extern,
-                           NULL,
-                           matrix_bandwidth_x,
-                           lambdax) == 1)
-    goto cleanup_xweights;
-
-  if(lp_engine == NP_LP_ENGINE_GENERAL){
-    if((vector_glp_degree_extern == NULL) || (num_reg_continuous_extern <= 0))
-      goto cleanup_xweights;
-    if(!np_glp_cv_prepare_extern(NP_LP_ENGINE_GENERAL,
-                                 num_train,
-                                 num_reg_continuous_extern,
-                                 matrix_X_continuous_train_extern))
-      goto cleanup_xweights;
-    if(!np_lp_full_row_workspace_reserve(&full_row_workspace,
-                                         np_glp_cv_cache.nterms,
-                                         1))
-      goto cleanup_xweights;
-  }
-
-  for(i = 0; i < num_train; i++){
-    const int orig_i = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[i] : i;
-    double row_sum = 0.0;
-
-    for(l = 0; l < num_reg_unordered_extern; l++)
-      eval_xuno_one[l][0] = matrix_X_unordered_train_extern[l][i];
-    for(l = 0; l < num_reg_ordered_extern; l++)
-      eval_xord_one[l][0] = matrix_X_ordered_train_extern[l][i];
-    for(l = 0; l < num_reg_continuous_extern; l++){
-      eval_xcon_one[l][0] = matrix_X_continuous_train_extern[l][i];
-      matrix_bandwidth_eval_one[l][0] =
-        (BANDWIDTH_den_extern == BW_GEN_NN) ? matrix_bandwidth_x[l][i] : matrix_bandwidth_x[l][0];
-    }
-
-    np_conditional_push_bounds(int_cxker_bound_extern,
-                               vector_cxkerlb_extern,
-                               vector_cxkerub_extern,
-                               &bounds_state);
-    if(np_shadow_conditional_kernel_row_raw(kernel_cx,
-                                            kernel_ux,
-                                            kernel_ox,
-                                            x_operator,
-                                            BANDWIDTH_den_extern,
-                                            num_train,
-                                            num_reg_unordered_extern,
-                                            num_reg_ordered_extern,
-                                            num_reg_continuous_extern,
-                                            matrix_X_unordered_train_extern,
-                                            matrix_X_ordered_train_extern,
-                                            matrix_X_continuous_train_extern,
-                                            eval_xuno_one,
-                                            eval_xord_one,
-                                            eval_xcon_one,
-                                            vsfx,
-                                            1,
-                                            matrix_bandwidth_x,
-                                            matrix_bandwidth_eval_one,
-                                            lambdax,
-                                            num_categories_extern_X,
-                                            matrix_categorical_vals_extern_X,
-                                            int_TREE_X,
-                                            kdt_extern_X,
-                                            kw,
-                                            mean_row) != 0){
-      np_conditional_pop_bounds(&bounds_state);
-      goto cleanup_xweights;
-    }
-    np_conditional_pop_bounds(&bounds_state);
-
-    if(drop_eval_self && (lp_engine == NP_LP_ENGINE_SCALAR))
-      kw[i] = 0.0;
-
-    if(lp_engine == NP_LP_ENGINE_SCALAR){
-      for(j = 0; j < num_train; j++)
-        row_sum += kw[j];
-      if(!(fabs(row_sum) > DBL_MIN))
-        goto cleanup_xweights;
-      for(j = 0; j < num_train; j++){
-        const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
-        weights_out[(size_t)orig_i*(size_t)num_train + (size_t)orig_j] = kw[j]/row_sum;
-      }
-    } else {
-      const int k = np_glp_cv_cache.nterms;
-
-      if((k <= 0) || (np_glp_cv_cache.basis == NULL))
-        goto cleanup_xweights;
-
-      for(l = 0; l < k; l++){
-        full_row_workspace.rhs[l] =
-          np_glp_cv_cache.basis[l][i];
-        for(j = 0; j < k; j++)
-          full_row_workspace.gram[l + j*k] = 0.0;
-      }
-
-      for(j = 0; j < num_train; j++){
-        const double wj = kw[j];
-        if(wj == 0.0)
-          continue;
-        for(int a = 0; a < k; a++){
-          const double za = np_glp_cv_cache.basis[a][j];
-          for(int b = a; b < k; b++){
-            const double zb = np_glp_cv_cache.basis[b][j];
-            full_row_workspace.gram[a + b*k] += wj*za*zb;
-            if(b != a)
-              full_row_workspace.gram[b + a*k] += wj*za*zb;
-          }
-        }
-      }
-
-      if(!np_lp_full_row_workspace_solve(&full_row_workspace,
-                                         k,
-                                         1,
-                                         1.0e-10))
-        goto cleanup_xweights;
-
-      for(j = 0; j < num_train; j++){
-        double zju = 0.0;
-        const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
-        for(l = 0; l < k; l++)
-          zju += np_glp_cv_cache.basis[l][j]*
-            full_row_workspace.rhs[l];
-        weights_out[(size_t)orig_i*(size_t)num_train + (size_t)orig_j] = kw[j]*zju;
-      }
-
-      if(drop_eval_self){
-        const size_t row_offset = (size_t)orig_i*(size_t)num_train;
-        double den;
-        if(!np_lp_delete_denominator(
-             weights_out[row_offset + (size_t)orig_i], &den))
-          goto cleanup_xweights;
-        for(j = 0; j < num_train; j++){
-          const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
-          weights_out[row_offset + (size_t)orig_j] =
-            (j == i) ? 0.0 : weights_out[row_offset + (size_t)orig_j]/den;
-        }
-      }
-    }
-  }
-
-  status = 0;
-
-cleanup_xweights:
-  np_lp_full_row_workspace_clear(&full_row_workspace);
-  if(vsfx != NULL) free(vsfx);
-  if(lambdax != NULL) free(lambdax);
-  if(kw != NULL) free(kw);
-  if(mean_row != NULL) free(mean_row);
-  if(matrix_bandwidth_x != NULL) free_tmat(matrix_bandwidth_x);
-  if(matrix_bandwidth_eval_one != NULL) free_tmat(matrix_bandwidth_eval_one);
-  if(eval_xuno_one != NULL) free_mat(eval_xuno_one, num_reg_unordered_extern);
-  if(eval_xord_one != NULL) free_mat(eval_xord_one, num_reg_ordered_extern);
-  if(eval_xcon_one != NULL) free_mat(eval_xcon_one, num_reg_continuous_extern);
-  if(kernel_cx != NULL) free(kernel_cx);
-  if(kernel_ux != NULL) free(kernel_ux);
-  if(kernel_ox != NULL) free(kernel_ox);
-  if(x_operator != NULL) free(x_operator);
-  return status;
-}
-
-static int np_shadow_conditional_build_x_weights(double *vector_scale_factor,
-                                                 double *weights_out){
-  return np_shadow_conditional_build_x_weights_core(vector_scale_factor, 1, weights_out);
-}
-
-static int np_shadow_conditional_build_x_weights_full(double *vector_scale_factor,
-                                                      double *weights_out){
-  return np_shadow_conditional_build_x_weights_core(vector_scale_factor, 0, weights_out);
-}
-
-int np_shadow_proof_conditional_x_weights_dense(double *vector_scale_factor,
-                                                double *weights_out){
-  return np_shadow_conditional_build_x_weights(vector_scale_factor, weights_out);
 }
 
 int np_regression_lp_hat_matrix(double *vector_scale_factor,
@@ -20036,7 +19746,7 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
                                vector_cxkerlb_extern,
                                vector_cxkerub_extern,
                                &bounds_state);
-    if(np_shadow_conditional_kernel_row_raw(kernel_cx,
+    if(np_conditional_kernel_row_raw(kernel_cx,
                                             kernel_ux,
                                             kernel_ox,
                                             x_operator,
@@ -20523,7 +20233,7 @@ static int np_conditional_xrow_from_ctx_impl(NPConditionalXRowCtx *ctx,
         ctx->kw);
 #endif
   if(!adaptive_gaussian_row &&
-     np_shadow_conditional_kernel_row_raw(ctx->kernel_cx,
+     np_conditional_kernel_row_raw(ctx->kernel_cx,
                                           ctx->kernel_ux,
                                           ctx->kernel_ox,
                                           ctx->x_operator,
@@ -21352,7 +21062,7 @@ static int np_conditional_yrow_from_ctx(NPConditionalYRowCtx *ctx,
         ctx->kw);
 #endif
   if(!adaptive_gaussian_row &&
-     (np_shadow_conditional_kernel_row(ctx->kernel_cy,
+     (np_conditional_kernel_row(ctx->kernel_cy,
                                        ctx->kernel_uy,
                                        ctx->kernel_oy,
                                        ctx->operator_y,
@@ -21434,7 +21144,7 @@ static int np_conditional_y_eval_from_ctx(NPConditionalYRowCtx *ctx,
                              vector_cykerlb_extern,
                              vector_cykerub_extern,
                              &bounds_state);
-  if(np_shadow_conditional_kernel_row(ctx->kernel_cy,
+  if(np_conditional_kernel_row(ctx->kernel_cy,
                                       ctx->kernel_uy,
                                       ctx->kernel_oy,
                                       ctx->operator_y,
@@ -21587,7 +21297,7 @@ static int np_conditional_y_scalar_eval_from_ctx(double *vector_scale_factor,
                              vector_cykerlb_extern,
                              vector_cykerub_extern,
                              &bounds_state);
-  if(np_shadow_conditional_kernel_row(ctx->kernel_cy,
+  if(np_conditional_kernel_row(ctx->kernel_cy,
                                       ctx->kernel_uy,
                                       ctx->kernel_oy,
                                       ctx->operator_y,
@@ -21761,7 +21471,7 @@ static int np_conditional_x_weight_row_stream_core_impl(double *vector_scale_fac
                              vector_cxkerlb_extern,
                              vector_cxkerub_extern,
                              &bounds_state);
-  if(np_shadow_conditional_kernel_row_raw(kernel_cx,
+  if(np_conditional_kernel_row_raw(kernel_cx,
                                           kernel_ux,
                                           kernel_ox,
                                           x_operator,
@@ -21899,42 +21609,10 @@ static int np_conditional_x_weight_row_full_stream_core(double *vector_scale_fac
                                                       row_out);
 }
 
-int np_shadow_proof_conditional_x_weight_row_stream(double *vector_scale_factor,
-                                                    int eval_idx,
-                                                    double *row_out){
-  return np_conditional_x_weight_row_stream_core(vector_scale_factor, eval_idx, row_out);
-}
-
-int np_shadow_proof_conditional_x_weight_row_fixed(double *vector_scale_factor,
-                                                   int eval_idx,
-                                                   double *row_out){
-  if(BANDWIDTH_den_extern != BW_FIXED)
-    return 1;
-  return np_conditional_x_weight_row_stream_core(vector_scale_factor, eval_idx, row_out);
-}
-
-int np_shadow_proof_conditional_x_weight_row_full(double *vector_scale_factor,
-                                                  int eval_idx,
-                                                  double *row_out){
-  return np_conditional_x_weight_row_full_stream_core(vector_scale_factor,
-                                                      eval_idx,
-                                                      row_out);
-}
-
 static int np_conditional_y_row_stream_op_core(double *vector_scale_factor,
                                                int eval_idx,
                                                int operator_code,
                                                double *row_out);
-
-int np_shadow_proof_conditional_y_row_stream(double *vector_scale_factor,
-                                             int eval_idx,
-                                             int operator_code,
-                                             double *row_out){
-  return np_conditional_y_row_stream_op_core(vector_scale_factor,
-                                             eval_idx,
-                                             operator_code,
-                                             row_out);
-}
 
 static int np_conditional_y_eval_row_stream_op_core(double *vector_scale_factor,
                                                     int eval_idx,
@@ -22057,7 +21735,7 @@ static int np_conditional_y_eval_row_stream_op_core(double *vector_scale_factor,
                              vector_cykerlb_extern,
                              vector_cykerub_extern,
                              &bounds_state);
-  if(np_shadow_conditional_kernel_row(kernel_cy,
+  if(np_conditional_kernel_row(kernel_cy,
                                       kernel_uy,
                                       kernel_oy,
                                       operator_y,
@@ -22264,7 +21942,7 @@ static int np_conditional_y_eval_block_stream_op_core(double *vector_scale_facto
                                vector_cykerlb_extern,
                                vector_cykerub_extern,
                                &bounds_state);
-    if(np_shadow_conditional_kernel_row(kernel_cy,
+    if(np_conditional_kernel_row(kernel_cy,
                                         kernel_uy,
                                         kernel_oy,
                                         operator_y,
@@ -24164,7 +23842,7 @@ static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_f
                                vector_cxkerlb_extern,
                                vector_cxkerub_extern,
                                &bounds_state);
-    if(np_shadow_conditional_kernel_row_raw(kernel_cx,
+    if(np_conditional_kernel_row_raw(kernel_cx,
                                             kernel_ux,
                                             kernel_ox,
                                             x_operator,
@@ -24617,7 +24295,7 @@ static int NP_NOINLINE np_conditional_x_weight_block_pair_stream_core(
                                vector_cxkerlb_extern,
                                vector_cxkerub_extern,
                                &bounds_state);
-    if(np_shadow_conditional_kernel_row_raw(kernel_cx,
+    if(np_conditional_kernel_row_raw(kernel_cx,
                                             kernel_ux,
                                             kernel_ox,
                                             x_operator,
@@ -24948,7 +24626,7 @@ static int NP_NOINLINE NP_HOT_ALIGN np_conditional_x_weight_block_pair_gnn_strea
                                vector_cxkerlb_extern,
                                vector_cxkerub_extern,
                                &bounds_state);
-    if(np_shadow_conditional_kernel_row_raw(kernel_cx,
+    if(np_conditional_kernel_row_raw(kernel_cx,
                                             kernel_ux,
                                             kernel_ox,
                                             x_operator,
@@ -25271,7 +24949,7 @@ static int np_conditional_y_block_stream_op_core(double *vector_scale_factor,
                                vector_cykerlb_extern,
                                vector_cykerub_extern,
                                &bounds_state);
-    if(np_shadow_conditional_kernel_row(kernel_cy,
+    if(np_conditional_kernel_row(kernel_cy,
                                         kernel_uy,
                                         kernel_oy,
                                         operator_y,
@@ -29662,343 +29340,6 @@ int np_conditional_distribution_cvls_lp_stream(double *vector_scale_factor,
 
   return np_conditional_distribution_cvls_lp_block_stream(vector_scale_factor, cv);
 }
-
-static int np_shadow_conditional_build_y_matrix(const int *operator_y,
-                                                double *vector_scale_factor,
-                                                double **matrix_Y_unordered_eval,
-                                                double **matrix_Y_ordered_eval,
-                                                double **matrix_Y_continuous_eval,
-                                                const int num_eval,
-                                                double *out_matrix){
-  const int num_var_tot = num_var_continuous_extern + num_var_unordered_extern + num_var_ordered_extern;
-  const int bw_rows =
-    (BANDWIDTH_den_extern == BW_FIXED) ? 1 :
-    ((BANDWIDTH_den_extern == BW_GEN_NN) ? num_eval : num_obs_train_extern);
-  int *kernel_cy = NULL, *kernel_uy = NULL, *kernel_oy = NULL;
-  double *vsfy = NULL, *lambday = NULL, *kw = NULL;
-  double **matrix_bandwidth_y = NULL, **matrix_bandwidth_eval_one = NULL;
-  double **eval_yuno_one = NULL, **eval_yord_one = NULL, **eval_ycon_one = NULL;
-  NPConditionalBoundState bounds_state;
-  int i, l, status = 1;
-
-  if((BANDWIDTH_den_extern != BW_FIXED) &&
-     (BANDWIDTH_den_extern != BW_GEN_NN) &&
-     (BANDWIDTH_den_extern != BW_ADAP_NN))
-    return 1;
-
-  vsfy = alloc_vecd(MAX(1, num_var_tot));
-  lambday = alloc_vecd(MAX(1, num_var_unordered_extern + num_var_ordered_extern));
-  kw = alloc_vecd(MAX(1, num_obs_train_extern));
-  matrix_bandwidth_y = alloc_tmatd(bw_rows, num_var_continuous_extern);
-  matrix_bandwidth_eval_one = alloc_tmatd(1, num_var_continuous_extern);
-  if(num_var_unordered_extern > 0) eval_yuno_one = alloc_matd(1, num_var_unordered_extern);
-  if(num_var_ordered_extern > 0) eval_yord_one = alloc_matd(1, num_var_ordered_extern);
-  if(num_var_continuous_extern > 0) eval_ycon_one = alloc_matd(1, num_var_continuous_extern);
-  kernel_cy = (int *)calloc((size_t)MAX(1, num_var_continuous_extern), sizeof(int));
-  kernel_uy = (int *)calloc((size_t)MAX(1, num_var_unordered_extern), sizeof(int));
-  kernel_oy = (int *)calloc((size_t)MAX(1, num_var_ordered_extern), sizeof(int));
-
-  if((vsfy == NULL) || (lambday == NULL) || (kw == NULL) ||
-     ((num_var_continuous_extern > 0) && (matrix_bandwidth_y == NULL)) ||
-     ((num_var_continuous_extern > 0) && (matrix_bandwidth_eval_one == NULL)) ||
-     ((num_var_unordered_extern > 0) && (eval_yuno_one == NULL)) ||
-     ((num_var_ordered_extern > 0) && (eval_yord_one == NULL)) ||
-     ((num_var_continuous_extern > 0) && (eval_ycon_one == NULL)) ||
-     (kernel_cy == NULL) || (kernel_uy == NULL) || (kernel_oy == NULL))
-    goto cleanup_ymat;
-
-  np_splitxy_vsf_mcv_nc(num_var_unordered_extern,
-                        num_var_ordered_extern,
-                        num_var_continuous_extern,
-                        num_reg_unordered_extern,
-                        num_reg_ordered_extern,
-                        num_reg_continuous_extern,
-                        vector_scale_factor,
-                        NULL,
-                        NULL,
-                        NULL,
-                        vsfy,
-                        NULL,
-                        NULL, NULL, NULL,
-                        NULL, NULL, NULL);
-
-  for(i = 0; i < num_var_continuous_extern; i++) kernel_cy[i] = KERNEL_den_extern;
-  for(i = 0; i < num_var_unordered_extern; i++) kernel_uy[i] = KERNEL_den_unordered_extern;
-  for(i = 0; i < num_var_ordered_extern; i++) kernel_oy[i] = KERNEL_den_ordered_extern;
-
-  if(kernel_bandwidth_mean(KERNEL_den_extern,
-                           BANDWIDTH_den_extern,
-                           num_obs_train_extern,
-                           num_eval,
-                           0,
-                           0,
-                           0,
-                           num_var_continuous_extern,
-                           num_var_unordered_extern,
-                           num_var_ordered_extern,
-                           0,
-                           vsfy,
-                           NULL,
-                           NULL,
-                           matrix_Y_continuous_train_extern,
-                           matrix_Y_continuous_eval,
-                           NULL,
-                           matrix_bandwidth_y,
-                           lambday) == 1)
-    goto cleanup_ymat;
-
-  for(i = 0; i < num_eval; i++){
-    const int orig_i = (int_TREE_Y == NP_TREE_TRUE) ? ipt_extern_Y[i] : i;
-    for(l = 0; l < num_var_unordered_extern; l++)
-      eval_yuno_one[l][0] = matrix_Y_unordered_eval[l][i];
-    for(l = 0; l < num_var_ordered_extern; l++)
-      eval_yord_one[l][0] = matrix_Y_ordered_eval[l][i];
-    for(l = 0; l < num_var_continuous_extern; l++){
-      eval_ycon_one[l][0] = matrix_Y_continuous_eval[l][i];
-      matrix_bandwidth_eval_one[l][0] =
-        (BANDWIDTH_den_extern == BW_GEN_NN) ? matrix_bandwidth_y[l][i] : matrix_bandwidth_y[l][0];
-    }
-
-    np_conditional_push_bounds(int_cyker_bound_extern,
-                               vector_cykerlb_extern,
-                               vector_cykerub_extern,
-                               &bounds_state);
-    if(np_shadow_conditional_kernel_row(kernel_cy,
-                                        kernel_uy,
-                                        kernel_oy,
-                                        operator_y,
-                                        BANDWIDTH_den_extern,
-                                        num_obs_train_extern,
-                                        num_var_unordered_extern,
-                                        num_var_ordered_extern,
-                                        num_var_continuous_extern,
-                                        matrix_Y_unordered_train_extern,
-                                        matrix_Y_ordered_train_extern,
-                                        matrix_Y_continuous_train_extern,
-                                        eval_yuno_one,
-                                        eval_yord_one,
-                                        eval_ycon_one,
-                                        vsfy,
-                                        1,
-                                        matrix_bandwidth_y,
-                                        matrix_bandwidth_eval_one,
-                                        lambday,
-                                        num_categories_extern_Y,
-                                        matrix_categorical_vals_extern_Y,
-                                        int_TREE_Y,
-                                        kdt_extern_Y,
-                                        kw,
-                                        NULL) != 0){
-      np_conditional_pop_bounds(&bounds_state);
-      goto cleanup_ymat;
-    }
-    np_conditional_pop_bounds(&bounds_state);
-
-    for(l = 0; l < num_obs_train_extern; l++){
-      const int orig_l = (int_TREE_Y == NP_TREE_TRUE) ? ipt_extern_Y[l] : l;
-      out_matrix[(size_t)orig_i*(size_t)num_obs_train_extern + (size_t)orig_l] = kw[l];
-    }
-  }
-
-  status = 0;
-
-cleanup_ymat:
-  if(vsfy != NULL) free(vsfy);
-  if(lambday != NULL) free(lambday);
-  if(kw != NULL) free(kw);
-  if(matrix_bandwidth_y != NULL) free_tmat(matrix_bandwidth_y);
-  if(matrix_bandwidth_eval_one != NULL) free_tmat(matrix_bandwidth_eval_one);
-  if(eval_yuno_one != NULL) free_mat(eval_yuno_one, num_var_unordered_extern);
-  if(eval_yord_one != NULL) free_mat(eval_yord_one, num_var_ordered_extern);
-  if(eval_ycon_one != NULL) free_mat(eval_ycon_one, num_var_continuous_extern);
-  if(kernel_cy != NULL) free(kernel_cy);
-  if(kernel_uy != NULL) free(kernel_uy);
-  if(kernel_oy != NULL) free(kernel_oy);
-  return status;
-}
-
-int np_shadow_proof_cv_con_density_ml(double *vector_scale_factor, double *cv){
-  double *weights = NULL, *yrow = NULL;
-  int *operator_y = NULL;
-  int i, j, status = 1;
-
-  if((cv == NULL) || (vector_scale_factor == NULL))
-    return 1;
-
-  weights = (double *)malloc((size_t)num_obs_train_extern*(size_t)num_obs_train_extern*sizeof(double));
-  yrow = (double *)malloc((size_t)num_obs_train_extern*(size_t)num_obs_train_extern*sizeof(double));
-  operator_y = (int *)calloc((size_t)MAX(1, num_var_continuous_extern + num_var_unordered_extern + num_var_ordered_extern), sizeof(int));
-  if((weights == NULL) || (yrow == NULL) || (operator_y == NULL))
-    goto cleanup_cvml_shadow;
-
-  for(i = 0; i < (num_var_continuous_extern + num_var_unordered_extern + num_var_ordered_extern); i++)
-    operator_y[i] = OP_NORMAL;
-  if(np_shadow_conditional_build_y_matrix(operator_y,
-                                         vector_scale_factor,
-                                         matrix_Y_unordered_train_extern,
-                                         matrix_Y_ordered_train_extern,
-                                         matrix_Y_continuous_train_extern,
-                                         num_obs_train_extern,
-                                         yrow) != 0)
-    goto cleanup_cvml_shadow;
-
-  *cv = 0.0;
-  if(np_shadow_conditional_build_x_weights(vector_scale_factor, weights) != 0)
-    goto cleanup_cvml_shadow;
-
-  for(i = 0; i < num_obs_train_extern; i++){
-    double fit = 0.0;
-    for(j = 0; j < num_obs_train_extern; j++)
-      fit += weights[(size_t)i*(size_t)num_obs_train_extern + (size_t)j] *
-        yrow[(size_t)i*(size_t)num_obs_train_extern + (size_t)j];
-    *cv += np_guarded_cvml_contribution(fit);
-  }
-
-  status = 0;
-
-cleanup_cvml_shadow:
-  if(weights != NULL) free(weights);
-  if(yrow != NULL) free(yrow);
-  if(operator_y != NULL) free(operator_y);
-  return status;
-}
-
-int np_shadow_proof_cv_con_density_ls(double *vector_scale_factor, double *cv){
-  double *weights = NULL, *weights_full = NULL, *yrow = NULL, *yconv = NULL;
-  int *operator_y = NULL;
-  int i, j, k, status = 1;
-
-  if((cv == NULL) || (vector_scale_factor == NULL))
-    return 1;
-
-  weights = (double *)malloc((size_t)num_obs_train_extern*(size_t)num_obs_train_extern*sizeof(double));
-  weights_full = (double *)malloc((size_t)num_obs_train_extern*(size_t)num_obs_train_extern*sizeof(double));
-  yrow = (double *)malloc((size_t)num_obs_train_extern*(size_t)num_obs_train_extern*sizeof(double));
-  yconv = (double *)malloc((size_t)num_obs_train_extern*(size_t)num_obs_train_extern*sizeof(double));
-  operator_y = (int *)calloc((size_t)MAX(1, num_var_continuous_extern + num_var_unordered_extern + num_var_ordered_extern), sizeof(int));
-  if((weights == NULL) || (weights_full == NULL) || (yrow == NULL) || (yconv == NULL) || (operator_y == NULL))
-    goto cleanup_cvls_shadow;
-
-  if(np_shadow_conditional_build_x_weights(vector_scale_factor, weights) != 0)
-    goto cleanup_cvls_shadow;
-  if(np_shadow_conditional_build_x_weights_full(vector_scale_factor, weights_full) != 0)
-    goto cleanup_cvls_shadow;
-
-  for(i = 0; i < (num_var_continuous_extern + num_var_unordered_extern + num_var_ordered_extern); i++)
-    operator_y[i] = OP_NORMAL;
-  if(np_shadow_conditional_build_y_matrix(operator_y,
-                                         vector_scale_factor,
-                                         matrix_Y_unordered_train_extern,
-                                         matrix_Y_ordered_train_extern,
-                                         matrix_Y_continuous_train_extern,
-                                         num_obs_train_extern,
-                                         yrow) != 0)
-    goto cleanup_cvls_shadow;
-
-  for(i = 0; i < (num_var_continuous_extern + num_var_unordered_extern + num_var_ordered_extern); i++)
-    operator_y[i] = OP_CONVOLUTION;
-  if(np_shadow_conditional_build_y_matrix(operator_y,
-                                         vector_scale_factor,
-                                         matrix_Y_unordered_train_extern,
-                                         matrix_Y_ordered_train_extern,
-                                         matrix_Y_continuous_train_extern,
-                                         num_obs_train_extern,
-                                         yconv) != 0)
-    goto cleanup_cvls_shadow;
-
-  *cv = 0.0;
-  for(i = 0; i < num_obs_train_extern; i++){
-    double quad = 0.0;
-    double lin = 0.0;
-    for(j = 0; j < num_obs_train_extern; j++){
-      const double aij = weights[(size_t)i*(size_t)num_obs_train_extern + (size_t)j];
-      const double aij_full = weights_full[(size_t)i*(size_t)num_obs_train_extern + (size_t)j];
-      lin += aij*yrow[(size_t)i*(size_t)num_obs_train_extern + (size_t)j];
-      if(aij_full == 0.0)
-        continue;
-      for(k = 0; k < num_obs_train_extern; k++)
-        quad += aij_full*
-          weights_full[(size_t)i*(size_t)num_obs_train_extern + (size_t)k]*
-          yconv[(size_t)j*(size_t)num_obs_train_extern + (size_t)k];
-    }
-    *cv += quad - 2.0*lin;
-  }
-  *cv /= (double)num_obs_train_extern;
-  status = 0;
-
-cleanup_cvls_shadow:
-  if(weights != NULL) free(weights);
-  if(weights_full != NULL) free(weights_full);
-  if(yrow != NULL) free(yrow);
-  if(yconv != NULL) free(yconv);
-  if(operator_y != NULL) free(operator_y);
-  return status;
-}
-
-int np_shadow_proof_cv_con_distribution_ls(double *vector_scale_factor, double *cv){
-  const int num_eval = num_obs_eval_extern;
-  double *weights = NULL, *ycdf = NULL;
-  int *operator_y = NULL;
-  int i, j, l, status = 1;
-
-  if((cv == NULL) || (vector_scale_factor == NULL))
-    return 1;
-
-  weights = (double *)malloc((size_t)num_obs_train_extern*(size_t)num_obs_train_extern*sizeof(double));
-  ycdf = (double *)malloc((size_t)num_eval*(size_t)num_obs_train_extern*sizeof(double));
-  operator_y = (int *)calloc((size_t)MAX(1, num_var_continuous_extern + num_var_unordered_extern + num_var_ordered_extern), sizeof(int));
-  if((weights == NULL) || (ycdf == NULL) || (operator_y == NULL))
-    goto cleanup_cdist_shadow;
-
-  if(np_shadow_conditional_build_x_weights(vector_scale_factor, weights) != 0)
-    goto cleanup_cdist_shadow;
-
-  for(i = 0; i < (num_var_continuous_extern + num_var_unordered_extern + num_var_ordered_extern); i++)
-    operator_y[i] = OP_INTEGRAL;
-
-  if(np_shadow_conditional_build_y_matrix(operator_y,
-                                         vector_scale_factor,
-                                         matrix_Y_unordered_eval_extern,
-                                         matrix_Y_ordered_eval_extern,
-                                         matrix_Y_continuous_eval_extern,
-                                         num_eval,
-                                         ycdf) != 0)
-    goto cleanup_cdist_shadow;
-
-  *cv = 0.0;
-  for(i = 0; i < num_obs_train_extern; i++){
-    for(j = 0; j < num_eval; j++){
-      double fit = 0.0;
-      const int indy = np_shadow_conditional_indicator_row(i,
-                                                           j,
-                                                           cdfontrain_extern,
-                                                           matrix_Y_ordered_train_extern,
-                                                           matrix_Y_continuous_train_extern,
-                                                           matrix_Y_ordered_eval_extern,
-                                                           matrix_Y_continuous_eval_extern,
-                                                           num_var_ordered_extern,
-                                                           num_var_continuous_extern);
-      if(cdfontrain_extern && (i == j))
-        continue;
-      for(l = 0; l < num_obs_train_extern; l++)
-        fit += weights[(size_t)i*(size_t)num_obs_train_extern + (size_t)l]*
-          ycdf[(size_t)j*(size_t)num_obs_train_extern + (size_t)l];
-      {
-        const double tvd = ((double)indy) - fit;
-        *cv += tvd*tvd;
-      }
-    }
-  }
-  *cv /= ((double)num_obs_train_extern*(double)MAX(1, num_eval));
-  status = 0;
-
-cleanup_cdist_shadow:
-  if(weights != NULL) free(weights);
-  if(ycdf != NULL) free(ycdf);
-  if(operator_y != NULL) free(operator_y);
-  return status;
-}
-
 
 int np_kernel_estimate_density_categorical_leave_one_out_cv(int KERNEL_den,
                                                             int KERNEL_unordered_den,

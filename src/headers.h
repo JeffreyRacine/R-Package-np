@@ -165,14 +165,6 @@ void np_bounded_cvls_conditional_effective_integration_bounds_extern(
   const double *support_upper,
   double *quadrature_lower,
   double *quadrature_upper);
-int np_shadow_proof_cv_con_density_ml(double *vector_scale_factor, double *cv);
-int np_shadow_proof_cv_con_density_ls(double *vector_scale_factor, double *cv);
-int np_shadow_proof_cv_con_distribution_ls(double *vector_scale_factor, double *cv);
-int np_shadow_proof_conditional_x_weights_dense(double *vector_scale_factor, double *weights_out);
-int np_shadow_proof_conditional_x_weight_row_stream(double *vector_scale_factor, int eval_idx, double *row_out);
-int np_shadow_proof_conditional_x_weight_row_fixed(double *vector_scale_factor, int eval_idx, double *row_out);
-int np_shadow_proof_conditional_x_weight_row_full(double *vector_scale_factor, int eval_idx, double *row_out);
-int np_shadow_proof_conditional_y_row_stream(double *vector_scale_factor, int eval_idx, int operator_code, double *row_out);
 int np_regression_lp_apply_matrix(double *vector_scale_factor, double **rhs_cols, int n_rhs, double *fitted_out);
 int np_conditional_density_cvml_lp_stream(double *vector_scale_factor, double *cv);
 int np_conditional_density_cvls_lp_stream(double *vector_scale_factor, double *cv);

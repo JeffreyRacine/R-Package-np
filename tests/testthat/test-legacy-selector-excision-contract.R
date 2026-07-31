@@ -64,14 +64,21 @@ test_that("retired density selectors cannot restore a second engine", {
   expect_false(grepl("compare_old", native, fixed = TRUE))
   expect_false(grepl("do_old", native, fixed = TRUE))
   expect_false(grepl("mkChar(\"old\")", native, fixed = TRUE))
-  expect_match(
-    registration,
-    "{\"C_np_shadow_cv_density_conditional\",(DL_FUNC) &C_np_shadow_cv_density_conditional,20}",
-    fixed = TRUE
+  retired_proof_symbols <- c(
+    "C_np_shadow_cv_density_conditional",
+    "C_np_shadow_cv_xweights_conditional",
+    "C_np_shadow_cv_yrow_conditional",
+    "C_np_shadow_cv_xweights_full_conditional",
+    "C_np_shadow_cv_distribution_conditional",
+    "C_np_shadow_reset_state",
+    "np_shadow_"
   )
+  for (symbol in retired_proof_symbols) {
+    expect_false(grepl(symbol, paste(headers, native, registration), fixed = TRUE))
+  }
   expect_match(
     registration,
-    "{\"C_np_shadow_cv_distribution_conditional\",(DL_FUNC) &C_np_shadow_cv_distribution_conditional,23}",
+    "{\"C_np_reset_native_estimator_state\",(DL_FUNC) &C_np_reset_native_estimator_state,0}",
     fixed = TRUE
   )
 
