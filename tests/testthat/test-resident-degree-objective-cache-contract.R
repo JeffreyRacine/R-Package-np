@@ -57,8 +57,7 @@ test_that("resident npreg MPI cache keys bandwidths and polynomial degree", {
 })
 
 test_that("resident shadows bound degree cache writes by allocated key length", {
-  src <- readLines(file.path(testthat::test_path("..", ".."), "src", "np.c"),
-                   warn = FALSE)
+  src <- readLines(npRmpi_test_source_path("src", "np.c"), warn = FALSE)
   text <- paste(src, collapse = "\n")
   expect_match(text, "bwm_nn_cache_configure_for_degree_search\\(BANDWIDTH_reg_extern")
   expect_match(text, "bwm_nn_cache_configure_for_degree_search\\(BANDWIDTH_den_extern")

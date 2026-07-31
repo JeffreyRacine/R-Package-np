@@ -43,6 +43,24 @@ npRmpi_namespace_hygiene_root <- function() {
   stop("Could not locate npRmpi package root for namespace hygiene checks", call. = FALSE)
 }
 
+npRmpi_test_source_path <- function(...) {
+  root <- tryCatch(
+    npRmpi_namespace_hygiene_root(),
+    error = function(e) NULL
+  )
+  testthat::skip_if(
+    is.null(root),
+    "npRmpi package source is unavailable in this test context"
+  )
+
+  path <- file.path(root, ...)
+  testthat::skip_if_not(
+    file.exists(path),
+    paste("npRmpi package source file is unavailable:", path)
+  )
+  path
+}
+
 npRmpi_namespace_hygiene_scan <- function(root = npRmpi_namespace_hygiene_root(), pkg = "npRmpi") {
   root <- normalizePath(root, mustWork = TRUE)
 

@@ -44,7 +44,8 @@ test_that("npreg bandwidth tree predicate rejects non-LC nearest-neighbor CV rou
     npRmpi:::.npregbw_tree_code(
       bw.lp.nn,
       ncon = bw.lp.nn$ncon,
-      ncat = bw.lp.nn$nuno + bw.lp.nn$nord
+      ncat = bw.lp.nn$nuno + bw.lp.nn$nord,
+      regtype.engine = bw.lp.nn[["regtype.engine"]]
     ),
     npRmpi:::DO_TREE_NO
   )
@@ -52,7 +53,8 @@ test_that("npreg bandwidth tree predicate rejects non-LC nearest-neighbor CV rou
     npRmpi:::.npregbw_tree_code(
       bw.lc.nn,
       ncon = bw.lc.nn$ncon,
-      ncat = bw.lc.nn$nuno + bw.lc.nn$nord
+      ncat = bw.lc.nn$nuno + bw.lc.nn$nord,
+      regtype.engine = bw.lc.nn[["regtype.engine"]]
     ),
     npRmpi:::DO_TREE_YES
   )
@@ -60,7 +62,8 @@ test_that("npreg bandwidth tree predicate rejects non-LC nearest-neighbor CV rou
     npRmpi:::.npregbw_tree_code(
       bw.lp.fixed,
       ncon = bw.lp.fixed$ncon,
-      ncat = bw.lp.fixed$nuno + bw.lp.fixed$nord
+      ncat = bw.lp.fixed$nuno + bw.lp.fixed$nord,
+      regtype.engine = bw.lp.fixed[["regtype.engine"]]
     ),
     npRmpi:::DO_TREE_YES
   )

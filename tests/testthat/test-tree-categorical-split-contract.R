@@ -95,7 +95,12 @@ test_that("np.tree alone does not enable all-categorical profile helpers", {
 
   options(np.tree = FALSE, np.categorical.compress = TRUE)
   expect_equal(
-    npRmpi:::.npregbw_tree_code(bws, ncon = bws$ncon, ncat = bws$nuno + bws$nord),
+    npRmpi:::.npregbw_tree_code(
+      bws,
+      ncon = bws$ncon,
+      ncat = bws$nuno + bws$nord,
+      regtype.engine = bws[["regtype.engine"]]
+    ),
     npRmpi:::DO_TREE_YES
   )
   expect_equal(

@@ -1,7 +1,7 @@
 library(npRmpi)
 
 test_that("MPI higher-order Gaussian product fusion is narrow and rank-local", {
-  src <- readLines(test_path("..", "..", "src", "jksum.c"), warn = FALSE)
+  src <- readLines(npRmpi_test_source_path("src", "jksum.c"), warn = FALSE)
   text <- paste(src, collapse = "\n")
 
   expect_match(
