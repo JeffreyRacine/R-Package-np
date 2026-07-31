@@ -1,5 +1,11 @@
 # npRmpi 0.70-6
 
+* `np.categorical.compress` now requires a single non-missing logical value
+  whenever categorical compression is applicable. Invalid explicit values
+  fail with a precise option error instead of silently disabling the selected
+  compression route; valid `TRUE`/`FALSE` behavior and routes where the option
+  is inapplicable are unchanged.
+
 * Fixed-bandwidth categorical conditional-density CVLS now bounds its three
   predictor, response, and response-convolution profile matrices within one
   checked workspace: 64 MiB for rank-one execution and 256 MiB for active
