@@ -82,7 +82,12 @@ npreghat <-
                                     s = NULL,
                                     deriv = NULL,
                                     con.names = NULL) {
-  regtype <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
+  base.spec <- npValidatedConditionalRegSpec(
+    bws,
+    where = "npreghat",
+    ncon.field = "ncon"
+  )
+  regtype <- base.spec$regtype
   ncon <- bws$ncon
   if (is.null(con.names) || length(con.names) != ncon) {
     con.names <- if (!is.null(bws$xnames)) {
@@ -98,23 +103,19 @@ npreghat <-
     rep.int(1L, ncon)
   } else {
     npValidateGlpDegree(regtype = "lp",
-                        degree = if (is.null(degree)) bws$degree else degree,
+                        degree = if (is.null(degree)) base.spec$degree else degree,
                         ncon = ncon)
   }
 
   basis <- npValidateLpBasis(
     regtype = "lp",
-    basis = if (is.null(basis)) {
-      if (is.null(bws$basis)) "glp" else bws$basis
-    } else {
-      basis
-    }
+    basis = if (is.null(basis)) base.spec$basis else basis
   )
 
   bernstein.basis <- npValidateGlpBernstein(
     regtype = "lp",
     bernstein.basis = if (is.null(bernstein.basis)) {
-      isTRUE(bws$bernstein.basis)
+      base.spec$bernstein.basis
     } else {
       bernstein.basis
     }
@@ -1365,21 +1366,12 @@ npreghat <-
     where = ".np_regression_direct",
     regtype = bws[["regtype", exact = TRUE]]
   )
-  regtype <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
-  basis <- npValidateLpBasis(regtype = regtype, basis = bws$basis)
-  degree <- npValidateGlpDegree(regtype = regtype,
-                                degree = bws$degree,
-                                ncon = bws$ncon)
-  bernstein.basis <- npValidateGlpBernstein(regtype = regtype,
-                                            bernstein.basis = bws$bernstein.basis)
-  reg.spec <- npCanonicalConditionalRegSpec(
-    regtype = regtype,
-    basis = basis,
-    degree = degree,
-    bernstein.basis = bernstein.basis,
-    ncon = bws$ncon,
-    where = ".np_regression_direct"
+  reg.spec <- npValidatedConditionalRegSpec(
+    bws,
+    where = ".np_regression_direct",
+    ncon.field = "ncon"
   )
+  regtype <- reg.spec$regtype
   if (isTRUE(gradients) && identical(regtype, "lc")) {
     npValidateLcGradientOrder(
       regtype = regtype,
@@ -1727,20 +1719,10 @@ npreghat.rbandwidth <-
            ...){
 
     no.ex <- missing(exdat)
-    regtype.raw <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
-    basis.raw <- npValidateLpBasis(regtype = regtype.raw, basis = bws$basis)
-    degree.raw <- npValidateGlpDegree(regtype = regtype.raw,
-                                      degree = bws$degree,
-                                      ncon = bws$ncon)
-    bernstein.raw <- npValidateGlpBernstein(regtype = regtype.raw,
-                                            bernstein.basis = bws$bernstein.basis)
-    reg.spec.raw <- npCanonicalConditionalRegSpec(
-      regtype = regtype.raw,
-      basis = basis.raw,
-      degree = degree.raw,
-      bernstein.basis = bernstein.raw,
-      ncon = bws$ncon,
-      where = "npreghat"
+    reg.spec.raw <- npValidatedConditionalRegSpec(
+      bws,
+      where = "npreghat",
+      ncon.field = "ncon"
     )
     world.size <- .npRmpi_safe_int(mpi.comm.size(0))
     world.size <- if (is.na(world.size)) 1L else as.integer(world.size)

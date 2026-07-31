@@ -3109,10 +3109,17 @@
   if (!isTRUE(bws$ncon == 0L) || (bws$nuno + bws$nord) < 1L)
     return(NULL)
 
-  regtype <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
+  reg.spec <- npValidatedConditionalRegSpec(
+    bws,
+    where = ".np_regression_cat_profile_mean",
+    ncon.field = "ncon"
+  )
+  regtype <- reg.spec$regtype
   if (!(identical(regtype, "lc") || identical(regtype, "lp")))
     return(NULL)
-  if (identical(regtype, "lp") && length(bws$degree) && any(bws$degree > 0L))
+  if (identical(regtype, "lp") &&
+      length(reg.spec$degree) &&
+      any(reg.spec$degree > 0L))
     return(NULL)
 
   txdat <- toFrame(txdat)
@@ -3254,10 +3261,17 @@
   if (!isTRUE(bws$ncon == 0L) || (bws$nuno + bws$nord) < 1L)
     return(NULL)
 
-  regtype <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
+  reg.spec <- npValidatedConditionalRegSpec(
+    bws,
+    where = ".np_regression_cat_profile_boot_setup",
+    ncon.field = "ncon"
+  )
+  regtype <- reg.spec$regtype
   if (!(identical(regtype, "lc") || identical(regtype, "lp")))
     return(NULL)
-  if (identical(regtype, "lp") && length(bws$degree) && any(bws$degree > 0L))
+  if (identical(regtype, "lp") &&
+      length(reg.spec$degree) &&
+      any(reg.spec$degree > 0L))
     return(NULL)
 
   xdat <- toFrame(xdat)
@@ -4287,7 +4301,12 @@
     stop("length of ydat must match training rows")
   if (n < 1L || neval < 1L || B < 1L)
     stop("invalid inid regression bootstrap dimensions")
-  regtype <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
+  reg.spec <- npValidatedConditionalRegSpec(
+    bws,
+    where = ".np_inid_boot_from_regression_localpoly_frozen",
+    ncon.field = "ncon"
+  )
+  regtype <- reg.spec$regtype
   if (identical(regtype, "lc"))
     stop("local-polynomial frozen regression helper requires regtype='ll' or 'lp'")
 
@@ -4297,18 +4316,18 @@
   } else {
     npValidateGlpDegree(
       regtype = "lp",
-      degree = bws$degree,
+      degree = reg.spec$degree,
       ncon = ncon
     )
   }
 
   basis <- npValidateLpBasis(
     regtype = "lp",
-    basis = if (is.null(bws$basis)) "glp" else bws$basis
+    basis = reg.spec$basis
   )
   bernstein.basis <- npValidateGlpBernstein(
     regtype = "lp",
-    bernstein.basis = isTRUE(bws$bernstein.basis)
+    bernstein.basis = reg.spec$bernstein.basis
   )
 
   gradient.vec <- NULL
@@ -4650,12 +4669,13 @@
   if (n < 1L || neval < 1L || B < 1L)
     stop("invalid inid regression bootstrap dimensions")
 
-  regtype <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
-  constant.basis <- npIsCanonicalLp0(
-    regtype.engine = if (is.null(bws$regtype.engine)) regtype else bws$regtype.engine,
-    degree.engine = if (is.null(bws$degree.engine)) bws$degree else bws$degree.engine,
-    ncon = bws$ncon
+  reg.spec <- npValidatedConditionalRegSpec(
+    bws,
+    where = ".np_inid_boot_from_regression",
+    ncon.field = "ncon"
   )
+  regtype <- reg.spec$regtype
+  constant.basis <- npIsCanonicalLp0Spec(reg.spec, ncon = bws$ncon)
   if (!identical(bws$type, "fixed")) {
     return(.np_inid_boot_from_regression_exact(
       xdat = xdat,
@@ -4837,7 +4857,12 @@
   if (identical(bws$type, "fixed"))
     stop("frozen regression bootstrap helper is for nonfixed bandwidths only")
 
-  regtype <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
+  reg.spec <- npValidatedConditionalRegSpec(
+    bws,
+    where = ".np_inid_boot_from_regression_frozen",
+    ncon.field = "ncon"
+  )
+  regtype <- reg.spec$regtype
   xi.factor <- isTRUE(slice.index > 0L) &&
     !is.null(bws$xdati) &&
     (isTRUE(bws$xdati$iord[slice.index]) || isTRUE(bws$xdati$iuno[slice.index]))
@@ -6237,8 +6262,12 @@
     return(FALSE)
   component.bws <- c(list(bws$bw$yzbw), bws$bw[seq.int(2L, p + 1L)])
   all(vapply(component.bws, function(bw) {
-    regtype <- if (is.null(bw$regtype)) "lc" else as.character(bw$regtype)[1L]
-    identical(regtype, "lc")
+    spec <- npValidatedConditionalRegSpec(
+      bw,
+      where = ".np_plreg_fixed_lc_components",
+      ncon.field = "ncon"
+    )
+    identical(spec$regtype, "lc")
   }, logical(1L)))
 }
 
@@ -6247,8 +6276,12 @@
     return(FALSE)
   component.bws <- c(list(bws$bw$yzbw), bws$bw[seq.int(2L, p + 1L)])
   all(vapply(component.bws, function(bw) {
-    regtype <- if (is.null(bw$regtype)) "lc" else as.character(bw$regtype)[1L]
-    regtype %in% c("lc", "ll", "lp")
+    spec <- npValidatedConditionalRegSpec(
+      bw,
+      where = ".np_plreg_fixed_supported_components",
+      ncon.field = "ncon"
+    )
+    spec$regtype %in% c("lc", "ll", "lp")
   }, logical(1L)))
 }
 
@@ -6270,7 +6303,12 @@
   if (!identical(bws$type, "fixed"))
     stop("local-polynomial state helper requires fixed bandwidths")
 
-  regtype <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)[1L]
+  reg.spec <- npValidatedConditionalRegSpec(
+    bws,
+    where = ".np_regression_localpoly_fixed_counts_precompute",
+    ncon.field = "ncon"
+  )
+  regtype <- reg.spec$regtype
   if (identical(regtype, "lc"))
     stop("local-polynomial state helper requires regtype='ll' or 'lp'")
 
@@ -6280,17 +6318,17 @@
   } else {
     npValidateGlpDegree(
       regtype = "lp",
-      degree = bws$degree,
+      degree = reg.spec$degree,
       ncon = ncon
     )
   }
   basis <- npValidateLpBasis(
     regtype = "lp",
-    basis = if (is.null(bws$basis)) "glp" else bws$basis
+    basis = reg.spec$basis
   )
   bernstein.basis <- npValidateGlpBernstein(
     regtype = "lp",
-    bernstein.basis = isTRUE(bws$bernstein.basis)
+    bernstein.basis = reg.spec$bernstein.basis
   )
 
   kw <- .np_plot_kernel_weights_direct(
@@ -6473,7 +6511,12 @@
                                       bws,
                                       ydat,
                                       ridge = 1.0e-12) {
-  regtype <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)[1L]
+  reg.spec <- npValidatedConditionalRegSpec(
+    bws,
+    where = ".np_plreg_component_state",
+    ncon.field = "ncon"
+  )
+  regtype <- reg.spec$regtype
   xdat <- toFrame(xdat)
   exdat <- toFrame(exdat)
   ydat <- as.double(ydat)
@@ -9616,7 +9659,12 @@
     where = "conditional localpoly y-operator"
   )
 
-  regtype <- if (is.null(xbw$regtype)) "lc" else as.character(xbw$regtype)
+  reg.spec <- npValidatedConditionalRegSpec(
+    xbw,
+    where = ".np_inid_boot_from_conditional_localpoly_fixed_precompute",
+    ncon.field = "ncon"
+  )
+  regtype <- reg.spec$regtype
   if (identical(regtype, "lc"))
     stop("conditional localpoly fixed counts helper requires regtype='ll' or 'lp'")
 
@@ -9626,18 +9674,18 @@
   } else {
     npValidateGlpDegree(
       regtype = "lp",
-      degree = xbw$degree,
+      degree = reg.spec$degree,
       ncon = ncon
     )
   }
 
   basis <- npValidateLpBasis(
     regtype = "lp",
-    basis = if (is.null(xbw$basis)) "glp" else xbw$basis
+    basis = reg.spec$basis
   )
   bernstein.basis <- npValidateGlpBernstein(
     regtype = "lp",
-    bernstein.basis = isTRUE(xbw$bernstein.basis)
+    bernstein.basis = reg.spec$bernstein.basis
   )
 
   kw <- .np_kernel_weights_direct(
@@ -17392,7 +17440,12 @@ compute.bootstrap.errors.rbandwidth =
     if (is.wild.hat && gradients && !xi.factor && is.na(match(slice.index, cont.idx))) {
       stop("bootstrap=\"wild\" supports gradients only for continuous or categorical slices in npRmpi; no serial fallback is permitted", call. = FALSE)
     }
-    regtype <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
+    reg.spec <- npValidatedConditionalRegSpec(
+      bws,
+      where = "regression plot bootstrap",
+      ncon.field = "ncon"
+    )
+    regtype <- reg.spec$regtype
 
     profile.setup <- NULL
     if (!isTRUE(gradients)) {

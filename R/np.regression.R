@@ -23,20 +23,17 @@ npreg <-
   }
 
 .npreg_fit_tree_code <- function(bws, ncon, ncat) {
+  reg.spec <- npValidatedConditionalRegSpec(
+    bws,
+    where = "npreg tree routing",
+    ncon.field = "ncon"
+  )
   code <- npDoTreeOrCategoricalCompress(ncon = ncon, ncat = ncat, bws = bws)
 
   if (!identical(code, DO_TREE_YES))
     return(code)
 
-  regtype <- if (!is.null(bws$regtype.engine) && length(bws$regtype.engine)) {
-    as.character(bws$regtype.engine[1L])
-  } else if (!is.null(bws$regtype) && length(bws$regtype)) {
-    as.character(bws$regtype[1L])
-  } else {
-    "lc"
-  }
-
-  if (!identical(regtype, "lc"))
+  if (!identical(reg.spec$regtype.engine, "lc"))
     return(DO_TREE_NO)
 
   code
@@ -253,26 +250,17 @@ npreg.rbandwidth <-
     .npRmpi_require_active_slave_pool(where = "npreg()")
     dots <- list(...)
     fit.progress.handoff <- isTRUE(dots$.np_fit_progress_handoff)
-    regtype.raw <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
+    reg.spec.raw <- npValidatedConditionalRegSpec(
+      bws,
+      where = "npreg",
+      ncon.field = "ncon"
+    )
+    regtype.raw <- reg.spec.raw$regtype
     if ("remin" %in% names(dots)) {
       warning("npreg: bandwidth-selection argument 'remin' is ignored when a bandwidth object is supplied",
               call. = FALSE)
       dots$remin <- NULL
     }
-    basis.raw <- npValidateLpBasis(regtype = regtype.raw, basis = bws$basis)
-    degree.raw <- npValidateGlpDegree(regtype = regtype.raw,
-                                      degree = bws$degree,
-                                      ncon = bws$ncon)
-    bernstein.raw <- npValidateGlpBernstein(regtype = regtype.raw,
-                                            bernstein.basis = bws$bernstein.basis)
-    reg.spec.raw <- npCanonicalConditionalRegSpec(
-      regtype = regtype.raw,
-      basis = basis.raw,
-      degree = degree.raw,
-      bernstein.basis = bernstein.raw,
-      ncon = bws$ncon,
-      where = "npreg"
-    )
     if (isTRUE(gradients) && identical(regtype.raw, "lc")) {
       npValidateLcGradientOrder(
         regtype = regtype.raw,
@@ -473,20 +461,10 @@ npreg.rbandwidth <-
       bandwidth.compute = FALSE
     )
 
-    bws$basis <- npValidateLpBasis(regtype = bws$regtype,
-                                   basis = bws$basis)
-    bws$degree <- npValidateGlpDegree(regtype = bws$regtype,
-                                      degree = bws$degree,
-                                      ncon = bws$ncon)
-    bws$bernstein.basis <- npValidateGlpBernstein(regtype = bws$regtype,
-                                                  bernstein.basis = bws$bernstein.basis)
-    reg.spec <- npCanonicalConditionalRegSpec(
-      regtype = bws$regtype,
-      basis = bws$basis,
-      degree = bws$degree,
-      bernstein.basis = bws$bernstein.basis,
-      ncon = bws$ncon,
-      where = "npreg"
+    reg.spec <- npValidatedConditionalRegSpec(
+      bws,
+      where = "npreg",
+      ncon.field = "ncon"
     )
     if (isTRUE(gradients) && identical(bws$regtype, "lc")) {
       npValidateLcGradientOrder(

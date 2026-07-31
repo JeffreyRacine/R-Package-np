@@ -54,27 +54,32 @@
            ...,
            random.seed){
 
+    reg.spec <- npValidatedConditionalRegSpec(
+      bws,
+      where = "plot.rbandwidth()",
+      ncon.field = "ncon"
+    )
     plot.gradient.order.label <- rep.int(1L, bws$ndim)
     plot.gradient.available <- rep.int(TRUE, bws$ndim)
-    if (gradients && identical(bws$regtype, "lc")) {
+    if (gradients && identical(reg.spec$regtype, "lc")) {
       npValidateLcGradientOrder(
-        regtype = bws$regtype,
+        regtype = reg.spec$regtype,
         gradient.order = gradient.order,
         ncon = bws$ncon,
         argname = "gradient_order",
         where = "plot.rbandwidth()"
       )
     }
-    if (gradients && identical(bws$regtype, "lp")) {
-      go <- npValidateGlpGradientOrder(regtype = bws$regtype,
+    if (gradients && identical(reg.spec$regtype, "lp")) {
+      go <- npValidateGlpGradientOrder(regtype = reg.spec$regtype,
                                        gradient.order = gradient.order,
                                        ncon = bws$ncon)
       if (length(go))
         plot.gradient.order.label[which(bws$icon)] <- go
       if (bws$ncon > 0L) {
         available <- npGlpGradientAvailability(
-          regtype.engine = bws$regtype,
-          degree.engine = bws$degree,
+          regtype.engine = reg.spec$regtype.engine,
+          degree.engine = reg.spec$degree.engine,
           gradient.order = go,
           ncon = bws$ncon
         )
@@ -83,7 +88,7 @@
           npStopGlpGradientNoneAvailable(
             where = "plot.rbandwidth()",
             action = "plot",
-            degree.engine = bws$degree,
+            degree.engine = reg.spec$degree.engine,
             gradient.order = go,
             available = available,
             con.names = bws$xnames[bws$icon]
@@ -92,7 +97,7 @@
         if (any(!available)) {
           npWarnGlpGradientPartialAvailability(
             where = "plot.rbandwidth()",
-            degree.engine = bws$degree,
+            degree.engine = reg.spec$degree.engine,
             gradient.order = go,
             available = available,
             con.names = bws$xnames[bws$icon]
