@@ -20,7 +20,7 @@ adaptive_cdist_supertile_body <- function(lines) {
     lines
   )
   stop <- grep(
-    "^static int np_conditional_density_cvls_categorical_profile_stream\\(",
+    "^np_conditional_density_cvls_categorical_profile_stream\\(",
     lines
   )
   expect_length(start, 1L)
