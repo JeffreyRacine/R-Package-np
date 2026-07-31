@@ -723,18 +723,16 @@ test_that("canonical LP direct-apply route avoids legacy solve marshalling", {
   expect_false(grepl("DELTA", helper_body, fixed = TRUE))
 })
 
-test_that("density CV tree-bypass predicate is centralized in one helper", {
+test_that("obsolete density CV tree-bypass shim remains eradicated", {
   src_file <- locate_jksum_c()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
 
   lines <- readLines(src_file, warn = FALSE)
-  expect_true(any(grepl("np_den_cv_use_tree_bypass_path", lines, fixed = TRUE)))
-
-  raw_pred <- "gate_x_all_large_fixed || !int_TREE_XY || (BANDWIDTH_den == BW_ADAP_NN)"
-  # One raw predicate instance is allowed (the helper definition itself).
-  expect_equal(sum(grepl(raw_pred, lines, fixed = TRUE)), 1L)
-  # No inline ad hoc usage in if-statements.
-  expect_equal(sum(grepl("if\\(gate_x_all_large_fixed \\|\\| !int_TREE_XY \\|\\| \\(BANDWIDTH_den == BW_ADAP_NN\\)\\)", lines)), 0L)
+  expect_false(any(grepl(
+    "np_den_cv_use_tree_bypass_path",
+    lines,
+    fixed = TRUE
+  )))
 })
 
 test_that("live generic conditional CV keeps Y-side gating enabled", {
