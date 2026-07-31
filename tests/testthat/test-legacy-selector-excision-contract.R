@@ -61,6 +61,7 @@ test_that("retired density selectors cannot restore a second engine", {
   }
   expect_false(grepl("old.dens =", r_sources, fixed = TRUE))
   expect_false(grepl("old.cdens =", r_sources, fixed = TRUE))
+  expect_false(grepl("CBWM_NPLS", paste(headers, native, r_sources), fixed = TRUE))
   expect_false(grepl("compare_old", native, fixed = TRUE))
   expect_false(grepl("do_old", native, fixed = TRUE))
   expect_false(grepl("mkChar(\"old\")", native, fixed = TRUE))
