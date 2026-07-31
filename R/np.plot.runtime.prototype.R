@@ -9,13 +9,10 @@
   expected.label <- if (isTRUE(cdf)) "conditional distribution" else "conditional density"
   if (!inherits(bws, expected.class))
     stop(sprintf("prototype route requires a %s bandwidth object", expected.label), call. = FALSE)
-  regtype.engine <- if (is.null(bws$regtype.engine)) {
-    if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
-  } else {
-    as.character(bws$regtype.engine)
-  }
-  if (!is.element(regtype.engine, c("lc", "lp")))
-    stop("prototype route currently supports regtype='lc', 'll', or 'lp' only", call. = FALSE)
+  npConditionalRegEngineSpec(
+    bws,
+    where = "conditional plot prototype"
+  )
   if (!is.element(as.character(bws$type), c("fixed", "generalized_nn", "adaptive_nn")))
     stop("prototype route currently supports fixed, generalized-NN, or adaptive-NN bandwidths only", call. = FALSE)
   if (bws$xndim != 1L || bws$yndim != 1L)

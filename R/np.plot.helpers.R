@@ -5231,8 +5231,10 @@
 }
 
 .np_con_xregtype <- function(bws) {
-  regtype <- if (is.null(bws$regtype.engine)) bws$regtype else bws$regtype.engine
-  if (is.null(regtype)) "lc" else as.character(regtype)
+  npConditionalRegEngineSpec(
+    bws,
+    where = "conditional plot helper"
+  )$reg.engine
 }
 
 .np_con_make_kbandwidth_x <- function(bws, xdat) {

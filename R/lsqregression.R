@@ -18,6 +18,12 @@ lsqregressionbandwidth <-
         missing(scale) || missing(xdat) || missing(ydat) || missing(qdat))
       stop("improper invocation of lsqregressionbandwidth constructor")
 
+    reg.spec <- npConditionalRegEngineSpec(
+      reg.bws,
+      where = "lsqregressionbandwidth",
+      ncon.field = "ncon"
+    )
+
     d <- list(
       bw = reg.bws$bw,
       xbw = reg.bws$bw,
@@ -76,6 +82,10 @@ lsqregressionbandwidth <-
       basis = reg.bws$basis,
       degree = reg.bws$degree,
       bernstein.basis = reg.bws$bernstein.basis,
+      regtype.engine = reg.spec$reg.engine,
+      basis.engine = reg.spec$basis.engine,
+      degree.engine = reg.spec$degree.engine,
+      bernstein.basis.engine = reg.spec$bernstein.engine,
       method = "cv.check",
       pmethod = "Check-Loss Cross-Validation",
       fval = objective,
@@ -113,6 +123,11 @@ lsqregression <-
         missing(tau) || missing(delta) || missing(quantile) ||
         missing(ntrain))
       stop("improper invocation of lsqregression constructor")
+
+    reg.spec <- npConditionalRegEngineSpec(
+      bws,
+      where = "lsqregression"
+    )
 
     d <- list(
       bw = bws$bw,
@@ -152,6 +167,10 @@ lsqregression <-
       basis = bws$basis,
       degree = bws$degree,
       bernstein.basis = bws$bernstein.basis,
+      regtype.engine = reg.spec$reg.engine,
+      basis.engine = reg.spec$basis.engine,
+      degree.engine = reg.spec$degree.engine,
+      bernstein.basis.engine = reg.spec$bernstein.engine,
       xeval = xeval,
       tau = tau,
       delta = delta,

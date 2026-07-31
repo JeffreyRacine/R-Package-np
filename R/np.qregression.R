@@ -382,16 +382,10 @@ npqreg <-
 
 .npqreg_assert_selected_cdf_metadata <- function(bws) {
   .npqreg_assert_monotone_cdf_kernel(bws)
-  reg.engine <- if (is.null(bws$regtype.engine)) {
-    if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
-  } else {
-    as.character(bws$regtype.engine)
-  }
-  if (!identical(reg.engine, "lp"))
-    return(invisible(TRUE))
-
-  if (is.null(bws$degree.engine) && is.null(bws$degree))
-    stop("selected LP conditional distribution metadata missing from bandwidth object: degree")
+  npConditionalRegEngineSpec(
+    bws,
+    where = "selected conditional distribution bandwidth"
+  )
   invisible(TRUE)
 }
 

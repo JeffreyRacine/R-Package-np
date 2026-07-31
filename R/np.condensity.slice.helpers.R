@@ -1,31 +1,7 @@
 .np_condens_engine_spec <- function(bws) {
-  reg.engine <- if (is.null(bws$regtype.engine)) {
-    if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
-  } else {
-    as.character(bws$regtype.engine)
-  }
-
-  degree.engine <- if (is.null(bws$degree.engine)) {
-    if (isTRUE(bws$xncon > 0L)) {
-      if (identical(reg.engine, "lc")) {
-        rep.int(0L, bws$xncon)
-      } else {
-        as.integer(npValidateGlpDegree(
-          regtype = "lp",
-          degree = bws$degree,
-          ncon = bws$xncon
-        ))
-      }
-    } else {
-      integer(0L)
-    }
-  } else {
-    as.integer(bws$degree.engine)
-  }
-
-  list(
-    reg.engine = reg.engine,
-    degree.engine = degree.engine
+  npConditionalRegEngineSpec(
+    bws,
+    where = "conditional density slice"
   )
 }
 

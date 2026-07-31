@@ -188,6 +188,10 @@ npcdistbw.condbandwidth <-
 
     ydat = toFrame(ydat)
     xdat = toFrame(xdat)
+    bws.reg.spec <- npConditionalRegEngineSpec(
+      bws,
+      where = "npcdistbw"
+    )
 
     if (missing(nmulti)){
       nmulti <- npDefaultNmulti(dim(ydat)[2]+dim(xdat)[2])
@@ -227,10 +231,10 @@ npcdistbw.condbandwidth <-
       bws.basis <- if (is.null(bws$basis)) "glp" else bws$basis
       bws.degree <- if (is.null(bws$degree)) NULL else bws$degree
       bws.bernstein <- isTRUE(bws$bernstein.basis)
-      bws.regtype.engine <- if (is.null(bws$regtype.engine)) bws.regtype else bws$regtype.engine
-      bws.basis.engine <- if (is.null(bws$basis.engine)) bws.basis else bws$basis.engine
-      bws.degree.engine <- if (is.null(bws$degree.engine)) bws.degree else bws$degree.engine
-      bws.bernstein.engine <- isTRUE(bws$bernstein.basis.engine)
+      bws.regtype.engine <- bws.reg.spec$reg.engine
+      bws.basis.engine <- bws.reg.spec$basis.engine
+      bws.degree.engine <- bws.reg.spec$degree.engine
+      bws.bernstein.engine <- bws.reg.spec$bernstein.engine
 
       return(.npcdistbw_run_fixed_degree_mads(
         xdat = xdat,

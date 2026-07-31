@@ -270,6 +270,10 @@ test_that("nplsqreg plot uses quantile plot contract for multiple slices", {
   fit <- nplsqreg(y ~ x + z, data = dat, tau = c(0.25, 0.5),
                   tau.search = "full", scale = scale0, nmulti = 1L,
                   optim.control = list(maxit = 2L))
+  expect_identical(fit$bws$regtype.engine, "lc")
+  expect_identical(fit$bws$basis.engine, "glp")
+  expect_identical(fit$bws$degree.engine, 0L)
+  expect_false(fit$bws$bernstein.basis.engine)
 
   out <- plot(fit, output = "data", perspective = FALSE, neval = 6L)
   expect_identical(names(out), c("cd1", "cd2"))

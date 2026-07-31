@@ -1,5 +1,13 @@
 # np 0.70-6
 
+* Conditional estimators and their gradient, hat, plotting, quantile, mode,
+  and progress helpers now read canonical local-polynomial engine metadata by
+  exact field name and validate the fields jointly. Malformed or mutated
+  bandwidth objects fail with an error identifying the invalid field instead
+  of reconstructing another engine from public display metadata. Derived
+  least-squares quantile objects now retain the canonical engine state of
+  their regression bandwidths.
+
 * `np.categorical.compress` now requires a single non-missing logical value
   whenever categorical compression is applicable. Invalid explicit values
   fail with a precise option error instead of silently disabling the selected
