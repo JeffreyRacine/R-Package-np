@@ -30,8 +30,8 @@ test_that("adaptive regression BLAS eligibility is narrow and bounded", {
   lines <- readLines(src_file, warn = FALSE)
   body <- npreg_adaptive_source_body(
     lines,
-    "^static NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas\\(",
-    "^static NPRegCvLpResult np_regression_cv_lp_objective\\("
+    "^static .*NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas\\(",
+    "^static .*NPRegCvLpResult np_regression_cv_lp_objective\\("
   )
   compact <- gsub("[[:space:]]+", " ", body)
 
@@ -53,7 +53,7 @@ test_that("adaptive regression BLAS eligibility is narrow and bounded", {
   )
   expect_match(
     compact,
-    "(kernel_c[l] != 0) && (kernel_c[l] != 4) && (kernel_c[l] != 8)",
+    "((kernel_c[l] < 0) || (kernel_c[l] > 4)) && (kernel_c[l] != 8)",
     fixed = TRUE
   )
   expect_false(grepl("num_obs\\s*\\*\\s*num_obs", body))
@@ -66,8 +66,8 @@ test_that("adaptive regression BLAS preserves delete-one and full-row algebra", 
   lines <- readLines(src_file, warn = FALSE)
   body <- npreg_adaptive_source_body(
     lines,
-    "^static NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas\\(",
-    "^static NPRegCvLpResult np_regression_cv_lp_objective\\("
+    "^static .*NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas\\(",
+    "^static .*NPRegCvLpResult np_regression_cv_lp_objective\\("
   )
   compact <- gsub("[[:space:]]+", " ", body)
 
@@ -105,11 +105,11 @@ test_that("adaptive regression BLAS allocation and solve failures fall back", {
   allocator <- npreg_adaptive_source_body(
     lines,
     "^static double \\*\\*np_regression_adaptive_one_row_matrix\\(",
-    "^static NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas\\("
+    "^static .*NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas\\("
   )
   owner <- npreg_adaptive_source_body(
     lines,
-    "^static NPRegCvLpResult np_regression_cv_lp_objective\\(",
+    "^static .*NPRegCvLpResult np_regression_cv_lp_objective\\(",
     "^double np_kernel_estimate_regression_categorical_ls_aic\\("
   )
   owner_compact <- gsub("[[:space:]]+", " ", owner)

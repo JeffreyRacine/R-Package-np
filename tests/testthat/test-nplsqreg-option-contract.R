@@ -217,6 +217,23 @@ test_that("nplsqreg NOMAD vector tau summary reports per-tau degrees", {
   expect_true(any(grepl("tau=0.50", out.fit, fixed = TRUE)))
   expect_true(any(grepl("x1", out.fit, fixed = TRUE)))
   expect_true(any(grepl("x2", out.fit, fixed = TRUE)))
+  expect_true(all(vapply(
+    fit$bws$tau.bws,
+    function(bw) {
+      reg.bw <- bw$reg.bws
+      spec <- np:::npValidatedConditionalRegSpec(
+        reg.bw,
+        where = "nplsqreg test",
+        ncon.field = "ncon"
+      )
+      identical(spec$regtype.engine, "lp") &&
+        identical(
+          as.integer(spec$degree.engine),
+          as.integer(reg.bw$degree)
+        )
+    },
+    logical(1L)
+  )))
 })
 
 test_that("nplsqreg residuals accessor exposes requested residuals", {

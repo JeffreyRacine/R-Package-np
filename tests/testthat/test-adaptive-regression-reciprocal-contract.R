@@ -63,12 +63,18 @@ test_that("adaptive regression reciprocal workspace is objective-owned and bound
   expect_false(grepl("n\\s*\\*\\s*n", workspace))
   expect_false(grepl("malloc|calloc|realloc", workspace))
 
-  prepare_calls <- gregexpr(
+  prepare_lines <- grep(
     "np_adaptive_bandwidth_reciprocal_workspace_prepare\\(",
-    text,
-    perl = TRUE
-  )[[1L]]
-  expect_length(prepare_calls[prepare_calls > 0L], 3L)
+    lines
+  )
+  prepare_definitions <- grep(
+    "^static int np_adaptive_bandwidth_reciprocal_workspace_prepare\\(",
+    lines
+  )
+  expect_length(prepare_definitions, 1L)
+  expect_length(setdiff(prepare_lines, prepare_definitions), 3L)
+  expect_match(text, "np_conditional_xrow_reciprocal_cache_try(", fixed = TRUE)
+  expect_match(text, "np_conditional_yrow_reciprocal_cache_try(", fixed = TRUE)
   expect_match(
     owner,
     "np_adaptive_bandwidth_reciprocal_workspace_prepare(",
