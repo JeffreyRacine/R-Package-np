@@ -1758,12 +1758,17 @@
     return(x)
   }
 
+  # Single-bracket list assignment preserves explicit NULL entries and arity.
   if (is.call(x)) {
     xlist <- as.list(x)
     for (i in seq_along(xlist)) {
       xi <- xlist[[i]]
       if (.npRmpi_is_missing_call_arg(xi))
         next
+      if (is.null(xi)) {
+        xlist[i] <- list(NULL)
+        next
+      }
       xlist[[i]] <- .npRmpi_autodispatch_replace_tmps(xi, tmpvals = tmpvals)
     }
     return(as.call(xlist))
@@ -1775,6 +1780,10 @@
       xi <- xlist[[i]]
       if (.npRmpi_is_missing_call_arg(xi))
         next
+      if (is.null(xi)) {
+        xlist[i] <- list(NULL)
+        next
+      }
       xlist[[i]] <- .npRmpi_autodispatch_replace_tmps(xi, tmpvals = tmpvals)
     }
     return(as.pairlist(xlist))

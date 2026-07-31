@@ -196,6 +196,80 @@ test_that("autodispatch tmp replacement handles calls with missing arguments", {
   expect_identical(out_list[[4L]], 7L)
 })
 
+test_that("autodispatch sanitation preserves explicit NULL arguments and later fields", {
+  call_in <- quote(npudistbw(
+    dat = .__npRmpi_autod_dat_1,
+    gdat = NULL,
+    bws = .__npRmpi_autod_bws_3,
+    bandwidth.compute = FALSE,
+    do.full.integral = TRUE
+  ))
+  tmpvals <- list(
+    .__npRmpi_autod_dat_1 = data.frame(x = 1:3),
+    .__npRmpi_autod_bws_3 = 0.25
+  )
+
+  sanitized <- .npRmpi_autodispatch_sanitize_object(
+    list(call = call_in, marker = "retained"),
+    tmpvals = tmpvals
+  )
+  call.args <- as.list(sanitized$call)
+
+  expect_identical(names(call.args), names(as.list(call_in)))
+  expect_identical(call.args$dat, tmpvals$.__npRmpi_autod_dat_1)
+  expect_true("gdat" %in% names(call.args))
+  expect_null(call.args$gdat)
+  expect_identical(call.args$bws, 0.25)
+  expect_identical(call.args$bandwidth.compute, FALSE)
+  expect_identical(call.args$do.full.integral, TRUE)
+  expect_identical(sanitized$marker, "retained")
+
+  pair_in <- as.pairlist(as.list(call_in)[-1L])
+  pair_out <- .npRmpi_autodispatch_replace_tmps(pair_in, tmpvals = tmpvals)
+  pair.args <- as.list(pair_out)
+  expect_identical(names(pair.args), names(as.list(pair_in)))
+  expect_true("gdat" %in% names(pair.args))
+  expect_null(pair.args$gdat)
+  expect_identical(pair.args$do.full.integral, TRUE)
+})
+
+test_that("npudistbw autodispatch preserves explicit NULL training-grid calls", {
+  if (!spawn_mpi_slaves(1L))
+    skip("Could not spawn MPI slave")
+  on.exit(close_mpi_slaves(), add = TRUE)
+
+  old.options <- options(np.messages = FALSE)
+  on.exit(options(old.options), add = TRUE)
+
+  set.seed(2026073011L)
+  values <- seq_len(8L)
+  dat <- data.frame(
+    o1 = ordered(sample(values, 480L, replace = TRUE), levels = values)
+  )
+  bw <- npudistbw(
+    dat = dat,
+    gdat = NULL,
+    bws = 0.19,
+    bwmethod = "cv.cdf",
+    bwtype = "fixed",
+    okertype = "wangvanryzin",
+    do.full.integral = TRUE,
+    bandwidth.compute = FALSE
+  )
+  objective <- npudistbw(
+    dat = dat,
+    gdat = NULL,
+    bws = bw,
+    do.full.integral = TRUE,
+    eval.only = TRUE
+  )
+
+  expect_s3_class(bw, "dbandwidth")
+  expect_s3_class(objective, "dbandwidth")
+  expect_true(is.finite(objective$fval))
+  expect_identical(objective$bw, bw$bw)
+})
+
 test_that("npudist(bws=...) resolves large autodispatch temporary call arguments", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(), add = TRUE)

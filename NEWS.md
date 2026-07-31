@@ -1,5 +1,12 @@
 # npRmpi 0.70-6
 
+* Autodispatch result sanitation now preserves explicit `NULL` call arguments
+  without deleting their list slots while replacing temporary symbols. This
+  corrects a shared post-computation failure that affected calls such as
+  `npudistbw(..., gdat = NULL, do.full.integral = TRUE)` and could shift or
+  overrun later arguments while reconstructing the returned call. Estimator
+  arithmetic and MPI work ownership are unchanged.
+
 * Added a dormant, rank-local categorical-profile tile engine for subsequent
   migration of dense profile consumers. Its caller-owned output is bounded by
   a checked 64 MiB ceiling, immutable training profiles can be validated once
