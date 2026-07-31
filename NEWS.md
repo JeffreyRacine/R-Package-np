@@ -1,5 +1,13 @@
 # np 0.70-6
 
+* Fixed-bandwidth categorical conditional-distribution CVLS now bounds its
+  aggregate predictor- and response-profile kernel workspace at 64 MiB.
+  Problems that fit retain the established dense arithmetic exactly; larger
+  profile topologies use stable reuse-priority resident rows plus one scratch
+  row, filled through the shared categorical-profile kernel engine. Objective
+  accumulation order and values are unchanged, and a failure after route
+  commitment can no longer silently enter a different implementation.
+
 * Fixed-bandwidth ordered-categorical unconditional-distribution CVLS now
   consumes compressed kernel rows through a checked, caller-owned tile capped
   at 64 MiB instead of retaining the full evaluation-by-training profile
