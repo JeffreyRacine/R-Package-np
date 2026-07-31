@@ -122,7 +122,7 @@ test_that("fixed CVLS weighted BLAS preserves signed row algebra and fallback", 
   expect_false(grepl("num_train\\*num_train", body))
 
   markers <- c(
-    "np_shadow_conditional_kernel_row_raw",
+    "np_conditional_kernel_row_raw",
     "weighted_row[j] = basis_row[j]*kw[j]",
     "F77_CALL(dgemm)",
     "np_lp_full_row_workspace_solve",
@@ -204,7 +204,7 @@ test_that("generalized-NN CVLS reuses signed weighted BLAS with scalar fallback"
   expect_false(grepl("num_train\\*num_train", body))
 
   markers <- c(
-    "np_shadow_conditional_kernel_row_raw",
+    "np_conditional_kernel_row_raw",
     "weighted_row[j] = basis_row[j]*kw[j]",
     "F77_CALL(dgemm)",
     "np_lp_full_row_workspace_solve",
@@ -298,7 +298,7 @@ test_that("weighted BLAS remains isolated from adjacent conditional routes", {
   distribution_body <- xrow_weighted_blas_source_body(
     lines,
     "^int np_conditional_distribution_cvls_lp_stream\\(",
-    "^static int np_shadow_conditional_build_y_matrix\\("
+    "^int np_kernel_estimate_density_categorical_leave_one_out_cv\\("
   )
 
   expect_false(grepl("weighted_design", density_body, fixed = TRUE))

@@ -53,7 +53,7 @@ test_that("fixed and generalized-NN CVLS derive LOO from their full rows", {
   for (body in list(fixed_body, gnn_body))
     expect_equal(lengths(regmatches(
       body,
-      gregexpr("np_shadow_conditional_kernel_row_raw\\(", body, perl = TRUE)
+      gregexpr("np_conditional_kernel_row_raw\\(", body, perl = TRUE)
     )), 1L)
 
   for (body in list(fixed_body, gnn_body)) {
@@ -78,7 +78,7 @@ test_that("fixed and generalized-NN CVLS derive LOO from their full rows", {
 
   gnn_markers <- c(
     "matrix_bandwidth_eval_one[l][0] = matrix_bandwidth_x[l][i]",
-    "np_shadow_conditional_kernel_row_raw",
+    "np_conditional_kernel_row_raw",
     "np_lp_full_row_workspace_solve",
     "np_lp_delete_denominator(full_rows_out[i][eval_idx], &den)",
     "loo_rows_out[i][j] ="
@@ -103,7 +103,7 @@ test_that("CVLS row reuse selects scalar, fixed, and generalized-NN siblings cen
   distribution_body <- cvls_source_body(
     lines,
     "^int np_conditional_distribution_cvls_lp_stream\\(",
-    "^static int np_shadow_conditional_build_y_matrix\\("
+    "^int np_kernel_estimate_density_categorical_leave_one_out_cv\\("
   )
 
   expect_equal(lengths(regmatches(

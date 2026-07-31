@@ -61,7 +61,7 @@ test_that("adaptive Gaussian row fusion is narrow and memory bounded", {
   expect_false(grepl("malloc|calloc|realloc", body))
 })
 
-test_that("adaptive Gaussian row fusion has exactly two objective consumers", {
+test_that("adaptive Gaussian row fusion has exactly three hot-row consumers", {
   src_file <- locate_adaptive_gaussian_row_source()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable")
   lines <- readLines(src_file, warn = FALSE)
@@ -72,20 +72,22 @@ test_that("adaptive Gaussian row fusion has exactly two objective consumers", {
     perl = TRUE
   )[[1L]]
 
-  expect_length(calls[calls > 0L], 3L)
+  expect_length(calls[calls > 0L], 4L)
 
   regression <- adaptive_gaussian_row_source_body(
     lines,
     "^static (NP_NOINLINE )?NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas\\(",
-    paste0(
-      "^static (NPRegCvLpResult np_regression_cv_lp_objective|",
-      "int np_distribution_cvls_ordered_profile_stream)\\("
-    )
+    "^double np_kernel_estimate_regression_categorical_ls_aic\\("
   )
   conditional <- adaptive_gaussian_row_source_body(
     lines,
     "^static int .*np_conditional_xrow_from_ctx_impl\\(",
     "^static int np_conditional_xrow_from_ctx\\("
+  )
+  conditional_y <- adaptive_gaussian_row_source_body(
+    lines,
+    "^static int np_conditional_yrow_from_ctx\\(",
+    "^static int np_conditional_y_eval_from_ctx\\("
   )
 
   expect_match(regression, "num_reg_unordered == 0", fixed = TRUE)
@@ -113,7 +115,17 @@ test_that("adaptive Gaussian row fusion has exactly two objective consumers", {
   expect_match(conditional, "int_TREE_X != NP_TREE_TRUE", fixed = TRUE)
   expect_match(
     conditional,
-    "np_shadow_conditional_kernel_row_raw(ctx->kernel_cx,",
+    "np_conditional_kernel_row_raw(ctx->kernel_cx,",
+    fixed = TRUE
+  )
+  expect_match(
+    conditional_y,
+    "np_accel_gauss_adaptive_row_try(",
+    fixed = TRUE
+  )
+  expect_match(
+    conditional_y,
+    "np_conditional_kernel_row(ctx->kernel_cy,",
     fixed = TRUE
   )
 })

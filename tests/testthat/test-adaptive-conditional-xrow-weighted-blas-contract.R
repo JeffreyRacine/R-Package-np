@@ -115,22 +115,18 @@ test_that("adaptive X rows preserve signed solve deletion and scalar fallback", 
   )
 })
 
-test_that("adaptive objective families share the context without changing shadows", {
+test_that("adaptive objective families share the context without a proof graph", {
   src_file <- locate_adaptive_xrow_blas_source()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable")
   lines <- readLines(src_file, warn = FALSE)
   all_source <- paste(lines, collapse = "\n")
-  shadow <- adaptive_xrow_source_body(
-    lines,
-    "^static int np_shadow_conditional_build_x_weights_core\\(",
-    "^static int np_shadow_conditional_build_x_weights\\("
-  )
   cv <- adaptive_xrow_source_body(
     lines,
     "^int np_conditional_density_cvml_lp_stream\\(",
-    "^static int np_shadow_conditional_build_y_matrix\\("
+    "^int np_kernel_estimate_density_categorical_leave_one_out_cv\\("
   )
 
+  expect_false(grepl("np_shadow_", all_source, fixed = TRUE))
   expect_match(
     all_source,
     "if(use_row_ctx){\n    if(np_conditional_xrow_ctx_prepare(",
@@ -143,6 +139,4 @@ test_that("adaptive objective families share the context without changing shadow
     )[[1L]]),
     3L
   )
-  expect_false(grepl("weighted_design", shadow, fixed = TRUE))
-  expect_false(grepl("F77_CALL(dgemm)", shadow, fixed = TRUE))
 })

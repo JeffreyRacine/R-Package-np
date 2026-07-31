@@ -59,7 +59,7 @@ test_that("adaptive Y normal admission retains the generic fallback and ownershi
   )
 
   expect_match(body, "if(!adaptive_gaussian_row &&", fixed = TRUE)
-  expect_match(body, "np_shadow_conditional_kernel_row(", fixed = TRUE)
+  expect_match(body, "np_conditional_kernel_row(", fixed = TRUE)
   expect_match(body, "np_conditional_push_bounds(", fixed = TRUE)
   expect_match(body, "np_conditional_pop_bounds(", fixed = TRUE)
   expect_match(body, "row_out[orig_j] = ctx->kw[j];", fixed = TRUE)
