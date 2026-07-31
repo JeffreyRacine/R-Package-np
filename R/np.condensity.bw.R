@@ -1406,10 +1406,10 @@ npRmpiNomadShadowPrepareConditionalDensity <- function(c.uno,
                                                        cxkerub,
                                                        cykerlb,
                                                        cykerub) {
-  if (length(myoptd) <= 23L || length(myopti) <= 28L) {
+  if (length(myoptd) <= 23L || length(myopti) <= 33L) {
     rank <- tryCatch(as.integer(mpi.comm.rank(1L)), error = function(e) 0L)
     if (isTRUE(rank == 0L))
-      stop("resident npcdens NOMAD shadow options are missing quadrature controls", call. = FALSE)
+      stop("resident npcdens NOMAD shadow options are missing canonical search controls", call. = FALSE)
     return(FALSE)
   }
 
@@ -1647,7 +1647,8 @@ npRmpiNomadShadowClearConditionalDensity <- function() {
                                                  bws,
                                                  start.bw = NULL,
                                                  invalid.penalty = c("baseline", "dbmax"),
-                                                 penalty.multiplier = 10) {
+                                                 penalty.multiplier = 10,
+                                                 degree.search = FALSE) {
   invalid.penalty <- match.arg(invalid.penalty)
 
   ydat <- toFrame(ydat)
@@ -1773,7 +1774,8 @@ npRmpiNomadShadowClearConditionalDensity <- function() {
     continuous.x.kernel.family = if (identical(bws$cxkertype, "beta")) CKER_FAMILY_BETA else CKER_FAMILY_LEGACY,
     continuous.x.kernel.order = as.integer(bws$cxkerorder),
     continuous.y.kernel.family = if (identical(bws$cykertype, "beta")) CKER_FAMILY_BETA else CKER_FAMILY_LEGACY,
-    continuous.y.kernel.order = as.integer(bws$cykerorder)
+    continuous.y.kernel.order = as.integer(bws$cykerorder),
+    degree.search = isTRUE(degree.search)
   )
 
   myoptd <- list(
@@ -3338,7 +3340,8 @@ npRmpiNomadShadowSearchConditionalDensity <- function(template,
       bws = template,
       start.bw = start.bw,
       invalid.penalty = "baseline",
-      penalty.multiplier = if (is.null(opt.args$penalty.multiplier)) 10 else opt.args$penalty.multiplier
+      penalty.multiplier = if (is.null(opt.args$penalty.multiplier)) 10 else opt.args$penalty.multiplier,
+      degree.search = TRUE
     )
     # Workers only need the fields consumed by the shadow NOMAD search.
     search.template <- list(

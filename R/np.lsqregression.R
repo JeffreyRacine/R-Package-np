@@ -465,6 +465,23 @@ nplsqregbw <-
   dots
 }
 
+.nplsqreg_canonical_lp_template <- function(template,
+                                            degree,
+                                            bernstein.basis) {
+  spec <- npCanonicalConditionalRegSpec(
+    regtype = "lp",
+    basis = template$basis,
+    degree = as.integer(degree),
+    bernstein.basis = bernstein.basis,
+    ncon = template$ncon,
+    where = "nplsqregbw"
+  )
+  for (field in names(spec))
+    template[[field]] <- spec[[field]]
+  template$pregtype <- "Local-Polynomial"
+  template
+}
+
 .nplsqreg_call_fixed_degree_core <- function(xdat, ydat, scale, tau, bws,
                                              delta, delta.bounds, opt.args,
                                              bandwidth.compute) {
@@ -669,9 +686,11 @@ nplsqregbw <-
     stop("nplsqregbw nomad=TRUE does not support degree.verify=TRUE",
          call. = FALSE)
 
-  template$regtype <- "lp"
-  template$degree <- as.integer(degree.search$start.degree)
-  template$bernstein.basis <- degree.search$bernstein.basis
+  template <- .nplsqreg_canonical_lp_template(
+    template = template,
+    degree = degree.search$start.degree,
+    bernstein.basis = degree.search$bernstein.basis
+  )
   if (!(template$type %in% c("fixed", "generalized_nn", "adaptive_nn")))
     stop("nplsqregbw nomad=TRUE requires bwtype='fixed', 'generalized_nn', or 'adaptive_nn'",
          call. = FALSE)
@@ -728,9 +747,11 @@ nplsqregbw <-
                                          setup = setup)
     tbw <- template
     tbw$bw <- bw.vec
-    tbw$regtype <- "lp"
-    tbw$degree <- degree
-    tbw$bernstein.basis <- degree.search$bernstein.basis
+    tbw <- .nplsqreg_canonical_lp_template(
+      template = tbw,
+      degree = degree,
+      bernstein.basis = degree.search$bernstein.basis
+    )
     out <- .nplsqreg_call_fixed_degree_core(
       xdat = xdat,
       ydat = ydat,
@@ -757,9 +778,11 @@ nplsqregbw <-
                                          setup = setup)
     tbw <- template
     tbw$bw <- bw.vec
-    tbw$regtype <- "lp"
-    tbw$degree <- degree
-    tbw$bernstein.basis <- degree.search$bernstein.basis
+    tbw <- .nplsqreg_canonical_lp_template(
+      template = tbw,
+      degree = degree,
+      bernstein.basis = degree.search$bernstein.basis
+    )
     direct <- .nplsqreg_call_fixed_degree_core(
       xdat = xdat,
       ydat = ydat,
@@ -775,9 +798,11 @@ nplsqregbw <-
     direct$num.feval.fast <- as.numeric(nomad.num.feval.fast.total)
     direct$bws <- tbw
     direct$bws$bw <- direct$bw
-    direct$bws$degree <- degree
-    direct$bws$regtype <- "lp"
-    direct$bws$bernstein.basis <- degree.search$bernstein.basis
+    direct$bws <- .nplsqreg_canonical_lp_template(
+      template = direct$bws,
+      degree = degree,
+      bernstein.basis = degree.search$bernstein.basis
+    )
     direct.objective <- as.numeric(direct$objective[1L])
     powell.elapsed <- NA_real_
 
@@ -804,9 +829,11 @@ nplsqregbw <-
       powell.elapsed <- proc.time()[3L] - powell.start
       hot$bws <- direct$bws
       hot$bws$bw <- hot$bw
-      hot$bws$degree <- degree
-      hot$bws$regtype <- "lp"
-      hot$bws$bernstein.basis <- degree.search$bernstein.basis
+      hot$bws <- .nplsqreg_canonical_lp_template(
+        template = hot$bws,
+        degree = degree,
+        bernstein.basis = degree.search$bernstein.basis
+      )
       hot$num.feval <- as.numeric(direct$num.feval[1L]) + as.numeric(hot$num.feval[1L])
       hot$num.feval.fast <- as.numeric(direct$num.feval.fast[1L]) + as.numeric(hot$num.feval.fast[1L])
       if (is.finite(hot$objective) &&
@@ -1270,9 +1297,11 @@ nplsqregbw.default <-
         fixed.reg.dots$bernstein.basis <- degree.search$bernstein.basis
         fixed.bws <- do.call(npregbw, c(list(xdat = xdat, ydat = ydat),
                                         fixed.reg.dots))
-        fixed.bws$regtype <- "lp"
-        fixed.bws$degree <- as.integer(degree.search$fixed.degree)
-        fixed.bws$bernstein.basis <- degree.search$bernstein.basis
+        fixed.bws <- .nplsqreg_canonical_lp_template(
+          template = fixed.bws,
+          degree = degree.search$fixed.degree,
+          bernstein.basis = degree.search$bernstein.basis
+        )
         fixed.core <- .nplsqreg_call_fixed_degree_core(
           xdat = xdat,
           ydat = ydat,
@@ -1286,9 +1315,11 @@ nplsqregbw.default <-
         )
         fixed.core$bws <- fixed.bws
         fixed.core$bws$bw <- fixed.core$bw
-        fixed.core$bws$degree <- as.integer(degree.search$fixed.degree)
-        fixed.core$bws$regtype <- "lp"
-        fixed.core$bws$bernstein.basis <- degree.search$bernstein.basis
+        fixed.core$bws <- .nplsqreg_canonical_lp_template(
+          template = fixed.core$bws,
+          degree = degree.search$fixed.degree,
+          bernstein.basis = degree.search$bernstein.basis
+        )
         search.result <- .np_degree_singleton_search_result(
           degree.search = degree.search,
           eval_result = list(
