@@ -103,18 +103,21 @@ test_that("MPI adaptive X rows retain solve deletion and scalar fallback", {
   expect_false(grepl("MPI_", body, fixed = TRUE))
 })
 
-test_that("MPI adaptive acceleration does not enter the dense shadow oracle", {
+test_that("MPI adaptive acceleration has no dense shadow oracle", {
   src_file <- locate_adaptive_xrow_blas_source()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable")
-  lines <- readLines(src_file, warn = FALSE)
-  shadow <- adaptive_xrow_source_body(
-    lines,
-    "^static int np_shadow_conditional_build_x_weights_core\\(",
-    "^static int np_shadow_conditional_build_x_weights\\("
-  )
+  source <- paste(readLines(src_file, warn = FALSE), collapse = "\n")
 
-  expect_false(grepl("weighted_design", shadow, fixed = TRUE))
-  expect_false(grepl("F77_CALL(dgemm)", shadow, fixed = TRUE))
+  expect_false(grepl(
+    "np_shadow_conditional_build_x_weights",
+    source,
+    fixed = TRUE
+  ))
+  expect_false(grepl(
+    "np_shadow_cv_con_density",
+    source,
+    fixed = TRUE
+  ))
 })
 
 test_that("MPI adaptive density CVML reuses rank-local row contexts", {

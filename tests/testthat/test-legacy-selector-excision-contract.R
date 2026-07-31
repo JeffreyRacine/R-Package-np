@@ -26,6 +26,10 @@ test_that("retired density selectors cannot restore a second engine", {
     readLines(file.path(root, "src", "np.c"), warn = FALSE),
     collapse = "\n"
   )
+  registration <- paste(
+    readLines(file.path(root, "src", "np_init.c"), warn = FALSE),
+    collapse = "\n"
+  )
   r_sources <- paste(
     unlist(lapply(
       c(
@@ -57,6 +61,19 @@ test_that("retired density selectors cannot restore a second engine", {
   }
   expect_false(grepl("old.dens =", r_sources, fixed = TRUE))
   expect_false(grepl("old.cdens =", r_sources, fixed = TRUE))
+  retired_proof_symbols <- c(
+    "C_np_shadow_cv_xweights_conditional",
+    "C_np_shadow_reset_state",
+    "np_shadow_"
+  )
+  for (symbol in retired_proof_symbols) {
+    expect_false(grepl(symbol, paste(headers, native, registration), fixed = TRUE))
+  }
+  expect_match(
+    registration,
+    "{\"C_np_reset_native_estimator_state\",(DL_FUNC) &C_np_reset_native_estimator_state,0}",
+    fixed = TRUE
+  )
 
   expect_match(
     native,

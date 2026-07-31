@@ -175,7 +175,7 @@ test_that("fixed CVLS row reuse is isolated from npcdist", {
   distribution_body <- cvls_source_body(
     lines,
     "^int np_conditional_distribution_cvls_lp_stream\\(",
-    "^static int np_shadow_conditional_build_y_matrix\\("
+    "^int np_kernel_estimate_density_categorical_leave_one_out_cv\\("
   )
   expect_false(grepl(
     "np_conditional_x_weight_block_pair_stream_core(",

@@ -203,7 +203,7 @@ test_that("all-large, packed, and nearest-neighbor LP CV avoid legacy solve mars
     lines
   )
   helper_stop <- grep(
-    "^static int np_distribution_cvls_ordered_profile_stream\\(",
+    "^np_distribution_cvls_ordered_profile_stream\\(",
     lines
   )
   expect_length(helper_start, 1L)
@@ -391,11 +391,11 @@ test_that("conditional LP LOO rows use signed full-row deletion and no QR", {
 
   expect_equal(
     sum(grepl("if\\(!np_lp_delete_denominator\\(", lines)),
-    6L
+    5L
   )
   expect_equal(
     sum(grepl("fabs\\(row_sum\\) > DBL_MIN", lines)),
-    4L
+    3L
   )
   expect_equal(sum(grepl(
     "fabs\\(loo_sum\\) > DBL_MIN.*fabs\\(full_sum\\) > DBL_MIN",
@@ -566,49 +566,23 @@ test_that("conditional LP block rows reuse full-row solve storage", {
   expect_false(grepl("np_mat_bad_rcond_sym(", helper_body, fixed = TRUE))
 })
 
-test_that("conditional LP dense shadow rows reuse full-row solve storage", {
+test_that("conditional LP dense proof-row graph is absent from production", {
   src_file <- locate_jksum_c()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
 
-  lines <- readLines(src_file, warn = FALSE)
-  helper_start <- grep(
-    "^static int np_shadow_conditional_build_x_weights_core\\(",
-    lines
+  source <- paste(readLines(src_file, warn = FALSE), collapse = "\n")
+  retired <- c(
+    "np_shadow_conditional_build_x_weights_core",
+    "np_shadow_conditional_build_x_weights",
+    "np_shadow_conditional_build_x_weights_full",
+    "np_shadow_conditional_build_y_matrix",
+    "np_shadow_cv_con_density_ml",
+    "np_shadow_cv_con_density_ls",
+    "np_shadow_cv_con_distribution_ls"
   )
-  helper_stop <- grep(
-    "^static int np_shadow_conditional_build_x_weights\\(",
-    lines
-  )
-  expect_length(helper_start, 1L)
-  expect_length(helper_stop, 1L)
-  expect_lt(helper_start, helper_stop)
-
-  helper_body <- paste(lines[helper_start:(helper_stop - 1L)], collapse = "\n")
-  expect_true(grepl(
-    "NPLPFullRowWorkspace full_row_workspace;",
-    helper_body,
-    fixed = TRUE
-  ))
-  expect_false(grepl("if((!drop_eval_self) &&", helper_body, fixed = TRUE))
-  expect_true(grepl(
-    "np_lp_full_row_workspace_reserve(&full_row_workspace,",
-    helper_body,
-    fixed = TRUE
-  ))
-  expect_true(grepl(
-    "np_lp_full_row_workspace_solve(&full_row_workspace,",
-    helper_body,
-    fixed = TRUE
-  ))
-  expect_true(grepl(
-    "full_row_workspace.gram[a + b*k] += wj*za*zb;",
-    helper_body,
-    fixed = TRUE
-  ))
-  expect_false(grepl("MATRIX KWM", helper_body, fixed = TRUE))
-  expect_false(grepl("mat_creat(", helper_body, fixed = TRUE))
-  expect_false(grepl("mat_solve(", helper_body, fixed = TRUE))
-  expect_false(grepl("np_mat_bad_rcond_sym(", helper_body, fixed = TRUE))
+  for (symbol in retired) {
+    expect_false(grepl(symbol, source, fixed = TRUE))
+  }
 })
 
 test_that("conditional LP row-stream rows use bounded full-row solve storage", {

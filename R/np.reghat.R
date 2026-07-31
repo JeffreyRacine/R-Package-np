@@ -1078,7 +1078,7 @@ npreghat <-
   )
   grad.vec <- if (length(s) && any(s > 0L)) as.integer(s) else integer(0L)
   on.exit(
-    tryCatch(.Call("C_np_shadow_reset_state", PACKAGE = "npRmpi"),
+    tryCatch(.Call("C_np_reset_native_estimator_state", PACKAGE = "npRmpi"),
              error = function(e) NULL),
     add = TRUE
   )

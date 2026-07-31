@@ -23,7 +23,6 @@ extern SEXP C_np_density_conditional_nomad_shadow_eval(SEXP, SEXP);
 extern SEXP C_np_density_conditional_nomad_shadow_native_search(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_density_conditional_nomad_shadow_fixed_native_search(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_density_conditional_nomad_shadow_clear(void);
-extern SEXP C_np_shadow_cv_xweights_conditional(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_distribution_bw(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_distribution_bw_eval(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_distribution_nomad_native_search(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
@@ -53,7 +52,7 @@ extern SEXP C_np_categorical_profile_kernel_tile(SEXP, SEXP, SEXP, SEXP, SEXP, S
 extern SEXP C_np_progress_signal(SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_mpi_interrupt_state(SEXP);
 extern SEXP C_np_mpi_interrupt_scope(SEXP);
-extern SEXP C_np_shadow_reset_state(void);
+extern SEXP C_np_reset_native_estimator_state(void);
 extern SEXP C_np_set_seed(SEXP);
 extern SEXP C_np_set_local_regression_mode(SEXP);
 extern SEXP C_np_set_active_comm(SEXP, SEXP);
@@ -156,7 +155,6 @@ static const R_CallMethodDef CallEntries[] = {
     {"C_np_density_conditional_nomad_shadow_native_search",(DL_FUNC) &C_np_density_conditional_nomad_shadow_native_search,12},
     {"C_np_density_conditional_nomad_shadow_fixed_native_search",(DL_FUNC) &C_np_density_conditional_nomad_shadow_fixed_native_search,12},
     {"C_np_density_conditional_nomad_shadow_clear",(DL_FUNC) &C_np_density_conditional_nomad_shadow_clear,0},
-    {"C_np_shadow_cv_xweights_conditional",(DL_FUNC) &C_np_shadow_cv_xweights_conditional,17},
     {"C_np_distribution_bw",           (DL_FUNC) &C_np_distribution_bw,           15},
     {"C_np_distribution_bw_eval",      (DL_FUNC) &C_np_distribution_bw_eval,      15},
     {"C_np_distribution_nomad_native_search",(DL_FUNC) &C_np_distribution_nomad_native_search,22},
@@ -187,7 +185,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"C_np_npscoef_batch_project",       (DL_FUNC) &C_np_npscoef_batch_project,        2},
     {"C_np_categorical_profile_kernel_tile",(DL_FUNC) &C_np_categorical_profile_kernel_tile,12},
     {"C_np_set_seed",                  (DL_FUNC) &C_np_set_seed,                   1},
-    {"C_np_shadow_reset_state",        (DL_FUNC) &C_np_shadow_reset_state,         0},
+    {"C_np_reset_native_estimator_state",(DL_FUNC) &C_np_reset_native_estimator_state,0},
     {"C_np_set_local_regression_mode", (DL_FUNC) &C_np_set_local_regression_mode,  1},
     {"C_np_set_active_comm",           (DL_FUNC) &C_np_set_active_comm,            2},
     {"C_np_release_static_buffers",    (DL_FUNC) &C_np_release_static_buffers,     0},
