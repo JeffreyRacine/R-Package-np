@@ -132,10 +132,26 @@ npUseContinuousTree <- function(ncon = 0L, bws = NULL, ckertype = NULL) {
   npTreeAutoKernelEligible(bws = bws, ckertype = ckertype)
 }
 
+npStrictLogicalOption <- function(name, default) {
+  value <- getOption(name, default)
+  if (!is.logical(value) || length(value) != 1L || is.na(value)) {
+    stop(
+      sprintf(
+        "option '%s' must be a single non-missing logical value",
+        name
+      ),
+      call. = FALSE
+    )
+  }
+  value
+}
+
 npUseCategoricalCompress <- function(ncon = 0L, ncat = 0L) {
-  isTRUE(getOption("np.categorical.compress", TRUE)) &&
-    isTRUE(npCountVars(ncon) == 0L) &&
-    isTRUE(npCountVars(ncat) > 0L)
+  if (!isTRUE(npCountVars(ncon) == 0L) ||
+      !isTRUE(npCountVars(ncat) > 0L))
+    return(FALSE)
+
+  npStrictLogicalOption("np.categorical.compress", TRUE)
 }
 
 npUseKernelAccelerationFlag <- function(ncon = 0L, ncat = 0L,
