@@ -1,5 +1,15 @@
 # npRmpi 0.70-6
 
+* Fixed-bandwidth ordered-categorical unconditional-distribution CVLS now
+  consumes compressed kernel rows through a checked, caller-owned tile capped
+  at 64 MiB for serial/rank-one execution and 256 MiB under active MPI instead
+  of retaining the full evaluation-by-training profile matrix. The traversal
+  and loss accumulation orders are unchanged, and objective values remain
+  byte-identical; the general route remains canonical when a single row cannot
+  fit the bounded workspace. Once the bounded route is selected, internal
+  failure now fails rank-symmetrically rather than silently re-entering the
+  general route.
+
 * Autodispatch result sanitation now preserves explicit `NULL` call arguments
   without deleting their list slots while replacing temporary symbols. This
   corrects a shared post-computation failure that affected calls such as

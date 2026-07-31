@@ -418,7 +418,7 @@ test_that("categorical profile tile failures are explicit and bounded", {
   expect_error(call(eval_count = 1L), "must be finite")
 })
 
-test_that("categorical profile implementation is bounded and dormant", {
+test_that("categorical profile implementation and native sink are bounded", {
   candidates <- c(
     test_path("..", ".."),
     test_path("..", "..", ".."),
@@ -504,4 +504,70 @@ test_that("categorical profile implementation is bounded and dormant", {
     "unsupported ordered kernel/operator combination",
     fixed = TRUE
   )
+  expect_match(jksum, "NP_KernelRowTileSink", fixed = TRUE)
+  expect_match(
+    jksum,
+    "np_distribution_profile_cv_consume_tile",
+    fixed = TRUE
+  )
+  expect_match(
+    jksum,
+    "np_categorical_profile_tile_bytes((size_t)nprof_train",
+    fixed = TRUE
+  )
+  expect_match(
+    jksum,
+    "np_distribution_profile_cv_serial_tile_max_bytes",
+    fixed = TRUE
+  )
+  expect_match(
+    jksum,
+    "tile_capacity_rows = tile_max_bytes/row_bytes;",
+    fixed = TRUE
+  )
+  expect_match(
+    jksum,
+    "np_distribution_profile_cv_mpi_tile_max_bytes",
+    fixed = TRUE
+  )
+  expect_match(
+    jksum,
+    "(iNum_Processors > 1) && !np_mpi_local_regression_active()",
+    fixed = TRUE
+  )
+  expect_match(jksum, "kw_work != row_tile_sink->weights", fixed = TRUE)
+  expect_match(jksum, "np_ks_tree_use ||", fixed = TRUE)
+  expect_match(
+    jksum,
+    "np_distribution_profile_cv_update",
+    fixed = TRUE
+  )
+  expect_match(
+    jksum,
+    "NP_DISTRIBUTION_PROFILE_CV_NOT_APPLICABLE",
+    fixed = TRUE
+  )
+  expect_match(
+    jksum,
+    "if(profile_status == NP_DISTRIBUTION_PROFILE_CV_FAILURE)",
+    fixed = TRUE
+  )
+  expect_match(
+    jksum,
+    "MPI_Allreduce(&local_preflight_status",
+    fixed = TRUE
+  )
+  expect_length(
+    gregexpr(
+      "MPI_Allreduce(&local_preflight_status",
+      jksum,
+      fixed = TRUE
+    )[[1L]],
+    1L
+  )
+  expect_false(grepl(
+    "alloc_vecd(nprof_eval*nprof_train)",
+    jksum,
+    fixed = TRUE
+  ))
 })
