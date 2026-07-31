@@ -24,6 +24,7 @@
 #include "jksum_gaussian_fixed.h"
 #include "jksum_lp_row.h"
 #include "jksum_lp_solve.h"
+#include "jksum_block_plan.h"
 #include "np_native_safety.h"
 #include "categorical_profile_tile.h"
 
@@ -75,13 +76,31 @@ extern void vvrec(double *, const double *, const int *);
 #define NP_NOINLINE __attribute__((noinline))
 #define NP_ALWAYS_INLINE inline __attribute__((always_inline))
 #define NP_HOT_ALIGN __attribute__((aligned(256)))
+#define NP_COLD __attribute__((cold))
 #define NP_UNLIKELY(value) __builtin_expect(!!(value), 0)
 #else
 #define NP_NOINLINE
 #define NP_ALWAYS_INLINE inline
 #define NP_HOT_ALIGN
+#define NP_COLD
 #define NP_UNLIKELY(value) (value)
 #endif
+
+static NP_NOINLINE NP_COLD int64_t
+np_jksum_distribution_one_block_plan_or_die(int64_t train_alloc,
+                                              int64_t eval_alloc,
+                                              int partitions,
+                                              double memfac);
+
+static NP_NOINLINE void
+np_jksum_distribution_two_block_plan_or_die(int64_t train_alloc,
+                                              int64_t eval_alloc,
+                                              int partitions,
+                                              double memfac,
+                                              int64_t *x_width,
+                                              int64_t *x_alloc,
+                                              int64_t *y_width,
+                                              int64_t *y_alloc);
 #ifdef MPI2
 
 #include "mpi.h"
@@ -16208,10 +16227,10 @@ double * cv){
 
   int64_t is,ie;
 
-  int64_t N, num_obs_eval_alloc, num_obs_train_alloc, num_obs_wx_alloc;
+  int64_t num_obs_eval_alloc, num_obs_train_alloc, num_obs_wx_alloc;
   int64_t wx, nwx;
-
-  size_t Nm = MIN((size_t)ceil(memfac*300000.0), (size_t)SIZE_MAX/10);
+  size_t full_plan_cells;
+  size_t block_capacity;
 
 #ifdef MPI2
   int64_t stride_t = MAX((int64_t)ceil((double) num_obs_train / (double) iNum_Processors),1);
@@ -16230,30 +16249,29 @@ double * cv){
   num_obs_eval_alloc = num_obs_eval;
 #endif
 
-  // blocking algo calculations
-  N = num_obs_eval_alloc*(num_obs_train_alloc+1);
-  
-  const int64_t sa = num_obs_eval_alloc*num_obs_train_alloc*sizeof(double);
-
-  if((N > Nm) || (sa > (((int64_t)1<<31)-1))){
-    const int64_t wx0 = Nm/(1+num_obs_train_alloc);
-    wx = (wx0 > num_obs_eval_alloc) ? num_obs_eval_alloc : wx0;
-    nwx = num_obs_eval_alloc/wx + (((num_obs_eval_alloc % wx) > 0) ? 1 : 0);
-  } else {
+  if((np_jksum_memfac_cells(memfac, &block_capacity) ==
+      NP_JKSUM_BLOCK_PLAN_OK) &&
+     np_jksum_distribution_one_full_plan_safe(
+       (size_t)num_obs_train_alloc,
+       (size_t)num_obs_eval_alloc,
+       block_capacity,
+       (size_t)INT_MAX,
+       &full_plan_cells)) {
     wx = num_obs_eval_alloc;
-    nwx = 1;
-  }
-
+  } else {
+    wx = np_jksum_distribution_one_block_plan_or_die(
+      num_obs_train_alloc,
+      num_obs_eval_alloc,
 #ifdef MPI2
-  int64_t stride_wx = MAX((int64_t)ceil((double)wx / (double) iNum_Processors),1);
-
-  num_obs_wx_alloc = stride_wx*iNum_Processors;
+      iNum_Processors,
 #else
+      1,
+#endif
+      memfac);
+  }
   num_obs_wx_alloc = wx;
-#endif
-
-#ifdef MPI2
-#endif
+  nwx = num_obs_eval_alloc/wx +
+    (((num_obs_eval_alloc % wx) > 0) ? 1 : 0);
 
   // allocate some pointers
   matrix_wX_continuous_eval = (double **)np_jksum_malloc_array_or_die((size_t)num_reg_continuous, sizeof(double *), "np_kernel_estimate_density_categorical_leave_one_out_cv matrix_wX_continuous_eval");
@@ -16668,9 +16686,7 @@ double *cv){
   const int num_all_cvar = num_reg_continuous + num_var_continuous;
   const int num_all_uvar = num_reg_unordered + num_var_unordered;
 
-  size_t Nm = MIN((size_t)ceil(memfac*300000.0), (size_t)SIZE_MAX/10);
-
-  int64_t N, num_obs_eval_alloc, num_obs_train_alloc, num_obs_wx_alloc, num_obs_wy_alloc;
+  int64_t num_obs_eval_alloc, num_obs_train_alloc, num_obs_wx_alloc, num_obs_wy_alloc;
   int64_t wx, wy, nwx, nwy;
 
   int * x_operator = NULL, * y_operator = NULL, * xy_operator = NULL;
@@ -16723,37 +16739,30 @@ double *cv){
 #endif
 
 
-  // blocking algo calculations
-  N = num_obs_train_alloc*num_obs_train_alloc + num_obs_eval_alloc*num_obs_train_alloc + num_obs_train_alloc + (num_obs_train_alloc + num_obs_eval_alloc)*num_obs_train_alloc;
-  
-  const int64_t sa = num_obs_train_alloc*num_obs_train_alloc*sizeof(double);
-  const int64_t sb = num_obs_eval_alloc*num_obs_train_alloc*sizeof(double);
-
-  if((N > Nm) || (sa > (((int64_t)1<<31)-1)) || (sb > (((int64_t)1<<31)-1))){
-    const int64_t wy0 = (Nm - 2*num_obs_train_alloc - 1)/(2*num_obs_train_alloc);
-    wy = ((wy0 > num_obs_eval_alloc) || (wy0 <= 0)) ? num_obs_eval_alloc : wy0;
-    wx = (wy0 > 0) ? (Nm - 2*num_obs_train_alloc*wy)/(1 + 2*num_obs_train_alloc) : 1;
-    nwx = num_obs_train_alloc/wx + (((num_obs_train_alloc % wx) > 0) ? 1 : 0);
-    nwy = num_obs_eval_alloc/wy + (((num_obs_eval_alloc % wy) > 0) ? 1 : 0);
-  } else {
-    wx = num_obs_train_alloc;
-    wy = num_obs_eval_alloc;
-    nwx = 1;
-    nwy = 1;
-  }
-
+  np_jksum_distribution_two_block_plan_or_die(
+    num_obs_train_alloc,
+    num_obs_eval_alloc,
 #ifdef MPI2
-  int64_t stride_wx = MAX((int64_t)ceil((double)wx / (double) iNum_Processors),1);
-  int64_t stride_wy = MAX((int64_t)ceil((double)wy / (double) iNum_Processors),1);
-
-  num_obs_wx_alloc = stride_wx*iNum_Processors;
-  num_obs_wy_alloc = stride_wy*iNum_Processors;
-
-  js = stride_wy*my_rank;
-  je = MIN(wy, js + stride_wy);
+    iNum_Processors,
 #else
-  num_obs_wx_alloc = wx;
-  num_obs_wy_alloc = wy;
+    1,
+#endif
+    memfac,
+    &wx,
+    &num_obs_wx_alloc,
+    &wy,
+    &num_obs_wy_alloc);
+  nwx = num_obs_train_alloc/wx +
+    (((num_obs_train_alloc % wx) > 0) ? 1 : 0);
+  nwy = num_obs_eval_alloc/wy +
+    (((num_obs_eval_alloc % wy) > 0) ? 1 : 0);
+#ifdef MPI2
+  {
+    const int64_t stride_wy =
+      num_obs_wy_alloc/(int64_t)iNum_Processors;
+    js = stride_wy*my_rank;
+    je = MIN(wy, js + stride_wy);
+  }
 #endif
 
   int * kernel_cx = NULL, * kernel_ux = NULL, * kernel_ox = NULL;
@@ -17193,17 +17202,20 @@ double *cv){
   if(!int_TREE_XY || gate_x_all_large_fixed){
     double * kwx = NULL;
 
-    double * kwy = (double *)malloc(num_obs_train_alloc*num_obs_wy_alloc*sizeof(double));
-
-    if(kwy == NULL)
-      error("failed to allocate kwy, try reducing num_obs_eval, tried to allocate: %" PRIi64 "bytes\n", num_obs_train_alloc*num_obs_wy_alloc*sizeof(double));
+    double * kwy = (double *)np_jksum_malloc_array3_or_die(
+      (size_t)num_obs_train_alloc,
+      (size_t)num_obs_wy_alloc,
+      sizeof(double),
+      "conditional-distribution CVLS kwy");
 
     double *kwy_row_sum = NULL;
 
     if(!gate_x_all_large_fixed){
-      kwx = (double *)malloc(num_obs_wx_alloc*num_obs_train_alloc*sizeof(double));
-      if(kwx == NULL)
-        error("failed to allocate kwx, tried to allocate: %" PRIi64 "bytes\n", num_obs_wx_alloc*num_obs_train_alloc*sizeof(double));
+      kwx = (double *)np_jksum_malloc_array3_or_die(
+        (size_t)num_obs_wx_alloc,
+        (size_t)num_obs_train_alloc,
+        sizeof(double),
+        "conditional-distribution CVLS kwx");
     } else {
       kwy_row_sum = (double *)malloc(num_obs_wy_alloc*sizeof(double));
       if(kwy_row_sum == NULL)
@@ -17480,15 +17492,17 @@ double *cv){
     for(l = num_reg_continuous; l < num_all_cvar; l++)
       KERNEL_XY[l] = KERNEL_den + OP_CFUN_OFFSETS[xy_operator[l]];
 
-    double * kwx = (double *)malloc(num_obs_wx_alloc*num_obs_train_alloc*sizeof(double));
+    double * kwx = (double *)np_jksum_malloc_array3_or_die(
+      (size_t)num_obs_wx_alloc,
+      (size_t)num_obs_train_alloc,
+      sizeof(double),
+      "conditional-distribution CVLS kwx");
 
-    if(kwx == NULL)
-      error("failed to allocate kwx, tried to allocate: %" PRIi64 "bytes\n", num_obs_wx_alloc*num_obs_train_alloc*sizeof(double));
-
-    double * kwy = (double *)malloc(num_obs_train_alloc*num_obs_wy_alloc*sizeof(double));
-
-    if(kwy == NULL)
-      error("failed to allocate kwy, try reducing num_obs_eval, tried to allocate: %" PRIi64 "bytes\n", num_obs_train_alloc*num_obs_wy_alloc*sizeof(double));
+    double * kwy = (double *)np_jksum_malloc_array3_or_die(
+      (size_t)num_obs_train_alloc,
+      (size_t)num_obs_wy_alloc,
+      sizeof(double),
+      "conditional-distribution CVLS kwy");
 
     nls.node = (int *)malloc(sizeof(int));
     nls.nalloc = 1;
@@ -33057,3 +33071,68 @@ static int NP_NOINLINE np_accel_gauss_adaptive_yrow_reciprocal_try(
   return 1;
 }
 #endif
+
+static NP_NOINLINE NP_COLD int64_t
+np_jksum_distribution_one_block_plan_or_die(int64_t train_alloc,
+                                              int64_t eval_alloc,
+                                              int partitions,
+                                              double memfac)
+{
+  size_t capacity = 0U;
+  NPJksumBlockPlan plan;
+  NPJksumBlockPlanStatus status;
+
+  status = np_jksum_memfac_cells(memfac, &capacity);
+  if(status == NP_JKSUM_BLOCK_PLAN_OK)
+    status = np_jksum_distribution_one_block_plan(
+      train_alloc,
+      eval_alloc,
+      partitions,
+      capacity,
+      (size_t)INT_MAX,
+      &plan);
+  if(status != NP_JKSUM_BLOCK_PLAN_OK)
+    error("distribution CVLS block planning failed: %s "
+          "(memfac=%.17g, capacity=%zu cells)",
+          np_jksum_block_plan_status_message(status),
+          memfac,
+          capacity);
+  if(plan.x_width != plan.x_alloc)
+    error("distribution CVLS block planner returned an unaligned width");
+  return plan.x_width;
+}
+
+static NP_NOINLINE void
+np_jksum_distribution_two_block_plan_or_die(int64_t train_alloc,
+                                              int64_t eval_alloc,
+                                              int partitions,
+                                              double memfac,
+                                              int64_t *x_width,
+                                              int64_t *x_alloc,
+                                              int64_t *y_width,
+                                              int64_t *y_alloc)
+{
+  size_t capacity = 0U;
+  NPJksumBlockPlan plan;
+  NPJksumBlockPlanStatus status;
+
+  status = np_jksum_memfac_cells(memfac, &capacity);
+  if(status == NP_JKSUM_BLOCK_PLAN_OK)
+    status = np_jksum_distribution_two_block_plan(
+      train_alloc,
+      eval_alloc,
+      partitions,
+      capacity,
+      (size_t)INT_MAX,
+      &plan);
+  if(status != NP_JKSUM_BLOCK_PLAN_OK)
+    error("conditional-distribution CVLS block planning failed: %s "
+          "(memfac=%.17g, capacity=%zu cells)",
+          np_jksum_block_plan_status_message(status),
+          memfac,
+          capacity);
+  *x_width = plan.x_width;
+  *x_alloc = plan.x_alloc;
+  *y_width = plan.y_width;
+  *y_alloc = plan.y_alloc;
+}
