@@ -53,7 +53,7 @@ test_that("fixed and generalized-NN CVLS derive LOO from their full rows", {
   for (body in list(fixed_body, gnn_body)) {
     expect_equal(lengths(regmatches(
       body,
-      gregexpr("np_shadow_conditional_kernel_row_raw\\(", body, perl = TRUE)
+      gregexpr("np_conditional_kernel_row_raw\\(", body, perl = TRUE)
     )), 1L)
     expect_match(body, "suppress_nn_parallel", fixed = TRUE)
   }
@@ -80,7 +80,7 @@ test_that("fixed and generalized-NN CVLS derive LOO from their full rows", {
 
   gnn_markers <- c(
     "matrix_bandwidth_eval_one[l][0] = matrix_bandwidth_x[l][i]",
-    "np_shadow_conditional_kernel_row_raw",
+    "np_conditional_kernel_row_raw",
     "np_lp_full_row_workspace_solve",
     "np_lp_delete_denominator(full_rows_out[i][eval_idx], &den)",
     "loo_rows_out[i][j] ="

@@ -100,7 +100,7 @@ test_that("adaptive higher-order Gaussian row fusion is narrow and bounded", {
   )
   expect_match(
     conditional,
-    "np_shadow_conditional_kernel_row_raw(ctx->kernel_cx,",
+    "np_conditional_kernel_row_raw(ctx->kernel_cx,",
     fixed = TRUE
   )
 })

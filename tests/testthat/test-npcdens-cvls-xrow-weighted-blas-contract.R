@@ -123,7 +123,7 @@ test_that("MPI fixed CVLS weighted BLAS preserves signed row algebra and fallbac
   expect_false(grepl("num_train\\*num_train", body))
 
   markers <- c(
-    "np_shadow_conditional_kernel_row_raw",
+    "np_conditional_kernel_row_raw",
     "weighted_row[j] = basis_row[j]*kw[j]",
     "F77_CALL(dgemm)",
     "np_lp_full_row_workspace_solve",

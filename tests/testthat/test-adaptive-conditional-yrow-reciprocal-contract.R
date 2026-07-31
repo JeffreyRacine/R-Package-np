@@ -126,7 +126,7 @@ test_that("MPI response reciprocal admission retains both fallbacks", {
     fixed = TRUE
   )
   generic <- regexpr(
-    "np_shadow_conditional_kernel_row(",
+    "np_conditional_kernel_row(",
     row,
     fixed = TRUE
   )
