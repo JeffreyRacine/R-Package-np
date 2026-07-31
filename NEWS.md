@@ -1,5 +1,14 @@
 # np 0.70-6
 
+* Added a dormant, rank-local categorical-profile tile engine for subsequent
+  migration of dense profile consumers. Its caller-owned output is bounded by
+  a checked 64 MiB ceiling, immutable training profiles can be validated once
+  per traversal, and no production estimator dispatch changes in this
+  checkpoint. The same work corrects unordered derivative dispatch so score
+  operators reach their canonical kernels instead of the historical normal-
+  kernel fallback; ordinary objective, fit, and prediction results are
+  unchanged.
+
 * Powell-side objective caches now use checked capacity, key-width,
   load-factor, and rehash arithmetic under an independent 64 MiB peak ceiling
   per native table. If a table cannot grow, its existing entries remain

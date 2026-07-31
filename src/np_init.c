@@ -30,6 +30,7 @@ extern SEXP C_np_lc_hat_normalize(SEXP, SEXP);
 extern SEXP C_np_reghat_lp_matrix_fast(SEXP, SEXP, SEXP);
 extern SEXP C_np_npscoef_batch_zero_solve(SEXP, SEXP);
 extern SEXP C_np_npscoef_batch_project(SEXP, SEXP);
+extern SEXP C_np_categorical_profile_kernel_tile(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_density_conditional_bw(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_density_conditional_bw_eval(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_distribution_bw(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
@@ -81,6 +82,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"C_np_reghat_lp_matrix_fast",       (DL_FUNC) &C_np_reghat_lp_matrix_fast,        3},
     {"C_np_npscoef_batch_zero_solve",    (DL_FUNC) &C_np_npscoef_batch_zero_solve,     2},
     {"C_np_npscoef_batch_project",       (DL_FUNC) &C_np_npscoef_batch_project,        2},
+    {"C_np_categorical_profile_kernel_tile",(DL_FUNC) &C_np_categorical_profile_kernel_tile,12},
     {"C_np_density_conditional_bw",    (DL_FUNC) &C_np_density_conditional_bw,    21},
     {"C_np_density_conditional_bw_eval",(DL_FUNC) &C_np_density_conditional_bw_eval,21},
     {"C_np_distribution_bw",           (DL_FUNC) &C_np_distribution_bw,           15},
