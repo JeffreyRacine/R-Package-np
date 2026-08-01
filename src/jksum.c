@@ -18992,7 +18992,17 @@ double *MSE,
 double *MAE,
 double *MAPE,
 double *CORR,
-double *SIGN){
+double *SIGN,
+const NPContinuousKernelRoute *kernel_route,
+NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
+int categorical_compress){
+
+  /* P21A plumbing only: every incumbent caller supplies a null route.  The
+     activation tranche will bind these arguments to the canonical row owner
+     after the unchanged legacy path has been qualified independently. */
+  (void)kernel_route;
+  (void)kernel_route_diagnostics;
+  (void)categorical_compress;
 
   // note that mean has 2*num_obs allocated for npksum
   int i, j, l;

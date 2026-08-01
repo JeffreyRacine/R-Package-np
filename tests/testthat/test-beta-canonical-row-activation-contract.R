@@ -254,6 +254,76 @@ test_that("beta density and distribution fits have one canonical ingress", {
   )
 })
 
+test_that("regression route plumbing is dormant before beta activation", {
+  root <- locate_beta_activation_sources()
+  skip_if(is.null(root), "package sources unavailable")
+  ingress <- paste(
+    readLines(file.path(root, "src", "np.c"), warn = FALSE),
+    collapse = "\n"
+  )
+  engine <- paste(
+    readLines(file.path(root, "src", "jksum.c"), warn = FALSE),
+    collapse = "\n"
+  )
+
+  public_start <- regexpr("SEXP C_np_regression(", ingress,
+                          fixed = TRUE)[[1L]]
+  public_end <- regexpr("SEXP C_np_density(", ingress,
+                        fixed = TRUE)[[1L]]
+  expect_gt(public_start, 0L)
+  expect_gt(public_end, public_start)
+  public_regression <- substr(ingress, public_start, public_end - 1L)
+
+  expect_match(public_regression, "np_beta_regression_lc(", fixed = TRUE)
+  expect_match(
+    public_regression,
+    "REAL(out_xtra), ckerlb_p, ckerub_p,\n                  NULL, NULL, 0);",
+    fixed = TRUE
+  )
+
+  owner_start <- regexpr("void np_regression(", ingress,
+                         fixed = TRUE)[[1L]]
+  owner_start <- regexpr(
+    "void np_regression(",
+    substr(ingress, owner_start + 1L, nchar(ingress)),
+    fixed = TRUE
+  )[[1L]] + owner_start
+  owner_end <- regexpr("static void np_kernelsum_common(", ingress,
+                       fixed = TRUE)[[1L]]
+  expect_gt(owner_start, 0L)
+  expect_gt(owner_end, owner_start)
+  owner <- substr(ingress, owner_start, owner_end - 1L)
+  expect_match(owner, "const NPContinuousKernelRoute *kernel_route",
+               fixed = TRUE)
+  expect_match(
+    owner,
+    paste0(
+      "&SIGN,\n                                                   kernel_route,\n",
+      "                                                   kernel_route_diagnostics,\n",
+      "                                                   categorical_compress);"
+    ),
+    fixed = TRUE
+  )
+
+  engine_start <- regexpr(
+    "int kernel_estimate_regression_categorical_tree_np(",
+    engine,
+    fixed = TRUE
+  )[[1L]]
+  engine_end <- regexpr("static int np_conditional_indicator_row_core(",
+                        engine, fixed = TRUE)[[1L]]
+  expect_gt(engine_start, 0L)
+  expect_gt(engine_end, engine_start)
+  regression_engine <- substr(engine, engine_start, engine_end - 1L)
+  expect_match(regression_engine, "(void)kernel_route;", fixed = TRUE)
+  expect_match(regression_engine, "(void)kernel_route_diagnostics;",
+               fixed = TRUE)
+  expect_match(regression_engine, "(void)categorical_compress;",
+               fixed = TRUE)
+  expect_false(grepl("NPContinuousKernelExecutionContext",
+                     regression_engine, fixed = TRUE))
+})
+
 test_that("signed-log beta rows compose every route segment", {
   root <- locate_beta_activation_sources()
   skip_if(is.null(root), "package sources unavailable")
