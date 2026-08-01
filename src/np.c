@@ -12045,7 +12045,7 @@ SEXP C_np_kernelsum_power12(SEXP tuno,
       ncat > 0 ? REAL(bw_r) + ncon : NULL,
       categorical_ingress.num_categories,
       categorical_ingress.category_values, categorical_compress,
-      REAL(out_ksum), REAL(out_ksum_power2), &route, &diagnostics);
+      REAL(out_ksum), REAL(out_ksum_power2), &route, &diagnostics, NULL);
     if(status != 0 && diagnostics.beta_status != NP_BETA_OK)
       error("C_np_kernelsum_power12: beta row failed in continuous dimension %d: %s",
             diagnostics.bad_coordinate + 1,

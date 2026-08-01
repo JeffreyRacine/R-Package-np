@@ -39,6 +39,9 @@ typedef struct {
   NPContinuousKernelSegment segment[NP_CKERNEL_ROUTE_MAX_SEGMENTS];
 } NPContinuousKernelRoute;
 
+/* Optional estimator-owned observation-progress hook for canonical rows. */
+typedef void (*NPContinuousKernelProgressFunction)(int completed, int total);
+
 typedef enum {
   NP_CKERNEL_ROUTE_OK = 0,
   NP_CKERNEL_ROUTE_ERR_NULL = 1,

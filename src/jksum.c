@@ -8444,6 +8444,7 @@ typedef struct {
   double **matrix_W;
   int ncol_Y;
   int ncol_W;
+  NPContinuousKernelProgressFunction progress;
 } NP_DualPowerCtx;
 
 typedef int (*NP_KernelRowTileConsumerFn)(
@@ -8822,7 +8823,8 @@ static int np_beta_absolute_route(
   double * const weighted_sum,
   double * const weighted_sum_power2,
   double * const kw,
-  NPContinuousKernelDerivativeDiagnostics * const route_diagnostics)
+  NPContinuousKernelDerivativeDiagnostics * const route_diagnostics,
+  NPContinuousKernelProgressFunction progress)
 {
   NPContinuousKernelRowWorkspace workspace;
   NPContinuousKernelRowPlan plan;
@@ -8999,7 +9001,7 @@ static int np_beta_absolute_route(
         matrix_Y, ncol_Y, matrix_W, ncol_W,
         matrix_Y_power2, ncol_Y_power2, matrix_W_power2, ncol_W_power2,
         &workspace, &row_result, weighted_sum, weighted_sum_power2,
-        route_diagnostics);
+        route_diagnostics, progress);
 
     if(row_status != NP_CONTINUOUS_ROW_OK)
       goto cleanup;
@@ -9355,7 +9357,8 @@ const int keep_kw_owner_local){
       kernel_pow,
       route_row, weighted_sum,
       beta_dual_power ? dual_power_ctx->weighted_sum : NULL,
-      kw, kernel_route_diagnostics);
+      kw, kernel_route_diagnostics,
+      beta_dual_power ? dual_power_ctx->progress : NULL);
     free(route_row);
     return route_status;
   }
@@ -11579,7 +11582,7 @@ double * const pkw){
   int old_pkw_nvar = kernel_weighted_sum_pkw_nvar_extern;
   int status = 0;
   const NP_DualPowerCtx dual_power_ctx = {
-    weighted_sum_power2, 2, NULL, NULL, 0, 0
+    weighted_sum_power2, 2, NULL, NULL, 0, 0, NULL
   };
 
   kernel_weighted_sum_pkw_extern = pkw;
@@ -11687,10 +11690,11 @@ const int categorical_compress,
 double * const weighted_sum,
 double * const weighted_sum_power2,
 const NPContinuousKernelRoute * const kernel_route,
-NPContinuousKernelDerivativeDiagnostics * const kernel_route_diagnostics)
+NPContinuousKernelDerivativeDiagnostics * const kernel_route_diagnostics,
+NPContinuousKernelProgressFunction progress)
 {
   const NP_DualPowerCtx dual_power_ctx = {
-    weighted_sum_power2, 2, NULL, NULL, 0, 0
+    weighted_sum_power2, 2, NULL, NULL, 0, 0, progress
   };
   const NPContinuousKernelExecutionContext kernel_execution_context = {
     kernel_route, kernel_route_diagnostics, categorical_compress
@@ -20761,7 +20765,7 @@ double *SIGN){
     double **Ycols = NULL, **Wcols = NULL;
     double *y2 = NULL, *out = NULL, *out2 = NULL, *fit_kw = NULL;
     NP_DualPowerCtx fit_dual_power_ctx = {
-      NULL, 2, NULL, NULL, 0, 0
+      NULL, 2, NULL, NULL, 0, 0, NULL
     };
     NPGLPBasisCtx *basis_ctx = NULL;
     NPLPSolveWorkspace solve_workspace;
