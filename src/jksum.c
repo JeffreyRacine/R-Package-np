@@ -8311,6 +8311,13 @@ static int np_beta_scalar_absolute_route(
        (matrix_bandwidth_train == NULL ||
         matrix_bandwidth_train[coordinate] == NULL))
       return KWSNP_ERR_BADINVOC;
+    if(bandwidth_mode != BW_FIXED &&
+       operator[coordinate] == OP_CONVOLUTION &&
+       (matrix_bandwidth_eval == NULL ||
+        matrix_bandwidth_train == NULL ||
+        matrix_bandwidth_eval[coordinate] == NULL ||
+        matrix_bandwidth_train[coordinate] == NULL))
+      return KWSNP_ERR_BADINVOC;
     train_is_eval &=
       matrix_X_continuous_train[coordinate] ==
       matrix_X_continuous_eval[coordinate];
@@ -8477,7 +8484,6 @@ const NPContinuousKernelRoute * const kernel_route){
       np_continuous_kernel_route_has_beta(kernel_route) &&
       (BANDWIDTH_reg == BW_FIXED || BANDWIDTH_reg == BW_GEN_NN ||
        BANDWIDTH_reg == BW_ADAP_NN) &&
-      (BANDWIDTH_reg == BW_FIXED || !route_has_convolution) &&
       kernel_pow == 1 &&
       bandwidth_divide == 0 && bandwidth_divide_weights == 0 &&
       num_reg_unordered == 0 && num_reg_ordered == 0 &&
@@ -8490,9 +8496,11 @@ const NPContinuousKernelRoute * const kernel_route){
         matrix_bw_train == NULL && matrix_bw_eval == NULL &&
         vector_scale_factor != NULL) ||
        (BANDWIDTH_reg == BW_GEN_NN && bandwidth_provided &&
-        matrix_bw_eval != NULL) ||
+        matrix_bw_eval != NULL &&
+        (!route_has_convolution || matrix_bw_train != NULL)) ||
        (BANDWIDTH_reg == BW_ADAP_NN && bandwidth_provided &&
-        matrix_bw_train != NULL)) &&
+        matrix_bw_train != NULL &&
+        (!route_has_convolution || matrix_bw_eval != NULL))) &&
       lambda_pre == NULL &&
       dual_power_ctx == NULL && outer_pack_ctx == NULL &&
       weighted_sum != NULL;

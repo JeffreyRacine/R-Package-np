@@ -10498,7 +10498,6 @@ SEXP C_np_kernelsum(SEXP tuno,
       error("C_np_kernelsum: beta derivative-weight buffer has the wrong length");
 
     if(all_nonderivative &&
-       (beta_bandwidth_code == BW_FIXED || !has_overlap) &&
        num_response_columns == 0 && num_weight_columns == 0 &&
        p_operator == OP_NOOP && !do_score && !do_ocg &&
        INTEGER(myopti_i)[KWS_DOTREEI] == NP_TREE_FALSE) {
