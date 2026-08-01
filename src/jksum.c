@@ -25,6 +25,7 @@
 #include "jksum_lp_row.h"
 #include "jksum_lp_solve.h"
 #include "jksum_block_plan.h"
+#include "kernel_registry.h"
 #include "np_native_safety.h"
 #include "categorical_profile_tile.h"
 
@@ -8297,7 +8298,8 @@ double * const weighted_permutation_sum,
 double * const kw,
 const NP_GateOverrideCtx * const gate_override_ctx,
 const NP_DualPowerCtx * const dual_power_ctx,
-const NP_OuterPackCtx * const outer_pack_ctx){
+const NP_OuterPackCtx * const outer_pack_ctx,
+const NPContinuousKernelRoute * const kernel_route){
   const NP_GateOverrideCtx * const gate_ctx_raw =
     (gate_override_ctx != NULL) ? gate_override_ctx : &np_gate_override_ctx;
   const NP_GateOverrideCtx gate_ctx_empty = {0};
@@ -8309,6 +8311,7 @@ const NP_OuterPackCtx * const outer_pack_ctx){
     (((!np_partial_gate_features_enabled) && (!caller_override_active))) ||
     ((gate_ctx != NULL) && (gate_ctx->active == NP_GATE_CTX_DISABLE));
   assert(np_gate_ctx_is_sane(gate_ctx));
+  (void)kernel_route;
   
   /* This function takes a vector Y and returns a kernel weighted
      leave-one-out sum. By default Y should be a vector of ones
@@ -10371,6 +10374,7 @@ const NP_GateOverrideCtx * const gate_override_ctx){
     kw,
     gate_override_ctx,
     NULL,
+    NULL,
     NULL);
 }
 
@@ -10495,6 +10499,7 @@ double * const pkw){
     kw,
     NULL,
     &dual_power_ctx,
+    NULL,
     NULL);
 
   kernel_weighted_sum_pkw_extern = old_pkw;
@@ -13260,7 +13265,8 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
                                   NULL,
                                   NULL,
                                   NULL,
-                                  &frozen_runtime_options) != 0){
+                                  &frozen_runtime_options,
+                                  NULL) != 0){
       int_LARGE_SF = tsf;
       goto cleanup_lp_cv;
     }
@@ -13399,7 +13405,8 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
                                   kw,
                                   NULL,
                                   NULL,
-                                  &frozen_runtime_options) != 0)
+                                  &frozen_runtime_options,
+                                  NULL) != 0)
       goto cleanup_lp_cv;
 
     if(nterms == 3){
@@ -13952,7 +13959,8 @@ static NP_NOINLINE NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas(
                                      kw,
                                      NULL,
                                      NULL,
-                                     &frozen_runtime_options) != 0)
+                                     &frozen_runtime_options,
+                                     NULL) != 0)
       goto cleanup_adaptive_blas;
 
     self_weight = kw[j];
@@ -14596,7 +14604,8 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
                                  NULL,
                                  NULL,
                                  NULL,
-                                 &objective_pack_ctx);
+                                 &objective_pack_ctx,
+                                 NULL);
       int_LARGE_SF = tsf;
     }
 
@@ -14674,7 +14683,8 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
                                      NULL,
                                      NULL,
                                      NULL,
-                                     &objective_pack_ctx);
+                                     &objective_pack_ctx,
+                                     NULL);
         } else {
           if(j < (num_obs-1)){
             for(l = 0; l < nrc2; l++)
@@ -15884,7 +15894,8 @@ double * cv){
                                          kw_tile,
                                          NULL,
                                          NULL,
-                                         &execution_ctx);
+                                         &execution_ctx,
+                                         NULL);
   if((engine_status != 0) || (row_tile_sink.count_rows != 0))
     goto cleanup_profile_cdf;
 
@@ -19050,6 +19061,7 @@ double *SIGN){
                              reuse_fit_kernel_row ? fit_kw : NULL,
                              &gate_ctx_local,
                              reuse_fit_dual_power ? &fit_dual_power_ctx : NULL,
+                             NULL,
                              NULL);
 
       for(i = 0; i < glp_nterms; i++){

@@ -1,3 +1,4 @@
+#include <math.h>
 #include <stddef.h>
 
 #include "kernel_registry.h"
@@ -51,5 +52,118 @@ const char *np_continuous_kernel_descriptor_status_message(
     return "continuous-kernel order must be one of 2, 4, 6, or 8";
   default:
     return "unknown continuous-kernel descriptor status";
+  }
+}
+
+np_continuous_kernel_route_status
+np_continuous_kernel_route_validate(const NPContinuousKernelRoute *route,
+                                    int coordinate_count)
+{
+  int coordinate_end = 0;
+  int segment_index;
+
+  if(route == NULL)
+    return NP_CKERNEL_ROUTE_ERR_NULL;
+  if(route->segment_count < 0 ||
+     route->segment_count > NP_CKERNEL_ROUTE_MAX_SEGMENTS)
+    return NP_CKERNEL_ROUTE_ERR_SEGMENT_COUNT;
+  if(coordinate_count < 0)
+    return NP_CKERNEL_ROUTE_ERR_COORDINATES;
+  if(route->segment_count == 0)
+    return (coordinate_count == 0) ? NP_CKERNEL_ROUTE_OK :
+      NP_CKERNEL_ROUTE_ERR_COORDINATES;
+
+  for(segment_index = 0; segment_index < route->segment_count;
+      segment_index++) {
+    const NPContinuousKernelSegment * const segment =
+      &route->segment[segment_index];
+    np_continuous_kernel_descriptor descriptor;
+
+    if(segment->coordinate_offset != coordinate_end ||
+       segment->coordinate_count <= 0 ||
+       segment->coordinate_count > coordinate_count - coordinate_end)
+      return NP_CKERNEL_ROUTE_ERR_COORDINATES;
+    if(np_continuous_kernel_descriptor_init(
+         segment->descriptor.family,
+         segment->descriptor.legacy_code,
+         segment->descriptor.order,
+         &descriptor) != NP_CKERNEL_DESCRIPTOR_OK)
+      return NP_CKERNEL_ROUTE_ERR_DESCRIPTOR;
+    if(descriptor.family == NP_CKERNEL_FAMILY_BETA) {
+      int coordinate;
+
+      if(segment->lower == NULL || segment->upper == NULL)
+        return NP_CKERNEL_ROUTE_ERR_BOUNDS;
+      for(coordinate = 0; coordinate < segment->coordinate_count;
+          coordinate++) {
+        const double lower = segment->lower[coordinate];
+        const double upper = segment->upper[coordinate];
+
+        if(!isfinite(lower) || !isfinite(upper) || !(upper > lower))
+          return NP_CKERNEL_ROUTE_ERR_BOUNDS;
+      }
+    }
+    coordinate_end += segment->coordinate_count;
+  }
+
+  return (coordinate_end == coordinate_count) ? NP_CKERNEL_ROUTE_OK :
+    NP_CKERNEL_ROUTE_ERR_COORDINATES;
+}
+
+const NPContinuousKernelSegment *
+np_continuous_kernel_route_segment(const NPContinuousKernelRoute *route,
+                                   int coordinate)
+{
+  int segment_index;
+
+  if(route == NULL || coordinate < 0)
+    return NULL;
+  for(segment_index = 0; segment_index < route->segment_count;
+      segment_index++) {
+    const NPContinuousKernelSegment * const segment =
+      &route->segment[segment_index];
+    const int coordinate_end = segment->coordinate_offset +
+      segment->coordinate_count;
+
+    if(coordinate >= segment->coordinate_offset &&
+       coordinate < coordinate_end)
+      return segment;
+  }
+  return NULL;
+}
+
+int np_continuous_kernel_route_has_beta(
+  const NPContinuousKernelRoute *route)
+{
+  int segment_index;
+
+  if(route == NULL)
+    return 0;
+  for(segment_index = 0; segment_index < route->segment_count;
+      segment_index++)
+    if(route->segment[segment_index].descriptor.family ==
+       NP_CKERNEL_FAMILY_BETA)
+      return 1;
+  return 0;
+}
+
+const char *np_continuous_kernel_route_status_message(
+  np_continuous_kernel_route_status status)
+{
+  switch(status) {
+  case NP_CKERNEL_ROUTE_OK:
+    return "success";
+  case NP_CKERNEL_ROUTE_ERR_NULL:
+    return "continuous-kernel route is missing";
+  case NP_CKERNEL_ROUTE_ERR_SEGMENT_COUNT:
+    return "continuous-kernel route has an invalid segment count";
+  case NP_CKERNEL_ROUTE_ERR_COORDINATES:
+    return "continuous-kernel route does not cover its coordinates exactly";
+  case NP_CKERNEL_ROUTE_ERR_DESCRIPTOR:
+    return "continuous-kernel route has an invalid descriptor";
+  case NP_CKERNEL_ROUTE_ERR_BOUNDS:
+    return "beta continuous-kernel route has invalid bounds";
+  default:
+    return "unknown continuous-kernel route status";
   }
 }
