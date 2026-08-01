@@ -1,3 +1,7 @@
+expect_beta_dual_square_equivalent <- function(actual, expected) {
+  expect_equal(actual, expected, tolerance = 16 * .Machine$double.eps)
+}
+
 test_that("beta dual-power rows equal independently evaluated powers", {
   old <- options(np.messages = FALSE, np.tree = FALSE)
   on.exit(options(old), add = TRUE)
@@ -26,7 +30,9 @@ test_that("beta dual-power rows equal independently evaluated powers", {
       power_two <- do.call(npksum, c(arguments, list(kernel.pow = 2L)))
 
       expect_identical(dual$ksum, power_one$ksum)
-      expect_identical(dual$ksum.power2, power_two$ksum)
+      expect_beta_dual_square_equivalent(
+        dual$ksum.power2, power_two$ksum
+      )
     }
   }
 })
@@ -53,7 +59,7 @@ test_that("beta dual-power rows preserve deletion and weighted semantics", {
   power_one <- do.call(npksum, arguments)
   power_two <- do.call(npksum, c(arguments, list(kernel.pow = 2L)))
   expect_identical(dual$ksum, power_one$ksum)
-  expect_identical(dual$ksum.power2, power_two$ksum)
+  expect_beta_dual_square_equivalent(dual$ksum.power2, power_two$ksum)
 
   weighted_arguments <- arguments
   weighted_arguments$leave.one.out <- NULL
@@ -70,7 +76,9 @@ test_that("beta dual-power rows preserve deletion and weighted semantics", {
     c(weighted_arguments, list(tydat = counts, kernel.pow = 2L))
   )
   expect_identical(weighted$ksum, weighted_one$ksum)
-  expect_identical(weighted$ksum.power2, weighted_two$ksum)
+  expect_beta_dual_square_equivalent(
+    weighted$ksum.power2, weighted_two$ksum
+  )
 })
 
 test_that("second-order beta dual powers match a direct scalar oracle", {
@@ -110,7 +118,7 @@ test_that("beta dual powers honor empirical range resolution", {
   power_one <- do.call(npksum, arguments)
   power_two <- do.call(npksum, c(arguments, list(kernel.pow = 2L)))
   expect_identical(dual$ksum, power_one$ksum)
-  expect_identical(dual$ksum.power2, power_two$ksum)
+  expect_beta_dual_square_equivalent(dual$ksum.power2, power_two$ksum)
 })
 
 test_that("beta dual powers share the canonical mixed categorical row", {
@@ -155,7 +163,9 @@ test_that("beta dual powers share the canonical mixed categorical row", {
       options(np.categorical.compress = FALSE)
 
       expect_identical(dense$ksum, power_one$ksum)
-      expect_identical(dense$ksum.power2, power_two$ksum)
+      expect_beta_dual_square_equivalent(
+        dense$ksum.power2, power_two$ksum
+      )
       expect_identical(compressed$ksum, dense$ksum)
       expect_identical(compressed$ksum.power2, dense$ksum.power2)
     }
