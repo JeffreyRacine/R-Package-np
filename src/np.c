@@ -10696,8 +10696,6 @@ SEXP C_np_kernelsum_power12(SEXP tuno,
 
   descriptor = np_kernelsum_descriptor_or_error(myopti_i,
                                                 "C_np_kernelsum_power12");
-  if(descriptor.family != NP_CKERNEL_FAMILY_LEGACY)
-    error("C_np_kernelsum_power12: beta kernels do not support the internal dual-power route");
 
   if(XLENGTH(myopti_i) <= KWS_BDIVWI)
     error("C_np_kernelsum_power12: invalid internal option vector");
@@ -10726,15 +10724,146 @@ SEXP C_np_kernelsum_power12(SEXP tuno,
   PROTECT(out_ksum = allocVector(REALSXP, n_ksum));
   PROTECT(out_ksum_power2 = allocVector(REALSXP, n_ksum));
 
-  np_kernelsum_power12(REAL(tuno_r), REAL(tord_r), REAL(tcon_r),
-                       REAL(ty_r), REAL(weights_r),
-                       REAL(euno_r), REAL(eord_r), REAL(econ_r),
-                       REAL(bw_r),
-                       REAL(mcv_r), REAL(padnum_r),
-                       INTEGER(op_i), INTEGER(myopti_i), REAL(kpow_r),
-                       REAL(out_ksum), REAL(out_ksum_power2),
-                       NULL, NULL, NULL,
-                       ckerlb_p, ckerub_p);
+  if(descriptor.family == NP_CKERNEL_FAMILY_BETA) {
+    const int num_train = INTEGER(myopti_i)[KWS_TNOBSI];
+    const int num_eval = INTEGER(myopti_i)[KWS_ENOBSI];
+    const int train_is_eval = INTEGER(myopti_i)[KWS_TISEI];
+    const int leave_one_out = INTEGER(myopti_i)[KWS_LOOI];
+    const int ncol_Y = INTEGER(myopti_i)[KWS_YNCOLI];
+    const int bandwidth_code = INTEGER(myopti_i)[KWS_BWI];
+    const R_xlen_t expected_sum =
+      (R_xlen_t)num_eval * (R_xlen_t)(ncol_Y > 0 ? ncol_Y : 1);
+    double **train_columns;
+    double **evaluation_columns;
+    double **response_columns = NULL;
+    double **bandwidth_eval_columns = NULL;
+    double **bandwidth_train_columns = NULL;
+    double *bandwidth_eval_storage = NULL;
+    double *bandwidth_train_storage = NULL;
+    size_t eval_bandwidth_count = 0U;
+    size_t train_bandwidth_count = 0U;
+    NPContinuousKernelRoute route;
+    NPContinuousKernelDerivativeDiagnostics diagnostics = {
+      -1, -1, 0, NP_BETA_OK
+    };
+    int status;
+
+    if(nuno != 0 || nord != 0 || ncon <= 0 ||
+       num_train <= 0 || num_eval <= 0 ||
+       (train_is_eval != 0 && train_is_eval != 1) ||
+       (leave_one_out != 0 && leave_one_out != 1) ||
+       (train_is_eval && num_train != num_eval) ||
+       (leave_one_out && !train_is_eval) ||
+       ncol_Y < 0 ||
+       (bandwidth_code != BW_FIXED && bandwidth_code != BW_GEN_NN &&
+        bandwidth_code != BW_ADAP_NN) ||
+       n_ksum != expected_sum ||
+       XLENGTH(tcon_r) < (R_xlen_t)num_train * (R_xlen_t)ncon ||
+       (!train_is_eval &&
+        XLENGTH(econ_r) < (R_xlen_t)num_eval * (R_xlen_t)ncon) ||
+       XLENGTH(bw_r) < ncon || XLENGTH(ckerlb_r) < ncon ||
+       XLENGTH(ckerub_r) < ncon ||
+       (ncol_Y > 0 &&
+        XLENGTH(ty_r) < (R_xlen_t)num_train * (R_xlen_t)ncol_Y))
+      error("C_np_kernelsum_power12: invalid beta dual-power layout");
+    for(i = 0; i < ncon; ++i)
+      if(!R_FINITE(ckerlb_p[i]) || !R_FINITE(ckerub_p[i]) ||
+         !(ckerub_p[i] > ckerlb_p[i]))
+        error("C_np_kernelsum_power12: invalid beta support bounds");
+
+    train_columns = (double **)R_alloc((size_t)ncon, sizeof(double *));
+    evaluation_columns = (double **)R_alloc((size_t)ncon, sizeof(double *));
+    for(i = 0; i < ncon; ++i) {
+      train_columns[i] = REAL(tcon_r) + (size_t)i * (size_t)num_train;
+      evaluation_columns[i] = train_is_eval ? train_columns[i] :
+        REAL(econ_r) + (size_t)i * (size_t)num_eval;
+    }
+    if(ncol_Y > 0) {
+      response_columns = (double **)R_alloc(
+        (size_t)ncol_Y, sizeof(double *));
+      for(i = 0; i < ncol_Y; ++i)
+        response_columns[i] = REAL(ty_r) +
+          (size_t)i * (size_t)num_train;
+    }
+
+    if(bandwidth_code != BW_FIXED) {
+      const np_beta_bandwidth_mode bandwidth_mode =
+        bandwidth_code == BW_GEN_NN ? NP_BETA_BANDWIDTH_GENERALIZED_NN :
+        NP_BETA_BANDWIDTH_ADAPTIVE_NN;
+      const int need_eval = bandwidth_code == BW_GEN_NN;
+      const int need_train = bandwidth_code == BW_ADAP_NN;
+      np_beta_bandwidth_prepare_status bandwidth_status;
+
+      if((need_eval &&
+          (!np_size_mul_checked((size_t)ncon, (size_t)num_eval,
+                                &eval_bandwidth_count) ||
+           eval_bandwidth_count > SIZE_MAX / sizeof(double))) ||
+         (need_train &&
+          (!np_size_mul_checked((size_t)ncon, (size_t)num_train,
+                                &train_bandwidth_count) ||
+           train_bandwidth_count > SIZE_MAX / sizeof(double))))
+        error("C_np_kernelsum_power12: beta bandwidth layout overflow");
+      bandwidth_eval_storage = need_eval ?
+        (double *)R_alloc(eval_bandwidth_count, sizeof(double)) : NULL;
+      bandwidth_train_storage = need_train ?
+        (double *)R_alloc(train_bandwidth_count, sizeof(double)) : NULL;
+      bandwidth_status = np_beta_bandwidth_prepare(
+        bandwidth_mode, REAL(tcon_r), train_is_eval ? NULL : REAL(econ_r),
+        REAL(bw_r), num_train, num_eval, ncon, train_is_eval,
+        need_eval, need_train, 0,
+        bandwidth_eval_storage, bandwidth_train_storage);
+      if(bandwidth_status != NP_BETA_BANDWIDTH_PREPARE_OK)
+        error("C_np_kernelsum_power12: %s",
+              np_beta_bandwidth_prepare_status_message(bandwidth_status));
+      if(need_eval) {
+        bandwidth_eval_columns = (double **)R_alloc(
+          (size_t)ncon, sizeof(double *));
+        for(i = 0; i < ncon; ++i)
+          bandwidth_eval_columns[i] = bandwidth_eval_storage +
+            (size_t)i * (size_t)num_eval;
+      }
+      if(need_train) {
+        bandwidth_train_columns = (double **)R_alloc(
+          (size_t)ncon, sizeof(double *));
+        for(i = 0; i < ncon; ++i)
+          bandwidth_train_columns[i] = bandwidth_train_storage +
+            (size_t)i * (size_t)num_train;
+      }
+    }
+
+    route.segment_count = 1;
+    route.segment[0].descriptor = descriptor;
+    route.segment[0].coordinate_offset = 0;
+    route.segment[0].coordinate_count = ncon;
+    route.segment[0].lower = ckerlb_p;
+    route.segment[0].upper = ckerub_p;
+    status = kernel_weighted_sum_np_route_power12(
+      NULL, NULL, NULL, bandwidth_code, num_train, num_eval,
+      0, 0, ncon, leave_one_out, 0, 0, 0,
+      INTEGER(op_i), ncol_Y, 0,
+      train_columns, evaluation_columns, response_columns, NULL,
+      bandwidth_code == BW_FIXED ? REAL(bw_r) : NULL,
+      bandwidth_code != BW_FIXED,
+      bandwidth_train_columns, bandwidth_eval_columns,
+      REAL(out_ksum), REAL(out_ksum_power2), &route, &diagnostics);
+    if(status != 0 && diagnostics.beta_status != NP_BETA_OK)
+      error("C_np_kernelsum_power12: beta row failed in continuous dimension %d: %s",
+            diagnostics.bad_coordinate + 1,
+            np_beta_status_message(diagnostics.beta_status));
+    if(status != 0)
+      error("C_np_kernelsum_power12: canonical beta dual-power row failed with code %d",
+            status);
+  } else {
+    np_kernelsum_power12(REAL(tuno_r), REAL(tord_r), REAL(tcon_r),
+                         REAL(ty_r), REAL(weights_r),
+                         REAL(euno_r), REAL(eord_r), REAL(econ_r),
+                         REAL(bw_r),
+                         REAL(mcv_r), REAL(padnum_r),
+                         INTEGER(op_i), INTEGER(myopti_i), REAL(kpow_r),
+                         REAL(out_ksum), REAL(out_ksum_power2),
+                         NULL, NULL, NULL,
+                         ckerlb_p, ckerub_p);
+  }
 
   PROTECT(out = allocVector(VECSXP, 2));
   SET_VECTOR_ELT(out, 0, out_ksum);

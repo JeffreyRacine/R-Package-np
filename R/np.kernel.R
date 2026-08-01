@@ -258,8 +258,6 @@ npksum.default <-
         stop("beta kernel sums support only derivative permutation operators")
       if (any(operator == "derivative") && permutation.operator == "derivative")
         stop("direct and permutation beta derivatives cannot be combined")
-      if (internal.power12)
-        stop("beta kernels do not support the internal dual-power route")
     }
     
     if ((any(bws$icon) &&

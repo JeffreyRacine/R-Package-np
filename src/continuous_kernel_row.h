@@ -145,6 +145,25 @@ np_continuous_kernel_beta_derivative_powered_rows_validated(
   double *kernel_weights,
   NPContinuousKernelDerivativeDiagnostics *diagnostics);
 
+NPContinuousKernelRowStatus
+np_continuous_kernel_beta_dual_power_rows_validated(
+  const NPContinuousKernelRowPlan *plan,
+  int leave_one_out,
+  int leave_one_out_offset,
+  double * const *response,
+  int response_columns,
+  double * const *case_weights,
+  int weight_columns,
+  double * const *power2_response,
+  int power2_response_columns,
+  double * const *power2_case_weights,
+  int power2_weight_columns,
+  NPContinuousKernelRowWorkspace *workspace,
+  NPContinuousKernelRowResult *row_result,
+  double *weighted_sum,
+  double *weighted_sum_power2,
+  NPContinuousKernelDerivativeDiagnostics *diagnostics);
+
 NPContinuousKernelRowStatus np_continuous_kernel_scaled_restore(
   double scaled_value,
   double log_scale,

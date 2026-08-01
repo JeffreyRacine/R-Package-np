@@ -253,6 +253,22 @@ int kernel_weighted_sum_np_route(
   const NPContinuousKernelRoute *kernel_route,
   NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics);
 
+int kernel_weighted_sum_np_route_power12(
+  int *KERNEL_reg, int *KERNEL_unordered_reg, int *KERNEL_ordered_reg,
+  const int BANDWIDTH_reg, const int num_obs_train, const int num_obs_eval,
+  const int num_reg_unordered, const int num_reg_ordered,
+  const int num_reg_continuous, const int leave_one_out,
+  const int leave_one_out_offset, const int bandwidth_divide,
+  const int bandwidth_divide_weights, const int * const operator,
+  const int ncol_Y, const int ncol_W,
+  double **matrix_X_continuous_train, double **matrix_X_continuous_eval,
+  double **matrix_Y, double **matrix_W, double *vector_scale_factor,
+  int bandwidth_provided, double **matrix_bw_train,
+  double **matrix_bw_eval, double * const restrict weighted_sum,
+  double * const restrict weighted_sum_power2,
+  const NPContinuousKernelRoute *kernel_route,
+  NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics);
+
 int kernel_weighted_sum_np_power12(
   int *KERNEL_reg, int *KERNEL_unordered_reg, int *KERNEL_ordered_reg,
   const int BANDWIDTH_reg, const int num_obs_train, const int num_obs_eval,
