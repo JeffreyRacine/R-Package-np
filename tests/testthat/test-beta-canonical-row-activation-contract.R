@@ -290,3 +290,34 @@ test_that("signed-log beta rows compose every route segment", {
     fixed = TRUE
   )
 })
+
+test_that("canonical centered moments use an online training-order update", {
+  root <- locate_beta_activation_sources()
+  skip_if(is.null(root), "package sources unavailable")
+  engine <- paste(
+    readLines(file.path(root, "src", "continuous_kernel_row.c"),
+              warn = FALSE),
+    collapse = "\n"
+  )
+  owner_start <- regexpr(
+    "np_continuous_kernel_beta_centered_moment_rows_validated(",
+    engine, fixed = TRUE
+  )[[1L]]
+  owner_end <- regexpr(
+    "NPContinuousKernelRowStatus np_continuous_kernel_scaled_restore(",
+    engine, fixed = TRUE
+  )[[1L]]
+  expect_gt(owner_start, 0L)
+  expect_gt(owner_end, owner_start)
+  owner <- substr(engine, owner_start, owner_end - 1L)
+
+  expect_match(owner, "sum[evaluation] += value;", fixed = TRUE)
+  expect_match(owner, "delta = value - running_mean;", fixed = TRUE)
+  expect_match(
+    owner,
+    "running_m2 += delta * (value - running_mean);",
+    fixed = TRUE
+  )
+  expect_match(owner, "centered_m2[evaluation] = running_m2;", fixed = TRUE)
+  expect_false(grepl("second_moment -", owner, fixed = TRUE))
+})
