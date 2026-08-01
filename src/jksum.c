@@ -8274,6 +8274,11 @@ typedef struct {
 } NPContinuousKernelExecutionContext;
 
 typedef struct {
+  double *centered_m2;
+  NPContinuousKernelProgressFunction progress;
+} NPCenteredMomentCtx;
+
+typedef struct {
   NPCategoricalProfileKernelSpec dense_spec;
   NPCategoricalProfileKernelSpec compressed_spec;
   int use_compressed;
@@ -8571,6 +8576,7 @@ static int np_beta_absolute_route(
   double * const row,
   double * const weighted_sum,
   double * const weighted_sum_power2,
+  double * const centered_m2,
   double * const kw,
   NPContinuousKernelDerivativeDiagnostics * const route_diagnostics,
   NPContinuousKernelProgressFunction progress)
@@ -8691,7 +8697,13 @@ static int np_beta_absolute_route(
       num_obs_eval > num_obs_train ||
       leave_one_out_offset > num_obs_train - num_obs_eval))
     return KWSNP_ERR_BADINVOC;
-  if(derivative_coordinate < 0 && row == NULL && weighted_sum_power2 == NULL)
+  if(derivative_coordinate < 0 && row == NULL &&
+     weighted_sum_power2 == NULL && centered_m2 == NULL)
+    return KWSNP_ERR_BADINVOC;
+  if(centered_m2 != NULL &&
+     (derivative_coordinate >= 0 || kernel_power != 1 ||
+      weighted_sum_power2 != NULL || kw != NULL ||
+      ncol_Y != 0 || ncol_W != 0))
     return KWSNP_ERR_BADINVOC;
 
   if(bandwidth_mode == BW_FIXED) {
@@ -8736,6 +8748,20 @@ static int np_beta_absolute_route(
       num_categories, matrix_categorical_vals, categorical_compress, row);
     if(row_status != NP_CONTINUOUS_ROW_OK)
       goto cleanup;
+  }
+
+  if(centered_m2 != NULL) {
+    const NPContinuousKernelRowStatus row_status =
+      np_continuous_kernel_beta_centered_moment_rows_validated(
+        &plan, leave_one_out, leave_one_out_offset,
+        has_categories ? &categorical_provider : NULL,
+        &workspace, &row_result, weighted_sum, centered_m2,
+        route_diagnostics, progress);
+
+    if(row_status != NP_CONTINUOUS_ROW_OK)
+      goto cleanup;
+    status = 0;
+    goto cleanup;
   }
 
   if(weighted_sum_power2 != NULL) {
@@ -8987,7 +9013,8 @@ double * const kw,
 const NP_GateOverrideCtx * const gate_override_ctx,
 const NP_DualPowerCtx * const dual_power_ctx,
 const NP_OuterPackCtx * const outer_pack_ctx,
-const NPContinuousKernelExecutionContext * const kernel_execution_context){
+const NPContinuousKernelExecutionContext * const kernel_execution_context,
+const NPCenteredMomentCtx * const centered_moment_ctx){
   const NP_GateOverrideCtx * const gate_ctx_raw =
     (gate_override_ctx != NULL) ? gate_override_ctx : &np_gate_override_ctx;
   const NP_GateOverrideCtx gate_ctx_empty = {0};
@@ -9011,6 +9038,9 @@ const NPContinuousKernelExecutionContext * const kernel_execution_context){
     const int beta_dual_power =
       dual_power_ctx != NULL && dual_power_ctx->weighted_sum != NULL &&
       dual_power_ctx->kernel_pow == 2;
+    const int beta_centered_moment =
+      centered_moment_ctx != NULL &&
+      centered_moment_ctx->centered_m2 != NULL;
     double ** const beta_power2_Y =
       beta_dual_power && dual_power_ctx->matrix_Y != NULL ?
       dual_power_ctx->matrix_Y : matrix_Y;
@@ -9073,6 +9103,10 @@ const NPContinuousKernelExecutionContext * const kernel_execution_context){
       (dual_power_ctx == NULL ||
        (beta_dual_power && kernel_pow == 1 && !route_has_derivative &&
         kw == NULL)) &&
+      (centered_moment_ctx == NULL ||
+       (beta_centered_moment && dual_power_ctx == NULL &&
+        kernel_pow == 1 && !route_has_derivative && kw == NULL &&
+        ncol_Y == 0 && ncol_W == 0)) &&
       outer_pack_ctx == NULL &&
       weighted_sum != NULL;
     double *route_row = NULL;
@@ -9080,7 +9114,8 @@ const NPContinuousKernelExecutionContext * const kernel_execution_context){
 
     if(!exact_beta_absolute_route)
       return KWSNP_ERR_BADINVOC;
-    if((!route_has_derivative && !beta_dual_power) || beta_has_categories) {
+    if((!route_has_derivative && !beta_dual_power &&
+        !beta_centered_moment) || beta_has_categories) {
       if((size_t)num_obs_train > SIZE_MAX / sizeof(double))
         return KWSNP_ERR_BADINVOC;
       route_row = (double *)malloc((size_t)num_obs_train * sizeof(double));
@@ -9105,8 +9140,10 @@ const NPContinuousKernelExecutionContext * const kernel_execution_context){
       kernel_pow,
       route_row, weighted_sum,
       beta_dual_power ? dual_power_ctx->weighted_sum : NULL,
+      beta_centered_moment ? centered_moment_ctx->centered_m2 : NULL,
       kw, kernel_route_diagnostics,
-      beta_dual_power ? dual_power_ctx->progress : NULL);
+      beta_dual_power ? dual_power_ctx->progress :
+      (beta_centered_moment ? centered_moment_ctx->progress : NULL));
     free(route_row);
     return route_status;
   }
@@ -11173,6 +11210,7 @@ const NP_GateOverrideCtx * const gate_override_ctx){
     gate_override_ctx,
     NULL,
     NULL,
+    NULL,
     NULL);
 }
 
@@ -11298,6 +11336,7 @@ double * const pkw){
     NULL,
     &dual_power_ctx,
     NULL,
+    NULL,
     NULL);
 
   kernel_weighted_sum_pkw_extern = old_pkw;
@@ -11369,7 +11408,72 @@ NPContinuousKernelProgressFunction progress)
     lambda_pre, num_categories, matrix_categorical_vals, NULL,
     weighted_sum, NULL, NULL, NULL,
     &dual_power_ctx, NULL,
-    kernel_route == NULL ? NULL : &kernel_execution_context);
+    kernel_route == NULL ? NULL : &kernel_execution_context,
+    NULL);
+}
+
+int kernel_weighted_sum_np_route_centered_m2(
+int * KERNEL_reg,
+int * KERNEL_unordered_reg,
+int * KERNEL_ordered_reg,
+const int BANDWIDTH_reg,
+const int num_obs_train,
+const int num_obs_eval,
+const int num_reg_unordered,
+const int num_reg_ordered,
+const int num_reg_continuous,
+const int leave_one_out,
+const int leave_one_out_offset,
+const int bandwidth_divide,
+const int bandwidth_divide_weights,
+const int * const operator,
+double **matrix_X_unordered_train,
+double **matrix_X_ordered_train,
+double **matrix_X_continuous_train,
+double **matrix_X_unordered_eval,
+double **matrix_X_ordered_eval,
+double **matrix_X_continuous_eval,
+double *vector_scale_factor,
+int bandwidth_provided,
+double **matrix_bw_train,
+double **matrix_bw_eval,
+double *lambda_pre,
+int *num_categories,
+double **matrix_categorical_vals,
+const int categorical_compress,
+double * const weighted_sum,
+double * const centered_m2,
+const NPContinuousKernelRoute * const kernel_route,
+NPContinuousKernelDerivativeDiagnostics * const kernel_route_diagnostics,
+NPContinuousKernelProgressFunction progress)
+{
+  const NPContinuousKernelExecutionContext kernel_execution_context = {
+    kernel_route, kernel_route_diagnostics, categorical_compress
+  };
+  const NPCenteredMomentCtx centered_moment_ctx = {
+    centered_m2, progress
+  };
+
+  return kernel_weighted_sum_np_ctx_ex(
+    KERNEL_reg, KERNEL_unordered_reg, KERNEL_ordered_reg,
+    BANDWIDTH_reg, num_obs_train, num_obs_eval,
+    num_reg_unordered, num_reg_ordered, num_reg_continuous,
+    leave_one_out, leave_one_out_offset, 1,
+    bandwidth_divide, bandwidth_divide_weights,
+    0, 0, 0, 0, operator, OP_NOOP,
+    0, 0, NULL, 0, 0, 0,
+    NP_TREE_FALSE, 0, NULL, NULL, NULL, NULL,
+    matrix_X_unordered_train, matrix_X_ordered_train,
+    matrix_X_continuous_train,
+    matrix_X_unordered_eval, matrix_X_ordered_eval,
+    matrix_X_continuous_eval,
+    NULL, NULL, NULL, vector_scale_factor,
+    bandwidth_provided, matrix_bw_train, matrix_bw_eval,
+    lambda_pre, num_categories, matrix_categorical_vals, NULL,
+    weighted_sum, NULL, NULL, NULL,
+    NULL, NULL,
+    kernel_route == NULL ? NULL : &kernel_execution_context,
+    centered_m2 == NULL ? NULL : &centered_moment_ctx);
 }
 
 int kernel_weighted_sum_np_route(
@@ -11495,7 +11599,8 @@ NPContinuousKernelDerivativeDiagnostics * const kernel_route_diagnostics){
                                     NULL,
                                     NULL,
                                     kernel_route == NULL ? NULL :
-                                      &kernel_execution_context);
+                                      &kernel_execution_context,
+                                    NULL);
   kernel_weighted_sum_pkw_extern = old_pkw;
   kernel_weighted_sum_pkw_nvar_extern = old_pkw_nvar;
   return status;
@@ -14213,6 +14318,7 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
                                   NULL,
                                   NULL,
                                   &frozen_runtime_options,
+                                  NULL,
                                   NULL) != 0){
       int_LARGE_SF = tsf;
       goto cleanup_lp_cv;
@@ -14353,6 +14459,7 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
                                   NULL,
                                   NULL,
                                   &frozen_runtime_options,
+                                  NULL,
                                   NULL) != 0)
       goto cleanup_lp_cv;
 
@@ -14907,6 +15014,7 @@ static NP_NOINLINE NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas(
                                      NULL,
                                      NULL,
                                      &frozen_runtime_options,
+                                     NULL,
                                      NULL) != 0)
       goto cleanup_adaptive_blas;
 
@@ -15552,6 +15660,7 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
                                  NULL,
                                  NULL,
                                  &objective_pack_ctx,
+                                 NULL,
                                  NULL);
       int_LARGE_SF = tsf;
     }
@@ -15631,6 +15740,7 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
                                      NULL,
                                      NULL,
                                      &objective_pack_ctx,
+                                     NULL,
                                      NULL);
         } else {
           if(j < (num_obs-1)){
@@ -16842,6 +16952,7 @@ double * cv){
                                          NULL,
                                          NULL,
                                          &execution_ctx,
+                                         NULL,
                                          NULL);
   if((engine_status != 0) || (row_tile_sink.count_rows != 0))
     goto cleanup_profile_cdf;
@@ -20008,6 +20119,7 @@ double *SIGN){
                              reuse_fit_kernel_row ? fit_kw : NULL,
                              &gate_ctx_local,
                              reuse_fit_dual_power ? &fit_dual_power_ctx : NULL,
+                             NULL,
                              NULL,
                              NULL);
 

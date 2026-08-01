@@ -321,3 +321,40 @@ test_that("canonical centered moments use an online training-order update", {
   expect_match(owner, "centered_m2[evaluation] = running_m2;", fixed = TRUE)
   expect_false(grepl("second_moment -", owner, fixed = TRUE))
 })
+
+test_that("centered moments have one dormant fail-closed route boundary", {
+  root <- locate_beta_activation_sources()
+  skip_if(is.null(root), "package sources unavailable")
+  engine <- paste(
+    readLines(file.path(root, "src", "jksum.c"), warn = FALSE),
+    collapse = "\n"
+  )
+  header <- paste(
+    readLines(file.path(root, "src", "headers.h"), warn = FALSE),
+    collapse = "\n"
+  )
+
+  expect_match(
+    header, "int kernel_weighted_sum_np_route_centered_m2(", fixed = TRUE
+  )
+  expect_match(engine, "} NPCenteredMomentCtx;", fixed = TRUE)
+  expect_match(
+    engine,
+    "beta_centered_moment && dual_power_ctx == NULL",
+    fixed = TRUE
+  )
+  expect_match(
+    engine,
+    "ncol_Y == 0 && ncol_W == 0",
+    fixed = TRUE
+  )
+  expect_match(
+    engine,
+    "centered_m2 == NULL ? NULL : &centered_moment_ctx",
+    fixed = TRUE
+  )
+  occurrences <- gregexpr(
+    "kernel_weighted_sum_np_route_centered_m2(", engine, fixed = TRUE
+  )[[1L]]
+  expect_length(occurrences[occurrences > 0L], 1L)
+})
