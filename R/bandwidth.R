@@ -75,7 +75,8 @@ bandwidth <-
     dati = xdati,
     bw = bw,
     bandwidth.compute = bandwidth.compute,
-    where = "beta density"
+    where = "beta density",
+    allow.categorical = !isTRUE(bandwidth.compute)
   )
     bounded_nonfixed_supported <- bwtype %in% c("generalized_nn", "adaptive_nn")
     if (bwtype != "fixed" &&

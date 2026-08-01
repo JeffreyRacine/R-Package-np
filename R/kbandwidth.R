@@ -82,7 +82,8 @@ kbandwidth.numeric <-
       dati = xdati,
       bw = bw,
       bandwidth.compute = FALSE,
-      where = "beta kernel sums"
+      where = "beta kernel sums",
+      allow.categorical = TRUE
     )
     bounded_nonfixed_supported <- bwtype %in% c("generalized_nn", "adaptive_nn")
     if (bwtype != "fixed" && cbounds$bound != "none" && !bounded_nonfixed_supported)

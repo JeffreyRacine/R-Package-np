@@ -209,15 +209,20 @@ test_that("beta density and distribution fits have one canonical ingress", {
   expect_gt(ingress_end, ingress_start)
   density_ingress <- substr(ingress, ingress_start, ingress_end - 1L)
 
-  expect_match(
-    density_ingress,
-    "active_route, active_diagnostics, 0);",
-    fixed = TRUE
-  )
   expect_false(grepl("np_beta_kernelsum(", density_ingress, fixed = TRUE))
   expect_false(grepl(
     "if(dens_or_dist == NP_DO_DENS)", density_ingress, fixed = TRUE
   ))
+  expect_false(grepl(
+    "currently supports continuous variables only",
+    density_ingress,
+    fixed = TRUE
+  ))
+  expect_match(
+    density_ingress,
+    "active_route, active_diagnostics, categorical_compress);",
+    fixed = TRUE
+  )
 
   engine_start <- regexpr(
     "void kernel_estimate_dens_dist_categorical_np(", engine, fixed = TRUE
