@@ -140,6 +140,12 @@ NPContinuousKernelRowStatus np_continuous_kernel_signed_log_restore(
   int sign,
   double *value);
 
+NPContinuousKernelRowStatus np_continuous_kernel_signed_log_power_restore(
+  double log_absolute,
+  int sign,
+  int power,
+  double *value);
+
 const char *np_continuous_kernel_row_status_message(
   NPContinuousKernelRowStatus status);
 

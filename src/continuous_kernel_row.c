@@ -1177,6 +1177,42 @@ NPContinuousKernelRowStatus np_continuous_kernel_signed_log_restore(
     NP_CONTINUOUS_ROW_ERR_NUMERIC;
 }
 
+NPContinuousKernelRowStatus np_continuous_kernel_signed_log_power_restore(
+  double log_absolute,
+  int sign,
+  int power,
+  double *value)
+{
+  double powered_log_absolute;
+  int powered_sign;
+
+  if(value == NULL || ISNAN(log_absolute) || log_absolute == INFINITY ||
+     (sign != -1 && sign != 0 && sign != 1) ||
+     ((sign == 0) != (log_absolute == -INFINITY)))
+    return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  if(sign == 0) {
+    *value = 0.0;
+    return NP_CONTINUOUS_ROW_OK;
+  }
+  if(power == 0) {
+    *value = 1.0;
+    return NP_CONTINUOUS_ROW_OK;
+  }
+
+  powered_log_absolute = (double)power * log_absolute;
+  if(ISNAN(powered_log_absolute) || powered_log_absolute == INFINITY ||
+     powered_log_absolute > log(DBL_MAX))
+    return NP_CONTINUOUS_ROW_ERR_NUMERIC;
+  if(powered_log_absolute == -INFINITY) {
+    *value = 0.0;
+    return NP_CONTINUOUS_ROW_OK;
+  }
+  powered_sign = ((power % 2) == 0) ? 1 : sign;
+  *value = (double)powered_sign * exp(powered_log_absolute);
+  return R_FINITE(*value) ? NP_CONTINUOUS_ROW_OK :
+    NP_CONTINUOUS_ROW_ERR_NUMERIC;
+}
+
 const char *np_continuous_kernel_row_status_message(
   NPContinuousKernelRowStatus status)
 {

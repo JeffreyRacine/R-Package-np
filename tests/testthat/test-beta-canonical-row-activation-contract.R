@@ -91,6 +91,16 @@ test_that("activated beta absolute rows enter the canonical central engine", {
   expect_match(engine, "np_continuous_kernel_signed_log_restore(", fixed = TRUE)
   expect_match(
     engine,
+    "np_continuous_kernel_signed_log_power_restore(",
+    fixed = TRUE
+  )
+  expect_match(
+    row_engine,
+    "NPContinuousKernelRowStatus np_continuous_kernel_signed_log_power_restore(",
+    fixed = TRUE
+  )
+  expect_match(
+    engine,
     "(!route_has_convolution || matrix_bw_train != NULL)",
     fixed = TRUE
   )
