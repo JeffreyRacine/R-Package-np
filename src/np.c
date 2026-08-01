@@ -10408,8 +10408,6 @@ SEXP C_np_kernelsum(SEXP tuno,
        beta_bandwidth_code != BW_GEN_NN &&
        beta_bandwidth_code != BW_ADAP_NN)
       error("C_np_kernelsum: invalid beta bandwidth mode");
-    if(INTEGER(myopti_i)[KWS_BDIVI] != 0)
-      error("C_np_kernelsum: bandwidth.divide = TRUE is not defined for beta kernels");
     if((p_operator != OP_NOOP && p_operator != OP_DERIVATIVE) ||
        do_score || do_ocg)
       error("C_np_kernelsum: beta kernels support only derivative permutation operators");
