@@ -46,6 +46,7 @@ extern MPI_Comm	*comm;
 #include "beta_bandwidth.h"
 #include "beta_regression.h"
 #include "beta_conditional.h"
+#include "continuous_kernel_row.h"
 #include "kernel_registry.h"
 #include "np_native_safety.h"
 #include "tree.h"
@@ -10401,7 +10402,6 @@ SEXP C_np_kernelsum(SEXP tuno,
     int beta_bandwidth_code = INTEGER(myopti_i)[KWS_BWI];
     int bad_dimension = -1;
     int has_overlap = 0;
-    int all_nonderivative = 1;
     int derivative_dimension = -1;
     int undefined_count = 0;
     int i;
@@ -10434,7 +10434,6 @@ SEXP C_np_kernelsum(SEXP tuno,
         beta_operators[i] = NP_BETA_OPERATOR_CDF;
       }
       else if(INTEGER(op_i)[i] == OP_DERIVATIVE) {
-        all_nonderivative = 0;
         if(derivative_dimension >= 0)
           error("C_np_kernelsum: beta kernels support one direct derivative dimension at a time");
         derivative_dimension = i;
@@ -10497,10 +10496,10 @@ SEXP C_np_kernelsum(SEXP tuno,
        n_pkw != (R_xlen_t)ncon * expected_weights)
       error("C_np_kernelsum: beta derivative-weight buffer has the wrong length");
 
-    if(all_nonderivative &&
-       p_operator == OP_NOOP && !do_score && !do_ocg &&
+    if(p_operator == OP_NOOP && !do_score && !do_ocg &&
        INTEGER(myopti_i)[KWS_DOTREEI] == NP_TREE_FALSE) {
       NPContinuousKernelRoute route;
+      NPContinuousKernelDerivativeDiagnostics route_diagnostics;
       double **train_columns = (double **)R_alloc(
         (size_t)ncon, sizeof(double *));
       double **evaluation_columns = (double **)R_alloc(
@@ -10565,21 +10564,18 @@ SEXP C_np_kernelsum(SEXP tuno,
         beta_bandwidth_code != BW_FIXED,
         bandwidth_train_columns, bandwidth_eval_columns, NULL, NULL,
         NULL, NULL, REAL(out_ksum), REAL(out_pksum),
-        return_kernel_weights ? REAL(out_kw) : NULL, NULL, &route);
+        return_kernel_weights ? REAL(out_kw) : NULL, NULL, &route,
+        &route_diagnostics);
+      undefined_count = route_diagnostics.undefined_count;
+      if(route_status != 0 &&
+         route_diagnostics.beta_status != NP_BETA_OK)
+        error("C_np_kernelsum: beta scalar operator failed in continuous dimension %d: %s",
+              route_diagnostics.bad_coordinate + 1,
+              np_beta_status_message(route_diagnostics.beta_status));
       if(route_status != 0)
         error("C_np_kernelsum: canonical beta kernel row failed with code %d",
               route_status);
       beta_status = NP_BETA_KERNELSUM_OK;
-    } else if(derivative_dimension >= 0) {
-      beta_status = np_beta_kernelsum_derivative(
-        REAL(tcon_r), train_is_eval ? NULL : REAL(econ_r),
-        REAL(ty_r), REAL(weights_r), beta_bandwidth_eval,
-        beta_bandwidth_train, ckerlb_p, ckerub_p, beta_operators,
-        derivative_dimension, beta_bandwidth_mode, descriptor.order,
-        num_train, num_eval, ncon, num_response_columns, num_weight_columns,
-        train_is_eval, leave_one_out, return_kernel_weights,
-        REAL(out_ksum), return_kernel_weights ? REAL(out_kw) : NULL,
-        &undefined_count, &bad_dimension, &scalar_status, NULL);
     } else {
       beta_status = np_beta_kernelsum(
         REAL(tcon_r), train_is_eval ? NULL : REAL(econ_r),

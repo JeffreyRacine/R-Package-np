@@ -59,6 +59,26 @@ typedef struct {
   np_beta_status beta_status;
 } NPContinuousKernelDerivativeRowResult;
 
+/*
+ * Scratch owned by an absolute derivative-row consumer.  The four signed-log
+ * channels are sized only by the response/weight tensor width, never by the
+ * observation count.  They are reusable across evaluation rows.
+ */
+typedef struct {
+  double *regular_positive_log;
+  double *regular_negative_log;
+  double *jump_positive_log;
+  double *jump_negative_log;
+  size_t capacity;
+} NPContinuousKernelDerivativeAccumulator;
+
+typedef struct NPContinuousKernelDerivativeDiagnostics {
+  int bad_coordinate;
+  int bad_observation;
+  int undefined_count;
+  np_beta_status beta_status;
+} NPContinuousKernelDerivativeDiagnostics;
+
 void np_continuous_kernel_row_workspace_init(
   NPContinuousKernelRowWorkspace *workspace);
 
@@ -69,6 +89,9 @@ NPContinuousKernelRowStatus np_continuous_kernel_row_workspace_reserve(
   NPContinuousKernelRowWorkspace *workspace,
   size_t observation_count,
   int need_secondary);
+
+NPContinuousKernelRowStatus np_continuous_kernel_row_plan_validate(
+  const NPContinuousKernelRowPlan *plan);
 
 NPContinuousKernelRowStatus np_continuous_kernel_beta_factor_row(
   const NPContinuousKernelRowPlan *plan,
@@ -84,6 +107,27 @@ NPContinuousKernelRowStatus np_continuous_kernel_beta_derivative_factor_row(
   int derivative_coordinate,
   NPContinuousKernelRowWorkspace *workspace,
   NPContinuousKernelDerivativeRowResult *result);
+
+void np_continuous_kernel_derivative_accumulator_init(
+  NPContinuousKernelDerivativeAccumulator *accumulator);
+
+void np_continuous_kernel_derivative_accumulator_release(
+  NPContinuousKernelDerivativeAccumulator *accumulator);
+
+NPContinuousKernelRowStatus
+np_continuous_kernel_beta_derivative_absolute_rows_validated(
+  const NPContinuousKernelRowPlan *plan,
+  int leave_one_out,
+  int leave_one_out_offset,
+  int derivative_coordinate,
+  double * const *response,
+  int response_columns,
+  double * const *case_weights,
+  int weight_columns,
+  NPContinuousKernelDerivativeAccumulator *accumulator,
+  double *weighted_sum,
+  double *kernel_weights,
+  NPContinuousKernelDerivativeDiagnostics *diagnostics);
 
 NPContinuousKernelRowStatus np_continuous_kernel_scaled_restore(
   double scaled_value,

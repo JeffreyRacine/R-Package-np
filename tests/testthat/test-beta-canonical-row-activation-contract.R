@@ -14,7 +14,7 @@ locate_beta_activation_sources <- function() {
   roots[[1L]]
 }
 
-test_that("the first beta row activation enters the canonical central engine", {
+test_that("activated beta absolute rows enter the canonical central engine", {
   root <- locate_beta_activation_sources()
   skip_if(is.null(root), "package sources unavailable")
 
@@ -26,14 +26,20 @@ test_that("the first beta row activation enters the canonical central engine", {
     readLines(file.path(root, "src", "jksum.c"), warn = FALSE),
     collapse = "\n"
   )
+  row_engine <- paste(
+    readLines(file.path(root, "src", "continuous_kernel_row.c"),
+              warn = FALSE),
+    collapse = "\n"
+  )
 
   activation_start <- regexpr(
-    "if(all_nonderivative &&",
+    "if(p_operator == OP_NOOP && !do_score && !do_ocg &&",
     ingress,
     fixed = TRUE
   )[[1L]]
   activation_end <- regexpr(
-    "} else if(derivative_dimension >= 0)",
+    paste0("} else {\n",
+           "      beta_status = np_beta_kernelsum("),
     ingress,
     fixed = TRUE
   )[[1L]]
@@ -41,7 +47,8 @@ test_that("the first beta row activation enters the canonical central engine", {
   expect_gt(activation_end, activation_start)
   activation <- substr(ingress, activation_start, activation_end - 1L)
 
-  expect_match(activation, "all_nonderivative", fixed = TRUE)
+  expect_match(activation, "NPContinuousKernelDerivativeDiagnostics",
+               fixed = TRUE)
   expect_match(activation, "kernel_weighted_sum_np_route(", fixed = TRUE)
   expect_match(activation, "&route", fixed = TRUE)
   expect_false(grepl(
@@ -52,8 +59,16 @@ test_that("the first beta row activation enters the canonical central engine", {
   expect_false(grepl("np_beta_kernelsum(", activation, fixed = TRUE))
   expect_false(grepl("np_beta_kernelsum_derivative(", activation,
                      fixed = TRUE))
+  derivative_sidecar_calls <- gregexpr(
+    "np_beta_kernelsum_derivative(", ingress, fixed = TRUE
+  )[[1L]]
+  derivative_sidecar_calls <- derivative_sidecar_calls[
+    derivative_sidecar_calls > 0L
+  ]
+  expect_length(derivative_sidecar_calls, 1L)
+  expect_gt(derivative_sidecar_calls[[1L]], activation_end)
 
-  route_start <- regexpr("if(kernel_route != NULL)", engine,
+  route_start <- regexpr("if(kernel_execution_context != NULL)", engine,
                          fixed = TRUE)[[1L]]
   legacy_start <- regexpr(
     "This function takes a vector Y and returns a kernel weighted",
@@ -64,6 +79,16 @@ test_that("the first beta row activation enters the canonical central engine", {
   expect_gt(legacy_start, route_start)
   expect_match(engine, "np_beta_absolute_route(", fixed = TRUE)
   expect_match(engine, "np_continuous_kernel_beta_factor_row(", fixed = TRUE)
+  expect_match(
+    engine,
+    "np_continuous_kernel_beta_derivative_absolute_rows_validated(",
+    fixed = TRUE
+  )
+  expect_match(
+    row_engine,
+    "if(response_columns == 0 && weight_columns == 0)",
+    fixed = TRUE
+  )
   expect_match(engine, "np_continuous_kernel_signed_log_restore(", fixed = TRUE)
   expect_match(
     engine,
@@ -89,7 +114,7 @@ test_that("legacy callers cannot acquire beta route metadata implicitly", {
     engine,
     paste0(
       "matrix_categorical_vals, matrix_ordered_indices, weighted_sum,\n",
-      "    weighted_permutation_sum, kw, pkw, NULL);"
+      "    weighted_permutation_sum, kw, pkw, NULL, NULL);"
     ),
     fixed = TRUE
   )
