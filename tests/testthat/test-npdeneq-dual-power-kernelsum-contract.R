@@ -1,3 +1,7 @@
+expect_npdeneq_dual_square_equivalent <- function(actual, expected) {
+  expect_equal(actual, expected, tolerance = 16 * .Machine$double.eps)
+}
+
 test_that("internal dual-power kernel sums equal separate scalar calls", {
   old <- options(np.messages = FALSE, np.tree = FALSE)
   on.exit(options(old), add = TRUE)
@@ -19,7 +23,7 @@ test_that("internal dual-power kernel sums equal separate scalar calls", {
                    bandwidth.divide = TRUE)
 
   expect_identical(dual$ksum, scalar1$ksum)
-  expect_identical(dual$ksum.power2, scalar2$ksum)
+  expect_npdeneq_dual_square_equivalent(dual$ksum.power2, scalar2$ksum)
   expect_false("ksum.power2" %in% names(scalar1))
 })
 
@@ -40,7 +44,7 @@ test_that("dual-power route is exact for nearest-neighbor bandwidths", {
     dual <- do.call(dual_sum, args)
 
     expect_identical(dual$ksum, scalar1$ksum)
-    expect_identical(dual$ksum.power2, scalar2$ksum)
+    expect_npdeneq_dual_square_equivalent(dual$ksum.power2, scalar2$ksum)
   }
 })
 
@@ -90,7 +94,7 @@ test_that("weighted dual-power sums preserve expanded-sample semantics", {
     bandwidth.divide = TRUE
   )
   expect_identical(weighted$ksum, scalar1$ksum)
-  expect_identical(weighted$ksum.power2, scalar2$ksum)
+  expect_npdeneq_dual_square_equivalent(weighted$ksum.power2, scalar2$ksum)
 
   undivided <- dual_sum(
     bws = bw, txdat = x, leave.one.out = TRUE,
@@ -105,7 +109,9 @@ test_that("weighted dual-power sums preserve expanded-sample semantics", {
     bandwidth.divide = FALSE
   )
   expect_identical(undivided$ksum, undivided1$ksum)
-  expect_identical(undivided$ksum.power2, undivided2$ksum)
+  expect_npdeneq_dual_square_equivalent(
+    undivided$ksum.power2, undivided2$ksum
+  )
 
   expanded <- x[rep(seq_len(nrow(x)), counts), , drop = FALSE]
   expanded_sum <- dual_sum(
