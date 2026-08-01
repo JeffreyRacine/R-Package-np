@@ -5719,7 +5719,10 @@ void np_density(double * tuno, double * tord, double * tcon,
                 double * nconfac, double * ncatfac, double * mysd,
                 int * myopti,
                 double * mydens, double * myderr, double * ll,
-                double * ckerlb, double * ckerub);
+                double * ckerlb, double * ckerub,
+                const NPContinuousKernelRoute *kernel_route,
+                NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
+                int categorical_compress);
 
 void np_density_conditional(double * tyuno, double * tyord, double * tycon,
                             double * txuno, double * txord, double * txcon,
@@ -7190,76 +7193,101 @@ SEXP C_np_density(SEXP tuno,
        XLENGTH(ckerub_r) < ncon)
       error("C_np_density: beta density/distribution input buffer is too short");
 
-    if(beta_bandwidth_code != BW_FIXED) {
-      const int need_eval = beta_bandwidth_code == BW_GEN_NN;
-      const int need_train = beta_bandwidth_code == BW_ADAP_NN;
-      double *bandwidth_eval_storage = need_eval ?
-        (double *)R_alloc((size_t)ncon * (size_t)num_eval,
-                          sizeof(double)) : NULL;
-      double *bandwidth_train_storage = need_train ?
-        (double *)R_alloc((size_t)ncon * (size_t)num_train,
-                          sizeof(double)) : NULL;
-      np_beta_bandwidth_prepare_status bandwidth_status;
+    if(dens_or_dist == NP_DO_DENS) {
+      NPContinuousKernelRoute route;
+      NPContinuousKernelDerivativeDiagnostics diagnostics;
 
-      beta_bandwidth_mode = (beta_bandwidth_code == BW_GEN_NN) ?
-        NP_BETA_BANDWIDTH_GENERALIZED_NN : NP_BETA_BANDWIDTH_ADAPTIVE_NN;
-      bandwidth_status = np_beta_bandwidth_prepare(
-        beta_bandwidth_mode,
-        REAL(tcon_r), train_is_eval ? NULL : REAL(econ_r), REAL(rbw_r),
-        num_train, num_eval, ncon, train_is_eval,
-        need_eval, need_train, 0,
-        bandwidth_eval_storage, bandwidth_train_storage);
-      if(bandwidth_status != NP_BETA_BANDWIDTH_PREPARE_OK)
+      route.segment_count = 1;
+      route.segment[0].descriptor = descriptor;
+      route.segment[0].coordinate_offset = 0;
+      route.segment[0].coordinate_count = ncon;
+      route.segment[0].lower = ckerlb_p;
+      route.segment[0].upper = ckerub_p;
+      diagnostics.bad_coordinate = -1;
+      diagnostics.bad_observation = -1;
+      diagnostics.undefined_count = 0;
+      diagnostics.beta_status = NP_BETA_OK;
+      np_density(REAL(tuno_r), REAL(tord_r), REAL(tcon_r),
+                 REAL(euno_r), REAL(eord_r), REAL(econ_r),
+                 REAL(rbw_r),
+                 REAL(mcv_r), REAL(padnum_r),
+                 REAL(nconfac_r), REAL(ncatfac_r), REAL(mysd_r),
+                 INTEGER(myopti_i),
+                 REAL(out_dens), REAL(out_derr), REAL(out_ll),
+                 ckerlb_p, ckerub_p, &route, &diagnostics, 0);
+    } else {
+      if(beta_bandwidth_code != BW_FIXED) {
+        const int need_eval = beta_bandwidth_code == BW_GEN_NN;
+        const int need_train = beta_bandwidth_code == BW_ADAP_NN;
+        double *bandwidth_eval_storage = need_eval ?
+          (double *)R_alloc((size_t)ncon * (size_t)num_eval,
+                            sizeof(double)) : NULL;
+        double *bandwidth_train_storage = need_train ?
+          (double *)R_alloc((size_t)ncon * (size_t)num_train,
+                            sizeof(double)) : NULL;
+        np_beta_bandwidth_prepare_status bandwidth_status;
+
+        beta_bandwidth_mode = (beta_bandwidth_code == BW_GEN_NN) ?
+          NP_BETA_BANDWIDTH_GENERALIZED_NN : NP_BETA_BANDWIDTH_ADAPTIVE_NN;
+        bandwidth_status = np_beta_bandwidth_prepare(
+          beta_bandwidth_mode,
+          REAL(tcon_r), train_is_eval ? NULL : REAL(econ_r), REAL(rbw_r),
+          num_train, num_eval, ncon, train_is_eval,
+          need_eval, need_train, 0,
+          bandwidth_eval_storage, bandwidth_train_storage);
+        if(bandwidth_status != NP_BETA_BANDWIDTH_PREPARE_OK)
+          error("C_np_density: %s",
+                np_beta_bandwidth_prepare_status_message(bandwidth_status));
+
+        beta_bandwidth_eval = bandwidth_eval_storage;
+        beta_bandwidth_train = bandwidth_train_storage;
+      }
+
+      kernel_square_sum = (double *)R_alloc((size_t)num_eval, sizeof(double));
+      if(dens_or_dist == NP_DO_DIST) {
+        beta_operators = (np_beta_operator *)R_alloc(
+          (size_t)ncon, sizeof(np_beta_operator));
+        for(i = 0; i < ncon; ++i)
+          beta_operators[i] = NP_BETA_OPERATOR_CDF;
+        kernel_centered_m2 = (double *)R_alloc((size_t)num_eval,
+                                               sizeof(double));
+      }
+      beta_status = np_beta_kernelsum(
+        REAL(tcon_r), train_is_eval ? NULL : REAL(econ_r),
+        NULL, NULL, beta_bandwidth_eval, beta_bandwidth_train,
+        ckerlb_p, ckerub_p, beta_operators, beta_bandwidth_mode,
+        descriptor.order,
+        num_train, num_eval, ncon, 0, 0,
+        train_is_eval, 0, 0,
+        REAL(out_dens), NULL, kernel_square_sum,
+        kernel_centered_m2,
+        &bad_dimension, &scalar_status, np_progress_fit_loop_step);
+      if(beta_status == NP_BETA_KERNELSUM_ERR_KERNEL)
+        error("C_np_density: beta scalar operator failed in continuous dimension %d: %s",
+              bad_dimension + 1, np_beta_status_message(scalar_status));
+      if(beta_status != NP_BETA_KERNELSUM_OK)
         error("C_np_density: %s",
-              np_beta_bandwidth_prepare_status_message(bandwidth_status));
+              np_beta_kernelsum_status_message(beta_status));
 
-      beta_bandwidth_eval = bandwidth_eval_storage;
-      beta_bandwidth_train = bandwidth_train_storage;
-    }
+      REAL(out_ll)[0] = 0.0;
+      for(i = 0; i < num_eval; ++i) {
+        const double estimate = REAL(out_dens)[i] / (double)num_train;
+        const double second_moment =
+          kernel_square_sum[i] / (double)num_train;
+        double variance = (dens_or_dist == NP_DO_DIST) ?
+          kernel_centered_m2[i] / (double)num_train :
+          fma(-estimate, estimate, second_moment);
 
-    kernel_square_sum = (double *)R_alloc((size_t)num_eval, sizeof(double));
-    if(dens_or_dist == NP_DO_DIST) {
-      beta_operators = (np_beta_operator *)R_alloc((size_t)ncon,
-                                                   sizeof(np_beta_operator));
-      for(i = 0; i < ncon; ++i)
-        beta_operators[i] = NP_BETA_OPERATOR_CDF;
-      kernel_centered_m2 = (double *)R_alloc((size_t)num_eval,
-                                             sizeof(double));
-    }
-    beta_status = np_beta_kernelsum(
-      REAL(tcon_r), train_is_eval ? NULL : REAL(econ_r),
-      NULL, NULL, beta_bandwidth_eval, beta_bandwidth_train,
-      ckerlb_p, ckerub_p, beta_operators, beta_bandwidth_mode,
-      descriptor.order,
-      num_train, num_eval, ncon, 0, 0,
-      train_is_eval, 0, 0,
-      REAL(out_dens), NULL, kernel_square_sum,
-      kernel_centered_m2,
-      &bad_dimension, &scalar_status, np_progress_fit_loop_step);
-    if(beta_status == NP_BETA_KERNELSUM_ERR_KERNEL)
-      error("C_np_density: beta scalar operator failed in continuous dimension %d: %s",
-            bad_dimension + 1, np_beta_status_message(scalar_status));
-    if(beta_status != NP_BETA_KERNELSUM_OK)
-      error("C_np_density: %s",
-            np_beta_kernelsum_status_message(beta_status));
-
-    REAL(out_ll)[0] = 0.0;
-    for(i = 0; i < num_eval; ++i) {
-      const double estimate = REAL(out_dens)[i] / (double)num_train;
-      const double second_moment = kernel_square_sum[i] / (double)num_train;
-      double variance = (dens_or_dist == NP_DO_DIST) ?
-        kernel_centered_m2[i] / (double)num_train :
-        fma(-estimate, estimate, second_moment);
-
-      if(!R_FINITE(estimate) || !R_FINITE(variance))
-        error("C_np_density: beta density/distribution produced a non-finite estimate or variance");
-      if(variance < 0.0)
-        variance = 0.0;
-      REAL(out_dens)[i] = estimate;
-      REAL(out_derr)[i] = (num_train > 1) ?
-        sqrt(variance / (double)(num_train - 1)) : 0.0;
-      if(dens_or_dist == NP_DO_DENS)
-        REAL(out_ll)[0] += log((estimate < DBL_MIN) ? DBL_MIN : estimate);
+        if(!R_FINITE(estimate) || !R_FINITE(variance))
+          error("C_np_density: beta density/distribution produced a non-finite estimate or variance");
+        if(variance < 0.0)
+          variance = 0.0;
+        REAL(out_dens)[i] = estimate;
+        REAL(out_derr)[i] = (num_train > 1) ?
+          sqrt(variance / (double)(num_train - 1)) : 0.0;
+        if(dens_or_dist == NP_DO_DENS)
+          REAL(out_ll)[0] += log((estimate < DBL_MIN) ? DBL_MIN : estimate);
+      }
     }
   } else {
     np_density(REAL(tuno_r), REAL(tord_r), REAL(tcon_r),
@@ -7269,7 +7297,7 @@ SEXP C_np_density(SEXP tuno,
                REAL(nconfac_r), REAL(ncatfac_r), REAL(mysd_r),
                INTEGER(myopti_i),
                REAL(out_dens), REAL(out_derr), REAL(out_ll),
-               ckerlb_p, ckerub_p);
+               ckerlb_p, ckerub_p, NULL, NULL, 0);
   }
 
   PROTECT(out = allocVector(VECSXP, 3));
@@ -16102,6 +16130,27 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
   return;
 }
 
+static double **np_column_view_alloc_or_die(double *storage,
+                                            int row_count,
+                                            int column_count,
+                                            const char *label)
+{
+  double **columns;
+  int column;
+
+  if(column_count == 0)
+    return NULL;
+  if(storage == NULL || row_count <= 0 || column_count < 0 ||
+     (size_t)column_count > SIZE_MAX / sizeof(double *))
+    error("%s has an invalid column-view layout", label);
+  columns = (double **)malloc((size_t)column_count * sizeof(double *));
+  if(columns == NULL)
+    error("failed to allocate %s column view", label);
+  for(column = 0; column < column_count; ++column)
+    columns[column] = storage + (size_t)column * (size_t)row_count;
+  return columns;
+}
+
 
 void np_density(double * tuno, double * tord, double * tcon, 
                 double * euno, double * eord, double * econ, 
@@ -16109,7 +16158,10 @@ void np_density(double * tuno, double * tord, double * tcon,
                 double * mcv, double * padnum, 
                 double * nconfac, double * ncatfac, double * mysd,
                 int * myopti, double * mydens, double * myderr, double * ll,
-                double * ckerlb, double * ckerub){
+                double * ckerlb, double * ckerub,
+                const NPContinuousKernelRoute *kernel_route,
+                NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
+                int categorical_compress){
 
 
   double * vector_scale_factor, * pdf, * pdf_stderr, log_likelihood = 0.0;
@@ -16117,6 +16169,7 @@ void np_density(double * tuno, double * tord, double * tcon,
 
   int i,j;
   int num_var, num_obs_eval_alloc, max_lev, train_is_eval, dens_or_dist;
+  const int canonical_beta_views = kernel_route != NULL;
 
   int * ipt = NULL, * ipe = NULL;
   
@@ -16157,6 +16210,10 @@ void np_density(double * tuno, double * tord, double * tcon,
     error("C_np_density: reserved legacy selector must be zero");
   int_TREE_X = myopti[DEN_TREEI];
   int_TREE_PROFILE_X = myopti[DEN_TREEI];
+  if(canonical_beta_views &&
+     (num_reg_unordered_extern != 0 || num_reg_ordered_extern != 0 ||
+      int_TREE_X != NP_TREE_FALSE))
+    error("canonical beta density views require continuous non-tree data");
 
 #ifdef MPI2
   num_obs_eval_alloc = MAX(ceil((double) num_obs_eval_extern / (double) iNum_Processors),1)*iNum_Processors;
@@ -16166,23 +16223,47 @@ void np_density(double * tuno, double * tord, double * tcon,
 
   /* Allocate memory for objects */
 
-  matrix_X_unordered_train_extern = alloc_matd(num_obs_train_extern, num_reg_unordered_extern);
-  matrix_X_ordered_train_extern = alloc_matd(num_obs_train_extern, num_reg_ordered_extern);
-  matrix_X_continuous_train_extern = alloc_matd(num_obs_train_extern, num_reg_continuous_extern);
+  if(canonical_beta_views) {
+    matrix_X_unordered_train_extern = NULL;
+    matrix_X_ordered_train_extern = NULL;
+    matrix_X_continuous_train_extern = np_column_view_alloc_or_die(
+      tcon, num_obs_train_extern, num_reg_continuous_extern,
+      "beta density training data");
+  } else {
+    matrix_X_unordered_train_extern = alloc_matd(
+      num_obs_train_extern, num_reg_unordered_extern);
+    matrix_X_ordered_train_extern = alloc_matd(
+      num_obs_train_extern, num_reg_ordered_extern);
+    matrix_X_continuous_train_extern = alloc_matd(
+      num_obs_train_extern, num_reg_continuous_extern);
+  }
 
   if(!train_is_eval){
-    matrix_X_unordered_eval_extern = alloc_matd(num_obs_eval_extern, num_reg_unordered_extern);
-    matrix_X_ordered_eval_extern = alloc_matd(num_obs_eval_extern, num_reg_ordered_extern);
-    matrix_X_continuous_eval_extern = alloc_matd(num_obs_eval_extern, num_reg_continuous_extern);
+    if(canonical_beta_views) {
+      matrix_X_unordered_eval_extern = NULL;
+      matrix_X_ordered_eval_extern = NULL;
+      matrix_X_continuous_eval_extern = np_column_view_alloc_or_die(
+        econ, num_obs_eval_extern, num_reg_continuous_extern,
+        "beta density evaluation data");
+    } else {
+      matrix_X_unordered_eval_extern = alloc_matd(
+        num_obs_eval_extern, num_reg_unordered_extern);
+      matrix_X_ordered_eval_extern = alloc_matd(
+        num_obs_eval_extern, num_reg_ordered_extern);
+      matrix_X_continuous_eval_extern = alloc_matd(
+        num_obs_eval_extern, num_reg_continuous_extern);
+    }
   } else {
     matrix_X_unordered_eval_extern = matrix_X_unordered_train_extern;
     matrix_X_ordered_eval_extern = matrix_X_ordered_train_extern;
     matrix_X_continuous_eval_extern = matrix_X_continuous_train_extern;
   }
 
-  num_categories_extern = alloc_vecu(num_reg_unordered_extern+num_reg_ordered_extern);
+  num_categories_extern = canonical_beta_views ? NULL :
+    alloc_vecu(num_reg_unordered_extern+num_reg_ordered_extern);
   vector_scale_factor = alloc_vecd(num_var + 1);
-  matrix_categorical_vals_extern = alloc_matd(max_lev, num_reg_unordered_extern + num_reg_ordered_extern);
+  matrix_categorical_vals_extern = canonical_beta_views ? NULL :
+    alloc_matd(max_lev, num_reg_unordered_extern + num_reg_ordered_extern);
 
   /* note use of num_obs_eval_alloc */
   pdf = alloc_vecd(num_obs_eval_alloc);
@@ -16192,33 +16273,40 @@ void np_density(double * tuno, double * tord, double * tcon,
 
   /* Parse data */
 	
-  /* train */
-
-  for( j=0;j<num_reg_unordered_extern;j++)
-    for( i=0;i<num_obs_train_extern;i++ )
-      matrix_X_unordered_train_extern[j][i]=tuno[j*num_obs_train_extern+i];
-
-  for( j=0;j<num_reg_ordered_extern;j++)
-    for( i=0;i<num_obs_train_extern;i++ )
-      matrix_X_ordered_train_extern[j][i]=tord[j*num_obs_train_extern+i];
-
-  for( j=0;j<num_reg_continuous_extern;j++)
-    for( i=0;i<num_obs_train_extern;i++ )
-      matrix_X_continuous_train_extern[j][i]=tcon[j*num_obs_train_extern+i];
-
-  /* eval */
-  if (!train_is_eval) {
+  if(!canonical_beta_views) {
+    /* train */
     for( j=0;j<num_reg_unordered_extern;j++)
-      for( i=0;i<num_obs_eval_extern;i++ )
-        matrix_X_unordered_eval_extern[j][i]=euno[j*num_obs_eval_extern+i];
+      for( i=0;i<num_obs_train_extern;i++ )
+        matrix_X_unordered_train_extern[j][i]=
+          tuno[j*num_obs_train_extern+i];
 
     for( j=0;j<num_reg_ordered_extern;j++)
-      for( i=0;i<num_obs_eval_extern;i++ )
-        matrix_X_ordered_eval_extern[j][i]=eord[j*num_obs_eval_extern+i];
+      for( i=0;i<num_obs_train_extern;i++ )
+        matrix_X_ordered_train_extern[j][i]=
+          tord[j*num_obs_train_extern+i];
 
     for( j=0;j<num_reg_continuous_extern;j++)
-      for( i=0;i<num_obs_eval_extern;i++ )
-        matrix_X_continuous_eval_extern[j][i]=econ[j*num_obs_eval_extern+i];
+      for( i=0;i<num_obs_train_extern;i++ )
+        matrix_X_continuous_train_extern[j][i]=
+          tcon[j*num_obs_train_extern+i];
+
+    /* eval */
+    if (!train_is_eval) {
+      for( j=0;j<num_reg_unordered_extern;j++)
+        for( i=0;i<num_obs_eval_extern;i++ )
+          matrix_X_unordered_eval_extern[j][i]=
+            euno[j*num_obs_eval_extern+i];
+
+      for( j=0;j<num_reg_ordered_extern;j++)
+        for( i=0;i<num_obs_eval_extern;i++ )
+          matrix_X_ordered_eval_extern[j][i]=
+            eord[j*num_obs_eval_extern+i];
+
+      for( j=0;j<num_reg_continuous_extern;j++)
+        for( i=0;i<num_obs_eval_extern;i++ )
+          matrix_X_continuous_eval_extern[j][i]=
+            econ[j*num_obs_eval_extern+i];
+    }
   }
 
   /*  bandwidths/scale factors */
@@ -16228,34 +16316,38 @@ void np_density(double * tuno, double * tord, double * tcon,
 
   /* fix up categories */
   
-  for(j=0; j < (num_reg_unordered_extern + num_reg_ordered_extern); j++){
-    i = 0;
-    do { 
-      matrix_categorical_vals_extern[j][i] = mcv[j*max_lev+i];
-    } while(++i < max_lev && mcv[j*max_lev+i] != pad_num);
-    num_categories_extern[j] = i;
+  if(!canonical_beta_views) {
+    for(j=0; j < (num_reg_unordered_extern + num_reg_ordered_extern); j++){
+      i = 0;
+      do {
+        matrix_categorical_vals_extern[j][i] = mcv[j*max_lev+i];
+      } while(++i < max_lev && mcv[j*max_lev+i] != pad_num);
+      num_categories_extern[j] = i;
+    }
   }
 
   /* data has been copied, now build tree */
 
-  ipt = (int *)malloc(num_obs_train_extern*sizeof(int));
-  if(!(ipt != NULL))
-    error("!(ipt != NULL)");
+  if(!canonical_beta_views) {
+    ipt = (int *)malloc(num_obs_train_extern*sizeof(int));
+    if(!(ipt != NULL))
+      error("!(ipt != NULL)");
 
-  for(i = 0; i < num_obs_train_extern; i++){
-    ipt[i] = i;
-  }
-
-  if(!train_is_eval) {
-    ipe = (int *)malloc(num_obs_eval_extern*sizeof(int));
-    if(!(ipe != NULL))
-      error("!(ipe != NULL)");
-
-    for(i = 0; i < num_obs_eval_extern; i++){
-      ipe[i] = i;
+    for(i = 0; i < num_obs_train_extern; i++){
+      ipt[i] = i;
     }
-  } else {
-    ipe = ipt;
+
+    if(!train_is_eval) {
+      ipe = (int *)malloc(num_obs_eval_extern*sizeof(int));
+      if(!(ipe != NULL))
+        error("!(ipe != NULL)");
+
+      for(i = 0; i < num_obs_eval_extern; i++){
+        ipe[i] = i;
+      }
+    } else {
+      ipe = ipt;
+    }
   }
 
   int_TREE_X = int_TREE_X && ((num_reg_continuous_extern != 0) ? NP_TREE_TRUE : NP_TREE_FALSE);
@@ -16329,30 +16421,40 @@ void np_density(double * tuno, double * tord, double * tcon,
                                              pdf,
                                              pdf_stderr,
                                              &log_likelihood,
-                                             NULL,
-                                             NULL,
-                                             0);
+                                             kernel_route,
+                                             kernel_route_diagnostics,
+                                             categorical_compress);
   }
   
   
   /* write the return values */
 
   for(i=0;i<num_obs_eval_extern;i++){
-    mydens[ipe[i]] = pdf[i];
-    myderr[ipe[i]] = pdf_stderr[i];
+    const int output_index = canonical_beta_views ? i : ipe[i];
+
+    mydens[output_index] = pdf[i];
+    myderr[output_index] = pdf_stderr[i];
   }
   *ll = log_likelihood;
 
   /* clean up and wave goodbye */
 
-  free_mat(matrix_X_unordered_train_extern, num_reg_unordered_extern);
-  free_mat(matrix_X_ordered_train_extern, num_reg_ordered_extern);
-  free_mat(matrix_X_continuous_train_extern, num_reg_continuous_extern);
+  if(canonical_beta_views) {
+    free(matrix_X_continuous_train_extern);
+  } else {
+    free_mat(matrix_X_unordered_train_extern, num_reg_unordered_extern);
+    free_mat(matrix_X_ordered_train_extern, num_reg_ordered_extern);
+    free_mat(matrix_X_continuous_train_extern, num_reg_continuous_extern);
+  }
 
   if (!train_is_eval){
-    free_mat(matrix_X_unordered_eval_extern, num_reg_unordered_extern);
-    free_mat(matrix_X_ordered_eval_extern, num_reg_ordered_extern);
-    free_mat(matrix_X_continuous_eval_extern, num_reg_continuous_extern);
+    if(canonical_beta_views) {
+      free(matrix_X_continuous_eval_extern);
+    } else {
+      free_mat(matrix_X_unordered_eval_extern, num_reg_unordered_extern);
+      free_mat(matrix_X_ordered_eval_extern, num_reg_ordered_extern);
+      free_mat(matrix_X_continuous_eval_extern, num_reg_continuous_extern);
+    }
   }
 
   vector_continuous_stddev_extern = NULL;
@@ -16362,7 +16464,9 @@ void np_density(double * tuno, double * tord, double * tcon,
   safe_free(pdf_stderr);
   safe_free(pdf);
 
-  free_mat(matrix_categorical_vals_extern, num_reg_unordered_extern+num_reg_ordered_extern);
+  if(!canonical_beta_views)
+    free_mat(matrix_categorical_vals_extern,
+             num_reg_unordered_extern+num_reg_ordered_extern);
 
   safe_free(ipt);
 

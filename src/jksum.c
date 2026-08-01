@@ -8691,7 +8691,7 @@ static int np_beta_absolute_route(
       num_obs_eval > num_obs_train ||
       leave_one_out_offset > num_obs_train - num_obs_eval))
     return KWSNP_ERR_BADINVOC;
-  if(derivative_coordinate < 0 && row == NULL)
+  if(derivative_coordinate < 0 && row == NULL && weighted_sum_power2 == NULL)
     return KWSNP_ERR_BADINVOC;
 
   if(bandwidth_mode == BW_FIXED) {
@@ -9080,7 +9080,7 @@ const NPContinuousKernelExecutionContext * const kernel_execution_context){
 
     if(!exact_beta_absolute_route)
       return KWSNP_ERR_BADINVOC;
-    if(!route_has_derivative || beta_has_categories) {
+    if((!route_has_derivative && !beta_dual_power) || beta_has_categories) {
       if((size_t)num_obs_train > SIZE_MAX / sizeof(double))
         return KWSNP_ERR_BADINVOC;
       route_row = (double *)malloc((size_t)num_obs_train * sizeof(double));
@@ -31108,17 +31108,11 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
   np_disc_profile_cache_clear();
   np_cont_largeh_cache_clear();
 
-  /* P20A freezes the call-scoped route seam before beta activation.  The
-   * incumbent density/distribution caller deliberately supplies a null route,
-   * so the literal legacy row call below remains unchanged in this tranche. */
-  (void)kernel_route;
-  (void)kernel_route_diagnostics;
-  (void)categorical_compress;
-
   NP_GateOverrideCtx gate_ctx_local;
   np_gate_ctx_clear(&gate_ctx_local);
 
   const int num_reg = num_reg_continuous+num_reg_unordered+num_reg_ordered;
+  const int exact_beta_pdf = kernel_route != NULL;
 
   int i, l;
 
@@ -31138,10 +31132,27 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
 	double DIFF_KER_PPM = 0.0;		 /* Difference between int K(z)^p and int K(z-.5)K(z+.5) */
 
   double ** matrix_bandwidth = NULL, * lambda = NULL;
+  double *beta_kernel_square_sum = NULL;
+  double *beta_fixed_bandwidth = NULL;
+  int beta_route_status = 0;
 
   double pnh = (double)num_obs_train;
 
 	const double log_DBL_MIN = log(DBL_MIN);
+
+  if(exact_beta_pdf &&
+     (np_continuous_kernel_route_validate(kernel_route,
+                                          num_reg_continuous) !=
+        NP_CKERNEL_ROUTE_OK ||
+      !np_continuous_kernel_route_has_beta(kernel_route) ||
+      kernel_route->segment_count != 1 ||
+      kernel_route->segment[0].coordinate_offset != 0 ||
+      kernel_route->segment[0].coordinate_count != num_reg_continuous ||
+      dop != OP_NORMAL || num_reg_continuous <= 0 ||
+      num_reg_unordered != 0 || num_reg_ordered != 0 ||
+      kernel_route_diagnostics == NULL ||
+      (categorical_compress != 0 && categorical_compress != 1)))
+    error("canonical beta density route has an invalid layout");
 
   operator = (int *)np_jksum_malloc_array_or_die((size_t)MAX(1, num_reg), sizeof(int), "density distribution categorical operator");
 
@@ -31166,7 +31177,10 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
     kernel_o[i] = KERNEL_ordered_den;
 
 
-  if(num_reg_continuous != 0) {
+  if(exact_beta_pdf) {
+    INT_KERNEL_P = 0.0;
+    K_INT_KERNEL_P = 0.0;
+  } else if(num_reg_continuous != 0) {
     initialize_kernel_regression_asymptotic_constants(KERNEL_den,
                                                       num_reg_continuous,
                                                       &INT_KERNEL_P,
@@ -31181,7 +31195,8 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
   matrix_bandwidth = alloc_matd(bwmdim,num_reg_continuous);
   lambda = alloc_vecd(num_reg_unordered+num_reg_ordered);
 
-  if(kernel_bandwidth_mean(KERNEL_den,
+  if(!(exact_beta_pdf && BANDWIDTH_den == BW_FIXED) &&
+     kernel_bandwidth_mean(KERNEL_den,
                            BANDWIDTH_den,
                            num_obs_train,
                            num_obs_eval,
@@ -31204,7 +31219,8 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
     error("\n** Error: invalid bandwidth.");
   }
 
-  if(((dop == OP_NORMAL) || (dop == OP_INTEGRAL)) &&
+  if(!exact_beta_pdf &&
+     ((dop == OP_NORMAL) || (dop == OP_INTEGRAL)) &&
      np_density_categorical_profile_fit(kernel_c,
                                         kernel_u,
                                         kernel_o,
@@ -31237,7 +31253,8 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
     return;
   }
 
-  if((num_reg_continuous + num_reg_unordered + num_reg_ordered) > 0){
+  if(!exact_beta_pdf &&
+     (num_reg_continuous + num_reg_unordered + num_reg_ordered) > 0){
     int ok_all = 1;
 
     if(num_reg_continuous > 0){
@@ -31369,82 +31386,130 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
     }
   }
 
-  kernel_weighted_sum_np_ctx(kernel_c,
-                             kernel_u,
-                             kernel_o,
-                             BANDWIDTH_den,
-                             num_obs_train,
-                             num_obs_eval,
-                             num_reg_unordered,
-                             num_reg_ordered,
-                             num_reg_continuous,
-                             0, // don't leave one out
-                             0,
-                             1, // kernel_pow = 1
-                             1, // bandwidth_divide = FALSE when not adaptive
-                             0,
-                             0, // symmetric
-                             0, // gather-scatter sum
-                             0, // do not drop train
-                             0, // do not drop train
-                             operator, // dens or dist
-                             OP_NOOP, // no permutations
-                             0, // no score
-                             0, // no ocg
-                             NULL,
-                             0, // explicity suppress parallel
-                             0,
-                             0,
-                             int_TREE_X,
-                             0,
-                             kdt_extern_X,
-                             NULL, NULL, NULL,
-                             matrix_X_unordered_train,
-                             matrix_X_ordered_train,
-                             matrix_X_continuous_train,
-                             matrix_X_unordered_eval,
-                             matrix_X_ordered_eval,
-                             matrix_X_continuous_eval,
-                             NULL, // no ys
-                             NULL, // no weights
-                             NULL, // no sgn
-                             vector_scale_factor,
-                             1,matrix_bandwidth,matrix_bandwidth,lambda,
-                             num_categories,
-                             matrix_categorical_vals, // if dist mcv (possibly) necessary
-                             NULL, // no ocg
-                             pdf,  // weighted sum
-                             NULL, // no permutations
-                             NULL, // do not return kernel weights
-                             &gate_ctx_local); // no permutation kernel weights
-
-  if((BANDWIDTH_den == BW_FIXED) && (dop == OP_NORMAL)){
-    for(l = 0, pnh = num_obs_train; l < num_reg_continuous; l++){      
-      pnh *= matrix_bandwidth[l][0];
+  if(exact_beta_pdf) {
+    beta_kernel_square_sum = alloc_vecd(num_obs_eval);
+    if(BANDWIDTH_den == BW_FIXED) {
+      beta_fixed_bandwidth = alloc_vecd(num_reg_continuous);
+      for(l = 0; l < num_reg_continuous; ++l)
+        beta_fixed_bandwidth[l] = vector_scale_factor[l];
     }
-  }
+    beta_route_status = kernel_weighted_sum_np_route_power12(
+      NULL, kernel_u, kernel_o,
+      BANDWIDTH_den, num_obs_train, num_obs_eval,
+      num_reg_unordered, num_reg_ordered, num_reg_continuous,
+      0, 0, 0, 0, operator, 0, 0,
+      matrix_X_unordered_train, matrix_X_ordered_train,
+      matrix_X_continuous_train,
+      matrix_X_unordered_eval, matrix_X_ordered_eval,
+      matrix_X_continuous_eval,
+      NULL, NULL,
+      beta_fixed_bandwidth,
+      BANDWIDTH_den != BW_FIXED,
+      BANDWIDTH_den == BW_FIXED ? NULL : matrix_bandwidth,
+      BANDWIDTH_den == BW_FIXED ? NULL : matrix_bandwidth,
+      NULL, num_categories, matrix_categorical_vals,
+      categorical_compress, pdf, beta_kernel_square_sum,
+      kernel_route, kernel_route_diagnostics, np_progress_fit_loop_step);
+    if(beta_route_status != 0)
+      goto cleanup_density_fit;
 
+    for(i = 0, *log_likelihood = 0.0; i < num_obs_eval; ++i) {
+      const double estimate = pdf[i] / (double)num_obs_train;
+      const double second_moment =
+        beta_kernel_square_sum[i] / (double)num_obs_train;
+      double variance = fma(-estimate, estimate, second_moment);
 
-  if (dop == OP_NORMAL) {
-    for(i = 0, *log_likelihood = 0.0; i < num_obs_eval; i++){
-      pdf[i] /= (double)num_obs_train;
-      *log_likelihood += (pdf[i] < DBL_MIN) ? log_DBL_MIN : log(pdf[i]);
-
-      if((BANDWIDTH_den == BW_GEN_NN) && (dop == OP_NORMAL)){
-        for(l = 0, pnh = num_obs_train; l < num_reg_continuous; l++){
-          pnh *= matrix_bandwidth[l][i];
-        }
+      if(!R_FINITE(estimate) || !R_FINITE(variance)) {
+        beta_route_status = KWSNP_ERR_BADINVOC;
+        goto cleanup_density_fit;
       }
-
-      pdf_stderr[i] = sqrt(pdf[i]*K_INT_KERNEL_P/pnh);
+      if(variance < 0.0)
+        variance = 0.0;
+      pdf[i] = estimate;
+      pdf_stderr[i] = num_obs_train > 1 ?
+        sqrt(variance / (double)(num_obs_train - 1)) : 0.0;
+      *log_likelihood += estimate < DBL_MIN ? log_DBL_MIN : log(estimate);
     }
   } else {
-    for(i = 0, *log_likelihood = 0.0; i < num_obs_eval; i++){
-      pdf[i] /= (double)num_obs_train;
-      pdf_stderr[i] = sqrt(pdf[i]*(1.0-pdf[i])/(double)num_obs_train);
+    kernel_weighted_sum_np_ctx(kernel_c,
+                               kernel_u,
+                               kernel_o,
+                               BANDWIDTH_den,
+                               num_obs_train,
+                               num_obs_eval,
+                               num_reg_unordered,
+                               num_reg_ordered,
+                               num_reg_continuous,
+                               0, // don't leave one out
+                               0,
+                               1, // kernel_pow = 1
+                               1, // bandwidth_divide = FALSE when not adaptive
+                               0,
+                               0, // symmetric
+                               0, // gather-scatter sum
+                               0, // do not drop train
+                               0, // do not drop train
+                               operator, // dens or dist
+                               OP_NOOP, // no permutations
+                               0, // no score
+                               0, // no ocg
+                               NULL,
+                               0, // explicity suppress parallel
+                               0,
+                               0,
+                               int_TREE_X,
+                               0,
+                               kdt_extern_X,
+                               NULL, NULL, NULL,
+                               matrix_X_unordered_train,
+                               matrix_X_ordered_train,
+                               matrix_X_continuous_train,
+                               matrix_X_unordered_eval,
+                               matrix_X_ordered_eval,
+                               matrix_X_continuous_eval,
+                               NULL, // no ys
+                               NULL, // no weights
+                               NULL, // no sgn
+                               vector_scale_factor,
+                               1,matrix_bandwidth,matrix_bandwidth,lambda,
+                               num_categories,
+                               matrix_categorical_vals, // if dist mcv (possibly) necessary
+                               NULL, // no ocg
+                               pdf,  // weighted sum
+                               NULL, // no permutations
+                               NULL, // do not return kernel weights
+                               &gate_ctx_local); // no permutation kernel weights
+
+    if((BANDWIDTH_den == BW_FIXED) && (dop == OP_NORMAL)){
+      for(l = 0, pnh = num_obs_train; l < num_reg_continuous; l++){
+        pnh *= matrix_bandwidth[l][0];
+      }
+    }
+
+    if (dop == OP_NORMAL) {
+      for(i = 0, *log_likelihood = 0.0; i < num_obs_eval; i++){
+        pdf[i] /= (double)num_obs_train;
+        *log_likelihood += (pdf[i] < DBL_MIN) ? log_DBL_MIN : log(pdf[i]);
+
+        if((BANDWIDTH_den == BW_GEN_NN) && (dop == OP_NORMAL)){
+          for(l = 0, pnh = num_obs_train; l < num_reg_continuous; l++){
+            pnh *= matrix_bandwidth[l][i];
+          }
+        }
+
+        pdf_stderr[i] = sqrt(pdf[i]*K_INT_KERNEL_P/pnh);
+      }
+    } else {
+      for(i = 0, *log_likelihood = 0.0; i < num_obs_eval; i++){
+        pdf[i] /= (double)num_obs_train;
+        pdf_stderr[i] = sqrt(pdf[i]*(1.0-pdf[i])/(double)num_obs_train);
+      }
     }
   }
 
+cleanup_density_fit:
+  free(beta_kernel_square_sum);
+  free(beta_fixed_bandwidth);
   free(operator);
   free(kernel_c);
   free(kernel_u);
@@ -31461,6 +31526,15 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
   if(ov_disc_ord_const != NULL) free(ov_disc_ord_const);
   np_disc_profile_cache_clear();
   np_cont_largeh_cache_clear();
+
+  if(beta_route_status != 0) {
+    if(kernel_route_diagnostics != NULL &&
+       kernel_route_diagnostics->beta_status != NP_BETA_OK)
+      error("canonical beta density row failed in continuous dimension %d: %s",
+            kernel_route_diagnostics->bad_coordinate + 1,
+            np_beta_status_message(kernel_route_diagnostics->beta_status));
+    error("canonical beta density row failed");
+  }
 
 }
 
