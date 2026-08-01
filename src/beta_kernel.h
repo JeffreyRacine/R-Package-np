@@ -132,6 +132,15 @@ double np_beta_cdf_order(double evaluation,
                          int order,
                          np_beta_status *status);
 
+double np_beta_log_abs_cdf_order(double evaluation,
+                                 double observation,
+                                 double bandwidth,
+                                 double lower,
+                                 double upper,
+                                 int order,
+                                 int *sign,
+                                 np_beta_status *status);
+
 double np_beta_log_overlap_order2(double center_one,
                                   double bandwidth_one,
                                   double center_two,
@@ -156,6 +165,16 @@ double np_beta_overlap_order(double center_one,
                              double upper,
                              int order,
                              np_beta_status *status);
+
+double np_beta_log_abs_overlap_order(double center_one,
+                                     double bandwidth_one,
+                                     double center_two,
+                                     double bandwidth_two,
+                                     double lower,
+                                     double upper,
+                                     int order,
+                                     int *sign,
+                                     np_beta_status *status);
 
 int np_beta_order_supported(int order);
 
