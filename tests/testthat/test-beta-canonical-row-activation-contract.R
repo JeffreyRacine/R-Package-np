@@ -104,6 +104,31 @@ test_that("activated beta absolute rows enter the canonical central engine", {
     "NPContinuousKernelRowStatus np_continuous_kernel_signed_log_power_restore(",
     fixed = TRUE
   )
+  scaled_restore_start <- regexpr(
+    "NPContinuousKernelRowStatus np_continuous_kernel_scaled_restore(",
+    row_engine,
+    fixed = TRUE
+  )[[1L]]
+  signed_restore_start <- regexpr(
+    "NPContinuousKernelRowStatus np_continuous_kernel_signed_log_restore(",
+    row_engine,
+    fixed = TRUE
+  )[[1L]]
+  expect_gt(scaled_restore_start, 0L)
+  expect_gt(signed_restore_start, scaled_restore_start)
+  scaled_restore <- substr(
+    row_engine, scaled_restore_start, signed_restore_start - 1L
+  )
+  expect_match(
+    scaled_restore,
+    "np_continuous_kernel_signed_log_power_restore(",
+    fixed = TRUE
+  )
+  expect_false(grepl(
+    "log(fabs(scaled_value)) + (double)power * log_scale",
+    scaled_restore,
+    fixed = TRUE
+  ))
   expect_match(
     engine,
     "np_continuous_kernel_beta_dual_power_rows_validated(",

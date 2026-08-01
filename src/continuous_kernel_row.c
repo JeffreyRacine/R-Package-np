@@ -1541,24 +1541,24 @@ NPContinuousKernelRowStatus np_continuous_kernel_scaled_restore(
   double *value)
 {
   double log_absolute;
+  const int sign = scaled_value < 0.0 ? -1 : 1;
 
-  if(value == NULL || power <= 0 || !R_FINITE(scaled_value) ||
+  if(value == NULL || !R_FINITE(scaled_value) ||
      ISNAN(log_scale) || log_scale == INFINITY)
     return NP_CONTINUOUS_ROW_ERR_LAYOUT;
   if(scaled_value == 0.0 || log_scale == -INFINITY) {
     *value = 0.0;
     return NP_CONTINUOUS_ROW_OK;
   }
-  if(log_scale == 0.0) {
+  if(power == 1 && log_scale == 0.0) {
     *value = scaled_value;
     return NP_CONTINUOUS_ROW_OK;
   }
-  log_absolute = log(fabs(scaled_value)) + (double)power * log_scale;
-  if(ISNAN(log_absolute) || log_absolute > log(DBL_MAX))
+  log_absolute = log(fabs(scaled_value)) + log_scale;
+  if(ISNAN(log_absolute) || log_absolute == INFINITY)
     return NP_CONTINUOUS_ROW_ERR_NUMERIC;
-  *value = copysign(exp(log_absolute), scaled_value);
-  return R_FINITE(*value) ? NP_CONTINUOUS_ROW_OK :
-    NP_CONTINUOUS_ROW_ERR_NUMERIC;
+  return np_continuous_kernel_signed_log_power_restore(
+    log_absolute, sign, power, value);
 }
 
 NPContinuousKernelRowStatus np_continuous_kernel_signed_log_restore(
