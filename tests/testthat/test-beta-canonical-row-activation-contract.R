@@ -32,19 +32,29 @@ test_that("activated beta absolute rows enter the canonical central engine", {
     collapse = "\n"
   )
 
+  ingress_start <- regexpr("SEXP C_np_kernelsum(", ingress,
+                           fixed = TRUE)[[1L]]
+  ingress_end <- regexpr("SEXP C_np_kernelsum_power12(", ingress,
+                         fixed = TRUE)[[1L]]
+  expect_gt(ingress_start, 0L)
+  expect_gt(ingress_end, ingress_start)
+  kernelsum_ingress <- substr(ingress, ingress_start, ingress_end - 1L)
+
   activation_start <- regexpr(
     "NPContinuousKernelRoute route;",
-    ingress,
+    kernelsum_ingress,
     fixed = TRUE
   )[[1L]]
   activation_end <- regexpr(
     "if(derivative_dimension >= 0 || p_operator == OP_DERIVATIVE)",
-    ingress,
+    kernelsum_ingress,
     fixed = TRUE
   )[[1L]]
   expect_gt(activation_start, 0L)
   expect_gt(activation_end, activation_start)
-  activation <- substr(ingress, activation_start, activation_end - 1L)
+  activation <- substr(
+    kernelsum_ingress, activation_start, activation_end - 1L
+  )
 
   expect_match(activation, "NPContinuousKernelDerivativeDiagnostics",
                fixed = TRUE)
@@ -177,4 +187,61 @@ test_that("legacy callers cannot acquire beta route metadata implicitly", {
     "if(!exact_beta_absolute_route)\n      return KWSNP_ERR_BADINVOC;",
     fixed = TRUE
   )
+})
+
+test_that("beta PDF fitting enters the canonical dual-row density owner", {
+  root <- locate_beta_activation_sources()
+  skip_if(is.null(root), "package sources unavailable")
+  ingress <- paste(
+    readLines(file.path(root, "src", "np.c"), warn = FALSE),
+    collapse = "\n"
+  )
+  engine <- paste(
+    readLines(file.path(root, "src", "jksum.c"), warn = FALSE),
+    collapse = "\n"
+  )
+
+  ingress_start <- regexpr("SEXP C_np_density(", ingress, fixed = TRUE)[[1L]]
+  ingress_end <- regexpr(
+    "SEXP C_np_beta_conditional_bootstrap(", ingress, fixed = TRUE
+  )[[1L]]
+  expect_gt(ingress_start, 0L)
+  expect_gt(ingress_end, ingress_start)
+  density_ingress <- substr(ingress, ingress_start, ingress_end - 1L)
+
+  canonical_call <- regexpr(
+    "ckerlb_p, ckerub_p, &route, &diagnostics, 0);",
+    density_ingress, fixed = TRUE
+  )[[1L]]
+  sidecar_call <- regexpr(
+    "beta_status = np_beta_kernelsum(", density_ingress, fixed = TRUE
+  )[[1L]]
+  expect_match(density_ingress, "if(dens_or_dist == NP_DO_DENS)",
+               fixed = TRUE)
+  expect_gt(canonical_call, 0L)
+  expect_gt(sidecar_call, canonical_call)
+
+  engine_start <- regexpr(
+    "void kernel_estimate_dens_dist_categorical_np(", engine, fixed = TRUE
+  )[[1L]]
+  engine_end <- regexpr(
+    "int np_kernel_estimate_con_density_categorical_leave_one_out_cv(",
+    engine, fixed = TRUE
+  )[[1L]]
+  expect_gt(engine_start, 0L)
+  expect_gt(engine_end, engine_start)
+  density_engine <- substr(engine, engine_start, engine_end - 1L)
+
+  expect_match(density_engine, "const int exact_beta_pdf = kernel_route != NULL;",
+               fixed = TRUE)
+  expect_match(density_engine, "kernel_weighted_sum_np_route_power12(",
+               fixed = TRUE)
+  expect_match(density_engine, "np_progress_fit_loop_step);", fixed = TRUE)
+  expect_match(
+    density_engine,
+    "if(beta_route_status != 0)\n      goto cleanup_density_fit;",
+    fixed = TRUE
+  )
+  expect_match(density_engine, "error(\"canonical beta density row failed\");",
+               fixed = TRUE)
 })
