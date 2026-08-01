@@ -168,7 +168,7 @@ test_that("legacy callers cannot acquire beta route metadata implicitly", {
     engine,
     paste0(
       "matrix_categorical_vals, matrix_ordered_indices, weighted_sum,\n",
-      "    weighted_permutation_sum, kw, pkw, NULL, NULL);"
+      "    weighted_permutation_sum, kw, pkw, 0, NULL, NULL);"
     ),
     fixed = TRUE
   )

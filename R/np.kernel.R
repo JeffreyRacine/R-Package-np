@@ -247,8 +247,6 @@ npksum.default <-
           any(!is.finite(bws$ckerlb[bws$icon])) ||
           any(!is.finite(bws$ckerub[bws$icon])))
         stop("beta kernel sums require finite fixed or empirical-range bounds")
-      if (bws$nuno != 0L || bws$nord != 0L)
-        stop("beta kernel sums currently support continuous variables only")
       if (any(!operator %in% c("normal", "convolution", "derivative", "integral")))
         stop("beta kernel sums support operator = \"normal\", \"convolution\", \"derivative\", or \"integral\"")
       if (sum(operator == "derivative") > 1L)
@@ -258,6 +256,10 @@ npksum.default <-
         stop("beta kernel sums support only derivative permutation operators")
       if (any(operator == "derivative") && permutation.operator == "derivative")
         stop("direct and permutation beta derivatives cannot be combined")
+      if ((bws$nuno != 0L || bws$nord != 0L) &&
+          (any(operator == "derivative") ||
+           permutation.operator == "derivative"))
+        stop("mixed beta derivatives are not yet activated")
     }
     
     if ((any(bws$icon) &&
@@ -432,6 +434,12 @@ npksum.default <-
       myopti <- c(myopti, list(
         divide.returned.kernel.weights = internal.bandwidth.divide.weights
       ))
+      if (beta.kernel && bws$nuno + bws$nord > 0L) {
+        myopti <- c(myopti, list(
+          categorical.compress =
+            npStrictLogicalOption("np.categorical.compress", TRUE)
+        ))
+      }
 
 	    cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
     

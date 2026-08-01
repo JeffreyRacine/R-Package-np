@@ -2503,9 +2503,14 @@ static int np_build_discrete_profile_index(const int num_xt,
                                            int **out_disc_prof_id,
                                            int **out_disc_prof_rep,
                                            int *out_disc_nprof){
-  int i, pos, pid;
-  int tsz = 1;
+  int i, pid;
   int nprof = 0;
+  size_t profile_bytes;
+  size_t hash_bytes;
+  size_t table_bytes;
+  size_t table_target;
+  size_t table_size = 1U;
+  size_t pos;
   int *disc_prof_id = NULL, *disc_prof_rep = NULL, *htable = NULL;
   uint64_t *disc_prof_hash = NULL;
 
@@ -2519,24 +2524,37 @@ static int np_build_discrete_profile_index(const int num_xt,
   if(num_xt <= 0 || (num_reg_unordered + num_reg_ordered) <= 0)
     return 0;
 
-  disc_prof_id = (int *)malloc((size_t)num_xt*sizeof(int));
-  disc_prof_rep = (int *)malloc((size_t)num_xt*sizeof(int));
-  disc_prof_hash = (uint64_t *)malloc((size_t)num_xt*sizeof(uint64_t));
+  if(!np_size_array_bytes_checked((size_t)num_xt, sizeof(int),
+                                  &profile_bytes) ||
+     !np_size_array_bytes_checked((size_t)num_xt, sizeof(uint64_t),
+                                  &hash_bytes) ||
+     !np_size_mul_checked((size_t)num_xt, 2U, &table_target))
+    goto fail;
+
+  disc_prof_id = (int *)malloc(profile_bytes);
+  disc_prof_rep = (int *)malloc(profile_bytes);
+  disc_prof_hash = (uint64_t *)malloc(hash_bytes);
 
   if(disc_prof_id == NULL || disc_prof_rep == NULL || disc_prof_hash == NULL)
     goto fail;
 
-  while(tsz < (2*num_xt)) tsz <<= 1;
-  htable = (int *)malloc((size_t)tsz*sizeof(int));
+  while(table_size < table_target) {
+    if(table_size > SIZE_MAX/2U)
+      goto fail;
+    table_size <<= 1U;
+  }
+  if(!np_size_array_bytes_checked(table_size, sizeof(int), &table_bytes))
+    goto fail;
+  htable = (int *)malloc(table_bytes);
   if(htable == NULL)
     goto fail;
 
-  for(i = 0; i < tsz; i++)
-    htable[i] = -1;
+  for(pos = 0U; pos < table_size; ++pos)
+    htable[pos] = -1;
 
   for(i = 0; i < num_xt; i++){
     const uint64_t h = np_hash_discrete_profile_idx(i, num_reg_unordered, num_reg_ordered, xtu, xto);
-    pos = (int)(h & (uint64_t)(tsz - 1));
+    pos = (size_t)(h & (uint64_t)(table_size - 1U));
     pid = -1;
 
     while(1){
@@ -2553,7 +2571,7 @@ static int np_build_discrete_profile_index(const int num_xt,
         pid = hs;
         break;
       }
-      pos = (pos + 1) & (tsz - 1);
+      pos = (pos + 1U) & (table_size - 1U);
     }
 
     disc_prof_id[i] = pid;
@@ -8251,19 +8269,292 @@ static inline void np_hot_loop_check_interrupt(const int pos,
 typedef struct {
   const NPContinuousKernelRoute *route;
   NPContinuousKernelDerivativeDiagnostics *diagnostics;
+  int categorical_compress;
 } NPContinuousKernelExecutionContext;
+
+typedef struct {
+  NPCategoricalProfileKernelSpec dense_spec;
+  NPCategoricalProfileKernelSpec compressed_spec;
+  int use_compressed;
+  int *profile_id;
+  double **compressed_unordered;
+  double **compressed_ordered;
+  double *compressed_unordered_storage;
+  double *compressed_ordered_storage;
+  double *compressed_log_absolute;
+  signed char *compressed_sign;
+  double *scratch;
+  size_t scratch_capacity;
+} NPBetaCategoricalFactorContext;
+
+static void np_beta_categorical_factor_context_init_empty(
+  NPBetaCategoricalFactorContext *context)
+{
+  if(context != NULL)
+    memset(context, 0, sizeof(*context));
+}
+
+static void np_beta_categorical_factor_context_release(
+  NPBetaCategoricalFactorContext *context)
+{
+  if(context == NULL)
+    return;
+  free(context->profile_id);
+  free(context->compressed_unordered);
+  free(context->compressed_ordered);
+  free(context->compressed_unordered_storage);
+  free(context->compressed_ordered_storage);
+  free(context->compressed_log_absolute);
+  free(context->compressed_sign);
+  np_beta_categorical_factor_context_init_empty(context);
+}
+
+static NPContinuousKernelRowStatus
+np_beta_categorical_tile_status(
+  NPCategoricalProfileTileStatus status)
+{
+  if(status == NP_PROFILE_TILE_OK)
+    return NP_CONTINUOUS_ROW_OK;
+  if(status == NP_PROFILE_TILE_ERR_NONFINITE)
+    return NP_CONTINUOUS_ROW_ERR_NUMERIC;
+  if(status == NP_PROFILE_TILE_ERR_CAPACITY)
+    return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  if(status == NP_PROFILE_TILE_ERR_KERNEL ||
+     status == NP_PROFILE_TILE_ERR_OPERATOR)
+    return NP_CONTINUOUS_ROW_ERR_ROUTE;
+  return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+}
+
+static int np_beta_categorical_profile_matrix_allocate(
+  int variable_count,
+  int profile_count,
+  double ***rows,
+  double **storage)
+{
+  size_t element_count;
+  size_t pointer_bytes;
+  size_t storage_bytes;
+  int variable;
+
+  if(rows == NULL || storage == NULL || variable_count < 0 ||
+     profile_count <= 0)
+    return 0;
+  *rows = NULL;
+  *storage = NULL;
+  if(variable_count == 0)
+    return 1;
+  if(!np_size_array_bytes_checked(
+       (size_t)variable_count, sizeof(double *), &pointer_bytes) ||
+     !np_size_mul_checked(
+       (size_t)variable_count, (size_t)profile_count, &element_count) ||
+     !np_size_array_bytes_checked(
+       element_count, sizeof(double), &storage_bytes))
+    return 0;
+  *rows = (double **)malloc(pointer_bytes);
+  *storage = (double *)malloc(storage_bytes);
+  if(*rows == NULL || *storage == NULL) {
+    free(*rows);
+    free(*storage);
+    *rows = NULL;
+    *storage = NULL;
+    return 0;
+  }
+  for(variable = 0; variable < variable_count; ++variable)
+    (*rows)[variable] =
+      *storage + (size_t)variable * (size_t)profile_count;
+  return 1;
+}
+
+static NPContinuousKernelRowStatus
+np_beta_categorical_factor_context_prepare(
+  NPBetaCategoricalFactorContext *context,
+  int ntrain,
+  int neval,
+  int nunordered,
+  int nordered,
+  double * const *train_unordered,
+  double * const *train_ordered,
+  double * const *eval_unordered,
+  double * const *eval_ordered,
+  const int *kernel_unordered,
+  const int *kernel_ordered,
+  const int *operator_code,
+  const double *lambda,
+  const int *num_categories,
+  double * const *category_values,
+  int categorical_compress,
+  double *scratch)
+{
+  NPCategoricalProfileTileStatus tile_status;
+  int *profile_representative = NULL;
+  int profile_count = 0;
+  size_t compressed_admission_count;
+  size_t dense_admission_count;
+  size_t compressed_log_bytes;
+  size_t compressed_sign_bytes;
+  int profile;
+  int variable;
+
+  if(context == NULL || scratch == NULL ||
+     (categorical_compress != 0 && categorical_compress != 1))
+    return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  context->dense_spec.ntrain = ntrain;
+  context->dense_spec.neval = neval;
+  context->dense_spec.nunordered = nunordered;
+  context->dense_spec.nordered = nordered;
+  context->dense_spec.train_unordered = train_unordered;
+  context->dense_spec.train_ordered = train_ordered;
+  context->dense_spec.eval_unordered = eval_unordered;
+  context->dense_spec.eval_ordered = eval_ordered;
+  context->dense_spec.kernel_unordered = kernel_unordered;
+  context->dense_spec.kernel_ordered = kernel_ordered;
+  context->dense_spec.operator_code = operator_code;
+  context->dense_spec.lambda = lambda;
+  context->dense_spec.num_categories = num_categories;
+  context->dense_spec.category_values = category_values;
+  context->scratch = scratch;
+  context->scratch_capacity = (size_t)ntrain;
+  tile_status = np_categorical_profile_spec_validate(&context->dense_spec);
+  if(tile_status != NP_PROFILE_TILE_OK)
+    return np_beta_categorical_tile_status(tile_status);
+  if(!categorical_compress)
+    return NP_CONTINUOUS_ROW_OK;
+
+  if(!np_build_discrete_profile_index(
+       ntrain, nunordered, nordered, train_unordered, train_ordered,
+       &context->profile_id, &profile_representative, &profile_count))
+    return NP_CONTINUOUS_ROW_ERR_MEMORY;
+  if(profile_count <= 0 ||
+     !np_size_mul_checked((size_t)profile_count, 4U,
+                          &compressed_admission_count) ||
+     !np_size_mul_checked((size_t)ntrain, 3U, &dense_admission_count)) {
+    free(profile_representative);
+    np_beta_categorical_factor_context_release(context);
+    return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  }
+  if(compressed_admission_count > dense_admission_count) {
+    free(context->profile_id);
+    free(profile_representative);
+    context->profile_id = NULL;
+    return NP_CONTINUOUS_ROW_OK;
+  }
+  if(!np_beta_categorical_profile_matrix_allocate(
+       nunordered, profile_count, &context->compressed_unordered,
+       &context->compressed_unordered_storage) ||
+     !np_beta_categorical_profile_matrix_allocate(
+       nordered, profile_count, &context->compressed_ordered,
+       &context->compressed_ordered_storage)) {
+    free(profile_representative);
+    np_beta_categorical_factor_context_release(context);
+    return NP_CONTINUOUS_ROW_ERR_MEMORY;
+  }
+  if(!np_size_array_bytes_checked((size_t)profile_count, sizeof(double),
+                                  &compressed_log_bytes) ||
+     !np_size_array_bytes_checked((size_t)profile_count,
+                                  sizeof(signed char),
+                                  &compressed_sign_bytes)) {
+    free(profile_representative);
+    np_beta_categorical_factor_context_release(context);
+    return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  }
+  context->compressed_log_absolute =
+    (double *)malloc(compressed_log_bytes);
+  context->compressed_sign =
+    (signed char *)malloc(compressed_sign_bytes);
+  if(context->compressed_log_absolute == NULL ||
+     context->compressed_sign == NULL) {
+    free(profile_representative);
+    np_beta_categorical_factor_context_release(context);
+    return NP_CONTINUOUS_ROW_ERR_MEMORY;
+  }
+  for(variable = 0; variable < nunordered; ++variable)
+    for(profile = 0; profile < profile_count; ++profile)
+      context->compressed_unordered[variable][profile] =
+        train_unordered[variable][profile_representative[profile]];
+  for(variable = 0; variable < nordered; ++variable)
+    for(profile = 0; profile < profile_count; ++profile)
+      context->compressed_ordered[variable][profile] =
+        train_ordered[variable][profile_representative[profile]];
+  free(profile_representative);
+
+  context->compressed_spec = context->dense_spec;
+  context->compressed_spec.ntrain = profile_count;
+  context->compressed_spec.train_unordered = context->compressed_unordered;
+  context->compressed_spec.train_ordered = context->compressed_ordered;
+  tile_status =
+    np_categorical_profile_spec_validate(&context->compressed_spec);
+  if(tile_status != NP_PROFILE_TILE_OK) {
+    const NPContinuousKernelRowStatus row_status =
+      np_beta_categorical_tile_status(tile_status);
+
+    np_beta_categorical_factor_context_release(context);
+    return row_status;
+  }
+  context->use_compressed = 1;
+  return NP_CONTINUOUS_ROW_OK;
+}
+
+static NPContinuousKernelRowStatus np_beta_categorical_log_factor(
+  const void *state,
+  int evaluation_index,
+  int omitted_observation,
+  int observation_count,
+  double *log_absolute,
+  signed char *sign)
+{
+  const NPBetaCategoricalFactorContext * const context =
+    (const NPBetaCategoricalFactorContext *)state;
+  NPCategoricalProfileTileStatus tile_status;
+  int observation;
+
+  if(context == NULL || observation_count != context->dense_spec.ntrain)
+    return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  if(!context->use_compressed) {
+    tile_status = np_categorical_profile_log_row_fill_prevalidated(
+      &context->dense_spec, evaluation_index, omitted_observation,
+      context->scratch, context->scratch_capacity, log_absolute, sign);
+    return np_beta_categorical_tile_status(tile_status);
+  }
+
+  tile_status = np_categorical_profile_log_row_fill_prevalidated(
+    &context->compressed_spec, evaluation_index, -1,
+    context->scratch, context->scratch_capacity,
+    context->compressed_log_absolute, context->compressed_sign);
+  if(tile_status != NP_PROFILE_TILE_OK)
+    return np_beta_categorical_tile_status(tile_status);
+  for(observation = 0; observation < observation_count; ++observation) {
+    const int profile = context->profile_id[observation];
+
+    log_absolute[observation] =
+      context->compressed_log_absolute[profile];
+    sign[observation] = context->compressed_sign[profile];
+  }
+  return NP_CONTINUOUS_ROW_OK;
+}
 
 static int np_beta_absolute_route(
   const NPContinuousKernelRoute * const route,
   const int bandwidth_mode,
   const int num_obs_train,
   const int num_obs_eval,
+  const int num_reg_unordered,
+  const int num_reg_ordered,
   const int num_reg_continuous,
   const int leave_one_out,
   const int leave_one_out_offset,
   const int * const operator,
   double **matrix_X_continuous_train,
   double **matrix_X_continuous_eval,
+  double **matrix_X_unordered_train,
+  double **matrix_X_ordered_train,
+  double **matrix_X_unordered_eval,
+  double **matrix_X_ordered_eval,
+  const int *kernel_unordered,
+  const int *kernel_ordered,
+  const double *categorical_lambda,
+  const int *num_categories,
+  double **matrix_categorical_vals,
+  const int categorical_compress,
   double * const vector_bandwidth,
   double **matrix_bandwidth_eval,
   double **matrix_bandwidth_train,
@@ -8286,7 +8577,11 @@ static int np_beta_absolute_route(
   NPContinuousKernelRowPlan plan;
   NPContinuousKernelRowResult row_result;
   NPContinuousKernelDerivativeAccumulator derivative_accumulator;
+  NPContinuousKernelLogFactorProvider categorical_provider;
+  NPBetaCategoricalFactorContext categorical_context;
   double **bandwidth_columns = NULL;
+  const int has_categories =
+    num_reg_unordered > 0 || num_reg_ordered > 0;
   int train_is_eval = num_obs_train == num_obs_eval;
   int status = KWSNP_ERR_BADINVOC;
   int evaluation;
@@ -8303,6 +8598,9 @@ static int np_beta_absolute_route(
   }
   np_continuous_kernel_row_workspace_init(&workspace);
   np_continuous_kernel_derivative_accumulator_init(&derivative_accumulator);
+  np_beta_categorical_factor_context_init_empty(&categorical_context);
+  categorical_provider.function = np_beta_categorical_log_factor;
+  categorical_provider.context = &categorical_context;
 
   if(route == NULL ||
      np_continuous_kernel_route_validate(route, num_reg_continuous) !=
@@ -8312,6 +8610,8 @@ static int np_beta_absolute_route(
      route->segment[0].coordinate_offset != 0 ||
      route->segment[0].coordinate_count != num_reg_continuous ||
      num_obs_train <= 0 || num_obs_eval <= 0 ||
+     num_reg_unordered < 0 || num_reg_ordered < 0 ||
+     num_reg_unordered > INT_MAX - num_reg_ordered ||
      num_reg_continuous <= 0 || operator == NULL ||
      matrix_X_continuous_train == NULL ||
      matrix_X_continuous_eval == NULL ||
@@ -8321,6 +8621,17 @@ static int np_beta_absolute_route(
      (ncol_Y > 0 && matrix_Y == NULL) ||
      (ncol_W > 0 && matrix_W == NULL) ||
      weighted_sum == NULL || leave_one_out_offset < 0)
+    return KWSNP_ERR_BADINVOC;
+  if(has_categories &&
+     ((num_reg_unordered > 0 &&
+       (matrix_X_unordered_train == NULL ||
+        matrix_X_unordered_eval == NULL || kernel_unordered == NULL)) ||
+      (num_reg_ordered > 0 &&
+       (matrix_X_ordered_train == NULL ||
+        matrix_X_ordered_eval == NULL || kernel_ordered == NULL)) ||
+      categorical_lambda == NULL || num_categories == NULL ||
+      matrix_categorical_vals == NULL ||
+      (categorical_compress != 0 && categorical_compress != 1)))
     return KWSNP_ERR_BADINVOC;
 
   for(response_column = 0; response_column < ncol_Y; ++response_column)
@@ -8367,6 +8678,12 @@ static int np_beta_absolute_route(
       matrix_X_continuous_train[coordinate] ==
       matrix_X_continuous_eval[coordinate];
   }
+  for(coordinate = 0; coordinate < num_reg_unordered; ++coordinate)
+    train_is_eval &= matrix_X_unordered_train[coordinate] ==
+      matrix_X_unordered_eval[coordinate];
+  for(coordinate = 0; coordinate < num_reg_ordered; ++coordinate)
+    train_is_eval &= matrix_X_ordered_train[coordinate] ==
+      matrix_X_ordered_eval[coordinate];
   if(leave_one_out &&
      (!train_is_eval ||
       num_obs_eval > num_obs_train ||
@@ -8403,6 +8720,23 @@ static int np_beta_absolute_route(
      NP_CONTINUOUS_ROW_OK)
     goto cleanup;
   row_result.row = row;
+
+  if(has_categories) {
+    NPContinuousKernelRowStatus row_status;
+
+    if(derivative_coordinate >= 0 || weighted_sum_power2 != NULL)
+      goto cleanup;
+    row_status = np_beta_categorical_factor_context_prepare(
+      &categorical_context, num_obs_train, num_obs_eval,
+      num_reg_unordered, num_reg_ordered,
+      matrix_X_unordered_train, matrix_X_ordered_train,
+      matrix_X_unordered_eval, matrix_X_ordered_eval,
+      kernel_unordered, kernel_ordered,
+      operator + num_reg_continuous, categorical_lambda,
+      num_categories, matrix_categorical_vals, categorical_compress, row);
+    if(row_status != NP_CONTINUOUS_ROW_OK)
+      goto cleanup;
+  }
 
   if(weighted_sum_power2 != NULL) {
     NPContinuousKernelRowStatus row_status;
@@ -8446,8 +8780,14 @@ static int np_beta_absolute_route(
     NPContinuousKernelRowStatus row_status;
     int observation;
 
-    row_status = np_continuous_kernel_beta_factor_row(
-      &plan, evaluation, omitted_observation, &workspace, &row_result);
+    if(has_categories)
+      row_status =
+        np_continuous_kernel_beta_factor_row_with_log_factor(
+          &plan, evaluation, omitted_observation, &categorical_provider,
+          &workspace, &row_result);
+    else
+      row_status = np_continuous_kernel_beta_factor_row(
+        &plan, evaluation, omitted_observation, &workspace, &row_result);
 
     if(row_status != NP_CONTINUOUS_ROW_OK)
       goto cleanup;
@@ -8554,6 +8894,7 @@ static int np_beta_absolute_route(
   status = 0;
 
 cleanup:
+  np_beta_categorical_factor_context_release(&categorical_context);
   np_continuous_kernel_row_workspace_release(&workspace);
   np_continuous_kernel_derivative_accumulator_release(
     &derivative_accumulator);
@@ -8664,6 +9005,24 @@ const NPContinuousKernelExecutionContext * const kernel_execution_context){
     const int beta_power2_ncol_W =
       beta_dual_power && dual_power_ctx->matrix_W != NULL ?
       dual_power_ctx->ncol_W : ncol_W;
+    const int beta_has_categories =
+      num_reg_unordered > 0 || num_reg_ordered > 0;
+    const int beta_categories_valid =
+      num_reg_unordered >= 0 && num_reg_ordered >= 0 &&
+      num_reg_unordered <= INT_MAX - num_reg_ordered &&
+      (!beta_has_categories ||
+       (((num_reg_unordered == 0) ||
+         (KERNEL_unordered_reg != NULL &&
+          matrix_X_unordered_train != NULL &&
+          matrix_X_unordered_eval != NULL)) &&
+        ((num_reg_ordered == 0) ||
+         (KERNEL_ordered_reg != NULL &&
+          matrix_X_ordered_train != NULL &&
+          matrix_X_ordered_eval != NULL)) &&
+        lambda_pre != NULL && num_categories != NULL &&
+        matrix_categorical_vals != NULL &&
+        (kernel_execution_context->categorical_compress == 0 ||
+         kernel_execution_context->categorical_compress == 1)));
     for(route_coordinate = 0; route_coordinate < num_reg_continuous;
         ++route_coordinate) {
       route_has_convolution |=
@@ -8676,7 +9035,7 @@ const NPContinuousKernelExecutionContext * const kernel_execution_context){
       (BANDWIDTH_reg == BW_FIXED || BANDWIDTH_reg == BW_GEN_NN ||
        BANDWIDTH_reg == BW_ADAP_NN) &&
       bandwidth_divide == 0 && bandwidth_divide_weights == 0 &&
-      num_reg_unordered == 0 && num_reg_ordered == 0 &&
+      beta_categories_valid &&
       num_reg_continuous > 0 && permutation_operator == OP_NOOP &&
       !do_score && !do_ocg &&
       int_TREE == NP_TREE_FALSE && !do_partial_tree &&
@@ -8691,7 +9050,8 @@ const NPContinuousKernelExecutionContext * const kernel_execution_context){
        (BANDWIDTH_reg == BW_ADAP_NN && bandwidth_provided &&
         matrix_bw_train != NULL &&
         (!route_has_convolution || matrix_bw_eval != NULL))) &&
-      lambda_pre == NULL &&
+      ((!beta_has_categories && lambda_pre == NULL) ||
+       (beta_has_categories && !route_has_derivative && !beta_dual_power)) &&
       (dual_power_ctx == NULL ||
        (beta_dual_power && kernel_pow == 1 && !route_has_derivative &&
         kw == NULL)) &&
@@ -8711,9 +9071,15 @@ const NPContinuousKernelExecutionContext * const kernel_execution_context){
     }
     route_status = np_beta_absolute_route(
       kernel_route, BANDWIDTH_reg, num_obs_train, num_obs_eval,
+      num_reg_unordered, num_reg_ordered,
       num_reg_continuous,
       leave_one_out, leave_one_out_offset, operator,
       matrix_X_continuous_train, matrix_X_continuous_eval,
+      matrix_X_unordered_train, matrix_X_ordered_train,
+      matrix_X_unordered_eval, matrix_X_ordered_eval,
+      KERNEL_unordered_reg, KERNEL_ordered_reg, lambda_pre,
+      num_categories, matrix_categorical_vals,
+      kernel_execution_context->categorical_compress,
       vector_scale_factor, matrix_bw_eval, matrix_bw_train,
       matrix_Y, matrix_W, ncol_Y, ncol_W,
       beta_power2_Y, beta_power2_W,
@@ -10954,7 +11320,7 @@ NPContinuousKernelDerivativeDiagnostics * const kernel_route_diagnostics)
     weighted_sum_power2, 2, NULL, NULL, 0, 0
   };
   const NPContinuousKernelExecutionContext kernel_execution_context = {
-    kernel_route, kernel_route_diagnostics
+    kernel_route, kernel_route_diagnostics, 0
   };
 
   return kernel_weighted_sum_np_ctx_ex(
@@ -11030,13 +11396,14 @@ double * const weighted_sum,
 double * const weighted_permutation_sum,
 double * const kw,
 double * const pkw,
+const int categorical_compress,
 const NPContinuousKernelRoute * const kernel_route,
 NPContinuousKernelDerivativeDiagnostics * const kernel_route_diagnostics){
   double * old_pkw = kernel_weighted_sum_pkw_extern;
   int old_pkw_nvar = kernel_weighted_sum_pkw_nvar_extern;
   int status = 0;
   const NPContinuousKernelExecutionContext kernel_execution_context = {
-    kernel_route, kernel_route_diagnostics
+    kernel_route, kernel_route_diagnostics, categorical_compress
   };
 
   kernel_weighted_sum_pkw_extern = pkw;
@@ -11173,7 +11540,7 @@ double * const pkw){
     matrix_W, sgn, vector_scale_factor, bandwidth_provided,
     matrix_bw_train, matrix_bw_eval, lambda_pre, num_categories,
     matrix_categorical_vals, matrix_ordered_indices, weighted_sum,
-    weighted_permutation_sum, kw, pkw, NULL, NULL);
+    weighted_permutation_sum, kw, pkw, 0, NULL, NULL);
 }
 
 int np_kernel_estimate_con_density_categorical_convolution_cv(
