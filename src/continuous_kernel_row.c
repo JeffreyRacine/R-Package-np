@@ -12,8 +12,10 @@
 #if defined(__clang__) || defined(__GNUC__)
 # define NP_CONTINUOUS_ROW_ALWAYS_INLINE \
   static inline __attribute__((always_inline))
+# define NP_CONTINUOUS_ROW_NOINLINE __attribute__((noinline))
 #else
 # define NP_CONTINUOUS_ROW_ALWAYS_INLINE static inline
+# define NP_CONTINUOUS_ROW_NOINLINE
 #endif
 
 static void np_continuous_kernel_row_reset_diagnostics(
@@ -463,20 +465,22 @@ np_continuous_kernel_beta_segment_log_fill(
   const NPContinuousKernelSegment *segment,
   int evaluation_index,
   int omitted_observation,
-  NPContinuousKernelRowWorkspace *workspace,
+  double *log_absolute,
+  signed char *sign,
   NPContinuousKernelRowResult *result)
 {
   int observation;
 
-  if(plan == NULL || segment == NULL || workspace == NULL || result == NULL)
+  if(plan == NULL || segment == NULL || log_absolute == NULL ||
+     sign == NULL || result == NULL)
     return NP_CONTINUOUS_ROW_ERR_LAYOUT;
   for(observation = 0; observation < plan->num_train; ++observation) {
     double log_product = 0.0;
     int product_sign = 1;
 
     if(observation == omitted_observation) {
-      workspace->primary_log_absolute[observation] = -INFINITY;
-      workspace->primary_sign[observation] = 0;
+      log_absolute[observation] = -INFINITY;
+      sign[observation] = 0;
       continue;
     }
     for(int coordinate = segment->coordinate_offset;
@@ -509,8 +513,8 @@ np_continuous_kernel_beta_segment_log_fill(
         return NP_CONTINUOUS_ROW_ERR_NUMERIC;
       }
     }
-    workspace->primary_log_absolute[observation] = log_product;
-    workspace->primary_sign[observation] = (signed char)product_sign;
+    log_absolute[observation] = log_product;
+    sign[observation] = (signed char)product_sign;
   }
   return NP_CONTINUOUS_ROW_OK;
 }
@@ -560,7 +564,7 @@ NPContinuousKernelRowStatus np_continuous_kernel_beta_factor_row(
       continue;
     status = np_continuous_kernel_beta_segment_log_fill(
       plan, segment, evaluation_index, omitted_observation,
-      workspace, result);
+      workspace->primary_log_absolute, workspace->primary_sign, result);
     if(status != NP_CONTINUOUS_ROW_OK)
       return status;
 
@@ -582,30 +586,20 @@ NPContinuousKernelRowStatus np_continuous_kernel_beta_factor_row(
 }
 
 static NPContinuousKernelRowStatus
-np_continuous_kernel_log_factor_compose(
+np_continuous_kernel_log_channels_multiply(
   const NPContinuousKernelRowPlan *plan,
-  int evaluation_index,
   int omitted_observation,
-  const NPContinuousKernelLogFactorProvider *provider,
   NPContinuousKernelRowWorkspace *workspace,
   NPContinuousKernelRowResult *result)
 {
-  NPContinuousKernelRowStatus status;
   int observation;
 
-  if(plan == NULL || provider == NULL || provider->function == NULL ||
-     workspace == NULL || result == NULL)
+  if(plan == NULL || workspace == NULL || result == NULL ||
+     workspace->primary_log_absolute == NULL ||
+     workspace->primary_sign == NULL ||
+     workspace->secondary_log_absolute == NULL ||
+     workspace->secondary_sign == NULL)
     return NP_CONTINUOUS_ROW_ERR_LAYOUT;
-  status = np_continuous_kernel_row_workspace_reserve(
-    workspace, (size_t)plan->num_train, 1);
-  if(status != NP_CONTINUOUS_ROW_OK)
-    return status;
-  status = provider->function(
-    provider->context, evaluation_index, omitted_observation,
-    plan->num_train, workspace->secondary_log_absolute,
-    workspace->secondary_sign);
-  if(status != NP_CONTINUOUS_ROW_OK)
-    return status;
 
   for(observation = 0; observation < plan->num_train; ++observation) {
     const double factor_log =
@@ -646,6 +640,96 @@ np_continuous_kernel_log_factor_compose(
 }
 
 static NPContinuousKernelRowStatus
+np_continuous_kernel_log_factor_compose(
+  const NPContinuousKernelRowPlan *plan,
+  int evaluation_index,
+  int omitted_observation,
+  const NPContinuousKernelLogFactorProvider *provider,
+  NPContinuousKernelRowWorkspace *workspace,
+  NPContinuousKernelRowResult *result)
+{
+  NPContinuousKernelRowStatus status;
+
+  if(plan == NULL || provider == NULL || provider->function == NULL ||
+     workspace == NULL || result == NULL)
+    return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  status = np_continuous_kernel_row_workspace_reserve(
+    workspace, (size_t)plan->num_train, 1);
+  if(status != NP_CONTINUOUS_ROW_OK)
+    return status;
+  status = provider->function(
+    provider->context, evaluation_index, omitted_observation,
+    plan->num_train, workspace->secondary_log_absolute,
+    workspace->secondary_sign);
+  if(status != NP_CONTINUOUS_ROW_OK)
+    return status;
+  return np_continuous_kernel_log_channels_multiply(
+    plan, omitted_observation, workspace, result);
+}
+
+static NPContinuousKernelRowStatus NP_CONTINUOUS_ROW_NOINLINE
+np_continuous_kernel_beta_log_factor_row_multi_prevalidated(
+  const NPContinuousKernelRowPlan *plan,
+  int evaluation_index,
+  int omitted_observation,
+  const NPContinuousKernelLogFactorProvider *provider,
+  NPContinuousKernelRowWorkspace *workspace,
+  NPContinuousKernelRowResult *result)
+{
+  NPContinuousKernelRowStatus status;
+  int beta_segment_count = 0;
+  int segment_index;
+
+  if(evaluation_index < 0 || evaluation_index >= plan->num_eval ||
+     omitted_observation < -1 || omitted_observation >= plan->num_train)
+    return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  for(segment_index = 0; segment_index < plan->route->segment_count;
+      ++segment_index)
+    beta_segment_count +=
+      plan->route->segment[segment_index].descriptor.family ==
+      NP_CKERNEL_FAMILY_BETA;
+  if(beta_segment_count == 0)
+    return NP_CONTINUOUS_ROW_ERR_ROUTE;
+  status = np_continuous_kernel_row_workspace_reserve(
+    workspace, (size_t)plan->num_train,
+    provider != NULL || beta_segment_count > 1);
+  if(status != NP_CONTINUOUS_ROW_OK)
+    return status;
+
+  beta_segment_count = 0;
+  for(segment_index = 0; segment_index < plan->route->segment_count;
+      ++segment_index) {
+    const NPContinuousKernelSegment * const segment =
+      &plan->route->segment[segment_index];
+    double * const segment_log = beta_segment_count == 0 ?
+      workspace->primary_log_absolute :
+      workspace->secondary_log_absolute;
+    signed char * const segment_sign = beta_segment_count == 0 ?
+      workspace->primary_sign : workspace->secondary_sign;
+
+    if(segment->descriptor.family != NP_CKERNEL_FAMILY_BETA)
+      continue;
+    status = np_continuous_kernel_beta_segment_log_fill(
+      plan, segment, evaluation_index, omitted_observation,
+      segment_log, segment_sign, result);
+    if(status != NP_CONTINUOUS_ROW_OK)
+      return status;
+    if(beta_segment_count > 0) {
+      status = np_continuous_kernel_log_channels_multiply(
+        plan, omitted_observation, workspace, result);
+      if(status != NP_CONTINUOUS_ROW_OK)
+        return status;
+    }
+    ++beta_segment_count;
+  }
+  if(provider == NULL)
+    return NP_CONTINUOUS_ROW_OK;
+  return np_continuous_kernel_log_factor_compose(
+    plan, evaluation_index, omitted_observation,
+    provider, workspace, result);
+}
+
+static NPContinuousKernelRowStatus
 np_continuous_kernel_beta_log_factor_row(
   const NPContinuousKernelRowPlan *plan,
   int evaluation_index,
@@ -671,8 +755,11 @@ np_continuous_kernel_beta_log_factor_row(
   if(status != NP_CONTINUOUS_ROW_OK)
     return status;
   if(plan->route->segment_count != 1 ||
-     plan->route->segment[0].descriptor.family != NP_CKERNEL_FAMILY_BETA ||
-     evaluation_index < 0 || evaluation_index >= plan->num_eval ||
+     plan->route->segment[0].descriptor.family != NP_CKERNEL_FAMILY_BETA)
+    return np_continuous_kernel_beta_log_factor_row_multi_prevalidated(
+      plan, evaluation_index, omitted_observation,
+      provider, workspace, result);
+  if(evaluation_index < 0 || evaluation_index >= plan->num_eval ||
      omitted_observation < -1 || omitted_observation >= plan->num_train)
     return NP_CONTINUOUS_ROW_ERR_LAYOUT;
   status = np_continuous_kernel_row_workspace_reserve(
@@ -681,7 +768,8 @@ np_continuous_kernel_beta_log_factor_row(
     return status;
   status = np_continuous_kernel_beta_segment_log_fill(
     plan, &plan->route->segment[0], evaluation_index,
-    omitted_observation, workspace, result);
+    omitted_observation, workspace->primary_log_absolute,
+    workspace->primary_sign, result);
   if(status != NP_CONTINUOUS_ROW_OK || provider == NULL)
     return status;
   return np_continuous_kernel_log_factor_compose(
@@ -1719,12 +1807,11 @@ cleanup:
 }
 
 /*
- * Consume powers one and two from one ordinary beta factor row.  The two
+ * Consume powers one and two from one complete ordinary beta route.  The two
  * output tensors may bind different response/weight columns, matching the
- * shared dual-power context contract.  This helper deliberately admits only
- * the currently representable homogeneous beta segment and ordinary
- * operators; a future mixed-family or nonordinary owner must widen the row
- * representation explicitly rather than acquire a silent fallback here.
+ * shared dual-power context contract.  Every beta segment is composed in
+ * signed-log form; an optional provider supplies the product of non-beta
+ * factors.  Derivatives retain their separate regular/jump owner.
  */
 NPContinuousKernelRowStatus
 np_continuous_kernel_beta_dual_power_rows_validated(
@@ -1767,8 +1854,6 @@ np_continuous_kernel_beta_dual_power_rows_validated(
   }
   if(plan == NULL || plan->route == NULL || plan->num_train <= 0 ||
      plan->num_eval <= 0 || plan->num_continuous <= 0 ||
-     plan->route->segment_count != 1 ||
-     plan->route->segment[0].descriptor.family != NP_CKERNEL_FAMILY_BETA ||
      (leave_one_out != 0 && leave_one_out != 1) ||
      leave_one_out_offset < 0 || response_columns < 0 ||
      weight_columns < 0 || power2_response_columns < 0 ||
