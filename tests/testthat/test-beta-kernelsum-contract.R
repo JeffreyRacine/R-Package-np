@@ -81,6 +81,39 @@ test_that("beta npksum supports weighting and leave-one-out", {
         )
 })
 
+test_that("beta bandwidth division uses complete-unit semantics", {
+  training <- data.frame(
+    x = c(.017, .08, .21, .47, .73, .94, .989),
+    z = c(.9, .18, .67, .31, .79, .42, .06)
+  )
+  evaluation <- data.frame(x = c(.11, .37, .82), z = c(.2, .7, .44))
+
+  for (mode in c("fixed", "generalized_nn", "adaptive_nn")) {
+    bandwidth <- if (identical(mode, "fixed")) c(.14, .18) else c(4, 4)
+    for (operators in list(
+      c("normal", "integral"),
+      c("normal", "convolution"),
+      c("derivative", "normal")
+    )) {
+      arguments <- list(
+        bws = bandwidth, txdat = training, exdat = evaluation,
+        bwtype = mode, operator = operators,
+        return.kernel.weights = TRUE,
+        ckertype = "beta", ckerorder = 8,
+        ckerbound = "fixed", ckerlb = c(0, 0), ckerub = c(1, 1)
+      )
+      undivided <- do.call(npksum, c(arguments, list(
+        bandwidth.divide = FALSE
+      )))
+      divided <- do.call(npksum, c(arguments, list(
+        bandwidth.divide = TRUE
+      )))
+      expect_identical(divided$ksum, undivided$ksum)
+      expect_identical(divided$kw, undivided$kw)
+    }
+  }
+})
+
 test_that("unsupported beta npksum surfaces fail explicitly", {
   args <- list(
     bws = 0.1,
@@ -92,8 +125,6 @@ test_that("unsupported beta npksum surfaces fail explicitly", {
     ckerub = 1
   )
 
-  expect_error(do.call(npksum, c(args, list(bandwidth.divide = TRUE))),
-               "bandwidth.divide = TRUE", fixed = TRUE)
   expect_error(do.call(npksum, c(args, list(permutation.operator = "normal"))),
                "only derivative permutation operators",
                fixed = TRUE)

@@ -287,8 +287,6 @@ npksum.default <-
         stop("beta kernel sums support one direct derivative dimension at a time")
       if (!identical(as.double(kernel.pow), 1.0))
         stop("beta kernel sums currently require kernel.pow = 1")
-      if (isTRUE(bandwidth.divide))
-        stop("bandwidth.divide = TRUE is not defined for beta kernels")
       if (compute.score || compute.ocg ||
           !permutation.operator %in% c("none", "derivative"))
         stop("beta kernel sums support only derivative permutation operators")
