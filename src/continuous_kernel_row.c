@@ -560,6 +560,103 @@ NPContinuousKernelRowStatus np_continuous_kernel_beta_factor_row(
     &result->total_log_scale);
 }
 
+NPContinuousKernelRowStatus
+np_continuous_kernel_beta_factor_row_with_log_factor(
+  const NPContinuousKernelRowPlan *plan,
+  int evaluation_index,
+  int omitted_observation,
+  const NPContinuousKernelLogFactorProvider *provider,
+  NPContinuousKernelRowWorkspace *workspace,
+  NPContinuousKernelRowResult *result)
+{
+  NPContinuousKernelRowStatus status;
+  double complete_log_scale;
+  int beta_segment_count = 0;
+  int segment_index;
+  int observation;
+
+  if(plan == NULL || plan->route == NULL || provider == NULL ||
+     provider->function == NULL || workspace == NULL || result == NULL)
+    return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  status = np_continuous_kernel_row_plan_validate(plan);
+  if(status != NP_CONTINUOUS_ROW_OK)
+    return status;
+  for(segment_index = 0; segment_index < plan->route->segment_count;
+      ++segment_index)
+    if(plan->route->segment[segment_index].descriptor.family ==
+       NP_CKERNEL_FAMILY_BETA)
+      ++beta_segment_count;
+  if(beta_segment_count != 1)
+    return NP_CONTINUOUS_ROW_ERR_ROUTE;
+
+  status = np_continuous_kernel_beta_factor_row(
+    plan, evaluation_index, omitted_observation, workspace, result);
+  if(status != NP_CONTINUOUS_ROW_OK)
+    return status;
+  status = np_continuous_kernel_row_workspace_reserve(
+    workspace, (size_t)plan->num_train, 1);
+  if(status != NP_CONTINUOUS_ROW_OK)
+    return status;
+  status = provider->function(
+    provider->context, evaluation_index, omitted_observation,
+    plan->num_train, workspace->secondary_log_absolute,
+    workspace->secondary_sign);
+  if(status != NP_CONTINUOUS_ROW_OK)
+    return status;
+
+  for(observation = 0; observation < plan->num_train; ++observation) {
+    double factor_log;
+    double beta_log;
+    int factor_sign;
+    int beta_sign;
+
+    if(observation == omitted_observation) {
+      workspace->primary_log_absolute[observation] = -INFINITY;
+      workspace->primary_sign[observation] = 0;
+      continue;
+    }
+    factor_log = workspace->secondary_log_absolute[observation];
+    factor_sign = workspace->secondary_sign[observation];
+    beta_log = workspace->primary_log_absolute[observation];
+    beta_sign = workspace->primary_sign[observation];
+    if(ISNAN(factor_log) || factor_log == INFINITY ||
+       (factor_sign != -1 && factor_sign != 0 && factor_sign != 1) ||
+       ((factor_sign == 0) != (factor_log == -INFINITY)) ||
+       ISNAN(beta_log) || beta_log == INFINITY ||
+       (beta_sign != -1 && beta_sign != 0 && beta_sign != 1) ||
+       ((beta_sign == 0) != (beta_log == -INFINITY))) {
+      result->bad_observation = observation;
+      return NP_CONTINUOUS_ROW_ERR_NUMERIC;
+    }
+    if(beta_sign == 0 || factor_sign == 0) {
+      workspace->primary_log_absolute[observation] = -INFINITY;
+      workspace->primary_sign[observation] = 0;
+      continue;
+    }
+    workspace->primary_log_absolute[observation] = beta_log + factor_log;
+    workspace->primary_sign[observation] =
+      (signed char)(beta_sign * factor_sign);
+    if(ISNAN(workspace->primary_log_absolute[observation]) ||
+       workspace->primary_log_absolute[observation] == INFINITY) {
+      result->bad_observation = observation;
+      return NP_CONTINUOUS_ROW_ERR_NUMERIC;
+    }
+  }
+
+  complete_log_scale = np_continuous_kernel_row_maximum(
+    workspace->primary_log_absolute, workspace->primary_sign,
+    plan->num_train);
+  for(observation = 0; observation < plan->num_train; ++observation)
+    result->row[observation] = 1.0;
+  status = np_continuous_kernel_row_multiply_scaled(
+    result->row, workspace->primary_log_absolute,
+    workspace->primary_sign, plan->num_train, complete_log_scale);
+  if(status != NP_CONTINUOUS_ROW_OK)
+    return status;
+  result->total_log_scale = complete_log_scale;
+  return NP_CONTINUOUS_ROW_OK;
+}
+
 NPContinuousKernelRowStatus np_continuous_kernel_beta_derivative_factor_row(
   const NPContinuousKernelRowPlan *plan,
   int evaluation_index,
