@@ -68,7 +68,7 @@ test_that("beta distribution supports dimensions, formulas, objects, and predict
   expect_equal(as.numeric(predicted$se.fit), se(direct), tolerance = 2e-12)
 })
 
-test_that("unsupported beta distribution surfaces fail explicitly", {
+test_that("invalid beta distribution bounds fail explicitly", {
   training <- data.frame(x = c(0, 0.03, 0.2, 0.6, 1))
 
   expect_error(
@@ -77,17 +77,6 @@ test_that("unsupported beta distribution surfaces fail explicitly", {
       ckerbound = "none"
     )),
     "require ckerbound = \"fixed\" or \"range\"",
-    fixed = TRUE
-  )
-  expect_error(
-    suppressWarnings(npudist(
-      bws = c(0.1, 0.2),
-      tdat = data.frame(x = training$x,
-                        group = ordered(c(1, 1, 1, 2, 2))),
-      ckertype = "beta", ckerbound = "fixed",
-      ckerlb = 0, ckerub = 1
-    )),
-    "continuous variables only",
     fixed = TRUE
   )
 })

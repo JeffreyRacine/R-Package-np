@@ -111,7 +111,8 @@ npudens.bandwidth <-
     dati = bws$xdati,
     bw = bws$bw,
     bandwidth.compute = FALSE,
-    where = "beta density"
+    where = "beta density",
+    allow.categorical = TRUE
   )
 
   if ((any(bws$icon) &&
@@ -215,6 +216,13 @@ npudens.bandwidth <-
                                       ncat = bws$nuno + bws$nord,
                                       bws = bws))
   myopti <- c(myopti, npContinuousKernelDescriptorOptions(bws))
+  if (beta.kernel)
+    myopti <- c(
+      myopti,
+      categorical.compress = npStrictLogicalOption(
+        "np.categorical.compress", TRUE
+      )
+    )
   cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
 
   myout <- .np_with_compiled_fit_progress(

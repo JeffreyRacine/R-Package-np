@@ -68,6 +68,8 @@ np_bandwidth_kernel_descriptor_or_error(int family,
                                         const double *upper,
                                         const char *where);
 
+static int np_real_buffer_has_matrix(SEXP value, int nrow, int ncol);
+
 // categorical hashing
 #include "hash.h"
 
@@ -7121,6 +7123,7 @@ SEXP C_np_density(SEXP tuno,
   SEXP out=R_NilValue, out_names=R_NilValue, out_dens=R_NilValue, out_derr=R_NilValue, out_ll=R_NilValue;
   int en = asInteger(enrow);
   int ncon = 0;
+  int categorical_compress = 0;
   double * ckerlb_p = NULL;
   double * ckerub_p = NULL;
   np_continuous_kernel_descriptor descriptor;
@@ -7147,16 +7150,19 @@ SEXP C_np_density(SEXP tuno,
   PROTECT(ckerlb_r = coerceVector(ckerlb, REALSXP));
   PROTECT(ckerub_r = coerceVector(ckerub, REALSXP));
 
-  ncon = (int)INTEGER(myopti_i)[DEN_NCONI];
-  resolve_bounds_or_default(ckerlb_r, ckerub_r, ncon, &ckerlb_p, &ckerub_p);
-
   if(XLENGTH(myopti_i) <= DEN_CKORDERI)
     error("C_np_density: continuous-kernel descriptor is missing");
+  ncon = (int)INTEGER(myopti_i)[DEN_NCONI];
+  resolve_bounds_or_default(ckerlb_r, ckerub_r, ncon, &ckerlb_p, &ckerub_p);
   descriptor = np_continuous_kernel_descriptor_or_error(
     INTEGER(myopti_i)[DEN_CKFAMILYI],
     INTEGER(myopti_i)[DEN_CKRNEVI],
     INTEGER(myopti_i)[DEN_CKORDERI],
     "C_np_density");
+  if(XLENGTH(myopti_i) > DEN_CATCOMPI)
+    categorical_compress = INTEGER(myopti_i)[DEN_CATCOMPI];
+  if(categorical_compress != 0 && categorical_compress != 1)
+    error("C_np_density: categorical compression must be TRUE or FALSE");
 
   PROTECT(out_dens = allocVector(REALSXP, en));
   PROTECT(out_derr = allocVector(REALSXP, en));
@@ -7168,22 +7174,43 @@ SEXP C_np_density(SEXP tuno,
     const int train_is_eval = INTEGER(myopti_i)[DEN_TISEI];
     const int dens_or_dist = INTEGER(myopti_i)[DEN_DODENI];
     const int beta_bandwidth_code = INTEGER(myopti_i)[DEN_DENI];
+    const int num_unordered = INTEGER(myopti_i)[DEN_NUNOI];
+    const int num_ordered = INTEGER(myopti_i)[DEN_NORDI];
+    const int max_levels = INTEGER(myopti_i)[DEN_MLEVI];
+    int num_categorical;
 
-    if(INTEGER(myopti_i)[DEN_NUNOI] != 0 ||
-       INTEGER(myopti_i)[DEN_NORDI] != 0)
-      error("C_np_density: beta density/distribution currently supports continuous variables only");
+    if(num_unordered < 0 || num_ordered < 0 ||
+       num_unordered > INT_MAX - num_ordered || ncon < 0)
+      error("C_np_density: invalid beta categorical dimensions");
+    num_categorical = num_unordered + num_ordered;
+    if(ncon > INT_MAX - num_categorical)
+      error("C_np_density: invalid beta total dimension");
     if(beta_bandwidth_code != BW_FIXED &&
        beta_bandwidth_code != BW_GEN_NN &&
        beta_bandwidth_code != BW_ADAP_NN)
       error("C_np_density: invalid beta bandwidth mode");
     if(dens_or_dist != NP_DO_DENS && dens_or_dist != NP_DO_DIST)
       error("C_np_density: invalid beta density/distribution operator");
-    if(num_train <= 0 || num_eval <= 0 || ncon <= 0 || en != num_eval)
+    if(num_categorical > 0 &&
+       (max_levels <= 0 ||
+        !np_real_buffer_has_matrix(
+          mcv_r, max_levels, num_categorical)))
+      error("C_np_density: beta categorical level buffer is too short");
+    if(num_train <= 0 || num_eval <= 0 || ncon <= 0 || en != num_eval ||
+       (train_is_eval != 0 && train_is_eval != 1))
       error("C_np_density: invalid beta density/distribution dimensions");
-    if(XLENGTH(tcon_r) < (R_xlen_t)num_train * (R_xlen_t)ncon ||
+    if(!np_real_buffer_has_matrix(tcon_r, num_train, ncon) ||
        (!train_is_eval &&
-        XLENGTH(econ_r) < (R_xlen_t)num_eval * (R_xlen_t)ncon) ||
-       XLENGTH(rbw_r) < ncon || XLENGTH(ckerlb_r) < ncon ||
+        !np_real_buffer_has_matrix(econ_r, num_eval, ncon)) ||
+       !np_real_buffer_has_matrix(tuno_r, num_train, num_unordered) ||
+       !np_real_buffer_has_matrix(tord_r, num_train, num_ordered) ||
+       (!train_is_eval &&
+        (!np_real_buffer_has_matrix(euno_r, num_eval, num_unordered) ||
+         !np_real_buffer_has_matrix(eord_r, num_eval, num_ordered))) ||
+       XLENGTH(rbw_r) < ncon + num_categorical ||
+       XLENGTH(padnum_r) < 1 || XLENGTH(nconfac_r) < 1 ||
+       XLENGTH(ncatfac_r) < 1 || XLENGTH(mysd_r) < ncon ||
+       XLENGTH(ckerlb_r) < ncon ||
        XLENGTH(ckerub_r) < ncon)
       error("C_np_density: beta density/distribution input buffer is too short");
 
@@ -7209,7 +7236,7 @@ SEXP C_np_density(SEXP tuno,
              INTEGER(myopti_i),
              REAL(out_dens), REAL(out_derr), REAL(out_ll),
              ckerlb_p, ckerub_p,
-             active_route, active_diagnostics, 0);
+             active_route, active_diagnostics, categorical_compress);
 
   PROTECT(out = allocVector(VECSXP, 3));
   SET_VECTOR_ELT(out, 0, out_dens);
@@ -16121,10 +16148,8 @@ void np_density(double * tuno, double * tord, double * tcon,
     error("C_np_density: reserved legacy selector must be zero");
   int_TREE_X = myopti[DEN_TREEI];
   int_TREE_PROFILE_X = myopti[DEN_TREEI];
-  if(canonical_beta_views &&
-     (num_reg_unordered_extern != 0 || num_reg_ordered_extern != 0 ||
-      int_TREE_X != NP_TREE_FALSE))
-    error("canonical beta density views require continuous non-tree data");
+  if(canonical_beta_views && int_TREE_X != NP_TREE_FALSE)
+    error("canonical beta density/distribution views require non-tree data");
 
 #ifdef MPI2
   num_obs_eval_alloc = MAX(ceil((double) num_obs_eval_extern / (double) iNum_Processors),1)*iNum_Processors;
@@ -16135,11 +16160,15 @@ void np_density(double * tuno, double * tord, double * tcon,
   /* Allocate memory for objects */
 
   if(canonical_beta_views) {
-    matrix_X_unordered_train_extern = NULL;
-    matrix_X_ordered_train_extern = NULL;
+    matrix_X_unordered_train_extern = np_column_view_alloc_or_die(
+      tuno, num_obs_train_extern, num_reg_unordered_extern,
+      "beta density/distribution unordered training data");
+    matrix_X_ordered_train_extern = np_column_view_alloc_or_die(
+      tord, num_obs_train_extern, num_reg_ordered_extern,
+      "beta density/distribution ordered training data");
     matrix_X_continuous_train_extern = np_column_view_alloc_or_die(
       tcon, num_obs_train_extern, num_reg_continuous_extern,
-      "beta density training data");
+      "beta density/distribution continuous training data");
   } else {
     matrix_X_unordered_train_extern = alloc_matd(
       num_obs_train_extern, num_reg_unordered_extern);
@@ -16151,11 +16180,15 @@ void np_density(double * tuno, double * tord, double * tcon,
 
   if(!train_is_eval){
     if(canonical_beta_views) {
-      matrix_X_unordered_eval_extern = NULL;
-      matrix_X_ordered_eval_extern = NULL;
+      matrix_X_unordered_eval_extern = np_column_view_alloc_or_die(
+        euno, num_obs_eval_extern, num_reg_unordered_extern,
+        "beta density/distribution unordered evaluation data");
+      matrix_X_ordered_eval_extern = np_column_view_alloc_or_die(
+        eord, num_obs_eval_extern, num_reg_ordered_extern,
+        "beta density/distribution ordered evaluation data");
       matrix_X_continuous_eval_extern = np_column_view_alloc_or_die(
         econ, num_obs_eval_extern, num_reg_continuous_extern,
-        "beta density evaluation data");
+        "beta density/distribution continuous evaluation data");
     } else {
       matrix_X_unordered_eval_extern = alloc_matd(
         num_obs_eval_extern, num_reg_unordered_extern);
@@ -16170,10 +16203,13 @@ void np_density(double * tuno, double * tord, double * tcon,
     matrix_X_continuous_eval_extern = matrix_X_continuous_train_extern;
   }
 
-  num_categories_extern = canonical_beta_views ? NULL :
-    alloc_vecu(num_reg_unordered_extern+num_reg_ordered_extern);
+  num_categories_extern =
+    alloc_vecu(num_reg_unordered_extern + num_reg_ordered_extern);
   vector_scale_factor = alloc_vecd(num_var + 1);
-  matrix_categorical_vals_extern = canonical_beta_views ? NULL :
+  matrix_categorical_vals_extern = canonical_beta_views ?
+    np_column_view_alloc_or_die(
+      mcv, max_lev, num_reg_unordered_extern + num_reg_ordered_extern,
+      "beta density/distribution category values") :
     alloc_matd(max_lev, num_reg_unordered_extern + num_reg_ordered_extern);
 
   /* note use of num_obs_eval_alloc */
@@ -16227,14 +16263,13 @@ void np_density(double * tuno, double * tord, double * tcon,
 
   /* fix up categories */
   
-  if(!canonical_beta_views) {
-    for(j=0; j < (num_reg_unordered_extern + num_reg_ordered_extern); j++){
-      i = 0;
-      do {
+  for(j=0; j < (num_reg_unordered_extern + num_reg_ordered_extern); j++){
+    i = 0;
+    do {
+      if(!canonical_beta_views)
         matrix_categorical_vals_extern[j][i] = mcv[j*max_lev+i];
-      } while(++i < max_lev && mcv[j*max_lev+i] != pad_num);
-      num_categories_extern[j] = i;
-    }
+    } while(++i < max_lev && mcv[j*max_lev+i] != pad_num);
+    num_categories_extern[j] = i;
   }
 
   /* data has been copied, now build tree */
@@ -16351,6 +16386,8 @@ void np_density(double * tuno, double * tord, double * tcon,
   /* clean up and wave goodbye */
 
   if(canonical_beta_views) {
+    free(matrix_X_unordered_train_extern);
+    free(matrix_X_ordered_train_extern);
     free(matrix_X_continuous_train_extern);
   } else {
     free_mat(matrix_X_unordered_train_extern, num_reg_unordered_extern);
@@ -16360,6 +16397,8 @@ void np_density(double * tuno, double * tord, double * tcon,
 
   if (!train_is_eval){
     if(canonical_beta_views) {
+      free(matrix_X_unordered_eval_extern);
+      free(matrix_X_ordered_eval_extern);
       free(matrix_X_continuous_eval_extern);
     } else {
       free_mat(matrix_X_unordered_eval_extern, num_reg_unordered_extern);
@@ -16375,7 +16414,9 @@ void np_density(double * tuno, double * tord, double * tcon,
   safe_free(pdf_stderr);
   safe_free(pdf);
 
-  if(!canonical_beta_views)
+  if(canonical_beta_views)
+    free(matrix_categorical_vals_extern);
+  else
     free_mat(matrix_categorical_vals_extern,
              num_reg_unordered_extern+num_reg_ordered_extern);
 

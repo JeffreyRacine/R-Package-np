@@ -31247,6 +31247,7 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
   double *beta_kernel_square_sum = NULL;
   double *beta_centered_m2 = NULL;
   double *beta_fixed_bandwidth = NULL;
+  double *beta_categorical_lambda = NULL;
   int beta_route_status = 0;
 
   double pnh = (double)num_obs_train;
@@ -31263,7 +31264,6 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
       kernel_route->segment[0].coordinate_count != num_reg_continuous ||
       (dop != OP_NORMAL && dop != OP_INTEGRAL) ||
       num_reg_continuous <= 0 ||
-      num_reg_unordered != 0 || num_reg_ordered != 0 ||
       kernel_route_diagnostics == NULL ||
       (categorical_compress != 0 && categorical_compress != 1)))
     error("canonical beta density/distribution route has an invalid layout");
@@ -31308,8 +31308,13 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
 
   matrix_bandwidth = alloc_matd(bwmdim,num_reg_continuous);
   lambda = alloc_vecd(num_reg_unordered+num_reg_ordered);
+  /* malloc(0) may return either NULL or a unique pointer.  Keep the route
+     contract independent of that implementation detail. */
+  if(exact_beta_route && (num_reg_unordered + num_reg_ordered) > 0)
+    beta_categorical_lambda = lambda;
 
-  if(!(exact_beta_route && BANDWIDTH_den == BW_FIXED) &&
+  if(!(exact_beta_route && BANDWIDTH_den == BW_FIXED &&
+       num_reg_unordered == 0 && num_reg_ordered == 0) &&
      kernel_bandwidth_mean(KERNEL_den,
                            BANDWIDTH_den,
                            num_obs_train,
@@ -31522,7 +31527,7 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
         BANDWIDTH_den != BW_FIXED,
         BANDWIDTH_den == BW_FIXED ? NULL : matrix_bandwidth,
         BANDWIDTH_den == BW_FIXED ? NULL : matrix_bandwidth,
-        NULL, num_categories, matrix_categorical_vals,
+        beta_categorical_lambda, num_categories, matrix_categorical_vals,
         categorical_compress, pdf, beta_kernel_square_sum,
         kernel_route, kernel_route_diagnostics, np_progress_fit_loop_step);
     } else {
@@ -31540,7 +31545,7 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
         BANDWIDTH_den != BW_FIXED,
         BANDWIDTH_den == BW_FIXED ? NULL : matrix_bandwidth,
         BANDWIDTH_den == BW_FIXED ? NULL : matrix_bandwidth,
-        NULL, num_categories, matrix_categorical_vals,
+        beta_categorical_lambda, num_categories, matrix_categorical_vals,
         categorical_compress, pdf, beta_centered_m2,
         kernel_route, kernel_route_diagnostics, np_progress_fit_loop_step);
     }

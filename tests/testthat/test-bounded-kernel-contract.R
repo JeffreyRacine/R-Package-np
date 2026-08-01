@@ -55,6 +55,21 @@ test_that("scalar fixed bounds recycle over multiple continuous variables", {
   expect_equal(as.numeric(fit.scalar$dens), as.numeric(fit.vector$dens), tolerance = 1e-12)
 })
 
+test_that("full-variable fixed bounds round-trip through mixed bandwidths", {
+  dat <- data.frame(
+    x = seq(0.05, 0.95, length.out = 12L),
+    group = factor(rep(letters[1:3], each = 4L))
+  )
+  bw <- npudensbw(
+    dat = dat, bws = c(0.2, 0.25), bandwidth.compute = FALSE,
+    ckerbound = "fixed", ckerlb = 0, ckerub = 1
+  )
+
+  expect_no_error(npudens(bws = bw, tdat = dat))
+  expect_identical(bw$ckerlb, c(0, -Inf))
+  expect_identical(bw$ckerub, c(1, Inf))
+})
+
 test_that("invalid fixed bounds are rejected with clear diagnostics", {
   set.seed(20260224)
   x <- runif(50)

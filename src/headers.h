@@ -748,6 +748,7 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 4, 8, 12 };
 #define DEN_TREEI 15
 #define DEN_CKFAMILYI 16
 #define DEN_CKORDERI 17
+#define DEN_CATCOMPI 18
 
 #define REG_TNOBSI   0
 #define REG_ENOBSI   1

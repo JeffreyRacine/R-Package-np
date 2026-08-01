@@ -1701,10 +1701,16 @@ npKernelBoundsResolve <- function(dati,
                    paste0(argprefix, "lb"),
                    paste0(argprefix, "ub")))
     x <- as.numeric(x)
-    if (!(length(x) %in% c(1L, ncon))) {
-      stop(sprintf("length(%s) must be 1 or equal to the number of continuous variables (%d).",
-                   nm, ncon))
-    }
+    if (length(x) == length(dati$icon))
+      x <- x[icon.idx]
+    if (!(length(x) %in% c(1L, ncon)))
+      stop(sprintf(
+        paste0(
+          "length(%s) must be 1, the number of continuous variables (%d), ",
+          "or the total number of variables (%d)."
+        ),
+        nm, ncon, length(dati$icon)
+      ))
     if (length(x) == 1L)
       rep(x, ncon)
     else
@@ -2051,7 +2057,8 @@ npValidateBetaKernelSpecification <- function(ckertype,
                                               bw,
                                               bandwidth.compute = FALSE,
                                               where = "beta kernel",
-                                              regtype = NULL) {
+                                              regtype = NULL,
+                                              allow.categorical = FALSE) {
   if (!identical(ckertype, "beta"))
     return(invisible(FALSE))
 
@@ -2067,7 +2074,7 @@ npValidateBetaKernelSpecification <- function(ckertype,
   icon <- dati$icon
   if (is.null(icon) || !any(icon))
     stop("beta kernels require at least one continuous variable", call. = FALSE)
-  if (any(dati$iuno) || any(dati$iord))
+  if (!isTRUE(allow.categorical) && (any(dati$iuno) || any(dati$iord)))
     stop("beta kernels currently support continuous variables only", call. = FALSE)
   if (any(!is.finite(ckerlb[icon])) || any(!is.finite(ckerub[icon])))
     stop("beta kernels require finite lower and upper bounds for every continuous variable",
