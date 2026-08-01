@@ -28,7 +28,7 @@ test_that("the first beta row activation enters the canonical central engine", {
   )
 
   activation_start <- regexpr(
-    "if(beta_bandwidth_code == BW_FIXED && all_nonderivative",
+    "if(all_nonderivative &&",
     ingress,
     fixed = TRUE
   )[[1L]]
@@ -57,7 +57,7 @@ test_that("the first beta row activation enters the canonical central engine", {
   )[[1L]]
   expect_gt(route_start, 0L)
   expect_gt(legacy_start, route_start)
-  expect_match(engine, "np_beta_fixed_scalar_absolute_route(", fixed = TRUE)
+  expect_match(engine, "np_beta_scalar_absolute_route(", fixed = TRUE)
   expect_match(engine, "np_continuous_kernel_beta_factor_row(", fixed = TRUE)
   expect_match(engine, "np_continuous_kernel_signed_log_restore(", fixed = TRUE)
 })
@@ -80,7 +80,7 @@ test_that("legacy callers cannot acquire beta route metadata implicitly", {
   )
   expect_match(
     engine,
-    "if(!exact_beta_fixed_scalar_route)\n      return KWSNP_ERR_BADINVOC;",
+    "if(!exact_beta_scalar_route)\n      return KWSNP_ERR_BADINVOC;",
     fixed = TRUE
   )
 })

@@ -10497,7 +10497,8 @@ SEXP C_np_kernelsum(SEXP tuno,
        n_pkw != (R_xlen_t)ncon * expected_weights)
       error("C_np_kernelsum: beta derivative-weight buffer has the wrong length");
 
-    if(beta_bandwidth_code == BW_FIXED && all_nonderivative &&
+    if(all_nonderivative &&
+       (beta_bandwidth_code == BW_FIXED || !has_overlap) &&
        num_response_columns == 0 && num_weight_columns == 0 &&
        p_operator == OP_NOOP && !do_score && !do_ocg &&
        INTEGER(myopti_i)[KWS_DOTREEI] == NP_TREE_FALSE) {
@@ -10506,6 +10507,8 @@ SEXP C_np_kernelsum(SEXP tuno,
         (size_t)ncon, sizeof(double *));
       double **evaluation_columns = (double **)R_alloc(
         (size_t)ncon, sizeof(double *));
+      double **bandwidth_eval_columns = NULL;
+      double **bandwidth_train_columns = NULL;
       int route_status;
 
       route.segment_count = 1;
@@ -10519,14 +10522,33 @@ SEXP C_np_kernelsum(SEXP tuno,
         evaluation_columns[i] = train_is_eval ? train_columns[i] :
           REAL(econ_r) + (size_t)i * (size_t)num_eval;
       }
+      if(beta_bandwidth_eval != NULL &&
+         beta_bandwidth_code != BW_FIXED) {
+        bandwidth_eval_columns = (double **)R_alloc(
+          (size_t)ncon, sizeof(double *));
+        for(i = 0; i < ncon; ++i)
+          bandwidth_eval_columns[i] = (double *)beta_bandwidth_eval +
+            (size_t)i * (size_t)num_eval;
+      }
+      if(beta_bandwidth_train != NULL &&
+         beta_bandwidth_code != BW_FIXED) {
+        bandwidth_train_columns = (double **)R_alloc(
+          (size_t)ncon, sizeof(double *));
+        for(i = 0; i < ncon; ++i)
+          bandwidth_train_columns[i] = (double *)beta_bandwidth_train +
+            (size_t)i * (size_t)num_train;
+      }
 
       route_status = kernel_weighted_sum_np_route(
-        NULL, NULL, NULL, BW_FIXED, num_train, num_eval,
+        NULL, NULL, NULL, beta_bandwidth_code, num_train, num_eval,
         0, 0, ncon, leave_one_out, 0, 1, 0, 0, 0, 0, 0, 0,
         INTEGER(op_i), OP_NOOP, 0, 0, NULL, 0, 0, 0,
         NP_TREE_FALSE, 0, NULL, NULL, NULL, NULL,
         NULL, NULL, train_columns, NULL, NULL, evaluation_columns,
-        NULL, NULL, NULL, REAL(bw_r), 0, NULL, NULL, NULL, NULL,
+        NULL, NULL, NULL,
+        (beta_bandwidth_code == BW_FIXED) ? REAL(bw_r) : NULL,
+        beta_bandwidth_code != BW_FIXED,
+        bandwidth_train_columns, bandwidth_eval_columns, NULL, NULL,
         NULL, NULL, REAL(out_ksum), REAL(out_pksum),
         return_kernel_weights ? REAL(out_kw) : NULL, NULL, &route);
       if(route_status != 0)
