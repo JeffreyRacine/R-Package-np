@@ -192,9 +192,6 @@ test_that("unsupported beta npksum surfaces fail explicitly", {
   expect_error(do.call(npksum, c(args, list(permutation.operator = "normal"))),
                "only derivative permutation operators",
                fixed = TRUE)
-  expect_error(do.call(npksum, c(args, list(
-    operator = "derivative", kernel.pow = 2
-  ))), "powered beta derivative rows", fixed = TRUE)
   expect_error(npksum(0.1, args$txdat, ckertype = "beta",
                      ckerbound = "none"),
                "require ckerbound = \"fixed\" or \"range\"", fixed = TRUE)

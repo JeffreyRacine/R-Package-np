@@ -129,6 +129,22 @@ np_continuous_kernel_beta_derivative_absolute_rows_validated(
   double *kernel_weights,
   NPContinuousKernelDerivativeDiagnostics *diagnostics);
 
+NPContinuousKernelRowStatus
+np_continuous_kernel_beta_derivative_powered_rows_validated(
+  const NPContinuousKernelRowPlan *plan,
+  int leave_one_out,
+  int leave_one_out_offset,
+  int derivative_coordinate,
+  int kernel_power,
+  double * const *response,
+  int response_columns,
+  double * const *case_weights,
+  int weight_columns,
+  NPContinuousKernelDerivativeAccumulator *accumulator,
+  double *weighted_sum,
+  double *kernel_weights,
+  NPContinuousKernelDerivativeDiagnostics *diagnostics);
+
 NPContinuousKernelRowStatus np_continuous_kernel_scaled_restore(
   double scaled_value,
   double log_scale,
@@ -145,6 +161,13 @@ NPContinuousKernelRowStatus np_continuous_kernel_signed_log_power_restore(
   int sign,
   int power,
   double *value);
+
+NPContinuousKernelRowStatus np_continuous_kernel_signed_log_power(
+  double log_absolute,
+  int sign,
+  int power,
+  double *powered_log_absolute,
+  int *powered_sign);
 
 const char *np_continuous_kernel_row_status_message(
   NPContinuousKernelRowStatus status);

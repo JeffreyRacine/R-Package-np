@@ -253,10 +253,6 @@ npksum.default <-
         stop("beta kernel sums support operator = \"normal\", \"convolution\", \"derivative\", or \"integral\"")
       if (sum(operator == "derivative") > 1L)
         stop("beta kernel sums support one direct derivative dimension at a time")
-      if (!identical(as.double(kernel.pow), 1.0) &&
-          (any(operator == "derivative") ||
-           permutation.operator == "derivative"))
-        stop("powered beta derivative rows are not yet activated")
       if (compute.score || compute.ocg ||
           !permutation.operator %in% c("none", "derivative"))
         stop("beta kernel sums support only derivative permutation operators")
