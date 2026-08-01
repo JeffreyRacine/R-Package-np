@@ -1214,7 +1214,8 @@ npreghat <-
     bandwidth.compute = FALSE,
     where = ".np_regression_direct",
     regtype = bws[["regtype", exact = TRUE]],
-    allow.categorical = TRUE
+    allow.categorical = TRUE,
+    allow.general.lp = TRUE
   )
   reg.spec <- npValidatedConditionalRegSpec(
     bws,

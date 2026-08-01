@@ -129,7 +129,7 @@ test_that("beta regression log-sum-exp survives complete raw-weight underflow", 
   expect_equal(se(fit), expected_se, tolerance = 2e-12)
 })
 
-test_that("unsupported beta regression surfaces fail explicitly", {
+test_that("beta regression validates bounds and general LP availability", {
   training <- data.frame(x = c(0, 0.03, 0.2, 0.6, 1))
   response <- c(0, 1, 0.5, 2, 1.5)
 
@@ -141,15 +141,13 @@ test_that("unsupported beta regression surfaces fail explicitly", {
     "require ckerbound = \"fixed\" or \"range\"",
     fixed = TRUE
   )
-  expect_error(
-    suppressWarnings(npreg(
+  ll_fit <- suppressWarnings(npreg(
       bws = 0.1, txdat = training, tydat = response,
       regtype = "ll", ckertype = "beta",
       ckerbound = "fixed", ckerlb = 0, ckerub = 1
-    )),
-    "only regtype = \"lc\"",
-    fixed = TRUE
-  )
+    ))
+  expect_s3_class(ll_fit, "npregression")
+  expect_true(all(is.finite(fitted(ll_fit))))
 
   bw <- npregbw(
     xdat = training, ydat = response, bws = 0.1,

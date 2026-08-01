@@ -2058,7 +2058,8 @@ npValidateBetaKernelSpecification <- function(ckertype,
                                               bandwidth.compute = FALSE,
                                               where = "beta kernel",
                                               regtype = NULL,
-                                              allow.categorical = FALSE) {
+                                              allow.categorical = FALSE,
+                                              allow.general.lp = FALSE) {
   if (!identical(ckertype, "beta"))
     return(invisible(FALSE))
 
@@ -2091,7 +2092,8 @@ npValidateBetaKernelSpecification <- function(ckertype,
     stop("beta nearest-neighbor bandwidths must be finite and at least 1",
          call. = FALSE)
   }
-  if (!is.null(regtype) && !identical(regtype, "lc"))
+  if (!is.null(regtype) && !identical(regtype, "lc") &&
+      !isTRUE(allow.general.lp))
     stop(where, " currently supports only regtype = \"lc\"", call. = FALSE)
   invisible(TRUE)
 }
