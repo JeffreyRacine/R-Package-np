@@ -166,14 +166,22 @@ test_that("unsupported beta regression surfaces fail explicitly", {
     "Evaluation data violate",
     fixed = TRUE
   )
+  mixed_fit <- suppressWarnings(npreg(
+    bws = c(0.1, 0.2),
+    txdat = data.frame(x = training$x,
+                       group = factor(c(1, 1, 1, 2, 2))),
+    tydat = response, regtype = "lc", ckertype = "beta",
+    ckerbound = "fixed", ckerlb = 0, ckerub = 1
+  ))
+  expect_true(all(is.finite(fitted(mixed_fit))))
+  expect_equal(length(fitted(mixed_fit)), length(response))
   expect_error(
-    suppressWarnings(npreg(
-      bws = c(0.1, 0.2),
-      txdat = data.frame(x = training$x, group = factor(c(1, 1, 1, 2, 2))),
-      tydat = response, regtype = "lc", ckertype = "beta",
+    npregbw(
+      xdat = data.frame(x = training$x,
+                        group = factor(c(1, 1, 1, 2, 2))),
+      ydat = response, regtype = "lc", ckertype = "beta",
       ckerbound = "fixed", ckerlb = 0, ckerub = 1
-    )),
-    "continuous variables only",
-    fixed = TRUE
+    ),
+    "continuous variables only", fixed = TRUE
   )
 })

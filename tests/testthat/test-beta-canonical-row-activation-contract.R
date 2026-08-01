@@ -339,30 +339,43 @@ test_that("scalar beta regression fits enter the canonical row engine", {
   expect_gt(engine_start, 0L)
   expect_gt(engine_end, engine_start)
   regression_engine <- substr(engine, engine_start, engine_end - 1L)
-  expect_match(regression_engine, "const int exact_beta_route = kernel_route != NULL;",
-               fixed = TRUE)
-  expect_match(regression_engine, "do_grad != do_gerr",
+  sibling_start <- regexpr(
+    "static NP_NOINLINE void np_beta_scalar_regression_fit_canonical(",
+    engine, fixed = TRUE
+  )[[1L]]
+  expect_gt(sibling_start, 0L)
+  expect_lt(sibling_start, engine_start)
+  regression_sibling <- substr(engine, sibling_start, engine_start - 1L)
+  expect_match(regression_engine, "if(kernel_route != NULL) {",
                fixed = TRUE)
   expect_match(
-    regression_engine, "np_beta_bandwidth_prepare_matrix(", fixed = TRUE
+    regression_engine, "np_beta_scalar_regression_fit_canonical(",
+    fixed = TRUE
   )
-  expect_match(regression_engine, "NPBetaRegressionMomentCtx", fixed = TRUE)
+  expect_match(regression_engine, "np_regression_fit_statistics(",
+               fixed = TRUE)
+  expect_match(regression_engine, "return 0;", fixed = TRUE)
+  expect_match(regression_sibling, "do_grad != do_gerr", fixed = TRUE)
+  expect_match(
+    regression_sibling, "np_beta_bandwidth_prepare_matrix(", fixed = TRUE
+  )
+  expect_match(regression_sibling, "NPBetaRegressionMomentCtx", fixed = TRUE)
   expect_match(
     engine, "np_beta_regression_gradient_rows_validated(",
     fixed = TRUE
   )
   expect_match(
-    regression_engine, "&regression_moment_context, kernel_route_diagnostics, NULL);",
+    regression_sibling, "&regression_moment_context, kernel_route_diagnostics, NULL);",
     fixed = TRUE
   )
   expect_match(
-    regression_engine, "estimation_shortcut_done = 1;\n    goto finish_regression_estimation;",
+    regression_sibling, "error(\"canonical beta regression row failed:",
     fixed = TRUE
   )
-  expect_match(
-    regression_engine, "error(\"canonical beta regression row failed:",
-    fixed = TRUE
-  )
+  expect_false(grepl("NPBetaRegressionMomentCtx", regression_engine,
+                     fixed = TRUE))
+  expect_false(grepl("np_beta_bandwidth_prepare_matrix(", regression_engine,
+                     fixed = TRUE))
   expect_false(grepl("np_beta_regression_lc(", regression_engine,
                      fixed = TRUE))
 })

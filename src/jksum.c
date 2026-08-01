@@ -8802,6 +8802,197 @@ static NPContinuousKernelRowStatus np_beta_categorical_log_factor(
   return NP_CONTINUOUS_ROW_OK;
 }
 
+/*
+ * Form the established discrete regression contrasts without leaving the
+ * canonical beta row owner.  Unordered coordinates compare the fitted value
+ * at the observed level with the fitted value at the first support level.
+ * Ordered coordinates use the preceding level, except that the first level
+ * uses the following level and reverses the contrast sign.  Each alternate
+ * categorical provider shares the immutable continuous row plan and the
+ * already-prepared training-profile context.  Additional workspace is
+ * O(n_eval + number of categorical coordinates).
+ */
+static NPContinuousKernelRowStatus
+np_beta_regression_categorical_gradients_validated(
+  const NPContinuousKernelRowPlan *plan,
+  int leave_one_out,
+  int leave_one_out_offset,
+  int nunordered,
+  int nordered,
+  NPBetaCategoricalFactorContext *context,
+  const double *response,
+  int positive_weights,
+  NPContinuousKernelRowWorkspace *workspace,
+  NPContinuousKernelRowResult *row_result,
+  const double *mean,
+  const double *mean_stderr,
+  double **gradient,
+  double **gradient_stderr,
+  NPContinuousKernelDerivativeDiagnostics *diagnostics)
+{
+  NPContinuousKernelRowStatus status = NP_CONTINUOUS_ROW_OK;
+  NPContinuousKernelLogFactorProvider provider;
+  double **alternate_unordered = NULL;
+  double **alternate_ordered = NULL;
+  double * const *eval_unordered;
+  double * const *eval_ordered;
+  const int *num_categories;
+  double * const *category_values;
+  double *numeric_storage;
+  double *alternate_value;
+  double *alternate_mean;
+  double *alternate_stderr;
+  signed char *direction;
+  size_t pointer_bytes;
+  size_t numeric_count;
+  int coordinate;
+  int evaluation;
+
+  if(plan == NULL || plan->num_eval <= 0 || plan->num_continuous <= 0 ||
+     nunordered < 0 || nordered < 0 ||
+     nunordered > INT_MAX - nordered ||
+     (nunordered + nordered) <= 0 ||
+     context == NULL || response == NULL || workspace == NULL ||
+     row_result == NULL || mean == NULL || mean_stderr == NULL ||
+     gradient == NULL || gradient_stderr == NULL ||
+     context->dense_spec.ntrain != plan->num_train ||
+     context->dense_spec.neval != plan->num_eval ||
+     context->dense_spec.nunordered != nunordered ||
+     context->dense_spec.nordered != nordered ||
+     context->dense_spec.num_categories == NULL ||
+     context->dense_spec.category_values == NULL ||
+     (nunordered > 0 && context->dense_spec.eval_unordered == NULL) ||
+     (nordered > 0 && context->dense_spec.eval_ordered == NULL) ||
+     !np_size_mul_checked((size_t)plan->num_eval, 3U, &numeric_count))
+    return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+
+  eval_unordered = context->dense_spec.eval_unordered;
+  eval_ordered = context->dense_spec.eval_ordered;
+  num_categories = context->dense_spec.num_categories;
+  category_values = context->dense_spec.category_values;
+  if(nunordered > 0) {
+    if(!np_size_array_bytes_checked((size_t)nunordered,
+                                    sizeof(double *), &pointer_bytes))
+      return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+    alternate_unordered = (double **)R_alloc(
+      (size_t)nunordered, (int)sizeof(double *));
+    memcpy(alternate_unordered, eval_unordered, pointer_bytes);
+  }
+  if(nordered > 0) {
+    if(!np_size_array_bytes_checked((size_t)nordered,
+                                    sizeof(double *), &pointer_bytes))
+      return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+    alternate_ordered = (double **)R_alloc(
+      (size_t)nordered, (int)sizeof(double *));
+    memcpy(alternate_ordered, eval_ordered, pointer_bytes);
+  }
+  numeric_storage = (double *)R_alloc(numeric_count, (int)sizeof(double));
+  direction = (signed char *)R_alloc(
+    (size_t)plan->num_eval, (int)sizeof(signed char));
+  alternate_value = numeric_storage;
+  alternate_mean = numeric_storage + plan->num_eval;
+  alternate_stderr = numeric_storage + 2 * plan->num_eval;
+  provider.function = np_beta_categorical_log_factor;
+  provider.context = context;
+
+  for(coordinate = 0; coordinate < nunordered; ++coordinate) {
+    const int output_coordinate = plan->num_continuous + coordinate;
+
+    if(num_categories[coordinate] <= 0 ||
+       category_values[coordinate] == NULL) {
+      status = NP_CONTINUOUS_ROW_ERR_LAYOUT;
+      goto cleanup;
+    }
+    for(evaluation = 0; evaluation < plan->num_eval; ++evaluation)
+      alternate_value[evaluation] = category_values[coordinate][0];
+    alternate_unordered[coordinate] = alternate_value;
+    context->dense_spec.eval_unordered = alternate_unordered;
+    if(context->use_compressed)
+      context->compressed_spec.eval_unordered = alternate_unordered;
+    status = np_continuous_kernel_beta_regression_moment_rows_validated(
+      plan, leave_one_out, leave_one_out_offset, &provider,
+      response, positive_weights, workspace, row_result,
+      alternate_mean, alternate_stderr, diagnostics, NULL);
+    context->dense_spec.eval_unordered = eval_unordered;
+    if(context->use_compressed)
+      context->compressed_spec.eval_unordered = eval_unordered;
+    alternate_unordered[coordinate] = eval_unordered[coordinate];
+    if(status != NP_CONTINUOUS_ROW_OK)
+      goto cleanup;
+    for(evaluation = 0; evaluation < plan->num_eval; ++evaluation) {
+      gradient[output_coordinate][evaluation] =
+        mean[evaluation] - alternate_mean[evaluation];
+      gradient_stderr[output_coordinate][evaluation] = sqrt(
+        mean_stderr[evaluation] * mean_stderr[evaluation] +
+        alternate_stderr[evaluation] * alternate_stderr[evaluation]);
+    }
+  }
+
+  for(coordinate = 0; coordinate < nordered; ++coordinate) {
+    const int category_coordinate = nunordered + coordinate;
+    const int output_coordinate =
+      plan->num_continuous + nunordered + coordinate;
+    const int category_count = num_categories[category_coordinate];
+    const double * const support = category_values[category_coordinate];
+
+    if(category_count <= 0 || support == NULL) {
+      status = NP_CONTINUOUS_ROW_ERR_LAYOUT;
+      goto cleanup;
+    }
+    if(category_count == 1) {
+      for(evaluation = 0; evaluation < plan->num_eval; ++evaluation) {
+        gradient[output_coordinate][evaluation] = 0.0;
+        gradient_stderr[output_coordinate][evaluation] = 0.0;
+      }
+      continue;
+    }
+    for(evaluation = 0; evaluation < plan->num_eval; ++evaluation) {
+      const double value = eval_ordered[coordinate][evaluation];
+      int support_index = 0;
+
+      while(support_index < category_count &&
+            support[support_index] != value)
+        ++support_index;
+      if(support_index == category_count) {
+        status = NP_CONTINUOUS_ROW_ERR_LAYOUT;
+        goto cleanup;
+      }
+      if(support_index == 0) {
+        alternate_value[evaluation] = support[1];
+        direction[evaluation] = -1;
+      } else {
+        alternate_value[evaluation] = support[support_index - 1];
+        direction[evaluation] = 1;
+      }
+    }
+    alternate_ordered[coordinate] = alternate_value;
+    context->dense_spec.eval_ordered = alternate_ordered;
+    if(context->use_compressed)
+      context->compressed_spec.eval_ordered = alternate_ordered;
+    status = np_continuous_kernel_beta_regression_moment_rows_validated(
+      plan, leave_one_out, leave_one_out_offset, &provider,
+      response, positive_weights, workspace, row_result,
+      alternate_mean, alternate_stderr, diagnostics, NULL);
+    context->dense_spec.eval_ordered = eval_ordered;
+    if(context->use_compressed)
+      context->compressed_spec.eval_ordered = eval_ordered;
+    alternate_ordered[coordinate] = eval_ordered[coordinate];
+    if(status != NP_CONTINUOUS_ROW_OK)
+      goto cleanup;
+    for(evaluation = 0; evaluation < plan->num_eval; ++evaluation) {
+      gradient[output_coordinate][evaluation] =
+        (double)direction[evaluation] *
+        (mean[evaluation] - alternate_mean[evaluation]);
+      gradient_stderr[output_coordinate][evaluation] = sqrt(
+        mean_stderr[evaluation] * mean_stderr[evaluation] +
+        alternate_stderr[evaluation] * alternate_stderr[evaluation]);
+    }
+  }
+
+cleanup:
+  return status;
+}
+
 static NPContinuousKernelRowStatus
 np_beta_regression_gradient_rows_validated(
   const NPContinuousKernelRowPlan *plan,
@@ -9312,6 +9503,23 @@ static int np_beta_absolute_route(
       if(infinite_count > 0 || undefined_count > 0)
         warning("beta regression gradient produced %d infinite endpoint value(s) and %d undefined cancellation(s)",
                 infinite_count, undefined_count);
+      if(has_categories) {
+        row_status =
+          np_beta_regression_categorical_gradients_validated(
+            &plan, leave_one_out, leave_one_out_offset,
+            num_reg_unordered, num_reg_ordered,
+            &categorical_context, regression_moment_context->response,
+            regression_moment_context->positive_weights,
+            &workspace, &row_result,
+            regression_moment_context->mean,
+            regression_moment_context->mean_stderr,
+            regression_moment_context->gradient,
+            regression_moment_context->gradient_stderr,
+            route_diagnostics);
+        *regression_moment_context->status = row_status;
+        if(row_status != NP_CONTINUOUS_ROW_OK)
+          goto cleanup;
+      }
     }
     status = 0;
     goto cleanup;
@@ -20201,6 +20409,190 @@ static void np_lp_power2_moments_from_kernel_row(double **basis,
                         NULL);
 }
 
+static void np_regression_fit_statistics(
+  const int num_obs_eval,
+  double *vector_Y_eval,
+  double *mean,
+  double *R_squared,
+  double *MSE,
+  double *MAE,
+  double *MAPE,
+  double *CORR,
+  double *SIGN)
+{
+  if(vector_Y_eval != NULL) {
+    *R_squared = fGoodness_of_Fit(num_obs_eval, vector_Y_eval, mean);
+    *MSE = fMSE(num_obs_eval, vector_Y_eval, mean);
+    *MAE = fMAE(num_obs_eval, vector_Y_eval, mean);
+    *MAPE = fMAPE(num_obs_eval, vector_Y_eval, mean);
+    *CORR = fCORR(num_obs_eval, vector_Y_eval, mean);
+    *SIGN = fSIGN(num_obs_eval, vector_Y_eval, mean);
+  } else {
+    *R_squared = 0.0;
+    *MSE = 0.0;
+    *MAE = 0.0;
+    *MAPE = 0.0;
+    *CORR = 0.0;
+    *SIGN = 0.0;
+  }
+}
+
+/*
+ * Canonical scalar beta sibling.  The estimator owner remains
+ * kernel_estimate_regression_categorical_tree_np(); this helper isolates the
+ * beta signed-log row and bandwidth preparation from the large legacy/general
+ * hot body so activating a beta capability cannot perturb its register layout.
+ */
+static NP_NOINLINE void np_beta_scalar_regression_fit_canonical(
+  const int BANDWIDTH_reg,
+  const int KERNEL_unordered_reg,
+  const int KERNEL_ordered_reg,
+  const int num_obs_train,
+  const int num_obs_eval,
+  const int num_reg_unordered,
+  const int num_reg_ordered,
+  const int num_reg_continuous,
+  double **matrix_X_unordered_train,
+  double **matrix_X_ordered_train,
+  double **matrix_X_continuous_train,
+  double **matrix_X_unordered_eval,
+  double **matrix_X_ordered_eval,
+  double **matrix_X_continuous_eval,
+  const double *vector_Y,
+  double *vector_scale_factor,
+  int *num_categories,
+  double **matrix_categorical_vals,
+  double *mean,
+  double **gradient,
+  double *mean_stderr,
+  double **gradient_stderr,
+  const NPContinuousKernelRoute *kernel_route,
+  NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
+  const int categorical_compress)
+{
+  const int num_categorical = num_reg_unordered + num_reg_ordered;
+  const int num_predictors = num_reg_continuous + num_categorical;
+  const int do_grad = gradient != NULL;
+  const int do_gerr = gradient_stderr != NULL;
+  const int bwmdim = (BANDWIDTH_reg == BW_GEN_NN) ? num_obs_eval :
+    ((BANDWIDTH_reg == BW_ADAP_NN) ? num_obs_train : 1);
+  int *operator;
+  int *kernel_u = NULL;
+  int *kernel_o = NULL;
+  double *lambda = NULL;
+  double **matrix_bandwidth;
+  double *route_row;
+  NPBetaRegressionMomentCtx regression_moment_context;
+  NPContinuousKernelRowStatus regression_row_status =
+    NP_CONTINUOUS_ROW_OK;
+  int route_status;
+  int coordinate;
+
+  if(np_continuous_kernel_route_validate(kernel_route,
+                                         num_reg_continuous) !=
+       NP_CKERNEL_ROUTE_OK ||
+     !np_continuous_kernel_route_has_beta(kernel_route) ||
+     kernel_route->segment_count != 1 ||
+     kernel_route->segment[0].coordinate_offset != 0 ||
+     kernel_route->segment[0].coordinate_count != num_reg_continuous ||
+     num_reg_continuous <= 0 || do_grad != do_gerr ||
+     kernel_route_diagnostics == NULL ||
+     (categorical_compress != 0 && categorical_compress != 1))
+    error("canonical beta regression route has an invalid layout");
+
+  operator = (int *)R_alloc((size_t)num_predictors, sizeof(int));
+  for(coordinate = 0; coordinate < num_predictors; ++coordinate)
+    operator[coordinate] = OP_NORMAL;
+  if(num_reg_unordered > 0) {
+    kernel_u = (int *)R_alloc((size_t)num_reg_unordered, sizeof(int));
+    for(coordinate = 0; coordinate < num_reg_unordered; ++coordinate)
+      kernel_u[coordinate] = KERNEL_unordered_reg;
+  }
+  if(num_reg_ordered > 0) {
+    kernel_o = (int *)R_alloc((size_t)num_reg_ordered, sizeof(int));
+    for(coordinate = 0; coordinate < num_reg_ordered; ++coordinate)
+      kernel_o[coordinate] = KERNEL_ordered_reg;
+  }
+  if(num_categorical > 0)
+    lambda = (double *)R_alloc((size_t)num_categorical, sizeof(double));
+  matrix_bandwidth = alloc_tmatd(bwmdim, num_reg_continuous);
+
+  if(num_categorical > 0 &&
+     kernel_bandwidth_mean(
+       0, BW_FIXED, num_obs_train, num_obs_eval,
+       0, 0, 0,
+       num_reg_continuous, num_reg_unordered, num_reg_ordered,
+       0, vector_scale_factor,
+       NULL, NULL,
+       matrix_X_continuous_train, matrix_X_continuous_eval,
+       NULL, matrix_bandwidth, lambda) == 1) {
+    free_tmat(matrix_bandwidth);
+    error("\n** Error: invalid categorical bandwidth.");
+  }
+
+  if(BANDWIDTH_reg != BW_FIXED) {
+    const np_beta_bandwidth_prepare_status bandwidth_status =
+      np_beta_bandwidth_prepare_matrix(
+        BANDWIDTH_reg == BW_GEN_NN ?
+          NP_BETA_BANDWIDTH_GENERALIZED_NN :
+          NP_BETA_BANDWIDTH_ADAPTIVE_NN,
+        matrix_X_continuous_train, matrix_X_continuous_eval,
+        vector_scale_factor,
+        num_obs_train, num_obs_eval, num_reg_continuous,
+        matrix_X_continuous_train == matrix_X_continuous_eval,
+        BANDWIDTH_reg == BW_GEN_NN, BANDWIDTH_reg == BW_ADAP_NN,
+        0, matrix_bandwidth, matrix_bandwidth);
+
+    if(bandwidth_status != NP_BETA_BANDWIDTH_PREPARE_OK) {
+      free_tmat(matrix_bandwidth);
+      error("\n** Error: %s.",
+            np_beta_bandwidth_prepare_status_message(bandwidth_status));
+    }
+  }
+
+  route_row = (double *)np_jksum_malloc_array_or_die(
+    (size_t)num_obs_train, sizeof(double), "beta regression row");
+  regression_moment_context.response = vector_Y;
+  regression_moment_context.mean = mean;
+  regression_moment_context.mean_stderr = mean_stderr;
+  regression_moment_context.gradient = gradient;
+  regression_moment_context.gradient_stderr = gradient_stderr;
+  regression_moment_context.compute_gradient = do_grad;
+  regression_moment_context.positive_weights =
+    kernel_route->segment[0].descriptor.order == 2;
+  regression_moment_context.status = &regression_row_status;
+  regression_moment_context.progress = np_progress_fit_loop_step;
+  route_status = np_beta_absolute_route(
+    kernel_route, BANDWIDTH_reg, num_obs_train, num_obs_eval,
+    num_reg_unordered, num_reg_ordered, num_reg_continuous,
+    0, 0, operator,
+    matrix_X_continuous_train, matrix_X_continuous_eval,
+    matrix_X_unordered_train, matrix_X_ordered_train,
+    matrix_X_unordered_eval, matrix_X_ordered_eval,
+    kernel_u, kernel_o,
+    num_categorical > 0 ? lambda : NULL,
+    num_categories, matrix_categorical_vals, categorical_compress,
+    vector_scale_factor,
+    BANDWIDTH_reg == BW_FIXED ? NULL : matrix_bandwidth,
+    BANDWIDTH_reg == BW_FIXED ? NULL : matrix_bandwidth,
+    NULL, NULL, 0, 0, NULL, NULL, 0, 0, 1,
+    route_row, NULL, NULL, NULL, NULL,
+    &regression_moment_context, kernel_route_diagnostics, NULL);
+  free(route_row);
+  free_tmat(matrix_bandwidth);
+
+  if(route_status != 0) {
+    if(kernel_route_diagnostics->beta_status != NP_BETA_OK)
+      error("canonical beta regression row failed in continuous dimension %d: %s",
+            kernel_route_diagnostics->bad_coordinate + 1,
+            np_beta_status_message(kernel_route_diagnostics->beta_status));
+    if(regression_row_status == NP_CONTINUOUS_ROW_ERR_ZERO_WEIGHT)
+      error("all beta regression weights are zero at an evaluation point");
+    error("canonical beta regression row failed: %s",
+          np_continuous_kernel_row_status_message(regression_row_status));
+  }
+}
+
 int kernel_estimate_regression_categorical_tree_np(
 int lp_engine,
 int KERNEL_reg,
@@ -20236,8 +20628,6 @@ double *SIGN,
 const NPContinuousKernelRoute *kernel_route,
 NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
 int categorical_compress){
-
-  const int exact_beta_route = kernel_route != NULL;
 
   // note that mean has 2*num_obs allocated for npksum
   int i, j, l;
@@ -20285,21 +20675,33 @@ int categorical_compress){
   const int lp_engine_est = lp_engine;
   if((lp_engine_est != NP_LP_ENGINE_SCALAR) && (lp_engine_est != NP_LP_ENGINE_GENERAL))
     error("invalid internal regression engine");
-  if(exact_beta_route &&
-     (np_continuous_kernel_route_validate(kernel_route,
-                                          num_reg_continuous) !=
-        NP_CKERNEL_ROUTE_OK ||
-      !np_continuous_kernel_route_has_beta(kernel_route) ||
-      kernel_route->segment_count != 1 ||
-      kernel_route->segment[0].coordinate_offset != 0 ||
-      kernel_route->segment[0].coordinate_count != num_reg_continuous ||
-      num_reg_continuous <= 0 ||
-      lp_engine_est != NP_LP_ENGINE_SCALAR ||
-      do_grad != do_gerr ||
-      (do_grad && (num_reg_unordered > 0 || num_reg_ordered > 0)) ||
-      kernel_route_diagnostics == NULL ||
-      (categorical_compress != 0 && categorical_compress != 1)))
-    error("canonical beta regression route has an invalid layout");
+  if(kernel_route != NULL) {
+    if(lp_engine_est != NP_LP_ENGINE_SCALAR)
+      error("canonical beta regression route has an invalid layout");
+    np_beta_scalar_regression_fit_canonical(
+      BANDWIDTH_reg, KERNEL_unordered_reg, KERNEL_ordered_reg,
+      num_obs_train, num_obs_eval,
+      num_reg_unordered, num_reg_ordered, num_reg_continuous,
+      matrix_X_unordered_train, matrix_X_ordered_train,
+      matrix_X_continuous_train,
+      matrix_X_unordered_eval, matrix_X_ordered_eval,
+      matrix_X_continuous_eval,
+      vector_Y, vector_scale_factor,
+      num_categories, matrix_categorical_vals,
+      mean, gradient, mean_stderr, gradient_stderr,
+      kernel_route, kernel_route_diagnostics, categorical_compress);
+    np_regression_fit_statistics(
+      num_obs_eval, vector_Y_eval, mean,
+      R_squared, MSE, MAE, MAPE, CORR, SIGN);
+    return 0;
+  }
+
+  operator = (int *)malloc(
+    sizeof(int)*(num_reg_continuous+num_reg_unordered+num_reg_ordered));
+  for(i = 0;
+      i < (num_reg_continuous+num_reg_unordered+num_reg_ordered);
+      i++)
+    operator[i] = OP_NORMAL;
   np_gate_ctx_clear(&gate_ctx_local);
   const NP_GateOverrideCtx * const est_gate_ctx_ptr = &gate_ctx_local;
 
@@ -20340,26 +20742,7 @@ int categorical_compress){
 
   matrix_bandwidth_deriv = alloc_matd(bwmdim,num_reg_continuous);
 
-  if(exact_beta_route && BANDWIDTH_reg != BW_FIXED &&
-     num_reg_unordered == 0 && num_reg_ordered == 0) {
-    const np_beta_bandwidth_prepare_status bandwidth_status =
-      np_beta_bandwidth_prepare_matrix(
-        BANDWIDTH_reg == BW_GEN_NN ?
-          NP_BETA_BANDWIDTH_GENERALIZED_NN :
-          NP_BETA_BANDWIDTH_ADAPTIVE_NN,
-        matrix_X_continuous_train, matrix_X_continuous_eval,
-        vector_scale_factor,
-        num_obs_train, num_obs_eval, num_reg_continuous,
-        matrix_X_continuous_train == matrix_X_continuous_eval,
-        BANDWIDTH_reg == BW_GEN_NN, BANDWIDTH_reg == BW_ADAP_NN,
-        0, matrix_bandwidth, matrix_bandwidth);
-
-    if(bandwidth_status != NP_BETA_BANDWIDTH_PREPARE_OK)
-      error("\n** Error: %s.",
-            np_beta_bandwidth_prepare_status_message(bandwidth_status));
-  } else if(!(exact_beta_route && BANDWIDTH_reg == BW_FIXED &&
-              num_reg_unordered == 0 && num_reg_ordered == 0) &&
-            kernel_bandwidth(KERNEL_reg,
+  if(kernel_bandwidth(KERNEL_reg,
                       BANDWIDTH_reg,
                       num_obs_train,
                       num_obs_eval,
@@ -20382,16 +20765,10 @@ int categorical_compress){
 	  }
 
   hprod = 1.0;
-  if(!exact_beta_route)
-    for(l = 0; l < num_reg_continuous; l++)
-      hprod *= matrix_bandwidth[l][0];
+  for(l = 0; l < num_reg_continuous; l++)
+    hprod *= matrix_bandwidth[l][0];
 
-
-  if(exact_beta_route) {
-    INT_KERNEL_P = 1.0;
-    K_INT_KERNEL_P = 1.0;
-    DIFF_KER_PPM = 0.0;
-  } else if(num_reg_continuous != 0) {
+  if(num_reg_continuous != 0) {
     initialize_kernel_regression_asymptotic_constants(KERNEL_reg,
                                                       num_reg_continuous,
                                                       &INT_KERNEL_P,
@@ -20404,55 +20781,6 @@ int categorical_compress){
   }
 
   const double gfac = sqrt(DIFF_KER_PPM/K_INT_KERNEL_P);
-
-  if(exact_beta_route) {
-    NPBetaRegressionMomentCtx regression_moment_context;
-    NPContinuousKernelRowStatus regression_row_status =
-      NP_CONTINUOUS_ROW_OK;
-    double *route_row = (double *)np_jksum_malloc_array_or_die(
-      (size_t)num_obs_train, sizeof(double), "beta regression row");
-    int route_status;
-
-    regression_moment_context.response = vector_Y;
-    regression_moment_context.mean = mean;
-    regression_moment_context.mean_stderr = mean_stderr;
-    regression_moment_context.gradient = gradient;
-    regression_moment_context.gradient_stderr = gradient_stderr;
-    regression_moment_context.compute_gradient = do_grad;
-    regression_moment_context.positive_weights =
-      kernel_route->segment[0].descriptor.order == 2;
-    regression_moment_context.status = &regression_row_status;
-    regression_moment_context.progress = np_progress_fit_loop_step;
-    route_status = np_beta_absolute_route(
-      kernel_route, BANDWIDTH_reg, num_obs_train, num_obs_eval,
-      num_reg_unordered, num_reg_ordered, num_reg_continuous,
-      0, 0, operator,
-      matrix_X_continuous_train, matrix_X_continuous_eval,
-      matrix_X_unordered_train, matrix_X_ordered_train,
-      matrix_X_unordered_eval, matrix_X_ordered_eval,
-      kernel_u, kernel_o,
-      (num_reg_unordered + num_reg_ordered) > 0 ? lambda : NULL,
-      num_categories, matrix_categorical_vals, categorical_compress,
-      vector_scale_factor,
-      BANDWIDTH_reg == BW_FIXED ? NULL : matrix_bandwidth,
-      BANDWIDTH_reg == BW_FIXED ? NULL : matrix_bandwidth,
-      NULL, NULL, 0, 0, NULL, NULL, 0, 0, 1,
-      route_row, NULL, NULL, NULL, NULL,
-      &regression_moment_context, kernel_route_diagnostics, NULL);
-    free(route_row);
-    if(route_status != 0) {
-      if(kernel_route_diagnostics->beta_status != NP_BETA_OK)
-        error("canonical beta regression row failed in continuous dimension %d: %s",
-              kernel_route_diagnostics->bad_coordinate + 1,
-              np_beta_status_message(kernel_route_diagnostics->beta_status));
-      if(regression_row_status == NP_CONTINUOUS_ROW_ERR_ZERO_WEIGHT)
-        error("all beta regression weights are zero at an evaluation point");
-      error("canonical beta regression row failed: %s",
-            np_continuous_kernel_row_status_message(regression_row_status));
-    }
-    estimation_shortcut_done = 1;
-    goto finish_regression_estimation;
-  }
 
   // compute hash stuff here if necessary
 
@@ -22117,24 +22445,9 @@ finish_regression_estimation:
           "LP solve failed in glp MPI owner path after bounded ridging" :
           "LP solve failed in glp path");
 
-	if(vector_Y_eval != NULL)
-	{
-		*R_squared = fGoodness_of_Fit(num_obs_eval, vector_Y_eval, mean);
-		*MSE = fMSE(num_obs_eval, vector_Y_eval, mean);
-		*MAE = fMAE(num_obs_eval, vector_Y_eval, mean);
-		*MAPE = fMAPE(num_obs_eval, vector_Y_eval, mean);
-		*CORR = fCORR(num_obs_eval, vector_Y_eval, mean);
-		*SIGN = fSIGN(num_obs_eval, vector_Y_eval, mean);
-	}
-	else
-	{
-		*R_squared = 0.0;
-		*MSE = 0.0;
-		*MAE = 0.0;
-		*MAPE = 0.0;
-		*CORR = 0.0;
-		*SIGN = 0.0;
-	}
+  np_regression_fit_statistics(
+    num_obs_eval, vector_Y_eval, mean,
+    R_squared, MSE, MAE, MAPE, CORR, SIGN);
 
   return(0);
 }

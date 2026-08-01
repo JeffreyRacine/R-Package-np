@@ -1364,7 +1364,8 @@ npreghat <-
     bw = bws[["bw", exact = TRUE]],
     bandwidth.compute = FALSE,
     where = ".np_regression_direct",
-    regtype = bws[["regtype", exact = TRUE]]
+    regtype = bws[["regtype", exact = TRUE]],
+    allow.categorical = TRUE
   )
   reg.spec <- npValidatedConditionalRegSpec(
     bws,
@@ -1555,7 +1556,13 @@ npreghat <-
     mcv.numRow = attr(bws$xmcv, "num.row"),
     int_do_tree = if (beta.kernel) DO_TREE_NO else
       .npreg_fit_tree_code(bws, ncon = bws$ncon, ncat = bws$nuno + bws$nord),
-    reserved.reg.engine = FALSE
+    categorical.compress = if (
+      beta.kernel && (bws$nuno > 0L || bws$nord > 0L)
+    ) {
+      npStrictLogicalOption("np.categorical.compress", TRUE)
+    } else {
+      FALSE
+    }
   )
   myopti$do_grad <- do.compiled.gradients
   myopti <- c(myopti, npContinuousKernelDescriptorOptions(bws))
