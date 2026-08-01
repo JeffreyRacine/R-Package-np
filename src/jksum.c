@@ -8234,8 +8234,8 @@ static inline void np_hot_loop_check_interrupt(const int pos,
 }
 
 /*
- * Canonical beta activation: the public, scalar, fixed-bandwidth
- * PDF/CDF/convolution row for every supported order. This sits at the shared
+ * Canonical beta activation: public absolute PDF/CDF/convolution rows for
+ * every supported order and bandwidth topology. This sits at the shared
  * kernel-row boundary rather
  * than in an estimator or beta-only kernel-sum engine.  The deliberately
  * narrow contract is fail-closed: C ingress passes route metadata only when
@@ -8248,7 +8248,7 @@ static inline void np_hot_loop_check_interrupt(const int pos,
  * common row scale in later tranches.  Workspace is O(n_train), excluding an
  * explicitly requested public kernel-weight matrix owned by the caller.
  */
-static int np_beta_scalar_absolute_route(
+static int np_beta_absolute_route(
   const NPContinuousKernelRoute * const route,
   const int bandwidth_mode,
   const int num_obs_train,
@@ -8262,6 +8262,10 @@ static int np_beta_scalar_absolute_route(
   double * const vector_bandwidth,
   double **matrix_bandwidth_eval,
   double **matrix_bandwidth_train,
+  double **matrix_Y,
+  double **matrix_W,
+  const int ncol_Y,
+  const int ncol_W,
   double * const row,
   double * const weighted_sum,
   double * const kw)
@@ -8274,6 +8278,8 @@ static int np_beta_scalar_absolute_route(
   int status = KWSNP_ERR_BADINVOC;
   int evaluation;
   int coordinate;
+  int response_column;
+  int weight_column;
 
   if(route == NULL ||
      np_continuous_kernel_route_validate(route, num_reg_continuous) !=
@@ -8288,8 +8294,18 @@ static int np_beta_scalar_absolute_route(
      matrix_X_continuous_eval == NULL ||
      (bandwidth_mode != BW_FIXED && bandwidth_mode != BW_GEN_NN &&
       bandwidth_mode != BW_ADAP_NN) ||
+     ncol_Y < 0 || ncol_W < 0 ||
+     (ncol_Y > 0 && matrix_Y == NULL) ||
+     (ncol_W > 0 && matrix_W == NULL) ||
      row == NULL || weighted_sum == NULL || leave_one_out_offset < 0)
     return KWSNP_ERR_BADINVOC;
+
+  for(response_column = 0; response_column < ncol_Y; ++response_column)
+    if(matrix_Y[response_column] == NULL)
+      return KWSNP_ERR_BADINVOC;
+  for(weight_column = 0; weight_column < ncol_W; ++weight_column)
+    if(matrix_W[weight_column] == NULL)
+      return KWSNP_ERR_BADINVOC;
 
   for(coordinate = 0; coordinate < num_reg_continuous; ++coordinate) {
     if((operator[coordinate] != OP_NORMAL &&
@@ -8360,27 +8376,78 @@ static int np_beta_scalar_absolute_route(
     const NPContinuousKernelRowStatus row_status =
       np_continuous_kernel_beta_factor_row(
         &plan, evaluation, omitted_observation, &workspace, &row_result);
-    double sum = 0.0;
     int observation;
 
     if(row_status != NP_CONTINUOUS_ROW_OK)
       goto cleanup;
-    for(observation = 0; observation < num_obs_train; ++observation) {
-      double value;
+    if(ncol_Y == 0 && ncol_W == 0) {
+      double sum = 0.0;
 
-      if(np_continuous_kernel_signed_log_restore(
-           workspace.primary_log_absolute[observation],
-           workspace.primary_sign[observation],
-           &value) != NP_CONTINUOUS_ROW_OK)
+      for(observation = 0; observation < num_obs_train; ++observation) {
+        double value;
+
+        if(np_continuous_kernel_signed_log_restore(
+             workspace.primary_log_absolute[observation],
+             workspace.primary_sign[observation],
+             &value) != NP_CONTINUOUS_ROW_OK)
+          goto cleanup;
+        if(kw != NULL)
+          kw[(size_t)evaluation * (size_t)num_obs_train +
+             (size_t)observation] = value;
+        sum += value;
+        if(!R_FINITE(sum))
+          goto cleanup;
+      }
+      weighted_sum[evaluation] = sum;
+    } else {
+      const int response_extent = (ncol_Y > 0) ? ncol_Y : 1;
+      const int weight_extent = (ncol_W > 0) ? ncol_W : 1;
+      size_t sum_extent;
+      size_t output_base;
+      size_t output_offset;
+
+      if((size_t)response_extent > SIZE_MAX / (size_t)weight_extent)
         goto cleanup;
-      if(kw != NULL)
-        kw[(size_t)evaluation * (size_t)num_obs_train +
-           (size_t)observation] = value;
-      sum += value;
-      if(!R_FINITE(sum))
+      sum_extent = (size_t)response_extent * (size_t)weight_extent;
+      if((size_t)evaluation > SIZE_MAX / sum_extent)
         goto cleanup;
+      output_base = (size_t)evaluation * sum_extent;
+      for(output_offset = 0; output_offset < sum_extent; ++output_offset)
+        weighted_sum[output_base + output_offset] = 0.0;
+
+      for(observation = 0; observation < num_obs_train; ++observation) {
+        double value;
+
+        if(np_continuous_kernel_signed_log_restore(
+             workspace.primary_log_absolute[observation],
+             workspace.primary_sign[observation],
+             &value) != NP_CONTINUOUS_ROW_OK)
+          goto cleanup;
+        if(kw != NULL)
+          kw[(size_t)evaluation * (size_t)num_obs_train +
+             (size_t)observation] = value;
+        if(observation == omitted_observation)
+          continue;
+
+        for(response_column = 0; response_column < response_extent;
+            ++response_column) {
+          const double response_value = (ncol_Y > 0) ?
+            matrix_Y[response_column][observation] : 1.0;
+          for(weight_column = 0; weight_column < weight_extent;
+              ++weight_column) {
+            const double weight_value = (ncol_W > 0) ?
+              matrix_W[weight_column][observation] : 1.0;
+            output_offset = output_base +
+              (size_t)response_column * (size_t)weight_extent +
+              (size_t)weight_column;
+            weighted_sum[output_offset] +=
+              value * response_value * weight_value;
+            if(!R_FINITE(weighted_sum[output_offset]))
+              goto cleanup;
+          }
+        }
+      }
     }
-    weighted_sum[evaluation] = sum;
     if((evaluation & 31) == 0)
       R_CheckUserInterrupt();
   }
@@ -8480,7 +8547,7 @@ const NPContinuousKernelRoute * const kernel_route){
         ++route_coordinate)
       route_has_convolution |=
         operator != NULL && operator[route_coordinate] == OP_CONVOLUTION;
-    const int exact_beta_scalar_route =
+    const int exact_beta_absolute_route =
       np_continuous_kernel_route_has_beta(kernel_route) &&
       (BANDWIDTH_reg == BW_FIXED || BANDWIDTH_reg == BW_GEN_NN ||
        BANDWIDTH_reg == BW_ADAP_NN) &&
@@ -8488,7 +8555,7 @@ const NPContinuousKernelRoute * const kernel_route){
       bandwidth_divide == 0 && bandwidth_divide_weights == 0 &&
       num_reg_unordered == 0 && num_reg_ordered == 0 &&
       num_reg_continuous > 0 && permutation_operator == OP_NOOP &&
-      !do_score && !do_ocg && ncol_Y == 0 && ncol_W == 0 &&
+      !do_score && !do_ocg &&
       int_TREE == NP_TREE_FALSE && !do_partial_tree &&
       !symmetric && !gather_scatter && !drop_one_train &&
       sgn == NULL &&
@@ -8507,19 +8574,20 @@ const NPContinuousKernelRoute * const kernel_route){
     double *route_row = NULL;
     int route_status;
 
-    if(!exact_beta_scalar_route)
+    if(!exact_beta_absolute_route)
       return KWSNP_ERR_BADINVOC;
     if((size_t)num_obs_train > SIZE_MAX / sizeof(double))
       return KWSNP_ERR_BADINVOC;
     route_row = (double *)malloc((size_t)num_obs_train * sizeof(double));
     if(route_row == NULL)
       return KWSNP_ERR_BADINVOC;
-    route_status = np_beta_scalar_absolute_route(
+    route_status = np_beta_absolute_route(
       kernel_route, BANDWIDTH_reg, num_obs_train, num_obs_eval,
       num_reg_continuous,
       leave_one_out, leave_one_out_offset, operator,
       matrix_X_continuous_train, matrix_X_continuous_eval,
       vector_scale_factor, matrix_bw_eval, matrix_bw_train,
+      matrix_Y, matrix_W, ncol_Y, ncol_W,
       route_row, weighted_sum, kw);
     free(route_row);
     return route_status;

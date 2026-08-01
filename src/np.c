@@ -10498,7 +10498,6 @@ SEXP C_np_kernelsum(SEXP tuno,
       error("C_np_kernelsum: beta derivative-weight buffer has the wrong length");
 
     if(all_nonderivative &&
-       num_response_columns == 0 && num_weight_columns == 0 &&
        p_operator == OP_NOOP && !do_score && !do_ocg &&
        INTEGER(myopti_i)[KWS_DOTREEI] == NP_TREE_FALSE) {
       NPContinuousKernelRoute route;
@@ -10508,6 +10507,8 @@ SEXP C_np_kernelsum(SEXP tuno,
         (size_t)ncon, sizeof(double *));
       double **bandwidth_eval_columns = NULL;
       double **bandwidth_train_columns = NULL;
+      double **response_columns = NULL;
+      double **weight_columns = NULL;
       int route_status;
 
       route.segment_count = 1;
@@ -10537,14 +10538,29 @@ SEXP C_np_kernelsum(SEXP tuno,
           bandwidth_train_columns[i] = (double *)beta_bandwidth_train +
             (size_t)i * (size_t)num_train;
       }
+      if(num_response_columns > 0) {
+        response_columns = (double **)R_alloc(
+          (size_t)num_response_columns, sizeof(double *));
+        for(i = 0; i < num_response_columns; ++i)
+          response_columns[i] = REAL(ty_r) +
+            (size_t)i * (size_t)num_train;
+      }
+      if(num_weight_columns > 0) {
+        weight_columns = (double **)R_alloc(
+          (size_t)num_weight_columns, sizeof(double *));
+        for(i = 0; i < num_weight_columns; ++i)
+          weight_columns[i] = REAL(weights_r) +
+            (size_t)i * (size_t)num_train;
+      }
 
       route_status = kernel_weighted_sum_np_route(
         NULL, NULL, NULL, beta_bandwidth_code, num_train, num_eval,
         0, 0, ncon, leave_one_out, 0, 1, 0, 0, 0, 0, 0, 0,
-        INTEGER(op_i), OP_NOOP, 0, 0, NULL, 0, 0, 0,
+        INTEGER(op_i), OP_NOOP, 0, 0, NULL, 0,
+        num_response_columns, num_weight_columns,
         NP_TREE_FALSE, 0, NULL, NULL, NULL, NULL,
         NULL, NULL, train_columns, NULL, NULL, evaluation_columns,
-        NULL, NULL, NULL,
+        response_columns, weight_columns, NULL,
         (beta_bandwidth_code == BW_FIXED) ? REAL(bw_r) : NULL,
         beta_bandwidth_code != BW_FIXED,
         bandwidth_train_columns, bandwidth_eval_columns, NULL, NULL,
