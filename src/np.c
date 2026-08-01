@@ -10309,6 +10309,119 @@ static int np_real_buffer_has_matrix(SEXP value, int nrow, int ncol)
     XLENGTH(value) >= (R_xlen_t)required;
 }
 
+typedef struct {
+  double **train_unordered;
+  double **train_ordered;
+  double **evaluation_unordered;
+  double **evaluation_ordered;
+  double **category_values;
+  int *kernel_unordered;
+  int *kernel_ordered;
+  int *num_categories;
+} NPBetaCategoricalIngress;
+
+static void np_beta_categorical_ingress_prepare_or_error(
+  NPBetaCategoricalIngress *ingress,
+  SEXP train_unordered,
+  SEXP train_ordered,
+  SEXP evaluation_unordered,
+  SEXP evaluation_ordered,
+  SEXP category_values,
+  SEXP category_padding,
+  SEXP options,
+  int num_train,
+  int num_eval,
+  int num_unordered,
+  int num_ordered,
+  int train_is_eval,
+  const char *where)
+{
+  int num_categorical;
+  int coordinate;
+
+  if(ingress == NULL || where == NULL || num_train <= 0 || num_eval <= 0 ||
+     num_unordered < 0 || num_ordered < 0 ||
+     num_unordered > INT_MAX - num_ordered ||
+     (train_is_eval != 0 && train_is_eval != 1))
+    error("%s: invalid categorical ingress layout", where);
+  num_categorical = num_unordered + num_ordered;
+  memset(ingress, 0, sizeof(*ingress));
+  if(num_categorical == 0)
+    return;
+  if(XLENGTH(options) <= KWS_MLEVI ||
+     !np_real_buffer_has_matrix(train_unordered, num_train, num_unordered) ||
+     !np_real_buffer_has_matrix(train_ordered, num_train, num_ordered) ||
+     (!train_is_eval &&
+      (!np_real_buffer_has_matrix(
+         evaluation_unordered, num_eval, num_unordered) ||
+       !np_real_buffer_has_matrix(
+         evaluation_ordered, num_eval, num_ordered))))
+    error("%s: categorical data buffer is too short", where);
+
+  {
+    const int max_levels = INTEGER(options)[KWS_MLEVI];
+    const double pad_value =
+      XLENGTH(category_padding) > 0 ? REAL(category_padding)[0] : NA_REAL;
+
+    if(max_levels <= 0 || XLENGTH(category_padding) < 1 ||
+       !R_FINITE(pad_value) ||
+       !np_real_buffer_has_matrix(
+         category_values, max_levels, num_categorical))
+      error("%s: invalid categorical support metadata", where);
+    ingress->category_values = (double **)R_alloc(
+      (size_t)num_categorical, sizeof(double *));
+    ingress->num_categories = (int *)R_alloc(
+      (size_t)num_categorical, sizeof(int));
+    for(coordinate = 0; coordinate < num_categorical; ++coordinate) {
+      int level_count = 0;
+
+      ingress->category_values[coordinate] = REAL(category_values) +
+        (size_t)coordinate * (size_t)max_levels;
+      while(level_count < max_levels &&
+            ingress->category_values[coordinate][level_count] != pad_value)
+        ++level_count;
+      if(level_count <= 0)
+        error("%s: categorical support is empty", where);
+      ingress->num_categories[coordinate] = level_count;
+    }
+  }
+
+  if(num_unordered > 0) {
+    ingress->train_unordered = (double **)R_alloc(
+      (size_t)num_unordered, sizeof(double *));
+    ingress->evaluation_unordered = (double **)R_alloc(
+      (size_t)num_unordered, sizeof(double *));
+    ingress->kernel_unordered = (int *)R_alloc(
+      (size_t)num_unordered, sizeof(int));
+    for(coordinate = 0; coordinate < num_unordered; ++coordinate) {
+      ingress->train_unordered[coordinate] = REAL(train_unordered) +
+        (size_t)coordinate * (size_t)num_train;
+      ingress->evaluation_unordered[coordinate] = train_is_eval ?
+        ingress->train_unordered[coordinate] : REAL(evaluation_unordered) +
+          (size_t)coordinate * (size_t)num_eval;
+      ingress->kernel_unordered[coordinate] =
+        INTEGER(options)[KWS_UKRNEVI];
+    }
+  }
+  if(num_ordered > 0) {
+    ingress->train_ordered = (double **)R_alloc(
+      (size_t)num_ordered, sizeof(double *));
+    ingress->evaluation_ordered = (double **)R_alloc(
+      (size_t)num_ordered, sizeof(double *));
+    ingress->kernel_ordered = (int *)R_alloc(
+      (size_t)num_ordered, sizeof(int));
+    for(coordinate = 0; coordinate < num_ordered; ++coordinate) {
+      ingress->train_ordered[coordinate] = REAL(train_ordered) +
+        (size_t)coordinate * (size_t)num_train;
+      ingress->evaluation_ordered[coordinate] = train_is_eval ?
+        ingress->train_ordered[coordinate] : REAL(evaluation_ordered) +
+          (size_t)coordinate * (size_t)num_eval;
+      ingress->kernel_ordered[coordinate] =
+        INTEGER(options)[KWS_OKRNEVI];
+    }
+  }
+}
+
 SEXP C_np_kernelsum(SEXP tuno,
                     SEXP tord,
                     SEXP tcon,
@@ -10530,14 +10643,7 @@ SEXP C_np_kernelsum(SEXP tuno,
       double **bandwidth_train_columns = NULL;
       double **response_columns = NULL;
       double **weight_columns = NULL;
-      double **train_unordered_columns = NULL;
-      double **train_ordered_columns = NULL;
-      double **evaluation_unordered_columns = NULL;
-      double **evaluation_ordered_columns = NULL;
-      double **category_values = NULL;
-      int *kernel_unordered = NULL;
-      int *kernel_ordered = NULL;
-      int *num_categories = NULL;
+      NPBetaCategoricalIngress categorical_ingress;
       int route_status;
 
       route.segment_count = 1;
@@ -10551,57 +10657,10 @@ SEXP C_np_kernelsum(SEXP tuno,
         evaluation_columns[i] = train_is_eval ? train_columns[i] :
           REAL(econ_r) + (size_t)i * (size_t)num_eval;
       }
-      if(ncat > 0) {
-        const int max_levels = INTEGER(myopti_i)[KWS_MLEVI];
-        const double pad_value = REAL(padnum_r)[0];
-        int category;
-
-        category_values = (double **)R_alloc(
-          (size_t)ncat, sizeof(double *));
-        num_categories = (int *)R_alloc((size_t)ncat, sizeof(int));
-        for(category = 0; category < ncat; ++category) {
-          int level_count = 0;
-
-          category_values[category] = REAL(mcv_r) +
-            (size_t)category * (size_t)max_levels;
-          while(level_count < max_levels &&
-                category_values[category][level_count] != pad_value)
-            ++level_count;
-          if(level_count <= 0)
-            error("C_np_kernelsum: categorical support is empty");
-          num_categories[category] = level_count;
-        }
-      }
-      if(nuno > 0) {
-        train_unordered_columns = (double **)R_alloc(
-          (size_t)nuno, sizeof(double *));
-        evaluation_unordered_columns = (double **)R_alloc(
-          (size_t)nuno, sizeof(double *));
-        kernel_unordered = (int *)R_alloc((size_t)nuno, sizeof(int));
-        for(i = 0; i < nuno; ++i) {
-          train_unordered_columns[i] = REAL(tuno_r) +
-            (size_t)i * (size_t)num_train;
-          evaluation_unordered_columns[i] = train_is_eval ?
-            train_unordered_columns[i] : REAL(euno_r) +
-              (size_t)i * (size_t)num_eval;
-          kernel_unordered[i] = INTEGER(myopti_i)[KWS_UKRNEVI];
-        }
-      }
-      if(nord > 0) {
-        train_ordered_columns = (double **)R_alloc(
-          (size_t)nord, sizeof(double *));
-        evaluation_ordered_columns = (double **)R_alloc(
-          (size_t)nord, sizeof(double *));
-        kernel_ordered = (int *)R_alloc((size_t)nord, sizeof(int));
-        for(i = 0; i < nord; ++i) {
-          train_ordered_columns[i] = REAL(tord_r) +
-            (size_t)i * (size_t)num_train;
-          evaluation_ordered_columns[i] = train_is_eval ?
-            train_ordered_columns[i] : REAL(eord_r) +
-              (size_t)i * (size_t)num_eval;
-          kernel_ordered[i] = INTEGER(myopti_i)[KWS_OKRNEVI];
-        }
-      }
+      np_beta_categorical_ingress_prepare_or_error(
+        &categorical_ingress, tuno_r, tord_r, euno_r, eord_r,
+        mcv_r, padnum_r, myopti_i, num_train, num_eval,
+        nuno, nord, train_is_eval, "C_np_kernelsum");
       if(beta_bandwidth_eval != NULL &&
          beta_bandwidth_code != BW_FIXED) {
         bandwidth_eval_columns = (double **)R_alloc(
@@ -10634,22 +10693,27 @@ SEXP C_np_kernelsum(SEXP tuno,
       }
 
       route_status = kernel_weighted_sum_np_route(
-        NULL, kernel_unordered, kernel_ordered,
+        NULL, categorical_ingress.kernel_unordered,
+        categorical_ingress.kernel_ordered,
         beta_bandwidth_code, num_train, num_eval,
         nuno, nord, ncon, leave_one_out, 0,
         beta_kernel_power, 0, 0, 0, 0, 0, 0,
         INTEGER(op_i), OP_NOOP, 0, 0, NULL, 0,
         num_response_columns, num_weight_columns,
         NP_TREE_FALSE, 0, NULL, NULL, NULL, NULL,
-        train_unordered_columns, train_ordered_columns, train_columns,
-        evaluation_unordered_columns, evaluation_ordered_columns,
+        categorical_ingress.train_unordered,
+        categorical_ingress.train_ordered, train_columns,
+        categorical_ingress.evaluation_unordered,
+        categorical_ingress.evaluation_ordered,
         evaluation_columns,
         response_columns, weight_columns, NULL,
         (beta_bandwidth_code == BW_FIXED) ? REAL(bw_r) : NULL,
         beta_bandwidth_code != BW_FIXED,
         bandwidth_train_columns, bandwidth_eval_columns,
-        ncat > 0 ? REAL(bw_r) + ncon : NULL, num_categories,
-        category_values, NULL, REAL(out_ksum), REAL(out_pksum),
+        ncat > 0 ? REAL(bw_r) + ncon : NULL,
+        categorical_ingress.num_categories,
+        categorical_ingress.category_values, NULL,
+        REAL(out_ksum), REAL(out_pksum),
         return_kernel_weights ? REAL(out_kw) : NULL, NULL,
         categorical_compress, &route,
         &route_diagnostics);
@@ -10673,22 +10737,26 @@ SEXP C_np_kernelsum(SEXP tuno,
             direct_operators[i - 1] = INTEGER(op_i)[i - 1];
           direct_operators[i] = OP_DERIVATIVE;
           route_status = kernel_weighted_sum_np_route(
-            NULL, kernel_unordered, kernel_ordered,
+            NULL, categorical_ingress.kernel_unordered,
+            categorical_ingress.kernel_ordered,
             beta_bandwidth_code, num_train, num_eval,
             nuno, nord, ncon, leave_one_out, 0,
             beta_kernel_power, 0, 0, 0, 0, 0, 0,
             direct_operators, OP_NOOP, 0, 0, NULL, 0,
             num_response_columns, num_weight_columns,
             NP_TREE_FALSE, 0, NULL, NULL, NULL, NULL,
-            train_unordered_columns, train_ordered_columns, train_columns,
-            evaluation_unordered_columns, evaluation_ordered_columns,
+            categorical_ingress.train_unordered,
+            categorical_ingress.train_ordered, train_columns,
+            categorical_ingress.evaluation_unordered,
+            categorical_ingress.evaluation_ordered,
             evaluation_columns,
             response_columns, weight_columns, NULL,
             (beta_bandwidth_code == BW_FIXED) ? REAL(bw_r) : NULL,
             beta_bandwidth_code != BW_FIXED,
             bandwidth_train_columns, bandwidth_eval_columns,
-            ncat > 0 ? REAL(bw_r) + ncon : NULL, num_categories,
-            category_values, NULL,
+            ncat > 0 ? REAL(bw_r) + ncon : NULL,
+            categorical_ingress.num_categories,
+            categorical_ingress.category_values, NULL,
             REAL(out_pksum) + (R_xlen_t)i * expected_sum, NULL,
             return_kernel_weights ?
               REAL(out_pkw) + (R_xlen_t)i * expected_weights : NULL,
