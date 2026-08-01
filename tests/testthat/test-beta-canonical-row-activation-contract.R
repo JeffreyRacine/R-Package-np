@@ -28,7 +28,7 @@ test_that("the first beta row activation enters the canonical central engine", {
   )
 
   activation_start <- regexpr(
-    "if(descriptor.order == 2 && beta_bandwidth_code == BW_FIXED",
+    "if(beta_bandwidth_code == BW_FIXED && all_pdf",
     ingress,
     fixed = TRUE
   )[[1L]]
