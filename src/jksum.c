@@ -8234,8 +8234,8 @@ static inline void np_hot_loop_check_interrupt(const int pos,
 }
 
 /*
- * First canonical beta activation: the public, scalar, fixed-bandwidth,
- * second-order PDF row.  This sits at the shared kernel-row boundary rather
+ * Canonical beta activation: the public, scalar, fixed-bandwidth PDF row for
+ * every supported order.  This sits at the shared kernel-row boundary rather
  * than in an estimator or beta-only kernel-sum engine.  The deliberately
  * narrow contract is fail-closed: C ingress passes route metadata only when
  * every condition below is proved, and later tranches widen this microkernel
@@ -8276,7 +8276,6 @@ static int np_beta_fixed_scalar_absolute_route(
        NP_CKERNEL_ROUTE_OK ||
      route->segment_count != 1 ||
      route->segment[0].descriptor.family != NP_CKERNEL_FAMILY_BETA ||
-     route->segment[0].descriptor.order != 2 ||
      route->segment[0].coordinate_offset != 0 ||
      route->segment[0].coordinate_count != num_reg_continuous ||
      num_obs_train <= 0 || num_obs_eval <= 0 ||
