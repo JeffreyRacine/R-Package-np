@@ -8446,6 +8446,7 @@ typedef struct {
   int ncol_Y;
   int ncol_W;
   NPContinuousKernelProgressFunction progress;
+  int retain_common_scale;
 } NP_DualPowerCtx;
 
 typedef int (*NP_KernelRowTileConsumerFn)(
@@ -9279,6 +9280,7 @@ static int np_beta_absolute_route(
   double * const row,
   double * const weighted_sum,
   double * const weighted_sum_power2,
+  const int retain_common_scale,
   double * const centered_m2,
   double * const kw,
   const NPBetaRegressionMomentCtx * const regression_moment_context,
@@ -9404,6 +9406,8 @@ static int np_beta_absolute_route(
     return KWSNP_ERR_BADINVOC;
   if(derivative_coordinate < 0 && row == NULL &&
      weighted_sum_power2 == NULL && centered_m2 == NULL)
+    return KWSNP_ERR_BADINVOC;
+  if(retain_common_scale != 0 && retain_common_scale != 1)
     return KWSNP_ERR_BADINVOC;
   if(centered_m2 != NULL &&
      (derivative_coordinate >= 0 || kernel_power != 1 ||
@@ -9542,7 +9546,8 @@ static int np_beta_absolute_route(
   if(weighted_sum_power2 != NULL) {
     NPContinuousKernelRowStatus row_status;
 
-    if(derivative_coordinate >= 0 || kernel_power != 1 || kw != NULL)
+    if(derivative_coordinate >= 0 || kernel_power != 1 ||
+       (!retain_common_scale && kw != NULL))
       goto cleanup;
     row_status =
       np_continuous_kernel_beta_dual_power_rows_validated(
@@ -9551,6 +9556,7 @@ static int np_beta_absolute_route(
         matrix_Y, ncol_Y, matrix_W, ncol_W,
         matrix_Y_power2, ncol_Y_power2, matrix_W_power2, ncol_W_power2,
         &workspace, &row_result, weighted_sum, weighted_sum_power2,
+        retain_common_scale, retain_common_scale ? kw : NULL,
         route_diagnostics, progress);
 
     if(row_status != NP_CONTINUOUS_ROW_OK)
@@ -9814,6 +9820,8 @@ const int keep_kw_owner_local){
     const int beta_dual_power =
       dual_power_ctx != NULL && dual_power_ctx->weighted_sum != NULL &&
       dual_power_ctx->kernel_pow == 2;
+    const int beta_retain_common_scale =
+      beta_dual_power && dual_power_ctx->retain_common_scale;
     const int beta_centered_moment =
       centered_moment_ctx != NULL &&
       centered_moment_ctx->centered_m2 != NULL;
@@ -9878,7 +9886,7 @@ const int keep_kw_owner_local){
        beta_has_categories) &&
       (dual_power_ctx == NULL ||
        (beta_dual_power && kernel_pow == 1 && !route_has_derivative &&
-        kw == NULL)) &&
+        (kw == NULL || beta_retain_common_scale))) &&
       (centered_moment_ctx == NULL ||
        (beta_centered_moment && dual_power_ctx == NULL &&
         kernel_pow == 1 && !route_has_derivative && kw == NULL &&
@@ -9891,7 +9899,8 @@ const int keep_kw_owner_local){
     if(!exact_beta_absolute_route)
       return KWSNP_ERR_BADINVOC;
     if((!route_has_derivative && !beta_dual_power &&
-        !beta_centered_moment) || beta_has_categories) {
+        !beta_centered_moment) || beta_has_categories ||
+       beta_retain_common_scale) {
       if((size_t)num_obs_train > SIZE_MAX / sizeof(double))
         return KWSNP_ERR_BADINVOC;
       route_row = (double *)malloc((size_t)num_obs_train * sizeof(double));
@@ -9916,6 +9925,7 @@ const int keep_kw_owner_local){
       kernel_pow,
       route_row, weighted_sum,
       beta_dual_power ? dual_power_ctx->weighted_sum : NULL,
+      beta_retain_common_scale,
       beta_centered_moment ? centered_moment_ctx->centered_m2 : NULL,
       kw, NULL, kernel_route_diagnostics,
       beta_dual_power ? dual_power_ctx->progress :
@@ -12144,7 +12154,7 @@ double * const pkw){
   int old_pkw_nvar = kernel_weighted_sum_pkw_nvar_extern;
   int status = 0;
   const NP_DualPowerCtx dual_power_ctx = {
-    weighted_sum_power2, 2, NULL, NULL, 0, 0, NULL
+    weighted_sum_power2, 2, NULL, NULL, 0, 0, NULL, 0
   };
 
   kernel_weighted_sum_pkw_extern = pkw;
@@ -12257,7 +12267,7 @@ NPContinuousKernelDerivativeDiagnostics * const kernel_route_diagnostics,
 NPContinuousKernelProgressFunction progress)
 {
   const NP_DualPowerCtx dual_power_ctx = {
-    weighted_sum_power2, 2, NULL, NULL, 0, 0, progress
+    weighted_sum_power2, 2, NULL, NULL, 0, 0, progress, 0
   };
   const NPContinuousKernelExecutionContext kernel_execution_context = {
     kernel_route, kernel_route_diagnostics, categorical_compress
@@ -20576,7 +20586,7 @@ static NP_NOINLINE void np_beta_scalar_regression_fit_canonical(
     BANDWIDTH_reg == BW_FIXED ? NULL : matrix_bandwidth,
     BANDWIDTH_reg == BW_FIXED ? NULL : matrix_bandwidth,
     NULL, NULL, 0, 0, NULL, NULL, 0, 0, 1,
-    route_row, NULL, NULL, NULL, NULL,
+    route_row, NULL, NULL, 0, NULL, NULL,
     &regression_moment_context, kernel_route_diagnostics, NULL);
   free(route_row);
   free_tmat(matrix_bandwidth);
@@ -20696,7 +20706,7 @@ static NP_NOINLINE int np_beta_regression_lp_moment_row_canonical(
   NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics)
 {
   NP_DualPowerCtx dual_power_context = {
-    weighted_sum_power2, 2, basis, basis, nterms, nterms, NULL
+    weighted_sum_power2, 2, basis, basis, nterms, nterms, NULL, 1
   };
   const NPContinuousKernelExecutionContext execution_context = {
     kernel_route, kernel_route_diagnostics, categorical_compress
@@ -21774,7 +21784,7 @@ int categorical_compress){
     double **Ycols = NULL, **Wcols = NULL;
     double *y2 = NULL, *out = NULL, *out2 = NULL, *fit_kw = NULL;
     NP_DualPowerCtx fit_dual_power_ctx = {
-      NULL, 2, NULL, NULL, 0, 0, NULL
+      NULL, 2, NULL, NULL, 0, 0, NULL, 0
     };
     NPGLPBasisCtx *basis_ctx = NULL;
     NPLPSolveWorkspace solve_workspace;

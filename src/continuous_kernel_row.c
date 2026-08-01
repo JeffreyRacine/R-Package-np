@@ -1928,6 +1928,8 @@ np_continuous_kernel_beta_dual_power_rows_validated(
   NPContinuousKernelRowResult *row_result,
   double *weighted_sum,
   double *weighted_sum_power2,
+  int retain_common_scale,
+  double *scaled_kernel_weights,
   NPContinuousKernelDerivativeDiagnostics *diagnostics,
   NPContinuousKernelProgressFunction progress)
 {
@@ -1961,6 +1963,9 @@ np_continuous_kernel_beta_dual_power_rows_validated(
      (power2_weight_columns > 0 && power2_case_weights == NULL) ||
      workspace == NULL || row_result == NULL ||
      weighted_sum == NULL || weighted_sum_power2 == NULL ||
+     (retain_common_scale != 0 && retain_common_scale != 1) ||
+     (!retain_common_scale && scaled_kernel_weights != NULL) ||
+     (retain_common_scale && row_result->row == NULL) ||
      (size_t)response_extent > SIZE_MAX / (size_t)weight_extent ||
      (size_t)power2_response_extent >
        SIZE_MAX / (size_t)power2_weight_extent)
@@ -1999,9 +2004,13 @@ np_continuous_kernel_beta_dual_power_rows_validated(
       (size_t)evaluation * power2_sum_extent;
     int observation;
 
-    status = np_continuous_kernel_beta_log_factor_row(
-      plan, evaluation, omitted_observation, provider,
-      workspace, row_result);
+    status = retain_common_scale ?
+      np_continuous_kernel_beta_factor_row_with_log_factor(
+        plan, evaluation, omitted_observation, provider,
+        workspace, row_result) :
+      np_continuous_kernel_beta_log_factor_row(
+        plan, evaluation, omitted_observation, provider,
+        workspace, row_result);
     if(status != NP_CONTINUOUS_ROW_OK) {
       if(diagnostics != NULL) {
         diagnostics->bad_coordinate = row_result->bad_coordinate;
@@ -2019,9 +2028,15 @@ np_continuous_kernel_beta_dual_power_rows_validated(
       double value;
       double value_power2;
 
-      status = np_continuous_kernel_signed_log_restore(
-        workspace->primary_log_absolute[observation],
-        workspace->primary_sign[observation], &value);
+      if(retain_common_scale) {
+        value = row_result->row[observation];
+        status = R_FINITE(value) ? NP_CONTINUOUS_ROW_OK :
+          NP_CONTINUOUS_ROW_ERR_NUMERIC;
+      } else {
+        status = np_continuous_kernel_signed_log_restore(
+          workspace->primary_log_absolute[observation],
+          workspace->primary_sign[observation], &value);
+      }
       if(status == NP_CONTINUOUS_ROW_OK) {
         /* A dual consumer already owns K in representable arithmetic.  Square
          * it directly instead of paying for a second exp(2 * log(K)). */
@@ -2031,6 +2046,11 @@ np_continuous_kernel_beta_dual_power_rows_validated(
       }
       if(status != NP_CONTINUOUS_ROW_OK)
         return status;
+      if(scaled_kernel_weights != NULL)
+        scaled_kernel_weights[
+          (size_t)evaluation * (size_t)plan->num_train +
+          (size_t)observation
+        ] = value;
       if(observation == omitted_observation)
         continue;
 
