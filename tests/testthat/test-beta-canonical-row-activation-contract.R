@@ -84,6 +84,11 @@ test_that("activated beta absolute rows enter the canonical central engine", {
     fixed = TRUE
   )
   expect_match(
+    engine,
+    "np_continuous_kernel_beta_derivative_powered_rows_validated(",
+    fixed = TRUE
+  )
+  expect_match(
     row_engine,
     "if(response_columns == 0 && weight_columns == 0)",
     fixed = TRUE

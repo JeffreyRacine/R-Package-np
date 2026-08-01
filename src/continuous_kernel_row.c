@@ -1130,6 +1130,234 @@ np_continuous_kernel_beta_derivative_absolute_rows_validated(
   return NP_CONTINUOUS_ROW_OK;
 }
 
+NPContinuousKernelRowStatus
+np_continuous_kernel_beta_derivative_powered_rows_validated(
+  const NPContinuousKernelRowPlan *plan,
+  int leave_one_out,
+  int leave_one_out_offset,
+  int derivative_coordinate,
+  int kernel_power,
+  double * const *response,
+  int response_columns,
+  double * const *case_weights,
+  int weight_columns,
+  NPContinuousKernelDerivativeAccumulator *accumulator,
+  double *weighted_sum,
+  double *kernel_weights,
+  NPContinuousKernelDerivativeDiagnostics *diagnostics)
+{
+  const int response_extent = response_columns > 0 ? response_columns : 1;
+  const int weight_extent = weight_columns > 0 ? weight_columns : 1;
+  NPContinuousKernelRowWorkspace workspace;
+  NPContinuousKernelDerivativeRowResult row_result;
+  double *row_storage = NULL;
+  size_t sum_extent;
+  size_t row_count;
+  NPContinuousKernelRowStatus status = NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  int derivative_count = 0;
+  int evaluation;
+  int index;
+
+  if(diagnostics != NULL) {
+    diagnostics->bad_coordinate = -1;
+    diagnostics->bad_observation = -1;
+    diagnostics->undefined_count = 0;
+    diagnostics->beta_status = NP_BETA_OK;
+  }
+  if(plan == NULL || plan->route == NULL || plan->num_train <= 0 ||
+     plan->num_eval <= 0 || plan->num_continuous <= 0 ||
+     plan->operator == NULL || plan->route->segment_count != 1 ||
+     plan->route->segment[0].descriptor.family != NP_CKERNEL_FAMILY_BETA ||
+     (leave_one_out != 0 && leave_one_out != 1) ||
+     leave_one_out_offset < 0 || derivative_coordinate < 0 ||
+     derivative_coordinate >= plan->num_continuous || kernel_power == 1 ||
+     response_columns < 0 || weight_columns < 0 ||
+     (response_columns > 0 && response == NULL) ||
+     (weight_columns > 0 && case_weights == NULL) ||
+     accumulator == NULL || weighted_sum == NULL ||
+     (size_t)response_extent > SIZE_MAX / (size_t)weight_extent)
+    return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  for(index = 0; index < response_columns; ++index)
+    if(response[index] == NULL)
+      return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  for(index = 0; index < weight_columns; ++index)
+    if(case_weights[index] == NULL)
+      return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  sum_extent = (size_t)response_extent * (size_t)weight_extent;
+  if((size_t)plan->num_eval > SIZE_MAX / sum_extent ||
+     (kernel_weights != NULL &&
+      (size_t)plan->num_eval > SIZE_MAX / (size_t)plan->num_train) ||
+     (leave_one_out &&
+      (plan->num_eval > plan->num_train ||
+       leave_one_out_offset > plan->num_train - plan->num_eval)) ||
+     (size_t)plan->num_train > SIZE_MAX / 2 ||
+     (size_t)plan->num_train * 2 > SIZE_MAX / sizeof(double))
+    return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  for(index = 0; index < plan->num_continuous; ++index)
+    derivative_count += plan->operator[index] == OP_DERIVATIVE;
+  if(derivative_count != 1 ||
+     plan->operator[derivative_coordinate] != OP_DERIVATIVE)
+    return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  status = np_continuous_kernel_derivative_accumulator_reserve(
+    accumulator, sum_extent);
+  if(status != NP_CONTINUOUS_ROW_OK)
+    return status;
+
+  row_count = (size_t)plan->num_train * 2;
+  row_storage = (double *)malloc(row_count * sizeof(double));
+  if(row_storage == NULL)
+    return NP_CONTINUOUS_ROW_ERR_MEMORY;
+  row_result.regular_row = row_storage;
+  row_result.jump_row = row_storage + plan->num_train;
+  np_continuous_kernel_row_workspace_init(&workspace);
+
+  for(evaluation = 0; evaluation < plan->num_eval; ++evaluation) {
+    const int omitted_observation = leave_one_out ?
+      evaluation + leave_one_out_offset : -1;
+    int observation;
+
+    for(size_t output = 0; output < sum_extent; ++output) {
+      accumulator->regular_positive_log[output] = -INFINITY;
+      accumulator->regular_negative_log[output] = -INFINITY;
+      accumulator->jump_positive_log[output] = -INFINITY;
+      accumulator->jump_negative_log[output] = -INFINITY;
+    }
+    status = np_continuous_kernel_beta_derivative_factor_row(
+      plan, evaluation, omitted_observation, derivative_coordinate,
+      &workspace, &row_result);
+    if(status != NP_CONTINUOUS_ROW_OK) {
+      if(diagnostics != NULL) {
+        diagnostics->bad_coordinate = row_result.bad_coordinate;
+        diagnostics->bad_observation = row_result.bad_observation;
+        diagnostics->beta_status = row_result.beta_status;
+      }
+      goto cleanup;
+    }
+
+    for(observation = 0; observation < plan->num_train; ++observation) {
+      const double regular_log = workspace.primary_log_absolute[observation];
+      const double jump_log = workspace.secondary_log_absolute[observation];
+      const int regular_sign = workspace.primary_sign[observation];
+      const int jump_sign = workspace.secondary_sign[observation];
+      double powered_log = -INFINITY;
+      int powered_sign = 0;
+      int powered_jump = 0;
+
+      if(kernel_weights != NULL) {
+        if(jump_sign != 0)
+          kernel_weights[(size_t)evaluation * (size_t)plan->num_train +
+                         (size_t)observation] =
+            jump_sign > 0 ? INFINITY : -INFINITY;
+        else if(regular_sign == 0)
+          kernel_weights[(size_t)evaluation * (size_t)plan->num_train +
+                         (size_t)observation] = 0.0;
+        else if(regular_log > log(DBL_MAX))
+          kernel_weights[(size_t)evaluation * (size_t)plan->num_train +
+                         (size_t)observation] =
+            regular_sign > 0 ? INFINITY : -INFINITY;
+        else
+          kernel_weights[(size_t)evaluation * (size_t)plan->num_train +
+                         (size_t)observation] =
+            regular_sign > 0 ? exp(regular_log) : -exp(regular_log);
+      }
+      if(observation == omitted_observation)
+        continue;
+
+      if(jump_sign != 0) {
+        if(kernel_power > 0) {
+          status = np_continuous_kernel_signed_log_power(
+            jump_log, jump_sign, kernel_power,
+            &powered_log, &powered_sign);
+          powered_jump = 1;
+        } else if(kernel_power == 0) {
+          powered_log = 0.0;
+          powered_sign = 1;
+        } else {
+          continue;
+        }
+      } else {
+        status = np_continuous_kernel_signed_log_power(
+          regular_log, regular_sign, kernel_power,
+          &powered_log, &powered_sign);
+      }
+      if(status != NP_CONTINUOUS_ROW_OK)
+        goto cleanup;
+      if(powered_sign == 0)
+        continue;
+
+      for(int response_column = 0; response_column < response_extent;
+          ++response_column) {
+        const double response_value = response_columns > 0 ?
+          response[response_column][observation] : 1.0;
+
+        for(int weight_column = 0; weight_column < weight_extent;
+            ++weight_column) {
+          const double weight_value = weight_columns > 0 ?
+            case_weights[weight_column][observation] : 1.0;
+          const size_t output =
+            (size_t)response_column * (size_t)weight_extent +
+            (size_t)weight_column;
+          double term_log;
+          int term_sign;
+
+          if(!R_FINITE(response_value) || !R_FINITE(weight_value)) {
+            status = NP_CONTINUOUS_ROW_ERR_NUMERIC;
+            goto cleanup;
+          }
+          if(response_value == 0.0 || weight_value == 0.0)
+            continue;
+          term_log = powered_log + log(fabs(response_value)) +
+            log(fabs(weight_value));
+          term_sign = powered_sign *
+            (response_value > 0.0 ? 1 : -1) *
+            (weight_value > 0.0 ? 1 : -1);
+          if(powered_jump)
+            np_continuous_kernel_signed_log_add(
+              term_log, term_sign,
+              &accumulator->jump_positive_log[output],
+              &accumulator->jump_negative_log[output]);
+          else
+            np_continuous_kernel_signed_log_add(
+              term_log, term_sign,
+              &accumulator->regular_positive_log[output],
+              &accumulator->regular_negative_log[output]);
+        }
+      }
+    }
+
+    for(size_t output = 0; output < sum_extent; ++output) {
+      int undefined = 0;
+      const double jump = np_continuous_kernel_signed_log_value(
+        accumulator->jump_positive_log[output],
+        accumulator->jump_negative_log[output], &undefined);
+      double * const destination = weighted_sum +
+        (size_t)evaluation * sum_extent + output;
+
+      if(undefined) {
+        *destination = NA_REAL;
+        if(diagnostics != NULL)
+          ++diagnostics->undefined_count;
+      } else if(jump != 0.0) {
+        *destination = jump > 0.0 ? INFINITY : -INFINITY;
+      } else {
+        *destination = np_continuous_kernel_signed_log_value(
+          accumulator->regular_positive_log[output],
+          accumulator->regular_negative_log[output], &undefined);
+        if(undefined && diagnostics != NULL)
+          ++diagnostics->undefined_count;
+      }
+    }
+    if((evaluation & 255) == 0)
+      R_CheckUserInterrupt();
+  }
+  status = NP_CONTINUOUS_ROW_OK;
+
+cleanup:
+  np_continuous_kernel_row_workspace_release(&workspace);
+  free(row_storage);
+  return status;
+}
+
 NPContinuousKernelRowStatus np_continuous_kernel_scaled_restore(
   double scaled_value,
   double log_scale,
@@ -1185,32 +1413,50 @@ NPContinuousKernelRowStatus np_continuous_kernel_signed_log_power_restore(
 {
   double powered_log_absolute;
   int powered_sign;
+  NPContinuousKernelRowStatus status;
 
-  if(value == NULL || ISNAN(log_absolute) || log_absolute == INFINITY ||
+  if(value == NULL)
+    return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  status = np_continuous_kernel_signed_log_power(
+    log_absolute, sign, power, &powered_log_absolute, &powered_sign);
+  if(status != NP_CONTINUOUS_ROW_OK)
+    return status;
+  return np_continuous_kernel_signed_log_restore(
+    powered_log_absolute, powered_sign, value);
+}
+
+NPContinuousKernelRowStatus np_continuous_kernel_signed_log_power(
+  double log_absolute,
+  int sign,
+  int power,
+  double *powered_log_absolute,
+  int *powered_sign)
+{
+  if(powered_log_absolute == NULL || powered_sign == NULL ||
+     ISNAN(log_absolute) || log_absolute == INFINITY ||
      (sign != -1 && sign != 0 && sign != 1) ||
      ((sign == 0) != (log_absolute == -INFINITY)))
     return NP_CONTINUOUS_ROW_ERR_LAYOUT;
   if(sign == 0) {
-    *value = 0.0;
+    *powered_log_absolute = -INFINITY;
+    *powered_sign = 0;
     return NP_CONTINUOUS_ROW_OK;
   }
   if(power == 0) {
-    *value = 1.0;
+    *powered_log_absolute = 0.0;
+    *powered_sign = 1;
     return NP_CONTINUOUS_ROW_OK;
   }
 
-  powered_log_absolute = (double)power * log_absolute;
-  if(ISNAN(powered_log_absolute) || powered_log_absolute == INFINITY ||
-     powered_log_absolute > log(DBL_MAX))
+  *powered_log_absolute = (double)power * log_absolute;
+  if(ISNAN(*powered_log_absolute) || *powered_log_absolute == INFINITY)
     return NP_CONTINUOUS_ROW_ERR_NUMERIC;
-  if(powered_log_absolute == -INFINITY) {
-    *value = 0.0;
+  if(*powered_log_absolute == -INFINITY) {
+    *powered_sign = 0;
     return NP_CONTINUOUS_ROW_OK;
   }
-  powered_sign = ((power % 2) == 0) ? 1 : sign;
-  *value = (double)powered_sign * exp(powered_log_absolute);
-  return R_FINITE(*value) ? NP_CONTINUOUS_ROW_OK :
-    NP_CONTINUOUS_ROW_ERR_NUMERIC;
+  *powered_sign = ((power % 2) == 0) ? 1 : sign;
+  return NP_CONTINUOUS_ROW_OK;
 }
 
 const char *np_continuous_kernel_row_status_message(

@@ -11411,9 +11411,6 @@ SEXP C_np_kernelsum(SEXP tuno,
     }
     if(derivative_dimension >= 0 && p_operator == OP_DERIVATIVE)
       error("C_np_kernelsum: direct and permutation beta derivatives cannot be combined");
-    if(beta_kernel_power != 1 &&
-       (derivative_dimension >= 0 || p_operator == OP_DERIVATIVE))
-      error("C_np_kernelsum: powered beta derivative rows are not yet activated");
     if(num_train <= 0 || num_eval <= 0 || ncon <= 0 ||
        num_response_columns < 0 || num_weight_columns < 0)
       error("C_np_kernelsum: invalid beta kernel-sum dimensions");

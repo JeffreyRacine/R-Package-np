@@ -69,6 +69,188 @@ test_that("beta direct and permutation derivatives agree", {
   }
 })
 
+test_that("powered beta derivatives match raw-weight oracles", {
+  training <- data.frame(
+    x = c(.07, .16, .29, .43, .61, .76, .91),
+    z = c(.88, .19, .68, .34, .79, .47, .11)
+  )
+  evaluation <- data.frame(x = c(.12, .31, .52, .81),
+                           z = c(.22, .64, .39, .73))
+  arguments <- list(
+    bws = c(.18, .2), txdat = training, exdat = evaluation,
+    operator = c("derivative", "normal"),
+    return.kernel.weights = TRUE,
+    ckertype = "beta", ckerorder = 6,
+    ckerbound = "fixed", ckerlb = c(0, 0), ckerub = c(1, 1)
+  )
+  raw <- do.call(npksum, arguments)
+
+  for (power in c(-2L, -1L, 0L, 2L, 3L)) {
+    powered <- do.call(npksum, c(arguments, list(kernel.pow = power)))
+    expected_weights <- ifelse(raw$kw == 0, 0, raw$kw^power)
+    expect_equal(as.double(powered$ksum), colSums(expected_weights),
+                 tolerance = 3e-10)
+    expect_identical(powered$kw, raw$kw)
+  }
+})
+
+test_that("powered beta derivative tensors retain public layout", {
+  training <- data.frame(
+    x = c(.07, .16, .29, .43, .61, .76, .91),
+    z = c(.88, .19, .68, .34, .79, .47, .11)
+  )
+  evaluation <- data.frame(x = c(.12, .31, .52, .81),
+                           z = c(.22, .64, .39, .73))
+  response <- cbind(y1 = seq_len(nrow(training)),
+                    y2 = cos(seq_len(nrow(training))))
+  case_weights <- cbind(w1 = 1, w2 = seq(.6, 1.2, length.out = nrow(training)))
+  arguments <- list(
+    bws = c(.18, .2), txdat = training, tydat = response,
+    weights = case_weights, exdat = evaluation,
+    operator = c("derivative", "normal"),
+    return.kernel.weights = TRUE,
+    ckertype = "beta", ckerorder = 8,
+    ckerbound = "fixed", ckerlb = c(0, 0), ckerub = c(1, 1)
+  )
+  raw <- do.call(npksum, arguments)
+  powered <- do.call(npksum, c(arguments, list(kernel.pow = 2L)))
+  powered_weights <- raw$kw^2
+
+  for (evaluation_index in seq_len(nrow(evaluation)))
+    for (response_column in seq_len(ncol(response)))
+      for (weight_column in seq_len(ncol(case_weights)))
+        expect_equal(
+          powered$ksum[weight_column, response_column, evaluation_index],
+          sum(powered_weights[, evaluation_index] *
+              response[, response_column] *
+              case_weights[, weight_column]),
+          tolerance = 5e-10
+        )
+  expect_identical(powered$kw, raw$kw)
+})
+
+test_that("powered beta permutation derivatives reuse direct rows", {
+  training <- data.frame(
+    x = c(.07, .16, .29, .43, .61, .76, .91),
+    z = c(.88, .19, .68, .34, .79, .47, .11)
+  )
+  evaluation <- data.frame(x = c(.12, .31, .52, .81),
+                           z = c(.22, .64, .39, .73))
+  common <- list(
+    bws = c(.18, .2), txdat = training, exdat = evaluation,
+    kernel.pow = 2L, ckertype = "beta", ckerorder = 8,
+    ckerbound = "fixed", ckerlb = c(0, 0), ckerub = c(1, 1)
+  )
+  permutation <- do.call(npksum, c(common, list(
+    permutation.operator = "derivative", return.kernel.weights = TRUE,
+    return.derivative.kernel.weights = TRUE
+  )))
+
+  for (dimension in 1:2) {
+    operators <- rep("normal", 2)
+    operators[dimension] <- "derivative"
+    direct <- do.call(npksum, c(common, list(
+      operator = operators, return.kernel.weights = TRUE
+    )))
+    expect_equal(as.double(permutation$p.ksum[, dimension]),
+                 as.double(direct$ksum), tolerance = 3e-10)
+    expect_identical(permutation$p.kw[, , dimension], direct$kw)
+  }
+})
+
+test_that("powered beta endpoint jumps retain structural semantics", {
+  arguments <- list(
+    bws = .14, txdat = data.frame(x = c(0, .2, .8, 1)),
+    exdat = data.frame(x = c(0, 1)), operator = "derivative",
+    return.kernel.weights = TRUE, ckertype = "beta", ckerorder = 8,
+    ckerbound = "fixed", ckerlb = 0, ckerub = 1
+  )
+  raw <- NULL
+  expect_warning(raw <- do.call(npksum, arguments), "infinite endpoint")
+
+  squared <- NULL
+  expect_warning(squared <- do.call(npksum, c(arguments, list(
+    kernel.pow = 2L
+  ))), "infinite endpoint")
+  expect_true(all(is.infinite(squared$ksum)))
+  expect_true(all(squared$ksum > 0))
+  expect_identical(squared$kw, raw$kw)
+
+  cubed <- NULL
+  expect_warning(cubed <- do.call(npksum, c(arguments, list(
+    kernel.pow = 3L
+  ))), "infinite endpoint")
+  expect_identical(sign(as.double(cubed$ksum)), c(-1, 1))
+  expect_identical(cubed$kw, raw$kw)
+
+  zeroth <- do.call(npksum, c(arguments, list(kernel.pow = 0L)))
+  expected_zero <- ifelse(raw$kw == 0, 0, 1)
+  expect_equal(as.double(zeroth$ksum), colSums(expected_zero),
+               tolerance = 2e-12)
+  expect_identical(zeroth$kw, raw$kw)
+})
+
+test_that("powered beta derivatives span orders, operators, and bandwidth modes", {
+  training <- data.frame(
+    x = c(.07, .16, .29, .43, .61, .76, .91),
+    z = c(.88, .19, .68, .34, .79, .47, .11)
+  )
+  evaluation <- data.frame(x = c(.12, .31, .52, .81),
+                           z = c(.22, .64, .39, .73))
+  companions <- c("normal", "integral", "convolution")
+
+  for (mode in c("fixed", "generalized_nn", "adaptive_nn")) {
+    bandwidth <- if (identical(mode, "fixed")) c(.18, .2) else c(4, 4)
+    for (order in c(2L, 4L, 6L, 8L))
+      for (derivative_dimension in 1:2)
+        for (companion in companions) {
+          operators <- rep(companion, 2)
+          operators[derivative_dimension] <- "derivative"
+          arguments <- list(
+            bws = bandwidth, txdat = training, exdat = evaluation,
+            bwtype = mode, operator = operators,
+            return.kernel.weights = TRUE, bandwidth.divide = TRUE,
+            ckertype = "beta", ckerorder = order,
+            ckerbound = "fixed", ckerlb = c(0, 0), ckerub = c(1, 1)
+          )
+          raw <- do.call(npksum, arguments)
+          for (power in c(0L, 2L, 3L)) {
+            powered <- do.call(npksum, c(arguments, list(
+              kernel.pow = power
+            )))
+            expected_weights <- ifelse(raw$kw == 0, 0, raw$kw^power)
+            expect_equal(as.double(powered$ksum), colSums(expected_weights),
+                         tolerance = 8e-9)
+            expect_identical(powered$kw, raw$kw)
+          }
+        }
+  }
+})
+
+test_that("powered beta derivative deletion remains structural", {
+  training <- data.frame(
+    x = c(.07, .16, .29, .43, .61, .76, .91),
+    z = c(.88, .19, .68, .34, .79, .47, .11)
+  )
+
+  for (mode in c("fixed", "generalized_nn", "adaptive_nn")) {
+    bandwidth <- if (identical(mode, "fixed")) c(.18, .2) else c(4, 4)
+    arguments <- list(
+      bws = bandwidth, txdat = training, bwtype = mode,
+      operator = c("derivative", "convolution"),
+      leave.one.out = TRUE, return.kernel.weights = TRUE,
+      ckertype = "beta", ckerorder = 8,
+      ckerbound = "fixed", ckerlb = c(0, 0), ckerub = c(1, 1)
+    )
+    raw <- do.call(npksum, arguments)
+    powered <- do.call(npksum, c(arguments, list(kernel.pow = 2L)))
+    expect_true(all(diag(raw$kw) == 0))
+    expect_identical(powered$kw, raw$kw)
+    expect_equal(as.double(powered$ksum), colSums(raw$kw^2),
+                 tolerance = 8e-9)
+  }
+})
+
 test_that("forced tree mode preserves canonical beta permutation derivatives", {
   training <- data.frame(
     x = c(.017, .08, .21, .47, .73, .94, .989),

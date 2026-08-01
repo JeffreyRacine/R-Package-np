@@ -8609,8 +8609,6 @@ static int np_beta_absolute_route(
       num_obs_eval > num_obs_train ||
       leave_one_out_offset > num_obs_train - num_obs_eval))
     return KWSNP_ERR_BADINVOC;
-  if(derivative_coordinate >= 0 && kernel_power != 1)
-    return KWSNP_ERR_BADINVOC;
   if(derivative_coordinate < 0 && row == NULL)
     return KWSNP_ERR_BADINVOC;
 
@@ -8652,11 +8650,15 @@ static int np_beta_absolute_route(
   }
 
   if(derivative_coordinate >= 0) {
-    const NPContinuousKernelRowStatus row_status =
+    const NPContinuousKernelRowStatus row_status = kernel_power == 1 ?
       np_continuous_kernel_beta_derivative_absolute_rows_validated(
         &plan, leave_one_out, leave_one_out_offset, derivative_coordinate,
         matrix_Y, ncol_Y, matrix_W, ncol_W, &derivative_accumulator,
-        weighted_sum, kw, route_diagnostics);
+        weighted_sum, kw, route_diagnostics) :
+      np_continuous_kernel_beta_derivative_powered_rows_validated(
+        &plan, leave_one_out, leave_one_out_offset, derivative_coordinate,
+        kernel_power, matrix_Y, ncol_Y, matrix_W, ncol_W,
+        &derivative_accumulator, weighted_sum, kw, route_diagnostics);
 
     if(row_status != NP_CONTINUOUS_ROW_OK)
       goto cleanup;
@@ -8885,7 +8887,6 @@ const int keep_kw_owner_local){
       np_continuous_kernel_route_has_beta(kernel_route) &&
       (BANDWIDTH_reg == BW_FIXED || BANDWIDTH_reg == BW_GEN_NN ||
        BANDWIDTH_reg == BW_ADAP_NN) &&
-      (!route_has_derivative || kernel_pow == 1) &&
       bandwidth_divide == 0 && bandwidth_divide_weights == 0 &&
       num_reg_unordered == 0 && num_reg_ordered == 0 &&
       num_reg_continuous > 0 && permutation_operator == OP_NOOP &&
