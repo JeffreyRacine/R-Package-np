@@ -254,7 +254,7 @@ test_that("beta density and distribution fits have one canonical ingress", {
   )
 })
 
-test_that("regression route plumbing is dormant before beta activation", {
+test_that("scalar beta regression fits enter the canonical row engine", {
   root <- locate_beta_activation_sources()
   skip_if(is.null(root), "package sources unavailable")
   ingress <- paste(
@@ -274,10 +274,43 @@ test_that("regression route plumbing is dormant before beta activation", {
   expect_gt(public_end, public_start)
   public_regression <- substr(ingress, public_start, public_end - 1L)
 
-  expect_match(public_regression, "np_beta_regression_lc(", fixed = TRUE)
+  scalar_start <- regexpr(
+    "if(descriptor.family == NP_CKERNEL_FAMILY_BETA && !do_grad)",
+    public_regression,
+    fixed = TRUE
+  )[[1L]]
+  gradient_start <- regexpr(
+    "if(descriptor.family == NP_CKERNEL_FAMILY_BETA && do_grad)",
+    public_regression,
+    fixed = TRUE
+  )[[1L]]
+  expect_gt(scalar_start, 0L)
+  expect_gt(gradient_start, scalar_start)
+  scalar_ingress <- substr(
+    public_regression, scalar_start, gradient_start - 1L
+  )
+  expect_match(scalar_ingress, "beta_route.segment_count = 1;", fixed = TRUE)
+  expect_match(scalar_ingress, "active_route = &beta_route;", fixed = TRUE)
+  expect_match(
+    scalar_ingress, "active_diagnostics = &beta_diagnostics;", fixed = TRUE
+  )
+  expect_false(grepl("np_beta_regression_lc(", scalar_ingress, fixed = TRUE))
   expect_match(
     public_regression,
-    "REAL(out_xtra), ckerlb_p, ckerub_p,\n                  NULL, NULL, 0);",
+    "active_route, active_diagnostics, categorical_compress);",
+    fixed = TRUE
+  )
+
+  gradient_ingress <- substr(
+    public_regression, gradient_start, nchar(public_regression)
+  )
+  expect_match(gradient_ingress, "np_beta_regression_lc(", fixed = TRUE)
+  expect_match(
+    gradient_ingress, "np_beta_regression_lc_gradient(", fixed = TRUE
+  )
+  expect_match(
+    gradient_ingress,
+    "if(descriptor.family == NP_CKERNEL_FAMILY_BETA && do_grad)",
     fixed = TRUE
   )
 
@@ -315,13 +348,69 @@ test_that("regression route plumbing is dormant before beta activation", {
   expect_gt(engine_start, 0L)
   expect_gt(engine_end, engine_start)
   regression_engine <- substr(engine, engine_start, engine_end - 1L)
-  expect_match(regression_engine, "(void)kernel_route;", fixed = TRUE)
-  expect_match(regression_engine, "(void)kernel_route_diagnostics;",
+  expect_match(regression_engine, "const int exact_beta_route = kernel_route != NULL;",
                fixed = TRUE)
-  expect_match(regression_engine, "(void)categorical_compress;",
+  expect_match(regression_engine, "lp_engine_est != NP_LP_ENGINE_SCALAR || do_grad || do_gerr",
                fixed = TRUE)
-  expect_false(grepl("NPContinuousKernelExecutionContext",
-                     regression_engine, fixed = TRUE))
+  expect_match(
+    regression_engine, "np_beta_bandwidth_prepare_matrix(", fixed = TRUE
+  )
+  expect_match(regression_engine, "NPBetaRegressionMomentCtx", fixed = TRUE)
+  expect_match(
+    regression_engine, "&regression_moment_context, kernel_route_diagnostics, NULL);",
+    fixed = TRUE
+  )
+  expect_match(
+    regression_engine, "estimation_shortcut_done = 1;\n    goto finish_regression_estimation;",
+    fixed = TRUE
+  )
+  expect_match(
+    regression_engine, "error(\"canonical beta regression row failed:",
+    fixed = TRUE
+  )
+  expect_false(grepl("np_beta_regression_lc(", regression_engine,
+                     fixed = TRUE))
+})
+
+test_that("canonical beta regression moments preserve the sidecar transcript", {
+  root <- locate_beta_activation_sources()
+  skip_if(is.null(root), "package sources unavailable")
+  row_engine <- paste(
+    readLines(file.path(root, "src", "continuous_kernel_row.c"),
+              warn = FALSE),
+    collapse = "\n"
+  )
+
+  owner_start <- regexpr(
+    "np_continuous_kernel_beta_regression_moment_rows_validated(",
+    row_engine,
+    fixed = TRUE
+  )[[1L]]
+  expect_gt(owner_start, 0L)
+  owner <- substr(row_engine, owner_start, nchar(row_engine))
+
+  expect_match(
+    owner, "np_continuous_kernel_beta_log_factor_row(", fixed = TRUE
+  )
+  expect_match(owner, "if(positive_weights)", fixed = TRUE)
+  expect_match(owner, "const double new_total_weight", fixed = TRUE)
+  expect_match(
+    owner,
+    "weighted_m2 += weight * delta *\n            (response[observation] - new_mean);",
+    fixed = TRUE
+  )
+  expect_match(owner, "double weighted_response_sum = 0.0;", fixed = TRUE)
+  expect_match(
+    owner, "weighted_mean = weighted_response_sum / total_weight;",
+    fixed = TRUE
+  )
+  expect_match(owner, "squared_weight_sum += weight * weight;", fixed = TRUE)
+  expect_match(
+    owner,
+    "(weighted_m2 / total_weight) *\n      (squared_weight_sum / (total_weight * total_weight))",
+    fixed = TRUE
+  )
+  expect_false(grepl("result->row[observation]", owner, fixed = TRUE))
 })
 
 test_that("signed-log beta rows compose every route segment", {

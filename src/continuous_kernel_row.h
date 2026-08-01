@@ -12,7 +12,8 @@ typedef enum {
   NP_CONTINUOUS_ROW_ERR_ROUTE = 2,
   NP_CONTINUOUS_ROW_ERR_MEMORY = 3,
   NP_CONTINUOUS_ROW_ERR_KERNEL = 4,
-  NP_CONTINUOUS_ROW_ERR_NUMERIC = 5
+  NP_CONTINUOUS_ROW_ERR_NUMERIC = 5,
+  NP_CONTINUOUS_ROW_ERR_ZERO_WEIGHT = 6
 } NPContinuousKernelRowStatus;
 
 typedef struct {
@@ -236,6 +237,27 @@ np_continuous_kernel_beta_centered_moment_rows_validated(
   NPContinuousKernelRowResult *row_result,
   double *sum,
   double *centered_m2,
+  NPContinuousKernelDerivativeDiagnostics *diagnostics,
+  NPContinuousKernelProgressFunction progress);
+
+/*
+ * Consume one normalized width-one regression row without restoring its
+ * common log scale.  Positive rows use weighted Welford accumulation; signed
+ * rows use a two-pass centered moment.  Both retain training order and the
+ * exact squared-weight effective-sample-size factor.
+ */
+NPContinuousKernelRowStatus
+np_continuous_kernel_beta_regression_moment_rows_validated(
+  const NPContinuousKernelRowPlan *plan,
+  int leave_one_out,
+  int leave_one_out_offset,
+  const NPContinuousKernelLogFactorProvider *provider,
+  const double *response,
+  int positive_weights,
+  NPContinuousKernelRowWorkspace *workspace,
+  NPContinuousKernelRowResult *row_result,
+  double *mean,
+  double *mean_stderr,
   NPContinuousKernelDerivativeDiagnostics *diagnostics,
   NPContinuousKernelProgressFunction progress);
 

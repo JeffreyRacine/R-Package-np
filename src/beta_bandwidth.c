@@ -26,6 +26,89 @@ const char *np_beta_bandwidth_prepare_status_message(
 }
 
 np_beta_bandwidth_prepare_status
+np_beta_bandwidth_prepare_matrix(
+  np_beta_bandwidth_mode bandwidth_mode,
+  double * const *train_continuous,
+  double * const *eval_continuous,
+  const double *nearest_neighbor,
+  int num_train,
+  int num_eval,
+  int num_continuous,
+  int train_is_eval,
+  int need_eval,
+  int need_train,
+  int suppress_parallel,
+  double **bandwidth_eval,
+  double **bandwidth_train)
+{
+  int large_sf_save;
+  double nconfac_save;
+  double ncatfac_save;
+  int status = 0;
+  int dimension;
+
+  if((bandwidth_mode != NP_BETA_BANDWIDTH_GENERALIZED_NN &&
+      bandwidth_mode != NP_BETA_BANDWIDTH_ADAPTIVE_NN) ||
+     train_continuous == NULL || nearest_neighbor == NULL ||
+     num_train <= 0 || num_eval <= 0 || num_continuous <= 0 ||
+     (!train_is_eval && eval_continuous == NULL) ||
+     (need_eval && bandwidth_eval == NULL) ||
+     (need_train && bandwidth_train == NULL))
+    return NP_BETA_BANDWIDTH_PREPARE_ERR_LAYOUT;
+  for(dimension = 0; dimension < num_continuous; ++dimension)
+    if(train_continuous[dimension] == NULL ||
+       (!train_is_eval && eval_continuous[dimension] == NULL) ||
+       (need_eval && bandwidth_eval[dimension] == NULL) ||
+       (need_train && bandwidth_train[dimension] == NULL))
+      return NP_BETA_BANDWIDTH_PREPARE_ERR_LAYOUT;
+
+  large_sf_save = int_LARGE_SF;
+  nconfac_save = nconfac_extern;
+  ncatfac_save = ncatfac_extern;
+  int_LARGE_SF = SF_ARB;
+  nconfac_extern = 0.0;
+  ncatfac_extern = 0.0;
+
+  if(need_train)
+    status = kernel_bandwidth_mean(
+      0,
+      (bandwidth_mode == NP_BETA_BANDWIDTH_GENERALIZED_NN) ?
+        BW_GEN_NN : BW_ADAP_NN,
+      num_train, num_train,
+      0, 0, 0, num_continuous, 0, 0, suppress_parallel,
+      (double *)nearest_neighbor,
+      (double **)train_continuous, (double **)train_continuous,
+      (double **)train_continuous, (double **)train_continuous,
+      bandwidth_train, bandwidth_train, NULL);
+
+  if(status == 0 && need_eval) {
+    if(bandwidth_mode == NP_BETA_BANDWIDTH_ADAPTIVE_NN && train_is_eval) {
+      if(!need_train) {
+        status = 1;
+      } else {
+        for(dimension = 0; dimension < num_continuous; ++dimension)
+          memcpy(bandwidth_eval[dimension], bandwidth_train[dimension],
+                 (size_t)num_train * sizeof(double));
+      }
+    } else {
+      status = kernel_bandwidth_mean(
+        0, BW_GEN_NN, num_train, num_eval,
+        0, 0, 0, num_continuous, 0, 0, suppress_parallel,
+        (double *)nearest_neighbor,
+        (double **)train_continuous, (double **)eval_continuous,
+        (double **)train_continuous, (double **)eval_continuous,
+        bandwidth_eval, bandwidth_eval, NULL);
+    }
+  }
+
+  int_LARGE_SF = large_sf_save;
+  nconfac_extern = nconfac_save;
+  ncatfac_extern = ncatfac_save;
+  return status == 0 ? NP_BETA_BANDWIDTH_PREPARE_OK :
+    NP_BETA_BANDWIDTH_PREPARE_ERR_DISTANCE;
+}
+
+np_beta_bandwidth_prepare_status
 np_beta_bandwidth_prepare(np_beta_bandwidth_mode bandwidth_mode,
                           const double *train_continuous,
                           const double *eval_continuous,
@@ -43,10 +126,6 @@ np_beta_bandwidth_prepare(np_beta_bandwidth_mode bandwidth_mode,
   double **matrix_train;
   double **matrix_eval;
   double **matrix_bandwidth;
-  int large_sf_save;
-  double nconfac_save;
-  double ncatfac_save;
-  int status = 0;
   int dimension;
 
   if((bandwidth_mode != NP_BETA_BANDWIDTH_GENERALIZED_NN &&
@@ -71,53 +150,25 @@ np_beta_bandwidth_prepare(np_beta_bandwidth_mode bandwidth_mode,
       (double *)eval_continuous + (size_t)dimension * (size_t)num_eval;
   }
 
-  large_sf_save = int_LARGE_SF;
-  nconfac_save = nconfac_extern;
-  ncatfac_save = ncatfac_extern;
-  int_LARGE_SF = SF_ARB;
-  nconfac_extern = 0.0;
-  ncatfac_extern = 0.0;
-
-  if(need_train) {
+  if(need_train)
     for(dimension = 0; dimension < num_continuous; ++dimension)
       matrix_bandwidth[dimension] = bandwidth_train +
         (size_t)dimension * (size_t)num_train;
-    status = kernel_bandwidth_mean(
-      0,
-      (bandwidth_mode == NP_BETA_BANDWIDTH_GENERALIZED_NN) ?
-        BW_GEN_NN : BW_ADAP_NN,
-      num_train, num_train,
-      0, 0, 0, num_continuous, 0, 0, suppress_parallel,
-      (double *)nearest_neighbor,
-      matrix_train, matrix_train, matrix_train, matrix_train,
-      matrix_bandwidth, matrix_bandwidth, NULL);
+  if(need_eval) {
+    double **matrix_bandwidth_eval = (double **)R_alloc(
+      (size_t)num_continuous, sizeof(double *));
+
+    for(dimension = 0; dimension < num_continuous; ++dimension)
+      matrix_bandwidth_eval[dimension] = bandwidth_eval +
+        (size_t)dimension * (size_t)num_eval;
+    return np_beta_bandwidth_prepare_matrix(
+      bandwidth_mode, matrix_train, matrix_eval, nearest_neighbor,
+      num_train, num_eval, num_continuous, train_is_eval,
+      need_eval, need_train, suppress_parallel,
+      matrix_bandwidth_eval, matrix_bandwidth);
   }
-
-  if(status == 0 && need_eval) {
-    if(bandwidth_mode == NP_BETA_BANDWIDTH_ADAPTIVE_NN && train_is_eval) {
-      if(!need_train) {
-        status = 1;
-      } else {
-        memcpy(bandwidth_eval, bandwidth_train,
-               (size_t)num_continuous * (size_t)num_train * sizeof(double));
-      }
-    } else {
-      for(dimension = 0; dimension < num_continuous; ++dimension)
-        matrix_bandwidth[dimension] = bandwidth_eval +
-          (size_t)dimension * (size_t)num_eval;
-      status = kernel_bandwidth_mean(
-        0, BW_GEN_NN, num_train, num_eval,
-        0, 0, 0, num_continuous, 0, 0, suppress_parallel,
-        (double *)nearest_neighbor,
-        matrix_train, matrix_eval, matrix_train, matrix_eval,
-        matrix_bandwidth, matrix_bandwidth, NULL);
-    }
-  }
-
-  int_LARGE_SF = large_sf_save;
-  nconfac_extern = nconfac_save;
-  ncatfac_extern = ncatfac_save;
-
-  return (status == 0) ? NP_BETA_BANDWIDTH_PREPARE_OK :
-    NP_BETA_BANDWIDTH_PREPARE_ERR_DISTANCE;
+  return np_beta_bandwidth_prepare_matrix(
+    bandwidth_mode, matrix_train, matrix_eval, nearest_neighbor,
+    num_train, num_eval, num_continuous, train_is_eval,
+    need_eval, need_train, suppress_parallel, NULL, matrix_bandwidth);
 }

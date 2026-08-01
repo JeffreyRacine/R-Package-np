@@ -467,13 +467,94 @@ np_continuous_kernel_beta_segment_log_fill(
   int omitted_observation,
   double *log_absolute,
   signed char *sign,
+  double *maximum,
   NPContinuousKernelRowResult *result)
 {
+  int normal_operator = 1;
   int observation;
 
   if(plan == NULL || segment == NULL || log_absolute == NULL ||
-     sign == NULL || result == NULL)
+     sign == NULL || maximum == NULL || result == NULL)
     return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  *maximum = -INFINITY;
+  for(int coordinate = segment->coordinate_offset;
+      coordinate < segment->coordinate_offset + segment->coordinate_count;
+      ++coordinate) {
+    normal_operator &= plan->operator[coordinate] == OP_NORMAL;
+    if((plan->bandwidth_mode == BW_FIXED ||
+        plan->bandwidth_mode == BW_GEN_NN) &&
+       (plan->bandwidth_eval == NULL ||
+        plan->bandwidth_eval[coordinate] == NULL))
+      return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+    if(plan->bandwidth_mode == BW_ADAP_NN &&
+       (plan->bandwidth_train == NULL ||
+        plan->bandwidth_train[coordinate] == NULL))
+      return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  }
+
+  if(normal_operator) {
+    for(observation = 0; observation < plan->num_train; ++observation) {
+      double log_product = 0.0;
+      int product_sign = 1;
+
+      if(observation == omitted_observation) {
+        log_absolute[observation] = -INFINITY;
+        sign[observation] = 0;
+        continue;
+      }
+      for(int coordinate = segment->coordinate_offset;
+          coordinate < segment->coordinate_offset + segment->coordinate_count;
+          ++coordinate) {
+        const int local_coordinate = coordinate - segment->coordinate_offset;
+        const double evaluation = plan->train_is_eval ?
+          plan->train[coordinate][evaluation_index] :
+          plan->evaluation[coordinate][evaluation_index];
+        const double bandwidth = plan->bandwidth_mode == BW_FIXED ?
+          plan->bandwidth_eval[coordinate][0] :
+          (plan->bandwidth_mode == BW_GEN_NN ?
+           plan->bandwidth_eval[coordinate][evaluation_index] :
+           plan->bandwidth_train[coordinate][observation]);
+        int scalar_sign = 0;
+
+        log_absolute[observation] = np_beta_log_abs_pdf_order(
+          evaluation, plan->train[coordinate][observation], bandwidth,
+          segment->lower[local_coordinate], segment->upper[local_coordinate],
+          segment->descriptor.order, &scalar_sign, &result->beta_status);
+        if(result->beta_status != NP_BETA_OK) {
+          result->bad_coordinate = coordinate;
+          result->bad_observation = observation;
+          return NP_CONTINUOUS_ROW_ERR_KERNEL;
+        }
+        if(ISNAN(log_absolute[observation]) ||
+           log_absolute[observation] == INFINITY ||
+           (scalar_sign != -1 && scalar_sign != 0 && scalar_sign != 1) ||
+           ((scalar_sign == 0) !=
+            (log_absolute[observation] == -INFINITY))) {
+          result->bad_coordinate = coordinate;
+          result->bad_observation = observation;
+          return NP_CONTINUOUS_ROW_ERR_NUMERIC;
+        }
+        if(scalar_sign == 0) {
+          product_sign = 0;
+          log_product = -INFINITY;
+          break;
+        }
+        log_product += log_absolute[observation];
+        product_sign *= scalar_sign;
+        if(ISNAN(log_product) || log_product == INFINITY) {
+          result->bad_coordinate = coordinate;
+          result->bad_observation = observation;
+          return NP_CONTINUOUS_ROW_ERR_NUMERIC;
+        }
+      }
+      log_absolute[observation] = log_product;
+      sign[observation] = (signed char)product_sign;
+      if(product_sign != 0 && log_product > *maximum)
+        *maximum = log_product;
+    }
+    return NP_CONTINUOUS_ROW_OK;
+  }
+
   for(observation = 0; observation < plan->num_train; ++observation) {
     double log_product = 0.0;
     int product_sign = 1;
@@ -515,6 +596,8 @@ np_continuous_kernel_beta_segment_log_fill(
     }
     log_absolute[observation] = log_product;
     sign[observation] = (signed char)product_sign;
+    if(product_sign != 0 && log_product > *maximum)
+      *maximum = log_product;
   }
   return NP_CONTINUOUS_ROW_OK;
 }
@@ -564,14 +647,11 @@ NPContinuousKernelRowStatus np_continuous_kernel_beta_factor_row(
       continue;
     status = np_continuous_kernel_beta_segment_log_fill(
       plan, segment, evaluation_index, omitted_observation,
-      workspace->primary_log_absolute, workspace->primary_sign, result);
+      workspace->primary_log_absolute, workspace->primary_sign,
+      &result->segment_log_scale[segment_index], result);
     if(status != NP_CONTINUOUS_ROW_OK)
       return status;
 
-    result->segment_log_scale[segment_index] =
-      np_continuous_kernel_row_maximum(
-        workspace->primary_log_absolute, workspace->primary_sign,
-        plan->num_train);
     status = np_continuous_kernel_row_multiply_scaled(
       result->row, workspace->primary_log_absolute,
       workspace->primary_sign, plan->num_train,
@@ -711,7 +791,8 @@ np_continuous_kernel_beta_log_factor_row_multi_prevalidated(
       continue;
     status = np_continuous_kernel_beta_segment_log_fill(
       plan, segment, evaluation_index, omitted_observation,
-      segment_log, segment_sign, result);
+      segment_log, segment_sign,
+      &result->segment_log_scale[segment_index], result);
     if(status != NP_CONTINUOUS_ROW_OK)
       return status;
     if(beta_segment_count > 0) {
@@ -722,11 +803,20 @@ np_continuous_kernel_beta_log_factor_row_multi_prevalidated(
     }
     ++beta_segment_count;
   }
-  if(provider == NULL)
+  if(provider == NULL) {
+    result->total_log_scale = np_continuous_kernel_row_maximum(
+      workspace->primary_log_absolute, workspace->primary_sign,
+      plan->num_train);
     return NP_CONTINUOUS_ROW_OK;
-  return np_continuous_kernel_log_factor_compose(
+  }
+  status = np_continuous_kernel_log_factor_compose(
     plan, evaluation_index, omitted_observation,
     provider, workspace, result);
+  if(status == NP_CONTINUOUS_ROW_OK)
+    result->total_log_scale = np_continuous_kernel_row_maximum(
+      workspace->primary_log_absolute, workspace->primary_sign,
+      plan->num_train);
+  return status;
 }
 
 static NPContinuousKernelRowStatus
@@ -769,12 +859,21 @@ np_continuous_kernel_beta_log_factor_row(
   status = np_continuous_kernel_beta_segment_log_fill(
     plan, &plan->route->segment[0], evaluation_index,
     omitted_observation, workspace->primary_log_absolute,
-    workspace->primary_sign, result);
-  if(status != NP_CONTINUOUS_ROW_OK || provider == NULL)
+    workspace->primary_sign, &result->segment_log_scale[0], result);
+  if(status != NP_CONTINUOUS_ROW_OK)
     return status;
-  return np_continuous_kernel_log_factor_compose(
+  if(provider == NULL) {
+    result->total_log_scale = result->segment_log_scale[0];
+    return NP_CONTINUOUS_ROW_OK;
+  }
+  status = np_continuous_kernel_log_factor_compose(
     plan, evaluation_index, omitted_observation,
     provider, workspace, result);
+  if(status == NP_CONTINUOUS_ROW_OK)
+    result->total_log_scale = np_continuous_kernel_row_maximum(
+      workspace->primary_log_absolute, workspace->primary_sign,
+      plan->num_train);
+  return status;
 }
 
 NPContinuousKernelRowStatus
@@ -798,9 +897,7 @@ np_continuous_kernel_beta_factor_row_with_log_factor(
   if(status != NP_CONTINUOUS_ROW_OK)
     return status;
 
-  complete_log_scale = np_continuous_kernel_row_maximum(
-    workspace->primary_log_absolute, workspace->primary_sign,
-    plan->num_train);
+  complete_log_scale = result->total_log_scale;
   for(observation = 0; observation < plan->num_train; ++observation)
     result->row[observation] = 1.0;
   status = np_continuous_kernel_row_multiply_scaled(
@@ -2203,7 +2300,166 @@ const char *np_continuous_kernel_row_status_message(
     return "continuous-kernel scalar evaluation failed";
   case NP_CONTINUOUS_ROW_ERR_NUMERIC:
     return "continuous-kernel row produced an invalid numeric result";
+  case NP_CONTINUOUS_ROW_ERR_ZERO_WEIGHT:
+    return "continuous-kernel row has zero total weight";
   default:
     return "unknown continuous-kernel row status";
   }
+}
+
+NPContinuousKernelRowStatus
+np_continuous_kernel_beta_regression_moment_rows_validated(
+  const NPContinuousKernelRowPlan *plan,
+  int leave_one_out,
+  int leave_one_out_offset,
+  const NPContinuousKernelLogFactorProvider *provider,
+  const double *response,
+  int positive_weights,
+  NPContinuousKernelRowWorkspace *workspace,
+  NPContinuousKernelRowResult *row_result,
+  double *mean,
+  double *mean_stderr,
+  NPContinuousKernelDerivativeDiagnostics *diagnostics,
+  NPContinuousKernelProgressFunction progress)
+{
+  NPContinuousKernelRowStatus status;
+  int evaluation;
+  int coordinate;
+  int observation;
+
+  if(diagnostics != NULL) {
+    diagnostics->bad_coordinate = -1;
+    diagnostics->bad_observation = -1;
+    diagnostics->undefined_count = 0;
+    diagnostics->beta_status = NP_BETA_OK;
+  }
+  if(plan == NULL || plan->route == NULL || plan->num_train <= 0 ||
+     plan->num_eval <= 0 || plan->num_continuous <= 0 ||
+     plan->route->segment_count != 1 ||
+     plan->route->segment[0].descriptor.family != NP_CKERNEL_FAMILY_BETA ||
+     (leave_one_out != 0 && leave_one_out != 1) ||
+     leave_one_out_offset < 0 ||
+     (positive_weights != 0 && positive_weights != 1) ||
+     plan->operator == NULL || response == NULL || workspace == NULL ||
+     row_result == NULL || mean == NULL || mean_stderr == NULL ||
+     (leave_one_out &&
+      (plan->num_eval > plan->num_train ||
+       leave_one_out_offset > plan->num_train - plan->num_eval)))
+    return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  for(coordinate = 0; coordinate < plan->num_continuous; ++coordinate)
+    if(plan->operator[coordinate] != OP_NORMAL)
+      return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  for(observation = 0; observation < plan->num_train; ++observation)
+    if(!R_FINITE(response[observation])) {
+      if(diagnostics != NULL)
+        diagnostics->bad_observation = observation;
+      return NP_CONTINUOUS_ROW_ERR_NUMERIC;
+    }
+
+  for(evaluation = 0; evaluation < plan->num_eval; ++evaluation) {
+    const int omitted_observation = leave_one_out ?
+      evaluation + leave_one_out_offset : -1;
+    double total_weight = 0.0;
+    double weighted_mean = 0.0;
+    double weighted_m2 = 0.0;
+    double squared_weight_sum = 0.0;
+
+    status = np_continuous_kernel_beta_log_factor_row(
+      plan, evaluation, omitted_observation, provider,
+      workspace, row_result);
+    if(status != NP_CONTINUOUS_ROW_OK) {
+      if(diagnostics != NULL) {
+        diagnostics->bad_coordinate = row_result->bad_coordinate;
+        diagnostics->bad_observation = row_result->bad_observation;
+        diagnostics->beta_status = row_result->beta_status;
+      }
+      return status;
+    }
+    if(row_result->total_log_scale == -INFINITY)
+      return NP_CONTINUOUS_ROW_ERR_ZERO_WEIGHT;
+
+    if(positive_weights) {
+      for(observation = 0; observation < plan->num_train; ++observation) {
+        const double weight = workspace->primary_sign[observation] == 0 ?
+          0.0 : (double)workspace->primary_sign[observation] * exp(
+            workspace->primary_log_absolute[observation] -
+            row_result->total_log_scale);
+
+        if(observation == omitted_observation)
+          continue;
+        if(weight < 0.0 || !R_FINITE(weight)) {
+          if(diagnostics != NULL)
+            diagnostics->bad_observation = observation;
+          return NP_CONTINUOUS_ROW_ERR_NUMERIC;
+        }
+        if(weight > 0.0) {
+          const double new_total_weight = total_weight + weight;
+          const double delta = response[observation] - weighted_mean;
+          const double new_mean = weighted_mean +
+            (weight / new_total_weight) * delta;
+
+          weighted_m2 += weight * delta *
+            (response[observation] - new_mean);
+          squared_weight_sum += weight * weight;
+          total_weight = new_total_weight;
+          weighted_mean = new_mean;
+        }
+      }
+    } else {
+      double weighted_response_sum = 0.0;
+
+      for(observation = 0; observation < plan->num_train; ++observation) {
+        const double weight = workspace->primary_sign[observation] == 0 ?
+          0.0 : (double)workspace->primary_sign[observation] * exp(
+            workspace->primary_log_absolute[observation] -
+            row_result->total_log_scale);
+
+        if(observation == omitted_observation)
+          continue;
+        total_weight += weight;
+        weighted_response_sum += weight * response[observation];
+      }
+      if(!R_FINITE(total_weight) || total_weight == 0.0 ||
+         !R_FINITE(weighted_response_sum))
+        return total_weight == 0.0 ? NP_CONTINUOUS_ROW_ERR_ZERO_WEIGHT :
+          NP_CONTINUOUS_ROW_ERR_NUMERIC;
+      weighted_mean = weighted_response_sum / total_weight;
+
+      for(observation = 0; observation < plan->num_train; ++observation) {
+        const double weight = workspace->primary_sign[observation] == 0 ?
+          0.0 : (double)workspace->primary_sign[observation] * exp(
+            workspace->primary_log_absolute[observation] -
+            row_result->total_log_scale);
+        const double residual = response[observation] - weighted_mean;
+
+        if(observation == omitted_observation)
+          continue;
+        weighted_m2 += weight * residual * residual;
+        squared_weight_sum += weight * weight;
+      }
+    }
+
+    if(!R_FINITE(total_weight) ||
+       (positive_weights ? total_weight <= 0.0 : total_weight == 0.0))
+      return total_weight == 0.0 ? NP_CONTINUOUS_ROW_ERR_ZERO_WEIGHT :
+        NP_CONTINUOUS_ROW_ERR_NUMERIC;
+    if(!R_FINITE(weighted_mean) || !R_FINITE(weighted_m2) ||
+       !R_FINITE(squared_weight_sum))
+      return NP_CONTINUOUS_ROW_ERR_NUMERIC;
+    if((positive_weights && weighted_m2 < 0.0) ||
+       (!positive_weights && weighted_m2 / total_weight < 0.0))
+      weighted_m2 = 0.0;
+
+    mean[evaluation] = weighted_mean;
+    mean_stderr[evaluation] = sqrt(
+      (weighted_m2 / total_weight) *
+      (squared_weight_sum / (total_weight * total_weight)));
+    if(!R_FINITE(mean_stderr[evaluation]))
+      return NP_CONTINUOUS_ROW_ERR_NUMERIC;
+    if(progress != NULL)
+      progress(evaluation + 1, plan->num_eval);
+    if((evaluation & 31) == 0)
+      R_CheckUserInterrupt();
+  }
+  return NP_CONTINUOUS_ROW_OK;
 }

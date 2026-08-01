@@ -6878,10 +6878,15 @@ SEXP C_np_regression(SEXP tuno,
   int num_eval = 0;
   int train_is_eval = 0;
   int ey_is_ty = 0;
+  int categorical_compress = 0;
   double * ckerlb_p = NULL;
   double * ckerub_p = NULL;
   R_xlen_t gsize;
   np_continuous_kernel_descriptor descriptor;
+  NPContinuousKernelRoute beta_route;
+  NPContinuousKernelDerivativeDiagnostics beta_diagnostics;
+  const NPContinuousKernelRoute *active_route = NULL;
+  NPContinuousKernelDerivativeDiagnostics *active_diagnostics = NULL;
 
   if (en < 0) en = 0;
   if (nc < 0) nc = 0;
@@ -6941,7 +6946,49 @@ SEXP C_np_regression(SEXP tuno,
   PROTECT(out_gerr = allocVector(REALSXP, gsize));
   PROTECT(out_xtra = allocVector(REALSXP, 6));
 
-  if(descriptor.family == NP_CKERNEL_FAMILY_BETA) {
+  if(descriptor.family == NP_CKERNEL_FAMILY_BETA && !do_grad) {
+    const int beta_bandwidth_code = INTEGER(myopti_i)[REG_BWI];
+
+    if(INTEGER(myopti_i)[REG_NUNOI] != 0 ||
+       INTEGER(myopti_i)[REG_NORDI] != 0)
+      error("C_np_regression: beta regression currently supports continuous predictors only");
+    if(beta_bandwidth_code != BW_FIXED &&
+       beta_bandwidth_code != BW_GEN_NN &&
+       beta_bandwidth_code != BW_ADAP_NN)
+      error("C_np_regression: invalid beta bandwidth mode");
+    if(INTEGER(myopti_i)[REG_LL] != NP_LP_ENGINE_SCALAR)
+      error("C_np_regression: beta regression currently supports only local-constant fitting");
+    if(do_grad != (INTEGER(myopti_i)[REG_GRAD] != 0))
+      error("C_np_regression: inconsistent beta gradient flags");
+    if(num_train <= 0 || num_eval <= 0 || en != num_eval ||
+       ncon <= 0 || nc != ncon)
+      error("C_np_regression: invalid beta regression dimensions");
+    if(XLENGTH(tcon_r) < (R_xlen_t)num_train * (R_xlen_t)ncon ||
+       (!train_is_eval &&
+        XLENGTH(econ_r) < (R_xlen_t)num_eval * (R_xlen_t)ncon) ||
+       XLENGTH(ty_r) < num_train || XLENGTH(rbw_r) < ncon ||
+       XLENGTH(ckerlb_r) < ncon || XLENGTH(ckerub_r) < ncon)
+      error("C_np_regression: beta regression input buffer is too short");
+    if(train_is_eval && num_eval != num_train)
+      error("C_np_regression: beta train/evaluation dimensions are inconsistent");
+    if(!ey_is_ty && XLENGTH(ey_r) < num_eval)
+      error("C_np_regression: beta evaluation-response buffer is too short");
+
+    beta_route.segment_count = 1;
+    beta_route.segment[0].descriptor = descriptor;
+    beta_route.segment[0].coordinate_offset = 0;
+    beta_route.segment[0].coordinate_count = ncon;
+    beta_route.segment[0].lower = ckerlb_p;
+    beta_route.segment[0].upper = ckerub_p;
+    beta_diagnostics.bad_coordinate = -1;
+    beta_diagnostics.bad_observation = -1;
+    beta_diagnostics.undefined_count = 0;
+    beta_diagnostics.beta_status = NP_BETA_OK;
+    active_route = &beta_route;
+    active_diagnostics = &beta_diagnostics;
+  }
+
+  if(descriptor.family == NP_CKERNEL_FAMILY_BETA && do_grad) {
     np_beta_regression_status beta_status;
     np_beta_status scalar_status = NP_BETA_OK;
     np_beta_bandwidth_mode beta_bandwidth_mode = NP_BETA_BANDWIDTH_FIXED;
@@ -7080,7 +7127,7 @@ SEXP C_np_regression(SEXP tuno,
                   INTEGER(degree_i), INTEGER(gradient_order_i), &bern, &basis,
                   REAL(out_mean), REAL(out_merr), REAL(out_g), REAL(out_gerr),
                   REAL(out_xtra), ckerlb_p, ckerub_p,
-                  NULL, NULL, 0);
+                  active_route, active_diagnostics, categorical_compress);
   }
 
   PROTECT(out = allocVector(VECSXP, 5));
