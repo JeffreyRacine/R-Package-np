@@ -903,6 +903,8 @@ np_continuous_kernel_beta_derivative_absolute_row_bound(
   int response_columns,
   double * const *case_weights,
   int weight_columns,
+  const double *factor_log_absolute,
+  const signed char *factor_sign,
   NPContinuousKernelDerivativeAccumulator *accumulator,
   double *weighted_sum,
   double *kernel_weights,
@@ -917,6 +919,8 @@ np_continuous_kernel_beta_derivative_absolute_row_bound(
   int response_column;
   int weight_column;
 
+  if((factor_log_absolute == NULL) != (factor_sign == NULL))
+    return NP_CONTINUOUS_ROW_ERR_LAYOUT;
   sum_extent = (size_t)response_extent * (size_t)weight_extent;
   if(plan->route->segment_count == 1 &&
      plan->route->segment[0].descriptor.family == NP_CKERNEL_FAMILY_BETA)
@@ -942,6 +946,17 @@ np_continuous_kernel_beta_derivative_absolute_row_bound(
       if(kernel_weights != NULL)
         kernel_weights[observation] = 0.0;
       continue;
+    }
+    if(factor_log_absolute != NULL) {
+      const double factor_log = factor_log_absolute[observation];
+      const int sign = factor_sign[observation];
+
+      if(ISNAN(factor_log) || factor_log == INFINITY ||
+         (sign != -1 && sign != 0 && sign != 1) ||
+         ((sign == 0) != (factor_log == -INFINITY)))
+        return NP_CONTINUOUS_ROW_ERR_NUMERIC;
+      other_log = factor_log;
+      other_sign = sign;
     }
     if(single_beta_segment != NULL) {
       int coordinate;
@@ -1132,8 +1147,8 @@ np_continuous_kernel_beta_derivative_absolute_row_bound(
   return NP_CONTINUOUS_ROW_OK;
 }
 
-NPContinuousKernelRowStatus
-np_continuous_kernel_beta_derivative_absolute_rows_validated(
+static NPContinuousKernelRowStatus
+np_continuous_kernel_beta_derivative_absolute_contract_validate(
   const NPContinuousKernelRowPlan *plan,
   int leave_one_out,
   int leave_one_out_offset,
@@ -1143,24 +1158,16 @@ np_continuous_kernel_beta_derivative_absolute_rows_validated(
   double * const *case_weights,
   int weight_columns,
   NPContinuousKernelDerivativeAccumulator *accumulator,
-  double *weighted_sum,
+  const double *weighted_sum,
   double *kernel_weights,
-  NPContinuousKernelDerivativeDiagnostics *diagnostics)
+  size_t *sum_extent)
 {
   const int response_extent = response_columns > 0 ? response_columns : 1;
   const int weight_extent = weight_columns > 0 ? weight_columns : 1;
-  size_t sum_extent;
   NPContinuousKernelRowStatus status;
   int derivative_count = 0;
-  int evaluation;
   int index;
 
-  if(diagnostics != NULL) {
-    diagnostics->bad_coordinate = -1;
-    diagnostics->bad_observation = -1;
-    diagnostics->undefined_count = 0;
-    diagnostics->beta_status = NP_BETA_OK;
-  }
   if(plan == NULL || plan->route == NULL || plan->num_train <= 0 ||
      plan->num_eval <= 0 || plan->num_continuous <= 0 ||
      plan->operator == NULL ||
@@ -1170,11 +1177,17 @@ np_continuous_kernel_beta_derivative_absolute_rows_validated(
      response_columns < 0 || weight_columns < 0 ||
      (response_columns > 0 && response == NULL) ||
      (weight_columns > 0 && case_weights == NULL) ||
-     accumulator == NULL || weighted_sum == NULL ||
+     accumulator == NULL || weighted_sum == NULL || sum_extent == NULL ||
      (size_t)response_extent > SIZE_MAX / (size_t)weight_extent)
     return NP_CONTINUOUS_ROW_ERR_LAYOUT;
-  sum_extent = (size_t)response_extent * (size_t)weight_extent;
-  if((size_t)plan->num_eval > SIZE_MAX / sum_extent ||
+  for(index = 0; index < response_columns; ++index)
+    if(response[index] == NULL)
+      return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  for(index = 0; index < weight_columns; ++index)
+    if(case_weights[index] == NULL)
+      return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  *sum_extent = (size_t)response_extent * (size_t)weight_extent;
+  if((size_t)plan->num_eval > SIZE_MAX / *sum_extent ||
      (kernel_weights != NULL &&
       (size_t)plan->num_eval > SIZE_MAX / (size_t)plan->num_train) ||
      (leave_one_out &&
@@ -1191,7 +1204,39 @@ np_continuous_kernel_beta_derivative_absolute_rows_validated(
      plan->operator[derivative_coordinate] != OP_DERIVATIVE)
     return NP_CONTINUOUS_ROW_ERR_LAYOUT;
   status = np_continuous_kernel_derivative_accumulator_reserve(
-    accumulator, sum_extent);
+    accumulator, *sum_extent);
+  return status;
+}
+
+NPContinuousKernelRowStatus
+np_continuous_kernel_beta_derivative_absolute_rows_validated(
+  const NPContinuousKernelRowPlan *plan,
+  int leave_one_out,
+  int leave_one_out_offset,
+  int derivative_coordinate,
+  double * const *response,
+  int response_columns,
+  double * const *case_weights,
+  int weight_columns,
+  NPContinuousKernelDerivativeAccumulator *accumulator,
+  double *weighted_sum,
+  double *kernel_weights,
+  NPContinuousKernelDerivativeDiagnostics *diagnostics)
+{
+  size_t sum_extent;
+  NPContinuousKernelRowStatus status;
+  int evaluation;
+
+  if(diagnostics != NULL) {
+    diagnostics->bad_coordinate = -1;
+    diagnostics->bad_observation = -1;
+    diagnostics->undefined_count = 0;
+    diagnostics->beta_status = NP_BETA_OK;
+  }
+  status = np_continuous_kernel_beta_derivative_absolute_contract_validate(
+    plan, leave_one_out, leave_one_out_offset, derivative_coordinate,
+    response, response_columns, case_weights, weight_columns, accumulator,
+    weighted_sum, kernel_weights, &sum_extent);
   if(status != NP_CONTINUOUS_ROW_OK)
     return status;
 
@@ -1206,7 +1251,8 @@ np_continuous_kernel_beta_derivative_absolute_rows_validated(
       return NP_CONTINUOUS_ROW_ERR_LAYOUT;
     status = np_continuous_kernel_beta_derivative_absolute_row_bound(
       plan, evaluation, omitted_observation, derivative_coordinate,
-      response, response_columns, case_weights, weight_columns, accumulator,
+      response, response_columns, case_weights, weight_columns,
+      NULL, NULL, accumulator,
       weighted_sum + (size_t)evaluation * sum_extent,
       kernel_weights == NULL ? NULL :
         kernel_weights + (size_t)evaluation * (size_t)plan->num_train,
@@ -1225,6 +1271,93 @@ np_continuous_kernel_beta_derivative_absolute_rows_validated(
       R_CheckUserInterrupt();
   }
   return NP_CONTINUOUS_ROW_OK;
+}
+
+NPContinuousKernelRowStatus
+np_continuous_kernel_beta_derivative_absolute_rows_with_log_factor_validated(
+  const NPContinuousKernelRowPlan *plan,
+  int leave_one_out,
+  int leave_one_out_offset,
+  int derivative_coordinate,
+  const NPContinuousKernelLogFactorProvider *provider,
+  double * const *response,
+  int response_columns,
+  double * const *case_weights,
+  int weight_columns,
+  NPContinuousKernelDerivativeAccumulator *accumulator,
+  double *weighted_sum,
+  double *kernel_weights,
+  NPContinuousKernelDerivativeDiagnostics *diagnostics)
+{
+  NPContinuousKernelRowWorkspace factor_workspace;
+  size_t sum_extent;
+  NPContinuousKernelRowStatus status;
+  int evaluation;
+
+  if(diagnostics != NULL) {
+    diagnostics->bad_coordinate = -1;
+    diagnostics->bad_observation = -1;
+    diagnostics->undefined_count = 0;
+    diagnostics->beta_status = NP_BETA_OK;
+  }
+  if(provider == NULL || provider->function == NULL)
+    return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  status = np_continuous_kernel_beta_derivative_absolute_contract_validate(
+    plan, leave_one_out, leave_one_out_offset, derivative_coordinate,
+    response, response_columns, case_weights, weight_columns, accumulator,
+    weighted_sum, kernel_weights, &sum_extent);
+  if(status != NP_CONTINUOUS_ROW_OK)
+    return status;
+
+  np_continuous_kernel_row_workspace_init(&factor_workspace);
+  status = np_continuous_kernel_row_workspace_reserve(
+    &factor_workspace, (size_t)plan->num_train, 0);
+  if(status != NP_CONTINUOUS_ROW_OK)
+    goto cleanup;
+  for(evaluation = 0; evaluation < plan->num_eval; ++evaluation) {
+    const int omitted_observation = leave_one_out ?
+      evaluation + leave_one_out_offset : -1;
+    NPContinuousKernelDerivativeDiagnostics row_diagnostics = {
+      -1, -1, 0, NP_BETA_OK
+    };
+
+    if(omitted_observation >= plan->num_train) {
+      status = NP_CONTINUOUS_ROW_ERR_LAYOUT;
+      goto cleanup;
+    }
+    status = provider->function(
+      provider->context, evaluation, omitted_observation,
+      plan->num_train, factor_workspace.primary_log_absolute,
+      factor_workspace.primary_sign);
+    if(status != NP_CONTINUOUS_ROW_OK)
+      goto cleanup;
+    status = np_continuous_kernel_beta_derivative_absolute_row_bound(
+      plan, evaluation, omitted_observation, derivative_coordinate,
+      response, response_columns, case_weights, weight_columns,
+      factor_workspace.primary_log_absolute,
+      factor_workspace.primary_sign, accumulator,
+      weighted_sum + (size_t)evaluation * sum_extent,
+      kernel_weights == NULL ? NULL :
+        kernel_weights + (size_t)evaluation * (size_t)plan->num_train,
+      &row_diagnostics);
+    if(diagnostics != NULL) {
+      diagnostics->undefined_count += row_diagnostics.undefined_count;
+      if(status != NP_CONTINUOUS_ROW_OK) {
+        diagnostics->bad_coordinate = row_diagnostics.bad_coordinate;
+        diagnostics->bad_observation = row_diagnostics.bad_observation;
+        diagnostics->beta_status = row_diagnostics.beta_status;
+      }
+    }
+    if(status != NP_CONTINUOUS_ROW_OK)
+      goto cleanup;
+    if((evaluation & 255) == 0)
+      R_CheckUserInterrupt();
+  }
+  status = NP_CONTINUOUS_ROW_OK;
+
+cleanup:
+  np_continuous_kernel_row_workspace_release(&factor_workspace);
+  return status;
 }
 
 NPContinuousKernelRowStatus

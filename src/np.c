@@ -10454,9 +10454,9 @@ SEXP C_np_kernelsum(SEXP tuno,
         error("C_np_kernelsum: unsupported categorical operator");
     if(derivative_dimension >= 0 && p_operator == OP_DERIVATIVE)
       error("C_np_kernelsum: direct and permutation beta derivatives cannot be combined");
-    if(ncat > 0 &&
+    if(ncat > 0 && beta_kernel_power != 1 &&
        (derivative_dimension >= 0 || p_operator == OP_DERIVATIVE))
-      error("C_np_kernelsum: mixed beta derivatives are not yet activated");
+      error("C_np_kernelsum: powered mixed beta derivatives are not yet activated");
     if(num_train <= 0 || num_eval <= 0 || ncon <= 0 ||
        num_response_columns < 0 || num_weight_columns < 0)
       error("C_np_kernelsum: invalid beta kernel-sum dimensions");
@@ -10666,30 +10666,36 @@ SEXP C_np_kernelsum(SEXP tuno,
         error("C_np_kernelsum: canonical beta kernel row failed with code %d",
               route_status);
       if(p_operator == OP_DERIVATIVE) {
-        int *direct_operators = (int *)R_alloc((size_t)ncon, sizeof(int));
+        int *direct_operators = (int *)R_alloc(
+          (size_t)(ncon + ncat), sizeof(int));
 
         memcpy(direct_operators, INTEGER(op_i),
-               (size_t)ncon * sizeof(int));
+               (size_t)(ncon + ncat) * sizeof(int));
         for(i = 0; i < ncon; ++i) {
           if(i > 0)
             direct_operators[i - 1] = INTEGER(op_i)[i - 1];
           direct_operators[i] = OP_DERIVATIVE;
           route_status = kernel_weighted_sum_np_route(
-            NULL, NULL, NULL, beta_bandwidth_code, num_train, num_eval,
-            0, 0, ncon, leave_one_out, 0, beta_kernel_power, 0, 0, 0, 0, 0, 0,
+            NULL, kernel_unordered, kernel_ordered,
+            beta_bandwidth_code, num_train, num_eval,
+            nuno, nord, ncon, leave_one_out, 0,
+            beta_kernel_power, 0, 0, 0, 0, 0, 0,
             direct_operators, OP_NOOP, 0, 0, NULL, 0,
             num_response_columns, num_weight_columns,
             NP_TREE_FALSE, 0, NULL, NULL, NULL, NULL,
-            NULL, NULL, train_columns, NULL, NULL, evaluation_columns,
+            train_unordered_columns, train_ordered_columns, train_columns,
+            evaluation_unordered_columns, evaluation_ordered_columns,
+            evaluation_columns,
             response_columns, weight_columns, NULL,
             (beta_bandwidth_code == BW_FIXED) ? REAL(bw_r) : NULL,
             beta_bandwidth_code != BW_FIXED,
-            bandwidth_train_columns, bandwidth_eval_columns, NULL, NULL,
-            NULL, NULL,
+            bandwidth_train_columns, bandwidth_eval_columns,
+            ncat > 0 ? REAL(bw_r) + ncon : NULL, num_categories,
+            category_values, NULL,
             REAL(out_pksum) + (R_xlen_t)i * expected_sum, NULL,
             return_kernel_weights ?
               REAL(out_pkw) + (R_xlen_t)i * expected_weights : NULL,
-            NULL, 0, &route, &route_diagnostics);
+            NULL, categorical_compress, &route, &route_diagnostics);
           undefined_count += route_diagnostics.undefined_count;
           if(route_status != 0 &&
              route_diagnostics.beta_status != NP_BETA_OK)

@@ -8724,7 +8724,7 @@ static int np_beta_absolute_route(
   if(has_categories) {
     NPContinuousKernelRowStatus row_status;
 
-    if(derivative_coordinate >= 0 || weighted_sum_power2 != NULL)
+    if(weighted_sum_power2 != NULL)
       goto cleanup;
     row_status = np_beta_categorical_factor_context_prepare(
       &categorical_context, num_obs_train, num_obs_eval,
@@ -8758,15 +8758,29 @@ static int np_beta_absolute_route(
   }
 
   if(derivative_coordinate >= 0) {
-    const NPContinuousKernelRowStatus row_status = kernel_power == 1 ?
-      np_continuous_kernel_beta_derivative_absolute_rows_validated(
-        &plan, leave_one_out, leave_one_out_offset, derivative_coordinate,
-        matrix_Y, ncol_Y, matrix_W, ncol_W, &derivative_accumulator,
-        weighted_sum, kw, route_diagnostics) :
-      np_continuous_kernel_beta_derivative_powered_rows_validated(
-        &plan, leave_one_out, leave_one_out_offset, derivative_coordinate,
-        kernel_power, matrix_Y, ncol_Y, matrix_W, ncol_W,
-        &derivative_accumulator, weighted_sum, kw, route_diagnostics);
+    NPContinuousKernelRowStatus row_status;
+
+    if(has_categories) {
+      if(kernel_power != 1)
+        goto cleanup;
+      row_status =
+        np_continuous_kernel_beta_derivative_absolute_rows_with_log_factor_validated(
+          &plan, leave_one_out, leave_one_out_offset,
+          derivative_coordinate, &categorical_provider,
+          matrix_Y, ncol_Y, matrix_W, ncol_W, &derivative_accumulator,
+          weighted_sum, kw, route_diagnostics);
+    } else {
+      row_status = kernel_power == 1 ?
+        np_continuous_kernel_beta_derivative_absolute_rows_validated(
+          &plan, leave_one_out, leave_one_out_offset,
+          derivative_coordinate, matrix_Y, ncol_Y, matrix_W, ncol_W,
+          &derivative_accumulator, weighted_sum, kw, route_diagnostics) :
+        np_continuous_kernel_beta_derivative_powered_rows_validated(
+          &plan, leave_one_out, leave_one_out_offset,
+          derivative_coordinate, kernel_power,
+          matrix_Y, ncol_Y, matrix_W, ncol_W,
+          &derivative_accumulator, weighted_sum, kw, route_diagnostics);
+    }
 
     if(row_status != NP_CONTINUOUS_ROW_OK)
       goto cleanup;
@@ -9051,7 +9065,8 @@ const NPContinuousKernelExecutionContext * const kernel_execution_context){
         matrix_bw_train != NULL &&
         (!route_has_convolution || matrix_bw_eval != NULL))) &&
       ((!beta_has_categories && lambda_pre == NULL) ||
-       (beta_has_categories && !route_has_derivative && !beta_dual_power)) &&
+       (beta_has_categories && !beta_dual_power &&
+        (!route_has_derivative || kernel_pow == 1))) &&
       (dual_power_ctx == NULL ||
        (beta_dual_power && kernel_pow == 1 && !route_has_derivative &&
         kw == NULL)) &&
@@ -9062,7 +9077,7 @@ const NPContinuousKernelExecutionContext * const kernel_execution_context){
 
     if(!exact_beta_absolute_route)
       return KWSNP_ERR_BADINVOC;
-    if(!route_has_derivative) {
+    if(!route_has_derivative || beta_has_categories) {
       if((size_t)num_obs_train > SIZE_MAX / sizeof(double))
         return KWSNP_ERR_BADINVOC;
       route_row = (double *)malloc((size_t)num_obs_train * sizeof(double));
