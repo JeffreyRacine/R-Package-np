@@ -106,6 +106,21 @@ test_that("activated beta absolute rows enter the canonical central engine", {
   )
   expect_match(
     engine,
+    "np_continuous_kernel_beta_dual_power_rows_validated(",
+    fixed = TRUE
+  )
+  expect_match(
+    ingress,
+    "kernel_weighted_sum_np_route_power12(",
+    fixed = TRUE
+  )
+  expect_false(grepl(
+    "beta kernels do not support the internal dual-power route",
+    paste(ingress, engine),
+    fixed = TRUE
+  ))
+  expect_match(
+    engine,
     "(!route_has_convolution || matrix_bw_train != NULL)",
     fixed = TRUE
   )

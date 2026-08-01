@@ -8522,9 +8522,14 @@ static int np_beta_absolute_route(
   double **matrix_W,
   const int ncol_Y,
   const int ncol_W,
+  double **matrix_Y_power2,
+  double **matrix_W_power2,
+  const int ncol_Y_power2,
+  const int ncol_W_power2,
   const int kernel_power,
   double * const row,
   double * const weighted_sum,
+  double * const weighted_sum_power2,
   double * const kw,
   NPContinuousKernelDerivativeDiagnostics * const route_diagnostics)
 {
@@ -8540,6 +8545,13 @@ static int np_beta_absolute_route(
   int derivative_coordinate = -1;
   int response_column;
   int weight_column;
+
+  if(route_diagnostics != NULL) {
+    route_diagnostics->bad_coordinate = -1;
+    route_diagnostics->bad_observation = -1;
+    route_diagnostics->undefined_count = 0;
+    route_diagnostics->beta_status = NP_BETA_OK;
+  }
 
   if(route == NULL ||
      np_continuous_kernel_route_validate(route, num_reg_continuous) !=
@@ -8642,11 +8654,24 @@ static int np_beta_absolute_route(
   row_result.row = row;
   np_continuous_kernel_row_workspace_init(&workspace);
   np_continuous_kernel_derivative_accumulator_init(&derivative_accumulator);
-  if(route_diagnostics != NULL) {
-    route_diagnostics->bad_coordinate = -1;
-    route_diagnostics->bad_observation = -1;
-    route_diagnostics->undefined_count = 0;
-    route_diagnostics->beta_status = NP_BETA_OK;
+
+  if(weighted_sum_power2 != NULL) {
+    NPContinuousKernelRowStatus row_status;
+
+    if(derivative_coordinate >= 0 || kernel_power != 1 || kw != NULL)
+      goto cleanup;
+    row_status =
+      np_continuous_kernel_beta_dual_power_rows_validated(
+        &plan, leave_one_out, leave_one_out_offset,
+        matrix_Y, ncol_Y, matrix_W, ncol_W,
+        matrix_Y_power2, ncol_Y_power2, matrix_W_power2, ncol_W_power2,
+        &workspace, &row_result, weighted_sum, weighted_sum_power2,
+        route_diagnostics);
+
+    if(row_status != NP_CONTINUOUS_ROW_OK)
+      goto cleanup;
+    status = 0;
+    goto cleanup;
   }
 
   if(derivative_coordinate >= 0) {
@@ -8876,6 +8901,21 @@ const int keep_kw_owner_local){
     int route_has_convolution = 0;
     int route_has_derivative = 0;
     int route_coordinate;
+    const int beta_dual_power =
+      dual_power_ctx != NULL && dual_power_ctx->weighted_sum != NULL &&
+      dual_power_ctx->kernel_pow == 2;
+    double ** const beta_power2_Y =
+      beta_dual_power && dual_power_ctx->matrix_Y != NULL ?
+      dual_power_ctx->matrix_Y : matrix_Y;
+    double ** const beta_power2_W =
+      beta_dual_power && dual_power_ctx->matrix_W != NULL ?
+      dual_power_ctx->matrix_W : matrix_W;
+    const int beta_power2_ncol_Y =
+      beta_dual_power && dual_power_ctx->matrix_Y != NULL ?
+      dual_power_ctx->ncol_Y : ncol_Y;
+    const int beta_power2_ncol_W =
+      beta_dual_power && dual_power_ctx->matrix_W != NULL ?
+      dual_power_ctx->ncol_W : ncol_W;
     for(route_coordinate = 0; route_coordinate < num_reg_continuous;
         ++route_coordinate) {
       route_has_convolution |=
@@ -8904,7 +8944,10 @@ const int keep_kw_owner_local){
         matrix_bw_train != NULL &&
         (!route_has_convolution || matrix_bw_eval != NULL))) &&
       lambda_pre == NULL &&
-      dual_power_ctx == NULL && outer_pack_ctx == NULL &&
+      (dual_power_ctx == NULL ||
+       (beta_dual_power && kernel_pow == 1 && !route_has_derivative &&
+        kw == NULL)) &&
+      outer_pack_ctx == NULL &&
       weighted_sum != NULL;
     double *route_row = NULL;
     int route_status;
@@ -8925,8 +8968,12 @@ const int keep_kw_owner_local){
       matrix_X_continuous_train, matrix_X_continuous_eval,
       vector_scale_factor, matrix_bw_eval, matrix_bw_train,
       matrix_Y, matrix_W, ncol_Y, ncol_W,
+      beta_power2_Y, beta_power2_W,
+      beta_power2_ncol_Y, beta_power2_ncol_W,
       kernel_pow,
-      route_row, weighted_sum, kw, kernel_route_diagnostics);
+      route_row, weighted_sum,
+      beta_dual_power ? dual_power_ctx->weighted_sum : NULL,
+      kw, kernel_route_diagnostics);
     free(route_row);
     return route_status;
   }
@@ -11220,6 +11267,62 @@ double * const pkw){
   kernel_weighted_sum_pkw_extern = old_pkw;
   kernel_weighted_sum_pkw_nvar_extern = old_pkw_nvar;
   return status;
+}
+
+int kernel_weighted_sum_np_route_power12(
+int * KERNEL_reg,
+int * KERNEL_unordered_reg,
+int * KERNEL_ordered_reg,
+const int BANDWIDTH_reg,
+const int num_obs_train,
+const int num_obs_eval,
+const int num_reg_unordered,
+const int num_reg_ordered,
+const int num_reg_continuous,
+const int leave_one_out,
+const int leave_one_out_offset,
+const int bandwidth_divide,
+const int bandwidth_divide_weights,
+const int * const operator,
+const int ncol_Y,
+const int ncol_W,
+double **matrix_X_continuous_train,
+double **matrix_X_continuous_eval,
+double **matrix_Y,
+double **matrix_W,
+double *vector_scale_factor,
+int bandwidth_provided,
+double **matrix_bw_train,
+double **matrix_bw_eval,
+double * const weighted_sum,
+double * const weighted_sum_power2,
+const NPContinuousKernelRoute * const kernel_route,
+NPContinuousKernelDerivativeDiagnostics * const kernel_route_diagnostics)
+{
+  const NP_DualPowerCtx dual_power_ctx = {
+    weighted_sum_power2, 2, NULL, NULL, 0, 0
+  };
+  const NPContinuousKernelExecutionContext kernel_execution_context = {
+    kernel_route, kernel_route_diagnostics
+  };
+
+  return kernel_weighted_sum_np_ctx_ex(
+    KERNEL_reg, KERNEL_unordered_reg, KERNEL_ordered_reg,
+    BANDWIDTH_reg, num_obs_train, num_obs_eval,
+    num_reg_unordered, num_reg_ordered, num_reg_continuous,
+    leave_one_out, leave_one_out_offset, 1,
+    bandwidth_divide, bandwidth_divide_weights,
+    0, 0, 0, 0, operator, OP_NOOP,
+    0, 0, NULL, 0, ncol_Y, ncol_W,
+    NP_TREE_FALSE, 0, NULL, NULL, NULL, NULL,
+    NULL, NULL, matrix_X_continuous_train,
+    NULL, NULL, matrix_X_continuous_eval,
+    matrix_Y, matrix_W, NULL, vector_scale_factor,
+    bandwidth_provided, matrix_bw_train, matrix_bw_eval,
+    NULL, NULL, NULL, NULL,
+    weighted_sum, NULL, NULL, NULL,
+    &dual_power_ctx, NULL,
+    kernel_route == NULL ? NULL : &kernel_execution_context);
 }
 
 int kernel_weighted_sum_np_route(

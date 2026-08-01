@@ -1358,6 +1358,182 @@ cleanup:
   return status;
 }
 
+/*
+ * Consume powers one and two from one ordinary beta factor row.  The two
+ * output tensors may bind different response/weight columns, matching the
+ * shared dual-power context contract.  This helper deliberately admits only
+ * the currently representable homogeneous beta segment and ordinary
+ * operators; a future mixed-family or nonordinary owner must widen the row
+ * representation explicitly rather than acquire a silent fallback here.
+ */
+NPContinuousKernelRowStatus
+np_continuous_kernel_beta_dual_power_rows_validated(
+  const NPContinuousKernelRowPlan *plan,
+  int leave_one_out,
+  int leave_one_out_offset,
+  double * const *response,
+  int response_columns,
+  double * const *case_weights,
+  int weight_columns,
+  double * const *power2_response,
+  int power2_response_columns,
+  double * const *power2_case_weights,
+  int power2_weight_columns,
+  NPContinuousKernelRowWorkspace *workspace,
+  NPContinuousKernelRowResult *row_result,
+  double *weighted_sum,
+  double *weighted_sum_power2,
+  NPContinuousKernelDerivativeDiagnostics *diagnostics)
+{
+  const int response_extent = response_columns > 0 ? response_columns : 1;
+  const int weight_extent = weight_columns > 0 ? weight_columns : 1;
+  const int power2_response_extent = power2_response_columns > 0 ?
+    power2_response_columns : 1;
+  const int power2_weight_extent = power2_weight_columns > 0 ?
+    power2_weight_columns : 1;
+  size_t sum_extent;
+  size_t power2_sum_extent;
+  NPContinuousKernelRowStatus status;
+  int evaluation;
+  int index;
+
+  if(diagnostics != NULL) {
+    diagnostics->bad_coordinate = -1;
+    diagnostics->bad_observation = -1;
+    diagnostics->undefined_count = 0;
+    diagnostics->beta_status = NP_BETA_OK;
+  }
+  if(plan == NULL || plan->route == NULL || plan->num_train <= 0 ||
+     plan->num_eval <= 0 || plan->num_continuous <= 0 ||
+     plan->route->segment_count != 1 ||
+     plan->route->segment[0].descriptor.family != NP_CKERNEL_FAMILY_BETA ||
+     (leave_one_out != 0 && leave_one_out != 1) ||
+     leave_one_out_offset < 0 || response_columns < 0 ||
+     weight_columns < 0 || power2_response_columns < 0 ||
+     power2_weight_columns < 0 ||
+     (response_columns > 0 && response == NULL) ||
+     (weight_columns > 0 && case_weights == NULL) ||
+     (power2_response_columns > 0 && power2_response == NULL) ||
+     (power2_weight_columns > 0 && power2_case_weights == NULL) ||
+     workspace == NULL || row_result == NULL || row_result->row == NULL ||
+     weighted_sum == NULL || weighted_sum_power2 == NULL ||
+     (size_t)response_extent > SIZE_MAX / (size_t)weight_extent ||
+     (size_t)power2_response_extent >
+       SIZE_MAX / (size_t)power2_weight_extent)
+    return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  for(index = 0; index < response_columns; ++index)
+    if(response[index] == NULL)
+      return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  for(index = 0; index < weight_columns; ++index)
+    if(case_weights[index] == NULL)
+      return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  for(index = 0; index < power2_response_columns; ++index)
+    if(power2_response[index] == NULL)
+      return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  for(index = 0; index < power2_weight_columns; ++index)
+    if(power2_case_weights[index] == NULL)
+      return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  for(index = 0; index < plan->num_continuous; ++index)
+    if(plan->operator[index] != OP_NORMAL)
+      return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+
+  sum_extent = (size_t)response_extent * (size_t)weight_extent;
+  power2_sum_extent = (size_t)power2_response_extent *
+    (size_t)power2_weight_extent;
+  if((size_t)plan->num_eval > SIZE_MAX / sum_extent ||
+     (size_t)plan->num_eval > SIZE_MAX / power2_sum_extent ||
+     (leave_one_out &&
+      (plan->num_eval > plan->num_train ||
+       leave_one_out_offset > plan->num_train - plan->num_eval)))
+    return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+
+  for(evaluation = 0; evaluation < plan->num_eval; ++evaluation) {
+    const int omitted_observation = leave_one_out ?
+      evaluation + leave_one_out_offset : -1;
+    const size_t output_base = (size_t)evaluation * sum_extent;
+    const size_t power2_output_base =
+      (size_t)evaluation * power2_sum_extent;
+    int observation;
+
+    status = np_continuous_kernel_beta_factor_row(
+      plan, evaluation, omitted_observation, workspace, row_result);
+    if(status != NP_CONTINUOUS_ROW_OK) {
+      if(diagnostics != NULL) {
+        diagnostics->bad_coordinate = row_result->bad_coordinate;
+        diagnostics->bad_observation = row_result->bad_observation;
+        diagnostics->beta_status = row_result->beta_status;
+      }
+      return status;
+    }
+    for(size_t output = 0; output < sum_extent; ++output)
+      weighted_sum[output_base + output] = 0.0;
+    for(size_t output = 0; output < power2_sum_extent; ++output)
+      weighted_sum_power2[power2_output_base + output] = 0.0;
+
+    for(observation = 0; observation < plan->num_train; ++observation) {
+      double value;
+      double value_power2;
+
+      status = np_continuous_kernel_signed_log_restore(
+        workspace->primary_log_absolute[observation],
+        workspace->primary_sign[observation], &value);
+      if(status == NP_CONTINUOUS_ROW_OK)
+        status = np_continuous_kernel_signed_log_power_restore(
+          workspace->primary_log_absolute[observation],
+          workspace->primary_sign[observation], 2, &value_power2);
+      if(status != NP_CONTINUOUS_ROW_OK)
+        return status;
+      if(observation == omitted_observation)
+        continue;
+
+      for(int response_column = 0; response_column < response_extent;
+          ++response_column) {
+        const double response_value = response_columns > 0 ?
+          response[response_column][observation] : 1.0;
+
+        for(int weight_column = 0; weight_column < weight_extent;
+            ++weight_column) {
+          const double weight_value = weight_columns > 0 ?
+            case_weights[weight_column][observation] : 1.0;
+          const size_t output = output_base +
+            (size_t)response_column * (size_t)weight_extent +
+            (size_t)weight_column;
+
+          if(!R_FINITE(response_value) || !R_FINITE(weight_value))
+            return NP_CONTINUOUS_ROW_ERR_NUMERIC;
+          weighted_sum[output] += value * response_value * weight_value;
+          if(!R_FINITE(weighted_sum[output]))
+            return NP_CONTINUOUS_ROW_ERR_NUMERIC;
+        }
+      }
+      for(int response_column = 0;
+          response_column < power2_response_extent; ++response_column) {
+        const double response_value = power2_response_columns > 0 ?
+          power2_response[response_column][observation] : 1.0;
+
+        for(int weight_column = 0;
+            weight_column < power2_weight_extent; ++weight_column) {
+          const double weight_value = power2_weight_columns > 0 ?
+            power2_case_weights[weight_column][observation] : 1.0;
+          const size_t output = power2_output_base +
+            (size_t)response_column * (size_t)power2_weight_extent +
+            (size_t)weight_column;
+
+          if(!R_FINITE(response_value) || !R_FINITE(weight_value))
+            return NP_CONTINUOUS_ROW_ERR_NUMERIC;
+          weighted_sum_power2[output] +=
+            value_power2 * response_value * weight_value;
+          if(!R_FINITE(weighted_sum_power2[output]))
+            return NP_CONTINUOUS_ROW_ERR_NUMERIC;
+        }
+      }
+    }
+    if((evaluation & 31) == 0)
+      R_CheckUserInterrupt();
+  }
+  return NP_CONTINUOUS_ROW_OK;
+}
+
 NPContinuousKernelRowStatus np_continuous_kernel_scaled_restore(
   double scaled_value,
   double log_scale,
