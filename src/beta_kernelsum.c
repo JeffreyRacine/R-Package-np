@@ -1,11 +1,15 @@
 #include <float.h>
+#include <limits.h>
 #include <math.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdlib.h>
 
 #include <R_ext/Arith.h>
 
+#include "headers.h"
 #include "beta_kernelsum.h"
+#include "continuous_kernel_row.h"
 
 const char *np_beta_kernelsum_status_message(np_beta_kernelsum_status status)
 {
@@ -55,7 +59,18 @@ np_beta_kernelsum(const double *train_continuous,
     num_response_columns : 1;
   const int weight_extent = (num_weight_columns > 0) ?
     num_weight_columns : 1;
-  const int sum_extent = response_extent * weight_extent;
+  int sum_extent;
+  NPContinuousKernelRowWorkspace workspace;
+  NPContinuousKernelRoute route;
+  NPContinuousKernelRowPlan plan;
+  NPContinuousKernelRowResult row_result;
+  double **train_columns = NULL;
+  double **evaluation_columns = NULL;
+  double **bandwidth_eval_columns = NULL;
+  double **bandwidth_train_columns = NULL;
+  double *row = NULL;
+  int *canonical_operators = NULL;
+  np_beta_kernelsum_status return_status = NP_BETA_KERNELSUM_OK;
   int evaluation_index;
   int observation_index;
   int dimension;
@@ -82,13 +97,102 @@ np_beta_kernelsum(const double *train_continuous,
       bandwidth_eval == NULL) ||
      (bandwidth_mode == NP_BETA_BANDWIDTH_ADAPTIVE_NN &&
       bandwidth_train == NULL) ||
+     response_extent > INT_MAX / weight_extent ||
      !np_beta_order_supported(order))
     return NP_BETA_KERNELSUM_ERR_LAYOUT;
+  sum_extent = response_extent * weight_extent;
+
+  if((size_t)num_continuous > SIZE_MAX / sizeof(double *) ||
+     (size_t)num_continuous > SIZE_MAX / sizeof(int) ||
+     (size_t)num_train > SIZE_MAX / sizeof(double))
+    return NP_BETA_KERNELSUM_ERR_LAYOUT;
+
+  train_columns = (double **)malloc(
+    (size_t)num_continuous * sizeof(double *));
+  evaluation_columns = (double **)malloc(
+    (size_t)num_continuous * sizeof(double *));
+  bandwidth_eval_columns = (double **)calloc(
+    (size_t)num_continuous, sizeof(double *));
+  bandwidth_train_columns = (double **)calloc(
+    (size_t)num_continuous, sizeof(double *));
+  canonical_operators = (int *)malloc(
+    (size_t)num_continuous * sizeof(int));
+  row = (double *)malloc((size_t)num_train * sizeof(double));
+  if(train_columns == NULL || evaluation_columns == NULL ||
+     bandwidth_eval_columns == NULL || bandwidth_train_columns == NULL ||
+     canonical_operators == NULL || row == NULL) {
+    return_status = NP_BETA_KERNELSUM_ERR_NUMERIC;
+    goto cleanup;
+  }
+
+  route.segment_count = 1;
+  if(np_continuous_kernel_descriptor_init(
+       NP_CKERNEL_FAMILY_BETA, NP_CKERNEL_COORDINATE_CODE, order,
+       &route.segment[0].descriptor) != NP_CKERNEL_DESCRIPTOR_OK) {
+    return_status = NP_BETA_KERNELSUM_ERR_LAYOUT;
+    goto cleanup;
+  }
+  route.segment[0].coordinate_offset = 0;
+  route.segment[0].coordinate_count = num_continuous;
+  route.segment[0].lower = lower;
+  route.segment[0].upper = upper;
+
+  for(dimension = 0; dimension < num_continuous; ++dimension) {
+    train_columns[dimension] =
+      (double *)train_continuous + (size_t)dimension * (size_t)num_train;
+    evaluation_columns[dimension] = train_is_eval ?
+      train_columns[dimension] :
+      (double *)eval_continuous + (size_t)dimension * (size_t)num_eval;
+
+    if(bandwidth_mode == NP_BETA_BANDWIDTH_FIXED) {
+      bandwidth_eval_columns[dimension] =
+        (double *)bandwidth_eval + dimension;
+      bandwidth_train_columns[dimension] =
+        bandwidth_eval_columns[dimension];
+    } else {
+      if(bandwidth_eval != NULL)
+        bandwidth_eval_columns[dimension] =
+          (double *)bandwidth_eval +
+          (size_t)dimension * (size_t)num_eval;
+      if(bandwidth_train != NULL)
+        bandwidth_train_columns[dimension] =
+          (double *)bandwidth_train +
+          (size_t)dimension * (size_t)num_train;
+    }
+
+    if(operators == NULL || operators[dimension] == NP_BETA_OPERATOR_PDF)
+      canonical_operators[dimension] = OP_NORMAL;
+    else if(operators[dimension] == NP_BETA_OPERATOR_CDF)
+      canonical_operators[dimension] = OP_INTEGRAL;
+    else if(operators[dimension] == NP_BETA_OPERATOR_OVERLAP)
+      canonical_operators[dimension] = OP_CONVOLUTION;
+    else {
+      return_status = NP_BETA_KERNELSUM_ERR_LAYOUT;
+      goto cleanup;
+    }
+  }
+
+  plan.route = &route;
+  plan.bandwidth_mode = (int)bandwidth_mode;
+  plan.num_train = num_train;
+  plan.num_eval = num_eval;
+  plan.num_continuous = num_continuous;
+  plan.train_is_eval = train_is_eval;
+  plan.train = train_columns;
+  plan.evaluation = evaluation_columns;
+  plan.bandwidth_eval = bandwidth_eval_columns;
+  plan.bandwidth_train = bandwidth_train_columns;
+  plan.operator = canonical_operators;
+  row_result.row = row;
+  np_continuous_kernel_row_workspace_init(&workspace);
 
   for(evaluation_index = 0; evaluation_index < num_eval; ++evaluation_index) {
     double kernel_running_mean = 0.0;
     double kernel_running_m2 = 0.0;
     int kernel_running_count = 0;
+    const int omitted_observation =
+      (leave_one_out && train_is_eval) ? evaluation_index : -1;
+    NPContinuousKernelRowStatus row_status;
 
     if(kernel_square_sum != NULL)
       kernel_square_sum[evaluation_index] = 0.0;
@@ -104,107 +208,43 @@ np_beta_kernelsum(const double *train_continuous,
       }
     }
 
+    row_status = np_continuous_kernel_beta_factor_row(
+      &plan, evaluation_index, omitted_observation,
+      &workspace, &row_result);
+    if(row_status != NP_CONTINUOUS_ROW_OK) {
+      if(bad_dimension != NULL)
+        *bad_dimension = row_result.bad_coordinate;
+      if(kernel_status != NULL)
+        *kernel_status = row_result.beta_status;
+      return_status = (row_status == NP_CONTINUOUS_ROW_ERR_KERNEL) ?
+        NP_BETA_KERNELSUM_ERR_KERNEL :
+        ((row_status == NP_CONTINUOUS_ROW_ERR_LAYOUT ||
+          row_status == NP_CONTINUOUS_ROW_ERR_ROUTE) ?
+         NP_BETA_KERNELSUM_ERR_LAYOUT : NP_BETA_KERNELSUM_ERR_NUMERIC);
+      goto release_workspace;
+    }
+
     for(observation_index = 0; observation_index < num_train;
         ++observation_index) {
-      double product = 1.0;
+      double product = 0.0;
 
-      if(leave_one_out && train_is_eval &&
-         observation_index == evaluation_index) {
-        if(return_kernel_weights)
-          kernel_weights[evaluation_index * num_train + observation_index] = 0.0;
-        continue;
+      /* This compatibility facade owns one homogeneous beta segment. Restore
+       * each complete public weight from its observation-specific signed log,
+       * not from the row maximum, so a weight is bit-stable when evaluated
+       * alone or as part of a larger evaluation matrix. Canonical normalized
+       * consumers use the scaled row directly. */
+      if(np_continuous_kernel_signed_log_restore(
+           workspace.primary_log_absolute[observation_index],
+           workspace.primary_sign[observation_index],
+           &product) != NP_CONTINUOUS_ROW_OK) {
+        return_status = NP_BETA_KERNELSUM_ERR_NUMERIC;
+        goto release_workspace;
       }
-
-      for(dimension = 0; dimension < num_continuous; ++dimension) {
-        const double evaluation = train_is_eval ?
-          train_continuous[dimension * num_train + evaluation_index] :
-          eval_continuous[dimension * num_eval + evaluation_index];
-        const double observation =
-          train_continuous[dimension * num_train + observation_index];
-        np_beta_status scalar_status = NP_BETA_OK;
-        double evaluation_bandwidth;
-        double observation_bandwidth;
-        double value;
-
-        if(bandwidth_mode == NP_BETA_BANDWIDTH_FIXED) {
-          evaluation_bandwidth = bandwidth_eval[dimension];
-          observation_bandwidth = evaluation_bandwidth;
-        } else if(bandwidth_mode == NP_BETA_BANDWIDTH_GENERALIZED_NN) {
-          evaluation_bandwidth =
-            bandwidth_eval[dimension * num_eval + evaluation_index];
-          observation_bandwidth = (bandwidth_train == NULL) ?
-            evaluation_bandwidth :
-            bandwidth_train[dimension * num_train + observation_index];
-        } else {
-          observation_bandwidth =
-            bandwidth_train[dimension * num_train + observation_index];
-          evaluation_bandwidth = observation_bandwidth;
-          if(operators != NULL &&
-             operators[dimension] == NP_BETA_OPERATOR_OVERLAP) {
-            if(bandwidth_eval == NULL) {
-              if(bad_dimension != NULL)
-                *bad_dimension = dimension;
-              return NP_BETA_KERNELSUM_ERR_LAYOUT;
-            }
-            evaluation_bandwidth =
-              bandwidth_eval[dimension * num_eval + evaluation_index];
-          }
-        }
-
-        if(operators == NULL ||
-           operators[dimension] == NP_BETA_OPERATOR_PDF) {
-          const double pdf_bandwidth =
-            (bandwidth_mode == NP_BETA_BANDWIDTH_ADAPTIVE_NN) ?
-            observation_bandwidth : evaluation_bandwidth;
-          value = np_beta_pdf_order(evaluation,
-                                    observation,
-                                    pdf_bandwidth,
-                                    lower[dimension],
-                                    upper[dimension],
-                                    order,
-                                    &scalar_status);
-        } else if(operators[dimension] == NP_BETA_OPERATOR_CDF) {
-          const double cdf_bandwidth =
-            (bandwidth_mode == NP_BETA_BANDWIDTH_ADAPTIVE_NN) ?
-            observation_bandwidth : evaluation_bandwidth;
-          value = np_beta_cdf_order(evaluation,
-                                    observation,
-                                    cdf_bandwidth,
-                                    lower[dimension],
-                                    upper[dimension],
-                                    order,
-                                    &scalar_status);
-        } else if(operators[dimension] == NP_BETA_OPERATOR_OVERLAP) {
-          value = np_beta_overlap_order(evaluation,
-                                        evaluation_bandwidth,
-                                        observation,
-                                        observation_bandwidth,
-                                        lower[dimension],
-                                        upper[dimension],
-                                        order,
-                                        &scalar_status);
-        } else {
-          if(bad_dimension != NULL)
-            *bad_dimension = dimension;
-          return NP_BETA_KERNELSUM_ERR_LAYOUT;
-        }
-        if(scalar_status != NP_BETA_OK) {
-          if(bad_dimension != NULL)
-            *bad_dimension = dimension;
-          if(kernel_status != NULL)
-            *kernel_status = scalar_status;
-          return NP_BETA_KERNELSUM_ERR_KERNEL;
-        }
-        product *= value;
-        if(!R_FINITE(product)) {
-          if(bad_dimension != NULL)
-            *bad_dimension = dimension;
-          return NP_BETA_KERNELSUM_ERR_NUMERIC;
-        }
-      }
-
       if(return_kernel_weights)
-        kernel_weights[evaluation_index * num_train + observation_index] = product;
+        kernel_weights[(size_t)evaluation_index * (size_t)num_train +
+                       observation_index] = product;
+      if(observation_index == omitted_observation)
+        continue;
 
       if(kernel_square_sum != NULL) {
         kernel_square_sum[evaluation_index] += product * product;
@@ -232,7 +272,10 @@ np_beta_kernelsum(const double *train_continuous,
             response_column * weight_extent + weight_column;
           weighted_sum[output_offset] += product * response_value * weight_value;
           if(!R_FINITE(weighted_sum[output_offset]))
-            return NP_BETA_KERNELSUM_ERR_NUMERIC;
+            {
+              return_status = NP_BETA_KERNELSUM_ERR_NUMERIC;
+              goto release_workspace;
+            }
         }
       }
     }
@@ -247,7 +290,16 @@ np_beta_kernelsum(const double *train_continuous,
       progress_callback(evaluation_index + 1, num_eval);
   }
 
-  return NP_BETA_KERNELSUM_OK;
+release_workspace:
+  np_continuous_kernel_row_workspace_release(&workspace);
+cleanup:
+  free(train_columns);
+  free(evaluation_columns);
+  free(bandwidth_eval_columns);
+  free(bandwidth_train_columns);
+  free(canonical_operators);
+  free(row);
+  return return_status;
 }
 
 np_beta_kernelsum_status

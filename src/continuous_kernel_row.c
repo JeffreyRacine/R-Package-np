@@ -623,10 +623,34 @@ NPContinuousKernelRowStatus np_continuous_kernel_scaled_restore(
     *value = 0.0;
     return NP_CONTINUOUS_ROW_OK;
   }
+  if(log_scale == 0.0) {
+    *value = scaled_value;
+    return NP_CONTINUOUS_ROW_OK;
+  }
   log_absolute = log(fabs(scaled_value)) + (double)power * log_scale;
   if(ISNAN(log_absolute) || log_absolute > log(DBL_MAX))
     return NP_CONTINUOUS_ROW_ERR_NUMERIC;
   *value = copysign(exp(log_absolute), scaled_value);
+  return R_FINITE(*value) ? NP_CONTINUOUS_ROW_OK :
+    NP_CONTINUOUS_ROW_ERR_NUMERIC;
+}
+
+NPContinuousKernelRowStatus np_continuous_kernel_signed_log_restore(
+  double log_absolute,
+  int sign,
+  double *value)
+{
+  if(value == NULL || ISNAN(log_absolute) || log_absolute == INFINITY ||
+     (sign != -1 && sign != 0 && sign != 1) ||
+     ((sign == 0) != (log_absolute == -INFINITY)))
+    return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  if(sign == 0) {
+    *value = 0.0;
+    return NP_CONTINUOUS_ROW_OK;
+  }
+  if(log_absolute > log(DBL_MAX))
+    return NP_CONTINUOUS_ROW_ERR_NUMERIC;
+  *value = (double)sign * exp(log_absolute);
   return R_FINITE(*value) ? NP_CONTINUOUS_ROW_OK :
     NP_CONTINUOUS_ROW_ERR_NUMERIC;
 }

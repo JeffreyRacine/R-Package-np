@@ -91,6 +91,11 @@ NPContinuousKernelRowStatus np_continuous_kernel_scaled_restore(
   int power,
   double *value);
 
+NPContinuousKernelRowStatus np_continuous_kernel_signed_log_restore(
+  double log_absolute,
+  int sign,
+  double *value);
+
 const char *np_continuous_kernel_row_status_message(
   NPContinuousKernelRowStatus status);
 
