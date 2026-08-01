@@ -10401,7 +10401,7 @@ SEXP C_np_kernelsum(SEXP tuno,
     int beta_bandwidth_code = INTEGER(myopti_i)[KWS_BWI];
     int bad_dimension = -1;
     int has_overlap = 0;
-    int all_pdf = 1;
+    int all_pdf_or_cdf = 1;
     int derivative_dimension = -1;
     int undefined_count = 0;
     int i;
@@ -10427,16 +10427,15 @@ SEXP C_np_kernelsum(SEXP tuno,
       if(INTEGER(op_i)[i] == OP_NORMAL)
         beta_operators[i] = NP_BETA_OPERATOR_PDF;
       else if(INTEGER(op_i)[i] == OP_CONVOLUTION) {
-        all_pdf = 0;
+        all_pdf_or_cdf = 0;
         beta_operators[i] = NP_BETA_OPERATOR_OVERLAP;
         has_overlap = 1;
       }
       else if(INTEGER(op_i)[i] == OP_INTEGRAL) {
-        all_pdf = 0;
         beta_operators[i] = NP_BETA_OPERATOR_CDF;
       }
       else if(INTEGER(op_i)[i] == OP_DERIVATIVE) {
-        all_pdf = 0;
+        all_pdf_or_cdf = 0;
         if(derivative_dimension >= 0)
           error("C_np_kernelsum: beta kernels support one direct derivative dimension at a time");
         derivative_dimension = i;
@@ -10499,7 +10498,7 @@ SEXP C_np_kernelsum(SEXP tuno,
        n_pkw != (R_xlen_t)ncon * expected_weights)
       error("C_np_kernelsum: beta derivative-weight buffer has the wrong length");
 
-    if(beta_bandwidth_code == BW_FIXED && all_pdf &&
+    if(beta_bandwidth_code == BW_FIXED && all_pdf_or_cdf &&
        num_response_columns == 0 && num_weight_columns == 0 &&
        p_operator == OP_NOOP && !do_score && !do_ocg &&
        INTEGER(myopti_i)[KWS_DOTREEI] == NP_TREE_FALSE) {

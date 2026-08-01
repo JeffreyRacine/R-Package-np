@@ -28,7 +28,7 @@ test_that("the first beta row activation enters the canonical central engine", {
   )
 
   activation_start <- regexpr(
-    "if(beta_bandwidth_code == BW_FIXED && all_pdf",
+    "if(beta_bandwidth_code == BW_FIXED && all_pdf_or_cdf",
     ingress,
     fixed = TRUE
   )[[1L]]
@@ -41,7 +41,7 @@ test_that("the first beta row activation enters the canonical central engine", {
   expect_gt(activation_end, activation_start)
   activation <- substr(ingress, activation_start, activation_end - 1L)
 
-  expect_match(activation, "all_pdf", fixed = TRUE)
+  expect_match(activation, "all_pdf_or_cdf", fixed = TRUE)
   expect_match(activation, "kernel_weighted_sum_np_route(", fixed = TRUE)
   expect_match(activation, "&route", fixed = TRUE)
   expect_false(grepl("np_beta_kernelsum(", activation, fixed = TRUE))
