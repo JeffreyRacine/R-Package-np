@@ -44,6 +44,11 @@ test_that("the first beta row activation enters the canonical central engine", {
   expect_match(activation, "all_nonderivative", fixed = TRUE)
   expect_match(activation, "kernel_weighted_sum_np_route(", fixed = TRUE)
   expect_match(activation, "&route", fixed = TRUE)
+  expect_false(grepl(
+    "beta_bandwidth_code == BW_FIXED || !has_overlap",
+    activation,
+    fixed = TRUE
+  ))
   expect_false(grepl("np_beta_kernelsum(", activation, fixed = TRUE))
   expect_false(grepl("np_beta_kernelsum_derivative(", activation,
                      fixed = TRUE))
@@ -60,6 +65,16 @@ test_that("the first beta row activation enters the canonical central engine", {
   expect_match(engine, "np_beta_scalar_absolute_route(", fixed = TRUE)
   expect_match(engine, "np_continuous_kernel_beta_factor_row(", fixed = TRUE)
   expect_match(engine, "np_continuous_kernel_signed_log_restore(", fixed = TRUE)
+  expect_match(
+    engine,
+    "(!route_has_convolution || matrix_bw_train != NULL)",
+    fixed = TRUE
+  )
+  expect_match(
+    engine,
+    "(!route_has_convolution || matrix_bw_eval != NULL)",
+    fixed = TRUE
+  )
 })
 
 test_that("legacy callers cannot acquire beta route metadata implicitly", {
