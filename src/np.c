@@ -16328,7 +16328,10 @@ void np_density(double * tuno, double * tord, double * tcon,
                                              matrix_categorical_vals_extern,
                                              pdf,
                                              pdf_stderr,
-                                             &log_likelihood);
+                                             &log_likelihood,
+                                             NULL,
+                                             NULL,
+                                             0);
   }
   
   
