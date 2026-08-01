@@ -245,3 +245,48 @@ test_that("beta PDF fitting enters the canonical dual-row density owner", {
   expect_match(density_engine, "error(\"canonical beta density row failed\");",
                fixed = TRUE)
 })
+
+test_that("signed-log beta rows compose every route segment", {
+  root <- locate_beta_activation_sources()
+  skip_if(is.null(root), "package sources unavailable")
+  engine <- paste(
+    readLines(file.path(root, "src", "continuous_kernel_row.c"),
+              warn = FALSE),
+    collapse = "\n"
+  )
+  multi_start <- regexpr(
+    "np_continuous_kernel_beta_log_factor_row_multi_prevalidated(",
+    engine, fixed = TRUE
+  )[[1L]]
+  resident_start <- regexpr(
+    "np_continuous_kernel_beta_factor_row_with_log_factor(",
+    engine, fixed = TRUE
+  )[[1L]]
+  resident_owner_start <- regexpr(
+    "np_continuous_kernel_beta_log_factor_row(", engine, fixed = TRUE
+  )[[1L]]
+  expect_gt(multi_start, 0L)
+  expect_gt(resident_owner_start, multi_start)
+  expect_gt(resident_start, resident_owner_start)
+  multi_owner <- substr(engine, multi_start, resident_owner_start - 1L)
+  resident_owner <- substr(
+    engine, resident_owner_start, resident_start - 1L
+  )
+
+  expect_match(multi_owner, "beta_segment_count", fixed = TRUE)
+  expect_match(
+    multi_owner,
+    "segment_index < plan->route->segment_count",
+    fixed = TRUE
+  )
+  expect_match(
+    multi_owner,
+    "np_continuous_kernel_log_channels_multiply(",
+    fixed = TRUE
+  )
+  expect_match(
+    resident_owner,
+    "return np_continuous_kernel_beta_log_factor_row_multi_prevalidated(",
+    fixed = TRUE
+  )
+})
