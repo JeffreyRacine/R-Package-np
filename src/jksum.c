@@ -31224,7 +31224,7 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
   np_gate_ctx_clear(&gate_ctx_local);
 
   const int num_reg = num_reg_continuous+num_reg_unordered+num_reg_ordered;
-  const int exact_beta_pdf = kernel_route != NULL;
+  const int exact_beta_route = kernel_route != NULL;
 
   int i, l;
 
@@ -31245,6 +31245,7 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
 
   double ** matrix_bandwidth = NULL, * lambda = NULL;
   double *beta_kernel_square_sum = NULL;
+  double *beta_centered_m2 = NULL;
   double *beta_fixed_bandwidth = NULL;
   int beta_route_status = 0;
 
@@ -31252,7 +31253,7 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
 
 	const double log_DBL_MIN = log(DBL_MIN);
 
-  if(exact_beta_pdf &&
+  if(exact_beta_route &&
      (np_continuous_kernel_route_validate(kernel_route,
                                           num_reg_continuous) !=
         NP_CKERNEL_ROUTE_OK ||
@@ -31260,11 +31261,12 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
       kernel_route->segment_count != 1 ||
       kernel_route->segment[0].coordinate_offset != 0 ||
       kernel_route->segment[0].coordinate_count != num_reg_continuous ||
-      dop != OP_NORMAL || num_reg_continuous <= 0 ||
+      (dop != OP_NORMAL && dop != OP_INTEGRAL) ||
+      num_reg_continuous <= 0 ||
       num_reg_unordered != 0 || num_reg_ordered != 0 ||
       kernel_route_diagnostics == NULL ||
       (categorical_compress != 0 && categorical_compress != 1)))
-    error("canonical beta density route has an invalid layout");
+    error("canonical beta density/distribution route has an invalid layout");
 
   operator = (int *)np_jksum_malloc_array_or_die((size_t)MAX(1, num_reg), sizeof(int), "density distribution categorical operator");
 
@@ -31289,7 +31291,7 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
     kernel_o[i] = KERNEL_ordered_den;
 
 
-  if(exact_beta_pdf) {
+  if(exact_beta_route) {
     INT_KERNEL_P = 0.0;
     K_INT_KERNEL_P = 0.0;
   } else if(num_reg_continuous != 0) {
@@ -31307,7 +31309,7 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
   matrix_bandwidth = alloc_matd(bwmdim,num_reg_continuous);
   lambda = alloc_vecd(num_reg_unordered+num_reg_ordered);
 
-  if(!(exact_beta_pdf && BANDWIDTH_den == BW_FIXED) &&
+  if(!(exact_beta_route && BANDWIDTH_den == BW_FIXED) &&
      kernel_bandwidth_mean(KERNEL_den,
                            BANDWIDTH_den,
                            num_obs_train,
@@ -31331,7 +31333,7 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
     error("\n** Error: invalid bandwidth.");
   }
 
-  if(!exact_beta_pdf &&
+  if(!exact_beta_route &&
      ((dop == OP_NORMAL) || (dop == OP_INTEGRAL)) &&
      np_density_categorical_profile_fit(kernel_c,
                                         kernel_u,
@@ -31365,7 +31367,7 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
     return;
   }
 
-  if(!exact_beta_pdf &&
+  if(!exact_beta_route &&
      (num_reg_continuous + num_reg_unordered + num_reg_ordered) > 0){
     int ok_all = 1;
 
@@ -31498,38 +31500,65 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
     }
   }
 
-  if(exact_beta_pdf) {
-    beta_kernel_square_sum = alloc_vecd(num_obs_eval);
+  if(exact_beta_route) {
     if(BANDWIDTH_den == BW_FIXED) {
       beta_fixed_bandwidth = alloc_vecd(num_reg_continuous);
       for(l = 0; l < num_reg_continuous; ++l)
         beta_fixed_bandwidth[l] = vector_scale_factor[l];
     }
-    beta_route_status = kernel_weighted_sum_np_route_power12(
-      NULL, kernel_u, kernel_o,
-      BANDWIDTH_den, num_obs_train, num_obs_eval,
-      num_reg_unordered, num_reg_ordered, num_reg_continuous,
-      0, 0, 0, 0, operator, 0, 0,
-      matrix_X_unordered_train, matrix_X_ordered_train,
-      matrix_X_continuous_train,
-      matrix_X_unordered_eval, matrix_X_ordered_eval,
-      matrix_X_continuous_eval,
-      NULL, NULL,
-      beta_fixed_bandwidth,
-      BANDWIDTH_den != BW_FIXED,
-      BANDWIDTH_den == BW_FIXED ? NULL : matrix_bandwidth,
-      BANDWIDTH_den == BW_FIXED ? NULL : matrix_bandwidth,
-      NULL, num_categories, matrix_categorical_vals,
-      categorical_compress, pdf, beta_kernel_square_sum,
-      kernel_route, kernel_route_diagnostics, np_progress_fit_loop_step);
+    if(dop == OP_NORMAL) {
+      beta_kernel_square_sum = alloc_vecd(num_obs_eval);
+      beta_route_status = kernel_weighted_sum_np_route_power12(
+        NULL, kernel_u, kernel_o,
+        BANDWIDTH_den, num_obs_train, num_obs_eval,
+        num_reg_unordered, num_reg_ordered, num_reg_continuous,
+        0, 0, 0, 0, operator, 0, 0,
+        matrix_X_unordered_train, matrix_X_ordered_train,
+        matrix_X_continuous_train,
+        matrix_X_unordered_eval, matrix_X_ordered_eval,
+        matrix_X_continuous_eval,
+        NULL, NULL,
+        beta_fixed_bandwidth,
+        BANDWIDTH_den != BW_FIXED,
+        BANDWIDTH_den == BW_FIXED ? NULL : matrix_bandwidth,
+        BANDWIDTH_den == BW_FIXED ? NULL : matrix_bandwidth,
+        NULL, num_categories, matrix_categorical_vals,
+        categorical_compress, pdf, beta_kernel_square_sum,
+        kernel_route, kernel_route_diagnostics, np_progress_fit_loop_step);
+    } else {
+      beta_centered_m2 = alloc_vecd(num_obs_eval);
+      beta_route_status = kernel_weighted_sum_np_route_centered_m2(
+        NULL, kernel_u, kernel_o,
+        BANDWIDTH_den, num_obs_train, num_obs_eval,
+        num_reg_unordered, num_reg_ordered, num_reg_continuous,
+        0, 0, 0, 0, operator,
+        matrix_X_unordered_train, matrix_X_ordered_train,
+        matrix_X_continuous_train,
+        matrix_X_unordered_eval, matrix_X_ordered_eval,
+        matrix_X_continuous_eval,
+        beta_fixed_bandwidth,
+        BANDWIDTH_den != BW_FIXED,
+        BANDWIDTH_den == BW_FIXED ? NULL : matrix_bandwidth,
+        BANDWIDTH_den == BW_FIXED ? NULL : matrix_bandwidth,
+        NULL, num_categories, matrix_categorical_vals,
+        categorical_compress, pdf, beta_centered_m2,
+        kernel_route, kernel_route_diagnostics, np_progress_fit_loop_step);
+    }
     if(beta_route_status != 0)
       goto cleanup_density_fit;
 
     for(i = 0, *log_likelihood = 0.0; i < num_obs_eval; ++i) {
       const double estimate = pdf[i] / (double)num_obs_train;
-      const double second_moment =
-        beta_kernel_square_sum[i] / (double)num_obs_train;
-      double variance = fma(-estimate, estimate, second_moment);
+      double variance;
+
+      if(dop == OP_NORMAL) {
+        const double second_moment =
+          beta_kernel_square_sum[i] / (double)num_obs_train;
+
+        variance = fma(-estimate, estimate, second_moment);
+      } else {
+        variance = beta_centered_m2[i] / (double)num_obs_train;
+      }
 
       if(!R_FINITE(estimate) || !R_FINITE(variance)) {
         beta_route_status = KWSNP_ERR_BADINVOC;
@@ -31540,7 +31569,8 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
       pdf[i] = estimate;
       pdf_stderr[i] = num_obs_train > 1 ?
         sqrt(variance / (double)(num_obs_train - 1)) : 0.0;
-      *log_likelihood += estimate < DBL_MIN ? log_DBL_MIN : log(estimate);
+      if(dop == OP_NORMAL)
+        *log_likelihood += estimate < DBL_MIN ? log_DBL_MIN : log(estimate);
     }
   } else {
     kernel_weighted_sum_np_ctx(kernel_c,
@@ -31621,6 +31651,7 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
 
 cleanup_density_fit:
   free(beta_kernel_square_sum);
+  free(beta_centered_m2);
   free(beta_fixed_bandwidth);
   free(operator);
   free(kernel_c);
@@ -31642,10 +31673,10 @@ cleanup_density_fit:
   if(beta_route_status != 0) {
     if(kernel_route_diagnostics != NULL &&
        kernel_route_diagnostics->beta_status != NP_BETA_OK)
-      error("canonical beta density row failed in continuous dimension %d: %s",
+      error("canonical beta density/distribution row failed in continuous dimension %d: %s",
             kernel_route_diagnostics->bad_coordinate + 1,
             np_beta_status_message(kernel_route_diagnostics->beta_status));
-    error("canonical beta density row failed");
+    error("canonical beta density/distribution row failed");
   }
 
 }

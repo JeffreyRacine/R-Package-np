@@ -7124,6 +7124,10 @@ SEXP C_np_density(SEXP tuno,
   double * ckerlb_p = NULL;
   double * ckerub_p = NULL;
   np_continuous_kernel_descriptor descriptor;
+  NPContinuousKernelRoute beta_route;
+  NPContinuousKernelDerivativeDiagnostics beta_diagnostics;
+  const NPContinuousKernelRoute *active_route = NULL;
+  NPContinuousKernelDerivativeDiagnostics *active_diagnostics = NULL;
 
   if (en < 0) en = 0;
 
@@ -7163,17 +7167,7 @@ SEXP C_np_density(SEXP tuno,
     const int num_eval = INTEGER(myopti_i)[DEN_ENOBSI];
     const int train_is_eval = INTEGER(myopti_i)[DEN_TISEI];
     const int dens_or_dist = INTEGER(myopti_i)[DEN_DODENI];
-    double *kernel_square_sum;
-    double *kernel_centered_m2 = NULL;
-    np_beta_operator *beta_operators = NULL;
-    np_beta_kernelsum_status beta_status;
-    np_beta_status scalar_status = NP_BETA_OK;
-    np_beta_bandwidth_mode beta_bandwidth_mode = NP_BETA_BANDWIDTH_FIXED;
-    const double *beta_bandwidth_eval = REAL(rbw_r);
-    const double *beta_bandwidth_train = REAL(rbw_r);
     const int beta_bandwidth_code = INTEGER(myopti_i)[DEN_DENI];
-    int bad_dimension = -1;
-    int i;
 
     if(INTEGER(myopti_i)[DEN_NUNOI] != 0 ||
        INTEGER(myopti_i)[DEN_NORDI] != 0)
@@ -7193,112 +7187,29 @@ SEXP C_np_density(SEXP tuno,
        XLENGTH(ckerub_r) < ncon)
       error("C_np_density: beta density/distribution input buffer is too short");
 
-    if(dens_or_dist == NP_DO_DENS) {
-      NPContinuousKernelRoute route;
-      NPContinuousKernelDerivativeDiagnostics diagnostics;
-
-      route.segment_count = 1;
-      route.segment[0].descriptor = descriptor;
-      route.segment[0].coordinate_offset = 0;
-      route.segment[0].coordinate_count = ncon;
-      route.segment[0].lower = ckerlb_p;
-      route.segment[0].upper = ckerub_p;
-      diagnostics.bad_coordinate = -1;
-      diagnostics.bad_observation = -1;
-      diagnostics.undefined_count = 0;
-      diagnostics.beta_status = NP_BETA_OK;
-      np_density(REAL(tuno_r), REAL(tord_r), REAL(tcon_r),
-                 REAL(euno_r), REAL(eord_r), REAL(econ_r),
-                 REAL(rbw_r),
-                 REAL(mcv_r), REAL(padnum_r),
-                 REAL(nconfac_r), REAL(ncatfac_r), REAL(mysd_r),
-                 INTEGER(myopti_i),
-                 REAL(out_dens), REAL(out_derr), REAL(out_ll),
-                 ckerlb_p, ckerub_p, &route, &diagnostics, 0);
-    } else {
-      if(beta_bandwidth_code != BW_FIXED) {
-        const int need_eval = beta_bandwidth_code == BW_GEN_NN;
-        const int need_train = beta_bandwidth_code == BW_ADAP_NN;
-        double *bandwidth_eval_storage = need_eval ?
-          (double *)R_alloc((size_t)ncon * (size_t)num_eval,
-                            sizeof(double)) : NULL;
-        double *bandwidth_train_storage = need_train ?
-          (double *)R_alloc((size_t)ncon * (size_t)num_train,
-                            sizeof(double)) : NULL;
-        np_beta_bandwidth_prepare_status bandwidth_status;
-
-        beta_bandwidth_mode = (beta_bandwidth_code == BW_GEN_NN) ?
-          NP_BETA_BANDWIDTH_GENERALIZED_NN : NP_BETA_BANDWIDTH_ADAPTIVE_NN;
-        bandwidth_status = np_beta_bandwidth_prepare(
-          beta_bandwidth_mode,
-          REAL(tcon_r), train_is_eval ? NULL : REAL(econ_r), REAL(rbw_r),
-          num_train, num_eval, ncon, train_is_eval,
-          need_eval, need_train, 0,
-          bandwidth_eval_storage, bandwidth_train_storage);
-        if(bandwidth_status != NP_BETA_BANDWIDTH_PREPARE_OK)
-          error("C_np_density: %s",
-                np_beta_bandwidth_prepare_status_message(bandwidth_status));
-
-        beta_bandwidth_eval = bandwidth_eval_storage;
-        beta_bandwidth_train = bandwidth_train_storage;
-      }
-
-      kernel_square_sum = (double *)R_alloc((size_t)num_eval, sizeof(double));
-      if(dens_or_dist == NP_DO_DIST) {
-        beta_operators = (np_beta_operator *)R_alloc(
-          (size_t)ncon, sizeof(np_beta_operator));
-        for(i = 0; i < ncon; ++i)
-          beta_operators[i] = NP_BETA_OPERATOR_CDF;
-        kernel_centered_m2 = (double *)R_alloc((size_t)num_eval,
-                                               sizeof(double));
-      }
-      beta_status = np_beta_kernelsum(
-        REAL(tcon_r), train_is_eval ? NULL : REAL(econ_r),
-        NULL, NULL, beta_bandwidth_eval, beta_bandwidth_train,
-        ckerlb_p, ckerub_p, beta_operators, beta_bandwidth_mode,
-        descriptor.order,
-        num_train, num_eval, ncon, 0, 0,
-        train_is_eval, 0, 0,
-        REAL(out_dens), NULL, kernel_square_sum,
-        kernel_centered_m2,
-        &bad_dimension, &scalar_status, np_progress_fit_loop_step);
-      if(beta_status == NP_BETA_KERNELSUM_ERR_KERNEL)
-        error("C_np_density: beta scalar operator failed in continuous dimension %d: %s",
-              bad_dimension + 1, np_beta_status_message(scalar_status));
-      if(beta_status != NP_BETA_KERNELSUM_OK)
-        error("C_np_density: %s",
-              np_beta_kernelsum_status_message(beta_status));
-
-      REAL(out_ll)[0] = 0.0;
-      for(i = 0; i < num_eval; ++i) {
-        const double estimate = REAL(out_dens)[i] / (double)num_train;
-        const double second_moment =
-          kernel_square_sum[i] / (double)num_train;
-        double variance = (dens_or_dist == NP_DO_DIST) ?
-          kernel_centered_m2[i] / (double)num_train :
-          fma(-estimate, estimate, second_moment);
-
-        if(!R_FINITE(estimate) || !R_FINITE(variance))
-          error("C_np_density: beta density/distribution produced a non-finite estimate or variance");
-        if(variance < 0.0)
-          variance = 0.0;
-        REAL(out_dens)[i] = estimate;
-        REAL(out_derr)[i] = (num_train > 1) ?
-          sqrt(variance / (double)(num_train - 1)) : 0.0;
-        if(dens_or_dist == NP_DO_DENS)
-          REAL(out_ll)[0] += log((estimate < DBL_MIN) ? DBL_MIN : estimate);
-      }
-    }
-  } else {
-    np_density(REAL(tuno_r), REAL(tord_r), REAL(tcon_r),
-               REAL(euno_r), REAL(eord_r), REAL(econ_r),
-               REAL(rbw_r),
-               REAL(mcv_r), REAL(padnum_r),
-               REAL(nconfac_r), REAL(ncatfac_r), REAL(mysd_r),
-               INTEGER(myopti_i),
-               REAL(out_dens), REAL(out_derr), REAL(out_ll),
-               ckerlb_p, ckerub_p, NULL, NULL, 0);
+    beta_route.segment_count = 1;
+    beta_route.segment[0].descriptor = descriptor;
+    beta_route.segment[0].coordinate_offset = 0;
+    beta_route.segment[0].coordinate_count = ncon;
+    beta_route.segment[0].lower = ckerlb_p;
+    beta_route.segment[0].upper = ckerub_p;
+    beta_diagnostics.bad_coordinate = -1;
+    beta_diagnostics.bad_observation = -1;
+    beta_diagnostics.undefined_count = 0;
+    beta_diagnostics.beta_status = NP_BETA_OK;
+    active_route = &beta_route;
+    active_diagnostics = &beta_diagnostics;
   }
+
+  np_density(REAL(tuno_r), REAL(tord_r), REAL(tcon_r),
+             REAL(euno_r), REAL(eord_r), REAL(econ_r),
+             REAL(rbw_r),
+             REAL(mcv_r), REAL(padnum_r),
+             REAL(nconfac_r), REAL(ncatfac_r), REAL(mysd_r),
+             INTEGER(myopti_i),
+             REAL(out_dens), REAL(out_derr), REAL(out_ll),
+             ckerlb_p, ckerub_p,
+             active_route, active_diagnostics, 0);
 
   PROTECT(out = allocVector(VECSXP, 3));
   SET_VECTOR_ELT(out, 0, out_dens);
