@@ -217,7 +217,8 @@ np_continuous_kernel_beta_dual_power_rows_validated(
   NPContinuousKernelRowResult *row_result,
   double *weighted_sum,
   double *weighted_sum_power2,
-  NPContinuousKernelDerivativeDiagnostics *diagnostics);
+  NPContinuousKernelDerivativeDiagnostics *diagnostics,
+  NPContinuousKernelProgressFunction progress);
 
 NPContinuousKernelRowStatus np_continuous_kernel_scaled_restore(
   double scaled_value,

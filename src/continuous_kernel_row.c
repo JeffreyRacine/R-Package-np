@@ -1677,7 +1677,8 @@ np_continuous_kernel_beta_dual_power_rows_validated(
   NPContinuousKernelRowResult *row_result,
   double *weighted_sum,
   double *weighted_sum_power2,
-  NPContinuousKernelDerivativeDiagnostics *diagnostics)
+  NPContinuousKernelDerivativeDiagnostics *diagnostics,
+  NPContinuousKernelProgressFunction progress)
 {
   const int response_extent = response_columns > 0 ? response_columns : 1;
   const int weight_extent = weight_columns > 0 ? weight_columns : 1;
@@ -1826,6 +1827,8 @@ np_continuous_kernel_beta_dual_power_rows_validated(
         }
       }
     }
+    if(progress != NULL)
+      progress(evaluation + 1, plan->num_eval);
     if((evaluation & 31) == 0)
       R_CheckUserInterrupt();
   }

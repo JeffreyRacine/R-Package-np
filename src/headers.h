@@ -273,7 +273,8 @@ int kernel_weighted_sum_np_route_power12(
   double * const restrict weighted_sum,
   double * const restrict weighted_sum_power2,
   const NPContinuousKernelRoute *kernel_route,
-  NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics);
+  NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
+  NPContinuousKernelProgressFunction progress);
 
 int kernel_weighted_sum_np_power12(
   int *KERNEL_reg, int *KERNEL_unordered_reg, int *KERNEL_ordered_reg,
