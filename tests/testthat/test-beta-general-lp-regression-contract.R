@@ -73,6 +73,43 @@ test_that("beta general LP agrees with independent uncentred WLS", {
   expect_equal(fitted(fit), oracle, tolerance = 2e-9)
 })
 
+test_that("beta general LP retains a common scale through raw-weight underflow", {
+  set.seed(6219)
+  n <- 100L
+  p <- 32L
+  log_complement <- matrix(runif(n * p, -1.4, -0.8), nrow = n)
+  log_complement <- log_complement - rowMeans(log_complement) - 1.1
+  x <- as.data.frame(1.0 - exp(log_complement))
+  names(x) <- paste0("x", seq_len(p))
+  coefficient <- seq_len(p) / p
+  y <- 1.0 + drop(as.matrix(x) %*% coefficient)
+  evaluation <- as.data.frame(matrix(0.0, nrow = 1L, ncol = p))
+  names(evaluation) <- names(x)
+
+  for (order in c(2L, 4L, 6L, 8L)) {
+    raw <- npksum(
+      bws = rep.int(0.1, p), txdat = x, exdat = evaluation,
+      ckertype = "beta", ckerorder = order,
+      ckerbound = "fixed", ckerlb = rep.int(0.0, p),
+      ckerub = rep.int(1.0, p), return.kernel.weights = TRUE
+    )
+    fit <- npreg(
+      bws = rep.int(0.1, p), txdat = x, tydat = y,
+      exdat = evaluation, regtype = "lp", degree = rep.int(1L, p),
+      basis = "glp", bernstein.basis = FALSE,
+      ckertype = "beta", ckerorder = order,
+      ckerbound = "fixed", ckerlb = rep.int(0.0, p),
+      ckerub = rep.int(1.0, p)
+    )
+
+    expect_true(all(raw$kw == 0.0), info = paste("order", order))
+    expect_equal(fitted(fit), 1.0, tolerance = 1e-8,
+                 info = paste("order", order))
+    expect_true(is.finite(se(fit)) && se(fit) >= 0.0,
+                info = paste("order", order))
+  }
+})
+
 test_that("automatic beta LP search remains fail-closed", {
   set.seed(5113)
   x <- data.frame(x1 = runif(31), x2 = runif(31))
