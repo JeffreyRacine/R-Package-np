@@ -32384,7 +32384,10 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
                                               double ** matrix_categorical_vals,
                                               double *pdf,
                                               double *pdf_stderr,
-                                              double *log_likelihood){
+                                              double *log_likelihood,
+                                              const NPContinuousKernelRoute *kernel_route,
+                                              NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
+                                              int categorical_compress){
   /*
     These caches are keyed by call-local row pointers.  Density/distribution
     evaluation invokes this helper directly, so stale keys from an earlier
@@ -32392,6 +32395,13 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
   */
   np_disc_profile_cache_clear();
   np_cont_largeh_cache_clear();
+
+  /* P20A freezes the call-scoped route seam before beta activation.  The
+   * incumbent density/distribution caller deliberately supplies a null route,
+   * so the literal legacy row call below remains unchanged in this tranche. */
+  (void)kernel_route;
+  (void)kernel_route_diagnostics;
+  (void)categorical_compress;
 
   NP_GateOverrideCtx gate_ctx_local;
   np_gate_ctx_clear(&gate_ctx_local);
