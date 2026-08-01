@@ -93,6 +93,22 @@ typedef struct {
   size_t capacity;
 } NPContinuousKernelDerivativeAccumulator;
 
+/*
+ * Reusable O(n) signed-log channels for a level row and the regular/jump
+ * parts of one target derivative.  The row owner fills all three channels
+ * against one common maximum so ratio consumers never restore absolute beta
+ * scale or multiply separately rounded scaled rows.
+ */
+typedef struct {
+  double *level_log_absolute;
+  double *regular_log_absolute;
+  double *jump_log_absolute;
+  signed char *level_sign;
+  signed char *regular_sign;
+  signed char *jump_sign;
+  size_t capacity;
+} NPContinuousKernelLevelDerivativeWorkspace;
+
 typedef struct NPContinuousKernelDerivativeDiagnostics {
   int bad_coordinate;
   int bad_observation;
@@ -151,6 +167,23 @@ void np_continuous_kernel_derivative_accumulator_init(
 
 void np_continuous_kernel_derivative_accumulator_release(
   NPContinuousKernelDerivativeAccumulator *accumulator);
+
+void np_continuous_kernel_level_derivative_workspace_init(
+  NPContinuousKernelLevelDerivativeWorkspace *workspace);
+
+void np_continuous_kernel_level_derivative_workspace_release(
+  NPContinuousKernelLevelDerivativeWorkspace *workspace);
+
+NPContinuousKernelRowStatus
+np_continuous_kernel_beta_level_derivative_log_row_validated(
+  const NPContinuousKernelRowPlan *plan,
+  int evaluation_index,
+  int omitted_observation,
+  int derivative_coordinate,
+  const NPContinuousKernelLogFactorProvider *provider,
+  NPContinuousKernelLevelDerivativeWorkspace *workspace,
+  double *common_log_scale,
+  NPContinuousKernelDerivativeDiagnostics *diagnostics);
 
 NPContinuousKernelRowStatus
 np_continuous_kernel_beta_derivative_absolute_rows_validated(
