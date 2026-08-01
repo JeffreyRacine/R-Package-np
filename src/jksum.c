@@ -28,6 +28,7 @@
 #include "kernel_registry.h"
 #include "np_native_safety.h"
 #include "categorical_profile_tile.h"
+#include "continuous_kernel_row.h"
 
 #include "hash.h"
 #include "tree.h"
@@ -8233,6 +8234,137 @@ static inline void np_hot_loop_check_interrupt(const int pos,
 }
 
 /*
+ * First canonical beta activation: the public, scalar, fixed-bandwidth,
+ * second-order PDF row.  This sits at the shared kernel-row boundary rather
+ * than in an estimator or beta-only kernel-sum engine.  The deliberately
+ * narrow contract is fail-closed: C ingress passes route metadata only when
+ * every condition below is proved, and later tranches widen this microkernel
+ * one independently qualified operation at a time.
+ *
+ * Absolute public weights are restored from each observation's own signed-log
+ * value.  That preserves the established beta-kernel representation and its
+ * summation order; normalized estimator consumers can instead retain the
+ * common row scale in later tranches.  Workspace is O(n_train), excluding an
+ * explicitly requested public kernel-weight matrix owned by the caller.
+ */
+static int np_beta_fixed_scalar_absolute_route(
+  const NPContinuousKernelRoute * const route,
+  const int num_obs_train,
+  const int num_obs_eval,
+  const int num_reg_continuous,
+  const int leave_one_out,
+  const int leave_one_out_offset,
+  const int * const operator,
+  double **matrix_X_continuous_train,
+  double **matrix_X_continuous_eval,
+  double * const vector_bandwidth,
+  double * const row,
+  double * const weighted_sum,
+  double * const kw)
+{
+  NPContinuousKernelRowWorkspace workspace;
+  NPContinuousKernelRowPlan plan;
+  NPContinuousKernelRowResult row_result;
+  double **bandwidth_columns = NULL;
+  int train_is_eval = num_obs_train == num_obs_eval;
+  int status = KWSNP_ERR_BADINVOC;
+  int evaluation;
+  int coordinate;
+
+  if(route == NULL ||
+     np_continuous_kernel_route_validate(route, num_reg_continuous) !=
+       NP_CKERNEL_ROUTE_OK ||
+     route->segment_count != 1 ||
+     route->segment[0].descriptor.family != NP_CKERNEL_FAMILY_BETA ||
+     route->segment[0].descriptor.order != 2 ||
+     route->segment[0].coordinate_offset != 0 ||
+     route->segment[0].coordinate_count != num_reg_continuous ||
+     num_obs_train <= 0 || num_obs_eval <= 0 ||
+     num_reg_continuous <= 0 || operator == NULL ||
+     matrix_X_continuous_train == NULL ||
+     matrix_X_continuous_eval == NULL || vector_bandwidth == NULL ||
+     row == NULL || weighted_sum == NULL || leave_one_out_offset < 0)
+    return KWSNP_ERR_BADINVOC;
+
+  for(coordinate = 0; coordinate < num_reg_continuous; ++coordinate) {
+    if(operator[coordinate] != OP_NORMAL ||
+       matrix_X_continuous_train[coordinate] == NULL ||
+       matrix_X_continuous_eval[coordinate] == NULL ||
+       !R_FINITE(vector_bandwidth[coordinate]) ||
+       vector_bandwidth[coordinate] <= 0.0)
+      return KWSNP_ERR_BADINVOC;
+    train_is_eval &=
+      matrix_X_continuous_train[coordinate] ==
+      matrix_X_continuous_eval[coordinate];
+  }
+  if(leave_one_out &&
+     (!train_is_eval ||
+      num_obs_train < num_obs_eval + leave_one_out_offset))
+    return KWSNP_ERR_BADINVOC;
+
+  if((size_t)num_reg_continuous > SIZE_MAX / sizeof(double *))
+    return KWSNP_ERR_BADINVOC;
+  bandwidth_columns = (double **)malloc(
+    (size_t)num_reg_continuous * sizeof(double *));
+  if(bandwidth_columns == NULL)
+    return KWSNP_ERR_BADINVOC;
+  for(coordinate = 0; coordinate < num_reg_continuous; ++coordinate)
+    bandwidth_columns[coordinate] = vector_bandwidth + coordinate;
+
+  plan.route = route;
+  plan.bandwidth_mode = BW_FIXED;
+  plan.num_train = num_obs_train;
+  plan.num_eval = num_obs_eval;
+  plan.num_continuous = num_reg_continuous;
+  plan.train_is_eval = train_is_eval;
+  plan.train = matrix_X_continuous_train;
+  plan.evaluation = matrix_X_continuous_eval;
+  plan.bandwidth_eval = bandwidth_columns;
+  plan.bandwidth_train = bandwidth_columns;
+  plan.operator = operator;
+  row_result.row = row;
+  np_continuous_kernel_row_workspace_init(&workspace);
+
+  for(evaluation = 0; evaluation < num_obs_eval; ++evaluation) {
+    const int omitted_observation = leave_one_out ?
+      evaluation + leave_one_out_offset : -1;
+    const NPContinuousKernelRowStatus row_status =
+      np_continuous_kernel_beta_factor_row(
+        &plan, evaluation, omitted_observation, &workspace, &row_result);
+    double sum = 0.0;
+    int observation;
+
+    if(row_status != NP_CONTINUOUS_ROW_OK)
+      goto cleanup;
+    for(observation = 0; observation < num_obs_train; ++observation) {
+      double value;
+
+      if(np_continuous_kernel_signed_log_restore(
+           workspace.primary_log_absolute[observation],
+           workspace.primary_sign[observation],
+           &value) != NP_CONTINUOUS_ROW_OK)
+        goto cleanup;
+      if(kw != NULL)
+        kw[(size_t)evaluation * (size_t)num_obs_train +
+           (size_t)observation] = value;
+      sum += value;
+      if(!R_FINITE(sum))
+        goto cleanup;
+    }
+    weighted_sum[evaluation] = sum;
+    if((evaluation & 31) == 0)
+      R_CheckUserInterrupt();
+  }
+
+  status = 0;
+
+cleanup:
+  np_continuous_kernel_row_workspace_release(&workspace);
+  free(bandwidth_columns);
+  return status;
+}
+
+/*
   Keep this adjacent hot engine on a stable cache-line boundary.  Adding the
   out-of-line Apple-arm64 pack helper otherwise displaced it enough to cause a
   reproducible regression in an inactive conditional-density control.
@@ -8311,7 +8443,39 @@ const NPContinuousKernelRoute * const kernel_route){
     (((!np_partial_gate_features_enabled) && (!caller_override_active))) ||
     ((gate_ctx != NULL) && (gate_ctx->active == NP_GATE_CTX_DISABLE));
   assert(np_gate_ctx_is_sane(gate_ctx));
-  (void)kernel_route;
+
+  if(kernel_route != NULL) {
+    const int exact_beta_fixed_scalar_route =
+      np_continuous_kernel_route_has_beta(kernel_route) &&
+      BANDWIDTH_reg == BW_FIXED && kernel_pow == 1 &&
+      bandwidth_divide == 0 && bandwidth_divide_weights == 0 &&
+      num_reg_unordered == 0 && num_reg_ordered == 0 &&
+      num_reg_continuous > 0 && permutation_operator == OP_NOOP &&
+      !do_score && !do_ocg && ncol_Y == 0 && ncol_W == 0 &&
+      int_TREE == NP_TREE_FALSE && !do_partial_tree &&
+      !symmetric && !gather_scatter && !drop_one_train &&
+      sgn == NULL && !bandwidth_provided && matrix_bw_train == NULL &&
+      matrix_bw_eval == NULL && lambda_pre == NULL &&
+      dual_power_ctx == NULL && outer_pack_ctx == NULL &&
+      weighted_sum != NULL;
+    double *route_row = NULL;
+    int route_status;
+
+    if(!exact_beta_fixed_scalar_route)
+      return KWSNP_ERR_BADINVOC;
+    if((size_t)num_obs_train > SIZE_MAX / sizeof(double))
+      return KWSNP_ERR_BADINVOC;
+    route_row = (double *)malloc((size_t)num_obs_train * sizeof(double));
+    if(route_row == NULL)
+      return KWSNP_ERR_BADINVOC;
+    route_status = np_beta_fixed_scalar_absolute_route(
+      kernel_route, num_obs_train, num_obs_eval, num_reg_continuous,
+      leave_one_out, leave_one_out_offset, operator,
+      matrix_X_continuous_train, matrix_X_continuous_eval,
+      vector_scale_factor, route_row, weighted_sum, kw);
+    free(route_row);
+    return route_status;
+  }
   
   /* This function takes a vector Y and returns a kernel weighted
      leave-one-out sum. By default Y should be a vector of ones
@@ -10507,6 +10671,129 @@ double * const pkw){
   return status;
 }
 
+int kernel_weighted_sum_np_route(
+int * KERNEL_reg,
+int * KERNEL_unordered_reg,
+int * KERNEL_ordered_reg,
+const int BANDWIDTH_reg,
+const int num_obs_train,
+const int num_obs_eval,
+const int num_reg_unordered,
+const int num_reg_ordered,
+const int num_reg_continuous,
+const int leave_one_out,
+const int leave_one_out_offset,
+const int kernel_pow,
+const int bandwidth_divide,
+const int bandwidth_divide_weights,
+const int symmetric,
+const int gather_scatter,
+const int drop_one_train,
+const int drop_which_train,
+const int * const operator,
+const int permutation_operator,
+int do_score,
+int do_ocg,
+int * bpso,
+const int suppress_parallel,
+const int ncol_Y,
+const int ncol_W,
+const int int_TREE,
+const int do_partial_tree,
+KDT * const kdt,
+NL * const inl,
+int * const nld,
+int * const idx,
+double **matrix_X_unordered_train,
+double **matrix_X_ordered_train,
+double **matrix_X_continuous_train,
+double **matrix_X_unordered_eval,
+double **matrix_X_ordered_eval,
+double **matrix_X_continuous_eval,
+double **matrix_Y,
+double **matrix_W,
+double * sgn,
+double *vector_scale_factor,
+int bandwidth_provided,
+double ** matrix_bw_train,
+double ** matrix_bw_eval,
+double * lambda_pre,
+int *num_categories,
+double **matrix_categorical_vals,
+int ** matrix_ordered_indices,
+double * const weighted_sum,
+double * const weighted_permutation_sum,
+double * const kw,
+double * const pkw,
+const NPContinuousKernelRoute * const kernel_route){
+  double * old_pkw = kernel_weighted_sum_pkw_extern;
+  int old_pkw_nvar = kernel_weighted_sum_pkw_nvar_extern;
+  int status = 0;
+
+  kernel_weighted_sum_pkw_extern = pkw;
+  kernel_weighted_sum_pkw_nvar_extern = (pkw == NULL) ? 0 : (((permutation_operator != OP_NOOP) ? num_reg_continuous : 0) + ((do_score || do_ocg) ? num_reg_unordered + num_reg_ordered : 0));
+
+  status = kernel_weighted_sum_np_ctx_ex(KERNEL_reg,
+                                    KERNEL_unordered_reg,
+                                    KERNEL_ordered_reg,
+                                    BANDWIDTH_reg,
+                                    num_obs_train,
+                                    num_obs_eval,
+                                    num_reg_unordered,
+                                    num_reg_ordered,
+                                    num_reg_continuous,
+                                    leave_one_out,
+                                    leave_one_out_offset,
+                                    kernel_pow,
+                                    bandwidth_divide,
+                                    bandwidth_divide_weights,
+                                    symmetric,
+                                    gather_scatter,
+                                    drop_one_train,
+                                    drop_which_train,
+                                    operator,
+                                    permutation_operator,
+                                    do_score,
+                                    do_ocg,
+                                    bpso,
+                                    suppress_parallel,
+                                    ncol_Y,
+                                    ncol_W,
+                                    int_TREE,
+                                    do_partial_tree,
+                                    kdt,
+                                    inl,
+                                    nld,
+                                    idx,
+                                    matrix_X_unordered_train,
+                                    matrix_X_ordered_train,
+                                    matrix_X_continuous_train,
+                                    matrix_X_unordered_eval,
+                                    matrix_X_ordered_eval,
+                                    matrix_X_continuous_eval,
+                                    matrix_Y,
+                                    matrix_W,
+                                    sgn,
+                                    vector_scale_factor,
+                                    bandwidth_provided,
+                                    matrix_bw_train,
+                                    matrix_bw_eval,
+                                    lambda_pre,
+                                    num_categories,
+                                    matrix_categorical_vals,
+                                    matrix_ordered_indices,
+                                    weighted_sum,
+                                    weighted_permutation_sum,
+                                    kw,
+                                    NULL,
+                                    NULL,
+                                    NULL,
+                                    kernel_route);
+  kernel_weighted_sum_pkw_extern = old_pkw;
+  kernel_weighted_sum_pkw_nvar_extern = old_pkw_nvar;
+  return status;
+}
+
 int kernel_weighted_sum_np(
 int * KERNEL_reg,
 int * KERNEL_unordered_reg,
@@ -10561,69 +10848,22 @@ double * const weighted_sum,
 double * const weighted_permutation_sum,
 double * const kw,
 double * const pkw){
-  double * old_pkw = kernel_weighted_sum_pkw_extern;
-  int old_pkw_nvar = kernel_weighted_sum_pkw_nvar_extern;
-  int status = 0;
-
-  kernel_weighted_sum_pkw_extern = pkw;
-  kernel_weighted_sum_pkw_nvar_extern = (pkw == NULL) ? 0 : (((permutation_operator != OP_NOOP) ? num_reg_continuous : 0) + ((do_score || do_ocg) ? num_reg_unordered + num_reg_ordered : 0));
-
-  status = kernel_weighted_sum_np_ctx(KERNEL_reg,
-                                    KERNEL_unordered_reg,
-                                    KERNEL_ordered_reg,
-                                    BANDWIDTH_reg,
-                                    num_obs_train,
-                                    num_obs_eval,
-                                    num_reg_unordered,
-                                    num_reg_ordered,
-                                    num_reg_continuous,
-                                    leave_one_out,
-                                    leave_one_out_offset,
-                                    kernel_pow,
-                                    bandwidth_divide,
-                                    bandwidth_divide_weights,
-                                    symmetric,
-                                    gather_scatter,
-                                    drop_one_train,
-                                    drop_which_train,
-                                    operator,
-                                    permutation_operator,
-                                    do_score,
-                                    do_ocg,
-                                    bpso,
-                                    suppress_parallel,
-                                    ncol_Y,
-                                    ncol_W,
-                                    int_TREE,
-                                    do_partial_tree,
-                                    kdt,
-                                    inl,
-                                    nld,
-                                    idx,
-                                    matrix_X_unordered_train,
-                                    matrix_X_ordered_train,
-                                    matrix_X_continuous_train,
-                                    matrix_X_unordered_eval,
-                                    matrix_X_ordered_eval,
-                                    matrix_X_continuous_eval,
-                                    matrix_Y,
-                                    matrix_W,
-                                    sgn,
-                                    vector_scale_factor,
-                                    bandwidth_provided,
-                                    matrix_bw_train,
-                                    matrix_bw_eval,
-                                    lambda_pre,
-                                    num_categories,
-                                    matrix_categorical_vals,
-                                    matrix_ordered_indices,
-                                    weighted_sum,
-                                    weighted_permutation_sum,
-                                    kw,
-                                    NULL);
-  kernel_weighted_sum_pkw_extern = old_pkw;
-  kernel_weighted_sum_pkw_nvar_extern = old_pkw_nvar;
-  return status;
+  return kernel_weighted_sum_np_route(
+    KERNEL_reg, KERNEL_unordered_reg, KERNEL_ordered_reg,
+    BANDWIDTH_reg, num_obs_train, num_obs_eval,
+    num_reg_unordered, num_reg_ordered, num_reg_continuous,
+    leave_one_out, leave_one_out_offset, kernel_pow,
+    bandwidth_divide, bandwidth_divide_weights, symmetric,
+    gather_scatter, drop_one_train, drop_which_train, operator,
+    permutation_operator, do_score, do_ocg, bpso, suppress_parallel,
+    ncol_Y, ncol_W, int_TREE, do_partial_tree, kdt, inl, nld, idx,
+    matrix_X_unordered_train, matrix_X_ordered_train,
+    matrix_X_continuous_train, matrix_X_unordered_eval,
+    matrix_X_ordered_eval, matrix_X_continuous_eval, matrix_Y,
+    matrix_W, sgn, vector_scale_factor, bandwidth_provided,
+    matrix_bw_train, matrix_bw_eval, lambda_pre, num_categories,
+    matrix_categorical_vals, matrix_ordered_indices, weighted_sum,
+    weighted_permutation_sum, kw, pkw, NULL);
 }
 
 int np_kernel_estimate_con_density_categorical_convolution_cv(
