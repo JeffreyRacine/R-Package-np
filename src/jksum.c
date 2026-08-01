@@ -29,6 +29,7 @@
 #include "jksum_lp_row.h"
 #include "jksum_lp_solve.h"
 #include "jksum_block_plan.h"
+#include "kernel_registry.h"
 #include "np_native_safety.h"
 #include "categorical_profile_tile.h"
 
@@ -8538,6 +8539,7 @@ double * const kw,
 const NP_GateOverrideCtx * const gate_override_ctx,
 const NP_DualPowerCtx * const dual_power_ctx,
 const NP_OuterPackCtx * const outer_pack_ctx,
+const NPContinuousKernelRoute * const kernel_route,
 const int keep_kw_owner_local){
   const NP_GateOverrideCtx * const gate_ctx_raw =
     (gate_override_ctx != NULL) ? gate_override_ctx : &np_gate_override_ctx;
@@ -8550,6 +8552,7 @@ const int keep_kw_owner_local){
     ((!np_partial_gate_features_enabled) && (!caller_override_active)) ||
     ((gate_ctx != NULL) && (gate_ctx->active == NP_GATE_CTX_DISABLE));
   assert(np_gate_ctx_is_sane(gate_ctx));
+  (void)kernel_route;
   
   /* This function takes a vector Y and returns a kernel weighted
      leave-one-out sum. By default Y should be a vector of ones
@@ -10708,6 +10711,7 @@ const NP_GateOverrideCtx * const gate_override_ctx){
     gate_override_ctx,
     NULL,
     NULL,
+    NULL,
     0);
 }
 
@@ -10832,6 +10836,7 @@ double * const pkw){
     kw,
     NULL,
     &dual_power_ctx,
+    NULL,
     NULL,
     0);
 
@@ -13795,6 +13800,7 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
                                   NULL,
                                   NULL,
                                   &frozen_runtime_options,
+                                  NULL,
                                   0) != 0){
       int_LARGE_SF = tsf;
       NP_LP_CV_FAIL();
@@ -13969,6 +13975,7 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
                                   NULL,
                                   NULL,
                                   &frozen_runtime_options,
+                                  NULL,
                                   0) != 0)
       NP_LP_CV_FAIL();
 
@@ -14592,6 +14599,7 @@ static NP_NOINLINE NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas(
                                      NULL,
                                      NULL,
                                      &frozen_runtime_options,
+                                     NULL,
                                      0) != 0){
       local_fail = 1;
       goto adaptive_blas_collective_gate;
@@ -15405,6 +15413,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                                    NULL,
                                    NULL,
                                    &objective_pack_ctx,
+                                   NULL,
                                    0);
         int_LARGE_SF = tsf;
       }
@@ -15643,6 +15652,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                                      NULL,
                                      NULL,
                                      &objective_pack_ctx,
+                                     NULL,
                                      0);
         } else {
           if(j < (num_obs-1)){
@@ -16727,6 +16737,7 @@ preflight_profile_cdf:
                                          NULL,
                                          NULL,
                                          &execution_ctx,
+                                         NULL,
                                          1);
   if((engine_status != 0) || (row_tile_sink.count_rows != 0))
     goto cleanup_profile_cdf;
@@ -20330,6 +20341,7 @@ double *SIGN){
                              reuse_fit_kernel_row ? fit_kw : NULL,
                              est_gate_ctx_ptr,
                              reuse_fit_dual_power ? &fit_dual_power_ctx : NULL,
+                             NULL,
                              NULL,
                              0);
 
