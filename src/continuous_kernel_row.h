@@ -220,6 +220,25 @@ np_continuous_kernel_beta_dual_power_rows_validated(
   NPContinuousKernelDerivativeDiagnostics *diagnostics,
   NPContinuousKernelProgressFunction progress);
 
+/*
+ * Accumulate the complete canonical row and its online centered second
+ * moment in training order.  This is the stable moment contract required by
+ * distribution-function consumers; it deliberately does not reconstruct the
+ * centered moment by subtracting two raw moments.
+ */
+NPContinuousKernelRowStatus
+np_continuous_kernel_beta_centered_moment_rows_validated(
+  const NPContinuousKernelRowPlan *plan,
+  int leave_one_out,
+  int leave_one_out_offset,
+  const NPContinuousKernelLogFactorProvider *provider,
+  NPContinuousKernelRowWorkspace *workspace,
+  NPContinuousKernelRowResult *row_result,
+  double *sum,
+  double *centered_m2,
+  NPContinuousKernelDerivativeDiagnostics *diagnostics,
+  NPContinuousKernelProgressFunction progress);
+
 NPContinuousKernelRowStatus np_continuous_kernel_scaled_restore(
   double scaled_value,
   double log_scale,

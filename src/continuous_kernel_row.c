@@ -1987,6 +1987,105 @@ np_continuous_kernel_beta_dual_power_rows_validated(
   return NP_CONTINUOUS_ROW_OK;
 }
 
+NPContinuousKernelRowStatus
+np_continuous_kernel_beta_centered_moment_rows_validated(
+  const NPContinuousKernelRowPlan *plan,
+  int leave_one_out,
+  int leave_one_out_offset,
+  const NPContinuousKernelLogFactorProvider *provider,
+  NPContinuousKernelRowWorkspace *workspace,
+  NPContinuousKernelRowResult *row_result,
+  double *sum,
+  double *centered_m2,
+  NPContinuousKernelDerivativeDiagnostics *diagnostics,
+  NPContinuousKernelProgressFunction progress)
+{
+  NPContinuousKernelRowStatus status;
+  int evaluation;
+  int coordinate;
+
+  if(diagnostics != NULL) {
+    diagnostics->bad_coordinate = -1;
+    diagnostics->bad_observation = -1;
+    diagnostics->undefined_count = 0;
+    diagnostics->beta_status = NP_BETA_OK;
+  }
+  if(plan == NULL || plan->route == NULL || plan->num_train <= 0 ||
+     plan->num_eval <= 0 || plan->num_continuous <= 0 ||
+     (leave_one_out != 0 && leave_one_out != 1) ||
+     leave_one_out_offset < 0 || plan->operator == NULL ||
+     workspace == NULL || row_result == NULL || sum == NULL ||
+     centered_m2 == NULL ||
+     (leave_one_out &&
+      (plan->num_eval > plan->num_train ||
+       leave_one_out_offset > plan->num_train - plan->num_eval)))
+    return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  for(coordinate = 0; coordinate < plan->num_continuous; ++coordinate)
+    if(plan->operator[coordinate] != OP_NORMAL &&
+       plan->operator[coordinate] != OP_INTEGRAL &&
+       plan->operator[coordinate] != OP_CONVOLUTION)
+      return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+
+  for(evaluation = 0; evaluation < plan->num_eval; ++evaluation) {
+    const int omitted_observation = leave_one_out ?
+      evaluation + leave_one_out_offset : -1;
+    double running_mean = 0.0;
+    double running_m2 = 0.0;
+    int running_count = 0;
+    int observation;
+
+    sum[evaluation] = 0.0;
+    centered_m2[evaluation] = 0.0;
+    status = np_continuous_kernel_beta_log_factor_row(
+      plan, evaluation, omitted_observation, provider,
+      workspace, row_result);
+    if(status != NP_CONTINUOUS_ROW_OK) {
+      if(diagnostics != NULL) {
+        diagnostics->bad_coordinate = row_result->bad_coordinate;
+        diagnostics->bad_observation = row_result->bad_observation;
+        diagnostics->beta_status = row_result->beta_status;
+      }
+      return status;
+    }
+
+    for(observation = 0; observation < plan->num_train; ++observation) {
+      double value;
+      double delta;
+
+      status = np_continuous_kernel_signed_log_restore(
+        workspace->primary_log_absolute[observation],
+        workspace->primary_sign[observation], &value);
+      if(status != NP_CONTINUOUS_ROW_OK) {
+        if(diagnostics != NULL)
+          diagnostics->bad_observation = observation;
+        return status;
+      }
+      if(observation == omitted_observation)
+        continue;
+
+      sum[evaluation] += value;
+      delta = value - running_mean;
+      ++running_count;
+      running_mean += delta / (double)running_count;
+      running_m2 += delta * (value - running_mean);
+      if(!R_FINITE(sum[evaluation]) || !R_FINITE(running_mean) ||
+         !R_FINITE(running_m2)) {
+        if(diagnostics != NULL)
+          diagnostics->bad_observation = observation;
+        return NP_CONTINUOUS_ROW_ERR_NUMERIC;
+      }
+    }
+    if(running_m2 < 0.0)
+      running_m2 = 0.0;
+    centered_m2[evaluation] = running_m2;
+    if(progress != NULL)
+      progress(evaluation + 1, plan->num_eval);
+    if((evaluation & 31) == 0)
+      R_CheckUserInterrupt();
+  }
+  return NP_CONTINUOUS_ROW_OK;
+}
+
 NPContinuousKernelRowStatus np_continuous_kernel_scaled_restore(
   double scaled_value,
   double log_scale,
