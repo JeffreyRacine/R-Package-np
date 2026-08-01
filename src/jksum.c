@@ -8499,8 +8499,9 @@ static inline void np_hot_loop_check_interrupt(const int pos,
  * common row scale in later tranches.  Workspace is O(n_train), excluding an
  * explicitly requested public kernel-weight matrix owned by the caller.
  */
-static int np_beta_fixed_scalar_absolute_route(
+static int np_beta_scalar_absolute_route(
   const NPContinuousKernelRoute * const route,
+  const int bandwidth_mode,
   const int num_obs_train,
   const int num_obs_eval,
   const int num_reg_continuous,
@@ -8510,6 +8511,8 @@ static int np_beta_fixed_scalar_absolute_route(
   double **matrix_X_continuous_train,
   double **matrix_X_continuous_eval,
   double * const vector_bandwidth,
+  double **matrix_bandwidth_eval,
+  double **matrix_bandwidth_train,
   double * const row,
   double * const weighted_sum,
   double * const kw)
@@ -8533,7 +8536,9 @@ static int np_beta_fixed_scalar_absolute_route(
      num_obs_train <= 0 || num_obs_eval <= 0 ||
      num_reg_continuous <= 0 || operator == NULL ||
      matrix_X_continuous_train == NULL ||
-     matrix_X_continuous_eval == NULL || vector_bandwidth == NULL ||
+     matrix_X_continuous_eval == NULL ||
+     (bandwidth_mode != BW_FIXED && bandwidth_mode != BW_GEN_NN &&
+      bandwidth_mode != BW_ADAP_NN) ||
      row == NULL || weighted_sum == NULL || leave_one_out_offset < 0)
     return KWSNP_ERR_BADINVOC;
 
@@ -8542,9 +8547,20 @@ static int np_beta_fixed_scalar_absolute_route(
         operator[coordinate] != OP_INTEGRAL &&
         operator[coordinate] != OP_CONVOLUTION) ||
        matrix_X_continuous_train[coordinate] == NULL ||
-       matrix_X_continuous_eval[coordinate] == NULL ||
-       !R_FINITE(vector_bandwidth[coordinate]) ||
-       vector_bandwidth[coordinate] <= 0.0)
+       matrix_X_continuous_eval[coordinate] == NULL)
+      return KWSNP_ERR_BADINVOC;
+    if(bandwidth_mode == BW_FIXED &&
+       (vector_bandwidth == NULL ||
+        !R_FINITE(vector_bandwidth[coordinate]) ||
+        vector_bandwidth[coordinate] <= 0.0))
+      return KWSNP_ERR_BADINVOC;
+    if(bandwidth_mode == BW_GEN_NN &&
+       (matrix_bandwidth_eval == NULL ||
+        matrix_bandwidth_eval[coordinate] == NULL))
+      return KWSNP_ERR_BADINVOC;
+    if(bandwidth_mode == BW_ADAP_NN &&
+       (matrix_bandwidth_train == NULL ||
+        matrix_bandwidth_train[coordinate] == NULL))
       return KWSNP_ERR_BADINVOC;
     train_is_eval &=
       matrix_X_continuous_train[coordinate] ==
@@ -8555,25 +8571,29 @@ static int np_beta_fixed_scalar_absolute_route(
       num_obs_train < num_obs_eval + leave_one_out_offset))
     return KWSNP_ERR_BADINVOC;
 
-  if((size_t)num_reg_continuous > SIZE_MAX / sizeof(double *))
-    return KWSNP_ERR_BADINVOC;
-  bandwidth_columns = (double **)malloc(
-    (size_t)num_reg_continuous * sizeof(double *));
-  if(bandwidth_columns == NULL)
-    return KWSNP_ERR_BADINVOC;
-  for(coordinate = 0; coordinate < num_reg_continuous; ++coordinate)
-    bandwidth_columns[coordinate] = vector_bandwidth + coordinate;
+  if(bandwidth_mode == BW_FIXED) {
+    if((size_t)num_reg_continuous > SIZE_MAX / sizeof(double *))
+      return KWSNP_ERR_BADINVOC;
+    bandwidth_columns = (double **)malloc(
+      (size_t)num_reg_continuous * sizeof(double *));
+    if(bandwidth_columns == NULL)
+      return KWSNP_ERR_BADINVOC;
+    for(coordinate = 0; coordinate < num_reg_continuous; ++coordinate)
+      bandwidth_columns[coordinate] = vector_bandwidth + coordinate;
+  }
 
   plan.route = route;
-  plan.bandwidth_mode = BW_FIXED;
+  plan.bandwidth_mode = bandwidth_mode;
   plan.num_train = num_obs_train;
   plan.num_eval = num_obs_eval;
   plan.num_continuous = num_reg_continuous;
   plan.train_is_eval = train_is_eval;
   plan.train = matrix_X_continuous_train;
   plan.evaluation = matrix_X_continuous_eval;
-  plan.bandwidth_eval = bandwidth_columns;
-  plan.bandwidth_train = bandwidth_columns;
+  plan.bandwidth_eval = (bandwidth_mode == BW_FIXED) ?
+    bandwidth_columns : matrix_bandwidth_eval;
+  plan.bandwidth_train = (bandwidth_mode == BW_FIXED) ?
+    bandwidth_columns : matrix_bandwidth_train;
   plan.operator = operator;
   row_result.row = row;
   np_continuous_kernel_row_workspace_init(&workspace);
@@ -8699,34 +8719,52 @@ const int keep_kw_owner_local){
   assert(np_gate_ctx_is_sane(gate_ctx));
 
   if(kernel_route != NULL) {
-    const int exact_beta_fixed_scalar_route =
+    int route_has_convolution = 0;
+    int route_coordinate;
+    for(route_coordinate = 0; route_coordinate < num_reg_continuous;
+        ++route_coordinate)
+      route_has_convolution |=
+        operator != NULL && operator[route_coordinate] == OP_CONVOLUTION;
+    const int exact_beta_scalar_route =
       np_continuous_kernel_route_has_beta(kernel_route) &&
-      BANDWIDTH_reg == BW_FIXED && kernel_pow == 1 &&
+      (BANDWIDTH_reg == BW_FIXED || BANDWIDTH_reg == BW_GEN_NN ||
+       BANDWIDTH_reg == BW_ADAP_NN) &&
+      (BANDWIDTH_reg == BW_FIXED || !route_has_convolution) &&
+      kernel_pow == 1 &&
       bandwidth_divide == 0 && bandwidth_divide_weights == 0 &&
       num_reg_unordered == 0 && num_reg_ordered == 0 &&
       num_reg_continuous > 0 && permutation_operator == OP_NOOP &&
       !do_score && !do_ocg && ncol_Y == 0 && ncol_W == 0 &&
       int_TREE == NP_TREE_FALSE && !do_partial_tree &&
       !symmetric && !gather_scatter && !drop_one_train &&
-      sgn == NULL && !bandwidth_provided && matrix_bw_train == NULL &&
-      matrix_bw_eval == NULL && lambda_pre == NULL &&
+      sgn == NULL &&
+      ((BANDWIDTH_reg == BW_FIXED && !bandwidth_provided &&
+        matrix_bw_train == NULL && matrix_bw_eval == NULL &&
+        vector_scale_factor != NULL) ||
+       (BANDWIDTH_reg == BW_GEN_NN && bandwidth_provided &&
+        matrix_bw_eval != NULL) ||
+       (BANDWIDTH_reg == BW_ADAP_NN && bandwidth_provided &&
+        matrix_bw_train != NULL)) &&
+      lambda_pre == NULL &&
       dual_power_ctx == NULL && outer_pack_ctx == NULL &&
       weighted_sum != NULL;
     double *route_row = NULL;
     int route_status;
 
-    if(!exact_beta_fixed_scalar_route)
+    if(!exact_beta_scalar_route)
       return KWSNP_ERR_BADINVOC;
     if((size_t)num_obs_train > SIZE_MAX / sizeof(double))
       return KWSNP_ERR_BADINVOC;
     route_row = (double *)malloc((size_t)num_obs_train * sizeof(double));
     if(route_row == NULL)
       return KWSNP_ERR_BADINVOC;
-    route_status = np_beta_fixed_scalar_absolute_route(
-      kernel_route, num_obs_train, num_obs_eval, num_reg_continuous,
+    route_status = np_beta_scalar_absolute_route(
+      kernel_route, BANDWIDTH_reg, num_obs_train, num_obs_eval,
+      num_reg_continuous,
       leave_one_out, leave_one_out_offset, operator,
       matrix_X_continuous_train, matrix_X_continuous_eval,
-      vector_scale_factor, route_row, weighted_sum, kw);
+      vector_scale_factor, matrix_bw_eval, matrix_bw_train,
+      route_row, weighted_sum, kw);
     free(route_row);
     return route_status;
   }
