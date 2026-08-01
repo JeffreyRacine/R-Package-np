@@ -33,6 +33,7 @@
 #include "np_native_safety.h"
 #include "categorical_profile_tile.h"
 #include "continuous_kernel_row.h"
+#include "beta_bandwidth.h"
 
 #include "hash.h"
 #include "tree.h"
@@ -8530,6 +8531,15 @@ typedef struct {
 } NPCenteredMomentCtx;
 
 typedef struct {
+  const double *response;
+  double *mean;
+  double *mean_stderr;
+  int positive_weights;
+  NPContinuousKernelRowStatus *status;
+  NPContinuousKernelProgressFunction progress;
+} NPBetaRegressionMomentCtx;
+
+typedef struct {
   NPCategoricalProfileKernelSpec dense_spec;
   NPCategoricalProfileKernelSpec compressed_spec;
   int use_compressed;
@@ -8829,6 +8839,7 @@ static int np_beta_absolute_route(
   double * const weighted_sum_power2,
   double * const centered_m2,
   double * const kw,
+  const NPBetaRegressionMomentCtx * const regression_moment_context,
   NPContinuousKernelDerivativeDiagnostics * const route_diagnostics,
   NPContinuousKernelProgressFunction progress)
 {
@@ -8879,7 +8890,8 @@ static int np_beta_absolute_route(
      ncol_Y < 0 || ncol_W < 0 ||
      (ncol_Y > 0 && matrix_Y == NULL) ||
      (ncol_W > 0 && matrix_W == NULL) ||
-     weighted_sum == NULL || leave_one_out_offset < 0)
+     (weighted_sum == NULL && regression_moment_context == NULL) ||
+     leave_one_out_offset < 0)
     return KWSNP_ERR_BADINVOC;
   if(has_categories &&
      ((num_reg_unordered > 0 &&
@@ -8954,7 +8966,19 @@ static int np_beta_absolute_route(
   if(centered_m2 != NULL &&
      (derivative_coordinate >= 0 || kernel_power != 1 ||
       weighted_sum_power2 != NULL || kw != NULL ||
-      ncol_Y != 0 || ncol_W != 0))
+      ncol_Y != 0 || ncol_W != 0 ||
+      regression_moment_context != NULL))
+    return KWSNP_ERR_BADINVOC;
+  if(regression_moment_context != NULL &&
+     (regression_moment_context->response == NULL ||
+      regression_moment_context->mean == NULL ||
+      regression_moment_context->mean_stderr == NULL ||
+      regression_moment_context->status == NULL ||
+      (regression_moment_context->positive_weights != 0 &&
+       regression_moment_context->positive_weights != 1) ||
+      derivative_coordinate >= 0 || kernel_power != 1 ||
+      weighted_sum != NULL || weighted_sum_power2 != NULL ||
+      centered_m2 != NULL || kw != NULL || ncol_Y != 0 || ncol_W != 0))
     return KWSNP_ERR_BADINVOC;
 
   if(bandwidth_mode == BW_FIXED) {
@@ -8999,6 +9023,25 @@ static int np_beta_absolute_route(
       num_categories, matrix_categorical_vals, categorical_compress, row);
     if(row_status != NP_CONTINUOUS_ROW_OK)
       goto cleanup;
+  }
+
+  if(regression_moment_context != NULL) {
+    const NPContinuousKernelRowStatus row_status =
+      np_continuous_kernel_beta_regression_moment_rows_validated(
+        &plan, leave_one_out, leave_one_out_offset,
+        has_categories ? &categorical_provider : NULL,
+        regression_moment_context->response,
+        regression_moment_context->positive_weights,
+        &workspace, &row_result,
+        regression_moment_context->mean,
+        regression_moment_context->mean_stderr,
+        route_diagnostics, regression_moment_context->progress);
+
+    *regression_moment_context->status = row_status;
+    if(row_status != NP_CONTINUOUS_ROW_OK)
+      goto cleanup;
+    status = 0;
+    goto cleanup;
   }
 
   if(centered_m2 != NULL) {
@@ -9393,7 +9436,7 @@ const int keep_kw_owner_local){
       route_row, weighted_sum,
       beta_dual_power ? dual_power_ctx->weighted_sum : NULL,
       beta_centered_moment ? centered_moment_ctx->centered_m2 : NULL,
-      kw, kernel_route_diagnostics,
+      kw, NULL, kernel_route_diagnostics,
       beta_dual_power ? dual_power_ctx->progress :
       (beta_centered_moment ? centered_moment_ctx->progress : NULL));
     free(route_row);
@@ -19921,12 +19964,7 @@ const NPContinuousKernelRoute *kernel_route,
 NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
 int categorical_compress){
 
-  /* P21A plumbing only: every incumbent caller supplies a null route.  The
-     activation tranche will bind these arguments to the canonical row owner
-     after the unchanged legacy path has been qualified independently. */
-  (void)kernel_route;
-  (void)kernel_route_diagnostics;
-  (void)categorical_compress;
+  const int exact_beta_route = kernel_route != NULL;
 
   // note that mean has 2*num_obs allocated for npksum
   int i, j, l;
@@ -19974,6 +20012,19 @@ int categorical_compress){
   const int lp_engine_est = lp_engine;
   if((lp_engine_est != NP_LP_ENGINE_SCALAR) && (lp_engine_est != NP_LP_ENGINE_GENERAL))
     error("invalid internal regression engine");
+  if(exact_beta_route &&
+     (np_continuous_kernel_route_validate(kernel_route,
+                                          num_reg_continuous) !=
+        NP_CKERNEL_ROUTE_OK ||
+      !np_continuous_kernel_route_has_beta(kernel_route) ||
+      kernel_route->segment_count != 1 ||
+      kernel_route->segment[0].coordinate_offset != 0 ||
+      kernel_route->segment[0].coordinate_count != num_reg_continuous ||
+      num_reg_continuous <= 0 ||
+      lp_engine_est != NP_LP_ENGINE_SCALAR || do_grad || do_gerr ||
+      kernel_route_diagnostics == NULL ||
+      (categorical_compress != 0 && categorical_compress != 1)))
+    error("canonical beta regression route has an invalid layout");
   np_gate_ctx_clear(&gate_ctx_local);
   const NP_GateOverrideCtx * const est_gate_ctx_ptr = &gate_ctx_local;
 
@@ -20014,7 +20065,26 @@ int categorical_compress){
 
   matrix_bandwidth_deriv = alloc_matd(bwmdim,num_reg_continuous);
 
-  if(kernel_bandwidth(KERNEL_reg,
+  if(exact_beta_route && BANDWIDTH_reg != BW_FIXED &&
+     num_reg_unordered == 0 && num_reg_ordered == 0) {
+    const np_beta_bandwidth_prepare_status bandwidth_status =
+      np_beta_bandwidth_prepare_matrix(
+        BANDWIDTH_reg == BW_GEN_NN ?
+          NP_BETA_BANDWIDTH_GENERALIZED_NN :
+          NP_BETA_BANDWIDTH_ADAPTIVE_NN,
+        matrix_X_continuous_train, matrix_X_continuous_eval,
+        vector_scale_factor,
+        num_obs_train, num_obs_eval, num_reg_continuous,
+        matrix_X_continuous_train == matrix_X_continuous_eval,
+        BANDWIDTH_reg == BW_GEN_NN, BANDWIDTH_reg == BW_ADAP_NN,
+        0, matrix_bandwidth, matrix_bandwidth);
+
+    if(bandwidth_status != NP_BETA_BANDWIDTH_PREPARE_OK)
+      error("\n** Error: %s.",
+            np_beta_bandwidth_prepare_status_message(bandwidth_status));
+  } else if(!(exact_beta_route && BANDWIDTH_reg == BW_FIXED &&
+              num_reg_unordered == 0 && num_reg_ordered == 0) &&
+            kernel_bandwidth(KERNEL_reg,
                       BANDWIDTH_reg,
                       num_obs_train,
                       num_obs_eval,
@@ -20036,11 +20106,17 @@ int categorical_compress){
 	    error("\n** Error: invalid bandwidth.");
 	  }
 
-  for(l = 0, hprod = 1.0; l < num_reg_continuous; l++)
-    hprod *= matrix_bandwidth[l][0];
+  hprod = 1.0;
+  if(!exact_beta_route)
+    for(l = 0; l < num_reg_continuous; l++)
+      hprod *= matrix_bandwidth[l][0];
 
 
-  if(num_reg_continuous != 0) {
+  if(exact_beta_route) {
+    INT_KERNEL_P = 1.0;
+    K_INT_KERNEL_P = 1.0;
+    DIFF_KER_PPM = 0.0;
+  } else if(num_reg_continuous != 0) {
     initialize_kernel_regression_asymptotic_constants(KERNEL_reg,
                                                       num_reg_continuous,
                                                       &INT_KERNEL_P,
@@ -20053,6 +20129,52 @@ int categorical_compress){
   }
 
   const double gfac = sqrt(DIFF_KER_PPM/K_INT_KERNEL_P);
+
+  if(exact_beta_route) {
+    NPBetaRegressionMomentCtx regression_moment_context;
+    NPContinuousKernelRowStatus regression_row_status =
+      NP_CONTINUOUS_ROW_OK;
+    double *route_row = (double *)np_jksum_malloc_array_or_die(
+      (size_t)num_obs_train, sizeof(double), "beta regression row");
+    int route_status;
+
+    regression_moment_context.response = vector_Y;
+    regression_moment_context.mean = mean;
+    regression_moment_context.mean_stderr = mean_stderr;
+    regression_moment_context.positive_weights =
+      kernel_route->segment[0].descriptor.order == 2;
+    regression_moment_context.status = &regression_row_status;
+    regression_moment_context.progress = np_progress_fit_loop_step;
+    route_status = np_beta_absolute_route(
+      kernel_route, BANDWIDTH_reg, num_obs_train, num_obs_eval,
+      num_reg_unordered, num_reg_ordered, num_reg_continuous,
+      0, 0, operator,
+      matrix_X_continuous_train, matrix_X_continuous_eval,
+      matrix_X_unordered_train, matrix_X_ordered_train,
+      matrix_X_unordered_eval, matrix_X_ordered_eval,
+      kernel_u, kernel_o,
+      (num_reg_unordered + num_reg_ordered) > 0 ? lambda : NULL,
+      num_categories, matrix_categorical_vals, categorical_compress,
+      vector_scale_factor,
+      BANDWIDTH_reg == BW_FIXED ? NULL : matrix_bandwidth,
+      BANDWIDTH_reg == BW_FIXED ? NULL : matrix_bandwidth,
+      NULL, NULL, 0, 0, NULL, NULL, 0, 0, 1,
+      route_row, NULL, NULL, NULL, NULL,
+      &regression_moment_context, kernel_route_diagnostics, NULL);
+    free(route_row);
+    if(route_status != 0) {
+      if(kernel_route_diagnostics->beta_status != NP_BETA_OK)
+        error("canonical beta regression row failed in continuous dimension %d: %s",
+              kernel_route_diagnostics->bad_coordinate + 1,
+              np_beta_status_message(kernel_route_diagnostics->beta_status));
+      if(regression_row_status == NP_CONTINUOUS_ROW_ERR_ZERO_WEIGHT)
+        error("all beta regression weights are zero at an evaluation point");
+      error("canonical beta regression row failed: %s",
+            np_continuous_kernel_row_status_message(regression_row_status));
+    }
+    estimation_shortcut_done = 1;
+    goto finish_regression_estimation;
+  }
 
   // compute hash stuff here if necessary
 
