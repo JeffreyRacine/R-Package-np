@@ -11383,6 +11383,7 @@ SEXP C_np_kernelsum(SEXP tuno,
     int beta_bandwidth_code = INTEGER(myopti_i)[KWS_BWI];
     int bad_dimension = -1;
     int has_overlap = 0;
+    int all_pdf = 1;
     int derivative_dimension = -1;
     int undefined_count = 0;
     int i;
@@ -11408,12 +11409,16 @@ SEXP C_np_kernelsum(SEXP tuno,
       if(INTEGER(op_i)[i] == OP_NORMAL)
         beta_operators[i] = NP_BETA_OPERATOR_PDF;
       else if(INTEGER(op_i)[i] == OP_CONVOLUTION) {
+        all_pdf = 0;
         beta_operators[i] = NP_BETA_OPERATOR_OVERLAP;
         has_overlap = 1;
       }
-      else if(INTEGER(op_i)[i] == OP_INTEGRAL)
+      else if(INTEGER(op_i)[i] == OP_INTEGRAL) {
+        all_pdf = 0;
         beta_operators[i] = NP_BETA_OPERATOR_CDF;
+      }
       else if(INTEGER(op_i)[i] == OP_DERIVATIVE) {
+        all_pdf = 0;
         if(derivative_dimension >= 0)
           error("C_np_kernelsum: beta kernels support one direct derivative dimension at a time");
         derivative_dimension = i;
@@ -11476,7 +11481,43 @@ SEXP C_np_kernelsum(SEXP tuno,
        n_pkw != (R_xlen_t)ncon * expected_weights)
       error("C_np_kernelsum: beta derivative-weight buffer has the wrong length");
 
-    if(derivative_dimension >= 0) {
+    if(descriptor.order == 2 && beta_bandwidth_code == BW_FIXED &&
+       all_pdf && num_response_columns == 0 && num_weight_columns == 0 &&
+       p_operator == OP_NOOP && !do_score && !do_ocg &&
+       INTEGER(myopti_i)[KWS_DOTREEI] == NP_TREE_FALSE) {
+      NPContinuousKernelRoute route;
+      double **train_columns = (double **)R_alloc(
+        (size_t)ncon, sizeof(double *));
+      double **evaluation_columns = (double **)R_alloc(
+        (size_t)ncon, sizeof(double *));
+      int route_status;
+
+      route.segment_count = 1;
+      route.segment[0].descriptor = descriptor;
+      route.segment[0].coordinate_offset = 0;
+      route.segment[0].coordinate_count = ncon;
+      route.segment[0].lower = ckerlb_p;
+      route.segment[0].upper = ckerub_p;
+      for(i = 0; i < ncon; ++i) {
+        train_columns[i] = REAL(tcon_r) + (size_t)i * (size_t)num_train;
+        evaluation_columns[i] = train_is_eval ? train_columns[i] :
+          REAL(econ_r) + (size_t)i * (size_t)num_eval;
+      }
+
+      route_status = kernel_weighted_sum_np_route(
+        NULL, NULL, NULL, BW_FIXED, num_train, num_eval,
+        0, 0, ncon, leave_one_out, 0, 1, 0, 0, 0, 0, 0, 0,
+        INTEGER(op_i), OP_NOOP, 0, 0, NULL, 0, 0, 0,
+        NP_TREE_FALSE, 0, NULL, NULL, NULL, NULL,
+        NULL, NULL, train_columns, NULL, NULL, evaluation_columns,
+        NULL, NULL, NULL, REAL(bw_r), 0, NULL, NULL, NULL, NULL,
+        NULL, NULL, REAL(out_ksum), REAL(out_pksum),
+        return_kernel_weights ? REAL(out_kw) : NULL, NULL, &route);
+      if(route_status != 0)
+        error("C_np_kernelsum: canonical beta kernel row failed with code %d",
+              route_status);
+      beta_status = NP_BETA_KERNELSUM_OK;
+    } else if(derivative_dimension >= 0) {
       beta_status = np_beta_kernelsum_derivative(
         REAL(tcon_r), train_is_eval ? NULL : REAL(econ_r),
         REAL(ty_r), REAL(weights_r), beta_bandwidth_eval,
