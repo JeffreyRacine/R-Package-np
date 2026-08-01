@@ -8499,6 +8499,11 @@ static inline void np_hot_loop_check_interrupt(const int pos,
  * common row scale in later tranches.  Workspace is O(n_train), excluding an
  * explicitly requested public kernel-weight matrix owned by the caller.
  */
+typedef struct {
+  const NPContinuousKernelRoute *route;
+  NPContinuousKernelDerivativeDiagnostics *diagnostics;
+} NPContinuousKernelExecutionContext;
+
 static int np_beta_absolute_route(
   const NPContinuousKernelRoute * const route,
   const int bandwidth_mode,
@@ -8519,16 +8524,19 @@ static int np_beta_absolute_route(
   const int ncol_W,
   double * const row,
   double * const weighted_sum,
-  double * const kw)
+  double * const kw,
+  NPContinuousKernelDerivativeDiagnostics * const route_diagnostics)
 {
   NPContinuousKernelRowWorkspace workspace;
   NPContinuousKernelRowPlan plan;
   NPContinuousKernelRowResult row_result;
+  NPContinuousKernelDerivativeAccumulator derivative_accumulator;
   double **bandwidth_columns = NULL;
   int train_is_eval = num_obs_train == num_obs_eval;
   int status = KWSNP_ERR_BADINVOC;
   int evaluation;
   int coordinate;
+  int derivative_coordinate = -1;
   int response_column;
   int weight_column;
 
@@ -8548,7 +8556,7 @@ static int np_beta_absolute_route(
      ncol_Y < 0 || ncol_W < 0 ||
      (ncol_Y > 0 && matrix_Y == NULL) ||
      (ncol_W > 0 && matrix_W == NULL) ||
-     row == NULL || weighted_sum == NULL || leave_one_out_offset < 0)
+     weighted_sum == NULL || leave_one_out_offset < 0)
     return KWSNP_ERR_BADINVOC;
 
   for(response_column = 0; response_column < ncol_Y; ++response_column)
@@ -8561,10 +8569,16 @@ static int np_beta_absolute_route(
   for(coordinate = 0; coordinate < num_reg_continuous; ++coordinate) {
     if((operator[coordinate] != OP_NORMAL &&
         operator[coordinate] != OP_INTEGRAL &&
-        operator[coordinate] != OP_CONVOLUTION) ||
+        operator[coordinate] != OP_CONVOLUTION &&
+        operator[coordinate] != OP_DERIVATIVE) ||
        matrix_X_continuous_train[coordinate] == NULL ||
        matrix_X_continuous_eval[coordinate] == NULL)
       return KWSNP_ERR_BADINVOC;
+    if(operator[coordinate] == OP_DERIVATIVE) {
+      if(derivative_coordinate >= 0)
+        return KWSNP_ERR_BADINVOC;
+      derivative_coordinate = coordinate;
+    }
     if(bandwidth_mode == BW_FIXED &&
        (vector_bandwidth == NULL ||
         !R_FINITE(vector_bandwidth[coordinate]) ||
@@ -8591,7 +8605,10 @@ static int np_beta_absolute_route(
   }
   if(leave_one_out &&
      (!train_is_eval ||
-      num_obs_train < num_obs_eval + leave_one_out_offset))
+      num_obs_eval > num_obs_train ||
+      leave_one_out_offset > num_obs_train - num_obs_eval))
+    return KWSNP_ERR_BADINVOC;
+  if(derivative_coordinate < 0 && row == NULL)
     return KWSNP_ERR_BADINVOC;
 
   if(bandwidth_mode == BW_FIXED) {
@@ -8618,16 +8635,40 @@ static int np_beta_absolute_route(
   plan.bandwidth_train = (bandwidth_mode == BW_FIXED) ?
     bandwidth_columns : matrix_bandwidth_train;
   plan.operator = operator;
+  if(np_continuous_kernel_row_plan_validate(&plan) !=
+     NP_CONTINUOUS_ROW_OK)
+    goto cleanup;
   row_result.row = row;
   np_continuous_kernel_row_workspace_init(&workspace);
+  np_continuous_kernel_derivative_accumulator_init(&derivative_accumulator);
+  if(route_diagnostics != NULL) {
+    route_diagnostics->bad_coordinate = -1;
+    route_diagnostics->bad_observation = -1;
+    route_diagnostics->undefined_count = 0;
+    route_diagnostics->beta_status = NP_BETA_OK;
+  }
+
+  if(derivative_coordinate >= 0) {
+    const NPContinuousKernelRowStatus row_status =
+      np_continuous_kernel_beta_derivative_absolute_rows_validated(
+        &plan, leave_one_out, leave_one_out_offset, derivative_coordinate,
+        matrix_Y, ncol_Y, matrix_W, ncol_W, &derivative_accumulator,
+        weighted_sum, kw, route_diagnostics);
+
+    if(row_status != NP_CONTINUOUS_ROW_OK)
+      goto cleanup;
+    status = 0;
+    goto cleanup;
+  }
 
   for(evaluation = 0; evaluation < num_obs_eval; ++evaluation) {
     const int omitted_observation = leave_one_out ?
       evaluation + leave_one_out_offset : -1;
-    const NPContinuousKernelRowStatus row_status =
-      np_continuous_kernel_beta_factor_row(
-        &plan, evaluation, omitted_observation, &workspace, &row_result);
+    NPContinuousKernelRowStatus row_status;
     int observation;
+
+    row_status = np_continuous_kernel_beta_factor_row(
+      &plan, evaluation, omitted_observation, &workspace, &row_result);
 
     if(row_status != NP_CONTINUOUS_ROW_OK)
       goto cleanup;
@@ -8707,6 +8748,8 @@ static int np_beta_absolute_route(
 
 cleanup:
   np_continuous_kernel_row_workspace_release(&workspace);
+  np_continuous_kernel_derivative_accumulator_release(
+    &derivative_accumulator);
   free(bandwidth_columns);
   return status;
 }
@@ -8778,7 +8821,7 @@ double * const kw,
 const NP_GateOverrideCtx * const gate_override_ctx,
 const NP_DualPowerCtx * const dual_power_ctx,
 const NP_OuterPackCtx * const outer_pack_ctx,
-const NPContinuousKernelRoute * const kernel_route,
+const NPContinuousKernelExecutionContext * const kernel_execution_context,
 const int keep_kw_owner_local){
   const NP_GateOverrideCtx * const gate_ctx_raw =
     (gate_override_ctx != NULL) ? gate_override_ctx : &np_gate_override_ctx;
@@ -8792,13 +8835,21 @@ const int keep_kw_owner_local){
     ((gate_ctx != NULL) && (gate_ctx->active == NP_GATE_CTX_DISABLE));
   assert(np_gate_ctx_is_sane(gate_ctx));
 
-  if(kernel_route != NULL) {
+  if(kernel_execution_context != NULL) {
+    const NPContinuousKernelRoute * const kernel_route =
+      kernel_execution_context->route;
+    NPContinuousKernelDerivativeDiagnostics * const
+      kernel_route_diagnostics = kernel_execution_context->diagnostics;
     int route_has_convolution = 0;
+    int route_has_derivative = 0;
     int route_coordinate;
     for(route_coordinate = 0; route_coordinate < num_reg_continuous;
-        ++route_coordinate)
+        ++route_coordinate) {
       route_has_convolution |=
         operator != NULL && operator[route_coordinate] == OP_CONVOLUTION;
+      route_has_derivative |=
+        operator != NULL && operator[route_coordinate] == OP_DERIVATIVE;
+    }
     const int exact_beta_absolute_route =
       np_continuous_kernel_route_has_beta(kernel_route) &&
       (BANDWIDTH_reg == BW_FIXED || BANDWIDTH_reg == BW_GEN_NN ||
@@ -8828,11 +8879,13 @@ const int keep_kw_owner_local){
 
     if(!exact_beta_absolute_route)
       return KWSNP_ERR_BADINVOC;
-    if((size_t)num_obs_train > SIZE_MAX / sizeof(double))
-      return KWSNP_ERR_BADINVOC;
-    route_row = (double *)malloc((size_t)num_obs_train * sizeof(double));
-    if(route_row == NULL)
-      return KWSNP_ERR_BADINVOC;
+    if(!route_has_derivative) {
+      if((size_t)num_obs_train > SIZE_MAX / sizeof(double))
+        return KWSNP_ERR_BADINVOC;
+      route_row = (double *)malloc((size_t)num_obs_train * sizeof(double));
+      if(route_row == NULL)
+        return KWSNP_ERR_BADINVOC;
+    }
     route_status = np_beta_absolute_route(
       kernel_route, BANDWIDTH_reg, num_obs_train, num_obs_eval,
       num_reg_continuous,
@@ -8840,7 +8893,7 @@ const int keep_kw_owner_local){
       matrix_X_continuous_train, matrix_X_continuous_eval,
       vector_scale_factor, matrix_bw_eval, matrix_bw_train,
       matrix_Y, matrix_W, ncol_Y, ncol_W,
-      route_row, weighted_sum, kw);
+      route_row, weighted_sum, kw, kernel_route_diagnostics);
     free(route_row);
     return route_status;
   }
@@ -11190,11 +11243,15 @@ double * const weighted_sum,
 double * const weighted_permutation_sum,
 double * const kw,
 double * const pkw,
-const NPContinuousKernelRoute * const kernel_route){
+const NPContinuousKernelRoute * const kernel_route,
+NPContinuousKernelDerivativeDiagnostics * const kernel_route_diagnostics){
   double * old_pkw = kernel_weighted_sum_pkw_extern;
   int old_pkw_nvar = kernel_weighted_sum_pkw_nvar_extern;
   int old_pkw_sparse = kernel_weighted_sum_pkw_sparse_extern;
   int status = 0;
+  const NPContinuousKernelExecutionContext kernel_execution_context = {
+    kernel_route, kernel_route_diagnostics
+  };
 
   kernel_weighted_sum_pkw_extern = pkw;
   kernel_weighted_sum_pkw_nvar_extern = (pkw == NULL) ? 0 : (((permutation_operator != OP_NOOP) ? num_reg_continuous : 0) + ((do_score || do_ocg) ? num_reg_unordered + num_reg_ordered : 0));
@@ -11258,7 +11315,8 @@ const NPContinuousKernelRoute * const kernel_route){
                                     NULL,
                                     NULL,
                                     NULL,
-                                    kernel_route,
+                                    kernel_route == NULL ? NULL :
+                                      &kernel_execution_context,
                                     0);
   kernel_weighted_sum_pkw_extern = old_pkw;
   kernel_weighted_sum_pkw_nvar_extern = old_pkw_nvar;
@@ -11335,7 +11393,7 @@ double * const pkw){
     matrix_W, sgn, vector_scale_factor, bandwidth_provided,
     matrix_bw_train, matrix_bw_eval, lambda_pre, num_categories,
     matrix_categorical_vals, matrix_ordered_indices, weighted_sum,
-    weighted_permutation_sum, kw, pkw, NULL);
+    weighted_permutation_sum, kw, pkw, NULL, NULL);
 }
 
 int np_kernel_estimate_con_density_categorical_convolution_cv(

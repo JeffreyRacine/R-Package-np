@@ -12,6 +12,9 @@
 #include "tree.h"
 #include "kernel_registry.h"
 
+typedef struct NPContinuousKernelDerivativeDiagnostics
+  NPContinuousKernelDerivativeDiagnostics;
+
 #define MAX_OBS INT_MAX
 #define MAX_REG 100                               /* Allows flexibility while trapping error... */
 #define VERSION 1.1
@@ -245,7 +248,8 @@ int kernel_weighted_sum_np_route(
   double * const restrict weighted_sum,
   double * const restrict weighted_permutation_sum,
   double * const restrict kw, double * const restrict pkw,
-  const NPContinuousKernelRoute *kernel_route);
+  const NPContinuousKernelRoute *kernel_route,
+  NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics);
 
 int kernel_weighted_sum_np_power12(
   int *KERNEL_reg, int *KERNEL_unordered_reg, int *KERNEL_ordered_reg,
