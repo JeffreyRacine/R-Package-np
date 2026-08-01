@@ -7277,7 +7277,10 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
                    int * glp_basis,
                    double * cm, double * cmerr, double * g, double *gerr,
                    double * xtra,
-                   double * ckerlb, double * ckerub);
+                   double * ckerlb, double * ckerub,
+                   const NPContinuousKernelRoute *kernel_route,
+                   NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
+                   int categorical_compress);
 
 void np_density(double * tuno, double * tord, double * tcon,
                 double * euno, double * eord, double * econ,
@@ -7949,7 +7952,8 @@ SEXP C_np_regression(SEXP tuno,
                   INTEGER(myopti_i),
                   INTEGER(degree_i), INTEGER(gradient_order_i), &bern, &basis,
                   REAL(out_mean), REAL(out_merr), REAL(out_g), REAL(out_gerr),
-                  REAL(out_xtra), ckerlb_p, ckerub_p);
+                  REAL(out_xtra), ckerlb_p, ckerub_p,
+                  NULL, NULL, 0);
   }
 
   PROTECT(out = allocVector(VECSXP, 5));
@@ -16950,7 +16954,10 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                                                                  &MAE,
                                                                  &MAPE,
                                                                  &CORR,
-                                                                 &SIGN);
+                                                                 &SIGN,
+                                                                 NULL,
+                                                                 NULL,
+                                                                 0);
         if(status != 0)
           lp_error = "np_density_conditional: regression LP solve failed in conditional LP path";
       }
@@ -18492,7 +18499,10 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
                    int * glp_basis,
                    double * cm, double * cmerr, double * g, double *gerr, 
                    double * xtra,
-                   double * ckerlb, double * ckerub){
+                   double * ckerlb, double * ckerub,
+                   const NPContinuousKernelRoute *kernel_route,
+                   NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
+                   int categorical_compress){
 
   double * vector_scale_factor, * ecm = NULL, * ecmerr = NULL, ** eg = NULL, **egerr = NULL;
   double RS, MSE, MAE, MAPE, CORR, SIGN, pad_num;
@@ -18762,7 +18772,10 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
                                                    &MAE,
                                                    &MAPE,
                                                    &CORR,
-                                                   &SIGN);
+                                                   &SIGN,
+                                                   kernel_route,
+                                                   kernel_route_diagnostics,
+                                                   categorical_compress);
   for(i=0;i<num_obs_eval_extern;i++)
     cm[ipe[i]] = ecm[i];
       
