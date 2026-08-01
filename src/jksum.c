@@ -8552,6 +8552,8 @@ static int np_beta_absolute_route(
     route_diagnostics->undefined_count = 0;
     route_diagnostics->beta_status = NP_BETA_OK;
   }
+  np_continuous_kernel_row_workspace_init(&workspace);
+  np_continuous_kernel_derivative_accumulator_init(&derivative_accumulator);
 
   if(route == NULL ||
      np_continuous_kernel_route_validate(route, num_reg_continuous) !=
@@ -8652,8 +8654,6 @@ static int np_beta_absolute_route(
      NP_CONTINUOUS_ROW_OK)
     goto cleanup;
   row_result.row = row;
-  np_continuous_kernel_row_workspace_init(&workspace);
-  np_continuous_kernel_derivative_accumulator_init(&derivative_accumulator);
 
   if(weighted_sum_power2 != NULL) {
     NPContinuousKernelRowStatus row_status;
