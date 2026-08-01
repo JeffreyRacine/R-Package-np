@@ -248,6 +248,7 @@ int kernel_weighted_sum_np_route(
   double * const restrict weighted_sum,
   double * const restrict weighted_permutation_sum,
   double * const restrict kw, double * const restrict pkw,
+  const int categorical_compress,
   const NPContinuousKernelRoute *kernel_route,
   NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics);
 
@@ -769,6 +770,7 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 4, 8, 12 };
 #define KWS_CKFAMILYI 23
 #define KWS_CKORDERI 24
 #define KWS_BDIVWI 25
+#define KWS_CCOMPRESSI 26
 
 #define CQ_TNOBSI 0
 #define CQ_ENOBSI   1

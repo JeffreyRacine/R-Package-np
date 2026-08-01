@@ -11272,6 +11272,16 @@ np_kernelsum_descriptor_or_error(SEXP options, const char *where)
     where);
 }
 
+static int np_real_buffer_has_matrix(SEXP value, int nrow, int ncol)
+{
+  size_t required;
+
+  return nrow >= 0 && ncol >= 0 &&
+    np_size_mul_checked((size_t)nrow, (size_t)ncol, &required) &&
+    required <= (size_t)R_XLEN_T_MAX &&
+    XLENGTH(value) >= (R_xlen_t)required;
+}
+
 SEXP C_np_kernelsum(SEXP tuno,
                     SEXP tord,
                     SEXP tcon,
@@ -11367,6 +11377,9 @@ SEXP C_np_kernelsum(SEXP tuno,
     const int num_weight_columns = INTEGER(myopti_i)[KWS_WNCOLI];
     const int train_is_eval = INTEGER(myopti_i)[KWS_TISEI];
     const int leave_one_out = INTEGER(myopti_i)[KWS_LOOI];
+    const int categorical_compress =
+      XLENGTH(myopti_i) > KWS_CCOMPRESSI ?
+      INTEGER(myopti_i)[KWS_CCOMPRESSI] : 0;
     const int response_extent = (num_response_columns > 0) ?
       num_response_columns : 1;
     const int weight_extent = (num_weight_columns > 0) ?
@@ -11383,10 +11396,17 @@ SEXP C_np_kernelsum(SEXP tuno,
     int has_overlap = 0;
     int derivative_dimension = -1;
     int undefined_count = 0;
+    int ncat;
     int i;
 
-    if(nuno != 0 || nord != 0)
-      error("C_np_kernelsum: beta kernels currently support continuous variables only");
+    if(ncon < 0 || nuno < 0 || nord < 0 ||
+       nuno > INT_MAX - nord)
+      error("C_np_kernelsum: invalid beta kernel-sum dimensions");
+    ncat = nuno + nord;
+    if(ncat > 0 && XLENGTH(myopti_i) <= KWS_CCOMPRESSI)
+      error("C_np_kernelsum: categorical-compression state is missing");
+    if(categorical_compress != 0 && categorical_compress != 1)
+      error("C_np_kernelsum: invalid categorical-compression option");
     if(beta_bandwidth_code != BW_FIXED &&
        beta_bandwidth_code != BW_GEN_NN &&
        beta_bandwidth_code != BW_ADAP_NN)
@@ -11394,7 +11414,7 @@ SEXP C_np_kernelsum(SEXP tuno,
     if((p_operator != OP_NOOP && p_operator != OP_DERIVATIVE) ||
        do_score || do_ocg)
       error("C_np_kernelsum: beta kernels support only derivative permutation operators");
-    if(XLENGTH(op_i) != ncon)
+    if(ncon > INT_MAX - ncat || XLENGTH(op_i) != ncon + ncat)
       error("C_np_kernelsum: beta operator vector has the wrong length");
     for(i = 0; i < ncon; ++i) {
       const int operator_code = INTEGER(op_i)[i];
@@ -11409,21 +11429,42 @@ SEXP C_np_kernelsum(SEXP tuno,
         error("C_np_kernelsum: unsupported beta operator");
       }
     }
+    for(i = ncon; i < ncon + ncat; ++i)
+      if(INTEGER(op_i)[i] != OP_NORMAL &&
+         INTEGER(op_i)[i] != OP_CONVOLUTION &&
+         INTEGER(op_i)[i] != OP_INTEGRAL)
+        error("C_np_kernelsum: unsupported categorical operator");
     if(derivative_dimension >= 0 && p_operator == OP_DERIVATIVE)
       error("C_np_kernelsum: direct and permutation beta derivatives cannot be combined");
+    if(ncat > 0 &&
+       (derivative_dimension >= 0 || p_operator == OP_DERIVATIVE))
+      error("C_np_kernelsum: mixed beta derivatives are not yet activated");
     if(num_train <= 0 || num_eval <= 0 || ncon <= 0 ||
        num_response_columns < 0 || num_weight_columns < 0)
       error("C_np_kernelsum: invalid beta kernel-sum dimensions");
-    if(XLENGTH(tcon_r) < (R_xlen_t)num_train * (R_xlen_t)ncon ||
+    if(!np_real_buffer_has_matrix(tcon_r, num_train, ncon) ||
+       (!train_is_eval && !np_real_buffer_has_matrix(
+          econ_r, num_eval, ncon)) ||
+       !np_real_buffer_has_matrix(tuno_r, num_train, nuno) ||
+       !np_real_buffer_has_matrix(tord_r, num_train, nord) ||
        (!train_is_eval &&
-        XLENGTH(econ_r) < (R_xlen_t)num_eval * (R_xlen_t)ncon) ||
-       XLENGTH(bw_r) < ncon || XLENGTH(ckerlb_r) < ncon ||
+        (!np_real_buffer_has_matrix(euno_r, num_eval, nuno) ||
+         !np_real_buffer_has_matrix(eord_r, num_eval, nord))) ||
+       XLENGTH(bw_r) < ncon + ncat || XLENGTH(ckerlb_r) < ncon ||
        XLENGTH(ckerub_r) < ncon ||
-       (num_response_columns > 0 &&
-        XLENGTH(ty_r) < (R_xlen_t)num_train * num_response_columns) ||
-       (num_weight_columns > 0 &&
-        XLENGTH(weights_r) < (R_xlen_t)num_train * num_weight_columns))
+       !np_real_buffer_has_matrix(ty_r, num_train,
+                                  num_response_columns) ||
+       !np_real_buffer_has_matrix(weights_r, num_train,
+                                  num_weight_columns))
       error("C_np_kernelsum: beta kernel-sum input buffer is too short");
+    if(ncat > 0) {
+      const int max_levels = INTEGER(myopti_i)[KWS_MLEVI];
+
+      if(max_levels <= 0 || XLENGTH(padnum_r) < 1 ||
+         !R_FINITE(REAL(padnum_r)[0]) ||
+         !np_real_buffer_has_matrix(mcv_r, max_levels, ncat))
+        error("C_np_kernelsum: invalid categorical support metadata");
+    }
     if(beta_bandwidth_code != BW_FIXED) {
       const int need_eval = (beta_bandwidth_code == BW_GEN_NN) || has_overlap;
       const int need_train = (beta_bandwidth_code == BW_ADAP_NN) || has_overlap;
@@ -11474,6 +11515,14 @@ SEXP C_np_kernelsum(SEXP tuno,
       double **bandwidth_train_columns = NULL;
       double **response_columns = NULL;
       double **weight_columns = NULL;
+      double **train_unordered_columns = NULL;
+      double **train_ordered_columns = NULL;
+      double **evaluation_unordered_columns = NULL;
+      double **evaluation_ordered_columns = NULL;
+      double **category_values = NULL;
+      int *kernel_unordered = NULL;
+      int *kernel_ordered = NULL;
+      int *num_categories = NULL;
       int route_status;
 
       route.segment_count = 1;
@@ -11486,6 +11535,57 @@ SEXP C_np_kernelsum(SEXP tuno,
         train_columns[i] = REAL(tcon_r) + (size_t)i * (size_t)num_train;
         evaluation_columns[i] = train_is_eval ? train_columns[i] :
           REAL(econ_r) + (size_t)i * (size_t)num_eval;
+      }
+      if(ncat > 0) {
+        const int max_levels = INTEGER(myopti_i)[KWS_MLEVI];
+        const double pad_value = REAL(padnum_r)[0];
+        int category;
+
+        category_values = (double **)R_alloc(
+          (size_t)ncat, sizeof(double *));
+        num_categories = (int *)R_alloc((size_t)ncat, sizeof(int));
+        for(category = 0; category < ncat; ++category) {
+          int level_count = 0;
+
+          category_values[category] = REAL(mcv_r) +
+            (size_t)category * (size_t)max_levels;
+          while(level_count < max_levels &&
+                category_values[category][level_count] != pad_value)
+            ++level_count;
+          if(level_count <= 0)
+            error("C_np_kernelsum: categorical support is empty");
+          num_categories[category] = level_count;
+        }
+      }
+      if(nuno > 0) {
+        train_unordered_columns = (double **)R_alloc(
+          (size_t)nuno, sizeof(double *));
+        evaluation_unordered_columns = (double **)R_alloc(
+          (size_t)nuno, sizeof(double *));
+        kernel_unordered = (int *)R_alloc((size_t)nuno, sizeof(int));
+        for(i = 0; i < nuno; ++i) {
+          train_unordered_columns[i] = REAL(tuno_r) +
+            (size_t)i * (size_t)num_train;
+          evaluation_unordered_columns[i] = train_is_eval ?
+            train_unordered_columns[i] : REAL(euno_r) +
+              (size_t)i * (size_t)num_eval;
+          kernel_unordered[i] = INTEGER(myopti_i)[KWS_UKRNEVI];
+        }
+      }
+      if(nord > 0) {
+        train_ordered_columns = (double **)R_alloc(
+          (size_t)nord, sizeof(double *));
+        evaluation_ordered_columns = (double **)R_alloc(
+          (size_t)nord, sizeof(double *));
+        kernel_ordered = (int *)R_alloc((size_t)nord, sizeof(int));
+        for(i = 0; i < nord; ++i) {
+          train_ordered_columns[i] = REAL(tord_r) +
+            (size_t)i * (size_t)num_train;
+          evaluation_ordered_columns[i] = train_is_eval ?
+            train_ordered_columns[i] : REAL(eord_r) +
+              (size_t)i * (size_t)num_eval;
+          kernel_ordered[i] = INTEGER(myopti_i)[KWS_OKRNEVI];
+        }
       }
       if(beta_bandwidth_eval != NULL &&
          beta_bandwidth_code != BW_FIXED) {
@@ -11519,18 +11619,24 @@ SEXP C_np_kernelsum(SEXP tuno,
       }
 
       route_status = kernel_weighted_sum_np_route(
-        NULL, NULL, NULL, beta_bandwidth_code, num_train, num_eval,
-        0, 0, ncon, leave_one_out, 0, beta_kernel_power, 0, 0, 0, 0, 0, 0,
+        NULL, kernel_unordered, kernel_ordered,
+        beta_bandwidth_code, num_train, num_eval,
+        nuno, nord, ncon, leave_one_out, 0,
+        beta_kernel_power, 0, 0, 0, 0, 0, 0,
         INTEGER(op_i), OP_NOOP, 0, 0, NULL, 0,
         num_response_columns, num_weight_columns,
         NP_TREE_FALSE, 0, NULL, NULL, NULL, NULL,
-        NULL, NULL, train_columns, NULL, NULL, evaluation_columns,
+        train_unordered_columns, train_ordered_columns, train_columns,
+        evaluation_unordered_columns, evaluation_ordered_columns,
+        evaluation_columns,
         response_columns, weight_columns, NULL,
         (beta_bandwidth_code == BW_FIXED) ? REAL(bw_r) : NULL,
         beta_bandwidth_code != BW_FIXED,
-        bandwidth_train_columns, bandwidth_eval_columns, NULL, NULL,
-        NULL, NULL, REAL(out_ksum), REAL(out_pksum),
-        return_kernel_weights ? REAL(out_kw) : NULL, NULL, &route,
+        bandwidth_train_columns, bandwidth_eval_columns,
+        ncat > 0 ? REAL(bw_r) + ncon : NULL, num_categories,
+        category_values, NULL, REAL(out_ksum), REAL(out_pksum),
+        return_kernel_weights ? REAL(out_kw) : NULL, NULL,
+        categorical_compress, &route,
         &route_diagnostics);
       undefined_count = route_diagnostics.undefined_count;
       if(route_status != 0 &&
@@ -11565,7 +11671,7 @@ SEXP C_np_kernelsum(SEXP tuno,
             REAL(out_pksum) + (R_xlen_t)i * expected_sum, NULL,
             return_kernel_weights ?
               REAL(out_pkw) + (R_xlen_t)i * expected_weights : NULL,
-            NULL, &route, &route_diagnostics);
+            NULL, 0, &route, &route_diagnostics);
           undefined_count += route_diagnostics.undefined_count;
           if(route_status != 0 &&
              route_diagnostics.beta_status != NP_BETA_OK)
