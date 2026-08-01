@@ -1664,6 +1664,7 @@ np_continuous_kernel_beta_dual_power_rows_validated(
   const NPContinuousKernelRowPlan *plan,
   int leave_one_out,
   int leave_one_out_offset,
+  const NPContinuousKernelLogFactorProvider *provider,
   double * const *response,
   int response_columns,
   double * const *case_weights,
@@ -1748,8 +1749,12 @@ np_continuous_kernel_beta_dual_power_rows_validated(
       (size_t)evaluation * power2_sum_extent;
     int observation;
 
-    status = np_continuous_kernel_beta_factor_row(
-      plan, evaluation, omitted_observation, workspace, row_result);
+    status = provider == NULL ?
+      np_continuous_kernel_beta_factor_row(
+        plan, evaluation, omitted_observation, workspace, row_result) :
+      np_continuous_kernel_beta_factor_row_with_log_factor(
+        plan, evaluation, omitted_observation, provider,
+        workspace, row_result);
     if(status != NP_CONTINUOUS_ROW_OK) {
       if(diagnostics != NULL) {
         diagnostics->bad_coordinate = row_result->bad_coordinate;

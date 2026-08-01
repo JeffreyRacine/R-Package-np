@@ -204,6 +204,7 @@ np_continuous_kernel_beta_dual_power_rows_validated(
   const NPContinuousKernelRowPlan *plan,
   int leave_one_out,
   int leave_one_out_offset,
+  const NPContinuousKernelLogFactorProvider *provider,
   double * const *response,
   int response_columns,
   double * const *case_weights,

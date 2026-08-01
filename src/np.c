@@ -11828,7 +11828,7 @@ SEXP C_np_kernelsum_power12(SEXP tuno,
   int n_ksum = asInteger(ksum_len);
   int n_pksum = asInteger(pksum_len);
   int n_kw = asInteger(kw_len);
-  int ncon = 0, nuno = 0, nord = 0, i = 0;
+  int ncon = 0, nuno = 0, nord = 0, ncat = 0, i = 0;
   int * myopti_p = NULL;
   double * ckerlb_p = NULL;
   double * ckerub_p = NULL;
@@ -11875,6 +11875,10 @@ SEXP C_np_kernelsum_power12(SEXP tuno,
   ncon = (int)INTEGER(myopti_i)[KWS_NCONI];
   nuno = (int)INTEGER(myopti_i)[KWS_NUNOI];
   nord = (int)INTEGER(myopti_i)[KWS_NORDI];
+  if(ncon < 0 || nuno < 0 || nord < 0 ||
+     nuno > INT_MAX - nord || ncon > INT_MAX - (nuno + nord))
+    error("C_np_kernelsum_power12: invalid kernel-sum dimensions");
+  ncat = nuno + nord;
   if(n_pksum != 0 || n_kw != 0 ||
      INTEGER(myopti_i)[KWS_YNCOLI] > 1 ||
      INTEGER(myopti_i)[KWS_WNCOLI] != 0 ||
@@ -11901,6 +11905,9 @@ SEXP C_np_kernelsum_power12(SEXP tuno,
     const int leave_one_out = INTEGER(myopti_i)[KWS_LOOI];
     const int ncol_Y = INTEGER(myopti_i)[KWS_YNCOLI];
     const int bandwidth_code = INTEGER(myopti_i)[KWS_BWI];
+    const int categorical_compress = ncat > 0 &&
+      XLENGTH(myopti_i) > KWS_CCOMPRESSI ?
+      INTEGER(myopti_i)[KWS_CCOMPRESSI] : 0;
     const R_xlen_t expected_sum =
       (R_xlen_t)num_eval * (R_xlen_t)(ncol_Y > 0 ? ncol_Y : 1);
     double **train_columns;
@@ -11916,9 +11923,10 @@ SEXP C_np_kernelsum_power12(SEXP tuno,
     NPContinuousKernelDerivativeDiagnostics diagnostics = {
       -1, -1, 0, NP_BETA_OK
     };
+    NPBetaCategoricalIngress categorical_ingress;
     int status;
 
-    if(nuno != 0 || nord != 0 || ncon <= 0 ||
+    if(ncon <= 0 ||
        num_train <= 0 || num_eval <= 0 ||
        (train_is_eval != 0 && train_is_eval != 1) ||
        (leave_one_out != 0 && leave_one_out != 1) ||
@@ -11931,11 +11939,20 @@ SEXP C_np_kernelsum_power12(SEXP tuno,
        XLENGTH(tcon_r) < (R_xlen_t)num_train * (R_xlen_t)ncon ||
        (!train_is_eval &&
         XLENGTH(econ_r) < (R_xlen_t)num_eval * (R_xlen_t)ncon) ||
-       XLENGTH(bw_r) < ncon || XLENGTH(ckerlb_r) < ncon ||
+       !np_real_buffer_has_matrix(tuno_r, num_train, nuno) ||
+       !np_real_buffer_has_matrix(tord_r, num_train, nord) ||
+       (!train_is_eval &&
+        (!np_real_buffer_has_matrix(euno_r, num_eval, nuno) ||
+         !np_real_buffer_has_matrix(eord_r, num_eval, nord))) ||
+       XLENGTH(bw_r) < ncon + ncat || XLENGTH(ckerlb_r) < ncon ||
        XLENGTH(ckerub_r) < ncon ||
        (ncol_Y > 0 &&
         XLENGTH(ty_r) < (R_xlen_t)num_train * (R_xlen_t)ncol_Y))
       error("C_np_kernelsum_power12: invalid beta dual-power layout");
+    if(ncat > 0 && XLENGTH(myopti_i) <= KWS_CCOMPRESSI)
+      error("C_np_kernelsum_power12: categorical-compression state is missing");
+    if(categorical_compress != 0 && categorical_compress != 1)
+      error("C_np_kernelsum_power12: invalid categorical-compression option");
     for(i = 0; i < ncon; ++i)
       if(!R_FINITE(ckerlb_p[i]) || !R_FINITE(ckerub_p[i]) ||
          !(ckerub_p[i] > ckerlb_p[i]))
@@ -11955,6 +11972,10 @@ SEXP C_np_kernelsum_power12(SEXP tuno,
         response_columns[i] = REAL(ty_r) +
           (size_t)i * (size_t)num_train;
     }
+    np_beta_categorical_ingress_prepare_or_error(
+      &categorical_ingress, tuno_r, tord_r, euno_r, eord_r,
+      mcv_r, padnum_r, myopti_i, num_train, num_eval,
+      nuno, nord, train_is_eval, "C_np_kernelsum_power12");
 
     if(bandwidth_code != BW_FIXED) {
       const np_beta_bandwidth_mode bandwidth_mode =
@@ -12008,13 +12029,22 @@ SEXP C_np_kernelsum_power12(SEXP tuno,
     route.segment[0].lower = ckerlb_p;
     route.segment[0].upper = ckerub_p;
     status = kernel_weighted_sum_np_route_power12(
-      NULL, NULL, NULL, bandwidth_code, num_train, num_eval,
-      0, 0, ncon, leave_one_out, 0, 0, 0,
+      NULL, categorical_ingress.kernel_unordered,
+      categorical_ingress.kernel_ordered,
+      bandwidth_code, num_train, num_eval,
+      nuno, nord, ncon, leave_one_out, 0, 0, 0,
       INTEGER(op_i), ncol_Y, 0,
-      train_columns, evaluation_columns, response_columns, NULL,
+      categorical_ingress.train_unordered,
+      categorical_ingress.train_ordered, train_columns,
+      categorical_ingress.evaluation_unordered,
+      categorical_ingress.evaluation_ordered, evaluation_columns,
+      response_columns, NULL,
       bandwidth_code == BW_FIXED ? REAL(bw_r) : NULL,
       bandwidth_code != BW_FIXED,
       bandwidth_train_columns, bandwidth_eval_columns,
+      ncat > 0 ? REAL(bw_r) + ncon : NULL,
+      categorical_ingress.num_categories,
+      categorical_ingress.category_values, categorical_compress,
       REAL(out_ksum), REAL(out_ksum_power2), &route, &diagnostics);
     if(status != 0 && diagnostics.beta_status != NP_BETA_OK)
       error("C_np_kernelsum_power12: beta row failed in continuous dimension %d: %s",
