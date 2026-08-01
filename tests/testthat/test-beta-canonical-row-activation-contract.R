@@ -274,45 +274,36 @@ test_that("scalar beta regression fits enter the canonical row engine", {
   expect_gt(public_end, public_start)
   public_regression <- substr(ingress, public_start, public_end - 1L)
 
-  scalar_start <- regexpr(
-    "if(descriptor.family == NP_CKERNEL_FAMILY_BETA && !do_grad)",
+  route_start <- regexpr(
+    "if(descriptor.family == NP_CKERNEL_FAMILY_BETA)",
     public_regression,
     fixed = TRUE
   )[[1L]]
-  gradient_start <- regexpr(
-    "if(descriptor.family == NP_CKERNEL_FAMILY_BETA && do_grad)",
+  common_call <- regexpr(
+    "  np_regression(REAL(tuno_r)",
     public_regression,
     fixed = TRUE
   )[[1L]]
-  expect_gt(scalar_start, 0L)
-  expect_gt(gradient_start, scalar_start)
-  scalar_ingress <- substr(
-    public_regression, scalar_start, gradient_start - 1L
+  expect_gt(route_start, 0L)
+  expect_gt(common_call, route_start)
+  route_ingress <- substr(
+    public_regression, route_start, common_call - 1L
   )
-  expect_match(scalar_ingress, "beta_route.segment_count = 1;", fixed = TRUE)
-  expect_match(scalar_ingress, "active_route = &beta_route;", fixed = TRUE)
+  expect_match(route_ingress, "beta_route.segment_count = 1;", fixed = TRUE)
+  expect_match(route_ingress, "active_route = &beta_route;", fixed = TRUE)
   expect_match(
-    scalar_ingress, "active_diagnostics = &beta_diagnostics;", fixed = TRUE
+    route_ingress, "active_diagnostics = &beta_diagnostics;", fixed = TRUE
   )
-  expect_false(grepl("np_beta_regression_lc(", scalar_ingress, fixed = TRUE))
   expect_match(
     public_regression,
     "active_route, active_diagnostics, categorical_compress);",
     fixed = TRUE
   )
-
-  gradient_ingress <- substr(
-    public_regression, gradient_start, nchar(public_regression)
-  )
-  expect_match(gradient_ingress, "np_beta_regression_lc(", fixed = TRUE)
-  expect_match(
-    gradient_ingress, "np_beta_regression_lc_gradient(", fixed = TRUE
-  )
-  expect_match(
-    gradient_ingress,
-    "if(descriptor.family == NP_CKERNEL_FAMILY_BETA && do_grad)",
-    fixed = TRUE
-  )
+  expect_false(grepl("np_beta_regression_lc(", public_regression,
+                     fixed = TRUE))
+  expect_false(grepl("beta_regression.h", ingress, fixed = TRUE))
+  expect_false(file.exists(file.path(root, "src", "beta_regression.c")))
+  expect_false(file.exists(file.path(root, "src", "beta_regression.h")))
 
   owner_start <- regexpr("void np_regression(", ingress,
                          fixed = TRUE)[[1L]]
@@ -350,12 +341,16 @@ test_that("scalar beta regression fits enter the canonical row engine", {
   regression_engine <- substr(engine, engine_start, engine_end - 1L)
   expect_match(regression_engine, "const int exact_beta_route = kernel_route != NULL;",
                fixed = TRUE)
-  expect_match(regression_engine, "lp_engine_est != NP_LP_ENGINE_SCALAR || do_grad || do_gerr",
+  expect_match(regression_engine, "do_grad != do_gerr",
                fixed = TRUE)
   expect_match(
     regression_engine, "np_beta_bandwidth_prepare_matrix(", fixed = TRUE
   )
   expect_match(regression_engine, "NPBetaRegressionMomentCtx", fixed = TRUE)
+  expect_match(
+    engine, "np_beta_regression_gradient_rows_validated(",
+    fixed = TRUE
+  )
   expect_match(
     regression_engine, "&regression_moment_context, kernel_route_diagnostics, NULL);",
     fixed = TRUE
@@ -370,6 +365,70 @@ test_that("scalar beta regression fits enter the canonical row engine", {
   )
   expect_false(grepl("np_beta_regression_lc(", regression_engine,
                      fixed = TRUE))
+})
+
+test_that("canonical beta gradient rows separate operator and estimator algebra", {
+  root <- locate_beta_activation_sources()
+  skip_if(is.null(root), "package sources unavailable")
+  row_engine <- paste(
+    readLines(file.path(root, "src", "continuous_kernel_row_gradient.c"),
+              warn = FALSE),
+    collapse = "\n"
+  )
+  estimator_engine <- paste(
+    readLines(file.path(root, "src", "jksum.c"), warn = FALSE),
+    collapse = "\n"
+  )
+
+  observation_start <- regexpr(
+    "np_continuous_kernel_beta_level_derivative_observation_bound(",
+    row_engine,
+    fixed = TRUE
+  )[[1L]]
+  row_start <- regexpr(
+    "np_continuous_kernel_beta_level_derivative_log_row_validated(",
+    row_engine,
+    fixed = TRUE
+  )[[1L]]
+  row_end <- nchar(row_engine) + 1L
+  expect_gt(observation_start, 0L)
+  expect_gt(row_start, observation_start)
+  expect_gt(row_end, row_start)
+  operator_owner <- substr(
+    row_engine, observation_start, row_start - 1L
+  )
+  row_owner <- substr(row_engine, row_start, row_end - 1L)
+  expect_match(operator_owner, "np_beta_log_abs_pdf_order(", fixed = TRUE)
+  expect_match(operator_owner, "np_beta_pdf_derivative_order(", fixed = TRUE)
+  expect_match(operator_owner, "*common_log_scale = fmax(", fixed = TRUE)
+  expect_match(
+    row_owner,
+    "np_continuous_kernel_beta_level_derivative_observation_bound(",
+    fixed = TRUE
+  )
+  expect_match(
+    row_owner, "provider == NULL && omitted_observation == -1",
+    fixed = TRUE
+  )
+  expect_false(grepl("weighted_response", operator_owner, fixed = TRUE))
+  expect_false(grepl("gradient_stderr", operator_owner, fixed = TRUE))
+  expect_false(grepl("weighted_response", row_owner, fixed = TRUE))
+  expect_false(grepl("gradient_stderr", row_owner, fixed = TRUE))
+
+  consumer_start <- regexpr(
+    "np_beta_regression_gradient_rows_validated(",
+    estimator_engine,
+    fixed = TRUE
+  )[[1L]]
+  expect_gt(consumer_start, 0L)
+  consumer <- substr(estimator_engine, consumer_start, nchar(estimator_engine))
+  expect_match(consumer, "weighted_response += w * y;", fixed = TRUE)
+  expect_match(
+    consumer,
+    "(regular_response - side_mean * regular_total) / side_weight;",
+    fixed = TRUE
+  )
+  expect_match(consumer, "derivative_coefficient_square_sum", fixed = TRUE)
 })
 
 test_that("canonical beta regression moments preserve the sidecar transcript", {

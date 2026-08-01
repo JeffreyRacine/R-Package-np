@@ -8534,6 +8534,9 @@ typedef struct {
   const double *response;
   double *mean;
   double *mean_stderr;
+  double **gradient;
+  double **gradient_stderr;
+  int compute_gradient;
   int positive_weights;
   NPContinuousKernelRowStatus *status;
   NPContinuousKernelProgressFunction progress;
@@ -8799,6 +8802,254 @@ static NPContinuousKernelRowStatus np_beta_categorical_log_factor(
   return NP_CONTINUOUS_ROW_OK;
 }
 
+static NPContinuousKernelRowStatus
+np_beta_regression_gradient_rows_validated(
+  const NPContinuousKernelRowPlan *plan,
+  const NPContinuousKernelLogFactorProvider *provider,
+  const double *response,
+  double **gradient,
+  double **gradient_stderr,
+  NPContinuousKernelDerivativeDiagnostics *diagnostics,
+  int *infinite_count,
+  int *undefined_count)
+{
+  NPContinuousKernelLevelDerivativeWorkspace workspace;
+  NPContinuousKernelRowStatus status = NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  int response_is_constant = 1;
+  int evaluation;
+  int derivative_coordinate;
+  int observation;
+
+  if(infinite_count != NULL)
+    *infinite_count = 0;
+  if(undefined_count != NULL)
+    *undefined_count = 0;
+  if(diagnostics != NULL) {
+    diagnostics->bad_coordinate = -1;
+    diagnostics->bad_observation = -1;
+    diagnostics->undefined_count = 0;
+    diagnostics->beta_status = NP_BETA_OK;
+  }
+  if(plan == NULL || plan->route == NULL || plan->num_train <= 0 ||
+     plan->num_eval <= 0 || plan->num_continuous <= 0 ||
+     plan->route->segment_count != 1 ||
+     plan->route->segment[0].descriptor.family != NP_CKERNEL_FAMILY_BETA ||
+     response == NULL || gradient == NULL || gradient_stderr == NULL)
+    return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  for(derivative_coordinate = 0;
+      derivative_coordinate < plan->num_continuous;
+      ++derivative_coordinate)
+    if(gradient[derivative_coordinate] == NULL ||
+       gradient_stderr[derivative_coordinate] == NULL)
+      return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  for(observation = 0; observation < plan->num_train; ++observation) {
+    if(!R_FINITE(response[observation])) {
+      if(diagnostics != NULL)
+        diagnostics->bad_observation = observation;
+      return NP_CONTINUOUS_ROW_ERR_NUMERIC;
+    }
+    if(observation > 0 && response[observation] != response[0])
+      response_is_constant = 0;
+  }
+  if(response_is_constant) {
+    for(derivative_coordinate = 0;
+        derivative_coordinate < plan->num_continuous;
+        ++derivative_coordinate)
+      for(evaluation = 0; evaluation < plan->num_eval; ++evaluation) {
+        gradient[derivative_coordinate][evaluation] = 0.0;
+        gradient_stderr[derivative_coordinate][evaluation] = 0.0;
+      }
+    return NP_CONTINUOUS_ROW_OK;
+  }
+
+  np_continuous_kernel_level_derivative_workspace_init(&workspace);
+  for(evaluation = 0; evaluation < plan->num_eval; ++evaluation) {
+    for(derivative_coordinate = 0;
+        derivative_coordinate < plan->num_continuous;
+        ++derivative_coordinate) {
+      const NPContinuousKernelSegment * const segment =
+        &plan->route->segment[0];
+      const int local_coordinate =
+        derivative_coordinate - segment->coordinate_offset;
+      const double evaluation_value = plan->train_is_eval ?
+        plan->train[derivative_coordinate][evaluation] :
+        plan->evaluation[derivative_coordinate][evaluation];
+      const int at_lower =
+        evaluation_value == segment->lower[local_coordinate];
+      const int at_upper =
+        evaluation_value == segment->upper[local_coordinate];
+      const double side_orientation = at_upper ? -1.0 : 1.0;
+      NPContinuousKernelDerivativeDiagnostics row_diagnostics = {
+        -1, -1, 0, NP_BETA_OK
+      };
+      double maximum_log = -INFINITY;
+      double total_weight = 0.0;
+      double weighted_response = 0.0;
+      double regular_total = 0.0;
+      double regular_response = 0.0;
+      double jump_total = 0.0;
+      double jump_response = 0.0;
+      double side_weight;
+      double side_response;
+      double base_mean;
+      double side_mean;
+      double derivative_value;
+      double sigma2_numerator = 0.0;
+      double derivative_coefficient_square_sum = 0.0;
+      int constant_active = 1;
+      int have_active = 0;
+      double first_response = 0.0;
+
+      status = np_continuous_kernel_beta_level_derivative_log_row_validated(
+        plan, evaluation, -1, derivative_coordinate, provider,
+        &workspace, &maximum_log, &row_diagnostics);
+      if(status != NP_CONTINUOUS_ROW_OK) {
+        if(diagnostics != NULL) {
+          diagnostics->bad_coordinate = row_diagnostics.bad_coordinate;
+          diagnostics->bad_observation = row_diagnostics.bad_observation;
+          diagnostics->beta_status = row_diagnostics.beta_status;
+        }
+        goto cleanup;
+      }
+      if(maximum_log == -INFINITY) {
+        status = NP_CONTINUOUS_ROW_ERR_ZERO_WEIGHT;
+        goto cleanup;
+      }
+
+      for(observation = 0; observation < plan->num_train; ++observation) {
+        const double y = response[observation];
+        const double w = workspace.level_sign[observation] == 0 ? 0.0 :
+          (double)workspace.level_sign[observation] * exp(
+            workspace.level_log_absolute[observation] - maximum_log);
+        const double d = workspace.regular_sign[observation] == 0 ? 0.0 :
+          (double)workspace.regular_sign[observation] * exp(
+            workspace.regular_log_absolute[observation] - maximum_log);
+        const double j = workspace.jump_sign[observation] == 0 ? 0.0 :
+          (double)workspace.jump_sign[observation] * exp(
+            workspace.jump_log_absolute[observation] - maximum_log);
+
+        total_weight += w;
+        weighted_response += w * y;
+        regular_total += d;
+        regular_response += d * y;
+        jump_total += j;
+        jump_response += j * y;
+      }
+      if(!R_FINITE(total_weight) || total_weight == 0.0 ||
+         !R_FINITE(weighted_response)) {
+        status = total_weight == 0.0 ?
+          NP_CONTINUOUS_ROW_ERR_ZERO_WEIGHT :
+          NP_CONTINUOUS_ROW_ERR_NUMERIC;
+        goto cleanup;
+      }
+      base_mean = weighted_response / total_weight;
+      side_weight = total_weight;
+      side_response = weighted_response;
+      if(at_lower || at_upper) {
+        side_weight += side_orientation * jump_total;
+        side_response += side_orientation * jump_response;
+      }
+      if(!R_FINITE(side_weight) || side_weight == 0.0 ||
+         !R_FINITE(side_response)) {
+        gradient[derivative_coordinate][evaluation] = NA_REAL;
+        gradient_stderr[derivative_coordinate][evaluation] = NA_REAL;
+        if(undefined_count != NULL)
+          ++*undefined_count;
+        continue;
+      }
+      side_mean = side_response / side_weight;
+
+      for(observation = 0; observation < plan->num_train; ++observation) {
+        const double w = workspace.level_sign[observation] == 0 ? 0.0 :
+          (double)workspace.level_sign[observation] * exp(
+            workspace.level_log_absolute[observation] - maximum_log);
+        const double j = workspace.jump_sign[observation] == 0 ? 0.0 :
+          (double)workspace.jump_sign[observation] * exp(
+            workspace.jump_log_absolute[observation] - maximum_log);
+
+        if(w != 0.0 || j != 0.0) {
+          if(!have_active) {
+            first_response = response[observation];
+            have_active = 1;
+          } else if(response[observation] != first_response) {
+            constant_active = 0;
+          }
+        }
+      }
+
+      if((at_lower || at_upper) && side_mean != base_mean) {
+        const double jump_in_ratio = side_orientation *
+          (side_mean - base_mean);
+        const double tolerance = 128.0 * DBL_EPSILON *
+          fmax(1.0, fmax(fabs(side_mean), fabs(base_mean)));
+
+        if(constant_active) {
+          gradient[derivative_coordinate][evaluation] = 0.0;
+          gradient_stderr[derivative_coordinate][evaluation] = 0.0;
+        } else if(fabs(jump_in_ratio) <= tolerance) {
+          gradient[derivative_coordinate][evaluation] = NA_REAL;
+          gradient_stderr[derivative_coordinate][evaluation] = NA_REAL;
+          if(undefined_count != NULL)
+            ++*undefined_count;
+        } else {
+          gradient[derivative_coordinate][evaluation] =
+            jump_in_ratio > 0.0 ? INFINITY : -INFINITY;
+          gradient_stderr[derivative_coordinate][evaluation] = NA_REAL;
+          if(infinite_count != NULL)
+            ++*infinite_count;
+        }
+        continue;
+      }
+
+      derivative_value =
+        (regular_response - side_mean * regular_total) / side_weight;
+      for(observation = 0; observation < plan->num_train; ++observation) {
+        const double y = response[observation];
+        const double w = workspace.level_sign[observation] == 0 ? 0.0 :
+          (double)workspace.level_sign[observation] * exp(
+            workspace.level_log_absolute[observation] - maximum_log);
+        const double d = workspace.regular_sign[observation] == 0 ? 0.0 :
+          (double)workspace.regular_sign[observation] * exp(
+            workspace.regular_log_absolute[observation] - maximum_log);
+        const double j = workspace.jump_sign[observation] == 0 ? 0.0 :
+          (double)workspace.jump_sign[observation] * exp(
+            workspace.jump_log_absolute[observation] - maximum_log);
+        const double side_w = w +
+          ((at_lower || at_upper) ? side_orientation * j : 0.0);
+        const double coefficient =
+          (d * side_weight - side_w * regular_total) /
+          (side_weight * side_weight);
+        const double residual = y - side_mean;
+
+        sigma2_numerator += side_w * residual * residual;
+        derivative_coefficient_square_sum += coefficient * coefficient;
+      }
+      if(sigma2_numerator / side_weight < 0.0)
+        sigma2_numerator = 0.0;
+      gradient[derivative_coordinate][evaluation] = derivative_value;
+      gradient_stderr[derivative_coordinate][evaluation] = sqrt(
+        (sigma2_numerator / side_weight) *
+        derivative_coefficient_square_sum);
+      if(!R_FINITE(derivative_value) ||
+         !R_FINITE(gradient_stderr[derivative_coordinate][evaluation])) {
+        gradient[derivative_coordinate][evaluation] = NA_REAL;
+        gradient_stderr[derivative_coordinate][evaluation] = NA_REAL;
+        if(undefined_count != NULL)
+          ++*undefined_count;
+      }
+    }
+    if((evaluation & 31) == 0)
+      R_CheckUserInterrupt();
+  }
+  status = NP_CONTINUOUS_ROW_OK;
+
+cleanup:
+  if(diagnostics != NULL && undefined_count != NULL)
+    diagnostics->undefined_count = *undefined_count;
+  np_continuous_kernel_level_derivative_workspace_release(&workspace);
+  return status;
+}
+
 static int np_beta_absolute_route(
   const NPContinuousKernelRoute * const route,
   const int bandwidth_mode,
@@ -8974,6 +9225,11 @@ static int np_beta_absolute_route(
       regression_moment_context->mean == NULL ||
       regression_moment_context->mean_stderr == NULL ||
       regression_moment_context->status == NULL ||
+      (regression_moment_context->compute_gradient != 0 &&
+       regression_moment_context->compute_gradient != 1) ||
+      (regression_moment_context->compute_gradient &&
+       (regression_moment_context->gradient == NULL ||
+        regression_moment_context->gradient_stderr == NULL)) ||
       (regression_moment_context->positive_weights != 0 &&
        regression_moment_context->positive_weights != 1) ||
       derivative_coordinate >= 0 || kernel_power != 1 ||
@@ -9026,7 +9282,7 @@ static int np_beta_absolute_route(
   }
 
   if(regression_moment_context != NULL) {
-    const NPContinuousKernelRowStatus row_status =
+    NPContinuousKernelRowStatus row_status =
       np_continuous_kernel_beta_regression_moment_rows_validated(
         &plan, leave_one_out, leave_one_out_offset,
         has_categories ? &categorical_provider : NULL,
@@ -9040,6 +9296,23 @@ static int np_beta_absolute_route(
     *regression_moment_context->status = row_status;
     if(row_status != NP_CONTINUOUS_ROW_OK)
       goto cleanup;
+    if(regression_moment_context->compute_gradient) {
+      int infinite_count = 0;
+      int undefined_count = 0;
+
+      row_status = np_beta_regression_gradient_rows_validated(
+        &plan, has_categories ? &categorical_provider : NULL,
+        regression_moment_context->response,
+        regression_moment_context->gradient,
+        regression_moment_context->gradient_stderr,
+        route_diagnostics, &infinite_count, &undefined_count);
+      *regression_moment_context->status = row_status;
+      if(row_status != NP_CONTINUOUS_ROW_OK)
+        goto cleanup;
+      if(infinite_count > 0 || undefined_count > 0)
+        warning("beta regression gradient produced %d infinite endpoint value(s) and %d undefined cancellation(s)",
+                infinite_count, undefined_count);
+    }
     status = 0;
     goto cleanup;
   }
@@ -20021,7 +20294,9 @@ int categorical_compress){
       kernel_route->segment[0].coordinate_offset != 0 ||
       kernel_route->segment[0].coordinate_count != num_reg_continuous ||
       num_reg_continuous <= 0 ||
-      lp_engine_est != NP_LP_ENGINE_SCALAR || do_grad || do_gerr ||
+      lp_engine_est != NP_LP_ENGINE_SCALAR ||
+      do_grad != do_gerr ||
+      (do_grad && (num_reg_unordered > 0 || num_reg_ordered > 0)) ||
       kernel_route_diagnostics == NULL ||
       (categorical_compress != 0 && categorical_compress != 1)))
     error("canonical beta regression route has an invalid layout");
@@ -20141,6 +20416,9 @@ int categorical_compress){
     regression_moment_context.response = vector_Y;
     regression_moment_context.mean = mean;
     regression_moment_context.mean_stderr = mean_stderr;
+    regression_moment_context.gradient = gradient;
+    regression_moment_context.gradient_stderr = gradient_stderr;
+    regression_moment_context.compute_gradient = do_grad;
     regression_moment_context.positive_weights =
       kernel_route->segment[0].descriptor.order == 2;
     regression_moment_context.status = &regression_row_status;

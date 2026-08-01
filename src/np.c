@@ -48,7 +48,6 @@ extern MPI_Comm	*comm;
 #include "np_native_safety.h"
 #include "beta_kernelsum.h"
 #include "beta_bandwidth.h"
-#include "beta_regression.h"
 #include "beta_conditional.h"
 #include "continuous_kernel_row.h"
 #include "kernel_registry.h"
@@ -7819,7 +7818,7 @@ SEXP C_np_regression(SEXP tuno,
   for(R_xlen_t ii = 0; ii < gsize; ii++)
     REAL(out_gerr)[ii] = 0.0;
 
-  if(descriptor.family == NP_CKERNEL_FAMILY_BETA && !do_grad) {
+  if(descriptor.family == NP_CKERNEL_FAMILY_BETA) {
     const int beta_bandwidth_code = INTEGER(myopti_i)[REG_BWI];
 
     if(INTEGER(myopti_i)[REG_NUNOI] != 0 ||
@@ -7861,147 +7860,15 @@ SEXP C_np_regression(SEXP tuno,
     active_diagnostics = &beta_diagnostics;
   }
 
-  if(descriptor.family == NP_CKERNEL_FAMILY_BETA && do_grad) {
-    np_beta_regression_status beta_status;
-    np_beta_status scalar_status = NP_BETA_OK;
-    np_beta_bandwidth_mode beta_bandwidth_mode = NP_BETA_BANDWIDTH_FIXED;
-    const double *beta_bandwidth_eval = REAL(rbw_r);
-    const double *beta_bandwidth_train = REAL(rbw_r);
-    const int beta_bandwidth_code = INTEGER(myopti_i)[REG_BWI];
-    const double *truth = NULL;
-    int bad_evaluation = -1;
-    int bad_dimension = -1;
-    int infinite_count = 0;
-    int undefined_count = 0;
-    int i;
-
-    if(INTEGER(myopti_i)[REG_NUNOI] != 0 ||
-       INTEGER(myopti_i)[REG_NORDI] != 0)
-      error("C_np_regression: beta regression currently supports continuous predictors only");
-    if(beta_bandwidth_code != BW_FIXED &&
-       beta_bandwidth_code != BW_GEN_NN &&
-       beta_bandwidth_code != BW_ADAP_NN)
-      error("C_np_regression: invalid beta bandwidth mode");
-    if(INTEGER(myopti_i)[REG_LL] != NP_LP_ENGINE_SCALAR)
-      error("C_np_regression: beta regression currently supports only local-constant fitting");
-    if(do_grad != (INTEGER(myopti_i)[REG_GRAD] != 0))
-      error("C_np_regression: inconsistent beta gradient flags");
-    if(num_train <= 0 || num_eval <= 0 || en != num_eval ||
-       ncon <= 0 || nc != ncon)
-      error("C_np_regression: invalid beta regression dimensions");
-    if(XLENGTH(tcon_r) < (R_xlen_t)num_train * (R_xlen_t)ncon ||
-       (!train_is_eval &&
-        XLENGTH(econ_r) < (R_xlen_t)num_eval * (R_xlen_t)ncon) ||
-       XLENGTH(ty_r) < num_train || XLENGTH(rbw_r) < ncon ||
-       XLENGTH(ckerlb_r) < ncon || XLENGTH(ckerub_r) < ncon)
-      error("C_np_regression: beta regression input buffer is too short");
-    if(train_is_eval && num_eval != num_train)
-      error("C_np_regression: beta train/evaluation dimensions are inconsistent");
-    if(!ey_is_ty && XLENGTH(ey_r) < num_eval)
-      error("C_np_regression: beta evaluation-response buffer is too short");
-
-    if(beta_bandwidth_code != BW_FIXED) {
-      const int need_eval = beta_bandwidth_code == BW_GEN_NN;
-      const int need_train = beta_bandwidth_code == BW_ADAP_NN;
-      double *bandwidth_eval_storage = need_eval ?
-        (double *)R_alloc((size_t)ncon * (size_t)num_eval,
-                          sizeof(double)) : NULL;
-      double *bandwidth_train_storage = need_train ?
-        (double *)R_alloc((size_t)ncon * (size_t)num_train,
-                          sizeof(double)) : NULL;
-      np_beta_bandwidth_prepare_status bandwidth_status;
-
-      beta_bandwidth_mode = (beta_bandwidth_code == BW_GEN_NN) ?
-        NP_BETA_BANDWIDTH_GENERALIZED_NN : NP_BETA_BANDWIDTH_ADAPTIVE_NN;
-      bandwidth_status = np_beta_bandwidth_prepare(
-        beta_bandwidth_mode,
-        REAL(tcon_r), train_is_eval ? NULL : REAL(econ_r), REAL(rbw_r),
-        num_train, num_eval, ncon, train_is_eval,
-        need_eval, need_train, 0,
-        bandwidth_eval_storage, bandwidth_train_storage);
-      if(bandwidth_status != NP_BETA_BANDWIDTH_PREPARE_OK)
-        error("C_np_regression: %s",
-              np_beta_bandwidth_prepare_status_message(bandwidth_status));
-
-      beta_bandwidth_eval = bandwidth_eval_storage;
-      beta_bandwidth_train = bandwidth_train_storage;
-    }
-
-    beta_status = np_beta_regression_lc(
-      REAL(tcon_r), train_is_eval ? NULL : REAL(econ_r), REAL(ty_r),
-      beta_bandwidth_eval, beta_bandwidth_train, ckerlb_p, ckerub_p,
-      beta_bandwidth_mode,
-      descriptor.order,
-      num_train, num_eval, ncon, train_is_eval,
-      REAL(out_mean), REAL(out_merr),
-      &bad_evaluation, &bad_dimension, &scalar_status,
-      np_progress_fit_loop_step);
-    if(beta_status == NP_BETA_REGRESSION_ERR_KERNEL)
-      error("C_np_regression: beta regression failed at evaluation %d, continuous dimension %d: %s",
-            bad_evaluation + 1, bad_dimension + 1,
-            np_beta_status_message(scalar_status));
-    if(beta_status == NP_BETA_REGRESSION_ERR_ZERO_WEIGHT)
-      error("C_np_regression: all beta regression weights are zero at evaluation %d",
-            bad_evaluation + 1);
-    if(beta_status != NP_BETA_REGRESSION_OK) {
-      if(bad_evaluation >= 0)
-        error("C_np_regression: %s at evaluation %d",
-              np_beta_regression_status_message(beta_status),
-              bad_evaluation + 1);
-      error("C_np_regression: %s",
-            np_beta_regression_status_message(beta_status));
-    }
-
-    if(do_grad) {
-      beta_status = np_beta_regression_lc_gradient(
-        REAL(tcon_r), train_is_eval ? NULL : REAL(econ_r), REAL(ty_r),
-        beta_bandwidth_eval, beta_bandwidth_train, ckerlb_p, ckerub_p,
-        beta_bandwidth_mode, descriptor.order,
-        num_train, num_eval, ncon, train_is_eval,
-        REAL(out_g), REAL(out_gerr), &infinite_count, &undefined_count,
-        &bad_evaluation, &bad_dimension, &scalar_status);
-      if(beta_status == NP_BETA_REGRESSION_ERR_KERNEL)
-        error("C_np_regression: beta gradient failed at evaluation %d, continuous dimension %d: %s",
-              bad_evaluation + 1, bad_dimension + 1,
-              np_beta_status_message(scalar_status));
-      if(beta_status != NP_BETA_REGRESSION_OK)
-        error("C_np_regression: %s",
-              np_beta_regression_status_message(beta_status));
-      if(infinite_count > 0 || undefined_count > 0)
-        warning("beta regression gradient produced %d infinite endpoint value(s) and %d undefined cancellation(s)",
-                infinite_count, undefined_count);
-    } else {
-      REAL(out_g)[0] = 0.0;
-      REAL(out_gerr)[0] = 0.0;
-    }
-    if(!ey_is_ty)
-      truth = REAL(ey_r);
-    else if(train_is_eval)
-      truth = REAL(ty_r);
-
-    if(truth != NULL) {
-      REAL(out_xtra)[0] = fGoodness_of_Fit(num_eval, (double *)truth,
-                                           REAL(out_mean));
-      REAL(out_xtra)[1] = fMSE(num_eval, (double *)truth, REAL(out_mean));
-      REAL(out_xtra)[2] = fMAE(num_eval, (double *)truth, REAL(out_mean));
-      REAL(out_xtra)[3] = fMAPE(num_eval, (double *)truth, REAL(out_mean));
-      REAL(out_xtra)[4] = fCORR(num_eval, (double *)truth, REAL(out_mean));
-      REAL(out_xtra)[5] = fSIGN(num_eval, (double *)truth, REAL(out_mean));
-    } else {
-      for(i = 0; i < 6; ++i)
-        REAL(out_xtra)[i] = 0.0;
-    }
-  } else {
-    np_regression(REAL(tuno_r), REAL(tord_r), REAL(tcon_r), REAL(ty_r),
-                  REAL(euno_r), REAL(eord_r), REAL(econ_r), REAL(ey_r),
-                  REAL(rbw_r), REAL(mcv_r), REAL(padnum_r),
-                  REAL(nconfac_r), REAL(ncatfac_r), REAL(mysd_r),
-                  INTEGER(myopti_i),
-                  INTEGER(degree_i), INTEGER(gradient_order_i), &bern, &basis,
-                  REAL(out_mean), REAL(out_merr), REAL(out_g), REAL(out_gerr),
-                  REAL(out_xtra), ckerlb_p, ckerub_p,
-                  active_route, active_diagnostics, categorical_compress);
-  }
+  np_regression(REAL(tuno_r), REAL(tord_r), REAL(tcon_r), REAL(ty_r),
+                REAL(euno_r), REAL(eord_r), REAL(econ_r), REAL(ey_r),
+                REAL(rbw_r), REAL(mcv_r), REAL(padnum_r),
+                REAL(nconfac_r), REAL(ncatfac_r), REAL(mysd_r),
+                INTEGER(myopti_i),
+                INTEGER(degree_i), INTEGER(gradient_order_i), &bern, &basis,
+                REAL(out_mean), REAL(out_merr), REAL(out_g), REAL(out_gerr),
+                REAL(out_xtra), ckerlb_p, ckerub_p,
+                active_route, active_diagnostics, categorical_compress);
 
   PROTECT(out = allocVector(VECSXP, 5));
   SET_VECTOR_ELT(out, 0, out_mean);
