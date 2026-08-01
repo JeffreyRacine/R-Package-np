@@ -8761,14 +8761,17 @@ static int np_beta_absolute_route(
     NPContinuousKernelRowStatus row_status;
 
     if(has_categories) {
-      if(kernel_power != 1)
-        goto cleanup;
-      row_status =
+      row_status = kernel_power == 1 ?
         np_continuous_kernel_beta_derivative_absolute_rows_with_log_factor_validated(
           &plan, leave_one_out, leave_one_out_offset,
           derivative_coordinate, &categorical_provider,
           matrix_Y, ncol_Y, matrix_W, ncol_W, &derivative_accumulator,
-          weighted_sum, kw, route_diagnostics);
+          weighted_sum, kw, route_diagnostics) :
+        np_continuous_kernel_beta_derivative_powered_rows_validated(
+          &plan, leave_one_out, leave_one_out_offset,
+          derivative_coordinate, kernel_power, &categorical_provider,
+          matrix_Y, ncol_Y, matrix_W, ncol_W,
+          &derivative_accumulator, weighted_sum, kw, route_diagnostics);
     } else {
       row_status = kernel_power == 1 ?
         np_continuous_kernel_beta_derivative_absolute_rows_validated(
@@ -8777,7 +8780,7 @@ static int np_beta_absolute_route(
           &derivative_accumulator, weighted_sum, kw, route_diagnostics) :
         np_continuous_kernel_beta_derivative_powered_rows_validated(
           &plan, leave_one_out, leave_one_out_offset,
-          derivative_coordinate, kernel_power,
+          derivative_coordinate, kernel_power, NULL,
           matrix_Y, ncol_Y, matrix_W, ncol_W,
           &derivative_accumulator, weighted_sum, kw, route_diagnostics);
     }
@@ -9065,8 +9068,7 @@ const NPContinuousKernelExecutionContext * const kernel_execution_context){
         matrix_bw_train != NULL &&
         (!route_has_convolution || matrix_bw_eval != NULL))) &&
       ((!beta_has_categories && lambda_pre == NULL) ||
-       (beta_has_categories && !beta_dual_power &&
-        (!route_has_derivative || kernel_pow == 1))) &&
+      (beta_has_categories && !beta_dual_power)) &&
       (dual_power_ctx == NULL ||
        (beta_dual_power && kernel_pow == 1 && !route_has_derivative &&
         kw == NULL)) &&

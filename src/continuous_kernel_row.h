@@ -189,6 +189,7 @@ np_continuous_kernel_beta_derivative_powered_rows_validated(
   int leave_one_out_offset,
   int derivative_coordinate,
   int kernel_power,
+  const NPContinuousKernelLogFactorProvider *provider,
   double * const *response,
   int response_columns,
   double * const *case_weights,

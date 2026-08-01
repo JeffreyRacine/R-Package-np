@@ -256,11 +256,6 @@ npksum.default <-
         stop("beta kernel sums support only derivative permutation operators")
       if (any(operator == "derivative") && permutation.operator == "derivative")
         stop("direct and permutation beta derivatives cannot be combined")
-      if ((bws$nuno != 0L || bws$nord != 0L) &&
-          (any(operator == "derivative") ||
-           permutation.operator == "derivative") &&
-          kernel.pow != 1L)
-        stop("powered mixed beta derivatives are not yet activated")
     }
     
     if ((any(bws$icon) &&
