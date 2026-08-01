@@ -47,6 +47,26 @@ typedef struct {
   np_beta_status beta_status;
 } NPContinuousKernelRowResult;
 
+/*
+ * Optional O(n) factor supplied in signed-log form for one evaluation row.
+ * The provider owns neither output buffer and must fill every non-omitted
+ * entry through observation_count.  Leave-one-out exclusion remains the row
+ * engine's responsibility; omitted_observation is supplied so a provider may
+ * leave that entry untouched.
+ */
+typedef NPContinuousKernelRowStatus (*NPContinuousKernelLogFactorFunction)(
+  const void *context,
+  int evaluation_index,
+  int omitted_observation,
+  int observation_count,
+  double *log_absolute,
+  signed char *sign);
+
+typedef struct {
+  NPContinuousKernelLogFactorFunction function;
+  const void *context;
+} NPContinuousKernelLogFactorProvider;
+
 typedef struct {
   double *regular_row;
   double *jump_row;
@@ -97,6 +117,23 @@ NPContinuousKernelRowStatus np_continuous_kernel_beta_factor_row(
   const NPContinuousKernelRowPlan *plan,
   int evaluation_index,
   int omitted_observation,
+  NPContinuousKernelRowWorkspace *workspace,
+  NPContinuousKernelRowResult *result);
+
+/*
+ * Compose the canonical beta factor with one family-neutral signed-log
+ * factor.  On success, workspace's primary channel is the complete product,
+ * result->row is scaled by its complete-row maximum, and
+ * result->total_log_scale records that maximum.  Per-segment scales retain
+ * their beta-only diagnostic meaning.  The incumbent beta-only entry point
+ * remains separate so existing hot paths incur no provider branch.
+ */
+NPContinuousKernelRowStatus
+np_continuous_kernel_beta_factor_row_with_log_factor(
+  const NPContinuousKernelRowPlan *plan,
+  int evaluation_index,
+  int omitted_observation,
+  const NPContinuousKernelLogFactorProvider *provider,
   NPContinuousKernelRowWorkspace *workspace,
   NPContinuousKernelRowResult *result);
 
