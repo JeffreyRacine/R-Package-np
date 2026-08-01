@@ -33,13 +33,12 @@ test_that("activated beta absolute rows enter the canonical central engine", {
   )
 
   activation_start <- regexpr(
-    "if(p_operator == OP_NOOP && !do_score && !do_ocg &&",
+    "NPContinuousKernelRoute route;",
     ingress,
     fixed = TRUE
   )[[1L]]
   activation_end <- regexpr(
-    paste0("} else {\n",
-           "      beta_status = np_beta_kernelsum("),
+    "if(derivative_dimension >= 0 || p_operator == OP_DERIVATIVE)",
     ingress,
     fixed = TRUE
   )[[1L]]
@@ -65,8 +64,8 @@ test_that("activated beta absolute rows enter the canonical central engine", {
   derivative_sidecar_calls <- derivative_sidecar_calls[
     derivative_sidecar_calls > 0L
   ]
-  expect_length(derivative_sidecar_calls, 1L)
-  expect_gt(derivative_sidecar_calls[[1L]], activation_end)
+  expect_length(derivative_sidecar_calls, 0L)
+  expect_false(grepl("KWS_DOTREEI", activation, fixed = TRUE))
 
   route_start <- regexpr("if(kernel_execution_context != NULL)", engine,
                          fixed = TRUE)[[1L]]

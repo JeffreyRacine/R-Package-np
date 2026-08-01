@@ -69,6 +69,32 @@ test_that("beta direct and permutation derivatives agree", {
   }
 })
 
+test_that("forced tree mode preserves canonical beta permutation derivatives", {
+  training <- data.frame(
+    x = c(.017, .08, .21, .47, .73, .94, .989),
+    z = c(.9, .18, .67, .31, .79, .42, .06)
+  )
+  evaluation <- data.frame(x = c(.11, .37, .82), z = c(.2, .7, .44))
+  arguments <- list(
+    bws = c(.14, .18), txdat = training, exdat = evaluation,
+    permutation.operator = "derivative",
+    return.kernel.weights = TRUE,
+    return.derivative.kernel.weights = TRUE,
+    ckertype = "beta", ckerorder = 8,
+    ckerbound = "fixed", ckerlb = c(0, 0), ckerub = c(1, 1)
+  )
+  old_options <- options(np.tree = FALSE)
+  on.exit(options(old_options), add = TRUE)
+  without_tree <- do.call(npksum, arguments)
+  options(np.tree = TRUE)
+  with_tree <- do.call(npksum, arguments)
+
+  expect_identical(with_tree$ksum, without_tree$ksum)
+  expect_identical(with_tree$kw, without_tree$kw)
+  expect_identical(with_tree$p.ksum, without_tree$p.ksum)
+  expect_identical(with_tree$p.kw, without_tree$p.kw)
+})
+
 test_that("beta scalar endpoint derivative signs are explicit", {
   fit <- NULL
   expect_warning(fit <- npksum(
