@@ -285,7 +285,8 @@ npreg.rbandwidth <-
       bw = bws[["bw", exact = TRUE]],
       bandwidth.compute = FALSE,
       where = "beta regression",
-      regtype = bws[["regtype", exact = TRUE]]
+      regtype = bws[["regtype", exact = TRUE]],
+      allow.categorical = TRUE
     )
     npValidateRegressionNnLowerBound(bws, where = "npreg")
     npValidateRegressionExtendedNn(
@@ -572,7 +573,13 @@ npreg.rbandwidth <-
       mcv.numRow = attr(bws$xmcv, "num.row"),
       int_do_tree = if (beta.kernel) DO_TREE_NO else
         .npreg_fit_tree_code(bws, ncon = bws$ncon, ncat = bws$nuno + bws$nord),
-      reserved.reg.engine = FALSE)
+      categorical.compress = if (
+        beta.kernel && (bws$nuno > 0L || bws$nord > 0L)
+      ) {
+        npStrictLogicalOption("np.categorical.compress", TRUE)
+      } else {
+        FALSE
+      })
     myopti <- c(myopti, npContinuousKernelDescriptorOptions(bws))
 
     cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])

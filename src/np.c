@@ -6873,6 +6873,10 @@ SEXP C_np_regression(SEXP tuno,
   int nc = asInteger(ncol);
   int do_grad = asLogical(gradients);
   int ncon = 0;
+  int nunordered = 0;
+  int nordered = 0;
+  int num_categorical = 0;
+  int num_predictors = 0;
   int num_train = 0;
   int num_eval = 0;
   int train_is_eval = 0;
@@ -6923,10 +6927,15 @@ SEXP C_np_regression(SEXP tuno,
     "C_np_regression");
 
   ncon = (int)INTEGER(myopti_i)[REG_NCONI];
+  nunordered = (int)INTEGER(myopti_i)[REG_NUNOI];
+  nordered = (int)INTEGER(myopti_i)[REG_NORDI];
   num_train = (int)INTEGER(myopti_i)[REG_TNOBSI];
   num_eval = (int)INTEGER(myopti_i)[REG_ENOBSI];
   train_is_eval = (int)INTEGER(myopti_i)[REG_TISEI];
   ey_is_ty = (int)INTEGER(myopti_i)[REG_EY];
+  categorical_compress = INTEGER(myopti_i)[REG_CATCOMPI];
+  if(categorical_compress != 0 && categorical_compress != 1)
+    error("C_np_regression: categorical compression must be TRUE or FALSE");
   ckerlb_p = REAL(ckerlb_r);
   ckerub_p = REAL(ckerub_r);
   if ((XLENGTH(ckerlb_r) == 0 || XLENGTH(ckerub_r) == 0) && ncon > 0) {
@@ -6947,10 +6956,15 @@ SEXP C_np_regression(SEXP tuno,
 
   if(descriptor.family == NP_CKERNEL_FAMILY_BETA) {
     const int beta_bandwidth_code = INTEGER(myopti_i)[REG_BWI];
+    const int max_levels = INTEGER(myopti_i)[REG_MLEVI];
 
-    if(INTEGER(myopti_i)[REG_NUNOI] != 0 ||
-       INTEGER(myopti_i)[REG_NORDI] != 0)
-      error("C_np_regression: beta regression currently supports continuous predictors only");
+    if(nunordered < 0 || nordered < 0 || ncon < 0 ||
+       nunordered > INT_MAX - nordered)
+      error("C_np_regression: invalid beta categorical dimensions");
+    num_categorical = nunordered + nordered;
+    if(ncon > INT_MAX - num_categorical)
+      error("C_np_regression: invalid beta total dimension");
+    num_predictors = ncon + num_categorical;
     if(beta_bandwidth_code != BW_FIXED &&
        beta_bandwidth_code != BW_GEN_NN &&
        beta_bandwidth_code != BW_ADAP_NN)
@@ -6960,12 +6974,27 @@ SEXP C_np_regression(SEXP tuno,
     if(do_grad != (INTEGER(myopti_i)[REG_GRAD] != 0))
       error("C_np_regression: inconsistent beta gradient flags");
     if(num_train <= 0 || num_eval <= 0 || en != num_eval ||
-       ncon <= 0 || nc != ncon)
+       ncon <= 0 || nc != num_predictors ||
+       (train_is_eval != 0 && train_is_eval != 1) ||
+       (ey_is_ty != 0 && ey_is_ty != 1))
       error("C_np_regression: invalid beta regression dimensions");
-    if(XLENGTH(tcon_r) < (R_xlen_t)num_train * (R_xlen_t)ncon ||
+    if(num_categorical > 0 &&
+       (max_levels <= 0 ||
+        !np_real_buffer_has_matrix(
+          mcv_r, max_levels, num_categorical)))
+      error("C_np_regression: beta categorical level buffer is too short");
+    if(!np_real_buffer_has_matrix(tcon_r, num_train, ncon) ||
        (!train_is_eval &&
-        XLENGTH(econ_r) < (R_xlen_t)num_eval * (R_xlen_t)ncon) ||
-       XLENGTH(ty_r) < num_train || XLENGTH(rbw_r) < ncon ||
+        !np_real_buffer_has_matrix(econ_r, num_eval, ncon)) ||
+       !np_real_buffer_has_matrix(tuno_r, num_train, nunordered) ||
+       !np_real_buffer_has_matrix(tord_r, num_train, nordered) ||
+       (!train_is_eval &&
+        (!np_real_buffer_has_matrix(euno_r, num_eval, nunordered) ||
+         !np_real_buffer_has_matrix(eord_r, num_eval, nordered))) ||
+       XLENGTH(ty_r) < num_train ||
+       XLENGTH(rbw_r) < num_predictors ||
+       XLENGTH(padnum_r) < 1 || XLENGTH(nconfac_r) < 1 ||
+       XLENGTH(ncatfac_r) < 1 || XLENGTH(mysd_r) < ncon ||
        XLENGTH(ckerlb_r) < ncon || XLENGTH(ckerub_r) < ncon)
       error("C_np_regression: beta regression input buffer is too short");
     if(train_is_eval && num_eval != num_train)
@@ -17644,11 +17673,17 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
 
 
   if(do_grad){
+    const int gradient_stderr_count =
+      (kernel_route != NULL) ? num_var : num_reg_continuous_extern;
+
     for(j=0;j<num_var;j++)
       for(i=0;i<num_obs_eval_extern;i++)
         g[j*num_obs_eval_extern+ipe[i]]=eg[j][i];
 
-    for(j=0;j<num_reg_continuous_extern;j++)
+    /* The canonical mixed beta route defines and returns discrete-contrast
+       standard errors.  Preserve the historical non-beta bridge unchanged;
+       its narrower copy contract is tracked as separate legacy debt. */
+    for(j=0;j<gradient_stderr_count;j++)
       for(i=0;i<num_obs_eval_extern;i++)
         gerr[j*num_obs_eval_extern+ipe[i]]=egerr[j][i];
   }
