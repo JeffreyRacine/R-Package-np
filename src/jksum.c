@@ -20593,6 +20593,136 @@ static NP_NOINLINE void np_beta_scalar_regression_fit_canonical(
   }
 }
 
+/*
+ * Fill the bandwidth objects already owned by the common regression engine.
+ * Beta differs from peer kernels only in continuous-bandwidth realization;
+ * categorical lambda preparation and every downstream LP operation remain
+ * shared.  Keeping this helper out of line prevents beta activation from
+ * changing register allocation in the large legacy/general fit owner.
+ */
+static NP_NOINLINE NP_COLD int np_beta_regression_bandwidth_prepare_canonical(
+  const int bandwidth_mode,
+  const int num_obs_train,
+  const int num_obs_eval,
+  const int num_reg_unordered,
+  const int num_reg_ordered,
+  const int num_reg_continuous,
+  double **matrix_X_continuous_train,
+  double **matrix_X_continuous_eval,
+  double *vector_scale_factor,
+  double **matrix_bandwidth,
+  double **matrix_bandwidth_deriv,
+  double *lambda)
+{
+  int coordinate;
+
+  if(bandwidth_mode != BW_FIXED &&
+     bandwidth_mode != BW_GEN_NN &&
+     bandwidth_mode != BW_ADAP_NN)
+    return 1;
+
+  if(kernel_bandwidth_mean(
+       0, BW_FIXED, num_obs_train, num_obs_eval,
+       0, 0, 0,
+       num_reg_continuous, num_reg_unordered, num_reg_ordered,
+       0, vector_scale_factor,
+       NULL, NULL,
+       matrix_X_continuous_train, matrix_X_continuous_eval,
+       NULL, matrix_bandwidth, lambda) == 1)
+    return 1;
+
+  if(bandwidth_mode != BW_FIXED) {
+    const np_beta_bandwidth_prepare_status status =
+      np_beta_bandwidth_prepare_matrix(
+        bandwidth_mode == BW_GEN_NN ?
+          NP_BETA_BANDWIDTH_GENERALIZED_NN :
+          NP_BETA_BANDWIDTH_ADAPTIVE_NN,
+        matrix_X_continuous_train, matrix_X_continuous_eval,
+        vector_scale_factor,
+        num_obs_train, num_obs_eval, num_reg_continuous,
+        matrix_X_continuous_train == matrix_X_continuous_eval,
+        bandwidth_mode == BW_GEN_NN,
+        bandwidth_mode == BW_ADAP_NN,
+        0, matrix_bandwidth, matrix_bandwidth);
+
+    if(status != NP_BETA_BANDWIDTH_PREPARE_OK)
+      return 1;
+  }
+
+  if(matrix_bandwidth_deriv != NULL)
+    for(coordinate = 0; coordinate < num_reg_continuous; ++coordinate)
+      memcpy(matrix_bandwidth_deriv[coordinate],
+             matrix_bandwidth[coordinate],
+             (size_t)((bandwidth_mode == BW_FIXED) ? 1 :
+                      ((bandwidth_mode == BW_GEN_NN) ?
+                       num_obs_eval : num_obs_train))*sizeof(double));
+
+  return 0;
+}
+
+/*
+ * Route one general-LP evaluation row through the canonical beta accumulator.
+ * Power one carries the response and design columns; power two carries only
+ * the design Gram columns used by the shared covariance sandwich.
+ */
+static NP_NOINLINE int np_beta_regression_lp_moment_row_canonical(
+  const int bandwidth_mode,
+  const int num_obs_train,
+  const int num_reg_unordered,
+  const int num_reg_ordered,
+  const int num_reg_continuous,
+  const int nterms,
+  const int *operator,
+  int *kernel_unordered,
+  int *kernel_ordered,
+  double **matrix_X_unordered_train,
+  double **matrix_X_ordered_train,
+  double **matrix_X_continuous_train,
+  double **matrix_X_unordered_eval,
+  double **matrix_X_ordered_eval,
+  double **matrix_X_continuous_eval,
+  double **matrix_Y,
+  double **basis,
+  double *vector_scale_factor,
+  double **matrix_bandwidth_train,
+  double **matrix_bandwidth_eval,
+  double *lambda,
+  int *num_categories,
+  double **matrix_categorical_vals,
+  const int categorical_compress,
+  double *weighted_sum,
+  double *weighted_sum_power2,
+  const NPContinuousKernelRoute *kernel_route,
+  NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics)
+{
+  NP_DualPowerCtx dual_power_context = {
+    weighted_sum_power2, 2, basis, basis, nterms, nterms, NULL
+  };
+  const NPContinuousKernelExecutionContext execution_context = {
+    kernel_route, kernel_route_diagnostics, categorical_compress
+  };
+
+  return kernel_weighted_sum_np_ctx_ex(
+    NULL, kernel_unordered, kernel_ordered,
+    bandwidth_mode, num_obs_train, 1,
+    num_reg_unordered, num_reg_ordered, num_reg_continuous,
+    0, 0, 1, 0, 0,
+    0, 0, 0, 0, operator, OP_NOOP,
+    0, 0, NULL, 1, nterms, nterms + 2,
+    NP_TREE_FALSE, 0, NULL, NULL, NULL, NULL,
+    matrix_X_unordered_train, matrix_X_ordered_train,
+    matrix_X_continuous_train,
+    matrix_X_unordered_eval, matrix_X_ordered_eval,
+    matrix_X_continuous_eval,
+    basis, matrix_Y, NULL, vector_scale_factor,
+    bandwidth_mode == BW_FIXED ? 0 : 1,
+    bandwidth_mode == BW_FIXED ? NULL : matrix_bandwidth_train,
+    bandwidth_mode == BW_FIXED ? NULL : matrix_bandwidth_eval,
+    lambda, num_categories, matrix_categorical_vals, NULL,
+    weighted_sum, NULL, NULL, NULL,
+    &dual_power_context, NULL, &execution_context, NULL);
+}
+
 int kernel_estimate_regression_categorical_tree_np(
 int lp_engine,
 int KERNEL_reg,
@@ -20675,9 +20805,8 @@ int categorical_compress){
   const int lp_engine_est = lp_engine;
   if((lp_engine_est != NP_LP_ENGINE_SCALAR) && (lp_engine_est != NP_LP_ENGINE_GENERAL))
     error("invalid internal regression engine");
-  if(kernel_route != NULL) {
-    if(lp_engine_est != NP_LP_ENGINE_SCALAR)
-      error("canonical beta regression route has an invalid layout");
+  if(NP_UNLIKELY(kernel_route != NULL) &&
+     lp_engine_est == NP_LP_ENGINE_SCALAR) {
     np_beta_scalar_regression_fit_canonical(
       BANDWIDTH_reg, KERNEL_unordered_reg, KERNEL_ordered_reg,
       num_obs_train, num_obs_eval,
@@ -20695,6 +20824,17 @@ int categorical_compress){
       R_squared, MSE, MAE, MAPE, CORR, SIGN);
     return 0;
   }
+  if(NP_UNLIKELY(kernel_route != NULL) &&
+     (np_continuous_kernel_route_validate(kernel_route,
+                                          num_reg_continuous) !=
+        NP_CKERNEL_ROUTE_OK ||
+      !np_continuous_kernel_route_has_beta(kernel_route) ||
+      kernel_route->segment_count != 1 ||
+      kernel_route->segment[0].coordinate_offset != 0 ||
+      kernel_route->segment[0].coordinate_count != num_reg_continuous ||
+      kernel_route_diagnostics == NULL ||
+      categorical_compress < 0 || categorical_compress > 1))
+    error("canonical beta regression route has an invalid layout");
 
   operator = (int *)malloc(
     sizeof(int)*(num_reg_continuous+num_reg_unordered+num_reg_ordered));
@@ -20742,33 +20882,53 @@ int categorical_compress){
 
   matrix_bandwidth_deriv = alloc_matd(bwmdim,num_reg_continuous);
 
-  if(kernel_bandwidth(KERNEL_reg,
-                      BANDWIDTH_reg,
-                      num_obs_train,
-                      num_obs_eval,
-                      0,
-                      0,
-                      0,
-                      num_reg_continuous,
-                      num_reg_unordered,
-                      num_reg_ordered,
-                      vector_scale_factor,
-                      NULL,			 // Not used 
-                      NULL,			 // Not used 
-                      matrix_X_continuous_train,
-                      matrix_X_continuous_eval,
-                      NULL,					 // Not used 
-	                      matrix_bandwidth,
-	                      lambda,
-	                      matrix_bandwidth_deriv)==1){
-	    error("\n** Error: invalid bandwidth.");
-	  }
+  if(NP_UNLIKELY(kernel_route != NULL)) {
+    if(np_beta_regression_bandwidth_prepare_canonical(
+        BANDWIDTH_reg,
+        num_obs_train,
+        num_obs_eval,
+        num_reg_unordered,
+        num_reg_ordered,
+        num_reg_continuous,
+        matrix_X_continuous_train,
+        matrix_X_continuous_eval,
+        vector_scale_factor,
+        matrix_bandwidth,
+        matrix_bandwidth_deriv,
+        lambda) == 1) {
+      error("\n** Error: invalid bandwidth.");
+    }
+  } else if(kernel_bandwidth(KERNEL_reg,
+                             BANDWIDTH_reg,
+                             num_obs_train,
+                             num_obs_eval,
+                             0,
+                             0,
+                             0,
+                             num_reg_continuous,
+                             num_reg_unordered,
+                             num_reg_ordered,
+                             vector_scale_factor,
+                             NULL,			 // Not used
+                             NULL,			 // Not used
+                             matrix_X_continuous_train,
+                             matrix_X_continuous_eval,
+                             NULL,					 // Not used
+                             matrix_bandwidth,
+                             lambda,
+                             matrix_bandwidth_deriv) == 1){
+    error("\n** Error: invalid bandwidth.");
+  }
 
   hprod = 1.0;
   for(l = 0; l < num_reg_continuous; l++)
     hprod *= matrix_bandwidth[l][0];
 
-  if(num_reg_continuous != 0) {
+  if(NP_UNLIKELY(kernel_route != NULL)) {
+    INT_KERNEL_P = 1.0;
+    K_INT_KERNEL_P = 1.0;
+    DIFF_KER_PPM = 0.0;
+  } else if(num_reg_continuous != 0) {
     initialize_kernel_regression_asymptotic_constants(KERNEL_reg,
                                                       num_reg_continuous,
                                                       &INT_KERNEL_P,
@@ -22097,7 +22257,42 @@ int categorical_compress){
         Wcols[l] = basis[l];
       }
 
-      kernel_weighted_sum_np_ctx_ex(kernel_c,
+      if(NP_UNLIKELY(kernel_route != NULL)) {
+        if(np_beta_regression_lp_moment_row_canonical(
+             BANDWIDTH_reg,
+             num_obs_train,
+             num_reg_unordered,
+             num_reg_ordered,
+             num_reg_continuous,
+             glp_nterms,
+             operator,
+             kernel_u,
+             kernel_o,
+             matrix_X_unordered_train,
+             matrix_X_ordered_train,
+             matrix_X_continuous_train,
+             TUNO,
+             TORD,
+             TCON,
+             Ycols,
+             basis,
+             vector_scale_factor,
+             matrix_bandwidth,
+             (BANDWIDTH_reg == BW_GEN_NN) ?
+               matrix_bandwidth_eval : matrix_bandwidth,
+             lambda,
+             num_categories,
+             matrix_categorical_vals,
+             categorical_compress,
+             out,
+             out2,
+             kernel_route,
+             kernel_route_diagnostics) != 0) {
+          estimation_shortcut_done = -2;
+          goto cleanup_glp_fit;
+        }
+      } else {
+        kernel_weighted_sum_np_ctx_ex(kernel_c,
                              kernel_u,
                              kernel_o,
                              BANDWIDTH_reg,
@@ -22153,6 +22348,7 @@ int categorical_compress){
                              NULL,
                              NULL,
                              0);
+      }
 
       for(i = 0; i < glp_nterms; i++){
         /* np_outer_weighted_sum lays out result as [W x Y], row-major by W term. */
@@ -22439,6 +22635,14 @@ finish_regression_estimation:
   free_tmat(matrix_bandwidth);
   free_mat(matrix_bandwidth_deriv,num_reg_continuous);
 
+  if(estimation_shortcut_done == -2) {
+    if(kernel_route_diagnostics != NULL &&
+       kernel_route_diagnostics->beta_status != NP_BETA_OK)
+      error("canonical beta LP row failed in continuous dimension %d: %s",
+            kernel_route_diagnostics->bad_coordinate + 1,
+            np_beta_status_message(kernel_route_diagnostics->beta_status));
+    error("canonical beta LP row failed");
+  }
   if(estimation_shortcut_done < 0)
     error("%s",
           (estimation_shortcut_done == -2) ?

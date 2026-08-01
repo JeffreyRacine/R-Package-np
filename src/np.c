@@ -7829,6 +7829,7 @@ SEXP C_np_regression(SEXP tuno,
 
   if(descriptor.family == NP_CKERNEL_FAMILY_BETA) {
     const int beta_bandwidth_code = INTEGER(myopti_i)[REG_BWI];
+    const int beta_lp_engine = INTEGER(myopti_i)[REG_LL];
     const int max_levels = INTEGER(myopti_i)[REG_MLEVI];
 
     if(nunordered < 0 || nordered < 0 || ncon < 0 ||
@@ -7842,8 +7843,12 @@ SEXP C_np_regression(SEXP tuno,
        beta_bandwidth_code != BW_GEN_NN &&
        beta_bandwidth_code != BW_ADAP_NN)
       error("C_np_regression: invalid beta bandwidth mode");
-    if(INTEGER(myopti_i)[REG_LL] != NP_LP_ENGINE_SCALAR)
-      error("C_np_regression: beta regression currently supports only local-constant fitting");
+    if(beta_lp_engine != NP_LP_ENGINE_SCALAR &&
+       beta_lp_engine != NP_LP_ENGINE_GENERAL)
+      error("C_np_regression: invalid beta regression engine");
+    if(beta_lp_engine == NP_LP_ENGINE_GENERAL &&
+       (XLENGTH(degree_i) < ncon || XLENGTH(gradient_order_i) < ncon))
+      error("C_np_regression: beta LP degree metadata is too short");
     if(do_grad != (INTEGER(myopti_i)[REG_GRAD] != 0))
       error("C_np_regression: inconsistent beta gradient flags");
     if(num_train <= 0 || num_eval <= 0 || en != num_eval ||

@@ -453,7 +453,8 @@ npreg.rbandwidth <-
       bandwidth.compute = FALSE,
       where = "beta regression",
       regtype = bws[["regtype", exact = TRUE]],
-      allow.categorical = TRUE
+      allow.categorical = TRUE,
+      allow.general.lp = TRUE
     )
     npValidateRegressionNnLowerBound(bws, where = "npreg")
     npValidateRegressionExtendedNn(

@@ -346,7 +346,7 @@ test_that("scalar beta regression fits enter the canonical row engine", {
   expect_gt(sibling_start, 0L)
   expect_lt(sibling_start, engine_start)
   regression_sibling <- substr(engine, sibling_start, engine_start - 1L)
-  expect_match(regression_engine, "if(kernel_route != NULL) {",
+  expect_match(regression_engine, "if(NP_UNLIKELY(kernel_route != NULL)",
                fixed = TRUE)
   expect_match(
     regression_engine, "np_beta_scalar_regression_fit_canonical(",
@@ -360,6 +360,15 @@ test_that("scalar beta regression fits enter the canonical row engine", {
     regression_sibling, "np_beta_bandwidth_prepare_matrix(", fixed = TRUE
   )
   expect_match(regression_sibling, "NPBetaRegressionMomentCtx", fixed = TRUE)
+  expect_match(
+    regression_sibling,
+    "static NP_NOINLINE int np_beta_regression_lp_moment_row_canonical(",
+    fixed = TRUE
+  )
+  expect_match(
+    regression_engine, "np_beta_regression_lp_moment_row_canonical(",
+    fixed = TRUE
+  )
   expect_match(
     engine, "np_beta_regression_gradient_rows_validated(",
     fixed = TRUE
