@@ -189,7 +189,7 @@ test_that("legacy callers cannot acquire beta route metadata implicitly", {
   )
 })
 
-test_that("beta PDF fitting enters the canonical dual-row density owner", {
+test_that("beta density and distribution fits have one canonical ingress", {
   root <- locate_beta_activation_sources()
   skip_if(is.null(root), "package sources unavailable")
   ingress <- paste(
@@ -209,17 +209,15 @@ test_that("beta PDF fitting enters the canonical dual-row density owner", {
   expect_gt(ingress_end, ingress_start)
   density_ingress <- substr(ingress, ingress_start, ingress_end - 1L)
 
-  canonical_call <- regexpr(
-    "ckerlb_p, ckerub_p, &route, &diagnostics, 0);",
-    density_ingress, fixed = TRUE
-  )[[1L]]
-  sidecar_call <- regexpr(
-    "beta_status = np_beta_kernelsum(", density_ingress, fixed = TRUE
-  )[[1L]]
-  expect_match(density_ingress, "if(dens_or_dist == NP_DO_DENS)",
-               fixed = TRUE)
-  expect_gt(canonical_call, 0L)
-  expect_gt(sidecar_call, canonical_call)
+  expect_match(
+    density_ingress,
+    "active_route, active_diagnostics, 0);",
+    fixed = TRUE
+  )
+  expect_false(grepl("np_beta_kernelsum(", density_ingress, fixed = TRUE))
+  expect_false(grepl(
+    "if(dens_or_dist == NP_DO_DENS)", density_ingress, fixed = TRUE
+  ))
 
   engine_start <- regexpr(
     "void kernel_estimate_dens_dist_categorical_np(", engine, fixed = TRUE
@@ -232,9 +230,11 @@ test_that("beta PDF fitting enters the canonical dual-row density owner", {
   expect_gt(engine_end, engine_start)
   density_engine <- substr(engine, engine_start, engine_end - 1L)
 
-  expect_match(density_engine, "const int exact_beta_pdf = kernel_route != NULL;",
+  expect_match(density_engine, "const int exact_beta_route = kernel_route != NULL;",
                fixed = TRUE)
   expect_match(density_engine, "kernel_weighted_sum_np_route_power12(",
+               fixed = TRUE)
+  expect_match(density_engine, "kernel_weighted_sum_np_route_centered_m2(",
                fixed = TRUE)
   expect_match(density_engine, "np_progress_fit_loop_step);", fixed = TRUE)
   expect_match(
@@ -242,8 +242,11 @@ test_that("beta PDF fitting enters the canonical dual-row density owner", {
     "if(beta_route_status != 0)\n      goto cleanup_density_fit;",
     fixed = TRUE
   )
-  expect_match(density_engine, "error(\"canonical beta density row failed\");",
-               fixed = TRUE)
+  expect_match(
+    density_engine,
+    "error(\"canonical beta density/distribution row failed\");",
+    fixed = TRUE
+  )
 })
 
 test_that("signed-log beta rows compose every route segment", {
@@ -322,7 +325,7 @@ test_that("canonical centered moments use an online training-order update", {
   expect_false(grepl("second_moment -", owner, fixed = TRUE))
 })
 
-test_that("centered moments have one dormant fail-closed route boundary", {
+test_that("centered moments have one activated fail-closed route boundary", {
   root <- locate_beta_activation_sources()
   skip_if(is.null(root), "package sources unavailable")
   engine <- paste(
@@ -356,5 +359,5 @@ test_that("centered moments have one dormant fail-closed route boundary", {
   occurrences <- gregexpr(
     "kernel_weighted_sum_np_route_centered_m2(", engine, fixed = TRUE
   )[[1L]]
-  expect_length(occurrences[occurrences > 0L], 1L)
+  expect_length(occurrences[occurrences > 0L], 2L)
 })
