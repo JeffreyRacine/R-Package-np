@@ -8271,6 +8271,7 @@ static int np_beta_absolute_route(
   double **matrix_W,
   const int ncol_Y,
   const int ncol_W,
+  const int kernel_power,
   double * const row,
   double * const weighted_sum,
   double * const kw,
@@ -8357,6 +8358,8 @@ static int np_beta_absolute_route(
       num_obs_eval > num_obs_train ||
       leave_one_out_offset > num_obs_train - num_obs_eval))
     return KWSNP_ERR_BADINVOC;
+  if(derivative_coordinate >= 0 && kernel_power != 1)
+    return KWSNP_ERR_BADINVOC;
   if(derivative_coordinate < 0 && row == NULL)
     return KWSNP_ERR_BADINVOC;
 
@@ -8427,14 +8430,28 @@ static int np_beta_absolute_route(
       for(observation = 0; observation < num_obs_train; ++observation) {
         double value;
 
-        if(np_continuous_kernel_signed_log_restore(
-             workspace.primary_log_absolute[observation],
-             workspace.primary_sign[observation],
-             &value) != NP_CONTINUOUS_ROW_OK)
+        if((kernel_power == 1 ?
+            np_continuous_kernel_signed_log_restore(
+              workspace.primary_log_absolute[observation],
+              workspace.primary_sign[observation], &value) :
+            np_continuous_kernel_signed_log_power_restore(
+              workspace.primary_log_absolute[observation],
+              workspace.primary_sign[observation], kernel_power,
+              &value)) != NP_CONTINUOUS_ROW_OK)
           goto cleanup;
-        if(kw != NULL)
+        if(kw != NULL) {
+          double raw_value;
+
+          if(kernel_power == 1)
+            raw_value = value;
+          else if(np_continuous_kernel_signed_log_restore(
+                    workspace.primary_log_absolute[observation],
+                    workspace.primary_sign[observation],
+                    &raw_value) != NP_CONTINUOUS_ROW_OK)
+            goto cleanup;
           kw[(size_t)evaluation * (size_t)num_obs_train +
-             (size_t)observation] = value;
+             (size_t)observation] = raw_value;
+        }
         sum += value;
         if(!R_FINITE(sum))
           goto cleanup;
@@ -8459,14 +8476,28 @@ static int np_beta_absolute_route(
       for(observation = 0; observation < num_obs_train; ++observation) {
         double value;
 
-        if(np_continuous_kernel_signed_log_restore(
-             workspace.primary_log_absolute[observation],
-             workspace.primary_sign[observation],
-             &value) != NP_CONTINUOUS_ROW_OK)
+        if((kernel_power == 1 ?
+            np_continuous_kernel_signed_log_restore(
+              workspace.primary_log_absolute[observation],
+              workspace.primary_sign[observation], &value) :
+            np_continuous_kernel_signed_log_power_restore(
+              workspace.primary_log_absolute[observation],
+              workspace.primary_sign[observation], kernel_power,
+              &value)) != NP_CONTINUOUS_ROW_OK)
           goto cleanup;
-        if(kw != NULL)
+        if(kw != NULL) {
+          double raw_value;
+
+          if(kernel_power == 1)
+            raw_value = value;
+          else if(np_continuous_kernel_signed_log_restore(
+                    workspace.primary_log_absolute[observation],
+                    workspace.primary_sign[observation],
+                    &raw_value) != NP_CONTINUOUS_ROW_OK)
+            goto cleanup;
           kw[(size_t)evaluation * (size_t)num_obs_train +
-             (size_t)observation] = value;
+             (size_t)observation] = raw_value;
+        }
         if(observation == omitted_observation)
           continue;
 
@@ -8602,7 +8633,7 @@ const NPContinuousKernelExecutionContext * const kernel_execution_context){
       np_continuous_kernel_route_has_beta(kernel_route) &&
       (BANDWIDTH_reg == BW_FIXED || BANDWIDTH_reg == BW_GEN_NN ||
        BANDWIDTH_reg == BW_ADAP_NN) &&
-      kernel_pow == 1 &&
+      (!route_has_derivative || kernel_pow == 1) &&
       bandwidth_divide == 0 && bandwidth_divide_weights == 0 &&
       num_reg_unordered == 0 && num_reg_ordered == 0 &&
       num_reg_continuous > 0 && permutation_operator == OP_NOOP &&
@@ -8641,6 +8672,7 @@ const NPContinuousKernelExecutionContext * const kernel_execution_context){
       matrix_X_continuous_train, matrix_X_continuous_eval,
       vector_scale_factor, matrix_bw_eval, matrix_bw_train,
       matrix_Y, matrix_W, ncol_Y, ncol_W,
+      kernel_pow,
       route_row, weighted_sum, kw, kernel_route_diagnostics);
     free(route_row);
     return route_status;

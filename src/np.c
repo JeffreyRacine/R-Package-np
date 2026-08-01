@@ -10397,6 +10397,7 @@ SEXP C_np_kernelsum(SEXP tuno,
     const double *beta_bandwidth_eval = REAL(bw_r);
     const double *beta_bandwidth_train = REAL(bw_r);
     int beta_bandwidth_code = INTEGER(myopti_i)[KWS_BWI];
+    const int beta_kernel_power = (int)REAL(kpow_r)[0];
     int has_overlap = 0;
     int derivative_dimension = -1;
     int undefined_count = 0;
@@ -10411,8 +10412,6 @@ SEXP C_np_kernelsum(SEXP tuno,
     if((p_operator != OP_NOOP && p_operator != OP_DERIVATIVE) ||
        do_score || do_ocg)
       error("C_np_kernelsum: beta kernels support only derivative permutation operators");
-    if(XLENGTH(kpow_r) != 1 || REAL(kpow_r)[0] != 1.0)
-      error("C_np_kernelsum: beta kernels currently require kernel.pow = 1");
     if(XLENGTH(op_i) != ncon)
       error("C_np_kernelsum: beta operator vector has the wrong length");
     for(i = 0; i < ncon; ++i) {
@@ -10430,6 +10429,9 @@ SEXP C_np_kernelsum(SEXP tuno,
     }
     if(derivative_dimension >= 0 && p_operator == OP_DERIVATIVE)
       error("C_np_kernelsum: direct and permutation beta derivatives cannot be combined");
+    if(beta_kernel_power != 1 &&
+       (derivative_dimension >= 0 || p_operator == OP_DERIVATIVE))
+      error("C_np_kernelsum: powered beta derivative rows are not yet activated");
     if(num_train <= 0 || num_eval <= 0 || ncon <= 0 ||
        num_response_columns < 0 || num_weight_columns < 0)
       error("C_np_kernelsum: invalid beta kernel-sum dimensions");
@@ -10539,7 +10541,7 @@ SEXP C_np_kernelsum(SEXP tuno,
 
       route_status = kernel_weighted_sum_np_route(
         NULL, NULL, NULL, beta_bandwidth_code, num_train, num_eval,
-        0, 0, ncon, leave_one_out, 0, 1, 0, 0, 0, 0, 0, 0,
+        0, 0, ncon, leave_one_out, 0, beta_kernel_power, 0, 0, 0, 0, 0, 0,
         INTEGER(op_i), OP_NOOP, 0, 0, NULL, 0,
         num_response_columns, num_weight_columns,
         NP_TREE_FALSE, 0, NULL, NULL, NULL, NULL,
@@ -10571,7 +10573,7 @@ SEXP C_np_kernelsum(SEXP tuno,
           direct_operators[i] = OP_DERIVATIVE;
           route_status = kernel_weighted_sum_np_route(
             NULL, NULL, NULL, beta_bandwidth_code, num_train, num_eval,
-            0, 0, ncon, leave_one_out, 0, 1, 0, 0, 0, 0, 0, 0,
+            0, 0, ncon, leave_one_out, 0, beta_kernel_power, 0, 0, 0, 0, 0, 0,
             direct_operators, OP_NOOP, 0, 0, NULL, 0,
             num_response_columns, num_weight_columns,
             NP_TREE_FALSE, 0, NULL, NULL, NULL, NULL,
