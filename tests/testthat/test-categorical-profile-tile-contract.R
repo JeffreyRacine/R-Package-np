@@ -321,6 +321,38 @@ test_that("mixed categorical dimensions retain product and tile order", {
   expect_equal(dense, expected, tolerance = 3e-14)
 })
 
+test_that("ordered convolution dispatch follows each coordinate kernel", {
+  empty_train <- profile_empty_matrix(6L)
+  empty_eval <- profile_empty_matrix(3L)
+  train_ordered <- cbind(
+    c(1, 2, 4, 3, 1, 4),
+    c(3, 2, 1, 2, 3, 1)
+  )
+  eval_ordered <- cbind(c(1, 3, 4), c(2, 1, 3))
+  supports <- list(as.double(1:4), as.double(1:3))
+  kernels <- c(3L, 1L)
+  operators <- c(0L, 1L)
+  lambdas <- c(0.31, 0.27)
+
+  actual <- profile_tile_call(
+    empty_train, train_ordered, empty_eval, eval_ordered,
+    integer(), kernels, operators, lambdas, c(4L, 3L), supports
+  )
+  expected <- vapply(seq_len(nrow(eval_ordered)), function(row) {
+    profile_ordered_kernel(
+      train_ordered[, 1L], eval_ordered[row, 1L], lambdas[[1L]],
+      supports[[1L]], kernels[[1L]], operators[[1L]]
+    ) *
+      profile_ordered_kernel(
+        train_ordered[, 2L], eval_ordered[row, 2L], lambdas[[2L]],
+        supports[[2L]], kernels[[2L]], operators[[2L]],
+        finite_support = TRUE
+      )
+  }, numeric(nrow(train_ordered)))
+
+  expect_equal(actual, expected, tolerance = 3e-14)
+})
+
 test_that("profile tiles are independent of categorical compression policy", {
   train_unordered <- matrix(c(1, 2, 1, 3, 2, 3), ncol = 1L)
   eval_unordered <- matrix(c(1, 3, 2), ncol = 1L)

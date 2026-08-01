@@ -209,6 +209,62 @@ np_categorical_profile_tile_bytes(size_t ntrain,
   return NP_PROFILE_TILE_OK;
 }
 
+static void np_categorical_profile_coordinate_fill_prevalidated(
+  const NPCategoricalProfileKernelSpec *spec,
+  int eval_index,
+  int coordinate,
+  int multiply,
+  double *output)
+{
+  if(coordinate < spec->nunordered) {
+    const int kernel = spec->kernel_unordered[coordinate] +
+      OP_UFUN_OFFSETS[spec->operator_code[coordinate]];
+
+    np_ukernelv(kernel,
+                spec->train_unordered[coordinate],
+                spec->ntrain,
+                multiply,
+                spec->eval_unordered[coordinate][eval_index],
+                spec->lambda[coordinate],
+                spec->num_categories[coordinate],
+                output,
+                NULL,
+                0);
+  } else {
+    const int ordered_coordinate = coordinate - spec->nunordered;
+    const int base_kernel = spec->kernel_ordered[ordered_coordinate];
+    const int operator_code = spec->operator_code[coordinate];
+
+    /* Preserve the incumbent ordered Li--Racine convolution owner. */
+    if(operator_code == OP_CONVOLUTION && base_kernel == 1) {
+      np_convol_okernelv(base_kernel,
+                         spec->train_ordered[ordered_coordinate],
+                         spec->ntrain,
+                         multiply,
+                         spec->eval_ordered[ordered_coordinate][eval_index],
+                         spec->lambda[coordinate],
+                         spec->num_categories[coordinate],
+                         spec->category_values[coordinate],
+                         output,
+                         0);
+    } else {
+      const int kernel = base_kernel + OP_OFUN_OFFSETS[operator_code];
+
+      np_okernelv(kernel,
+                  spec->train_ordered[ordered_coordinate],
+                  spec->ntrain,
+                  multiply,
+                  spec->eval_ordered[ordered_coordinate][eval_index],
+                  spec->lambda[coordinate],
+                  spec->category_values[coordinate],
+                  spec->num_categories[coordinate],
+                  output,
+                  NULL,
+                  0);
+    }
+  }
+}
+
 NPCategoricalProfileTileStatus
 np_categorical_profile_tile_fill_prevalidated(
   const NPCategoricalProfileKernelSpec *spec,
@@ -249,63 +305,73 @@ np_categorical_profile_tile_fill_prevalidated(
     int have_weights = 0;
     int i;
 
-    for(i = 0; i < spec->nunordered; i++) {
-      const int kernel =
-        spec->kernel_unordered[i] +
-        OP_UFUN_OFFSETS[spec->operator_code[i]];
-      np_ukernelv(kernel,
-                  spec->train_unordered[i],
-                  spec->ntrain,
-                  have_weights,
-                  spec->eval_unordered[i][eval_index],
-                  spec->lambda[i],
-                  spec->num_categories[i],
-                  weights,
-                  NULL,
-                  0);
-      have_weights = 1;
-    }
-
-    for(i = 0; i < spec->nordered; i++) {
-      const int offset = spec->nunordered + i;
-      const int base_kernel = spec->kernel_ordered[i];
-      const int operator_code = spec->operator_code[offset];
-
-      /*
-       * Preserve the incumbent ordered Li--Racine convolution owner. Other
-       * ordered kernels use the established operator-code offsets.
-       */
-      if((operator_code == OP_CONVOLUTION) &&
-         (spec->kernel_ordered[0] == 1)) {
-        np_convol_okernelv(base_kernel,
-                           spec->train_ordered[i],
-                           spec->ntrain,
-                           have_weights,
-                           spec->eval_ordered[i][eval_index],
-                           spec->lambda[offset],
-                           spec->num_categories[offset],
-                           spec->category_values[offset],
-                           weights,
-                           0);
-      } else {
-        const int kernel =
-          base_kernel + OP_OFUN_OFFSETS[operator_code];
-        np_okernelv(kernel,
-                    spec->train_ordered[i],
-                    spec->ntrain,
-                    have_weights,
-                    spec->eval_ordered[i][eval_index],
-                    spec->lambda[offset],
-                    spec->category_values[offset],
-                    spec->num_categories[offset],
-                    weights,
-                    NULL,
-                    0);
-      }
+    for(i = 0; i < spec->nunordered + spec->nordered; i++) {
+      np_categorical_profile_coordinate_fill_prevalidated(
+        spec, eval_index, i, have_weights, weights);
       have_weights = 1;
     }
   }
 
+  return NP_PROFILE_TILE_OK;
+}
+
+NPCategoricalProfileTileStatus
+np_categorical_profile_log_row_fill_prevalidated(
+  const NPCategoricalProfileKernelSpec *spec,
+  int eval_index,
+  int omitted_observation,
+  double *scratch,
+  size_t scratch_elements,
+  double *log_absolute,
+  signed char *sign)
+{
+  NPCategoricalProfileTileStatus status;
+  int coordinate;
+  int observation;
+
+  if(spec == NULL || scratch == NULL || log_absolute == NULL || sign == NULL)
+    return NP_PROFILE_TILE_ERR_ARGUMENT;
+  if(eval_index < 0 || eval_index >= spec->neval ||
+     omitted_observation < -1 || omitted_observation >= spec->ntrain)
+    return NP_PROFILE_TILE_ERR_RANGE;
+  if(scratch_elements < (size_t)spec->ntrain)
+    return NP_PROFILE_TILE_ERR_CAPACITY;
+  status = np_categorical_profile_evaluation_data_validate(
+    spec, eval_index, 1);
+  if(status != NP_PROFILE_TILE_OK)
+    return status;
+
+  for(observation = 0; observation < spec->ntrain; ++observation) {
+    log_absolute[observation] =
+      observation == omitted_observation ? -INFINITY : 0.0;
+    sign[observation] = observation == omitted_observation ? 0 : 1;
+  }
+  for(coordinate = 0;
+      coordinate < spec->nunordered + spec->nordered;
+      ++coordinate) {
+    np_categorical_profile_coordinate_fill_prevalidated(
+      spec, eval_index, coordinate, 0, scratch);
+    for(observation = 0; observation < spec->ntrain; ++observation) {
+      const double factor = scratch[observation];
+
+      if(observation == omitted_observation)
+        continue;
+      if(!isfinite(factor))
+        return NP_PROFILE_TILE_ERR_NONFINITE;
+      if(sign[observation] == 0)
+        continue;
+      if(factor == 0.0) {
+        log_absolute[observation] = -INFINITY;
+        sign[observation] = 0;
+      } else {
+        log_absolute[observation] += log(fabs(factor));
+        sign[observation] =
+          (signed char)(sign[observation] * (factor < 0.0 ? -1 : 1));
+        if(!isfinite(log_absolute[observation]))
+          return NP_PROFILE_TILE_ERR_NONFINITE;
+      }
+    }
+  }
   return NP_PROFILE_TILE_OK;
 }
 

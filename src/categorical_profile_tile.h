@@ -63,6 +63,22 @@ np_categorical_profile_tile_fill_prevalidated(
   double *output,
   size_t output_elements);
 
+/*
+ * Form one complete categorical product row in signed-log form.  The caller
+ * supplies one reusable O(ntrain) ordinary-value scratch row; no storage is
+ * allocated here.  Every non-omitted output satisfies the strict pair
+ * contract sign in {-1,0,1}, with sign zero iff log_absolute is -Inf.
+ */
+NPCategoricalProfileTileStatus
+np_categorical_profile_log_row_fill_prevalidated(
+  const NPCategoricalProfileKernelSpec *spec,
+  int eval_index,
+  int omitted_observation,
+  double *scratch,
+  size_t scratch_elements,
+  double *log_absolute,
+  signed char *sign);
+
 /* Fully checked convenience entry for isolated calls and proof hooks. */
 NPCategoricalProfileTileStatus
 np_categorical_profile_tile_fill(
