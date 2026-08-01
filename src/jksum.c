@@ -8724,8 +8724,6 @@ static int np_beta_absolute_route(
   if(has_categories) {
     NPContinuousKernelRowStatus row_status;
 
-    if(weighted_sum_power2 != NULL)
-      goto cleanup;
     row_status = np_beta_categorical_factor_context_prepare(
       &categorical_context, num_obs_train, num_obs_eval,
       num_reg_unordered, num_reg_ordered,
@@ -8746,6 +8744,7 @@ static int np_beta_absolute_route(
     row_status =
       np_continuous_kernel_beta_dual_power_rows_validated(
         &plan, leave_one_out, leave_one_out_offset,
+        has_categories ? &categorical_provider : NULL,
         matrix_Y, ncol_Y, matrix_W, ncol_W,
         matrix_Y_power2, ncol_Y_power2, matrix_W_power2, ncol_W_power2,
         &workspace, &row_result, weighted_sum, weighted_sum_power2,
@@ -9068,7 +9067,7 @@ const NPContinuousKernelExecutionContext * const kernel_execution_context){
         matrix_bw_train != NULL &&
         (!route_has_convolution || matrix_bw_eval != NULL))) &&
       ((!beta_has_categories && lambda_pre == NULL) ||
-      (beta_has_categories && !beta_dual_power)) &&
+       beta_has_categories) &&
       (dual_power_ctx == NULL ||
        (beta_dual_power && kernel_pow == 1 && !route_has_derivative &&
         kw == NULL)) &&
@@ -11320,7 +11319,11 @@ const int bandwidth_divide_weights,
 const int * const operator,
 const int ncol_Y,
 const int ncol_W,
+double **matrix_X_unordered_train,
+double **matrix_X_ordered_train,
 double **matrix_X_continuous_train,
+double **matrix_X_unordered_eval,
+double **matrix_X_ordered_eval,
 double **matrix_X_continuous_eval,
 double **matrix_Y,
 double **matrix_W,
@@ -11328,6 +11331,10 @@ double *vector_scale_factor,
 int bandwidth_provided,
 double **matrix_bw_train,
 double **matrix_bw_eval,
+double *lambda_pre,
+int *num_categories,
+double **matrix_categorical_vals,
+const int categorical_compress,
 double * const weighted_sum,
 double * const weighted_sum_power2,
 const NPContinuousKernelRoute * const kernel_route,
@@ -11337,7 +11344,7 @@ NPContinuousKernelDerivativeDiagnostics * const kernel_route_diagnostics)
     weighted_sum_power2, 2, NULL, NULL, 0, 0
   };
   const NPContinuousKernelExecutionContext kernel_execution_context = {
-    kernel_route, kernel_route_diagnostics, 0
+    kernel_route, kernel_route_diagnostics, categorical_compress
   };
 
   return kernel_weighted_sum_np_ctx_ex(
@@ -11349,11 +11356,13 @@ NPContinuousKernelDerivativeDiagnostics * const kernel_route_diagnostics)
     0, 0, 0, 0, operator, OP_NOOP,
     0, 0, NULL, 0, ncol_Y, ncol_W,
     NP_TREE_FALSE, 0, NULL, NULL, NULL, NULL,
-    NULL, NULL, matrix_X_continuous_train,
-    NULL, NULL, matrix_X_continuous_eval,
+    matrix_X_unordered_train, matrix_X_ordered_train,
+    matrix_X_continuous_train,
+    matrix_X_unordered_eval, matrix_X_ordered_eval,
+    matrix_X_continuous_eval,
     matrix_Y, matrix_W, NULL, vector_scale_factor,
     bandwidth_provided, matrix_bw_train, matrix_bw_eval,
-    NULL, NULL, NULL, NULL,
+    lambda_pre, num_categories, matrix_categorical_vals, NULL,
     weighted_sum, NULL, NULL, NULL,
     &dual_power_ctx, NULL,
     kernel_route == NULL ? NULL : &kernel_execution_context);

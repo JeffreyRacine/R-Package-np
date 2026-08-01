@@ -112,3 +112,52 @@ test_that("beta dual powers honor empirical range resolution", {
   expect_identical(dual$ksum, power_one$ksum)
   expect_identical(dual$ksum.power2, power_two$ksum)
 })
+
+test_that("beta dual powers share the canonical mixed categorical row", {
+  old <- options(np.messages = FALSE, np.categorical.compress = FALSE)
+  on.exit(options(old), add = TRUE)
+  dual_sum <- getFromNamespace(".npksum_power12", "np")
+  training <- data.frame(
+    x = seq(.01, .99, length.out = 24L),
+    u = factor(rep(letters[1:3], each = 8L)),
+    o = ordered(rep(1:4, length.out = 24L), levels = 1:4)
+  )
+  evaluation <- training[c(2L, 7L, 13L, 20L), , drop = FALSE]
+
+  for (mode in c("fixed", "generalized_nn", "adaptive_nn")) {
+    continuous_bandwidth <- if (identical(mode, "fixed")) .14 else 12
+    for (order in c(2L, 4L, 6L, 8L)) {
+      bandwidth <- np:::kbandwidth(
+        bw = c(continuous_bandwidth, .22, .31),
+        xdati = np:::untangle(training),
+        xnames = names(training),
+        bwtype = mode,
+        ckertype = "gaussian"
+      )
+      bandwidth[["ckertype"]] <- "beta"
+      bandwidth[["ckerorder"]] <- order
+      bandwidth[["ckerbound"]] <- "fixed"
+      bandwidth[["ckerlb"]][bandwidth[["icon"]]] <- 0
+      bandwidth[["ckerub"]][bandwidth[["icon"]]] <- 1
+      arguments <- list(
+        bws = bandwidth,
+        txdat = training,
+        exdat = evaluation
+      )
+
+      dense <- do.call(dual_sum, arguments)
+      power_one <- do.call(npksum, arguments)
+      power_two <- do.call(
+        npksum, c(arguments, list(kernel.pow = 2L))
+      )
+      options(np.categorical.compress = TRUE)
+      compressed <- do.call(dual_sum, arguments)
+      options(np.categorical.compress = FALSE)
+
+      expect_identical(dense$ksum, power_one$ksum)
+      expect_identical(dense$ksum.power2, power_two$ksum)
+      expect_identical(compressed$ksum, dense$ksum)
+      expect_identical(compressed$ksum.power2, dense$ksum.power2)
+    }
+  }
+})
