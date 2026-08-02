@@ -513,6 +513,64 @@ test_that("legacy conditional scalar owner retains dormant route plumbing", {
   )
 })
 
+test_that("density CVML owner retains beta-unreachable route plumbing", {
+  root <- locate_beta_activation_sources()
+  skip_if(is.null(root), "package sources unavailable")
+  ingress <- paste(
+    readLines(file.path(root, "src", "kernelcv.c"), warn = FALSE),
+    collapse = "\n"
+  )
+  engine <- paste(
+    readLines(file.path(root, "src", "jksum.c"), warn = FALSE),
+    collapse = "\n"
+  )
+
+  owner_start <- regexpr(
+    "int np_kernel_estimate_density_categorical_leave_one_out_cv(",
+    engine,
+    fixed = TRUE
+  )[[1L]]
+  owner_end <- regexpr(
+    "int np_kernel_estimate_density_categorical_convolution_cv(",
+    engine,
+    fixed = TRUE
+  )[[1L]]
+  expect_gt(owner_start, 0L)
+  expect_gt(owner_end, owner_start)
+  owner <- substr(engine, owner_start, owner_end - 1L)
+
+  expect_match(owner, "const NPContinuousKernelRoute * const kernel_route",
+               fixed = TRUE)
+  expect_match(owner, "(void)kernel_route;", fixed = TRUE)
+  expect_match(owner, "(void)kernel_route_diagnostics;", fixed = TRUE)
+  expect_match(owner, "(void)categorical_compress;", fixed = TRUE)
+  expect_false(grepl("NPContinuousKernelExecutionContext", owner,
+                     fixed = TRUE))
+
+  callback_start <- regexpr(
+    "double np_cv_func_density_categorical_ml(", ingress, fixed = TRUE
+  )[[1L]]
+  callback_end <- regexpr(
+    "double np_cv_func_density_categorical_ls(", ingress, fixed = TRUE
+  )[[1L]]
+  expect_gt(callback_start, 0L)
+  expect_gt(callback_end, callback_start)
+  callback <- substr(ingress, callback_start, callback_end - 1L)
+  expect_match(callback, "if(KERNEL_den_extern == NP_CKERNEL_COORDINATE_CODE)",
+               fixed = TRUE)
+  expect_match(
+    callback,
+    paste0(
+      "num_categories_extern,\n",
+      "        NULL,\n",
+      "        NULL,\n",
+      "        0,\n",
+      "        &cv)==1)"
+    ),
+    fixed = TRUE
+  )
+})
+
 test_that("every beta side enters the common conditional regression owner", {
   root <- locate_beta_activation_sources()
   skip_if(is.null(root), "package sources unavailable")

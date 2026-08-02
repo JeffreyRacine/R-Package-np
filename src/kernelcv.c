@@ -422,6 +422,9 @@ double np_cv_func_density_categorical_ml(double *vector_scale_factor)
         matrix_X_continuous_train_extern,
         &vector_scale_factor[1],
         num_categories_extern,
+        NULL,
+        NULL,
+        0,
         &cv)==1)
     {
         return(DBL_MAX);

@@ -32204,9 +32204,17 @@ int np_kernel_estimate_density_categorical_leave_one_out_cv(int KERNEL_den,
 double **matrix_X_continuous,
 double *vector_scale_factor,
 int *num_categories,
+const NPContinuousKernelRoute * const kernel_route,
+NPContinuousKernelDerivativeDiagnostics * const kernel_route_diagnostics,
+const int categorical_compress,
 double *cv){
   NP_GateOverrideCtx gate_ctx_local;
   np_gate_ctx_clear(&gate_ctx_local);
+
+  /* A null route preserves the incumbent objective arithmetic. */
+  (void)kernel_route;
+  (void)kernel_route_diagnostics;
+  (void)categorical_compress;
 
   const int num_reg = num_reg_continuous+num_reg_unordered+num_reg_ordered;
   const int bwmdim = (BANDWIDTH_den==BW_GEN_NN)?num_obs:
