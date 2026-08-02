@@ -1904,8 +1904,10 @@ cleanup:
 }
 
 /*
- * Consume powers one and two from one complete ordinary beta route.  The two
- * output tensors may bind different response/weight columns, matching the
+ * Consume power one and, when requested, power two from one complete ordinary
+ * beta route.  Retaining the common row scale is also useful to power-one-only
+ * LP hat/apply consumers, which must not reconstruct absolute weights.  The
+ * two output tensors may bind different response/weight columns, matching the
  * shared dual-power context contract.  Every beta segment is composed in
  * signed-log form; an optional provider supplies the product of non-beta
  * factors.  Derivatives retain their separate regular/jump owner.
@@ -1933,6 +1935,7 @@ np_continuous_kernel_beta_dual_power_rows_validated(
   NPContinuousKernelDerivativeDiagnostics *diagnostics,
   NPContinuousKernelProgressFunction progress)
 {
+  const int compute_power2 = weighted_sum_power2 != NULL;
   const int response_extent = response_columns > 0 ? response_columns : 1;
   const int weight_extent = weight_columns > 0 ? weight_columns : 1;
   const int power2_response_extent = power2_response_columns > 0 ?
@@ -1961,14 +1964,16 @@ np_continuous_kernel_beta_dual_power_rows_validated(
      (weight_columns > 0 && case_weights == NULL) ||
      (power2_response_columns > 0 && power2_response == NULL) ||
      (power2_weight_columns > 0 && power2_case_weights == NULL) ||
-     workspace == NULL || row_result == NULL ||
-     weighted_sum == NULL || weighted_sum_power2 == NULL ||
+     workspace == NULL || row_result == NULL || weighted_sum == NULL ||
+     (!compute_power2 &&
+      (power2_response != NULL || power2_response_columns != 0 ||
+       power2_case_weights != NULL || power2_weight_columns != 0)) ||
      (retain_common_scale != 0 && retain_common_scale != 1) ||
      (!retain_common_scale && scaled_kernel_weights != NULL) ||
      (retain_common_scale && row_result->row == NULL) ||
      (size_t)response_extent > SIZE_MAX / (size_t)weight_extent ||
-     (size_t)power2_response_extent >
-       SIZE_MAX / (size_t)power2_weight_extent)
+     (compute_power2 && (size_t)power2_response_extent >
+       SIZE_MAX / (size_t)power2_weight_extent))
     return NP_CONTINUOUS_ROW_ERR_LAYOUT;
   for(index = 0; index < response_columns; ++index)
     if(response[index] == NULL)
@@ -1976,21 +1981,24 @@ np_continuous_kernel_beta_dual_power_rows_validated(
   for(index = 0; index < weight_columns; ++index)
     if(case_weights[index] == NULL)
       return NP_CONTINUOUS_ROW_ERR_LAYOUT;
-  for(index = 0; index < power2_response_columns; ++index)
-    if(power2_response[index] == NULL)
-      return NP_CONTINUOUS_ROW_ERR_LAYOUT;
-  for(index = 0; index < power2_weight_columns; ++index)
-    if(power2_case_weights[index] == NULL)
-      return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  if(compute_power2) {
+    for(index = 0; index < power2_response_columns; ++index)
+      if(power2_response[index] == NULL)
+        return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+    for(index = 0; index < power2_weight_columns; ++index)
+      if(power2_case_weights[index] == NULL)
+        return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  }
   for(index = 0; index < plan->num_continuous; ++index)
     if(plan->operator[index] != OP_NORMAL)
       return NP_CONTINUOUS_ROW_ERR_LAYOUT;
 
   sum_extent = (size_t)response_extent * (size_t)weight_extent;
-  power2_sum_extent = (size_t)power2_response_extent *
-    (size_t)power2_weight_extent;
+  power2_sum_extent = compute_power2 ?
+    (size_t)power2_response_extent * (size_t)power2_weight_extent : 0;
   if((size_t)plan->num_eval > SIZE_MAX / sum_extent ||
-     (size_t)plan->num_eval > SIZE_MAX / power2_sum_extent ||
+     (compute_power2 &&
+      (size_t)plan->num_eval > SIZE_MAX / power2_sum_extent) ||
      (leave_one_out &&
       (plan->num_eval > plan->num_train ||
        leave_one_out_offset > plan->num_train - plan->num_eval)))
@@ -2021,8 +2029,9 @@ np_continuous_kernel_beta_dual_power_rows_validated(
     }
     for(size_t output = 0; output < sum_extent; ++output)
       weighted_sum[output_base + output] = 0.0;
-    for(size_t output = 0; output < power2_sum_extent; ++output)
-      weighted_sum_power2[power2_output_base + output] = 0.0;
+    if(compute_power2)
+      for(size_t output = 0; output < power2_sum_extent; ++output)
+        weighted_sum_power2[power2_output_base + output] = 0.0;
 
     for(observation = 0; observation < plan->num_train; ++observation) {
       double value;
@@ -2037,7 +2046,7 @@ np_continuous_kernel_beta_dual_power_rows_validated(
           workspace->primary_log_absolute[observation],
           workspace->primary_sign[observation], &value);
       }
-      if(status == NP_CONTINUOUS_ROW_OK) {
+      if(compute_power2 && status == NP_CONTINUOUS_ROW_OK) {
         /* A dual consumer already owns K in representable arithmetic.  Square
          * it directly instead of paying for a second exp(2 * log(K)). */
         value_power2 = value * value;
@@ -2074,25 +2083,27 @@ np_continuous_kernel_beta_dual_power_rows_validated(
             return NP_CONTINUOUS_ROW_ERR_NUMERIC;
         }
       }
-      for(int response_column = 0;
-          response_column < power2_response_extent; ++response_column) {
-        const double response_value = power2_response_columns > 0 ?
-          power2_response[response_column][observation] : 1.0;
+      if(compute_power2) {
+        for(int response_column = 0;
+            response_column < power2_response_extent; ++response_column) {
+          const double response_value = power2_response_columns > 0 ?
+            power2_response[response_column][observation] : 1.0;
 
-        for(int weight_column = 0;
-            weight_column < power2_weight_extent; ++weight_column) {
-          const double weight_value = power2_weight_columns > 0 ?
-            power2_case_weights[weight_column][observation] : 1.0;
-          const size_t output = power2_output_base +
-            (size_t)response_column * (size_t)power2_weight_extent +
-            (size_t)weight_column;
+          for(int weight_column = 0;
+              weight_column < power2_weight_extent; ++weight_column) {
+            const double weight_value = power2_weight_columns > 0 ?
+              power2_case_weights[weight_column][observation] : 1.0;
+            const size_t output = power2_output_base +
+              (size_t)response_column * (size_t)power2_weight_extent +
+              (size_t)weight_column;
 
-          if(!R_FINITE(response_value) || !R_FINITE(weight_value))
-            return NP_CONTINUOUS_ROW_ERR_NUMERIC;
-          weighted_sum_power2[output] +=
-            value_power2 * response_value * weight_value;
-          if(!R_FINITE(weighted_sum_power2[output]))
-            return NP_CONTINUOUS_ROW_ERR_NUMERIC;
+            if(!R_FINITE(response_value) || !R_FINITE(weight_value))
+              return NP_CONTINUOUS_ROW_ERR_NUMERIC;
+            weighted_sum_power2[output] +=
+              value_power2 * response_value * weight_value;
+            if(!R_FINITE(weighted_sum_power2[output]))
+              return NP_CONTINUOUS_ROW_ERR_NUMERIC;
+          }
         }
       }
     }

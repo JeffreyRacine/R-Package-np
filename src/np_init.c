@@ -20,7 +20,7 @@ extern SEXP C_np_density_conditional_nomad_shadow_fixed_native_search(SEXP, SEXP
 extern SEXP C_np_density_conditional_nomad_shadow_clear(void);
 extern SEXP C_np_density_conditional(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_beta_conditional_bootstrap(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
-extern SEXP C_np_regression_lp_apply_conditional(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP C_np_regression_lp_apply_conditional(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_lc_hat_normalize(SEXP, SEXP);
 extern SEXP C_np_reghat_lp_matrix_fast(SEXP, SEXP, SEXP);
 extern SEXP C_np_npscoef_batch_zero_solve(SEXP, SEXP);
@@ -67,7 +67,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"C_np_density_conditional_nomad_shadow_clear",(DL_FUNC) &C_np_density_conditional_nomad_shadow_clear,0},
     {"C_np_density_conditional",       (DL_FUNC) &C_np_density_conditional,       31},
     {"C_np_beta_conditional_bootstrap",(DL_FUNC) &C_np_beta_conditional_bootstrap,19},
-    {"C_np_regression_lp_apply_conditional",(DL_FUNC) &C_np_regression_lp_apply_conditional,17},
+    {"C_np_regression_lp_apply_conditional",(DL_FUNC) &C_np_regression_lp_apply_conditional,23},
     {"C_np_lc_hat_normalize",             (DL_FUNC) &C_np_lc_hat_normalize,              2},
     {"C_np_reghat_lp_matrix_fast",       (DL_FUNC) &C_np_reghat_lp_matrix_fast,        3},
     {"C_np_npscoef_batch_zero_solve",    (DL_FUNC) &C_np_npscoef_batch_zero_solve,     2},

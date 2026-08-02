@@ -298,6 +298,15 @@
   bounds remain literal, while every non-beta range route continues to use
   exact sample minima and maxima.
 
+* Beta regression hat matrices, leverages, and matrix-free applications now
+  use the same canonical common-scaled row and local-polynomial solve owners as
+  fitted values. Orders 2/4/6/8, fixed and nearest-neighbour bandwidths,
+  raw/Bernstein bases, derivatives, and mixed categorical predictors are
+  supported without reconstructing underflowed absolute weights. Direct
+  application retains only a bounded influence-row block rather than an
+  evaluation-by-training matrix; a full matrix is allocated only when the
+  caller explicitly requests one.
+
 * Beta range resolution now validates distinct-extrema metadata coordinate by
   coordinate. This fixes an unreleased 0.70-6 development defect in which two
   or more continuous beta coordinates failed during support resolution because

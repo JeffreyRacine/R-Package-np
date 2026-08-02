@@ -30,6 +30,7 @@
 #include "categorical_profile_tile.h"
 #include "continuous_kernel_row.h"
 #include "beta_bandwidth.h"
+#include "reghat_fast.h"
 
 #include "hash.h"
 #include "tree.h"
@@ -9292,7 +9293,7 @@ static int np_beta_absolute_route(
     goto cleanup;
   }
 
-  if(weighted_sum_power2 != NULL) {
+  if(weighted_sum_power2 != NULL || retain_common_scale) {
     NPContinuousKernelRowStatus row_status;
 
     if(derivative_coordinate >= 0 || kernel_power != 1 ||
@@ -9565,26 +9566,28 @@ const NPCenteredMomentCtx * const centered_moment_ctx){
     int route_has_convolution = 0;
     int route_has_derivative = 0;
     int route_coordinate;
+    const int beta_scaled_outer =
+      dual_power_ctx != NULL && dual_power_ctx->retain_common_scale;
     const int beta_dual_power =
       dual_power_ctx != NULL && dual_power_ctx->weighted_sum != NULL &&
       dual_power_ctx->kernel_pow == 2;
     const int beta_retain_common_scale =
-      beta_dual_power && dual_power_ctx->retain_common_scale;
+      beta_scaled_outer;
     const int beta_centered_moment =
       centered_moment_ctx != NULL &&
       centered_moment_ctx->centered_m2 != NULL;
-    double ** const beta_power2_Y =
-      beta_dual_power && dual_power_ctx->matrix_Y != NULL ?
-      dual_power_ctx->matrix_Y : matrix_Y;
-    double ** const beta_power2_W =
-      beta_dual_power && dual_power_ctx->matrix_W != NULL ?
-      dual_power_ctx->matrix_W : matrix_W;
-    const int beta_power2_ncol_Y =
-      beta_dual_power && dual_power_ctx->matrix_Y != NULL ?
-      dual_power_ctx->ncol_Y : ncol_Y;
-    const int beta_power2_ncol_W =
-      beta_dual_power && dual_power_ctx->matrix_W != NULL ?
-      dual_power_ctx->ncol_W : ncol_W;
+    double ** const beta_power2_Y = beta_dual_power ?
+      ((dual_power_ctx->matrix_Y != NULL) ?
+       dual_power_ctx->matrix_Y : matrix_Y) : NULL;
+    double ** const beta_power2_W = beta_dual_power ?
+      ((dual_power_ctx->matrix_W != NULL) ?
+       dual_power_ctx->matrix_W : matrix_W) : NULL;
+    const int beta_power2_ncol_Y = beta_dual_power ?
+      ((dual_power_ctx->matrix_Y != NULL) ?
+       dual_power_ctx->ncol_Y : ncol_Y) : 0;
+    const int beta_power2_ncol_W = beta_dual_power ?
+      ((dual_power_ctx->matrix_W != NULL) ?
+       dual_power_ctx->ncol_W : ncol_W) : 0;
     const int beta_has_categories =
       num_reg_unordered > 0 || num_reg_ordered > 0;
     const int beta_categories_valid =
@@ -9633,7 +9636,8 @@ const NPCenteredMomentCtx * const centered_moment_ctx){
       ((!beta_has_categories && lambda_pre == NULL) ||
        beta_has_categories) &&
       (dual_power_ctx == NULL ||
-       (beta_dual_power && kernel_pow == 1 && !route_has_derivative &&
+       ((beta_dual_power || beta_scaled_outer) &&
+        kernel_pow == 1 && !route_has_derivative &&
         (kw == NULL || beta_retain_common_scale))) &&
       (centered_moment_ctx == NULL ||
        (beta_centered_moment && dual_power_ctx == NULL &&
@@ -19747,9 +19751,10 @@ static NP_NOINLINE NP_COLD int np_beta_regression_bandwidth_prepare_canonical(
 }
 
 /*
- * Route one general-LP evaluation row through the canonical beta accumulator.
- * Power one carries the response and design columns; power two carries only
- * the design Gram columns used by the shared covariance sandwich.
+ * Route one LP fit evaluation row through the canonical beta moment
+ * accumulator. Power one carries the caller's response/basis columns and the
+ * design Gram may bind to power two. Normalized hat/apply consumers instead
+ * retain only the common-scaled row in their persistent row context below.
  */
 static NP_NOINLINE int np_beta_regression_lp_moment_row_canonical(
   const int bandwidth_mode,
@@ -19758,6 +19763,7 @@ static NP_NOINLINE int np_beta_regression_lp_moment_row_canonical(
   const int num_reg_ordered,
   const int num_reg_continuous,
   const int nterms,
+  const int outer_column_count,
   const int *operator,
   int *kernel_unordered,
   int *kernel_ordered,
@@ -19767,7 +19773,7 @@ static NP_NOINLINE int np_beta_regression_lp_moment_row_canonical(
   double **matrix_X_unordered_eval,
   double **matrix_X_ordered_eval,
   double **matrix_X_continuous_eval,
-  double **matrix_Y,
+  double **outer_columns,
   double **basis,
   double *vector_scale_factor,
   double **matrix_bandwidth_train,
@@ -19778,6 +19784,7 @@ static NP_NOINLINE int np_beta_regression_lp_moment_row_canonical(
   const int categorical_compress,
   double *weighted_sum,
   double *weighted_sum_power2,
+  double *scaled_kernel_weights,
   const NPContinuousKernelRoute *kernel_route,
   NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics)
 {
@@ -19794,19 +19801,184 @@ static NP_NOINLINE int np_beta_regression_lp_moment_row_canonical(
     num_reg_unordered, num_reg_ordered, num_reg_continuous,
     0, 0, 1, 0, 0,
     0, 0, 0, 0, operator, OP_NOOP,
-    0, 0, NULL, 1, nterms, nterms + 2,
+    0, 0, NULL, 1, nterms, outer_column_count,
     NP_TREE_FALSE, 0, NULL, NULL, NULL, NULL,
     matrix_X_unordered_train, matrix_X_ordered_train,
     matrix_X_continuous_train,
     matrix_X_unordered_eval, matrix_X_ordered_eval,
     matrix_X_continuous_eval,
-    basis, matrix_Y, NULL, vector_scale_factor,
+    basis, outer_columns, NULL, vector_scale_factor,
     bandwidth_mode == BW_FIXED ? 0 : 1,
     bandwidth_mode == BW_FIXED ? NULL : matrix_bandwidth_train,
     bandwidth_mode == BW_FIXED ? NULL : matrix_bandwidth_eval,
     lambda, num_categories, matrix_categorical_vals, NULL,
-    weighted_sum, NULL, NULL, NULL,
+    weighted_sum, NULL, scaled_kernel_weights, NULL,
     &dual_power_context, NULL, &execution_context, NULL);
+}
+
+/*
+ * Persistent call-scoped beta row owner for normalized LP consumers.  It
+ * retains the canonical signed-log and categorical-profile workspaces across
+ * evaluation rows, but owns no estimator algebra and no evaluation-by-training
+ * storage.  The scaled output row has one common factor, which cancels from
+ * scalar normalization and every nonsingular wider-LP influence solve.
+ */
+typedef struct {
+  int ready;
+  int has_categories;
+  NPContinuousKernelRowWorkspace row_workspace;
+  NPContinuousKernelRowPlan plan;
+  NPContinuousKernelRowResult row_result;
+  NPBetaCategoricalFactorContext categorical_context;
+  NPContinuousKernelLogFactorProvider categorical_provider;
+  NPContinuousKernelDerivativeDiagnostics *diagnostics;
+} NPBetaRegressionScaledRowContext;
+
+static void np_beta_regression_scaled_row_context_init(
+  NPBetaRegressionScaledRowContext *context)
+{
+  if(context == NULL)
+    return;
+  memset(context, 0, sizeof(*context));
+  np_continuous_kernel_row_workspace_init(&context->row_workspace);
+  np_beta_categorical_factor_context_init_empty(
+    &context->categorical_context);
+}
+
+static void np_beta_regression_scaled_row_context_clear(
+  NPBetaRegressionScaledRowContext *context)
+{
+  if(context == NULL)
+    return;
+  np_continuous_kernel_row_workspace_release(&context->row_workspace);
+  np_beta_categorical_factor_context_release(
+    &context->categorical_context);
+  np_beta_regression_scaled_row_context_init(context);
+}
+
+static NPContinuousKernelRowStatus
+np_beta_regression_scaled_row_context_prepare(
+  NPBetaRegressionScaledRowContext *context,
+  const NPContinuousKernelRoute *route,
+  NPContinuousKernelDerivativeDiagnostics *diagnostics,
+  int bandwidth_mode,
+  int ntrain,
+  int neval,
+  int ncontinuous,
+  int nunordered,
+  int nordered,
+  double **train_continuous,
+  double **eval_continuous,
+  double **train_unordered,
+  double **eval_unordered,
+  double **train_ordered,
+  double **eval_ordered,
+  double **bandwidth_train,
+  double **bandwidth_eval,
+  const int *operator_code,
+  const int *kernel_unordered,
+  const int *kernel_ordered,
+  const double *lambda,
+  const int *num_categories,
+  double **category_values,
+  int categorical_compress,
+  double *row)
+{
+  NPContinuousKernelRowStatus status;
+  int coordinate;
+  int train_is_eval = ntrain == neval;
+
+  if(context == NULL || route == NULL || diagnostics == NULL ||
+     ntrain <= 0 || neval <= 0 || ncontinuous <= 0 ||
+     train_continuous == NULL || eval_continuous == NULL ||
+     bandwidth_train == NULL || bandwidth_eval == NULL ||
+     operator_code == NULL || row == NULL ||
+     (categorical_compress != 0 && categorical_compress != 1))
+    return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  if(np_continuous_kernel_route_validate(route, ncontinuous) !=
+       NP_CKERNEL_ROUTE_OK ||
+     !np_continuous_kernel_route_has_beta(route) ||
+     route->segment_count != 1 ||
+     route->segment[0].coordinate_offset != 0 ||
+     route->segment[0].coordinate_count != ncontinuous)
+    return NP_CONTINUOUS_ROW_ERR_ROUTE;
+
+  for(coordinate = 0; coordinate < ncontinuous; ++coordinate)
+    train_is_eval &= train_continuous[coordinate] ==
+      eval_continuous[coordinate];
+  for(coordinate = 0; coordinate < nunordered; ++coordinate)
+    train_is_eval &= train_unordered[coordinate] ==
+      eval_unordered[coordinate];
+  for(coordinate = 0; coordinate < nordered; ++coordinate)
+    train_is_eval &= train_ordered[coordinate] == eval_ordered[coordinate];
+
+  context->plan.route = route;
+  context->plan.bandwidth_mode = bandwidth_mode;
+  context->plan.num_train = ntrain;
+  context->plan.num_eval = neval;
+  context->plan.num_continuous = ncontinuous;
+  context->plan.train_is_eval = train_is_eval;
+  context->plan.train = train_continuous;
+  context->plan.evaluation = eval_continuous;
+  context->plan.bandwidth_train = bandwidth_train;
+  context->plan.bandwidth_eval = bandwidth_eval;
+  context->plan.operator = operator_code;
+  context->row_result.row = row;
+  context->diagnostics = diagnostics;
+  context->has_categories = nunordered > 0 || nordered > 0;
+  context->categorical_provider.function = np_beta_categorical_log_factor;
+  context->categorical_provider.context = &context->categorical_context;
+
+  status = np_continuous_kernel_row_plan_validate(&context->plan);
+  if(status != NP_CONTINUOUS_ROW_OK)
+    return status;
+  if(context->has_categories) {
+    status = np_beta_categorical_factor_context_prepare(
+      &context->categorical_context, ntrain, neval, nunordered, nordered,
+      train_unordered, train_ordered, eval_unordered, eval_ordered,
+      kernel_unordered, kernel_ordered, operator_code + ncontinuous,
+      lambda, num_categories, category_values, categorical_compress, row);
+    if(status != NP_CONTINUOUS_ROW_OK)
+      return status;
+  }
+  context->ready = 1;
+  return NP_CONTINUOUS_ROW_OK;
+}
+
+static NPContinuousKernelRowStatus
+np_beta_regression_scaled_row_context_fill(
+  NPBetaRegressionScaledRowContext *context,
+  int evaluation,
+  double *sum)
+{
+  NPContinuousKernelRowStatus status;
+  int observation;
+  double row_sum = 0.0;
+
+  if(context == NULL || !context->ready || evaluation < 0 ||
+     evaluation >= context->plan.num_eval)
+    return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  status = np_continuous_kernel_beta_factor_row_with_log_factor(
+    &context->plan, evaluation, -1,
+    context->has_categories ? &context->categorical_provider : NULL,
+    &context->row_workspace, &context->row_result);
+  if(status != NP_CONTINUOUS_ROW_OK) {
+    context->diagnostics->bad_coordinate =
+      context->row_result.bad_coordinate;
+    context->diagnostics->bad_observation =
+      context->row_result.bad_observation;
+    context->diagnostics->beta_status = context->row_result.beta_status;
+    return status;
+  }
+  if(sum != NULL) {
+    for(observation = 0; observation < context->plan.num_train;
+        ++observation)
+      row_sum += context->row_result.row[observation];
+    if(!R_FINITE(row_sum))
+      return NP_CONTINUOUS_ROW_ERR_NUMERIC;
+    *sum = row_sum;
+  }
+  return NP_CONTINUOUS_ROW_OK;
 }
 
 int kernel_estimate_regression_categorical_tree_np(
@@ -20982,6 +21154,7 @@ int categorical_compress){
              num_reg_ordered,
              num_reg_continuous,
              glp_nterms,
+             glp_nterms + 2,
              operator,
              kernel_u,
              kernel_o,
@@ -21003,6 +21176,7 @@ int categorical_compress){
              categorical_compress,
              out,
              out2,
+             NULL,
              kernel_route,
              kernel_route_diagnostics) != 0) {
           estimation_shortcut_done = -2;
@@ -21588,7 +21762,10 @@ static int np_conditional_kernel_row_raw(const int *kernel_c,
 int np_regression_lp_hat_matrix(double *vector_scale_factor,
                                 int deriv_var,
                                 int deriv_order,
-                                double *weights_out){
+                                double *weights_out,
+                                const NPContinuousKernelRoute *kernel_route,
+                                NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
+                                int categorical_compress){
   const int num_train = num_obs_train_extern;
   const int num_eval = num_obs_eval_extern;
   const int num_reg_tot =
@@ -21598,16 +21775,20 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
     ((BANDWIDTH_den_extern == BW_GEN_NN) ? num_eval : num_train);
   const int use_bernstein = (int_glp_bernstein_extern != 0);
   int *kernel_cx = NULL, *kernel_ux = NULL, *kernel_ox = NULL, *x_operator = NULL;
-  double *vsfx = NULL, *lambdax = NULL, *kw = NULL, *mean_row = NULL, *out2 = NULL;
+  double *vsfx = NULL, *lambdax = NULL, *kw = NULL, *mean_row = NULL;
+  double *out2 = NULL;
   double **matrix_bandwidth_x = NULL, **matrix_bandwidth_eval_one = NULL;
   double **eval_xuno_one = NULL, **eval_xord_one = NULL, **eval_xcon_one = NULL;
   NPLPSolveWorkspace solve_workspace;
+  NPReghatLPWorkspace reghat_workspace;
+  NPBetaRegressionScaledRowContext beta_row_context;
   double *eval_basis = NULL;
   NPConditionalBoundState bounds_state;
   int i, j, l;
   int status = 1;
 
-  if(np_lp_engine_extern != NP_LP_ENGINE_GENERAL)
+  if(np_lp_engine_extern != NP_LP_ENGINE_SCALAR &&
+     np_lp_engine_extern != NP_LP_ENGINE_GENERAL)
     return 1;
   if((BANDWIDTH_den_extern != BW_FIXED) &&
      (BANDWIDTH_den_extern != BW_GEN_NN) &&
@@ -21617,32 +21798,62 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
     return 1;
   if((deriv_var < 0) || (deriv_var > num_reg_continuous_extern) || (deriv_order < 0))
     return 1;
+  if(kernel_route != NULL &&
+     (np_continuous_kernel_route_validate(kernel_route,
+                                          num_reg_continuous_extern) !=
+        NP_CKERNEL_ROUTE_OK ||
+      !np_continuous_kernel_route_has_beta(kernel_route) ||
+      kernel_route->segment_count != 1 ||
+      kernel_route->segment[0].coordinate_offset != 0 ||
+      kernel_route->segment[0].coordinate_count !=
+        num_reg_continuous_extern ||
+      kernel_route_diagnostics == NULL ||
+      categorical_compress < 0 || categorical_compress > 1))
+    return 1;
+  if(np_lp_engine_extern == NP_LP_ENGINE_SCALAR &&
+     (kernel_route == NULL || deriv_order != 0))
+    return 1;
 
   np_lp_solve_workspace_init(&solve_workspace);
+  np_reghat_lp_workspace_init(&reghat_workspace);
+  np_beta_regression_scaled_row_context_init(&beta_row_context);
   memset(weights_out, 0, (size_t)num_eval*(size_t)num_train*sizeof(double));
 
   vsfx = alloc_vecd(MAX(1, num_reg_tot));
   lambdax = alloc_vecd(MAX(1, num_reg_unordered_extern + num_reg_ordered_extern));
   kw = alloc_vecd(MAX(1, num_train));
   matrix_bandwidth_x = alloc_tmatd(bw_rows, num_reg_continuous_extern);
-  matrix_bandwidth_eval_one = alloc_tmatd(1, num_reg_continuous_extern);
-  if(num_reg_unordered_extern > 0) eval_xuno_one = alloc_matd(1, num_reg_unordered_extern);
-  if(num_reg_ordered_extern > 0) eval_xord_one = alloc_matd(1, num_reg_ordered_extern);
-  if(num_reg_continuous_extern > 0) eval_xcon_one = alloc_matd(1, num_reg_continuous_extern);
+  if(kernel_route == NULL) {
+    matrix_bandwidth_eval_one =
+      alloc_tmatd(1, num_reg_continuous_extern);
+    if(num_reg_unordered_extern > 0)
+      eval_xuno_one = alloc_matd(1, num_reg_unordered_extern);
+    if(num_reg_ordered_extern > 0)
+      eval_xord_one = alloc_matd(1, num_reg_ordered_extern);
+    if(num_reg_continuous_extern > 0)
+      eval_xcon_one = alloc_matd(1, num_reg_continuous_extern);
+  }
 
-  kernel_cx = (int *)calloc((size_t)MAX(1, num_reg_continuous_extern), sizeof(int));
+  if(kernel_route == NULL)
+    kernel_cx = (int *)calloc(
+      (size_t)MAX(1, num_reg_continuous_extern), sizeof(int));
   kernel_ux = (int *)calloc((size_t)MAX(1, num_reg_unordered_extern), sizeof(int));
   kernel_ox = (int *)calloc((size_t)MAX(1, num_reg_ordered_extern), sizeof(int));
   x_operator = (int *)calloc((size_t)MAX(1, num_reg_tot), sizeof(int));
 
-  mean_row = alloc_vecd(MAX(1, num_train));
-  if((vsfx == NULL) || (lambdax == NULL) || (kw == NULL) || (mean_row == NULL) ||
+  if(kernel_route == NULL)
+    mean_row = alloc_vecd(MAX(1, num_train));
+  if((vsfx == NULL) || (lambdax == NULL) || (kw == NULL) ||
+     (kernel_route == NULL && mean_row == NULL) ||
      ((num_reg_continuous_extern > 0) && (matrix_bandwidth_x == NULL)) ||
-     ((num_reg_continuous_extern > 0) && (matrix_bandwidth_eval_one == NULL)) ||
-     ((num_reg_unordered_extern > 0) && (eval_xuno_one == NULL)) ||
-     ((num_reg_ordered_extern > 0) && (eval_xord_one == NULL)) ||
-     ((num_reg_continuous_extern > 0) && (eval_xcon_one == NULL)) ||
-     (kernel_cx == NULL) || (kernel_ux == NULL) || (kernel_ox == NULL) || (x_operator == NULL))
+     ((kernel_route == NULL && num_reg_continuous_extern > 0) &&
+      (matrix_bandwidth_eval_one == NULL || eval_xcon_one == NULL)) ||
+     ((kernel_route == NULL && num_reg_unordered_extern > 0) &&
+      eval_xuno_one == NULL) ||
+     ((kernel_route == NULL && num_reg_ordered_extern > 0) &&
+      eval_xord_one == NULL) ||
+     (kernel_route == NULL && kernel_cx == NULL) ||
+     (kernel_ux == NULL) || (kernel_ox == NULL) || (x_operator == NULL))
     goto cleanup_lp_hat;
 
   np_splitxy_vsf_mcv_nc(num_var_unordered_extern,
@@ -21660,12 +21871,29 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
                         NULL, NULL, NULL,
                         NULL, NULL, NULL);
 
-  for(i = 0; i < num_reg_continuous_extern; i++) kernel_cx[i] = KERNEL_reg_extern;
+  if(kernel_cx != NULL)
+    for(i = 0; i < num_reg_continuous_extern; i++)
+      kernel_cx[i] = KERNEL_reg_extern;
   for(i = 0; i < num_reg_unordered_extern; i++) kernel_ux[i] = KERNEL_reg_unordered_extern;
   for(i = 0; i < num_reg_ordered_extern; i++) kernel_ox[i] = KERNEL_reg_ordered_extern;
   for(i = 0; i < num_reg_tot; i++) x_operator[i] = OP_NORMAL;
 
-  if(kernel_bandwidth_mean(KERNEL_reg_extern,
+  if(kernel_route != NULL) {
+    if(np_beta_regression_bandwidth_prepare_canonical(
+        BANDWIDTH_den_extern,
+        num_train,
+        num_eval,
+        num_reg_unordered_extern,
+        num_reg_ordered_extern,
+        num_reg_continuous_extern,
+        matrix_X_continuous_train_extern,
+        matrix_X_continuous_eval_extern,
+        vsfx,
+        matrix_bandwidth_x,
+        NULL,
+        lambdax) == 1)
+      goto cleanup_lp_hat;
+  } else if(kernel_bandwidth_mean(KERNEL_reg_extern,
                            BANDWIDTH_den_extern,
                            num_train,
                            num_eval,
@@ -21686,6 +21914,41 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
                            lambdax) == 1)
     goto cleanup_lp_hat;
 
+  if(kernel_route != NULL &&
+     np_beta_regression_scaled_row_context_prepare(
+       &beta_row_context, kernel_route, kernel_route_diagnostics,
+       BANDWIDTH_den_extern, num_train, num_eval,
+       num_reg_continuous_extern, num_reg_unordered_extern,
+       num_reg_ordered_extern, matrix_X_continuous_train_extern,
+       matrix_X_continuous_eval_extern, matrix_X_unordered_train_extern,
+       matrix_X_unordered_eval_extern, matrix_X_ordered_train_extern,
+       matrix_X_ordered_eval_extern, matrix_bandwidth_x,
+       matrix_bandwidth_x, x_operator, kernel_ux, kernel_ox,
+       (num_reg_unordered_extern + num_reg_ordered_extern > 0) ?
+         lambdax : NULL,
+       num_categories_extern_X, matrix_categorical_vals_extern_X,
+       categorical_compress, kw) != NP_CONTINUOUS_ROW_OK)
+    goto cleanup_lp_hat;
+
+  if(np_lp_engine_extern == NP_LP_ENGINE_SCALAR) {
+    double sum = 0.0;
+
+    for(i = 0; i < num_eval; ++i) {
+      if(np_beta_regression_scaled_row_context_fill(
+           &beta_row_context, i, &sum) != NP_CONTINUOUS_ROW_OK ||
+         !R_FINITE(sum) || sum == 0.0)
+        goto cleanup_lp_hat;
+      for(j = 0; j < num_train; ++j) {
+        const int orig_j = (int_TREE_X == NP_TREE_TRUE) ?
+          ipt_extern_X[j] : j;
+        weights_out[(size_t)i +
+                    (size_t)num_eval*(size_t)orig_j] = kw[j]/sum;
+      }
+    }
+    status = 0;
+    goto cleanup_lp_hat;
+  }
+
   if((vector_glp_degree_extern == NULL) || (num_reg_continuous_extern <= 0))
     goto cleanup_lp_hat;
   if(!np_glp_cv_prepare_extern(NP_LP_ENGINE_GENERAL,
@@ -21698,29 +21961,43 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
      (np_glp_cv_cache.terms == NULL))
     goto cleanup_lp_hat;
 
-  if(!np_lp_solve_workspace_reserve(&solve_workspace,
-                                    np_glp_cv_cache.nterms,
-                                    1))
-    goto cleanup_lp_hat;
-  out2 = alloc_vecd(MAX(1, np_glp_cv_cache.nterms*np_glp_cv_cache.nterms));
+  if(kernel_route != NULL) {
+    if(np_reghat_lp_workspace_prepare_columns(
+         &reghat_workspace, np_glp_cv_cache.basis, num_train,
+         np_glp_cv_cache.nterms) != NP_REGHAT_LP_ROW_OK)
+      goto cleanup_lp_hat;
+  } else {
+    if(!np_lp_solve_workspace_reserve(&solve_workspace,
+                                      np_glp_cv_cache.nterms,
+                                      1))
+      goto cleanup_lp_hat;
+    out2 = alloc_vecd(
+      MAX(1, np_glp_cv_cache.nterms*np_glp_cv_cache.nterms));
+  }
   eval_basis = alloc_vecd(MAX(1, np_glp_cv_cache.nterms));
-  if((out2 == NULL) || (eval_basis == NULL))
+  if((kernel_route == NULL && out2 == NULL) || (eval_basis == NULL))
     goto cleanup_lp_hat;
 
   for(i = 0; i < num_eval; i++){
     const int which_var = deriv_var - 1;
     const double epsilon = 1.0/(double)MAX(1, num_train);
     double nepsilon = 0.0;
-    memset(out2, 0, (size_t)np_glp_cv_cache.nterms*(size_t)np_glp_cv_cache.nterms*sizeof(double));
+    if(out2 != NULL)
+      memset(out2, 0,
+             (size_t)np_glp_cv_cache.nterms*
+             (size_t)np_glp_cv_cache.nterms*sizeof(double));
 
-    for(l = 0; l < num_reg_unordered_extern; l++)
-      eval_xuno_one[l][0] = matrix_X_unordered_eval_extern[l][i];
-    for(l = 0; l < num_reg_ordered_extern; l++)
-      eval_xord_one[l][0] = matrix_X_ordered_eval_extern[l][i];
-    for(l = 0; l < num_reg_continuous_extern; l++){
-      eval_xcon_one[l][0] = matrix_X_continuous_eval_extern[l][i];
-      matrix_bandwidth_eval_one[l][0] =
-        (BANDWIDTH_den_extern == BW_GEN_NN) ? matrix_bandwidth_x[l][i] : matrix_bandwidth_x[l][0];
+    if(kernel_route == NULL) {
+      for(l = 0; l < num_reg_unordered_extern; l++)
+        eval_xuno_one[l][0] = matrix_X_unordered_eval_extern[l][i];
+      for(l = 0; l < num_reg_ordered_extern; l++)
+        eval_xord_one[l][0] = matrix_X_ordered_eval_extern[l][i];
+      for(l = 0; l < num_reg_continuous_extern; l++) {
+        eval_xcon_one[l][0] = matrix_X_continuous_eval_extern[l][i];
+        matrix_bandwidth_eval_one[l][0] =
+          (BANDWIDTH_den_extern == BW_GEN_NN) ?
+            matrix_bandwidth_x[l][i] : matrix_bandwidth_x[l][0];
+      }
     }
 
     if(use_bernstein){
@@ -21763,11 +22040,20 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
       }
     }
 
-    np_conditional_push_bounds(int_cxker_bound_extern,
-                               vector_cxkerlb_extern,
-                               vector_cxkerub_extern,
-                               &bounds_state);
-    if(np_conditional_kernel_row_raw(kernel_cx,
+    if(kernel_route != NULL) {
+      if(np_beta_regression_scaled_row_context_fill(
+           &beta_row_context, i, NULL) != NP_CONTINUOUS_ROW_OK ||
+         np_reghat_lp_workspace_influence_row(
+           &reghat_workspace, kw, eval_basis, weights_out + i,
+           (size_t)num_eval) != NP_REGHAT_LP_ROW_OK)
+        goto cleanup_lp_hat;
+      continue;
+    } else {
+      np_conditional_push_bounds(int_cxker_bound_extern,
+                                 vector_cxkerlb_extern,
+                                 vector_cxkerub_extern,
+                                 &bounds_state);
+      if(np_conditional_kernel_row_raw(kernel_cx,
                                             kernel_ux,
                                             kernel_ox,
                                             x_operator,
@@ -21793,11 +22079,11 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
                                             (BANDWIDTH_den_extern == BW_ADAP_NN) ? NULL : kdt_extern_X,
                                             kw,
                                             mean_row) != 0){
-      np_conditional_pop_bounds(&bounds_state);
-      goto cleanup_lp_hat;
-    }
+        np_conditional_pop_bounds(&bounds_state);
+        goto cleanup_lp_hat;
+      }
 
-    if(kernel_weighted_sum_np_ctx(kernel_cx,
+      if(kernel_weighted_sum_np_ctx(kernel_cx,
                                   kernel_ux,
                                   kernel_ox,
                                   BANDWIDTH_den_extern,
@@ -21848,10 +22134,11 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
                                   NULL,
                                   NULL,
                                   NULL) != 0){
+        np_conditional_pop_bounds(&bounds_state);
+        goto cleanup_lp_hat;
+      }
       np_conditional_pop_bounds(&bounds_state);
-      goto cleanup_lp_hat;
     }
-    np_conditional_pop_bounds(&bounds_state);
 
     for(l = 0; l < np_glp_cv_cache.nterms; l++){
       const int base = l*np_glp_cv_cache.nterms;
@@ -21896,7 +22183,8 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
       const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
       for(l = 0; l < np_glp_cv_cache.nterms; l++)
         zju += np_glp_cv_cache.basis[l][j]*solve_workspace.rhs_work[l];
-      weights_out[(size_t)i*(size_t)num_train + (size_t)orig_j] = kw[j]*zju;
+      weights_out[(size_t)i +
+                  (size_t)num_eval*(size_t)orig_j] = kw[j]*zju;
     }
   }
 
@@ -21904,6 +22192,8 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
 
 cleanup_lp_hat:
   np_lp_solve_workspace_clear(&solve_workspace);
+  np_reghat_lp_workspace_clear(&reghat_workspace);
+  np_beta_regression_scaled_row_context_clear(&beta_row_context);
   if(vsfx != NULL) free(vsfx);
   if(lambdax != NULL) free(lambdax);
   if(kw != NULL) free(kw);
@@ -22518,18 +22808,26 @@ cleanup_hatblock_apply:
 int np_regression_lp_apply_matrix(double *vector_scale_factor,
                                   double **rhs_cols,
                                   int n_rhs,
-                                  double *fitted_out){
+                                  double *fitted_out,
+                                  const NPContinuousKernelRoute *kernel_route,
+                                  NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
+                                  int categorical_compress){
   const int num_train = num_obs_train_extern;
   const int num_eval = num_obs_eval_extern;
   const int num_reg_tot = num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern;
-  const int bw_rows = (BANDWIDTH_den_extern == BW_FIXED) ? 1 : num_eval;
+  const int bw_rows =
+    (BANDWIDTH_den_extern == BW_FIXED) ? 1 :
+    ((BANDWIDTH_den_extern == BW_GEN_NN) ? num_eval : num_train);
   const int use_bernstein = (int_glp_bernstein_extern != 0);
   const double epsilon = 1.0/(double)MAX(1, num_train);
   int *kernel_cx = NULL, *kernel_ux = NULL, *kernel_ox = NULL, *x_operator = NULL;
   double *vsfx = NULL, *lambdax = NULL;
+  double *kw = NULL, *hat_block = NULL;
   double **matrix_bandwidth_x = NULL;
   double **TCON = NULL, **TUNO = NULL, **TORD = NULL;
   NPLPSolveWorkspace solve_workspace;
+  NPReghatLPWorkspace reghat_workspace;
+  NPBetaRegressionScaledRowContext beta_row_context;
   double **Ycols = NULL, **Wcols = NULL;
   double *out = NULL, *eval_basis = NULL;
   int i, j, l;
@@ -22539,12 +22837,26 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
 
   if((vector_scale_factor == NULL) || (rhs_cols == NULL) || (fitted_out == NULL))
     return 1;
-  if(np_lp_engine_extern != NP_LP_ENGINE_GENERAL)
+  if(np_lp_engine_extern != NP_LP_ENGINE_SCALAR &&
+     np_lp_engine_extern != NP_LP_ENGINE_GENERAL)
     return 1;
   if((BANDWIDTH_den_extern != BW_FIXED) &&
-     (BANDWIDTH_den_extern != BW_GEN_NN))
+     (BANDWIDTH_den_extern != BW_GEN_NN) &&
+     (kernel_route == NULL || BANDWIDTH_den_extern != BW_ADAP_NN))
     return 1;
   if((num_train <= 0) || (num_eval <= 0) || (num_reg_continuous_extern <= 0) || (n_rhs <= 0))
+    return 1;
+  if(kernel_route != NULL &&
+     (np_continuous_kernel_route_validate(kernel_route,
+                                          num_reg_continuous_extern) !=
+        NP_CKERNEL_ROUTE_OK ||
+      !np_continuous_kernel_route_has_beta(kernel_route) ||
+      kernel_route->segment_count != 1 ||
+      kernel_route->segment[0].coordinate_offset != 0 ||
+      kernel_route->segment[0].coordinate_count !=
+        num_reg_continuous_extern ||
+      kernel_route_diagnostics == NULL ||
+      categorical_compress < 0 || categorical_compress > 1))
     return 1;
 
   if(vector_glp_gradient_order_extern != NULL){
@@ -22558,27 +22870,42 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
       }
     }
   }
+  if(np_lp_engine_extern == NP_LP_ENGINE_SCALAR &&
+     (kernel_route == NULL || target_deriv >= 0))
+    return 1;
 
   np_lp_solve_workspace_init(&solve_workspace);
+  np_reghat_lp_workspace_init(&reghat_workspace);
+  np_beta_regression_scaled_row_context_init(&beta_row_context);
   memset(fitted_out, 0, (size_t)num_eval*(size_t)n_rhs*sizeof(double));
 
   vsfx = alloc_vecd(MAX(1, num_reg_tot));
   lambdax = alloc_vecd(MAX(1, num_reg_unordered_extern + num_reg_ordered_extern));
+  if(kernel_route != NULL)
+    kw = alloc_vecd(MAX(1, num_train));
   matrix_bandwidth_x = alloc_tmatd(bw_rows, num_reg_continuous_extern);
-  TCON = alloc_matd(1, num_reg_continuous_extern);
-  TUNO = alloc_matd(1, num_reg_unordered_extern);
-  TORD = alloc_matd(1, num_reg_ordered_extern);
-  kernel_cx = (int *)calloc((size_t)MAX(1, num_reg_continuous_extern), sizeof(int));
+  if(kernel_route == NULL) {
+    TCON = alloc_matd(1, num_reg_continuous_extern);
+    TUNO = alloc_matd(1, num_reg_unordered_extern);
+    TORD = alloc_matd(1, num_reg_ordered_extern);
+    kernel_cx = (int *)calloc(
+      (size_t)MAX(1, num_reg_continuous_extern), sizeof(int));
+  }
   kernel_ux = (int *)calloc((size_t)MAX(1, num_reg_unordered_extern), sizeof(int));
   kernel_ox = (int *)calloc((size_t)MAX(1, num_reg_ordered_extern), sizeof(int));
   x_operator = (int *)calloc((size_t)MAX(1, num_reg_tot), sizeof(int));
 
   if((vsfx == NULL) || (lambdax == NULL) ||
+     (kernel_route != NULL && kw == NULL) ||
      ((num_reg_continuous_extern > 0) && (matrix_bandwidth_x == NULL)) ||
-     ((num_reg_continuous_extern > 0) && (TCON == NULL)) ||
-     ((num_reg_unordered_extern > 0) && (TUNO == NULL)) ||
-     ((num_reg_ordered_extern > 0) && (TORD == NULL)) ||
-     (kernel_cx == NULL) || (kernel_ux == NULL) || (kernel_ox == NULL) || (x_operator == NULL))
+     ((kernel_route == NULL && num_reg_continuous_extern > 0) &&
+      TCON == NULL) ||
+     ((kernel_route == NULL && num_reg_unordered_extern > 0) &&
+      TUNO == NULL) ||
+     ((kernel_route == NULL && num_reg_ordered_extern > 0) &&
+      TORD == NULL) ||
+     (kernel_route == NULL && kernel_cx == NULL) ||
+     (kernel_ux == NULL) || (kernel_ox == NULL) || (x_operator == NULL))
     goto cleanup_lp_apply;
 
   np_splitxy_vsf_mcv_nc(num_var_unordered_extern,
@@ -22596,12 +22923,29 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
                         NULL, NULL, NULL,
                         NULL, NULL, NULL);
 
-  for(i = 0; i < num_reg_continuous_extern; i++) kernel_cx[i] = KERNEL_reg_extern;
+  if(kernel_cx != NULL)
+    for(i = 0; i < num_reg_continuous_extern; i++)
+      kernel_cx[i] = KERNEL_reg_extern;
   for(i = 0; i < num_reg_unordered_extern; i++) kernel_ux[i] = KERNEL_reg_unordered_extern;
   for(i = 0; i < num_reg_ordered_extern; i++) kernel_ox[i] = KERNEL_reg_ordered_extern;
   for(i = 0; i < num_reg_tot; i++) x_operator[i] = OP_NORMAL;
 
-  if(kernel_bandwidth_mean(KERNEL_reg_extern,
+  if(kernel_route != NULL) {
+    if(np_beta_regression_bandwidth_prepare_canonical(
+        BANDWIDTH_den_extern,
+        num_train,
+        num_eval,
+        num_reg_unordered_extern,
+        num_reg_ordered_extern,
+        num_reg_continuous_extern,
+        matrix_X_continuous_train_extern,
+        matrix_X_continuous_eval_extern,
+        vsfx,
+        matrix_bandwidth_x,
+        NULL,
+        lambdax) == 1)
+      goto cleanup_lp_apply;
+  } else if(kernel_bandwidth_mean(KERNEL_reg_extern,
                            BANDWIDTH_den_extern,
                            num_train,
                            num_eval,
@@ -22622,6 +22966,47 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
                            lambdax) == 1)
     goto cleanup_lp_apply;
 
+  if(kernel_route != NULL &&
+     np_beta_regression_scaled_row_context_prepare(
+       &beta_row_context, kernel_route, kernel_route_diagnostics,
+       BANDWIDTH_den_extern, num_train, num_eval,
+       num_reg_continuous_extern, num_reg_unordered_extern,
+       num_reg_ordered_extern, matrix_X_continuous_train_extern,
+       matrix_X_continuous_eval_extern, matrix_X_unordered_train_extern,
+       matrix_X_unordered_eval_extern, matrix_X_ordered_train_extern,
+       matrix_X_ordered_eval_extern, matrix_bandwidth_x,
+       matrix_bandwidth_x, x_operator, kernel_ux, kernel_ox,
+       (num_reg_unordered_extern + num_reg_ordered_extern > 0) ?
+         lambdax : NULL,
+       num_categories_extern_X, matrix_categorical_vals_extern_X,
+       categorical_compress, kw) != NP_CONTINUOUS_ROW_OK)
+    goto cleanup_lp_apply;
+
+  if(np_lp_engine_extern == NP_LP_ENGINE_SCALAR) {
+    const int one = 1;
+
+    for(j = 0; j < num_eval; ++j) {
+      double denominator;
+
+      if(np_beta_regression_scaled_row_context_fill(
+           &beta_row_context, j, &denominator) != NP_CONTINUOUS_ROW_OK)
+        goto cleanup_lp_apply;
+      if(!R_FINITE(denominator) || denominator == 0.0)
+        goto cleanup_lp_apply;
+      for(i = 0; i < n_rhs; ++i) {
+        const double numerator = F77_CALL(ddot)(
+          &num_train, kw, &one, rhs_cols[i], &one);
+        const double fitted = numerator/denominator;
+
+        if(!R_FINITE(fitted))
+          goto cleanup_lp_apply;
+        fitted_out[(size_t)j + (size_t)num_eval*(size_t)i] = fitted;
+      }
+    }
+    status = 0;
+    goto cleanup_lp_apply;
+  }
+
   if(!np_glp_cv_cache.ready ||
      (np_glp_cv_cache.use_bernstein != use_bernstein) ||
      (np_glp_cv_cache.basis_mode != int_glp_basis_extern) ||
@@ -22638,7 +23023,108 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
   if((np_glp_cv_cache.nterms <= 0) || (np_glp_cv_cache.basis == NULL) || (np_glp_cv_cache.terms == NULL))
     goto cleanup_lp_apply;
 
+  if(kernel_route != NULL) {
+    const size_t block_budget_elements =
+      (size_t)(8U * 1024U * 1024U) / sizeof(double);
+    size_t block_rows_size = block_budget_elements/(size_t)num_train;
+    int block_rows;
+    int block_count = 0;
+    int block_start = 0;
+    int rhs_contiguous = 1;
+
+    if(block_rows_size == 0U)
+      block_rows_size = 1U;
+    if(block_rows_size > 256U)
+      block_rows_size = 256U;
+    if(block_rows_size > (size_t)num_eval)
+      block_rows_size = (size_t)num_eval;
+    block_rows = (int)block_rows_size;
+    if((size_t)block_rows > SIZE_MAX/(size_t)num_train ||
+       (size_t)block_rows*(size_t)num_train > SIZE_MAX/sizeof(double))
+      goto cleanup_lp_apply;
+    hat_block = (double *)malloc(
+      (size_t)block_rows*(size_t)num_train*sizeof(double));
+    eval_basis = (double *)malloc(
+      (size_t)np_glp_cv_cache.nterms*sizeof(double));
+    if(hat_block == NULL || eval_basis == NULL ||
+       np_reghat_lp_workspace_prepare_columns(
+         &reghat_workspace, np_glp_cv_cache.basis, num_train,
+         np_glp_cv_cache.nterms) != NP_REGHAT_LP_ROW_OK)
+      goto cleanup_lp_apply;
+    for(i = 1; i < n_rhs; ++i) {
+      const size_t element_offset = (size_t)i*(size_t)num_train;
+      const uintptr_t base_address =
+        (uintptr_t)(const void *)rhs_cols[0];
+
+      if(element_offset > (UINTPTR_MAX - base_address)/sizeof(double) ||
+         (uintptr_t)(const void *)rhs_cols[i] !=
+           base_address + element_offset*sizeof(double))
+        rhs_contiguous = 0;
+    }
+
+    for(j = 0; j < num_eval; ++j) {
+      if(target_deriv >= 0) {
+        if(use_bernstein)
+          np_glp_fill_basis_eval_deriv(
+            target_deriv, target_order, num_reg_continuous_extern,
+            np_glp_cv_cache.terms, np_glp_cv_cache.nterms,
+            matrix_X_continuous_eval_extern, j,
+            np_glp_cv_cache.basis_ctx, eval_basis);
+        else
+          np_glp_fill_basis_eval_deriv_raw(
+            target_deriv, target_order, num_reg_continuous_extern,
+            np_glp_cv_cache.terms, np_glp_cv_cache.nterms,
+            matrix_X_continuous_eval_extern, j, eval_basis);
+      } else if(use_bernstein) {
+        np_glp_fill_basis_eval(
+          num_reg_continuous_extern, np_glp_cv_cache.terms,
+          np_glp_cv_cache.nterms, matrix_X_continuous_eval_extern, j,
+          np_glp_cv_cache.basis_ctx, eval_basis);
+      } else {
+        np_glp_fill_basis_eval_raw(
+          num_reg_continuous_extern, np_glp_cv_cache.terms,
+          np_glp_cv_cache.nterms, matrix_X_continuous_eval_extern, j,
+          eval_basis);
+      }
+
+      if(np_beta_regression_scaled_row_context_fill(
+           &beta_row_context, j, NULL) != NP_CONTINUOUS_ROW_OK ||
+         np_reghat_lp_workspace_influence_row(
+           &reghat_workspace, kw, eval_basis, hat_block + block_count,
+           (size_t)block_rows) != NP_REGHAT_LP_ROW_OK)
+        goto cleanup_lp_apply;
+      ++block_count;
+
+      if(block_count == block_rows || j + 1 == num_eval) {
+        if(rhs_contiguous) {
+          const char trans_n = 'N';
+          const double alpha = 1.0;
+          const double beta = 0.0;
+
+          F77_CALL(dgemm)(
+            &trans_n, &trans_n, &block_count, &n_rhs, &num_train,
+            &alpha, hat_block, &block_rows, rhs_cols[0], &num_train,
+            &beta, fitted_out + block_start, &num_eval FCONE FCONE);
+        } else {
+          const int one = 1;
+
+          for(i = 0; i < n_rhs; ++i)
+            for(l = 0; l < block_count; ++l)
+              fitted_out[(size_t)(block_start + l) +
+                         (size_t)num_eval*(size_t)i] = F77_CALL(ddot)(
+                &num_train, hat_block + l, &block_rows,
+                rhs_cols[i], &one);
+        }
+        block_start += block_count;
+        block_count = 0;
+      }
+    }
+    status = 0;
+    goto cleanup_lp_apply;
+  }
+
   if((target_deriv < 0) &&
+     kernel_route == NULL &&
      (num_eval == num_train) &&
      (n_rhs > 16) &&
      (BANDWIDTH_den_extern == BW_FIXED) &&
@@ -22830,6 +23316,8 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
 
 cleanup_lp_apply:
   np_lp_solve_workspace_clear(&solve_workspace);
+  np_reghat_lp_workspace_clear(&reghat_workspace);
+  np_beta_regression_scaled_row_context_clear(&beta_row_context);
   if(matrix_bandwidth_x != NULL) free_tmat(matrix_bandwidth_x);
   if((TCON != NULL) && (num_reg_continuous_extern > 0)) free_mat(TCON, num_reg_continuous_extern);
   if((TUNO != NULL) && (num_reg_unordered_extern > 0)) free_mat(TUNO, num_reg_unordered_extern);
@@ -22844,6 +23332,8 @@ cleanup_lp_apply:
   if(Wcols != NULL) free(Wcols);
   if(out != NULL) free(out);
   if(eval_basis != NULL) free(eval_basis);
+  if(kw != NULL) free(kw);
+  if(hat_block != NULL) free(hat_block);
   return status;
 }
 

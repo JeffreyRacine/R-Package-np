@@ -169,7 +169,16 @@ void np_bounded_cvls_conditional_effective_integration_bounds_extern(
   const double *support_upper,
   double *quadrature_lower,
   double *quadrature_upper);
-int np_regression_lp_apply_matrix(double *vector_scale_factor, double **rhs_cols, int n_rhs, double *fitted_out);
+int np_regression_lp_hat_matrix(
+  double *vector_scale_factor, int deriv_var, int deriv_order,
+  double *weights_out, const NPContinuousKernelRoute *kernel_route,
+  NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
+  int categorical_compress);
+int np_regression_lp_apply_matrix(
+  double *vector_scale_factor, double **rhs_cols, int n_rhs,
+  double *fitted_out, const NPContinuousKernelRoute *kernel_route,
+  NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
+  int categorical_compress);
 int np_conditional_density_cvml_lp_stream(double *vector_scale_factor, double *cv);
 int np_conditional_density_cvls_lp_stream(double *vector_scale_factor, double *cv);
 int np_conditional_distribution_cvls_lp_stream(double *vector_scale_factor, double *cv);

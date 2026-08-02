@@ -7721,22 +7721,42 @@ SEXP C_np_regression_lp_apply_conditional(SEXP txuno,
                                           SEXP glp_degree,
                                           SEXP glp_gradient_order,
                                           SEXP glp_bernstein,
-                                          SEXP glp_basis)
+                                          SEXP glp_basis,
+                                          SEXP continuous_kernel_family,
+                                          SEXP continuous_kernel_order,
+                                          SEXP ckerlb,
+                                          SEXP ckerub,
+                                          SEXP categorical_compress,
+                                          SEXP return_hat)
 {
   SEXP txuno_r = R_NilValue, txord_r = R_NilValue, txcon_r = R_NilValue;
   SEXP exuno_r = R_NilValue, exord_r = R_NilValue, excon_r = R_NilValue;
-  SEXP rhs_r = R_NilValue, rbw_r = R_NilValue, degree_i = R_NilValue, grad_i = R_NilValue, out = R_NilValue;
+  SEXP rhs_r = R_NilValue, rbw_r = R_NilValue, degree_i = R_NilValue;
+  SEXP grad_i = R_NilValue, ckerlb_r = R_NilValue, ckerub_r = R_NilValue;
+  SEXP out = R_NilValue;
   int nrow_txuno = 0, ncol_txuno = 0, nrow_txord = 0, ncol_txord = 0, nrow_txcon = 0, ncol_txcon = 0;
   int nrow_exuno = 0, ncol_exuno = 0, nrow_exord = 0, ncol_exord = 0, nrow_excon = 0, ncol_excon = 0;
   int nrow_rhs = 0, ncol_rhs = 0;
   int num_obs_train = 0, num_obs_eval = 0;
   int tree_flag = asLogical(use_tree);
+  int categorical_compress_flag = asInteger(categorical_compress);
+  int return_hat_flag = asLogical(return_hat);
+  int lp_engine = NP_LP_ENGINE_GENERAL;
+  int derivative_variable = 0;
+  int derivative_order = 0;
+  int compute_status = 1;
+  const char *failure_message = NULL;
   int int_large_sf_save = int_LARGE_SF;
   double nconfac_save = nconfac_extern;
   double ncatfac_save = ncatfac_extern;
   double *vector_continuous_stddev_save = vector_continuous_stddev_extern;
   double *shadow_continuous_stddev = NULL;
   double **rhs_cols = NULL;
+  np_continuous_kernel_descriptor descriptor;
+  NPContinuousKernelRoute beta_route;
+  NPContinuousKernelDerivativeDiagnostics beta_diagnostics;
+  const NPContinuousKernelRoute *active_route = NULL;
+  NPContinuousKernelDerivativeDiagnostics *active_diagnostics = NULL;
   int i;
 
   txuno_r = PROTECT(coerceVector(txuno, REALSXP));
@@ -7749,6 +7769,8 @@ SEXP C_np_regression_lp_apply_conditional(SEXP txuno,
   rbw_r = PROTECT(coerceVector(rbw, REALSXP));
   degree_i = PROTECT(coerceVector(glp_degree, INTSXP));
   grad_i = PROTECT(coerceVector(glp_gradient_order, INTSXP));
+  ckerlb_r = PROTECT(coerceVector(ckerlb, REALSXP));
+  ckerub_r = PROTECT(coerceVector(ckerub, REALSXP));
 
   np_matrix_dims_or_zero(txuno, &nrow_txuno, &ncol_txuno);
   np_matrix_dims_or_zero(txord, &nrow_txord, &ncol_txord);
@@ -7760,6 +7782,11 @@ SEXP C_np_regression_lp_apply_conditional(SEXP txuno,
 
   num_obs_train = MAX(nrow_txuno, MAX(nrow_txord, nrow_txcon));
   num_obs_eval = MAX(nrow_exuno, MAX(nrow_exord, nrow_excon));
+  descriptor = np_continuous_kernel_descriptor_or_error(
+    asInteger(continuous_kernel_family),
+    asInteger(kernel_x),
+    asInteger(continuous_kernel_order),
+    "C_np_regression_lp_apply_conditional");
   if((num_obs_train <= 0) || (num_obs_eval <= 0))
     error("C_np_regression_lp_apply_conditional: zero-row inputs are not supported");
   if((nrow_txuno > 0 && nrow_txuno != num_obs_train) ||
@@ -7770,14 +7797,70 @@ SEXP C_np_regression_lp_apply_conditional(SEXP txuno,
      (nrow_exord > 0 && nrow_exord != num_obs_eval) ||
      (nrow_excon > 0 && nrow_excon != num_obs_eval))
     error("C_np_regression_lp_apply_conditional: evaluation inputs must share the same row count");
-  if((nrow_rhs <= 0) || (ncol_rhs <= 0))
+  if(return_hat_flag == NA_LOGICAL)
+    error("C_np_regression_lp_apply_conditional: invalid return-hat flag");
+  if(!return_hat_flag && ((nrow_rhs <= 0) || (ncol_rhs <= 0)))
     error("C_np_regression_lp_apply_conditional: rhs must be a non-empty numeric matrix");
-  if(nrow_rhs != num_obs_train)
+  if(!return_hat_flag && nrow_rhs != num_obs_train)
     error("C_np_regression_lp_apply_conditional: rhs row count must match training row count");
   if((asInteger(bwtype) != BW_FIXED) &&
      (asInteger(bwtype) != BW_GEN_NN) &&
      (asInteger(bwtype) != BW_ADAP_NN))
     error("C_np_regression_lp_apply_conditional: unsupported bandwidth type");
+  if(tree_flag == NA_LOGICAL)
+    error("C_np_regression_lp_apply_conditional: invalid tree flag");
+  if(categorical_compress_flag != 0 && categorical_compress_flag != 1)
+    error("C_np_regression_lp_apply_conditional: categorical compression must be TRUE or FALSE");
+  if((int)XLENGTH(degree_i) != ncol_txcon)
+    error("C_np_regression_lp_apply_conditional: glp_degree length mismatch");
+  if((XLENGTH(grad_i) != 0) &&
+     ((int)XLENGTH(grad_i) != ncol_txcon))
+    error("C_np_regression_lp_apply_conditional: glp_gradient_order length mismatch");
+  if(XLENGTH(rbw_r) <
+     (R_xlen_t)ncol_txcon + (R_xlen_t)ncol_txuno + (R_xlen_t)ncol_txord)
+    error("C_np_regression_lp_apply_conditional: bandwidth buffer is too short");
+  lp_engine = NP_LP_ENGINE_SCALAR;
+  for(i = 0; i < ncol_txcon; ++i) {
+    if(INTEGER(degree_i)[i] < 0)
+      error("C_np_regression_lp_apply_conditional: invalid LP degree");
+    if(INTEGER(degree_i)[i] > 0)
+      lp_engine = NP_LP_ENGINE_GENERAL;
+  }
+  for(i = 0; i < (int)XLENGTH(grad_i); ++i) {
+    const int order = INTEGER(grad_i)[i];
+
+    if(order < 0)
+      error("C_np_regression_lp_apply_conditional: invalid LP derivative order");
+    if(order > 0) {
+      if(derivative_variable != 0)
+        error("C_np_regression_lp_apply_conditional: only one LP derivative coordinate is supported");
+      derivative_variable = i + 1;
+      derivative_order = order;
+    }
+  }
+  if(return_hat_flag && lp_engine == NP_LP_ENGINE_SCALAR &&
+     derivative_order > 0)
+    error("C_np_regression_lp_apply_conditional: scalar derivative hats use the canonical derivative route");
+
+  if(descriptor.family == NP_CKERNEL_FAMILY_BETA) {
+    if(XLENGTH(ckerlb_r) != ncol_txcon ||
+       XLENGTH(ckerub_r) != ncol_txcon)
+      error("C_np_regression_lp_apply_conditional: beta bounds length mismatch");
+    if(tree_flag)
+      error("C_np_regression_lp_apply_conditional: beta route cannot use a legacy tree");
+    beta_route.segment_count = 1;
+    beta_route.segment[0].descriptor = descriptor;
+    beta_route.segment[0].coordinate_offset = 0;
+    beta_route.segment[0].coordinate_count = ncol_txcon;
+    beta_route.segment[0].lower = REAL(ckerlb_r);
+    beta_route.segment[0].upper = REAL(ckerub_r);
+    beta_diagnostics.bad_coordinate = -1;
+    beta_diagnostics.bad_observation = -1;
+    beta_diagnostics.undefined_count = 0;
+    beta_diagnostics.beta_status = NP_BETA_OK;
+    active_route = &beta_route;
+    active_diagnostics = &beta_diagnostics;
+  }
 
   np_native_estimator_state_active = 1;
   num_obs_train_extern = num_obs_train;
@@ -7806,6 +7889,18 @@ SEXP C_np_regression_lp_apply_conditional(SEXP txuno,
   matrix_X_unordered_eval_extern = alloc_matd(num_obs_eval, num_reg_unordered_extern);
   matrix_X_ordered_eval_extern = alloc_matd(num_obs_eval, num_reg_ordered_extern);
   matrix_X_continuous_eval_extern = alloc_matd(num_obs_eval, num_reg_continuous_extern);
+  if((num_reg_unordered_extern > 0 &&
+      (matrix_X_unordered_train_extern == NULL ||
+       matrix_X_unordered_eval_extern == NULL)) ||
+     (num_reg_ordered_extern > 0 &&
+      (matrix_X_ordered_train_extern == NULL ||
+       matrix_X_ordered_eval_extern == NULL)) ||
+     (num_reg_continuous_extern > 0 &&
+      (matrix_X_continuous_train_extern == NULL ||
+       matrix_X_continuous_eval_extern == NULL))) {
+    failure_message = "data-matrix allocation failed";
+    goto cleanup_lp_apply_wrapper;
+  }
   np_fill_column_major_matrix(matrix_X_unordered_train_extern, REAL(txuno_r), num_obs_train, num_reg_unordered_extern);
   np_fill_column_major_matrix(matrix_X_ordered_train_extern, REAL(txord_r), num_obs_train, num_reg_ordered_extern);
   np_fill_column_major_matrix(matrix_X_continuous_train_extern, REAL(txcon_r), num_obs_train, num_reg_continuous_extern);
@@ -7816,8 +7911,10 @@ SEXP C_np_regression_lp_apply_conditional(SEXP txuno,
   if(num_reg_continuous_extern > 0){
     shadow_continuous_stddev =
       (double *)malloc((size_t)num_reg_continuous_extern*sizeof(double));
-    if(shadow_continuous_stddev == NULL)
-      error("C_np_regression_lp_apply_conditional: stddev allocation failed");
+    if(shadow_continuous_stddev == NULL) {
+      failure_message = "stddev allocation failed";
+      goto cleanup_lp_apply_wrapper;
+    }
     for(i = 0; i < num_reg_continuous_extern; i++)
       shadow_continuous_stddev[i] =
         standerrd(num_obs_train, matrix_X_continuous_train_extern[i]);
@@ -7832,8 +7929,10 @@ SEXP C_np_regression_lp_apply_conditional(SEXP txuno,
     if(int_TREE_X == NP_TREE_TRUE){
       ipt_extern_X = (int *)malloc((size_t)num_obs_train*sizeof(int));
       ipt_lookup_extern_X = (int *)malloc((size_t)num_obs_train*sizeof(int));
-      if((ipt_extern_X == NULL) || (ipt_lookup_extern_X == NULL))
-        error("C_np_regression_lp_apply_conditional: x-tree allocation failed");
+      if((ipt_extern_X == NULL) || (ipt_lookup_extern_X == NULL)) {
+        failure_message = "x-tree allocation failed";
+        goto cleanup_lp_apply_wrapper;
+      }
       for(i = 0; i < num_obs_train; i++) ipt_extern_X[i] = i;
       build_kdtree(matrix_X_continuous_train_extern, num_obs_train, num_reg_continuous_extern,
                    4*num_reg_continuous_extern, ipt_extern_X, &kdt_extern_X);
@@ -7861,6 +7960,12 @@ SEXP C_np_regression_lp_apply_conditional(SEXP txuno,
 
   num_categories_extern_X = alloc_vecu(num_reg_unordered_extern + num_reg_ordered_extern);
   matrix_categorical_vals_extern_X = alloc_matd(num_obs_train, num_reg_unordered_extern + num_reg_ordered_extern);
+  if((num_reg_unordered_extern + num_reg_ordered_extern > 0) &&
+     (num_categories_extern_X == NULL ||
+      matrix_categorical_vals_extern_X == NULL)) {
+    failure_message = "categorical-metadata allocation failed";
+    goto cleanup_lp_apply_wrapper;
+  }
   determine_categorical_vals(num_obs_train,
                              0,
                              0,
@@ -7873,25 +7978,37 @@ SEXP C_np_regression_lp_apply_conditional(SEXP txuno,
                              num_categories_extern_X,
                              matrix_categorical_vals_extern_X);
 
-  np_lp_engine_extern = NP_LP_ENGINE_GENERAL;
-  if((int)XLENGTH(degree_i) != num_reg_continuous_extern)
-    error("C_np_regression_lp_apply_conditional: glp_degree length mismatch");
-  if((XLENGTH(grad_i) != 0) && ((int)XLENGTH(grad_i) != num_reg_continuous_extern))
-    error("C_np_regression_lp_apply_conditional: glp_gradient_order length mismatch");
+  np_lp_engine_extern = lp_engine;
   vector_glp_degree_extern = INTEGER(degree_i);
   vector_glp_gradient_order_extern = (XLENGTH(grad_i) > 0) ? INTEGER(grad_i) : NULL;
   int_glp_bernstein_extern = asInteger(glp_bernstein);
   int_glp_basis_extern = asInteger(glp_basis);
 
-  rhs_cols = (double **)malloc((size_t)ncol_rhs*sizeof(double *));
-  if(rhs_cols == NULL)
-    error("C_np_regression_lp_apply_conditional: rhs column allocation failed");
-  for(i = 0; i < ncol_rhs; i++)
-    rhs_cols[i] = REAL(rhs_r) + ((size_t)i * (size_t)nrow_rhs);
+  if(return_hat_flag) {
+    out = PROTECT(allocMatrix(REALSXP, num_obs_eval, num_obs_train));
+    compute_status = np_regression_lp_hat_matrix(
+      REAL(rbw_r), derivative_variable, derivative_order, REAL(out),
+      active_route, active_diagnostics, categorical_compress_flag);
+    if(compute_status != 0)
+      failure_message = "LP hat helper failed";
+  } else {
+    rhs_cols = (double **)malloc((size_t)ncol_rhs*sizeof(double *));
+    if(rhs_cols == NULL) {
+      failure_message = "rhs column allocation failed";
+      goto cleanup_lp_apply_wrapper;
+    }
+    for(i = 0; i < ncol_rhs; i++)
+      rhs_cols[i] = REAL(rhs_r) + ((size_t)i * (size_t)nrow_rhs);
 
-  out = PROTECT(allocMatrix(REALSXP, num_obs_eval, ncol_rhs));
-  if(np_regression_lp_apply_matrix(REAL(rbw_r), rhs_cols, ncol_rhs, REAL(out)) != 0)
-    error("C_np_regression_lp_apply_conditional: lp apply helper failed");
+    out = PROTECT(allocMatrix(REALSXP, num_obs_eval, ncol_rhs));
+    compute_status = np_regression_lp_apply_matrix(
+      REAL(rbw_r), rhs_cols, ncol_rhs, REAL(out),
+      active_route, active_diagnostics, categorical_compress_flag);
+    if(compute_status != 0)
+      failure_message = "LP apply helper failed";
+  }
+
+cleanup_lp_apply_wrapper:
 
   if(kdt_extern_X != NULL) free_kdtree(&kdt_extern_X);
   safe_free(ipt_extern_X); safe_free(ipt_lookup_extern_X);
@@ -7924,7 +8041,16 @@ SEXP C_np_regression_lp_apply_conditional(SEXP txuno,
   safe_free(rhs_cols);
   np_native_estimator_state_active = 0;
 
-  UNPROTECT(11);
+  UNPROTECT(out == R_NilValue ? 12 : 13);
+  if(compute_status != 0 || failure_message != NULL) {
+    if(descriptor.family == NP_CKERNEL_FAMILY_BETA &&
+       beta_diagnostics.beta_status != NP_BETA_OK)
+      error("C_np_regression_lp_apply_conditional: beta row failed in continuous dimension %d: %s",
+            beta_diagnostics.bad_coordinate + 1,
+            np_beta_status_message(beta_diagnostics.beta_status));
+    error("C_np_regression_lp_apply_conditional: %s",
+          failure_message != NULL ? failure_message : "LP computation failed");
+  }
   return out;
 }
 
