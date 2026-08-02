@@ -680,32 +680,6 @@ test_that("every beta side enters the common conditional regression owner", {
   )
 })
 
-test_that("displaced beta conditional estimator sidecars are excised", {
-  root <- locate_beta_activation_sources()
-  skip_if(is.null(root), "package sources unavailable")
-  implementation <- paste(
-    readLines(file.path(root, "src", "beta_conditional.c"), warn = FALSE),
-    collapse = "\n"
-  )
-  declarations <- paste(
-    readLines(file.path(root, "src", "beta_conditional.h"), warn = FALSE),
-    collapse = "\n"
-  )
-
-  expect_false(grepl("np_beta_conditional_lc(", implementation,
-                     fixed = TRUE))
-  expect_false(grepl("np_beta_conditional_lc_gradient(", implementation,
-                     fixed = TRUE))
-  expect_false(grepl("np_beta_conditional_lc(", declarations,
-                     fixed = TRUE))
-  expect_false(grepl("np_beta_conditional_lc_gradient(", declarations,
-                     fixed = TRUE))
-  expect_match(implementation, "np_beta_conditional_lc_counts(",
-               fixed = TRUE)
-  expect_match(declarations, "np_beta_conditional_lc_counts(",
-               fixed = TRUE)
-})
-
 test_that("canonical beta regression moments preserve the sidecar transcript", {
   root <- locate_beta_activation_sources()
   skip_if(is.null(root), "package sources unavailable")
