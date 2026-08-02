@@ -3506,6 +3506,7 @@ int KERNEL_den_extern=0;
 int KERNEL_den_unordered_extern=0;
 int KERNEL_den_ordered_extern=0;
 int np_beta_bw_order_extern=2;
+int np_density_bw_categorical_compress_extern=0;
 int np_beta_cx_bw_order_extern=2;
 int np_beta_cy_bw_order_extern=2;
 int BANDWIDTH_reg_extern;
@@ -8886,6 +8887,9 @@ static SEXP C_np_density_bw_common(SEXP myuno,
   if (XLENGTH(myopti_i) <= BW_CKORDERI &&
       INTEGER(myopti_i)[BW_CKRNEVI] == NP_CKERNEL_COORDINATE_CODE)
     error("C_np_density_bw: continuous-kernel descriptor is missing");
+  if (INTEGER(myopti_i)[BW_CKRNEVI] == NP_CKERNEL_COORDINATE_CODE &&
+      XLENGTH(myopti_i) <= BW_CATCOMPI)
+    error("C_np_density_bw: categorical-compression state is missing");
 
   ncon = (int)INTEGER(myopti_i)[BW_NCONI];
   resolve_bounds_or_default(ckerlb_r, ckerub_r, ncon, &ckerlb_p, &ckerub_p);
@@ -12184,12 +12188,18 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   KERNEL_den_unordered_extern = myopti[BW_UKRNEVI];
   KERNEL_den_ordered_extern = myopti[BW_OKRNEVI];
   np_beta_bw_order_extern = 2;
-  if(KERNEL_den_extern == NP_CKERNEL_COORDINATE_CODE)
+  np_density_bw_categorical_compress_extern = 0;
+  if(KERNEL_den_extern == NP_CKERNEL_COORDINATE_CODE) {
     np_beta_bw_order_extern = np_bandwidth_kernel_descriptor_or_error(
       myopti[BW_CKFAMILYI], KERNEL_den_extern, myopti[BW_CKORDERI],
       num_reg_continuous_extern, num_reg_unordered_extern,
       num_reg_ordered_extern, ckerlb, ckerub,
       "C_np_density_bw").order;
+    np_density_bw_categorical_compress_extern = myopti[BW_CATCOMPI];
+    if(np_density_bw_categorical_compress_extern != 0 &&
+       np_density_bw_categorical_compress_extern != 1)
+      error("C_np_density_bw: categorical compression must be TRUE or FALSE");
+  }
 
   int_use_starting_values= myopti[BW_USTARTI];
   int_LARGE_SF=myopti[BW_LSFI];
@@ -12930,6 +12940,7 @@ cleanup_np_density_bw:
   int_cker_bound_extern = 0;
   vector_ckerlb_extern = NULL;
   vector_ckerub_extern = NULL;
+  np_density_bw_categorical_compress_extern = 0;
   np_reset_y_side_extern();
   np_clear_estimator_extern_aliases();
 
