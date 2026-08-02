@@ -37077,3 +37077,109 @@ np_jksum_distribution_two_block_plan_or_die(int64_t train_alloc,
   *y_width = plan.y_width;
   *y_alloc = plan.y_alloc;
 }
+
+/*
+ * Validate the family-neutral conditional route seam without consulting or
+ * mutating estimator-global state.  A route is present exactly when its side
+ * selects the coordinate-kernel registry entry.  Each side owns one complete
+ * beta segment; categorical factors remain a separate shared row concern.
+ */
+static int np_conditional_kernel_execution_context_valid(
+  const NPConditionalKernelExecutionContext * const context,
+  const int kernel_x,
+  const int kernel_y,
+  const int num_continuous_x,
+  const int num_continuous_y)
+{
+  const int beta_x = kernel_x == NP_CKERNEL_COORDINATE_CODE;
+  const int beta_y = kernel_y == NP_CKERNEL_COORDINATE_CODE;
+
+  if(context == NULL ||
+     (context->categorical_compress != 0 &&
+      context->categorical_compress != 1) ||
+     beta_x != (context->x_route != NULL) ||
+     beta_y != (context->y_route != NULL) ||
+     (context->x_route == NULL) != (context->x_diagnostics == NULL) ||
+     (context->y_route == NULL) != (context->y_diagnostics == NULL) ||
+     (!beta_x && !beta_y))
+    return 0;
+
+  if(beta_x &&
+     (num_continuous_x <= 0 ||
+      np_continuous_kernel_route_validate(
+        context->x_route, num_continuous_x) != NP_CKERNEL_ROUTE_OK ||
+      !np_continuous_kernel_route_has_beta(context->x_route) ||
+      context->x_route->segment_count != 1 ||
+      context->x_route->segment[0].coordinate_offset != 0 ||
+      context->x_route->segment[0].coordinate_count != num_continuous_x))
+    return 0;
+
+  if(beta_y &&
+     (num_continuous_y <= 0 ||
+      np_continuous_kernel_route_validate(
+        context->y_route, num_continuous_y) != NP_CKERNEL_ROUTE_OK ||
+      !np_continuous_kernel_route_has_beta(context->y_route) ||
+      context->y_route->segment_count != 1 ||
+      context->y_route->segment[0].coordinate_offset != 0 ||
+      context->y_route->segment[0].coordinate_count != num_continuous_y))
+    return 0;
+
+  return 1;
+}
+
+/*
+ * Isolated route-bearing sibling for conditional-density CVML.  Keeping the
+ * incumbent ABI and body literal protects its linked layout and hot path.
+ * Null context delegates to that owner.  A valid non-null route is deliberately
+ * beta-unreachable in this plumbing tranche and fails closed until canonical
+ * row arithmetic is activated; it must never fall back to the incumbent
+ * continuous-kernel switch.
+ */
+int np_kernel_estimate_con_density_categorical_leave_one_out_cv_ctx(
+  int KERNEL_den,
+  int KERNEL_unordered_den,
+  int KERNEL_ordered_den,
+  int KERNEL_reg,
+  int KERNEL_unordered_reg,
+  int KERNEL_ordered_reg,
+  int BANDWIDTH_den,
+  int num_obs,
+  int num_var_unordered,
+  int num_var_ordered,
+  int num_var_continuous,
+  int num_reg_unordered,
+  int num_reg_ordered,
+  int num_reg_continuous,
+  double **matrix_Y_unordered,
+  double **matrix_Y_ordered,
+  double **matrix_Y_continuous,
+  double **matrix_X_unordered,
+  double **matrix_X_ordered,
+  double **matrix_X_continuous,
+  double **matrix_XY_unordered,
+  double **matrix_XY_ordered,
+  double **matrix_XY_continuous,
+  double *vector_scale_factor,
+  int *num_categories,
+  const NPConditionalKernelExecutionContext * const execution_context,
+  double *cv)
+{
+  if(execution_context == NULL)
+    return np_kernel_estimate_con_density_categorical_leave_one_out_cv(
+      KERNEL_den, KERNEL_unordered_den, KERNEL_ordered_den,
+      KERNEL_reg, KERNEL_unordered_reg, KERNEL_ordered_reg,
+      BANDWIDTH_den, num_obs,
+      num_var_unordered, num_var_ordered, num_var_continuous,
+      num_reg_unordered, num_reg_ordered, num_reg_continuous,
+      matrix_Y_unordered, matrix_Y_ordered, matrix_Y_continuous,
+      matrix_X_unordered, matrix_X_ordered, matrix_X_continuous,
+      matrix_XY_unordered, matrix_XY_ordered, matrix_XY_continuous,
+      vector_scale_factor, num_categories, cv);
+
+  if(!np_conditional_kernel_execution_context_valid(
+       execution_context, KERNEL_reg, KERNEL_den,
+       num_reg_continuous, num_var_continuous))
+    error("conditional density CVML kernel route has an invalid layout");
+
+  return 1;
+}
