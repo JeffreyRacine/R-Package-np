@@ -173,13 +173,13 @@ test_that("beta regression validates bounds and general LP availability", {
   ))
   expect_true(all(is.finite(fitted(mixed_fit))))
   expect_equal(length(fitted(mixed_fit)), length(response))
-  expect_error(
-    npregbw(
-      xdat = data.frame(x = training$x,
-                        group = factor(c(1, 1, 1, 2, 2))),
-      ydat = response, regtype = "lc", ckertype = "beta",
-      ckerbound = "fixed", ckerlb = 0, ckerub = 1
-    ),
-    "continuous variables only", fixed = TRUE
+  mixed_bw <- npregbw(
+    xdat = data.frame(x = training$x,
+                      group = factor(c(1, 1, 1, 2, 2))),
+    ydat = response, bws = c(0.1, 0.2), bandwidth.compute = FALSE,
+    regtype = "lc", ckertype = "beta",
+    ckerbound = "fixed", ckerlb = 0, ckerub = 1
   )
+  expect_s3_class(mixed_bw, "rbandwidth")
+  expect_equal(mixed_bw$bw, c(0.1, 0.2))
 })

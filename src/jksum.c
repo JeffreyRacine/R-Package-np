@@ -18347,8 +18347,7 @@ const int categorical_compress)
      kernel_route->segment_count != 1 ||
      kernel_route->segment[0].coordinate_offset != 0 ||
      kernel_route->segment[0].coordinate_count != num_reg_continuous ||
-     num_reg_continuous <= 0 || num_reg_unordered != 0 ||
-     num_reg_ordered != 0 ||
+     num_reg_continuous <= 0 ||
      (lp_engine != NP_LP_ENGINE_SCALAR &&
       lp_engine != NP_LP_ENGINE_GENERAL) ||
      (categorical_compress != 0 && categorical_compress != 1))
