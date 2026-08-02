@@ -130,6 +130,7 @@ extern int cdfontrain_extern;
 // timing
 extern double timing_extern;
 extern int np_beta_bw_order_extern;
+extern int np_density_bw_categorical_compress_extern;
 extern int np_beta_cx_bw_order_extern;
 extern int np_beta_cy_bw_order_extern;
 extern double *vector_ckerlb_extern;
@@ -438,7 +439,7 @@ double np_cv_func_density_categorical_ml(double *vector_scale_factor)
         num_categories_extern,
         active_route,
         active_diagnostics,
-        0,
+        np_density_bw_categorical_compress_extern,
         &cv)==1)
     {
         return(DBL_MAX);
@@ -831,7 +832,7 @@ double np_cv_func_density_categorical_ls(double *vector_scale_factor){
         matrix_categorical_vals_extern,
         active_route,
         active_diagnostics,
-        0,
+        np_density_bw_categorical_compress_extern,
         &cv)==1)
     {
         return(DBL_MAX);
