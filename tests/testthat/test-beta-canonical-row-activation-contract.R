@@ -513,7 +513,7 @@ test_that("legacy conditional scalar owner retains dormant route plumbing", {
   )
 })
 
-test_that("one beta side enters the common conditional regression owner", {
+test_that("every beta side enters the common conditional regression owner", {
   root <- locate_beta_activation_sources()
   skip_if(is.null(root), "package sources unavailable")
   ingress <- paste(
@@ -529,7 +529,7 @@ test_that("one beta side enters the common conditional regression owner", {
   public_owner <- substr(ingress, public_start, public_end - 1L)
   expect_match(
     public_owner,
-    "x_descriptor.family == NP_CKERNEL_FAMILY_BETA &&\n     y_descriptor.family == NP_CKERNEL_FAMILY_LEGACY",
+    "x_descriptor.family == NP_CKERNEL_FAMILY_BETA) {",
     fixed = TRUE
   )
   expect_match(public_owner, "active_x_route = &beta_x_route;", fixed = TRUE)
@@ -540,7 +540,7 @@ test_that("one beta side enters the common conditional regression owner", {
   )
   expect_match(
     public_owner,
-    "x_descriptor.family == NP_CKERNEL_FAMILY_LEGACY &&\n     y_descriptor.family == NP_CKERNEL_FAMILY_BETA",
+    "y_descriptor.family == NP_CKERNEL_FAMILY_BETA) {",
     fixed = TRUE
   )
   expect_match(public_owner, "active_y_route = &beta_y_route;", fixed = TRUE)
@@ -559,9 +559,17 @@ test_that("one beta side enters the common conditional regression owner", {
     public_owner,
     fixed = TRUE
   ))
+  expect_false(grepl("np_beta_conditional_lc(", public_owner, fixed = TRUE))
+  expect_false(grepl(
+    "np_beta_conditional_lc_gradient(", public_owner, fixed = TRUE
+  ))
+  expect_false(grepl(
+    "beta conditional estimators currently support", public_owner,
+    fixed = TRUE
+  ))
   expect_match(
     public_owner,
-    "x_descriptor.family == NP_CKERNEL_FAMILY_BETA &&\n     y_descriptor.family == NP_CKERNEL_FAMILY_BETA",
+    "np_density_conditional(REAL(tyuno_r), REAL(tyord_r), REAL(tycon_r)",
     fixed = TRUE
   )
 
@@ -581,6 +589,10 @@ test_that("one beta side enters the common conditional regression owner", {
     "error(\"np_density_conditional: invalid canonical response-kernel route\")",
     fixed = TRUE
   )
+  expect_false(grepl(
+    "kernel_route != NULL || response_kernel_route_diagnostics == NULL",
+    conditional, fixed = TRUE
+  ))
   expect_false(grepl(
     "kernel_weighted_sum_np_route(kernel_cy", conditional, fixed = TRUE
   ))
