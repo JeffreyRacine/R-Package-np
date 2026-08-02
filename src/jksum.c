@@ -28804,10 +28804,6 @@ typedef struct {
                            int evaluation,
                            double *row,
                            double *common_log_scale);
-  int (*y_scalar_eval_row)(void *context,
-                          double evaluation,
-                          double *row,
-                          double *common_log_scale);
   int (*y_eval_block)(void *context,
                       int block_rows,
                       double **matrix_Y_unordered_eval,
@@ -28830,6 +28826,7 @@ static int np_conditional_density_cvls_bounded_i1_eval_on_grid(double *vector_sc
                                                                double *yrow,
                                                                double **ygridblock,
                                                                double *ygrid_log_scale,
+                                                               double **provider_eval_ycon,
                                                                double *fit_block,
                                                                double *lin_block,
                                                                const int block_size,
@@ -28853,29 +28850,34 @@ static int np_conditional_density_cvls_bounded_i1_eval_on_grid(double *vector_sc
     return 1;
   if(provider != NULL &&
      (provider->context == NULL || provider->x_row == NULL ||
-      provider->y_train_row == NULL || provider->y_scalar_eval_row == NULL))
+      provider->y_train_row == NULL || provider->y_eval_block == NULL))
     return 1;
   if(provider != NULL && ygrid_log_scale == NULL)
+    return 1;
+  if(provider != NULL && provider_eval_ycon == NULL)
     return 1;
   if((i1_mode == NP_BOUNDED_CVLS_I1_MODE_FULL) && (xblock_full == NULL))
     return 1;
   if((q < 2) || (block_size <= 0))
     return 1;
 
-  for(m = 0; m < q; m++){
-    if(provider != NULL) {
-      if(provider->y_scalar_eval_row(provider->context, grid[m],
-                                     ygridblock[m],
-                                     &ygrid_log_scale[m]) != 0)
-        local_fail = 1;
-    } else if(np_conditional_y_scalar_eval_from_ctx(vector_scale_factor,
-                                                    yctx,
-                                                    grid[m],
-                                                    ygridblock[m]) != 0) {
+  if(provider != NULL) {
+    for(m = 0; m < q; m++)
+      provider_eval_ycon[0][m] = grid[m];
+    if(provider->y_eval_block(provider->context, q,
+                              NULL, NULL, provider_eval_ycon,
+                              ygridblock, ygrid_log_scale) != 0)
       local_fail = 1;
+  } else {
+    for(m = 0; m < q; m++){
+      if(np_conditional_y_scalar_eval_from_ctx(vector_scale_factor,
+                                               yctx,
+                                               grid[m],
+                                               ygridblock[m]) != 0)
+        local_fail = 1;
+      if(local_fail)
+        break;
     }
-    if(local_fail)
-      break;
   }
 
   for(i0 = 0; (i0 < num_obs) && !local_fail; i0 += block_size){
@@ -29464,6 +29466,7 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_row_stream(double *
   double *yrow = NULL, *fit_block = NULL, *lin_block = NULL;
   double *ygrid_log_scale = NULL;
   double **xblock = NULL, **xblock_full = NULL;
+  double **provider_eval_ycon = NULL;
   const double *base_grid = NULL, *base_weights = NULL;
   double *base_grid_local = NULL, *base_weights_local = NULL;
   double **ygridblock = NULL;
@@ -29480,7 +29483,7 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_row_stream(double *
     return 1;
   if(provider != NULL &&
      (provider->context == NULL || provider->x_row == NULL ||
-      provider->y_train_row == NULL || provider->y_scalar_eval_row == NULL))
+      provider->y_train_row == NULL || provider->y_eval_block == NULL))
     return 1;
   if((quad_ctx->ready != 0) &&
      (quad_ctx->num_obs == num_obs) &&
@@ -29518,12 +29521,15 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_row_stream(double *
     base_weights = base_weights_local;
   }
   ygridblock = alloc_tmatd(num_obs, q);
-  if(provider != NULL)
+  if(provider != NULL) {
     ygrid_log_scale = alloc_vecd(q);
+    provider_eval_ycon = alloc_matd(q, 1);
+  }
   if((xblock == NULL) || (yrow == NULL) || (fit_block == NULL) || (lin_block == NULL) ||
      (base_grid == NULL) || (base_weights == NULL) ||
      (ygridblock == NULL) ||
-     ((provider != NULL) && (ygrid_log_scale == NULL)) ||
+     ((provider != NULL) &&
+      ((ygrid_log_scale == NULL) || (provider_eval_ycon == NULL))) ||
      ((i1_mode == NP_BOUNDED_CVLS_I1_MODE_FULL) && (xblock_full == NULL)))
     goto cleanup_bounded_cvls_quad;
 
@@ -29573,6 +29579,7 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_row_stream(double *
                                                          yrow,
                                                          ygridblock,
                                                          ygrid_log_scale,
+                                                         provider_eval_ycon,
                                                          fit_block,
                                                          lin_block,
                                                          block_size,
@@ -29594,6 +29601,7 @@ cleanup_bounded_cvls_quad:
   if(base_weights_local != NULL) free(base_weights_local);
   if(ygridblock != NULL) free_tmat(ygridblock);
   if(ygrid_log_scale != NULL) free(ygrid_log_scale);
+  if(provider_eval_ycon != NULL) free_mat(provider_eval_ycon, 1);
   return status;
 }
 

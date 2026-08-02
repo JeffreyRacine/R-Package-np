@@ -20,7 +20,7 @@ test_that("bounded conditional CVLS has one typed row-provider seam", {
 
   expect_match(engine, "} NPConditionalCVLSRowProvider;", fixed = TRUE)
   for (member in c("x_row", "y_train_row", "y_convolution_row",
-                   "y_scalar_eval_row", "y_eval_block"))
+                   "y_eval_block"))
     expect_match(engine, paste0("(*", member, ")"), fixed = TRUE)
   expect_match(
     engine,
@@ -58,7 +58,12 @@ test_that("live bounded CVLS retains literal legacy arithmetic under null", {
   )
   expect_match(
     engine,
-    "} else if(np_conditional_y_scalar_eval_from_ctx(",
+    "if(np_conditional_y_scalar_eval_from_ctx(",
+    fixed = TRUE
+  )
+  expect_match(
+    engine,
+    "if(provider->y_eval_block(provider->context, q,",
     fixed = TRUE
   )
   expect_match(
