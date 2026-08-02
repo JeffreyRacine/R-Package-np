@@ -130,6 +130,7 @@ extern int cdfontrain_extern;
 // timing
 extern double timing_extern;
 extern int np_beta_bw_order_extern;
+extern int np_regression_bw_categorical_compress_extern;
 extern int np_density_bw_categorical_compress_extern;
 extern int np_distribution_bw_categorical_compress_extern;
 extern int np_beta_cx_bw_order_extern;

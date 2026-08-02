@@ -295,6 +295,10 @@ npregbw.NULL <-
     transform.bounds = transform.bounds
   )
   myopti <- c(myopti, npContinuousKernelDescriptorOptions(bws))
+  myopti <- c(
+    myopti,
+    categorical.compress = npStrictLogicalOption("np.categorical.compress", TRUE)
+  )
 
   myoptd <- list(
     ftol = ftol,
@@ -651,6 +655,10 @@ npregbw.rbandwidth <-
         dfc.dir = dfc.dir,
         transform.bounds = transform.bounds)
       myopti <- c(myopti, npContinuousKernelDescriptorOptions(bws))
+      myopti <- c(
+        myopti,
+        categorical.compress = npStrictLogicalOption("np.categorical.compress", TRUE)
+      )
       
       myoptd = list(ftol=ftol, tol=tol, small=small,
         lbc.dir = lbc.dir, cfac.dir = cfac.dir, initc.dir = initc.dir, 
@@ -983,6 +991,10 @@ npregbw.rbandwidth <-
     transform.bounds = transform.bounds
   )
   myopti <- c(myopti, npContinuousKernelDescriptorOptions(bws))
+  myopti <- c(
+    myopti,
+    categorical.compress = npStrictLogicalOption("np.categorical.compress", TRUE)
+  )
 
   myoptd <- list(
     ftol = ftol,
