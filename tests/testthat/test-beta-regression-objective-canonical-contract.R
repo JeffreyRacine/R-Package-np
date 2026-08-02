@@ -251,22 +251,22 @@ test_that("beta ll and raw degree-one LP objectives share one canonical route", 
   }
 })
 
-test_that("continuous beta regression activation remains categorically scoped", {
-  training <- data.frame(x = seq(0.05, 0.95, length.out = 12L))
-  response <- sin(2 * pi * training$x)
-
-  expect_error(
-    npregbw(
-      xdat = data.frame(x = training$x,
-                        group = factor(rep(letters[1:2], each = 6L))),
-      ydat = response,
-      regtype = "lc",
-      ckertype = "beta",
-      ckerbound = "fixed",
-      ckerlb = 0,
-      ckerub = 1
-    ),
-    "continuous variables only",
-    fixed = TRUE
+test_that("mixed beta regression objectives enter the canonical route", {
+  training <- data.frame(
+    x = seq(0.05, 0.95, length.out = 12L),
+    group = factor(rep(letters[1:2], each = 6L))
   )
+  response <- sin(2 * pi * training$x) + 0.1 * as.integer(training$group)
+
+  expect_silent(npregbw(
+    xdat = training,
+    ydat = response,
+    bws = c(0.22, 0.2),
+    bandwidth.compute = FALSE,
+    regtype = "lc",
+    ckertype = "beta",
+    ckerbound = "fixed",
+    ckerlb = 0,
+    ckerub = 1
+  ))
 })

@@ -558,8 +558,8 @@ test_that("regression objective owner activates the continuous scalar beta route
     fixed = TRUE
   )
   expect_match(owner, "lp_engine != NP_LP_ENGINE_SCALAR", fixed = TRUE)
-  expect_match(owner, "num_reg_unordered != 0", fixed = TRUE)
-  expect_match(owner, "num_reg_ordered != 0", fixed = TRUE)
+  expect_false(grepl("num_reg_unordered != 0", owner, fixed = TRUE))
+  expect_false(grepl("num_reg_ordered != 0", owner, fixed = TRUE))
   expect_match(
     owner,
     "np_regression_cv_scalar_continuous_route(",
@@ -651,12 +651,12 @@ test_that("regression bandwidth ingress owns categorical compression state", {
   )
   expect_match(
     ingress,
-    "num_reg_ordered_extern, NP_BETA_BW_CONTINUOUS_ONLY,",
+    "num_reg_ordered_extern, NP_BETA_BW_ALLOW_CATEGORICAL,",
     fixed = TRUE
   )
   expect_match(
     bandwidth_r,
-    "allow.categorical = !isTRUE(bandwidth.compute)",
+    "allow.categorical = TRUE",
     fixed = TRUE
   )
   expect_match(
@@ -980,8 +980,8 @@ test_that("density bandwidth ingress owns categorical compression state", {
     "NP_BETA_BW_CONTINUOUS_ONLY,", ingress, fixed = TRUE
   )[[1L]]
   reject_hits <- reject_hits[reject_hits > 0L]
-  expect_length(allow_hits, 2L)
-  expect_length(reject_hits, 7L)
+  expect_length(allow_hits, 3L)
+  expect_length(reject_hits, 6L)
   contract_hits <- gregexpr(
     "np_density_bw_integer_contract_or_error(", ingress, fixed = TRUE
   )[[1L]]

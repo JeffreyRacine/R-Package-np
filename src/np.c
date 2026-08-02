@@ -16857,7 +16857,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
     np_beta_bw_order_extern = np_bandwidth_kernel_descriptor_or_error(
       myopti[RBW_CKFAMILYI], KERNEL_reg_extern, myopti[RBW_CKORDERI],
       num_reg_continuous_extern, num_reg_unordered_extern,
-      num_reg_ordered_extern, NP_BETA_BW_CONTINUOUS_ONLY,
+      num_reg_ordered_extern, NP_BETA_BW_ALLOW_CATEGORICAL,
       ckerlb, ckerub,
       "C_np_regression_bw").order;
     np_regression_bw_categorical_compress_extern = myopti[RBW_CATCOMPI];

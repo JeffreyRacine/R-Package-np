@@ -179,7 +179,7 @@ test_that("mixed beta scalar regression matches canonical kernel-weight oracles"
   }
 })
 
-test_that("mixed beta regression preserves public routes and fail-closed search", {
+test_that("mixed beta regression preserves public routes and objective search", {
   old <- options(np.messages = FALSE, np.categorical.compress = TRUE)
   on.exit(options(old), add = TRUE)
 
@@ -227,18 +227,28 @@ test_that("mixed beta regression preserves public routes and fail-closed search"
   expect_equal(as.numeric(prediction$fit), fitted(direct), tolerance = 3e-10)
   expect_equal(as.numeric(prediction$se.fit), se(direct), tolerance = 3e-10)
 
+  selected <- npregbw(
+    xdat = training[c("x", "u", "o")], ydat = training$y,
+    bws = c(0.16, 0.2, 0.25), bandwidth.compute = FALSE,
+    regtype = "lc", ckertype = "beta",
+    ckerbound = "fixed", ckerlb = 0, ckerub = 1
+  )
+  expect_true(is.finite(np:::.npregbw_eval_only(
+    training[c("x", "u", "o")], training$y, selected,
+    invalid.penalty = "dbmax"
+  )$objective[[1L]]))
+  options(np.categorical.compress = NA)
+  expect_error(
+    npreg(bws = bws, txdat = training[c("x", "u", "o")],
+          tydat = training$y),
+    "np.categorical.compress", fixed = TRUE
+  )
   expect_error(
     npregbw(
       xdat = training[c("x", "u", "o")], ydat = training$y,
       regtype = "lc", ckertype = "beta",
       ckerbound = "fixed", ckerlb = 0, ckerub = 1
     ),
-    "continuous variables only", fixed = TRUE
-  )
-  options(np.categorical.compress = NA)
-  expect_error(
-    npreg(bws = bws, txdat = training[c("x", "u", "o")],
-          tydat = training$y),
     "np.categorical.compress", fixed = TRUE
   )
   expect_silent(npreg(
@@ -286,4 +296,44 @@ test_that("mixed beta regression is structurally canonical and linear-memory", {
   expect_false(grepl(
     "plan->num_train * plan->num_eval", helper, fixed = TRUE
   ))
+})
+
+test_that("mixed beta native MADS returns the point it evaluated", {
+  skip_if_not_installed("crs")
+  old <- options(np.messages = FALSE, np.categorical.compress = TRUE)
+  on.exit(options(old), add = TRUE)
+
+  set.seed(2323)
+  n <- 81L
+  training <- data.frame(
+    x1 = rbeta(n, 1.2, 1.7),
+    x2 = rbeta(n, 1.5, 1.3),
+    u = factor(sample(letters[1:3], n, replace = TRUE)),
+    o = ordered(sample(1:4, n, replace = TRUE), levels = 1:4)
+  )
+  response <- sin(3 * training$x1) + 0.35 * training$x2 +
+    0.1 * (training$u == "b") - 0.08 * (training$o == "4") +
+    rnorm(n, sd = 0.03)
+  bandwidth <- npregbw(
+    xdat = training,
+    ydat = response,
+    regtype = "lp",
+    degree = c(1L, 1L),
+    basis = "glp",
+    bernstein.basis = TRUE,
+    bwmethod = "cv.ls",
+    bwsolver = "mads",
+    ckertype = "beta",
+    ckerorder = 4L,
+    ckerbound = "fixed",
+    ckerlb = c(0, 0),
+    ckerub = c(1, 1),
+    nmulti = 1L,
+    nomad.opts = list(MAX_BB_EVAL = 20L)
+  )
+  replay <- np:::.npregbw_eval_only(
+    training, response, bandwidth, invalid.penalty = "baseline"
+  )$objective[[1L]]
+
+  expect_identical(as.numeric(bandwidth$fval[[1L]]), as.numeric(replay))
 })

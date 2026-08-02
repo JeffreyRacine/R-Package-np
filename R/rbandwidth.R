@@ -77,7 +77,7 @@ rbandwidth <-
     bandwidth.compute = bandwidth.compute,
     where = "beta regression",
     regtype = regtype,
-    allow.categorical = !isTRUE(bandwidth.compute),
+    allow.categorical = TRUE,
     allow.general.lp = TRUE
   )
   bounded_nonfixed_supported <- bwtype %in% c("generalized_nn", "adaptive_nn")
