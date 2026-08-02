@@ -511,3 +511,120 @@ test_that("automatic conditional beta selection returns usable bandwidths", {
     mads.lp$xbw, mads.lp$ybw, mads.lp$fval[1L]
   ))))
 })
+
+test_that("conditional beta distribution CVLS uses signed canonical LP rows", {
+  set.seed(9182L)
+  n <- 17L
+  x <- data.frame(x = runif(n, 0.03, 0.97))
+  y <- data.frame(y = runif(n, 0.04, 0.96))
+  grid <- data.frame(y = seq(0.05, 0.95, length.out = 7L))
+  indicator <- outer(y$y, grid$y, "<=")
+
+  influence <- function(weights, degree, bernstein) {
+    if (is.null(degree)) {
+      full <- sweep(weights, 2L, colSums(weights), "/")
+    } else {
+      design <- np:::W.lp(
+        x, degree = degree, basis = "glp",
+        bernstein.basis = bernstein
+      )
+      full <- matrix(0, n, n)
+      for (evaluation in seq_len(n)) {
+        weight <- weights[, evaluation]
+        coefficient <- solve(
+          crossprod(design, design * weight),
+          design[evaluation, ]
+        )
+        full[, evaluation] <-
+          weight * drop(design %*% coefficient)
+      }
+    }
+    for (evaluation in seq_len(n)) {
+      full[, evaluation] <- full[, evaluation] /
+        (1 - full[evaluation, evaluation])
+      full[evaluation, evaluation] <- 0
+    }
+    full
+  }
+
+  for (bwtype in c("fixed", "generalized_nn", "adaptive_nn")) {
+    hx <- if (identical(bwtype, "fixed")) 0.2 else 7L
+    hy <- if (identical(bwtype, "fixed")) 0.18 else 6L
+    for (order in c(2L, 8L)) {
+      wx <- conditional_beta_bw_weights(
+        x$x, x$x, hx, bwtype, order = order
+      )
+      wy <- conditional_beta_bw_weights(
+        y$y, grid$y, hy, bwtype, order = order,
+        operator = "integral"
+      )
+      for (engine in list(
+        list(regtype = "lc", degree = NULL, bernstein = FALSE),
+        list(regtype = "lp", degree = 2L, bernstein = FALSE),
+        list(regtype = "lp", degree = 2L, bernstein = TRUE)
+      )) {
+        xrow <- influence(wx, engine$degree, engine$bernstein)
+        expected <- mean((indicator - crossprod(xrow, wy))^2)
+        arguments <- list(
+          xdat = x, ydat = y, bws = c(hy, hx),
+          bandwidth.compute = FALSE, bwmethod = "cv.ls",
+          bwtype = bwtype, bwscaling = FALSE,
+          regtype = engine$regtype,
+          cxkertype = "beta", cxkerorder = order,
+          cxkerbound = "fixed", cxkerlb = 0, cxkerub = 1,
+          cykertype = "beta", cykerorder = order,
+          cykerbound = "fixed", cykerlb = 0, cykerub = 1
+        )
+        if (!is.null(engine$degree)) {
+          arguments$degree <- engine$degree
+          arguments$basis <- "glp"
+          arguments$bernstein.basis <- engine$bernstein
+        }
+        bandwidth <- do.call(npcdistbw, arguments)
+        observed <- np:::.npcdistbw_eval_only(
+          x, y, bws = bandwidth, gydat = grid
+        )$objective[[1L]]
+        expect_equal(
+          observed, expected, tolerance = 5e-8,
+          info = paste(bwtype, order, engine$regtype,
+                       engine$bernstein)
+        )
+      }
+    }
+  }
+})
+
+test_that("mixed conditional beta distribution compression is representational", {
+  old <- options(np.messages = FALSE, np.categorical.compress = FALSE)
+  on.exit(options(old), add = TRUE)
+  set.seed(892L)
+  n <- 29L
+  x <- data.frame(
+    x = runif(n),
+    group = factor(rep(letters[1:4], length.out = n))
+  )
+  y <- data.frame(
+    y = runif(n),
+    rank = ordered(rep(1:3, length.out = n), levels = 1:3)
+  )
+  grid <- y[seq(2L, n, length.out = 8L), , drop = FALSE]
+  values <- vapply(c(FALSE, TRUE), function(compress) {
+    options(np.categorical.compress = compress)
+    bandwidth <- npcdistbw(
+      xdat = x, ydat = y, bws = c(0.17, 0.21, 0.19, 0.23),
+      bandwidth.compute = FALSE, bwtype = "fixed", bwscaling = FALSE,
+      regtype = "lp", degree = 2L, basis = "glp",
+      bernstein.basis = TRUE,
+      cxkertype = "beta", cxkerorder = 6L,
+      cxkerbound = "fixed", cxkerlb = 0, cxkerub = 1,
+      cykertype = "beta", cykerorder = 8L,
+      cykerbound = "fixed", cykerlb = 0, cykerub = 1
+    )
+    np:::.npcdistbw_eval_only(
+      x, y, bws = bandwidth, gydat = grid
+    )$objective[[1L]]
+  }, numeric(1L))
+
+  expect_true(all(is.finite(values)))
+  expect_identical(values[[2L]], values[[1L]])
+})

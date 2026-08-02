@@ -1747,7 +1747,11 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
     xdat = xdat,
     ydat = ydat,
     bws = bws,
-    bandwidth.compute = FALSE,
+    # A zero beta vector is an automatic-search placeholder, not a manual
+    # bandwidth. Match fixed-degree MADS and conditional-density degree
+    # search so NOMAD can construct its admissible starting point.
+    bandwidth.compute = identical(reg.args$cxkertype, "beta") ||
+      identical(reg.args$cykertype, "beta"),
     reg.args = template.reg.args
   )
 

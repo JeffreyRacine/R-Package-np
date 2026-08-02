@@ -70,24 +70,4 @@ double np_beta_objective_conditional_density_ml(
   const double *lower_y,
   const double *upper_y);
 
-double np_beta_objective_conditional_distribution_ls(
-  int bandwidth_mode,
-  int kernel_code_x,
-  int order_x,
-  int kernel_code_y,
-  int order_y,
-  int num_obs_train,
-  int num_obs_eval,
-  int num_x,
-  int num_y,
-  int cdf_on_train,
-  double **train_x,
-  double **train_y,
-  double **eval_y,
-  const double *candidate,
-  const double *lower_x,
-  const double *upper_x,
-  const double *lower_y,
-  const double *upper_y);
-
 #endif

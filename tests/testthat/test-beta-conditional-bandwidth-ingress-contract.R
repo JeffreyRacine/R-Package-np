@@ -72,7 +72,7 @@ test_that("conditional bandwidth ingress marshals one compression contract", {
   )
 })
 
-test_that("conditional density beta ingress is open while distribution remains closed", {
+test_that("conditional beta bandwidth ingress is open for both estimators", {
   root <- locate_beta_conditional_bandwidth_sources()
   skip_if(is.null(root), "package sources unavailable")
   ingress <- paste(
@@ -90,16 +90,16 @@ test_that("conditional density beta ingress is open while distribution remains c
     ingress,
     fixed = TRUE
   ))
-  expect_match(
-    ingress,
+  expect_false(grepl(
     "C_np_distribution_conditional_bw: beta bandwidth selection supports only local-constant fitting",
-    fixed = TRUE
-  )
-  expect_match(
     ingress,
-    "C_np_distribution_conditional_bw: beta bandwidth selection requires continuous X and Y variables only",
     fixed = TRUE
-  )
+  ))
+  expect_false(grepl(
+    "C_np_distribution_conditional_bw: beta bandwidth selection requires continuous X and Y variables only",
+    ingress,
+    fixed = TRUE
+  ))
 
   density_starts <- gregexpr(
     "void np_density_conditional_bw(double * c_uno",
@@ -134,6 +134,50 @@ test_that("conditional density beta ingress is open while distribution remains c
     density_ingress,
     fixed = TRUE
   ))
+  distribution_ingress <- substr(
+    ingress,
+    distribution_start,
+    nchar(ingress)
+  )
+  distribution_allow_hits <- gregexpr(
+    "NP_BETA_BW_ALLOW_CATEGORICAL",
+    distribution_ingress,
+    fixed = TRUE
+  )[[1L]]
+  expect_gte(length(distribution_allow_hits[
+    distribution_allow_hits > 0L
+  ]), 2L)
+  expect_match(
+    paste(readLines(file.path(root, "R", "condbandwidth.R"),
+                    warn = FALSE), collapse = "\n"),
+    "allow.automatic.full = TRUE",
+    fixed = TRUE
+  )
+})
+
+test_that("distribution degree search owns automatic beta placeholders", {
+  root <- locate_beta_conditional_bandwidth_sources()
+  skip_if(is.null(root), "package sources unavailable")
+  distribution_r <- paste(
+    readLines(file.path(root, "R", "np.condistribution.bw.R"),
+              warn = FALSE),
+    collapse = "\n"
+  )
+  search_start <- regexpr(
+    ".npcdistbw_nomad_search <- function",
+    distribution_r,
+    fixed = TRUE
+  )[[1L]]
+  expect_gt(search_start, 0L)
+  search_text <- substring(distribution_r, search_start)
+  expect_match(
+    search_text,
+    paste0(
+      "bandwidth.compute = identical(reg.args$cxkertype, \"beta\") ||\n",
+      "      identical(reg.args$cykertype, \"beta\")"
+    ),
+    fixed = TRUE
+  )
 })
 
 test_that("conditional bandwidth objectives are neutral to dormant compression state", {

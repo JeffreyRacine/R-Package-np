@@ -24543,7 +24543,7 @@ static int np_conditional_yrow_eval_ctx_prepare(double *vector_scale_factor,
   if(kernel_bandwidth_mean(KERNEL_den_extern,
                            BANDWIDTH_den_extern,
                            num_train,
-                           num_train,
+                           num_eval,
                            0,
                            0,
                            0,
@@ -26360,6 +26360,10 @@ typedef struct {
                       double **matrix_Y_continuous_eval,
                       double **rows,
                       double *common_log_scale);
+  int (*y_integral_row)(void *context,
+                        int evaluation,
+                        double *row,
+                        double *common_log_scale);
 } NPConditionalCVLSRowProvider;
 
 static int np_conditional_density_cvls_bounded_i1_eval_on_grid(double *vector_scale_factor,
@@ -29961,6 +29965,222 @@ cleanup_cvls_lp_block:
   if(workspace_status == NP_CVLS_WORKSPACE_UNAVAILABLE)
     return np_conditional_density_cvls_lp_row_stream(
       vector_scale_factor, cv, NULL);
+  return status;
+}
+
+/*
+ * Linear-memory routed distribution owner.  This is used only when an
+ * optional acceleration slab cannot be obtained.  It preserves the X-major,
+ * Y-minor loss order and consumes exactly the same provider rows as the
+ * supertile; it never selects a different kernel family or estimator.
+ */
+static int np_conditional_distribution_cvls_provider_row_stream(
+  double *vector_scale_factor,
+  double *cv,
+  const NPConditionalCVLSRowProvider *provider)
+{
+  const int num_train = num_obs_train_extern;
+  const int num_eval = num_obs_eval_extern;
+  double *xrow = NULL;
+  double *yint = NULL;
+  int i, j;
+  int status = 1;
+
+  if(cv == NULL || vector_scale_factor == NULL || provider == NULL ||
+     provider->context == NULL || provider->x_row == NULL ||
+     provider->y_integral_row == NULL || num_train <= 0 || num_eval <= 0)
+    return 1;
+  if(BANDWIDTH_den_extern != BW_FIXED &&
+     BANDWIDTH_den_extern != BW_GEN_NN &&
+     BANDWIDTH_den_extern != BW_ADAP_NN)
+    return 1;
+
+  xrow = alloc_vecd(MAX(1, num_train));
+  yint = alloc_vecd(MAX(1, num_train));
+  if(xrow == NULL || yint == NULL)
+    goto cleanup_provider_row;
+
+  *cv = 0.0;
+  for(i = 0; i < num_train; ++i) {
+    if((i & 15) == 0)
+      np_progress_bandwidth_loop_step();
+    if(provider->x_row(provider->context, i, xrow) != 0)
+      goto cleanup_provider_row;
+
+    for(j = 0; j < num_eval; ++j) {
+      double y_log_scale = 0.0;
+      double fit;
+      double difference;
+      int indicator;
+
+      if(cdfontrain_extern && i == j)
+        continue;
+      if(provider->y_integral_row(
+           provider->context, j, yint, &y_log_scale) != 0)
+        goto cleanup_provider_row;
+      fit = np_blas_ddot_int(num_train, xrow, yint);
+      if(np_continuous_kernel_scaled_restore(
+           fit, y_log_scale, 1, &fit) != NP_CONTINUOUS_ROW_OK)
+        goto cleanup_provider_row;
+      indicator = np_conditional_indicator_row_core(
+        i, j, cdfontrain_extern,
+        matrix_Y_ordered_train_extern,
+        matrix_Y_continuous_train_extern,
+        matrix_Y_ordered_eval_extern,
+        matrix_Y_continuous_eval_extern,
+        num_var_ordered_extern, num_var_continuous_extern);
+      difference = (double)indicator - fit;
+      *cv += difference*difference;
+    }
+  }
+
+  *cv /= (double)num_train*(double)MAX(1, num_eval);
+  status = 0;
+
+cleanup_provider_row:
+  free(xrow);
+  free(yint);
+  np_glp_cv_clear_extern();
+  return status;
+}
+
+/*
+ * Routed conditional-distribution supertile.  A bounded group of X influence
+ * blocks shares each Y-integral tile; the only retained product is B x B.
+ * Each response row's common scale is restored after GEMM and before the
+ * canonical indicator loss.  Storage is O(n B + B^2).
+ */
+static int np_conditional_distribution_cvls_provider_supertile(
+  double *vector_scale_factor,
+  double *cv,
+  const NPConditionalCVLSRowProvider *provider)
+{
+  const int num_train = num_obs_train_extern;
+  const int num_eval = num_obs_eval_extern;
+  const int block_size = MIN(
+    np_conditional_lp_cvls_block_size(num_train, 5U, 1U),
+    MAX(1, num_train));
+  double **xblocks[4] = {NULL, NULL, NULL, NULL};
+  double **yintblock = NULL;
+  double *fit_cross = NULL;
+  double *y_log_scale = NULL;
+  int group_width;
+  int nblocks;
+  int i0, j0, ii, jj, g;
+  int status = 1;
+  NPCVLSWorkspaceStatus workspace_status = NP_CVLS_WORKSPACE_OK;
+
+  if(cv == NULL || vector_scale_factor == NULL || provider == NULL ||
+     provider->context == NULL || provider->x_row == NULL ||
+     provider->y_integral_row == NULL || num_train <= 0 || num_eval <= 0)
+    return 1;
+  if(block_size <= 0)
+    return 2;
+  if(BANDWIDTH_den_extern != BW_FIXED &&
+     BANDWIDTH_den_extern != BW_GEN_NN &&
+     BANDWIDTH_den_extern != BW_ADAP_NN)
+    return 1;
+
+  nblocks = num_train/block_size + ((num_train % block_size) != 0);
+  group_width = MIN(4, MAX(1, nblocks));
+  for(g = 0; g < group_width; ++g) {
+    workspace_status =
+      np_cvls_workspace_matrix_try(num_train, block_size, &xblocks[g]);
+    if(workspace_status != NP_CVLS_WORKSPACE_OK)
+      goto cleanup_provider_supertile;
+  }
+  workspace_status =
+    np_cvls_workspace_matrix_try(num_train, block_size, &yintblock);
+  if(workspace_status == NP_CVLS_WORKSPACE_OK)
+    workspace_status =
+      np_cvls_workspace_square_try(block_size, &fit_cross);
+  if(workspace_status == NP_CVLS_WORKSPACE_OK)
+    workspace_status = np_cvls_workspace_vector_try(
+      (size_t)block_size, &y_log_scale);
+  if(workspace_status != NP_CVLS_WORKSPACE_OK)
+    goto cleanup_provider_supertile;
+
+  *cv = 0.0;
+  for(i0 = 0; i0 < num_train; i0 += group_width*block_size) {
+    int block_start[4] = {
+      i0, i0 + block_size, i0 + 2*block_size, i0 + 3*block_size
+    };
+    int block_rows[4] = {0, 0, 0, 0};
+    double block_sum[4] = {0.0, 0.0, 0.0, 0.0};
+
+    np_progress_bandwidth_loop_step();
+    for(g = 0; g < group_width; ++g) {
+      block_rows[g] =
+        MIN(block_size, MAX(0, num_train - block_start[g]));
+      for(ii = 0; ii < block_rows[g]; ++ii)
+        if(provider->x_row(provider->context, block_start[g] + ii,
+                           xblocks[g][ii]) != 0)
+          goto cleanup_provider_supertile;
+    }
+
+    for(j0 = 0; j0 < num_eval; j0 += block_size) {
+      const int jb = MIN(block_size, num_eval - j0);
+
+      for(jj = 0; jj < jb; ++jj)
+        if(provider->y_integral_row(
+             provider->context, j0 + jj, yintblock[jj],
+             &y_log_scale[jj]) != 0)
+          goto cleanup_provider_supertile;
+
+      for(g = 0; g < group_width; ++g) {
+        const int ib = block_rows[g];
+
+        if(ib <= 0)
+          continue;
+        np_blas_dgemm_tn_int(
+          ib, jb, num_train, xblocks[g][0], yintblock[0], fit_cross);
+        for(ii = 0; ii < ib; ++ii) {
+          const int train_i = block_start[g] + ii;
+
+          for(jj = 0; jj < jb; ++jj) {
+            const int eval_j = j0 + jj;
+            double fit = fit_cross[ii + jj*ib];
+            double difference;
+            int indicator;
+
+            if(cdfontrain_extern && train_i == eval_j)
+              continue;
+            if(np_continuous_kernel_scaled_restore(
+                 fit, y_log_scale[jj], 1, &fit) !=
+               NP_CONTINUOUS_ROW_OK)
+              goto cleanup_provider_supertile;
+            indicator = np_conditional_indicator_row_core(
+              train_i, eval_j, cdfontrain_extern,
+              matrix_Y_ordered_train_extern,
+              matrix_Y_continuous_train_extern,
+              matrix_Y_ordered_eval_extern,
+              matrix_Y_continuous_eval_extern,
+              num_var_ordered_extern, num_var_continuous_extern);
+            difference = (double)indicator - fit;
+            block_sum[g] += difference*difference;
+          }
+        }
+      }
+    }
+
+    for(g = 0; g < group_width; ++g)
+      if(block_rows[g] > 0)
+        *cv += block_sum[g];
+  }
+
+  *cv /= (double)num_train*(double)MAX(1, num_eval);
+  status = 0;
+
+cleanup_provider_supertile:
+  for(g = 0; g < 4; ++g)
+    if(xblocks[g] != NULL)
+      free_tmat(xblocks[g]);
+  if(yintblock != NULL)
+    free_tmat(yintblock);
+  free(fit_cross);
+  free(y_log_scale);
+  if(workspace_status == NP_CVLS_WORKSPACE_UNAVAILABLE)
+    return 2;
   return status;
 }
 
@@ -36687,11 +36907,13 @@ static void np_conditional_route_row_context_clear(
 static int np_conditional_route_bandwidth_prepare(
   const int standard_deviation_offset,
   const int bandwidth_mode,
-  const int num_obs,
+  const int num_train,
+  const int num_eval,
   const int num_unordered,
   const int num_ordered,
   const int num_continuous,
-  double **matrix_continuous,
+  double **matrix_continuous_train,
+  double **matrix_continuous_eval,
   double *scale_factor,
   double **matrix_bandwidth,
   double *lambda)
@@ -36706,12 +36928,130 @@ static int np_conditional_route_bandwidth_prepare(
     vector_continuous_stddev_extern =
       saved_standard_deviation + standard_deviation_offset;
   status = np_beta_continuous_bandwidth_prepare_canonical(
-    bandwidth_mode, num_obs, num_obs,
+    bandwidth_mode, num_train, num_eval,
     num_unordered, num_ordered, num_continuous,
-    matrix_continuous, matrix_continuous,
+    matrix_continuous_train, matrix_continuous_eval,
     scale_factor, matrix_bandwidth, NULL, lambda, NULL);
   vector_continuous_stddev_extern = saved_standard_deviation;
   return status;
+}
+
+static int np_conditional_route_row_context_prepare_general(
+  NPConditionalRouteRowContext * const context,
+  const int is_x_side,
+  const int bandwidth_mode,
+  const int num_train,
+  const int num_eval,
+  const int num_var_unordered,
+  const int num_var_ordered,
+  const int num_var_continuous,
+  const int num_reg_unordered,
+  const int num_reg_ordered,
+  const int num_reg_continuous,
+  const int kernel_unordered_code,
+  const int kernel_ordered_code,
+  double **matrix_unordered_train,
+  double **matrix_ordered_train,
+  double **matrix_continuous_train,
+  double **matrix_unordered_eval,
+  double **matrix_ordered_eval,
+  double **matrix_continuous_eval,
+  const int operator_code,
+  const double * const vector_scale_factor,
+  const int * const num_categories,
+  double **matrix_categorical_vals,
+  const NPContinuousKernelRoute * const route,
+  NPContinuousKernelDerivativeDiagnostics * const diagnostics,
+  const int categorical_compress)
+{
+  const int num_continuous = is_x_side ?
+    num_reg_continuous : num_var_continuous;
+  const int num_unordered = is_x_side ?
+    num_reg_unordered : num_var_unordered;
+  const int num_ordered = is_x_side ?
+    num_reg_ordered : num_var_ordered;
+  const int total = num_continuous + num_unordered + num_ordered;
+  const int bandwidth_rows = bandwidth_mode == BW_FIXED ? 1 :
+    (bandwidth_mode == BW_GEN_NN ? num_eval : num_train);
+  int coordinate;
+
+  if(context == NULL || num_train < 2 || num_eval <= 0 ||
+     num_continuous <= 0 || matrix_continuous_train == NULL ||
+     matrix_continuous_eval == NULL || vector_scale_factor == NULL ||
+     route == NULL || diagnostics == NULL ||
+     (operator_code != OP_NORMAL && operator_code != OP_INTEGRAL) ||
+     (bandwidth_mode != BW_FIXED && bandwidth_mode != BW_GEN_NN &&
+      bandwidth_mode != BW_ADAP_NN) ||
+     (categorical_compress != 0 && categorical_compress != 1))
+    return 1;
+
+  context->num_continuous = num_continuous;
+  context->num_unordered = num_unordered;
+  context->num_ordered = num_ordered;
+  context->scale_factor = (double *)np_jksum_malloc_array_or_die(
+    (size_t)MAX(1, total), sizeof(double),
+    "conditional objective route scale factor");
+  context->lambda = (double *)np_jksum_malloc_array_or_die(
+    (size_t)MAX(1, num_unordered + num_ordered), sizeof(double),
+    "conditional objective route categorical bandwidth");
+  context->row = (double *)np_jksum_malloc_array_or_die(
+    (size_t)num_train, sizeof(double),
+    "conditional objective route row");
+  context->operator_code = (int *)np_jksum_malloc_array_or_die(
+    (size_t)MAX(1, total), sizeof(int),
+    "conditional objective route operator");
+  context->kernel_unordered = (int *)np_jksum_malloc_array_or_die(
+    (size_t)MAX(1, num_unordered), sizeof(int),
+    "conditional objective route unordered kernel");
+  context->kernel_ordered = (int *)np_jksum_malloc_array_or_die(
+    (size_t)MAX(1, num_ordered), sizeof(int),
+    "conditional objective route ordered kernel");
+  context->matrix_bandwidth = alloc_matd(bandwidth_rows, num_continuous);
+  if(context->matrix_bandwidth == NULL)
+    goto fail_prepare;
+
+  np_splitxy_vsf_mcv_nc(
+    num_var_unordered, num_var_ordered, num_var_continuous,
+    num_reg_unordered, num_reg_ordered, num_reg_continuous,
+    vector_scale_factor, NULL, NULL,
+    is_x_side ? context->scale_factor : NULL,
+    is_x_side ? NULL : context->scale_factor,
+    NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+  for(coordinate = 0; coordinate < total; ++coordinate)
+    context->operator_code[coordinate] = operator_code;
+  for(coordinate = 0; coordinate < num_unordered; ++coordinate)
+    context->kernel_unordered[coordinate] = kernel_unordered_code;
+  for(coordinate = 0; coordinate < num_ordered; ++coordinate)
+    context->kernel_ordered[coordinate] = kernel_ordered_code;
+
+  if(np_conditional_route_bandwidth_prepare(
+       is_x_side ? 0 : num_reg_continuous,
+       bandwidth_mode, num_train, num_eval,
+       num_unordered, num_ordered, num_continuous,
+       matrix_continuous_train, matrix_continuous_eval,
+       context->scale_factor,
+       context->matrix_bandwidth, context->lambda) != 0)
+    goto fail_prepare;
+  if(np_beta_scaled_row_context_prepare(
+       &context->scaled_row, route, diagnostics,
+       bandwidth_mode, num_train, num_eval,
+       num_continuous, num_unordered, num_ordered,
+       matrix_continuous_train, matrix_continuous_eval,
+       matrix_unordered_train, matrix_unordered_eval,
+       matrix_ordered_train, matrix_ordered_eval,
+       context->matrix_bandwidth, context->matrix_bandwidth,
+       context->operator_code,
+       context->kernel_unordered, context->kernel_ordered,
+       context->lambda, num_categories, matrix_categorical_vals,
+       categorical_compress, context->row) != NP_CONTINUOUS_ROW_OK)
+    goto fail_prepare;
+
+  context->ready = 1;
+  return 0;
+
+fail_prepare:
+  np_conditional_route_row_context_clear(context);
+  return 1;
 }
 
 static int np_conditional_route_row_context_prepare(
@@ -36737,90 +37077,16 @@ static int np_conditional_route_row_context_prepare(
   NPContinuousKernelDerivativeDiagnostics * const diagnostics,
   const int categorical_compress)
 {
-  const int num_continuous = is_x_side ?
-    num_reg_continuous : num_var_continuous;
-  const int num_unordered = is_x_side ?
-    num_reg_unordered : num_var_unordered;
-  const int num_ordered = is_x_side ?
-    num_reg_ordered : num_var_ordered;
-  const int total = num_continuous + num_unordered + num_ordered;
-  const int bandwidth_rows = bandwidth_mode == BW_FIXED ? 1 : num_obs;
-  int coordinate;
-
-  if(context == NULL || num_obs < 2 || num_continuous <= 0 ||
-     matrix_continuous == NULL || vector_scale_factor == NULL ||
-     route == NULL || diagnostics == NULL ||
-     (bandwidth_mode != BW_FIXED && bandwidth_mode != BW_GEN_NN &&
-      bandwidth_mode != BW_ADAP_NN) ||
-     (categorical_compress != 0 && categorical_compress != 1))
-    return 1;
-
-  context->num_continuous = num_continuous;
-  context->num_unordered = num_unordered;
-  context->num_ordered = num_ordered;
-  context->scale_factor = (double *)np_jksum_malloc_array_or_die(
-    (size_t)MAX(1, total), sizeof(double),
-    "conditional objective route scale factor");
-  context->lambda = (double *)np_jksum_malloc_array_or_die(
-    (size_t)MAX(1, num_unordered + num_ordered), sizeof(double),
-    "conditional objective route categorical bandwidth");
-  context->row = (double *)np_jksum_malloc_array_or_die(
-    (size_t)num_obs, sizeof(double),
-    "conditional objective route row");
-  context->operator_code = (int *)np_jksum_malloc_array_or_die(
-    (size_t)MAX(1, total), sizeof(int),
-    "conditional objective route operator");
-  context->kernel_unordered = (int *)np_jksum_malloc_array_or_die(
-    (size_t)MAX(1, num_unordered), sizeof(int),
-    "conditional objective route unordered kernel");
-  context->kernel_ordered = (int *)np_jksum_malloc_array_or_die(
-    (size_t)MAX(1, num_ordered), sizeof(int),
-    "conditional objective route ordered kernel");
-  context->matrix_bandwidth = alloc_matd(bandwidth_rows, num_continuous);
-  if(context->matrix_bandwidth == NULL)
-    goto fail_prepare;
-
-  np_splitxy_vsf_mcv_nc(
+  return np_conditional_route_row_context_prepare_general(
+    context, is_x_side, bandwidth_mode, num_obs, num_obs,
     num_var_unordered, num_var_ordered, num_var_continuous,
     num_reg_unordered, num_reg_ordered, num_reg_continuous,
-    vector_scale_factor, NULL, NULL,
-    is_x_side ? context->scale_factor : NULL,
-    is_x_side ? NULL : context->scale_factor,
-    NULL, NULL, NULL, NULL, NULL, NULL, NULL);
-  for(coordinate = 0; coordinate < total; ++coordinate)
-    context->operator_code[coordinate] = OP_NORMAL;
-  for(coordinate = 0; coordinate < num_unordered; ++coordinate)
-    context->kernel_unordered[coordinate] = kernel_unordered_code;
-  for(coordinate = 0; coordinate < num_ordered; ++coordinate)
-    context->kernel_ordered[coordinate] = kernel_ordered_code;
-
-  if(np_conditional_route_bandwidth_prepare(
-       is_x_side ? 0 : num_reg_continuous,
-       bandwidth_mode, num_obs,
-       num_unordered, num_ordered, num_continuous,
-       matrix_continuous, context->scale_factor,
-       context->matrix_bandwidth, context->lambda) != 0)
-    goto fail_prepare;
-  if(np_beta_scaled_row_context_prepare(
-       &context->scaled_row, route, diagnostics,
-       bandwidth_mode, num_obs, num_obs,
-       num_continuous, num_unordered, num_ordered,
-       matrix_continuous, matrix_continuous,
-       matrix_unordered, matrix_unordered,
-       matrix_ordered, matrix_ordered,
-       context->matrix_bandwidth, context->matrix_bandwidth,
-       context->operator_code,
-       context->kernel_unordered, context->kernel_ordered,
-       context->lambda, num_categories, matrix_categorical_vals,
-       categorical_compress, context->row) != NP_CONTINUOUS_ROW_OK)
-    goto fail_prepare;
-
-  context->ready = 1;
-  return 0;
-
-fail_prepare:
-  np_conditional_route_row_context_clear(context);
-  return 1;
+    kernel_unordered_code, kernel_ordered_code,
+    matrix_unordered, matrix_ordered, matrix_continuous,
+    matrix_unordered, matrix_ordered, matrix_continuous,
+    OP_NORMAL, vector_scale_factor, num_categories,
+    matrix_categorical_vals, route, diagnostics,
+    categorical_compress);
 }
 
 /*
@@ -37094,14 +37360,19 @@ static void np_conditional_cvls_route_context_clear(
 static int np_conditional_cvls_route_context_prepare(
   NPConditionalCVLSRouteContext * const context,
   double * const vector_scale_factor,
-  const NPConditionalKernelExecutionContext * const execution_context)
+  const NPConditionalKernelExecutionContext * const execution_context,
+  const int response_operator)
 {
   const int num_obs = num_obs_train_extern;
+  const int num_y_eval = response_operator == OP_INTEGRAL ?
+    num_obs_eval_extern : num_obs;
   const int use_general_lp = np_lp_engine_extern == NP_LP_ENGINE_GENERAL;
   const int use_bernstein = int_glp_bernstein_extern != 0;
 
   if(context == NULL || vector_scale_factor == NULL ||
-     execution_context == NULL || num_obs < 2 ||
+     execution_context == NULL || num_obs < 2 || num_y_eval <= 0 ||
+     (response_operator != OP_NORMAL &&
+      response_operator != OP_INTEGRAL) ||
      (np_lp_engine_extern != NP_LP_ENGINE_SCALAR &&
       np_lp_engine_extern != NP_LP_ENGINE_GENERAL))
     return 1;
@@ -37130,19 +37401,30 @@ static int np_conditional_cvls_route_context_prepare(
   }
 
   if(context->beta_y) {
-    if(np_conditional_route_row_context_prepare(
-         &context->route_y, 0, BANDWIDTH_den_extern, num_obs,
+    if(np_conditional_route_row_context_prepare_general(
+         &context->route_y, 0, BANDWIDTH_den_extern,
+         num_obs, num_y_eval,
          num_var_unordered_extern, num_var_ordered_extern,
          num_var_continuous_extern, num_reg_unordered_extern,
          num_reg_ordered_extern, num_reg_continuous_extern,
          KERNEL_den_unordered_extern, KERNEL_den_ordered_extern,
          matrix_Y_unordered_train_extern, matrix_Y_ordered_train_extern,
-         matrix_Y_continuous_train_extern, vector_scale_factor,
+         matrix_Y_continuous_train_extern,
+         response_operator == OP_INTEGRAL ?
+           matrix_Y_unordered_eval_extern :
+           matrix_Y_unordered_train_extern,
+         response_operator == OP_INTEGRAL ?
+           matrix_Y_ordered_eval_extern :
+           matrix_Y_ordered_train_extern,
+         response_operator == OP_INTEGRAL ?
+           matrix_Y_continuous_eval_extern :
+           matrix_Y_continuous_train_extern,
+         response_operator, vector_scale_factor,
          num_categories_extern_Y, matrix_categorical_vals_extern_Y,
          execution_context->y_route, execution_context->y_diagnostics,
          execution_context->categorical_compress) != 0)
       goto fail_prepare;
-  } else {
+  } else if(response_operator == OP_NORMAL) {
     if(np_conditional_yrow_ctx_prepare(
          vector_scale_factor, OP_NORMAL, &context->legacy_y) != 0)
       goto fail_prepare;
@@ -37151,6 +37433,13 @@ static int np_conditional_cvls_route_context_prepare(
          vector_scale_factor, OP_CONVOLUTION,
          &context->legacy_y_convolution) != 0)
       goto fail_prepare;
+  } else if(np_conditional_yrow_eval_ctx_prepare(
+              vector_scale_factor, OP_INTEGRAL,
+              matrix_Y_unordered_eval_extern,
+              matrix_Y_ordered_eval_extern,
+              matrix_Y_continuous_eval_extern,
+              num_y_eval, &context->legacy_y) != 0) {
+    goto fail_prepare;
   }
 
   if(context->beta_x && use_general_lp) {
@@ -37393,6 +37682,48 @@ cleanup_eval:
 }
 
 /*
+ * Supply one response CDF row on the actual distribution evaluation plane.
+ * The persistent route context was prepared with OP_INTEGRAL and with the
+ * train/evaluation bandwidth topology, so generalized-NN rows are indexed by
+ * evaluation point while adaptive-NN rows remain indexed by observation.
+ */
+static int np_conditional_cvls_provider_y_integral_row(
+  void *raw_context,
+  const int evaluation,
+  double * const row,
+  double * const common_log_scale)
+{
+  NPConditionalCVLSRouteContext * const context =
+    (NPConditionalCVLSRouteContext *)raw_context;
+  const int num_train = num_obs_train_extern;
+  const int num_eval = num_obs_eval_extern;
+
+  if(context == NULL || !context->ready || row == NULL ||
+     common_log_scale == NULL || evaluation < 0 ||
+     evaluation >= num_eval)
+    return 1;
+
+  *common_log_scale = 0.0;
+  if(!context->beta_y)
+    return np_conditional_y_eval_from_ctx(
+      &context->legacy_y, evaluation,
+      matrix_Y_unordered_eval_extern,
+      matrix_Y_ordered_eval_extern,
+      matrix_Y_continuous_eval_extern,
+      num_eval,
+      cdfontrain_extern && (num_eval == num_train),
+      row);
+
+  if(np_beta_scaled_row_context_fill(
+       &context->route_y.scaled_row, evaluation, NULL,
+       common_log_scale) != NP_CONTINUOUS_ROW_OK)
+    return 1;
+  memcpy(row, context->route_y.row,
+         (size_t)num_train*sizeof(double));
+  return 0;
+}
+
+/*
  * Analytic-Y routed CVLS owner.  Retain a bounded group of canonical X rows
  * and reuse each legacy Y-convolution tile across the group.  The workspace
  * is O(n * B + B^2), where B is the existing memory-bounded CVLS tile width;
@@ -37585,7 +37916,8 @@ int np_conditional_density_cvls_lp_stream_ctx(
 
   np_conditional_cvls_route_context_init(&route_context);
   if(np_conditional_cvls_route_context_prepare(
-       &route_context, vector_scale_factor, execution_context) != 0)
+       &route_context, vector_scale_factor, execution_context,
+       OP_NORMAL) != 0)
     goto cleanup_route;
   provider.context = &route_context;
   provider.x_row = np_conditional_cvls_provider_x_row;
@@ -37593,6 +37925,7 @@ int np_conditional_density_cvls_lp_stream_ctx(
   provider.y_convolution_row =
     np_conditional_cvls_provider_y_convolution_row;
   provider.y_eval_block = np_conditional_cvls_provider_y_eval_block;
+  provider.y_integral_row = NULL;
 
   if(np_conditional_density_cvls_bounded_scalar_route_ok()) {
     status = np_conditional_density_cvls_bounded_i1_quadrature_row_stream(
@@ -37612,6 +37945,57 @@ int np_conditional_density_cvls_lp_stream_ctx(
       status = np_conditional_density_cvls_lp_row_stream(
         vector_scale_factor, cv, &provider);
   }
+
+cleanup_route:
+  np_conditional_cvls_route_context_clear(&route_context);
+  np_glp_cv_clear_extern();
+  return status;
+}
+
+/*
+ * Route-bearing sibling for conditional-distribution CVLS.  The null route
+ * is the literal incumbent owner.  Routed execution uses the same canonical
+ * signed X influence row as conditional density and supplies only response
+ * CDF rows to the family-neutral distribution loss.  No routed failure may
+ * select the historical beta sidecar or another estimator.
+ */
+int np_conditional_distribution_cvls_lp_stream_ctx(
+  double *vector_scale_factor,
+  const NPConditionalKernelExecutionContext * const execution_context,
+  double *cv)
+{
+  NPConditionalCVLSRouteContext route_context;
+  NPConditionalCVLSRowProvider provider;
+  int status = 1;
+
+  if(execution_context == NULL)
+    return np_conditional_distribution_cvls_lp_stream(
+      vector_scale_factor, cv);
+
+  if(!np_conditional_kernel_execution_context_valid(
+       execution_context, KERNEL_reg_extern, KERNEL_den_extern,
+       num_reg_continuous_extern, num_var_continuous_extern))
+    error("conditional distribution CVLS kernel route has an invalid layout");
+
+  np_conditional_cvls_route_context_init(&route_context);
+  if(np_conditional_cvls_route_context_prepare(
+       &route_context, vector_scale_factor, execution_context,
+       OP_INTEGRAL) != 0)
+    goto cleanup_route;
+
+  provider.context = &route_context;
+  provider.x_row = np_conditional_cvls_provider_x_row;
+  provider.y_train_row = NULL;
+  provider.y_convolution_row = NULL;
+  provider.y_eval_block = NULL;
+  provider.y_integral_row =
+    np_conditional_cvls_provider_y_integral_row;
+
+  status = np_conditional_distribution_cvls_provider_supertile(
+    vector_scale_factor, cv, &provider);
+  if(status == 2)
+    status = np_conditional_distribution_cvls_provider_row_stream(
+      vector_scale_factor, cv, &provider);
 
 cleanup_route:
   np_conditional_cvls_route_context_clear(&route_context);

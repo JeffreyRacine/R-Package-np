@@ -980,8 +980,12 @@ test_that("density bandwidth ingress owns categorical compression state", {
     "NP_BETA_BW_CONTINUOUS_ONLY,", ingress, fixed = TRUE
   )[[1L]]
   reject_hits <- reject_hits[reject_hits > 0L]
-  expect_length(allow_hits, 7L)
-  expect_length(reject_hits, 2L)
+  # Every public beta bandwidth descriptor now admits the categorical peer
+  # route.  The final two sites are conditional-distribution X and Y; P23Z
+  # removed their former continuous-only policy without removing the enum
+  # value used by the shared validator itself.
+  expect_length(allow_hits, 9L)
+  expect_length(reject_hits, 0L)
   contract_hits <- gregexpr(
     "np_density_bw_integer_contract_or_error(", ingress, fixed = TRUE
   )[[1L]]
