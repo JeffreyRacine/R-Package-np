@@ -544,6 +544,11 @@ test_that("beta density CVML enters the canonical scaled-row owner", {
   expect_match(owner, "const int exact_beta_route = kernel_route != NULL;",
                fixed = TRUE)
   expect_match(owner, "np_density_cvml_beta_route(", fixed = TRUE)
+  expect_match(
+    owner,
+    "if(exact_beta_route)\n      goto cleanup_density_leave_one_out_cv;",
+    fixed = TRUE
+  )
   expect_match(owner, "goto cleanup_density_leave_one_out_cv;",
                fixed = TRUE)
   expect_match(
@@ -580,7 +585,7 @@ test_that("beta density CVML enters the canonical scaled-row owner", {
   )
 })
 
-test_that("density CVLS owner retains beta-unreachable route plumbing", {
+test_that("beta density CVLS enters canonical quadrature and LOO owners", {
   root <- locate_beta_activation_sources()
   skip_if(is.null(root), "package sources unavailable")
   ingress <- paste(
@@ -608,9 +613,15 @@ test_that("density CVLS owner retains beta-unreachable route plumbing", {
 
   expect_match(owner, "const NPContinuousKernelRoute * const kernel_route",
                fixed = TRUE)
-  expect_match(owner, "(void)kernel_route;", fixed = TRUE)
-  expect_match(owner, "(void)kernel_route_diagnostics;", fixed = TRUE)
-  expect_match(owner, "(void)categorical_compress;", fixed = TRUE)
+  expect_match(owner, "const int exact_beta_route = kernel_route != NULL;",
+               fixed = TRUE)
+  expect_match(owner, "np_density_cvls_beta_cross_term(", fixed = TRUE)
+  expect_match(
+    owner,
+    "if(exact_beta_route)\n      goto cleanup_density_convolution_cv;",
+    fixed = TRUE
+  )
+  expect_match(owner, "goto cleanup_density_convolution_cv;", fixed = TRUE)
   expect_false(grepl("NPContinuousKernelExecutionContext", owner,
                      fixed = TRUE))
 
@@ -623,13 +634,17 @@ test_that("density CVLS owner retains beta-unreachable route plumbing", {
   expect_gt(callback_start, 0L)
   expect_gt(callback_end, callback_start)
   callback <- substr(ingress, callback_start, callback_end - 1L)
-  expect_match(callback, "np_beta_objective_density_ls(", fixed = TRUE)
+  expect_match(callback, "if(KERNEL_den_extern == NP_CKERNEL_COORDINATE_CODE)",
+               fixed = TRUE)
+  expect_false(grepl("np_beta_objective_density_ls(", callback,
+                     fixed = TRUE))
+  expect_match(callback, "active_route = &beta_route;", fixed = TRUE)
   expect_match(
     callback,
     paste0(
       "matrix_categorical_vals_extern,\n",
-      "        NULL,\n",
-      "        NULL,\n",
+      "        active_route,\n",
+      "        active_diagnostics,\n",
       "        0,\n",
       "        &cv)==1)"
     ),
