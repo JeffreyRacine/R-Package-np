@@ -513,7 +513,7 @@ test_that("legacy conditional scalar owner retains dormant route plumbing", {
   )
 })
 
-test_that("density CVML owner retains beta-unreachable route plumbing", {
+test_that("beta density CVML enters the canonical scaled-row owner", {
   root <- locate_beta_activation_sources()
   skip_if(is.null(root), "package sources unavailable")
   ingress <- paste(
@@ -541,11 +541,17 @@ test_that("density CVML owner retains beta-unreachable route plumbing", {
 
   expect_match(owner, "const NPContinuousKernelRoute * const kernel_route",
                fixed = TRUE)
-  expect_match(owner, "(void)kernel_route;", fixed = TRUE)
-  expect_match(owner, "(void)kernel_route_diagnostics;", fixed = TRUE)
-  expect_match(owner, "(void)categorical_compress;", fixed = TRUE)
-  expect_false(grepl("NPContinuousKernelExecutionContext", owner,
-                     fixed = TRUE))
+  expect_match(owner, "const int exact_beta_route = kernel_route != NULL;",
+               fixed = TRUE)
+  expect_match(owner, "np_density_cvml_beta_route(", fixed = TRUE)
+  expect_match(owner, "goto cleanup_density_leave_one_out_cv;",
+               fixed = TRUE)
+  expect_match(
+    engine,
+    "np_beta_scaled_row_context_fill_omitting(",
+    fixed = TRUE
+  )
+  expect_match(engine, "np_guarded_cvml_log_contribution(", fixed = TRUE)
 
   callback_start <- regexpr(
     "double np_cv_func_density_categorical_ml(", ingress, fixed = TRUE
@@ -558,12 +564,15 @@ test_that("density CVML owner retains beta-unreachable route plumbing", {
   callback <- substr(ingress, callback_start, callback_end - 1L)
   expect_match(callback, "if(KERNEL_den_extern == NP_CKERNEL_COORDINATE_CODE)",
                fixed = TRUE)
+  expect_false(grepl("np_beta_objective_density_ml(", callback,
+                     fixed = TRUE))
+  expect_match(callback, "active_route = &beta_route;", fixed = TRUE)
   expect_match(
     callback,
     paste0(
       "num_categories_extern,\n",
-      "        NULL,\n",
-      "        NULL,\n",
+      "        active_route,\n",
+      "        active_diagnostics,\n",
       "        0,\n",
       "        &cv)==1)"
     ),
