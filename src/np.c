@@ -172,6 +172,28 @@ static int np_canonical_lp_engine_for_degree(const int *degree, const int ncon)
   return NP_LP_ENGINE_SCALAR;
 }
 
+/*
+ * NOMAD represents categorical bandwidths on a 1e4-expanded search scale.
+ * Decode them in the same operation order used by the canonical R
+ * point-to-storage helper: divide by the search scale first and, for scaled
+ * bandwidth objects, divide by ncatfac second. Precomputing and multiplying
+ * by the reciprocal is not byte-equivalent and can make a returned point
+ * differ from the point evaluated by the native callback.
+ */
+static int np_nomad_decode_categorical_bandwidth(
+  const double raw_point,
+  const int scaling,
+  const double ncatfac,
+  double * const bandwidth)
+{
+  const double external = raw_point/1.0e4;
+
+  if(bandwidth == NULL || (scaling && ncatfac == 0.0))
+    return 1;
+  *bandwidth = scaling ? external/ncatfac : external;
+  return 0;
+}
+
 static void np_load_crs_namespace(void)
 {
   SEXP pkg;
@@ -5006,6 +5028,8 @@ typedef struct {
   int n;
   int nbw_point;
   int nbw_flat;
+  int ncont_point;
+  int scaling;
   int ndegree;
   int nfixed_degree;
   const int *flat_from_point;
@@ -5017,6 +5041,7 @@ typedef struct {
   double total_num_feval;
   double total_fast;
   double total_guarded;
+  double ncatfac;
   double best_min_objective;
   double best_objective;
   double best_eval[4];
@@ -5043,7 +5068,8 @@ static int np_cdens_native_search_callback(int n,
   int degree_len, j, status;
 
   if (context == NULL || x == NULL || bb_outputs == NULL || m != 1 ||
-      n != context->n)
+      n != context->n || context->ncont_point < 0 ||
+      context->ncont_point > context->nbw_point)
     return 1;
 
   degree_len = (context->ndegree > 0) ? context->ndegree : context->nfixed_degree;
@@ -5065,7 +5091,14 @@ static int np_cdens_native_search_callback(int n,
       NP_NOMAD_CALLBACK_FREE(degree);
       return 1;
     }
-    if (BANDWIDTH_den_extern == BW_FIXED) {
+    if (idx >= context->ncont_point) {
+      if (np_nomad_decode_categorical_bandwidth(
+            x[idx], context->scaling, context->ncatfac, &flat_bw[j]) != 0) {
+        NP_NOMAD_CALLBACK_FREE(flat_bw);
+        NP_NOMAD_CALLBACK_FREE(degree);
+        return 1;
+      }
+    } else if (BANDWIDTH_den_extern == BW_FIXED) {
       flat_bw[j] = x[idx];
       if (context->flat_decode_scale != NULL)
         flat_bw[j] *= context->flat_decode_scale[j];
@@ -5271,6 +5304,9 @@ SEXP C_np_density_conditional_nomad_shadow_native_search(SEXP x0,
   context.n = n;
   context.nbw_point = n - np_conditional_density_nomad_shadow.num_reg_continuous;
   context.nbw_flat = np_conditional_density_nomad_shadow.num_all_var;
+  context.ncont_point = num_reg_continuous_extern + num_var_continuous_extern;
+  context.scaling = (int_LARGE_SF == SF_NORMAL);
+  context.ncatfac = ncatfac_extern;
   context.ndegree = np_conditional_density_nomad_shadow.num_reg_continuous;
   context.flat_from_point = flat_map;
   context.flat_decode_scale = REAL(decode_scale_r);
@@ -5545,6 +5581,9 @@ SEXP C_np_density_conditional_nomad_shadow_fixed_native_search(SEXP x0,
   context.n = n;
   context.nbw_point = n;
   context.nbw_flat = np_conditional_density_nomad_shadow.num_all_var;
+  context.ncont_point = num_reg_continuous_extern + num_var_continuous_extern;
+  context.scaling = (int_LARGE_SF == SF_NORMAL);
+  context.ncatfac = ncatfac_extern;
   context.ndegree = 0;
   context.nfixed_degree = (np_conditional_density_nomad_shadow.glp_degree != NULL) ?
     np_conditional_density_nomad_shadow.num_reg_continuous : 0;
@@ -6190,7 +6229,6 @@ static int np_regression_native_decode_eval_bw(const np_regression_native_search
 {
   int j, ncon, ncat, scaling, bandwidth;
   double nconfac, ncatfac;
-  const double bandwidth_scale_categorical = 1.0e4;
 
   if (context == NULL || raw_point == NULL || eval_bw == NULL ||
       context->myopti == NULL || context->myoptd == NULL)
@@ -6224,16 +6262,9 @@ static int np_regression_native_decode_eval_bw(const np_regression_native_search
 
   for (j = 0; j < ncat; j++) {
     const int k = ncon + j;
-    const double ext_bw = raw_point[k] / bandwidth_scale_categorical;
-    if (context->decode_scale != NULL) {
-      eval_bw[k] = raw_point[k] * context->decode_scale[k];
-    } else if (scaling) {
-      if (ncatfac == 0.0)
-        return 1;
-      eval_bw[k] = ext_bw / ncatfac;
-    } else {
-      eval_bw[k] = ext_bw;
-    }
+    if(np_nomad_decode_categorical_bandwidth(
+         raw_point[k], scaling, ncatfac, &eval_bw[k]) != 0)
+      return 1;
   }
 
   return 0;
@@ -8287,7 +8318,6 @@ static int np_udens_native_decode_eval_bw(const np_udens_native_search_context *
 {
   int j, ncon, ncat, scaling, bandwidth;
   double nconfac, ncatfac;
-  const double bandwidth_scale_categorical = 1.0e4;
 
   if (context == NULL || raw_point == NULL || eval_bw == NULL ||
       context->myopti == NULL || context->myoptd == NULL)
@@ -8319,14 +8349,9 @@ static int np_udens_native_decode_eval_bw(const np_udens_native_search_context *
 
   for (j = 0; j < ncat; j++) {
     const int k = ncon + j;
-    const double ext_bw = raw_point[k] / bandwidth_scale_categorical;
-    if (scaling) {
-      if (ncatfac == 0.0)
-        return 1;
-      eval_bw[k] = ext_bw / ncatfac;
-    } else {
-      eval_bw[k] = ext_bw;
-    }
+    if(np_nomad_decode_categorical_bandwidth(
+         raw_point[k], scaling, ncatfac, &eval_bw[k]) != 0)
+      return 1;
   }
 
   return 0;
@@ -8891,7 +8916,6 @@ static int np_udist_native_decode_eval_bw(const np_udist_native_search_context *
 {
   int j, ncon, ncat, scaling, bandwidth;
   double nconfac, ncatfac;
-  const double bandwidth_scale_categorical = 1.0e4;
 
   if (context == NULL || raw_point == NULL || eval_bw == NULL ||
       context->myopti == NULL || context->myoptd == NULL)
@@ -8923,14 +8947,9 @@ static int np_udist_native_decode_eval_bw(const np_udist_native_search_context *
 
   for (j = 0; j < ncat; j++) {
     const int k = ncon + j;
-    const double ext_bw = raw_point[k] / bandwidth_scale_categorical;
-    if (scaling) {
-      if (ncatfac == 0.0)
-        return 1;
-      eval_bw[k] = ext_bw / ncatfac;
-    } else {
-      eval_bw[k] = ext_bw;
-    }
+    if(np_nomad_decode_categorical_bandwidth(
+         raw_point[k], scaling, ncatfac, &eval_bw[k]) != 0)
+      return 1;
   }
 
   return 0;
@@ -9696,7 +9715,6 @@ static int np_cdist_native_decode_eval_bw(const np_cdist_native_search_context *
 {
   int j, yncon, xncon, yncat, xncat, ncont, ncat, scaling, bandwidth;
   double nconfac, ncatfac;
-  const double bandwidth_scale_categorical = 1.0e4;
 
   if (context == NULL || raw_point == NULL || eval_bw == NULL ||
       context->myopti == NULL || context->myoptd == NULL)
@@ -9752,14 +9770,9 @@ static int np_cdist_native_decode_eval_bw(const np_cdist_native_search_context *
   for (j = 0; j < ncat; j++) {
     const int raw_idx = ncont + j;
     const int eval_idx = ncont + j;
-    const double ext_bw = raw_point[raw_idx] / bandwidth_scale_categorical;
-    if (scaling) {
-      if (ncatfac == 0.0)
-        return 1;
-      eval_bw[eval_idx] = ext_bw / ncatfac;
-    } else {
-      eval_bw[eval_idx] = ext_bw;
-    }
+    if(np_nomad_decode_categorical_bandwidth(
+         raw_point[raw_idx], scaling, ncatfac, &eval_bw[eval_idx]) != 0)
+      return 1;
   }
 
   return 0;
