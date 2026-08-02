@@ -20,6 +20,12 @@
 #include <R.h>
 #include <Rmath.h>
 
+#if defined(__GNUC__) || defined(__clang__)
+#define NP_KERNELCV_NOINLINE __attribute__((noinline))
+#else
+#define NP_KERNELCV_NOINLINE
+#endif
+
 #ifdef MPI2
 
 #include "mpi.h"
@@ -133,6 +139,7 @@ extern int np_beta_bw_order_extern;
 extern int np_regression_bw_categorical_compress_extern;
 extern int np_density_bw_categorical_compress_extern;
 extern int np_distribution_bw_categorical_compress_extern;
+extern int np_conditional_density_bw_categorical_compress_extern;
 extern int np_beta_cx_bw_order_extern;
 extern int np_beta_cy_bw_order_extern;
 extern double *vector_ckerlb_extern;
@@ -153,6 +160,32 @@ static int np_beta_conditional_bw_active(void)
 {
   return KERNEL_reg_extern == NP_CKERNEL_COORDINATE_CODE ||
     KERNEL_den_extern == NP_CKERNEL_COORDINATE_CODE;
+}
+
+static void np_beta_conditional_bw_route_or_error(
+  NPContinuousKernelRoute * const route,
+  NPContinuousKernelDerivativeDiagnostics * const diagnostics,
+  const int order,
+  const int num_continuous,
+  const double * const lower,
+  const double * const upper,
+  const char * const where)
+{
+  route->segment_count = 1;
+  route->segment[0].descriptor.family = NP_CKERNEL_FAMILY_BETA;
+  route->segment[0].descriptor.legacy_code = NP_CKERNEL_COORDINATE_CODE;
+  route->segment[0].descriptor.order = order;
+  route->segment[0].coordinate_offset = 0;
+  route->segment[0].coordinate_count = num_continuous;
+  route->segment[0].lower = lower;
+  route->segment[0].upper = upper;
+  if(np_continuous_kernel_route_validate(route, num_continuous) !=
+     NP_CKERNEL_ROUTE_OK)
+    error("%s beta route has an invalid layout", where);
+  diagnostics->bad_coordinate = -1;
+  diagnostics->bad_observation = -1;
+  diagnostics->undefined_count = 0;
+  diagnostics->beta_status = NP_BETA_OK;
 }
 
 static double np_beta_conditional_density_bw_objective(
@@ -183,6 +216,73 @@ static double np_beta_conditional_density_bw_objective(
     &vector_scale_factor[1],
     vector_cxkerlb_extern, vector_cxkerub_extern,
     vector_cykerlb_extern, vector_cykerub_extern);
+}
+
+/*
+ * Keep route construction and the expanded context call outside the shared
+ * CVML wrapper.  The beta branch is selected before entry, while the legacy
+ * wrapper retains its established stack frame and hot instruction layout.
+ */
+static NP_KERNELCV_NOINLINE double
+np_beta_conditional_density_bw_objective_ctx(double *vector_scale_factor)
+{
+  double cv = 0.0;
+  NPContinuousKernelRoute beta_x_route;
+  NPContinuousKernelRoute beta_y_route;
+  NPContinuousKernelDerivativeDiagnostics beta_x_diagnostics;
+  NPContinuousKernelDerivativeDiagnostics beta_y_diagnostics;
+  NPConditionalKernelExecutionContext execution_context = {0};
+
+  if(KERNEL_reg_extern == NP_CKERNEL_COORDINATE_CODE) {
+    np_beta_conditional_bw_route_or_error(
+      &beta_x_route, &beta_x_diagnostics,
+      np_beta_cx_bw_order_extern, num_reg_continuous_extern,
+      vector_cxkerlb_extern, vector_cxkerub_extern,
+      "conditional density CVML X");
+    execution_context.x_route = &beta_x_route;
+    execution_context.x_diagnostics = &beta_x_diagnostics;
+  }
+  if(KERNEL_den_extern == NP_CKERNEL_COORDINATE_CODE) {
+    np_beta_conditional_bw_route_or_error(
+      &beta_y_route, &beta_y_diagnostics,
+      np_beta_cy_bw_order_extern, num_var_continuous_extern,
+      vector_cykerlb_extern, vector_cykerub_extern,
+      "conditional density CVML Y");
+    execution_context.y_route = &beta_y_route;
+    execution_context.y_diagnostics = &beta_y_diagnostics;
+  }
+  execution_context.categorical_compress =
+    np_conditional_density_bw_categorical_compress_extern;
+  if(np_kernel_estimate_con_density_categorical_leave_one_out_cv_ctx(
+       KERNEL_den_extern,
+       KERNEL_den_unordered_extern,
+       KERNEL_den_ordered_extern,
+       KERNEL_reg_extern,
+       KERNEL_reg_unordered_extern,
+       KERNEL_reg_ordered_extern,
+       BANDWIDTH_den_extern,
+       num_obs_train_extern,
+       num_var_unordered_extern,
+       num_var_ordered_extern,
+       num_var_continuous_extern,
+       num_reg_unordered_extern,
+       num_reg_ordered_extern,
+       num_reg_continuous_extern,
+       matrix_Y_unordered_train_extern,
+       matrix_Y_ordered_train_extern,
+       matrix_Y_continuous_train_extern,
+       matrix_X_unordered_train_extern,
+       matrix_X_ordered_train_extern,
+       matrix_X_continuous_train_extern,
+       matrix_XY_unordered_train_extern,
+       matrix_XY_ordered_train_extern,
+       matrix_XY_continuous_train_extern,
+       &vector_scale_factor[1],
+       num_categories_extern,
+       &execution_context,
+       &cv) == 1)
+    return DBL_MAX;
+  return cv;
 }
 
 static void np_beta_regression_bw_route_or_error(
@@ -611,7 +711,8 @@ double np_cv_func_con_density_categorical_ml(double *vector_scale_factor){
 
     if(np_beta_conditional_bw_active()) {
       start = clock();
-      cv = np_beta_conditional_density_bw_objective(vector_scale_factor, 0);
+      cv = np_beta_conditional_density_bw_objective_ctx(
+        vector_scale_factor);
       diff = clock() - start;
       timing_extern = ((double)diff) / ((double)CLOCKS_PER_SEC);
       return cv;

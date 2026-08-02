@@ -39454,6 +39454,29 @@ np_jksum_distribution_two_block_plan_or_die(int64_t train_alloc,
   *y_alloc = plan.y_alloc;
 }
 
+static int np_conditional_density_cvml_continuous_route(
+  const int KERNEL_unordered_den,
+  const int KERNEL_ordered_den,
+  const int KERNEL_unordered_reg,
+  const int KERNEL_ordered_reg,
+  const int BANDWIDTH_den,
+  const int num_obs,
+  const int num_var_unordered,
+  const int num_var_ordered,
+  const int num_var_continuous,
+  const int num_reg_unordered,
+  const int num_reg_ordered,
+  const int num_reg_continuous,
+  double **matrix_Y_unordered,
+  double **matrix_Y_ordered,
+  double **matrix_Y_continuous,
+  double **matrix_X_unordered,
+  double **matrix_X_ordered,
+  double **matrix_X_continuous,
+  double *vector_scale_factor,
+  const NPConditionalKernelExecutionContext *execution_context,
+  double *cv);
+
 /*
  * Validate the family-neutral conditional route seam without consulting or
  * mutating estimator-global state.  A route is present exactly when its side
@@ -39506,10 +39529,9 @@ static int np_conditional_kernel_execution_context_valid(
 /*
  * Isolated route-bearing sibling for conditional-density CVML.  Keeping the
  * incumbent ABI and body literal protects its linked layout and hot path.
- * Null context delegates to that owner.  A valid non-null route is deliberately
- * beta-unreachable in this plumbing tranche and fails closed until canonical
- * row arithmetic is activated; it must never fall back to the incumbent
- * continuous-kernel switch.
+ * Null context delegates to that owner.  A valid non-null route enters the
+ * family-neutral row consumer below; once selected it must never fall back to
+ * the incumbent continuous-kernel switch.
  */
 int np_kernel_estimate_con_density_categorical_leave_one_out_cv_ctx(
   int KERNEL_den,
@@ -39557,5 +39579,428 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv_ctx(
        num_reg_continuous, num_var_continuous))
     error("conditional density CVML kernel route has an invalid layout");
 
+  return np_conditional_density_cvml_continuous_route(
+    KERNEL_unordered_den, KERNEL_ordered_den,
+    KERNEL_unordered_reg, KERNEL_ordered_reg,
+    BANDWIDTH_den, num_obs,
+    num_var_unordered, num_var_ordered, num_var_continuous,
+    num_reg_unordered, num_reg_ordered, num_reg_continuous,
+    matrix_Y_unordered, matrix_Y_ordered, matrix_Y_continuous,
+    matrix_X_unordered, matrix_X_ordered, matrix_X_continuous,
+    vector_scale_factor, execution_context, cv);
+}
+
+/*
+ * Persistent route-row owner for one side of a conditional objective.  It
+ * retains only O(n) row/bandwidth state and the package's existing bounded
+ * categorical-profile representation.  Estimator algebra remains outside
+ * this object; its sole responsibility is canonical continuous/categorical
+ * row construction on one common finite scale.
+ */
+typedef struct {
+  int ready;
+  int num_continuous;
+  int num_unordered;
+  int num_ordered;
+  double *scale_factor;
+  double *lambda;
+  double *row;
+  double **matrix_bandwidth;
+  int *operator_code;
+  int *kernel_unordered;
+  int *kernel_ordered;
+  NPBetaScaledRowContext scaled_row;
+} NPConditionalRouteRowContext;
+
+static void np_conditional_route_row_context_init(
+  NPConditionalRouteRowContext * const context)
+{
+  if(context == NULL)
+    return;
+  memset(context, 0, sizeof(*context));
+  np_beta_scaled_row_context_init(&context->scaled_row);
+}
+
+static void np_conditional_route_row_context_clear(
+  NPConditionalRouteRowContext * const context)
+{
+  if(context == NULL)
+    return;
+  np_beta_scaled_row_context_clear(&context->scaled_row);
+  if(context->matrix_bandwidth != NULL)
+    free_mat(context->matrix_bandwidth, context->num_continuous);
+  free(context->scale_factor);
+  free(context->lambda);
+  free(context->row);
+  free(context->operator_code);
+  free(context->kernel_unordered);
+  free(context->kernel_ordered);
+  np_conditional_route_row_context_init(context);
+}
+
+/*
+ * Conditional X and Y coordinates share the package-global continuous-scale
+ * vector in X-then-Y order.  Present the canonical bandwidth preparer with
+ * the correct side-local view and restore the owner pointer on every return.
+ * This is the same offset contract used by the independent beta objective;
+ * only bandwidth realization is side-aware, while all row algebra remains
+ * family-neutral.
+ */
+static int np_conditional_route_bandwidth_prepare(
+  const int standard_deviation_offset,
+  const int bandwidth_mode,
+  const int num_obs,
+  const int num_unordered,
+  const int num_ordered,
+  const int num_continuous,
+  double **matrix_continuous,
+  double *scale_factor,
+  double **matrix_bandwidth,
+  double *lambda)
+{
+  double * const saved_standard_deviation =
+    vector_continuous_stddev_extern;
+  int status;
+
+  if(standard_deviation_offset < 0)
+    return 1;
+  if(saved_standard_deviation != NULL)
+    vector_continuous_stddev_extern =
+      saved_standard_deviation + standard_deviation_offset;
+  status = np_beta_continuous_bandwidth_prepare_canonical(
+    bandwidth_mode, num_obs, num_obs,
+    num_unordered, num_ordered, num_continuous,
+    matrix_continuous, matrix_continuous,
+    scale_factor, matrix_bandwidth, NULL, lambda, NULL);
+  vector_continuous_stddev_extern = saved_standard_deviation;
+  return status;
+}
+
+static int np_conditional_route_row_context_prepare(
+  NPConditionalRouteRowContext * const context,
+  const int is_x_side,
+  const int bandwidth_mode,
+  const int num_obs,
+  const int num_var_unordered,
+  const int num_var_ordered,
+  const int num_var_continuous,
+  const int num_reg_unordered,
+  const int num_reg_ordered,
+  const int num_reg_continuous,
+  const int kernel_unordered_code,
+  const int kernel_ordered_code,
+  double **matrix_unordered,
+  double **matrix_ordered,
+  double **matrix_continuous,
+  const double * const vector_scale_factor,
+  const int * const num_categories,
+  double **matrix_categorical_vals,
+  const NPContinuousKernelRoute * const route,
+  NPContinuousKernelDerivativeDiagnostics * const diagnostics,
+  const int categorical_compress)
+{
+  const int num_continuous = is_x_side ?
+    num_reg_continuous : num_var_continuous;
+  const int num_unordered = is_x_side ?
+    num_reg_unordered : num_var_unordered;
+  const int num_ordered = is_x_side ?
+    num_reg_ordered : num_var_ordered;
+  const int total = num_continuous + num_unordered + num_ordered;
+  const int bandwidth_rows = bandwidth_mode == BW_FIXED ? 1 : num_obs;
+  int coordinate;
+
+  if(context == NULL || num_obs < 2 || num_continuous <= 0 ||
+     matrix_continuous == NULL || vector_scale_factor == NULL ||
+     route == NULL || diagnostics == NULL ||
+     (bandwidth_mode != BW_FIXED && bandwidth_mode != BW_GEN_NN &&
+      bandwidth_mode != BW_ADAP_NN) ||
+     (categorical_compress != 0 && categorical_compress != 1))
+    return 1;
+
+  context->num_continuous = num_continuous;
+  context->num_unordered = num_unordered;
+  context->num_ordered = num_ordered;
+  context->scale_factor = (double *)np_jksum_malloc_array_or_die(
+    (size_t)MAX(1, total), sizeof(double),
+    "conditional objective route scale factor");
+  context->lambda = (double *)np_jksum_malloc_array_or_die(
+    (size_t)MAX(1, num_unordered + num_ordered), sizeof(double),
+    "conditional objective route categorical bandwidth");
+  context->row = (double *)np_jksum_malloc_array_or_die(
+    (size_t)num_obs, sizeof(double),
+    "conditional objective route row");
+  context->operator_code = (int *)np_jksum_malloc_array_or_die(
+    (size_t)MAX(1, total), sizeof(int),
+    "conditional objective route operator");
+  context->kernel_unordered = (int *)np_jksum_malloc_array_or_die(
+    (size_t)MAX(1, num_unordered), sizeof(int),
+    "conditional objective route unordered kernel");
+  context->kernel_ordered = (int *)np_jksum_malloc_array_or_die(
+    (size_t)MAX(1, num_ordered), sizeof(int),
+    "conditional objective route ordered kernel");
+  context->matrix_bandwidth = alloc_matd(bandwidth_rows, num_continuous);
+  if(context->matrix_bandwidth == NULL)
+    goto fail_prepare;
+
+  np_splitxy_vsf_mcv_nc(
+    num_var_unordered, num_var_ordered, num_var_continuous,
+    num_reg_unordered, num_reg_ordered, num_reg_continuous,
+    vector_scale_factor, NULL, NULL,
+    is_x_side ? context->scale_factor : NULL,
+    is_x_side ? NULL : context->scale_factor,
+    NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+  for(coordinate = 0; coordinate < total; ++coordinate)
+    context->operator_code[coordinate] = OP_NORMAL;
+  for(coordinate = 0; coordinate < num_unordered; ++coordinate)
+    context->kernel_unordered[coordinate] = kernel_unordered_code;
+  for(coordinate = 0; coordinate < num_ordered; ++coordinate)
+    context->kernel_ordered[coordinate] = kernel_ordered_code;
+
+  if(np_conditional_route_bandwidth_prepare(
+       is_x_side ? 0 : num_reg_continuous,
+       bandwidth_mode, num_obs,
+       num_unordered, num_ordered, num_continuous,
+       matrix_continuous, context->scale_factor,
+       context->matrix_bandwidth, context->lambda) != 0)
+    goto fail_prepare;
+  if(np_beta_scaled_row_context_prepare(
+       &context->scaled_row, route, diagnostics,
+       bandwidth_mode, num_obs, num_obs,
+       num_continuous, num_unordered, num_ordered,
+       matrix_continuous, matrix_continuous,
+       matrix_unordered, matrix_unordered,
+       matrix_ordered, matrix_ordered,
+       context->matrix_bandwidth, context->matrix_bandwidth,
+       context->operator_code,
+       context->kernel_unordered, context->kernel_ordered,
+       context->lambda, num_categories, matrix_categorical_vals,
+       categorical_compress, context->row) != NP_CONTINUOUS_ROW_OK)
+    goto fail_prepare;
+
+  context->ready = 1;
+  return 0;
+
+fail_prepare:
+  np_conditional_route_row_context_clear(context);
   return 1;
+}
+
+/*
+ * Canonical conditional-density CVML route consumer.  X row construction is
+ * scale equivariant: scalar normalization or the shared LP influence solve
+ * cancels the X common scale.  The Y common scale is retained in log space,
+ * so higher-order signed rows and complete absolute underflow preserve the
+ * package-wide guarded-CVML contract without a beta-specific objective.
+ */
+static NP_NOINLINE int np_conditional_density_cvml_continuous_route(
+  const int KERNEL_unordered_den,
+  const int KERNEL_ordered_den,
+  const int KERNEL_unordered_reg,
+  const int KERNEL_ordered_reg,
+  const int BANDWIDTH_den,
+  const int num_obs,
+  const int num_var_unordered,
+  const int num_var_ordered,
+  const int num_var_continuous,
+  const int num_reg_unordered,
+  const int num_reg_ordered,
+  const int num_reg_continuous,
+  double **matrix_Y_unordered,
+  double **matrix_Y_ordered,
+  double **matrix_Y_continuous,
+  double **matrix_X_unordered,
+  double **matrix_X_ordered,
+  double **matrix_X_continuous,
+  double * const vector_scale_factor,
+  const NPConditionalKernelExecutionContext * const execution_context,
+  double * const cv)
+{
+  const int beta_x = execution_context->x_route != NULL;
+  const int beta_y = execution_context->y_route != NULL;
+  const int use_general_lp = np_lp_engine_extern == NP_LP_ENGINE_GENERAL;
+  const int use_bernstein = int_glp_bernstein_extern != 0;
+  NPConditionalRouteRowContext route_x;
+  NPConditionalRouteRowContext route_y;
+  NPConditionalXRowCtx legacy_x = {0};
+  NPConditionalYRowCtx legacy_y = {0};
+  NPReghatLPWorkspace lp_workspace;
+  double *xrow = NULL;
+  double *yrow = NULL;
+  double *eval_basis = NULL;
+  int nterms = 0;
+  int evaluation;
+  int observation;
+  int status = 1;
+
+  if(cv == NULL || vector_scale_factor == NULL || num_obs < 2 ||
+     (!beta_x && !beta_y) ||
+     (np_lp_engine_extern != NP_LP_ENGINE_SCALAR &&
+      np_lp_engine_extern != NP_LP_ENGINE_GENERAL) ||
+     (BANDWIDTH_den != BW_FIXED && BANDWIDTH_den != BW_GEN_NN &&
+      BANDWIDTH_den != BW_ADAP_NN))
+    return 1;
+
+  np_conditional_route_row_context_init(&route_x);
+  np_conditional_route_row_context_init(&route_y);
+  np_reghat_lp_workspace_init(&lp_workspace);
+  xrow = (double *)np_jksum_malloc_array_or_die(
+    (size_t)num_obs, sizeof(double),
+    "conditional density CVML X influence row");
+  if(!beta_y)
+    yrow = (double *)np_jksum_malloc_array_or_die(
+      (size_t)num_obs, sizeof(double),
+      "conditional density CVML Y row");
+
+  if(beta_x) {
+    if(np_conditional_route_row_context_prepare(
+         &route_x, 1, BANDWIDTH_den, num_obs,
+         num_var_unordered, num_var_ordered, num_var_continuous,
+         num_reg_unordered, num_reg_ordered, num_reg_continuous,
+         KERNEL_unordered_reg, KERNEL_ordered_reg,
+         matrix_X_unordered, matrix_X_ordered, matrix_X_continuous,
+         vector_scale_factor, num_categories_extern_X,
+         matrix_categorical_vals_extern_X,
+         execution_context->x_route,
+         execution_context->x_diagnostics,
+         execution_context->categorical_compress) != 0)
+      goto cleanup_route;
+  } else if(np_conditional_xrow_ctx_prepare(
+              vector_scale_factor, &legacy_x) != 0) {
+    goto cleanup_route;
+  }
+
+  if(beta_y) {
+    if(np_conditional_route_row_context_prepare(
+         &route_y, 0, BANDWIDTH_den, num_obs,
+         num_var_unordered, num_var_ordered, num_var_continuous,
+         num_reg_unordered, num_reg_ordered, num_reg_continuous,
+         KERNEL_unordered_den, KERNEL_ordered_den,
+         matrix_Y_unordered, matrix_Y_ordered, matrix_Y_continuous,
+         vector_scale_factor, num_categories_extern_Y,
+         matrix_categorical_vals_extern_Y,
+         execution_context->y_route,
+         execution_context->y_diagnostics,
+         execution_context->categorical_compress) != 0)
+      goto cleanup_route;
+  } else if(np_conditional_yrow_ctx_prepare(
+              vector_scale_factor, OP_NORMAL, &legacy_y) != 0) {
+    goto cleanup_route;
+  }
+
+  if(beta_x && use_general_lp) {
+    if(!np_glp_cv_cache.ready ||
+       np_glp_cv_cache.use_bernstein != use_bernstein ||
+       np_glp_cv_cache.basis_mode != int_glp_basis_extern ||
+       np_glp_cv_cache.num_obs != num_obs ||
+       np_glp_cv_cache.ncon != num_reg_continuous ||
+       np_glp_cv_cache.matrix_X_continuous_train_ptr !=
+         matrix_X_continuous) {
+      if(!np_glp_cv_cache_prepare(
+           NP_LP_ENGINE_GENERAL, num_obs, num_reg_continuous,
+           matrix_X_continuous))
+        goto cleanup_route;
+    }
+    if(!np_glp_cv_cache.ready || np_glp_cv_cache.basis == NULL ||
+       np_glp_cv_cache.terms == NULL || np_glp_cv_cache.nterms <= 1)
+      goto cleanup_route;
+    nterms = np_glp_cv_cache.nterms;
+    eval_basis = (double *)np_jksum_malloc_array_or_die(
+      (size_t)nterms, sizeof(double),
+      "conditional density CVML evaluation basis");
+    if(np_reghat_lp_workspace_prepare_columns(
+         &lp_workspace, np_glp_cv_cache.basis, num_obs, nterms) !=
+       NP_REGHAT_LP_ROW_OK)
+      goto cleanup_route;
+  }
+
+  *cv = 0.0;
+  for(evaluation = 0; evaluation < num_obs; ++evaluation) {
+    const double *active_yrow;
+    double y_common_log_scale = 0.0;
+    double fit = 0.0;
+
+    if((evaluation & 31) == 0)
+      np_progress_bandwidth_loop_step();
+
+    if(beta_x) {
+      if(np_beta_scaled_row_context_fill(
+           &route_x.scaled_row, evaluation, NULL, NULL) !=
+         NP_CONTINUOUS_ROW_OK)
+        goto cleanup_route;
+
+      if(!use_general_lp) {
+        double denominator = 0.0;
+
+        route_x.row[evaluation] = 0.0;
+        for(observation = 0; observation < num_obs; ++observation)
+          denominator += route_x.row[observation];
+        if(denominator == 0.0 || !R_FINITE(denominator))
+          goto cleanup_route;
+        for(observation = 0; observation < num_obs; ++observation)
+          xrow[observation] = route_x.row[observation]/denominator;
+      } else {
+        double delete_denominator;
+
+        for(int term = 0; term < nterms; ++term)
+          eval_basis[term] = np_glp_cv_cache.basis[term][evaluation];
+        if(np_reghat_lp_workspace_influence_row(
+             &lp_workspace, route_x.row, eval_basis, xrow, 1U) !=
+           NP_REGHAT_LP_ROW_OK ||
+           !np_lp_delete_denominator(
+             xrow[evaluation], &delete_denominator))
+          goto cleanup_route;
+        for(observation = 0; observation < num_obs; ++observation)
+          xrow[observation] = observation == evaluation ?
+            0.0 : xrow[observation]/delete_denominator;
+      }
+    } else if(np_conditional_xrow_from_ctx(
+                &legacy_x, evaluation, xrow) != 0) {
+      goto cleanup_route;
+    }
+
+    if(beta_y) {
+      if(np_beta_scaled_row_context_fill(
+           &route_y.scaled_row, evaluation, NULL,
+           &y_common_log_scale) != NP_CONTINUOUS_ROW_OK)
+        goto cleanup_route;
+      active_yrow = route_y.row;
+    } else {
+      if(np_conditional_yrow_from_ctx(
+           &legacy_y, evaluation, yrow) != 0)
+        goto cleanup_route;
+      active_yrow = yrow;
+    }
+
+    for(observation = 0; observation < num_obs; ++observation)
+      fit += xrow[observation]*active_yrow[observation];
+
+    if(beta_y) {
+      const double log_absolute_fit = fit == 0.0 ?
+        -INFINITY : log(fabs(fit)) + y_common_log_scale;
+      const int sign = fit > 0.0 ? 1 : (fit < 0.0 ? -1 : 0);
+
+      if(ISNAN(log_absolute_fit))
+        goto cleanup_route;
+      *cv += np_guarded_cvml_log_contribution(
+        log_absolute_fit, sign, 1);
+    } else {
+      *cv += np_guarded_cvml_contribution(fit);
+    }
+    if(!R_FINITE(*cv))
+      goto cleanup_route;
+  }
+
+  status = 0;
+
+cleanup_route:
+  np_conditional_route_row_context_clear(&route_x);
+  np_conditional_route_row_context_clear(&route_y);
+  np_conditional_xrow_ctx_clear(&legacy_x);
+  np_conditional_yrow_ctx_clear(&legacy_y);
+  np_reghat_lp_workspace_clear(&lp_workspace);
+  np_glp_cv_clear_extern();
+  free(xrow);
+  free(yrow);
+  free(eval_basis);
+  return status;
 }
