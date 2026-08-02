@@ -52,7 +52,7 @@ test_that("conditional CVML route metadata has one typed X/Y contract", {
   )
 })
 
-test_that("conditional CVML route sibling is dormant beside a literal incumbent", {
+test_that("conditional CVML route sibling is active beside a literal incumbent", {
   root <- locate_beta_conditional_cvml_sources()
   skip_if(is.null(root), "package sources unavailable")
   engine <- paste(
@@ -86,7 +86,13 @@ test_that("conditional CVML route sibling is dormant beside a literal incumbent"
   incumbent <- substr(engine, incumbent_start, incumbent_end - 1L)
   expect_false(grepl("NPConditionalKernelExecutionContext", incumbent,
                      fixed = TRUE))
-  expect_false(grepl("_cv_ctx(", ingress, fixed = TRUE))
+  expect_identical(
+    beta_conditional_count_fixed(
+      ingress,
+      "np_kernel_estimate_con_density_categorical_leave_one_out_cv_ctx("
+    ),
+    1L
+  )
   expect_identical(
     beta_conditional_count_fixed(
       ingress,
@@ -94,19 +100,19 @@ test_that("conditional CVML route sibling is dormant beside a literal incumbent"
     ),
     1L
   )
-  expect_match(
-    ingress,
-    "np_beta_conditional_density_bw_objective(vector_scale_factor, 0)",
-    fixed = TRUE
-  )
   expect_false(grepl(
-    "np_conditional_density_bw_categorical_compress_extern",
+    "np_beta_conditional_density_bw_objective(vector_scale_factor, 0)",
     ingress,
     fixed = TRUE
   ))
+  expect_match(
+    ingress,
+    "np_conditional_density_bw_categorical_compress_extern",
+    fixed = TRUE
+  )
 })
 
-test_that("conditional CVML route sibling delegates null and fails closed", {
+test_that("conditional CVML route sibling delegates null and owns valid routes", {
   root <- locate_beta_conditional_cvml_sources()
   skip_if(is.null(root), "package sources unavailable")
   engine <- paste(
@@ -118,8 +124,14 @@ test_that("conditional CVML route sibling delegates null and fails closed", {
     engine,
     fixed = TRUE
   )[[1L]]
+  sibling_end <- regexpr(
+    " * Persistent route-row owner for one side of a conditional objective.",
+    engine,
+    fixed = TRUE
+  )[[1L]]
   expect_gt(sibling_start, 0L)
-  sibling <- substr(engine, sibling_start, nchar(engine))
+  expect_gt(sibling_end, sibling_start)
+  sibling <- substr(engine, sibling_start, sibling_end - 1L)
 
   expect_match(
     sibling,
@@ -139,7 +151,11 @@ test_that("conditional CVML route sibling delegates null and fails closed", {
     "conditional density CVML kernel route has an invalid layout",
     fixed = TRUE
   )
-  expect_match(sibling, "return 1;", fixed = TRUE)
+  expect_match(
+    sibling,
+    "return np_conditional_density_cvml_continuous_route(",
+    fixed = TRUE
+  )
   expect_false(grepl("kernel_weighted_sum_np(", sibling, fixed = TRUE))
   expect_false(grepl("malloc(", sibling, fixed = TRUE))
   expect_false(grepl("calloc(", sibling, fixed = TRUE))
@@ -163,6 +179,21 @@ test_that("conditional CVML route sibling delegates null and fails closed", {
   expect_match(
     engine,
     "context->x_route->segment_count",
+    fixed = TRUE
+  )
+  expect_match(
+    engine,
+    "NPConditionalRouteRowContext",
+    fixed = TRUE
+  )
+  expect_match(
+    engine,
+    "np_beta_scaled_row_context_fill(",
+    fixed = TRUE
+  )
+  expect_match(
+    engine,
+    "np_guarded_cvml_log_contribution(",
     fixed = TRUE
   )
 })
