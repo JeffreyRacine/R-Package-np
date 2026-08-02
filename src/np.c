@@ -3535,6 +3535,8 @@ int np_beta_bw_order_extern=2;
 int np_regression_bw_categorical_compress_extern=0;
 int np_density_bw_categorical_compress_extern=0;
 int np_distribution_bw_categorical_compress_extern=0;
+int np_conditional_density_bw_categorical_compress_extern=0;
+int np_conditional_distribution_bw_categorical_compress_extern=0;
 int np_beta_cx_bw_order_extern=2;
 int np_beta_cy_bw_order_extern=2;
 int BANDWIDTH_reg_extern;
@@ -3861,6 +3863,8 @@ static void np_reset_native_estimator_state_internal(void)
   KERNEL_den_ordered_extern = 0;
   BANDWIDTH_den_extern = 0;
   cdfontrain_extern = 0;
+  np_conditional_density_bw_categorical_compress_extern = 0;
+  np_conditional_distribution_bw_categorical_compress_extern = 0;
 
   np_glp_cv_clear_extern();
   np_reg_cv_core_clear_extern();
@@ -5308,6 +5312,7 @@ static void np_conditional_density_nomad_shadow_clear_internal(void)
   KERNEL_den_ordered_extern = 0;
   cdfontrain_extern = 0;
   int_WEIGHTS = 0;
+  np_conditional_density_bw_categorical_compress_extern = 0;
 
   np_glp_cv_clear_extern();
   np_reset_y_side_extern();
@@ -5600,6 +5605,7 @@ static int np_conditional_density_nomad_shadow_prepare_internal(double *c_uno,
 
   np_beta_cx_bw_order_extern = 2;
   np_beta_cy_bw_order_extern = 2;
+  np_conditional_density_bw_categorical_compress_extern = 0;
 
   np_conditional_density_nomad_shadow.num_all_var = num_all_var;
   np_conditional_density_nomad_shadow.num_reg_continuous = num_reg_continuous_extern;
@@ -5659,6 +5665,12 @@ static int np_conditional_density_nomad_shadow_prepare_internal(double *c_uno,
       num_var_unordered_extern;
     const int num_ordered = num_reg_ordered_extern +
       num_var_ordered_extern;
+
+    np_conditional_density_bw_categorical_compress_extern =
+      myopti[CBW_CATCOMPI];
+    if(np_conditional_density_bw_categorical_compress_extern != 0 &&
+       np_conditional_density_bw_categorical_compress_extern != 1)
+      goto fail;
 
     if(degree_search || *regtype != NP_LP_ENGINE_SCALAR ||
        num_unordered != 0 || num_ordered != 0)
@@ -6373,16 +6385,13 @@ SEXP C_np_density_conditional_nomad_shadow_prepare(SEXP c_uno,
   PROTECT(cykerlb_r = coerceVector(cykerlb, REALSXP));
   PROTECT(cykerub_r = coerceVector(cykerub, REALSXP));
 
-  if (XLENGTH(myopti_i) <= CBW_DEGREE_SEARCHI ||
+  if (XLENGTH(myopti_i) <= CBW_CATCOMPI ||
       XLENGTH(myoptd_r) <= CBW_QUAD_EXTD ||
       XLENGTH(penalty_mode_i) < 1 ||
       XLENGTH(penalty_mult_r) < 1 ||
       XLENGTH(glp_bernstein_i) < 1 ||
       XLENGTH(glp_basis_i) < 1 ||
-      XLENGTH(regtype_i) < 1 ||
-      ((INTEGER(myopti_i)[CBW_CXKRNEVI] == NP_CKERNEL_COORDINATE_CODE ||
-        INTEGER(myopti_i)[CBW_CYKRNEVI] == NP_CKERNEL_COORDINATE_CODE) &&
-       XLENGTH(myopti_i) <= CBW_CYORDERI)) {
+      XLENGTH(regtype_i) < 1) {
     ok = 0;
   } else if (INTEGER(myopti_i)[CBW_UNCONI] < 0 ||
              ((INTEGER(myopti_i)[CBW_DEGREE_SEARCHI] != 0 ||
@@ -10234,12 +10243,8 @@ static SEXP C_np_density_conditional_bw_common(SEXP c_uno,
   PROTECT(cykerlb_r = coerceVector(cykerlb, REALSXP));
   PROTECT(cykerub_r = coerceVector(cykerub, REALSXP));
 
-  if (XLENGTH(myopti_i) <= CBW_CVLS_QUAD_POINTSI)
-    error("C_np_density_conditional_bw: myopti is missing cvls.quadrature grid/points");
-  if ((INTEGER(myopti_i)[CBW_CXKRNEVI] == NP_CKERNEL_COORDINATE_CODE ||
-       INTEGER(myopti_i)[CBW_CYKRNEVI] == NP_CKERNEL_COORDINATE_CODE) &&
-      XLENGTH(myopti_i) <= CBW_CYORDERI)
-    error("C_np_density_conditional_bw: continuous-kernel descriptors are missing");
+  if (XLENGTH(myopti_i) <= CBW_CATCOMPI)
+    error("C_np_density_conditional_bw: myopti is missing canonical search controls");
   if (XLENGTH(myoptd_r) <= CBW_QUAD_EXTD)
     error("C_np_density_conditional_bw: myoptd is missing cvls.quadrature.extend.factor");
 
@@ -10363,12 +10368,8 @@ static SEXP C_np_distribution_conditional_bw_common(SEXP c_uno,
   PROTECT(cykerlb_r = coerceVector(cykerlb, REALSXP));
   PROTECT(cykerub_r = coerceVector(cykerub, REALSXP));
 
-  if (XLENGTH(myopti_i) <= CDBW_TBNDI)
+  if (XLENGTH(myopti_i) <= CDBW_CATCOMPI)
     error("C_np_distribution_conditional_bw: myopti is incomplete");
-  if ((INTEGER(myopti_i)[CDBW_CXKRNEVI] == NP_CKERNEL_COORDINATE_CODE ||
-       INTEGER(myopti_i)[CDBW_CYKRNEVI] == NP_CKERNEL_COORDINATE_CODE) &&
-      XLENGTH(myopti_i) <= CDBW_CYORDERI)
-    error("C_np_distribution_conditional_bw: continuous-kernel descriptors are missing");
 
   ncon_x = (int)INTEGER(myopti_i)[CDBW_UNCONI];
   ncon_y = (int)INTEGER(myopti_i)[CDBW_CNCONI];
@@ -10941,6 +10942,10 @@ SEXP C_np_distribution_conditional_nomad_native_search(SEXP c_uno,
   PROTECT(cykerlb_r = coerceVector(cykerlb, REALSXP));
   PROTECT(cykerub_r = coerceVector(cykerub, REALSXP));
 
+  if (XLENGTH(myopti_i) <= CDBW_CATCOMPI) {
+    UNPROTECT(23);
+    error("native npcdist NOMAD search received incomplete myopti");
+  }
   n = (int) XLENGTH(x0_r);
   if (n <= 0 || XLENGTH(bbin_i) != n || XLENGTH(lower_r) != n || XLENGTH(upper_r) != n) {
     UNPROTECT(23);
@@ -13987,6 +13992,10 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   KERNEL_reg_ordered_extern = myopti[CBW_OXKRNEVI];
   KERNEL_den_ordered_extern = myopti[CBW_OYKRNEVI];
 
+  np_beta_cx_bw_order_extern = 2;
+  np_beta_cy_bw_order_extern = 2;
+  np_conditional_density_bw_categorical_compress_extern = 0;
+
   vector_cxkerlb_extern = cxkerlb;
   vector_cxkerub_extern = cxkerub;
   int_cxker_bound_extern = np_has_finite_cker_bounds(cxkerlb, cxkerub, num_reg_continuous_extern);
@@ -14001,6 +14010,12 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
       num_var_unordered_extern;
     const int num_ordered = num_reg_ordered_extern +
       num_var_ordered_extern;
+
+    np_conditional_density_bw_categorical_compress_extern =
+      myopti[CBW_CATCOMPI];
+    if(np_conditional_density_bw_categorical_compress_extern != 0 &&
+       np_conditional_density_bw_categorical_compress_extern != 1)
+      error("C_np_density_conditional_bw: categorical compression must be TRUE or FALSE");
 
     if(*regtype != NP_LP_ENGINE_SCALAR)
       error("C_np_density_conditional_bw: beta bandwidth selection supports only local-constant fitting");
@@ -15131,6 +15146,7 @@ cleanup_np_density_conditional_bw:
   vector_ckerub_extern = NULL;
   safe_free(cxylb);
   safe_free(cxyub);
+  np_conditional_density_bw_categorical_compress_extern = 0;
   np_clear_estimator_extern_aliases();
 
   if (bw_error_msg != NULL) {
@@ -15229,6 +15245,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
 
   np_beta_cx_bw_order_extern = 2;
   np_beta_cy_bw_order_extern = 2;
+  np_conditional_distribution_bw_categorical_compress_extern = 0;
 
   vector_cxkerlb_extern = cxkerlb;
   vector_cxkerub_extern = cxkerub;
@@ -15244,6 +15261,12 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
       num_var_unordered_extern;
     const int num_ordered = num_reg_ordered_extern +
       num_var_ordered_extern;
+
+    np_conditional_distribution_bw_categorical_compress_extern =
+      myopti[CDBW_CATCOMPI];
+    if(np_conditional_distribution_bw_categorical_compress_extern != 0 &&
+       np_conditional_distribution_bw_categorical_compress_extern != 1)
+      error("C_np_distribution_conditional_bw: categorical compression must be TRUE or FALSE");
 
     if(*regtype != NP_LP_ENGINE_SCALAR)
       error("C_np_distribution_conditional_bw: beta bandwidth selection supports only local-constant fitting");
@@ -16320,6 +16343,7 @@ cleanup_np_distribution_conditional_bw:
   vector_ckerub_extern = NULL;
   safe_free(cxylb);
   safe_free(cxyub);
+  np_conditional_distribution_bw_categorical_compress_extern = 0;
   np_clear_estimator_extern_aliases();
 
   if (bw_error_msg != NULL)

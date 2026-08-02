@@ -676,7 +676,11 @@ npcdensbw.conbandwidth <-
         continuous.x.kernel.family = if (identical(bws$cxkertype, "beta")) CKER_FAMILY_BETA else CKER_FAMILY_LEGACY,
         continuous.x.kernel.order = as.integer(bws$cxkerorder),
         continuous.y.kernel.family = if (identical(bws$cykertype, "beta")) CKER_FAMILY_BETA else CKER_FAMILY_LEGACY,
-        continuous.y.kernel.order = as.integer(bws$cykerorder))
+        continuous.y.kernel.order = as.integer(bws$cykerorder),
+        degree.search = FALSE,
+        categorical.compress = npStrictLogicalOption(
+          "np.categorical.compress", TRUE
+        ))
 
       myoptd = list(ftol=ftol, tol=tol, small=small, memfac = memfac,
         lbc.dir = lbc.dir, cfac.dir = cfac.dir, initc.dir = initc.dir,
@@ -1294,7 +1298,11 @@ npcdensbw.conbandwidth <-
     continuous.x.kernel.family = if (identical(bws$cxkertype, "beta")) CKER_FAMILY_BETA else CKER_FAMILY_LEGACY,
     continuous.x.kernel.order = as.integer(bws$cxkerorder),
     continuous.y.kernel.family = if (identical(bws$cykertype, "beta")) CKER_FAMILY_BETA else CKER_FAMILY_LEGACY,
-    continuous.y.kernel.order = as.integer(bws$cykerorder)
+    continuous.y.kernel.order = as.integer(bws$cykerorder),
+    degree.search = FALSE,
+    categorical.compress = npStrictLogicalOption(
+      "np.categorical.compress", TRUE
+    )
   )
 
   myoptd <- list(
@@ -1406,7 +1414,7 @@ npRmpiNomadShadowPrepareConditionalDensity <- function(c.uno,
                                                        cxkerub,
                                                        cykerlb,
                                                        cykerub) {
-  if (length(myoptd) <= 23L || length(myopti) <= 33L) {
+  if (length(myoptd) <= 23L || length(myopti) <= 34L) {
     rank <- tryCatch(as.integer(mpi.comm.rank(1L)), error = function(e) 0L)
     if (isTRUE(rank == 0L))
       stop("resident npcdens NOMAD shadow options are missing canonical search controls", call. = FALSE)
@@ -1775,7 +1783,10 @@ npRmpiNomadShadowClearConditionalDensity <- function() {
     continuous.x.kernel.order = as.integer(bws$cxkerorder),
     continuous.y.kernel.family = if (identical(bws$cykertype, "beta")) CKER_FAMILY_BETA else CKER_FAMILY_LEGACY,
     continuous.y.kernel.order = as.integer(bws$cykerorder),
-    degree.search = isTRUE(degree.search)
+    degree.search = isTRUE(degree.search),
+    categorical.compress = npStrictLogicalOption(
+      "np.categorical.compress", TRUE
+    )
   )
 
   myoptd <- list(

@@ -529,7 +529,10 @@ npcdistbw.condbandwidth <-
         continuous.x.kernel.family = if (identical(bws$cxkertype, "beta")) CKER_FAMILY_BETA else CKER_FAMILY_LEGACY,
         continuous.x.kernel.order = as.integer(bws$cxkerorder),
         continuous.y.kernel.family = if (identical(bws$cykertype, "beta")) CKER_FAMILY_BETA else CKER_FAMILY_LEGACY,
-        continuous.y.kernel.order = as.integer(bws$cykerorder))
+        continuous.y.kernel.order = as.integer(bws$cykerorder),
+        categorical.compress = npStrictLogicalOption(
+          "np.categorical.compress", TRUE
+        ))
 
       myoptd = list(ftol=ftol, tol=tol, small=small, memfac = memfac,
         lbc.dir = lbc.dir, cfac.dir = cfac.dir, initc.dir = initc.dir,
@@ -990,7 +993,10 @@ npcdistbw.condbandwidth <-
     continuous.x.kernel.family = if (identical(bws$cxkertype, "beta")) CKER_FAMILY_BETA else CKER_FAMILY_LEGACY,
     continuous.x.kernel.order = as.integer(bws$cxkerorder),
     continuous.y.kernel.family = if (identical(bws$cykertype, "beta")) CKER_FAMILY_BETA else CKER_FAMILY_LEGACY,
-    continuous.y.kernel.order = as.integer(bws$cykerorder)
+    continuous.y.kernel.order = as.integer(bws$cykerorder),
+    categorical.compress = npStrictLogicalOption(
+      "np.categorical.compress", TRUE
+    )
   )
 
   myoptd <- list(
@@ -1285,7 +1291,10 @@ npcdistbw.condbandwidth <-
     continuous.x.kernel.family = if (identical(bws$cxkertype, "beta")) CKER_FAMILY_BETA else CKER_FAMILY_LEGACY,
     continuous.x.kernel.order = as.integer(bws$cxkerorder),
     continuous.y.kernel.family = if (identical(bws$cykertype, "beta")) CKER_FAMILY_BETA else CKER_FAMILY_LEGACY,
-    continuous.y.kernel.order = as.integer(bws$cykerorder)
+    continuous.y.kernel.order = as.integer(bws$cykerorder),
+    categorical.compress = npStrictLogicalOption(
+      "np.categorical.compress", TRUE
+    )
   )
 
   myoptd <- list(
