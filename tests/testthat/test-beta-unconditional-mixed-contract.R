@@ -98,7 +98,7 @@ test_that("mixed beta distribution uses the canonical categorical row", {
   }
 })
 
-test_that("mixed beta density objectives are active while distribution stays closed", {
+test_that("mixed beta density and distribution objectives are active", {
   training <- data.frame(
     x = seq(0.05, 0.95, length.out = 12L),
     u = factor(rep(letters[1:3], each = 4L)),
@@ -117,14 +117,91 @@ test_that("mixed beta density objectives are active while distribution stays clo
   )
   expect_true(is.finite(as.numeric(objective$fval[[1L]])))
 
+  dist.bw <- npudistbw(
+    dat = training[c("x", "o")], bws = c(0.15, 0.25),
+    bandwidth.compute = FALSE, bwmethod = "cv.cdf", bwscaling = FALSE,
+    ckertype = "beta", ckerorder = 4,
+    ckerbound = "fixed", ckerlb = 0, ckerub = 1
+  )
+  dist.objective <- np:::npudistbw.dbandwidth(
+    dat = training[c("x", "o")], bws = dist.bw,
+    bandwidth.compute = TRUE, eval.only = TRUE, nmulti = 1L,
+    invalid.penalty = "dbmax"
+  )
+  expect_true(is.finite(as.numeric(dist.objective$fval[[1L]])))
+
   expect_error(
     npudistbw(
-      dat = training[c("x", "o")], bandwidth.compute = TRUE,
+      dat = training[c("x", "u")], bandwidth.compute = TRUE,
       ckertype = "beta", ckerbound = "fixed", ckerlb = 0, ckerub = 1
     ),
-    "continuous variables only",
+    "distribution bandwidth selection does not support unordered data types",
     fixed = TRUE
   )
+})
+
+test_that("native MADS searches mixed beta distribution objectives", {
+  skip_if_not_installed("crs", minimum_version = "0.15.46")
+  set.seed(9135)
+  training <- data.frame(
+    x = runif(24L),
+    o = ordered(rep(1:4, length.out = 24L), levels = 1:4)
+  )
+
+  bw <- npudistbw(
+    dat = training, bwmethod = "cv.cdf",
+    bwtype = "fixed", bwscaling = FALSE,
+    ckertype = "beta", ckerorder = 4,
+    ckerbound = "fixed", ckerlb = 0, ckerub = 1,
+    bwsolver = "mads", nmulti = 1L,
+    nomad.opts = list(MAX_BB_EVAL = 12)
+  )
+  fit <- npudist(
+    bws = bw, tdat = training,
+    edat = training[seq_len(4L), , drop = FALSE]
+  )
+  replay <- np:::npudistbw.dbandwidth(
+    dat = training, bws = bw, bandwidth.compute = TRUE,
+    eval.only = TRUE, nmulti = 1L, invalid.penalty = "dbmax"
+  )
+  expect_true(all(is.finite(bw$bw)))
+  expect_true(is.finite(as.numeric(bw$fval[[1L]])))
+  expect_equal(
+    as.numeric(replay$fval[[1L]]), as.numeric(bw$fval[[1L]]),
+    tolerance = 2e-12
+  )
+  expect_true(all(is.finite(fitted(fit))))
+})
+
+test_that("Powell searches mixed beta distribution objectives", {
+  set.seed(9136)
+  training <- data.frame(
+    x = runif(24L),
+    o = ordered(rep(1:4, length.out = 24L), levels = 1:4)
+  )
+
+  bw <- npudistbw(
+    dat = training, bwmethod = "cv.cdf",
+    bwtype = "fixed", bwscaling = FALSE,
+    ckertype = "beta", ckerorder = 4,
+    ckerbound = "fixed", ckerlb = 0, ckerub = 1,
+    bwsolver = "powell", nmulti = 1L, itmax = 40L
+  )
+  fit <- npudist(
+    bws = bw, tdat = training,
+    edat = training[seq_len(4L), , drop = FALSE]
+  )
+  replay <- np:::npudistbw.dbandwidth(
+    dat = training, bws = bw, bandwidth.compute = TRUE,
+    eval.only = TRUE, nmulti = 1L, invalid.penalty = "dbmax"
+  )
+  expect_true(all(is.finite(bw$bw)))
+  expect_true(is.finite(as.numeric(bw$fval[[1L]])))
+  expect_equal(
+    as.numeric(replay$fval[[1L]]), as.numeric(bw$fval[[1L]]),
+    tolerance = 2e-12
+  )
+  expect_true(all(is.finite(fitted(fit))))
 })
 
 test_that("native density objective ingress requires compression state", {
@@ -225,12 +302,16 @@ test_that("native MADS searches mixed beta density objectives", {
   }
 })
 
-test_that("mixed beta fits reject invalid categorical compression state", {
+test_that("mixed beta routes reject invalid categorical compression state", {
   training <- data.frame(
     x = seq(0.05, 0.95, length.out = 12L),
-    u = factor(rep(letters[1:3], each = 4L))
+    o = ordered(rep(1:4, length.out = 12L), levels = 1:4)
   )
-  bw <- npudensbw(
+  density.bw <- npudensbw(
+    dat = training, bws = c(0.15, 0.2), bandwidth.compute = FALSE,
+    ckertype = "beta", ckerbound = "fixed", ckerlb = 0, ckerub = 1
+  )
+  distribution.bw <- npudistbw(
     dat = training, bws = c(0.15, 0.2), bandwidth.compute = FALSE,
     ckertype = "beta", ckerbound = "fixed", ckerlb = 0, ckerub = 1
   )
@@ -238,7 +319,15 @@ test_that("mixed beta fits reject invalid categorical compression state", {
   on.exit(options(old), add = TRUE)
 
   expect_error(
-    npudens(bws = bw, tdat = training),
+    npudens(bws = density.bw, tdat = training),
+    "must be a single non-missing logical value",
+    fixed = TRUE
+  )
+  expect_error(
+    np:::npudistbw.dbandwidth(
+      dat = training, bws = distribution.bw,
+      bandwidth.compute = TRUE, eval.only = TRUE, nmulti = 1L
+    ),
     "must be a single non-missing logical value",
     fixed = TRUE
   )

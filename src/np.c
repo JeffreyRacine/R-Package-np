@@ -13062,7 +13062,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
     np_beta_bw_order_extern = np_bandwidth_kernel_descriptor_or_error(
       myopti[DBW_CKFAMILYI], KERNEL_den_extern, myopti[DBW_CKORDERI],
       num_reg_continuous_extern, num_reg_unordered_extern,
-      num_reg_ordered_extern, NP_BETA_BW_CONTINUOUS_ONLY,
+      num_reg_ordered_extern, NP_BETA_BW_ALLOW_CATEGORICAL,
       ckerlb, ckerub,
       "C_np_distribution_bw").order;
     np_distribution_bw_categorical_compress_extern = myopti[DBW_CATCOMPI];

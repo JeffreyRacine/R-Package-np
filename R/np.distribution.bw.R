@@ -819,7 +819,7 @@ npudistbw.dbandwidth <-
       bw = bws[["bw", exact = TRUE]],
       bandwidth.compute = bandwidth.compute,
       where = "beta distribution",
-      allow.categorical = !isTRUE(bandwidth.compute)
+      allow.categorical = TRUE
     )
 
     if ((any(bws$icon) &&

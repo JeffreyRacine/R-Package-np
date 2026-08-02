@@ -762,6 +762,20 @@ test_that("distribution bandwidth ingress owns categorical compression state", {
     "C_np_distribution_bw: categorical compression must be TRUE or FALSE",
     fixed = TRUE
   )
+  allow_hits <- gregexpr(
+    "allow.categorical = TRUE", distribution_r, fixed = TRUE
+  )[[1L]]
+  allow_hits <- allow_hits[allow_hits > 0L]
+  expect_length(allow_hits, 1L)
+  expect_match(
+    ingress,
+    paste0(
+      "num_reg_ordered_extern, NP_BETA_BW_ALLOW_CATEGORICAL,\n",
+      "      ckerlb, ckerub,\n",
+      "      \"C_np_distribution_bw\""
+    ),
+    fixed = TRUE
+  )
 })
 
 test_that("density bandwidth ingress owns categorical compression state", {
@@ -813,8 +827,8 @@ test_that("density bandwidth ingress owns categorical compression state", {
     "NP_BETA_BW_CONTINUOUS_ONLY,", ingress, fixed = TRUE
   )[[1L]]
   reject_hits <- reject_hits[reject_hits > 0L]
-  expect_length(allow_hits, 1L)
-  expect_length(reject_hits, 8L)
+  expect_length(allow_hits, 2L)
+  expect_length(reject_hits, 7L)
   contract_hits <- gregexpr(
     "np_density_bw_integer_contract_or_error(", ingress, fixed = TRUE
   )[[1L]]

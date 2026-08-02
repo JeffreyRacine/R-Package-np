@@ -300,6 +300,69 @@ test_that("beta CDF cross-validation matches all order and topology oracles", {
   }
 })
 
+test_that("mixed beta CDF cross-validation matches ordered-product oracles", {
+  old <- options(np.categorical.compress = FALSE)
+  on.exit(options(old), add = TRUE)
+  training <- data.frame(
+    x = c(0.003, 0.014, 0.037, 0.081, 0.16, 0.27,
+          0.41, 0.57, 0.71, 0.83, 0.92, 0.982),
+    o = ordered(rep(1:4, length.out = 12L), levels = 1:4)
+  )
+  n <- nrow(training)
+  empirical.cdf <- outer(training$x, training$x, "<=") *
+    outer(as.integer(training$o), as.integer(training$o), "<=")
+
+  for (order in c(2L, 4L, 6L, 8L)) {
+    for (bwtype in c("fixed", "generalized_nn", "adaptive_nn")) {
+      bandwidth <- if (identical(bwtype, "fixed")) {
+        c(0.14, 0.29)
+      } else {
+        c(5, 0.29)
+      }
+      bws <- npudistbw(
+        dat = training, bws = bandwidth, bandwidth.compute = FALSE,
+        bwtype = bwtype, bwscaling = FALSE,
+        ckertype = "beta", ckerorder = order,
+        ckerbound = "fixed", ckerlb = 0, ckerub = 1
+      )
+      ## Distribution objectives use the normalized ordered Li--Racine
+      ## kernel. npksum() names that explicit low-level variant nliracine.
+      oracle.bws <- bws
+      oracle.bws[["okertype"]] <- "nliracine"
+      weights <- npksum(
+        bws = oracle.bws, txdat = training, exdat = training,
+        operator = rep("integral", ncol(training)),
+        return.kernel.weights = TRUE
+      )$kw
+      fitted.loo <-
+        (matrix(colSums(weights), n, n, byrow = TRUE) - weights) /
+        (n - 1L)
+      expected <- mean((empirical.cdf - fitted.loo)^2)
+      squared <- (empirical.cdf - fitted.loo)^2
+      expected.on.train <-
+        (sum(squared) - sum(diag(squared))) / n^2
+
+      options(np.categorical.compress = FALSE)
+      ordinary <- beta_distribution_objective(
+        training, bandwidth, order, bwtype, gdat = training
+      )
+      options(np.categorical.compress = TRUE)
+      compressed <- beta_distribution_objective(
+        training, bandwidth, order, bwtype, gdat = training
+      )
+      on.train <- beta_distribution_objective(
+        training, bandwidth, order, bwtype,
+        do.full.integral = TRUE
+      )
+
+      expect_equal(ordinary, expected, tolerance = 5e-11)
+      expect_equal(compressed, expected, tolerance = 5e-11)
+      expect_equal(compressed, ordinary, tolerance = 5e-15)
+      expect_equal(on.train, expected.on.train, tolerance = 5e-11)
+    }
+  }
+})
+
 test_that("beta objectives support fixed and both nearest-neighbor modes", {
   xval <- c(0.004, 0.015, 0.04, 0.11, 0.23, 0.39, 0.58, 0.74, 0.88, 0.97)
   x <- data.frame(x = xval)
