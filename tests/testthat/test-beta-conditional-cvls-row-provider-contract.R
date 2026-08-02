@@ -19,8 +19,8 @@ test_that("bounded conditional CVLS has one typed row-provider seam", {
   engine <- paste(readLines(path, warn = FALSE), collapse = "\n")
 
   expect_match(engine, "} NPConditionalCVLSRowProvider;", fixed = TRUE)
-  for (member in c("x_row", "y_train_row", "y_scalar_eval_row",
-                   "y_eval_block"))
+  for (member in c("x_row", "y_train_row", "y_convolution_row",
+                   "y_scalar_eval_row", "y_eval_block"))
     expect_match(engine, paste0("(*", member, ")"), fixed = TRUE)
   expect_match(
     engine,
@@ -72,6 +72,14 @@ test_that("live bounded CVLS retains literal legacy arithmetic under null", {
     fixed = TRUE
   )
   expect_match(engine, "np_conditional_yrow_from_ctx(", fixed = TRUE)
+  expect_match(
+    engine,
+    paste0(
+      "np_conditional_density_cvls_lp_row_stream(\n",
+      "      vector_scale_factor, cv, NULL);"
+    ),
+    fixed = TRUE
+  )
 
   sibling_start <- regexpr(
     "int np_conditional_density_cvls_lp_stream_ctx(", engine, fixed = TRUE

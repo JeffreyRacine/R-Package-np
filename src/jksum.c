@@ -26252,6 +26252,10 @@ typedef struct {
                      int evaluation,
                      double *row,
                      double *common_log_scale);
+  int (*y_convolution_row)(void *context,
+                           int evaluation,
+                           double *row,
+                           double *common_log_scale);
   int (*y_scalar_eval_row)(void *context,
                           double evaluation,
                           double *row,
@@ -29716,7 +29720,8 @@ cleanup_cvml_lp_block:
 }
 
 static int np_conditional_density_cvls_lp_row_stream(double *vector_scale_factor,
-                                                     double *cv){
+                                                     double *cv,
+                                                     const NPConditionalCVLSRowProvider *provider){
   const int num_obs = num_obs_train_extern;
   const int use_row_ctx = (BANDWIDTH_den_extern == BW_ADAP_NN);
   double *xrow = NULL, *xrow_full = NULL, *yrow = NULL, *yconv = NULL;
@@ -29731,6 +29736,11 @@ static int np_conditional_density_cvls_lp_row_stream(double *vector_scale_factor
      (BANDWIDTH_den_extern != BW_GEN_NN) &&
      (BANDWIDTH_den_extern != BW_ADAP_NN))
     return 1;
+  if(provider != NULL &&
+     (provider->context == NULL || provider->x_row == NULL ||
+      provider->y_train_row == NULL ||
+      provider->y_convolution_row == NULL))
+    return 1;
 
   xrow = alloc_vecd(MAX(1, num_obs));
   xrow_full = alloc_vecd(MAX(1, num_obs));
@@ -29739,7 +29749,7 @@ static int np_conditional_density_cvls_lp_row_stream(double *vector_scale_factor
   if((xrow == NULL) || (xrow_full == NULL) || (yrow == NULL) || (yconv == NULL))
     goto cleanup_cvls_lp_stream;
 
-  if(use_row_ctx){
+  if(provider == NULL && use_row_ctx){
     if(np_conditional_xrow_ctx_prepare(vector_scale_factor, &xctx) != 0)
       goto cleanup_cvls_lp_stream;
     if(np_conditional_yrow_ctx_prepare(vector_scale_factor, OP_NORMAL, &yctx) != 0)
@@ -29752,8 +29762,15 @@ static int np_conditional_density_cvls_lp_row_stream(double *vector_scale_factor
   for(i = 0; i < num_obs; i++){
     double lin = 0.0;
     double quad = 0.0;
+    double y_log_scale = 0.0;
 
-    if(use_row_ctx){
+    if(provider != NULL) {
+      if(provider->x_row(provider->context, i, 0, xrow) != 0 ||
+         provider->x_row(provider->context, i, 1, xrow_full) != 0 ||
+         provider->y_train_row(provider->context, i, yrow,
+                               &y_log_scale) != 0)
+        goto cleanup_cvls_lp_stream;
+    } else if(use_row_ctx){
       if(np_lp_engine_extern == NP_LP_ENGINE_GENERAL){
         if((np_conditional_xrow_full_from_ctx(&xctx, i, xrow_full) != 0) ||
            (np_lp_delete_smoother_row(xrow_full,
@@ -29780,12 +29797,21 @@ static int np_conditional_density_cvls_lp_row_stream(double *vector_scale_factor
 
     for(j = 0; j < num_obs; j++)
       lin += xrow[j]*yrow[j];
+    if(provider != NULL &&
+       np_continuous_kernel_scaled_restore(
+         lin, y_log_scale, 1, &lin) != NP_CONTINUOUS_ROW_OK)
+      goto cleanup_cvls_lp_stream;
 
     for(j = 0; j < num_obs; j++){
       double inner = 0.0;
+      double yconv_log_scale = 0.0;
       if(xrow_full[j] == 0.0)
         continue;
-      if(use_row_ctx){
+      if(provider != NULL) {
+        if(provider->y_convolution_row(
+             provider->context, j, yconv, &yconv_log_scale) != 0)
+          goto cleanup_cvls_lp_stream;
+      } else if(use_row_ctx){
         if(np_conditional_yrow_from_ctx(&yconvctx, j, yconv) != 0)
           goto cleanup_cvls_lp_stream;
       } else {
@@ -29794,6 +29820,10 @@ static int np_conditional_density_cvls_lp_row_stream(double *vector_scale_factor
       }
       for(k = 0; k < num_obs; k++)
         inner += xrow_full[k]*yconv[k];
+      if(provider != NULL &&
+         np_continuous_kernel_scaled_restore(
+           inner, yconv_log_scale, 1, &inner) != NP_CONTINUOUS_ROW_OK)
+        goto cleanup_cvls_lp_stream;
       quad += xrow_full[j]*inner;
     }
 
@@ -29859,7 +29889,8 @@ static int np_conditional_density_cvls_lp_adap_block_stream(double *vector_scale
   if((cv == NULL) || (vector_scale_factor == NULL) || (num_obs <= 0))
     return 1;
   if(block_size <= 0)
-    return np_conditional_density_cvls_lp_row_stream(vector_scale_factor, cv);
+    return np_conditional_density_cvls_lp_row_stream(
+      vector_scale_factor, cv, NULL);
   if(BANDWIDTH_den_extern != BW_ADAP_NN)
     return 1;
   if(int_cyker_bound_extern != 0)
@@ -29875,7 +29906,8 @@ static int np_conditional_density_cvls_lp_adap_block_stream(double *vector_scale
         vector_scale_factor,
         cv);
     if(width3_status == NP_CDENS_ADAP_WIDTH3_ALLOC_UNAVAILABLE)
-      return np_conditional_density_cvls_lp_row_stream(vector_scale_factor, cv);
+      return np_conditional_density_cvls_lp_row_stream(
+        vector_scale_factor, cv, NULL);
     if(width3_status != NP_CDENS_ADAP_WIDTH3_NOT_BENEFICIAL)
       return width3_status;
   }
@@ -29998,7 +30030,8 @@ cleanup_cvls_lp_adap_block:
   if(shared_y != NULL) free_tmat(shared_y);
   np_glp_cv_clear_extern();
   if(workspace_status == NP_CVLS_WORKSPACE_UNAVAILABLE)
-    return np_conditional_density_cvls_lp_row_stream(vector_scale_factor, cv);
+    return np_conditional_density_cvls_lp_row_stream(
+      vector_scale_factor, cv, NULL);
   return status;
 }
 
@@ -30530,10 +30563,12 @@ int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
 
   if(((int_TREE_X == NP_TREE_TRUE) || (int_TREE_Y == NP_TREE_TRUE)) &&
      (BANDWIDTH_den_extern != BW_FIXED))
-    return np_conditional_density_cvls_lp_row_stream(vector_scale_factor, cv);
+    return np_conditional_density_cvls_lp_row_stream(
+      vector_scale_factor, cv, NULL);
 
   if(block_size <= 0)
-    return np_conditional_density_cvls_lp_row_stream(vector_scale_factor, cv);
+    return np_conditional_density_cvls_lp_row_stream(
+      vector_scale_factor, cv, NULL);
 
   if(np_conditional_lp_stream_engine_supported() &&
      (num_reg_continuous_extern > 0) &&
@@ -30547,7 +30582,8 @@ int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
                                                        cv);
     if(supertile_status != 2)
       return supertile_status;
-    return np_conditional_density_cvls_lp_row_stream(vector_scale_factor, cv);
+    return np_conditional_density_cvls_lp_row_stream(
+      vector_scale_factor, cv, NULL);
   }
 
   workspace_status =
@@ -30663,7 +30699,8 @@ cleanup_cvls_lp_block:
   if(quad_cross != NULL) free(quad_cross);
   np_glp_cv_clear_extern();
   if(workspace_status == NP_CVLS_WORKSPACE_UNAVAILABLE)
-    return np_conditional_density_cvls_lp_row_stream(vector_scale_factor, cv);
+    return np_conditional_density_cvls_lp_row_stream(
+      vector_scale_factor, cv, NULL);
   return status;
 }
 
