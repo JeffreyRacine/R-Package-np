@@ -72,6 +72,18 @@ extern void vvrec(double *, const double *, const int *);
 #define NP_ACCEL_GAUSS_COMPILED 0
 #endif
 
+static int np_gnn_convolution_training_bandwidth_prepare(
+  int kernel,
+  int num_obs_train,
+  int num_reg_unordered,
+  int num_reg_ordered,
+  int num_reg_continuous,
+  int suppress_parallel,
+  double *vector_scale_factor,
+  double **matrix_X_continuous_train,
+  double *lambda,
+  double ***matrix_alt_bandwidth);
+
 /*
  * Keep independently timed hot row engines on a stable cache boundary.
  * This limits otherwise measurable code-placement drift when a neighboring
@@ -10135,6 +10147,20 @@ const NPCenteredMomentCtx * const centered_moment_ctx){
     }
   }
 
+  if(!bandwidth_provided && any_convolution &&
+     (num_reg_continuous > 0) &&
+     (BANDWIDTH_reg == BW_GEN_NN)){
+    if(np_gnn_convolution_training_bandwidth_prepare(
+         (num_reg_continuous != 0) ? KERNEL_reg[0] : 0,
+         num_obs_train, num_reg_unordered, num_reg_ordered,
+         num_reg_continuous, suppress_parallel, vector_scale_factor,
+         matrix_X_continuous_train, lambda,
+         &matrix_alt_bandwidth) != 0){
+      status = KWSNP_ERR_BADBW;
+      goto cleanup;
+    }
+  }
+
   if(!bandwidth_provided && (is_adaptive && any_convolution)){ // need additional bandwidths
     matrix_alt_bandwidth = alloc_tmatd(num_obs_eval, num_reg_continuous);  
 
@@ -11582,6 +11608,9 @@ cleanup:
 
   if(!bandwidth_provided && ((BANDWIDTH_reg == BW_ADAP_NN) && any_convolution))
     free_tmat(matrix_alt_bandwidth);
+  if(!bandwidth_provided && (BANDWIDTH_reg == BW_GEN_NN) &&
+     any_convolution && (num_reg_continuous > 0))
+    free_tmat(matrix_alt_bandwidth);
 
   if(bounded_cdf_lower_fixed != NULL) free_tmat(bounded_cdf_lower_fixed);
   if(bounded_cdf_den_fixed != NULL) free_tmat(bounded_cdf_den_fixed);
@@ -11648,6 +11677,47 @@ cleanup:
 }
 
 #undef NP_OUTER_PACK_ADJACENT_HOT_ALIGN
+
+/*
+ * Generalized-NN convolution combines each evaluation bandwidth with a
+ * training-point companion bandwidth.  Keep construction out of the
+ * adjacent hot engine so inactive fixed/adaptive routes retain their
+ * established loop layout.
+ */
+static int NP_NOINLINE np_gnn_convolution_training_bandwidth_prepare(
+  const int kernel,
+  const int num_obs_train,
+  const int num_reg_unordered,
+  const int num_reg_ordered,
+  const int num_reg_continuous,
+  const int suppress_parallel,
+  double * const vector_scale_factor,
+  double ** const matrix_X_continuous_train,
+  double * const lambda,
+  double *** const matrix_alt_bandwidth)
+{
+  double **bandwidth;
+
+  if((num_obs_train <= 1) || (num_reg_continuous <= 0) ||
+     (vector_scale_factor == NULL) ||
+     (matrix_X_continuous_train == NULL) ||
+     (matrix_alt_bandwidth == NULL))
+    return 1;
+  *matrix_alt_bandwidth = NULL;
+  bandwidth = alloc_tmatd(num_obs_train, num_reg_continuous);
+  if(kernel_bandwidth_mean(
+       kernel, BW_GEN_NN, num_obs_train, num_obs_train,
+       0, 0, 0, num_reg_continuous,
+       num_reg_unordered, num_reg_ordered, suppress_parallel,
+       vector_scale_factor, NULL, NULL,
+       matrix_X_continuous_train, matrix_X_continuous_train,
+       bandwidth, bandwidth, lambda) != 0){
+    free_tmat(bandwidth);
+    return 1;
+  }
+  *matrix_alt_bandwidth = bandwidth;
+  return 0;
+}
 
 #if NP_ACCEL_GAUSS_COMPILED
 /*
