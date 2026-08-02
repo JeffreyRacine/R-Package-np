@@ -292,22 +292,6 @@ static int np_beta_objective_kernel_sum_log(
   return np_beta_log_sum_finish(&sum, log_absolute, sign);
 }
 
-static double np_beta_objective_cvml_contribution(double log_sum,
-                                                   int sign,
-                                                   int denominator)
-{
-  const double log_dbl_min = log(DBL_MIN);
-  const double log_fit = log_sum - log((double)denominator);
-
-  if(sign > 0 && log_fit > log_dbl_min)
-    return -log_fit;
-
-  np_guarded_cvml_hit();
-  if(sign < 0 && log_fit > log_dbl_min)
-    return log_fit - 2.0 * log_dbl_min;
-  return -log_dbl_min;
-}
-
 double np_beta_objective_density_ml(
   int bandwidth_mode,
   int order,
@@ -358,7 +342,7 @@ double np_beta_objective_density_ml(
       objective = DBL_MAX;
       break;
     }
-    objective += np_beta_objective_cvml_contribution(
+    objective += np_guarded_cvml_log_contribution(
       log_sum, sum_sign, num_obs - 1);
     if(!R_FINITE(objective)) {
       objective = DBL_MAX;
@@ -1276,7 +1260,7 @@ double np_beta_objective_conditional_density_ml(
          &numerator_log, &numerator_sign) != 0)
       goto cleanup_conditional_density_ml;
     fit_sign = denominator_sign * numerator_sign;
-    sum += np_beta_objective_cvml_contribution(
+    sum += np_guarded_cvml_log_contribution(
       numerator_log - denominator_log, fit_sign, 1);
     if(!R_FINITE(sum))
       goto cleanup_conditional_density_ml;

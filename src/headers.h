@@ -60,6 +60,20 @@ static inline double np_guarded_cvml_contribution(const double fit){
     return log(-fit) - 2.0*log(DBL_MIN);
   return -log(DBL_MIN);
 }
+static inline double np_guarded_cvml_log_contribution(
+  const double log_absolute_sum,
+  const int sign,
+  const int denominator){
+  const double log_dbl_min = log(DBL_MIN);
+  const double log_fit = log_absolute_sum - log((double)denominator);
+
+  if(sign > 0 && log_fit > log_dbl_min)
+    return -log_fit;
+  np_guarded_cvml_hit();
+  if(sign < 0 && log_fit > log_dbl_min)
+    return log_fit - 2.0*log_dbl_min;
+  return -log_dbl_min;
+}
 void np_fastcv_alllarge_hits_reset(void);
 double np_fastcv_alllarge_hits_get(void);
 void np_cont_largeh_cache_clear_extern(void);

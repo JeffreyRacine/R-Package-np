@@ -75,4 +75,11 @@ NPContinuousKernelRowStatus np_beta_scaled_row_context_fill(
   double *sum,
   double *common_log_scale);
 
+NPContinuousKernelRowStatus np_beta_scaled_row_context_fill_omitting(
+  NPBetaScaledRowContext *context,
+  int evaluation,
+  int omitted_observation,
+  double *sum,
+  double *common_log_scale);
+
 #endif
