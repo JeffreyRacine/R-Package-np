@@ -659,6 +659,10 @@ test_that("density bandwidth ingress owns categorical compression state", {
     readLines(file.path(root, "R", "np.density.bw.R"), warn = FALSE),
     collapse = "\n"
   )
+  bandwidth_r <- paste(
+    readLines(file.path(root, "R", "bandwidth.R"), warn = FALSE),
+    collapse = "\n"
+  )
   headers <- paste(
     readLines(file.path(root, "src", "headers.h"), warn = FALSE),
     collapse = "\n"
@@ -688,6 +692,22 @@ test_that("density bandwidth ingress owns categorical compression state", {
     "C_np_density_bw: categorical compression must be TRUE or FALSE",
     fixed = TRUE
   )
+  expect_match(bandwidth_r, "allow.categorical = TRUE", fixed = TRUE)
+  allow_hits <- gregexpr(
+    "NP_BETA_BW_ALLOW_CATEGORICAL,", ingress, fixed = TRUE
+  )[[1L]]
+  allow_hits <- allow_hits[allow_hits > 0L]
+  reject_hits <- gregexpr(
+    "NP_BETA_BW_CONTINUOUS_ONLY,", ingress, fixed = TRUE
+  )[[1L]]
+  reject_hits <- reject_hits[reject_hits > 0L]
+  expect_length(allow_hits, 1L)
+  expect_length(reject_hits, 8L)
+  contract_hits <- gregexpr(
+    "np_density_bw_integer_contract_or_error(", ingress, fixed = TRUE
+  )[[1L]]
+  contract_hits <- contract_hits[contract_hits > 0L]
+  expect_length(contract_hits, 4L)
 })
 
 test_that("every beta side enters the common conditional regression owner", {

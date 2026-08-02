@@ -128,16 +128,18 @@
   orders 4--8, nearest-neighbour or multivariate searches, or non-Powell
   solvers.
 
-  The beta routes currently require continuous variables only. Regression and
-  conditional estimators additionally require \code{regtype="lc"}; if either
-  conditional side uses beta, all X and Y coordinates must be continuous.
-  \code{npksum} requires \code{bandwidth.divide=FALSE} and
-  \code{kernel.pow=1}. Normal, integral, convolution, and one-coordinate
-  PDF-derivative operators are supported;
-  \code{permutation.operator="derivative"} returns every continuous first
-  derivative. Score, OCG, categorical-product, higher/mixed derivative, and
-  local-polynomial combinations fail explicitly rather than falling through
-  a legacy kernel code.
+  Beta continuous coordinates can be combined with unordered and ordered
+  categorical coordinates in kernel sums and supported estimators. Automatic
+  mixed-data bandwidth selection is available for unconditional density;
+  automatic beta selection in other estimator families remains
+  continuous-only until each corresponding objective is activated.
+  Regression and conditional fitting support the canonical scalar and general
+  local-polynomial engines. \code{npksum} supports categorical products,
+  integer powers, normal, integral, convolution, and one-coordinate
+  PDF-derivative operators; \code{permutation.operator="derivative"} returns
+  every continuous first derivative. Unsupported score, OCG, or mixed
+  derivative requests fail explicitly rather than entering a legacy kernel
+  code.
 
   For scale component \eqn{s}, put \eqn{\tau_s=\tau/s},
   \eqn{\alpha_s=1+t\tau_s}, and \eqn{\beta_s=1+(1-t)\tau_s}. At an interior

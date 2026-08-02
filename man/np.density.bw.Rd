@@ -544,11 +544,13 @@ or standard-deviation factors.
 
   The Chen/Igarashi--Kakizawa beta family is available at orders 2, 4, 6,
   and 8 for fixed, generalized-NN, and adaptive-NN estimation of continuous
-  variables on finite supports. Set \code{ckertype = "beta"} and use either
+  variables on finite supports. Beta continuous coordinates may be combined
+  with unordered and ordered categorical coordinates, which retain their
+  selected categorical kernels. Set \code{ckertype = "beta"} and use either
   \code{ckerbound = "fixed"} with finite \code{ckerlb}/\code{ckerub} or
   \code{ckerbound = "range"}. Explicit bandwidth objects and automatic
-  \code{cv.ml}/\code{cv.ls} selection are supported; normal-reference
-  selection and mixed continuous/categorical products are not. The bandwidth \eqn{h_j} is in
+  \code{cv.ml}/\code{cv.ls} selection are supported for continuous and mixed
+  data; normal-reference selection is not. The bandwidth \eqn{h_j} is in
   the units of coordinate \eqn{j}; internally the beta precision is
   \eqn{\tau_j=((b_j-a_j)/h_j)^2}{tau[j]=((b[j]-a[j])/h[j])^2}.
   Higher orders use the signed multiscale coefficients documented in

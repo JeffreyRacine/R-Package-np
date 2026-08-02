@@ -1,5 +1,14 @@
 # np 0.70-6
 
+* Beta density bandwidth selection now supports mixed continuous, unordered,
+  and ordered data for CVML and bounded target-quadrature CVLS, across fixed,
+  generalized-nearest-neighbour, and adaptive-nearest-neighbour bandwidths and
+  beta orders 2, 4, 6, and 8. The continuous beta row and categorical kernels
+  use the canonical density objective owners, including strict
+  `np.categorical.compress = TRUE`/`FALSE` behavior; no beta-specific
+  objective or categorical fallback is used. Other automatic beta bandwidth
+  families retain their existing continuous-only gates.
+
 * Corrected native automatic-degree search for conditional density and
   distribution bandwidths so every callback selects the canonical scalar
   degree-zero or general positive-degree local-polynomial engine from that

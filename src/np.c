@@ -57,6 +57,11 @@ np_continuous_kernel_descriptor_or_error(int family,
                                          int order,
                                          const char *where);
 
+typedef enum {
+  NP_BETA_BW_CONTINUOUS_ONLY = 0,
+  NP_BETA_BW_ALLOW_CATEGORICAL = 1
+} NPBetaBandwidthCategoricalPolicy;
+
 static np_continuous_kernel_descriptor
 np_bandwidth_kernel_descriptor_or_error(int family,
                                         int code,
@@ -64,6 +69,8 @@ np_bandwidth_kernel_descriptor_or_error(int family,
                                         int ncon,
                                         int nuno,
                                         int nord,
+                                        NPBetaBandwidthCategoricalPolicy
+                                          categorical_policy,
                                         const double *lower,
                                         const double *upper,
                                         const char *where);
@@ -4112,6 +4119,7 @@ static int np_conditional_density_nomad_shadow_prepare_internal(double *c_uno,
       np_beta_cx_bw_order_extern = np_bandwidth_kernel_descriptor_or_error(
         myopti[CBW_CXFAMILYI], KERNEL_reg_extern, myopti[CBW_CXORDERI],
         num_reg_continuous_extern, num_unordered, num_ordered,
+        NP_BETA_BW_CONTINUOUS_ONLY,
         vector_cxkerlb_extern, vector_cxkerub_extern,
         "C_np_density_conditional_nomad_native_search (X)").order;
     else
@@ -4120,6 +4128,7 @@ static int np_conditional_density_nomad_shadow_prepare_internal(double *c_uno,
       np_beta_cy_bw_order_extern = np_bandwidth_kernel_descriptor_or_error(
         myopti[CBW_CYFAMILYI], KERNEL_den_extern, myopti[CBW_CYORDERI],
         num_var_continuous_extern, num_unordered, num_ordered,
+        NP_BETA_BW_CONTINUOUS_ONLY,
         vector_cykerlb_extern, vector_cykerub_extern,
         "C_np_density_conditional_nomad_native_search (Y)").order;
     else
@@ -7967,6 +7976,19 @@ cleanup_lp_apply_wrapper:
   return out;
 }
 
+static void np_density_bw_integer_contract_or_error(SEXP myopti,
+                                                     const char *where)
+{
+  if(XLENGTH(myopti) <= BW_CKRNEVI)
+    error("%s: integer option contract is incomplete", where);
+  if(INTEGER(myopti)[BW_CKRNEVI] != NP_CKERNEL_COORDINATE_CODE)
+    return;
+  if(XLENGTH(myopti) <= BW_CKORDERI)
+    error("%s: continuous-kernel descriptor is missing", where);
+  if(XLENGTH(myopti) <= BW_CATCOMPI)
+    error("%s: categorical-compression state is missing", where);
+}
+
 static SEXP C_np_density_bw_common(SEXP myuno,
                                    SEXP myord,
                                    SEXP mycon,
@@ -8007,12 +8029,7 @@ static SEXP C_np_density_bw_common(SEXP myuno,
 
   if (XLENGTH(myoptd_r) <= BW_SFLOORD)
     error("C_np_density_bw: myoptd is missing scale.factor.lower.bound");
-  if (XLENGTH(myopti_i) <= BW_CKORDERI &&
-      INTEGER(myopti_i)[BW_CKRNEVI] == NP_CKERNEL_COORDINATE_CODE)
-    error("C_np_density_bw: continuous-kernel descriptor is missing");
-  if (INTEGER(myopti_i)[BW_CKRNEVI] == NP_CKERNEL_COORDINATE_CODE &&
-      XLENGTH(myopti_i) <= BW_CATCOMPI)
-    error("C_np_density_bw: categorical-compression state is missing");
+  np_density_bw_integer_contract_or_error(myopti_i, "C_np_density_bw");
 
   ncon = (int)INTEGER(myopti_i)[BW_NCONI];
   resolve_bounds_or_default(ckerlb_r, ckerub_r, ncon, &ckerlb_p, &ckerub_p);
@@ -8193,9 +8210,8 @@ SEXP C_np_density_nomad_native_fixed_eval(SEXP myuno,
   PROTECT(ckerlb_r = coerceVector(ckerlb, REALSXP));
   PROTECT(ckerub_r = coerceVector(ckerub, REALSXP));
 
-  if (XLENGTH(myopti_i) <= BW_CKORDERI &&
-      INTEGER(myopti_i)[BW_CKRNEVI] == NP_CKERNEL_COORDINATE_CODE)
-    error("native npudens NOMAD evaluator: continuous-kernel descriptor is missing");
+  np_density_bw_integer_contract_or_error(
+    myopti_i, "native npudens NOMAD evaluator");
 
   if (XLENGTH(myoptd_r) <= BW_SFLOORD) {
     UNPROTECT(9);
@@ -8444,6 +8460,9 @@ SEXP C_np_density_nomad_native_search(SEXP myuno,
   PROTECT(option_values_s = coerceVector(option_values, STRSXP));
   PROTECT(ckerlb_r = coerceVector(ckerlb, REALSXP));
   PROTECT(ckerub_r = coerceVector(ckerub, REALSXP));
+
+  np_density_bw_integer_contract_or_error(
+    myopti_i, "native npudens NOMAD search");
 
   n = (int) XLENGTH(x0_r);
   if (n <= 0 ||
@@ -10221,6 +10240,8 @@ np_bandwidth_kernel_descriptor_or_error(int family,
                                         int ncon,
                                         int nuno,
                                         int nord,
+                                        NPBetaBandwidthCategoricalPolicy
+                                          categorical_policy,
                                         const double *lower,
                                         const double *upper,
                                         const char *where)
@@ -10231,7 +10252,13 @@ np_bandwidth_kernel_descriptor_or_error(int family,
   if(descriptor.family == NP_CKERNEL_FAMILY_BETA) {
     int dimension;
 
-    if(ncon <= 0 || nuno != 0 || nord != 0)
+    if(categorical_policy != NP_BETA_BW_CONTINUOUS_ONLY &&
+       categorical_policy != NP_BETA_BW_ALLOW_CATEGORICAL)
+      error("%s: beta bandwidth selection has invalid categorical policy",
+            where);
+    if(ncon <= 0 ||
+       (categorical_policy == NP_BETA_BW_CONTINUOUS_ONLY &&
+        (nuno != 0 || nord != 0)))
       error("%s: beta bandwidth selection requires continuous variables only",
             where);
     if(lower == NULL || upper == NULL)
@@ -11270,7 +11297,8 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
     np_beta_bw_order_extern = np_bandwidth_kernel_descriptor_or_error(
       myopti[BW_CKFAMILYI], KERNEL_den_extern, myopti[BW_CKORDERI],
       num_reg_continuous_extern, num_reg_unordered_extern,
-      num_reg_ordered_extern, ckerlb, ckerub,
+      num_reg_ordered_extern, NP_BETA_BW_ALLOW_CATEGORICAL,
+      ckerlb, ckerub,
       "C_np_density_bw").order;
     np_density_bw_categorical_compress_extern = myopti[BW_CATCOMPI];
     if(np_density_bw_categorical_compress_extern != 0 &&
@@ -12107,7 +12135,8 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
     np_beta_bw_order_extern = np_bandwidth_kernel_descriptor_or_error(
       myopti[DBW_CKFAMILYI], KERNEL_den_extern, myopti[DBW_CKORDERI],
       num_reg_continuous_extern, num_reg_unordered_extern,
-      num_reg_ordered_extern, ckerlb, ckerub,
+      num_reg_ordered_extern, NP_BETA_BW_CONTINUOUS_ONLY,
+      ckerlb, ckerub,
       "C_np_distribution_bw").order;
 
   int_use_starting_values= myopti[DBW_USTARTI];
@@ -13027,6 +13056,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
       np_beta_cx_bw_order_extern = np_bandwidth_kernel_descriptor_or_error(
         myopti[CBW_CXFAMILYI], KERNEL_reg_extern, myopti[CBW_CXORDERI],
         num_reg_continuous_extern, num_unordered, num_ordered,
+        NP_BETA_BW_CONTINUOUS_ONLY,
         cxkerlb, cxkerub, "C_np_density_conditional_bw (X)").order;
     else
       np_beta_cx_bw_order_extern = myopti[CBW_CXORDERI];
@@ -13034,6 +13064,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
       np_beta_cy_bw_order_extern = np_bandwidth_kernel_descriptor_or_error(
         myopti[CBW_CYFAMILYI], KERNEL_den_extern, myopti[CBW_CYORDERI],
         num_var_continuous_extern, num_unordered, num_ordered,
+        NP_BETA_BW_CONTINUOUS_ONLY,
         cykerlb, cykerub, "C_np_density_conditional_bw (Y)").order;
     else
       np_beta_cy_bw_order_extern = myopti[CBW_CYORDERI];
@@ -14272,7 +14303,8 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
       np_beta_cx_bw_order_extern = np_bandwidth_kernel_descriptor_or_error(
         myopti[CDBW_CXFAMILYI], KERNEL_reg_extern,
         myopti[CDBW_CXORDERI], num_reg_continuous_extern,
-        num_unordered, num_ordered, cxkerlb, cxkerub,
+        num_unordered, num_ordered, NP_BETA_BW_CONTINUOUS_ONLY,
+        cxkerlb, cxkerub,
         "C_np_distribution_conditional_bw (X)").order;
     else
       np_beta_cx_bw_order_extern = myopti[CDBW_CXORDERI];
@@ -14280,7 +14312,8 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
       np_beta_cy_bw_order_extern = np_bandwidth_kernel_descriptor_or_error(
         myopti[CDBW_CYFAMILYI], KERNEL_den_extern,
         myopti[CDBW_CYORDERI], num_var_continuous_extern,
-        num_unordered, num_ordered, cykerlb, cykerub,
+        num_unordered, num_ordered, NP_BETA_BW_CONTINUOUS_ONLY,
+        cykerlb, cykerub,
         "C_np_distribution_conditional_bw (Y)").order;
     else
       np_beta_cy_bw_order_extern = myopti[CDBW_CYORDERI];
@@ -16795,7 +16828,8 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
     np_beta_bw_order_extern = np_bandwidth_kernel_descriptor_or_error(
       myopti[RBW_CKFAMILYI], KERNEL_reg_extern, myopti[RBW_CKORDERI],
       num_reg_continuous_extern, num_reg_unordered_extern,
-      num_reg_ordered_extern, ckerlb, ckerub,
+      num_reg_ordered_extern, NP_BETA_BW_CONTINUOUS_ONLY,
+      ckerlb, ckerub,
       "C_np_regression_bw").order;
 
   int_use_starting_values= myopti[RBW_USTARTI];
