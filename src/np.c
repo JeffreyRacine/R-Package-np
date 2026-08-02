@@ -5739,7 +5739,10 @@ void np_density_conditional(double * tyuno, double * tyord, double * tycon,
                             double * cmean, double * cmean_stderr,
                             double * gradients, double * gradients_stderr, double * ll,
                             double * cxkerlb, double * cxkerub,
-                            double * cykerlb, double * cykerub);
+                            double * cykerlb, double * cykerub,
+                            const NPContinuousKernelRoute *kernel_route,
+                            NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
+                            int categorical_compress);
 void np_density_bw(double * myuno, double * myord, double * mycon,
                    double * mysd, int * myopti, double * myoptd, double * myans, double * fval,
                    double * objective_function_values, double * objective_function_evals,
@@ -7451,7 +7454,12 @@ SEXP C_np_density_conditional(SEXP tyuno,
   double * cykerub_p = NULL;
   np_continuous_kernel_descriptor x_descriptor;
   np_continuous_kernel_descriptor y_descriptor;
+  NPContinuousKernelRoute beta_x_route;
+  NPContinuousKernelDerivativeDiagnostics beta_x_diagnostics;
+  const NPContinuousKernelRoute *active_x_route = NULL;
+  NPContinuousKernelDerivativeDiagnostics *active_x_diagnostics = NULL;
   int has_kernel_descriptors = 0;
+  int categorical_compress = 0;
   R_xlen_t gsize;
 
   if (en < 0) en = 0;
@@ -7505,6 +7513,29 @@ SEXP C_np_density_conditional(SEXP tyuno,
       "C_np_density_conditional y kernel");
     has_kernel_descriptors = 1;
   }
+  if(XLENGTH(myopti_i) > CD_CATCOMPI)
+    categorical_compress = INTEGER(myopti_i)[CD_CATCOMPI];
+  if(categorical_compress != 0 && categorical_compress != 1)
+    error("C_np_density_conditional: categorical compression must be TRUE or FALSE");
+
+  if(has_kernel_descriptors &&
+     x_descriptor.family == NP_CKERNEL_FAMILY_BETA &&
+     y_descriptor.family == NP_CKERNEL_FAMILY_LEGACY) {
+    if(ncon_x <= 0)
+      error("C_np_density_conditional: explanatory beta route requires continuous X variables");
+    beta_x_route.segment_count = 1;
+    beta_x_route.segment[0].descriptor = x_descriptor;
+    beta_x_route.segment[0].coordinate_offset = 0;
+    beta_x_route.segment[0].coordinate_count = ncon_x;
+    beta_x_route.segment[0].lower = cxkerlb_p;
+    beta_x_route.segment[0].upper = cxkerub_p;
+    beta_x_diagnostics.bad_coordinate = -1;
+    beta_x_diagnostics.bad_observation = -1;
+    beta_x_diagnostics.undefined_count = 0;
+    beta_x_diagnostics.beta_status = NP_BETA_OK;
+    active_x_route = &beta_x_route;
+    active_x_diagnostics = &beta_x_diagnostics;
+  }
 
   np_lp_engine_extern = np_regression_engine_or_error(
     asInteger(regtype_i), "C_np_conditional_density_bw");
@@ -7527,8 +7558,7 @@ SEXP C_np_density_conditional(SEXP tyuno,
   PROTECT(out_ll = allocVector(REALSXP, 1));
 
   if(has_kernel_descriptors &&
-     (x_descriptor.family == NP_CKERNEL_FAMILY_BETA ||
-      y_descriptor.family == NP_CKERNEL_FAMILY_BETA)) {
+     y_descriptor.family == NP_CKERNEL_FAMILY_BETA) {
     const int num_train = INTEGER(myopti_i)[CD_TNOBSI];
     const int num_eval = INTEGER(myopti_i)[CD_ENOBSI];
     const int train_is_eval = INTEGER(myopti_i)[CD_TISEI];
@@ -7679,7 +7709,9 @@ SEXP C_np_density_conditional(SEXP tyuno,
                            REAL(nconfac_r), REAL(ncatfac_r), REAL(mysd_r),
                            INTEGER(myopti_i),
                            REAL(out_cond), REAL(out_cderr), REAL(out_grad), REAL(out_gerr), REAL(out_ll),
-                           cxkerlb_p, cxkerub_p, cykerlb_p, cykerub_p);
+                           cxkerlb_p, cxkerub_p, cykerlb_p, cykerub_p,
+                           active_x_route, active_x_diagnostics,
+                           categorical_compress);
   }
 
   PROTECT(out = allocVector(VECSXP, 5));
@@ -15424,6 +15456,82 @@ cleanup_np_distribution_conditional_bw:
   return ;
 }
 
+/*
+ * Realize one immutable beta nearest-neighbor bandwidth layout for the
+ * conditional X owner.  Successive dependent-side response rows then reuse
+ * this O((n + eval) * p) layout through the common regression engine instead
+ * of rebuilding the same X bandwidths once per evaluation point.
+ */
+static int np_beta_regression_prepared_bandwidth_view_init_or_error(
+  NPRegressionPreparedBandwidthView *view,
+  const int bandwidth_mode,
+  double **matrix_X_continuous_train,
+  double **matrix_X_continuous_eval,
+  const double *vector_scale_factor,
+  const int num_obs_train,
+  const int num_obs_eval,
+  const int num_reg_continuous)
+{
+  const int need_eval = bandwidth_mode == BW_GEN_NN;
+  const int need_train = bandwidth_mode == BW_ADAP_NN;
+  const int row_count = need_eval ? num_obs_eval : num_obs_train;
+  double **bandwidth_columns;
+  double *bandwidth_storage;
+  size_t storage_count;
+  size_t storage_bytes;
+  int coordinate;
+  np_beta_bandwidth_prepare_status status;
+
+  if(view == NULL)
+    error("np_density_conditional: missing prepared-bandwidth view");
+  memset(view, 0, sizeof(*view));
+  if(bandwidth_mode == BW_FIXED)
+    return 0;
+  if((bandwidth_mode != BW_GEN_NN && bandwidth_mode != BW_ADAP_NN) ||
+     matrix_X_continuous_train == NULL ||
+     matrix_X_continuous_eval == NULL || vector_scale_factor == NULL ||
+     num_obs_train <= 0 || num_obs_eval <= 0 ||
+     num_reg_continuous <= 0 ||
+     !np_size_mul_checked((size_t)num_reg_continuous,
+                          (size_t)row_count, &storage_count) ||
+     !np_size_array_bytes_checked(storage_count, sizeof(double),
+                                  &storage_bytes) ||
+     (size_t)num_reg_continuous > SIZE_MAX/sizeof(double *))
+    error("np_density_conditional: invalid prepared beta bandwidth layout");
+
+  bandwidth_columns = (double **)R_alloc(
+    (size_t)num_reg_continuous, sizeof(double *));
+  bandwidth_storage = (double *)R_alloc(storage_count, sizeof(double));
+  for(coordinate = 0; coordinate < num_reg_continuous; ++coordinate)
+    bandwidth_columns[coordinate] = bandwidth_storage +
+      (size_t)coordinate * (size_t)row_count;
+
+  status = np_beta_bandwidth_prepare_matrix(
+    need_eval ? NP_BETA_BANDWIDTH_GENERALIZED_NN :
+      NP_BETA_BANDWIDTH_ADAPTIVE_NN,
+    matrix_X_continuous_train, matrix_X_continuous_eval,
+    vector_scale_factor,
+    num_obs_train, num_obs_eval, num_reg_continuous,
+    matrix_X_continuous_train == matrix_X_continuous_eval,
+    need_eval, need_train, 0,
+    need_eval ? bandwidth_columns : NULL,
+    need_train ? bandwidth_columns : NULL);
+  if(status != NP_BETA_BANDWIDTH_PREPARE_OK)
+    error("np_density_conditional: %s",
+          np_beta_bandwidth_prepare_status_message(status));
+
+  view->bandwidth_mode = bandwidth_mode;
+  view->num_train = num_obs_train;
+  view->num_eval_total = num_obs_eval;
+  view->num_continuous = num_reg_continuous;
+  view->evaluation_offset = 0;
+  view->evaluation_count = 1;
+  view->bandwidth_eval = need_eval ? bandwidth_columns : NULL;
+  view->bandwidth_train = need_train ? bandwidth_columns : NULL;
+  (void)storage_bytes;
+  return 1;
+}
+
 
 void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con, 
                             double * tu_uno, double * tu_ord, double * tu_con,
@@ -15438,7 +15546,10 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                             double * cg, double * cgerr,
                             double * ll,
                             double * cxkerlb, double * cxkerub,
-                            double * cykerlb, double * cykerub){
+                            double * cykerlb, double * cykerub,
+                            const NPContinuousKernelRoute *kernel_route,
+                            NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
+                            int categorical_compress){
   /* Likelihood bandwidth selection for density estimation */
 
   double *vector_scale_factor, *pdf, *pdf_stderr, log_likelihood = 0.0;
@@ -15776,7 +15887,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
   if((lp_engine_eff == NP_LP_ENGINE_GENERAL) && (num_reg_continuous_extern == 0))
     lp_engine_eff = NP_LP_ENGINE_SCALAR;
 
-  if(lp_engine_eff == NP_LP_ENGINE_SCALAR){
+  if(lp_engine_eff == NP_LP_ENGINE_SCALAR && kernel_route == NULL){
     np_kernel_estimate_con_dens_dist_categorical(KERNEL_den_extern,
                                                  KERNEL_den_unordered_extern,
                                                  KERNEL_den_ordered_extern,
@@ -15820,6 +15931,8 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
     double **yuno_eval_one = NULL, **yord_eval_one = NULL, **ycon_eval_one = NULL;
     double **grad_one = NULL, **graderr_one = NULL;
     int *kernel_cy = NULL, *kernel_uy = NULL, *kernel_oy = NULL, *operator_y = NULL;
+    NPRegressionPreparedBandwidthView prepared_x_bandwidth;
+    NPRegressionPreparedBandwidthView *prepared_x_bandwidth_ptr = NULL;
     double RS = 0.0, MSE = 0.0, MAE = 0.0, MAPE = 0.0, CORR = 0.0, SIGN = 0.0;
     int num_y_vars = num_var_continuous_extern + num_var_unordered_extern + num_var_ordered_extern;
     int num_x_vars = num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern;
@@ -15896,12 +16009,26 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
         vector_scale_factor[1 + num_reg_continuous_extern + num_var_continuous_extern +
                             num_var_unordered_extern + i];
 
+    if(kernel_route != NULL &&
+       np_beta_regression_prepared_bandwidth_view_init_or_error(
+         &prepared_x_bandwidth,
+         BANDWIDTH_den_extern,
+         matrix_XY_continuous_train_extern,
+         matrix_XY_continuous_eval_extern,
+         vsf_x,
+         num_obs_train_extern,
+         num_obs_eval_extern,
+         num_reg_continuous_extern))
+      prepared_x_bandwidth_ptr = &prepared_x_bandwidth;
+
     saved_cker_bound = int_cker_bound_extern;
     saved_ckerlb = vector_ckerlb_extern;
     saved_ckerub = vector_ckerub_extern;
     log_likelihood = 0.0;
 
     for(j = 0; j < num_obs_eval_extern; j++){
+      if(prepared_x_bandwidth_ptr != NULL)
+        prepared_x_bandwidth.evaluation_offset = j;
       for(i = 0; i < num_reg_unordered_extern; i++)
         xuno_eval_one[i][0] = matrix_XY_unordered_eval_extern[i][j];
       for(i = 0; i < num_reg_ordered_extern; i++)
@@ -16013,9 +16140,13 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                                                                &MAPE,
                                                                &CORR,
                                                                &SIGN,
-                                                               NULL,
-                                                               NULL,
-                                                               0);
+                                                               kernel_route,
+                                                               kernel_route_diagnostics,
+                                                               categorical_compress,
+                                                               (lp_engine_eff == NP_LP_ENGINE_SCALAR) ?
+                                                                 NP_REGRESSION_STDERR_CONDITIONAL_INFLUENCE :
+                                                                 NP_REGRESSION_STDERR_LOCAL_RESIDUAL,
+                                                               prepared_x_bandwidth_ptr);
 
       if(status != 0)
         error("np_density_conditional: regression LP solve failed in conditional LP path");
@@ -17796,7 +17927,9 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
                                                    &SIGN,
                                                    kernel_route,
                                                    kernel_route_diagnostics,
-                                                   categorical_compress);
+                                                   categorical_compress,
+                                                   NP_REGRESSION_STDERR_LOCAL_RESIDUAL,
+                                                   NULL);
 
 
   for(i=0;i<num_obs_eval_extern;i++)

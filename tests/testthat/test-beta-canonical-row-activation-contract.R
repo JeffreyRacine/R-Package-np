@@ -324,7 +324,9 @@ test_that("scalar beta regression fits enter the canonical row engine", {
     paste0(
       "&SIGN,\n                                                   kernel_route,\n",
       "                                                   kernel_route_diagnostics,\n",
-      "                                                   categorical_compress);"
+      "                                                   categorical_compress,\n",
+      "                                                   NP_REGRESSION_STDERR_LOCAL_RESIDUAL,\n",
+      "                                                   NULL);"
     ),
     fixed = TRUE
   )
@@ -453,7 +455,7 @@ test_that("canonical beta gradient rows separate operator and estimator algebra"
   expect_match(consumer, "derivative_coefficient_square_sum", fixed = TRUE)
 })
 
-test_that("conditional scalar route plumbing is dormant before beta activation", {
+test_that("legacy conditional scalar owner retains dormant route plumbing", {
   root <- locate_beta_activation_sources()
   skip_if(is.null(root), "package sources unavailable")
   ingress <- paste(
@@ -511,6 +513,94 @@ test_that("conditional scalar route plumbing is dormant before beta activation",
   )
 })
 
+test_that("beta X with legacy Y enters the common conditional regression owner", {
+  root <- locate_beta_activation_sources()
+  skip_if(is.null(root), "package sources unavailable")
+  ingress <- paste(
+    readLines(file.path(root, "src", "np.c"), warn = FALSE),
+    collapse = "\n"
+  )
+  public_start <- regexpr("SEXP C_np_density_conditional(", ingress,
+                          fixed = TRUE)[[1L]]
+  public_end <- regexpr("SEXP C_np_density_bw(", ingress,
+                        fixed = TRUE)[[1L]]
+  expect_gt(public_start, 0L)
+  expect_gt(public_end, public_start)
+  public_owner <- substr(ingress, public_start, public_end - 1L)
+  expect_match(
+    public_owner,
+    "x_descriptor.family == NP_CKERNEL_FAMILY_BETA &&\n     y_descriptor.family == NP_CKERNEL_FAMILY_LEGACY",
+    fixed = TRUE
+  )
+  expect_match(public_owner, "active_x_route = &beta_x_route;", fixed = TRUE)
+  expect_match(
+    public_owner,
+    "y_descriptor.family == NP_CKERNEL_FAMILY_BETA",
+    fixed = TRUE
+  )
+  expect_false(grepl(
+    "x_descriptor.family == NP_CKERNEL_FAMILY_BETA ||\n      y_descriptor.family == NP_CKERNEL_FAMILY_BETA",
+    public_owner,
+    fixed = TRUE
+  ))
+
+  conditional_starts <- gregexpr(
+    "void np_density_conditional(", ingress, fixed = TRUE
+  )[[1L]]
+  conditional_start <- tail(conditional_starts[conditional_starts > 0L], 1L)
+  density_starts <- gregexpr("void np_density(double", ingress,
+                             fixed = TRUE)[[1L]]
+  conditional_end <- tail(density_starts[density_starts > conditional_start],
+                          1L)
+  conditional <- substr(ingress, conditional_start, conditional_end - 1L)
+  expect_match(
+    conditional,
+    "if(lp_engine_eff == NP_LP_ENGINE_SCALAR && kernel_route == NULL)",
+    fixed = TRUE
+  )
+  expect_match(
+    conditional,
+    "NP_REGRESSION_STDERR_CONDITIONAL_INFLUENCE",
+    fixed = TRUE
+  )
+  expect_match(
+    conditional,
+    "kernel_route,\n                                                               kernel_route_diagnostics,\n                                                               categorical_compress",
+    fixed = TRUE
+  )
+  expect_match(
+    conditional,
+    "np_beta_regression_prepared_bandwidth_view_init_or_error(",
+    fixed = TRUE
+  )
+  expect_match(
+    conditional,
+    "prepared_x_bandwidth.evaluation_offset = j;",
+    fixed = TRUE
+  )
+  expect_match(
+    conditional, "prepared_x_bandwidth_ptr);", fixed = TRUE
+  )
+
+  engine <- paste(
+    readLines(file.path(root, "src", "jksum.c"), warn = FALSE),
+    collapse = "\n"
+  )
+  expect_match(
+    engine, "np_regression_prepared_bandwidth_copy(", fixed = TRUE
+  )
+  expect_match(
+    engine,
+    "if(prepared_status < 0) {\n      free_tmat(matrix_bandwidth);\n      error(",
+    fixed = TRUE
+  )
+  expect_match(
+    engine,
+    "if(prepared_status == 0) {\n      const np_beta_bandwidth_prepare_status",
+    fixed = TRUE
+  )
+})
+
 test_that("canonical beta regression moments preserve the sidecar transcript", {
   root <- locate_beta_activation_sources()
   skip_if(is.null(root), "package sources unavailable")
@@ -525,8 +615,28 @@ test_that("canonical beta regression moments preserve the sidecar transcript", {
     row_engine,
     fixed = TRUE
   )[[1L]]
+  influence_start <- regexpr(
+    "np_continuous_kernel_beta_conditional_influence_stderr(",
+    row_engine,
+    fixed = TRUE
+  )[[1L]]
+  conditional_start <- regexpr(
+    "np_continuous_kernel_beta_conditional_moment_rows_validated(",
+    row_engine,
+    fixed = TRUE
+  )[[1L]]
   expect_gt(owner_start, 0L)
-  owner <- substr(row_engine, owner_start, nchar(row_engine))
+  expect_gt(influence_start, 0L)
+  expect_gt(conditional_start, 0L)
+  expect_lt(owner_start, influence_start)
+  expect_lt(influence_start, conditional_start)
+  owner <- substr(row_engine, owner_start, influence_start - 1L)
+  influence_owner <- substr(
+    row_engine, influence_start, conditional_start - 1L
+  )
+  conditional_owner <- substr(
+    row_engine, conditional_start, nchar(row_engine)
+  )
 
   expect_match(
     owner, "np_continuous_kernel_beta_log_factor_row(", fixed = TRUE
@@ -546,10 +656,30 @@ test_that("canonical beta regression moments preserve the sidecar transcript", {
   expect_match(owner, "squared_weight_sum += weight * weight;", fixed = TRUE)
   expect_match(
     owner,
-    "(weighted_m2 / total_weight) *\n      (squared_weight_sum / (total_weight * total_weight))",
+    "mean_stderr[evaluation] = sqrt(\n      (weighted_m2 / total_weight) *\n      (squared_weight_sum / (total_weight * total_weight)));",
+    fixed = TRUE
+  )
+  expect_false(grepl(
+    "NP_REGRESSION_STDERR_CONDITIONAL_INFLUENCE", owner, fixed = TRUE
+  ))
+  expect_match(
+    influence_owner,
+    "weight * (response[observation] - weighted_mean)",
+    fixed = TRUE
+  )
+  expect_match(
+    influence_owner,
+    "fabs(total_weight) * sqrt((double)(variance_count - 1))",
+    fixed = TRUE
+  )
+  expect_match(
+    conditional_owner,
+    "np_continuous_kernel_beta_conditional_influence_stderr(",
     fixed = TRUE
   )
   expect_false(grepl("result->row[observation]", owner, fixed = TRUE))
+  expect_false(grepl("result->row[observation]", conditional_owner,
+                     fixed = TRUE))
 })
 
 test_that("signed-log beta rows compose every route segment", {

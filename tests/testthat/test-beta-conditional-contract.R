@@ -17,6 +17,20 @@ beta_conditional_side_weights <- function(train, evaluation, bandwidth,
   if (!identical(kertype, "beta") && identical(operator, "normal") &&
       identical(bwtype, "fixed"))
     weights <- weights / bandwidth
+  if (!identical(kertype, "beta") && identical(operator, "normal") &&
+      identical(bwtype, "generalized_nn")) {
+    realized <- vapply(evaluation, function(value) {
+      sort(abs(train - value), method = "quick")[[bandwidth]]
+    }, numeric(1L))
+    weights <- sweep(weights, 2L, realized, "/")
+  }
+  if (!identical(kertype, "beta") && identical(operator, "normal") &&
+      identical(bwtype, "adaptive_nn")) {
+    realized <- vapply(train, function(value) {
+      sort(abs(train - value), method = "quick")[[bandwidth + 1L]]
+    }, numeric(1L))
+    weights <- sweep(weights, 1L, realized, "/")
+  }
   weights
 }
 
@@ -27,6 +41,52 @@ beta_conditional_oracle <- function(x_weights, y_weights) {
   stderr <- sqrt(colSums(influence^2) / (nrow(x_weights) - 1L)) /
     abs(denominator)
   list(estimate = estimate, stderr = stderr)
+}
+
+beta_conditional_lp_oracle <- function(training_x, evaluation_x, degree,
+                                       bernstein, x_weights, y_weights) {
+  basis <- np:::W.lp(
+    training_x, degree = degree, basis = "glp",
+    Bernstein = bernstein
+  )
+  evaluation_basis <- np:::W.lp(
+    training_x, exdat = evaluation_x, degree = degree, basis = "glp",
+    Bernstein = bernstein
+  )
+  evaluation_derivative <- np:::W.lp(
+    training_x, exdat = evaluation_x, degree = degree,
+    gradient.vec = rep(1L, length(degree)), basis = "glp",
+    Bernstein = bernstein
+  )
+  estimate <- stderr <- gradient <- gradient_stderr <-
+    numeric(nrow(evaluation_x))
+  for (evaluation in seq_len(nrow(evaluation_x))) {
+    weight <- x_weights[, evaluation]
+    response <- y_weights[, evaluation]
+    gram <- crossprod(basis, weight * basis)
+    coefficient <- solve(gram, crossprod(basis, weight * response))
+    variance <- sum(weight * response * response) / sum(weight) -
+      (sum(weight * response) / sum(weight))^2
+    gram_power_two <- crossprod(basis, (weight * weight) * basis)
+    fit_vector <- solve(gram, evaluation_basis[evaluation, ])
+    derivative_vector <- solve(gram, evaluation_derivative[evaluation, ])
+    estimate[[evaluation]] <-
+      drop(crossprod(evaluation_basis[evaluation, ], coefficient))
+    stderr[[evaluation]] <- sqrt(max(
+      0, variance * drop(crossprod(fit_vector,
+                                  gram_power_two %*% fit_vector))
+    ))
+    gradient[[evaluation]] <-
+      drop(crossprod(evaluation_derivative[evaluation, ], coefficient))
+    gradient_stderr[[evaluation]] <- sqrt(max(
+      0, variance * drop(crossprod(derivative_vector,
+                                  gram_power_two %*% derivative_vector))
+    ))
+  }
+  list(
+    estimate = estimate, stderr = stderr,
+    gradient = gradient, gradient_stderr = gradient_stderr
+  )
 }
 
 test_that("conditional beta X and Y kernels match side-weight ratios", {
@@ -249,4 +309,198 @@ test_that("conditional beta supports local-constant gradient routes", {
                  gradients = TRUE)
   expect_equal(dim(gradients(fit)), c(nrow(training_x), 1L))
   expect_true(all(is.finite(gradients(fit))))
+})
+
+test_that("beta X uses the canonical conditional LP engine", {
+  training_x <- data.frame(
+    x = c(0.025, 0.07, 0.13, 0.21, 0.34, 0.46, 0.58, 0.67,
+          0.76, 0.84, 0.91, 0.975)
+  )
+  training_y <- data.frame(
+    y = c(-1.1, -0.82, -0.55, -0.31, -0.08, 0.13,
+          0.29, 0.48, 0.66, 0.81, 1.02, 1.21)
+  )
+  evaluation_x <- data.frame(x = c(0.09, 0.27, 0.49, 0.72, 0.9))
+  evaluation_y <- data.frame(y = c(-0.75, -0.25, 0.2, 0.6, 0.95))
+  x_weights <- beta_conditional_side_weights(
+    training_x$x, evaluation_x$x, 0.17, "fixed", "beta", 8L, 0, 1
+  )
+  y_weights <- beta_conditional_side_weights(
+    training_y$y, evaluation_y$y, 0.3, "fixed", "gaussian", 4L, 0, 1
+  )
+
+  for (specification in list(
+    list(degree = 2L, bernstein = FALSE),
+    list(degree = 3L, bernstein = TRUE)
+  )) {
+    bw <- npcdensbw(
+      xdat = training_x, ydat = training_y, bws = c(0.3, 0.17),
+      bandwidth.compute = FALSE, regtype = "lp",
+      degree = specification$degree, basis = "glp",
+      bernstein.basis = specification$bernstein,
+      cxkertype = "beta", cxkerorder = 8L,
+      cxkerbound = "fixed", cxkerlb = 0, cxkerub = 1,
+      cykertype = "gaussian", cykerorder = 4L
+    )
+    fit <- npcdens(
+      bws = bw, txdat = training_x, tydat = training_y,
+      exdat = evaluation_x, eydat = evaluation_y, gradients = TRUE
+    )
+    expected <- beta_conditional_lp_oracle(
+      training_x, evaluation_x, specification$degree,
+      specification$bernstein, x_weights, y_weights
+    )
+    expect_equal(fitted(fit), expected$estimate, tolerance = 2e-8)
+    expect_equal(se(fit), expected$stderr, tolerance = 2e-8)
+    expect_equal(drop(fit$congrad), expected$gradient, tolerance = 3e-7)
+    expect_equal(drop(fit$congerr), expected$gradient_stderr,
+                 tolerance = 3e-7)
+  }
+
+  ll_bw <- npcdensbw(
+    xdat = training_x, ydat = training_y, bws = c(0.3, 0.17),
+    bandwidth.compute = FALSE, regtype = "ll",
+    cxkertype = "beta", cxkerorder = 8L,
+    cxkerbound = "fixed", cxkerlb = 0, cxkerub = 1,
+    cykertype = "gaussian", cykerorder = 4L
+  )
+  lp1_bw <- npcdensbw(
+    xdat = training_x, ydat = training_y, bws = c(0.3, 0.17),
+    bandwidth.compute = FALSE, regtype = "lp", degree = 1L,
+    basis = "glp", bernstein.basis = FALSE,
+    cxkertype = "beta", cxkerorder = 8L,
+    cxkerbound = "fixed", cxkerlb = 0, cxkerub = 1,
+    cykertype = "gaussian", cykerorder = 4L
+  )
+  ll_fit <- npcdens(
+    bws = ll_bw, txdat = training_x, tydat = training_y,
+    exdat = evaluation_x, eydat = evaluation_y, gradients = TRUE
+  )
+  lp1_fit <- npcdens(
+    bws = lp1_bw, txdat = training_x, tydat = training_y,
+    exdat = evaluation_x, eydat = evaluation_y, gradients = TRUE
+  )
+  expect_identical(fitted(ll_fit), fitted(lp1_fit))
+  expect_identical(se(ll_fit), se(lp1_fit))
+  expect_identical(ll_fit$congrad, lp1_fit$congrad)
+  expect_identical(ll_fit$congerr, lp1_fit$congerr)
+})
+
+test_that("beta X prepared NN bandwidths preserve scalar and LP algebra", {
+  training_x <- data.frame(
+    x = c(0.025, 0.07, 0.13, 0.21, 0.34, 0.46, 0.58, 0.67,
+          0.76, 0.84, 0.91, 0.975)
+  )
+  training_y <- data.frame(
+    y = c(-1.1, -0.82, -0.55, -0.31, -0.08, 0.13,
+          0.29, 0.48, 0.66, 0.81, 1.02, 1.21)
+  )
+  evaluation_x <- data.frame(x = c(0.09, 0.27, 0.49, 0.72, 0.9))
+  evaluation_y <- data.frame(y = c(-0.75, -0.25, 0.2, 0.6, 0.95))
+  neighbours <- 4L
+
+  for (bwtype in c("generalized_nn", "adaptive_nn")) {
+    x_weights <- beta_conditional_side_weights(
+      training_x$x, evaluation_x$x, neighbours, bwtype,
+      "beta", 8L, 0, 1
+    )
+    for (kind in c("density", "distribution")) {
+      y_operator <- if (identical(kind, "density")) "normal" else "integral"
+      y_weights <- beta_conditional_side_weights(
+        training_y$y, evaluation_y$y, neighbours, bwtype,
+        "gaussian", 4L, 0, 1, operator = y_operator
+      )
+      constructor <- if (identical(kind, "density")) npcdensbw else npcdistbw
+      estimator <- if (identical(kind, "density")) npcdens else npcdist
+      common <- list(
+        xdat = training_x, ydat = training_y,
+        bws = c(neighbours, neighbours), bandwidth.compute = FALSE,
+        bwtype = bwtype,
+        cxkertype = "beta", cxkerorder = 8L,
+        cxkerbound = "fixed", cxkerlb = 0, cxkerub = 1,
+        cykertype = "gaussian", cykerorder = 4L
+      )
+
+      scalar_bw <- do.call(constructor, c(common, list(regtype = "lc")))
+      scalar <- estimator(
+        bws = scalar_bw, txdat = training_x, tydat = training_y,
+        exdat = evaluation_x, eydat = evaluation_y
+      )
+      scalar_expected <- beta_conditional_oracle(x_weights, y_weights)
+      expect_equal(fitted(scalar), scalar_expected$estimate,
+                   tolerance = 2e-8)
+      expect_equal(se(scalar), scalar_expected$stderr, tolerance = 2e-8)
+
+      lp_bw <- do.call(constructor, c(
+        common,
+        list(regtype = "lp", degree = 2L, basis = "glp",
+             bernstein.basis = FALSE)
+      ))
+      lp <- estimator(
+        bws = lp_bw, txdat = training_x, tydat = training_y,
+        exdat = evaluation_x, eydat = evaluation_y, gradients = TRUE
+      )
+      lp_expected <- beta_conditional_lp_oracle(
+        training_x, evaluation_x, 2L, FALSE, x_weights, y_weights
+      )
+      expect_equal(fitted(lp), lp_expected$estimate, tolerance = 2e-8)
+      expect_equal(se(lp), lp_expected$stderr, tolerance = 2e-8)
+      expect_equal(drop(lp$congrad), lp_expected$gradient, tolerance = 3e-7)
+      expect_equal(drop(lp$congerr), lp_expected$gradient_stderr,
+                   tolerance = 3e-7)
+    }
+  }
+})
+
+test_that("beta-X mixed conditional fits honor categorical compression", {
+  training_x <- data.frame(
+    x = seq(0.035, 0.965, length.out = 24L),
+    group = factor(rep(c("a", "b", "c"), length.out = 24L))
+  )
+  training_y <- data.frame(
+    y = sin(2 * pi * training_x$x) +
+      as.integer(training_x$group) / 9
+  )
+  evaluation_x <- data.frame(
+    x = seq(0.09, 0.91, length.out = 8L),
+    group = factor(rep(c("a", "c"), length.out = 8L),
+                   levels = levels(training_x$group))
+  )
+  evaluation_y <- data.frame(y = seq(-0.6, 0.7, length.out = 8L))
+  results <- list()
+
+  for (compress in c(FALSE, TRUE)) {
+    old_options <- options(np.categorical.compress = compress)
+    on.exit(options(old_options), add = TRUE)
+    for (regtype in c("lc", "lp")) {
+      arguments <- list(
+        xdat = training_x, ydat = training_y,
+        bws = c(0.28, 0.17, 0.22), bandwidth.compute = FALSE,
+        regtype = regtype,
+        cxkertype = "beta", cxkerorder = 6L,
+        cxkerbound = "fixed", cxkerlb = 0, cxkerub = 1,
+        cykertype = "gaussian", cykerorder = 4L
+      )
+      if (identical(regtype, "lp")) {
+        arguments$degree <- 2L
+        arguments$basis <- "glp"
+        arguments$bernstein.basis <- FALSE
+      }
+      bw <- do.call(npcdensbw, arguments)
+      results[[paste(regtype, compress)]] <- npcdens(
+        bws = bw, txdat = training_x, tydat = training_y,
+        exdat = evaluation_x, eydat = evaluation_y, gradients = TRUE
+      )
+    }
+    options(old_options)
+  }
+
+  for (regtype in c("lc", "lp")) {
+    dense <- results[[paste(regtype, FALSE)]]
+    compressed <- results[[paste(regtype, TRUE)]]
+    expect_identical(fitted(dense), fitted(compressed))
+    expect_identical(se(dense), se(compressed))
+    expect_identical(dense$congrad, compressed$congrad)
+    expect_identical(dense$congerr, compressed$congerr)
+  }
 })

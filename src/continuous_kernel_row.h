@@ -5,6 +5,7 @@
 
 #include "beta_kernel.h"
 #include "kernel_registry.h"
+#include "regression_contract.h"
 
 typedef enum {
   NP_CONTINUOUS_ROW_OK = 0,
@@ -278,11 +279,29 @@ np_continuous_kernel_beta_centered_moment_rows_validated(
 /*
  * Consume one normalized width-one regression row without restoring its
  * common log scale.  Positive rows use weighted Welford accumulation; signed
- * rows use a two-pass centered moment.  Both retain training order and the
+ * rows use a two-pass centered moment.  Ordinary regression retains the
  * exact squared-weight effective-sample-size factor.
  */
 NPContinuousKernelRowStatus
 np_continuous_kernel_beta_regression_moment_rows_validated(
+  const NPContinuousKernelRowPlan *plan,
+  int leave_one_out,
+  int leave_one_out_offset,
+  const NPContinuousKernelLogFactorProvider *provider,
+  const double *response,
+  int positive_weights,
+  NPContinuousKernelRowWorkspace *workspace,
+  NPContinuousKernelRowResult *row_result,
+  double *mean,
+  double *mean_stderr,
+  NPContinuousKernelDerivativeDiagnostics *diagnostics,
+  NPContinuousKernelProgressFunction progress);
+
+/* Conditional scalar sibling with the established observation-influence
+ * standard-error contract.  Row construction and moment arithmetic remain
+ * canonical; the separate entry keeps ordinary regression's hot body exact. */
+NPContinuousKernelRowStatus
+np_continuous_kernel_beta_conditional_moment_rows_validated(
   const NPContinuousKernelRowPlan *plan,
   int leave_one_out,
   int leave_one_out_offset,
