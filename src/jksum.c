@@ -17073,6 +17073,43 @@ finish_cv_path:
   return(cv);
 }
 
+/*
+ * Isolated route-bearing sibling for canonical continuous-kernel activation.
+ * The incumbent ABI and hot body above stay literal. Until activation, any
+ * non-null route state is a terminal error rather than a silent legacy
+ * fallback.
+ */
+double np_kernel_estimate_regression_categorical_ls_aic_ctx(
+int lp_engine,
+int bwm,
+int KERNEL_reg,
+int KERNEL_unordered_reg,
+int KERNEL_ordered_reg,
+int BANDWIDTH_reg,
+int num_obs,
+int num_reg_unordered,
+int num_reg_ordered,
+int num_reg_continuous,
+double **matrix_X_unordered,
+double **matrix_X_ordered,
+double **matrix_X_continuous,
+double *vector_Y,
+double *vector_scale_factor,
+int *num_categories,
+const NPContinuousKernelRoute * const kernel_route,
+NPContinuousKernelDerivativeDiagnostics * const kernel_route_diagnostics,
+const int categorical_compress)
+{
+  if(kernel_route != NULL || kernel_route_diagnostics != NULL ||
+     categorical_compress != 0)
+    error("regression objective kernel route is not activated");
+  return np_kernel_estimate_regression_categorical_ls_aic(
+    lp_engine, bwm, KERNEL_reg, KERNEL_unordered_reg, KERNEL_ordered_reg,
+    BANDWIDTH_reg, num_obs, num_reg_unordered, num_reg_ordered,
+    num_reg_continuous, matrix_X_unordered, matrix_X_ordered,
+    matrix_X_continuous, vector_Y, vector_scale_factor, num_categories);
+}
+
 typedef struct {
   int nprof_train;
   int nprof_eval;
