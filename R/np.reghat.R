@@ -178,20 +178,32 @@ npreghat <-
 .npreghat_native_apply_candidate <- function(bws, output, y, regtype, degree,
                                              basis, bernstein.basis, s,
                                              leave.one.out) {
-  identical(output, "apply") &&
+  base.candidate <- identical(output, "apply") &&
     !is.null(y) &&
     is.matrix(y) &&
     ncol(y) > 1L &&
     !isTRUE(leave.one.out) &&
     length(s) > 0L &&
+    isTRUE(any(bws$icon))
+
+  if (!base.candidate)
+    return(FALSE)
+
+  if (identical(bws[["ckertype", exact = TRUE]], "beta")) {
+    return(
+      sum(s) == 0L ||
+        (any(as.integer(degree) > 0L) &&
+         sum(s) == 1L && all(s %in% c(0L, 1L)))
+    )
+  }
+
+  identical(regtype, "lp") &&
     !any(s > 0L) &&
-    identical(regtype, "lp") &&
     identical(as.character(bws$type), "fixed") &&
     length(degree) == as.integer(bws$ncon) &&
     all(as.integer(degree) == 1L) &&
     identical(basis, "glp") &&
     !isTRUE(bernstein.basis) &&
-    isTRUE(any(bws$icon)) &&
     !isTRUE(any(bws$iord)) &&
     !isTRUE(any(bws$iuno))
 }
@@ -989,7 +1001,8 @@ npreghat <-
                                                           basis = "glp",
                                                           degree = integer(0),
                                                           bernstein.basis = FALSE,
-                                                          s = NULL) {
+                                                          s = NULL,
+                                                          return.hat = FALSE) {
   no.ex <- is.null(exdat)
 
   txdat <- toFrame(txdat)
@@ -1056,11 +1069,16 @@ npreghat <-
     generalized_nn = BW_GEN_NN,
     adaptive_nn = BW_ADAP_NN
   )
-  kernel.x.c <- switch(bws$ckertype,
-    gaussian = CKER_GAUSS + bws$ckerorder / 2 - 1,
-    epanechnikov = CKER_EPAN + bws$ckerorder / 2 - 1,
-    uniform = CKER_UNI
-  )
+  beta.kernel <- identical(bws[["ckertype", exact = TRUE]], "beta")
+  kernel.x.c <- if (beta.kernel) {
+    npContinuousKernelCode(bws)
+  } else {
+    switch(bws$ckertype,
+      gaussian = CKER_GAUSS + bws$ckerorder / 2 - 1,
+      epanechnikov = CKER_EPAN + bws$ckerorder / 2 - 1,
+      uniform = CKER_UNI
+    )
+  }
   kernel.xu.c <- switch(bws$ukertype,
     aitchisonaitken = UKER_AIT,
     liracine = UKER_LR
@@ -1072,10 +1090,32 @@ npreghat <-
   )
 
   bw.vec <- as.double(c(bws$bw[bws$icon], bws$bw[bws$iuno], bws$bw[bws$iord]))
-  tree.flag <- identical(
-    .npreg_fit_tree_code(bws, ncon = bws$ncon, ncat = bws$nuno + bws$nord),
-    DO_TREE_YES
-  )
+  tree.flag <- !beta.kernel && identical(
+      .npreg_fit_tree_code(bws, ncon = bws$ncon,
+                           ncat = bws$nuno + bws$nord),
+      DO_TREE_YES
+    )
+  categorical.compress <- if (
+    beta.kernel && (bws$nuno > 0L || bws$nord > 0L)
+  ) {
+    npStrictLogicalOption("np.categorical.compress", TRUE)
+  } else {
+    FALSE
+  }
+  if (beta.kernel) {
+    descriptor.family <- CKER_FAMILY_BETA
+    descriptor.order <- as.integer(bws[["ckerorder", exact = TRUE]])
+    cker.bounds <- npKernelBoundsMarshal(
+      bws$ckerlb[bws$icon], bws$ckerub[bws$icon]
+    )
+    cker.lb <- cker.bounds$lb
+    cker.ub <- cker.bounds$ub
+  } else {
+    descriptor.family <- CKER_FAMILY_LEGACY
+    descriptor.order <- as.integer(bws[["ckerorder", exact = TRUE]])
+    cker.lb <- double()
+    cker.ub <- double()
+  }
   grad.vec <- if (length(s) && any(s > 0L)) as.integer(s) else integer(0L)
   on.exit(
     tryCatch(.Call("C_np_reset_native_estimator_state", PACKAGE = "npRmpi"),
@@ -1102,7 +1142,33 @@ npreghat <-
     grad.vec,
     as.integer(isTRUE(bernstein.basis)),
     as.integer(npLpBasisCode(basis)),
+    as.integer(descriptor.family),
+    as.integer(descriptor.order),
+    as.double(cker.lb),
+    as.double(cker.ub),
+    as.integer(categorical.compress),
+    as.logical(return.hat),
     PACKAGE = "npRmpi"
+  )
+}
+
+.npreghat_exact_lp_matrix_from_regression_core <- function(bws,
+                                                           txdat,
+                                                           exdat = NULL,
+                                                           basis = "glp",
+                                                           degree = integer(0),
+                                                           bernstein.basis = FALSE,
+                                                           s = NULL) {
+  .npreghat_exact_lp_apply_from_regression_core(
+    bws = bws,
+    txdat = txdat,
+    y = matrix(double(), nrow = nrow(txdat), ncol = 0L),
+    exdat = exdat,
+    basis = basis,
+    degree = degree,
+    bernstein.basis = bernstein.basis,
+    s = s,
+    return.hat = TRUE
   )
 }
 
@@ -1936,6 +2002,7 @@ npreghat.rbandwidth <-
     lp.degree0.lc.derivative.route <- operator.spec$lp.degree0.lc.derivative.route
     direct.apply.compatible <- operator.spec$direct.apply.compatible
     lc.derivative.exact.route <- operator.spec$lc.derivative.exact.route
+    beta.kernel <- identical(bws[["ckertype", exact = TRUE]], "beta")
 
     direct.apply <- identical(output, "apply") &&
       !is.null(y) &&
@@ -1963,6 +2030,12 @@ npreghat.rbandwidth <-
       !lp.degree0.lc.derivative.route &&
       (bws$ncon > 0L)
 
+    exact.beta.native.route <- beta.kernel &&
+      !isTRUE(leave.one.out) &&
+      simple.operator.request &&
+      !lc.derivative.exact.route &&
+      (bws$ncon > 0L)
+
     exact.core.route <- !isTRUE(leave.one.out) &&
       simple.operator.request &&
       (
@@ -1971,7 +2044,7 @@ npreghat.rbandwidth <-
         exact.lp.kernel.route ||
         lp.degree0.lc.derivative.route ||
         lc.derivative.exact.route ||
-        FALSE
+        exact.beta.native.route
       )
 
     if (.npreghat_native_apply_candidate(
@@ -2027,7 +2100,17 @@ npreghat.rbandwidth <-
     }
 
     if (exact.core.route) {
-      H <- if (lc.derivative.exact.route) {
+      H <- if (exact.beta.native.route) {
+        .npRmpi_with_local_regression(.npreghat_exact_lp_matrix_from_regression_core(
+          bws = bws,
+          txdat = txdat,
+          exdat = if (no.ex) NULL else exdat,
+          s = s,
+          basis = reg.spec$basis.engine,
+          degree = reg.spec$degree.engine,
+          bernstein.basis = reg.spec$bernstein.basis.engine
+        ))
+      } else if (lc.derivative.exact.route) {
         .npRmpi_with_local_regression(.npreghat_exact_lc_derivative_matrix_from_npksum_chunked(
           bws = bws,
           txdat = txdat,

@@ -150,7 +150,16 @@ int np_glp_cv_prepare_original_order_extern(const int *ipt);
 void np_glp_cv_clear_extern(void);
 int np_glp_cv_degree_admissible_extern(const int num_obs, const int ncon, const int *degree, const int basis_mode);
 void np_reg_cv_core_clear_extern(void);
-int np_regression_lp_apply_matrix(double *vector_scale_factor, double **rhs_cols, int n_rhs, double *fitted_out);
+int np_regression_lp_hat_matrix(
+  double *vector_scale_factor, int deriv_var, int deriv_order,
+  double *weights_out, const NPContinuousKernelRoute *kernel_route,
+  NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
+  int categorical_compress);
+int np_regression_lp_apply_matrix(
+  double *vector_scale_factor, double **rhs_cols, int n_rhs,
+  double *fitted_out, const NPContinuousKernelRoute *kernel_route,
+  NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
+  int categorical_compress);
 int np_bounded_cvls_conditional_quad_context_prepare_extern(void);
 void np_bounded_cvls_conditional_quad_context_clear_extern(void);
 int np_bounded_cvls_build_conditional_grid_1d_extern(
