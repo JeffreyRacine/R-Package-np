@@ -3514,6 +3514,7 @@ int KERNEL_den_unordered_extern=0;
 int KERNEL_den_ordered_extern=0;
 int np_beta_bw_order_extern=2;
 int np_density_bw_categorical_compress_extern=0;
+int np_distribution_bw_categorical_compress_extern=0;
 int np_beta_cx_bw_order_extern=2;
 int np_beta_cy_bw_order_extern=2;
 int BANDWIDTH_reg_extern;
@@ -9568,6 +9569,9 @@ static SEXP C_np_distribution_bw_common(SEXP myuno,
   if (XLENGTH(myopti_i) <= DBW_CKORDERI &&
       INTEGER(myopti_i)[DBW_CKRNEVI] == NP_CKERNEL_COORDINATE_CODE)
     error("C_np_distribution_bw: continuous-kernel descriptor is missing");
+  if (INTEGER(myopti_i)[DBW_CKRNEVI] == NP_CKERNEL_COORDINATE_CODE &&
+      XLENGTH(myopti_i) <= DBW_CATCOMPI)
+    error("C_np_distribution_bw: categorical-compression state is missing");
 
   ncon = (int)INTEGER(myopti_i)[DBW_NCONI];
   resolve_bounds_or_default(ckerlb_r, ckerub_r, ncon, &ckerlb_p, &ckerub_p);
@@ -13053,13 +13057,19 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   KERNEL_den_unordered_extern = myopti[DBW_UKRNEVI];
   KERNEL_den_ordered_extern = myopti[DBW_OKRNEVI];
   np_beta_bw_order_extern = 2;
-  if(KERNEL_den_extern == NP_CKERNEL_COORDINATE_CODE)
+  np_distribution_bw_categorical_compress_extern = 0;
+  if(KERNEL_den_extern == NP_CKERNEL_COORDINATE_CODE) {
     np_beta_bw_order_extern = np_bandwidth_kernel_descriptor_or_error(
       myopti[DBW_CKFAMILYI], KERNEL_den_extern, myopti[DBW_CKORDERI],
       num_reg_continuous_extern, num_reg_unordered_extern,
       num_reg_ordered_extern, NP_BETA_BW_CONTINUOUS_ONLY,
       ckerlb, ckerub,
       "C_np_distribution_bw").order;
+    np_distribution_bw_categorical_compress_extern = myopti[DBW_CATCOMPI];
+    if(np_distribution_bw_categorical_compress_extern != 0 &&
+       np_distribution_bw_categorical_compress_extern != 1)
+      error("C_np_distribution_bw: categorical compression must be TRUE or FALSE");
+  }
 
   int_use_starting_values= myopti[DBW_USTARTI];
   int_LARGE_SF=myopti[DBW_LSFI];
@@ -13855,6 +13865,7 @@ cleanup_np_distribution_bw:
   int_cker_bound_extern = 0;
   vector_ckerlb_extern = NULL;
   vector_ckerub_extern = NULL;
+  np_distribution_bw_categorical_compress_extern = 0;
   np_reset_y_side_extern();
   np_clear_estimator_extern_aliases();
 

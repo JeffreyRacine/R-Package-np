@@ -579,6 +579,7 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 4, 8, 12 };
 #define DBW_TBNDI 21
 #define DBW_CKFAMILYI 22
 #define DBW_CKORDERI 23
+#define DBW_CATCOMPI 24
 
 #define DBW_FTOLD  0
 #define DBW_TOLD   1

@@ -716,9 +716,50 @@ test_that("beta distribution CVLS enters the canonical row owner", {
       "matrix_categorical_vals_extern,\n",
       "                                             active_route,\n",
       "                                             active_diagnostics,\n",
-      "                                             0,\n",
+      "                                             np_distribution_bw_categorical_compress_extern,\n",
       "                                             &cv)==1)"
     ),
+    fixed = TRUE
+  )
+})
+
+test_that("distribution bandwidth ingress owns categorical compression state", {
+  root <- locate_beta_activation_sources()
+  skip_if(is.null(root), "package sources unavailable")
+  distribution_r <- paste(
+    readLines(file.path(root, "R", "np.distribution.bw.R"), warn = FALSE),
+    collapse = "\n"
+  )
+  headers <- paste(
+    readLines(file.path(root, "src", "headers.h"), warn = FALSE),
+    collapse = "\n"
+  )
+  ingress <- paste(
+    readLines(file.path(root, "src", "np.c"), warn = FALSE),
+    collapse = "\n"
+  )
+
+  option_literal <- "categorical.compress = npStrictLogicalOption("
+  option_hits <- gregexpr(option_literal, distribution_r, fixed = TRUE)[[1L]]
+  option_hits <- option_hits[option_hits > 0L]
+  expect_length(option_hits, 2L)
+  expect_match(headers, "#define DBW_CATCOMPI 24", fixed = TRUE)
+  expect_match(
+    ingress,
+    paste0(
+      "np_distribution_bw_categorical_compress_extern = ",
+      "myopti[DBW_CATCOMPI];"
+    ),
+    fixed = TRUE
+  )
+  expect_match(
+    ingress,
+    "np_distribution_bw_categorical_compress_extern = 0;",
+    fixed = TRUE
+  )
+  expect_match(
+    ingress,
+    "C_np_distribution_bw: categorical compression must be TRUE or FALSE",
     fixed = TRUE
   )
 })
