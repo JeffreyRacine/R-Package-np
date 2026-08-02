@@ -112,3 +112,28 @@ test_that("native NOMAD C callback path does not call R API or longjmp helpers",
     stop(paste(violations, collapse = "\n"), call. = FALSE)
   expect_length(violations, 0L)
 })
+
+test_that("native NOMAD categorical coordinates use one canonical decoder", {
+  source_file <- file.path(np_namespace_hygiene_root(), "src", "np.c")
+  expect_true(file.exists(source_file))
+  source_text <- paste(readLines(source_file, warn = FALSE), collapse = "\n")
+  helper <- np_extract_c_function_body(
+    source_text, "np_nomad_decode_categorical_bandwidth"
+  )
+
+  expect_match(helper, "raw_point/1.0e4", fixed = TRUE)
+  expect_match(helper, "external/ncatfac", fixed = TRUE)
+  for (fun in c(
+    "np_udens_native_decode_eval_bw",
+    "np_udist_native_decode_eval_bw",
+    "np_cdist_native_decode_eval_bw",
+    "np_cdens_native_search_callback"
+  )) {
+    expect_match(
+      np_extract_c_function_body(source_text, fun),
+      "np_nomad_decode_categorical_bandwidth(",
+      fixed = TRUE,
+      info = fun
+    )
+  }
+})
