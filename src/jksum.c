@@ -18723,6 +18723,153 @@ static double np_distribution_cvls_continuous_q123(
 }
 #endif
 
+/*
+ * Family-neutral CDF-CV row finisher. Continuous-kernel families supply an
+ * absolute row and its full sum; the objective owner retains deletion,
+ * empirical-CDF orientation, loss order, and normalization here.
+ */
+static inline double np_distribution_cvls_accumulate_row(
+  const int64_t evaluation,
+  const int64_t is,
+  const int64_t ie,
+  const int cdfontrain,
+  const int num_reg_ordered,
+  const int num_reg_continuous,
+  double * const * const matrix_X_ordered_train,
+  double * const * const matrix_X_continuous_train,
+  double * const * const matrix_X_ordered_eval,
+  double * const * const matrix_X_continuous_eval,
+  const double row_sum,
+  const double ofac,
+  const double * const row,
+  const int64_t row_stride,
+  double cv_accumulator)
+{
+  int64_t observation;
+  int coordinate;
+
+  for(observation = is; observation <= ie; ++observation) {
+    int indicator = 1;
+    double difference;
+
+    if(cdfontrain && evaluation == observation)
+      continue;
+    for(coordinate = 0;
+        coordinate < num_reg_ordered && indicator != 0;
+        ++coordinate)
+      indicator *= matrix_X_ordered_train[coordinate][observation] <=
+        matrix_X_ordered_eval[coordinate][evaluation];
+    for(coordinate = 0;
+        coordinate < num_reg_continuous && indicator != 0;
+        ++coordinate)
+      indicator *= matrix_X_continuous_train[coordinate][observation] <=
+        matrix_X_continuous_eval[coordinate][evaluation];
+    difference = indicator - row_sum/ofac +
+      row[observation*row_stride]/ofac;
+    cv_accumulator += difference*difference;
+  }
+  return cv_accumulator;
+}
+
+static int np_distribution_cvls_continuous_route(
+  const NPContinuousKernelRoute *route,
+  NPContinuousKernelDerivativeDiagnostics *diagnostics,
+  const int bandwidth_mode,
+  const int num_obs_train,
+  const int num_obs_eval,
+  const int num_reg_unordered,
+  const int num_reg_ordered,
+  const int num_reg_continuous,
+  const int cdfontrain,
+  const int64_t is,
+  const int64_t ie,
+  double **matrix_X_unordered_train,
+  double **matrix_X_ordered_train,
+  double **matrix_X_continuous_train,
+  double **matrix_X_unordered_eval,
+  double **matrix_X_ordered_eval,
+  double **matrix_X_continuous_eval,
+  double **matrix_bandwidth,
+  const int *operator_code,
+  const int *kernel_unordered,
+  const int *kernel_ordered,
+  const double *lambda,
+  const int *num_categories,
+  double **category_values,
+  const int categorical_compress,
+  double *row,
+  double *cv)
+{
+  NPBetaScaledRowContext context;
+  NPContinuousKernelRowStatus row_status;
+  const double ofac = num_obs_train - 1.0;
+  double cv_accumulator = 0.0;
+  int evaluation;
+  int observation;
+  int status = 1;
+
+  if(route == NULL || diagnostics == NULL || row == NULL || cv == NULL ||
+     num_obs_train <= 1 || num_obs_eval <= 0 ||
+     num_reg_unordered != 0 || num_reg_continuous <= 0 ||
+     is < 0 || ie < is || ie >= num_obs_train)
+    return 1;
+
+  np_beta_scaled_row_context_init(&context);
+  row_status = np_beta_scaled_row_context_prepare(
+    &context, route, diagnostics, bandwidth_mode,
+    num_obs_train, num_obs_eval, num_reg_continuous,
+    num_reg_unordered, num_reg_ordered,
+    matrix_X_continuous_train, matrix_X_continuous_eval,
+    matrix_X_unordered_train, matrix_X_unordered_eval,
+    matrix_X_ordered_train, matrix_X_ordered_eval,
+    matrix_bandwidth, matrix_bandwidth, operator_code,
+    kernel_unordered, kernel_ordered, lambda, num_categories,
+    category_values, categorical_compress, row);
+  if(row_status != NP_CONTINUOUS_ROW_OK)
+    goto cleanup_distribution_route;
+
+  for(evaluation = 0; evaluation < num_obs_eval; ++evaluation) {
+    double scaled_sum = 0.0;
+    double common_log_scale = 0.0;
+    double row_sum = 0.0;
+
+    if((evaluation & 31) == 0)
+      np_progress_bandwidth_loop_step();
+    row_status = np_beta_scaled_row_context_fill(
+      &context, evaluation, &scaled_sum, &common_log_scale);
+    if(row_status != NP_CONTINUOUS_ROW_OK ||
+       np_continuous_kernel_scaled_restore(
+         scaled_sum, common_log_scale, 1, &row_sum) !=
+           NP_CONTINUOUS_ROW_OK)
+      goto cleanup_distribution_route;
+    for(observation = 0; observation < num_obs_train; ++observation)
+      if(np_continuous_kernel_scaled_restore(
+           row[observation], common_log_scale, 1,
+           &row[observation]) != NP_CONTINUOUS_ROW_OK)
+        goto cleanup_distribution_route;
+
+    cv_accumulator = np_distribution_cvls_accumulate_row(
+      evaluation, is, ie, cdfontrain,
+      num_reg_ordered, num_reg_continuous,
+      matrix_X_ordered_train, matrix_X_continuous_train,
+      matrix_X_ordered_eval, matrix_X_continuous_eval,
+      row_sum, ofac, row, 1, cv_accumulator);
+    if(!R_FINITE(cv_accumulator))
+      goto cleanup_distribution_route;
+  }
+
+  *cv = cv_accumulator;
+#ifdef MPI2
+  MPI_Allreduce(MPI_IN_PLACE, cv, 1, MPI_DOUBLE, MPI_SUM, comm[1]);
+#endif
+  *cv /= (double)num_obs_train*(double)num_obs_eval;
+  status = R_FINITE(*cv) ? 0 : 1;
+
+cleanup_distribution_route:
+  np_beta_scaled_row_context_clear(&context);
+  return status;
+}
+
 double np_kernel_estimate_distribution_ls_cv( 
 int KERNEL_den,
 int KERNEL_den_unordered,
@@ -18748,12 +18895,9 @@ const NPContinuousKernelRoute * const kernel_route,
 NPContinuousKernelDerivativeDiagnostics * const kernel_route_diagnostics,
 const int categorical_compress,
 double * cv){
-  /* A null route preserves the incumbent objective arithmetic. */
-  (void)kernel_route;
-  (void)kernel_route_diagnostics;
-  (void)categorical_compress;
-
-  const NPDistributionProfileCvStatus profile_status =
+  const int exact_beta_route = kernel_route != NULL;
+  const NPDistributionProfileCvStatus profile_status = exact_beta_route ?
+    NP_DISTRIBUTION_PROFILE_CV_NOT_APPLICABLE :
     np_distribution_cvls_ordered_profile_stream(KERNEL_den,
                                                  KERNEL_den_unordered,
                                                  KERNEL_den_ordered,
@@ -18784,17 +18928,29 @@ double * cv){
   const int bwmdim = (BANDWIDTH_den==BW_GEN_NN)?num_obs_eval:
     ((BANDWIDTH_den==BW_ADAP_NN)?num_obs_train:1);
 
-  int indy;
-
   int64_t i,j,l,iwx;
 
   int * operator = NULL;
+  int status = 0;
   int gate_override_active = 0;
   int all_large_gate = 0;
   int *ov_cont_ok = NULL;
   double *ov_cont_hmin = NULL, *ov_cont_k0 = NULL;
   double **matrix_bandwidth = NULL;
   double *lambda = NULL;
+  double *beta_row = NULL;
+
+  if(exact_beta_route &&
+     (np_continuous_kernel_route_validate(
+        kernel_route, num_reg_continuous) != NP_CKERNEL_ROUTE_OK ||
+      !np_continuous_kernel_route_has_beta(kernel_route) ||
+      kernel_route->segment_count != 1 ||
+      kernel_route->segment[0].coordinate_offset != 0 ||
+      kernel_route->segment[0].coordinate_count != num_reg_continuous ||
+      kernel_route_diagnostics == NULL || num_reg_continuous <= 0 ||
+      num_reg_unordered != 0 ||
+      (categorical_compress != 0 && categorical_compress != 1)))
+    return 1;
 
   double **matrix_wX_unordered_eval=NULL;
   double **matrix_wX_ordered_eval=NULL;
@@ -18885,7 +19041,7 @@ double * cv){
   matrix_bandwidth = alloc_matd(bwmdim,num_reg_continuous);
   lambda = alloc_vecd(num_reg_unordered+num_reg_ordered);
 
-  if(kernel_bandwidth_mean(KERNEL_den,
+  if(kernel_bandwidth_mean(exact_beta_route ? 0 : KERNEL_den,
                            BANDWIDTH_den,
                            num_obs_train,
                            num_obs_eval,
@@ -18901,7 +19057,28 @@ double * cv){
                            NULL,
                            matrix_bandwidth,
                            lambda)==1){
+    if(exact_beta_route) {
+      status = 1;
+      goto cleanup_distribution_ls_cv;
+    }
     error("\n** Error: invalid bandwidth.");
+  }
+
+  if(exact_beta_route) {
+    beta_row = (double *)np_jksum_malloc_array_or_die(
+      (size_t)num_obs_train, sizeof(double),
+      "np_kernel_estimate_distribution_ls_cv beta_row");
+    status = np_distribution_cvls_continuous_route(
+      kernel_route, kernel_route_diagnostics, BANDWIDTH_den,
+      num_obs_train, num_obs_eval, num_reg_unordered,
+      num_reg_ordered, num_reg_continuous, cdfontrain, is, ie,
+      matrix_X_unordered_train, matrix_X_ordered_train,
+      matrix_X_continuous_train, matrix_X_unordered_eval,
+      matrix_X_ordered_eval, matrix_X_continuous_eval,
+      matrix_bandwidth, operator, kernel_u, kernel_o, lambda,
+      num_categories, matrix_categorical_vals, categorical_compress,
+      beta_row, cv);
+    goto cleanup_distribution_ls_cv;
   }
 
   if(num_reg_continuous > 0){
@@ -19123,25 +19300,16 @@ double * cv){
       } else {
         for(j = js_local_eval; j <= je_local_eval; j++){
           const int64_t j_global = wxo + j;
-
-          for(i = 0; i < num_obs_train; i++){
-            if(cdfontrain && (j_global == i)) continue;
-            indy = 1;
-            for(l = 0; (l < num_reg_ordered) && (indy != 0); l++){
-              indy *= (matrix_X_ordered_train[l][i] <= matrix_X_ordered_eval[l][j_global]);
-            }
-            for(l = 0; (l < num_reg_continuous) && (indy != 0); l++){
-              indy *= (matrix_X_continuous_train[l][i] <= matrix_X_continuous_eval[l][j_global]);
-            }
-            if(BANDWIDTH_den != BW_ADAP_NN){
-              const double tvd = (indy - mean[j]/ofac + kwx[j*num_obs_train + i]/ofac);
-              cv_accumulator += tvd*tvd;
-            } else {
-              const double tvd = (indy - mean[j]/ofac + kwx[i*dwx + j]/ofac);
-              cv_accumulator += tvd*tvd;
-            }
-          }
-        }
+        cv_accumulator = np_distribution_cvls_accumulate_row(
+          j_global, 0, num_obs_train - 1, cdfontrain,
+          num_reg_ordered, num_reg_continuous,
+          matrix_X_ordered_train, matrix_X_continuous_train,
+          matrix_X_ordered_eval, matrix_X_continuous_eval,
+          mean[j], ofac,
+          BANDWIDTH_den != BW_ADAP_NN ?
+            kwx + j*num_obs_train : kwx + j,
+          BANDWIDTH_den != BW_ADAP_NN ? 1 : dwx,
+          cv_accumulator);
       }
     }
 #else
@@ -19176,6 +19344,8 @@ double * cv){
 
   free(kwx);
 
+cleanup_distribution_ls_cv:
+  free(beta_row);
   free(operator);
   free(kernel_c);
   free(kernel_u);
@@ -19195,7 +19365,7 @@ double * cv){
   np_disc_profile_cache_clear();
   np_cont_largeh_cache_clear();
 
-  return(0);
+  return(status);
 }
 
 typedef enum {

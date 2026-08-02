@@ -856,23 +856,33 @@ double cv_func_distribution_categorical_ls(double *vector_scale_factor)
 
     double cv = 0.0;
     clock_t start, diff;
+    NPContinuousKernelRoute beta_route;
+    NPContinuousKernelDerivativeDiagnostics beta_diagnostics;
+    const NPContinuousKernelRoute *active_route = NULL;
+    NPContinuousKernelDerivativeDiagnostics *active_diagnostics = NULL;
 
     if(KERNEL_den_extern == NP_CKERNEL_COORDINATE_CODE) {
-      start = clock();
-      cv = np_beta_objective_distribution_ls(
-        BANDWIDTH_den_extern, np_beta_bw_order_extern,
-        num_obs_train_extern, num_obs_eval_extern,
-        num_reg_continuous_extern, cdfontrain_extern,
-        matrix_X_continuous_train_extern,
-        matrix_X_continuous_eval_extern,
-        &vector_scale_factor[1], vector_ckerlb_extern,
-        vector_ckerub_extern);
-      diff = clock() - start;
-      timing_extern = ((double)diff) / ((double)CLOCKS_PER_SEC);
-      return cv;
+      beta_route.segment_count = 1;
+      beta_route.segment[0].descriptor.family = NP_CKERNEL_FAMILY_BETA;
+      beta_route.segment[0].descriptor.legacy_code =
+        NP_CKERNEL_COORDINATE_CODE;
+      beta_route.segment[0].descriptor.order = np_beta_bw_order_extern;
+      beta_route.segment[0].coordinate_offset = 0;
+      beta_route.segment[0].coordinate_count = num_reg_continuous_extern;
+      beta_route.segment[0].lower = vector_ckerlb_extern;
+      beta_route.segment[0].upper = vector_ckerub_extern;
+      if(np_continuous_kernel_route_validate(
+           &beta_route, num_reg_continuous_extern) != NP_CKERNEL_ROUTE_OK)
+        error("distribution CVLS beta route has an invalid layout");
+      beta_diagnostics.bad_coordinate = -1;
+      beta_diagnostics.bad_observation = -1;
+      beta_diagnostics.undefined_count = 0;
+      beta_diagnostics.beta_status = NP_BETA_OK;
+      active_route = &beta_route;
+      active_diagnostics = &beta_diagnostics;
     }
 
-    if(check_valid_scale_factor_cv(
+    if(active_route == NULL && check_valid_scale_factor_cv(
         KERNEL_den_extern,
         KERNEL_den_unordered_extern,
         BANDWIDTH_den_extern,
@@ -910,8 +920,8 @@ double cv_func_distribution_categorical_ls(double *vector_scale_factor)
                                              &vector_scale_factor[1],
                                              num_categories_extern,
                                              matrix_categorical_vals_extern,
-                                             NULL,
-                                             NULL,
+                                             active_route,
+                                             active_diagnostics,
                                              0,
                                              &cv)==1)
     {

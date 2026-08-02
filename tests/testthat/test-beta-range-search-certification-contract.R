@@ -58,7 +58,10 @@ test_that("beta range distribution CDF uses the support-width bridge", {
     expect_true(certified$beta.range.certification$triggered)
     expect_identical(certified$beta.range.certification$selected,
                      "refinement")
-    expect_equal(certified$bw, target[["h"]], tolerance = 2e-7)
+    # The canonical row owner changes only last-bit objective accumulation.
+    # Powell can therefore stop a few parts in 1e6 away on this locally flat
+    # refinement surface even though the attained objective is unchanged.
+    expect_equal(certified$bw, target[["h"]], tolerance = 5e-6)
     expect_equal(certified$fval, target[["objective"]], tolerance = 2e-12)
     expect_true(certified$num.feval.certified > 0)
 
@@ -114,7 +117,8 @@ test_that("bandwidth-object restarts receive exactly one certification", {
   expect_identical(
     distribution$beta.range.certification$selected, "refinement"
   )
-  expect_equal(distribution$bw, 4.45267153258119, tolerance = 2e-7)
+  # See the refinement-surface note in the distribution certification test.
+  expect_equal(distribution$bw, 4.45267153258119, tolerance = 5e-6)
 })
 
 test_that("beta range certification is isolated from adjacent routes", {
