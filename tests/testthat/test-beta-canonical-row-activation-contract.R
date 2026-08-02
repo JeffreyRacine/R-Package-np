@@ -453,6 +453,64 @@ test_that("canonical beta gradient rows separate operator and estimator algebra"
   expect_match(consumer, "derivative_coefficient_square_sum", fixed = TRUE)
 })
 
+test_that("conditional scalar route plumbing is dormant before beta activation", {
+  root <- locate_beta_activation_sources()
+  skip_if(is.null(root), "package sources unavailable")
+  ingress <- paste(
+    readLines(file.path(root, "src", "np.c"), warn = FALSE),
+    collapse = "\n"
+  )
+  engine <- paste(
+    readLines(file.path(root, "src", "jksum.c"), warn = FALSE),
+    collapse = "\n"
+  )
+
+  owner_start <- regexpr(
+    "void np_kernel_estimate_con_dens_dist_categorical(",
+    engine,
+    fixed = TRUE
+  )[[1L]]
+  owner_end <- regexpr(
+    "attribute_hidden int np_fixed_gaussian_density_cvls_pair_dispatch_try(",
+    engine,
+    fixed = TRUE
+  )[[1L]]
+  expect_gt(owner_start, 0L)
+  expect_gt(owner_end, owner_start)
+  owner <- substr(engine, owner_start, owner_end - 1L)
+
+  expect_match(owner, "const NPContinuousKernelRoute *kernel_route",
+               fixed = TRUE)
+  expect_match(owner, "(void)kernel_route;", fixed = TRUE)
+  expect_match(owner, "(void)kernel_route_diagnostics;", fixed = TRUE)
+  expect_match(owner, "(void)categorical_compress;", fixed = TRUE)
+  expect_false(grepl("NPContinuousKernelExecutionContext", owner,
+                     fixed = TRUE))
+
+  conditional_starts <- gregexpr(
+    "void np_density_conditional(", ingress, fixed = TRUE
+  )[[1L]]
+  conditional_start <- tail(conditional_starts[conditional_starts > 0L], 1L)
+  density_starts <- gregexpr("void np_density(double", ingress,
+                             fixed = TRUE)[[1L]]
+  conditional_end <- tail(density_starts[density_starts > conditional_start],
+                          1L)
+  expect_gt(conditional_start, 0L)
+  expect_gt(conditional_end, conditional_start)
+  conditional <- substr(ingress, conditional_start, conditional_end - 1L)
+  expect_match(
+    conditional,
+    paste0(
+      "pdf_deriv_stderr,\n",
+      "                                                 &log_likelihood,\n",
+      "                                                 NULL,\n",
+      "                                                 NULL,\n",
+      "                                                 0);"
+    ),
+    fixed = TRUE
+  )
+})
+
 test_that("canonical beta regression moments preserve the sidecar transcript", {
   root <- locate_beta_activation_sources()
   skip_if(is.null(root), "package sources unavailable")

@@ -15808,7 +15808,10 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                                                  pdf_stderr,
                                                  pdf_deriv,
                                                  pdf_deriv_stderr,
-                                                 &log_likelihood);
+                                                 &log_likelihood,
+                                                 NULL,
+                                                 NULL,
+                                                 0);
   } else {
     int status = 0;
     double *vsf_x = NULL, *vsf_y = NULL, *ykw = NULL, *y_eval_one = NULL;
