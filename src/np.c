@@ -7307,6 +7307,8 @@ void np_density_conditional(double * tyuno, double * tyord, double * tycon,
                             double * cykerlb, double * cykerub,
                             const NPContinuousKernelRoute *kernel_route,
                             NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
+                            const NPContinuousKernelRoute *response_kernel_route,
+                            NPContinuousKernelDerivativeDiagnostics *response_kernel_route_diagnostics,
                             int categorical_compress);
 void np_density_bw(double * myuno, double * myord, double * mycon,
                    double * mysd, int * myopti, double * myoptd, double * myans, double * fval,
@@ -8336,6 +8338,8 @@ SEXP C_np_density_conditional(SEXP tyuno,
   NPContinuousKernelDerivativeDiagnostics beta_x_diagnostics;
   const NPContinuousKernelRoute *active_x_route = NULL;
   NPContinuousKernelDerivativeDiagnostics *active_x_diagnostics = NULL;
+  const NPContinuousKernelRoute *active_y_route = NULL;
+  NPContinuousKernelDerivativeDiagnostics *active_y_diagnostics = NULL;
   int has_kernel_descriptors = 0;
   int categorical_compress = 0;
   R_xlen_t gsize;
@@ -8589,6 +8593,7 @@ SEXP C_np_density_conditional(SEXP tyuno,
                            REAL(out_cond), REAL(out_cderr), REAL(out_grad), REAL(out_gerr), REAL(out_ll),
                            cxkerlb_p, cxkerub_p, cykerlb_p, cykerub_p,
                            active_x_route, active_x_diagnostics,
+                           active_y_route, active_y_diagnostics,
                            categorical_compress);
   }
 
@@ -16464,10 +16469,13 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                             double * cykerlb, double * cykerub,
                             const NPContinuousKernelRoute *kernel_route,
                             NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
+                            const NPContinuousKernelRoute *response_kernel_route,
+                            NPContinuousKernelDerivativeDiagnostics *response_kernel_route_diagnostics,
                             int categorical_compress){
   /* Likelihood bandwidth selection for density estimation */
 
   double *vector_scale_factor, *pdf, *pdf_stderr, log_likelihood = 0.0;
+
   double ** pdf_deriv = NULL, ** pdf_deriv_stderr = NULL;
   double *cxylb = NULL, *cxyub = NULL;
   double xpad_num, ypad_num;
@@ -16489,6 +16497,10 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
   double * saved_ckerlb = NULL;
   double * saved_ckerub = NULL;
 
+  /* P22C1 dormant plumbing: response-side route selection remains at ingress
+   * and is deliberately unreachable until its arithmetic tranche passes. */
+  (void)response_kernel_route;
+  (void)response_kernel_route_diagnostics;
 
   num_var_unordered_extern = myopti[CD_CNUNOI];
   num_var_ordered_extern = myopti[CD_CNORDI];

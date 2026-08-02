@@ -535,6 +535,16 @@ test_that("beta X with legacy Y enters the common conditional regression owner",
   expect_match(public_owner, "active_x_route = &beta_x_route;", fixed = TRUE)
   expect_match(
     public_owner,
+    "const NPContinuousKernelRoute *active_y_route = NULL;",
+    fixed = TRUE
+  )
+  expect_match(
+    public_owner,
+    "active_y_route, active_y_diagnostics,",
+    fixed = TRUE
+  )
+  expect_match(
+    public_owner,
     "y_descriptor.family == NP_CKERNEL_FAMILY_BETA",
     fixed = TRUE
   )
@@ -553,6 +563,17 @@ test_that("beta X with legacy Y enters the common conditional regression owner",
   conditional_end <- tail(density_starts[density_starts > conditional_start],
                           1L)
   conditional <- substr(ingress, conditional_start, conditional_end - 1L)
+  expect_match(
+    conditional, "(void)response_kernel_route;", fixed = TRUE
+  )
+  expect_match(
+    conditional,
+    "(void)response_kernel_route_diagnostics;",
+    fixed = TRUE
+  )
+  expect_false(grepl(
+    "kernel_weighted_sum_np_route(kernel_cy", conditional, fixed = TRUE
+  ))
   expect_match(
     conditional,
     "if(lp_engine_eff == NP_LP_ENGINE_SCALAR && kernel_route == NULL)",
