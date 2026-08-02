@@ -118,13 +118,15 @@ Further arguments are passed to \code{\link{npudensbw}} when bandwidths are comp
   bandwidth metadata in that object.
 
   The beta associated density described in \code{\link{np.kernels}} is
-  available for continuous data at orders 2, 4, 6, and 8 with manual or
-  cross-validated metric bandwidths. Fixed, generalized-NN, and adaptive-NN
-  bandwidths are supported. Use \code{ckertype="beta"} and either
+  available for continuous coordinates at orders 2, 4, 6, and 8 with manual
+  or cross-validated metric bandwidths. Such coordinates may be combined with
+  unordered and ordered categorical coordinates. Fixed, generalized-NN, and
+  adaptive-NN bandwidths are supported. Use \code{ckertype="beta"} and either
   \code{ckerbound="fixed"} with finite lower and upper bounds or
   \code{ckerbound="range"} for beta outer half-spacing sample bounds as
   defined in \code{\link{np.kernels}}. Every
-  training and evaluation value must lie within the resulting support. For
+  continuous training and evaluation value must lie within the resulting
+  support. For
   example:
   \preformatted{
     fhat <- npudens(tdat=data.frame(x), edat=data.frame(x=x.eval),
@@ -133,7 +135,7 @@ Further arguments are passed to \code{\link{npudensbw}} when bandwidths are comp
   }
   The beta contribution already includes its complete original-scale density
   normalization. No additional division by the bandwidth is performed.
-  Beta density routes currently require continuous data only and reject
+  Beta density routes require at least one continuous coordinate and reject
   normal-reference selection. Cross-validated \code{cv.ml} and bounded
   target-coordinate \code{cv.ls} are available; the latter integrates the
   actual estimator and does not substitute the public beta-overlap operator.

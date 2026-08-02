@@ -134,6 +134,93 @@ test_that("beta density CVLS uses bounded target-coordinate quadrature", {
   }
 })
 
+test_that("mixed beta density objectives match independent kernel-weight oracles", {
+  old <- options(np.categorical.compress = FALSE)
+  on.exit(options(old), add = TRUE)
+  training <- data.frame(
+    x = c(0.01, 0.04, 0.08, 0.13, 0.2, 0.29, 0.38,
+          0.49, 0.61, 0.72, 0.82, 0.9, 0.96, 0.99),
+    u = factor(rep(letters[1:3], length.out = 14L)),
+    o = ordered(rep(1:4, length.out = 14L), levels = 1:4)
+  )
+  q <- 81L
+  grid <- expand.grid(
+    x = seq(0, 1, length.out = q),
+    u = levels(training$u),
+    o = levels(training$o),
+    KEEP.OUT.ATTRS = FALSE,
+    stringsAsFactors = FALSE
+  )
+  grid$u <- factor(grid$u, levels = levels(training$u))
+  grid$o <- ordered(grid$o, levels = levels(training$o))
+  quadrature_weight <- rep(
+    c(0.5, rep(1, q - 2L), 0.5) / (q - 1L),
+    times = nlevels(training$u) * nlevels(training$o)
+  )
+  guarded_log <- function(fit) {
+    if (fit > .Machine$double.xmin)
+      return(-log(fit))
+    if (fit < -.Machine$double.xmin)
+      return(log(-fit) - 2 * log(.Machine$double.xmin))
+    -log(.Machine$double.xmin)
+  }
+
+  for (order in c(2L, 4L, 6L, 8L)) {
+    for (bwtype in c("fixed", "generalized_nn", "adaptive_nn")) {
+      bandwidth <- if (identical(bwtype, "fixed")) {
+        c(0.15, 0.21, 0.29)
+      } else {
+        c(5, 0.21, 0.29)
+      }
+      bw <- npudensbw(
+        dat = training, bws = bandwidth, bandwidth.compute = FALSE,
+        bwmethod = "cv.ml", bwtype = bwtype, bwscaling = FALSE,
+        ckertype = "beta", ckerorder = order,
+        ckerbound = "fixed", ckerlb = 0, ckerub = 1
+      )
+      ## Density routes use normalized ordered Li--Racine weights; npksum()
+      ## exposes that low-level variant as nliracine.
+      oracle_bw <- bw
+      oracle_bw[["okertype"]] <- "nliracine"
+      loo_weights <- npksum(
+        bws = oracle_bw, txdat = training, leave.one.out = TRUE,
+        return.kernel.weights = TRUE
+      )$kw
+      loo_density <- colSums(loo_weights) / (nrow(training) - 1L)
+      expected_ml <- sum(vapply(
+        loo_density, guarded_log, numeric(1L)
+      ))
+      grid_weights <- npksum(
+        bws = oracle_bw, txdat = training, exdat = grid,
+        return.kernel.weights = TRUE
+      )$kw
+      grid_density <- colMeans(grid_weights)
+      expected_ls <- sum(quadrature_weight * grid_density^2) -
+        2 * mean(loo_density)
+
+      options(np.categorical.compress = FALSE)
+      dense_ml <- beta_density_objective(
+        training, bandwidth, "cv.ml", order, bwtype
+      )
+      dense_ls <- beta_density_objective(
+        training, bandwidth, "cv.ls", order, bwtype
+      )
+      options(np.categorical.compress = TRUE)
+      compressed_ml <- beta_density_objective(
+        training, bandwidth, "cv.ml", order, bwtype
+      )
+      compressed_ls <- beta_density_objective(
+        training, bandwidth, "cv.ls", order, bwtype
+      )
+
+      expect_equal(dense_ml, expected_ml, tolerance = 3e-10)
+      expect_equal(dense_ls, expected_ls, tolerance = 3e-10)
+      expect_identical(dense_ml, compressed_ml)
+      expect_identical(dense_ls, compressed_ls)
+    }
+  }
+})
+
 test_that("beta CDF cross-validation matches explicit leave-one-out matrices", {
   xval <- c(0.002, 0.02, 0.09, 0.24, 0.51, 0.76, 0.94, 0.997)
   x <- data.frame(x = xval)
