@@ -513,6 +513,59 @@ test_that("legacy conditional scalar owner retains dormant route plumbing", {
   )
 })
 
+test_that("regression objective owner retains beta-unreachable route plumbing", {
+  root <- locate_beta_activation_sources()
+  skip_if(is.null(root), "package sources unavailable")
+  ingress <- paste(
+    readLines(file.path(root, "src", "kernelcv.c"), warn = FALSE),
+    collapse = "\n"
+  )
+  engine <- paste(
+    readLines(file.path(root, "src", "jksum.c"), warn = FALSE),
+    collapse = "\n"
+  )
+
+  incumbent_start <- regexpr(
+    "double np_kernel_estimate_regression_categorical_ls_aic(",
+    engine,
+    fixed = TRUE
+  )[[1L]]
+  owner_start <- regexpr(
+    "double np_kernel_estimate_regression_categorical_ls_aic_ctx(",
+    engine,
+    fixed = TRUE
+  )[[1L]]
+  owner_end <- regexpr(
+    "typedef struct {\n  int nprof_train;",
+    engine,
+    fixed = TRUE
+  )[[1L]]
+  expect_gt(incumbent_start, 0L)
+  expect_gt(owner_start, incumbent_start)
+  expect_gt(owner_end, owner_start)
+  owner <- substr(engine, owner_start, owner_end - 1L)
+
+  expect_match(owner, "const NPContinuousKernelRoute * const kernel_route",
+               fixed = TRUE)
+  expect_match(owner, "kernel_route != NULL", fixed = TRUE)
+  expect_match(owner, "kernel_route_diagnostics != NULL", fixed = TRUE)
+  expect_match(owner, "categorical_compress != 0", fixed = TRUE)
+  expect_match(owner, "regression objective kernel route is not activated",
+               fixed = TRUE)
+  expect_match(
+    owner,
+    "return np_kernel_estimate_regression_categorical_ls_aic(",
+    fixed = TRUE
+  )
+  expect_false(grepl("NPContinuousKernelExecutionContext", owner,
+                     fixed = TRUE))
+  expect_false(grepl(
+    "np_kernel_estimate_regression_categorical_ls_aic_ctx(",
+    ingress,
+    fixed = TRUE
+  ))
+})
+
 test_that("beta density CVML enters the canonical scaled-row owner", {
   root <- locate_beta_activation_sources()
   skip_if(is.null(root), "package sources unavailable")
