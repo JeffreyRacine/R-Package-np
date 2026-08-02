@@ -566,6 +566,67 @@ test_that("regression objective owner retains beta-unreachable route plumbing", 
   ))
 })
 
+test_that("regression bandwidth ingress owns dormant categorical compression state", {
+  root <- locate_beta_activation_sources()
+  skip_if(is.null(root), "package sources unavailable")
+  regression_r <- paste(
+    readLines(file.path(root, "R", "np.regression.bw.R"), warn = FALSE),
+    collapse = "\n"
+  )
+  bandwidth_r <- paste(
+    readLines(file.path(root, "R", "rbandwidth.R"), warn = FALSE),
+    collapse = "\n"
+  )
+  headers <- paste(
+    readLines(file.path(root, "src", "headers.h"), warn = FALSE),
+    collapse = "\n"
+  )
+  ingress <- paste(
+    readLines(file.path(root, "src", "np.c"), warn = FALSE),
+    collapse = "\n"
+  )
+  callbacks <- paste(
+    readLines(file.path(root, "src", "kernelcv.c"), warn = FALSE),
+    collapse = "\n"
+  )
+
+  option_literal <- "categorical.compress = npStrictLogicalOption("
+  option_hits <- gregexpr(option_literal, regression_r, fixed = TRUE)[[1L]]
+  option_hits <- option_hits[option_hits > 0L]
+  expect_length(option_hits, 3L)
+  expect_match(headers, "#define RBW_CATCOMPI 23", fixed = TRUE)
+  expect_match(
+    ingress,
+    "np_regression_bw_categorical_compress_extern = myopti[RBW_CATCOMPI];",
+    fixed = TRUE
+  )
+  expect_match(
+    ingress,
+    "np_regression_bw_categorical_compress_extern = 0;",
+    fixed = TRUE
+  )
+  expect_match(
+    ingress,
+    "C_np_regression_bw: categorical compression must be TRUE or FALSE",
+    fixed = TRUE
+  )
+  expect_match(
+    ingress,
+    "num_reg_ordered_extern, NP_BETA_BW_CONTINUOUS_ONLY,",
+    fixed = TRUE
+  )
+  expect_match(
+    bandwidth_r,
+    "allow.categorical = !isTRUE(bandwidth.compute)",
+    fixed = TRUE
+  )
+  expect_false(grepl(
+    "np_kernel_estimate_regression_categorical_ls_aic_ctx(",
+    callbacks,
+    fixed = TRUE
+  ))
+})
+
 test_that("beta density CVML enters the canonical scaled-row owner", {
   root <- locate_beta_activation_sources()
   skip_if(is.null(root), "package sources unavailable")

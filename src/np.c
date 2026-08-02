@@ -3513,6 +3513,7 @@ int KERNEL_den_extern=0;
 int KERNEL_den_unordered_extern=0;
 int KERNEL_den_ordered_extern=0;
 int np_beta_bw_order_extern=2;
+int np_regression_bw_categorical_compress_extern=0;
 int np_density_bw_categorical_compress_extern=0;
 int np_distribution_bw_categorical_compress_extern=0;
 int np_beta_cx_bw_order_extern=2;
@@ -7459,6 +7460,9 @@ static SEXP C_np_regression_bw_common(SEXP runo,
   if (XLENGTH(myopti_i) <= RBW_CKORDERI &&
       INTEGER(myopti_i)[RBW_CKRNEVI] == NP_CKERNEL_COORDINATE_CODE)
     error("C_np_regression_bw: continuous-kernel descriptor is missing");
+  if (XLENGTH(myopti_i) <= RBW_CATCOMPI &&
+      INTEGER(myopti_i)[RBW_CKRNEVI] == NP_CKERNEL_COORDINATE_CODE)
+    error("C_np_regression_bw: categorical-compression state is missing");
 
   ncon = (int)INTEGER(myopti_i)[RBW_NCONI];
   if (ncon < 0)
@@ -17877,13 +17881,19 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   vector_ckerub_extern = ckerub;
   int_cker_bound_extern = np_has_finite_cker_bounds(ckerlb, ckerub, num_reg_continuous_extern);
   np_beta_bw_order_extern = 2;
-  if(KERNEL_reg_extern == NP_CKERNEL_COORDINATE_CODE)
+  np_regression_bw_categorical_compress_extern = 0;
+  if(KERNEL_reg_extern == NP_CKERNEL_COORDINATE_CODE) {
     np_beta_bw_order_extern = np_bandwidth_kernel_descriptor_or_error(
       myopti[RBW_CKFAMILYI], KERNEL_reg_extern, myopti[RBW_CKORDERI],
       num_reg_continuous_extern, num_reg_unordered_extern,
       num_reg_ordered_extern, NP_BETA_BW_CONTINUOUS_ONLY,
       ckerlb, ckerub,
       "C_np_regression_bw").order;
+    np_regression_bw_categorical_compress_extern = myopti[RBW_CATCOMPI];
+    if(np_regression_bw_categorical_compress_extern != 0 &&
+       np_regression_bw_categorical_compress_extern != 1)
+      error("C_np_regression_bw: categorical compression must be TRUE or FALSE");
+  }
 
   int_use_starting_values= myopti[RBW_USTARTI];
   int_LARGE_SF=myopti[RBW_LSFI];
@@ -18730,6 +18740,7 @@ cleanup_np_regression_bw_mode:
   int_cker_bound_extern = 0;
   vector_ckerlb_extern = NULL;
   vector_ckerub_extern = NULL;
+  np_regression_bw_categorical_compress_extern = 0;
   np_reset_y_side_extern();
   vector_glp_degree_extern = NULL;
   vector_glp_gradient_order_extern = NULL;

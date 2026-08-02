@@ -401,6 +401,10 @@ npregbw.rbandwidth <-
         dfc.dir = dfc.dir,
         transform.bounds = transform.bounds)
       myopti <- c(myopti, npContinuousKernelDescriptorOptions(bws))
+      myopti <- c(
+        myopti,
+        categorical.compress = npStrictLogicalOption("np.categorical.compress", TRUE)
+      )
 
       myoptd = list(ftol=ftol, tol=tol, small=small,
         lbc.dir = lbc.dir, cfac.dir = cfac.dir, initc.dir = initc.dir,
@@ -715,6 +719,10 @@ npregbw.rbandwidth <-
     transform.bounds = transform.bounds
   )
   myopti <- c(myopti, npContinuousKernelDescriptorOptions(bws))
+  myopti <- c(
+    myopti,
+    categorical.compress = npStrictLogicalOption("np.categorical.compress", TRUE)
+  )
 
   myoptd <- list(
     ftol = ftol,
@@ -1320,6 +1328,10 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
     transform.bounds = FALSE
   )
   myopti <- c(myopti, npContinuousKernelDescriptorOptions(bws))
+  myopti <- c(
+    myopti,
+    categorical.compress = npStrictLogicalOption("np.categorical.compress", TRUE)
+  )
 
   myoptd <- list(
     ftol = 0,

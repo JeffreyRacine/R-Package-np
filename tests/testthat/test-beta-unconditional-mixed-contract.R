@@ -274,6 +274,40 @@ test_that("native distribution objective ingress requires compression state", {
   expect_true(is.finite(valid$fval[[1L]]))
 })
 
+test_that("native regression objective ingress requires compression state", {
+  training <- data.frame(x = seq(0.05, 0.95, length.out = 12L))
+  response <- sin(2 * pi * training$x)
+  bw <- npregbw(
+    xdat = training, ydat = response, bws = 0.15,
+    bandwidth.compute = FALSE, regtype = "lc", bwmethod = "cv.ls",
+    bwscaling = FALSE, ckertype = "beta", ckerorder = 4,
+    ckerbound = "fixed", ckerlb = 0, ckerub = 1
+  )
+  prepare <- getFromNamespace(
+    ".npregbw_nomad_native_prepare_args", "np"
+  )
+  prep <- prepare(training, response, bw, invalid.penalty = "dbmax")
+  native_eval <- function(myopti) {
+    .Call(
+      "C_np_regression_bw_eval",
+      prep$runo, prep$rord, prep$rcon, prep$y, prep$mysd,
+      myopti, prep$myoptd, as.double(bw$bw), 1L,
+      prep$penalty_mode, prep$penalty_multiplier,
+      prep$degree, prep$bernstein, prep$basis,
+      prep$ckerlb, prep$ckerub,
+      PACKAGE = "np"
+    )
+  }
+
+  expect_error(
+    native_eval(prep$myopti[-length(prep$myopti)]),
+    "categorical-compression state is missing",
+    fixed = TRUE
+  )
+  valid <- native_eval(prep$myopti)
+  expect_true(is.finite(valid$fval[[1L]]))
+})
+
 test_that("native MADS searches mixed beta density objectives", {
   skip_if_not_installed("crs", minimum_version = "0.15.46")
   set.seed(9134)
