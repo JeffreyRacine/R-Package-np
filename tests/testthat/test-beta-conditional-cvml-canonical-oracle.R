@@ -34,11 +34,29 @@ beta_cvml_weights <- function(data, bandwidth, type, kernel, order,
   t(do.call(npksum, arguments)$ksum)
 }
 
+beta_cvml_adaptive_radius <- function(train, k) {
+  vapply(seq_along(train), function(index) {
+    distance <- abs(train - train[[index]])
+    duplicate <- sum(distance == 0) - 1L
+    positive <- sort(distance[distance > 0])
+    if (duplicate >= k) positive[[1L]] else
+      positive[[max(1L, k - duplicate)]]
+  }, numeric(1L))
+}
+
 beta_cvml_ratio_oracle <- function(x, y, bandwidth, type,
                                     xkernel, ykernel, order) {
   xweights <- beta_cvml_weights(
     x, bandwidth[[2L]], type, xkernel, order, density = FALSE
   )
+  if (identical(type, "adaptive_nn") &&
+      !identical(xkernel, "beta")) {
+    xbandwidth <- beta_cvml_adaptive_radius(
+      x[[1L]], bandwidth[[2L]]
+    )
+    xweights <- xweights /
+      matrix(xbandwidth, nrow = nrow(x), ncol = nrow(x))
+  }
   yweights <- beta_cvml_weights(
     y, bandwidth[[1L]], type, ykernel, order, density = TRUE
   )

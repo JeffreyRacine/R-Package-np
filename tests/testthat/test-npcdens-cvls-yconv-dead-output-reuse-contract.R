@@ -26,7 +26,7 @@ dead_output_body <- function(lines) {
   paste(lines[start:(stop - 1L)], collapse = "\n")
 }
 
-test_that("quadratic output reuses the dead LOO block without changing GEMMs", {
+test_that("quadratic output uses one bounded square tile without extra row slabs", {
   src_file <- locate_dead_output_source()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable")
   body <- dead_output_body(readLines(src_file, warn = FALSE))
@@ -34,9 +34,11 @@ test_that("quadratic output reuses the dead LOO block without changing GEMMs", {
   expect_false(grepl("alloc_vecd\\(block_size\\*block_size\\)", body))
   expect_match(
     body,
-    "double * const quad_cross = loo_work[0];",
+    "np_cvls_workspace_square_try(block_size, &quad_cross)",
     fixed = TRUE
   )
+  expect_false(grepl("loo_work", body, fixed = TRUE))
+  expect_false(grepl("full_blocks", body, fixed = TRUE))
   expect_equal(lengths(regmatches(
     body,
     gregexpr("np_blas_dgemm_tn_int\\(", body, perl = TRUE)
@@ -48,14 +50,14 @@ test_that("quadratic output reuses the dead LOO block without changing GEMMs", {
   )
 })
 
-test_that("dead-output alias begins only after all LOO linear consumers", {
+test_that("bounded square tile preserves LOO consumer order", {
   src_file <- locate_dead_output_source()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable")
   body <- dead_output_body(readLines(src_file, warn = FALSE))
 
   markers <- c(
+    "xblocks[g]) != 0",
     "lin[g] += np_blas_ddot_int",
-    "double * const quad_cross = loo_work[0]",
     "np_blas_dgemm_tn_int(ib,",
     "*cv += quad[g] - 2.0*lin[g]"
   )

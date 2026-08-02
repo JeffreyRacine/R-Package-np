@@ -411,27 +411,3 @@ void np_lp_accumulate_dense_resident_row(const NPLPDenseRowContext *ctx)
   default: np_lp_accumulate_dense_row_generic(ctx); return;
   }
 }
-
-int np_lp_delete_smoother_row(const double *full_row,
-                              const int n,
-                              const int eval_idx,
-                              double *loo_row)
-{
-  double den;
-  int j;
-
-  if((full_row == NULL) || (loo_row == NULL) ||
-     (n <= 0) || (eval_idx < 0) || (eval_idx >= n))
-    return 1;
-
-  /*
-   * Exact delete-one identity for a linear smoother with its bandwidth row
-   * held fixed. Do not replace a valid small signed denominator by a floor.
-   */
-  if(!np_lp_delete_denominator(full_row[eval_idx], &den))
-    return 1;
-  for(j = 0; j < n; j++)
-    loo_row[j] = (j == eval_idx) ? 0.0 : full_row[j]/den;
-
-  return 0;
-}

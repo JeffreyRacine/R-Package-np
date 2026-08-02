@@ -40,7 +40,10 @@ test_that("objective pack reuse is scoped away from adaptive, tree, and reduced 
     source,
     "Pack it once at objective scope;\\s*reduced triangular rows advance the source pointers and cannot reuse it"
   )
-  expect_match(source, "&objective_pack_ctx);", fixed = TRUE)
+  expect_match(source, "&objective_pack_ctx,", fixed = TRUE)
+  expect_gte(lengths(regmatches(
+    source, gregexpr("&objective_pack_ctx,", source, fixed = TRUE)
+  )), 2L)
   expect_match(source, "(outer_pack_ctx->data != NULL)", fixed = TRUE)
   expect_match(source, "if\\(objective_Apack != NULL\\) free\\(objective_Apack\\)")
 })

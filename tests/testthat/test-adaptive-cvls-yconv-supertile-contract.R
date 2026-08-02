@@ -64,7 +64,7 @@ test_that("adaptive CVLS dispatches width three inside its width-two owner", {
   skip_if(is.null(src_file), "source file src/jksum.c unavailable")
   body <- adaptive_cvls_supertile_body(readLines(src_file, warn = FALSE))
 
-  expect_match(body, "double **full_blocks[2] = {NULL, NULL};", fixed = TRUE)
+  expect_match(body, "double **xblocks[2] = {NULL, NULL};", fixed = TRUE)
   expect_match(
     body,
     "np_conditional_density_cvls_lp_adap_block3_stream(",
@@ -85,10 +85,10 @@ test_that("adaptive CVLS dispatches width three inside its width-two owner", {
   )
   expect_match(
     body,
-    "double * const quad_cross = loo_work[0];",
+    "np_cvls_workspace_square_try(block_size, &quad_cross)",
     fixed = TRUE
   )
-  expect_match(body, "full_blocks[g][0]", fixed = TRUE)
+  expect_match(body, "xblocks[g][0]", fixed = TRUE)
   expect_match(body, "*cv += quad[g] - 2.0*lin[g];", fixed = TRUE)
 })
 
@@ -99,7 +99,7 @@ test_that("adaptive CVLS width three is an isolated pass-saving sibling", {
 
   expect_match(
     body,
-    "double **full_blocks[3] = {NULL, NULL, NULL};",
+    "double **xblocks[3] = {NULL, NULL, NULL};",
     fixed = TRUE
   )
   expect_match(body, "width3_passes >= width2_passes", fixed = TRUE)
@@ -120,16 +120,16 @@ test_that("adaptive CVLS width three is an isolated pass-saving sibling", {
   )
   expect_match(
     body,
-    "&full_blocks[2]",
+    "&xblocks[2]",
     fixed = TRUE
   )
   incumbent_alloc <- regexpr(
-    "&loo_work",
+    "&xblocks[0]",
     body,
     fixed = TRUE
   )[[1L]]
   optional_alloc <- regexpr(
-    "&full_blocks[2]",
+    "&xblocks[2]",
     body,
     fixed = TRUE
   )[[1L]]
@@ -139,7 +139,7 @@ test_that("adaptive CVLS width three is an isolated pass-saving sibling", {
   expect_match(body, "for(g = 0; g < 3; g++)", fixed = TRUE)
   expect_match(
     body,
-    "double * const quad_cross = loo_work[0];",
+    "np_cvls_workspace_square_try(block_size, &quad_cross)",
     fixed = TRUE
   )
   expect_match(body, "*cv += quad[g] - 2.0*lin[g];", fixed = TRUE)
@@ -152,7 +152,7 @@ test_that("adaptive CVLS width four is an isolated pass-saving sibling", {
 
   expect_match(
     body,
-    "double **full_blocks[4] = {NULL, NULL, NULL, NULL};",
+    "double **xblocks[4] = {NULL, NULL, NULL, NULL};",
     fixed = TRUE
   )
   expect_match(body, "width4_passes >= width3_passes", fixed = TRUE)
@@ -162,7 +162,7 @@ test_that("adaptive CVLS width four is an isolated pass-saving sibling", {
     fixed = TRUE
   )
   incumbent_alloc <- regexpr(
-    "&loo_work",
+    "&xblocks[0]",
     body,
     fixed = TRUE
   )[[1L]]
@@ -173,17 +173,17 @@ test_that("adaptive CVLS width four is an isolated pass-saving sibling", {
   )[[1L]]
   expect_gt(incumbent_alloc, 0L)
   expect_gt(optional_alloc, incumbent_alloc)
-  expect_match(body, "full_blocks[2] = optional_blocks;", fixed = TRUE)
+  expect_match(body, "xblocks[2] = optional_blocks;", fixed = TRUE)
   expect_match(
     body,
-    "full_blocks[3] = optional_blocks + block_size;",
+    "xblocks[3] = optional_blocks + block_size;",
     fixed = TRUE
   )
   expect_match(body, "i0 += 4*block_size", fixed = TRUE)
   expect_match(body, "for(g = 0; g < 4; g++)", fixed = TRUE)
   expect_match(
     body,
-    "double * const quad_cross = loo_work[0];",
+    "np_cvls_workspace_square_try(block_size, &quad_cross)",
     fixed = TRUE
   )
   expect_match(body, "np_blas_dgemm_tn_int(", fixed = TRUE)
@@ -198,7 +198,8 @@ test_that("adaptive CVLS supertile lowers workspace without changing owners", {
   expect_match(body, "NPConditionalXRowCtx xctx = {0};", fixed = TRUE)
   expect_match(body, "NPConditionalYRowCtx yctx = {0}, yconvctx = {0};",
                fixed = TRUE)
-  expect_match(body, "np_lp_delete_smoother_row(", fixed = TRUE)
+  expect_match(body, "np_conditional_xrow_from_ctx(", fixed = TRUE)
+  expect_false(grepl("np_conditional_xrow_full_from_ctx", body, fixed = TRUE))
   expect_match(body, "np_blas_dgemm_tn_int(", fixed = TRUE)
   expect_false(grepl("alloc_vecd\\(block_size\\*block_size\\)", body))
   expect_false(grepl("malloc|calloc|realloc", body))

@@ -71,20 +71,19 @@ test_that("conditional CVLS weighted BLAS gate is narrow and memory bounded", {
   expect_false(grepl("nrows\\*nrows", gate))
 })
 
-test_that("fixed CVLS weighted BLAS preserves signed row algebra and fallback", {
+test_that("canonical CVLS weighted BLAS preserves signed row algebra and fallback", {
   src_file <- locate_xrow_weighted_blas_source()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
   lines <- readLines(src_file, warn = FALSE)
   body <- xrow_weighted_blas_source_body(
     lines,
-    "^static int (NP_NOINLINE )?np_conditional_x_weight_block_pair_stream_core\\(",
-    "^static int (NP_NOINLINE )?(NP_HOT_ALIGN )?np_conditional_x_weight_block_pair_gnn_stream_core\\("
+    "^static int np_conditional_x_weight_block_stream_core_impl\\(",
+    "^static int np_conditional_x_weight_block_stream_core\\("
   )
   compact <- gsub("[[:space:]]+", " ", body)
 
   expect_match(body, "BANDWIDTH_den_extern != BW_FIXED", fixed = TRUE)
-  expect_match(body, "NP_NOINLINE", fixed = TRUE)
-  expect_false(grepl("BW_GEN_NN", body, fixed = TRUE))
+  expect_match(body, "BANDWIDTH_den_extern != BW_GEN_NN", fixed = TRUE)
   expect_match(
     body,
     "np_conditional_x_weighted_blas_profitable(",
@@ -109,12 +108,12 @@ test_that("fixed CVLS weighted BLAS preserves signed row algebra and fallback", 
   expect_match(body, "F77_CALL(dgemv)", fixed = TRUE)
   expect_match(
     body,
-    "full_rows_out[i][orig_j] = kw[j]*mean_row[j];",
+    "rows_out[i][orig_j] = kw[j]*mean_row[j];",
     fixed = TRUE
   )
   expect_match(
     body,
-    "np_lp_delete_denominator(full_rows_out[i][eval_idx], &den)",
+    "np_lp_delete_denominator(rows_out[i][eval_idx], &den)",
     fixed = TRUE
   )
   expect_match(body, "if(weighted_design != NULL) free(weighted_design);", fixed = TRUE)
@@ -127,8 +126,8 @@ test_that("fixed CVLS weighted BLAS preserves signed row algebra and fallback", 
     "F77_CALL(dgemm)",
     "np_lp_full_row_workspace_solve",
     "F77_CALL(dgemv)",
-    "full_rows_out[i][orig_j] = kw[j]*mean_row[j]",
-    "np_lp_delete_denominator(full_rows_out[i][eval_idx], &den)"
+    "rows_out[i][orig_j] = kw[j]*mean_row[j]",
+    "np_lp_delete_denominator(rows_out[i][eval_idx], &den)"
   )
   positions <- vapply(markers, function(marker) {
     regexpr(marker, body, fixed = TRUE)[[1L]]
@@ -153,20 +152,19 @@ test_that("fixed CVLS weighted BLAS preserves signed row algebra and fallback", 
   )
 })
 
-test_that("generalized-NN CVLS reuses signed weighted BLAS with scalar fallback", {
+test_that("generalized-NN CVLS reaches the same weighted BLAS implementation", {
   src_file <- locate_xrow_weighted_blas_source()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
   lines <- readLines(src_file, warn = FALSE)
   body <- xrow_weighted_blas_source_body(
     lines,
-    "^static int (NP_NOINLINE )?(NP_HOT_ALIGN )?np_conditional_x_weight_block_pair_gnn_stream_core\\(",
-    "^static int np_conditional_x_weight_block_pair_selected_stream_core\\("
+    "^static int np_conditional_x_weight_block_stream_core_impl\\(",
+    "^static int np_conditional_x_weight_block_stream_core\\("
   )
   compact <- gsub("[[:space:]]+", " ", body)
 
   expect_match(body, "BANDWIDTH_den_extern != BW_GEN_NN", fixed = TRUE)
-  expect_match(body, "NP_NOINLINE", fixed = TRUE)
-  expect_false(grepl("BANDWIDTH_den_extern != BW_FIXED", body, fixed = TRUE))
+  expect_match(body, "BANDWIDTH_den_extern != BW_FIXED", fixed = TRUE)
   expect_match(
     body,
     "np_conditional_x_weighted_blas_profitable(",
@@ -191,12 +189,12 @@ test_that("generalized-NN CVLS reuses signed weighted BLAS with scalar fallback"
   expect_match(body, "F77_CALL(dgemv)", fixed = TRUE)
   expect_match(
     body,
-    "full_rows_out[i][j] = kw[j]*mean_row[j];",
+    "rows_out[i][orig_j] = kw[j]*mean_row[j];",
     fixed = TRUE
   )
   expect_match(
     body,
-    "np_lp_delete_denominator(full_rows_out[i][eval_idx], &den)",
+    "np_lp_delete_denominator(rows_out[i][eval_idx], &den)",
     fixed = TRUE
   )
   expect_match(body, "if(weighted_design != NULL) free(weighted_design);", fixed = TRUE)
@@ -209,8 +207,8 @@ test_that("generalized-NN CVLS reuses signed weighted BLAS with scalar fallback"
     "F77_CALL(dgemm)",
     "np_lp_full_row_workspace_solve",
     "F77_CALL(dgemv)",
-    "full_rows_out[i][j] = kw[j]*mean_row[j]",
-    "np_lp_delete_denominator(full_rows_out[i][eval_idx], &den)"
+    "rows_out[i][orig_j] = kw[j]*mean_row[j]",
+    "np_lp_delete_denominator(rows_out[i][eval_idx], &den)"
   )
   positions <- vapply(markers, function(marker) {
     regexpr(marker, body, fixed = TRUE)[[1L]]

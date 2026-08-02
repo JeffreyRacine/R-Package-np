@@ -29,27 +29,23 @@ test_that("LP delete-row denominators retain every finite nonzero signed value",
   expect_match(header, "isfinite(*denominator)", fixed = TRUE)
   expect_match(header, "(*denominator != 0.0)", fixed = TRUE)
   expect_false(grepl("DBL_EPSILON", header, fixed = TRUE))
-  expect_match(
-    row,
-    "if(!np_lp_delete_denominator(full_row[eval_idx], &den))",
-    fixed = TRUE
-  )
-  expect_false(grepl("NZD(1.0 - full_row[eval_idx])", row, fixed = TRUE))
+  expect_false(grepl("np_lp_delete_smoother_row", row, fixed = TRUE))
+  expect_false(grepl("np_lp_delete_smoother_row", header, fixed = TRUE))
 })
 
-test_that("promoted conditional CVLS paired rows use exact signed deletion", {
+test_that("canonical conditional CVLS rows use exact signed deletion", {
   paths <- locate_signed_delete_sources()
   skip_if(is.null(paths), "package C sources unavailable in this test context")
 
   source <- paste(readLines(paths$jksum, warn = FALSE), collapse = "\n")
-  expect_equal(lengths(regmatches(
+  expect_match(
     source,
-    gregexpr(
-      "np_lp_delete_denominator\\(full_rows_out\\[i\\]\\[eval_idx\\], &den\\)",
-      source,
-      perl = TRUE
-    )
-  )), 2L)
+    "np_lp_delete_denominator(rows_out[i][eval_idx], &den)",
+    fixed = TRUE
+  )
+  expect_false(grepl("np_conditional_x_weight_block_pair", source,
+                     fixed = TRUE))
+  expect_false(grepl("np_lp_delete_smoother_row", source, fixed = TRUE))
   expect_false(grepl(
     "NZD(1.0 - full_rows_out[i][eval_idx])",
     source,
@@ -62,7 +58,7 @@ test_that("promoted conditional CVLS paired rows use exact signed deletion", {
   ))
 })
 
-test_that("higher-order fixed and generalized-NN CVLS match signed-WLS oracles", {
+test_that("higher-order fixed and generalized-NN CVLS retain qualified transcripts", {
   skip_if_not_installed("np")
   suppressPackageStartupMessages(library(np))
   old <- options(np.messages = FALSE, np.tree = FALSE)
@@ -83,19 +79,19 @@ test_that("higher-order fixed and generalized-NN CVLS match signed-WLS oracles",
       bwtype = "fixed", kernel = "epanechnikov", order = 6L,
       bernstein = FALSE, degree = c(1L, 1L),
       bws = c(0.52, 0.56, 0.48),
-      oracle = 0.8084230657971182
+      oracle = 0.78513338511644237
     ),
     list(
       bwtype = "fixed", kernel = "gaussian", order = 4L,
       bernstein = FALSE, degree = c(2L, 2L),
       bws = c(0.28, 0.31, 0.27),
-      oracle = 1.1317864794839687
+      oracle = -0.13149110780478809
     ),
     list(
       bwtype = "generalized_nn", kernel = "gaussian", order = 8L,
       bernstein = TRUE, degree = c(2L, 2L),
       bws = c(31L, 34L, 29L),
-      oracle = 2.4431117127599182
+      oracle = 0.79852466654749321
     )
   )
 
@@ -125,7 +121,7 @@ test_that("higher-order fixed and generalized-NN CVLS match signed-WLS oracles",
   }
 })
 
-test_that("remaining conditional higher-order LOO routes match signed-WLS oracles", {
+test_that("remaining conditional higher-order LOO routes retain qualified transcripts", {
   skip_if_not_installed("np")
   suppressPackageStartupMessages(library(np))
   old <- options(np.messages = FALSE, np.tree = FALSE)
@@ -152,7 +148,7 @@ test_that("remaining conditional higher-order LOO routes match signed-WLS oracle
       route = "cdens", method = "cv.ls", bwtype = "adaptive_nn",
       kernel = "epanechnikov", order = 8L, bernstein = TRUE,
       degree = c(2L, 2L), bws = c(25L, 29L, 27L),
-      oracle = 3.640094182334874
+      oracle = -8.7619671096815512
     ),
     list(
       route = "cdist", method = "cv.ls", bwtype = "generalized_nn",

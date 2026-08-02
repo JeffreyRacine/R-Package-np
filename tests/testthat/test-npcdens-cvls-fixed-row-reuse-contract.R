@@ -24,73 +24,48 @@ cvls_source_body <- function(lines, start_pattern, stop_pattern) {
   paste(lines[start:(stop - 1L)], collapse = "\n")
 }
 
-test_that("fixed and generalized-NN CVLS derive LOO from their full rows", {
+test_that("fixed and generalized-NN CVLS share one canonical LOO block engine", {
   src_file <- locate_cvls_row_reuse_source()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
   lines <- readLines(src_file, warn = FALSE)
+  source <- paste(lines, collapse = "\n")
 
-  fixed_body <- cvls_source_body(
+  body <- cvls_source_body(
     lines,
-    "^static int (NP_NOINLINE )?np_conditional_x_weight_block_pair_stream_core\\(",
-    "^static int (NP_NOINLINE )?(NP_HOT_ALIGN )?np_conditional_x_weight_block_pair_gnn_stream_core\\("
-  )
-  gnn_body <- cvls_source_body(
-    lines,
-    "^static int (NP_NOINLINE )?(NP_HOT_ALIGN )?np_conditional_x_weight_block_pair_gnn_stream_core\\(",
-    "^static int np_conditional_y_block_stream_op_core\\("
+    "^static int np_conditional_x_weight_block_stream_core_impl\\(",
+    "^static int np_conditional_x_weight_block_stream_core\\("
   )
 
-  expect_match(fixed_body, "BANDWIDTH_den_extern != BW_FIXED", fixed = TRUE)
-  expect_false(grepl("BW_GEN_NN", fixed_body, fixed = TRUE))
-  expect_match(gnn_body, "BANDWIDTH_den_extern != BW_GEN_NN", fixed = TRUE)
-  expect_match(gnn_body, "NP_NOINLINE", fixed = TRUE)
-  expect_false(grepl("BANDWIDTH_den_extern != BW_FIXED", gnn_body, fixed = TRUE))
+  expect_match(body, "BANDWIDTH_den_extern != BW_FIXED", fixed = TRUE)
+  expect_match(body, "BANDWIDTH_den_extern != BW_GEN_NN", fixed = TRUE)
+  expect_match(body, "const int use_bwctx =", fixed = TRUE)
   expect_match(
-    gnn_body,
-    "matrix_bandwidth_eval_one[l][0] = matrix_bandwidth_x[l][i]",
+    body,
+    "(BANDWIDTH_den_extern == BW_GEN_NN) ? matrix_bandwidth_x[l][i]",
     fixed = TRUE
   )
-  for (body in list(fixed_body, gnn_body))
-    expect_equal(lengths(regmatches(
-      body,
-      gregexpr("np_conditional_kernel_row_raw\\(", body, perl = TRUE)
-    )), 1L)
-
-  for (body in list(fixed_body, gnn_body)) {
-    expect_false(grepl("np_glp_qr_drop_workspace_apply", body, fixed = TRUE))
-    expect_false(grepl("self_weight = kw[eval_pos]", body, fixed = TRUE))
-    expect_match(
-      body,
-      "np_lp_delete_denominator(full_rows_out[i][eval_idx], &den)",
-      fixed = TRUE
-    )
-  }
-  fixed_markers <- c(
-    "np_lp_full_row_workspace_solve",
-    "np_lp_delete_denominator(full_rows_out[i][eval_idx], &den)",
-    "loo_rows_out[i][orig_j] ="
-  )
-  fixed_positions <- vapply(fixed_markers, function(marker) {
-    regexpr(marker, fixed_body, fixed = TRUE)[[1L]]
-  }, integer(1L))
-  expect_true(all(fixed_positions > 0L))
-  expect_true(all(diff(fixed_positions) > 0L))
-
-  gnn_markers <- c(
-    "matrix_bandwidth_eval_one[l][0] = matrix_bandwidth_x[l][i]",
+  expect_equal(lengths(regmatches(
+    body,
+    gregexpr("np_conditional_kernel_row_raw\\(", body, perl = TRUE)
+  )), 1L)
+  expect_false(grepl("np_glp_qr_drop_workspace_apply", body, fixed = TRUE))
+  expect_false(grepl("self_weight = kw[eval_pos]", body, fixed = TRUE))
+  markers <- c(
     "np_conditional_kernel_row_raw",
     "np_lp_full_row_workspace_solve",
-    "np_lp_delete_denominator(full_rows_out[i][eval_idx], &den)",
-    "loo_rows_out[i][j] ="
+    "np_lp_delete_denominator(rows_out[i][eval_idx], &den)"
   )
-  gnn_positions <- vapply(gnn_markers, function(marker) {
-    regexpr(marker, gnn_body, fixed = TRUE)[[1L]]
+  positions <- vapply(markers, function(marker) {
+    regexpr(marker, body, fixed = TRUE)[[1L]]
   }, integer(1L))
-  expect_true(all(gnn_positions > 0L))
-  expect_true(all(diff(gnn_positions) > 0L))
+  expect_true(all(positions > 0L))
+  expect_true(all(diff(positions) > 0L))
+  expect_match(body, "(j == eval_pos) ? 0.0 : rows_out[i][orig_j]/den",
+               fixed = TRUE)
+  expect_false(grepl("np_conditional_x_weight_block_pair", source, fixed = TRUE))
 })
 
-test_that("CVLS row reuse selects scalar, fixed, and generalized-NN siblings centrally", {
+test_that("conditional CVLS dispatch reaches only the canonical block owner", {
   src_file <- locate_cvls_row_reuse_source()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
   lines <- readLines(src_file, warn = FALSE)
@@ -108,49 +83,20 @@ test_that("CVLS row reuse selects scalar, fixed, and generalized-NN siblings cen
 
   expect_equal(lengths(regmatches(
     density_body,
-    gregexpr("np_conditional_x_weight_block_pair_selected_stream_core\\(", density_body, perl = TRUE)
+    gregexpr("np_conditional_x_weight_block_stream_core\\(", density_body, perl = TRUE)
   )), 2L)
   expect_equal(lengths(regmatches(
     density_body,
-    gregexpr("np_conditional_x_weight_block_pair_stream_core\\(", density_body, perl = TRUE)
-  )), 0L)
-  expect_equal(lengths(regmatches(
-    density_body,
-    gregexpr("np_conditional_x_weight_block_pair_gnn_stream_core\\(", density_body, perl = TRUE)
-  )), 0L)
+    gregexpr("np_conditional_x_weight_block_stream_core_impl\\(", density_body, perl = TRUE)
+  )), 1L)
   expect_match(
     density_body,
     "((np_lp_engine_extern == NP_LP_ENGINE_SCALAR) ||",
     fixed = TRUE
   )
   expect_false(grepl(
-    "np_conditional_x_weight_block_pair_selected_stream_core(",
+    "np_conditional_x_weight_block_pair",
     distribution_body,
-    fixed = TRUE
-  ))
-
-  selected_body <- cvls_source_body(
-    lines,
-    "^static int np_conditional_x_weight_block_pair_selected_stream_core\\(",
-    "^static int np_conditional_y_block_stream_op_core\\("
-  )
-  markers <- c(
-    "if(np_lp_engine_extern == NP_LP_ENGINE_SCALAR)",
-    "return np_conditional_x_weight_block_pair_scalar_stream_core",
-    "if(np_lp_engine_extern != NP_LP_ENGINE_GENERAL)",
-    "if(BANDWIDTH_den_extern == BW_GEN_NN)",
-    "return np_conditional_x_weight_block_pair_gnn_stream_core",
-    "if(BANDWIDTH_den_extern == BW_FIXED)",
-    "return np_conditional_x_weight_block_pair_stream_core"
-  )
-  positions <- vapply(markers, function(marker) {
-    regexpr(marker, selected_body, fixed = TRUE)[[1L]]
-  }, integer(1L))
-  expect_true(all(positions > 0L))
-  expect_true(all(diff(positions) > 0L))
-  expect_false(grepl(
-    "np_conditional_x_weight_block_stream_core_impl(",
-    selected_body,
     fixed = TRUE
   ))
 
@@ -159,6 +105,7 @@ test_that("CVLS row reuse selects scalar, fixed, and generalized-NN siblings cen
     "^static int np_conditional_x_weight_block_stream_core_impl\\(",
     "^static int np_conditional_x_weight_block_stream_core\\("
   )
+  expect_match(shared_x_body, "BANDWIDTH_den_extern != BW_FIXED", fixed = TRUE)
   expect_match(shared_x_body, "BANDWIDTH_den_extern != BW_GEN_NN", fixed = TRUE)
   expect_match(
     shared_x_body,

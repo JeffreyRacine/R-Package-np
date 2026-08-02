@@ -246,41 +246,30 @@ test_that("conditional width-one blocks share one raw row without LAPACK", {
   skip_if(!length(hits), "source file src/jksum.c unavailable")
   source <- paste(readLines(hits[[1L]], warn = FALSE), collapse = "\n")
 
-  scalar_start <- regexpr(
-    "static int np_conditional_x_weight_block_pair_scalar_stream_core(",
-    source,
-    fixed = TRUE
+  lines <- strsplit(source, "\n", fixed = TRUE)[[1L]]
+  start <- grep(
+    "^static int np_conditional_x_weight_block_stream_core_impl\\(",
+    lines
   )
-  general_start <- regexpr(
-    paste0(
-      "static int[^\\n]*",
-      "np_conditional_x_weight_block_pair_stream_core\\("
-    ),
-    source,
-    perl = TRUE
-  )
-  expect_gt(scalar_start, 0L)
-  expect_gt(general_start, scalar_start)
-  scalar <- substr(source, scalar_start, general_start - 1L)
+  stop <- grep("^static int np_conditional_x_weight_block_stream_core\\(", lines)
+  expect_length(start, 1L)
+  expect_length(stop, 1L)
+  expect_lt(start, stop)
+  body <- paste(lines[start:(stop - 1L)], collapse = "\n")
 
   expect_true(grepl(
-    "np_conditional_x_weight_block_stream_core_impl(vector_scale_factor,",
-    scalar,
+    "if(drop_eval_self && (lp_engine == NP_LP_ENGINE_SCALAR))",
+    body,
     fixed = TRUE
   ))
-  expect_true(grepl("loo_rows_out,", scalar, fixed = TRUE))
-  expect_true(grepl("full_rows_out);", scalar, fixed = TRUE))
-  expect_false(grepl("np_lp_full_row_workspace", scalar, fixed = TRUE))
-  expect_false(grepl("np_glp_qr_drop_workspace", scalar, fixed = TRUE))
-  expect_false(grepl("F77_", scalar, fixed = TRUE))
-
-  expect_true(grepl("double loo_sum = 0.0", source, fixed = TRUE))
-  expect_true(grepl("double full_sum = 0.0", source, fixed = TRUE))
-  expect_true(grepl(
-    "paired_full_rows_out[i][orig_j] = kw[j]/full_sum",
-    source,
-    fixed = TRUE
-  ))
+  expect_true(grepl("kw[eval_pos] = 0.0;", body, fixed = TRUE))
+  expect_true(grepl("if(lp_engine == NP_LP_ENGINE_SCALAR){", body,
+                    fixed = TRUE))
+  expect_true(grepl("rows_out[i][orig_j] = kw[j]/row_sum;", body,
+                    fixed = TRUE))
+  expect_false(grepl("np_conditional_x_weight_block_pair", source,
+                     fixed = TRUE))
+  expect_false(grepl("np_glp_qr_drop_workspace", body, fixed = TRUE))
 })
 
 test_that("conditional scalar fast streams retain the adaptive-NN oracle", {
@@ -344,7 +333,7 @@ test_that("conditional scalar fast streams retain the adaptive-NN oracle", {
     fixed = TRUE
   ))
   expect_true(grepl(
-    "np_conditional_x_weight_block_pair_selected_stream_core(",
+    "np_conditional_x_weight_block_stream_core(",
     source,
     fixed = TRUE
   ))

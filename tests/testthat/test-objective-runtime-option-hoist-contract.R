@@ -27,5 +27,7 @@ test_that("LP objectives freeze the Apple acceleration option only per call", {
   expect_match(text, "\\.runtime_options_frozen = 1")
   expect_match(text, "&frozen_runtime_options")
   expect_match(text, "&objective_pack_ctx")
-  expect_match(text, "gate_override_ctx,\\s+NULL,\\s+NULL\\);")
+  expect_gte(length(regmatches(
+    text, gregexpr("&objective_pack_ctx,", text, fixed = TRUE)
+  )[[1L]]), 2L)
 })

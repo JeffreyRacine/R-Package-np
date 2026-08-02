@@ -115,9 +115,17 @@ test_that("adaptive Gaussian row fusion has exactly three hot-row consumers", {
   expect_match(conditional, "int_TREE_X != NP_TREE_TRUE", fixed = TRUE)
   expect_match(
     conditional,
-    "np_conditional_kernel_row_raw(ctx->kernel_cx,",
+    "row_status = np_conditional_kernel_row(",
     fixed = TRUE
   )
+  expect_match(
+    conditional,
+    "row_status = np_conditional_kernel_row_raw(",
+    fixed = TRUE
+  )
+  expect_false(grepl(
+    "np_conditional_kernel_row_core(", conditional, fixed = TRUE
+  ))
   expect_match(
     conditional_y,
     "np_accel_gauss_adaptive_row_try(",
