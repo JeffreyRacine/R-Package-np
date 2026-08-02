@@ -266,6 +266,40 @@ test_that("beta CDF cross-validation matches explicit leave-one-out matrices", {
   )
 })
 
+test_that("beta CDF cross-validation matches all order and topology oracles", {
+  xval <- c(0.003, 0.014, 0.037, 0.081, 0.16, 0.27,
+            0.41, 0.57, 0.71, 0.83, 0.92, 0.982)
+  x <- data.frame(x = xval)
+
+  for (order in c(2L, 4L, 6L, 8L)) {
+    for (bwtype in c("fixed", "generalized_nn", "adaptive_nn")) {
+      bandwidth <- if (identical(bwtype, "fixed")) 0.14 else 5
+      bws <- npudistbw(
+        dat = x, bws = bandwidth, bandwidth.compute = FALSE,
+        bwtype = bwtype, bwscaling = FALSE,
+        ckertype = "beta", ckerorder = order,
+        ckerbound = "fixed", ckerlb = 0, ckerub = 1
+      )
+      weights <- npksum(
+        bws = bws, txdat = x, exdat = x,
+        operator = "integral", return.kernel.weights = TRUE
+      )$kw
+      fitted_loo <-
+        (matrix(colSums(weights), nrow(x), nrow(x), byrow = TRUE) -
+           weights) / (nrow(x) - 1L)
+      expected <- mean((outer(xval, xval, "<=") - fitted_loo)^2)
+
+      expect_equal(
+        beta_distribution_objective(
+          x, bandwidth, order, bwtype, gdat = x
+        ),
+        expected,
+        tolerance = 5e-11
+      )
+    }
+  }
+})
+
 test_that("beta objectives support fixed and both nearest-neighbor modes", {
   xval <- c(0.004, 0.015, 0.04, 0.11, 0.23, 0.39, 0.58, 0.74, 0.88, 0.97)
   x <- data.frame(x = xval)
@@ -352,4 +386,14 @@ test_that("beta automatic selectors return usable Powell and native NOMAD object
   ), common))
   expect_true(is.finite(mads$bw) && mads$bw > 0)
   expect_true(is.finite(mads$fval))
+
+  distribution_mads <- do.call(npudistbw, c(list(
+    dat = x, bwsolver = "mads", ngrid = 17L,
+    nomad.opts = list(MAX_BB_EVAL = 12)
+  ), common))
+  expect_true(is.finite(distribution_mads$bw) && distribution_mads$bw > 0)
+  expect_true(is.finite(distribution_mads$fval))
+  expect_true(all(is.finite(fitted(npudist(
+    bws = distribution_mads, tdat = x
+  )))))
 })
