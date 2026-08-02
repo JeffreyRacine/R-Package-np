@@ -1,5 +1,17 @@
 # np 0.70-6
 
+* Conditional-density least-squares bandwidth selection with a beta predictor
+  or response kernel now uses the shared conditional local-polynomial CVLS
+  engine across scalar and positive degrees, raw and Bernstein bases, fixed,
+  generalized-nearest-neighbour, and adaptive-nearest-neighbour bandwidths,
+  and mixed continuous/categorical data. Predictor rows use the canonical
+  signed full-row solve and exact delete-one identity; response rows retain the
+  established bounded-quadrature or analytic-convolution owners. A bounded
+  analytic-response supertile reuses convolution rows without retaining an
+  observation-square matrix. Automatic Powell, MADS plus Powell, and degree
+  search now accept these supported conditional-density configurations;
+  conditional-distribution bandwidth activation remains separately gated.
+
 * Conditional density and distribution gradients with a beta response kernel
   now retain the same signed-infinite endpoint limits and explicit missing
   gradient standard errors as the canonical beta regression engine. Finite

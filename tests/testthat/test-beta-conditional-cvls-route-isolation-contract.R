@@ -8,7 +8,9 @@ locate_beta_conditional_cvls_sources <- function() {
   for (root in roots) {
     if (file.exists(file.path(root, "src", "headers.h")) &&
         file.exists(file.path(root, "src", "jksum.c")) &&
-        file.exists(file.path(root, "src", "kernelcv.c")))
+        file.exists(file.path(root, "src", "kernelcv.c")) &&
+        file.exists(file.path(root, "src", "beta_objectives.c")) &&
+        file.exists(file.path(root, "src", "beta_objectives.h")))
       return(root)
   }
   NULL
@@ -19,7 +21,7 @@ beta_conditional_cvls_count_fixed <- function(text, pattern) {
   sum(hits > 0L)
 }
 
-test_that("conditional CVLS route sibling is declared but dormant", {
+test_that("conditional CVLS route sibling is the sole beta ingress", {
   root <- locate_beta_conditional_cvls_sources()
   skip_if(is.null(root), "package sources unavailable")
   headers <- paste(
@@ -32,6 +34,13 @@ test_that("conditional CVLS route sibling is declared but dormant", {
   )
   ingress <- paste(
     readLines(file.path(root, "src", "kernelcv.c"), warn = FALSE),
+    collapse = "\n"
+  )
+  displaced_sidecar <- paste(
+    c(
+      readLines(file.path(root, "src", "beta_objectives.c"), warn = FALSE),
+      readLines(file.path(root, "src", "beta_objectives.h"), warn = FALSE)
+    ),
     collapse = "\n"
   )
 
@@ -57,16 +66,28 @@ test_that("conditional CVLS route sibling is declared but dormant", {
       ingress,
       "np_conditional_density_cvls_lp_stream_ctx("
     ),
-    0L
+    1L
   )
   expect_match(
     ingress,
-    "np_beta_conditional_density_bw_objective(vector_scale_factor, 1)",
+    "np_beta_conditional_density_bw_objective_ls_ctx(",
     fixed = TRUE
   )
+  expect_false(grepl("np_beta_objective_conditional_density_ls(", ingress,
+                     fixed = TRUE))
+  expect_false(grepl(
+    "np_beta_objective_conditional_density_ls(",
+    displaced_sidecar,
+    fixed = TRUE
+  ))
+  expect_false(grepl(
+    "np_beta_objective_conditional_density_ls_unbounded_legacy_y(",
+    displaced_sidecar,
+    fixed = TRUE
+  ))
 })
 
-test_that("conditional CVLS route sibling delegates null and fails closed", {
+test_that("conditional CVLS route sibling delegates null and owns routed adapter", {
   root <- locate_beta_conditional_cvls_sources()
   skip_if(is.null(root), "package sources unavailable")
   engine <- paste(
@@ -99,7 +120,13 @@ test_that("conditional CVLS route sibling delegates null and fails closed", {
     "conditional density CVLS kernel route has an invalid layout",
     fixed = TRUE
   )
-  expect_match(sibling, "return 1;", fixed = TRUE)
+  expect_match(sibling, "NPConditionalCVLSRowProvider provider;", fixed = TRUE)
+  expect_match(
+    sibling,
+    "provider.x_row = np_conditional_cvls_provider_x_row;",
+    fixed = TRUE
+  )
+  expect_match(sibling, "&provider", fixed = TRUE)
   expect_false(grepl("kernel_weighted_sum_np(", sibling, fixed = TRUE))
   expect_false(grepl("malloc(", sibling, fixed = TRUE))
   expect_false(grepl("calloc(", sibling, fixed = TRUE))

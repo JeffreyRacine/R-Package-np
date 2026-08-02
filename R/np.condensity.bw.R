@@ -2919,7 +2919,11 @@ npNomadShadowSearchConditionalDensity <- function(template,
     xdat = xdat,
     ydat = ydat,
     bws = bws,
-    bandwidth.compute = FALSE,
+    # A zero beta vector is an automatic-search placeholder, not a manual
+    # bandwidth.  Use the same template-validation contract as fixed-degree
+    # MADS so degree search cannot reject its own unevaluated start state.
+    bandwidth.compute = identical(reg.args$cxkertype, "beta") ||
+      identical(reg.args$cykertype, "beta"),
     reg.args = template.reg.args
   )
 

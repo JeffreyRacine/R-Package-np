@@ -980,8 +980,8 @@ test_that("density bandwidth ingress owns categorical compression state", {
     "NP_BETA_BW_CONTINUOUS_ONLY,", ingress, fixed = TRUE
   )[[1L]]
   reject_hits <- reject_hits[reject_hits > 0L]
-  expect_length(allow_hits, 3L)
-  expect_length(reject_hits, 6L)
+  expect_length(allow_hits, 7L)
+  expect_length(reject_hits, 2L)
   contract_hits <- gregexpr(
     "np_density_bw_integer_contract_or_error(", ingress, fixed = TRUE
   )[[1L]]

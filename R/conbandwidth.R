@@ -138,7 +138,8 @@ conbandwidth <-
   )
   npValidateConditionalBetaBandwidthObject(
     beta.prototype, where = "conditional density",
-    bandwidth.compute = bandwidth.compute
+    bandwidth.compute = bandwidth.compute,
+    allow.automatic.full = TRUE
   )
   bounded_nonfixed_supported <- bwtype %in% c("generalized_nn", "adaptive_nn")
   if (bwtype != "fixed" &&

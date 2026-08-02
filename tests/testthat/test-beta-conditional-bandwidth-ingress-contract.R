@@ -72,6 +72,70 @@ test_that("conditional bandwidth ingress marshals one compression contract", {
   )
 })
 
+test_that("conditional density beta ingress is open while distribution remains closed", {
+  root <- locate_beta_conditional_bandwidth_sources()
+  skip_if(is.null(root), "package sources unavailable")
+  ingress <- paste(
+    readLines(file.path(root, "src", "np.c"), warn = FALSE),
+    collapse = "\n"
+  )
+
+  expect_false(grepl(
+    "C_np_density_conditional_bw: beta bandwidth selection supports only local-constant fitting",
+    ingress,
+    fixed = TRUE
+  ))
+  expect_false(grepl(
+    "C_np_density_conditional_bw: beta bandwidth selection requires continuous X and Y variables only",
+    ingress,
+    fixed = TRUE
+  ))
+  expect_match(
+    ingress,
+    "C_np_distribution_conditional_bw: beta bandwidth selection supports only local-constant fitting",
+    fixed = TRUE
+  )
+  expect_match(
+    ingress,
+    "C_np_distribution_conditional_bw: beta bandwidth selection requires continuous X and Y variables only",
+    fixed = TRUE
+  )
+
+  density_starts <- gregexpr(
+    "void np_density_conditional_bw(double * c_uno",
+    ingress,
+    fixed = TRUE
+  )[[1L]]
+  distribution_starts <- gregexpr(
+    "void np_distribution_conditional_bw(double * c_uno",
+    ingress,
+    fixed = TRUE
+  )[[1L]]
+  density_start <- tail(density_starts[density_starts > 0L], 1L)
+  distribution_start <- tail(
+    distribution_starts[distribution_starts > 0L],
+    1L
+  )
+  expect_gt(density_start, 0L)
+  expect_gt(distribution_start, density_start)
+  density_ingress <- substr(
+    ingress,
+    density_start,
+    distribution_start - 1L
+  )
+  allow_hits <- gregexpr(
+    "NP_BETA_BW_ALLOW_CATEGORICAL",
+    density_ingress,
+    fixed = TRUE
+  )[[1L]]
+  expect_length(allow_hits[allow_hits > 0L], 2L)
+  expect_false(grepl(
+    "NP_BETA_BW_CONTINUOUS_ONLY",
+    density_ingress,
+    fixed = TRUE
+  ))
+})
+
 test_that("conditional bandwidth objectives are neutral to dormant compression state", {
   old <- options(np.messages = FALSE, np.categorical.compress = FALSE)
   on.exit(options(old), add = TRUE)
