@@ -572,6 +572,21 @@ test_that("regression objective owner activates the continuous scalar beta route
   )
   expect_match(
     engine,
+    "np_regression_cv_lp_continuous_route(",
+    fixed = TRUE
+  )
+  expect_match(
+    owner,
+    "lp_engine != NP_LP_ENGINE_GENERAL",
+    fixed = TRUE
+  )
+  expect_match(
+    owner,
+    "if(lp_engine == NP_LP_ENGINE_SCALAR)",
+    fixed = TRUE
+  )
+  expect_match(
+    engine,
     "np_beta_scaled_row_context_fill_omitting(",
     fixed = TRUE
   )

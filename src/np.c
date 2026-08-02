@@ -16869,8 +16869,8 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   np_lp_engine_extern = np_regression_engine_or_error(
     myopti[RBW_LL], "C_np_regression_bw");
   if(KERNEL_reg_extern == NP_CKERNEL_COORDINATE_CODE &&
-     (np_lp_engine_extern != NP_LP_ENGINE_SCALAR || lsq_check_mode))
-    error("C_np_regression_bw: beta bandwidth selection supports only local-constant mean regression");
+     lsq_check_mode)
+    error("C_np_regression_bw: beta bandwidth selection does not support least-quantile regression");
   vector_glp_degree_extern = glp_degree;
   vector_glp_gradient_order_extern = NULL;
   int_glp_bernstein_extern = *glp_bernstein;

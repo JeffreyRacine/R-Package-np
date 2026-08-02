@@ -17256,6 +17256,217 @@ cleanup_route:
 }
 
 /*
+ * Route-aware wider-LP regression objective.  The hoisted package basis and
+ * common LP influence-row workspace own estimator algebra; the continuous
+ * route supplies only one complete common-scaled kernel row per evaluation.
+ * CVLS is obtained from the full smoother row by the exact signed delete-one
+ * identity, so CVLS and CVAIC share the kernel and WLS work without retaining
+ * an observation-square matrix.
+ */
+static NP_NOINLINE int np_regression_cv_lp_continuous_route(
+  const int bwm,
+  const int KERNEL_unordered_reg,
+  const int KERNEL_ordered_reg,
+  const int BANDWIDTH_reg,
+  const int num_obs,
+  const int num_reg_unordered,
+  const int num_reg_ordered,
+  const int num_reg_continuous,
+  double **matrix_X_unordered,
+  double **matrix_X_ordered,
+  double **matrix_X_continuous,
+  double *vector_Y,
+  double *vector_scale_factor,
+  int *num_categories,
+  const NPContinuousKernelRoute * const kernel_route,
+  NPContinuousKernelDerivativeDiagnostics * const kernel_route_diagnostics,
+  const int categorical_compress,
+  double * const objective)
+{
+  const int num_reg =
+    num_reg_continuous + num_reg_unordered + num_reg_ordered;
+  const int bwmdim = (BANDWIDTH_reg == BW_FIXED) ? 1 : num_obs;
+  const int use_bernstein = (int_glp_bernstein_extern != 0);
+  NPBetaScaledRowContext row_context;
+  NPReghatLPWorkspace lp_workspace;
+  NPContinuousKernelRowStatus row_status = NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  int *operator = NULL;
+  int *kernel_u = NULL;
+  int *kernel_o = NULL;
+  double **matrix_bandwidth = NULL;
+  double *lambda = NULL;
+  double *row = NULL;
+  double *influence_row = NULL;
+  double *eval_basis = NULL;
+  double cv = 0.0;
+  double traceH = 0.0;
+  int nterms;
+  int evaluation;
+  int status = 1;
+
+  if(objective == NULL || num_obs < 2 || num_reg_continuous <= 0 ||
+     matrix_X_continuous == NULL || vector_Y == NULL ||
+     vector_scale_factor == NULL || kernel_route == NULL ||
+     kernel_route_diagnostics == NULL ||
+     (bwm != RBWM_CVLS && bwm != RBWM_CVAIC) ||
+     (BANDWIDTH_reg != BW_FIXED && BANDWIDTH_reg != BW_GEN_NN &&
+      BANDWIDTH_reg != BW_ADAP_NN) ||
+     (categorical_compress != 0 && categorical_compress != 1))
+    return 1;
+
+  np_beta_scaled_row_context_init(&row_context);
+  np_reghat_lp_workspace_init(&lp_workspace);
+
+  if(!np_glp_cv_cache.ready ||
+     (np_glp_cv_cache.use_bernstein != use_bernstein) ||
+     (np_glp_cv_cache.basis_mode != int_glp_basis_extern) ||
+     (np_glp_cv_cache.num_obs != num_obs) ||
+     (np_glp_cv_cache.ncon != num_reg_continuous) ||
+     (np_glp_cv_cache.matrix_X_continuous_train_ptr !=
+      matrix_X_continuous)) {
+    if(!np_glp_cv_cache_prepare(NP_LP_ENGINE_GENERAL, num_obs,
+                                num_reg_continuous,
+                                matrix_X_continuous))
+      goto cleanup_lp_route;
+  }
+  if(!np_glp_cv_cache.ready || np_glp_cv_cache.basis == NULL ||
+     np_glp_cv_cache.terms == NULL || np_glp_cv_cache.nterms <= 0)
+    goto cleanup_lp_route;
+
+  nterms = np_glp_cv_cache.nterms;
+  if(nterms <= 1)
+    error("regression objective general LP route requires basis width greater than one");
+  if(np_reghat_lp_workspace_prepare_columns(
+       &lp_workspace, np_glp_cv_cache.basis, num_obs, nterms) !=
+     NP_REGHAT_LP_ROW_OK)
+    goto cleanup_lp_route;
+
+  operator = (int *)np_jksum_malloc_array_or_die(
+    (size_t)MAX(1, num_reg), sizeof(int),
+    "regression LP objective route operator");
+  kernel_u = (int *)np_jksum_malloc_array_or_die(
+    (size_t)MAX(1, num_reg_unordered), sizeof(int),
+    "regression LP objective route unordered kernel");
+  kernel_o = (int *)np_jksum_malloc_array_or_die(
+    (size_t)MAX(1, num_reg_ordered), sizeof(int),
+    "regression LP objective route ordered kernel");
+  lambda = (double *)np_jksum_malloc_array_or_die(
+    (size_t)MAX(1, num_reg_unordered + num_reg_ordered), sizeof(double),
+    "regression LP objective route categorical bandwidth");
+  row = (double *)np_jksum_malloc_array_or_die(
+    (size_t)num_obs, sizeof(double), "regression LP objective route row");
+  influence_row = (double *)np_jksum_malloc_array_or_die(
+    (size_t)num_obs, sizeof(double),
+    "regression LP objective influence row");
+  eval_basis = (double *)np_jksum_malloc_array_or_die(
+    (size_t)nterms, sizeof(double),
+    "regression LP objective evaluation basis");
+  matrix_bandwidth = alloc_matd(bwmdim, num_reg_continuous);
+  if(matrix_bandwidth == NULL)
+    goto cleanup_lp_route;
+
+  for(evaluation = 0; evaluation < num_reg; ++evaluation)
+    operator[evaluation] = OP_NORMAL;
+  for(evaluation = 0; evaluation < num_reg_unordered; ++evaluation)
+    kernel_u[evaluation] = KERNEL_unordered_reg;
+  for(evaluation = 0; evaluation < num_reg_ordered; ++evaluation)
+    kernel_o[evaluation] = KERNEL_ordered_reg;
+
+  if(np_beta_continuous_bandwidth_prepare_canonical(
+       BANDWIDTH_reg, num_obs, num_obs,
+       num_reg_unordered, num_reg_ordered, num_reg_continuous,
+       matrix_X_continuous, matrix_X_continuous,
+       vector_scale_factor, matrix_bandwidth, NULL, lambda, NULL) != 0)
+    goto cleanup_lp_route;
+
+  row_status = np_beta_scaled_row_context_prepare(
+    &row_context, kernel_route, kernel_route_diagnostics, BANDWIDTH_reg,
+    num_obs, num_obs, num_reg_continuous,
+    num_reg_unordered, num_reg_ordered,
+    matrix_X_continuous, matrix_X_continuous,
+    matrix_X_unordered, matrix_X_unordered,
+    matrix_X_ordered, matrix_X_ordered,
+    matrix_bandwidth, matrix_bandwidth, operator,
+    kernel_u, kernel_o, lambda, num_categories,
+    matrix_categorical_vals_extern, categorical_compress, row);
+  if(row_status != NP_CONTINUOUS_ROW_OK)
+    goto cleanup_lp_route;
+
+  for(evaluation = 0; evaluation < num_obs; ++evaluation) {
+    double fitted = 0.0;
+    double leverage;
+    double residual;
+    int observation;
+    int term;
+
+    if((evaluation & 31) == 0)
+      np_progress_bandwidth_loop_step();
+    row_status = np_beta_scaled_row_context_fill(
+      &row_context, evaluation, NULL, NULL);
+    if(row_status != NP_CONTINUOUS_ROW_OK)
+      goto cleanup_lp_route;
+
+    for(term = 0; term < nterms; ++term)
+      eval_basis[term] = np_glp_cv_cache.basis[term][evaluation];
+    if(np_reghat_lp_workspace_influence_row(
+         &lp_workspace, row, eval_basis, influence_row, 1U) !=
+       NP_REGHAT_LP_ROW_OK)
+      goto cleanup_lp_route;
+
+    for(observation = 0; observation < num_obs; ++observation)
+      fitted += influence_row[observation]*vector_Y[observation];
+    leverage = influence_row[evaluation];
+    residual = vector_Y[evaluation] - fitted;
+
+    if(bwm == RBWM_CVLS) {
+      double denominator;
+
+      if(!np_lp_delete_denominator(leverage, &denominator))
+        goto cleanup_lp_route;
+      residual /= denominator;
+      cv += residual*residual;
+    } else {
+      cv += residual*residual;
+      traceH += leverage;
+    }
+    if(!R_FINITE(cv) || !R_FINITE(traceH))
+      goto cleanup_lp_route;
+  }
+
+  cv /= (double)num_obs;
+  if(bwm == RBWM_CVAIC) {
+    const double penalty_denominator =
+      1.0 - (traceH + 2.0)/(double)num_obs;
+    const double penalty_numerator =
+      1.0 + traceH/(double)num_obs;
+    const double penalty = penalty_numerator/penalty_denominator;
+
+    if(!(cv > 0.0) || !R_FINITE(cv) || !R_FINITE(penalty) || penalty < 0.0)
+      goto cleanup_lp_route;
+    cv = log(cv) + penalty;
+  }
+  if(!R_FINITE(cv))
+    goto cleanup_lp_route;
+
+  *objective = cv;
+  status = 0;
+
+cleanup_lp_route:
+  np_beta_scaled_row_context_clear(&row_context);
+  np_reghat_lp_workspace_clear(&lp_workspace);
+  if(matrix_bandwidth != NULL)
+    free_mat(matrix_bandwidth, num_reg_continuous);
+  free(operator);
+  free(kernel_u);
+  free(kernel_o);
+  free(lambda);
+  free(row);
+  free(influence_row);
+  free(eval_basis);
+  return status;
+}
+
+/*
  * Isolated route-bearing sibling for canonical continuous-kernel activation.
  * The incumbent ABI and hot body above stay literal. Null route state still
  * delegates to that exact owner; admitted route state must complete through
@@ -17301,18 +17512,31 @@ const int categorical_compress)
      kernel_route->segment[0].coordinate_offset != 0 ||
      kernel_route->segment[0].coordinate_count != num_reg_continuous ||
      num_reg_continuous <= 0 || num_reg_unordered != 0 ||
-     num_reg_ordered != 0 || lp_engine != NP_LP_ENGINE_SCALAR ||
+     num_reg_ordered != 0 ||
+     (lp_engine != NP_LP_ENGINE_SCALAR &&
+      lp_engine != NP_LP_ENGINE_GENERAL) ||
      (categorical_compress != 0 && categorical_compress != 1))
     error("regression objective kernel route has an invalid layout");
 
-  if(np_regression_cv_scalar_continuous_route(
-       bwm, KERNEL_unordered_reg, KERNEL_ordered_reg, BANDWIDTH_reg,
-       num_obs, num_reg_unordered, num_reg_ordered, num_reg_continuous,
-       matrix_X_unordered, matrix_X_ordered, matrix_X_continuous,
-       vector_Y, vector_scale_factor, num_categories,
-       kernel_route, kernel_route_diagnostics, categorical_compress,
-       &objective) != 0)
-    return DBL_MAX;
+  if(lp_engine == NP_LP_ENGINE_SCALAR) {
+    if(np_regression_cv_scalar_continuous_route(
+         bwm, KERNEL_unordered_reg, KERNEL_ordered_reg, BANDWIDTH_reg,
+         num_obs, num_reg_unordered, num_reg_ordered, num_reg_continuous,
+         matrix_X_unordered, matrix_X_ordered, matrix_X_continuous,
+         vector_Y, vector_scale_factor, num_categories,
+         kernel_route, kernel_route_diagnostics, categorical_compress,
+         &objective) != 0)
+      return DBL_MAX;
+  } else {
+    if(np_regression_cv_lp_continuous_route(
+         bwm, KERNEL_unordered_reg, KERNEL_ordered_reg, BANDWIDTH_reg,
+         num_obs, num_reg_unordered, num_reg_ordered, num_reg_continuous,
+         matrix_X_unordered, matrix_X_ordered, matrix_X_continuous,
+         vector_Y, vector_scale_factor, num_categories,
+         kernel_route, kernel_route_diagnostics, categorical_compress,
+         &objective) != 0)
+      return DBL_MAX;
+  }
   return objective;
 }
 

@@ -372,7 +372,7 @@ test_that("canonical LP hat and apply routes avoid legacy solve marshalling", {
   }
 })
 
-test_that("conditional LP LOO rows use signed full-row deletion and no QR", {
+test_that("LP LOO rows use signed full-row deletion and no QR", {
   src_file <- locate_jksum_c()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
 
@@ -399,8 +399,13 @@ test_that("conditional LP LOO rows use signed full-row deletion and no QR", {
 
   expect_equal(
     sum(grepl("if\\(!np_lp_delete_denominator\\(", lines)),
-    5L
+    6L
   )
+  expect_true(grepl(
+    "np_regression_cv_lp_continuous_route",
+    source,
+    fixed = TRUE
+  ))
   expect_equal(
     sum(grepl("fabs\\(row_sum\\) > DBL_MIN", lines)),
     3L

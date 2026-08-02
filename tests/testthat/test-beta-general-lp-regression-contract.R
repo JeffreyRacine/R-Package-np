@@ -110,17 +110,20 @@ test_that("beta general LP retains a common scale through raw-weight underflow",
   }
 })
 
-test_that("automatic beta LP search remains fail-closed", {
+test_that("automatic beta LP objective evaluation is enabled", {
   set.seed(5113)
   x <- data.frame(x1 = runif(31), x2 = runif(31))
   y <- x$x1 - x$x2
 
-  expect_error(
-    npregbw(
-      xdat = x, ydat = y, regtype = "lp", degree = c(1L, 1L),
-      ckertype = "beta", ckerorder = 2L,
-      ckerbound = "fixed", ckerlb = c(0, 0), ckerub = c(1, 1)
-    ),
-    "currently supports only regtype = \"lc\""
+  bw <- npregbw(
+    xdat = x, ydat = y, bws = c(0.31, 0.34),
+    bandwidth.compute = FALSE, regtype = "lp", degree = c(1L, 1L),
+    ckertype = "beta", ckerorder = 2L,
+    ckerbound = "fixed", ckerlb = c(0, 0), ckerub = c(1, 1)
   )
+  result <- np:::.npregbw_eval_only(
+    xdat = x, ydat = y, bws = bw, invalid.penalty = "dbmax"
+  )
+
+  expect_true(is.finite(result$objective[[1L]]))
 })
