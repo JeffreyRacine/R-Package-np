@@ -34,6 +34,33 @@ beta_conditional_side_weights <- function(train, evaluation, bandwidth,
   weights
 }
 
+beta_conditional_legacy_derivative_weights <- function(
+    train, evaluation, bandwidth, bwtype, order) {
+  weights <- npksum(
+    bws = bandwidth, txdat = data.frame(value = train),
+    exdat = data.frame(value = evaluation), bwtype = bwtype,
+    ckertype = "gaussian", ckerorder = order,
+    operator = "derivative", return.kernel.weights = TRUE
+  )$kw
+  realized <- if (identical(bwtype, "fixed")) {
+    bandwidth
+  } else if (identical(bwtype, "generalized_nn")) {
+    vapply(evaluation, function(value) {
+      sort(abs(train - value), method = "quick")[[bandwidth]]
+    }, numeric(1L))
+  } else {
+    vapply(train, function(value) {
+      sort(abs(train - value), method = "quick")[[bandwidth + 1L]]
+    }, numeric(1L))
+  }
+  sweep(
+    weights,
+    if (identical(bwtype, "adaptive_nn")) 1L else 2L,
+    realized * realized,
+    "/"
+  )
+}
+
 beta_conditional_oracle <- function(x_weights, y_weights) {
   denominator <- colSums(x_weights)
   estimate <- colSums(x_weights * y_weights) / denominator
@@ -449,6 +476,334 @@ test_that("beta X prepared NN bandwidths preserve scalar and LP algebra", {
       expect_equal(drop(lp$congerr), lp_expected$gradient_stderr,
                    tolerance = 3e-7)
     }
+  }
+})
+
+test_that("beta Y uses the canonical conditional scalar and LP engine", {
+  training_x <- data.frame(
+    x = c(-1.1, -0.82, -0.57, -0.31, -0.08, 0.13,
+          0.29, 0.48, 0.66, 0.81, 1.02, 1.21)
+  )
+  training_y <- data.frame(
+    y = c(0.025, 0.07, 0.13, 0.21, 0.34, 0.46,
+          0.58, 0.67, 0.76, 0.84, 0.91, 0.975)
+  )
+  evaluation_x <- data.frame(x = c(-0.75, -0.25, 0.2, 0.6, 0.95))
+  evaluation_y <- data.frame(y = c(0.09, 0.27, 0.49, 0.72, 0.9))
+  x_weights <- beta_conditional_side_weights(
+    training_x$x, evaluation_x$x, 0.3, "fixed", "gaussian", 4L, 0, 1
+  )
+  x_derivative <- beta_conditional_legacy_derivative_weights(
+    training_x$x, evaluation_x$x, 0.3, "fixed", 4L
+  )
+
+  for (kind in c("density", "distribution")) {
+    constructor <- if (identical(kind, "density")) npcdensbw else npcdistbw
+    estimator <- if (identical(kind, "density")) npcdens else npcdist
+    y_weights <- beta_conditional_side_weights(
+      training_y$y, evaluation_y$y, 0.17, "fixed", "beta", 8L, 0, 1,
+      operator = if (identical(kind, "density")) "normal" else "integral"
+    )
+    common <- list(
+      xdat = training_x, ydat = training_y, bws = c(0.17, 0.3),
+      bandwidth.compute = FALSE,
+      cxkertype = "gaussian", cxkerorder = 4L,
+      cykertype = "beta", cykerorder = 8L,
+      cykerbound = "fixed", cykerlb = 0, cykerub = 1
+    )
+
+    scalar_bw <- do.call(constructor, c(common, list(regtype = "lc")))
+    scalar <- estimator(
+      bws = scalar_bw, txdat = training_x, tydat = training_y,
+      exdat = evaluation_x, eydat = evaluation_y, gradients = TRUE
+    )
+    scalar_expected <- beta_conditional_oracle(x_weights, y_weights)
+    denominator <- colSums(x_weights)
+    derivative_denominator <- colSums(x_derivative)
+    scalar_gradient <-
+      (colSums(x_derivative * y_weights) -
+       scalar_expected$estimate * derivative_denominator) / denominator
+    normalized <- sweep(x_weights, 2L, denominator, "/")
+    derivative_normalized <-
+      sweep(x_derivative, 2L, denominator, "/") -
+      sweep(normalized, 2L, derivative_denominator / denominator, "*")
+    gradient_influence <-
+      derivative_normalized *
+        sweep(y_weights, 2L, scalar_expected$estimate, "-") -
+      sweep(normalized, 2L, scalar_gradient, "*")
+    scalar_gradient_stderr <- sqrt(
+      colSums(gradient_influence^2) / (nrow(x_weights) - 1L)
+    )
+    expect_equal(fitted(scalar), scalar_expected$estimate, tolerance = 2e-8)
+    expect_equal(se(scalar), scalar_expected$stderr, tolerance = 2e-8)
+    expect_equal(drop(scalar$congrad), scalar_gradient, tolerance = 3e-7)
+    expect_equal(drop(scalar$congerr), scalar_gradient_stderr,
+                 tolerance = 3e-7)
+
+    for (specification in list(
+      list(degree = 2L, bernstein = FALSE),
+      list(degree = 3L, bernstein = TRUE)
+    )) {
+      lp_bw <- do.call(constructor, c(
+        common,
+        list(regtype = "lp", degree = specification$degree,
+             basis = "glp", bernstein.basis = specification$bernstein)
+      ))
+      lp <- estimator(
+        bws = lp_bw, txdat = training_x, tydat = training_y,
+        exdat = evaluation_x, eydat = evaluation_y, gradients = TRUE
+      )
+      lp_expected <- beta_conditional_lp_oracle(
+        training_x, evaluation_x, specification$degree,
+        specification$bernstein, x_weights, y_weights
+      )
+      expect_equal(fitted(lp), lp_expected$estimate, tolerance = 2e-8)
+      expect_equal(se(lp), lp_expected$stderr, tolerance = 2e-8)
+      expect_equal(drop(lp$congrad), lp_expected$gradient, tolerance = 3e-7)
+      expect_equal(drop(lp$congerr), lp_expected$gradient_stderr,
+                   tolerance = 3e-7)
+    }
+  }
+
+  alias_common <- list(
+    xdat = training_x, ydat = training_y, bws = c(0.17, 0.3),
+    bandwidth.compute = FALSE,
+    cxkertype = "gaussian", cxkerorder = 4L,
+    cykertype = "beta", cykerorder = 8L,
+    cykerbound = "fixed", cykerlb = 0, cykerub = 1
+  )
+  ll_bw <- do.call(npcdensbw, c(alias_common, list(regtype = "ll")))
+  lp1_bw <- do.call(npcdensbw, c(
+    alias_common,
+    list(regtype = "lp", degree = 1L, basis = "glp",
+         bernstein.basis = FALSE)
+  ))
+  ll_fit <- npcdens(
+    bws = ll_bw, txdat = training_x, tydat = training_y,
+    exdat = evaluation_x, eydat = evaluation_y, gradients = TRUE
+  )
+  lp1_fit <- npcdens(
+    bws = lp1_bw, txdat = training_x, tydat = training_y,
+    exdat = evaluation_x, eydat = evaluation_y, gradients = TRUE
+  )
+  expect_identical(fitted(ll_fit), fitted(lp1_fit))
+  expect_identical(se(ll_fit), se(lp1_fit))
+  expect_identical(ll_fit$congrad, lp1_fit$congrad)
+  expect_identical(ll_fit$congerr, lp1_fit$congerr)
+})
+
+test_that("beta Y prepared NN bandwidths preserve scalar and LP algebra", {
+  training_x <- data.frame(
+    x = c(-1.1, -0.82, -0.57, -0.31, -0.08, 0.13,
+          0.29, 0.48, 0.66, 0.81, 1.02, 1.21)
+  )
+  training_y <- data.frame(
+    y = c(0.025, 0.07, 0.13, 0.21, 0.34, 0.46,
+          0.58, 0.67, 0.76, 0.84, 0.91, 0.975)
+  )
+  evaluation_x <- data.frame(x = c(-0.75, -0.25, 0.2, 0.6, 0.95))
+  evaluation_y <- data.frame(y = c(0.09, 0.27, 0.49, 0.72, 0.9))
+  neighbours <- 4L
+
+  for (bwtype in c("generalized_nn", "adaptive_nn")) {
+    x_weights <- beta_conditional_side_weights(
+      training_x$x, evaluation_x$x, neighbours, bwtype,
+      "gaussian", 4L, 0, 1
+    )
+    for (kind in c("density", "distribution")) {
+      constructor <- if (identical(kind, "density")) npcdensbw else npcdistbw
+      estimator <- if (identical(kind, "density")) npcdens else npcdist
+      y_weights <- beta_conditional_side_weights(
+        training_y$y, evaluation_y$y, neighbours, bwtype,
+        "beta", 8L, 0, 1,
+        operator = if (identical(kind, "density")) "normal" else "integral"
+      )
+      common <- list(
+        xdat = training_x, ydat = training_y,
+        bws = c(neighbours, neighbours), bandwidth.compute = FALSE,
+        bwtype = bwtype,
+        cxkertype = "gaussian", cxkerorder = 4L,
+        cykertype = "beta", cykerorder = 8L,
+        cykerbound = "fixed", cykerlb = 0, cykerub = 1
+      )
+      scalar_bw <- do.call(constructor, c(common, list(regtype = "lc")))
+      scalar <- estimator(
+        bws = scalar_bw, txdat = training_x, tydat = training_y,
+        exdat = evaluation_x, eydat = evaluation_y
+      )
+      scalar_expected <- beta_conditional_oracle(x_weights, y_weights)
+      expect_equal(fitted(scalar), scalar_expected$estimate,
+                   tolerance = 2e-8)
+      expect_equal(se(scalar), scalar_expected$stderr, tolerance = 2e-8)
+
+      lp_bw <- do.call(constructor, c(
+        common,
+        list(regtype = "lp", degree = 2L, basis = "glp",
+             bernstein.basis = FALSE)
+      ))
+      lp <- estimator(
+        bws = lp_bw, txdat = training_x, tydat = training_y,
+        exdat = evaluation_x, eydat = evaluation_y, gradients = TRUE
+      )
+      lp_expected <- beta_conditional_lp_oracle(
+        training_x, evaluation_x, 2L, FALSE, x_weights, y_weights
+      )
+      expect_equal(fitted(lp), lp_expected$estimate, tolerance = 2e-8)
+      expect_equal(se(lp), lp_expected$stderr, tolerance = 2e-8)
+      expect_equal(drop(lp$congrad), lp_expected$gradient, tolerance = 3e-7)
+      expect_equal(drop(lp$congerr), lp_expected$gradient_stderr,
+                   tolerance = 3e-7)
+    }
+  }
+})
+
+test_that("adaptive beta-Y gradients preserve independent predictor planes", {
+  n <- 32L
+  neighbours <- 8L
+  training_x <- data.frame(
+    x1 = seq(-1.1, 1.1, length.out = n),
+    x2 = ((seq_len(n) * 11L) %% n) / (n - 1L) - 0.5
+  )
+  training_y <- data.frame(
+    y = plogis(0.6 * sin(training_x$x1) - 0.4 * training_x$x2)
+  )
+  evaluation_x <- data.frame(
+    x1 = seq(-0.8, 0.8, length.out = 6L),
+    x2 = seq(0.35, -0.35, length.out = 6L)
+  )
+  evaluation_y <- data.frame(y = seq(0.12, 0.88, length.out = 6L))
+  bandwidth <- npcdensbw(
+    xdat = training_x, ydat = training_y,
+    bws = rep(neighbours, 3L), bandwidth.compute = FALSE,
+    bwtype = "adaptive_nn", regtype = "lc",
+    cxkertype = "gaussian", cxkerorder = 4L,
+    cykertype = "beta", cykerorder = 6L,
+    cykerbound = "fixed", cykerlb = 0, cykerub = 1
+  )
+  fits <- replicate(3L, npcdens(
+    bws = bandwidth, txdat = training_x, tydat = training_y,
+    exdat = evaluation_x, eydat = evaluation_y, gradients = TRUE
+  ), simplify = FALSE)
+
+  realized <- vapply(training_x, function(variable) {
+    vapply(variable, function(value) {
+      sort(abs(variable - value), method = "quick")[[neighbours + 1L]]
+    }, numeric(1L))
+  }, numeric(n))
+  x_weights <- npksum(
+    bws = rep(neighbours, 2L), txdat = training_x,
+    exdat = evaluation_x, bwtype = "adaptive_nn",
+    ckertype = "gaussian", ckerorder = 4L,
+    operator = c("normal", "normal"),
+    return.kernel.weights = TRUE
+  )$kw / (realized[, 1L] * realized[, 2L])
+  derivative_weights <- lapply(seq_len(2L), function(dimension) {
+    operators <- rep("normal", 2L)
+    operators[[dimension]] <- "derivative"
+    raw <- npksum(
+      bws = rep(neighbours, 2L), txdat = training_x,
+      exdat = evaluation_x, bwtype = "adaptive_nn",
+      ckertype = "gaussian", ckerorder = 4L,
+      operator = operators, return.kernel.weights = TRUE
+    )$kw
+    raw / (realized[, dimension] *
+           realized[, 1L] * realized[, 2L])
+  })
+  response <- beta_conditional_side_weights(
+    training_y$y, evaluation_y$y, neighbours, "adaptive_nn",
+    "beta", 6L, 0, 1
+  )
+  expected <- beta_conditional_oracle(x_weights, response)
+  denominator <- colSums(x_weights)
+  normalized <- sweep(x_weights, 2L, denominator, "/")
+  expected_gradient <- expected_gradient_stderr <-
+    matrix(0, nrow = nrow(evaluation_x), ncol = 2L)
+  for (dimension in seq_len(2L)) {
+    derivative_denominator <- colSums(derivative_weights[[dimension]])
+    expected_gradient[, dimension] <-
+      (colSums(derivative_weights[[dimension]] * response) -
+       expected$estimate * derivative_denominator) / denominator
+    derivative_normalized <-
+      sweep(derivative_weights[[dimension]], 2L, denominator, "/") -
+      sweep(normalized, 2L, derivative_denominator / denominator, "*")
+    influence <-
+      derivative_normalized * sweep(response, 2L, expected$estimate, "-") -
+      sweep(normalized, 2L, expected_gradient[, dimension], "*")
+    expected_gradient_stderr[, dimension] <- sqrt(
+      colSums(influence^2) / (nrow(training_x) - 1L)
+    )
+  }
+
+  for (fit in fits) {
+    expect_equal(fitted(fit), expected$estimate, tolerance = 2e-8)
+    expect_equal(se(fit), expected$stderr, tolerance = 2e-8)
+    expect_equal(fit$congrad, expected_gradient, tolerance = 3e-7)
+    expect_equal(fit$congerr, expected_gradient_stderr, tolerance = 3e-7)
+  }
+  expect_identical(fits[[1L]]$condens, fits[[2L]]$condens)
+  expect_identical(fits[[1L]]$conderr, fits[[2L]]$conderr)
+  expect_identical(fits[[1L]]$congrad, fits[[2L]]$congrad)
+  expect_identical(fits[[1L]]$congerr, fits[[2L]]$congerr)
+  expect_identical(fits[[1L]]$condens, fits[[3L]]$condens)
+  expect_identical(fits[[1L]]$conderr, fits[[3L]]$conderr)
+  expect_identical(fits[[1L]]$congrad, fits[[3L]]$congrad)
+  expect_identical(fits[[1L]]$congerr, fits[[3L]]$congerr)
+})
+
+test_that("beta-Y mixed conditional fits honor categorical compression", {
+  training_x <- data.frame(
+    x = seq(-1.1, 1.1, length.out = 24L),
+    group = factor(rep(c("a", "b", "c"), length.out = 24L))
+  )
+  training_y <- data.frame(
+    y = plogis(sin(1.4 * training_x$x)),
+    class = factor(rep(c("u", "v", "u", "w"), length.out = 24L))
+  )
+  evaluation_x <- data.frame(
+    x = seq(-0.9, 0.9, length.out = 8L),
+    group = factor(rep(c("a", "c"), length.out = 8L),
+                   levels = levels(training_x$group))
+  )
+  evaluation_y <- data.frame(
+    y = seq(0.12, 0.88, length.out = 8L),
+    class = factor(rep(c("u", "w"), length.out = 8L),
+                   levels = levels(training_y$class))
+  )
+  results <- list()
+
+  for (compress in c(FALSE, TRUE)) {
+    old_options <- options(np.categorical.compress = compress)
+    on.exit(options(old_options), add = TRUE)
+    for (regtype in c("lc", "lp")) {
+      arguments <- list(
+        xdat = training_x, ydat = training_y,
+        bws = c(0.16, 0.21, 0.43, 0.24), bandwidth.compute = FALSE,
+        regtype = regtype,
+        cxkertype = "gaussian", cxkerorder = 6L,
+        cykertype = "beta", cykerorder = 8L,
+        cykerbound = "fixed", cykerlb = 0, cykerub = 1
+      )
+      if (identical(regtype, "lp")) {
+        arguments$degree <- 2L
+        arguments$basis <- "glp"
+        arguments$bernstein.basis <- FALSE
+      }
+      bw <- do.call(npcdensbw, arguments)
+      results[[paste(regtype, compress)]] <- npcdens(
+        bws = bw, txdat = training_x, tydat = training_y,
+        exdat = evaluation_x, eydat = evaluation_y, gradients = TRUE
+      )
+    }
+    options(old_options)
+  }
+
+  for (regtype in c("lc", "lp")) {
+    dense <- results[[paste(regtype, FALSE)]]
+    compressed <- results[[paste(regtype, TRUE)]]
+    expect_identical(fitted(dense), fitted(compressed))
+    expect_identical(se(dense), se(compressed))
+    expect_identical(dense$congrad, compressed$congrad)
+    expect_identical(dense$congerr, compressed$congerr)
   }
 })
 

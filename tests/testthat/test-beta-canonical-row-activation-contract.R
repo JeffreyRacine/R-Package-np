@@ -513,7 +513,7 @@ test_that("legacy conditional scalar owner retains dormant route plumbing", {
   )
 })
 
-test_that("beta X with legacy Y enters the common conditional regression owner", {
+test_that("one beta side enters the common conditional regression owner", {
   root <- locate_beta_activation_sources()
   skip_if(is.null(root), "package sources unavailable")
   ingress <- paste(
@@ -540,6 +540,12 @@ test_that("beta X with legacy Y enters the common conditional regression owner",
   )
   expect_match(
     public_owner,
+    "x_descriptor.family == NP_CKERNEL_FAMILY_LEGACY &&\n     y_descriptor.family == NP_CKERNEL_FAMILY_BETA",
+    fixed = TRUE
+  )
+  expect_match(public_owner, "active_y_route = &beta_y_route;", fixed = TRUE)
+  expect_match(
+    public_owner,
     "active_y_route, active_y_diagnostics,",
     fixed = TRUE
   )
@@ -553,6 +559,11 @@ test_that("beta X with legacy Y enters the common conditional regression owner",
     public_owner,
     fixed = TRUE
   ))
+  expect_match(
+    public_owner,
+    "x_descriptor.family == NP_CKERNEL_FAMILY_BETA &&\n     y_descriptor.family == NP_CKERNEL_FAMILY_BETA",
+    fixed = TRUE
+  )
 
   conditional_starts <- gregexpr(
     "void np_density_conditional(", ingress, fixed = TRUE
@@ -563,12 +574,11 @@ test_that("beta X with legacy Y enters the common conditional regression owner",
   conditional_end <- tail(density_starts[density_starts > conditional_start],
                           1L)
   conditional <- substr(ingress, conditional_start, conditional_end - 1L)
-  expect_match(
-    conditional, "(void)response_kernel_route;", fixed = TRUE
-  )
+  expect_match(conditional, "const int beta_y_active = response_kernel_route != NULL;",
+               fixed = TRUE)
   expect_match(
     conditional,
-    "(void)response_kernel_route_diagnostics;",
+    "error(\"np_density_conditional: invalid canonical response-kernel route\")",
     fixed = TRUE
   )
   expect_false(grepl(
@@ -576,7 +586,7 @@ test_that("beta X with legacy Y enters the common conditional regression owner",
   ))
   expect_match(
     conditional,
-    "if(lp_engine_eff == NP_LP_ENGINE_SCALAR && kernel_route == NULL)",
+    "if(lp_engine_eff == NP_LP_ENGINE_SCALAR && kernel_route == NULL &&\n     response_kernel_route == NULL)",
     fixed = TRUE
   )
   expect_match(
@@ -591,7 +601,7 @@ test_that("beta X with legacy Y enters the common conditional regression owner",
   )
   expect_match(
     conditional,
-    "np_beta_regression_prepared_bandwidth_view_init_or_error(",
+    "np_beta_prepared_bandwidth_view_init_or_error(",
     fixed = TRUE
   )
   expect_match(
@@ -602,6 +612,23 @@ test_that("beta X with legacy Y enters the common conditional regression owner",
   expect_match(
     conditional, "prepared_x_bandwidth_ptr);", fixed = TRUE
   )
+  expect_match(
+    conditional, "np_beta_continuous_bandwidth_prepare_canonical(",
+    fixed = TRUE
+  )
+  expect_match(
+    conditional, "np_beta_scaled_row_context_prepare(", fixed = TRUE
+  )
+  expect_match(
+    conditional, "np_beta_scaled_row_context_fill(", fixed = TRUE
+  )
+  expect_match(
+    conditional, "np_continuous_kernel_scaled_restore(", fixed = TRUE
+  )
+  expect_false(grepl(
+    "alloc_matd(num_obs_train_extern, num_obs_train_extern)",
+    conditional, fixed = TRUE
+  ))
 
   engine <- paste(
     readLines(file.path(root, "src", "jksum.c"), warn = FALSE),
@@ -610,6 +637,25 @@ test_that("beta X with legacy Y enters the common conditional regression owner",
   expect_match(
     engine, "np_regression_prepared_bandwidth_copy(", fixed = TRUE
   )
+  expect_match(
+    engine, "np_regression_conditional_influence_finish(", fixed = TRUE
+  )
+  expect_match(engine, "double *conditional_kw = NULL;", fixed = TRUE)
+  expect_match(engine, "double *conditional_pkw = NULL;", fixed = TRUE)
+  expect_match(
+    engine,
+    "size_t pkw_plane = 0;",
+    fixed = TRUE
+  )
+  expect_match(
+    engine,
+    "pkw_plane = np_jksum_size_mul_or_die(",
+    fixed = TRUE
+  )
+  expect_match(engine, "(size_t)ii*pkw_plane +", fixed = TRUE)
+  expect_false(grepl(
+    "ii*num_obs_eval*num_xt + j*num_xt + i", engine, fixed = TRUE
+  ))
   expect_match(
     engine,
     "if(prepared_status < 0) {\n      free_tmat(matrix_bandwidth);\n      error(",

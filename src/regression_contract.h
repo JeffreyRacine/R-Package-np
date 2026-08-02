@@ -31,6 +31,6 @@ typedef struct {
   int evaluation_count;
   double **bandwidth_eval;
   double **bandwidth_train;
-} NPRegressionPreparedBandwidthView;
+} NPContinuousPreparedBandwidthView;
 
 #endif
