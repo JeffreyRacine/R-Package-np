@@ -2494,3 +2494,229 @@ np_continuous_kernel_beta_regression_moment_rows_validated(
   }
   return NP_CONTINUOUS_ROW_OK;
 }
+
+/*
+ * Conditional scalar estimators use an observation-influence variance that
+ * is intentionally distinct from ordinary regression's local-residual
+ * covariance.  Keep it out of line so adding this policy cannot enlarge or
+ * perturb the ordinary regression moment hot path.
+ */
+static NPContinuousKernelRowStatus NP_CONTINUOUS_ROW_NOINLINE
+np_continuous_kernel_beta_conditional_influence_stderr(
+  const NPContinuousKernelRowWorkspace *workspace,
+  const double *response,
+  const int num_train,
+  const int omitted_observation,
+  const double total_log_scale,
+  const double weighted_mean,
+  const double total_weight,
+  double *mean_stderr)
+{
+  const int variance_count =
+    num_train - (omitted_observation >= 0 ? 1 : 0);
+  double influence_scale = 0.0;
+  double influence_sum_squares = 1.0;
+  int observation;
+
+  if(workspace == NULL || response == NULL || mean_stderr == NULL ||
+     num_train <= 0 || omitted_observation < -1 ||
+     omitted_observation >= num_train || ISNAN(total_log_scale) ||
+     total_log_scale == INFINITY || !R_FINITE(weighted_mean) ||
+     !R_FINITE(total_weight) || total_weight == 0.0)
+    return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  if(variance_count <= 1) {
+    *mean_stderr = 0.0;
+    return NP_CONTINUOUS_ROW_OK;
+  }
+
+  for(observation = 0; observation < num_train; ++observation) {
+    const double weight = workspace->primary_sign[observation] == 0 ?
+      0.0 : (double)workspace->primary_sign[observation] * exp(
+        workspace->primary_log_absolute[observation] - total_log_scale);
+    const double influence =
+      weight * (response[observation] - weighted_mean);
+    const double absolute_influence = fabs(influence);
+
+    if(observation == omitted_observation)
+      continue;
+    if(!R_FINITE(influence))
+      return NP_CONTINUOUS_ROW_ERR_NUMERIC;
+    if(absolute_influence != 0.0) {
+      if(influence_scale < absolute_influence) {
+        const double ratio = influence_scale / absolute_influence;
+
+        influence_sum_squares =
+          1.0 + influence_sum_squares * ratio * ratio;
+        influence_scale = absolute_influence;
+      } else {
+        const double ratio = absolute_influence / influence_scale;
+
+        influence_sum_squares += ratio * ratio;
+      }
+    }
+  }
+  *mean_stderr = influence_scale * sqrt(influence_sum_squares) /
+    (fabs(total_weight) * sqrt((double)(variance_count - 1)));
+  return R_FINITE(*mean_stderr) ? NP_CONTINUOUS_ROW_OK :
+    NP_CONTINUOUS_ROW_ERR_NUMERIC;
+}
+
+NPContinuousKernelRowStatus
+np_continuous_kernel_beta_conditional_moment_rows_validated(
+  const NPContinuousKernelRowPlan *plan,
+  int leave_one_out,
+  int leave_one_out_offset,
+  const NPContinuousKernelLogFactorProvider *provider,
+  const double *response,
+  int positive_weights,
+  NPContinuousKernelRowWorkspace *workspace,
+  NPContinuousKernelRowResult *row_result,
+  double *mean,
+  double *mean_stderr,
+  NPContinuousKernelDerivativeDiagnostics *diagnostics,
+  NPContinuousKernelProgressFunction progress)
+{
+  NPContinuousKernelRowStatus status;
+  int evaluation;
+  int coordinate;
+  int observation;
+
+  if(diagnostics != NULL) {
+    diagnostics->bad_coordinate = -1;
+    diagnostics->bad_observation = -1;
+    diagnostics->undefined_count = 0;
+    diagnostics->beta_status = NP_BETA_OK;
+  }
+  if(plan == NULL || plan->route == NULL || plan->num_train <= 0 ||
+     plan->num_eval <= 0 || plan->num_continuous <= 0 ||
+     plan->route->segment_count != 1 ||
+     plan->route->segment[0].descriptor.family != NP_CKERNEL_FAMILY_BETA ||
+     (leave_one_out != 0 && leave_one_out != 1) ||
+     leave_one_out_offset < 0 ||
+     (positive_weights != 0 && positive_weights != 1) ||
+     plan->operator == NULL || response == NULL || workspace == NULL ||
+     row_result == NULL || mean == NULL || mean_stderr == NULL ||
+     (leave_one_out &&
+      (plan->num_eval > plan->num_train ||
+       leave_one_out_offset > plan->num_train - plan->num_eval)))
+    return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  for(coordinate = 0; coordinate < plan->num_continuous; ++coordinate)
+    if(plan->operator[coordinate] != OP_NORMAL)
+      return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  for(observation = 0; observation < plan->num_train; ++observation)
+    if(!R_FINITE(response[observation])) {
+      if(diagnostics != NULL)
+        diagnostics->bad_observation = observation;
+      return NP_CONTINUOUS_ROW_ERR_NUMERIC;
+    }
+
+  for(evaluation = 0; evaluation < plan->num_eval; ++evaluation) {
+    const int omitted_observation = leave_one_out ?
+      evaluation + leave_one_out_offset : -1;
+    double total_weight = 0.0;
+    double weighted_mean = 0.0;
+    double weighted_m2 = 0.0;
+    double squared_weight_sum = 0.0;
+
+    status = np_continuous_kernel_beta_log_factor_row(
+      plan, evaluation, omitted_observation, provider,
+      workspace, row_result);
+    if(status != NP_CONTINUOUS_ROW_OK) {
+      if(diagnostics != NULL) {
+        diagnostics->bad_coordinate = row_result->bad_coordinate;
+        diagnostics->bad_observation = row_result->bad_observation;
+        diagnostics->beta_status = row_result->beta_status;
+      }
+      return status;
+    }
+    if(row_result->total_log_scale == -INFINITY)
+      return NP_CONTINUOUS_ROW_ERR_ZERO_WEIGHT;
+
+    if(positive_weights) {
+      for(observation = 0; observation < plan->num_train; ++observation) {
+        const double weight = workspace->primary_sign[observation] == 0 ?
+          0.0 : (double)workspace->primary_sign[observation] * exp(
+            workspace->primary_log_absolute[observation] -
+            row_result->total_log_scale);
+
+        if(observation == omitted_observation)
+          continue;
+        if(weight < 0.0 || !R_FINITE(weight)) {
+          if(diagnostics != NULL)
+            diagnostics->bad_observation = observation;
+          return NP_CONTINUOUS_ROW_ERR_NUMERIC;
+        }
+        if(weight > 0.0) {
+          const double new_total_weight = total_weight + weight;
+          const double delta = response[observation] - weighted_mean;
+          const double new_mean = weighted_mean +
+            (weight / new_total_weight) * delta;
+
+          weighted_m2 += weight * delta *
+            (response[observation] - new_mean);
+          squared_weight_sum += weight * weight;
+          total_weight = new_total_weight;
+          weighted_mean = new_mean;
+        }
+      }
+    } else {
+      double weighted_response_sum = 0.0;
+
+      for(observation = 0; observation < plan->num_train; ++observation) {
+        const double weight = workspace->primary_sign[observation] == 0 ?
+          0.0 : (double)workspace->primary_sign[observation] * exp(
+            workspace->primary_log_absolute[observation] -
+            row_result->total_log_scale);
+
+        if(observation == omitted_observation)
+          continue;
+        total_weight += weight;
+        weighted_response_sum += weight * response[observation];
+      }
+      if(!R_FINITE(total_weight) || total_weight == 0.0 ||
+         !R_FINITE(weighted_response_sum))
+        return total_weight == 0.0 ? NP_CONTINUOUS_ROW_ERR_ZERO_WEIGHT :
+          NP_CONTINUOUS_ROW_ERR_NUMERIC;
+      weighted_mean = weighted_response_sum / total_weight;
+
+      for(observation = 0; observation < plan->num_train; ++observation) {
+        const double weight = workspace->primary_sign[observation] == 0 ?
+          0.0 : (double)workspace->primary_sign[observation] * exp(
+            workspace->primary_log_absolute[observation] -
+            row_result->total_log_scale);
+        const double residual = response[observation] - weighted_mean;
+
+        if(observation == omitted_observation)
+          continue;
+        weighted_m2 += weight * residual * residual;
+        squared_weight_sum += weight * weight;
+      }
+    }
+
+    if(!R_FINITE(total_weight) ||
+       (positive_weights ? total_weight <= 0.0 : total_weight == 0.0))
+      return total_weight == 0.0 ? NP_CONTINUOUS_ROW_ERR_ZERO_WEIGHT :
+        NP_CONTINUOUS_ROW_ERR_NUMERIC;
+    if(!R_FINITE(weighted_mean) || !R_FINITE(weighted_m2) ||
+       !R_FINITE(squared_weight_sum))
+      return NP_CONTINUOUS_ROW_ERR_NUMERIC;
+    if((positive_weights && weighted_m2 < 0.0) ||
+       (!positive_weights && weighted_m2 / total_weight < 0.0))
+      weighted_m2 = 0.0;
+
+    mean[evaluation] = weighted_mean;
+    status = np_continuous_kernel_beta_conditional_influence_stderr(
+      workspace, response, plan->num_train, omitted_observation,
+      row_result->total_log_scale, weighted_mean, total_weight,
+      &mean_stderr[evaluation]);
+    if(status != NP_CONTINUOUS_ROW_OK)
+      return status;
+    if(!R_FINITE(mean_stderr[evaluation]))
+      return NP_CONTINUOUS_ROW_ERR_NUMERIC;
+    if(progress != NULL)
+      progress(evaluation + 1, plan->num_eval);
+    if((evaluation & 31) == 0)
+      R_CheckUserInterrupt();
+  }
+  return NP_CONTINUOUS_ROW_OK;
+}

@@ -8540,6 +8540,7 @@ typedef struct {
   double **gradient_stderr;
   int compute_gradient;
   int positive_weights;
+  NPRegressionStandardErrorMode standard_error_mode;
   NPContinuousKernelRowStatus *status;
   NPContinuousKernelProgressFunction progress;
 } NPBetaRegressionMomentCtx;
@@ -8804,6 +8805,38 @@ static NPContinuousKernelRowStatus np_beta_categorical_log_factor(
   return NP_CONTINUOUS_ROW_OK;
 }
 
+/* Select the estimator-owned variance contract once, before entering either
+ * compile-time-specialized moment loop.  Ordinary regression therefore keeps
+ * its incumbent hot body free of conditional-policy branches. */
+static inline NPContinuousKernelRowStatus
+np_beta_regression_moment_rows_dispatch(
+  const NPContinuousKernelRowPlan *plan,
+  const int leave_one_out,
+  const int leave_one_out_offset,
+  const NPContinuousKernelLogFactorProvider *provider,
+  const double *response,
+  const int positive_weights,
+  const NPRegressionStandardErrorMode standard_error_mode,
+  NPContinuousKernelRowWorkspace *workspace,
+  NPContinuousKernelRowResult *row_result,
+  double *mean,
+  double *mean_stderr,
+  NPContinuousKernelDerivativeDiagnostics *diagnostics,
+  NPContinuousKernelProgressFunction progress)
+{
+  if(standard_error_mode == NP_REGRESSION_STDERR_CONDITIONAL_INFLUENCE)
+    return np_continuous_kernel_beta_conditional_moment_rows_validated(
+      plan, leave_one_out, leave_one_out_offset, provider,
+      response, positive_weights, workspace, row_result,
+      mean, mean_stderr, diagnostics, progress);
+  if(standard_error_mode != NP_REGRESSION_STDERR_LOCAL_RESIDUAL)
+    return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  return np_continuous_kernel_beta_regression_moment_rows_validated(
+    plan, leave_one_out, leave_one_out_offset, provider,
+    response, positive_weights, workspace, row_result,
+    mean, mean_stderr, diagnostics, progress);
+}
+
 /*
  * Form the established discrete regression contrasts without leaving the
  * canonical beta row owner.  Unordered coordinates compare the fitted value
@@ -8824,6 +8857,7 @@ np_beta_regression_categorical_gradients_validated(
   NPBetaCategoricalFactorContext *context,
   const double *response,
   int positive_weights,
+  NPRegressionStandardErrorMode standard_error_mode,
   NPContinuousKernelRowWorkspace *workspace,
   NPContinuousKernelRowResult *row_result,
   const double *mean,
@@ -8911,9 +8945,10 @@ np_beta_regression_categorical_gradients_validated(
     context->dense_spec.eval_unordered = alternate_unordered;
     if(context->use_compressed)
       context->compressed_spec.eval_unordered = alternate_unordered;
-    status = np_continuous_kernel_beta_regression_moment_rows_validated(
+    status = np_beta_regression_moment_rows_dispatch(
       plan, leave_one_out, leave_one_out_offset, &provider,
-      response, positive_weights, workspace, row_result,
+      response, positive_weights, standard_error_mode,
+      workspace, row_result,
       alternate_mean, alternate_stderr, diagnostics, NULL);
     context->dense_spec.eval_unordered = eval_unordered;
     if(context->use_compressed)
@@ -8971,9 +9006,10 @@ np_beta_regression_categorical_gradients_validated(
     context->dense_spec.eval_ordered = alternate_ordered;
     if(context->use_compressed)
       context->compressed_spec.eval_ordered = alternate_ordered;
-    status = np_continuous_kernel_beta_regression_moment_rows_validated(
+    status = np_beta_regression_moment_rows_dispatch(
       plan, leave_one_out, leave_one_out_offset, &provider,
-      response, positive_weights, workspace, row_result,
+      response, positive_weights, standard_error_mode,
+      workspace, row_result,
       alternate_mean, alternate_stderr, diagnostics, NULL);
     context->dense_spec.eval_ordered = eval_ordered;
     if(context->use_compressed)
@@ -9000,6 +9036,7 @@ np_beta_regression_gradient_rows_validated(
   const NPContinuousKernelRowPlan *plan,
   const NPContinuousKernelLogFactorProvider *provider,
   const double *response,
+  NPRegressionStandardErrorMode standard_error_mode,
   double **gradient,
   double **gradient_stderr,
   NPContinuousKernelDerivativeDiagnostics *diagnostics,
@@ -9027,7 +9064,9 @@ np_beta_regression_gradient_rows_validated(
      plan->num_eval <= 0 || plan->num_continuous <= 0 ||
      plan->route->segment_count != 1 ||
      plan->route->segment[0].descriptor.family != NP_CKERNEL_FAMILY_BETA ||
-     response == NULL || gradient == NULL || gradient_stderr == NULL)
+     response == NULL || gradient == NULL || gradient_stderr == NULL ||
+     (standard_error_mode != NP_REGRESSION_STDERR_LOCAL_RESIDUAL &&
+      standard_error_mode != NP_REGRESSION_STDERR_CONDITIONAL_INFLUENCE))
     return NP_CONTINUOUS_ROW_ERR_LAYOUT;
   for(derivative_coordinate = 0;
       derivative_coordinate < plan->num_continuous;
@@ -9196,33 +9235,86 @@ np_beta_regression_gradient_rows_validated(
 
       derivative_value =
         (regular_response - side_mean * regular_total) / side_weight;
-      for(observation = 0; observation < plan->num_train; ++observation) {
-        const double y = response[observation];
-        const double w = workspace.level_sign[observation] == 0 ? 0.0 :
-          (double)workspace.level_sign[observation] * exp(
-            workspace.level_log_absolute[observation] - maximum_log);
-        const double d = workspace.regular_sign[observation] == 0 ? 0.0 :
-          (double)workspace.regular_sign[observation] * exp(
-            workspace.regular_log_absolute[observation] - maximum_log);
-        const double j = workspace.jump_sign[observation] == 0 ? 0.0 :
-          (double)workspace.jump_sign[observation] * exp(
-            workspace.jump_log_absolute[observation] - maximum_log);
-        const double side_w = w +
-          ((at_lower || at_upper) ? side_orientation * j : 0.0);
-        const double coefficient =
-          (d * side_weight - side_w * regular_total) /
-          (side_weight * side_weight);
-        const double residual = y - side_mean;
-
-        sigma2_numerator += side_w * residual * residual;
-        derivative_coefficient_square_sum += coefficient * coefficient;
-      }
-      if(sigma2_numerator / side_weight < 0.0)
-        sigma2_numerator = 0.0;
       gradient[derivative_coordinate][evaluation] = derivative_value;
-      gradient_stderr[derivative_coordinate][evaluation] = sqrt(
-        (sigma2_numerator / side_weight) *
-        derivative_coefficient_square_sum);
+      if(standard_error_mode ==
+         NP_REGRESSION_STDERR_CONDITIONAL_INFLUENCE) {
+        if(plan->num_train <= 1) {
+          gradient_stderr[derivative_coordinate][evaluation] = 0.0;
+        } else {
+          double influence_scale = 0.0;
+          double influence_sum_squares = 1.0;
+
+          for(observation = 0; observation < plan->num_train; ++observation) {
+            const double y = response[observation];
+            const double w = workspace.level_sign[observation] == 0 ? 0.0 :
+              (double)workspace.level_sign[observation] * exp(
+                workspace.level_log_absolute[observation] - maximum_log);
+            const double d = workspace.regular_sign[observation] == 0 ? 0.0 :
+              (double)workspace.regular_sign[observation] * exp(
+                workspace.regular_log_absolute[observation] - maximum_log);
+            const double j = workspace.jump_sign[observation] == 0 ? 0.0 :
+              (double)workspace.jump_sign[observation] * exp(
+                workspace.jump_log_absolute[observation] - maximum_log);
+            const double side_w = w +
+              ((at_lower || at_upper) ? side_orientation * j : 0.0);
+            const double coefficient =
+              (d * side_weight - side_w * regular_total) /
+              (side_weight * side_weight);
+            const double influence =
+              coefficient * (y - side_mean) -
+              derivative_value * (side_w / side_weight);
+            const double absolute_influence = fabs(influence);
+
+            if(!R_FINITE(influence)) {
+              status = NP_CONTINUOUS_ROW_ERR_NUMERIC;
+              goto cleanup;
+            }
+            if(absolute_influence != 0.0) {
+              if(influence_scale < absolute_influence) {
+                const double ratio = influence_scale / absolute_influence;
+
+                influence_sum_squares =
+                  1.0 + influence_sum_squares * ratio * ratio;
+                influence_scale = absolute_influence;
+              } else {
+                const double ratio = absolute_influence / influence_scale;
+
+                influence_sum_squares += ratio * ratio;
+              }
+            }
+          }
+          gradient_stderr[derivative_coordinate][evaluation] =
+            influence_scale * sqrt(influence_sum_squares /
+                                   (double)(plan->num_train - 1));
+        }
+      } else {
+        for(observation = 0; observation < plan->num_train; ++observation) {
+          const double y = response[observation];
+          const double w = workspace.level_sign[observation] == 0 ? 0.0 :
+            (double)workspace.level_sign[observation] * exp(
+              workspace.level_log_absolute[observation] - maximum_log);
+          const double d = workspace.regular_sign[observation] == 0 ? 0.0 :
+            (double)workspace.regular_sign[observation] * exp(
+              workspace.regular_log_absolute[observation] - maximum_log);
+          const double j = workspace.jump_sign[observation] == 0 ? 0.0 :
+            (double)workspace.jump_sign[observation] * exp(
+              workspace.jump_log_absolute[observation] - maximum_log);
+          const double side_w = w +
+            ((at_lower || at_upper) ? side_orientation * j : 0.0);
+          const double coefficient =
+            (d * side_weight - side_w * regular_total) /
+            (side_weight * side_weight);
+          const double residual = y - side_mean;
+
+          sigma2_numerator += side_w * residual * residual;
+          derivative_coefficient_square_sum += coefficient * coefficient;
+        }
+        if(sigma2_numerator / side_weight < 0.0)
+          sigma2_numerator = 0.0;
+        gradient_stderr[derivative_coordinate][evaluation] = sqrt(
+          (sigma2_numerator / side_weight) *
+          derivative_coefficient_square_sum);
+      }
       if(!R_FINITE(derivative_value) ||
          !R_FINITE(gradient_stderr[derivative_coordinate][evaluation])) {
         gradient[derivative_coordinate][evaluation] = NA_REAL;
@@ -9479,11 +9571,12 @@ static int np_beta_absolute_route(
 
   if(regression_moment_context != NULL) {
     NPContinuousKernelRowStatus row_status =
-      np_continuous_kernel_beta_regression_moment_rows_validated(
+      np_beta_regression_moment_rows_dispatch(
         &plan, leave_one_out, leave_one_out_offset,
         has_categories ? &categorical_provider : NULL,
         regression_moment_context->response,
         regression_moment_context->positive_weights,
+        regression_moment_context->standard_error_mode,
         &workspace, &row_result,
         regression_moment_context->mean,
         regression_moment_context->mean_stderr,
@@ -9499,6 +9592,7 @@ static int np_beta_absolute_route(
       row_status = np_beta_regression_gradient_rows_validated(
         &plan, has_categories ? &categorical_provider : NULL,
         regression_moment_context->response,
+        regression_moment_context->standard_error_mode,
         regression_moment_context->gradient,
         regression_moment_context->gradient_stderr,
         route_diagnostics, &infinite_count, &undefined_count);
@@ -9515,6 +9609,7 @@ static int np_beta_absolute_route(
             num_reg_unordered, num_reg_ordered,
             &categorical_context, regression_moment_context->response,
             regression_moment_context->positive_weights,
+            regression_moment_context->standard_error_mode,
             &workspace, &row_result,
             regression_moment_context->mean,
             regression_moment_context->mean_stderr,
@@ -20452,6 +20547,63 @@ static void np_regression_fit_statistics(
 }
 
 /*
+ * Copy one immutable prepared-bandwidth view into the regression owner's
+ * existing bounded workspace.  Return zero when no view was supplied, one
+ * after a successful copy, and minus one for an invalid view.  Fixed
+ * bandwidths retain their incumbent direct scale-factor path.
+ */
+static int np_regression_prepared_bandwidth_copy(
+  const NPRegressionPreparedBandwidthView *view,
+  const int bandwidth_mode,
+  const int num_obs_train,
+  const int num_obs_eval,
+  const int num_reg_continuous,
+  double **matrix_bandwidth)
+{
+  int coordinate;
+
+  if(view == NULL)
+    return 0;
+  if(num_obs_train <= 0 || num_obs_eval <= 0 ||
+     num_reg_continuous <= 0 ||
+     bandwidth_mode == BW_FIXED ||
+     (bandwidth_mode != BW_GEN_NN && bandwidth_mode != BW_ADAP_NN) ||
+     view->bandwidth_mode != bandwidth_mode ||
+     view->num_train != num_obs_train ||
+     view->num_continuous != num_reg_continuous ||
+     view->num_eval_total < num_obs_eval || view->evaluation_offset < 0 ||
+     view->evaluation_count != num_obs_eval ||
+     view->evaluation_offset > view->num_eval_total - num_obs_eval ||
+     matrix_bandwidth == NULL)
+    return -1;
+
+  if(bandwidth_mode == BW_GEN_NN) {
+    if(view->bandwidth_eval == NULL)
+      return -1;
+    for(coordinate = 0; coordinate < num_reg_continuous; ++coordinate) {
+      if(view->bandwidth_eval[coordinate] == NULL ||
+         matrix_bandwidth[coordinate] == NULL)
+        return -1;
+      memcpy(matrix_bandwidth[coordinate],
+             view->bandwidth_eval[coordinate] + view->evaluation_offset,
+             (size_t)num_obs_eval * sizeof(double));
+    }
+  } else {
+    if(view->bandwidth_train == NULL)
+      return -1;
+    for(coordinate = 0; coordinate < num_reg_continuous; ++coordinate) {
+      if(view->bandwidth_train[coordinate] == NULL ||
+         matrix_bandwidth[coordinate] == NULL)
+        return -1;
+      memcpy(matrix_bandwidth[coordinate],
+             view->bandwidth_train[coordinate],
+             (size_t)num_obs_train * sizeof(double));
+    }
+  }
+  return 1;
+}
+
+/*
  * Canonical scalar beta sibling.  The estimator owner remains
  * kernel_estimate_regression_categorical_tree_np(); this helper isolates the
  * beta signed-log row and bandwidth preparation from the large legacy/general
@@ -20482,7 +20634,9 @@ static NP_NOINLINE void np_beta_scalar_regression_fit_canonical(
   double **gradient_stderr,
   const NPContinuousKernelRoute *kernel_route,
   NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
-  const int categorical_compress)
+  const int categorical_compress,
+  const NPRegressionStandardErrorMode standard_error_mode,
+  const NPRegressionPreparedBandwidthView *prepared_bandwidth)
 {
   const int num_categorical = num_reg_unordered + num_reg_ordered;
   const int num_predictors = num_reg_continuous + num_categorical;
@@ -20511,7 +20665,9 @@ static NP_NOINLINE void np_beta_scalar_regression_fit_canonical(
      kernel_route->segment[0].coordinate_count != num_reg_continuous ||
      num_reg_continuous <= 0 || do_grad != do_gerr ||
      kernel_route_diagnostics == NULL ||
-     (categorical_compress != 0 && categorical_compress != 1))
+     (categorical_compress != 0 && categorical_compress != 1) ||
+     (standard_error_mode != NP_REGRESSION_STDERR_LOCAL_RESIDUAL &&
+      standard_error_mode != NP_REGRESSION_STDERR_CONDITIONAL_INFLUENCE))
     error("canonical beta regression route has an invalid layout");
 
   operator = (int *)R_alloc((size_t)num_predictors, sizeof(int));
@@ -20545,22 +20701,32 @@ static NP_NOINLINE void np_beta_scalar_regression_fit_canonical(
   }
 
   if(BANDWIDTH_reg != BW_FIXED) {
-    const np_beta_bandwidth_prepare_status bandwidth_status =
-      np_beta_bandwidth_prepare_matrix(
-        BANDWIDTH_reg == BW_GEN_NN ?
-          NP_BETA_BANDWIDTH_GENERALIZED_NN :
-          NP_BETA_BANDWIDTH_ADAPTIVE_NN,
-        matrix_X_continuous_train, matrix_X_continuous_eval,
-        vector_scale_factor,
-        num_obs_train, num_obs_eval, num_reg_continuous,
-        matrix_X_continuous_train == matrix_X_continuous_eval,
-        BANDWIDTH_reg == BW_GEN_NN, BANDWIDTH_reg == BW_ADAP_NN,
-        0, matrix_bandwidth, matrix_bandwidth);
+    const int prepared_status = np_regression_prepared_bandwidth_copy(
+      prepared_bandwidth, BANDWIDTH_reg, num_obs_train, num_obs_eval,
+      num_reg_continuous, matrix_bandwidth);
 
-    if(bandwidth_status != NP_BETA_BANDWIDTH_PREPARE_OK) {
+    if(prepared_status < 0) {
       free_tmat(matrix_bandwidth);
-      error("\n** Error: %s.",
-            np_beta_bandwidth_prepare_status_message(bandwidth_status));
+      error("canonical beta regression route has an invalid prepared bandwidth view");
+    }
+    if(prepared_status == 0) {
+      const np_beta_bandwidth_prepare_status bandwidth_status =
+        np_beta_bandwidth_prepare_matrix(
+          BANDWIDTH_reg == BW_GEN_NN ?
+            NP_BETA_BANDWIDTH_GENERALIZED_NN :
+            NP_BETA_BANDWIDTH_ADAPTIVE_NN,
+          matrix_X_continuous_train, matrix_X_continuous_eval,
+          vector_scale_factor,
+          num_obs_train, num_obs_eval, num_reg_continuous,
+          matrix_X_continuous_train == matrix_X_continuous_eval,
+          BANDWIDTH_reg == BW_GEN_NN, BANDWIDTH_reg == BW_ADAP_NN,
+          0, matrix_bandwidth, matrix_bandwidth);
+
+      if(bandwidth_status != NP_BETA_BANDWIDTH_PREPARE_OK) {
+        free_tmat(matrix_bandwidth);
+        error("\n** Error: %s.",
+              np_beta_bandwidth_prepare_status_message(bandwidth_status));
+      }
     }
   }
 
@@ -20574,6 +20740,7 @@ static NP_NOINLINE void np_beta_scalar_regression_fit_canonical(
   regression_moment_context.compute_gradient = do_grad;
   regression_moment_context.positive_weights =
     kernel_route->segment[0].descriptor.order == 2;
+  regression_moment_context.standard_error_mode = standard_error_mode;
   regression_moment_context.status = &regression_row_status;
   regression_moment_context.progress = np_progress_fit_loop_step;
   route_status = np_beta_absolute_route(
@@ -20626,7 +20793,8 @@ static NP_NOINLINE NP_COLD int np_beta_regression_bandwidth_prepare_canonical(
   double *vector_scale_factor,
   double **matrix_bandwidth,
   double **matrix_bandwidth_deriv,
-  double *lambda)
+  double *lambda,
+  const NPRegressionPreparedBandwidthView *prepared_bandwidth)
 {
   int coordinate;
 
@@ -20646,21 +20814,29 @@ static NP_NOINLINE NP_COLD int np_beta_regression_bandwidth_prepare_canonical(
     return 1;
 
   if(bandwidth_mode != BW_FIXED) {
-    const np_beta_bandwidth_prepare_status status =
-      np_beta_bandwidth_prepare_matrix(
-        bandwidth_mode == BW_GEN_NN ?
-          NP_BETA_BANDWIDTH_GENERALIZED_NN :
-          NP_BETA_BANDWIDTH_ADAPTIVE_NN,
-        matrix_X_continuous_train, matrix_X_continuous_eval,
-        vector_scale_factor,
-        num_obs_train, num_obs_eval, num_reg_continuous,
-        matrix_X_continuous_train == matrix_X_continuous_eval,
-        bandwidth_mode == BW_GEN_NN,
-        bandwidth_mode == BW_ADAP_NN,
-        0, matrix_bandwidth, matrix_bandwidth);
+    const int prepared_status = np_regression_prepared_bandwidth_copy(
+      prepared_bandwidth, bandwidth_mode, num_obs_train, num_obs_eval,
+      num_reg_continuous, matrix_bandwidth);
 
-    if(status != NP_BETA_BANDWIDTH_PREPARE_OK)
+    if(prepared_status < 0)
       return 1;
+    if(prepared_status == 0) {
+      const np_beta_bandwidth_prepare_status status =
+        np_beta_bandwidth_prepare_matrix(
+          bandwidth_mode == BW_GEN_NN ?
+            NP_BETA_BANDWIDTH_GENERALIZED_NN :
+            NP_BETA_BANDWIDTH_ADAPTIVE_NN,
+          matrix_X_continuous_train, matrix_X_continuous_eval,
+          vector_scale_factor,
+          num_obs_train, num_obs_eval, num_reg_continuous,
+          matrix_X_continuous_train == matrix_X_continuous_eval,
+          bandwidth_mode == BW_GEN_NN,
+          bandwidth_mode == BW_ADAP_NN,
+          0, matrix_bandwidth, matrix_bandwidth);
+
+      if(status != NP_BETA_BANDWIDTH_PREPARE_OK)
+        return 1;
+    }
   }
 
   if(matrix_bandwidth_deriv != NULL)
@@ -20939,7 +21115,9 @@ double *CORR,
 double *SIGN,
 const NPContinuousKernelRoute *kernel_route,
 NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
-int categorical_compress){
+int categorical_compress,
+NPRegressionStandardErrorMode standard_error_mode,
+const NPRegressionPreparedBandwidthView *prepared_bandwidth){
 
   // note that mean has 2*num_obs allocated for npksum
   int i, j, l;
@@ -20987,6 +21165,14 @@ int categorical_compress){
   const int lp_engine_est = lp_engine;
   if((lp_engine_est != NP_LP_ENGINE_SCALAR) && (lp_engine_est != NP_LP_ENGINE_GENERAL))
     error("invalid internal regression engine");
+  if(standard_error_mode != NP_REGRESSION_STDERR_LOCAL_RESIDUAL &&
+     standard_error_mode != NP_REGRESSION_STDERR_CONDITIONAL_INFLUENCE)
+    error("invalid internal regression standard-error mode");
+  if(lp_engine_est != NP_LP_ENGINE_SCALAR &&
+     standard_error_mode == NP_REGRESSION_STDERR_CONDITIONAL_INFLUENCE)
+    error("conditional influence standard errors require the scalar regression engine");
+  if(prepared_bandwidth != NULL && kernel_route == NULL)
+    error("prepared regression bandwidths require a canonical kernel route");
   if(NP_UNLIKELY(kernel_route != NULL) &&
      lp_engine_est == NP_LP_ENGINE_SCALAR) {
     np_beta_scalar_regression_fit_canonical(
@@ -21000,7 +21186,8 @@ int categorical_compress){
       vector_Y, vector_scale_factor,
       num_categories, matrix_categorical_vals,
       mean, gradient, mean_stderr, gradient_stderr,
-      kernel_route, kernel_route_diagnostics, categorical_compress);
+      kernel_route, kernel_route_diagnostics, categorical_compress,
+      standard_error_mode, prepared_bandwidth);
     np_regression_fit_statistics(
       num_obs_eval, vector_Y_eval, mean,
       R_squared, MSE, MAE, MAPE, CORR, SIGN);
@@ -21077,7 +21264,8 @@ int categorical_compress){
         vector_scale_factor,
         matrix_bandwidth,
         matrix_bandwidth_deriv,
-        lambda) == 1) {
+        lambda,
+        prepared_bandwidth) == 1) {
       error("\n** Error: invalid bandwidth.");
     }
   } else if(kernel_bandwidth(KERNEL_reg,
@@ -23200,7 +23388,8 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
         vsfx,
         matrix_bandwidth_x,
         NULL,
-        lambdax) == 1)
+        lambdax,
+        NULL) == 1)
       goto cleanup_lp_hat;
   } else if(kernel_bandwidth_mean(KERNEL_reg_extern,
                            BANDWIDTH_den_extern,
@@ -24279,7 +24468,8 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
         vsfx,
         matrix_bandwidth_x,
         NULL,
-        lambdax) == 1)
+        lambdax,
+        NULL) == 1)
       goto cleanup_lp_apply;
   } else if(kernel_bandwidth_mean(KERNEL_reg_extern,
                            BANDWIDTH_den_extern,

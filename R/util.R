@@ -4749,7 +4749,10 @@ npConditionalKernelDescriptorOptions <- function(bws) {
     continuous.y.kernel.family = if (identical(bws[["cykertype", exact = TRUE]],
                                                 "beta"))
       CKER_FAMILY_BETA else CKER_FAMILY_LEGACY,
-    continuous.y.kernel.order = as.integer(bws[["cykerorder", exact = TRUE]])
+    continuous.y.kernel.order = as.integer(bws[["cykerorder", exact = TRUE]]),
+    categorical.compress = npStrictLogicalOption(
+      "np.categorical.compress", TRUE
+    )
   )
 }
 
@@ -4772,8 +4775,10 @@ npConditionalContinuousKernelCode <- function(bws, side = c("x", "y")) {
 npValidateConditionalBetaBandwidthObject <- function(bws,
                                                       where,
                                                       bandwidth.compute = FALSE) {
-  has.beta <- identical(bws[["cxkertype", exact = TRUE]], "beta") ||
-    identical(bws[["cykertype", exact = TRUE]], "beta")
+  beta.x <- identical(bws[["cxkertype", exact = TRUE]], "beta")
+  beta.y <- identical(bws[["cykertype", exact = TRUE]], "beta")
+  has.beta <- beta.x || beta.y
+  canonical.x.only <- beta.x && !beta.y
   if (!has.beta)
     return(invisible(FALSE))
 
@@ -4788,7 +4793,9 @@ npValidateConditionalBetaBandwidthObject <- function(bws,
     bw = bws[["xbw", exact = TRUE]],
     bandwidth.compute = bandwidth.compute,
     where = paste(where, "explanatory beta kernel"),
-    regtype = bws[["regtype", exact = TRUE]]
+    regtype = bws[["regtype", exact = TRUE]],
+    allow.categorical = canonical.x.only,
+    allow.general.lp = canonical.x.only
   )
   npValidateBetaKernelSpecification(
     ckertype = bws[["cykertype", exact = TRUE]],
@@ -4802,7 +4809,8 @@ npValidateConditionalBetaBandwidthObject <- function(bws,
     bandwidth.compute = bandwidth.compute,
     where = paste(where, "dependent beta kernel")
   )
-  if ((bws[["xnuno", exact = TRUE]] + bws[["xnord", exact = TRUE]] +
+  if (!canonical.x.only &&
+      (bws[["xnuno", exact = TRUE]] + bws[["xnord", exact = TRUE]] +
        bws[["ynuno", exact = TRUE]] + bws[["ynord", exact = TRUE]]) > 0L)
     stop(where, " beta kernels currently require all X and Y variables to be continuous",
          call. = FALSE)
