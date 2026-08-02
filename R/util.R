@@ -4778,7 +4778,7 @@ npValidateConditionalBetaBandwidthObject <- function(bws,
   beta.x <- identical(bws[["cxkertype", exact = TRUE]], "beta")
   beta.y <- identical(bws[["cykertype", exact = TRUE]], "beta")
   has.beta <- beta.x || beta.y
-  canonical.x.only <- beta.x && !beta.y
+  canonical.single.side <- xor(beta.x, beta.y)
   if (!has.beta)
     return(invisible(FALSE))
 
@@ -4794,8 +4794,8 @@ npValidateConditionalBetaBandwidthObject <- function(bws,
     bandwidth.compute = bandwidth.compute,
     where = paste(where, "explanatory beta kernel"),
     regtype = bws[["regtype", exact = TRUE]],
-    allow.categorical = canonical.x.only,
-    allow.general.lp = canonical.x.only
+    allow.categorical = canonical.single.side,
+    allow.general.lp = canonical.single.side
   )
   npValidateBetaKernelSpecification(
     ckertype = bws[["cykertype", exact = TRUE]],
@@ -4807,9 +4807,10 @@ npValidateConditionalBetaBandwidthObject <- function(bws,
     dati = bws[["ydati", exact = TRUE]],
     bw = bws[["ybw", exact = TRUE]],
     bandwidth.compute = bandwidth.compute,
-    where = paste(where, "dependent beta kernel")
+    where = paste(where, "dependent beta kernel"),
+    allow.categorical = canonical.single.side
   )
-  if (!canonical.x.only &&
+  if (!canonical.single.side &&
       (bws[["xnuno", exact = TRUE]] + bws[["xnord", exact = TRUE]] +
        bws[["ynuno", exact = TRUE]] + bws[["ynord", exact = TRUE]]) > 0L)
     stop(where, " beta kernels currently require all X and Y variables to be continuous",

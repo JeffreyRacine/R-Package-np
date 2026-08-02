@@ -2,6 +2,7 @@
 #define NP_BETA_BANDWIDTH_H
 
 #include "beta_kernelsum.h"
+#include "regression_contract.h"
 
 typedef enum {
   NP_BETA_BANDWIDTH_PREPARE_OK = 0,
@@ -51,5 +52,22 @@ np_beta_bandwidth_prepare(np_beta_bandwidth_mode bandwidth_mode,
 
 const char *np_beta_bandwidth_prepare_status_message(
   np_beta_bandwidth_prepare_status status);
+
+/* Fill a bounded dimension-major continuous-bandwidth layout and matching
+ * categorical lambda vector for any canonical beta row consumer. */
+int np_beta_continuous_bandwidth_prepare_canonical(
+  int bandwidth_mode,
+  int num_obs_train,
+  int num_obs_eval,
+  int num_unordered,
+  int num_ordered,
+  int num_continuous,
+  double **matrix_continuous_train,
+  double **matrix_continuous_eval,
+  double *vector_scale_factor,
+  double **matrix_bandwidth,
+  double **matrix_bandwidth_deriv,
+  double *lambda,
+  const NPContinuousPreparedBandwidthView *prepared_bandwidth);
 
 #endif

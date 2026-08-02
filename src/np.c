@@ -50,6 +50,7 @@ extern MPI_Comm	*comm;
 #include "beta_bandwidth.h"
 #include "beta_conditional.h"
 #include "continuous_kernel_row.h"
+#include "beta_scaled_row.h"
 #include "kernel_registry.h"
 #include "np_native_safety.h"
 #include "tree.h"
@@ -8336,6 +8337,8 @@ SEXP C_np_density_conditional(SEXP tyuno,
   np_continuous_kernel_descriptor y_descriptor;
   NPContinuousKernelRoute beta_x_route;
   NPContinuousKernelDerivativeDiagnostics beta_x_diagnostics;
+  NPContinuousKernelRoute beta_y_route;
+  NPContinuousKernelDerivativeDiagnostics beta_y_diagnostics;
   const NPContinuousKernelRoute *active_x_route = NULL;
   NPContinuousKernelDerivativeDiagnostics *active_x_diagnostics = NULL;
   const NPContinuousKernelRoute *active_y_route = NULL;
@@ -8418,6 +8421,24 @@ SEXP C_np_density_conditional(SEXP tyuno,
     active_x_route = &beta_x_route;
     active_x_diagnostics = &beta_x_diagnostics;
   }
+  if(has_kernel_descriptors &&
+     x_descriptor.family == NP_CKERNEL_FAMILY_LEGACY &&
+     y_descriptor.family == NP_CKERNEL_FAMILY_BETA) {
+    if(ncon_y <= 0)
+      error("C_np_density_conditional: dependent beta route requires continuous Y variables");
+    beta_y_route.segment_count = 1;
+    beta_y_route.segment[0].descriptor = y_descriptor;
+    beta_y_route.segment[0].coordinate_offset = 0;
+    beta_y_route.segment[0].coordinate_count = ncon_y;
+    beta_y_route.segment[0].lower = cykerlb_p;
+    beta_y_route.segment[0].upper = cykerub_p;
+    beta_y_diagnostics.bad_coordinate = -1;
+    beta_y_diagnostics.bad_observation = -1;
+    beta_y_diagnostics.undefined_count = 0;
+    beta_y_diagnostics.beta_status = NP_BETA_OK;
+    active_y_route = &beta_y_route;
+    active_y_diagnostics = &beta_y_diagnostics;
+  }
 
   np_lp_engine_extern = np_regression_engine_or_error(
     asInteger(regtype_i), "C_np_conditional_density_bw");
@@ -8440,6 +8461,7 @@ SEXP C_np_density_conditional(SEXP tyuno,
   PROTECT(out_ll = allocVector(REALSXP, 1));
 
   if(has_kernel_descriptors &&
+     x_descriptor.family == NP_CKERNEL_FAMILY_BETA &&
      y_descriptor.family == NP_CKERNEL_FAMILY_BETA) {
     const int num_train = INTEGER(myopti_i)[CD_TNOBSI];
     const int num_eval = INTEGER(myopti_i)[CD_ENOBSI];
@@ -16382,8 +16404,8 @@ cleanup_np_distribution_conditional_bw:
  * this O((n + eval) * p) layout through the common regression engine instead
  * of rebuilding the same X bandwidths once per evaluation point.
  */
-static int np_beta_regression_prepared_bandwidth_view_init_or_error(
-  NPRegressionPreparedBandwidthView *view,
+static int np_beta_prepared_bandwidth_view_init_or_error(
+  NPContinuousPreparedBandwidthView *view,
   const int bandwidth_mode,
   double **matrix_X_continuous_train,
   double **matrix_X_continuous_eval,
@@ -16497,11 +16519,6 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
   double * saved_ckerlb = NULL;
   double * saved_ckerub = NULL;
 
-  /* P22C1 dormant plumbing: response-side route selection remains at ingress
-   * and is deliberately unreachable until its arithmetic tranche passes. */
-  (void)response_kernel_route;
-  (void)response_kernel_route_diagnostics;
-
   num_var_unordered_extern = myopti[CD_CNUNOI];
   num_var_ordered_extern = myopti[CD_CNORDI];
   num_var_continuous_extern = myopti[CD_CNCONI];
@@ -16588,6 +16605,19 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
   int_TREE_X = int_TREE_Y = NP_TREE_FALSE;
 
   operator = (dens_or_dist == NP_DO_DENS) ? OP_NORMAL : OP_INTEGRAL;
+
+  if(response_kernel_route != NULL &&
+     (kernel_route != NULL || response_kernel_route_diagnostics == NULL ||
+      num_var_continuous_extern <= 0 ||
+      np_continuous_kernel_route_validate(
+        response_kernel_route, num_var_continuous_extern) !=
+        NP_CKERNEL_ROUTE_OK ||
+      !np_continuous_kernel_route_has_beta(response_kernel_route) ||
+      response_kernel_route->segment_count != 1 ||
+      response_kernel_route->segment[0].coordinate_offset != 0 ||
+      response_kernel_route->segment[0].coordinate_count !=
+        num_var_continuous_extern))
+    error("np_density_conditional: invalid canonical response-kernel route");
 
 #ifdef MPI2
   num_obs_eval_alloc =
@@ -16816,7 +16846,8 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
   if((lp_engine_eff == NP_LP_ENGINE_GENERAL) && (num_reg_continuous_extern == 0))
     lp_engine_eff = NP_LP_ENGINE_SCALAR;
 
-  if(lp_engine_eff == NP_LP_ENGINE_SCALAR && kernel_route == NULL){
+  if(lp_engine_eff == NP_LP_ENGINE_SCALAR && kernel_route == NULL &&
+     response_kernel_route == NULL){
     int lc_owner_done = 0;
 #ifdef MPI2
     if((lp_engine_eff == NP_LP_ENGINE_SCALAR) &&
@@ -16899,14 +16930,21 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
     int status = 0;
     int lp_eval_alloc = 1;
     double *vsf_x = NULL, *vsf_y = NULL, *ykw = NULL, *y_eval_one = NULL;
+    double *lambda_y = NULL;
     double *mean_one = NULL, *stderr_one = NULL;
     double **xuno_eval_one = NULL, **xord_eval_one = NULL, **xcon_eval_one = NULL;
     double **yuno_eval_one = NULL, **yord_eval_one = NULL, **ycon_eval_one = NULL;
     double **grad_one = NULL, **graderr_one = NULL;
     int *kernel_cy = NULL, *kernel_uy = NULL, *kernel_oy = NULL, *operator_y = NULL;
     const char *lp_error = NULL;
-    NPRegressionPreparedBandwidthView prepared_x_bandwidth;
-    NPRegressionPreparedBandwidthView *prepared_x_bandwidth_ptr = NULL;
+    double **matrix_bandwidth_y = NULL;
+    NPContinuousPreparedBandwidthView prepared_x_bandwidth;
+    NPContinuousPreparedBandwidthView *prepared_x_bandwidth_ptr = NULL;
+    NPBetaScaledRowContext beta_y_row_context;
+    const int beta_y_active = response_kernel_route != NULL;
+    const int beta_y_bw_rows = (BANDWIDTH_den_extern == BW_FIXED) ? 1 :
+      ((BANDWIDTH_den_extern == BW_GEN_NN) ? num_obs_eval_extern :
+       num_obs_train_extern);
     double RS = 0.0, MSE = 0.0, MAE = 0.0, MAPE = 0.0, CORR = 0.0, SIGN = 0.0;
     int num_y_vars = num_var_continuous_extern + num_var_unordered_extern + num_var_ordered_extern;
     int num_x_vars = num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern;
@@ -16939,6 +16977,8 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
     }
 #endif
 
+    np_beta_scaled_row_context_init(&beta_y_row_context);
+
     if((lp_engine_eff == NP_LP_ENGINE_GENERAL) &&
        ((vector_glp_degree_extern == NULL) || (num_reg_continuous_extern <= 0)))
       error("np_density_conditional: LP conditional path requires continuous x variables and GLP degree metadata");
@@ -16952,6 +16992,12 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
     y_eval_one = alloc_vecd(1);
     mean_one = alloc_vecd(MAX(1, lp_eval_alloc));
     stderr_one = alloc_vecd(MAX(1, lp_eval_alloc));
+    if(beta_y_active) {
+      lambda_y = alloc_vecd(MAX(
+        1, num_var_unordered_extern + num_var_ordered_extern));
+      matrix_bandwidth_y = alloc_tmatd(
+        beta_y_bw_rows, num_var_continuous_extern);
+    }
 
     if(num_reg_unordered_extern > 0) xuno_eval_one = alloc_matd(1, num_reg_unordered_extern);
     if(num_reg_ordered_extern > 0) xord_eval_one = alloc_matd(1, num_reg_ordered_extern);
@@ -16975,6 +17021,8 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
        (y_eval_one == NULL) || (mean_one == NULL) || (stderr_one == NULL) ||
        (kernel_cy == NULL) || (kernel_uy == NULL) || (kernel_oy == NULL) ||
        (operator_y == NULL) ||
+       (beta_y_active &&
+        (lambda_y == NULL || matrix_bandwidth_y == NULL)) ||
        ((num_reg_unordered_extern > 0) && (xuno_eval_one == NULL)) ||
        ((num_reg_ordered_extern > 0) && (xord_eval_one == NULL)) ||
        ((num_reg_continuous_extern > 0) && (xcon_eval_one == NULL)) ||
@@ -17011,8 +17059,71 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
         vector_scale_factor[1 + num_reg_continuous_extern + num_var_continuous_extern +
                             num_var_unordered_extern + i];
 
+    if(beta_y_active) {
+      const NPContinuousKernelRowStatus row_status =
+        np_beta_continuous_bandwidth_prepare_canonical(
+          BANDWIDTH_den_extern,
+          num_obs_train_extern,
+          num_obs_eval_extern,
+          num_var_unordered_extern,
+          num_var_ordered_extern,
+          num_var_continuous_extern,
+          matrix_XY_continuous_train_extern + num_reg_continuous_extern,
+          matrix_XY_continuous_eval_extern + num_reg_continuous_extern,
+          vsf_y,
+          matrix_bandwidth_y,
+          NULL,
+          lambda_y,
+          NULL) == 0 ?
+            np_beta_scaled_row_context_prepare(
+              &beta_y_row_context,
+              response_kernel_route,
+              response_kernel_route_diagnostics,
+              BANDWIDTH_den_extern,
+              num_obs_train_extern,
+              num_obs_eval_extern,
+              num_var_continuous_extern,
+              num_var_unordered_extern,
+              num_var_ordered_extern,
+              matrix_XY_continuous_train_extern +
+                num_reg_continuous_extern,
+              matrix_XY_continuous_eval_extern +
+                num_reg_continuous_extern,
+              (num_var_unordered_extern > 0) ?
+                matrix_XY_unordered_train_extern +
+                  num_reg_unordered_extern : NULL,
+              (num_var_unordered_extern > 0) ?
+                matrix_XY_unordered_eval_extern +
+                  num_reg_unordered_extern : NULL,
+              (num_var_ordered_extern > 0) ?
+                matrix_XY_ordered_train_extern +
+                  num_reg_ordered_extern : NULL,
+              (num_var_ordered_extern > 0) ?
+                matrix_XY_ordered_eval_extern +
+                  num_reg_ordered_extern : NULL,
+              matrix_bandwidth_y,
+              matrix_bandwidth_y,
+              operator_y,
+              kernel_uy,
+              kernel_oy,
+              (num_var_unordered_extern + num_var_ordered_extern > 0) ?
+                lambda_y : NULL,
+              (num_var_unordered_extern + num_var_ordered_extern > 0) ?
+                num_categories_extern + ycat_offset : NULL,
+              (num_var_unordered_extern + num_var_ordered_extern > 0) ?
+                matrix_categorical_vals_extern + ycat_offset : NULL,
+              categorical_compress,
+              ykw) : NP_CONTINUOUS_ROW_ERR_LAYOUT;
+
+      if(row_status != NP_CONTINUOUS_ROW_OK) {
+        np_beta_scaled_row_context_clear(&beta_y_row_context);
+        error("np_density_conditional: canonical beta response-row preparation failed: %s",
+              np_continuous_kernel_row_status_message(row_status));
+      }
+    }
+
     if(kernel_route != NULL &&
-       np_beta_regression_prepared_bandwidth_view_init_or_error(
+       np_beta_prepared_bandwidth_view_init_or_error(
          &prepared_x_bandwidth,
          BANDWIDTH_den_extern,
          matrix_XY_continuous_train_extern,
@@ -17036,6 +17147,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
 
     status = 0;
     for(j = lp_loop_start; j < lp_loop_stop; j++){
+      double beta_y_log_scale = 0.0;
       if(prepared_x_bandwidth_ptr != NULL)
         prepared_x_bandwidth.evaluation_offset = j;
       for(i = 0; i < num_reg_unordered_extern; i++)
@@ -17058,7 +17170,20 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
 
       lp_error = NULL;
 
-      status = kernel_weighted_sum_np(kernel_cy,
+      if(beta_y_active) {
+        const NPContinuousKernelRowStatus row_status =
+          np_beta_scaled_row_context_fill(
+            &beta_y_row_context, j, NULL, &beta_y_log_scale);
+
+        if(row_status != NP_CONTINUOUS_ROW_OK) {
+          status = 1;
+          lp_error =
+            "np_density_conditional: canonical beta response row failed";
+          break;
+        }
+        status = 0;
+      } else {
+        status = kernel_weighted_sum_np(kernel_cy,
                                       kernel_uy,
                                       kernel_oy,
                                       BANDWIDTH_den_extern,
@@ -17111,6 +17236,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                                       NULL,
                                       ykw,
                                       NULL);
+      }
       if(status != 0){
         lp_error = "np_density_conditional: y-kernel response construction failed in LP path";
       }
@@ -17167,8 +17293,24 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
       if(status != 0)
         break;
 
-      pdf[j] = mean_one[0];
-      pdf_stderr[j] = stderr_one[0];
+      if(beta_y_active) {
+        NPContinuousKernelRowStatus restore_status =
+          np_continuous_kernel_scaled_restore(
+            mean_one[0], beta_y_log_scale, 1, &pdf[j]);
+
+        if(restore_status == NP_CONTINUOUS_ROW_OK)
+          restore_status = np_continuous_kernel_scaled_restore(
+            stderr_one[0], beta_y_log_scale, 1, &pdf_stderr[j]);
+        if(restore_status != NP_CONTINUOUS_ROW_OK) {
+          status = 1;
+          lp_error =
+            "np_density_conditional: canonical beta response-unit restoration failed";
+          break;
+        }
+      } else {
+        pdf[j] = mean_one[0];
+        pdf_stderr[j] = stderr_one[0];
+      }
 
       if(dens_or_dist == NP_DO_DENS){
         const double val = (pdf[j] < DBL_MIN) ? DBL_MIN : pdf[j];
@@ -17177,10 +17319,36 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
 
       if(do_grad){
         for(i = 0; i < num_x_vars; i++){
-          pdf_deriv[i][j] = (grad_one != NULL) ? grad_one[i][0] : 0.0;
-          pdf_deriv_stderr[i][j] = (graderr_one != NULL) ? graderr_one[i][0] : 0.0;
+          const double scaled_gradient =
+            (grad_one != NULL) ? grad_one[i][0] : 0.0;
+          const double scaled_gradient_stderr =
+            (graderr_one != NULL) ? graderr_one[i][0] : 0.0;
+
+          if(beta_y_active) {
+            NPContinuousKernelRowStatus restore_status =
+              np_continuous_kernel_scaled_restore(
+                scaled_gradient, beta_y_log_scale, 1,
+                &pdf_deriv[i][j]);
+
+            if(restore_status == NP_CONTINUOUS_ROW_OK)
+              restore_status = np_continuous_kernel_scaled_restore(
+                scaled_gradient_stderr, beta_y_log_scale, 1,
+                &pdf_deriv_stderr[i][j]);
+            if(restore_status != NP_CONTINUOUS_ROW_OK) {
+              status = 1;
+              lp_error =
+                "np_density_conditional: canonical beta gradient-unit restoration failed";
+              break;
+            }
+          } else {
+            pdf_deriv[i][j] = scaled_gradient;
+            pdf_deriv_stderr[i][j] = scaled_gradient_stderr;
+          }
         }
       }
+
+      if(status != 0)
+        break;
 
       np_progress_fit_step(j + 1);
     }
@@ -17225,6 +17393,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
 
     safe_free(vsf_x);
     safe_free(vsf_y);
+    safe_free(lambda_y);
     safe_free(ykw);
     safe_free(y_eval_one);
     safe_free(mean_one);
@@ -17245,6 +17414,9 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
     safe_free(kernel_uy);
     safe_free(kernel_oy);
     safe_free(operator_y);
+    if(matrix_bandwidth_y != NULL)
+      free_tmat(matrix_bandwidth_y);
+    np_beta_scaled_row_context_clear(&beta_y_row_context);
   }
 
 

@@ -34,6 +34,7 @@
 #include "categorical_profile_tile.h"
 #include "continuous_kernel_row.h"
 #include "beta_bandwidth.h"
+#include "beta_scaled_row.h"
 #include "reghat_fast.h"
 
 #include "hash.h"
@@ -8545,30 +8546,15 @@ typedef struct {
   NPContinuousKernelProgressFunction progress;
 } NPBetaRegressionMomentCtx;
 
-typedef struct {
-  NPCategoricalProfileKernelSpec dense_spec;
-  NPCategoricalProfileKernelSpec compressed_spec;
-  int use_compressed;
-  int *profile_id;
-  double **compressed_unordered;
-  double **compressed_ordered;
-  double *compressed_unordered_storage;
-  double *compressed_ordered_storage;
-  double *compressed_log_absolute;
-  signed char *compressed_sign;
-  double *scratch;
-  size_t scratch_capacity;
-} NPBetaCategoricalFactorContext;
-
 static void np_beta_categorical_factor_context_init_empty(
-  NPBetaCategoricalFactorContext *context)
+  NPBetaScaledRowCategoricalContext *context)
 {
   if(context != NULL)
     memset(context, 0, sizeof(*context));
 }
 
 static void np_beta_categorical_factor_context_release(
-  NPBetaCategoricalFactorContext *context)
+  NPBetaScaledRowCategoricalContext *context)
 {
   if(context == NULL)
     return;
@@ -8640,7 +8626,7 @@ static int np_beta_categorical_profile_matrix_allocate(
 
 static NPContinuousKernelRowStatus
 np_beta_categorical_factor_context_prepare(
-  NPBetaCategoricalFactorContext *context,
+  NPBetaScaledRowCategoricalContext *context,
   int ntrain,
   int neval,
   int nunordered,
@@ -8775,8 +8761,8 @@ static NPContinuousKernelRowStatus np_beta_categorical_log_factor(
   double *log_absolute,
   signed char *sign)
 {
-  const NPBetaCategoricalFactorContext * const context =
-    (const NPBetaCategoricalFactorContext *)state;
+  const NPBetaScaledRowCategoricalContext * const context =
+    (const NPBetaScaledRowCategoricalContext *)state;
   NPCategoricalProfileTileStatus tile_status;
   int observation;
 
@@ -8854,7 +8840,7 @@ np_beta_regression_categorical_gradients_validated(
   int leave_one_out_offset,
   int nunordered,
   int nordered,
-  NPBetaCategoricalFactorContext *context,
+  NPBetaScaledRowCategoricalContext *context,
   const double *response,
   int positive_weights,
   NPRegressionStandardErrorMode standard_error_mode,
@@ -9385,7 +9371,7 @@ static int np_beta_absolute_route(
   NPContinuousKernelRowResult row_result;
   NPContinuousKernelDerivativeAccumulator derivative_accumulator;
   NPContinuousKernelLogFactorProvider categorical_provider;
-  NPBetaCategoricalFactorContext categorical_context;
+  NPBetaScaledRowCategoricalContext categorical_context;
   double **bandwidth_columns = NULL;
   const int has_categories =
     num_reg_unordered > 0 || num_reg_ordered > 0;
@@ -10230,6 +10216,7 @@ const int keep_kw_owner_local){
 
   const int num_xt = is_adaptive?num_obs_eval:num_obs_train;
   const int progress_total = is_adaptive ? num_obs_train : num_obs_eval;
+  size_t pkw_plane = 0;
   const int ws_step = is_adaptive? 0 :
                                  (MAX(ncol_Y, 1) * MAX(ncol_W, 1));
   const int dual_ws_step = is_adaptive ? 0 :
@@ -10856,15 +10843,33 @@ const int keep_kw_owner_local){
   }
 
   if((kernel_weighted_sum_pkw_extern != NULL) &&
-     (kernel_weighted_sum_pkw_nvar_extern > 0)){
-    const size_t pkw_count =
-      np_jksum_size_mul3_or_die((size_t)kernel_weighted_sum_pkw_nvar_extern,
-                                (size_t)num_obs_eval,
-                                (size_t)num_xt,
-                                "derivative kernel-weight initialization");
-    memset(kernel_weighted_sum_pkw_extern, 0,
-           np_jksum_size_mul_or_die(pkw_count, sizeof(double),
-                                    "derivative kernel-weight initialization"));
+     (kernel_weighted_sum_pkw_nvar_extern > 0))
+    pkw_plane = np_jksum_size_mul_or_die(
+      (size_t)progress_total, (size_t)num_xt,
+      "permuted kernel-weight plane");
+
+  if(np_ks_tree_use && !is_adaptive && pkw_plane > 0){
+    for(i = 0; i < num_reg_continuous; i++){
+      const int kernel = KERNEL_reg_np[i];
+      const int p_kernel = (do_perm && bpso[i]) ? permutation_kernel[i] : kernel;
+      tree_pkw_sparse =
+        (fabs(cksup[kernel][0]) < 0.5*DBL_MAX) ||
+        (fabs(cksup[kernel][1]) < 0.5*DBL_MAX) ||
+        (fabs(cksup[p_kernel][0]) < 0.5*DBL_MAX) ||
+        (fabs(cksup[p_kernel][1]) < 0.5*DBL_MAX);
+      if(tree_pkw_sparse)
+        break;
+    }
+
+    if(tree_pkw_sparse){
+      const size_t pkw_count =
+        np_jksum_size_mul_or_die(
+          (size_t)kernel_weighted_sum_pkw_nvar_extern, pkw_plane,
+          "tree derivative kernel-weight initialization");
+      memset(kernel_weighted_sum_pkw_extern, 0,
+             np_jksum_size_mul_or_die(pkw_count, sizeof(double),
+                                      "tree derivative kernel-weight initialization"));
+    }
   }
 
   if (BANDWIDTH_reg == BW_FIXED || BANDWIDTH_reg == BW_GEN_NN){
@@ -11781,7 +11786,7 @@ const int keep_kw_owner_local){
       for(ii = 0; ii < kernel_weighted_sum_pkw_nvar_extern; ii++){
         if(kernel_weighted_sum_pkw_sparse_extern && (p_pxl != NULL)){
           const size_t dst_offset =
-            (size_t)ii*(size_t)num_obs_eval*(size_t)num_xt +
+            (size_t)ii*pkw_plane +
             (size_t)j*(size_t)num_xt;
           const size_t src_offset = (size_t)ii*(size_t)num_xt;
 
@@ -11805,11 +11810,15 @@ const int keep_kw_owner_local){
           }
         } else if(bandwidth_divide_weights)
           for(i = 0; i < num_xt; i++)
-            kernel_weighted_sum_pkw_extern[ii*num_obs_eval*num_xt + j*num_xt + i] =
+            kernel_weighted_sum_pkw_extern[(size_t)ii*pkw_plane +
+                                            (size_t)j*(size_t)num_xt +
+                                            (size_t)i] =
               tprod_mp[ii*num_xt + i]/p_dband[ii];
         else
           for(i = 0; i < num_xt; i++)
-            kernel_weighted_sum_pkw_extern[ii*num_obs_eval*num_xt + j*num_xt + i] =
+            kernel_weighted_sum_pkw_extern[(size_t)ii*pkw_plane +
+                                            (size_t)j*(size_t)num_xt +
+                                            (size_t)i] =
               tprod_mp[ii*num_xt + i];
       }
     }
@@ -20553,7 +20562,7 @@ static void np_regression_fit_statistics(
  * bandwidths retain their incumbent direct scale-factor path.
  */
 static int np_regression_prepared_bandwidth_copy(
-  const NPRegressionPreparedBandwidthView *view,
+  const NPContinuousPreparedBandwidthView *view,
   const int bandwidth_mode,
   const int num_obs_train,
   const int num_obs_eval,
@@ -20636,7 +20645,7 @@ static NP_NOINLINE void np_beta_scalar_regression_fit_canonical(
   NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
   const int categorical_compress,
   const NPRegressionStandardErrorMode standard_error_mode,
-  const NPRegressionPreparedBandwidthView *prepared_bandwidth)
+  const NPContinuousPreparedBandwidthView *prepared_bandwidth)
 {
   const int num_categorical = num_reg_unordered + num_reg_ordered;
   const int num_predictors = num_reg_continuous + num_categorical;
@@ -20781,7 +20790,7 @@ static NP_NOINLINE void np_beta_scalar_regression_fit_canonical(
  * shared.  Keeping this helper out of line prevents beta activation from
  * changing register allocation in the large legacy/general fit owner.
  */
-static NP_NOINLINE NP_COLD int np_beta_regression_bandwidth_prepare_canonical(
+NP_NOINLINE NP_COLD int np_beta_continuous_bandwidth_prepare_canonical(
   const int bandwidth_mode,
   const int num_obs_train,
   const int num_obs_eval,
@@ -20794,7 +20803,7 @@ static NP_NOINLINE NP_COLD int np_beta_regression_bandwidth_prepare_canonical(
   double **matrix_bandwidth,
   double **matrix_bandwidth_deriv,
   double *lambda,
-  const NPRegressionPreparedBandwidthView *prepared_bandwidth)
+  const NPContinuousPreparedBandwidthView *prepared_bandwidth)
 {
   int coordinate;
 
@@ -20916,26 +20925,7 @@ static NP_NOINLINE int np_beta_regression_lp_moment_row_canonical(
     &dual_power_context, NULL, &execution_context, NULL);
 }
 
-/*
- * Persistent call-scoped beta row owner for normalized LP consumers.  It
- * retains the canonical signed-log and categorical-profile workspaces across
- * evaluation rows, but owns no estimator algebra and no evaluation-by-training
- * storage.  The scaled output row has one common factor, which cancels from
- * scalar normalization and every nonsingular wider-LP influence solve.
- */
-typedef struct {
-  int ready;
-  int has_categories;
-  NPContinuousKernelRowWorkspace row_workspace;
-  NPContinuousKernelRowPlan plan;
-  NPContinuousKernelRowResult row_result;
-  NPBetaCategoricalFactorContext categorical_context;
-  NPContinuousKernelLogFactorProvider categorical_provider;
-  NPContinuousKernelDerivativeDiagnostics *diagnostics;
-} NPBetaRegressionScaledRowContext;
-
-static void np_beta_regression_scaled_row_context_init(
-  NPBetaRegressionScaledRowContext *context)
+void np_beta_scaled_row_context_init(NPBetaScaledRowContext *context)
 {
   if(context == NULL)
     return;
@@ -20945,20 +20935,18 @@ static void np_beta_regression_scaled_row_context_init(
     &context->categorical_context);
 }
 
-static void np_beta_regression_scaled_row_context_clear(
-  NPBetaRegressionScaledRowContext *context)
+void np_beta_scaled_row_context_clear(NPBetaScaledRowContext *context)
 {
   if(context == NULL)
     return;
   np_continuous_kernel_row_workspace_release(&context->row_workspace);
   np_beta_categorical_factor_context_release(
     &context->categorical_context);
-  np_beta_regression_scaled_row_context_init(context);
+  np_beta_scaled_row_context_init(context);
 }
 
-static NPContinuousKernelRowStatus
-np_beta_regression_scaled_row_context_prepare(
-  NPBetaRegressionScaledRowContext *context,
+NPContinuousKernelRowStatus np_beta_scaled_row_context_prepare(
+  NPBetaScaledRowContext *context,
   const NPContinuousKernelRoute *route,
   NPContinuousKernelDerivativeDiagnostics *diagnostics,
   int bandwidth_mode,
@@ -21045,11 +21033,11 @@ np_beta_regression_scaled_row_context_prepare(
   return NP_CONTINUOUS_ROW_OK;
 }
 
-static NPContinuousKernelRowStatus
-np_beta_regression_scaled_row_context_fill(
-  NPBetaRegressionScaledRowContext *context,
+NPContinuousKernelRowStatus np_beta_scaled_row_context_fill(
+  NPBetaScaledRowContext *context,
   int evaluation,
-  double *sum)
+  double *sum,
+  double *common_log_scale)
 {
   NPContinuousKernelRowStatus status;
   int observation;
@@ -21078,7 +21066,131 @@ np_beta_regression_scaled_row_context_fill(
       return NP_CONTINUOUS_ROW_ERR_NUMERIC;
     *sum = row_sum;
   }
+  if(common_log_scale != NULL)
+    *common_log_scale = context->row_result.total_log_scale;
   return NP_CONTINUOUS_ROW_OK;
+}
+
+/*
+ * Conditional scalar fits use the empirical influence of each normalized X
+ * weight, not ordinary-regression residual covariance.  This family-neutral
+ * finisher consumes the level and derivative/alternate rows already emitted
+ * by the common weighted-sum traversal.  It performs no kernel work and owns
+ * no storage.
+ */
+static int NP_NOINLINE np_regression_conditional_influence_finish(
+  const int num_obs_train,
+  const int num_predictors,
+  const int num_continuous,
+  const int num_unordered,
+  const double *response,
+  const double *kernel_weights,
+  const double *permuted_kernel_weights,
+  const double *weighted_sums,
+  const double *permuted_weighted_sums,
+  const double *mean,
+  double * const *gradient,
+  double *mean_stderr,
+  double **gradient_stderr)
+{
+  const double denominator = weighted_sums[1];
+  double influence_scale = 0.0;
+  double influence_sum_squares = 1.0;
+  int predictor;
+  int observation;
+
+  if(num_obs_train <= 0 || num_predictors < 0 || num_continuous < 0 ||
+     num_unordered < 0 || num_continuous + num_unordered > num_predictors ||
+     response == NULL || kernel_weights == NULL || weighted_sums == NULL ||
+     mean == NULL || mean_stderr == NULL || !R_FINITE(denominator) ||
+     denominator == 0.0 || !R_FINITE(mean[0]) ||
+     (num_predictors > 0 &&
+      (permuted_kernel_weights == NULL ||
+       permuted_weighted_sums == NULL || gradient == NULL ||
+       gradient_stderr == NULL)))
+    return 0;
+  if(num_obs_train <= 1) {
+    mean_stderr[0] = 0.0;
+    for(predictor = 0; predictor < num_predictors; ++predictor)
+      gradient_stderr[predictor][0] = 0.0;
+    return 1;
+  }
+
+#define NP_ACCUMULATE_SQUARE(value_) do {                                \
+    const double np_value_ = fabs(value_);                               \
+    if(!R_FINITE(np_value_))                                             \
+      return 0;                                                          \
+    if(np_value_ != 0.0) {                                               \
+      if(influence_scale < np_value_) {                                  \
+        const double np_ratio_ = influence_scale / np_value_;            \
+        influence_sum_squares =                                          \
+          1.0 + influence_sum_squares * np_ratio_ * np_ratio_;           \
+        influence_scale = np_value_;                                     \
+      } else {                                                           \
+        const double np_ratio_ = np_value_ / influence_scale;            \
+        influence_sum_squares += np_ratio_ * np_ratio_;                  \
+      }                                                                  \
+    }                                                                    \
+  } while(0)
+
+  for(observation = 0; observation < num_obs_train; ++observation)
+    NP_ACCUMULATE_SQUARE(
+      kernel_weights[observation] * (response[observation] - mean[0]));
+  mean_stderr[0] = influence_scale * sqrt(influence_sum_squares) /
+    (fabs(denominator) * sqrt((double)(num_obs_train - 1)));
+  if(!R_FINITE(mean_stderr[0]))
+    return 0;
+
+  for(predictor = 0; predictor < num_predictors; ++predictor) {
+    const double * const alternate_weights =
+      permuted_kernel_weights +
+      (size_t)predictor * (size_t)num_obs_train;
+    const double alternate_denominator =
+      permuted_weighted_sums[(size_t)predictor * 3U + 1U];
+
+    influence_scale = 0.0;
+    influence_sum_squares = 1.0;
+    if(!R_FINITE(alternate_denominator) || alternate_denominator == 0.0)
+      return 0;
+    if(predictor < num_continuous) {
+      const double denominator_ratio = alternate_denominator / denominator;
+
+      for(observation = 0; observation < num_obs_train; ++observation) {
+        const double normalized_weight =
+          kernel_weights[observation] / denominator;
+        const double normalized_derivative =
+          alternate_weights[observation] / denominator -
+          normalized_weight * denominator_ratio;
+        const double influence = normalized_derivative *
+          (response[observation] - mean[0]) -
+          normalized_weight * gradient[predictor][0];
+
+        NP_ACCUMULATE_SQUARE(influence);
+      }
+      gradient_stderr[predictor][0] = influence_scale *
+        sqrt(influence_sum_squares / (double)(num_obs_train - 1));
+    } else {
+      const double alternate_mean =
+        permuted_weighted_sums[(size_t)predictor * 3U] /
+        alternate_denominator;
+      double alternate_stderr;
+
+      if(!R_FINITE(alternate_mean))
+        return 0;
+      for(observation = 0; observation < num_obs_train; ++observation)
+        NP_ACCUMULATE_SQUARE(
+          alternate_weights[observation] *
+          (response[observation] - alternate_mean));
+      alternate_stderr = influence_scale * sqrt(influence_sum_squares) /
+        (fabs(alternate_denominator) * sqrt((double)(num_obs_train - 1)));
+      gradient_stderr[predictor][0] = hypot(mean_stderr[0], alternate_stderr);
+    }
+    if(!R_FINITE(gradient_stderr[predictor][0]))
+      return 0;
+  }
+
+#undef NP_ACCUMULATE_SQUARE
+  return 1;
 }
 
 int kernel_estimate_regression_categorical_tree_np(
@@ -21117,7 +21229,7 @@ const NPContinuousKernelRoute *kernel_route,
 NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
 int categorical_compress,
 NPRegressionStandardErrorMode standard_error_mode,
-const NPRegressionPreparedBandwidthView *prepared_bandwidth){
+const NPContinuousPreparedBandwidthView *prepared_bandwidth){
 
   // note that mean has 2*num_obs allocated for npksum
   int i, j, l;
@@ -21171,6 +21283,10 @@ const NPRegressionPreparedBandwidthView *prepared_bandwidth){
   if(lp_engine_est != NP_LP_ENGINE_SCALAR &&
      standard_error_mode == NP_REGRESSION_STDERR_CONDITIONAL_INFLUENCE)
     error("conditional influence standard errors require the scalar regression engine");
+  if(kernel_route == NULL &&
+     standard_error_mode == NP_REGRESSION_STDERR_CONDITIONAL_INFLUENCE &&
+     num_obs_eval != 1)
+    error("legacy conditional influence standard errors require one evaluation row");
   if(prepared_bandwidth != NULL && kernel_route == NULL)
     error("prepared regression bandwidths require a canonical kernel route");
   if(NP_UNLIKELY(kernel_route != NULL) &&
@@ -21252,7 +21368,7 @@ const NPRegressionPreparedBandwidthView *prepared_bandwidth){
   matrix_bandwidth_deriv = alloc_matd(bwmdim,num_reg_continuous);
 
   if(NP_UNLIKELY(kernel_route != NULL)) {
-    if(np_beta_regression_bandwidth_prepare_canonical(
+    if(np_beta_continuous_bandwidth_prepare_canonical(
         BANDWIDTH_reg,
         num_obs_train,
         num_obs_eval,
@@ -21514,6 +21630,7 @@ const NPRegressionPreparedBandwidthView *prepared_bandwidth){
     }
 
     if(all_large_gate &&
+       standard_error_mode == NP_REGRESSION_STDERR_LOCAL_RESIDUAL &&
        ((lp_engine_est == NP_LP_ENGINE_SCALAR) || (lp_engine_est == NP_LP_ENGINE_GENERAL))){
       double kconst = 1.0;
       int kconst_ok = 1;
@@ -21953,8 +22070,29 @@ const NPRegressionPreparedBandwidthView *prepared_bandwidth){
     double * lc_Y[NCOL_Y] = {NULL,NULL,NULL};
     double * meany = (double *)malloc(NCOL_Y*num_obs_eval_alloc*sizeof(double));
     double * permy = NULL;
+    double *conditional_kw = NULL;
+    double *conditional_pkw = NULL;
+    const int conditional_influence =
+      standard_error_mode == NP_REGRESSION_STDERR_CONDITIONAL_INFLUENCE;
     int pop = OP_NOOP;
     int p_nvar = do_grad ? (num_reg_continuous + num_reg_unordered + num_reg_ordered) : 0;
+
+    if(conditional_influence) {
+      size_t conditional_pkw_count = 0;
+
+      conditional_kw = (double *)malloc(
+        (size_t)num_obs_train * sizeof(double));
+      if(p_nvar > 0 &&
+         (!np_size_mul_checked((size_t)num_obs_train, (size_t)p_nvar,
+                               &conditional_pkw_count) ||
+          !np_size_array_bytes_checked(
+            conditional_pkw_count, sizeof(double), &conditional_pkw_count)))
+        error("conditional influence kernel-weight dimensions overflow");
+      if(p_nvar > 0)
+        conditional_pkw = (double *)malloc(conditional_pkw_count);
+      if(conditional_kw == NULL || (p_nvar > 0 && conditional_pkw == NULL))
+        error("memory allocation failed in conditional influence workspace");
+    }
   
     if(do_grad){
       permy = (double *)malloc(NCOL_Y*num_obs_eval_alloc*p_nvar*sizeof(double));
@@ -21979,7 +22117,7 @@ const NPRegressionPreparedBandwidthView *prepared_bandwidth){
       lc_Y[2][ii] = vector_Y[ii]*vector_Y[ii];
     }
 
-    if((!do_grad) &&
+    if((!conditional_influence) && (!do_grad) &&
        np_regression_categorical_profile_fit(kernel_c,
                                              kernel_u,
                                              kernel_o,
@@ -22008,7 +22146,16 @@ const NPRegressionPreparedBandwidthView *prepared_bandwidth){
       goto finish_regression_estimation;
     }
     
-    kernel_weighted_sum_np_ctx(kernel_c,
+    {
+      double * const old_pkw = kernel_weighted_sum_pkw_extern;
+      const int old_pkw_nvar = kernel_weighted_sum_pkw_nvar_extern;
+      int kws_status;
+
+      if(conditional_influence) {
+        kernel_weighted_sum_pkw_extern = conditional_pkw;
+        kernel_weighted_sum_pkw_nvar_extern = p_nvar;
+      }
+      kws_status = kernel_weighted_sum_np_ctx(kernel_c,
                            kernel_u,
                            kernel_o,
                            BANDWIDTH_reg,
@@ -22021,7 +22168,7 @@ const NPRegressionPreparedBandwidthView *prepared_bandwidth){
                            0,
                            1, // kernel_pow = 1
                            1, // bandwidth_divide = TRUE, always
-                           0, 
+                           conditional_influence,
                            0, // not symmetric
                            0, // do not gather-scatter
                            0, // do not drop train
@@ -22057,8 +22204,13 @@ const NPRegressionPreparedBandwidthView *prepared_bandwidth){
                            matrix_ordered_indices, 
                            meany,
                            permy, // permutations used for gradients
-                           NULL, // do not return kernel weights
+                           conditional_kw,
                            est_gate_ctx_ptr);
+      kernel_weighted_sum_pkw_extern = old_pkw;
+      kernel_weighted_sum_pkw_nvar_extern = old_pkw_nvar;
+      if(kws_status != 0)
+        error("conditional regression kernel traversal failed");
+    }
 
     for(int ii = 0; ii < num_obs_eval; ii++){
       const int ii3 = NCOL_Y*ii;
@@ -22124,12 +22276,24 @@ const NPRegressionPreparedBandwidthView *prepared_bandwidth){
       }
     }
 
+    if(conditional_influence &&
+       !np_regression_conditional_influence_finish(
+         num_obs_train, p_nvar,
+         do_grad ? num_reg_continuous : 0,
+         do_grad ? num_reg_unordered : 0,
+         vector_Y, conditional_kw, conditional_pkw, meany, permy,
+         mean, gradient, mean_stderr, gradient_stderr))
+      error("conditional influence variance construction failed");
+
 
     free(meany);
 
     if(do_grad && (p_nvar > 0)){
       free(permy);
     }
+
+    free(conditional_kw);
+    free(conditional_pkw);
 
     free(lc_Y[1]);
     free(lc_Y[2]);
@@ -23278,7 +23442,7 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
   double **eval_xuno_one = NULL, **eval_xord_one = NULL, **eval_xcon_one = NULL;
   NPLPSolveWorkspace solve_workspace;
   NPReghatLPWorkspace reghat_workspace;
-  NPBetaRegressionScaledRowContext beta_row_context;
+  NPBetaScaledRowContext beta_row_context;
   double *eval_basis = NULL;
   NPConditionalBoundState bounds_state;
   int i, j, l;
@@ -23313,7 +23477,7 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
 
   np_lp_solve_workspace_init(&solve_workspace);
   np_reghat_lp_workspace_init(&reghat_workspace);
-  np_beta_regression_scaled_row_context_init(&beta_row_context);
+  np_beta_scaled_row_context_init(&beta_row_context);
   memset(weights_out, 0, (size_t)num_eval*(size_t)num_train*sizeof(double));
 
   vsfx = alloc_vecd(MAX(1, num_reg_tot));
@@ -23376,7 +23540,7 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
   for(i = 0; i < num_reg_tot; i++) x_operator[i] = OP_NORMAL;
 
   if(kernel_route != NULL) {
-    if(np_beta_regression_bandwidth_prepare_canonical(
+    if(np_beta_continuous_bandwidth_prepare_canonical(
         BANDWIDTH_den_extern,
         num_train,
         num_eval,
@@ -23413,7 +23577,7 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
     goto cleanup_lp_hat;
 
   if(kernel_route != NULL &&
-     np_beta_regression_scaled_row_context_prepare(
+     np_beta_scaled_row_context_prepare(
        &beta_row_context, kernel_route, kernel_route_diagnostics,
        BANDWIDTH_den_extern, num_train, num_eval,
        num_reg_continuous_extern, num_reg_unordered_extern,
@@ -23432,8 +23596,8 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
     double sum = 0.0;
 
     for(i = 0; i < num_eval; ++i) {
-      if(np_beta_regression_scaled_row_context_fill(
-           &beta_row_context, i, &sum) != NP_CONTINUOUS_ROW_OK ||
+      if(np_beta_scaled_row_context_fill(
+           &beta_row_context, i, &sum, NULL) != NP_CONTINUOUS_ROW_OK ||
          !R_FINITE(sum) || sum == 0.0)
         goto cleanup_lp_hat;
       for(j = 0; j < num_train; ++j) {
@@ -23539,8 +23703,8 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
     }
 
     if(kernel_route != NULL) {
-      if(np_beta_regression_scaled_row_context_fill(
-           &beta_row_context, i, NULL) != NP_CONTINUOUS_ROW_OK ||
+      if(np_beta_scaled_row_context_fill(
+           &beta_row_context, i, NULL, NULL) != NP_CONTINUOUS_ROW_OK ||
          np_reghat_lp_workspace_influence_row(
            &reghat_workspace, kw, eval_basis, weights_out + i,
            (size_t)num_eval) != NP_REGHAT_LP_ROW_OK)
@@ -23691,7 +23855,7 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
 cleanup_lp_hat:
   np_lp_solve_workspace_clear(&solve_workspace);
   np_reghat_lp_workspace_clear(&reghat_workspace);
-  np_beta_regression_scaled_row_context_clear(&beta_row_context);
+  np_beta_scaled_row_context_clear(&beta_row_context);
   if(vsfx != NULL) free(vsfx);
   if(lambdax != NULL) free(lambdax);
   if(kw != NULL) free(kw);
@@ -24352,7 +24516,7 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
   double **TCON = NULL, **TUNO = NULL, **TORD = NULL;
   NPLPSolveWorkspace solve_workspace;
   NPReghatLPWorkspace reghat_workspace;
-  NPBetaRegressionScaledRowContext beta_row_context;
+  NPBetaScaledRowContext beta_row_context;
   double **Ycols = NULL, **Wcols = NULL;
   double *out = NULL, *eval_basis = NULL;
   int i, j, l;
@@ -24401,7 +24565,7 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
 
   np_lp_solve_workspace_init(&solve_workspace);
   np_reghat_lp_workspace_init(&reghat_workspace);
-  np_beta_regression_scaled_row_context_init(&beta_row_context);
+  np_beta_scaled_row_context_init(&beta_row_context);
   memset(fitted_out, 0, (size_t)num_eval*(size_t)n_rhs*sizeof(double));
 
   vsfx = alloc_vecd(MAX(1, num_reg_tot));
@@ -24456,7 +24620,7 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
   for(i = 0; i < num_reg_tot; i++) x_operator[i] = OP_NORMAL;
 
   if(kernel_route != NULL) {
-    if(np_beta_regression_bandwidth_prepare_canonical(
+    if(np_beta_continuous_bandwidth_prepare_canonical(
         BANDWIDTH_den_extern,
         num_train,
         num_eval,
@@ -24493,7 +24657,7 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
     goto cleanup_lp_apply;
 
   if(kernel_route != NULL &&
-     np_beta_regression_scaled_row_context_prepare(
+     np_beta_scaled_row_context_prepare(
        &beta_row_context, kernel_route, kernel_route_diagnostics,
        BANDWIDTH_den_extern, num_train, num_eval,
        num_reg_continuous_extern, num_reg_unordered_extern,
@@ -24514,8 +24678,8 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
     for(j = 0; j < num_eval; ++j) {
       double denominator;
 
-      if(np_beta_regression_scaled_row_context_fill(
-           &beta_row_context, j, &denominator) != NP_CONTINUOUS_ROW_OK)
+      if(np_beta_scaled_row_context_fill(
+           &beta_row_context, j, &denominator, NULL) != NP_CONTINUOUS_ROW_OK)
         goto cleanup_lp_apply;
       if(!R_FINITE(denominator) || denominator == 0.0)
         goto cleanup_lp_apply;
@@ -24613,8 +24777,8 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
           eval_basis);
       }
 
-      if(np_beta_regression_scaled_row_context_fill(
-           &beta_row_context, j, NULL) != NP_CONTINUOUS_ROW_OK ||
+      if(np_beta_scaled_row_context_fill(
+           &beta_row_context, j, NULL, NULL) != NP_CONTINUOUS_ROW_OK ||
          np_reghat_lp_workspace_influence_row(
            &reghat_workspace, kw, eval_basis, hat_block + block_count,
            (size_t)block_rows) != NP_REGHAT_LP_ROW_OK)
@@ -24843,7 +25007,7 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
 cleanup_lp_apply:
   np_lp_solve_workspace_clear(&solve_workspace);
   np_reghat_lp_workspace_clear(&reghat_workspace);
-  np_beta_regression_scaled_row_context_clear(&beta_row_context);
+  np_beta_scaled_row_context_clear(&beta_row_context);
   if(matrix_bandwidth_x != NULL) free_tmat(matrix_bandwidth_x);
   if((TCON != NULL) && (num_reg_continuous_extern > 0)) free_mat(TCON, num_reg_continuous_extern);
   if((TUNO != NULL) && (num_reg_unordered_extern > 0)) free_mat(TUNO, num_reg_unordered_extern);
