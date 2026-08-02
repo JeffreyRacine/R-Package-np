@@ -185,19 +185,51 @@ static double np_beta_conditional_density_bw_objective(
     vector_cykerlb_extern, vector_cykerub_extern);
 }
 
+static void np_beta_regression_bw_route_or_error(
+  NPContinuousKernelRoute * const route,
+  NPContinuousKernelDerivativeDiagnostics * const diagnostics,
+  const char * const where)
+{
+  route->segment_count = 1;
+  route->segment[0].descriptor.family = NP_CKERNEL_FAMILY_BETA;
+  route->segment[0].descriptor.legacy_code = NP_CKERNEL_COORDINATE_CODE;
+  route->segment[0].descriptor.order = np_beta_bw_order_extern;
+  route->segment[0].coordinate_offset = 0;
+  route->segment[0].coordinate_count = num_reg_continuous_extern;
+  route->segment[0].lower = vector_ckerlb_extern;
+  route->segment[0].upper = vector_ckerub_extern;
+  if(np_continuous_kernel_route_validate(
+       route, num_reg_continuous_extern) != NP_CKERNEL_ROUTE_OK)
+    error("%s beta route has an invalid layout", where);
+  diagnostics->bad_coordinate = -1;
+  diagnostics->bad_observation = -1;
+  diagnostics->undefined_count = 0;
+  diagnostics->beta_status = NP_BETA_OK;
+}
+
 
 double cv_func_regression_categorical_ls(double *vector_scale_factor){
   double cv = 0.0;
   clock_t start, diff;
+  NPContinuousKernelRoute beta_route;
+  NPContinuousKernelDerivativeDiagnostics beta_diagnostics;
 
   if(KERNEL_reg_extern == NP_CKERNEL_COORDINATE_CODE) {
+    np_beta_regression_bw_route_or_error(
+      &beta_route, &beta_diagnostics, "regression CVLS");
     start = clock();
-    cv = np_beta_objective_regression_lc(
-      BANDWIDTH_reg_extern, np_beta_bw_order_extern, 0,
-      num_obs_train_extern, num_reg_continuous_extern,
+    cv = np_kernel_estimate_regression_categorical_ls_aic_ctx(
+      np_lp_engine_extern, RBWM_CVLS,
+      KERNEL_reg_extern, KERNEL_reg_unordered_extern,
+      KERNEL_reg_ordered_extern, BANDWIDTH_reg_extern,
+      num_obs_train_extern, num_reg_unordered_extern,
+      num_reg_ordered_extern, num_reg_continuous_extern,
+      matrix_X_unordered_train_extern,
+      matrix_X_ordered_train_extern,
       matrix_X_continuous_train_extern, vector_Y_extern,
-      &vector_scale_factor[1], vector_ckerlb_extern,
-      vector_ckerub_extern);
+      &vector_scale_factor[1], num_categories_extern,
+      &beta_route, &beta_diagnostics,
+      np_regression_bw_categorical_compress_extern);
     diff = clock() - start;
     timing_extern = ((double)diff) / ((double)CLOCKS_PER_SEC);
     return cv;
@@ -1009,15 +1041,25 @@ double cv_func_regression_categorical_aic_c(double *vector_scale_factor)
 /* Declarations */
   double cv = 0.0;
   clock_t start, diff;
+  NPContinuousKernelRoute beta_route;
+  NPContinuousKernelDerivativeDiagnostics beta_diagnostics;
 
   if(KERNEL_reg_extern == NP_CKERNEL_COORDINATE_CODE) {
+    np_beta_regression_bw_route_or_error(
+      &beta_route, &beta_diagnostics, "regression CVAIC");
     start = clock();
-    cv = np_beta_objective_regression_lc(
-      BANDWIDTH_reg_extern, np_beta_bw_order_extern, 1,
-      num_obs_train_extern, num_reg_continuous_extern,
+    cv = np_kernel_estimate_regression_categorical_ls_aic_ctx(
+      np_lp_engine_extern, RBWM_CVAIC,
+      KERNEL_reg_extern, KERNEL_reg_unordered_extern,
+      KERNEL_reg_ordered_extern, BANDWIDTH_reg_extern,
+      num_obs_train_extern, num_reg_unordered_extern,
+      num_reg_ordered_extern, num_reg_continuous_extern,
+      matrix_X_unordered_train_extern,
+      matrix_X_ordered_train_extern,
       matrix_X_continuous_train_extern, vector_Y_extern,
-      &vector_scale_factor[1], vector_ckerlb_extern,
-      vector_ckerub_extern);
+      &vector_scale_factor[1], num_categories_extern,
+      &beta_route, &beta_diagnostics,
+      np_regression_bw_categorical_compress_extern);
     diff = clock() - start;
     timing_extern = ((double)diff) / ((double)CLOCKS_PER_SEC);
     return cv;

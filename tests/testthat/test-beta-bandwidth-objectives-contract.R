@@ -92,8 +92,14 @@ test_that("beta CVML and local-constant regression objectives match kernel weigh
     fitted_full <- colSums(weights_full * y) / denominator
     trace_hat <- sum(diag(weights_full) / denominator)
     loss <- mean((y - fitted_full)^2)
-    expected_aic <- log(loss) +
-      (1 + trace_hat / nrow(x)) / (1 - (trace_hat + 2) / nrow(x))
+    penalty <- (1 + trace_hat / nrow(x)) /
+      (1 - (trace_hat + 2) / nrow(x))
+    expected_aic <- if (is.finite(loss) && loss > 0 &&
+                        is.finite(penalty) && penalty >= 0) {
+      log(loss) + penalty
+    } else {
+      .Machine$double.xmax
+    }
     expect_equal(
       beta_regression_objective(x, y, 0.14, "cv.aic", order),
       expected_aic,
