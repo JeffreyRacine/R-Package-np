@@ -18831,22 +18831,30 @@ static int np_distribution_cvls_continuous_route(
   for(evaluation = 0; evaluation < num_obs_eval; ++evaluation) {
     double scaled_sum = 0.0;
     double common_log_scale = 0.0;
+    double common_scale = 0.0;
     double row_sum = 0.0;
 
     if((evaluation & 31) == 0)
       np_progress_bandwidth_loop_step();
     row_status = np_beta_scaled_row_context_fill(
       &context, evaluation, &scaled_sum, &common_log_scale);
+    /* The canonical row is bounded by one in absolute value on its common
+     * scale. Restore that scale once per evaluation, then recover the absolute
+     * row with plain multiplication instead of one log/exp restoration per
+     * observation. The shared legacy finisher remains byte-for-byte literal. */
     if(row_status != NP_CONTINUOUS_ROW_OK ||
        np_continuous_kernel_scaled_restore(
-         scaled_sum, common_log_scale, 1, &row_sum) !=
+         1.0, common_log_scale, 1, &common_scale) !=
            NP_CONTINUOUS_ROW_OK)
       goto cleanup_distribution_route;
-    for(observation = 0; observation < num_obs_train; ++observation)
-      if(np_continuous_kernel_scaled_restore(
-           row[observation], common_log_scale, 1,
-           &row[observation]) != NP_CONTINUOUS_ROW_OK)
+    row_sum = scaled_sum*common_scale;
+    if(!R_FINITE(row_sum))
+      goto cleanup_distribution_route;
+    for(observation = 0; observation < num_obs_train; ++observation) {
+      row[observation] *= common_scale;
+      if(!R_FINITE(row[observation]))
         goto cleanup_distribution_route;
+    }
 
     cv_accumulator = np_distribution_cvls_accumulate_row(
       evaluation, is, ie, cdfontrain,
