@@ -580,6 +580,63 @@ test_that("beta density CVML enters the canonical scaled-row owner", {
   )
 })
 
+test_that("density CVLS owner retains beta-unreachable route plumbing", {
+  root <- locate_beta_activation_sources()
+  skip_if(is.null(root), "package sources unavailable")
+  ingress <- paste(
+    readLines(file.path(root, "src", "kernelcv.c"), warn = FALSE),
+    collapse = "\n"
+  )
+  engine <- paste(
+    readLines(file.path(root, "src", "jksum.c"), warn = FALSE),
+    collapse = "\n"
+  )
+
+  owner_start <- regexpr(
+    "int np_kernel_estimate_density_categorical_convolution_cv(",
+    engine,
+    fixed = TRUE
+  )[[1L]]
+  owner_end <- regexpr(
+    "void kernel_estimate_dens_dist_categorical_np(",
+    engine,
+    fixed = TRUE
+  )[[1L]]
+  expect_gt(owner_start, 0L)
+  expect_gt(owner_end, owner_start)
+  owner <- substr(engine, owner_start, owner_end - 1L)
+
+  expect_match(owner, "const NPContinuousKernelRoute * const kernel_route",
+               fixed = TRUE)
+  expect_match(owner, "(void)kernel_route;", fixed = TRUE)
+  expect_match(owner, "(void)kernel_route_diagnostics;", fixed = TRUE)
+  expect_match(owner, "(void)categorical_compress;", fixed = TRUE)
+  expect_false(grepl("NPContinuousKernelExecutionContext", owner,
+                     fixed = TRUE))
+
+  callback_start <- regexpr(
+    "double np_cv_func_density_categorical_ls(", ingress, fixed = TRUE
+  )[[1L]]
+  callback_end <- regexpr(
+    "double cv_func_distribution_categorical_ls(", ingress, fixed = TRUE
+  )[[1L]]
+  expect_gt(callback_start, 0L)
+  expect_gt(callback_end, callback_start)
+  callback <- substr(ingress, callback_start, callback_end - 1L)
+  expect_match(callback, "np_beta_objective_density_ls(", fixed = TRUE)
+  expect_match(
+    callback,
+    paste0(
+      "matrix_categorical_vals_extern,\n",
+      "        NULL,\n",
+      "        NULL,\n",
+      "        0,\n",
+      "        &cv)==1)"
+    ),
+    fixed = TRUE
+  )
+})
+
 test_that("every beta side enters the common conditional regression owner", {
   root <- locate_beta_activation_sources()
   skip_if(is.null(root), "package sources unavailable")
