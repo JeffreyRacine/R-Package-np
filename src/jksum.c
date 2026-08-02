@@ -40004,3 +40004,26 @@ cleanup_route:
   free(eval_basis);
   return status;
 }
+
+/*
+ * Route-bearing sibling for conditional-density CVLS.  It is appended beside
+ * the incumbent stream so null execution remains literal and linked-layout
+ * movement cannot perturb that hot owner.  The routed arithmetic is enabled
+ * only in the following tranche; valid beta state fails closed here and must
+ * never fall back to the incumbent continuous-kernel switch.
+ */
+int np_conditional_density_cvls_lp_stream_ctx(
+  double *vector_scale_factor,
+  const NPConditionalKernelExecutionContext * const execution_context,
+  double *cv)
+{
+  if(execution_context == NULL)
+    return np_conditional_density_cvls_lp_stream(vector_scale_factor, cv);
+
+  if(!np_conditional_kernel_execution_context_valid(
+       execution_context, KERNEL_reg_extern, KERNEL_den_extern,
+       num_reg_continuous_extern, num_var_continuous_extern))
+    error("conditional density CVLS kernel route has an invalid layout");
+
+  return 1;
+}
