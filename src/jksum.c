@@ -28463,17 +28463,33 @@ static int np_density_cvls_bounded_i1_quadrature_general(const int KERNEL_den,
                                                          double *vector_scale_factor,
                                                          int *num_categories,
                                                          double **matrix_categorical_vals,
+                                                         double **canonical_bandwidth_train,
+                                                         const double *canonical_lambda,
+                                                         const int *canonical_operator,
+                                                         const int *canonical_kernel_unordered,
+                                                         const int *canonical_kernel_ordered,
+                                                         const NPContinuousKernelRoute * const kernel_route,
+                                                         NPContinuousKernelDerivativeDiagnostics * const kernel_route_diagnostics,
+                                                         const int categorical_compress,
                                                          double *cv1){
   const int ncon = num_reg_continuous;
   const int nuno = num_reg_unordered;
   const int nord = num_reg_ordered;
   const int q = np_bounded_cvls_grid_points(ncon);
-  const int block_size = 64;
+  const int exact_beta_route = kernel_route != NULL;
+  /* The continuous-only beta grid is bounded by 81 points in one dimension
+     and 31^2 points in two, independent of n.  Owning it as one block avoids
+     repeated route/workspace setup.  Mixed categorical grids remain tiled so
+     their level product cannot create an unbounded allocation. */
+  const int block_size =
+    exact_beta_route && nuno == 0 && nord == 0 ?
+    (ncon == 1 ? q : q*q) : 64;
   size_t total_eval = 0;
   double **cont_grid = NULL, **cont_weight = NULL;
   double **eval_xuno = NULL, **eval_xord = NULL, **eval_xcon = NULL;
   double **matrix_bandwidth = NULL;
   double *lambda = NULL, *eval_weight = NULL;
+  double *beta_row = NULL;
   int bw_rows, d;
   int status = 1;
 
@@ -28482,6 +28498,20 @@ static int np_density_cvls_bounded_i1_quadrature_general(const int KERNEL_den,
   if((BANDWIDTH_den != BW_FIXED) &&
      (BANDWIDTH_den != BW_GEN_NN) &&
      (BANDWIDTH_den != BW_ADAP_NN))
+    return 1;
+  if(exact_beta_route &&
+     (np_continuous_kernel_route_validate(kernel_route, ncon) !=
+        NP_CKERNEL_ROUTE_OK ||
+      !np_continuous_kernel_route_has_beta(kernel_route) ||
+      kernel_route->segment_count != 1 ||
+      kernel_route->segment[0].coordinate_offset != 0 ||
+      kernel_route->segment[0].coordinate_count != ncon ||
+      kernel_route_diagnostics == NULL ||
+      canonical_bandwidth_train == NULL || canonical_operator == NULL ||
+      ((nuno + nord > 0) && canonical_lambda == NULL) ||
+      (nuno > 0 && canonical_kernel_unordered == NULL) ||
+      (nord > 0 && canonical_kernel_ordered == NULL) ||
+      (categorical_compress != 0 && categorical_compress != 1)))
     return 1;
   if(!np_density_cvls_bounded_general_route_ok(num_reg_continuous))
     return 1;
@@ -28505,9 +28535,14 @@ static int np_density_cvls_bounded_i1_quadrature_general(const int KERNEL_den,
   matrix_bandwidth = alloc_matd(bw_rows, ncon);
   lambda = alloc_vecd(nuno + nord);
   eval_weight = alloc_vecd(block_size);
+  if(exact_beta_route)
+    beta_row = alloc_vecd(num_obs);
 
   if((cont_grid == NULL) || (cont_weight == NULL) || (eval_xcon == NULL) ||
-     (matrix_bandwidth == NULL) || (lambda == NULL) || (eval_weight == NULL) ||
+     (matrix_bandwidth == NULL) ||
+     ((nuno + nord > 0) && (lambda == NULL)) ||
+     (eval_weight == NULL) ||
+     (exact_beta_route && (beta_row == NULL)) ||
      ((nuno > 0) && (eval_xuno == NULL)) ||
      ((nord > 0) && (eval_xord == NULL)))
     goto cleanup_density_bounded_quad_general;
@@ -28539,71 +28574,125 @@ static int np_density_cvls_bounded_i1_quadrature_general(const int KERNEL_den,
                                     eval_xcon,
                                     eval_weight);
 
-    if(kernel_bandwidth_mean(KERNEL_den,
-                             BANDWIDTH_den,
-                             num_obs,
-                             eb,
-                             0,
-                             0,
-                             0,
-                             ncon,
-                             nuno,
-                             nord,
-                             0,
-                             vector_scale_factor,
-                             NULL,
-                             NULL,
-                             matrix_X_continuous,
-                             eval_xcon,
-                             NULL,
-                             matrix_bandwidth,
-                             lambda) == 1)
-      goto cleanup_density_bounded_quad_general;
+    if(!exact_beta_route || BANDWIDTH_den == BW_GEN_NN)
+      if(kernel_bandwidth_mean(exact_beta_route ? 0 : KERNEL_den,
+                               BANDWIDTH_den,
+                               num_obs,
+                               eb,
+                               0,
+                               0,
+                               0,
+                               ncon,
+                               nuno,
+                               nord,
+                               0,
+                               vector_scale_factor,
+                               NULL,
+                               NULL,
+                               matrix_X_continuous,
+                               eval_xcon,
+                               NULL,
+                               matrix_bandwidth,
+                               lambda) == 1)
+        goto cleanup_density_bounded_quad_general;
 
-    for(b = 0; b < eb; b++){
-      double fit = 0.0;
+    if(exact_beta_route) {
+      NPBetaScaledRowContext beta_context;
+      NPContinuousKernelRowStatus row_status;
+      double ** const beta_bandwidth_eval =
+        BANDWIDTH_den == BW_GEN_NN ? matrix_bandwidth :
+        canonical_bandwidth_train;
 
-      for(i = 0; i < num_obs; i++){
-        double prod = 1.0;
-
-        for(d = 0; d < ncon; d++){
-          const int bw_idx =
-            (BANDWIDTH_den == BW_FIXED) ? 0 :
-            ((BANDWIDTH_den == BW_GEN_NN) ? b : i);
-          const double h = matrix_bandwidth[d][bw_idx];
-          const double eval_x = eval_xcon[d][b];
-          double density_scale;
-
-          if(!(h > 0.0) || !isfinite(h))
-            goto cleanup_density_bounded_quad_general;
-          density_scale =
-            np_cker_bounded_norm(KERNEL_den,
-                                 eval_x,
-                                 h,
-                                 vector_ckerlb_extern[d],
-                                 vector_ckerub_extern[d]).density_scale;
-          prod *= density_scale*np_cker_base_eval(
-            KERNEL_den, (eval_x - matrix_X_continuous[d][i])/h);
-        }
-
-        for(l = 0; l < nuno; l++)
-          prod *= kernel_unordered(KERNEL_unordered_den,
-                                   eval_xuno[l][b],
-                                   matrix_X_unordered[l][i],
-                                   lambda[l],
-                                   num_categories[l]);
-
-        for(l = 0; l < nord; l++)
-          prod *= kernel_ordered(KERNEL_ordered_den,
-                                 eval_xord[l][b],
-                                 matrix_X_ordered[l][i],
-                                 lambda[l + nuno]);
-
-        fit += prod;
+      np_beta_scaled_row_context_init(&beta_context);
+      row_status = np_beta_scaled_row_context_prepare(
+        &beta_context, kernel_route, kernel_route_diagnostics,
+        BANDWIDTH_den, num_obs, eb, ncon, nuno, nord,
+        matrix_X_continuous, eval_xcon,
+        matrix_X_unordered, eval_xuno,
+        matrix_X_ordered, eval_xord,
+        canonical_bandwidth_train, beta_bandwidth_eval,
+        canonical_operator,
+        canonical_kernel_unordered, canonical_kernel_ordered,
+        canonical_lambda, num_categories,
+        matrix_categorical_vals, categorical_compress, beta_row);
+      if(row_status != NP_CONTINUOUS_ROW_OK) {
+        np_beta_scaled_row_context_clear(&beta_context);
+        goto cleanup_density_bounded_quad_general;
       }
 
-      fit /= (double)num_obs;
-      *cv1 += eval_weight[b]*fit*fit;
+      for(b = 0; b < eb; ++b) {
+        double scaled_sum = 0.0;
+        double common_log_scale = 0.0;
+        double fit_sum = 0.0;
+
+        if((((size_t)b + eval_start) & 31u) == 0u)
+          np_progress_bandwidth_loop_step();
+        row_status = np_beta_scaled_row_context_fill(
+          &beta_context, b, &scaled_sum, &common_log_scale);
+        if(row_status != NP_CONTINUOUS_ROW_OK) {
+          np_beta_scaled_row_context_clear(&beta_context);
+          goto cleanup_density_bounded_quad_general;
+        }
+        row_status = np_continuous_kernel_scaled_restore(
+          scaled_sum, common_log_scale, 1, &fit_sum);
+        if(row_status != NP_CONTINUOUS_ROW_OK) {
+          np_beta_scaled_row_context_clear(&beta_context);
+          goto cleanup_density_bounded_quad_general;
+        }
+        fit_sum /= (double)num_obs;
+        *cv1 += eval_weight[b]*fit_sum*fit_sum;
+        if(!R_FINITE(*cv1)) {
+          np_beta_scaled_row_context_clear(&beta_context);
+          goto cleanup_density_bounded_quad_general;
+        }
+      }
+      np_beta_scaled_row_context_clear(&beta_context);
+    } else {
+      for(b = 0; b < eb; b++){
+        double fit = 0.0;
+
+        for(i = 0; i < num_obs; i++){
+          double prod = 1.0;
+
+          for(d = 0; d < ncon; d++){
+            const int bw_idx =
+              (BANDWIDTH_den == BW_FIXED) ? 0 :
+              ((BANDWIDTH_den == BW_GEN_NN) ? b : i);
+            const double h = matrix_bandwidth[d][bw_idx];
+            const double eval_x = eval_xcon[d][b];
+            double density_scale;
+
+            if(!(h > 0.0) || !isfinite(h))
+              goto cleanup_density_bounded_quad_general;
+            density_scale =
+              np_cker_bounded_norm(KERNEL_den,
+                                   eval_x,
+                                   h,
+                                   vector_ckerlb_extern[d],
+                                   vector_ckerub_extern[d]).density_scale;
+            prod *= density_scale*np_cker_base_eval(
+              KERNEL_den, (eval_x - matrix_X_continuous[d][i])/h);
+          }
+
+          for(l = 0; l < nuno; l++)
+            prod *= kernel_unordered(KERNEL_unordered_den,
+                                     eval_xuno[l][b],
+                                     matrix_X_unordered[l][i],
+                                     lambda[l],
+                                     num_categories[l]);
+
+          for(l = 0; l < nord; l++)
+            prod *= kernel_ordered(KERNEL_ordered_den,
+                                   eval_xord[l][b],
+                                   matrix_X_ordered[l][i],
+                                   lambda[l + nuno]);
+
+          fit += prod;
+        }
+
+        fit /= (double)num_obs;
+        *cv1 += eval_weight[b]*fit*fit;
+      }
     }
 
     eval_start += (size_t)eb;
@@ -28620,6 +28709,7 @@ cleanup_density_bounded_quad_general:
   if(matrix_bandwidth != NULL) free_mat(matrix_bandwidth, ncon);
   if(lambda != NULL) free(lambda);
   if(eval_weight != NULL) free(eval_weight);
+  if(beta_row != NULL) free(beta_row);
   return status;
 }
 
@@ -33913,6 +34003,74 @@ cleanup:
   return status;
 }
 
+static int np_density_cvls_beta_cross_term(
+  const NPContinuousKernelRoute *route,
+  NPContinuousKernelDerivativeDiagnostics *diagnostics,
+  int bandwidth_mode,
+  int num_obs,
+  int num_reg_unordered,
+  int num_reg_ordered,
+  int num_reg_continuous,
+  double **matrix_X_unordered,
+  double **matrix_X_ordered,
+  double **matrix_X_continuous,
+  double **matrix_bandwidth,
+  const double *lambda,
+  const int *operator,
+  const int *kernel_unordered,
+  const int *kernel_ordered,
+  const int *num_categories,
+  double **category_values,
+  int categorical_compress,
+  double *row,
+  double *cross_term)
+{
+  NPBetaScaledRowContext context;
+  NPContinuousKernelRowStatus row_status;
+  int evaluation;
+  int status = 1;
+
+  if(cross_term == NULL)
+    return 1;
+  np_beta_scaled_row_context_init(&context);
+  row_status = np_beta_scaled_row_context_prepare(
+    &context, route, diagnostics, bandwidth_mode,
+    num_obs, num_obs, num_reg_continuous,
+    num_reg_unordered, num_reg_ordered,
+    matrix_X_continuous, matrix_X_continuous,
+    matrix_X_unordered, matrix_X_unordered,
+    matrix_X_ordered, matrix_X_ordered,
+    matrix_bandwidth, matrix_bandwidth, operator,
+    kernel_unordered, kernel_ordered, lambda, num_categories,
+    category_values, categorical_compress, row);
+  if(row_status != NP_CONTINUOUS_ROW_OK)
+    goto cleanup;
+
+  *cross_term = 0.0;
+  for(evaluation = 0; evaluation < num_obs; ++evaluation) {
+    double scaled_sum = 0.0;
+    double common_log_scale = 0.0;
+    double fit_sum = 0.0;
+
+    row_status = np_beta_scaled_row_context_fill_omitting(
+      &context, evaluation, evaluation,
+      &scaled_sum, &common_log_scale);
+    if(row_status != NP_CONTINUOUS_ROW_OK ||
+       np_continuous_kernel_scaled_restore(
+         scaled_sum, common_log_scale, 1, &fit_sum) !=
+           NP_CONTINUOUS_ROW_OK)
+      goto cleanup;
+    *cross_term += fit_sum/(double)(num_obs - 1);
+    if(!R_FINITE(*cross_term))
+      goto cleanup;
+  }
+  status = 0;
+
+cleanup:
+  np_beta_scaled_row_context_clear(&context);
+  return status;
+}
+
 int np_kernel_estimate_density_categorical_leave_one_out_cv(int KERNEL_den,
                                                             int KERNEL_unordered_den,
                                                             int KERNEL_ordered_den,
@@ -34022,6 +34180,11 @@ double *cv){
                            NULL,
                            matrix_bandwidth,
                            lambda)==1){
+    /* Beta candidates participate in optimizer penalty handling.  Preserve
+       the incumbent hard error for legacy callers, but let the canonical
+       beta callback convert an invalid candidate into DBL_MAX. */
+    if(exact_beta_route)
+      goto cleanup_density_leave_one_out_cv;
     error("\n** Error: invalid bandwidth.");
   }
 
@@ -34323,12 +34486,8 @@ double *cv){
   np_gate_ctx_clear(&gate_y_ctx);
   np_gate_ctx_clear(&gate_xy_ctx);
 
-  /* A null route preserves the incumbent objective arithmetic. */
-  (void)kernel_route;
-  (void)kernel_route_diagnostics;
-  (void)categorical_compress;
-
   const int num_reg = num_reg_continuous+num_reg_unordered+num_reg_ordered;
+  const int exact_beta_route = kernel_route != NULL;
   const int bwmdim = (BANDWIDTH_den==BW_GEN_NN)?num_obs:
     ((BANDWIDTH_den==BW_ADAP_NN)?num_obs:1);
   const int bounded_scalar_quadrature =
@@ -34346,6 +34505,7 @@ double *cv){
   int *ov_cont_ok = NULL, *ov_disc_uno_ok = NULL, *ov_disc_ord_ok = NULL;
   double *ov_cont_hmin = NULL, *ov_cont_k0 = NULL;
   double *ov_disc_uno_const = NULL, *ov_disc_ord_const = NULL;
+  int *kernel_c = NULL, *kernel_u = NULL, *kernel_o = NULL;
   double **matrix_bandwidth = NULL;
   double *lambda = NULL;
 
@@ -34366,13 +34526,22 @@ double *cv){
   double * res = (double *)np_jksum_malloc_array_or_die((size_t)num_obs_alloc, sizeof(double), "np_kernel_estimate_density_categorical_convolution_cv rho");
   double cv1, cv2;
 
+  if(exact_beta_route &&
+     (np_continuous_kernel_route_validate(
+        kernel_route, num_reg_continuous) != NP_CKERNEL_ROUTE_OK ||
+      !np_continuous_kernel_route_has_beta(kernel_route) ||
+      kernel_route->segment_count != 1 ||
+      kernel_route->segment[0].coordinate_offset != 0 ||
+      kernel_route->segment[0].coordinate_count != num_reg_continuous ||
+      kernel_route_diagnostics == NULL || num_reg_continuous <= 0 ||
+      (categorical_compress != 0 && categorical_compress != 1)))
+    goto cleanup_density_convolution_cv;
+
   operator = (int *)np_jksum_malloc_array_or_die((size_t)num_reg, sizeof(int), "np_kernel_estimate_density_categorical_convolution_cv operator");
 
   // first the convolution portion
   for(i = 0; i < num_reg; i++)
     operator[i] = OP_CONVOLUTION;
-
-  int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
 
   kernel_c = (int *)np_jksum_malloc_array_or_die((size_t)num_reg_continuous, sizeof(int), "np_kernel_estimate_density_categorical_convolution_cv kernel_c");
 
@@ -34392,7 +34561,7 @@ double *cv){
   matrix_bandwidth = alloc_matd(bwmdim,num_reg_continuous);
   lambda = alloc_vecd(num_reg_unordered+num_reg_ordered);
 
-  if(kernel_bandwidth_mean(KERNEL_den,
+  if(kernel_bandwidth_mean(exact_beta_route ? 0 : KERNEL_den,
                            BANDWIDTH_den,
                            num_obs,
                            num_obs,
@@ -34408,10 +34577,14 @@ double *cv){
                            NULL,
                            matrix_bandwidth,
                            lambda)==1){
+    /* See the matching CVML owner: invalid beta candidates fail closed and
+       are converted to the optimizer penalty by the callback. */
+    if(exact_beta_route)
+      goto cleanup_density_convolution_cv;
     error("\n** Error: invalid bandwidth.");
   }
 
-  if(np_density_categorical_profile_cv(kernel_c,
+  if(!exact_beta_route && np_density_categorical_profile_cv(kernel_c,
                                        kernel_u,
                                        kernel_o,
                                        1,
@@ -34432,7 +34605,7 @@ double *cv){
     goto cleanup_density_convolution_cv;
   }
 
-  if(bounded_scalar_quadrature){
+  if(bounded_scalar_quadrature && !exact_beta_route){
     if(np_density_cvls_bounded_i1_quadrature(KERNEL_den,
                                              BANDWIDTH_den,
                                              num_obs,
@@ -34444,6 +34617,9 @@ double *cv){
                                              &cv1) != 0)
       goto cleanup_density_convolution_cv;
   } else if(bounded_general_quadrature) {
+    if(exact_beta_route)
+      for(i = 0; i < num_reg; ++i)
+        operator[i] = OP_NORMAL;
     if(np_density_cvls_bounded_i1_quadrature_general(KERNEL_den,
                                                      KERNEL_unordered_den,
                                                      KERNEL_ordered_den,
@@ -34458,6 +34634,14 @@ double *cv){
                                                      vector_scale_factor,
                                                      num_categories,
                                                      matrix_categorical_vals,
+                                                     matrix_bandwidth,
+                                                     lambda,
+                                                     operator,
+                                                     kernel_u,
+                                                     kernel_o,
+                                                     kernel_route,
+                                                     kernel_route_diagnostics,
+                                                     categorical_compress,
                                                      &cv1) != 0)
       goto cleanup_density_convolution_cv;
   } else {
@@ -34522,6 +34706,22 @@ double *cv){
   // then the cross term
   for(i = 0; i < num_reg; i++)
     operator[i] = OP_NORMAL;
+
+  if(exact_beta_route) {
+    if(np_density_cvls_beta_cross_term(
+         kernel_route, kernel_route_diagnostics, BANDWIDTH_den,
+         num_obs, num_reg_unordered, num_reg_ordered,
+         num_reg_continuous, matrix_X_unordered, matrix_X_ordered,
+         matrix_X_continuous, matrix_bandwidth, lambda, operator,
+         kernel_u, kernel_o, num_categories, matrix_categorical_vals,
+         categorical_compress,
+         res, &cv2) != 0)
+      goto cleanup_density_convolution_cv;
+    cv2 /= (double)num_obs;
+    *cv = cv1 - 2.0*cv2;
+    status = 0;
+    goto cleanup_density_convolution_cv;
+  }
 
   if((num_reg_continuous + num_reg_unordered + num_reg_ordered) > 0){
     int ok_all = 1;
