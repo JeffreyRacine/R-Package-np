@@ -16,6 +16,14 @@
 typedef struct NPContinuousKernelDerivativeDiagnostics
   NPContinuousKernelDerivativeDiagnostics;
 
+typedef struct {
+  const NPContinuousKernelRoute *x_route;
+  NPContinuousKernelDerivativeDiagnostics *x_diagnostics;
+  const NPContinuousKernelRoute *y_route;
+  NPContinuousKernelDerivativeDiagnostics *y_diagnostics;
+  int categorical_compress;
+} NPConditionalKernelExecutionContext;
+
 #define MAX_OBS INT_MAX
 #define MAX_REG 100                               /* Allows flexibility while trapping error... */
 #define VERSION 1.1
@@ -150,6 +158,21 @@ int kernel_bandwidth(int KERNEL, int BANDWIDTH, int num_obs_train, int num_obs_e
 int kernel_bandwidth_mean(int KERNEL, int BANDWIDTH, int num_obs_train, int num_obs_eval, int num_var_cont, int num_var_un, int num_var_or, int num_reg_cont, int num_reg_un, int num_reg_or, int suppress_parallel, double *vector_scale_factor, double **matrix_Y_train, double **matrix_Y_eval, double **matrix_X_train, double **matrix_X_eval, double **matrix_bandwidth_Y, double **matrix_bandwidth_X, double *vector_lambda);
 
 int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den, int KERNEL_unordered_den, int KERNEL_ordered_den, int KERNEL_reg, int KERNEL_unordered_reg, int KERNEL_ordered_reg, int BANDWIDTH_den, int num_obs, int num_var_unordered, int num_var_ordered, int num_var_continuous, int num_reg_unordered, int num_reg_ordered, int num_reg_continuous, double **matrix_Y_unordered, double **matrix_Y_ordered, double **matrix_Y_continuous, double **matrix_X_unordered, double **matrix_X_ordered, double **matrix_X_continuous, double **matrix_XY_unordered, double **matrix_XY_ordered, double **matrix_XY_continuous, double *vector_scale_factor, int *num_categories, double *cv);
+int np_kernel_estimate_con_density_categorical_leave_one_out_cv_ctx(
+  int KERNEL_den, int KERNEL_unordered_den, int KERNEL_ordered_den,
+  int KERNEL_reg, int KERNEL_unordered_reg, int KERNEL_ordered_reg,
+  int BANDWIDTH_den, int num_obs,
+  int num_var_unordered, int num_var_ordered, int num_var_continuous,
+  int num_reg_unordered, int num_reg_ordered, int num_reg_continuous,
+  double **matrix_Y_unordered, double **matrix_Y_ordered,
+  double **matrix_Y_continuous,
+  double **matrix_X_unordered, double **matrix_X_ordered,
+  double **matrix_X_continuous,
+  double **matrix_XY_unordered, double **matrix_XY_ordered,
+  double **matrix_XY_continuous,
+  double *vector_scale_factor, int *num_categories,
+  const NPConditionalKernelExecutionContext *execution_context,
+  double *cv);
 
 int kernel_estimate_con_distribution_categorical_no_mpi(int KERNEL_den, int KERNEL_unordered_den, int KERNEL_ordered_den, int KERNEL_reg, int KERNEL_unordered_reg, int KERNEL_ordered_reg, int BANDWIDTH_den, int num_obs_train, int num_obs_eval, int num_var_unordered, int num_var_ordered, int num_var_continuous, int num_reg_unordered, int num_reg_ordered, int num_reg_continuous, double **matrix_Y_unordered_train, double **matrix_Y_ordered_train, double **matrix_Y_continuous_train, double **matrix_Y_unordered_eval, double **matrix_Y_ordered_eval, double **matrix_Y_continuous_eval, double **matrix_X_unordered_train, double **matrix_X_ordered_train, double **matrix_X_continuous_train, double **matrix_X_unordered_eval, double **matrix_X_ordered_eval, double **matrix_X_continuous_eval, double *vector_scale_factor, int *num_categories, double **matrix_categorical_vals, double *cdf, double *cdf_stderr, double small, int itmax);
 
