@@ -513,7 +513,7 @@ test_that("legacy conditional scalar owner retains dormant route plumbing", {
   )
 })
 
-test_that("regression objective owner retains beta-unreachable route plumbing", {
+test_that("regression objective owner activates the continuous scalar beta route", {
   root <- locate_beta_activation_sources()
   skip_if(is.null(root), "package sources unavailable")
   ingress <- paste(
@@ -547,26 +547,50 @@ test_that("regression objective owner retains beta-unreachable route plumbing", 
 
   expect_match(owner, "const NPContinuousKernelRoute * const kernel_route",
                fixed = TRUE)
-  expect_match(owner, "kernel_route != NULL", fixed = TRUE)
-  expect_match(owner, "kernel_route_diagnostics != NULL", fixed = TRUE)
-  expect_match(owner, "categorical_compress != 0", fixed = TRUE)
-  expect_match(owner, "regression objective kernel route is not activated",
-               fixed = TRUE)
+  expect_match(
+    owner,
+    "kernel_route == NULL && kernel_route_diagnostics == NULL",
+    fixed = TRUE
+  )
   expect_match(
     owner,
     "return np_kernel_estimate_regression_categorical_ls_aic(",
     fixed = TRUE
   )
-  expect_false(grepl("NPContinuousKernelExecutionContext", owner,
-                     fixed = TRUE))
-  expect_false(grepl(
+  expect_match(owner, "lp_engine != NP_LP_ENGINE_SCALAR", fixed = TRUE)
+  expect_match(owner, "num_reg_unordered != 0", fixed = TRUE)
+  expect_match(owner, "num_reg_ordered != 0", fixed = TRUE)
+  expect_match(
+    owner,
+    "np_regression_cv_scalar_continuous_route(",
+    fixed = TRUE
+  )
+  expect_match(
+    engine,
+    "np_regression_cv_scalar_accumulate_scaled_row(",
+    fixed = TRUE
+  )
+  expect_match(
+    engine,
+    "np_beta_scaled_row_context_fill_omitting(",
+    fixed = TRUE
+  )
+  expect_false(grepl("regression objective kernel route is not activated",
+                     owner, fixed = TRUE))
+
+  callback_hits <- gregexpr(
     "np_kernel_estimate_regression_categorical_ls_aic_ctx(",
     ingress,
     fixed = TRUE
-  ))
+  )[[1L]]
+  expect_length(callback_hits[callback_hits > 0L], 2L)
+  sidecar_hits <- gregexpr(
+    "np_beta_objective_regression_lc(", ingress, fixed = TRUE
+  )[[1L]]
+  expect_length(sidecar_hits[sidecar_hits > 0L], 0L)
 })
 
-test_that("regression bandwidth ingress owns dormant categorical compression state", {
+test_that("regression bandwidth ingress owns categorical compression state", {
   root <- locate_beta_activation_sources()
   skip_if(is.null(root), "package sources unavailable")
   regression_r <- paste(
@@ -620,11 +644,11 @@ test_that("regression bandwidth ingress owns dormant categorical compression sta
     "allow.categorical = !isTRUE(bandwidth.compute)",
     fixed = TRUE
   )
-  expect_false(grepl(
-    "np_kernel_estimate_regression_categorical_ls_aic_ctx(",
+  expect_match(
     callbacks,
+    "np_regression_bw_categorical_compress_extern);",
     fixed = TRUE
-  ))
+  )
 })
 
 test_that("beta density CVML enters the canonical scaled-row owner", {
