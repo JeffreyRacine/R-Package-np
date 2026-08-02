@@ -321,6 +321,15 @@ NPContinuousKernelRowStatus np_continuous_kernel_scaled_restore(
   int power,
   double *value);
 
+/* Derivative outputs may have mathematically defined signed-infinite endpoint
+ * limits or an explicit R missing value for an undefined derivative
+ * cancellation/standard error. Keep this contract separate from finite-only
+ * row/objective restoration so no non-derivative consumer can admit them. */
+NPContinuousKernelRowStatus np_continuous_kernel_scaled_derivative_restore(
+  double scaled_value,
+  double log_scale,
+  double *value);
+
 NPContinuousKernelRowStatus np_continuous_kernel_signed_log_restore(
   double log_absolute,
   int sign,

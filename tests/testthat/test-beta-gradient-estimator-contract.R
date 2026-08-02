@@ -123,6 +123,76 @@ test_that("conditional beta gradients match finite differences", {
   }
 })
 
+test_that("conditional beta endpoint gradient limits survive response scaling", {
+  training_x <- data.frame(x = c(0, .12, .3, .55, .82, 1))
+  training_y <- data.frame(y = c(.05, .21, .37, .62, .79, .96))
+  evaluation_x <- data.frame(x = c(0, .4, 1))
+  evaluation_y <- data.frame(y = c(.25, .5, .75))
+  step <- 1e-7
+
+  for (distribution in c(FALSE, TRUE)) {
+    bwfun <- if (distribution) npcdistbw else npcdensbw
+    fitfun <- if (distribution) npcdist else npcdens
+
+    for (order in c(2L, 4L, 6L, 8L)) {
+      bw <- bwfun(
+        xdat = training_x, ydat = training_y, bws = c(.16, .18),
+        bandwidth.compute = FALSE,
+        cxkertype = "beta", cxkerorder = order,
+        cxkerbound = "fixed", cxkerlb = 0, cxkerub = 1,
+        cykertype = "beta", cykerorder = order,
+        cykerbound = "fixed", cykerlb = 0, cykerub = 1
+      )
+      fit <- NULL
+      endpoint_warnings <- character()
+      fit <- withCallingHandlers(
+        fitfun(
+          bws = bw, txdat = training_x, tydat = training_y,
+          exdat = evaluation_x, eydat = evaluation_y,
+          gradients = TRUE
+        ),
+        warning = function(condition) {
+          endpoint_warnings <<- c(
+            endpoint_warnings,
+            conditionMessage(condition)
+          )
+          invokeRestart("muffleWarning")
+        }
+      )
+      expect_true(length(endpoint_warnings) > 0L)
+      expect_true(all(grepl("infinite endpoint", endpoint_warnings)))
+
+      evaluate <- function(x, y) fitted(fitfun(
+        bws = bw, txdat = training_x, tydat = training_y,
+        exdat = data.frame(x = x), eydat = data.frame(y = y)
+      ))
+      oracle <- c(
+        (evaluate(step, evaluation_y$y[[1L]]) -
+           evaluate(0, evaluation_y$y[[1L]])) / step,
+        (evaluate(evaluation_x$x[[2L]] + step, evaluation_y$y[[2L]]) -
+           evaluate(evaluation_x$x[[2L]] - step,
+                    evaluation_y$y[[2L]])) / (2 * step),
+        (evaluate(1, evaluation_y$y[[3L]]) -
+           evaluate(1 - step, evaluation_y$y[[3L]])) / step
+      )
+      actual <- as.double(gradients(fit))
+      gradient_se <- as.double(fit$congerr)
+
+      expect_identical(
+        as.double(gradients(fit, errors = TRUE)),
+        gradient_se
+      )
+      expect_true(all(is.infinite(actual[c(1L, 3L)])))
+      expect_identical(sign(actual[c(1L, 3L)]),
+                       sign(oracle[c(1L, 3L)]))
+      expect_equal(actual[[2L]], oracle[[2L]], tolerance = 5e-6)
+      expect_true(all(is.na(gradient_se[c(1L, 3L)])))
+      expect_false(any(is.nan(gradient_se[c(1L, 3L)])))
+      expect_true(is.finite(gradient_se[[2L]]) && gradient_se[[2L]] >= 0)
+    }
+  }
+})
+
 test_that("conditional beta endpoint gradients have finite one-sided limits", {
   training_x <- data.frame(x = c(.06, .14, .27, .39, .53, .68, .81, .94))
   training_y <- data.frame(y = c(.11, .29, .18, .47, .39, .72, .61, .88))
