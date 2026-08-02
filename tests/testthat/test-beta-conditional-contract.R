@@ -168,6 +168,90 @@ test_that("conditional beta X and Y kernels match side-weight ratios", {
   }
 })
 
+test_that("simultaneous beta X and Y uses the canonical conditional LP engine", {
+  training_x <- data.frame(
+    x = c(0.025, 0.07, 0.13, 0.21, 0.34, 0.46,
+          0.58, 0.67, 0.76, 0.84, 0.91, 0.975)
+  )
+  training_y <- data.frame(
+    y = c(0.035, 0.09, 0.16, 0.24, 0.36, 0.44,
+          0.57, 0.65, 0.74, 0.82, 0.9, 0.965)
+  )
+  evaluation_x <- data.frame(x = c(0.09, 0.27, 0.49, 0.72, 0.9))
+  evaluation_y <- data.frame(y = c(0.08, 0.25, 0.52, 0.7, 0.92))
+  x_weights <- beta_conditional_side_weights(
+    training_x$x, evaluation_x$x, 0.17, "fixed", "beta", 6L, 0, 1
+  )
+
+  for (kind in c("density", "distribution")) {
+    constructor <- if (identical(kind, "density")) npcdensbw else npcdistbw
+    estimator <- if (identical(kind, "density")) npcdens else npcdist
+    y_weights <- beta_conditional_side_weights(
+      training_y$y, evaluation_y$y, 0.16, "fixed", "beta", 8L, 0, 1,
+      operator = if (identical(kind, "density")) "normal" else "integral"
+    )
+    common <- list(
+      xdat = training_x, ydat = training_y, bws = c(0.16, 0.17),
+      bandwidth.compute = FALSE,
+      cxkertype = "beta", cxkerorder = 6L,
+      cxkerbound = "fixed", cxkerlb = 0, cxkerub = 1,
+      cykertype = "beta", cykerorder = 8L,
+      cykerbound = "fixed", cykerlb = 0, cykerub = 1
+    )
+
+    for (specification in list(
+      list(degree = 2L, bernstein = FALSE),
+      list(degree = 3L, bernstein = TRUE)
+    )) {
+      bw <- do.call(constructor, c(
+        common,
+        list(regtype = "lp", degree = specification$degree,
+             basis = "glp", bernstein.basis = specification$bernstein)
+      ))
+      fit <- estimator(
+        bws = bw, txdat = training_x, tydat = training_y,
+        exdat = evaluation_x, eydat = evaluation_y, gradients = TRUE
+      )
+      expected <- beta_conditional_lp_oracle(
+        training_x, evaluation_x, specification$degree,
+        specification$bernstein, x_weights, y_weights
+      )
+      expect_equal(fitted(fit), expected$estimate, tolerance = 1e-7)
+      expect_equal(se(fit), expected$stderr, tolerance = 1e-7)
+      expect_equal(drop(fit$congrad), expected$gradient, tolerance = 2e-6)
+      expect_equal(drop(fit$congerr), expected$gradient_stderr,
+                   tolerance = 2e-6)
+    }
+  }
+
+  alias_common <- list(
+    xdat = training_x, ydat = training_y, bws = c(0.16, 0.17),
+    bandwidth.compute = FALSE,
+    cxkertype = "beta", cxkerorder = 6L,
+    cxkerbound = "fixed", cxkerlb = 0, cxkerub = 1,
+    cykertype = "beta", cykerorder = 8L,
+    cykerbound = "fixed", cykerlb = 0, cykerub = 1
+  )
+  ll_bw <- do.call(npcdensbw, c(alias_common, list(regtype = "ll")))
+  lp1_bw <- do.call(npcdensbw, c(
+    alias_common,
+    list(regtype = "lp", degree = 1L, basis = "glp",
+         bernstein.basis = FALSE)
+  ))
+  ll_fit <- npcdens(
+    bws = ll_bw, txdat = training_x, tydat = training_y,
+    exdat = evaluation_x, eydat = evaluation_y, gradients = TRUE
+  )
+  lp1_fit <- npcdens(
+    bws = lp1_bw, txdat = training_x, tydat = training_y,
+    exdat = evaluation_x, eydat = evaluation_y, gradients = TRUE
+  )
+  expect_identical(fitted(ll_fit), fitted(lp1_fit))
+  expect_identical(se(ll_fit), se(lp1_fit))
+  expect_identical(ll_fit$congrad, lp1_fit$congrad)
+  expect_identical(ll_fit$congerr, lp1_fit$congerr)
+})
+
 test_that("beta and legacy conditional kernels can be mixed by side", {
   training_x <- data.frame(x = c(0.02, 0.08, 0.2, 0.39, 0.61, 0.8, 0.94, 0.99))
   training_y <- data.frame(y = c(-1.2, -0.8, -0.3, 0.1, 0.35, 0.7, 1.0, 1.3))
@@ -858,4 +942,71 @@ test_that("beta-X mixed conditional fits honor categorical compression", {
     expect_identical(dense$congrad, compressed$congrad)
     expect_identical(dense$congerr, compressed$congerr)
   }
+})
+
+test_that("simultaneous beta sides honor categorical compression", {
+  training_x <- data.frame(
+    x = seq(0.035, 0.965, length.out = 24L),
+    group = factor(rep(c("a", "b", "c"), length.out = 24L))
+  )
+  training_y <- data.frame(
+    y = plogis(sin(2 * pi * training_x$x)),
+    class = factor(rep(c("u", "v", "u", "w"), length.out = 24L))
+  )
+  evaluation_x <- data.frame(
+    x = seq(0.09, 0.91, length.out = 8L),
+    group = factor(rep(c("a", "c"), length.out = 8L),
+                   levels = levels(training_x$group))
+  )
+  evaluation_y <- data.frame(
+    y = seq(0.12, 0.88, length.out = 8L),
+    class = factor(rep(c("u", "w"), length.out = 8L),
+                   levels = levels(training_y$class))
+  )
+  x_weights <- npksum(
+    bws = c(0.17, 0.24), txdat = training_x, exdat = evaluation_x,
+    bwtype = "fixed", ckertype = "beta", ckerorder = 6L,
+    ckerbound = "fixed", ckerlb = 0, ckerub = 1,
+    return.kernel.weights = TRUE
+  )$kw
+  y_weights <- npksum(
+    bws = c(0.16, 0.21), txdat = training_y, exdat = evaluation_y,
+    bwtype = "fixed", ckertype = "beta", ckerorder = 8L,
+    ckerbound = "fixed", ckerlb = 0, ckerub = 1,
+    return.kernel.weights = TRUE
+  )$kw
+  expected <- beta_conditional_lp_oracle(
+    training_x["x"], evaluation_x["x"], 2L, FALSE,
+    x_weights, y_weights
+  )
+  fits <- list()
+
+  for (compress in c(FALSE, TRUE)) {
+    old_options <- options(np.categorical.compress = compress)
+    on.exit(options(old_options), add = TRUE)
+    bw <- npcdensbw(
+      xdat = training_x, ydat = training_y,
+      bws = c(0.16, 0.21, 0.17, 0.24), bandwidth.compute = FALSE,
+      regtype = "lp", degree = 2L, basis = "glp",
+      bernstein.basis = FALSE,
+      cxkertype = "beta", cxkerorder = 6L,
+      cxkerbound = "fixed", cxkerlb = 0, cxkerub = 1,
+      cykertype = "beta", cykerorder = 8L,
+      cykerbound = "fixed", cykerlb = 0, cykerub = 1
+    )
+    fits[[as.character(compress)]] <- npcdens(
+      bws = bw, txdat = training_x, tydat = training_y,
+      exdat = evaluation_x, eydat = evaluation_y, gradients = TRUE
+    )
+    options(old_options)
+  }
+
+  for (fit in fits) {
+    expect_equal(fitted(fit), expected$estimate, tolerance = 1e-7)
+    expect_equal(se(fit), expected$stderr, tolerance = 1e-7)
+  }
+  expect_identical(fitted(fits$`FALSE`), fitted(fits$`TRUE`))
+  expect_identical(se(fits$`FALSE`), se(fits$`TRUE`))
+  expect_identical(fits$`FALSE`$congrad, fits$`TRUE`$congrad)
+  expect_identical(fits$`FALSE`$congerr, fits$`TRUE`$congerr)
 })

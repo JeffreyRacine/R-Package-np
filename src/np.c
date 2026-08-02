@@ -7526,8 +7526,7 @@ SEXP C_np_density_conditional(SEXP tyuno,
     error("C_np_density_conditional: categorical compression must be TRUE or FALSE");
 
   if(has_kernel_descriptors &&
-     x_descriptor.family == NP_CKERNEL_FAMILY_BETA &&
-     y_descriptor.family == NP_CKERNEL_FAMILY_LEGACY) {
+     x_descriptor.family == NP_CKERNEL_FAMILY_BETA) {
     if(ncon_x <= 0)
       error("C_np_density_conditional: explanatory beta route requires continuous X variables");
     beta_x_route.segment_count = 1;
@@ -7544,7 +7543,6 @@ SEXP C_np_density_conditional(SEXP tyuno,
     active_x_diagnostics = &beta_x_diagnostics;
   }
   if(has_kernel_descriptors &&
-     x_descriptor.family == NP_CKERNEL_FAMILY_LEGACY &&
      y_descriptor.family == NP_CKERNEL_FAMILY_BETA) {
     if(ncon_y <= 0)
       error("C_np_density_conditional: dependent beta route requires continuous Y variables");
@@ -7582,151 +7580,7 @@ SEXP C_np_density_conditional(SEXP tyuno,
   PROTECT(out_gerr = allocVector(REALSXP, gsize));
   PROTECT(out_ll = allocVector(REALSXP, 1));
 
-  if(has_kernel_descriptors &&
-     x_descriptor.family == NP_CKERNEL_FAMILY_BETA &&
-     y_descriptor.family == NP_CKERNEL_FAMILY_BETA) {
-    const int num_train = INTEGER(myopti_i)[CD_TNOBSI];
-    const int num_eval = INTEGER(myopti_i)[CD_ENOBSI];
-    const int train_is_eval = INTEGER(myopti_i)[CD_TISEI];
-    const int bandwidth_code = INTEGER(myopti_i)[CD_DENI];
-    const int do_distribution = INTEGER(myopti_i)[CD_DODENI] == NP_DO_DIST;
-    np_beta_bandwidth_mode bandwidth_mode = NP_BETA_BANDWIDTH_FIXED;
-    const double *bandwidth_eval_x = REAL(rbw_r);
-    const double *bandwidth_train_x = REAL(rbw_r);
-    const double *bandwidth_eval_y = REAL(rbw_r) + ncon_x;
-    const double *bandwidth_train_y = REAL(rbw_r) + ncon_x;
-    np_beta_conditional_status conditional_status;
-    np_beta_status scalar_status = NP_BETA_OK;
-    int bad_evaluation = -1;
-    int bad_dimension = -1;
-    int infinite_count = 0;
-    int undefined_count = 0;
-    int i;
-
-    if(INTEGER(myopti_i)[CD_CNUNOI] != 0 ||
-       INTEGER(myopti_i)[CD_CNORDI] != 0 ||
-       INTEGER(myopti_i)[CD_UNUNOI] != 0 ||
-       INTEGER(myopti_i)[CD_UNORDI] != 0)
-      error("C_np_density_conditional: beta conditional estimators currently support continuous X and Y variables only");
-    if(ncon_x <= 0 || ncon_y <= 0 || num_train <= 0 || num_eval <= 0 ||
-       en != num_eval || xd != ncon_x)
-      error("C_np_density_conditional: invalid beta conditional-estimator dimensions");
-    if(np_lp_engine_extern != NP_LP_ENGINE_SCALAR)
-      error("C_np_density_conditional: beta conditional estimators currently support only local-constant fitting");
-    if(bandwidth_code != BW_FIXED && bandwidth_code != BW_GEN_NN &&
-       bandwidth_code != BW_ADAP_NN)
-      error("C_np_density_conditional: invalid beta bandwidth mode");
-    if(XLENGTH(txcon_r) < (R_xlen_t)num_train * ncon_x ||
-       XLENGTH(tycon_r) < (R_xlen_t)num_train * ncon_y ||
-       (!train_is_eval &&
-        (XLENGTH(excon_r) < (R_xlen_t)num_eval * ncon_x ||
-         XLENGTH(eycon_r) < (R_xlen_t)num_eval * ncon_y)) ||
-       XLENGTH(rbw_r) < ncon_x + ncon_y)
-      error("C_np_density_conditional: beta conditional-estimator input buffer is too short");
-
-    if(bandwidth_code != BW_FIXED) {
-      const int need_eval = bandwidth_code == BW_GEN_NN;
-      const int need_train = bandwidth_code == BW_ADAP_NN;
-      double *bandwidth_eval_x_storage = need_eval ?
-        (double *)R_alloc((size_t)ncon_x * (size_t)num_eval,
-                          sizeof(double)) : NULL;
-      double *bandwidth_train_x_storage = need_train ?
-        (double *)R_alloc((size_t)ncon_x * (size_t)num_train,
-                          sizeof(double)) : NULL;
-      double *bandwidth_eval_y_storage = need_eval ?
-        (double *)R_alloc((size_t)ncon_y * (size_t)num_eval,
-                          sizeof(double)) : NULL;
-      double *bandwidth_train_y_storage = need_train ?
-        (double *)R_alloc((size_t)ncon_y * (size_t)num_train,
-                          sizeof(double)) : NULL;
-      np_beta_bandwidth_prepare_status bandwidth_status;
-
-      bandwidth_mode = (bandwidth_code == BW_GEN_NN) ?
-        NP_BETA_BANDWIDTH_GENERALIZED_NN : NP_BETA_BANDWIDTH_ADAPTIVE_NN;
-      bandwidth_status = np_beta_bandwidth_prepare(
-        bandwidth_mode, REAL(txcon_r),
-        train_is_eval ? NULL : REAL(excon_r), REAL(rbw_r),
-        num_train, num_eval, ncon_x, train_is_eval,
-        need_eval, need_train, 0,
-        bandwidth_eval_x_storage, bandwidth_train_x_storage);
-      if(bandwidth_status != NP_BETA_BANDWIDTH_PREPARE_OK)
-        error("C_np_density_conditional: x-side %s",
-              np_beta_bandwidth_prepare_status_message(bandwidth_status));
-      bandwidth_status = np_beta_bandwidth_prepare(
-        bandwidth_mode, REAL(tycon_r),
-        train_is_eval ? NULL : REAL(eycon_r), REAL(rbw_r) + ncon_x,
-        num_train, num_eval, ncon_y, train_is_eval,
-        need_eval, need_train, 0,
-        bandwidth_eval_y_storage, bandwidth_train_y_storage);
-      if(bandwidth_status != NP_BETA_BANDWIDTH_PREPARE_OK)
-        error("C_np_density_conditional: y-side %s",
-              np_beta_bandwidth_prepare_status_message(bandwidth_status));
-
-      bandwidth_eval_x = bandwidth_eval_x_storage;
-      bandwidth_train_x = bandwidth_train_x_storage;
-      bandwidth_eval_y = bandwidth_eval_y_storage;
-      bandwidth_train_y = bandwidth_train_y_storage;
-    }
-
-    conditional_status = np_beta_conditional_lc(
-      REAL(txcon_r), REAL(tycon_r),
-      train_is_eval ? NULL : REAL(excon_r),
-      train_is_eval ? NULL : REAL(eycon_r),
-      bandwidth_eval_x, bandwidth_train_x,
-      bandwidth_eval_y, bandwidth_train_y,
-      cxkerlb_p, cxkerub_p, cykerlb_p, cykerub_p,
-      x_descriptor.family, x_descriptor.legacy_code, x_descriptor.order,
-      y_descriptor.family, y_descriptor.legacy_code, y_descriptor.order,
-      bandwidth_mode, do_distribution,
-      num_train, num_eval, ncon_x, ncon_y, train_is_eval,
-      REAL(out_cond), REAL(out_cderr), REAL(out_ll),
-      &bad_evaluation, &bad_dimension, &scalar_status,
-      np_progress_fit_loop_step);
-    if(conditional_status == NP_BETA_CONDITIONAL_ERR_KERNEL)
-      error("C_np_density_conditional: scalar kernel failed at evaluation %d, continuous dimension %d: %s",
-            bad_evaluation + 1, bad_dimension + 1,
-            np_beta_status_message(scalar_status));
-    if(conditional_status != NP_BETA_CONDITIONAL_OK) {
-      if(bad_evaluation >= 0)
-        error("C_np_density_conditional: %s at evaluation %d",
-              np_beta_conditional_status_message(conditional_status),
-              bad_evaluation + 1);
-      error("C_np_density_conditional: %s",
-            np_beta_conditional_status_message(conditional_status));
-    }
-    if(INTEGER(myopti_i)[CD_GRAD] != 0) {
-      conditional_status = np_beta_conditional_lc_gradient(
-        REAL(txcon_r), REAL(tycon_r),
-        train_is_eval ? NULL : REAL(excon_r),
-        train_is_eval ? NULL : REAL(eycon_r),
-        bandwidth_eval_x, bandwidth_train_x,
-        bandwidth_eval_y, bandwidth_train_y,
-        cxkerlb_p, cxkerub_p, cykerlb_p, cykerub_p,
-        x_descriptor.family, x_descriptor.legacy_code, x_descriptor.order,
-        y_descriptor.family, y_descriptor.legacy_code, y_descriptor.order,
-        bandwidth_mode, do_distribution,
-        num_train, num_eval, ncon_x, ncon_y, train_is_eval,
-        REAL(out_grad), REAL(out_gerr),
-        &infinite_count, &undefined_count,
-        &bad_evaluation, &bad_dimension, &scalar_status);
-      if(conditional_status == NP_BETA_CONDITIONAL_ERR_KERNEL)
-        error("C_np_density_conditional: gradient kernel failed at evaluation %d, continuous dimension %d: %s",
-              bad_evaluation + 1, bad_dimension + 1,
-              np_beta_status_message(scalar_status));
-      if(conditional_status != NP_BETA_CONDITIONAL_OK)
-        error("C_np_density_conditional: %s",
-              np_beta_conditional_status_message(conditional_status));
-      if(infinite_count > 0 || undefined_count > 0)
-        warning("beta conditional gradient produced %d infinite endpoint value(s) and %d undefined cancellation(s)",
-                infinite_count, undefined_count);
-    } else {
-      for(i = 0; i < (int)gsize; ++i) {
-        REAL(out_grad)[i] = 0.0;
-        REAL(out_gerr)[i] = 0.0;
-      }
-    }
-  } else {
-    np_density_conditional(REAL(tyuno_r), REAL(tyord_r), REAL(tycon_r),
+  np_density_conditional(REAL(tyuno_r), REAL(tyord_r), REAL(tycon_r),
                            REAL(txuno_r), REAL(txord_r), REAL(txcon_r),
                            REAL(eyuno_r), REAL(eyord_r), REAL(eycon_r),
                            REAL(exuno_r), REAL(exord_r), REAL(excon_r),
@@ -7739,7 +7593,6 @@ SEXP C_np_density_conditional(SEXP tyuno,
                            active_x_route, active_x_diagnostics,
                            active_y_route, active_y_diagnostics,
                            categorical_compress);
-  }
 
   PROTECT(out = allocVector(VECSXP, 5));
   SET_VECTOR_ELT(out, 0, out_cond);
@@ -15692,7 +15545,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
   operator = (dens_or_dist == NP_DO_DENS) ? OP_NORMAL : OP_INTEGRAL;
 
   if(response_kernel_route != NULL &&
-     (kernel_route != NULL || response_kernel_route_diagnostics == NULL ||
+     (response_kernel_route_diagnostics == NULL ||
       num_var_continuous_extern <= 0 ||
       np_continuous_kernel_route_validate(
         response_kernel_route, num_var_continuous_extern) !=
