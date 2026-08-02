@@ -35958,8 +35958,18 @@ double * kdf,
 double * kdf_stderr,
 double ** kdf_deriv,
 double ** kdf_deriv_stderr,
-double * log_likelihood
+double * log_likelihood,
+const NPContinuousKernelRoute *kernel_route,
+NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
+int categorical_compress
 ){
+
+  /* P22A plumbing only: the incumbent conditional caller supplies a null
+     route, so the complete legacy X/Y arithmetic below remains literal.
+     Activation binds this family-neutral context in a separate tranche. */
+  (void)kernel_route;
+  (void)kernel_route_diagnostics;
+  (void)categorical_compress;
 
 
   const int num_X = num_X_continuous+num_X_unordered+num_X_ordered;
