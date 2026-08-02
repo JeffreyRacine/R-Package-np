@@ -18744,7 +18744,15 @@ double ** matrix_X_continuous_eval,
 double * vsf,
 int * num_categories,
 double ** matrix_categorical_vals,
+const NPContinuousKernelRoute * const kernel_route,
+NPContinuousKernelDerivativeDiagnostics * const kernel_route_diagnostics,
+const int categorical_compress,
 double * cv){
+  /* A null route preserves the incumbent objective arithmetic. */
+  (void)kernel_route;
+  (void)kernel_route_diagnostics;
+  (void)categorical_compress;
+
   const NPDistributionProfileCvStatus profile_status =
     np_distribution_cvls_ordered_profile_stream(KERNEL_den,
                                                  KERNEL_den_unordered,

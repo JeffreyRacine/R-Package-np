@@ -910,6 +910,9 @@ double cv_func_distribution_categorical_ls(double *vector_scale_factor)
                                              &vector_scale_factor[1],
                                              num_categories_extern,
                                              matrix_categorical_vals_extern,
+                                             NULL,
+                                             NULL,
+                                             0,
                                              &cv)==1)
     {
         return(DBL_MAX);
