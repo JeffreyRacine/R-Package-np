@@ -7302,8 +7302,22 @@ SEXP C_np_beta_conditional_bootstrap(SEXP txcon,
   const double *bandwidth_train_x;
   const double *bandwidth_eval_y;
   const double *bandwidth_train_y;
-  np_beta_conditional_status conditional_status;
-  np_beta_status scalar_status = NP_BETA_OK;
+  double **train_x_columns;
+  double **train_y_columns;
+  double **eval_x_columns;
+  double **eval_y_columns;
+  double **bandwidth_eval_x_columns;
+  double **bandwidth_train_x_columns;
+  double **bandwidth_eval_y_columns;
+  double **bandwidth_train_y_columns;
+  int *operator_x;
+  int *operator_y;
+  NPContinuousKernelRoute x_route;
+  NPContinuousKernelRoute y_route;
+  NPContinuousKernelDerivativeDiagnostics x_diagnostics;
+  NPContinuousKernelDerivativeDiagnostics y_diagnostics;
+  NPConditionalCountPlan count_plan;
+  int count_status;
   int bad_evaluation = -1;
   int bad_replicate = -1;
   int bad_dimension = -1;
@@ -7426,31 +7440,129 @@ SEXP C_np_beta_conditional_bootstrap(SEXP txcon,
     bandwidth_train_y = bandwidth_train_y_storage;
   }
 
-  PROTECT(out = allocMatrix(REALSXP, num_replicates, num_eval_x));
-  conditional_status = np_beta_conditional_lc_counts(
-    REAL(txcon_r), REAL(tycon_r), REAL(excon_r), REAL(eycon_r),
-    bandwidth_eval_x, bandwidth_train_x,
-    bandwidth_eval_y, bandwidth_train_y,
-    REAL(ckerlbx_r), REAL(ckerubx_r),
-    REAL(ckerlby_r), REAL(ckeruby_r),
-    x_descriptor.family, x_descriptor.legacy_code, x_descriptor.order,
-    y_descriptor.family, y_descriptor.legacy_code, y_descriptor.order,
-    bandwidth_mode, do_distribution, REAL(counts_r),
-    num_train_x, num_eval_x, num_x, num_y, num_replicates,
-    REAL(out), &bad_evaluation, &bad_replicate, &bad_dimension,
-    &scalar_status, NULL);
+  train_x_columns = (double **)R_alloc((size_t)num_x, sizeof(double *));
+  train_y_columns = (double **)R_alloc((size_t)num_y, sizeof(double *));
+  eval_x_columns = (double **)R_alloc((size_t)num_x, sizeof(double *));
+  eval_y_columns = (double **)R_alloc((size_t)num_y, sizeof(double *));
+  bandwidth_eval_x_columns =
+    (double **)R_alloc((size_t)num_x, sizeof(double *));
+  bandwidth_train_x_columns =
+    (double **)R_alloc((size_t)num_x, sizeof(double *));
+  bandwidth_eval_y_columns =
+    (double **)R_alloc((size_t)num_y, sizeof(double *));
+  bandwidth_train_y_columns =
+    (double **)R_alloc((size_t)num_y, sizeof(double *));
+  operator_x = (int *)R_alloc((size_t)num_x, sizeof(int));
+  operator_y = (int *)R_alloc((size_t)num_y, sizeof(int));
 
-  if(conditional_status == NP_BETA_CONDITIONAL_ERR_KERNEL)
+  for(int dimension = 0; dimension < num_x; ++dimension) {
+    train_x_columns[dimension] =
+      REAL(txcon_r) + (size_t)dimension*(size_t)num_train_x;
+    eval_x_columns[dimension] =
+      REAL(excon_r) + (size_t)dimension*(size_t)num_eval_x;
+    bandwidth_eval_x_columns[dimension] =
+      (double *)bandwidth_eval_x +
+      (bandwidth_mode == NP_BETA_BANDWIDTH_GENERALIZED_NN ?
+       (size_t)dimension*(size_t)num_eval_x : dimension);
+    bandwidth_train_x_columns[dimension] =
+      (double *)bandwidth_train_x +
+      (bandwidth_mode == NP_BETA_BANDWIDTH_FIXED ? dimension :
+       (bandwidth_mode == NP_BETA_BANDWIDTH_ADAPTIVE_NN ?
+        (size_t)dimension*(size_t)num_train_x : dimension));
+    operator_x[dimension] = OP_NORMAL;
+  }
+  for(int dimension = 0; dimension < num_y; ++dimension) {
+    train_y_columns[dimension] =
+      REAL(tycon_r) + (size_t)dimension*(size_t)num_train_y;
+    eval_y_columns[dimension] =
+      REAL(eycon_r) + (size_t)dimension*(size_t)num_eval_y;
+    bandwidth_eval_y_columns[dimension] =
+      (double *)bandwidth_eval_y +
+      (bandwidth_mode == NP_BETA_BANDWIDTH_GENERALIZED_NN ?
+       (size_t)dimension*(size_t)num_eval_y : dimension);
+    bandwidth_train_y_columns[dimension] =
+      (double *)bandwidth_train_y +
+      (bandwidth_mode == NP_BETA_BANDWIDTH_FIXED ? dimension :
+       (bandwidth_mode == NP_BETA_BANDWIDTH_ADAPTIVE_NN ?
+        (size_t)dimension*(size_t)num_train_y : dimension));
+    operator_y[dimension] = do_distribution ? OP_INTEGRAL : OP_NORMAL;
+  }
+
+  memset(&x_route, 0, sizeof(x_route));
+  memset(&y_route, 0, sizeof(y_route));
+  memset(&x_diagnostics, 0, sizeof(x_diagnostics));
+  memset(&y_diagnostics, 0, sizeof(y_diagnostics));
+  if(x_descriptor.family == NP_CKERNEL_FAMILY_BETA) {
+    x_route.segment_count = 1;
+    x_route.segment[0].descriptor = x_descriptor;
+    x_route.segment[0].coordinate_offset = 0;
+    x_route.segment[0].coordinate_count = num_x;
+    x_route.segment[0].lower = REAL(ckerlbx_r);
+    x_route.segment[0].upper = REAL(ckerubx_r);
+  }
+  if(y_descriptor.family == NP_CKERNEL_FAMILY_BETA) {
+    y_route.segment_count = 1;
+    y_route.segment[0].descriptor = y_descriptor;
+    y_route.segment[0].coordinate_offset = 0;
+    y_route.segment[0].coordinate_count = num_y;
+    y_route.segment[0].lower = REAL(ckerlby_r);
+    y_route.segment[0].upper = REAL(ckeruby_r);
+  }
+
+  PROTECT(out = allocMatrix(REALSXP, num_replicates, num_eval_x));
+  memset(&count_plan, 0, sizeof(count_plan));
+  count_plan.bandwidth_mode = bandwidth_mode;
+  count_plan.do_distribution = do_distribution;
+  count_plan.num_train = num_train_x;
+  count_plan.num_eval = num_eval_x;
+  count_plan.num_x = num_x;
+  count_plan.num_y = num_y;
+  count_plan.num_replicates = num_replicates;
+  count_plan.train_x = train_x_columns;
+  count_plan.train_y = train_y_columns;
+  count_plan.eval_x = eval_x_columns;
+  count_plan.eval_y = eval_y_columns;
+  count_plan.bandwidth_eval_x = bandwidth_eval_x_columns;
+  count_plan.bandwidth_train_x = bandwidth_train_x_columns;
+  count_plan.bandwidth_eval_y = bandwidth_eval_y_columns;
+  count_plan.bandwidth_train_y = bandwidth_train_y_columns;
+  count_plan.lower_x = REAL(ckerlbx_r);
+  count_plan.upper_x = REAL(ckerubx_r);
+  count_plan.lower_y = REAL(ckerlby_r);
+  count_plan.upper_y = REAL(ckeruby_r);
+  count_plan.operator_x = operator_x;
+  count_plan.operator_y = operator_y;
+  count_plan.descriptor_x = x_descriptor;
+  count_plan.descriptor_y = y_descriptor;
+  count_plan.route_x = x_descriptor.family == NP_CKERNEL_FAMILY_BETA ?
+    &x_route : NULL;
+  count_plan.diagnostics_x =
+    x_descriptor.family == NP_CKERNEL_FAMILY_BETA ? &x_diagnostics : NULL;
+  count_plan.route_y = y_descriptor.family == NP_CKERNEL_FAMILY_BETA ?
+    &y_route : NULL;
+  count_plan.diagnostics_y =
+    y_descriptor.family == NP_CKERNEL_FAMILY_BETA ? &y_diagnostics : NULL;
+  count_plan.counts = REAL(counts_r);
+  count_plan.levels = REAL(out);
+  count_status = np_conditional_count_levels(
+    &count_plan, &bad_evaluation, &bad_replicate, &bad_dimension);
+
+  if(count_status == NP_CONTINUOUS_ROW_ERR_KERNEL) {
+    const NPContinuousKernelDerivativeDiagnostics * const diagnostics =
+      bad_dimension < num_x ? &x_diagnostics : &y_diagnostics;
     error("C_np_beta_conditional_bootstrap: scalar kernel failed at evaluation %d, continuous dimension %d: %s",
           bad_evaluation + 1, bad_dimension + 1,
-          np_beta_status_message(scalar_status));
-  if(conditional_status != NP_BETA_CONDITIONAL_OK) {
+          diagnostics->beta_status == NP_BETA_OK ?
+            np_continuous_kernel_row_status_message(count_status) :
+            np_beta_status_message(diagnostics->beta_status));
+  }
+  if(count_status != NP_CONTINUOUS_ROW_OK) {
     if(bad_replicate >= 0 && bad_evaluation >= 0)
       error("C_np_beta_conditional_bootstrap: %s at bootstrap replicate %d, evaluation %d",
-            np_beta_conditional_status_message(conditional_status),
+            np_continuous_kernel_row_status_message(count_status),
             bad_replicate + 1, bad_evaluation + 1);
     error("C_np_beta_conditional_bootstrap: %s",
-          np_beta_conditional_status_message(conditional_status));
+          np_continuous_kernel_row_status_message(count_status));
   }
 
   UNPROTECT(12);

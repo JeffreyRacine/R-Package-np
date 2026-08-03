@@ -24,6 +24,43 @@ typedef struct {
   int categorical_compress;
 } NPConditionalKernelExecutionContext;
 
+/*
+ * Family-neutral width-one conditional count consumer.  Kernel rows and
+ * realized bandwidths are caller-owned immutable views; the executor streams
+ * one evaluation row and never retains an observation-by-evaluation matrix.
+ */
+typedef struct {
+  int bandwidth_mode;
+  int do_distribution;
+  int num_train;
+  int num_eval;
+  int num_x;
+  int num_y;
+  int num_replicates;
+  double **train_x;
+  double **train_y;
+  double **eval_x;
+  double **eval_y;
+  double **bandwidth_eval_x;
+  double **bandwidth_train_x;
+  double **bandwidth_eval_y;
+  double **bandwidth_train_y;
+  const double *lower_x;
+  const double *upper_x;
+  const double *lower_y;
+  const double *upper_y;
+  const int *operator_x;
+  const int *operator_y;
+  np_continuous_kernel_descriptor descriptor_x;
+  np_continuous_kernel_descriptor descriptor_y;
+  const NPContinuousKernelRoute *route_x;
+  NPContinuousKernelDerivativeDiagnostics *diagnostics_x;
+  const NPContinuousKernelRoute *route_y;
+  NPContinuousKernelDerivativeDiagnostics *diagnostics_y;
+  const double *counts;
+  double *levels;
+} NPConditionalCountPlan;
+
 #define MAX_OBS INT_MAX
 #define MAX_REG 100                               /* Allows flexibility while trapping error... */
 #define VERSION 1.1
@@ -173,6 +210,11 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv_ctx(
   double *vector_scale_factor, int *num_categories,
   const NPConditionalKernelExecutionContext *execution_context,
   double *cv);
+
+int np_conditional_count_levels(const NPConditionalCountPlan *plan,
+                                int *bad_evaluation,
+                                int *bad_replicate,
+                                int *bad_dimension);
 
 int kernel_estimate_con_distribution_categorical_no_mpi(int KERNEL_den, int KERNEL_unordered_den, int KERNEL_ordered_den, int KERNEL_reg, int KERNEL_unordered_reg, int KERNEL_ordered_reg, int BANDWIDTH_den, int num_obs_train, int num_obs_eval, int num_var_unordered, int num_var_ordered, int num_var_continuous, int num_reg_unordered, int num_reg_ordered, int num_reg_continuous, double **matrix_Y_unordered_train, double **matrix_Y_ordered_train, double **matrix_Y_continuous_train, double **matrix_Y_unordered_eval, double **matrix_Y_ordered_eval, double **matrix_Y_continuous_eval, double **matrix_X_unordered_train, double **matrix_X_ordered_train, double **matrix_X_continuous_train, double **matrix_X_unordered_eval, double **matrix_X_ordered_eval, double **matrix_X_continuous_eval, double *vector_scale_factor, int *num_categories, double **matrix_categorical_vals, double *cdf, double *cdf_stderr, double small, int itmax);
 

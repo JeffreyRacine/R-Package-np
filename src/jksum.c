@@ -30,6 +30,7 @@
 #include "categorical_profile_tile.h"
 #include "continuous_kernel_row.h"
 #include "beta_bandwidth.h"
+#include "beta_conditional.h"
 #include "beta_scaled_row.h"
 #include "reghat_fast.h"
 
@@ -20867,6 +20868,296 @@ NPContinuousKernelRowStatus np_beta_scaled_row_context_fill(
 {
   return np_beta_scaled_row_context_fill_omitting(
     context, evaluation, -1, sum, common_log_scale);
+}
+
+/*
+ * Fill a legacy continuous-kernel row on one finite common scale.  This is
+ * the legacy-side factor of the family-neutral conditional count consumer;
+ * beta sides use the canonical persistent scaled-row owner above.  The
+ * scalar registry operation is shared with the historical sidecar during the
+ * migration and will remain the sole bounded legacy/beta scalar dispatcher
+ * after that sidecar is removed.
+ */
+static NPContinuousKernelRowStatus
+np_conditional_count_legacy_row(const NPConditionalCountPlan * const plan,
+                                const int is_x_side,
+                                const int evaluation,
+                                double * const log_absolute,
+                                signed char * const sign,
+                                double * const row,
+                                double * const common_log_scale,
+                                int * const bad_dimension)
+{
+  const int dimensions = is_x_side ? plan->num_x : plan->num_y;
+  const int do_cdf = is_x_side ? 0 : plan->do_distribution;
+  const int bandwidth_mode = plan->bandwidth_mode;
+  const int num_train = plan->num_train;
+  double ** const train = is_x_side ? plan->train_x : plan->train_y;
+  double ** const eval = is_x_side ? plan->eval_x : plan->eval_y;
+  double ** const bandwidth_eval = is_x_side ?
+    plan->bandwidth_eval_x : plan->bandwidth_eval_y;
+  double ** const bandwidth_train = is_x_side ?
+    plan->bandwidth_train_x : plan->bandwidth_train_y;
+  const double * const lower = is_x_side ? plan->lower_x : plan->lower_y;
+  const double * const upper = is_x_side ? plan->upper_x : plan->upper_y;
+  const np_continuous_kernel_descriptor descriptor = is_x_side ?
+    plan->descriptor_x : plan->descriptor_y;
+  double maximum = -INFINITY;
+  int observation;
+
+  if(descriptor.family != NP_CKERNEL_FAMILY_LEGACY || dimensions <= 0 ||
+     train == NULL || eval == NULL || bandwidth_eval == NULL ||
+     bandwidth_train == NULL || lower == NULL || upper == NULL ||
+     log_absolute == NULL || sign == NULL || row == NULL ||
+     common_log_scale == NULL)
+    return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+
+  for(observation = 0; observation < num_train; ++observation) {
+    double product_log = 0.0;
+    int product_sign = 1;
+    int dimension;
+
+    for(dimension = 0; dimension < dimensions; ++dimension) {
+      const double bandwidth = bandwidth_mode == BW_FIXED ?
+        bandwidth_eval[dimension][0] :
+        (bandwidth_mode == BW_GEN_NN ?
+          bandwidth_eval[dimension][evaluation] :
+          bandwidth_train[dimension][observation]);
+      double scalar_log = -INFINITY;
+      int scalar_sign = 0;
+      np_beta_status beta_status = NP_BETA_OK;
+      const np_beta_conditional_status scalar_status =
+        np_beta_conditional_scalar_log(
+          descriptor.family, descriptor.legacy_code, descriptor.order,
+          do_cdf, eval[dimension][evaluation], train[dimension][observation],
+          bandwidth, lower[dimension], upper[dimension],
+          &scalar_log, &scalar_sign, &beta_status);
+
+      (void)beta_status;
+      if(scalar_status == NP_BETA_CONDITIONAL_ERR_KERNEL) {
+        if(bad_dimension != NULL)
+          *bad_dimension = (is_x_side ? 0 : plan->num_x) + dimension;
+        return NP_CONTINUOUS_ROW_ERR_KERNEL;
+      }
+      if(scalar_status != NP_BETA_CONDITIONAL_OK) {
+        if(bad_dimension != NULL)
+          *bad_dimension = (is_x_side ? 0 : plan->num_x) + dimension;
+        return scalar_status == NP_BETA_CONDITIONAL_ERR_NUMERIC ?
+          NP_CONTINUOUS_ROW_ERR_NUMERIC : NP_CONTINUOUS_ROW_ERR_LAYOUT;
+      }
+      if(scalar_sign == 0) {
+        product_log = -INFINITY;
+        product_sign = 0;
+        break;
+      }
+      product_log += scalar_log;
+      product_sign *= scalar_sign;
+      if(ISNAN(product_log) || product_log == INFINITY) {
+        if(bad_dimension != NULL)
+          *bad_dimension = (is_x_side ? 0 : plan->num_x) + dimension;
+        return NP_CONTINUOUS_ROW_ERR_NUMERIC;
+      }
+    }
+    log_absolute[observation] = product_log;
+    sign[observation] = (signed char)product_sign;
+    if(product_sign != 0 && product_log > maximum)
+      maximum = product_log;
+  }
+
+  for(observation = 0; observation < num_train; ++observation) {
+    row[observation] = sign[observation] == 0 ? 0.0 :
+      (double)sign[observation] * exp(log_absolute[observation] - maximum);
+    if(!R_FINITE(row[observation]))
+      return NP_CONTINUOUS_ROW_ERR_NUMERIC;
+  }
+  *common_log_scale = maximum;
+  return NP_CONTINUOUS_ROW_OK;
+}
+
+int np_conditional_count_levels(const NPConditionalCountPlan * const plan,
+                                int * const bad_evaluation,
+                                int * const bad_replicate,
+                                int * const bad_dimension)
+{
+  NPBetaScaledRowContext x_context;
+  NPBetaScaledRowContext y_context;
+  double *numeric = NULL;
+  signed char *legacy_sign = NULL;
+  double *x_row;
+  double *y_row;
+  double *joint_row;
+  double *legacy_log;
+  double *denominator;
+  const int beta_x = plan != NULL &&
+    plan->descriptor_x.family == NP_CKERNEL_FAMILY_BETA;
+  const int beta_y = plan != NULL &&
+    plan->descriptor_y.family == NP_CKERNEL_FAMILY_BETA;
+  int evaluation;
+  int status = NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  size_t numeric_count;
+
+  if(bad_evaluation != NULL) *bad_evaluation = -1;
+  if(bad_replicate != NULL) *bad_replicate = -1;
+  if(bad_dimension != NULL) *bad_dimension = -1;
+  np_beta_scaled_row_context_init(&x_context);
+  np_beta_scaled_row_context_init(&y_context);
+
+  if(plan == NULL || plan->num_train <= 0 || plan->num_eval <= 0 ||
+     plan->num_x <= 0 || plan->num_y <= 0 || plan->num_replicates <= 0 ||
+     plan->train_x == NULL || plan->train_y == NULL ||
+     plan->eval_x == NULL || plan->eval_y == NULL ||
+     plan->bandwidth_eval_x == NULL || plan->bandwidth_train_x == NULL ||
+     plan->bandwidth_eval_y == NULL || plan->bandwidth_train_y == NULL ||
+     plan->lower_x == NULL || plan->upper_x == NULL ||
+     plan->lower_y == NULL || plan->upper_y == NULL ||
+     plan->operator_x == NULL || plan->operator_y == NULL ||
+     plan->counts == NULL || plan->levels == NULL ||
+     (plan->bandwidth_mode != BW_FIXED &&
+      plan->bandwidth_mode != BW_GEN_NN &&
+      plan->bandwidth_mode != BW_ADAP_NN) ||
+     (plan->do_distribution != 0 && plan->do_distribution != 1) ||
+     (!beta_x && !beta_y) ||
+     beta_x != (plan->route_x != NULL) ||
+     beta_y != (plan->route_y != NULL) ||
+     beta_x != (plan->diagnostics_x != NULL) ||
+     beta_y != (plan->diagnostics_y != NULL))
+    goto cleanup_count_levels;
+  if(!np_size_mul_checked((size_t)plan->num_train, 4U, &numeric_count) ||
+     !np_size_add_checked(numeric_count,
+                          (size_t)plan->num_replicates,
+                          &numeric_count) ||
+     !np_size_array_bytes_checked(numeric_count,
+                                  sizeof(double),
+                                  &numeric_count)) {
+    status = NP_CONTINUOUS_ROW_ERR_MEMORY;
+    goto cleanup_count_levels;
+  }
+
+  numeric = (double *)malloc(numeric_count);
+  legacy_sign = (signed char *)malloc(
+    (size_t)plan->num_train*sizeof(signed char));
+  if(numeric == NULL || legacy_sign == NULL) {
+    status = NP_CONTINUOUS_ROW_ERR_MEMORY;
+    goto cleanup_count_levels;
+  }
+  x_row = numeric;
+  y_row = x_row + plan->num_train;
+  joint_row = y_row + plan->num_train;
+  legacy_log = joint_row + plan->num_train;
+  denominator = legacy_log + plan->num_train;
+
+  if(beta_x) {
+    status = np_beta_scaled_row_context_prepare(
+      &x_context, plan->route_x, plan->diagnostics_x,
+      plan->bandwidth_mode, plan->num_train, plan->num_eval,
+      plan->num_x, 0, 0, plan->train_x, plan->eval_x,
+      NULL, NULL, NULL, NULL,
+      plan->bandwidth_train_x, plan->bandwidth_eval_x,
+      plan->operator_x, NULL, NULL, NULL, NULL, NULL, 0, x_row);
+    if(status != NP_CONTINUOUS_ROW_OK)
+      goto cleanup_count_levels;
+  }
+  if(beta_y) {
+    status = np_beta_scaled_row_context_prepare(
+      &y_context, plan->route_y, plan->diagnostics_y,
+      plan->bandwidth_mode, plan->num_train, plan->num_eval,
+      plan->num_y, 0, 0, plan->train_y, plan->eval_y,
+      NULL, NULL, NULL, NULL,
+      plan->bandwidth_train_y, plan->bandwidth_eval_y,
+      plan->operator_y, NULL, NULL, NULL, NULL, NULL, 0, y_row);
+    if(status != NP_CONTINUOUS_ROW_OK)
+      goto cleanup_count_levels;
+  }
+
+  for(evaluation = 0; evaluation < plan->num_eval; ++evaluation) {
+    double x_log_scale = 0.0;
+    double y_log_scale = 0.0;
+    double * const numerator =
+      plan->levels + (size_t)plan->num_replicates*(size_t)evaluation;
+    const char transposed = 'T';
+    const double alpha = 1.0;
+    const double zero = 0.0;
+    const int one = 1;
+    int observation;
+    int replicate;
+    NPContinuousKernelRowStatus row_status;
+
+    row_status = beta_x ?
+      np_beta_scaled_row_context_fill(
+        &x_context, evaluation, NULL, &x_log_scale) :
+      np_conditional_count_legacy_row(
+        plan, 1, evaluation, legacy_log, legacy_sign,
+        x_row, &x_log_scale, bad_dimension);
+    if(row_status != NP_CONTINUOUS_ROW_OK) {
+      status = row_status;
+      if(bad_evaluation != NULL) *bad_evaluation = evaluation;
+      if(beta_x && bad_dimension != NULL)
+        *bad_dimension = plan->diagnostics_x->bad_coordinate;
+      goto cleanup_count_levels;
+    }
+    row_status = beta_y ?
+      np_beta_scaled_row_context_fill(
+        &y_context, evaluation, NULL, &y_log_scale) :
+      np_conditional_count_legacy_row(
+        plan, 0, evaluation, legacy_log, legacy_sign,
+        y_row, &y_log_scale, bad_dimension);
+    if(row_status != NP_CONTINUOUS_ROW_OK) {
+      status = row_status;
+      if(bad_evaluation != NULL) *bad_evaluation = evaluation;
+      if(beta_y && bad_dimension != NULL)
+        *bad_dimension = plan->num_x +
+          plan->diagnostics_y->bad_coordinate;
+      goto cleanup_count_levels;
+    }
+    for(observation = 0; observation < plan->num_train; ++observation) {
+      joint_row[observation] = x_row[observation]*y_row[observation];
+      if(!R_FINITE(joint_row[observation])) {
+        status = NP_CONTINUOUS_ROW_ERR_NUMERIC;
+        if(bad_evaluation != NULL) *bad_evaluation = evaluation;
+        goto cleanup_count_levels;
+      }
+    }
+
+    F77_CALL(dgemv)(&transposed, &plan->num_train,
+                    &plan->num_replicates, &alpha,
+                    plan->counts, &plan->num_train,
+                    x_row, &one, &zero, denominator, &one FCONE);
+    F77_CALL(dgemv)(&transposed, &plan->num_train,
+                    &plan->num_replicates, &alpha,
+                    plan->counts, &plan->num_train,
+                    joint_row, &one, &zero, numerator, &one FCONE);
+
+    for(replicate = 0; replicate < plan->num_replicates; ++replicate) {
+      const double ratio = numerator[replicate]/denominator[replicate];
+      double restored;
+
+      if(!R_FINITE(denominator[replicate]) || denominator[replicate] == 0.0) {
+        status = NP_CONTINUOUS_ROW_ERR_ZERO_WEIGHT;
+        if(bad_evaluation != NULL) *bad_evaluation = evaluation;
+        if(bad_replicate != NULL) *bad_replicate = replicate;
+        goto cleanup_count_levels;
+      }
+      if(!R_FINITE(ratio) ||
+         np_continuous_kernel_scaled_restore(
+           ratio, y_log_scale, 1, &restored) != NP_CONTINUOUS_ROW_OK ||
+         !R_FINITE(restored)) {
+        status = NP_CONTINUOUS_ROW_ERR_NUMERIC;
+        if(bad_evaluation != NULL) *bad_evaluation = evaluation;
+        if(bad_replicate != NULL) *bad_replicate = replicate;
+        goto cleanup_count_levels;
+      }
+      numerator[replicate] = restored;
+    }
+    (void)x_log_scale;
+  }
+  status = NP_CONTINUOUS_ROW_OK;
+
+cleanup_count_levels:
+  np_beta_scaled_row_context_clear(&x_context);
+  np_beta_scaled_row_context_clear(&y_context);
+  free(numeric);
+  free(legacy_sign);
+  return status;
 }
 
 /*
