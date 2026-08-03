@@ -8141,25 +8141,193 @@ SEXP C_np_density(SEXP tuno,
   return out;
 }
 
-SEXP C_np_beta_conditional_bootstrap(SEXP txcon,
-                                     SEXP tycon,
-                                     SEXP excon,
-                                     SEXP eycon,
-                                     SEXP rbwx,
-                                     SEXP rbwy,
-                                     SEXP ckerlbx,
-                                     SEXP ckerubx,
-                                     SEXP ckerlby,
-                                     SEXP ckeruby,
-                                     SEXP familyx,
-                                     SEXP codex,
-                                     SEXP orderx,
-                                     SEXP familyy,
-                                     SEXP codey,
-                                     SEXP ordery,
-                                     SEXP bandwidth_mode_sexp,
-                                     SEXP do_distribution_sexp,
-                                     SEXP counts)
+enum {
+  NP_COUNT_CAT_TRAIN_UNORDERED = 0,
+  NP_COUNT_CAT_TRAIN_ORDERED,
+  NP_COUNT_CAT_EVAL_UNORDERED,
+  NP_COUNT_CAT_EVAL_ORDERED,
+  NP_COUNT_CAT_KERNEL_UNORDERED,
+  NP_COUNT_CAT_KERNEL_ORDERED,
+  NP_COUNT_CAT_LAMBDA,
+  NP_COUNT_CAT_NUM_CATEGORIES,
+  NP_COUNT_CAT_CATEGORY_VALUES,
+  NP_COUNT_CAT_LENGTH
+};
+
+static SEXP np_conditional_count_category_component(
+  SEXP state,
+  int component,
+  const char *where)
+{
+  if(TYPEOF(state) != VECSXP || XLENGTH(state) != NP_COUNT_CAT_LENGTH ||
+     component < 0 || component >= NP_COUNT_CAT_LENGTH)
+    error("%s: invalid categorical side state", where);
+  return VECTOR_ELT(state, component);
+}
+
+static double **np_conditional_count_matrix_columns(
+  SEXP matrix,
+  int expected_rows,
+  int *columns,
+  const char *where)
+{
+  int rows = 0;
+  int cols = 0;
+  double **view = NULL;
+  int column;
+
+  if(TYPEOF(matrix) != REALSXP)
+    error("%s: categorical matrices must use double storage", where);
+  np_matrix_dims_or_zero(matrix, &rows, &cols);
+  if(rows != expected_rows || cols < 0)
+    error("%s: categorical matrix dimensions are inconsistent", where);
+  if(columns != NULL)
+    *columns = cols;
+  if(cols == 0)
+    return NULL;
+  view = (double **)R_alloc((size_t)cols, sizeof(double *));
+  for(column = 0; column < cols; ++column)
+    view[column] = REAL(matrix) + (size_t)column*(size_t)rows;
+  return view;
+}
+
+static double **np_conditional_count_category_values(
+  SEXP values,
+  const int *num_categories,
+  int dimensions,
+  const char *where)
+{
+  double **view = NULL;
+  int dimension;
+
+  if(dimensions == 0) {
+    if(TYPEOF(values) != VECSXP || XLENGTH(values) != 0)
+      error("%s: empty categorical state has nonempty support", where);
+    return NULL;
+  }
+  if(TYPEOF(values) != VECSXP || XLENGTH(values) != dimensions ||
+     num_categories == NULL)
+    error("%s: categorical support dimensions are inconsistent", where);
+  view = (double **)R_alloc((size_t)dimensions, sizeof(double *));
+  for(dimension = 0; dimension < dimensions; ++dimension) {
+    SEXP support = VECTOR_ELT(values, dimension);
+
+    if(TYPEOF(support) != REALSXP || num_categories[dimension] <= 0 ||
+       XLENGTH(support) != num_categories[dimension])
+      error("%s: categorical support is invalid", where);
+    view[dimension] = REAL(support);
+  }
+  return view;
+}
+
+typedef struct {
+  int nunordered;
+  int nordered;
+  int ntotal;
+  double **train_unordered;
+  double **train_ordered;
+  double **eval_unordered;
+  double **eval_ordered;
+  const int *kernel_unordered;
+  const int *kernel_ordered;
+  const double *lambda;
+  const int *num_categories;
+  double **category_values;
+} NPConditionalCountCategoricalIngress;
+
+static void np_conditional_count_categorical_ingress(
+  SEXP state,
+  int num_train,
+  int num_eval,
+  const char *where,
+  NPConditionalCountCategoricalIngress *ingress)
+{
+  int eval_columns = 0;
+  SEXP kernel_u;
+  SEXP kernel_o;
+  SEXP lambda;
+  SEXP num_categories;
+  SEXP category_values;
+
+  if(where == NULL || ingress == NULL)
+    error("C_np_conditional_count_levels: invalid categorical ingress");
+  memset(ingress, 0, sizeof(*ingress));
+  if(state == R_NilValue)
+    return;
+
+  ingress->train_unordered = np_conditional_count_matrix_columns(
+    np_conditional_count_category_component(
+      state, NP_COUNT_CAT_TRAIN_UNORDERED, where),
+    num_train, &ingress->nunordered, where);
+  ingress->train_ordered = np_conditional_count_matrix_columns(
+    np_conditional_count_category_component(
+      state, NP_COUNT_CAT_TRAIN_ORDERED, where),
+    num_train, &ingress->nordered, where);
+  ingress->eval_unordered = np_conditional_count_matrix_columns(
+    np_conditional_count_category_component(
+      state, NP_COUNT_CAT_EVAL_UNORDERED, where),
+    num_eval, &eval_columns, where);
+  if(eval_columns != ingress->nunordered)
+    error("%s: unordered training and evaluation dimensions differ", where);
+  ingress->eval_ordered = np_conditional_count_matrix_columns(
+    np_conditional_count_category_component(
+      state, NP_COUNT_CAT_EVAL_ORDERED, where),
+    num_eval, &eval_columns, where);
+  if(eval_columns != ingress->nordered)
+    error("%s: ordered training and evaluation dimensions differ", where);
+  if(ingress->nunordered > INT_MAX - ingress->nordered)
+    error("%s: categorical dimensions overflow", where);
+  ingress->ntotal = ingress->nunordered + ingress->nordered;
+
+  kernel_u = np_conditional_count_category_component(
+    state, NP_COUNT_CAT_KERNEL_UNORDERED, where);
+  kernel_o = np_conditional_count_category_component(
+    state, NP_COUNT_CAT_KERNEL_ORDERED, where);
+  lambda = np_conditional_count_category_component(
+    state, NP_COUNT_CAT_LAMBDA, where);
+  num_categories = np_conditional_count_category_component(
+    state, NP_COUNT_CAT_NUM_CATEGORIES, where);
+  category_values = np_conditional_count_category_component(
+    state, NP_COUNT_CAT_CATEGORY_VALUES, where);
+  if(TYPEOF(kernel_u) != INTSXP ||
+     XLENGTH(kernel_u) != ingress->nunordered ||
+     TYPEOF(kernel_o) != INTSXP ||
+     XLENGTH(kernel_o) != ingress->nordered ||
+     TYPEOF(lambda) != REALSXP || XLENGTH(lambda) != ingress->ntotal ||
+     TYPEOF(num_categories) != INTSXP ||
+     XLENGTH(num_categories) != ingress->ntotal)
+    error("%s: invalid categorical metadata", where);
+
+  ingress->kernel_unordered = INTEGER(kernel_u);
+  ingress->kernel_ordered = INTEGER(kernel_o);
+  ingress->lambda = REAL(lambda);
+  ingress->num_categories = INTEGER(num_categories);
+  ingress->category_values = np_conditional_count_category_values(
+    category_values, ingress->num_categories, ingress->ntotal, where);
+}
+
+SEXP C_np_conditional_count_levels(SEXP txcon,
+                                   SEXP tycon,
+                                   SEXP excon,
+                                   SEXP eycon,
+                                   SEXP rbwx,
+                                   SEXP rbwy,
+                                   SEXP ckerlbx,
+                                   SEXP ckerubx,
+                                   SEXP ckerlby,
+                                   SEXP ckeruby,
+                                   SEXP familyx,
+                                   SEXP codex,
+                                   SEXP orderx,
+                                   SEXP familyy,
+                                   SEXP codey,
+                                   SEXP ordery,
+                                   SEXP bandwidth_mode_sexp,
+                                   SEXP do_distribution_sexp,
+                                   SEXP x_categorical,
+                                   SEXP y_categorical,
+                                   SEXP categorical_compress_sexp,
+                                   SEXP counts)
 {
   SEXP txcon_r = R_NilValue, tycon_r = R_NilValue;
   SEXP excon_r = R_NilValue, eycon_r = R_NilValue;
@@ -8170,9 +8338,13 @@ SEXP C_np_beta_conditional_bootstrap(SEXP txcon,
   int num_train_x, num_x, num_train_y, num_y;
   int num_eval_x, num_eval_x_columns;
   int num_eval_y, num_eval_y_columns;
+  int num_x_unordered, num_x_ordered;
+  int num_y_unordered, num_y_ordered;
+  int num_x_categorical, num_y_categorical;
   int counts_rows, num_replicates;
   int bandwidth_mode_code = asInteger(bandwidth_mode_sexp);
   int do_distribution = asLogical(do_distribution_sexp);
+  int categorical_compress = asLogical(categorical_compress_sexp);
   np_beta_bandwidth_mode bandwidth_mode;
   np_continuous_kernel_descriptor x_descriptor;
   np_continuous_kernel_descriptor y_descriptor;
@@ -8184,12 +8356,30 @@ SEXP C_np_beta_conditional_bootstrap(SEXP txcon,
   double **train_y_columns;
   double **eval_x_columns;
   double **eval_y_columns;
+  double **train_x_unordered_columns;
+  double **train_x_ordered_columns;
+  double **eval_x_unordered_columns;
+  double **eval_x_ordered_columns;
+  double **train_y_unordered_columns;
+  double **train_y_ordered_columns;
+  double **eval_y_unordered_columns;
+  double **eval_y_ordered_columns;
   double **bandwidth_eval_x_columns;
   double **bandwidth_train_x_columns;
   double **bandwidth_eval_y_columns;
   double **bandwidth_train_y_columns;
   int *operator_x;
   int *operator_y;
+  const int *kernel_x_unordered;
+  const int *kernel_x_ordered;
+  const int *kernel_y_unordered;
+  const int *kernel_y_ordered;
+  const double *lambda_x;
+  const double *lambda_y;
+  const int *num_categories_x;
+  const int *num_categories_y;
+  double **category_values_x;
+  double **category_values_y;
   NPContinuousKernelRoute x_route;
   NPContinuousKernelRoute y_route;
   NPContinuousKernelDerivativeDiagnostics x_diagnostics;
@@ -8218,34 +8408,81 @@ SEXP C_np_beta_conditional_bootstrap(SEXP txcon,
   np_matrix_dims_or_zero(excon_r, &num_eval_x, &num_eval_x_columns);
   np_matrix_dims_or_zero(eycon_r, &num_eval_y, &num_eval_y_columns);
   np_matrix_dims_or_zero(counts_r, &counts_rows, &num_replicates);
-  if(num_train_x <= 0 || num_x <= 0 || num_train_y != num_train_x ||
-     num_y <= 0 || num_eval_x <= 0 || num_eval_y != num_eval_x ||
+  if(num_train_x <= 0 || num_x < 0 || num_train_y != num_train_x ||
+     num_y < 0 || num_eval_x <= 0 || num_eval_y != num_eval_x ||
      num_eval_x_columns != num_x || num_eval_y_columns != num_y ||
      counts_rows != num_train_x || num_replicates <= 0)
-    error("C_np_beta_conditional_bootstrap: invalid matrix dimensions");
+    error("C_np_conditional_count_levels: invalid matrix dimensions");
+
+  {
+    NPConditionalCountCategoricalIngress x_ingress;
+    NPConditionalCountCategoricalIngress y_ingress;
+
+    np_conditional_count_categorical_ingress(
+      x_categorical, num_train_x, num_eval_x,
+      "C_np_conditional_count_levels x side", &x_ingress);
+    np_conditional_count_categorical_ingress(
+      y_categorical, num_train_y, num_eval_y,
+      "C_np_conditional_count_levels y side", &y_ingress);
+
+    num_x_unordered = x_ingress.nunordered;
+    num_x_ordered = x_ingress.nordered;
+    num_x_categorical = x_ingress.ntotal;
+    train_x_unordered_columns = x_ingress.train_unordered;
+    train_x_ordered_columns = x_ingress.train_ordered;
+    eval_x_unordered_columns = x_ingress.eval_unordered;
+    eval_x_ordered_columns = x_ingress.eval_ordered;
+    kernel_x_unordered = x_ingress.kernel_unordered;
+    kernel_x_ordered = x_ingress.kernel_ordered;
+    lambda_x = x_ingress.lambda;
+    num_categories_x = x_ingress.num_categories;
+    category_values_x = x_ingress.category_values;
+
+    num_y_unordered = y_ingress.nunordered;
+    num_y_ordered = y_ingress.nordered;
+    num_y_categorical = y_ingress.ntotal;
+    train_y_unordered_columns = y_ingress.train_unordered;
+    train_y_ordered_columns = y_ingress.train_ordered;
+    eval_y_unordered_columns = y_ingress.eval_unordered;
+    eval_y_ordered_columns = y_ingress.eval_ordered;
+    kernel_y_unordered = y_ingress.kernel_unordered;
+    kernel_y_ordered = y_ingress.kernel_ordered;
+    lambda_y = y_ingress.lambda;
+    num_categories_y = y_ingress.num_categories;
+    category_values_y = y_ingress.category_values;
+  }
+
+  if(num_x > INT_MAX - num_x_categorical ||
+     num_y > INT_MAX - num_y_categorical)
+    error("C_np_conditional_count_levels: total side dimensions overflow");
+  if(num_x + num_x_categorical <= 0 || num_y + num_y_categorical <= 0)
+    error("C_np_conditional_count_levels: each side requires a variable");
   if(XLENGTH(rbwx_r) != num_x || XLENGTH(rbwy_r) != num_y ||
      XLENGTH(ckerlbx_r) != num_x || XLENGTH(ckerubx_r) != num_x ||
      XLENGTH(ckerlby_r) != num_y || XLENGTH(ckeruby_r) != num_y)
-    error("C_np_beta_conditional_bootstrap: bandwidth or bound length does not match its continuous side");
-  if(do_distribution == NA_LOGICAL)
-    error("C_np_beta_conditional_bootstrap: distribution flag must be TRUE or FALSE");
+    error("C_np_conditional_count_levels: bandwidth or bound length does not match its continuous side");
+  if(do_distribution == NA_LOGICAL || categorical_compress == NA_LOGICAL)
+    error("C_np_conditional_count_levels: logical flags must be TRUE or FALSE");
   if((R_xlen_t)num_replicates > R_XLEN_T_MAX / (R_xlen_t)num_eval_x)
-    error("C_np_beta_conditional_bootstrap: result dimensions overflow R's vector limit");
+    error("C_np_conditional_count_levels: result dimensions overflow R's vector limit");
   if((size_t)num_x > SIZE_MAX / (size_t)num_eval_x ||
      (size_t)num_x > SIZE_MAX / (size_t)num_train_x ||
      (size_t)num_y > SIZE_MAX / (size_t)num_eval_y ||
      (size_t)num_y > SIZE_MAX / (size_t)num_train_y)
-    error("C_np_beta_conditional_bootstrap: bandwidth workspace dimensions overflow");
+    error("C_np_conditional_count_levels: bandwidth workspace dimensions overflow");
 
   x_descriptor = np_continuous_kernel_descriptor_or_error(
     asInteger(familyx), asInteger(codex), asInteger(orderx),
-    "C_np_beta_conditional_bootstrap x kernel");
+    "C_np_conditional_count_levels x kernel");
   y_descriptor = np_continuous_kernel_descriptor_or_error(
     asInteger(familyy), asInteger(codey), asInteger(ordery),
-    "C_np_beta_conditional_bootstrap y kernel");
+    "C_np_conditional_count_levels y kernel");
   if(x_descriptor.family != NP_CKERNEL_FAMILY_BETA &&
      y_descriptor.family != NP_CKERNEL_FAMILY_BETA)
-    error("C_np_beta_conditional_bootstrap: at least one continuous side must use the beta family");
+    error("C_np_conditional_count_levels: at least one continuous side must use the beta family");
+  if((x_descriptor.family == NP_CKERNEL_FAMILY_BETA && num_x <= 0) ||
+     (y_descriptor.family == NP_CKERNEL_FAMILY_BETA && num_y <= 0))
+    error("C_np_conditional_count_levels: a beta family requires a continuous coordinate");
 
   if(bandwidth_mode_code == NP_BETA_BANDWIDTH_FIXED)
     bandwidth_mode = NP_BETA_BANDWIDTH_FIXED;
@@ -8254,7 +8491,7 @@ SEXP C_np_beta_conditional_bootstrap(SEXP txcon,
   else if(bandwidth_mode_code == NP_BETA_BANDWIDTH_ADAPTIVE_NN)
     bandwidth_mode = NP_BETA_BANDWIDTH_ADAPTIVE_NN;
   else
-    error("C_np_beta_conditional_bootstrap: invalid bandwidth mode");
+    error("C_np_conditional_count_levels: invalid bandwidth mode");
 
   for(replicate_index = 0; replicate_index < num_replicates;
       ++replicate_index) {
@@ -8267,11 +8504,13 @@ SEXP C_np_beta_conditional_bootstrap(SEXP txcon,
         (size_t)num_train_x * (size_t)replicate_index];
       if(!R_FINITE(count) || count < 0.0 || count != floor(count) ||
          count > (double)num_train_x)
-        error("C_np_beta_conditional_bootstrap: counts must be finite nonnegative integer multiplicities");
+        error("C_np_conditional_count_levels: counts must be finite nonnegative integer multiplicities");
+      if(bandwidth_mode != NP_BETA_BANDWIDTH_FIXED && count != 1.0)
+        error("C_np_conditional_count_levels: nonfixed bandwidths require an expanded sample with unit counts");
       count_sum += count;
     }
     if(count_sum != (double)num_train_x)
-      error("C_np_beta_conditional_bootstrap: every count column must sum to the training sample size");
+      error("C_np_conditional_count_levels: every count column must sum to the training sample size");
   }
 
   bandwidth_eval_x = REAL(rbwx_r);
@@ -8300,22 +8539,26 @@ SEXP C_np_beta_conditional_bootstrap(SEXP txcon,
      * collective NN bandwidth path so neither the master center calculation
      * nor a worker payload attempts nested MPI participation.
      */
-    bandwidth_status = np_beta_bandwidth_prepare(
-      bandwidth_mode, REAL(txcon_r), REAL(excon_r), REAL(rbwx_r),
-      num_train_x, num_eval_x, num_x, 0,
-      need_eval, need_train, 1,
-      bandwidth_eval_x_storage, bandwidth_train_x_storage);
-    if(bandwidth_status != NP_BETA_BANDWIDTH_PREPARE_OK)
-      error("C_np_beta_conditional_bootstrap: x-side %s",
-            np_beta_bandwidth_prepare_status_message(bandwidth_status));
-    bandwidth_status = np_beta_bandwidth_prepare(
-      bandwidth_mode, REAL(tycon_r), REAL(eycon_r), REAL(rbwy_r),
-      num_train_y, num_eval_y, num_y, 0,
-      need_eval, need_train, 1,
-      bandwidth_eval_y_storage, bandwidth_train_y_storage);
-    if(bandwidth_status != NP_BETA_BANDWIDTH_PREPARE_OK)
-      error("C_np_beta_conditional_bootstrap: y-side %s",
-            np_beta_bandwidth_prepare_status_message(bandwidth_status));
+    if(num_x > 0) {
+      bandwidth_status = np_beta_bandwidth_prepare(
+        bandwidth_mode, REAL(txcon_r), REAL(excon_r), REAL(rbwx_r),
+        num_train_x, num_eval_x, num_x, 0,
+        need_eval, need_train, 1,
+        bandwidth_eval_x_storage, bandwidth_train_x_storage);
+      if(bandwidth_status != NP_BETA_BANDWIDTH_PREPARE_OK)
+        error("C_np_conditional_count_levels: x-side %s",
+              np_beta_bandwidth_prepare_status_message(bandwidth_status));
+    }
+    if(num_y > 0) {
+      bandwidth_status = np_beta_bandwidth_prepare(
+        bandwidth_mode, REAL(tycon_r), REAL(eycon_r), REAL(rbwy_r),
+        num_train_y, num_eval_y, num_y, 0,
+        need_eval, need_train, 1,
+        bandwidth_eval_y_storage, bandwidth_train_y_storage);
+      if(bandwidth_status != NP_BETA_BANDWIDTH_PREPARE_OK)
+        error("C_np_conditional_count_levels: y-side %s",
+              np_beta_bandwidth_prepare_status_message(bandwidth_status));
+    }
 
     bandwidth_eval_x = bandwidth_eval_x_storage;
     bandwidth_train_x = bandwidth_train_x_storage;
@@ -8323,20 +8566,26 @@ SEXP C_np_beta_conditional_bootstrap(SEXP txcon,
     bandwidth_train_y = bandwidth_train_y_storage;
   }
 
-  train_x_columns = (double **)R_alloc((size_t)num_x, sizeof(double *));
-  train_y_columns = (double **)R_alloc((size_t)num_y, sizeof(double *));
-  eval_x_columns = (double **)R_alloc((size_t)num_x, sizeof(double *));
-  eval_y_columns = (double **)R_alloc((size_t)num_y, sizeof(double *));
-  bandwidth_eval_x_columns =
-    (double **)R_alloc((size_t)num_x, sizeof(double *));
-  bandwidth_train_x_columns =
-    (double **)R_alloc((size_t)num_x, sizeof(double *));
-  bandwidth_eval_y_columns =
-    (double **)R_alloc((size_t)num_y, sizeof(double *));
-  bandwidth_train_y_columns =
-    (double **)R_alloc((size_t)num_y, sizeof(double *));
-  operator_x = (int *)R_alloc((size_t)num_x, sizeof(int));
-  operator_y = (int *)R_alloc((size_t)num_y, sizeof(int));
+  train_x_columns = num_x > 0 ?
+    (double **)R_alloc((size_t)num_x, sizeof(double *)) : NULL;
+  train_y_columns = num_y > 0 ?
+    (double **)R_alloc((size_t)num_y, sizeof(double *)) : NULL;
+  eval_x_columns = num_x > 0 ?
+    (double **)R_alloc((size_t)num_x, sizeof(double *)) : NULL;
+  eval_y_columns = num_y > 0 ?
+    (double **)R_alloc((size_t)num_y, sizeof(double *)) : NULL;
+  bandwidth_eval_x_columns = num_x > 0 ?
+    (double **)R_alloc((size_t)num_x, sizeof(double *)) : NULL;
+  bandwidth_train_x_columns = num_x > 0 ?
+    (double **)R_alloc((size_t)num_x, sizeof(double *)) : NULL;
+  bandwidth_eval_y_columns = num_y > 0 ?
+    (double **)R_alloc((size_t)num_y, sizeof(double *)) : NULL;
+  bandwidth_train_y_columns = num_y > 0 ?
+    (double **)R_alloc((size_t)num_y, sizeof(double *)) : NULL;
+  operator_x = (int *)R_alloc(
+    (size_t)(num_x + num_x_categorical), sizeof(int));
+  operator_y = (int *)R_alloc(
+    (size_t)(num_y + num_y_categorical), sizeof(int));
 
   for(int dimension = 0; dimension < num_x; ++dimension) {
     train_x_columns[dimension] =
@@ -8370,6 +8619,12 @@ SEXP C_np_beta_conditional_bootstrap(SEXP txcon,
         (size_t)dimension*(size_t)num_train_y : dimension));
     operator_y[dimension] = do_distribution ? OP_INTEGRAL : OP_NORMAL;
   }
+  for(int dimension = num_x; dimension < num_x + num_x_categorical;
+      ++dimension)
+    operator_x[dimension] = OP_NORMAL;
+  for(int dimension = num_y; dimension < num_y + num_y_categorical;
+      ++dimension)
+    operator_y[dimension] = do_distribution ? OP_INTEGRAL : OP_NORMAL;
 
   memset(&x_route, 0, sizeof(x_route));
   memset(&y_route, 0, sizeof(y_route));
@@ -8396,15 +8651,28 @@ SEXP C_np_beta_conditional_bootstrap(SEXP txcon,
   memset(&count_plan, 0, sizeof(count_plan));
   count_plan.bandwidth_mode = bandwidth_mode;
   count_plan.do_distribution = do_distribution;
+  count_plan.categorical_compress = categorical_compress;
   count_plan.num_train = num_train_x;
   count_plan.num_eval = num_eval_x;
-  count_plan.num_x = num_x;
-  count_plan.num_y = num_y;
+  count_plan.num_x_continuous = num_x;
+  count_plan.num_x_unordered = num_x_unordered;
+  count_plan.num_x_ordered = num_x_ordered;
+  count_plan.num_y_continuous = num_y;
+  count_plan.num_y_unordered = num_y_unordered;
+  count_plan.num_y_ordered = num_y_ordered;
   count_plan.num_replicates = num_replicates;
   count_plan.train_x = train_x_columns;
   count_plan.train_y = train_y_columns;
   count_plan.eval_x = eval_x_columns;
   count_plan.eval_y = eval_y_columns;
+  count_plan.train_x_unordered = train_x_unordered_columns;
+  count_plan.train_x_ordered = train_x_ordered_columns;
+  count_plan.eval_x_unordered = eval_x_unordered_columns;
+  count_plan.eval_x_ordered = eval_x_ordered_columns;
+  count_plan.train_y_unordered = train_y_unordered_columns;
+  count_plan.train_y_ordered = train_y_ordered_columns;
+  count_plan.eval_y_unordered = eval_y_unordered_columns;
+  count_plan.eval_y_ordered = eval_y_ordered_columns;
   count_plan.bandwidth_eval_x = bandwidth_eval_x_columns;
   count_plan.bandwidth_train_x = bandwidth_train_x_columns;
   count_plan.bandwidth_eval_y = bandwidth_eval_y_columns;
@@ -8415,6 +8683,16 @@ SEXP C_np_beta_conditional_bootstrap(SEXP txcon,
   count_plan.upper_y = REAL(ckeruby_r);
   count_plan.operator_x = operator_x;
   count_plan.operator_y = operator_y;
+  count_plan.kernel_x_unordered = kernel_x_unordered;
+  count_plan.kernel_x_ordered = kernel_x_ordered;
+  count_plan.kernel_y_unordered = kernel_y_unordered;
+  count_plan.kernel_y_ordered = kernel_y_ordered;
+  count_plan.lambda_x = lambda_x;
+  count_plan.lambda_y = lambda_y;
+  count_plan.num_categories_x = num_categories_x;
+  count_plan.num_categories_y = num_categories_y;
+  count_plan.category_values_x = category_values_x;
+  count_plan.category_values_y = category_values_y;
   count_plan.descriptor_x = x_descriptor;
   count_plan.descriptor_y = y_descriptor;
   count_plan.route_x = x_descriptor.family == NP_CKERNEL_FAMILY_BETA ?
@@ -8431,20 +8709,26 @@ SEXP C_np_beta_conditional_bootstrap(SEXP txcon,
     &count_plan, &bad_evaluation, &bad_replicate, &bad_dimension);
 
   if(count_status == NP_CONTINUOUS_ROW_ERR_KERNEL) {
-    const NPContinuousKernelDerivativeDiagnostics * const diagnostics =
-      bad_dimension < num_x ? &x_diagnostics : &y_diagnostics;
-    error("C_np_beta_conditional_bootstrap: scalar kernel failed at evaluation %d, continuous dimension %d: %s",
+    const NPContinuousKernelDerivativeDiagnostics *diagnostics = NULL;
+
+    if(bad_dimension >= 0 && bad_dimension < num_x &&
+       x_descriptor.family == NP_CKERNEL_FAMILY_BETA)
+      diagnostics = &x_diagnostics;
+    else if(bad_dimension >= num_x &&
+            y_descriptor.family == NP_CKERNEL_FAMILY_BETA)
+      diagnostics = &y_diagnostics;
+    error("C_np_conditional_count_levels: scalar kernel failed at evaluation %d, continuous dimension %d: %s",
           bad_evaluation + 1, bad_dimension + 1,
-          diagnostics->beta_status == NP_BETA_OK ?
+          diagnostics == NULL || diagnostics->beta_status == NP_BETA_OK ?
             np_continuous_kernel_row_status_message(count_status) :
             np_beta_status_message(diagnostics->beta_status));
   }
   if(count_status != NP_CONTINUOUS_ROW_OK) {
     if(bad_replicate >= 0 && bad_evaluation >= 0)
-      error("C_np_beta_conditional_bootstrap: %s at bootstrap replicate %d, evaluation %d",
+      error("C_np_conditional_count_levels: %s at bootstrap replicate %d, evaluation %d",
             np_continuous_kernel_row_status_message(count_status),
             bad_replicate + 1, bad_evaluation + 1);
-    error("C_np_beta_conditional_bootstrap: %s",
+    error("C_np_conditional_count_levels: %s",
           np_continuous_kernel_row_status_message(count_status));
   }
 

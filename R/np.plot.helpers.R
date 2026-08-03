@@ -8716,7 +8716,7 @@
     stop("invalid conditional frozen bootstrap dimensions")
 
   if (.np_con_has_beta_kernel(bws)) {
-    return(.np_inid_boot_from_beta_conditional_counts(
+    return(.np_inid_boot_from_conditional_counts(
       xdat = xdat,
       ydat = ydat,
       exdat = exdat,
@@ -10025,13 +10025,98 @@
   )
 }
 
-.np_beta_conditional_bootstrap_levels <- function(xdat,
-                                                   ydat,
-                                                   exdat,
-                                                   eydat,
-                                                   bws,
-                                                   cdf,
-                                                   counts) {
+.np_conditional_count_side_state <- function(tdat,
+                                             edat,
+                                             bws,
+                                             side) {
+  side <- match.arg(side, c("x", "y"))
+  xside <- identical(side, "x")
+  icon <- bws[[if (xside) "ixcon" else "iycon", exact = TRUE]]
+  iuno <- bws[[if (xside) "ixuno" else "iyuno", exact = TRUE]]
+  iord <- bws[[if (xside) "ixord" else "iyord", exact = TRUE]]
+  dati <- bws[[if (xside) "xdati" else "ydati", exact = TRUE]]
+  bw <- bws[[if (xside) "xbw" else "ybw", exact = TRUE]]
+  ukertype <- bws[[if (xside) "uxkertype" else "uykertype", exact = TRUE]]
+  okertype <- bws[[if (xside) "oxkertype" else "oykertype", exact = TRUE]]
+  lower <- bws[[if (xside) "cxkerlb" else "cykerlb", exact = TRUE]]
+  upper <- bws[[if (xside) "cxkerub" else "cykerub", exact = TRUE]]
+
+  if (!any(iuno) && !any(iord)) {
+    train.continuous <- as.matrix(tdat[, icon, drop = FALSE])
+    eval.continuous <- as.matrix(edat[, icon, drop = FALSE])
+    storage.mode(train.continuous) <- "double"
+    storage.mode(eval.continuous) <- "double"
+    return(list(
+      train.continuous = train.continuous,
+      eval.continuous = eval.continuous,
+      bandwidth = as.double(bw[icon]),
+      lower = as.double(lower[icon]),
+      upper = as.double(upper[icon]),
+      categorical = NULL
+    ))
+  }
+
+  tdat <- adjustLevels(tdat, dati, allowNewCells = TRUE)
+  edat <- adjustLevels(edat, dati, allowNewCells = TRUE)
+  tm <- toMatrix(tdat)
+  em <- toMatrix(edat)
+  storage.mode(tm) <- "double"
+  storage.mode(em) <- "double"
+
+  cat.index <- c(which(iuno), which(iord))
+  num.categories <- if (length(cat.index)) {
+    as.integer(unlist(dati[["all.nlev", exact = TRUE]][cat.index],
+                      use.names = FALSE))
+  } else {
+    integer(0)
+  }
+  category.values <- if (length(cat.index)) {
+    lapply(dati[["all.dlev", exact = TRUE]][cat.index], as.double)
+  } else {
+    list()
+  }
+  unordered.code <- switch(
+    ukertype,
+    aitchisonaitken = UKER_AIT,
+    liracine = UKER_LR,
+    stop("invalid unordered conditional kernel", call. = FALSE)
+  )
+  ordered.code <- switch(
+    okertype,
+    wangvanryzin = OKER_WANG,
+    liracine = OKER_NLR,
+    racineliyan = OKER_RLY,
+    stop("invalid ordered conditional kernel", call. = FALSE)
+  )
+
+  list(
+    train.continuous = tm[, icon, drop = FALSE],
+    eval.continuous = em[, icon, drop = FALSE],
+    bandwidth = as.double(bw[icon]),
+    lower = as.double(lower[icon]),
+    upper = as.double(upper[icon]),
+    categorical = list(
+      train.unordered = tm[, iuno, drop = FALSE],
+      train.ordered = tm[, iord, drop = FALSE],
+      eval.unordered = em[, iuno, drop = FALSE],
+      eval.ordered = em[, iord, drop = FALSE],
+      kernel.unordered = rep.int(as.integer(unordered.code), sum(iuno)),
+      kernel.ordered = rep.int(as.integer(ordered.code), sum(iord)),
+      lambda = as.double(bw[cat.index]),
+      num.categories = num.categories,
+      category.values = category.values
+    )
+  )
+}
+
+.np_conditional_count_levels <- function(xdat,
+                                         ydat,
+                                         exdat,
+                                         eydat,
+                                         bws,
+                                         cdf,
+                                         counts,
+                                         nn.sample.expanded = FALSE) {
   xdat <- toFrame(xdat)
   ydat <- toFrame(ydat)
   exdat <- toFrame(exdat)
@@ -10041,48 +10126,90 @@
   )
 
   if (!.np_con_has_beta_kernel(bws))
-    stop("beta conditional bootstrap evaluator requires a beta kernel side",
+    stop("conditional count evaluator requires a beta kernel side",
          call. = FALSE)
-  if (!.np_con_continuous_lc_level_eligible(bws))
-    stop("beta conditional bootstrap evaluator requires continuous X and Y with local-constant fitting",
+  if (!identical(.np_con_xregtype(bws), "lc"))
+    stop("conditional count evaluator requires local-constant fitting",
          call. = FALSE)
   if (nrow(ydat) != nrow(xdat) || nrow(exdat) != nrow(eydat))
-    stop("beta conditional bootstrap evaluator requires aligned training and evaluation rows",
+    stop("conditional count evaluator requires aligned training and evaluation rows",
          call. = FALSE)
 
-  txcon <- as.matrix(xdat[, bws$ixcon, drop = FALSE])
-  tycon <- as.matrix(ydat[, bws$iycon, drop = FALSE])
-  excon <- as.matrix(exdat[, bws$ixcon, drop = FALSE])
-  eycon <- as.matrix(eydat[, bws$iycon, drop = FALSE])
-  storage.mode(txcon) <- "double"
-  storage.mode(tycon) <- "double"
-  storage.mode(excon) <- "double"
-  storage.mode(eycon) <- "double"
+  ## Nearest-neighbour radii belong to the realized bootstrap sample, not to
+  ## its compressed multiplicity representation. Expand each non-unit count
+  ## column before entering the same native row owner. Fixed bandwidths are
+  ## count-invariant and retain their one-pass matrix consumer below.
+  if (!identical(bws[["type", exact = TRUE]], "fixed") &&
+      !isTRUE(nn.sample.expanded)) {
+    counts <- as.matrix(counts)
+    if (!is.numeric(counts) || nrow(counts) != nrow(xdat) ||
+        ncol(counts) < 1L)
+      stop("counts must be an n x B numeric matrix", call. = FALSE)
+    if (any(!is.finite(counts)) || any(counts < 0) ||
+        any(counts != floor(counts)) ||
+        any(colSums(counts) != nrow(xdat)))
+      stop("counts must contain finite nonnegative integer multiplicities summing to n",
+           call. = FALSE)
+    if (any(counts != 1)) {
+      expanded <- vapply(seq_len(ncol(counts)), function(j) {
+        idx <- .np_counts_to_indices(counts[, j])
+        as.numeric(.np_conditional_count_levels(
+          xdat = xdat[idx, , drop = FALSE],
+          ydat = ydat[idx, , drop = FALSE],
+          exdat = exdat,
+          eydat = eydat,
+          bws = bws,
+          cdf = cdf,
+          counts = matrix(1, nrow = nrow(xdat), ncol = 1L),
+          nn.sample.expanded = TRUE
+        )[1L, ])
+      }, numeric(nrow(exdat)))
+      return(t(matrix(
+        expanded, nrow = nrow(exdat), ncol = ncol(counts)
+      )))
+    }
+  }
+
+  xstate <- .np_conditional_count_side_state(
+    tdat = xdat, edat = exdat, bws = bws, side = "x"
+  )
+  ystate <- .np_conditional_count_side_state(
+    tdat = ydat, edat = eydat, bws = bws, side = "y"
+  )
+  categorical.compress <- if (
+    (bws[["xnuno", exact = TRUE]] + bws[["xnord", exact = TRUE]] +
+       bws[["ynuno", exact = TRUE]] + bws[["ynord", exact = TRUE]]) > 0L
+  ) {
+    npStrictLogicalOption("np.categorical.compress", TRUE)
+  } else {
+    FALSE
+  }
 
   .Call(
-    "C_np_beta_conditional_bootstrap",
-    txcon, tycon, excon, eycon,
-    as.double(bws$xbw[bws$ixcon]),
-    as.double(bws$ybw[bws$iycon]),
-    as.double(bws$cxkerlb[bws$ixcon]),
-    as.double(bws$cxkerub[bws$ixcon]),
-    as.double(bws$cykerlb[bws$iycon]),
-    as.double(bws$cykerub[bws$iycon]),
-    as.integer(if (identical(bws$cxkertype, "beta"))
+    "C_np_conditional_count_levels",
+    xstate$train.continuous, ystate$train.continuous,
+    xstate$eval.continuous, ystate$eval.continuous,
+    xstate$bandwidth, ystate$bandwidth,
+    xstate$lower, xstate$upper,
+    ystate$lower, ystate$upper,
+    as.integer(if (identical(bws[["cxkertype", exact = TRUE]], "beta"))
       CKER_FAMILY_BETA else CKER_FAMILY_LEGACY),
     as.integer(npConditionalContinuousKernelCode(bws, side = "x")),
-    as.integer(bws$cxkerorder),
-    as.integer(if (identical(bws$cykertype, "beta"))
+    as.integer(bws[["cxkerorder", exact = TRUE]]),
+    as.integer(if (identical(bws[["cykertype", exact = TRUE]], "beta"))
       CKER_FAMILY_BETA else CKER_FAMILY_LEGACY),
     as.integer(npConditionalContinuousKernelCode(bws, side = "y")),
-    as.integer(bws$cykerorder),
-    as.integer(switch(bws$type,
+    as.integer(bws[["cykerorder", exact = TRUE]]),
+    as.integer(switch(bws[["type", exact = TRUE]],
       fixed = BW_FIXED,
       generalized_nn = BW_GEN_NN,
       adaptive_nn = BW_ADAP_NN,
-      stop("invalid beta conditional bootstrap bandwidth type", call. = FALSE)
+      stop("invalid conditional count bandwidth type", call. = FALSE)
     )),
     as.logical(cdf),
+    xstate$categorical,
+    ystate$categorical,
+    categorical.compress,
     counts,
     PACKAGE = "npRmpi"
   )
@@ -10266,22 +10393,22 @@
   list(t = tmat, t0 = t0)
 }
 
-.np_inid_boot_from_beta_conditional_counts <- function(xdat,
-                                                        ydat,
-                                                        exdat,
-                                                        eydat,
-                                                        bws,
-                                                        B,
-                                                        cdf,
-                                                        counts = NULL,
-                                                        counts.drawer = NULL,
-                                                        progress.label = NULL) {
+.np_inid_boot_from_conditional_counts <- function(xdat,
+                                                   ydat,
+                                                   exdat,
+                                                   eydat,
+                                                   bws,
+                                                   B,
+                                                   cdf,
+                                                   counts = NULL,
+                                                   counts.drawer = NULL,
+                                                   progress.label = NULL) {
   xdat <- toFrame(xdat)
   ydat <- toFrame(ydat)
   exdat <- toFrame(exdat)
   eydat <- toFrame(eydat)
   evaluator <- function(counts.mat) {
-    .np_beta_conditional_bootstrap_levels(
+    .np_conditional_count_levels(
       xdat = xdat, ydat = ydat, exdat = exdat, eydat = eydat,
       bws = bws, cdf = cdf, counts = counts.mat
     )
@@ -10548,8 +10675,9 @@
   general.lp <- !identical(regtype, "lc")
   joint.eligible <- .np_con_inid_ksum_eligible(bws)
   any.beta <- .np_con_has_beta_kernel(bws)
+  scalar.beta <- identical(regtype, "lc") && any.beta
   mixed.continuous <- .np_con_continuous_lc_level_eligible(bws)
-  if (!general.lp && !joint.eligible && !mixed.continuous)
+  if (!general.lp && !joint.eligible && !mixed.continuous && !scalar.beta)
     return(NULL)
 
   fit_one_local <- function(x.train, y.train) {
@@ -10577,14 +10705,15 @@
 
     if (any.beta) {
       fit.expr.local <- function() {
-        as.numeric(.np_beta_conditional_bootstrap_levels(
+        as.numeric(.np_conditional_count_levels(
           xdat = x.train,
           ydat = y.train,
           exdat = exdat,
           eydat = eydat,
           bws = bws,
           cdf = cdf,
-          counts = matrix(1, nrow = nrow(x.train), ncol = 1L)
+          counts = matrix(1, nrow = nrow(x.train), ncol = 1L),
+          nn.sample.expanded = TRUE
         )[1L, ])
       }
       if (identical(bws$type, "adaptive_nn")) {
@@ -11239,7 +11368,7 @@
   if (n < 1L || neval < 1L || B < 1L)
     stop("invalid conditional inid bootstrap dimensions")
   if (.np_con_has_beta_kernel(bws)) {
-    return(.np_inid_boot_from_beta_conditional_counts(
+    return(.np_inid_boot_from_conditional_counts(
       xdat = xdat,
       ydat = ydat,
       exdat = exdat,

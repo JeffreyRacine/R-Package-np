@@ -203,7 +203,7 @@ test_that("beta density and distribution fits have one canonical ingress", {
 
   ingress_start <- regexpr("SEXP C_np_density(", ingress, fixed = TRUE)[[1L]]
   ingress_end <- regexpr(
-    "SEXP C_np_beta_conditional_bootstrap(", ingress, fixed = TRUE
+    "SEXP C_np_conditional_count_levels(", ingress, fixed = TRUE
   )[[1L]]
   expect_gt(ingress_start, 0L)
   expect_gt(ingress_end, ingress_start)
