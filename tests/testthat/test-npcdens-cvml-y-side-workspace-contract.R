@@ -82,8 +82,10 @@ test_that("categorical kernel rows reject missing category metadata", {
   source <- npcdens_y_side_source("jksum.c")
   skip_if(is.null(source), "source file src/jksum.c unavailable")
 
-  start <- regexpr("static int kernel_weighted_sum_np_ctx_ex(", source,
-                   fixed = TRUE)
+  start <- regexpr(
+    "static int NP_OUTER_PACK_ADJACENT_HOT_ALIGN kernel_weighted_sum_np_ctx_ex(",
+    source, fixed = TRUE
+  )
   stop <- regexpr("int kernel_weighted_sum_np_ctx(", source,
                   fixed = TRUE)
   expect_gt(start, 0L)
@@ -130,7 +132,11 @@ test_that("scalar native CVML callbacks do not manufacture a degree buffer", {
     fixed = TRUE
   ))
   expect_true(grepl(
-    "if (degree_refresh_needed)\n    degree_refresh_ok = np_mpi_comm1_all_ok(degree_refresh_ok);",
+    paste0(
+      "if (np_conditional_density_nomad_shadow.degree_search ||\n",
+      "      degree_refresh_needed)\n",
+      "    degree_refresh_ok = np_mpi_comm1_all_ok(degree_refresh_ok);"
+    ),
     evaluator,
     fixed = TRUE
   ))
