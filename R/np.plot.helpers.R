@@ -5524,6 +5524,29 @@
   )
 }
 
+.np_conditional_localpoly_exact_refit <- function(xdat,
+                                                   ydat,
+                                                   exdat,
+                                                   eydat,
+                                                   bws,
+                                                   cdf) {
+  fit.args <- list(
+    bws = bws,
+    txdat = xdat,
+    tydat = ydat,
+    exdat = exdat,
+    eydat = eydat,
+    gradients = FALSE,
+    proper = FALSE
+  )
+  fit <- if (cdf) {
+    do.call(npcdist, fit.args)
+  } else {
+    do.call(npcdens, fit.args)
+  }
+  as.numeric(if (cdf) fit$condist else fit$condens)
+}
+
 .np_ksum_conditional_operator_fixed <- function(xdat,
                                                 ydat,
                                                 exdat,
@@ -6212,13 +6235,37 @@
     stop("conditional exact bootstrap helper requires aligned x/y training and evaluation rows")
   if (n < 1L || nrow(exdat) < 1L || B < 1L)
     stop("invalid conditional exact bootstrap dimensions")
+  regtype <- .np_con_xregtype(bws)
+  general.lp <- !identical(regtype, "lc")
   joint.eligible <- .np_con_inid_ksum_eligible(bws)
   any.beta <- .np_con_has_beta_kernel(bws)
   mixed.continuous <- .np_con_continuous_lc_level_eligible(bws)
-  if (!joint.eligible && !mixed.continuous)
+  if (!general.lp && !joint.eligible && !mixed.continuous)
     return(NULL)
 
   fit_one <- function(x.train, y.train) {
+    if (general.lp) {
+      fit.expr <- function() {
+        .np_conditional_localpoly_exact_refit(
+          xdat = x.train,
+          ydat = y.train,
+          exdat = exdat,
+          eydat = eydat,
+          bws = bws,
+          cdf = cdf
+        )
+      }
+      if (identical(bws$type, "adaptive_nn")) {
+        return(.np_conditional_exact_fit_or_stop(
+          fit.expr = fit.expr,
+          bws = bws,
+          x.train = x.train,
+          y.train = y.train
+        ))
+      }
+      return(fit.expr())
+    }
+
     if (any.beta) {
       fit.expr <- function() {
         as.numeric(.np_beta_conditional_bootstrap_levels(
