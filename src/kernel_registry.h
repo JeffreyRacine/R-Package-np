@@ -18,6 +18,13 @@ typedef enum {
   NP_CKERNEL_DESCRIPTOR_ERR_ORDER = 3
 } np_continuous_kernel_descriptor_status;
 
+typedef enum {
+  NP_CONTINUOUS_KERNEL_SCALAR_OK = 0,
+  NP_CONTINUOUS_KERNEL_SCALAR_ERR_LAYOUT = 1,
+  NP_CONTINUOUS_KERNEL_SCALAR_ERR_KERNEL = 2,
+  NP_CONTINUOUS_KERNEL_SCALAR_ERR_NUMERIC = 3
+} NPContinuousKernelScalarStatus;
+
 typedef struct {
   np_continuous_kernel_family family;
   int legacy_code;
@@ -56,6 +63,19 @@ np_continuous_kernel_descriptor_init(int family,
                                      int code,
                                      int order,
                                      np_continuous_kernel_descriptor *descriptor);
+
+NPContinuousKernelScalarStatus
+np_continuous_kernel_scalar_log(np_continuous_kernel_family family,
+                                int kernel_code,
+                                int order,
+                                int do_cdf,
+                                double evaluation,
+                                double observation,
+                                double bandwidth,
+                                double lower,
+                                double upper,
+                                double *log_absolute,
+                                int *sign);
 
 const char *np_continuous_kernel_descriptor_status_message(
   np_continuous_kernel_descriptor_status status);

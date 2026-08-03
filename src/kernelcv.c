@@ -12,7 +12,6 @@
 #include <time.h>
 
 #include "headers.h"
-#include "beta_objectives.h"
 #include "continuous_kernel_row.h"
 #include "jksum_gaussian_density.h"
 #include "kernel_registry.h"

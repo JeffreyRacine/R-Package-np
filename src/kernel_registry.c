@@ -1,13 +1,148 @@
+#include <float.h>
 #include <math.h>
 #include <stddef.h>
 
+#include <R_ext/Arith.h>
+
+#include "beta_kernel.h"
 #include "kernel_registry.h"
+
+/* Legacy scalar implementations are owned by kernel.c. */
+extern double kernel(int kernel_code, double value);
+extern double cdf_kernel(int kernel_code, double value);
 
 /* Compile-time uniqueness and ABI sentinels without requiring C11. */
 typedef char np_ckernel_family_codes_must_differ[
   (NP_CKERNEL_FAMILY_LEGACY != NP_CKERNEL_FAMILY_BETA) ? 1 : -1];
 typedef char np_ckernel_coordinate_code_must_be_nonlegacy[
   (NP_CKERNEL_COORDINATE_CODE < NP_CKERNEL_LEGACY_CODE_MIN) ? 1 : -1];
+
+static int np_continuous_kernel_finite_bound(double value)
+{
+  return R_FINITE(value) && fabs(value) < 0.5 * DBL_MAX;
+}
+
+static double np_continuous_kernel_legacy_pdf(int kernel_code,
+                                              double evaluation,
+                                              double observation,
+                                              double bandwidth,
+                                              double lower,
+                                              double upper)
+{
+  const int finite_lower = np_continuous_kernel_finite_bound(lower);
+  const int finite_upper = np_continuous_kernel_finite_bound(upper);
+  const double base = kernel(kernel_code,
+                             (evaluation - observation) / bandwidth);
+  double denominator = 1.0;
+
+  if(!R_FINITE(evaluation) || !R_FINITE(observation) ||
+     !R_FINITE(bandwidth) || bandwidth <= 0.0 || !R_FINITE(base))
+    return NAN;
+  if(finite_lower || finite_upper) {
+    const double lower_mass = finite_lower ?
+      cdf_kernel(kernel_code, (lower - evaluation) / bandwidth) : 0.0;
+    const double upper_mass = finite_upper ?
+      cdf_kernel(kernel_code, (upper - evaluation) / bandwidth) : 1.0;
+    denominator = upper_mass - lower_mass;
+  }
+  if(!R_FINITE(denominator) || denominator <= 0.0)
+    return NAN;
+  return base / (bandwidth * denominator);
+}
+
+static double np_continuous_kernel_legacy_cdf(int kernel_code,
+                                              double evaluation,
+                                              double observation,
+                                              double bandwidth,
+                                              double lower,
+                                              double upper)
+{
+  const int finite_lower = np_continuous_kernel_finite_bound(lower);
+  const int finite_upper = np_continuous_kernel_finite_bound(upper);
+  double lower_mass;
+  double upper_mass;
+  double evaluation_mass;
+  double denominator;
+
+  if(!R_FINITE(evaluation) || !R_FINITE(observation) ||
+     !R_FINITE(bandwidth) || bandwidth <= 0.0)
+    return NAN;
+  if(finite_lower && evaluation <= lower)
+    return 0.0;
+  if(finite_upper && evaluation >= upper)
+    return 1.0;
+
+  lower_mass = finite_lower ?
+    cdf_kernel(kernel_code, (lower - observation) / bandwidth) : 0.0;
+  upper_mass = finite_upper ?
+    cdf_kernel(kernel_code, (upper - observation) / bandwidth) : 1.0;
+  evaluation_mass = cdf_kernel(
+    kernel_code, (evaluation - observation) / bandwidth);
+  denominator = upper_mass - lower_mass;
+  if(!R_FINITE(lower_mass) || !R_FINITE(upper_mass) ||
+     !R_FINITE(evaluation_mass) || !R_FINITE(denominator) ||
+     denominator <= 0.0)
+    return NAN;
+  return (evaluation_mass - lower_mass) / denominator;
+}
+
+NPContinuousKernelScalarStatus
+np_continuous_kernel_scalar_log(np_continuous_kernel_family family,
+                                int kernel_code,
+                                int order,
+                                int do_cdf,
+                                double evaluation,
+                                double observation,
+                                double bandwidth,
+                                double lower,
+                                double upper,
+                                double *log_absolute,
+                                int *sign)
+{
+  double value;
+
+  if(log_absolute == NULL || sign == NULL)
+    return NP_CONTINUOUS_KERNEL_SCALAR_ERR_LAYOUT;
+  *log_absolute = -INFINITY;
+  *sign = 0;
+
+  if(family == NP_CKERNEL_FAMILY_BETA) {
+    np_beta_status scalar_status = NP_BETA_OK;
+
+    if(do_cdf) {
+      value = np_beta_cdf_order(evaluation, observation, bandwidth,
+                                lower, upper, order, &scalar_status);
+      if(scalar_status == NP_BETA_OK && value != 0.0) {
+        *log_absolute = log(fabs(value));
+        *sign = (value > 0.0) ? 1 : -1;
+      }
+    } else {
+      *log_absolute = np_beta_log_abs_pdf_order(
+        evaluation, observation, bandwidth, lower, upper,
+        order, sign, &scalar_status);
+    }
+    if(scalar_status != NP_BETA_OK)
+      return NP_CONTINUOUS_KERNEL_SCALAR_ERR_KERNEL;
+  } else if(family == NP_CKERNEL_FAMILY_LEGACY) {
+    value = do_cdf ?
+      np_continuous_kernel_legacy_cdf(kernel_code, evaluation, observation,
+                                      bandwidth, lower, upper) :
+      np_continuous_kernel_legacy_pdf(kernel_code, evaluation, observation,
+                                      bandwidth, lower, upper);
+    if(!R_FINITE(value))
+      return NP_CONTINUOUS_KERNEL_SCALAR_ERR_KERNEL;
+    if(value != 0.0) {
+      *log_absolute = log(fabs(value));
+      *sign = (value > 0.0) ? 1 : -1;
+    }
+  } else {
+    return NP_CONTINUOUS_KERNEL_SCALAR_ERR_LAYOUT;
+  }
+
+  if(ISNAN(*log_absolute) || *log_absolute == INFINITY)
+    return NP_CONTINUOUS_KERNEL_SCALAR_ERR_NUMERIC;
+  return NP_CONTINUOUS_KERNEL_SCALAR_OK;
+}
 
 np_continuous_kernel_descriptor_status
 np_continuous_kernel_descriptor_init(int family,
