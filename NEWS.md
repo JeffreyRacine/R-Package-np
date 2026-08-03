@@ -1,5 +1,12 @@
 # npRmpi 0.70-6
 
+* Corrected active-MPI derivative kernel-weight output so every rank
+  initializes non-owned cells before the canonical reduction. Output
+  ownership is now invocation scoped and each derivative block retains its
+  own tree-support intervals, also correcting compact-support adaptive-
+  nearest-neighbour tree output and yielding exact local, one-worker, and
+  multi-worker `p.kw` results without additional observation-square storage.
+
 * Corrected positive-degree raw local-polynomial bandwidth selection for
   conditional density and distribution estimators when predictor units make
   the raw polynomial coordinates numerically ill conditioned (for example,
