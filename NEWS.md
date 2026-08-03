@@ -1,5 +1,12 @@
 # npRmpi 0.70-6
 
+* Conditional count-bootstrap levels with a beta predictor or response kernel
+  now reuse the canonical scaled conditional rows and contract all count
+  columns through BLAS. The evaluator streams one observation-length row per
+  side and retains no observation-by-evaluation matrix. This preserves the
+  established weighted conditional ratio up to floating-point accumulation
+  order while substantially reducing repeated count-evaluation time.
+
 * Conditional-distribution least-squares bandwidth selection with a beta
   predictor or response kernel now uses the shared conditional
   local-polynomial CVLS engine across scalar and positive degrees, raw and
