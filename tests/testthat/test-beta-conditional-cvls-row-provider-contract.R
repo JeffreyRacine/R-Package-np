@@ -28,7 +28,6 @@ test_that("bounded conditional CVLS has one typed row-provider seam", {
       "np_conditional_density_cvls_bounded_i1_quadrature_row_stream(",
       "vector_scale_factor,\n",
       "                                                                        cv,\n",
-      "                                                                        NP_BOUNDED_CVLS_I1_MODE_BOOK,\n",
       "                                                                        NULL);"
     ),
     fixed = TRUE
@@ -39,11 +38,12 @@ test_that("bounded conditional CVLS has one typed row-provider seam", {
       "np_conditional_density_cvls_bounded_i1_quadrature_general_row_stream(",
       "vector_scale_factor,\n",
       "                                                                                cv,\n",
-      "                                                                                NP_BOUNDED_CVLS_I1_MODE_BOOK,\n",
       "                                                                                NULL);"
     ),
     fixed = TRUE
   )
+  expect_false(grepl("NP_BOUNDED_CVLS_I1_MODE_", engine, fixed = TRUE))
+  expect_false(grepl("i1_mode", engine, fixed = TRUE))
 })
 
 test_that("live bounded CVLS retains literal legacy arithmetic under null", {

@@ -130,7 +130,8 @@ test_that("MPI scalar fixed objectives use the batch sibling without LAPACK", {
     file.path(getwd(), "src", "jksum.c"),
     file.path(getwd(), "..", "src", "jksum.c")
   )
-  hits <- unique(candidates[nzchar(candidates) & file.exists(candidates)])
+  candidates <- unique(candidates[nzchar(candidates)])
+  hits <- candidates[file.exists(candidates)]
   skip_if(!length(hits), "source file src/jksum.c unavailable")
   source <- paste(readLines(hits[[1L]], warn = FALSE), collapse = "\n")
 
@@ -161,7 +162,6 @@ test_that("MPI scalar fixed objectives use the batch sibling without LAPACK", {
     fixed = TRUE
   ))
   expect_true(grepl("eval_basis[0] = 1.0", fixed_owner, fixed = TRUE))
-
   general_start <- regexpr(
     "if(lp_engine == NP_LP_ENGINE_GENERAL){",
     objective,
@@ -175,13 +175,14 @@ test_that("MPI scalar fixed objectives use the batch sibling without LAPACK", {
   expect_gt(general_start, 0L)
   expect_gt(scalar_start, general_start)
   scalar_owner <- substr(objective, scalar_start, nchar(objective))
+
   expect_true(grepl(
     "kernel_weighted_sum_np_ctx(kernel_c,",
     scalar_owner,
     fixed = TRUE
   ))
   expect_true(grepl(
-    "double * lc_Y[2];",
+    "double *lc_Y[2]",
     scalar_owner,
     fixed = TRUE
   ))
@@ -212,46 +213,35 @@ test_that("conditional width-one blocks share one raw row without LAPACK", {
     file.path(getwd(), "src", "jksum.c"),
     file.path(getwd(), "..", "src", "jksum.c")
   )
-  hits <- unique(candidates[nzchar(candidates) & file.exists(candidates)])
+  candidates <- unique(candidates[nzchar(candidates)])
+  hits <- candidates[file.exists(candidates)]
   skip_if(!length(hits), "source file src/jksum.c unavailable")
   source <- paste(readLines(hits[[1L]], warn = FALSE), collapse = "\n")
 
-  scalar_start <- regexpr(
-    "static int np_conditional_x_weight_block_pair_scalar_stream_core(",
-    source,
-    fixed = TRUE
+  lines <- strsplit(source, "\n", fixed = TRUE)[[1L]]
+  start <- grep(
+    "^static int np_conditional_x_weight_block_stream_core_impl\\(",
+    lines
   )
-  general_start <- regexpr(
-    paste0(
-      "static int[^\\n]*",
-      "np_conditional_x_weight_block_pair_stream_core\\("
-    ),
-    source,
-    perl = TRUE
-  )
-  expect_gt(scalar_start, 0L)
-  expect_gt(general_start, scalar_start)
-  scalar <- substr(source, scalar_start, general_start - 1L)
+  stop <- grep("^static int np_conditional_x_weight_block_stream_core\\(", lines)
+  expect_length(start, 1L)
+  expect_length(stop, 1L)
+  expect_lt(start, stop)
+  body <- paste(lines[start:(stop - 1L)], collapse = "\n")
 
   expect_true(grepl(
-    "np_conditional_x_weight_block_stream_core_impl(",
-    scalar,
+    "if(drop_eval_self && (ll_mode == NP_LP_ENGINE_SCALAR))",
+    body,
     fixed = TRUE
   ))
-  expect_true(grepl("suppress_nn_parallel", scalar, fixed = TRUE))
-  expect_true(grepl("loo_rows_out,", scalar, fixed = TRUE))
-  expect_true(grepl("full_rows_out);", scalar, fixed = TRUE))
-  expect_false(grepl("np_lp_full_row_workspace", scalar, fixed = TRUE))
-  expect_false(grepl("np_glp_qr_drop_workspace", scalar, fixed = TRUE))
-  expect_false(grepl("F77_", scalar, fixed = TRUE))
-
-  expect_true(grepl("double loo_sum = 0.0", source, fixed = TRUE))
-  expect_true(grepl("double full_sum = 0.0", source, fixed = TRUE))
-  expect_true(grepl(
-    "paired_full_rows_out[i][orig_j] = kw[j]/full_sum",
-    source,
-    fixed = TRUE
-  ))
+  expect_true(grepl("kw[eval_pos] = 0.0;", body, fixed = TRUE))
+  expect_true(grepl("if(ll_mode == NP_LP_ENGINE_SCALAR){", body,
+                    fixed = TRUE))
+  expect_true(grepl("rows_out[i][orig_j] = kw[j]/row_sum;", body,
+                    fixed = TRUE))
+  expect_false(grepl("np_conditional_x_weight_block_pair", source,
+                     fixed = TRUE))
+  expect_false(grepl("np_glp_qr_drop_workspace", body, fixed = TRUE))
 })
 
 test_that("conditional scalar CVLS and CVML use their MPI-optimal siblings", {
@@ -263,7 +253,8 @@ test_that("conditional scalar CVLS and CVML use their MPI-optimal siblings", {
     file.path(getwd(), "src", "jksum.c"),
     file.path(getwd(), "..", "src", "jksum.c")
   )
-  hits <- unique(candidates[nzchar(candidates) & file.exists(candidates)])
+  candidates <- unique(candidates[nzchar(candidates)])
+  hits <- candidates[file.exists(candidates)]
   skip_if(!length(hits), "source file src/jksum.c unavailable")
   source <- paste(readLines(hits[[1L]], warn = FALSE), collapse = "\n")
 
@@ -280,6 +271,7 @@ test_that("conditional scalar CVLS and CVML use their MPI-optimal siblings", {
   expect_gt(support_start, 0L)
   expect_gt(cvml_start, support_start)
   support <- substr(source, support_start, cvml_start - 1L)
+
   expect_true(grepl(
     "np_lp_engine_extern == NP_LP_ENGINE_SCALAR",
     support,
@@ -297,7 +289,11 @@ test_that("conditional scalar CVLS and CVML use their MPI-optimal siblings", {
     fixed = TRUE
   )
   expect_gt(cvml_support_start, 0L)
-  cvml_support <- substr(support, cvml_support_start, nchar(support))
+  cvml_support <- substr(
+    support,
+    cvml_support_start,
+    nchar(support)
+  )
   expect_true(grepl(
     "return np_lp_engine_extern == NP_LP_ENGINE_GENERAL;",
     cvml_support,
@@ -314,7 +310,7 @@ test_that("conditional scalar CVLS and CVML use their MPI-optimal siblings", {
     fixed = TRUE
   ))
   expect_true(grepl(
-    "np_conditional_x_weight_block_pair_selected_stream_core(",
+    "np_conditional_x_weight_block_stream_core(",
     source,
     fixed = TRUE
   ))

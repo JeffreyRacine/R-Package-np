@@ -1,5 +1,17 @@
 # npRmpi 0.70-6
 
+* Corrected conditional-density least-squares cross-validation so its
+  integrated-square and fitted-value terms use the same signed delete-one X
+  smoother in every analytic and categorical-profile route. Adaptive-nearest-
+  neighbour conditional rows now apply their observation-specific X
+  bandwidth divisors and pair response convolutions with the corresponding
+  row bandwidth. A scalar response-row shortcut is now restricted to ordinary
+  density evaluation rather than being reused for convolution. These changes
+  intentionally correct affected CVLS objectives and adaptive-nearest-
+  neighbour CVML and conditional-distribution objectives; bounded-quadrature
+  routes and adjacent fixed/generalized-nearest-neighbour objectives are
+  unchanged.
+
 * Beta density bandwidth selection now supports mixed continuous, unordered,
   and ordered data for CVML and bounded target-quadrature CVLS, across fixed,
   generalized-nearest-neighbour, and adaptive-nearest-neighbour bandwidths and

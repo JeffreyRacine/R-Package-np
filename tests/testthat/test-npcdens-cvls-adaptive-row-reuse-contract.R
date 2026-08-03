@@ -30,16 +30,14 @@ adaptive_source_body <- function(lines, start_pattern, stop_pattern) {
   paste(lines[start:(stop - 1L)], collapse = "\n")
 }
 
-test_that("adaptive CVLS derives deleted rows only from completed full rows", {
+test_that("adaptive CVLS consumes only canonical delete-one context rows", {
   files <- locate_adaptive_row_reuse_sources()
   skip_if(is.null(files), "package source files unavailable")
   jksum <- readLines(files[[1L]], warn = FALSE)
   source <- paste(jksum, collapse = "\n")
 
-  expect_equal(lengths(regmatches(
-    source,
-    gregexpr("np_lp_delete_smoother_row\\(", source, perl = TRUE)
-  )), 4L)
+  expect_false(grepl("np_lp_delete_smoother_row", source, fixed = TRUE))
+  expect_false(grepl("np_conditional_xrow_full_from_ctx", source, fixed = TRUE))
 
   row_body <- adaptive_source_body(
     jksum,
@@ -53,58 +51,36 @@ test_that("adaptive CVLS derives deleted rows only from completed full rows", {
   )
 
   for (body in list(row_body, block_body)) {
-    expect_match(
-      body,
-      "np_lp_engine_extern == NP_LP_ENGINE_GENERAL",
-      fixed = TRUE
-    )
-    full_pos <- regexpr(
-      "np_conditional_xrow_full_from_ctx",
-      body,
-      fixed = TRUE
-    )[[1L]]
-    delete_pos <- regexpr(
-      "np_lp_delete_smoother_row",
-      body,
-      fixed = TRUE
-    )[[1L]]
-    expect_true(full_pos > 0L && delete_pos > full_pos)
+    expect_match(body, "np_conditional_xrow_from_ctx", fixed = TRUE)
+    expect_false(grepl("np_conditional_xrow_from_ctx_impl", body, fixed = TRUE))
+    expect_false(grepl("np_lp_delete_smoother_row", body, fixed = TRUE))
   }
 })
 
-test_that("shared deletion utility is hidden, signed, bounded, and allocation-free", {
+test_that("adaptive row context owns signed delete-one conversion", {
   files <- locate_adaptive_row_reuse_sources()
   skip_if(is.null(files), "package source files unavailable")
-  implementation_lines <- readLines(files[[2L]], warn = FALSE)
-  implementation_start <- grep(
-    "^int np_lp_delete_smoother_row\\(",
-    implementation_lines
+  lines <- readLines(files[[1L]], warn = FALSE)
+  implementation <- adaptive_source_body(
+    lines,
+    "^static int (NP_NOINLINE )?(NP_HOT_ALIGN )?np_conditional_xrow_from_ctx_impl\\(",
+    "^static int np_conditional_xrow_from_ctx\\("
   )
-  expect_length(implementation_start, 1L)
-  implementation <- paste(
-    implementation_lines[implementation_start:length(implementation_lines)],
-    collapse = "\n"
-  )
+  row_source <- paste(readLines(files[[2L]], warn = FALSE), collapse = "\n")
   header <- paste(readLines(files[[3L]], warn = FALSE), collapse = "\n")
 
+  expect_match(implementation, "if(drop_eval_self){", fixed = TRUE)
   expect_match(
-    header,
-    "attribute_hidden int np_lp_delete_smoother_row",
+    implementation,
+    "if(!np_lp_delete_denominator(row_out[eval_idx], &den))",
     fixed = TRUE
   )
   expect_match(
     implementation,
-    "if(!np_lp_delete_denominator(full_row[eval_idx], &den))",
+    "(j == eval_pos) ? 0.0 : row_out[orig_j]/den",
     fixed = TRUE
   )
   expect_false(grepl("NZD", implementation, fixed = TRUE))
-  expect_match(
-    implementation,
-    "(j == eval_idx) ? 0.0 : full_row[j]/den",
-    fixed = TRUE
-  )
-  expect_match(implementation, "n <= 0", fixed = TRUE)
-  expect_match(implementation, "eval_idx >= n", fixed = TRUE)
-  expect_false(grepl("malloc", implementation, fixed = TRUE))
-  expect_false(grepl("calloc", implementation, fixed = TRUE))
+  expect_false(grepl("np_lp_delete_smoother_row", row_source, fixed = TRUE))
+  expect_false(grepl("np_lp_delete_smoother_row", header, fixed = TRUE))
 })

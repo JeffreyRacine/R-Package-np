@@ -32,7 +32,12 @@ test_that("MPI adaptive conditional reciprocals remain an isolated sidecar", {
   expect_match(source, "(num_train <= 0) || (ndim < 2)", fixed = TRUE)
   expect_match(
     source,
-    "reciprocal_count = (size_t)ndim*(size_t)num_train;",
+    "reciprocal_count = ((size_t)ndim + 1)*(size_t)num_train;",
+    fixed = TRUE
+  )
+  expect_match(
+    source,
+    "cache->product_reciprocal =",
     fixed = TRUE
   )
   expect_match(
@@ -88,6 +93,11 @@ test_that("MPI adaptive conditional reciprocals remain an isolated sidecar", {
   expect_match(
     row,
     "ctx->reciprocal_cache->storage",
+    fixed = TRUE
+  )
+  expect_match(
+    row,
+    "ctx->reciprocal_cache->product_reciprocal",
     fixed = TRUE
   )
 })

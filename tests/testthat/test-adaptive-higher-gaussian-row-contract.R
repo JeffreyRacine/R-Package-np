@@ -100,9 +100,17 @@ test_that("adaptive higher-order Gaussian row fusion is narrow and bounded", {
   )
   expect_match(
     conditional,
-    "np_conditional_kernel_row_raw(ctx->kernel_cx,",
+    "row_status = np_conditional_kernel_row(",
     fixed = TRUE
   )
+  expect_match(
+    conditional,
+    "row_status = np_conditional_kernel_row_raw(",
+    fixed = TRUE
+  )
+  expect_false(grepl(
+    "np_conditional_kernel_row_core(", conditional, fixed = TRUE
+  ))
 })
 
 test_that("adaptive higher-order conditional objectives retain scalar oracle", {

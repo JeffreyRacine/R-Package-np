@@ -439,10 +439,8 @@ test_that("conditional LP LOO rows use signed full-row deletion and no QR", {
     sum(grepl("fabs\\(row_sum\\) > DBL_MIN", lines)),
     3L
   )
-  expect_equal(sum(grepl(
-    "fabs\\(loo_sum\\) > DBL_MIN.*fabs\\(full_sum\\) > DBL_MIN",
-    lines
-  )), 1L)
+  expect_false(grepl("np_conditional_x_weight_block_pair", source,
+                     fixed = TRUE))
   expect_true(grepl(
     "denominator += kw[i]*zi*zi;",
     solve_source,
@@ -455,17 +453,17 @@ test_that("conditional LP LOO rows use signed full-row deletion and no QR", {
   ))
 })
 
-test_that("fixed conditional LP paired rows reuse the canonical full-row workspace", {
+test_that("conditional LP block rows reuse one canonical full-row workspace", {
   src_file <- locate_jksum_c()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
 
   lines <- readLines(src_file, warn = FALSE)
   helper_start <- grep(
-    "^static int (NP_NOINLINE )?np_conditional_x_weight_block_pair_stream_core\\(",
+    "^static int np_conditional_x_weight_block_stream_core_impl\\(",
     lines
   )
   helper_stop <- grep(
-    "^static int np_conditional_y_block_stream_op_core\\(",
+    "^static int np_conditional_x_weight_block_stream_core\\(",
     lines
   )
   expect_length(helper_start, 1L)
@@ -494,7 +492,7 @@ test_that("fixed conditional LP paired rows reuse the canonical full-row workspa
     fixed = TRUE
   ))
   expect_true(grepl(
-    "full_row_workspace.rhs[l];",
+    "np_lp_delete_denominator(rows_out[i][eval_idx], &den)",
     helper_body,
     fixed = TRUE
   ))

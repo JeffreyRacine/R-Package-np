@@ -34,11 +34,29 @@ beta_cvml_weights <- function(data, bandwidth, type, kernel, order,
   t(do.call(npksum, arguments)$ksum)
 }
 
+beta_cvml_adaptive_radius <- function(train, k) {
+  vapply(seq_along(train), function(index) {
+    distance <- abs(train - train[[index]])
+    duplicate <- sum(distance == 0) - 1L
+    positive <- sort(distance[distance > 0])
+    if (duplicate >= k) positive[[1L]] else
+      positive[[max(1L, k - duplicate)]]
+  }, numeric(1L))
+}
+
 beta_cvml_ratio_oracle <- function(x, y, bandwidth, type,
                                     xkernel, ykernel, order) {
   xweights <- beta_cvml_weights(
     x, bandwidth[[2L]], type, xkernel, order, density = FALSE
   )
+  if (identical(type, "adaptive_nn") &&
+      !identical(xkernel, "beta")) {
+    xbandwidth <- beta_cvml_adaptive_radius(
+      x[[1L]], bandwidth[[2L]]
+    )
+    xweights <- xweights /
+      matrix(xbandwidth, nrow = nrow(x), ncol = nrow(x))
+  }
   yweights <- beta_cvml_weights(
     y, bandwidth[[1L]], type, ykernel, order, density = TRUE
   )
@@ -83,11 +101,28 @@ beta_cvml_native_objective <- function(x, y, bandwidth, type,
     arguments$cykerub <- 1
   }
   bandwidth_object <- do.call(npcdensbw, arguments)
-  evaluator <- getFromNamespace(".npcdensbw_eval_only", "np")
+  evaluator <- getFromNamespace(".npcdensbw_eval_only", "npRmpi")
   as.numeric(evaluator(x, y, bandwidth_object)$objective[[1L]])
 }
 
+.beta_cvml_test_env <- new.env(parent = emptyenv())
+
+.ensure_beta_cvml_pool <- function() {
+  if (!isTRUE(.beta_cvml_test_env$started)) {
+    npRmpi.init(nslaves = 1L, quiet = TRUE)
+    .beta_cvml_test_env$started <- TRUE
+    withr::defer({
+      if (isTRUE(.beta_cvml_test_env$started)) {
+        try(npRmpi.quit(force = TRUE), silent = TRUE)
+        .beta_cvml_test_env$started <- FALSE
+      }
+    }, envir = testthat::teardown_env())
+  }
+}
+
 test_that("conditional beta CVML equals the public signed weight-ratio oracle", {
+  skip_on_cran()
+  .ensure_beta_cvml_pool()
   set.seed(20260801L)
   n <- 31L
   xbeta <- data.frame(x = sort(runif(n, 0.03, 0.97)))

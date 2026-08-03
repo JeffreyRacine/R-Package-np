@@ -157,3 +157,70 @@ test_that("npcdens categorical profile CVLS remains numerically equivalent", {
 
   expect_equal(compressed, canonical, tolerance = 1e-12)
 })
+
+test_that("categorical profile CVLS matches an explicit delete-one oracle", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(), add = TRUE)
+  set.seed(2026080103L)
+  n <- 96L
+  x <- data.frame(
+    xu = factor(sample(letters[1:4], n, TRUE), levels = letters[1:4])
+  )
+  y <- data.frame(
+    yu = factor(sample(LETTERS[1:3], n, TRUE), levels = LETTERS[1:3])
+  )
+  state <- npcdensbw(
+    xdat = x,
+    ydat = y,
+    bwmethod = "cv.ls",
+    bwtype = "fixed",
+    regtype = "lc",
+    uxkertype = "liracine",
+    uykertype = "liracine",
+    bws = c(0.19, 0.27),
+    bandwidth.compute = FALSE
+  )
+  lambda_x <- state$xbw[[1L]]
+  lambda_y <- state$ybw[[1L]]
+  categories_y <- nlevels(y$yu)
+  y_normalizer <- 1 + (categories_y - 1) * lambda_y
+  x_kernel <- outer(
+    as.integer(x$xu), as.integer(x$xu),
+    function(training, evaluation) {
+      ifelse(training == evaluation, 1, lambda_x)
+    }
+  )
+  y_normal <- outer(
+    as.integer(y$yu), as.integer(y$yu),
+    function(training, evaluation) {
+      ifelse(training == evaluation, 1, lambda_y) / y_normalizer
+    }
+  )
+  y_convolution <- outer(
+    as.integer(y$yu), as.integer(y$yu),
+    function(first, second) {
+      ifelse(
+        first == second,
+        1 + (categories_y - 1) * lambda_y^2,
+        2 * lambda_y + (categories_y - 2) * lambda_y^2
+      ) / y_normalizer^2
+    }
+  )
+  contribution <- vapply(seq_len(n), function(evaluation) {
+    weight <- x_kernel[, evaluation]
+    weight[[evaluation]] <- 0
+    weight <- weight / sum(weight)
+    sum((weight %o% weight) * y_convolution) -
+      2 * sum(weight * y_normal[, evaluation])
+  }, numeric(1L))
+  oracle <- -mean(contribution)
+  old <- options(np.categorical.compress = TRUE, np.tree = FALSE)
+  on.exit(options(old), add = TRUE)
+
+  compressed <- npRmpi:::.npcdensbw_eval_only(x, y, state)$objective
+  options(np.categorical.compress = FALSE)
+  dense <- npRmpi:::.npcdensbw_eval_only(x, y, state)$objective
+
+  expect_equal(compressed, oracle, tolerance = 5e-13)
+  expect_equal(dense, oracle, tolerance = 5e-13)
+})

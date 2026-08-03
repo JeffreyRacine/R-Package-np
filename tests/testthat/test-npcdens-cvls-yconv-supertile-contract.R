@@ -56,13 +56,17 @@ test_that("MPI CVLS Y convolution supertile is memory bounded and isolated", {
   expect_equal(lengths(regmatches(
     body,
     gregexpr("np_cvls_workspace_matrix_try\\(", body, perl = TRUE)
-  )), 6L)
-  expect_match(body, "&loo_work", fixed = TRUE)
-  expect_match(body, "&full_blocks[0]", fixed = TRUE)
-  expect_match(body, "&full_blocks[1]", fixed = TRUE)
-  expect_match(body, "&full_blocks[2]", fixed = TRUE)
-  expect_match(body, "&full_blocks[3]", fixed = TRUE)
+  )), 5L)
+  expect_match(body, "&xblocks[0]", fixed = TRUE)
+  expect_match(body, "&xblocks[1]", fixed = TRUE)
+  expect_match(body, "&xblocks[2]", fixed = TRUE)
+  expect_match(body, "&xblocks[3]", fixed = TRUE)
   expect_match(body, "&shared_y", fixed = TRUE)
+  expect_match(body, "&quad_cross", fixed = TRUE)
+  expect_equal(lengths(regmatches(
+    body,
+    gregexpr("np_cvls_workspace_square_try\\(", body, perl = TRUE)
+  )), 1L)
   expect_match(body, "int requested_group_width;", fixed = TRUE)
   expect_match(body, "MIN(4,", fixed = TRUE)
   expect_match(body, "int group_width = 2;", fixed = TRUE)
@@ -75,11 +79,10 @@ test_that("MPI CVLS Y convolution supertile is memory bounded and isolated", {
     fixed = TRUE
   )
   expect_false(grepl("alloc_vecd\\(block_size\\*block_size\\)", body))
-  expect_match(
-    body,
-    "double * const quad_cross = loo_work[0];",
-    fixed = TRUE
-  )
+  expect_false(grepl("loo_work", body, fixed = TRUE))
+  expect_false(grepl("full_blocks", body, fixed = TRUE))
+  expect_false(grepl("np_conditional_x_weight_block_pair", body,
+                     fixed = TRUE))
   expect_false(grepl("num_obs\\*num_obs", body))
   expect_false(grepl("num_obs \\* num_obs", body, fixed = TRUE))
 })
@@ -118,8 +121,8 @@ test_that("MPI CVLS supertile retains rank ownership and block-order reduction",
 
   markers <- c(
     "lin[g] += np_blas_ddot_int",
-    "double * const quad_cross = loo_work[0]",
     "for(j0 = 0; j0 < num_obs; j0 += block_size)",
+    "np_blas_dgemm_tn_int",
     "quad[g] += aij*quad_cross",
     "block_terms[block_id[g]]",
     "MPI_Allreduce(&local_fail, &any_fail",
