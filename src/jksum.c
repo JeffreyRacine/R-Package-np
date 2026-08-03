@@ -26,6 +26,7 @@
 #include "gsl_bspline.h"
 #include "jksum_gaussian_density.h"
 #include "jksum_gaussian_fixed.h"
+#include "jksum_lp_basis.h"
 #include "jksum_lp_row.h"
 #include "jksum_lp_solve.h"
 #include "jksum_block_plan.h"
@@ -13634,8 +13635,12 @@ typedef struct {
   int nterms;
   int basis_stride;
   int basis_original_stride;
+  int influence_basis_ready;
+  int influence_basis_conditioned;
   int *terms;
   double **basis;
+  double **source_basis;
+  double **conditioned_basis;
   double **basis_original_order;
   const int *basis_original_ipt_ptr;
   NPGLPBasisCtx *basis_ctx;
@@ -13650,13 +13655,17 @@ typedef struct {
  */
 enum { NP_GLP_BASIS_PAD_DOUBLES = 8 };
 
-static NPGLPCVCache np_glp_cv_cache = {0, 0, 1, 0, 0, 0, 0, 0,
-                                      NULL, NULL, NULL, NULL, NULL, NULL};
+static NPGLPCVCache np_glp_cv_cache = {0};
 
 static void np_glp_cv_cache_clear(void){
   int l;
-  if(np_glp_cv_cache.basis != NULL)
+  if(np_glp_cv_cache.source_basis != NULL)
+    free_tmat(np_glp_cv_cache.source_basis);
+  else if((np_glp_cv_cache.basis != NULL) &&
+          (np_glp_cv_cache.basis != np_glp_cv_cache.conditioned_basis))
     free_tmat(np_glp_cv_cache.basis);
+  if(np_glp_cv_cache.conditioned_basis != NULL)
+    free_tmat(np_glp_cv_cache.conditioned_basis);
   if(np_glp_cv_cache.basis_original_order != NULL)
     free_tmat(np_glp_cv_cache.basis_original_order);
   if(np_glp_cv_cache.basis_ctx != NULL){
@@ -13673,8 +13682,12 @@ static void np_glp_cv_cache_clear(void){
   np_glp_cv_cache.nterms = 0;
   np_glp_cv_cache.basis_stride = 0;
   np_glp_cv_cache.basis_original_stride = 0;
+  np_glp_cv_cache.influence_basis_ready = 0;
+  np_glp_cv_cache.influence_basis_conditioned = 0;
   np_glp_cv_cache.terms = NULL;
   np_glp_cv_cache.basis = NULL;
+  np_glp_cv_cache.source_basis = NULL;
+  np_glp_cv_cache.conditioned_basis = NULL;
   np_glp_cv_cache.basis_original_order = NULL;
   np_glp_cv_cache.basis_original_ipt_ptr = NULL;
   np_glp_cv_cache.basis_ctx = NULL;
@@ -13756,14 +13769,149 @@ static int np_glp_cv_cache_prepare(const int lp_engine,
   np_glp_cv_cache.basis_stride = basis_stride;
   np_glp_cv_cache.terms = terms;
   np_glp_cv_cache.basis = basis;
+  np_glp_cv_cache.source_basis = basis;
   np_glp_cv_cache.basis_ctx = basis_ctx;
   np_glp_cv_cache.matrix_X_continuous_train_ptr = matrix_X_continuous_train;
   return 1;
 }
 
+static int np_glp_cv_cache_prepare_influence_basis(void){
+  double **assessment_basis = NULL;
+  double **conditioned_basis;
+  NPGLPBasisCtx *basis_ctx = NULL;
+  const int *degree_vec = vector_glp_degree_extern;
+  int i;
+  int l;
+  int requires_conditioning = 0;
+
+  if((!np_glp_cv_cache.ready) || (np_glp_cv_cache.basis == NULL) ||
+     (np_glp_cv_cache.nterms <= 0) ||
+     (np_glp_cv_cache.basis_stride < np_glp_cv_cache.num_obs) ||
+     (np_glp_cv_cache.ncon <= 0) || (degree_vec == NULL) ||
+     (np_glp_cv_cache.matrix_X_continuous_train_ptr == NULL))
+    return 0;
+  if(np_glp_cv_cache.influence_basis_ready)
+    return np_glp_cv_cache.basis != NULL;
+  if(np_glp_cv_cache.nterms == 1)
+    requires_conditioning = 0;
+  else {
+    NPLPBasisStatus assessment_status;
+
+    /*
+     * Representation policy must not depend on the user's display basis.
+     * Diagnose the raw polynomial coordinates in both cases; when the public
+     * cache is graded, construct only a temporary raw assessment view.
+     */
+    assessment_basis = np_glp_cv_cache.source_basis;
+    if(np_glp_cv_cache.use_bernstein){
+      assessment_basis = alloc_tmatd(np_glp_cv_cache.basis_stride,
+                                      np_glp_cv_cache.nterms);
+      if(assessment_basis == NULL)
+        return 0;
+      np_glp_fill_basis_raw_train(np_glp_cv_cache.ncon,
+                                  np_glp_cv_cache.terms,
+                                  np_glp_cv_cache.nterms,
+                                  np_glp_cv_cache.matrix_X_continuous_train_ptr,
+                                  np_glp_cv_cache.num_obs,
+                                  assessment_basis);
+    }
+    assessment_status =
+      np_lp_basis_requires_conditioning(assessment_basis,
+                                        np_glp_cv_cache.num_obs,
+                                        np_glp_cv_cache.nterms,
+                                        np_glp_cv_cache.basis_stride,
+                                        1.0e-10,
+                                        &requires_conditioning);
+    if(assessment_basis != np_glp_cv_cache.source_basis)
+      free_tmat(assessment_basis);
+    if(assessment_status != NP_LP_BASIS_OK)
+      return 0;
+  }
+  if(!requires_conditioning){
+    np_glp_cv_cache.influence_basis_ready = 1;
+    np_glp_cv_cache.influence_basis_conditioned = 0;
+    return 1;
+  }
+  if(np_glp_cv_cache.conditioned_basis != NULL){
+    np_glp_cv_cache.basis = np_glp_cv_cache.conditioned_basis;
+    np_glp_cv_cache.influence_basis_ready = 1;
+    np_glp_cv_cache.influence_basis_conditioned = 1;
+    return 1;
+  }
+
+  conditioned_basis = alloc_tmatd(np_glp_cv_cache.basis_stride,
+                                   np_glp_cv_cache.nterms);
+  if(conditioned_basis == NULL)
+    return 0;
+
+  /*
+   * The public raw and Bernstein/graded representations describe the same
+   * polynomial span but can carry radically different units into a signed
+   * normal equation. Build the influence-only seed from one stable canonical
+   * representation for both public choices, then orthonormalize it. This is a
+   * global change of basis, never evaluation-point centering, and leaves the
+   * public basis and all coefficient/derivative owners untouched.
+   */
+  basis_ctx = (NPGLPBasisCtx *)calloc((size_t)np_glp_cv_cache.ncon,
+                                      sizeof(NPGLPBasisCtx));
+  if(basis_ctx == NULL){
+    free_tmat(conditioned_basis);
+    return 0;
+  }
+  for(l = 0; l < np_glp_cv_cache.ncon; l++){
+    double xmin = np_glp_cv_cache.matrix_X_continuous_train_ptr[l][0];
+    double xmax = xmin;
+
+    for(i = 1; i < np_glp_cv_cache.num_obs; i++){
+      const double xi =
+        np_glp_cv_cache.matrix_X_continuous_train_ptr[l][i];
+      if(xi < xmin) xmin = xi;
+      if(xi > xmax) xmax = xi;
+    }
+    if(!np_glp_basis_ctx_init(&basis_ctx[l], degree_vec[l], xmin, xmax,
+                              np_glp_cv_cache.basis_mode == 1)){
+      for(i = 0; i <= l; i++)
+        np_glp_basis_ctx_free(&basis_ctx[i]);
+      free(basis_ctx);
+      free_tmat(conditioned_basis);
+      return 0;
+    }
+  }
+  np_glp_fill_basis_train(np_glp_cv_cache.ncon,
+                          np_glp_cv_cache.terms,
+                          np_glp_cv_cache.nterms,
+                          np_glp_cv_cache.matrix_X_continuous_train_ptr,
+                          np_glp_cv_cache.num_obs,
+                          basis_ctx,
+                          conditioned_basis);
+  for(l = 0; l < np_glp_cv_cache.ncon; l++)
+    np_glp_basis_ctx_free(&basis_ctx[l]);
+  free(basis_ctx);
+
+  if(np_lp_conditioned_basis_prepare(conditioned_basis,
+                                     np_glp_cv_cache.num_obs,
+                                     np_glp_cv_cache.nterms,
+                                     np_glp_cv_cache.basis_stride,
+                                     conditioned_basis[0]) !=
+     NP_LP_BASIS_OK){
+    free_tmat(conditioned_basis);
+    return 0;
+  }
+  np_glp_cv_cache.conditioned_basis = conditioned_basis;
+  np_glp_cv_cache.basis = conditioned_basis;
+  np_glp_cv_cache.influence_basis_ready = 1;
+  np_glp_cv_cache.influence_basis_conditioned = 1;
+  return 1;
+}
+
+
+
 static int np_glp_cv_cache_prepare_original_order(const int *ipt){
   double **basis_original_order = NULL;
   int i, a;
+
+  if(!np_glp_cv_cache_prepare_influence_basis())
+    return 0;
 
   /*
    * The tree permutation is fixed for the lifetime of the GLP cache.  Retain
@@ -25264,6 +25412,7 @@ static int np_conditional_xrow_ctx_prepare(double *vector_scale_factor,
         goto fail_xrow_ctx_prepare;
     }
     if((np_glp_cv_cache.nterms <= 0) ||
+       !np_glp_cv_cache_prepare_influence_basis() ||
        !np_lp_full_row_workspace_reserve(&ctx->full_row_workspace,
                                          np_glp_cv_cache.nterms,
                                          1))
@@ -26877,14 +27026,25 @@ static int np_conditional_x_weight_row_stream_core_impl(double *vector_scale_fac
     goto cleanup_xweight_row;
 
   if(ll_mode == NP_LP_ENGINE_GENERAL){
+    const int use_bernstein = (int_glp_bernstein_extern != 0);
+
     if((vector_glp_degree_extern == NULL) || (num_reg_continuous_extern <= 0))
       goto cleanup_xweight_row;
-    if(!np_glp_cv_prepare_extern(NP_LP_ENGINE_GENERAL,
-                                 num_train,
-                                 num_reg_continuous_extern,
-                                 matrix_X_continuous_train_extern))
-      goto cleanup_xweight_row;
-    if(!np_lp_full_row_workspace_reserve(&full_row_workspace,
+    if(!np_glp_cv_cache.ready ||
+       (np_glp_cv_cache.use_bernstein != use_bernstein) ||
+       (np_glp_cv_cache.basis_mode != int_glp_basis_extern) ||
+       (np_glp_cv_cache.num_obs != num_train) ||
+       (np_glp_cv_cache.ncon != num_reg_continuous_extern) ||
+       (np_glp_cv_cache.matrix_X_continuous_train_ptr !=
+        matrix_X_continuous_train_extern)){
+      if(!np_glp_cv_prepare_extern(NP_LP_ENGINE_GENERAL,
+                                   num_train,
+                                   num_reg_continuous_extern,
+                                   matrix_X_continuous_train_extern))
+        goto cleanup_xweight_row;
+    }
+    if(!np_glp_cv_cache_prepare_influence_basis() ||
+       !np_lp_full_row_workspace_reserve(&full_row_workspace,
                                          np_glp_cv_cache.nterms,
                                          1))
       goto cleanup_xweight_row;
@@ -27020,7 +27180,6 @@ cleanup_xweight_row:
   if(kernel_ux != NULL) free(kernel_ux);
   if(kernel_ox != NULL) free(kernel_ox);
   if(x_operator != NULL) free(x_operator);
-  np_glp_cv_clear_extern();
   return status;
 }
 
@@ -27585,7 +27744,8 @@ static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_f
                                   matrix_X_continuous_train_extern))
         goto cleanup_xweight_block;
     }
-    if((np_glp_cv_cache.nterms <= 0) || (np_glp_cv_cache.basis == NULL))
+    if((np_glp_cv_cache.nterms <= 0) || (np_glp_cv_cache.basis == NULL) ||
+       !np_glp_cv_cache_prepare_influence_basis())
       goto cleanup_xweight_block;
 
     if(!np_lp_full_row_workspace_reserve(&full_row_workspace,
@@ -27679,6 +27839,9 @@ static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_f
       }
     } else {
       const int k = np_glp_cv_cache.nterms;
+
+      if(np_glp_cv_cache.basis == NULL)
+        goto cleanup_xweight_block;
 
       for(l = 0; l < k; l++)
         full_row_workspace.rhs[l] =
@@ -30127,7 +30290,9 @@ static int np_conditional_lp_all_large_ctx_prepare_core(double *vector_scale_fac
       goto cleanup_all_large_prepare;
   }
 
-  if((np_glp_cv_cache.nterms <= 0) || (np_glp_cv_cache.basis == NULL))
+  if((np_glp_cv_cache.nterms <= 0) ||
+     !np_glp_cv_cache_prepare_influence_basis() ||
+     (np_glp_cv_cache.basis == NULL))
     goto cleanup_all_large_prepare;
 
   ctx->num_train = num_train;
@@ -31162,6 +31327,7 @@ cleanup_cvls_lp_stream:
   np_conditional_xrow_ctx_clear(&xctx);
   np_conditional_yrow_ctx_clear(&yctx);
   np_conditional_yrow_ctx_clear(&yconvctx);
+  np_glp_cv_clear_extern();
   if(xrow != NULL) free(xrow);
   if(yrow != NULL) free(yrow);
   if(yconv != NULL) free(yconv);

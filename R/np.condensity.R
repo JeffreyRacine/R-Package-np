@@ -632,19 +632,6 @@ npcdens.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   } else {
     "fixed"
   }
-  bwmethod.request <- if (has.explicit.bws) {
-    if (is.null(bws$method)) "cv.ls" else as.character(bws$method)
-  } else if ("bwmethod" %in% sc.names) {
-    as.character(eval(sc$bwmethod, parent.frame()))
-  } else {
-    "cv.ls"
-  }
-  degree.request <- if ("degree" %in% sc.names) eval(sc$degree, parent.frame()) else NULL
-  bernstein.request <- if ("bernstein.basis" %in% sc.names) {
-    isTRUE(eval(sc$bernstein.basis, parent.frame()))
-  } else {
-    FALSE
-  }
   uses.nomad.degree.search <- FALSE
   if (!has.explicit.bws && !bws.formula && !txdat.formula && !dots.formula) {
     sc.bw.dispatch <- sc
@@ -677,19 +664,10 @@ npcdens.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   keep_local_shadow_nn <- (identical(regtype.request[1L], "lp") ||
     identical(regtype.request[1L], "ll")) &&
     identical(bwtype.request[1L] %in% c("generalized_nn", "adaptive_nn"), TRUE)
-  keep_local_raw_degree1_cvls <- !has.explicit.bws &&
-    identical(bwmethod.request[1L], "cv.ls") &&
-    identical(bwtype.request[1L], "fixed") &&
-    npIsRawDegreeOneConditionalRequest(
-      regtype = regtype.request[1L],
-      degree = degree.request,
-      bernstein.basis = bernstein.request
-    )
   if (.npRmpi_autodispatch_active() &&
       !npNomadControlRequested(nomad) &&
       !uses.nomad.degree.search &&
       !keep_local_shadow_nn &&
-      !keep_local_raw_degree1_cvls &&
       !bws.formula &&
       !txdat.formula &&
       !dots.formula)

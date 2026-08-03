@@ -551,8 +551,7 @@ npcdistbw.condbandwidth <-
         if (is.na(myopti$bwmethod))
           stop("npcdistbw native search requires a valid bandwidth method code",
                call. = FALSE)
-        myout <- npWithLocalLinearRawBasisSearchError(
-          if (keep_local_cvls_nn) {
+        myout <- if (keep_local_cvls_nn) {
             .npRmpi_with_local_cdist_eval(
               .Call("C_np_distribution_conditional_bw",
                     as.double(yuno), as.double(yord), as.double(ycon),
@@ -598,12 +597,7 @@ npcdistbw.condbandwidth <-
                   as.double(cyker.bounds.c$lb),
                   as.double(cyker.bounds.c$ub),
                   PACKAGE="npRmpi")
-          },
-          where = "npcdistbw",
-          spec = spec,
-          bwmethod = bws$method,
-          ncon = tbw$xncon
-        )
+          }
         total.time <- proc.time()[3] - elapsed.start
       } else {
         nbw = double(yncol+xncol)

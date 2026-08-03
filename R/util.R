@@ -1465,62 +1465,6 @@ npCanonicalConditionalRegSpec <- function(regtype = c("lc", "ll", "lp"),
   )
 }
 
-npIsRawDegreeOneConditionalSpec <- function(spec, ncon) {
-  degree <- if (is.null(spec$degree.engine)) integer(0) else as.integer(spec$degree.engine)
-  ncon <- as.integer(ncon)
-  identical(spec$regtype.engine, "lp") &&
-    !isTRUE(spec$bernstein.basis.engine) &&
-    length(degree) == ncon &&
-    ncon > 0L &&
-    all(degree == 1L)
-}
-
-npIsRawDegreeOneConditionalRequest <- function(regtype,
-                                               degree = NULL,
-                                               bernstein.basis = FALSE) {
-  regtype <- as.character(regtype)[1L]
-  if (identical(regtype, "ll"))
-    return(TRUE)
-  if (!identical(regtype, "lp"))
-    return(FALSE)
-  if (isTRUE(bernstein.basis) || is.null(degree))
-    return(FALSE)
-  degree <- suppressWarnings(as.numeric(degree))
-  length(degree) > 0L &&
-    all(is.finite(degree)) &&
-    all(degree == 1)
-}
-
-npWithLocalLinearRawBasisSearchError <- function(expr,
-                                                 where,
-                                                 spec,
-                                                 bwmethod,
-                                                 ncon) {
-  expected <- switch(where,
-    npcdensbw = "C_np_density_conditional_bw: optimizer returned a fixed-bandwidth candidate with invalid raw objective",
-    npcdistbw = "C_np_distribution_conditional_bw: optimizer returned a fixed-bandwidth candidate with invalid raw objective",
-    NULL
-  )
-  tryCatch(
-    force(expr),
-    error = function(e) {
-      msg <- conditionMessage(e)
-      targeted <- !is.null(expected) &&
-        identical(msg, expected) &&
-        identical(bwmethod, "cv.ls") &&
-        npIsRawDegreeOneConditionalSpec(spec, ncon)
-
-      if (targeted) {
-        stop(sprintf(
-          "%s() local-linear cv.ls failed while using the canonical raw degree-1 basis. Try regtype = \"lp\", degree = 1, bernstein.basis = TRUE, or center/scale continuous regressors.",
-          where
-        ), call. = FALSE)
-      }
-      stop(e)
-    }
-  )
-}
-
 npResolveCanonicalConditionalRegSpec <- function(mc.names,
                                                  regtype = c("lc", "ll", "lp"),
                                                  basis = c("glp", "additive", "tensor"),

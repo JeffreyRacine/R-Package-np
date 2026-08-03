@@ -704,8 +704,7 @@ npcdensbw.conbandwidth <-
                                                     extend.factor = tbw$cvls.quadrature.extend.factor)
 
       if (bws$method != "normal-reference"){
-        myout <- npWithLocalLinearRawBasisSearchError(
-          if (keep_local_shadow_nn) {
+        myout <- if (keep_local_shadow_nn) {
             .npRmpi_with_local_regression(
               .Call("C_np_density_conditional_bw",
                     as.double(yuno), as.double(yord), as.double(ycon),
@@ -749,12 +748,7 @@ npcdensbw.conbandwidth <-
                   as.double(cyker.bounds.c$lb),
                   as.double(cyker.bounds.c$ub),
                   PACKAGE="npRmpi")
-          },
-          where = "npcdensbw",
-          spec = spec,
-          bwmethod = bws$method,
-          ncon = tbw$xncon
-        )
+          }
         total.time <- proc.time()[3] - elapsed.start
       } else {
         nbw = double(yncol+xncol)
