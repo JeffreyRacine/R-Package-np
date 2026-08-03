@@ -303,7 +303,7 @@ test_that("common-scaled beta hats survive complete absolute-weight underflow", 
 
 test_that("beta LP apply retains bounded row storage and no obsolete owner", {
   source <- paste(
-    readLines(test_path("..", "..", "src", "jksum.c"), warn = FALSE),
+    readLines(np_test_source_path("src", "jksum.c"), warn = FALSE),
     collapse = "\n"
   )
   start <- regexpr("int np_regression_lp_apply_matrix(", source, fixed = TRUE)
