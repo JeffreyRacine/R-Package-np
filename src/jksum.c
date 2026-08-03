@@ -23539,9 +23539,10 @@ const NPContinuousPreparedBandwidthView *prepared_bandwidth){
     }
     
     {
+      /* Optional derivative weights follow their own storage ownership;
+         conditional influence weights are an independent output channel. */
       NPPermutationWeightOutput conditional_pkw_output =
-        np_pkw_output_make(conditional_influence ? conditional_pkw : NULL,
-                           p_nvar);
+        np_pkw_output_make(conditional_pkw, p_nvar);
       int kws_status;
 
       kws_status = kernel_weighted_sum_np_ctx(kernel_c,
@@ -23595,7 +23596,7 @@ const NPContinuousPreparedBandwidthView *prepared_bandwidth){
                            permy, // permutations used for gradients
                            conditional_kw,
                            est_gate_ctx_ptr,
-                           conditional_influence ?
+                           conditional_pkw != NULL ?
                              &conditional_pkw_output : NULL);
       if(kws_status != 0)
         error("conditional regression kernel traversal failed");

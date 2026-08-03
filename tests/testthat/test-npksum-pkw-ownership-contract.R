@@ -23,6 +23,17 @@ test_that("derivative kernel-weight ownership is invocation scoped", {
   expect_false(grepl("kernel_weighted_sum_pkw_nvar_extern", text, fixed = TRUE))
   expect_false(grepl("kernel_weighted_sum_pkw_sparse_extern", text, fixed = TRUE))
   expect_false(grepl("np_jksum_tree_pkw_is_sparse", text, fixed = TRUE))
+  expect_true(grepl(
+    "np_pkw_output_make(conditional_pkw, p_nvar)", text, fixed = TRUE
+  ))
+  expect_true(grepl(
+    "conditional_pkw != NULL ?\n                             &conditional_pkw_output : NULL",
+    text, fixed = TRUE
+  ))
+  expect_false(grepl(
+    "np_pkw_output_make(conditional_influence ? conditional_pkw : NULL",
+    text, fixed = TRUE
+  ))
 })
 
 test_that("a rejected derivative request does not poison the next p.kw call", {

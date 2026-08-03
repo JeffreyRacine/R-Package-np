@@ -329,6 +329,45 @@ test_that("beta and legacy conditional kernels can be mixed by side", {
   }
 })
 
+test_that("conditional influence keeps optional derivative weights independent", {
+  old_options <- options(np.messages = FALSE, np.tree = FALSE)
+  on.exit(options(old_options), add = TRUE)
+
+  training_x <- data.frame(x = seq(-1.1, 1.1, length.out = 12L))
+  training_y <- data.frame(y = seq(0.025, 0.975, length.out = 12L))
+  evaluation_x <- data.frame(x = c(-0.8, -0.25, 0.3, 0.85))
+  evaluation_y <- data.frame(y = c(0.08, 0.31, 0.64, 0.91))
+  common <- list(
+    xdat = training_x, ydat = training_y,
+    bws = c(0.17, 0.3), bandwidth.compute = FALSE,
+    regtype = "lc",
+    cxkertype = "gaussian", cxkerorder = 4L,
+    cykertype = "beta", cykerorder = 8L,
+    cykerbound = "fixed", cykerlb = 0, cykerub = 1
+  )
+
+  for (kind in c("density", "distribution")) {
+    constructor <- if (identical(kind, "density")) npcdensbw else npcdistbw
+    estimator <- if (identical(kind, "density")) npcdens else npcdist
+    bandwidth <- do.call(constructor, common)
+    fit_without_derivatives <- estimator(
+      bws = bandwidth, txdat = training_x, tydat = training_y,
+      exdat = evaluation_x, eydat = evaluation_y, gradients = FALSE
+    )
+    fit_with_derivatives <- estimator(
+      bws = bandwidth, txdat = training_x, tydat = training_y,
+      exdat = evaluation_x, eydat = evaluation_y, gradients = TRUE
+    )
+
+    expect_identical(fitted(fit_without_derivatives),
+                     fitted(fit_with_derivatives), info = kind)
+    expect_identical(se(fit_without_derivatives), se(fit_with_derivatives),
+                     info = kind)
+    expect_true(all(is.finite(fitted(fit_without_derivatives))), info = kind)
+    expect_true(all(is.finite(se(fit_without_derivatives))), info = kind)
+  }
+})
+
 test_that("beta conditional distribution is exact at dependent support endpoints", {
   training_x <- data.frame(x = c(0.03, 0.12, 0.28, 0.53, 0.77, 0.96))
   training_y <- data.frame(y = c(0.02, 0.1, 0.31, 0.59, 0.82, 0.98))
