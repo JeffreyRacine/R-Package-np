@@ -355,6 +355,7 @@ extern double *vector_lsq_loss_extern;
 extern double np_lsq_tau_extern;
 extern double *vector_T_extern;
 extern double *vector_Y_eval_extern;
+extern double *vector_continuous_stddev_extern;
 
 /* Quantile - no Y ordered or unordered used, but defined anyways */
 
@@ -39063,7 +39064,6 @@ static int np_conditional_route_bandwidth_prepare(
   double **matrix_bandwidth,
   double *lambda)
 {
-  extern double *vector_continuous_stddev_extern;
   double * const saved_standard_deviation =
     vector_continuous_stddev_extern;
   int status;
@@ -39412,24 +39412,577 @@ cleanup_route:
 }
 
 /*
- * Route-bearing sibling for conditional-density CVLS.  It is appended beside
- * the incumbent stream so null execution remains literal and linked-layout
- * movement cannot perturb that hot owner.  The routed arithmetic is enabled
- * only in the following tranche; valid beta state fails closed here and must
- * never fall back to the incumbent continuous-kernel switch.
+ * Conditional CVLS route adapter.  It owns only persistent row/bandwidth
+ * state; the established bounded-quadrature and analytic-convolution owners
+ * retain every objective contraction and accumulation.  X providers expose
+ * only the canonical signed delete-one influence row required by both owners.
+ * Every persistent buffer is O(n) or depends only on LP basis width.
+ */
+typedef struct {
+  int ready;
+  int beta_x;
+  int beta_y;
+  double *vector_scale_factor;
+  double *eval_basis;
+  NPConditionalRouteRowContext route_x;
+  NPConditionalRouteRowContext route_y;
+  NPConditionalXRowCtx legacy_x;
+  NPConditionalYRowCtx legacy_y;
+  NPConditionalYRowCtx legacy_y_convolution;
+  NPReghatLPWorkspace lp_workspace;
+  const NPConditionalKernelExecutionContext *execution_context;
+} NPConditionalCVLSRouteContext;
+
+static void np_conditional_cvls_route_context_init(
+  NPConditionalCVLSRouteContext * const context)
+{
+  if(context == NULL)
+    return;
+  memset(context, 0, sizeof(*context));
+  np_conditional_route_row_context_init(&context->route_x);
+  np_conditional_route_row_context_init(&context->route_y);
+  np_reghat_lp_workspace_init(&context->lp_workspace);
+}
+
+static void np_conditional_cvls_route_context_clear(
+  NPConditionalCVLSRouteContext * const context)
+{
+  if(context == NULL)
+    return;
+  np_conditional_route_row_context_clear(&context->route_x);
+  np_conditional_route_row_context_clear(&context->route_y);
+  np_conditional_xrow_ctx_clear(&context->legacy_x);
+  np_conditional_yrow_ctx_clear(&context->legacy_y);
+  np_conditional_yrow_ctx_clear(&context->legacy_y_convolution);
+  np_reghat_lp_workspace_clear(&context->lp_workspace);
+  free(context->eval_basis);
+  np_conditional_cvls_route_context_init(context);
+}
+
+static int np_conditional_cvls_route_context_prepare(
+  NPConditionalCVLSRouteContext * const context,
+  double * const vector_scale_factor,
+  const NPConditionalKernelExecutionContext * const execution_context)
+{
+  const int num_obs = num_obs_train_extern;
+  const int use_general_lp = np_lp_engine_extern == NP_LP_ENGINE_GENERAL;
+  const int use_bernstein = int_glp_bernstein_extern != 0;
+
+  if(context == NULL || vector_scale_factor == NULL ||
+     execution_context == NULL || num_obs < 2 ||
+     (np_lp_engine_extern != NP_LP_ENGINE_SCALAR &&
+      np_lp_engine_extern != NP_LP_ENGINE_GENERAL))
+    return 1;
+
+  context->beta_x = execution_context->x_route != NULL;
+  context->beta_y = execution_context->y_route != NULL;
+  context->vector_scale_factor = vector_scale_factor;
+  context->execution_context = execution_context;
+
+  if(context->beta_x) {
+    if(np_conditional_route_row_context_prepare(
+         &context->route_x, 1, BANDWIDTH_den_extern, num_obs,
+         num_var_unordered_extern, num_var_ordered_extern,
+         num_var_continuous_extern, num_reg_unordered_extern,
+         num_reg_ordered_extern, num_reg_continuous_extern,
+         KERNEL_reg_unordered_extern, KERNEL_reg_ordered_extern,
+         matrix_X_unordered_train_extern, matrix_X_ordered_train_extern,
+         matrix_X_continuous_train_extern, vector_scale_factor,
+         num_categories_extern_X, matrix_categorical_vals_extern_X,
+         execution_context->x_route, execution_context->x_diagnostics,
+         execution_context->categorical_compress) != 0)
+      goto fail_prepare;
+  } else if(np_conditional_xrow_ctx_prepare(
+              vector_scale_factor, &context->legacy_x) != 0) {
+    goto fail_prepare;
+  }
+
+  if(context->beta_y) {
+    if(np_conditional_route_row_context_prepare(
+         &context->route_y, 0, BANDWIDTH_den_extern, num_obs,
+         num_var_unordered_extern, num_var_ordered_extern,
+         num_var_continuous_extern, num_reg_unordered_extern,
+         num_reg_ordered_extern, num_reg_continuous_extern,
+         KERNEL_den_unordered_extern, KERNEL_den_ordered_extern,
+         matrix_Y_unordered_train_extern, matrix_Y_ordered_train_extern,
+         matrix_Y_continuous_train_extern, vector_scale_factor,
+         num_categories_extern_Y, matrix_categorical_vals_extern_Y,
+         execution_context->y_route, execution_context->y_diagnostics,
+         execution_context->categorical_compress) != 0)
+      goto fail_prepare;
+  } else {
+    if(np_conditional_yrow_ctx_prepare(
+         vector_scale_factor, OP_NORMAL, &context->legacy_y) != 0)
+      goto fail_prepare;
+    if(int_cyker_bound_extern == 0 &&
+       np_conditional_yrow_ctx_prepare(
+         vector_scale_factor, OP_CONVOLUTION,
+         &context->legacy_y_convolution) != 0)
+      goto fail_prepare;
+  }
+
+  if(context->beta_x && use_general_lp) {
+    if(!np_glp_cv_cache.ready ||
+       np_glp_cv_cache.use_bernstein != use_bernstein ||
+       np_glp_cv_cache.basis_mode != int_glp_basis_extern ||
+       np_glp_cv_cache.num_obs != num_obs ||
+       np_glp_cv_cache.ncon != num_reg_continuous_extern ||
+       np_glp_cv_cache.matrix_X_continuous_train_ptr !=
+         matrix_X_continuous_train_extern) {
+      if(!np_glp_cv_cache_prepare(
+           NP_LP_ENGINE_GENERAL, num_obs,
+           num_reg_continuous_extern,
+           matrix_X_continuous_train_extern))
+        goto fail_prepare;
+    }
+    if(!np_glp_cv_cache.ready || np_glp_cv_cache.basis == NULL ||
+       np_glp_cv_cache.terms == NULL || np_glp_cv_cache.nterms <= 1)
+      goto fail_prepare;
+    context->eval_basis = (double *)np_jksum_malloc_array_or_die(
+      (size_t)np_glp_cv_cache.nterms, sizeof(double),
+      "conditional CVLS routed X evaluation basis");
+    if(np_reghat_lp_workspace_prepare_columns(
+         &context->lp_workspace, np_glp_cv_cache.basis,
+         num_obs, np_glp_cv_cache.nterms) != NP_REGHAT_LP_ROW_OK)
+      goto fail_prepare;
+  }
+
+  context->ready = 1;
+  return 0;
+
+fail_prepare:
+  np_conditional_cvls_route_context_clear(context);
+  return 1;
+}
+
+/*
+ * Form one full signed smoother row and delete its evaluation observation by
+ * the package-wide exact identity h[-i] / (1 - h_ii).  Scalar width one and
+ * general LP therefore share the same deletion contract; only full-row
+ * construction differs.  No positivity shortcut or fallback is permitted.
+ */
+static int np_conditional_cvls_provider_x_row(
+  void *raw_context,
+  const int evaluation,
+  double * const row)
+{
+  NPConditionalCVLSRouteContext * const context =
+    (NPConditionalCVLSRouteContext *)raw_context;
+  const int num_obs = num_obs_train_extern;
+  double delete_denominator;
+  int observation;
+
+  if(context == NULL || !context->ready || row == NULL ||
+     evaluation < 0 || evaluation >= num_obs)
+    return 1;
+
+  if(!context->beta_x)
+    return np_conditional_xrow_from_ctx(
+      &context->legacy_x, evaluation, row);
+
+  if(np_beta_scaled_row_context_fill(
+       &context->route_x.scaled_row, evaluation, NULL, NULL) !=
+     NP_CONTINUOUS_ROW_OK)
+    return 1;
+
+  if(np_lp_engine_extern == NP_LP_ENGINE_SCALAR) {
+    double denominator = 0.0;
+
+    for(observation = 0; observation < num_obs; ++observation)
+      denominator += context->route_x.row[observation];
+    if(denominator == 0.0 || !R_FINITE(denominator))
+      return 1;
+    for(observation = 0; observation < num_obs; ++observation)
+      row[observation] = context->route_x.row[observation]/denominator;
+  } else {
+    int term;
+
+    for(term = 0; term < np_glp_cv_cache.nterms; ++term)
+      context->eval_basis[term] =
+        np_glp_cv_cache.basis[term][evaluation];
+    if(np_reghat_lp_workspace_influence_row(
+         &context->lp_workspace, context->route_x.row,
+         context->eval_basis, row, 1U) != NP_REGHAT_LP_ROW_OK)
+      return 1;
+  }
+
+  if(!np_lp_delete_denominator(row[evaluation], &delete_denominator))
+    return 1;
+  for(observation = 0; observation < num_obs; ++observation)
+    row[observation] = observation == evaluation ?
+      0.0 : row[observation]/delete_denominator;
+  return 0;
+}
+
+static int np_conditional_cvls_provider_y_train_row(
+  void *raw_context,
+  const int evaluation,
+  double * const row,
+  double * const common_log_scale)
+{
+  NPConditionalCVLSRouteContext * const context =
+    (NPConditionalCVLSRouteContext *)raw_context;
+
+  if(context == NULL || !context->ready || row == NULL ||
+     common_log_scale == NULL || evaluation < 0 ||
+     evaluation >= num_obs_train_extern)
+    return 1;
+  *common_log_scale = 0.0;
+  if(!context->beta_y)
+    return np_conditional_yrow_from_ctx(
+      &context->legacy_y, evaluation, row);
+  if(np_beta_scaled_row_context_fill(
+       &context->route_y.scaled_row, evaluation, NULL,
+       common_log_scale) != NP_CONTINUOUS_ROW_OK)
+    return 1;
+  memcpy(row, context->route_y.row,
+         (size_t)num_obs_train_extern*sizeof(double));
+  return 0;
+}
+
+static int np_conditional_cvls_provider_y_convolution_row(
+  void *raw_context,
+  const int evaluation,
+  double * const row,
+  double * const common_log_scale)
+{
+  NPConditionalCVLSRouteContext * const context =
+    (NPConditionalCVLSRouteContext *)raw_context;
+
+  if(context == NULL || !context->ready || row == NULL ||
+     common_log_scale == NULL || context->beta_y ||
+     int_cyker_bound_extern != 0)
+    return 1;
+  *common_log_scale = 0.0;
+  return np_conditional_yrow_from_ctx(
+    &context->legacy_y_convolution, evaluation, row);
+}
+
+static int np_conditional_cvls_provider_y_eval_block(
+  void *raw_context,
+  const int block_rows,
+  double **matrix_Y_unordered_eval,
+  double **matrix_Y_ordered_eval,
+  double **matrix_Y_continuous_eval,
+  double **rows,
+  double *common_log_scale)
+{
+  NPConditionalCVLSRouteContext * const context =
+    (NPConditionalCVLSRouteContext *)raw_context;
+  const int num_obs = num_obs_train_extern;
+  const int bandwidth_rows = BANDWIDTH_den_extern == BW_FIXED ? 1 :
+    (BANDWIDTH_den_extern == BW_GEN_NN ? block_rows : num_obs);
+  NPBetaScaledRowContext eval_context;
+  double **matrix_bandwidth = NULL;
+  double * const saved_standard_deviation =
+    vector_continuous_stddev_extern;
+  int evaluation;
+  int status = 1;
+
+  if(context == NULL || !context->ready || block_rows <= 0 ||
+     rows == NULL || common_log_scale == NULL)
+    return 1;
+  if(!context->beta_y) {
+    const int legacy_status =
+      np_conditional_y_eval_any_block_stream_core(
+        context->vector_scale_factor, block_rows,
+        matrix_Y_unordered_eval, matrix_Y_ordered_eval,
+        matrix_Y_continuous_eval, 1, rows);
+
+    if(legacy_status != 0)
+      return legacy_status;
+    for(evaluation = 0; evaluation < block_rows; ++evaluation)
+      common_log_scale[evaluation] = 0.0;
+    return 0;
+  }
+  if(matrix_Y_continuous_eval == NULL ||
+     (num_var_unordered_extern > 0 && matrix_Y_unordered_eval == NULL) ||
+     (num_var_ordered_extern > 0 && matrix_Y_ordered_eval == NULL))
+    return 1;
+
+  np_beta_scaled_row_context_init(&eval_context);
+  matrix_bandwidth = alloc_matd(
+    bandwidth_rows, num_var_continuous_extern);
+  if(matrix_bandwidth == NULL)
+    goto cleanup_eval;
+
+  if(saved_standard_deviation != NULL)
+    vector_continuous_stddev_extern =
+      saved_standard_deviation + num_reg_continuous_extern;
+  status = np_beta_continuous_bandwidth_prepare_canonical(
+    BANDWIDTH_den_extern, num_obs, block_rows,
+    num_var_unordered_extern, num_var_ordered_extern,
+    num_var_continuous_extern,
+    matrix_Y_continuous_train_extern, matrix_Y_continuous_eval,
+    context->route_y.scale_factor, matrix_bandwidth, NULL,
+    context->route_y.lambda, NULL);
+  vector_continuous_stddev_extern = saved_standard_deviation;
+  if(status != 0)
+    goto cleanup_eval;
+
+  if(np_beta_scaled_row_context_prepare(
+       &eval_context, context->execution_context->y_route,
+       context->execution_context->y_diagnostics,
+       BANDWIDTH_den_extern, num_obs, block_rows,
+       num_var_continuous_extern, num_var_unordered_extern,
+       num_var_ordered_extern,
+       matrix_Y_continuous_train_extern, matrix_Y_continuous_eval,
+       matrix_Y_unordered_train_extern, matrix_Y_unordered_eval,
+       matrix_Y_ordered_train_extern, matrix_Y_ordered_eval,
+       matrix_bandwidth, matrix_bandwidth,
+       context->route_y.operator_code,
+       context->route_y.kernel_unordered,
+       context->route_y.kernel_ordered,
+       context->route_y.lambda, num_categories_extern_Y,
+       matrix_categorical_vals_extern_Y,
+       context->execution_context->categorical_compress,
+       context->route_y.row) != NP_CONTINUOUS_ROW_OK) {
+    status = 1;
+    goto cleanup_eval;
+  }
+
+  for(evaluation = 0; evaluation < block_rows; ++evaluation) {
+    eval_context.row_result.row = rows[evaluation];
+    if(np_beta_scaled_row_context_fill(
+         &eval_context, evaluation, NULL,
+         &common_log_scale[evaluation]) != NP_CONTINUOUS_ROW_OK) {
+      status = 1;
+      goto cleanup_eval;
+    }
+  }
+  status = 0;
+
+cleanup_eval:
+  vector_continuous_stddev_extern = saved_standard_deviation;
+  np_beta_scaled_row_context_clear(&eval_context);
+  if(matrix_bandwidth != NULL)
+    free_mat(matrix_bandwidth, num_var_continuous_extern);
+  return status;
+}
+
+/*
+ * Analytic-Y routed CVLS owner.  Retain a bounded group of canonical X rows
+ * and reuse each legacy Y-convolution tile across the group.  The workspace
+ * is O(n * B + B^2), where B is the existing memory-bounded CVLS tile width;
+ * no observation-square matrix is retained.  Row-local linear and quadratic
+ * contributions are accumulated in evaluation order after each complete
+ * convolution sweep.
+ *
+ * Return 2 only when an optional tile allocation is unavailable.  The caller
+ * may then use the algebraically identical O(n)-memory row stream; all other
+ * failures remain terminal and never select a legacy kernel family.
+ */
+static int np_conditional_density_cvls_provider_supertile_stream(
+  double *vector_scale_factor,
+  double *cv,
+  const NPConditionalCVLSRowProvider *provider)
+{
+  const int num_obs = num_obs_train_extern;
+  const int block_size =
+    MIN(np_conditional_lp_cvls_block_size(num_obs, 6U, 0U),
+        MAX(1, num_obs));
+  double **xblocks[4] = {NULL, NULL, NULL, NULL};
+  double **shared_y = NULL;
+  double *quad_cross = NULL;
+  double *yconv_log_scale = NULL;
+  double *lin_rows = NULL;
+  double *quad_rows = NULL;
+  size_t grouped_rows;
+  int nblocks;
+  int group_width;
+  int i0, j0, ii, jj, g;
+  int status = 1;
+  NPCVLSWorkspaceStatus workspace_status = NP_CVLS_WORKSPACE_OK;
+
+  if(cv == NULL || vector_scale_factor == NULL || provider == NULL ||
+     provider->context == NULL || provider->x_row == NULL ||
+     provider->y_train_row == NULL ||
+     provider->y_convolution_row == NULL || num_obs <= 0)
+    return 1;
+  if(block_size <= 0)
+    return 2;
+  if(BANDWIDTH_den_extern != BW_FIXED &&
+     BANDWIDTH_den_extern != BW_GEN_NN &&
+     BANDWIDTH_den_extern != BW_ADAP_NN)
+    return 1;
+
+  nblocks = (num_obs / block_size) + ((num_obs % block_size) != 0);
+  group_width = MIN(4, MAX(1, nblocks));
+  if(!np_size_mul_checked((size_t)group_width,
+                          (size_t)block_size,
+                          &grouped_rows))
+    return 1;
+
+  for(g = 0; g < group_width; ++g) {
+    workspace_status =
+      np_cvls_workspace_matrix_try(num_obs, block_size, &xblocks[g]);
+    if(workspace_status != NP_CVLS_WORKSPACE_OK)
+      goto cleanup_provider_supertile;
+  }
+  workspace_status =
+    np_cvls_workspace_matrix_try(num_obs, block_size, &shared_y);
+  if(workspace_status == NP_CVLS_WORKSPACE_OK)
+    workspace_status =
+      np_cvls_workspace_square_try(block_size, &quad_cross);
+  if(workspace_status == NP_CVLS_WORKSPACE_OK)
+    workspace_status = np_cvls_workspace_vector_try(
+      (size_t)block_size, &yconv_log_scale);
+  if(workspace_status == NP_CVLS_WORKSPACE_OK)
+    workspace_status =
+      np_cvls_workspace_vector_try(grouped_rows, &lin_rows);
+  if(workspace_status == NP_CVLS_WORKSPACE_OK)
+    workspace_status =
+      np_cvls_workspace_vector_try(grouped_rows, &quad_rows);
+  if(workspace_status != NP_CVLS_WORKSPACE_OK)
+    goto cleanup_provider_supertile;
+
+  *cv = 0.0;
+  for(i0 = 0; i0 < num_obs; i0 += group_width*block_size) {
+    int block_start[4] = {
+      i0, i0 + block_size, i0 + 2*block_size, i0 + 3*block_size
+    };
+    int block_rows[4] = {0, 0, 0, 0};
+
+    for(g = 0; g < group_width; ++g) {
+      block_rows[g] =
+        MIN(block_size, MAX(0, num_obs - block_start[g]));
+      for(ii = 0; ii < block_rows[g]; ++ii) {
+        const int evaluation = block_start[g] + ii;
+        const size_t row_index =
+          (size_t)g*(size_t)block_size + (size_t)ii;
+        double y_log_scale = 0.0;
+
+        if(provider->x_row(provider->context, evaluation,
+                           xblocks[g][ii]) != 0 ||
+           provider->y_train_row(provider->context, evaluation,
+                                 shared_y[ii], &y_log_scale) != 0)
+          goto cleanup_provider_supertile;
+        lin_rows[row_index] =
+          np_blas_ddot_int(num_obs, xblocks[g][ii], shared_y[ii]);
+        if(np_continuous_kernel_scaled_restore(
+             lin_rows[row_index], y_log_scale, 1,
+             &lin_rows[row_index]) != NP_CONTINUOUS_ROW_OK)
+          goto cleanup_provider_supertile;
+        quad_rows[row_index] = 0.0;
+      }
+    }
+
+    for(j0 = 0; j0 < num_obs; j0 += block_size) {
+      const int jb = MIN(block_size, num_obs - j0);
+
+      for(jj = 0; jj < jb; ++jj)
+        if(provider->y_convolution_row(
+             provider->context, j0 + jj, shared_y[jj],
+             &yconv_log_scale[jj]) != 0)
+          goto cleanup_provider_supertile;
+
+      for(g = 0; g < group_width; ++g) {
+        const int ib = block_rows[g];
+
+        if(ib <= 0)
+          continue;
+        np_blas_dgemm_tn_int(ib, jb, num_obs,
+                             xblocks[g][0], shared_y[0], quad_cross);
+        for(ii = 0; ii < ib; ++ii) {
+          double * const xrow = xblocks[g][ii];
+          const size_t row_index =
+            (size_t)g*(size_t)block_size + (size_t)ii;
+
+          for(jj = 0; jj < jb; ++jj) {
+            double inner = quad_cross[ii + jj*ib];
+
+            if(xrow[j0 + jj] == 0.0)
+              continue;
+            if(np_continuous_kernel_scaled_restore(
+                 inner, yconv_log_scale[jj], 1,
+                 &inner) != NP_CONTINUOUS_ROW_OK)
+              goto cleanup_provider_supertile;
+            quad_rows[row_index] += xrow[j0 + jj]*inner;
+          }
+        }
+      }
+    }
+
+    for(g = 0; g < group_width; ++g)
+      for(ii = 0; ii < block_rows[g]; ++ii) {
+        const size_t row_index =
+          (size_t)g*(size_t)block_size + (size_t)ii;
+        *cv += quad_rows[row_index] - 2.0*lin_rows[row_index];
+      }
+  }
+
+  *cv /= (double)num_obs;
+  status = 0;
+
+cleanup_provider_supertile:
+  for(g = 0; g < 4; ++g)
+    if(xblocks[g] != NULL)
+      free_tmat(xblocks[g]);
+  if(shared_y != NULL)
+    free_tmat(shared_y);
+  free(quad_cross);
+  free(yconv_log_scale);
+  free(lin_rows);
+  free(quad_rows);
+  if(workspace_status == NP_CVLS_WORKSPACE_UNAVAILABLE)
+    return 2;
+  return status;
+}
+
+/*
+ * Route-bearing sibling for conditional-density CVLS.  Null execution
+ * delegates to the literal incumbent owner.  Once a valid beta route is
+ * selected, every failure is terminal: there is no legacy or sidecar fallback.
  */
 int np_conditional_density_cvls_lp_stream_ctx(
   double *vector_scale_factor,
   const NPConditionalKernelExecutionContext * const execution_context,
   double *cv)
 {
+  NPConditionalCVLSRouteContext route_context;
+  NPConditionalCVLSRowProvider provider;
+  int status = 1;
+
   if(execution_context == NULL)
     return np_conditional_density_cvls_lp_stream(vector_scale_factor, cv);
 
   if(!np_conditional_kernel_execution_context_valid(
-       execution_context, KERNEL_reg_extern, KERNEL_den_extern,
-       num_reg_continuous_extern, num_var_continuous_extern))
+     execution_context, KERNEL_reg_extern, KERNEL_den_extern,
+     num_reg_continuous_extern, num_var_continuous_extern))
     error("conditional density CVLS kernel route has an invalid layout");
 
-  return 1;
+  np_conditional_cvls_route_context_init(&route_context);
+  if(np_conditional_cvls_route_context_prepare(
+       &route_context, vector_scale_factor, execution_context) != 0)
+    goto cleanup_route;
+  provider.context = &route_context;
+  provider.x_row = np_conditional_cvls_provider_x_row;
+  provider.y_train_row = np_conditional_cvls_provider_y_train_row;
+  provider.y_convolution_row =
+    np_conditional_cvls_provider_y_convolution_row;
+  provider.y_eval_block = np_conditional_cvls_provider_y_eval_block;
+
+  if(np_conditional_density_cvls_bounded_scalar_route_ok()) {
+    status = np_conditional_density_cvls_bounded_i1_quadrature_row_stream(
+      vector_scale_factor, cv, &provider);
+  } else if(np_conditional_density_cvls_bounded_general_route_ok()) {
+    status =
+      np_conditional_density_cvls_bounded_i1_quadrature_general_row_stream(
+        vector_scale_factor, cv, &provider);
+  } else if(int_cyker_bound_extern != 0 || route_context.beta_y) {
+    np_bwm_set_deferred_error(
+      "bounded npcdens cv.ls currently supports up to two continuous response variables");
+    status = 1;
+  } else {
+    status = np_conditional_density_cvls_provider_supertile_stream(
+      vector_scale_factor, cv, &provider);
+    if(status == 2)
+      status = np_conditional_density_cvls_lp_row_stream(
+        vector_scale_factor, cv, &provider);
+  }
+
+cleanup_route:
+  np_conditional_cvls_route_context_clear(&route_context);
+  np_glp_cv_clear_extern();
+  return status;
 }

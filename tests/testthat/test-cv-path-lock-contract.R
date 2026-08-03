@@ -428,8 +428,31 @@ test_that("conditional LP LOO rows use signed full-row deletion and no QR", {
 
   expect_equal(
     sum(grepl("if\\(!np_lp_delete_denominator\\(", lines)),
-    6L
+    7L
   )
+  beta_provider_start <- grep(
+    "static int np_conditional_cvls_provider_x_row(",
+    lines,
+    fixed = TRUE
+  )
+  beta_provider_stop <- grep(
+    "static int np_conditional_cvls_provider_y_train_row(",
+    lines,
+    fixed = TRUE
+  )
+  expect_length(beta_provider_start, 1L)
+  expect_length(beta_provider_stop, 1L)
+  expect_lt(beta_provider_start, beta_provider_stop)
+  beta_provider <- paste(
+    lines[beta_provider_start:(beta_provider_stop - 1L)],
+    collapse = "\n"
+  )
+  expect_true(grepl(
+    "np_lp_delete_denominator(row[evaluation], &delete_denominator)",
+    beta_provider,
+    fixed = TRUE
+  ))
+  expect_false(grepl("fabs(", beta_provider, fixed = TRUE))
   expect_true(grepl(
     "np_regression_cv_lp_continuous_route",
     source,

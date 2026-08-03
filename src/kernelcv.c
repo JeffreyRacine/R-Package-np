@@ -188,36 +188,6 @@ static void np_beta_conditional_bw_route_or_error(
   diagnostics->beta_status = NP_BETA_OK;
 }
 
-static double np_beta_conditional_density_bw_objective(
-  double *vector_scale_factor,
-  int use_ls)
-{
-  if(use_ls)
-    return np_beta_objective_conditional_density_ls(
-      BANDWIDTH_den_extern,
-      KERNEL_reg_extern, np_beta_cx_bw_order_extern,
-      KERNEL_den_extern, np_beta_cy_bw_order_extern,
-      int_bounded_cvls_quadrature_points_extern,
-      num_obs_train_extern,
-      num_reg_continuous_extern, num_var_continuous_extern,
-      matrix_X_continuous_train_extern,
-      matrix_Y_continuous_train_extern,
-      &vector_scale_factor[1],
-      vector_cxkerlb_extern, vector_cxkerub_extern,
-      vector_cykerlb_extern, vector_cykerub_extern);
-  return np_beta_objective_conditional_density_ml(
-    BANDWIDTH_den_extern,
-    KERNEL_reg_extern, np_beta_cx_bw_order_extern,
-    KERNEL_den_extern, np_beta_cy_bw_order_extern,
-    num_obs_train_extern,
-    num_reg_continuous_extern, num_var_continuous_extern,
-    matrix_X_continuous_train_extern,
-    matrix_Y_continuous_train_extern,
-    &vector_scale_factor[1],
-    vector_cxkerlb_extern, vector_cxkerub_extern,
-    vector_cykerlb_extern, vector_cykerub_extern);
-}
-
 /*
  * Keep route construction and the expanded context call outside the shared
  * CVML wrapper.  The beta branch is selected before entry, while the legacy
@@ -281,6 +251,49 @@ np_beta_conditional_density_bw_objective_ctx(double *vector_scale_factor)
        num_categories_extern,
        &execution_context,
        &cv) == 1)
+    return DBL_MAX;
+  return cv;
+}
+
+/*
+ * Conditional-density CVLS uses the same immutable X/Y route descriptors as
+ * CVML, but enters the shared quadrature/analytic CVLS adapter.  Keeping this
+ * beta-only callback out of line preserves the incumbent legacy callback and
+ * makes failure after route selection terminal rather than a sidecar fallback.
+ */
+static NP_KERNELCV_NOINLINE double
+np_beta_conditional_density_bw_objective_ls_ctx(
+  double *vector_scale_factor)
+{
+  double cv = 0.0;
+  NPContinuousKernelRoute beta_x_route;
+  NPContinuousKernelRoute beta_y_route;
+  NPContinuousKernelDerivativeDiagnostics beta_x_diagnostics;
+  NPContinuousKernelDerivativeDiagnostics beta_y_diagnostics;
+  NPConditionalKernelExecutionContext execution_context = {0};
+
+  if(KERNEL_reg_extern == NP_CKERNEL_COORDINATE_CODE) {
+    np_beta_conditional_bw_route_or_error(
+      &beta_x_route, &beta_x_diagnostics,
+      np_beta_cx_bw_order_extern, num_reg_continuous_extern,
+      vector_cxkerlb_extern, vector_cxkerub_extern,
+      "conditional density CVLS X");
+    execution_context.x_route = &beta_x_route;
+    execution_context.x_diagnostics = &beta_x_diagnostics;
+  }
+  if(KERNEL_den_extern == NP_CKERNEL_COORDINATE_CODE) {
+    np_beta_conditional_bw_route_or_error(
+      &beta_y_route, &beta_y_diagnostics,
+      np_beta_cy_bw_order_extern, num_var_continuous_extern,
+      vector_cykerlb_extern, vector_cykerub_extern,
+      "conditional density CVLS Y");
+    execution_context.y_route = &beta_y_route;
+    execution_context.y_diagnostics = &beta_y_diagnostics;
+  }
+  execution_context.categorical_compress =
+    np_conditional_density_bw_categorical_compress_extern;
+  if(np_conditional_density_cvls_lp_stream_ctx(
+       &vector_scale_factor[1], &execution_context, &cv) != 0)
     return DBL_MAX;
   return cv;
 }
@@ -804,7 +817,8 @@ double np_cv_func_con_density_categorical_ls_npksum(double *vector_scale_factor)
 
   if(np_beta_conditional_bw_active()) {
     start = clock();
-    cv = np_beta_conditional_density_bw_objective(vector_scale_factor, 1);
+    cv = np_beta_conditional_density_bw_objective_ls_ctx(
+      vector_scale_factor);
     diff = clock() - start;
     timing_extern = ((double)diff) / ((double)CLOCKS_PER_SEC);
     return cv;

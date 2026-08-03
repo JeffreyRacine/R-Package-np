@@ -91,7 +91,50 @@ test_that("live bounded CVLS retains literal legacy arithmetic under null", {
   )[[1L]]
   expect_gt(sibling_start, 0L)
   sibling <- substr(engine, sibling_start, nchar(engine))
-  expect_match(sibling, "return 1;", fixed = TRUE)
-  expect_false(grepl("NPConditionalCVLSRowProvider provider", sibling,
-                     fixed = TRUE))
+  expect_match(sibling, "NPConditionalCVLSRowProvider provider;", fixed = TRUE)
+  expect_match(sibling, "provider.y_eval_block =", fixed = TRUE)
+  expect_match(sibling, "&provider", fixed = TRUE)
+})
+
+test_that("analytic routed CVLS uses bounded tiles and only an allocation fallback", {
+  path <- locate_beta_conditional_cvls_provider_source()
+  skip_if(is.null(path), "package source unavailable")
+  engine <- paste(readLines(path, warn = FALSE), collapse = "\n")
+  start <- regexpr(
+    "static int np_conditional_density_cvls_provider_supertile_stream(",
+    engine,
+    fixed = TRUE
+  )[[1L]]
+  finish <- regexpr(
+    "int np_conditional_density_cvls_lp_stream_ctx(",
+    engine,
+    fixed = TRUE
+  )[[1L]]
+  expect_gt(start, 0L)
+  expect_gt(finish, start)
+  route <- substr(engine, start, finish - 1L)
+
+  expect_match(
+    route,
+    "np_conditional_lp_cvls_block_size(num_obs, 6U, 0U)",
+    fixed = TRUE
+  )
+  expect_match(route, "group_width = MIN(4, MAX(1, nblocks));", fixed = TRUE)
+  expect_match(route, "np_blas_dgemm_tn_int(", fixed = TRUE)
+  expect_false(grepl(
+    "np_cvls_workspace_matrix_try(num_obs, num_obs",
+    route,
+    fixed = TRUE
+  ))
+  expect_false(grepl("kernel_weighted_sum_np(", route, fixed = TRUE))
+
+  sibling <- substr(engine, finish, nchar(engine))
+  expect_match(
+    sibling,
+    paste0(
+      "if(status == 2)\n",
+      "      status = np_conditional_density_cvls_lp_row_stream("
+    ),
+    fixed = TRUE
+  )
 })

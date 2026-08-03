@@ -93,7 +93,7 @@ conditional_cvls_delete_one_oracle <- function(xdat, ydat, bw) {
     basis = bw$basis.engine,
     bernstein.basis = bw$bernstein.basis.engine
   )
-  xraw <- npksum(
+  x.arguments <- list(
     bws = bw$xbw,
     txdat = xdat,
     exdat = xdat,
@@ -103,8 +103,15 @@ conditional_cvls_delete_one_oracle <- function(xdat, ydat, bw) {
     operator = "normal",
     return.kernel.weights = TRUE,
     bandwidth.divide = FALSE
-  )$kw
-  if (identical(bw$type, "adaptive_nn")) {
+  )
+  if (identical(bw$cxkertype, "beta")) {
+    x.arguments$ckerbound <- bw$cxkerbound
+    x.arguments$ckerlb <- bw$cxkerlb
+    x.arguments$ckerub <- bw$cxkerub
+  }
+  xraw <- do.call(npksum, x.arguments)$kw
+  if (identical(bw$type, "adaptive_nn") &&
+      !identical(bw$cxkertype, "beta")) {
     xraw <- xraw / conditional_cvls_bandwidth_matrices(
       xdat, bw$xbw, bw$type, convolution = FALSE
     )
@@ -249,6 +256,65 @@ test_that("conditional LP CVLS matches independent delete-one WLS", {
     expect_equal(
       as.numeric(native), oracle, tolerance = 2e-8,
       info = paste(case$type, case$kernel, case$order,
+                   if (case$bernstein) "bernstein" else "raw")
+    )
+  }
+})
+
+test_that("beta-X conditional LP CVLS matches independent signed WLS", {
+  skip_on_cran()
+  .ensure_conditional_delete_one_pool()
+  old <- options(np.messages = FALSE, np.tree = FALSE,
+                 np.categorical.compress = FALSE, np.largeh = FALSE)
+  on.exit(options(old), add = TRUE)
+
+  set.seed(2026080112L)
+  n <- 54L
+  xdat <- data.frame(
+    x1 = runif(n, 0.05, 0.95),
+    x2 = runif(n, 0.04, 0.96)
+  )
+  ydat <- data.frame(
+    y = 0.35 + 0.22 * sin(2 * pi * xdat$x1) - 0.16 * xdat$x2 +
+      rnorm(n, sd = 0.08)
+  )
+  cases <- list(
+    list(type = "fixed", order = 2L, degree = c(1L, 1L),
+         bernstein = FALSE, bws = c(0.27, 0.25, 0.28)),
+    list(type = "fixed", order = 8L, degree = c(2L, 2L),
+         bernstein = TRUE, bws = c(0.29, 0.31, 0.33)),
+    list(type = "generalized_nn", order = 4L, degree = c(2L, 2L),
+         bernstein = FALSE, bws = c(21L, 24L, 25L)),
+    list(type = "adaptive_nn", order = 6L, degree = c(1L, 1L),
+         bernstein = TRUE, bws = c(22L, 24L, 25L))
+  )
+
+  for (case in cases) {
+    bw <- npcdensbw(
+      xdat = xdat,
+      ydat = ydat,
+      bws = case$bws,
+      bandwidth.compute = FALSE,
+      bwmethod = "cv.ls",
+      bwtype = case$type,
+      regtype = "lp",
+      degree = case$degree,
+      basis = "glp",
+      bernstein.basis = case$bernstein,
+      cxkertype = "beta",
+      cxkerorder = case$order,
+      cxkerbound = "fixed",
+      cxkerlb = c(0, 0),
+      cxkerub = c(1, 1),
+      cykertype = "gaussian",
+      cykerorder = 2L
+    )
+    native <- npRmpi:::.npcdensbw_eval_only(xdat, ydat, bw)$objective
+    oracle <- conditional_cvls_delete_one_oracle(xdat, ydat, bw)
+
+    expect_equal(
+      as.numeric(native), oracle, tolerance = 5e-8,
+      info = paste(case$type, case$order,
                    if (case$bernstein) "bernstein" else "raw")
     )
   }

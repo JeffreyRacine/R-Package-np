@@ -1,3 +1,18 @@
+.beta_conditional_bw_test_env <- new.env(parent = emptyenv())
+
+.ensure_beta_conditional_bw_pool <- function() {
+  if (!isTRUE(.beta_conditional_bw_test_env$started)) {
+    skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+    .beta_conditional_bw_test_env$started <- TRUE
+    withr::defer({
+      if (isTRUE(.beta_conditional_bw_test_env$started)) {
+        try(close_mpi_slaves(force = TRUE), silent = TRUE)
+        .beta_conditional_bw_test_env$started <- FALSE
+      }
+    }, envir = testthat::teardown_env())
+  }
+}
+
 conditional_beta_bw_weights <- function(train, evaluation, bandwidth,
                                         bwtype, kertype = "beta",
                                         order = 2L,
@@ -53,6 +68,7 @@ conditional_beta_manual_bw <- function(x, y, hx, hy,
 }
 
 test_that("conditional beta objectives agree with independent fixed-bandwidth oracles", {
+  .ensure_beta_conditional_bw_pool()
   x <- c(0.02, 0.08, 0.19, 0.37, 0.62, 0.81, 0.96)
   y <- c(0.03, 0.14, 0.24, 0.43, 0.59, 0.79, 0.97)
   hx <- 0.17
@@ -143,6 +159,7 @@ test_that("conditional beta objectives agree with independent fixed-bandwidth or
 })
 
 test_that("conditional beta CVLS honors the bounded quadrature grid controls", {
+  .ensure_beta_conditional_bw_pool()
   x <- c(0.02, 0.07, 0.13, 0.26, 0.44, 0.67, 0.85, 0.97)
   y <- c(0.01, 0.03, 0.08, 0.19, 0.42, 0.7, 0.91, 0.99)
   evaluate <- function(grid) {
@@ -162,6 +179,7 @@ test_that("conditional beta CVLS honors the bounded quadrature grid controls", {
 })
 
 test_that("beta X with unbounded Gaussian Y uses the analytic CVLS overlap", {
+  .ensure_beta_conditional_bw_pool()
   x <- c(0.02, 0.07, 0.16, 0.31, 0.5, 0.69, 0.84, 0.96)
   y <- c(-1.4, -0.92, -0.41, -0.08, 0.25, 0.61, 1.05, 1.48)
   hx <- 0.17
@@ -207,6 +225,7 @@ test_that("beta X with unbounded Gaussian Y uses the analytic CVLS overlap", {
 })
 
 test_that("beta X with one-sided Gaussian Y uses effective bounded quadrature", {
+  .ensure_beta_conditional_bw_pool()
   x <- c(0.02, 0.07, 0.16, 0.31, 0.5, 0.69, 0.84, 0.96)
   y <- c(0.12, 0.23, 0.41, 0.72, 1.08, 1.51, 2.04, 2.7)
   hx <- 0.17
@@ -258,6 +277,7 @@ test_that("beta X with one-sided Gaussian Y uses effective bounded quadrature", 
 })
 
 test_that("sample-grid conditional beta CVLS uses its actual generalized-NN grid", {
+  .ensure_beta_conditional_bw_pool()
   x <- c(0.02, 0.07, 0.13, 0.26, 0.44, 0.67, 0.85, 0.97)
   y <- c(0.01, 0.03, 0.08, 0.19, 0.42, 0.7, 0.91, 0.99)
   hx <- 3
@@ -293,6 +313,7 @@ test_that("sample-grid conditional beta CVLS uses its actual generalized-NN grid
 })
 
 test_that("conditional beta CVML agrees with nearest-neighbor weight ratios", {
+  .ensure_beta_conditional_bw_pool()
   x <- c(0.02, 0.07, 0.16, 0.31, 0.5, 0.69, 0.84, 0.96)
   y <- c(0.03, 0.12, 0.22, 0.39, 0.57, 0.72, 0.87, 0.98)
 
@@ -316,6 +337,7 @@ test_that("conditional beta CVML agrees with nearest-neighbor weight ratios", {
 })
 
 test_that("conditional beta scaling uses the matching X and Y standard deviations", {
+  .ensure_beta_conditional_bw_pool()
   x <- c(0.02, 0.05, 0.11, 0.22, 0.41, 0.65, 0.83, 0.97)
   y <- c(0.2, 0.22, 0.27, 0.35, 0.48, 0.63, 0.81, 0.94)
   scale.x <- 0.8
@@ -341,6 +363,7 @@ test_that("conditional beta scaling uses the matching X and Y standard deviation
 })
 
 test_that("conditional beta objectives cover all orders and mixed sides", {
+  .ensure_beta_conditional_bw_pool()
   x <- c(0.03, 0.09, 0.2, 0.38, 0.61, 0.78, 0.93)
   y <- c(0.04, 0.13, 0.27, 0.45, 0.58, 0.76, 0.95)
 
@@ -391,7 +414,62 @@ test_that("conditional beta objectives cover all orders and mixed sides", {
   }
 })
 
+test_that("mixed conditional beta objectives share compression-neutral owners", {
+  .ensure_beta_conditional_bw_pool()
+  old <- options(np.messages = FALSE, np.tree = FALSE,
+                 np.categorical.compress = FALSE)
+  on.exit(options(old), add = TRUE)
+
+  set.seed(2026080113L)
+  n <- 31L
+  x <- data.frame(
+    x = runif(n, 0.04, 0.96),
+    group = factor(sample(letters[1:3], n, replace = TRUE))
+  )
+  y <- data.frame(
+    y = runif(n, 0.05, 0.95),
+    rank = ordered(sample(c("low", "high"), n, replace = TRUE))
+  )
+
+  for (method in c("cv.ml", "cv.ls")) {
+    for (regtype in c("lc", "lp")) {
+      arguments <- list(
+        xdat = x, ydat = y,
+        bws = c(0.18, 0.2, 0.17, 0.22),
+        bandwidth.compute = FALSE,
+        bwmethod = method,
+        bwtype = "fixed",
+        regtype = regtype,
+        cxkertype = "beta", cxkerorder = 6L,
+        cxkerbound = "fixed", cxkerlb = c(0, NA),
+        cxkerub = c(1, NA),
+        cykertype = "beta", cykerorder = 8L,
+        cykerbound = "fixed", cykerlb = c(0, NA),
+        cykerub = c(1, NA)
+      )
+      if (identical(regtype, "lp")) {
+        arguments$degree <- 2L
+        arguments$basis <- "glp"
+        arguments$bernstein.basis <- FALSE
+      }
+
+      values <- vapply(c(FALSE, TRUE), function(compress) {
+        options(np.categorical.compress = compress)
+        bw <- do.call(npcdensbw, arguments)
+        as.numeric(npRmpi:::.npcdensbw_eval_only(x, y, bw)$objective[[1L]])
+      }, numeric(1L))
+
+      expect_true(all(is.finite(values)))
+      expect_identical(
+        values[[2L]], values[[1L]],
+        info = paste(method, regtype)
+      )
+    }
+  }
+})
+
 test_that("automatic conditional beta selection returns usable bandwidths", {
+  .ensure_beta_conditional_bw_pool()
   x <- data.frame(x = c(0.02, 0.06, 0.13, 0.24, 0.39, 0.57, 0.73, 0.86, 0.96))
   y <- data.frame(y = c(0.03, 0.1, 0.19, 0.3, 0.48, 0.61, 0.77, 0.89, 0.98))
   common <- list(
@@ -409,12 +487,25 @@ test_that("automatic conditional beta selection returns usable bandwidths", {
     scale.factor.init.upper = 0.4,
     scale.factor.search.lower = 0.03
   )))
+  density.lp <- do.call(npcdensbw, c(common, list(
+    bwmethod = "cv.ls", bwtype = "fixed",
+    regtype = "lp", degree = 1L, basis = "glp",
+    bernstein.basis = FALSE,
+    scale.factor.init = 0.18,
+    scale.factor.init.lower = 0.06,
+    scale.factor.init.upper = 0.4,
+    scale.factor.search.lower = 0.03
+  )))
   distribution <- do.call(npcdistbw, c(common, list(
     bwmethod = "cv.ls", bwtype = "generalized_nn", ngrid = 7L
   )))
 
   expect_true(all(is.finite(c(density$xbw, density$ybw, density$fval[1L]))))
   expect_true(all(c(density$xbw, density$ybw) > 0))
+  expect_true(all(is.finite(c(
+    density.lp$xbw, density.lp$ybw, density.lp$fval[1L]
+  ))))
+  expect_true(all(c(density.lp$xbw, density.lp$ybw) > 0))
   expect_true(all(is.finite(c(
     distribution$xbw, distribution$ybw, distribution$fval[1L]
   ))))
@@ -433,4 +524,15 @@ test_that("automatic conditional beta selection returns usable bandwidths", {
   mads.args$scale.factor.search.lower <- 0.03
   mads <- do.call(npcdensbw, mads.args)
   expect_true(all(is.finite(c(mads$xbw, mads$ybw, mads$fval[1L]))))
+
+  mads.lp.args <- mads.args
+  mads.lp.args$bwmethod <- "cv.ls"
+  mads.lp.args$regtype <- "lp"
+  mads.lp.args$degree <- 1L
+  mads.lp.args$basis <- "glp"
+  mads.lp.args$bernstein.basis <- FALSE
+  mads.lp <- do.call(npcdensbw, mads.lp.args)
+  expect_true(all(is.finite(c(
+    mads.lp$xbw, mads.lp$ybw, mads.lp$fval[1L]
+  ))))
 })

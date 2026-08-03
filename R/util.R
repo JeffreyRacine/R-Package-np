@@ -4774,13 +4774,15 @@ npConditionalContinuousKernelCode <- function(bws, side = c("x", "y")) {
 
 npValidateConditionalBetaBandwidthObject <- function(bws,
                                                       where,
-                                                      bandwidth.compute = FALSE) {
+                                                      bandwidth.compute = FALSE,
+                                                      allow.automatic.full = FALSE) {
   beta.x <- identical(bws[["cxkertype", exact = TRUE]], "beta")
   beta.y <- identical(bws[["cykertype", exact = TRUE]], "beta")
   has.beta <- beta.x || beta.y
   canonical.single.side <- xor(beta.x, beta.y)
   canonical.manual.fit <- !isTRUE(bandwidth.compute)
-  canonical.fit.route <- canonical.single.side || canonical.manual.fit
+  canonical.fit.route <- isTRUE(allow.automatic.full) ||
+    canonical.single.side || canonical.manual.fit
   if (!has.beta)
     return(invisible(FALSE))
 
