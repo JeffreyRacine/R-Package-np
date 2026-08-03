@@ -11883,6 +11883,7 @@ SEXP C_np_kernelsum(SEXP tuno,
     const int num_weight_columns = INTEGER(myopti_i)[KWS_WNCOLI];
     const int train_is_eval = INTEGER(myopti_i)[KWS_TISEI];
     const int leave_one_out = INTEGER(myopti_i)[KWS_LOOI];
+    const int suppress_parallel = INTEGER(myopti_i)[KWS_SPARI];
     const int categorical_compress =
       XLENGTH(myopti_i) > KWS_CCOMPRESSI ?
       INTEGER(myopti_i)[KWS_CCOMPRESSI] : 0;
@@ -11908,6 +11909,8 @@ SEXP C_np_kernelsum(SEXP tuno,
     if(ncon < 0 || nuno < 0 || nord < 0 ||
        nuno > INT_MAX - nord)
       error("C_np_kernelsum: invalid beta kernel-sum dimensions");
+    if(suppress_parallel != 0 && suppress_parallel != 1)
+      error("C_np_kernelsum: invalid parallel-suppression option");
     ncat = nuno + nord;
     if(ncat > 0 && XLENGTH(myopti_i) <= KWS_CCOMPRESSI)
       error("C_np_kernelsum: categorical-compression state is missing");
@@ -11985,7 +11988,7 @@ SEXP C_np_kernelsum(SEXP tuno,
         beta_bandwidth_mode,
         REAL(tcon_r), train_is_eval ? NULL : REAL(econ_r), REAL(bw_r),
         num_train, num_eval, ncon, train_is_eval,
-        need_eval, need_train, 0,
+        need_eval, need_train, suppress_parallel,
         bandwidth_eval_storage, bandwidth_train_storage);
       if(bandwidth_status != NP_BETA_BANDWIDTH_PREPARE_OK)
         error("C_np_kernelsum: %s",
@@ -12073,7 +12076,7 @@ SEXP C_np_kernelsum(SEXP tuno,
         beta_bandwidth_code, num_train, num_eval,
         nuno, nord, ncon, leave_one_out, 0,
         beta_kernel_power, 0, 0, 0, 0, 0, 0,
-        INTEGER(op_i), OP_NOOP, 0, 0, NULL, 0,
+        INTEGER(op_i), OP_NOOP, 0, 0, NULL, suppress_parallel,
         num_response_columns, num_weight_columns,
         NP_TREE_FALSE, 0, NULL, NULL, NULL, NULL,
         categorical_ingress.train_unordered,
@@ -12117,7 +12120,7 @@ SEXP C_np_kernelsum(SEXP tuno,
             beta_bandwidth_code, num_train, num_eval,
             nuno, nord, ncon, leave_one_out, 0,
             beta_kernel_power, 0, 0, 0, 0, 0, 0,
-            direct_operators, OP_NOOP, 0, 0, NULL, 0,
+            direct_operators, OP_NOOP, 0, 0, NULL, suppress_parallel,
             num_response_columns, num_weight_columns,
             NP_TREE_FALSE, 0, NULL, NULL, NULL, NULL,
             categorical_ingress.train_unordered,
@@ -12296,6 +12299,7 @@ SEXP C_np_kernelsum_power12(SEXP tuno,
     const int num_eval = INTEGER(myopti_i)[KWS_ENOBSI];
     const int train_is_eval = INTEGER(myopti_i)[KWS_TISEI];
     const int leave_one_out = INTEGER(myopti_i)[KWS_LOOI];
+    const int suppress_parallel = INTEGER(myopti_i)[KWS_SPARI];
     const int ncol_Y = INTEGER(myopti_i)[KWS_YNCOLI];
     const int bandwidth_code = INTEGER(myopti_i)[KWS_BWI];
     const int categorical_compress = ncat > 0 &&
@@ -12321,6 +12325,7 @@ SEXP C_np_kernelsum_power12(SEXP tuno,
 
     if(ncon <= 0 ||
        num_train <= 0 || num_eval <= 0 ||
+       (suppress_parallel != 0 && suppress_parallel != 1) ||
        (train_is_eval != 0 && train_is_eval != 1) ||
        (leave_one_out != 0 && leave_one_out != 1) ||
        (train_is_eval && num_train != num_eval) ||
@@ -12394,7 +12399,7 @@ SEXP C_np_kernelsum_power12(SEXP tuno,
       bandwidth_status = np_beta_bandwidth_prepare(
         bandwidth_mode, REAL(tcon_r), train_is_eval ? NULL : REAL(econ_r),
         REAL(bw_r), num_train, num_eval, ncon, train_is_eval,
-        need_eval, need_train, 0,
+        need_eval, need_train, suppress_parallel,
         bandwidth_eval_storage, bandwidth_train_storage);
       if(bandwidth_status != NP_BETA_BANDWIDTH_PREPARE_OK)
         error("C_np_kernelsum_power12: %s",
