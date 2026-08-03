@@ -8197,10 +8197,82 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
 //consisting of nproc*stride will not segfault. It is up to the caller
 //to ensure that this is the case.
 
-// this will be fixed by using the mpi*v functions
+typedef enum {
+  NP_PKW_OUTPUT_UNSET = 0,
+  NP_PKW_OUTPUT_DENSE_FULL,
+  NP_PKW_OUTPUT_TREE_SPARSE,
+  NP_PKW_OUTPUT_MPI_DENSE,
+  NP_PKW_OUTPUT_MPI_TREE_SPARSE,
+  NP_PKW_OUTPUT_ADAPTIVE_FULL,
+  NP_PKW_OUTPUT_MPI_ADAPTIVE
+} NPPermutationWeightOutputState;
 
-static double * kernel_weighted_sum_pkw_extern = NULL;
-static int kernel_weighted_sum_pkw_nvar_extern = 0;
+/*
+ * Invocation-owned derivative kernel-weight destination.  The core validates
+ * the block count, computes checked plane/total sizes, and records the actual
+ * traversal/ownership state.  No pointer or transfer mode may outlive the
+ * native invocation.
+ */
+typedef struct {
+  double *data;
+  int block_count;
+  size_t plane_elements;
+  size_t total_elements;
+  NPPermutationWeightOutputState state;
+} NPPermutationWeightOutput;
+
+static NPPermutationWeightOutput np_pkw_output_make(double * const data,
+                                                    const int block_count)
+{
+  NPPermutationWeightOutput output = {
+    data, data == NULL ? 0 : block_count, 0U, 0U, NP_PKW_OUTPUT_UNSET
+  };
+  return output;
+}
+
+static inline int np_pkw_block_count(const int num_reg_continuous,
+                                     const int num_reg_unordered,
+                                     const int num_reg_ordered,
+                                     const int permutation_operator,
+                                     const int do_score,
+                                     const int do_ocg,
+                                     const int * const bpso)
+{
+  int count = 0;
+  int total = 0;
+
+  if(num_reg_continuous < 0 || num_reg_unordered < 0 ||
+     num_reg_ordered < 0 ||
+     num_reg_continuous > INT_MAX - num_reg_unordered ||
+     num_reg_continuous + num_reg_unordered > INT_MAX - num_reg_ordered)
+    return -1;
+
+  total = num_reg_continuous + num_reg_unordered + num_reg_ordered;
+
+  if(bpso == NULL) {
+    if((do_score || do_ocg) && num_reg_unordered > INT_MAX - num_reg_ordered)
+      return -1;
+    return
+      ((permutation_operator != OP_NOOP) ? num_reg_continuous : 0) +
+      ((do_score || do_ocg) ? num_reg_unordered + num_reg_ordered : 0);
+  }
+
+  for(int i = 0; i < total; ++i) {
+    if(bpso[i] < 0 || count > INT_MAX - bpso[i])
+      return -1;
+    count += bpso[i];
+  }
+
+  return count;
+}
+
+static int np_pkw_output_is_sparse(
+  const NPPermutationWeightOutput * const output)
+{
+  return output != NULL &&
+    (output->state == NP_PKW_OUTPUT_TREE_SPARSE ||
+     output->state == NP_PKW_OUTPUT_MPI_TREE_SPARSE);
+}
 
 typedef struct {
   double *weighted_sum;
@@ -9639,7 +9711,8 @@ const NP_GateOverrideCtx * const gate_override_ctx,
 const NP_DualPowerCtx * const dual_power_ctx,
 const NP_OuterPackCtx * const outer_pack_ctx,
 const NPContinuousKernelExecutionContext * const kernel_execution_context,
-const NPCenteredMomentCtx * const centered_moment_ctx){
+const NPCenteredMomentCtx * const centered_moment_ctx,
+NPPermutationWeightOutput * const pkw_output){
   const NP_GateOverrideCtx * const gate_ctx_raw =
     (gate_override_ctx != NULL) ? gate_override_ctx : &np_gate_override_ctx;
   const NP_GateOverrideCtx gate_ctx_empty = {0};
@@ -9823,7 +9896,8 @@ const NPCenteredMomentCtx * const centered_moment_ctx){
     for(i = num_reg_continuous; i < num_reg_continuous+num_reg_unordered+num_reg_ordered; i++)
       bpso[i] = doscoreocg;
 
-    p_nvar = (do_perm ? num_reg_continuous : 0) + (doscoreocg ? num_reg_unordered + num_reg_ordered : 0);
+    p_nvar = (do_perm ? num_reg_continuous : 0) +
+      (doscoreocg ? num_reg_unordered + num_reg_ordered : 0);
 
   } else {
     // it's possible that do_perm and do_ocg could be set, but no continuous or categorical
@@ -10568,13 +10642,22 @@ const NPCenteredMomentCtx * const centered_moment_ctx){
     }
   }
 
-  if((kernel_weighted_sum_pkw_extern != NULL) &&
-     (kernel_weighted_sum_pkw_nvar_extern > 0))
+  if(pkw_output != NULL){
+    if(pkw_output->data == NULL || pkw_output->block_count <= 0 ||
+       pkw_output->block_count != p_nvar){
+      status = KWSNP_ERR_BADINVOC;
+      goto cleanup;
+    }
     pkw_plane = np_jksum_size_mul_or_die(
       (size_t)progress_total, (size_t)num_xt,
       "permuted kernel-weight plane");
+    pkw_output->plane_elements = pkw_plane;
+    pkw_output->total_elements = np_jksum_size_mul_or_die(
+      (size_t)pkw_output->block_count, pkw_plane,
+      "derivative kernel-weight output");
+  }
 
-  if(np_ks_tree_use && !is_adaptive && pkw_plane > 0){
+  if(np_ks_tree_use && pkw_plane > 0){
     for(i = 0; i < num_reg_continuous; i++){
       const int kernel = KERNEL_reg_np[i];
       const int p_kernel = (do_perm && bpso[i]) ? permutation_kernel[i] : kernel;
@@ -10587,15 +10670,19 @@ const NPCenteredMomentCtx * const centered_moment_ctx){
         break;
     }
 
-    if(tree_pkw_sparse){
-      const size_t pkw_count =
-        np_jksum_size_mul_or_die(
-          (size_t)kernel_weighted_sum_pkw_nvar_extern, pkw_plane,
-          "tree derivative kernel-weight initialization");
-      memset(kernel_weighted_sum_pkw_extern, 0,
-             np_jksum_size_mul_or_die(pkw_count, sizeof(double),
-                                      "tree derivative kernel-weight initialization"));
-    }
+  }
+
+  if(pkw_output != NULL){
+    pkw_output->state = tree_pkw_sparse ?
+      NP_PKW_OUTPUT_TREE_SPARSE :
+      (is_adaptive ?
+       NP_PKW_OUTPUT_ADAPTIVE_FULL : NP_PKW_OUTPUT_DENSE_FULL);
+
+    if(tree_pkw_sparse)
+      memset(pkw_output->data, 0,
+             np_jksum_size_mul_or_die(pkw_output->total_elements,
+                                      sizeof(double),
+                                      "derivative kernel-weight initialization"));
   }
 
   if (BANDWIDTH_reg == BW_FIXED || BANDWIDTH_reg == BW_GEN_NN){
@@ -11507,9 +11594,9 @@ const NPCenteredMomentCtx * const centered_moment_ctx){
       }
     }
 
-    if((kernel_weighted_sum_pkw_extern != NULL) && (kernel_weighted_sum_pkw_nvar_extern > 0)){
-      for(ii = 0; ii < kernel_weighted_sum_pkw_nvar_extern; ii++){
-        if(tree_pkw_sparse && (p_pxl != NULL)){
+    if(pkw_output != NULL){
+      for(ii = 0; ii < pkw_output->block_count; ii++){
+        if(np_pkw_output_is_sparse(pkw_output) && (p_pxl != NULL)){
           const size_t dst_offset =
             (size_t)ii*pkw_plane +
             (size_t)j*(size_t)num_xt;
@@ -11520,30 +11607,32 @@ const NPCenteredMomentCtx * const centered_moment_ctx){
             const int nlev = p_pxl[ii].nlev[support];
             const int iend = istart + nlev;
 
-            if(istart < 0 || nlev < 0 || iend < istart || iend > num_xt)
-              error("invalid tree derivative kernel-weight support interval");
+            if(istart < 0 || nlev < 0 || iend < istart || iend > num_xt){
+              status = KWSNP_ERR_BADINVOC;
+              goto cleanup;
+            }
 
             if(bandwidth_divide_weights){
               for(i = istart; i < iend; i++)
-                kernel_weighted_sum_pkw_extern[dst_offset + (size_t)i] =
+                pkw_output->data[dst_offset + (size_t)i] =
                   tprod_mp[src_offset + (size_t)i]/p_dband[ii];
             } else {
               for(i = istart; i < iend; i++)
-                kernel_weighted_sum_pkw_extern[dst_offset + (size_t)i] =
+                pkw_output->data[dst_offset + (size_t)i] =
                   tprod_mp[src_offset + (size_t)i];
             }
           }
         } else if(bandwidth_divide_weights)
           for(i = 0; i < num_xt; i++)
-            kernel_weighted_sum_pkw_extern[(size_t)ii*pkw_plane +
-                                            (size_t)j*(size_t)num_xt +
-                                            (size_t)i] =
+            pkw_output->data[(size_t)ii*pkw_plane +
+                             (size_t)j*(size_t)num_xt +
+                             (size_t)i] =
               tprod_mp[ii*num_xt + i]/p_dband[ii];
         else
           for(i = 0; i < num_xt; i++)
-            kernel_weighted_sum_pkw_extern[(size_t)ii*pkw_plane +
-                                            (size_t)j*(size_t)num_xt +
-                                            (size_t)i] =
+            pkw_output->data[(size_t)ii*pkw_plane +
+                             (size_t)j*(size_t)num_xt +
+                             (size_t)i] =
               tprod_mp[ii*num_xt + i];
       }
     }
@@ -11851,7 +11940,8 @@ int ** matrix_ordered_indices,
 double * const weighted_sum,
 double * const weighted_permutation_sum,
 double * const kw,
-const NP_GateOverrideCtx * const gate_override_ctx){
+const NP_GateOverrideCtx * const gate_override_ctx,
+NPPermutationWeightOutput * const pkw_output){
   return kernel_weighted_sum_np_ctx_ex(
     KERNEL_reg,
     KERNEL_unordered_reg,
@@ -11909,7 +11999,8 @@ const NP_GateOverrideCtx * const gate_override_ctx){
     NULL,
     NULL,
     NULL,
-    NULL);
+    NULL,
+    pkw_output);
 }
 
 int kernel_weighted_sum_np_power12(
@@ -11966,17 +12057,17 @@ double * const weighted_sum_power2,
 double * const weighted_permutation_sum,
 double * const kw,
 double * const pkw){
-  double * old_pkw = kernel_weighted_sum_pkw_extern;
-  int old_pkw_nvar = kernel_weighted_sum_pkw_nvar_extern;
   int status = 0;
+  const int pkw_blocks = pkw == NULL ? 0 : np_pkw_block_count(
+    num_reg_continuous, num_reg_unordered, num_reg_ordered,
+    permutation_operator, do_score, do_ocg, bpso);
+  NPPermutationWeightOutput pkw_storage =
+    np_pkw_output_make(pkw, pkw_blocks);
+  NPPermutationWeightOutput * const pkw_output =
+    pkw == NULL ? NULL : &pkw_storage;
   const NP_DualPowerCtx dual_power_ctx = {
     weighted_sum_power2, 2, NULL, NULL, 0, 0, NULL, 0
   };
-
-  kernel_weighted_sum_pkw_extern = pkw;
-  kernel_weighted_sum_pkw_nvar_extern = (pkw == NULL) ? 0 :
-    (((permutation_operator != OP_NOOP) ? num_reg_continuous : 0) +
-     ((do_score || do_ocg) ? num_reg_unordered + num_reg_ordered : 0));
 
   status = kernel_weighted_sum_np_ctx_ex(
     KERNEL_reg,
@@ -12035,10 +12126,8 @@ double * const pkw){
     &dual_power_ctx,
     NULL,
     NULL,
-    NULL);
-
-  kernel_weighted_sum_pkw_extern = old_pkw;
-  kernel_weighted_sum_pkw_nvar_extern = old_pkw_nvar;
+    NULL,
+    pkw_output);
   return status;
 }
 
@@ -12107,6 +12196,7 @@ NPContinuousKernelProgressFunction progress)
     weighted_sum, NULL, NULL, NULL,
     &dual_power_ctx, NULL,
     kernel_route == NULL ? NULL : &kernel_execution_context,
+    NULL,
     NULL);
 }
 
@@ -12171,7 +12261,8 @@ NPContinuousKernelProgressFunction progress)
     weighted_sum, NULL, NULL, NULL,
     NULL, NULL,
     kernel_route == NULL ? NULL : &kernel_execution_context,
-    centered_m2 == NULL ? NULL : &centered_moment_ctx);
+    centered_m2 == NULL ? NULL : &centered_moment_ctx,
+    NULL);
 }
 
 int kernel_weighted_sum_np_route(
@@ -12231,15 +12322,17 @@ double * const pkw,
 const int categorical_compress,
 const NPContinuousKernelRoute * const kernel_route,
 NPContinuousKernelDerivativeDiagnostics * const kernel_route_diagnostics){
-  double * old_pkw = kernel_weighted_sum_pkw_extern;
-  int old_pkw_nvar = kernel_weighted_sum_pkw_nvar_extern;
   int status = 0;
+  const int pkw_blocks = pkw == NULL ? 0 : np_pkw_block_count(
+    num_reg_continuous, num_reg_unordered, num_reg_ordered,
+    permutation_operator, do_score, do_ocg, bpso);
+  NPPermutationWeightOutput pkw_storage =
+    np_pkw_output_make(pkw, pkw_blocks);
+  NPPermutationWeightOutput * const pkw_output =
+    pkw == NULL ? NULL : &pkw_storage;
   const NPContinuousKernelExecutionContext kernel_execution_context = {
     kernel_route, kernel_route_diagnostics, categorical_compress
   };
-
-  kernel_weighted_sum_pkw_extern = pkw;
-  kernel_weighted_sum_pkw_nvar_extern = (pkw == NULL) ? 0 : (((permutation_operator != OP_NOOP) ? num_reg_continuous : 0) + ((do_score || do_ocg) ? num_reg_unordered + num_reg_ordered : 0));
 
   status = kernel_weighted_sum_np_ctx_ex(KERNEL_reg,
                                     KERNEL_unordered_reg,
@@ -12298,9 +12391,8 @@ NPContinuousKernelDerivativeDiagnostics * const kernel_route_diagnostics){
                                     NULL,
                                     kernel_route == NULL ? NULL :
                                       &kernel_execution_context,
-                                    NULL);
-  kernel_weighted_sum_pkw_extern = old_pkw;
-  kernel_weighted_sum_pkw_nvar_extern = old_pkw_nvar;
+                                    NULL,
+                                    pkw_output);
   return status;
 }
 
@@ -14741,6 +14833,7 @@ static int np_lp_fixed_tree_sparse_accumulate(
                                     &oracle_mean_dummy,
                                     NULL,
                                     kw_oracle,
+                                    NULL,
                                     NULL) != 0)
         goto cleanup_sparse;
     }
@@ -15162,6 +15255,7 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
                                   NULL,
                                   &frozen_runtime_options,
                                   NULL,
+                                  NULL,
                                   NULL) != 0){
       int_LARGE_SF = tsf;
       goto cleanup_lp_cv;
@@ -15302,6 +15396,7 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
                                   NULL,
                                   NULL,
                                   &frozen_runtime_options,
+                                  NULL,
                                   NULL,
                                   NULL) != 0)
       goto cleanup_lp_cv;
@@ -15857,6 +15952,7 @@ static NP_NOINLINE NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas(
                                      NULL,
                                      NULL,
                                      &frozen_runtime_options,
+                                     NULL,
                                      NULL,
                                      NULL) != 0)
       goto cleanup_adaptive_blas;
@@ -16504,6 +16600,7 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
                                  NULL,
                                  &objective_pack_ctx,
                                  NULL,
+                                 NULL,
                                  NULL);
       int_LARGE_SF = tsf;
     }
@@ -16584,6 +16681,7 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
                                      NULL,
                                      &objective_pack_ctx,
                                      NULL,
+                                     NULL,
                                      NULL);
         } else {
           if(j < (num_obs-1)){
@@ -16653,6 +16751,7 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
                                        matrix_categorical_vals_extern,
                                        NULL,
                                        kwm+j*nrcc22,
+                                       NULL,
                                        NULL,
                                        NULL,
                                        NULL);
@@ -17127,6 +17226,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                            &aicc,
                            NULL, // no permutations
                            NULL, // do not return kernel weights
+                           NULL,
                            NULL);
     int_LARGE_SF = tsf;
 
@@ -17231,6 +17331,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                            mean,
                            NULL, // no permutations
                            NULL, // do not return kernel weights
+                           NULL,
                            NULL);
 
     // every even entry in mean is sum(y*kij)
@@ -18262,6 +18363,7 @@ double * cv){
                                          NULL,
                                          &execution_ctx,
                                          NULL,
+                                         NULL,
                                          NULL);
   if((engine_status != 0) || (row_tile_sink.count_rows != 0))
     goto cleanup_profile_cdf;
@@ -19047,7 +19149,8 @@ double * cv){
                            mean,
                            NULL, // no permutations
                            kwx,
-                           &gate_ctx_local);
+                           &gate_ctx_local,
+                           NULL);
     
     if(use_continuous_q123){
 #if NP_ACCEL_GAUSS_COMPILED
@@ -19870,7 +19973,8 @@ double *cv){
                                mean,
                                NULL, // no permutations
                                kwx,
-                               &gate_x_ctx);
+                               &gate_x_ctx,
+                               NULL);
       }
 
       for(iwy = 0; iwy < nwy; iwy++){
@@ -19955,7 +20059,8 @@ double *cv){
                                NULL,
                                NULL, // no permutations
                                kwy,
-                               &gate_y_ctx);
+                               &gate_y_ctx,
+                               NULL);
 
         const int64_t je_dwy = MIN(je,dwy);
 
@@ -20170,7 +20275,8 @@ double *cv){
                                mean,
                                NULL, // no permutations
                                kwx,
-                               &gate_x_ctx);
+                               &gate_x_ctx,
+                               NULL);
       }
 
       for(iwy = 0; iwy < nwy; iwy++){
@@ -20254,7 +20360,8 @@ double *cv){
                                NULL,
                                NULL, // no permutations
                                kwy,
-                               &gate_y_ctx);
+                               &gate_y_ctx,
+                               NULL);
 
         const int64_t je_dwy = MIN(je,dwy);
 
@@ -20853,7 +20960,7 @@ static NP_NOINLINE int np_beta_regression_lp_moment_row_canonical(
     bandwidth_mode == BW_FIXED ? NULL : matrix_bandwidth_eval,
     lambda, num_categories, matrix_categorical_vals, NULL,
     weighted_sum, NULL, scaled_kernel_weights, NULL,
-    &dual_power_context, NULL, &execution_context, NULL);
+    &dual_power_context, NULL, &execution_context, NULL, NULL);
 }
 
 void np_beta_scaled_row_context_init(NPBetaScaledRowContext *context)
@@ -22497,14 +22604,11 @@ const NPContinuousPreparedBandwidthView *prepared_bandwidth){
     }
     
     {
-      double * const old_pkw = kernel_weighted_sum_pkw_extern;
-      const int old_pkw_nvar = kernel_weighted_sum_pkw_nvar_extern;
+      NPPermutationWeightOutput conditional_pkw_output =
+        np_pkw_output_make(conditional_influence ? conditional_pkw : NULL,
+                           p_nvar);
       int kws_status;
 
-      if(conditional_influence) {
-        kernel_weighted_sum_pkw_extern = conditional_pkw;
-        kernel_weighted_sum_pkw_nvar_extern = p_nvar;
-      }
       kws_status = kernel_weighted_sum_np_ctx(kernel_c,
                            kernel_u,
                            kernel_o,
@@ -22555,9 +22659,9 @@ const NPContinuousPreparedBandwidthView *prepared_bandwidth){
                            meany,
                            permy, // permutations used for gradients
                            conditional_kw,
-                           &gate_ctx_local);
-      kernel_weighted_sum_pkw_extern = old_pkw;
-      kernel_weighted_sum_pkw_nvar_extern = old_pkw_nvar;
+                           &gate_ctx_local,
+                           conditional_influence ?
+                             &conditional_pkw_output : NULL);
       if(kws_status != 0)
         error("conditional regression kernel traversal failed");
     }
@@ -22877,6 +22981,7 @@ const NPContinuousPreparedBandwidthView *prepared_bandwidth){
                              reuse_fit_dual_power ? &fit_dual_power_ctx : NULL,
                              NULL,
                              NULL,
+                             NULL,
                              NULL);
       }
 
@@ -23009,7 +23114,8 @@ const NPContinuousPreparedBandwidthView *prepared_bandwidth){
                              out2,
                              NULL,
                              NULL,
-                             &gate_ctx_local);
+                             &gate_ctx_local,
+                             NULL);
 
       for(l = 0; l < glp_nterms; l++)
         for(i = 0; i < glp_nterms; i++)
@@ -23286,6 +23392,7 @@ static int np_conditional_kernel_row_core(const int *kernel_c,
                                     mean_out,
                                     NULL,
                                     kw_out,
+                                    NULL,
                                     NULL);
 }
 
@@ -23772,6 +23879,7 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
                                   matrix_categorical_vals_extern_X,
                                   NULL,
                                   out2,
+                                  NULL,
                                   NULL,
                                   NULL,
                                   NULL) != 0){
@@ -24891,6 +24999,7 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
                                   matrix_categorical_vals_extern_X,
                                   NULL,
                                   out,
+                                  NULL,
                                   NULL,
                                   NULL,
                                   NULL) != 0)
@@ -33676,7 +33785,8 @@ double *cv){
                          rho,  // weighted sum
                          NULL, // no permutations
                          NULL, // do not return kernel weights
-                         &gate_ctx_local);
+                         &gate_ctx_local,
+                         NULL);
   
   
 
@@ -33934,7 +34044,8 @@ double *cv){
                            res,  // weighted sum
                            NULL, // no permutations
                            NULL, // do not return kernel weights
-                           &gate_x_ctx);
+                           &gate_x_ctx,
+                           NULL);
 
     for(i = 0, cv1 = 0.0; i < num_obs; i++) cv1 += res[i];
 
@@ -34126,7 +34237,8 @@ double *cv){
                          res,  // weighted sum
                          NULL, // no permutations
                          NULL, // do not return kernel weights
-                         &gate_x_ctx);
+                         &gate_x_ctx,
+                         NULL);
 
 
   for(i = 0, cv2 = 0.0; i < num_obs; i++) cv2 += res[i];
@@ -34594,7 +34706,8 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
                                pdf,  // weighted sum
                                NULL, // no permutations
                                NULL, // do not return kernel weights
-                               &gate_ctx_local); // no permutation kernel weights
+                               &gate_ctx_local,
+                               NULL); // no permutation kernel weights
 
     if((BANDWIDTH_den == BW_FIXED) && (dop == OP_NORMAL)){
       for(l = 0, pnh = num_obs_train; l < num_reg_continuous; l++){

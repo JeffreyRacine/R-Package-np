@@ -1,5 +1,11 @@
 # np 0.70-6
 
+* Derivative kernel-weight output now uses invocation-scoped ownership and
+  each derivative block's canonical tree-support intervals. This removes
+  mutable native output state and corrects compact-support adaptive-nearest-
+  neighbour tree output while preserving exact dense, tree, automatic, and
+  repeated `npksum()` results, including mixed score/OCG blocks.
+
 * Corrected positive-degree raw local-polynomial bandwidth selection for
   conditional density and distribution estimators when predictor units make
   the raw polynomial coordinates numerically ill conditioned (for example,
