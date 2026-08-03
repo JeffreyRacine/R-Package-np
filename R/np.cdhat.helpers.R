@@ -223,7 +223,7 @@
     bws = op.info$bws,
     txdat = txdat,
     exdat = exdat,
-    bandwidth.divide = !identical(op.info$bws[["ckertype", exact = TRUE]], "beta"),
+    bandwidth.divide = op.info$bandwidth.divide,
     operator = op.info$operator
   )
 
@@ -254,7 +254,7 @@
     bws = op.info$bws,
     txdat = txdat,
     exdat = exdat,
-    bandwidth.divide = !identical(op.info$bws[["ckertype", exact = TRUE]], "beta"),
+    bandwidth.divide = op.info$bandwidth.divide,
     operator = op.info$operator
   )
 
@@ -365,7 +365,7 @@
     ),
     miss.ex = FALSE,
     leave.one.out = FALSE,
-    bandwidth.divide = !identical(bws[["ckertype", exact = TRUE]], "beta"),
+    bandwidth.divide = op.info$bandwidth.divide,
     mcv.numRow = attr(bws$xmcv, "num.row"),
     wncol = 0L,
     yncol = ncol(rhs),

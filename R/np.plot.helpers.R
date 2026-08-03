@@ -4924,15 +4924,23 @@
   if (length(operator) != nvars)
     stop(sprintf("%s requires one operator per column", where))
 
+  ncon <- bws[["ncon", exact = TRUE]]
+  icon <- bws[["icon", exact = TRUE]]
+  bw <- bws[["bw", exact = TRUE]]
+  beta.kernel <- identical(bws[["ckertype", exact = TRUE]], "beta")
   bw.scale <- 1.0
-  if (bws$ncon > 0L &&
-      !identical(bws[["ckertype", exact = TRUE]], "beta")) {
-    con.ops <- operator[bws$icon]
+  if (ncon > 0L && !beta.kernel) {
+    con.ops <- operator[icon]
     if (any(con.ops == "normal"))
-      bw.scale <- prod(bws$bw[bws$icon][con.ops == "normal"])
+      bw.scale <- prod(bw[icon][con.ops == "normal"])
   }
 
-  list(bws = bws, scale = bw.scale, operator = operator)
+  list(
+    bws = bws,
+    scale = bw.scale,
+    operator = operator,
+    bandwidth.divide = !beta.kernel
+  )
 }
 
 .np_ksum_unconditional_operator_fixed <- function(xdat, exdat, bws, operator) {
@@ -4950,7 +4958,7 @@
     bws = bws,
     txdat = xdat,
     exdat = exdat,
-    bandwidth.divide = !identical(bws[["ckertype", exact = TRUE]], "beta"),
+    bandwidth.divide = op.info$bandwidth.divide,
     operator = op.info$operator
   )
 
@@ -5580,18 +5588,14 @@
     bws = den.info$bws,
     txdat = xdat,
     exdat = exdat,
-    bandwidth.divide = !identical(
-      den.info$bws[["ckertype", exact = TRUE]], "beta"
-    ),
+    bandwidth.divide = den.info$bandwidth.divide,
     operator = den.info$operator
   )
   Knum <- .np_kernel_weights_direct(
     bws = num.info$bws,
     txdat = data.frame(xdat, ydat),
     exdat = data.frame(exdat, eydat),
-    bandwidth.divide = !identical(
-      num.info$bws[["ckertype", exact = TRUE]], "beta"
-    ),
+    bandwidth.divide = num.info$bandwidth.divide,
     operator = num.info$operator
   )
 
