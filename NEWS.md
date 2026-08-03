@@ -1,5 +1,10 @@
 # npRmpi 0.70-6
 
+* Corrected conditional plot/bootstrap dispatch so local-polynomial beta fits
+  retain the declared LP engine on every exact resample instead of being
+  intercepted by the local-constant count evaluator. MPI exact refits execute
+  locally within each outer bootstrap worker, avoiding nested collectives.
+
 * Conditional count-bootstrap levels with a beta predictor or response kernel
   now reuse the canonical scaled conditional rows and contract all count
   columns through BLAS. The evaluator streams one observation-length row per

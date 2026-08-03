@@ -8958,6 +8958,30 @@
   stop(sprintf("%s returned unexpected operator shape", where))
 }
 
+.np_conditional_localpoly_exact_refit <- function(xdat,
+                                                   ydat,
+                                                   exdat,
+                                                   eydat,
+                                                   bws,
+                                                   cdf) {
+  local.bws <- .npRmpi_autodispatch_untag(bws)
+  fit.args <- list(
+    bws = local.bws,
+    txdat = xdat,
+    tydat = ydat,
+    exdat = exdat,
+    eydat = eydat,
+    gradients = FALSE,
+    proper = FALSE
+  )
+  fit <- .np_plot_with_local_compiled_eval(if (cdf) {
+    do.call(npcdist, fit.args)
+  } else {
+    do.call(npcdens, fit.args)
+  })
+  as.numeric(if (cdf) fit$condist else fit$condens)
+}
+
 .np_ksum_conditional_operator_fixed <- function(xdat,
                                                 ydat,
                                                 exdat,
@@ -10328,7 +10352,7 @@
   )
 }
 
-.np_inid_boot_from_ksum_conditional_nn_exact_mpi <- function(xdat,
+.np_inid_boot_from_ksum_conditional_exact_mpi <- function(xdat,
                                                             ydat,
                                                             exdat,
                                                             eydat,
@@ -10339,7 +10363,7 @@
                                                             counts.drawer = NULL,
                                                             progress.label = NULL,
                                                             fit_one_local) {
-  ## Contract: partition exact conditional NN bootstrap replications across
+  ## Contract: partition exact conditional bootstrap replications across
   ## MPI workers. Each worker reconstructs duplicate-row bootstrap samples and
   ## calls the supplied local evaluator so sample-dependent NN bandwidth state
   ## is rebuilt per replicate.
@@ -10348,8 +10372,10 @@
   nout <- length(t0)
   what.prefix <- if (identical(bws$type, "generalized_nn")) {
     "inid-ksum-conditional-generalized-exact"
-  } else {
+  } else if (identical(bws$type, "adaptive_nn")) {
     "inid-ksum-conditional-adaptive-exact"
+  } else {
+    "inid-ksum-conditional-fixed-exact"
   }
   chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
     B = B,
@@ -10388,6 +10414,10 @@
     fit_one_local = fit_one_local,
     eval_counts_chunk = eval_counts_chunk,
     .np_counts_to_indices = .np_counts_to_indices,
+    .np_conditional_localpoly_exact_refit =
+      .np_conditional_localpoly_exact_refit,
+    .np_plot_with_local_compiled_eval = .np_plot_with_local_compiled_eval,
+    .npRmpi_autodispatch_untag = .npRmpi_autodispatch_untag,
     .np_con_make_kbandwidth_x = .np_con_make_kbandwidth_x,
     .np_con_make_kbandwidth_xy = .np_con_make_kbandwidth_xy,
     .np_conditional_exact_fit_or_stop = .np_conditional_exact_fit_or_stop,
@@ -10487,7 +10517,7 @@
   }
 
   .npRmpi_bootstrap_fail_or_fallback(
-    msg = "conditional NN exact bootstrap fan-out did not dispatch",
+    msg = "conditional exact bootstrap fan-out did not dispatch",
     what = what.prefix
   )
 }
@@ -10514,13 +10544,37 @@
     stop("conditional exact bootstrap helper requires aligned x/y training and evaluation rows")
   if (n < 1L || neval < 1L || B < 1L)
     stop("invalid conditional exact bootstrap dimensions")
+  regtype <- .np_con_xregtype(bws)
+  general.lp <- !identical(regtype, "lc")
   joint.eligible <- .np_con_inid_ksum_eligible(bws)
   any.beta <- .np_con_has_beta_kernel(bws)
   mixed.continuous <- .np_con_continuous_lc_level_eligible(bws)
-  if (!joint.eligible && !mixed.continuous)
+  if (!general.lp && !joint.eligible && !mixed.continuous)
     return(NULL)
 
   fit_one_local <- function(x.train, y.train) {
+    if (general.lp) {
+      fit.expr.local <- function() {
+        .np_conditional_localpoly_exact_refit(
+          xdat = x.train,
+          ydat = y.train,
+          exdat = exdat,
+          eydat = eydat,
+          bws = bws,
+          cdf = cdf
+        )
+      }
+      if (identical(bws$type, "adaptive_nn")) {
+        return(.np_conditional_exact_fit_or_stop(
+          fit.expr = fit.expr.local,
+          bws = bws,
+          x.train = x.train,
+          y.train = y.train
+        ))
+      }
+      return(fit.expr.local())
+    }
+
     if (any.beta) {
       fit.expr.local <- function() {
         as.numeric(.np_beta_conditional_bootstrap_levels(
@@ -10657,8 +10711,9 @@
     return(list(t = tmat.local, t0 = t0.local))
   }
 
-  if (identical(bws$type, "adaptive_nn") || identical(bws$type, "generalized_nn")) {
-    return(.np_inid_boot_from_ksum_conditional_nn_exact_mpi(
+  if (general.lp || identical(bws$type, "adaptive_nn") ||
+      identical(bws$type, "generalized_nn")) {
+    return(.np_inid_boot_from_ksum_conditional_exact_mpi(
       xdat = xdat,
       ydat = ydat,
       exdat = exdat,
