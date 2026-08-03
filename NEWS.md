@@ -1,5 +1,16 @@
 # np 0.70-6
 
+* Conditional count-bootstrap evaluation with a beta predictor or response
+  kernel now uses one family-neutral native ingress for continuous and mixed
+  categorical data, with strict `np.categorical.compress = TRUE`/`FALSE`
+  behavior. Beta X or Y rows retain the canonical scaled-row owner, while the
+  other side uses the shared continuous/categorical scalar registry; the
+  implementation streams `O(n + B)` scratch and supports an entirely
+  categorical non-beta side. For generalized- and adaptive-nearest-neighbour
+  bandwidths, compressed multiplicities are expanded before row evaluation so
+  bandwidth radii belong to the realized resample rather than the unreplicated
+  source rows.
+
 * Corrected conditional plot/bootstrap dispatch so nonfixed local-polynomial
   beta fits retain the declared LP engine on every exact resample instead of
   being intercepted by the local-constant count evaluator.

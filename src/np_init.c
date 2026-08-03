@@ -19,7 +19,7 @@ extern SEXP C_np_density_conditional_nomad_shadow_native_search(SEXP, SEXP, SEXP
 extern SEXP C_np_density_conditional_nomad_shadow_fixed_native_search(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_density_conditional_nomad_shadow_clear(void);
 extern SEXP C_np_density_conditional(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
-extern SEXP C_np_beta_conditional_bootstrap(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP C_np_conditional_count_levels(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_regression_lp_apply_conditional(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_lc_hat_normalize(SEXP, SEXP);
 extern SEXP C_np_reghat_lp_matrix_fast(SEXP, SEXP, SEXP);
@@ -66,7 +66,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"C_np_density_conditional_nomad_shadow_fixed_native_search",(DL_FUNC) &C_np_density_conditional_nomad_shadow_fixed_native_search,12},
     {"C_np_density_conditional_nomad_shadow_clear",(DL_FUNC) &C_np_density_conditional_nomad_shadow_clear,0},
     {"C_np_density_conditional",       (DL_FUNC) &C_np_density_conditional,       31},
-    {"C_np_beta_conditional_bootstrap",(DL_FUNC) &C_np_beta_conditional_bootstrap,19},
+    {"C_np_conditional_count_levels",  (DL_FUNC) &C_np_conditional_count_levels,  22},
     {"C_np_regression_lp_apply_conditional",(DL_FUNC) &C_np_regression_lp_apply_conditional,23},
     {"C_np_lc_hat_normalize",             (DL_FUNC) &C_np_lc_hat_normalize,              2},
     {"C_np_reghat_lp_matrix_fast",       (DL_FUNC) &C_np_reghat_lp_matrix_fast,        3},

@@ -20882,13 +20882,20 @@ static NPContinuousKernelRowStatus
 np_conditional_count_legacy_row(const NPConditionalCountPlan * const plan,
                                 const int is_x_side,
                                 const int evaluation,
+                                const NPBetaScaledRowCategoricalContext * const
+                                  categorical_context,
                                 double * const log_absolute,
                                 signed char * const sign,
+                                signed char * const categorical_sign,
                                 double * const row,
                                 double * const common_log_scale,
                                 int * const bad_dimension)
 {
-  const int dimensions = is_x_side ? plan->num_x : plan->num_y;
+  const int dimensions = is_x_side ? plan->num_x_continuous :
+    plan->num_y_continuous;
+  const int categorical_dimensions = is_x_side ?
+    plan->num_x_unordered + plan->num_x_ordered :
+    plan->num_y_unordered + plan->num_y_ordered;
   const int do_cdf = is_x_side ? 0 : plan->do_distribution;
   const int bandwidth_mode = plan->bandwidth_mode;
   const int num_train = plan->num_train;
@@ -20905,11 +20912,17 @@ np_conditional_count_legacy_row(const NPConditionalCountPlan * const plan,
   double maximum = -INFINITY;
   int observation;
 
-  if(descriptor.family != NP_CKERNEL_FAMILY_LEGACY || dimensions <= 0 ||
-     train == NULL || eval == NULL || bandwidth_eval == NULL ||
-     bandwidth_train == NULL || lower == NULL || upper == NULL ||
+  if(descriptor.family != NP_CKERNEL_FAMILY_LEGACY || dimensions < 0 ||
+     categorical_dimensions < 0 ||
+     dimensions > INT_MAX - categorical_dimensions ||
+     dimensions + categorical_dimensions <= 0 ||
+     (dimensions > 0 &&
+      (train == NULL || eval == NULL || bandwidth_eval == NULL ||
+       bandwidth_train == NULL || lower == NULL || upper == NULL)) ||
      log_absolute == NULL || sign == NULL || row == NULL ||
-     common_log_scale == NULL)
+     common_log_scale == NULL ||
+     (categorical_dimensions > 0 &&
+      (categorical_context == NULL || categorical_sign == NULL)))
     return NP_CONTINUOUS_ROW_ERR_LAYOUT;
 
   for(observation = 0; observation < num_train; ++observation) {
@@ -20936,12 +20949,12 @@ np_conditional_count_legacy_row(const NPConditionalCountPlan * const plan,
       (void)beta_status;
       if(scalar_status == NP_BETA_CONDITIONAL_ERR_KERNEL) {
         if(bad_dimension != NULL)
-          *bad_dimension = (is_x_side ? 0 : plan->num_x) + dimension;
+          *bad_dimension = (is_x_side ? 0 : plan->num_x_continuous) + dimension;
         return NP_CONTINUOUS_ROW_ERR_KERNEL;
       }
       if(scalar_status != NP_BETA_CONDITIONAL_OK) {
         if(bad_dimension != NULL)
-          *bad_dimension = (is_x_side ? 0 : plan->num_x) + dimension;
+          *bad_dimension = (is_x_side ? 0 : plan->num_x_continuous) + dimension;
         return scalar_status == NP_BETA_CONDITIONAL_ERR_NUMERIC ?
           NP_CONTINUOUS_ROW_ERR_NUMERIC : NP_CONTINUOUS_ROW_ERR_LAYOUT;
       }
@@ -20954,7 +20967,7 @@ np_conditional_count_legacy_row(const NPConditionalCountPlan * const plan,
       product_sign *= scalar_sign;
       if(ISNAN(product_log) || product_log == INFINITY) {
         if(bad_dimension != NULL)
-          *bad_dimension = (is_x_side ? 0 : plan->num_x) + dimension;
+          *bad_dimension = (is_x_side ? 0 : plan->num_x_continuous) + dimension;
         return NP_CONTINUOUS_ROW_ERR_NUMERIC;
       }
     }
@@ -20962,6 +20975,39 @@ np_conditional_count_legacy_row(const NPConditionalCountPlan * const plan,
     sign[observation] = (signed char)product_sign;
     if(product_sign != 0 && product_log > maximum)
       maximum = product_log;
+  }
+
+  if(categorical_dimensions > 0) {
+    const NPContinuousKernelRowStatus categorical_status =
+      np_beta_categorical_log_factor(
+        categorical_context, evaluation, -1, num_train,
+        row, categorical_sign);
+
+    if(categorical_status != NP_CONTINUOUS_ROW_OK)
+      return categorical_status;
+    maximum = -INFINITY;
+    for(observation = 0; observation < num_train; ++observation) {
+      if(sign[observation] == 0 || categorical_sign[observation] == 0) {
+        log_absolute[observation] = -INFINITY;
+        sign[observation] = 0;
+      } else {
+        log_absolute[observation] += row[observation];
+        sign[observation] = (signed char)(
+          (int)sign[observation] * (int)categorical_sign[observation]);
+        if(ISNAN(log_absolute[observation]) ||
+           log_absolute[observation] == INFINITY)
+          return NP_CONTINUOUS_ROW_ERR_NUMERIC;
+        if(log_absolute[observation] > maximum)
+          maximum = log_absolute[observation];
+      }
+    }
+  }
+
+  if(maximum == -INFINITY) {
+    for(observation = 0; observation < num_train; ++observation)
+      row[observation] = 0.0;
+    *common_log_scale = -INFINITY;
+    return NP_CONTINUOUS_ROW_OK;
   }
 
   for(observation = 0; observation < num_train; ++observation) {
@@ -20981,8 +21027,11 @@ int np_conditional_count_levels(const NPConditionalCountPlan * const plan,
 {
   NPBetaScaledRowContext x_context;
   NPBetaScaledRowContext y_context;
+  NPBetaScaledRowCategoricalContext x_legacy_categorical_context;
+  NPBetaScaledRowCategoricalContext y_legacy_categorical_context;
   double *numeric = NULL;
   signed char *legacy_sign = NULL;
+  signed char *categorical_sign = NULL;
   double *x_row;
   double *y_row;
   double *joint_row;
@@ -20992,6 +21041,8 @@ int np_conditional_count_levels(const NPConditionalCountPlan * const plan,
     plan->descriptor_x.family == NP_CKERNEL_FAMILY_BETA;
   const int beta_y = plan != NULL &&
     plan->descriptor_y.family == NP_CKERNEL_FAMILY_BETA;
+  int x_legacy_categorical_initialized = 0;
+  int y_legacy_categorical_initialized = 0;
   int evaluation;
   int status = NP_CONTINUOUS_ROW_ERR_LAYOUT;
   size_t numeric_count;
@@ -21003,19 +21054,38 @@ int np_conditional_count_levels(const NPConditionalCountPlan * const plan,
   np_beta_scaled_row_context_init(&y_context);
 
   if(plan == NULL || plan->num_train <= 0 || plan->num_eval <= 0 ||
-     plan->num_x <= 0 || plan->num_y <= 0 || plan->num_replicates <= 0 ||
-     plan->train_x == NULL || plan->train_y == NULL ||
-     plan->eval_x == NULL || plan->eval_y == NULL ||
-     plan->bandwidth_eval_x == NULL || plan->bandwidth_train_x == NULL ||
-     plan->bandwidth_eval_y == NULL || plan->bandwidth_train_y == NULL ||
-     plan->lower_x == NULL || plan->upper_x == NULL ||
-     plan->lower_y == NULL || plan->upper_y == NULL ||
+     plan->num_x_continuous < 0 || plan->num_x_unordered < 0 ||
+     plan->num_x_ordered < 0 || plan->num_y_continuous < 0 ||
+     plan->num_y_unordered < 0 || plan->num_y_ordered < 0 ||
+     plan->num_x_continuous > INT_MAX - plan->num_x_unordered ||
+     plan->num_x_continuous + plan->num_x_unordered >
+       INT_MAX - plan->num_x_ordered ||
+     plan->num_y_continuous > INT_MAX - plan->num_y_unordered ||
+     plan->num_y_continuous + plan->num_y_unordered >
+       INT_MAX - plan->num_y_ordered ||
+     plan->num_x_continuous + plan->num_x_unordered +
+       plan->num_x_ordered <= 0 ||
+     plan->num_y_continuous + plan->num_y_unordered +
+       plan->num_y_ordered <= 0 ||
+     plan->num_replicates <= 0 ||
+     (plan->num_x_continuous > 0 &&
+      (plan->train_x == NULL || plan->eval_x == NULL ||
+       plan->bandwidth_eval_x == NULL ||
+       plan->bandwidth_train_x == NULL || plan->lower_x == NULL ||
+       plan->upper_x == NULL)) ||
+     (plan->num_y_continuous > 0 &&
+      (plan->train_y == NULL || plan->eval_y == NULL ||
+       plan->bandwidth_eval_y == NULL ||
+       plan->bandwidth_train_y == NULL || plan->lower_y == NULL ||
+       plan->upper_y == NULL)) ||
      plan->operator_x == NULL || plan->operator_y == NULL ||
      plan->counts == NULL || plan->levels == NULL ||
      (plan->bandwidth_mode != BW_FIXED &&
       plan->bandwidth_mode != BW_GEN_NN &&
       plan->bandwidth_mode != BW_ADAP_NN) ||
      (plan->do_distribution != 0 && plan->do_distribution != 1) ||
+     (plan->categorical_compress != 0 &&
+      plan->categorical_compress != 1) ||
      (!beta_x && !beta_y) ||
      beta_x != (plan->route_x != NULL) ||
      beta_y != (plan->route_y != NULL) ||
@@ -21036,7 +21106,14 @@ int np_conditional_count_levels(const NPConditionalCountPlan * const plan,
   numeric = (double *)malloc(numeric_count);
   legacy_sign = (signed char *)malloc(
     (size_t)plan->num_train*sizeof(signed char));
-  if(numeric == NULL || legacy_sign == NULL) {
+  if((!beta_x && plan->num_x_unordered + plan->num_x_ordered > 0) ||
+     (!beta_y && plan->num_y_unordered + plan->num_y_ordered > 0))
+    categorical_sign = (signed char *)malloc(
+      (size_t)plan->num_train*sizeof(signed char));
+  if(numeric == NULL || legacy_sign == NULL ||
+     (((!beta_x && plan->num_x_unordered + plan->num_x_ordered > 0) ||
+       (!beta_y && plan->num_y_unordered + plan->num_y_ordered > 0)) &&
+      categorical_sign == NULL)) {
     status = NP_CONTINUOUS_ROW_ERR_MEMORY;
     goto cleanup_count_levels;
   }
@@ -21050,10 +21127,15 @@ int np_conditional_count_levels(const NPConditionalCountPlan * const plan,
     status = np_beta_scaled_row_context_prepare(
       &x_context, plan->route_x, plan->diagnostics_x,
       plan->bandwidth_mode, plan->num_train, plan->num_eval,
-      plan->num_x, 0, 0, plan->train_x, plan->eval_x,
-      NULL, NULL, NULL, NULL,
+      plan->num_x_continuous, plan->num_x_unordered,
+      plan->num_x_ordered, plan->train_x, plan->eval_x,
+      plan->train_x_unordered, plan->eval_x_unordered,
+      plan->train_x_ordered, plan->eval_x_ordered,
       plan->bandwidth_train_x, plan->bandwidth_eval_x,
-      plan->operator_x, NULL, NULL, NULL, NULL, NULL, 0, x_row);
+      plan->operator_x, plan->kernel_x_unordered,
+      plan->kernel_x_ordered, plan->lambda_x,
+      plan->num_categories_x, plan->category_values_x,
+      plan->categorical_compress, x_row);
     if(status != NP_CONTINUOUS_ROW_OK)
       goto cleanup_count_levels;
   }
@@ -21061,10 +21143,47 @@ int np_conditional_count_levels(const NPConditionalCountPlan * const plan,
     status = np_beta_scaled_row_context_prepare(
       &y_context, plan->route_y, plan->diagnostics_y,
       plan->bandwidth_mode, plan->num_train, plan->num_eval,
-      plan->num_y, 0, 0, plan->train_y, plan->eval_y,
-      NULL, NULL, NULL, NULL,
+      plan->num_y_continuous, plan->num_y_unordered,
+      plan->num_y_ordered, plan->train_y, plan->eval_y,
+      plan->train_y_unordered, plan->eval_y_unordered,
+      plan->train_y_ordered, plan->eval_y_ordered,
       plan->bandwidth_train_y, plan->bandwidth_eval_y,
-      plan->operator_y, NULL, NULL, NULL, NULL, NULL, 0, y_row);
+      plan->operator_y, plan->kernel_y_unordered,
+      plan->kernel_y_ordered, plan->lambda_y,
+      plan->num_categories_y, plan->category_values_y,
+      plan->categorical_compress, y_row);
+    if(status != NP_CONTINUOUS_ROW_OK)
+      goto cleanup_count_levels;
+  }
+  if(!beta_x && plan->num_x_unordered + plan->num_x_ordered > 0) {
+    np_beta_categorical_factor_context_init_empty(
+      &x_legacy_categorical_context);
+    x_legacy_categorical_initialized = 1;
+    status = np_beta_categorical_factor_context_prepare(
+      &x_legacy_categorical_context, plan->num_train, plan->num_eval,
+      plan->num_x_unordered, plan->num_x_ordered,
+      plan->train_x_unordered, plan->train_x_ordered,
+      plan->eval_x_unordered, plan->eval_x_ordered,
+      plan->kernel_x_unordered, plan->kernel_x_ordered,
+      plan->operator_x + plan->num_x_continuous,
+      plan->lambda_x, plan->num_categories_x,
+      plan->category_values_x, plan->categorical_compress, joint_row);
+    if(status != NP_CONTINUOUS_ROW_OK)
+      goto cleanup_count_levels;
+  }
+  if(!beta_y && plan->num_y_unordered + plan->num_y_ordered > 0) {
+    np_beta_categorical_factor_context_init_empty(
+      &y_legacy_categorical_context);
+    y_legacy_categorical_initialized = 1;
+    status = np_beta_categorical_factor_context_prepare(
+      &y_legacy_categorical_context, plan->num_train, plan->num_eval,
+      plan->num_y_unordered, plan->num_y_ordered,
+      plan->train_y_unordered, plan->train_y_ordered,
+      plan->eval_y_unordered, plan->eval_y_ordered,
+      plan->kernel_y_unordered, plan->kernel_y_ordered,
+      plan->operator_y + plan->num_y_continuous,
+      plan->lambda_y, plan->num_categories_y,
+      plan->category_values_y, plan->categorical_compress, joint_row);
     if(status != NP_CONTINUOUS_ROW_OK)
       goto cleanup_count_levels;
   }
@@ -21086,7 +21205,10 @@ int np_conditional_count_levels(const NPConditionalCountPlan * const plan,
       np_beta_scaled_row_context_fill(
         &x_context, evaluation, NULL, &x_log_scale) :
       np_conditional_count_legacy_row(
-        plan, 1, evaluation, legacy_log, legacy_sign,
+        plan, 1, evaluation,
+        plan->num_x_unordered + plan->num_x_ordered > 0 ?
+          &x_legacy_categorical_context : NULL,
+        legacy_log, legacy_sign, categorical_sign,
         x_row, &x_log_scale, bad_dimension);
     if(row_status != NP_CONTINUOUS_ROW_OK) {
       status = row_status;
@@ -21099,13 +21221,16 @@ int np_conditional_count_levels(const NPConditionalCountPlan * const plan,
       np_beta_scaled_row_context_fill(
         &y_context, evaluation, NULL, &y_log_scale) :
       np_conditional_count_legacy_row(
-        plan, 0, evaluation, legacy_log, legacy_sign,
+        plan, 0, evaluation,
+        plan->num_y_unordered + plan->num_y_ordered > 0 ?
+          &y_legacy_categorical_context : NULL,
+        legacy_log, legacy_sign, categorical_sign,
         y_row, &y_log_scale, bad_dimension);
     if(row_status != NP_CONTINUOUS_ROW_OK) {
       status = row_status;
       if(bad_evaluation != NULL) *bad_evaluation = evaluation;
       if(beta_y && bad_dimension != NULL)
-        *bad_dimension = plan->num_x +
+        *bad_dimension = plan->num_x_continuous +
           plan->diagnostics_y->bad_coordinate;
       goto cleanup_count_levels;
     }
@@ -21155,8 +21280,15 @@ int np_conditional_count_levels(const NPConditionalCountPlan * const plan,
 cleanup_count_levels:
   np_beta_scaled_row_context_clear(&x_context);
   np_beta_scaled_row_context_clear(&y_context);
+  if(x_legacy_categorical_initialized)
+    np_beta_categorical_factor_context_release(
+      &x_legacy_categorical_context);
+  if(y_legacy_categorical_initialized)
+    np_beta_categorical_factor_context_release(
+      &y_legacy_categorical_context);
   free(numeric);
   free(legacy_sign);
+  free(categorical_sign);
   return status;
 }
 
