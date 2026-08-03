@@ -1,5 +1,12 @@
 # npRmpi 0.70-6
 
+* Corrected internally computed generalized-nearest-neighbour convolution
+  kernel sums so every continuous coordinate owns the required
+  training-point companion bandwidths. The public route now uses the same
+  unequal-bandwidth convolution contract as supplied-bandwidth consumers
+  instead of dereferencing an absent companion matrix; fixed and adaptive
+  bandwidth routes are unchanged.
+
 * Corrected conditional-density least-squares cross-validation so its
   integrated-square and fitted-value terms use the same signed delete-one X
   smoother in every analytic and categorical-profile route. Adaptive-nearest-
