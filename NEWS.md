@@ -1,5 +1,19 @@
 # npRmpi 0.70-6
 
+* Conditional-distribution least-squares bandwidth selection with a beta
+  predictor or response kernel now uses the shared conditional
+  local-polynomial CVLS engine across scalar and positive degrees, raw and
+  Bernstein bases, fixed, generalized-nearest-neighbour, and
+  adaptive-nearest-neighbour bandwidths, and supported mixed
+  continuous/categorical data. Predictor rows use the canonical signed
+  delete-one influence solve, while response rows use the canonical CDF
+  operator on the actual evaluation plane. A bounded response-row supertile
+  retains `O(n B + B^2)` workspace and reuses each CDF tile across small
+  groups of predictor tiles; allocation failure selects only the
+  algebraically identical linear-memory row stream. The former private beta
+  conditional-distribution objective and its caller-free cache helpers have
+  been removed.
+
 * Conditional-density least-squares bandwidth selection with a beta predictor
   or response kernel now uses the shared conditional local-polynomial CVLS
   engine across scalar and positive degrees, raw and Bernstein bases, fixed,

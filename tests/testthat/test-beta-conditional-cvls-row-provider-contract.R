@@ -20,7 +20,7 @@ test_that("bounded conditional CVLS has one typed row-provider seam", {
 
   expect_match(engine, "} NPConditionalCVLSRowProvider;", fixed = TRUE)
   for (member in c("x_row", "y_train_row", "y_convolution_row",
-                   "y_eval_block"))
+                   "y_eval_block", "y_integral_row"))
     expect_match(engine, paste0("(*", member, ")"), fixed = TRUE)
   expect_match(
     engine,
@@ -44,6 +44,46 @@ test_that("bounded conditional CVLS has one typed row-provider seam", {
   )
   expect_false(grepl("NP_BOUNDED_CVLS_I1_MODE_", engine, fixed = TRUE))
   expect_false(grepl("i1_mode", engine, fixed = TRUE))
+})
+
+test_that("conditional distribution provider is bounded and operator explicit", {
+  path <- locate_beta_conditional_cvls_provider_source()
+  skip_if(is.null(path), "package source unavailable")
+  engine <- paste(readLines(path, warn = FALSE), collapse = "\n")
+  start <- regexpr(
+    "static int np_conditional_distribution_cvls_provider_supertile(",
+    engine,
+    fixed = TRUE
+  )[[1L]]
+  finish <- regexpr(
+    "static int np_conditional_distribution_cvls_lp_row_stream(",
+    engine,
+    fixed = TRUE
+  )[[1L]]
+  expect_gt(start, 0L)
+  expect_gt(finish, start)
+  route <- substr(engine, start, finish - 1L)
+
+  expect_match(route, "group_width = MIN(4, MAX(1, nblocks));",
+               fixed = TRUE)
+  expect_match(route, "np_blas_dgemm_tn_int(", fixed = TRUE)
+  expect_match(route, "provider->y_integral_row(", fixed = TRUE)
+  expect_match(route, "np_continuous_kernel_scaled_restore(", fixed = TRUE)
+  expect_false(grepl(
+    "np_cvls_workspace_matrix_try(num_train, num_train",
+    route,
+    fixed = TRUE
+  ))
+  expect_false(grepl("np_beta_objective_conditional_distribution_ls(",
+                     route, fixed = TRUE))
+  expect_match(
+    engine,
+    paste0(
+      "&route_context, vector_scale_factor, execution_context,\n",
+      "       OP_INTEGRAL)"
+    ),
+    fixed = TRUE
+  )
 })
 
 test_that("live bounded CVLS retains literal legacy arithmetic under null", {

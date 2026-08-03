@@ -140,6 +140,7 @@ extern int np_regression_bw_categorical_compress_extern;
 extern int np_density_bw_categorical_compress_extern;
 extern int np_distribution_bw_categorical_compress_extern;
 extern int np_conditional_density_bw_categorical_compress_extern;
+extern int np_conditional_distribution_bw_categorical_compress_extern;
 extern int np_beta_cx_bw_order_extern;
 extern int np_beta_cy_bw_order_extern;
 extern double *vector_ckerlb_extern;
@@ -293,6 +294,49 @@ np_beta_conditional_density_bw_objective_ls_ctx(
   execution_context.categorical_compress =
     np_conditional_density_bw_categorical_compress_extern;
   if(np_conditional_density_cvls_lp_stream_ctx(
+       &vector_scale_factor[1], &execution_context, &cv) != 0)
+    return DBL_MAX;
+  return cv;
+}
+
+/*
+ * Conditional-distribution CVLS shares the immutable X/Y descriptors and
+ * canonical signed LP row owner with conditional density.  The response
+ * provider changes only the operator to OP_INTEGRAL inside jksum.c; the
+ * callback owns no estimator algebra and has no beta-sidecar fallback.
+ */
+static NP_KERNELCV_NOINLINE double
+np_beta_conditional_distribution_bw_objective_ls_ctx(
+  double *vector_scale_factor)
+{
+  double cv = 0.0;
+  NPContinuousKernelRoute beta_x_route;
+  NPContinuousKernelRoute beta_y_route;
+  NPContinuousKernelDerivativeDiagnostics beta_x_diagnostics;
+  NPContinuousKernelDerivativeDiagnostics beta_y_diagnostics;
+  NPConditionalKernelExecutionContext execution_context = {0};
+
+  if(KERNEL_reg_extern == NP_CKERNEL_COORDINATE_CODE) {
+    np_beta_conditional_bw_route_or_error(
+      &beta_x_route, &beta_x_diagnostics,
+      np_beta_cx_bw_order_extern, num_reg_continuous_extern,
+      vector_cxkerlb_extern, vector_cxkerub_extern,
+      "conditional distribution CVLS X");
+    execution_context.x_route = &beta_x_route;
+    execution_context.x_diagnostics = &beta_x_diagnostics;
+  }
+  if(KERNEL_den_extern == NP_CKERNEL_COORDINATE_CODE) {
+    np_beta_conditional_bw_route_or_error(
+      &beta_y_route, &beta_y_diagnostics,
+      np_beta_cy_bw_order_extern, num_var_continuous_extern,
+      vector_cykerlb_extern, vector_cykerub_extern,
+      "conditional distribution CVLS Y");
+    execution_context.y_route = &beta_y_route;
+    execution_context.y_diagnostics = &beta_y_diagnostics;
+  }
+  execution_context.categorical_compress =
+    np_conditional_distribution_bw_categorical_compress_extern;
+  if(np_conditional_distribution_cvls_lp_stream_ctx(
        &vector_scale_factor[1], &execution_context, &cv) != 0)
     return DBL_MAX;
   return cv;
@@ -613,19 +657,8 @@ double cv_func_con_distribution_categorical_ls(double *vector_scale_factor)
 
     if(np_beta_conditional_bw_active()) {
       start = clock();
-      cv = np_beta_objective_conditional_distribution_ls(
-        BANDWIDTH_den_extern,
-        KERNEL_reg_extern, np_beta_cx_bw_order_extern,
-        KERNEL_den_extern, np_beta_cy_bw_order_extern,
-        num_obs_train_extern, num_obs_eval_extern,
-        num_reg_continuous_extern, num_var_continuous_extern,
-        cdfontrain_extern,
-        matrix_X_continuous_train_extern,
-        matrix_Y_continuous_train_extern,
-        matrix_Y_continuous_eval_extern,
-        &vector_scale_factor[1],
-        vector_cxkerlb_extern, vector_cxkerub_extern,
-        vector_cykerlb_extern, vector_cykerub_extern);
+      cv = np_beta_conditional_distribution_bw_objective_ls_ctx(
+        vector_scale_factor);
       diff = clock() - start;
       timing_extern = ((double)diff) / ((double)CLOCKS_PER_SEC);
       return cv;

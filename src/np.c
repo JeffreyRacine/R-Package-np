@@ -15261,15 +15261,11 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
        np_conditional_distribution_bw_categorical_compress_extern != 1)
       error("C_np_distribution_conditional_bw: categorical compression must be TRUE or FALSE");
 
-    if(*regtype != NP_LP_ENGINE_SCALAR)
-      error("C_np_distribution_conditional_bw: beta bandwidth selection supports only local-constant fitting");
-    if(num_unordered != 0 || num_ordered != 0)
-      error("C_np_distribution_conditional_bw: beta bandwidth selection requires continuous X and Y variables only");
     if(KERNEL_reg_extern == NP_CKERNEL_COORDINATE_CODE)
       np_beta_cx_bw_order_extern = np_bandwidth_kernel_descriptor_or_error(
         myopti[CDBW_CXFAMILYI], KERNEL_reg_extern,
         myopti[CDBW_CXORDERI], num_reg_continuous_extern,
-        num_unordered, num_ordered, NP_BETA_BW_CONTINUOUS_ONLY,
+        num_unordered, num_ordered, NP_BETA_BW_ALLOW_CATEGORICAL,
         cxkerlb, cxkerub,
         "C_np_distribution_conditional_bw (X)").order;
     else
@@ -15278,7 +15274,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
       np_beta_cy_bw_order_extern = np_bandwidth_kernel_descriptor_or_error(
         myopti[CDBW_CYFAMILYI], KERNEL_den_extern,
         myopti[CDBW_CYORDERI], num_var_continuous_extern,
-        num_unordered, num_ordered, NP_BETA_BW_CONTINUOUS_ONLY,
+        num_unordered, num_ordered, NP_BETA_BW_ALLOW_CATEGORICAL,
         cykerlb, cykerub,
         "C_np_distribution_conditional_bw (Y)").order;
     else
