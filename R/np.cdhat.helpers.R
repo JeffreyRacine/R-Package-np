@@ -423,6 +423,20 @@
   crossprod(kw, rhs) / op.info$scale
 }
 
+.np_native_output_extent <- function(..., where) {
+  factors <- as.double(c(...))
+  extent <- prod(factors)
+
+  if (!length(factors) || any(!is.finite(factors)) ||
+      any(factors < 0.0) || any(factors != floor(factors)) ||
+      !is.finite(extent) || extent > .Machine$integer.max) {
+    stop(sprintf("%s exceeds the native output-size capacity", where),
+         call. = FALSE)
+  }
+
+  as.integer(extent)
+}
+
 .np_local_operator_ksum <- function(kbw,
                                     txdat,
                                     exdat,
@@ -461,7 +475,20 @@
 
   tnrow <- nrow(txdat)
   enrow <- nrow(exdat)
-  nkw <- if (isTRUE(return.kernel.weights)) tnrow * enrow else 0L
+  nksum <- .np_native_output_extent(
+    enrow,
+    max(1L, ncol(rhs)),
+    where = sprintf("%s kernel-sum result", where)
+  )
+  nkw <- if (isTRUE(return.kernel.weights)) {
+    .np_native_output_extent(
+      tnrow,
+      enrow,
+      where = sprintf("%s kernel-weight result", where)
+    )
+  } else {
+    0L
+  }
 
   operator.num <- ALL_OPERATORS[op.info$operator]
   myopti <- list(
@@ -532,7 +559,7 @@
     as.double(bws$xmcv), as.double(attr(bws$xmcv, "pad.num")),
     as.integer(c(operator.num[bws$icon], operator.num[bws$iuno], operator.num[bws$iord])),
     as.integer(myopti), as.double(1.0),
-    as.integer(enrow),
+    nksum,
     as.integer(0L),
     as.integer(nkw),
     as.double(cker.bounds.c$lb),
@@ -541,8 +568,11 @@
   )
 
   out <- myout[["ksum"]]
-  if (!is.matrix(out))
-    out <- matrix(out, nrow = enrow, ncol = ncol(rhs))
+  if (ncol(rhs) == 1L) {
+    out <- matrix(out, nrow = enrow, ncol = 1L)
+  } else {
+    out <- t(matrix(out, nrow = ncol(rhs), ncol = enrow))
+  }
 
   kw <- NULL
   if (isTRUE(return.kernel.weights))
