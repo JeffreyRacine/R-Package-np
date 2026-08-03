@@ -10217,6 +10217,7 @@ const int keep_kw_owner_local){
   const int num_xt = is_adaptive?num_obs_eval:num_obs_train;
   const int progress_total = is_adaptive ? num_obs_train : num_obs_eval;
   size_t pkw_plane = 0;
+  int tree_pkw_sparse = 0;
   const int ws_step = is_adaptive? 0 :
                                  (MAX(ncol_Y, 1) * MAX(ncol_W, 1));
   const int dual_ws_step = is_adaptive ? 0 :
@@ -12400,7 +12401,8 @@ NPContinuousKernelProgressFunction progress)
     weighted_sum, NULL, NULL, NULL,
     &dual_power_ctx, NULL,
     kernel_route == NULL ? NULL : &kernel_execution_context,
-    NULL);
+    NULL,
+    0);
 }
 
 int kernel_weighted_sum_np_route_centered_m2(
@@ -12464,7 +12466,8 @@ NPContinuousKernelProgressFunction progress)
     weighted_sum, NULL, NULL, NULL,
     NULL, NULL,
     kernel_route == NULL ? NULL : &kernel_execution_context,
-    centered_m2 == NULL ? NULL : &centered_moment_ctx);
+    centered_m2 == NULL ? NULL : &centered_moment_ctx,
+    0);
 }
 
 int kernel_weighted_sum_np_route(
@@ -17202,6 +17205,8 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                                          NULL,
                                          NULL,
                                          &objective_pack_ctx,
+                                         NULL,
+                                         NULL,
                                          0);
             }
             MPI_Allgather(MPI_IN_PLACE, nrcc22, MPI_DOUBLE, kwm+j*nrcc22, nrcc22, MPI_DOUBLE, comm[1]);
@@ -19436,13 +19441,14 @@ double * cv){
   size_t block_capacity;
 
 #ifdef MPI2
+  int train_partition_stride = 0;
   int partition_stride = 0;
   int num_obs_train_padded = 0;
   int num_obs_eval_padded = 0;
   if(!np_int_padded_count_nonnegative(num_obs_train,
                                       iNum_Processors,
                                       1,
-                                      &partition_stride,
+                                      &train_partition_stride,
                                       &num_obs_train_padded) ||
      !np_int_padded_count_nonnegative(num_obs_eval,
                                       iNum_Processors,
@@ -19452,9 +19458,14 @@ double * cv){
     error("distribution CV partition exceeds native integer limits");
   num_obs_train_alloc = (int64_t)num_obs_train_padded;
   num_obs_eval_alloc = (int64_t)num_obs_eval_padded;
+  const int64_t is = (int64_t)train_partition_stride*(int64_t)my_rank;
+  const int64_t ie = MIN((int64_t)num_obs_train - 1,
+                         is + (int64_t)train_partition_stride - 1);
 #else
   num_obs_train_alloc = num_obs_train;
   num_obs_eval_alloc = num_obs_eval;
+  const int64_t is = 0;
+  const int64_t ie = (int64_t)num_obs_train - 1;
 #endif
 
   if((np_jksum_memfac_cells(memfac, &block_capacity) ==
@@ -19710,6 +19721,8 @@ double * cv){
                               &gate_ctx_local,
                               NULL,
                               NULL,
+                              NULL,
+                              NULL,
                               1);
     
 #ifdef MPI2
@@ -19785,6 +19798,7 @@ double * cv){
           BANDWIDTH_den != BW_ADAP_NN ? 1 : dwx,
           cv_accumulator);
       }
+    }
     }
 #else
     for(i = 0; i < num_obs_train; i++){
@@ -21574,7 +21588,7 @@ static NP_NOINLINE int np_beta_regression_lp_moment_row_canonical(
     bandwidth_mode == BW_FIXED ? NULL : matrix_bandwidth_eval,
     lambda, num_categories, matrix_categorical_vals, NULL,
     weighted_sum, NULL, scaled_kernel_weights, NULL,
-    &dual_power_context, NULL, &execution_context, NULL);
+    &dual_power_context, NULL, &execution_context, NULL, 0);
 }
 
 void np_beta_scaled_row_context_init(NPBetaScaledRowContext *context)
@@ -38187,7 +38201,10 @@ double * log_likelihood
                                                  stderr_local,
                                                  deriv_local,
                                                  gerr_local,
-                                                 &local_log_likelihood);
+                                                 &local_log_likelihood,
+                                                 NULL,
+                                                 NULL,
+                                                 0);
   }
 
   MPI_Allgatherv(kdf_local,
@@ -39846,6 +39863,7 @@ static int np_conditional_route_bandwidth_prepare(
   double **matrix_bandwidth,
   double *lambda)
 {
+  extern double *vector_continuous_stddev_extern;
   double * const saved_standard_deviation =
     vector_continuous_stddev_extern;
   int status;
