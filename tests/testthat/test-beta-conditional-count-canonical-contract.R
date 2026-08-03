@@ -34,10 +34,12 @@ test_that("conditional count bootstrap enters the canonical scaled-row owner", {
                    collapse = "\n")
   engine <- paste(readLines(file.path(root, "src", "jksum.c"), warn = FALSE),
                   collapse = "\n")
-  sidecar <- paste(
-    readLines(file.path(root, "src", "beta_conditional.c"), warn = FALSE),
-    collapse = "\n"
+  native.files <- list.files(
+    file.path(root, "src"), pattern = "\\.[ch]$", full.names = TRUE
   )
+  native.sources <- paste(vapply(native.files, function(path) {
+    paste(readLines(path, warn = FALSE), collapse = "\n")
+  }, character(1)), collapse = "\n")
 
   expect_match(ingress, "count_status = np_conditional_count_levels(", fixed = TRUE)
   expect_match(ingress, "SEXP C_np_conditional_count_levels(", fixed = TRUE)
@@ -72,7 +74,9 @@ test_that("conditional count bootstrap enters the canonical scaled-row owner", {
              paste(ingress, engine, sep = "\n"), fixed = TRUE)
   ))
   expect_identical(callers, 0L)
-  expect_match(sidecar, "np_beta_conditional_lc_counts(", fixed = TRUE)
+  expect_false(grepl(
+    "np_beta_conditional_lc_counts(", native.sources, fixed = TRUE
+  ))
 })
 
 test_that("canonical beta count levels match direct weighted conditional rows", {

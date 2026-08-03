@@ -48,7 +48,6 @@ extern MPI_Comm	*comm;
 #include "np_native_safety.h"
 #include "beta_kernelsum.h"
 #include "beta_bandwidth.h"
-#include "beta_conditional.h"
 #include "continuous_kernel_row.h"
 #include "beta_scaled_row.h"
 #include "kernel_registry.h"
