@@ -8,9 +8,7 @@ locate_beta_conditional_cvls_sources <- function() {
   for (root in roots) {
     if (file.exists(file.path(root, "src", "headers.h")) &&
         file.exists(file.path(root, "src", "jksum.c")) &&
-        file.exists(file.path(root, "src", "kernelcv.c")) &&
-        file.exists(file.path(root, "src", "beta_objectives.c")) &&
-        file.exists(file.path(root, "src", "beta_objectives.h")))
+        file.exists(file.path(root, "src", "kernelcv.c")))
       return(root)
   }
   NULL
@@ -36,13 +34,12 @@ test_that("conditional CVLS route sibling is the sole beta ingress", {
     readLines(file.path(root, "src", "kernelcv.c"), warn = FALSE),
     collapse = "\n"
   )
-  displaced_sidecar <- paste(
-    c(
-      readLines(file.path(root, "src", "beta_objectives.c"), warn = FALSE),
-      readLines(file.path(root, "src", "beta_objectives.h"), warn = FALSE)
-    ),
-    collapse = "\n"
+  native.files <- list.files(
+    file.path(root, "src"), pattern = "\\.[ch]$", full.names = TRUE
   )
+  native <- paste(vapply(native.files, function(path) {
+    paste(readLines(path, warn = FALSE), collapse = "\n")
+  }, character(1)), collapse = "\n")
 
   expect_match(
     headers,
@@ -101,12 +98,12 @@ test_that("conditional CVLS route sibling is the sole beta ingress", {
                      fixed = TRUE))
   expect_false(grepl(
     "np_beta_objective_conditional_density_ls(",
-    displaced_sidecar,
+    native,
     fixed = TRUE
   ))
   expect_false(grepl(
     "np_beta_objective_conditional_density_ls_unbounded_legacy_y(",
-    displaced_sidecar,
+    native,
     fixed = TRUE
   ))
   expect_false(grepl(
@@ -114,6 +111,9 @@ test_that("conditional CVLS route sibling is the sole beta ingress", {
     ingress,
     fixed = TRUE
   ))
+  expect_false(file.exists(file.path(root, "src", "beta_objectives.c")))
+  expect_false(file.exists(file.path(root, "src", "beta_objectives.h")))
+  expect_false(grepl("np_beta_objective_", native, fixed = TRUE))
 })
 
 test_that("conditional CVLS route sibling delegates null and owns routed adapter", {

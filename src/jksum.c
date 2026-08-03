@@ -30,7 +30,6 @@
 #include "categorical_profile_tile.h"
 #include "continuous_kernel_row.h"
 #include "beta_bandwidth.h"
-#include "beta_conditional.h"
 #include "beta_scaled_row.h"
 #include "reghat_fast.h"
 
@@ -20938,24 +20937,22 @@ np_conditional_count_legacy_row(const NPConditionalCountPlan * const plan,
           bandwidth_train[dimension][observation]);
       double scalar_log = -INFINITY;
       int scalar_sign = 0;
-      np_beta_status beta_status = NP_BETA_OK;
-      const np_beta_conditional_status scalar_status =
-        np_beta_conditional_scalar_log(
+      const NPContinuousKernelScalarStatus scalar_status =
+        np_continuous_kernel_scalar_log(
           descriptor.family, descriptor.legacy_code, descriptor.order,
           do_cdf, eval[dimension][evaluation], train[dimension][observation],
           bandwidth, lower[dimension], upper[dimension],
-          &scalar_log, &scalar_sign, &beta_status);
+          &scalar_log, &scalar_sign);
 
-      (void)beta_status;
-      if(scalar_status == NP_BETA_CONDITIONAL_ERR_KERNEL) {
+      if(scalar_status == NP_CONTINUOUS_KERNEL_SCALAR_ERR_KERNEL) {
         if(bad_dimension != NULL)
           *bad_dimension = (is_x_side ? 0 : plan->num_x_continuous) + dimension;
         return NP_CONTINUOUS_ROW_ERR_KERNEL;
       }
-      if(scalar_status != NP_BETA_CONDITIONAL_OK) {
+      if(scalar_status != NP_CONTINUOUS_KERNEL_SCALAR_OK) {
         if(bad_dimension != NULL)
           *bad_dimension = (is_x_side ? 0 : plan->num_x_continuous) + dimension;
-        return scalar_status == NP_BETA_CONDITIONAL_ERR_NUMERIC ?
+        return scalar_status == NP_CONTINUOUS_KERNEL_SCALAR_ERR_NUMERIC ?
           NP_CONTINUOUS_ROW_ERR_NUMERIC : NP_CONTINUOUS_ROW_ERR_LAYOUT;
       }
       if(scalar_sign == 0) {

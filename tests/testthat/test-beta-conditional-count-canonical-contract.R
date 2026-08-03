@@ -6,7 +6,7 @@ locate_beta_conditional_count_sources <- function() {
   for (root in candidates) {
     if (file.exists(file.path(root, "src", "np.c")) &&
         file.exists(file.path(root, "src", "jksum.c")) &&
-        file.exists(file.path(root, "src", "beta_conditional.c")))
+        file.exists(file.path(root, "src", "kernel_registry.c")))
       return(root)
   }
   NULL
