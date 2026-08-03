@@ -123,14 +123,23 @@ test_that("conditional beta endpoint gradients plot and retain infinities", {
     )
 
     plotted <- NULL
-    expect_warning(
-      plotted <- plot(
+    endpoint_warnings <- character()
+    plotted <- withCallingHandlers(
+      plot(
         bw, xdat = training.x, ydat = training.y,
         gradients = TRUE, errors = "none", output = "plot-data",
         common_scale = TRUE, neval = 11L, xtrim = 0, ytrim = 0
       ),
-      "infinite endpoint"
+      warning = function(condition) {
+        endpoint_warnings <<- c(
+          endpoint_warnings,
+          conditionMessage(condition)
+        )
+        invokeRestart("muffleWarning")
+      }
     )
+    expect_true(length(endpoint_warnings) > 0L)
+    expect_true(all(grepl("infinite endpoint", endpoint_warnings)))
     returned <- as.double(gradients(plotted[[1L]]))
     expect_true(is.infinite(returned[1L]))
     expect_true(is.infinite(returned[length(returned)]))

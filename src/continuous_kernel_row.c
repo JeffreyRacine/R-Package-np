@@ -2241,6 +2241,28 @@ NPContinuousKernelRowStatus np_continuous_kernel_scaled_restore(
     log_absolute, sign, power, value);
 }
 
+NPContinuousKernelRowStatus np_continuous_kernel_scaled_derivative_restore(
+  double scaled_value,
+  double log_scale,
+  double *value)
+{
+  if(value == NULL || ISNAN(log_scale) || log_scale == INFINITY)
+    return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  if(ISNA(scaled_value)) {
+    *value = NA_REAL;
+    return NP_CONTINUOUS_ROW_OK;
+  }
+  if(ISNAN(scaled_value))
+    return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  if(R_FINITE(scaled_value))
+    return np_continuous_kernel_scaled_restore(
+      scaled_value, log_scale, 1, value);
+  if(log_scale == -INFINITY)
+    return NP_CONTINUOUS_ROW_ERR_NUMERIC;
+  *value = scaled_value;
+  return NP_CONTINUOUS_ROW_OK;
+}
+
 NPContinuousKernelRowStatus np_continuous_kernel_signed_log_restore(
   double log_absolute,
   int sign,

@@ -17280,13 +17280,13 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
 
           if(beta_y_active) {
             NPContinuousKernelRowStatus restore_status =
-              np_continuous_kernel_scaled_restore(
-                scaled_gradient, beta_y_log_scale, 1,
+              np_continuous_kernel_scaled_derivative_restore(
+                scaled_gradient, beta_y_log_scale,
                 &pdf_deriv[i][j]);
 
             if(restore_status == NP_CONTINUOUS_ROW_OK)
-              restore_status = np_continuous_kernel_scaled_restore(
-                scaled_gradient_stderr, beta_y_log_scale, 1,
+              restore_status = np_continuous_kernel_scaled_derivative_restore(
+                scaled_gradient_stderr, beta_y_log_scale,
                 &pdf_deriv_stderr[i][j]);
             if(restore_status != NP_CONTINUOUS_ROW_OK) {
               status = 1;

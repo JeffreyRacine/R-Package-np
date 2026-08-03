@@ -501,14 +501,8 @@ test_that("legacy conditional scalar owner retains dormant route plumbing", {
   expect_gt(conditional_end, conditional_start)
   conditional <- substr(ingress, conditional_start, conditional_end - 1L)
   expect_match(
-    conditional,
-    paste0(
-      "pdf_deriv_stderr,\n",
-      "                                                 &log_likelihood,\n",
-      "                                                 NULL,\n",
-      "                                                 NULL,\n",
-      "                                                 0);"
-    ),
+    gsub("[[:space:]]+", " ", conditional),
+    "pdf_deriv_stderr, &log_likelihood, NULL, NULL, 0);",
     fixed = TRUE
   )
 })
@@ -1083,8 +1077,8 @@ test_that("every beta side enters the common conditional regression owner", {
     fixed = TRUE
   )
   expect_match(
-    conditional,
-    "kernel_route,\n                                                               kernel_route_diagnostics,\n                                                               categorical_compress",
+    gsub("[[:space:]]+", " ", conditional),
+    "kernel_route, kernel_route_diagnostics, categorical_compress",
     fixed = TRUE
   )
   expect_match(
@@ -1311,6 +1305,49 @@ test_that("canonical centered moments use an online training-order update", {
   )
   expect_match(owner, "centered_m2[evaluation] = running_m2;", fixed = TRUE)
   expect_false(grepl("second_moment -", owner, fixed = TRUE))
+})
+
+test_that("conditional derivative restoration has one typed extended-real contract", {
+  root <- locate_beta_activation_sources()
+  skip_if(is.null(root), "package sources unavailable")
+  row_engine <- paste(
+    readLines(file.path(root, "src", "continuous_kernel_row.c"),
+              warn = FALSE),
+    collapse = "\n"
+  )
+  conditional <- paste(
+    readLines(file.path(root, "src", "np.c"), warn = FALSE),
+    collapse = "\n"
+  )
+
+  helper_start <- regexpr(
+    "NPContinuousKernelRowStatus np_continuous_kernel_scaled_derivative_restore(",
+    row_engine,
+    fixed = TRUE
+  )[[1L]]
+  helper_end <- regexpr(
+    "NPContinuousKernelRowStatus np_continuous_kernel_signed_log_restore(",
+    row_engine,
+    fixed = TRUE
+  )[[1L]]
+  expect_gt(helper_start, 0L)
+  expect_gt(helper_end, helper_start)
+  helper <- substr(row_engine, helper_start, helper_end - 1L)
+
+  expect_match(helper, "if(ISNA(scaled_value))", fixed = TRUE)
+  expect_match(helper, "if(ISNAN(scaled_value))", fixed = TRUE)
+  expect_match(helper, "if(log_scale == -INFINITY)", fixed = TRUE)
+  expect_match(
+    helper,
+    "return np_continuous_kernel_scaled_restore(",
+    fixed = TRUE
+  )
+  calls <- gregexpr(
+    "np_continuous_kernel_scaled_derivative_restore(",
+    conditional,
+    fixed = TRUE
+  )[[1L]]
+  expect_equal(sum(calls > 0L), 2L)
 })
 
 test_that("centered moments have one activated fail-closed route boundary", {

@@ -1,5 +1,12 @@
 # npRmpi 0.70-6
 
+* Conditional density and distribution gradients with a beta response kernel
+  now retain the same signed-infinite endpoint limits and explicit missing
+  gradient standard errors as the canonical beta regression engine. Finite
+  gradients still use the strict finite restoration path, and indeterminate
+  extended-real scaling remains an error; plot geometry continues to omit
+  non-finite coordinates without mutating returned estimator values.
+
 * Corrected internally computed generalized-nearest-neighbour convolution
   kernel sums so every continuous coordinate owns the required
   training-point companion bandwidths. The public route now uses the same
