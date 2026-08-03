@@ -1,5 +1,16 @@
 # np 0.70-6
 
+* Corrected positive-degree raw local-polynomial bandwidth selection for
+  conditional density and distribution estimators when predictor units make
+  the raw polynomial coordinates numerically ill conditioned (for example,
+  calendar years). The signed full-row influence engine now selects one
+  globally equivalent, conditioned coordinate representation before row
+  traversal and uses it across scalar, block, tree, and all-large owners. The
+  selection is basis-family neutral, does not center at evaluation points, and
+  retains only `O(n k + k^2)` workspace for basis width `k`. The scalar row
+  owner also now reuses the hoisted LP basis for the whole objective rather
+  than rebuilding and clearing it for every evaluation row.
+
 * Conditional count-bootstrap evaluation with a beta predictor or response
   kernel now uses one family-neutral native ingress for continuous and mixed
   categorical data, with strict `np.categorical.compress = TRUE`/`FALSE`
