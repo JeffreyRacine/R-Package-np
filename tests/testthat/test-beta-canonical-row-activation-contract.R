@@ -231,6 +231,100 @@ test_that("adaptive beta PDF rows prepare invariant observation state", {
   ))
 })
 
+test_that("adaptive beta gradient rows reuse prepared observation state", {
+  root <- locate_beta_activation_sources()
+  skip_if(is.null(root), "package sources unavailable")
+  row_engine <- paste(
+    readLines(file.path(root, "src", "continuous_kernel_row_gradient.c"),
+              warn = FALSE),
+    collapse = "\n"
+  )
+
+  sibling_start <- regexpr(
+    paste0(
+      "np_continuous_kernel_beta_level_derivative_observation_",
+      "adaptive_prepared_bound("
+    ),
+    row_engine,
+    fixed = TRUE
+  )[[1L]]
+  row_start <- regexpr(
+    "np_continuous_kernel_beta_level_derivative_log_row_validated(",
+    row_engine,
+    fixed = TRUE
+  )[[1L]]
+  expect_gt(sibling_start, 0L)
+  expect_gt(row_start, sibling_start)
+  sibling <- substr(row_engine, sibling_start, row_start - 1L)
+
+  expect_match(
+    sibling,
+    "np_beta_log_abs_pdf_derivative_order_prepared_observation(",
+    fixed = TRUE
+  )
+  expect_match(
+    sibling,
+    "np_beta_log_abs_pdf_order_prepared_observation(",
+    fixed = TRUE
+  )
+  expect_match(
+    sibling,
+    "plan->bandwidth_train[coordinate][observation]",
+    fixed = TRUE
+  )
+  expect_false(grepl(
+    "np_beta_log_abs_pdf_derivative_order(", sibling, fixed = TRUE
+  ))
+  expect_match(
+    sibling,
+    "NP_CONTINUOUS_ROW_GRADIENT_NOINLINE",
+    fixed = TRUE
+  )
+  expect_match(
+    sibling,
+    paste0(
+      "np_continuous_kernel_beta_level_derivative_",
+      "adaptive_prepared_row_bound("
+    ),
+    fixed = TRUE
+  )
+
+  row_owner <- substr(row_engine, row_start, nchar(row_engine))
+  adaptive_start <- regexpr(
+    paste0(
+      "if(plan->bandwidth_mode == BW_ADAP_NN &&\n",
+      "     plan->beta_prepared != NULL"
+    ),
+    row_owner,
+    fixed = TRUE
+  )[[1L]]
+  scalar_start <- regexpr(
+    "np_continuous_kernel_beta_level_derivative_observation_bound(",
+    substr(row_owner, adaptive_start + 1L, nchar(row_owner)),
+    fixed = TRUE
+  )[[1L]]
+  expect_gt(adaptive_start, 0L)
+  expect_gt(scalar_start, 0L)
+  adaptive_owner <- substr(
+    row_owner,
+    adaptive_start,
+    adaptive_start + scalar_start - 1L
+  )
+  expect_match(
+    adaptive_owner,
+    paste0(
+      "np_continuous_kernel_beta_level_derivative_",
+      "adaptive_prepared_row_bound("
+    ),
+    fixed = TRUE
+  )
+  expect_false(grepl(
+    "np_continuous_kernel_beta_level_derivative_observation_bound(",
+    adaptive_owner,
+    fixed = TRUE
+  ))
+})
+
 test_that("legacy callers cannot acquire beta route metadata implicitly", {
   root <- locate_beta_activation_sources()
   skip_if(is.null(root), "package sources unavailable")
