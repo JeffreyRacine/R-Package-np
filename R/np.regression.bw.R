@@ -1802,7 +1802,7 @@ npregbw.rbandwidth <-
     xdat = xdat,
     ydat = ydat,
     bws = bws,
-    bandwidth.compute = FALSE,
+    bandwidth.compute = TRUE,
     reg.args = template.reg.args,
     yname = yname
   )

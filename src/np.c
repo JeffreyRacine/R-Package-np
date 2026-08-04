@@ -6106,6 +6106,7 @@ static int np_regression_nomad_native_eval_once(double *runo,
                                                 const double *bw_in,
                                                 int penalty_mode,
                                                 double penalty_mult,
+                                                const int lp_engine,
                                                 int *glp_degree,
                                                 int *glp_bernstein,
                                                 int *glp_basis,
@@ -6115,6 +6116,9 @@ static int np_regression_nomad_native_eval_once(double *runo,
 {
   int i;
   const int num_var = myopti[RBW_NCONI] + myopti[RBW_NUNOI] + myopti[RBW_NORDI];
+  int myopti_work[RBW_OPTIONS_COUNT];
+  int glp_bernstein_work;
+  int glp_basis_work;
   double *bw = NULL;
   double fval[2] = {R_NaN, R_NaN};
   double fval_history[1] = {R_NaN};
@@ -6127,12 +6131,22 @@ static int np_regression_nomad_native_eval_once(double *runo,
 
   if (num_var <= 0 || bw_in == NULL || out == NULL)
     return 1;
+  if (lp_engine != NP_LP_ENGINE_SCALAR &&
+      lp_engine != NP_LP_ENGINE_GENERAL)
+    return 1;
 
-  if (myopti[RBW_LL] == NP_LP_ENGINE_GENERAL &&
+  memcpy(myopti_work, myopti, sizeof(myopti_work));
+  myopti_work[RBW_LL] = lp_engine;
+  glp_bernstein_work =
+    (lp_engine == NP_LP_ENGINE_GENERAL) ? *glp_bernstein : 0;
+  glp_basis_work =
+    (lp_engine == NP_LP_ENGINE_GENERAL) ? *glp_basis : 1;
+
+  if (lp_engine == NP_LP_ENGINE_GENERAL &&
       !np_glp_cv_degree_admissible_extern(myopti[RBW_NOBSI],
                                           myopti[RBW_NCONI],
                                           glp_degree,
-                                          *glp_basis)) {
+                                          glp_basis_work)) {
     const double penalty =
       np_regression_nomad_native_invalid_penalty(y, myopti, penalty_mode, penalty_mult);
 
@@ -6155,7 +6169,7 @@ static int np_regression_nomad_native_eval_once(double *runo,
                         rcon,
                         y,
                         mysd,
-                        myopti,
+                        myopti_work,
                         myoptd,
                         bw,
                         fval,
@@ -6167,8 +6181,8 @@ static int np_regression_nomad_native_eval_once(double *runo,
                         &pmode,
                         &pmult,
                         glp_degree,
-                        glp_bernstein,
-                        glp_basis,
+                        &glp_bernstein_work,
+                        &glp_basis_work,
                         ckerlb,
                         ckerub,
                         1,
@@ -6287,7 +6301,7 @@ static int np_regression_native_search_callback(int n,
   double *eval_bw = NULL;
   int *degree_work = NULL;
   double eval_out[5];
-  int j;
+  int active_engine, j;
   int status;
 
   if (context == NULL || x == NULL || bb_outputs == NULL || m != 1 ||
@@ -6334,6 +6348,20 @@ static int np_regression_native_search_callback(int n,
     degree_work = context->glp_degree;
   }
 
+  /* Automatic degree is part of the evaluated point, so it—not the
+     template's initial engine—owns width-one versus general-LP dispatch. */
+  active_engine = (context->ndegree > 0) ?
+    np_canonical_lp_engine_for_degree(degree_work, context->ndegree) :
+    context->myopti[RBW_LL];
+  if (active_engine < 0) {
+    context->callback_failures++;
+    NP_NOMAD_CALLBACK_FREE(raw_point);
+    NP_NOMAD_CALLBACK_FREE(eval_bw);
+    if (context->ndegree > 0 && degree_work != NULL)
+      NP_NOMAD_CALLBACK_FREE(degree_work);
+    return 1;
+  }
+
   status = np_regression_nomad_native_eval_once(context->runo,
                                                 context->rord,
                                                 context->rcon,
@@ -6344,6 +6372,7 @@ static int np_regression_native_search_callback(int n,
                                                 eval_bw,
                                                 context->penalty_mode,
                                                 context->penalty_mult,
+                                                active_engine,
                                                 degree_work,
                                                 &context->glp_bernstein,
                                                 &context->glp_basis,
@@ -6463,6 +6492,13 @@ SEXP C_np_regression_nomad_native_search(SEXP runo,
       XLENGTH(upper_r) != n) {
     UNPROTECT(17);
     error("native npreg NOMAD search received inconsistent problem dimensions");
+  }
+  if (XLENGTH(myopti_i) < RBW_OPTIONS_COUNT ||
+      XLENGTH(degree_i) < 1 ||
+      XLENGTH(glp_bernstein) < 1 ||
+      XLENGTH(glp_basis) < 1) {
+    UNPROTECT(17);
+    error("native npreg NOMAD search received incomplete regression state");
   }
   if (XLENGTH(myoptd_r) <= RBW_SFLOORD) {
     UNPROTECT(17);

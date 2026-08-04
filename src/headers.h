@@ -582,6 +582,7 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 4, 8, 12 };
 #define RBW_CKFAMILYI 21
 #define RBW_CKORDERI 22
 #define RBW_CATCOMPI 23
+#define RBW_OPTIONS_COUNT (RBW_CATCOMPI + 1)
 
 #define RBW_FTOLD  0
 #define RBW_TOLD   1

@@ -1,5 +1,13 @@
 # np 0.70-6
 
+* Corrected automatic-degree regression startup for beta kernels and
+  local-polynomial engine transitions for every continuous kernel. Internal
+  zero bandwidth placeholders are now owned by bandwidth selection rather
+  than validated as manual beta bandwidths, and each evaluated degree selects
+  the scalar width-one or general LP engine through the shared canonical rule.
+  Returned objectives continue to replay exactly without fallback or
+  post-search rewriting.
+
 * Derivative kernel-weight output now uses invocation-scoped ownership and
   each derivative block's canonical tree-support intervals. This removes
   mutable native output state and corrects compact-support adaptive-nearest-
