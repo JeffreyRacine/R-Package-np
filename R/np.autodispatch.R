@@ -1208,6 +1208,35 @@
   .npRmpi_bcast_cmd_expr(expr = cmd, comm = comm, caller.execute = TRUE)
 }
 
+.npRmpi_set_validated_backend_seed <- function(seed, comm = 1L) {
+  # Calls already executing on every rank must remain local. In particular,
+  # the command broadcast below re-enters npseed() under this context.
+  if (isTRUE(.npRmpi_autodispatch_in_context()) ||
+      isTRUE(.npRmpi_manual_bcast_in_context())) {
+    .np_backend_seed_local(seed)
+    return(invisible())
+  }
+
+  if (!isTRUE(getOption("npRmpi.pool.active", FALSE))) {
+    .np_backend_seed_local(seed)
+    return(invisible())
+  }
+  if (!isTRUE(.npRmpi_has_active_slave_pool(comm = comm))) {
+    stop(
+      "npseed() cannot synchronize the C backend because the active MPI pool is inconsistent",
+      call. = FALSE
+    )
+  }
+
+  # The validated seed write is total and non-allocating. Reuse the canonical
+  # command path so every rank receives the write before any following command;
+  # the manual-broadcast context above prevents nested dispatch.
+  cmd <- substitute(npseed(SEED), list(SEED = seed))
+
+  .npRmpi_bcast_cmd_expr(expr = cmd, comm = comm, caller.execute = TRUE)
+  invisible()
+}
+
 .npRmpi_autodispatch_eval_char_arg <- function(mc, caller_env, argname) {
   arg.list <- as.list(mc)
   nms <- names(arg.list)

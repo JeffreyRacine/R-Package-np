@@ -1,5 +1,13 @@
 # npRmpi 0.70-6
 
+* `npseed()` now applies its validated C-backend seed to every rank of an
+  active MPI pool through the canonical command-broadcast path. This corrects
+  rank-asymmetric multistart state that could hang a later collective
+  bandwidth search without adding a separate synchronization protocol. Calls
+  made before pool startup remain local, while an explicit
+  `mpi.bcast.cmd(npseed(...))` continues to seed once per executing rank
+  without a nested broadcast.
+
 * Corrected active-MPI derivative kernel-weight output so every rank
   initializes non-owned cells before the canonical reduction. Output
   ownership is now invocation scoped and each derivative block retains its

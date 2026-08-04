@@ -1668,8 +1668,14 @@ is.monotone.increasing <- function(x) {
   as.integer(normalized)
 }
 
+.np_backend_seed_local <- function(seed) {
+  .Call("C_np_set_seed", seed, PACKAGE = "npRmpi")
+  invisible()
+}
+
 npseed <- function(seed){
-  .Call("C_np_set_seed", .np_validate_seed_scalar(seed), PACKAGE = "npRmpi")
+  seed <- .np_validate_seed_scalar(seed)
+  .npRmpi_set_validated_backend_seed(seed)
   invisible()
 }
 

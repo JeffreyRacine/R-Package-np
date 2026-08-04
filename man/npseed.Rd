@@ -38,6 +38,13 @@ Seed value used to reset the package C backend random number generator.
   \code{\link{npcmstest}} (via \code{\link{npregbw}}),
   \code{\link{npqcmstest}} (via \code{\link{npregbw}}),
   \code{\link{npsigtest}} (via \code{\link{npregbw}}).
+
+  With an active \code{npRmpi} slave pool, a call from the master sends the
+  validated seed through the canonical command-broadcast path, applying it to
+  the C backend on every rank before any following package command. Before
+  pool startup the seed is applied only to the local backend. A call already
+  being executed explicitly through \code{mpi.bcast.cmd} remains local on
+  each executing rank and does not initiate a nested broadcast.
 }
 
 \seealso{

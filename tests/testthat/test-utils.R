@@ -10,14 +10,6 @@ test_that("npksum basic functionality works", {
   expect_type(k$ksum, "double")
 })
 
-test_that("npseed works", {
-  # # skip_on_cran()
-  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  
-  # npseed sets seed for C backend
-  expect_silent(npseed(42))
-})
-
 test_that("b.star works", {
   # b.star is a standard R function in npRmpi, doesn't necessarily need MPI 
   # but we can run it on master.

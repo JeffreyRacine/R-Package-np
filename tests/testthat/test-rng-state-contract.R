@@ -22,7 +22,32 @@ test_that("npseed rejects malformed seeds without touching R RNG", {
   expect_error(npseed(NA_real_), "single finite numeric")
   expect_error(npseed(1.5), "non-negative integer")
   expect_error(npseed(.Machine$integer.max + 1), "non-negative integer")
-  expect_silent(npseed(0))
 
   expect_identical(.Random.seed, before)
+})
+
+test_that("valid npseed leaves the R RNG unchanged in an isolated process", {
+  env <- npRmpi_subprocess_env(c(
+    "_R_CHECK_PACKAGE_NAME_=",
+    "NP_RMPI_TEST_SUITE_POOL="
+  ))
+  skip_if(is.null(env), "installed npRmpi unavailable for subprocess RNG contract")
+
+  res <- npRmpi_run_rscript_subprocess(
+    lines = c(
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "set.seed(314159)",
+      "before <- .Random.seed",
+      "npseed(0)",
+      "stopifnot(identical(.Random.seed, before))",
+      "cat('NPSEED_R_RNG_PRISTINE_OK\\n')"
+    ),
+    timeout = 30L,
+    env = env
+  )
+
+  info <- paste(res$output, collapse = "\n")
+  expect_identical(res$status, 0L, info = info)
+  expect_true(any(grepl("NPSEED_R_RNG_PRISTINE_OK", res$output, fixed = TRUE)),
+              info = info)
 })
