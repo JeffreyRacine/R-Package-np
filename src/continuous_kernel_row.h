@@ -17,6 +17,26 @@ typedef enum {
   NP_CONTINUOUS_ROW_ERR_ZERO_WEIGHT = 6
 } NPContinuousKernelRowStatus;
 
+#define NP_BETA_PREPARED_MAX_COMPONENTS NP_BETA_ORDER_MAX_COMPONENTS
+
+typedef struct {
+  /* R transient allocation scope: nested owners must release in LIFO order.
+   * coordinate_slot maps global continuous coordinates to dense beta-only
+   * storage and is -1 for every non-beta coordinate. */
+  int pdf_active;
+  int allocation_active;
+  int num_train;
+  int num_continuous;
+  int num_beta_coordinates;
+  const void *allocation_marker;
+  int *coordinate_slot;
+  np_beta_pdf_observation *pdf_observation;
+  np_beta_status *pdf_observation_status;
+  np_beta_pdf_component *pdf_row_component;
+  int *pdf_first_interior;
+  int *pdf_second_interior;
+} NPContinuousKernelBetaPreparedContext;
+
 typedef struct {
   double *primary_log_absolute;
   double *secondary_log_absolute;
@@ -38,6 +58,7 @@ typedef struct {
   double * const *bandwidth_eval;
   double * const *bandwidth_train;
   const int *operator;
+  NPContinuousKernelBetaPreparedContext *beta_prepared;
 } NPContinuousKernelRowPlan;
 
 typedef struct {
@@ -119,6 +140,16 @@ typedef struct NPContinuousKernelDerivativeDiagnostics {
 
 void np_continuous_kernel_row_workspace_init(
   NPContinuousKernelRowWorkspace *workspace);
+
+void np_continuous_kernel_beta_prepared_context_init(
+  NPContinuousKernelBetaPreparedContext *context);
+
+void np_continuous_kernel_beta_prepared_context_release(
+  NPContinuousKernelBetaPreparedContext *context);
+
+NPContinuousKernelRowStatus np_continuous_kernel_beta_prepared_context_prepare(
+  NPContinuousKernelBetaPreparedContext *context,
+  const NPContinuousKernelRowPlan *plan);
 
 void np_continuous_kernel_row_workspace_release(
   NPContinuousKernelRowWorkspace *workspace);

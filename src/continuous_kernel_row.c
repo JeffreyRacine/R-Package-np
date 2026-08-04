@@ -4,6 +4,7 @@
 #include <stdlib.h>
 
 #include <R_ext/Arith.h>
+#include <R_ext/Memory.h>
 #include <R_ext/Utils.h>
 
 #include "headers.h"
@@ -42,6 +43,35 @@ void np_continuous_kernel_row_workspace_init(
   workspace->secondary_sign = NULL;
   workspace->capacity = 0;
   workspace->secondary_capacity = 0;
+}
+
+void np_continuous_kernel_beta_prepared_context_init(
+  NPContinuousKernelBetaPreparedContext *context)
+{
+  if(context == NULL)
+    return;
+  context->pdf_active = 0;
+  context->allocation_active = 0;
+  context->num_train = 0;
+  context->num_continuous = 0;
+  context->num_beta_coordinates = 0;
+  context->allocation_marker = NULL;
+  context->coordinate_slot = NULL;
+  context->pdf_observation = NULL;
+  context->pdf_observation_status = NULL;
+  context->pdf_row_component = NULL;
+  context->pdf_first_interior = NULL;
+  context->pdf_second_interior = NULL;
+}
+
+void np_continuous_kernel_beta_prepared_context_release(
+  NPContinuousKernelBetaPreparedContext *context)
+{
+  if(context == NULL)
+    return;
+  if(context->allocation_active)
+    vmaxset(context->allocation_marker);
+  np_continuous_kernel_beta_prepared_context_init(context);
 }
 
 void np_continuous_kernel_row_workspace_release(
@@ -153,6 +183,216 @@ NPContinuousKernelRowStatus np_continuous_kernel_row_plan_validate(
     if(plan->train[coordinate] == NULL ||
        (!plan->train_is_eval && plan->evaluation[coordinate] == NULL))
       return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  return NP_CONTINUOUS_ROW_OK;
+}
+
+NPContinuousKernelRowStatus np_continuous_kernel_beta_prepared_context_prepare(
+  NPContinuousKernelBetaPreparedContext *context,
+  const NPContinuousKernelRowPlan *plan)
+{
+  size_t observation_count;
+  size_t component_count;
+  int beta_coordinate_count = 0;
+  int coordinate;
+
+  if(context == NULL)
+    return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  if(context->allocation_active)
+    return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  np_continuous_kernel_beta_prepared_context_init(context);
+  if(np_continuous_kernel_row_plan_validate(plan) !=
+     NP_CONTINUOUS_ROW_OK)
+    return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  if(plan->bandwidth_mode != BW_FIXED &&
+     plan->bandwidth_mode != BW_GEN_NN)
+    return NP_CONTINUOUS_ROW_OK;
+
+  for(coordinate = 0; coordinate < plan->num_continuous; ++coordinate) {
+    const NPContinuousKernelSegment * const segment =
+      np_continuous_kernel_route_segment(plan->route, coordinate);
+
+    if(segment == NULL)
+      return NP_CONTINUOUS_ROW_ERR_ROUTE;
+    if(segment->descriptor.family != NP_CKERNEL_FAMILY_BETA)
+      continue;
+    ++beta_coordinate_count;
+    if(plan->operator[coordinate] != OP_NORMAL)
+      return NP_CONTINUOUS_ROW_OK;
+    if(plan->bandwidth_eval == NULL ||
+       plan->bandwidth_eval[coordinate] == NULL)
+      return NP_CONTINUOUS_ROW_OK;
+  }
+  if(beta_coordinate_count == 0)
+    return NP_CONTINUOUS_ROW_OK;
+  if((size_t)beta_coordinate_count >
+       SIZE_MAX / (size_t)plan->num_train ||
+     (size_t)beta_coordinate_count >
+       SIZE_MAX / NP_BETA_PREPARED_MAX_COMPONENTS)
+    return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  observation_count = (size_t)beta_coordinate_count *
+    (size_t)plan->num_train;
+  component_count = (size_t)beta_coordinate_count *
+    NP_BETA_PREPARED_MAX_COMPONENTS;
+  context->allocation_marker = vmaxget();
+  context->allocation_active = 1;
+  context->coordinate_slot = (int *)R_alloc(
+    (size_t)plan->num_continuous, (int)sizeof(int));
+  context->pdf_observation = (np_beta_pdf_observation *)R_alloc(
+    observation_count, (int)sizeof(np_beta_pdf_observation));
+  context->pdf_observation_status = (np_beta_status *)R_alloc(
+    observation_count, (int)sizeof(np_beta_status));
+  context->pdf_row_component = (np_beta_pdf_component *)R_alloc(
+    component_count, (int)sizeof(np_beta_pdf_component));
+  context->pdf_first_interior = (int *)R_alloc(
+    (size_t)beta_coordinate_count, (int)sizeof(int));
+  context->pdf_second_interior = (int *)R_alloc(
+    (size_t)beta_coordinate_count, (int)sizeof(int));
+
+  beta_coordinate_count = 0;
+  for(coordinate = 0; coordinate < plan->num_continuous; ++coordinate) {
+    const NPContinuousKernelSegment * const segment =
+      np_continuous_kernel_route_segment(plan->route, coordinate);
+    const int local_coordinate = segment == NULL ? -1 :
+      coordinate - segment->coordinate_offset;
+    int observation;
+
+    context->coordinate_slot[coordinate] = -1;
+    if(segment == NULL ||
+       segment->descriptor.family != NP_CKERNEL_FAMILY_BETA)
+      continue;
+    context->coordinate_slot[coordinate] = beta_coordinate_count;
+    context->pdf_first_interior[beta_coordinate_count] = -1;
+    context->pdf_second_interior[beta_coordinate_count] = -1;
+    for(observation = 0; observation < plan->num_train; ++observation) {
+      const double observed = plan->train[coordinate][observation];
+      const double support_length =
+        segment->upper[local_coordinate] -
+        segment->lower[local_coordinate];
+      const size_t observation_offset =
+        (size_t)beta_coordinate_count * (size_t)plan->num_train +
+        (size_t)observation;
+      np_beta_pdf_observation * const pdf_observation =
+        &context->pdf_observation[observation_offset];
+      double observation_unit;
+      double observation_complement_unit;
+      const np_beta_status beta_status =
+        np_beta_pdf_observation_init(
+          observed,
+          segment->lower[local_coordinate],
+          segment->upper[local_coordinate], support_length,
+          &observation_unit, &observation_complement_unit,
+          &pdf_observation->log_unit,
+          &pdf_observation->log_complement_unit,
+          &pdf_observation->endpoint);
+
+      context->pdf_observation_status[observation_offset] = beta_status;
+      if(beta_status != NP_BETA_OK)
+        continue;
+      if(pdf_observation->endpoint == 0) {
+        if(context->pdf_first_interior[beta_coordinate_count] < 0)
+          context->pdf_first_interior[beta_coordinate_count] = observation;
+        else if(context->pdf_second_interior[beta_coordinate_count] < 0)
+          context->pdf_second_interior[beta_coordinate_count] = observation;
+      }
+    }
+    ++beta_coordinate_count;
+  }
+  context->num_train = plan->num_train;
+  context->num_continuous = plan->num_continuous;
+  context->num_beta_coordinates = beta_coordinate_count;
+  context->pdf_active = 1;
+  return NP_CONTINUOUS_ROW_OK;
+}
+
+static NPContinuousKernelRowStatus
+np_continuous_kernel_beta_prepared_pdf_row_prepare(
+  const NPContinuousKernelRowPlan *plan,
+  const NPContinuousKernelSegment *segment,
+  int evaluation_index,
+  int omitted_observation,
+  NPContinuousKernelRowResult *result)
+{
+  NPContinuousKernelBetaPreparedContext * const context =
+    plan == NULL ? NULL : plan->beta_prepared;
+  const int first_observation = omitted_observation == 0 ? 1 : 0;
+  int coordinate;
+
+  if(context == NULL || !context->pdf_active || segment == NULL ||
+     result == NULL ||
+     context->num_train != plan->num_train ||
+     context->num_continuous != plan->num_continuous)
+    return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  if(first_observation >= plan->num_train)
+    return NP_CONTINUOUS_ROW_OK;
+  for(coordinate = segment->coordinate_offset;
+      coordinate < segment->coordinate_offset + segment->coordinate_count;
+      ++coordinate) {
+    const int local_coordinate = coordinate - segment->coordinate_offset;
+    const double evaluation = plan->train_is_eval ?
+      plan->train[coordinate][evaluation_index] :
+      plan->evaluation[coordinate][evaluation_index];
+    const double bandwidth = plan->bandwidth_mode == BW_FIXED ?
+      plan->bandwidth_eval[coordinate][0] :
+      plan->bandwidth_eval[coordinate][evaluation_index];
+    const int beta_slot = context->coordinate_slot[coordinate];
+    const int component_count = segment->descriptor.order / 2;
+    int normalizer_observation =
+      beta_slot < 0 ? -1 : context->pdf_first_interior[beta_slot];
+    int component;
+
+    if(beta_slot < 0 || beta_slot >= context->num_beta_coordinates)
+      return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+    if(normalizer_observation == omitted_observation)
+      normalizer_observation = context->pdf_second_interior[beta_slot];
+
+    if(component_count <= 0 ||
+       component_count > NP_BETA_PREPARED_MAX_COMPONENTS)
+      return NP_CONTINUOUS_ROW_ERR_ROUTE;
+    for(component = 0; component < component_count; ++component) {
+      np_beta_pdf_component * const row_component =
+        &context->pdf_row_component[
+          (size_t)beta_slot * NP_BETA_PREPARED_MAX_COMPONENTS +
+          (size_t)component];
+      np_beta_shape shape;
+      np_beta_status beta_status = np_beta_shape_init(
+        evaluation, segment->lower[local_coordinate], bandwidth,
+        segment->lower[local_coordinate],
+        segment->upper[local_coordinate], component + 1, &shape);
+
+      if(beta_status != NP_BETA_OK) {
+        result->beta_status = beta_status;
+        result->bad_coordinate = coordinate;
+        result->bad_observation = first_observation;
+        return NP_CONTINUOUS_ROW_ERR_KERNEL;
+      }
+      beta_status = np_beta_pdf_component_from_shape(
+        &shape, row_component);
+      if(beta_status != NP_BETA_OK) {
+        result->beta_status = beta_status;
+        result->bad_coordinate = coordinate;
+        result->bad_observation = first_observation;
+        return NP_CONTINUOUS_ROW_ERR_KERNEL;
+      }
+      beta_status = np_beta_pdf_component_prepare_coefficient(
+        row_component, segment->descriptor.order, component);
+      if(beta_status != NP_BETA_OK) {
+        result->beta_status = beta_status;
+        result->bad_coordinate = coordinate;
+        result->bad_observation = first_observation;
+        return NP_CONTINUOUS_ROW_ERR_KERNEL;
+      }
+      if(normalizer_observation >= 0) {
+        beta_status = np_beta_pdf_component_prepare_normalizer(
+          row_component);
+        if(beta_status != NP_BETA_OK) {
+          result->beta_status = beta_status;
+          result->bad_coordinate = coordinate;
+          result->bad_observation = normalizer_observation;
+          return NP_CONTINUOUS_ROW_ERR_KERNEL;
+        }
+      }
+    }
+  }
   return NP_CONTINUOUS_ROW_OK;
 }
 
@@ -494,6 +734,96 @@ np_continuous_kernel_beta_segment_log_fill(
   }
 
   if(normal_operator) {
+    NPContinuousKernelBetaPreparedContext * const prepared =
+      plan->beta_prepared;
+
+    if(prepared != NULL && prepared->pdf_active) {
+      const int prepared_component_count =
+        segment->descriptor.order / 2;
+          const NPContinuousKernelRowStatus prepare_status =
+        np_continuous_kernel_beta_prepared_pdf_row_prepare(
+          plan, segment, evaluation_index, omitted_observation, result);
+
+      if(prepare_status != NP_CONTINUOUS_ROW_OK)
+        return prepare_status;
+      for(observation = 0; observation < plan->num_train; ++observation) {
+        double log_product = 0.0;
+        int product_sign = 1;
+
+        if(observation == omitted_observation) {
+          log_absolute[observation] = -INFINITY;
+          sign[observation] = 0;
+          continue;
+        }
+        for(int coordinate = segment->coordinate_offset;
+            coordinate < segment->coordinate_offset +
+              segment->coordinate_count;
+            ++coordinate) {
+          const int beta_slot = prepared->coordinate_slot[coordinate];
+          const np_beta_pdf_component *components;
+          const np_beta_pdf_observation *prepared_observation;
+          const size_t observation_offset =
+            (size_t)beta_slot * (size_t)plan->num_train +
+            (size_t)observation;
+          int scalar_sign = 0;
+
+          if(beta_slot < 0 ||
+             beta_slot >= prepared->num_beta_coordinates) {
+            result->bad_coordinate = coordinate;
+            result->bad_observation = observation;
+            return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+          }
+          components = &prepared->pdf_row_component[
+            (size_t)beta_slot * NP_BETA_PREPARED_MAX_COMPONENTS];
+          if(prepared->pdf_observation_status[observation_offset] !=
+               NP_BETA_OK) {
+            result->beta_status =
+              prepared->pdf_observation_status[observation_offset];
+            result->bad_coordinate = coordinate;
+            result->bad_observation = observation;
+            return NP_CONTINUOUS_ROW_ERR_KERNEL;
+          }
+          prepared_observation =
+            &prepared->pdf_observation[observation_offset];
+
+          log_absolute[observation] = np_beta_log_abs_pdf_prepared(
+            components, prepared_observation, prepared_component_count,
+            &scalar_sign, &result->beta_status);
+          if(result->beta_status != NP_BETA_OK) {
+            result->bad_coordinate = coordinate;
+            result->bad_observation = observation;
+            return NP_CONTINUOUS_ROW_ERR_KERNEL;
+          }
+          if(ISNAN(log_absolute[observation]) ||
+             log_absolute[observation] == INFINITY ||
+             (scalar_sign != -1 && scalar_sign != 0 && scalar_sign != 1) ||
+             ((scalar_sign == 0) !=
+              (log_absolute[observation] == -INFINITY))) {
+            result->bad_coordinate = coordinate;
+            result->bad_observation = observation;
+            return NP_CONTINUOUS_ROW_ERR_NUMERIC;
+          }
+          if(scalar_sign == 0) {
+            product_sign = 0;
+            log_product = -INFINITY;
+            break;
+          }
+          log_product += log_absolute[observation];
+          product_sign *= scalar_sign;
+          if(ISNAN(log_product) || log_product == INFINITY) {
+            result->bad_coordinate = coordinate;
+            result->bad_observation = observation;
+            return NP_CONTINUOUS_ROW_ERR_NUMERIC;
+          }
+        }
+        log_absolute[observation] = log_product;
+        sign[observation] = (signed char)product_sign;
+        if(product_sign != 0 && log_product > *maximum)
+          *maximum = log_product;
+      }
+      return NP_CONTINUOUS_ROW_OK;
+    }
+
     for(observation = 0; observation < plan->num_train; ++observation) {
       double log_product = 0.0;
       int product_sign = 1;

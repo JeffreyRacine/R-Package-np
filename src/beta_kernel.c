@@ -30,20 +30,6 @@ static void np_beta_set_status(np_beta_status *status,
     *status = value;
 }
 
-static double np_beta_unit_coordinate(double value,
-                                      double lower,
-                                      double upper,
-                                      double support_length)
-{
-  const double midpoint = lower + 0.5 * support_length;
-
-  /* Use the nearer endpoint to avoid losing most of a small upper-tail gap. */
-  if(value <= midpoint)
-    return (value - lower) / support_length;
-
-  return 1.0 - (upper - value) / support_length;
-}
-
 /* Stable log-gamma differences used by the analytic beta-product overlap.
  * Directly subtracting three lbeta values loses several digits when the
  * concentration is large because the desired log overlap is small relative
@@ -297,12 +283,11 @@ np_beta_status np_beta_shape_init(double evaluation,
 
   if(observation < lower || observation > upper)
     return NP_BETA_ERR_OBSERVATION;
-  shape->observation_unit = np_beta_unit_coordinate(observation,
-                                                    lower,
-                                                    upper,
-                                                    shape->support_length);
+  shape->observation_unit = np_beta_observation_unit_coordinate(
+    observation, lower, upper, shape->support_length);
   shape->observation_complement_unit =
-    (upper - observation) / shape->support_length;
+    np_beta_observation_complement_unit_coordinate(
+      observation, upper, shape->support_length);
   if(!R_FINITE(shape->observation_unit) ||
      shape->observation_unit < 0.0 || shape->observation_unit > 1.0)
     return NP_BETA_ERR_OBSERVATION;
@@ -310,7 +295,6 @@ np_beta_status np_beta_shape_init(double evaluation,
      shape->observation_complement_unit < 0.0 ||
      shape->observation_complement_unit > 1.0)
     return NP_BETA_ERR_OBSERVATION;
-
   if(observation == lower) {
     shape->observation_endpoint = -1;
     shape->log_observation_unit = -INFINITY;
@@ -321,10 +305,11 @@ np_beta_status np_beta_shape_init(double evaluation,
     shape->log_observation_complement_unit = -INFINITY;
   } else {
     shape->observation_endpoint = 0;
-    shape->log_observation_unit =
-      log(observation - lower) - log(shape->support_length);
+    shape->log_observation_unit = np_beta_observation_log_unit(
+      observation, lower, shape->support_length);
     shape->log_observation_complement_unit =
-      log(upper - observation) - log(shape->support_length);
+      np_beta_observation_log_complement_unit(
+        observation, upper, shape->support_length);
   }
 
   if(evaluation < lower) {
@@ -362,53 +347,131 @@ np_beta_status np_beta_shape_init(double evaluation,
   return NP_BETA_OK;
 }
 
-double np_beta_log_pdf_scale(const np_beta_shape *shape,
-                             np_beta_status *status)
+void np_beta_pdf_observation_from_shape(
+  const np_beta_shape *shape,
+  np_beta_pdf_observation *observation)
 {
-  double alpha;
-  double beta;
-  double alpha_minus_one;
-  double beta_minus_one;
+  if(shape == NULL || observation == NULL)
+    return;
+  observation->log_unit = shape->log_observation_unit;
+  observation->log_complement_unit =
+    shape->log_observation_complement_unit;
+  observation->endpoint = shape->observation_endpoint;
+}
+
+np_beta_status np_beta_pdf_component_from_shape(
+  const np_beta_shape *shape,
+  np_beta_pdf_component *component)
+{
+  if(shape == NULL || component == NULL)
+    return NP_BETA_ERR_NUMERIC;
+
+  component->log_support_length = log(shape->support_length);
+  component->eval_location = shape->eval_location;
+  component->normalizer_ready = 0;
+  component->log_beta = 0.0;
+  component->log_abs_coefficient = 0.0;
+  component->coefficient_sign = 1;
+  component->alpha_minus_one = 0.0;
+  component->beta_minus_one = 0.0;
+  component->alpha = 1.0;
+  component->beta = 1.0;
+  if(shape->eval_location != NP_BETA_EVAL_INSIDE)
+    return NP_BETA_OK;
+
+  component->alpha_minus_one =
+    shape->target_unit * shape->concentration;
+  component->beta_minus_one =
+    shape->target_complement_unit * shape->concentration;
+  component->alpha = 1.0 + component->alpha_minus_one;
+  component->beta = 1.0 + component->beta_minus_one;
+  if(!R_FINITE(component->alpha) || !R_FINITE(component->beta) ||
+     component->alpha < 1.0 || component->beta < 1.0)
+    return NP_BETA_ERR_NUMERIC;
+
+  return NP_BETA_OK;
+}
+
+np_beta_status np_beta_pdf_component_prepare_coefficient(
+  np_beta_pdf_component *component,
+  int order,
+  int component_index)
+{
+  const int *coefficients = NULL;
+  const int component_count =
+    np_beta_order_coefficients(order, &coefficients);
+  int coefficient;
+
+  if(component == NULL || component_index < 0 ||
+     component_index >= component_count)
+    return NP_BETA_ERR_SCALE;
+  coefficient = coefficients[component_index];
+  if(coefficient == 0)
+    return NP_BETA_ERR_SCALE;
+  component->log_abs_coefficient =
+    log((double)abs(coefficient));
+  component->coefficient_sign = coefficient > 0 ? 1 : -1;
+  return R_FINITE(component->log_abs_coefficient) ?
+    NP_BETA_OK : NP_BETA_ERR_NUMERIC;
+}
+
+np_beta_status np_beta_pdf_component_prepare_normalizer(
+  np_beta_pdf_component *component)
+{
+  if(component == NULL)
+    return NP_BETA_ERR_NUMERIC;
+  /* An outside-support target is an exact zero PDF row.  No observation can
+   * consume a normalizer, so retain the unprepared state and succeed. */
+  if(component->eval_location != NP_BETA_EVAL_INSIDE)
+    return NP_BETA_OK;
+  component->log_beta = lbeta(component->alpha, component->beta);
+  if(ISNAN(component->log_beta))
+    return NP_BETA_ERR_NUMERIC;
+  if(component->log_beta == INFINITY)
+    return NP_BETA_ERR_RANGE;
+  component->normalizer_ready = 1;
+  return NP_BETA_OK;
+}
+
+double np_beta_log_pdf_component_prepared(
+  const np_beta_pdf_component *component,
+  const np_beta_pdf_observation *observation,
+  np_beta_status *status)
+{
   double log_value;
 
-  if(shape == NULL) {
+  if(component == NULL || observation == NULL) {
     np_beta_set_status(status, NP_BETA_ERR_NUMERIC);
     return NAN;
   }
-
-  if(shape->eval_location != NP_BETA_EVAL_INSIDE) {
+  if(component->eval_location != NP_BETA_EVAL_INSIDE) {
     np_beta_set_status(status, NP_BETA_OK);
     return -INFINITY;
   }
 
-  alpha_minus_one = shape->target_unit * shape->concentration;
-  beta_minus_one = shape->target_complement_unit * shape->concentration;
-  alpha = 1.0 + alpha_minus_one;
-  beta = 1.0 + beta_minus_one;
-  if(!R_FINITE(alpha) || !R_FINITE(beta) || alpha < 1.0 || beta < 1.0) {
-    np_beta_set_status(status, NP_BETA_ERR_NUMERIC);
-    return NAN;
-  }
-
-  if(shape->observation_endpoint < 0) {
-    if(alpha_minus_one == 0.0) {
-      log_value = log(beta) - log(shape->support_length);
+  if(observation->endpoint < 0) {
+    if(component->alpha_minus_one == 0.0) {
+      log_value = log(component->beta) - component->log_support_length;
     } else {
       np_beta_set_status(status, NP_BETA_OK);
       return -INFINITY;
     }
-  } else if(shape->observation_endpoint > 0) {
-    if(beta_minus_one == 0.0) {
-      log_value = log(alpha) - log(shape->support_length);
+  } else if(observation->endpoint > 0) {
+    if(component->beta_minus_one == 0.0) {
+      log_value = log(component->alpha) - component->log_support_length;
     } else {
       np_beta_set_status(status, NP_BETA_OK);
       return -INFINITY;
     }
   } else {
-    log_value = -log(shape->support_length) +
-      alpha_minus_one * shape->log_observation_unit +
-      beta_minus_one * shape->log_observation_complement_unit -
-      lbeta(alpha, beta);
+    if(!component->normalizer_ready) {
+      np_beta_set_status(status, NP_BETA_ERR_NUMERIC);
+      return NAN;
+    }
+    log_value = -component->log_support_length +
+      component->alpha_minus_one * observation->log_unit +
+      component->beta_minus_one * observation->log_complement_unit -
+      component->log_beta;
   }
 
   if(ISNAN(log_value)) {
@@ -419,9 +482,81 @@ double np_beta_log_pdf_scale(const np_beta_shape *shape,
     np_beta_set_status(status, NP_BETA_ERR_RANGE);
     return INFINITY;
   }
-
   np_beta_set_status(status, NP_BETA_OK);
   return log_value;
+}
+
+double np_beta_log_abs_pdf_prepared(
+  const np_beta_pdf_component *components,
+  const np_beta_pdf_observation *observation,
+  int component_count,
+  int *sign,
+  np_beta_status *status)
+{
+  double positive_log = -INFINITY;
+  double negative_log = -INFINITY;
+  double log_absolute = -INFINITY;
+  np_beta_status difference_status;
+  int component;
+
+  if(components == NULL || observation == NULL || sign == NULL ||
+     component_count <= 0 ||
+     component_count > NP_BETA_ORDER_MAX_COMPONENTS) {
+    np_beta_set_status(status, NP_BETA_ERR_SCALE);
+    return NAN;
+  }
+  *sign = 0;
+  for(component = 0; component < component_count; ++component) {
+    np_beta_status component_status = NP_BETA_OK;
+    const double log_value = np_beta_log_pdf_component_prepared(
+      &components[component], observation, &component_status);
+    double log_term;
+
+    if(component_status != NP_BETA_OK) {
+      np_beta_set_status(status, component_status);
+      return (component_status == NP_BETA_ERR_RANGE) ? INFINITY : NAN;
+    }
+    if(components[component].coefficient_sign != -1 &&
+       components[component].coefficient_sign != 1) {
+      np_beta_set_status(status, NP_BETA_ERR_NUMERIC);
+      return NAN;
+    }
+    log_term = (log_value == -INFINITY) ? -INFINITY :
+      log_value + components[component].log_abs_coefficient;
+    if(components[component].coefficient_sign > 0)
+      positive_log = np_beta_log_add(positive_log, log_term);
+    else
+      negative_log = np_beta_log_add(negative_log, log_term);
+  }
+
+  difference_status = np_beta_signed_log_absolute(
+    positive_log, negative_log, &log_absolute, sign);
+  np_beta_set_status(status, difference_status);
+  return (difference_status == NP_BETA_OK) ? log_absolute : NAN;
+}
+
+double np_beta_log_pdf_scale(const np_beta_shape *shape,
+                             np_beta_status *status)
+{
+  np_beta_pdf_observation observation;
+  np_beta_pdf_component component;
+  np_beta_status component_status;
+
+  if(shape == NULL) {
+    np_beta_set_status(status, NP_BETA_ERR_NUMERIC);
+    return NAN;
+  }
+
+  np_beta_pdf_observation_from_shape(shape, &observation);
+  component_status = np_beta_pdf_component_from_shape(shape, &component);
+  if(component_status == NP_BETA_OK && observation.endpoint == 0)
+    component_status = np_beta_pdf_component_prepare_normalizer(&component);
+  if(component_status != NP_BETA_OK) {
+    np_beta_set_status(status, component_status);
+    return (component_status == NP_BETA_ERR_RANGE) ? INFINITY : NAN;
+  }
+  return np_beta_log_pdf_component_prepared(
+    &component, &observation, status);
 }
 
 double np_beta_pdf_scale(const np_beta_shape *shape,

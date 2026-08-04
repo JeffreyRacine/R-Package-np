@@ -9424,6 +9424,7 @@ static int np_beta_absolute_route(
   NPContinuousKernelDerivativeDiagnostics * const route_diagnostics,
   NPContinuousKernelProgressFunction progress)
 {
+  NPContinuousKernelBetaPreparedContext beta_prepared;
   NPContinuousKernelRowWorkspace workspace;
   NPContinuousKernelRowPlan plan;
   NPContinuousKernelRowResult row_result;
@@ -9448,6 +9449,7 @@ static int np_beta_absolute_route(
     route_diagnostics->beta_status = NP_BETA_OK;
   }
   np_continuous_kernel_row_workspace_init(&workspace);
+  np_continuous_kernel_beta_prepared_context_init(&beta_prepared);
   np_continuous_kernel_derivative_accumulator_init(&derivative_accumulator);
   np_beta_categorical_factor_context_init_empty(&categorical_context);
   categorical_provider.function = np_beta_categorical_log_factor;
@@ -9593,8 +9595,12 @@ static int np_beta_absolute_route(
   plan.bandwidth_train = (bandwidth_mode == BW_FIXED) ?
     bandwidth_columns : matrix_bandwidth_train;
   plan.operator = operator;
+  plan.beta_prepared = &beta_prepared;
   if(np_continuous_kernel_row_plan_validate(&plan) !=
      NP_CONTINUOUS_ROW_OK)
+    goto cleanup;
+  if(np_continuous_kernel_beta_prepared_context_prepare(
+       &beta_prepared, &plan) != NP_CONTINUOUS_ROW_OK)
     goto cleanup;
   row_result.row = row;
 
@@ -9864,6 +9870,7 @@ cleanup:
   np_continuous_kernel_derivative_accumulator_release(
     &derivative_accumulator);
   free(bandwidth_columns);
+  np_continuous_kernel_beta_prepared_context_release(&beta_prepared);
   return status;
 }
 
@@ -21889,6 +21896,8 @@ void np_beta_scaled_row_context_init(NPBetaScaledRowContext *context)
   if(context == NULL)
     return;
   memset(context, 0, sizeof(*context));
+  np_continuous_kernel_beta_prepared_context_init(
+    &context->beta_prepared);
   np_continuous_kernel_row_workspace_init(&context->row_workspace);
   np_beta_categorical_factor_context_init_empty(
     &context->categorical_context);
@@ -21901,6 +21910,8 @@ void np_beta_scaled_row_context_clear(NPBetaScaledRowContext *context)
   np_continuous_kernel_row_workspace_release(&context->row_workspace);
   np_beta_categorical_factor_context_release(
     &context->categorical_context);
+  np_continuous_kernel_beta_prepared_context_release(
+    &context->beta_prepared);
   np_beta_scaled_row_context_init(context);
 }
 
@@ -21970,6 +21981,7 @@ NPContinuousKernelRowStatus np_beta_scaled_row_context_prepare(
   context->plan.bandwidth_train = bandwidth_train;
   context->plan.bandwidth_eval = bandwidth_eval;
   context->plan.operator = operator_code;
+  context->plan.beta_prepared = &context->beta_prepared;
   context->row_result.row = row;
   context->diagnostics = diagnostics;
   context->has_categories = nunordered > 0 || nordered > 0;
@@ -21977,6 +21989,10 @@ NPContinuousKernelRowStatus np_beta_scaled_row_context_prepare(
   context->categorical_provider.context = &context->categorical_context;
 
   status = np_continuous_kernel_row_plan_validate(&context->plan);
+  if(status != NP_CONTINUOUS_ROW_OK)
+    return status;
+  status = np_continuous_kernel_beta_prepared_context_prepare(
+    &context->beta_prepared, &context->plan);
   if(status != NP_CONTINUOUS_ROW_OK)
     return status;
   if(context->has_categories) {
@@ -22449,8 +22465,8 @@ int np_conditional_count_levels(const NPConditionalCountPlan * const plan,
   status = NP_CONTINUOUS_ROW_OK;
 
 cleanup_count_levels:
-  np_beta_scaled_row_context_clear(&x_context);
   np_beta_scaled_row_context_clear(&y_context);
+  np_beta_scaled_row_context_clear(&x_context);
   if(x_legacy_categorical_initialized)
     np_beta_categorical_factor_context_release(
       &x_legacy_categorical_context);
@@ -40378,8 +40394,8 @@ static NP_NOINLINE int np_conditional_density_cvml_continuous_route(
   status = 0;
 
 cleanup_route:
-  np_conditional_route_row_context_clear(&route_x);
   np_conditional_route_row_context_clear(&route_y);
+  np_conditional_route_row_context_clear(&route_x);
   np_conditional_xrow_ctx_clear(&legacy_x);
   np_conditional_yrow_ctx_clear(&legacy_y);
   np_reghat_lp_workspace_clear(&lp_workspace);
@@ -40428,8 +40444,8 @@ static void np_conditional_cvls_route_context_clear(
 {
   if(context == NULL)
     return;
-  np_conditional_route_row_context_clear(&context->route_x);
   np_conditional_route_row_context_clear(&context->route_y);
+  np_conditional_route_row_context_clear(&context->route_x);
   np_conditional_xrow_ctx_clear(&context->legacy_x);
   np_conditional_yrow_ctx_clear(&context->legacy_y);
   np_conditional_yrow_ctx_clear(&context->legacy_y_convolution);

@@ -31,6 +31,7 @@ typedef struct {
 typedef struct {
   int ready;
   int has_categories;
+  NPContinuousKernelBetaPreparedContext beta_prepared;
   NPContinuousKernelRowWorkspace row_workspace;
   NPContinuousKernelRowPlan plan;
   NPContinuousKernelRowResult row_result;
