@@ -1,8 +1,13 @@
 #ifndef NP_BETA_BANDWIDTH_H
 #define NP_BETA_BANDWIDTH_H
 
-#include "beta_kernelsum.h"
 #include "regression_contract.h"
+
+typedef enum {
+  NP_BETA_BANDWIDTH_FIXED = 0,
+  NP_BETA_BANDWIDTH_GENERALIZED_NN = 1,
+  NP_BETA_BANDWIDTH_ADAPTIVE_NN = 2
+} np_beta_bandwidth_mode;
 
 typedef enum {
   NP_BETA_BANDWIDTH_PREPARE_OK = 0,
