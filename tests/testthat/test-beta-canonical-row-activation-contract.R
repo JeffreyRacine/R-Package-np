@@ -325,6 +325,133 @@ test_that("adaptive beta gradient rows reuse prepared observation state", {
   ))
 })
 
+test_that("beta CDF rows reuse invocation-owned observation state", {
+  root <- locate_beta_activation_sources()
+  skip_if(is.null(root), "package sources unavailable")
+  row_engine <- paste(
+    readLines(file.path(root, "src", "continuous_kernel_row.c"),
+              warn = FALSE),
+    collapse = "\n"
+  )
+  row_header <- paste(
+    readLines(file.path(root, "src", "continuous_kernel_row.h"),
+              warn = FALSE),
+    collapse = "\n"
+  )
+  beta_kernel <- paste(
+    readLines(file.path(root, "src", "beta_kernel.c"), warn = FALSE),
+    collapse = "\n"
+  )
+
+  prepare_start <- regexpr(
+    "np_continuous_kernel_beta_prepared_cdf_context_prepare(",
+    row_engine,
+    fixed = TRUE
+  )[[1L]]
+  public_prepare_start <- regexpr(
+    "NPContinuousKernelRowStatus np_continuous_kernel_beta_prepared_context_prepare(",
+    row_engine,
+    fixed = TRUE
+  )[[1L]]
+  expect_gt(prepare_start, 0L)
+  expect_gt(public_prepare_start, prepare_start)
+  cdf_prepare <- substr(
+    row_engine, prepare_start, public_prepare_start - 1L
+  )
+
+  expect_match(
+    cdf_prepare,
+    "plan->operator[coordinate] == OP_INTEGRAL",
+    fixed = TRUE
+  )
+  expect_match(
+    cdf_prepare,
+    "np_beta_cdf_observation_init(",
+    fixed = TRUE
+  )
+  expect_match(
+    cdf_prepare,
+    "np_beta_pdf_component_prepare_coefficient(",
+    fixed = TRUE
+  )
+  expect_match(row_header, "int cdf_active;", fixed = TRUE)
+  expect_match(
+    row_header, "np_beta_cdf_observation *cdf_observation;", fixed = TRUE
+  )
+
+  sibling_start <- regexpr(
+    "np_continuous_kernel_beta_cdf_prepared_segment_log_fill(",
+    row_engine,
+    fixed = TRUE
+  )[[1L]]
+  next_owner_start <- regexpr(
+    "typedef struct {\n  double other_log;",
+    substr(row_engine, sibling_start + 1L, nchar(row_engine)),
+    fixed = TRUE
+  )[[1L]]
+  expect_gt(sibling_start, 0L)
+  expect_gt(next_owner_start, 0L)
+  sibling <- substr(
+    row_engine,
+    sibling_start,
+    sibling_start + next_owner_start - 1L
+  )
+  expect_match(
+    sibling,
+    "np_beta_log_abs_cdf_order_prepared_observation(",
+    fixed = TRUE
+  )
+  expect_false(grepl(
+    "np_beta_log_abs_cdf_order(", sibling, fixed = TRUE
+  ))
+  expect_match(
+    sibling,
+    "} else {\n        row_status = np_continuous_kernel_beta_log_value(",
+    fixed = TRUE
+  )
+  expect_match(
+    row_engine,
+    paste0(
+      "if(plan->beta_prepared != NULL && ",
+      "plan->beta_prepared->cdf_active)\n",
+      "    return np_continuous_kernel_beta_cdf_prepared_segment_log_fill("
+    ),
+    fixed = TRUE
+  )
+  expect_false(grepl(
+    "integral_operator |=",
+    row_engine,
+    fixed = TRUE
+  ))
+
+  canonical_cdf_calls <- gregexpr(
+    "np_beta_cdf_from_shape(", beta_kernel, fixed = TRUE
+  )[[1L]]
+  canonical_cdf_calls <- canonical_cdf_calls[canonical_cdf_calls > 0L]
+  expect_length(canonical_cdf_calls, 3L)
+  prepared_start <- regexpr(
+    "double np_beta_log_abs_cdf_order_prepared_observation(",
+    beta_kernel,
+    fixed = TRUE
+  )[[1L]]
+  next_owner_start <- regexpr(
+    "static double np_beta_log_overlap_scale(",
+    substr(beta_kernel, prepared_start + 1L, nchar(beta_kernel)),
+    fixed = TRUE
+  )[[1L]]
+  expect_gt(prepared_start, 0L)
+  expect_gt(next_owner_start, 0L)
+  prepared_cdf <- substr(
+    beta_kernel,
+    prepared_start,
+    prepared_start + next_owner_start - 1L
+  )
+  expect_match(
+    prepared_cdf, "np_beta_cdf_from_shape(", fixed = TRUE
+  )
+  expect_false(grepl("pbeta(", prepared_cdf, fixed = TRUE))
+})
+
 test_that("legacy callers cannot acquire beta route metadata implicitly", {
   root <- locate_beta_activation_sources()
   skip_if(is.null(root), "package sources unavailable")

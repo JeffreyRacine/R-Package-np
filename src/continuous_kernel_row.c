@@ -52,12 +52,15 @@ void np_continuous_kernel_beta_prepared_context_init(
     return;
   context->pdf_active = 0;
   context->pdf_row_component_active = 0;
+  context->cdf_active = 0;
   context->allocation_active = 0;
   context->num_train = 0;
   context->num_continuous = 0;
   context->num_beta_coordinates = 0;
+  context->num_cdf_coordinates = 0;
   context->allocation_marker = NULL;
   context->coordinate_slot = NULL;
+  context->cdf_coordinate_slot = NULL;
   context->pdf_observation = NULL;
   context->pdf_observation_status = NULL;
   context->pdf_row_component = NULL;
@@ -66,6 +69,10 @@ void np_continuous_kernel_beta_prepared_context_init(
   context->pdf_coefficient_sign = NULL;
   context->pdf_first_interior = NULL;
   context->pdf_second_interior = NULL;
+  context->cdf_observation = NULL;
+  context->cdf_observation_status = NULL;
+  context->cdf_log_abs_coefficient = NULL;
+  context->cdf_coefficient_sign = NULL;
 }
 
 void np_continuous_kernel_beta_prepared_context_release(
@@ -190,6 +197,111 @@ NPContinuousKernelRowStatus np_continuous_kernel_row_plan_validate(
   return NP_CONTINUOUS_ROW_OK;
 }
 
+static NPContinuousKernelRowStatus
+np_continuous_kernel_beta_prepared_cdf_context_prepare(
+  NPContinuousKernelBetaPreparedContext *context,
+  const NPContinuousKernelRowPlan *plan)
+{
+  size_t observation_count;
+  size_t component_count;
+  int cdf_coordinate_count = 0;
+  int coordinate;
+
+  for(coordinate = 0; coordinate < plan->num_continuous; ++coordinate) {
+    const NPContinuousKernelSegment * const segment =
+      np_continuous_kernel_route_segment(plan->route, coordinate);
+
+    if(segment == NULL)
+      return NP_CONTINUOUS_ROW_ERR_ROUTE;
+    if(segment->descriptor.family == NP_CKERNEL_FAMILY_BETA &&
+       plan->operator[coordinate] == OP_INTEGRAL)
+      ++cdf_coordinate_count;
+  }
+  if(cdf_coordinate_count == 0)
+    return NP_CONTINUOUS_ROW_OK;
+  if((size_t)cdf_coordinate_count >
+       SIZE_MAX / (size_t)plan->num_train ||
+     (size_t)cdf_coordinate_count >
+       SIZE_MAX / NP_BETA_PREPARED_MAX_COMPONENTS)
+    return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  observation_count = (size_t)cdf_coordinate_count *
+    (size_t)plan->num_train;
+  component_count = (size_t)cdf_coordinate_count *
+    NP_BETA_PREPARED_MAX_COMPONENTS;
+
+  context->allocation_marker = vmaxget();
+  context->allocation_active = 1;
+  context->cdf_coordinate_slot = (int *)R_alloc(
+    (size_t)plan->num_continuous, (int)sizeof(int));
+  context->cdf_observation = (np_beta_cdf_observation *)R_alloc(
+    observation_count, (int)sizeof(np_beta_cdf_observation));
+  context->cdf_observation_status = (np_beta_status *)R_alloc(
+    observation_count, (int)sizeof(np_beta_status));
+  context->cdf_log_abs_coefficient = (double *)R_alloc(
+    component_count, (int)sizeof(double));
+  context->cdf_coefficient_sign = (signed char *)R_alloc(
+    component_count, (int)sizeof(signed char));
+
+  cdf_coordinate_count = 0;
+  for(coordinate = 0; coordinate < plan->num_continuous; ++coordinate) {
+    const NPContinuousKernelSegment * const segment =
+      np_continuous_kernel_route_segment(plan->route, coordinate);
+    const int local_coordinate = segment == NULL ? -1 :
+      coordinate - segment->coordinate_offset;
+    int observation;
+
+    context->cdf_coordinate_slot[coordinate] = -1;
+    if(segment == NULL ||
+       segment->descriptor.family != NP_CKERNEL_FAMILY_BETA ||
+       plan->operator[coordinate] != OP_INTEGRAL)
+      continue;
+    context->cdf_coordinate_slot[coordinate] = cdf_coordinate_count;
+    for(int component = 0;
+        component < NP_BETA_PREPARED_MAX_COMPONENTS;
+        ++component) {
+      const size_t component_offset =
+        (size_t)cdf_coordinate_count * NP_BETA_PREPARED_MAX_COMPONENTS +
+        (size_t)component;
+      np_beta_pdf_component coefficient_component = {0};
+
+      context->cdf_log_abs_coefficient[component_offset] = 0.0;
+      context->cdf_coefficient_sign[component_offset] = 0;
+      if(component < segment->descriptor.order / 2) {
+        const np_beta_status coefficient_status =
+          np_beta_pdf_component_prepare_coefficient(
+            &coefficient_component, segment->descriptor.order, component);
+
+        if(coefficient_status != NP_BETA_OK)
+          return NP_CONTINUOUS_ROW_ERR_ROUTE;
+        context->cdf_log_abs_coefficient[component_offset] =
+          coefficient_component.log_abs_coefficient;
+        context->cdf_coefficient_sign[component_offset] =
+          (signed char)coefficient_component.coefficient_sign;
+      }
+    }
+    for(observation = 0; observation < plan->num_train; ++observation) {
+      const size_t observation_offset =
+        (size_t)cdf_coordinate_count * (size_t)plan->num_train +
+        (size_t)observation;
+
+      context->cdf_observation_status[observation_offset] =
+        np_beta_cdf_observation_init(
+          plan->train[coordinate][observation],
+          segment->lower[local_coordinate],
+          segment->upper[local_coordinate],
+          segment->upper[local_coordinate] -
+            segment->lower[local_coordinate],
+          &context->cdf_observation[observation_offset]);
+    }
+    ++cdf_coordinate_count;
+  }
+  context->num_train = plan->num_train;
+  context->num_continuous = plan->num_continuous;
+  context->num_cdf_coordinates = cdf_coordinate_count;
+  context->cdf_active = 1;
+  return NP_CONTINUOUS_ROW_OK;
+}
+
 NPContinuousKernelRowStatus np_continuous_kernel_beta_prepared_context_prepare(
   NPContinuousKernelBetaPreparedContext *context,
   const NPContinuousKernelRowPlan *plan)
@@ -207,6 +319,17 @@ NPContinuousKernelRowStatus np_continuous_kernel_beta_prepared_context_prepare(
   if(np_continuous_kernel_row_plan_validate(plan) !=
      NP_CONTINUOUS_ROW_OK)
     return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  for(coordinate = 0; coordinate < plan->num_continuous; ++coordinate) {
+    const NPContinuousKernelSegment * const segment =
+      np_continuous_kernel_route_segment(plan->route, coordinate);
+
+    if(segment == NULL)
+      return NP_CONTINUOUS_ROW_ERR_ROUTE;
+    if(segment->descriptor.family == NP_CKERNEL_FAMILY_BETA &&
+       plan->operator[coordinate] == OP_INTEGRAL)
+      return np_continuous_kernel_beta_prepared_cdf_context_prepare(
+        context, plan);
+  }
   for(coordinate = 0; coordinate < plan->num_continuous; ++coordinate) {
     const NPContinuousKernelSegment * const segment =
       np_continuous_kernel_route_segment(plan->route, coordinate);
@@ -637,6 +760,123 @@ np_continuous_kernel_beta_log_value(
   return NP_CONTINUOUS_ROW_OK;
 }
 
+static NPContinuousKernelRowStatus NP_CONTINUOUS_ROW_NOINLINE
+np_continuous_kernel_beta_cdf_prepared_segment_log_fill(
+  const NPContinuousKernelRowPlan *plan,
+  const NPContinuousKernelSegment *segment,
+  int evaluation_index,
+  int omitted_observation,
+  double *log_absolute,
+  signed char *sign,
+  double *maximum,
+  NPContinuousKernelRowResult *result)
+{
+  NPContinuousKernelBetaPreparedContext * const prepared =
+    plan == NULL ? NULL : plan->beta_prepared;
+  int observation;
+
+  if(prepared == NULL || !prepared->cdf_active ||
+     prepared->cdf_coordinate_slot == NULL ||
+     prepared->cdf_observation == NULL ||
+     prepared->cdf_observation_status == NULL ||
+     prepared->cdf_log_abs_coefficient == NULL ||
+     prepared->cdf_coefficient_sign == NULL)
+    return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  *maximum = -INFINITY;
+  for(observation = 0; observation < plan->num_train; ++observation) {
+    double log_product = 0.0;
+    int product_sign = 1;
+
+    if(observation == omitted_observation) {
+      log_absolute[observation] = -INFINITY;
+      sign[observation] = 0;
+      continue;
+    }
+    for(int coordinate = segment->coordinate_offset;
+        coordinate < segment->coordinate_offset + segment->coordinate_count;
+        ++coordinate) {
+      const int local_coordinate = coordinate - segment->coordinate_offset;
+      double scalar_log = -INFINITY;
+      int scalar_sign = 0;
+      NPContinuousKernelRowStatus row_status;
+
+      if(plan->operator[coordinate] == OP_INTEGRAL) {
+        const int cdf_slot = prepared->cdf_coordinate_slot[coordinate];
+        size_t observation_offset;
+        size_t component_offset;
+        double evaluation_bandwidth;
+        double observation_bandwidth;
+
+        if(cdf_slot < 0 || cdf_slot >= prepared->num_cdf_coordinates) {
+          result->bad_coordinate = coordinate;
+          result->bad_observation = observation;
+          return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+        }
+        observation_offset =
+          (size_t)cdf_slot * (size_t)plan->num_train +
+          (size_t)observation;
+        component_offset =
+          (size_t)cdf_slot * NP_BETA_PREPARED_MAX_COMPONENTS;
+        row_status = np_continuous_kernel_row_bandwidths(
+          plan, coordinate, evaluation_index, observation, 0,
+          &evaluation_bandwidth, &observation_bandwidth);
+        if(row_status != NP_CONTINUOUS_ROW_OK) {
+          result->bad_coordinate = coordinate;
+          result->bad_observation = observation;
+          return row_status;
+        }
+        (void)observation_bandwidth;
+        scalar_log = np_beta_log_abs_cdf_order_prepared_observation(
+          plan->train_is_eval ?
+            plan->train[coordinate][evaluation_index] :
+            plan->evaluation[coordinate][evaluation_index],
+          evaluation_bandwidth,
+          segment->lower[local_coordinate],
+          segment->upper[local_coordinate], segment->descriptor.order,
+          &prepared->cdf_observation[observation_offset],
+          prepared->cdf_observation_status[observation_offset],
+          &prepared->cdf_log_abs_coefficient[component_offset],
+          &prepared->cdf_coefficient_sign[component_offset],
+          &scalar_sign, &result->beta_status);
+        row_status = result->beta_status == NP_BETA_OK ?
+          NP_CONTINUOUS_ROW_OK : NP_CONTINUOUS_ROW_ERR_KERNEL;
+        if(row_status == NP_CONTINUOUS_ROW_OK &&
+           (ISNAN(scalar_log) || scalar_log == INFINITY ||
+            (scalar_sign != -1 && scalar_sign != 0 && scalar_sign != 1) ||
+            ((scalar_sign == 0) != (scalar_log == -INFINITY))))
+          row_status = NP_CONTINUOUS_ROW_ERR_NUMERIC;
+      } else {
+        row_status = np_continuous_kernel_beta_log_value(
+          plan, segment, local_coordinate, coordinate,
+          evaluation_index, observation,
+          &scalar_log, &scalar_sign, &result->beta_status);
+      }
+      if(row_status != NP_CONTINUOUS_ROW_OK) {
+        result->bad_coordinate = coordinate;
+        result->bad_observation = observation;
+        return row_status;
+      }
+      if(scalar_sign == 0) {
+        product_sign = 0;
+        log_product = -INFINITY;
+        break;
+      }
+      log_product += scalar_log;
+      product_sign *= scalar_sign;
+      if(ISNAN(log_product) || log_product == INFINITY) {
+        result->bad_coordinate = coordinate;
+        result->bad_observation = observation;
+        return NP_CONTINUOUS_ROW_ERR_NUMERIC;
+      }
+    }
+    log_absolute[observation] = log_product;
+    sign[observation] = (signed char)product_sign;
+    if(product_sign != 0 && log_product > *maximum)
+      *maximum = log_product;
+  }
+  return NP_CONTINUOUS_ROW_OK;
+}
+
 typedef struct {
   double other_log;
   double regular_log;
@@ -854,6 +1094,10 @@ np_continuous_kernel_beta_segment_log_fill(
   if(plan == NULL || segment == NULL || log_absolute == NULL ||
      sign == NULL || maximum == NULL || result == NULL)
     return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  if(plan->beta_prepared != NULL && plan->beta_prepared->cdf_active)
+    return np_continuous_kernel_beta_cdf_prepared_segment_log_fill(
+      plan, segment, evaluation_index, omitted_observation,
+      log_absolute, sign, maximum, result);
   *maximum = -INFINITY;
   for(int coordinate = segment->coordinate_offset;
       coordinate < segment->coordinate_offset + segment->coordinate_count;

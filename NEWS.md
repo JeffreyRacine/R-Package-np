@@ -1,5 +1,14 @@
 # np 0.70-6
 
+* Beta CDF rows now prepare observation support coordinates and higher-order
+  coefficient state once per invocation rather than rebuilding them for every
+  evaluation-observation pair. Fixed, generalized-nearest-neighbour, and
+  adaptive-nearest-neighbour distribution rows share the same canonical
+  `pbeta()` arithmetic and failure contract. The prepared route is selected
+  outside row traversal, cannot fall back to the scalar CDF evaluator, and
+  uses only beta-coordinate-linear transient storage; density-only routes
+  retain their existing prepared-PDF path unchanged.
+
 * Beta regression gradient rows now form the signed-log level and its
   regular/jump target derivative from one canonical component preparation.
   The level phase still completes before derivative work, preserving native
