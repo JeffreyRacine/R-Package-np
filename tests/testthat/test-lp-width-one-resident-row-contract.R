@@ -172,9 +172,15 @@ test_that("MPI scalar fixed objectives use the batch sibling without LAPACK", {
     objective,
     fixed = TRUE
   )
+  scalar_end <- regexpr(
+    "finish_cv_path:",
+    objective,
+    fixed = TRUE
+  )
   expect_gt(general_start, 0L)
   expect_gt(scalar_start, general_start)
-  scalar_owner <- substr(objective, scalar_start, nchar(objective))
+  expect_gt(scalar_end, scalar_start)
+  scalar_owner <- substr(objective, scalar_start, scalar_end - 1L)
 
   expect_true(grepl(
     "kernel_weighted_sum_np_ctx(kernel_c,",

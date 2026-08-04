@@ -25,7 +25,9 @@ make_proper_test_bws <- function() {
     regtype = "lp",
     degree = 3L,
     regtype.engine = "lp",
-    degree.engine = 3L
+    basis.engine = "glp",
+    degree.engine = 3L,
+    bernstein.basis.engine = FALSE
   )
 }
 

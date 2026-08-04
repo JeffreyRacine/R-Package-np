@@ -3,8 +3,12 @@
   identical(Sys.getenv("_R_CHECK_PACKAGE_NAME_", ""), "npRmpi")
 }
 
+.mpi_suite_pool_owned <- function() {
+  identical(Sys.getenv("NP_RMPI_TEST_SUITE_POOL", ""), "1")
+}
+
 .mpi_pool_active <- function() {
-  if (.mpi_check_context())
+  if (.mpi_check_context() && !.mpi_suite_pool_owned())
     return(FALSE)
   if (!isTRUE(getOption("npRmpi.mpi.initialized", FALSE)))
     return(FALSE)
@@ -15,8 +19,8 @@
 }
 
 spawn_mpi_slaves <- function(n = 1L) {
-  # R CMD check environments are not a stable MPI runtime target.
-  if (.mpi_check_context()) {
+  # Only the full-suite runner may own MPI resources under R CMD check.
+  if (.mpi_check_context() && !.mpi_suite_pool_owned()) {
     return(FALSE)
   }
 
@@ -41,6 +45,10 @@ spawn_mpi_slaves <- function(n = 1L) {
 }
 
 close_mpi_slaves <- function(force = FALSE) {
+  # Individual tests may release pools they created, but never the one pool
+  # owned by the full-suite runner.
+  if (.mpi_suite_pool_owned())
+    return(invisible(TRUE))
   if (.mpi_check_context())
     return(invisible())
   if (!.mpi_pool_active())
@@ -77,6 +85,27 @@ npRmpi_run_rscript_subprocess <- function(lines, timeout = 45L, env = character(
     status <- 0L
 
   list(status = as.integer(status), output = out)
+}
+
+npRmpi_run_isolated_contract <- function(lines,
+                                         marker,
+                                         timeout = 45L,
+                                         extra.env = character()) {
+  if (length(marker) != 1L || is.na(marker) || !nzchar(marker)) {
+    stop("isolated MPI test marker must be one non-empty string")
+  }
+  env <- npRmpi_subprocess_env(c(
+    "_R_CHECK_PACKAGE_NAME_=",
+    "NP_RMPI_TEST_SUITE_POOL=",
+    extra.env
+  ))
+  if (is.null(env)) return(NULL)
+
+  result <- npRmpi_run_rscript_subprocess(
+    lines = lines, timeout = timeout, env = env
+  )
+  result$witnessed <- any(grepl(marker, result$output, fixed = TRUE))
+  result
 }
 
 npRmpi_subprocess_env <- local({

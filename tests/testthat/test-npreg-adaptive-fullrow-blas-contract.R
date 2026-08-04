@@ -30,7 +30,7 @@ test_that("adaptive regression BLAS eligibility is narrow and bounded", {
   lines <- readLines(src_file, warn = FALSE)
   body <- npreg_adaptive_source_body(
     lines,
-    "^static NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas\\(",
+    "^static .*NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas\\(",
     "^double np_kernel_estimate_regression_categorical_ls_aic\\("
   )
   compact <- gsub("[[:space:]]+", " ", body)
@@ -66,7 +66,7 @@ test_that("adaptive regression BLAS preserves delete-one and full-row algebra", 
   lines <- readLines(src_file, warn = FALSE)
   body <- npreg_adaptive_source_body(
     lines,
-    "^static NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas\\(",
+    "^static .*NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas\\(",
     "^double np_kernel_estimate_regression_categorical_ls_aic\\("
   )
   compact <- gsub("[[:space:]]+", " ", body)
@@ -105,11 +105,11 @@ test_that("adaptive regression BLAS MPI ownership and fallback are symmetric", {
   allocator <- npreg_adaptive_source_body(
     lines,
     "^static double \\*\\*np_regression_adaptive_one_row_matrix\\(",
-    "^static NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas\\("
+    "^static .*NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas\\("
   )
   body <- npreg_adaptive_source_body(
     lines,
-    "^static NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas\\(",
+    "^static .*NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas\\(",
     "^double np_kernel_estimate_regression_categorical_ls_aic\\("
   )
   owner <- npreg_adaptive_source_body(

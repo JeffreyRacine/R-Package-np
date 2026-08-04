@@ -39,12 +39,17 @@ test_that("regression all-large projection uses bounded BLAS with scalar fallbac
   src_file <- locate_alllarge_projection_source()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable")
   lines <- readLines(src_file, warn = FALSE)
+  owner.start <- grep(
+    "^double np_kernel_estimate_regression_categorical_ls_aic\\(",
+    lines
+  )
+  expect_length(owner.start, 1L)
   start <- grep(
     "const int basis_stride = np_glp_cv_cache.basis_stride;",
     lines,
     fixed = TRUE
   )
-  start <- start[1L]
+  start <- start[start > owner.start][1L]
   stop <- grep("np_fastcv_alllarge_hits++;", lines, fixed = TRUE)
   stop <- stop[stop > start][1L]
   expect_length(start, 1L)
@@ -84,4 +89,3 @@ test_that("regression all-large projection uses bounded BLAS with scalar fallbac
   expect_false(grepl("num_obs\\s*\\*\\s*num_obs", body))
   expect_false(grepl("num_obs\\)\\s*\\*\\s*\\(size_t\\)num_obs", body))
 })
-

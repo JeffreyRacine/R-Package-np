@@ -126,7 +126,16 @@ test_that("regression helper labels carry target context for block bootstrap pha
       bws = list(
         type = "fixed",
         ndim = 2L,
+        ncon = 2L,
         xnames = c("x1", "x2"),
+        regtype = "lp",
+        basis = "glp",
+        degree = c(1L, 1L),
+        bernstein.basis = FALSE,
+        regtype.engine = "lp",
+        basis.engine = "glp",
+        degree.engine = c(1L, 1L),
+        bernstein.basis.engine = FALSE,
         xdati = list(icon = c(TRUE, TRUE), iord = c(FALSE, FALSE), iuno = c(FALSE, FALSE))
       )
     )
@@ -221,7 +230,14 @@ test_that("conditional exact ksum wrapper preserves user-facing progress label",
       ydat = data.frame(y = c(0.1, 0.2, 0.3)),
       exdat = data.frame(x = c(0, 1)),
       eydat = data.frame(y = c(0.1, 0.2)),
-      bws = list(type = "adaptive_nn"),
+      bws = list(
+        type = "adaptive_nn",
+        xncon = 1L,
+        regtype.engine = "lc",
+        basis.engine = "glp",
+        degree.engine = 0L,
+        bernstein.basis.engine = FALSE
+      ),
       B = 2L,
       cdf = FALSE,
       counts.drawer = function(start, stopi) matrix(1L, nrow = 3L, ncol = stopi - start + 1L),

@@ -17,6 +17,27 @@ test_that(".simplify enforces one scalar logical-control contract", {
 })
 
 test_that("simplify validation preserves established earlier condition precedence", {
+  if (.mpi_suite_pool_owned()) {
+    marker <- "SIMPLIFY_NO_POOL_PRECEDENCE_OK"
+    result <- npRmpi_run_isolated_contract(
+      lines = c(
+        "suppressPackageStartupMessages(library(npRmpi))",
+        "condition_text <- function(expr) tryCatch({ force(expr); NA_character_ }, error=conditionMessage)",
+        "stopifnot(identical(condition_text(npRmpi:::mpi.remote.exec(1L, simplify=c(TRUE, FALSE))), 'It seems no slaves running.'))",
+        "stopifnot(grepl('was not found', condition_text(npRmpi:::mpi.parSapply(1L, 'not_a_function', job.num=2L, simplify=c(TRUE, FALSE))), fixed=TRUE))",
+        sprintf("cat('%s\\n')", marker)
+      ),
+      marker = marker,
+      timeout = 45L
+    )
+    skip_if(is.null(result), "installed npRmpi unavailable for isolated no-pool contract")
+    expect_true(result$status %in% c(0L, 137L),
+                info = paste(result$output, collapse = "\n"))
+    expect_true(result$witnessed,
+                info = paste(result$output, collapse = "\n"))
+    return(invisible(NULL))
+  }
+
   expect_error(
     npRmpi:::mpi.remote.exec(1L, simplify = c(TRUE, FALSE)),
     "It seems no slaves running.",

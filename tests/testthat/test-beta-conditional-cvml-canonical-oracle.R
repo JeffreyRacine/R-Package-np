@@ -109,11 +109,11 @@ beta_cvml_native_objective <- function(x, y, bandwidth, type,
 
 .ensure_beta_cvml_pool <- function() {
   if (!isTRUE(.beta_cvml_test_env$started)) {
-    npRmpi.init(nslaves = 1L, quiet = TRUE)
+    skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
     .beta_cvml_test_env$started <- TRUE
     withr::defer({
       if (isTRUE(.beta_cvml_test_env$started)) {
-        try(npRmpi.quit(force = TRUE), silent = TRUE)
+        try(close_mpi_slaves(force = TRUE), silent = TRUE)
         .beta_cvml_test_env$started <- FALSE
       }
     }, envir = testthat::teardown_env())

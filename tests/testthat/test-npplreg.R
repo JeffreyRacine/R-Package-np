@@ -279,7 +279,7 @@ test_that("npplreg residuals stay training-length when evaluation x/z are suppli
 
 test_that("npplreg uses categorical compression for all-categorical z", {
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
-  options(npRmpi.autodispatch = FALSE)
+  withr::local_options(npRmpi.autodispatch = FALSE)
   on.exit(close_mpi_slaves(), add = TRUE)
   old <- options(np.messages = FALSE, np.tree = FALSE,
                  np.categorical.compress = FALSE)

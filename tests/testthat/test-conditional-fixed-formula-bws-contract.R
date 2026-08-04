@@ -2,11 +2,11 @@
 
 .ensure_conditional_fixed_formula_pool <- function() {
   if (!isTRUE(.conditional_fixed_formula_env$started)) {
-    npRmpi.init(nslaves = 1L, quiet = TRUE)
+    skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
     .conditional_fixed_formula_env$started <- TRUE
     withr::defer({
       if (isTRUE(.conditional_fixed_formula_env$started)) {
-        try(npRmpi.quit(force = TRUE), silent = TRUE)
+        try(close_mpi_slaves(force = TRUE), silent = TRUE)
         .conditional_fixed_formula_env$started <- FALSE
       }
     }, envir = testthat::teardown_env())

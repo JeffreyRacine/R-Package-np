@@ -69,7 +69,7 @@ npscoef_profile_oracle <- function(xdat, ydat, zdat, bws, exdat = NULL,
 
 test_that("npscoef all-categorical profile route preserves fitted values", {
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
-  options(npRmpi.autodispatch = FALSE)
+  withr::local_options(npRmpi.autodispatch = FALSE)
   on.exit(close_mpi_slaves(), add = TRUE)
   old <- options(np.messages = FALSE, np.tree = FALSE,
                  np.categorical.compress = TRUE)
@@ -102,7 +102,7 @@ test_that("npscoef all-categorical profile route preserves fitted values", {
 
 test_that("npscoef all-categorical profile route preserves evaluation values", {
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
-  options(npRmpi.autodispatch = FALSE)
+  withr::local_options(npRmpi.autodispatch = FALSE)
   on.exit(close_mpi_slaves(), add = TRUE)
   old <- options(np.messages = FALSE, np.tree = FALSE,
                  np.categorical.compress = TRUE)
@@ -135,7 +135,7 @@ test_that("npscoef all-categorical profile route preserves evaluation values", {
 
 test_that("npscoef all-categorical profile route preserves bandwidth CV", {
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
-  options(npRmpi.autodispatch = TRUE)
+  withr::local_options(npRmpi.autodispatch = TRUE)
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   old <- options(np.messages = FALSE, np.tree = FALSE,
                  np.categorical.compress = FALSE)
@@ -168,7 +168,7 @@ test_that("npscoef all-categorical profile route preserves bandwidth CV", {
 
 test_that("npscoefhat apply uses categorical profile route", {
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
-  options(npRmpi.autodispatch = FALSE)
+  withr::local_options(npRmpi.autodispatch = FALSE)
   on.exit(close_mpi_slaves(), add = TRUE)
   old <- options(np.messages = FALSE, np.tree = FALSE,
                  np.categorical.compress = TRUE)
@@ -200,7 +200,7 @@ test_that("npscoefhat apply uses categorical profile route", {
 
 test_that("npscoef plot-bootstrap inid helper uses categorical profiles exactly", {
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
-  options(npRmpi.autodispatch = FALSE)
+  withr::local_options(npRmpi.autodispatch = FALSE)
   on.exit(close_mpi_slaves(), add = TRUE)
   old <- options(np.messages = FALSE, np.tree = FALSE,
                  np.categorical.compress = FALSE)

@@ -35,17 +35,26 @@ test_that("npregbw fixed LP tree predicate follows bandwidth-selection policy", 
   on.exit(options(old_opts), add = TRUE)
 
   expect_equal(
-    npRmpi:::.npregbw_tree_code(bw.lp, ncon = bw.lp$ncon, ncat = bw.lp$nuno + bw.lp$nord),
+    npRmpi:::.npregbw_tree_code(
+      bw.lp, ncon = bw.lp$ncon, ncat = bw.lp$nuno + bw.lp$nord,
+      regtype.engine = bw.lp$regtype.engine
+    ),
     npRmpi:::DO_TREE_YES
   )
   expect_equal(
-    npRmpi:::.npregbw_tree_code(bw.lc, ncon = bw.lc$ncon, ncat = bw.lc$nuno + bw.lc$nord),
+    npRmpi:::.npregbw_tree_code(
+      bw.lc, ncon = bw.lc$ncon, ncat = bw.lc$nuno + bw.lc$nord,
+      regtype.engine = bw.lc$regtype.engine
+    ),
     npRmpi:::DO_TREE_YES
   )
 
   options(np.tree = FALSE)
   expect_equal(
-    npRmpi:::.npregbw_tree_code(bw.lp, ncon = bw.lp$ncon, ncat = bw.lp$nuno + bw.lp$nord),
+    npRmpi:::.npregbw_tree_code(
+      bw.lp, ncon = bw.lp$ncon, ncat = bw.lp$nuno + bw.lp$nord,
+      regtype.engine = bw.lp$regtype.engine
+    ),
     npRmpi:::DO_TREE_NO
   )
 })

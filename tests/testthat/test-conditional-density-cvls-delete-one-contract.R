@@ -147,11 +147,11 @@ conditional_cvls_delete_one_oracle <- function(xdat, ydat, bw) {
 
 .ensure_conditional_delete_one_pool <- function() {
   if (!isTRUE(.conditional_delete_one_test_env$started)) {
-    npRmpi.init(nslaves = 1L, quiet = TRUE)
+    skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
     .conditional_delete_one_test_env$started <- TRUE
     withr::defer({
       if (isTRUE(.conditional_delete_one_test_env$started)) {
-        try(npRmpi.quit(force = TRUE), silent = TRUE)
+        try(close_mpi_slaves(force = TRUE), silent = TRUE)
         .conditional_delete_one_test_env$started <- FALSE
       }
     }, envir = testthat::teardown_env())

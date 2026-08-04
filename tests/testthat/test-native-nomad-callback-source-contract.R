@@ -114,7 +114,7 @@ test_that("native NOMAD C callback path does not call R API or longjmp helpers",
 })
 
 test_that("native NOMAD categorical coordinates use one canonical decoder", {
-  source_file <- file.path(np_namespace_hygiene_root(), "src", "np.c")
+  source_file <- npRmpi_test_source_path("src", "np.c")
   expect_true(file.exists(source_file))
   source_text <- paste(readLines(source_file, warn = FALSE), collapse = "\n")
   helper <- np_extract_c_function_body(

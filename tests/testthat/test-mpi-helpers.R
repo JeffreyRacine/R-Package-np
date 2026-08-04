@@ -7,6 +7,34 @@ test_that("npRmpi.init() is idempotent", {
 })
 
 test_that("npRmpi.quit() respects reuse/force", {
+  if (.mpi_suite_pool_owned()) {
+    subprocess_env <- npRmpi_subprocess_env()
+    expect_false(is.null(subprocess_env))
+    if (is.null(subprocess_env))
+      return(invisible(NULL))
+
+    result <- npRmpi_run_rscript_subprocess(c(
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "options(npRmpi.reuse.slaves = TRUE)",
+      "npRmpi.init(nslaves = 1L, quiet = TRUE)",
+      "npRmpi.quit(force = FALSE)",
+      "stopifnot(mpi.comm.size(1) > 1L)",
+      "stopifnot(isTRUE(getOption('npRmpi.pool.active', FALSE)))",
+      "stopifnot(getFromNamespace('.npRmpi_has_active_slave_pool', 'npRmpi')())",
+      "getFromNamespace('.npRmpi_require_active_slave_pool', 'npRmpi')(where = 'isolated soft-close probe')",
+      "npRmpi.quit(force = TRUE)",
+      "size <- try(mpi.comm.size(1), silent = TRUE)",
+      "if (!inherits(size, 'try-error')) stopifnot(size < 2L)",
+      "cat('NP_RMPI_ISOLATED_QUIT_OK\\n')"
+    ), timeout = 90L, env = subprocess_env)
+
+    expect_equal(result$status, 0L, info = paste(result$output, collapse = "\n"))
+    expect_true(any(grepl(
+      "NP_RMPI_ISOLATED_QUIT_OK", result$output, fixed = TRUE
+    )))
+    return(invisible(NULL))
+  }
+
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
 
   old <- getOption("npRmpi.reuse.slaves", FALSE)

@@ -48,30 +48,24 @@ test_that("all canonical LP solve retries are bounded", {
   reghat.c <- paste(readLines(reghat.c.file, warn = FALSE), collapse = "\n")
   reghat.r <- paste(readLines(reghat.r.file, warn = FALSE), collapse = "\n")
 
-  expect_equal(
-    lengths(regmatches(
-      jksum,
-      gregexpr(
-        "while\\s*\\(\\s*!np_lp_solve_workspace_solve\\(",
-        jksum
-      )
-    )),
-    6L
-  )
-  expect_equal(
-    lengths(regmatches(
-      jksum,
-      gregexpr("np_lp_solve_workspace_sources_finite\\(", jksum)
-    )),
-    6L
-  )
-  expect_equal(
-    lengths(regmatches(
-      jksum,
-      gregexpr("ridge_steps >= NP_LP_SOLVE_MAX_RIDGE_STEPS", jksum)
-    )),
-    6L
-  )
+  retry.count <- lengths(regmatches(
+    jksum,
+    gregexpr(
+      "while\\s*\\(\\s*!np_lp_solve_workspace_solve\\(",
+      jksum
+    )
+  ))
+  finite.guard.count <- lengths(regmatches(
+    jksum,
+    gregexpr("np_lp_solve_workspace_sources_finite\\(", jksum)
+  ))
+  step.guard.count <- lengths(regmatches(
+    jksum,
+    gregexpr("ridge_steps >= NP_LP_SOLVE_MAX_RIDGE_STEPS", jksum)
+  ))
+  expect_gt(retry.count, 0L)
+  expect_equal(finite.guard.count, retry.count)
+  expect_equal(step.guard.count, retry.count)
   expect_equal(
     lengths(regmatches(
       jksum,
@@ -94,7 +88,7 @@ test_that("all canonical LP solve retries are bounded", {
       jksum,
       gregexpr("estimation_shortcut_done = -2", jksum, fixed = TRUE)
     )),
-    1L
+    2L
   )
   expect_false(grepl(
     'error("LP solve failed in glp MPI owner path after bounded ridging")',

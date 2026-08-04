@@ -7,7 +7,14 @@ test_that("conditional adaptive-NN exact bootstrap partitions replications acros
   ydat <- data.frame(y = c(2, 4, 6, 8))
   exdat <- data.frame(x = c(1.5, 2.5))
   eydat <- data.frame(y = c(3, 5))
-  bws <- list(type = "adaptive_nn")
+  bws <- list(
+    type = "adaptive_nn",
+    xncon = 1L,
+    regtype.engine = "lc",
+    basis.engine = "glp",
+    degree.engine = 0L,
+    bernstein.basis.engine = FALSE
+  )
   counts <- matrix(
     c(
       1, 0, 2,
