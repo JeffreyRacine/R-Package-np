@@ -30,6 +30,93 @@ static void np_beta_set_status(np_beta_status *status,
     *status = value;
 }
 
+#if defined(__clang__) || defined(__GNUC__)
+# define NP_BETA_KERNEL_ALWAYS_INLINE \
+  static inline __attribute__((always_inline))
+#else
+# define NP_BETA_KERNEL_ALWAYS_INLINE static inline
+#endif
+
+NP_BETA_KERNEL_ALWAYS_INLINE np_beta_status
+np_beta_shape_target_coordinate_init(
+  double evaluation,
+  double lower,
+  double upper,
+  double support_length,
+  np_beta_shape *shape)
+{
+  if(evaluation < lower) {
+    shape->eval_location = NP_BETA_EVAL_BELOW;
+    shape->target_unit = 0.0;
+    shape->target_complement_unit = 1.0;
+  } else if(evaluation > upper) {
+    shape->eval_location = NP_BETA_EVAL_ABOVE;
+    shape->target_unit = 1.0;
+    shape->target_complement_unit = 0.0;
+  } else {
+    shape->eval_location = NP_BETA_EVAL_INSIDE;
+    shape->target_unit =
+      (evaluation - lower) / support_length;
+    shape->target_complement_unit =
+      (upper - evaluation) / support_length;
+    if(!R_FINITE(shape->target_unit) ||
+       shape->target_unit < 0.0 || shape->target_unit > 1.0)
+      return NP_BETA_ERR_NUMERIC;
+    if(!R_FINITE(shape->target_complement_unit) ||
+       shape->target_complement_unit < 0.0 ||
+       shape->target_complement_unit > 1.0)
+      return NP_BETA_ERR_NUMERIC;
+  }
+  return NP_BETA_OK;
+}
+
+NP_BETA_KERNEL_ALWAYS_INLINE np_beta_status
+np_beta_shape_concentration_init(
+  double bandwidth,
+  double support_length,
+  int scale,
+  np_beta_shape *shape)
+{
+  double concentration_limit;
+  double ratio;
+
+  ratio = support_length / bandwidth;
+  concentration_limit = sqrt(DBL_MAX) * sqrt((double)scale);
+  if(!R_FINITE(ratio) || !R_FINITE(concentration_limit) ||
+     ratio > concentration_limit)
+    return NP_BETA_ERR_CONCENTRATION;
+
+  shape->concentration = (ratio / (double)scale) * ratio;
+  if(!R_FINITE(shape->concentration))
+    return NP_BETA_ERR_CONCENTRATION;
+  return NP_BETA_OK;
+}
+
+/* Complete the evaluation/bandwidth-owned part of a shape whose support has
+ * already been validated.  Scalar and prepared PDF consumers share this
+ * exact arithmetic; keeping it inline avoids adding a call boundary to the
+ * public scalar primitive. */
+NP_BETA_KERNEL_ALWAYS_INLINE np_beta_status np_beta_shape_target_init(
+  double evaluation,
+  double bandwidth,
+  double lower,
+  double upper,
+  double support_length,
+  int scale,
+  np_beta_shape *shape)
+{
+  const np_beta_status target_status =
+    np_beta_shape_target_coordinate_init(
+      evaluation, lower, upper, support_length, shape);
+
+  if(target_status != NP_BETA_OK)
+    return target_status;
+  return np_beta_shape_concentration_init(
+    bandwidth, support_length, scale, shape);
+}
+
+#undef NP_BETA_KERNEL_ALWAYS_INLINE
+
 /* Stable log-gamma differences used by the analytic beta-product overlap.
  * Directly subtracting three lbeta values loses several digits when the
  * concentration is large because the desired log overlap is small relative
@@ -259,9 +346,6 @@ np_beta_status np_beta_shape_init(double evaluation,
                                   int scale,
                                   np_beta_shape *shape)
 {
-  double concentration_limit;
-  double ratio;
-
   if(shape == NULL)
     return NP_BETA_ERR_NUMERIC;
 
@@ -312,39 +396,9 @@ np_beta_status np_beta_shape_init(double evaluation,
         observation, upper, shape->support_length);
   }
 
-  if(evaluation < lower) {
-    shape->eval_location = NP_BETA_EVAL_BELOW;
-    shape->target_unit = 0.0;
-    shape->target_complement_unit = 1.0;
-  } else if(evaluation > upper) {
-    shape->eval_location = NP_BETA_EVAL_ABOVE;
-    shape->target_unit = 1.0;
-    shape->target_complement_unit = 0.0;
-  } else {
-    shape->eval_location = NP_BETA_EVAL_INSIDE;
-    shape->target_unit = (evaluation - lower) / shape->support_length;
-    shape->target_complement_unit =
-      (upper - evaluation) / shape->support_length;
-    if(!R_FINITE(shape->target_unit) ||
-       shape->target_unit < 0.0 || shape->target_unit > 1.0)
-      return NP_BETA_ERR_NUMERIC;
-    if(!R_FINITE(shape->target_complement_unit) ||
-       shape->target_complement_unit < 0.0 ||
-       shape->target_complement_unit > 1.0)
-      return NP_BETA_ERR_NUMERIC;
-  }
-
-  ratio = shape->support_length / bandwidth;
-  concentration_limit = sqrt(DBL_MAX) * sqrt((double) scale);
-  if(!R_FINITE(ratio) || !R_FINITE(concentration_limit) ||
-     ratio > concentration_limit)
-    return NP_BETA_ERR_CONCENTRATION;
-
-  shape->concentration = (ratio / (double) scale) * ratio;
-  if(!R_FINITE(shape->concentration))
-    return NP_BETA_ERR_CONCENTRATION;
-
-  return NP_BETA_OK;
+  return np_beta_shape_target_init(
+    evaluation, bandwidth, lower, upper, shape->support_length,
+    scale, shape);
 }
 
 void np_beta_pdf_observation_from_shape(
@@ -533,6 +587,102 @@ double np_beta_log_abs_pdf_prepared(
     positive_log, negative_log, &log_absolute, sign);
   np_beta_set_status(status, difference_status);
   return (difference_status == NP_BETA_OK) ? log_absolute : NAN;
+}
+
+/* Adaptive-NN PDF rows own their bandwidth by observation.  The observation
+ * coordinate and coefficient algebra are nevertheless invocation-invariant.
+ * Prepare only the bandwidth-dependent target components here, preserving
+ * the scalar shape-init arithmetic and its error precedence. */
+double np_beta_log_abs_pdf_order_prepared_observation(
+  double evaluation,
+  double bandwidth,
+  double lower,
+  double upper,
+  int order,
+  const np_beta_pdf_observation *observation,
+  np_beta_status observation_status,
+  const double *log_abs_coefficient,
+  const signed char *coefficient_sign,
+  int *sign,
+  np_beta_status *status)
+{
+  const int *coefficients = NULL;
+  const int component_count =
+    np_beta_order_coefficients(order, &coefficients);
+  np_beta_pdf_component components[NP_BETA_ORDER_MAX_COMPONENTS];
+  np_beta_shape shape_template;
+  np_beta_status component_status;
+  int component;
+
+  (void)coefficients;
+  if(sign == NULL || observation == NULL ||
+     log_abs_coefficient == NULL || coefficient_sign == NULL ||
+     component_count == 0) {
+    np_beta_set_status(status, NP_BETA_ERR_SCALE);
+    return NAN;
+  }
+  *sign = 0;
+
+  if(!R_FINITE(evaluation) || !R_FINITE(lower) || !R_FINITE(upper) ||
+     observation_status == NP_BETA_ERR_NONFINITE) {
+    np_beta_set_status(status, NP_BETA_ERR_NONFINITE);
+    return NAN;
+  }
+  if(!R_FINITE(bandwidth) || bandwidth <= 0.0) {
+    np_beta_set_status(status, NP_BETA_ERR_BANDWIDTH);
+    return NAN;
+  }
+  shape_template.lower = lower;
+  shape_template.upper = upper;
+  shape_template.support_length = upper - lower;
+  if(!R_FINITE(shape_template.support_length) ||
+     shape_template.support_length <= 0.0) {
+    np_beta_set_status(status, NP_BETA_ERR_BOUNDS);
+    return NAN;
+  }
+  if(observation_status != NP_BETA_OK) {
+    np_beta_set_status(status, observation_status);
+    return NAN;
+  }
+
+  shape_template.log_observation_unit = observation->log_unit;
+  shape_template.log_observation_complement_unit =
+    observation->log_complement_unit;
+  shape_template.observation_endpoint = observation->endpoint;
+  component_status = np_beta_shape_target_coordinate_init(
+    evaluation, lower, upper, shape_template.support_length,
+    &shape_template);
+  if(component_status != NP_BETA_OK) {
+    np_beta_set_status(status, component_status);
+    return NAN;
+  }
+
+  for(component = 0; component < component_count; ++component) {
+    np_beta_shape shape = shape_template;
+
+    component_status = np_beta_shape_concentration_init(
+      bandwidth, shape.support_length, component + 1, &shape);
+    if(component_status != NP_BETA_OK) {
+      np_beta_set_status(status, component_status);
+      return NAN;
+    }
+
+    component_status = np_beta_pdf_component_from_shape(
+      &shape, &components[component]);
+    if(component_status == NP_BETA_OK && observation->endpoint == 0)
+      component_status = np_beta_pdf_component_prepare_normalizer(
+        &components[component]);
+    if(component_status != NP_BETA_OK) {
+      np_beta_set_status(status, component_status);
+      return (component_status == NP_BETA_ERR_RANGE) ? INFINITY : NAN;
+    }
+    components[component].log_abs_coefficient =
+      log_abs_coefficient[component];
+    components[component].coefficient_sign = coefficient_sign[component];
+  }
+
+  return np_beta_log_abs_pdf_prepared(
+    components, observation, component_count, sign, status);
 }
 
 double np_beta_log_pdf_scale(const np_beta_shape *shape,

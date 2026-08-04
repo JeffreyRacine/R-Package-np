@@ -220,6 +220,19 @@ double np_beta_log_abs_pdf_prepared(
   int *sign,
   np_beta_status *status);
 
+double np_beta_log_abs_pdf_order_prepared_observation(
+  double evaluation,
+  double bandwidth,
+  double lower,
+  double upper,
+  int order,
+  const np_beta_pdf_observation *observation,
+  np_beta_status observation_status,
+  const double *log_abs_coefficient,
+  const signed char *coefficient_sign,
+  int *sign,
+  np_beta_status *status);
+
 double np_beta_pdf_scale(const np_beta_shape *shape,
                          np_beta_status *status);
 
