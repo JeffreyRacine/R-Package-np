@@ -23863,58 +23863,101 @@ const NPContinuousPreparedBandwidthView *prepared_bandwidth){
 	            Wcols[l] = basis[l];
 	          }
 
-	          kernel_weighted_sum_np_ctx(kernel_c,
-	                                 kernel_u,
-	                                 kernel_o,
-	                                 BANDWIDTH_reg,
-	                                 num_obs_train,
-	                                 1,
-	                                 num_reg_unordered,
-	                                 num_reg_ordered,
-	                                 num_reg_continuous,
-	                                 0,
-	                                 0,
-	                                 1,
-	                                 1,
-	                                 1,
-	                                 0,
-	                                 0,
-	                                 0,
-	                                 0,
-	                                 operator,
-	                                 OP_NOOP,
-	                                 0,
-	                                 0,
-	                                 NULL,
-	                                 1,
-	                                 glp_nterms + 2,
-	                                 glp_nterms,
-	                                 (BANDWIDTH_reg == BW_ADAP_NN) ? NP_TREE_FALSE : int_TREE_X,
-	                                 0,
-	                                 (BANDWIDTH_reg == BW_ADAP_NN) ? NULL : kdt_extern_X,
-	                                 NULL, NULL, NULL,
-	                                 matrix_X_unordered_train,
-	                                 matrix_X_ordered_train,
-	                                 matrix_X_continuous_train,
-	                                 TUNO,
-	                                 TORD,
-	                                 TCON,
-	                                 Ycols,
-	                                 Wcols,
-	                                 NULL,
-	                                 vector_scale_factor,
-	                                 1,
-	                                 matrix_bandwidth,
-	                                 matrix_bandwidth_eval,
-	                                 lambda,
-	                                 num_categories,
-	                                 matrix_categorical_vals,
-	                                 NULL,
-	                                 out,
-	                                 NULL,
-	                                 kw_owner,
-	                                 est_gate_ctx_ptr,
-	                                 NULL);
+	          if(kernel_route == NULL)
+	            kernel_weighted_sum_np_ctx(kernel_c,
+	                                   kernel_u,
+	                                   kernel_o,
+	                                   BANDWIDTH_reg,
+	                                   num_obs_train,
+	                                   1,
+	                                   num_reg_unordered,
+	                                   num_reg_ordered,
+	                                   num_reg_continuous,
+	                                   0,
+	                                   0,
+	                                   1,
+	                                   1,
+	                                   1,
+	                                   0,
+	                                   0,
+	                                   0,
+	                                   0,
+	                                   operator,
+	                                   OP_NOOP,
+	                                   0,
+	                                   0,
+	                                   NULL,
+	                                   1,
+	                                   glp_nterms + 2,
+	                                   glp_nterms,
+	                                   (BANDWIDTH_reg == BW_ADAP_NN) ? NP_TREE_FALSE : int_TREE_X,
+	                                   0,
+	                                   (BANDWIDTH_reg == BW_ADAP_NN) ? NULL : kdt_extern_X,
+	                                   NULL, NULL, NULL,
+	                                   matrix_X_unordered_train,
+	                                   matrix_X_ordered_train,
+	                                   matrix_X_continuous_train,
+	                                   TUNO,
+	                                   TORD,
+	                                   TCON,
+	                                   Ycols,
+	                                   Wcols,
+	                                   NULL,
+	                                   vector_scale_factor,
+	                                   1,
+	                                   matrix_bandwidth,
+	                                   matrix_bandwidth_eval,
+	                                   lambda,
+	                                   num_categories,
+	                                   matrix_categorical_vals,
+	                                   NULL,
+	                                   out,
+	                                   NULL,
+	                                   kw_owner,
+	                                   est_gate_ctx_ptr,
+	                                   NULL);
+	          else {
+	            /*
+	             * Rank ownership changes only who computes this row.  It must
+	             * not change the selected continuous-kernel family: beta rows
+	             * retain the same canonical scaled-moment owner used by the
+	             * serial and non-owner LP routes.
+	             */
+	            if(np_beta_regression_lp_moment_row_canonical(
+	                 BANDWIDTH_reg,
+	                 num_obs_train,
+	                 num_reg_unordered,
+	                 num_reg_ordered,
+	                 num_reg_continuous,
+	                 glp_nterms,
+	                 glp_nterms + 2,
+	                 operator,
+	                 kernel_u,
+	                 kernel_o,
+	                 matrix_X_unordered_train,
+	                 matrix_X_ordered_train,
+	                 matrix_X_continuous_train,
+	                 TUNO,
+	                 TORD,
+	                 TCON,
+	                 Ycols,
+	                 basis,
+	                 vector_scale_factor,
+	                 matrix_bandwidth,
+	                 matrix_bandwidth,
+	                 lambda,
+	                 num_categories,
+	                 matrix_categorical_vals,
+	                 categorical_compress,
+	                 out,
+	                 out2,
+	                 kw_owner,
+	                 kernel_route,
+	                 kernel_route_diagnostics) != 0) {
+	              owner_solve_failed = 1;
+	              break;
+	            }
+	          }
 
 	          for(i = 0; i < glp_nterms; i++){
 	            const int base = i*(glp_nterms + 2);
@@ -23992,18 +24035,20 @@ const NPContinuousPreparedBandwidthView *prepared_bandwidth){
 	          }
 	          sigma2_owner = (sigma2_owner <= 0.0) ? 0.0 : sigma2_owner;
 
-	          for(i = 0; i < glp_nterms*glp_nterms; i++)
-	            out2[i] = 0.0;
+	          if(kernel_route == NULL) {
+	            for(i = 0; i < glp_nterms*glp_nterms; i++)
+	              out2[i] = 0.0;
 
-	          for(i = 0; i < num_obs_train; i++){
-	            const double w = kw_owner[i];
-	            const double w2 = w*w;
-	            if(w2 == 0.0)
-	              continue;
-	            for(int a = 0; a < glp_nterms; a++){
-	              const double za = basis[a][i];
-	              for(int b = 0; b < glp_nterms; b++)
-	                out2[a*glp_nterms+b] += za*basis[b][i]*w2;
+	            for(i = 0; i < num_obs_train; i++){
+	              const double w = kw_owner[i];
+	              const double w2 = w*w;
+	              if(w2 == 0.0)
+	                continue;
+	              for(int a = 0; a < glp_nterms; a++){
+	                const double za = basis[a][i];
+	                for(int b = 0; b < glp_nterms; b++)
+	                  out2[a*glp_nterms+b] += za*basis[b][i]*w2;
+	              }
 	            }
 	          }
 	          for(l = 0; l < glp_nterms; l++)

@@ -1,5 +1,12 @@
 # npRmpi 0.70-6
 
+* Corrected fixed-bandwidth beta local-polynomial regression with an active
+  MPI pool so rank ownership retains the canonical scaled beta moment row
+  used by serial and nearest-neighbour routes. The owner path no longer
+  substitutes the legacy continuous-kernel accumulator; fitted values,
+  standard errors, and gradients now agree across local, one-worker, and
+  multi-worker evaluation while retaining bounded row storage.
+
 * `npseed()` now applies its validated C-backend seed to every rank of an
   active MPI pool through the canonical command-broadcast path. This corrects
   rank-asymmetric multistart state that could hang a later collective
