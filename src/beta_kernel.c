@@ -887,6 +887,60 @@ static np_beta_status np_beta_derivative_accumulate(double log_term,
   return NP_BETA_OK;
 }
 
+static np_beta_status np_beta_derivative_component_accumulate(
+  const np_beta_shape *shape,
+  double evaluation,
+  double observation,
+  double log_pdf,
+  double log_abs_coefficient,
+  int coefficient_sign,
+  double *regular_positive_log,
+  double *regular_negative_log,
+  double *jump_positive_log,
+  double *jump_negative_log)
+{
+  double score;
+  double log_term;
+  int term_sign;
+
+  if(shape == NULL || coefficient_sign == 0 ||
+     !R_FINITE(log_abs_coefficient))
+    return NP_BETA_ERR_NUMERIC;
+
+  /* Exact matching endpoints are jump discontinuities.  Their regular
+   * one-sided derivative is zero; the signed jump is retained so ratio
+   * estimators can cancel it structurally. */
+  if((evaluation == shape->lower && observation == shape->lower) ||
+     (evaluation == shape->upper && observation == shape->upper)) {
+    log_term = log_pdf + log_abs_coefficient;
+    term_sign = coefficient_sign;
+    if(evaluation == shape->lower)
+      term_sign = -term_sign;
+    return np_beta_derivative_accumulate(
+      log_term, term_sign, jump_positive_log, jump_negative_log);
+  }
+
+  if(log_pdf == -INFINITY)
+    return NP_BETA_OK;
+
+  score = (shape->concentration / shape->support_length) *
+    (shape->log_observation_unit -
+     shape->log_observation_complement_unit -
+     digamma(1.0 + shape->target_unit * shape->concentration) +
+     digamma(1.0 + shape->target_complement_unit * shape->concentration));
+  if(ISNAN(score))
+    return NP_BETA_ERR_NUMERIC;
+  if(score == 0.0)
+    return NP_BETA_OK;
+  if(!R_FINITE(score))
+    return NP_BETA_ERR_RANGE;
+
+  log_term = log_pdf + log(fabs(score)) + log_abs_coefficient;
+  term_sign = coefficient_sign * ((score > 0.0) ? 1 : -1);
+  return np_beta_derivative_accumulate(
+    log_term, term_sign, regular_positive_log, regular_negative_log);
+}
+
 np_beta_status np_beta_pdf_derivative_order(double evaluation,
                                             double observation,
                                             double bandwidth,
@@ -916,59 +970,24 @@ np_beta_status np_beta_pdf_derivative_order(double evaluation,
       evaluation, observation, bandwidth, lower, upper,
       component + 1, &shape);
     double log_pdf;
-    double score;
-    double log_term;
-    int term_sign;
+    double log_abs_coefficient;
+    int coefficient_sign;
 
     if(status != NP_BETA_OK)
       return status;
     if(shape.eval_location != NP_BETA_EVAL_INSIDE ||
        shape.concentration == 0.0)
       continue;
-
-    /* Exact matching endpoints are jump discontinuities.  Their regular
-     * one-sided derivative is zero; the signed jump is retained so ratio
-     * estimators can cancel it structurally. */
-    if((evaluation == lower && observation == lower) ||
-       (evaluation == upper && observation == upper)) {
-      log_pdf = np_beta_log_pdf_scale(&shape, &status);
-      if(status != NP_BETA_OK)
-        return status;
-      log_term = log_pdf + log((double)abs(coefficients[component]));
-      term_sign = (coefficients[component] > 0) ? 1 : -1;
-      if(evaluation == lower)
-        term_sign = -term_sign;
-      status = np_beta_derivative_accumulate(
-        log_term, term_sign, &jump_positive_log, &jump_negative_log);
-      if(status != NP_BETA_OK)
-        return status;
-      continue;
-    }
-
     log_pdf = np_beta_log_pdf_scale(&shape, &status);
     if(status != NP_BETA_OK)
       return status;
-    if(log_pdf == -INFINITY)
-      continue;
-
-    score = (shape.concentration / shape.support_length) *
-      (shape.log_observation_unit -
-       shape.log_observation_complement_unit -
-       digamma(1.0 + shape.target_unit * shape.concentration) +
-       digamma(1.0 + shape.target_complement_unit * shape.concentration));
-    if(ISNAN(score))
-      return NP_BETA_ERR_NUMERIC;
-    if(score == 0.0)
-      continue;
-    if(!R_FINITE(score))
-      return NP_BETA_ERR_RANGE;
-
-    log_term = log_pdf + log(fabs(score)) +
-      log((double)abs(coefficients[component]));
-    term_sign = ((coefficients[component] > 0) ? 1 : -1) *
-      ((score > 0.0) ? 1 : -1);
-    status = np_beta_derivative_accumulate(
-      log_term, term_sign, &regular_positive_log, &regular_negative_log);
+    log_abs_coefficient = log((double)abs(coefficients[component]));
+    coefficient_sign = coefficients[component] > 0 ? 1 : -1;
+    status = np_beta_derivative_component_accumulate(
+      &shape, evaluation, observation, log_pdf,
+      log_abs_coefficient, coefficient_sign,
+      &regular_positive_log, &regular_negative_log,
+      &jump_positive_log, &jump_negative_log);
     if(status != NP_BETA_OK)
       return status;
   }
@@ -984,6 +1003,93 @@ np_beta_status np_beta_pdf_derivative_order(double evaluation,
       &derivative->jump_log_absolute, &derivative->jump_sign);
     return status;
   }
+}
+
+np_beta_status np_beta_log_abs_pdf_derivative_order(
+  double evaluation,
+  double observation,
+  double bandwidth,
+  double lower,
+  double upper,
+  int order,
+  double *level_log_absolute,
+  int *level_sign,
+  np_beta_derivative *derivative)
+{
+  const int *coefficients = NULL;
+  const int component_count =
+    np_beta_order_coefficients(order, &coefficients);
+  np_beta_shape shape[NP_BETA_ORDER_MAX_COMPONENTS];
+  double log_pdf[NP_BETA_ORDER_MAX_COMPONENTS];
+  double log_abs_coefficient[NP_BETA_ORDER_MAX_COMPONENTS];
+  double level_positive_log = -INFINITY;
+  double level_negative_log = -INFINITY;
+  double regular_positive_log = -INFINITY;
+  double regular_negative_log = -INFINITY;
+  double jump_positive_log = -INFINITY;
+  double jump_negative_log = -INFINITY;
+  np_beta_status status;
+  int component;
+
+  if(level_log_absolute == NULL || level_sign == NULL ||
+     derivative == NULL || component_count == 0)
+    return NP_BETA_ERR_SCALE;
+  *level_log_absolute = -INFINITY;
+  *level_sign = 0;
+  np_beta_derivative_zero(derivative);
+
+  /* Complete the level phase before derivative work.  Besides preserving
+   * arithmetic order, this retains the incumbent first-failure contract of
+   * np_beta_log_abs_pdf_order() followed by np_beta_pdf_derivative_order(). */
+  for(component = 0; component < component_count; ++component) {
+    double log_term;
+
+    status = np_beta_shape_init(
+      evaluation, observation, bandwidth, lower, upper,
+      component + 1, &shape[component]);
+    if(status != NP_BETA_OK)
+      return status;
+    log_pdf[component] = np_beta_log_pdf_scale(
+      &shape[component], &status);
+    if(status != NP_BETA_OK)
+      return status;
+    log_abs_coefficient[component] =
+      log((double)abs(coefficients[component]));
+    log_term = log_pdf[component] == -INFINITY ? -INFINITY :
+      log_pdf[component] + log_abs_coefficient[component];
+    if(coefficients[component] > 0)
+      level_positive_log = np_beta_log_add(level_positive_log, log_term);
+    else
+      level_negative_log = np_beta_log_add(level_negative_log, log_term);
+  }
+  status = np_beta_signed_log_absolute(
+    level_positive_log, level_negative_log,
+    level_log_absolute, level_sign);
+  if(status != NP_BETA_OK)
+    return status;
+
+  for(component = 0; component < component_count; ++component) {
+    if(shape[component].eval_location != NP_BETA_EVAL_INSIDE ||
+       shape[component].concentration == 0.0)
+      continue;
+    status = np_beta_derivative_component_accumulate(
+      &shape[component], evaluation, observation, log_pdf[component],
+      log_abs_coefficient[component],
+      coefficients[component] > 0 ? 1 : -1,
+      &regular_positive_log, &regular_negative_log,
+      &jump_positive_log, &jump_negative_log);
+    if(status != NP_BETA_OK)
+      return status;
+  }
+
+  status = np_beta_signed_log_absolute(
+    regular_positive_log, regular_negative_log,
+    &derivative->regular_log_absolute, &derivative->regular_sign);
+  if(status != NP_BETA_OK)
+    return status;
+  return np_beta_signed_log_absolute(
+    jump_positive_log, jump_negative_log,
+    &derivative->jump_log_absolute, &derivative->jump_sign);
 }
 
 static double np_beta_signed_log_value(double log_absolute,

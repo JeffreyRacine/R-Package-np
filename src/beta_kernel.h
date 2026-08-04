@@ -278,6 +278,21 @@ np_beta_status np_beta_pdf_derivative_order(double evaluation,
                                             int order,
                                             np_beta_derivative *derivative);
 
+/* Form the signed-log level and its regular/jump target derivative from one
+ * component preparation.  The level phase is completed first so native
+ * failure precedence remains identical to calling the two scalar primitives
+ * in sequence. */
+np_beta_status np_beta_log_abs_pdf_derivative_order(
+  double evaluation,
+  double observation,
+  double bandwidth,
+  double lower,
+  double upper,
+  int order,
+  double *level_log_absolute,
+  int *level_sign,
+  np_beta_derivative *derivative);
+
 double np_beta_derivative_regular_value(
   const np_beta_derivative *derivative,
   np_beta_status *status);
