@@ -37,6 +37,7 @@ typedef struct {
   np_beta_pdf_observation *pdf_observation;
   np_beta_status *pdf_observation_status;
   np_beta_pdf_component *pdf_row_component;
+  np_beta_pdf_derivative_component *pdf_row_derivative_component;
   double *pdf_log_abs_coefficient;
   signed char *pdf_coefficient_sign;
   int *pdf_first_interior;
@@ -156,6 +157,26 @@ void np_continuous_kernel_beta_prepared_context_release(
 NPContinuousKernelRowStatus np_continuous_kernel_beta_prepared_context_prepare(
   NPContinuousKernelBetaPreparedContext *context,
   const NPContinuousKernelRowPlan *plan);
+
+NPContinuousKernelRowStatus
+np_continuous_kernel_beta_prepared_derivative_context_prepare(
+  NPContinuousKernelBetaPreparedContext *context);
+
+NPContinuousKernelRowStatus
+np_continuous_kernel_beta_prepared_pdf_row_prepare(
+  const NPContinuousKernelRowPlan *plan,
+  const NPContinuousKernelSegment *segment,
+  int evaluation_index,
+  int omitted_observation,
+  NPContinuousKernelRowResult *result);
+
+NPContinuousKernelRowStatus
+np_continuous_kernel_beta_prepared_derivative_row_prepare(
+  const NPContinuousKernelRowPlan *plan,
+  const NPContinuousKernelSegment *segment,
+  int evaluation_index,
+  int omitted_observation,
+  NPContinuousKernelRowResult *result);
 
 void np_continuous_kernel_row_workspace_release(
   NPContinuousKernelRowWorkspace *workspace);
