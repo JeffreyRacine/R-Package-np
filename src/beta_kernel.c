@@ -1092,6 +1092,87 @@ np_beta_status np_beta_log_abs_pdf_derivative_order(
     &derivative->jump_log_absolute, &derivative->jump_sign);
 }
 
+np_beta_status np_beta_log_abs_pdf_derivative_prepared(
+  const np_beta_pdf_component *components,
+  const np_beta_pdf_derivative_component *derivative_components,
+  const np_beta_pdf_observation *observation,
+  int component_count,
+  double evaluation,
+  double observed,
+  double lower,
+  double upper,
+  double *level_log_absolute,
+  int *level_sign,
+  np_beta_derivative *derivative)
+{
+  double regular_positive_log = -INFINITY;
+  double regular_negative_log = -INFINITY;
+  double jump_positive_log = -INFINITY;
+  double jump_negative_log = -INFINITY;
+  np_beta_status status = NP_BETA_OK;
+  int component;
+
+  if(components == NULL || derivative_components == NULL ||
+     observation == NULL ||
+     level_log_absolute == NULL || level_sign == NULL ||
+     derivative == NULL || component_count <= 0 ||
+     component_count > NP_BETA_ORDER_MAX_COMPONENTS)
+    return NP_BETA_ERR_SCALE;
+  *level_log_absolute = -INFINITY;
+  *level_sign = 0;
+  np_beta_derivative_zero(derivative);
+
+  /* The canonical prepared level owner remains responsible for the complete
+   * level phase.  Only after it succeeds do we consume the same component
+   * state for the derivative, preserving the fused scalar failure order. */
+  *level_log_absolute = np_beta_log_abs_pdf_prepared(
+    components, observation, component_count, level_sign, &status);
+  if(status != NP_BETA_OK)
+    return status;
+
+  for(component = 0; component < component_count; ++component) {
+    np_beta_shape shape;
+    double log_pdf;
+
+    if(components[component].eval_location != NP_BETA_EVAL_INSIDE ||
+       derivative_components[component].concentration == 0.0)
+      continue;
+    log_pdf = np_beta_log_pdf_component_prepared(
+      &components[component], observation, &status);
+    if(status != NP_BETA_OK)
+      return status;
+    shape.lower = lower;
+    shape.upper = upper;
+    shape.support_length =
+      derivative_components[component].support_length;
+    shape.concentration =
+      derivative_components[component].concentration;
+    shape.target_unit = derivative_components[component].target_unit;
+    shape.target_complement_unit =
+      derivative_components[component].target_complement_unit;
+    shape.log_observation_unit = observation->log_unit;
+    shape.log_observation_complement_unit =
+      observation->log_complement_unit;
+    status = np_beta_derivative_component_accumulate(
+      &shape, evaluation, observed, log_pdf,
+      components[component].log_abs_coefficient,
+      components[component].coefficient_sign,
+      &regular_positive_log, &regular_negative_log,
+      &jump_positive_log, &jump_negative_log);
+    if(status != NP_BETA_OK)
+      return status;
+  }
+
+  status = np_beta_signed_log_absolute(
+    regular_positive_log, regular_negative_log,
+    &derivative->regular_log_absolute, &derivative->regular_sign);
+  if(status != NP_BETA_OK)
+    return status;
+  return np_beta_signed_log_absolute(
+    jump_positive_log, jump_negative_log,
+    &derivative->jump_log_absolute, &derivative->jump_sign);
+}
+
 static double np_beta_signed_log_value(double log_absolute,
                                        int sign,
                                        np_beta_status *status)

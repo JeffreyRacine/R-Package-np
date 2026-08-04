@@ -170,6 +170,16 @@ typedef struct {
   int normalizer_ready;
 } np_beta_pdf_component;
 
+/* Derivative-only state prepared once per fixed/GNN evaluation row.  Keeping
+ * it separate prevents the scalar/adaptive PDF component from carrying cold
+ * fields through its O(n_train * n_eval) stack path. */
+typedef struct {
+  double support_length;
+  double concentration;
+  double target_unit;
+  double target_complement_unit;
+} np_beta_pdf_derivative_component;
+
 /*
  * Derivatives of an observation-centred beta kernel can have an ordinary
  * one-sided derivative and, only when an observation exactly matches a
@@ -219,6 +229,19 @@ double np_beta_log_abs_pdf_prepared(
   int component_count,
   int *sign,
   np_beta_status *status);
+
+np_beta_status np_beta_log_abs_pdf_derivative_prepared(
+  const np_beta_pdf_component *components,
+  const np_beta_pdf_derivative_component *derivative_components,
+  const np_beta_pdf_observation *observation,
+  int component_count,
+  double evaluation,
+  double observed,
+  double lower,
+  double upper,
+  double *level_log_absolute,
+  int *level_sign,
+  np_beta_derivative *derivative);
 
 double np_beta_log_abs_pdf_order_prepared_observation(
   double evaluation,

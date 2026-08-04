@@ -184,6 +184,142 @@ np_continuous_kernel_beta_level_derivative_observation_bound(
   return NP_CONTINUOUS_ROW_OK;
 }
 
+/* Fixed and generalized-NN rows have evaluation-owned beta components.  This
+ * sibling keeps that topology outside the observation loop so the adaptive
+ * scalar microkernel above remains byte-for-byte unchanged. */
+NP_CONTINUOUS_ROW_GRADIENT_ALWAYS_INLINE NPContinuousKernelRowStatus
+np_continuous_kernel_beta_level_derivative_observation_prepared_bound(
+  const NPContinuousKernelRowPlan *plan,
+  const NPContinuousKernelSegment *segment,
+  int evaluation_index,
+  int observation,
+  int derivative_coordinate,
+  double other_log,
+  int other_sign,
+  NPContinuousKernelLevelDerivativeWorkspace *workspace,
+  double *common_log_scale,
+  NPContinuousKernelDerivativeDiagnostics *diagnostics)
+{
+  NPContinuousKernelBetaPreparedContext * const prepared =
+    plan->beta_prepared;
+  double level_log = -INFINITY;
+  int level_sign = 0;
+  np_beta_derivative derivative;
+  int coordinate;
+
+  if(prepared == NULL || !prepared->pdf_active ||
+     !prepared->pdf_row_component_active ||
+     prepared->pdf_row_component == NULL ||
+     prepared->pdf_row_derivative_component == NULL)
+    return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+
+  for(coordinate = 0; coordinate < plan->num_continuous; ++coordinate) {
+    const int local_coordinate =
+      coordinate - segment->coordinate_offset;
+    const double evaluation = plan->train_is_eval ?
+      plan->train[coordinate][evaluation_index] :
+      plan->evaluation[coordinate][evaluation_index];
+    const double observed = plan->train[coordinate][observation];
+    const int beta_slot = prepared->coordinate_slot[coordinate];
+    const size_t observation_offset = beta_slot < 0 ? 0U :
+      (size_t)beta_slot * (size_t)plan->num_train +
+      (size_t)observation;
+    const np_beta_pdf_component *components;
+    const np_beta_pdf_derivative_component *derivative_components;
+    const np_beta_pdf_observation *prepared_observation;
+    np_beta_status beta_status = NP_BETA_OK;
+
+    if(beta_slot < 0 || beta_slot >= prepared->num_beta_coordinates) {
+      if(diagnostics != NULL) {
+        diagnostics->bad_coordinate = coordinate;
+        diagnostics->bad_observation = observation;
+      }
+      return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+    }
+    beta_status = prepared->pdf_observation_status[observation_offset];
+    if(beta_status != NP_BETA_OK) {
+      if(diagnostics != NULL) {
+        diagnostics->bad_coordinate = coordinate;
+        diagnostics->bad_observation = observation;
+        diagnostics->beta_status = beta_status;
+      }
+      return NP_CONTINUOUS_ROW_ERR_KERNEL;
+    }
+    components = &prepared->pdf_row_component[
+      (size_t)beta_slot * NP_BETA_PREPARED_MAX_COMPONENTS];
+    derivative_components = &prepared->pdf_row_derivative_component[
+      (size_t)beta_slot * NP_BETA_PREPARED_MAX_COMPONENTS];
+    prepared_observation = &prepared->pdf_observation[observation_offset];
+
+    if(coordinate == derivative_coordinate) {
+      beta_status = np_beta_log_abs_pdf_derivative_prepared(
+        components, derivative_components, prepared_observation,
+        segment->descriptor.order / 2,
+        evaluation, observed,
+        segment->lower[local_coordinate],
+        segment->upper[local_coordinate],
+        &level_log, &level_sign, &derivative);
+    } else {
+      int scalar_sign = 0;
+      const double scalar_log = np_beta_log_abs_pdf_prepared(
+        components, prepared_observation,
+        segment->descriptor.order / 2,
+        &scalar_sign, &beta_status);
+
+      if(beta_status == NP_BETA_OK) {
+        if(scalar_sign == 0)
+          other_sign = 0;
+        else if(other_sign != 0) {
+          other_sign *= scalar_sign;
+          other_log += scalar_log;
+        }
+      }
+    }
+    if(beta_status != NP_BETA_OK) {
+      if(diagnostics != NULL) {
+        diagnostics->bad_coordinate = coordinate;
+        diagnostics->bad_observation = observation;
+        diagnostics->beta_status = beta_status;
+      }
+      return NP_CONTINUOUS_ROW_ERR_KERNEL;
+    }
+  }
+
+  if(other_sign == 0 || level_sign == 0) {
+    workspace->level_log_absolute[observation] = -INFINITY;
+    workspace->level_sign[observation] = 0;
+  } else {
+    workspace->level_log_absolute[observation] = other_log + level_log;
+    workspace->level_sign[observation] =
+      (signed char)(other_sign * level_sign);
+    *common_log_scale = fmax(
+      *common_log_scale, workspace->level_log_absolute[observation]);
+  }
+  if(other_sign == 0 || derivative.regular_sign == 0) {
+    workspace->regular_log_absolute[observation] = -INFINITY;
+    workspace->regular_sign[observation] = 0;
+  } else {
+    workspace->regular_log_absolute[observation] =
+      other_log + derivative.regular_log_absolute;
+    workspace->regular_sign[observation] =
+      (signed char)(other_sign * derivative.regular_sign);
+    *common_log_scale = fmax(
+      *common_log_scale, workspace->regular_log_absolute[observation]);
+  }
+  if(other_sign == 0 || derivative.jump_sign == 0) {
+    workspace->jump_log_absolute[observation] = -INFINITY;
+    workspace->jump_sign[observation] = 0;
+  } else {
+    workspace->jump_log_absolute[observation] =
+      other_log + derivative.jump_log_absolute;
+    workspace->jump_sign[observation] =
+      (signed char)(other_sign * derivative.jump_sign);
+    *common_log_scale = fmax(
+      *common_log_scale, workspace->jump_log_absolute[observation]);
+  }
+  return NP_CONTINUOUS_ROW_OK;
+}
+
 NPContinuousKernelRowStatus
 np_continuous_kernel_beta_level_derivative_log_row_validated(
   const NPContinuousKernelRowPlan *plan,
@@ -237,6 +373,90 @@ np_continuous_kernel_beta_level_derivative_log_row_validated(
   }
 
   segment = &plan->route->segment[0];
+  if(plan->beta_prepared != NULL &&
+     plan->beta_prepared->pdf_active &&
+     plan->beta_prepared->pdf_row_component_active) {
+    NPContinuousKernelRowResult prepare_result = {0};
+
+    row_status =
+      np_continuous_kernel_beta_prepared_derivative_context_prepare(
+        plan->beta_prepared);
+    if(row_status != NP_CONTINUOUS_ROW_OK)
+      return row_status;
+    prepare_result.bad_coordinate = -1;
+    prepare_result.bad_observation = -1;
+    prepare_result.beta_status = NP_BETA_OK;
+    row_status = np_continuous_kernel_beta_prepared_pdf_row_prepare(
+      plan, segment, evaluation_index, omitted_observation,
+      &prepare_result);
+    if(row_status != NP_CONTINUOUS_ROW_OK) {
+      if(diagnostics != NULL) {
+        diagnostics->bad_coordinate = prepare_result.bad_coordinate;
+        diagnostics->bad_observation = prepare_result.bad_observation;
+        diagnostics->beta_status = prepare_result.beta_status;
+      }
+      return row_status;
+    }
+    row_status = np_continuous_kernel_beta_prepared_derivative_row_prepare(
+      plan, segment, evaluation_index, omitted_observation,
+      &prepare_result);
+    if(row_status != NP_CONTINUOUS_ROW_OK) {
+      if(diagnostics != NULL) {
+        diagnostics->bad_coordinate = prepare_result.bad_coordinate;
+        diagnostics->bad_observation = prepare_result.bad_observation;
+        diagnostics->beta_status = prepare_result.beta_status;
+      }
+      return row_status;
+    }
+    *common_log_scale = -INFINITY;
+    if(provider == NULL && omitted_observation == -1) {
+      for(observation = 0;
+          observation < plan->num_train;
+          ++observation) {
+        row_status =
+          np_continuous_kernel_beta_level_derivative_observation_prepared_bound(
+            plan, segment, evaluation_index, observation,
+            derivative_coordinate, 0.0, 1, workspace, common_log_scale,
+            diagnostics);
+        if(row_status != NP_CONTINUOUS_ROW_OK)
+          return row_status;
+      }
+      return NP_CONTINUOUS_ROW_OK;
+    }
+    for(observation = 0; observation < plan->num_train; ++observation) {
+      double other_log = 0.0;
+      int other_sign = 1;
+
+      if(observation == omitted_observation) {
+        workspace->level_log_absolute[observation] = -INFINITY;
+        workspace->regular_log_absolute[observation] = -INFINITY;
+        workspace->jump_log_absolute[observation] = -INFINITY;
+        workspace->level_sign[observation] = 0;
+        workspace->regular_sign[observation] = 0;
+        workspace->jump_sign[observation] = 0;
+        continue;
+      }
+      if(provider != NULL) {
+        other_log = workspace->level_log_absolute[observation];
+        other_sign = workspace->level_sign[observation];
+        if(ISNAN(other_log) || other_log == INFINITY ||
+           (other_sign != -1 && other_sign != 0 && other_sign != 1) ||
+           ((other_sign == 0) != (other_log == -INFINITY))) {
+          if(diagnostics != NULL)
+            diagnostics->bad_observation = observation;
+          return NP_CONTINUOUS_ROW_ERR_NUMERIC;
+        }
+      }
+      row_status =
+        np_continuous_kernel_beta_level_derivative_observation_prepared_bound(
+          plan, segment, evaluation_index, observation,
+          derivative_coordinate, other_log, other_sign, workspace,
+          common_log_scale, diagnostics);
+      if(row_status != NP_CONTINUOUS_ROW_OK)
+        return row_status;
+    }
+    return NP_CONTINUOUS_ROW_OK;
+  }
   *common_log_scale = -INFINITY;
   if(provider == NULL && omitted_observation == -1) {
     for(observation = 0; observation < plan->num_train; ++observation) {

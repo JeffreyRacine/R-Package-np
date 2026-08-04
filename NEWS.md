@@ -4,7 +4,13 @@
   regular/jump target derivative from one canonical component preparation.
   The level phase still completes before derivative work, preserving native
   failure precedence and exact fitted, gradient, and standard-error
-  arithmetic while removing the duplicate beta shape and PDF pass.
+  arithmetic while removing the duplicate beta shape and PDF pass. Fixed- and
+  generalized-nearest-neighbour gradient rows additionally reuse their
+  prepared evaluation-row components; adaptive rows retain an isolated scalar
+  sibling so this specialization adds no pairwise branch or stack overhead to
+  the observation-owned-bandwidth topology. Derivative-only prepared state is
+  allocated lazily, so level-only fits retain their incumbent preparation
+  cost.
 
 * Adaptive-nearest-neighbour beta PDF rows now prepare support-transformed
   observations and higher-order coefficient state once per invocation while
