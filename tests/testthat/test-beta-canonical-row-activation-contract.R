@@ -487,8 +487,16 @@ test_that("canonical beta gradient rows separate operator and estimator algebra"
     row_engine, observation_start, row_start - 1L
   )
   row_owner <- substr(row_engine, row_start, row_end - 1L)
-  expect_match(operator_owner, "np_beta_log_abs_pdf_order(", fixed = TRUE)
-  expect_match(operator_owner, "np_beta_pdf_derivative_order(", fixed = TRUE)
+  expect_match(
+    operator_owner, "np_beta_log_abs_pdf_derivative_order(", fixed = TRUE
+  )
+  legacy_level_calls <- gregexpr(
+    "np_beta_log_abs_pdf_order(", operator_owner, fixed = TRUE
+  )[[1L]]
+  expect_identical(sum(legacy_level_calls > 0L), 1L)
+  expect_false(grepl(
+    "np_beta_pdf_derivative_order(", operator_owner, fixed = TRUE
+  ))
   expect_match(operator_owner, "*common_log_scale = fmax(", fixed = TRUE)
   expect_match(
     row_owner,

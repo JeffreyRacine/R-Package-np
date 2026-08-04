@@ -117,17 +117,11 @@ np_continuous_kernel_beta_level_derivative_observation_bound(
     np_beta_status beta_status = NP_BETA_OK;
 
     if(coordinate == derivative_coordinate) {
-      level_log = np_beta_log_abs_pdf_order(
+      beta_status = np_beta_log_abs_pdf_derivative_order(
         evaluation, observed, bandwidth,
         segment->lower[local_coordinate],
         segment->upper[local_coordinate], segment->descriptor.order,
-        &level_sign, &beta_status);
-      if(beta_status == NP_BETA_OK)
-        beta_status = np_beta_pdf_derivative_order(
-          evaluation, observed, bandwidth,
-          segment->lower[local_coordinate],
-          segment->upper[local_coordinate], segment->descriptor.order,
-          &derivative);
+        &level_log, &level_sign, &derivative);
     } else {
       int scalar_sign = 0;
       const double scalar_log = np_beta_log_abs_pdf_order(

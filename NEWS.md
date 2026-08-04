@@ -1,5 +1,12 @@
 # npRmpi 0.70-6
 
+* Beta regression gradient rows now form the signed-log level and its
+  regular/jump target derivative from one canonical component preparation on
+  every rank. The level phase still completes before derivative work,
+  preserving native failure precedence and exact fitted, gradient, and
+  standard-error arithmetic while removing the duplicate beta shape and PDF
+  pass.
+
 * Adaptive-nearest-neighbour beta PDF rows now prepare support-transformed
   observations and higher-order coefficient state once per invocation while
   retaining observation-owned bandwidth shapes and normalizers in the
