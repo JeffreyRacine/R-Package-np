@@ -490,6 +490,52 @@ test_that("beta CDF rows reuse observation and fixed concentration state", {
   expect_false(grepl("pbeta(", prepared_cdf, fixed = TRUE))
 })
 
+test_that("higher-order beta overlap prepares each distinct side shape once", {
+  root <- locate_beta_activation_sources()
+  skip_if(is.null(root), "package sources unavailable")
+  beta_kernel <- paste(
+    readLines(file.path(root, "src", "beta_kernel.c"), warn = FALSE),
+    collapse = "\n"
+  )
+
+  parts_start <- regexpr(
+    "static np_beta_status np_beta_overlap_order_log_parts(",
+    beta_kernel,
+    fixed = TRUE
+  )[[1L]]
+  parts_end <- regexpr(
+    "double np_beta_overlap_order(",
+    substr(beta_kernel, parts_start + 1L, nchar(beta_kernel)),
+    fixed = TRUE
+  )[[1L]]
+  expect_gt(parts_start, 0L)
+  expect_gt(parts_end, 0L)
+  parts <- substr(
+    beta_kernel, parts_start, parts_start + parts_end - 1L
+  )
+
+  expect_match(
+    parts,
+    "np_beta_shape shape_one[NP_BETA_ORDER_MAX_COMPONENTS];",
+    fixed = TRUE
+  )
+  expect_match(
+    parts,
+    "np_beta_shape shape_two[NP_BETA_ORDER_MAX_COMPONENTS];",
+    fixed = TRUE
+  )
+  shape_calls <- gregexpr("np_beta_shape_init(", parts, fixed = TRUE)[[1L]]
+  expect_length(shape_calls[shape_calls > 0L], 2L)
+  expect_match(parts, "np_beta_log_overlap_shapes(", fixed = TRUE)
+  expect_false(grepl("np_beta_log_overlap_scale(", parts, fixed = TRUE))
+
+  expect_match(
+    beta_kernel,
+    "return np_beta_log_overlap_shapes(&shape_one, &shape_two, status);",
+    fixed = TRUE
+  )
+})
+
 test_that("legacy callers cannot acquire beta route metadata implicitly", {
   root <- locate_beta_activation_sources()
   skip_if(is.null(root), "package sources unavailable")
