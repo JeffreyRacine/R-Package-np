@@ -1,5 +1,11 @@
 # np 0.70-6
 
+* Higher-order beta convolution now prepares each distinct side/component
+  shape once per observation pair rather than rebuilding it for every
+  opposing component. The stack-local decomposition retains the canonical
+  centered gamma-ratio and signed component-pair accumulation order, changes
+  no order-two arithmetic, and adds no dynamic or sample-sized storage.
+
 * Fixed-bandwidth beta CDF rows now prepare each coordinate/component
   concentration once per invocation rather than recomputing it for every
   evaluation-observation pair. The fixed-only sibling shares the canonical

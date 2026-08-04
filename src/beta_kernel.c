@@ -1840,19 +1840,14 @@ double np_beta_log_abs_cdf_order_prepared_concentration(
     sign, status);
 }
 
-static double np_beta_log_overlap_scale(double center_one,
-                                        double bandwidth_one,
-                                        int scale_one,
-                                        double center_two,
-                                        double bandwidth_two,
-                                        int scale_two,
-                                        double lower,
-                                        double upper,
-                                        np_beta_status *status)
+/* One canonical gamma-ratio owner consumes already validated side shapes.
+ * Scalar order two prepares its two shapes immediately before this call;
+ * higher orders prepare each distinct side/component shape once per pair and
+ * retain the established component-pair accumulation order. */
+static double np_beta_log_overlap_shapes(const np_beta_shape *shape_one,
+                                         const np_beta_shape *shape_two,
+                                         np_beta_status *status)
 {
-  np_beta_shape shape_one;
-  np_beta_shape shape_two;
-  np_beta_status shape_status;
   double alpha_one;
   double beta_one;
   double alpha_two;
@@ -1873,38 +1868,12 @@ static double np_beta_log_overlap_scale(double center_one,
   double total_half;
   double log_value;
 
-  /* Each center defines one associated beta density in the common
-   * observation coordinate.  Passing the center in both scalar positions
-   * validates it against the support while preparing its shape parameters. */
-  shape_status = np_beta_shape_init(center_one,
-                                    center_one,
-                                    bandwidth_one,
-                                    lower,
-                                    upper,
-                                    scale_one,
-                                    &shape_one);
-  if(shape_status != NP_BETA_OK) {
-    np_beta_set_status(status, shape_status);
-    return NAN;
-  }
-  shape_status = np_beta_shape_init(center_two,
-                                    center_two,
-                                    bandwidth_two,
-                                    lower,
-                                    upper,
-                                    scale_two,
-                                    &shape_two);
-  if(shape_status != NP_BETA_OK) {
-    np_beta_set_status(status, shape_status);
-    return NAN;
-  }
-
-  alpha_one = 1.0 + shape_one.target_unit * shape_one.concentration;
+  alpha_one = 1.0 + shape_one->target_unit * shape_one->concentration;
   beta_one = 1.0 +
-    shape_one.target_complement_unit * shape_one.concentration;
-  alpha_two = 1.0 + shape_two.target_unit * shape_two.concentration;
+    shape_one->target_complement_unit * shape_one->concentration;
+  alpha_two = 1.0 + shape_two->target_unit * shape_two->concentration;
   beta_two = 1.0 +
-    shape_two.target_complement_unit * shape_two.concentration;
+    shape_two->target_complement_unit * shape_two->concentration;
   overlap_alpha = alpha_one + alpha_two - 1.0;
   overlap_beta = beta_one + beta_two - 1.0;
   if(!R_FINITE(alpha_one) || !R_FINITE(beta_one) ||
@@ -1944,7 +1913,7 @@ static double np_beta_log_overlap_scale(double center_one,
     np_beta_set_status(status, NP_BETA_ERR_NUMERIC);
     return NAN;
   }
-  log_value = -log(shape_one.support_length) - log(2.0) -
+  log_value = -log(shape_one->support_length) - log(2.0) -
     0.57236494292470008707 +
     alpha_half - alpha_centered + beta_half - beta_centered +
     total_centered + log(total_mean - 1.0) - total_half;
@@ -1959,6 +1928,49 @@ static double np_beta_log_overlap_scale(double center_one,
 
   np_beta_set_status(status, NP_BETA_OK);
   return log_value;
+}
+
+static double np_beta_log_overlap_scale(double center_one,
+                                        double bandwidth_one,
+                                        int scale_one,
+                                        double center_two,
+                                        double bandwidth_two,
+                                        int scale_two,
+                                        double lower,
+                                        double upper,
+                                        np_beta_status *status)
+{
+  np_beta_shape shape_one;
+  np_beta_shape shape_two;
+  np_beta_status shape_status;
+
+  /* Each center defines one associated beta density in the common
+   * observation coordinate. Passing the center in both scalar positions
+   * validates it against the support while preparing its shape parameters. */
+  shape_status = np_beta_shape_init(center_one,
+                                    center_one,
+                                    bandwidth_one,
+                                    lower,
+                                    upper,
+                                    scale_one,
+                                    &shape_one);
+  if(shape_status != NP_BETA_OK) {
+    np_beta_set_status(status, shape_status);
+    return NAN;
+  }
+  shape_status = np_beta_shape_init(center_two,
+                                    center_two,
+                                    bandwidth_two,
+                                    lower,
+                                    upper,
+                                    scale_two,
+                                    &shape_two);
+  if(shape_status != NP_BETA_OK) {
+    np_beta_set_status(status, shape_status);
+    return NAN;
+  }
+
+  return np_beta_log_overlap_shapes(&shape_one, &shape_two, status);
 }
 
 double np_beta_log_overlap_order2(double center_one,
@@ -2022,6 +2034,10 @@ static np_beta_status np_beta_overlap_order_log_parts(
   const int *coefficients = NULL;
   const int component_count =
     np_beta_order_coefficients(order, &coefficients);
+  np_beta_shape shape_one[NP_BETA_ORDER_MAX_COMPONENTS];
+  np_beta_shape shape_two[NP_BETA_ORDER_MAX_COMPONENTS];
+  np_beta_status shape_one_status[NP_BETA_ORDER_MAX_COMPONENTS];
+  np_beta_status shape_two_status[NP_BETA_ORDER_MAX_COMPONENTS];
   int component_one;
   int component_two;
 
@@ -2030,16 +2046,35 @@ static np_beta_status np_beta_overlap_order_log_parts(
   *positive_log = -INFINITY;
   *negative_log = -INFINITY;
 
+  /* Shape construction depends on one side and one component, not on the
+   * opposing component. Record every status now but consume statuses only in
+   * the original nested-loop order, preserving the incumbent first-failure
+   * contract as well as the arithmetic transcript below. */
+  for(component_one = 0; component_one < component_count; ++component_one)
+    shape_one_status[component_one] = np_beta_shape_init(
+      center_one, center_one, bandwidth_one, lower, upper,
+      component_one + 1, &shape_one[component_one]);
+  for(component_two = 0; component_two < component_count; ++component_two)
+    shape_two_status[component_two] = np_beta_shape_init(
+      center_two, center_two, bandwidth_two, lower, upper,
+      component_two + 1, &shape_two[component_two]);
+
   for(component_one = 0; component_one < component_count; ++component_one) {
     for(component_two = 0; component_two < component_count; ++component_two) {
       const int coefficient = coefficients[component_one] *
         coefficients[component_two];
       np_beta_status component_status = NP_BETA_OK;
-      const double log_value = np_beta_log_overlap_scale(
-        center_one, bandwidth_one, component_one + 1,
-        center_two, bandwidth_two, component_two + 1,
-        lower, upper, &component_status);
-      const double log_term = (log_value == -INFINITY) ? -INFINITY :
+      double log_value;
+      double log_term;
+
+      if(shape_one_status[component_one] != NP_BETA_OK)
+        return shape_one_status[component_one];
+      if(shape_two_status[component_two] != NP_BETA_OK)
+        return shape_two_status[component_two];
+      log_value = np_beta_log_overlap_shapes(
+        &shape_one[component_one], &shape_two[component_two],
+        &component_status);
+      log_term = (log_value == -INFINITY) ? -INFINITY :
         log_value + log((double)abs(coefficient));
 
       if(component_status != NP_BETA_OK)
