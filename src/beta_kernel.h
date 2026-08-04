@@ -1,6 +1,13 @@
 #ifndef NP_BETA_KERNEL_H
 #define NP_BETA_KERNEL_H
 
+#include <math.h>
+#include <stddef.h>
+
+#include <R_ext/Arith.h>
+
+#define NP_BETA_ORDER_MAX_COMPONENTS 4
+
 /*
  * Coordinate-aware associated beta-kernel primitives.
  *
@@ -42,6 +49,127 @@ typedef struct {
   int observation_endpoint;
 } np_beta_shape;
 
+/* PDF-only decomposition of np_beta_shape.  Observation state is immutable
+ * within one native invocation; component state is immutable within one
+ * evaluation row for fixed and generalized-NN bandwidths. */
+typedef struct {
+  double log_unit;
+  double log_complement_unit;
+  int endpoint;
+} np_beta_pdf_observation;
+
+#if defined(__clang__) || defined(__GNUC__)
+# define NP_BETA_ALWAYS_INLINE static inline __attribute__((always_inline))
+#else
+# define NP_BETA_ALWAYS_INLINE static inline
+#endif
+
+NP_BETA_ALWAYS_INLINE double np_beta_observation_unit_coordinate(
+  double value,
+  double lower,
+  double upper,
+  double support_length)
+{
+  const double midpoint = lower + 0.5 * support_length;
+
+  /* Use the nearer endpoint to avoid losing most of a small upper-tail gap. */
+  if(value <= midpoint)
+    return (value - lower) / support_length;
+  return 1.0 - (upper - value) / support_length;
+}
+
+NP_BETA_ALWAYS_INLINE double np_beta_observation_complement_unit_coordinate(
+  double observation,
+  double upper,
+  double support_length)
+{
+  return (upper - observation) / support_length;
+}
+
+NP_BETA_ALWAYS_INLINE double np_beta_observation_log_unit(
+  double observation,
+  double lower,
+  double support_length)
+{
+  return log(observation - lower) - log(support_length);
+}
+
+NP_BETA_ALWAYS_INLINE double np_beta_observation_log_complement_unit(
+  double observation,
+  double upper,
+  double support_length)
+{
+  return log(upper - observation) - log(support_length);
+}
+
+NP_BETA_ALWAYS_INLINE np_beta_status np_beta_pdf_observation_init(
+  double observation,
+  double lower,
+  double upper,
+  double support_length,
+  double *observation_unit,
+  double *observation_complement_unit,
+  double *log_observation_unit,
+  double *log_observation_complement_unit,
+  int *observation_endpoint)
+{
+  if(observation_unit == NULL || observation_complement_unit == NULL ||
+     log_observation_unit == NULL ||
+     log_observation_complement_unit == NULL ||
+     observation_endpoint == NULL)
+    return NP_BETA_ERR_NUMERIC;
+  if(!R_FINITE(observation) || !R_FINITE(lower) || !R_FINITE(upper))
+    return NP_BETA_ERR_NONFINITE;
+  if(!R_FINITE(support_length) || support_length <= 0.0)
+    return NP_BETA_ERR_BOUNDS;
+  if(observation < lower || observation > upper)
+    return NP_BETA_ERR_OBSERVATION;
+
+  *observation_unit = np_beta_observation_unit_coordinate(
+    observation, lower, upper, support_length);
+  *observation_complement_unit =
+    np_beta_observation_complement_unit_coordinate(
+      observation, upper, support_length);
+  if(!R_FINITE(*observation_unit) ||
+     *observation_unit < 0.0 || *observation_unit > 1.0 ||
+     !R_FINITE(*observation_complement_unit) ||
+     *observation_complement_unit < 0.0 ||
+     *observation_complement_unit > 1.0)
+    return NP_BETA_ERR_OBSERVATION;
+  if(observation == lower) {
+    *observation_endpoint = -1;
+    *log_observation_unit = -INFINITY;
+    *log_observation_complement_unit = 0.0;
+  } else if(observation == upper) {
+    *observation_endpoint = 1;
+    *log_observation_unit = 0.0;
+    *log_observation_complement_unit = -INFINITY;
+  } else {
+    *observation_endpoint = 0;
+    *log_observation_unit = np_beta_observation_log_unit(
+      observation, lower, support_length);
+    *log_observation_complement_unit =
+      np_beta_observation_log_complement_unit(
+        observation, upper, support_length);
+  }
+  return NP_BETA_OK;
+}
+
+#undef NP_BETA_ALWAYS_INLINE
+
+typedef struct {
+  double log_support_length;
+  double alpha_minus_one;
+  double beta_minus_one;
+  double alpha;
+  double beta;
+  double log_beta;
+  double log_abs_coefficient;
+  np_beta_eval_location eval_location;
+  int coefficient_sign;
+  int normalizer_ready;
+} np_beta_pdf_component;
+
 /*
  * Derivatives of an observation-centred beta kernel can have an ordinary
  * one-sided derivative and, only when an observation exactly matches a
@@ -63,6 +191,34 @@ np_beta_status np_beta_shape_init(double evaluation,
                                   double upper,
                                   int scale,
                                   np_beta_shape *shape);
+
+void np_beta_pdf_observation_from_shape(
+  const np_beta_shape *shape,
+  np_beta_pdf_observation *observation);
+
+np_beta_status np_beta_pdf_component_from_shape(
+  const np_beta_shape *shape,
+  np_beta_pdf_component *component);
+
+np_beta_status np_beta_pdf_component_prepare_normalizer(
+  np_beta_pdf_component *component);
+
+np_beta_status np_beta_pdf_component_prepare_coefficient(
+  np_beta_pdf_component *component,
+  int order,
+  int component_index);
+
+double np_beta_log_pdf_component_prepared(
+  const np_beta_pdf_component *component,
+  const np_beta_pdf_observation *observation,
+  np_beta_status *status);
+
+double np_beta_log_abs_pdf_prepared(
+  const np_beta_pdf_component *components,
+  const np_beta_pdf_observation *observation,
+  int component_count,
+  int *sign,
+  np_beta_status *status);
 
 double np_beta_pdf_scale(const np_beta_shape *shape,
                          np_beta_status *status);

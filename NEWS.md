@@ -1,5 +1,13 @@
 # np 0.70-6
 
+* Fixed- and generalized-nearest-neighbour beta PDF rows now prepare support-
+  transformed observations, component normalizers, and higher-order
+  coefficient logs at their invocation or evaluation-row lifetime instead of
+  recomputing them for every observation pair. The shared row engine retains
+  exact objective, fit, prediction, and kernel-weight arithmetic, has no
+  runtime fallback after route selection, and uses only beta-coordinate-linear
+  transient storage.
+
 * Hardened beta self-map layout validation at the registered kernel-sum,
   nearest-neighbour bandwidth, and canonical continuous-row boundaries.
   Internal calls that identify training and evaluation data now require equal

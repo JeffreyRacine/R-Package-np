@@ -183,6 +183,9 @@ np_beta_kernelsum(const double *train_continuous,
   plan.bandwidth_eval = bandwidth_eval_columns;
   plan.bandwidth_train = bandwidth_train_columns;
   plan.operator = canonical_operators;
+  /* The compiled compatibility facade remains on the scalar canonical
+   * evaluator pending its separately planned excision. */
+  plan.beta_prepared = NULL;
   row_result.row = row;
   np_continuous_kernel_row_workspace_init(&workspace);
 
