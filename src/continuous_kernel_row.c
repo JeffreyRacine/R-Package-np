@@ -141,6 +141,7 @@ NPContinuousKernelRowStatus np_continuous_kernel_row_plan_validate(
      plan->train == NULL || plan->operator == NULL ||
      (!plan->train_is_eval && plan->evaluation == NULL) ||
      (plan->train_is_eval != 0 && plan->train_is_eval != 1) ||
+     (plan->train_is_eval && plan->num_train != plan->num_eval) ||
      (plan->bandwidth_mode != BW_FIXED &&
       plan->bandwidth_mode != BW_GEN_NN &&
       plan->bandwidth_mode != BW_ADAP_NN))

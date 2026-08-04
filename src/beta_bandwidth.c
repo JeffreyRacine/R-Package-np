@@ -51,6 +51,8 @@ np_beta_bandwidth_prepare_matrix(
       bandwidth_mode != NP_BETA_BANDWIDTH_ADAPTIVE_NN) ||
      train_continuous == NULL || nearest_neighbor == NULL ||
      num_train <= 0 || num_eval <= 0 || num_continuous <= 0 ||
+     (train_is_eval != 0 && train_is_eval != 1) ||
+     (train_is_eval && num_train != num_eval) ||
      (!train_is_eval && eval_continuous == NULL) ||
      (need_eval && bandwidth_eval == NULL) ||
      (need_train && bandwidth_train == NULL))
@@ -132,6 +134,8 @@ np_beta_bandwidth_prepare(np_beta_bandwidth_mode bandwidth_mode,
       bandwidth_mode != NP_BETA_BANDWIDTH_ADAPTIVE_NN) ||
      train_continuous == NULL || nearest_neighbor == NULL ||
      num_train <= 0 || num_eval <= 0 || num_continuous <= 0 ||
+     (train_is_eval != 0 && train_is_eval != 1) ||
+     (train_is_eval && num_train != num_eval) ||
      (!train_is_eval && eval_continuous == NULL) ||
      (need_eval && bandwidth_eval == NULL) ||
      (need_train && bandwidth_train == NULL))
