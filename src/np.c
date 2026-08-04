@@ -42,7 +42,6 @@ extern MPI_Comm	*comm;
 /* headers.h has all definitions of routines used by main() and related modules */
 
 #include "headers.h"
-#include "beta_kernelsum.h"
 #include "beta_bandwidth.h"
 #include "continuous_kernel_row.h"
 #include "beta_scaled_row.h"

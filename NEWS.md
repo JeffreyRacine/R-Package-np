@@ -1,5 +1,10 @@
 # np 0.70-6
 
+* Removed the unregistered and callerless internal `beta_kernelsum` facade.
+  Beta bandwidth-mode ownership now resides in the shared bandwidth contract;
+  all estimator, kernel-sum, LP, and optional-output routes continue to use the
+  canonical continuous-row engine.
+
 * Higher-order beta convolution now prepares each distinct side/component
   shape once per observation pair rather than rebuilding it for every
   opposing component. The stack-local decomposition retains the canonical
