@@ -1,5 +1,12 @@
 # npRmpi 0.70-6
 
+* Hardened beta self-map layout validation at the registered kernel-sum,
+  nearest-neighbour bandwidth, and canonical continuous-row boundaries.
+  Internal calls that identify training and evaluation data now require equal
+  extents and a strict logical self-map flag, preventing an inconsistent
+  native invocation from aliasing a shorter training buffer as a longer
+  evaluation buffer. Valid estimator and `npksum()` arithmetic is unchanged.
+
 * Corrected automatic-degree regression startup for beta kernels and
   local-polynomial engine transitions for every continuous kernel. Internal
   zero bandwidth placeholders are now owned by bandwidth selection rather
