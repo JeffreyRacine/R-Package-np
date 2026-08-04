@@ -1,5 +1,13 @@
 # npRmpi 0.70-6
 
+* Corrected automatic-degree regression startup for beta kernels and
+  local-polynomial engine transitions for every continuous kernel. Internal
+  zero bandwidth placeholders are now owned by bandwidth selection rather
+  than validated as manual beta bandwidths, and each evaluated degree selects
+  the scalar width-one or general LP engine through the shared canonical rule
+  on every rank. Returned objectives replay exactly across one- and
+  multi-worker searches without fallback or post-search rewriting.
+
 * Corrected native regression NOMAD handoff so the returned bandwidth vector
   is the exact decoded point evaluated by the resident objective, including
   mixed predictors stored in non-kernel-grouped column order. The resident

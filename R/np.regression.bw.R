@@ -723,7 +723,6 @@ npregbw.rbandwidth <-
     myopti,
     categorical.compress = npStrictLogicalOption("np.categorical.compress", TRUE)
   )
-
   myoptd <- list(
     ftol = ftol,
     tol = tol,
@@ -1006,6 +1005,7 @@ npRmpiNomadShadowPrepareRegression <- function(runo,
                                                degree,
                                                bernstein,
                                                basis,
+                                               degree.search,
                                                ckerlb,
                                                ckerub) {
   if (length(myoptd) <= 18L) {
@@ -1030,6 +1030,7 @@ npRmpiNomadShadowPrepareRegression <- function(runo,
     degree,
     bernstein,
     basis,
+    degree.search,
     ckerlb,
     ckerub,
     PACKAGE = "npRmpi"
@@ -1332,6 +1333,10 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
     myopti,
     categorical.compress = npStrictLogicalOption("np.categorical.compress", TRUE)
   )
+  regtype.index <- match("regtype", names(myopti))
+  if (is.na(regtype.index))
+    stop("resident npreg NOMAD state is missing its regression-engine coordinate",
+         call. = FALSE)
 
   myoptd <- list(
     ftol = 0,
@@ -1369,6 +1374,7 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
     ydat = as.double(ydat),
     mysd = as.double(mysd),
     myopti = as.integer(myopti),
+    regtype_index = as.integer(regtype.index),
     myoptd = as.double(myoptd),
     rbw = as.double(start.bw),
     penalty_mode = as.integer(penalty_mode),
@@ -1418,6 +1424,7 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
       DEGREE,
       BERN,
       BASIS,
+      DSEARCH,
       CKERLB,
       CKERUB
     ),
@@ -1435,6 +1442,7 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
       DEGREE = prep$degree,
       BERN = prep$bernstein,
       BASIS = prep$basis,
+      DSEARCH = FALSE,
       CKERLB = prep$ckerlb,
       CKERUB = prep$ckerub
     )
@@ -2243,6 +2251,7 @@ npRmpiNomadShadowSearchRegression <- function(template,
     degree = prep$degree,
     bernstein = prep$bernstein,
     basis = prep$basis,
+    degree.search = TRUE,
     ckerlb = prep$ckerlb,
     ckerub = prep$ckerub
   )
@@ -2630,7 +2639,7 @@ npRmpiNomadShadowSearchRegression <- function(template,
     xdat = xdat,
     ydat = ydat,
     bws = bws,
-    bandwidth.compute = FALSE,
+    bandwidth.compute = TRUE,
     reg.args = template.reg.args,
     yname = yname
   )
@@ -2883,13 +2892,23 @@ npRmpiNomadShadowSearchRegression <- function(template,
     degree <- .np_degree_clip_to_grid(degree, degree.search$candidates)
     bw_vec <- .npregbw_nomad_point_to_bw(point[seq_len(ncon + ncat)], template = template, setup = setup)
     flat.bw <- c(bw_vec[template$icon], bw_vec[template$iuno], bw_vec[template$iord])
+    ## The local evaluator has no resident shadow to refresh. Derive its
+    ## scalar/general LP owner from this evaluated degree by the same canonical
+    ## rule used by the collective native callback.
+    eval.myopti <- prep$myopti
+    eval.myopti[[prep$regtype_index]] <- npRegtypeToC(
+      regtype = "lp",
+      degree = degree,
+      ncon = ncon,
+      context = "npregbw automatic degree search"
+    )$code
     out <- npRmpiNomadEvalOnlyRegression(
       runo = prep$runo,
       rord = prep$rord,
       rcon = prep$rcon,
       yvec = prep$ydat,
       mysd = prep$mysd,
-      myopti = prep$myopti,
+      myopti = eval.myopti,
       myoptd = prep$myoptd,
       bw = as.double(flat.bw),
       penalty.mode = prep$penalty_mode,

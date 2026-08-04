@@ -36,7 +36,7 @@ extern SEXP C_np_progress_fit_end(void);
 extern SEXP C_np_quantile_conditional(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_regression_bw(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_regression_bw_eval(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
-extern SEXP C_np_regression_nomad_shadow_prepare(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP C_np_regression_nomad_shadow_prepare(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_regression_nomad_shadow_eval(SEXP, SEXP);
 extern SEXP C_np_regression_nomad_shadow_native_search(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_regression_nomad_shadow_clear(void);
@@ -171,7 +171,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"C_np_quantile_conditional",      (DL_FUNC) &C_np_quantile_conditional,      19},
     {"C_np_regression_bw",             (DL_FUNC) &C_np_regression_bw,             16},
     {"C_np_regression_bw_eval",        (DL_FUNC) &C_np_regression_bw_eval,        16},
-    {"C_np_regression_nomad_shadow_prepare",(DL_FUNC) &C_np_regression_nomad_shadow_prepare,15},
+    {"C_np_regression_nomad_shadow_prepare",(DL_FUNC) &C_np_regression_nomad_shadow_prepare,16},
     {"C_np_regression_nomad_shadow_eval",(DL_FUNC) &C_np_regression_nomad_shadow_eval,2},
     {"C_np_regression_nomad_shadow_native_search",(DL_FUNC) &C_np_regression_nomad_shadow_native_search,11},
     {"C_np_regression_nomad_shadow_clear",(DL_FUNC) &C_np_regression_nomad_shadow_clear,0},
