@@ -8,6 +8,11 @@
   `mpi.bcast.cmd(npseed(...))` continues to seed once per executing rank
   without a nested broadcast.
 
+* Corrected active-MPI conditional-density derivative hat evaluation so its
+  internal kernel-sum calls carry concrete argument values across the
+  autodispatch boundary. This removes a rank-local lexical lookup failure
+  while preserving the serial arithmetic, warnings, and chunking contract.
+
 * Corrected active-MPI derivative kernel-weight output so every rank
   initializes non-owned cells before the canonical reduction. Output
   ownership is now invocation scoped and each derivative block retains its

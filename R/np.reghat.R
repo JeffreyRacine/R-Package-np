@@ -357,7 +357,7 @@ npreghat <-
   beta.kernel <- identical(bws[["ckertype", exact = TRUE]], "beta")
 
   if (identical(bws$type, "adaptive_nn")) {
-    call <- quote(npksum.default(
+    args <- list(
       bws = bws,
       txdat = txdat,
       exdat = if (no.ex) txdat else eval.data,
@@ -365,8 +365,12 @@ npreghat <-
       return.kernel.weights = TRUE,
       return.derivative.kernel.weights = TRUE,
       permutation.operator = "derivative"
-    ))
-    out <- if (beta.kernel) suppressWarnings(eval(call)) else eval(call)
+    )
+    out <- if (beta.kernel) {
+      suppressWarnings(.npksum_closed_values(args))
+    } else {
+      .npksum_closed_values(args)
+    }
 
     kw <- out$kw
     pkw <- out$p.kw
@@ -432,15 +436,15 @@ npreghat <-
     uniform.warning <- unname(.np_io_prefix_text(
       "ignoring kernel order specified with uniform kernel type"
     ))
-    call_npksum <- function(call) {
+    call_npksum <- function(args) {
       if (uniform.kernel && use.tree) {
         old.tree.option <- options(np.tree = FALSE)
         on.exit(options(old.tree.option), add = TRUE)
       }
       if (!uniform.kernel)
-        return(eval(call))
+        return(.npksum_closed_values(args))
       withCallingHandlers(
-        eval(call),
+        .npksum_closed_values(args),
         warning = function(w) {
           if (identical(conditionMessage(w), uniform.warning))
             invokeRestart("muffleWarning")
@@ -465,32 +469,32 @@ npreghat <-
       eval.chunk <- eval.data[rows, , drop = FALSE]
 
       if (epan.tree) {
-        normal.call <- quote(npksum.default(
+        normal.args <- list(
           bws = bws,
           txdat = txdat,
           exdat = eval.chunk,
           bandwidth.divide = TRUE,
           return.kernel.weights = TRUE,
           operator = rep.int("normal", ncol(txdat))
-        ))
+        )
         derivative.operator <- rep.int("normal", ncol(txdat))
         derivative.operator[which(bws$icon)[target.cont]] <- "derivative"
-        derivative.call <- quote(npksum.default(
+        derivative.args <- list(
           bws = bws,
           txdat = txdat,
           exdat = eval.chunk,
           bandwidth.divide = TRUE,
           return.kernel.weights = TRUE,
           operator = derivative.operator
-        ))
-        normal.out <- call_npksum(normal.call)
-        derivative.out <- call_npksum(derivative.call)
+        )
+        normal.out <- call_npksum(normal.args)
+        derivative.out <- call_npksum(derivative.args)
         kw <- normal.out$kw / dband
         pkw <- derivative.out$kw / p.dband
         sk <- as.vector(normal.out$ksum)
         dsk <- as.vector(derivative.out$ksum)
       } else {
-        call <- quote(npksum.default(
+        args <- list(
           bws = bws,
           txdat = txdat,
           exdat = eval.chunk,
@@ -498,8 +502,12 @@ npreghat <-
           return.kernel.weights = TRUE,
           return.derivative.kernel.weights = TRUE,
           permutation.operator = "derivative"
-        ))
-        out <- if (beta.kernel) suppressWarnings(eval(call)) else call_npksum(call)
+        )
+        out <- if (beta.kernel) {
+          suppressWarnings(.npksum_closed_values(args))
+        } else {
+          call_npksum(args)
+        }
         kw <- out$kw
         pkw <- out$p.kw
         if (!is.matrix(kw))
@@ -578,15 +586,15 @@ npreghat <-
     uniform.warning <- unname(.np_io_prefix_text(
       "ignoring kernel order specified with uniform kernel type"
     ))
-    call_npksum <- function(call) {
+    call_npksum <- function(args) {
       if (uniform.kernel && use.tree) {
         old.tree.option <- options(np.tree = FALSE)
         on.exit(options(old.tree.option), add = TRUE)
       }
       if (!uniform.kernel)
-        return(eval(call))
+        return(.npksum_closed_values(args))
       withCallingHandlers(
-        eval(call),
+        .npksum_closed_values(args),
         warning = function(w) {
           if (identical(conditionMessage(w), uniform.warning))
             invokeRestart("muffleWarning")
@@ -599,7 +607,7 @@ npreghat <-
       eval.chunk <- eval.data[rows, , drop = FALSE]
 
       if (epan.tree) {
-        normal.call <- quote(npksum.default(
+        normal.args <- list(
           bws = bws,
           txdat = txdat,
           exdat = eval.chunk,
@@ -607,10 +615,10 @@ npreghat <-
           return.kernel.weights = TRUE,
           .np.internal.bandwidth.divide.weights = TRUE,
           operator = rep.int("normal", ncol(txdat))
-        ))
+        )
         derivative.operator <- rep.int("normal", ncol(txdat))
         derivative.operator[which(bws$icon)[target.cont]] <- "derivative"
-        derivative.call <- quote(npksum.default(
+        derivative.args <- list(
           bws = bws,
           txdat = txdat,
           exdat = eval.chunk,
@@ -618,15 +626,15 @@ npreghat <-
           return.kernel.weights = TRUE,
           .np.internal.bandwidth.divide.weights = TRUE,
           operator = derivative.operator
-        ))
-        normal.out <- call_npksum(normal.call)
-        derivative.out <- call_npksum(derivative.call)
+        )
+        normal.out <- call_npksum(normal.args)
+        derivative.out <- call_npksum(derivative.args)
         kw <- normal.out$kw
         pkw <- derivative.out$kw
         sk <- as.vector(normal.out$ksum)
         dsk <- as.vector(derivative.out$ksum)
       } else {
-        call <- quote(npksum.default(
+        args <- list(
           bws = bws,
           txdat = txdat,
           exdat = eval.chunk,
@@ -635,8 +643,12 @@ npreghat <-
           return.derivative.kernel.weights = TRUE,
           .np.internal.bandwidth.divide.weights = !beta.kernel,
           permutation.operator = "derivative"
-        ))
-        out <- if (beta.kernel) suppressWarnings(eval(call)) else call_npksum(call)
+        )
+        out <- if (beta.kernel) {
+          suppressWarnings(.npksum_closed_values(args))
+        } else {
+          call_npksum(args)
+        }
         kw <- out$kw
         pkw <- out$p.kw
         if (!is.matrix(kw))
@@ -703,7 +715,7 @@ npreghat <-
     W[, ib + 1L] <- 1.0
 
     # The derivative call already returns both ksum and p.ksum.
-    call <- quote(npksum.default(
+    args <- list(
       bws = bws,
       txdat = txdat,
       exdat = if (no.ex) txdat else eval.data,
@@ -711,8 +723,12 @@ npreghat <-
       weights = W,
       bandwidth.divide = !beta.kernel,
       permutation.operator = "derivative"
-    ))
-    out <- if (beta.kernel) suppressWarnings(eval(call)) else eval(call)
+    )
+    out <- if (beta.kernel) {
+      suppressWarnings(.npksum_closed_values(args))
+    } else {
+      .npksum_closed_values(args)
+    }
 
     ks <- out$ksum
     ps <- out$p.ksum

@@ -603,6 +603,27 @@ npksum.default <-
 
   }
 
+.npksum_closed_values <- function(args) {
+  if (!is.list(args) || !length(args) || is.null(names(args)) ||
+      anyNA(names(args)) || any(!nzchar(names(args))) ||
+      anyDuplicated(names(args))) {
+    stop("internal closed npksum arguments must be a uniquely named list",
+         call. = FALSE)
+  }
+  for (i in seq_along(args)) {
+    if (is.language(args[[i]])) {
+      stop("internal closed npksum arguments must contain values, not language objects",
+           call. = FALSE)
+    }
+  }
+
+  # The explicit named call head and concrete argument values survive
+  # match.call() unchanged. No caller-local symbol can therefore cross an MPI
+  # autodispatch boundary.
+  eval(as.call(c(list(as.name("npksum.default")), args)),
+       envir = environment())
+}
+
 .npksum_power12 <- function(bws,
                             txdat = stop("training data 'txdat' missing"),
                             exdat,
