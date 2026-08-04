@@ -1634,7 +1634,39 @@ np_beta_status np_beta_cdf_observation_init(
   return NP_BETA_OK;
 }
 
-double np_beta_log_abs_cdf_order_prepared_observation(
+np_beta_status np_beta_concentration_prepare(
+  double bandwidth,
+  double support_length,
+  int scale,
+  double *concentration)
+{
+  np_beta_shape shape = {0};
+  np_beta_status status;
+
+  if(concentration == NULL)
+    return NP_BETA_ERR_NUMERIC;
+  if(!R_FINITE(bandwidth) || bandwidth <= 0.0)
+    return NP_BETA_ERR_BANDWIDTH;
+  if(!R_FINITE(support_length) || support_length <= 0.0)
+    return NP_BETA_ERR_BOUNDS;
+  if(scale <= 0)
+    return NP_BETA_ERR_SCALE;
+  status = np_beta_shape_concentration_init(
+    bandwidth, support_length, scale, &shape);
+  if(status == NP_BETA_OK)
+    *concentration = shape.concentration;
+  return status;
+}
+
+#if defined(__clang__) || defined(__GNUC__)
+# define NP_BETA_CDF_PREPARED_ALWAYS_INLINE \
+  static inline __attribute__((always_inline))
+#else
+# define NP_BETA_CDF_PREPARED_ALWAYS_INLINE static inline
+#endif
+
+NP_BETA_CDF_PREPARED_ALWAYS_INLINE double
+np_beta_log_abs_cdf_order_prepared_core(
   double evaluation,
   double bandwidth,
   double lower,
@@ -1644,6 +1676,8 @@ double np_beta_log_abs_cdf_order_prepared_observation(
   np_beta_status observation_status,
   const double *log_abs_coefficient,
   const signed char *coefficient_sign,
+  const double *prepared_concentration,
+  const np_beta_status *prepared_concentration_status,
   int *sign,
   np_beta_status *status)
 {
@@ -1703,8 +1737,14 @@ double np_beta_log_abs_cdf_order_prepared_observation(
     shape.support_length = support_length;
     shape.target_unit = observation->target_unit;
     shape.target_complement_unit = observation->target_complement_unit;
-    component_status = np_beta_shape_concentration_init(
-      bandwidth, support_length, component + 1, &shape);
+    if(prepared_concentration == NULL) {
+      component_status = np_beta_shape_concentration_init(
+        bandwidth, support_length, component + 1, &shape);
+    } else {
+      component_status = prepared_concentration_status[component];
+      if(component_status == NP_BETA_OK)
+        shape.concentration = prepared_concentration[component];
+    }
     if(component_status != NP_BETA_OK) {
       np_beta_set_status(status, component_status);
       return NAN;
@@ -1748,6 +1788,56 @@ double np_beta_log_abs_cdf_order_prepared_observation(
     np_beta_set_status(status, parts_status);
     return parts_status == NP_BETA_OK ? log_absolute : NAN;
   }
+}
+
+#undef NP_BETA_CDF_PREPARED_ALWAYS_INLINE
+
+double np_beta_log_abs_cdf_order_prepared_observation(
+  double evaluation,
+  double bandwidth,
+  double lower,
+  double upper,
+  int order,
+  const np_beta_cdf_observation *observation,
+  np_beta_status observation_status,
+  const double *log_abs_coefficient,
+  const signed char *coefficient_sign,
+  int *sign,
+  np_beta_status *status)
+{
+  return np_beta_log_abs_cdf_order_prepared_core(
+    evaluation, bandwidth, lower, upper, order,
+    observation, observation_status,
+    log_abs_coefficient, coefficient_sign,
+    NULL, NULL, sign, status);
+}
+
+double np_beta_log_abs_cdf_order_prepared_concentration(
+  double evaluation,
+  double bandwidth,
+  double lower,
+  double upper,
+  int order,
+  const np_beta_cdf_observation *observation,
+  np_beta_status observation_status,
+  const double *log_abs_coefficient,
+  const signed char *coefficient_sign,
+  const double *prepared_concentration,
+  const np_beta_status *prepared_concentration_status,
+  int *sign,
+  np_beta_status *status)
+{
+  if(prepared_concentration == NULL ||
+     prepared_concentration_status == NULL) {
+    np_beta_set_status(status, NP_BETA_ERR_NUMERIC);
+    return NAN;
+  }
+  return np_beta_log_abs_cdf_order_prepared_core(
+    evaluation, bandwidth, lower, upper, order,
+    observation, observation_status,
+    log_abs_coefficient, coefficient_sign,
+    prepared_concentration, prepared_concentration_status,
+    sign, status);
 }
 
 static double np_beta_log_overlap_scale(double center_one,

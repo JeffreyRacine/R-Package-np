@@ -25,10 +25,15 @@ typedef struct {
    * storage and is -1 for every non-beta coordinate.  pdf_active owns the
    * invocation-invariant observation plane for every normal/PDF bandwidth
    * topology.  pdf_row_component_active additionally identifies fixed/GNN
-   * rows whose complete component state is evaluation-row invariant. */
+   * rows whose complete component state is evaluation-row invariant.
+   * cdf_active owns the invocation-invariant observation plane for every CDF
+   * bandwidth topology.  cdf_concentration_active additionally owns one
+   * coordinate/component concentration table for fixed bandwidths only; it
+   * never owns an observation or evaluation plane. */
   int pdf_active;
   int pdf_row_component_active;
   int cdf_active;
+  int cdf_concentration_active;
   int allocation_active;
   int num_train;
   int num_continuous;
@@ -49,6 +54,8 @@ typedef struct {
   np_beta_status *cdf_observation_status;
   double *cdf_log_abs_coefficient;
   signed char *cdf_coefficient_sign;
+  double *cdf_concentration;
+  np_beta_status *cdf_concentration_status;
 } NPContinuousKernelBetaPreparedContext;
 
 typedef struct {
