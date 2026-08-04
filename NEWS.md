@@ -1,5 +1,12 @@
 # np 0.70-6
 
+* Adaptive-nearest-neighbour beta PDF rows now prepare support-transformed
+  observations and higher-order coefficient state once per invocation while
+  retaining observation-owned bandwidth shapes and normalizers in the
+  pairwise evaluator. This preserves exact kernel-weight, objective, fit, and
+  prediction arithmetic, uses beta-coordinate-linear transient storage, and
+  cannot fall back to the scalar row after the prepared route is selected.
+
 * Fixed- and generalized-nearest-neighbour beta PDF rows now prepare support-
   transformed observations, component normalizers, and higher-order
   coefficient logs at their invocation or evaluation-row lifetime instead of

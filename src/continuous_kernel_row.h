@@ -22,8 +22,12 @@ typedef enum {
 typedef struct {
   /* R transient allocation scope: nested owners must release in LIFO order.
    * coordinate_slot maps global continuous coordinates to dense beta-only
-   * storage and is -1 for every non-beta coordinate. */
+   * storage and is -1 for every non-beta coordinate.  pdf_active owns the
+   * invocation-invariant observation plane for every normal/PDF bandwidth
+   * topology.  pdf_row_component_active additionally identifies fixed/GNN
+   * rows whose complete component state is evaluation-row invariant. */
   int pdf_active;
+  int pdf_row_component_active;
   int allocation_active;
   int num_train;
   int num_continuous;
@@ -33,6 +37,8 @@ typedef struct {
   np_beta_pdf_observation *pdf_observation;
   np_beta_status *pdf_observation_status;
   np_beta_pdf_component *pdf_row_component;
+  double *pdf_log_abs_coefficient;
+  signed char *pdf_coefficient_sign;
   int *pdf_first_interior;
   int *pdf_second_interior;
 } NPContinuousKernelBetaPreparedContext;

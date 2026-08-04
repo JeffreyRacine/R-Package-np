@@ -166,6 +166,71 @@ test_that("activated beta absolute rows enter the canonical central engine", {
   )
 })
 
+test_that("adaptive beta PDF rows prepare invariant observation state", {
+  root <- locate_beta_activation_sources()
+  skip_if(is.null(root), "package sources unavailable")
+  row_engine <- paste(
+    readLines(file.path(root, "src", "continuous_kernel_row.c"),
+              warn = FALSE),
+    collapse = "\n"
+  )
+  row_header <- paste(
+    readLines(file.path(root, "src", "continuous_kernel_row.h"),
+              warn = FALSE),
+    collapse = "\n"
+  )
+
+  adaptive_start <- regexpr(
+    paste0(
+      "if(prepared != NULL && prepared->pdf_active &&\n",
+      "       plan->bandwidth_mode == BW_ADAP_NN)"
+    ),
+    row_engine,
+    fixed = TRUE
+  )[[1L]]
+  scalar_start <- regexpr(
+    "log_absolute[observation] = np_beta_log_abs_pdf_order(",
+    substr(row_engine, adaptive_start + 1L, nchar(row_engine)),
+    fixed = TRUE
+  )[[1L]]
+  expect_gt(adaptive_start, 0L)
+  expect_gt(scalar_start, 0L)
+  adaptive_owner <- substr(
+    row_engine,
+    adaptive_start,
+    adaptive_start + scalar_start - 1L
+  )
+
+  expect_match(
+    adaptive_owner,
+    "np_beta_log_abs_pdf_order_prepared_observation(",
+    fixed = TRUE
+  )
+  expect_false(grepl(
+    "np_beta_log_abs_pdf_order(", adaptive_owner, fixed = TRUE
+  ))
+  expect_match(
+    row_engine,
+    paste0(
+      "context->pdf_row_component_active =\n",
+      "    plan->bandwidth_mode == BW_FIXED ||\n",
+      "    plan->bandwidth_mode == BW_GEN_NN;"
+    ),
+    fixed = TRUE
+  )
+  expect_match(row_header, "double *pdf_log_abs_coefficient;", fixed = TRUE)
+  expect_match(row_header, "signed char *pdf_coefficient_sign;", fixed = TRUE)
+  expect_false(grepl(
+    paste0(
+      "if(plan->bandwidth_mode != BW_FIXED &&\n",
+      "     plan->bandwidth_mode != BW_GEN_NN)\n",
+      "    return NP_CONTINUOUS_ROW_OK;"
+    ),
+    row_engine,
+    fixed = TRUE
+  ))
+})
+
 test_that("legacy callers cannot acquire beta route metadata implicitly", {
   root <- locate_beta_activation_sources()
   skip_if(is.null(root), "package sources unavailable")
