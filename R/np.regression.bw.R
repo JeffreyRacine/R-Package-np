@@ -1558,8 +1558,17 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
     )
   }
 
-  build_payload <- function(point, best_record, solution, interrupted) {
-    bw_vec <- .npregbw_nomad_point_to_bw(point, template = template, setup = setup)
+  build_payload <- function(point, best_record, solution, interrupted,
+                            evaluated.bw = NULL) {
+    bw_vec <- if (is.null(evaluated.bw)) {
+      .npregbw_nomad_point_to_bw(point, template = template, setup = setup)
+    } else {
+      .np_nomad_bw_validate_storage(
+        evaluated.bw,
+        storage.length = length(template[["bw"]]),
+        where = "native npreg NOMAD route"
+      )
+    }
     final.tbw <- .npregbw_build_rbandwidth(
       xdat = xdat,
       ydat = ydat,
@@ -1773,7 +1782,12 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
     native.handoff.point <- as.numeric(native.best$best_point)
     if (any(!is.finite(native.handoff.point)))
       stop("native npreg NOMAD route did not return a finite best point", call. = FALSE)
-    native.bw <- .npregbw_nomad_point_to_bw(native.handoff.point, template = template, setup = setup)
+    native.bw <- .np_nomad_bw_evaluated_to_storage(
+      native.best[["best_bw"]],
+      setup = setup,
+      storage.length = length(template[["bw"]]),
+      where = "native npreg NOMAD route"
+    )
     if (!is.null(shadow) && isTRUE(shadow$active)) {
       .npregbw_nomad_shadow_end(
         shadow,
@@ -1798,7 +1812,8 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
       point = native.handoff.point,
       best_record = native.record,
       solution = native.best,
-      interrupted = FALSE
+      interrupted = FALSE,
+      evaluated.bw = native.bw
     )
     search.result <- list(
       best = native.record,
@@ -2383,6 +2398,12 @@ npRmpiNomadShadowSearchRegression <- function(template,
         iterations = as.numeric(native$iterations[1L]),
         solution = as.numeric(native$solution),
         best_point = as.numeric(native$best_point),
+        best_bw = .np_nomad_bw_evaluated_to_storage(
+          native[["best_bw"]],
+          setup = setup,
+          storage.length = length(template[["bw"]]),
+          where = "native npreg NOMAD degree-search route"
+        ),
         best_degree = native.degree,
         first_degree = if (!is.null(native$first_degree)) as.integer(native$first_degree) else integer(0L),
         first_objective = as.numeric(native$first_objective[1L]),
@@ -2515,6 +2536,7 @@ npRmpiNomadShadowSearchRegression <- function(template,
       ),
       native.diagnostics = list(
         raw.point = as.numeric(native.best$best_point),
+        bandwidth = as.numeric(native.best$best_bw),
         degree = as.integer(native.best$best_degree),
         objective = as.numeric(native.best$objective[1L]),
         official.solution = as.numeric(native.best$solution),
@@ -2654,10 +2676,21 @@ npRmpiNomadShadowSearchRegression <- function(template,
   nomad.num.feval.total <- 0
   nomad.num.feval.fast.total <- 0
 
-  build_payload <- function(point, best_record, solution, interrupted) {
+  build_payload <- function(point, best_record, solution, interrupted,
+                            evaluated.bw = NULL) {
     point <- as.numeric(point)
     degree <- as.integer(best_record$degree)
-    bw_vec <- .npregbw_nomad_point_to_bw(point[seq_len(ncon + ncat)], template = template, setup = setup)
+    bw_vec <- if (is.null(evaluated.bw)) {
+      .npregbw_nomad_point_to_bw(
+        point[seq_len(ncon + ncat)], template = template, setup = setup
+      )
+    } else {
+      .np_nomad_bw_validate_storage(
+        evaluated.bw,
+        storage.length = length(template[["bw"]]),
+        where = "native npreg NOMAD degree-search route"
+      )
+    }
     powell.elapsed <- NA_real_
     final.reg.args <- reg.args
     final.reg.args$regtype <- "lp"
@@ -2802,7 +2835,12 @@ npRmpiNomadShadowSearchRegression <- function(template,
       point = search.result$best_point,
       best_record = search.result$best,
       solution = best.solution,
-      interrupted = !isTRUE(search.result$completed)
+      interrupted = !isTRUE(search.result$completed),
+      evaluated.bw = if (is.null(best.solution)) {
+        NULL
+      } else {
+        best.solution[["best_bw"]]
+      }
     )
 
     if (is.list(payload_result) && !is.null(payload_result$payload)) {

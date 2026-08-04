@@ -1,5 +1,13 @@
 # npRmpi 0.70-6
 
+* Corrected native regression NOMAD handoff so the returned bandwidth vector
+  is the exact decoded point evaluated by the resident objective, including
+  mixed predictors stored in non-kernel-grouped column order. The resident
+  search now shares the ordinary regression kernel-state configuration for
+  beta order, categorical compression, and tree eligibility; fixed-degree and
+  automatic-degree results therefore replay their stored objective exactly
+  across local, one-worker, and multi-worker routes.
+
 * Corrected fixed-bandwidth beta local-polynomial regression with an active
   MPI pool so rank ownership retains the canonical scaled beta moment row
   used by serial and nearest-neighbour routes. The owner path no longer

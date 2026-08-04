@@ -3541,6 +3541,37 @@ int np_beta_cy_bw_order_extern=2;
 int BANDWIDTH_reg_extern;
 int BANDWIDTH_den_extern;
 
+static void np_regression_bw_kernel_state_reset(void)
+{
+  np_beta_bw_order_extern = 2;
+  np_regression_bw_categorical_compress_extern = 0;
+}
+
+static void np_regression_bw_kernel_state_configure_or_error(
+  const int *options,
+  const double *lower,
+  const double *upper,
+  const char *where)
+{
+  np_regression_bw_kernel_state_reset();
+
+  if(KERNEL_reg_extern != NP_CKERNEL_COORDINATE_CODE)
+    return;
+
+  np_beta_bw_order_extern = np_bandwidth_kernel_descriptor_or_error(
+    options[RBW_CKFAMILYI], KERNEL_reg_extern, options[RBW_CKORDERI],
+    num_reg_continuous_extern, num_reg_unordered_extern,
+    num_reg_ordered_extern, NP_BETA_BW_ALLOW_CATEGORICAL,
+    lower, upper, where).order;
+  np_regression_bw_categorical_compress_extern = options[RBW_CATCOMPI];
+  if(np_regression_bw_categorical_compress_extern != 0 &&
+     np_regression_bw_categorical_compress_extern != 1)
+    error("%s: categorical compression must be TRUE or FALSE", where);
+
+  int_TREE_X = 0;
+  int_TREE_PROFILE_X = 0;
+}
+
 // cdf algorithm extern
 double dbl_memfac_ccdf_extern = 1.0;
 double dbl_memfac_dls_extern = 1.0;
@@ -3981,6 +4012,7 @@ static void np_regression_nomad_shadow_clear_internal(void)
   int_nn_k_min_extern = 1;
   BANDWIDTH_reg_extern = 0;
   BANDWIDTH_den_extern = 0;
+  np_regression_bw_kernel_state_reset();
   KERNEL_reg_extern = 0;
   KERNEL_reg_unordered_extern = 0;
   KERNEL_reg_ordered_extern = 0;
@@ -4145,6 +4177,8 @@ static int np_regression_nomad_shadow_prepare_internal(double *runo,
 
   int_TREE_PROFILE_X = myopti[RBW_DOTREEI];
   int_TREE_X = myopti[RBW_DOTREEI];
+  np_regression_bw_kernel_state_configure_or_error(
+    myopti, ckerlb, ckerub, "np_regression_nomad_shadow");
   scale_cat = myopti[RBW_SCATI];
   bwm_use_transform = myopti[RBW_TBNDI];
   if (BANDWIDTH_reg_extern != BW_FIXED)
@@ -18311,20 +18345,6 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   vector_ckerlb_extern = ckerlb;
   vector_ckerub_extern = ckerub;
   int_cker_bound_extern = np_has_finite_cker_bounds(ckerlb, ckerub, num_reg_continuous_extern);
-  np_beta_bw_order_extern = 2;
-  np_regression_bw_categorical_compress_extern = 0;
-  if(KERNEL_reg_extern == NP_CKERNEL_COORDINATE_CODE) {
-    np_beta_bw_order_extern = np_bandwidth_kernel_descriptor_or_error(
-      myopti[RBW_CKFAMILYI], KERNEL_reg_extern, myopti[RBW_CKORDERI],
-      num_reg_continuous_extern, num_reg_unordered_extern,
-      num_reg_ordered_extern, NP_BETA_BW_ALLOW_CATEGORICAL,
-      ckerlb, ckerub,
-      "C_np_regression_bw").order;
-    np_regression_bw_categorical_compress_extern = myopti[RBW_CATCOMPI];
-    if(np_regression_bw_categorical_compress_extern != 0 &&
-       np_regression_bw_categorical_compress_extern != 1)
-      error("C_np_regression_bw: categorical compression must be TRUE or FALSE");
-  }
 
   int_use_starting_values= myopti[RBW_USTARTI];
   int_LARGE_SF=myopti[RBW_LSFI];
@@ -18353,10 +18373,8 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
 
   int_TREE_PROFILE_X = myopti[RBW_DOTREEI];
   int_TREE_X = myopti[RBW_DOTREEI];
-  if(KERNEL_reg_extern == NP_CKERNEL_COORDINATE_CODE) {
-    int_TREE_X = 0;
-    int_TREE_PROFILE_X = 0;
-  }
+  np_regression_bw_kernel_state_configure_or_error(
+    myopti, ckerlb, ckerub, "C_np_regression_bw");
   scale_cat = myopti[RBW_SCATI];
   bwm_use_transform = myopti[RBW_TBNDI];
   if (BANDWIDTH_reg_extern != BW_FIXED)
@@ -19171,7 +19189,7 @@ cleanup_np_regression_bw_mode:
   int_cker_bound_extern = 0;
   vector_ckerlb_extern = NULL;
   vector_ckerub_extern = NULL;
-  np_regression_bw_categorical_compress_extern = 0;
+  np_regression_bw_kernel_state_reset();
   np_reset_y_side_extern();
   vector_glp_degree_extern = NULL;
   vector_glp_gradient_order_extern = NULL;

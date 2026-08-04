@@ -330,6 +330,48 @@
   bws
 }
 
+.np_nomad_bw_evaluated_to_storage <- function(evaluated,
+                                               setup,
+                                               storage.length,
+                                               where = "NOMAD bandwidth search") {
+  evaluated <- as.double(evaluated)
+  storage.length <- as.integer(storage.length)[1L]
+  storage.index <- c(
+    .np_nomad_bw_cont_index(setup),
+    .np_nomad_bw_cat_index(setup)
+  )
+
+  if (is.na(storage.length) || storage.length < 0L ||
+      length(storage.index) != storage.length ||
+      anyNA(storage.index) || any(storage.index < 1L) ||
+      any(storage.index > storage.length) ||
+      anyDuplicated(storage.index)) {
+    stop(sprintf("%s returned inconsistent bandwidth geometry", where),
+         call. = FALSE)
+  }
+  if (length(evaluated) != storage.length || any(!is.finite(evaluated))) {
+    stop(sprintf("%s returned invalid evaluated bandwidths", where),
+         call. = FALSE)
+  }
+
+  bandwidth <- numeric(storage.length)
+  bandwidth[storage.index] <- evaluated
+  bandwidth
+}
+
+.np_nomad_bw_validate_storage <- function(bandwidth,
+                                          storage.length,
+                                          where = "NOMAD bandwidth search") {
+  bandwidth <- as.double(bandwidth)
+  storage.length <- as.integer(storage.length)[1L]
+  if (is.na(storage.length) || storage.length < 0L ||
+      length(bandwidth) != storage.length || any(!is.finite(bandwidth))) {
+    stop(sprintf("%s returned invalid stored bandwidths", where),
+         call. = FALSE)
+  }
+  bandwidth
+}
+
 .np_nomad_bw_storage_to_point <- function(bws, template, setup) {
   cont.index <- .np_nomad_bw_cont_index(setup)
   cat.index <- .np_nomad_bw_cat_index(setup)

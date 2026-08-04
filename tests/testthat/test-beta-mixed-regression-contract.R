@@ -337,3 +337,56 @@ test_that("mixed beta native MADS returns the point it evaluated", {
 
   expect_identical(as.numeric(bandwidth$fval[[1L]]), as.numeric(replay))
 })
+
+test_that("mixed beta native degree search preserves evaluated bandwidth order", {
+  skip_if_not_installed("crs")
+  old <- options(np.messages = FALSE, np.categorical.compress = TRUE)
+  on.exit(options(old), add = TRUE)
+
+  set.seed(2026080402L)
+  n <- 73L
+  training <- data.frame(
+    u = factor(sample(letters[1:3], n, replace = TRUE)),
+    x1 = rbeta(n, 1.3, 1.8),
+    o = ordered(sample(1:4, n, replace = TRUE), levels = 1:4),
+    x2 = rbeta(n, 1.7, 1.4)
+  )
+  response <- sin(3 * training$x1) + 0.4 * training$x2 +
+    0.12 * (training$u == "b") - 0.07 * (training$o == "4") +
+    rnorm(n, sd = 0.035)
+  bandwidth <- npregbw(
+    xdat = training,
+    ydat = response,
+    bws = c(0.3, 0.12, 0.3, 0.14),
+    regtype = "lp",
+    degree.select = "coordinate",
+    search.engine = "nomad",
+    degree.min = 1L,
+    degree.max = 2L,
+    bwtype = "fixed",
+    bwmethod = "cv.ls",
+    ckertype = "beta",
+    ckerorder = 4L,
+    ckerbound = "fixed",
+    ckerlb = c(0, 0),
+    ckerub = c(1, 1),
+    bernstein.basis = TRUE,
+    nmulti = 1L,
+    nomad.opts = list(MAX_BB_EVAL = 18L)
+  )
+  replay <- getFromNamespace(".npregbw_eval_only", "npRmpi")(
+    training, response, bandwidth, invalid.penalty = "baseline"
+  )$objective[[1L]]
+  serial.replay <- np:::.npregbw_eval_only(
+    training, response, bandwidth, invalid.penalty = "baseline"
+  )$objective[[1L]]
+  best.restart <- bandwidth[["nomad.best.restart"]]
+  native.best <- bandwidth[["nomad.restart.results"]][[best.restart]]
+
+  expect_identical(
+    as.numeric(bandwidth[["bw"]]), as.numeric(native.best[["best_bw"]])
+  )
+  expect_equal(as.numeric(bandwidth$fval[[1L]]), as.numeric(replay),
+               tolerance = 1e-12)
+  expect_equal(as.numeric(replay), as.numeric(serial.replay), tolerance = 1e-12)
+})
