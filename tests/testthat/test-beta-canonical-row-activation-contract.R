@@ -599,7 +599,7 @@ test_that("regression objective owner activates the continuous scalar beta route
   expect_length(sidecar_hits[sidecar_hits > 0L], 0L)
 })
 
-test_that("regression bandwidth ingress owns categorical compression state", {
+test_that("shared regression bandwidth owner carries categorical compression", {
   root <- locate_beta_activation_sources()
   skip_if(is.null(root), "package sources unavailable")
   regression_r <- paste(
@@ -630,7 +630,12 @@ test_that("regression bandwidth ingress owns categorical compression state", {
   expect_match(headers, "#define RBW_CATCOMPI 23", fixed = TRUE)
   expect_match(
     ingress,
-    "np_regression_bw_categorical_compress_extern = myopti[RBW_CATCOMPI];",
+    "static void np_regression_bw_kernel_state_configure_or_error(",
+    fixed = TRUE
+  )
+  expect_match(
+    ingress,
+    "np_regression_bw_categorical_compress_extern = options[RBW_CATCOMPI];",
     fixed = TRUE
   )
   expect_match(
@@ -640,7 +645,17 @@ test_that("regression bandwidth ingress owns categorical compression state", {
   )
   expect_match(
     ingress,
-    "C_np_regression_bw: categorical compression must be TRUE or FALSE",
+    "error(\"%s: categorical compression must be TRUE or FALSE\", where);",
+    fixed = TRUE
+  )
+  expect_match(
+    ingress,
+    "myopti, ckerlb, ckerub, \"C_np_regression_bw\");",
+    fixed = TRUE
+  )
+  expect_match(
+    ingress,
+    "myopti, ckerlb, ckerub, \"np_regression_nomad_shadow\");",
     fixed = TRUE
   )
   expect_match(
