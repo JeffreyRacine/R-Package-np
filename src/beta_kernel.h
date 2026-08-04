@@ -379,6 +379,12 @@ np_beta_status np_beta_cdf_observation_init(
   double support_length,
   np_beta_cdf_observation *prepared);
 
+np_beta_status np_beta_concentration_prepare(
+  double bandwidth,
+  double support_length,
+  int scale,
+  double *concentration);
+
 double np_beta_log_abs_cdf_order_prepared_observation(
   double evaluation,
   double bandwidth,
@@ -389,6 +395,21 @@ double np_beta_log_abs_cdf_order_prepared_observation(
   np_beta_status observation_status,
   const double *log_abs_coefficient,
   const signed char *coefficient_sign,
+  int *sign,
+  np_beta_status *status);
+
+double np_beta_log_abs_cdf_order_prepared_concentration(
+  double evaluation,
+  double bandwidth,
+  double lower,
+  double upper,
+  int order,
+  const np_beta_cdf_observation *observation,
+  np_beta_status observation_status,
+  const double *log_abs_coefficient,
+  const signed char *coefficient_sign,
+  const double *prepared_concentration,
+  const np_beta_status *prepared_concentration_status,
   int *sign,
   np_beta_status *status);
 

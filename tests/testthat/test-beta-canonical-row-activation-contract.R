@@ -325,7 +325,7 @@ test_that("adaptive beta gradient rows reuse prepared observation state", {
   ))
 })
 
-test_that("beta CDF rows reuse invocation-owned observation state", {
+test_that("beta CDF rows reuse observation and fixed concentration state", {
   root <- locate_beta_activation_sources()
   skip_if(is.null(root), "package sources unavailable")
   row_engine <- paste(
@@ -374,13 +374,37 @@ test_that("beta CDF rows reuse invocation-owned observation state", {
     "np_beta_pdf_component_prepare_coefficient(",
     fixed = TRUE
   )
+  expect_match(
+    cdf_prepare,
+    "int concentration_eligible = plan->bandwidth_mode == BW_FIXED;",
+    fixed = TRUE
+  )
+  expect_match(
+    cdf_prepare,
+    paste0(
+      "component_count = (size_t)cdf_coordinate_count *\n",
+      "    NP_BETA_PREPARED_MAX_COMPONENTS;"
+    ),
+    fixed = TRUE
+  )
+  expect_match(
+    cdf_prepare,
+    "np_beta_concentration_prepare(",
+    fixed = TRUE
+  )
   expect_match(row_header, "int cdf_active;", fixed = TRUE)
+  expect_match(
+    row_header, "int cdf_concentration_active;", fixed = TRUE
+  )
   expect_match(
     row_header, "np_beta_cdf_observation *cdf_observation;", fixed = TRUE
   )
+  expect_match(
+    row_header, "double *cdf_concentration;", fixed = TRUE
+  )
 
   sibling_start <- regexpr(
-    "np_continuous_kernel_beta_cdf_prepared_segment_log_fill(",
+    "np_continuous_kernel_beta_cdf_prepared_segment_log_fill_core(",
     row_engine,
     fixed = TRUE
   )[[1L]]
@@ -401,6 +425,11 @@ test_that("beta CDF rows reuse invocation-owned observation state", {
     "np_beta_log_abs_cdf_order_prepared_observation(",
     fixed = TRUE
   )
+  expect_match(
+    sibling,
+    "np_beta_log_abs_cdf_order_prepared_concentration(",
+    fixed = TRUE
+  )
   expect_false(grepl(
     "np_beta_log_abs_cdf_order(", sibling, fixed = TRUE
   ))
@@ -412,8 +441,17 @@ test_that("beta CDF rows reuse invocation-owned observation state", {
   expect_match(
     row_engine,
     paste0(
-      "if(plan->beta_prepared != NULL && ",
-      "plan->beta_prepared->cdf_active)\n",
+      "if(plan->beta_prepared != NULL &&\n",
+      "     plan->beta_prepared->cdf_concentration_active)\n",
+      "    return\n",
+      "      np_continuous_kernel_beta_cdf_prepared_concentration_segment_log_fill("
+    ),
+    fixed = TRUE
+  )
+  expect_match(
+    row_engine,
+    paste0(
+      "if(plan->beta_prepared != NULL && plan->beta_prepared->cdf_active)\n",
       "    return np_continuous_kernel_beta_cdf_prepared_segment_log_fill("
     ),
     fixed = TRUE
@@ -430,7 +468,7 @@ test_that("beta CDF rows reuse invocation-owned observation state", {
   canonical_cdf_calls <- canonical_cdf_calls[canonical_cdf_calls > 0L]
   expect_length(canonical_cdf_calls, 3L)
   prepared_start <- regexpr(
-    "double np_beta_log_abs_cdf_order_prepared_observation(",
+    "np_beta_log_abs_cdf_order_prepared_core(",
     beta_kernel,
     fixed = TRUE
   )[[1L]]

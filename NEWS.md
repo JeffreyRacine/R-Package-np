@@ -1,5 +1,12 @@
 # np 0.70-6
 
+* Fixed-bandwidth beta CDF rows now prepare each coordinate/component
+  concentration once per invocation rather than recomputing it for every
+  evaluation-observation pair. The fixed-only sibling shares the canonical
+  CDF arithmetic and failure statuses with scalar and nearest-neighbour rows,
+  cannot fall back after selection, and adds only coordinate-by-component
+  transient storage.
+
 * Beta CDF rows now prepare observation support coordinates and higher-order
   coefficient state once per invocation rather than rebuilding them for every
   evaluation-observation pair. Fixed, generalized-nearest-neighbour, and
