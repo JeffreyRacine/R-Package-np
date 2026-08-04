@@ -28,12 +28,15 @@ typedef struct {
    * rows whose complete component state is evaluation-row invariant. */
   int pdf_active;
   int pdf_row_component_active;
+  int cdf_active;
   int allocation_active;
   int num_train;
   int num_continuous;
   int num_beta_coordinates;
+  int num_cdf_coordinates;
   const void *allocation_marker;
   int *coordinate_slot;
+  int *cdf_coordinate_slot;
   np_beta_pdf_observation *pdf_observation;
   np_beta_status *pdf_observation_status;
   np_beta_pdf_component *pdf_row_component;
@@ -42,6 +45,10 @@ typedef struct {
   signed char *pdf_coefficient_sign;
   int *pdf_first_interior;
   int *pdf_second_interior;
+  np_beta_cdf_observation *cdf_observation;
+  np_beta_status *cdf_observation_status;
+  double *cdf_log_abs_coefficient;
+  signed char *cdf_coefficient_sign;
 } NPContinuousKernelBetaPreparedContext;
 
 typedef struct {

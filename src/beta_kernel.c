@@ -1373,58 +1373,42 @@ double np_beta_log_pdf_order2(double evaluation,
   return np_beta_log_pdf_scale(&shape, status);
 }
 
-static double np_beta_cdf_scale(double evaluation,
-                                double observation,
-                                double bandwidth,
-                                double lower,
-                                double upper,
-                                int scale,
-                                np_beta_status *status)
+/* Scalar and prepared CDF consumers must share the same incomplete-beta
+ * boundary, tail, and numeric contract.  The caller owns shape preparation;
+ * this small primitive owns the one canonical CDF calculation. */
+#if defined(__clang__) || defined(__GNUC__)
+# define NP_BETA_CDF_ALWAYS_INLINE \
+  static inline __attribute__((always_inline))
+#else
+# define NP_BETA_CDF_ALWAYS_INLINE static inline
+#endif
+
+NP_BETA_CDF_ALWAYS_INLINE double np_beta_cdf_from_shape(
+  double evaluation,
+  const np_beta_shape *shape,
+  np_beta_status *status)
 {
-  np_beta_shape shape;
-  np_beta_status shape_status;
   double alpha;
   double beta;
   double tail_coordinate;
   double midpoint;
   double value;
 
-  if(!R_FINITE(evaluation)) {
-    np_beta_set_status(status, NP_BETA_ERR_NONFINITE);
-    return NAN;
-  }
-
-  /* The CDF is observation-centred: the observation supplies the beta
-   * shapes, while the distribution target is the incomplete-beta argument.
-   * Initializing with the observation in both scalar positions validates the
-   * support/bandwidth contract and prepares exactly those shapes. */
-  shape_status = np_beta_shape_init(observation,
-                                    observation,
-                                    bandwidth,
-                                    lower,
-                                    upper,
-                                    scale,
-                                    &shape);
-  if(shape_status != NP_BETA_OK) {
-    np_beta_set_status(status, shape_status);
-    return NAN;
-  }
-
-  if(evaluation <= lower) {
+  if(evaluation <= shape->lower) {
     np_beta_set_status(status, NP_BETA_OK);
     return 0.0;
   }
-  if(evaluation >= upper) {
+  if(evaluation >= shape->upper) {
     np_beta_set_status(status, NP_BETA_OK);
     return 1.0;
   }
 
-  alpha = 1.0 + shape.target_unit * shape.concentration;
-  beta = 1.0 + shape.target_complement_unit * shape.concentration;
-  midpoint = lower + 0.5 * shape.support_length;
+  alpha = 1.0 + shape->target_unit * shape->concentration;
+  beta = 1.0 + shape->target_complement_unit * shape->concentration;
+  midpoint = shape->lower + 0.5 * shape->support_length;
   tail_coordinate = (evaluation <= midpoint) ?
-    (evaluation - lower) / shape.support_length :
-    (upper - evaluation) / shape.support_length;
+    (evaluation - shape->lower) / shape->support_length :
+    (shape->upper - evaluation) / shape->support_length;
   if(!R_FINITE(tail_coordinate) || tail_coordinate <= 0.0 ||
      tail_coordinate >= 1.0 || !R_FINITE(alpha) || !R_FINITE(beta) ||
      alpha < 1.0 || beta < 1.0) {
@@ -1447,6 +1431,43 @@ static double np_beta_cdf_scale(double evaluation,
 
   np_beta_set_status(status, NP_BETA_OK);
   return value;
+}
+
+#undef NP_BETA_CDF_ALWAYS_INLINE
+
+static double np_beta_cdf_scale(double evaluation,
+                                double observation,
+                                double bandwidth,
+                                double lower,
+                                double upper,
+                                int scale,
+                                np_beta_status *status)
+{
+  np_beta_shape shape;
+  np_beta_status shape_status;
+
+  if(!R_FINITE(evaluation)) {
+    np_beta_set_status(status, NP_BETA_ERR_NONFINITE);
+    return NAN;
+  }
+
+  /* The CDF is observation-centred: the observation supplies the beta
+   * shapes, while the distribution target is the incomplete-beta argument.
+   * Initializing with the observation in both scalar positions validates the
+   * support/bandwidth contract and prepares exactly those shapes. */
+  shape_status = np_beta_shape_init(observation,
+                                    observation,
+                                    bandwidth,
+                                    lower,
+                                    upper,
+                                    scale,
+                                    &shape);
+  if(shape_status != NP_BETA_OK) {
+    np_beta_set_status(status, shape_status);
+    return NAN;
+  }
+
+  return np_beta_cdf_from_shape(evaluation, &shape, status);
 }
 
 double np_beta_cdf_order2(double evaluation,
@@ -1580,6 +1601,153 @@ double np_beta_log_abs_cdf_order(double evaluation,
       positive_log, negative_log, &log_absolute, sign);
   np_beta_set_status(status, parts_status);
   return (parts_status == NP_BETA_OK) ? log_absolute : NAN;
+}
+
+np_beta_status np_beta_cdf_observation_init(
+  double observation,
+  double lower,
+  double upper,
+  double support_length,
+  np_beta_cdf_observation *prepared)
+{
+  np_beta_pdf_observation pdf_observation;
+  np_beta_shape shape = {0};
+  double observation_unit;
+  double observation_complement_unit;
+  np_beta_status status;
+
+  if(prepared == NULL)
+    return NP_BETA_ERR_NUMERIC;
+  status = np_beta_pdf_observation_init(
+    observation, lower, upper, support_length,
+    &observation_unit, &observation_complement_unit,
+    &pdf_observation.log_unit, &pdf_observation.log_complement_unit,
+    &pdf_observation.endpoint);
+  if(status != NP_BETA_OK)
+    return status;
+  status = np_beta_shape_target_coordinate_init(
+    observation, lower, upper, support_length, &shape);
+  if(status != NP_BETA_OK)
+    return status;
+  prepared->target_unit = shape.target_unit;
+  prepared->target_complement_unit = shape.target_complement_unit;
+  return NP_BETA_OK;
+}
+
+double np_beta_log_abs_cdf_order_prepared_observation(
+  double evaluation,
+  double bandwidth,
+  double lower,
+  double upper,
+  int order,
+  const np_beta_cdf_observation *observation,
+  np_beta_status observation_status,
+  const double *log_abs_coefficient,
+  const signed char *coefficient_sign,
+  int *sign,
+  np_beta_status *status)
+{
+  const int *coefficients = NULL;
+  const int component_count =
+    np_beta_order_coefficients(order, &coefficients);
+  double positive_log = -INFINITY;
+  double negative_log = -INFINITY;
+  double support_length;
+  int component_limit;
+  int component;
+
+  (void)coefficients;
+  if(sign == NULL || observation == NULL ||
+     log_abs_coefficient == NULL || coefficient_sign == NULL ||
+     component_count == 0) {
+    np_beta_set_status(status, NP_BETA_ERR_SCALE);
+    return NAN;
+  }
+  *sign = 0;
+  if(!R_FINITE(evaluation) || !R_FINITE(lower) || !R_FINITE(upper) ||
+     observation_status == NP_BETA_ERR_NONFINITE) {
+    np_beta_set_status(status, NP_BETA_ERR_NONFINITE);
+    return NAN;
+  }
+  if(!R_FINITE(bandwidth) || bandwidth <= 0.0) {
+    np_beta_set_status(status, NP_BETA_ERR_BANDWIDTH);
+    return NAN;
+  }
+  support_length = upper - lower;
+  if(!R_FINITE(support_length) || support_length <= 0.0) {
+    np_beta_set_status(status, NP_BETA_ERR_BOUNDS);
+    return NAN;
+  }
+  if(observation_status != NP_BETA_OK) {
+    np_beta_set_status(status, observation_status);
+    return NAN;
+  }
+
+  component_limit = (evaluation <= lower || evaluation >= upper) ?
+    1 : component_count;
+
+  for(component = 0; component < component_limit; ++component) {
+    np_beta_shape shape = {0};
+    double component_value;
+    double log_term;
+    np_beta_status component_status;
+
+    if(!R_FINITE(log_abs_coefficient[component]) ||
+       (coefficient_sign[component] != -1 &&
+        coefficient_sign[component] != 1)) {
+      np_beta_set_status(status, NP_BETA_ERR_NUMERIC);
+      return NAN;
+    }
+    shape.lower = lower;
+    shape.upper = upper;
+    shape.support_length = support_length;
+    shape.target_unit = observation->target_unit;
+    shape.target_complement_unit = observation->target_complement_unit;
+    component_status = np_beta_shape_concentration_init(
+      bandwidth, support_length, component + 1, &shape);
+    if(component_status != NP_BETA_OK) {
+      np_beta_set_status(status, component_status);
+      return NAN;
+    }
+    component_value = np_beta_cdf_from_shape(
+      evaluation, &shape, &component_status);
+    if(component_status != NP_BETA_OK) {
+      np_beta_set_status(status, component_status);
+      return NAN;
+    }
+    if(evaluation <= lower) {
+      np_beta_set_status(status, NP_BETA_OK);
+      return -INFINITY;
+    }
+    if(evaluation >= upper) {
+      *sign = 1;
+      np_beta_set_status(status, NP_BETA_OK);
+      return 0.0;
+    }
+    if(component_count == 1) {
+      if(component_value != 0.0) {
+        *sign = 1;
+        positive_log = log(fabs(component_value));
+      }
+      np_beta_set_status(status, NP_BETA_OK);
+      return positive_log;
+    }
+    log_term = component_value == 0.0 ? -INFINITY :
+      log(component_value) + log_abs_coefficient[component];
+    if(coefficient_sign[component] > 0)
+      positive_log = np_beta_log_add(positive_log, log_term);
+    else
+      negative_log = np_beta_log_add(negative_log, log_term);
+  }
+
+  {
+    double log_absolute = -INFINITY;
+    const np_beta_status parts_status = np_beta_signed_log_absolute(
+      positive_log, negative_log, &log_absolute, sign);
+
+    np_beta_set_status(status, parts_status);
+    return parts_status == NP_BETA_OK ? log_absolute : NAN;
+  }
 }
 
 static double np_beta_log_overlap_scale(double center_one,

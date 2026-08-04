@@ -58,6 +58,14 @@ typedef struct {
   int endpoint;
 } np_beta_pdf_observation;
 
+/* CDF-only observation state.  The observation centres the beta shape, so
+ * these two coordinates are invariant for every evaluation row and bandwidth
+ * topology. */
+typedef struct {
+  double target_unit;
+  double target_complement_unit;
+} np_beta_cdf_observation;
+
 #if defined(__clang__) || defined(__GNUC__)
 # define NP_BETA_ALWAYS_INLINE static inline __attribute__((always_inline))
 #else
@@ -363,6 +371,26 @@ double np_beta_log_abs_cdf_order(double evaluation,
                                  int order,
                                  int *sign,
                                  np_beta_status *status);
+
+np_beta_status np_beta_cdf_observation_init(
+  double observation,
+  double lower,
+  double upper,
+  double support_length,
+  np_beta_cdf_observation *prepared);
+
+double np_beta_log_abs_cdf_order_prepared_observation(
+  double evaluation,
+  double bandwidth,
+  double lower,
+  double upper,
+  int order,
+  const np_beta_cdf_observation *observation,
+  np_beta_status observation_status,
+  const double *log_abs_coefficient,
+  const signed char *coefficient_sign,
+  int *sign,
+  np_beta_status *status);
 
 double np_beta_log_overlap_order2(double center_one,
                                   double bandwidth_one,
