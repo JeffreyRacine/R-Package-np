@@ -1173,6 +1173,136 @@ np_beta_status np_beta_log_abs_pdf_derivative_prepared(
     &derivative->jump_log_absolute, &derivative->jump_sign);
 }
 
+np_beta_status
+np_beta_log_abs_pdf_derivative_order_prepared_observation(
+  double evaluation,
+  double observed,
+  double bandwidth,
+  double lower,
+  double upper,
+  int order,
+  const np_beta_pdf_observation *observation,
+  np_beta_status observation_status,
+  const double *log_abs_coefficient,
+  const signed char *coefficient_sign,
+  double *level_log_absolute,
+  int *level_sign,
+  np_beta_derivative *derivative)
+{
+  const int *coefficients = NULL;
+  const int component_count =
+    np_beta_order_coefficients(order, &coefficients);
+  np_beta_shape shape[NP_BETA_ORDER_MAX_COMPONENTS];
+  np_beta_pdf_component components[NP_BETA_ORDER_MAX_COMPONENTS];
+  double log_pdf[NP_BETA_ORDER_MAX_COMPONENTS];
+  double level_positive_log = -INFINITY;
+  double level_negative_log = -INFINITY;
+  double regular_positive_log = -INFINITY;
+  double regular_negative_log = -INFINITY;
+  double jump_positive_log = -INFINITY;
+  double jump_negative_log = -INFINITY;
+  np_beta_shape shape_template;
+  np_beta_status status;
+  int component;
+
+  (void)coefficients;
+  if(observation == NULL || log_abs_coefficient == NULL ||
+     coefficient_sign == NULL || level_log_absolute == NULL ||
+     level_sign == NULL || derivative == NULL || component_count == 0)
+    return NP_BETA_ERR_SCALE;
+  *level_log_absolute = -INFINITY;
+  *level_sign = 0;
+  np_beta_derivative_zero(derivative);
+
+  if(!R_FINITE(evaluation) || !R_FINITE(lower) || !R_FINITE(upper) ||
+     observation_status == NP_BETA_ERR_NONFINITE)
+    return NP_BETA_ERR_NONFINITE;
+  if(!R_FINITE(bandwidth) || bandwidth <= 0.0)
+    return NP_BETA_ERR_BANDWIDTH;
+  shape_template.lower = lower;
+  shape_template.upper = upper;
+  shape_template.support_length = upper - lower;
+  if(!R_FINITE(shape_template.support_length) ||
+     shape_template.support_length <= 0.0)
+    return NP_BETA_ERR_BOUNDS;
+  if(observation_status != NP_BETA_OK)
+    return observation_status;
+
+  shape_template.log_observation_unit = observation->log_unit;
+  shape_template.log_observation_complement_unit =
+    observation->log_complement_unit;
+  shape_template.observation_endpoint = observation->endpoint;
+  status = np_beta_shape_target_coordinate_init(
+    evaluation, lower, upper, shape_template.support_length,
+    &shape_template);
+  if(status != NP_BETA_OK)
+    return status;
+
+  /* Complete the level phase before derivative work, matching the scalar
+   * fused primitive while consuming invocation-owned observation state. */
+  for(component = 0; component < component_count; ++component) {
+    double log_term;
+
+    if(!R_FINITE(log_abs_coefficient[component]) ||
+       (coefficient_sign[component] != -1 &&
+        coefficient_sign[component] != 1))
+      return NP_BETA_ERR_NUMERIC;
+    shape[component] = shape_template;
+    status = np_beta_shape_concentration_init(
+      bandwidth, shape[component].support_length,
+      component + 1, &shape[component]);
+    if(status != NP_BETA_OK)
+      return status;
+    status = np_beta_pdf_component_from_shape(
+      &shape[component], &components[component]);
+    if(status == NP_BETA_OK && observation->endpoint == 0)
+      status = np_beta_pdf_component_prepare_normalizer(
+        &components[component]);
+    if(status != NP_BETA_OK)
+      return status;
+    components[component].log_abs_coefficient =
+      log_abs_coefficient[component];
+    components[component].coefficient_sign =
+      coefficient_sign[component];
+    log_pdf[component] = np_beta_log_pdf_component_prepared(
+      &components[component], observation, &status);
+    if(status != NP_BETA_OK)
+      return status;
+    log_term = log_pdf[component] == -INFINITY ? -INFINITY :
+      log_pdf[component] + log_abs_coefficient[component];
+    if(coefficient_sign[component] > 0)
+      level_positive_log = np_beta_log_add(level_positive_log, log_term);
+    else
+      level_negative_log = np_beta_log_add(level_negative_log, log_term);
+  }
+  status = np_beta_signed_log_absolute(
+    level_positive_log, level_negative_log,
+    level_log_absolute, level_sign);
+  if(status != NP_BETA_OK)
+    return status;
+
+  for(component = 0; component < component_count; ++component) {
+    if(shape[component].eval_location != NP_BETA_EVAL_INSIDE ||
+       shape[component].concentration == 0.0)
+      continue;
+    status = np_beta_derivative_component_accumulate(
+      &shape[component], evaluation, observed, log_pdf[component],
+      log_abs_coefficient[component], coefficient_sign[component],
+      &regular_positive_log, &regular_negative_log,
+      &jump_positive_log, &jump_negative_log);
+    if(status != NP_BETA_OK)
+      return status;
+  }
+  status = np_beta_signed_log_absolute(
+    regular_positive_log, regular_negative_log,
+    &derivative->regular_log_absolute, &derivative->regular_sign);
+  if(status != NP_BETA_OK)
+    return status;
+  return np_beta_signed_log_absolute(
+    jump_positive_log, jump_negative_log,
+    &derivative->jump_log_absolute, &derivative->jump_sign);
+}
+
 static double np_beta_signed_log_value(double log_absolute,
                                        int sign,
                                        np_beta_status *status)

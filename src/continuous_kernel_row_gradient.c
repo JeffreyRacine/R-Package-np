@@ -10,8 +10,10 @@
 #if defined(__clang__) || defined(__GNUC__)
 # define NP_CONTINUOUS_ROW_GRADIENT_ALWAYS_INLINE \
   static inline __attribute__((always_inline))
+# define NP_CONTINUOUS_ROW_GRADIENT_NOINLINE __attribute__((noinline))
 #else
 # define NP_CONTINUOUS_ROW_GRADIENT_ALWAYS_INLINE static inline
+# define NP_CONTINUOUS_ROW_GRADIENT_NOINLINE
 #endif
 void np_continuous_kernel_level_derivative_workspace_init(
   NPContinuousKernelLevelDerivativeWorkspace *workspace)
@@ -320,6 +322,215 @@ np_continuous_kernel_beta_level_derivative_observation_prepared_bound(
   return NP_CONTINUOUS_ROW_OK;
 }
 
+/* Adaptive-NN bandwidths remain observation-owned.  This sibling reuses only
+ * invocation-invariant observation transforms and coefficient state; shape,
+ * normalizer, and derivative-score work stay pair-owned. */
+NP_CONTINUOUS_ROW_GRADIENT_ALWAYS_INLINE NPContinuousKernelRowStatus
+np_continuous_kernel_beta_level_derivative_observation_adaptive_prepared_bound(
+  const NPContinuousKernelRowPlan *plan,
+  const NPContinuousKernelSegment *segment,
+  int evaluation_index,
+  int observation,
+  int derivative_coordinate,
+  double other_log,
+  int other_sign,
+  NPContinuousKernelLevelDerivativeWorkspace *workspace,
+  double *common_log_scale,
+  NPContinuousKernelDerivativeDiagnostics *diagnostics)
+{
+  NPContinuousKernelBetaPreparedContext * const prepared =
+    plan->beta_prepared;
+  double level_log = -INFINITY;
+  int level_sign = 0;
+  np_beta_derivative derivative;
+  int coordinate;
+
+  if(prepared == NULL || !prepared->pdf_active ||
+     prepared->pdf_row_component_active ||
+     prepared->pdf_log_abs_coefficient == NULL ||
+     prepared->pdf_coefficient_sign == NULL)
+    return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+
+  for(coordinate = 0; coordinate < plan->num_continuous; ++coordinate) {
+    const int local_coordinate =
+      coordinate - segment->coordinate_offset;
+    const double evaluation = plan->train_is_eval ?
+      plan->train[coordinate][evaluation_index] :
+      plan->evaluation[coordinate][evaluation_index];
+    const double observed = plan->train[coordinate][observation];
+    const double bandwidth =
+      plan->bandwidth_train[coordinate][observation];
+    const int beta_slot = prepared->coordinate_slot[coordinate];
+    const size_t observation_offset = beta_slot < 0 ? 0U :
+      (size_t)beta_slot * (size_t)plan->num_train +
+      (size_t)observation;
+    const size_t component_offset = beta_slot < 0 ? 0U :
+      (size_t)beta_slot * NP_BETA_PREPARED_MAX_COMPONENTS;
+    const np_beta_pdf_observation *prepared_observation;
+    np_beta_status beta_status = NP_BETA_OK;
+
+    if(beta_slot < 0 || beta_slot >= prepared->num_beta_coordinates) {
+      if(diagnostics != NULL) {
+        diagnostics->bad_coordinate = coordinate;
+        diagnostics->bad_observation = observation;
+      }
+      return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+    }
+    beta_status = prepared->pdf_observation_status[observation_offset];
+    if(beta_status != NP_BETA_OK) {
+      if(diagnostics != NULL) {
+        diagnostics->bad_coordinate = coordinate;
+        diagnostics->bad_observation = observation;
+        diagnostics->beta_status = beta_status;
+      }
+      return NP_CONTINUOUS_ROW_ERR_KERNEL;
+    }
+    prepared_observation = &prepared->pdf_observation[observation_offset];
+
+    if(coordinate == derivative_coordinate) {
+      beta_status =
+        np_beta_log_abs_pdf_derivative_order_prepared_observation(
+          evaluation, observed, bandwidth,
+          segment->lower[local_coordinate],
+          segment->upper[local_coordinate], segment->descriptor.order,
+          prepared_observation, beta_status,
+          &prepared->pdf_log_abs_coefficient[component_offset],
+          &prepared->pdf_coefficient_sign[component_offset],
+          &level_log, &level_sign, &derivative);
+    } else {
+      int scalar_sign = 0;
+      const double scalar_log =
+        np_beta_log_abs_pdf_order_prepared_observation(
+          evaluation, bandwidth,
+          segment->lower[local_coordinate],
+          segment->upper[local_coordinate], segment->descriptor.order,
+          prepared_observation, beta_status,
+          &prepared->pdf_log_abs_coefficient[component_offset],
+          &prepared->pdf_coefficient_sign[component_offset],
+          &scalar_sign, &beta_status);
+
+      if(beta_status == NP_BETA_OK) {
+        if(scalar_sign == 0)
+          other_sign = 0;
+        else if(other_sign != 0) {
+          other_sign *= scalar_sign;
+          other_log += scalar_log;
+        }
+      }
+    }
+    if(beta_status != NP_BETA_OK) {
+      if(diagnostics != NULL) {
+        diagnostics->bad_coordinate = coordinate;
+        diagnostics->bad_observation = observation;
+        diagnostics->beta_status = beta_status;
+      }
+      return NP_CONTINUOUS_ROW_ERR_KERNEL;
+    }
+  }
+
+  if(other_sign == 0 || level_sign == 0) {
+    workspace->level_log_absolute[observation] = -INFINITY;
+    workspace->level_sign[observation] = 0;
+  } else {
+    workspace->level_log_absolute[observation] = other_log + level_log;
+    workspace->level_sign[observation] =
+      (signed char)(other_sign * level_sign);
+    *common_log_scale = fmax(
+      *common_log_scale, workspace->level_log_absolute[observation]);
+  }
+  if(other_sign == 0 || derivative.regular_sign == 0) {
+    workspace->regular_log_absolute[observation] = -INFINITY;
+    workspace->regular_sign[observation] = 0;
+  } else {
+    workspace->regular_log_absolute[observation] =
+      other_log + derivative.regular_log_absolute;
+    workspace->regular_sign[observation] =
+      (signed char)(other_sign * derivative.regular_sign);
+    *common_log_scale = fmax(
+      *common_log_scale, workspace->regular_log_absolute[observation]);
+  }
+  if(other_sign == 0 || derivative.jump_sign == 0) {
+    workspace->jump_log_absolute[observation] = -INFINITY;
+    workspace->jump_sign[observation] = 0;
+  } else {
+    workspace->jump_log_absolute[observation] =
+      other_log + derivative.jump_log_absolute;
+    workspace->jump_sign[observation] =
+      (signed char)(other_sign * derivative.jump_sign);
+    *common_log_scale = fmax(
+      *common_log_scale, workspace->jump_log_absolute[observation]);
+  }
+  return NP_CONTINUOUS_ROW_OK;
+}
+
+/* Keep the observation-owned-bandwidth topology outside the shared row
+ * dispatcher.  The observation primitive remains inlined within this sibling,
+ * while the sibling itself is selected only once per row. */
+static NPContinuousKernelRowStatus NP_CONTINUOUS_ROW_GRADIENT_NOINLINE
+np_continuous_kernel_beta_level_derivative_adaptive_prepared_row_bound(
+  const NPContinuousKernelRowPlan *plan,
+  const NPContinuousKernelSegment *segment,
+  int evaluation_index,
+  int omitted_observation,
+  int derivative_coordinate,
+  const NPContinuousKernelLogFactorProvider *provider,
+  NPContinuousKernelLevelDerivativeWorkspace *workspace,
+  double *common_log_scale,
+  NPContinuousKernelDerivativeDiagnostics *diagnostics)
+{
+  NPContinuousKernelRowStatus row_status;
+  int observation;
+
+  *common_log_scale = -INFINITY;
+  if(provider == NULL && omitted_observation == -1) {
+    for(observation = 0;
+        observation < plan->num_train;
+        ++observation) {
+      row_status =
+        np_continuous_kernel_beta_level_derivative_observation_adaptive_prepared_bound(
+          plan, segment, evaluation_index, observation,
+          derivative_coordinate, 0.0, 1, workspace, common_log_scale,
+          diagnostics);
+      if(row_status != NP_CONTINUOUS_ROW_OK)
+        return row_status;
+    }
+    return NP_CONTINUOUS_ROW_OK;
+  }
+  for(observation = 0; observation < plan->num_train; ++observation) {
+    double other_log = 0.0;
+    int other_sign = 1;
+
+    if(observation == omitted_observation) {
+      workspace->level_log_absolute[observation] = -INFINITY;
+      workspace->regular_log_absolute[observation] = -INFINITY;
+      workspace->jump_log_absolute[observation] = -INFINITY;
+      workspace->level_sign[observation] = 0;
+      workspace->regular_sign[observation] = 0;
+      workspace->jump_sign[observation] = 0;
+      continue;
+    }
+    if(provider != NULL) {
+      other_log = workspace->level_log_absolute[observation];
+      other_sign = workspace->level_sign[observation];
+      if(ISNAN(other_log) || other_log == INFINITY ||
+         (other_sign != -1 && other_sign != 0 && other_sign != 1) ||
+         ((other_sign == 0) != (other_log == -INFINITY))) {
+        if(diagnostics != NULL)
+          diagnostics->bad_observation = observation;
+        return NP_CONTINUOUS_ROW_ERR_NUMERIC;
+      }
+    }
+    row_status =
+      np_continuous_kernel_beta_level_derivative_observation_adaptive_prepared_bound(
+        plan, segment, evaluation_index, observation,
+        derivative_coordinate, other_log, other_sign, workspace,
+        common_log_scale, diagnostics);
+    if(row_status != NP_CONTINUOUS_ROW_OK)
+      return row_status;
+  }
+  return NP_CONTINUOUS_ROW_OK;
+}
+
 NPContinuousKernelRowStatus
 np_continuous_kernel_beta_level_derivative_log_row_validated(
   const NPContinuousKernelRowPlan *plan,
@@ -457,6 +668,15 @@ np_continuous_kernel_beta_level_derivative_log_row_validated(
     }
     return NP_CONTINUOUS_ROW_OK;
   }
+  if(plan->bandwidth_mode == BW_ADAP_NN &&
+     plan->beta_prepared != NULL &&
+     plan->beta_prepared->pdf_active &&
+     !plan->beta_prepared->pdf_row_component_active)
+    return
+      np_continuous_kernel_beta_level_derivative_adaptive_prepared_row_bound(
+        plan, segment, evaluation_index, omitted_observation,
+        derivative_coordinate, provider, workspace, common_log_scale,
+        diagnostics);
   *common_log_scale = -INFINITY;
   if(provider == NULL && omitted_observation == -1) {
     for(observation = 0; observation < plan->num_train; ++observation) {

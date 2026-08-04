@@ -6,11 +6,12 @@
   failure precedence and exact fitted, gradient, and standard-error
   arithmetic while removing the duplicate beta shape and PDF pass. Fixed- and
   generalized-nearest-neighbour gradient rows additionally reuse their
-  prepared evaluation-row components; adaptive rows retain an isolated scalar
-  sibling so this specialization adds no pairwise branch or stack overhead to
-  the observation-owned-bandwidth topology. Derivative-only prepared state is
-  allocated lazily, so level-only fits retain their incumbent preparation
-  cost.
+  prepared evaluation-row components. Adaptive-nearest-neighbour gradient rows
+  reuse invocation-owned observation transforms and coefficient state while
+  retaining pair-owned bandwidth shapes and normalizers. Each bandwidth
+  topology selects an isolated sibling before row traversal, with no inner-loop
+  route branch or scalar fallback. Derivative-only fixed/GNN state is allocated
+  lazily, so level-only fits retain their incumbent preparation cost.
 
 * Adaptive-nearest-neighbour beta PDF rows now prepare support-transformed
   observations and higher-order coefficient state once per invocation while

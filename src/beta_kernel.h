@@ -243,6 +243,22 @@ np_beta_status np_beta_log_abs_pdf_derivative_prepared(
   int *level_sign,
   np_beta_derivative *derivative);
 
+np_beta_status
+np_beta_log_abs_pdf_derivative_order_prepared_observation(
+  double evaluation,
+  double observed,
+  double bandwidth,
+  double lower,
+  double upper,
+  int order,
+  const np_beta_pdf_observation *observation,
+  np_beta_status observation_status,
+  const double *log_abs_coefficient,
+  const signed char *coefficient_sign,
+  double *level_log_absolute,
+  int *level_sign,
+  np_beta_derivative *derivative);
+
 double np_beta_log_abs_pdf_order_prepared_observation(
   double evaluation,
   double bandwidth,
