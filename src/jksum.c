@@ -22046,6 +22046,391 @@ static int NP_NOINLINE np_regression_conditional_influence_finish(
   return 1;
 }
 
+/*
+ * Canonical non-beta scalar-LP0 fit owner. Conditional estimators can invoke
+ * this route once per evaluation row, so every buffer remains malloc-backed
+ * and is released at the route boundary on normal return or longjmp.
+ */
+enum {
+  NP_REGRESSION_SCALAR_FIT_OK = 0,
+  NP_REGRESSION_SCALAR_FIT_PROFILE = 1,
+  NP_REGRESSION_SCALAR_FIT_ERR_DIMENSION = -1,
+  NP_REGRESSION_SCALAR_FIT_ERR_CONDITIONAL_ALLOC = -2,
+  NP_REGRESSION_SCALAR_FIT_ERR_ALLOC = -3,
+  NP_REGRESSION_SCALAR_FIT_ERR_TRAVERSAL = -4,
+  NP_REGRESSION_SCALAR_FIT_ERR_INFLUENCE = -5,
+  NP_REGRESSION_SCALAR_FIT_ERR_WORKSPACE_DIMENSION = -6
+};
+
+enum { NP_REGRESSION_SCALAR_RESPONSE_COLUMNS = 3 };
+
+typedef struct {
+  int *kernel_c;
+  int *kernel_u;
+  int *kernel_o;
+  int lp_engine;
+  int bandwidth_mode;
+  int num_obs_train;
+  int num_obs_eval;
+  int num_obs_eval_alloc;
+  int num_reg_unordered;
+  int num_reg_ordered;
+  int num_reg_continuous;
+  double **matrix_X_unordered_train;
+  double **matrix_X_ordered_train;
+  double **matrix_X_continuous_train;
+  double **matrix_X_unordered_eval;
+  double **matrix_X_ordered_eval;
+  double **matrix_X_continuous_eval;
+  double *vector_Y;
+  double *vector_scale_factor;
+  double *lambda;
+  int *num_categories;
+  int *operator;
+  double **matrix_categorical_vals;
+  double **matrix_bandwidth;
+  int **matrix_ordered_indices;
+  double *mean;
+  double **gradient;
+  double *mean_stderr;
+  double **gradient_stderr;
+  int tree_enabled;
+  int do_grad;
+  int do_gerr;
+  NPRegressionStandardErrorMode standard_error_mode;
+  NP_GateOverrideCtx *gate_context;
+  double kernel_squared_integral;
+  double bandwidth_product;
+  double gradient_stderr_factor;
+} NPRegressionScalarFitCall;
+
+typedef struct {
+  double *mean_columns;
+  double *permutation_columns;
+  double *conditional_weights;
+  double *conditional_permutation_weights;
+  double *unit_response;
+  double *squared_response;
+} NPRegressionScalarFitOwner;
+
+typedef struct {
+  const NPRegressionScalarFitCall *call;
+  NPRegressionScalarFitOwner owner;
+  int status;
+} NPRegressionScalarFitExecution;
+
+static void np_regression_scalar_fit_owner_init(
+  NPRegressionScalarFitOwner *owner)
+{
+  owner->mean_columns = NULL;
+  owner->permutation_columns = NULL;
+  owner->conditional_weights = NULL;
+  owner->conditional_permutation_weights = NULL;
+  owner->unit_response = NULL;
+  owner->squared_response = NULL;
+}
+
+static void np_regression_scalar_fit_owner_cleanup(
+  void *data,
+  Rboolean jump)
+{
+  NPRegressionScalarFitOwner * const owner =
+    (NPRegressionScalarFitOwner *)data;
+
+  (void)jump;
+  free(owner->mean_columns);
+  free(owner->permutation_columns);
+  free(owner->conditional_weights);
+  free(owner->conditional_permutation_weights);
+  free(owner->unit_response);
+  free(owner->squared_response);
+}
+
+static SEXP np_regression_scalar_fit_execute(void *data)
+{
+  NPRegressionScalarFitExecution * const execution =
+    (NPRegressionScalarFitExecution *)data;
+  const NPRegressionScalarFitCall * const call = execution->call;
+  NPRegressionScalarFitOwner * const owner = &execution->owner;
+  const int conditional_influence =
+    call->standard_error_mode == NP_REGRESSION_STDERR_CONDITIONAL_INFLUENCE;
+  const int p_nvar = call->do_grad ?
+    (call->num_reg_continuous + call->num_reg_unordered +
+     call->num_reg_ordered) : 0;
+  double *response_columns[NP_REGRESSION_SCALAR_RESPONSE_COLUMNS] = {
+    call->vector_Y, NULL, NULL
+  };
+  int permutation_operator = OP_NOOP;
+  size_t allocation_count;
+  size_t allocation_bytes;
+  int i;
+  int predictor;
+
+  allocation_count =
+    (size_t)NP_REGRESSION_SCALAR_RESPONSE_COLUMNS *
+    (size_t)call->num_obs_eval_alloc;
+  if(!np_size_array_bytes_checked(
+       allocation_count, sizeof(double), &allocation_bytes)) {
+    execution->status = NP_REGRESSION_SCALAR_FIT_ERR_WORKSPACE_DIMENSION;
+    return R_NilValue;
+  }
+  owner->mean_columns = (double *)malloc(allocation_bytes);
+
+  if(conditional_influence) {
+    owner->conditional_weights = (double *)malloc(
+      (size_t)call->num_obs_train * sizeof(double));
+    if(p_nvar > 0 &&
+       (!np_size_mul_checked((size_t)call->num_obs_train,
+                             (size_t)p_nvar, &allocation_count) ||
+        !np_size_array_bytes_checked(
+          allocation_count, sizeof(double), &allocation_bytes))) {
+      execution->status = NP_REGRESSION_SCALAR_FIT_ERR_DIMENSION;
+      return R_NilValue;
+    }
+    if(p_nvar > 0)
+      owner->conditional_permutation_weights =
+        (double *)malloc(allocation_bytes);
+    if(owner->conditional_weights == NULL ||
+       (p_nvar > 0 && owner->conditional_permutation_weights == NULL)) {
+      execution->status = NP_REGRESSION_SCALAR_FIT_ERR_CONDITIONAL_ALLOC;
+      return R_NilValue;
+    }
+  }
+
+  if(call->do_grad) {
+    if(!np_size_mul_checked(
+         (size_t)NP_REGRESSION_SCALAR_RESPONSE_COLUMNS,
+         (size_t)call->num_obs_eval_alloc, &allocation_count) ||
+       !np_size_mul_checked(
+         allocation_count, (size_t)p_nvar, &allocation_count) ||
+       !np_size_array_bytes_checked(
+         allocation_count, sizeof(double), &allocation_bytes)) {
+      execution->status = NP_REGRESSION_SCALAR_FIT_ERR_WORKSPACE_DIMENSION;
+      return R_NilValue;
+    }
+    owner->permutation_columns = (double *)malloc(allocation_bytes);
+    if(owner->permutation_columns == NULL) {
+      execution->status = NP_REGRESSION_SCALAR_FIT_ERR_ALLOC;
+      return R_NilValue;
+    }
+    permutation_operator = OP_DERIVATIVE;
+  }
+
+  if(owner->mean_columns == NULL) {
+    execution->status = NP_REGRESSION_SCALAR_FIT_ERR_ALLOC;
+    return R_NilValue;
+  }
+
+  owner->unit_response = (double *)malloc(
+    (size_t)call->num_obs_train * sizeof(double));
+  owner->squared_response = (double *)malloc(
+    (size_t)call->num_obs_train * sizeof(double));
+  if(owner->unit_response == NULL || owner->squared_response == NULL) {
+    execution->status = NP_REGRESSION_SCALAR_FIT_ERR_ALLOC;
+    return R_NilValue;
+  }
+  response_columns[1] = owner->unit_response;
+  response_columns[2] = owner->squared_response;
+
+  for(i = 0; i < call->num_obs_train; i++) {
+    owner->unit_response[i] = 1.0;
+    owner->squared_response[i] = call->vector_Y[i] * call->vector_Y[i];
+  }
+
+  if((!conditional_influence) && (!call->do_grad) &&
+     np_regression_categorical_profile_fit(
+       call->kernel_c, call->kernel_u, call->kernel_o,
+       call->lp_engine, call->bandwidth_mode,
+       call->num_obs_train, call->num_obs_eval,
+       call->num_reg_unordered, call->num_reg_ordered,
+       call->num_reg_continuous,
+       call->matrix_X_unordered_train, call->matrix_X_ordered_train,
+       call->matrix_X_unordered_eval, call->matrix_X_ordered_eval,
+       call->vector_Y, call->vector_scale_factor, call->lambda,
+       call->num_categories, call->operator,
+       call->matrix_categorical_vals, call->mean, call->mean_stderr)) {
+    execution->status = NP_REGRESSION_SCALAR_FIT_PROFILE;
+    return R_NilValue;
+  }
+
+  {
+    NPPermutationWeightOutput conditional_pkw_output = np_pkw_output_make(
+      owner->conditional_permutation_weights, p_nvar);
+    const int weighted_sum_status = kernel_weighted_sum_np_ctx(
+      call->kernel_c, call->kernel_u, call->kernel_o,
+      call->bandwidth_mode,
+      call->num_obs_train, call->num_obs_eval,
+      call->num_reg_unordered, call->num_reg_ordered,
+      call->num_reg_continuous,
+      0, 0, 1, 1, conditional_influence, 0, 0, 0, 0,
+      call->operator, permutation_operator,
+      0, call->do_grad, NULL, 0,
+      NP_REGRESSION_SCALAR_RESPONSE_COLUMNS, 0,
+      call->tree_enabled, 0, kdt_extern_X,
+      NULL, NULL, NULL,
+      call->matrix_X_unordered_train,
+      call->matrix_X_ordered_train,
+      call->matrix_X_continuous_train,
+      call->matrix_X_unordered_eval,
+      call->matrix_X_ordered_eval,
+      call->matrix_X_continuous_eval,
+      response_columns, NULL, NULL,
+      call->vector_scale_factor, 1,
+      call->matrix_bandwidth, call->matrix_bandwidth,
+      call->lambda, call->num_categories,
+      call->matrix_categorical_vals, call->matrix_ordered_indices,
+      owner->mean_columns, owner->permutation_columns,
+      owner->conditional_weights, call->gate_context,
+      owner->conditional_permutation_weights != NULL ?
+        &conditional_pkw_output : NULL);
+
+    if(weighted_sum_status != 0) {
+      execution->status = NP_REGRESSION_SCALAR_FIT_ERR_TRAVERSAL;
+      return R_NilValue;
+    }
+  }
+
+  for(i = 0; i < call->num_obs_eval; i++) {
+    const int response_offset = NP_REGRESSION_SCALAR_RESPONSE_COLUMNS * i;
+    const double denominator =
+      copysign(DBL_MIN, owner->mean_columns[response_offset + 1]) +
+      owner->mean_columns[response_offset + 1];
+    call->mean[i] = owner->mean_columns[response_offset] / denominator;
+    call->mean_stderr[i] =
+      owner->mean_columns[response_offset + 2] / denominator -
+      call->mean[i] * call->mean[i];
+    call->mean_stderr[i] = (call->mean_stderr[i] <= 0.0) ? 0.0 :
+      sqrt(call->mean_stderr[i] * call->kernel_squared_integral /
+           (denominator * call->bandwidth_product));
+  }
+
+  if(call->do_grad) {
+    for(predictor = 0; predictor < call->num_reg_continuous; predictor++) {
+      for(i = 0; i < call->num_obs_eval; i++) {
+        const int response_offset =
+          NP_REGRESSION_SCALAR_RESPONSE_COLUMNS * i;
+        const int permutation_offset =
+          predictor * call->num_obs_eval *
+          NP_REGRESSION_SCALAR_RESPONSE_COLUMNS + response_offset;
+        const double denominator =
+          copysign(DBL_MIN, owner->mean_columns[response_offset + 1]) +
+          owner->mean_columns[response_offset + 1];
+        call->gradient[predictor][i] =
+          (owner->permutation_columns[permutation_offset] -
+           call->mean[i] *
+           owner->permutation_columns[permutation_offset + 1]) /
+          denominator;
+        if(call->do_gerr) {
+          const double bandwidth =
+            call->bandwidth_mode == BW_ADAP_NN ? 1.0 :
+            (call->bandwidth_mode == BW_GEN_NN ?
+             call->matrix_bandwidth[predictor][i] :
+             call->matrix_bandwidth[predictor][0]);
+          call->gradient_stderr[predictor][i] =
+            call->gradient_stderr_factor * call->mean_stderr[i] / bandwidth;
+        }
+      }
+    }
+
+    for(predictor = call->num_reg_continuous;
+        predictor < call->num_reg_continuous + call->num_reg_unordered;
+        predictor++) {
+      for(i = 0; i < call->num_obs_eval; i++) {
+        const int response_offset =
+          NP_REGRESSION_SCALAR_RESPONSE_COLUMNS * i;
+        const int permutation_offset =
+          predictor * call->num_obs_eval *
+          NP_REGRESSION_SCALAR_RESPONSE_COLUMNS + response_offset;
+        const double denominator =
+          copysign(DBL_MIN,
+                   owner->permutation_columns[permutation_offset + 1]) +
+          owner->permutation_columns[permutation_offset + 1];
+        const double alternate_mean =
+          owner->permutation_columns[permutation_offset] / denominator;
+        call->gradient[predictor][i] = call->mean[i] - alternate_mean;
+        if(call->do_gerr && call->num_reg_continuous > 0) {
+          const double variance =
+            owner->permutation_columns[permutation_offset + 2] / denominator -
+            alternate_mean * alternate_mean;
+          const double nonnegative_variance = variance <= 0.0 ? 0.0 : variance;
+          call->gradient_stderr[predictor][i] = sqrt(
+            call->mean_stderr[i] * call->mean_stderr[i] +
+            nonnegative_variance * call->kernel_squared_integral /
+            (denominator * call->bandwidth_product));
+        } else {
+          call->gradient_stderr[predictor][i] = 0.0;
+        }
+      }
+    }
+
+    for(predictor = call->num_reg_continuous + call->num_reg_unordered;
+        predictor < p_nvar; predictor++) {
+      for(i = 0; i < call->num_obs_eval; i++) {
+        const int response_offset =
+          NP_REGRESSION_SCALAR_RESPONSE_COLUMNS * i;
+        const int permutation_offset =
+          predictor * call->num_obs_eval *
+          NP_REGRESSION_SCALAR_RESPONSE_COLUMNS + response_offset;
+        const double denominator =
+          copysign(DBL_MIN,
+                   owner->permutation_columns[permutation_offset + 1]) +
+          owner->permutation_columns[permutation_offset + 1];
+        const double alternate_mean =
+          owner->permutation_columns[permutation_offset] / denominator;
+        const int ordered_coordinate = predictor -
+          call->num_reg_continuous - call->num_reg_unordered;
+        call->gradient[predictor][i] =
+          (call->mean[i] - alternate_mean) *
+          (call->matrix_ordered_indices[ordered_coordinate][i] != 0 ?
+           1.0 : -1.0);
+        if(call->do_gerr && call->num_reg_continuous > 0) {
+          const double variance =
+            owner->permutation_columns[permutation_offset + 2] / denominator -
+            alternate_mean * alternate_mean;
+          const double nonnegative_variance = variance <= 0.0 ? 0.0 : variance;
+          call->gradient_stderr[predictor][i] = sqrt(
+            call->mean_stderr[i] * call->mean_stderr[i] +
+            nonnegative_variance * call->kernel_squared_integral /
+            (denominator * call->bandwidth_product));
+        } else {
+          call->gradient_stderr[predictor][i] = 0.0;
+        }
+      }
+    }
+  }
+
+  if(conditional_influence &&
+     !np_regression_conditional_influence_finish(
+       call->num_obs_train, p_nvar,
+       call->do_grad ? call->num_reg_continuous : 0,
+       call->do_grad ? call->num_reg_unordered : 0,
+       call->vector_Y, owner->conditional_weights,
+       owner->conditional_permutation_weights,
+       owner->mean_columns, owner->permutation_columns,
+       call->mean, call->gradient,
+       call->mean_stderr, call->gradient_stderr)) {
+    execution->status = NP_REGRESSION_SCALAR_FIT_ERR_INFLUENCE;
+    return R_NilValue;
+  }
+
+  execution->status = NP_REGRESSION_SCALAR_FIT_OK;
+  return R_NilValue;
+}
+
+static int np_regression_scalar_fit(
+  const NPRegressionScalarFitCall *call)
+{
+  NPRegressionScalarFitExecution execution;
+
+  execution.call = call;
+  execution.status = NP_REGRESSION_SCALAR_FIT_ERR_ALLOC;
+  np_regression_scalar_fit_owner_init(&execution.owner);
+  R_UnwindProtect(
+    np_regression_scalar_fit_execute, &execution,
+    np_regression_scalar_fit_owner_cleanup, &execution.owner, NULL);
+  return execution.status;
+}
+
 int kernel_estimate_regression_categorical_tree_np(
 int lp_engine,
 int KERNEL_reg,
@@ -22903,238 +23288,63 @@ const NPContinuousPreparedBandwidthView *prepared_bandwidth){
   if(lp_engine_est == NP_LP_ENGINE_SCALAR) { // canonical scalar LP0
     // Nadaraya-Watson
     // Generate bandwidth vector given scale factors, nearest neighbors, or lambda 
+    const NPRegressionScalarFitCall scalar_call = {
+      .kernel_c = kernel_c,
+      .kernel_u = kernel_u,
+      .kernel_o = kernel_o,
+      .lp_engine = lp_engine_est,
+      .bandwidth_mode = BANDWIDTH_reg,
+      .num_obs_train = num_obs_train,
+      .num_obs_eval = num_obs_eval,
+      .num_obs_eval_alloc = num_obs_eval_alloc,
+      .num_reg_unordered = num_reg_unordered,
+      .num_reg_ordered = num_reg_ordered,
+      .num_reg_continuous = num_reg_continuous,
+      .matrix_X_unordered_train = matrix_X_unordered_train,
+      .matrix_X_ordered_train = matrix_X_ordered_train,
+      .matrix_X_continuous_train = matrix_X_continuous_train,
+      .matrix_X_unordered_eval = matrix_X_unordered_eval,
+      .matrix_X_ordered_eval = matrix_X_ordered_eval,
+      .matrix_X_continuous_eval = matrix_X_continuous_eval,
+      .vector_Y = vector_Y,
+      .vector_scale_factor = vector_scale_factor,
+      .lambda = lambda,
+      .num_categories = num_categories,
+      .operator = operator,
+      .matrix_categorical_vals = matrix_categorical_vals,
+      .matrix_bandwidth = matrix_bandwidth,
+      .matrix_ordered_indices = matrix_ordered_indices,
+      .mean = mean,
+      .gradient = gradient,
+      .mean_stderr = mean_stderr,
+      .gradient_stderr = gradient_stderr,
+      .tree_enabled = int_TREE_X,
+      .do_grad = do_grad,
+      .do_gerr = do_gerr,
+      .standard_error_mode = standard_error_mode,
+      .gate_context = &gate_ctx_local,
+      .kernel_squared_integral = K_INT_KERNEL_P,
+      .bandwidth_product = hprod,
+      .gradient_stderr_factor = gfac
+    };
+    const int scalar_status = np_regression_scalar_fit(&scalar_call);
 
-#define NCOL_Y 3
-
-    double * lc_Y[NCOL_Y] = {NULL,NULL,NULL};
-    double * meany = (double *)malloc(NCOL_Y*num_obs_eval_alloc*sizeof(double));
-    double * permy = NULL;
-    double *conditional_kw = NULL;
-    double *conditional_pkw = NULL;
-    const int conditional_influence =
-      standard_error_mode == NP_REGRESSION_STDERR_CONDITIONAL_INFLUENCE;
-    int pop = OP_NOOP;
-    int p_nvar = do_grad ? (num_reg_continuous + num_reg_unordered + num_reg_ordered) : 0;
-
-    if(conditional_influence) {
-      size_t conditional_pkw_count = 0;
-
-      conditional_kw = (double *)malloc(
-        (size_t)num_obs_train * sizeof(double));
-      if(p_nvar > 0 &&
-         (!np_size_mul_checked((size_t)num_obs_train, (size_t)p_nvar,
-                               &conditional_pkw_count) ||
-          !np_size_array_bytes_checked(
-            conditional_pkw_count, sizeof(double), &conditional_pkw_count)))
-        error("conditional influence kernel-weight dimensions overflow");
-      if(p_nvar > 0)
-        conditional_pkw = (double *)malloc(conditional_pkw_count);
-      if(conditional_kw == NULL || (p_nvar > 0 && conditional_pkw == NULL))
-        error("memory allocation failed in conditional influence workspace");
-    }
-  
-    if(do_grad){
-      permy = (double *)malloc(NCOL_Y*num_obs_eval_alloc*p_nvar*sizeof(double));
-      if(permy == NULL)
-        error("\n** Error: memory allocation failed.");
-      pop = OP_DERIVATIVE;
-    }
-    
-    if(meany == NULL)
-      error("\n** Error: memory allocation failed.");
-
-    lc_Y[0] = vector_Y;
-      
-    lc_Y[1] = (double *)malloc(num_obs_train*sizeof(double));
-    lc_Y[2] = (double *)malloc(num_obs_train*sizeof(double));
-
-    if((lc_Y[1] == NULL) || (lc_Y[2] == NULL))
-      error("\n** Error: memory allocation failed.");
-
-    for(int ii = 0; ii < num_obs_train; ii++){
-      lc_Y[1][ii] = 1.0;
-      lc_Y[2][ii] = vector_Y[ii]*vector_Y[ii];
-    }
-
-    if((!conditional_influence) && (!do_grad) &&
-       np_regression_categorical_profile_fit(kernel_c,
-                                             kernel_u,
-                                             kernel_o,
-                                             lp_engine_est,
-                                             BANDWIDTH_reg,
-                                             num_obs_train,
-                                             num_obs_eval,
-                                             num_reg_unordered,
-                                             num_reg_ordered,
-                                             num_reg_continuous,
-                                             matrix_X_unordered_train,
-                                             matrix_X_ordered_train,
-                                             matrix_X_unordered_eval,
-                                             matrix_X_ordered_eval,
-                                             vector_Y,
-                                             vector_scale_factor,
-                                             lambda,
-                                             num_categories,
-                                             operator,
-                                             matrix_categorical_vals,
-                                             mean,
-                                             mean_stderr)){
-      free(meany);
-      free(lc_Y[1]);
-      free(lc_Y[2]);
+    if(scalar_status == NP_REGRESSION_SCALAR_FIT_PROFILE)
       goto finish_regression_estimation;
-    }
-    
-    {
-      /* Optional derivative weights follow their own storage ownership;
-         conditional influence weights are an independent output channel. */
-      NPPermutationWeightOutput conditional_pkw_output =
-        np_pkw_output_make(conditional_pkw, p_nvar);
-      int kws_status;
-
-      kws_status = kernel_weighted_sum_np_ctx(kernel_c,
-                           kernel_u,
-                           kernel_o,
-                           BANDWIDTH_reg,
-                           num_obs_train,
-                           num_obs_eval,
-                           num_reg_unordered,
-                           num_reg_ordered,
-                           num_reg_continuous,
-                           0, // no leave one out 
-                           0,
-                           1, // kernel_pow = 1
-                           1, // bandwidth_divide = TRUE, always
-                           conditional_influence,
-                           0, // not symmetric
-                           0, // do not gather-scatter
-                           0, // do not drop train
-                           0, // do not drop train
-                           operator, // no special operators being used
-                           pop, // permutations used for gradients
-                           0, // no score
-                           do_grad, // ocg if grad 
-                           NULL,
-                           0, // don't explicity suppress parallel
-                           NCOL_Y,
-                           0,
-                           int_TREE_X,
-                           0,
-                           kdt_extern_X,
-                           NULL, NULL, NULL,
-                           matrix_X_unordered_train, // TRAIN
-                           matrix_X_ordered_train,
-                           matrix_X_continuous_train,
-                           matrix_X_unordered_eval, // EVAL
-                           matrix_X_ordered_eval,
-                           matrix_X_continuous_eval,
-                           lc_Y,
-                           NULL, // no W matrix
-                           NULL, // no sgn 
-                           vector_scale_factor,
-                           1,
-                           matrix_bandwidth,
-                           matrix_bandwidth,
-                           lambda,
-                           num_categories,
-                           matrix_categorical_vals,
-                           matrix_ordered_indices, 
-                           meany,
-                           permy, // permutations used for gradients
-                           conditional_kw,
-                           &gate_ctx_local,
-                           conditional_pkw != NULL ?
-                             &conditional_pkw_output : NULL);
-      if(kws_status != 0)
-        error("conditional regression kernel traversal failed");
-    }
-
-    for(int ii = 0; ii < num_obs_eval; ii++){
-      const int ii3 = NCOL_Y*ii;
-      const double sk = copysign(DBL_MIN, meany[ii3+1]) + meany[ii3+1];
-      mean[ii] = meany[ii3]/sk;
-
-      mean_stderr[ii] = meany[ii3+2]/sk - mean[ii]*mean[ii];
-
-      mean_stderr[ii] = (mean_stderr[ii] <= 0.0) ? 0.0 : sqrt(mean_stderr[ii] * K_INT_KERNEL_P / (sk*hprod));
-    }
-   
-    if(do_grad){
-      for(l = 0; l < num_reg_continuous; l++){
-        for(i = 0; i < num_obs_eval; i++){
-          // ordered y, 1, y*y
-          const int ii3 = NCOL_Y*i;
-          const int li3 = l*num_obs_eval*NCOL_Y + ii3;
-          const double sk = copysign(DBL_MIN, meany[ii3+1]) + meany[ii3+1];
-          gradient[l][i] = (permy[li3] - mean[i]*permy[li3+1])/sk;
-          
-          if(do_gerr){
-            gradient_stderr[l][i] = gfac*mean_stderr[i]/((BANDWIDTH_reg == BW_ADAP_NN) ? 1.0 : ((BANDWIDTH_reg == BW_GEN_NN) ? matrix_bandwidth[l][i]:matrix_bandwidth[l][0]));
-          }
-        }
-      }
-
-      for(l = num_reg_continuous; l < (num_reg_continuous + num_reg_unordered); l++){
-        for(i = 0; i < num_obs_eval; i++){
-          const int ii3 = NCOL_Y*i;
-          const int li3 = l*num_obs_eval*NCOL_Y + ii3;
-          const double sk = copysign(DBL_MIN, permy[li3+1]) + permy[li3+1];
-          const double s1 = permy[li3]/sk;
-
-          gradient[l][i] = mean[i] - s1;
-          
-          if(do_gerr && (num_reg_continuous > 0)){
-            const double se = permy[li3+2]/sk - s1*s1;
-            const double senn = (se <= 0.0) ? 0.0 : se;
-            gradient_stderr[l][i] = sqrt(mean_stderr[i]*mean_stderr[i] + senn*K_INT_KERNEL_P/(sk*hprod));
-          } else {
-            gradient_stderr[l][i] = 0.0;
-          }
-        }
-      }
-
-      for(l = num_reg_continuous + num_reg_unordered; l < p_nvar; l++){
-        for(i = 0; i < num_obs_eval; i++){
-          const int ii3 = NCOL_Y*i;
-          const int li3 = l*num_obs_eval*NCOL_Y + ii3;
-          const double sk = copysign(DBL_MIN, permy[li3+1]) + permy[li3+1];
-          const double s1 = permy[li3]/sk;
-          
-          gradient[l][i] = (mean[i] - s1)*((matrix_ordered_indices[l - num_reg_continuous - num_reg_unordered][i] != 0) ? 1.0 : -1.0);
-
-          if(do_gerr && (num_reg_continuous > 0)){
-            const double se = permy[li3+2]/sk - s1*s1;
-            const double senn = (se <= 0.0) ? 0.0 : se;
-            gradient_stderr[l][i] = sqrt(mean_stderr[i]*mean_stderr[i] + senn*K_INT_KERNEL_P/(sk*hprod));
-          } else {
-            gradient_stderr[l][i] = 0.0;
-          }
-        }
-      }
-    }
-
-    if(conditional_influence &&
-       !np_regression_conditional_influence_finish(
-         num_obs_train, p_nvar,
-         do_grad ? num_reg_continuous : 0,
-         do_grad ? num_reg_unordered : 0,
-         vector_Y, conditional_kw, conditional_pkw, meany, permy,
-         mean, gradient, mean_stderr, gradient_stderr))
+    if(scalar_status == NP_REGRESSION_SCALAR_FIT_ERR_DIMENSION)
+      error("conditional influence kernel-weight dimensions overflow");
+    if(scalar_status == NP_REGRESSION_SCALAR_FIT_ERR_CONDITIONAL_ALLOC)
+      error("memory allocation failed in conditional influence workspace");
+    if(scalar_status == NP_REGRESSION_SCALAR_FIT_ERR_ALLOC)
+      error("\n** Error: memory allocation failed.");
+    if(scalar_status == NP_REGRESSION_SCALAR_FIT_ERR_TRAVERSAL)
+      error("conditional regression kernel traversal failed");
+    if(scalar_status == NP_REGRESSION_SCALAR_FIT_ERR_INFLUENCE)
       error("conditional influence variance construction failed");
-
-
-    free(meany);
-
-    if(do_grad && (p_nvar > 0)){
-      free(permy);
-    }
-
-    free(conditional_kw);
-    free(conditional_pkw);
-
-    free(lc_Y[1]);
-    free(lc_Y[2]);
-#undef NCOL_Y
+    if(scalar_status == NP_REGRESSION_SCALAR_FIT_ERR_WORKSPACE_DIMENSION)
+      error("scalar regression workspace dimensions overflow");
+    if(scalar_status != NP_REGRESSION_SCALAR_FIT_OK)
+      error("invalid internal scalar regression fit status");
   } else if(lp_engine_est == NP_LP_ENGINE_GENERAL) { // local polynomial (regtype = "lp")
     int *glp_terms = NULL;
     int glp_nterms = 0;
