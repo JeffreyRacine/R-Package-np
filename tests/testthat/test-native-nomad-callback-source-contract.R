@@ -117,7 +117,7 @@ test_that("native NOMAD categorical coordinates use one canonical decoder", {
   source_file <- npRmpi_test_source_path("src", "np.c")
   expect_true(file.exists(source_file))
   source_text <- paste(readLines(source_file, warn = FALSE), collapse = "\n")
-  helper <- np_extract_c_function_body(
+  helper <- npRmpi_extract_c_function_body(
     source_text, "np_nomad_decode_categorical_bandwidth"
   )
 
@@ -130,7 +130,7 @@ test_that("native NOMAD categorical coordinates use one canonical decoder", {
     "np_cdens_native_search_callback"
   )) {
     expect_match(
-      np_extract_c_function_body(source_text, fun),
+      npRmpi_extract_c_function_body(source_text, fun),
       "np_nomad_decode_categorical_bandwidth(",
       fixed = TRUE,
       info = fun

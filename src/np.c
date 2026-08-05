@@ -1419,12 +1419,77 @@ static int bwm_num_reg_ordered = 0;
 static int bwm_num_extra_params = 0;
 static int bwm_kernel_unordered = 0;
 static int *bwm_num_categories = NULL;
+static int *bwm_kernel_unordered_vec = NULL;
+static int bwm_kernel_unordered_len = 0;
 static double *bwm_transform_buf = NULL;
 static int bwm_transform_buf_len = 0;
 
 static void bwm_nn_cache_free(void);
 static void bwm_objective_cache_free(void);
 extern void np_accel_gauss_release_buffers(void);
+
+/*
+ * Own every dimension, categorical-kernel, and borrowed category-count field
+ * used by bandwidth coordinate transforms.  Initial starts must install this
+ * context before external bandwidths are converted to optimizer coordinates;
+ * no transform may depend on state left by an earlier search owner.
+ */
+static void bwm_search_context_release(void)
+{
+  safe_free(bwm_kernel_unordered_vec);
+  bwm_kernel_unordered_vec = NULL;
+  bwm_kernel_unordered_len = 0;
+  bwm_num_reg_continuous = 0;
+  bwm_num_reg_unordered = 0;
+  bwm_num_reg_ordered = 0;
+  bwm_num_extra_params = 0;
+  bwm_kernel_unordered = 0;
+  bwm_num_categories = NULL;
+}
+
+static void bwm_search_context_configure_uniform(
+  const int num_continuous,
+  const int num_unordered,
+  const int num_ordered,
+  const int num_extra_params,
+  const int kernel_unordered,
+  int * const num_categories)
+{
+  bwm_search_context_release();
+  bwm_num_reg_continuous = num_continuous;
+  bwm_num_reg_unordered = num_unordered;
+  bwm_num_reg_ordered = num_ordered;
+  bwm_num_extra_params = num_extra_params;
+  bwm_kernel_unordered = kernel_unordered;
+  bwm_num_categories = num_categories;
+}
+
+static void bwm_search_context_configure_split(
+  const int num_continuous,
+  const int num_y_unordered,
+  const int num_x_unordered,
+  const int num_ordered,
+  const int num_extra_params,
+  const int kernel_y_unordered,
+  const int kernel_x_unordered,
+  int * const num_categories)
+{
+  int i;
+  const int num_unordered = num_y_unordered + num_x_unordered;
+
+  bwm_search_context_configure_uniform(
+    num_continuous, num_unordered, num_ordered, num_extra_params,
+    kernel_y_unordered, num_categories);
+  bwm_kernel_unordered_len = num_unordered;
+  if (num_unordered <= 0)
+    return;
+
+  bwm_kernel_unordered_vec = alloc_vecu(num_unordered);
+  for (i = 0; i < num_y_unordered; i++)
+    bwm_kernel_unordered_vec[i] = kernel_y_unordered;
+  for (i = 0; i < num_x_unordered; i++)
+    bwm_kernel_unordered_vec[num_y_unordered + i] = kernel_x_unordered;
+}
 
 static int bwm_reserve_transform_buf(int needed_len)
 {
@@ -1459,12 +1524,11 @@ void np_release_static_buffers(int *unused)
   bwm_transform_buf_len = 0;
   bwm_nn_cache_free();
   bwm_objective_cache_free();
+  bwm_search_context_release();
   np_accel_gauss_release_buffers();
 }
 static int bwm_penalty_mode = 0;
 static double bwm_penalty_value = DBL_MAX;
-static int *bwm_kernel_unordered_vec = NULL;
-static int bwm_kernel_unordered_len = 0;
 static double bwm_scale_factor_lower_bound = 0.1;
 double *vector_extendednn_upper_extern = NULL;
 int int_extendednn_upper_num_extern = 0;
@@ -3884,6 +3948,7 @@ static void np_reset_native_estimator_state_internal(void)
   if (matrix_categorical_vals_extern_Y != NULL) free_mat(matrix_categorical_vals_extern_Y, nuno + nord);
   if (matrix_categorical_vals_extern_XY != NULL) free_mat(matrix_categorical_vals_extern_XY, nuno + nord + runo + rord);
 
+  bwm_search_context_release();
   safe_free(num_categories_extern);
   safe_free(num_categories_extern_X);
   safe_free(num_categories_extern_Y);
@@ -4020,6 +4085,7 @@ static void np_regression_nomad_shadow_clear_internal(void)
   if (matrix_categorical_vals_extern != NULL)
     free_mat(matrix_categorical_vals_extern, num_reg_unordered_extern + num_reg_ordered_extern);
 
+  bwm_search_context_release();
   safe_free(vector_Y_extern);
   safe_free(num_categories_extern);
   safe_free(vector_continuous_stddev_extern);
@@ -4029,7 +4095,6 @@ static void np_regression_nomad_shadow_clear_internal(void)
   safe_free(np_regression_nomad_shadow.ckerub);
   safe_free(np_regression_nomad_shadow.vector_scale_factor);
   safe_free(np_regression_nomad_shadow.extendednn_upper);
-  safe_free(bwm_kernel_unordered_vec);
 
   matrix_X_unordered_train_extern = NULL;
   matrix_X_ordered_train_extern = NULL;
@@ -4041,18 +4106,10 @@ static void np_regression_nomad_shadow_clear_internal(void)
   vector_Y_extern = NULL;
   num_categories_extern = NULL;
   vector_continuous_stddev_extern = NULL;
-  bwm_num_categories = NULL;
-  bwm_kernel_unordered_vec = NULL;
-  bwm_kernel_unordered_len = 0;
   bwmfunc_raw = NULL;
   bwm_penalty_mode = 0;
   bwm_penalty_value = DBL_MAX;
   bwm_use_transform = 0;
-  bwm_num_reg_continuous = 0;
-  bwm_num_reg_unordered = 0;
-  bwm_num_reg_ordered = 0;
-  bwm_num_extra_params = 0;
-  bwm_kernel_unordered = 0;
   vector_ckerlb_extern = NULL;
   vector_ckerub_extern = NULL;
   int_cker_bound_extern = 0;
@@ -4276,7 +4333,6 @@ static int np_regression_nomad_shadow_prepare_internal(double *runo,
      np_lp_engine_extern == NP_LP_ENGINE_GENERAL) ?
     num_reg_continuous_extern : 0;
   np_regression_nomad_shadow.degree_key_len = degree_key_len;
-  bwm_num_extra_params = degree_key_len;
   vector_glp_gradient_order_extern = NULL;
   np_regression_nomad_shadow.requested_glp_bernstein = *glp_bernstein;
   np_regression_nomad_shadow.requested_glp_basis = *glp_basis;
@@ -4555,13 +4611,13 @@ static int np_regression_nomad_shadow_prepare_internal(double *runo,
       error("np.c: invalid bandwidth selection method.");
   }
 
-  bwm_num_reg_continuous = num_reg_continuous_extern;
-  bwm_num_reg_unordered = num_reg_unordered_extern;
-  bwm_num_reg_ordered = num_reg_ordered_extern;
-  bwm_kernel_unordered = KERNEL_reg_unordered_extern;
-  bwm_num_categories = num_categories_extern;
-  bwm_kernel_unordered_vec = NULL;
-  bwm_kernel_unordered_len = 0;
+  bwm_search_context_configure_uniform(
+    num_reg_continuous_extern,
+    num_reg_unordered_extern,
+    num_reg_ordered_extern,
+    degree_key_len,
+    KERNEL_reg_unordered_extern,
+    num_categories_extern);
   if (bwm_use_transform) {
     int n = bwm_num_reg_continuous + bwm_num_reg_unordered + bwm_num_reg_ordered;
     bwm_reserve_transform_buf(n + degree_key_len + 1);
@@ -5357,6 +5413,7 @@ static void np_conditional_density_nomad_shadow_clear_internal(void)
              num_var_unordered_extern + num_var_ordered_extern +
              num_reg_unordered_extern + num_reg_ordered_extern);
 
+  bwm_search_context_release();
   safe_free(num_categories_extern);
   safe_free(num_categories_extern_X);
   safe_free(num_categories_extern_Y);
@@ -5371,7 +5428,6 @@ static void np_conditional_density_nomad_shadow_clear_internal(void)
   safe_free(np_conditional_density_nomad_shadow.cxykerlb);
   safe_free(np_conditional_density_nomad_shadow.cxykerub);
   safe_free(np_conditional_density_nomad_shadow.extendednn_upper);
-  safe_free(bwm_kernel_unordered_vec);
 
   safe_free(np_conditional_density_nomad_shadow.ipt_x);
   safe_free(np_conditional_density_nomad_shadow.ipt_lookup_x);
@@ -5443,14 +5499,6 @@ static void np_conditional_density_nomad_shadow_clear_internal(void)
   bwm_penalty_mode = 0;
   bwm_penalty_value = DBL_MAX;
   bwm_use_transform = 0;
-  bwm_num_reg_continuous = 0;
-  bwm_num_reg_unordered = 0;
-  bwm_num_reg_ordered = 0;
-  bwm_num_extra_params = 0;
-  bwm_kernel_unordered = 0;
-  bwm_num_categories = NULL;
-  bwm_kernel_unordered_vec = NULL;
-  bwm_kernel_unordered_len = 0;
 
   int_cxker_bound_extern = 0;
   int_cyker_bound_extern = 0;
@@ -5914,7 +5962,6 @@ static int np_conditional_density_nomad_shadow_prepare_internal(double *c_uno,
     (degree_search || (np_lp_engine_extern == NP_LP_ENGINE_GENERAL)) ?
     num_reg_continuous_extern : 0;
   np_conditional_density_nomad_shadow.degree_key_len = degree_key_len;
-  bwm_num_extra_params = degree_key_len;
   vector_glp_gradient_order_extern = NULL;
   np_conditional_density_nomad_shadow.requested_glp_bernstein =
     ((ibwmfunc == CBWM_CVML) || (ibwmfunc == CBWM_CVLS)) ?
@@ -6441,23 +6488,15 @@ static int np_conditional_density_nomad_shadow_prepare_internal(double *c_uno,
       error("np.c: invalid bandwidth selection method.");
   }
 
-  bwm_num_reg_continuous = num_all_cvar;
-  bwm_num_reg_unordered = num_all_uvar;
-  bwm_num_reg_ordered = num_all_ovar;
-  bwm_kernel_unordered = KERNEL_den_unordered_extern;
-  bwm_kernel_unordered_len = bwm_num_reg_unordered;
-  if (bwm_kernel_unordered_len > 0) {
-    bwm_kernel_unordered_vec = alloc_vecu(bwm_kernel_unordered_len);
-    if (bwm_kernel_unordered_vec == NULL)
-      goto fail;
-    for (i = 0; i < num_var_unordered_extern; i++)
-      bwm_kernel_unordered_vec[i] = KERNEL_den_unordered_extern;
-    for (i = 0; i < num_reg_unordered_extern; i++)
-      bwm_kernel_unordered_vec[num_var_unordered_extern + i] = KERNEL_reg_unordered_extern;
-  } else {
-    bwm_kernel_unordered_vec = NULL;
-  }
-  bwm_num_categories = num_categories_extern;
+  bwm_search_context_configure_split(
+    num_all_cvar,
+    num_var_unordered_extern,
+    num_reg_unordered_extern,
+    num_all_ovar,
+    degree_key_len,
+    KERNEL_den_unordered_extern,
+    KERNEL_reg_unordered_extern,
+    num_categories_extern);
   /* Shadow evaluators call bwmfunc_wrapper(), so prepare owns a fresh
      bandwidth-objective cache lifecycle just like ordinary searches. */
   bwm_nn_cache_configure_for_degree_search(BANDWIDTH_den_extern,
@@ -13083,6 +13122,13 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
     goto cleanup_np_density_bw;
   }
 
+  bwm_search_context_configure_uniform(
+    num_reg_continuous_extern,
+    num_reg_unordered_extern,
+    num_reg_ordered_extern,
+    0,
+    KERNEL_den_unordered_extern,
+    num_categories_extern);
   if (bwm_use_transform &&
       bwm_to_unconstrained(vector_scale_factor, num_var) != 0) {
     bw_error_msg = "C_np_density_bw: transform buffer allocation failed";
@@ -13093,13 +13139,6 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
 
   np_bwm_clear_deferred_error();
   bwmfunc_raw = bwmfunc;
-  bwm_num_reg_continuous = num_reg_continuous_extern;
-  bwm_num_reg_unordered = num_reg_unordered_extern;
-  bwm_num_reg_ordered = num_reg_ordered_extern;
-  bwm_kernel_unordered = KERNEL_den_unordered_extern;
-  bwm_kernel_unordered_vec = NULL;
-  bwm_kernel_unordered_len = 0;
-  bwm_num_categories = num_categories_extern;
   bwm_set_floor_context(
     enforce_fixed_feasibility,
     num_var,
@@ -13543,6 +13582,7 @@ cleanup_np_density_bw:
   bwm_clear_floor_context();
   bwm_nn_cache_free();
   bwm_objective_cache_free();
+  bwm_search_context_release();
 
   free_mat(matrix_X_unordered_train_extern, num_reg_unordered_extern);
   free_mat(matrix_X_ordered_train_extern, num_reg_ordered_extern);
@@ -13981,6 +14021,13 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
     goto cleanup_np_distribution_bw;
   }
 
+  bwm_search_context_configure_uniform(
+    num_reg_continuous_extern,
+    num_reg_unordered_extern,
+    num_reg_ordered_extern,
+    0,
+    KERNEL_den_unordered_extern,
+    num_categories_extern);
   if (bwm_use_transform &&
       bwm_to_unconstrained(vector_scale_factor, num_var) != 0) {
     bw_error_msg = "C_np_distribution_bw: transform buffer allocation failed";
@@ -13991,13 +14038,6 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
 
   np_bwm_clear_deferred_error();
   bwmfunc_raw = bwmfunc;
-  bwm_num_reg_continuous = num_reg_continuous_extern;
-  bwm_num_reg_unordered = num_reg_unordered_extern;
-  bwm_num_reg_ordered = num_reg_ordered_extern;
-  bwm_kernel_unordered = KERNEL_den_unordered_extern;
-  bwm_kernel_unordered_vec = NULL;
-  bwm_kernel_unordered_len = 0;
-  bwm_num_categories = num_categories_extern;
   bwm_set_floor_context(
     enforce_fixed_feasibility,
     num_var,
@@ -14430,6 +14470,7 @@ cleanup_np_distribution_bw:
   bwm_clear_floor_context();
   bwm_nn_cache_free();
   bwm_objective_cache_free();
+  bwm_search_context_release();
 
   free_mat(matrix_X_unordered_train_extern, num_reg_unordered_extern);
   free_mat(matrix_X_ordered_train_extern, num_reg_ordered_extern);
@@ -15146,6 +15187,15 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
     goto cleanup_np_density_conditional_bw;
   }
 
+  bwm_search_context_configure_split(
+    num_var_continuous_extern + num_reg_continuous_extern,
+    num_var_unordered_extern,
+    num_reg_unordered_extern,
+    num_var_ordered_extern + num_reg_ordered_extern,
+    0,
+    KERNEL_den_unordered_extern,
+    KERNEL_reg_unordered_extern,
+    num_categories_extern);
   if (bwm_use_transform &&
       bwm_to_unconstrained(vector_scale_factor, num_all_var) != 0) {
     bw_error_msg = "C_np_density_conditional_bw: transform buffer allocation failed";
@@ -15156,21 +15206,6 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 
   np_bwm_clear_deferred_error();
   bwmfunc_raw = bwmfunc;
-  bwm_num_reg_continuous = num_var_continuous_extern + num_reg_continuous_extern;
-  bwm_num_reg_unordered = num_var_unordered_extern + num_reg_unordered_extern;
-  bwm_num_reg_ordered = num_var_ordered_extern + num_reg_ordered_extern;
-  bwm_kernel_unordered = KERNEL_den_unordered_extern;
-  bwm_kernel_unordered_len = bwm_num_reg_unordered;
-  if (bwm_kernel_unordered_len > 0) {
-    bwm_kernel_unordered_vec = alloc_vecu(bwm_kernel_unordered_len);
-    for (i = 0; i < num_var_unordered_extern; i++)
-      bwm_kernel_unordered_vec[i] = KERNEL_den_unordered_extern;
-    for (i = 0; i < num_reg_unordered_extern; i++)
-      bwm_kernel_unordered_vec[num_var_unordered_extern + i] = KERNEL_reg_unordered_extern;
-  } else {
-    bwm_kernel_unordered_vec = NULL;
-  }
-  bwm_num_categories = num_categories_extern;
   bwm_set_floor_context(
     enforce_fixed_feasibility,
     num_all_var,
@@ -15624,6 +15659,7 @@ cleanup_np_density_conditional_bw:
   bwm_clear_floor_context();
   bwm_nn_cache_free();
   bwm_objective_cache_free();
+  bwm_search_context_release();
   safe_free(vector_extendednn_upper_extern);
   vector_extendednn_upper_extern = NULL;
   int_extendednn_upper_num_extern = 0;
@@ -15643,9 +15679,6 @@ cleanup_np_density_conditional_bw:
   safe_free(num_categories_extern_XY);
   safe_free(num_categories_extern_X);
   safe_free(num_categories_extern_Y);
-  safe_free(bwm_kernel_unordered_vec);
-  bwm_kernel_unordered_vec = NULL;
-  bwm_kernel_unordered_len = 0;
 
   free_mat(matrix_categorical_vals_extern, num_reg_unordered_extern + num_reg_ordered_extern +
            num_var_unordered_extern + num_var_ordered_extern);
@@ -16368,6 +16401,15 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
     goto cleanup_np_distribution_conditional_bw;
   }
 
+  bwm_search_context_configure_split(
+    num_var_continuous_extern + num_reg_continuous_extern,
+    num_var_unordered_extern,
+    num_reg_unordered_extern,
+    num_var_ordered_extern + num_reg_ordered_extern,
+    0,
+    KERNEL_den_unordered_extern,
+    KERNEL_reg_unordered_extern,
+    num_categories_extern);
   if (bwm_use_transform &&
       bwm_to_unconstrained(vector_scale_factor, num_all_var) != 0) {
     bw_error_msg = "C_np_distribution_conditional_bw: transform buffer allocation failed";
@@ -16377,21 +16419,6 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   spinner(0);
 
   bwmfunc_raw = bwmfunc;
-  bwm_num_reg_continuous = num_var_continuous_extern + num_reg_continuous_extern;
-  bwm_num_reg_unordered = num_var_unordered_extern + num_reg_unordered_extern;
-  bwm_num_reg_ordered = num_var_ordered_extern + num_reg_ordered_extern;
-  bwm_kernel_unordered = KERNEL_den_unordered_extern;
-  bwm_kernel_unordered_len = bwm_num_reg_unordered;
-  if (bwm_kernel_unordered_len > 0) {
-    bwm_kernel_unordered_vec = alloc_vecu(bwm_kernel_unordered_len);
-    for (i = 0; i < num_var_unordered_extern; i++)
-      bwm_kernel_unordered_vec[i] = KERNEL_den_unordered_extern;
-    for (i = 0; i < num_reg_unordered_extern; i++)
-      bwm_kernel_unordered_vec[num_var_unordered_extern + i] = KERNEL_reg_unordered_extern;
-  } else {
-    bwm_kernel_unordered_vec = NULL;
-  }
-  bwm_num_categories = num_categories_extern;
   bwm_set_floor_context(
     enforce_fixed_feasibility,
     num_all_var,
@@ -16819,6 +16846,7 @@ cleanup_np_distribution_conditional_bw:
   bwm_clear_floor_context();
   bwm_nn_cache_free();
   bwm_objective_cache_free();
+  bwm_search_context_release();
   safe_free(vector_extendednn_upper_extern);
   vector_extendednn_upper_extern = NULL;
   int_extendednn_upper_num_extern = 0;
@@ -16842,9 +16870,6 @@ cleanup_np_distribution_conditional_bw:
   safe_free(vector_scale_factor_startbest);
   safe_free(vsfh);
   safe_free(num_categories_extern);
-  safe_free(bwm_kernel_unordered_vec);
-  bwm_kernel_unordered_vec = NULL;
-  bwm_kernel_unordered_len = 0;
   safe_free(num_categories_extern_X);
   safe_free(num_categories_extern_Y);
   safe_free(num_categories_extern_XY);
@@ -18839,12 +18864,13 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   spinner(0);
 
   bwmfunc_raw = bwmfunc;
-  bwm_num_reg_continuous = num_reg_continuous_extern;
-  bwm_num_reg_unordered = num_reg_unordered_extern;
-  bwm_num_reg_ordered = num_reg_ordered_extern;
-  bwm_num_extra_params = lsq_check_mode ? 1 : 0;
-  bwm_kernel_unordered = KERNEL_reg_unordered_extern;
-  bwm_num_categories = num_categories_extern;
+  bwm_search_context_configure_uniform(
+    num_reg_continuous_extern,
+    num_reg_unordered_extern,
+    num_reg_ordered_extern,
+    lsq_check_mode ? 1 : 0,
+    KERNEL_reg_unordered_extern,
+    num_categories_extern);
   bwm_set_floor_context(
     enforce_fixed_feasibility,
     num_var,
@@ -19285,6 +19311,7 @@ cleanup_np_regression_bw_mode:
   bwm_clear_floor_context();
   bwm_nn_cache_free();
   bwm_objective_cache_free();
+  bwm_search_context_release();
   safe_free(vector_extendednn_upper_extern);
   vector_extendednn_upper_extern = NULL;
   int_extendednn_upper_num_extern = 0;
@@ -19338,7 +19365,6 @@ cleanup_np_regression_bw_mode:
   int_glp_basis_extern = 1;
   np_clear_estimator_extern_aliases();
   int_nn_k_min_extern = 1;
-  bwm_num_extra_params = 0;
 
   if (bw_error_msg != NULL)
     error("%s", bw_error_msg);
