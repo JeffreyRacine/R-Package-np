@@ -22170,6 +22170,229 @@ static int NP_NOINLINE np_regression_conditional_influence_finish(
 }
 
 /*
+ * Enclosing owner for the generic regression fit.  The canonical scalar-beta
+ * route returns before this owner is initialized.  Every remaining branch
+ * either reports an ordinary status to the common finish block or chains this
+ * cleanup from its existing narrow unwind boundary.
+ */
+typedef struct {
+  int num_reg_continuous;
+  int ordered_tables_initialized;
+  int gate_override_active;
+  int ov_cont_from_cache;
+  int *operator;
+  int *kernel_c;
+  int *kernel_u;
+  int *kernel_o;
+  double *lambda;
+  double **matrix_bandwidth;
+  double **matrix_bandwidth_deriv;
+  struct th_table *ordered_tables;
+  int **matrix_ordered_indices;
+  int *ordered_indices_storage;
+  NP_GateOverrideCtx *gate_context;
+  int *ov_cont_ok;
+  int *ov_disc_uno_ok;
+  int *ov_disc_ord_ok;
+  double *ov_cont_hmin;
+  double *ov_cont_k0;
+  double *ov_disc_uno_const;
+  double *ov_disc_ord_const;
+} NPRegressionFitOwner;
+
+static void np_regression_fit_owner_init(
+  NPRegressionFitOwner *owner,
+  const int num_reg_continuous,
+  NP_GateOverrideCtx *gate_context)
+{
+  memset(owner, 0, sizeof(*owner));
+  owner->num_reg_continuous = num_reg_continuous;
+  owner->gate_context = gate_context;
+}
+
+static void np_regression_fit_owner_clear(NPRegressionFitOwner *owner)
+{
+  int coordinate;
+
+  np_disc_profile_cache_clear();
+  np_cont_largeh_cache_clear();
+  for(coordinate = 0;
+      coordinate < owner->ordered_tables_initialized;
+      ++coordinate)
+    thdestroy_r(owner->ordered_tables + coordinate);
+  free(owner->ordered_tables);
+  free(owner->ordered_indices_storage);
+  free(owner->matrix_ordered_indices);
+  if(owner->gate_override_active && owner->gate_context != NULL)
+    np_gate_ctx_clear(owner->gate_context);
+  if(!owner->ov_cont_from_cache) {
+    free(owner->ov_cont_ok);
+    free(owner->ov_cont_hmin);
+    free(owner->ov_cont_k0);
+  }
+  free(owner->ov_disc_uno_ok);
+  free(owner->ov_disc_uno_const);
+  free(owner->ov_disc_ord_ok);
+  free(owner->ov_disc_ord_const);
+  free(owner->operator);
+  free(owner->kernel_c);
+  free(owner->kernel_u);
+  free(owner->kernel_o);
+  free(owner->lambda);
+  free_tmat(owner->matrix_bandwidth);
+  free_mat(owner->matrix_bandwidth_deriv, owner->num_reg_continuous);
+  np_regression_fit_owner_init(
+    owner, owner->num_reg_continuous, owner->gate_context);
+}
+
+static void np_regression_fit_owner_cleanup(void *data, Rboolean jump)
+{
+  if(jump)
+    np_regression_fit_owner_clear((NPRegressionFitOwner *)data);
+}
+
+static double **np_regression_fit_matrix_alloc(
+  const int nrows,
+  const int ncols,
+  const int contiguous)
+{
+  double **matrix = NULL;
+  size_t pointer_bytes, row_bytes;
+  int column;
+
+  if(nrows < 0 || ncols < 0)
+    return NULL;
+  if(nrows == 0 || ncols == 0)
+    return NULL;
+  if((size_t)ncols > SIZE_MAX/sizeof(double *) ||
+     (size_t)nrows > SIZE_MAX/sizeof(double))
+    return NULL;
+  pointer_bytes = (size_t)ncols*sizeof(double *);
+  row_bytes = (size_t)nrows*sizeof(double);
+  matrix = (double **)malloc(pointer_bytes);
+  if(matrix == NULL)
+    return NULL;
+
+  if(contiguous) {
+    double * const storage =
+      (size_t)ncols <= SIZE_MAX/row_bytes ?
+      (double *)malloc((size_t)ncols*row_bytes) : NULL;
+    if(storage == NULL) {
+      free(matrix);
+      return NULL;
+    }
+    matrix[0] = storage;
+    for(column = 1; column < ncols; ++column)
+      matrix[column] = matrix[column - 1] + nrows;
+  } else {
+    for(column = 0; column < ncols; ++column) {
+      matrix[column] = (double *)malloc(row_bytes);
+      if(matrix[column] == NULL) {
+        while(column > 0)
+          free(matrix[--column]);
+        free(matrix);
+        return NULL;
+      }
+    }
+  }
+  return matrix;
+}
+
+typedef struct {
+  int use_canonical_beta;
+  int kernel;
+  int bandwidth_mode;
+  int num_obs_train;
+  int num_obs_eval;
+  int num_reg_unordered;
+  int num_reg_ordered;
+  int num_reg_continuous;
+  double *vector_scale_factor;
+  double **matrix_X_continuous_train;
+  double **matrix_X_continuous_eval;
+  double **matrix_bandwidth;
+  double **matrix_bandwidth_deriv;
+  double *lambda;
+  const NPContinuousPreparedBandwidthView *prepared_bandwidth;
+  double *kernel_integral;
+  double *kernel_power_integral;
+  double *kernel_half_integral;
+  double *kernel_difference;
+  int status;
+} NPRegressionFitBandwidthCall;
+
+static SEXP np_regression_fit_bandwidth_execute(void *data)
+{
+  NPRegressionFitBandwidthCall * const call =
+    (NPRegressionFitBandwidthCall *)data;
+
+  if(call->use_canonical_beta) {
+    call->status = np_beta_continuous_bandwidth_prepare_canonical(
+      call->bandwidth_mode,
+      call->num_obs_train,
+      call->num_obs_eval,
+      call->num_reg_unordered,
+      call->num_reg_ordered,
+      call->num_reg_continuous,
+      call->matrix_X_continuous_train,
+      call->matrix_X_continuous_eval,
+      call->vector_scale_factor,
+      call->matrix_bandwidth,
+      call->matrix_bandwidth_deriv,
+      call->lambda,
+      call->prepared_bandwidth);
+  } else {
+    call->status = kernel_bandwidth(
+      call->kernel,
+      call->bandwidth_mode,
+      call->num_obs_train,
+      call->num_obs_eval,
+      0, 0, 0,
+      call->num_reg_continuous,
+      call->num_reg_unordered,
+      call->num_reg_ordered,
+      call->vector_scale_factor,
+      NULL, NULL,
+      call->matrix_X_continuous_train,
+      call->matrix_X_continuous_eval,
+      NULL,
+      call->matrix_bandwidth,
+      call->lambda,
+      call->matrix_bandwidth_deriv);
+  }
+  if(call->status == 0) {
+    if(call->use_canonical_beta) {
+      *call->kernel_integral = 1.0;
+      *call->kernel_power_integral = 1.0;
+      *call->kernel_difference = 0.0;
+    } else if(call->num_reg_continuous != 0) {
+      initialize_kernel_regression_asymptotic_constants(
+        call->kernel,
+        call->num_reg_continuous,
+        call->kernel_integral,
+        call->kernel_power_integral,
+        call->kernel_half_integral,
+        call->kernel_difference);
+    } else {
+      *call->kernel_integral = 1.0;
+      *call->kernel_power_integral = 1.0;
+    }
+  }
+  return R_NilValue;
+}
+
+static int np_regression_fit_bandwidth_prepare_owned(
+  NPRegressionFitBandwidthCall *call,
+  NPRegressionFitOwner *owner)
+{
+  call->status = 1;
+  R_UnwindProtect(
+    np_regression_fit_bandwidth_execute, call,
+    np_regression_fit_owner_cleanup, owner, NULL);
+  return call->status;
+}
+
+/*
  * Canonical non-beta scalar-LP0 fit owner. Conditional estimators can invoke
  * this route once per evaluation row, so every buffer remains malloc-backed
  * and is released at the route boundary on normal return or longjmp.
@@ -22221,7 +22444,8 @@ typedef struct {
   int do_grad;
   int do_gerr;
   NPRegressionStandardErrorMode standard_error_mode;
-  NP_GateOverrideCtx *gate_context;
+  const NP_GateOverrideCtx *gate_context;
+  NPRegressionFitOwner *enclosing_owner;
   double kernel_squared_integral;
   double bandwidth_product;
   double gradient_stderr_factor;
@@ -22234,6 +22458,7 @@ typedef struct {
   double *conditional_permutation_weights;
   double *unit_response;
   double *squared_response;
+  NPRegressionFitOwner *enclosing_owner;
 } NPRegressionScalarFitOwner;
 
 typedef struct {
@@ -22243,7 +22468,8 @@ typedef struct {
 } NPRegressionScalarFitExecution;
 
 static void np_regression_scalar_fit_owner_init(
-  NPRegressionScalarFitOwner *owner)
+  NPRegressionScalarFitOwner *owner,
+  NPRegressionFitOwner *enclosing_owner)
 {
   owner->mean_columns = NULL;
   owner->permutation_columns = NULL;
@@ -22251,6 +22477,7 @@ static void np_regression_scalar_fit_owner_init(
   owner->conditional_permutation_weights = NULL;
   owner->unit_response = NULL;
   owner->squared_response = NULL;
+  owner->enclosing_owner = enclosing_owner;
 }
 
 static void np_regression_scalar_fit_owner_cleanup(
@@ -22260,13 +22487,14 @@ static void np_regression_scalar_fit_owner_cleanup(
   NPRegressionScalarFitOwner * const owner =
     (NPRegressionScalarFitOwner *)data;
 
-  (void)jump;
   free(owner->mean_columns);
   free(owner->permutation_columns);
   free(owner->conditional_weights);
   free(owner->conditional_permutation_weights);
   free(owner->unit_response);
   free(owner->squared_response);
+  if(jump && owner->enclosing_owner != NULL)
+    np_regression_fit_owner_clear(owner->enclosing_owner);
 }
 
 static SEXP np_regression_scalar_fit_execute(void *data)
@@ -22547,7 +22775,8 @@ static int np_regression_scalar_fit(
 
   execution.call = call;
   execution.status = NP_REGRESSION_SCALAR_FIT_ERR_ALLOC;
-  np_regression_scalar_fit_owner_init(&execution.owner);
+  np_regression_scalar_fit_owner_init(
+    &execution.owner, call->enclosing_owner);
   R_UnwindProtect(
     np_regression_scalar_fit_execute, &execution,
     np_regression_scalar_fit_owner_cleanup, &execution.owner, NULL);
@@ -22563,7 +22792,8 @@ enum {
   NP_REGRESSION_GENERAL_LP_FIT_ERR_ALLOC = -5,
   NP_REGRESSION_GENERAL_LP_FIT_ERR_BASIS = -6,
   NP_REGRESSION_GENERAL_LP_FIT_ERR_ROUTE = -7,
-  NP_REGRESSION_GENERAL_LP_FIT_ERR_SOLVE = -8
+  NP_REGRESSION_GENERAL_LP_FIT_ERR_SOLVE = -8,
+  NP_REGRESSION_GENERAL_LP_FIT_ERR_OWNER_SOLVE = -9
 };
 
 typedef struct {
@@ -22606,6 +22836,7 @@ typedef struct {
   double bandwidth_product;
   const NPContinuousKernelRoute *kernel_route;
   NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics;
+  NPRegressionFitOwner *enclosing_owner;
 } NPRegressionGeneralLPFitCall;
 
 typedef struct {
@@ -22715,6 +22946,8 @@ static void np_regression_general_lp_fit_owner_cleanup(
   np_reg_mpi_owner_chunk_free(&owner->mpi_owner_chunk);
   free(owner->mpi_kernel_row);
 #endif
+  if(jump && call->enclosing_owner != NULL)
+    np_regression_fit_owner_clear(call->enclosing_owner);
 }
 
 static SEXP np_regression_general_lp_fit_execute(void *data)
@@ -23270,7 +23503,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	        free(owner->mpi_kernel_row);
 	        owner->mpi_kernel_row = NULL;
 	        if(owner_solve_failed){
-	          execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_ROUTE;
+	          execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_OWNER_SOLVE;
 	          return R_NilValue;
 	        }
 	      }
@@ -23661,6 +23894,7 @@ typedef struct {
   double *projection_block;
   double *fitted_block;
   NPLPFullRowWorkspace *inverse_workspace;
+  NPRegressionFitOwner *enclosing_owner;
 } NPRegressionAllLargeLPFitOwner;
 
 typedef struct {
@@ -23672,50 +23906,6 @@ typedef struct {
   NPGLPBasisCtx *basis_context;
   double **basis;
 } NPRegressionAllLargeBernsteinBasisCall;
-
-static double **np_regression_alllarge_basis_alloc(
-  const int nrows,
-  const int ncols,
-  const int contiguous)
-{
-  double **matrix = NULL;
-  size_t pointer_bytes, row_bytes;
-  int column;
-
-  if((nrows <= 0) || (ncols <= 0) ||
-     ((size_t)ncols > SIZE_MAX/sizeof(double *)) ||
-     ((size_t)nrows > SIZE_MAX/sizeof(double)))
-    return NULL;
-  pointer_bytes = (size_t)ncols*sizeof(double *);
-  row_bytes = (size_t)nrows*sizeof(double);
-  matrix = (double **)malloc(pointer_bytes);
-  if(matrix == NULL)
-    return NULL;
-
-  if(contiguous){
-    double * const storage =
-      ((size_t)ncols <= SIZE_MAX/row_bytes) ?
-      (double *)malloc((size_t)ncols*row_bytes) : NULL;
-    if(storage == NULL){
-      free(matrix);
-      return NULL;
-    }
-    matrix[0] = storage;
-    for(column = 1; column < ncols; column++)
-      matrix[column] = matrix[column - 1] + nrows;
-  } else {
-    for(column = 0; column < ncols; column++){
-      matrix[column] = (double *)malloc(row_bytes);
-      if(matrix[column] == NULL){
-        while(column > 0)
-          free(matrix[--column]);
-        free(matrix);
-        return NULL;
-      }
-    }
-  }
-  return matrix;
-}
 
 static SEXP np_regression_alllarge_bernstein_basis_execute(void *data)
 {
@@ -23761,7 +23951,18 @@ static void np_regression_alllarge_lp_fit_cleanup(
       free_mat(owner->basis, owner->nterms);
   }
   free(owner->terms);
+  if(owner->enclosing_owner != NULL)
+    np_regression_fit_owner_clear(owner->enclosing_owner);
 }
+
+enum {
+  NP_REGRESSION_FIT_OK = 0,
+  NP_REGRESSION_FIT_ERR_ALLOC = -1,
+  NP_REGRESSION_FIT_ERR_BANDWIDTH = -2,
+  NP_REGRESSION_FIT_ERR_HASH_CREATE = -3,
+  NP_REGRESSION_FIT_ERR_HASH_INSERT = -4,
+  NP_REGRESSION_FIT_ERR_HASH_LOOKUP = -5
+};
 
 int kernel_estimate_regression_categorical_tree_np(
 int lp_engine,
@@ -23808,8 +24009,9 @@ const NPContinuousPreparedBandwidthView *prepared_bandwidth){
 	double K_INT_KERNEL_P;				 /*  K^p */
 	/* Integral of K(z-0.5)*K(z+0.5) */
 	double INT_KERNEL_PM_HALF = 0.0;
-	double DIFF_KER_PPM = 0.0;		 /* Difference between int K(z)^p and int K(z-.5)K(z+.5) */
+  double DIFF_KER_PPM = 0.0;		 /* Difference between int K(z)^p and int K(z-.5)K(z+.5) */
   double hprod;
+  double gfac = 0.0;
 
   double * lambda = NULL;
   double ** matrix_bandwidth = NULL;
@@ -23820,9 +24022,11 @@ const NPContinuousPreparedBandwidthView *prepared_bandwidth){
   int *ov_cont_ok = NULL, *ov_disc_uno_ok = NULL, *ov_disc_ord_ok = NULL;
   double *ov_cont_hmin = NULL, *ov_cont_k0 = NULL;
   double *ov_disc_uno_const = NULL, *ov_disc_ord_const = NULL;
-  int ov_cont_from_cache = 0;
   int estimation_shortcut_done = 0;
+  int regression_fit_status = NP_REGRESSION_FIT_OK;
+  int scalar_fit_status = NP_REGRESSION_SCALAR_FIT_OK;
   int general_lp_fit_status = NP_REGRESSION_GENERAL_LP_FIT_OK;
+  NPRegressionFitOwner fit_owner;
 
 #ifdef MPI2
   int stride_e = MAX((int)ceil((double) num_obs_eval / (double) iNum_Processors),1);
@@ -23881,8 +24085,28 @@ const NPContinuousPreparedBandwidthView *prepared_bandwidth){
       categorical_compress < 0 || categorical_compress > 1))
     error("canonical beta regression route has an invalid layout");
 
-  operator = (int *)malloc(
-    sizeof(int)*(num_reg_continuous+num_reg_unordered+num_reg_ordered));
+  /* Option reads can longjmp; perform them before malloc-backed state exists. */
+  np_refresh_runtime_tolerances();
+  np_regression_fit_owner_init(
+    &fit_owner, num_reg_continuous, &gate_ctx_local);
+
+  {
+    const int num_reg_total =
+      num_reg_continuous + num_reg_unordered + num_reg_ordered;
+    size_t bytes = 0;
+    if(num_reg_total < 0 ||
+       !np_size_array_bytes_checked((size_t)num_reg_total,
+                                    sizeof(int), &bytes)) {
+      regression_fit_status = NP_REGRESSION_FIT_ERR_ALLOC;
+      goto finish_regression_estimation;
+    }
+    operator = num_reg_total > 0 ? (int *)malloc(bytes) : NULL;
+    fit_owner.operator = operator;
+    if(num_reg_total > 0 && operator == NULL) {
+      regression_fit_status = NP_REGRESSION_FIT_ERR_ALLOC;
+      goto finish_regression_estimation;
+    }
+  }
   for(i = 0;
       i < (num_reg_continuous+num_reg_unordered+num_reg_ordered);
       i++)
@@ -23900,17 +24124,35 @@ const NPContinuousPreparedBandwidthView *prepared_bandwidth){
 
   int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
 
-  kernel_c = (int *)malloc(sizeof(int)*num_reg_continuous);
+  kernel_c = num_reg_continuous > 0 ?
+    (int *)malloc((size_t)num_reg_continuous*sizeof(int)) : NULL;
+  fit_owner.kernel_c = kernel_c;
+  if(num_reg_continuous > 0 && kernel_c == NULL) {
+    regression_fit_status = NP_REGRESSION_FIT_ERR_ALLOC;
+    goto finish_regression_estimation;
+  }
 
   for(i = 0; i < num_reg_continuous; i++)
     kernel_c[i] = KERNEL_reg;
 
-  kernel_u = (int *)malloc(sizeof(int)*num_reg_unordered);
+  kernel_u = num_reg_unordered > 0 ?
+    (int *)malloc((size_t)num_reg_unordered*sizeof(int)) : NULL;
+  fit_owner.kernel_u = kernel_u;
+  if(num_reg_unordered > 0 && kernel_u == NULL) {
+    regression_fit_status = NP_REGRESSION_FIT_ERR_ALLOC;
+    goto finish_regression_estimation;
+  }
 
   for(i = 0; i < num_reg_unordered; i++)
     kernel_u[i] = KERNEL_unordered_reg;
 
-  kernel_o = (int *)malloc(sizeof(int)*num_reg_ordered);
+  kernel_o = num_reg_ordered > 0 ?
+    (int *)malloc((size_t)num_reg_ordered*sizeof(int)) : NULL;
+  fit_owner.kernel_o = kernel_o;
+  if(num_reg_ordered > 0 && kernel_o == NULL) {
+    regression_fit_status = NP_REGRESSION_FIT_ERR_ALLOC;
+    goto finish_regression_estimation;
+  }
 
   for(i = 0; i < num_reg_ordered; i++)
     kernel_o[i] = KERNEL_ordered_reg;
@@ -23920,103 +24162,106 @@ const NPContinuousPreparedBandwidthView *prepared_bandwidth){
 
   // Allocate memory for objects 
 
-  lambda = alloc_vecd(num_reg_unordered+num_reg_ordered);
-  matrix_bandwidth = alloc_tmatd(bwmdim,num_reg_continuous);
-
-  matrix_bandwidth_deriv = alloc_matd(bwmdim,num_reg_continuous);
-
-  if(NP_UNLIKELY(kernel_route != NULL)) {
-    if(np_beta_continuous_bandwidth_prepare_canonical(
-        BANDWIDTH_reg,
-        num_obs_train,
-        num_obs_eval,
-        num_reg_unordered,
-        num_reg_ordered,
-        num_reg_continuous,
-        matrix_X_continuous_train,
-        matrix_X_continuous_eval,
-        vector_scale_factor,
-        matrix_bandwidth,
-        matrix_bandwidth_deriv,
-        lambda,
-        prepared_bandwidth) == 1) {
-#ifdef MPI2
-		MPI_Barrier(comm[1]);
-		MPI_Finalize();
-#endif
-      error("\n** Error: invalid bandwidth.");
+  {
+    const int num_reg_categorical = num_reg_unordered + num_reg_ordered;
+    lambda = num_reg_categorical > 0 ?
+      (double *)malloc((size_t)num_reg_categorical*sizeof(double)) : NULL;
+    fit_owner.lambda = lambda;
+    matrix_bandwidth = np_regression_fit_matrix_alloc(
+      bwmdim, num_reg_continuous, 1);
+    fit_owner.matrix_bandwidth = matrix_bandwidth;
+    matrix_bandwidth_deriv = np_regression_fit_matrix_alloc(
+      bwmdim, num_reg_continuous, 0);
+    fit_owner.matrix_bandwidth_deriv = matrix_bandwidth_deriv;
+    if((num_reg_categorical > 0 && lambda == NULL) ||
+       (num_reg_continuous > 0 &&
+        (matrix_bandwidth == NULL || matrix_bandwidth_deriv == NULL))) {
+      regression_fit_status = NP_REGRESSION_FIT_ERR_ALLOC;
+      goto finish_regression_estimation;
     }
-  } else if(kernel_bandwidth(KERNEL_reg,
-                             BANDWIDTH_reg,
-                             num_obs_train,
-                             num_obs_eval,
-                             0,
-                             0,
-                             0,
-                             num_reg_continuous,
-                             num_reg_unordered,
-                             num_reg_ordered,
-                             vector_scale_factor,
-                             NULL,			 // Not used
-                             NULL,			 // Not used
-                             matrix_X_continuous_train,
-                             matrix_X_continuous_eval,
-                             NULL,					 // Not used
-                             matrix_bandwidth,
-                             lambda,
-                             matrix_bandwidth_deriv) == 1){
-#ifdef MPI2
-		MPI_Barrier(comm[1]);
-		MPI_Finalize();
-#endif
-    error("\n** Error: invalid bandwidth.");
+  }
+
+  {
+    NPRegressionFitBandwidthCall bandwidth_call = {
+      .use_canonical_beta = kernel_route != NULL,
+      .kernel = KERNEL_reg,
+      .bandwidth_mode = BANDWIDTH_reg,
+      .num_obs_train = num_obs_train,
+      .num_obs_eval = num_obs_eval,
+      .num_reg_unordered = num_reg_unordered,
+      .num_reg_ordered = num_reg_ordered,
+      .num_reg_continuous = num_reg_continuous,
+      .vector_scale_factor = vector_scale_factor,
+      .matrix_X_continuous_train = matrix_X_continuous_train,
+      .matrix_X_continuous_eval = matrix_X_continuous_eval,
+      .matrix_bandwidth = matrix_bandwidth,
+      .matrix_bandwidth_deriv = matrix_bandwidth_deriv,
+      .lambda = lambda,
+      .prepared_bandwidth = prepared_bandwidth,
+      .kernel_integral = &INT_KERNEL_P,
+      .kernel_power_integral = &K_INT_KERNEL_P,
+      .kernel_half_integral = &INT_KERNEL_PM_HALF,
+      .kernel_difference = &DIFF_KER_PPM,
+      .status = 1
+    };
+    if(np_regression_fit_bandwidth_prepare_owned(
+         &bandwidth_call, &fit_owner) != 0) {
+      regression_fit_status = NP_REGRESSION_FIT_ERR_BANDWIDTH;
+      goto finish_regression_estimation;
+    }
   }
 
   hprod = 1.0;
   for(l = 0; l < num_reg_continuous; l++)
     hprod *= matrix_bandwidth[l][0];
 
-  if(NP_UNLIKELY(kernel_route != NULL)) {
-    INT_KERNEL_P = 1.0;
-    K_INT_KERNEL_P = 1.0;
-    DIFF_KER_PPM = 0.0;
-  } else if(num_reg_continuous != 0) {
-    initialize_kernel_regression_asymptotic_constants(KERNEL_reg,
-                                                      num_reg_continuous,
-                                                      &INT_KERNEL_P,
-                                                      &K_INT_KERNEL_P,
-                                                      &INT_KERNEL_PM_HALF,
-                                                      &DIFF_KER_PPM);
-  } else {
-    INT_KERNEL_P = 1.0;
-    K_INT_KERNEL_P = 1.0;
-  }
-
-  const double gfac = sqrt(DIFF_KER_PPM/K_INT_KERNEL_P);
+  gfac = sqrt(DIFF_KER_PPM/K_INT_KERNEL_P);
 
   // compute hash stuff here if necessary
 
   if(do_grad && (num_reg_ordered > 0)){
-    otabs = (struct th_table *)malloc(num_reg_ordered*sizeof(struct th_table));
-    matrix_ordered_indices = (int **)malloc(num_reg_ordered*sizeof(int *));
-    int * tc = (int *)np_jksum_malloc_array3_or_die((size_t)num_reg_ordered,
-                                                    (size_t)num_obs_eval,
-                                                    sizeof(int),
-                                                    "ordered index buffer");
+    size_t index_count = 0;
+    size_t index_bytes = 0;
+    int *tc = NULL;
+    otabs = (struct th_table *)calloc(
+      (size_t)num_reg_ordered, sizeof(struct th_table));
+    matrix_ordered_indices = (int **)malloc(
+      (size_t)num_reg_ordered*sizeof(int *));
+    if(!np_size_mul_checked((size_t)num_reg_ordered,
+                            (size_t)num_obs_eval,
+                            &index_count) ||
+       !np_size_array_bytes_checked(index_count, sizeof(int), &index_bytes)) {
+      regression_fit_status = NP_REGRESSION_FIT_ERR_ALLOC;
+      goto finish_regression_estimation;
+    }
+    tc = index_count > 0 ? (int *)malloc(index_bytes) : NULL;
+    fit_owner.ordered_tables = otabs;
+    fit_owner.matrix_ordered_indices = matrix_ordered_indices;
+    fit_owner.ordered_indices_storage = tc;
+    if(otabs == NULL || matrix_ordered_indices == NULL || tc == NULL) {
+      regression_fit_status = NP_REGRESSION_FIT_ERR_ALLOC;
+      goto finish_regression_estimation;
+    }
     for(l = 0; l < num_reg_ordered; l++)
       matrix_ordered_indices[l] = tc + l*num_obs_eval;
 
     for(l = 0; l < num_reg_ordered; l++){
-      if(thcreate_r((size_t)ceil(1.6*num_categories[l+num_reg_unordered]), otabs + l) == TH_ERROR)
-        error("hash table creation failed");
+      if(thcreate_r((size_t)ceil(1.6*num_categories[l+num_reg_unordered]),
+                    otabs + l) == TH_ERROR) {
+        regression_fit_status = NP_REGRESSION_FIT_ERR_HASH_CREATE;
+        goto finish_regression_estimation;
+      }
+      fit_owner.ordered_tables_initialized = l + 1;
 
       for(i = 0; i < num_categories[l+num_reg_unordered]; i++){
         struct th_entry centry;
         centry.key.dkey = matrix_categorical_vals[l+num_reg_unordered][i];
         centry.data = i;
 
-        if(thsearch_r(&centry, TH_ENTER, &ret, otabs+l) == TH_FAILURE)
-          error("insertion into hash table failed");
+        if(thsearch_r(&centry, TH_ENTER, &ret, otabs+l) == TH_FAILURE) {
+          regression_fit_status = NP_REGRESSION_FIT_ERR_HASH_INSERT;
+          goto finish_regression_estimation;
+        }
       }
 
       // now do lookups
@@ -24028,8 +24273,10 @@ const NPContinuousPreparedBandwidthView *prepared_bandwidth){
       for(i = 0; i < num_obs_eval; i++){
         if(ret->key.dkey != matrix_X_ordered_eval[l][i]){
           te.key.dkey = matrix_X_ordered_eval[l][i];
-          if(thsearch_r(&te, TH_SEARCH, &ret, otabs+l) == TH_FAILURE)
-            error("hash table lookup failed (which should be impossible)");
+          if(thsearch_r(&te, TH_SEARCH, &ret, otabs+l) == TH_FAILURE) {
+            regression_fit_status = NP_REGRESSION_FIT_ERR_HASH_LOOKUP;
+            goto finish_regression_estimation;
+          }
         } 
 
         matrix_ordered_indices[l][i] = ret->data;
@@ -24052,11 +24299,17 @@ const NPContinuousPreparedBandwidthView *prepared_bandwidth){
                                            &ov_cont_ok,
                                            &ov_cont_hmin,
                                            &ov_cont_k0)){
-        ov_cont_from_cache = 1;
+        fit_owner.ov_cont_from_cache = 1;
+        fit_owner.ov_cont_ok = ov_cont_ok;
+        fit_owner.ov_cont_hmin = ov_cont_hmin;
+        fit_owner.ov_cont_k0 = ov_cont_k0;
       } else {
         ov_cont_ok = (int *)calloc((size_t)num_reg_continuous, sizeof(int));
         ov_cont_hmin = (double *)malloc((size_t)num_reg_continuous*sizeof(double));
         ov_cont_k0 = (double *)malloc((size_t)num_reg_continuous*sizeof(double));
+        fit_owner.ov_cont_ok = ov_cont_ok;
+        fit_owner.ov_cont_hmin = ov_cont_hmin;
+        fit_owner.ov_cont_k0 = ov_cont_k0;
         ok_all = (ov_cont_ok != NULL) && (ov_cont_hmin != NULL) && (ov_cont_k0 != NULL);
         if(ok_all){
           for(i = 0; i < num_reg_continuous; i++){
@@ -24085,6 +24338,8 @@ const NPContinuousPreparedBandwidthView *prepared_bandwidth){
     if(ok_all && num_reg_unordered > 0){
       ov_disc_uno_ok = (int *)calloc((size_t)num_reg_unordered, sizeof(int));
       ov_disc_uno_const = (double *)malloc((size_t)num_reg_unordered*sizeof(double));
+      fit_owner.ov_disc_uno_ok = ov_disc_uno_ok;
+      fit_owner.ov_disc_uno_const = ov_disc_uno_const;
       ok_all = (ov_disc_uno_ok != NULL) && (ov_disc_uno_const != NULL);
       if(ok_all){
         double (* const ukf[])(int, double, int) = {
@@ -24114,6 +24369,8 @@ const NPContinuousPreparedBandwidthView *prepared_bandwidth){
     if(ok_all && num_reg_ordered > 0){
       ov_disc_ord_ok = (int *)calloc((size_t)num_reg_ordered, sizeof(int));
       ov_disc_ord_const = (double *)malloc((size_t)num_reg_ordered*sizeof(double));
+      fit_owner.ov_disc_ord_ok = ov_disc_ord_ok;
+      fit_owner.ov_disc_ord_const = ov_disc_ord_const;
       ok_all = (ov_disc_ord_ok != NULL) && (ov_disc_ord_const != NULL);
       if(ok_all){
         double (* const okf[])(double, double, double, double, double) = {
@@ -24163,6 +24420,7 @@ const NPContinuousPreparedBandwidthView *prepared_bandwidth){
                       ov_disc_ord_ok,
                       ov_disc_ord_const);
       gate_override_active = 1;
+      fit_owner.gate_override_active = 1;
     }
   }
 
@@ -24237,7 +24495,11 @@ const NPContinuousPreparedBandwidthView *prepared_bandwidth){
         for(i = 0; i < num_obs_eval; i++){
           mean[i] = ymean;
           mean_stderr[i] = sefac;
-          np_progress_fit_loop_step(i + 1, fit_progress_total);
+          np_progress_fit_loop_step_owned(
+            i + 1,
+            fit_progress_total,
+            np_regression_fit_owner_cleanup,
+            (void *)&fit_owner);
         }
 
         estimation_shortcut_done = 1;
@@ -24271,11 +24533,11 @@ const NPContinuousPreparedBandwidthView *prepared_bandwidth){
           .eval_basis_block = NULL,
           .projection_block = NULL,
           .fitted_block = NULL,
-          .inverse_workspace = &inverse_workspace
+          .inverse_workspace = &inverse_workspace,
+          .enclosing_owner = &fit_owner
         };
 
         np_lp_full_row_workspace_init(&inverse_workspace);
-        np_refresh_mseries_accelerate_option();
         fast_ok = np_glp_build_terms(num_reg_continuous,
                                      vector_glp_degree_extern,
                                      int_glp_basis_extern,
@@ -24290,7 +24552,7 @@ const NPContinuousPreparedBandwidthView *prepared_bandwidth){
             np_reg_alllarge_blas_profitable(num_obs_eval,
                                             glp_nterms,
                                             num_obs_eval);
-          basis = np_regression_alllarge_basis_alloc(
+          basis = np_regression_fit_matrix_alloc(
             num_obs_train, glp_nterms, basis_is_contiguous);
           fast_ok = np_lp_full_row_workspace_reserve(
             &inverse_workspace, glp_nterms, 1);
@@ -24699,28 +24961,17 @@ const NPContinuousPreparedBandwidthView *prepared_bandwidth){
       .do_gerr = do_gerr,
       .standard_error_mode = standard_error_mode,
       .gate_context = &gate_ctx_local,
+      .enclosing_owner = &fit_owner,
       .kernel_squared_integral = K_INT_KERNEL_P,
       .bandwidth_product = hprod,
       .gradient_stderr_factor = gfac
     };
-    const int scalar_status = np_regression_scalar_fit(&scalar_call);
+    scalar_fit_status = np_regression_scalar_fit(&scalar_call);
 
-    if(scalar_status == NP_REGRESSION_SCALAR_FIT_PROFILE)
+    if(scalar_fit_status == NP_REGRESSION_SCALAR_FIT_PROFILE)
       goto finish_regression_estimation;
-    if(scalar_status == NP_REGRESSION_SCALAR_FIT_ERR_DIMENSION)
-      error("conditional influence kernel-weight dimensions overflow");
-    if(scalar_status == NP_REGRESSION_SCALAR_FIT_ERR_CONDITIONAL_ALLOC)
-      error("memory allocation failed in conditional influence workspace");
-    if(scalar_status == NP_REGRESSION_SCALAR_FIT_ERR_ALLOC)
-      error("\n** Error: memory allocation failed.");
-    if(scalar_status == NP_REGRESSION_SCALAR_FIT_ERR_TRAVERSAL)
-      error("conditional regression kernel traversal failed");
-    if(scalar_status == NP_REGRESSION_SCALAR_FIT_ERR_INFLUENCE)
-      error("conditional influence variance construction failed");
-    if(scalar_status == NP_REGRESSION_SCALAR_FIT_ERR_WORKSPACE_DIMENSION)
-      error("scalar regression workspace dimensions overflow");
-    if(scalar_status != NP_REGRESSION_SCALAR_FIT_OK)
-      error("invalid internal scalar regression fit status");
+    if(scalar_fit_status != NP_REGRESSION_SCALAR_FIT_OK)
+      goto finish_regression_estimation;
   } else if(lp_engine_est == NP_LP_ENGINE_GENERAL) { // local polynomial (regtype = "lp")
     const NPRegressionGeneralLPFitCall general_lp_call = {
       .kernel_c = kernel_c,
@@ -24761,46 +25012,44 @@ const NPContinuousPreparedBandwidthView *prepared_bandwidth){
       .kernel_squared_integral = K_INT_KERNEL_P,
       .bandwidth_product = hprod,
       .kernel_route = kernel_route,
-      .kernel_route_diagnostics = kernel_route_diagnostics
+      .kernel_route_diagnostics = kernel_route_diagnostics,
+      .enclosing_owner = &fit_owner
     };
 
     general_lp_fit_status = np_regression_general_lp_fit(&general_lp_call);
   }
 
 finish_regression_estimation:
-  /*
-    These caches are keyed by row pointers into call-local matrices. They are
-    safe within a regression call, but not across later .Call invocations where
-    R/C allocation can reuse the same addresses for different data.
-  */
-  np_disc_profile_cache_clear();
-  np_cont_largeh_cache_clear();
+  np_regression_fit_owner_clear(&fit_owner);
 
-  // clean up hash stuff
-  if(do_grad && (num_reg_ordered > 0)){
-    for(l = 0; l < num_reg_ordered; l++)
-      thdestroy_r(otabs+l);
-    free(otabs);
-    free(matrix_ordered_indices[0]);
-    free(matrix_ordered_indices);
-  }
+  if(regression_fit_status == NP_REGRESSION_FIT_ERR_ALLOC)
+    error("\n** Error: memory allocation failed.");
+  if(regression_fit_status == NP_REGRESSION_FIT_ERR_BANDWIDTH)
+    error("\n** Error: invalid bandwidth.");
+  if(regression_fit_status == NP_REGRESSION_FIT_ERR_HASH_CREATE)
+    error("hash table creation failed");
+  if(regression_fit_status == NP_REGRESSION_FIT_ERR_HASH_INSERT)
+    error("insertion into hash table failed");
+  if(regression_fit_status == NP_REGRESSION_FIT_ERR_HASH_LOOKUP)
+    error("hash table lookup failed (which should be impossible)");
+  if(regression_fit_status != NP_REGRESSION_FIT_OK)
+    error("invalid internal regression fit status");
 
-  if(gate_override_active) np_gate_ctx_clear(&gate_ctx_local);
-  if((ov_cont_ok != NULL) && (!ov_cont_from_cache)) free(ov_cont_ok);
-  if((ov_cont_hmin != NULL) && (!ov_cont_from_cache)) free(ov_cont_hmin);
-  if((ov_cont_k0 != NULL) && (!ov_cont_from_cache)) free(ov_cont_k0);
-  if(ov_disc_uno_ok != NULL) free(ov_disc_uno_ok);
-  if(ov_disc_uno_const != NULL) free(ov_disc_uno_const);
-  if(ov_disc_ord_ok != NULL) free(ov_disc_ord_ok);
-  if(ov_disc_ord_const != NULL) free(ov_disc_ord_const);
-
-  free(operator);
-  free(kernel_c);
-  free(kernel_u);
-  free(kernel_o);
-  free(lambda);
-  free_tmat(matrix_bandwidth);
-  free_mat(matrix_bandwidth_deriv,num_reg_continuous);
+  if(scalar_fit_status == NP_REGRESSION_SCALAR_FIT_ERR_DIMENSION)
+    error("conditional influence kernel-weight dimensions overflow");
+  if(scalar_fit_status == NP_REGRESSION_SCALAR_FIT_ERR_CONDITIONAL_ALLOC)
+    error("memory allocation failed in conditional influence workspace");
+  if(scalar_fit_status == NP_REGRESSION_SCALAR_FIT_ERR_ALLOC)
+    error("\n** Error: memory allocation failed.");
+  if(scalar_fit_status == NP_REGRESSION_SCALAR_FIT_ERR_TRAVERSAL)
+    error("conditional regression kernel traversal failed");
+  if(scalar_fit_status == NP_REGRESSION_SCALAR_FIT_ERR_INFLUENCE)
+    error("conditional influence variance construction failed");
+  if(scalar_fit_status == NP_REGRESSION_SCALAR_FIT_ERR_WORKSPACE_DIMENSION)
+    error("scalar regression workspace dimensions overflow");
+  if(scalar_fit_status != NP_REGRESSION_SCALAR_FIT_OK &&
+     scalar_fit_status != NP_REGRESSION_SCALAR_FIT_PROFILE)
+    error("invalid internal scalar regression fit status");
 
   if(general_lp_fit_status == NP_REGRESSION_GENERAL_LP_FIT_ERR_ROUTE) {
     if(kernel_route_diagnostics != NULL &&
@@ -24824,6 +25073,8 @@ finish_regression_estimation:
     error("failed to initialize glp Bernstein basis");
   if(general_lp_fit_status == NP_REGRESSION_GENERAL_LP_FIT_ERR_SOLVE)
     error("LP solve failed in glp path");
+  if(general_lp_fit_status == NP_REGRESSION_GENERAL_LP_FIT_ERR_OWNER_SOLVE)
+    error("LP solve failed in MPI owner-row path");
   if(general_lp_fit_status != NP_REGRESSION_GENERAL_LP_FIT_OK)
     error("invalid internal general LP fit status");
 
