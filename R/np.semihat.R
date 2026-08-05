@@ -738,8 +738,6 @@
 }
 
 .npscoef_batch_zero_solve <- function(tyw, tww) {
-  if (nrow(tyw) <= 2L)
-    return(NULL)
   .Call(
     "C_np_npscoef_batch_zero_solve",
     tww,
