@@ -3745,6 +3745,36 @@ npFormat <- function(x){
   format(sapply(x,format))
 }
 
+genBwContinuousKerLines <- function(x, vari, ncon) {
+  active <- which(ncon > 0)
+  if (!length(active))
+    return(character())
+
+  conditional.xy <- length(vari) == 2L &&
+    all(c("x", "y") %in% vari)
+  if (conditional.xy) {
+    return(vapply(active, function(i) {
+      role <- vari[[i]]
+      paste0(
+        "Continuous Kernel Type (", x$vartitleabb[[role]],
+        " Var.; c", role, "ker*): ", x$klist[[role]]$pckertype
+      )
+    }, character(1L)))
+  }
+
+  cktype <- vapply(vari, function(v) x$klist[[v]]$ckertype,
+                   character(1L))
+  if (length(unique(cktype)) == 1L)
+    return(paste("Continuous Kernel Type:",
+                 x$klist[[vari[[1L]]]]$pckertype))
+
+  vapply(active, function(i) {
+    role <- vari[[i]]
+    paste0("Continuous Kernel Type (", x$vartitleabb[[role]],
+           " Var.): ", x$klist[[role]]$pckertype)
+  }, character(1L))
+}
+
 genBwKerStrs <- function(x){
   vari <- names(x$klist)
 
@@ -3760,34 +3790,12 @@ genBwKerStrs <- function(x){
     sum(x$dati[[v]]$iord)
   })
 
-  cktype <- sapply(vari, function(v){
-    x$klist[[v]]$ckertype
-  })
-
-  uktype <- sapply(vari, function(v){
-    x$klist[[v]]$ukertype
-  })
-
-  oktype <- sapply(vari, function(v){
-    x$klist[[v]]$okertype
-  })
-
   tt <- ''
 
   if(any(ncon > 0)){
-    ctype.str <- ""
-    if (length(unique(cktype)) == 1) {
-      ctype.str <- paste("\nContinuous Kernel Type:",
-                         x$klist[[vari[1]]]$pckertype)
-    } else {
-      ctype.str <- paste(sapply(seq_along(vari), function(v){
-        if (ncon[v] > 0)
-          paste("\nContinuous Kernel Type (",
-                x$vartitleabb[[vari[v]]],
-                " Var.): ", x$klist[[vari[v]]]$pckertype, sep = "")
-        else ""
-      }), collapse = "")
-    }
+    ctype.str <- paste0(
+      "\n", genBwContinuousKerLines(x, vari, ncon), collapse = ""
+    )
     tt <- paste("\n", ctype.str, sep = "")
     cont.str <- paste(sapply(seq_along(vari), function(i){
       if (ncon[i] > 0)
@@ -3800,6 +3808,9 @@ genBwKerStrs <- function(x){
                 
     
   if(any(nuno > 0)) {
+    uktype <- sapply(vari, function(v){
+      x$klist[[v]]$ukertype
+    })
     utype.str <- ""
     if (length(unique(uktype)) == 1) {
       utype.str <- paste("\nUnordered Categorical Kernel Type:",
@@ -3825,6 +3836,9 @@ genBwKerStrs <- function(x){
   }
 
   if(any(nord > 0)) {
+    oktype <- sapply(vari, function(v){
+      x$klist[[v]]$okertype
+    })
     otype.str <- ""
     if (length(unique(oktype)) == 1) {
       otype.str <- paste("\nOrdered Categorical Kernel Type:",
@@ -3857,18 +3871,13 @@ genBwKerStrsXY <- function(x){
   cnt <- 0
   
   if (x$xncon + x$yncon > 0){
-    cker.str <- ""
-    if (x$pcxkertype == x$pcykertype) {
-      cker.str <- paste("\n\nContinuous Kernel Type:", x$pcxkertype)
-    } else {
-      exp.str <- if (x$xncon > 0)
-        paste("\nContinuous Kernel Type (Exp. Var.):", x$pcxkertype)
-      else ""
-      dep.str <- if (x$yncon > 0)
-        paste("\nContinuous Kernel Type (Dep. Var.):", x$pcykertype)
-      else ""
-      cker.str <- paste("\n", exp.str, dep.str)
-    }
+    vari <- names(x$klist)
+    ncon <- vapply(vari, function(v) sum(x$dati[[v]]$icon), integer(1L))
+    cker.lines <- genBwContinuousKerLines(x, vari, ncon)
+    cker.str <- if (identical(x$pcxkertype, x$pcykertype))
+      paste0("\n\n", paste(cker.lines, collapse = "\n"))
+    else
+      paste(c("\n", paste0("\n", cker.lines)), collapse = " ")
     ycon.str <- if (x$yncon > 0) paste("\nNo. Continuous Dependent Vars.:", x$yncon) else ""
     xcon.str <- if (x$xncon > 0) paste("\nNo. Continuous Explanatory Vars.:", x$xncon) else ""
     t.str[cnt <- cnt + 1] <-
