@@ -1,5 +1,9 @@
 # np 0.70-6
 
+* Removed the unreachable conditional-bootstrap exact-state sidecar and its
+  dead-state-only test assertions. Public conditional bootstrap routes retain
+  their existing canonical refit, count, and fixed local-constant owners.
+
 * Removed the unregistered and callerless internal `beta_kernelsum` facade.
   Beta bandwidth-mode ownership now resides in the shared bandwidth contract;
   all estimator, kernel-sum, LP, and optional-output routes continue to use the
