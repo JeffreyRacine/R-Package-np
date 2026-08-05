@@ -1,5 +1,10 @@
 # npRmpi 0.70-6
 
+* Removed the unreachable conditional-bootstrap exact-state sidecar and its
+  bypassed MPI worker block. Public conditional bootstrap routes retain their
+  canonical distributed refit/count and fixed local-constant owners, without
+  serial fallback.
+
 * Removed the unregistered and callerless internal `beta_kernelsum` facade.
   Beta bandwidth-mode ownership now resides in the shared bandwidth contract;
   all estimator, kernel-sum, LP, optional-output, and distributed routes
