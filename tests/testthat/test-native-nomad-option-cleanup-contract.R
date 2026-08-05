@@ -25,6 +25,25 @@ test_that("native NOMAD option builders reject cache-off solves before solver en
   }
 })
 
+test_that("native estimator callbacks reject parallel evaluation explicitly", {
+  builders <- list(
+    np:::.np_nomad_native_option_vectors,
+    np:::.npudensbw_nomad_native_option_vectors,
+    np:::.npcdensbw_nomad_shadow_native_option_vectors,
+    np:::.npcdistbw_nomad_native_option_vectors,
+    np:::.npregbw_nomad_native_option_vectors
+  )
+
+  for (builder in builders) {
+    expect_error(
+      builder(list(NB_THREADS_PARALLEL_EVAL = 2L)),
+      "requires NB_THREADS_PARALLEL_EVAL = 1",
+      fixed = TRUE
+    )
+    expect_no_error(builder(list(NB_THREADS_PARALLEL_EVAL = 1L)))
+  }
+})
+
 test_that("native R callback failure does not poison the next package solve", {
   bad <- np:::.np_nomad_native_r_callback_search(
     eval.f = function(x) stop("intentional package R callback failure"),
