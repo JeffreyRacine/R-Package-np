@@ -46,6 +46,19 @@ test_that("the canonical beta row route has one unwind owner", {
   expect_match(owner, "free(owner->route_row);", fixed = TRUE)
   expect_match(
     owner,
+    "free_tmat(owner->owned_bandwidth_tmatrix);",
+    fixed = TRUE
+  )
+  expect_match(
+    owner,
+    paste0(
+      "execution.owner.owned_bandwidth_tmatrix =\n",
+      "    call->owned_bandwidth_tmatrix;"
+    ),
+    fixed = TRUE
+  )
+  expect_match(
+    owner,
     "np_continuous_kernel_level_derivative_workspace_release(",
     fixed = TRUE
   )
@@ -64,6 +77,36 @@ test_that("the canonical beta row route has one unwind owner", {
     fixed_occurrences(engine, "np_beta_absolute_route(&route_call);"),
     2L
   )
+
+  fit_start <- regexpr(
+    "static NP_NOINLINE void np_beta_scalar_regression_fit_canonical(",
+    engine,
+    fixed = TRUE
+  )[[1L]]
+  fit_end <- regexpr(
+    "NP_NOINLINE NP_COLD int np_beta_continuous_bandwidth_prepare_canonical(",
+    engine,
+    fixed = TRUE
+  )[[1L]]
+  expect_gt(fit_start, 0L)
+  expect_gt(fit_end, fit_start)
+  fit <- substr(engine, fit_start, fit_end - 1L)
+  expect_match(
+    fit,
+    ".owned_bandwidth_tmatrix = matrix_bandwidth,",
+    fixed = TRUE
+  )
+  route_call <- regexpr(
+    "route_status = np_beta_absolute_route(&route_call);",
+    fit,
+    fixed = TRUE
+  )[[1L]]
+  expect_gt(route_call, 0L)
+  expect_false(grepl(
+    "free_tmat(matrix_bandwidth);",
+    substr(fit, route_call, nchar(fit)),
+    fixed = TRUE
+  ))
 })
 
 test_that("nested beta derivative rows borrow route-owned scratch", {
