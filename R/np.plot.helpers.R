@@ -8979,7 +8979,7 @@
   } else {
     do.call(npcdens, fit.args)
   })
-  as.numeric(if (cdf) fit$condist else fit$condens)
+  as.numeric(fit[[if (cdf) "condist" else "condens", exact = TRUE]])
 }
 
 .np_ksum_conditional_operator_fixed <- function(xdat,
@@ -9277,7 +9277,7 @@
   tryCatch(
     fit.expr(),
     error = function(e) {
-      if (identical(bws$type, "adaptive_nn")) {
+      if (identical(bws[["type", exact = TRUE]], "adaptive_nn")) {
         stop(
           sprintf(
             "adaptive conditional exact bootstrap resample is invalid for this active support (n.active=%d, x.unique=%d, y.unique=%d): %s",

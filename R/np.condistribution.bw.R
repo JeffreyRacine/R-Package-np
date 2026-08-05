@@ -529,7 +529,9 @@ npcdistbw.condbandwidth <-
         continuous.x.kernel.family = if (identical(bws$cxkertype, "beta")) CKER_FAMILY_BETA else CKER_FAMILY_LEGACY,
         continuous.x.kernel.order = as.integer(bws$cxkerorder),
         continuous.y.kernel.family = if (identical(bws$cykertype, "beta")) CKER_FAMILY_BETA else CKER_FAMILY_LEGACY,
-        continuous.y.kernel.order = as.integer(bws$cykerorder),
+        continuous.y.kernel.order = as.integer(
+          bws[["cykerorder", exact = TRUE]]
+        ),
         categorical.compress = npStrictLogicalOption(
           "np.categorical.compress", TRUE
         ))
@@ -559,9 +561,14 @@ npcdistbw.condbandwidth <-
                     as.double(gyuno), as.double(gyord), as.double(gycon),
                     as.double(mysd),
                     as.integer(myopti), as.double(myoptd),
-                    as.double(c(bws$xbw[bws$ixcon], bws$ybw[bws$iycon],
-                                bws$ybw[bws$iyuno], bws$ybw[bws$iyord],
-                                bws$xbw[bws$ixuno], bws$xbw[bws$ixord])),
+                as.double(c(
+                  bws[["xbw", exact = TRUE]][bws[["ixcon", exact = TRUE]]],
+                  bws[["ybw", exact = TRUE]][bws[["iycon", exact = TRUE]]],
+                  bws[["ybw", exact = TRUE]][bws[["iyuno", exact = TRUE]]],
+                  bws[["ybw", exact = TRUE]][bws[["iyord", exact = TRUE]]],
+                  bws[["xbw", exact = TRUE]][bws[["ixuno", exact = TRUE]]],
+                  bws[["xbw", exact = TRUE]][bws[["ixord", exact = TRUE]]]
+                )),
                     as.integer(nmulti),
                     as.integer(penalty_mode),
                     as.double(penalty.multiplier),
@@ -987,7 +994,9 @@ npcdistbw.condbandwidth <-
     continuous.x.kernel.family = if (identical(bws$cxkertype, "beta")) CKER_FAMILY_BETA else CKER_FAMILY_LEGACY,
     continuous.x.kernel.order = as.integer(bws$cxkerorder),
     continuous.y.kernel.family = if (identical(bws$cykertype, "beta")) CKER_FAMILY_BETA else CKER_FAMILY_LEGACY,
-    continuous.y.kernel.order = as.integer(bws$cykerorder),
+    continuous.y.kernel.order = as.integer(
+      bws[["cykerorder", exact = TRUE]]
+    ),
     categorical.compress = npStrictLogicalOption(
       "np.categorical.compress", TRUE
     )
@@ -1285,7 +1294,9 @@ npcdistbw.condbandwidth <-
     continuous.x.kernel.family = if (identical(bws$cxkertype, "beta")) CKER_FAMILY_BETA else CKER_FAMILY_LEGACY,
     continuous.x.kernel.order = as.integer(bws$cxkerorder),
     continuous.y.kernel.family = if (identical(bws$cykertype, "beta")) CKER_FAMILY_BETA else CKER_FAMILY_LEGACY,
-    continuous.y.kernel.order = as.integer(bws$cykerorder),
+    continuous.y.kernel.order = as.integer(
+      bws[["cykerorder", exact = TRUE]]
+    ),
     categorical.compress = npStrictLogicalOption(
       "np.categorical.compress", TRUE
     )

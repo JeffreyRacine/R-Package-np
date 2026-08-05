@@ -184,7 +184,7 @@ npreghat <-
     ncol(y) > 1L &&
     !isTRUE(leave.one.out) &&
     length(s) > 0L &&
-    isTRUE(any(bws$icon))
+    isTRUE(any(bws[["icon", exact = TRUE]]))
 
   if (!base.candidate)
     return(FALSE)
@@ -1089,9 +1089,9 @@ npreghat <-
   kernel.x.c <- if (beta.kernel) {
     npContinuousKernelCode(bws)
   } else {
-    switch(bws$ckertype,
-      gaussian = CKER_GAUSS + bws$ckerorder / 2 - 1,
-      epanechnikov = CKER_EPAN + bws$ckerorder / 2 - 1,
+    switch(bws[["ckertype", exact = TRUE]],
+      gaussian = CKER_GAUSS + bws[["ckerorder", exact = TRUE]] / 2 - 1,
+      epanechnikov = CKER_EPAN + bws[["ckerorder", exact = TRUE]] / 2 - 1,
       uniform = CKER_UNI
     )
   }
@@ -1107,12 +1107,17 @@ npreghat <-
 
   bw.vec <- as.double(c(bws$bw[bws$icon], bws$bw[bws$iuno], bws$bw[bws$iord]))
   tree.flag <- !beta.kernel && identical(
-      .npreg_fit_tree_code(bws, ncon = bws$ncon,
-                           ncat = bws$nuno + bws$nord),
+      .npreg_fit_tree_code(
+        bws,
+        ncon = bws[["ncon", exact = TRUE]],
+        ncat = bws[["nuno", exact = TRUE]] + bws[["nord", exact = TRUE]]
+      ),
       DO_TREE_YES
     )
   categorical.compress <- if (
-    beta.kernel && (bws$nuno > 0L || bws$nord > 0L)
+    beta.kernel &&
+      (bws[["nuno", exact = TRUE]] > 0L ||
+         bws[["nord", exact = TRUE]] > 0L)
   ) {
     npStrictLogicalOption("np.categorical.compress", TRUE)
   } else {
@@ -1122,7 +1127,8 @@ npreghat <-
     descriptor.family <- CKER_FAMILY_BETA
     descriptor.order <- as.integer(bws[["ckerorder", exact = TRUE]])
     cker.bounds <- npKernelBoundsMarshal(
-      bws$ckerlb[bws$icon], bws$ckerub[bws$icon]
+      bws[["ckerlb", exact = TRUE]][bws[["icon", exact = TRUE]]],
+      bws[["ckerub", exact = TRUE]][bws[["icon", exact = TRUE]]]
     )
     cker.lb <- cker.bounds$lb
     cker.ub <- cker.bounds$ub
@@ -1640,7 +1646,9 @@ npreghat <-
     int_do_tree = if (beta.kernel) DO_TREE_NO else
       .npreg_fit_tree_code(bws, ncon = bws$ncon, ncat = bws$nuno + bws$nord),
     categorical.compress = if (
-      beta.kernel && (bws$nuno > 0L || bws$nord > 0L)
+      beta.kernel &&
+        (bws[["nuno", exact = TRUE]] > 0L ||
+           bws[["nord", exact = TRUE]] > 0L)
     ) {
       npStrictLogicalOption("np.categorical.compress", TRUE)
     } else {
@@ -2031,7 +2039,7 @@ npreghat.rbandwidth <-
     exact.lc.kernel.route <- !isTRUE(leave.one.out) &&
       !any(s > 0L) &&
       constant.basis &&
-      (bws$ncon > 0L)
+      (bws[["ncon", exact = TRUE]] > 0L)
 
     exact.ll.kernel.route <- !isTRUE(leave.one.out) &&
       simple.operator.request &&
