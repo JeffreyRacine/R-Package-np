@@ -20,6 +20,7 @@ test_that("legacy density translation unit and engines are absent", {
   skip_if(is.null(root), "package sources unavailable")
 
   expect_false(file.exists(file.path(root, "src", "kernele.c")))
+  expect_false(file.exists(file.path(root, "src", "kernelw.c")))
   expect_true(file.exists(file.path(root, "src", "quantile.c")))
 
   native_lines <- c(
@@ -70,6 +71,25 @@ test_that("legacy density translation unit and engines are absent", {
     sum(grepl("^int kernel_estimate_quantile\\(", quantile)),
     1L
   )
+})
+
+test_that("obsolete conditional convolution roots cannot return", {
+  root <- locate_engine_sources()
+  skip_if(is.null(root), "package sources unavailable")
+
+  native <- paste(
+    readLines(file.path(root, "src", "jksum.c"), warn = FALSE),
+    readLines(file.path(root, "src", "headers.h"), warn = FALSE),
+    collapse = "\n"
+  )
+  retired <- c(
+    "kernel_weights_conditional_convolution_cv",
+    "kernel_convolution_weighted_sum",
+    "np_kernel_estimate_con_density_categorical_convolution_cv"
+  )
+  for (symbol in retired) {
+    expect_false(grepl(symbol, native, fixed = TRUE), info = symbol)
+  }
 })
 
 test_that("conditional-density CVLS wrapper has no dormant second engine", {
