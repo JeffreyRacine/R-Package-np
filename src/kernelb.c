@@ -426,6 +426,7 @@ double **matrix_bandwidth_deriv)
 
 	int i;
 	int j;
+	int status = 0;
 
 	double temp_inv;
 
@@ -680,12 +681,14 @@ double **matrix_bandwidth_deriv)
 
 			if(np_nn_lookup_from_scale(num_obs_train, 1, vector_scale_factor[i], &int_nn_k, &nn_scale, &nn_extended)==1)
 			{
-				return(1);
+				status = 1;
+				goto cleanup;
 			}
 
 			if(np_compute_nn_distance_train_eval_cached(num_obs_train,num_obs_eval, 0,matrix_X_train[i], matrix_X_eval[i], int_nn_k, 1, nn_distance)==1)
 			{
-				return(1);
+				status = 1;
+				goto cleanup;
 			}
 
 /* Compute the nearest neighbor distances */
@@ -711,12 +714,14 @@ double **matrix_bandwidth_deriv)
 
 			if(np_nn_lookup_from_scale(num_obs_train, 1, vector_scale_factor[i+num_reg_cont], &int_nn_k, &nn_scale, &nn_extended)==1)
 			{
-				return(1);
+				status = 1;
+				goto cleanup;
 			}
 
 			if(np_compute_nn_distance_train_eval_cached(num_obs_train,num_obs_eval, 0, matrix_Y_train[i], matrix_Y_eval[i], int_nn_k, 1, nn_distance)==1)
 			{
-				return(1);
+				status = 1;
+				goto cleanup;
 			}
 
 /* Compute the nearest neighbor distances */
@@ -745,12 +750,14 @@ double **matrix_bandwidth_deriv)
 /* Return 1 for nearest-neighbor which is zero */
 			if(np_nn_lookup_from_scale(num_obs_train, 1, vector_scale_factor[i], &int_nn_k, &nn_scale, &nn_extended)==1)
 			{
-				return(1);
+				status = 1;
+				goto cleanup;
 			}
 
 			if(np_compute_nn_distance_cached(num_obs_train, 0, matrix_X_train[i], int_nn_k, 1, nn_distance)==1)
 			{
-				return(1);
+				status = 1;
+				goto cleanup;
 			}
 
 /* Compute the nearest neighbor distances */
@@ -775,12 +782,14 @@ double **matrix_bandwidth_deriv)
 /* Return 1 for nearest-neighbor which is zero */
 			if(np_nn_lookup_from_scale(num_obs_train, 1, vector_scale_factor[i+num_reg_cont], &int_nn_k, &nn_scale, &nn_extended)==1)
 			{
-				return(1);
+				status = 1;
+				goto cleanup;
 			}
 
 			if(np_compute_nn_distance_cached(num_obs_train, 0, matrix_Y_train[i], int_nn_k, 1, nn_distance)==1)
 			{
-				return(1);
+				status = 1;
+				goto cleanup;
 			}
 
 /* Compute the nearest neighbor distances */
@@ -862,22 +871,12 @@ double **matrix_bandwidth_deriv)
 		}
 	}
 
-	if((BANDWIDTH == 1) || (BANDWIDTH == 2))
-	{
-		free(nn_distance);
-	}
+cleanup:
+	free(nn_distance);
+	free(vec_sdev_x);
+	free(vec_sdev_y);
 
-/* Don't compute unnecessary standard deviations  */
-
-	if(int_LARGE_SF == 0)
-	{
-
-		free(vec_sdev_x);
-		free(vec_sdev_y);
-
-	}
-
-	return(0);
+	return(status);
 
 }
 
@@ -911,6 +910,7 @@ int kernel_bandwidth_mean(int KERNEL,
 
 	int i;
 	int j;
+	int status = 0;
 
 	double temp_pow = DBL_MAX;
 
@@ -1069,12 +1069,14 @@ fact constant. */
 
 			if(np_nn_lookup_from_scale(num_obs_train, 1, vector_scale_factor[i], &int_nn_k, &nn_scale, &nn_extended)==1)
 			{
-				return(1);
+				status = 1;
+				goto cleanup;
 			}
 
 			if(np_compute_nn_distance_train_eval_cached(num_obs_train,num_obs_eval, suppress_parallel, matrix_X_train[i], matrix_X_eval[i], int_nn_k, 1, nn_distance)==1)
 			{
-				return(1);
+				status = 1;
+				goto cleanup;
 			}
 
 /* Compute the nearest neighbor distances */
@@ -1098,12 +1100,14 @@ fact constant. */
 
 			if(np_nn_lookup_from_scale(num_obs_train, 1, vector_scale_factor[i+num_reg_cont], &int_nn_k, &nn_scale, &nn_extended)==1)
 			{
-				return(1);
+				status = 1;
+				goto cleanup;
 			}
 
 			if(np_compute_nn_distance_train_eval_cached(num_obs_train,num_obs_eval, suppress_parallel, matrix_Y_train[i], matrix_Y_eval[i], int_nn_k, 1, nn_distance)==1)
 			{
-				return(1);
+				status = 1;
+				goto cleanup;
 			}
 
 /* Compute the nearest neighbor distances */
@@ -1132,12 +1136,14 @@ fact constant. */
 /* Return 1 for nearest-neighbor which is zero */
 			if(np_nn_lookup_from_scale(num_obs_train, 1, vector_scale_factor[i], &int_nn_k, &nn_scale, &nn_extended)==1)
 			{
-				return(1);
+				status = 1;
+				goto cleanup;
 			}
 
 			if(np_compute_nn_distance_cached(num_obs_train, suppress_parallel, matrix_X_train[i], int_nn_k, 1, nn_distance)==1)
 			{
-				return(1);
+				status = 1;
+				goto cleanup;
 			}
 
 /* Compute the nearest neighbor distances */
@@ -1160,12 +1166,14 @@ fact constant. */
 /* Return 1 for nearest-neighbor which is zero */
 			if(np_nn_lookup_from_scale(num_obs_train, 1, vector_scale_factor[i+num_reg_cont], &int_nn_k, &nn_scale, &nn_extended)==1)
 			{
-				return(1);
+				status = 1;
+				goto cleanup;
 			}
 
 			if(np_compute_nn_distance_cached(num_obs_train, suppress_parallel, matrix_Y_train[i], int_nn_k, 1, nn_distance)==1)
 			{
-				return(1);
+				status = 1;
+				goto cleanup;
 			}
 
 /* Compute the nearest neighbor distances */
@@ -1245,20 +1253,12 @@ fact constant. */
 		}
 	}
 
-	if((BANDWIDTH == 1) || (BANDWIDTH == 2))
-	{
-		free(nn_distance);
-	}
+cleanup:
+	free(nn_distance);
+	free(vec_sdev_x);
+	free(vec_sdev_y);
 
-	if(int_LARGE_SF == 0)
-	{
-
-		free(vec_sdev_x);
-		free(vec_sdev_y);
-
-	}
-
-	return(0);
+	return(status);
 
 }
 
