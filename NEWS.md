@@ -1,5 +1,13 @@
 # npRmpi 0.70-6
 
+* The canonical beta row engine now owns its malloc-backed route, categorical,
+  derivative, and row workspaces behind one unwind-protected cleanup boundary
+  on every rank. Nested derivative helpers borrow that invocation-scoped
+  scratch rather than allocating it per call, so user interrupts and R errors
+  cannot strand native storage. Successful PDF, CDF, convolution, derivative,
+  powered-derivative, and regression arithmetic and rank ownership are
+  unchanged.
+
 * The shared regression fit now allocates its operator vector once, after
   engine and route validation. This removes a duplicate general-path
   allocation and the scalar beta route's retained allocation on every rank

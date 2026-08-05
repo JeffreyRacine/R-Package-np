@@ -9081,13 +9081,13 @@ np_beta_regression_gradient_rows_validated(
   const NPContinuousKernelLogFactorProvider *provider,
   const double *response,
   NPRegressionStandardErrorMode standard_error_mode,
+  NPContinuousKernelLevelDerivativeWorkspace *workspace,
   double **gradient,
   double **gradient_stderr,
   NPContinuousKernelDerivativeDiagnostics *diagnostics,
   int *infinite_count,
   int *undefined_count)
 {
-  NPContinuousKernelLevelDerivativeWorkspace workspace;
   NPContinuousKernelRowStatus status = NP_CONTINUOUS_ROW_ERR_LAYOUT;
   int response_is_constant = 1;
   int evaluation;
@@ -9108,7 +9108,8 @@ np_beta_regression_gradient_rows_validated(
      plan->num_eval <= 0 || plan->num_continuous <= 0 ||
      plan->route->segment_count != 1 ||
      plan->route->segment[0].descriptor.family != NP_CKERNEL_FAMILY_BETA ||
-     response == NULL || gradient == NULL || gradient_stderr == NULL ||
+     response == NULL || workspace == NULL || gradient == NULL ||
+     gradient_stderr == NULL ||
      (standard_error_mode != NP_REGRESSION_STDERR_LOCAL_RESIDUAL &&
       standard_error_mode != NP_REGRESSION_STDERR_CONDITIONAL_INFLUENCE))
     return NP_CONTINUOUS_ROW_ERR_LAYOUT;
@@ -9138,7 +9139,6 @@ np_beta_regression_gradient_rows_validated(
     return NP_CONTINUOUS_ROW_OK;
   }
 
-  np_continuous_kernel_level_derivative_workspace_init(&workspace);
   for(evaluation = 0; evaluation < plan->num_eval; ++evaluation) {
     for(derivative_coordinate = 0;
         derivative_coordinate < plan->num_continuous;
@@ -9178,7 +9178,7 @@ np_beta_regression_gradient_rows_validated(
 
       status = np_continuous_kernel_beta_level_derivative_log_row_validated(
         plan, evaluation, -1, derivative_coordinate, provider,
-        &workspace, &maximum_log, &row_diagnostics);
+        workspace, &maximum_log, &row_diagnostics);
       if(status != NP_CONTINUOUS_ROW_OK) {
         if(diagnostics != NULL) {
           diagnostics->bad_coordinate = row_diagnostics.bad_coordinate;
@@ -9194,15 +9194,15 @@ np_beta_regression_gradient_rows_validated(
 
       for(observation = 0; observation < plan->num_train; ++observation) {
         const double y = response[observation];
-        const double w = workspace.level_sign[observation] == 0 ? 0.0 :
-          (double)workspace.level_sign[observation] * exp(
-            workspace.level_log_absolute[observation] - maximum_log);
-        const double d = workspace.regular_sign[observation] == 0 ? 0.0 :
-          (double)workspace.regular_sign[observation] * exp(
-            workspace.regular_log_absolute[observation] - maximum_log);
-        const double j = workspace.jump_sign[observation] == 0 ? 0.0 :
-          (double)workspace.jump_sign[observation] * exp(
-            workspace.jump_log_absolute[observation] - maximum_log);
+        const double w = workspace->level_sign[observation] == 0 ? 0.0 :
+          (double)workspace->level_sign[observation] * exp(
+            workspace->level_log_absolute[observation] - maximum_log);
+        const double d = workspace->regular_sign[observation] == 0 ? 0.0 :
+          (double)workspace->regular_sign[observation] * exp(
+            workspace->regular_log_absolute[observation] - maximum_log);
+        const double j = workspace->jump_sign[observation] == 0 ? 0.0 :
+          (double)workspace->jump_sign[observation] * exp(
+            workspace->jump_log_absolute[observation] - maximum_log);
 
         total_weight += w;
         weighted_response += w * y;
@@ -9236,12 +9236,12 @@ np_beta_regression_gradient_rows_validated(
       side_mean = side_response / side_weight;
 
       for(observation = 0; observation < plan->num_train; ++observation) {
-        const double w = workspace.level_sign[observation] == 0 ? 0.0 :
-          (double)workspace.level_sign[observation] * exp(
-            workspace.level_log_absolute[observation] - maximum_log);
-        const double j = workspace.jump_sign[observation] == 0 ? 0.0 :
-          (double)workspace.jump_sign[observation] * exp(
-            workspace.jump_log_absolute[observation] - maximum_log);
+        const double w = workspace->level_sign[observation] == 0 ? 0.0 :
+          (double)workspace->level_sign[observation] * exp(
+            workspace->level_log_absolute[observation] - maximum_log);
+        const double j = workspace->jump_sign[observation] == 0 ? 0.0 :
+          (double)workspace->jump_sign[observation] * exp(
+            workspace->jump_log_absolute[observation] - maximum_log);
 
         if(w != 0.0 || j != 0.0) {
           if(!have_active) {
@@ -9290,15 +9290,15 @@ np_beta_regression_gradient_rows_validated(
 
           for(observation = 0; observation < plan->num_train; ++observation) {
             const double y = response[observation];
-            const double w = workspace.level_sign[observation] == 0 ? 0.0 :
-              (double)workspace.level_sign[observation] * exp(
-                workspace.level_log_absolute[observation] - maximum_log);
-            const double d = workspace.regular_sign[observation] == 0 ? 0.0 :
-              (double)workspace.regular_sign[observation] * exp(
-                workspace.regular_log_absolute[observation] - maximum_log);
-            const double j = workspace.jump_sign[observation] == 0 ? 0.0 :
-              (double)workspace.jump_sign[observation] * exp(
-                workspace.jump_log_absolute[observation] - maximum_log);
+            const double w = workspace->level_sign[observation] == 0 ? 0.0 :
+              (double)workspace->level_sign[observation] * exp(
+                workspace->level_log_absolute[observation] - maximum_log);
+            const double d = workspace->regular_sign[observation] == 0 ? 0.0 :
+              (double)workspace->regular_sign[observation] * exp(
+                workspace->regular_log_absolute[observation] - maximum_log);
+            const double j = workspace->jump_sign[observation] == 0 ? 0.0 :
+              (double)workspace->jump_sign[observation] * exp(
+                workspace->jump_log_absolute[observation] - maximum_log);
             const double side_w = w +
               ((at_lower || at_upper) ? side_orientation * j : 0.0);
             const double coefficient =
@@ -9334,15 +9334,15 @@ np_beta_regression_gradient_rows_validated(
       } else {
         for(observation = 0; observation < plan->num_train; ++observation) {
           const double y = response[observation];
-          const double w = workspace.level_sign[observation] == 0 ? 0.0 :
-            (double)workspace.level_sign[observation] * exp(
-              workspace.level_log_absolute[observation] - maximum_log);
-          const double d = workspace.regular_sign[observation] == 0 ? 0.0 :
-            (double)workspace.regular_sign[observation] * exp(
-              workspace.regular_log_absolute[observation] - maximum_log);
-          const double j = workspace.jump_sign[observation] == 0 ? 0.0 :
-            (double)workspace.jump_sign[observation] * exp(
-              workspace.jump_log_absolute[observation] - maximum_log);
+          const double w = workspace->level_sign[observation] == 0 ? 0.0 :
+            (double)workspace->level_sign[observation] * exp(
+              workspace->level_log_absolute[observation] - maximum_log);
+          const double d = workspace->regular_sign[observation] == 0 ? 0.0 :
+            (double)workspace->regular_sign[observation] * exp(
+              workspace->regular_log_absolute[observation] - maximum_log);
+          const double j = workspace->jump_sign[observation] == 0 ? 0.0 :
+            (double)workspace->jump_sign[observation] * exp(
+              workspace->jump_log_absolute[observation] - maximum_log);
           const double side_w = w +
             ((at_lower || at_upper) ? side_orientation * j : 0.0);
           const double coefficient =
@@ -9375,63 +9375,176 @@ np_beta_regression_gradient_rows_validated(
 cleanup:
   if(diagnostics != NULL && undefined_count != NULL)
     diagnostics->undefined_count = *undefined_count;
-  np_continuous_kernel_level_derivative_workspace_release(&workspace);
   return status;
 }
 
-static int np_beta_absolute_route(
-  const NPContinuousKernelRoute * const route,
-  const int bandwidth_mode,
-  const int num_obs_train,
-  const int num_obs_eval,
-  const int num_reg_unordered,
-  const int num_reg_ordered,
-  const int num_reg_continuous,
-  const int leave_one_out,
-  const int leave_one_out_offset,
-  const int * const operator,
-  double **matrix_X_continuous_train,
-  double **matrix_X_continuous_eval,
-  double **matrix_X_unordered_train,
-  double **matrix_X_ordered_train,
-  double **matrix_X_unordered_eval,
-  double **matrix_X_ordered_eval,
-  const int *kernel_unordered,
-  const int *kernel_ordered,
-  const double *categorical_lambda,
-  const int *num_categories,
-  double **matrix_categorical_vals,
-  const int categorical_compress,
-  double * const vector_bandwidth,
-  double **matrix_bandwidth_eval,
-  double **matrix_bandwidth_train,
-  double **matrix_Y,
-  double **matrix_W,
-  const int ncol_Y,
-  const int ncol_W,
-  double **matrix_Y_power2,
-  double **matrix_W_power2,
-  const int ncol_Y_power2,
-  const int ncol_W_power2,
-  const int kernel_power,
-  double * const row,
-  double * const weighted_sum,
-  double * const weighted_sum_power2,
-  const int retain_common_scale,
-  double * const centered_m2,
-  double * const kw,
-  const NPBetaRegressionMomentCtx * const regression_moment_context,
-  NPContinuousKernelDerivativeDiagnostics * const route_diagnostics,
-  NPContinuousKernelProgressFunction progress)
-{
+typedef struct {
+  const NPContinuousKernelRoute *route;
+  int bandwidth_mode;
+  int num_obs_train;
+  int num_obs_eval;
+  int num_reg_unordered;
+  int num_reg_ordered;
+  int num_reg_continuous;
+  int leave_one_out;
+  int leave_one_out_offset;
+  const int *operator;
+  double **matrix_X_continuous_train;
+  double **matrix_X_continuous_eval;
+  double **matrix_X_unordered_train;
+  double **matrix_X_ordered_train;
+  double **matrix_X_unordered_eval;
+  double **matrix_X_ordered_eval;
+  const int *kernel_unordered;
+  const int *kernel_ordered;
+  const double *categorical_lambda;
+  const int *num_categories;
+  double **matrix_categorical_vals;
+  int categorical_compress;
+  double *vector_bandwidth;
+  double **matrix_bandwidth_eval;
+  double **matrix_bandwidth_train;
+  double **matrix_Y;
+  double **matrix_W;
+  int ncol_Y;
+  int ncol_W;
+  double **matrix_Y_power2;
+  double **matrix_W_power2;
+  int ncol_Y_power2;
+  int ncol_W_power2;
+  int kernel_power;
+  double *row;
+  double *weighted_sum;
+  double *weighted_sum_power2;
+  int retain_common_scale;
+  double *centered_m2;
+  double *kw;
+  const NPBetaRegressionMomentCtx *regression_moment_context;
+  NPContinuousKernelDerivativeDiagnostics *route_diagnostics;
+  NPContinuousKernelProgressFunction progress;
+} NPBetaAbsoluteRouteCall;
+
+typedef struct {
   NPContinuousKernelBetaPreparedContext beta_prepared;
   NPContinuousKernelRowWorkspace workspace;
+  NPContinuousKernelDerivativeAccumulator derivative_accumulator;
+  NPContinuousKernelLevelDerivativeWorkspace regression_gradient_workspace;
+  NPBetaScaledRowCategoricalContext categorical_context;
+  double **bandwidth_columns;
+  double *derivative_row_storage;
+  double *derivative_factor_log_absolute;
+  signed char *derivative_factor_sign;
+  double *route_row;
+} NPBetaAbsoluteRouteOwner;
+
+typedef struct {
+  const NPBetaAbsoluteRouteCall *call;
+  NPBetaAbsoluteRouteOwner owner;
+  int status;
+} NPBetaAbsoluteRouteExecution;
+
+static void np_beta_absolute_route_owner_init(
+  NPBetaAbsoluteRouteOwner *owner)
+{
+  np_continuous_kernel_beta_prepared_context_init(&owner->beta_prepared);
+  np_continuous_kernel_row_workspace_init(&owner->workspace);
+  np_continuous_kernel_derivative_accumulator_init(
+    &owner->derivative_accumulator);
+  np_continuous_kernel_level_derivative_workspace_init(
+    &owner->regression_gradient_workspace);
+  np_beta_categorical_factor_context_init_empty(&owner->categorical_context);
+  owner->bandwidth_columns = NULL;
+  owner->derivative_row_storage = NULL;
+  owner->derivative_factor_log_absolute = NULL;
+  owner->derivative_factor_sign = NULL;
+  owner->route_row = NULL;
+}
+
+static void np_beta_absolute_route_owner_cleanup(
+  void *data,
+  Rboolean jump)
+{
+  NPBetaAbsoluteRouteOwner * const owner =
+    (NPBetaAbsoluteRouteOwner *)data;
+
+  np_beta_categorical_factor_context_release(&owner->categorical_context);
+  np_continuous_kernel_row_workspace_release(&owner->workspace);
+  np_continuous_kernel_derivative_accumulator_release(
+    &owner->derivative_accumulator);
+  np_continuous_kernel_level_derivative_workspace_release(
+    &owner->regression_gradient_workspace);
+  free(owner->bandwidth_columns);
+  free(owner->derivative_row_storage);
+  free(owner->derivative_factor_log_absolute);
+  free(owner->derivative_factor_sign);
+  free(owner->route_row);
+  if(!jump)
+    np_continuous_kernel_beta_prepared_context_release(
+      &owner->beta_prepared);
+}
+
+static int np_beta_absolute_route_body(
+  const NPBetaAbsoluteRouteCall *call,
+  NPBetaAbsoluteRouteOwner *owner)
+{
+  const NPContinuousKernelRoute * const route = call->route;
+  const int bandwidth_mode = call->bandwidth_mode;
+  const int num_obs_train = call->num_obs_train;
+  const int num_obs_eval = call->num_obs_eval;
+  const int num_reg_unordered = call->num_reg_unordered;
+  const int num_reg_ordered = call->num_reg_ordered;
+  const int num_reg_continuous = call->num_reg_continuous;
+  const int leave_one_out = call->leave_one_out;
+  const int leave_one_out_offset = call->leave_one_out_offset;
+  const int * const operator = call->operator;
+  double ** const matrix_X_continuous_train =
+    call->matrix_X_continuous_train;
+  double ** const matrix_X_continuous_eval = call->matrix_X_continuous_eval;
+  double ** const matrix_X_unordered_train = call->matrix_X_unordered_train;
+  double ** const matrix_X_ordered_train = call->matrix_X_ordered_train;
+  double ** const matrix_X_unordered_eval = call->matrix_X_unordered_eval;
+  double ** const matrix_X_ordered_eval = call->matrix_X_ordered_eval;
+  const int * const kernel_unordered = call->kernel_unordered;
+  const int * const kernel_ordered = call->kernel_ordered;
+  const double * const categorical_lambda = call->categorical_lambda;
+  const int * const num_categories = call->num_categories;
+  double ** const matrix_categorical_vals = call->matrix_categorical_vals;
+  const int categorical_compress = call->categorical_compress;
+  double * const vector_bandwidth = call->vector_bandwidth;
+  double ** const matrix_bandwidth_eval = call->matrix_bandwidth_eval;
+  double ** const matrix_bandwidth_train = call->matrix_bandwidth_train;
+  double ** const matrix_Y = call->matrix_Y;
+  double ** const matrix_W = call->matrix_W;
+  const int ncol_Y = call->ncol_Y;
+  const int ncol_W = call->ncol_W;
+  double ** const matrix_Y_power2 = call->matrix_Y_power2;
+  double ** const matrix_W_power2 = call->matrix_W_power2;
+  const int ncol_Y_power2 = call->ncol_Y_power2;
+  const int ncol_W_power2 = call->ncol_W_power2;
+  const int kernel_power = call->kernel_power;
+  double * const row = call->row;
+  double * const weighted_sum = call->weighted_sum;
+  double * const weighted_sum_power2 = call->weighted_sum_power2;
+  const int retain_common_scale = call->retain_common_scale;
+  double * const centered_m2 = call->centered_m2;
+  double * const kw = call->kw;
+  const NPBetaRegressionMomentCtx * const regression_moment_context =
+    call->regression_moment_context;
+  NPContinuousKernelDerivativeDiagnostics * const route_diagnostics =
+    call->route_diagnostics;
+  NPContinuousKernelProgressFunction progress = call->progress;
+  NPContinuousKernelBetaPreparedContext * const beta_prepared =
+    &owner->beta_prepared;
+  NPContinuousKernelRowWorkspace * const workspace = &owner->workspace;
   NPContinuousKernelRowPlan plan;
   NPContinuousKernelRowResult row_result;
-  NPContinuousKernelDerivativeAccumulator derivative_accumulator;
+  NPContinuousKernelDerivativeAccumulator * const derivative_accumulator =
+    &owner->derivative_accumulator;
+  NPContinuousKernelLevelDerivativeWorkspace * const
+    regression_gradient_workspace = &owner->regression_gradient_workspace;
   NPContinuousKernelLogFactorProvider categorical_provider;
-  NPBetaScaledRowCategoricalContext categorical_context;
-  double **bandwidth_columns = NULL;
+  NPBetaScaledRowCategoricalContext * const categorical_context =
+    &owner->categorical_context;
   const int has_categories =
     num_reg_unordered > 0 || num_reg_ordered > 0;
   int train_is_eval = num_obs_train == num_obs_eval;
@@ -9448,12 +9561,8 @@ static int np_beta_absolute_route(
     route_diagnostics->undefined_count = 0;
     route_diagnostics->beta_status = NP_BETA_OK;
   }
-  np_continuous_kernel_row_workspace_init(&workspace);
-  np_continuous_kernel_beta_prepared_context_init(&beta_prepared);
-  np_continuous_kernel_derivative_accumulator_init(&derivative_accumulator);
-  np_beta_categorical_factor_context_init_empty(&categorical_context);
   categorical_provider.function = np_beta_categorical_log_factor;
-  categorical_provider.context = &categorical_context;
+  categorical_provider.context = categorical_context;
 
   if(route == NULL ||
      np_continuous_kernel_route_validate(route, num_reg_continuous) !=
@@ -9574,12 +9683,12 @@ static int np_beta_absolute_route(
   if(bandwidth_mode == BW_FIXED) {
     if((size_t)num_reg_continuous > SIZE_MAX / sizeof(double *))
       return KWSNP_ERR_BADINVOC;
-    bandwidth_columns = (double **)malloc(
+    owner->bandwidth_columns = (double **)malloc(
       (size_t)num_reg_continuous * sizeof(double *));
-    if(bandwidth_columns == NULL)
+    if(owner->bandwidth_columns == NULL)
       return KWSNP_ERR_BADINVOC;
     for(coordinate = 0; coordinate < num_reg_continuous; ++coordinate)
-      bandwidth_columns[coordinate] = vector_bandwidth + coordinate;
+      owner->bandwidth_columns[coordinate] = vector_bandwidth + coordinate;
   }
 
   plan.route = route;
@@ -9591,16 +9700,16 @@ static int np_beta_absolute_route(
   plan.train = matrix_X_continuous_train;
   plan.evaluation = matrix_X_continuous_eval;
   plan.bandwidth_eval = (bandwidth_mode == BW_FIXED) ?
-    bandwidth_columns : matrix_bandwidth_eval;
+    owner->bandwidth_columns : matrix_bandwidth_eval;
   plan.bandwidth_train = (bandwidth_mode == BW_FIXED) ?
-    bandwidth_columns : matrix_bandwidth_train;
+    owner->bandwidth_columns : matrix_bandwidth_train;
   plan.operator = operator;
-  plan.beta_prepared = &beta_prepared;
+  plan.beta_prepared = beta_prepared;
   if(np_continuous_kernel_row_plan_validate(&plan) !=
      NP_CONTINUOUS_ROW_OK)
     goto cleanup;
   if(np_continuous_kernel_beta_prepared_context_prepare(
-       &beta_prepared, &plan) != NP_CONTINUOUS_ROW_OK)
+       beta_prepared, &plan) != NP_CONTINUOUS_ROW_OK)
     goto cleanup;
   row_result.row = row;
 
@@ -9608,7 +9717,7 @@ static int np_beta_absolute_route(
     NPContinuousKernelRowStatus row_status;
 
     row_status = np_beta_categorical_factor_context_prepare(
-      &categorical_context, num_obs_train, num_obs_eval,
+      categorical_context, num_obs_train, num_obs_eval,
       num_reg_unordered, num_reg_ordered,
       matrix_X_unordered_train, matrix_X_ordered_train,
       matrix_X_unordered_eval, matrix_X_ordered_eval,
@@ -9627,7 +9736,7 @@ static int np_beta_absolute_route(
         regression_moment_context->response,
         regression_moment_context->positive_weights,
         regression_moment_context->standard_error_mode,
-        &workspace, &row_result,
+        workspace, &row_result,
         regression_moment_context->mean,
         regression_moment_context->mean_stderr,
         route_diagnostics, regression_moment_context->progress);
@@ -9643,6 +9752,7 @@ static int np_beta_absolute_route(
         &plan, has_categories ? &categorical_provider : NULL,
         regression_moment_context->response,
         regression_moment_context->standard_error_mode,
+        regression_gradient_workspace,
         regression_moment_context->gradient,
         regression_moment_context->gradient_stderr,
         route_diagnostics, &infinite_count, &undefined_count);
@@ -9657,10 +9767,10 @@ static int np_beta_absolute_route(
           np_beta_regression_categorical_gradients_validated(
             &plan, leave_one_out, leave_one_out_offset,
             num_reg_unordered, num_reg_ordered,
-            &categorical_context, regression_moment_context->response,
+            categorical_context, regression_moment_context->response,
             regression_moment_context->positive_weights,
             regression_moment_context->standard_error_mode,
-            &workspace, &row_result,
+            workspace, &row_result,
             regression_moment_context->mean,
             regression_moment_context->mean_stderr,
             regression_moment_context->gradient,
@@ -9680,7 +9790,7 @@ static int np_beta_absolute_route(
       np_continuous_kernel_beta_centered_moment_rows_validated(
         &plan, leave_one_out, leave_one_out_offset,
         has_categories ? &categorical_provider : NULL,
-        &workspace, &row_result, weighted_sum, centered_m2,
+        workspace, &row_result, weighted_sum, centered_m2,
         route_diagnostics, progress);
 
     if(row_status != NP_CONTINUOUS_ROW_OK)
@@ -9701,7 +9811,7 @@ static int np_beta_absolute_route(
         has_categories ? &categorical_provider : NULL,
         matrix_Y, ncol_Y, matrix_W, ncol_W,
         matrix_Y_power2, ncol_Y_power2, matrix_W_power2, ncol_W_power2,
-        &workspace, &row_result, weighted_sum, weighted_sum_power2,
+        workspace, &row_result, weighted_sum, weighted_sum_power2,
         retain_common_scale, retain_common_scale ? kw : NULL,
         route_diagnostics, progress);
 
@@ -9714,29 +9824,57 @@ static int np_beta_absolute_route(
   if(derivative_coordinate >= 0) {
     NPContinuousKernelRowStatus row_status;
 
+    if(kernel_power != 1) {
+      size_t derivative_row_count;
+
+      if((size_t)num_obs_train > SIZE_MAX / 2 ||
+         !np_size_array_bytes_checked(
+           (size_t)num_obs_train * 2, sizeof(double),
+           &derivative_row_count))
+        goto cleanup;
+      owner->derivative_row_storage =
+        (double *)malloc(derivative_row_count);
+      if(has_categories) {
+        owner->derivative_factor_log_absolute = (double *)malloc(
+          (size_t)num_obs_train * sizeof(double));
+        owner->derivative_factor_sign = (signed char *)malloc(
+          (size_t)num_obs_train * sizeof(signed char));
+      }
+      if(owner->derivative_row_storage == NULL ||
+         (has_categories &&
+          (owner->derivative_factor_log_absolute == NULL ||
+           owner->derivative_factor_sign == NULL)))
+        goto cleanup;
+    }
+
     if(has_categories) {
       row_status = kernel_power == 1 ?
         np_continuous_kernel_beta_derivative_absolute_rows_with_log_factor_validated(
           &plan, leave_one_out, leave_one_out_offset,
           derivative_coordinate, &categorical_provider,
-          matrix_Y, ncol_Y, matrix_W, ncol_W, &derivative_accumulator,
+          matrix_Y, ncol_Y, matrix_W, ncol_W, derivative_accumulator,
+          workspace,
           weighted_sum, kw, route_diagnostics) :
         np_continuous_kernel_beta_derivative_powered_rows_validated(
           &plan, leave_one_out, leave_one_out_offset,
           derivative_coordinate, kernel_power, &categorical_provider,
           matrix_Y, ncol_Y, matrix_W, ncol_W,
-          &derivative_accumulator, weighted_sum, kw, route_diagnostics);
+          derivative_accumulator, workspace, owner->derivative_row_storage,
+          owner->derivative_factor_log_absolute,
+          owner->derivative_factor_sign,
+          weighted_sum, kw, route_diagnostics);
     } else {
       row_status = kernel_power == 1 ?
         np_continuous_kernel_beta_derivative_absolute_rows_validated(
           &plan, leave_one_out, leave_one_out_offset,
           derivative_coordinate, matrix_Y, ncol_Y, matrix_W, ncol_W,
-          &derivative_accumulator, weighted_sum, kw, route_diagnostics) :
+          derivative_accumulator, weighted_sum, kw, route_diagnostics) :
         np_continuous_kernel_beta_derivative_powered_rows_validated(
           &plan, leave_one_out, leave_one_out_offset,
           derivative_coordinate, kernel_power, NULL,
           matrix_Y, ncol_Y, matrix_W, ncol_W,
-          &derivative_accumulator, weighted_sum, kw, route_diagnostics);
+          derivative_accumulator, workspace, owner->derivative_row_storage,
+          NULL, NULL, weighted_sum, kw, route_diagnostics);
     }
 
     if(row_status != NP_CONTINUOUS_ROW_OK)
@@ -9755,10 +9893,10 @@ static int np_beta_absolute_route(
       row_status =
         np_continuous_kernel_beta_factor_row_with_log_factor(
           &plan, evaluation, omitted_observation, &categorical_provider,
-          &workspace, &row_result);
+          workspace, &row_result);
     else
       row_status = np_continuous_kernel_beta_factor_row(
-        &plan, evaluation, omitted_observation, &workspace, &row_result);
+        &plan, evaluation, omitted_observation, workspace, &row_result);
 
     if(row_status != NP_CONTINUOUS_ROW_OK)
       goto cleanup;
@@ -9770,11 +9908,11 @@ static int np_beta_absolute_route(
 
         if((kernel_power == 1 ?
             np_continuous_kernel_signed_log_restore(
-              workspace.primary_log_absolute[observation],
-              workspace.primary_sign[observation], &value) :
+              workspace->primary_log_absolute[observation],
+              workspace->primary_sign[observation], &value) :
             np_continuous_kernel_signed_log_power_restore(
-              workspace.primary_log_absolute[observation],
-              workspace.primary_sign[observation], kernel_power,
+              workspace->primary_log_absolute[observation],
+              workspace->primary_sign[observation], kernel_power,
               &value)) != NP_CONTINUOUS_ROW_OK)
           goto cleanup;
         if(kw != NULL) {
@@ -9783,8 +9921,8 @@ static int np_beta_absolute_route(
           if(kernel_power == 1)
             raw_value = value;
           else if(np_continuous_kernel_signed_log_restore(
-                    workspace.primary_log_absolute[observation],
-                    workspace.primary_sign[observation],
+                    workspace->primary_log_absolute[observation],
+                    workspace->primary_sign[observation],
                     &raw_value) != NP_CONTINUOUS_ROW_OK)
             goto cleanup;
           kw[(size_t)evaluation * (size_t)num_obs_train +
@@ -9816,11 +9954,11 @@ static int np_beta_absolute_route(
 
         if((kernel_power == 1 ?
             np_continuous_kernel_signed_log_restore(
-              workspace.primary_log_absolute[observation],
-              workspace.primary_sign[observation], &value) :
+              workspace->primary_log_absolute[observation],
+              workspace->primary_sign[observation], &value) :
             np_continuous_kernel_signed_log_power_restore(
-              workspace.primary_log_absolute[observation],
-              workspace.primary_sign[observation], kernel_power,
+              workspace->primary_log_absolute[observation],
+              workspace->primary_sign[observation], kernel_power,
               &value)) != NP_CONTINUOUS_ROW_OK)
           goto cleanup;
         if(kw != NULL) {
@@ -9829,8 +9967,8 @@ static int np_beta_absolute_route(
           if(kernel_power == 1)
             raw_value = value;
           else if(np_continuous_kernel_signed_log_restore(
-                    workspace.primary_log_absolute[observation],
-                    workspace.primary_sign[observation],
+                    workspace->primary_log_absolute[observation],
+                    workspace->primary_sign[observation],
                     &raw_value) != NP_CONTINUOUS_ROW_OK)
             goto cleanup;
           kw[(size_t)evaluation * (size_t)num_obs_train +
@@ -9865,13 +10003,33 @@ static int np_beta_absolute_route(
   status = 0;
 
 cleanup:
-  np_beta_categorical_factor_context_release(&categorical_context);
-  np_continuous_kernel_row_workspace_release(&workspace);
-  np_continuous_kernel_derivative_accumulator_release(
-    &derivative_accumulator);
-  free(bandwidth_columns);
-  np_continuous_kernel_beta_prepared_context_release(&beta_prepared);
   return status;
+}
+
+static SEXP np_beta_absolute_route_execute(void *data)
+{
+  NPBetaAbsoluteRouteExecution * const execution =
+    (NPBetaAbsoluteRouteExecution *)data;
+
+  execution->status = np_beta_absolute_route_body(
+    execution->call, &execution->owner);
+  return R_NilValue;
+}
+
+static int np_beta_absolute_route(const NPBetaAbsoluteRouteCall *call)
+{
+  NPBetaAbsoluteRouteExecution execution;
+
+  if(call == NULL)
+    return KWSNP_ERR_BADINVOC;
+  execution.call = call;
+  execution.status = KWSNP_ERR_BADINVOC;
+  np_beta_absolute_route_owner_init(&execution.owner);
+  execution.owner.route_row = call->row;
+  R_UnwindProtect(
+    np_beta_absolute_route_execute, &execution,
+    np_beta_absolute_route_owner_cleanup, &execution.owner, NULL);
+  return execution.status;
 }
 
 /*
@@ -10058,30 +10216,59 @@ NPPermutationWeightOutput * const pkw_output){
       if(route_row == NULL)
         return KWSNP_ERR_BADINVOC;
     }
-    route_status = np_beta_absolute_route(
-      kernel_route, BANDWIDTH_reg, num_obs_train, num_obs_eval,
-      num_reg_unordered, num_reg_ordered,
-      num_reg_continuous,
-      leave_one_out, leave_one_out_offset, operator,
-      matrix_X_continuous_train, matrix_X_continuous_eval,
-      matrix_X_unordered_train, matrix_X_ordered_train,
-      matrix_X_unordered_eval, matrix_X_ordered_eval,
-      KERNEL_unordered_reg, KERNEL_ordered_reg, lambda_pre,
-      num_categories, matrix_categorical_vals,
-      kernel_execution_context->categorical_compress,
-      vector_scale_factor, matrix_bw_eval, matrix_bw_train,
-      matrix_Y, matrix_W, ncol_Y, ncol_W,
-      beta_power2_Y, beta_power2_W,
-      beta_power2_ncol_Y, beta_power2_ncol_W,
-      kernel_pow,
-      route_row, weighted_sum,
-      beta_dual_power ? dual_power_ctx->weighted_sum : NULL,
-      beta_retain_common_scale,
-      beta_centered_moment ? centered_moment_ctx->centered_m2 : NULL,
-      kw, NULL, kernel_route_diagnostics,
-      beta_dual_power ? dual_power_ctx->progress :
-      (beta_centered_moment ? centered_moment_ctx->progress : NULL));
-    free(route_row);
+    {
+      const NPBetaAbsoluteRouteCall route_call = {
+        .route = kernel_route,
+        .bandwidth_mode = BANDWIDTH_reg,
+        .num_obs_train = num_obs_train,
+        .num_obs_eval = num_obs_eval,
+        .num_reg_unordered = num_reg_unordered,
+        .num_reg_ordered = num_reg_ordered,
+        .num_reg_continuous = num_reg_continuous,
+        .leave_one_out = leave_one_out,
+        .leave_one_out_offset = leave_one_out_offset,
+        .operator = operator,
+        .matrix_X_continuous_train = matrix_X_continuous_train,
+        .matrix_X_continuous_eval = matrix_X_continuous_eval,
+        .matrix_X_unordered_train = matrix_X_unordered_train,
+        .matrix_X_ordered_train = matrix_X_ordered_train,
+        .matrix_X_unordered_eval = matrix_X_unordered_eval,
+        .matrix_X_ordered_eval = matrix_X_ordered_eval,
+        .kernel_unordered = KERNEL_unordered_reg,
+        .kernel_ordered = KERNEL_ordered_reg,
+        .categorical_lambda = lambda_pre,
+        .num_categories = num_categories,
+        .matrix_categorical_vals = matrix_categorical_vals,
+        .categorical_compress =
+          kernel_execution_context->categorical_compress,
+        .vector_bandwidth = vector_scale_factor,
+        .matrix_bandwidth_eval = matrix_bw_eval,
+        .matrix_bandwidth_train = matrix_bw_train,
+        .matrix_Y = matrix_Y,
+        .matrix_W = matrix_W,
+        .ncol_Y = ncol_Y,
+        .ncol_W = ncol_W,
+        .matrix_Y_power2 = beta_power2_Y,
+        .matrix_W_power2 = beta_power2_W,
+        .ncol_Y_power2 = beta_power2_ncol_Y,
+        .ncol_W_power2 = beta_power2_ncol_W,
+        .kernel_power = kernel_pow,
+        .row = route_row,
+        .weighted_sum = weighted_sum,
+        .weighted_sum_power2 =
+          beta_dual_power ? dual_power_ctx->weighted_sum : NULL,
+        .retain_common_scale = beta_retain_common_scale,
+        .centered_m2 = beta_centered_moment ?
+          centered_moment_ctx->centered_m2 : NULL,
+        .kw = kw,
+        .regression_moment_context = NULL,
+        .route_diagnostics = kernel_route_diagnostics,
+        .progress = beta_dual_power ? dual_power_ctx->progress :
+          (beta_centered_moment ? centered_moment_ctx->progress : NULL)
+      };
+
+      route_status = np_beta_absolute_route(&route_call);
+    }
     return route_status;
   }
   
@@ -21718,23 +21905,57 @@ static NP_NOINLINE void np_beta_scalar_regression_fit_canonical(
   regression_moment_context.standard_error_mode = standard_error_mode;
   regression_moment_context.status = &regression_row_status;
   regression_moment_context.progress = np_progress_fit_loop_step;
-  route_status = np_beta_absolute_route(
-    kernel_route, BANDWIDTH_reg, num_obs_train, num_obs_eval,
-    num_reg_unordered, num_reg_ordered, num_reg_continuous,
-    0, 0, operator,
-    matrix_X_continuous_train, matrix_X_continuous_eval,
-    matrix_X_unordered_train, matrix_X_ordered_train,
-    matrix_X_unordered_eval, matrix_X_ordered_eval,
-    kernel_u, kernel_o,
-    num_categorical > 0 ? lambda : NULL,
-    num_categories, matrix_categorical_vals, categorical_compress,
-    vector_scale_factor,
-    BANDWIDTH_reg == BW_FIXED ? NULL : matrix_bandwidth,
-    BANDWIDTH_reg == BW_FIXED ? NULL : matrix_bandwidth,
-    NULL, NULL, 0, 0, NULL, NULL, 0, 0, 1,
-    route_row, NULL, NULL, 0, NULL, NULL,
-    &regression_moment_context, kernel_route_diagnostics, NULL);
-  free(route_row);
+  {
+    const NPBetaAbsoluteRouteCall route_call = {
+      .route = kernel_route,
+      .bandwidth_mode = BANDWIDTH_reg,
+      .num_obs_train = num_obs_train,
+      .num_obs_eval = num_obs_eval,
+      .num_reg_unordered = num_reg_unordered,
+      .num_reg_ordered = num_reg_ordered,
+      .num_reg_continuous = num_reg_continuous,
+      .leave_one_out = 0,
+      .leave_one_out_offset = 0,
+      .operator = operator,
+      .matrix_X_continuous_train = matrix_X_continuous_train,
+      .matrix_X_continuous_eval = matrix_X_continuous_eval,
+      .matrix_X_unordered_train = matrix_X_unordered_train,
+      .matrix_X_ordered_train = matrix_X_ordered_train,
+      .matrix_X_unordered_eval = matrix_X_unordered_eval,
+      .matrix_X_ordered_eval = matrix_X_ordered_eval,
+      .kernel_unordered = kernel_u,
+      .kernel_ordered = kernel_o,
+      .categorical_lambda = num_categorical > 0 ? lambda : NULL,
+      .num_categories = num_categories,
+      .matrix_categorical_vals = matrix_categorical_vals,
+      .categorical_compress = categorical_compress,
+      .vector_bandwidth = vector_scale_factor,
+      .matrix_bandwidth_eval = BANDWIDTH_reg == BW_FIXED ?
+        NULL : matrix_bandwidth,
+      .matrix_bandwidth_train = BANDWIDTH_reg == BW_FIXED ?
+        NULL : matrix_bandwidth,
+      .matrix_Y = NULL,
+      .matrix_W = NULL,
+      .ncol_Y = 0,
+      .ncol_W = 0,
+      .matrix_Y_power2 = NULL,
+      .matrix_W_power2 = NULL,
+      .ncol_Y_power2 = 0,
+      .ncol_W_power2 = 0,
+      .kernel_power = 1,
+      .row = route_row,
+      .weighted_sum = NULL,
+      .weighted_sum_power2 = NULL,
+      .retain_common_scale = 0,
+      .centered_m2 = NULL,
+      .kw = NULL,
+      .regression_moment_context = &regression_moment_context,
+      .route_diagnostics = kernel_route_diagnostics,
+      .progress = NULL
+    };
+
+    route_status = np_beta_absolute_route(&route_call);
+  }
   free_tmat(matrix_bandwidth);
 
   if(route_status != 0) {

@@ -285,6 +285,7 @@ np_continuous_kernel_beta_derivative_absolute_rows_with_log_factor_validated(
   double * const *case_weights,
   int weight_columns,
   NPContinuousKernelDerivativeAccumulator *accumulator,
+  NPContinuousKernelRowWorkspace *factor_workspace,
   double *weighted_sum,
   double *kernel_weights,
   NPContinuousKernelDerivativeDiagnostics *diagnostics);
@@ -302,6 +303,10 @@ np_continuous_kernel_beta_derivative_powered_rows_validated(
   double * const *case_weights,
   int weight_columns,
   NPContinuousKernelDerivativeAccumulator *accumulator,
+  NPContinuousKernelRowWorkspace *workspace,
+  double *row_storage,
+  double *factor_log_absolute,
+  signed char *factor_sign,
   double *weighted_sum,
   double *kernel_weights,
   NPContinuousKernelDerivativeDiagnostics *diagnostics);
