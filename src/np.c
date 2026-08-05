@@ -1081,7 +1081,24 @@ void np_progress_fit_set_offset(const int offset)
   fit_progress_last_signal_eval = fit_progress_offset;
 }
 
-static void np_progress_fit_maybe_signal(const int global_done)
+typedef struct {
+  int current;
+  int total;
+} NPProgressFitSignalCall;
+
+static SEXP np_progress_fit_signal_execute(void *data)
+{
+  const NPProgressFitSignalCall * const call =
+    (const NPProgressFitSignalCall *)data;
+
+  np_progress_signal("fit_step", "bandwidth", call->current, call->total);
+  return R_NilValue;
+}
+
+static void np_progress_fit_maybe_signal_owned(
+  const int global_done,
+  NPProgressUnwindCleanup cleanup,
+  void *cleanup_data)
 {
   const clock_t now = clock();
   const double signal_after_sec = 0.5;
@@ -1110,9 +1127,26 @@ static void np_progress_fit_maybe_signal(const int global_done)
     }
   }
 
-  np_progress_signal("fit_step", "bandwidth", bounded_done, fit_progress_total);
+  if(cleanup != NULL) {
+    const NPProgressFitSignalCall call = {
+      .current = bounded_done,
+      .total = fit_progress_total
+    };
+
+    R_UnwindProtect(
+      np_progress_fit_signal_execute, (void *)&call,
+      cleanup, cleanup_data, NULL);
+  } else {
+    np_progress_signal("fit_step", "bandwidth", bounded_done,
+                       fit_progress_total);
+  }
   fit_progress_last_signal_eval = bounded_done;
   fit_progress_last_signal_clock = now;
+}
+
+static void np_progress_fit_maybe_signal(const int global_done)
+{
+  np_progress_fit_maybe_signal_owned(global_done, NULL, NULL);
 }
 
 void np_progress_fit_step(const int done)
@@ -1129,6 +1163,22 @@ void np_progress_fit_loop_step(const int done, const int natural_total)
     return;
 
   np_progress_fit_maybe_signal(fit_progress_offset + done);
+}
+
+void np_progress_fit_loop_step_owned(
+  const int done,
+  const int natural_total,
+  NPProgressUnwindCleanup cleanup,
+  void *cleanup_data)
+{
+  if (!fit_progress_active || natural_total <= 1)
+    return;
+
+  if ((fit_progress_offset + natural_total) > fit_progress_total)
+    return;
+
+  np_progress_fit_maybe_signal_owned(
+    fit_progress_offset + done, cleanup, cleanup_data);
 }
 
 SEXP C_np_progress_fit_begin(SEXP total)
