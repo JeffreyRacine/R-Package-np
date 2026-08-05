@@ -113,6 +113,34 @@ test_that("native npreg solver option failure does not poison the next serial so
   expect_false(is.null(attr(fit, "native.nomad.diagnostics")))
 })
 
+test_that("resident npudens state is released after a solver option failure", {
+  skip_if_not_installed("crs", minimum_version = "0.15.46")
+  old <- options(np.messages = FALSE, np.tree = TRUE)
+  on.exit(options(old), add = TRUE)
+
+  set.seed(20260805)
+  dat <- data.frame(x = runif(40L))
+  expect_error(
+    suppressWarnings(np::npudensbw(
+      dat = dat, bwsolver = "mads", nmulti = 1L,
+      nomad.opts = list(MAX_BB_EVAL = "invalid")
+    )),
+    "NOMAD route failed",
+    fixed = TRUE
+  )
+
+  first <- np::npudensbw(
+    dat = dat, bwsolver = "mads", nmulti = 1L,
+    nomad.opts = list(MAX_BB_EVAL = 12L)
+  )
+  second <- np::npudensbw(
+    dat = dat, bwsolver = "mads", nmulti = 1L,
+    nomad.opts = list(MAX_BB_EVAL = 12L)
+  )
+  expect_identical(first$bw, second$bw)
+  expect_identical(first$fval, second$fval)
+})
+
 test_that("native bandwidth constructors reject cache-off options before solver work", {
   old <- options(
     np.messages = FALSE,

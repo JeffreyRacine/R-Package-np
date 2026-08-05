@@ -502,6 +502,38 @@ static int bwm_objective_cache_callback_option_value = 1;
 
 typedef struct {
   int active;
+  int num_var;
+  int num_unordered;
+  int num_ordered;
+  int num_continuous;
+  double **matrix_x_unordered;
+  double **matrix_x_ordered;
+  double **matrix_x_continuous;
+  int *num_categories;
+  double **matrix_categorical_vals;
+  double *continuous_stddev;
+  double *extendednn_upper;
+  double **powell_directions;
+  double *scale_factor;
+  double *scale_factor_startbest;
+  double *powell_step;
+  int *tree_permutation;
+  KDT *tree;
+} NPDensityPreparedCtx;
+
+static int np_density_prepared_context_prepare(
+  NPDensityPreparedCtx *context,
+  double *myuno, double *myord, double *mycon, double *mysd,
+  int *myopti, double *myoptd, const double *bw,
+  int penalty_mode, double penalty_mult,
+  double *ckerlb, double *ckerub);
+static int np_density_prepared_context_eval(
+  NPDensityPreparedCtx *context, const double *bw,
+  int penalty_mode, double penalty_mult, double out[5]);
+static void np_density_prepared_context_destroy(NPDensityPreparedCtx *context);
+
+typedef struct {
+  int active;
   int owned;
   int num_all_var;
   int num_reg_continuous;
@@ -8840,6 +8872,7 @@ typedef struct {
   double best_objective;
   double best_eval[5];
   double *best_point;
+  NPDensityPreparedCtx prepared;
 } np_udens_native_search_context;
 
 static int np_udens_native_decode_eval_bw(const np_udens_native_search_context *context,
@@ -8931,18 +8964,11 @@ static int np_udens_native_search_callback(int n,
     return 1;
   }
 
-  status = np_density_nomad_native_eval_once(context->myuno,
-                                             context->myord,
-                                             context->mycon,
-                                             context->mysd,
-                                             context->myopti,
-                                             context->myoptd,
-                                             eval_bw,
-                                             context->penalty_mode,
-                                             context->penalty_mult,
-                                             context->ckerlb,
-                                             context->ckerub,
-                                             eval_out);
+  status = np_density_prepared_context_eval(&context->prepared,
+                                            eval_bw,
+                                            context->penalty_mode,
+                                            context->penalty_mult,
+                                            eval_out);
   if (status != 0) {
     context->callback_failures++;
     NP_NOMAD_CALLBACK_FREE(raw_point);
@@ -9004,6 +9030,8 @@ SEXP C_np_density_nomad_native_search(SEXP myuno,
   np_udens_native_search_context context;
   double *solution = NULL;
   double *best_point = NULL;
+  double *raw_start = NULL;
+  double *eval_start = NULL;
   int n, i, status, budget, seed, inner_count, n_options, objective_cache_enabled;
 
   PROTECT(myuno_r = coerceVector(myuno, REALSXP));
@@ -9054,11 +9082,51 @@ SEXP C_np_density_nomad_native_search(SEXP myuno,
   n_options = (int) XLENGTH(option_names_s);
   objective_cache_enabled = bwm_objective_cache_read_user_enabled();
 
+  memset(&context, 0, sizeof(context));
+  for (i = 0; i < 5; i++)
+    context.best_eval[i] = R_NaN;
+  context.n = n;
+  context.bbin = INTEGER(bbin_i);
+  context.lower = REAL(lower_r);
+  context.upper = REAL(upper_r);
+  context.myuno = REAL(myuno_r);
+  context.myord = REAL(myord_r);
+  context.mycon = REAL(mycon_r);
+  context.mysd = REAL(mysd_r);
+  context.myopti = INTEGER(myopti_i);
+  context.myoptd = REAL(myoptd_r);
+  context.penalty_mode = asInteger(penalty_mode);
+  context.penalty_mult = asReal(penalty_mult);
+  context.ckerlb = REAL(ckerlb_r);
+  context.ckerub = REAL(ckerub_r);
+
+  raw_start = (double *)R_alloc((size_t)n, sizeof(double));
+  eval_start = (double *)R_alloc((size_t)n, sizeof(double));
+  for (i = 0; i < n; i++) {
+    raw_start[i] = context.bbin[i] == 1 ? nearbyint(REAL(x0_r)[i]) :
+      REAL(x0_r)[i];
+    if (R_FINITE(context.lower[i]) && raw_start[i] < context.lower[i])
+      raw_start[i] = context.lower[i];
+    if (R_FINITE(context.upper[i]) && raw_start[i] > context.upper[i])
+      raw_start[i] = context.upper[i];
+  }
+  if (np_udens_native_decode_eval_bw(&context, raw_start, eval_start) != 0 ||
+      np_density_prepared_context_prepare(
+        &context.prepared, context.myuno, context.myord, context.mycon,
+        context.mysd, context.myopti, context.myoptd, eval_start,
+        context.penalty_mode, context.penalty_mult,
+        context.ckerlb, context.ckerub) != 0) {
+    np_density_prepared_context_destroy(&context.prepared);
+    UNPROTECT(14);
+    error("native npudens NOMAD search failed to prepare objective state");
+  }
+
   solution = R_Calloc(n, double);
   best_point = R_Calloc(n, double);
   if (solution == NULL || best_point == NULL) {
     if (solution != NULL) R_Free(solution);
     if (best_point != NULL) R_Free(best_point);
+    np_density_prepared_context_destroy(&context.prepared);
     UNPROTECT(14);
     error("failed to allocate native npudens NOMAD buffers");
   }
@@ -9067,6 +9135,7 @@ SEXP C_np_density_nomad_native_search(SEXP myuno,
     if (native_options == NULL) {
       R_Free(solution);
       R_Free(best_point);
+      np_density_prepared_context_destroy(&context.prepared);
       UNPROTECT(14);
       error("failed to allocate native npudens NOMAD option buffers");
     }
@@ -9082,24 +9151,6 @@ SEXP C_np_density_nomad_native_search(SEXP myuno,
 
   memset(&problem, 0, sizeof(problem));
   memset(&result, 0, sizeof(result));
-  memset(&context, 0, sizeof(context));
-  for (i = 0; i < 5; i++)
-    context.best_eval[i] = R_NaN;
-
-  context.n = n;
-  context.bbin = INTEGER(bbin_i);
-  context.lower = REAL(lower_r);
-  context.upper = REAL(upper_r);
-  context.myuno = REAL(myuno_r);
-  context.myord = REAL(myord_r);
-  context.mycon = REAL(mycon_r);
-  context.mysd = REAL(mysd_r);
-  context.myopti = INTEGER(myopti_i);
-  context.myoptd = REAL(myoptd_r);
-  context.penalty_mode = asInteger(penalty_mode);
-  context.penalty_mult = asReal(penalty_mult);
-  context.ckerlb = REAL(ckerlb_r);
-  context.ckerub = REAL(ckerub_r);
   context.best_point = best_point;
 
   problem.api_version = CRS_NOMAD_API_VERSION;
@@ -9134,6 +9185,7 @@ SEXP C_np_density_nomad_native_search(SEXP myuno,
                                         NULL,
                                         &result);
   bwm_objective_cache_callback_option_end();
+  np_density_prepared_context_destroy(&context.prepared);
 
   PROTECT(out = allocVector(VECSXP, 23));
   PROTECT(names = allocVector(STRSXP, 23));
@@ -11762,28 +11814,6 @@ SEXP C_np_quantile_conditional(SEXP tc_con,
   return out;
 }
 
-typedef struct {
-  int active;
-  int num_var;
-  int num_unordered;
-  int num_ordered;
-  int num_continuous;
-  int tree_x;
-  double **matrix_x_unordered;
-  double **matrix_x_ordered;
-  double **matrix_x_continuous;
-  int *num_categories;
-  double **matrix_categorical_vals;
-  double *continuous_stddev;
-  double *extendednn_upper;
-  double **powell_directions;
-  double *scale_factor;
-  double *scale_factor_startbest;
-  double *powell_step;
-  int *tree_permutation;
-  KDT *tree;
-} NPDensityPreparedCtx;
-
 static void np_density_prepared_context_destroy(NPDensityPreparedCtx *context)
 {
   if (context == NULL || !context->active)
@@ -11836,16 +11866,79 @@ static void np_density_prepared_context_destroy(NPDensityPreparedCtx *context)
   memset(context, 0, sizeof(*context));
 }
 
-void np_density_bw(double * myuno, double * myord, double * mycon, 
-                   double * mysd, int * myopti, double * myoptd, double * myans, double * fval,
-                   double * objective_function_values, double * objective_function_evals,
-                   double * objective_function_invalid, double * timing,
-                   double * objective_function_fast,
-                   double * objective_function_guarded,
-                   int * penalty_mode, double * penalty_mult,
-                   double * ckerlb, double * ckerub,
-                   const int eval_only){
-  NPDensityPreparedCtx prepared_context = {0};
+static void np_density_refresh_penalty(double *vector_scale_factor,
+                                       int num_var,
+                                       int penalty_mode,
+                                       double penalty_mult)
+{
+  int i;
+
+  bwm_penalty_mode = 0;
+  bwm_penalty_value = DBL_MAX;
+  if (penalty_mode != 1)
+    return;
+
+  {
+    double pmult = penalty_mult;
+    double baseline;
+    if (pmult < 1.0) pmult = 1.0;
+    baseline = bwmfunc_raw_current_scale(vector_scale_factor, num_var);
+    bwm_eval_count += 1.0;
+    if (!R_FINITE(baseline) || baseline == DBL_MAX)
+      bwm_invalid_count += 1.0;
+    if (!R_FINITE(baseline) || baseline == DBL_MAX) {
+      double *tmp = bwm_alloc_transform_tmp(num_var + 1);
+      if (tmp != NULL &&
+          np_copy_scale_factor_for_raw(tmp, vector_scale_factor, num_var) == 0) {
+        for (i = 1; i <= num_reg_continuous_extern; i++)
+          tmp[i] *= 2.0;
+        for (i = 0; i < num_reg_unordered_extern; i++) {
+          int idx = num_reg_continuous_extern + 1 + i;
+          double maxbw = max_unordered_bw(num_categories_extern[i],
+                                          KERNEL_den_unordered_extern);
+          tmp[idx] = 0.5 * maxbw;
+        }
+        for (i = 0; i < num_reg_ordered_extern; i++) {
+          int idx = num_reg_continuous_extern +
+            num_reg_unordered_extern + 1 + i;
+          tmp[idx] = 0.5;
+        }
+        baseline = bwmfunc_raw(tmp);
+        bwm_eval_count += 1.0;
+        if (!R_FINITE(baseline) || baseline == DBL_MAX)
+          bwm_invalid_count += 1.0;
+      }
+      safe_free(tmp);
+    }
+    if (!R_FINITE(baseline) || baseline == DBL_MAX)
+      bwm_penalty_value = pmult * 1.0e6;
+    else
+      bwm_penalty_value = baseline + (fabs(baseline) + 1.0) * pmult;
+    if (R_FINITE(bwm_penalty_value))
+      bwm_penalty_mode = 1;
+  }
+}
+
+static void np_density_bw_internal(double * myuno, double * myord, double * mycon,
+                                   double * mysd, int * myopti, double * myoptd,
+                                   double * myans, double * fval,
+                                   double * objective_function_values,
+                                   double * objective_function_evals,
+                                   double * objective_function_invalid,
+                                   double * timing,
+                                   double * objective_function_fast,
+                                   double * objective_function_guarded,
+                                   int * penalty_mode, double * penalty_mult,
+                                   double * ckerlb, double * ckerub,
+                                   const int eval_only,
+                                   NPDensityPreparedCtx *retained_context,
+                                   const int prepare_only){
+  NPDensityPreparedCtx local_context = {0};
+  NPDensityPreparedCtx *prepared_context =
+    retained_context != NULL ? retained_context : &local_context;
+  if (retained_context != NULL && retained_context->active)
+    error("C_np_density_bw: prepared context is already active");
+  memset(prepared_context, 0, sizeof(*prepared_context));
   int_nn_k_min_extern = 1;
   /* Likelihood bandwidth selection for density estimation */
 
@@ -11892,11 +11985,11 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   int_cker_bound_extern = np_has_finite_cker_bounds(ckerlb, ckerub, num_reg_continuous_extern);
 
   num_var = num_reg_ordered_extern + num_reg_continuous_extern + num_reg_unordered_extern;
-  prepared_context.active = 1;
-  prepared_context.num_var = num_var;
-  prepared_context.num_unordered = num_reg_unordered_extern;
-  prepared_context.num_ordered = num_reg_ordered_extern;
-  prepared_context.num_continuous = num_reg_continuous_extern;
+  prepared_context->active = 1;
+  prepared_context->num_var = num_var;
+  prepared_context->num_unordered = num_reg_unordered_extern;
+  prepared_context->num_ordered = num_reg_ordered_extern;
+  prepared_context->num_continuous = num_reg_continuous_extern;
 
   num_obs_train_extern = myopti[BW_NOBSI];
   iMultistart = myopti[BW_IMULTII];
@@ -11994,15 +12087,15 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
 
   matrix_categorical_vals_extern = alloc_matd(num_obs_train_extern, num_reg_unordered_extern + num_reg_ordered_extern);
 
-  prepared_context.matrix_x_unordered = matrix_X_unordered_train_extern;
-  prepared_context.matrix_x_ordered = matrix_X_ordered_train_extern;
-  prepared_context.matrix_x_continuous = matrix_X_continuous_train_extern;
-  prepared_context.num_categories = num_categories_extern;
-  prepared_context.powell_directions = matrix_y;
-  prepared_context.scale_factor = vector_scale_factor;
-  prepared_context.scale_factor_startbest = vector_scale_factor_startbest;
-  prepared_context.powell_step = vsfh;
-  prepared_context.matrix_categorical_vals = matrix_categorical_vals_extern;
+  prepared_context->matrix_x_unordered = matrix_X_unordered_train_extern;
+  prepared_context->matrix_x_ordered = matrix_X_ordered_train_extern;
+  prepared_context->matrix_x_continuous = matrix_X_continuous_train_extern;
+  prepared_context->num_categories = num_categories_extern;
+  prepared_context->powell_directions = matrix_y;
+  prepared_context->scale_factor = vector_scale_factor;
+  prepared_context->scale_factor_startbest = vector_scale_factor_startbest;
+  prepared_context->powell_step = vsfh;
+  prepared_context->matrix_categorical_vals = matrix_categorical_vals_extern;
 
   
   if (int_use_starting_values)
@@ -12025,7 +12118,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
       matrix_X_continuous_train_extern[j][i]=mycon[j*num_obs_train_extern+i];
 
   ipt = (int *)malloc(num_obs_train_extern*sizeof(int));
-  prepared_context.tree_permutation = ipt;
+  prepared_context->tree_permutation = ipt;
   if(!(ipt != NULL)){
     bw_error_msg = "!(ipt != NULL)";
     goto cleanup_np_density_bw;
@@ -12041,7 +12134,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   if(int_TREE_X == NP_TREE_TRUE){
     build_kdtree(matrix_X_continuous_train_extern, num_obs_train_extern, num_reg_continuous_extern, 
                  4*num_reg_continuous_extern, ipt, &kdt_extern_X);
-    prepared_context.tree = kdt_extern_X;
+    prepared_context->tree = kdt_extern_X;
   
 
     //put training data into tree-order using the index array
@@ -12076,7 +12169,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
                              matrix_categorical_vals_extern);
 
   vector_continuous_stddev = alloc_vecd(num_reg_continuous_extern);
-  prepared_context.continuous_stddev = vector_continuous_stddev;
+  prepared_context->continuous_stddev = vector_continuous_stddev;
 
   for (j = 0; j < num_reg_continuous_extern; j++)
     vector_continuous_stddev[j] = mysd[j];
@@ -12101,7 +12194,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
       myans);
   int_extendednn_upper_num_extern =
     (vector_extendednn_upper_extern != NULL) ? num_reg_continuous_extern : 0;
-  prepared_context.extendednn_upper = vector_extendednn_upper_extern;
+  prepared_context->extendednn_upper = vector_extendednn_upper_extern;
 
   /* Initialize scale factors and Hessian for NR modules */
 
@@ -12221,46 +12314,11 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
     num_reg_ordered_extern,
     num_categories_extern,
     bwm_scale_factor_lower_bound);
+  if (prepare_only)
+    return;
   bwm_reset_counters();
-  bwm_penalty_mode = 0;
-  bwm_penalty_value = DBL_MAX;
-  if (penalty_mode[0] == 1) {
-    double pmult = penalty_mult[0];
-    double baseline;
-    if (pmult < 1.0) pmult = 1.0;
-    baseline = bwmfunc_raw_current_scale(vector_scale_factor, num_var);
-    bwm_eval_count += 1.0;
-    if (!R_FINITE(baseline) || baseline == DBL_MAX)
-      bwm_invalid_count += 1.0;
-    if (!R_FINITE(baseline) || baseline == DBL_MAX) {
-      double *tmp = bwm_alloc_transform_tmp(num_var + 1);
-      if (tmp != NULL && np_copy_scale_factor_for_raw(tmp, vector_scale_factor, num_var) == 0) {
-        for (i = 1; i <= num_reg_continuous_extern; i++)
-          tmp[i] *= 2.0;
-        for (i = 0; i < num_reg_unordered_extern; i++) {
-          int idx = num_reg_continuous_extern + 1 + i;
-          double maxbw = max_unordered_bw(num_categories_extern[i], KERNEL_den_unordered_extern);
-          tmp[idx] = 0.5*maxbw;
-        }
-        for (i = 0; i < num_reg_ordered_extern; i++) {
-          int idx = num_reg_continuous_extern + num_reg_unordered_extern + 1 + i;
-          tmp[idx] = 0.5;
-        }
-        baseline = bwmfunc_raw(tmp);
-        bwm_eval_count += 1.0;
-        if (!R_FINITE(baseline) || baseline == DBL_MAX)
-          bwm_invalid_count += 1.0;
-      }
-      safe_free(tmp);
-    }
-    if (!R_FINITE(baseline) || baseline == DBL_MAX) {
-      bwm_penalty_value = pmult * 1.0e6;
-    } else {
-      bwm_penalty_value = baseline + (fabs(baseline) + 1.0) * pmult;
-    }
-    if (R_FINITE(bwm_penalty_value))
-      bwm_penalty_mode = 1;
-  }
+  np_density_refresh_penalty(vector_scale_factor, num_var,
+                             penalty_mode[0], penalty_mult[0]);
 
   fret_initial = fret_best = bwmfunc_wrapper(vector_scale_factor);
   fret = fret_initial;
@@ -12642,13 +12700,107 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   /* end return data */
 
 cleanup_np_density_bw:
-  np_density_prepared_context_destroy(&prepared_context);
+  np_density_prepared_context_destroy(prepared_context);
 
   if (bw_error_msg != NULL)
     error("%s", bw_error_msg);
 
   return ;
   
+}
+
+static int np_density_prepared_context_prepare(
+  NPDensityPreparedCtx *context,
+  double *myuno, double *myord, double *mycon, double *mysd,
+  int *myopti, double *myoptd, const double *bw,
+  int penalty_mode, double penalty_mult,
+  double *ckerlb, double *ckerub)
+{
+  double fval[2] = {R_NaN, R_NaN};
+  double objective[1] = {R_NaN};
+  double evaluations[1] = {R_NaN};
+  double invalid[1] = {R_NaN};
+  double timing[1] = {R_NaN};
+  double fast[1] = {R_NaN};
+  double guarded[1] = {R_NaN};
+  int pmode = penalty_mode;
+  double pmult = penalty_mult;
+
+  if (context == NULL || bw == NULL)
+    return 1;
+
+  np_density_bw_internal(myuno, myord, mycon, mysd, myopti, myoptd,
+                         (double *)bw, fval, objective, evaluations, invalid,
+                         timing, fast, guarded, &pmode, &pmult,
+                         ckerlb, ckerub, 1, context, 1);
+  return context->active ? 0 : 1;
+}
+
+static int np_density_prepared_context_eval(
+  NPDensityPreparedCtx *context, const double *bw,
+  int penalty_mode, double penalty_mult, double out[5])
+{
+  double *vector_scale_factor;
+  double fret;
+  int i;
+
+  if (context == NULL || !context->active || bw == NULL || out == NULL ||
+      context->scale_factor == NULL || context->num_var <= 0)
+    return 1;
+
+  vector_scale_factor = context->scale_factor;
+  for (i = 0; i < context->num_var; i++)
+    vector_scale_factor[i + 1] = bw[i];
+
+  if (context->extendednn_upper != NULL) {
+    const double base_k = (double)(num_obs_train_extern - 1);
+    const double hard_upper = (double)INT_MAX / 4.0;
+    for (i = 0; i < context->num_continuous; i++) {
+      double candidate = bw[i];
+      if (!R_FINITE(candidate) || candidate < base_k)
+        candidate = base_k;
+      if (candidate > hard_upper)
+        candidate = hard_upper;
+      context->extendednn_upper[i] = candidate;
+    }
+  }
+
+  if (bwm_use_transform &&
+      bwm_to_unconstrained(vector_scale_factor, context->num_var) != 0)
+    return 1;
+
+  bwm_reset_counters();
+  np_density_refresh_penalty(vector_scale_factor, context->num_var,
+                             penalty_mode, penalty_mult);
+
+  fret = bwmfunc_wrapper(vector_scale_factor);
+  bwm_snapshot_fast_counters();
+  out[0] = fret;
+  out[1] = -fret;
+  out[2] = bwm_eval_count;
+  out[3] = bwm_fast_eval_count;
+  out[4] = bwm_guarded_eval_count;
+  return 0;
+}
+
+void np_density_bw(double * myuno, double * myord, double * mycon,
+                   double * mysd, int * myopti, double * myoptd,
+                   double * myans, double * fval,
+                   double * objective_function_values,
+                   double * objective_function_evals,
+                   double * objective_function_invalid, double * timing,
+                   double * objective_function_fast,
+                   double * objective_function_guarded,
+                   int * penalty_mode, double * penalty_mult,
+                   double * ckerlb, double * ckerub,
+                   const int eval_only)
+{
+  np_density_bw_internal(myuno, myord, mycon, mysd, myopti, myoptd,
+                         myans, fval, objective_function_values,
+                         objective_function_evals, objective_function_invalid,
+                         timing, objective_function_fast,
+                         objective_function_guarded, penalty_mode, penalty_mult,
+                         ckerlb, ckerub, eval_only, NULL, 0);
 }
 
  
