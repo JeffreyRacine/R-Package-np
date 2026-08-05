@@ -5396,7 +5396,7 @@
   } else {
     do.call(npcdens, fit.args)
   }
-  as.numeric(if (cdf) fit$condist else fit$condens)
+  as.numeric(fit[[if (cdf) "condist" else "condens", exact = TRUE]])
 }
 
 .np_ksum_conditional_operator_fixed <- function(xdat,
@@ -6231,7 +6231,7 @@
           cdf = cdf
         )
       }
-      if (identical(bws$type, "adaptive_nn")) {
+      if (identical(bws[["type", exact = TRUE]], "adaptive_nn")) {
         return(.np_conditional_exact_fit_or_stop(
           fit.expr = fit.expr,
           bws = bws,

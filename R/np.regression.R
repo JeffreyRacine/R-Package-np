@@ -575,7 +575,9 @@ npreg.rbandwidth <-
       int_do_tree = if (beta.kernel) DO_TREE_NO else
         .npreg_fit_tree_code(bws, ncon = bws$ncon, ncat = bws$nuno + bws$nord),
       categorical.compress = if (
-        beta.kernel && (bws$nuno > 0L || bws$nord > 0L)
+        beta.kernel &&
+          (bws[["nuno", exact = TRUE]] > 0L ||
+             bws[["nord", exact = TRUE]] > 0L)
       ) {
         npStrictLogicalOption("np.categorical.compress", TRUE)
       } else {

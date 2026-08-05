@@ -430,7 +430,8 @@ npksum.default <-
       myopti <- c(myopti, list(
         divide.returned.kernel.weights = internal.bandwidth.divide.weights
       ))
-      if (beta.kernel && bws$nuno + bws$nord > 0L) {
+      if (beta.kernel &&
+          bws[["nuno", exact = TRUE]] + bws[["nord", exact = TRUE]] > 0L) {
         myopti <- c(myopti, list(
           categorical.compress =
             npStrictLogicalOption("np.categorical.compress", TRUE)
