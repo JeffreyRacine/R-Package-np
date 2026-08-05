@@ -50,7 +50,7 @@ test_that("MPI all-large fit BLAS route is narrow and bounded", {
   expect_match(
     compact,
     paste0(
-      "basis = np_regression_alllarge_basis_alloc( ",
+      "basis = np_regression_fit_matrix_alloc( ",
       "num_obs_train, glp_nterms, basis_is_contiguous);"
     ),
     fixed = TRUE
@@ -102,7 +102,7 @@ test_that("MPI all-large fit BLAS route is narrow and bounded", {
     sum(gregexpr(
       "np_progress_fit_loop_step_owned(", body, fixed = TRUE
     )[[1L]] > 0L),
-    2L
+    3L
   )
   expect_match(
     source_compact,
@@ -116,7 +116,7 @@ test_that("MPI all-large fit BLAS route is narrow and bounded", {
   expect_match(
     source_compact,
     paste0(
-      "static double **np_regression_alllarge_basis_alloc( ",
+      "static double **np_regression_fit_matrix_alloc( ",
       "const int nrows, const int ncols, const int contiguous)"
     ),
     fixed = TRUE
@@ -124,7 +124,7 @@ test_that("MPI all-large fit BLAS route is narrow and bounded", {
   expect_match(
     source_compact,
     paste0(
-      "if(matrix[column] == NULL){ while(column > 0) ",
+      "if(matrix[column] == NULL) { while(column > 0) ",
       "free(matrix[--column]); free(matrix); return NULL;"
     ),
     fixed = TRUE
@@ -139,13 +139,20 @@ test_that("MPI all-large fit BLAS route is narrow and bounded", {
     fixed = TRUE
   )
   refresh_position <- regexpr(
-    "np_refresh_mseries_accelerate_option();", compact, fixed = TRUE
+    "np_refresh_runtime_tolerances();", compact, fixed = TRUE
+  )[[1L]]
+  owner_position <- regexpr(
+    "np_regression_fit_owner_init(", compact, fixed = TRUE
   )[[1L]]
   terms_position <- regexpr(
     "fast_ok = np_glp_build_terms(", compact, fixed = TRUE
   )[[1L]]
   expect_gt(refresh_position, 0L)
-  expect_gt(terms_position, refresh_position)
+  expect_gt(owner_position, refresh_position)
+  expect_gt(terms_position, owner_position)
+  expect_false(grepl(
+    "np_refresh_mseries_accelerate_option();", body, fixed = TRUE
+  ))
   expect_match(
     compact,
     paste0(
