@@ -281,24 +281,3 @@ int np_continuous_kernel_route_has_beta(
       return 1;
   return 0;
 }
-
-const char *np_continuous_kernel_route_status_message(
-  np_continuous_kernel_route_status status)
-{
-  switch(status) {
-  case NP_CKERNEL_ROUTE_OK:
-    return "success";
-  case NP_CKERNEL_ROUTE_ERR_NULL:
-    return "continuous-kernel route is missing";
-  case NP_CKERNEL_ROUTE_ERR_SEGMENT_COUNT:
-    return "continuous-kernel route has an invalid segment count";
-  case NP_CKERNEL_ROUTE_ERR_COORDINATES:
-    return "continuous-kernel route does not cover its coordinates exactly";
-  case NP_CKERNEL_ROUTE_ERR_DESCRIPTOR:
-    return "continuous-kernel route has an invalid descriptor";
-  case NP_CKERNEL_ROUTE_ERR_BOUNDS:
-    return "beta continuous-kernel route has invalid bounds";
-  default:
-    return "unknown continuous-kernel route status";
-  }
-}
