@@ -375,8 +375,10 @@ np_continuous_kernel_beta_regression_moment_rows_validated(
   NPContinuousKernelProgressFunction progress);
 
 /* Conditional scalar sibling with the established observation-influence
- * standard-error contract.  Row construction and moment arithmetic remain
- * canonical; the separate entry keeps ordinary regression's hot body exact. */
+ * standard-error contract. All rows fuse M2 overflow validation into the
+ * required influence pass; positive rows retain their stable online mean.
+ * Max-log-scaled weights make a separate squared-weight sum redundant. The
+ * separate entry keeps ordinary regression's hot body exact. */
 NPContinuousKernelRowStatus
 np_continuous_kernel_beta_conditional_moment_rows_validated(
   const NPContinuousKernelRowPlan *plan,

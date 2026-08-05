@@ -3404,6 +3404,7 @@ np_continuous_kernel_beta_conditional_influence_stderr(
   const double total_log_scale,
   const double weighted_mean,
   const double total_weight,
+  double *validation_m2,
   double *mean_stderr)
 {
   const int variance_count =
@@ -3412,27 +3413,31 @@ np_continuous_kernel_beta_conditional_influence_stderr(
   double influence_sum_squares = 1.0;
   int observation;
 
-  if(workspace == NULL || response == NULL || mean_stderr == NULL ||
+  if(workspace == NULL || response == NULL || validation_m2 == NULL ||
+     mean_stderr == NULL ||
      num_train <= 0 || omitted_observation < -1 ||
      omitted_observation >= num_train || ISNAN(total_log_scale) ||
      total_log_scale == INFINITY || !R_FINITE(weighted_mean) ||
      !R_FINITE(total_weight) || total_weight == 0.0)
     return NP_CONTINUOUS_ROW_ERR_LAYOUT;
   if(variance_count <= 1) {
+    *validation_m2 = 0.0;
     *mean_stderr = 0.0;
     return NP_CONTINUOUS_ROW_OK;
   }
+  *validation_m2 = 0.0;
 
   for(observation = 0; observation < num_train; ++observation) {
     const double weight = workspace->primary_sign[observation] == 0 ?
       0.0 : (double)workspace->primary_sign[observation] * exp(
         workspace->primary_log_absolute[observation] - total_log_scale);
-    const double influence =
-      weight * (response[observation] - weighted_mean);
+    const double residual = response[observation] - weighted_mean;
+    const double influence = weight * residual;
     const double absolute_influence = fabs(influence);
 
     if(observation == omitted_observation)
       continue;
+    *validation_m2 += weight * residual * residual;
     if(!R_FINITE(influence))
       return NP_CONTINUOUS_ROW_ERR_NUMERIC;
     if(absolute_influence != 0.0) {
@@ -3449,6 +3454,8 @@ np_continuous_kernel_beta_conditional_influence_stderr(
       }
     }
   }
+  if(!R_FINITE(*validation_m2))
+    return NP_CONTINUOUS_ROW_ERR_NUMERIC;
   *mean_stderr = influence_scale * sqrt(influence_sum_squares) /
     (fabs(total_weight) * sqrt((double)(variance_count - 1)));
   return R_FINITE(*mean_stderr) ? NP_CONTINUOUS_ROW_OK :
@@ -3509,8 +3516,7 @@ np_continuous_kernel_beta_conditional_moment_rows_validated(
       evaluation + leave_one_out_offset : -1;
     double total_weight = 0.0;
     double weighted_mean = 0.0;
-    double weighted_m2 = 0.0;
-    double squared_weight_sum = 0.0;
+    double validation_m2 = 0.0;
 
     status = np_continuous_kernel_beta_log_factor_row(
       plan, evaluation, omitted_observation, provider,
@@ -3546,9 +3552,6 @@ np_continuous_kernel_beta_conditional_moment_rows_validated(
           const double new_mean = weighted_mean +
             (weight / new_total_weight) * delta;
 
-          weighted_m2 += weight * delta *
-            (response[observation] - new_mean);
-          squared_weight_sum += weight * weight;
           total_weight = new_total_weight;
           weighted_mean = new_mean;
         }
@@ -3572,36 +3575,20 @@ np_continuous_kernel_beta_conditional_moment_rows_validated(
         return total_weight == 0.0 ? NP_CONTINUOUS_ROW_ERR_ZERO_WEIGHT :
           NP_CONTINUOUS_ROW_ERR_NUMERIC;
       weighted_mean = weighted_response_sum / total_weight;
-
-      for(observation = 0; observation < plan->num_train; ++observation) {
-        const double weight = workspace->primary_sign[observation] == 0 ?
-          0.0 : (double)workspace->primary_sign[observation] * exp(
-            workspace->primary_log_absolute[observation] -
-            row_result->total_log_scale);
-        const double residual = response[observation] - weighted_mean;
-
-        if(observation == omitted_observation)
-          continue;
-        weighted_m2 += weight * residual * residual;
-        squared_weight_sum += weight * weight;
-      }
     }
 
     if(!R_FINITE(total_weight) ||
        (positive_weights ? total_weight <= 0.0 : total_weight == 0.0))
       return total_weight == 0.0 ? NP_CONTINUOUS_ROW_ERR_ZERO_WEIGHT :
         NP_CONTINUOUS_ROW_ERR_NUMERIC;
-    if(!R_FINITE(weighted_mean) || !R_FINITE(weighted_m2) ||
-       !R_FINITE(squared_weight_sum))
+    if(!R_FINITE(weighted_mean))
       return NP_CONTINUOUS_ROW_ERR_NUMERIC;
-    if((positive_weights && weighted_m2 < 0.0) ||
-       (!positive_weights && weighted_m2 / total_weight < 0.0))
-      weighted_m2 = 0.0;
 
     mean[evaluation] = weighted_mean;
     status = np_continuous_kernel_beta_conditional_influence_stderr(
       workspace, response, plan->num_train, omitted_observation,
       row_result->total_log_scale, weighted_mean, total_weight,
+      &validation_m2,
       &mean_stderr[evaluation]);
     if(status != NP_CONTINUOUS_ROW_OK)
       return status;
