@@ -22554,6 +22554,1091 @@ static int np_regression_scalar_fit(
   return execution.status;
 }
 
+enum {
+  NP_REGRESSION_GENERAL_LP_FIT_OK = 0,
+  NP_REGRESSION_GENERAL_LP_FIT_ERR_DEGREE = -1,
+  NP_REGRESSION_GENERAL_LP_FIT_ERR_TERMS = -2,
+  NP_REGRESSION_GENERAL_LP_FIT_ERR_DIMENSION = -3,
+  NP_REGRESSION_GENERAL_LP_FIT_ERR_SOLVE_ALLOC = -4,
+  NP_REGRESSION_GENERAL_LP_FIT_ERR_ALLOC = -5,
+  NP_REGRESSION_GENERAL_LP_FIT_ERR_BASIS = -6,
+  NP_REGRESSION_GENERAL_LP_FIT_ERR_ROUTE = -7,
+  NP_REGRESSION_GENERAL_LP_FIT_ERR_SOLVE = -8
+};
+
+typedef struct {
+  int *kernel_c;
+  int *kernel_u;
+  int *kernel_o;
+  int bandwidth_mode;
+  int num_obs_train;
+  int num_obs_eval;
+  int num_reg_unordered;
+  int num_reg_ordered;
+  int num_reg_continuous;
+  double **matrix_X_unordered_train;
+  double **matrix_X_ordered_train;
+  double **matrix_X_continuous_train;
+  double **matrix_X_unordered_eval;
+  double **matrix_X_ordered_eval;
+  double **matrix_X_continuous_eval;
+  double *vector_Y;
+  double *vector_scale_factor;
+  double *lambda;
+  int *num_categories;
+  int *operator;
+  double **matrix_categorical_vals;
+  double **matrix_bandwidth;
+  double *mean;
+  double **gradient;
+  double *mean_stderr;
+  double **gradient_stderr;
+  int tree_enabled;
+  int do_grad;
+  int do_gerr;
+  int categorical_compress;
+  int fit_progress_total;
+#ifdef MPI2
+  int fit_progress_active;
+#endif
+  const NP_GateOverrideCtx *gate_context;
+  double kernel_squared_integral;
+  double bandwidth_product;
+  const NPContinuousKernelRoute *kernel_route;
+  NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics;
+} NPRegressionGeneralLPFitCall;
+
+typedef struct {
+  int *terms;
+  int nterms;
+  double **basis;
+  double **matrix_bandwidth_eval;
+  double **eval_continuous;
+  double **eval_unordered;
+  double **eval_ordered;
+  double **response_columns;
+  double **basis_columns;
+  double *squared_response;
+  double *moments;
+  double *power2_moments;
+  double *retained_kernel_row;
+  NPGLPBasisCtx *basis_context;
+  double *coefficient;
+  double *eval_basis;
+  double *eval_derivative;
+  double *projection;
+  double *power2_projection;
+  NPLPSolveWorkspace solve_workspace;
+#ifdef MPI2
+  NPRegMpiOwnerChunk mpi_owner_chunk;
+  double *mpi_kernel_row;
+#endif
+} NPRegressionGeneralLPFitOwner;
+
+typedef struct {
+  const NPRegressionGeneralLPFitCall *call;
+  NPRegressionGeneralLPFitOwner owner;
+  int status;
+} NPRegressionGeneralLPFitExecution;
+
+static void np_regression_general_lp_fit_owner_init(
+  NPRegressionGeneralLPFitOwner *owner)
+{
+  owner->terms = NULL;
+  owner->nterms = 0;
+  owner->basis = NULL;
+  owner->matrix_bandwidth_eval = NULL;
+  owner->eval_continuous = NULL;
+  owner->eval_unordered = NULL;
+  owner->eval_ordered = NULL;
+  owner->response_columns = NULL;
+  owner->basis_columns = NULL;
+  owner->squared_response = NULL;
+  owner->moments = NULL;
+  owner->power2_moments = NULL;
+  owner->retained_kernel_row = NULL;
+  owner->basis_context = NULL;
+  owner->coefficient = NULL;
+  owner->eval_basis = NULL;
+  owner->eval_derivative = NULL;
+  owner->projection = NULL;
+  owner->power2_projection = NULL;
+  np_lp_solve_workspace_init(&owner->solve_workspace);
+#ifdef MPI2
+  owner->mpi_owner_chunk.recvcounts = NULL;
+  owner->mpi_owner_chunk.displs = NULL;
+  owner->mpi_owner_chunk.sendbuf = NULL;
+  owner->mpi_owner_chunk.recvbuf = NULL;
+  owner->mpi_kernel_row = NULL;
+#endif
+}
+
+static void np_regression_general_lp_fit_owner_cleanup(
+  void *data,
+  Rboolean jump)
+{
+  NPRegressionGeneralLPFitExecution * const execution =
+    (NPRegressionGeneralLPFitExecution *)data;
+  NPRegressionGeneralLPFitOwner * const owner = &execution->owner;
+  const NPRegressionGeneralLPFitCall * const call = execution->call;
+  int coordinate;
+
+  (void)jump;
+  np_lp_solve_workspace_clear(&owner->solve_workspace);
+  free_mat(owner->basis, owner->nterms);
+  if(owner->matrix_bandwidth_eval != NULL)
+    free_tmat(owner->matrix_bandwidth_eval);
+  if(owner->eval_continuous != NULL && call->num_reg_continuous > 0)
+    free_mat(owner->eval_continuous, call->num_reg_continuous);
+  if(owner->eval_unordered != NULL && call->num_reg_unordered > 0)
+    free_mat(owner->eval_unordered, call->num_reg_unordered);
+  if(owner->eval_ordered != NULL && call->num_reg_ordered > 0)
+    free_mat(owner->eval_ordered, call->num_reg_ordered);
+  free(owner->response_columns);
+  free(owner->basis_columns);
+  free(owner->squared_response);
+  free(owner->moments);
+  free(owner->power2_moments);
+  free(owner->retained_kernel_row);
+  free(owner->coefficient);
+  free(owner->projection);
+  free(owner->power2_projection);
+  if(owner->basis_context != NULL) {
+    for(coordinate = 0; coordinate < call->num_reg_continuous; ++coordinate)
+      np_glp_basis_ctx_free(&owner->basis_context[coordinate]);
+    free(owner->basis_context);
+  }
+  free(owner->eval_basis);
+  free(owner->eval_derivative);
+  free(owner->terms);
+#ifdef MPI2
+  np_reg_mpi_owner_chunk_free(&owner->mpi_owner_chunk);
+  free(owner->mpi_kernel_row);
+#endif
+}
+
+static SEXP np_regression_general_lp_fit_execute(void *data)
+{
+  NPRegressionGeneralLPFitExecution * const execution =
+    (NPRegressionGeneralLPFitExecution *)data;
+  const NPRegressionGeneralLPFitCall * const call = execution->call;
+  NPRegressionGeneralLPFitOwner * const owner = &execution->owner;
+  const int BANDWIDTH_reg = call->bandwidth_mode;
+  const int num_obs_train = call->num_obs_train;
+  const int num_obs_eval = call->num_obs_eval;
+  const int num_reg_unordered = call->num_reg_unordered;
+  const int num_reg_ordered = call->num_reg_ordered;
+  const int num_reg_continuous = call->num_reg_continuous;
+  const int use_bernstein = (int_glp_bernstein_extern != 0);
+  const double epsilon = 1.0/(double)MAX(1, num_obs_train);
+  const int reuse_fit_kernel_row =
+    (BANDWIDTH_reg == BW_FIXED) &&
+    (call->tree_enabled != NP_TREE_TRUE) &&
+    (num_reg_unordered == 0) &&
+    (num_reg_ordered == 0) &&
+    (!use_bernstein) &&
+    (!int_cker_bound_extern);
+  const int fit_tree_active =
+    (BANDWIDTH_reg != BW_ADAP_NN) &&
+    (call->tree_enabled == NP_TREE_TRUE);
+  const int reuse_fit_dual_power =
+    (!reuse_fit_kernel_row) && (!fit_tree_active);
+  NP_DualPowerCtx fit_dual_power_ctx = {
+    NULL, 2, NULL, NULL, 0, 0, NULL, 0
+  };
+  int i, j, l;
+
+  if((vector_glp_degree_extern == NULL) || (num_reg_continuous <= 0)) {
+    execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_DEGREE;
+    return R_NilValue;
+  }
+  if(!np_glp_build_terms(num_reg_continuous,
+                         vector_glp_degree_extern,
+                         int_glp_basis_extern,
+                         &owner->terms,
+                         &owner->nterms)) {
+    execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_TERMS;
+    return R_NilValue;
+  }
+  if(owner->nterms <= 0) {
+    execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_DIMENSION;
+    return R_NilValue;
+  }
+  if(!np_lp_solve_workspace_reserve(&owner->solve_workspace,
+                                    owner->nterms,
+                                    owner->nterms)) {
+    execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_SOLVE_ALLOC;
+    return R_NilValue;
+  }
+
+  owner->basis = alloc_matd(num_obs_train, owner->nterms);
+  if(BANDWIDTH_reg == BW_GEN_NN
+#ifdef MPI2
+     || BANDWIDTH_reg == BW_FIXED
+#endif
+     )
+    owner->matrix_bandwidth_eval = alloc_tmatd(1, num_reg_continuous);
+  owner->eval_continuous = alloc_matd(1, num_reg_continuous);
+  owner->eval_unordered = alloc_matd(1, num_reg_unordered);
+  owner->eval_ordered = alloc_matd(1, num_reg_ordered);
+  owner->response_columns = (double **)malloc(
+    (size_t)(owner->nterms + 2)*sizeof(double *));
+  owner->basis_columns = (double **)malloc(
+    (size_t)owner->nterms*sizeof(double *));
+  owner->squared_response = (double *)malloc(
+    (size_t)num_obs_train*sizeof(double));
+  owner->moments = (double *)malloc(
+    (size_t)(owner->nterms + 2)*(size_t)owner->nterms*sizeof(double));
+  owner->power2_moments = (double *)malloc(
+    (size_t)owner->nterms*(size_t)owner->nterms*sizeof(double));
+  if(reuse_fit_kernel_row)
+    owner->retained_kernel_row = (double *)malloc(
+      (size_t)num_obs_train*sizeof(double));
+  owner->coefficient = (double *)malloc(
+    (size_t)owner->nterms*sizeof(double));
+  owner->projection = (double *)malloc(
+    (size_t)owner->nterms*sizeof(double));
+  owner->power2_projection = (double *)malloc(
+    (size_t)owner->nterms*sizeof(double));
+  owner->eval_basis = (double *)malloc(
+    (size_t)owner->nterms*sizeof(double));
+  owner->eval_derivative = (double *)malloc(
+    (size_t)owner->nterms*sizeof(double));
+  if(use_bernstein)
+    owner->basis_context = (NPGLPBasisCtx *)calloc(
+      (size_t)num_reg_continuous, sizeof(NPGLPBasisCtx));
+
+  if(owner->basis == NULL ||
+     ((BANDWIDTH_reg == BW_GEN_NN
+#ifdef MPI2
+       || BANDWIDTH_reg == BW_FIXED
+#endif
+       ) &&
+      owner->matrix_bandwidth_eval == NULL) ||
+     owner->eval_continuous == NULL ||
+     (num_reg_unordered > 0 && owner->eval_unordered == NULL) ||
+     (num_reg_ordered > 0 && owner->eval_ordered == NULL) ||
+     owner->response_columns == NULL || owner->basis_columns == NULL ||
+     owner->squared_response == NULL || owner->moments == NULL ||
+     owner->power2_moments == NULL ||
+     (reuse_fit_kernel_row && owner->retained_kernel_row == NULL) ||
+     owner->coefficient == NULL || owner->projection == NULL ||
+     owner->power2_projection == NULL || owner->eval_basis == NULL ||
+     owner->eval_derivative == NULL ||
+     (use_bernstein && owner->basis_context == NULL)) {
+    execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_ALLOC;
+    return R_NilValue;
+  }
+
+  fit_dual_power_ctx.weighted_sum = owner->power2_moments;
+  fit_dual_power_ctx.matrix_Y = owner->basis;
+  fit_dual_power_ctx.matrix_W = owner->basis;
+  fit_dual_power_ctx.ncol_Y = owner->nterms;
+  fit_dual_power_ctx.ncol_W = owner->nterms;
+
+  for(i = 0; i < num_obs_train; ++i)
+    owner->squared_response[i] = call->vector_Y[i]*call->vector_Y[i];
+
+  if(use_bernstein) {
+    for(l = 0; l < num_reg_continuous; ++l) {
+      double xmin = call->matrix_X_continuous_train[l][0];
+      double xmax = xmin;
+
+      for(i = 1; i < num_obs_train; ++i) {
+        const double xi = call->matrix_X_continuous_train[l][i];
+        if(xi < xmin) xmin = xi;
+        if(xi > xmax) xmax = xi;
+      }
+      if(!np_glp_basis_ctx_init(&owner->basis_context[l],
+                                vector_glp_degree_extern[l],
+                                xmin,
+                                xmax,
+                                int_glp_basis_extern == 1)) {
+        execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_BASIS;
+        return R_NilValue;
+      }
+    }
+    np_glp_fill_basis_train(num_reg_continuous,
+                            owner->terms,
+                            owner->nterms,
+                            call->matrix_X_continuous_train,
+                            num_obs_train,
+                            owner->basis_context,
+                            owner->basis);
+  } else {
+    np_glp_fill_basis_raw_train(num_reg_continuous,
+                                owner->terms,
+                                owner->nterms,
+                                call->matrix_X_continuous_train,
+                                num_obs_train,
+                                owner->basis);
+  }
+
+#ifdef MPI2
+	    const int use_mpi_owner_reduce_lp =
+	      (iNum_Processors > 1) &&
+	      (!np_mpi_local_regression_active()) &&
+	      (BANDWIDTH_reg == BW_FIXED);
+	    const int owner_chunk_rows_lp =
+	      np_reg_mpi_owner_chunk_rows(num_obs_eval,
+	                                  2 + (call->do_grad ? num_reg_continuous*(1 + (call->do_gerr ? 1 : 0)) : 0));
+#endif
+
+  for(j = 0; j < num_obs_eval; ++j) {
+    double nepsilon = 0.0;
+    double sk, ey, ey2, sigma2hat;
+    int have_vcov = 0;
+
+#ifdef MPI2
+	      if(use_mpi_owner_reduce_lp && ((j % owner_chunk_rows_lp) == 0)){
+	        const int chunk_start = j;
+	        const int chunk_end = MIN(num_obs_eval, chunk_start + owner_chunk_rows_lp);
+	        const int owner_row_width_lp = 2 + (call->do_grad ? num_reg_continuous*(1 + (call->do_gerr ? 1 : 0)) : 0);
+	        int local_pos = 0;
+	        int owner_solve_failed = 0;
+
+	        np_reg_mpi_owner_chunk_init(&owner->mpi_owner_chunk,
+	                                    chunk_start,
+	                                    chunk_end,
+	                                    owner_row_width_lp,
+	                                    "npreg LP");
+	        owner->mpi_kernel_row = (double *)malloc((size_t)num_obs_train*sizeof(double));
+	        if(owner->mpi_kernel_row == NULL)
+	          error("\n** Error: memory allocation failed.");
+
+	        local_pos = 0;
+	        for(int jj = chunk_start + my_rank; jj < chunk_end; jj += iNum_Processors){
+	          double nepsilon_owner = 0.0;
+	          double sk_owner, ey_owner, ey2_owner, sigma2_owner;
+	          int have_vcov_owner = 0;
+	          double * const out_owner = owner->mpi_owner_chunk.sendbuf + (size_t)local_pos*(size_t)owner_row_width_lp;
+	          int opos = 0;
+
+	          for(l = 0; l < num_reg_continuous; l++){
+	            owner->eval_continuous[l][0] =
+	              call->matrix_X_continuous_eval[l][jj];
+	            owner->matrix_bandwidth_eval[l][0] =
+	              (BANDWIDTH_reg == BW_GEN_NN) ? call->matrix_bandwidth[l][jj] :
+	              ((BANDWIDTH_reg == BW_FIXED) ? call->matrix_bandwidth[l][0] : 0.0);
+	          }
+	          for(l = 0; l < num_reg_unordered; l++)
+	            owner->eval_unordered[l][0] =
+	              call->matrix_X_unordered_eval[l][jj];
+	          for(l = 0; l < num_reg_ordered; l++)
+	            owner->eval_ordered[l][0] =
+	              call->matrix_X_ordered_eval[l][jj];
+
+	          owner->response_columns[0] = owner->squared_response;
+	          owner->response_columns[1] = call->vector_Y;
+	          for(l = 0; l < owner->nterms; l++){
+	            owner->response_columns[l + 2] = owner->basis[l];
+	            owner->basis_columns[l] = owner->basis[l];
+	          }
+
+	          if(call->kernel_route == NULL)
+	            kernel_weighted_sum_np_ctx(call->kernel_c,
+	                                   call->kernel_u,
+	                                   call->kernel_o,
+	                                   BANDWIDTH_reg,
+	                                   num_obs_train,
+	                                   1,
+	                                   num_reg_unordered,
+	                                   num_reg_ordered,
+	                                   num_reg_continuous,
+	                                   0,
+	                                   0,
+	                                   1,
+	                                   1,
+	                                   1,
+	                                   0,
+	                                   0,
+	                                   0,
+	                                   0,
+	                                   call->operator,
+	                                   OP_NOOP,
+	                                   0,
+	                                   0,
+	                                   NULL,
+	                                   1,
+	                                   owner->nterms + 2,
+	                                   owner->nterms,
+	                                   (BANDWIDTH_reg == BW_ADAP_NN) ? NP_TREE_FALSE : call->tree_enabled,
+	                                   0,
+	                                   (BANDWIDTH_reg == BW_ADAP_NN) ? NULL : kdt_extern_X,
+	                                   NULL, NULL, NULL,
+	                                   call->matrix_X_unordered_train,
+	                                   call->matrix_X_ordered_train,
+	                                   call->matrix_X_continuous_train,
+	                                   owner->eval_unordered,
+	                                   owner->eval_ordered,
+	                                   owner->eval_continuous,
+	                                   owner->response_columns,
+	                                   owner->basis_columns,
+	                                   NULL,
+	                                   call->vector_scale_factor,
+	                                   1,
+	                                   call->matrix_bandwidth,
+	                                   owner->matrix_bandwidth_eval,
+	                                   call->lambda,
+	                                   call->num_categories,
+	                                   call->matrix_categorical_vals,
+	                                   NULL,
+	                                   owner->moments,
+	                                   NULL,
+	                                   owner->mpi_kernel_row,
+	                                   call->gate_context,
+	                                   NULL);
+	          else {
+	            /*
+	             * Rank ownership changes only who computes this row.  It must
+	             * not change the selected continuous-kernel family: beta rows
+	             * retain the same canonical scaled-moment owner used by the
+	             * serial and non-owner LP routes.
+	             */
+	            if(np_beta_regression_lp_moment_row_canonical(
+	                 BANDWIDTH_reg,
+	                 num_obs_train,
+	                 num_reg_unordered,
+	                 num_reg_ordered,
+	                 num_reg_continuous,
+	                 owner->nterms,
+	                 owner->nterms + 2,
+	                 call->operator,
+	                 call->kernel_u,
+	                 call->kernel_o,
+	                 call->matrix_X_unordered_train,
+	                 call->matrix_X_ordered_train,
+	                 call->matrix_X_continuous_train,
+	                 owner->eval_unordered,
+	                 owner->eval_ordered,
+	                 owner->eval_continuous,
+	                 owner->response_columns,
+	                 owner->basis,
+	                 call->vector_scale_factor,
+	                 call->matrix_bandwidth,
+	                 call->matrix_bandwidth,
+	                 call->lambda,
+	                 call->num_categories,
+	                 call->matrix_categorical_vals,
+	                 call->categorical_compress,
+	                 owner->moments,
+	                 owner->power2_moments,
+	                 owner->mpi_kernel_row,
+	                 call->kernel_route,
+	                 call->kernel_route_diagnostics) != 0) {
+	              owner_solve_failed = 1;
+	              break;
+	            }
+	          }
+
+	          for(i = 0; i < owner->nterms; i++){
+	            const int base = i*(owner->nterms + 2);
+	            owner->solve_workspace.rhs_source[i] = owner->moments[base + 1];
+	            for(l = 0; l < owner->nterms; l++)
+	              owner->solve_workspace.gram_source[i+l*owner->nterms] =
+	                owner->moments[base + (l + 2)];
+	          }
+	          {
+	            int ridge_steps = 0;
+	            while(!np_lp_solve_workspace_solve(&owner->solve_workspace,
+	                                               owner->nterms,
+	                                               1)){
+	              if((ridge_steps >= NP_LP_SOLVE_MAX_RIDGE_STEPS) ||
+	                 !np_lp_solve_workspace_sources_finite(
+	                   &owner->solve_workspace,
+	                   owner->nterms,
+	                   1)){
+	                owner_solve_failed = 1;
+	                break;
+	              }
+	              for(i = 0; i < owner->nterms; i++)
+	                owner->solve_workspace.gram_source[
+	                  i+i*owner->nterms
+	                ] += epsilon;
+	              nepsilon_owner += epsilon;
+	              ridge_steps++;
+	            }
+	            if(owner_solve_failed)
+	              break;
+	          }
+
+	          owner->solve_workspace.rhs_source[0] +=
+	            nepsilon_owner*owner->solve_workspace.rhs_source[0]/
+	            NZD_POS(owner->solve_workspace.gram_source[0]);
+	          if(nepsilon_owner > 0.0){
+	            if(!np_lp_solve_workspace_solve(&owner->solve_workspace,
+	                                            owner->nterms,
+	                                            1)){
+	              owner_solve_failed = 1;
+	              break;
+	            }
+	          }
+	          for(i = 0; i < owner->nterms; i++)
+	            owner->coefficient[i] = owner->solve_workspace.rhs_work[i];
+
+	          if(use_bernstein)
+	            np_glp_fill_basis_eval(num_reg_continuous,
+	                                   owner->terms,
+	                                   owner->nterms,
+	                                   call->matrix_X_continuous_eval,
+	                                   jj,
+	                                   owner->basis_context,
+	                                   owner->eval_basis);
+	          else
+	            np_glp_fill_basis_eval_raw(num_reg_continuous,
+	                                       owner->terms,
+	                                       owner->nterms,
+	                                       call->matrix_X_continuous_eval,
+	                                       jj,
+	                                       owner->eval_basis);
+
+	          out_owner[opos] = 0.0;
+	          for(i = 0; i < owner->nterms; i++)
+	            out_owner[opos] += owner->eval_basis[i]*owner->coefficient[i];
+	          opos++;
+
+	          sk_owner = copysign(DBL_MIN, owner->moments[2]) + owner->moments[2];
+	          ey_owner = owner->moments[1]/sk_owner;
+	          ey2_owner = owner->moments[0]/sk_owner;
+	          sigma2_owner = ey2_owner - ey_owner*ey_owner;
+	          {
+	            const double v_owner = sigma2_owner * call->kernel_squared_integral / (sk_owner*call->bandwidth_product);
+	            out_owner[opos] = (v_owner <= 0.0) ? 0.0 : sqrt(v_owner);
+	          }
+	          sigma2_owner = (sigma2_owner <= 0.0) ? 0.0 : sigma2_owner;
+
+	          if(call->kernel_route == NULL) {
+	            for(i = 0; i < owner->nterms*owner->nterms; i++)
+	              owner->power2_moments[i] = 0.0;
+
+	            for(i = 0; i < num_obs_train; i++){
+	              const double w = owner->mpi_kernel_row[i];
+	              const double w2 = w*w;
+	              if(w2 == 0.0)
+	                continue;
+	              for(int a = 0; a < owner->nterms; a++){
+	                const double za = owner->basis[a][i];
+	                for(int b = 0; b < owner->nterms; b++)
+	                  owner->power2_moments[a*owner->nterms+b] += za*owner->basis[b][i]*w2;
+	              }
+	            }
+	          }
+	          for(l = 0; l < owner->nterms; l++)
+	            for(i = 0; i < owner->nterms; i++)
+	              owner->solve_workspace.rhs_source[i+l*owner->nterms] =
+	                (i == l) ? 1.0 : 0.0;
+	          if(np_lp_solve_workspace_solve(&owner->solve_workspace,
+	                                         owner->nterms,
+	                                         owner->nterms))
+	            have_vcov_owner = 1;
+
+	          if(have_vcov_owner){
+	            double q = 0.0;
+	            for(i = 0; i < owner->nterms; i++){
+	              double vv = 0.0;
+	              for(int ii = 0; ii < owner->nterms; ii++)
+	                vv += owner->solve_workspace.rhs_work[i+ii*owner->nterms]*
+	                  owner->eval_basis[ii];
+	              owner->projection[i] = vv;
+	            }
+	            for(i = 0; i < owner->nterms; i++){
+	              double ww = 0.0;
+	              for(int ii = 0; ii < owner->nterms; ii++)
+	                ww += owner->power2_moments[i*owner->nterms+ii]*owner->projection[ii];
+	              owner->power2_projection[i] = ww;
+	            }
+	            for(i = 0; i < owner->nterms; i++)
+	              q += owner->projection[i]*owner->power2_projection[i];
+	            {
+	              const double mv = sigma2_owner*q;
+	              if((mv > 0.0) && isfinite(mv))
+	                out_owner[opos] = sqrt(mv);
+	            }
+	          }
+	          opos++;
+
+	          if(call->do_grad){
+	            for(l = 0; l < num_reg_continuous; l++){
+	              const int grad_order = (vector_glp_gradient_order_extern != NULL) ?
+	                MAX(1, vector_glp_gradient_order_extern[l]) : 1;
+	              double grad_value = 0.0;
+
+	              if(use_bernstein)
+	                np_glp_fill_basis_eval_deriv(l,
+	                                             grad_order,
+	                                             num_reg_continuous,
+	                                             owner->terms,
+	                                             owner->nterms,
+	                                             call->matrix_X_continuous_eval,
+	                                             jj,
+	                                             owner->basis_context,
+	                                             owner->eval_derivative);
+	              else
+	                np_glp_fill_basis_eval_deriv_raw(l,
+	                                                grad_order,
+	                                                num_reg_continuous,
+	                                                owner->terms,
+	                                                owner->nterms,
+	                                                call->matrix_X_continuous_eval,
+	                                                jj,
+	                                                owner->eval_derivative);
+	              for(i = 0; i < owner->nterms; i++)
+	                grad_value += owner->eval_derivative[i]*owner->coefficient[i];
+	              out_owner[opos++] = grad_value;
+
+	              if(call->do_gerr){
+	                double grad_se = 0.0;
+	                if(have_vcov_owner){
+	                  double q = 0.0;
+	                  for(i = 0; i < owner->nterms; i++){
+	                    double vv = 0.0;
+	                    for(int ii = 0; ii < owner->nterms; ii++)
+	                      vv += owner->solve_workspace.rhs_work[i+ii*owner->nterms]*
+	                        owner->eval_derivative[ii];
+	                    owner->projection[i] = vv;
+	                  }
+	                  for(i = 0; i < owner->nterms; i++){
+	                    double ww = 0.0;
+	                    for(int ii = 0; ii < owner->nterms; ii++)
+	                      ww += owner->power2_moments[i*owner->nterms+ii]*owner->projection[ii];
+	                    owner->power2_projection[i] = ww;
+	                  }
+	                  for(i = 0; i < owner->nterms; i++)
+	                    q += owner->projection[i]*owner->power2_projection[i];
+	                  {
+	                    const double gv = sigma2_owner*q;
+	                    grad_se = (gv > 0.0 && isfinite(gv)) ? sqrt(gv) : 0.0;
+	                  }
+	                }
+	                out_owner[opos++] = grad_se;
+	              }
+	            }
+	          }
+	          local_pos++;
+	        }
+
+	        if(owner_solve_failed){
+	          for(int pos = local_pos; pos < owner->mpi_owner_chunk.local_rows; pos++){
+	            double * const failed_row =
+	              owner->mpi_owner_chunk.sendbuf + (size_t)pos*(size_t)owner_row_width_lp;
+	            for(int col = 0; col < owner_row_width_lp; col++)
+	              failed_row[col] = 0.0;
+	          }
+	          owner->mpi_owner_chunk.sendbuf[0] = NAN;
+	        }
+
+	        np_reg_mpi_owner_chunk_allgather(&owner->mpi_owner_chunk);
+
+	        owner_solve_failed = 0;
+	        for(i = 0; i < iNum_Processors; i++)
+	          if((owner->mpi_owner_chunk.recvcounts[i] > 0) &&
+	             !isfinite(np_reg_mpi_owner_chunk_recv_ptr(
+	               &owner->mpi_owner_chunk,
+	               i,
+	               0)[0]))
+	            owner_solve_failed = 1;
+
+	        if(!owner_solve_failed){
+	          for(i = 0; i < iNum_Processors; i++){
+	            int pos_i = 0;
+	            for(int jj = chunk_start + i; jj < chunk_end; jj += iNum_Processors){
+	              const double * const in =
+	                np_reg_mpi_owner_chunk_recv_ptr(&owner->mpi_owner_chunk, i, pos_i);
+	              int ipos = 0;
+	              call->mean[jj] = in[ipos++];
+	              call->mean_stderr[jj] = in[ipos++];
+	              if(call->do_grad){
+	                for(l = 0; l < num_reg_continuous; l++){
+	                  call->gradient[l][jj] = in[ipos++];
+	                  if(call->do_gerr)
+	                    call->gradient_stderr[l][jj] = in[ipos++];
+	                }
+	                for(l = num_reg_continuous;
+	                    l < (num_reg_continuous + num_reg_unordered + num_reg_ordered);
+	                    l++){
+	                  call->gradient[l][jj] = 0.0;
+	                  if(call->do_gerr)
+	                    call->gradient_stderr[l][jj] = 0.0;
+	                }
+	              }
+	              pos_i++;
+	            }
+	          }
+	        }
+
+	        np_reg_mpi_owner_chunk_free(&owner->mpi_owner_chunk);
+	        free(owner->mpi_kernel_row);
+	        owner->mpi_kernel_row = NULL;
+	        if(owner_solve_failed){
+	          execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_ROUTE;
+	          return R_NilValue;
+	        }
+	      }
+
+	      if(use_mpi_owner_reduce_lp){
+	        if (call->fit_progress_active)
+	          np_progress_fit_loop_step(j + 1, call->fit_progress_total);
+	        continue;
+	      }
+#endif
+
+    for(l = 0; l < num_reg_continuous; ++l) {
+      owner->eval_continuous[l][0] = call->matrix_X_continuous_eval[l][j];
+      if(BANDWIDTH_reg == BW_GEN_NN)
+        owner->matrix_bandwidth_eval[l][0] = call->matrix_bandwidth[l][j];
+    }
+    for(l = 0; l < num_reg_unordered; ++l)
+      owner->eval_unordered[l][0] = call->matrix_X_unordered_eval[l][j];
+    for(l = 0; l < num_reg_ordered; ++l)
+      owner->eval_ordered[l][0] = call->matrix_X_ordered_eval[l][j];
+
+    owner->response_columns[0] = owner->squared_response;
+    owner->response_columns[1] = call->vector_Y;
+    for(l = 0; l < owner->nterms; ++l) {
+      owner->response_columns[l + 2] = owner->basis[l];
+      owner->basis_columns[l] = owner->basis[l];
+    }
+
+    if(NP_UNLIKELY(call->kernel_route != NULL)) {
+      if(np_beta_regression_lp_moment_row_canonical(
+           BANDWIDTH_reg,
+           num_obs_train,
+           num_reg_unordered,
+           num_reg_ordered,
+           num_reg_continuous,
+           owner->nterms,
+           owner->nterms + 2,
+           call->operator,
+           call->kernel_u,
+           call->kernel_o,
+           call->matrix_X_unordered_train,
+           call->matrix_X_ordered_train,
+           call->matrix_X_continuous_train,
+           owner->eval_unordered,
+           owner->eval_ordered,
+           owner->eval_continuous,
+           owner->response_columns,
+           owner->basis,
+           call->vector_scale_factor,
+           call->matrix_bandwidth,
+           BANDWIDTH_reg == BW_GEN_NN ?
+             owner->matrix_bandwidth_eval : call->matrix_bandwidth,
+           call->lambda,
+           call->num_categories,
+           call->matrix_categorical_vals,
+           call->categorical_compress,
+           owner->moments,
+           owner->power2_moments,
+           NULL,
+           call->kernel_route,
+           call->kernel_route_diagnostics) != 0) {
+        execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_ROUTE;
+        return R_NilValue;
+      }
+    } else {
+      kernel_weighted_sum_np_ctx_ex(call->kernel_c,
+                         call->kernel_u,
+                         call->kernel_o,
+                         BANDWIDTH_reg,
+                         num_obs_train,
+                         1,
+                         num_reg_unordered,
+                         num_reg_ordered,
+                         num_reg_continuous,
+                         0, 0, 1, 1, 0, 0, 0, 0, 0,
+                         call->operator,
+                         OP_NOOP,
+                         0, 0, NULL, 1,
+                         owner->nterms + 2,
+                         owner->nterms,
+                         BANDWIDTH_reg == BW_ADAP_NN ?
+                           NP_TREE_FALSE : call->tree_enabled,
+                         0,
+                         BANDWIDTH_reg == BW_ADAP_NN ? NULL : kdt_extern_X,
+                         NULL, NULL, NULL,
+                         call->matrix_X_unordered_train,
+                         call->matrix_X_ordered_train,
+                         call->matrix_X_continuous_train,
+                         owner->eval_unordered,
+                         owner->eval_ordered,
+                         owner->eval_continuous,
+                         owner->response_columns,
+                         owner->basis_columns,
+                         NULL,
+                         call->vector_scale_factor,
+                         1,
+                         call->matrix_bandwidth,
+                         BANDWIDTH_reg == BW_GEN_NN ?
+                           owner->matrix_bandwidth_eval : call->matrix_bandwidth,
+                         call->lambda,
+                         call->num_categories,
+                         call->matrix_categorical_vals,
+                         NULL,
+                         owner->moments,
+                         NULL,
+                         reuse_fit_kernel_row ?
+                           owner->retained_kernel_row : NULL,
+                         call->gate_context,
+                         reuse_fit_dual_power ? &fit_dual_power_ctx : NULL,
+                         NULL, NULL, NULL,
+#ifdef MPI2
+                         0,
+#endif
+                         NULL);
+    }
+
+    for(i = 0; i < owner->nterms; ++i) {
+      const int base = i*(owner->nterms + 2);
+      owner->solve_workspace.rhs_source[i] = owner->moments[base + 1];
+      for(l = 0; l < owner->nterms; ++l)
+        owner->solve_workspace.gram_source[i+l*owner->nterms] =
+          owner->moments[base + l + 2];
+    }
+
+    {
+      int ridge_steps = 0;
+      while(!np_lp_solve_workspace_solve(&owner->solve_workspace,
+                                         owner->nterms,
+                                         1)) {
+        if(ridge_steps >= NP_LP_SOLVE_MAX_RIDGE_STEPS ||
+           !np_lp_solve_workspace_sources_finite(&owner->solve_workspace,
+                                                 owner->nterms,
+                                                 1)) {
+          execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_SOLVE;
+          return R_NilValue;
+        }
+        for(i = 0; i < owner->nterms; ++i)
+          owner->solve_workspace.gram_source[i+i*owner->nterms] += epsilon;
+        nepsilon += epsilon;
+        ++ridge_steps;
+      }
+    }
+
+    owner->solve_workspace.rhs_source[0] +=
+      nepsilon*owner->solve_workspace.rhs_source[0]/
+      NZD_POS(owner->solve_workspace.gram_source[0]);
+    if(nepsilon > 0.0 &&
+       !np_lp_solve_workspace_solve(&owner->solve_workspace,
+                                    owner->nterms,
+                                    1)) {
+      execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_SOLVE;
+      return R_NilValue;
+    }
+    for(i = 0; i < owner->nterms; ++i)
+      owner->coefficient[i] = owner->solve_workspace.rhs_work[i];
+
+    if(use_bernstein)
+      np_glp_fill_basis_eval(num_reg_continuous,
+                             owner->terms,
+                             owner->nterms,
+                             call->matrix_X_continuous_eval,
+                             j,
+                             owner->basis_context,
+                             owner->eval_basis);
+    else
+      np_glp_fill_basis_eval_raw(num_reg_continuous,
+                                 owner->terms,
+                                 owner->nterms,
+                                 call->matrix_X_continuous_eval,
+                                 j,
+                                 owner->eval_basis);
+    call->mean[j] = 0.0;
+    for(i = 0; i < owner->nterms; ++i)
+      call->mean[j] += owner->eval_basis[i]*owner->coefficient[i];
+    sk = copysign(DBL_MIN, owner->moments[2]) + owner->moments[2];
+    ey = owner->moments[1]/sk;
+    ey2 = owner->moments[0]/sk;
+    sigma2hat = ey2 - ey*ey;
+    call->mean_stderr[j] = sigma2hat <= 0.0 ? 0.0 :
+      sqrt(sigma2hat*call->kernel_squared_integral/
+           (sk*call->bandwidth_product));
+    sigma2hat = sigma2hat <= 0.0 ? 0.0 : sigma2hat;
+
+    for(l = 0; l < owner->nterms; ++l) {
+      owner->response_columns[l] = owner->basis[l];
+      owner->basis_columns[l] = owner->basis[l];
+    }
+
+    if(reuse_fit_kernel_row) {
+      np_lp_power2_moments_from_kernel_row(owner->basis,
+                                            owner->nterms,
+                                            owner->retained_kernel_row,
+                                            num_obs_train,
+                                            call->bandwidth_product,
+                                            owner->power2_moments);
+    } else if(!reuse_fit_dual_power) {
+      kernel_weighted_sum_np_ctx(call->kernel_c,
+                         call->kernel_u,
+                         call->kernel_o,
+                         BANDWIDTH_reg,
+                         num_obs_train,
+                         1,
+                         num_reg_unordered,
+                         num_reg_ordered,
+                         num_reg_continuous,
+                         0, 0, 2, 1, 0, 0, 0, 0, 0,
+                         call->operator,
+                         OP_NOOP,
+                         0, 0, NULL, 1,
+                         owner->nterms,
+                         owner->nterms,
+                         BANDWIDTH_reg == BW_ADAP_NN ?
+                           NP_TREE_FALSE : call->tree_enabled,
+                         0,
+                         BANDWIDTH_reg == BW_ADAP_NN ? NULL : kdt_extern_X,
+                         NULL, NULL, NULL,
+                         call->matrix_X_unordered_train,
+                         call->matrix_X_ordered_train,
+                         call->matrix_X_continuous_train,
+                         owner->eval_unordered,
+                         owner->eval_ordered,
+                         owner->eval_continuous,
+                         owner->response_columns,
+                         owner->basis_columns,
+                         NULL,
+                         call->vector_scale_factor,
+                         1,
+                         call->matrix_bandwidth,
+                         BANDWIDTH_reg == BW_GEN_NN ?
+                           owner->matrix_bandwidth_eval : call->matrix_bandwidth,
+                         call->lambda,
+                         call->num_categories,
+                         call->matrix_categorical_vals,
+                         NULL,
+                         owner->power2_moments,
+                         NULL, NULL,
+                         call->gate_context,
+                         NULL);
+    }
+
+    for(l = 0; l < owner->nterms; ++l)
+      for(i = 0; i < owner->nterms; ++i)
+        owner->solve_workspace.rhs_source[i+l*owner->nterms] =
+          i == l ? 1.0 : 0.0;
+
+    if(np_lp_solve_workspace_solve_factored(&owner->solve_workspace,
+                                            owner->nterms,
+                                            owner->nterms))
+      have_vcov = 1;
+
+    if(have_vcov) {
+      double q = 0.0;
+      for(i = 0; i < owner->nterms; ++i) {
+        double vv = 0.0;
+        int ii;
+        for(ii = 0; ii < owner->nterms; ++ii)
+          vv += owner->solve_workspace.rhs_work[
+            i+ii*owner->nterms]*owner->eval_basis[ii];
+        owner->projection[i] = vv;
+      }
+      for(i = 0; i < owner->nterms; ++i) {
+        double ww = 0.0;
+        int ii;
+        for(ii = 0; ii < owner->nterms; ++ii)
+          ww += owner->power2_moments[i*owner->nterms+ii]*
+            owner->projection[ii];
+        owner->power2_projection[i] = ww;
+      }
+      for(i = 0; i < owner->nterms; ++i)
+        q += owner->projection[i]*owner->power2_projection[i];
+      {
+        const double mv = sigma2hat*q;
+        if(mv > 0.0 && isfinite(mv))
+          call->mean_stderr[j] = sqrt(mv);
+      }
+    }
+
+    if(call->do_grad) {
+      for(l = 0; l < num_reg_continuous; ++l) {
+        const int grad_order = vector_glp_gradient_order_extern != NULL ?
+          MAX(1, vector_glp_gradient_order_extern[l]) : 1;
+        if(use_bernstein)
+          np_glp_fill_basis_eval_deriv(l,
+                                       grad_order,
+                                       num_reg_continuous,
+                                       owner->terms,
+                                       owner->nterms,
+                                       call->matrix_X_continuous_eval,
+                                       j,
+                                       owner->basis_context,
+                                       owner->eval_derivative);
+        else
+          np_glp_fill_basis_eval_deriv_raw(l,
+                                           grad_order,
+                                           num_reg_continuous,
+                                           owner->terms,
+                                           owner->nterms,
+                                           call->matrix_X_continuous_eval,
+                                           j,
+                                           owner->eval_derivative);
+        call->gradient[l][j] = 0.0;
+        for(i = 0; i < owner->nterms; ++i)
+          call->gradient[l][j] +=
+            owner->eval_derivative[i]*owner->coefficient[i];
+        if(call->do_gerr) {
+          if(have_vcov) {
+            double q = 0.0;
+            for(i = 0; i < owner->nterms; ++i) {
+              double vv = 0.0;
+              int ii;
+              for(ii = 0; ii < owner->nterms; ++ii)
+                vv += owner->solve_workspace.rhs_work[
+                  i+ii*owner->nterms]*owner->eval_derivative[ii];
+              owner->projection[i] = vv;
+            }
+            for(i = 0; i < owner->nterms; ++i) {
+              double ww = 0.0;
+              int ii;
+              for(ii = 0; ii < owner->nterms; ++ii)
+                ww += owner->power2_moments[i*owner->nterms+ii]*
+                  owner->projection[ii];
+              owner->power2_projection[i] = ww;
+            }
+            for(i = 0; i < owner->nterms; ++i)
+              q += owner->projection[i]*owner->power2_projection[i];
+            {
+              const double gv = sigma2hat*q;
+              call->gradient_stderr[l][j] =
+                gv > 0.0 && isfinite(gv) ? sqrt(gv) : 0.0;
+            }
+          } else {
+            call->gradient_stderr[l][j] = 0.0;
+          }
+        }
+      }
+      for(l = num_reg_continuous;
+          l < num_reg_continuous + num_reg_unordered + num_reg_ordered;
+          ++l) {
+        call->gradient[l][j] = 0.0;
+        if(call->do_gerr)
+          call->gradient_stderr[l][j] = 0.0;
+      }
+    }
+
+#ifdef MPI2
+    if(call->fit_progress_active)
+#endif
+      np_progress_fit_loop_step(j + 1, call->fit_progress_total);
+  }
+
+  execution->status = NP_REGRESSION_GENERAL_LP_FIT_OK;
+  return R_NilValue;
+}
+
+static int np_regression_general_lp_fit(
+  const NPRegressionGeneralLPFitCall *call)
+{
+  NPRegressionGeneralLPFitExecution execution;
+
+  execution.call = call;
+  execution.status = NP_REGRESSION_GENERAL_LP_FIT_ERR_ALLOC;
+  np_regression_general_lp_fit_owner_init(&execution.owner);
+  R_UnwindProtect(
+    np_regression_general_lp_fit_execute, &execution,
+    np_regression_general_lp_fit_owner_cleanup, &execution, NULL);
+  return execution.status;
+}
+
 int kernel_estimate_regression_categorical_tree_np(
 int lp_engine,
 int KERNEL_reg,
@@ -22613,6 +23698,7 @@ const NPContinuousPreparedBandwidthView *prepared_bandwidth){
   double *ov_disc_uno_const = NULL, *ov_disc_ord_const = NULL;
   int ov_cont_from_cache = 0;
   int estimation_shortcut_done = 0;
+  int general_lp_fit_status = NP_REGRESSION_GENERAL_LP_FIT_OK;
 
 #ifdef MPI2
   int stride_e = MAX((int)ceil((double) num_obs_eval / (double) iNum_Processors),1);
@@ -23469,487 +24555,49 @@ const NPContinuousPreparedBandwidthView *prepared_bandwidth){
     if(scalar_status != NP_REGRESSION_SCALAR_FIT_OK)
       error("invalid internal scalar regression fit status");
   } else if(lp_engine_est == NP_LP_ENGINE_GENERAL) { // local polynomial (regtype = "lp")
-    int *glp_terms = NULL;
-    int glp_nterms = 0;
-    const int use_bernstein = (int_glp_bernstein_extern != 0);
-    double **basis = NULL;
-    double **matrix_bandwidth_eval = NULL;
-    double **TCON = NULL, **TUNO = NULL, **TORD = NULL;
-    double **Ycols = NULL, **Wcols = NULL;
-    double *y2 = NULL, *out = NULL, *out2 = NULL, *fit_kw = NULL;
-    NP_DualPowerCtx fit_dual_power_ctx = {
-      NULL, 2, NULL, NULL, 0, 0, NULL, 0
+    const NPRegressionGeneralLPFitCall general_lp_call = {
+      .kernel_c = kernel_c,
+      .kernel_u = kernel_u,
+      .kernel_o = kernel_o,
+      .bandwidth_mode = BANDWIDTH_reg,
+      .num_obs_train = num_obs_train,
+      .num_obs_eval = num_obs_eval,
+      .num_reg_unordered = num_reg_unordered,
+      .num_reg_ordered = num_reg_ordered,
+      .num_reg_continuous = num_reg_continuous,
+      .matrix_X_unordered_train = matrix_X_unordered_train,
+      .matrix_X_ordered_train = matrix_X_ordered_train,
+      .matrix_X_continuous_train = matrix_X_continuous_train,
+      .matrix_X_unordered_eval = matrix_X_unordered_eval,
+      .matrix_X_ordered_eval = matrix_X_ordered_eval,
+      .matrix_X_continuous_eval = matrix_X_continuous_eval,
+      .vector_Y = vector_Y,
+      .vector_scale_factor = vector_scale_factor,
+      .lambda = lambda,
+      .num_categories = num_categories,
+      .operator = operator,
+      .matrix_categorical_vals = matrix_categorical_vals,
+      .matrix_bandwidth = matrix_bandwidth,
+      .mean = mean,
+      .gradient = gradient,
+      .mean_stderr = mean_stderr,
+      .gradient_stderr = gradient_stderr,
+      .tree_enabled = int_TREE_X,
+      .do_grad = do_grad,
+      .do_gerr = do_gerr,
+      .categorical_compress = categorical_compress,
+      .fit_progress_total = fit_progress_total,
+#ifdef MPI2
+      .fit_progress_active = fit_progress_active,
+#endif
+      .gate_context = &gate_ctx_local,
+      .kernel_squared_integral = K_INT_KERNEL_P,
+      .bandwidth_product = hprod,
+      .kernel_route = kernel_route,
+      .kernel_route_diagnostics = kernel_route_diagnostics
     };
-    NPGLPBasisCtx *basis_ctx = NULL;
-    NPLPSolveWorkspace solve_workspace;
-    double *beta = NULL, *eval_basis = NULL, *eval_deriv = NULL;
-    double *tmp_v = NULL, *tmp_w = NULL;
-    const double epsilon = 1.0/(double)MAX(1, num_obs_train);
-    const int reuse_fit_kernel_row =
-      (BANDWIDTH_reg == BW_FIXED) &&
-      (int_TREE_X != NP_TREE_TRUE) &&
-      (num_reg_unordered == 0) &&
-      (num_reg_ordered == 0) &&
-      (!use_bernstein) &&
-      (!int_cker_bound_extern);
-    const int fit_tree_active =
-      (BANDWIDTH_reg != BW_ADAP_NN) && (int_TREE_X == NP_TREE_TRUE);
-    const int reuse_fit_dual_power =
-      (!reuse_fit_kernel_row) && (!fit_tree_active);
 
-    np_lp_solve_workspace_init(&solve_workspace);
-
-    if((vector_glp_degree_extern == NULL) || (num_reg_continuous <= 0))
-      error("glp degree vector unavailable");
-
-    if(!np_glp_build_terms(num_reg_continuous, vector_glp_degree_extern, int_glp_basis_extern, &glp_terms, &glp_nterms))
-      error("failed to build glp basis terms");
-    if(glp_nterms <= 0)
-      error("invalid glp basis dimension");
-
-    if(!np_lp_solve_workspace_reserve(&solve_workspace,
-                                      glp_nterms,
-                                      glp_nterms))
-      error("memory allocation failed in glp solve workspace");
-    basis = alloc_matd(num_obs_train, glp_nterms);
-    if(BANDWIDTH_reg == BW_GEN_NN)
-      matrix_bandwidth_eval = alloc_tmatd(1, num_reg_continuous);
-    TCON = alloc_matd(1, num_reg_continuous);
-    TUNO = alloc_matd(1, num_reg_unordered);
-    TORD = alloc_matd(1, num_reg_ordered);
-    Ycols = (double **)malloc((size_t)(glp_nterms + 2)*sizeof(double *));
-    Wcols = (double **)malloc((size_t)glp_nterms*sizeof(double *));
-    y2 = (double *)malloc((size_t)num_obs_train*sizeof(double));
-    out = (double *)malloc((size_t)(glp_nterms + 2)*(size_t)glp_nterms*sizeof(double));
-    out2 = (double *)malloc((size_t)glp_nterms*(size_t)glp_nterms*sizeof(double));
-    fit_dual_power_ctx.weighted_sum = out2;
-    fit_dual_power_ctx.matrix_Y = basis;
-    fit_dual_power_ctx.matrix_W = basis;
-    fit_dual_power_ctx.ncol_Y = glp_nterms;
-    fit_dual_power_ctx.ncol_W = glp_nterms;
-    if(reuse_fit_kernel_row)
-      fit_kw = (double *)malloc((size_t)num_obs_train*sizeof(double));
-    beta = (double *)malloc((size_t)glp_nterms*sizeof(double));
-    tmp_v = (double *)malloc((size_t)glp_nterms*sizeof(double));
-    tmp_w = (double *)malloc((size_t)glp_nterms*sizeof(double));
-    eval_basis = (double *)malloc((size_t)glp_nterms*sizeof(double));
-    eval_deriv = (double *)malloc((size_t)glp_nterms*sizeof(double));
-    if(use_bernstein)
-      basis_ctx = (NPGLPBasisCtx *)calloc((size_t)num_reg_continuous, sizeof(NPGLPBasisCtx));
-
-    if(!((solve_workspace.gram_source != NULL) &&
-      (solve_workspace.rhs_source != NULL) &&
-      (basis != NULL) &&
-      ((BANDWIDTH_reg != BW_GEN_NN) || (num_reg_continuous == 0) || (matrix_bandwidth_eval != NULL)) &&
-      ((num_reg_continuous == 0) || (TCON != NULL)) &&
-      ((num_reg_unordered == 0) || (TUNO != NULL)) &&
-      ((num_reg_ordered == 0) || (TORD != NULL)) &&
-      (Ycols != NULL) && (Wcols != NULL) && (y2 != NULL) && (out != NULL) &&
-      (out2 != NULL) && (beta != NULL) && (tmp_v != NULL) && (tmp_w != NULL) &&
-      ((!reuse_fit_kernel_row) || (fit_kw != NULL)) &&
-      (eval_basis != NULL) && (eval_deriv != NULL) &&
-      (!use_bernstein || (basis_ctx != NULL))))
-      error("memory allocation failed in glp path");
-
-    for(i = 0; i < num_obs_train; i++)
-      y2[i] = vector_Y[i]*vector_Y[i];
-
-    if(use_bernstein){
-      for(l = 0; l < num_reg_continuous; l++){
-        double xmin = matrix_X_continuous_train[l][0];
-        double xmax = matrix_X_continuous_train[l][0];
-        for(i = 1; i < num_obs_train; i++){
-          const double xi = matrix_X_continuous_train[l][i];
-          if(xi < xmin) xmin = xi;
-          if(xi > xmax) xmax = xi;
-        }
-        if(!np_glp_basis_ctx_init(&basis_ctx[l], vector_glp_degree_extern[l], xmin, xmax,
-                                  int_glp_basis_extern == 1))
-          error("failed to initialize glp Bernstein basis");
-      }
-
-      np_glp_fill_basis_train(num_reg_continuous,
-                              glp_terms,
-                              glp_nterms,
-                              matrix_X_continuous_train,
-                              num_obs_train,
-                              basis_ctx,
-                              basis);
-    } else {
-      np_glp_fill_basis_raw_train(num_reg_continuous,
-                                  glp_terms,
-                                  glp_nterms,
-                                  matrix_X_continuous_train,
-                                  num_obs_train,
-                                  basis);
-    }
-
-    for(j = 0; j < num_obs_eval; j++){
-      double nepsilon = 0.0;
-      double sk, ey, ey2, sigma2hat;
-      int have_vcov = 0;
-
-      for(l = 0; l < num_reg_continuous; l++){
-        TCON[l][0] = matrix_X_continuous_eval[l][j];
-        if(BANDWIDTH_reg == BW_GEN_NN)
-          matrix_bandwidth_eval[l][0] = matrix_bandwidth[l][j];
-      }
-      for(l = 0; l < num_reg_unordered; l++)
-        TUNO[l][0] = matrix_X_unordered_eval[l][j];
-      for(l = 0; l < num_reg_ordered; l++)
-        TORD[l][0] = matrix_X_ordered_eval[l][j];
-
-      Ycols[0] = y2;
-      Ycols[1] = vector_Y;
-      for(l = 0; l < glp_nterms; l++){
-        Ycols[l + 2] = basis[l];
-        Wcols[l] = basis[l];
-      }
-
-      if(NP_UNLIKELY(kernel_route != NULL)) {
-        if(np_beta_regression_lp_moment_row_canonical(
-             BANDWIDTH_reg,
-             num_obs_train,
-             num_reg_unordered,
-             num_reg_ordered,
-             num_reg_continuous,
-             glp_nterms,
-             glp_nterms + 2,
-             operator,
-             kernel_u,
-             kernel_o,
-             matrix_X_unordered_train,
-             matrix_X_ordered_train,
-             matrix_X_continuous_train,
-             TUNO,
-             TORD,
-             TCON,
-             Ycols,
-             basis,
-             vector_scale_factor,
-             matrix_bandwidth,
-             (BANDWIDTH_reg == BW_GEN_NN) ?
-               matrix_bandwidth_eval : matrix_bandwidth,
-             lambda,
-             num_categories,
-             matrix_categorical_vals,
-             categorical_compress,
-             out,
-             out2,
-             NULL,
-             kernel_route,
-             kernel_route_diagnostics) != 0) {
-          estimation_shortcut_done = -2;
-          goto cleanup_glp_fit;
-        }
-      } else {
-        kernel_weighted_sum_np_ctx_ex(kernel_c,
-                             kernel_u,
-                             kernel_o,
-                             BANDWIDTH_reg,
-                             num_obs_train,
-                             1,
-                             num_reg_unordered,
-                             num_reg_ordered,
-                             num_reg_continuous,
-                             0,
-                             0,
-                             1,
-                             1,
-                             0,
-                             0,
-                             0,
-                             0,
-                             0,
-                             operator,
-                             OP_NOOP,
-                             0,
-                             0,
-                             NULL,
-                             1,
-                             glp_nterms + 2,
-                             glp_nterms,
-                             (BANDWIDTH_reg == BW_ADAP_NN) ? NP_TREE_FALSE : int_TREE_X,
-                             0,
-                             (BANDWIDTH_reg == BW_ADAP_NN) ? NULL : kdt_extern_X,
-                             NULL, NULL, NULL,
-                             matrix_X_unordered_train,
-                             matrix_X_ordered_train,
-                             matrix_X_continuous_train,
-                             TUNO,
-                             TORD,
-                             TCON,
-                             Ycols,
-                             Wcols,
-                             NULL,
-                             vector_scale_factor,
-                             1,
-                             matrix_bandwidth,
-                             (BANDWIDTH_reg == BW_GEN_NN) ? matrix_bandwidth_eval : matrix_bandwidth,
-                             lambda,
-                             num_categories,
-                             matrix_categorical_vals,
-                             NULL,
-                             out,
-                             NULL,
-                             reuse_fit_kernel_row ? fit_kw : NULL,
-                             &gate_ctx_local,
-                             reuse_fit_dual_power ? &fit_dual_power_ctx : NULL,
-                             NULL,
-                             NULL,
-                             NULL,
-                             NULL);
-      }
-
-      for(i = 0; i < glp_nterms; i++){
-        /* np_outer_weighted_sum lays out result as [W x Y], row-major by W term. */
-        const int base = i*(glp_nterms + 2);
-        solve_workspace.rhs_source[i] = out[base + 1]; /* Y column 1 is y */
-        for(l = 0; l < glp_nterms; l++)
-          solve_workspace.gram_source[i+l*glp_nterms] =
-            out[base + (l + 2)]; /* Y columns 2.. are basis terms */
-      }
-
-      {
-        int ridge_steps = 0;
-        while(!np_lp_solve_workspace_solve(&solve_workspace,
-                                           glp_nterms,
-                                           1)){
-          if((ridge_steps >= NP_LP_SOLVE_MAX_RIDGE_STEPS) ||
-             !np_lp_solve_workspace_sources_finite(&solve_workspace,
-                                                   glp_nterms,
-                                                   1)){
-            estimation_shortcut_done = -1;
-            goto cleanup_glp_fit;
-          }
-          for(i = 0; i < glp_nterms; i++)
-            solve_workspace.gram_source[i+i*glp_nterms] += epsilon;
-          nepsilon += epsilon;
-          ridge_steps++;
-        }
-      }
-
-      solve_workspace.rhs_source[0] +=
-        nepsilon*solve_workspace.rhs_source[0]/
-        NZD_POS(solve_workspace.gram_source[0]);
-      if(nepsilon > 0.0){
-        if(!np_lp_solve_workspace_solve(&solve_workspace, glp_nterms, 1)){
-          estimation_shortcut_done = -1;
-          goto cleanup_glp_fit;
-        }
-      }
-      for(i = 0; i < glp_nterms; i++)
-        beta[i] = solve_workspace.rhs_work[i];
-
-      if(use_bernstein)
-        np_glp_fill_basis_eval(num_reg_continuous,
-                               glp_terms,
-                               glp_nterms,
-                               matrix_X_continuous_eval,
-                               j,
-                               basis_ctx,
-                               eval_basis);
-      else
-        np_glp_fill_basis_eval_raw(num_reg_continuous,
-                                   glp_terms,
-                                   glp_nterms,
-                                   matrix_X_continuous_eval,
-                                   j,
-                                   eval_basis);
-      mean[j] = 0.0;
-      for(i = 0; i < glp_nterms; i++)
-        mean[j] += eval_basis[i]*beta[i];
-      /* Row 0 corresponds to the constant basis term W0. */
-      sk = copysign(DBL_MIN, out[2]) + out[2]; /* sum K * W0 * W0 */
-      ey = out[1]/sk;  /* sum K * W0 * y / sk */
-      ey2 = out[0]/sk; /* sum K * W0 * y^2 / sk */
-      sigma2hat = ey2 - ey*ey;
-      mean_stderr[j] = (sigma2hat <= 0.0) ? 0.0 : sqrt(sigma2hat * K_INT_KERNEL_P / (sk*hprod));
-      sigma2hat = (sigma2hat <= 0.0) ? 0.0 : sigma2hat;
-
-      for(l = 0; l < glp_nterms; l++){
-        Ycols[l] = basis[l];
-        Wcols[l] = basis[l];
-      }
-
-      if(reuse_fit_kernel_row)
-        np_lp_power2_moments_from_kernel_row(basis,
-                                              glp_nterms,
-                                              fit_kw,
-                                              num_obs_train,
-                                              hprod,
-                                              out2);
-      else if(!reuse_fit_dual_power)
-        kernel_weighted_sum_np_ctx(kernel_c,
-                             kernel_u,
-                             kernel_o,
-                             BANDWIDTH_reg,
-                             num_obs_train,
-                             1,
-                             num_reg_unordered,
-                             num_reg_ordered,
-                             num_reg_continuous,
-                             0,
-                             0,
-                             2,
-                             1,
-                             0,
-                             0,
-                             0,
-                             0,
-                             0,
-                             operator,
-                             OP_NOOP,
-                             0,
-                             0,
-                             NULL,
-                             1,
-                             glp_nterms,
-                             glp_nterms,
-                             (BANDWIDTH_reg == BW_ADAP_NN) ? NP_TREE_FALSE : int_TREE_X,
-                             0,
-                             (BANDWIDTH_reg == BW_ADAP_NN) ? NULL : kdt_extern_X,
-                             NULL, NULL, NULL,
-                             matrix_X_unordered_train,
-                             matrix_X_ordered_train,
-                             matrix_X_continuous_train,
-                             TUNO,
-                             TORD,
-                             TCON,
-                             Ycols,
-                             Wcols,
-                             NULL,
-                             vector_scale_factor,
-                             1,
-                             matrix_bandwidth,
-                             (BANDWIDTH_reg == BW_GEN_NN) ? matrix_bandwidth_eval : matrix_bandwidth,
-                             lambda,
-                             num_categories,
-                             matrix_categorical_vals,
-                             NULL,
-                             out2,
-                             NULL,
-                             NULL,
-                             &gate_ctx_local,
-                             NULL);
-
-      for(l = 0; l < glp_nterms; l++)
-        for(i = 0; i < glp_nterms; i++)
-          solve_workspace.rhs_source[i+l*glp_nterms] =
-            (i == l) ? 1.0 : 0.0;
-
-      if(np_lp_solve_workspace_solve_factored(&solve_workspace,
-                                              glp_nterms,
-                                              glp_nterms))
-        have_vcov = 1;
-
-      if(have_vcov){
-        double q = 0.0;
-        for(i = 0; i < glp_nterms; i++){
-          double vv = 0.0;
-          for(int ii = 0; ii < glp_nterms; ii++)
-            vv += solve_workspace.rhs_work[i+ii*glp_nterms]*eval_basis[ii];
-          tmp_v[i] = vv;
-        }
-        for(i = 0; i < glp_nterms; i++){
-          double ww = 0.0;
-          for(int ii = 0; ii < glp_nterms; ii++)
-            ww += out2[i*glp_nterms+ii]*tmp_v[ii];
-          tmp_w[i] = ww;
-        }
-        for(i = 0; i < glp_nterms; i++)
-          q += tmp_v[i]*tmp_w[i];
-        {
-          const double mv = sigma2hat*q;
-          if((mv > 0.0) && isfinite(mv))
-            mean_stderr[j] = sqrt(mv);
-        }
-      }
-
-      if(do_grad){
-        for(l = 0; l < num_reg_continuous; l++){
-          const int grad_order = (vector_glp_gradient_order_extern != NULL) ? MAX(1, vector_glp_gradient_order_extern[l]) : 1;
-          if(use_bernstein)
-            np_glp_fill_basis_eval_deriv(l,
-                                         grad_order,
-                                         num_reg_continuous,
-                                         glp_terms,
-                                         glp_nterms,
-                                         matrix_X_continuous_eval,
-                                         j,
-                                         basis_ctx,
-                                         eval_deriv);
-          else
-            np_glp_fill_basis_eval_deriv_raw(l,
-                                             grad_order,
-                                             num_reg_continuous,
-                                             glp_terms,
-                                             glp_nterms,
-                                             matrix_X_continuous_eval,
-                                             j,
-                                             eval_deriv);
-          gradient[l][j] = 0.0;
-          for(i = 0; i < glp_nterms; i++)
-            gradient[l][j] += eval_deriv[i]*beta[i];
-          if(do_gerr){
-            if(have_vcov){
-              double q = 0.0;
-              for(i = 0; i < glp_nterms; i++){
-                double vv = 0.0;
-                for(int ii = 0; ii < glp_nterms; ii++)
-                  vv += solve_workspace.rhs_work[i+ii*glp_nterms]*eval_deriv[ii];
-                tmp_v[i] = vv;
-              }
-              for(i = 0; i < glp_nterms; i++){
-                double ww = 0.0;
-                for(int ii = 0; ii < glp_nterms; ii++)
-                  ww += out2[i*glp_nterms+ii]*tmp_v[ii];
-                tmp_w[i] = ww;
-              }
-              for(i = 0; i < glp_nterms; i++)
-                q += tmp_v[i]*tmp_w[i];
-              {
-                const double gv = sigma2hat*q;
-                gradient_stderr[l][j] = (gv > 0.0 && isfinite(gv)) ? sqrt(gv) : 0.0;
-              }
-            } else {
-              gradient_stderr[l][j] = 0.0;
-            }
-          }
-        }
-        for(l = num_reg_continuous; l < (num_reg_continuous + num_reg_unordered + num_reg_ordered); l++){
-          gradient[l][j] = 0.0;
-          if(do_gerr) gradient_stderr[l][j] = 0.0;
-        }
-      }
-
-      np_progress_fit_loop_step(j + 1, fit_progress_total);
-    }
-
-cleanup_glp_fit:
-    np_lp_solve_workspace_clear(&solve_workspace);
-    free_mat(basis, glp_nterms);
-    if(matrix_bandwidth_eval != NULL) free_tmat(matrix_bandwidth_eval);
-    if((TCON != NULL) && (num_reg_continuous > 0)) free_mat(TCON, num_reg_continuous);
-    if((TUNO != NULL) && (num_reg_unordered > 0)) free_mat(TUNO, num_reg_unordered);
-    if((TORD != NULL) && (num_reg_ordered > 0)) free_mat(TORD, num_reg_ordered);
-    free(Ycols);
-    free(Wcols);
-    free(y2);
-    free(out);
-    free(out2);
-    if(fit_kw != NULL) free(fit_kw);
-    free(beta);
-    free(tmp_v);
-    free(tmp_w);
-    if(use_bernstein){
-      for(l = 0; l < num_reg_continuous; l++) np_glp_basis_ctx_free(&basis_ctx[l]);
-      free(basis_ctx);
-    }
-    free(eval_basis);
-    free(eval_deriv);
-    free(glp_terms);
-
+    general_lp_fit_status = np_regression_general_lp_fit(&general_lp_call);
   }
 
 finish_regression_estimation:
@@ -23987,7 +24635,7 @@ finish_regression_estimation:
   free_tmat(matrix_bandwidth);
   free_mat(matrix_bandwidth_deriv,num_reg_continuous);
 
-  if(estimation_shortcut_done == -2) {
+  if(general_lp_fit_status == NP_REGRESSION_GENERAL_LP_FIT_ERR_ROUTE) {
     if(kernel_route_diagnostics != NULL &&
        kernel_route_diagnostics->beta_status != NP_BETA_OK)
       error("canonical beta LP row failed in continuous dimension %d: %s",
@@ -23995,8 +24643,22 @@ finish_regression_estimation:
             np_beta_status_message(kernel_route_diagnostics->beta_status));
     error("canonical beta LP row failed");
   }
-  if(estimation_shortcut_done < 0)
+  if(general_lp_fit_status == NP_REGRESSION_GENERAL_LP_FIT_ERR_DEGREE)
+    error("glp degree vector unavailable");
+  if(general_lp_fit_status == NP_REGRESSION_GENERAL_LP_FIT_ERR_TERMS)
+    error("failed to build glp basis terms");
+  if(general_lp_fit_status == NP_REGRESSION_GENERAL_LP_FIT_ERR_DIMENSION)
+    error("invalid glp basis dimension");
+  if(general_lp_fit_status == NP_REGRESSION_GENERAL_LP_FIT_ERR_SOLVE_ALLOC)
+    error("memory allocation failed in glp solve workspace");
+  if(general_lp_fit_status == NP_REGRESSION_GENERAL_LP_FIT_ERR_ALLOC)
+    error("memory allocation failed in glp path");
+  if(general_lp_fit_status == NP_REGRESSION_GENERAL_LP_FIT_ERR_BASIS)
+    error("failed to initialize glp Bernstein basis");
+  if(general_lp_fit_status == NP_REGRESSION_GENERAL_LP_FIT_ERR_SOLVE)
     error("LP solve failed in glp path");
+  if(general_lp_fit_status != NP_REGRESSION_GENERAL_LP_FIT_OK)
+    error("invalid internal general LP fit status");
 
   np_regression_fit_statistics(
     num_obs_eval, vector_Y_eval, mean,

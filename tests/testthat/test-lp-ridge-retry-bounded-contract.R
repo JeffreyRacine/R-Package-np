@@ -48,47 +48,30 @@ test_that("all canonical LP solve retries are bounded", {
   reghat.c <- paste(readLines(reghat.c.file, warn = FALSE), collapse = "\n")
   reghat.r <- paste(readLines(reghat.r.file, warn = FALSE), collapse = "\n")
 
-  expect_equal(
-    lengths(regmatches(
-      jksum,
-      gregexpr(
-        "while\\s*\\(\\s*!np_lp_solve_workspace_solve\\(",
-        jksum
-      )
-    )),
-    6L
-  )
-  expect_equal(
-    lengths(regmatches(
-      jksum,
-      gregexpr("np_lp_solve_workspace_sources_finite\\(", jksum)
-    )),
-    6L
-  )
-  expect_equal(
-    lengths(regmatches(
-      jksum,
-      gregexpr("ridge_steps >= NP_LP_SOLVE_MAX_RIDGE_STEPS", jksum)
-    )),
-    6L
-  )
-  expect_equal(
-    lengths(regmatches(
-      jksum,
-      gregexpr(
-        "estimation_shortcut_done = -1",
-        jksum,
-        fixed = TRUE
-      )
-    )),
-    2L
-  )
-  expect_true(grepl("cleanup_glp_fit:", jksum, fixed = TRUE))
+  retry.count <- lengths(regmatches(
+    jksum,
+    gregexpr(
+      "while\\s*\\(\\s*!np_lp_solve_workspace_solve\\(",
+      jksum
+    )
+  ))
+  finite.guard.count <- lengths(regmatches(
+    jksum,
+    gregexpr("np_lp_solve_workspace_sources_finite\\(", jksum)
+  ))
+  step.guard.count <- lengths(regmatches(
+    jksum,
+    gregexpr("ridge_steps >= NP_LP_SOLVE_MAX_RIDGE_STEPS", jksum)
+  ))
+  expect_gt(retry.count, 0L)
+  expect_equal(finite.guard.count, retry.count)
+  expect_equal(step.guard.count, retry.count)
   expect_true(grepl(
-    'if(estimation_shortcut_done < 0)',
+    "execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_SOLVE;",
     jksum,
     fixed = TRUE
   ))
+  expect_false(grepl("cleanup_glp_fit:", jksum, fixed = TRUE))
   expect_true(grepl(
     "#define NP_LP_SOLVE_MAX_RIDGE_STEPS 128",
     solve.h,
