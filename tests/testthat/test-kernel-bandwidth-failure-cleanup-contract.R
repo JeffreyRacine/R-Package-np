@@ -34,15 +34,20 @@ test_that("shared bandwidth owners clean ordinary NN failures", {
   source <- readLines(path, warn = FALSE)
 
   regions <- list(
-    kernel_bandwidth = kernel_bandwidth_function_region(
-      source, "kernel_bandwidth", "kernel_bandwidth_mean"
+    kernel_bandwidth = list(
+      code = kernel_bandwidth_function_region(
+        source, "kernel_bandwidth", "np_kernel_bandwidth_continuous_nn"
+      ),
+      cleanup_gotos = 8L
     ),
-    kernel_bandwidth_mean = kernel_bandwidth_function_region(
-      source, "kernel_bandwidth_mean"
+    kernel_bandwidth_mean = list(
+      code = kernel_bandwidth_function_region(source, "kernel_bandwidth_mean"),
+      cleanup_gotos = 2L
     )
   )
 
-  for (region in regions) {
+  for (contract in regions) {
+    region <- contract$code
     allocation <- regexpr("nn_distance = alloc_vecd", region, fixed = TRUE)
     cleanup <- regexpr("\ncleanup:", region, fixed = TRUE)
     expect_gt(allocation, 0L)
@@ -50,12 +55,19 @@ test_that("shared bandwidth owners clean ordinary NN failures", {
     owned_region <- substr(region, allocation, cleanup)
     expect_false(grepl("return(1);", owned_region, fixed = TRUE))
     gotos <- gregexpr("goto cleanup;", region, fixed = TRUE)[[1L]]
-    expect_equal(sum(gotos > 0L), 8L)
+    expect_equal(sum(gotos > 0L), contract$cleanup_gotos)
     expect_match(region, "free(nn_distance);", fixed = TRUE)
     expect_match(region, "free(vec_sdev_x);", fixed = TRUE)
     expect_match(region, "free(vec_sdev_y);", fixed = TRUE)
     expect_match(region, "return(status);", fixed = TRUE)
   }
+
+  owner <- kernel_bandwidth_function_region(
+    source, "np_kernel_bandwidth_continuous_nn", "kernel_bandwidth_mean"
+  )
+  expect_match(owner, "nn_distance = alloc_vecd", fixed = TRUE)
+  expect_match(owner, "free(nn_distance);", fixed = TRUE)
+  expect_match(owner, "return status;", fixed = TRUE)
 })
 
 test_that("failed beta NN preparation is followed by an exact valid call", {
