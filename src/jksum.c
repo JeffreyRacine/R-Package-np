@@ -875,16 +875,8 @@ double np_score_uaa(const int same_cat,const double lambda, const int c){
   return (same_cat)?-1.0:(1.0/((double)c-1.0));
 }
 
-double np_uli_racine(const int same_cat, const double lambda, const int c){
-  return (same_cat)?1.0:lambda;
-}
-
 double np_unli_racine(const int same_cat, const double lambda, const int c){
   return ((same_cat)?1.0:lambda)/((c-1.0)*lambda + 1.0);
-}
-
-double np_score_uli_racine(const int same_cat, const double lambda, const int c){
-  return (same_cat)?0.0:1.0;
 }
 
 double np_score_unli_racine(const int same_cat, const double lambda, const int c){
@@ -3537,10 +3529,6 @@ double np_econvol_uaa(const int same_cat, const double lambda, const int c){
   const double dcm1 = (double)(c-1);
   const double oml = 1.0-lambda;
   return (same_cat)?(oml*oml+lambda*lambda/dcm1):(lambda/dcm1*(2.0*oml+((double)(c-2))*lambda/dcm1));
-}
-
-double np_econvol_uli_racine(const int same_cat, const double lambda, const int c){
-  return (same_cat)?(1.0 + (double)(c-1)*lambda*lambda):(lambda*(2.0+(double)(c-2)*lambda));
 }
 
 double np_econvol_unli_racine(const int same_cat, const double lambda, const int c){

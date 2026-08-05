@@ -91,7 +91,5 @@ np_continuous_kernel_route_segment(const NPContinuousKernelRoute *route,
 int np_continuous_kernel_route_has_beta(
   const NPContinuousKernelRoute *route);
 
-const char *np_continuous_kernel_route_status_message(
-  np_continuous_kernel_route_status status);
 
 #endif

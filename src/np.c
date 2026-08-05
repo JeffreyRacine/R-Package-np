@@ -11766,19 +11766,6 @@ SEXP C_np_quantile_conditional(SEXP tc_con,
   return out;
 }
 
-void np_mpi_init(int * mpi_status){
-#ifdef MPI2 
-  MPI_Comm_rank(comm[1], &my_rank);
-  MPI_Comm_size(comm[1], &iNum_Processors);
-  mpi_status[MPI_RANKI] = my_rank;
-  mpi_status[MPI_NUMPI] = iNum_Processors;
-#else
-  mpi_status[MPI_RANKI] = -1;
-  mpi_status[MPI_NUMPI] = -1;
-#endif
-}
-
-
 void np_density_bw(double * myuno, double * myord, double * mycon, 
                    double * mysd, int * myopti, double * myoptd, double * myans, double * fval,
                    double * objective_function_values, double * objective_function_evals,
@@ -18264,29 +18251,6 @@ cleanup_np_regression_bw_mode:
   return ;
   
 }
-
-void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
-                      double * mysd, int * myopti, double * myoptd, double * rbw, double * fval,
-                      double * objective_function_values, double * objective_function_evals,
-                      double * objective_function_invalid, double * timing,
-                      double * objective_function_fast,
-                      int * penalty_mode, double * penalty_mult,
-                      int * glp_degree,
-                      int * glp_bernstein,
-                      int * glp_basis,
-                      double * ckerlb, double * ckerub){
-  int_nn_k_min_extern = 1;
-  np_regression_bw_mode(runo, rord, rcon, y,
-                        mysd, myopti, myoptd, rbw, fval,
-                        objective_function_values, objective_function_evals,
-                        objective_function_invalid, timing,
-                        objective_function_fast,
-                        penalty_mode, penalty_mult,
-                        glp_degree, glp_bernstein, glp_basis,
-                        ckerlb, ckerub, 0, 0, NULL, 0.5, 0.5,
-                        DBL_EPSILON, 1.0 - DBL_EPSILON, NULL);
-}
-
 
 void np_regression(double * tuno, double * tord, double * tcon, double * ty,
                    double * euno, double * eord, double * econ, double * ey,

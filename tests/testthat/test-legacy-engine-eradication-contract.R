@@ -92,6 +92,36 @@ test_that("obsolete conditional convolution roots cannot return", {
   }
 })
 
+test_that("unreachable native leaves and legacy wrappers cannot return", {
+  root <- locate_engine_sources()
+  skip_if(is.null(root), "package sources unavailable")
+
+  sources <- vapply(
+    c("kernel.c", "statmods.c", "tree.c", "kernel_registry.c", "jksum.c", "np.c"),
+    function(file) paste(readLines(file.path(root, "src", file), warn = FALSE),
+                         collapse = "\n"),
+    character(1L), USE.NAMES = TRUE
+  )
+  retired <- c(
+    "double kernel_deriv(",
+    "int initialize_kernel_density_asymptotic_constants(",
+    "double kernel_unordered_ratio(",
+    "int compute_continuous_stddev(",
+    "void mirror_xl(",
+    "const char *np_continuous_kernel_route_status_message(",
+    "double np_uli_racine(",
+    "double np_score_uli_racine(",
+    "double np_econvol_uli_racine(",
+    "void np_regression_bw("
+  )
+  combined <- paste(sources, collapse = "\n")
+  for (signature in retired) {
+    expect_false(grepl(signature, combined, fixed = TRUE), info = signature)
+  }
+  expect_false(grepl("void np_mpi_init(", sources[["np.c"]], fixed = TRUE))
+  expect_match(sources[["np.c"]], "SEXP C_np_regression_bw(", fixed = TRUE)
+})
+
 test_that("conditional-density CVLS wrapper has no dormant second engine", {
   root <- locate_engine_sources()
   skip_if(is.null(root), "package sources unavailable")

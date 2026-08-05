@@ -192,12 +192,10 @@ double fGoodness_of_Fit(int iNum_Obs, double *fvector_Y, double *fkernel_fit);
 
 double kernel(int KERNEL, double z);
 double kernel_unordered(int KERNEL, double x, double y, double lambda, int c);
-double kernel_unordered_ratio(int KERNEL, double x, double y, double lambda, int c);
 double kernel_ordered(int KERNEL, double x, double y, double lambda);
 double kernel_unordered_convolution(int KERNEL, double x, double y, double lambda, int c, double *c_vals);
 double kernel_ordered_convolution(int KERNEL, double x, double y, double lambda, int c, double *c_vals);
 double kernel_convol(int KERNEL, int BANDWIDTH, double z, double h1, double h2);
-double kernel_deriv(int KERNEL, double z);
 double meand(int n, double *vector);
 
 double ran3(int *idum);
@@ -214,7 +212,6 @@ int determine_categorical_vals(int num_obs, int num_var_unordered, int num_var_o
 
 int np_fround(double x);
 
-int initialize_kernel_density_asymptotic_constants(int KERNEL, int num_var_continuous, double *INT_KERNEL_P, double *K_INT_KERNEL_P);  
 int initialize_kernel_regression_asymptotic_constants(int KERNEL, int num_reg_continuous, double *INT_KERNEL_P, double *K_INT_KERNEL_P, double *INT_KERNEL_PM_HALF, double *DIFF_KER_PPM); 
 
 int initialize_nr_directions(int BANDWIDTH,int num_obs,int num_reg_continuous,int num_reg_unordered,int num_reg_ordered,int num_var_continuous,int num_var_unordered,int num_var_ordered,double * vector_scale_factor,int * num_categories,double **matrix_y,int random,int seed,double lbc_dir,int dfc_dir,double c_dir,double initc_dir,double lbd_dir,double hbd_dir,double d_dir, double initd_dir, double ** matrix_x_continuous,double ** matrix_y_continuous);
@@ -323,7 +320,6 @@ void powell(int RESTRICT, int INTEGER, double *p_restrict, double *p, double **x
 void sort(int n, double ra[]);
 
 
-int compute_continuous_stddev(int int_LARGE, int num_obs, int num_var_continuous, int num_reg_continuous, double **matrix_Y_continuous, double **matrix_X_continuous, double *vector_continuous_stddev);
 
 void initialize_nr_vector_scale_factor(int BANDWIDTH,int RANDOM,int seed,int int_large,int num_obs,int num_var_continuous,int num_var_unordered,int num_var_ordered,int num_reg_continuous,int num_reg_unordered,int num_reg_ordered,int kernel_yu,int kernel_xu,int int_use_starting_values,int scale_cat,double init_continuous,double nconfac,double ncatfac,int *num_categories,double *vector_continuous_stddev,double *vector_scale_factor,double lbc_init,double hbc_init,double c_init,double lbd_init,double hbd_init,double d_init,double ** matrix_x_continuous,double ** matrix_y_continuous);
 
