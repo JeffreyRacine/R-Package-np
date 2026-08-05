@@ -813,7 +813,10 @@ nplsqregbw <-
         remin = isTRUE(opt.args$powell.remin)
       )
       powell.start <- proc.time()[3L]
-      hot <- .npregbw_with_powell_refinement_progress(degree, local({
+      hot <- .np_nomad_with_powell_progress(
+        degree = degree,
+        best_record = best_record,
+        expr = local({
         .nplsqreg_call_fixed_degree_core(
           xdat = xdat,
           ydat = ydat,

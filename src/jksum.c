@@ -15155,6 +15155,12 @@ static int np_lp_fixed_tree_sparse_accumulate(
     const int eval_idx = ipt_lookup_extern_X[j];
     const double yj = vector_Y[eval_idx];
     int a, b;
+
+    /* This sparse row is expensive; 256 rows remain well below the
+       native activity throttle while avoiding needless clock polling. */
+    if((j & 255) == 0)
+      np_progress_bandwidth_loop_step();
+
 #ifdef MPI2
     if(use_mpi_transport && ((j % iNum_Processors) != my_rank))
       continue;

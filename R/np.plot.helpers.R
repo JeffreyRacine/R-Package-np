@@ -40,10 +40,7 @@
 }
 
 .np_plot_progress_interval_sec <- function() {
-  val <- suppressWarnings(as.numeric(getOption("np.plot.progress.interval.sec", 2.0))[1L])
-  if (!is.finite(val) || is.na(val) || val < 0)
-    val <- 2.0
-  val
+  .np_progress_interval_sec(known_total = FALSE, domain = "plot")
 }
 
 .np_plot_progress_start_grace_sec <- function() {

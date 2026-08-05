@@ -52,9 +52,9 @@ expect_npreg_powell_progress_surface <- function(lines) {
     "^\\[npRmpi\\] Bandwidth selection \\(Refining NOMAD solution",
     lines
   )), info = info)
-  expect_false(any(grepl("best (", powell.lines, fixed = TRUE)), info = info)
+  expect_true(any(grepl("best (", powell.lines, fixed = TRUE)), info = info)
   expect_true(any(grepl(
-    "^\\[npRmpi\\] Refining bandwidth \\(elapsed [0-9]+\\.[0-9]s, degree \\([^)]*\\), iter [0-9]+\\)$",
+    "^\\[npRmpi\\] Refining bandwidth \\(elapsed [0-9]+\\.[0-9]s, iter [0-9]+, deg \\([^)]*\\), best \\([^)]*\\)\\)$",
     powell.lines
   )), info = info)
 }

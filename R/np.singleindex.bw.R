@@ -628,13 +628,6 @@ npindexbw.NULL <-
   )
 }
 
-.npindexbw_with_inner_bandwidth_progress_suppressed <- function(expr) {
-  old.state <- .np_progress_runtime$bandwidth_state
-  .np_progress_runtime$bandwidth_state <- NULL
-  on.exit(.np_progress_runtime$bandwidth_state <- old.state, add = TRUE)
-  force(expr)
-}
-
 .npindexbw_eval_ichimura_lp_via_npreg <- function(index,
                                                   ydat,
                                                   h,
@@ -651,7 +644,7 @@ npindexbw.NULL <-
   )
 
   out <- tryCatch(
-    .npindexbw_with_inner_bandwidth_progress_suppressed(
+    .np_progress_with_nested_bandwidth_forwarding(
       .npregbw_eval_only(
         xdat = leaf$xdat,
         ydat = ydat,
@@ -689,7 +682,7 @@ npindexbw.NULL <-
   )
 
   out <- tryCatch(
-    .npindexbw_with_inner_bandwidth_progress_suppressed(
+    .np_progress_with_nested_bandwidth_forwarding(
       .npregbw_eval_only(
         xdat = leaf$xdat,
         ydat = ydat,

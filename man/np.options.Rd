@@ -21,13 +21,20 @@
       plot/bootstrap progress heartbeats on the master rank. Default is
       \code{TRUE}.
 
+      \item \code{np.progress.interval.sec} (numeric): canonical minimum
+      elapsed time between optimization/search progress heartbeats on the
+      master rank. The default is \code{2}. Family-specific progress intervals
+      remain supported when this option is unset; setting this option overrides
+      those bandwidth, fit, and related optimization intervals uniformly.
+
       \item \code{np.plot.progress.start.grace.sec} (numeric): delay before
       the first plot/bootstrap progress line is shown. Default is
       \code{0.75}.
 
       \item \code{np.plot.progress.interval.sec} (numeric): minimum elapsed
       time between plot/bootstrap heartbeat lines once progress reporting has
-      started. Default is \code{0.5}.
+      started. Default is \code{2} when
+      \code{np.progress.interval.sec} is unset.
 
       \item \code{np.plot.progress.max.intermediate} (integer): maximum
       number of mid-run plot/bootstrap heartbeat lines emitted between the

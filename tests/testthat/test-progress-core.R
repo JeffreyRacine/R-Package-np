@@ -703,3 +703,25 @@ test_that("NOMAD bandwidth lines preserve restart and cumulative iteration", {
     "[npRmpi] Bandwidth selection (2/2, iter 32 (188), elapsed 11.2s, deg (1), best (0))"
   )
 })
+
+test_that("plot and optimization progress share the canonical default cadence", {
+  plot_interval <- getFromNamespace(".np_plot_progress_interval_sec", "npRmpi")
+  begin <- getFromNamespace(".np_progress_begin", "npRmpi")
+
+  old_opts <- options(
+    np.progress.interval.sec = NULL,
+    np.plot.progress.interval.sec = NULL,
+    np.progress.interval.unknown.sec = NULL,
+    np.progress.interval.known.sec = NULL
+  )
+  on.exit(options(old_opts), add = TRUE)
+
+  expect_identical(plot_interval(), 2.0)
+  expect_identical(begin("Bandwidth selection")$throttle_sec, 2.0)
+  expect_identical(begin("Bootstrap replications", total = 10L)$throttle_sec, 2.0)
+
+  options(np.progress.interval.sec = 1.25)
+  expect_identical(plot_interval(), 1.25)
+  expect_identical(begin("Bandwidth selection")$throttle_sec, 1.25)
+  expect_identical(begin("Bootstrap replications", total = 10L)$throttle_sec, 1.25)
+})

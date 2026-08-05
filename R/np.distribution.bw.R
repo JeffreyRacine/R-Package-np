@@ -461,20 +461,26 @@ npNomadNativeSearchDistribution <- function(prep,
 
     if (identical(bwsolver, "mads+powell")) {
       hot.start <- proc.time()[3L]
-      hot.payload <- npudistbw.dbandwidth(
-        dat = dat,
-        bws = final.tbw,
-        gdat = gdat,
-        bandwidth.compute = TRUE,
-        nmulti = 1L,
-        powell.remin = isTRUE(opt.args$powell.remin),
-        invalid.penalty = opt.value("invalid.penalty", "baseline"),
-        penalty.multiplier = opt.value("penalty.multiplier", 10),
-        scale.factor.search.lower = opt.value("scale.factor.search.lower", NULL),
-        do.full.integral = opt.value("do.full.integral", FALSE),
-        ngrid = opt.value("ngrid", 100L),
-        memfac = opt.value("memfac", 500.0),
-        bwsolver = "powell"
+      hot.payload <- .np_nomad_with_powell_progress(
+        degree = integer(0L),
+        best_record = best_record,
+        expr = local({
+          npudistbw.dbandwidth(
+            dat = dat,
+            bws = final.tbw,
+            gdat = gdat,
+            bandwidth.compute = TRUE,
+            nmulti = 1L,
+            powell.remin = isTRUE(opt.args$powell.remin),
+            invalid.penalty = opt.value("invalid.penalty", "baseline"),
+            penalty.multiplier = opt.value("penalty.multiplier", 10),
+            scale.factor.search.lower = opt.value("scale.factor.search.lower", NULL),
+            do.full.integral = opt.value("do.full.integral", FALSE),
+            ngrid = opt.value("ngrid", 100L),
+            memfac = opt.value("memfac", 500.0),
+            bwsolver = "powell"
+          )
+        })
       )
       powell.elapsed <- proc.time()[3L] - hot.start
       hot.payload$num.feval <- as.numeric(direct.payload$num.feval[1L]) + as.numeric(hot.payload$num.feval[1L])
