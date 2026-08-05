@@ -280,33 +280,8 @@ double np_beta_log_abs_pdf_order_prepared_observation(
   int *sign,
   np_beta_status *status);
 
-double np_beta_pdf_scale(const np_beta_shape *shape,
-                         np_beta_status *status);
-
 double np_beta_log_pdf_scale(const np_beta_shape *shape,
                              np_beta_status *status);
-
-double np_beta_pdf_order2(double evaluation,
-                          double observation,
-                          double bandwidth,
-                          double lower,
-                          double upper,
-                          np_beta_status *status);
-
-double np_beta_pdf_order(double evaluation,
-                         double observation,
-                         double bandwidth,
-                         double lower,
-                         double upper,
-                         int order,
-                         np_beta_status *status);
-
-double np_beta_log_pdf_order2(double evaluation,
-                              double observation,
-                              double bandwidth,
-                              double lower,
-                              double upper,
-                              np_beta_status *status);
 
 double np_beta_log_abs_pdf_order(double evaluation,
                                  double observation,
@@ -339,14 +314,6 @@ np_beta_status np_beta_log_abs_pdf_derivative_order(
   double *level_log_absolute,
   int *level_sign,
   np_beta_derivative *derivative);
-
-double np_beta_derivative_regular_value(
-  const np_beta_derivative *derivative,
-  np_beta_status *status);
-
-double np_beta_derivative_public_value(
-  const np_beta_derivative *derivative,
-  np_beta_status *status);
 
 double np_beta_cdf_order2(double evaluation,
                           double observation,
@@ -420,23 +387,6 @@ double np_beta_log_overlap_order2(double center_one,
                                   double lower,
                                   double upper,
                                   np_beta_status *status);
-
-double np_beta_overlap_order2(double center_one,
-                              double bandwidth_one,
-                              double center_two,
-                              double bandwidth_two,
-                              double lower,
-                              double upper,
-                              np_beta_status *status);
-
-double np_beta_overlap_order(double center_one,
-                             double bandwidth_one,
-                             double center_two,
-                             double bandwidth_two,
-                             double lower,
-                             double upper,
-                             int order,
-                             np_beta_status *status);
 
 double np_beta_log_abs_overlap_order(double center_one,
                                      double bandwidth_one,
