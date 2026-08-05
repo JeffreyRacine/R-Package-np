@@ -1,5 +1,12 @@
 # np 0.70-6
 
+* The canonical beta row engine now owns its malloc-backed route, categorical,
+  derivative, and row workspaces behind one unwind-protected cleanup boundary.
+  Nested derivative helpers borrow that invocation-scoped scratch rather than
+  allocating it per call, so user interrupts and R errors cannot strand native
+  storage. Successful PDF, CDF, convolution, derivative, powered-derivative,
+  and regression arithmetic is unchanged.
+
 * Beta nearest-neighbour bandwidth preparation now calls the shared
   continuous-distance owner directly. It no longer temporarily rewrites
   unrelated package-global scaling and categorical factors, while retaining

@@ -2425,11 +2425,11 @@ np_continuous_kernel_beta_derivative_absolute_rows_with_log_factor_validated(
   double * const *case_weights,
   int weight_columns,
   NPContinuousKernelDerivativeAccumulator *accumulator,
+  NPContinuousKernelRowWorkspace *factor_workspace,
   double *weighted_sum,
   double *kernel_weights,
   NPContinuousKernelDerivativeDiagnostics *diagnostics)
 {
-  NPContinuousKernelRowWorkspace factor_workspace;
   size_t sum_extent;
   NPContinuousKernelRowStatus status;
   int evaluation;
@@ -2440,7 +2440,8 @@ np_continuous_kernel_beta_derivative_absolute_rows_with_log_factor_validated(
     diagnostics->undefined_count = 0;
     diagnostics->beta_status = NP_BETA_OK;
   }
-  if(provider == NULL || provider->function == NULL)
+  if(provider == NULL || provider->function == NULL ||
+     factor_workspace == NULL)
     return NP_CONTINUOUS_ROW_ERR_LAYOUT;
   status = np_continuous_kernel_beta_derivative_absolute_contract_validate(
     plan, leave_one_out, leave_one_out_offset, derivative_coordinate,
@@ -2449,9 +2450,8 @@ np_continuous_kernel_beta_derivative_absolute_rows_with_log_factor_validated(
   if(status != NP_CONTINUOUS_ROW_OK)
     return status;
 
-  np_continuous_kernel_row_workspace_init(&factor_workspace);
   status = np_continuous_kernel_row_workspace_reserve(
-    &factor_workspace, (size_t)plan->num_train, 0);
+    factor_workspace, (size_t)plan->num_train, 0);
   if(status != NP_CONTINUOUS_ROW_OK)
     goto cleanup;
   for(evaluation = 0; evaluation < plan->num_eval; ++evaluation) {
@@ -2467,15 +2467,15 @@ np_continuous_kernel_beta_derivative_absolute_rows_with_log_factor_validated(
     }
     status = provider->function(
       provider->context, evaluation, omitted_observation,
-      plan->num_train, factor_workspace.primary_log_absolute,
-      factor_workspace.primary_sign);
+      plan->num_train, factor_workspace->primary_log_absolute,
+      factor_workspace->primary_sign);
     if(status != NP_CONTINUOUS_ROW_OK)
       goto cleanup;
     status = np_continuous_kernel_beta_derivative_absolute_row_bound(
       plan, evaluation, omitted_observation, derivative_coordinate,
       response, response_columns, case_weights, weight_columns,
-      factor_workspace.primary_log_absolute,
-      factor_workspace.primary_sign, accumulator,
+      factor_workspace->primary_log_absolute,
+      factor_workspace->primary_sign, accumulator,
       weighted_sum + (size_t)evaluation * sum_extent,
       kernel_weights == NULL ? NULL :
         kernel_weights + (size_t)evaluation * (size_t)plan->num_train,
@@ -2496,7 +2496,6 @@ np_continuous_kernel_beta_derivative_absolute_rows_with_log_factor_validated(
   status = NP_CONTINUOUS_ROW_OK;
 
 cleanup:
-  np_continuous_kernel_row_workspace_release(&factor_workspace);
   return status;
 }
 
@@ -2513,19 +2512,18 @@ np_continuous_kernel_beta_derivative_powered_rows_validated(
   double * const *case_weights,
   int weight_columns,
   NPContinuousKernelDerivativeAccumulator *accumulator,
+  NPContinuousKernelRowWorkspace *workspace,
+  double *row_storage,
+  double *factor_log_absolute,
+  signed char *factor_sign,
   double *weighted_sum,
   double *kernel_weights,
   NPContinuousKernelDerivativeDiagnostics *diagnostics)
 {
   const int response_extent = response_columns > 0 ? response_columns : 1;
   const int weight_extent = weight_columns > 0 ? weight_columns : 1;
-  NPContinuousKernelRowWorkspace workspace;
   NPContinuousKernelDerivativeRowResult row_result;
-  double *row_storage = NULL;
-  double *factor_log_absolute = NULL;
-  signed char *factor_sign = NULL;
   size_t sum_extent;
-  size_t row_count;
   NPContinuousKernelRowStatus status = NP_CONTINUOUS_ROW_ERR_LAYOUT;
   int derivative_count = 0;
   int evaluation;
@@ -2547,7 +2545,10 @@ np_continuous_kernel_beta_derivative_powered_rows_validated(
      response_columns < 0 || weight_columns < 0 ||
      (response_columns > 0 && response == NULL) ||
      (weight_columns > 0 && case_weights == NULL) ||
-     accumulator == NULL || weighted_sum == NULL ||
+     accumulator == NULL || workspace == NULL || row_storage == NULL ||
+     weighted_sum == NULL ||
+     (provider != NULL &&
+      (factor_log_absolute == NULL || factor_sign == NULL)) ||
      (size_t)response_extent > SIZE_MAX / (size_t)weight_extent)
     return NP_CONTINUOUS_ROW_ERR_LAYOUT;
   for(index = 0; index < response_columns; ++index)
@@ -2576,24 +2577,11 @@ np_continuous_kernel_beta_derivative_powered_rows_validated(
   if(status != NP_CONTINUOUS_ROW_OK)
     return status;
 
-  row_count = (size_t)plan->num_train * 2;
-  row_storage = (double *)malloc(row_count * sizeof(double));
-  if(row_storage == NULL)
-    return NP_CONTINUOUS_ROW_ERR_MEMORY;
   row_result.regular_row = row_storage;
   row_result.jump_row = row_storage + plan->num_train;
-  np_continuous_kernel_row_workspace_init(&workspace);
   if(provider != NULL) {
     if(provider->function == NULL) {
       status = NP_CONTINUOUS_ROW_ERR_LAYOUT;
-      goto cleanup;
-    }
-    factor_log_absolute = (double *)malloc(
-      (size_t)plan->num_train * sizeof(double));
-    factor_sign = (signed char *)malloc(
-      (size_t)plan->num_train * sizeof(signed char));
-    if(factor_log_absolute == NULL || factor_sign == NULL) {
-      status = NP_CONTINUOUS_ROW_ERR_MEMORY;
       goto cleanup;
     }
   }
@@ -2611,7 +2599,7 @@ np_continuous_kernel_beta_derivative_powered_rows_validated(
     }
     status = np_continuous_kernel_beta_derivative_factor_row(
       plan, evaluation, omitted_observation, derivative_coordinate,
-      &workspace, &row_result);
+      workspace, &row_result);
     if(status != NP_CONTINUOUS_ROW_OK) {
       if(diagnostics != NULL) {
         diagnostics->bad_coordinate = row_result.bad_coordinate;
@@ -2639,25 +2627,25 @@ np_continuous_kernel_beta_derivative_powered_rows_validated(
           goto cleanup;
         }
         if(sign == 0) {
-          workspace.primary_log_absolute[observation] = -INFINITY;
-          workspace.secondary_log_absolute[observation] = -INFINITY;
-          workspace.primary_sign[observation] = 0;
-          workspace.secondary_sign[observation] = 0;
+          workspace->primary_log_absolute[observation] = -INFINITY;
+          workspace->secondary_log_absolute[observation] = -INFINITY;
+          workspace->primary_sign[observation] = 0;
+          workspace->secondary_sign[observation] = 0;
         } else {
-          if(workspace.primary_sign[observation] != 0) {
-            workspace.primary_log_absolute[observation] += factor_log;
-            workspace.primary_sign[observation] = (signed char)(
-              workspace.primary_sign[observation] * sign);
+          if(workspace->primary_sign[observation] != 0) {
+            workspace->primary_log_absolute[observation] += factor_log;
+            workspace->primary_sign[observation] = (signed char)(
+              workspace->primary_sign[observation] * sign);
           }
-          if(workspace.secondary_sign[observation] != 0) {
-            workspace.secondary_log_absolute[observation] += factor_log;
-            workspace.secondary_sign[observation] = (signed char)(
-              workspace.secondary_sign[observation] * sign);
+          if(workspace->secondary_sign[observation] != 0) {
+            workspace->secondary_log_absolute[observation] += factor_log;
+            workspace->secondary_sign[observation] = (signed char)(
+              workspace->secondary_sign[observation] * sign);
           }
-          if(ISNAN(workspace.primary_log_absolute[observation]) ||
-             workspace.primary_log_absolute[observation] == INFINITY ||
-             ISNAN(workspace.secondary_log_absolute[observation]) ||
-             workspace.secondary_log_absolute[observation] == INFINITY) {
+          if(ISNAN(workspace->primary_log_absolute[observation]) ||
+             workspace->primary_log_absolute[observation] == INFINITY ||
+             ISNAN(workspace->secondary_log_absolute[observation]) ||
+             workspace->secondary_log_absolute[observation] == INFINITY) {
             status = NP_CONTINUOUS_ROW_ERR_NUMERIC;
             goto cleanup;
           }
@@ -2666,10 +2654,10 @@ np_continuous_kernel_beta_derivative_powered_rows_validated(
     }
 
     for(observation = 0; observation < plan->num_train; ++observation) {
-      const double regular_log = workspace.primary_log_absolute[observation];
-      const double jump_log = workspace.secondary_log_absolute[observation];
-      const int regular_sign = workspace.primary_sign[observation];
-      const int jump_sign = workspace.secondary_sign[observation];
+      const double regular_log = workspace->primary_log_absolute[observation];
+      const double jump_log = workspace->secondary_log_absolute[observation];
+      const int regular_sign = workspace->primary_sign[observation];
+      const int jump_sign = workspace->secondary_sign[observation];
       double powered_log = -INFINITY;
       int powered_sign = 0;
       int powered_jump = 0;
@@ -2784,10 +2772,6 @@ np_continuous_kernel_beta_derivative_powered_rows_validated(
   status = NP_CONTINUOUS_ROW_OK;
 
 cleanup:
-  np_continuous_kernel_row_workspace_release(&workspace);
-  free(factor_log_absolute);
-  free(factor_sign);
-  free(row_storage);
   return status;
 }
 
