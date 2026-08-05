@@ -1,5 +1,12 @@
 # npRmpi 0.70-6
 
+* Nearest-neighbour lookup and distance failures now leave both shared
+  bandwidth owners through their normal cleanup exit on every rank. This
+  removes retained standard-deviation and distance workspaces after
+  recoverable failures while preserving successful fixed, generalized-
+  nearest-neighbour, and adaptive-nearest-neighbour arithmetic and
+  conditions.
+
 * Removed the unreachable conditional-bootstrap exact-state sidecar and its
   bypassed MPI worker block. Public conditional bootstrap routes retain their
   canonical distributed refit/count and fixed local-constant owners, without
