@@ -24229,6 +24229,43 @@ enum {
   NP_REGRESSION_GENERAL_LP_FIT_ERR_OWNER_SOLVE = -9
 };
 
+static int np_glp_gradient_direction_active(const int coordinate)
+{
+  const int order = vector_glp_gradient_order_extern != NULL ?
+    MAX(1, vector_glp_gradient_order_extern[coordinate]) : 1;
+
+  return vector_glp_degree_extern != NULL &&
+    vector_glp_degree_extern[coordinate] >= order;
+}
+
+/*
+ * Variance evaluation needs A^{-1}v only for the fitted-value direction and
+ * requested derivative directions.  Solve those columns from the retained LU
+ * directly; do not materialize A^{-1}.  The quadratic loop retains the
+ * established row and dot-product order.
+ */
+static double np_lp_variance_quadratic(
+  const double *projection,
+  const double *power2_moments,
+  double *power2_projection,
+  const int nterms)
+{
+  double quadratic = 0.0;
+  int i;
+
+  for(i = 0; i < nterms; ++i) {
+    double value = 0.0;
+    int ii;
+    for(ii = 0; ii < nterms; ++ii)
+      value += power2_moments[i*nterms + ii]*projection[ii];
+    power2_projection[i] = value;
+  }
+  for(i = 0; i < nterms; ++i)
+    quadratic += projection[i]*power2_projection[i];
+
+  return quadratic;
+}
+
 typedef struct {
   int *kernel_c;
   int *kernel_u;
@@ -24290,7 +24327,6 @@ typedef struct {
   double *coefficient;
   double *eval_basis;
   double *eval_derivative;
-  double *projection;
   double *power2_projection;
   NPLPSolveWorkspace solve_workspace;
 #ifdef MPI2
@@ -24325,7 +24361,6 @@ static void np_regression_general_lp_fit_owner_init(
   owner->coefficient = NULL;
   owner->eval_basis = NULL;
   owner->eval_derivative = NULL;
-  owner->projection = NULL;
   owner->power2_projection = NULL;
   np_lp_solve_workspace_init(&owner->solve_workspace);
 #ifdef MPI2
@@ -24365,7 +24400,6 @@ static void np_regression_general_lp_fit_owner_cleanup(
   free(owner->power2_moments);
   free(owner->retained_kernel_row);
   free(owner->coefficient);
-  free(owner->projection);
   free(owner->power2_projection);
   if(owner->basis_context != NULL) {
     for(coordinate = 0; coordinate < call->num_reg_continuous; ++coordinate)
@@ -24412,6 +24446,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
   NP_DualPowerCtx fit_dual_power_ctx = {
     NULL, 2, NULL, NULL, 0, 0, NULL, 0
   };
+  int variance_nrhs = 1;
   int i, j, l;
 
   if((vector_glp_degree_extern == NULL) || (num_reg_continuous <= 0)) {
@@ -24430,9 +24465,17 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
     execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_DIMENSION;
     return R_NilValue;
   }
+  if(call->do_grad && call->do_gerr)
+    for(l = 0; l < num_reg_continuous; ++l)
+      if(np_glp_gradient_direction_active(l))
+        ++variance_nrhs;
+  if(variance_nrhs > owner->nterms) {
+    execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_DIMENSION;
+    return R_NilValue;
+  }
   if(!np_lp_solve_workspace_reserve(&owner->solve_workspace,
                                     owner->nterms,
-                                    owner->nterms)) {
+                                    variance_nrhs)) {
     execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_SOLVE_ALLOC;
     return R_NilValue;
   }
@@ -24462,8 +24505,6 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
       (size_t)num_obs_train*sizeof(double));
   owner->coefficient = (double *)malloc(
     (size_t)owner->nterms*sizeof(double));
-  owner->projection = (double *)malloc(
-    (size_t)owner->nterms*sizeof(double));
   owner->power2_projection = (double *)malloc(
     (size_t)owner->nterms*sizeof(double));
   owner->eval_basis = (double *)malloc(
@@ -24488,8 +24529,8 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
      owner->squared_response == NULL || owner->moments == NULL ||
      owner->power2_moments == NULL ||
      (reuse_fit_kernel_row && owner->retained_kernel_row == NULL) ||
-     owner->coefficient == NULL || owner->projection == NULL ||
-     owner->power2_projection == NULL || owner->eval_basis == NULL ||
+     owner->coefficient == NULL || owner->power2_projection == NULL ||
+     owner->eval_basis == NULL ||
      owner->eval_derivative == NULL ||
      (use_bernstein && owner->basis_context == NULL)) {
     execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_ALLOC;
@@ -24578,7 +24619,6 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	          double sk_owner, ey_owner, ey2_owner, sigma2_owner;
 	          int have_vcov_owner = 0;
 	          double * const out_owner = owner->mpi_owner_chunk.sendbuf + (size_t)local_pos*(size_t)owner_row_width_lp;
-	          int opos = 0;
 
 	          for(l = 0; l < num_reg_continuous; l++){
 	            owner->eval_continuous[l][0] =
@@ -24758,10 +24798,9 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	                                       jj,
 	                                       owner->eval_basis);
 
-	          out_owner[opos] = 0.0;
+	          out_owner[0] = 0.0;
 	          for(i = 0; i < owner->nterms; i++)
-	            out_owner[opos] += owner->eval_basis[i]*owner->coefficient[i];
-	          opos++;
+	            out_owner[0] += owner->eval_basis[i]*owner->coefficient[i];
 
 	          sk_owner = copysign(DBL_MIN, owner->moments[2]) + owner->moments[2];
 	          ey_owner = owner->moments[1]/sk_owner;
@@ -24769,7 +24808,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	          sigma2_owner = ey2_owner - ey_owner*ey_owner;
 	          {
 	            const double v_owner = sigma2_owner * call->kernel_squared_integral / (sk_owner*call->bandwidth_product);
-	            out_owner[opos] = (v_owner <= 0.0) ? 0.0 : sqrt(v_owner);
+	            out_owner[1] = (v_owner <= 0.0) ? 0.0 : sqrt(v_owner);
 	          }
 	          sigma2_owner = (sigma2_owner <= 0.0) ? 0.0 : sigma2_owner;
 
@@ -24789,95 +24828,93 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	              }
 	            }
 	          }
-	          for(l = 0; l < owner->nterms; l++)
+	          {
+	            int variance_rhs = 1;
 	            for(i = 0; i < owner->nterms; i++)
-	              owner->solve_workspace.rhs_source[i+l*owner->nterms] =
-	                (i == l) ? 1.0 : 0.0;
-	          if(np_lp_solve_workspace_solve_factored(
-	               &owner->solve_workspace,
-	               owner->nterms,
-	               owner->nterms))
-	            have_vcov_owner = 1;
+	              owner->solve_workspace.rhs_source[i] = owner->eval_basis[i];
 
-	          if(have_vcov_owner){
-	            double q = 0.0;
-	            for(i = 0; i < owner->nterms; i++){
-	              double vv = 0.0;
-	              for(int ii = 0; ii < owner->nterms; ii++)
-	                vv += owner->solve_workspace.rhs_work[i+ii*owner->nterms]*
-	                  owner->eval_basis[ii];
-	              owner->projection[i] = vv;
+	            if(call->do_grad){
+	              for(l = 0; l < num_reg_continuous; l++){
+	                const int grad_order =
+	                  (vector_glp_gradient_order_extern != NULL) ?
+	                  MAX(1, vector_glp_gradient_order_extern[l]) : 1;
+	                const int active = np_glp_gradient_direction_active(l);
+	                double * const direction = (call->do_gerr && active) ?
+	                  owner->solve_workspace.rhs_source +
+	                    (size_t)variance_rhs*(size_t)owner->nterms :
+	                  owner->eval_derivative;
+	                double grad_value = 0.0;
+	                const int output_offset =
+	                  2 + l*(1 + (call->do_gerr ? 1 : 0));
+
+	                if(use_bernstein)
+	                  np_glp_fill_basis_eval_deriv(l,
+	                                               grad_order,
+	                                               num_reg_continuous,
+	                                               owner->terms,
+	                                               owner->nterms,
+	                                               call->matrix_X_continuous_eval,
+	                                               jj,
+	                                               owner->basis_context,
+	                                               direction);
+	                else
+	                  np_glp_fill_basis_eval_deriv_raw(l,
+	                                                  grad_order,
+	                                                  num_reg_continuous,
+	                                                  owner->terms,
+	                                                  owner->nterms,
+	                                                  call->matrix_X_continuous_eval,
+	                                                  jj,
+	                                                  direction);
+	                for(i = 0; i < owner->nterms; i++)
+	                  grad_value += direction[i]*owner->coefficient[i];
+	                out_owner[output_offset] = grad_value;
+	                if(call->do_gerr){
+	                  out_owner[output_offset + 1] = 0.0;
+	                  if(active)
+	                    variance_rhs++;
+	                }
+	              }
 	            }
-	            for(i = 0; i < owner->nterms; i++){
-	              double ww = 0.0;
-	              for(int ii = 0; ii < owner->nterms; ii++)
-	                ww += owner->power2_moments[i*owner->nterms+ii]*owner->projection[ii];
-	              owner->power2_projection[i] = ww;
+
+	            if(variance_rhs != variance_nrhs){
+	              owner_solve_failed = 1;
+	              break;
 	            }
-	            for(i = 0; i < owner->nterms; i++)
-	              q += owner->projection[i]*owner->power2_projection[i];
-	            {
+	            if(np_lp_solve_workspace_solve_factored(
+	                 &owner->solve_workspace,
+	                 owner->nterms,
+	                 variance_rhs))
+	              have_vcov_owner = 1;
+
+	            if(have_vcov_owner){
+	              const double q = np_lp_variance_quadratic(
+	                owner->solve_workspace.rhs_work,
+	                owner->power2_moments,
+	                owner->power2_projection,
+	                owner->nterms);
 	              const double mv = sigma2_owner*q;
 	              if((mv > 0.0) && isfinite(mv))
-	                out_owner[opos] = sqrt(mv);
-	            }
-	          }
-	          opos++;
+	                out_owner[1] = sqrt(mv);
 
-	          if(call->do_grad){
-	            for(l = 0; l < num_reg_continuous; l++){
-	              const int grad_order = (vector_glp_gradient_order_extern != NULL) ?
-	                MAX(1, vector_glp_gradient_order_extern[l]) : 1;
-	              double grad_value = 0.0;
-
-	              if(use_bernstein)
-	                np_glp_fill_basis_eval_deriv(l,
-	                                             grad_order,
-	                                             num_reg_continuous,
-	                                             owner->terms,
-	                                             owner->nterms,
-	                                             call->matrix_X_continuous_eval,
-	                                             jj,
-	                                             owner->basis_context,
-	                                             owner->eval_derivative);
-	              else
-	                np_glp_fill_basis_eval_deriv_raw(l,
-	                                                grad_order,
-	                                                num_reg_continuous,
-	                                                owner->terms,
-	                                                owner->nterms,
-	                                                call->matrix_X_continuous_eval,
-	                                                jj,
-	                                                owner->eval_derivative);
-	              for(i = 0; i < owner->nterms; i++)
-	                grad_value += owner->eval_derivative[i]*owner->coefficient[i];
-	              out_owner[opos++] = grad_value;
-
-	              if(call->do_gerr){
-	                double grad_se = 0.0;
-	                if(have_vcov_owner){
-	                  double q = 0.0;
-	                  for(i = 0; i < owner->nterms; i++){
-	                    double vv = 0.0;
-	                    for(int ii = 0; ii < owner->nterms; ii++)
-	                      vv += owner->solve_workspace.rhs_work[i+ii*owner->nterms]*
-	                        owner->eval_derivative[ii];
-	                    owner->projection[i] = vv;
-	                  }
-	                  for(i = 0; i < owner->nterms; i++){
-	                    double ww = 0.0;
-	                    for(int ii = 0; ii < owner->nterms; ii++)
-	                      ww += owner->power2_moments[i*owner->nterms+ii]*owner->projection[ii];
-	                    owner->power2_projection[i] = ww;
-	                  }
-	                  for(i = 0; i < owner->nterms; i++)
-	                    q += owner->projection[i]*owner->power2_projection[i];
-	                  {
-	                    const double gv = sigma2_owner*q;
-	                    grad_se = (gv > 0.0 && isfinite(gv)) ? sqrt(gv) : 0.0;
+	              if(call->do_grad && call->do_gerr){
+	                int rhs = 1;
+	                for(l = 0; l < num_reg_continuous; l++){
+	                  if(np_glp_gradient_direction_active(l)){
+	                    const double * const projection =
+	                      owner->solve_workspace.rhs_work +
+	                        (size_t)rhs*(size_t)owner->nterms;
+	                    const double grad_q = np_lp_variance_quadratic(
+	                      projection,
+	                      owner->power2_moments,
+	                      owner->power2_projection,
+	                      owner->nterms);
+	                    const double gv = sigma2_owner*grad_q;
+	                    if((gv > 0.0) && isfinite(gv))
+	                      out_owner[3 + l*2] = sqrt(gv);
+	                    rhs++;
 	                  }
 	                }
-	                out_owner[opos++] = grad_se;
 	              }
 	            }
 	          }
@@ -25178,107 +25215,99 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
                          NULL);
     }
 
-    for(l = 0; l < owner->nterms; ++l)
+    {
+      int variance_rhs = 1;
       for(i = 0; i < owner->nterms; ++i)
-        owner->solve_workspace.rhs_source[i+l*owner->nterms] =
-          i == l ? 1.0 : 0.0;
+        owner->solve_workspace.rhs_source[i] = owner->eval_basis[i];
 
-    if(np_lp_solve_workspace_solve_factored(&owner->solve_workspace,
-                                            owner->nterms,
-                                            owner->nterms))
-      have_vcov = 1;
+      if(call->do_grad) {
+        for(l = 0; l < num_reg_continuous; ++l) {
+          const int grad_order = vector_glp_gradient_order_extern != NULL ?
+            MAX(1, vector_glp_gradient_order_extern[l]) : 1;
+          const int active = np_glp_gradient_direction_active(l);
+          double * const direction = (call->do_gerr && active) ?
+            owner->solve_workspace.rhs_source +
+              (size_t)variance_rhs*(size_t)owner->nterms :
+            owner->eval_derivative;
 
-    if(have_vcov) {
-      double q = 0.0;
-      for(i = 0; i < owner->nterms; ++i) {
-        double vv = 0.0;
-        int ii;
-        for(ii = 0; ii < owner->nterms; ++ii)
-          vv += owner->solve_workspace.rhs_work[
-            i+ii*owner->nterms]*owner->eval_basis[ii];
-        owner->projection[i] = vv;
-      }
-      for(i = 0; i < owner->nterms; ++i) {
-        double ww = 0.0;
-        int ii;
-        for(ii = 0; ii < owner->nterms; ++ii)
-          ww += owner->power2_moments[i*owner->nterms+ii]*
-            owner->projection[ii];
-        owner->power2_projection[i] = ww;
-      }
-      for(i = 0; i < owner->nterms; ++i)
-        q += owner->projection[i]*owner->power2_projection[i];
-      {
-        const double mv = sigma2hat*q;
-        if(mv > 0.0 && isfinite(mv))
-          call->mean_stderr[j] = sqrt(mv);
-      }
-    }
-
-    if(call->do_grad) {
-      for(l = 0; l < num_reg_continuous; ++l) {
-        const int grad_order = vector_glp_gradient_order_extern != NULL ?
-          MAX(1, vector_glp_gradient_order_extern[l]) : 1;
-        if(use_bernstein)
-          np_glp_fill_basis_eval_deriv(l,
-                                       grad_order,
-                                       num_reg_continuous,
-                                       owner->terms,
-                                       owner->nterms,
-                                       call->matrix_X_continuous_eval,
-                                       j,
-                                       owner->basis_context,
-                                       owner->eval_derivative);
-        else
-          np_glp_fill_basis_eval_deriv_raw(l,
-                                           grad_order,
-                                           num_reg_continuous,
-                                           owner->terms,
-                                           owner->nterms,
-                                           call->matrix_X_continuous_eval,
-                                           j,
-                                           owner->eval_derivative);
-        call->gradient[l][j] = 0.0;
-        for(i = 0; i < owner->nterms; ++i)
-          call->gradient[l][j] +=
-            owner->eval_derivative[i]*owner->coefficient[i];
-        if(call->do_gerr) {
-          if(have_vcov) {
-            double q = 0.0;
-            for(i = 0; i < owner->nterms; ++i) {
-              double vv = 0.0;
-              int ii;
-              for(ii = 0; ii < owner->nterms; ++ii)
-                vv += owner->solve_workspace.rhs_work[
-                  i+ii*owner->nterms]*owner->eval_derivative[ii];
-              owner->projection[i] = vv;
-            }
-            for(i = 0; i < owner->nterms; ++i) {
-              double ww = 0.0;
-              int ii;
-              for(ii = 0; ii < owner->nterms; ++ii)
-                ww += owner->power2_moments[i*owner->nterms+ii]*
-                  owner->projection[ii];
-              owner->power2_projection[i] = ww;
-            }
-            for(i = 0; i < owner->nterms; ++i)
-              q += owner->projection[i]*owner->power2_projection[i];
-            {
-              const double gv = sigma2hat*q;
-              call->gradient_stderr[l][j] =
-                gv > 0.0 && isfinite(gv) ? sqrt(gv) : 0.0;
-            }
-          } else {
+          if(use_bernstein)
+            np_glp_fill_basis_eval_deriv(l,
+                                         grad_order,
+                                         num_reg_continuous,
+                                         owner->terms,
+                                         owner->nterms,
+                                         call->matrix_X_continuous_eval,
+                                         j,
+                                         owner->basis_context,
+                                         direction);
+          else
+            np_glp_fill_basis_eval_deriv_raw(l,
+                                             grad_order,
+                                             num_reg_continuous,
+                                             owner->terms,
+                                             owner->nterms,
+                                             call->matrix_X_continuous_eval,
+                                             j,
+                                             direction);
+          call->gradient[l][j] = 0.0;
+          for(i = 0; i < owner->nterms; ++i)
+            call->gradient[l][j] += direction[i]*owner->coefficient[i];
+          if(call->do_gerr) {
             call->gradient_stderr[l][j] = 0.0;
+            if(active)
+              ++variance_rhs;
           }
         }
       }
-      for(l = num_reg_continuous;
-          l < num_reg_continuous + num_reg_unordered + num_reg_ordered;
-          ++l) {
-        call->gradient[l][j] = 0.0;
-        if(call->do_gerr)
-          call->gradient_stderr[l][j] = 0.0;
+
+      if(variance_rhs != variance_nrhs) {
+        execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_DIMENSION;
+        return R_NilValue;
+      }
+      if(np_lp_solve_workspace_solve_factored(&owner->solve_workspace,
+                                              owner->nterms,
+                                              variance_rhs))
+        have_vcov = 1;
+
+      if(have_vcov) {
+        const double q = np_lp_variance_quadratic(
+          owner->solve_workspace.rhs_work,
+          owner->power2_moments,
+          owner->power2_projection,
+          owner->nterms);
+        const double mv = sigma2hat*q;
+        if(mv > 0.0 && isfinite(mv))
+          call->mean_stderr[j] = sqrt(mv);
+
+        if(call->do_grad && call->do_gerr) {
+          int rhs = 1;
+          for(l = 0; l < num_reg_continuous; ++l) {
+            if(np_glp_gradient_direction_active(l)) {
+              const double * const projection =
+                owner->solve_workspace.rhs_work +
+                  (size_t)rhs*(size_t)owner->nterms;
+              const double grad_q = np_lp_variance_quadratic(
+                projection,
+                owner->power2_moments,
+                owner->power2_projection,
+                owner->nterms);
+              const double gv = sigma2hat*grad_q;
+              if(gv > 0.0 && isfinite(gv))
+                call->gradient_stderr[l][j] = sqrt(gv);
+              ++rhs;
+            }
+          }
+        }
+      }
+
+      if(call->do_grad) {
+        for(l = num_reg_continuous;
+            l < num_reg_continuous + num_reg_unordered + num_reg_ordered;
+            ++l) {
+          call->gradient[l][j] = 0.0;
+          if(call->do_gerr)
+            call->gradient_stderr[l][j] = 0.0;
+        }
       }
     }
 
