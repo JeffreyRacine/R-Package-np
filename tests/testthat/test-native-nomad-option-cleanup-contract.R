@@ -25,6 +25,25 @@ test_that("native NOMAD option builders reject cache-off solves before solver en
   }
 })
 
+test_that("native estimator callbacks reject parallel evaluation explicitly", {
+  builders <- list(
+    npRmpi:::.np_nomad_native_option_vectors,
+    npRmpi:::.npudensbw_nomad_native_option_vectors,
+    npRmpi:::.npcdensbw_nomad_shadow_native_option_vectors,
+    npRmpi:::.npcdistbw_nomad_native_option_vectors,
+    npRmpi:::.npregbw_nomad_native_option_vectors
+  )
+
+  for (builder in builders) {
+    expect_error(
+      builder(list(NB_THREADS_PARALLEL_EVAL = 2L)),
+      "requires NB_THREADS_PARALLEL_EVAL = 1",
+      fixed = TRUE
+    )
+    expect_no_error(builder(list(NB_THREADS_PARALLEL_EVAL = 1L)))
+  }
+})
+
 test_that("native R callback failure is contained in an isolated process", {
   env <- npRmpi_subprocess_env()
   skip_if(is.null(env))

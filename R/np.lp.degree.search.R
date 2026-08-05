@@ -1532,6 +1532,13 @@
   token %in% c("false", "f", "no", "n", "0")
 }
 
+.np_nomad_native_parallel_eval_gt_one <- function(value) {
+  if (!length(value))
+    return(FALSE)
+  parsed <- suppressWarnings(as.numeric(as.character(value[1L])))
+  length(parsed) == 1L && is.finite(parsed) && parsed > 1
+}
+
 .np_nomad_native_reject_unsupported_options <- function(opts, route) {
   if (is.null(opts) || !length(opts))
     return(invisible(TRUE))
@@ -1542,6 +1549,15 @@
   if (length(idx) && any(vapply(opts[idx], .np_nomad_native_false_option, logical(1)))) {
     stop(sprintf(
       "%s requires EVAL_USE_CACHE = TRUE; cache-off native solves are not supported",
+      route
+    ), call. = FALSE)
+  }
+  idx <- which(toupper(trimws(option.names)) == "NB_THREADS_PARALLEL_EVAL")
+  if (length(idx) && any(vapply(
+    opts[idx], .np_nomad_native_parallel_eval_gt_one, logical(1)
+  ))) {
+    stop(sprintf(
+      "%s requires NB_THREADS_PARALLEL_EVAL = 1; package objective state is not re-entrant",
       route
     ), call. = FALSE)
   }
