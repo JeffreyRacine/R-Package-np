@@ -586,6 +586,128 @@ cleanup:
 
 }
 
+static int np_kernel_bandwidth_continuous_nn_into(
+  int BANDWIDTH,
+  int num_obs_train,
+  int num_obs_eval,
+  int num_cont,
+  int suppress_parallel,
+  double *vector_scale_factor,
+  double **matrix_train,
+  double **matrix_eval,
+  double **matrix_bandwidth,
+  double *nn_distance)
+{
+  int dimension;
+  int observation;
+  int int_nn_k;
+  double nn_scale;
+#ifndef MPI2
+  int nn_extended;
+#endif
+
+  for(dimension = 0; dimension < num_cont; ++dimension) {
+#ifndef MPI2
+    if(np_nn_lookup_from_scale(num_obs_train, 1,
+                               vector_scale_factor[dimension],
+                               &int_nn_k, &nn_scale, &nn_extended) == 1)
+      return 1;
+#else
+    if(np_nn_lookup_from_scale(num_obs_train, 1,
+                               vector_scale_factor[dimension],
+                               &int_nn_k, &nn_scale) == 1)
+      return 1;
+#endif
+
+    if(BANDWIDTH == BW_GEN_NN) {
+#ifndef MPI2
+      if(np_compute_nn_distance_train_eval_cached(
+           num_obs_train, num_obs_eval, suppress_parallel,
+           matrix_train[dimension], matrix_eval[dimension],
+           int_nn_k, 1, nn_distance) == 1)
+        return 1;
+#else
+      if(compute_nn_distance_train_eval(
+           num_obs_train, num_obs_eval, suppress_parallel,
+           matrix_train[dimension], matrix_eval[dimension],
+           int_nn_k, nn_distance) == 1)
+        return 1;
+#endif
+      for(observation = 0; observation < num_obs_eval; ++observation)
+        matrix_bandwidth[dimension][observation] =
+          nn_scale * nn_distance[observation];
+    } else {
+#ifndef MPI2
+      if(np_compute_nn_distance_cached(
+           num_obs_train, suppress_parallel, matrix_train[dimension],
+           int_nn_k, 1, nn_distance) == 1)
+        return 1;
+#else
+      if(compute_nn_distance(
+           num_obs_train, suppress_parallel, matrix_train[dimension],
+           int_nn_k, nn_distance) == 1)
+        return 1;
+#endif
+      for(observation = 0; observation < num_obs_train; ++observation)
+        matrix_bandwidth[dimension][observation] =
+          nn_scale * nn_distance[observation];
+    }
+  }
+
+  return 0;
+}
+
+int np_kernel_bandwidth_continuous_nn(
+  int BANDWIDTH,
+  int num_obs_train,
+  int num_obs_eval,
+  int num_cont,
+  int suppress_parallel,
+  double *vector_scale_factor,
+  double **matrix_train,
+  double **matrix_eval,
+  double **matrix_bandwidth)
+{
+  int dimension;
+  int allocation_count;
+  int status;
+  double *nn_distance;
+#ifdef MPI2
+  int stride_ignored;
+#endif
+
+  if((BANDWIDTH != BW_GEN_NN && BANDWIDTH != BW_ADAP_NN) ||
+     num_obs_train <= 0 || num_obs_eval <= 0 || num_cont <= 0 ||
+     vector_scale_factor == NULL || matrix_train == NULL ||
+     matrix_eval == NULL || matrix_bandwidth == NULL)
+    return 1;
+
+  for(dimension = 0; dimension < num_cont; ++dimension)
+    if(matrix_train[dimension] == NULL || matrix_eval[dimension] == NULL ||
+       matrix_bandwidth[dimension] == NULL)
+      return 1;
+
+  allocation_count =
+    (BANDWIDTH == BW_GEN_NN) ? num_obs_eval : num_obs_train;
+#ifdef MPI2
+  if(!np_int_padded_count_nonnegative(allocation_count,
+                                      iNum_Processors,
+                                      1,
+                                      &stride_ignored,
+                                      &allocation_count))
+    return 1;
+#endif
+
+  nn_distance = alloc_vecd(allocation_count);
+  status = np_kernel_bandwidth_continuous_nn_into(
+    BANDWIDTH, num_obs_train, num_obs_eval, num_cont, suppress_parallel,
+    vector_scale_factor, matrix_train, matrix_eval, matrix_bandwidth,
+    nn_distance);
+  free(nn_distance);
+  return status;
+}
+
+
 int kernel_bandwidth_mean(int KERNEL,
                           int BANDWIDTH,
                           int num_obs_train,
@@ -615,7 +737,6 @@ int kernel_bandwidth_mean(int KERNEL,
 /* `normalized' scaling factor which is constant for all sample sizes. */
 
 	int i;
-	int j;
 	int status = 0;
 
 	double temp_pow = DBL_MAX;
@@ -626,11 +747,6 @@ int kernel_bandwidth_mean(int KERNEL,
 	double *vec_sdev_y = NULL;
 
 	double *nn_distance = NULL;
-
-	double *pointer_bw;
-	double *pointer_nn;
-	double nn_scale;
-	int int_nn_k;
 
 #ifdef MPI2
 	int nn_distance_alloc = 0;
@@ -765,140 +881,24 @@ fact constant. */
 		}
 
 	}
-	else if(BANDWIDTH == 1)
+	else if(BANDWIDTH == BW_GEN_NN || BANDWIDTH == BW_ADAP_NN)
 	{
+		status = np_kernel_bandwidth_continuous_nn_into(
+			BANDWIDTH, num_obs_train, num_obs_eval, num_reg_cont,
+			suppress_parallel, vector_scale_factor,
+			matrix_X_train, matrix_X_eval, matrix_bandwidth_X,
+			nn_distance);
+		if(status != 0)
+			goto cleanup;
 
-/* Generalized NN */
-
-		for(i=0; i < num_reg_cont; i++)
-		{
-
-/* Return 1 for nearest-neighbor which is zero */
-
-			if(np_nn_lookup_from_scale(num_obs_train, 1, vector_scale_factor[i], &int_nn_k, &nn_scale)==1)
-			{
-				status = 1;
-				goto cleanup;
-			}
-
-			if(compute_nn_distance_train_eval(num_obs_train,num_obs_eval, suppress_parallel, matrix_X_train[i], matrix_X_eval[i], int_nn_k, nn_distance)==1)
-			{
-				status = 1;
-				goto cleanup;
-			}
-
-/* Compute the nearest neighbor distances */
-
-			pointer_bw = &matrix_bandwidth_X[i][0];
-			pointer_nn = &nn_distance[0];
-
-			for(j=0; j < num_obs_eval; j++)
-			{
-
-				*pointer_bw++ = nn_scale * *pointer_nn++;
-
-			}
-
-		}
-
-		for(i=0; i < num_var_cont; i++)
-		{
-
-/* Return 1 for nearest-neighbor which is zero */
-
-			if(np_nn_lookup_from_scale(num_obs_train, 1, vector_scale_factor[i+num_reg_cont], &int_nn_k, &nn_scale)==1)
-			{
-				status = 1;
-				goto cleanup;
-			}
-
-			if(compute_nn_distance_train_eval(num_obs_train,num_obs_eval, suppress_parallel, matrix_Y_train[i], matrix_Y_eval[i], int_nn_k, nn_distance)==1)
-			{
-				status = 1;
-				goto cleanup;
-			}
-
-/* Compute the nearest neighbor distances */
-
-			pointer_bw = &matrix_bandwidth_Y[i][0];
-			pointer_nn = &nn_distance[0];
-
-			for(j=0; j < num_obs_eval; j++)
-			{
-
-				*pointer_bw++ = nn_scale * *pointer_nn++;
-
-			}
-
-		}
-
+		status = np_kernel_bandwidth_continuous_nn_into(
+			BANDWIDTH, num_obs_train, num_obs_eval, num_var_cont,
+			suppress_parallel, vector_scale_factor + num_reg_cont,
+			matrix_Y_train, matrix_Y_eval, matrix_bandwidth_Y,
+			nn_distance);
+		if(status != 0)
+			goto cleanup;
 	}
-	else if(BANDWIDTH == 2)
-	{
-
-/* Adaptive */
-
-		for(i=0; i < num_reg_cont; i++)
-		{
-
-/* Return 1 for nearest-neighbor which is zero */
-			if(np_nn_lookup_from_scale(num_obs_train, 1, vector_scale_factor[i], &int_nn_k, &nn_scale)==1)
-			{
-				status = 1;
-				goto cleanup;
-			}
-
-			if(compute_nn_distance(num_obs_train, suppress_parallel, matrix_X_train[i], int_nn_k, nn_distance)==1)
-			{
-				status = 1;
-				goto cleanup;
-			}
-
-/* Compute the nearest neighbor distances */
-
-			pointer_bw = &matrix_bandwidth_X[i][0];
-			pointer_nn = &nn_distance[0];
-
-			for(j=0; j < num_obs_train; j++)
-			{
-
-				*pointer_bw++ = nn_scale * *pointer_nn++;
-
-			}
-
-		}
-
-		for(i=0; i < num_var_cont; i++)
-		{
-
-/* Return 1 for nearest-neighbor which is zero */
-			if(np_nn_lookup_from_scale(num_obs_train, 1, vector_scale_factor[i+num_reg_cont], &int_nn_k, &nn_scale)==1)
-			{
-				status = 1;
-				goto cleanup;
-			}
-
-			if(compute_nn_distance(num_obs_train, suppress_parallel, matrix_Y_train[i], int_nn_k, nn_distance)==1)
-			{
-				status = 1;
-				goto cleanup;
-			}
-
-/* Compute the nearest neighbor distances */
-
-			pointer_bw = &matrix_bandwidth_Y[i][0];
-			pointer_nn = &nn_distance[0];
-
-			for(j=0; j < num_obs_train; j++)
-			{
-
-				*pointer_bw++ = nn_scale * *pointer_nn++;
-
-			}
-
-		}
-
-	}                                               /* End generalized NN or adaptive */
 
 /* In vector_scale_factor, order is continuous reg, continuous var, */
 /* unordered variables, ordered variables, unordered regressors, ordered regressors */

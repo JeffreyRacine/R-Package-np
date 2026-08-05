@@ -6,10 +6,6 @@
 #include "headers.h"
 #include "beta_bandwidth.h"
 
-extern int int_LARGE_SF;
-extern double nconfac_extern;
-extern double ncatfac_extern;
-
 const char *np_beta_bandwidth_prepare_status_message(
   np_beta_bandwidth_prepare_status status)
 {
@@ -41,9 +37,6 @@ np_beta_bandwidth_prepare_matrix(
   double **bandwidth_eval,
   double **bandwidth_train)
 {
-  int large_sf_save;
-  double nconfac_save;
-  double ncatfac_save;
   int status = 0;
   int dimension;
 
@@ -64,24 +57,14 @@ np_beta_bandwidth_prepare_matrix(
        (need_train && bandwidth_train[dimension] == NULL))
       return NP_BETA_BANDWIDTH_PREPARE_ERR_LAYOUT;
 
-  large_sf_save = int_LARGE_SF;
-  nconfac_save = nconfac_extern;
-  ncatfac_save = ncatfac_extern;
-  int_LARGE_SF = SF_ARB;
-  nconfac_extern = 0.0;
-  ncatfac_extern = 0.0;
-
   if(need_train)
-    status = kernel_bandwidth_mean(
-      0,
+    status = np_kernel_bandwidth_continuous_nn(
       (bandwidth_mode == NP_BETA_BANDWIDTH_GENERALIZED_NN) ?
         BW_GEN_NN : BW_ADAP_NN,
-      num_train, num_train,
-      0, 0, 0, num_continuous, 0, 0, suppress_parallel,
+      num_train, num_train, num_continuous, suppress_parallel,
       (double *)nearest_neighbor,
       (double **)train_continuous, (double **)train_continuous,
-      (double **)train_continuous, (double **)train_continuous,
-      bandwidth_train, bandwidth_train, NULL);
+      bandwidth_train);
 
   if(status == 0 && need_eval) {
     if(bandwidth_mode == NP_BETA_BANDWIDTH_ADAPTIVE_NN && train_is_eval) {
@@ -93,19 +76,14 @@ np_beta_bandwidth_prepare_matrix(
                  (size_t)num_train * sizeof(double));
       }
     } else {
-      status = kernel_bandwidth_mean(
-        0, BW_GEN_NN, num_train, num_eval,
-        0, 0, 0, num_continuous, 0, 0, suppress_parallel,
+      status = np_kernel_bandwidth_continuous_nn(
+        BW_GEN_NN, num_train, num_eval, num_continuous, suppress_parallel,
         (double *)nearest_neighbor,
         (double **)train_continuous, (double **)eval_continuous,
-        (double **)train_continuous, (double **)eval_continuous,
-        bandwidth_eval, bandwidth_eval, NULL);
+        bandwidth_eval);
     }
   }
 
-  int_LARGE_SF = large_sf_save;
-  nconfac_extern = nconfac_save;
-  ncatfac_extern = ncatfac_save;
   return status == 0 ? NP_BETA_BANDWIDTH_PREPARE_OK :
     NP_BETA_BANDWIDTH_PREPARE_ERR_DISTANCE;
 }

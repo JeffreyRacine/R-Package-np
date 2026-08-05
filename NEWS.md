@@ -1,5 +1,10 @@
 # npRmpi 0.70-6
 
+* Beta nearest-neighbour bandwidth preparation now calls the shared
+  continuous-distance owner directly on every rank. It no longer temporarily
+  rewrites unrelated package-global scaling and categorical factors, while
+  retaining the same generalized- and adaptive-nearest-neighbour arithmetic.
+
 * Nearest-neighbour lookup and distance failures now leave both shared
   bandwidth owners through their normal cleanup exit on every rank. This
   removes retained standard-deviation and distance workspaces after
