@@ -24793,9 +24793,10 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	            for(i = 0; i < owner->nterms; i++)
 	              owner->solve_workspace.rhs_source[i+l*owner->nterms] =
 	                (i == l) ? 1.0 : 0.0;
-	          if(np_lp_solve_workspace_solve(&owner->solve_workspace,
-	                                         owner->nterms,
-	                                         owner->nterms))
+	          if(np_lp_solve_workspace_solve_factored(
+	               &owner->solve_workspace,
+	               owner->nterms,
+	               owner->nterms))
 	            have_vcov_owner = 1;
 
 	          if(have_vcov_owner){

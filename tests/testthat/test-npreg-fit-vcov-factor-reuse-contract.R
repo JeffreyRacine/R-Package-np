@@ -21,7 +21,7 @@ function_body <- function(lines, signature) {
   paste(lines[start:stop], collapse = "\n")
 }
 
-test_that("LP fit covariance reuses only a validated retained factorization", {
+test_that("serial and MPI-owner LP covariance reuse validated factorizations", {
   jksum_file <- locate_lp_source("jksum.c")
   solve_file <- locate_lp_source("jksum_lp_solve.c")
   header_file <- locate_lp_source("jksum_lp_solve.h")
@@ -40,7 +40,7 @@ test_that("LP fit covariance reuses only a validated retained factorization", {
 
   expect_equal(
     sum(grepl("np_lp_solve_workspace_solve_factored\\(", jksum_lines)),
-    1L
+    2L
   )
   expect_true(any(grepl("int factor_ready;", header_lines, fixed = TRUE)))
   expect_true(any(grepl("int factor_p;", header_lines, fixed = TRUE)))
