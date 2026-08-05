@@ -50,6 +50,33 @@ test_that("the dead beta kernel-sum facade is absent", {
   expect_false(grepl("#include \"beta_kernelsum.h\"", native_source,
                      fixed = TRUE))
   expect_false(grepl("np_beta_kernelsum(", native_source, fixed = TRUE))
+
+  retired_kernel_roots <- c(
+    "np_beta_pdf_scale(",
+    "np_beta_pdf_order2(",
+    "np_beta_pdf_order(",
+    "np_beta_log_pdf_order2(",
+    "np_beta_derivative_regular_value(",
+    "np_beta_derivative_public_value(",
+    "np_beta_overlap_order2(",
+    "np_beta_overlap_order("
+  )
+  for (root_name in retired_kernel_roots) {
+    expect_false(
+      grepl(root_name, native_source, fixed = TRUE),
+      info = root_name
+    )
+  }
+  expect_match(
+    native_source,
+    "np_beta_log_abs_pdf_order(",
+    fixed = TRUE
+  )
+  expect_match(
+    native_source,
+    "np_beta_log_abs_overlap_order(",
+    fixed = TRUE
+  )
   expect_equal(
     lengths(regmatches(
       native_source,

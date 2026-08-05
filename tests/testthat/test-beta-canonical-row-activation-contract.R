@@ -504,7 +504,7 @@ test_that("higher-order beta overlap prepares each distinct side shape once", {
     fixed = TRUE
   )[[1L]]
   parts_end <- regexpr(
-    "double np_beta_overlap_order(",
+    "double np_beta_log_abs_overlap_order(",
     substr(beta_kernel, parts_start + 1L, nchar(beta_kernel)),
     fixed = TRUE
   )[[1L]]

@@ -709,103 +709,6 @@ double np_beta_log_pdf_scale(const np_beta_shape *shape,
     &component, &observation, status);
 }
 
-double np_beta_pdf_scale(const np_beta_shape *shape,
-                         np_beta_status *status)
-{
-  np_beta_status log_status = NP_BETA_OK;
-  const double log_value = np_beta_log_pdf_scale(shape, &log_status);
-
-  if(log_status != NP_BETA_OK) {
-    np_beta_set_status(status, log_status);
-    return (log_status == NP_BETA_ERR_RANGE) ? INFINITY : NAN;
-  }
-  if(log_value == -INFINITY) {
-    np_beta_set_status(status, NP_BETA_OK);
-    return 0.0;
-  }
-  if(log_value > log(DBL_MAX)) {
-    np_beta_set_status(status, NP_BETA_ERR_RANGE);
-    return INFINITY;
-  }
-
-  np_beta_set_status(status, NP_BETA_OK);
-  return exp(log_value);
-}
-
-double np_beta_pdf_order2(double evaluation,
-                          double observation,
-                          double bandwidth,
-                          double lower,
-                          double upper,
-                          np_beta_status *status)
-{
-  np_beta_shape shape;
-  np_beta_status shape_status = np_beta_shape_init(evaluation,
-                                                   observation,
-                                                   bandwidth,
-                                                   lower,
-                                                   upper,
-                                                   1,
-                                                   &shape);
-  if(shape_status != NP_BETA_OK) {
-    np_beta_set_status(status, shape_status);
-    return NAN;
-  }
-
-  return np_beta_pdf_scale(&shape, status);
-}
-
-double np_beta_pdf_order(double evaluation,
-                         double observation,
-                         double bandwidth,
-                         double lower,
-                         double upper,
-                         int order,
-                         np_beta_status *status)
-{
-  const int *coefficients = NULL;
-  const int component_count =
-    np_beta_order_coefficients(order, &coefficients);
-  double positive_log = -INFINITY;
-  double negative_log = -INFINITY;
-  int component;
-
-  if(component_count == 0) {
-    np_beta_set_status(status, NP_BETA_ERR_SCALE);
-    return NAN;
-  }
-  if(order == 2)
-    return np_beta_pdf_order2(evaluation, observation, bandwidth,
-                              lower, upper, status);
-
-  for(component = 0; component < component_count; ++component) {
-    np_beta_shape shape;
-    np_beta_status component_status = np_beta_shape_init(
-      evaluation, observation, bandwidth, lower, upper,
-      component + 1, &shape);
-    double log_value;
-    double log_term;
-
-    if(component_status != NP_BETA_OK) {
-      np_beta_set_status(status, component_status);
-      return NAN;
-    }
-    log_value = np_beta_log_pdf_scale(&shape, &component_status);
-    if(component_status != NP_BETA_OK) {
-      np_beta_set_status(status, component_status);
-      return (component_status == NP_BETA_ERR_RANGE) ? INFINITY : NAN;
-    }
-    log_term = (log_value == -INFINITY) ? -INFINITY :
-      log_value + log((double)abs(coefficients[component]));
-    if(coefficients[component] > 0)
-      positive_log = np_beta_log_add(positive_log, log_term);
-    else
-      negative_log = np_beta_log_add(negative_log, log_term);
-  }
-
-  return np_beta_signed_log_difference(positive_log, negative_log, status);
-}
-
 double np_beta_log_abs_pdf_order(double evaluation,
                                  double observation,
                                  double bandwidth,
@@ -1301,76 +1204,6 @@ np_beta_log_abs_pdf_derivative_order_prepared_observation(
   return np_beta_signed_log_absolute(
     jump_positive_log, jump_negative_log,
     &derivative->jump_log_absolute, &derivative->jump_sign);
-}
-
-static double np_beta_signed_log_value(double log_absolute,
-                                       int sign,
-                                       np_beta_status *status)
-{
-  if(sign == 0 || log_absolute == -INFINITY) {
-    np_beta_set_status(status, NP_BETA_OK);
-    return 0.0;
-  }
-  if((sign != -1 && sign != 1) || ISNAN(log_absolute)) {
-    np_beta_set_status(status, NP_BETA_ERR_NUMERIC);
-    return NAN;
-  }
-  if(log_absolute > log(DBL_MAX)) {
-    np_beta_set_status(status, NP_BETA_ERR_RANGE);
-    return (sign > 0) ? INFINITY : -INFINITY;
-  }
-  np_beta_set_status(status, NP_BETA_OK);
-  return (sign > 0) ? exp(log_absolute) : -exp(log_absolute);
-}
-
-double np_beta_derivative_regular_value(
-  const np_beta_derivative *derivative,
-  np_beta_status *status)
-{
-  if(derivative == NULL) {
-    np_beta_set_status(status, NP_BETA_ERR_NUMERIC);
-    return NAN;
-  }
-  return np_beta_signed_log_value(derivative->regular_log_absolute,
-                                  derivative->regular_sign, status);
-}
-
-double np_beta_derivative_public_value(
-  const np_beta_derivative *derivative,
-  np_beta_status *status)
-{
-  if(derivative == NULL) {
-    np_beta_set_status(status, NP_BETA_ERR_NUMERIC);
-    return NAN;
-  }
-  if(derivative->jump_sign != 0) {
-    np_beta_set_status(status, NP_BETA_OK);
-    return (derivative->jump_sign > 0) ? INFINITY : -INFINITY;
-  }
-  return np_beta_derivative_regular_value(derivative, status);
-}
-
-double np_beta_log_pdf_order2(double evaluation,
-                              double observation,
-                              double bandwidth,
-                              double lower,
-                              double upper,
-                              np_beta_status *status)
-{
-  np_beta_shape shape;
-  np_beta_status shape_status = np_beta_shape_init(evaluation,
-                                                   observation,
-                                                   bandwidth,
-                                                   lower,
-                                                   upper,
-                                                   1,
-                                                   &shape);
-  if(shape_status != NP_BETA_OK) {
-    np_beta_set_status(status, shape_status);
-    return NAN;
-  }
-
-  return np_beta_log_pdf_scale(&shape, status);
 }
 
 /* Scalar and prepared CDF consumers must share the same incomplete-beta
@@ -1986,40 +1819,6 @@ double np_beta_log_overlap_order2(double center_one,
                                    lower, upper, status);
 }
 
-double np_beta_overlap_order2(double center_one,
-                              double bandwidth_one,
-                              double center_two,
-                              double bandwidth_two,
-                              double lower,
-                              double upper,
-                              np_beta_status *status)
-{
-  np_beta_status log_status = NP_BETA_OK;
-  const double log_value = np_beta_log_overlap_order2(center_one,
-                                                       bandwidth_one,
-                                                       center_two,
-                                                       bandwidth_two,
-                                                       lower,
-                                                       upper,
-                                                       &log_status);
-
-  if(log_status != NP_BETA_OK) {
-    np_beta_set_status(status, log_status);
-    return (log_status == NP_BETA_ERR_RANGE) ? INFINITY : NAN;
-  }
-  if(log_value == -INFINITY) {
-    np_beta_set_status(status, NP_BETA_OK);
-    return 0.0;
-  }
-  if(log_value > log(DBL_MAX)) {
-    np_beta_set_status(status, NP_BETA_ERR_RANGE);
-    return INFINITY;
-  }
-
-  np_beta_set_status(status, NP_BETA_OK);
-  return exp(log_value);
-}
-
 static np_beta_status np_beta_overlap_order_log_parts(
   double center_one,
   double bandwidth_one,
@@ -2087,39 +1886,6 @@ static np_beta_status np_beta_overlap_order_log_parts(
   }
 
   return NP_BETA_OK;
-}
-
-double np_beta_overlap_order(double center_one,
-                             double bandwidth_one,
-                             double center_two,
-                             double bandwidth_two,
-                             double lower,
-                             double upper,
-                             int order,
-                             np_beta_status *status)
-{
-  double positive_log = -INFINITY;
-  double negative_log = -INFINITY;
-  np_beta_status parts_status;
-
-  if(!np_beta_order_supported(order)) {
-    np_beta_set_status(status, NP_BETA_ERR_SCALE);
-    return NAN;
-  }
-  if(order == 2)
-    return np_beta_overlap_order2(center_one, bandwidth_one,
-                                  center_two, bandwidth_two,
-                                  lower, upper, status);
-
-  parts_status = np_beta_overlap_order_log_parts(
-    center_one, bandwidth_one, center_two, bandwidth_two,
-    lower, upper, order, &positive_log, &negative_log);
-  if(parts_status != NP_BETA_OK) {
-    np_beta_set_status(status, parts_status);
-    return (parts_status == NP_BETA_ERR_RANGE) ? INFINITY : NAN;
-  }
-
-  return np_beta_signed_log_difference(positive_log, negative_log, status);
 }
 
 double np_beta_log_abs_overlap_order(double center_one,
