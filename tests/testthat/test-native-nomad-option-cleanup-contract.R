@@ -118,6 +118,34 @@ test_that("native npreg solver option failure does not poison the next MPI solve
   expect_equal(out$status, 0L, info = paste(out$output, collapse = "\n"))
 })
 
+test_that("resident npudens state is released after an MPI solver option failure", {
+  env <- npRmpi_subprocess_env("NP_RMPI_NO_REUSE_SLAVES=1")
+  skip_if(is.null(env))
+
+  out <- npRmpi_run_rscript_subprocess(
+    c(
+      "library(npRmpi)",
+      "options(np.messages = FALSE, np.tree = TRUE)",
+      "npRmpi.init(nslaves = 1L, quiet = TRUE)",
+      "set.seed(20260805)",
+      "dat <- data.frame(x = runif(40L))",
+      "err <- tryCatch(suppressWarnings(npudensbw(dat = dat, bwsolver = 'mads', nmulti = 1L, nomad.opts = list(MAX_BB_EVAL = 'invalid'))), error = function(e) e)",
+      "stopifnot(inherits(err, 'error'))",
+      "stopifnot(grepl('NOMAD route failed', conditionMessage(err), fixed = TRUE))",
+      "first <- npudensbw(dat = dat, bwsolver = 'mads', nmulti = 1L, nomad.opts = list(MAX_BB_EVAL = 12L))",
+      "second <- npudensbw(dat = dat, bwsolver = 'mads', nmulti = 1L, nomad.opts = list(MAX_BB_EVAL = 12L))",
+      "stopifnot(identical(first$bw, second$bw))",
+      "stopifnot(identical(first$fval, second$fval))",
+      "npRmpi.quit()",
+      "quit(save = 'no', status = 0L, runLast = FALSE)"
+    ),
+    timeout = 60L,
+    env = env
+  )
+
+  expect_equal(out$status, 0L, info = paste(out$output, collapse = "\n"))
+})
+
 test_that("native bandwidth option failures do not poison next MPI solves", {
   env <- npRmpi_subprocess_env("NP_RMPI_NO_REUSE_SLAVES=1")
   skip_if(is.null(env))
