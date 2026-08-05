@@ -29,26 +29,63 @@ test_that("blocked bivariate entropy integration preserves the scalar formula", 
   expect_equal(candidate, reference, tolerance = tolerance)
 })
 
-test_that("entropy integration block sizing is bounded and result invariant", {
-  block.size <- getFromNamespace(".np_entropy_integration_block_size", "np")
-  helper <- getFromNamespace(".np_entropy_bivariate_integral", "np")
-
-  expect_identical(block.size(100L), 64L)
-  expect_lt(block.size(100000L), 64L)
-  expect_lte(64 * 100000 * block.size(100000L), 32 * 1024^2)
-
+test_that("native entropy callback preserves pointwise Gaussian arithmetic", {
   set.seed(20260718)
   x <- rnorm(20)
   y <- rnorm(20)
-  bw <- c(0.4, 0.5)
-  lower <- c(min(x) - 10 * IQR(x), min(y) - 10 * IQR(y))
-  upper <- c(max(x) + 10 * IQR(x), max(y) + 10 * IQR(y))
-  ordinary <- helper(x, y, bw[1L], bw[2L], bw, lower, upper)
-  forced <- helper(
-    x, y, bw[1L], bw[2L], bw, lower, upper,
-    target.bytes = 64 * length(x) * 4L
+  bandwidths <- c(0.4, 0.5, 0.45, 0.55)
+  points <- cbind(
+    c(0, 0),
+    c(-1.25, 0.75),
+    c(2.5, -3),
+    c(-15, 15),
+    c(25, -25)
   )
 
-  tolerance <- 64 * .Machine$double.eps * max(1, abs(ordinary))
-  expect_equal(forced, ordinary, tolerance = tolerance)
+  scalar <- function(xy) {
+    f.x <- mean(dnorm((xy[1L] - x) / bandwidths[1L])) / bandwidths[1L]
+    f.y <- mean(dnorm((xy[2L] - y) / bandwidths[2L])) / bandwidths[2L]
+    f.xy <- mean(
+      dnorm((xy[1L] - x) / bandwidths[3L]) *
+        dnorm((xy[2L] - y) / bandwidths[4L]) /
+        (bandwidths[3L] * bandwidths[4L])
+    )
+    (sqrt(f.xy) - sqrt(f.x) * sqrt(f.y))^2
+  }
+
+  reference <- matrix(apply(points, 2L, scalar), nrow = 1L)
+  candidate <- .Call(
+    "C_np_entropy_gaussian_integrand",
+    points,
+    x,
+    y,
+    bandwidths,
+    PACKAGE = "np"
+  )
+
+  tolerance <- 128 * .Machine$double.eps * max(1, abs(reference))
+  expect_identical(dim(candidate), c(1L, ncol(points)))
+  expect_equal(candidate, reference, tolerance = tolerance)
+})
+
+test_that("native entropy callback rejects malformed inputs without fallback", {
+  call.native <- function(points, x = c(0, 1), y = c(0, 1),
+                          bandwidths = rep(0.5, 4L)) {
+    .Call(
+      "C_np_entropy_gaussian_integrand",
+      points,
+      x,
+      y,
+      bandwidths,
+      PACKAGE = "np"
+    )
+  }
+
+  expect_error(call.native(c(0, 1)), "numeric matrix")
+  expect_error(call.native(matrix(0, nrow = 3L)), "two rows")
+  expect_error(call.native(matrix(0, nrow = 2L), y = 0), "equal positive")
+  expect_error(
+    call.native(matrix(0, nrow = 2L), bandwidths = c(0.5, 0, 0.5, 0.5)),
+    "finite and positive"
+  )
 })

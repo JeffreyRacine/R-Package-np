@@ -1,5 +1,12 @@
 # np 0.70-6
 
+* Bivariate entropy integration for `npdeptest()` and `npsdeptest()` now
+  evaluates the existing Gaussian integrand in one registered native callback.
+  The cubature rule, limits, tolerances, bandwidths, bootstrap, and statistic
+  are unchanged; the callback no longer constructs sample-by-quadrature
+  distance matrices and evaluates the joint Gaussian product with one
+  bivariate exponential.
+
 * Removed the private, unexported package-local `gsl.bs` bridge and its
   registered native wrappers. Public spline construction remains owned by
   `crs::gsl.bs()`; the independent B-spline primitives used by the canonical
