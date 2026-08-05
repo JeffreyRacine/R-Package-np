@@ -2022,27 +2022,46 @@ npValidateBetaKernelSpecification <- function(ckertype,
                                               where = "beta kernel",
                                               regtype = NULL,
                                               allow.categorical = FALSE,
-                                              allow.general.lp = FALSE) {
+                                              allow.general.lp = FALSE,
+                                              arg.prefix = c("cker", "cxker", "cyker")) {
   if (!identical(ckertype, "beta"))
     return(invisible(FALSE))
 
+  arg.prefix <- match.arg(arg.prefix)
+  conditional.side <- !identical(arg.prefix, "cker")
+  subject <- if (conditional.side) where else "beta kernels"
+  verb <- if (conditional.side) "requires" else "require"
+
   if (!(as.integer(ckerorder) %in% c(2L, 4L, 6L, 8L)))
-    stop("beta kernels require ckerorder in 2, 4, 6, or 8", call. = FALSE)
+    stop(subject, " ", verb, " ", arg.prefix,
+         "order in 2, 4, 6, or 8", call. = FALSE)
   if (!(bwtype %in% c("fixed", "generalized_nn", "adaptive_nn")))
-    stop("beta kernels require a recognized fixed or nearest-neighbor bandwidth mode",
+    stop(subject, " ", verb,
+         " a recognized fixed or nearest-neighbor bandwidth mode",
          call. = FALSE)
-  if (!(ckerbound %in% c("fixed", "range")))
-    stop("beta kernels require ckerbound = \"fixed\" or \"range\" with finite lower and upper bounds",
-         call. = FALSE)
+  if (!(ckerbound %in% c("fixed", "range"))) {
+    if (!conditional.side)
+      stop("beta kernels require ckerbound = \"fixed\" or \"range\" with finite lower and upper bounds",
+           call. = FALSE)
+    stop(subject, " requires ", arg.prefix,
+         "bound = \"fixed\" or \"range\" with finite ", arg.prefix,
+         "lb and ", arg.prefix, "ub", call. = FALSE)
+  }
 
   icon <- dati$icon
   if (is.null(icon) || !any(icon))
-    stop("beta kernels require at least one continuous variable", call. = FALSE)
-  if (!isTRUE(allow.categorical) && (any(dati$iuno) || any(dati$iord)))
-    stop("beta kernels currently support continuous variables only", call. = FALSE)
-  if (any(!is.finite(ckerlb[icon])) || any(!is.finite(ckerub[icon])))
-    stop("beta kernels require finite lower and upper bounds for every continuous variable",
+    stop(subject, " ", verb, " at least one continuous variable",
          call. = FALSE)
+  if (!isTRUE(allow.categorical) && (any(dati$iuno) || any(dati$iord)))
+    stop(subject, if (conditional.side) " currently supports" else
+           " currently support", " continuous variables only", call. = FALSE)
+  if (any(!is.finite(ckerlb[icon])) || any(!is.finite(ckerub[icon]))) {
+    if (!conditional.side)
+      stop("beta kernels require finite lower and upper bounds for every continuous variable",
+           call. = FALSE)
+    stop(subject, " requires finite ", arg.prefix, "lb and ",
+         arg.prefix, "ub for every continuous variable", call. = FALSE)
+  }
   bw.continuous <- bw[icon]
   automatic.zero.start <- isTRUE(bandwidth.compute) &&
     length(bw.continuous) > 0L && all(bw.continuous == 0)
@@ -2051,8 +2070,12 @@ npValidateBetaKernelSpecification <- function(ckertype,
        (identical(bwtype, "fixed") && any(bw.continuous <= 0)) ||
        (!identical(bwtype, "fixed") && any(bw.continuous < 1)))) {
     if (identical(bwtype, "fixed"))
-      stop("beta kernel bandwidths must be finite and strictly positive", call. = FALSE)
-    stop("beta nearest-neighbor bandwidths must be finite and at least 1",
+      stop(if (conditional.side) paste(where, "bandwidths") else
+             "beta kernel bandwidths",
+           " must be finite and strictly positive", call. = FALSE)
+    stop(if (conditional.side) paste(where, "nearest-neighbor bandwidths") else
+           "beta nearest-neighbor bandwidths",
+         " must be finite and at least 1",
          call. = FALSE)
   }
   if (!is.null(regtype) && !identical(regtype, "lc") &&
@@ -2074,7 +2097,12 @@ npWarnIgnoredUniformKernelOrder <- function(call.names,
   if (!identical(kernel.type, "uniform"))
     return(invisible(FALSE))
 
-  .np_warning("ignoring kernel order specified with uniform kernel type")
+  warning.text <- if (identical(order.arg, "ckerorder"))
+    "ignoring kernel order specified with uniform kernel type"
+  else
+    paste("ignoring", order.arg, "specified with uniform",
+          sub("order$", "type", order.arg))
+  .np_warning(warning.text)
   invisible(TRUE)
 }
 
@@ -4455,7 +4483,8 @@ npValidateConditionalBetaBandwidthObject <- function(bws,
     where = paste(where, "explanatory beta kernel"),
     regtype = bws[["regtype", exact = TRUE]],
     allow.categorical = canonical.fit.route,
-    allow.general.lp = canonical.fit.route
+    allow.general.lp = canonical.fit.route,
+    arg.prefix = "cxker"
   )
   npValidateBetaKernelSpecification(
     ckertype = bws[["cykertype", exact = TRUE]],
@@ -4468,7 +4497,8 @@ npValidateConditionalBetaBandwidthObject <- function(bws,
     bw = bws[["ybw", exact = TRUE]],
     bandwidth.compute = bandwidth.compute,
     where = paste(where, "dependent beta kernel"),
-    allow.categorical = canonical.fit.route
+    allow.categorical = canonical.fit.route,
+    arg.prefix = "cyker"
   )
   if (!canonical.fit.route &&
       (bws[["xnuno", exact = TRUE]] + bws[["xnord", exact = TRUE]] +

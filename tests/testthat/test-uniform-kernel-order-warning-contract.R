@@ -17,7 +17,12 @@ test_that("uniform kernel order warnings require an explicit user order", {
   x <- data.frame(x = seq(0.1, 0.9, length.out = 12L))
   y <- sin(2 * pi * x$x)
   y.frame <- data.frame(y = y)
-  expected <- "[np] ignoring kernel order specified with uniform kernel type"
+  expected <- function(order.arg) {
+    if (identical(order.arg, "ckerorder"))
+      return("[np] ignoring kernel order specified with uniform kernel type")
+    paste("[np] ignoring", order.arg, "specified with uniform",
+          sub("order$", "type", order.arg))
+  }
 
   calls <- list(
     regression = list(
@@ -67,7 +72,7 @@ test_that("uniform kernel order warnings require an explicit user order", {
     expect_identical(omitted$messages, character())
 
     explicit <- collect_warnings(do.call(case$fun, c(case$args, case$order)))
-    expect_identical(explicit$messages, expected)
+    expect_identical(explicit$messages, expected(names(case$order)))
   }
 
   formula.data <- data.frame(y = y, x = x$x)
@@ -121,7 +126,7 @@ test_that("uniform kernel order warnings require an explicit user order", {
     )
     expect_identical(
       collect_warnings(do.call(case$fun, c(case$args, case$order)))$messages,
-      expected
+      expected(names(case$order))
     )
   }
 
@@ -166,7 +171,7 @@ test_that("uniform kernel order warnings require an explicit user order", {
     )
     expect_identical(
       collect_warnings(do.call(case$fun, c(case$args, case$order)))$messages,
-      expected
+      expected(names(case$order))
     )
   }
 
@@ -182,6 +187,6 @@ test_that("uniform kernel order warnings require an explicit user order", {
     collect_warnings(do.call(
       npcdensbw, c(conditional_y, list(cykerorder = 4L))
     ))$messages,
-    expected
+    expected("cykerorder")
   )
 })
