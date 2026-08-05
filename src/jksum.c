@@ -22675,11 +22675,6 @@ const NPContinuousPreparedBandwidthView *prepared_bandwidth){
   int num_obs_eval_alloc = num_obs_eval;
 #endif
 
-  operator = (int *)malloc(sizeof(int)*(num_reg_continuous+num_reg_unordered+num_reg_ordered));
-
-  for(i = 0; i < (num_reg_continuous+num_reg_unordered+num_reg_ordered); i++)
-    operator[i] = OP_NORMAL;
-
   const int do_grad = (gradient != NULL); 
   const int do_gerr = (gradient_stderr != NULL);
   const int lp_engine_est = lp_engine;

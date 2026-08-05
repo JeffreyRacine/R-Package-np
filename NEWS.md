@@ -1,5 +1,10 @@
 # npRmpi 0.70-6
 
+* The shared regression fit now allocates its operator vector once, after
+  engine and route validation. This removes a duplicate general-path
+  allocation and the scalar beta route's retained allocation on every rank
+  without changing estimator arithmetic.
+
 * Beta nearest-neighbour bandwidth preparation now calls the shared
   continuous-distance owner directly on every rank. It no longer temporarily
   rewrites unrelated package-global scaling and categorical factors, while
