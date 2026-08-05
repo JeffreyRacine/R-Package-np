@@ -1724,26 +1724,132 @@ double **matrix_categorical_vals){
   return w;
 }
 
-static int np_regression_categorical_profile_cv(
-int *kernel_c,
-int *kernel_u,
-int *kernel_o,
-const int bwm,
-const int BANDWIDTH_reg,
-const int num_obs,
-const int num_reg_unordered,
-const int num_reg_ordered,
-const int num_reg_continuous,
-double **matrix_X_unordered,
-double **matrix_X_ordered,
-double **matrix_X_continuous,
-double *vector_Y,
-double *vector_scale_factor,
-double *lambda,
-int *num_categories,
-int *operator,
-double *cv_out,
-double *traceH_out){
+enum {
+  NP_CATEGORICAL_PROFILE_OWNER_CAPACITY = 8
+};
+
+typedef struct {
+  int *indices[NP_CATEGORICAL_PROFILE_OWNER_CAPACITY];
+  double **matrices[NP_CATEGORICAL_PROFILE_OWNER_CAPACITY];
+  double *vectors[NP_CATEGORICAL_PROFILE_OWNER_CAPACITY];
+  int index_count;
+  int matrix_count;
+  int vector_count;
+} NPCategoricalProfileOwner;
+
+static void np_categorical_profile_owner_init(NPCategoricalProfileOwner *owner)
+{
+  memset(owner, 0, sizeof(*owner));
+}
+
+static void np_categorical_profile_owner_clear(NPCategoricalProfileOwner *owner)
+{
+  int item;
+
+  for(item = owner->index_count - 1; item >= 0; --item)
+    free(owner->indices[item]);
+  for(item = owner->matrix_count - 1; item >= 0; --item)
+    free_tmat(owner->matrices[item]);
+  for(item = owner->vector_count - 1; item >= 0; --item)
+    free(owner->vectors[item]);
+  np_categorical_profile_owner_init(owner);
+}
+
+static void np_categorical_profile_owner_cleanup(void *data, Rboolean jump)
+{
+  if(jump)
+    np_categorical_profile_owner_clear((NPCategoricalProfileOwner *)data);
+}
+
+static void np_categorical_profile_owner_take_index(
+  NPCategoricalProfileOwner *owner,
+  int *index)
+{
+  if(index == NULL)
+    return;
+  if(owner->index_count >= NP_CATEGORICAL_PROFILE_OWNER_CAPACITY) {
+    free(index);
+    error("internal categorical-profile index-owner capacity exceeded");
+  }
+  owner->indices[owner->index_count++] = index;
+}
+
+static void np_categorical_profile_owner_take_matrix(
+  NPCategoricalProfileOwner *owner,
+  double **matrix)
+{
+  if(matrix == NULL)
+    return;
+  if(owner->matrix_count >= NP_CATEGORICAL_PROFILE_OWNER_CAPACITY) {
+    free_tmat(matrix);
+    error("internal categorical-profile matrix-owner capacity exceeded");
+  }
+  owner->matrices[owner->matrix_count++] = matrix;
+}
+
+static void np_categorical_profile_owner_take_vector(
+  NPCategoricalProfileOwner *owner,
+  double *vector)
+{
+  if(vector == NULL)
+    return;
+  if(owner->vector_count >= NP_CATEGORICAL_PROFILE_OWNER_CAPACITY) {
+    free(vector);
+    error("internal categorical-profile vector-owner capacity exceeded");
+  }
+  owner->vectors[owner->vector_count++] = vector;
+}
+
+typedef struct {
+  int *kernel_c;
+  int *kernel_u;
+  int *kernel_o;
+  int bwm;
+  int bandwidth_mode;
+  int num_obs;
+  int num_reg_unordered;
+  int num_reg_ordered;
+  int num_reg_continuous;
+  double **matrix_X_unordered;
+  double **matrix_X_ordered;
+  double **matrix_X_continuous;
+  double *vector_Y;
+  double *vector_scale_factor;
+  double *lambda;
+  int *num_categories;
+  int *operator;
+  double *cv_out;
+  double *traceH_out;
+} NPRegressionCategoricalProfileCvCall;
+
+typedef struct {
+  const NPRegressionCategoricalProfileCvCall *call;
+  NPCategoricalProfileOwner owner;
+  int status;
+} NPRegressionCategoricalProfileCvExecution;
+
+static int np_regression_categorical_profile_cv_body(
+  const NPRegressionCategoricalProfileCvCall *call,
+  NPCategoricalProfileOwner *owner)
+{
+  int * const kernel_c = call->kernel_c;
+  int * const kernel_u = call->kernel_u;
+  int * const kernel_o = call->kernel_o;
+  const int bwm = call->bwm;
+  const int BANDWIDTH_reg = call->bandwidth_mode;
+  const int num_obs = call->num_obs;
+  const int num_reg_unordered = call->num_reg_unordered;
+  const int num_reg_ordered = call->num_reg_ordered;
+  const int num_reg_continuous = call->num_reg_continuous;
+  double ** const matrix_X_unordered = call->matrix_X_unordered;
+  double ** const matrix_X_ordered = call->matrix_X_ordered;
+  double * const vector_Y = call->vector_Y;
+  double * const vector_scale_factor = call->vector_scale_factor;
+  double * const lambda = call->lambda;
+  int * const num_categories = call->num_categories;
+  int * const operator = call->operator;
+  double * const cv_out = call->cv_out;
+  double * const traceH_out = call->traceH_out;
 
   int i, j, g, status;
   int *prof_id = NULL, *prof_rep = NULL;
@@ -1788,16 +1894,24 @@ double *traceH_out){
                                       &prof_rep,
                                       &nprof))
     return 0;
+  np_categorical_profile_owner_take_index(owner, prof_id);
+  np_categorical_profile_owner_take_index(owner, prof_rep);
 
   if((nprof <= 0) || (4*nprof > 3*num_obs))
     goto cleanup;
 
   profile_unordered = alloc_tmatd(nprof, num_reg_unordered);
+  np_categorical_profile_owner_take_matrix(owner, profile_unordered);
   profile_ordered = alloc_tmatd(nprof, num_reg_ordered);
+  np_categorical_profile_owner_take_matrix(owner, profile_ordered);
   counts = alloc_vecd(nprof);
+  np_categorical_profile_owner_take_vector(owner, counts);
   sums = alloc_vecd(nprof);
+  np_categorical_profile_owner_take_vector(owner, sums);
   sums2 = alloc_vecd(nprof);
+  np_categorical_profile_owner_take_vector(owner, sums2);
   weighted_sum = alloc_vecd(2*nprof);
+  np_categorical_profile_owner_take_vector(owner, weighted_sum);
 
   if(((num_reg_unordered > 0) && profile_unordered == NULL) ||
      ((num_reg_ordered > 0) && profile_ordered == NULL) ||
@@ -1923,41 +2037,132 @@ double *traceH_out){
   ok = R_FINITE(*cv_out);
 
 cleanup:
-  if(prof_id != NULL) free(prof_id);
-  if(prof_rep != NULL) free(prof_rep);
-  if(profile_unordered != NULL) free_tmat(profile_unordered);
-  if(profile_ordered != NULL) free_tmat(profile_ordered);
-  if(counts != NULL) free(counts);
-  if(sums != NULL) free(sums);
-  if(sums2 != NULL) free(sums2);
-  if(weighted_sum != NULL) free(weighted_sum);
+  np_categorical_profile_owner_clear(owner);
 
   return ok;
 }
 
-static int np_regression_categorical_profile_fit(
+static SEXP np_regression_categorical_profile_cv_execute(void *data)
+{
+  NPRegressionCategoricalProfileCvExecution * const execution =
+    (NPRegressionCategoricalProfileCvExecution *)data;
+
+  execution->status = np_regression_categorical_profile_cv_body(
+    execution->call, &execution->owner);
+  return R_NilValue;
+}
+
+static int np_regression_categorical_profile_cv(
 int *kernel_c,
 int *kernel_u,
 int *kernel_o,
-const int lp_engine,
+const int bwm,
 const int BANDWIDTH_reg,
-const int num_obs_train,
-const int num_obs_eval,
+const int num_obs,
 const int num_reg_unordered,
 const int num_reg_ordered,
 const int num_reg_continuous,
-double **matrix_X_unordered_train,
-double **matrix_X_ordered_train,
-double **matrix_X_unordered_eval,
-double **matrix_X_ordered_eval,
+double **matrix_X_unordered,
+double **matrix_X_ordered,
+double **matrix_X_continuous,
 double *vector_Y,
 double *vector_scale_factor,
 double *lambda,
 int *num_categories,
 int *operator,
-double **matrix_categorical_vals,
-double *mean,
-double *mean_stderr){
+double *cv_out,
+double *traceH_out)
+{
+  const NPRegressionCategoricalProfileCvCall call = {
+    .kernel_c = kernel_c,
+    .kernel_u = kernel_u,
+    .kernel_o = kernel_o,
+    .bwm = bwm,
+    .bandwidth_mode = BANDWIDTH_reg,
+    .num_obs = num_obs,
+    .num_reg_unordered = num_reg_unordered,
+    .num_reg_ordered = num_reg_ordered,
+    .num_reg_continuous = num_reg_continuous,
+    .matrix_X_unordered = matrix_X_unordered,
+    .matrix_X_ordered = matrix_X_ordered,
+    .matrix_X_continuous = matrix_X_continuous,
+    .vector_Y = vector_Y,
+    .vector_scale_factor = vector_scale_factor,
+    .lambda = lambda,
+    .num_categories = num_categories,
+    .operator = operator,
+    .cv_out = cv_out,
+    .traceH_out = traceH_out
+  };
+  NPRegressionCategoricalProfileCvExecution execution;
+
+  execution.call = &call;
+  execution.status = 0;
+  np_categorical_profile_owner_init(&execution.owner);
+  R_UnwindProtect(
+    np_regression_categorical_profile_cv_execute, &execution,
+    np_categorical_profile_owner_cleanup, &execution.owner, NULL);
+  return execution.status;
+}
+
+typedef struct {
+  int *kernel_c;
+  int *kernel_u;
+  int *kernel_o;
+  int lp_engine;
+  int bandwidth_mode;
+  int num_obs_train;
+  int num_obs_eval;
+  int num_reg_unordered;
+  int num_reg_ordered;
+  int num_reg_continuous;
+  double **matrix_X_unordered_train;
+  double **matrix_X_ordered_train;
+  double **matrix_X_unordered_eval;
+  double **matrix_X_ordered_eval;
+  double *vector_Y;
+  double *vector_scale_factor;
+  double *lambda;
+  int *num_categories;
+  int *operator;
+  double **matrix_categorical_vals;
+  double *mean;
+  double *mean_stderr;
+} NPRegressionCategoricalProfileFitCall;
+
+typedef struct {
+  const NPRegressionCategoricalProfileFitCall *call;
+  NPCategoricalProfileOwner owner;
+  int status;
+} NPRegressionCategoricalProfileFitExecution;
+
+static int np_regression_categorical_profile_fit_body(
+  const NPRegressionCategoricalProfileFitCall *call,
+  NPCategoricalProfileOwner *owner)
+{
+  int * const kernel_c = call->kernel_c;
+  int * const kernel_u = call->kernel_u;
+  int * const kernel_o = call->kernel_o;
+  const int lp_engine = call->lp_engine;
+  const int BANDWIDTH_reg = call->bandwidth_mode;
+  const int num_obs_train = call->num_obs_train;
+  const int num_obs_eval = call->num_obs_eval;
+  const int num_reg_unordered = call->num_reg_unordered;
+  const int num_reg_ordered = call->num_reg_ordered;
+  const int num_reg_continuous = call->num_reg_continuous;
+  double ** const matrix_X_unordered_train =
+    call->matrix_X_unordered_train;
+  double ** const matrix_X_ordered_train = call->matrix_X_ordered_train;
+  double ** const matrix_X_unordered_eval = call->matrix_X_unordered_eval;
+  double ** const matrix_X_ordered_eval = call->matrix_X_ordered_eval;
+  double * const vector_Y = call->vector_Y;
+  double * const vector_scale_factor = call->vector_scale_factor;
+  double * const lambda = call->lambda;
+  int * const num_categories = call->num_categories;
+  int * const operator = call->operator;
+  double ** const matrix_categorical_vals = call->matrix_categorical_vals;
+  double * const mean = call->mean;
+  double * const mean_stderr = call->mean_stderr;
 
   int i, j, g, status;
   int *train_prof_id = NULL, *train_prof_rep = NULL;
@@ -2007,6 +2212,8 @@ double *mean_stderr){
                                       &train_prof_rep,
                                       &nprof_train))
     return 0;
+  np_categorical_profile_owner_take_index(owner, train_prof_id);
+  np_categorical_profile_owner_take_index(owner, train_prof_rep);
 
   if(!np_build_discrete_profile_index(num_obs_eval,
                                       num_reg_unordered,
@@ -2017,6 +2224,8 @@ double *mean_stderr){
                                       &eval_prof_rep,
                                       &nprof_eval))
     goto cleanup;
+  np_categorical_profile_owner_take_index(owner, eval_prof_id);
+  np_categorical_profile_owner_take_index(owner, eval_prof_rep);
 
   if((nprof_train <= 0) || (nprof_eval <= 0) ||
      (4*nprof_train > 3*num_obs_train) ||
@@ -2024,15 +2233,25 @@ double *mean_stderr){
     goto cleanup;
 
   profile_unordered_train = alloc_tmatd(nprof_train, num_reg_unordered);
+  np_categorical_profile_owner_take_matrix(owner, profile_unordered_train);
   profile_ordered_train = alloc_tmatd(nprof_train, num_reg_ordered);
+  np_categorical_profile_owner_take_matrix(owner, profile_ordered_train);
   profile_unordered_eval = alloc_tmatd(nprof_eval, num_reg_unordered);
+  np_categorical_profile_owner_take_matrix(owner, profile_unordered_eval);
   profile_ordered_eval = alloc_tmatd(nprof_eval, num_reg_ordered);
+  np_categorical_profile_owner_take_matrix(owner, profile_ordered_eval);
   counts = alloc_vecd(nprof_train);
+  np_categorical_profile_owner_take_vector(owner, counts);
   sums = alloc_vecd(nprof_train);
+  np_categorical_profile_owner_take_vector(owner, sums);
   sums2 = alloc_vecd(nprof_train);
+  np_categorical_profile_owner_take_vector(owner, sums2);
   weighted_sum = alloc_vecd(3*nprof_eval);
+  np_categorical_profile_owner_take_vector(owner, weighted_sum);
   profile_mean = alloc_vecd(nprof_eval);
+  np_categorical_profile_owner_take_vector(owner, profile_mean);
   profile_stderr = alloc_vecd(nprof_eval);
+  np_categorical_profile_owner_take_vector(owner, profile_stderr);
 
   if(((num_reg_unordered > 0) &&
       (profile_unordered_train == NULL || profile_unordered_eval == NULL)) ||
@@ -2152,29 +2371,27 @@ double *mean_stderr){
   ok = 1;
 
 cleanup:
-  if(train_prof_id != NULL) free(train_prof_id);
-  if(train_prof_rep != NULL) free(train_prof_rep);
-  if(eval_prof_id != NULL) free(eval_prof_id);
-  if(eval_prof_rep != NULL) free(eval_prof_rep);
-  if(profile_unordered_train != NULL) free_tmat(profile_unordered_train);
-  if(profile_ordered_train != NULL) free_tmat(profile_ordered_train);
-  if(profile_unordered_eval != NULL) free_tmat(profile_unordered_eval);
-  if(profile_ordered_eval != NULL) free_tmat(profile_ordered_eval);
-  if(counts != NULL) free(counts);
-  if(sums != NULL) free(sums);
-  if(sums2 != NULL) free(sums2);
-  if(weighted_sum != NULL) free(weighted_sum);
-  if(profile_mean != NULL) free(profile_mean);
-  if(profile_stderr != NULL) free(profile_stderr);
+  np_categorical_profile_owner_clear(owner);
 
   return ok;
 }
 
-static int np_density_categorical_profile_fit(
+static SEXP np_regression_categorical_profile_fit_execute(void *data)
+{
+  NPRegressionCategoricalProfileFitExecution * const execution =
+    (NPRegressionCategoricalProfileFitExecution *)data;
+
+  execution->status = np_regression_categorical_profile_fit_body(
+    execution->call, &execution->owner);
+  return R_NilValue;
+}
+
+static int np_regression_categorical_profile_fit(
 int *kernel_c,
 int *kernel_u,
 int *kernel_o,
-const int BANDWIDTH_den,
+const int lp_engine,
+const int BANDWIDTH_reg,
 const int num_obs_train,
 const int num_obs_eval,
 const int num_reg_unordered,
@@ -2184,14 +2401,106 @@ double **matrix_X_unordered_train,
 double **matrix_X_ordered_train,
 double **matrix_X_unordered_eval,
 double **matrix_X_ordered_eval,
+double *vector_Y,
 double *vector_scale_factor,
 double *lambda,
 int *num_categories,
 int *operator,
 double **matrix_categorical_vals,
-double *pdf,
-double *pdf_stderr,
-double *log_likelihood){
+double *mean,
+double *mean_stderr)
+{
+  const NPRegressionCategoricalProfileFitCall call = {
+    .kernel_c = kernel_c,
+    .kernel_u = kernel_u,
+    .kernel_o = kernel_o,
+    .lp_engine = lp_engine,
+    .bandwidth_mode = BANDWIDTH_reg,
+    .num_obs_train = num_obs_train,
+    .num_obs_eval = num_obs_eval,
+    .num_reg_unordered = num_reg_unordered,
+    .num_reg_ordered = num_reg_ordered,
+    .num_reg_continuous = num_reg_continuous,
+    .matrix_X_unordered_train = matrix_X_unordered_train,
+    .matrix_X_ordered_train = matrix_X_ordered_train,
+    .matrix_X_unordered_eval = matrix_X_unordered_eval,
+    .matrix_X_ordered_eval = matrix_X_ordered_eval,
+    .vector_Y = vector_Y,
+    .vector_scale_factor = vector_scale_factor,
+    .lambda = lambda,
+    .num_categories = num_categories,
+    .operator = operator,
+    .matrix_categorical_vals = matrix_categorical_vals,
+    .mean = mean,
+    .mean_stderr = mean_stderr
+  };
+  NPRegressionCategoricalProfileFitExecution execution;
+
+  execution.call = &call;
+  execution.status = 0;
+  np_categorical_profile_owner_init(&execution.owner);
+  R_UnwindProtect(
+    np_regression_categorical_profile_fit_execute, &execution,
+    np_categorical_profile_owner_cleanup, &execution.owner, NULL);
+  return execution.status;
+}
+
+typedef struct {
+  int *kernel_c;
+  int *kernel_u;
+  int *kernel_o;
+  int bandwidth_mode;
+  int num_obs_train;
+  int num_obs_eval;
+  int num_reg_unordered;
+  int num_reg_ordered;
+  int num_reg_continuous;
+  double **matrix_X_unordered_train;
+  double **matrix_X_ordered_train;
+  double **matrix_X_unordered_eval;
+  double **matrix_X_ordered_eval;
+  double *vector_scale_factor;
+  double *lambda;
+  int *num_categories;
+  int *operator;
+  double **matrix_categorical_vals;
+  double *pdf;
+  double *pdf_stderr;
+  double *log_likelihood;
+} NPDensityCategoricalProfileFitCall;
+
+typedef struct {
+  const NPDensityCategoricalProfileFitCall *call;
+  NPCategoricalProfileOwner owner;
+  int status;
+} NPDensityCategoricalProfileFitExecution;
+
+static int np_density_categorical_profile_fit_body(
+  const NPDensityCategoricalProfileFitCall *call,
+  NPCategoricalProfileOwner *owner)
+{
+  int * const kernel_c = call->kernel_c;
+  int * const kernel_u = call->kernel_u;
+  int * const kernel_o = call->kernel_o;
+  const int BANDWIDTH_den = call->bandwidth_mode;
+  const int num_obs_train = call->num_obs_train;
+  const int num_obs_eval = call->num_obs_eval;
+  const int num_reg_unordered = call->num_reg_unordered;
+  const int num_reg_ordered = call->num_reg_ordered;
+  const int num_reg_continuous = call->num_reg_continuous;
+  double ** const matrix_X_unordered_train =
+    call->matrix_X_unordered_train;
+  double ** const matrix_X_ordered_train = call->matrix_X_ordered_train;
+  double ** const matrix_X_unordered_eval = call->matrix_X_unordered_eval;
+  double ** const matrix_X_ordered_eval = call->matrix_X_ordered_eval;
+  double * const vector_scale_factor = call->vector_scale_factor;
+  double * const lambda = call->lambda;
+  int * const num_categories = call->num_categories;
+  int * const operator = call->operator;
+  double ** const matrix_categorical_vals = call->matrix_categorical_vals;
+  double * const pdf = call->pdf;
+  double * const pdf_stderr = call->pdf_stderr;
+  double * const log_likelihood = call->log_likelihood;
 
   int i, j, g, status;
   int *train_prof_id = NULL, *train_prof_rep = NULL;
@@ -2237,6 +2546,8 @@ double *log_likelihood){
                                       &train_prof_rep,
                                       &nprof_train))
     return 0;
+  np_categorical_profile_owner_take_index(owner, train_prof_id);
+  np_categorical_profile_owner_take_index(owner, train_prof_rep);
 
   if(!np_build_discrete_profile_index(num_obs_eval,
                                       num_reg_unordered,
@@ -2247,6 +2558,8 @@ double *log_likelihood){
                                       &eval_prof_rep,
                                       &nprof_eval))
     goto cleanup;
+  np_categorical_profile_owner_take_index(owner, eval_prof_id);
+  np_categorical_profile_owner_take_index(owner, eval_prof_rep);
 
   if((nprof_train <= 0) || (nprof_eval <= 0) ||
      (4*nprof_train > 3*num_obs_train) ||
@@ -2254,11 +2567,17 @@ double *log_likelihood){
     goto cleanup;
 
   profile_unordered_train = alloc_tmatd(nprof_train, num_reg_unordered);
+  np_categorical_profile_owner_take_matrix(owner, profile_unordered_train);
   profile_ordered_train = alloc_tmatd(nprof_train, num_reg_ordered);
+  np_categorical_profile_owner_take_matrix(owner, profile_ordered_train);
   profile_unordered_eval = alloc_tmatd(nprof_eval, num_reg_unordered);
+  np_categorical_profile_owner_take_matrix(owner, profile_unordered_eval);
   profile_ordered_eval = alloc_tmatd(nprof_eval, num_reg_ordered);
+  np_categorical_profile_owner_take_matrix(owner, profile_ordered_eval);
   counts = alloc_vecd(nprof_train);
+  np_categorical_profile_owner_take_vector(owner, counts);
   profile_pdf_sum = alloc_vecd(nprof_eval);
+  np_categorical_profile_owner_take_vector(owner, profile_pdf_sum);
 
   if(((num_reg_unordered > 0) &&
       (profile_unordered_train == NULL || profile_unordered_eval == NULL)) ||
@@ -2361,37 +2680,123 @@ double *log_likelihood){
   ok = 1;
 
 cleanup:
-  if(train_prof_id != NULL) free(train_prof_id);
-  if(train_prof_rep != NULL) free(train_prof_rep);
-  if(eval_prof_id != NULL) free(eval_prof_id);
-  if(eval_prof_rep != NULL) free(eval_prof_rep);
-  if(profile_unordered_train != NULL) free_tmat(profile_unordered_train);
-  if(profile_ordered_train != NULL) free_tmat(profile_ordered_train);
-  if(profile_unordered_eval != NULL) free_tmat(profile_unordered_eval);
-  if(profile_ordered_eval != NULL) free_tmat(profile_ordered_eval);
-  if(counts != NULL) free(counts);
-  if(profile_pdf_sum != NULL) free(profile_pdf_sum);
+  np_categorical_profile_owner_clear(owner);
 
   return ok;
 }
 
-static int np_density_categorical_profile_cv(
+static SEXP np_density_categorical_profile_fit_execute(void *data)
+{
+  NPDensityCategoricalProfileFitExecution * const execution =
+    (NPDensityCategoricalProfileFitExecution *)data;
+
+  execution->status = np_density_categorical_profile_fit_body(
+    execution->call, &execution->owner);
+  return R_NilValue;
+}
+
+static int np_density_categorical_profile_fit(
 int *kernel_c,
 int *kernel_u,
 int *kernel_o,
-const int do_convolution_cv,
 const int BANDWIDTH_den,
-const int num_obs,
+const int num_obs_train,
+const int num_obs_eval,
 const int num_reg_unordered,
 const int num_reg_ordered,
 const int num_reg_continuous,
-double **matrix_X_unordered,
-double **matrix_X_ordered,
+double **matrix_X_unordered_train,
+double **matrix_X_ordered_train,
+double **matrix_X_unordered_eval,
+double **matrix_X_ordered_eval,
 double *vector_scale_factor,
 double *lambda,
 int *num_categories,
+int *operator,
 double **matrix_categorical_vals,
-double *cv){
+double *pdf,
+double *pdf_stderr,
+double *log_likelihood)
+{
+  const NPDensityCategoricalProfileFitCall call = {
+    .kernel_c = kernel_c,
+    .kernel_u = kernel_u,
+    .kernel_o = kernel_o,
+    .bandwidth_mode = BANDWIDTH_den,
+    .num_obs_train = num_obs_train,
+    .num_obs_eval = num_obs_eval,
+    .num_reg_unordered = num_reg_unordered,
+    .num_reg_ordered = num_reg_ordered,
+    .num_reg_continuous = num_reg_continuous,
+    .matrix_X_unordered_train = matrix_X_unordered_train,
+    .matrix_X_ordered_train = matrix_X_ordered_train,
+    .matrix_X_unordered_eval = matrix_X_unordered_eval,
+    .matrix_X_ordered_eval = matrix_X_ordered_eval,
+    .vector_scale_factor = vector_scale_factor,
+    .lambda = lambda,
+    .num_categories = num_categories,
+    .operator = operator,
+    .matrix_categorical_vals = matrix_categorical_vals,
+    .pdf = pdf,
+    .pdf_stderr = pdf_stderr,
+    .log_likelihood = log_likelihood
+  };
+  NPDensityCategoricalProfileFitExecution execution;
+
+  execution.call = &call;
+  execution.status = 0;
+  np_categorical_profile_owner_init(&execution.owner);
+  R_UnwindProtect(
+    np_density_categorical_profile_fit_execute, &execution,
+    np_categorical_profile_owner_cleanup, &execution.owner, NULL);
+  return execution.status;
+}
+
+typedef struct {
+  int *kernel_c;
+  int *kernel_u;
+  int *kernel_o;
+  int do_convolution_cv;
+  int bandwidth_mode;
+  int num_obs;
+  int num_reg_unordered;
+  int num_reg_ordered;
+  int num_reg_continuous;
+  double **matrix_X_unordered;
+  double **matrix_X_ordered;
+  double *vector_scale_factor;
+  double *lambda;
+  int *num_categories;
+  double **matrix_categorical_vals;
+  double *cv;
+} NPDensityCategoricalProfileCvCall;
+
+typedef struct {
+  const NPDensityCategoricalProfileCvCall *call;
+  NPCategoricalProfileOwner owner;
+  int status;
+} NPDensityCategoricalProfileCvExecution;
+
+static int np_density_categorical_profile_cv_body(
+  const NPDensityCategoricalProfileCvCall *call,
+  NPCategoricalProfileOwner *owner)
+{
+  int * const kernel_c = call->kernel_c;
+  int * const kernel_u = call->kernel_u;
+  int * const kernel_o = call->kernel_o;
+  const int do_convolution_cv = call->do_convolution_cv;
+  const int BANDWIDTH_den = call->bandwidth_mode;
+  const int num_obs = call->num_obs;
+  const int num_reg_unordered = call->num_reg_unordered;
+  const int num_reg_ordered = call->num_reg_ordered;
+  const int num_reg_continuous = call->num_reg_continuous;
+  double ** const matrix_X_unordered = call->matrix_X_unordered;
+  double ** const matrix_X_ordered = call->matrix_X_ordered;
+  double * const vector_scale_factor = call->vector_scale_factor;
+  double * const lambda = call->lambda;
+  int * const num_categories = call->num_categories;
+  double ** const matrix_categorical_vals = call->matrix_categorical_vals;
+  double * const cv = call->cv;
 
   int i, j, g, status;
   int *prof_id = NULL, *prof_rep = NULL;
@@ -2419,17 +2824,25 @@ double *cv){
                                       &prof_rep,
                                       &nprof))
     return 0;
+  np_categorical_profile_owner_take_index(owner, prof_id);
+  np_categorical_profile_owner_take_index(owner, prof_rep);
 
   if((nprof <= 0) || (4*nprof > 3*num_obs))
     goto cleanup;
 
   operator = (int *)malloc(sizeof(int)*(num_reg_unordered + num_reg_ordered));
+  np_categorical_profile_owner_take_index(owner, operator);
   profile_unordered = alloc_tmatd(nprof, num_reg_unordered);
+  np_categorical_profile_owner_take_matrix(owner, profile_unordered);
   profile_ordered = alloc_tmatd(nprof, num_reg_ordered);
+  np_categorical_profile_owner_take_matrix(owner, profile_ordered);
   counts = alloc_vecd(nprof);
+  np_categorical_profile_owner_take_vector(owner, counts);
   weighted_sum = alloc_vecd(nprof);
+  np_categorical_profile_owner_take_vector(owner, weighted_sum);
   if(do_convolution_cv)
     weighted_conv = alloc_vecd(nprof);
+  np_categorical_profile_owner_take_vector(owner, weighted_conv);
 
   if(operator == NULL ||
      ((num_reg_unordered > 0) && profile_unordered == NULL) ||
@@ -2615,16 +3028,66 @@ double *cv){
   ok = R_FINITE(*cv);
 
 cleanup:
-  if(prof_id != NULL) free(prof_id);
-  if(prof_rep != NULL) free(prof_rep);
-  if(operator != NULL) free(operator);
-  if(profile_unordered != NULL) free_tmat(profile_unordered);
-  if(profile_ordered != NULL) free_tmat(profile_ordered);
-  if(counts != NULL) free(counts);
-  if(weighted_sum != NULL) free(weighted_sum);
-  if(weighted_conv != NULL) free(weighted_conv);
+  np_categorical_profile_owner_clear(owner);
 
   return ok;
+}
+
+static SEXP np_density_categorical_profile_cv_execute(void *data)
+{
+  NPDensityCategoricalProfileCvExecution * const execution =
+    (NPDensityCategoricalProfileCvExecution *)data;
+
+  execution->status = np_density_categorical_profile_cv_body(
+    execution->call, &execution->owner);
+  return R_NilValue;
+}
+
+static int np_density_categorical_profile_cv(
+int *kernel_c,
+int *kernel_u,
+int *kernel_o,
+const int do_convolution_cv,
+const int BANDWIDTH_den,
+const int num_obs,
+const int num_reg_unordered,
+const int num_reg_ordered,
+const int num_reg_continuous,
+double **matrix_X_unordered,
+double **matrix_X_ordered,
+double *vector_scale_factor,
+double *lambda,
+int *num_categories,
+double **matrix_categorical_vals,
+double *cv)
+{
+  const NPDensityCategoricalProfileCvCall call = {
+    .kernel_c = kernel_c,
+    .kernel_u = kernel_u,
+    .kernel_o = kernel_o,
+    .do_convolution_cv = do_convolution_cv,
+    .bandwidth_mode = BANDWIDTH_den,
+    .num_obs = num_obs,
+    .num_reg_unordered = num_reg_unordered,
+    .num_reg_ordered = num_reg_ordered,
+    .num_reg_continuous = num_reg_continuous,
+    .matrix_X_unordered = matrix_X_unordered,
+    .matrix_X_ordered = matrix_X_ordered,
+    .vector_scale_factor = vector_scale_factor,
+    .lambda = lambda,
+    .num_categories = num_categories,
+    .matrix_categorical_vals = matrix_categorical_vals,
+    .cv = cv
+  };
+  NPDensityCategoricalProfileCvExecution execution;
+
+  execution.call = &call;
+  execution.status = 0;
+  np_categorical_profile_owner_init(&execution.owner);
+  R_UnwindProtect(
+    np_density_categorical_profile_cv_execute, &execution,
+    np_categorical_profile_owner_cleanup, &execution.owner, NULL);
+  return execution.status;
 }
 
 static inline uint64_t np_mix_u64(uint64_t x){
@@ -39032,38 +39495,84 @@ cleanup_cvml_return:
 
 }
 
-static int np_conditional_categorical_profile_fit(
-int *kernel_uXY,
-int *kernel_oXY,
-int *kernel_uX,
-int *kernel_oX,
-int BANDWIDTH_den,
-int num_obs_train,
-int num_obs_eval,
-int num_Y_unordered,
-int num_Y_ordered,
-int num_Y_continuous,
-int num_X_unordered,
-int num_X_ordered,
-int num_X_continuous,
-double **matrix_XY_unordered_train,
-double **matrix_XY_ordered_train,
-double **matrix_XY_unordered_eval,
-double **matrix_XY_ordered_eval,
-double *vsf_XY,
-double *vsf_X,
-int *num_categories,
-int *num_categories_XY,
-double **matrix_categorical_vals,
-double **matrix_categorical_vals_XY,
-int *operator_XY,
-int *operator_X,
-int yop,
-double K_INT_KERNEL_P,
-int int_tree_profile,
-double *kdf,
-double *kdf_stderr,
-double *log_likelihood){
+typedef struct {
+  int *kernel_uXY;
+  int *kernel_oXY;
+  int *kernel_uX;
+  int *kernel_oX;
+  int bandwidth_mode;
+  int num_obs_train;
+  int num_obs_eval;
+  int num_Y_unordered;
+  int num_Y_ordered;
+  int num_Y_continuous;
+  int num_X_unordered;
+  int num_X_ordered;
+  int num_X_continuous;
+  double **matrix_XY_unordered_train;
+  double **matrix_XY_ordered_train;
+  double **matrix_XY_unordered_eval;
+  double **matrix_XY_ordered_eval;
+  double *vsf_XY;
+  double *vsf_X;
+  int *num_categories;
+  int *num_categories_XY;
+  double **matrix_categorical_vals;
+  double **matrix_categorical_vals_XY;
+  int *operator_XY;
+  int *operator_X;
+  int yop;
+  double kernel_squared_integral;
+  int tree_profile;
+  double *kdf;
+  double *kdf_stderr;
+  double *log_likelihood;
+} NPConditionalCategoricalProfileFitCall;
+
+typedef struct {
+  const NPConditionalCategoricalProfileFitCall *call;
+  NPCategoricalProfileOwner owner;
+  int status;
+} NPConditionalCategoricalProfileFitExecution;
+
+static int np_conditional_categorical_profile_fit_body(
+  const NPConditionalCategoricalProfileFitCall *call,
+  NPCategoricalProfileOwner *owner)
+{
+  int * const kernel_uXY = call->kernel_uXY;
+  int * const kernel_oXY = call->kernel_oXY;
+  int * const kernel_uX = call->kernel_uX;
+  int * const kernel_oX = call->kernel_oX;
+  const int BANDWIDTH_den = call->bandwidth_mode;
+  const int num_obs_train = call->num_obs_train;
+  const int num_obs_eval = call->num_obs_eval;
+  const int num_Y_unordered = call->num_Y_unordered;
+  const int num_Y_ordered = call->num_Y_ordered;
+  const int num_Y_continuous = call->num_Y_continuous;
+  const int num_X_unordered = call->num_X_unordered;
+  const int num_X_ordered = call->num_X_ordered;
+  const int num_X_continuous = call->num_X_continuous;
+  double ** const matrix_XY_unordered_train =
+    call->matrix_XY_unordered_train;
+  double ** const matrix_XY_ordered_train =
+    call->matrix_XY_ordered_train;
+  double ** const matrix_XY_unordered_eval = call->matrix_XY_unordered_eval;
+  double ** const matrix_XY_ordered_eval = call->matrix_XY_ordered_eval;
+  double * const vsf_XY = call->vsf_XY;
+  double * const vsf_X = call->vsf_X;
+  int * const num_categories = call->num_categories;
+  int * const num_categories_XY = call->num_categories_XY;
+  double ** const matrix_categorical_vals = call->matrix_categorical_vals;
+  double ** const matrix_categorical_vals_XY =
+    call->matrix_categorical_vals_XY;
+  int * const operator_XY = call->operator_XY;
+  int * const operator_X = call->operator_X;
+  const int yop = call->yop;
+  const double K_INT_KERNEL_P = call->kernel_squared_integral;
+  const int int_tree_profile = call->tree_profile;
+  double * const kdf = call->kdf;
+  double * const kdf_stderr = call->kdf_stderr;
+  double * const log_likelihood = call->log_likelihood;
 
   const int num_uXY = num_X_unordered + num_Y_unordered;
   const int num_oXY = num_X_ordered + num_Y_ordered;
@@ -39107,6 +39616,8 @@ double *log_likelihood){
                                       &train_xy_rep,
                                       &nprof_train_xy))
     return 0;
+  np_categorical_profile_owner_take_index(owner, train_xy_id);
+  np_categorical_profile_owner_take_index(owner, train_xy_rep);
 
   if(!np_build_discrete_profile_index(num_obs_eval,
                                       num_uXY,
@@ -39117,6 +39628,8 @@ double *log_likelihood){
                                       &eval_xy_rep,
                                       &nprof_eval_xy))
     goto cleanup;
+  np_categorical_profile_owner_take_index(owner, eval_xy_id);
+  np_categorical_profile_owner_take_index(owner, eval_xy_rep);
 
   if(!np_build_discrete_profile_index(num_obs_train,
                                       num_X_unordered,
@@ -39127,6 +39640,8 @@ double *log_likelihood){
                                       &train_x_rep,
                                       &nprof_train_x))
     goto cleanup;
+  np_categorical_profile_owner_take_index(owner, train_x_id);
+  np_categorical_profile_owner_take_index(owner, train_x_rep);
 
   if(!np_build_discrete_profile_index(num_obs_eval,
                                       num_X_unordered,
@@ -39137,6 +39652,8 @@ double *log_likelihood){
                                       &eval_x_rep,
                                       &nprof_eval_x))
     goto cleanup;
+  np_categorical_profile_owner_take_index(owner, eval_x_id);
+  np_categorical_profile_owner_take_index(owner, eval_x_rep);
 
   if((nprof_train_xy <= 0) || (nprof_eval_xy <= 0) ||
      (nprof_train_x <= 0) || (nprof_eval_x <= 0) ||
@@ -39147,17 +39664,29 @@ double *log_likelihood){
     goto cleanup;
 
   profile_xy_uno_train = alloc_tmatd(nprof_train_xy, num_uXY);
+  np_categorical_profile_owner_take_matrix(owner, profile_xy_uno_train);
   profile_xy_ord_train = alloc_tmatd(nprof_train_xy, num_oXY);
+  np_categorical_profile_owner_take_matrix(owner, profile_xy_ord_train);
   profile_xy_uno_eval = alloc_tmatd(nprof_eval_xy, num_uXY);
+  np_categorical_profile_owner_take_matrix(owner, profile_xy_uno_eval);
   profile_xy_ord_eval = alloc_tmatd(nprof_eval_xy, num_oXY);
+  np_categorical_profile_owner_take_matrix(owner, profile_xy_ord_eval);
   profile_x_uno_train = alloc_tmatd(nprof_train_x, num_X_unordered);
+  np_categorical_profile_owner_take_matrix(owner, profile_x_uno_train);
   profile_x_ord_train = alloc_tmatd(nprof_train_x, num_X_ordered);
+  np_categorical_profile_owner_take_matrix(owner, profile_x_ord_train);
   profile_x_uno_eval = alloc_tmatd(nprof_eval_x, num_X_unordered);
+  np_categorical_profile_owner_take_matrix(owner, profile_x_uno_eval);
   profile_x_ord_eval = alloc_tmatd(nprof_eval_x, num_X_ordered);
+  np_categorical_profile_owner_take_matrix(owner, profile_x_ord_eval);
   counts_xy = alloc_vecd(nprof_train_xy);
+  np_categorical_profile_owner_take_vector(owner, counts_xy);
   counts_x = alloc_vecd(nprof_train_x);
+  np_categorical_profile_owner_take_vector(owner, counts_x);
   profile_num = alloc_vecd(nprof_eval_xy);
+  np_categorical_profile_owner_take_vector(owner, profile_num);
   profile_den = alloc_vecd(nprof_eval_x);
+  np_categorical_profile_owner_take_vector(owner, profile_den);
 
   if(((num_uXY > 0) &&
       (profile_xy_uno_train == NULL || profile_xy_uno_eval == NULL)) ||
@@ -39335,28 +39864,96 @@ double *log_likelihood){
   ok = 1;
 
 cleanup:
-  if(train_xy_id != NULL) free(train_xy_id);
-  if(train_xy_rep != NULL) free(train_xy_rep);
-  if(eval_xy_id != NULL) free(eval_xy_id);
-  if(eval_xy_rep != NULL) free(eval_xy_rep);
-  if(train_x_id != NULL) free(train_x_id);
-  if(train_x_rep != NULL) free(train_x_rep);
-  if(eval_x_id != NULL) free(eval_x_id);
-  if(eval_x_rep != NULL) free(eval_x_rep);
-  if(profile_xy_uno_train != NULL) free_tmat(profile_xy_uno_train);
-  if(profile_xy_ord_train != NULL) free_tmat(profile_xy_ord_train);
-  if(profile_xy_uno_eval != NULL) free_tmat(profile_xy_uno_eval);
-  if(profile_xy_ord_eval != NULL) free_tmat(profile_xy_ord_eval);
-  if(profile_x_uno_train != NULL) free_tmat(profile_x_uno_train);
-  if(profile_x_ord_train != NULL) free_tmat(profile_x_ord_train);
-  if(profile_x_uno_eval != NULL) free_tmat(profile_x_uno_eval);
-  if(profile_x_ord_eval != NULL) free_tmat(profile_x_ord_eval);
-  if(counts_xy != NULL) free(counts_xy);
-  if(counts_x != NULL) free(counts_x);
-  if(profile_num != NULL) free(profile_num);
-  if(profile_den != NULL) free(profile_den);
+  np_categorical_profile_owner_clear(owner);
 
   return ok;
+}
+
+static SEXP np_conditional_categorical_profile_fit_execute(void *data)
+{
+  NPConditionalCategoricalProfileFitExecution * const execution =
+    (NPConditionalCategoricalProfileFitExecution *)data;
+
+  execution->status = np_conditional_categorical_profile_fit_body(
+    execution->call, &execution->owner);
+  return R_NilValue;
+}
+
+static int np_conditional_categorical_profile_fit(
+int *kernel_uXY,
+int *kernel_oXY,
+int *kernel_uX,
+int *kernel_oX,
+int BANDWIDTH_den,
+int num_obs_train,
+int num_obs_eval,
+int num_Y_unordered,
+int num_Y_ordered,
+int num_Y_continuous,
+int num_X_unordered,
+int num_X_ordered,
+int num_X_continuous,
+double **matrix_XY_unordered_train,
+double **matrix_XY_ordered_train,
+double **matrix_XY_unordered_eval,
+double **matrix_XY_ordered_eval,
+double *vsf_XY,
+double *vsf_X,
+int *num_categories,
+int *num_categories_XY,
+double **matrix_categorical_vals,
+double **matrix_categorical_vals_XY,
+int *operator_XY,
+int *operator_X,
+int yop,
+double K_INT_KERNEL_P,
+int int_tree_profile,
+double *kdf,
+double *kdf_stderr,
+double *log_likelihood)
+{
+  const NPConditionalCategoricalProfileFitCall call = {
+    .kernel_uXY = kernel_uXY,
+    .kernel_oXY = kernel_oXY,
+    .kernel_uX = kernel_uX,
+    .kernel_oX = kernel_oX,
+    .bandwidth_mode = BANDWIDTH_den,
+    .num_obs_train = num_obs_train,
+    .num_obs_eval = num_obs_eval,
+    .num_Y_unordered = num_Y_unordered,
+    .num_Y_ordered = num_Y_ordered,
+    .num_Y_continuous = num_Y_continuous,
+    .num_X_unordered = num_X_unordered,
+    .num_X_ordered = num_X_ordered,
+    .num_X_continuous = num_X_continuous,
+    .matrix_XY_unordered_train = matrix_XY_unordered_train,
+    .matrix_XY_ordered_train = matrix_XY_ordered_train,
+    .matrix_XY_unordered_eval = matrix_XY_unordered_eval,
+    .matrix_XY_ordered_eval = matrix_XY_ordered_eval,
+    .vsf_XY = vsf_XY,
+    .vsf_X = vsf_X,
+    .num_categories = num_categories,
+    .num_categories_XY = num_categories_XY,
+    .matrix_categorical_vals = matrix_categorical_vals,
+    .matrix_categorical_vals_XY = matrix_categorical_vals_XY,
+    .operator_XY = operator_XY,
+    .operator_X = operator_X,
+    .yop = yop,
+    .kernel_squared_integral = K_INT_KERNEL_P,
+    .tree_profile = int_tree_profile,
+    .kdf = kdf,
+    .kdf_stderr = kdf_stderr,
+    .log_likelihood = log_likelihood
+  };
+  NPConditionalCategoricalProfileFitExecution execution;
+
+  execution.call = &call;
+  execution.status = 0;
+  np_categorical_profile_owner_init(&execution.owner);
+  R_UnwindProtect(
+    np_conditional_categorical_profile_fit_execute, &execution,
+    np_categorical_profile_owner_cleanup, &execution.owner, NULL);
+  return execution.status;
 }
 
 void np_kernel_estimate_con_dens_dist_categorical(
