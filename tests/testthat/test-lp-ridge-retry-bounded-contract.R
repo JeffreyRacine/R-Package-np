@@ -66,35 +66,12 @@ test_that("all canonical LP solve retries are bounded", {
   expect_gt(retry.count, 0L)
   expect_equal(finite.guard.count, retry.count)
   expect_equal(step.guard.count, retry.count)
-  expect_equal(
-    lengths(regmatches(
-      jksum,
-      gregexpr(
-        "estimation_shortcut_done = -1",
-        jksum,
-        fixed = TRUE
-      )
-    )),
-    2L
-  )
-  expect_true(grepl("cleanup_glp_fit:", jksum, fixed = TRUE))
   expect_true(grepl(
-    'if(estimation_shortcut_done < 0)',
+    "execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_SOLVE;",
     jksum,
     fixed = TRUE
   ))
-  expect_equal(
-    lengths(regmatches(
-      jksum,
-      gregexpr("estimation_shortcut_done = -2", jksum, fixed = TRUE)
-    )),
-    2L
-  )
-  expect_false(grepl(
-    'error("LP solve failed in glp MPI owner path after bounded ridging")',
-    jksum,
-    fixed = TRUE
-  ))
+  expect_false(grepl("cleanup_glp_fit:", jksum, fixed = TRUE))
   expect_true(grepl(
     "#define NP_LP_SOLVE_MAX_RIDGE_STEPS 128",
     solve.h,
@@ -201,18 +178,18 @@ test_that("compiled LP hat path rejects a non-finite system promptly", {
   )
 })
 
-test_that("MPI LP owner failures remain collective and rank-symmetric", {
+test_that("MPI LP owner failures remain collective and fully owned", {
   jksum.file <- locate_lp_retry_source("jksum.c")
   skip_if(is.null(jksum.file), "source file src/jksum.c unavailable")
   source <- paste(readLines(jksum.file, warn = FALSE), collapse = "\n")
 
   expect_true(grepl(
-    "owner_chunk.sendbuf[0] = NAN;",
+    "owner->mpi_owner_chunk.sendbuf[0] = NAN;",
     source,
     fixed = TRUE
   ))
   expect_true(grepl(
-    "np_reg_mpi_owner_chunk_allgather(&owner_chunk);",
+    "np_reg_mpi_owner_chunk_allgather(&owner->mpi_owner_chunk);",
     source,
     fixed = TRUE
   ))
@@ -221,21 +198,15 @@ test_that("MPI LP owner failures remain collective and rank-symmetric", {
     source,
     fixed = TRUE
   ))
-  free.pos <- regexpr("np_reg_mpi_owner_chunk_free(&owner_chunk);",
+  free.pos <- regexpr(
+    "np_reg_mpi_owner_chunk_free(&owner->mpi_owner_chunk);",
                       source, fixed = TRUE)
-  deferred.pos <- regexpr(
-    "estimation_shortcut_done = -2;",
+  status.pos <- max(gregexpr(
+    "execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_ROUTE;",
     source,
     fixed = TRUE
-  )
-  cleanup.pos <- regexpr("cleanup_glp_fit:", source, fixed = TRUE)
-  message.pos <- regexpr(
-    "\"LP solve failed in glp MPI owner path after bounded ridging\"",
-    source,
-    fixed = TRUE
-  )
+  )[[1L]])
   expect_gt(free.pos, 0L)
-  expect_gt(deferred.pos, free.pos)
-  expect_gt(cleanup.pos, deferred.pos)
-  expect_gt(message.pos, cleanup.pos)
+  expect_gt(status.pos, free.pos)
+  expect_true(grepl("return R_NilValue;", source, fixed = TRUE))
 })

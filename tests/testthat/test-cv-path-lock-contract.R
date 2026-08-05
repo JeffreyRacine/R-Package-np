@@ -326,32 +326,32 @@ test_that("canonical LP fit and evaluation avoid legacy solve marshalling", {
   expect_false(grepl("MATRIX XtX", shortcut_body, fixed = TRUE))
 
   helper_start <- grep(
-    "^  } else if\\(lp_engine_est == NP_LP_ENGINE_GENERAL\\) \\{ // local polynomial \\(regtype = \"lp\"\\)$",
+    "^static SEXP np_regression_general_lp_fit_execute\\(void \\*data\\)$",
     lines
   )
-  helper_stop <- grep("^finish_regression_estimation:$", lines)
+  helper_stop <- grep("^static int np_regression_general_lp_fit\\($", lines)
   expect_length(helper_start, 1L)
   expect_length(helper_stop, 1L)
   expect_lt(helper_start, helper_stop)
 
   helper_body <- paste(lines[helper_start:(helper_stop - 1L)], collapse = "\n")
   expect_true(grepl(
-    "np_lp_solve_workspace_reserve(&solve_workspace,",
+    "np_lp_solve_workspace_reserve(&owner->solve_workspace,",
     helper_body,
     fixed = TRUE
   ))
   expect_true(grepl(
-    "mean[j] += eval_basis[i]*beta[i];",
+    "call->mean[j] += owner->eval_basis[i]*owner->coefficient[i];",
     helper_body,
     fixed = TRUE
   ))
   expect_true(grepl(
-    "gradient[l][j] += eval_deriv[i]*beta[i];",
+    "call->gradient[l][j] +=\n            owner->eval_derivative[i]*owner->coefficient[i];",
     helper_body,
     fixed = TRUE
   ))
   expect_true(grepl(
-    "solve_workspace.rhs_work[i+ii*glp_nterms]*eval_basis[ii]",
+    "owner->solve_workspace.rhs_work[\n            i+ii*owner->nterms]*owner->eval_basis[ii]",
     helper_body,
     fixed = TRUE
   ))
