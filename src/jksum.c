@@ -9180,6 +9180,7 @@ typedef struct {
   double *vector_bandwidth;
   double **matrix_bandwidth_eval;
   double **matrix_bandwidth_train;
+  double **owned_bandwidth_tmatrix;
   double **matrix_Y;
   double **matrix_W;
   int ncol_Y;
@@ -9211,6 +9212,8 @@ typedef struct {
   double *derivative_factor_log_absolute;
   signed char *derivative_factor_sign;
   double *route_row;
+  /* Optional alloc_tmatd allocation transferred by a route caller. */
+  double **owned_bandwidth_tmatrix;
 } NPBetaAbsoluteRouteOwner;
 
 typedef struct {
@@ -9234,6 +9237,7 @@ static void np_beta_absolute_route_owner_init(
   owner->derivative_factor_log_absolute = NULL;
   owner->derivative_factor_sign = NULL;
   owner->route_row = NULL;
+  owner->owned_bandwidth_tmatrix = NULL;
 }
 
 static void np_beta_absolute_route_owner_cleanup(
@@ -9254,6 +9258,7 @@ static void np_beta_absolute_route_owner_cleanup(
   free(owner->derivative_factor_log_absolute);
   free(owner->derivative_factor_sign);
   free(owner->route_row);
+  free_tmat(owner->owned_bandwidth_tmatrix);
   if(!jump)
     np_continuous_kernel_beta_prepared_context_release(
       &owner->beta_prepared);
@@ -9802,6 +9807,8 @@ static int np_beta_absolute_route(const NPBetaAbsoluteRouteCall *call)
   execution.status = KWSNP_ERR_BADINVOC;
   np_beta_absolute_route_owner_init(&execution.owner);
   execution.owner.route_row = call->row;
+  execution.owner.owned_bandwidth_tmatrix =
+    call->owned_bandwidth_tmatrix;
   R_UnwindProtect(
     np_beta_absolute_route_execute, &execution,
     np_beta_absolute_route_owner_cleanup, &execution.owner, NULL);
@@ -21151,6 +21158,7 @@ static NP_NOINLINE void np_beta_scalar_regression_fit_canonical(
         NULL : matrix_bandwidth,
       .matrix_bandwidth_train = BANDWIDTH_reg == BW_FIXED ?
         NULL : matrix_bandwidth,
+      .owned_bandwidth_tmatrix = matrix_bandwidth,
       .matrix_Y = NULL,
       .matrix_W = NULL,
       .ncol_Y = 0,
@@ -21173,7 +21181,6 @@ static NP_NOINLINE void np_beta_scalar_regression_fit_canonical(
 
     route_status = np_beta_absolute_route(&route_call);
   }
-  free_tmat(matrix_bandwidth);
 
   if(route_status != 0) {
     if(kernel_route_diagnostics->beta_status != NP_BETA_OK)
