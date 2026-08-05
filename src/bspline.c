@@ -220,35 +220,6 @@ gsl_bspline_deriv_alloc (const size_t k)
 	return NULL;
 }				/* gsl_bspline_deriv_alloc() */
 
-/* Return number of coefficients */
-size_t
-gsl_bspline_ncoeffs (gsl_bspline_workspace * w)
-{
-  return w->n;
-}
-
-/* Return order */
-size_t
-gsl_bspline_order (gsl_bspline_workspace * w)
-{
-  return w->k;
-}
-
-/* Return number of breakpoints */
-size_t
-gsl_bspline_nbreak (gsl_bspline_workspace * w)
-{
-  return w->nbreak;
-}
-
-/* Return the location of the i-th breakpoint*/
-double
-gsl_bspline_breakpoint (size_t i, gsl_bspline_workspace * w)
-{
-  size_t j = i + w->k - 1;
-  return gsl_vector_get (w->knots, j);
-}
-
 /*
 gsl_bspline_free()
   Free a gsl_bspline_workspace.

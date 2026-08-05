@@ -1,5 +1,11 @@
 # np 0.70-6
 
+* Removed the private, unexported package-local `gsl.bs` bridge and its
+  registered native wrappers. Public spline construction remains owned by
+  `crs::gsl.bs()`; the independent B-spline primitives used by the canonical
+  Bernstein local-polynomial engine remain in place, with estimator arithmetic
+  unchanged.
+
 * The canonical beta row engine now owns its malloc-backed route, categorical,
   derivative, and row workspaces behind one unwind-protected cleanup boundary.
   Nested derivative helpers borrow that invocation-scoped scratch rather than

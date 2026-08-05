@@ -374,6 +374,3 @@ S3method(npscoef, default)
 S3method(npscoef, call)
 S3method(npscoef, formula)
 S3method(npscoef, scbandwidth)
-
-S3method(gsl.bs, default)
-S3method(predict, np_gsl.bs)

@@ -122,6 +122,58 @@ test_that("unreachable native leaves and legacy wrappers cannot return", {
   expect_match(sources[["np.c"]], "SEXP C_np_regression_bw(", fixed = TRUE)
 })
 
+test_that("the private spline bridge is absent while the LP spline owner remains", {
+  root <- locate_engine_sources()
+  skip_if(is.null(root), "package sources unavailable")
+
+  expect_false(file.exists(file.path(root, "R", "gsl_bspline.R")))
+  expect_false(file.exists(file.path(root, "src", "gsl_bspline.c")))
+
+  namespace <- paste(
+    readLines(file.path(root, "NAMESPACE"), warn = FALSE),
+    collapse = "\n"
+  )
+  registration <- paste(
+    readLines(file.path(root, "src", "np_init.c"), warn = FALSE),
+    collapse = "\n"
+  )
+  spline_source <- paste(
+    readLines(file.path(root, "src", "bspline.c"), warn = FALSE),
+    collapse = "\n"
+  )
+  spline_header <- paste(
+    readLines(file.path(root, "src", "gsl_bspline.h"), warn = FALSE),
+    collapse = "\n"
+  )
+
+  for (retired in c(
+    "S3method(gsl.bs, default)",
+    "C_gsl_bspline",
+    "C_gsl_bspline_deriv"
+  )) {
+    expect_false(
+      grepl(retired, paste(namespace, registration), fixed = TRUE),
+      info = retired
+    )
+  }
+  for (retired in c(
+    "gsl_bspline_ncoeffs (",
+    "gsl_bspline_order (",
+    "gsl_bspline_nbreak (",
+    "gsl_bspline_breakpoint (",
+    "gsl_bspline_greville_abscissa("
+  )) {
+    expect_false(
+      grepl(retired, paste(spline_source, spline_header), fixed = TRUE),
+      info = retired
+    )
+  }
+  expect_match(spline_source, "gsl_bspline_alloc (", fixed = TRUE)
+  expect_match(spline_source, "gsl_bspline_eval (", fixed = TRUE)
+  expect_match(spline_source, "gsl_bspline_deriv_eval (", fixed = TRUE)
+  expect_match(spline_header, "gsl_bspline_workspace", fixed = TRUE)
+})
+
 test_that("conditional-density CVLS wrapper has no dormant second engine", {
   root <- locate_engine_sources()
   skip_if(is.null(root), "package sources unavailable")

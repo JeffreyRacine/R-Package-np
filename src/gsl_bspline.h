@@ -200,12 +200,6 @@ gsl_bspline_workspace *gsl_bspline_alloc(const size_t k, const size_t nbreak);
 
 void gsl_bspline_free(gsl_bspline_workspace *w);
 
-size_t gsl_bspline_ncoeffs(gsl_bspline_workspace * w);
-size_t gsl_bspline_order(gsl_bspline_workspace * w);
-size_t gsl_bspline_nbreak(gsl_bspline_workspace * w);
-double gsl_bspline_breakpoint(size_t i, gsl_bspline_workspace * w);
-double gsl_bspline_greville_abscissa(size_t i, gsl_bspline_workspace *w);
-
 int gsl_bspline_knots(const gsl_vector *breakpts, gsl_bspline_workspace *w);
 
 int gsl_bspline_knots_uniform(const double a, const double b,
