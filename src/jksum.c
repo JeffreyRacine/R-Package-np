@@ -961,6 +961,54 @@ static int np_jksum_mpi_count_or_die(size_t count, const char *what)
     error("%s: MPI count exceeds INT_MAX", what);
   return (int)count;
 }
+
+static int np_jksum_mpi_contiguous_row_layout(
+  const int total_rows,
+  const int row_stride,
+  const int row_width,
+  int * const recvcounts,
+  int * const displs,
+  int * const equal_counts)
+{
+  size_t plane_elements;
+  int rank;
+
+  if(total_rows < 0 || row_stride <= 0 || row_width <= 0 ||
+     iNum_Processors <= 0 || recvcounts == NULL || displs == NULL ||
+     equal_counts == NULL ||
+     !np_size_mul_checked((size_t)total_rows, (size_t)row_width,
+                          &plane_elements) ||
+     plane_elements > (size_t)INT_MAX)
+    return 0;
+
+  *equal_counts = 1;
+  for(rank = 0; rank < iNum_Processors; ++rank) {
+    size_t rank_start;
+    size_t rank_rows;
+    size_t rank_count;
+    size_t rank_displacement;
+
+    if(!np_size_mul_checked((size_t)rank, (size_t)row_stride,
+                            &rank_start))
+      return 0;
+    rank_start = MIN(rank_start, (size_t)total_rows);
+    rank_rows = MIN((size_t)row_stride,
+                    (size_t)total_rows - rank_start);
+    if(!np_size_mul_checked(rank_rows, (size_t)row_width, &rank_count) ||
+       !np_size_mul_checked(rank_start, (size_t)row_width,
+                            &rank_displacement) ||
+       rank_count > (size_t)INT_MAX ||
+       rank_displacement > (size_t)INT_MAX)
+      return 0;
+
+    recvcounts[rank] = (int)rank_count;
+    displs[rank] = (int)rank_displacement;
+    if(rank > 0 && recvcounts[rank] != recvcounts[0])
+      *equal_counts = 0;
+  }
+
+  return 1;
+}
 #endif
 
 int kernel_convolution_weighted_sum(
@@ -10898,6 +10946,7 @@ NPPermutationWeightOutput * const pkw_output){
   num_obs_eval_alloc = suppress_parallel ? num_obs_eval : num_obs_eval_padded;
 
   int * igatherv = NULL, * idisplsv = NULL;
+  int kw_equal_counts = 0;
 
   igatherv = (int *)malloc((size_t)iNum_Processors*sizeof(int));
   if(igatherv == NULL) error("memory allocation failed");
@@ -11001,28 +11050,7 @@ NPPermutationWeightOutput * const pkw_output){
   double * const * const xo = is_adaptive?
     matrix_X_ordered_train:matrix_X_ordered_eval;
 
-#ifdef MPI2
-  if((kw != NULL) && (!suppress_parallel)){
-    const int kw_rows_alloc =
-      is_adaptive ? num_obs_train_padded : num_obs_eval_alloc;
-    size_t kw_count = 0U;
-    if(!np_size_mul_checked((size_t)kw_rows_alloc,
-                            (size_t)num_xt,
-                            &kw_count)){
-      status = KWSNP_ERR_BADINVOC;
-      goto cleanup;
-    }
-    kw_work = (double *)calloc(kw_count, sizeof(double));
-    if(kw_work == NULL){
-      status = KWSNP_ERR_BADINVOC;
-      goto cleanup;
-    }
-  } else {
-    kw_work = kw;
-  }
-#else
   kw_work = kw;
-#endif
 
   if (num_obs_eval == 0) {
     status = KWSNP_ERR_NOEVAL;
@@ -12632,13 +12660,45 @@ NPPermutationWeightOutput * const pkw_output){
     }
 
     if((kw_work != NULL) && (!keep_kw_owner_local)){
-      const int kw_stride = is_adaptive ? loop_stride : stride;
-      const int kw_count =
-        np_jksum_mpi_count_or_die(np_jksum_size_mul_or_die((size_t)kw_stride,
-                                                           (size_t)num_xt,
-                                                           "kw_work MPI_Allgather"),
-                                  "kw_work MPI_Allgather");
-      MPI_Allgather(MPI_IN_PLACE, kw_count, MPI_DOUBLE, kw_work, kw_count, MPI_DOUBLE, comm[1]);
+      const int kw_owner_rows = is_adaptive ? num_obs_train : num_obs_eval;
+      const int kw_owner_stride = is_adaptive ? loop_stride : stride;
+
+      if(!np_jksum_mpi_contiguous_row_layout(
+           kw_owner_rows, kw_owner_stride, num_xt,
+           igatherv, idisplsv, &kw_equal_counts)){
+        status = KWSNP_ERR_BADINVOC;
+        goto cleanup;
+      }
+      if(kw_equal_counts){
+        MPI_Allgather(MPI_IN_PLACE, igatherv[my_rank], MPI_DOUBLE,
+                      kw_work, igatherv[0], MPI_DOUBLE, comm[1]);
+      } else {
+        MPI_Allgatherv(MPI_IN_PLACE, igatherv[my_rank], MPI_DOUBLE,
+                       kw_work, igatherv, idisplsv,
+                       MPI_DOUBLE, comm[1]);
+      }
+
+      if((p_nvar > 0) &&
+         ((BANDWIDTH_reg == BW_FIXED) || (BANDWIDTH_reg == BW_GEN_NN))){
+        for(ii = 0; ii < iNum_Processors; ii++){
+          const size_t rank_start = MIN((size_t)ii*(size_t)stride,
+                                        (size_t)num_obs_eval);
+          const size_t rank_rows = MIN((size_t)stride,
+                                       (size_t)num_obs_eval - rank_start);
+          igatherv[ii] =
+            np_jksum_mpi_count_or_die(
+              np_jksum_size_mul_or_die(
+                rank_rows, (size_t)sum_element_length,
+                "weighted_permutation_sum MPI_Allgatherv count"),
+              "weighted_permutation_sum MPI_Allgatherv count");
+          idisplsv[ii] =
+            np_jksum_mpi_count_or_die(
+              np_jksum_size_mul_or_die(
+                rank_start, (size_t)sum_element_length,
+                "weighted_permutation_sum MPI_Allgatherv displacement"),
+              "weighted_permutation_sum MPI_Allgatherv displacement");
+        }
+      }
     }
 
     if(pkw_output != NULL){
@@ -12671,13 +12731,6 @@ NPPermutationWeightOutput * const pkw_output){
     }
 #endif
   }
-
-#ifdef MPI2
-  if((kw != NULL) && (kw_work != kw)){
-    const size_t kw_copy_rows = is_adaptive ? (size_t)num_obs_train : (size_t)num_obs_eval;
-    memcpy(kw, kw_work, kw_copy_rows*(size_t)num_xt*sizeof(double));
-  }
-#endif
 
 cleanup:
 #ifdef MPI2
@@ -12756,10 +12809,6 @@ cleanup:
   if(cont_largeh_active != NULL) free(cont_largeh_active);
   if(cont_largeh_active_fixed != NULL) free(cont_largeh_active_fixed);
   if(tree_active_dims != NULL) free(tree_active_dims);
-
-#ifdef MPI2
-  if((kw_work != NULL) && (kw_work != kw)) free(kw_work);
-#endif
 
   if(no_bpso)
     free(bpso);
