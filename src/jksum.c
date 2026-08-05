@@ -24560,6 +24560,130 @@ static int np_regression_general_lp_fit(
   return execution.status;
 }
 
+/*
+ * The all-large shortcut allocates its fit workspace before Bernstein basis
+ * construction and later optional projection blocks.  Keep the established
+ * inline arithmetic untouched.  Local basis allocation returns status instead
+ * of long-jumping; one failure-only owner covers Bernstein basis construction
+ * and a progress signal when one is actually due.  Normal ownership and
+ * release order remain with the incumbent route.
+ */
+typedef struct {
+  int num_reg_continuous;
+  int *terms;
+  int nterms;
+  double **basis;
+  int basis_is_contiguous;
+  NPGLPBasisCtx *basis_context;
+  double *eval_basis;
+  double *eval_derivative;
+  double *coefficient;
+  double *eval_basis_block;
+  double *projection_block;
+  double *fitted_block;
+  NPLPFullRowWorkspace *inverse_workspace;
+} NPRegressionAllLargeLPFitOwner;
+
+typedef struct {
+  int num_reg_continuous;
+  const int *terms;
+  int nterms;
+  double **matrix_X_continuous_train;
+  int num_obs_train;
+  NPGLPBasisCtx *basis_context;
+  double **basis;
+} NPRegressionAllLargeBernsteinBasisCall;
+
+static double **np_regression_alllarge_basis_alloc(
+  const int nrows,
+  const int ncols,
+  const int contiguous)
+{
+  double **matrix = NULL;
+  size_t pointer_bytes, row_bytes;
+  int column;
+
+  if((nrows <= 0) || (ncols <= 0) ||
+     ((size_t)ncols > SIZE_MAX/sizeof(double *)) ||
+     ((size_t)nrows > SIZE_MAX/sizeof(double)))
+    return NULL;
+  pointer_bytes = (size_t)ncols*sizeof(double *);
+  row_bytes = (size_t)nrows*sizeof(double);
+  matrix = (double **)malloc(pointer_bytes);
+  if(matrix == NULL)
+    return NULL;
+
+  if(contiguous){
+    double * const storage =
+      ((size_t)ncols <= SIZE_MAX/row_bytes) ?
+      (double *)malloc((size_t)ncols*row_bytes) : NULL;
+    if(storage == NULL){
+      free(matrix);
+      return NULL;
+    }
+    matrix[0] = storage;
+    for(column = 1; column < ncols; column++)
+      matrix[column] = matrix[column - 1] + nrows;
+  } else {
+    for(column = 0; column < ncols; column++){
+      matrix[column] = (double *)malloc(row_bytes);
+      if(matrix[column] == NULL){
+        while(column > 0)
+          free(matrix[--column]);
+        free(matrix);
+        return NULL;
+      }
+    }
+  }
+  return matrix;
+}
+
+static SEXP np_regression_alllarge_bernstein_basis_execute(void *data)
+{
+  const NPRegressionAllLargeBernsteinBasisCall * const call =
+    (const NPRegressionAllLargeBernsteinBasisCall *)data;
+
+  np_glp_fill_basis_train(call->num_reg_continuous,
+                          call->terms,
+                          call->nterms,
+                          call->matrix_X_continuous_train,
+                          call->num_obs_train,
+                          call->basis_context,
+                          call->basis);
+  return R_NilValue;
+}
+
+static void np_regression_alllarge_lp_fit_cleanup(
+  void *data,
+  Rboolean jump)
+{
+  NPRegressionAllLargeLPFitOwner * const owner =
+    (NPRegressionAllLargeLPFitOwner *)data;
+  int coordinate;
+
+  if(!jump)
+    return;
+  if(owner->basis_context != NULL){
+    for(coordinate = 0; coordinate < owner->num_reg_continuous; coordinate++)
+      np_glp_basis_ctx_free(&owner->basis_context[coordinate]);
+    free(owner->basis_context);
+  }
+  free(owner->eval_basis_block);
+  free(owner->projection_block);
+  free(owner->fitted_block);
+  free(owner->eval_basis);
+  free(owner->eval_derivative);
+  free(owner->coefficient);
+  np_lp_full_row_workspace_clear(owner->inverse_workspace);
+  if(owner->basis != NULL){
+    if(owner->basis_is_contiguous)
+      free_tmat(owner->basis);
+    else
+      free_mat(owner->basis, owner->nterms);
+  }
+  free(owner->terms);
+}
+
 
 int kernel_estimate_regression_categorical_tree_np(
 int lp_engine,
@@ -25063,15 +25187,30 @@ const NPContinuousPreparedBandwidthView *prepared_bandwidth){
         int basis_is_contiguous = 0;
         int use_fit_projection_blas = 0;
         int fast_ok;
+        NPRegressionAllLargeLPFitOwner all_large_owner = {
+          .num_reg_continuous = num_reg_continuous,
+          .terms = NULL,
+          .nterms = 0,
+          .basis = NULL,
+          .basis_is_contiguous = 0,
+          .basis_context = NULL,
+          .eval_basis = NULL,
+          .eval_derivative = NULL,
+          .coefficient = NULL,
+          .eval_basis_block = NULL,
+          .projection_block = NULL,
+          .fitted_block = NULL,
+          .inverse_workspace = &inverse_workspace
+        };
 
         np_lp_full_row_workspace_init(&inverse_workspace);
+        np_refresh_mseries_accelerate_option();
         fast_ok = np_glp_build_terms(num_reg_continuous,
                                      vector_glp_degree_extern,
                                      int_glp_basis_extern,
                                      &glp_terms,
                                      &glp_nterms);
         if(fast_ok && (glp_nterms > 0)){
-          np_refresh_mseries_accelerate_option();
           basis_is_contiguous =
             (!do_grad) &&
             np_reg_alllarge_blas_profitable(num_obs_train,
@@ -25080,9 +25219,8 @@ const NPContinuousPreparedBandwidthView *prepared_bandwidth){
             np_reg_alllarge_blas_profitable(num_obs_eval,
                                             glp_nterms,
                                             num_obs_eval);
-          basis = basis_is_contiguous ?
-            alloc_tmatd(num_obs_train, glp_nterms) :
-            alloc_matd(num_obs_train, glp_nterms);
+          basis = np_regression_alllarge_basis_alloc(
+            num_obs_train, glp_nterms, basis_is_contiguous);
           fast_ok = np_lp_full_row_workspace_reserve(
             &inverse_workspace, glp_nterms, 1);
           beta = (double *)malloc((size_t)glp_nterms*sizeof(double));
@@ -25090,11 +25228,20 @@ const NPContinuousPreparedBandwidthView *prepared_bandwidth){
           if(do_grad)
             eval_deriv = (double *)malloc((size_t)glp_nterms*sizeof(double));
           if(use_bernstein)
-            basis_ctx = (NPGLPBasisCtx *)calloc((size_t)num_reg_continuous, sizeof(NPGLPBasisCtx));
+            basis_ctx = (NPGLPBasisCtx *)calloc(
+              (size_t)num_reg_continuous, sizeof(NPGLPBasisCtx));
           fast_ok = fast_ok && (basis != NULL) && (beta != NULL) &&
             (eval_basis != NULL) &&
             ((!do_grad) || (eval_deriv != NULL)) &&
             (!use_bernstein || (basis_ctx != NULL));
+          all_large_owner.terms = glp_terms;
+          all_large_owner.nterms = glp_nterms;
+          all_large_owner.basis = basis;
+          all_large_owner.basis_is_contiguous = basis_is_contiguous;
+          all_large_owner.basis_context = basis_ctx;
+          all_large_owner.eval_basis = eval_basis;
+          all_large_owner.eval_derivative = eval_deriv;
+          all_large_owner.coefficient = beta;
         } else {
           fast_ok = 0;
         }
@@ -25109,8 +25256,9 @@ const NPContinuousPreparedBandwidthView *prepared_bandwidth){
                 if(xi < xmin) xmin = xi;
                 if(xi > xmax) xmax = xi;
               }
-              if(!np_glp_basis_ctx_init(&basis_ctx[l], vector_glp_degree_extern[l], xmin, xmax,
-                                        int_glp_basis_extern == 1)){
+              if(!np_glp_basis_ctx_init(
+                  &basis_ctx[l], vector_glp_degree_extern[l], xmin, xmax,
+                  int_glp_basis_extern == 1)){
                 fast_ok = 0;
                 break;
               }
@@ -25120,13 +25268,21 @@ const NPContinuousPreparedBandwidthView *prepared_bandwidth){
 
         if(fast_ok){
           if(use_bernstein){
-            np_glp_fill_basis_train(num_reg_continuous,
-                                    glp_terms,
-                                    glp_nterms,
-                                    matrix_X_continuous_train,
-                                    num_obs_train,
-                                    basis_ctx,
-                                    basis);
+            const NPRegressionAllLargeBernsteinBasisCall basis_call = {
+              .num_reg_continuous = num_reg_continuous,
+              .terms = glp_terms,
+              .nterms = glp_nterms,
+              .matrix_X_continuous_train = matrix_X_continuous_train,
+              .num_obs_train = num_obs_train,
+              .basis_context = basis_ctx,
+              .basis = basis
+            };
+            R_UnwindProtect(
+              np_regression_alllarge_bernstein_basis_execute,
+              (void *)&basis_call,
+              np_regression_alllarge_lp_fit_cleanup,
+              (void *)&all_large_owner,
+              NULL);
           } else {
             np_glp_fill_basis_raw_train(num_reg_continuous,
                                         glp_terms,
@@ -25171,6 +25327,10 @@ const NPContinuousPreparedBandwidthView *prepared_bandwidth){
                 yhat_block = NULL;
                 eval_block_rows = 0;
                 use_fit_projection_blas = 0;
+              } else {
+                all_large_owner.eval_basis_block = eval_basis_block;
+                all_large_owner.projection_block = projection_block;
+                all_large_owner.fitted_block = yhat_block;
               }
             }
           }
@@ -25291,8 +25451,11 @@ const NPContinuousPreparedBandwidthView *prepared_bandwidth){
                       sqrt(mv) : se_default;
                   }
                   if(fit_progress_active)
-                    np_progress_fit_loop_step(i + row + 1,
-                                              fit_progress_total);
+                    np_progress_fit_loop_step_owned(
+                      i + row + 1,
+                      fit_progress_total,
+                      np_regression_alllarge_lp_fit_cleanup,
+                      (void *)&all_large_owner);
                 }
               }
             } else {
@@ -25391,7 +25554,11 @@ const NPContinuousPreparedBandwidthView *prepared_bandwidth){
                   }
                 }
                 if(fit_progress_active)
-                  np_progress_fit_loop_step(i + 1, fit_progress_total);
+                  np_progress_fit_loop_step_owned(
+                    i + 1,
+                    fit_progress_total,
+                    np_regression_alllarge_lp_fit_cleanup,
+                    (void *)&all_large_owner);
               }
             }
             estimation_shortcut_done = 1;

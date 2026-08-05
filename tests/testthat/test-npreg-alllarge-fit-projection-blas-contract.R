@@ -28,9 +28,11 @@ test_that("MPI all-large fit BLAS route is narrow and bounded", {
   expect_true(is.finite(stop))
   body <- paste(lines[start:stop], collapse = "\n")
   compact <- gsub("[[:space:]]+", " ", body)
+  source <- paste(lines, collapse = "\n")
+  source_compact <- gsub("[[:space:]]+", " ", source)
 
   expect_match(
-    paste(lines, collapse = "\n"),
+    source,
     "#define NP_REG_ALLLARGE_FIT_BLOCK_MAX_ROWS 8192",
     fixed = TRUE
   )
@@ -47,7 +49,10 @@ test_that("MPI all-large fit BLAS route is narrow and bounded", {
   )
   expect_match(
     compact,
-    "basis = basis_is_contiguous ? alloc_tmatd(num_obs_train, glp_nterms) : alloc_matd(num_obs_train, glp_nterms);",
+    paste0(
+      "basis = np_regression_alllarge_basis_alloc( ",
+      "num_obs_train, glp_nterms, basis_is_contiguous);"
+    ),
     fixed = TRUE
   )
   expect_match(body, "np_blas_gram_int(", fixed = TRUE)
@@ -71,7 +76,84 @@ test_that("MPI all-large fit BLAS route is narrow and bounded", {
   )
   expect_match(
     compact,
-    "if(fit_progress_active) np_progress_fit_loop_step(i + row + 1, fit_progress_total);",
+    paste0(
+      "R_UnwindProtect( ",
+      "np_regression_alllarge_bernstein_basis_execute, ",
+      "(void *)&basis_call, ",
+      "np_regression_alllarge_lp_fit_cleanup, ",
+      "(void *)&all_large_owner, NULL);"
+    ),
+    fixed = TRUE
+  )
+  expect_match(
+    source_compact,
+    "if(!jump) return; if(owner->basis_context != NULL){",
+    fixed = TRUE
+  )
+  expect_match(
+    source_compact,
+    paste0(
+      "free(owner->eval_basis_block); free(owner->projection_block); ",
+      "free(owner->fitted_block);"
+    ),
+    fixed = TRUE
+  )
+  expect_equal(
+    sum(gregexpr(
+      "np_progress_fit_loop_step_owned(", body, fixed = TRUE
+    )[[1L]] > 0L),
+    2L
+  )
+  expect_match(
+    source_compact,
+    paste0(
+      "free(owner->eval_basis); free(owner->eval_derivative); ",
+      "free(owner->coefficient); ",
+      "np_lp_full_row_workspace_clear(owner->inverse_workspace);"
+    ),
+    fixed = TRUE
+  )
+  expect_match(
+    source_compact,
+    paste0(
+      "static double **np_regression_alllarge_basis_alloc( ",
+      "const int nrows, const int ncols, const int contiguous)"
+    ),
+    fixed = TRUE
+  )
+  expect_match(
+    source_compact,
+    paste0(
+      "if(matrix[column] == NULL){ while(column > 0) ",
+      "free(matrix[--column]); free(matrix); return NULL;"
+    ),
+    fixed = TRUE
+  )
+  expect_match(
+    compact,
+    paste0(
+      "} else { np_glp_fill_basis_raw_train(num_reg_continuous, ",
+      "glp_terms, glp_nterms, matrix_X_continuous_train, ",
+      "num_obs_train, basis);"
+    ),
+    fixed = TRUE
+  )
+  refresh_position <- regexpr(
+    "np_refresh_mseries_accelerate_option();", compact, fixed = TRUE
+  )[[1L]]
+  terms_position <- regexpr(
+    "fast_ok = np_glp_build_terms(", compact, fixed = TRUE
+  )[[1L]]
+  expect_gt(refresh_position, 0L)
+  expect_gt(terms_position, refresh_position)
+  expect_match(
+    compact,
+    paste0(
+      "if(fit_progress_active) np_progress_fit_loop_step_owned( ",
+      "i + row + 1, fit_progress_total, ",
+      "np_regression_alllarge_lp_fit_cleanup, ",
+      "(void *)&all_large_owner);"
+    ),
     fixed = TRUE
   )
   expect_false(grepl("num_obs_eval\\s*\\*\\s*num_obs_eval", body))

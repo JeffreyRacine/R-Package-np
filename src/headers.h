@@ -151,6 +151,12 @@ SEXP C_np_progress_fit_end(void);
 void np_progress_fit_set_offset(const int offset);
 void np_progress_fit_step(const int done);
 void np_progress_fit_loop_step(const int done, const int natural_total);
+typedef void (*NPProgressUnwindCleanup)(void *, Rboolean);
+void np_progress_fit_loop_step_owned(
+  const int done,
+  const int natural_total,
+  NPProgressUnwindCleanup cleanup,
+  void *cleanup_data);
 int np_progress_fit_is_active(void);
 void np_progress_bandwidth_loop_step(void);
 

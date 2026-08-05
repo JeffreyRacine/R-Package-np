@@ -17,8 +17,8 @@ locate_general_lp_fit_source <- function() {
 
 general_lp_owner_region <- function(source) {
   start <- grep("^  NP_REGRESSION_GENERAL_LP_FIT_OK = 0,$", source)
-  stop <- grep("^int kernel_estimate_regression_categorical_tree_np\\($",
-               source)
+  marker <- grep("^ \\* The all-large shortcut allocates", source)
+  stop <- marker - 1L
   stopifnot(length(start) == 1L, length(stop) == 1L, stop > start)
   paste(source[seq.int(start - 1L, stop - 1L)], collapse = "\n")
 }
