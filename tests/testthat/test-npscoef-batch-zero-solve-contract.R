@@ -63,20 +63,48 @@ test_that("npscoef native zero-ridge batch solve returns difficult rows to R", {
   ))
 })
 
-test_that("npscoef width-one and width-two systems cannot enter batch solve", {
+test_that("npscoef width-one and width-two systems share the native batch solve", {
   for (p in 1:2) {
-    tww <- array(diag(p), dim = c(p, p, 1L))
-    tyw <- matrix(as.double(seq_len(p)), nrow = p, ncol = 1L)
-    expect_null(npRmpi:::.npscoef_batch_zero_solve(tyw = tyw, tww = tww))
-    expect_error(
-      .Call(
-        "C_np_npscoef_batch_zero_solve",
-        tww,
-        tyw,
-        PACKAGE = "npRmpi"
+    neval <- 5L
+    tww <- array(0.0, dim = c(p, p, neval))
+    tyw <- matrix(0.0, nrow = p, ncol = neval)
+    for (ii in seq_len(neval)) {
+      design <- matrix(
+        sin(seq_len((p + 2L) * p) + ii / 7),
+        nrow = p + 2L,
+        ncol = p
+      )
+      tww[, , ii] <- crossprod(design) + diag(0.25 + ii / 20, p)
+      tyw[, ii] <- cos(seq_len(p) + ii / 11)
+    }
+    expected <- matrix(
+      vapply(
+        seq_len(neval),
+        function(ii) solve(tww[, , ii], tyw[, ii]),
+        numeric(p)
       ),
-      "incompatible dimensions"
+      nrow = p,
+      ncol = neval
     )
+    actual <- npRmpi:::.npscoef_batch_zero_solve(tyw = tyw, tww = tww)
+    expect_equal(actual, expected, tolerance = 1e-13)
+
+    singular <- tww
+    singular[, , 3L] <- 0.0
+    expect_null(npRmpi:::.npscoef_batch_zero_solve(tyw = tyw, tww = singular))
+
+    nonfinite <- tww
+    nonfinite[1L, 1L, 3L] <- NaN
+    expect_null(npRmpi:::.npscoef_batch_zero_solve(tyw = tyw, tww = nonfinite))
+
+    if (p == 2L) {
+      ill_conditioned <- tww
+      ill_conditioned[, , 3L] <- diag(c(1.0, .Machine$double.eps^2))
+      expect_null(npRmpi:::.npscoef_batch_zero_solve(
+        tyw = tyw,
+        tww = ill_conditioned
+      ))
+    }
   }
 })
 

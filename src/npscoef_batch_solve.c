@@ -50,7 +50,7 @@ SEXP C_np_npscoef_batch_zero_solve(SEXP tww_r, SEXP tyw_r)
 
   p = INTEGER(tww_dim)[0];
   neval = INTEGER(tww_dim)[2];
-  if((p <= 2) || (neval <= 0) ||
+  if((p <= 0) || (neval <= 0) ||
      (INTEGER(tww_dim)[1] != p) ||
      (INTEGER(tyw_dim)[0] != p) ||
      (INTEGER(tyw_dim)[1] != neval))
