@@ -23,16 +23,26 @@ test_that("derivative kernel-weight ownership is invocation scoped", {
   expect_false(grepl("kernel_weighted_sum_pkw_nvar_extern", text, fixed = TRUE))
   expect_false(grepl("kernel_weighted_sum_pkw_sparse_extern", text, fixed = TRUE))
   expect_false(grepl("np_jksum_tree_pkw_is_sparse", text, fixed = TRUE))
-  expect_true(grepl(
-    "np_pkw_output_make(conditional_pkw, p_nvar)", text, fixed = TRUE
-  ))
-  expect_true(grepl(
-    "conditional_pkw != NULL ?\n                             &conditional_pkw_output : NULL",
-    text, fixed = TRUE
-  ))
+  expect_match(
+    text,
+    paste0(
+      "np_pkw_output_make\\([[:space:]]*",
+      "owner->conditional_permutation_weights,[[:space:]]*p_nvar\\)"
+    ),
+    perl = TRUE
+  )
+  expect_match(
+    text,
+    paste0(
+      "owner->conditional_permutation_weights != NULL[[:space:]]*\\?[[:space:]]*",
+      "&conditional_pkw_output[[:space:]]*:[[:space:]]*NULL"
+    ),
+    perl = TRUE
+  )
   expect_false(grepl(
-    "np_pkw_output_make(conditional_influence ? conditional_pkw : NULL",
-    text, fixed = TRUE
+    "np_pkw_output_make\\([[:space:]]*conditional_influence[[:space:]]*\\?",
+    text,
+    perl = TRUE
   ))
 })
 
