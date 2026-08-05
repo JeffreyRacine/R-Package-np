@@ -1365,12 +1365,18 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
         remin = isTRUE(opt.args$powell.remin)
       )
       hot.start <- proc.time()[3L]
-      hot.payload <- .npcdistbw_run_fixed_degree(
-        xdat = xdat,
-        ydat = ydat,
-        bws = bw_vec,
-        reg.args = reg.args,
-        opt.args = hot.opt.args
+      hot.payload <- .np_nomad_with_powell_progress(
+        degree = best_record$degree,
+        best_record = best_record,
+        expr = local({
+          .npcdistbw_run_fixed_degree(
+            xdat = xdat,
+            ydat = ydat,
+            bws = bw_vec,
+            reg.args = reg.args,
+            opt.args = hot.opt.args
+          )
+        })
       )
       powell.elapsed <- proc.time()[3L] - hot.start
       direct.payload$num.feval <- as.numeric(direct.payload$num.feval[1L]) + as.numeric(hot.payload$num.feval[1L])

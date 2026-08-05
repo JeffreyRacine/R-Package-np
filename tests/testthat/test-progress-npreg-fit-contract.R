@@ -28,9 +28,9 @@ expect_np_npreg_powell_progress_surface <- function(lines) {
     "^\\[np\\] Refining NOMAD solution with one Powell hot start at degree ",
     lines
   )), info = info)
-  expect_false(any(grepl("best (", powell.lines, fixed = TRUE)), info = info)
+  expect_true(any(grepl("best (", powell.lines, fixed = TRUE)), info = info)
   expect_true(any(grepl(
-    "^\\[np\\] Refining bandwidth \\(elapsed [0-9]+\\.[0-9]s, degree \\([^)]*\\), iter [0-9]+\\)$",
+    "^\\[np\\] Refining bandwidth \\(elapsed [0-9]+\\.[0-9]s, iter [0-9]+, deg \\([^)]*\\), best \\([^)]*\\)\\)$",
     powell.lines
   )), info = info)
 }

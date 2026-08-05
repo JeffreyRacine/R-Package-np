@@ -101,10 +101,6 @@ double *fret, double (*func)(double *))
     double t,fptt,fp,del;
     double *pt,*ptt,*xit;
 
-    /* In powell(), want user to know instantly */
-
-		spinner(4);
-
 /* Only changes _non zero_ restrictions... not a general approach
    but valid for the current purpose */
 
@@ -124,7 +120,6 @@ double *fret, double (*func)(double *))
     }
     for (*iter=1;;(*iter)++)
     {
-			spinner((*iter)-1);
 /* Main body up to max number of iterations */
         fp=(*fret);
         ibig=0;

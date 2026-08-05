@@ -118,6 +118,8 @@
   env$bandwidth_depth <- 0L
   env$bandwidth_label <- NULL
   env$bandwidth_state <- NULL
+  env$bandwidth_forward_active <- FALSE
+  env$bandwidth_forward_state <- NULL
   env$bandwidth_old_messages <- NULL
   env$bandwidth_context_label <- NULL
   env$fit_state <- NULL
@@ -143,6 +145,77 @@
 
   .np_progress_runtime$bandwidth_context_label <- label
   invisible(NULL)
+}
+
+.np_progress_bandwidth_enter_provider_stage <- function(state,
+                                                        provider,
+                                                        label,
+                                                        fields,
+                                                        degree = NULL,
+                                                        best_record = NULL) {
+  if (is.null(state)) {
+    return(state)
+  }
+
+  provider <- as.character(provider)[1L]
+  if (is.na(provider) || !nzchar(provider)) {
+    stop("progress provider must be a non-empty string", call. = FALSE)
+  }
+  if (!is.function(fields)) {
+    stop("progress stage fields must be a function", call. = FALSE)
+  }
+
+  now <- .np_progress_now()
+  state$progress_provider <- provider
+  state$nomad_native_progress <- identical(provider, "nomad_native")
+  state$bandwidth_progress_common <- FALSE
+  state$label <- as.character(label)[1L]
+  state$unknown_total_fields <- fields
+  state$nomad_nmulti <- 1L
+  state$nomad_current_degree <- if (is.null(degree)) NULL else as.integer(degree)
+  state$nomad_best_record <- best_record
+  state$started <- now
+  state$last_done <- NULL
+  state$last_emitted_done <- NULL
+  state$last_emitted_detail <- NULL
+  state$start_note_pending <- FALSE
+  state$last_emit <- now - state$throttle_sec
+
+  .np_progress_step_at(
+    state = state,
+    now = now,
+    done = NULL,
+    force = TRUE
+  )
+}
+
+.np_progress_bandwidth_worker_silent <- function() {
+  FALSE
+}
+
+.np_progress_with_nested_bandwidth_forwarding <- function(expr) {
+  old.state <- .np_progress_runtime$bandwidth_state
+  old.forward.active <- isTRUE(.np_progress_runtime$bandwidth_forward_active)
+  old.forward.state <- .np_progress_runtime$bandwidth_forward_state
+  parent.state <- if (old.forward.active) old.forward.state else old.state
+
+  .np_progress_runtime$bandwidth_forward_active <- TRUE
+  .np_progress_runtime$bandwidth_forward_state <- parent.state
+  .np_progress_runtime$bandwidth_state <- NULL
+
+  on.exit({
+    evolved.parent <- .np_progress_runtime$bandwidth_forward_state
+    .np_progress_runtime$bandwidth_state <- old.state
+    .np_progress_runtime$bandwidth_forward_active <- old.forward.active
+    if (old.forward.active) {
+      .np_progress_runtime$bandwidth_forward_state <- evolved.parent
+    } else {
+      .np_progress_runtime$bandwidth_forward_state <- old.forward.state
+      .np_progress_runtime$bandwidth_state <- evolved.parent
+    }
+  }, add = TRUE)
+
+  force(expr)
 }
 
 .np_progress_make_registry <- function() {
@@ -830,14 +903,7 @@
 }
 
 .np_progress_interval_sec <- function(known_total = FALSE, domain = "general") {
-  default <- if (identical(domain, "plot")) {
-    # Plot bootstrap progress should feel like the accepted bandwidth heartbeat.
-    2.0
-  } else if (isTRUE(known_total)) {
-    0.5
-  } else {
-    2.0
-  }
+  default <- 2.0
 
   option_name <- if (identical(domain, "plot")) {
     "np.plot.progress.interval.sec"
@@ -847,7 +913,9 @@
     "np.progress.interval.unknown.sec"
   }
 
-  val <- suppressWarnings(as.numeric(getOption(option_name, default))[1L])
+  common <- getOption("np.progress.interval.sec", NULL)
+  configured <- if (is.null(common)) getOption(option_name, default) else common
+  val <- suppressWarnings(as.numeric(configured)[1L])
   if (!is.finite(val) || is.na(val) || val < 0) {
     val <- default
   }
@@ -1912,7 +1980,12 @@
 }
 
 .np_progress_bandwidth_activity_step <- function(done = NULL, force = FALSE) {
-  state <- .np_progress_runtime$bandwidth_state
+  forwarding <- isTRUE(.np_progress_runtime$bandwidth_forward_active)
+  state <- if (forwarding) {
+    .np_progress_runtime$bandwidth_forward_state
+  } else {
+    .np_progress_runtime$bandwidth_state
+  }
 
   if (isTRUE(state$nomad_native_progress)) {
     return(invisible(NULL))
@@ -1925,12 +1998,17 @@
         done <- NULL
       }
     }
-    .np_progress_runtime$bandwidth_state <- .np_progress_step_at(
+    updated <- .np_progress_step_at(
       state = state,
       now = .np_progress_now(),
       done = done,
       force = isTRUE(force)
     )
+    if (forwarding) {
+      .np_progress_runtime$bandwidth_forward_state <- updated
+    } else {
+      .np_progress_runtime$bandwidth_state <- updated
+    }
     return(invisible(NULL))
   }
 
@@ -1945,12 +2023,17 @@
     }
   }
 
-  .np_progress_runtime$bandwidth_state <- .np_progress_step_at(
+  updated <- .np_progress_step_at(
     state = state,
     now = .np_progress_now(),
     done = done,
     force = isTRUE(force)
   )
+  if (forwarding) {
+    .np_progress_runtime$bandwidth_forward_state <- updated
+  } else {
+    .np_progress_runtime$bandwidth_state <- updated
+  }
 
   invisible(NULL)
 }
@@ -2005,6 +2088,8 @@
   .np_progress_runtime$bandwidth_depth <- 0L
   .np_progress_runtime$bandwidth_label <- NULL
   .np_progress_runtime$bandwidth_state <- NULL
+  .np_progress_runtime$bandwidth_forward_active <- FALSE
+  .np_progress_runtime$bandwidth_forward_state <- NULL
   .np_progress_runtime$bandwidth_old_messages <- NULL
   .np_progress_runtime$bandwidth_context_label <- NULL
   .np_progress_runtime$force_enabled <- FALSE

@@ -1271,7 +1271,10 @@ npregbw.rbandwidth <-
         remin = isTRUE(opt.args$powell.remin)
       )
       powell.start <- proc.time()[3L]
-      hot.payload <- .npregbw_with_powell_refinement_progress(integer(0L), local({
+      hot.payload <- .np_nomad_with_powell_progress(
+        degree = integer(0L),
+        best_record = best_record,
+        expr = local({
         .npregbw_run_fixed_degree_source_of_truth(
           xdat = xdat,
           ydat = ydat,
@@ -1701,83 +1704,6 @@ npregbw.rbandwidth <-
   .np_nomad_bw_storage_to_point(bws = bws, template = template, setup = setup)
 }
 
-.npregbw_powell_progress_fields <- function(state,
-                                            done = NULL,
-                                            detail = NULL,
-                                            now = .np_progress_now()) {
-  fields <- .np_degree_progress_context_fields()
-  elapsed <- max(0, now - state$started)
-
-  fields <- c(fields, sprintf("elapsed %ss", .np_progress_fmt_num(elapsed)))
-
-  if (!is.null(state$nomad_current_degree)) {
-    fields <- c(
-      fields,
-      sprintf("degree %s", .np_degree_format_degree(state$nomad_current_degree))
-    )
-  }
-
-  if (!is.null(done)) {
-    done <- suppressWarnings(as.integer(done)[1L])
-    if (!is.na(done) && done >= 1L) {
-      fields <- c(fields, sprintf("iter %s", format(done)))
-    }
-  }
-
-  fields
-}
-
-.npregbw_with_powell_refinement_progress <- function(degree, expr) {
-  old.state <- .np_progress_runtime$bandwidth_state
-  reuse.active <- !is.null(old.state) &&
-    isTRUE(old.state$enabled) &&
-    isTRUE(old.state$visible)
-  active.state <- if (isTRUE(reuse.active)) {
-    old.state
-  } else {
-    .np_progress_begin(
-      label = .np_nomad_powell_progress_label(),
-      domain = "general",
-      surface = "bandwidth"
-    )
-  }
-
-  on.exit({
-    if (!isTRUE(reuse.active)) {
-      current.state <- .np_progress_runtime$bandwidth_state
-      if (!is.null(current.state)) {
-        .np_progress_end(current.state)
-      }
-    }
-    .np_progress_runtime$bandwidth_state <- old.state
-  }, add = TRUE)
-
-  active.state$label <- .np_nomad_powell_progress_label()
-  active.state$unknown_total_fields <- .npregbw_powell_progress_fields
-  active.state$nomad_nmulti <- 1L
-  active.state$nomad_current_degree <- as.integer(degree)
-  active.state$started <- .np_progress_now()
-  active.state$last_done <- NULL
-  active.state <- .np_progress_show_now(active.state)
-  .np_progress_runtime$bandwidth_state <- active.state
-
-  value <- force(expr)
-
-  if (!is.null(active.state) && is.list(value) && !is.null(value$num.feval)) {
-    done <- suppressWarnings(as.integer(value$num.feval[1L]))
-    if (!is.na(done) && done >= 1L && !is.null(.np_progress_runtime$bandwidth_state)) {
-      .np_progress_runtime$bandwidth_state <- .np_progress_step_at(
-        state = .np_progress_runtime$bandwidth_state,
-        now = .np_progress_now(),
-        done = done,
-        force = TRUE
-      )
-    }
-  }
-
-  value
-}
-
 .npregbw_nomad_search <- function(xdat,
                                   ydat,
                                   bws,
@@ -1932,7 +1858,10 @@ npregbw.rbandwidth <-
       )
 
       powell.start <- proc.time()[3L]
-      hot.payload <- .npregbw_with_powell_refinement_progress(degree, local({
+      hot.payload <- .np_nomad_with_powell_progress(
+        degree = degree,
+        best_record = best_record,
+        expr = local({
         .npregbw_run_fixed_degree_source_of_truth(
           xdat = xdat,
           ydat = ydat,

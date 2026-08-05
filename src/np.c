@@ -3413,10 +3413,6 @@ static int np_native_estimator_state_active = 0;
 
 double timing_extern  = -1.0;
 
-void spinner(int num) {
-  (void) num;
-}
-
 void np_set_seed(int * num){
   int_RANDOM_SEED = *num;
   np_reset_nr_rng_state();
@@ -12111,7 +12107,6 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
     goto cleanup_np_density_bw;
   }
 
-  spinner(0);
 
   bwmfunc_raw = bwmfunc;
   bwm_set_floor_context(
@@ -13011,7 +13006,6 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
     goto cleanup_np_distribution_bw;
   }
 
-  spinner(0);
 
   bwmfunc_raw = bwmfunc;
   bwm_set_floor_context(
@@ -14181,7 +14175,6 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
     goto cleanup_np_density_conditional_bw;
   }
 
-  spinner(0);
 
   np_bwm_clear_deferred_error();
   bwmfunc_raw = bwmfunc;
@@ -15397,7 +15390,6 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
     goto cleanup_np_distribution_conditional_bw;
   }
 
-  spinner(0);
 
   bwmfunc_raw = bwmfunc;
   bwm_set_floor_context(
@@ -17736,7 +17728,6 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
     goto cleanup_np_regression_bw_mode;
   }
 
-  spinner(0);
 
   bwmfunc_raw = bwmfunc;
   bwm_search_context_configure_uniform(

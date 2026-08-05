@@ -19,13 +19,19 @@
       \item \code{np.plot.progress} (logical): controls bounded
       plot/bootstrap progress heartbeats. Default is \code{TRUE}.
 
+      \item \code{np.progress.interval.sec} (numeric): package-wide minimum
+      elapsed time between visible progress heartbeats. The default is
+      \code{2.0} seconds. When set, this canonical option takes precedence over
+      the older surface-specific interval options.
+
       \item \code{np.plot.progress.start.grace.sec} (numeric): delay before
       the first plot/bootstrap progress line is shown. Default is
       \code{0.75}.
 
       \item \code{np.plot.progress.interval.sec} (numeric): minimum elapsed
       time between plot/bootstrap heartbeat lines once progress reporting has
-      started. Default is \code{0.5}.
+      started when \code{np.progress.interval.sec} is unset. Default is
+      \code{2.0}.
 
       \item \code{np.plot.progress.max.intermediate} (integer): maximum
       number of mid-run plot/bootstrap heartbeat lines emitted between the

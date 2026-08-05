@@ -1030,25 +1030,14 @@ npscoefbw.scbandwidth <-
             invisible(NULL)
           }
 
-          partial_progress_detail <- function(fv = NULL) {
-            detail <- sprintf(
+          partial_progress_detail <- function() {
+            sprintf(
               "backfitting iteration %d of %d, partial residual %d of %d",
               cv_state$backfit_iteration,
               cv.num.iterations,
               cv_state$partial_index,
               ncol(W)
             )
-            if (!is.null(fv)) {
-              detail <- paste(
-                detail,
-                sprintf(
-                  "fval %s",
-                  format(signif(fv, digits = getOption("digits", 7L)), trim = TRUE)
-                ),
-                sep = ", "
-              )
-            }
-            detail
           }
 
           partial_progress_begin <- function(iteration, partial.index) {
@@ -1064,7 +1053,7 @@ npscoefbw.scbandwidth <-
             cv_state$partial_progress <- .np_progress_step(
               state = cv_state$partial_progress,
               done = cv_state$partial_eval,
-              detail = partial_progress_detail(fv = fv)
+              detail = partial_progress_detail()
             )
             invisible(NULL)
           }
@@ -1076,7 +1065,7 @@ npscoefbw.scbandwidth <-
             cv_state$partial_progress$last_emit <- -Inf
             cv_state$partial_progress <- .np_progress_end(
               cv_state$partial_progress,
-              detail = partial_progress_detail(fv = fv)
+              detail = partial_progress_detail()
             )
             cv_state$partial_progress <- NULL
             invisible(NULL)

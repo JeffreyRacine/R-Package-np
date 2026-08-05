@@ -815,6 +815,7 @@ test_that("plot progress default cadence matches bandwidth heartbeat", {
   begin <- getFromNamespace(".np_progress_begin", "np")
 
   old_opts <- options(
+    np.progress.interval.sec = NULL,
     np.plot.progress.interval.sec = NULL,
     np.progress.interval.unknown.sec = NULL,
     np.progress.interval.known.sec = NULL
@@ -823,7 +824,12 @@ test_that("plot progress default cadence matches bandwidth heartbeat", {
 
   expect_identical(plot_interval(), 2.0)
   expect_identical(begin("Bandwidth selection")$throttle_sec, 2.0)
-  expect_identical(begin("Bootstrap replications", total = 10L)$throttle_sec, 0.5)
+  expect_identical(begin("Bootstrap replications", total = 10L)$throttle_sec, 2.0)
+
+  options(np.progress.interval.sec = 1.25)
+  expect_identical(plot_interval(), 1.25)
+  expect_identical(begin("Bandwidth selection")$throttle_sec, 1.25)
+  expect_identical(begin("Bootstrap replications", total = 10L)$throttle_sec, 1.25)
 })
 
 test_that("interactive bootstrap chunk sizes leave room for intermediate progress", {

@@ -347,14 +347,6 @@
   sprintf("(%s)", paste(as.integer(degree), collapse = ","))
 }
 
-.np_degree_format_objective <- function(value) {
-  value <- as.numeric(value)[1L]
-  if (!is.finite(value))
-    return("NA")
-
-  formatC(value, digits = 6L, format = "fg", flag = "#")
-}
-
 .np_degree_coordinate_visit_cap <- function(candidates,
                                             max_cycles,
                                             restart_total) {
@@ -394,20 +386,22 @@
 
 .np_degree_progress_best_detail <- function(best_record,
                                             objective_name = "objective") {
+  # Objective values remain in search records and returned objects. Dynamic
+  # progress reports only the incumbent degree so every search provider uses
+  # the same presentation-neutral contract.
+  invisible(objective_name)
   if (is.null(best_record))
     return("best pending")
 
-  sprintf(
-    "best %s, %s=%s",
-    .np_degree_format_degree(best_record$degree),
-    objective_name,
-    .np_degree_format_objective(best_record$objective)
-  )
+  sprintf("best %s", .np_degree_format_degree(best_record$degree))
 }
 
 .np_degree_progress_best_degree_detail <- function(best_record) {
   if (is.null(best_record))
     return("best pending")
+
+  if (is.null(best_record$degree) || !length(best_record$degree))
+    return(NULL)
 
   sprintf("best %s", .np_degree_format_degree(best_record$degree))
 }
@@ -1716,7 +1710,7 @@
   if (is.finite(elapsed) && !is.na(elapsed) && elapsed >= 0)
     fields <- c(fields, sprintf("elapsed %ss", .np_progress_fmt_num(elapsed)))
 
-  if (!is.null(current_degree))
+  if (!is.null(current_degree) && length(current_degree))
     fields <- c(fields, sprintf("deg %s", .np_degree_format_degree(current_degree)))
 
   fields <- c(fields, .np_degree_progress_best_degree_detail(best_record = best_record))
@@ -1843,7 +1837,7 @@
       fields <- c(fields, sprintf("iter %s", format(iteration)))
   }
 
-  if (!is.null(current_degree))
+  if (!is.null(current_degree) && length(current_degree))
     fields <- c(fields, sprintf("deg %s", .np_degree_format_degree(current_degree)))
 
   fields <- c(fields, .np_degree_progress_best_degree_detail(best_record = best_record))
@@ -1866,30 +1860,22 @@
 .np_nomad_progress_enter_powell <- function(state,
                                             degree,
                                             best_record) {
-  if (is.null(state))
-    return(state)
-
-  now <- .np_progress_now()
-  state$label <- .np_nomad_powell_progress_label()
-  state$unknown_total_fields <- .np_nomad_powell_progress_fields
-  state$nomad_current_degree <- as.integer(degree)
-  state$nomad_best_record <- best_record
-  state$started <- now
-  state$last_done <- NULL
-  state$last_emitted_done <- NULL
-  state$last_emitted_detail <- NULL
-  state$last_emit <- now - state$throttle_sec
-  .np_progress_step_at(
+  .np_progress_bandwidth_enter_provider_stage(
     state = state,
-    now = now,
-    done = NULL,
-    force = TRUE
+    provider = "powell",
+    label = .np_nomad_powell_progress_label(),
+    fields = .np_nomad_powell_progress_fields,
+    degree = degree,
+    best_record = best_record
   )
 }
 
 .np_nomad_with_powell_progress <- function(degree, expr, best_record = NULL) {
   old.context <- .np_progress_runtime$bandwidth_context_label
   old.state <- .np_progress_runtime$bandwidth_state
+  old.state.active <- !is.null(old.state) &&
+    identical(.np_progress_registry$active_id, old.state$id)
+  worker.silent <- isTRUE(.np_progress_bandwidth_worker_silent())
   local.state <- NULL
   progress.enabled <- isTRUE(.np_progress_enabled(domain = "general"))
 
@@ -1899,29 +1885,41 @@
     if (!is.null(local.state) && !is.null(.np_progress_runtime$bandwidth_state)) {
       .np_progress_end(.np_progress_runtime$bandwidth_state)
     }
-    if (!is.null(local.state)) {
+    if (!is.null(local.state) || isTRUE(worker.silent)) {
       .np_progress_runtime$bandwidth_state <- old.state
     }
     .np_progress_bandwidth_set_context(old.context)
   }, add = TRUE)
 
-  if (is.null(old.state) && isTRUE(progress.enabled)) {
+  if (isTRUE(worker.silent)) {
+    .np_progress_runtime$bandwidth_state <- NULL
+  } else if (!isTRUE(old.state.active) && isTRUE(progress.enabled)) {
     local.state <- .np_progress_begin(
       label = .np_nomad_powell_progress_label(),
       domain = "general",
       surface = "bandwidth"
     )
-    local.state$unknown_total_fields <- .np_nomad_powell_progress_fields
-    local.state$nomad_current_degree <- as.integer(degree)
-    local.state$nomad_best_record <- best_record
-    local.state$nomad_nmulti <- 1L
-    local.state <- .np_progress_show_now(local.state)
+    local.state <- .np_progress_bandwidth_enter_provider_stage(
+      state = local.state,
+      provider = "powell",
+      label = .np_nomad_powell_progress_label(),
+      fields = .np_nomad_powell_progress_fields,
+      degree = degree,
+      best_record = best_record
+    )
     .np_progress_runtime$bandwidth_state <- local.state
+  } else if (isTRUE(old.state.active) &&
+             !identical(old.state$progress_provider, "powell")) {
+    .np_progress_runtime$bandwidth_state <- .np_nomad_progress_enter_powell(
+      state = old.state,
+      degree = degree,
+      best_record = best_record
+    )
   }
 
   value <- force(expr)
 
-  if (!is.null(local.state) && is.list(value) && !is.null(value$num.feval)) {
+  if (is.list(value) && !is.null(value$num.feval)) {
     done <- suppressWarnings(as.integer(value$num.feval[1L]))
     if (!is.na(done) && done >= 1L && !is.null(.np_progress_runtime$bandwidth_state)) {
       .np_progress_runtime$bandwidth_state <- .np_progress_step_at(
@@ -2036,6 +2034,7 @@
     best_record = best_record,
     label = label
   )
+  handle$state$progress_provider <- "nomad_native"
   handle$state$nomad_native_progress <- TRUE
   handle$state$nomad_eval_offset <- 0L
   .np_progress_runtime$bandwidth_state <- handle$state
@@ -2799,12 +2798,14 @@
       state$error
     })
 
-  if (identical(engine, "nomad+powell") && !is.null(state$progress_state)) {
-    state$progress_state <- .np_nomad_progress_enter_powell(
+  if (identical(engine, "nomad+powell") &&
+      !isTRUE(handoff_before_build) &&
+      !is.null(state$progress_state)) {
+    set_progress_state(.np_nomad_progress_enter_powell(
       state = state$progress_state,
       degree = state$best_record$degree,
       best_record = state$best_record
-    )
+    ))
   }
 
   if (isTRUE(handoff_before_build) && !is.null(state$progress_state)) {

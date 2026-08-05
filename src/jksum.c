@@ -14607,6 +14607,11 @@ static int np_lp_fixed_tree_sparse_accumulate(
     double scalar_rhs = 0.0;
     int a, b;
 
+    /* This sparse row is expensive; 256 rows remain well below the
+       native activity throttle while avoiding needless clock polling. */
+    if((j & 255) == 0)
+      np_progress_bandwidth_loop_step();
+
     if(nterms == 1){
       eval_ybasis[0] = yj;
       eval_outer[0] = 1.0;

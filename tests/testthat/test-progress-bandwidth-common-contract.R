@@ -47,7 +47,7 @@ test_that("unknown-bound NOMAD restart detail drops synthetic percent and eta", 
 test_that("NOMAD progress fuses component context with dynamic fields", {
   nomad_detail <- getFromNamespace(".np_nomad_progress_detail", "np")
   powell_detail <- getFromNamespace(".np_nomad_powell_progress_detail", "np")
-  npreg_powell_fields <- getFromNamespace(".npregbw_powell_progress_fields", "np")
+  powell_fields <- getFromNamespace(".np_nomad_powell_progress_fields", "np")
   fit_line <- getFromNamespace(".np_progress_fit_single_line", "np")
   set_context <- getFromNamespace(".np_progress_bandwidth_set_context", "np")
 
@@ -94,13 +94,149 @@ test_that("NOMAD progress fuses component context with dynamic fields", {
   )
 
   expect_identical(
-    npreg_powell_fields(
-      state = list(started = 0, nomad_current_degree = 5L),
+    powell_fields(
+      state = list(
+        started = 0,
+        nomad_current_degree = 5L,
+        nomad_best_record = list(degree = 1L)
+      ),
       done = 9L,
       now = 2.5
     ),
-    c("E[y|z] (1/3)", "elapsed 2.5s", "degree (5)", "iter 9")
+    "E[y|z] (1/3), elapsed 2.5s, iter 9, deg (5), best (1)"
   )
+
+  expect_identical(
+    powell_detail(
+      current_degree = integer(0L),
+      best_record = list(degree = integer(0L)),
+      iteration = 9L,
+      elapsed = 2.5
+    ),
+    "E[y|z] (1/3), elapsed 2.5s, iter 9"
+  )
+})
+
+test_that("every native NOMAD-to-Powell family uses the canonical refinement owner", {
+  family_functions <- c(
+    ".npudensbw_run_mads",
+    ".npudistbw_run_mads",
+    ".npregbw_run_fixed_degree_mads",
+    ".npcdensbw_run_fixed_degree_mads",
+    ".npcdistbw_run_fixed_degree_mads",
+    ".npregbw_nomad_search",
+    ".npcdensbw_nomad_search",
+    ".npcdistbw_nomad_search",
+    ".npindexbw_nomad_search",
+    ".npscoefbw_nomad_search",
+    ".nplsqreg_nomad_search"
+  )
+
+  for (fn_name in family_functions) {
+    fn <- getFromNamespace(fn_name, "np")
+    source <- paste(deparse(body(fn)), collapse = "\n")
+    expect_match(source, ".np_nomad_with_powell_progress", fixed = TRUE,
+                 info = fn_name)
+  }
+})
+
+test_that("Powell transition retires the native NOMAD provider mode", {
+  enter <- getFromNamespace(".np_nomad_progress_enter_powell", "np")
+  state <- list(
+    enabled = FALSE,
+    visible = FALSE,
+    bandwidth_progress_common = TRUE,
+    progress_provider = "nomad_native",
+    nomad_native_progress = TRUE,
+    throttle_sec = 2,
+    started = 0,
+    last_emit = 0,
+    last_done = 7L
+  )
+
+  out <- enter(
+    state = state,
+    degree = 2L,
+    best_record = list(degree = 1L, objective = 3.5)
+  )
+
+  expect_identical(out$progress_provider, "powell")
+  expect_false(out$nomad_native_progress)
+  expect_false(out$bandwidth_progress_common)
+  expect_identical(out$nomad_current_degree, 2L)
+  expect_null(out$last_done)
+})
+
+test_that("serial Powell progress never classifies the process as an MPI worker", {
+  worker_silent <- getFromNamespace(".np_progress_bandwidth_worker_silent", "np")
+  expect_false(worker_silent())
+})
+
+test_that("Powell wrapper replaces a released NOMAD owner instead of leaking child progress", {
+  begin <- getFromNamespace(".np_progress_begin", "np")
+  end <- getFromNamespace(".np_progress_end", "np")
+  refine <- getFromNamespace(".np_nomad_with_powell_progress", "np")
+  activity <- getFromNamespace(".np_progress_bandwidth_activity_step", "np")
+  runtime <- getFromNamespace(".np_progress_runtime", "np")
+
+  old_opts <- options(
+    np.messages = TRUE,
+    np.progress.start.grace.unknown.sec = 0,
+    np.progress.interval.sec = 0
+  )
+  on.exit(options(old_opts), add = TRUE)
+
+  actual <- capture_progress_shadow_trace(
+    {
+      released <- begin(
+        label = "NOMAD degree/bw",
+        domain = "general",
+        surface = "bandwidth"
+      )
+      released <- end(released)
+      runtime$bandwidth_state <- released
+      on.exit(runtime$bandwidth_state <- NULL, add = TRUE)
+
+      refine(
+        degree = integer(0L),
+        best_record = list(degree = integer(0L)),
+        expr = {
+          activity(3L)
+          structure(list(num.feval = 3L), class = "progress-test-payload")
+        }
+      )
+    },
+    now = progress_time_values(seq(0, 10, by = 0.5))
+  )
+
+  lines <- shadow_lines(actual)
+  powell <- lines[grepl("^\\[np\\] Refining bandwidth \\(", lines)]
+
+  expect_true(length(powell) >= 1L)
+  expect_true(any(grepl("iter 3", powell, fixed = TRUE)))
+  expect_false(any(grepl("deg \\(\\)|best \\(\\)", powell)))
+  expect_false(any(grepl("^\\[np\\] Bandwidth selection", lines)))
+})
+
+test_that("dynamic degree detail excludes objective values", {
+  detail <- getFromNamespace(".np_degree_progress_best_detail", "np")
+  best <- list(degree = c(2L, 4L), objective = 0.123456)
+
+  expect_identical(detail(best, objective_name = "fval"), "best (2,4)")
+  expect_false(grepl("fval|objective|0.123456", detail(best), ignore.case = TRUE))
+})
+
+test_that("dynamic optimization progress never formats objective values", {
+  fn <- getFromNamespace("npscoefbw.default", "np")
+  source <- paste(deparse(body(fn)), collapse = "\n")
+  expect_false(grepl('"fval %s"', source, fixed = TRUE))
+})
+
+test_that("obsolete spinner progress machinery is absent", {
+  pkg <- normalizePath(testthat::test_path("..", ".."), mustWork = TRUE)
+  sources <- file.path(pkg, "src", c("headers.h", "np.c", "nr.c"))
+  text <- paste(unlist(lapply(sources, readLines, warn = FALSE), use.names = FALSE), collapse = "\n")
+  expect_false(grepl("spinner(", text, fixed = TRUE))
 })
 
 test_that("NOMAD degree search emits its initial line before long first evaluations", {

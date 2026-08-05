@@ -17,12 +17,12 @@ expect_condensdist_clean_powell_surface <- function(lines, pkg_pattern = "np", i
   expect_true(length(powell.lines) > 0L, info = detail.info)
   expect_true(
     any(grepl(
-      sprintf("^\\[%s\\] Refining bandwidth \\(elapsed [0-9]+\\.[0-9]s, degree \\([0-9]+\\)(, iter [0-9]+)?\\)$", pkg_pattern),
+      sprintf("^\\[%s\\] Refining bandwidth \\(elapsed [0-9]+\\.[0-9]s, iter [0-9]+, deg \\([0-9]+\\), best \\([0-9]+\\)\\)$", pkg_pattern),
       powell.lines
     )),
     info = paste(c(detail.info, powell.lines), collapse = "\n")
   )
-  expect_false(any(grepl("best \\(", powell.lines)), info = paste(c(detail.info, powell.lines), collapse = "\n"))
+  expect_true(any(grepl("best \\(", powell.lines)), info = paste(c(detail.info, powell.lines), collapse = "\n"))
   expect_false(
     any(grepl(sprintf("^\\[%s\\] Bandwidth selection \\(Refining NOMAD solution", pkg_pattern), lines)),
     info = detail.info

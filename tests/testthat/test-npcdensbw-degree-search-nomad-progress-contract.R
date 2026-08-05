@@ -27,7 +27,7 @@ test_that("npcdensbw nomad+powell payload does not inject phantom multistart tot
     print = FALSE
   )
   trace(
-    np:::.npcdensbw_with_powell_refinement_progress,
+    np:::.np_nomad_with_powell_progress,
     tracer = eval(substitute(
       quote({
         assign(
@@ -41,7 +41,7 @@ test_that("npcdensbw nomad+powell payload does not inject phantom multistart tot
     print = FALSE
   )
   on.exit(untrace(np:::.np_progress_bandwidth_set_total), add = TRUE)
-  on.exit(untrace(np:::.npcdensbw_with_powell_refinement_progress), add = TRUE)
+  on.exit(untrace(np:::.np_nomad_with_powell_progress), add = TRUE)
 
   bw <- np::npcdensbw(
     y ~ x,
