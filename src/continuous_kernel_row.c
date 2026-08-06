@@ -3248,6 +3248,7 @@ np_continuous_kernel_beta_regression_moment_rows_validated(
   NPContinuousKernelProgressFunction progress)
 {
   NPContinuousKernelRowStatus status;
+  const int compute_errors = mean_stderr != NULL;
   int evaluation;
   int coordinate;
   int observation;
@@ -3266,7 +3267,7 @@ np_continuous_kernel_beta_regression_moment_rows_validated(
      leave_one_out_offset < 0 ||
      (positive_weights != 0 && positive_weights != 1) ||
      plan->operator == NULL || response == NULL || workspace == NULL ||
-     row_result == NULL || mean == NULL || mean_stderr == NULL ||
+     row_result == NULL || mean == NULL ||
      (leave_one_out &&
       (plan->num_eval > plan->num_train ||
        leave_one_out_offset > plan->num_train - plan->num_eval)))
@@ -3323,9 +3324,11 @@ np_continuous_kernel_beta_regression_moment_rows_validated(
           const double new_mean = weighted_mean +
             (weight / new_total_weight) * delta;
 
-          weighted_m2 += weight * delta *
-            (response[observation] - new_mean);
-          squared_weight_sum += weight * weight;
+          if(compute_errors) {
+            weighted_m2 += weight * delta *
+              (response[observation] - new_mean);
+            squared_weight_sum += weight * weight;
+          }
           total_weight = new_total_weight;
           weighted_mean = new_mean;
         }
@@ -3350,37 +3353,42 @@ np_continuous_kernel_beta_regression_moment_rows_validated(
           NP_CONTINUOUS_ROW_ERR_NUMERIC;
       weighted_mean = weighted_response_sum / total_weight;
 
-      for(observation = 0; observation < plan->num_train; ++observation) {
-        const double weight = workspace->primary_sign[observation] == 0 ?
-          0.0 : (double)workspace->primary_sign[observation] * exp(
-            workspace->primary_log_absolute[observation] -
-            row_result->total_log_scale);
-        const double residual = response[observation] - weighted_mean;
+      if(compute_errors)
+        for(observation = 0; observation < plan->num_train; ++observation) {
+          const double weight = workspace->primary_sign[observation] == 0 ?
+            0.0 : (double)workspace->primary_sign[observation] * exp(
+              workspace->primary_log_absolute[observation] -
+              row_result->total_log_scale);
+          const double residual = response[observation] - weighted_mean;
 
-        if(observation == omitted_observation)
-          continue;
-        weighted_m2 += weight * residual * residual;
-        squared_weight_sum += weight * weight;
-      }
+          if(observation == omitted_observation)
+            continue;
+          weighted_m2 += weight * residual * residual;
+          squared_weight_sum += weight * weight;
+        }
     }
 
     if(!R_FINITE(total_weight) ||
        (positive_weights ? total_weight <= 0.0 : total_weight == 0.0))
       return total_weight == 0.0 ? NP_CONTINUOUS_ROW_ERR_ZERO_WEIGHT :
         NP_CONTINUOUS_ROW_ERR_NUMERIC;
-    if(!R_FINITE(weighted_mean) || !R_FINITE(weighted_m2) ||
-       !R_FINITE(squared_weight_sum))
+    if(!R_FINITE(weighted_mean) ||
+       (compute_errors &&
+        (!R_FINITE(weighted_m2) || !R_FINITE(squared_weight_sum))))
       return NP_CONTINUOUS_ROW_ERR_NUMERIC;
-    if((positive_weights && weighted_m2 < 0.0) ||
-       (!positive_weights && weighted_m2 / total_weight < 0.0))
+    if(compute_errors &&
+       ((positive_weights && weighted_m2 < 0.0) ||
+        (!positive_weights && weighted_m2 / total_weight < 0.0)))
       weighted_m2 = 0.0;
 
     mean[evaluation] = weighted_mean;
-    mean_stderr[evaluation] = sqrt(
-      (weighted_m2 / total_weight) *
-      (squared_weight_sum / (total_weight * total_weight)));
-    if(!R_FINITE(mean_stderr[evaluation]))
-      return NP_CONTINUOUS_ROW_ERR_NUMERIC;
+    if(compute_errors) {
+      mean_stderr[evaluation] = sqrt(
+        (weighted_m2 / total_weight) *
+        (squared_weight_sum / (total_weight * total_weight)));
+      if(!R_FINITE(mean_stderr[evaluation]))
+        return NP_CONTINUOUS_ROW_ERR_NUMERIC;
+    }
     if(progress != NULL)
       progress(evaluation + 1, plan->num_eval);
     if((evaluation & 31) == 0)

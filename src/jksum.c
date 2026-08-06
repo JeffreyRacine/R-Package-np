@@ -1864,6 +1864,8 @@ static int np_regression_categorical_profile_fit_body(
   double ** const matrix_categorical_vals = call->matrix_categorical_vals;
   double * const mean = call->mean;
   double * const mean_stderr = call->mean_stderr;
+  const int do_merr = mean_stderr != NULL;
+  const int response_column_count = do_merr ? 3 : 2;
 
   int i, j, g, status;
   int *train_prof_id = NULL, *train_prof_rep = NULL;
@@ -1882,7 +1884,6 @@ static int np_regression_categorical_profile_fit_body(
      ((num_reg_unordered + num_reg_ordered) <= 0) ||
      (vector_Y == NULL) ||
      (mean == NULL) ||
-     (mean_stderr == NULL) ||
      (lambda == NULL) ||
      (operator == NULL))
     return 0;
@@ -1945,28 +1946,34 @@ static int np_regression_categorical_profile_fit_body(
   np_categorical_profile_owner_take_vector(owner, counts);
   sums = alloc_vecd(nprof_train);
   np_categorical_profile_owner_take_vector(owner, sums);
-  sums2 = alloc_vecd(nprof_train);
-  np_categorical_profile_owner_take_vector(owner, sums2);
-  weighted_sum = alloc_vecd(3*nprof_eval);
+  if(do_merr) {
+    sums2 = alloc_vecd(nprof_train);
+    np_categorical_profile_owner_take_vector(owner, sums2);
+  }
+  weighted_sum = alloc_vecd(response_column_count*nprof_eval);
   np_categorical_profile_owner_take_vector(owner, weighted_sum);
   profile_mean = alloc_vecd(nprof_eval);
   np_categorical_profile_owner_take_vector(owner, profile_mean);
-  profile_stderr = alloc_vecd(nprof_eval);
-  np_categorical_profile_owner_take_vector(owner, profile_stderr);
+  if(do_merr) {
+    profile_stderr = alloc_vecd(nprof_eval);
+    np_categorical_profile_owner_take_vector(owner, profile_stderr);
+  }
 
   if(((num_reg_unordered > 0) &&
       (profile_unordered_train == NULL || profile_unordered_eval == NULL)) ||
      ((num_reg_ordered > 0) &&
       (profile_ordered_train == NULL || profile_ordered_eval == NULL)) ||
-     counts == NULL || sums == NULL || sums2 == NULL ||
-     weighted_sum == NULL || profile_mean == NULL || profile_stderr == NULL)
+     counts == NULL || sums == NULL ||
+     (do_merr && sums2 == NULL) || weighted_sum == NULL ||
+     profile_mean == NULL || (do_merr && profile_stderr == NULL))
     goto cleanup;
 
   for(g = 0; g < nprof_train; g++){
     const int rep = train_prof_rep[g];
     counts[g] = 0.0;
     sums[g] = 0.0;
-    sums2[g] = 0.0;
+    if(do_merr)
+      sums2[g] = 0.0;
     for(j = 0; j < num_reg_unordered; j++)
       profile_unordered_train[j][g] = matrix_X_unordered_train[j][rep];
     for(j = 0; j < num_reg_ordered; j++)
@@ -1985,7 +1992,8 @@ static int np_regression_categorical_profile_fit_body(
     g = train_prof_id[i];
     counts[g] += 1.0;
     sums[g] += vector_Y[i];
-    sums2[g] += vector_Y[i]*vector_Y[i];
+    if(do_merr)
+      sums2[g] += vector_Y[i]*vector_Y[i];
   }
 
   profile_y[0] = sums;
@@ -2016,7 +2024,7 @@ static int np_regression_categorical_profile_fit_body(
                                   0,
                                   NULL,
                                   1,
-                                  3,
+                                  response_column_count,
                                   0,
                                   NP_TREE_FALSE,
                                   0,
@@ -2050,23 +2058,25 @@ static int np_regression_categorical_profile_fit_body(
     goto cleanup;
 
   for(g = 0; g < nprof_eval; g++){
-    const double A = weighted_sum[3*g];
-    const double B = weighted_sum[3*g + 1];
-    const double C = weighted_sum[3*g + 2];
-    double v;
+    const double A = weighted_sum[response_column_count*g];
+    const double B = weighted_sum[response_column_count*g + 1];
 
     if(!(fabs(B) > DBL_MIN) || !R_FINITE(B))
       goto cleanup;
 
     profile_mean[g] = A/B;
-    v = C/B - profile_mean[g]*profile_mean[g];
-    profile_stderr[g] = (v <= 0.0 || !R_FINITE(v)) ? 0.0 : sqrt(v/B);
+    if(do_merr) {
+      const double C = weighted_sum[response_column_count*g + 2];
+      const double v = C/B - profile_mean[g]*profile_mean[g];
+      profile_stderr[g] = (v <= 0.0 || !R_FINITE(v)) ? 0.0 : sqrt(v/B);
+    }
   }
 
   for(i = 0; i < num_obs_eval; i++){
     g = eval_prof_id[i];
     mean[i] = profile_mean[g];
-    mean_stderr[i] = profile_stderr[g];
+    if(do_merr)
+      mean_stderr[i] = profile_stderr[g];
   }
 
   ok = 1;
@@ -8757,6 +8767,7 @@ typedef struct {
   double *mean_stderr;
   double **gradient;
   double **gradient_stderr;
+  int compute_errors;
   int compute_gradient;
   int positive_weights;
   NPRegressionStandardErrorMode standard_error_mode;
@@ -9071,6 +9082,7 @@ np_beta_regression_categorical_gradients_validated(
   NPContinuousKernelDerivativeDiagnostics *diagnostics)
 {
   NPContinuousKernelRowStatus status = NP_CONTINUOUS_ROW_OK;
+  const int do_gerr = gradient_stderr != NULL;
   NPContinuousKernelLogFactorProvider provider;
   double **alternate_unordered = NULL;
   double **alternate_ordered = NULL;
@@ -9093,8 +9105,8 @@ np_beta_regression_categorical_gradients_validated(
      nunordered > INT_MAX - nordered ||
      (nunordered + nordered) <= 0 ||
      context == NULL || response == NULL || workspace == NULL ||
-     row_result == NULL || mean == NULL || mean_stderr == NULL ||
-     gradient == NULL || gradient_stderr == NULL ||
+     row_result == NULL || mean == NULL || gradient == NULL ||
+     (do_gerr && mean_stderr == NULL) ||
      context->dense_spec.ntrain != plan->num_train ||
      context->dense_spec.neval != plan->num_eval ||
      context->dense_spec.nunordered != nunordered ||
@@ -9153,7 +9165,7 @@ np_beta_regression_categorical_gradients_validated(
       plan, leave_one_out, leave_one_out_offset, &provider,
       response, positive_weights, standard_error_mode,
       workspace, row_result,
-      alternate_mean, alternate_stderr, diagnostics, NULL);
+      alternate_mean, do_gerr ? alternate_stderr : NULL, diagnostics, NULL);
     context->dense_spec.eval_unordered = eval_unordered;
     if(context->use_compressed)
       context->compressed_spec.eval_unordered = eval_unordered;
@@ -9163,9 +9175,10 @@ np_beta_regression_categorical_gradients_validated(
     for(evaluation = 0; evaluation < plan->num_eval; ++evaluation) {
       gradient[output_coordinate][evaluation] =
         mean[evaluation] - alternate_mean[evaluation];
-      gradient_stderr[output_coordinate][evaluation] = sqrt(
-        mean_stderr[evaluation] * mean_stderr[evaluation] +
-        alternate_stderr[evaluation] * alternate_stderr[evaluation]);
+      if(do_gerr)
+        gradient_stderr[output_coordinate][evaluation] = sqrt(
+          mean_stderr[evaluation] * mean_stderr[evaluation] +
+          alternate_stderr[evaluation] * alternate_stderr[evaluation]);
     }
   }
 
@@ -9183,7 +9196,8 @@ np_beta_regression_categorical_gradients_validated(
     if(category_count == 1) {
       for(evaluation = 0; evaluation < plan->num_eval; ++evaluation) {
         gradient[output_coordinate][evaluation] = 0.0;
-        gradient_stderr[output_coordinate][evaluation] = 0.0;
+        if(do_gerr)
+          gradient_stderr[output_coordinate][evaluation] = 0.0;
       }
       continue;
     }
@@ -9214,7 +9228,7 @@ np_beta_regression_categorical_gradients_validated(
       plan, leave_one_out, leave_one_out_offset, &provider,
       response, positive_weights, standard_error_mode,
       workspace, row_result,
-      alternate_mean, alternate_stderr, diagnostics, NULL);
+      alternate_mean, do_gerr ? alternate_stderr : NULL, diagnostics, NULL);
     context->dense_spec.eval_ordered = eval_ordered;
     if(context->use_compressed)
       context->compressed_spec.eval_ordered = eval_ordered;
@@ -9225,9 +9239,10 @@ np_beta_regression_categorical_gradients_validated(
       gradient[output_coordinate][evaluation] =
         (double)direction[evaluation] *
         (mean[evaluation] - alternate_mean[evaluation]);
-      gradient_stderr[output_coordinate][evaluation] = sqrt(
-        mean_stderr[evaluation] * mean_stderr[evaluation] +
-        alternate_stderr[evaluation] * alternate_stderr[evaluation]);
+      if(do_gerr)
+        gradient_stderr[output_coordinate][evaluation] = sqrt(
+          mean_stderr[evaluation] * mean_stderr[evaluation] +
+          alternate_stderr[evaluation] * alternate_stderr[evaluation]);
     }
   }
 
@@ -9249,6 +9264,7 @@ np_beta_regression_gradient_rows_validated(
   int *undefined_count)
 {
   NPContinuousKernelRowStatus status = NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  const int do_gerr = gradient_stderr != NULL;
   int response_is_constant = 1;
   int evaluation;
   int derivative_coordinate;
@@ -9269,7 +9285,6 @@ np_beta_regression_gradient_rows_validated(
      plan->route->segment_count != 1 ||
      plan->route->segment[0].descriptor.family != NP_CKERNEL_FAMILY_BETA ||
      response == NULL || workspace == NULL || gradient == NULL ||
-     gradient_stderr == NULL ||
      (standard_error_mode != NP_REGRESSION_STDERR_LOCAL_RESIDUAL &&
       standard_error_mode != NP_REGRESSION_STDERR_CONDITIONAL_INFLUENCE))
     return NP_CONTINUOUS_ROW_ERR_LAYOUT;
@@ -9277,7 +9292,7 @@ np_beta_regression_gradient_rows_validated(
       derivative_coordinate < plan->num_continuous;
       ++derivative_coordinate)
     if(gradient[derivative_coordinate] == NULL ||
-       gradient_stderr[derivative_coordinate] == NULL)
+       (do_gerr && gradient_stderr[derivative_coordinate] == NULL))
       return NP_CONTINUOUS_ROW_ERR_LAYOUT;
   for(observation = 0; observation < plan->num_train; ++observation) {
     if(!R_FINITE(response[observation])) {
@@ -9294,7 +9309,8 @@ np_beta_regression_gradient_rows_validated(
         ++derivative_coordinate)
       for(evaluation = 0; evaluation < plan->num_eval; ++evaluation) {
         gradient[derivative_coordinate][evaluation] = 0.0;
-        gradient_stderr[derivative_coordinate][evaluation] = 0.0;
+        if(do_gerr)
+          gradient_stderr[derivative_coordinate][evaluation] = 0.0;
       }
     return NP_CONTINUOUS_ROW_OK;
   }
@@ -9388,7 +9404,8 @@ np_beta_regression_gradient_rows_validated(
       if(!R_FINITE(side_weight) || side_weight == 0.0 ||
          !R_FINITE(side_response)) {
         gradient[derivative_coordinate][evaluation] = NA_REAL;
-        gradient_stderr[derivative_coordinate][evaluation] = NA_REAL;
+        if(do_gerr)
+          gradient_stderr[derivative_coordinate][evaluation] = NA_REAL;
         if(undefined_count != NULL)
           ++*undefined_count;
         continue;
@@ -9421,16 +9438,19 @@ np_beta_regression_gradient_rows_validated(
 
         if(constant_active) {
           gradient[derivative_coordinate][evaluation] = 0.0;
-          gradient_stderr[derivative_coordinate][evaluation] = 0.0;
+          if(do_gerr)
+            gradient_stderr[derivative_coordinate][evaluation] = 0.0;
         } else if(fabs(jump_in_ratio) <= tolerance) {
           gradient[derivative_coordinate][evaluation] = NA_REAL;
-          gradient_stderr[derivative_coordinate][evaluation] = NA_REAL;
+          if(do_gerr)
+            gradient_stderr[derivative_coordinate][evaluation] = NA_REAL;
           if(undefined_count != NULL)
             ++*undefined_count;
         } else {
           gradient[derivative_coordinate][evaluation] =
             jump_in_ratio > 0.0 ? INFINITY : -INFINITY;
-          gradient_stderr[derivative_coordinate][evaluation] = NA_REAL;
+          if(do_gerr)
+            gradient_stderr[derivative_coordinate][evaluation] = NA_REAL;
           if(infinite_count != NULL)
             ++*infinite_count;
         }
@@ -9440,6 +9460,14 @@ np_beta_regression_gradient_rows_validated(
       derivative_value =
         (regular_response - side_mean * regular_total) / side_weight;
       gradient[derivative_coordinate][evaluation] = derivative_value;
+      if(!do_gerr) {
+        if(!R_FINITE(derivative_value)) {
+          gradient[derivative_coordinate][evaluation] = NA_REAL;
+          if(undefined_count != NULL)
+            ++*undefined_count;
+        }
+        continue;
+      }
       if(standard_error_mode ==
          NP_REGRESSION_STDERR_CONDITIONAL_INFLUENCE) {
         if(plan->num_train <= 1) {
@@ -9831,13 +9859,18 @@ static int np_beta_absolute_route_body(
   if(regression_moment_context != NULL &&
      (regression_moment_context->response == NULL ||
       regression_moment_context->mean == NULL ||
-      regression_moment_context->mean_stderr == NULL ||
       regression_moment_context->status == NULL ||
+      (regression_moment_context->compute_errors != 0 &&
+       regression_moment_context->compute_errors != 1) ||
+      (regression_moment_context->compute_errors &&
+       regression_moment_context->mean_stderr == NULL) ||
       (regression_moment_context->compute_gradient != 0 &&
        regression_moment_context->compute_gradient != 1) ||
       (regression_moment_context->compute_gradient &&
-       (regression_moment_context->gradient == NULL ||
-        regression_moment_context->gradient_stderr == NULL)) ||
+       regression_moment_context->gradient == NULL) ||
+      (regression_moment_context->compute_gradient &&
+       regression_moment_context->compute_errors &&
+       regression_moment_context->gradient_stderr == NULL) ||
       (regression_moment_context->positive_weights != 0 &&
        regression_moment_context->positive_weights != 1) ||
       derivative_coordinate >= 0 || kernel_power != 1 ||
@@ -21910,7 +21943,8 @@ static NP_NOINLINE void np_beta_scalar_regression_fit_canonical(
      kernel_route->segment_count != 1 ||
      kernel_route->segment[0].coordinate_offset != 0 ||
      kernel_route->segment[0].coordinate_count != num_reg_continuous ||
-     num_reg_continuous <= 0 || do_grad != do_gerr ||
+     num_reg_continuous <= 0 ||
+     (do_gerr && (!do_grad || mean_stderr == NULL)) ||
      kernel_route_diagnostics == NULL ||
      (categorical_compress != 0 && categorical_compress != 1) ||
      (standard_error_mode != NP_REGRESSION_STDERR_LOCAL_RESIDUAL &&
@@ -21984,6 +22018,7 @@ static NP_NOINLINE void np_beta_scalar_regression_fit_canonical(
   regression_moment_context.mean_stderr = mean_stderr;
   regression_moment_context.gradient = gradient;
   regression_moment_context.gradient_stderr = gradient_stderr;
+  regression_moment_context.compute_errors = mean_stderr != NULL;
   regression_moment_context.compute_gradient = do_grad;
   regression_moment_context.positive_weights =
     kernel_route->segment[0].descriptor.order == 2;
@@ -22194,7 +22229,8 @@ static NP_NOINLINE int np_beta_regression_lp_moment_row_canonical(
     bandwidth_mode == BW_FIXED ? NULL : matrix_bandwidth_eval,
     lambda, num_categories, matrix_categorical_vals, NULL,
     weighted_sum, NULL, scaled_kernel_weights, NULL,
-    &dual_power_context, NULL, &execution_context, NULL, 0, NULL);
+    weighted_sum_power2 != NULL ? &dual_power_context : NULL,
+    NULL, &execution_context, NULL, 0, NULL);
 }
 
 void np_beta_scaled_row_context_init(NPBetaScaledRowContext *context)
@@ -23146,7 +23182,7 @@ enum {
   NP_REGRESSION_SCALAR_FIT_ERR_WORKSPACE_DIMENSION = -6
 };
 
-enum { NP_REGRESSION_SCALAR_RESPONSE_COLUMNS = 3 };
+enum { NP_REGRESSION_SCALAR_RESPONSE_COLUMNS_MAX = 3 };
 
 typedef struct {
   int *kernel_c;
@@ -23179,6 +23215,7 @@ typedef struct {
   double *mean_stderr;
   double **gradient_stderr;
   int tree_enabled;
+  int do_merr;
   int do_grad;
   int do_gerr;
   NPRegressionStandardErrorMode standard_error_mode;
@@ -23243,10 +23280,11 @@ static SEXP np_regression_scalar_fit_execute(void *data)
   NPRegressionScalarFitOwner * const owner = &execution->owner;
   const int conditional_influence =
     call->standard_error_mode == NP_REGRESSION_STDERR_CONDITIONAL_INFLUENCE;
+  const int response_column_count = call->do_merr ? 3 : 2;
   const int p_nvar = call->do_grad ?
     (call->num_reg_continuous + call->num_reg_unordered +
      call->num_reg_ordered) : 0;
-  double *response_columns[NP_REGRESSION_SCALAR_RESPONSE_COLUMNS] = {
+  double *response_columns[NP_REGRESSION_SCALAR_RESPONSE_COLUMNS_MAX] = {
     call->vector_Y, NULL, NULL
   };
   int permutation_operator = OP_NOOP;
@@ -23256,7 +23294,7 @@ static SEXP np_regression_scalar_fit_execute(void *data)
   int predictor;
 
   allocation_count =
-    (size_t)NP_REGRESSION_SCALAR_RESPONSE_COLUMNS *
+    (size_t)response_column_count *
     (size_t)call->num_obs_eval_alloc;
   if(!np_size_array_bytes_checked(
        allocation_count, sizeof(double), &allocation_bytes)) {
@@ -23288,7 +23326,7 @@ static SEXP np_regression_scalar_fit_execute(void *data)
 
   if(call->do_grad) {
     if(!np_size_mul_checked(
-         (size_t)NP_REGRESSION_SCALAR_RESPONSE_COLUMNS,
+         (size_t)response_column_count,
          (size_t)call->num_obs_eval_alloc, &allocation_count) ||
        !np_size_mul_checked(
          allocation_count, (size_t)p_nvar, &allocation_count) ||
@@ -23312,18 +23350,22 @@ static SEXP np_regression_scalar_fit_execute(void *data)
 
   owner->unit_response = (double *)malloc(
     (size_t)call->num_obs_train * sizeof(double));
-  owner->squared_response = (double *)malloc(
-    (size_t)call->num_obs_train * sizeof(double));
-  if(owner->unit_response == NULL || owner->squared_response == NULL) {
+  if(call->do_merr)
+    owner->squared_response = (double *)malloc(
+      (size_t)call->num_obs_train * sizeof(double));
+  if(owner->unit_response == NULL ||
+     (call->do_merr && owner->squared_response == NULL)) {
     execution->status = NP_REGRESSION_SCALAR_FIT_ERR_ALLOC;
     return R_NilValue;
   }
   response_columns[1] = owner->unit_response;
-  response_columns[2] = owner->squared_response;
+  if(call->do_merr)
+    response_columns[2] = owner->squared_response;
 
   for(i = 0; i < call->num_obs_train; i++) {
     owner->unit_response[i] = 1.0;
-    owner->squared_response[i] = call->vector_Y[i] * call->vector_Y[i];
+    if(call->do_merr)
+      owner->squared_response[i] = call->vector_Y[i] * call->vector_Y[i];
   }
 
   if((!conditional_influence) && (!call->do_grad) &&
@@ -23354,7 +23396,7 @@ static SEXP np_regression_scalar_fit_execute(void *data)
       0, 0, 1, 1, conditional_influence, 0, 0, 0, 0,
       call->operator, permutation_operator,
       0, call->do_grad, NULL, 0,
-      NP_REGRESSION_SCALAR_RESPONSE_COLUMNS, 0,
+      response_column_count, 0,
       call->tree_enabled, 0, kdt_extern_X,
       NULL, NULL, NULL,
       call->matrix_X_unordered_train,
@@ -23380,27 +23422,29 @@ static SEXP np_regression_scalar_fit_execute(void *data)
   }
 
   for(i = 0; i < call->num_obs_eval; i++) {
-    const int response_offset = NP_REGRESSION_SCALAR_RESPONSE_COLUMNS * i;
+    const int response_offset = response_column_count * i;
     const double denominator =
       copysign(DBL_MIN, owner->mean_columns[response_offset + 1]) +
       owner->mean_columns[response_offset + 1];
     call->mean[i] = owner->mean_columns[response_offset] / denominator;
-    call->mean_stderr[i] =
-      owner->mean_columns[response_offset + 2] / denominator -
-      call->mean[i] * call->mean[i];
-    call->mean_stderr[i] = (call->mean_stderr[i] <= 0.0) ? 0.0 :
-      sqrt(call->mean_stderr[i] * call->kernel_squared_integral /
-           (denominator * call->bandwidth_product));
+    if(call->do_merr) {
+      call->mean_stderr[i] =
+        owner->mean_columns[response_offset + 2] / denominator -
+        call->mean[i] * call->mean[i];
+      call->mean_stderr[i] = (call->mean_stderr[i] <= 0.0) ? 0.0 :
+        sqrt(call->mean_stderr[i] * call->kernel_squared_integral /
+             (denominator * call->bandwidth_product));
+    }
   }
 
   if(call->do_grad) {
     for(predictor = 0; predictor < call->num_reg_continuous; predictor++) {
       for(i = 0; i < call->num_obs_eval; i++) {
         const int response_offset =
-          NP_REGRESSION_SCALAR_RESPONSE_COLUMNS * i;
+          response_column_count * i;
         const int permutation_offset =
           predictor * call->num_obs_eval *
-          NP_REGRESSION_SCALAR_RESPONSE_COLUMNS + response_offset;
+          response_column_count + response_offset;
         const double denominator =
           copysign(DBL_MIN, owner->mean_columns[response_offset + 1]) +
           owner->mean_columns[response_offset + 1];
@@ -23426,10 +23470,10 @@ static SEXP np_regression_scalar_fit_execute(void *data)
         predictor++) {
       for(i = 0; i < call->num_obs_eval; i++) {
         const int response_offset =
-          NP_REGRESSION_SCALAR_RESPONSE_COLUMNS * i;
+          response_column_count * i;
         const int permutation_offset =
           predictor * call->num_obs_eval *
-          NP_REGRESSION_SCALAR_RESPONSE_COLUMNS + response_offset;
+          response_column_count + response_offset;
         const double denominator =
           copysign(DBL_MIN,
                    owner->permutation_columns[permutation_offset + 1]) +
@@ -23446,7 +23490,7 @@ static SEXP np_regression_scalar_fit_execute(void *data)
             call->mean_stderr[i] * call->mean_stderr[i] +
             nonnegative_variance * call->kernel_squared_integral /
             (denominator * call->bandwidth_product));
-        } else {
+        } else if(call->do_gerr) {
           call->gradient_stderr[predictor][i] = 0.0;
         }
       }
@@ -23456,10 +23500,10 @@ static SEXP np_regression_scalar_fit_execute(void *data)
         predictor < p_nvar; predictor++) {
       for(i = 0; i < call->num_obs_eval; i++) {
         const int response_offset =
-          NP_REGRESSION_SCALAR_RESPONSE_COLUMNS * i;
+          response_column_count * i;
         const int permutation_offset =
           predictor * call->num_obs_eval *
-          NP_REGRESSION_SCALAR_RESPONSE_COLUMNS + response_offset;
+          response_column_count + response_offset;
         const double denominator =
           copysign(DBL_MIN,
                    owner->permutation_columns[permutation_offset + 1]) +
@@ -23481,14 +23525,14 @@ static SEXP np_regression_scalar_fit_execute(void *data)
             call->mean_stderr[i] * call->mean_stderr[i] +
             nonnegative_variance * call->kernel_squared_integral /
             (denominator * call->bandwidth_product));
-        } else {
+        } else if(call->do_gerr) {
           call->gradient_stderr[predictor][i] = 0.0;
         }
       }
     }
   }
 
-  if(conditional_influence &&
+  if(conditional_influence && call->do_merr &&
      !np_regression_conditional_influence_finish(
        call->num_obs_train, p_nvar,
        call->do_grad ? call->num_reg_continuous : 0,
@@ -23599,6 +23643,7 @@ typedef struct {
   double *mean_stderr;
   double **gradient_stderr;
   int tree_enabled;
+  int do_merr;
   int do_grad;
   int do_gerr;
   int categorical_compress;
@@ -23747,11 +23792,14 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
     (BANDWIDTH_reg != BW_ADAP_NN) &&
     (call->tree_enabled == NP_TREE_TRUE);
   const int reuse_fit_dual_power =
-    (!reuse_fit_kernel_row) && (!fit_tree_active);
+    call->do_merr && (!reuse_fit_kernel_row) && (!fit_tree_active);
   NP_DualPowerCtx fit_dual_power_ctx = {
     NULL, 2, NULL, NULL, 0, 0, NULL, 0
   };
   int variance_nrhs = 1;
+  int response_y_offset;
+  int response_basis_offset;
+  int moment_stride;
   int i, j, l;
 
   if((vector_glp_degree_extern == NULL) || (num_reg_continuous <= 0)) {
@@ -23770,6 +23818,9 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
     execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_DIMENSION;
     return R_NilValue;
   }
+  response_y_offset = call->do_merr ? 1 : 0;
+  response_basis_offset = call->do_merr ? 2 : 1;
+  moment_stride = owner->nterms + response_basis_offset;
   if(call->do_grad && call->do_gerr)
     for(l = 0; l < num_reg_continuous; ++l)
       if(np_glp_gradient_direction_active(l))
@@ -23796,22 +23847,25 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
   owner->eval_unordered = alloc_matd(1, num_reg_unordered);
   owner->eval_ordered = alloc_matd(1, num_reg_ordered);
   owner->response_columns = (double **)malloc(
-    (size_t)(owner->nterms + 2)*sizeof(double *));
+    (size_t)moment_stride*sizeof(double *));
   owner->basis_columns = (double **)malloc(
     (size_t)owner->nterms*sizeof(double *));
-  owner->squared_response = (double *)malloc(
-    (size_t)num_obs_train*sizeof(double));
+  if(call->do_merr)
+    owner->squared_response = (double *)malloc(
+      (size_t)num_obs_train*sizeof(double));
   owner->moments = (double *)malloc(
-    (size_t)(owner->nterms + 2)*(size_t)owner->nterms*sizeof(double));
-  owner->power2_moments = (double *)malloc(
-    (size_t)owner->nterms*(size_t)owner->nterms*sizeof(double));
-  if(reuse_fit_kernel_row)
+    (size_t)moment_stride*(size_t)owner->nterms*sizeof(double));
+  if(call->do_merr)
+    owner->power2_moments = (double *)malloc(
+      (size_t)owner->nterms*(size_t)owner->nterms*sizeof(double));
+  if(call->do_merr && reuse_fit_kernel_row)
     owner->retained_kernel_row = (double *)malloc(
       (size_t)num_obs_train*sizeof(double));
   owner->coefficient = (double *)malloc(
     (size_t)owner->nterms*sizeof(double));
-  owner->power2_projection = (double *)malloc(
-    (size_t)owner->nterms*sizeof(double));
+  if(call->do_merr)
+    owner->power2_projection = (double *)malloc(
+      (size_t)owner->nterms*sizeof(double));
   owner->eval_basis = (double *)malloc(
     (size_t)owner->nterms*sizeof(double));
   owner->eval_derivative = (double *)malloc(
@@ -23831,10 +23885,13 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
      (num_reg_unordered > 0 && owner->eval_unordered == NULL) ||
      (num_reg_ordered > 0 && owner->eval_ordered == NULL) ||
      owner->response_columns == NULL || owner->basis_columns == NULL ||
-     owner->squared_response == NULL || owner->moments == NULL ||
-     owner->power2_moments == NULL ||
-     (reuse_fit_kernel_row && owner->retained_kernel_row == NULL) ||
-     owner->coefficient == NULL || owner->power2_projection == NULL ||
+     (call->do_merr && owner->squared_response == NULL) ||
+     owner->moments == NULL ||
+     (call->do_merr && owner->power2_moments == NULL) ||
+     (call->do_merr && reuse_fit_kernel_row &&
+      owner->retained_kernel_row == NULL) ||
+     owner->coefficient == NULL ||
+     (call->do_merr && owner->power2_projection == NULL) ||
      owner->eval_basis == NULL ||
      owner->eval_derivative == NULL ||
      (use_bernstein && owner->basis_context == NULL)) {
@@ -23842,14 +23899,17 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
     return R_NilValue;
   }
 
-  fit_dual_power_ctx.weighted_sum = owner->power2_moments;
-  fit_dual_power_ctx.matrix_Y = owner->basis;
-  fit_dual_power_ctx.matrix_W = owner->basis;
-  fit_dual_power_ctx.ncol_Y = owner->nterms;
-  fit_dual_power_ctx.ncol_W = owner->nterms;
+  if(call->do_merr) {
+    fit_dual_power_ctx.weighted_sum = owner->power2_moments;
+    fit_dual_power_ctx.matrix_Y = owner->basis;
+    fit_dual_power_ctx.matrix_W = owner->basis;
+    fit_dual_power_ctx.ncol_Y = owner->nterms;
+    fit_dual_power_ctx.ncol_W = owner->nterms;
+  }
 
-  for(i = 0; i < num_obs_train; ++i)
-    owner->squared_response[i] = call->vector_Y[i]*call->vector_Y[i];
+  if(call->do_merr)
+    for(i = 0; i < num_obs_train; ++i)
+      owner->squared_response[i] = call->vector_Y[i]*call->vector_Y[i];
 
   if(use_bernstein) {
     for(l = 0; l < num_reg_continuous; ++l) {
@@ -23893,7 +23953,8 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	      (BANDWIDTH_reg == BW_FIXED);
 	    const int owner_chunk_rows_lp =
 	      np_reg_mpi_owner_chunk_rows(num_obs_eval,
-	                                  2 + (call->do_grad ? num_reg_continuous*(1 + (call->do_gerr ? 1 : 0)) : 0));
+	                                  1 + call->do_merr +
+	                                  (call->do_grad ? num_reg_continuous*(1 + (call->do_gerr ? 1 : 0)) : 0));
 #endif
 
   for(j = 0; j < num_obs_eval; ++j) {
@@ -23905,7 +23966,8 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	      if(use_mpi_owner_reduce_lp && ((j % owner_chunk_rows_lp) == 0)){
 	        const int chunk_start = j;
 	        const int chunk_end = MIN(num_obs_eval, chunk_start + owner_chunk_rows_lp);
-	        const int owner_row_width_lp = 2 + (call->do_grad ? num_reg_continuous*(1 + (call->do_gerr ? 1 : 0)) : 0);
+	        const int owner_row_width_lp = 1 + call->do_merr +
+	          (call->do_grad ? num_reg_continuous*(1 + (call->do_gerr ? 1 : 0)) : 0);
 	        int local_pos = 0;
 	        int owner_solve_failed = 0;
 
@@ -23914,8 +23976,10 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	                                    chunk_end,
 	                                    owner_row_width_lp,
 	                                    "npreg LP");
-	        owner->mpi_kernel_row = (double *)malloc((size_t)num_obs_train*sizeof(double));
-	        if(owner->mpi_kernel_row == NULL)
+	        if(call->do_merr)
+	          owner->mpi_kernel_row = (double *)malloc(
+	            (size_t)num_obs_train*sizeof(double));
+	        if(call->do_merr && owner->mpi_kernel_row == NULL)
 	          error("\n** Error: memory allocation failed.");
 
 	        local_pos = 0;
@@ -23939,10 +24003,11 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	            owner->eval_ordered[l][0] =
 	              call->matrix_X_ordered_eval[l][jj];
 
-	          owner->response_columns[0] = owner->squared_response;
-	          owner->response_columns[1] = call->vector_Y;
+	          if(call->do_merr)
+	            owner->response_columns[0] = owner->squared_response;
+	          owner->response_columns[response_y_offset] = call->vector_Y;
 	          for(l = 0; l < owner->nterms; l++){
-	            owner->response_columns[l + 2] = owner->basis[l];
+	            owner->response_columns[l + response_basis_offset] = owner->basis[l];
 	            owner->basis_columns[l] = owner->basis[l];
 	          }
 
@@ -23971,7 +24036,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	                                   0,
 	                                   NULL,
 	                                   1,
-	                                   owner->nterms + 2,
+	                                   moment_stride,
 	                                   owner->nterms,
 	                                   (BANDWIDTH_reg == BW_ADAP_NN) ? NP_TREE_FALSE : call->tree_enabled,
 	                                   0,
@@ -24013,7 +24078,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	                 num_reg_ordered,
 	                 num_reg_continuous,
 	                 owner->nterms,
-	                 owner->nterms + 2,
+	                 moment_stride,
 	                 call->operator,
 	                 call->kernel_u,
 	                 call->kernel_o,
@@ -24033,7 +24098,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	                 call->matrix_categorical_vals,
 	                 call->categorical_compress,
 	                 owner->moments,
-	                 owner->power2_moments,
+	                 call->do_merr ? owner->power2_moments : NULL,
 	                 owner->mpi_kernel_row,
 	                 call->kernel_route,
 	                 call->kernel_route_diagnostics) != 0) {
@@ -24043,11 +24108,12 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	          }
 
 	          for(i = 0; i < owner->nterms; i++){
-	            const int base = i*(owner->nterms + 2);
-	            owner->solve_workspace.rhs_source[i] = owner->moments[base + 1];
+	            const int base = i*moment_stride;
+	            owner->solve_workspace.rhs_source[i] =
+	              owner->moments[base + response_y_offset];
 	            for(l = 0; l < owner->nterms; l++)
 	              owner->solve_workspace.gram_source[i+l*owner->nterms] =
-	                owner->moments[base + (l + 2)];
+	                owner->moments[base + l + response_basis_offset];
 	          }
 	          {
 	            int ridge_steps = 0;
@@ -24107,17 +24173,24 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	          for(i = 0; i < owner->nterms; i++)
 	            out_owner[0] += owner->eval_basis[i]*owner->coefficient[i];
 
-	          sk_owner = copysign(DBL_MIN, owner->moments[2]) + owner->moments[2];
-	          ey_owner = owner->moments[1]/sk_owner;
-	          ey2_owner = owner->moments[0]/sk_owner;
-	          sigma2_owner = ey2_owner - ey_owner*ey_owner;
-	          {
-	            const double v_owner = sigma2_owner * call->kernel_squared_integral / (sk_owner*call->bandwidth_product);
-	            out_owner[1] = (v_owner <= 0.0) ? 0.0 : sqrt(v_owner);
+	          sigma2_owner = 0.0;
+	          if(call->do_merr) {
+	            sk_owner = copysign(DBL_MIN,
+	              owner->moments[response_basis_offset]) +
+	              owner->moments[response_basis_offset];
+	            ey_owner = owner->moments[response_y_offset]/sk_owner;
+	            ey2_owner = owner->moments[0]/sk_owner;
+	            sigma2_owner = ey2_owner - ey_owner*ey_owner;
+	            {
+	              const double v_owner = sigma2_owner *
+	                call->kernel_squared_integral /
+	                (sk_owner*call->bandwidth_product);
+	              out_owner[1] = (v_owner <= 0.0) ? 0.0 : sqrt(v_owner);
+	            }
+	            sigma2_owner = (sigma2_owner <= 0.0) ? 0.0 : sigma2_owner;
 	          }
-	          sigma2_owner = (sigma2_owner <= 0.0) ? 0.0 : sigma2_owner;
 
-	          if(call->kernel_route == NULL) {
+	          if(call->do_merr && call->kernel_route == NULL) {
 	            for(i = 0; i < owner->nterms*owner->nterms; i++)
 	              owner->power2_moments[i] = 0.0;
 
@@ -24135,8 +24208,9 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	          }
 	          {
 	            int variance_rhs = 1;
-	            for(i = 0; i < owner->nterms; i++)
-	              owner->solve_workspace.rhs_source[i] = owner->eval_basis[i];
+	            if(call->do_merr)
+	              for(i = 0; i < owner->nterms; i++)
+	                owner->solve_workspace.rhs_source[i] = owner->eval_basis[i];
 
 	            if(call->do_grad){
 	              for(l = 0; l < num_reg_continuous; l++){
@@ -24150,7 +24224,8 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	                  owner->eval_derivative;
 	                double grad_value = 0.0;
 	                const int output_offset =
-	                  2 + l*(1 + (call->do_gerr ? 1 : 0));
+	                  1 + call->do_merr +
+	                  l*(1 + (call->do_gerr ? 1 : 0));
 
 	                if(use_bernstein)
 	                  np_glp_fill_basis_eval_deriv(l,
@@ -24182,15 +24257,17 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	              }
 	            }
 
-	            if(variance_rhs != variance_nrhs){
-	              owner_solve_failed = 1;
-	              break;
+	            if(call->do_merr) {
+	              if(variance_rhs != variance_nrhs){
+	                owner_solve_failed = 1;
+	                break;
+	              }
+	              if(np_lp_solve_workspace_solve_factored(
+	                   &owner->solve_workspace,
+	                   owner->nterms,
+	                   variance_rhs))
+	                have_vcov_owner = 1;
 	            }
-	            if(np_lp_solve_workspace_solve_factored(
-	                 &owner->solve_workspace,
-	                 owner->nterms,
-	                 variance_rhs))
-	              have_vcov_owner = 1;
 
 	            if(have_vcov_owner){
 	              const double q = np_lp_variance_quadratic(
@@ -24216,7 +24293,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	                      owner->nterms);
 	                    const double gv = sigma2_owner*grad_q;
 	                    if((gv > 0.0) && isfinite(gv))
-	                      out_owner[3 + l*2] = sqrt(gv);
+	                      out_owner[2 + call->do_merr + l*2] = sqrt(gv);
 	                    rhs++;
 	                  }
 	                }
@@ -24255,7 +24332,8 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	                np_reg_mpi_owner_chunk_recv_ptr(&owner->mpi_owner_chunk, i, pos_i);
 	              int ipos = 0;
 	              call->mean[jj] = in[ipos++];
-	              call->mean_stderr[jj] = in[ipos++];
+	              if(call->do_merr)
+	                call->mean_stderr[jj] = in[ipos++];
 	              if(call->do_grad){
 	                for(l = 0; l < num_reg_continuous; l++){
 	                  call->gradient[l][jj] = in[ipos++];
@@ -24301,10 +24379,11 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
     for(l = 0; l < num_reg_ordered; ++l)
       owner->eval_ordered[l][0] = call->matrix_X_ordered_eval[l][j];
 
-    owner->response_columns[0] = owner->squared_response;
-    owner->response_columns[1] = call->vector_Y;
+    if(call->do_merr)
+      owner->response_columns[0] = owner->squared_response;
+    owner->response_columns[response_y_offset] = call->vector_Y;
     for(l = 0; l < owner->nterms; ++l) {
-      owner->response_columns[l + 2] = owner->basis[l];
+      owner->response_columns[l + response_basis_offset] = owner->basis[l];
       owner->basis_columns[l] = owner->basis[l];
     }
 
@@ -24316,7 +24395,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
            num_reg_ordered,
            num_reg_continuous,
            owner->nterms,
-           owner->nterms + 2,
+           moment_stride,
            call->operator,
            call->kernel_u,
            call->kernel_o,
@@ -24335,9 +24414,9 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
            call->lambda,
            call->num_categories,
            call->matrix_categorical_vals,
-           call->categorical_compress,
-           owner->moments,
-           owner->power2_moments,
+	           call->categorical_compress,
+	           owner->moments,
+	           call->do_merr ? owner->power2_moments : NULL,
            NULL,
            call->kernel_route,
            call->kernel_route_diagnostics) != 0) {
@@ -24358,7 +24437,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
                          call->operator,
                          OP_NOOP,
                          0, 0, NULL, 1,
-                         owner->nterms + 2,
+                         moment_stride,
                          owner->nterms,
                          BANDWIDTH_reg == BW_ADAP_NN ?
                            NP_TREE_FALSE : call->tree_enabled,
@@ -24385,7 +24464,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
                          NULL,
                          owner->moments,
                          NULL,
-                         reuse_fit_kernel_row ?
+                           (call->do_merr && reuse_fit_kernel_row) ?
                            owner->retained_kernel_row : NULL,
                          call->gate_context,
                          reuse_fit_dual_power ? &fit_dual_power_ctx : NULL,
@@ -24397,11 +24476,12 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
     }
 
     for(i = 0; i < owner->nterms; ++i) {
-      const int base = i*(owner->nterms + 2);
-      owner->solve_workspace.rhs_source[i] = owner->moments[base + 1];
+      const int base = i*moment_stride;
+      owner->solve_workspace.rhs_source[i] =
+        owner->moments[base + response_y_offset];
       for(l = 0; l < owner->nterms; ++l)
         owner->solve_workspace.gram_source[i+l*owner->nterms] =
-          owner->moments[base + l + 2];
+          owner->moments[base + l + response_basis_offset];
     }
 
     {
@@ -24454,28 +24534,32 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
     call->mean[j] = 0.0;
     for(i = 0; i < owner->nterms; ++i)
       call->mean[j] += owner->eval_basis[i]*owner->coefficient[i];
-    sk = copysign(DBL_MIN, owner->moments[2]) + owner->moments[2];
-    ey = owner->moments[1]/sk;
-    ey2 = owner->moments[0]/sk;
-    sigma2hat = ey2 - ey*ey;
-    call->mean_stderr[j] = sigma2hat <= 0.0 ? 0.0 :
-      sqrt(sigma2hat*call->kernel_squared_integral/
-           (sk*call->bandwidth_product));
-    sigma2hat = sigma2hat <= 0.0 ? 0.0 : sigma2hat;
+    sigma2hat = 0.0;
+    if(call->do_merr) {
+      sk = copysign(DBL_MIN, owner->moments[response_basis_offset]) +
+        owner->moments[response_basis_offset];
+      ey = owner->moments[response_y_offset]/sk;
+      ey2 = owner->moments[0]/sk;
+      sigma2hat = ey2 - ey*ey;
+      call->mean_stderr[j] = sigma2hat <= 0.0 ? 0.0 :
+        sqrt(sigma2hat*call->kernel_squared_integral/
+             (sk*call->bandwidth_product));
+      sigma2hat = sigma2hat <= 0.0 ? 0.0 : sigma2hat;
+    }
 
     for(l = 0; l < owner->nterms; ++l) {
       owner->response_columns[l] = owner->basis[l];
       owner->basis_columns[l] = owner->basis[l];
     }
 
-    if(reuse_fit_kernel_row) {
+    if(call->do_merr && reuse_fit_kernel_row) {
       np_lp_power2_moments_from_kernel_row(owner->basis,
                                             owner->nterms,
                                             owner->retained_kernel_row,
                                             num_obs_train,
                                             call->bandwidth_product,
                                             owner->power2_moments);
-    } else if(!reuse_fit_dual_power) {
+    } else if(call->do_merr && !reuse_fit_dual_power) {
       kernel_weighted_sum_np_ctx(call->kernel_c,
                          call->kernel_u,
                          call->kernel_o,
@@ -24522,8 +24606,9 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 
     {
       int variance_rhs = 1;
-      for(i = 0; i < owner->nterms; ++i)
-        owner->solve_workspace.rhs_source[i] = owner->eval_basis[i];
+      if(call->do_merr)
+        for(i = 0; i < owner->nterms; ++i)
+          owner->solve_workspace.rhs_source[i] = owner->eval_basis[i];
 
       if(call->do_grad) {
         for(l = 0; l < num_reg_continuous; ++l) {
@@ -24565,14 +24650,16 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
         }
       }
 
-      if(variance_rhs != variance_nrhs) {
-        execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_DIMENSION;
-        return R_NilValue;
+      if(call->do_merr) {
+        if(variance_rhs != variance_nrhs) {
+          execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_DIMENSION;
+          return R_NilValue;
+        }
+        if(np_lp_solve_workspace_solve_factored(&owner->solve_workspace,
+                                                owner->nterms,
+                                                variance_rhs))
+          have_vcov = 1;
       }
-      if(np_lp_solve_workspace_solve_factored(&owner->solve_workspace,
-                                              owner->nterms,
-                                              variance_rhs))
-        have_vcov = 1;
 
       if(have_vcov) {
         const double q = np_lp_variance_quadratic(
@@ -24810,6 +24897,7 @@ const NPContinuousPreparedBandwidthView *prepared_bandwidth){
   int num_obs_eval_alloc = num_obs_eval;
 #endif
 
+  const int do_merr = (mean_stderr != NULL);
   const int do_grad = (gradient != NULL);
   const int do_gerr = (gradient_stderr != NULL);
   const int lp_engine_est = lp_engine;
@@ -24818,6 +24906,11 @@ const NPContinuousPreparedBandwidthView *prepared_bandwidth){
   if(standard_error_mode != NP_REGRESSION_STDERR_LOCAL_RESIDUAL &&
      standard_error_mode != NP_REGRESSION_STDERR_CONDITIONAL_INFLUENCE)
     error("invalid internal regression standard-error mode");
+  if(do_gerr && (!do_merr || !do_grad))
+    error("gradient standard errors require gradients and mean standard errors");
+  if(standard_error_mode == NP_REGRESSION_STDERR_CONDITIONAL_INFLUENCE &&
+     !do_merr)
+    error("conditional influence standard errors require an output buffer");
   if(lp_engine_est != NP_LP_ENGINE_SCALAR &&
      standard_error_mode == NP_REGRESSION_STDERR_CONDITIONAL_INFLUENCE)
     error("conditional influence standard errors require the scalar regression engine");
@@ -25238,11 +25331,13 @@ const NPContinuousPreparedBandwidthView *prepared_bandwidth){
       double sigma2hat = 0.0;
       const double ymean = meand(num_obs_train, vector_Y);
 
-      for(i = 0; i < num_obs_train; i++){
-        const double dy = vector_Y[i] - ymean;
-        sigma2hat += dy*dy;
+      if(do_merr) {
+        for(i = 0; i < num_obs_train; i++){
+          const double dy = vector_Y[i] - ymean;
+          sigma2hat += dy*dy;
+        }
+        sigma2hat /= (double)MAX(1, num_obs_train);
       }
-      sigma2hat /= (double)MAX(1, num_obs_train);
 
       for(i = 0; i < num_reg_continuous; i++){
         const double h = matrix_bandwidth[i][0];
@@ -25271,7 +25366,8 @@ const NPContinuousPreparedBandwidthView *prepared_bandwidth){
         if (fit_progress_active) {
           for(i = 0; i < num_obs_eval; i++){
             mean[i] = ymean;
-            mean_stderr[i] = sefac;
+            if(do_merr)
+              mean_stderr[i] = sefac;
             np_progress_fit_loop_step_owned(
               i + 1,
               fit_progress_total,
@@ -25281,7 +25377,8 @@ const NPContinuousPreparedBandwidthView *prepared_bandwidth){
         } else {
           for(i = 0; i < num_obs_eval; i++){
             mean[i] = ymean;
-            mean_stderr[i] = sefac;
+            if(do_merr)
+              mean_stderr[i] = sefac;
           }
         }
 
@@ -25429,11 +25526,12 @@ const NPContinuousPreparedBandwidthView *prepared_bandwidth){
               eval_block_rows = (int)block_rows;
               eval_basis_block = (double *)malloc(
                 block_rows*(size_t)glp_nterms*sizeof(double));
-              projection_block = (double *)malloc(
-                block_rows*(size_t)glp_nterms*sizeof(double));
+              if(do_merr)
+                projection_block = (double *)malloc(
+                  block_rows*(size_t)glp_nterms*sizeof(double));
               yhat_block = (double *)malloc(block_rows*sizeof(double));
               if((eval_basis_block == NULL) ||
-                 (projection_block == NULL) ||
+                 (do_merr && projection_block == NULL) ||
                  (yhat_block == NULL)){
                 free(eval_basis_block);
                 free(projection_block);
@@ -25546,21 +25644,23 @@ const NPContinuousPreparedBandwidthView *prepared_bandwidth){
                                     eval_block_rows,
                                     beta,
                                     yhat_block);
-                np_blas_project_inverse_block_int(
-                  nblock,
-                  glp_nterms,
-                  eval_basis_block,
-                  eval_block_rows,
-                  inverse_workspace.gram,
-                  projection_block);
+                if(do_merr)
+                  np_blas_project_inverse_block_int(
+                    nblock,
+                    glp_nterms,
+                    eval_basis_block,
+                    eval_block_rows,
+                    inverse_workspace.gram,
+                    projection_block);
 
                 for(int row = 0; row < nblock; row++){
                   double q = 0.0;
-                  for(j = 0; j < glp_nterms; j++)
-                    q += eval_basis_block[j*eval_block_rows + row] *
-                      projection_block[j*nblock + row];
+                  if(do_merr)
+                    for(j = 0; j < glp_nterms; j++)
+                      q += eval_basis_block[j*eval_block_rows + row] *
+                        projection_block[j*nblock + row];
                   mean[i + row] = yhat_block[row];
-                  {
+                  if(do_merr) {
                     const double mv = sigma2hat*q;
                     mean_stderr[i + row] =
                       (mv > 0.0 && isfinite(mv)) ?
@@ -25598,16 +25698,17 @@ const NPContinuousPreparedBandwidthView *prepared_bandwidth){
 
                 for(j = 0; j < glp_nterms; j++)
                   yhat += eval_basis[j]*beta[j];
-                for(j = 0; j < glp_nterms; j++){
-                  const double zj = eval_basis[j];
-                  for(int b = 0; b < glp_nterms; b++)
-                    q += zj *
-                      inverse_workspace.matrix_copy[j*glp_nterms + b] *
-                      eval_basis[b];
-                }
+                if(do_merr)
+                  for(j = 0; j < glp_nterms; j++){
+                    const double zj = eval_basis[j];
+                    for(int b = 0; b < glp_nterms; b++)
+                      q += zj *
+                        inverse_workspace.matrix_copy[j*glp_nterms + b] *
+                        eval_basis[b];
+                  }
 
                 mean[i] = yhat;
-                {
+                if(do_merr) {
                   const double mv = sigma2hat*q;
                   mean_stderr[i] = (mv > 0.0 && isfinite(mv)) ?
                     sqrt(mv) : se_default;
@@ -25742,6 +25843,7 @@ const NPContinuousPreparedBandwidthView *prepared_bandwidth){
       .mean_stderr = mean_stderr,
       .gradient_stderr = gradient_stderr,
       .tree_enabled = int_TREE_X,
+      .do_merr = do_merr,
       .do_grad = do_grad,
       .do_gerr = do_gerr,
       .standard_error_mode = standard_error_mode,
@@ -25786,6 +25888,7 @@ const NPContinuousPreparedBandwidthView *prepared_bandwidth){
       .mean_stderr = mean_stderr,
       .gradient_stderr = gradient_stderr,
       .tree_enabled = int_TREE_X,
+      .do_merr = do_merr,
       .do_grad = do_grad,
       .do_gerr = do_gerr,
       .categorical_compress = categorical_compress,

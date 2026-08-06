@@ -1,7 +1,8 @@
 npregression <- 
-    function(bws, eval, mean, merr = NA, grad = NA, gerr = NA,
+    function(bws, eval, mean, merr = NULL, grad = NULL, gerr = NULL,
              resid = NA,
-             ntrain, trainiseval = FALSE, gradients = FALSE, residuals = FALSE,
+             ntrain, trainiseval = FALSE, errors = TRUE,
+             gradients = FALSE, residuals = FALSE,
              gradient.order = NULL,
              xtra = rep(NA, 6),
              rows.omit = NA,
@@ -46,6 +47,7 @@ npregression <-
             resid = resid,
             ntrain = ntrain,
             trainiseval = trainiseval,
+            errors = errors,
             gradients = gradients,
             gradient.order = gradient.order,
             residuals = residuals,
@@ -97,14 +99,20 @@ residuals.npregression <- function(object, ...) {
  if(object$residuals) {
    return(object$resid)
  } else {
-   call.residuals <- function() npreg(bws = object$bws, residuals = TRUE)$resid
+   call.residuals <- function() npreg(bws = object$bws, errors = FALSE,
+                                      residuals = TRUE)$resid
    if (.npRmpi_has_active_slave_pool(comm = 1L)) {
      return(call.residuals())
    }
    return(.npRmpi_with_local_regression(call.residuals()))
  }
 }
-se.npregression <- function(x) { x$merr }
+se.npregression <- function(x) {
+  if (!isTRUE(x$errors) || is.null(x$merr))
+    stop("standard errors are not available: refit or predict/evaluate with errors=TRUE",
+         call. = FALSE)
+  x$merr
+}
 gradients.npregression <- function(x, errors = FALSE, gradient.order = NULL, ...) {
   errors <- npValidateScalarLogical(errors, "errors")
   gout <- if (!errors) x$grad else x$gerr
@@ -112,7 +120,8 @@ gradients.npregression <- function(x, errors = FALSE, gradient.order = NULL, ...
     stop(if (!errors)
       "gradients are not available: fit the model with gradients=TRUE"
     else
-      "gradient standard errors are not available: fit the model with gradients=TRUE")
+      "gradient standard errors are not available: refit or predict/evaluate with gradients=TRUE and errors=TRUE",
+      call. = FALSE)
 
   if (identical(x$bws$regtype, "lc") && !is.null(gradient.order)) {
     npValidateLcGradientOrder(
@@ -192,6 +201,7 @@ gradients.npregression <- function(x, errors = FALSE, gradient.order = NULL, ...
 predict.npregression <- function(object, se.fit = FALSE, ...) {
   se.fit <- npValidateScalarLogical(se.fit, "se.fit")
   dots <- list(...)
+  dots$errors <- NULL
   has.formula.route <- !is.null(object$bws$formula)
 
   if (!is.null(dots$exdat) && !is.null(dots$newdata)) {
@@ -201,7 +211,10 @@ predict.npregression <- function(object, se.fit = FALSE, ...) {
     dots$newdata <- NULL
   }
 
-  call.predict <- function() do.call(npreg, c(list(bws = object$bws), dots))
+  call.predict <- function() do.call(
+    npreg,
+    c(list(bws = object$bws, errors = se.fit), dots)
+  )
   tr <- if (.npRmpi_has_active_slave_pool(comm = 1L)) {
     call.predict()
   } else {
