@@ -84,3 +84,34 @@ test_that("distribution bandwidth state has one typed cleanup owner", {
   expect_match(public, "np_distribution_bw_internal(", fixed = TRUE)
   expect_match(public, "eval_only, NULL, 0);", fixed = TRUE)
 })
+
+test_that("native distribution search evaluates one retained prepared state", {
+  source <- np_distribution_prepared_source()
+  callback <- np_distribution_prepared_function(
+    source, "np_udist_native_search_callback", "int"
+  )
+  search <- np_distribution_prepared_function(
+    source, "C_np_distribution_nomad_native_search", "SEXP"
+  )
+
+  expect_match(source, "NPDistributionPreparedCtx prepared;", fixed = TRUE)
+  expect_match(
+    callback,
+    "np_distribution_prepared_context_eval(",
+    fixed = TRUE
+  )
+  expect_false(grepl(
+    "np_distribution_nomad_native_eval_once(", callback, fixed = TRUE
+  ))
+  expect_false(grepl("NP_NOMAD_CALLBACK_CALLOC", callback, fixed = TRUE))
+  expect_match(
+    search,
+    "np_distribution_prepared_context_prepare(",
+    fixed = TRUE
+  )
+  expect_match(
+    search,
+    "np_distribution_prepared_context_destroy(&context.prepared);",
+    fixed = TRUE
+  )
+})

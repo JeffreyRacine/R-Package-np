@@ -1288,6 +1288,16 @@ typedef struct {
   KDT *tree;
 } NPDistributionPreparedCtx;
 
+static int np_distribution_prepared_context_prepare(
+  NPDistributionPreparedCtx *context,
+  double *myuno, double *myord, double *mycon,
+  double *myeuno, double *myeord, double *myecon, double *mysd,
+  int *myopti, double *myoptd, const double *bw,
+  int penalty_mode, double penalty_mult,
+  double *ckerlb, double *ckerub);
+static int np_distribution_prepared_context_eval(
+  NPDistributionPreparedCtx *context, const double *bw,
+  int penalty_mode, double penalty_mult, double out[5]);
 static void np_distribution_prepared_context_destroy(
   NPDistributionPreparedCtx *context);
 
@@ -10042,6 +10052,9 @@ typedef struct {
   double best_objective;
   double best_eval[5];
   double *best_point;
+  double *raw_point;
+  double *eval_bw;
+  NPDistributionPreparedCtx prepared;
 } np_udist_native_search_context;
 
 static int np_udist_native_decode_eval_bw(const np_udist_native_search_context *context,
@@ -10097,25 +10110,19 @@ static int np_udist_native_search_callback(int n,
 {
   np_udist_native_search_context *context =
     (np_udist_native_search_context *) user_data;
-  double *raw_point = NULL;
-  double *eval_bw = NULL;
+  double *raw_point;
+  double *eval_bw;
   double eval_out[5];
   int j;
   int status;
 
   if (context == NULL || x == NULL || bb_outputs == NULL || m != 1 ||
-      n != context->n)
+      n != context->n || context->raw_point == NULL ||
+      context->eval_bw == NULL)
     return 1;
 
-  raw_point = NP_NOMAD_CALLBACK_CALLOC(context->n, double);
-  eval_bw = NP_NOMAD_CALLBACK_CALLOC(context->n, double);
-  if (raw_point == NULL || eval_bw == NULL) {
-    if (raw_point != NULL)
-      NP_NOMAD_CALLBACK_FREE(raw_point);
-    if (eval_bw != NULL)
-      NP_NOMAD_CALLBACK_FREE(eval_bw);
-    return 1;
-  }
+  raw_point = context->raw_point;
+  eval_bw = context->eval_bw;
 
   for (j = 0; j < context->n; j++) {
     raw_point[j] = (context->bbin[j] == 1) ? nearbyint(x[j]) : x[j];
@@ -10135,30 +10142,16 @@ static int np_udist_native_search_callback(int n,
   status = np_udist_native_decode_eval_bw(context, raw_point, eval_bw);
   if (status != 0) {
     context->callback_failures++;
-    NP_NOMAD_CALLBACK_FREE(raw_point);
-    NP_NOMAD_CALLBACK_FREE(eval_bw);
     return 1;
   }
 
-  status = np_distribution_nomad_native_eval_once(context->myuno,
-                                                  context->myord,
-                                                  context->mycon,
-                                                  context->myeuno,
-                                                  context->myeord,
-                                                  context->myecon,
-                                                  context->mysd,
-                                                  context->myopti,
-                                                  context->myoptd,
-                                                  eval_bw,
-                                                  context->penalty_mode,
-                                                  context->penalty_mult,
-                                                  context->ckerlb,
-                                                  context->ckerub,
-                                                  eval_out);
+  status = np_distribution_prepared_context_eval(&context->prepared,
+                                                 eval_bw,
+                                                 context->penalty_mode,
+                                                 context->penalty_mult,
+                                                 eval_out);
   if (status != 0) {
     context->callback_failures++;
-    NP_NOMAD_CALLBACK_FREE(raw_point);
-    NP_NOMAD_CALLBACK_FREE(eval_bw);
     return 1;
   }
 
@@ -10177,8 +10170,6 @@ static int np_udist_native_search_callback(int n,
   }
 
   bb_outputs[0] = eval_out[0];
-  NP_NOMAD_CALLBACK_FREE(raw_point);
-  NP_NOMAD_CALLBACK_FREE(eval_bw);
   return 0;
 }
 
@@ -10220,6 +10211,8 @@ SEXP C_np_distribution_nomad_native_search(SEXP myuno,
   np_udist_native_search_context context;
   double *solution = NULL;
   double *best_point = NULL;
+  double *raw_start = NULL;
+  double *eval_start = NULL;
   const char *result_message = NULL;
   int n, i, status, budget, seed, inner_count, n_options, objective_cache_enabled;
 
@@ -10322,6 +10315,47 @@ SEXP C_np_distribution_nomad_native_search(SEXP myuno,
   context.ckerub = REAL(ckerub_r);
   context.best_point = best_point;
 
+  raw_start = (double *)R_alloc((size_t)n, sizeof(double));
+  eval_start = (double *)R_alloc((size_t)n, sizeof(double));
+  for (i = 0; i < n; i++) {
+    raw_start[i] = context.bbin[i] == 1 ? nearbyint(REAL(x0_r)[i]) :
+      REAL(x0_r)[i];
+    if (R_FINITE(context.lower[i]) && raw_start[i] < context.lower[i])
+      raw_start[i] = context.lower[i];
+    if (R_FINITE(context.upper[i]) && raw_start[i] > context.upper[i])
+      raw_start[i] = context.upper[i];
+  }
+  if (np_udist_native_decode_eval_bw(&context, raw_start, eval_start) != 0 ||
+      np_distribution_prepared_context_prepare(
+        &context.prepared,
+        context.myuno, context.myord, context.mycon,
+        context.myeuno, context.myeord, context.myecon, context.mysd,
+        context.myopti, context.myoptd, eval_start,
+        context.penalty_mode, context.penalty_mult,
+        context.ckerlb, context.ckerub) != 0) {
+    np_distribution_prepared_context_destroy(&context.prepared);
+    R_Free(solution);
+    R_Free(best_point);
+    if (native_options != NULL)
+      R_Free(native_options);
+    UNPROTECT(17);
+    error("native npudist NOMAD search failed to prepare objective state");
+  }
+
+  context.raw_point = R_Calloc(n, double);
+  context.eval_bw = R_Calloc(n, double);
+  if (context.raw_point == NULL || context.eval_bw == NULL) {
+    if (context.raw_point != NULL) R_Free(context.raw_point);
+    if (context.eval_bw != NULL) R_Free(context.eval_bw);
+    np_distribution_prepared_context_destroy(&context.prepared);
+    R_Free(solution);
+    R_Free(best_point);
+    if (native_options != NULL)
+      R_Free(native_options);
+    UNPROTECT(17);
+    error("failed to allocate native npudist callback scratch");
+  }
+
   problem.api_version = CRS_NOMAD_API_VERSION;
   problem.struct_size = sizeof(problem);
   problem.n = n;
@@ -10354,6 +10388,11 @@ SEXP C_np_distribution_nomad_native_search(SEXP myuno,
                                         NULL,
                                         &result);
   bwm_objective_cache_callback_option_end();
+  R_Free(context.raw_point);
+  R_Free(context.eval_bw);
+  context.raw_point = NULL;
+  context.eval_bw = NULL;
+  np_distribution_prepared_context_destroy(&context.prepared);
 
   PROTECT(out = allocVector(VECSXP, 23));
   PROTECT(names = allocVector(STRSXP, 23));
@@ -12598,6 +12637,53 @@ static void np_density_refresh_penalty(double *vector_scale_factor,
   }
 }
 
+static void np_distribution_refresh_penalty(double *vector_scale_factor,
+                                            int num_var,
+                                            int penalty_mode,
+                                            double penalty_mult)
+{
+  int i;
+
+  bwm_penalty_mode = 0;
+  bwm_penalty_value = DBL_MAX;
+  if (penalty_mode != 1)
+    return;
+
+  {
+    double pmult = penalty_mult;
+    double baseline;
+    if (pmult < 1.0) pmult = 1.0;
+    baseline = bwmfunc_raw_current_scale(vector_scale_factor, num_var);
+    if (!R_FINITE(baseline) || baseline == DBL_MAX) {
+      double *tmp = bwm_alloc_transform_tmp(num_var + 1);
+      if (tmp != NULL &&
+          np_copy_scale_factor_for_raw(tmp, vector_scale_factor, num_var) == 0) {
+        for (i = 1; i <= num_reg_continuous_extern; i++)
+          tmp[i] *= 2.0;
+        for (i = 0; i < num_reg_unordered_extern; i++) {
+          int idx = num_reg_continuous_extern + 1 + i;
+          double maxbw = max_unordered_bw(num_categories_extern[i],
+                                          KERNEL_den_unordered_extern);
+          tmp[idx] = 0.5 * maxbw;
+        }
+        for (i = 0; i < num_reg_ordered_extern; i++) {
+          int idx = num_reg_continuous_extern +
+            num_reg_unordered_extern + 1 + i;
+          tmp[idx] = 0.5;
+        }
+        baseline = bwmfunc_raw(tmp);
+      }
+      safe_free(tmp);
+    }
+    if (!R_FINITE(baseline) || baseline == DBL_MAX)
+      bwm_penalty_value = pmult * 1.0e6;
+    else
+      bwm_penalty_value = baseline + (fabs(baseline) + 1.0) * pmult;
+    if (R_FINITE(bwm_penalty_value))
+      bwm_penalty_mode = 1;
+  }
+}
+
 
 static void np_density_bw_internal(double * myuno, double * myord, double * mycon,
                                    double * mysd, int * myopti, double * myoptd,
@@ -13965,39 +14051,8 @@ static void np_distribution_bw_internal(
   if (prepare_only)
     return;
   bwm_reset_counters();
-  bwm_penalty_mode = 0;
-  bwm_penalty_value = DBL_MAX;
-  if (penalty_mode[0] == 1) {
-    double pmult = penalty_mult[0];
-    double baseline;
-    if (pmult < 1.0) pmult = 1.0;
-    baseline = bwmfunc_raw_current_scale(vector_scale_factor, num_var);
-    if (!R_FINITE(baseline) || baseline == DBL_MAX) {
-      double *tmp = bwm_alloc_transform_tmp(num_var + 1);
-      if (tmp != NULL && np_copy_scale_factor_for_raw(tmp, vector_scale_factor, num_var) == 0) {
-        for (i = 1; i <= num_reg_continuous_extern; i++)
-          tmp[i] *= 2.0;
-        for (i = 0; i < num_reg_unordered_extern; i++) {
-          int idx = num_reg_continuous_extern + 1 + i;
-          double maxbw = max_unordered_bw(num_categories_extern[i], KERNEL_den_unordered_extern);
-          tmp[idx] = 0.5*maxbw;
-        }
-        for (i = 0; i < num_reg_ordered_extern; i++) {
-          int idx = num_reg_continuous_extern + num_reg_unordered_extern + 1 + i;
-          tmp[idx] = 0.5;
-        }
-        baseline = bwmfunc_raw(tmp);
-      }
-      safe_free(tmp);
-    }
-    if (!R_FINITE(baseline) || baseline == DBL_MAX) {
-      bwm_penalty_value = pmult * 1.0e6;
-    } else {
-      bwm_penalty_value = baseline + (fabs(baseline) + 1.0) * pmult;
-    }
-    if (R_FINITE(bwm_penalty_value))
-      bwm_penalty_mode = 1;
-  }
+  np_distribution_refresh_penalty(vector_scale_factor, num_var,
+                                  penalty_mode[0], penalty_mult[0]);
   fret_initial = fret_best = bwmfunc_wrapper(vector_scale_factor);
   iImproved = 0;
   have_start_best = 0;
@@ -14381,6 +14436,83 @@ cleanup_np_distribution_bw:
 
   return ;
   
+}
+
+static int np_distribution_prepared_context_prepare(
+  NPDistributionPreparedCtx *context,
+  double *myuno, double *myord, double *mycon,
+  double *myeuno, double *myeord, double *myecon, double *mysd,
+  int *myopti, double *myoptd, const double *bw,
+  int penalty_mode, double penalty_mult,
+  double *ckerlb, double *ckerub)
+{
+  double fval[3] = {R_NaN, R_NaN, R_NaN};
+  double objective[1] = {R_NaN};
+  double evaluations[1] = {R_NaN};
+  double invalid[1] = {R_NaN};
+  double timing[1] = {R_NaN};
+  double fast[1] = {R_NaN};
+  int pmode = penalty_mode;
+  double pmult = penalty_mult;
+
+  if (context == NULL || bw == NULL)
+    return 1;
+
+  np_distribution_bw_internal(
+    myuno, myord, mycon, myeuno, myeord, myecon, mysd,
+    myopti, myoptd, (double *)bw, fval,
+    objective, evaluations, invalid, timing, fast,
+    &pmode, &pmult, ckerlb, ckerub,
+    1, context, 1);
+  return context->active ? 0 : 1;
+}
+
+static int np_distribution_prepared_context_eval(
+  NPDistributionPreparedCtx *context, const double *bw,
+  int penalty_mode, double penalty_mult, double out[5])
+{
+  double *vector_scale_factor;
+  double fret;
+  int i;
+
+  if (context == NULL || !context->active || bw == NULL || out == NULL ||
+      context->scale_factor == NULL || context->num_var <= 0)
+    return 1;
+
+  vector_scale_factor = context->scale_factor;
+  for (i = 0; i < context->num_var; i++)
+    vector_scale_factor[i + 1] = bw[i];
+
+  if (context->extendednn_upper != NULL) {
+    const double base_k = (double)(num_obs_train_extern - 1);
+    const double hard_upper = (double)INT_MAX / 4.0;
+    for (i = 0; i < context->num_continuous; i++) {
+      double candidate = bw[i];
+      if (!R_FINITE(candidate) || candidate < base_k)
+        candidate = base_k;
+      if (candidate > hard_upper)
+        candidate = hard_upper;
+      context->extendednn_upper[i] = candidate;
+    }
+  }
+
+  if (bwm_use_transform &&
+      bwm_to_unconstrained(vector_scale_factor, context->num_var) != 0)
+    return 1;
+
+  np_bwm_clear_deferred_error();
+  bwm_reset_counters();
+  np_distribution_refresh_penalty(vector_scale_factor, context->num_var,
+                                  penalty_mode, penalty_mult);
+
+  fret = bwmfunc_wrapper(vector_scale_factor);
+  bwm_snapshot_fast_counters();
+  out[0] = fret;
+  out[1] = fret;
+  out[2] = bwm_eval_count;
+  out[3] = bwm_fast_eval_count;
+  out[4] = bwm_invalid_count;
+  return 0;
 }
 
 void np_distribution_bw(double *myuno, double *myord, double *mycon,
