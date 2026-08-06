@@ -54,7 +54,8 @@ Optional local-polynomial derivative order controls.
     rejected. If another derivative order is desired, compute the fit,
     prediction, or evaluation with \code{gradients=TRUE} and that
     \code{gradient.order}; \code{gradients()} does not recompute derivatives
-    after fitting.
+    after fitting. Gradient standard errors additionally require the object
+    to have been created with \code{errors=TRUE}.
   }
 
 \subsection{Additional Arguments}{

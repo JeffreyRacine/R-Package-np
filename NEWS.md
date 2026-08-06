@@ -1,5 +1,16 @@
 # np 0.70-6
 
+* `npreg()` now accepts `errors = TRUE`. The unchanged default computes and
+  retains mean and gradient standard errors as before; `errors = FALSE`
+  requests fitted values and optional gradients without constructing the
+  unrequested standard-error moments, projections, solves, or native output
+  vectors. `predict(..., se.fit = FALSE)` and internal regression evaluators
+  use the corresponding lean request, while `se()` and
+  `gradients(..., errors = TRUE)` give a direct refit message when errors were
+  deliberately omitted. All four mean/SE/gradient request combinations share
+  the canonical scalar, local-polynomial, bounded-beta, and MPI regression
+  engines; bandwidth selection and objective functions are unchanged.
+
 * Conditional density and distribution kernel summaries now identify
   explanatory and dependent kernels separately for continuous, unordered, and
   ordered variables. Bandwidth-object `print()` and `summary()` methods share

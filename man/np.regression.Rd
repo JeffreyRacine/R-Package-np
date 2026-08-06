@@ -18,17 +18,19 @@
 }
 
 \usage{
-npreg(bws, \dots)
+npreg(bws, errors = TRUE, \dots)
 
 \method{npreg}{formula}(bws, 
-      data = NULL, 
+      data = NULL,
+      errors = TRUE,
       newdata = NULL, 
       y.eval = FALSE, 
       \dots)
 
 \method{npreg}{default}(bws, 
       txdat, 
-      tydat, 
+      tydat,
+      errors = TRUE,
       nomad = FALSE, 
       \dots)
 
@@ -37,6 +39,7 @@ npreg(bws, \dots)
       tydat = stop("training data 'tydat' missing"),
       exdat,
       eydat,
+      errors = TRUE,
       gradient.order = 1L,
       gradients = FALSE,
       residuals = FALSE,
@@ -108,6 +111,18 @@ This argument controls the recommended automatic local-polynomial NOMAD route, w
 \subsection{Evaluation Data And Returned Quantities}{
 These arguments control where the regression is evaluated and which fitted quantities are returned.
 }
+
+  \item{errors}{
+    a logical value indicating whether asymptotic standard errors are
+    computed and retained. Defaults to \code{TRUE}, preserving historical
+    behavior. With \code{errors = FALSE}, fitted values and any requested
+    gradients are still computed, but the returned \code{merr} and
+    \code{gerr} components are \code{NULL}; \code{se()} and
+    \code{gradients(..., errors = TRUE)} then fail with a message directing
+    the user to refit or re-evaluate with \code{errors = TRUE}. This option
+    controls fit/evaluation output only and is not forwarded to bandwidth
+    selection.
+  }
 
   \item{exdat}{
     a \eqn{p}-variate data frame of points on which the regression will be
@@ -412,9 +427,11 @@ Further arguments are passed to \code{\link{npregbw}} when bandwidths are comput
   \item{eval}{ evaluation points }
   \item{mean}{ estimates of the regression function (conditional mean) at the
   evaluation points }
-  \item{merr}{ standard errors of the regression function estimates }
+  \item{merr}{ standard errors of the regression function estimates, or
+    \code{NULL} when \code{errors = FALSE} }
   \item{grad}{ estimates of the gradients at each evaluation point }
-  \item{gerr}{ standard errors of the gradient estimates }
+  \item{gerr}{ standard errors of the gradient estimates, or \code{NULL}
+    when \code{errors = FALSE} }
   \item{resid}{ if \code{residuals = TRUE}, in-sample or out-of-sample
     residuals where appropriate (or possible) }
   \item{R2}{ coefficient of determination (Doksum and Samarov (1995))}

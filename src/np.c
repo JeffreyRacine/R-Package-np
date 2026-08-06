@@ -7415,7 +7415,7 @@ SEXP C_np_regression(SEXP tuno,
                      SEXP glp_basis,
                      SEXP enrow,
                      SEXP ncol,
-                     SEXP gradients,
+                     SEXP output_request,
                      SEXP ckerlb,
                      SEXP ckerub)
 {
@@ -7430,7 +7430,10 @@ SEXP C_np_regression(SEXP tuno,
   int basis = asInteger(glp_basis);
   int en = asInteger(enrow);
   int nc = asInteger(ncol);
-  int do_grad = asLogical(gradients);
+  int request = asInteger(output_request);
+  int do_merr;
+  int do_grad;
+  int do_gerr;
   int ncon = 0;
   int nunordered = 0;
   int nordered = 0;
@@ -7452,10 +7455,12 @@ SEXP C_np_regression(SEXP tuno,
 
   if (en < 0) en = 0;
   if (nc < 0) nc = 0;
-  if (do_grad == NA_LOGICAL) do_grad = 0;
-  /* Keep non-zero storage for g/gerr when gradients are disabled to avoid
-   * passing potentially invalid zero-length REAL pointers into legacy C code. */
-  gsize = (do_grad ? ((R_xlen_t)en * (R_xlen_t)nc) : 1);
+  if(!np_regression_output_request_valid(request))
+    error("C_np_regression: invalid output request");
+  do_merr = np_regression_output_requests_errors(request);
+  do_grad = np_regression_output_requests_gradients(request);
+  do_gerr = do_merr && do_grad;
+  gsize = (R_xlen_t)en * (R_xlen_t)nc;
 
   PROTECT(tuno_r = duplicate(coerceVector(tuno, REALSXP)));
   PROTECT(tord_r = duplicate(coerceVector(tord, REALSXP)));
@@ -7508,9 +7513,9 @@ SEXP C_np_regression(SEXP tuno,
   }
 
   PROTECT(out_mean = allocVector(REALSXP, en));
-  PROTECT(out_merr = allocVector(REALSXP, en));
-  PROTECT(out_g = allocVector(REALSXP, gsize));
-  PROTECT(out_gerr = allocVector(REALSXP, gsize));
+  PROTECT(out_merr = do_merr ? allocVector(REALSXP, en) : R_NilValue);
+  PROTECT(out_g = do_grad ? allocVector(REALSXP, gsize) : R_NilValue);
+  PROTECT(out_gerr = do_gerr ? allocVector(REALSXP, gsize) : R_NilValue);
   PROTECT(out_xtra = allocVector(REALSXP, 6));
 
   if(descriptor.family == NP_CKERNEL_FAMILY_BETA) {
@@ -7586,7 +7591,9 @@ SEXP C_np_regression(SEXP tuno,
                 REAL(nconfac_r), REAL(ncatfac_r), REAL(mysd_r),
                 INTEGER(myopti_i),
                 INTEGER(degree_i), INTEGER(gradient_order_i), &bern, &basis,
-                REAL(out_mean), REAL(out_merr), REAL(out_g), REAL(out_gerr),
+                REAL(out_mean), do_merr ? REAL(out_merr) : NULL,
+                do_grad ? REAL(out_g) : NULL,
+                do_gerr ? REAL(out_gerr) : NULL,
                 REAL(out_xtra), ckerlb_p, ckerub_p,
                 active_route, active_diagnostics, categorical_compress);
 
@@ -18839,7 +18846,8 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
   double RS, MSE, MAE, MAPE, CORR, SIGN, pad_num;
 
   int i,j, num_var;
-  int ey_is_ty, do_grad, train_is_eval, num_obs_eval_alloc, max_lev;
+  int ey_is_ty, do_merr, do_grad, do_gerr;
+  int train_is_eval, num_obs_eval_alloc, max_lev;
 
   int * ipt = NULL, * ipe = NULL;  // point permutation, see tree.c
   /* match integer options with their globals */
@@ -18874,7 +18882,13 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
   int_MINIMIZE_IO = myopti[REG_MINIOI];
   BANDWIDTH_reg_extern = myopti[REG_BWI];
 
-  do_grad = myopti[REG_GRAD];
+  do_merr = cmerr != NULL;
+  do_grad = g != NULL;
+  do_gerr = gerr != NULL;
+  if(do_gerr && (!do_merr || !do_grad))
+    error("C_np_regression: gradient standard errors require gradients and mean standard errors");
+  if(do_grad != (myopti[REG_GRAD] != 0))
+    error("C_np_regression: inconsistent gradient output request");
   np_lp_engine_extern = np_regression_engine_or_error(
     myopti[REG_LL], "C_np_regression");
   vector_glp_degree_extern = glp_degree;
@@ -18929,11 +18943,12 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
   }
 
   ecm = alloc_vecd(num_obs_eval_alloc);
-  ecmerr = alloc_vecd(num_obs_eval_alloc);
-  
-
-  eg = alloc_matd(num_obs_eval_alloc, num_var);
-  egerr = alloc_matd(num_obs_eval_alloc, num_var);
+  if(do_merr)
+    ecmerr = alloc_vecd(num_obs_eval_alloc);
+  if(do_grad)
+    eg = alloc_matd(num_obs_eval_alloc, num_var);
+  if(do_gerr)
+    egerr = alloc_matd(num_obs_eval_alloc, num_var);
   
   num_categories_extern = alloc_vecu(num_reg_unordered_extern+num_reg_ordered_extern);
   vector_scale_factor = alloc_vecd(num_var + 1);
@@ -19093,9 +19108,9 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
                                                    num_categories_extern,
                                                    matrix_categorical_vals_extern,
                                                    ecm,
-                                                   do_grad ? eg : NULL,
+                                                   eg,
                                                    ecmerr,
-                                                   do_grad ? egerr : NULL,
+                                                   egerr,
                                                    &RS,
                                                    &MSE,
                                                    &MAE,
@@ -19112,14 +19127,12 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
   for(i=0;i<num_obs_eval_extern;i++)
     cm[ipe[i]] = ecm[i];
       
-  for(i=0;i<num_obs_eval_extern;i++)
-    cmerr[ipe[i]] = ecmerr[i];
+  if(do_merr)
+    for(i=0;i<num_obs_eval_extern;i++)
+      cmerr[ipe[i]] = ecmerr[i];
 
 
   if(do_grad){
-    const int gradient_stderr_count =
-      (kernel_route != NULL) ? num_var : num_reg_continuous_extern;
-
     for(j=0;j<num_var;j++)
       for(i=0;i<num_obs_eval_extern;i++)
         g[j*num_obs_eval_extern+ipe[i]]=eg[j][i];
@@ -19127,9 +19140,14 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
     /* The canonical mixed beta route defines and returns discrete-contrast
        standard errors.  Preserve the historical non-beta bridge unchanged;
        its narrower copy contract is tracked as separate legacy debt. */
-    for(j=0;j<gradient_stderr_count;j++)
-      for(i=0;i<num_obs_eval_extern;i++)
-        gerr[j*num_obs_eval_extern+ipe[i]]=egerr[j][i];
+    if(do_gerr) {
+      const int gradient_stderr_count =
+        (kernel_route != NULL) ? num_var : num_reg_continuous_extern;
+
+      for(j=0;j<gradient_stderr_count;j++)
+        for(i=0;i<num_obs_eval_extern;i++)
+          gerr[j*num_obs_eval_extern+ipe[i]]=egerr[j][i];
+    }
   }
 
 
@@ -19165,8 +19183,10 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
     int_TREE_X = NP_TREE_FALSE;
   }
 
-  free_mat(eg, num_var);
-  free_mat(egerr, num_var);
+  if(do_grad)
+    free_mat(eg, num_var);
+  if(do_gerr)
+    free_mat(egerr, num_var);
   
   free_mat(matrix_categorical_vals_extern, num_reg_unordered_extern+num_reg_ordered_extern);
 
@@ -19175,7 +19195,8 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
     safe_free(vector_Y_eval_extern);
 
   safe_free(ecm);
-  safe_free(ecmerr);
+  if(do_merr)
+    safe_free(ecmerr);
 
   safe_free(num_categories_extern);
   safe_free(vector_scale_factor);

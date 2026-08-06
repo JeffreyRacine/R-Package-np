@@ -1,5 +1,6 @@
 npreg <-
-  function(bws, ...){
+  function(bws, errors = TRUE, ...){
+    errors <- npValidateScalarLogical(errors, "errors")
     args <- list(...)
 
     if (!missing(bws)){
@@ -21,6 +22,12 @@ npreg <-
       UseMethod("npreg", NULL)
     }
   }
+
+.np_regression_output_request <- function(errors, gradients) {
+  errors <- npValidateScalarLogical(errors, "errors")
+  gradients <- npValidateScalarLogical(gradients, "gradients")
+  as.integer(errors) + 2L * as.integer(gradients)
+}
 
 .npreg_fit_tree_code <- function(bws, ncon, ncat) {
   reg.spec <- npValidatedConditionalRegSpec(
@@ -92,7 +99,10 @@ npreg <-
 }
 
 npreg.formula <-
-  function(bws, data = NULL, newdata = NULL, y.eval = FALSE, ...){
+  function(bws, data = NULL, errors = TRUE, newdata = NULL,
+           y.eval = FALSE, ...){
+
+    errors <- npValidateScalarLogical(errors, "errors")
 
     tt <- terms(bws)
     tmf <- if (!is.null(bws$call)) {
@@ -162,7 +172,7 @@ npreg.formula <-
       if (y.eval)
         reg.args$eydat <- eydat
     }
-    ev <- do.call(npreg, c(reg.args, list(...)))
+    ev <- do.call(npreg, c(reg.args, list(errors = errors), list(...)))
     ev$call <- match.call(expand.dots = FALSE)
     environment(ev$call) <- parent.frame()
 
@@ -182,11 +192,13 @@ npreg.formula <-
     ev$eval.nobs.omit <- length(eval.omit)
 
     ev$mean <- napredict(ev$omit, ev$mean)
-    ev$merr <- napredict(ev$omit, ev$merr)
+    if (!is.null(ev$merr))
+      ev$merr <- napredict(ev$omit, ev$merr)
 
     if(ev$gradients){
         ev$grad <- napredict(ev$omit, ev$grad)
-        ev$gerr <- napredict(ev$omit, ev$gerr)
+        if (!is.null(ev$gerr))
+          ev$gerr <- napredict(ev$omit, ev$gerr)
     }
 
     if(ev$residuals){
@@ -217,7 +229,8 @@ npreg.rbandwidth <-
   function(bws,
            txdat = stop("training data 'txdat' missing"),
            tydat = stop("training data 'tydat' missing"),
-           exdat, eydat, gradient.order = 1L, gradients = FALSE,
+           exdat, eydat, errors = TRUE,
+           gradient.order = 1L, gradients = FALSE,
            residuals = FALSE,
            ...){
     fit.start <- proc.time()[3]
@@ -235,6 +248,7 @@ npreg.rbandwidth <-
     warn.glp.gradient <- if (is.null(dots$warn.glp.gradient)) TRUE else isTRUE(dots$warn.glp.gradient)
 
     gradients <- npValidateScalarLogical(gradients, "gradients")
+    errors <- npValidateScalarLogical(errors, "errors")
     residuals <- npValidateScalarLogical(residuals, "residuals")
 
     txdat = toFrame(txdat)
@@ -463,7 +477,8 @@ npreg.rbandwidth <-
     compute.resid.from.fit <- isTRUE(residuals) && no.ex && !is.factor(resid.response)
 
     if (residuals && !compute.resid.from.fit){
-      resid <- tydat - npreg(txdat = txdat, tydat = tydat, bws = bws)$mean
+      resid <- tydat - npreg(txdat = txdat, tydat = tydat, bws = bws,
+                             errors = FALSE)$mean
     }
 
 
@@ -622,7 +637,10 @@ npreg.rbandwidth <-
             as.integer(npLpBasisCode(reg.spec$basis.engine)),
             as.integer(enrow),
             as.integer(ncol),
-            as.logical(do.compiled.gradients),
+            .np_regression_output_request(
+              errors = errors,
+              gradients = do.compiled.gradients
+            ),
             as.double(cker.bounds.c$lb),
             as.double(cker.bounds.c$ub),
             PACKAGE = "np")
@@ -635,8 +653,10 @@ npreg.rbandwidth <-
       rorder[c(ord_idx[bws$icon], ord_idx[bws$iuno], ord_idx[bws$iord])] <- ord_idx
       myout$g = as.matrix(myout$g[,rorder])
 
-      myout$gerr = matrix(data=myout$gerr, nrow = enrow, ncol = ncol, byrow = FALSE) 
-      myout$gerr = as.matrix(myout$gerr[,rorder])
+      if (errors) {
+        myout$gerr = matrix(data=myout$gerr, nrow = enrow, ncol = ncol, byrow = FALSE)
+        myout$gerr = as.matrix(myout$gerr[,rorder])
+      }
 
     } else if (gradients) {
       myout$g <- .npreg_glp_partial_gradients_from_npreghat(
@@ -649,7 +669,8 @@ npreg.rbandwidth <-
         nrow.eval = enrow,
         ncol.x = ncol
       )
-      myout$gerr <- matrix(NA_real_, nrow = enrow, ncol = ncol)
+      myout$gerr <- if (errors)
+        matrix(NA_real_, nrow = enrow, ncol = ncol) else NULL
     }
 
     if (compute.resid.from.fit)
@@ -666,6 +687,7 @@ npreg.rbandwidth <-
       merr = myout$merr,
       ntrain = tnrow,
       trainiseval = no.ex,
+      errors = errors,
       gradients = gradients,
       residuals = residuals,
       xtra = myout$xtra,
@@ -679,7 +701,8 @@ npreg.rbandwidth <-
     )
     if (gradients) {
       ev.args$grad <- myout$g
-      ev.args$gerr <- myout$gerr
+      if (errors)
+        ev.args$gerr <- myout$gerr
     }
     if (residuals)
       ev.args$resid <- resid
@@ -695,9 +718,11 @@ npreg.rbandwidth <-
     return(ev)
   }
 
-npreg.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
+npreg.default <- function(bws, txdat, tydat, errors = TRUE,
+                          nomad = FALSE, ...){
   sc <- sys.call()
   sc.names <- names(sc)
+  errors <- npValidateScalarLogical(errors, "errors")
   nomad <- npValidateNomadControl(nomad, "nomad")
 
   if (!missing(bws) &&
@@ -719,7 +744,7 @@ npreg.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
     fit.dots <- dots
     fit.dots$remin <- NULL
     fit.dots$.np_fit_progress_handoff <- TRUE
-    return(do.call(npreg, c(reg.args, fit.dots)))
+    return(do.call(npreg, c(reg.args, list(errors = errors), fit.dots)))
   }
 
   ## here we check to see if the function was called with tdat =
@@ -748,6 +773,7 @@ npreg.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
     sc.bw <- sc
     sc.bw[[1]] <- quote(npregbw)
   }
+  sc.bw$errors <- NULL
 
   ## if bws was passed in explicitly, do not compute bandwidths
     
@@ -798,7 +824,7 @@ npreg.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   }
   if (!has.explicit.bws)
     call.args$.np_fit_progress_handoff <- TRUE
-  ev <- do.call(npreg, c(call.args, list(...)))
+  ev <- do.call(npreg, c(call.args, list(errors = errors), list(...)))
 
   ev$call <- match.call(expand.dots = FALSE)
   environment(ev$call) <- parent.frame()

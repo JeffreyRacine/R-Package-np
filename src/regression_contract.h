@@ -14,6 +14,35 @@ typedef enum {
 } NPRegressionStandardErrorMode;
 
 /*
+ * Public regression fits select one explicit output contract at the native
+ * boundary.  The values are intentionally bit flags so all owners can derive
+ * the same request without route-specific boolean combinations or silent
+ * promotion to a more expensive mode.
+ */
+typedef enum {
+  NP_REGRESSION_OUTPUT_MEAN_ONLY = 0,
+  NP_REGRESSION_OUTPUT_MEAN_AND_SE = 1,
+  NP_REGRESSION_OUTPUT_MEAN_AND_GRADIENT = 2,
+  NP_REGRESSION_OUTPUT_FULL = 3
+} NPRegressionOutputRequest;
+
+static inline int np_regression_output_request_valid(const int request)
+{
+  return request >= NP_REGRESSION_OUTPUT_MEAN_ONLY &&
+    request <= NP_REGRESSION_OUTPUT_FULL;
+}
+
+static inline int np_regression_output_requests_errors(const int request)
+{
+  return (request & NP_REGRESSION_OUTPUT_MEAN_AND_SE) != 0;
+}
+
+static inline int np_regression_output_requests_gradients(const int request)
+{
+  return (request & NP_REGRESSION_OUTPUT_MEAN_AND_GRADIENT) != 0;
+}
+
+/*
  * Read-only consumer view of a call-scoped realized continuous-bandwidth
  * layout.  The owning conditional loop advances only evaluation_offset;
  * bandwidth storage remains immutable after realization.

@@ -1256,10 +1256,12 @@ npreghat <-
                                   txdat,
                                   tydat,
                                   exdat = NULL,
+                                  errors = FALSE,
                                   gradients = FALSE,
                                   gradient.order = 1L,
                                   local.mode = FALSE) {
   no.ex <- is.null(exdat)
+  errors <- npValidateScalarLogical(errors, "errors")
   gradients <- npValidateScalarLogical(gradients, "gradients")
   local.mode <- npValidateScalarLogical(local.mode, "local.mode")
 
@@ -1509,13 +1511,19 @@ npreghat <-
     as.integer(npLpBasisCode(reg.spec$basis.engine)),
     as.integer(enrow),
     as.integer(ncol.x),
-    as.logical(do.compiled.gradients),
+    .np_regression_output_request(
+      errors = errors,
+      gradients = do.compiled.gradients
+    ),
     as.double(cker.bounds.c$lb),
     as.double(cker.bounds.c$ub),
     PACKAGE = "np"
   )
 
   out <- list(mean = as.double(myout$mean))
+
+  if (errors)
+    out$merr <- as.double(myout$merr)
 
   if (gradients && !glp.gradient.partial) {
     grad <- matrix(data = myout$g, nrow = enrow, ncol = ncol.x, byrow = FALSE)
@@ -1525,6 +1533,11 @@ npreghat <-
     grad <- as.matrix(grad[, rorder, drop = FALSE])
 
     out$grad <- grad
+    if (errors) {
+      gerr <- matrix(data = myout$gerr, nrow = enrow, ncol = ncol.x,
+                     byrow = FALSE)
+      out$gerr <- as.matrix(gerr[, rorder, drop = FALSE])
+    }
   } else if (gradients) {
     out$grad <- .npreg_glp_partial_gradients_from_npreghat(
       bws = bws,
@@ -1536,6 +1549,8 @@ npreghat <-
       nrow.eval = enrow,
       ncol.x = ncol.x
     )
+    if (errors)
+      out$gerr <- matrix(NA_real_, nrow = enrow, ncol = ncol.x)
   }
 
   out
