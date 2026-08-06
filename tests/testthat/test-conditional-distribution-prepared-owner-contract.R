@@ -54,3 +54,30 @@ test_that("conditional-distribution bandwidth state has one typed owner", {
     fixed = TRUE
   )
 })
+
+test_that("native conditional-distribution search retains one prepared owner", {
+  source <- np_conditional_distribution_owner_source()
+
+  expect_match(
+    source,
+    "NPConditionalDistributionPreparedCtx prepared;",
+    fixed = TRUE
+  )
+  expect_match(
+    source,
+    "np_conditional_distribution_prepared_context_eval(\n      &context->prepared",
+    fixed = TRUE
+  )
+  expect_match(
+    source,
+    "1, &context.prepared, 1, ndegree > 0);",
+    fixed = TRUE
+  )
+  for (field in c(
+    "eval_bandwidth", "eval_degree", "glp_degree",
+    "matrix_y_continuous_tree", "matrix_xy_continuous_tree"
+  )) {
+    expect_match(source, paste0("context->", field), fixed = TRUE,
+                 info = field)
+  }
+})
