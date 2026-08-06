@@ -3904,6 +3904,7 @@ static void np_conditional_density_prepared_context_clear_internal(void)
     return;
 
   bwm_clear_floor_context();
+  np_clear_support_counts_extern();
 
   if (kdt_extern_X != NULL)
     free_kdtree(&kdt_extern_X);
@@ -4729,6 +4730,12 @@ static int np_conditional_density_prepared_context_prepare_internal(double *c_un
   for (j = 0; j < num_reg_continuous_extern; j++)
     for (i = 0; i < num_obs_train_extern; i++)
       matrix_X_continuous_train_extern[j][i] = u_con[j * num_obs_train_extern + i];
+
+  /* Preserve the legacy/full-owner nonfixed support contract before any
+   * tree permutation changes the resident matrix view. */
+  np_refresh_support_counts_extern();
+  np_validate_nonfixed_support_counts_extern(
+    "C_np_density_conditional_bw", BANDWIDTH_den_extern);
 
   ipt_X = (int *)malloc((size_t)num_obs_train_extern * sizeof(int));
   ipt_lookup_X = (int *)malloc((size_t)num_obs_train_extern * sizeof(int));

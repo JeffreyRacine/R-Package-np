@@ -63,4 +63,10 @@ test_that("nonfixed conditional bandwidth search fails fast for constant respons
     ),
     "at least two distinct continuous variable values per dimension"
   )
+
+  expect_no_error(
+    suppressWarnings(
+      npcdensbw(ydat = rep(1:5, 8), xdat = x, bwtype = "adaptive_nn")
+    )
+  )
 })
