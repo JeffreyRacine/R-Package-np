@@ -1,5 +1,7 @@
+.rgl_test_package <- if (isNamespaceLoaded("npRmpi")) "npRmpi" else "np"
+
 test_that("rgl presentation defaults are centralized and immutable", {
-  defaults <- getFromNamespace(".np_plot_rgl_defaults", "np")
+  defaults <- getFromNamespace(".np_plot_rgl_defaults", .rgl_test_package)
 
   first <- defaults()
   second <- defaults()
@@ -34,7 +36,7 @@ test_that("rgl high-DPI adapter preserves the serialized scene and delegates ups
   rgl::points3d(0, 0, 0)
   source.widget <- rgl::rglwidget(x = rgl::scene3d())
 
-  adapt <- getFromNamespace(".np_plot_rgl_hidpi_widget", "np")
+  adapt <- getFromNamespace(".np_plot_rgl_hidpi_widget", .rgl_test_package)
   result <- adapt(source.widget)
 
   expect_identical(result$x, source.widget$x)
@@ -49,7 +51,7 @@ test_that("rgl high-DPI adapter preserves the serialized scene and delegates ups
 })
 
 test_that("rgl legend magnification retains apparent geometry", {
-  scale.legend <- getFromNamespace(".np_plot_rgl_scale_legend_geometry", "np")
+  scale.legend <- getFromNamespace(".np_plot_rgl_scale_legend_geometry", .rgl_test_package)
 
   result <- scale.legend(list(
     magnify = 2,
@@ -72,13 +74,13 @@ test_that("rgl legend magnification retains apparent geometry", {
 })
 
 test_that("rgl DPI and legend controls retain user precedence", {
-  user.args <- getFromNamespace(".np_plot_user_args", "np")(
+  user.args <- getFromNamespace(".np_plot_user_args", .rgl_test_package)(
     list(magnify = 1.5, unsupported = TRUE),
     type = "rgl.legend3d"
   )
   expect_identical(user.args, list(magnify = 1.5))
 
-  make.hook <- getFromNamespace(".np_plot_rgl_hidpi_hook", "np")
+  make.hook <- getFromNamespace(".np_plot_rgl_hidpi_hook", .rgl_test_package)
   expect_error(make.hook(0.5), "no smaller than one")
   expect_match(make.hook(1.5), "var maxRatio = 1.5", fixed = TRUE)
 })
@@ -87,7 +89,7 @@ test_that("rgl uses the base-matched camera unless the user overrides it", {
   skip_if_not(suppressWarnings(requireNamespace("rgl", quietly = TRUE)))
   skip_if_not(suppressWarnings(requireNamespace("htmlwidgets", quietly = TRUE)))
 
-  view.angles <- getFromNamespace(".np_plot_rgl_view_angles", "np")
+  view.angles <- getFromNamespace(".np_plot_rgl_view_angles", .rgl_test_package)
   expect_identical(view.angles(0, 20), list(theta = 0, phi = -70))
   expect_identical(view.angles(25, 15), list(theta = 25, phi = 15))
 
@@ -103,7 +105,7 @@ test_that("rgl uses the base-matched camera unless the user overrides it", {
     }
   }, add = TRUE)
 
-  render <- getFromNamespace(".np_plot_render_surface_rgl", "np")
+  render <- getFromNamespace(".np_plot_render_surface_rgl", .rgl_test_package)
   mapped <- view.angles(0, 20)
   default.widget <- suppressWarnings(render(
     0:1,
@@ -139,4 +141,14 @@ test_that("rgl uses the base-matched camera unless the user overrides it", {
   expect_identical(subscene(default.widget)$par3d$FOV, 55)
   expect_identical(subscene(override.widget)$par3d$FOV, 45)
   expect_equal(subscene(override.widget)$par3d$zoom, 0.9, tolerance = 1e-7)
+
+  text.labels <- unlist(lapply(
+    Filter(
+      function(object) identical(object$type, "text"),
+      default.widget$x$objects
+    ),
+    `[[`,
+    "texts"
+  ), use.names = FALSE)
+  expect_true(all(c("x", "y", "z") %in% text.labels))
 })
