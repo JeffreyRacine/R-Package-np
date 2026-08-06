@@ -534,6 +534,35 @@ static void np_density_prepared_context_destroy(NPDensityPreparedCtx *context);
 
 typedef struct {
   int active;
+  int num_var;
+  int num_search_var;
+  int num_unordered;
+  int num_ordered;
+  int num_continuous;
+  double **matrix_x_unordered;
+  double **matrix_x_ordered;
+  double **matrix_x_continuous;
+  double *response;
+  double *lsq_scale;
+  double *lsq_q;
+  int *num_categories;
+  double **matrix_categorical_vals;
+  double *continuous_stddev;
+  double *extendednn_upper;
+  double **powell_directions;
+  double *scale_factor;
+  double *scale_factor_startbest;
+  double *powell_step;
+  int *tree_permutation;
+  int *tree_lookup;
+  KDT *tree;
+} NPRegressionPreparedCtx;
+
+static void np_regression_prepared_context_destroy(
+  NPRegressionPreparedCtx *context);
+
+typedef struct {
+  int active;
   int owned;
   int num_all_var;
   int num_reg_continuous;
@@ -5861,6 +5890,76 @@ SEXP C_np_density_conditional_nomad_shadow_clear(void)
   return R_NilValue;
 }
 
+
+static void np_regression_prepared_context_destroy(
+  NPRegressionPreparedCtx *context)
+{
+  if (context == NULL || !context->active)
+    return;
+
+  bwm_clear_floor_context();
+  bwm_nn_cache_free();
+  bwm_objective_cache_free();
+  bwm_search_context_release();
+  safe_free(context->extendednn_upper);
+
+  if (context->matrix_x_unordered != NULL)
+    free_mat(context->matrix_x_unordered, context->num_unordered);
+  if (context->matrix_x_ordered != NULL)
+    free_mat(context->matrix_x_ordered, context->num_ordered);
+  if (context->matrix_x_continuous != NULL)
+    free_mat(context->matrix_x_continuous, context->num_continuous);
+  np_clear_support_counts_extern();
+
+  safe_free(context->response);
+  safe_free(context->lsq_scale);
+  safe_free(context->lsq_q);
+  if (context->powell_directions != NULL)
+    free_mat(context->powell_directions, context->num_search_var + 1);
+  safe_free(context->scale_factor);
+  safe_free(context->scale_factor_startbest);
+  safe_free(context->powell_step);
+  safe_free(context->num_categories);
+  if (context->matrix_categorical_vals != NULL)
+    free_mat(context->matrix_categorical_vals,
+             context->num_unordered + context->num_ordered);
+  safe_free(context->continuous_stddev);
+  safe_free(context->tree_permutation);
+  safe_free(context->tree_lookup);
+  if (context->tree != NULL)
+    free_kdtree(&context->tree);
+
+  vector_extendednn_upper_extern = NULL;
+  int_extendednn_upper_num_extern = 0;
+  vector_lsq_scale_extern = NULL;
+  vector_lsq_loss_extern = NULL;
+  vector_lsq_q_extern = NULL;
+  np_lsq_tau_extern = 0.5;
+  np_lsq_delta_lower_extern = DBL_EPSILON;
+  np_lsq_delta_upper_extern = 1.0 - DBL_EPSILON;
+  ipt_extern_X = NULL;
+  ipt_lookup_extern_X = NULL;
+  kdt_extern_X = NULL;
+  int_TREE_X = NP_TREE_FALSE;
+  int_TREE_PROFILE_X = NP_TREE_FALSE;
+
+  np_glp_cv_clear_extern();
+  np_cont_largeh_cache_clear_extern();
+  np_reg_cv_core_clear_extern();
+
+  int_cker_bound_extern = 0;
+  vector_ckerlb_extern = NULL;
+  vector_ckerub_extern = NULL;
+  np_regression_bw_categorical_compress_extern = 0;
+  np_reset_y_side_extern();
+  vector_glp_degree_extern = NULL;
+  vector_glp_gradient_order_extern = NULL;
+  int_glp_bernstein_extern = 0;
+  int_glp_basis_extern = 1;
+  np_clear_estimator_extern_aliases();
+  int_nn_k_min_extern = 1;
+  memset(context, 0, sizeof(*context));
+}
 
 static void np_regression_bw_mode(double * runo, double * rord, double * rcon, double * y,
                                   double * mysd, int * myopti, double * myoptd, double * rbw, double * fval,
@@ -17380,16 +17479,19 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
                                   const double lsq_delta_lower,
                                   const double lsq_delta_upper,
                                   double * lsq_delta_out){
+  NPRegressionPreparedCtx prepared_context = {0};
   //KDT * kdt = NULL; // tree structure
   //NL nl = { .node = NULL, .n = 0, .nalloc = 0 };// a node list structure -- used for searching - here for testing
   //double tb[4] = {0.25, 0.5, 0.3, 0.75};
   int * ipt = NULL, *ipt_lookup = NULL;  // point permutation, see tree.c
 
-  double **matrix_y;
+  double **matrix_y = NULL;
 
   double *vector_continuous_stddev = NULL;
-  double *vector_scale_factor, *vector_scale_factor_multistart, * vsfh;
-  double *vector_scale_factor_startbest;
+  double *vector_scale_factor = NULL;
+  double *vector_scale_factor_multistart = NULL;
+  double *vsfh = NULL;
+  double *vector_scale_factor_startbest = NULL;
 
   double fret, fret_best, fret_start_best, fret_initial;
   double ftol, tol, small;
@@ -17423,6 +17525,12 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
 
   num_var = num_reg_ordered_extern + num_reg_continuous_extern + num_reg_unordered_extern;
   num_search_var = num_var + (lsq_check_mode ? 1 : 0);
+  prepared_context.active = 1;
+  prepared_context.num_var = num_var;
+  prepared_context.num_search_var = num_search_var;
+  prepared_context.num_unordered = num_reg_unordered_extern;
+  prepared_context.num_ordered = num_reg_ordered_extern;
+  prepared_context.num_continuous = num_reg_continuous_extern;
   if(lsq_check_mode && ((lsq_scale == NULL) ||
                         (!R_FINITE(lsq_tau)) ||
                         (lsq_tau <= 0.0) ||
@@ -17537,10 +17645,16 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   matrix_X_unordered_train_extern = alloc_matd(num_obs_train_extern, num_reg_unordered_extern);
   matrix_X_ordered_train_extern = alloc_matd(num_obs_train_extern, num_reg_ordered_extern);
   matrix_X_continuous_train_extern = alloc_matd(num_obs_train_extern, num_reg_continuous_extern);
+  prepared_context.matrix_x_unordered = matrix_X_unordered_train_extern;
+  prepared_context.matrix_x_ordered = matrix_X_ordered_train_extern;
+  prepared_context.matrix_x_continuous = matrix_X_continuous_train_extern;
 
   vector_Y_extern = alloc_vecd(num_obs_train_extern);
   vector_lsq_scale_extern = lsq_check_mode ? alloc_vecd(num_obs_train_extern) : NULL;
   vector_lsq_q_extern = lsq_check_mode ? alloc_vecd(num_obs_train_extern) : NULL;
+  prepared_context.response = vector_Y_extern;
+  prepared_context.lsq_scale = vector_lsq_scale_extern;
+  prepared_context.lsq_q = vector_lsq_q_extern;
 	
   num_categories_extern = alloc_vecu(num_reg_unordered_extern+num_reg_ordered_extern);
   matrix_y = alloc_matd(num_search_var + 1, num_search_var +1);
@@ -17548,8 +17662,15 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   vector_scale_factor_startbest = alloc_vecd(num_search_var + 1);
   vsfh = alloc_vecd(num_search_var + 1);
   matrix_categorical_vals_extern = alloc_matd(num_obs_train_extern, num_reg_unordered_extern + num_reg_ordered_extern);
+  prepared_context.num_categories = num_categories_extern;
+  prepared_context.powell_directions = matrix_y;
+  prepared_context.scale_factor = vector_scale_factor;
+  prepared_context.scale_factor_startbest = vector_scale_factor_startbest;
+  prepared_context.powell_step = vsfh;
+  prepared_context.matrix_categorical_vals = matrix_categorical_vals_extern;
 
   vector_continuous_stddev = alloc_vecd(num_reg_continuous_extern);
+  prepared_context.continuous_stddev = vector_continuous_stddev;
 
   for(j = 0; j < num_reg_continuous_extern; j++)
     vector_continuous_stddev[j] = mysd[j];
@@ -17622,6 +17743,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
 
   // initialize permutation arrays
   ipt = (int *)malloc(num_obs_train_extern*sizeof(int));
+  prepared_context.tree_permutation = ipt;
   if(!(ipt != NULL)){
     bw_error_msg = "!(ipt != NULL)";
     goto cleanup_np_regression_bw_mode;
@@ -17636,6 +17758,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
 
   if(int_TREE_X == NP_TREE_TRUE){
     ipt_lookup = (int *)malloc(num_obs_train_extern*sizeof(int));
+    prepared_context.tree_lookup = ipt_lookup;
     if(!(ipt_lookup != NULL)){
       bw_error_msg = "!(ipt_lookup != NULL)";
       goto cleanup_np_regression_bw_mode;
@@ -17643,6 +17766,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
 
     build_kdtree(matrix_X_continuous_train_extern, num_obs_train_extern, num_reg_continuous_extern, 
                  4*num_reg_continuous_extern, ipt, &kdt_extern_X);
+    prepared_context.tree = kdt_extern_X;
     for(i = 0; i < num_obs_train_extern; i++)
       ipt_lookup[ipt[i]] = i;
     ipt_extern_X = ipt;
@@ -17719,6 +17843,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
       rbw);
   int_extendednn_upper_num_extern =
     (vector_extendednn_upper_extern != NULL) ? num_reg_continuous_extern : 0;
+  prepared_context.extendednn_upper = vector_extendednn_upper_extern;
 
   /* Initialize scale factors and Directions for NR modules */
 
@@ -18265,64 +18390,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
 
 cleanup_np_regression_bw_mode:
   /* Free data objects */
-  bwm_clear_floor_context();
-  bwm_nn_cache_free();
-  bwm_objective_cache_free();
-  bwm_search_context_release();
-  safe_free(vector_extendednn_upper_extern);
-  vector_extendednn_upper_extern = NULL;
-  int_extendednn_upper_num_extern = 0;
-
-  free_mat(matrix_X_unordered_train_extern, num_reg_unordered_extern);
-  free_mat(matrix_X_ordered_train_extern, num_reg_ordered_extern);
-  free_mat(matrix_X_continuous_train_extern, num_reg_continuous_extern);
-  np_clear_support_counts_extern();
-
-  safe_free(vector_Y_extern);
-  safe_free(vector_lsq_scale_extern);
-  safe_free(vector_lsq_q_extern);
-  vector_lsq_scale_extern = NULL;
-  vector_lsq_loss_extern = NULL;
-  vector_lsq_q_extern = NULL;
-  np_lsq_tau_extern = 0.5;
-  np_lsq_delta_lower_extern = DBL_EPSILON;
-  np_lsq_delta_upper_extern = 1.0-DBL_EPSILON;
-
-  free_mat(matrix_y, num_search_var + 1);
-  safe_free(vector_scale_factor);
-  safe_free(vector_scale_factor_startbest);
-  safe_free(vsfh);
-  safe_free(num_categories_extern);
-
-  free_mat(matrix_categorical_vals_extern, num_reg_unordered_extern+num_reg_ordered_extern);
-
-  free(vector_continuous_stddev);
-
-  safe_free(ipt);
-  safe_free(ipt_lookup);
-  ipt_extern_X = NULL;
-  ipt_lookup_extern_X = NULL;
-  if(int_TREE_X == NP_TREE_TRUE){
-    free_kdtree(&kdt_extern_X);
-    int_TREE_X = NP_TREE_FALSE;
-  }
-  int_TREE_PROFILE_X = NP_TREE_FALSE;
-
-  np_glp_cv_clear_extern();
-  np_cont_largeh_cache_clear_extern();
-  np_reg_cv_core_clear_extern();
-
-  int_cker_bound_extern = 0;
-  vector_ckerlb_extern = NULL;
-  vector_ckerub_extern = NULL;
-  np_regression_bw_categorical_compress_extern = 0;
-  np_reset_y_side_extern();
-  vector_glp_degree_extern = NULL;
-  vector_glp_gradient_order_extern = NULL;
-  int_glp_bernstein_extern = 0;
-  int_glp_basis_extern = 1;
-  np_clear_estimator_extern_aliases();
-  int_nn_k_min_extern = 1;
+  np_regression_prepared_context_destroy(&prepared_context);
 
   if (bw_error_msg != NULL)
     error("%s", bw_error_msg);
