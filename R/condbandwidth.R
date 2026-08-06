@@ -100,11 +100,19 @@ condbandwidth <-
   if (cxkerorder != cykerorder && bwscaling)
     stop("scale factors with different order kernels for dependent and explanatory variables is unsupported")
   
-  uxkertype = match.arg(uxkertype)
-  uykertype = match.arg(uykertype)
+  uxkertype = .np_match_arg_named(
+    uxkertype, c("aitchisonaitken", "liracine"), "uxkertype"
+  )
+  uykertype = .np_match_arg_named(
+    uykertype, c("aitchisonaitken", "liracine"), "uykertype"
+  )
   
-  oxkertype = match.arg(oxkertype)
-  oykertype = match.arg(oykertype)
+  oxkertype = .np_match_arg_named(
+    oxkertype, c("liracine", "wangvanryzin", "racineliyan"), "oxkertype"
+  )
+  oykertype = .np_match_arg_named(
+    oykertype, c("liracine", "wangvanryzin", "racineliyan"), "oykertype"
+  )
   cxbounds <- npKernelBoundsResolve(
     dati = xdati,
     varnames = xnames,

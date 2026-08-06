@@ -204,3 +204,63 @@ test_that("unconditional summaries retain the generic cker display", {
     "Continuous Kernel Type: Fourth-Order Beta associated (bounded/range)"
   )
 })
+
+test_that("named categorical matching preserves match.arg semantics", {
+  unordered <- c("aitchisonaitken", "liracine")
+  ordered <- c("liracine", "wangvanryzin", "racineliyan")
+
+  expect_identical(
+    .np_match_arg_named(unordered, unordered, "uxkertype"),
+    unordered[[1L]]
+  )
+  expect_identical(
+    .np_match_arg_named("a", unordered, "uykertype"),
+    "aitchisonaitken"
+  )
+  expect_identical(
+    .np_match_arg_named("w", ordered, "oxkertype"),
+    "wangvanryzin"
+  )
+
+  bad.values <- list("invalid", character(), c("liracine", "wangvanryzin"), 1)
+  for (value in bad.values) {
+    condition <- capture_np_error(
+      .np_match_arg_named(value, ordered, "oykertype")
+    )
+    expect_s3_class(condition, "simpleError")
+    expect_match(conditionMessage(condition), "'oykertype'", fixed = TRUE)
+    expect_identical(deparse(conditionCall(condition)),
+                     "match.arg(oykertype)")
+  }
+})
+
+test_that("conditional categorical diagnostics name each public argument", {
+  x <- data.frame(x = seq(0.05, 0.95, length.out = 24L))
+  y <- data.frame(y = seq(0.08, 0.92, length.out = 24L))
+  common <- list(
+    xdat = x, ydat = y, bws = c(0.2, 0.2),
+    bandwidth.compute = FALSE
+  )
+
+  for (argument in c("uxkertype", "uykertype", "oxkertype", "oykertype")) {
+    call.args <- common
+    call.args[[argument]] <- "invalid"
+    condition <- capture_np_error(do.call(npcdensbw, call.args))
+    expect_s3_class(condition, "simpleError")
+    expect_match(conditionMessage(condition),
+                 paste0("'", argument, "'"), fixed = TRUE)
+    expect_identical(
+      deparse(conditionCall(condition)),
+      paste0("match.arg(", argument, ")")
+    )
+  }
+
+  for (argument in c("uxkertype", "oxkertype", "oykertype")) {
+    call.args <- common
+    call.args[[argument]] <- "invalid"
+    condition <- capture_np_error(do.call(npcdistbw, call.args))
+    expect_s3_class(condition, "simpleError")
+    expect_match(conditionMessage(condition),
+                 paste0("'", argument, "'"), fixed = TRUE)
+  }
+})
