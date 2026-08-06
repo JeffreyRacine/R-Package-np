@@ -46,7 +46,8 @@ test_that("npindexbw retains Powell evaluation counts when Powell does not impro
           ynames = "y"
         )
       },
-      .npindexbw_eval_objective = function(param, xmat, ydat, bws, spec) {
+      .npindexbw_prepare_lp_regression_leaf_owner = function(...) list(),
+      .npindexbw_eval_objective = function(param, xmat, ydat, bws, spec, ...) {
         list(objective = 10, num.feval.fast = 3L)
       },
       .np_nomad_baseline_note = function(degree) invisible(NULL),
@@ -165,6 +166,7 @@ test_that("npindexbw fixed NOMAD route normalizes internal h starts but keeps pu
       .npindexbw_build_sibandwidth = function(xdat, ydat, bws, template, bandwidth.compute, reg.args) {
         baseline.bws
       },
+      .npindexbw_prepare_lp_regression_leaf_owner = function(...) list(),
       .np_nomad_baseline_note = function(degree) invisible(NULL),
       .np_nomad_search = function(engine,
                                   baseline_record,
@@ -289,6 +291,7 @@ test_that("npindexbw fixed NOMAD route preserves explicit user fixed starts", {
       .npindexbw_build_sibandwidth = function(xdat, ydat, bws, template, bandwidth.compute, reg.args) {
         baseline.bws
       },
+      .npindexbw_prepare_lp_regression_leaf_owner = function(...) list(),
       .np_nomad_baseline_note = function(degree) invisible(NULL),
       .np_nomad_search = function(engine,
                                   baseline_record,
