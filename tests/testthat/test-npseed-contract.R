@@ -43,19 +43,32 @@ test_that("C_np_set_seed rejects direct misuse", {
 })
 
 test_that("npseed fails closed for inconsistent active-pool state", {
-  old.active <- getOption("npRmpi.pool.active", FALSE)
-  on.exit(options(npRmpi.pool.active = old.active), add = TRUE)
+  env <- npRmpi_subprocess_env(c(
+    "_R_CHECK_PACKAGE_NAME_=",
+    "NP_RMPI_TEST_SUITE_POOL="
+  ))
+  skip_if(is.null(env), "installed npRmpi unavailable for subprocess seed contract")
 
-  options(npRmpi.pool.active = TRUE)
-  set.seed(271828)
-  before <- .Random.seed
-
-  expect_error(
-    npseed(19),
-    "active MPI pool is inconsistent",
-    fixed = TRUE
+  res <- npRmpi_run_rscript_subprocess(
+    lines = c(
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "options(npRmpi.pool.active = TRUE)",
+      "set.seed(271828)",
+      "before <- .Random.seed",
+      "bad <- try(npseed(19), silent = TRUE)",
+      "stopifnot(inherits(bad, 'try-error'))",
+      "stopifnot(grepl('active MPI pool is inconsistent', as.character(bad), fixed = TRUE))",
+      "stopifnot(identical(.Random.seed, before))",
+      "cat('NPSEED_INCONSISTENT_POOL_OK\\n')"
+    ),
+    timeout = 30L,
+    env = env
   )
-  expect_identical(.Random.seed, before)
+
+  info <- paste(res$output, collapse = "\n")
+  expect_identical(res$status, 0L, info = info)
+  expect_true(any(grepl("NPSEED_INCONSISTENT_POOL_OK", res$output, fixed = TRUE)),
+              info = info)
 })
 
 test_that("npseed synchronizes the C backend across an active MPI pool", {
