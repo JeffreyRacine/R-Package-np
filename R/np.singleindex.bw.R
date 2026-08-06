@@ -267,8 +267,21 @@ npindexbw.NULL <-
   out
 }
 
+.npindex_internal_numeric_matrix <- function(xmat, where) {
+  if (!is.matrix(xmat) || !is.numeric(xmat)) {
+    stop(
+      sprintf("internal error: %s requires a numeric matrix", where),
+      call. = FALSE
+    )
+  }
+  xmat
+}
+
 .npindex_index_from_beta_tail <- function(xmat, beta.tail) {
-  xmat <- toMatrix(xmat)
+  xmat <- .npindex_internal_numeric_matrix(
+    xmat,
+    where = ".npindex_index_from_beta_tail()"
+  )
   beta.tail <- as.double(beta.tail)
   beta <- c(1, beta.tail)
   if (length(beta) != ncol(xmat))
@@ -279,7 +292,10 @@ npindexbw.NULL <-
 }
 
 .npindex_beta_coordinate_setup <- function(xmat) {
-  xmat <- toMatrix(xmat)
+  xmat <- .npindex_internal_numeric_matrix(
+    xmat,
+    where = ".npindex_beta_coordinate_setup()"
+  )
   p <- ncol(xmat)
   if (p <= 1L) {
     factor <- numeric(0)

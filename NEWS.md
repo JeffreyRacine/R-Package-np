@@ -1,5 +1,10 @@
 # np 0.70-6
 
+* `npindexbw()` now canonicalizes its numeric design matrix once at the public
+  boundary and reuses that matrix during internal index and coordinate setup.
+  This removes redundant full-matrix copies before objective evaluation while
+  preserving estimator arithmetic and conditions.
+
 * Bivariate entropy integration for `npdeptest()` and `npsdeptest()` now
   evaluates the existing Gaussian integrand in one registered native callback.
   The cubature rule, limits, tolerances, bandwidths, bootstrap, and statistic
