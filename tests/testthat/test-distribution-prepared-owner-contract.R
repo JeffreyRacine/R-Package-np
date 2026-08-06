@@ -76,6 +76,13 @@ test_that("distribution bandwidth state has one typed cleanup owner", {
   )
   expect_match(routine, "if (prepare_only)", fixed = TRUE)
   expect_match(routine, "return;", fixed = TRUE)
+  expect_match(routine, "matrix_y = prepare_only ? NULL :", fixed = TRUE)
+  expect_match(
+    routine,
+    "vector_scale_factor_startbest = prepare_only ? NULL :",
+    fixed = TRUE
+  )
+  expect_match(routine, "vsfh = prepare_only ? NULL :", fixed = TRUE)
   expect_match(
     routine,
     "np_distribution_prepared_context_destroy(prepared_context);",
