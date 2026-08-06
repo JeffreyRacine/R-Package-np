@@ -16,13 +16,14 @@ locate_lp_objective_source <- function() {
 }
 
 lp_objective_owner_region <- function(source) {
-  start <- grep("^} NPRegressionCvLPRouteOwner;$", source)
+  anchor <- grep("^} NPRegressionCvLPRouteOwner;$", source)
   stop <- grep(
     " * Isolated route-bearing sibling for canonical continuous-kernel activation",
     source,
     fixed = TRUE
   )
-  stopifnot(length(start) == 1L, length(stop) == 1L, stop > start)
+  stopifnot(length(anchor) == 1L, length(stop) == 1L, stop > anchor)
+  start <- max(which(seq_along(source) < anchor & source == "typedef struct {"))
   paste(source[seq.int(start, stop - 1L)], collapse = "\n")
 }
 
