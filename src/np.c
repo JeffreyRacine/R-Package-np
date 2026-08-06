@@ -668,6 +668,56 @@ typedef struct {
   double **matrix_xy_continuous_tree;
 } NPConditionalDensityPreparedCtx;
 
+typedef struct {
+  int active;
+  int cdfontrain;
+  int num_all_var;
+  int num_all_cvar;
+  int num_all_uvar;
+  int num_all_ovar;
+  int num_obs_alt;
+  int num_var_unordered;
+  int num_var_ordered;
+  int num_var_continuous;
+  int num_reg_unordered;
+  int num_reg_ordered;
+  int num_reg_continuous;
+  double **matrix_y_unordered_train;
+  double **matrix_y_ordered_train;
+  double **matrix_y_continuous_train;
+  double **matrix_y_unordered_eval;
+  double **matrix_y_ordered_eval;
+  double **matrix_y_continuous_eval;
+  double **matrix_x_unordered_train;
+  double **matrix_x_ordered_train;
+  double **matrix_x_continuous_train;
+  double **matrix_xy_unordered_train;
+  double **matrix_xy_ordered_train;
+  double **matrix_xy_continuous_train;
+  double **matrix_categorical_vals;
+  double **matrix_categorical_vals_x;
+  double **matrix_categorical_vals_y;
+  double **matrix_categorical_vals_xy;
+  double **powell_directions;
+  double *scale_factor;
+  double *scale_factor_startbest;
+  double *powell_step;
+  double *scale_factor_multistart;
+  double *cxy_lower;
+  double *cxy_upper;
+  double *extendednn_upper;
+  int *num_categories;
+  int *num_categories_x;
+  int *num_categories_y;
+  int *num_categories_xy;
+  int *ipt_x;
+  int *ipt_y;
+  int *ipt_xy;
+  int *ipt_lookup_x;
+  int *ipt_lookup_y;
+  int *ipt_lookup_xy;
+} NPConditionalDistributionPreparedCtx;
+
 static NPConditionalDensityPreparedCtx np_conditional_density_prepared_context =
   {0};
 
@@ -14556,7 +14606,129 @@ cleanup_np_density_conditional_bw:
   return ;
 }
 
-void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_con, 
+static void np_conditional_distribution_prepared_context_destroy(
+  NPConditionalDistributionPreparedCtx *context)
+{
+  if (context == NULL || !context->active)
+    return;
+
+  bwm_clear_floor_context();
+  bwm_nn_cache_free();
+  bwm_objective_cache_free();
+  bwm_search_context_release();
+  np_clear_support_counts_extern();
+
+  if (kdt_extern_X != NULL)
+    free_kdtree(&kdt_extern_X);
+  if (kdt_extern_Y != NULL)
+    free_kdtree(&kdt_extern_Y);
+  if (kdt_extern_XY != NULL)
+    free_kdtree(&kdt_extern_XY);
+  int_TREE_X = NP_TREE_FALSE;
+  int_TREE_Y = NP_TREE_FALSE;
+  int_TREE_XY = NP_TREE_FALSE;
+  int_TREE_PROFILE_X = NP_TREE_FALSE;
+
+  free_mat(context->matrix_y_unordered_train, context->num_var_unordered);
+  free_mat(context->matrix_y_ordered_train, context->num_var_ordered);
+  free_mat(context->matrix_y_continuous_train, context->num_var_continuous);
+  if (!context->cdfontrain) {
+    free_mat(context->matrix_y_unordered_eval, context->num_var_unordered);
+    free_mat(context->matrix_y_ordered_eval, context->num_var_ordered);
+    free_mat(context->matrix_y_continuous_eval, context->num_var_continuous);
+  }
+  free_mat(context->matrix_x_unordered_train, context->num_reg_unordered);
+  free_mat(context->matrix_x_ordered_train, context->num_reg_ordered);
+  free_mat(context->matrix_x_continuous_train, context->num_reg_continuous);
+  free_mat(context->matrix_xy_unordered_train, context->num_all_uvar);
+  free_mat(context->matrix_xy_ordered_train, context->num_all_ovar);
+  free_mat(context->matrix_xy_continuous_train, context->num_all_cvar);
+  free_mat(context->matrix_categorical_vals,
+           context->num_var_unordered + context->num_var_ordered +
+           context->num_reg_unordered + context->num_reg_ordered);
+  free_mat(context->matrix_categorical_vals_x,
+           context->num_reg_unordered + context->num_reg_ordered);
+  free_mat(context->matrix_categorical_vals_y,
+           context->num_var_unordered + context->num_var_ordered);
+  free_mat(context->matrix_categorical_vals_xy,
+           context->num_var_unordered + context->num_var_ordered +
+           context->num_reg_unordered + context->num_reg_ordered);
+  free_mat(context->powell_directions, context->num_all_var + 1);
+
+  safe_free(context->scale_factor);
+  safe_free(context->scale_factor_startbest);
+  safe_free(context->powell_step);
+  safe_free(context->scale_factor_multistart);
+  safe_free(context->cxy_lower);
+  safe_free(context->cxy_upper);
+  safe_free(context->extendednn_upper);
+  safe_free(context->num_categories);
+  safe_free(context->num_categories_x);
+  safe_free(context->num_categories_y);
+  safe_free(context->num_categories_xy);
+  safe_free(context->ipt_x);
+  safe_free(context->ipt_y);
+  safe_free(context->ipt_xy);
+  safe_free(context->ipt_lookup_x);
+  safe_free(context->ipt_lookup_y);
+  safe_free(context->ipt_lookup_xy);
+
+  matrix_Y_unordered_train_extern = NULL;
+  matrix_Y_ordered_train_extern = NULL;
+  matrix_Y_continuous_train_extern = NULL;
+  matrix_Y_unordered_eval_extern = NULL;
+  matrix_Y_ordered_eval_extern = NULL;
+  matrix_Y_continuous_eval_extern = NULL;
+  matrix_X_unordered_train_extern = NULL;
+  matrix_X_ordered_train_extern = NULL;
+  matrix_X_continuous_train_extern = NULL;
+  matrix_XY_unordered_train_extern = NULL;
+  matrix_XY_ordered_train_extern = NULL;
+  matrix_XY_continuous_train_extern = NULL;
+  matrix_categorical_vals_extern = NULL;
+  matrix_categorical_vals_extern_X = NULL;
+  matrix_categorical_vals_extern_Y = NULL;
+  matrix_categorical_vals_extern_XY = NULL;
+  num_categories_extern = NULL;
+  num_categories_extern_X = NULL;
+  num_categories_extern_Y = NULL;
+  num_categories_extern_XY = NULL;
+  vector_extendednn_upper_extern = NULL;
+  int_extendednn_upper_num_extern = 0;
+  ipt_extern_X = NULL;
+  ipt_extern_Y = NULL;
+  ipt_extern_XY = NULL;
+  ipt_lookup_extern_X = NULL;
+  ipt_lookup_extern_Y = NULL;
+  ipt_lookup_extern_XY = NULL;
+
+  int_WEIGHTS = 0;
+  int_cxker_bound_extern = 0;
+  int_cyker_bound_extern = 0;
+  int_cxyker_bound_extern = 0;
+  int_cker_bound_extern = 0;
+  vector_cxkerlb_extern = NULL;
+  vector_cxkerub_extern = NULL;
+  vector_cykerlb_extern = NULL;
+  vector_cykerub_extern = NULL;
+  vector_cxykerlb_extern = NULL;
+  vector_cxykerub_extern = NULL;
+  vector_ckerlb_extern = NULL;
+  vector_ckerub_extern = NULL;
+  np_lp_engine_extern = NP_LP_ENGINE_SCALAR;
+  vector_glp_degree_extern = NULL;
+  vector_glp_gradient_order_extern = NULL;
+  int_glp_bernstein_extern = 0;
+  int_glp_basis_extern = 1;
+  np_conditional_distribution_bw_categorical_compress_extern = 0;
+  cdfontrain_extern = 0;
+  np_clear_estimator_extern_aliases();
+  np_glp_cv_clear_extern();
+
+  memset(context, 0, sizeof(*context));
+}
+
+static void np_distribution_conditional_bw_mode(double * c_uno, double * c_ord, double * c_con,
                                     double * u_uno, double * u_ord, double * u_con,
                                     double * cg_uno, double * cg_ord, double * cg_con, double * mysd,
                                     int * myopti, double * myoptd, double * myans, double * fval,
@@ -14570,7 +14742,9 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                                     int * regtype,
                                     double * cxkerlb, double * cxkerub,
                                     double * cykerlb, double * cykerub,
-                                    const int eval_only){
+                                    const int eval_only,
+                                    NPConditionalDistributionPreparedCtx *retained_context,
+                                    const int prepare_only){
   int_nn_k_min_extern = 1;
 /* Likelihood bandwidth selection for density estimation */
 
@@ -14609,6 +14783,14 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   int * ipt_X = NULL, * ipt_XY = NULL, * ipt_Y = NULL; 
   int * ipt_lookup_XY = NULL, * ipt_lookup_Y = NULL, * ipt_lookup_X = NULL;
   int num_obs_alt;
+  NPConditionalDistributionPreparedCtx local_context = {0};
+  NPConditionalDistributionPreparedCtx *prepared_context =
+    (retained_context != NULL) ? retained_context : &local_context;
+
+  (void)prepare_only;
+  if (prepared_context->active)
+    error("C_np_distribution_conditional_bw: prepared context is already active");
+  memset(prepared_context, 0, sizeof(*prepared_context));
 
   cdfontrain_extern = cdfontrain =  myopti[CDBW_CDFONTRAIN];
 
@@ -14687,9 +14869,21 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
       np_beta_cy_bw_order_extern = myopti[CDBW_CYORDERI];
   }
 
+  prepared_context->active = 1;
+  prepared_context->cdfontrain = cdfontrain;
+  prepared_context->num_all_var = num_all_var;
+  prepared_context->num_var_unordered = num_var_unordered_extern;
+  prepared_context->num_var_ordered = num_var_ordered_extern;
+  prepared_context->num_var_continuous = num_var_continuous_extern;
+  prepared_context->num_reg_unordered = num_reg_unordered_extern;
+  prepared_context->num_reg_ordered = num_reg_ordered_extern;
+  prepared_context->num_reg_continuous = num_reg_continuous_extern;
+
   if((num_reg_continuous_extern + num_var_continuous_extern) > 0){
     cxylb = alloc_vecd(num_reg_continuous_extern + num_var_continuous_extern);
     cxyub = alloc_vecd(num_reg_continuous_extern + num_var_continuous_extern);
+    prepared_context->cxy_lower = cxylb;
+    prepared_context->cxy_upper = cxyub;
     for(i = 0; i < num_reg_continuous_extern; i++){
       cxylb[i] = (cxkerlb != NULL) ? cxkerlb[i] : DBL_MAX;
       cxyub[i] = (cxkerub != NULL) ? cxkerub[i] : DBL_MAX;
@@ -14784,10 +14978,16 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   matrix_Y_unordered_train_extern = alloc_matd(num_obs_train_extern, num_var_unordered_extern);
   matrix_Y_ordered_train_extern = alloc_matd(num_obs_train_extern, num_var_ordered_extern);
   matrix_Y_continuous_train_extern = alloc_matd(num_obs_train_extern, num_var_continuous_extern);
+  prepared_context->matrix_y_unordered_train = matrix_Y_unordered_train_extern;
+  prepared_context->matrix_y_ordered_train = matrix_Y_ordered_train_extern;
+  prepared_context->matrix_y_continuous_train = matrix_Y_continuous_train_extern;
 
   matrix_X_unordered_train_extern = alloc_matd(num_obs_train_extern, num_reg_unordered_extern);
   matrix_X_ordered_train_extern = alloc_matd(num_obs_train_extern, num_reg_ordered_extern);
   matrix_X_continuous_train_extern = alloc_matd(num_obs_train_extern, num_reg_continuous_extern);
+  prepared_context->matrix_x_unordered_train = matrix_X_unordered_train_extern;
+  prepared_context->matrix_x_ordered_train = matrix_X_ordered_train_extern;
+  prepared_context->matrix_x_continuous_train = matrix_X_continuous_train_extern;
 
   if(cdfontrain){
     matrix_Y_unordered_eval_extern = matrix_Y_unordered_train_extern;
@@ -14798,6 +14998,9 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
     matrix_Y_ordered_eval_extern = alloc_matd(num_obs_eval_extern, num_var_ordered_extern);
     matrix_Y_continuous_eval_extern = alloc_matd(num_obs_eval_extern, num_var_continuous_extern);
   }
+  prepared_context->matrix_y_unordered_eval = matrix_Y_unordered_eval_extern;
+  prepared_context->matrix_y_ordered_eval = matrix_Y_ordered_eval_extern;
+  prepared_context->matrix_y_continuous_eval = matrix_Y_continuous_eval_extern;
 
   num_categories_extern = alloc_vecu(num_var_unordered_extern + num_var_ordered_extern +
                                      num_reg_unordered_extern + num_reg_ordered_extern);
@@ -14807,11 +15010,19 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
 
   num_categories_extern_XY = alloc_vecu(num_var_unordered_extern + num_var_ordered_extern +
                                         num_reg_unordered_extern + num_reg_ordered_extern);
+  prepared_context->num_categories = num_categories_extern;
+  prepared_context->num_categories_x = num_categories_extern_X;
+  prepared_context->num_categories_y = num_categories_extern_Y;
+  prepared_context->num_categories_xy = num_categories_extern_XY;
   
   matrix_y = alloc_matd(num_all_var + 1, num_all_var + 1);
   vector_scale_factor = alloc_vecd(num_all_var + 1);
   vector_scale_factor_startbest = alloc_vecd(num_all_var + 1);
   vsfh = alloc_vecd(num_all_var + 1);
+  prepared_context->powell_directions = matrix_y;
+  prepared_context->scale_factor = vector_scale_factor;
+  prepared_context->scale_factor_startbest = vector_scale_factor_startbest;
+  prepared_context->powell_step = vsfh;
   
   matrix_categorical_vals_extern = 
     alloc_matd(num_obs_train_extern, num_var_unordered_extern + num_var_ordered_extern + 
@@ -14826,6 +15037,10 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   matrix_categorical_vals_extern_XY = 
     alloc_matd(num_obs_train_extern, num_var_unordered_extern + num_var_ordered_extern + 
                num_reg_unordered_extern + num_reg_ordered_extern);
+  prepared_context->matrix_categorical_vals = matrix_categorical_vals_extern;
+  prepared_context->matrix_categorical_vals_x = matrix_categorical_vals_extern_X;
+  prepared_context->matrix_categorical_vals_y = matrix_categorical_vals_extern_Y;
+  prepared_context->matrix_categorical_vals_xy = matrix_categorical_vals_extern_XY;
 
   /* in v_s_f order is creg, cvar, uvar, ovar, ureg, oreg  */
 
@@ -14879,15 +15094,21 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   num_all_uvar = num_reg_unordered_extern + num_var_unordered_extern;
   num_all_ovar = num_reg_ordered_extern + num_var_ordered_extern;
 
+  prepared_context->num_all_cvar = num_all_cvar;
+  prepared_context->num_all_uvar = num_all_uvar;
+  prepared_context->num_all_ovar = num_all_ovar;
+
   // we need 3 trees to accelerate cg_concdf :)
 
   ipt_X = (int *)malloc(num_obs_train_extern*sizeof(int));
+  prepared_context->ipt_x = ipt_X;
   if(!(ipt_X != NULL)){
     bw_error_msg = "!(ipt_X != NULL)";
     goto cleanup_np_distribution_conditional_bw;
   }
 
   ipt_lookup_X = (int *)malloc(num_obs_train_extern*sizeof(int));
+  prepared_context->ipt_lookup_x = ipt_lookup_X;
   if(!(ipt_lookup_X != NULL)){
     bw_error_msg = "!(ipt_lookup_X != NULL)";
     goto cleanup_np_distribution_conditional_bw;
@@ -14902,12 +15123,14 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
 
 
   ipt_Y = (int *)malloc(num_obs_train_extern*sizeof(int));
+  prepared_context->ipt_y = ipt_Y;
   if(!(ipt_Y != NULL)){
     bw_error_msg = "!(ipt_Y != NULL)";
     goto cleanup_np_distribution_conditional_bw;
   }
 
   ipt_lookup_Y = (int *)malloc(num_obs_train_extern*sizeof(int));
+  prepared_context->ipt_lookup_y = ipt_lookup_Y;
   if(!(ipt_lookup_Y != NULL)){
     bw_error_msg = "!(ipt_lookup_Y != NULL)";
     goto cleanup_np_distribution_conditional_bw;
@@ -14921,14 +15144,17 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   ipt_lookup_extern_Y = ipt_lookup_Y;
 
   num_obs_alt = (BANDWIDTH_den_extern != BW_ADAP_NN) ? num_obs_train_extern : 0;
+  prepared_context->num_obs_alt = num_obs_alt;
 
   ipt_XY = (int *)malloc(num_obs_alt*sizeof(int));
+  prepared_context->ipt_xy = ipt_XY;
   if(!(ipt_XY != NULL)){
     bw_error_msg = "!(ipt_XY != NULL)";
     goto cleanup_np_distribution_conditional_bw;
   }
 
   ipt_lookup_XY = (int *)malloc(num_obs_alt*sizeof(int));
+  prepared_context->ipt_lookup_xy = ipt_lookup_XY;
   if(!(ipt_lookup_XY != NULL)){
     bw_error_msg = "!(ipt_lookup_XY != NULL)";
     goto cleanup_np_distribution_conditional_bw;
@@ -14998,6 +15224,9 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   matrix_XY_continuous_train_extern = alloc_matd(num_obs_alt, num_all_cvar);
   matrix_XY_unordered_train_extern = alloc_matd(num_obs_alt, num_all_uvar);
   matrix_XY_ordered_train_extern = alloc_matd(num_obs_alt, num_all_ovar);
+  prepared_context->matrix_xy_continuous_train = matrix_XY_continuous_train_extern;
+  prepared_context->matrix_xy_unordered_train = matrix_XY_unordered_train_extern;
+  prepared_context->matrix_xy_ordered_train = matrix_XY_ordered_train_extern;
 
   if(int_TREE_XY == NP_TREE_TRUE){
 
@@ -15109,6 +15338,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
       num_obs_train_extern,
       num_reg_continuous_extern + num_var_continuous_extern,
       myans);
+  prepared_context->extendednn_upper = vector_extendednn_upper_extern;
   int_extendednn_upper_num_extern =
     (vector_extendednn_upper_extern != NULL) ?
     (num_reg_continuous_extern + num_var_continuous_extern) : 0;
@@ -15408,6 +15638,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
       fret_best = fret;
     }
     vector_scale_factor_multistart = alloc_vecd(num_all_var + 1);
+    prepared_context->scale_factor_multistart = vector_scale_factor_multistart;
     for(i = 1; i <= num_all_var; i++)
       vector_scale_factor_multistart[i] = (double) vector_scale_factor[i];
     np_progress_bandwidth_multistart_step(1, iNum_Multistart);
@@ -15581,6 +15812,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
         vector_scale_factor[i] = (double) vector_scale_factor_multistart[i];
     }
     free(vector_scale_factor_multistart);
+    prepared_context->scale_factor_multistart = NULL;
   }
 
   if (enforce_fixed_feasibility) {
@@ -15639,105 +15871,44 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   /* end return data */
 
 cleanup_np_distribution_conditional_bw:
-  /* Free data objects */
-  bwm_clear_floor_context();
-  bwm_nn_cache_free();
-  bwm_objective_cache_free();
-  bwm_search_context_release();
-  safe_free(vector_extendednn_upper_extern);
-  vector_extendednn_upper_extern = NULL;
-  int_extendednn_upper_num_extern = 0;
-
-  free_mat(matrix_Y_unordered_train_extern, num_var_unordered_extern);
-  free_mat(matrix_Y_ordered_train_extern, num_var_ordered_extern);
-  free_mat(matrix_Y_continuous_train_extern, num_var_continuous_extern);
-
-  free_mat(matrix_X_unordered_train_extern, num_reg_unordered_extern);
-  free_mat(matrix_X_ordered_train_extern, num_reg_ordered_extern);
-  free_mat(matrix_X_continuous_train_extern, num_reg_continuous_extern);
-  np_clear_support_counts_extern();
-  int_TREE_PROFILE_X = NP_TREE_FALSE;
-
-  if(!cdfontrain){
-    free_mat(matrix_Y_unordered_eval_extern, num_var_unordered_extern);
-    free_mat(matrix_Y_ordered_eval_extern, num_var_ordered_extern);
-    free_mat(matrix_Y_continuous_eval_extern, num_var_continuous_extern);
-  }
-
-  free_mat(matrix_y, num_all_var + 1);
-  safe_free(vector_scale_factor);
-  safe_free(vector_scale_factor_startbest);
-  safe_free(vsfh);
-  safe_free(num_categories_extern);
-  safe_free(num_categories_extern_X);
-  safe_free(num_categories_extern_Y);
-  safe_free(num_categories_extern_XY);
-
-  free_mat(matrix_categorical_vals_extern, num_reg_unordered_extern + num_reg_ordered_extern +
-           num_var_unordered_extern + num_var_ordered_extern);
-
-  free_mat(matrix_categorical_vals_extern_X, num_reg_unordered_extern + num_reg_ordered_extern);
-
-  free_mat(matrix_categorical_vals_extern_Y, num_var_unordered_extern + num_var_ordered_extern);
-  free_mat(matrix_categorical_vals_extern_XY, num_reg_unordered_extern + num_reg_ordered_extern +
-           num_var_unordered_extern + num_var_ordered_extern);
-
-  safe_free(ipt_X);
-  safe_free(ipt_Y);
-  safe_free(ipt_XY);
-
-  safe_free(ipt_lookup_X);
-  safe_free(ipt_lookup_Y);
-  safe_free(ipt_lookup_XY);
-
-  if(int_TREE_X == NP_TREE_TRUE){
-    free_kdtree(&kdt_extern_X);
-    int_TREE_X = NP_TREE_FALSE;
-  }
-
- if(int_TREE_Y == NP_TREE_TRUE){
-    free_kdtree(&kdt_extern_Y);
-    int_TREE_Y = NP_TREE_FALSE;
-  }
-
-  free_mat(matrix_XY_continuous_train_extern, num_all_cvar);
-  free_mat(matrix_XY_unordered_train_extern, num_all_uvar);
-  free_mat(matrix_XY_ordered_train_extern, num_all_ovar);
-
-  if(int_TREE_XY == NP_TREE_TRUE){
-    free_kdtree(&kdt_extern_XY);
-    int_TREE_XY = NP_TREE_FALSE;
-  }
-
-
-  int_WEIGHTS = 0;
-
-  int_cxker_bound_extern = 0;
-  int_cyker_bound_extern = 0;
-  int_cxyker_bound_extern = 0;
-  vector_cxkerlb_extern = NULL;
-  vector_cxkerub_extern = NULL;
-  vector_cykerlb_extern = NULL;
-  vector_cykerub_extern = NULL;
-  vector_cxykerlb_extern = NULL;
-  vector_cxykerub_extern = NULL;
-  int_cker_bound_extern = 0;
-  vector_ckerlb_extern = NULL;
-  vector_ckerub_extern = NULL;
-  safe_free(cxylb);
-  safe_free(cxyub);
-  np_lp_engine_extern = NP_LP_ENGINE_SCALAR;
-  vector_glp_degree_extern = NULL;
-  int_glp_bernstein_extern = 0;
-  int_glp_basis_extern = 1;
-  np_conditional_distribution_bw_categorical_compress_extern = 0;
-  np_clear_estimator_extern_aliases();
-  np_glp_cv_clear_extern();
+  np_conditional_distribution_prepared_context_destroy(prepared_context);
 
   if (bw_error_msg != NULL)
     error("%s", bw_error_msg);
 
   return ;
+}
+
+void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_con,
+                                    double * u_uno, double * u_ord, double * u_con,
+                                    double * cg_uno, double * cg_ord, double * cg_con,
+                                    double * mysd,
+                                    int * myopti, double * myoptd,
+                                    double * myans, double * fval,
+                                    double * objective_function_values,
+                                    double * objective_function_evals,
+                                    double * objective_function_invalid,
+                                    double * timing,
+                                    double * objective_function_fast,
+                                    int * penalty_mode, double * penalty_mult,
+                                    int * glp_degree,
+                                    int * glp_bernstein,
+                                    int * glp_basis,
+                                    int * regtype,
+                                    double * cxkerlb, double * cxkerub,
+                                    double * cykerlb, double * cykerub,
+                                    const int eval_only)
+{
+  np_distribution_conditional_bw_mode(
+    c_uno, c_ord, c_con, u_uno, u_ord, u_con,
+    cg_uno, cg_ord, cg_con, mysd,
+    myopti, myoptd, myans, fval,
+    objective_function_values, objective_function_evals,
+    objective_function_invalid, timing, objective_function_fast,
+    penalty_mode, penalty_mult,
+    glp_degree, glp_bernstein, glp_basis, regtype,
+    cxkerlb, cxkerub, cykerlb, cykerub,
+    eval_only, NULL, 0);
 }
 
 /*
