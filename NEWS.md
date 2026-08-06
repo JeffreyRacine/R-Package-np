@@ -1,5 +1,12 @@
 # npRmpi 0.70-6
 
+* During bandwidth-objective evaluation, MPI-3 builds now use progress-aware
+  nonblocking forms of the existing shared post-kernel collectives. Rank zero
+  can therefore maintain the canonical progress heartbeat while waiting for
+  workers, without changing collective buffers, operations, ordering, or
+  estimator arithmetic. Fit/evaluation routes and MPI-2 builds retain their
+  existing blocking collectives.
+
 * `npindexbw()` now canonicalizes its numeric design matrix once at the public
   boundary and reuses that matrix during internal index and coordinate setup.
   This removes redundant full-matrix copies before objective evaluation while

@@ -158,6 +158,7 @@ void np_progress_fit_loop_step_owned(
   NPProgressUnwindCleanup cleanup,
   void *cleanup_data);
 int np_progress_fit_is_active(void);
+int np_progress_bandwidth_is_active(void);
 void np_progress_bandwidth_loop_step(void);
 
 double **alloc_matd(int nrows, int ncols);

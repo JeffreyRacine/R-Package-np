@@ -144,6 +144,97 @@ extern  MPI_Status status;
 extern MPI_Comm	*comm;
 extern int int_conditional_prepared_context_extern;
 
+#if MPI_VERSION >= 3
+static void np_mpi_bandwidth_progress_wait(MPI_Request * const request,
+                                           const char * const label){
+  int complete = 0;
+  int rc;
+
+  if(request == NULL)
+    error("%s received an invalid MPI request",
+          (label == NULL) ? "bandwidth objective collective" : label);
+
+  if(my_rank != 0){
+    rc = MPI_Wait(request, MPI_STATUS_IGNORE);
+    if(rc != MPI_SUCCESS)
+      error("%s failed while waiting for MPI completion",
+            (label == NULL) ? "bandwidth objective collective" : label);
+    return;
+  }
+
+  while(!complete){
+    rc = MPI_Test(request, &complete, MPI_STATUS_IGNORE);
+    if(rc != MPI_SUCCESS)
+      error("%s failed while polling MPI completion",
+            (label == NULL) ? "bandwidth objective collective" : label);
+    if(!complete)
+      np_progress_bandwidth_loop_step();
+  }
+}
+#endif
+
+static void np_mpi_allgather_in_place_double(const int sendcount,
+                                             double * const recvbuf,
+                                             const int recvcount,
+                                             const char * const label){
+#if MPI_VERSION >= 3
+  if(np_progress_bandwidth_is_active()){
+    MPI_Request request = MPI_REQUEST_NULL;
+    const int rc = MPI_Iallgather(
+      MPI_IN_PLACE, sendcount, MPI_DOUBLE,
+      recvbuf, recvcount, MPI_DOUBLE, comm[1], &request);
+    if(rc != MPI_SUCCESS)
+      error("%s failed to start",
+            (label == NULL) ? "bandwidth objective MPI_Allgather" : label);
+    np_mpi_bandwidth_progress_wait(&request, label);
+    return;
+  }
+#endif
+  MPI_Allgather(MPI_IN_PLACE, sendcount, MPI_DOUBLE,
+                recvbuf, recvcount, MPI_DOUBLE, comm[1]);
+}
+
+static void np_mpi_allgatherv_in_place_double(const int sendcount,
+                                              double * const recvbuf,
+                                              const int * const recvcounts,
+                                              const int * const displs,
+                                              const char * const label){
+#if MPI_VERSION >= 3
+  if(np_progress_bandwidth_is_active()){
+    MPI_Request request = MPI_REQUEST_NULL;
+    const int rc = MPI_Iallgatherv(
+      MPI_IN_PLACE, sendcount, MPI_DOUBLE,
+      recvbuf, recvcounts, displs, MPI_DOUBLE, comm[1], &request);
+    if(rc != MPI_SUCCESS)
+      error("%s failed to start",
+            (label == NULL) ? "bandwidth objective MPI_Allgatherv" : label);
+    np_mpi_bandwidth_progress_wait(&request, label);
+    return;
+  }
+#endif
+  MPI_Allgatherv(MPI_IN_PLACE, sendcount, MPI_DOUBLE,
+                 recvbuf, recvcounts, displs, MPI_DOUBLE, comm[1]);
+}
+
+static void np_mpi_allreduce_in_place_double(double * const buffer,
+                                             const int count,
+                                             MPI_Op op,
+                                             const char * const label){
+#if MPI_VERSION >= 3
+  if(np_progress_bandwidth_is_active()){
+    MPI_Request request = MPI_REQUEST_NULL;
+    const int rc = MPI_Iallreduce(
+      MPI_IN_PLACE, buffer, count, MPI_DOUBLE, op, comm[1], &request);
+    if(rc != MPI_SUCCESS)
+      error("%s failed to start",
+            (label == NULL) ? "bandwidth objective MPI_Allreduce" : label);
+    np_mpi_bandwidth_progress_wait(&request, label);
+    return;
+  }
+#endif
+  MPI_Allreduce(MPI_IN_PLACE, buffer, count, MPI_DOUBLE, op, comm[1]);
+}
+
 typedef struct {
   int chunk_start;
   int chunk_end;
@@ -12185,14 +12276,18 @@ NPPermutationWeightOutput * const pkw_output){
                                                              (size_t)sum_element_length,
                                                              "weighted_sum MPI_Allgather"),
                                     "weighted_sum MPI_Allgather");
-        MPI_Allgather(MPI_IN_PLACE, weighted_count, MPI_DOUBLE, weighted_sum, weighted_count, MPI_DOUBLE, comm[1]);
+        np_mpi_allgather_in_place_double(
+          weighted_count, weighted_sum, weighted_count,
+          "weighted_sum MPI_Allgather");
       } else if(BANDWIDTH_reg == BW_ADAP_NN){
         const int weighted_count =
           np_jksum_mpi_count_or_die(np_jksum_size_mul_or_die((size_t)num_obs_eval,
                                                              (size_t)sum_element_length,
                                                              "weighted_sum MPI_Allreduce"),
                                     "weighted_sum MPI_Allreduce");
-        MPI_Allreduce(MPI_IN_PLACE, weighted_sum, weighted_count, MPI_DOUBLE, MPI_SUM, comm[1]);
+        np_mpi_allreduce_in_place_double(
+          weighted_sum, weighted_count, MPI_SUM,
+          "weighted_sum MPI_Allreduce");
       }
     }
 
@@ -12203,17 +12298,18 @@ NPPermutationWeightOutput * const pkw_output){
                                                              (size_t)dual_sum_element_length,
                                                              "dual power weighted_sum MPI_Allgather"),
                                     "dual power weighted_sum MPI_Allgather");
-        MPI_Allgather(MPI_IN_PLACE, dual_count, MPI_DOUBLE,
-                      dual_power_ctx->weighted_sum, dual_count,
-                      MPI_DOUBLE, comm[1]);
+        np_mpi_allgather_in_place_double(
+          dual_count, dual_power_ctx->weighted_sum, dual_count,
+          "dual power weighted_sum MPI_Allgather");
       } else if(BANDWIDTH_reg == BW_ADAP_NN){
         const int dual_count =
           np_jksum_mpi_count_or_die(np_jksum_size_mul_or_die((size_t)num_obs_eval,
                                                              (size_t)dual_sum_element_length,
                                                              "dual power weighted_sum MPI_Allreduce"),
                                     "dual power weighted_sum MPI_Allreduce");
-        MPI_Allreduce(MPI_IN_PLACE, dual_power_ctx->weighted_sum,
-                      dual_count, MPI_DOUBLE, MPI_SUM, comm[1]);
+        np_mpi_allreduce_in_place_double(
+          dual_power_ctx->weighted_sum, dual_count, MPI_SUM,
+          "dual power weighted_sum MPI_Allreduce");
       }
     }
 
@@ -12228,12 +12324,13 @@ NPPermutationWeightOutput * const pkw_output){
         goto cleanup;
       }
       if(kw_equal_counts){
-        MPI_Allgather(MPI_IN_PLACE, igatherv[my_rank], MPI_DOUBLE,
-                      kw_work, igatherv[0], MPI_DOUBLE, comm[1]);
+        np_mpi_allgather_in_place_double(
+          igatherv[my_rank], kw_work, igatherv[0],
+          "kernel weights MPI_Allgather");
       } else {
-        MPI_Allgatherv(MPI_IN_PLACE, igatherv[my_rank], MPI_DOUBLE,
-                       kw_work, igatherv, idisplsv,
-                       MPI_DOUBLE, comm[1]);
+        np_mpi_allgatherv_in_place_double(
+          igatherv[my_rank], kw_work, igatherv, idisplsv,
+          "kernel weights MPI_Allgatherv");
       }
 
       if((p_nvar > 0) &&
@@ -12263,8 +12360,9 @@ NPPermutationWeightOutput * const pkw_output){
       const int pkw_count = np_jksum_mpi_count_or_die(
         pkw_output->total_elements,
         "derivative kernel weights MPI_Allreduce");
-      MPI_Allreduce(MPI_IN_PLACE, pkw_output->data,
-                    pkw_count, MPI_DOUBLE, MPI_SUM, comm[1]);
+      np_mpi_allreduce_in_place_double(
+        pkw_output->data, pkw_count, MPI_SUM,
+        "derivative kernel weights MPI_Allreduce");
     }
 
     if(p_nvar > 0){
@@ -12275,7 +12373,10 @@ NPPermutationWeightOutput * const pkw_output){
                                       (size_t)num_obs_eval,
                                       (size_t)sum_element_length,
                                       "weighted_permutation_sum offset");
-          MPI_Allgatherv(MPI_IN_PLACE, igatherv[my_rank], MPI_DOUBLE, weighted_permutation_sum + perm_offset, igatherv, idisplsv, MPI_DOUBLE, comm[1]);
+          np_mpi_allgatherv_in_place_double(
+            igatherv[my_rank], weighted_permutation_sum + perm_offset,
+            igatherv, idisplsv,
+            "weighted_permutation_sum MPI_Allgatherv");
         }
       } else if(BANDWIDTH_reg == BW_ADAP_NN){
         const int perm_count =
@@ -12284,7 +12385,9 @@ NPPermutationWeightOutput * const pkw_output){
                                                               (size_t)sum_element_length,
                                                               "weighted_permutation_sum MPI_Allreduce"),
                                     "weighted_permutation_sum MPI_Allreduce");
-        MPI_Allreduce(MPI_IN_PLACE, weighted_permutation_sum, perm_count, MPI_DOUBLE, MPI_SUM, comm[1]);
+        np_mpi_allreduce_in_place_double(
+          weighted_permutation_sum, perm_count, MPI_SUM,
+          "weighted_permutation_sum MPI_Allreduce");
       }
     }
 #endif

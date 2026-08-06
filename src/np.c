@@ -3367,6 +3367,11 @@ void np_progress_bandwidth_loop_step(void)
   bwm_maybe_signal_activity();
 }
 
+int np_progress_bandwidth_is_active(void)
+{
+  return bwm_progress_eval_active;
+}
+
 static inline void bwm_snapshot_fast_counters(void)
 {
   bwm_fast_eval_count = np_fastcv_alllarge_hits_get() +
