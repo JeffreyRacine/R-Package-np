@@ -67,3 +67,34 @@ test_that("ordinary conditional-density bandwidth state has one typed owner", {
     fixed = TRUE
   )
 })
+
+test_that("ordinary and resident conditional-density paths share preparation", {
+  source <- np_conditional_density_owner_source()
+  evaluator_start <- regexpr(
+    "static int\\s+np_density_conditional_nomad_shadow_eval_native_raw\\s*\\(",
+    source, perl = TRUE
+  )
+  expect_gt(evaluator_start[[1L]], 0L)
+  evaluator_tail <- substring(source, evaluator_start[[1L]])
+  evaluator_end <- regexpr(
+    "\\n}\\n\\nSEXP C_np_density_conditional_nomad_shadow_eval",
+    evaluator_tail, perl = TRUE
+  )
+  expect_gt(evaluator_end[[1L]], 0L)
+  evaluator <- substring(evaluator_tail, 1L, evaluator_end[[1L]] + 1L)
+
+  expect_match(
+    source,
+    "np_conditional_density_nomad_shadow_prepare_internal(",
+    fixed = TRUE
+  )
+  expect_match(
+    source,
+    "goto canonical_conditional_density_search;",
+    fixed = TRUE
+  )
+  expect_match(evaluator, ".eval_bandwidth", fixed = TRUE)
+  expect_match(evaluator, ".eval_degree", fixed = TRUE)
+  expect_false(grepl("NP_NOMAD_CALLBACK_CALLOC", evaluator, fixed = TRUE))
+  expect_false(grepl("NP_NOMAD_CALLBACK_FREE", evaluator, fixed = TRUE))
+})
