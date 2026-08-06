@@ -53,18 +53,50 @@ test_that("MPI regression bandwidth state has one typed cleanup owner", {
     "response", "lsq_scale", "lsq_q", "num_categories",
     "matrix_categorical_vals", "continuous_stddev", "extendednn_upper",
     "powell_directions", "scale_factor", "scale_factor_startbest",
-    "powell_step", "tree_permutation", "tree_lookup", "tree"
+    "powell_step", "degree", "ckerlb", "ckerub",
+    "tree_permutation", "tree_lookup", "tree"
   )) {
     expect_match(owner, paste0("context->", field), fixed = TRUE, info = field)
   }
   expect_match(
     routine,
-    "NPRegressionPreparedCtx prepared_context = {0};",
+    "NPRegressionPreparedCtx local_context = {0};",
     fixed = TRUE
   )
   expect_match(
     routine,
-    "np_regression_prepared_context_destroy(&prepared_context);",
+    "NPRegressionPreparedCtx *prepared_context =",
+    fixed = TRUE
+  )
+  expect_match(
+    routine,
+    "np_regression_prepared_context_destroy(prepared_context);",
+    fixed = TRUE
+  )
+})
+
+test_that("MPI native regression search evaluates one retained prepared state", {
+  source <- np_regression_prepared_source()
+  callback <- np_regression_prepared_function(
+    source, "np_regression_shadow_native_search_callback", "int"
+  )
+  evaluator <- np_regression_prepared_function(
+    source, "np_regression_nomad_shadow_eval_native_raw", "int"
+  )
+  prepare <- np_regression_prepared_function(
+    source, "np_regression_prepared_shadow_prepare_internal", "int"
+  )
+
+  expect_match(
+    evaluator,
+    "np_regression_prepared_context_eval(",
+    fixed = TRUE
+  )
+  expect_false(grepl("NP_NOMAD_CALLBACK_CALLOC", callback, fixed = TRUE))
+  expect_false(grepl("NP_NOMAD_CALLBACK_FREE", callback, fixed = TRUE))
+  expect_match(
+    prepare,
+    "&np_regression_prepared, 1, degree_search[0]);",
     fixed = TRUE
   )
 })
