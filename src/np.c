@@ -1264,6 +1264,36 @@ static void np_density_prepared_context_destroy(NPDensityPreparedCtx *context);
 typedef struct {
   int active;
   int num_var;
+  int num_unordered;
+  int num_ordered;
+  int num_continuous;
+  int cdfontrain;
+  double **matrix_x_unordered_train;
+  double **matrix_x_ordered_train;
+  double **matrix_x_continuous_train;
+  double **matrix_x_unordered_eval;
+  double **matrix_x_ordered_eval;
+  double **matrix_x_continuous_eval;
+  int *num_categories;
+  double **matrix_categorical_vals;
+  double *continuous_stddev;
+  double *extendednn_upper;
+  double **powell_directions;
+  double *scale_factor;
+  double *scale_factor_multistart;
+  double *scale_factor_startbest;
+  double *powell_step;
+  int *tree_permutation_train;
+  int *tree_permutation_eval;
+  KDT *tree;
+} NPDistributionPreparedCtx;
+
+static void np_distribution_prepared_context_destroy(
+  NPDistributionPreparedCtx *context);
+
+typedef struct {
+  int active;
+  int num_var;
   int num_search_var;
   int num_unordered;
   int num_ordered;
@@ -12449,6 +12479,72 @@ static void np_density_prepared_context_destroy(NPDensityPreparedCtx *context)
   memset(context, 0, sizeof(*context));
 }
 
+static void np_distribution_prepared_context_destroy(
+  NPDistributionPreparedCtx *context)
+{
+  if (context == NULL || !context->active)
+    return;
+
+  bwm_clear_floor_context();
+  bwm_nn_cache_free();
+  bwm_objective_cache_free();
+  bwm_search_context_release();
+
+  if (context->matrix_x_unordered_train != NULL)
+    free_mat(context->matrix_x_unordered_train, context->num_unordered);
+  if (context->matrix_x_ordered_train != NULL)
+    free_mat(context->matrix_x_ordered_train, context->num_ordered);
+  if (context->matrix_x_continuous_train != NULL)
+    free_mat(context->matrix_x_continuous_train, context->num_continuous);
+  if (!context->cdfontrain) {
+    if (context->matrix_x_unordered_eval != NULL)
+      free_mat(context->matrix_x_unordered_eval, context->num_unordered);
+    if (context->matrix_x_ordered_eval != NULL)
+      free_mat(context->matrix_x_ordered_eval, context->num_ordered);
+    if (context->matrix_x_continuous_eval != NULL)
+      free_mat(context->matrix_x_continuous_eval, context->num_continuous);
+  }
+  safe_free(context->extendednn_upper);
+  if (context->powell_directions != NULL)
+    free_mat(context->powell_directions, context->num_var + 1);
+  safe_free(context->scale_factor);
+  safe_free(context->scale_factor_multistart);
+  safe_free(context->scale_factor_startbest);
+  safe_free(context->powell_step);
+  safe_free(context->num_categories);
+  if (context->matrix_categorical_vals != NULL)
+    free_mat(context->matrix_categorical_vals,
+             context->num_unordered + context->num_ordered);
+  safe_free(context->continuous_stddev);
+  safe_free(context->tree_permutation_train);
+  if (!context->cdfontrain)
+    safe_free(context->tree_permutation_eval);
+  if (context->tree != NULL)
+    free_kdtree(&context->tree);
+
+  matrix_X_unordered_train_extern = NULL;
+  matrix_X_ordered_train_extern = NULL;
+  matrix_X_continuous_train_extern = NULL;
+  matrix_X_unordered_eval_extern = NULL;
+  matrix_X_ordered_eval_extern = NULL;
+  matrix_X_continuous_eval_extern = NULL;
+  num_categories_extern = NULL;
+  matrix_categorical_vals_extern = NULL;
+  vector_continuous_stddev_extern = NULL;
+  vector_extendednn_upper_extern = NULL;
+  int_extendednn_upper_num_extern = 0;
+  kdt_extern_X = NULL;
+  int_TREE_X = NP_TREE_FALSE;
+  int_TREE_PROFILE_X = NP_TREE_FALSE;
+  int_cker_bound_extern = 0;
+  vector_ckerlb_extern = NULL;
+  vector_ckerub_extern = NULL;
+  np_distribution_bw_categorical_compress_extern = 0;
+  np_reset_y_side_extern();
+  np_clear_estimator_extern_aliases();
+  memset(context, 0, sizeof(*context));
+}
+
 static void np_density_refresh_penalty(double *vector_scale_factor,
                                        int num_var,
                                        int penalty_mode,
@@ -13398,23 +13494,35 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
 // For distributions the bandwidth selection involves evaluating the CDF at a number of points.
 // We allow one to specify those points, passed in by mye{uno,ord,con}.
 
-void np_distribution_bw(double * myuno, double * myord, double * mycon, 
-                        double * myeuno, double * myeord, double * myecon, double * mysd,
-                        int * myopti, double * myoptd, double * myans, double * fval,
-                        double * objective_function_values, double * objective_function_evals,
-                        double * objective_function_invalid, double * timing,
-                        double * objective_function_fast,
-                        int * penalty_mode, double * penalty_mult,
-                        double * ckerlb, double * ckerub,
-                        const int eval_only){
+static void np_distribution_bw_internal(
+  double *myuno, double *myord, double *mycon,
+  double *myeuno, double *myeord, double *myecon, double *mysd,
+  int *myopti, double *myoptd, double *myans, double *fval,
+  double *objective_function_values, double *objective_function_evals,
+  double *objective_function_invalid, double *timing,
+  double *objective_function_fast,
+  int *penalty_mode, double *penalty_mult,
+  double *ckerlb, double *ckerub,
+  const int eval_only,
+  NPDistributionPreparedCtx *retained_context,
+  const int prepare_only)
+{
+  NPDistributionPreparedCtx local_context = {0};
+  NPDistributionPreparedCtx *prepared_context =
+    retained_context != NULL ? retained_context : &local_context;
+  if (retained_context != NULL && retained_context->active)
+    error("C_np_distribution_bw: prepared context is already active");
+  memset(prepared_context, 0, sizeof(*prepared_context));
   int_nn_k_min_extern = 1;
   /* Likelihood bandwidth selection for density estimation */
 
-  double **matrix_y;
+  double **matrix_y = NULL;
 
   double *vector_continuous_stddev = NULL;
-  double *vsfh, *vector_scale_factor, *vector_scale_factor_multistart;
-  double *vector_scale_factor_startbest;
+  double *vsfh = NULL;
+  double *vector_scale_factor = NULL;
+  double *vector_scale_factor_multistart = NULL;
+  double *vector_scale_factor_startbest = NULL;
 
   double fret, fret_best, fret_start_best, fret_initial;
   double fast_eval_total = 0.0;
@@ -13454,6 +13562,12 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   int_cker_bound_extern = np_has_finite_cker_bounds(ckerlb, ckerub, num_reg_continuous_extern);
 
   num_var = num_reg_ordered_extern + num_reg_continuous_extern + num_reg_unordered_extern;
+  prepared_context->active = 1;
+  prepared_context->num_var = num_var;
+  prepared_context->num_unordered = num_reg_unordered_extern;
+  prepared_context->num_ordered = num_reg_ordered_extern;
+  prepared_context->num_continuous = num_reg_continuous_extern;
+  prepared_context->cdfontrain = cdfontrain;
 
   num_obs_train_extern = myopti[DBW_NOBSI];
   
@@ -13556,6 +13670,13 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
     matrix_X_continuous_eval_extern = alloc_matd(num_obs_eval_extern, num_reg_continuous_extern);
   }
 
+  prepared_context->matrix_x_unordered_train = matrix_X_unordered_train_extern;
+  prepared_context->matrix_x_ordered_train = matrix_X_ordered_train_extern;
+  prepared_context->matrix_x_continuous_train = matrix_X_continuous_train_extern;
+  prepared_context->matrix_x_unordered_eval = matrix_X_unordered_eval_extern;
+  prepared_context->matrix_x_ordered_eval = matrix_X_ordered_eval_extern;
+  prepared_context->matrix_x_continuous_eval = matrix_X_continuous_eval_extern;
+
   num_categories_extern = alloc_vecu(num_reg_unordered_extern+num_reg_ordered_extern);
   matrix_y = alloc_matd(num_var + 1, num_var +1);
   vector_scale_factor = alloc_vecd(num_var + 1);
@@ -13563,6 +13684,13 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   vsfh = alloc_vecd(num_var + 1);
   // nb check vals
   matrix_categorical_vals_extern = alloc_matd(num_obs_train_extern, num_reg_unordered_extern + num_reg_ordered_extern);
+
+  prepared_context->num_categories = num_categories_extern;
+  prepared_context->powell_directions = matrix_y;
+  prepared_context->scale_factor = vector_scale_factor;
+  prepared_context->scale_factor_startbest = vector_scale_factor_startbest;
+  prepared_context->powell_step = vsfh;
+  prepared_context->matrix_categorical_vals = matrix_categorical_vals_extern;
 
   if(num_reg_unordered_extern > 0){
     bw_error_msg = "np.c: distribution bw selection only works on ordered and continuous data.";
@@ -13605,6 +13733,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   }
 
   ipt = (int *)malloc(num_obs_train_extern*sizeof(int));
+  prepared_context->tree_permutation_train = ipt;
   if(!(ipt != NULL)){
     bw_error_msg = "!(ipt != NULL)";
     goto cleanup_np_distribution_bw;
@@ -13616,6 +13745,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
 
   if(!cdfontrain) {
     ipe = (int *)malloc(num_obs_eval_extern*sizeof(int));
+    prepared_context->tree_permutation_eval = ipe;
     if(!(ipe != NULL)){
       bw_error_msg = "!(ipe != NULL)";
       goto cleanup_np_distribution_bw;
@@ -13626,6 +13756,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
     }
   } else {
     ipe = ipt;
+    prepared_context->tree_permutation_eval = ipe;
   }
 
   // attempt tree build, if enabled 
@@ -13635,6 +13766,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
     if((BANDWIDTH_den_extern != BW_ADAP_NN) || ((BANDWIDTH_den_extern == BW_ADAP_NN) && cdfontrain)){
       build_kdtree(matrix_X_continuous_train_extern, num_obs_train_extern, num_reg_continuous_extern, 
                    4*num_reg_continuous_extern, ipt, &kdt_extern_X);
+      prepared_context->tree = kdt_extern_X;
 
       //put training data into tree-order using the index array
 
@@ -13653,6 +13785,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
     } else {
       build_kdtree(matrix_X_continuous_eval_extern, num_obs_eval_extern, num_reg_continuous_extern, 
                    4*num_reg_continuous_extern, ipe, &kdt_extern_X);      
+      prepared_context->tree = kdt_extern_X;
 
       for( j=0;j<num_reg_unordered_extern;j++)
         for( i=0;i<num_obs_eval_extern;i++ )
@@ -13684,6 +13817,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
                              matrix_categorical_vals_extern);
 
   vector_continuous_stddev = alloc_vecd(num_reg_continuous_extern);
+  prepared_context->continuous_stddev = vector_continuous_stddev;
 
   for (j = 0; j < num_reg_continuous_extern; j++)
     vector_continuous_stddev[j] = mysd[j];
@@ -13707,6 +13841,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
       myans);
   int_extendednn_upper_num_extern =
     (vector_extendednn_upper_extern != NULL) ? num_reg_continuous_extern : 0;
+  prepared_context->extendednn_upper = vector_extendednn_upper_extern;
 
   /* Initialize scale factors and Directions for NR modules */
 
@@ -13827,6 +13962,8 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
     num_reg_ordered_extern,
     num_categories_extern,
     bwm_scale_factor_lower_bound);
+  if (prepare_only)
+    return;
   bwm_reset_counters();
   bwm_penalty_mode = 0;
   bwm_penalty_value = DBL_MAX;
@@ -13999,6 +14136,8 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
       fret_best = fret;
     }
     vector_scale_factor_multistart = alloc_vecd(num_var + 1);
+    prepared_context->scale_factor_multistart =
+      vector_scale_factor_multistart;
     for(i = 1; i <= num_var; i++)
       vector_scale_factor_multistart[i] = (double) vector_scale_factor[i];
     np_progress_bandwidth_multistart_step(1, iNum_Multistart);
@@ -14173,6 +14312,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
     }
 
     free(vector_scale_factor_multistart);
+    prepared_context->scale_factor_multistart = NULL;
 
   }
 
@@ -14234,57 +14374,34 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   /* end return data */
 
 cleanup_np_distribution_bw:
-  /* Free data objects */
-  safe_free(vector_extendednn_upper_extern);
-  vector_extendednn_upper_extern = NULL;
-  int_extendednn_upper_num_extern = 0;
-  bwm_clear_floor_context();
-  bwm_nn_cache_free();
-  bwm_objective_cache_free();
-  bwm_search_context_release();
-
-  free_mat(matrix_X_unordered_train_extern, num_reg_unordered_extern);
-  free_mat(matrix_X_ordered_train_extern, num_reg_ordered_extern);
-  free_mat(matrix_X_continuous_train_extern, num_reg_continuous_extern);
-
-  if(!cdfontrain){
-    free_mat(matrix_X_unordered_eval_extern, num_reg_unordered_extern);
-    free_mat(matrix_X_ordered_eval_extern, num_reg_ordered_extern);
-    free_mat(matrix_X_continuous_eval_extern, num_reg_continuous_extern);
-  }
-
-  free_mat(matrix_y, num_var + 1);
-  free(vector_scale_factor);
-  free(vector_scale_factor_startbest);
-  free(vsfh);
-  free(num_categories_extern);
-
-  free_mat(matrix_categorical_vals_extern, num_reg_unordered_extern+num_reg_ordered_extern);
-
-  free(vector_continuous_stddev);
-
-  free(ipt);
-  if(!cdfontrain)
-    free(ipe);
-
-  if(int_TREE_X == NP_TREE_TRUE){
-    free_kdtree(&kdt_extern_X);
-    int_TREE_X = NP_TREE_FALSE;
-  }
-  int_TREE_PROFILE_X = NP_TREE_FALSE;
-
-  int_cker_bound_extern = 0;
-  vector_ckerlb_extern = NULL;
-  vector_ckerub_extern = NULL;
-  np_distribution_bw_categorical_compress_extern = 0;
-  np_reset_y_side_extern();
-  np_clear_estimator_extern_aliases();
+  np_distribution_prepared_context_destroy(prepared_context);
 
   if (bw_error_msg != NULL)
     error("%s", bw_error_msg);
 
   return ;
   
+}
+
+void np_distribution_bw(double *myuno, double *myord, double *mycon,
+                        double *myeuno, double *myeord, double *myecon,
+                        double *mysd, int *myopti, double *myoptd,
+                        double *myans, double *fval,
+                        double *objective_function_values,
+                        double *objective_function_evals,
+                        double *objective_function_invalid, double *timing,
+                        double *objective_function_fast,
+                        int *penalty_mode, double *penalty_mult,
+                        double *ckerlb, double *ckerub,
+                        const int eval_only)
+{
+  np_distribution_bw_internal(
+    myuno, myord, mycon, myeuno, myeord, myecon, mysd,
+    myopti, myoptd, myans, fval,
+    objective_function_values, objective_function_evals,
+    objective_function_invalid, timing, objective_function_fast,
+    penalty_mode, penalty_mult, ckerlb, ckerub,
+    eval_only, NULL, 0);
 }
 
 
