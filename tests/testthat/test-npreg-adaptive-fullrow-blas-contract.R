@@ -53,7 +53,7 @@ test_that("adaptive regression BLAS eligibility is narrow and bounded", {
   )
   expect_match(
     compact,
-    "(kernel_c[l] != 0) && (kernel_c[l] != 4) && (kernel_c[l] != 8)",
+    "((kernel_c[l] < 0) || (kernel_c[l] > 4)) && (kernel_c[l] != 8)",
     fixed = TRUE
   )
   expect_false(grepl("num_obs\\s*\\*\\s*num_obs", body))
@@ -115,7 +115,7 @@ test_that("adaptive regression BLAS MPI ownership and fallback are symmetric", {
   owner <- npreg_adaptive_source_body(
     lines,
     "^double np_kernel_estimate_regression_categorical_ls_aic\\(",
-    "^static int np_distribution_cvls_ordered_profile_stream\\("
+    "^static void np_regression_cv_scalar_route_owner_init\\("
   )
   owner_compact <- gsub("[[:space:]]+", " ", owner)
 
@@ -157,7 +157,12 @@ test_that("adaptive regression BLAS MPI ownership and fallback are symmetric", {
   )
   expect_match(
     owner,
-    "const size_t kwm_len =",
+    "size_t kwm_len = 0;",
+    fixed = TRUE
+  )
+  expect_match(
+    owner_compact,
+    "np_size_mul_checked(nrcc22_size, (size_t)num_obs_eval_alloc, &kwm_len)",
     fixed = TRUE
   )
 })
