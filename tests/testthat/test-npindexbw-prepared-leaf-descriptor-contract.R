@@ -15,6 +15,10 @@ test_that("npindex prepared regression leaf refresh matches clean reconstruction
     ".npindexbw_prepare_lp_regression_leaf_descriptor", "np"
   )
   refresh <- getFromNamespace(".npindexbw_refresh_lp_regression_leaf", "np")
+  untangle.local <- getFromNamespace("untangle", "np")
+  prepare.owner <- getFromNamespace(
+    ".npindexbw_prepare_lp_regression_leaf_owner", "np"
+  )
 
   degree0 <- policy(bws, resolve(bws), TRUE)$objective.spec
   degree2 <- degree0
@@ -38,13 +42,19 @@ test_that("npindex prepared regression leaf refresh matches clean reconstruction
   expect_identical(retained$xdat, rebuilt$xdat)
   expect_identical(retained$bws, rebuilt$bws)
   expect_identical(serialize(descriptor, NULL, version = 3L), descriptor.bytes)
-  expect_identical(retained$bws$xdati, untangle(retained$xdat))
+  expect_identical(retained$bws$xdati, untangle.local(retained$xdat))
   expect_identical(retained$bws$dati$x, retained$bws$xdati)
   expect_identical(retained$bws$ckerlb, min(index2))
   expect_identical(retained$bws$ckerub, max(index2))
   expect_identical(retained$bws$regtype.engine, "lp")
   expect_identical(retained$bws$degree.engine, 2L)
   expect_true(retained$bws$bernstein.basis.engine)
+
+  placeholder <- bws
+  placeholder$beta <- c(0, 0)
+  normalized.owner <- prepare.owner(xmat, y, placeholder, degree0)
+  expect_identical(normalized.owner$bws$ckerlb, min(xmat[, 1L]))
+  expect_identical(normalized.owner$bws$ckerub, max(xmat[, 1L]))
 })
 
 test_that("npindex search owners pass one prepared leaf descriptor", {
