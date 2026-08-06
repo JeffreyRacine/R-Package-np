@@ -1011,6 +1011,7 @@ plot.npcopula <- function(x,
     )
     if (identical(renderer, "rgl")) {
       rgl.view <- .np_plot_rgl_view_angles(theta = theta, phi = phi)
+      rgl.controls <- .np_plot_rgl_controls(dots, legend = legend)
       rgl.out <- .np_plot_render_surface_rgl(
         x = u1,
         y = u2,
@@ -1024,11 +1025,11 @@ plot.npcopula <- function(x,
         col = col,
         border = border,
         zlim = zlim,
-        par3d.args = .np_plot_collect_rgl_args(dots, "rgl.par3d", "rgl.par3d."),
-        view3d.args = .np_plot_collect_rgl_args(dots, "rgl.view3d", "rgl.view3d."),
-        persp3d.args = .np_plot_collect_rgl_args(dots, "rgl.persp3d", "rgl.persp3d."),
-        grid3d.args = .np_plot_collect_rgl_args(dots, "rgl.grid3d", "rgl.grid3d."),
-        widget.args = .np_plot_collect_rgl_args(dots, "rgl.widget", "rgl.widget."),
+        par3d.args = rgl.controls$par3d,
+        view3d.args = rgl.controls$view3d,
+        persp3d.args = rgl.controls$persp3d,
+        grid3d.args = rgl.controls$grid3d,
+        widget.args = rgl.controls$widget,
         draw.extras = function() {
           if (!is.null(payload)) {
             .np_plot_error_surfaces_rgl(
@@ -1039,11 +1040,8 @@ plot.npcopula <- function(x,
               herr = herr,
               lerr.all = lerr.all,
               herr.all = herr.all,
-              surface3d.args = .np_plot_collect_rgl_args(dots, "rgl.persp3d", "rgl.persp3d."),
-              legend3d.args = .np_plot_merge_rgl_legend_control(
-                .np_plot_collect_rgl_args(dots, "rgl.legend3d", "rgl.legend3d."),
-                legend = legend
-              )
+              surface3d.args = rgl.controls$persp3d,
+              legend3d.args = rgl.controls$legend3d
             )
           }
         }

@@ -11,6 +11,7 @@ test_that("plot runtime files avoid forbidden *bw( calls", {
   root <- normalizePath(testthat::test_path("..", ".."), mustWork = TRUE)
   files <- c(
     file.path(root, "R", "np.plot.helpers.R"),
+    file.path(root, "R", "np.plot.rgl.R"),
     Sys.glob(file.path(root, "R", "np.plot.engine*.R"))
   )
   files <- unique(files[file.exists(files)])
@@ -47,6 +48,7 @@ test_that("plot runtime files avoid silent remap/downgrade patterns", {
   root <- normalizePath(testthat::test_path("..", ".."), mustWork = TRUE)
   files <- c(
     file.path(root, "R", "np.plot.helpers.R"),
+    file.path(root, "R", "np.plot.rgl.R"),
     Sys.glob(file.path(root, "R", "np.plot.engine*.R"))
   )
   files <- unique(files[file.exists(files)])
@@ -60,7 +62,7 @@ test_that("plot runtime files avoid silent remap/downgrade patterns", {
     raw <- readLines(f, warn = FALSE)
     code <- sub("#.*$", "", raw)
     idx <- which(grepl(pat.assign, code, perl = TRUE) | grepl(pat.warn, raw, fixed = TRUE))
-    if (length(idx) && identical(basename(f), "np.plot.helpers.R")) {
+    if (length(idx)) {
       idx <- idx[!vapply(idx, function(i) {
         context <- raw[pmax(1L, i - 10L):i]
         any(grepl("\\.np_plot_validate_renderer_request\\s*<-\\s*function", context, perl = TRUE))
