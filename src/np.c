@@ -14585,12 +14585,81 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   int have_start_best, have_multistart_best;
   int itmax, iter;
   int int_use_starting_values, ibwmfunc, scale_cat;
+  int canonical_prepared = 0;
   const char *bw_error_msg = NULL;
 
   int num_all_cvar, num_all_uvar, num_all_ovar;
 
   int * ipt_X = NULL, * ipt_XY = NULL, * ipt_Y = NULL; 
   int * ipt_lookup_XY = NULL, * ipt_lookup_Y = NULL, * ipt_lookup_X = NULL;
+
+  iMultistart = myopti[CBW_IMULTII];
+  iNum_Multistart = myopti[CBW_NMULTII];
+  if (!eval_only && iNum_Multistart < 1)
+    error("C_np_density_conditional_bw: nmulti must be a positive integer");
+
+  if (!np_conditional_density_nomad_shadow_prepare_internal(
+        c_uno, c_ord, c_con, u_uno, u_ord, u_con,
+        mysd, myopti, myoptd, myans,
+        penalty_mode, penalty_mult,
+        glp_degree, glp_bernstein, glp_basis, regtype,
+        cxkerlb, cxkerub, cykerlb, cykerub,
+        1, eval_only))
+    error("C_np_density_conditional_bw: failed to prepare objective state");
+
+  canonical_prepared = 1;
+  num_var = num_reg_ordered_extern + num_reg_continuous_extern +
+    num_reg_unordered_extern;
+  num_var_var = num_var_continuous_extern + num_var_unordered_extern +
+    num_var_ordered_extern;
+  num_all_var = num_var + num_var_var;
+  num_all_cvar = num_reg_continuous_extern + num_var_continuous_extern;
+  num_all_uvar = num_reg_unordered_extern + num_var_unordered_extern;
+  num_all_ovar = num_reg_ordered_extern + num_var_ordered_extern;
+  need_y_side = np_conditional_density_objective_needs_y_side(myopti[CBW_MI]);
+
+  matrix_y = np_conditional_density_nomad_shadow.powell_directions;
+  vector_scale_factor = np_conditional_density_nomad_shadow.vector_scale_factor;
+  vector_scale_factor_startbest =
+    np_conditional_density_nomad_shadow.scale_factor_startbest;
+  vsfh = np_conditional_density_nomad_shadow.powell_step;
+  vector_continuous_stddev = vector_continuous_stddev_extern;
+
+  int_use_starting_values = myopti[CBW_USTARTI];
+  int_LARGE_SF = myopti[CBW_LSFI];
+  BANDWIDTH_den_extern = myopti[CBW_DENI];
+  enforce_fixed_feasibility =
+    ((BANDWIDTH_den_extern == BW_FIXED) && (!eval_only));
+  int_RESTART_FROM_MIN = myopti[CBW_REMINI];
+  int_MINIMIZE_IO = myopti[CBW_MINIOI];
+  itmax = myopti[CBW_ITMAXI];
+  scale_cat = myopti[CBW_SCATI];
+  ibwmfunc = myopti[CBW_MI];
+
+  ftol = myoptd[CBW_FTOLD];
+  tol = myoptd[CBW_TOLD];
+  small = myoptd[CBW_SMALLD];
+  scale_factor_lower_bound = myoptd[CBW_SFLOORD];
+  if (!R_FINITE(scale_factor_lower_bound) || scale_factor_lower_bound < 0.0)
+    scale_factor_lower_bound = 0.1;
+  dfc_dir = myopti[CBW_DFC_DIRI];
+  lbc_dir = myoptd[CBW_LBC_DIRD];
+  c_dir = myoptd[CBW_C_DIRD];
+  initc_dir = myoptd[CBW_INITC_DIRD];
+  lbd_dir = myoptd[CBW_LBD_DIRD];
+  hbd_dir = myoptd[CBW_HBD_DIRD];
+  d_dir = myoptd[CBW_D_DIRD];
+  initd_dir = myoptd[CBW_INITD_DIRD];
+  lbc_init = myoptd[CBW_LBC_INITD];
+  hbc_init = myoptd[CBW_HBC_INITD];
+  c_init = myoptd[CBW_C_INITD];
+  lbd_init = myoptd[CBW_LBD_INITD];
+  hbd_init = myoptd[CBW_HBD_INITD];
+  d_init = myoptd[CBW_D_INITD];
+  nconfac_extern = myoptd[CBW_NCONFD];
+  ncatfac_extern = myoptd[CBW_NCATFD];
+
+  goto canonical_conditional_density_search;
 
   /* Ensure optional Y-only categorical arrays are reset each call */
   num_categories_extern_Y = NULL;
@@ -15190,6 +15259,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                            matrix_X_continuous_train_extern,
                            matrix_Y_continuous_train_extern);
 
+canonical_conditional_density_search:
   /* When multistarting, set counter */
 
   imsnum = iMs_counter = 0;
@@ -15674,6 +15744,11 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 cleanup_np_density_conditional_bw:
   /* Free data objects */
 
+  if (canonical_prepared) {
+    np_conditional_density_nomad_shadow_clear_internal();
+    goto conditional_density_cleanup_complete;
+  }
+
   np_bounded_cvls_conditional_quad_context_clear_extern();
   bwm_clear_floor_context();
   bwm_nn_cache_free();
@@ -15769,6 +15844,7 @@ cleanup_np_density_conditional_bw:
   np_conditional_density_bw_categorical_compress_extern = 0;
   np_clear_estimator_extern_aliases();
 
+conditional_density_cleanup_complete:
   if (bw_error_msg != NULL) {
     np_bwm_clear_deferred_error();
     error("%s", bw_error_msg);
