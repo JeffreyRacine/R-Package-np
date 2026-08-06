@@ -1157,6 +1157,82 @@ double **matrix_Y_continuous_eval_extern;
 double **matrix_Y_unordered_eval_extern;
 double **matrix_Y_ordered_eval_extern;
 
+int *vector_X_support_count_extern = NULL;
+int *vector_Y_support_count_extern = NULL;
+
+enum {
+  NP_SUPPORT_FAILURE_NONE = 0,
+  NP_SUPPORT_FAILURE_X = 1,
+  NP_SUPPORT_FAILURE_Y = 2
+};
+
+static int *np_compute_support_counts(int num_obs, int ncon,
+                                      double **matrix_continuous)
+{
+  int j;
+  int *counts = NULL;
+
+  if ((ncon <= 0) || (matrix_continuous == NULL))
+    return NULL;
+
+  counts = alloc_vecu(ncon);
+  for (j = 0; j < ncon; j++)
+    counts[j] = simple_unique(num_obs, matrix_continuous[j]);
+
+  return counts;
+}
+
+static void np_clear_support_counts_extern(void)
+{
+  if (vector_X_support_count_extern != NULL) {
+    safe_free(vector_X_support_count_extern);
+    vector_X_support_count_extern = NULL;
+  }
+  if (vector_Y_support_count_extern != NULL) {
+    safe_free(vector_Y_support_count_extern);
+    vector_Y_support_count_extern = NULL;
+  }
+}
+
+static void np_refresh_support_counts_extern(void)
+{
+  np_clear_support_counts_extern();
+
+  if ((num_obs_train_extern > 0) && (num_reg_continuous_extern > 0))
+    vector_X_support_count_extern =
+      np_compute_support_counts(num_obs_train_extern,
+                                num_reg_continuous_extern,
+                                matrix_X_continuous_train_extern);
+
+  if ((num_obs_train_extern > 0) && (num_var_continuous_extern > 0))
+    vector_Y_support_count_extern =
+      np_compute_support_counts(num_obs_train_extern,
+                                num_var_continuous_extern,
+                                matrix_Y_continuous_train_extern);
+}
+
+static int np_nonfixed_support_failure_extern(const int bandwidth)
+{
+  int j;
+
+  if (bandwidth == BW_FIXED)
+    return NP_SUPPORT_FAILURE_NONE;
+
+  for (j = 0; j < num_reg_continuous_extern; j++) {
+    if ((vector_X_support_count_extern == NULL) ||
+        (vector_X_support_count_extern[j] <= 1))
+      return NP_SUPPORT_FAILURE_X;
+  }
+
+  for (j = 0; j < num_var_continuous_extern; j++) {
+    if ((vector_Y_support_count_extern == NULL) ||
+        (vector_Y_support_count_extern[j] <= 1))
+      return NP_SUPPORT_FAILURE_Y;
+  }
+
+  return NP_SUPPORT_FAILURE_NONE;
+}
+
 /* these are data which are sorted into an 'alternate' order */
 /* this allows us to support 2 trees simultaneously !*/
 
@@ -1533,7 +1609,8 @@ static int np_conditional_density_prepared_context_prepare_internal(double *c_un
                                                                double *cykerlb,
                                                                double *cykerub,
                                                                int retain_powell_geometry,
-                                                               int eval_only);
+                                                               int eval_only,
+                                                               int *support_failure);
 
 static int np_mpi_comm1_all_ok(const int local_ok)
 {
@@ -1544,6 +1621,18 @@ static int np_mpi_comm1_all_ok(const int local_ok)
   return global_ok;
 #else
   return local_ok ? 1 : 0;
+#endif
+}
+
+static int np_mpi_comm1_max_int(const int local_value)
+{
+#ifdef MPI2
+  int global_value = local_value;
+  if (comm != NULL && comm[1] != MPI_COMM_NULL)
+    MPI_Allreduce(MPI_IN_PLACE, &global_value, 1, MPI_INT, MPI_MAX, comm[1]);
+  return global_value;
+#else
+  return local_value;
 #endif
 }
 
@@ -4960,6 +5049,7 @@ static void np_conditional_density_prepared_context_clear_internal(void)
     return;
 
   bwm_clear_floor_context();
+  np_clear_support_counts_extern();
 
   if (kdt_extern_X != NULL)
     free_kdtree(&kdt_extern_X);
@@ -5410,7 +5500,8 @@ static int np_conditional_density_prepared_context_prepare_internal(double *c_un
                                                                 double *cykerlb,
                                                                 double *cykerub,
                                                                 int retain_powell_geometry,
-                                                                int eval_only)
+                                                                int eval_only,
+                                                                int *support_failure)
 {
   int i, j;
   int num_all_var, num_all_cvar, num_all_uvar, num_all_ovar;
@@ -5429,6 +5520,8 @@ static int np_conditional_density_prepared_context_prepare_internal(double *c_un
   double lbd_init, hbd_init, d_init;
 
   np_conditional_density_prepared_context_clear_internal();
+  if (support_failure != NULL)
+    *support_failure = NP_SUPPORT_FAILURE_NONE;
   np_conditional_density_prepared_context.owned = 1;
 
   num_var_unordered_extern = myopti[CBW_CNUNOI];
@@ -5778,6 +5871,16 @@ static int np_conditional_density_prepared_context_prepare_internal(double *c_un
   for (j = 0; j < num_reg_continuous_extern; j++)
     for (i = 0; i < num_obs_train_extern; i++)
       matrix_X_continuous_train_extern[j][i] = u_con[j * num_obs_train_extern + i];
+
+  /* Preserve the legacy/full-owner nonfixed support contract before any
+   * tree permutation changes the resident matrix view. */
+  if (support_failure != NULL) {
+    np_refresh_support_counts_extern();
+    *support_failure =
+      np_nonfixed_support_failure_extern(BANDWIDTH_den_extern);
+    if (*support_failure != NP_SUPPORT_FAILURE_NONE)
+      goto fail;
+  }
 
   ipt_X = (int *)malloc((size_t)num_obs_train_extern * sizeof(int));
   ipt_lookup_X = (int *)malloc((size_t)num_obs_train_extern * sizeof(int));
@@ -6233,6 +6336,7 @@ SEXP C_np_density_conditional_prepared_prepare(SEXP c_uno,
   SEXP glp_degree_i = R_NilValue, glp_bernstein_i = R_NilValue, glp_basis_i = R_NilValue, regtype_i = R_NilValue;
   SEXP cxkerlb_r = R_NilValue, cxkerub_r = R_NilValue, cykerlb_r = R_NilValue, cykerub_r = R_NilValue;
   int ok;
+  int support_failure = NP_SUPPORT_FAILURE_NONE;
 
   PROTECT(c_uno_r = coerceVector(c_uno, REALSXP));
   PROTECT(c_ord_r = coerceVector(c_ord, REALSXP));
@@ -6290,16 +6394,18 @@ SEXP C_np_density_conditional_prepared_prepare(SEXP c_uno,
                                                               REAL(cykerlb_r),
                                                               REAL(cykerub_r),
                                                               0,
-                                                              0);
+                                                              0,
+                                                              &support_failure);
   }
 
+  support_failure = np_mpi_comm1_max_int(support_failure);
   ok = np_mpi_comm1_all_ok(ok);
   if (!ok)
     np_conditional_density_prepared_context_clear_internal();
 
   UNPROTECT(20);
 
-  return ScalarLogical(ok ? 1 : 0);
+  return ScalarInteger(ok ? 1 : -(support_failure + 1));
 }
 
 static int np_conditional_density_prepared_context_eval_native_raw(const double *rbw,
@@ -14671,7 +14777,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
         penalty_mode, penalty_mult,
         glp_degree, glp_bernstein, glp_basis, regtype,
         cxkerlb, cxkerub, cykerlb, cykerub,
-        1, eval_only))
+        1, eval_only, NULL))
     error("C_np_density_conditional_bw: failed to prepare objective state");
 
   num_all_var = np_conditional_density_prepared_context.num_all_var;

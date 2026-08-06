@@ -1424,7 +1424,7 @@ npRmpiPreparedObjectivePrepareConditionalDensity <- function(c.uno,
     return(FALSE)
   }
 
-  ok <- .Call(
+  status <- as.integer(.Call(
     "C_np_density_conditional_prepared_prepare",
     c.uno,
     c.ord,
@@ -1447,12 +1447,22 @@ npRmpiPreparedObjectivePrepareConditionalDensity <- function(c.uno,
     cykerlb,
     cykerub,
     PACKAGE = "npRmpi"
-  )
+  ))[1L]
 
-  if (isTRUE(ok))
+  if (identical(status, 1L))
     return(TRUE)
 
   rank <- tryCatch(as.integer(mpi.comm.rank(1L)), error = function(e) 0L)
+  if (isTRUE(rank == 0L) && identical(status, -2L))
+    stop(
+      "C_np_density_conditional_bw: nonfixed nearest-neighbour bandwidths require at least two distinct continuous regressor values per dimension",
+      call. = FALSE
+    )
+  if (isTRUE(rank == 0L) && identical(status, -3L))
+    stop(
+      "C_np_density_conditional_bw: nonfixed nearest-neighbour bandwidths require at least two distinct continuous variable values per dimension",
+      call. = FALSE
+    )
   if (isTRUE(rank == 0L))
     stop("failed to prepare resident npcdens prepared objective state", call. = FALSE)
 
