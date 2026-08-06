@@ -10,13 +10,16 @@ shadow_lines <- function(shadow) {
   vapply(shadow$trace, `[[`, character(1L), "line")
 }
 
-shadow_signature <- function(shadow) {
-  trace <- shadow$trace[vapply(shadow$trace, `[[`, character(1L), "event") == "render"]
-  data.frame(
-    event = vapply(trace, `[[`, character(1L), "event"),
-    line = vapply(trace, `[[`, character(1L), "line"),
-    stringsAsFactors = FALSE
-  )
+shadow_render_trace <- function(shadow) {
+  shadow$trace[
+    vapply(shadow$trace, `[[`, character(1L), "event") == "render"
+  ]
+}
+
+shadow_multistart_sequence <- function(shadow) {
+  lines <- vapply(shadow_render_trace(shadow), `[[`, character(1L), "line")
+  hits <- regmatches(lines, regexpr("multistart [0-9]+/[0-9]+", lines))
+  unique(sub("^multistart ", "", hits))
 }
 
 test_that("npindexbw adopts the generic bandwidth selection line", {
@@ -60,7 +63,23 @@ test_that("npindexbw adopts the generic bandwidth selection line", {
   lines <- shadow_lines(single_line)
 
   expect_s3_class(single_line$value, "sibandwidth")
-  expect_equal(shadow_signature(single_line), shadow_signature(legacy))
+  expect_identical(single_line$value[["bw"]], legacy$value[["bw"]])
+  expect_identical(single_line$value[["fval"]], legacy$value[["fval"]])
+  expect_identical(
+    single_line$value[["num.feval"]], legacy$value[["num.feval"]]
+  )
+  expect_identical(shadow_multistart_sequence(legacy), c("1/3", "2/3", "3/3"))
+  expect_identical(
+    shadow_multistart_sequence(single_line), c("1/3", "2/3", "3/3")
+  )
+  # Native heartbeat delivery is wall-clock throttled, so two otherwise exact
+  # runs need not emit on the same objective-evaluation number.  The renderer
+  # contract is semantic phase parity plus bounded I/O continuity.
+  for (shadow in list(legacy, single_line)) {
+    render_trace <- shadow_render_trace(shadow)
+    render_time <- vapply(render_trace, `[[`, numeric(1L), "now")
+    expect_lte(max(diff(render_time)), 3.0)
+  }
   expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 1/3\\)$", lines)))
   expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 1/3, iteration [0-9]+, elapsed [0-9]+\\.[0-9]s\\)$", lines)))
   expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 2/3, elapsed [0-9]+\\.[0-9]s, [0-9]+\\.[0-9]%, eta [0-9]+\\.[0-9]s\\)$", lines)))
