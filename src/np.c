@@ -9465,75 +9465,6 @@ SEXP C_np_distribution_bw_eval(SEXP myuno,
                                      penalty_mode, penalty_mult, ckerlb, ckerub, 1);
 }
 
-static int np_distribution_nomad_native_eval_once(double *myuno,
-                                                  double *myord,
-                                                  double *mycon,
-                                                  double *myeuno,
-                                                  double *myeord,
-                                                  double *myecon,
-                                                  double *mysd,
-                                                  int *myopti,
-                                                  double *myoptd,
-                                                  const double *bw_in,
-                                                  int penalty_mode,
-                                                  double penalty_mult,
-                                                  double *ckerlb,
-                                                  double *ckerub,
-                                                  double out[5])
-{
-  int i;
-  const int num_var = myopti[DBW_NCONI] + myopti[DBW_NUNOI] + myopti[DBW_NORDI];
-  double *bw = NULL;
-  double fval[2] = {R_NaN, R_NaN};
-  double fval_history[1] = {R_NaN};
-  double eval_history[1] = {R_NaN};
-  double invalid_history[1] = {R_NaN};
-  double timing[1] = {R_NaN};
-  double fast[1] = {R_NaN};
-  int pmode = penalty_mode;
-  double pmult = penalty_mult;
-
-  if (num_var <= 0 || bw_in == NULL || out == NULL)
-    return 1;
-
-  bw = NP_NOMAD_CALLBACK_CALLOC(num_var, double);
-  if (bw == NULL)
-    return 1;
-  for (i = 0; i < num_var; i++)
-    bw[i] = bw_in[i];
-
-  np_distribution_bw(myuno,
-                     myord,
-                     mycon,
-                     myeuno,
-                     myeord,
-                     myecon,
-                     mysd,
-                     myopti,
-                     myoptd,
-                     bw,
-                     fval,
-                     fval_history,
-                     eval_history,
-                     invalid_history,
-                     timing,
-                     fast,
-                     &pmode,
-                     &pmult,
-                     ckerlb,
-                     ckerub,
-                     1);
-
-  out[0] = fval[0];
-  out[1] = fval[0];
-  out[2] = eval_history[0];
-  out[3] = fast[0];
-  out[4] = invalid_history[0];
-
-  NP_NOMAD_CALLBACK_FREE(bw);
-  return 0;
-}
-
 typedef struct {
   int n;
   int callback_calls;
@@ -13210,10 +13141,10 @@ static void np_distribution_bw_internal(
   prepared_context->matrix_x_continuous_eval = matrix_X_continuous_eval_extern;
 
   num_categories_extern = alloc_vecu(num_reg_unordered_extern+num_reg_ordered_extern);
-  matrix_y = alloc_matd(num_var + 1, num_var +1);
+  matrix_y = prepare_only ? NULL : alloc_matd(num_var + 1, num_var + 1);
   vector_scale_factor = alloc_vecd(num_var + 1);
-  vector_scale_factor_startbest = alloc_vecd(num_var + 1);
-  vsfh = alloc_vecd(num_var + 1);
+  vector_scale_factor_startbest = prepare_only ? NULL : alloc_vecd(num_var + 1);
+  vsfh = prepare_only ? NULL : alloc_vecd(num_var + 1);
   // nb check vals
   matrix_categorical_vals_extern = alloc_matd(num_obs_train_extern, num_reg_unordered_extern + num_reg_ordered_extern);
 
@@ -13403,47 +13334,49 @@ static void np_distribution_bw_internal(
                                     matrix_X_continuous_eval_extern,
                                     matrix_Y_continuous_train_extern);
 
-  initialize_nr_vector_scale_factor(BANDWIDTH_den_extern,
-                                    0,                /* Not Random (0) Random (1) */
-                                    int_RANDOM_SEED,
-                                    int_LARGE_SF,
-                                    num_obs_train_extern,
-                                    0,
-                                    0,
-                                    0,
-                                    num_reg_continuous_extern,
-                                    num_reg_unordered_extern,
-                                    num_reg_ordered_extern,
-                                    0,
-                                    KERNEL_den_unordered_extern,
-                                    0,
-                                    scale_cat,
-                                    pow((double)4.0/(double)3.0,0.2),             /* Init for continuous vars */
-                                    nconfac_extern, ncatfac_extern,
-                                    num_categories_extern,
-                                    vector_continuous_stddev,
-                                    vsfh,
-                                    lbc_init, hbc_init, c_init, 
-                                    lbd_init, hbd_init, d_init,
-                                    matrix_X_continuous_eval_extern,
-                                    matrix_Y_continuous_train_extern);
+  if (!prepare_only) {
+    initialize_nr_vector_scale_factor(BANDWIDTH_den_extern,
+                                      0,                /* Not Random (0) Random (1) */
+                                      int_RANDOM_SEED,
+                                      int_LARGE_SF,
+                                      num_obs_train_extern,
+                                      0,
+                                      0,
+                                      0,
+                                      num_reg_continuous_extern,
+                                      num_reg_unordered_extern,
+                                      num_reg_ordered_extern,
+                                      0,
+                                      KERNEL_den_unordered_extern,
+                                      0,
+                                      scale_cat,
+                                      pow((double)4.0/(double)3.0,0.2),
+                                      nconfac_extern, ncatfac_extern,
+                                      num_categories_extern,
+                                      vector_continuous_stddev,
+                                      vsfh,
+                                      lbc_init, hbc_init, c_init,
+                                      lbd_init, hbd_init, d_init,
+                                      matrix_X_continuous_eval_extern,
+                                      matrix_Y_continuous_train_extern);
 
-  initialize_nr_directions(BANDWIDTH_den_extern,
-                           num_obs_train_extern,
-                           num_reg_continuous_extern,
-                           num_reg_unordered_extern,
-                           num_reg_ordered_extern,
-                           0,
-                           0,
-                           0,
-                           vsfh,
-                           num_categories_extern,
-                           matrix_y,
-                           0, int_RANDOM_SEED, 
-                           lbc_dir, dfc_dir, c_dir, initc_dir,
-                           lbd_dir, hbd_dir, d_dir, initd_dir,
-                           matrix_X_continuous_train_extern,
-                           matrix_Y_continuous_train_extern);
+    initialize_nr_directions(BANDWIDTH_den_extern,
+                             num_obs_train_extern,
+                             num_reg_continuous_extern,
+                             num_reg_unordered_extern,
+                             num_reg_ordered_extern,
+                             0,
+                             0,
+                             0,
+                             vsfh,
+                             num_categories_extern,
+                             matrix_y,
+                             0, int_RANDOM_SEED,
+                             lbc_dir, dfc_dir, c_dir, initc_dir,
+                             lbd_dir, hbd_dir, d_dir, initd_dir,
+                             matrix_X_continuous_train_extern,
+                             matrix_Y_continuous_train_extern);
+  }
 
 
   /* When multistarting, set counter */
