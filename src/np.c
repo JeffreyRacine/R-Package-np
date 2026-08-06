@@ -615,7 +615,11 @@ static int np_regression_prepared_context_eval(
 typedef struct {
   int active;
   int owned;
+  int num_obs_train;
   int num_all_var;
+  int num_all_cvar;
+  int num_all_uvar;
+  int num_all_ovar;
   int num_reg_continuous;
   int degree_key_len;
   int num_var_continuous;
@@ -649,21 +653,39 @@ typedef struct {
   double *cxykerlb;
   double *cxykerub;
   double *extendednn_upper;
+  int *num_categories;
+  int *num_categories_x;
+  int *num_categories_y;
+  int *num_categories_xy;
+  double *continuous_stddev;
+  double **matrix_categorical_vals;
+  double **matrix_categorical_vals_x;
+  double **matrix_categorical_vals_y;
+  double **matrix_categorical_vals_xy;
+  double **powell_directions;
+  double *scale_factor_startbest;
+  double *powell_step;
   double **matrix_y_unordered_original;
   double **matrix_y_ordered_original;
   double **matrix_y_continuous_original;
   double **matrix_y_unordered_tree;
   double **matrix_y_ordered_tree;
   double **matrix_y_continuous_tree;
+  double **matrix_x_unordered_original;
+  double **matrix_x_ordered_original;
+  double **matrix_x_continuous_original;
   double **matrix_xy_unordered_original;
   double **matrix_xy_ordered_original;
   double **matrix_xy_continuous_original;
   double **matrix_xy_unordered_tree;
   double **matrix_xy_ordered_tree;
   double **matrix_xy_continuous_tree;
-} NPConditionalDensityNomadShadowCtx;
+  KDT *tree_x;
+  KDT *tree_y;
+  KDT *tree_xy;
+} NPConditionalDensityPreparedCtx;
 
-static NPConditionalDensityNomadShadowCtx np_conditional_density_nomad_shadow =
+static NPConditionalDensityPreparedCtx np_conditional_density_nomad_shadow =
   {0};
 
 static void np_conditional_density_nomad_shadow_clear_internal(void);
@@ -13914,6 +13936,143 @@ void np_distribution_bw(double *myuno, double *myord, double *mycon,
     eval_only, NULL, 0);
 }
 
+static void np_conditional_density_bw_prepared_context_destroy(
+  NPConditionalDensityPreparedCtx *context)
+{
+  if (context == NULL || (!context->active && !context->owned))
+    return;
+
+  np_bounded_cvls_conditional_quad_context_clear_extern();
+  bwm_clear_floor_context();
+  bwm_nn_cache_free();
+  bwm_objective_cache_free();
+  bwm_search_context_release();
+  safe_free(context->extendednn_upper);
+
+  if (context->matrix_y_unordered_original != NULL)
+    free_mat(context->matrix_y_unordered_original, context->num_var_unordered);
+  if (context->matrix_y_ordered_original != NULL)
+    free_mat(context->matrix_y_ordered_original, context->num_var_ordered);
+  if (context->matrix_y_continuous_original != NULL)
+    free_mat(context->matrix_y_continuous_original, context->num_var_continuous);
+  if (context->matrix_x_unordered_original != NULL)
+    free_mat(context->matrix_x_unordered_original, context->num_reg_unordered);
+  if (context->matrix_x_ordered_original != NULL)
+    free_mat(context->matrix_x_ordered_original, context->num_reg_ordered);
+  if (context->matrix_x_continuous_original != NULL)
+    free_mat(context->matrix_x_continuous_original, context->num_reg_continuous);
+  np_clear_support_counts_extern();
+
+  if (context->powell_directions != NULL)
+    free_mat(context->powell_directions, context->num_all_var + 1);
+  safe_free(context->vector_scale_factor);
+  safe_free(context->scale_factor_startbest);
+  safe_free(context->powell_step);
+  safe_free(context->num_categories);
+  safe_free(context->num_categories_x);
+  safe_free(context->num_categories_y);
+  safe_free(context->num_categories_xy);
+
+  if (context->matrix_categorical_vals != NULL)
+    free_mat(context->matrix_categorical_vals,
+             context->num_reg_unordered + context->num_reg_ordered +
+             context->num_var_unordered + context->num_var_ordered);
+  if (context->matrix_categorical_vals_x != NULL)
+    free_mat(context->matrix_categorical_vals_x,
+             context->num_reg_unordered + context->num_reg_ordered);
+  if (context->matrix_categorical_vals_xy != NULL)
+    free_mat(context->matrix_categorical_vals_xy,
+             context->num_reg_unordered + context->num_reg_ordered +
+             context->num_var_unordered + context->num_var_ordered);
+  if (context->matrix_categorical_vals_y != NULL)
+    free_mat(context->matrix_categorical_vals_y,
+             context->num_var_unordered + context->num_var_ordered);
+
+  safe_free(context->continuous_stddev);
+  safe_free(context->ipt_x);
+  safe_free(context->ipt_y);
+  safe_free(context->ipt_xy);
+  safe_free(context->ipt_lookup_x);
+  safe_free(context->ipt_lookup_y);
+  safe_free(context->ipt_lookup_xy);
+
+  if (context->tree_x != NULL)
+    free_kdtree(&context->tree_x);
+  if (context->tree_y != NULL)
+    free_kdtree(&context->tree_y);
+  if (context->matrix_xy_continuous_original != NULL)
+    free_mat(context->matrix_xy_continuous_original, context->num_all_cvar);
+  if (context->matrix_xy_unordered_original != NULL)
+    free_mat(context->matrix_xy_unordered_original, context->num_all_uvar);
+  if (context->matrix_xy_ordered_original != NULL)
+    free_mat(context->matrix_xy_ordered_original, context->num_all_ovar);
+  if (context->tree_xy != NULL)
+    free_kdtree(&context->tree_xy);
+
+  safe_free(context->cxkerlb);
+  safe_free(context->cxkerub);
+  safe_free(context->cykerlb);
+  safe_free(context->cykerub);
+  safe_free(context->cxykerlb);
+  safe_free(context->cxykerub);
+
+  matrix_Y_unordered_train_extern = NULL;
+  matrix_Y_ordered_train_extern = NULL;
+  matrix_Y_continuous_train_extern = NULL;
+  matrix_X_unordered_train_extern = NULL;
+  matrix_X_ordered_train_extern = NULL;
+  matrix_X_continuous_train_extern = NULL;
+  matrix_XY_continuous_train_extern = NULL;
+  matrix_XY_unordered_train_extern = NULL;
+  matrix_XY_ordered_train_extern = NULL;
+  matrix_categorical_vals_extern = NULL;
+  matrix_categorical_vals_extern_X = NULL;
+  matrix_categorical_vals_extern_Y = NULL;
+  matrix_categorical_vals_extern_XY = NULL;
+  num_categories_extern = NULL;
+  num_categories_extern_X = NULL;
+  num_categories_extern_Y = NULL;
+  num_categories_extern_XY = NULL;
+  vector_continuous_stddev_extern = NULL;
+  vector_extendednn_upper_extern = NULL;
+  int_extendednn_upper_num_extern = 0;
+  ipt_extern_X = NULL;
+  ipt_extern_Y = NULL;
+  ipt_extern_XY = NULL;
+  ipt_lookup_extern_X = NULL;
+  ipt_lookup_extern_Y = NULL;
+  ipt_lookup_extern_XY = NULL;
+  kdt_extern_X = NULL;
+  kdt_extern_Y = NULL;
+  kdt_extern_XY = NULL;
+  int_TREE_X = NP_TREE_FALSE;
+  int_TREE_Y = NP_TREE_FALSE;
+  int_TREE_XY = NP_TREE_FALSE;
+  int_TREE_PROFILE_X = NP_TREE_FALSE;
+  int_WEIGHTS = 0;
+
+  int_cxker_bound_extern = 0;
+  int_cyker_bound_extern = 0;
+  int_cxyker_bound_extern = 0;
+  vector_cxkerlb_extern = NULL;
+  vector_cxkerub_extern = NULL;
+  vector_cykerlb_extern = NULL;
+  vector_cykerub_extern = NULL;
+  vector_cxykerlb_extern = NULL;
+  vector_cxykerub_extern = NULL;
+  int_cker_bound_extern = 0;
+  vector_ckerlb_extern = NULL;
+  vector_ckerub_extern = NULL;
+  np_lp_engine_extern = NP_LP_ENGINE_SCALAR;
+  vector_glp_degree_extern = NULL;
+  int_glp_bernstein_extern = 0;
+  int_glp_basis_extern = 1;
+  np_conditional_density_bw_categorical_compress_extern = 0;
+  np_clear_estimator_extern_aliases();
+  np_glp_cv_clear_extern();
+  memset(context, 0, sizeof(*context));
+}
+
 
 void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con, 
                                double * u_uno, double * u_ord, double * u_con,
@@ -13931,6 +14090,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                double * cxkerlb, double * cxkerub,
                                double * cykerlb, double * cykerub,
                                const int eval_only){
+  NPConditionalDensityPreparedCtx prepared_context = {0};
   int_nn_k_min_extern = 1;
 /* Likelihood bandwidth selection for density estimation */
 
@@ -13987,8 +14147,24 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   num_var = num_reg_ordered_extern + num_reg_continuous_extern + num_reg_unordered_extern;
   num_var_var = num_var_continuous_extern + num_var_unordered_extern + num_var_ordered_extern;
   num_all_var = num_var+num_var_var;
+  num_all_cvar = num_reg_continuous_extern + num_var_continuous_extern;
+  num_all_uvar = num_reg_unordered_extern + num_var_unordered_extern;
+  num_all_ovar = num_reg_ordered_extern + num_var_ordered_extern;
 
   num_obs_train_extern = myopti[CBW_NOBSI];
+  prepared_context.active = 1;
+  prepared_context.owned = 1;
+  prepared_context.num_obs_train = num_obs_train_extern;
+  prepared_context.num_all_var = num_all_var;
+  prepared_context.num_all_cvar = num_all_cvar;
+  prepared_context.num_all_uvar = num_all_uvar;
+  prepared_context.num_all_ovar = num_all_ovar;
+  prepared_context.num_reg_continuous = num_reg_continuous_extern;
+  prepared_context.num_var_continuous = num_var_continuous_extern;
+  prepared_context.num_reg_unordered = num_reg_unordered_extern;
+  prepared_context.num_var_unordered = num_var_unordered_extern;
+  prepared_context.num_reg_ordered = num_reg_ordered_extern;
+  prepared_context.num_var_ordered = num_var_ordered_extern;
   iMultistart = myopti[CBW_IMULTII];
   iNum_Multistart = myopti[CBW_NMULTII];
   if (!eval_only && iNum_Multistart < 1)
@@ -14059,6 +14235,8 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
     }
     vector_cxykerlb_extern = cxylb;
     vector_cxykerub_extern = cxyub;
+    prepared_context.cxykerlb = cxylb;
+    prepared_context.cxykerub = cxyub;
     int_cxyker_bound_extern = np_has_finite_cker_bounds(cxylb, cxyub, num_reg_continuous_extern + num_var_continuous_extern);
   } else {
     vector_cxykerlb_extern = NULL;
@@ -14173,6 +14351,12 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   matrix_X_unordered_train_extern = alloc_matd(num_obs_train_extern, num_reg_unordered_extern);
   matrix_X_ordered_train_extern = alloc_matd(num_obs_train_extern, num_reg_ordered_extern);
   matrix_X_continuous_train_extern = alloc_matd(num_obs_train_extern, num_reg_continuous_extern);
+  prepared_context.matrix_y_unordered_original = matrix_Y_unordered_train_extern;
+  prepared_context.matrix_y_ordered_original = matrix_Y_ordered_train_extern;
+  prepared_context.matrix_y_continuous_original = matrix_Y_continuous_train_extern;
+  prepared_context.matrix_x_unordered_original = matrix_X_unordered_train_extern;
+  prepared_context.matrix_x_ordered_original = matrix_X_ordered_train_extern;
+  prepared_context.matrix_x_continuous_original = matrix_X_continuous_train_extern;
 	
   num_categories_extern = alloc_vecu(num_var_unordered_extern + num_var_ordered_extern +
                                      num_reg_unordered_extern + num_reg_ordered_extern);
@@ -14185,11 +14369,20 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   if(need_y_side){
     num_categories_extern_Y = alloc_vecu(num_var_unordered_extern + num_var_ordered_extern);
   }
+  prepared_context.need_y_side = need_y_side;
+  prepared_context.num_categories = num_categories_extern;
+  prepared_context.num_categories_xy = num_categories_extern_XY;
+  prepared_context.num_categories_x = num_categories_extern_X;
+  prepared_context.num_categories_y = num_categories_extern_Y;
 
   matrix_y = alloc_matd(num_all_var + 1, num_all_var + 1);
   vector_scale_factor = alloc_vecd(num_all_var + 1);
   vector_scale_factor_startbest = alloc_vecd(num_all_var + 1);
   vsfh = alloc_vecd(num_all_var + 1);
+  prepared_context.powell_directions = matrix_y;
+  prepared_context.vector_scale_factor = vector_scale_factor;
+  prepared_context.scale_factor_startbest = vector_scale_factor_startbest;
+  prepared_context.powell_step = vsfh;
   
   matrix_categorical_vals_extern = 
     alloc_matd(num_obs_train_extern, num_var_unordered_extern + num_var_ordered_extern + 
@@ -14206,6 +14399,10 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   matrix_categorical_vals_extern_XY = 
     alloc_matd(num_obs_train_extern, num_var_unordered_extern + num_var_ordered_extern + 
                num_reg_unordered_extern + num_reg_ordered_extern);
+  prepared_context.matrix_categorical_vals = matrix_categorical_vals_extern;
+  prepared_context.matrix_categorical_vals_x = matrix_categorical_vals_extern_X;
+  prepared_context.matrix_categorical_vals_y = matrix_categorical_vals_extern_Y;
+  prepared_context.matrix_categorical_vals_xy = matrix_categorical_vals_extern_XY;
 
 
   /* in v_s_f order is creg, cvar, uvar, ovar, ureg, oreg  */
@@ -14252,12 +14449,14 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   // we use 3 trees for cpdf ls, and 2 for cpdf ml
 
   ipt_X = (int *)malloc(num_obs_train_extern*sizeof(int));
+  prepared_context.ipt_x = ipt_X;
   if(!(ipt_X != NULL)){
     bw_error_msg = "!(ipt_X != NULL)";
     goto cleanup_np_density_conditional_bw;
   }
 
   ipt_lookup_X = (int *)malloc(num_obs_train_extern*sizeof(int));
+  prepared_context.ipt_lookup_x = ipt_lookup_X;
   if(!(ipt_lookup_X != NULL)){
     bw_error_msg = "!(ipt_lookup_X != NULL)";
     goto cleanup_np_density_conditional_bw;
@@ -14272,12 +14471,14 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 
   if(need_y_side){
     ipt_Y = (int *)malloc(num_obs_train_extern*sizeof(int));
+    prepared_context.ipt_y = ipt_Y;
     if(!(ipt_Y != NULL)){
       bw_error_msg = "!(ipt_Y != NULL)";
       goto cleanup_np_density_conditional_bw;
     }
 
     ipt_lookup_Y = (int *)malloc(num_obs_train_extern*sizeof(int));
+    prepared_context.ipt_lookup_y = ipt_lookup_Y;
     if(!(ipt_lookup_Y != NULL)){
       bw_error_msg = "!(ipt_lookup_Y != NULL)";
       goto cleanup_np_density_conditional_bw;
@@ -14296,12 +14497,14 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   ipt_lookup_extern_Y = ipt_lookup_Y;
 
   ipt_XY = (int *)malloc(num_obs_train_extern*sizeof(int));
+  prepared_context.ipt_xy = ipt_XY;
   if(!(ipt_XY != NULL)){
     bw_error_msg = "!(ipt_XY != NULL)";
     goto cleanup_np_density_conditional_bw;
   }
 
   ipt_lookup_XY = (int *)malloc(num_obs_train_extern*sizeof(int));
+  prepared_context.ipt_lookup_xy = ipt_lookup_XY;
   if(!(ipt_lookup_XY != NULL)){
     bw_error_msg = "!(ipt_lookup_XY != NULL)";
     goto cleanup_np_density_conditional_bw;
@@ -14324,6 +14527,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   if(int_TREE_X == NP_TREE_TRUE){
     build_kdtree(matrix_X_continuous_train_extern, num_obs_train_extern, num_reg_continuous_extern, 
                  4*num_reg_continuous_extern, ipt_X, &kdt_extern_X);
+    prepared_context.tree_x = kdt_extern_X;
   
 
     //put training data into tree-order using the index array
@@ -14349,6 +14553,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   if(int_TREE_Y == NP_TREE_TRUE){
     build_kdtree(matrix_Y_continuous_train_extern, num_obs_train_extern, num_var_continuous_extern, 
                  4*num_var_continuous_extern, ipt_Y, &kdt_extern_Y);
+    prepared_context.tree_y = kdt_extern_Y;
 
     for(i = 0; i < num_obs_train_extern; i++){
       ipt_lookup_Y[ipt_Y[i]] = i;
@@ -14376,6 +14581,9 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   matrix_XY_continuous_train_extern = alloc_matd(num_obs_train_extern, num_all_cvar);
   matrix_XY_unordered_train_extern = alloc_matd(num_obs_train_extern, num_all_uvar);
   matrix_XY_ordered_train_extern = alloc_matd(num_obs_train_extern, num_all_ovar);
+  prepared_context.matrix_xy_continuous_original = matrix_XY_continuous_train_extern;
+  prepared_context.matrix_xy_unordered_original = matrix_XY_unordered_train_extern;
+  prepared_context.matrix_xy_ordered_original = matrix_XY_ordered_train_extern;
 
 
   for(j = 0; j < num_reg_unordered_extern; j++)
@@ -14408,6 +14616,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 
     build_kdtree(matrix_XY_continuous_train_extern, num_obs_train_extern, num_all_cvar, 
                  4*num_all_cvar, ipt_XY, &kdt_extern_XY);
+    prepared_context.tree_xy = kdt_extern_XY;
 
     // put data into tree-order
     for(j = 0; j < num_reg_unordered_extern; j++)
@@ -14465,6 +14674,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   
 
   vector_continuous_stddev = alloc_vecd(num_var_continuous_extern + num_reg_continuous_extern);
+  prepared_context.continuous_stddev = vector_continuous_stddev;
 
   for(j = 0; j < (num_var_continuous_extern + num_reg_continuous_extern); j++)
     vector_continuous_stddev[j] = mysd[j];
@@ -14493,6 +14703,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   int_extendednn_upper_num_extern =
     (vector_extendednn_upper_extern != NULL) ?
     (num_reg_continuous_extern + num_var_continuous_extern) : 0;
+  prepared_context.extendednn_upper = vector_extendednn_upper_extern;
 
   if((ibwmfunc == CBWM_CVLS) && (np_lp_engine_extern == NP_LP_ENGINE_GENERAL)){
     if(np_bounded_cvls_conditional_quad_context_prepare_extern() != 0){
@@ -15052,104 +15263,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   /* end return data */
 
 cleanup_np_density_conditional_bw:
-  /* Free data objects */
-
-  np_bounded_cvls_conditional_quad_context_clear_extern();
-  bwm_clear_floor_context();
-  bwm_nn_cache_free();
-  bwm_objective_cache_free();
-  bwm_search_context_release();
-  safe_free(vector_extendednn_upper_extern);
-  vector_extendednn_upper_extern = NULL;
-  int_extendednn_upper_num_extern = 0;
-
-  free_mat(matrix_Y_unordered_train_extern, num_var_unordered_extern);
-  free_mat(matrix_Y_ordered_train_extern, num_var_ordered_extern);
-  free_mat(matrix_Y_continuous_train_extern, num_var_continuous_extern);
-
-  free_mat(matrix_X_unordered_train_extern, num_reg_unordered_extern);
-  free_mat(matrix_X_ordered_train_extern, num_reg_ordered_extern);
-  free_mat(matrix_X_continuous_train_extern, num_reg_continuous_extern);
-  np_clear_support_counts_extern();
-  free_mat(matrix_y, num_all_var + 1);
-  safe_free(vector_scale_factor);
-  safe_free(vector_scale_factor_startbest);
-  safe_free(vsfh);
-  safe_free(num_categories_extern);
-  safe_free(num_categories_extern_XY);
-  safe_free(num_categories_extern_X);
-  safe_free(num_categories_extern_Y);
-
-  free_mat(matrix_categorical_vals_extern, num_reg_unordered_extern + num_reg_ordered_extern +
-           num_var_unordered_extern + num_var_ordered_extern);
-
-  free_mat(matrix_categorical_vals_extern_X, num_reg_unordered_extern + num_reg_ordered_extern);
-
-  free_mat(matrix_categorical_vals_extern_XY, num_reg_unordered_extern + num_reg_ordered_extern +
-           num_var_unordered_extern + num_var_ordered_extern);
-
-  if(need_y_side)
-    free_mat(matrix_categorical_vals_extern_Y, num_var_unordered_extern + num_var_ordered_extern);
-  matrix_categorical_vals_extern_Y = NULL;
-
-  safe_free(vector_continuous_stddev);
-
-  safe_free(ipt_X);
-  safe_free(ipt_XY);
-
-  safe_free(ipt_lookup_X);
-  safe_free(ipt_lookup_XY);
-
-  if(need_y_side){
-    safe_free(ipt_Y);
-    safe_free(ipt_lookup_Y);
-  }
-  num_categories_extern_Y = NULL;
-
-  if(int_TREE_X == NP_TREE_TRUE){
-    free_kdtree(&kdt_extern_X);
-    int_TREE_X = NP_TREE_FALSE;
-  }
-
-  if(int_TREE_Y == NP_TREE_TRUE){
-    free_kdtree(&kdt_extern_Y);
-    int_TREE_Y = NP_TREE_FALSE;
-  }
-
-  free_mat(matrix_XY_continuous_train_extern, num_all_cvar);
-  free_mat(matrix_XY_unordered_train_extern, num_all_uvar);
-  free_mat(matrix_XY_ordered_train_extern, num_all_ovar);
-
-  if(int_TREE_XY == NP_TREE_TRUE){
-    free_kdtree(&kdt_extern_XY);
-    int_TREE_XY = NP_TREE_FALSE;
-  }
-  int_TREE_PROFILE_X = NP_TREE_FALSE;
-
-
-  int_WEIGHTS = 0;
-
-  int_cxker_bound_extern = 0;
-  int_cyker_bound_extern = 0;
-  int_cxyker_bound_extern = 0;
-  vector_cxkerlb_extern = NULL;
-  vector_cxkerub_extern = NULL;
-  vector_cykerlb_extern = NULL;
-  vector_cykerub_extern = NULL;
-  vector_cxykerlb_extern = NULL;
-  vector_cxykerub_extern = NULL;
-  int_cker_bound_extern = 0;
-  vector_ckerlb_extern = NULL;
-  vector_ckerub_extern = NULL;
-  safe_free(cxylb);
-  safe_free(cxyub);
-  np_lp_engine_extern = NP_LP_ENGINE_SCALAR;
-  vector_glp_degree_extern = NULL;
-  int_glp_bernstein_extern = 0;
-  int_glp_basis_extern = 1;
-  np_conditional_density_bw_categorical_compress_extern = 0;
-  np_clear_estimator_extern_aliases();
-  np_glp_cv_clear_extern();
+  np_conditional_density_bw_prepared_context_destroy(&prepared_context);
 
   if (bw_error_msg != NULL) {
     np_bwm_clear_deferred_error();
