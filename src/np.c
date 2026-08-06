@@ -1390,6 +1390,8 @@ typedef struct {
   int *ipt_lookup_y;
   int *ipt_lookup_xy;
   double *vector_scale_factor;
+  double *eval_bandwidth;
+  int *eval_degree;
   double *cxkerlb;
   double *cxkerub;
   double *cykerlb;
@@ -1397,6 +1399,9 @@ typedef struct {
   double *cxykerlb;
   double *cxykerub;
   double *extendednn_upper;
+  double **powell_directions;
+  double *scale_factor_startbest;
+  double *powell_step;
   double **matrix_y_unordered_original;
   double **matrix_y_ordered_original;
   double **matrix_y_continuous_original;
@@ -1417,6 +1422,28 @@ static NPConditionalDensityNomadShadowCtx np_conditional_density_nomad_shadow =
 static void np_regression_prepared_clear_internal(void);
 static void np_conditional_density_nomad_shadow_clear_internal(void);
 static void np_conditional_density_nomad_shadow_refresh_penalty(void);
+static int np_conditional_density_nomad_shadow_prepare_internal(double *c_uno,
+                                                               double *c_ord,
+                                                               double *c_con,
+                                                               double *u_uno,
+                                                               double *u_ord,
+                                                               double *u_con,
+                                                               double *mysd,
+                                                               int *myopti,
+                                                               double *myoptd,
+                                                               double *rbw,
+                                                               int *penalty_mode,
+                                                               double *penalty_mult,
+                                                               int *glp_degree,
+                                                               int *glp_bernstein,
+                                                               int *glp_basis,
+                                                               int *regtype,
+                                                               double *cxkerlb,
+                                                               double *cxkerub,
+                                                               double *cykerlb,
+                                                               double *cykerub,
+                                                               int retain_powell_geometry,
+                                                               int eval_only);
 
 static int np_mpi_comm1_all_ok(const int local_ok)
 {
@@ -4842,6 +4869,8 @@ static void np_conditional_density_nomad_shadow_clear_internal(void)
   if (!np_conditional_density_nomad_shadow.active && !np_conditional_density_nomad_shadow.owned)
     return;
 
+  bwm_clear_floor_context();
+
   if (kdt_extern_X != NULL)
     free_kdtree(&kdt_extern_X);
   if (kdt_extern_Y != NULL)
@@ -4917,7 +4946,14 @@ static void np_conditional_density_nomad_shadow_clear_internal(void)
   safe_free(num_categories_extern_XY);
   safe_free(vector_continuous_stddev_extern);
   safe_free(np_conditional_density_nomad_shadow.glp_degree);
+  if (np_conditional_density_nomad_shadow.powell_directions != NULL)
+    free_mat(np_conditional_density_nomad_shadow.powell_directions,
+             np_conditional_density_nomad_shadow.num_all_var + 1);
   safe_free(np_conditional_density_nomad_shadow.vector_scale_factor);
+  safe_free(np_conditional_density_nomad_shadow.eval_bandwidth);
+  safe_free(np_conditional_density_nomad_shadow.eval_degree);
+  safe_free(np_conditional_density_nomad_shadow.scale_factor_startbest);
+  safe_free(np_conditional_density_nomad_shadow.powell_step);
   safe_free(np_conditional_density_nomad_shadow.cxkerlb);
   safe_free(np_conditional_density_nomad_shadow.cxkerub);
   safe_free(np_conditional_density_nomad_shadow.cykerlb);
@@ -4936,7 +4972,12 @@ static void np_conditional_density_nomad_shadow_clear_internal(void)
   safe_free(np_conditional_density_nomad_shadow.ipt_lookup_xy);
 
   np_conditional_density_nomad_shadow.glp_degree = NULL;
+  np_conditional_density_nomad_shadow.powell_directions = NULL;
   np_conditional_density_nomad_shadow.vector_scale_factor = NULL;
+  np_conditional_density_nomad_shadow.eval_bandwidth = NULL;
+  np_conditional_density_nomad_shadow.eval_degree = NULL;
+  np_conditional_density_nomad_shadow.scale_factor_startbest = NULL;
+  np_conditional_density_nomad_shadow.powell_step = NULL;
   np_conditional_density_nomad_shadow.cxkerlb = NULL;
   np_conditional_density_nomad_shadow.cxkerub = NULL;
   np_conditional_density_nomad_shadow.cykerlb = NULL;
@@ -5277,7 +5318,9 @@ static int np_conditional_density_nomad_shadow_prepare_internal(double *c_uno,
                                                                 double *cxkerlb,
                                                                 double *cxkerub,
                                                                 double *cykerlb,
-                                                                double *cykerub)
+                                                                double *cykerub,
+                                                                int retain_powell_geometry,
+                                                                int eval_only)
 {
   int i, j;
   int num_all_var, num_all_cvar, num_all_uvar, num_all_ovar;
@@ -5554,7 +5597,18 @@ static int np_conditional_density_nomad_shadow_prepare_internal(double *c_uno,
   matrix_y = alloc_matd(num_all_var + 1, num_all_var + 1);
   np_conditional_density_nomad_shadow.vector_scale_factor =
     alloc_vecd(num_all_var + degree_key_len + 1);
+  np_conditional_density_nomad_shadow.eval_bandwidth =
+    alloc_vecd(num_all_var);
+  np_conditional_density_nomad_shadow.eval_degree =
+    (num_reg_continuous_extern > 0) ?
+    alloc_vecu(num_reg_continuous_extern) : NULL;
   vsfh = alloc_vecd(num_all_var + 1);
+  np_conditional_density_nomad_shadow.powell_directions =
+    retain_powell_geometry ? matrix_y : NULL;
+  np_conditional_density_nomad_shadow.powell_step =
+    retain_powell_geometry ? vsfh : NULL;
+  np_conditional_density_nomad_shadow.scale_factor_startbest =
+    retain_powell_geometry ? alloc_vecd(num_all_var + 1) : NULL;
   matrix_categorical_vals_extern =
     alloc_matd(num_obs_train_extern, num_var_unordered_extern + num_var_ordered_extern +
                num_reg_unordered_extern + num_reg_ordered_extern);
@@ -5595,7 +5649,12 @@ static int np_conditional_density_nomad_shadow_prepare_internal(double *c_uno,
       (((num_var_unordered_extern + num_var_ordered_extern + num_reg_unordered_extern + num_reg_ordered_extern) > 0) && (num_categories_extern_XY == NULL)) ||
       (matrix_y == NULL) ||
       (np_conditional_density_nomad_shadow.vector_scale_factor == NULL) ||
+      (np_conditional_density_nomad_shadow.eval_bandwidth == NULL) ||
+      ((num_reg_continuous_extern > 0) &&
+       np_conditional_density_nomad_shadow.eval_degree == NULL) ||
       (vsfh == NULL) ||
+      (retain_powell_geometry &&
+       np_conditional_density_nomad_shadow.scale_factor_startbest == NULL) ||
       (((num_var_unordered_extern + num_var_ordered_extern + num_reg_unordered_extern + num_reg_ordered_extern) > 0) && (matrix_categorical_vals_extern == NULL)) ||
       (((num_reg_unordered_extern + num_reg_ordered_extern) > 0) && (matrix_categorical_vals_extern_X == NULL)) ||
       (need_y_side && ((num_var_unordered_extern + num_var_ordered_extern) > 0) && (matrix_categorical_vals_extern_Y == NULL)) ||
@@ -5864,7 +5923,12 @@ static int np_conditional_density_nomad_shadow_prepare_internal(double *c_uno,
   for (j = 0; j < num_all_cvar; j++)
     vector_continuous_stddev_extern[j] = mysd[j];
 
-  np_conditional_density_nomad_shadow.extendednn_upper =
+  np_conditional_density_nomad_shadow.extendednn_upper = eval_only ?
+    np_continuous_extendednn_eval_upper_alloc(
+      BANDWIDTH_den_extern,
+      num_obs_train_extern,
+      num_reg_continuous_extern + num_var_continuous_extern,
+      rbw) :
     np_conditional_extendednn_upper_alloc(
       BANDWIDTH_den_extern,
       KERNEL_reg_extern,
@@ -5994,17 +6058,25 @@ static int np_conditional_density_nomad_shadow_prepare_internal(double *c_uno,
     KERNEL_den_unordered_extern,
     KERNEL_reg_unordered_extern,
     num_categories_extern);
-  /* Shadow evaluators call bwmfunc_wrapper(), so prepare owns a fresh
-     bandwidth-objective cache lifecycle just like ordinary searches. */
-  bwm_nn_cache_configure_for_degree_search(BANDWIDTH_den_extern,
-                                           0,
-                                           degree_key_len,
-                                           bwm_num_reg_continuous,
-                                           bwm_num_reg_unordered,
-                                           bwm_num_reg_ordered);
-  bwm_reset_counters();
-
-  np_conditional_density_nomad_shadow_refresh_penalty();
+  if (retain_powell_geometry) {
+    bwm_nn_cache_configure_for_powell(
+      BANDWIDTH_den_extern,
+      eval_only,
+      0,
+      num_var_continuous_extern + num_reg_continuous_extern,
+      num_var_unordered_extern + num_reg_unordered_extern,
+      num_var_ordered_extern + num_reg_ordered_extern);
+  } else {
+    /* Repeated-candidate evaluators own a fresh cache and penalty lifecycle. */
+    bwm_nn_cache_configure_for_degree_search(BANDWIDTH_den_extern,
+                                             0,
+                                             degree_key_len,
+                                             bwm_num_reg_continuous,
+                                             bwm_num_reg_unordered,
+                                             bwm_num_reg_ordered);
+    bwm_reset_counters();
+    np_conditional_density_nomad_shadow_refresh_penalty();
+  }
 
   if (np_mpi_rank_failure_injected("NP_RMPI_INJECT_CDEN_SHADOW_PREPARE_FAIL_RANK"))
     goto fail;
@@ -6018,16 +6090,19 @@ static int np_conditional_density_nomad_shadow_prepare_internal(double *c_uno,
   ipt_X = ipt_Y = ipt_XY = NULL;
   ipt_lookup_X = ipt_lookup_Y = ipt_lookup_XY = NULL;
 
-  free_mat(matrix_y, num_all_var + 1);
-  safe_free(vsfh);
+  if (!retain_powell_geometry) {
+    free_mat(matrix_y, num_all_var + 1);
+    safe_free(vsfh);
+  }
   np_conditional_density_nomad_shadow.active = 1;
   int_conditional_nomad_shadow_extern = 1;
   return 1;
 
 fail:
-  if (matrix_y != NULL)
+  if (!retain_powell_geometry && matrix_y != NULL)
     free_mat(matrix_y, num_all_var + 1);
-  safe_free(vsfh);
+  if (!retain_powell_geometry)
+    safe_free(vsfh);
   safe_free(ipt_X);
   if (ipt_Y != ipt_X)
     safe_free(ipt_Y);
@@ -6123,7 +6198,9 @@ SEXP C_np_density_conditional_nomad_shadow_prepare(SEXP c_uno,
                                                               REAL(cxkerlb_r),
                                                               REAL(cxkerub_r),
                                                               REAL(cykerlb_r),
-                                                              REAL(cykerub_r));
+                                                              REAL(cykerub_r),
+                                                              0,
+                                                              0);
   }
 
   ok = np_mpi_comm1_all_ok(ok);
@@ -6155,18 +6232,12 @@ static int np_density_conditional_nomad_shadow_eval_native_raw(const double *rbw
       glp_degree == NULL)
     return 1;
 
-  rbw_work = NP_NOMAD_CALLBACK_CALLOC(np_conditional_density_nomad_shadow.num_all_var, double);
-  if (np_conditional_density_nomad_shadow.degree_key_len > 0)
-    degree_work = NP_NOMAD_CALLBACK_CALLOC(np_conditional_density_nomad_shadow.num_reg_continuous, int);
+  rbw_work = np_conditional_density_nomad_shadow.eval_bandwidth;
+  degree_work = np_conditional_density_nomad_shadow.eval_degree;
   if (rbw_work == NULL ||
       (np_conditional_density_nomad_shadow.degree_key_len > 0 &&
-       degree_work == NULL)) {
-    if (rbw_work != NULL)
-      NP_NOMAD_CALLBACK_FREE(rbw_work);
-    if (degree_work != NULL)
-      NP_NOMAD_CALLBACK_FREE(degree_work);
+       degree_work == NULL))
     return 1;
-  }
   for (i = 0; i < np_conditional_density_nomad_shadow.num_all_var; i++)
     rbw_work[i] = rbw[i];
   if (np_conditional_density_nomad_shadow.degree_key_len > 0) {
@@ -6217,8 +6288,6 @@ static int np_density_conditional_nomad_shadow_eval_native_raw(const double *rbw
     out[1] = 1.0;
     out[2] = 0.0;
     out[3] = 0.0;
-    NP_NOMAD_CALLBACK_FREE(rbw_work);
-    NP_NOMAD_CALLBACK_FREE(degree_work);
     return 0;
   }
 
@@ -6260,8 +6329,6 @@ static int np_density_conditional_nomad_shadow_eval_native_raw(const double *rbw
   out[1] = evals;
   out[2] = fast;
   out[3] = (guarded > 0.0) ? 1.0 : 0.0;
-  NP_NOMAD_CALLBACK_FREE(rbw_work);
-  NP_NOMAD_CALLBACK_FREE(degree_work);
   return 0;
 }
 
