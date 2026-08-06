@@ -106,12 +106,12 @@ make_conditional_kernel_bw <- function(kind = c("density", "distribution"),
 
 test_that("conditional summaries always identify X and Y continuous kernels", {
   expected.same <- c(
-    "Continuous Kernel Type (Exp. Var.; cxker*): Fourth-Order Beta associated (bounded/range)",
-    "Continuous Kernel Type (Dep. Var.; cyker*): Fourth-Order Beta associated (bounded/range)"
+    "Continuous Kernel Type (Exp. Var.): Fourth-Order Beta associated (bounded/range)",
+    "Continuous Kernel Type (Dep. Var.): Fourth-Order Beta associated (bounded/range)"
   )
   expected.different <- c(
-    "Continuous Kernel Type (Exp. Var.; cxker*): Fourth-Order Beta associated (bounded/range)",
-    "Continuous Kernel Type (Dep. Var.; cyker*): Sixth-Order Beta associated (bounded/range)"
+    "Continuous Kernel Type (Exp. Var.): Fourth-Order Beta associated (bounded/range)",
+    "Continuous Kernel Type (Dep. Var.): Sixth-Order Beta associated (bounded/range)"
   )
 
   for (kind in c("density", "distribution")) {
@@ -138,8 +138,8 @@ test_that("conditional summaries retain side-specific boundary descriptions", {
   expect_identical(
     conditional_kernel_lines(object),
     c(
-      "Continuous Kernel Type (Exp. Var.; cxker*): Fourth-Order Beta associated (bounded/range)",
-      "Continuous Kernel Type (Dep. Var.; cyker*): Fourth-Order Beta associated (bounded/fixed)"
+      "Continuous Kernel Type (Exp. Var.): Fourth-Order Beta associated (bounded/range)",
+      "Continuous Kernel Type (Dep. Var.): Fourth-Order Beta associated (bounded/fixed)"
     )
   )
 })
@@ -154,7 +154,7 @@ test_that("conditional summaries print only active continuous sides", {
   )
 
   expected <- paste(
-    "Continuous Kernel Type (Exp. Var.; cxker*):",
+    "Continuous Kernel Type (Exp. Var.):",
     "Second-Order Beta associated (bounded/range)"
   )
   expect_identical(conditional_kernel_lines(object), expected)
@@ -179,14 +179,14 @@ test_that("inherited conditional estimators use the canonical kernel lines", {
   expect_identical(
     conditional_kernel_lines(quantile),
     c(
-      "Continuous Kernel Type (Exp. Var.; cxker*): Fourth-Order Beta associated (bounded/range)",
-      "Continuous Kernel Type (Dep. Var.; cyker*): Second-Order Beta associated (bounded/range)"
+      "Continuous Kernel Type (Exp. Var.): Fourth-Order Beta associated (bounded/range)",
+      "Continuous Kernel Type (Dep. Var.): Second-Order Beta associated (bounded/range)"
     )
   )
   expect_identical(
     conditional_kernel_lines(mode),
     paste(
-      "Continuous Kernel Type (Exp. Var.; cxker*):",
+      "Continuous Kernel Type (Exp. Var.):",
       "Second-Order Beta associated (bounded/range)"
     )
   )
@@ -203,6 +203,95 @@ test_that("unconditional summaries retain the generic cker display", {
     conditional_kernel_lines(object),
     "Continuous Kernel Type: Fourth-Order Beta associated (bounded/range)"
   )
+})
+
+conditional_kernel_block <- function(object, method = c("summary", "print")) {
+  method <- match.arg(method)
+  output <- capture.output(if (identical(method, "summary")) {
+    summary(object)
+  } else {
+    print(object)
+  })
+  trimws(grep(
+    "^(Continuous|Unordered Categorical|Ordered Categorical) Kernel Type|^No\\. (Continuous|Unordered Categorical|Ordered Categorical)",
+    output, value = TRUE
+  ))
+}
+
+make_mixed_conditional_bw <- function(kind = c("density", "distribution"),
+                                      same = FALSE) {
+  kind <- match.arg(kind)
+  x <- data.frame(
+    xc = seq(0.10, 0.90, length.out = 24L),
+    xu = factor(rep(c("a", "b"), 12L)),
+    xo = ordered(rep(c("low", "middle", "high"), 8L))
+  )
+  y <- data.frame(
+    yc = seq(0.12, 0.88, length.out = 24L),
+    yu = factor(rep(c("u", "v", "w"), 8L)),
+    yo = ordered(rep(c("down", "up"), 12L))
+  )
+  arguments <- list(
+    xdat = x, ydat = y, bws = rep(0.2, 6L),
+    bandwidth.compute = FALSE, regtype = "lp", degree = 1L,
+    uxkertype = if (same && identical(kind, "distribution"))
+      "aitchisonaitken" else "liracine",
+    oxkertype = if (same) "liracine" else "wangvanryzin",
+    oykertype = "liracine"
+  )
+  if (identical(kind, "density"))
+    arguments$uykertype <- if (same) "liracine" else "aitchisonaitken"
+
+  do.call(if (identical(kind, "density")) npcdensbw else npcdistbw,
+          arguments)
+}
+
+test_that("all conditional kernel families retain explicit X and Y roles", {
+  expected <- c(
+    "Continuous Kernel Type (Exp. Var.): Second-Order Gaussian",
+    "Continuous Kernel Type (Dep. Var.): Second-Order Gaussian",
+    "No. Continuous Explanatory Vars.: 1",
+    "No. Continuous Dependent Vars.: 1",
+    "Unordered Categorical Kernel Type (Exp. Var.): Li and Racine (normalized)",
+    "Unordered Categorical Kernel Type (Dep. Var.): Li and Racine (normalized)",
+    "No. Unordered Categorical Explanatory Vars.: 1",
+    "No. Unordered Categorical Dependent Vars.: 1",
+    "Ordered Categorical Kernel Type (Exp. Var.): Li and Racine",
+    "Ordered Categorical Kernel Type (Dep. Var.): Li and Racine (normalized)",
+    "No. Ordered Categorical Explanatory Vars.: 1",
+    "No. Ordered Categorical Dependent Vars.: 1"
+  )
+
+  for (kind in c("density", "distribution")) {
+    object <- make_mixed_conditional_bw(kind, same = TRUE)
+    kind.expected <- expected
+    if (identical(kind, "distribution")) {
+      kind.expected[5:6] <- paste0(
+        c(
+          "Unordered Categorical Kernel Type (Exp. Var.): ",
+          "Unordered Categorical Kernel Type (Dep. Var.): "
+        ),
+        "Aitchison and Aitken"
+      )
+    }
+    expect_identical(conditional_kernel_block(object), kind.expected)
+    expect_identical(conditional_kernel_block(object, "print"), kind.expected)
+  }
+})
+
+test_that("conditional kernel sections use one canonical print and summary layout", {
+  for (kind in c("density", "distribution")) {
+    object <- make_mixed_conditional_bw(kind)
+    expect_identical(
+      conditional_kernel_block(object, "print"),
+      conditional_kernel_block(object, "summary")
+    )
+  }
+})
+
+test_that("the obsolete conditional formatter wrapper is absent", {
+  namespace <- environment(genBwKerStrs)
+  expect_false(exists("genBwKerStrsXY", envir = namespace, inherits = FALSE))
 })
 
 test_that("named categorical matching preserves match.arg semantics", {

@@ -1,5 +1,12 @@
 # np 0.70-6
 
+* Conditional density and distribution kernel summaries now identify
+  explanatory and dependent kernels separately for continuous, unordered, and
+  ordered variables. Bandwidth-object `print()` and `summary()` methods share
+  one formatter, public output no longer exposes internal `cxker*`/`cyker*`
+  argument mnemonics, and invalid categorical-kernel selections name the
+  specific `uxkertype`, `uykertype`, `oxkertype`, or `oykertype` argument.
+
 * Interactive `renderer = "rgl"` surfaces now use a high-DPI-aware widget
   canvas, a higher-resolution uncertainty legend, and an initial camera more
   closely matched to the base perspective. The renderer caps backing-store
