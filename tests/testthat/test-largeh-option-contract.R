@@ -176,7 +176,8 @@ test_that("np.largeh and np.largelambda both gate mixed fast objective rows", {
   npregbw <- getFromNamespace("npregbw", "np")
   npreg_eval_only <- getFromNamespace(".npregbw_eval_only", "np")
   npscoefbw <- getFromNamespace("npscoefbw", "np")
-  npscoef_eval_only <- getFromNamespace(".npscoefbw_eval_only", "np")
+  npscoef_prepare <- getFromNamespace(".npscoefbw_nomad_context_prepare", "np")
+  npscoef_eval <- getFromNamespace(".npscoefbw_nomad_eval_direct", "np")
 
   set.seed(107)
   n <- 80L
@@ -231,6 +232,8 @@ test_that("np.largeh and np.largelambda both gate mixed fast objective rows", {
     bandwidth.compute = FALSE,
     bws = c(1e8, 2 / 3)
   )
+  scoef.ctx <- npscoef_prepare(xdat = sxdat, zdat = szdat, ydat = sydat)
+  npscoef_eval_only <- function(...) npscoef_eval(ctx = scoef.ctx, bws = sbw)
 
   options(np.largeh = TRUE, np.largelambda = TRUE)
   sc.both <- npscoef_eval_only(xdat = sxdat, zdat = szdat, ydat = sydat, bws = sbw)
