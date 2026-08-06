@@ -513,52 +513,93 @@ npscoefbw.NULL <-
   coef.out
 }
 
-.npscoefbw_nomad_lp_eval_subset <- function(ctx,
-                                            bws,
-                                            idx,
-                                            maxPenalty,
-                                            localize = TRUE) {
+.npscoefbw_nomad_moment_state <- function(ctx,
+                                         bws,
+                                         leave.one.out,
+                                         eval.idx = NULL) {
+  if (is.null(eval.idx))
+    eval.idx <- seq_len(ctx$n)
+  eval.zdat <- ctx$zdat.df[as.integer(eval.idx), , drop = FALSE]
+  spec <- .npscoef_canonical_spec(
+    source = bws,
+    zdat = ctx$zdat.df,
+    where = "npscoefbw"
+  )
+  if (npIsCanonicalLp0Spec(spec, ncon = bws$ncon)) {
+    z.train <- adjustLevels(ctx$zdat.df, bws$zdati)
+    return(list(
+      z.train = z.train,
+      z.eval = if (leave.one.out) z.train else
+        adjustLevels(eval.zdat, bws$zdati, allowNewCells = TRUE),
+      kernel.bws = bws,
+      ytensor = cbind(ctx$ydat, ctx$W),
+      Wz.eval = NULL,
+      bandwidth.divide = FALSE
+    ))
+  }
+
+  lp.state <- .npscoef_lp_state(
+    bws = bws,
+    tzdat = ctx$zdat.df,
+    ezdat = eval.zdat,
+    leave.one.out = leave.one.out,
+    where = "npscoefbw"
+  )
+  tensor.train <- .npscoef_row_tensor_design(ctx$W, lp.state$W.train)
+  list(
+    z.train = lp.state$z.train,
+    z.eval = lp.state$z.eval,
+    kernel.bws = lp.state$rbw,
+    ytensor = cbind(ctx$ydat, tensor.train),
+    Wz.eval = lp.state$W.eval,
+    bandwidth.divide = TRUE
+  )
+}
+
+.npscoefbw_nomad_eval_subset <- function(ctx,
+                                         bws,
+                                         idx,
+                                         maxPenalty,
+                                         localize = TRUE) {
   idx <- as.integer(idx)
   if (!length(idx))
     return(list(sse = 0.0, invalid = 0L))
 
-  lp_state <- .npscoef_lp_state(
+  moment.state <- .npscoefbw_nomad_moment_state(
+    ctx = ctx,
     bws = bws,
-    tzdat = ctx$zdat.df,
-    ezdat = ctx$zdat.df[idx, , drop = FALSE],
     leave.one.out = FALSE,
-    where = "npscoefbw"
+    eval.idx = idx
   )
-  tensor.train <- .npscoef_row_tensor_design(ctx$W, lp_state$W.train)
-  ytensor <- cbind(ctx$ydat, tensor.train)
   main.ks <- .npscoefbw_nomad_lp_npksum(
     args = list(
-      txdat = lp_state$z.train,
-      exdat = lp_state$z.eval,
-      tydat = ytensor,
-      weights = ytensor,
-      bws = lp_state$rbw,
+      txdat = moment.state$z.train,
+      exdat = moment.state$z.eval,
+      tydat = moment.state$ytensor,
+      weights = moment.state$ytensor,
+      bws = moment.state$kernel.bws,
       leave.one.out = FALSE,
-      bandwidth.divide = TRUE
+      bandwidth.divide = moment.state$bandwidth.divide
     ),
     localize = localize
   )$ksum
   kw.self <- .np_kernel_weights_direct(
-    bws = lp_state$rbw,
-    txdat = lp_state$z.train,
-    exdat = lp_state$z.eval,
-    bandwidth.divide = TRUE,
+    bws = moment.state$kernel.bws,
+    txdat = moment.state$z.train,
+    exdat = moment.state$z.eval,
+    bandwidth.divide = moment.state$bandwidth.divide,
     kernel.pow = 1.0
   )
-  bwv <- lp_state$rbw$bandwidth[[1L]]
-  bw.divisor <- if (any(lp_state$rbw$icon))
-    prod(as.double(bwv[lp_state$rbw$icon]))
+  bwv <- moment.state$kernel.bws$bandwidth[[1L]]
+  bw.divisor <- if (moment.state$bandwidth.divide && any(moment.state$kernel.bws$icon))
+    prod(as.double(bwv[moment.state$kernel.bws$icon]))
   else
     1.0
 
   for (jj in seq_along(idx)) {
     main.ks[, , jj] <- main.ks[, , jj] -
-      (kw.self[idx[jj], jj] / bw.divisor) * tcrossprod(ytensor[idx[jj], ], ytensor[idx[jj], ])
+      (kw.self[idx[jj], jj] / bw.divisor) *
+      tcrossprod(moment.state$ytensor[idx[jj], ], moment.state$ytensor[idx[jj], ])
   }
 
   tyw <- main.ks[-1L, 1L, , drop = FALSE]
@@ -569,7 +610,7 @@ npscoefbw.NULL <-
     tyw = tyw,
     tww = tww,
     W.eval.design = ctx$W[idx, , drop = FALSE],
-    Wz.eval = lp_state$W.eval,
+    Wz.eval = moment.state$Wz.eval,
     maxPenalty = maxPenalty,
     n.train = ctx$n
   )
@@ -585,11 +626,11 @@ npscoefbw.NULL <-
   )
 }
 
-.npscoefbw_nomad_lp_eval_direct <- function(ctx,
-                                            bws,
-                                            invalid.penalty = c("baseline", "large"),
-                                            penalty.multiplier = 10,
-                                            localize = TRUE) {
+.npscoefbw_nomad_eval_direct <- function(ctx,
+                                         bws,
+                                         invalid.penalty = c("baseline", "large"),
+                                         penalty.multiplier = 10,
+                                         localize = TRUE) {
   invalid.penalty <- match.arg(invalid.penalty)
   base.penalty <- switch(
     invalid.penalty,
@@ -612,23 +653,19 @@ npscoefbw.NULL <-
   maxPenalty <- sqrt(.Machine$double.xmax)
 
   result <- tryCatch({
-    lp_state <- .npscoef_lp_state(
+    moment.state <- .npscoefbw_nomad_moment_state(
+      ctx = ctx,
       bws = bws,
-      tzdat = ctx$zdat.df,
-      ezdat = ctx$zdat.df,
-      leave.one.out = TRUE,
-      where = "npscoefbw"
+      leave.one.out = TRUE
     )
-    tensor.train <- .npscoef_row_tensor_design(ctx$W, lp_state$W.train)
-    ytensor <- cbind(ctx$ydat, tensor.train)
     main.ks <- .npscoefbw_nomad_lp_npksum(
       args = list(
-        txdat = lp_state$z.train,
-        tydat = ytensor,
-        weights = ytensor,
-        bws = lp_state$rbw,
+        txdat = moment.state$z.train,
+        tydat = moment.state$ytensor,
+        weights = moment.state$ytensor,
+        bws = moment.state$kernel.bws,
         leave.one.out = TRUE,
-        bandwidth.divide = TRUE
+        bandwidth.divide = moment.state$bandwidth.divide
       ),
       localize = localize
     )$ksum
@@ -640,7 +677,7 @@ npscoefbw.NULL <-
       tyw = tyw,
       tww = tww,
       W.eval.design = ctx$W,
-      Wz.eval = lp_state$W.eval,
+      Wz.eval = moment.state$Wz.eval,
       maxPenalty = maxPenalty,
       n.train = ctx$n
     )
@@ -874,7 +911,7 @@ npscoefbw.NULL <-
     }
 
     out <- tryCatch(
-      .npscoefbw_nomad_lp_eval_subset(
+      .npscoefbw_nomad_eval_subset(
         ctx = ctx,
         bws = msg$bws,
         idx = as.integer(msg$idx),
@@ -924,7 +961,7 @@ npscoefbw.NULL <-
   }
 
   if (is.null(pool) || !is.list(pool) || is.null(pool$nslaves) || pool$nslaves < 1L) {
-    return(.npscoefbw_nomad_lp_eval_direct(
+    return(.npscoefbw_nomad_eval_direct(
       ctx = ctx,
       bws = bws,
       invalid.penalty = invalid.penalty,
@@ -951,7 +988,7 @@ npscoefbw.NULL <-
   }
 
   local.out <- tryCatch(
-    .npscoefbw_nomad_lp_eval_subset(
+    .npscoefbw_nomad_eval_subset(
       ctx = ctx,
       bws = bws,
       idx = local.indices,
@@ -984,49 +1021,6 @@ npscoefbw.NULL <-
     objective = as.numeric(total.sse / ctx$n),
     num.feval = 1L,
     num.feval.fast = if (.npscoefbw_fast_eligible(bws, eval.zdat = ctx$zdat.df)) 1L else 0L
-  )
-}
-
-.npscoefbw_eval_only <- function(xdat,
-                                 ydat,
-                                 zdat,
-                                 bws,
-                                 invalid.penalty = c("baseline", "large"),
-                                 penalty.multiplier = 10) {
-  invalid.penalty <- match.arg(invalid.penalty)
-  base.penalty <- switch(
-    invalid.penalty,
-    baseline = if (is.finite(bws$fval[1L])) as.numeric(bws$fval[1L]) else 1,
-    large = 1
-  )
-  base.penalty <- max(abs(base.penalty), 1)
-  penalty <- penalty.multiplier * base.penalty
-
-  fit <- tryCatch(
-    .npRmpi_with_local_regression(
-      npscoef(
-        bws = bws,
-        txdat = xdat,
-        tydat = ydat,
-        tzdat = zdat,
-        leave.one.out = TRUE,
-        iterate = FALSE,
-        betas = FALSE,
-        errors = FALSE,
-        .np_fit_progress_allow = FALSE
-      )
-    ),
-    error = function(e) e
-  )
-
-  if (inherits(fit, "error") || is.null(fit$mean) || any(!is.finite(fit$mean))) {
-    return(list(objective = penalty, num.feval = 1L, num.feval.fast = 0L))
-  }
-
-  list(
-    objective = as.numeric(mean((as.double(ydat) - as.double(fit$mean))^2)),
-    num.feval = 1L,
-    num.feval.fast = if (.npscoefbw_fast_eligible(bws, eval.zdat = if (is.null(zdat)) xdat else zdat)) 1L else 0L
   )
 }
 
@@ -1160,7 +1154,7 @@ npscoefbw.NULL <-
     penalty.multiplier <- if (is.null(opt.args$penalty.multiplier)) 10 else opt.args$penalty.multiplier
     out <- if (isTRUE(.npRmpi_autodispatch_called_from_bcast()) &&
                .npRmpi_safe_int(mpi.comm.size(1L)) > 1L) {
-      .npscoefbw_nomad_lp_eval_direct(
+      .npscoefbw_nomad_eval_direct(
         ctx = ctx,
         bws = tbw,
         invalid.penalty = "baseline",

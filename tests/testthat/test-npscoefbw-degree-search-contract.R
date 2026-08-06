@@ -235,31 +235,16 @@ test_that("npscoefbw automatic degree search enforces pilot guardrails", {
   )
 })
 
-test_that("npscoefbw eval-only route localizes internal fits under autodispatch", {
-  n <- 8L
-  xdat <- data.frame(x = seq_len(n) / n)
-  zdat <- data.frame(z = seq_len(n) / n)
-  ydat <- seq_len(n) / n
-  bws <- list(fval = 1)
-  localized <- FALSE
+test_that("npscoefbw prepared evaluator owns the localized kernel route", {
+  direct <- getFromNamespace(".npscoefbw_nomad_eval_direct", "npRmpi")
+  pool <- getFromNamespace(".npscoefbw_eval_pool", "npRmpi")
+  direct.text <- paste(deparse(body(direct)), collapse = "\n")
+  pool.text <- paste(deparse(body(pool)), collapse = "\n")
 
-  out <- with_mocked_bindings(
-    .npscoefbw_eval_only(
-      xdat = xdat,
-      ydat = ydat,
-      zdat = zdat,
-      bws = bws
-    ),
-    .npRmpi_with_local_regression = function(expr) {
-      localized <<- TRUE
-      force(expr)
-    },
-    npscoef = function(...) list(mean = rep(0, n)),
-    .package = "npRmpi"
-  )
-
-  expect_true(localized)
-  expect_equal(out$objective, mean(ydat^2))
+  expect_match(direct.text, ".npscoefbw_nomad_lp_npksum", fixed = TRUE)
+  expect_match(pool.text, ".npscoefbw_nomad_eval_direct", fixed = TRUE)
+  expect_false(exists(".npscoefbw_eval_only", envir = asNamespace("npRmpi"),
+                      inherits = FALSE))
 })
 
 test_that("npscoef forwards automatic LP degree search through npscoefbw", {
