@@ -529,15 +529,10 @@ npindexbw.NULL <-
   h >= (diff(range(vals)) / cont_utol)
 }
 
-.npindexbw_build_lp_regression_leaf <- function(index,
-                                                ydat,
-                                                h,
-                                                bws,
-                                                spec) {
-  index.df <- data.frame(index = as.double(index))
-  engine.regtype <- spec$regtype.engine
+.npindexbw_lp_regression_leaf_spec <- function(spec) {
+  engine.regtype <- as.character(spec$regtype.engine)[1L]
   engine.basis <- if (identical(engine.regtype, "lp")) {
-    as.character(spec$basis.engine)
+    as.character(spec$basis.engine)[1L]
   } else {
     "glp"
   }
@@ -548,11 +543,37 @@ npindexbw.NULL <-
   }
   engine.bernstein <- identical(engine.regtype, "lp") &&
     isTRUE(spec$bernstein.basis.engine)
-  reg.args <- list(
+
+  list(
     regtype = engine.regtype,
+    pregtype = switch(
+      engine.regtype,
+      lc = "Local-Constant",
+      lp = "Local-Polynomial",
+      stop("internal error: unsupported npindex regression-leaf type", call. = FALSE)
+    ),
     basis = engine.basis,
     degree = engine.degree,
     bernstein.basis = engine.bernstein,
+    regtype.engine = engine.regtype,
+    basis.engine = engine.basis,
+    degree.engine = if (identical(engine.regtype, "lp")) engine.degree else 0L,
+    bernstein.basis.engine = engine.bernstein
+  )
+}
+
+.npindexbw_prepare_lp_regression_leaf_descriptor <- function(index,
+                                                             ydat,
+                                                             h,
+                                                             bws,
+                                                             spec) {
+  index.df <- data.frame(index = as.double(index))
+  leaf.spec <- .npindexbw_lp_regression_leaf_spec(spec)
+  reg.args <- list(
+    regtype = leaf.spec$regtype,
+    basis = leaf.spec$basis,
+    degree = leaf.spec$degree,
+    bernstein.basis = leaf.spec$bernstein.basis,
     bwmethod = "cv.ls",
     bwtype = bws$type,
     ckertype = bws$ckertype,
@@ -564,16 +585,98 @@ npindexbw.NULL <-
     okertype = if (is.null(bws$okertype)) "liracine" else bws$okertype
   )
 
-  list(
-    xdat = index.df,
-    bws = .npregbw_build_rbandwidth(
-      xdat = index.df,
+  structure(
+    list(
+      bws = .npregbw_build_rbandwidth(
+        xdat = index.df,
+        ydat = ydat,
+        bws = c(h),
+        bandwidth.compute = FALSE,
+        reg.args = reg.args,
+        yname = if (is.null(bws$ynames)) "y" else as.character(bws$ynames[1L])
+      )
+    ),
+    class = "npindex_lp_regression_leaf_descriptor"
+  )
+}
+
+.npindexbw_refresh_lp_regression_leaf <- function(descriptor,
+                                                  index,
+                                                  h,
+                                                  spec) {
+  if (!inherits(descriptor, "npindex_lp_regression_leaf_descriptor") ||
+      !is.list(descriptor$bws)) {
+    stop("internal error: invalid npindex regression-leaf descriptor", call. = FALSE)
+  }
+
+  index.df <- data.frame(index = as.double(index))
+  leaf.bws <- descriptor$bws
+  leaf.spec <- .npindexbw_lp_regression_leaf_spec(spec)
+  leaf.bws$bw <- c(as.double(h))
+  for (field in names(leaf.spec))
+    leaf.bws[[field]] <- leaf.spec[[field]]
+
+  ## The scalar index changes with every beta candidate. Keep no stale
+  ## index-derived metadata in the otherwise immutable descriptor.
+  leaf.bws$xdati <- untangle(index.df)
+  leaf.bws$dati$x <- leaf.bws$xdati
+  bounds <- npKernelBoundsResolve(
+    dati = leaf.bws$xdati,
+    varnames = names(index.df),
+    kerbound = leaf.bws$ckerbound,
+    kerlb = leaf.bws$ckerlb,
+    kerub = leaf.bws$ckerub,
+    argprefix = "cker",
+    range.policy = if (identical(leaf.bws$ckertype, "beta"))
+      "beta_half_spacing" else "exact"
+  )
+  leaf.bws$ckerbound <- bounds$bound
+  leaf.bws$ckerlb <- bounds$lb
+  leaf.bws$ckerub <- bounds$ub
+
+  list(xdat = index.df, bws = leaf.bws)
+}
+
+.npindexbw_lp_regression_leaf <- function(descriptor,
+                                          index,
+                                          ydat,
+                                          h,
+                                          bws,
+                                          spec) {
+  if (is.null(descriptor)) {
+    descriptor <- .npindexbw_prepare_lp_regression_leaf_descriptor(
+      index = index,
       ydat = ydat,
-      bws = c(h),
-      bandwidth.compute = FALSE,
-      reg.args = reg.args,
-      yname = if (is.null(bws$ynames)) "y" else as.character(bws$ynames[1L])
+      h = h,
+      bws = bws,
+      spec = spec
     )
+  }
+  .npindexbw_refresh_lp_regression_leaf(
+    descriptor = descriptor,
+    index = index,
+    h = h,
+    spec = spec
+  )
+}
+
+.npindexbw_prepare_lp_regression_leaf_owner <- function(xmat,
+                                                        ydat,
+                                                        bws,
+                                                        spec) {
+  beta <- as.double(bws$beta)
+  if (length(beta) != ncol(xmat) || any(!is.finite(beta)))
+    stop("internal error: invalid npindex regression-leaf beta state", call. = FALSE)
+  h <- as.double(bws$bw)[1L]
+  if (!is.finite(h))
+    stop("internal error: invalid npindex regression-leaf bandwidth state", call. = FALSE)
+
+  .npindexbw_prepare_lp_regression_leaf_descriptor(
+    index = drop(xmat %*% beta),
+    ydat = ydat,
+    h = h,
+    bws = bws,
+    spec = spec
   )
 }
 
@@ -582,8 +685,10 @@ npindexbw.NULL <-
                                                   h,
                                                   bws,
                                                   spec,
-                                                  invalid.penalty) {
-  leaf <- .npindexbw_build_lp_regression_leaf(
+                                                  invalid.penalty,
+                                                  leaf.descriptor = NULL) {
+  leaf <- .npindexbw_lp_regression_leaf(
+    descriptor = leaf.descriptor,
     index = index,
     ydat = ydat,
     h = h,
@@ -618,8 +723,10 @@ npindexbw.NULL <-
                                                      h,
                                                      bws,
                                                      spec,
-                                                     invalid.penalty) {
-  leaf <- .npindexbw_build_lp_regression_leaf(
+                                                     invalid.penalty,
+                                                     leaf.descriptor = NULL) {
+  leaf <- .npindexbw_lp_regression_leaf(
+    descriptor = leaf.descriptor,
     index = index,
     ydat = ydat,
     h = h,
@@ -705,7 +812,8 @@ npindexbw.NULL <-
                                       xmat,
                                       ydat,
                                       bws,
-                                      spec) {
+                                      spec,
+                                      leaf.descriptor = NULL) {
   p <- ncol(xmat)
   beta.idx <- if (p > 1L) seq_len(p - 1L) else integer(0)
   beta <- if (length(beta.idx)) as.double(param[beta.idx]) else numeric(0)
@@ -744,7 +852,8 @@ npindexbw.NULL <-
       h = h,
       bws = bws,
       spec = spec,
-      invalid.penalty = invalid.penalty
+      invalid.penalty = invalid.penalty,
+      leaf.descriptor = leaf.descriptor
     ))
   }
 
@@ -755,7 +864,8 @@ npindexbw.NULL <-
       h = h,
       bws = bws,
       spec = spec,
-      invalid.penalty = invalid.penalty
+      invalid.penalty = invalid.penalty,
+      leaf.descriptor = leaf.descriptor
     ))
   }
 
@@ -806,6 +916,18 @@ npindexbw.NULL <-
     y.clean <- as.double(y.clean)
 
   p <- ncol(x.clean)
+  leaf.spec <- .npindex_objective_policy(
+    bws = baseline.bws,
+    spec = template.reg.args,
+    bandwidth.compute = TRUE,
+    where = "npindexbw objective descriptor"
+  )$objective.spec
+  leaf.descriptor <- .npindexbw_prepare_lp_regression_leaf_owner(
+    xmat = x.clean,
+    ydat = y.clean,
+    bws = baseline.bws,
+    spec = leaf.spec
+  )
   beta.coord <- .npindex_beta_coordinate_setup(x.clean)
   nomad.nmulti <- if (is.null(opt.args$nmulti)) npDefaultNmulti(ncol(xdat)) else npValidateNmulti(opt.args$nmulti[1L])
   scale.factor.search.lower <- npResolveScaleFactorLowerBound(opt.args$scale.factor.search.lower)
@@ -971,7 +1093,8 @@ npindexbw.NULL <-
       xmat = x.clean,
       ydat = y.clean,
       bws = baseline.bws,
-      spec = eval.spec
+      spec = eval.spec,
+      leaf.descriptor = leaf.descriptor
     )
     nomad.num.feval.total <<- nomad.num.feval.total + 1L
     nomad.num.feval.fast.total <<- nomad.num.feval.fast.total + as.numeric(objective$num.feval.fast[1L])
@@ -1744,6 +1867,12 @@ npindexbw.sibandwidth <-
 
 	      ## Invariant objects used by objective evaluations.
 	      xmat <- xdat
+	      leaf.descriptor <- .npindexbw_prepare_lp_regression_leaf_owner(
+	        xmat = xmat,
+	        ydat = ydat,
+	        bws = bws,
+	        spec = objective.spec
+	      )
 	      beta.coord <- .npindex_beta_coordinate_setup(xmat)
           bandwidth_eval_count <- 0L
           objective.cache.enabled <- npObjectiveCacheEnabled()
@@ -1816,7 +1945,8 @@ npindexbw.sibandwidth <-
                 h = h,
                 bws = bws,
                 spec = objective.spec,
-                invalid.penalty = ichimuraMaxPenalty
+                invalid.penalty = ichimuraMaxPenalty,
+                leaf.descriptor = leaf.descriptor
               )
               num.feval.fast.overall <<- num.feval.fast.overall +
                 as.numeric(objective$num.feval.fast[1L])
@@ -1874,7 +2004,8 @@ npindexbw.sibandwidth <-
                 h = h,
                 bws = bws,
                 spec = objective.spec,
-                invalid.penalty = sqrt(.Machine$double.xmax)
+                invalid.penalty = sqrt(.Machine$double.xmax),
+                leaf.descriptor = leaf.descriptor
               )
               num.feval.fast.overall <<- num.feval.fast.overall +
                 as.numeric(objective$num.feval.fast[1L])

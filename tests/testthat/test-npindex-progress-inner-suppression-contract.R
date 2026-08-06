@@ -12,7 +12,7 @@ test_that("npindex LP via-npreg evaluators preserve outer bandwidth progress sta
   eval.ichimura <- getFromNamespace(".npindexbw_eval_ichimura_lp_via_npreg", "np")
   eval.kleinspady <- getFromNamespace(".npindexbw_eval_kleinspady_lp_via_npreg", "np")
 
-  build.leaf <- function(index, ydat, h, bws, spec) {
+  build.leaf <- function(descriptor, index, ydat, h, bws, spec) {
     list(
       xdat = data.frame(index = index),
       bws = list()
@@ -30,7 +30,7 @@ test_that("npindex LP via-npreg evaluators preserve outer bandwidth progress sta
 
   with_np_progress_bindings(
     list(
-      .npindexbw_build_lp_regression_leaf = build.leaf,
+      .npindexbw_lp_regression_leaf = build.leaf,
       .npregbw_eval_only = function(...) {
         getFromNamespace(".np_progress_bandwidth_activity_step", "np")(done = 3L)
         runtime$bandwidth_state <- list(id = "inner-npreg", current = 1L)
@@ -58,7 +58,7 @@ test_that("npindex LP via-npreg evaluators preserve outer bandwidth progress sta
 
   with_np_progress_bindings(
     list(
-      .npindexbw_build_lp_regression_leaf = build.leaf,
+      .npindexbw_lp_regression_leaf = build.leaf,
       .npregbw_eval_only = function(...) {
         getFromNamespace(".np_progress_bandwidth_activity_step", "np")(done = 4L)
         runtime$bandwidth_state <- list(id = "inner-npreg", current = 1L)
