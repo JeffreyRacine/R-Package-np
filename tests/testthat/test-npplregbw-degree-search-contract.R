@@ -49,6 +49,22 @@ test_that("degree-search metadata preserves structured child degrees", {
   expect_identical(names(metadata$best.degree), names(children))
 })
 
+test_that("npplreg child searches use the canonical native regression owner", {
+  ns <- asNamespace("npRmpi")
+  child.search <- get(".npplregbw_child_specific_nomad_search", ns,
+                      inherits = FALSE)
+  child.args <- get(".npplregbw_child_nomad_call_args", ns, inherits = FALSE)
+  child.search.text <- paste(deparse(body(child.search)), collapse = "\n")
+  child.args.text <- paste(deparse(body(child.args)), collapse = "\n")
+
+  expect_match(child.search.text, ".npplregbw_child_nomad_call_args",
+               fixed = TRUE)
+  expect_match(child.search.text, "do.call(npregbw, child.args)", fixed = TRUE)
+  expect_match(child.args.text, "nomad = TRUE", fixed = TRUE)
+  expect_match(child.args.text, "search.engine = degree.search$engine",
+               fixed = TRUE)
+})
+
 test_that("npplregbw exhaustive degree search matches manual profile minimum", {
   skip_slow_npplregbw_degree_search()
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
