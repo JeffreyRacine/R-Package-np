@@ -1,4 +1,4 @@
-test_that("resident npreg MPI cache keys bandwidths and polynomial degree", {
+test_that("prepared fixed-degree npreg MPI cache keys repeated bandwidths", {
   skip_if_not_installed("crs")
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
@@ -24,12 +24,12 @@ test_that("resident npreg MPI cache keys bandwidths and polynomial degree", {
   )
   points <- data.frame(
     bw = c(0.24, 0.24, 0.41, 0.24),
-    degree = c(0L, 2L, 2L, 0L)
+    degree = rep(2L, 4L)
   )
 
   evaluate <- function(cache) {
     options(np.objective.cache = cache)
-    shadow <- npRmpi:::.npregbw_nomad_shadow_begin(
+    prepared <- npRmpi:::.npregbw_prepared_begin(
       xdat = xdat,
       ydat = y,
       bws = bw,
@@ -37,11 +37,11 @@ test_that("resident npreg MPI cache keys bandwidths and polynomial degree", {
       comm = 1L,
       broadcast = TRUE
     )
-    on.exit(npRmpi:::.npregbw_nomad_shadow_end(shadow, broadcast = TRUE),
+    on.exit(npRmpi:::.npregbw_prepared_end(prepared, broadcast = TRUE),
             add = TRUE)
     vapply(seq_len(nrow(points)), function(i) {
-      npRmpi:::.npregbw_nomad_shadow_eval(
-        shadow = shadow,
+      npRmpi:::.npregbw_prepared_eval(
+        prepared = prepared,
         bw = points$bw[i],
         degree = points$degree[i],
         broadcast = TRUE
@@ -52,26 +52,30 @@ test_that("resident npreg MPI cache keys bandwidths and polynomial degree", {
   cached <- evaluate(TRUE)
   uncached <- evaluate(FALSE)
   expect_equal(cached, uncached, tolerance = 1e-12)
-  expect_false(isTRUE(all.equal(cached[1L], cached[2L], tolerance = 1e-8)))
+  expect_identical(cached[1L], cached[2L])
+  expect_false(isTRUE(all.equal(cached[1L], cached[3L], tolerance = 1e-8)))
   expect_identical(cached[1L], cached[4L])
 })
 
-test_that("resident shadows bound degree cache writes by allocated key length", {
+test_that("prepared regression and resident density bound degree-key writes", {
   src <- readLines(npRmpi_test_source_path("src", "np.c"), warn = FALSE)
   text <- paste(src, collapse = "\n")
-  expect_match(text, "bwm_nn_cache_configure_for_degree_search\\(BANDWIDTH_reg_extern")
   expect_match(text, "bwm_nn_cache_configure_for_degree_search\\(BANDWIDTH_den_extern")
-  expect_match(text, "np_regression_nomad_shadow\\.degree_key_len = degree_key_len")
+  expect_match(
+    text,
+    "prepared_context->degree_key_len = degree_search ?",
+    fixed = TRUE
+  )
   expect_match(text, "np_conditional_density_nomad_shadow\\.degree_key_len = degree_key_len")
   expect_match(
     text,
-    "i < np_regression_nomad_shadow\\.degree_key_len"
+    "i < context->degree_key_len"
   )
   expect_match(
     text,
     "i < np_conditional_density_nomad_shadow\\.degree_key_len"
   )
-  expect_match(text, "np_regression_nomad_shadow.num_var \\+ i \\+ 1")
+  expect_match(text, "context->num_var \\+ i \\+ 1")
   expect_match(text, "np_conditional_density_nomad_shadow.num_all_var \\+ i \\+ 1")
   expect_match(
     text,
@@ -82,4 +86,5 @@ test_that("resident shadows bound degree cache writes by allocated key length", 
     ),
     perl = TRUE
   )
+  expect_false(grepl("np_regression_nomad_shadow", text, fixed = TRUE))
 })

@@ -78,13 +78,13 @@ test_that("MPI regression bandwidth state has one typed cleanup owner", {
 test_that("MPI native regression search evaluates one retained prepared state", {
   source <- np_regression_prepared_source()
   callback <- np_regression_prepared_function(
-    source, "np_regression_shadow_native_search_callback", "int"
+    source, "np_regression_prepared_native_search_callback", "int"
   )
   evaluator <- np_regression_prepared_function(
-    source, "np_regression_nomad_shadow_eval_native_raw", "int"
+    source, "np_regression_prepared_eval_native_raw", "int"
   )
   prepare <- np_regression_prepared_function(
-    source, "np_regression_prepared_shadow_prepare_internal", "int"
+    source, "np_regression_prepared_prepare_internal", "int"
   )
 
   expect_match(
@@ -99,4 +99,52 @@ test_that("MPI native regression search evaluates one retained prepared state", 
     "&np_regression_prepared, 1, degree_search[0]);",
     fixed = TRUE
   )
+  expect_false(grepl("NPRegressionNomadShadowCtx", source, fixed = TRUE))
+  expect_false(grepl("np_regression_nomad_shadow", source, fixed = TRUE))
+  expect_false(grepl("np_regression_prepared_shadow", source, fixed = TRUE))
+})
+
+test_that("MPI prepared-only regression setup elides Powell-only geometry", {
+  source <- np_regression_prepared_source()
+  routine <- np_regression_prepared_function(source, "np_regression_bw_mode")
+
+  expect_match(
+    routine,
+    "matrix_y = prepare_only ? NULL :",
+    fixed = TRUE
+  )
+  expect_match(
+    routine,
+    "vector_scale_factor_startbest = prepare_only ? NULL :",
+    fixed = TRUE
+  )
+  expect_match(
+    routine,
+    "vsfh = prepare_only ? NULL : alloc_vecd",
+    fixed = TRUE
+  )
+  expect_match(routine, "if(!prepare_only){", fixed = TRUE)
+})
+
+test_that("MPI regression prepared API has no obsolete shadow registrations", {
+  root <- npRmpi_namespace_hygiene_root()
+  init <- paste(readLines(file.path(root, "src", "np_init.c"), warn = FALSE),
+                collapse = "\n")
+  regression_r <- paste(
+    readLines(file.path(root, "R", "np.regression.bw.R"), warn = FALSE),
+    collapse = "\n"
+  )
+
+  for (name in c(
+    "C_np_regression_prepared_prepare",
+    "C_np_regression_prepared_eval",
+    "C_np_regression_prepared_native_search",
+    "C_np_regression_prepared_clear"
+  )) {
+    expect_match(init, name, fixed = TRUE)
+    expect_match(regression_r, name, fixed = TRUE)
+  }
+  expect_false(grepl("C_np_regression_nomad_shadow", init, fixed = TRUE))
+  expect_false(grepl("C_np_regression_nomad_shadow", regression_r, fixed = TRUE))
+  expect_false(grepl("npregbw_nomad_shadow", regression_r, fixed = TRUE))
 })

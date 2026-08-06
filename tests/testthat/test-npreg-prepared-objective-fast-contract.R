@@ -1,4 +1,4 @@
-test_that("npreg shadow NOMAD evaluation matches objective and reports a counter", {
+test_that("npreg prepared NOMAD evaluation matches objective and reports a counter", {
   skip_if_not_installed("crs")
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
@@ -14,19 +14,19 @@ test_that("npreg shadow NOMAD evaluation matches objective and reports a counter
 
   bw <- npregbw(y ~ x, nomad = TRUE, nmulti = 1L, degree.max = 1L)
 
-  shadow <- npRmpi:::.npregbw_nomad_shadow_begin(
+  prepared <- npRmpi:::.npregbw_prepared_begin(
     xdat = xdat,
     ydat = y,
     bws = bw,
     start.bw = bw$bw
   )
 
-  out <- npRmpi:::.npregbw_nomad_shadow_eval(
-    shadow = shadow,
+  out <- npRmpi:::.npregbw_prepared_eval(
+    prepared = prepared,
     bw = bw$bw,
     degree = bw$degree
   )
-  npRmpi:::.npregbw_nomad_shadow_end(shadow)
+  npRmpi:::.npregbw_prepared_end(prepared)
 
   expect_equal(out[1L], bw$fval, tolerance = 1e-10)
   expect_true(is.finite(out[2L]))

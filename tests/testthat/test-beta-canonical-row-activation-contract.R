@@ -1026,14 +1026,14 @@ test_that("shared regression bandwidth owner carries categorical compression", {
     "error(\"%s: categorical compression must be TRUE or FALSE\", where);",
     fixed = TRUE
   )
+  expect_false(grepl(
+    "np_regression_nomad_shadow",
+    ingress,
+    fixed = TRUE
+  ))
   expect_match(
     ingress,
     "myopti, ckerlb, ckerub, \"C_np_regression_bw\");",
-    fixed = TRUE
-  )
-  expect_match(
-    ingress,
-    "myopti, ckerlb, ckerub, \"np_regression_nomad_shadow\");",
     fixed = TRUE
   )
   expect_match(

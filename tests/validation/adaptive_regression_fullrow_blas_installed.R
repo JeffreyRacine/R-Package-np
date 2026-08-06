@@ -62,27 +62,27 @@ make_case <- function(n, kernel, order, binary = FALSE) {
 }
 
 objective_pair <- function(case) {
-  shadow <- npRmpi:::.npregbw_nomad_shadow_begin(
+  prepared <- npRmpi:::.npregbw_prepared_begin(
     xdat = case$xdat,
     ydat = case$y,
     bws = case$state,
     broadcast = TRUE
   )
-  on.exit(npRmpi:::.npregbw_nomad_shadow_end(
-    shadow,
+  on.exit(npRmpi:::.npregbw_prepared_end(
+    prepared,
     broadcast = TRUE
   ), add = TRUE)
 
   set_accelerate(FALSE)
-  scalar <- npRmpi:::.npregbw_nomad_shadow_eval(
-    shadow,
+  scalar <- npRmpi:::.npregbw_prepared_eval(
+    prepared,
     bw = case$state$bw,
     degree = case$state$degree,
     broadcast = TRUE
   )[1L]
   set_accelerate(TRUE)
-  blas <- npRmpi:::.npregbw_nomad_shadow_eval(
-    shadow,
+  blas <- npRmpi:::.npregbw_prepared_eval(
+    prepared,
     bw = case$state$bw,
     degree = case$state$degree,
     broadcast = TRUE

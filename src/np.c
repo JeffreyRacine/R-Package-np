@@ -1323,29 +1323,6 @@ static NPRegressionPreparedCtx np_regression_prepared = {0};
 typedef struct {
   int active;
   int owned;
-  int num_var;
-  int num_reg_continuous;
-  int degree_key_len;
-  int degree_search;
-  int degree_state_ready;
-  int requested_glp_bernstein;
-  int requested_glp_basis;
-  int num_reg_unordered;
-  int num_reg_ordered;
-  int *ipt;
-  int *glp_degree;
-  double *ckerlb;
-  double *ckerub;
-  double *vector_scale_factor;
-  double *extendednn_upper;
-} NPRegressionNomadShadowCtx;
-
-static NPRegressionNomadShadowCtx np_regression_nomad_shadow =
-  {0};
-
-typedef struct {
-  int active;
-  int owned;
   int num_all_var;
   int num_reg_continuous;
   int degree_key_len;
@@ -1397,7 +1374,7 @@ typedef struct {
 static NPConditionalDensityNomadShadowCtx np_conditional_density_nomad_shadow =
   {0};
 
-static void np_regression_nomad_shadow_clear_internal(void);
+static void np_regression_prepared_clear_internal(void);
 static void np_conditional_density_nomad_shadow_clear_internal(void);
 static void np_conditional_density_nomad_shadow_refresh_penalty(void);
 
@@ -3993,7 +3970,7 @@ static void np_reset_native_estimator_state_internal(void)
   int rord = num_reg_ordered_extern;
   int rcon = num_reg_continuous_extern;
 
-  np_regression_nomad_shadow_clear_internal();
+  np_regression_prepared_clear_internal();
   np_conditional_density_nomad_shadow_clear_internal();
 
   if (!np_native_estimator_state_active)
@@ -4154,7 +4131,7 @@ SEXP C_np_reset_native_estimator_state(void)
   return R_NilValue;
 }
 
-static void np_regression_nomad_shadow_clear_internal(void)
+static void np_regression_prepared_clear_internal(void)
 {
   np_regression_prepared_context_destroy(&np_regression_prepared);
   bwmfunc_raw = NULL;
@@ -4170,429 +4147,9 @@ static void np_regression_nomad_shadow_clear_internal(void)
   num_reg_continuous_extern = 0;
   num_reg_unordered_extern = 0;
   num_reg_ordered_extern = 0;
-  memset(&np_regression_nomad_shadow, 0,
-         sizeof(np_regression_nomad_shadow));
 }
 
-static int np_regression_nomad_shadow_refresh_degree(const int *degree)
-{
-  return np_regression_prepared_context_refresh_degree(
-    &np_regression_prepared, degree);
-}
-
-static int np_regression_nomad_shadow_prepare_internal(double *runo,
-                                                       double *rord,
-                                                       double *rcon,
-                                                       double *y,
-                                                       double *mysd,
-                                                       int *myopti,
-                                                       double *myoptd,
-                                                       double *rbw,
-                                                       int *penalty_mode,
-                                                       double *penalty_mult,
-                                                       int *glp_degree,
-                                                       int *glp_bernstein,
-                                                       int *glp_basis,
-                                                       int *degree_search,
-                                                       double *ckerlb,
-                                                       double *ckerub)
-{
-  int i, j;
-  int num_var;
-  int scale_cat;
-  int int_use_starting_values;
-  int degree_key_len;
-  int requested_engine;
-  int *ipt = NULL;
-  int dfc_dir;
-  double lbc_dir, c_dir, initc_dir;
-  double lbd_dir, hbd_dir, d_dir, initd_dir;
-  double lbc_init, hbc_init, c_init;
-  double lbd_init, hbd_init, d_init;
-  double **matrix_y = NULL;
-  double *vsfh = NULL;
-
-  np_regression_nomad_shadow_clear_internal();
-  np_regression_nomad_shadow.owned = 1;
-  num_reg_continuous_extern = myopti[RBW_NCONI];
-  num_reg_unordered_extern = myopti[RBW_NUNOI];
-  num_reg_ordered_extern = myopti[RBW_NORDI];
-  np_reset_y_side_extern();
-
-  num_var = num_reg_ordered_extern + num_reg_continuous_extern + num_reg_unordered_extern;
-
-  num_obs_train_extern = myopti[RBW_NOBSI];
-  KERNEL_reg_extern = myopti[RBW_CKRNEVI];
-  KERNEL_reg_unordered_extern = myopti[RBW_UKRNEVI];
-  KERNEL_reg_ordered_extern = myopti[RBW_OKRNEVI];
-
-  np_regression_nomad_shadow.num_var = num_var;
-  np_regression_nomad_shadow.num_reg_continuous = num_reg_continuous_extern;
-  np_regression_nomad_shadow.num_reg_unordered = num_reg_unordered_extern;
-  np_regression_nomad_shadow.num_reg_ordered = num_reg_ordered_extern;
-  if (num_reg_continuous_extern > 0) {
-    np_regression_nomad_shadow.ckerlb = alloc_vecd(num_reg_continuous_extern);
-    np_regression_nomad_shadow.ckerub = alloc_vecd(num_reg_continuous_extern);
-    if (np_regression_nomad_shadow.ckerlb == NULL ||
-        np_regression_nomad_shadow.ckerub == NULL)
-      goto fail;
-    for (i = 0; i < num_reg_continuous_extern; i++) {
-      np_regression_nomad_shadow.ckerlb[i] = ckerlb[i];
-      np_regression_nomad_shadow.ckerub[i] = ckerub[i];
-    }
-    vector_ckerlb_extern = np_regression_nomad_shadow.ckerlb;
-    vector_ckerub_extern = np_regression_nomad_shadow.ckerub;
-  } else {
-    vector_ckerlb_extern = NULL;
-    vector_ckerub_extern = NULL;
-  }
-  int_cker_bound_extern = np_has_finite_cker_bounds(vector_ckerlb_extern,
-                                                    vector_ckerub_extern,
-                                                    num_reg_continuous_extern);
-
-  int_use_starting_values = myopti[RBW_USTARTI];
-  int_LARGE_SF = myopti[RBW_LSFI];
-
-  BANDWIDTH_reg_extern = myopti[RBW_REGI];
-  BANDWIDTH_den_extern = 0;
-
-  int_RESTART_FROM_MIN = RE_MIN_FALSE;
-  int_MINIMIZE_IO = IO_MIN_TRUE;
-
-  requested_engine = np_regression_engine_or_error(
-    myopti[RBW_LL], "np_regression_nomad_shadow");
-  if (degree_search[0] != 0 && degree_search[0] != 1)
-    goto fail;
-  np_regression_nomad_shadow.degree_search = degree_search[0];
-  np_lp_engine_extern = np_regression_nomad_shadow.degree_search ?
-    np_canonical_lp_engine_for_degree(glp_degree, num_reg_continuous_extern) :
-    requested_engine;
-  if (np_lp_engine_extern < 0)
-    goto fail;
-  degree_key_len =
-    (np_regression_nomad_shadow.degree_search ||
-     np_lp_engine_extern == NP_LP_ENGINE_GENERAL) ?
-    num_reg_continuous_extern : 0;
-  np_regression_nomad_shadow.degree_key_len = degree_key_len;
-  vector_glp_gradient_order_extern = NULL;
-  np_regression_nomad_shadow.requested_glp_bernstein = *glp_bernstein;
-  np_regression_nomad_shadow.requested_glp_basis = *glp_basis;
-  int_glp_bernstein_extern =
-    (np_lp_engine_extern == NP_LP_ENGINE_GENERAL) ?
-    np_regression_nomad_shadow.requested_glp_bernstein : 0;
-  int_glp_basis_extern =
-    (np_lp_engine_extern == NP_LP_ENGINE_GENERAL) ?
-    np_regression_nomad_shadow.requested_glp_basis : 1;
-  int_nn_k_min_extern =
-    ((BANDWIDTH_reg_extern != BW_FIXED) && (num_reg_continuous_extern > 0)) ? 2 : 1;
-
-  if (num_reg_continuous_extern > 0) {
-    np_regression_nomad_shadow.glp_degree = alloc_vecu(num_reg_continuous_extern);
-    if (np_regression_nomad_shadow.glp_degree == NULL)
-      goto fail;
-    for (i = 0; i < num_reg_continuous_extern; i++)
-      np_regression_nomad_shadow.glp_degree[i] = glp_degree[i];
-    vector_glp_degree_extern =
-      (np_lp_engine_extern == NP_LP_ENGINE_GENERAL) ?
-      np_regression_nomad_shadow.glp_degree : NULL;
-  } else {
-    vector_glp_degree_extern = NULL;
-  }
-
-  int_TREE_PROFILE_X = myopti[RBW_DOTREEI];
-  int_TREE_X = myopti[RBW_DOTREEI];
-  np_regression_bw_kernel_state_configure_or_error(
-    myopti, ckerlb, ckerub, "np_regression_nomad_shadow");
-  scale_cat = myopti[RBW_SCATI];
-  bwm_use_transform = myopti[RBW_TBNDI];
-  if (BANDWIDTH_reg_extern != BW_FIXED)
-    bwm_use_transform = 0;
-
-  nconfac_extern = myoptd[RBW_NCONFD];
-  ncatfac_extern = myoptd[RBW_NCATFD];
-  bwm_set_scale_factor_lower_bound(myoptd[RBW_SFLOORD]);
-  dfc_dir = myopti[RBW_DFC_DIRI];
-  lbc_dir = myoptd[RBW_LBC_DIRD];
-  c_dir = myoptd[RBW_C_DIRD];
-  initc_dir = myoptd[RBW_INITC_DIRD];
-  lbd_dir = myoptd[RBW_LBD_DIRD];
-  hbd_dir = myoptd[RBW_HBD_DIRD];
-  d_dir = myoptd[RBW_D_DIRD];
-  initd_dir = myoptd[RBW_INITD_DIRD];
-  lbc_init = myoptd[RBW_LBC_INITD];
-  hbc_init = myoptd[RBW_HBC_INITD];
-  c_init = myoptd[RBW_C_INITD];
-  lbd_init = myoptd[RBW_LBD_INITD];
-  hbd_init = myoptd[RBW_HBD_INITD];
-  d_init = myoptd[RBW_D_INITD];
-
-  imsnum = 0;
-  imstot = 0;
-
-  matrix_X_unordered_train_extern = alloc_matd(num_obs_train_extern, num_reg_unordered_extern);
-  matrix_X_ordered_train_extern = alloc_matd(num_obs_train_extern, num_reg_ordered_extern);
-  matrix_X_continuous_train_extern = alloc_matd(num_obs_train_extern, num_reg_continuous_extern);
-  vector_Y_extern = alloc_vecd(num_obs_train_extern);
-  num_categories_extern = alloc_vecu(num_reg_unordered_extern + num_reg_ordered_extern);
-  matrix_categorical_vals_extern = alloc_matd(num_obs_train_extern,
-                                              num_reg_unordered_extern + num_reg_ordered_extern);
-  vector_continuous_stddev_extern = alloc_vecd(num_reg_continuous_extern);
-  np_regression_nomad_shadow.vector_scale_factor =
-    alloc_vecd(num_var + degree_key_len + 1);
-  matrix_y = alloc_matd(num_var + 1, num_var + 1);
-  vsfh = alloc_vecd(num_var + 1);
-
-  if (((num_reg_unordered_extern > 0) && (matrix_X_unordered_train_extern == NULL)) ||
-      ((num_reg_ordered_extern > 0) && (matrix_X_ordered_train_extern == NULL)) ||
-      ((num_reg_continuous_extern > 0) && (matrix_X_continuous_train_extern == NULL)) ||
-      (vector_Y_extern == NULL) ||
-      (((num_reg_unordered_extern + num_reg_ordered_extern) > 0) && (num_categories_extern == NULL)) ||
-      (((num_reg_unordered_extern + num_reg_ordered_extern) > 0) && (matrix_categorical_vals_extern == NULL)) ||
-      ((num_reg_continuous_extern > 0) && (vector_continuous_stddev_extern == NULL)) ||
-      (np_regression_nomad_shadow.vector_scale_factor == NULL) ||
-      (matrix_y == NULL) ||
-      (vsfh == NULL))
-    goto fail;
-
-  for (j = 0; j < num_reg_continuous_extern; j++)
-    vector_continuous_stddev_extern[j] = mysd[j];
-
-  if (int_use_starting_values) {
-    for (i = 0; i < num_var; i++)
-      np_regression_nomad_shadow.vector_scale_factor[i + 1] = rbw[i];
-  }
-
-  for (j = 0; j < num_reg_unordered_extern; j++)
-    for (i = 0; i < num_obs_train_extern; i++)
-      matrix_X_unordered_train_extern[j][i] = runo[j * num_obs_train_extern + i];
-
-  for (j = 0; j < num_reg_ordered_extern; j++)
-    for (i = 0; i < num_obs_train_extern; i++)
-      matrix_X_ordered_train_extern[j][i] = rord[j * num_obs_train_extern + i];
-
-  for (j = 0; j < num_reg_continuous_extern; j++)
-    for (i = 0; i < num_obs_train_extern; i++)
-      matrix_X_continuous_train_extern[j][i] = rcon[j * num_obs_train_extern + i];
-
-  np_regression_nomad_shadow.extendednn_upper =
-    np_continuous_extendednn_upper_alloc(
-      BANDWIDTH_reg_extern,
-      KERNEL_reg_extern,
-      num_obs_train_extern,
-      num_obs_train_extern,
-      num_reg_continuous_extern,
-      1,
-      matrix_X_continuous_train_extern,
-      matrix_X_continuous_train_extern);
-  vector_extendednn_upper_extern = np_regression_nomad_shadow.extendednn_upper;
-  int_extendednn_upper_num_extern =
-    (vector_extendednn_upper_extern != NULL) ? num_reg_continuous_extern : 0;
-
-  for (i = 0; i < num_obs_train_extern; i++)
-    vector_Y_extern[i] = y[i];
-  bwm_penalty_mode = 0;
-  bwm_penalty_value = DBL_MAX;
-  if (penalty_mode[0] == 1) {
-    double pmult = penalty_mult[0];
-    double y_mean = 0.0;
-    double mse0 = 0.0;
-    if (pmult < 1.0) pmult = 1.0;
-    for (i = 0; i < num_obs_train_extern; i++)
-      y_mean += vector_Y_extern[i];
-    y_mean /= (double) num_obs_train_extern;
-    for (i = 0; i < num_obs_train_extern; i++) {
-      const double dy = vector_Y_extern[i] - y_mean;
-      mse0 += dy * dy;
-    }
-    mse0 /= (double) num_obs_train_extern;
-    if (mse0 <= 0.0) mse0 = DBL_MIN;
-    if (myopti[RBW_MI] == RBWM_CVAIC) {
-      const double denom = 1.0 - 2.0 / ((double) num_obs_train_extern);
-      if (denom > 0.0) {
-        const double base_aic = log(mse0) + (1.0 / denom);
-        bwm_penalty_value = base_aic + log(pmult);
-      }
-    } else {
-      bwm_penalty_value = pmult * mse0;
-    }
-    if (R_FINITE(bwm_penalty_value))
-      bwm_penalty_mode = 1;
-  }
-
-  ipt = (int *)malloc((size_t)num_obs_train_extern * sizeof(int));
-  if (ipt == NULL)
-    goto fail;
-  for (i = 0; i < num_obs_train_extern; i++)
-    ipt[i] = i;
-
-  int_TREE_X = int_TREE_X && ((num_reg_continuous_extern != 0) ? NP_TREE_TRUE : NP_TREE_FALSE);
-  if (int_TREE_X == NP_TREE_TRUE) {
-    build_kdtree(matrix_X_continuous_train_extern,
-                 num_obs_train_extern,
-                 num_reg_continuous_extern,
-                 4 * num_reg_continuous_extern,
-                 ipt,
-                 &kdt_extern_X);
-
-    for (j = 0; j < num_reg_unordered_extern; j++)
-      for (i = 0; i < num_obs_train_extern; i++)
-        matrix_X_unordered_train_extern[j][i] = runo[j * num_obs_train_extern + ipt[i]];
-
-    for (j = 0; j < num_reg_ordered_extern; j++)
-      for (i = 0; i < num_obs_train_extern; i++)
-        matrix_X_ordered_train_extern[j][i] = rord[j * num_obs_train_extern + ipt[i]];
-
-    for (j = 0; j < num_reg_continuous_extern; j++)
-      for (i = 0; i < num_obs_train_extern; i++)
-        matrix_X_continuous_train_extern[j][i] = rcon[j * num_obs_train_extern + ipt[i]];
-
-    for (i = 0; i < num_obs_train_extern; i++)
-      vector_Y_extern[i] = y[ipt[i]];
-  }
-
-  determine_categorical_vals(num_obs_train_extern,
-                             0,
-                             0,
-                             num_reg_unordered_extern,
-                             num_reg_ordered_extern,
-                             matrix_Y_unordered_train_extern,
-                             matrix_Y_ordered_train_extern,
-                             matrix_X_unordered_train_extern,
-                             matrix_X_ordered_train_extern,
-                             num_categories_extern,
-                             matrix_categorical_vals_extern);
-
-  if ((np_lp_engine_extern == NP_LP_ENGINE_GENERAL) &&
-      (!np_glp_cv_prepare_extern(np_lp_engine_extern,
-                                 num_obs_train_extern,
-                                 num_reg_continuous_extern,
-                                 matrix_X_continuous_train_extern)))
-    goto fail;
-  np_regression_nomad_shadow.degree_state_ready = 1;
-
-  initialize_nr_vector_scale_factor(BANDWIDTH_reg_extern,
-                                    0,
-                                    int_RANDOM_SEED,
-                                    int_LARGE_SF,
-                                    num_obs_train_extern,
-                                    0,
-                                    0,
-                                    0,
-                                    num_reg_continuous_extern,
-                                    num_reg_unordered_extern,
-                                    num_reg_ordered_extern,
-                                    0,
-                                    KERNEL_reg_unordered_extern,
-                                    int_use_starting_values,
-                                    scale_cat,
-                                    pow((double)4.0/(double)3.0,0.2),
-                                    nconfac_extern, ncatfac_extern,
-                                    num_categories_extern,
-                                    vector_continuous_stddev_extern,
-                                    np_regression_nomad_shadow.vector_scale_factor,
-                                    lbc_init, hbc_init, c_init,
-                                    lbd_init, hbd_init, d_init,
-                                    matrix_X_continuous_train_extern,
-                                    matrix_Y_continuous_train_extern);
-
-  for (i = 0; i < degree_key_len; i++)
-    np_regression_nomad_shadow.vector_scale_factor[num_var + i + 1] =
-      (double)np_regression_nomad_shadow.glp_degree[i];
-
-  initialize_nr_vector_scale_factor(BANDWIDTH_reg_extern,
-                                    0,
-                                    int_RANDOM_SEED,
-                                    int_LARGE_SF,
-                                    num_obs_train_extern,
-                                    0,
-                                    0,
-                                    0,
-                                    num_reg_continuous_extern,
-                                    num_reg_unordered_extern,
-                                    num_reg_ordered_extern,
-                                    0,
-                                    KERNEL_reg_unordered_extern,
-                                    0,
-                                    scale_cat,
-                                    pow((double)4.0/(double)3.0,0.2),
-                                    nconfac_extern, ncatfac_extern,
-                                    num_categories_extern,
-                                    vector_continuous_stddev_extern,
-                                    vsfh,
-                                    lbc_init, hbc_init, c_init,
-                                    lbd_init, hbd_init, d_init,
-                                    matrix_X_continuous_train_extern,
-                                    matrix_Y_continuous_train_extern);
-
-  initialize_nr_directions(BANDWIDTH_reg_extern,
-                           num_obs_train_extern,
-                           num_reg_continuous_extern,
-                           num_reg_unordered_extern,
-                           num_reg_ordered_extern,
-                           0,
-                           0,
-                           0,
-                           vsfh,
-                           num_categories_extern,
-                           matrix_y,
-                           0, int_RANDOM_SEED,
-                           lbc_dir, dfc_dir, c_dir, initc_dir,
-                           lbd_dir, hbd_dir, d_dir, initd_dir,
-                           matrix_X_continuous_train_extern,
-                           matrix_Y_continuous_train_extern);
-
-  switch (myopti[RBW_MI]) {
-    case RBWM_CVAIC:
-      bwmfunc_raw = cv_func_regression_categorical_aic_c;
-      break;
-    case RBWM_CVLS:
-      bwmfunc_raw = cv_func_regression_categorical_ls;
-      break;
-    default:
-      error("np.c: invalid bandwidth selection method.");
-  }
-
-  bwm_search_context_configure_uniform(
-    num_reg_continuous_extern,
-    num_reg_unordered_extern,
-    num_reg_ordered_extern,
-    degree_key_len,
-    KERNEL_reg_unordered_extern,
-    num_categories_extern);
-  if (bwm_use_transform) {
-    int n = bwm_num_reg_continuous + bwm_num_reg_unordered + bwm_num_reg_ordered;
-    bwm_reserve_transform_buf(n + degree_key_len + 1);
-  }
-  /* Shadow evaluators call bwmfunc_wrapper(), so prepare owns a fresh
-     bandwidth-objective cache lifecycle just like ordinary searches. */
-  bwm_nn_cache_configure_for_degree_search(BANDWIDTH_reg_extern,
-                                           0,
-                                           degree_key_len,
-                                           bwm_num_reg_continuous,
-                                           bwm_num_reg_unordered,
-                                           bwm_num_reg_ordered);
-  bwm_reset_counters();
-
-  if (np_mpi_rank_failure_injected("NP_RMPI_INJECT_REG_SHADOW_PREPARE_FAIL_RANK"))
-    goto fail;
-
-  np_regression_nomad_shadow.ipt = ipt;
-  ipt = NULL;
-  free_mat(matrix_y, num_var + 1);
-  safe_free(vsfh);
-  np_regression_nomad_shadow.active = 1;
-  return 1;
-
-fail:
-  if (matrix_y != NULL)
-    free_mat(matrix_y, num_var + 1);
-  safe_free(vsfh);
-  safe_free(ipt);
-  np_regression_nomad_shadow_clear_internal();
-  return 0;
-}
-
-static int np_regression_prepared_shadow_prepare_internal(
+static int np_regression_prepared_prepare_internal(
   double *runo, double *rord, double *rcon, double *y,
   double *mysd, int *myopti, double *myoptd, double *rbw,
   int *penalty_mode, double *penalty_mult,
@@ -4606,7 +4163,7 @@ static int np_regression_prepared_shadow_prepare_internal(
   double timing[1] = {R_NaN};
   double fast[1] = {R_NaN};
 
-  np_regression_nomad_shadow_clear_internal();
+  np_regression_prepared_clear_internal();
   np_regression_bw_mode(
     runo, rord, rcon, y, mysd, myopti, myoptd, rbw, fval,
     history, eval_history, invalid_history, timing, fast,
@@ -4618,53 +4175,25 @@ static int np_regression_prepared_shadow_prepare_internal(
 
   if (!np_regression_prepared.active)
     return 0;
-
-  np_regression_nomad_shadow.active = 1;
-  np_regression_nomad_shadow.num_var = np_regression_prepared.num_var;
-  np_regression_nomad_shadow.num_reg_continuous =
-    np_regression_prepared.num_continuous;
-  np_regression_nomad_shadow.num_reg_unordered =
-    np_regression_prepared.num_unordered;
-  np_regression_nomad_shadow.num_reg_ordered =
-    np_regression_prepared.num_ordered;
-  np_regression_nomad_shadow.degree_key_len =
-    np_regression_prepared.degree_key_len;
-  np_regression_nomad_shadow.degree_search =
-    np_regression_prepared.degree_search;
-  np_regression_nomad_shadow.degree_state_ready =
-    np_regression_prepared.degree_state_ready;
-  np_regression_nomad_shadow.requested_glp_bernstein =
-    np_regression_prepared.requested_bernstein;
-  np_regression_nomad_shadow.requested_glp_basis =
-    np_regression_prepared.requested_basis;
-  np_regression_nomad_shadow.ipt =
-    np_regression_prepared.tree_permutation;
-  np_regression_nomad_shadow.glp_degree = np_regression_prepared.degree;
-  np_regression_nomad_shadow.ckerlb = np_regression_prepared.ckerlb;
-  np_regression_nomad_shadow.ckerub = np_regression_prepared.ckerub;
-  np_regression_nomad_shadow.vector_scale_factor =
-    np_regression_prepared.scale_factor;
-  np_regression_nomad_shadow.extendednn_upper =
-    np_regression_prepared.extendednn_upper;
   return 1;
 }
 
-SEXP C_np_regression_nomad_shadow_prepare(SEXP runo,
-                                          SEXP rord,
-                                          SEXP rcon,
-                                          SEXP y,
-                                          SEXP mysd,
-                                          SEXP myopti,
-                                          SEXP myoptd,
-                                          SEXP rbw,
-                                          SEXP penalty_mode,
-                                          SEXP penalty_mult,
-                                          SEXP glp_degree,
-                                          SEXP glp_bernstein,
-                                          SEXP glp_basis,
-                                          SEXP degree_search,
-                                          SEXP ckerlb,
-                                          SEXP ckerub)
+SEXP C_np_regression_prepared_prepare(SEXP runo,
+                                      SEXP rord,
+                                      SEXP rcon,
+                                      SEXP y,
+                                      SEXP mysd,
+                                      SEXP myopti,
+                                      SEXP myoptd,
+                                      SEXP rbw,
+                                      SEXP penalty_mode,
+                                      SEXP penalty_mult,
+                                      SEXP glp_degree,
+                                      SEXP glp_bernstein,
+                                      SEXP glp_basis,
+                                      SEXP degree_search,
+                                      SEXP ckerlb,
+                                      SEXP ckerub)
 {
   SEXP runo_r = R_NilValue, rord_r = R_NilValue, rcon_r = R_NilValue, y_r = R_NilValue;
   SEXP mysd_r = R_NilValue, myopti_i = R_NilValue, myoptd_r = R_NilValue;
@@ -4702,62 +4231,62 @@ SEXP C_np_regression_nomad_shadow_prepare(SEXP runo,
        XLENGTH(glp_degree_i) != INTEGER(myopti_i)[RBW_NCONI])) {
     ok = 0;
   } else {
-    ok = np_regression_prepared_shadow_prepare_internal(REAL(runo_r),
-                                                     REAL(rord_r),
-                                                     REAL(rcon_r),
-                                                     REAL(y_r),
-                                                     REAL(mysd_r),
-                                                     INTEGER(myopti_i),
-                                                     REAL(myoptd_r),
-                                                     REAL(rbw_r),
-                                                     INTEGER(penalty_mode_i),
-                                                     REAL(penalty_mult_r),
-                                                     INTEGER(glp_degree_i),
-                                                     INTEGER(glp_bernstein_i),
-                                                     INTEGER(glp_basis_i),
-                                                     INTEGER(degree_search_i),
-                                                     REAL(ckerlb_r),
-                                                     REAL(ckerub_r));
+    ok = np_regression_prepared_prepare_internal(REAL(runo_r),
+                                                 REAL(rord_r),
+                                                 REAL(rcon_r),
+                                                 REAL(y_r),
+                                                 REAL(mysd_r),
+                                                 INTEGER(myopti_i),
+                                                 REAL(myoptd_r),
+                                                 REAL(rbw_r),
+                                                 INTEGER(penalty_mode_i),
+                                                 REAL(penalty_mult_r),
+                                                 INTEGER(glp_degree_i),
+                                                 INTEGER(glp_bernstein_i),
+                                                 INTEGER(glp_basis_i),
+                                                 INTEGER(degree_search_i),
+                                                 REAL(ckerlb_r),
+                                                 REAL(ckerub_r));
   }
 
   ok = np_mpi_comm1_all_ok(ok);
   if (!ok)
-    np_regression_nomad_shadow_clear_internal();
+    np_regression_prepared_clear_internal();
 
   UNPROTECT(16);
 
   return ScalarLogical(ok ? 1 : 0);
 }
 
-static int np_regression_nomad_shadow_eval_native_raw(const double *rbw,
-                                                      const int *glp_degree,
-                                                      double *rbw_work,
-                                                      int *degree_work,
-                                                      double out[3])
+static int np_regression_prepared_eval_native_raw(const double *rbw,
+                                                  const int *glp_degree,
+                                                  double *rbw_work,
+                                                  int *degree_work,
+                                                  double out[3])
 {
   int i;
   int status;
 
-  if (!np_regression_nomad_shadow.active || rbw == NULL ||
+  if (!np_regression_prepared.active || rbw == NULL ||
       rbw_work == NULL ||
-      (np_regression_nomad_shadow.num_reg_continuous > 0 &&
+      (np_regression_prepared.num_continuous > 0 &&
        (glp_degree == NULL || degree_work == NULL)) || out == NULL)
     return 1;
 
-  for (i = 0; i < np_regression_nomad_shadow.num_var; i++)
+  for (i = 0; i < np_regression_prepared.num_var; i++)
     rbw_work[i] = rbw[i];
-  for (i = 0; i < np_regression_nomad_shadow.num_reg_continuous; i++)
+  for (i = 0; i < np_regression_prepared.num_continuous; i++)
     degree_work[i] = glp_degree[i];
 
 #ifdef MPI2
   if (comm != NULL && comm[1] != MPI_COMM_NULL) {
     MPI_Bcast(rbw_work,
-              np_regression_nomad_shadow.num_var,
+              np_regression_prepared.num_var,
               MPI_DOUBLE,
               0,
               comm[1]);
     MPI_Bcast(degree_work,
-              np_regression_nomad_shadow.num_reg_continuous,
+              np_regression_prepared.num_continuous,
               MPI_INT,
               0,
               comm[1]);
@@ -4769,41 +4298,41 @@ static int np_regression_nomad_shadow_eval_native_raw(const double *rbw,
   return status;
 }
 
-SEXP C_np_regression_nomad_shadow_eval(SEXP rbw, SEXP glp_degree)
+SEXP C_np_regression_prepared_eval(SEXP rbw, SEXP glp_degree)
 {
   SEXP rbw_r = R_NilValue, degree_i = R_NilValue, out = R_NilValue;
   double *rbw_work;
   int *degree_work = NULL;
   double eval_out[3];
 
-  if (!np_regression_nomad_shadow.active)
-    error("resident npreg NOMAD shadow state is not active");
+  if (!np_regression_prepared.active)
+    error("prepared npreg objective state is not active");
 
   PROTECT(rbw_r = coerceVector(rbw, REALSXP));
   PROTECT(degree_i = coerceVector(glp_degree, INTSXP));
 
-  if (XLENGTH(rbw_r) != np_regression_nomad_shadow.num_var) {
+  if (XLENGTH(rbw_r) != np_regression_prepared.num_var) {
     UNPROTECT(2);
-    error("resident npreg NOMAD shadow received bandwidth vector of unexpected length");
+    error("prepared npreg objective received bandwidth vector of unexpected length");
   }
-  if (XLENGTH(degree_i) != np_regression_nomad_shadow.num_reg_continuous) {
+  if (XLENGTH(degree_i) != np_regression_prepared.num_continuous) {
     UNPROTECT(2);
-    error("resident npreg NOMAD shadow received degree vector of unexpected length");
+    error("prepared npreg objective received degree vector of unexpected length");
   }
 
   rbw_work = (double *)R_alloc(
-    (size_t)np_regression_nomad_shadow.num_var, sizeof(double));
-  if (np_regression_nomad_shadow.num_reg_continuous > 0)
+    (size_t)np_regression_prepared.num_var, sizeof(double));
+  if (np_regression_prepared.num_continuous > 0)
     degree_work = (int *)R_alloc(
-      (size_t)np_regression_nomad_shadow.num_reg_continuous, sizeof(int));
+      (size_t)np_regression_prepared.num_continuous, sizeof(int));
 
-  if (np_regression_nomad_shadow_eval_native_raw(REAL(rbw_r),
-                                                 INTEGER(degree_i),
-                                                 rbw_work,
-                                                 degree_work,
-                                                 eval_out) != 0) {
+  if (np_regression_prepared_eval_native_raw(REAL(rbw_r),
+                                             INTEGER(degree_i),
+                                             rbw_work,
+                                             degree_work,
+                                             eval_out) != 0) {
     UNPROTECT(2);
-    error("resident npreg NOMAD shadow native evaluator failed");
+    error("prepared npreg objective evaluator failed");
   }
 
   PROTECT(out = allocVector(REALSXP, 2));
@@ -4839,10 +4368,10 @@ typedef struct {
   int progress_last_signal_eval;
   clock_t progress_last_signal_clock;
   time_t progress_last_signal_wall;
-} np_regression_shadow_native_search_context;
+} np_regression_prepared_native_search_context;
 
-static int np_regression_shadow_native_decode_bw(
-    const np_regression_shadow_native_search_context *context,
+static int np_regression_prepared_native_decode_bw(
+    const np_regression_prepared_native_search_context *context,
     const double *raw_point,
     double *eval_bw)
 {
@@ -4871,14 +4400,14 @@ static int np_regression_shadow_native_decode_bw(
   return 0;
 }
 
-static int np_regression_shadow_native_search_callback(int n,
-                                                       const double *x,
-                                                       int m,
-                                                       double *bb_outputs,
-                                                       void *user_data)
+static int np_regression_prepared_native_search_callback(int n,
+                                                         const double *x,
+                                                         int m,
+                                                         double *bb_outputs,
+                                                         void *user_data)
 {
-  np_regression_shadow_native_search_context *context =
-    (np_regression_shadow_native_search_context *) user_data;
+  np_regression_prepared_native_search_context *context =
+    (np_regression_prepared_native_search_context *) user_data;
   double *raw_point;
   double *eval_bw;
   int *degree_work;
@@ -4888,7 +4417,7 @@ static int np_regression_shadow_native_search_callback(int n,
   if (context == NULL || x == NULL || bb_outputs == NULL || m != 1 ||
       n != context->n || context->raw_point == NULL ||
       context->eval_bw == NULL ||
-      (np_regression_nomad_shadow.num_reg_continuous > 0 &&
+      (np_regression_prepared.num_continuous > 0 &&
        context->degree_work == NULL))
     return 1;
 
@@ -4906,7 +4435,7 @@ static int np_regression_shadow_native_search_callback(int n,
       raw_point[j] = context->upper[j];
   }
 
-  status = np_regression_shadow_native_decode_bw(context, raw_point, eval_bw);
+  status = np_regression_prepared_native_decode_bw(context, raw_point, eval_bw);
   if (status != 0) {
     context->callback_failures++;
     return 1;
@@ -4916,11 +4445,11 @@ static int np_regression_shadow_native_search_callback(int n,
     for (j = 0; j < context->ndegree; j++)
       degree_work[j] = (int) nearbyint(raw_point[context->nbw + j]);
   } else {
-    for (j = 0; j < np_regression_nomad_shadow.num_reg_continuous; j++)
-      degree_work[j] = np_regression_nomad_shadow.glp_degree[j];
+    for (j = 0; j < np_regression_prepared.num_continuous; j++)
+      degree_work[j] = np_regression_prepared.degree[j];
   }
 
-  status = np_regression_nomad_shadow_eval_native_raw(
+  status = np_regression_prepared_eval_native_raw(
     eval_bw,
     degree_work,
     eval_bw,
@@ -4959,17 +4488,17 @@ static int np_regression_shadow_native_search_callback(int n,
   return 0;
 }
 
-SEXP C_np_regression_nomad_shadow_native_search(SEXP x0,
-                                                SEXP bbin,
-                                                SEXP lower,
-                                                SEXP upper,
-                                                SEXP decode_scale,
-                                                SEXP point_upper,
-                                                SEXP max_eval,
-                                                SEXP random_seed,
-                                                SEXP inner_start_count,
-                                                SEXP option_names,
-                                                SEXP option_values)
+SEXP C_np_regression_prepared_native_search(SEXP x0,
+                                            SEXP bbin,
+                                            SEXP lower,
+                                            SEXP upper,
+                                            SEXP decode_scale,
+                                            SEXP point_upper,
+                                            SEXP max_eval,
+                                            SEXP random_seed,
+                                            SEXP inner_start_count,
+                                            SEXP option_names,
+                                            SEXP option_values)
 {
   SEXP x0_r = R_NilValue, bbin_i = R_NilValue, lower_r = R_NilValue;
   SEXP upper_r = R_NilValue, decode_scale_r = R_NilValue, point_upper_r = R_NilValue;
@@ -4982,13 +4511,13 @@ SEXP C_np_regression_nomad_shadow_native_search(SEXP x0,
   crs_nomad_option *native_options = NULL;
   int bb_output_type[1] = {CRS_NOMAD_OUTPUT_OBJ};
   double crs_outputs[1];
-  np_regression_shadow_native_search_context context;
+  np_regression_prepared_native_search_context context;
   double *solution = NULL, *best_point = NULL, *best_bw_d = NULL;
   int *best_degree_i = NULL, *first_degree_i = NULL;
   int n, nbw, ndegree, i, status, budget, seed, inner_count, n_options, objective_cache_enabled;
 
-  if (!np_regression_nomad_shadow.active)
-    error("resident npreg NOMAD shadow state is not active");
+  if (!np_regression_prepared.active)
+    error("prepared npreg objective state is not active");
 
   PROTECT(x0_r = coerceVector(x0, REALSXP));
   PROTECT(bbin_i = coerceVector(bbin, INTSXP));
@@ -5000,12 +4529,12 @@ SEXP C_np_regression_nomad_shadow_native_search(SEXP x0,
   PROTECT(option_values_s = coerceVector(option_values, STRSXP));
 
   n = (int) XLENGTH(x0_r);
-  nbw = np_regression_nomad_shadow.num_var;
+  nbw = np_regression_prepared.num_var;
   ndegree = n - nbw;
   if (n <= 0 ||
       nbw <= 0 ||
       ndegree < 0 ||
-      (ndegree > 0 && ndegree != np_regression_nomad_shadow.num_reg_continuous) ||
+      (ndegree > 0 && ndegree != np_regression_prepared.num_continuous) ||
       XLENGTH(bbin_i) != n ||
       XLENGTH(lower_r) != n ||
       XLENGTH(upper_r) != n ||
@@ -5041,16 +4570,16 @@ SEXP C_np_regression_nomad_shadow_native_search(SEXP x0,
   best_bw_d = R_Calloc(nbw, double);
   context.raw_point = R_Calloc(n, double);
   context.eval_bw = R_Calloc(nbw, double);
-  if (np_regression_nomad_shadow.num_reg_continuous > 0)
+  if (np_regression_prepared.num_continuous > 0)
     context.degree_work = R_Calloc(
-      np_regression_nomad_shadow.num_reg_continuous, int);
+      np_regression_prepared.num_continuous, int);
   if (ndegree > 0) {
     best_degree_i = R_Calloc(ndegree, int);
     first_degree_i = R_Calloc(ndegree, int);
   }
   if (solution == NULL || best_point == NULL || best_bw_d == NULL ||
       context.raw_point == NULL || context.eval_bw == NULL ||
-      (np_regression_nomad_shadow.num_reg_continuous > 0 &&
+      (np_regression_prepared.num_continuous > 0 &&
        context.degree_work == NULL) ||
       (ndegree > 0 && (best_degree_i == NULL || first_degree_i == NULL))) {
     if (solution != NULL) R_Free(solution);
@@ -5146,7 +4675,7 @@ SEXP C_np_regression_nomad_shadow_native_search(SEXP x0,
   nomad_degree_progress_active = (context.ndegree > 0);
   bwm_objective_cache_callback_option_begin(objective_cache_enabled);
   status = np_nomad_solve_with_progress(&problem,
-                                        np_regression_shadow_native_search_callback,
+                                        np_regression_prepared_native_search_callback,
                                         &context,
                                         &progress_spec,
                                         &result);
@@ -5256,9 +4785,9 @@ SEXP C_np_regression_nomad_shadow_native_search(SEXP x0,
   return out;
 }
 
-SEXP C_np_regression_nomad_shadow_clear(void)
+SEXP C_np_regression_prepared_clear(void)
 {
-  np_regression_nomad_shadow_clear_internal();
+  np_regression_prepared_clear_internal();
   return R_NilValue;
 }
 
@@ -18905,10 +18434,12 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   prepared_context->lsq_q = vector_lsq_q_extern;
 	
   num_categories_extern = alloc_vecu(num_reg_unordered_extern+num_reg_ordered_extern);
-  matrix_y = alloc_matd(num_search_var + 1, num_search_var +1);
+  matrix_y = prepare_only ? NULL :
+    alloc_matd(num_search_var + 1, num_search_var + 1);
   vector_scale_factor = alloc_vecd(num_state_var + 1);
-  vector_scale_factor_startbest = alloc_vecd(num_search_var + 1);
-  vsfh = alloc_vecd(num_search_var + 1);
+  vector_scale_factor_startbest = prepare_only ? NULL :
+    alloc_vecd(num_search_var + 1);
+  vsfh = prepare_only ? NULL : alloc_vecd(num_search_var + 1);
   matrix_categorical_vals_extern = alloc_matd(num_obs_train_extern, num_reg_unordered_extern + num_reg_ordered_extern);
   prepared_context->num_categories = num_categories_extern;
   prepared_context->powell_directions = matrix_y;
@@ -19133,54 +18664,56 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
       MIN(MAX(lsq_delta_start, lsq_delta_lower + DBL_EPSILON),
           lsq_delta_upper - DBL_EPSILON);
 
-  initialize_nr_vector_scale_factor(BANDWIDTH_reg_extern,
-                                    0,                /* Not Random (0) Random (1) */
-                                    int_RANDOM_SEED,
-                                    int_LARGE_SF,
-                                    num_obs_train_extern,
-                                    0,
-                                    0,
-                                    0,
-                                    num_reg_continuous_extern,
-                                    num_reg_unordered_extern,
-                                    num_reg_ordered_extern,
-                                    0,
-                                    KERNEL_reg_unordered_extern,
-                                    0,
-                                    scale_cat,
-                                    pow((double)4.0/(double)3.0,0.2),             /* Init for continuous vars */
-                                    nconfac_extern, ncatfac_extern,
-                                    num_categories_extern,
-                                    vector_continuous_stddev,
-                                    vsfh,
-                                    lbc_init, hbc_init, c_init, 
-                                    lbd_init, hbd_init, d_init,
-                                    matrix_X_continuous_train_extern,
-                                    matrix_Y_continuous_train_extern);
+  if(!prepare_only){
+    initialize_nr_vector_scale_factor(BANDWIDTH_reg_extern,
+                                      0,                /* Not Random (0) Random (1) */
+                                      int_RANDOM_SEED,
+                                      int_LARGE_SF,
+                                      num_obs_train_extern,
+                                      0,
+                                      0,
+                                      0,
+                                      num_reg_continuous_extern,
+                                      num_reg_unordered_extern,
+                                      num_reg_ordered_extern,
+                                      0,
+                                      KERNEL_reg_unordered_extern,
+                                      0,
+                                      scale_cat,
+                                      pow((double)4.0/(double)3.0,0.2),
+                                      nconfac_extern, ncatfac_extern,
+                                      num_categories_extern,
+                                      vector_continuous_stddev,
+                                      vsfh,
+                                      lbc_init, hbc_init, c_init,
+                                      lbd_init, hbd_init, d_init,
+                                      matrix_X_continuous_train_extern,
+                                      matrix_Y_continuous_train_extern);
 
-  initialize_nr_directions(BANDWIDTH_reg_extern,
-                           num_obs_train_extern,
-                           num_reg_continuous_extern,
-                           num_reg_unordered_extern,
-                           num_reg_ordered_extern,
-                           0,
-                           0,
-                           0,
-                           vsfh,
-                           num_categories_extern,
-                           matrix_y,
-                           0, int_RANDOM_SEED, 
-                           lbc_dir, dfc_dir, c_dir, initc_dir,
-                           lbd_dir, hbd_dir, d_dir, initd_dir,
-                           matrix_X_continuous_train_extern,
-                           matrix_Y_continuous_train_extern);
-  if(lsq_check_mode){
-    for(i = 1; i <= num_search_var; i++){
-      matrix_y[i][num_var + 1] = 0.0;
-      matrix_y[num_var + 1][i] = 0.0;
+    initialize_nr_directions(BANDWIDTH_reg_extern,
+                             num_obs_train_extern,
+                             num_reg_continuous_extern,
+                             num_reg_unordered_extern,
+                             num_reg_ordered_extern,
+                             0,
+                             0,
+                             0,
+                             vsfh,
+                             num_categories_extern,
+                             matrix_y,
+                             0, int_RANDOM_SEED,
+                             lbc_dir, dfc_dir, c_dir, initc_dir,
+                             lbd_dir, hbd_dir, d_dir, initd_dir,
+                             matrix_X_continuous_train_extern,
+                             matrix_Y_continuous_train_extern);
+    if(lsq_check_mode){
+      for(i = 1; i <= num_search_var; i++){
+        matrix_y[i][num_var + 1] = 0.0;
+        matrix_y[num_var + 1][i] = 0.0;
+      }
+      matrix_y[num_var + 1][num_var + 1] =
+        0.25*(lsq_delta_upper - lsq_delta_lower);
     }
-    matrix_y[num_var + 1][num_var + 1] =
-      0.25*(lsq_delta_upper - lsq_delta_lower);
   }
 
 

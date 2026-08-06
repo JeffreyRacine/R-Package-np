@@ -992,31 +992,31 @@ npregbw.rbandwidth <-
   )
 }
 
-npRmpiNomadShadowPrepareRegression <- function(runo,
-                                               rord,
-                                               rcon,
-                                               yvec,
-                                               mysd,
-                                               myopti,
-                                               myoptd,
-                                               rbw,
-                                               penalty.mode,
-                                               penalty.multiplier,
-                                               degree,
-                                               bernstein,
-                                               basis,
-                                               degree.search,
-                                               ckerlb,
-                                               ckerub) {
+npRmpiPreparedObjectivePrepareRegression <- function(runo,
+                                                      rord,
+                                                      rcon,
+                                                      yvec,
+                                                      mysd,
+                                                      myopti,
+                                                      myoptd,
+                                                      rbw,
+                                                      penalty.mode,
+                                                      penalty.multiplier,
+                                                      degree,
+                                                      bernstein,
+                                                      basis,
+                                                      degree.search,
+                                                      ckerlb,
+                                                      ckerub) {
   if (length(myoptd) <= 18L) {
     rank <- tryCatch(as.integer(mpi.comm.rank(1L)), error = function(e) 0L)
     if (isTRUE(rank == 0L))
-      stop("resident npreg NOMAD shadow options are missing the scale-factor search lower bound", call. = FALSE)
+      stop("prepared npreg objective options are missing the scale-factor search lower bound", call. = FALSE)
     return(FALSE)
   }
 
   ok <- .Call(
-    "C_np_regression_nomad_shadow_prepare",
+    "C_np_regression_prepared_prepare",
     runo,
     rord,
     rcon,
@@ -1041,33 +1041,33 @@ npRmpiNomadShadowPrepareRegression <- function(runo,
 
   rank <- tryCatch(as.integer(mpi.comm.rank(1L)), error = function(e) 0L)
   if (isTRUE(rank == 0L))
-    stop("failed to prepare resident npreg NOMAD shadow state", call. = FALSE)
+    stop("failed to prepare npreg objective state", call. = FALSE)
 
   FALSE
 }
 
-npRmpiNomadShadowEvalRegression <- function(bw, degree) {
+npRmpiPreparedObjectiveEvalRegression <- function(bw, degree) {
   .Call(
-    "C_np_regression_nomad_shadow_eval",
+    "C_np_regression_prepared_eval",
     bw,
     degree,
     PACKAGE = "npRmpi"
   )
 }
 
-npRmpiNomadShadowNativeSearchRegression <- function(x0,
-                                                    bbin,
-                                                    lb,
-                                                    ub,
-                                                    decode.scale,
-                                                    point.upper,
-                                                    max.eval = 0L,
-                                                    random.seed = 42L,
-                                                    inner.start.count = 0L,
-                                                    option.names = character(),
-                                                    option.values = character()) {
+npRmpiPreparedObjectiveNativeSearchRegression <- function(x0,
+                                                           bbin,
+                                                           lb,
+                                                           ub,
+                                                           decode.scale,
+                                                           point.upper,
+                                                           max.eval = 0L,
+                                                           random.seed = 42L,
+                                                           inner.start.count = 0L,
+                                                           option.names = character(),
+                                                           option.values = character()) {
   native.call <- .np_nomad_capture_solver_output(.Call(
-    "C_np_regression_nomad_shadow_native_search",
+    "C_np_regression_prepared_native_search",
     as.double(x0),
     as.integer(bbin),
     as.double(lb),
@@ -1084,11 +1084,11 @@ npRmpiNomadShadowNativeSearchRegression <- function(x0,
   .np_nomad_native_call_value(native.call)
 }
 
-npRmpiNomadShadowClearRegression <- function() {
-  .Call("C_np_regression_nomad_shadow_clear", PACKAGE = "npRmpi")
+npRmpiPreparedObjectiveClearRegression <- function() {
+  .Call("C_np_regression_prepared_clear", PACKAGE = "npRmpi")
 }
 
-.npregbw_nomad_shadow_template <- function(template) {
+.npregbw_prepared_template <- function(template) {
   template[c("bw", "icon", "iuno", "iord", "scaling", "method", "type", "regtype")]
 }
 
@@ -1236,7 +1236,7 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
   )
 }
 
-.npregbw_nomad_shadow_prepare_args <- function(xdat,
+.npregbw_prepared_args <- function(xdat,
                                                ydat,
                                                bws,
                                                start.bw = NULL,
@@ -1387,20 +1387,20 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
   )
 }
 
-.npregbw_nomad_shadow_begin <- function(xdat,
-                                        ydat,
-                                        bws,
-                                        start.bw = NULL,
-                                        invalid.penalty = c("baseline", "dbmax"),
-                                        penalty.multiplier = 10,
-                                        comm = 1L,
-                                        broadcast = TRUE) {
+.npregbw_prepared_begin <- function(xdat,
+                                    ydat,
+                                    bws,
+                                    start.bw = NULL,
+                                    invalid.penalty = c("baseline", "dbmax"),
+                                    penalty.multiplier = 10,
+                                    comm = 1L,
+                                    broadcast = TRUE) {
   if (!is.null(start.bw) &&
       (is.null(bws$bw) || length(bws$bw) != dim(toFrame(xdat))[2L])) {
     bws$bw <- as.numeric(start.bw)
   }
 
-  prep <- .npregbw_nomad_shadow_prepare_args(
+  prep <- .npregbw_prepared_args(
     xdat = xdat,
     ydat = ydat,
     bws = bws,
@@ -1410,7 +1410,7 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
   )
 
   mc <- substitute(
-    get("npRmpiNomadShadowPrepareRegression", envir = asNamespace("npRmpi"), inherits = FALSE)(
+    get("npRmpiPreparedObjectivePrepareRegression", envir = asNamespace("npRmpi"), inherits = FALSE)(
       RUNO,
       RORD,
       RCON,
@@ -1463,10 +1463,10 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
   )
 }
 
-.npregbw_nomad_shadow_eval <- function(shadow, bw, degree, broadcast = TRUE) {
-  flat.bw <- c(bw[shadow$icon], bw[shadow$iuno], bw[shadow$iord])
+.npregbw_prepared_eval <- function(prepared, bw, degree, broadcast = TRUE) {
+  flat.bw <- c(bw[prepared$icon], bw[prepared$iuno], bw[prepared$iord])
   mc <- substitute(
-    get("npRmpiNomadShadowEvalRegression", envir = asNamespace("npRmpi"), inherits = FALSE)(
+    get("npRmpiPreparedObjectiveEvalRegression", envir = asNamespace("npRmpi"), inherits = FALSE)(
       BW,
       DEGREE
     ),
@@ -1477,19 +1477,19 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
   )
 
   if (isTRUE(broadcast)) {
-    as.numeric(.npRmpi_bcast_cmd_expr(mc, comm = shadow$comm, caller.execute = TRUE))
+    as.numeric(.npRmpi_bcast_cmd_expr(mc, comm = prepared$comm, caller.execute = TRUE))
   } else {
     as.numeric(eval(mc, envir = parent.frame()))
   }
 }
 
-.npregbw_nomad_shadow_end <- function(shadow, broadcast = TRUE) {
-  if (is.null(shadow) || !isTRUE(shadow$active))
+.npregbw_prepared_end <- function(prepared, broadcast = TRUE) {
+  if (is.null(prepared) || !isTRUE(prepared$active))
     return(invisible(NULL))
 
-  mc <- quote(get("npRmpiNomadShadowClearRegression", envir = asNamespace("npRmpi"), inherits = FALSE)())
+  mc <- quote(get("npRmpiPreparedObjectiveClearRegression", envir = asNamespace("npRmpi"), inherits = FALSE)())
   if (isTRUE(broadcast)) {
-    .npRmpi_bcast_cmd_expr(mc, comm = shadow$comm, caller.execute = TRUE)
+    .npRmpi_bcast_cmd_expr(mc, comm = prepared$comm, caller.execute = TRUE)
   } else {
     eval(mc, envir = parent.frame())
   }
@@ -1700,7 +1700,7 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
     if (active.pool && !called.from.bcast) {
       .npRmpi_bcast_cmd_expr(quote(invisible(NULL)), comm = 1L, caller.execute = TRUE)
     }
-    shadow <- .npregbw_nomad_shadow_begin(
+    prepared <- .npregbw_prepared_begin(
       xdat = xdat,
       ydat = ydat,
       bws = template,
@@ -1710,8 +1710,8 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
       comm = 1L,
       broadcast = active.pool && !called.from.bcast
     )
-    on.exit(.npregbw_nomad_shadow_end(
-      shadow,
+    on.exit(.npregbw_prepared_end(
+      prepared,
       broadcast = active.pool && !called.from.bcast
     ), add = TRUE)
     native.decode.scale <- .npregbw_nomad_native_decode_scale(template, setup)
@@ -1726,7 +1726,7 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
     for (i in seq_len(nrow(native.start.matrix))) {
       native.start <- proc.time()[3L]
       native.call <- substitute(
-        get("npRmpiNomadShadowNativeSearchRegression", envir = asNamespace("npRmpi"), inherits = FALSE)(
+        get("npRmpiPreparedObjectiveNativeSearchRegression", envir = asNamespace("npRmpi"), inherits = FALSE)(
           X0,
           BBIN,
           LB,
@@ -1799,12 +1799,12 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
       storage.length = length(template[["bw"]]),
       where = "native npreg NOMAD route"
     )
-    if (!is.null(shadow) && isTRUE(shadow$active)) {
-      .npregbw_nomad_shadow_end(
-        shadow,
+    if (!is.null(prepared) && isTRUE(prepared$active)) {
+      .npregbw_prepared_end(
+        prepared,
         broadcast = active.pool && !called.from.bcast
       )
-      shadow$active <- FALSE
+      prepared$active <- FALSE
     }
     native.record <- list(
       eval_id = as.integer(native.best$native$compiled_callback_calls[1L]),
@@ -2114,7 +2114,7 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
   .np_nomad_bw_storage_to_point(bws = bws, template = template, setup = setup)
 }
 
-npRmpiNomadShadowSearchRegression <- function(template,
+npRmpiNomadPreparedSearchRegression <- function(template,
                                               setup,
                                               prep,
                                               degree.search,
@@ -2149,7 +2149,7 @@ npRmpiNomadShadowSearchRegression <- function(template,
 
   ncon <- length(setup$cont_idx)
   ncat <- length(setup$cat_idx)
-  prepared <- npRmpiNomadShadowPrepareRegression(
+  prepared <- npRmpiPreparedObjectivePrepareRegression(
     runo = prep$runo,
     rord = prep$rord,
     rcon = prep$rcon,
@@ -2180,7 +2180,7 @@ npRmpiNomadShadowSearchRegression <- function(template,
   mpi.barrier(1L)
   on.exit({
     mpi.barrier(1L)
-    npRmpiNomadShadowClearRegression()
+    npRmpiPreparedObjectiveClearRegression()
   }, add = TRUE)
   nomad.num.feval.total <- 0
   nomad.num.feval.fast.total <- 0
@@ -2191,7 +2191,7 @@ npRmpiNomadShadowSearchRegression <- function(template,
     degree <- .np_degree_clip_to_grid(degree, degree.search$candidates)
     bw_vec <- .npregbw_nomad_point_to_bw(point[seq_len(ncon + ncat)], template = template, setup = setup)
     flat.bw <- c(bw_vec[template$icon], bw_vec[template$iuno], bw_vec[template$iord])
-    out <- npRmpiNomadShadowEvalRegression(
+    out <- npRmpiPreparedObjectiveEvalRegression(
       bw = as.double(flat.bw),
       degree = as.integer(degree)
     )
@@ -2218,7 +2218,7 @@ npRmpiNomadShadowSearchRegression <- function(template,
     native.inner.nmulti <- npValidateNonNegativeInteger(nomad.inner.nmulti, "nomad.inner.nmulti")
     native.inner.nmulti <- as.integer(native.inner.nmulti[1L])
 
-    shadow.bw.bounds <- list(
+    prepared.bw.bounds <- list(
       lower = lb[seq_len(ncon + ncat)],
       upper = ub[seq_len(ncon + ncat)],
       bbin = bbin[seq_len(ncon + ncat)],
@@ -2228,7 +2228,7 @@ npRmpiNomadShadowSearchRegression <- function(template,
     native.nomad.opts <- .np_nomad_prepare_solver_opts(
       random.seed = random.seed,
       nomad.opts = nomad.opts,
-      coordinate.roles = .np_nomad_coordinate_roles(shadow.bw.bounds, degree.search),
+      coordinate.roles = .np_nomad_coordinate_roles(prepared.bw.bounds, degree.search),
       expected.length = length(lb),
       geometry.policy = "generate-central",
       where = "npregbw native NOMAD degree source geometry"
@@ -2283,7 +2283,7 @@ npRmpiNomadShadowSearchRegression <- function(template,
         eval_offset = native.callback.total
       )
       native.start <- proc.time()[3L]
-      native <- npRmpiNomadShadowNativeSearchRegression(
+      native <- npRmpiPreparedObjectiveNativeSearchRegression(
         x0 = as.numeric(start),
         bbin = as.integer(bbin),
         lb = as.double(lb),
@@ -2683,7 +2683,7 @@ npRmpiNomadShadowSearchRegression <- function(template,
   if (.npRmpi_has_active_slave_pool(comm = 1L) &&
       !isTRUE(getOption("npRmpi.local.regression.mode", FALSE))) {
     start.bw <- .npregbw_nomad_point_to_bw(x0[seq_len(ncon + ncat)], template = template, setup = setup)
-    prep <- .npregbw_nomad_shadow_prepare_args(
+    prep <- .npregbw_prepared_args(
       xdat = xdat,
       ydat = ydat,
       bws = template,
@@ -2692,9 +2692,9 @@ npRmpiNomadShadowSearchRegression <- function(template,
       penalty.multiplier = if (is.null(opt.args$penalty.multiplier)) 10 else opt.args$penalty.multiplier
     )
 
-    shadow.template <- .npregbw_nomad_shadow_template(template)
+    prepared.template <- .npregbw_prepared_template(template)
     mc <- substitute(
-      get("npRmpiNomadShadowSearchRegression", envir = asNamespace("npRmpi"), inherits = FALSE)(
+      get("npRmpiNomadPreparedSearchRegression", envir = asNamespace("npRmpi"), inherits = FALSE)(
         TEMPLATE,
         SETUP,
         PREP,
@@ -2715,7 +2715,7 @@ npRmpiNomadShadowSearchRegression <- function(template,
           PROGRESSLABEL
         ),
         list(
-          TEMPLATE = shadow.template,
+          TEMPLATE = prepared.template,
           SETUP = setup,
         PREP = prep,
         DEGREESEARCH = degree.search,
@@ -2792,7 +2792,7 @@ npRmpiNomadShadowSearchRegression <- function(template,
   .np_nomad_baseline_note(degree.search$start.degree)
 
   start.bw <- .npregbw_nomad_point_to_bw(x0[seq_len(ncon + ncat)], template = template, setup = setup)
-  prep <- .npregbw_nomad_shadow_prepare_args(
+  prep <- .npregbw_prepared_args(
     xdat = xdat,
     ydat = ydat,
     bws = template,
@@ -2807,7 +2807,7 @@ npRmpiNomadShadowSearchRegression <- function(template,
     degree <- .np_degree_clip_to_grid(degree, degree.search$candidates)
     bw_vec <- .npregbw_nomad_point_to_bw(point[seq_len(ncon + ncat)], template = template, setup = setup)
     flat.bw <- c(bw_vec[template$icon], bw_vec[template$iuno], bw_vec[template$iord])
-    ## The local evaluator has no resident shadow to refresh. Derive its
+    ## The local evaluator has no retained prepared state to refresh. Derive its
     ## scalar/general LP owner from this evaluated degree by the same canonical
     ## rule used by the collective native callback.
     eval.myopti <- prep$myopti
