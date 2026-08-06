@@ -1157,8 +1157,8 @@ double **matrix_Y_continuous_eval_extern;
 double **matrix_Y_unordered_eval_extern;
 double **matrix_Y_ordered_eval_extern;
 
-int *vector_X_support_count_extern = NULL;
-int *vector_Y_support_count_extern = NULL;
+static int *vector_X_support_count_extern = NULL;
+static int *vector_Y_support_count_extern = NULL;
 
 enum {
   NP_SUPPORT_FAILURE_NONE = 0,
