@@ -301,6 +301,16 @@
   degree_value <- function(value) {
     if (is.null(value) || !length(value))
       return(integer(0L))
+    if (is.list(value)) {
+      out <- lapply(value, degree_value)
+      names(out) <- names(value)
+      return(out)
+    }
+    if (is.matrix(value)) {
+      out <- matrix(as.integer(value), nrow = nrow(value), ncol = ncol(value))
+      dimnames(out) <- dimnames(value)
+      return(out)
+    }
     as.integer(value)
   }
 

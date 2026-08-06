@@ -31,6 +31,24 @@ with_nprmpi_npplreg_degree_bindings <- function(bindings, code) {
   eval(code, envir = parent.frame())
 }
 
+test_that("degree-search metadata preserves structured child degrees", {
+  children <- list(yzbw = c(1, 2), x1 = c(0, 1))
+  metadata <- .np_degree_search_metadata(
+    list(
+      method = "nomad",
+      direction = "min",
+      completed = TRUE,
+      baseline = list(degree = children, objective = 2),
+      best = list(degree = children, objective = 1)
+    ),
+    default_direction = "min"
+  )
+
+  expect_identical(metadata$baseline.degree, lapply(children, as.integer))
+  expect_identical(metadata$best.degree, lapply(children, as.integer))
+  expect_identical(names(metadata$best.degree), names(children))
+})
+
 test_that("npplregbw exhaustive degree search matches manual profile minimum", {
   skip_slow_npplregbw_degree_search()
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
