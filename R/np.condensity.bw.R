@@ -549,12 +549,12 @@ npcdensbw.conbandwidth <-
     )
     .npcdensbw_assert_bounded_cvls_supported(bws, where = "npcdensbw()")
     .npRmpi_require_active_slave_pool(where = "npcdensbw()")
-    keep_local_shadow_nn <- bandwidth.compute &&
+    keep_local_prepared_nn <- bandwidth.compute &&
       identical(spec$regtype.engine, "lp") &&
       identical(bws$method %in% c("cv.ml", "cv.ls"), TRUE) &&
       identical(bws$type %in% c("generalized_nn", "adaptive_nn"), TRUE)
     if (.npRmpi_autodispatch_active() &&
-        !keep_local_shadow_nn)
+        !keep_local_prepared_nn)
       return(.npRmpi_autodispatch_call(
         .npRmpi_autodispatch_expand_dots_call(match.call(expand.dots = FALSE)),
         parent.frame()))
@@ -706,7 +706,7 @@ npcdensbw.conbandwidth <-
                                                     extend.factor = tbw$cvls.quadrature.extend.factor)
 
       if (bws$method != "normal-reference"){
-        myout <- if (keep_local_shadow_nn) {
+        myout <- if (keep_local_prepared_nn) {
             .npRmpi_with_local_regression(
               .Call("C_np_density_conditional_bw",
                     as.double(yuno), as.double(yord), as.double(ycon),
@@ -2708,8 +2708,8 @@ npRmpiPreparedObjectiveSearchConditionalDensity <- function(template,
     }
     if (!isTRUE(prepared))
       stop("failed to prepare native npcdens fixed-degree route", call. = FALSE)
-    shadow.active <- TRUE
-    clear_shadow <- function() {
+    prepared.active <- TRUE
+    destroy_prepared <- function() {
       clear.call <- quote(
         get("npRmpiPreparedObjectiveDestroyConditionalDensity", envir = asNamespace("npRmpi"), inherits = FALSE)()
       )
@@ -2721,8 +2721,8 @@ npRmpiPreparedObjectiveSearchConditionalDensity <- function(template,
       invisible(NULL)
     }
     on.exit({
-      if (isTRUE(shadow.active))
-        clear_shadow()
+      if (isTRUE(prepared.active))
+        destroy_prepared()
     }, add = TRUE)
 
     native.results <- vector("list", nrow(native.start.matrix))
@@ -2830,9 +2830,9 @@ npRmpiPreparedObjectiveSearchConditionalDensity <- function(template,
     native.best <- native.results[[native.best.index]]
     native.handoff.point <- as.numeric(native.best$best_point)
     native.bw <- .npcdensbw_nomad_point_to_bw(native.handoff.point[seq_len(bwdim)], template = template, setup = setup)
-    if (isTRUE(shadow.active)) {
-      clear_shadow()
-      shadow.active <- FALSE
+    if (isTRUE(prepared.active)) {
+      destroy_prepared()
+      prepared.active <- FALSE
     }
     native.record <- list(
       eval_id = as.integer(native.best$native$compiled_callback_calls[1L]),
@@ -3278,7 +3278,7 @@ npRmpiPreparedObjectiveSearchConditionalDensity <- function(template,
       penalty.multiplier = if (is.null(opt.args$penalty.multiplier)) 10 else opt.args$penalty.multiplier,
       degree.search = TRUE
     )
-    # Workers only need the fields consumed by the shadow NOMAD search.
+    # Workers only need the fields consumed by the prepared native search.
     search.template <- list(
       method = template$method,
       type = template$type,
@@ -3977,12 +3977,12 @@ npcdensbw.default <-
     if (is.null(degree.search)) {
       tbw <- do.call(conbandwidth, bw.args)
       .npRmpi_require_active_slave_pool(where = "npcdensbw()")
-      keep_local_shadow_nn <- bandwidth.compute &&
+      keep_local_prepared_nn <- bandwidth.compute &&
         identical(tbw$regtype.engine, "lp") &&
         identical(tbw$method %in% c("cv.ml", "cv.ls"), TRUE) &&
         identical(tbw$type %in% c("generalized_nn", "adaptive_nn"), TRUE)
       if (.npRmpi_autodispatch_active() &&
-          !keep_local_shadow_nn)
+          !keep_local_prepared_nn)
         return(.npRmpi_autodispatch_call(
           .npRmpi_autodispatch_expand_dots_call(match.call(expand.dots = FALSE)),
           parent.frame()))

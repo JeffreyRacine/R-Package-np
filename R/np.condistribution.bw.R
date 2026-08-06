@@ -1882,7 +1882,7 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
   )
 }
 
-npRmpiNomadShadowSearchConditionalDistribution <- function(xdat,
+npRmpiPreparedSearchConditionalDistribution <- function(xdat,
                                                            ydat,
                                                            template,
                                                            setup,
@@ -2562,7 +2562,7 @@ npRmpiNomadShadowSearchConditionalDistribution <- function(xdat,
     )
 
     mc <- substitute(
-      get("npRmpiNomadShadowSearchConditionalDistribution", envir = asNamespace("npRmpi"), inherits = FALSE)(
+      get("npRmpiPreparedSearchConditionalDistribution", envir = asNamespace("npRmpi"), inherits = FALSE)(
         XDAT,
         YDAT,
         TEMPLATE,
@@ -2643,7 +2643,7 @@ npRmpiNomadShadowSearchConditionalDistribution <- function(xdat,
   local.inner.nmulti <- npValidateNonNegativeInteger(nomad.inner.nmulti, "nomad.inner.nmulti")
   if (.npcdistbw_nomad_degree_native_target(template, degree.search) &&
       as.integer(local.inner.nmulti[1L]) <= 1L) {
-    search.result <- npRmpiNomadShadowSearchConditionalDistribution(
+    search.result <- npRmpiPreparedSearchConditionalDistribution(
       xdat = xdat,
       ydat = ydat,
       template = template,

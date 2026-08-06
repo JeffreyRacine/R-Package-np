@@ -661,13 +661,13 @@ npcdens.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
       !.npRmpi_session_has_active_pool(comm = 1L)) {
     return(.npRmpi_with_local_regression(.npRmpi_eval_without_dispatch(match.call(), parent.frame())))
   }
-  keep_local_shadow_nn <- (identical(regtype.request[1L], "lp") ||
+  keep_local_prepared_nn <- (identical(regtype.request[1L], "lp") ||
     identical(regtype.request[1L], "ll")) &&
     identical(bwtype.request[1L] %in% c("generalized_nn", "adaptive_nn"), TRUE)
   if (.npRmpi_autodispatch_active() &&
       !npNomadControlRequested(nomad) &&
       !uses.nomad.degree.search &&
-      !keep_local_shadow_nn &&
+      !keep_local_prepared_nn &&
       !bws.formula &&
       !txdat.formula &&
       !dots.formula)
