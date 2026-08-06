@@ -1,5 +1,10 @@
 # npRmpi 0.70-6
 
+* `npindexbw()` now canonicalizes its numeric design matrix once at the public
+  boundary and reuses that matrix during internal index and coordinate setup.
+  This removes redundant full-matrix copies before objective evaluation while
+  preserving estimator arithmetic and conditions on every rank.
+
 * Bivariate entropy integration for `npdeptest()` and `npsdeptest()` now
   evaluates the existing Gaussian integrand in one registered native callback
   on every bootstrap worker. The cubature rule, limits, tolerances,
