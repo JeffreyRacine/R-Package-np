@@ -4,7 +4,7 @@ Date: 2026-07-15
 Depends: R (>= 3.5.0)
 Imports: boot, cubature, methods, quadprog, quantreg, stats, parallel, tools, crs (>= 0.15-46)
 SystemRequirements: MPI
-Suggests: MASS, logspline, ks, testthat, np, withr, knitr, rmarkdown, rgl
+Suggests: MASS, logspline, ks, testthat, np, withr, knitr, rmarkdown, rgl, htmlwidgets
 LinkingTo: crs (>= 0.15-46)
 VignetteBuilder: knitr
 Config/testthat/edition: 3

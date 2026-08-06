@@ -7,6 +7,15 @@
   estimator arithmetic. Fit/evaluation routes and MPI-2 builds retain their
   existing blocking collectives.
 
+* Interactive `renderer = "rgl"` surfaces now use a high-DPI-aware widget
+  canvas, a higher-resolution uncertainty legend, and an initial camera more
+  closely matched to the base perspective. The renderer caps backing-store
+  scaling at two device pixels per CSS pixel, retains native rgl axis labels
+  and interaction, and preserves all existing `rgl.*` user overrides. Shared
+  rgl setup and option routing now have one internal owner across supported
+  plot families; estimator, bootstrap, interval, and base-renderer arithmetic
+  are unchanged.
+
 * `npindexbw()` now canonicalizes its numeric design matrix once at the public
   boundary and reuses that matrix during internal index and coordinate setup.
   This removes redundant full-matrix copies before objective evaluation while
