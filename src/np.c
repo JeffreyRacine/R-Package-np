@@ -6450,161 +6450,6 @@ SEXP C_np_regression_bw_eval(SEXP runo,
                                    ckerlb, ckerub, 1);
 }
 
-static double np_regression_nomad_native_invalid_penalty(double *y,
-                                                         int *myopti,
-                                                         int penalty_mode,
-                                                         double penalty_mult)
-{
-  int i;
-  double penalty = DBL_MAX;
-
-  if (y == NULL || myopti == NULL || myopti[RBW_NOBSI] <= 0)
-    return penalty;
-
-  if (penalty_mode == 1) {
-    double pmult = penalty_mult;
-    double y_mean = 0.0;
-    double mse0 = 0.0;
-
-    if (pmult < 1.0)
-      pmult = 1.0;
-
-    for (i = 0; i < myopti[RBW_NOBSI]; i++)
-      y_mean += y[i];
-    y_mean /= (double) myopti[RBW_NOBSI];
-
-    for (i = 0; i < myopti[RBW_NOBSI]; i++) {
-      const double dy = y[i] - y_mean;
-      mse0 += dy * dy;
-    }
-    mse0 /= (double) myopti[RBW_NOBSI];
-
-    if (mse0 <= 0.0)
-      mse0 = DBL_MIN;
-
-    if (myopti[RBW_MI] == RBWM_CVAIC) {
-      const double denom = 1.0 - 2.0 / ((double) myopti[RBW_NOBSI]);
-      if (denom > 0.0)
-        penalty = log(mse0) + (1.0 / denom) + log(pmult);
-    } else {
-      penalty = pmult * mse0;
-    }
-  }
-
-  return penalty;
-}
-
-static int np_regression_nomad_native_eval_once(double *runo,
-                                                double *rord,
-                                                double *rcon,
-                                                double *y,
-                                                double *mysd,
-                                                int *myopti,
-                                                double *myoptd,
-                                                const double *bw_in,
-                                                int penalty_mode,
-                                                double penalty_mult,
-                                                const int lp_engine,
-                                                int *glp_degree,
-                                                int *glp_bernstein,
-                                                int *glp_basis,
-                                                double *ckerlb,
-                                                double *ckerub,
-                                                double out[5])
-{
-  int i;
-  const int num_var = myopti[RBW_NCONI] + myopti[RBW_NUNOI] + myopti[RBW_NORDI];
-  int myopti_work[RBW_OPTIONS_COUNT];
-  int glp_bernstein_work;
-  int glp_basis_work;
-  double *bw = NULL;
-  double fval[2] = {R_NaN, R_NaN};
-  double fval_history[1] = {R_NaN};
-  double eval_history[1] = {R_NaN};
-  double invalid_history[1] = {R_NaN};
-  double timing[1] = {R_NaN};
-  double fast[1] = {R_NaN};
-  int pmode = penalty_mode;
-  double pmult = penalty_mult;
-
-  if (num_var <= 0 || bw_in == NULL || out == NULL)
-    return 1;
-  if (lp_engine != NP_LP_ENGINE_SCALAR &&
-      lp_engine != NP_LP_ENGINE_GENERAL)
-    return 1;
-
-  memcpy(myopti_work, myopti, sizeof(myopti_work));
-  myopti_work[RBW_LL] = lp_engine;
-  glp_bernstein_work =
-    (lp_engine == NP_LP_ENGINE_GENERAL) ? *glp_bernstein : 0;
-  glp_basis_work =
-    (lp_engine == NP_LP_ENGINE_GENERAL) ? *glp_basis : 1;
-
-  if (lp_engine == NP_LP_ENGINE_GENERAL &&
-      !np_glp_cv_degree_admissible_extern(myopti[RBW_NOBSI],
-                                          myopti[RBW_NCONI],
-                                          glp_degree,
-                                          glp_basis_work)) {
-    const double penalty =
-      np_regression_nomad_native_invalid_penalty(y, myopti, penalty_mode, penalty_mult);
-
-    out[0] = penalty;
-    out[1] = penalty;
-    out[2] = 1.0;
-    out[3] = 0.0;
-    out[4] = 1.0;
-    return 0;
-  }
-
-  bw = NP_NOMAD_CALLBACK_CALLOC(num_var, double);
-  if (bw == NULL)
-    return 1;
-  for (i = 0; i < num_var; i++)
-    bw[i] = bw_in[i];
-
-  np_regression_bw_mode(runo,
-                        rord,
-                        rcon,
-                        y,
-                        mysd,
-                        myopti_work,
-                        myoptd,
-                        bw,
-                        fval,
-                        fval_history,
-                        eval_history,
-                        invalid_history,
-                        timing,
-                        fast,
-                        &pmode,
-                        &pmult,
-                        glp_degree,
-                        &glp_bernstein_work,
-                        &glp_basis_work,
-                        ckerlb,
-                        ckerub,
-                        1,
-                        0,
-                        NULL,
-                        0.5,
-                        0.5,
-                        DBL_EPSILON,
-                        1.0 - DBL_EPSILON,
-                        NULL,
-                        NULL,
-                        0,
-                        0);
-
-  out[0] = fval[0];
-  out[1] = fval[1];
-  out[2] = eval_history[0];
-  out[3] = fast[0];
-  out[4] = invalid_history[0];
-
-  NP_NOMAD_CALLBACK_FREE(bw);
-  return 0;
-}
-
 typedef struct {
   int n;
   int nbw;
@@ -17913,10 +17758,12 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   prepared_context->lsq_q = vector_lsq_q_extern;
 	
   num_categories_extern = alloc_vecu(num_reg_unordered_extern+num_reg_ordered_extern);
-  matrix_y = alloc_matd(num_search_var + 1, num_search_var +1);
+  matrix_y = prepare_only ? NULL :
+    alloc_matd(num_search_var + 1, num_search_var + 1);
   vector_scale_factor = alloc_vecd(num_state_var + 1);
-  vector_scale_factor_startbest = alloc_vecd(num_search_var + 1);
-  vsfh = alloc_vecd(num_search_var + 1);
+  vector_scale_factor_startbest = prepare_only ? NULL :
+    alloc_vecd(num_search_var + 1);
+  vsfh = prepare_only ? NULL : alloc_vecd(num_search_var + 1);
   matrix_categorical_vals_extern = alloc_matd(num_obs_train_extern, num_reg_unordered_extern + num_reg_ordered_extern);
   prepared_context->num_categories = num_categories_extern;
   prepared_context->powell_directions = matrix_y;
@@ -18145,54 +17992,56 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
       MIN(MAX(lsq_delta_start, lsq_delta_lower + DBL_EPSILON),
           lsq_delta_upper - DBL_EPSILON);
 
-  initialize_nr_vector_scale_factor(BANDWIDTH_reg_extern,
-                                    0,                /* Not Random (0) Random (1) */
-                                    int_RANDOM_SEED,
-                                    int_LARGE_SF,
-                                    num_obs_train_extern,
-                                    0,
-                                    0,
-                                    0,
-                                    num_reg_continuous_extern,
-                                    num_reg_unordered_extern,
-                                    num_reg_ordered_extern,
-                                    0,
-                                    KERNEL_reg_unordered_extern,
-                                    0,
-                                    scale_cat,
-                                    pow((double)4.0/(double)3.0,0.2),             /* Init for continuous vars */
-                                    nconfac_extern, ncatfac_extern,
-                                    num_categories_extern,
-                                    vector_continuous_stddev,
-                                    vsfh,
-                                    lbc_init, hbc_init, c_init, 
-                                    lbd_init, hbd_init, d_init,
-                                    matrix_X_continuous_train_extern,
-                                    matrix_Y_continuous_train_extern);
+  if(!prepare_only){
+    initialize_nr_vector_scale_factor(BANDWIDTH_reg_extern,
+                                      0,                /* Not Random (0) Random (1) */
+                                      int_RANDOM_SEED,
+                                      int_LARGE_SF,
+                                      num_obs_train_extern,
+                                      0,
+                                      0,
+                                      0,
+                                      num_reg_continuous_extern,
+                                      num_reg_unordered_extern,
+                                      num_reg_ordered_extern,
+                                      0,
+                                      KERNEL_reg_unordered_extern,
+                                      0,
+                                      scale_cat,
+                                      pow((double)4.0/(double)3.0,0.2),
+                                      nconfac_extern, ncatfac_extern,
+                                      num_categories_extern,
+                                      vector_continuous_stddev,
+                                      vsfh,
+                                      lbc_init, hbc_init, c_init,
+                                      lbd_init, hbd_init, d_init,
+                                      matrix_X_continuous_train_extern,
+                                      matrix_Y_continuous_train_extern);
 
-  initialize_nr_directions(BANDWIDTH_reg_extern,
-                           num_obs_train_extern,
-                           num_reg_continuous_extern,
-                           num_reg_unordered_extern,
-                           num_reg_ordered_extern,
-                           0,
-                           0,
-                           0,
-                           vsfh,
-                           num_categories_extern,
-                           matrix_y,
-                           0, int_RANDOM_SEED, 
-                           lbc_dir, dfc_dir, c_dir, initc_dir,
-                           lbd_dir, hbd_dir, d_dir, initd_dir,
-                           matrix_X_continuous_train_extern,
-                           matrix_Y_continuous_train_extern);
-  if(lsq_check_mode){
-    for(i = 1; i <= num_search_var; i++){
-      matrix_y[i][num_var + 1] = 0.0;
-      matrix_y[num_var + 1][i] = 0.0;
+    initialize_nr_directions(BANDWIDTH_reg_extern,
+                             num_obs_train_extern,
+                             num_reg_continuous_extern,
+                             num_reg_unordered_extern,
+                             num_reg_ordered_extern,
+                             0,
+                             0,
+                             0,
+                             vsfh,
+                             num_categories_extern,
+                             matrix_y,
+                             0, int_RANDOM_SEED,
+                             lbc_dir, dfc_dir, c_dir, initc_dir,
+                             lbd_dir, hbd_dir, d_dir, initd_dir,
+                             matrix_X_continuous_train_extern,
+                             matrix_Y_continuous_train_extern);
+    if(lsq_check_mode){
+      for(i = 1; i <= num_search_var; i++){
+        matrix_y[i][num_var + 1] = 0.0;
+        matrix_y[num_var + 1][i] = 0.0;
+      }
+      matrix_y[num_var + 1][num_var + 1] =
+        0.25*(lsq_delta_upper - lsq_delta_lower);
     }
-    matrix_y[num_var + 1][num_var + 1] =
-      0.25*(lsq_delta_upper - lsq_delta_lower);
   }
 
 

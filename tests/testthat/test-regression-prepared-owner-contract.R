@@ -72,6 +72,13 @@ test_that("regression bandwidth state has one typed cleanup owner", {
     "np_regression_prepared_context_destroy(prepared_context);",
     fixed = TRUE
   )
+  expect_match(routine, "matrix_y = prepare_only ? NULL :", fixed = TRUE)
+  expect_match(
+    routine,
+    "vector_scale_factor_startbest = prepare_only ? NULL :",
+    fixed = TRUE
+  )
+  expect_match(routine, "if(!prepare_only){", fixed = TRUE)
 })
 
 test_that("native regression search evaluates one retained prepared state", {
@@ -91,6 +98,12 @@ test_that("native regression search evaluates one retained prepared state", {
   )
   expect_false(grepl(
     "np_regression_nomad_native_eval_once(", callback, fixed = TRUE
+  ))
+  expect_false(grepl(
+    "np_regression_nomad_native_eval_once", source, fixed = TRUE
+  ))
+  expect_false(grepl(
+    "np_regression_nomad_native_invalid_penalty", source, fixed = TRUE
   ))
   expect_false(grepl("NP_NOMAD_CALLBACK_CALLOC", callback, fixed = TRUE))
   expect_match(
