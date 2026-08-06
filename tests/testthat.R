@@ -45,6 +45,7 @@ local({
         )
         test_dir <- normalizePath("testthat", mustWork = TRUE)
         rscript <- file.path(R.home("bin"), "Rscript")
+        setsid <- unname(Sys.which("setsid"))
         statuses <- integer(shard_count)
 
         for (shard in seq_len(shard_count)) {
@@ -60,14 +61,23 @@ local({
             "NP_RMPI_TEST_SUITE_POOL=1",
             paste0("NOT_CRAN=", Sys.getenv("NOT_CRAN", unset = "true"))
           )
+          shard_command <- rscript
+          shard_args <- c(
+            "--vanilla", shard_runner,
+            as.character(shard), as.character(shard_count),
+            as.character(np_full_shard_size), as.character(np_full_nslaves),
+            shQuote(witness), shQuote(test_dir)
+          )
+          if (nzchar(setsid)) {
+            # Some MPI launchers terminate the shard's process group during
+            # their known teardown-137 path.  Give each shard its own session
+            # so that teardown cannot terminate the suite orchestrator.
+            shard_command <- setsid
+            shard_args <- c(shQuote(rscript), shard_args)
+          }
           statuses[[shard]] <- system2(
-            rscript,
-            args = c(
-              "--vanilla", shard_runner,
-              as.character(shard), as.character(shard_count),
-              as.character(np_full_shard_size), as.character(np_full_nslaves),
-              shQuote(witness), shQuote(test_dir)
-            ),
+            shard_command,
+            args = shard_args,
             stdout = "", stderr = "", env = env
           )
 
