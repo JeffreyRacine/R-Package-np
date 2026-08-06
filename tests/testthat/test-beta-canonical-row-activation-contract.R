@@ -738,7 +738,7 @@ test_that("scalar beta regression fits enter the canonical row engine", {
     fixed = TRUE
   )
   expect_match(
-    regression_engine, "np_beta_regression_lp_moment_row_canonical(",
+    regression_engine, "np_regression_general_lp_fit(&general_lp_call);",
     fixed = TRUE
   )
   expect_match(
@@ -746,7 +746,12 @@ test_that("scalar beta regression fits enter the canonical row engine", {
     fixed = TRUE
   )
   expect_match(
-    regression_sibling, "&regression_moment_context, kernel_route_diagnostics, NULL);",
+    regression_sibling,
+    ".regression_moment_context = &regression_moment_context,",
+    fixed = TRUE
+  )
+  expect_match(
+    regression_sibling, ".route_diagnostics = kernel_route_diagnostics,",
     fixed = TRUE
   )
   expect_match(
@@ -1358,17 +1363,17 @@ test_that("density bandwidth ingress owns categorical compression state", {
     "NP_BETA_BW_CONTINUOUS_ONLY,", ingress, fixed = TRUE
   )[[1L]]
   reject_hits <- reject_hits[reject_hits > 0L]
-  # Every public beta bandwidth descriptor now admits the categorical peer
-  # route.  The final two sites are conditional-distribution X and Y; P23Z
-  # removed their former continuous-only policy without removing the enum
-  # value used by the shared validator itself.
-  expect_length(allow_hits, 9L)
+  # The prepared conditional-density owner replaces its retired duplicate
+  # ingress.  Seven canonical descriptors remain: unconditional density,
+  # unconditional distribution, regression, prepared conditional-density X/Y,
+  # and conditional-distribution X/Y.
+  expect_length(allow_hits, 7L)
   expect_length(reject_hits, 0L)
   contract_hits <- gregexpr(
     "np_density_bw_integer_contract_or_error(", ingress, fixed = TRUE
   )[[1L]]
   contract_hits <- contract_hits[contract_hits > 0L]
-  expect_length(contract_hits, 4L)
+  expect_length(contract_hits, 3L)
 })
 
 test_that("every beta side enters the common conditional regression owner", {
@@ -1510,8 +1515,16 @@ test_that("every beta side enters the common conditional regression owner", {
   expect_match(
     engine, "np_regression_conditional_influence_finish(", fixed = TRUE
   )
-  expect_match(engine, "double *conditional_kw = NULL;", fixed = TRUE)
-  expect_match(engine, "double *conditional_pkw = NULL;", fixed = TRUE)
+  expect_match(engine, "double *conditional_weights;", fixed = TRUE)
+  expect_match(
+    engine, "double *conditional_permutation_weights;", fixed = TRUE
+  )
+  expect_match(
+    engine, "NPPermutationWeightOutput conditional_pkw_output =",
+    fixed = TRUE
+  )
+  expect_false(grepl("double *conditional_kw = NULL;", engine, fixed = TRUE))
+  expect_false(grepl("double *conditional_pkw = NULL;", engine, fixed = TRUE))
   expect_match(
     engine,
     "size_t pkw_plane = 0;",
@@ -1601,7 +1614,12 @@ test_that("canonical beta regression moments preserve the sidecar transcript", {
   ))
   expect_match(
     influence_owner,
-    "weight * (response[observation] - weighted_mean)",
+    "const double residual = response[observation] - weighted_mean;",
+    fixed = TRUE
+  )
+  expect_match(
+    influence_owner,
+    "const double influence = weight * residual;",
     fixed = TRUE
   )
   expect_match(

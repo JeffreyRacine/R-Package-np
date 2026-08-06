@@ -90,7 +90,7 @@ test_that("retired density selectors cannot restore a second engine", {
   )
   expect_match(
     native,
-    "C_np_density_conditional_bw: reserved legacy selector must be zero",
+    "C_np_density_conditional_prepared_native_search: reserved legacy selector must be zero",
     fixed = TRUE
   )
   expect_match(

@@ -317,12 +317,22 @@ test_that("canonical LP fit and evaluation avoid legacy solve marshalling", {
     fixed = TRUE
   ))
   expect_true(grepl(
-    "call->gradient[l][j] +=\n            owner->eval_derivative[i]*owner->coefficient[i];",
+    "call->gradient[l][j] += direction[i]*owner->coefficient[i];",
     helper_body,
     fixed = TRUE
   ))
   expect_true(grepl(
-    "owner->solve_workspace.rhs_work[\n            i+ii*owner->nterms]*owner->eval_basis[ii]",
+    "owner->solve_workspace.rhs_source[i] = owner->eval_basis[i];",
+    helper_body,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
+    "np_lp_solve_workspace_solve_factored(&owner->solve_workspace,",
+    helper_body,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
+    "np_lp_variance_quadratic(",
     helper_body,
     fixed = TRUE
   ))

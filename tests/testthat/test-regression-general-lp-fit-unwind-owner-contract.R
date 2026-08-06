@@ -63,7 +63,7 @@ test_that("main general-LP fit branch has one complete unwind owner", {
   )
   for (resource in c(
     "response_columns", "basis_columns", "squared_response", "moments",
-    "power2_moments", "retained_kernel_row", "coefficient", "projection",
+    "power2_moments", "retained_kernel_row", "coefficient",
     "power2_projection", "eval_basis", "eval_derivative", "terms"
   )) {
     expect_equal(
@@ -76,6 +76,12 @@ test_that("main general-LP fit branch has one complete unwind owner", {
       info = resource
     )
   }
+  expect_false(grepl("double *projection;", region, fixed = TRUE))
+  expect_match(
+    region,
+    "np_lp_solve_workspace_solve_factored(&owner->solve_workspace,",
+    fixed = TRUE
+  )
   expect_equal(
     sum(gregexpr(
       "np_regression_general_lp_fit(&general_lp_call)",
