@@ -723,7 +723,11 @@ npindexbw.NULL <-
     stop("internal error: invalid npindex regression-leaf bandwidth state", call. = FALSE)
 
   .npindexbw_prepare_lp_regression_leaf_descriptor(
-    index = drop(xmat %*% beta),
+    ## The single-index identification contract fixes beta[1] at one.  A
+    ## bandwidth object's pre-search placeholder can still contain zero in
+    ## that slot, so do not let the prepared descriptor see a spurious
+    ## constant index (which is invalid for ckerbound = "range").
+    index = .npindex_index_from_beta_tail(xmat, beta[-1L]),
     ydat = ydat,
     h = h,
     bws = bws,
