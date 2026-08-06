@@ -4040,6 +4040,20 @@ npFormat <- function(x){
   format(sapply(x,format))
 }
 
+.np_match_arg_named <- function(arg, choices, arg.name) {
+  tryCatch(
+    match.arg(arg, choices),
+    error = function(condition) {
+      condition$message <- sub(
+        "'arg'", sprintf("'%s'", arg.name),
+        conditionMessage(condition), fixed = TRUE
+      )
+      condition$call <- call("match.arg", as.name(arg.name))
+      stop(condition)
+    }
+  )
+}
+
 genBwContinuousKerLines <- function(x, vari, ncon) {
   active <- which(ncon > 0)
   if (!length(active))
