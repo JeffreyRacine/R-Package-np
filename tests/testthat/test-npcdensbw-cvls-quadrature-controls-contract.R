@@ -118,7 +118,7 @@ test_that("npcdensbw stores cv.ls quadrature controls and old objects use defaul
   expect_true(is.finite(npRmpi:::.npcdensbw_eval_only(dat$x, dat$y, bw_old)$objective))
 })
 
-test_that("resident npcdens NOMAD shadow accepts cv.ls quadrature controls", {
+test_that("resident npcdens prepared objective accepts cv.ls quadrature controls", {
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   old_opts <- options(npRmpi.autodispatch = FALSE)
@@ -131,7 +131,7 @@ test_that("resident npcdens NOMAD shadow accepts cv.ls quadrature controls", {
     cvls.quadrature.points = c(41L, 17L),
     cvls.quadrature.extend.factor = 1.5
   )
-  prep <- npRmpi:::.npcdensbw_nomad_shadow_prepare_args(
+  prep <- npRmpi:::.npcdensbw_prepared_prepare_args(
     xdat = dat$x,
     ydat = dat$y,
     bws = bw,
@@ -148,7 +148,7 @@ test_that("resident npcdens NOMAD shadow accepts cv.ls quadrature controls", {
   expect_equal(prep$myoptd[[24L]], bw$cvls.quadrature.ratios[[3L]])
 
   prepare_body <- paste(
-    deparse(body(npRmpi:::npRmpiNomadShadowPrepareConditionalDensity)),
+    deparse(body(npRmpi:::npRmpiPreparedObjectivePrepareConditionalDensity)),
     collapse = "\n"
   )
   expect_match(prepare_body, "length\\(myoptd\\) <= 23L")

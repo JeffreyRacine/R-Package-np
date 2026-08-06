@@ -459,7 +459,7 @@ test_that("every MPI native NOMAD-to-Powell family uses the canonical refinement
     ".npindexbw_nomad_search",
     ".npscoefbw_nomad_search",
     ".nplsqreg_nomad_search",
-    "npRmpiNomadShadowSearchConditionalDensity"
+    "npRmpiPreparedObjectiveSearchConditionalDensity"
   )
 
   for (fn_name in family_functions) {

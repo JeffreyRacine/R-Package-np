@@ -142,7 +142,7 @@ extern  int iNum_Processors;
 extern  int iSeed_my_rank;
 extern  MPI_Status status;
 extern MPI_Comm	*comm;
-extern int int_conditional_nomad_shadow_extern;
+extern int int_conditional_prepared_context_extern;
 
 typedef struct {
   int chunk_start;
@@ -32330,7 +32330,7 @@ int np_conditional_density_cvml_lp_stream(double *vector_scale_factor,
   const int use_parallel_rows =
     (iNum_Processors > 1) &&
     !np_mpi_local_regression_active() &&
-    !int_conditional_nomad_shadow_extern;
+    !int_conditional_prepared_context_extern;
 #else
   const int use_parallel_rows = 0;
 #endif

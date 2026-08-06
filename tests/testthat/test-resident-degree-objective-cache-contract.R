@@ -66,21 +66,21 @@ test_that("prepared regression and resident density bound degree-key writes", {
     "prepared_context->degree_key_len = degree_search ?",
     fixed = TRUE
   )
-  expect_match(text, "np_conditional_density_nomad_shadow\\.degree_key_len = degree_key_len")
+  expect_match(text, "np_conditional_density_prepared_context\\.degree_key_len = degree_key_len")
   expect_match(
     text,
     "i < context->degree_key_len"
   )
   expect_match(
     text,
-    "i < np_conditional_density_nomad_shadow\\.degree_key_len"
+    "i < np_conditional_density_prepared_context\\.degree_key_len"
   )
   expect_match(text, "context->num_var \\+ i \\+ 1")
-  expect_match(text, "np_conditional_density_nomad_shadow.num_all_var \\+ i \\+ 1")
+  expect_match(text, "np_conditional_density_prepared_context.num_all_var \\+ i \\+ 1")
   expect_match(
     text,
     paste0(
-      "if \\(np_conditional_density_nomad_shadow\\.degree_search \\|\\|",
+      "if \\(np_conditional_density_prepared_context\\.degree_search \\|\\|",
       "\\s+degree_refresh_needed\\)\\s+",
       "degree_refresh_ok = np_mpi_comm1_all_ok\\(degree_refresh_ok\\)"
     ),

@@ -5,7 +5,7 @@ test_that("native NOMAD option builders reject cache-off solves before solver en
   builders <- list(
     npRmpi:::.np_nomad_native_option_vectors,
     npRmpi:::.npudensbw_nomad_native_option_vectors,
-    npRmpi:::.npcdensbw_nomad_shadow_native_option_vectors,
+    npRmpi:::.npcdensbw_prepared_native_option_vectors,
     npRmpi:::.npcdistbw_nomad_native_option_vectors,
     npRmpi:::.npregbw_nomad_native_option_vectors
   )
@@ -29,7 +29,7 @@ test_that("native estimator callbacks reject parallel evaluation explicitly", {
   builders <- list(
     npRmpi:::.np_nomad_native_option_vectors,
     npRmpi:::.npudensbw_nomad_native_option_vectors,
-    npRmpi:::.npcdensbw_nomad_shadow_native_option_vectors,
+    npRmpi:::.npcdensbw_prepared_native_option_vectors,
     npRmpi:::.npcdistbw_nomad_native_option_vectors,
     npRmpi:::.npregbw_nomad_native_option_vectors
   )

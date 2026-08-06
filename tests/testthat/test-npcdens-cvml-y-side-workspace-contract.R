@@ -70,7 +70,7 @@ test_that("conditional CVML Y-side ownership follows the selected stream", {
         source, fixed = TRUE
       )
     )),
-    2L
+    1L
   )
   expect_false(grepl(
     "need_y_side = (ibwmfunc == CBWM_CVLS) || ((ibwmfunc == CBWM_CVML) && (np_lp_engine_extern == NP_LP_ENGINE_GENERAL));",
@@ -98,17 +98,17 @@ test_that("categorical kernel rows reject missing category metadata", {
   expect_true(grepl("(num_categories == NULL)", owner, fixed = TRUE))
 })
 
-test_that("scalar native CVML callbacks do not manufacture a degree buffer", {
+test_that("native CVML degree buffers use bounded prepared scratch", {
   source <- npcdens_y_side_source("np.c")
   skip_if(is.null(source), "source file src/np.c unavailable")
 
   start <- regexpr(
-    "static int np_density_conditional_nomad_shadow_eval_native_raw(",
+    "static int np_conditional_density_prepared_context_eval_native_raw(",
     source,
     fixed = TRUE
   )
   stop <- regexpr(
-    "SEXP C_np_density_conditional_nomad_shadow_eval(",
+    "SEXP C_np_density_conditional_prepared_eval(",
     source,
     fixed = TRUE
   )
@@ -117,23 +117,23 @@ test_that("scalar native CVML callbacks do not manufacture a degree buffer", {
   evaluator <- substr(source, start, stop - 1L)
 
   expect_true(grepl(
-    "if (np_conditional_density_nomad_shadow.degree_key_len > 0 &&\n      glp_degree == NULL)",
+    "if (np_conditional_density_prepared_context.degree_key_len > 0 &&\n      glp_degree == NULL)",
     evaluator,
     fixed = TRUE
   ))
   expect_true(grepl(
-    "if (np_conditional_density_nomad_shadow.degree_key_len > 0)\n    degree_work =",
+    "degree_work = np_conditional_density_prepared_context.eval_degree;",
     evaluator,
     fixed = TRUE
   ))
   expect_true(grepl(
-    "if (np_conditional_density_nomad_shadow.degree_key_len > 0)\n      MPI_Bcast(degree_work,",
+    "if (np_conditional_density_prepared_context.degree_key_len > 0)\n      MPI_Bcast(degree_work,",
     evaluator,
     fixed = TRUE
   ))
   expect_true(grepl(
     paste0(
-      "if (np_conditional_density_nomad_shadow.degree_search ||\n",
+      "if (np_conditional_density_prepared_context.degree_search ||\n",
       "      degree_refresh_needed)\n",
       "    degree_refresh_ok = np_mpi_comm1_all_ok(degree_refresh_ok);"
     ),

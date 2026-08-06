@@ -27,7 +27,7 @@ test_that("npcdensbw automatic degree search defaults to NOMAD plus Powell", {
   expect_gte(bw$degree.search$best.fval, bw$degree.search$baseline.fval - 1e-8)
 })
 
-test_that("npcdensbw NOMAD shadow search keeps collective routing in manual-broadcast context", {
+test_that("npcdensbw prepared-objective search keeps collective routing in manual-broadcast context", {
   body_text <- paste(
     deparse(body(get(".npcdensbw_nomad_search", envir = asNamespace("npRmpi"), inherits = FALSE))),
     collapse = "\n"
