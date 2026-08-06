@@ -1,8 +1,10 @@
+.rgl_test_package <- if (isNamespaceLoaded("npRmpi")) "npRmpi" else "np"
+
 test_that("canonical rgl controls preserve established parsing and precedence", {
-  controls <- getFromNamespace(".np_plot_rgl_controls", "np")
-  collect <- getFromNamespace(".np_plot_collect_rgl_args", "np")
-  extract <- getFromNamespace(".np_plot_extract_prefixed_args", "np")
-  merge.legend <- getFromNamespace(".np_plot_merge_rgl_legend_control", "np")
+  controls <- getFromNamespace(".np_plot_rgl_controls", .rgl_test_package)
+  collect <- getFromNamespace(".np_plot_collect_rgl_args", .rgl_test_package)
+  extract <- getFromNamespace(".np_plot_extract_prefixed_args", .rgl_test_package)
+  merge.legend <- getFromNamespace(".np_plot_merge_rgl_legend_control", .rgl_test_package)
 
   dots <- list(
     fov = 70,
@@ -58,7 +60,7 @@ test_that("canonical rgl controls preserve established parsing and precedence", 
 })
 
 test_that("canonical rgl controls retain every legend condition contract", {
-  controls <- getFromNamespace(".np_plot_rgl_controls", "np")
+  controls <- getFromNamespace(".np_plot_rgl_controls", .rgl_test_package)
 
   expect_identical(controls(list(), TRUE)$legend3d, list())
   expect_identical(controls(list(), FALSE)$legend3d, list(plot = FALSE))
