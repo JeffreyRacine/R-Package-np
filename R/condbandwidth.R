@@ -313,7 +313,7 @@ print.condbandwidth <- function(x, digits=NULL, ...){
   print(matrix(x$xbw,ncol=x$xndim,dimnames=list(paste("Exp. Var. ",x$pscaling,":",sep=""),x$xnames)))
 
   cat(genBwSelStr(x))
-  cat(genBwKerStrsXY(x))
+  cat(genBwKerStrs(x))
   
   cat("\n\n")
   if(!missing(...))

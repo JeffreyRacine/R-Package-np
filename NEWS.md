@@ -1,5 +1,12 @@
 # npRmpi 0.70-6
 
+* Conditional density and distribution kernel summaries now identify
+  explanatory and dependent kernels separately for continuous, unordered, and
+  ordered variables. Bandwidth-object `print()` and `summary()` methods share
+  one formatter, public output no longer exposes internal `cxker*`/`cyker*`
+  argument mnemonics, and invalid categorical-kernel selections name the
+  specific `uxkertype`, `uykertype`, `oxkertype`, or `oykertype` argument.
+
 * During bandwidth-objective evaluation, MPI-3 builds now use progress-aware
   nonblocking forms of the existing shared post-kernel collectives. Rank zero
   can therefore maintain the canonical progress heartbeat while waiting for

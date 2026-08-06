@@ -4054,183 +4054,94 @@ npFormat <- function(x){
   )
 }
 
-genBwContinuousKerLines <- function(x, vari, ncon) {
-  active <- which(ncon > 0)
+.np_bw_kernel_family_lines <- function(x, variables, family,
+                                       indicator, type, print.type,
+                                       conditional.xy) {
+  counts <- vapply(variables, function(variable) {
+    sum(x[["dati"]][[variable]][[indicator]])
+  }, numeric(1L))
+  active <- which(counts > 0)
   if (!length(active))
     return(character())
 
-  conditional.xy <- length(vari) == 2L &&
-    all(c("x", "y") %in% vari)
   if (conditional.xy) {
-    return(vapply(active, function(i) {
-      role <- vari[[i]]
+    type.lines <- vapply(active, function(i) {
+      variable <- variables[[i]]
       paste0(
-        "Continuous Kernel Type (", x$vartitleabb[[role]],
-        " Var.; c", role, "ker*): ", x$klist[[role]]$pckertype
+        family, " Kernel Type (", x[["vartitleabb"]][[variable]],
+        " Var.): ", x[["klist"]][[variable]][[print.type]]
       )
-    }, character(1L)))
+    }, character(1L))
+  } else {
+    types <- vapply(variables, function(variable) {
+      x[["klist"]][[variable]][[type]]
+    }, character(1L))
+    if (length(unique(types)) == 1L) {
+      type.lines <- paste0(
+        family, " Kernel Type: ",
+        x[["klist"]][[variables[[1L]]]][[print.type]]
+      )
+    } else {
+      type.lines <- vapply(active, function(i) {
+        variable <- variables[[i]]
+        paste0(
+          family, " Kernel Type (", x[["vartitleabb"]][[variable]],
+          " Var.): ", x[["klist"]][[variable]][[print.type]]
+        )
+      }, character(1L))
+    }
   }
 
-  cktype <- vapply(vari, function(v) x$klist[[v]]$ckertype,
-                   character(1L))
-  if (length(unique(cktype)) == 1L)
-    return(paste("Continuous Kernel Type:",
-                 x$klist[[vari[[1L]]]]$pckertype))
-
-  vapply(active, function(i) {
-    role <- vari[[i]]
-    paste0("Continuous Kernel Type (", x$vartitleabb[[role]],
-           " Var.): ", x$klist[[role]]$pckertype)
-  }, character(1L))
-}
-
-genBwKerStrs <- function(x){
-  vari <- names(x$klist)
-
-  ncon <- sapply(vari, function(v){
-    sum(x$dati[[v]]$icon)
-  })
-
-  nuno <- sapply(vari, function(v){
-    sum(x$dati[[v]]$iuno)
-  })
-
-  nord <- sapply(vari, function(v){
-    sum(x$dati[[v]]$iord)
-  })
-
-  tt <- ''
-
-  if(any(ncon > 0)){
-    ctype.str <- paste0(
-      "\n", genBwContinuousKerLines(x, vari, ncon), collapse = ""
+  count.lines <- vapply(active, function(i) {
+    variable <- variables[[i]]
+    paste0(
+      "No. ", family, pad(x[["vartitle"]][[variable]]),
+      "Vars.: ", counts[[i]]
     )
-    tt <- paste("\n", ctype.str, sep = "")
-    cont.str <- paste(sapply(seq_along(vari), function(i){
-      if (ncon[i] > 0)
-        paste("\nNo. Continuous", pad(x$vartitle[[vari[i]]]), "Vars.: ",
-              ncon[i], sep = "")
-      else ""
-    }), collapse = "")
-    tt <- paste(tt, cont.str, sep = "")
-  }
-                
-    
-  if(any(nuno > 0)) {
-    uktype <- sapply(vari, function(v){
-      x$klist[[v]]$ukertype
-    })
-    utype.str <- ""
-    if (length(unique(uktype)) == 1) {
-      utype.str <- paste("\nUnordered Categorical Kernel Type:",
-                         x$klist[[vari[1]]]$pukertype)
-    } else {
-      utype.str <- paste(sapply(seq_along(vari), function(i){
-        if (nuno[i] > 0)
-          paste("\nUnordered Categorical Kernel Type (",
-                x$vartitleabb[[vari[i]]],
-                " Var.): ", x$klist[[vari[i]]]$pukertype, sep = "")
-        else ""
-      }), collapse = "")
-    }
-    tt <- paste(tt, "\n", utype.str, sep = "")
-    uno.str <- paste(sapply(seq_along(vari), function(i){
-      if (nuno[i] > 0)
-        paste("\nNo. Unordered Categorical", pad(x$vartitle[[vari[i]]]), "Vars.: ",
-              nuno[i], sep = "")
-      else ""
-    }), collapse = "")
-    tt <- paste(tt, uno.str, sep = "")
+  }, character(1L))
 
-  }
-
-  if(any(nord > 0)) {
-    oktype <- sapply(vari, function(v){
-      x$klist[[v]]$okertype
-    })
-    otype.str <- ""
-    if (length(unique(oktype)) == 1) {
-      otype.str <- paste("\nOrdered Categorical Kernel Type:",
-                         x$klist[[vari[1]]]$pokertype)
-    } else {
-      otype.str <- paste(sapply(seq_along(vari), function(i){
-        if (nord[i] > 0)
-          paste("\nOrdered Categorical Kernel Type (",
-                x$vartitleabb[[vari[i]]],
-                " Var.): ", x$klist[[vari[i]]]$pokertype, sep = "")
-        else ""
-      }), collapse = "")
-    }
-    tt <- paste(tt, "\n", otype.str, sep = "")
-    ord.str <- paste(sapply(seq_along(vari), function(i){
-      if (nord[i] > 0)
-        paste("\nNo. Ordered Categorical", pad(x$vartitle[[vari[i]]]), "Vars.: ",
-              nord[i], sep = "")
-      else ""
-    }), collapse = "")
-    tt <- paste(tt, ord.str, sep = "")
-
-  }
-
-  return(tt)
+  c(type.lines, count.lines)
 }
 
-genBwKerStrsXY <- function(x){
-  t.str <- ''
-  cnt <- 0
-  
-  if (x$xncon + x$yncon > 0){
-    vari <- names(x$klist)
-    ncon <- vapply(vari, function(v) sum(x$dati[[v]]$icon), integer(1L))
-    cker.lines <- genBwContinuousKerLines(x, vari, ncon)
-    cker.str <- if (identical(x$pcxkertype, x$pcykertype))
-      paste0("\n\n", paste(cker.lines, collapse = "\n"))
-    else
-      paste(c("\n", paste0("\n", cker.lines)), collapse = " ")
-    ycon.str <- if (x$yncon > 0) paste("\nNo. Continuous Dependent Vars.:", x$yncon) else ""
-    xcon.str <- if (x$xncon > 0) paste("\nNo. Continuous Explanatory Vars.:", x$xncon) else ""
-    t.str[cnt <- cnt + 1] <-
-      paste(cker.str, ycon.str, xcon.str)
-  }
+genBwKerStrs <- function(x) {
+  variables <- names(x[["klist"]])
+  conditional.xy <- length(variables) == 2L &&
+    all(c("x", "y") %in% variables)
+  families <- list(
+    list(
+      family = "Continuous", indicator = "icon",
+      type = "ckertype", print.type = "pckertype"
+    ),
+    list(
+      family = "Unordered Categorical", indicator = "iuno",
+      type = "ukertype", print.type = "pukertype"
+    ),
+    list(
+      family = "Ordered Categorical", indicator = "iord",
+      type = "okertype", print.type = "pokertype"
+    )
+  )
 
-  if (x$xnuno + x$ynuno > 0){
-    uker.str <- ""
-    if (x$puxkertype == x$puykertype) {
-      uker.str <- paste("\n\nUnordered Categorical Kernel Type:", x$puxkertype)
-    } else {
-      exp.str <- if (x$xnuno > 0)
-        paste("\nUnordered Categorical Kernel Type (Exp. Var.):", x$puxkertype)
-      else ""
-      dep.str <- if (x$ynuno > 0)
-        paste("\nUnordered Categorical Kernel Type (Dep. Var.):", x$puykertype)
-      else ""
-      uker.str <- paste("\n", exp.str, dep.str)
-    }
-    yuno.str <- if (x$ynuno > 0) paste("\nNo. Unordered Categorical Dependent Vars.:", x$ynuno) else ""
-    xuno.str <- if (x$xnuno > 0) paste("\nNo. Unordered Categorical Explanatory Vars.:", x$xnuno) else ""
-    t.str[cnt <- cnt + 1] <-
-      paste(uker.str, yuno.str, xuno.str)
-  }
+  sections <- lapply(families, function(specification) {
+    .np_bw_kernel_family_lines(
+      x = x,
+      variables = variables,
+      family = specification[["family"]],
+      indicator = specification[["indicator"]],
+      type = specification[["type"]],
+      print.type = specification[["print.type"]],
+      conditional.xy = conditional.xy
+    )
+  })
+  sections <- sections[lengths(sections) > 0L]
+  if (!length(sections))
+    return("")
 
-  if (x$xnord + x$ynord > 0){
-    oker.str <- ""
-    if (x$poxkertype == x$poykertype) {
-      oker.str <- paste("\n\nOrdered Categorical Kernel Type:", x$poxkertype)
-    } else {
-      exp.str <- if (x$xnord > 0)
-        paste("\nOrdered Categorical Kernel Type (Exp. Var.):", x$poxkertype)
-      else ""
-      dep.str <- if (x$ynord > 0)
-        paste("\nOrdered Categorical Kernel Type (Dep. Var.):", x$poykertype)
-      else ""
-      oker.str <- paste("\n", exp.str, dep.str)
-    }
-    yord.str <- if (x$ynord > 0) paste("\nNo. Ordered Categorical Dependent Vars.:", x$ynord) else ""
-    xord.str <- if (x$xnord > 0) paste("\nNo. Ordered Categorical Explanatory Vars.:", x$xnord) else ""
-    t.str[cnt <- cnt + 1] <-
-      paste(oker.str, yord.str, xord.str)
-  }
-  return(t.str)
+  paste0(
+    "\n\n",
+    paste(vapply(sections, paste, character(1L), collapse = "\n"),
+          collapse = "\n\n")
+  )
 }
 
 ## statistical functions
