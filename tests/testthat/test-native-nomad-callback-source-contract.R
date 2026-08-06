@@ -66,7 +66,7 @@ test_that("native NOMAD C callback path does not call R API or longjmp helpers",
     "np_conditional_density_prepared_context_eval_native_raw",
     "np_density_prepared_context_eval",
     "np_distribution_prepared_context_eval",
-    "np_distribution_conditional_nomad_native_eval_once",
+    "np_conditional_distribution_prepared_context_eval",
     "np_udens_native_decode_eval_bw",
     "np_udist_native_decode_eval_bw",
     "np_cdist_native_decode_eval_bw",
@@ -118,6 +118,11 @@ test_that("native NOMAD C callback path does not call R API or longjmp helpers",
   ))
   expect_false(grepl(
     "\\bnp_distribution_nomad_native_eval_once\\b",
+    source_text,
+    perl = TRUE
+  ))
+  expect_false(grepl(
+    "\\bnp_distribution_conditional_nomad_native_eval_once\\b",
     source_text,
     perl = TRUE
   ))
