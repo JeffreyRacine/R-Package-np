@@ -8618,20 +8618,33 @@ SEXP C_np_regression_lp_apply_conditional(SEXP txuno,
   NPContinuousKernelDerivativeDiagnostics beta_diagnostics;
   const NPContinuousKernelRoute *active_route = NULL;
   NPContinuousKernelDerivativeDiagnostics *active_diagnostics = NULL;
+  int nprotect = 0;
   int i;
 
   txuno_r = PROTECT(coerceVector(txuno, REALSXP));
+  nprotect++;
   txord_r = PROTECT(coerceVector(txord, REALSXP));
+  nprotect++;
   txcon_r = PROTECT(coerceVector(txcon, REALSXP));
+  nprotect++;
   exuno_r = PROTECT(coerceVector(exuno, REALSXP));
+  nprotect++;
   exord_r = PROTECT(coerceVector(exord, REALSXP));
+  nprotect++;
   excon_r = PROTECT(coerceVector(excon, REALSXP));
+  nprotect++;
   rhs_r = PROTECT(coerceVector(rhs, REALSXP));
+  nprotect++;
   rbw_r = PROTECT(coerceVector(rbw, REALSXP));
+  nprotect++;
   degree_i = PROTECT(coerceVector(glp_degree, INTSXP));
+  nprotect++;
   grad_i = PROTECT(coerceVector(glp_gradient_order, INTSXP));
+  nprotect++;
   ckerlb_r = PROTECT(coerceVector(ckerlb, REALSXP));
+  nprotect++;
   ckerub_r = PROTECT(coerceVector(ckerub, REALSXP));
+  nprotect++;
 
   np_matrix_dims_or_zero(txuno, &nrow_txuno, &ncol_txuno);
   np_matrix_dims_or_zero(txord, &nrow_txord, &ncol_txord);
@@ -8847,6 +8860,7 @@ SEXP C_np_regression_lp_apply_conditional(SEXP txuno,
 
   if(return_hat_flag) {
     out = PROTECT(allocMatrix(REALSXP, num_obs_eval, num_obs_train));
+    nprotect++;
     compute_status = np_regression_lp_hat_matrix(
       REAL(rbw_r), derivative_variable, derivative_order, REAL(out),
       active_route, active_diagnostics, categorical_compress_flag);
@@ -8862,6 +8876,7 @@ SEXP C_np_regression_lp_apply_conditional(SEXP txuno,
       rhs_cols[i] = REAL(rhs_r) + ((size_t)i * (size_t)nrow_rhs);
 
     out = PROTECT(allocMatrix(REALSXP, num_obs_eval, ncol_rhs));
+    nprotect++;
     compute_status = np_regression_lp_apply_matrix(
       REAL(rbw_r), rhs_cols, ncol_rhs, REAL(out),
       active_route, active_diagnostics, categorical_compress_flag);
@@ -8902,7 +8917,7 @@ cleanup_lp_apply_wrapper:
   safe_free(rhs_cols);
   np_native_estimator_state_active = 0;
 
-  UNPROTECT(out == R_NilValue ? 12 : 13);
+  UNPROTECT(nprotect);
   if(compute_status != 0 || failure_message != NULL) {
     if(descriptor.family == NP_CKERNEL_FAMILY_BETA &&
        beta_diagnostics.beta_status != NP_BETA_OK)
