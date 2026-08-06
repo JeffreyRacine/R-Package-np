@@ -28,7 +28,7 @@ test_that("npcdensbw NOMAD degree search backend improves over the baseline", {
   expect_gte(bw$degree.search$best.fval, bw$degree.search$baseline.fval - 1e-10)
 })
 
-test_that("npcdensbw beta degree search uses the canonical LP shadow", {
+test_that("npcdensbw beta degree search uses the canonical LP context", {
   skip_if_not_installed("crs")
 
   old_opts <- options(np.messages = FALSE, np.tree = FALSE)

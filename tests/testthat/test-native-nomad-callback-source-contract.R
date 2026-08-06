@@ -61,7 +61,7 @@ test_that("native NOMAD C callback path does not call R API or longjmp helpers",
 
   callback_path <- c(
     "bwmfunc_wrapper",
-    "np_density_conditional_nomad_shadow_eval_native_raw",
+    "np_conditional_density_prepared_context_eval_native_raw",
     "np_regression_native_decode_eval_bw",
     "np_density_prepared_context_eval",
     "np_distribution_prepared_context_eval",

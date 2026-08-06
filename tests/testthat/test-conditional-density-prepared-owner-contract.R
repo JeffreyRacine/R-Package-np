@@ -14,7 +14,7 @@ np_conditional_density_owner_source <- function() {
 
 np_conditional_density_owner_function <- function(source, name) {
   start <- regexpr(
-    paste0("static void\\s+", name, "\\s*\\("),
+    paste0("static void\\s+", name, "\\s*\\([^;]*\\)\\s*\\{"),
     source, perl = TRUE
   )
   expect_gt(start[[1L]], 0L)
@@ -38,46 +38,66 @@ np_conditional_density_owner_function <- function(source, name) {
 
 test_that("ordinary conditional-density bandwidth state has one typed owner", {
   source <- np_conditional_density_owner_source()
-  destroy <- np_conditional_density_owner_function(
-    source, "np_conditional_density_bw_prepared_context_destroy"
+  clear <- np_conditional_density_owner_function(
+    source, "np_conditional_density_prepared_context_clear_internal"
   )
 
   expect_match(source, "} NPConditionalDensityPreparedCtx;", fixed = TRUE)
+  expect_equal(
+    lengths(regmatches(
+      source,
+      gregexpr(
+        "static NPConditionalDensityPreparedCtx np_conditional_density_prepared_context =",
+        source,
+        fixed = TRUE
+      )
+    )),
+    1L
+  )
   for (field in c(
     "matrix_y_unordered_original", "matrix_y_ordered_original",
-    "matrix_y_continuous_original", "matrix_x_unordered_original",
-    "matrix_x_ordered_original", "matrix_x_continuous_original",
+    "matrix_y_continuous_original",
     "matrix_xy_unordered_original", "matrix_xy_ordered_original",
-    "matrix_xy_continuous_original", "num_categories",
-    "matrix_categorical_vals", "continuous_stddev", "extendednn_upper",
+    "matrix_xy_continuous_original", "extendednn_upper",
     "powell_directions", "vector_scale_factor", "scale_factor_startbest",
-    "powell_step", "ipt_x", "ipt_y", "ipt_xy", "tree_x", "tree_y",
-    "tree_xy"
+    "powell_step", "ipt_x", "ipt_y", "ipt_xy"
   )) {
-    expect_match(destroy, paste0("context->", field), fixed = TRUE, info = field)
+    expect_match(
+      clear,
+      paste0("np_conditional_density_prepared_context.", field),
+      fixed = TRUE,
+      info = field
+    )
   }
   expect_match(
     source,
-    "NPConditionalDensityPreparedCtx prepared_context = {0};",
+    "np_conditional_density_prepared_context_prepare_internal(",
     fixed = TRUE
   )
   expect_match(
     source,
-    "np_conditional_density_bw_prepared_context_destroy(&prepared_context);",
+    "np_conditional_density_prepared_context_clear_internal();",
     fixed = TRUE
   )
+  expect_match(clear, "bwm_clear_floor_context();", fixed = TRUE)
+  expect_false(grepl(
+    "np_conditional_density_bw_prepared_context_destroy",
+    source,
+    fixed = TRUE
+  ))
+  expect_false(grepl("nomad_shadow", source, fixed = TRUE))
 })
 
 test_that("ordinary and resident conditional-density paths share preparation", {
   source <- np_conditional_density_owner_source()
   evaluator_start <- regexpr(
-    "static int\\s+np_density_conditional_nomad_shadow_eval_native_raw\\s*\\(",
+    "static int\\s+np_conditional_density_prepared_context_eval_native_raw\\s*\\(",
     source, perl = TRUE
   )
   expect_gt(evaluator_start[[1L]], 0L)
   evaluator_tail <- substring(source, evaluator_start[[1L]])
   evaluator_end <- regexpr(
-    "\\n}\\n\\nSEXP C_np_density_conditional_nomad_shadow_eval",
+    "\\n}\\n\\nSEXP C_np_density_conditional_prepared_eval",
     evaluator_tail, perl = TRUE
   )
   expect_gt(evaluator_end[[1L]], 0L)
@@ -85,12 +105,7 @@ test_that("ordinary and resident conditional-density paths share preparation", {
 
   expect_match(
     source,
-    "np_conditional_density_nomad_shadow_prepare_internal(",
-    fixed = TRUE
-  )
-  expect_match(
-    source,
-    "goto canonical_conditional_density_search;",
+    "np_conditional_density_prepared_context_prepare_internal(",
     fixed = TRUE
   )
   expect_match(evaluator, ".eval_bandwidth", fixed = TRUE)

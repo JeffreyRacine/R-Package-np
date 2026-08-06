@@ -2,6 +2,27 @@ test_that("resident npcdens cache keys bandwidths and polynomial degree", {
   old_opts <- options(np.messages = FALSE, np.tree = FALSE)
   on.exit(options(old_opts), add = TRUE)
 
+  set.seed(20260805)
+  prior_n <- 32L
+  prior_x <- data.frame(
+    x1 = runif(prior_n),
+    x2 = runif(prior_n)
+  )
+  prior_y <- data.frame(y = factor(ifelse(
+    prior_x$x1 + prior_x$x2 + rnorm(prior_n, sd = 0.15) > 1,
+    "yes",
+    "no"
+  )))
+  invisible(np::npcdensbw(
+    xdat = prior_x,
+    ydat = prior_y,
+    regtype = "lc",
+    bwmethod = "cv.ml",
+    bwtype = "fixed",
+    bwsolver = "powell",
+    nmulti = 1L
+  ))
+
   set.seed(271828)
   n <- 70L
   x <- sort(runif(n))
@@ -18,7 +39,7 @@ test_that("resident npcdens cache keys bandwidths and polynomial degree", {
     bws = c(0.24, 0.31),
     bandwidth.compute = FALSE
   )
-  prep <- np:::.npcdensbw_nomad_shadow_prepare_args(
+  prep <- np:::.npcdensbw_prepared_prepare_args(
     xdat = xdat,
     ydat = ydat,
     bws = bw,
@@ -35,7 +56,7 @@ test_that("resident npcdens cache keys bandwidths and polynomial degree", {
 
   evaluate <- function(cache) {
     options(np.objective.cache = cache)
-    do.call(np:::npNomadShadowPrepareConditionalDensity, list(
+    do.call(np:::npPreparedObjectivePrepareConditionalDensity, list(
       c.uno = prep$c.uno, c.ord = prep$c.ord, c.con = prep$c.con,
       u.uno = prep$u.uno, u.ord = prep$u.ord, u.con = prep$u.con,
       mysd = prep$mysd, myopti = prep$myopti, myoptd = prep$myoptd,
@@ -45,9 +66,9 @@ test_that("resident npcdens cache keys bandwidths and polynomial degree", {
       cxkerlb = prep$cxkerlb, cxkerub = prep$cxkerub,
       cykerlb = prep$cykerlb, cykerub = prep$cykerub
     ))
-    on.exit(np:::npNomadShadowClearConditionalDensity(), add = TRUE)
+    on.exit(np:::npPreparedObjectiveDestroyConditionalDensity(), add = TRUE)
     vapply(seq_len(nrow(points)), function(i) {
-      np:::npNomadShadowEvalConditionalDensity(
+      np:::npPreparedObjectiveEvalConditionalDensity(
         bw = c(points$xbw[i], points$ybw[i]),
         degree = points$degree[i]
       )[1L]
@@ -78,19 +99,19 @@ test_that("resident npcdens cache keys bandwidths and polynomial degree", {
   expect_identical(cached[1L], cached[4L])
 })
 
-test_that("resident npcdens shadow bounds degree writes by allocated key length", {
+test_that("prepared npcdens context bounds degree writes by allocated key length", {
   src <- readLines(np_test_source_path("src", "np.c"), warn = FALSE)
   text <- paste(src, collapse = "\n")
   expect_match(
     text,
-    "np_conditional_density_nomad_shadow\\.degree_key_len = degree_key_len"
+    "np_conditional_density_prepared_context\\.degree_key_len = degree_key_len"
   )
   expect_match(
     text,
-    "i < np_conditional_density_nomad_shadow\\.degree_key_len"
+    "i < np_conditional_density_prepared_context\\.degree_key_len"
   )
   expect_match(
     text,
-    "np_conditional_density_nomad_shadow.num_all_var \\+ i \\+ 1"
+    "np_conditional_density_prepared_context.num_all_var \\+ i \\+ 1"
   )
 })

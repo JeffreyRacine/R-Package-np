@@ -1251,7 +1251,7 @@ npcdensbw.conbandwidth <-
   x
 }
 
-npNomadShadowPrepareConditionalDensity <- function(c.uno,
+npPreparedObjectivePrepareConditionalDensity <- function(c.uno,
                                                        c.ord,
                                                        c.con,
                                                        u.uno,
@@ -1272,10 +1272,10 @@ npNomadShadowPrepareConditionalDensity <- function(c.uno,
                                                        cykerlb,
                                                        cykerub) {
   if (length(myoptd) <= 23L || length(myopti) <= 34L)
-    stop("resident npcdens NOMAD shadow options are missing canonical search controls", call. = FALSE)
+    stop("resident npcdens prepared objective options are missing canonical search controls", call. = FALSE)
 
   ok <- .Call(
-    "C_np_density_conditional_nomad_shadow_prepare",
+    "C_np_density_conditional_prepared_prepare",
     c.uno,
     c.ord,
     c.con,
@@ -1302,19 +1302,19 @@ npNomadShadowPrepareConditionalDensity <- function(c.uno,
   if (isTRUE(ok))
     return(TRUE)
 
-  stop("failed to prepare resident npcdens NOMAD shadow state", call. = FALSE)
+  stop("failed to prepare resident npcdens prepared objective state", call. = FALSE)
 }
 
-npNomadShadowEvalConditionalDensity <- function(bw, degree) {
+npPreparedObjectiveEvalConditionalDensity <- function(bw, degree) {
   .Call(
-    "C_np_density_conditional_nomad_shadow_eval",
+    "C_np_density_conditional_prepared_eval",
     bw,
     degree,
     PACKAGE = "np"
   )
 }
 
-npNomadShadowNativeSearchConditionalDensity <- function(x0,
+npPreparedObjectiveNativeSearchConditionalDensity <- function(x0,
                                                             bbin,
                                                             lb,
                                                             ub,
@@ -1327,7 +1327,7 @@ npNomadShadowNativeSearchConditionalDensity <- function(x0,
                                                             option.values,
                                                             flat.decode.scale = rep.int(1, length(flat.from.point))) {
   native.call <- .np_nomad_capture_solver_output(.Call(
-    "C_np_density_conditional_nomad_shadow_native_search",
+    "C_np_density_conditional_prepared_native_search",
     x0,
     as.integer(bbin),
     lb,
@@ -1345,7 +1345,7 @@ npNomadShadowNativeSearchConditionalDensity <- function(x0,
   .np_nomad_native_call_value(native.call)
 }
 
-npNomadShadowFixedNativeSearchConditionalDensity <- function(x0,
+npPreparedObjectiveFixedNativeSearchConditionalDensity <- function(x0,
                                                                  bbin,
                                                                  lb,
                                                                  ub,
@@ -1358,7 +1358,7 @@ npNomadShadowFixedNativeSearchConditionalDensity <- function(x0,
                                                                  option.values,
                                                                  flat.decode.scale = rep.int(1, length(flat.from.point))) {
   native.call <- .np_nomad_capture_solver_output(.Call(
-    "C_np_density_conditional_nomad_shadow_fixed_native_search",
+    "C_np_density_conditional_prepared_fixed_native_search",
     x0,
     as.integer(bbin),
     lb,
@@ -1376,11 +1376,11 @@ npNomadShadowFixedNativeSearchConditionalDensity <- function(x0,
   .np_nomad_native_call_value(native.call)
 }
 
-npNomadShadowClearConditionalDensity <- function() {
-  .Call("C_np_density_conditional_nomad_shadow_clear", PACKAGE = "np")
+npPreparedObjectiveDestroyConditionalDensity <- function() {
+  .Call("C_np_density_conditional_prepared_destroy", PACKAGE = "np")
 }
 
-.npcdensbw_nomad_shadow_native_target <- function(template, reg.args, degree.search) {
+.npcdensbw_prepared_native_target <- function(template, reg.args, degree.search) {
   bwtype <- if (!is.null(template$type) && length(template$type)) {
     as.character(template$type[1L])
   } else {
@@ -1424,7 +1424,7 @@ npNomadShadowClearConditionalDensity <- function() {
     bwsolver %in% c("mads", "mads+powell")
 }
 
-.npcdensbw_nomad_shadow_native_require_crs <- function() {
+.npcdensbw_prepared_native_require_crs <- function() {
   if (!requireNamespace("crs", quietly = TRUE))
     stop("native npcdens NOMAD route requires crs >= 0.15-46", call. = FALSE)
   if (utils::packageVersion("crs") < "0.15.46")
@@ -1432,7 +1432,7 @@ npNomadShadowClearConditionalDensity <- function() {
   invisible(TRUE)
 }
 
-.npcdensbw_nomad_shadow_native_flat_map <- function(template, setup) {
+.npcdensbw_prepared_native_flat_map <- function(template, setup) {
   x.offset <- length(template$ybw)
   point.full.indices <- c(setup$cont_flat, setup$cat_flat)
   flat.full.indices <- c(
@@ -1449,7 +1449,7 @@ npNomadShadowClearConditionalDensity <- function() {
   as.integer(flat.from.point)
 }
 
-.npcdensbw_nomad_shadow_native_decode_scale <- function(template, setup, flat.from.point) {
+.npcdensbw_prepared_native_decode_scale <- function(template, setup, flat.from.point) {
   ncont <- length(setup$cont_flat)
   ncat <- length(setup$cat_flat)
   point.scale <- numeric(ncont + ncat)
@@ -1476,7 +1476,7 @@ npNomadShadowClearConditionalDensity <- function() {
   as.double(point.scale[flat.from.point])
 }
 
-.npcdensbw_nomad_shadow_native_option_vectors <- function(opts) {
+.npcdensbw_prepared_native_option_vectors <- function(opts) {
   if (is.null(opts) || !length(opts))
     return(list(names = character(), values = character()))
 
@@ -1499,7 +1499,7 @@ npNomadShadowClearConditionalDensity <- function() {
   list(names = as.character(option.names), values = option.values)
 }
 
-.npcdensbw_nomad_shadow_prepare_args <- function(xdat,
+.npcdensbw_prepared_prepare_args <- function(xdat,
                                                  ydat,
                                                  bws,
                                                  start.bw = NULL,
@@ -1706,7 +1706,7 @@ npNomadShadowClearConditionalDensity <- function() {
   )
 }
 
-npNomadShadowSearchConditionalDensity <- function(template,
+npPreparedObjectiveSearchConditionalDensity <- function(template,
                                                       setup,
                                                       prep,
                                                       degree.search,
@@ -1734,7 +1734,7 @@ npNomadShadowSearchConditionalDensity <- function(template,
   bwdim <- length(setup$cont_flat) + length(setup$cat_flat)
   ndeg <- length(degree.search$start.degree)
 
-  prepared <- npNomadShadowPrepareConditionalDensity(
+  prepared <- npPreparedObjectivePrepareConditionalDensity(
     c.uno = prep$c.uno,
     c.ord = prep$c.ord,
     c.con = prep$c.con,
@@ -1765,7 +1765,7 @@ npNomadShadowSearchConditionalDensity <- function(template,
       num.feval.guarded.total = 0,
       method = degree.search$engine
     ))
-  on.exit(npNomadShadowClearConditionalDensity(), add = TRUE)
+  on.exit(npPreparedObjectiveDestroyConditionalDensity(), add = TRUE)
   nomad.num.feval.total <- 0
   nomad.num.feval.fast.total <- 0
   nomad.num.feval.guarded.total <- 0
@@ -1779,7 +1779,7 @@ npNomadShadowSearchConditionalDensity <- function(template,
     flat.bw <- c(bw_vec[x.offset + which(template$ixcon)], bw_vec[which(template$iycon)],
                  bw_vec[which(template$iyuno)], bw_vec[which(template$iyord)],
                  bw_vec[x.offset + which(template$ixuno)], bw_vec[x.offset + which(template$ixord)])
-    out <- npNomadShadowEvalConditionalDensity(
+    out <- npPreparedObjectiveEvalConditionalDensity(
       bw = as.double(flat.bw),
       degree = as.integer(degree)
     )
@@ -1824,8 +1824,8 @@ npNomadShadowSearchConditionalDensity <- function(template,
     where = "npcdensbw"
   )
 
-  if (.npcdensbw_nomad_shadow_native_target(template, reg.args, degree.search)) {
-    .npcdensbw_nomad_shadow_native_require_crs()
+  if (.npcdensbw_prepared_native_target(template, reg.args, degree.search)) {
+    .npcdensbw_prepared_native_require_crs()
     native.nmulti <- npValidateNmulti(nomad.nmulti)
     native.inner.nmulti <- npValidateNonNegativeInteger(
       nomad.inner.nmulti,
@@ -1840,9 +1840,9 @@ npNomadShadowSearchConditionalDensity <- function(template,
       geometry.policy = "user-only",
       where = "npcdensbw native NOMAD degree source geometry"
     )
-    native.option.vectors <- .npcdensbw_nomad_shadow_native_option_vectors(native.nomad.opts)
-    flat.from.point <- .npcdensbw_nomad_shadow_native_flat_map(template, setup)
-    flat.decode.scale <- .npcdensbw_nomad_shadow_native_decode_scale(
+    native.option.vectors <- .npcdensbw_prepared_native_option_vectors(native.nomad.opts)
+    flat.from.point <- .npcdensbw_prepared_native_flat_map(template, setup)
+    flat.decode.scale <- .npcdensbw_prepared_native_decode_scale(
       template = template,
       setup = setup,
       flat.from.point = flat.from.point
@@ -1917,7 +1917,7 @@ npNomadShadowSearchConditionalDensity <- function(template,
         eval_offset = native.callback.total
       )
       native.start <- proc.time()[3L]
-      native <- npNomadShadowNativeSearchConditionalDensity(
+      native <- npPreparedObjectiveNativeSearchConditionalDensity(
         x0 = as.numeric(start),
         bbin = as.integer(bbin),
         lb = as.double(lb),
@@ -2114,7 +2114,7 @@ npNomadShadowSearchConditionalDensity <- function(template,
       best.solution <- search.result$restart.results[[as.integer(search.result$best.restart)]]
     }
 
-    build_shadow_payload <- function(point, best_record, solution, interrupted) {
+    build_prepared_payload <- function(point, best_record, solution, interrupted) {
       point <- as.numeric(point)
       degree <- as.integer(best_record$degree)
       bw_vec <- .npcdensbw_nomad_point_to_bw(point[seq_len(bwdim)], template = template, setup = setup)
@@ -2217,7 +2217,7 @@ npNomadShadowSearchConditionalDensity <- function(template,
       list(payload = direct.payload, objective = direct.objective, powell.time = powell.elapsed)
     }
 
-    payload.result <- build_shadow_payload(
+    payload.result <- build_prepared_payload(
       point = search.result$best_point,
       best_record = search.result$best,
       solution = best.solution,
@@ -2434,7 +2434,7 @@ npNomadShadowSearchConditionalDensity <- function(template,
   }
 
   if (.npcdensbw_fixed_native_target(template, reg.args, bwsolver)) {
-    .npcdensbw_nomad_shadow_native_require_crs()
+    .npcdensbw_prepared_native_require_crs()
     native.nmulti <- npValidateNmulti(
       opt.value("nmulti", npDefaultNmulti(dim(ydat)[2L] + dim(xdat)[2L]))
     )
@@ -2451,9 +2451,9 @@ npNomadShadowSearchConditionalDensity <- function(template,
       geometry.policy = "user-only",
       where = "npcdensbw native NOMAD source geometry"
     )
-    native.option.vectors <- .npcdensbw_nomad_shadow_native_option_vectors(native.nomad.opts)
-    flat.from.point <- .npcdensbw_nomad_shadow_native_flat_map(template, setup)
-    flat.decode.scale <- .npcdensbw_nomad_shadow_native_decode_scale(
+    native.option.vectors <- .npcdensbw_prepared_native_option_vectors(native.nomad.opts)
+    flat.from.point <- .npcdensbw_prepared_native_flat_map(template, setup)
+    flat.decode.scale <- .npcdensbw_prepared_native_decode_scale(
       template = template,
       setup = setup,
       flat.from.point = flat.from.point
@@ -2481,7 +2481,7 @@ npNomadShadowSearchConditionalDensity <- function(template,
       start.upper = native.start.bounds$upper
     )
     start.bw <- .npcdensbw_nomad_point_to_bw(x0[seq_len(bwdim)], template = template, setup = setup)
-    native.prep <- .npcdensbw_nomad_shadow_prepare_args(
+    native.prep <- .npcdensbw_prepared_prepare_args(
       xdat = xdat,
       ydat = ydat,
       bws = template,
@@ -2490,7 +2490,7 @@ npNomadShadowSearchConditionalDensity <- function(template,
       penalty.multiplier = opt.value("penalty.multiplier", 10)
     )
 
-    prepared <- npNomadShadowPrepareConditionalDensity(
+    prepared <- npPreparedObjectivePrepareConditionalDensity(
       c.uno = native.prep$c.uno,
       c.ord = native.prep$c.ord,
       c.con = native.prep$c.con,
@@ -2514,7 +2514,7 @@ npNomadShadowSearchConditionalDensity <- function(template,
     )
     if (!isTRUE(prepared))
       stop("failed to prepare native npcdens fixed-degree route", call. = FALSE)
-    on.exit(npNomadShadowClearConditionalDensity(), add = TRUE)
+    on.exit(npPreparedObjectiveDestroyConditionalDensity(), add = TRUE)
 
     native.results <- vector("list", nrow(native.start.matrix))
     native.best.index <- NA_integer_
@@ -2526,7 +2526,7 @@ npNomadShadowSearchConditionalDensity <- function(template,
 
     run_native_restart <- function(start, restart.index) {
       native.start <- proc.time()[3L]
-      native <- npNomadShadowFixedNativeSearchConditionalDensity(
+      native <- npPreparedObjectiveFixedNativeSearchConditionalDensity(
         x0 = as.numeric(start),
         bbin = bounds$bbin,
         lb = bounds$lower,
@@ -3081,9 +3081,9 @@ npNomadShadowSearchConditionalDensity <- function(template,
     degree.search$engine
   }
 
-  if (.npcdensbw_nomad_shadow_native_target(template, reg.args, degree.search)) {
+  if (.npcdensbw_prepared_native_target(template, reg.args, degree.search)) {
     start.bw <- .npcdensbw_nomad_point_to_bw(x0[seq_len(bwdim)], template = template, setup = setup)
-    prep <- .npcdensbw_nomad_shadow_prepare_args(
+    prep <- .npcdensbw_prepared_prepare_args(
       xdat = xdat,
       ydat = ydat,
       bws = template,
@@ -3128,7 +3128,7 @@ npNomadShadowSearchConditionalDensity <- function(template,
       bernstein.basis = degree.search$bernstein.basis
     )
 
-    search.result <- npNomadShadowSearchConditionalDensity(
+    search.result <- npPreparedObjectiveSearchConditionalDensity(
       template = search.template,
       setup = search.setup,
       prep = prep,
