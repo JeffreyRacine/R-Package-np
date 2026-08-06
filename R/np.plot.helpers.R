@@ -7633,7 +7633,7 @@ plotFactor <- function(f, y, ...){
                                      "trace", "plot", "ncol", "horiz",
                                      "title", "inset", "bg", "bty", "box.lwd",
                                      "box.lty", "box.col", "pt.bg",
-                                     "lwd", "lty", "seg.len"),
+                                     "lwd", "lty", "seg.len", "magnify"),
                     bxp = c("boxfill", "outline", "notch", "varwidth",
                             "frame.plot", "horizontal", "at", "show.names",
                             "pars", "pch", "cex", "col", "bg"))

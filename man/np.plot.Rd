@@ -287,8 +287,9 @@ Named options passed via \code{\dots} include:
         \code{renderer="rgl"} requires \code{perspective=TRUE},
         \code{view="fixed"} and \code{output="plot"};
         unsupported combinations still error rather than falling back
-        silently. The suggested package
-        \code{rgl} must be installed when \code{renderer="rgl"} is
+        silently. The suggested packages
+        \code{rgl} and \code{htmlwidgets} must be installed when
+        \code{renderer="rgl"} is
         requested. When drawn, the \code{rgl} surface is displayed via
         the active \code{rgl} backend, which on this rollout path is
         typically the RStudio Viewer or a browser/WebGL window rather
@@ -296,9 +297,12 @@ Named options passed via \code{\dots} include:
         the \code{rgl} surface uses a value-based
         \code{\link[grDevices]{hcl.colors}(..., "viridis")} gradient. When the
         inherited base-view defaults \code{theta=0} and \code{phi=20}
-        are left unchanged, the \code{rgl} backend remaps that default
-        camera to a more informative oblique view for this rollout
-        tranche. For the currently supported \code{npreg},
+        are left unchanged, the \code{rgl} backend uses
+        \code{theta=0}, \code{phi=-70}, and \code{fov=55} to approximate
+        the base perspective in the square interactive viewport. The widget
+        automatically uses up to two backing-store pixels per CSS pixel on
+        high-DPI displays. Axis titles retain rgl's native screen-facing text
+        orientation while the scene is rotated. For the currently supported \code{npreg},
         \code{npplreg}, and plain mean-surface
         \code{npscoef} surface routes, \code{data_overlay=TRUE}
         adds observed data as an interactive point cloud. For all
@@ -328,7 +332,9 @@ Named options passed via \code{\dots} include:
         When \code{band="all"} is used on supported
         \code{rgl} routes, a matching interactive legend is drawn, and
         \code{rgl.legend3d.<arg>} may be used to customize it, for
-        example \code{rgl.legend3d.bty="o"} to restore a legend box.
+        example \code{rgl.legend3d.bty="o"} to restore a legend box or
+        \code{rgl.legend3d.magnify=1} to request the original legend texture
+        resolution.
         By default, these legends follow the base-graphics uncertainty
         legend convention and are drawn without a surrounding box.
       }

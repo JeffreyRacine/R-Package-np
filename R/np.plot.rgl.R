@@ -61,10 +61,12 @@
         lwd = .np_plot_lwd("band_all_surface"),
         cex = .np_plot_cex("legend"),
         bg = .np_plot_color("legend_bg"),
-        bty = "n"
+        bty = "n",
+        magnify = .np_plot_rgl_defaults()$legend.magnify
       ),
       legend3d.args
     )
+    legend3d.call <- .np_plot_rgl_scale_legend_geometry(legend3d.call)
     do.call(rgl::legend3d, legend3d.call)
     return(invisible(TRUE))
   }
@@ -83,6 +85,161 @@
   }
 
   list(theta = theta, phi = phi)
+}
+
+.np_plot_rgl_defaults <- function() {
+  list(
+    windowRect = c(900, 100, 900 + 640, 100 + 640),
+    fov = 55,
+    max.pixel.ratio = 2,
+    legend.magnify = 2
+  )
+}
+
+.np_plot_rgl_scale_legend_geometry <- function(args) {
+  magnify <- args$magnify
+  if (is.null(magnify))
+    magnify <- 1
+  magnify <- as.double(magnify)[1L]
+  if (!is.finite(magnify) || magnify <= 0) {
+    stop("rgl.legend3d.magnify must be a finite positive number.",
+         call. = FALSE)
+  }
+  args$magnify <- magnify
+
+  for (name in c("cex", "pt.cex", "lwd", "box.lwd")) {
+    value <- args[[name]]
+    if (!is.null(value) && is.numeric(value))
+      args[[name]] <- value * magnify
+  }
+  args
+}
+
+.np_plot_rgl_hidpi_hook <- function(max.pixel.ratio = 2) {
+  max.pixel.ratio <- as.double(max.pixel.ratio)[1L]
+  if (!is.finite(max.pixel.ratio) || max.pixel.ratio < 1) {
+    stop("max.pixel.ratio must be a finite number no smaller than one.",
+         call. = FALSE)
+  }
+
+  paste0(
+    "function(el, x) {\n",
+    "  var r = el.rglinstance;\n",
+    "  if (!r || !r.canvas) throw new Error('np: rglwidget instance unavailable');\n",
+    "  var maxRatio = ", format(max.pixel.ratio, scientific = FALSE,
+                                 trim = TRUE), ";\n",
+    "  var targetRatio = Math.max(1, Math.min(window.devicePixelRatio || 1, maxRatio));\n",
+    "  var initialRect = r.canvas.getBoundingClientRect();\n",
+    "  var initialWidth = initialRect.width > 0 ? initialRect.width : el.width;\n",
+    "  var initialHeight = initialRect.height > 0 ? initialRect.height : el.height;\n",
+    "  var initialXRatio = initialWidth > 0 ? r.canvas.width / initialWidth : 1;\n",
+    "  var initialYRatio = initialHeight > 0 ? r.canvas.height / initialHeight : 1;\n",
+    "  if (targetRatio > 1 && initialXRatio >= targetRatio - 0.05 && initialYRatio >= targetRatio - 0.05) {\n",
+    "    el.dataset.npDevicePixelRatio = Math.min(initialXRatio, initialYRatio);\n",
+    "    el.dataset.npHiDpiMode = 'native';\n",
+    "    return;\n",
+    "  }\n",
+    "  if (initialXRatio > 1.05 || initialYRatio > 1.05) {\n",
+    "    throw new Error('np: incompatible partial rgl high-DPI canvas scaling');\n",
+    "  }\n",
+    "  if (r._npHiDpiInstalled) {\n",
+    "    r.resize(el);\n",
+    "    r.drawScene();\n",
+    "    return;\n",
+    "  }\n",
+    "  if (typeof r.resize !== 'function' || typeof r.relMouseCoords !== 'function' || typeof r.restartCanvas !== 'function') {\n",
+    "    throw new Error('np: incompatible rglwidget lifecycle API');\n",
+    "  }\n",
+    "  var upstreamResize = r.resize.bind(r);\n",
+    "  var upstreamRelMouseCoords = r.relMouseCoords.bind(r);\n",
+    "  var upstreamRestartCanvas = r.restartCanvas.bind(r);\n",
+    "  r._npMaterialBase = new WeakMap();\n",
+    "  r._npScaleValue = function(value, ratio) {\n",
+    "    if (Array.isArray(value)) return value.map(function(item) { return r._npScaleValue(item, ratio); });\n",
+    "    return typeof value === 'number' ? value * ratio : value;\n",
+    "  };\n",
+    "  r._npScaleMaterial = function(material, ratio) {\n",
+    "    if (!material) return;\n",
+    "    if (!r._npMaterialBase.has(material)) {\n",
+    "      r._npMaterialBase.set(material, {\n",
+    "        lwd: material.lwd === undefined ? undefined : JSON.parse(JSON.stringify(material.lwd)),\n",
+    "        size: material.size === undefined ? undefined : JSON.parse(JSON.stringify(material.size))\n",
+    "      });\n",
+    "    }\n",
+    "    var base = r._npMaterialBase.get(material);\n",
+    "    if (base.lwd !== undefined) material.lwd = r._npScaleValue(base.lwd, ratio);\n",
+    "    if (base.size !== undefined) material.size = r._npScaleValue(base.size, ratio);\n",
+    "  };\n",
+    "  r._npApplyPixelRatio = function(ratio) {\n",
+    "    this._npScaleMaterial(this.scene.material, ratio);\n",
+    "    Object.keys(this.scene.objects).forEach(function(key) {\n",
+    "      var obj = r.scene.objects[key];\n",
+    "      if (obj.type === 'text' && obj.cex) {\n",
+    "        if (!obj._npBaseCex) obj._npBaseCex = JSON.parse(JSON.stringify(obj.cex));\n",
+    "        obj.cex = r._npScaleValue(obj._npBaseCex, ratio);\n",
+    "        obj.initialized = false;\n",
+    "      }\n",
+    "      r._npScaleMaterial(obj.material, ratio);\n",
+    "    });\n",
+    "  };\n",
+    "  r.resize = function(host) {\n",
+    "    upstreamResize(host);\n",
+    "    var ratio = Math.max(1, Math.min(window.devicePixelRatio || 1, maxRatio));\n",
+    "    var rect = this.canvas.getBoundingClientRect();\n",
+    "    var width = Math.max(1, Math.round(host.width || rect.width));\n",
+    "    var height = Math.max(1, Math.round(host.height || rect.height));\n",
+    "    this.canvas.style.width = width + 'px';\n",
+    "    this.canvas.style.height = height + 'px';\n",
+    "    var pixelWidth = Math.max(1, Math.round(width * ratio));\n",
+    "    var pixelHeight = Math.max(1, Math.round(height * ratio));\n",
+    "    var upstreamXRatio = this.canvas.width / width;\n",
+    "    var upstreamYRatio = this.canvas.height / height;\n",
+    "    if ((upstreamXRatio > 1.05 && upstreamXRatio < ratio - 0.05) || (upstreamYRatio > 1.05 && upstreamYRatio < ratio - 0.05)) {\n",
+    "      throw new Error('np: incompatible partial rgl high-DPI resize');\n",
+    "    }\n",
+    "    if (upstreamXRatio < ratio - 0.05) this.canvas.width = pixelWidth;\n",
+    "    if (upstreamYRatio < ratio - 0.05) this.canvas.height = pixelHeight;\n",
+    "    var actualRatio = Math.min(this.canvas.width / width, this.canvas.height / height);\n",
+    "    if (this._npPixelRatio !== actualRatio || this._npNeedsScale) {\n",
+    "      this._npPixelRatio = actualRatio;\n",
+    "      this._npApplyPixelRatio(actualRatio);\n",
+    "      this._npNeedsScale = false;\n",
+    "    }\n",
+    "  };\n",
+    "  r.relMouseCoords = function(event) {\n",
+    "    var coords = upstreamRelMouseCoords(event);\n",
+    "    if (!event || (!event.target && !event.currentTarget)) return coords;\n",
+    "    var rect = this.canvas.getBoundingClientRect();\n",
+    "    return {\n",
+    "      x: coords.x * (rect.width > 0 ? this.canvas.width / rect.width : 1),\n",
+    "      y: coords.y * (rect.height > 0 ? this.canvas.height / rect.height : 1)\n",
+    "    };\n",
+    "  };\n",
+    "  r.restartCanvas = function() {\n",
+    "    upstreamRestartCanvas();\n",
+    "    this._npNeedsScale = true;\n",
+    "    this.resize(this.el);\n",
+    "  };\n",
+    "  r._npHiDpiInstalled = true;\n",
+    "  r.resize(el);\n",
+    "  r.drawScene();\n",
+    "  el.dataset.npDevicePixelRatio = r._npPixelRatio;\n",
+    "  el.dataset.npHiDpiMode = 'adapter';\n",
+    "}"
+  )
+}
+
+.np_plot_rgl_hidpi_widget <- function(widget, max.pixel.ratio = NULL) {
+  if (!isTRUE(suppressWarnings(requireNamespace("htmlwidgets", quietly = TRUE)))) {
+    stop("renderer='rgl' requires the package 'htmlwidgets' supplied with rgl.",
+         call. = FALSE)
+  }
+  if (is.null(max.pixel.ratio))
+    max.pixel.ratio <- .np_plot_rgl_defaults()$max.pixel.ratio
+  htmlwidgets::onRender(
+    widget,
+    .np_plot_rgl_hidpi_hook(max.pixel.ratio = max.pixel.ratio)
+  )
 }
 
 .np_plot_rgl_surface_colors <- function(z, col = NULL, num.colors = 1000L) {
@@ -215,6 +372,7 @@
                                         widget.args = list(),
                                         draw.extras = NULL) {
   tryCatch({
+    defaults <- .np_plot_rgl_defaults()
     old.opts <- options(
       rgl.useNULL = TRUE,
       rgl.printRglwidget = TRUE
@@ -235,13 +393,13 @@
 
     rgl::open3d(useNULL = TRUE, silent = TRUE)
     par3d.call <- .np_plot_merge_override_args(
-      list(windowRect = c(900, 100, 900 + 640, 100 + 640)),
+      list(windowRect = defaults$windowRect),
       par3d.args
     )
     do.call(rgl::par3d, par3d.call)
 
     view3d.call <- .np_plot_merge_override_args(
-      list(theta = theta, phi = phi, fov = 80),
+      list(theta = theta, phi = phi, fov = defaults$fov),
       view3d.args
     )
     do.call(rgl::view3d, view3d.call)
@@ -284,6 +442,10 @@
       else
         try(rgl::close3d(silent = TRUE), silent = TRUE)
       widget <- do.call(rgl::rglwidget, c(list(x = scene), widget.args))
+      widget <- .np_plot_rgl_hidpi_widget(
+        widget,
+        max.pixel.ratio = defaults$max.pixel.ratio
+      )
       print(widget)
       return(widget)
     }
