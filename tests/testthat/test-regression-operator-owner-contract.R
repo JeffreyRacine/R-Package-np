@@ -27,9 +27,14 @@ regression_operator_owner_region <- function(source) {
 test_that("regression fit has one post-validation operator owner", {
   path <- locate_regression_operator_source()
   skip_if(is.null(path), "package sources unavailable")
-  region <- regression_operator_owner_region(readLines(path, warn = FALSE))
+  source <- readLines(path, warn = FALSE)
+  region <- regression_operator_owner_region(source)
 
-  allocations <- gregexpr("operator = (int *)malloc(", region, fixed = TRUE)[[1L]]
+  allocations <- gregexpr(
+    "operator = num_reg_total > 0 ? (int *)malloc(bytes) : NULL;",
+    region,
+    fixed = TRUE
+  )[[1L]]
   expect_equal(sum(allocations > 0L), 1L)
   allocation <- allocations[allocations > 0L][[1L]]
   scalar_return <- regexpr(
@@ -37,8 +42,29 @@ test_that("regression fit has one post-validation operator owner", {
   )
   expect_gt(scalar_return, 0L)
   expect_gt(allocation, scalar_return)
+  expect_match(region, "fit_owner.operator = operator;", fixed = TRUE)
+  expect_false(grepl("free(operator);", region, fixed = TRUE))
   expect_equal(
-    sum(gregexpr("free(operator);", region, fixed = TRUE)[[1L]] > 0L),
+    sum(gregexpr(
+      "np_regression_fit_owner_clear(&fit_owner);",
+      region,
+      fixed = TRUE
+    )[[1L]] > 0L),
+    1L
+  )
+  owner_clear_start <- grep(
+    "^static void np_regression_fit_owner_clear\\(", source
+  )
+  owner_clear_stop <- grep(
+    "^static void np_regression_fit_owner_cleanup\\(", source
+  )
+  expect_length(owner_clear_start, 1L)
+  expect_length(owner_clear_stop, 1L)
+  owner_clear <- paste(
+    source[owner_clear_start:(owner_clear_stop - 1L)], collapse = "\n"
+  )
+  expect_equal(
+    sum(gregexpr("free(owner->operator);", owner_clear, fixed = TRUE)[[1L]] > 0L),
     1L
   )
 })
@@ -82,4 +108,3 @@ test_that("scalar and general beta regression repeats are exact", {
       expect_identical(fit_once(degree), reference)
   }
 })
-

@@ -28,7 +28,7 @@ test_that("the generic scalar fit has one complete unwind owner", {
     fixed = TRUE
   )[[1L]]
   end <- regexpr(
-    "int kernel_estimate_regression_categorical_tree_np(",
+    "enum {\n  NP_REGRESSION_GENERAL_LP_FIT_OK = 0,",
     engine,
     fixed = TRUE
   )[[1L]]
@@ -83,11 +83,19 @@ test_that("the generic scalar branch delegates without duplicate ownership", {
   expect_false(grepl("free(", branch, fixed = TRUE))
   expect_match(
     branch,
+    "if(scalar_fit_status != NP_REGRESSION_SCALAR_FIT_OK)",
+    fixed = TRUE
+  )
+  expect_match(
+    branch, "goto finish_regression_estimation;", fixed = TRUE
+  )
+  expect_match(
+    engine,
     "error(\"conditional regression kernel traversal failed\");",
     fixed = TRUE
   )
   expect_match(
-    branch,
+    engine,
     "error(\"conditional influence variance construction failed\");",
     fixed = TRUE
   )

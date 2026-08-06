@@ -77,7 +77,11 @@ test_that("conditional bandwidth ingress marshals one compression contract", {
   )
   expect_match(
     ingress,
-    "C_np_density_conditional_bw: categorical compression must be TRUE or FALSE",
+    paste0(
+      "if(np_conditional_density_bw_categorical_compress_extern != 0 &&\n",
+      "       np_conditional_density_bw_categorical_compress_extern != 1)\n",
+      "      goto fail;"
+    ),
     fixed = TRUE
   )
   expect_match(
@@ -117,26 +121,43 @@ test_that("conditional beta bandwidth ingress is open for both estimators", {
   ))
 
   density_starts <- gregexpr(
-    "void np_density_conditional_bw(double * c_uno",
+    "static int np_conditional_density_prepared_context_prepare_internal(double *c_uno",
+    ingress,
+    fixed = TRUE
+  )[[1L]]
+  density_stops <- gregexpr(
+    "SEXP C_np_density_conditional_prepared_prepare(SEXP c_uno",
     ingress,
     fixed = TRUE
   )[[1L]]
   distribution_starts <- gregexpr(
+    "static void np_distribution_conditional_bw_mode(double * c_uno",
+    ingress,
+    fixed = TRUE
+  )[[1L]]
+  distribution_stops <- gregexpr(
     "void np_distribution_conditional_bw(double * c_uno",
     ingress,
     fixed = TRUE
   )[[1L]]
   density_start <- tail(density_starts[density_starts > 0L], 1L)
+  density_stop <- tail(density_stops[density_stops > density_start], 1L)
   distribution_start <- tail(
     distribution_starts[distribution_starts > 0L],
     1L
   )
+  distribution_stop <- tail(
+    distribution_stops[distribution_stops > distribution_start],
+    1L
+  )
   expect_gt(density_start, 0L)
-  expect_gt(distribution_start, density_start)
+  expect_gt(density_stop, density_start)
+  expect_gt(distribution_start, density_stop)
+  expect_gt(distribution_stop, distribution_start)
   density_ingress <- substr(
     ingress,
     density_start,
-    distribution_start - 1L
+    density_stop - 1L
   )
   allow_hits <- gregexpr(
     "NP_BETA_BW_ALLOW_CATEGORICAL",
@@ -152,16 +173,16 @@ test_that("conditional beta bandwidth ingress is open for both estimators", {
   distribution_ingress <- substr(
     ingress,
     distribution_start,
-    nchar(ingress)
+    distribution_stop - 1L
   )
   distribution_allow_hits <- gregexpr(
     "NP_BETA_BW_ALLOW_CATEGORICAL",
     distribution_ingress,
     fixed = TRUE
   )[[1L]]
-  expect_gte(length(distribution_allow_hits[
+  expect_length(distribution_allow_hits[
     distribution_allow_hits > 0L
-  ]), 2L)
+  ], 2L)
   expect_match(
     paste(readLines(file.path(root, "R", "condbandwidth.R"),
                     warn = FALSE), collapse = "\n"),
