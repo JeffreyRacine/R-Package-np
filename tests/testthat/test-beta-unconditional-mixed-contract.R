@@ -222,9 +222,10 @@ test_that("native density objective ingress requires compression state", {
   prep <- prepare(training, bw, invalid.penalty = "dbmax")
   native_eval <- function(myopti) {
     .Call(
-      "C_np_density_nomad_native_fixed_eval",
+      "C_np_density_bw_eval",
       prep$duno, prep$dord, prep$dcon, prep$mysd,
       myopti, prep$myoptd, as.double(bw$bw),
+      1L,
       prep$penalty_mode, prep$penalty_multiplier,
       prep$ckerlb, prep$ckerub,
       PACKAGE = "np"
@@ -237,8 +238,7 @@ test_that("native density objective ingress requires compression state", {
     fixed = TRUE
   )
   valid <- native_eval(prep$myopti)
-  expect_identical(valid$status, 0L)
-  expect_true(is.finite(valid$objective))
+  expect_true(is.finite(valid$fval[[1L]]))
 })
 
 test_that("native distribution objective ingress requires compression state", {

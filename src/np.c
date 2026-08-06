@@ -9675,141 +9675,6 @@ SEXP C_np_density_bw_eval(SEXP myuno,
                                 ckerlb, ckerub, 1);
 }
 
-static int np_density_nomad_native_eval_once(double *myuno,
-                                             double *myord,
-                                             double *mycon,
-                                             double *mysd,
-                                             int *myopti,
-                                             double *myoptd,
-                                             const double *bw_in,
-                                             int penalty_mode,
-                                             double penalty_mult,
-                                             double *ckerlb,
-                                             double *ckerub,
-                                             double out[5])
-{
-  int i;
-  const int num_var = myopti[BW_NCONI] + myopti[BW_NUNOI] + myopti[BW_NORDI];
-  double *bw = NULL;
-  double fval[2] = {R_NaN, R_NaN};
-  double fval_history[1] = {R_NaN};
-  double eval_history[1] = {R_NaN};
-  double invalid_history[1] = {R_NaN};
-  double timing[1] = {R_NaN};
-  double fast[1] = {R_NaN};
-  double guarded[1] = {R_NaN};
-  int pmode = penalty_mode;
-  double pmult = penalty_mult;
-
-  if (num_var <= 0 || bw_in == NULL || out == NULL)
-    return 1;
-
-  bw = NP_NOMAD_CALLBACK_CALLOC(num_var, double);
-  if (bw == NULL)
-    return 1;
-  for (i = 0; i < num_var; i++)
-    bw[i] = bw_in[i];
-
-  np_density_bw(myuno,
-                myord,
-                mycon,
-                mysd,
-                myopti,
-                myoptd,
-                bw,
-                fval,
-                fval_history,
-                eval_history,
-                invalid_history,
-                timing,
-                fast,
-                guarded,
-                &pmode,
-                &pmult,
-                ckerlb,
-                ckerub,
-                1);
-
-  out[0] = -fval[0];
-  out[1] = fval[0];
-  out[2] = eval_history[0];
-  out[3] = fast[0];
-  out[4] = guarded[0];
-
-  NP_NOMAD_CALLBACK_FREE(bw);
-  return 0;
-}
-
-SEXP C_np_density_nomad_native_fixed_eval(SEXP myuno,
-                                          SEXP myord,
-                                          SEXP mycon,
-                                          SEXP mysd,
-                                          SEXP myopti,
-                                          SEXP myoptd,
-                                          SEXP bw,
-                                          SEXP penalty_mode,
-                                          SEXP penalty_mult,
-                                          SEXP ckerlb,
-                                          SEXP ckerub)
-{
-  SEXP myuno_r = R_NilValue, myord_r = R_NilValue, mycon_r = R_NilValue;
-  SEXP mysd_r = R_NilValue, myopti_i = R_NilValue, myoptd_r = R_NilValue;
-  SEXP bw_r = R_NilValue, ckerlb_r = R_NilValue, ckerub_r = R_NilValue;
-  SEXP out = R_NilValue, names = R_NilValue;
-  double eval_out[5];
-  int status;
-
-  PROTECT(myuno_r = coerceVector(myuno, REALSXP));
-  PROTECT(myord_r = coerceVector(myord, REALSXP));
-  PROTECT(mycon_r = coerceVector(mycon, REALSXP));
-  PROTECT(mysd_r = coerceVector(mysd, REALSXP));
-  PROTECT(myopti_i = coerceVector(myopti, INTSXP));
-  PROTECT(myoptd_r = coerceVector(myoptd, REALSXP));
-  PROTECT(bw_r = coerceVector(bw, REALSXP));
-  PROTECT(ckerlb_r = coerceVector(ckerlb, REALSXP));
-  PROTECT(ckerub_r = coerceVector(ckerub, REALSXP));
-
-  np_density_bw_integer_contract_or_error(
-    myopti_i, "native npudens NOMAD evaluator");
-
-  if (XLENGTH(myoptd_r) <= BW_SFLOORD) {
-    UNPROTECT(9);
-    error("native npudens NOMAD evaluator received incomplete myoptd");
-  }
-
-  status = np_density_nomad_native_eval_once(REAL(myuno_r),
-                                             REAL(myord_r),
-                                             REAL(mycon_r),
-                                             REAL(mysd_r),
-                                             INTEGER(myopti_i),
-                                             REAL(myoptd_r),
-                                             REAL(bw_r),
-                                             asInteger(penalty_mode),
-                                             asReal(penalty_mult),
-                                             REAL(ckerlb_r),
-                                             REAL(ckerub_r),
-                                             eval_out);
-
-  PROTECT(out = allocVector(VECSXP, 6));
-  PROTECT(names = allocVector(STRSXP, 6));
-  SET_VECTOR_ELT(out, 0, ScalarInteger(status));
-  SET_VECTOR_ELT(out, 1, ScalarReal(eval_out[0]));
-  SET_VECTOR_ELT(out, 2, ScalarReal(eval_out[1]));
-  SET_VECTOR_ELT(out, 3, ScalarReal(eval_out[2]));
-  SET_VECTOR_ELT(out, 4, ScalarReal(eval_out[3]));
-  SET_VECTOR_ELT(out, 5, ScalarReal(eval_out[4]));
-  SET_STRING_ELT(names, 0, mkChar("status"));
-  SET_STRING_ELT(names, 1, mkChar("objective"));
-  SET_STRING_ELT(names, 2, mkChar("fval"));
-  SET_STRING_ELT(names, 3, mkChar("num.feval"));
-  SET_STRING_ELT(names, 4, mkChar("num.feval.fast"));
-  SET_STRING_ELT(names, 5, mkChar("num.feval.guarded"));
-  setAttrib(out, R_NamesSymbol, names);
-
-  UNPROTECT(11);
-  return out;
-}
-
 typedef struct {
   int n;
   int callback_calls;
@@ -9833,6 +9698,8 @@ typedef struct {
   double best_objective;
   double best_eval[5];
   double *best_point;
+  double *raw_point;
+  double *eval_bw;
   NPDensityPreparedCtx prepared;
 } np_udens_native_search_context;
 
@@ -9890,25 +9757,19 @@ static int np_udens_native_search_callback(int n,
 {
   np_udens_native_search_context *context =
     (np_udens_native_search_context *) user_data;
-  double *raw_point = NULL;
-  double *eval_bw = NULL;
+  double *raw_point;
+  double *eval_bw;
   double eval_out[5];
   int j;
   int status;
 
   if (context == NULL || x == NULL || bb_outputs == NULL || m != 1 ||
-      n != context->n)
+      n != context->n || context->raw_point == NULL ||
+      context->eval_bw == NULL)
     return 1;
 
-  raw_point = NP_NOMAD_CALLBACK_CALLOC(context->n, double);
-  eval_bw = NP_NOMAD_CALLBACK_CALLOC(context->n, double);
-  if (raw_point == NULL || eval_bw == NULL) {
-    if (raw_point != NULL)
-      NP_NOMAD_CALLBACK_FREE(raw_point);
-    if (eval_bw != NULL)
-      NP_NOMAD_CALLBACK_FREE(eval_bw);
-    return 1;
-  }
+  raw_point = context->raw_point;
+  eval_bw = context->eval_bw;
 
   for (j = 0; j < context->n; j++) {
     raw_point[j] = (context->bbin[j] == 1) ? nearbyint(x[j]) : x[j];
@@ -9921,8 +9782,6 @@ static int np_udens_native_search_callback(int n,
   status = np_udens_native_decode_eval_bw(context, raw_point, eval_bw);
   if (status != 0) {
     context->callback_failures++;
-    NP_NOMAD_CALLBACK_FREE(raw_point);
-    NP_NOMAD_CALLBACK_FREE(eval_bw);
     return 1;
   }
 
@@ -9933,8 +9792,6 @@ static int np_udens_native_search_callback(int n,
                                             eval_out);
   if (status != 0) {
     context->callback_failures++;
-    NP_NOMAD_CALLBACK_FREE(raw_point);
-    NP_NOMAD_CALLBACK_FREE(eval_bw);
     return 1;
   }
 
@@ -9953,8 +9810,6 @@ static int np_udens_native_search_callback(int n,
   }
 
   bb_outputs[0] = eval_out[0];
-  NP_NOMAD_CALLBACK_FREE(raw_point);
-  NP_NOMAD_CALLBACK_FREE(eval_bw);
   return 0;
 }
 
@@ -10083,11 +9938,23 @@ SEXP C_np_density_nomad_native_search(SEXP myuno,
     error("native npudens NOMAD search failed to prepare objective state");
   }
 
+  context.raw_point = R_Calloc(n, double);
+  context.eval_bw = R_Calloc(n, double);
+  if (context.raw_point == NULL || context.eval_bw == NULL) {
+    if (context.raw_point != NULL) R_Free(context.raw_point);
+    if (context.eval_bw != NULL) R_Free(context.eval_bw);
+    np_density_prepared_context_destroy(&context.prepared);
+    UNPROTECT(14);
+    error("failed to allocate native npudens callback scratch");
+  }
+
   solution = R_Calloc(n, double);
   best_point = R_Calloc(n, double);
   if (solution == NULL || best_point == NULL) {
     if (solution != NULL) R_Free(solution);
     if (best_point != NULL) R_Free(best_point);
+    R_Free(context.raw_point);
+    R_Free(context.eval_bw);
     np_density_prepared_context_destroy(&context.prepared);
     UNPROTECT(14);
     error("failed to allocate native npudens NOMAD buffers");
@@ -10097,6 +9964,8 @@ SEXP C_np_density_nomad_native_search(SEXP myuno,
     if (native_options == NULL) {
       R_Free(solution);
       R_Free(best_point);
+      R_Free(context.raw_point);
+      R_Free(context.eval_bw);
       np_density_prepared_context_destroy(&context.prepared);
       UNPROTECT(14);
       error("failed to allocate native npudens NOMAD option buffers");
@@ -10147,6 +10016,10 @@ SEXP C_np_density_nomad_native_search(SEXP myuno,
                                         NULL,
                                         &result);
   bwm_objective_cache_callback_option_end();
+  R_Free(context.raw_point);
+  R_Free(context.eval_bw);
+  context.raw_point = NULL;
+  context.eval_bw = NULL;
   np_density_prepared_context_destroy(&context.prepared);
 
   PROTECT(out = allocVector(VECSXP, 23));
@@ -12966,11 +12839,13 @@ static void np_density_bw_internal(double * myuno, double * myord, double * myco
   int_nn_k_min_extern = 1;
   /* Likelihood bandwidth selection for density estimation */
 
-  double **matrix_y;
+  double **matrix_y = NULL;
 
   double *vector_continuous_stddev = NULL;
-  double *vsfh, *vector_scale_factor, *vector_scale_factor_multistart;
-  double *vector_scale_factor_startbest;
+  double *vsfh = NULL;
+  double *vector_scale_factor = NULL;
+  double *vector_scale_factor_multistart = NULL;
+  double *vector_scale_factor_startbest = NULL;
 
   double fret, fret_best, fret_start_best, fret_initial;
   double ftol, tol;
@@ -13104,10 +12979,12 @@ static void np_density_bw_internal(double * myuno, double * myord, double * myco
 
 
   num_categories_extern = alloc_vecu(num_reg_unordered_extern+num_reg_ordered_extern);
-  matrix_y = alloc_matd(num_var + 1, num_var +1);
   vector_scale_factor = alloc_vecd(num_var + 1);
-  vector_scale_factor_startbest = alloc_vecd(num_var + 1);
-  vsfh = alloc_vecd(num_var + 1);
+  if (!eval_only) {
+    matrix_y = alloc_matd(num_var + 1, num_var + 1);
+    vector_scale_factor_startbest = alloc_vecd(num_var + 1);
+    vsfh = alloc_vecd(num_var + 1);
+  }
 
   matrix_categorical_vals_extern = alloc_matd(num_obs_train_extern, num_reg_unordered_extern + num_reg_ordered_extern);
 
@@ -13246,47 +13123,49 @@ static void np_density_bw_internal(double * myuno, double * myord, double * myco
                                     matrix_X_continuous_train_extern,
                                     matrix_Y_continuous_train_extern);
 
-  initialize_nr_vector_scale_factor(BANDWIDTH_den_extern,
-                                    0,                /* Not Random (0) Random (1) */
-                                    int_RANDOM_SEED,
-                                    int_LARGE_SF,
-                                    num_obs_train_extern,
-                                    0, 
-                                    0,
-                                    0,
-                                    num_reg_continuous_extern,
-                                    num_reg_unordered_extern,
-                                    num_reg_ordered_extern,
-                                    0, 
-                                    KERNEL_den_unordered_extern,                                    
-                                    0,
-                                    scale_cat,
-                                    pow((double)4.0/(double)3.0,0.2),             /* Init for continuous vars */
-                                    nconfac_extern, ncatfac_extern,
-                                    num_categories_extern,
-                                    vector_continuous_stddev,
-                                    vsfh,
-                                    lbc_init, hbc_init, c_init, 
-                                    lbd_init, hbd_init, d_init,
-                                    matrix_X_continuous_train_extern,
-                                    matrix_Y_continuous_train_extern);
+  if (!eval_only) {
+    initialize_nr_vector_scale_factor(BANDWIDTH_den_extern,
+                                      0,                /* Not Random (0) Random (1) */
+                                      int_RANDOM_SEED,
+                                      int_LARGE_SF,
+                                      num_obs_train_extern,
+                                      0,
+                                      0,
+                                      0,
+                                      num_reg_continuous_extern,
+                                      num_reg_unordered_extern,
+                                      num_reg_ordered_extern,
+                                      0,
+                                      KERNEL_den_unordered_extern,
+                                      0,
+                                      scale_cat,
+                                      pow((double)4.0/(double)3.0,0.2),
+                                      nconfac_extern, ncatfac_extern,
+                                      num_categories_extern,
+                                      vector_continuous_stddev,
+                                      vsfh,
+                                      lbc_init, hbc_init, c_init,
+                                      lbd_init, hbd_init, d_init,
+                                      matrix_X_continuous_train_extern,
+                                      matrix_Y_continuous_train_extern);
 
-  initialize_nr_directions(BANDWIDTH_den_extern,
-                           num_obs_train_extern,
-                           num_reg_continuous_extern,
-                           num_reg_unordered_extern,
-                           num_reg_ordered_extern,
-                           0,
-                           0,
-                           0,
-                           vsfh,
-                           num_categories_extern,
-                           matrix_y,
-                           0, int_RANDOM_SEED, 
-                           lbc_dir, dfc_dir, c_dir,initc_dir,
-                           lbd_dir, hbd_dir, d_dir, initd_dir,
-                           matrix_X_continuous_train_extern,
-                           matrix_Y_continuous_train_extern);
+    initialize_nr_directions(BANDWIDTH_den_extern,
+                             num_obs_train_extern,
+                             num_reg_continuous_extern,
+                             num_reg_unordered_extern,
+                             num_reg_ordered_extern,
+                             0,
+                             0,
+                             0,
+                             vsfh,
+                             num_categories_extern,
+                             matrix_y,
+                             0, int_RANDOM_SEED,
+                             lbc_dir, dfc_dir, c_dir, initc_dir,
+                             lbd_dir, hbd_dir, d_dir, initd_dir,
+                             matrix_X_continuous_train_extern,
+                             matrix_Y_continuous_train_extern);
+  }
 
   /* When multistarting, set counter */
 

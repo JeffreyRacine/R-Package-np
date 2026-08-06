@@ -64,7 +64,6 @@ test_that("native NOMAD C callback path does not call R API or longjmp helpers",
     "np_regression_shadow_native_decode_bw",
     "np_regression_nomad_shadow_eval_native_raw",
     "np_density_conditional_nomad_shadow_eval_native_raw",
-    "np_density_nomad_native_eval_once",
     "np_density_prepared_context_eval",
     "np_distribution_nomad_native_eval_once",
     "np_distribution_conditional_nomad_native_eval_once",
@@ -112,6 +111,25 @@ test_that("native NOMAD C callback path does not call R API or longjmp helpers",
   if (length(violations))
     stop(paste(violations, collapse = "\n"), call. = FALSE)
   expect_length(violations, 0L)
+  expect_false(grepl(
+    "\\bnp_density_nomad_native_eval_once\\b",
+    source_text,
+    perl = TRUE
+  ))
+  expect_false(grepl(
+    "NP_NOMAD_CALLBACK_CALLOC",
+    npRmpi_extract_c_function_body(source_text, "np_udens_native_search_callback"),
+    fixed = TRUE
+  ))
+  init_text <- paste(readLines(
+    file.path(npRmpi_namespace_hygiene_root(), "src", "np_init.c"),
+    warn = FALSE
+  ), collapse = "\n")
+  expect_false(grepl(
+    "C_np_density_nomad_native_fixed_eval",
+    init_text,
+    fixed = TRUE
+  ))
 })
 
 test_that("native NOMAD categorical coordinates use one canonical decoder", {
