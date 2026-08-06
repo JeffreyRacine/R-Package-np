@@ -81,3 +81,26 @@ test_that("native conditional-distribution search retains one prepared owner", {
                  info = field)
   }
 })
+
+test_that("conditional-distribution native callbacks cannot restore constructor evaluation", {
+  source <- np_conditional_distribution_owner_source()
+
+  expect_false(grepl(
+    "np_distribution_conditional_nomad_native_eval_once",
+    source,
+    fixed = TRUE
+  ))
+
+  callback <- sub(
+    ".*static int np_cdist_native_search_callback",
+    "static int np_cdist_native_search_callback",
+    source
+  )
+  callback <- sub(
+    "SEXP C_np_distribution_conditional_nomad_native_search.*",
+    "",
+    callback
+  )
+  expect_false(grepl("NP_NOMAD_CALLBACK_CALLOC", callback, fixed = TRUE))
+  expect_false(grepl("np_distribution_conditional_bw(", callback, fixed = TRUE))
+})
