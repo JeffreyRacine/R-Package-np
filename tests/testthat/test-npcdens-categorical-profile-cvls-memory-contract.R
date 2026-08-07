@@ -13,6 +13,10 @@ test_that("npcdens categorical profile CVLS owns a bounded tri-state workspace",
     readLines(file.path(source_root, "src", "jksum.c"), warn = FALSE),
     collapse = "\n"
   )
+  np_source <- paste(
+    readLines(file.path(source_root, "src", "np.c"), warn = FALSE),
+    collapse = "\n"
+  )
   starts <- gregexpr(
     paste0(
       "static NPConditionalProfileCvStatus\\n",
@@ -46,6 +50,16 @@ test_that("npcdens categorical profile CVLS owns a bounded tri-state workspace",
   expect_match(
     source,
     "if(profile_status == NP_CONDITIONAL_PROFILE_CV_FAILURE)",
+    fixed = TRUE
+  )
+  expect_match(
+    np_source,
+    "int_TREE_PROFILE_X = myopti[CBW_TREEI];",
+    fixed = TRUE
+  )
+  expect_match(
+    source,
+    "np_fastcv_alllarge_hits++;",
     fixed = TRUE
   )
   expect_match(implementation, "np_size_mul_checked", fixed = TRUE)
@@ -139,11 +153,13 @@ test_that("npcdens categorical profile CVLS remains numerically equivalent", {
   old <- options(np.categorical.compress = TRUE, np.tree = FALSE)
   on.exit(options(old), add = TRUE)
 
-  compressed <- np:::.npcdensbw_eval_only(x, y, state)$objective
+  compressed <- np:::.npcdensbw_eval_only(x, y, state)
   options(np.categorical.compress = FALSE)
-  canonical <- np:::.npcdensbw_eval_only(x, y, state)$objective
+  canonical <- np:::.npcdensbw_eval_only(x, y, state)
 
-  expect_equal(compressed, canonical, tolerance = 1e-12)
+  expect_equal(compressed$objective, canonical$objective, tolerance = 1e-12)
+  expect_equal(compressed$num.feval.fast, 1)
+  expect_equal(canonical$num.feval.fast, 0)
 })
 
 test_that("categorical profile CVLS matches an explicit delete-one oracle", {

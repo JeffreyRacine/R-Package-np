@@ -32112,6 +32112,7 @@ int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
 
     if(profile_status == NP_CONDITIONAL_PROFILE_CV_SUCCESS){
       np_glp_cv_clear_extern();
+      np_fastcv_alllarge_hits++;
       return 0;
     }
     if(profile_status == NP_CONDITIONAL_PROFILE_CV_FAILURE){
