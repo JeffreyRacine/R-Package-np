@@ -38496,6 +38496,36 @@ int np_conditional_distribution_cvls_lp_stream(double *vector_scale_factor,
   return np_conditional_distribution_cvls_lp_one(vector_scale_factor, cv);
 }
 
+static inline int np_density_cvml_beta_row_contribution(
+  NPBetaScaledRowContext *context,
+  const int evaluation,
+  const int num_obs,
+  double *contribution)
+{
+  NPContinuousKernelRowStatus row_status;
+  double scaled_sum = 0.0;
+  double common_log_scale = 0.0;
+  double log_absolute_sum = -INFINITY;
+  int sign = 0;
+
+  if(context == NULL || contribution == NULL || num_obs <= 1)
+    return 1;
+  row_status = np_beta_scaled_row_context_fill_omitting(
+    context, evaluation, evaluation,
+    &scaled_sum, &common_log_scale);
+  if(row_status != NP_CONTINUOUS_ROW_OK)
+    return 1;
+  if(scaled_sum != 0.0) {
+    log_absolute_sum = log(fabs(scaled_sum)) + common_log_scale;
+    sign = scaled_sum > 0.0 ? 1 : -1;
+  }
+  if(ISNAN(log_absolute_sum))
+    return 1;
+  *contribution = np_guarded_cvml_log_contribution(
+    log_absolute_sum, sign, num_obs - 1);
+  return R_FINITE(*contribution) ? 0 : 1;
+}
+
 static int np_density_cvml_beta_route(
   const NPContinuousKernelRoute *route,
   NPContinuousKernelDerivativeDiagnostics *diagnostics,
@@ -38519,8 +38549,14 @@ static int np_density_cvml_beta_route(
 {
   NPBetaScaledRowContext context;
   NPContinuousKernelRowStatus row_status;
+  double *contributions = NULL;
+  double local_cv = 0.0;
+  int owned_start = 0;
+  int owned_rows = 0;
+  int local_fail = 0;
   int evaluation;
   int status = 1;
+  const int use_parallel_rows = np_objective_outer_rows_enabled(1);
 
   np_beta_scaled_row_context_init(&context);
   row_status = np_beta_scaled_row_context_prepare(
@@ -38533,37 +38569,70 @@ static int np_density_cvml_beta_route(
     matrix_bandwidth, matrix_bandwidth, operator,
     kernel_unordered, kernel_ordered, lambda, num_categories,
     matrix_categorical_vals_extern, categorical_compress, row);
-  if(row_status != NP_CONTINUOUS_ROW_OK)
+  local_fail = row_status != NP_CONTINUOUS_ROW_OK;
+#ifdef MPI2
+  if(use_parallel_rows) {
+    int any_fail = 0;
+
+    MPI_Allreduce(&local_fail, &any_fail, 1, MPI_INT, MPI_MAX, comm[1]);
+    if(any_fail)
+      goto cleanup;
+  }
+#endif
+  if(local_fail)
     goto cleanup;
 
-  *cv = 0.0;
-  for(evaluation = 0; evaluation < num_obs; ++evaluation) {
-    double scaled_sum = 0.0;
-    double common_log_scale = 0.0;
-    double log_absolute_sum = -INFINITY;
-    int sign = 0;
+  if(np_objective_outer_buffer_prepare(use_parallel_rows,
+                                       (size_t)num_obs,
+                                       &contributions) != 0)
+    goto cleanup;
+  np_objective_outer_owned_rows(0,
+                                num_obs,
+                                use_parallel_rows,
+                                &owned_start,
+                                &owned_rows);
+
+  for(evaluation = owned_start;
+      evaluation < owned_start + owned_rows;
+      ++evaluation) {
+    double contribution = 0.0;
 
     if((evaluation & 31) == 0)
       np_progress_bandwidth_loop_step();
-    row_status = np_beta_scaled_row_context_fill_omitting(
-      &context, evaluation, evaluation,
-      &scaled_sum, &common_log_scale);
-    if(row_status != NP_CONTINUOUS_ROW_OK)
-      goto cleanup;
-    if(scaled_sum != 0.0) {
-      log_absolute_sum = log(fabs(scaled_sum)) + common_log_scale;
-      sign = scaled_sum > 0.0 ? 1 : -1;
+    if(np_density_cvml_beta_row_contribution(
+         &context, evaluation, num_obs, &contribution) != 0) {
+      local_fail = 1;
+      break;
     }
-    if(ISNAN(log_absolute_sum))
-      goto cleanup;
-    *cv += np_guarded_cvml_log_contribution(
-      log_absolute_sum, sign, num_obs - 1);
-    if(!R_FINITE(*cv))
-      goto cleanup;
+    if(use_parallel_rows)
+      contributions[evaluation] = contribution;
+    else {
+      local_cv += contribution;
+      if(!R_FINITE(local_cv)) {
+        local_fail = 1;
+        break;
+      }
+    }
   }
+
+  if(np_objective_outer_buffer_finish(
+       use_parallel_rows,
+       num_obs,
+       local_fail,
+       contributions,
+       "NP_RMPI_INJECT_UDEN_CVML_FAIL_RANK",
+       "unconditional density beta CVML contributions MPI_Allreduce") != 0)
+    goto cleanup;
+  if(use_parallel_rows)
+    for(evaluation = 0; evaluation < num_obs; ++evaluation)
+      local_cv += contributions[evaluation];
+  if(!R_FINITE(local_cv))
+    goto cleanup;
+  *cv = local_cv;
   status = 0;
 
 cleanup:
+  free(contributions);
   np_beta_scaled_row_context_clear(&context);
   return status;
 }
