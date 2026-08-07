@@ -9,7 +9,10 @@
   `gradients(..., errors = TRUE)` give a direct refit message when errors were
   deliberately omitted. All four mean/SE/gradient request combinations share
   the canonical scalar, local-polynomial, bounded-beta, and MPI regression
-  engines; bandwidth selection and objective functions are unchanged.
+  engines; bandwidth selection and objective functions are unchanged. The new
+  control is forwarded through the historical `npreg(bws, ...)` generic so
+  formula calls that also supply `bws` and all pre-existing positional method
+  arguments retain their established dispatch.
 
 * Conditional density and distribution kernel summaries now identify
   explanatory and dependent kernels separately for continuous, unordered, and

@@ -57,6 +57,56 @@ test_that("npreg request states preserve retained scalar and LP outputs", {
                "gradients=TRUE and errors=TRUE", fixed = TRUE)
 })
 
+test_that("errors preserves historical generic and positional dispatch", {
+  request_driven_regression_runtime()
+  old <- options(np.messages = FALSE, np.tree = FALSE, np.largeh = FALSE)
+  on.exit(options(old), add = TRUE)
+
+  training <- data.frame(
+    x = c(0.03, 0.10, 0.24, 0.43, 0.67, 0.82, 0.96)
+  )
+  training$y <- sin(2 * training$x) + training$x
+  evaluation <- data.frame(x = c(0.08, 0.38, 0.74, 0.92))
+  common <- list(
+    bws = 0.18,
+    regtype = "lc",
+    ckertype = "beta",
+    ckerbound = "fixed",
+    ckerlb = 0,
+    ckerub = 1
+  )
+
+  named <- do.call(npreg, c(list(
+    y ~ x, data = training, newdata = evaluation
+  ), common))
+  direct <- do.call(npreg, c(list(
+    txdat = training["x"], tydat = training$y, exdat = evaluation
+  ), common))
+  lean <- do.call(npreg, c(list(
+    y ~ x, data = training, newdata = evaluation
+  ), common, list(errors = FALSE)))
+
+  expect_identical(fitted(named), fitted(direct))
+  expect_identical(se(named), se(direct))
+  expect_identical(fitted(lean), fitted(named))
+  expect_null(lean$merr)
+
+  expect_identical(names(formals(npreg)), c("bws", "..."))
+  expect_identical(
+    names(formals(getS3method("npreg", "formula")))[seq_len(4L)],
+    c("bws", "data", "newdata", "y.eval")
+  )
+  expect_identical(
+    names(formals(getS3method("npreg", "default")))[seq_len(4L)],
+    c("bws", "txdat", "tydat", "nomad")
+  )
+  expect_identical(
+    names(formals(getS3method("npreg", "rbandwidth")))[seq_len(8L)],
+    c("bws", "txdat", "tydat", "exdat", "eydat", "gradient.order",
+      "gradients", "residuals")
+  )
+})
+
 test_that("beta request suppression agrees with the independent LP apply owner", {
   request_driven_regression_runtime()
   old <- options(np.messages = FALSE, np.tree = FALSE, np.largeh = FALSE)
