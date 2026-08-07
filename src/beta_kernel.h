@@ -184,8 +184,8 @@ typedef struct {
 typedef struct {
   double support_length;
   double concentration;
-  double target_unit;
-  double target_complement_unit;
+  double digamma_alpha;
+  double digamma_beta;
 } np_beta_pdf_derivative_component;
 
 /*

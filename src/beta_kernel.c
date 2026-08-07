@@ -792,6 +792,7 @@ static np_beta_status np_beta_derivative_accumulate(double log_term,
 
 static np_beta_status np_beta_derivative_component_accumulate(
   const np_beta_shape *shape,
+  const np_beta_pdf_derivative_component *prepared,
   double evaluation,
   double observation,
   double log_pdf,
@@ -802,6 +803,8 @@ static np_beta_status np_beta_derivative_component_accumulate(
   double *jump_positive_log,
   double *jump_negative_log)
 {
+  double digamma_alpha;
+  double digamma_beta;
   double score;
   double log_term;
   int term_sign;
@@ -825,12 +828,19 @@ static np_beta_status np_beta_derivative_component_accumulate(
 
   if(log_pdf == -INFINITY)
     return NP_BETA_OK;
-
+  if(prepared == NULL) {
+    digamma_alpha = digamma(
+      1.0 + shape->target_unit * shape->concentration);
+    digamma_beta = digamma(
+      1.0 + shape->target_complement_unit * shape->concentration);
+  } else {
+    digamma_alpha = prepared->digamma_alpha;
+    digamma_beta = prepared->digamma_beta;
+  }
   score = (shape->concentration / shape->support_length) *
     (shape->log_observation_unit -
      shape->log_observation_complement_unit -
-     digamma(1.0 + shape->target_unit * shape->concentration) +
-     digamma(1.0 + shape->target_complement_unit * shape->concentration));
+     digamma_alpha + digamma_beta);
   if(ISNAN(score))
     return NP_BETA_ERR_NUMERIC;
   if(score == 0.0)
@@ -887,7 +897,7 @@ np_beta_status np_beta_pdf_derivative_order(double evaluation,
     log_abs_coefficient = log((double)abs(coefficients[component]));
     coefficient_sign = coefficients[component] > 0 ? 1 : -1;
     status = np_beta_derivative_component_accumulate(
-      &shape, evaluation, observation, log_pdf,
+      &shape, NULL, evaluation, observation, log_pdf,
       log_abs_coefficient, coefficient_sign,
       &regular_positive_log, &regular_negative_log,
       &jump_positive_log, &jump_negative_log);
@@ -976,7 +986,8 @@ np_beta_status np_beta_log_abs_pdf_derivative_order(
        shape[component].concentration == 0.0)
       continue;
     status = np_beta_derivative_component_accumulate(
-      &shape[component], evaluation, observation, log_pdf[component],
+      &shape[component], NULL,
+      evaluation, observation, log_pdf[component],
       log_abs_coefficient[component],
       coefficients[component] > 0 ? 1 : -1,
       &regular_positive_log, &regular_negative_log,
@@ -1050,14 +1061,12 @@ np_beta_status np_beta_log_abs_pdf_derivative_prepared(
       derivative_components[component].support_length;
     shape.concentration =
       derivative_components[component].concentration;
-    shape.target_unit = derivative_components[component].target_unit;
-    shape.target_complement_unit =
-      derivative_components[component].target_complement_unit;
     shape.log_observation_unit = observation->log_unit;
     shape.log_observation_complement_unit =
       observation->log_complement_unit;
     status = np_beta_derivative_component_accumulate(
-      &shape, evaluation, observed, log_pdf,
+      &shape, &derivative_components[component],
+      evaluation, observed, log_pdf,
       components[component].log_abs_coefficient,
       components[component].coefficient_sign,
       &regular_positive_log, &regular_negative_log,
@@ -1189,7 +1198,8 @@ np_beta_log_abs_pdf_derivative_order_prepared_observation(
        shape[component].concentration == 0.0)
       continue;
     status = np_beta_derivative_component_accumulate(
-      &shape[component], evaluation, observed, log_pdf[component],
+      &shape[component], NULL,
+      evaluation, observed, log_pdf[component],
       log_abs_coefficient[component], coefficient_sign[component],
       &regular_positive_log, &regular_negative_log,
       &jump_positive_log, &jump_negative_log);
