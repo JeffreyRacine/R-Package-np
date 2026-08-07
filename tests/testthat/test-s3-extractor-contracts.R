@@ -8,7 +8,8 @@ test_that("core fitted and se extract stored quantities without recomputation", 
   expect_equal(se(dist), dist$derr)
 
   reg <- structure(
-    list(mean = c(2, 3), merr = c(0.2, 0.3), residuals = TRUE, resid = c(-0.1, 0.1)),
+    list(mean = c(2, 3), merr = c(0.2, 0.3), errors = TRUE,
+         residuals = TRUE, resid = c(-0.1, 0.1)),
     class = "npregression"
   )
   expect_equal(fitted(reg), reg$mean)
