@@ -18419,6 +18419,36 @@ static inline int np_regression_cv_scalar_accumulate_scaled_row(
   return !R_FINITE(*cv) || !R_FINITE(*traceH);
 }
 
+static inline int np_regression_cv_scalar_finish_objective(
+  const int bwm,
+  const int num_obs,
+  double cv,
+  const double traceH,
+  double * const objective)
+{
+  if(objective == NULL || num_obs <= 0 ||
+     (bwm != RBWM_CVLS && bwm != RBWM_CVAIC))
+    return 1;
+
+  cv /= (double)num_obs;
+  if(bwm == RBWM_CVAIC) {
+    const double penalty_denominator =
+      1.0 - (traceH + 2.0)/(double)num_obs;
+    const double penalty_numerator =
+      1.0 + traceH/(double)num_obs;
+    const double penalty = penalty_numerator/penalty_denominator;
+
+    if(!(cv > 0.0) || !R_FINITE(cv) || !R_FINITE(penalty) || penalty < 0.0)
+      return 1;
+    cv = log(cv) + penalty;
+  }
+  if(!R_FINITE(cv))
+    return 1;
+
+  *objective = cv;
+  return 0;
+}
+
 /*
  * Route-aware scalar regression objective.  This is an O(n) row consumer,
  * not a beta objective: the route owns continuous-kernel construction while
@@ -18621,22 +18651,10 @@ static int np_regression_cv_scalar_continuous_route_body(
       goto cleanup_route;
   }
 
-  cv /= (double)num_obs;
-  if(bwm == RBWM_CVAIC) {
-    const double penalty_denominator =
-      1.0 - (traceH + 2.0)/(double)num_obs;
-    const double penalty_numerator =
-      1.0 + traceH/(double)num_obs;
-    const double penalty = penalty_numerator/penalty_denominator;
-
-    if(!(cv > 0.0) || !R_FINITE(cv) || !R_FINITE(penalty) || penalty < 0.0)
-      goto cleanup_route;
-    cv = log(cv) + penalty;
-  }
-  if(!R_FINITE(cv))
+  if(np_regression_cv_scalar_finish_objective(
+       bwm, num_obs, cv, traceH, objective) != 0)
     goto cleanup_route;
 
-  *objective = cv;
   status = 0;
 
 cleanup_route:
@@ -18664,6 +18682,8 @@ static int np_regression_cv_scalar_continuous_route_parallel_body(
   double **matrix_bandwidth;
   double *contributions;
   double cv = 0.0;
+  double traceH = 0.0;
+  int contribution_count;
   int owned_start = 0;
   int owned_rows = 0;
   int local_fail = 0;
@@ -18672,13 +18692,17 @@ static int np_regression_cv_scalar_continuous_route_parallel_body(
   if(call->objective == NULL || num_obs < 2 || num_reg_continuous <= 0 ||
      call->matrix_X_continuous == NULL || call->response == NULL ||
      call->scale_factor == NULL || call->kernel_route == NULL ||
-     call->kernel_route_diagnostics == NULL || call->bwm != RBWM_CVLS ||
+     call->kernel_route_diagnostics == NULL ||
+     (call->bwm != RBWM_CVLS && call->bwm != RBWM_CVAIC) ||
      call->bandwidth_mode != BW_FIXED ||
      (call->categorical_compress != 0 && call->categorical_compress != 1))
     return 1;
 
+  if(call->bwm == RBWM_CVAIC && num_obs > INT_MAX/2)
+    return 1;
+  contribution_count = call->bwm == RBWM_CVAIC ? 2*num_obs : num_obs;
   if(np_objective_outer_buffer_prepare(
-       1, (size_t)num_obs, &owner->contributions) != 0)
+       1, (size_t)contribution_count, &owner->contributions) != 0)
     return 1;
   owner->operator = (int *)np_jksum_malloc_array_try(
     (size_t)MAX(1, num_reg), sizeof(*owner->operator));
@@ -18742,33 +18766,38 @@ static int np_regression_cv_scalar_continuous_route_parallel_body(
     double row_loss = 0.0;
     double row_trace = 0.0;
     double row_sum = 0.0;
+    const int omitted = call->bwm == RBWM_CVLS ? evaluation : -1;
 
     if((evaluation & 31) == 0)
       np_progress_bandwidth_loop_step();
     row_status = np_beta_scaled_row_context_fill_omitting(
-      row_context, evaluation, evaluation, &row_sum, NULL);
+      row_context, evaluation, omitted, &row_sum, NULL);
     if(row_status != NP_CONTINUOUS_ROW_OK ||
        np_regression_cv_scalar_accumulate_scaled_row(
-         RBWM_CVLS, evaluation, num_obs, call->response, owner->row,
+         call->bwm, evaluation, num_obs, call->response, owner->row,
          row_sum, &row_loss, &row_trace) != 0) {
       local_fail = 1;
       break;
     }
     contributions[evaluation] = row_loss;
+    if(call->bwm == RBWM_CVAIC)
+      contributions[num_obs + evaluation] = row_trace;
   }
 
   if(np_objective_outer_buffer_finish(
-       1, num_obs, local_fail, contributions,
+       1, contribution_count, local_fail, contributions,
        "NP_RMPI_INJECT_REG_ROUTED_CV_FAIL_RANK",
        "regression routed scalar CV contributions MPI_Allreduce") != 0)
     return 1;
-  for(evaluation = 0; evaluation < num_obs; ++evaluation)
+  for(evaluation = 0; evaluation < num_obs; ++evaluation) {
     cv += contributions[evaluation];
-  cv /= (double)num_obs;
-  if(!R_FINITE(cv))
+    if(call->bwm == RBWM_CVAIC)
+      traceH += contributions[num_obs + evaluation];
+  }
+  if(np_regression_cv_scalar_finish_objective(
+       call->bwm, num_obs, cv, traceH, call->objective) != 0)
     return 1;
 
-  *call->objective = cv;
   return 0;
 }
 
@@ -18778,7 +18807,8 @@ static SEXP np_regression_cv_scalar_route_execute(void *data)
     (NPRegressionCvScalarRouteExecution *)data;
 
   if(np_objective_outer_rows_enabled(
-       execution->call->bwm == RBWM_CVLS &&
+       (execution->call->bwm == RBWM_CVLS ||
+        execution->call->bwm == RBWM_CVAIC) &&
        execution->call->bandwidth_mode == BW_FIXED))
     execution->status =
       np_regression_cv_scalar_continuous_route_parallel_body(

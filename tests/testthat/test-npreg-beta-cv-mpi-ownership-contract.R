@@ -52,7 +52,7 @@ test_that("fixed scalar CVLS admits one complete-row MPI owner", {
   )
   expect_match(
     body,
-    "for(evaluation = 0; evaluation < num_obs; ++evaluation)\n    cv += contributions[evaluation];",
+    "for(evaluation = 0; evaluation < num_obs; ++evaluation) {\n    cv += contributions[evaluation];",
     fixed = TRUE
   )
   expect_false(grepl("evaluation % iNum_Processors", body, fixed = TRUE))
@@ -61,7 +61,7 @@ test_that("fixed scalar CVLS admits one complete-row MPI owner", {
   expect_false(grepl("diag(num_obs)", body, fixed = TRUE))
 })
 
-test_that("scalar owner retains local CVAIC and NN isolation", {
+test_that("scalar owner admits both fixed objectives and retains NN isolation", {
   source <- npreg_beta_cv_mpi_source()
   skip_if(is.null(source), "package C source unavailable")
 
@@ -80,8 +80,8 @@ test_that("scalar owner retains local CVAIC and NN isolation", {
   )
   expect_length(gate, 1L)
   expect_match(gate, "RBWM_CVLS", fixed = TRUE)
+  expect_match(gate, "RBWM_CVAIC", fixed = TRUE)
   expect_match(gate, "BW_FIXED", fixed = TRUE)
-  expect_false(grepl("RBWM_CVAIC", gate, fixed = TRUE))
   expect_false(grepl("BW_GEN_NN", gate, fixed = TRUE))
   expect_false(grepl("BW_ADAP_NN", gate, fixed = TRUE))
 })
@@ -150,6 +150,35 @@ test_that("parallel rows reuse the incumbent scalar estimator finisher", {
   expect_match(
     source,
     "&row_loss, &row_trace) != 0",
+    fixed = TRUE
+  )
+  expect_match(
+    source,
+    "contributions[num_obs + evaluation] = row_trace;",
+    fixed = TRUE
+  )
+})
+
+test_that("local and parallel scalar routes share the objective finisher", {
+  source <- npreg_beta_cv_mpi_source()
+  skip_if(is.null(source), "package C source unavailable")
+
+  helper <- npreg_beta_cv_mpi_body(
+    source,
+    "static inline int np_regression_cv_scalar_finish_objective(",
+    "typedef struct {\n  int bwm;"
+  )
+  expect_match(helper, "cv /= (double)num_obs;", fixed = TRUE)
+  expect_match(helper, "if(bwm == RBWM_CVAIC)", fixed = TRUE)
+  expect_match(helper, "cv = log(cv) + penalty;", fixed = TRUE)
+  expect_match(
+    source,
+    "bwm, num_obs, cv, traceH, objective",
+    fixed = TRUE
+  )
+  expect_match(
+    source,
+    "call->bwm, num_obs, cv, traceH, call->objective",
     fixed = TRUE
   )
 })
