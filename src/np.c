@@ -5730,9 +5730,11 @@ static int np_conditional_density_prepared_context_prepare_internal(double *c_un
   np_conditional_density_prepared_context.penalty_multiplier = penalty_mult[0];
 
   int_TREE_XY = int_TREE_Y = int_TREE_X = myopti[CBW_TREEI];
+  int_TREE_PROFILE_X = myopti[CBW_TREEI];
   if(KERNEL_reg_extern == NP_CKERNEL_COORDINATE_CODE ||
      KERNEL_den_extern == NP_CKERNEL_COORDINATE_CODE)
-    int_TREE_XY = int_TREE_Y = int_TREE_X = NP_TREE_FALSE;
+    int_TREE_XY = int_TREE_Y = int_TREE_X = int_TREE_PROFILE_X =
+      NP_TREE_FALSE;
   if((np_lp_engine_extern == NP_LP_ENGINE_GENERAL) && !degree_search){
     int_TREE_Y = NP_TREE_FALSE;
     int_TREE_XY = NP_TREE_FALSE;
