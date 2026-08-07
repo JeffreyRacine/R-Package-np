@@ -73,9 +73,23 @@ test_that("the canonical beta row route has one unwind owner", {
     fixed = TRUE
   )
   expect_false(grepl("free(route_row);", engine, fixed = TRUE))
+  # The public kernel-sum consumer enters through the MPI-aware dispatcher;
+  # the regression-fit consumer enters the same canonical owner directly.
   expect_identical(
     fixed_occurrences(engine, "np_beta_absolute_route(&route_call);"),
-    2L
+    1L
+  )
+  expect_identical(
+    fixed_occurrences(
+      engine,
+      "np_beta_absolute_route_dispatch(\n        &route_call, suppress_parallel);"
+    ),
+    1L
+  )
+  expect_match(
+    engine,
+    "return np_beta_absolute_route(call);",
+    fixed = TRUE
   )
 
   fit_start <- regexpr(
