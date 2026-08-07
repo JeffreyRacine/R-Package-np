@@ -610,77 +610,23 @@ np_continuous_kernel_beta_prepared_pdf_row_prepare(
           return NP_CONTINUOUS_ROW_ERR_KERNEL;
         }
       }
-    }
-  }
-  return NP_CONTINUOUS_ROW_OK;
-}
+      /* The PDF row is the canonical owner of this validated shape.  A
+       * derivative consumer allocates its sibling state before entering this
+       * routine, allowing both views to be filled without reconstructing the
+       * shape in a second pass.  Level-only consumers leave the pointer NULL. */
+      if(context->pdf_row_derivative_component != NULL) {
+        np_beta_pdf_derivative_component * const derivative_component =
+          &context->pdf_row_derivative_component[
+            (size_t)beta_slot * NP_BETA_PREPARED_MAX_COMPONENTS +
+            (size_t)component];
 
-NPContinuousKernelRowStatus
-np_continuous_kernel_beta_prepared_derivative_row_prepare(
-  const NPContinuousKernelRowPlan *plan,
-  const NPContinuousKernelSegment *segment,
-  int evaluation_index,
-  int omitted_observation,
-  NPContinuousKernelRowResult *result)
-{
-  NPContinuousKernelBetaPreparedContext * const context =
-    plan == NULL ? NULL : plan->beta_prepared;
-  const int first_observation = omitted_observation == 0 ? 1 : 0;
-  int coordinate;
-
-  if(context == NULL || !context->pdf_active ||
-     !context->pdf_row_component_active ||
-     context->pdf_row_derivative_component == NULL ||
-     segment == NULL || result == NULL ||
-     context->num_train != plan->num_train ||
-     context->num_continuous != plan->num_continuous)
-    return NP_CONTINUOUS_ROW_ERR_LAYOUT;
-  if(first_observation >= plan->num_train)
-    return NP_CONTINUOUS_ROW_OK;
-
-  for(coordinate = segment->coordinate_offset;
-      coordinate < segment->coordinate_offset + segment->coordinate_count;
-      ++coordinate) {
-    const int local_coordinate = coordinate - segment->coordinate_offset;
-    const double evaluation = plan->train_is_eval ?
-      plan->train[coordinate][evaluation_index] :
-      plan->evaluation[coordinate][evaluation_index];
-    const double bandwidth = plan->bandwidth_mode == BW_FIXED ?
-      plan->bandwidth_eval[coordinate][0] :
-      plan->bandwidth_eval[coordinate][evaluation_index];
-    const int beta_slot = context->coordinate_slot[coordinate];
-    const int component_count = segment->descriptor.order / 2;
-    int component;
-
-    if(beta_slot < 0 || beta_slot >= context->num_beta_coordinates)
-      return NP_CONTINUOUS_ROW_ERR_LAYOUT;
-    if(component_count <= 0 ||
-       component_count > NP_BETA_PREPARED_MAX_COMPONENTS)
-      return NP_CONTINUOUS_ROW_ERR_ROUTE;
-    for(component = 0; component < component_count; ++component) {
-      const size_t component_offset =
-        (size_t)beta_slot * NP_BETA_PREPARED_MAX_COMPONENTS +
-        (size_t)component;
-      np_beta_pdf_derivative_component * const derivative_component =
-        &context->pdf_row_derivative_component[component_offset];
-      np_beta_shape shape;
-      const np_beta_status beta_status = np_beta_shape_init(
-        evaluation, segment->lower[local_coordinate], bandwidth,
-        segment->lower[local_coordinate],
-        segment->upper[local_coordinate], component + 1, &shape);
-
-      if(beta_status != NP_BETA_OK) {
-        result->beta_status = beta_status;
-        result->bad_coordinate = coordinate;
-        result->bad_observation = first_observation;
-        return NP_CONTINUOUS_ROW_ERR_KERNEL;
+        derivative_component->support_length = shape.support_length;
+        derivative_component->concentration = shape.concentration;
+        derivative_component->digamma_alpha = digamma(
+          1.0 + shape.target_unit * shape.concentration);
+        derivative_component->digamma_beta = digamma(
+          1.0 + shape.target_complement_unit * shape.concentration);
       }
-      derivative_component->support_length = shape.support_length;
-      derivative_component->concentration = shape.concentration;
-      derivative_component->digamma_alpha = digamma(
-        1.0 + shape.target_unit * shape.concentration);
-      derivative_component->digamma_beta = digamma(
-        1.0 + shape.target_complement_unit * shape.concentration);
     }
   }
   return NP_CONTINUOUS_ROW_OK;

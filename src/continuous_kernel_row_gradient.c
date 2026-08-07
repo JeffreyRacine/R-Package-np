@@ -608,17 +608,6 @@ np_continuous_kernel_beta_level_derivative_log_row_validated(
       }
       return row_status;
     }
-    row_status = np_continuous_kernel_beta_prepared_derivative_row_prepare(
-      plan, segment, evaluation_index, omitted_observation,
-      &prepare_result);
-    if(row_status != NP_CONTINUOUS_ROW_OK) {
-      if(diagnostics != NULL) {
-        diagnostics->bad_coordinate = prepare_result.bad_coordinate;
-        diagnostics->bad_observation = prepare_result.bad_observation;
-        diagnostics->beta_status = prepare_result.beta_status;
-      }
-      return row_status;
-    }
     *common_log_scale = -INFINITY;
     if(provider == NULL && omitted_observation == -1) {
       for(observation = 0;
