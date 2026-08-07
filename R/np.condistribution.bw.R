@@ -795,18 +795,6 @@ npcdistbw.condbandwidth <-
   out
 }
 
-.npcdistbw_run_fixed_degree <- function(xdat, ydat, bws, reg.args, opt.args) {
-  tbw <- .npcdistbw_build_condbandwidth(
-    xdat = xdat,
-    ydat = ydat,
-    bws = bws,
-    bandwidth.compute = opt.args$bandwidth.compute,
-    reg.args = reg.args
-  )
-
-  do.call(npcdistbw.condbandwidth, c(list(xdat = xdat, ydat = ydat, bws = tbw), opt.args))
-}
-
 .npcdistbw_run_fixed_degree_bcast_payload <- function(xdat, ydat, bws, reg.args, opt.args) {
   old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
   old.messages <- getOption("np.messages")
