@@ -25646,7 +25646,8 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	    const int use_mpi_owner_reduce_lp =
 	      (iNum_Processors > 1) &&
 	      (!np_mpi_local_regression_active()) &&
-	      (BANDWIDTH_reg == BW_FIXED);
+	      ((BANDWIDTH_reg == BW_FIXED) ||
+	       (BANDWIDTH_reg == BW_GEN_NN));
 	    const int owner_chunk_rows_lp =
 	      np_reg_mpi_owner_chunk_rows(num_obs_eval,
 	                                  1 + call->do_merr +
@@ -25672,10 +25673,12 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	                                    chunk_end,
 	                                    owner_row_width_lp,
 	                                    "npreg LP");
-	        if(call->do_merr)
+	        /* The beta row provider returns its power-two moments directly. */
+	        if(call->do_merr && call->kernel_route == NULL)
 	          owner->mpi_kernel_row = (double *)malloc(
 	            (size_t)num_obs_train*sizeof(double));
-	        if(call->do_merr && owner->mpi_kernel_row == NULL)
+	        if(call->do_merr && call->kernel_route == NULL &&
+	           owner->mpi_kernel_row == NULL)
 	          error("\n** Error: memory allocation failed.");
 
 	        local_pos = 0;
@@ -25788,14 +25791,16 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	                 owner->basis,
 	                 call->vector_scale_factor,
 	                 call->matrix_bandwidth,
-	                 call->matrix_bandwidth,
+	                 (BANDWIDTH_reg == BW_GEN_NN) ?
+	                   owner->matrix_bandwidth_eval :
+	                   call->matrix_bandwidth,
 	                 call->lambda,
 	                 call->num_categories,
 	                 call->matrix_categorical_vals,
 	                 call->categorical_compress,
 	                 owner->moments,
 	                 call->do_merr ? owner->power2_moments : NULL,
-	                 owner->mpi_kernel_row,
+	                 NULL,
 	                 call->kernel_route,
 	                 call->kernel_route_diagnostics) != 0) {
 	              owner_solve_failed = 1;
@@ -25877,7 +25882,10 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	            ey_owner = owner->moments[response_y_offset]/sk_owner;
 	            ey2_owner = owner->moments[0]/sk_owner;
 	            sigma2_owner = ey2_owner - ey_owner*ey_owner;
-	            {
+	            /* Match the local path: clamp before signed normalization. */
+	            if(sigma2_owner <= 0.0) {
+	              out_owner[1] = 0.0;
+	            } else {
 	              const double v_owner = sigma2_owner *
 	                call->kernel_squared_integral /
 	                (sk_owner*call->bandwidth_product);
