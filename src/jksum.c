@@ -18871,6 +18871,208 @@ static NP_NOINLINE int np_regression_cv_scalar_continuous_route(
 }
 
 /*
+ * MPI-only generalized-NN scalar sibling.  Keep the qualified fixed/local
+ * dispatcher above unchanged: topology realization is the only new risk
+ * axis.  Complete evaluation rows remain rank-local and one O(n) or O(2n)
+ * contribution buffer restores canonical CVLS/CVAIC finishing order.
+ */
+static int np_regression_cv_scalar_gnn_continuous_route_parallel_body(
+  const NPRegressionCvScalarRouteCall *call,
+  NPRegressionCvScalarRouteOwner *owner)
+{
+  const int num_obs = call->num_obs;
+  const int num_reg_unordered = call->num_reg_unordered;
+  const int num_reg_ordered = call->num_reg_ordered;
+  const int num_reg_continuous = call->num_reg_continuous;
+  const int num_reg =
+    num_reg_continuous + num_reg_unordered + num_reg_ordered;
+  NPBetaScaledRowContext * const row_context = &owner->row_context;
+  NPContinuousKernelRowStatus row_status = NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  double **matrix_bandwidth = NULL;
+  double *contributions = NULL;
+  double cv = 0.0;
+  double traceH = 0.0;
+  int contribution_count;
+  int owned_start = 0;
+  int owned_rows = 0;
+  int local_fail = 0;
+  int evaluation;
+
+  if(call->objective == NULL || num_obs < 2 || num_reg_continuous <= 0 ||
+     call->matrix_X_continuous == NULL || call->response == NULL ||
+     call->scale_factor == NULL || call->kernel_route == NULL ||
+     call->kernel_route_diagnostics == NULL ||
+     (call->bwm != RBWM_CVLS && call->bwm != RBWM_CVAIC) ||
+     call->bandwidth_mode != BW_GEN_NN ||
+     (call->categorical_compress != 0 && call->categorical_compress != 1))
+    return 1;
+
+  if(call->bwm == RBWM_CVAIC && num_obs > INT_MAX/2)
+    return 1;
+  contribution_count = call->bwm == RBWM_CVAIC ? 2*num_obs : num_obs;
+  if(np_objective_outer_buffer_prepare(
+       1, (size_t)contribution_count, &owner->contributions) != 0)
+    return 1;
+  contributions = owner->contributions;
+  owner->operator = (int *)np_jksum_malloc_array_try(
+    (size_t)MAX(1, num_reg), sizeof(*owner->operator));
+  owner->kernel_u = (int *)np_jksum_malloc_array_try(
+    (size_t)MAX(1, num_reg_unordered), sizeof(*owner->kernel_u));
+  owner->kernel_o = (int *)np_jksum_malloc_array_try(
+    (size_t)MAX(1, num_reg_ordered), sizeof(*owner->kernel_o));
+  owner->lambda = (double *)np_jksum_malloc_array_try(
+    (size_t)MAX(1, num_reg_unordered + num_reg_ordered),
+    sizeof(*owner->lambda));
+  owner->row = (double *)np_jksum_malloc_array_try(
+    (size_t)num_obs, sizeof(*owner->row));
+  owner->matrix_bandwidth_columns = num_reg_continuous;
+  owner->matrix_bandwidth = np_objective_outer_matrix_try(
+    num_obs, num_reg_continuous);
+  matrix_bandwidth = owner->matrix_bandwidth;
+  if(owner->operator == NULL || owner->kernel_u == NULL ||
+     owner->kernel_o == NULL || owner->lambda == NULL ||
+     owner->row == NULL || matrix_bandwidth == NULL)
+    local_fail = 1;
+
+  if(!local_fail) {
+    for(evaluation = 0; evaluation < num_reg; ++evaluation)
+      owner->operator[evaluation] = OP_NORMAL;
+    for(evaluation = 0; evaluation < num_reg_unordered; ++evaluation)
+      owner->kernel_u[evaluation] = call->kernel_unordered;
+    for(evaluation = 0; evaluation < num_reg_ordered; ++evaluation)
+      owner->kernel_o[evaluation] = call->kernel_ordered;
+  }
+
+  if(!local_fail && np_beta_continuous_bandwidth_prepare_canonical(
+       BW_GEN_NN, num_obs, num_obs,
+       num_reg_unordered, num_reg_ordered, num_reg_continuous,
+       call->matrix_X_continuous, call->matrix_X_continuous,
+       call->scale_factor, matrix_bandwidth, NULL,
+       owner->lambda, NULL) != 0)
+    local_fail = 1;
+
+  if(!local_fail) {
+    row_status = np_beta_scaled_row_context_prepare(
+      row_context, call->kernel_route, call->kernel_route_diagnostics,
+      BW_GEN_NN, num_obs, num_obs, num_reg_continuous,
+      num_reg_unordered, num_reg_ordered,
+      call->matrix_X_continuous, call->matrix_X_continuous,
+      call->matrix_X_unordered, call->matrix_X_unordered,
+      call->matrix_X_ordered, call->matrix_X_ordered,
+      matrix_bandwidth, matrix_bandwidth, owner->operator,
+      owner->kernel_u, owner->kernel_o, owner->lambda,
+      call->num_categories, matrix_categorical_vals_extern,
+      call->categorical_compress, owner->row);
+    if(row_status != NP_CONTINUOUS_ROW_OK)
+      local_fail = 1;
+  }
+
+  np_objective_outer_owned_rows(
+    0, num_obs, 1, &owned_start, &owned_rows);
+  for(evaluation = owned_start;
+      evaluation < owned_start + owned_rows && !local_fail;
+      ++evaluation) {
+    double row_loss = 0.0;
+    double row_trace = 0.0;
+    double row_sum = 0.0;
+    const int omitted = call->bwm == RBWM_CVLS ? evaluation : -1;
+
+    if((evaluation & 31) == 0)
+      np_progress_bandwidth_loop_step();
+    row_status = np_beta_scaled_row_context_fill_omitting(
+      row_context, evaluation, omitted, &row_sum, NULL);
+    if(row_status != NP_CONTINUOUS_ROW_OK ||
+       np_regression_cv_scalar_accumulate_scaled_row(
+         call->bwm, evaluation, num_obs, call->response, owner->row,
+         row_sum, &row_loss, &row_trace) != 0) {
+      local_fail = 1;
+      break;
+    }
+    contributions[evaluation] = row_loss;
+    if(call->bwm == RBWM_CVAIC)
+      contributions[num_obs + evaluation] = row_trace;
+  }
+
+  if(np_objective_outer_buffer_finish(
+       1, contribution_count, local_fail, contributions,
+       "NP_RMPI_INJECT_REG_ROUTED_CV_FAIL_RANK",
+       "regression routed scalar GNN CV contributions MPI_Allreduce") != 0)
+    return 1;
+  for(evaluation = 0; evaluation < num_obs; ++evaluation) {
+    cv += contributions[evaluation];
+    if(call->bwm == RBWM_CVAIC)
+      traceH += contributions[num_obs + evaluation];
+  }
+  if(np_regression_cv_finish_objective(
+       call->bwm, num_obs, cv, traceH, call->objective) != 0)
+    return 1;
+
+  return 0;
+}
+
+static SEXP np_regression_cv_scalar_gnn_route_execute(void *data)
+{
+  NPRegressionCvScalarRouteExecution * const execution =
+    (NPRegressionCvScalarRouteExecution *)data;
+
+  execution->status =
+    np_regression_cv_scalar_gnn_continuous_route_parallel_body(
+      execution->call, &execution->owner);
+  return R_NilValue;
+}
+
+static NP_NOINLINE int np_regression_cv_scalar_gnn_continuous_route_parallel(
+  const int bwm,
+  const int KERNEL_unordered_reg,
+  const int KERNEL_ordered_reg,
+  const int BANDWIDTH_reg,
+  const int num_obs,
+  const int num_reg_unordered,
+  const int num_reg_ordered,
+  const int num_reg_continuous,
+  double **matrix_X_unordered,
+  double **matrix_X_ordered,
+  double **matrix_X_continuous,
+  double *vector_Y,
+  double *vector_scale_factor,
+  int *num_categories,
+  const NPContinuousKernelRoute * const kernel_route,
+  NPContinuousKernelDerivativeDiagnostics * const kernel_route_diagnostics,
+  const int categorical_compress,
+  double * const objective)
+{
+  const NPRegressionCvScalarRouteCall call = {
+    bwm,
+    KERNEL_unordered_reg,
+    KERNEL_ordered_reg,
+    BANDWIDTH_reg,
+    num_obs,
+    num_reg_unordered,
+    num_reg_ordered,
+    num_reg_continuous,
+    matrix_X_unordered,
+    matrix_X_ordered,
+    matrix_X_continuous,
+    vector_Y,
+    vector_scale_factor,
+    num_categories,
+    kernel_route,
+    kernel_route_diagnostics,
+    categorical_compress,
+    objective
+  };
+  NPRegressionCvScalarRouteExecution execution;
+
+  execution.call = &call;
+  execution.status = 1;
+  np_regression_cv_scalar_route_owner_init(&execution.owner);
+  R_UnwindProtect(
+    np_regression_cv_scalar_gnn_route_execute, &execution,
+    np_regression_cv_scalar_route_owner_cleanup, &execution.owner, NULL);
+  return execution.status;
+}
+
+/*
  * Route-aware wider-LP regression objective.  The hoisted package basis and
  * common LP influence-row workspace own estimator algebra; the continuous
  * route supplies only one complete common-scaled kernel row per evaluation.
@@ -19690,14 +19892,27 @@ const int categorical_compress)
     error("regression objective kernel route has an invalid layout");
 
   if(lp_engine == NP_LP_ENGINE_SCALAR) {
-    if(np_regression_cv_scalar_continuous_route(
-         bwm, KERNEL_unordered_reg, KERNEL_ordered_reg, BANDWIDTH_reg,
-         num_obs, num_reg_unordered, num_reg_ordered, num_reg_continuous,
-         matrix_X_unordered, matrix_X_ordered, matrix_X_continuous,
-         vector_Y, vector_scale_factor, num_categories,
-         kernel_route, kernel_route_diagnostics, categorical_compress,
-         &objective) != 0)
-      return DBL_MAX;
+    if(np_objective_outer_rows_enabled(
+         (bwm == RBWM_CVLS || bwm == RBWM_CVAIC) &&
+         BANDWIDTH_reg == BW_GEN_NN)) {
+      if(np_regression_cv_scalar_gnn_continuous_route_parallel(
+           bwm, KERNEL_unordered_reg, KERNEL_ordered_reg, BANDWIDTH_reg,
+           num_obs, num_reg_unordered, num_reg_ordered, num_reg_continuous,
+           matrix_X_unordered, matrix_X_ordered, matrix_X_continuous,
+           vector_Y, vector_scale_factor, num_categories,
+           kernel_route, kernel_route_diagnostics, categorical_compress,
+           &objective) != 0)
+        return DBL_MAX;
+    } else {
+      if(np_regression_cv_scalar_continuous_route(
+           bwm, KERNEL_unordered_reg, KERNEL_ordered_reg, BANDWIDTH_reg,
+           num_obs, num_reg_unordered, num_reg_ordered, num_reg_continuous,
+           matrix_X_unordered, matrix_X_ordered, matrix_X_continuous,
+           vector_Y, vector_scale_factor, num_categories,
+           kernel_route, kernel_route_diagnostics, categorical_compress,
+           &objective) != 0)
+        return DBL_MAX;
+    }
   } else {
     if(np_objective_outer_rows_enabled(
          bwm == RBWM_CVAIC && BANDWIDTH_reg == BW_FIXED)) {
