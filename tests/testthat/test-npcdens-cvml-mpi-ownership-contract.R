@@ -52,27 +52,58 @@ test_that("conditional CVML has one bounded MPI contribution owner", {
   expect_false(grepl("diag(num_obs)", source, fixed = TRUE))
 })
 
-test_that("outer CVML ownership excludes beta's canonical MPI row engine", {
+test_that("prepared outer CVML ownership is kernel-family neutral", {
   source <- npcdens_cvml_mpi_source()
   skip_if(is.null(source), "package C source unavailable")
 
   policy <- npcdens_cvml_mpi_body(
     source,
-    "np_conditional_cvml_parallel_rows_enabled(void)",
+    "np_conditional_cvml_prepared_outer_rows_enabled(void)",
     "static void\nnp_conditional_cvml_owned_rows"
-  )
-  expect_match(
-    policy,
-    "KERNEL_reg_extern != NP_CKERNEL_COORDINATE_CODE",
-    fixed = TRUE
-  )
-  expect_match(
-    policy,
-    "KERNEL_den_extern != NP_CKERNEL_COORDINATE_CODE",
-    fixed = TRUE
   )
   expect_match(policy, "!np_mpi_local_regression_active()", fixed = TRUE)
   expect_match(policy, "int_conditional_prepared_context_extern", fixed = TRUE)
+  expect_false(grepl("KERNEL_reg_extern", policy, fixed = TRUE))
+  expect_false(grepl("KERNEL_den_extern", policy, fixed = TRUE))
+  expect_false(grepl("NP_CKERNEL_COORDINATE_CODE", policy, fixed = TRUE))
+})
+
+test_that("routed beta CVML uses the canonical prepared outer-row owner", {
+  source <- npcdens_cvml_mpi_source()
+  skip_if(is.null(source), "package C source unavailable")
+
+  routed_start <- tail(gregexpr(
+    "static NP_NOINLINE int np_conditional_density_cvml_continuous_route(",
+    source,
+    fixed = TRUE
+  )[[1L]], 1L)
+  routed_stop <- regexpr(
+    "typedef struct {\n  int ready;\n  int beta_x;",
+    source,
+    fixed = TRUE
+  )[[1L]]
+  expect_gt(routed_start, 0L)
+  expect_gt(routed_stop, routed_start)
+  routed <- substr(source, routed_start, routed_stop - 1L)
+  expect_match(
+    routed,
+    "np_conditional_cvml_prepared_outer_rows_enabled()",
+    fixed = TRUE
+  )
+  expect_match(routed, "BANDWIDTH_den == BW_FIXED", fixed = TRUE)
+  expect_match(
+    routed,
+    "np_conditional_cvml_contributions_prepare(",
+    fixed = TRUE
+  )
+  expect_match(routed, "np_conditional_cvml_owned_rows(", fixed = TRUE)
+  expect_match(
+    routed,
+    "np_conditional_cvml_contributions_finish(",
+    fixed = TRUE
+  )
+  expect_false(grepl("MPI_Allreduce[[:space:]]*\\(", routed))
+  expect_false(grepl("evaluation % iNum_Processors", routed, fixed = TRUE))
 })
 
 test_that("all positive-width CVML exits use canonical contribution finish", {

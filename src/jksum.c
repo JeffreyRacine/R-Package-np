@@ -1040,6 +1040,13 @@ static void *np_jksum_malloc_array_or_die(size_t count, size_t elem_size, const 
   return np_jksum_malloc_bytes_or_die(np_jksum_size_mul_or_die(count, elem_size, what), what);
 }
 
+static void *np_jksum_malloc_array_try(size_t count, size_t elem_size)
+{
+  if((count != 0U) && (elem_size > SIZE_MAX/count))
+    return NULL;
+  return malloc(count*elem_size);
+}
+
 static void *np_jksum_malloc_array3_or_die(size_t a, size_t b, size_t c, const char *what)
 {
   return np_jksum_malloc_bytes_or_die(np_jksum_size_mul3_or_die(a, b, c, what), what);
@@ -28970,21 +28977,18 @@ np_cvls_workspace_collective_status(
 );
 
 static int
-np_conditional_cvml_parallel_rows_enabled(void)
+np_conditional_cvml_prepared_outer_rows_enabled(void)
 {
 #ifdef MPI2
   /*
-   * Beta rows already distribute their substantially more expensive kernel
-   * construction through the canonical continuous-row engine.  Wrapping that
-   * engine in a second ownership layer suppresses its existing collectives and
-   * adds a redundant contribution reduction.  Keep one explicit policy owner:
-   * outer CVML row ownership is for legacy continuous kernels only.
+   * Prepared CVML owns complete evaluation rows here.  Kernel-row providers
+   * are rank-local mathematical engines; kernel family must not change the
+   * outer ownership topology.  Owned-row callers suppress any eligible nested
+   * NN distribution before entering a row provider.
    */
   return (iNum_Processors > 1) &&
     !np_mpi_local_regression_active() &&
-    int_conditional_prepared_context_extern &&
-    (KERNEL_reg_extern != NP_CKERNEL_COORDINATE_CODE) &&
-    (KERNEL_den_extern != NP_CKERNEL_COORDINATE_CODE);
+    int_conditional_prepared_context_extern;
 #else
   return 0;
 #endif
@@ -32360,7 +32364,7 @@ static int np_conditional_density_cvml_lp_all_large_stream(double *vector_scale_
   int status = 1;
   NPCVLSWorkspaceStatus workspace_status = NP_CVLS_WORKSPACE_OK;
   const int use_parallel_rows =
-    np_conditional_cvml_parallel_rows_enabled();
+    np_conditional_cvml_prepared_outer_rows_enabled();
 
   if((cv == NULL) || (vector_scale_factor == NULL))
     return 1;
@@ -32720,7 +32724,7 @@ static int np_conditional_density_cvml_lp_prepared_parallel_stream(
   int local_fail = 0;
   NPCVLSWorkspaceStatus workspace_status = NP_CVLS_WORKSPACE_OK;
   const int use_parallel_rows =
-    np_conditional_cvml_parallel_rows_enabled();
+    np_conditional_cvml_prepared_outer_rows_enabled();
 
   if((cv == NULL) || (vector_scale_factor == NULL) || (num_obs <= 0))
     return 1;
@@ -32868,7 +32872,7 @@ int np_conditional_density_cvml_lp_stream(double *vector_scale_factor,
   const int use_parallel_rows = 0;
 #endif
 
-  if(np_conditional_cvml_parallel_rows_enabled())
+  if(np_conditional_cvml_prepared_outer_rows_enabled())
     return np_conditional_density_cvml_lp_prepared_parallel_stream(
       vector_scale_factor, cv);
 
@@ -41990,26 +41994,23 @@ static int np_conditional_route_row_context_prepare_general(
   context->num_continuous = num_continuous;
   context->num_unordered = num_unordered;
   context->num_ordered = num_ordered;
-  context->scale_factor = (double *)np_jksum_malloc_array_or_die(
-    (size_t)MAX(1, total), sizeof(double),
-    "conditional objective route scale factor");
-  context->lambda = (double *)np_jksum_malloc_array_or_die(
-    (size_t)MAX(1, num_unordered + num_ordered), sizeof(double),
-    "conditional objective route categorical bandwidth");
-  context->row = (double *)np_jksum_malloc_array_or_die(
-    (size_t)num_train, sizeof(double),
-    "conditional objective route row");
-  context->operator_code = (int *)np_jksum_malloc_array_or_die(
-    (size_t)MAX(1, total), sizeof(int),
-    "conditional objective route operator");
-  context->kernel_unordered = (int *)np_jksum_malloc_array_or_die(
-    (size_t)MAX(1, num_unordered), sizeof(int),
-    "conditional objective route unordered kernel");
-  context->kernel_ordered = (int *)np_jksum_malloc_array_or_die(
-    (size_t)MAX(1, num_ordered), sizeof(int),
-    "conditional objective route ordered kernel");
+  context->scale_factor = (double *)np_jksum_malloc_array_try(
+    (size_t)MAX(1, total), sizeof(double));
+  context->lambda = (double *)np_jksum_malloc_array_try(
+    (size_t)MAX(1, num_unordered + num_ordered), sizeof(double));
+  context->row = (double *)np_jksum_malloc_array_try(
+    (size_t)num_train, sizeof(double));
+  context->operator_code = (int *)np_jksum_malloc_array_try(
+    (size_t)MAX(1, total), sizeof(int));
+  context->kernel_unordered = (int *)np_jksum_malloc_array_try(
+    (size_t)MAX(1, num_unordered), sizeof(int));
+  context->kernel_ordered = (int *)np_jksum_malloc_array_try(
+    (size_t)MAX(1, num_ordered), sizeof(int));
   context->matrix_bandwidth = alloc_matd(bandwidth_rows, num_continuous);
-  if(context->matrix_bandwidth == NULL)
+  if(context->scale_factor == NULL || context->lambda == NULL ||
+     context->row == NULL || context->operator_code == NULL ||
+     context->kernel_unordered == NULL || context->kernel_ordered == NULL ||
+     context->matrix_bandwidth == NULL)
     goto fail_prepare;
 
   np_splitxy_vsf_mcv_nc(
@@ -42133,10 +42134,19 @@ static NP_NOINLINE int np_conditional_density_cvml_continuous_route(
   double *xrow = NULL;
   double *yrow = NULL;
   double *eval_basis = NULL;
+  double *contributions = NULL;
+  double local_cv = 0.0;
   int nterms = 0;
   int evaluation;
   int observation;
+  int owned_start = 0;
+  int owned_rows = 0;
+  int local_fail = 0;
   int status = 1;
+  NPCVLSWorkspaceStatus workspace_status = NP_CVLS_WORKSPACE_OK;
+  const int use_parallel_rows =
+    BANDWIDTH_den == BW_FIXED &&
+    np_conditional_cvml_prepared_outer_rows_enabled();
 
   if(cv == NULL || vector_scale_factor == NULL || num_obs < 2 ||
      (!beta_x && !beta_y) ||
@@ -42149,15 +42159,23 @@ static NP_NOINLINE int np_conditional_density_cvml_continuous_route(
   np_conditional_route_row_context_init(&route_x);
   np_conditional_route_row_context_init(&route_y);
   np_reghat_lp_workspace_init(&lp_workspace);
-  xrow = (double *)np_jksum_malloc_array_or_die(
-    (size_t)num_obs, sizeof(double),
-    "conditional density CVML X influence row");
-  if(!beta_y)
-    yrow = (double *)np_jksum_malloc_array_or_die(
-      (size_t)num_obs, sizeof(double),
-      "conditional density CVML Y row");
+  workspace_status = np_conditional_cvml_contributions_prepare(
+    use_parallel_rows, num_obs, &contributions);
+  if(workspace_status != NP_CVLS_WORKSPACE_OK)
+    goto cleanup_route;
 
-  if(beta_x) {
+  workspace_status = np_cvls_workspace_vector_try(
+    (size_t)num_obs, &xrow);
+  if(workspace_status != NP_CVLS_WORKSPACE_OK)
+    local_fail = 1;
+  if(!local_fail && !beta_y) {
+    workspace_status = np_cvls_workspace_vector_try(
+      (size_t)num_obs, &yrow);
+    if(workspace_status != NP_CVLS_WORKSPACE_OK)
+      local_fail = 1;
+  }
+
+  if(!local_fail && beta_x) {
     if(np_conditional_route_row_context_prepare(
          &route_x, 1, BANDWIDTH_den, num_obs,
          num_var_unordered, num_var_ordered, num_var_continuous,
@@ -42169,13 +42187,13 @@ static NP_NOINLINE int np_conditional_density_cvml_continuous_route(
          execution_context->x_route,
          execution_context->x_diagnostics,
          execution_context->categorical_compress) != 0)
-      goto cleanup_route;
-  } else if(np_conditional_xrow_ctx_prepare(
+      local_fail = 1;
+  } else if(!local_fail && np_conditional_xrow_ctx_prepare(
               vector_scale_factor, &legacy_x) != 0) {
-    goto cleanup_route;
+    local_fail = 1;
   }
 
-  if(beta_y) {
+  if(!local_fail && beta_y) {
     if(np_conditional_route_row_context_prepare(
          &route_y, 0, BANDWIDTH_den, num_obs,
          num_var_unordered, num_var_ordered, num_var_continuous,
@@ -42187,13 +42205,13 @@ static NP_NOINLINE int np_conditional_density_cvml_continuous_route(
          execution_context->y_route,
          execution_context->y_diagnostics,
          execution_context->categorical_compress) != 0)
-      goto cleanup_route;
-  } else if(np_conditional_yrow_ctx_prepare(
+      local_fail = 1;
+  } else if(!local_fail && np_conditional_yrow_ctx_prepare(
               vector_scale_factor, OP_NORMAL, &legacy_y) != 0) {
-    goto cleanup_route;
+    local_fail = 1;
   }
 
-  if(beta_x && use_general_lp) {
+  if(!local_fail && beta_x && use_general_lp) {
     if(!np_glp_cv_cache.ready ||
        np_glp_cv_cache.use_bernstein != use_bernstein ||
        np_glp_cv_cache.basis_mode != int_glp_basis_extern ||
@@ -42204,26 +42222,34 @@ static NP_NOINLINE int np_conditional_density_cvml_continuous_route(
       if(!np_glp_cv_cache_prepare(
            NP_LP_ENGINE_GENERAL, num_obs, num_reg_continuous,
            matrix_X_continuous))
-        goto cleanup_route;
+        local_fail = 1;
     }
-    if(!np_glp_cv_cache.ready || np_glp_cv_cache.basis == NULL ||
-       np_glp_cv_cache.terms == NULL || np_glp_cv_cache.nterms <= 1)
-      goto cleanup_route;
-    nterms = np_glp_cv_cache.nterms;
-    eval_basis = (double *)np_jksum_malloc_array_or_die(
-      (size_t)nterms, sizeof(double),
-      "conditional density CVML evaluation basis");
-    if(np_reghat_lp_workspace_prepare_columns(
-         &lp_workspace, np_glp_cv_cache.basis, num_obs, nterms) !=
-       NP_REGHAT_LP_ROW_OK)
-      goto cleanup_route;
+    if(!local_fail &&
+       (!np_glp_cv_cache.ready || np_glp_cv_cache.basis == NULL ||
+        np_glp_cv_cache.terms == NULL || np_glp_cv_cache.nterms <= 1))
+      local_fail = 1;
+    if(!local_fail) {
+      nterms = np_glp_cv_cache.nterms;
+      workspace_status = np_cvls_workspace_vector_try(
+        (size_t)nterms, &eval_basis);
+      if(workspace_status != NP_CVLS_WORKSPACE_OK)
+        local_fail = 1;
+      if(!local_fail && np_reghat_lp_workspace_prepare_columns(
+           &lp_workspace, np_glp_cv_cache.basis, num_obs, nterms) !=
+         NP_REGHAT_LP_ROW_OK)
+        local_fail = 1;
+    }
   }
 
-  *cv = 0.0;
-  for(evaluation = 0; evaluation < num_obs; ++evaluation) {
+  np_conditional_cvml_owned_rows(
+    0, num_obs, use_parallel_rows, &owned_start, &owned_rows);
+  for(evaluation = owned_start;
+      evaluation < owned_start + owned_rows && !local_fail;
+      ++evaluation) {
     const double *active_yrow;
     double y_common_log_scale = 0.0;
     double fit = 0.0;
+    double contribution;
 
     if((evaluation & 31) == 0)
       np_progress_bandwidth_loop_step();
@@ -42231,8 +42257,10 @@ static NP_NOINLINE int np_conditional_density_cvml_continuous_route(
     if(beta_x) {
       if(np_beta_scaled_row_context_fill(
            &route_x.scaled_row, evaluation, NULL, NULL) !=
-         NP_CONTINUOUS_ROW_OK)
-        goto cleanup_route;
+         NP_CONTINUOUS_ROW_OK) {
+        local_fail = 1;
+        break;
+      }
 
       if(!use_general_lp) {
         double denominator = 0.0;
@@ -42240,8 +42268,10 @@ static NP_NOINLINE int np_conditional_density_cvml_continuous_route(
         route_x.row[evaluation] = 0.0;
         for(observation = 0; observation < num_obs; ++observation)
           denominator += route_x.row[observation];
-        if(denominator == 0.0 || !R_FINITE(denominator))
-          goto cleanup_route;
+        if(denominator == 0.0 || !R_FINITE(denominator)) {
+          local_fail = 1;
+          break;
+        }
         for(observation = 0; observation < num_obs; ++observation)
           xrow[observation] = route_x.row[observation]/denominator;
       } else {
@@ -42253,27 +42283,34 @@ static NP_NOINLINE int np_conditional_density_cvml_continuous_route(
              &lp_workspace, route_x.row, eval_basis, xrow, 1U) !=
            NP_REGHAT_LP_ROW_OK ||
            !np_lp_delete_denominator(
-             xrow[evaluation], &delete_denominator))
-          goto cleanup_route;
+             xrow[evaluation], &delete_denominator)) {
+          local_fail = 1;
+          break;
+        }
         for(observation = 0; observation < num_obs; ++observation)
           xrow[observation] = observation == evaluation ?
             0.0 : xrow[observation]/delete_denominator;
       }
     } else if(np_conditional_xrow_from_ctx(
                 &legacy_x, evaluation, xrow) != 0) {
-      goto cleanup_route;
+      local_fail = 1;
+      break;
     }
 
     if(beta_y) {
       if(np_beta_scaled_row_context_fill(
            &route_y.scaled_row, evaluation, NULL,
-           &y_common_log_scale) != NP_CONTINUOUS_ROW_OK)
-        goto cleanup_route;
+           &y_common_log_scale) != NP_CONTINUOUS_ROW_OK) {
+        local_fail = 1;
+        break;
+      }
       active_yrow = route_y.row;
     } else {
       if(np_conditional_yrow_from_ctx(
-           &legacy_y, evaluation, yrow) != 0)
-        goto cleanup_route;
+           &legacy_y, evaluation, yrow) != 0) {
+        local_fail = 1;
+        break;
+      }
       active_yrow = yrow;
     }
 
@@ -42285,17 +42322,36 @@ static NP_NOINLINE int np_conditional_density_cvml_continuous_route(
         -INFINITY : log(fabs(fit)) + y_common_log_scale;
       const int sign = fit > 0.0 ? 1 : (fit < 0.0 ? -1 : 0);
 
-      if(ISNAN(log_absolute_fit))
-        goto cleanup_route;
-      *cv += np_guarded_cvml_log_contribution(
+      if(ISNAN(log_absolute_fit)) {
+        local_fail = 1;
+        break;
+      }
+      contribution = np_guarded_cvml_log_contribution(
         log_absolute_fit, sign, 1);
     } else {
-      *cv += np_guarded_cvml_contribution(fit);
+      contribution = np_guarded_cvml_contribution(fit);
     }
-    if(!R_FINITE(*cv))
-      goto cleanup_route;
+    if(use_parallel_rows) {
+      contributions[evaluation] = contribution;
+    } else {
+      local_cv += contribution;
+      if(!R_FINITE(local_cv)) {
+        local_fail = 1;
+        break;
+      }
+    }
   }
 
+  if(np_conditional_cvml_contributions_finish(
+       use_parallel_rows,
+       num_obs,
+       local_fail,
+       local_cv,
+       contributions,
+       cv,
+       "conditional density routed CVML contributions MPI_Allreduce") != 0 ||
+     !R_FINITE(*cv))
+    goto cleanup_route;
   status = 0;
 
 cleanup_route:
@@ -42308,6 +42364,7 @@ cleanup_route:
   free(xrow);
   free(yrow);
   free(eval_basis);
+  free(contributions);
   return status;
 }
 
