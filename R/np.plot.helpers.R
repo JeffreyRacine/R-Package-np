@@ -12393,6 +12393,45 @@ plotFactor <- function(f, y, ...){
   invisible(NULL)
 }
 
+.np_plot_user_arg_names <- function(
+    type = c("plot", "points", "lines", "persp", "bxp",
+             "rgl.persp3d", "rgl.view3d", "rgl.par3d",
+             "rgl.grid3d", "rgl.widget", "rgl.legend3d")) {
+  type <- match.arg(type)
+  switch(type,
+         plot = c("pch", "cex", "xaxs", "yaxs", "xaxt", "yaxt",
+                  "las", "font", "adj", "bg", "fg", "bty", "asp"),
+         points = c("pch", "cex", "col", "bg"),
+         lines = c("lty", "lwd", "col"),
+         persp = c("shade", "ltheta", "lphi", "expand", "nticks",
+                   "box", "axes"),
+         rgl.persp3d = c("alpha", "back", "front", "lit", "smooth",
+                         "color", "specular", "ambient", "emission",
+                         "shininess", "polygon_offset", "fog", "texture"),
+         rgl.view3d = c("fov", "zoom"),
+         rgl.par3d = c("windowRect"),
+         rgl.grid3d = c("side", "at", "col", "lwd", "lty", "n"),
+         rgl.widget = c("width", "height", "controllers"),
+         rgl.legend3d = c("x", "y", "legend", "fill", "border", "col",
+                          "text.col", "adj", "cex", "pt.cex", "pch",
+                          "xjust", "yjust", "x.intersp", "y.intersp",
+                          "merge", "trace", "plot", "ncol", "horiz",
+                          "title", "inset", "bg", "bty", "box.lwd",
+                          "box.lty", "box.col", "pt.bg", "lwd", "lty",
+                          "seg.len", "magnify"),
+         bxp = c("boxfill", "outline", "notch", "varwidth", "frame.plot",
+                 "horizontal", "at", "show.names", "pars", "pch", "cex",
+                 "col", "bg"))
+}
+
+.np_plot_rgl_prefixed_arg_names <- function() {
+  types <- c("rgl.persp3d", "rgl.view3d", "rgl.par3d", "rgl.grid3d",
+             "rgl.widget", "rgl.legend3d")
+  unlist(lapply(types, function(type) {
+    paste0(type, ".", .np_plot_user_arg_names(type))
+  }), use.names = FALSE)
+}
+
 .np_plot_user_args <- function(dots,
                                type = c("plot", "points", "lines", "persp", "bxp",
                                         "rgl.persp3d", "rgl.view3d", "rgl.par3d",
@@ -12400,36 +12439,7 @@ plotFactor <- function(f, y, ...){
   if (is.null(dots) || !length(dots))
     return(list())
 
-  type <- match.arg(type)
-  allowed <- switch(type,
-                    plot = c("pch", "cex", "xaxs", "yaxs", "xaxt", "yaxt",
-                             "las", "font", "adj", "bg", "fg", "bty", "asp"),
-                    points = c("pch", "cex", "col", "bg"),
-                    lines = c("lty", "lwd", "col"),
-                    persp = c("shade", "ltheta", "lphi", "expand", "nticks",
-                              "box", "axes"),
-                    rgl.persp3d = c("alpha", "back", "front", "lit", "smooth",
-                                    "color",
-                                    "specular", "ambient", "emission",
-                                    "shininess", "polygon_offset", "fog",
-                                    "texture"),
-                    rgl.view3d = c("fov", "zoom"),
-                    rgl.par3d = c("windowRect"),
-                    rgl.grid3d = c("side", "at", "col", "lwd", "lty", "n"),
-                    rgl.widget = c("width", "height", "controllers"),
-                    rgl.legend3d = c("x", "y", "legend", "fill", "border",
-                                     "col", "text.col", "adj", "cex",
-                                     "pt.cex", "pch", "xjust", "yjust",
-                                     "x.intersp", "y.intersp", "merge",
-                                     "trace", "plot", "ncol", "horiz",
-                                     "title", "inset", "bg", "bty", "box.lwd",
-                                     "box.lty", "box.col", "pt.bg",
-                                     "lwd", "lty", "seg.len", "magnify"),
-                    bxp = c("boxfill", "outline", "notch", "varwidth",
-                            "frame.plot", "horizontal", "at", "show.names",
-                            "pars", "pch", "cex", "col", "bg"))
-
-  dots[names(dots) %in% allowed]
+  dots[names(dots) %in% .np_plot_user_arg_names(type)]
 }
 
 .np_plot_extract_prefixed_args <- function(dots, prefix) {

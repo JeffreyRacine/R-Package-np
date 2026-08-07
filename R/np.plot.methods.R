@@ -188,7 +188,8 @@ np_render_control <- function(style = c("band", "bar"),
   engine <- .np_plot_allowed_engine_args(method = method, bws = bws)
   dispatcher <- "random.seed"
   allowed <- unique(c(canonical, legacy, dispatcher, engine,
-                      .np_plot_graphics_arg_names()))
+                      .np_plot_graphics_arg_names(),
+                      .np_plot_rgl_prefixed_arg_names()))
   bad <- setdiff(dot.names[nzchar(dot.names)], allowed)
   .np_plot_stop_unused_args(bad, allowed)
   invisible(NULL)
