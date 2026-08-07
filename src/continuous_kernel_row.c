@@ -6,6 +6,7 @@
 #include <R_ext/Arith.h>
 #include <R_ext/Memory.h>
 #include <R_ext/Utils.h>
+#include <Rmath.h>
 
 #include "headers.h"
 #include "continuous_kernel_row.h"
@@ -676,9 +677,10 @@ np_continuous_kernel_beta_prepared_derivative_row_prepare(
       }
       derivative_component->support_length = shape.support_length;
       derivative_component->concentration = shape.concentration;
-      derivative_component->target_unit = shape.target_unit;
-      derivative_component->target_complement_unit =
-        shape.target_complement_unit;
+      derivative_component->digamma_alpha = digamma(
+        1.0 + shape.target_unit * shape.concentration);
+      derivative_component->digamma_beta = digamma(
+        1.0 + shape.target_complement_unit * shape.concentration);
     }
   }
   return NP_CONTINUOUS_ROW_OK;
