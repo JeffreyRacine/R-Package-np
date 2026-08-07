@@ -38705,6 +38705,126 @@ cleanup:
   return status;
 }
 
+/*
+ * Active-MPI sibling of the byte-stable local cross-term engine above.
+ * Ownership is selected before entering either hot loop: local evaluation
+ * therefore pays no MPI-mode branch, while active ranks complete disjoint
+ * delete-one rows and finish contributions in canonical observation order.
+ */
+static int np_density_cvls_beta_cross_term_mpi(
+  const NPContinuousKernelRoute *route,
+  NPContinuousKernelDerivativeDiagnostics *diagnostics,
+  int bandwidth_mode,
+  int num_obs,
+  int num_reg_unordered,
+  int num_reg_ordered,
+  int num_reg_continuous,
+  double **matrix_X_unordered,
+  double **matrix_X_ordered,
+  double **matrix_X_continuous,
+  double **matrix_bandwidth,
+  const double *lambda,
+  const int *operator,
+  const int *kernel_unordered,
+  const int *kernel_ordered,
+  const int *num_categories,
+  double **category_values,
+  int categorical_compress,
+  double *row,
+  double *cross_term)
+{
+  NPBetaScaledRowContext context;
+  NPContinuousKernelRowStatus row_status;
+  double *contributions = NULL;
+  double local_cross_term = 0.0;
+  int owned_start = 0;
+  int owned_rows = 0;
+  int local_fail = 0;
+  int evaluation;
+  int status = 1;
+
+  if(cross_term == NULL || !np_objective_outer_rows_enabled(1))
+    return 1;
+  np_beta_scaled_row_context_init(&context);
+  row_status = np_beta_scaled_row_context_prepare(
+    &context, route, diagnostics, bandwidth_mode,
+    num_obs, num_obs, num_reg_continuous,
+    num_reg_unordered, num_reg_ordered,
+    matrix_X_continuous, matrix_X_continuous,
+    matrix_X_unordered, matrix_X_unordered,
+    matrix_X_ordered, matrix_X_ordered,
+    matrix_bandwidth, matrix_bandwidth, operator,
+    kernel_unordered, kernel_ordered, lambda, num_categories,
+    category_values, categorical_compress, row);
+  local_fail = row_status != NP_CONTINUOUS_ROW_OK;
+#ifdef MPI2
+  {
+    int any_fail = 0;
+
+    MPI_Allreduce(&local_fail, &any_fail, 1, MPI_INT, MPI_MAX, comm[1]);
+    if(any_fail)
+      goto cleanup;
+  }
+#endif
+
+  if(np_objective_outer_buffer_prepare(1,
+                                       (size_t)num_obs,
+                                       &contributions) != 0)
+    goto cleanup;
+  np_objective_outer_owned_rows(0,
+                                num_obs,
+                                1,
+                                &owned_start,
+                                &owned_rows);
+
+  for(evaluation = owned_start;
+      evaluation < owned_start + owned_rows;
+      ++evaluation) {
+    double scaled_sum = 0.0;
+    double common_log_scale = 0.0;
+    double fit_sum = 0.0;
+    double contribution;
+
+    row_status = np_beta_scaled_row_context_fill_omitting(
+      &context, evaluation, evaluation,
+      &scaled_sum, &common_log_scale);
+    if(row_status != NP_CONTINUOUS_ROW_OK ||
+       np_continuous_kernel_scaled_restore(
+         scaled_sum, common_log_scale, 1, &fit_sum) !=
+           NP_CONTINUOUS_ROW_OK) {
+      local_fail = 1;
+      break;
+    }
+    contribution = fit_sum/(double)(num_obs - 1);
+    if(!R_FINITE(contribution)) {
+      local_fail = 1;
+      break;
+    }
+    contributions[evaluation] = contribution;
+  }
+
+  if(np_objective_outer_buffer_finish(
+       1,
+       num_obs,
+       local_fail,
+       contributions,
+       "NP_RMPI_INJECT_UDEN_CVLS_CROSS_FAIL_RANK",
+       "unconditional density beta CVLS cross contributions MPI_Allreduce") !=
+       0)
+    goto cleanup;
+  for(evaluation = 0; evaluation < num_obs; ++evaluation)
+    local_cross_term += contributions[evaluation];
+  if(!R_FINITE(local_cross_term))
+    goto cleanup;
+  *cross_term = local_cross_term;
+  status = 0;
+
+cleanup:
+  free(contributions);
+  np_beta_scaled_row_context_clear(&context);
+  return status;
+}
+
 int np_kernel_estimate_density_categorical_leave_one_out_cv(int KERNEL_den,
                                                             int KERNEL_unordered_den,
                                                             int KERNEL_ordered_den,
@@ -39098,6 +39218,264 @@ cleanup_density_leave_one_out_cv:
   return(status);
 }
 
+/*
+ * Active-MPI beta sibling for the bounded CVLS integral.  It retains the
+ * incumbent bounded grid and canonical beta row provider, but partitions each
+ * memory-bounded grid tile into complete evaluation rows.  A tile-sized
+ * contribution vector preserves the serial quadrature order without making
+ * storage proportional to the full categorical grid.
+ */
+static int np_density_cvls_bounded_i1_quadrature_general_beta_mpi(
+  const int BANDWIDTH_den,
+  const int num_obs,
+  const int num_reg_unordered,
+  const int num_reg_ordered,
+  const int num_reg_continuous,
+  double **matrix_X_unordered,
+  double **matrix_X_ordered,
+  double **matrix_X_continuous,
+  double *vector_scale_factor,
+  int *num_categories,
+  double **matrix_categorical_vals,
+  double **canonical_bandwidth_train,
+  const double *canonical_lambda,
+  const int *canonical_operator,
+  const int *canonical_kernel_unordered,
+  const int *canonical_kernel_ordered,
+  const NPContinuousKernelRoute * const kernel_route,
+  NPContinuousKernelDerivativeDiagnostics * const kernel_route_diagnostics,
+  const int categorical_compress,
+  double *cv1)
+{
+  const int ncon = num_reg_continuous;
+  const int nuno = num_reg_unordered;
+  const int nord = num_reg_ordered;
+  const int q = np_bounded_cvls_grid_points(ncon);
+  const int block_size = nuno == 0 && nord == 0 ?
+    (ncon == 1 ? q : q*q) : 64;
+  size_t total_eval = 0;
+  double **cont_grid = NULL, **cont_weight = NULL;
+  double **eval_xuno = NULL, **eval_xord = NULL, **eval_xcon = NULL;
+  double **matrix_bandwidth = NULL;
+  double *lambda = NULL, *eval_weight = NULL;
+  double *beta_row = NULL, *contributions = NULL;
+  double local_cv = 0.0;
+  int bw_rows, d;
+  int allocation_fail = 0;
+  int status = 1;
+
+  if((cv1 == NULL) || (vector_scale_factor == NULL) || (num_obs <= 0) ||
+     !np_objective_outer_rows_enabled(1))
+    return 1;
+  if((BANDWIDTH_den != BW_FIXED) &&
+     (BANDWIDTH_den != BW_GEN_NN) &&
+     (BANDWIDTH_den != BW_ADAP_NN))
+    return 1;
+  if(np_continuous_kernel_route_validate(kernel_route, ncon) !=
+       NP_CKERNEL_ROUTE_OK ||
+     !np_continuous_kernel_route_has_beta(kernel_route) ||
+     kernel_route->segment_count != 1 ||
+     kernel_route->segment[0].coordinate_offset != 0 ||
+     kernel_route->segment[0].coordinate_count != ncon ||
+     kernel_route_diagnostics == NULL ||
+     canonical_bandwidth_train == NULL || canonical_operator == NULL ||
+     ((nuno + nord > 0) && canonical_lambda == NULL) ||
+     (nuno > 0 && canonical_kernel_unordered == NULL) ||
+     (nord > 0 && canonical_kernel_ordered == NULL) ||
+     (categorical_compress != 0 && categorical_compress != 1))
+    return 1;
+  if(!np_density_cvls_bounded_general_route_ok(ncon))
+    return 1;
+  if(np_bounded_cvls_eval_count(ncon,
+                                nuno,
+                                nord,
+                                q,
+                                num_categories,
+                                &total_eval) != 0)
+    return 1;
+
+  bw_rows = BANDWIDTH_den == BW_GEN_NN ? block_size : 1;
+  cont_grid = alloc_matd(q, ncon);
+  cont_weight = alloc_matd(q, ncon);
+  if(nuno > 0) eval_xuno = alloc_matd(block_size, nuno);
+  if(nord > 0) eval_xord = alloc_matd(block_size, nord);
+  eval_xcon = alloc_matd(block_size, ncon);
+  matrix_bandwidth = alloc_matd(bw_rows, ncon);
+  lambda = alloc_vecd(nuno + nord);
+  eval_weight = alloc_vecd(block_size);
+  beta_row = alloc_vecd(num_obs);
+
+  allocation_fail =
+    (cont_grid == NULL) || (cont_weight == NULL) || (eval_xcon == NULL) ||
+    (matrix_bandwidth == NULL) ||
+    ((nuno + nord > 0) && (lambda == NULL)) ||
+    (eval_weight == NULL) || (beta_row == NULL) ||
+    ((nuno > 0) && (eval_xuno == NULL)) ||
+    ((nord > 0) && (eval_xord == NULL));
+#ifdef MPI2
+  {
+    int any_allocation_fail = 0;
+
+    MPI_Allreduce(&allocation_fail,
+                  &any_allocation_fail,
+                  1,
+                  MPI_INT,
+                  MPI_MAX,
+                  comm[1]);
+    allocation_fail = any_allocation_fail;
+  }
+#endif
+  if(allocation_fail)
+    goto cleanup;
+  if(np_objective_outer_buffer_prepare(1,
+                                       (size_t)block_size,
+                                       &contributions) != 0)
+    goto cleanup;
+
+  for(d = 0; d < ncon; ++d)
+    np_fill_trapezoid_rule(vector_ckerlb_extern[d],
+                           vector_ckerub_extern[d],
+                           q,
+                           cont_grid[d],
+                           cont_weight[d]);
+
+  for(size_t eval_start = 0; eval_start < total_eval; ) {
+    const int eb = (int)MIN((size_t)block_size, total_eval - eval_start);
+    NPBetaScaledRowContext beta_context;
+    NPContinuousKernelRowStatus row_status = NP_CONTINUOUS_ROW_OK;
+    int owned_offset = 0;
+    int owned_rows = 0;
+    int local_fail = 0;
+    int b;
+
+    memset(contributions, 0, (size_t)eb*sizeof(*contributions));
+    np_objective_outer_owned_rows(0,
+                                  eb,
+                                  1,
+                                  &owned_offset,
+                                  &owned_rows);
+    np_beta_scaled_row_context_init(&beta_context);
+
+    if(owned_rows > 0) {
+      np_bounded_cvls_fill_eval_block(
+        eval_start + (size_t)owned_offset,
+        owned_rows,
+        ncon,
+        nuno,
+        nord,
+        q,
+        cont_grid,
+        cont_weight,
+        num_categories,
+        matrix_categorical_vals,
+        eval_xuno,
+        eval_xord,
+        eval_xcon,
+        eval_weight);
+
+      if(BANDWIDTH_den == BW_GEN_NN &&
+         kernel_bandwidth_mean(0,
+                               BANDWIDTH_den,
+                               num_obs,
+                               owned_rows,
+                               0,
+                               0,
+                               0,
+                               ncon,
+                               nuno,
+                               nord,
+                               1,
+                               vector_scale_factor,
+                               NULL,
+                               NULL,
+                               matrix_X_continuous,
+                               eval_xcon,
+                               NULL,
+                               matrix_bandwidth,
+                               lambda) == 1)
+        local_fail = 1;
+
+      if(!local_fail) {
+        double ** const beta_bandwidth_eval =
+          BANDWIDTH_den == BW_GEN_NN ? matrix_bandwidth :
+          canonical_bandwidth_train;
+
+        row_status = np_beta_scaled_row_context_prepare(
+          &beta_context, kernel_route, kernel_route_diagnostics,
+          BANDWIDTH_den, num_obs, owned_rows, ncon, nuno, nord,
+          matrix_X_continuous, eval_xcon,
+          matrix_X_unordered, eval_xuno,
+          matrix_X_ordered, eval_xord,
+          canonical_bandwidth_train, beta_bandwidth_eval,
+          canonical_operator,
+          canonical_kernel_unordered, canonical_kernel_ordered,
+          canonical_lambda, num_categories,
+          matrix_categorical_vals, categorical_compress, beta_row);
+        local_fail = row_status != NP_CONTINUOUS_ROW_OK;
+      }
+
+      for(b = 0; b < owned_rows && !local_fail; ++b) {
+        double scaled_sum = 0.0;
+        double common_log_scale = 0.0;
+        double fit_sum = 0.0;
+        double contribution;
+
+        if(((eval_start + (size_t)owned_offset + (size_t)b) & 31u) == 0u)
+          np_progress_bandwidth_loop_step();
+        row_status = np_beta_scaled_row_context_fill(
+          &beta_context, b, &scaled_sum, &common_log_scale);
+        if(row_status != NP_CONTINUOUS_ROW_OK ||
+           np_continuous_kernel_scaled_restore(
+             scaled_sum, common_log_scale, 1, &fit_sum) !=
+               NP_CONTINUOUS_ROW_OK) {
+          local_fail = 1;
+          break;
+        }
+        fit_sum /= (double)num_obs;
+        contribution = eval_weight[b]*fit_sum*fit_sum;
+        if(!R_FINITE(contribution)) {
+          local_fail = 1;
+          break;
+        }
+        contributions[owned_offset + b] = contribution;
+      }
+    }
+    np_beta_scaled_row_context_clear(&beta_context);
+
+    if(np_objective_outer_buffer_finish(
+         1,
+         eb,
+         local_fail,
+         contributions,
+         "NP_RMPI_INJECT_UDEN_CVLS_QUAD_FAIL_RANK",
+         "unconditional density beta CVLS quadrature contributions MPI_Allreduce") !=
+         0)
+      goto cleanup;
+    for(b = 0; b < eb; ++b)
+      local_cv += contributions[b];
+    if(!R_FINITE(local_cv))
+      goto cleanup;
+
+    eval_start += (size_t)eb;
+  }
+
+  *cv1 = local_cv;
+  status = 0;
+
+cleanup:
+  if(cont_grid != NULL) free_mat(cont_grid, ncon);
+  if(cont_weight != NULL) free_mat(cont_weight, ncon);
+  if(eval_xuno != NULL) free_mat(eval_xuno, nuno);
+  if(eval_xord != NULL) free_mat(eval_xord, nord);
+  if(eval_xcon != NULL) free_mat(eval_xcon, ncon);
+  if(matrix_bandwidth != NULL) free_mat(matrix_bandwidth, ncon);
+  free(lambda);
+  free(eval_weight);
+  free(beta_row);
+  free(contributions);
+  return status;
+}
+
 int np_kernel_estimate_density_categorical_convolution_cv(int KERNEL_den,
                                                           int KERNEL_unordered_den,
                                                           int KERNEL_ordered_den,
@@ -39255,30 +39633,55 @@ double *cv){
     if(exact_beta_route)
       for(i = 0; i < num_reg; ++i)
         operator[i] = OP_NORMAL;
-    if(np_density_cvls_bounded_i1_quadrature_general(KERNEL_den,
-                                                     KERNEL_unordered_den,
-                                                     KERNEL_ordered_den,
-                                                     BANDWIDTH_den,
-                                                     num_obs,
-                                                     num_reg_unordered,
-                                                     num_reg_ordered,
-                                                     num_reg_continuous,
-                                                     matrix_X_unordered,
-                                                     matrix_X_ordered,
-                                                     matrix_X_continuous,
-                                                     vector_scale_factor,
-                                                     num_categories,
-                                                     matrix_categorical_vals,
-                                                     matrix_bandwidth,
-                                                     lambda,
-                                                     operator,
-                                                     kernel_u,
-                                                     kernel_o,
-                                                     kernel_route,
-                                                     kernel_route_diagnostics,
-                                                     categorical_compress,
-                                                     &cv1) != 0)
+    if(exact_beta_route && np_objective_outer_rows_enabled(1)) {
+      if(np_density_cvls_bounded_i1_quadrature_general_beta_mpi(
+           BANDWIDTH_den,
+           num_obs,
+           num_reg_unordered,
+           num_reg_ordered,
+           num_reg_continuous,
+           matrix_X_unordered,
+           matrix_X_ordered,
+           matrix_X_continuous,
+           vector_scale_factor,
+           num_categories,
+           matrix_categorical_vals,
+           matrix_bandwidth,
+           lambda,
+           operator,
+           kernel_u,
+           kernel_o,
+           kernel_route,
+           kernel_route_diagnostics,
+           categorical_compress,
+           &cv1) != 0)
+        goto cleanup_density_convolution_cv;
+    } else if(np_density_cvls_bounded_i1_quadrature_general(
+                KERNEL_den,
+                KERNEL_unordered_den,
+                KERNEL_ordered_den,
+                BANDWIDTH_den,
+                num_obs,
+                num_reg_unordered,
+                num_reg_ordered,
+                num_reg_continuous,
+                matrix_X_unordered,
+                matrix_X_ordered,
+                matrix_X_continuous,
+                vector_scale_factor,
+                num_categories,
+                matrix_categorical_vals,
+                matrix_bandwidth,
+                lambda,
+                operator,
+                kernel_u,
+                kernel_o,
+                kernel_route,
+                kernel_route_diagnostics,
+                categorical_compress,
+                &cv1) != 0) {
       goto cleanup_density_convolution_cv;
+    }
   } else {
     if(int_cker_bound_extern){
       error("bounded npudens cv.ls currently supports up to two continuous variables");
@@ -39344,15 +39747,26 @@ double *cv){
     operator[i] = OP_NORMAL;
 
   if(exact_beta_route) {
-    if(np_density_cvls_beta_cross_term(
-         kernel_route, kernel_route_diagnostics, BANDWIDTH_den,
-         num_obs, num_reg_unordered, num_reg_ordered,
-         num_reg_continuous, matrix_X_unordered, matrix_X_ordered,
-         matrix_X_continuous, matrix_bandwidth, lambda, operator,
-         kernel_u, kernel_o, num_categories, matrix_categorical_vals,
-         categorical_compress,
-         res, &cv2) != 0)
+    if(np_objective_outer_rows_enabled(1)) {
+      if(np_density_cvls_beta_cross_term_mpi(
+           kernel_route, kernel_route_diagnostics, BANDWIDTH_den,
+           num_obs, num_reg_unordered, num_reg_ordered,
+           num_reg_continuous, matrix_X_unordered, matrix_X_ordered,
+           matrix_X_continuous, matrix_bandwidth, lambda, operator,
+           kernel_u, kernel_o, num_categories, matrix_categorical_vals,
+           categorical_compress,
+           res, &cv2) != 0)
+        goto cleanup_density_convolution_cv;
+    } else if(np_density_cvls_beta_cross_term(
+                kernel_route, kernel_route_diagnostics, BANDWIDTH_den,
+                num_obs, num_reg_unordered, num_reg_ordered,
+                num_reg_continuous, matrix_X_unordered, matrix_X_ordered,
+                matrix_X_continuous, matrix_bandwidth, lambda, operator,
+                kernel_u, kernel_o, num_categories, matrix_categorical_vals,
+                categorical_compress,
+                res, &cv2) != 0) {
       goto cleanup_density_convolution_cv;
+    }
     cv2 /= (double)num_obs;
     *cv = cv1 - 2.0*cv2;
     status = 0;
