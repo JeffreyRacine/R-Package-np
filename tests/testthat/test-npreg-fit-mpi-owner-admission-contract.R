@@ -30,24 +30,23 @@ npreg_fit_owner_body <- function(source) {
   substr(source, start, start + stop - 2L)
 }
 
-test_that("general LP fit owner admits fixed and generalized NN", {
+test_that("general LP fit owner admits fixed, generalized NN, and adaptive NN", {
   source <- npreg_fit_owner_source()
   skip_if(is.null(source), "package C source unavailable")
   body <- npreg_fit_owner_body(source)
 
   expect_match(
     body,
-    "((BANDWIDTH_reg == BW_FIXED) ||\n\t       (BANDWIDTH_reg == BW_GEN_NN))",
+    paste0(
+      "((BANDWIDTH_reg == BW_FIXED) ||\n",
+      "\t       (BANDWIDTH_reg == BW_GEN_NN) ||\n",
+      "\t       (BANDWIDTH_reg == BW_ADAP_NN))"
+    ),
     fixed = TRUE
   )
-  expect_false(grepl("BANDWIDTH_reg == BW_ADAP_NN", substr(
-    body,
-    regexpr("const int use_mpi_owner_reduce_lp", body, fixed = TRUE)[[1L]],
-    regexpr("const int owner_chunk_rows_lp", body, fixed = TRUE)[[1L]] - 1L
-  ), fixed = TRUE))
 })
 
-test_that("generalized-NN owner passes its one-row evaluation bandwidth", {
+test_that("nearest-neighbor owner selects the canonical bandwidth shape", {
   source <- npreg_fit_owner_source()
   skip_if(is.null(source), "package C source unavailable")
   body <- npreg_fit_owner_body(source)
@@ -59,7 +58,21 @@ test_that("generalized-NN owner passes its one-row evaluation bandwidth", {
   )
   expect_match(
     body,
-    "owner->matrix_bandwidth_eval[l][0] =\n\t              (BANDWIDTH_reg == BW_GEN_NN) ? call->matrix_bandwidth[l][jj]",
+    "if(BANDWIDTH_reg != BW_ADAP_NN)",
+    fixed = TRUE
+  )
+  expect_match(
+    body,
+    "(BANDWIDTH_reg == BW_GEN_NN) ?\n\t                  call->matrix_bandwidth[l][jj] :",
+    fixed = TRUE
+  )
+  expect_match(
+    body,
+    paste0(
+      "(BANDWIDTH_reg == BW_GEN_NN) ?\n",
+      "\t                                     owner->matrix_bandwidth_eval :\n",
+      "\t                                     call->matrix_bandwidth,"
+    ),
     fixed = TRUE
   )
   expect_match(

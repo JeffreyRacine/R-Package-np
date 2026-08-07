@@ -25647,7 +25647,8 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	      (iNum_Processors > 1) &&
 	      (!np_mpi_local_regression_active()) &&
 	      ((BANDWIDTH_reg == BW_FIXED) ||
-	       (BANDWIDTH_reg == BW_GEN_NN));
+	       (BANDWIDTH_reg == BW_GEN_NN) ||
+	       (BANDWIDTH_reg == BW_ADAP_NN));
 	    const int owner_chunk_rows_lp =
 	      np_reg_mpi_owner_chunk_rows(num_obs_eval,
 	                                  1 + call->do_merr +
@@ -25691,9 +25692,11 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	          for(l = 0; l < num_reg_continuous; l++){
 	            owner->eval_continuous[l][0] =
 	              call->matrix_X_continuous_eval[l][jj];
-	            owner->matrix_bandwidth_eval[l][0] =
-	              (BANDWIDTH_reg == BW_GEN_NN) ? call->matrix_bandwidth[l][jj] :
-	              ((BANDWIDTH_reg == BW_FIXED) ? call->matrix_bandwidth[l][0] : 0.0);
+	            if(BANDWIDTH_reg != BW_ADAP_NN)
+	              owner->matrix_bandwidth_eval[l][0] =
+	                (BANDWIDTH_reg == BW_GEN_NN) ?
+	                  call->matrix_bandwidth[l][jj] :
+	                  call->matrix_bandwidth[l][0];
 	          }
 	          for(l = 0; l < num_reg_unordered; l++)
 	            owner->eval_unordered[l][0] =
@@ -25753,7 +25756,9 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	                                   call->vector_scale_factor,
 	                                   1,
 	                                   call->matrix_bandwidth,
-	                                   owner->matrix_bandwidth_eval,
+	                                   (BANDWIDTH_reg == BW_GEN_NN) ?
+	                                     owner->matrix_bandwidth_eval :
+	                                     call->matrix_bandwidth,
 	                                   call->lambda,
 	                                   call->num_categories,
 	                                   call->matrix_categorical_vals,
