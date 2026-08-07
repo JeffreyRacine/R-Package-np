@@ -316,7 +316,7 @@ test_that("conditional scalar CVLS and CVML use their MPI-optimal siblings", {
     fixed = TRUE
   ))
   expect_true(grepl(
-    "np_conditional_x_weight_block_stream_core(",
+    "np_conditional_x_weight_block_stream_core_suppress(",
     source,
     fixed = TRUE
   ))

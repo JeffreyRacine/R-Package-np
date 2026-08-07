@@ -1,5 +1,14 @@
 # npRmpi 0.70-6
 
+* Prepared local-polynomial conditional-density maximum-likelihood
+  cross-validation now assigns each observation row to one MPI rank and
+  reduces an order-preserving contribution vector once per objective. This
+  removes rank-replicated LP row accumulation while retaining byte-identical
+  objective values and bounded workspace. The incumbent nonprepared route and
+  the beta kernel's existing distributed row engine remain isolated in their
+  original sibling kernels, avoiding nested ownership and adjacent timing
+  regressions.
+
 * `npreg()` now accepts `errors = TRUE`. The unchanged default computes and
   retains mean and gradient standard errors as before; `errors = FALSE`
   requests fitted values and optional gradients without constructing the

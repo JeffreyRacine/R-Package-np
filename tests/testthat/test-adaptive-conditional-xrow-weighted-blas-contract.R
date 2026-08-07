@@ -126,8 +126,8 @@ test_that("MPI adaptive density CVML reuses rank-local row contexts", {
   lines <- readLines(src_file, warn = FALSE)
   body <- adaptive_xrow_source_body(
     lines,
-    "^int np_conditional_density_cvml_lp_stream\\(",
-    "^static int np_conditional_density_cvml_lp_block_stream\\("
+    "^static int np_conditional_density_cvml_lp_prepared_parallel_stream\\(",
+    "^int np_conditional_density_cvml_lp_stream\\("
   )
   compact <- gsub("[[:space:]]+", " ", body)
 
@@ -142,7 +142,7 @@ test_that("MPI adaptive density CVML reuses rank-local row contexts", {
     fixed = TRUE
   )
   expect_match(
-    body,
+    compact,
     "np_conditional_yrow_ctx_prepare(vector_scale_factor, OP_NORMAL, &yctx)",
     fixed = TRUE
   )
@@ -156,5 +156,14 @@ test_that("MPI adaptive density CVML reuses rank-local row contexts", {
     "np_conditional_yrow_from_ctx(&yctx, i, yrow)",
     fixed = TRUE
   )
-  expect_match(body, "MPI_Allreduce(&local_cv", fixed = TRUE)
+  expect_match(
+    body,
+    "np_conditional_cvml_contributions_finish(",
+    fixed = TRUE
+  )
+  expect_false(grepl(
+    "!int_conditional_prepared_context_extern",
+    body,
+    fixed = TRUE
+  ))
 })
