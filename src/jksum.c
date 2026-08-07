@@ -18260,6 +18260,105 @@ finish_cv_path:
 }
 
 /*
+ * Kernel-neutral owner for prepared objective rows.  Every rank prepares the
+ * same immutable mathematical state; active MPI partitions only complete
+ * outer evaluation rows.  One canonical-index contribution buffer preserves
+ * serial finishing order without retaining an observation-square object.
+ */
+static int np_objective_outer_rows_enabled(const int route_ready)
+{
+#ifdef MPI2
+  return route_ready && (iNum_Processors > 1) &&
+    !np_mpi_local_regression_active();
+#else
+  (void)route_ready;
+  return 0;
+#endif
+}
+
+static void np_objective_outer_owned_rows(const int start,
+                                          const int rows,
+                                          const int use_parallel_rows,
+                                          int * const owned_start,
+                                          int * const owned_rows)
+{
+  int base_rows;
+  int extra_rows;
+
+  if(owned_start == NULL || owned_rows == NULL)
+    return;
+  if(!use_parallel_rows) {
+    *owned_start = start;
+    *owned_rows = rows;
+    return;
+  }
+
+  base_rows = rows/iNum_Processors;
+  extra_rows = rows%iNum_Processors;
+  *owned_rows = base_rows + (my_rank < extra_rows);
+  *owned_start = start + my_rank*base_rows + MIN(my_rank, extra_rows);
+}
+
+static int np_objective_outer_buffer_prepare(const int use_parallel_rows,
+                                             const size_t count,
+                                             double ** const buffer)
+{
+  int local_ok;
+
+  if(buffer == NULL)
+    return 1;
+  *buffer = NULL;
+  if(!use_parallel_rows)
+    return 0;
+
+  *buffer = (double *)np_jksum_malloc_array_try(count, sizeof(**buffer));
+  local_ok = *buffer != NULL;
+#ifdef MPI2
+  {
+    int all_ok = 0;
+    MPI_Allreduce(&local_ok, &all_ok, 1, MPI_INT, MPI_MIN, comm[1]);
+    local_ok = all_ok;
+  }
+#endif
+  if(!local_ok) {
+    free(*buffer);
+    *buffer = NULL;
+    return 1;
+  }
+  memset(*buffer, 0, count*sizeof(**buffer));
+  return 0;
+}
+
+static int np_objective_outer_buffer_finish(
+  const int use_parallel_rows,
+  const int count,
+  int local_fail,
+  double * const buffer,
+  const char * const failure_env,
+  const char * const label)
+{
+#ifdef MPI2
+  if(use_parallel_rows) {
+    int any_fail = 0;
+
+    if(failure_env != NULL && np_mpi_rank_failure_injected(failure_env))
+      local_fail = 1;
+    MPI_Allreduce(&local_fail, &any_fail, 1, MPI_INT, MPI_MAX, comm[1]);
+    if(any_fail)
+      return 1;
+    np_mpi_allreduce_in_place_double(buffer, count, MPI_SUM, label);
+  }
+#else
+  (void)use_parallel_rows;
+  (void)count;
+  (void)buffer;
+  (void)failure_env;
+  (void)label;
+#endif
+  return local_fail != 0;
+}
+
+/*
  * Finish one common-scaled scalar-regression row.  The continuous-row owner
  * supplies every kernel family on a single positive scale, which cancels from
  * the fitted value and leverage.  Keep deletion, response accumulation, and
@@ -28976,107 +29075,6 @@ np_cvls_workspace_collective_status(
   const NPCVLSWorkspaceStatus local_status
 );
 
-static int
-np_conditional_cvml_prepared_outer_rows_enabled(void)
-{
-#ifdef MPI2
-  /*
-   * Prepared CVML owns complete evaluation rows here.  Kernel-row providers
-   * are rank-local mathematical engines; kernel family must not change the
-   * outer ownership topology.  Owned-row callers suppress any eligible nested
-   * NN distribution before entering a row provider.
-   */
-  return (iNum_Processors > 1) &&
-    !np_mpi_local_regression_active() &&
-    int_conditional_prepared_context_extern;
-#else
-  return 0;
-#endif
-}
-
-static void
-np_conditional_cvml_owned_rows(const int start,
-                               const int rows,
-                               const int use_parallel_rows,
-                               int * const owned_start,
-                               int * const owned_rows)
-{
-  int base_rows;
-  int extra_rows;
-
-  if((owned_start == NULL) || (owned_rows == NULL))
-    return;
-  if(!use_parallel_rows){
-    *owned_start = start;
-    *owned_rows = rows;
-    return;
-  }
-
-  base_rows = rows/iNum_Processors;
-  extra_rows = rows%iNum_Processors;
-  *owned_rows = base_rows + (my_rank < extra_rows);
-  *owned_start = start + my_rank*base_rows + MIN(my_rank, extra_rows);
-}
-
-static NPCVLSWorkspaceStatus
-np_conditional_cvml_contributions_prepare(const int use_parallel_rows,
-                                          const int num_obs,
-                                          double ** const contributions)
-{
-  NPCVLSWorkspaceStatus status;
-
-  if(contributions == NULL)
-    return NP_CVLS_WORKSPACE_ERROR;
-  *contributions = NULL;
-  if(!use_parallel_rows)
-    return NP_CVLS_WORKSPACE_OK;
-
-  status = np_cvls_workspace_vector_try((size_t)num_obs, contributions);
-  status = np_cvls_workspace_collective_status(status);
-  if(status == NP_CVLS_WORKSPACE_OK)
-    memset(*contributions, 0, (size_t)num_obs*sizeof(**contributions));
-  return status;
-}
-
-static int
-np_conditional_cvml_contributions_finish(const int use_parallel_rows,
-                                         const int num_obs,
-                                         int local_fail,
-                                         double local_cv,
-                                         double * const contributions,
-                                         double * const cv,
-                                         const char * const label)
-{
-#ifdef MPI2
-  if(use_parallel_rows){
-    int any_fail = 0;
-    int i;
-
-    if(np_mpi_rank_failure_injected("NP_RMPI_INJECT_CDEN_CVML_FAIL_RANK"))
-      local_fail = 1;
-    MPI_Allreduce(&local_fail, &any_fail, 1, MPI_INT, MPI_MAX, comm[1]);
-    if(any_fail)
-      return 1;
-
-    np_mpi_allreduce_in_place_double(contributions,
-                                     num_obs,
-                                     MPI_SUM,
-                                     label);
-    local_cv = 0.0;
-    for(i = 0; i < num_obs; i++)
-      local_cv += contributions[i];
-  }
-#else
-  (void)contributions;
-  (void)label;
-#endif
-
-  if(local_fail)
-    return 1;
-  *cv = local_cv;
-  return 0;
-}
-
 typedef struct {
   int ready;
   int eval_start;
@@ -32362,9 +32360,8 @@ static int np_conditional_density_cvml_lp_all_large_stream(double *vector_scale_
   int owned_start = 0, owned_rows = 0;
   int local_fail = 0;
   int status = 1;
-  NPCVLSWorkspaceStatus workspace_status = NP_CVLS_WORKSPACE_OK;
   const int use_parallel_rows =
-    np_conditional_cvml_prepared_outer_rows_enabled();
+    np_objective_outer_rows_enabled(int_conditional_prepared_context_extern);
 
   if((cv == NULL) || (vector_scale_factor == NULL))
     return 1;
@@ -32381,15 +32378,10 @@ static int np_conditional_density_cvml_lp_all_large_stream(double *vector_scale_
   if(local_fail)
     goto cleanup_cvml_all_large;
 
-  workspace_status =
-    np_conditional_cvml_contributions_prepare(use_parallel_rows,
-                                              ctx.num_train,
-                                              &contributions);
-  if(workspace_status != NP_CVLS_WORKSPACE_OK){
-    if(workspace_status == NP_CVLS_WORKSPACE_UNAVAILABLE)
-      status = 2;
+  if(np_objective_outer_buffer_prepare(use_parallel_rows,
+                                       (size_t)ctx.num_train,
+                                       &contributions) != 0)
     goto cleanup_cvml_all_large;
-  }
   use_original_dgemv =
     np_glp_dgemv_profitable(ctx.num_train, ctx.nterms) &&
     (ctx.basis_original_order != NULL) &&
@@ -32405,11 +32397,11 @@ static int np_conditional_density_cvml_lp_all_large_stream(double *vector_scale_
      (cross_terms == NULL) || (beta == NULL))
     local_fail = 1;
 
-  np_conditional_cvml_owned_rows(0,
-                                 ctx.num_train,
-                                 use_parallel_rows,
-                                 &owned_start,
-                                 &owned_rows);
+  np_objective_outer_owned_rows(0,
+                                ctx.num_train,
+                                use_parallel_rows,
+                                &owned_start,
+                                &owned_rows);
   for(i = owned_start;
       (i < owned_start + owned_rows) && !local_fail;
       i++){
@@ -32478,15 +32470,18 @@ static int np_conditional_density_cvml_lp_all_large_stream(double *vector_scale_
       local_cv += np_guarded_cvml_contribution(fit);
   }
 
-  if(np_conditional_cvml_contributions_finish(
+  if(np_objective_outer_buffer_finish(
        use_parallel_rows,
        ctx.num_train,
        local_fail,
-       local_cv,
        contributions,
-       cv,
+       "NP_RMPI_INJECT_CDEN_CVML_FAIL_RANK",
        "conditional density LP CVML all-large contributions MPI_Allreduce") != 0)
     goto cleanup_cvml_all_large;
+  if(use_parallel_rows)
+    for(i = 0; i < ctx.num_train; ++i)
+      local_cv += contributions[i];
+  *cv = local_cv;
   status = 0;
 
 cleanup_cvml_all_large:
@@ -32722,9 +32717,8 @@ static int np_conditional_density_cvml_lp_prepared_parallel_stream(
   int i, j, owned_start = 0, owned_rows = 0;
   int status = 1;
   int local_fail = 0;
-  NPCVLSWorkspaceStatus workspace_status = NP_CVLS_WORKSPACE_OK;
   const int use_parallel_rows =
-    np_conditional_cvml_prepared_outer_rows_enabled();
+    np_objective_outer_rows_enabled(int_conditional_prepared_context_extern);
 
   if((cv == NULL) || (vector_scale_factor == NULL) || (num_obs <= 0))
     return 1;
@@ -32756,11 +32750,9 @@ static int np_conditional_density_cvml_lp_prepared_parallel_stream(
   if((xrow == NULL) || (yrow == NULL))
     local_fail = 1;
 
-  workspace_status =
-    np_conditional_cvml_contributions_prepare(use_parallel_rows,
-                                              num_obs,
-                                              &contributions);
-  if(workspace_status != NP_CVLS_WORKSPACE_OK)
+  if(np_objective_outer_buffer_prepare(use_parallel_rows,
+                                       (size_t)num_obs,
+                                       &contributions) != 0)
     local_fail = 1;
 
   if((!local_fail) && use_xrow_ctx){
@@ -32773,11 +32765,11 @@ static int np_conditional_density_cvml_lp_prepared_parallel_stream(
       local_fail = 1;
   }
 
-  np_conditional_cvml_owned_rows(0,
-                                 num_obs,
-                                 use_parallel_rows,
-                                 &owned_start,
-                                 &owned_rows);
+  np_objective_outer_owned_rows(0,
+                                num_obs,
+                                use_parallel_rows,
+                                &owned_start,
+                                &owned_rows);
   for(i = owned_start;
       (i < owned_start + owned_rows) && !local_fail;
       i++){
@@ -32828,15 +32820,18 @@ static int np_conditional_density_cvml_lp_prepared_parallel_stream(
       local_cv += np_guarded_cvml_contribution(fit);
   }
 
-  if(np_conditional_cvml_contributions_finish(
+  if(np_objective_outer_buffer_finish(
        use_parallel_rows,
        num_obs,
        local_fail,
-       local_cv,
        contributions,
-       cv,
+       "NP_RMPI_INJECT_CDEN_CVML_FAIL_RANK",
        "conditional density LP CVML row contributions MPI_Allreduce") != 0)
     goto cleanup_cvml_lp_stream;
+  if(use_parallel_rows)
+    for(i = 0; i < num_obs; ++i)
+      local_cv += contributions[i];
+  *cv = local_cv;
 
   status = 0;
 
@@ -32872,7 +32867,7 @@ int np_conditional_density_cvml_lp_stream(double *vector_scale_factor,
   const int use_parallel_rows = 0;
 #endif
 
-  if(np_conditional_cvml_prepared_outer_rows_enabled())
+  if(np_objective_outer_rows_enabled(int_conditional_prepared_context_extern))
     return np_conditional_density_cvml_lp_prepared_parallel_stream(
       vector_scale_factor, cv);
 
@@ -33070,24 +33065,25 @@ static int np_conditional_density_cvml_lp_parallel_block_stream(
     workspace_status =
       np_cvls_workspace_matrix_try(num_obs, owned_capacity, &yblock);
   workspace_status = np_cvls_workspace_collective_status(workspace_status);
-  if(workspace_status == NP_CVLS_WORKSPACE_OK)
-    workspace_status =
-      np_conditional_cvml_contributions_prepare(1,
-                                                num_obs,
-                                                &contributions);
   if(workspace_status != NP_CVLS_WORKSPACE_OK)
     goto cleanup_cvml_lp_block;
+  if(np_objective_outer_buffer_prepare(1,
+                                       (size_t)num_obs,
+                                       &contributions) != 0){
+    local_fail = 1;
+    goto cleanup_cvml_lp_block;
+  }
 
   for(i0 = 0; (i0 < num_obs) && !local_fail; i0 += block_size){
     const int ib = MIN(block_size, num_obs - i0);
     int owned_start = i0;
     int owned_rows = ib;
 
-    np_conditional_cvml_owned_rows(i0,
-                                   ib,
-                                   1,
-                                   &owned_start,
-                                   &owned_rows);
+    np_objective_outer_owned_rows(i0,
+                                  ib,
+                                  1,
+                                  &owned_start,
+                                  &owned_rows);
     if(owned_rows <= 0)
       continue;
 
@@ -33117,15 +33113,17 @@ static int np_conditional_density_cvml_lp_parallel_block_stream(
     }
   }
 
-  if(np_conditional_cvml_contributions_finish(
+  if(np_objective_outer_buffer_finish(
        1,
        num_obs,
        local_fail,
-       local_cv,
        contributions,
-       cv,
+       "NP_RMPI_INJECT_CDEN_CVML_FAIL_RANK",
        "conditional density LP CVML block contributions MPI_Allreduce") != 0)
     goto cleanup_cvml_lp_block;
+  for(ii = 0; ii < num_obs; ++ii)
+    local_cv += contributions[ii];
+  *cv = local_cv;
   status = 0;
 
 cleanup_cvml_lp_block:
@@ -42145,7 +42143,7 @@ static NP_NOINLINE int np_conditional_density_cvml_continuous_route(
   int status = 1;
   NPCVLSWorkspaceStatus workspace_status = NP_CVLS_WORKSPACE_OK;
   const int use_parallel_rows =
-    np_conditional_cvml_prepared_outer_rows_enabled();
+    np_objective_outer_rows_enabled(int_conditional_prepared_context_extern);
 
   if(cv == NULL || vector_scale_factor == NULL || num_obs < 2 ||
      (!beta_x && !beta_y) ||
@@ -42158,9 +42156,9 @@ static NP_NOINLINE int np_conditional_density_cvml_continuous_route(
   np_conditional_route_row_context_init(&route_x);
   np_conditional_route_row_context_init(&route_y);
   np_reghat_lp_workspace_init(&lp_workspace);
-  workspace_status = np_conditional_cvml_contributions_prepare(
-    use_parallel_rows, num_obs, &contributions);
-  if(workspace_status != NP_CVLS_WORKSPACE_OK)
+  if(np_objective_outer_buffer_prepare(use_parallel_rows,
+                                       (size_t)num_obs,
+                                       &contributions) != 0)
     goto cleanup_route;
 
   workspace_status = np_cvls_workspace_vector_try(
@@ -42240,7 +42238,7 @@ static NP_NOINLINE int np_conditional_density_cvml_continuous_route(
     }
   }
 
-  np_conditional_cvml_owned_rows(
+  np_objective_outer_owned_rows(
     0, num_obs, use_parallel_rows, &owned_start, &owned_rows);
   for(evaluation = owned_start;
       evaluation < owned_start + owned_rows && !local_fail;
@@ -42341,15 +42339,19 @@ static NP_NOINLINE int np_conditional_density_cvml_continuous_route(
     }
   }
 
-  if(np_conditional_cvml_contributions_finish(
+  if(np_objective_outer_buffer_finish(
        use_parallel_rows,
        num_obs,
        local_fail,
-       local_cv,
        contributions,
-       cv,
-       "conditional density routed CVML contributions MPI_Allreduce") != 0 ||
-     !R_FINITE(*cv))
+       "NP_RMPI_INJECT_CDEN_CVML_FAIL_RANK",
+       "conditional density routed CVML contributions MPI_Allreduce") != 0)
+    goto cleanup_route;
+  if(use_parallel_rows)
+    for(evaluation = 0; evaluation < num_obs; ++evaluation)
+      local_cv += contributions[evaluation];
+  *cv = local_cv;
+  if(!R_FINITE(*cv))
     goto cleanup_route;
   status = 0;
 

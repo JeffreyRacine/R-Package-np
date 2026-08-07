@@ -27,25 +27,25 @@ test_that("conditional CVML has one bounded MPI contribution owner", {
   source <- npcdens_cvml_mpi_source()
   skip_if(is.null(source), "package C source unavailable")
 
-  expect_match(source, "np_conditional_cvml_owned_rows(", fixed = TRUE)
+  expect_match(source, "np_objective_outer_owned_rows(", fixed = TRUE)
   expect_match(
     source,
-    "np_conditional_cvml_contributions_prepare(",
+    "np_objective_outer_buffer_prepare(",
     fixed = TRUE
   )
   expect_match(
     source,
-    "np_conditional_cvml_contributions_finish(",
+    "np_objective_outer_buffer_finish(",
     fixed = TRUE
   )
   expect_match(
     source,
-    "np_cvls_workspace_vector_try((size_t)num_obs, contributions)",
+    "np_jksum_malloc_array_try(count, sizeof(**buffer))",
     fixed = TRUE
   )
   expect_match(
     source,
-    "np_mpi_allreduce_in_place_double(contributions,",
+    "np_mpi_allreduce_in_place_double(buffer, count, MPI_SUM, label)",
     fixed = TRUE
   )
   expect_false(grepl("alloc_tmatd(num_obs, num_obs)", source, fixed = TRUE))
@@ -58,11 +58,11 @@ test_that("prepared outer CVML ownership is kernel-family neutral", {
 
   policy <- npcdens_cvml_mpi_body(
     source,
-    "np_conditional_cvml_prepared_outer_rows_enabled(void)",
-    "static void\nnp_conditional_cvml_owned_rows"
+    "np_objective_outer_rows_enabled(const int route_ready)",
+    "static void np_objective_outer_owned_rows"
   )
   expect_match(policy, "!np_mpi_local_regression_active()", fixed = TRUE)
-  expect_match(policy, "int_conditional_prepared_context_extern", fixed = TRUE)
+  expect_match(policy, "route_ready", fixed = TRUE)
   expect_false(grepl("KERNEL_reg_extern", policy, fixed = TRUE))
   expect_false(grepl("KERNEL_den_extern", policy, fixed = TRUE))
   expect_false(grepl("NP_CKERNEL_COORDINATE_CODE", policy, fixed = TRUE))
@@ -87,19 +87,19 @@ test_that("routed beta CVML uses the canonical prepared outer-row owner", {
   routed <- substr(source, routed_start, routed_stop - 1L)
   expect_match(
     routed,
-    "np_conditional_cvml_prepared_outer_rows_enabled()",
+    "np_objective_outer_rows_enabled(int_conditional_prepared_context_extern)",
     fixed = TRUE
   )
   expect_false(grepl("BANDWIDTH_den == BW_FIXED", routed, fixed = TRUE))
   expect_match(
     routed,
-    "np_conditional_cvml_contributions_prepare(",
+    "np_objective_outer_buffer_prepare(",
     fixed = TRUE
   )
-  expect_match(routed, "np_conditional_cvml_owned_rows(", fixed = TRUE)
+  expect_match(routed, "np_objective_outer_owned_rows(", fixed = TRUE)
   expect_match(
     routed,
-    "np_conditional_cvml_contributions_finish(",
+    "np_objective_outer_buffer_finish(",
     fixed = TRUE
   )
   expect_false(grepl("MPI_Allreduce[[:space:]]*\\(", routed))
@@ -137,12 +137,12 @@ test_that("all positive-width CVML exits use canonical contribution finish", {
   for (body in list(all_large, row, block)) {
     expect_match(
       body,
-      "np_conditional_cvml_contributions_finish(",
+      "np_objective_outer_buffer_finish(",
       fixed = TRUE
     )
     expect_true(
       grepl("use_parallel_rows", body, fixed = TRUE) ||
-        grepl("np_conditional_cvml_owned_rows(i0,\n                                   ib,\n                                   1,", body, fixed = TRUE)
+        grepl("np_objective_outer_owned_rows(i0,\n                                  ib,\n                                  1,", body, fixed = TRUE)
     )
   }
 
@@ -253,12 +253,12 @@ test_that("CVML rank failure uses a common rendezvous", {
 
   finish <- npcdens_cvml_mpi_body(
     source,
-    "np_conditional_cvml_contributions_finish",
-    "typedef struct {\n  int ready;\n  int eval_start;"
+    "np_objective_outer_buffer_finish",
+    "static inline int np_regression_cv_scalar_accumulate_scaled_row"
   )
   expect_match(
-    finish,
-    "NP_RMPI_INJECT_CDEN_CVML_FAIL_RANK",
+    source,
+    '"NP_RMPI_INJECT_CDEN_CVML_FAIL_RANK"',
     fixed = TRUE
   )
   expect_match(
