@@ -18419,7 +18419,7 @@ static inline int np_regression_cv_scalar_accumulate_scaled_row(
   return !R_FINITE(*cv) || !R_FINITE(*traceH);
 }
 
-static inline int np_regression_cv_scalar_finish_objective(
+static NP_ALWAYS_INLINE int np_regression_cv_finish_objective(
   const int bwm,
   const int num_obs,
   double cv,
@@ -18651,7 +18651,7 @@ static int np_regression_cv_scalar_continuous_route_body(
       goto cleanup_route;
   }
 
-  if(np_regression_cv_scalar_finish_objective(
+  if(np_regression_cv_finish_objective(
        bwm, num_obs, cv, traceH, objective) != 0)
     goto cleanup_route;
 
@@ -18794,7 +18794,7 @@ static int np_regression_cv_scalar_continuous_route_parallel_body(
     if(call->bwm == RBWM_CVAIC)
       traceH += contributions[num_obs + evaluation];
   }
-  if(np_regression_cv_scalar_finish_objective(
+  if(np_regression_cv_finish_objective(
        call->bwm, num_obs, cv, traceH, call->objective) != 0)
     return 1;
 
@@ -19121,22 +19121,9 @@ static int np_regression_cv_lp_continuous_route_body(
       goto cleanup_lp_route;
   }
 
-  cv /= (double)num_obs;
-  if(bwm == RBWM_CVAIC) {
-    const double penalty_denominator =
-      1.0 - (traceH + 2.0)/(double)num_obs;
-    const double penalty_numerator =
-      1.0 + traceH/(double)num_obs;
-    const double penalty = penalty_numerator/penalty_denominator;
-
-    if(!(cv > 0.0) || !R_FINITE(cv) || !R_FINITE(penalty) || penalty < 0.0)
-      goto cleanup_lp_route;
-    cv = log(cv) + penalty;
-  }
-  if(!R_FINITE(cv))
+  if(np_regression_cv_finish_objective(
+       bwm, num_obs, cv, traceH, objective) != 0)
     goto cleanup_lp_route;
-
-  *objective = cv;
   status = 0;
 
 cleanup_lp_route:

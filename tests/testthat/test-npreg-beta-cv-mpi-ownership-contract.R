@@ -165,7 +165,7 @@ test_that("local and parallel scalar routes share the objective finisher", {
 
   helper <- npreg_beta_cv_mpi_body(
     source,
-    "static inline int np_regression_cv_scalar_finish_objective(",
+    "static NP_ALWAYS_INLINE int np_regression_cv_finish_objective(",
     "typedef struct {\n  int bwm;"
   )
   expect_match(helper, "cv /= (double)num_obs;", fixed = TRUE)
@@ -179,6 +179,11 @@ test_that("local and parallel scalar routes share the objective finisher", {
   expect_match(
     source,
     "call->bwm, num_obs, cv, traceH, call->objective",
+    fixed = TRUE
+  )
+  expect_match(
+    source,
+    "bwm, num_obs, cv, traceH, objective",
     fixed = TRUE
   )
 })
