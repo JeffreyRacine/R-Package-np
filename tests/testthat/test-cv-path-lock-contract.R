@@ -407,9 +407,18 @@ test_that("LP LOO rows use signed full-row deletion and no QR", {
     expect_false(grepl(obsolete, header_source, fixed = TRUE))
   }
 
-  expect_equal(
-    sum(grepl("if\\(!np_lp_delete_denominator\\(", lines)),
-    6L
+  delete_calls <- gregexpr(
+    "np_lp_delete_denominator\\(", source, perl = TRUE
+  )[[1L]]
+  guarded_delete_calls <- gregexpr(
+    "(?:if\\s*\\(|&&\\s*|\\|\\|\\s*)!np_lp_delete_denominator\\(",
+    source,
+    perl = TRUE
+  )[[1L]]
+  expect_gt(sum(delete_calls > 0L), 0L)
+  expect_identical(
+    sum(guarded_delete_calls > 0L),
+    sum(delete_calls > 0L)
   )
   beta_provider_start <- grep(
     "static int np_conditional_cvls_provider_x_row(",
