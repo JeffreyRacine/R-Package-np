@@ -20042,14 +20042,14 @@ static NP_NOINLINE int np_regression_cv_lp_cvaic_continuous_route_parallel(
 }
 
 /*
- * MPI-only generalized-NN sibling for wider local polynomials.  The
+ * MPI-only nearest-neighbor owner for wider local polynomials.  The
  * qualified fixed and local dispatchers above remain byte-stable.  Each rank
- * realizes the canonical GNN bandwidth matrix, solves complete LP rows for
- * its owned evaluations, and contributes O(n) CVLS or O(2n) CVAIC scalars in
- * canonical evaluation order.  Estimator algebra remains in the shared LP
- * influence-row, delete-denominator, and objective-finisher helpers.
+ * realizes the selected canonical NN bandwidth matrix, solves complete LP
+ * rows for its owned evaluations, and contributes O(n) CVLS or O(2n) CVAIC
+ * scalars in canonical evaluation order.  Estimator algebra remains in the
+ * shared LP influence-row, delete-denominator, and objective-finisher helpers.
  */
-static int np_regression_cv_lp_gnn_continuous_route_parallel_body(
+static int np_regression_cv_lp_nn_continuous_route_parallel_body(
   const NPRegressionCvScalarRouteCall *call,
   NPRegressionCvLPRouteOwner *owner)
 {
@@ -20079,7 +20079,8 @@ static int np_regression_cv_lp_gnn_continuous_route_parallel_body(
      call->scale_factor == NULL || call->kernel_route == NULL ||
      call->kernel_route_diagnostics == NULL ||
      (call->bwm != RBWM_CVLS && call->bwm != RBWM_CVAIC) ||
-     call->bandwidth_mode != BW_GEN_NN ||
+     (call->bandwidth_mode != BW_GEN_NN &&
+      call->bandwidth_mode != BW_ADAP_NN) ||
      (call->categorical_compress != 0 && call->categorical_compress != 1) ||
      (call->bwm == RBWM_CVAIC && num_obs > INT_MAX/2))
     return 1;
@@ -20151,7 +20152,7 @@ static int np_regression_cv_lp_gnn_continuous_route_parallel_body(
   }
 
   if(!local_fail && np_beta_continuous_bandwidth_prepare_canonical(
-       BW_GEN_NN, num_obs, num_obs,
+       call->bandwidth_mode, num_obs, num_obs,
        num_reg_unordered, num_reg_ordered, num_reg_continuous,
        call->matrix_X_continuous, call->matrix_X_continuous,
        call->scale_factor, matrix_bandwidth, NULL,
@@ -20161,7 +20162,7 @@ static int np_regression_cv_lp_gnn_continuous_route_parallel_body(
   if(!local_fail) {
     row_status = np_beta_scaled_row_context_prepare(
       row_context, call->kernel_route, call->kernel_route_diagnostics,
-      BW_GEN_NN, num_obs, num_obs, num_reg_continuous,
+      call->bandwidth_mode, num_obs, num_obs, num_reg_continuous,
       num_reg_unordered, num_reg_ordered,
       call->matrix_X_continuous, call->matrix_X_continuous,
       call->matrix_X_unordered, call->matrix_X_unordered,
@@ -20228,7 +20229,7 @@ static int np_regression_cv_lp_gnn_continuous_route_parallel_body(
   if(np_objective_outer_buffer_finish(
        1, contribution_count, local_fail, contributions,
        "NP_RMPI_INJECT_REG_ROUTED_CV_FAIL_RANK",
-       "regression routed LP GNN CV contributions MPI_Allreduce") != 0)
+       "regression routed LP NN CV contributions MPI_Allreduce") != 0)
     return 1;
   for(evaluation = 0; evaluation < num_obs; ++evaluation) {
     cv += contributions[evaluation];
@@ -20250,7 +20251,7 @@ static SEXP np_regression_cv_lp_gnn_route_execute(void *data)
     (NPRegressionCvLPRouteExecution *)data;
 
   execution->status =
-    np_regression_cv_lp_gnn_continuous_route_parallel_body(
+    np_regression_cv_lp_nn_continuous_route_parallel_body(
       execution->call, &execution->owner);
   return R_NilValue;
 }
@@ -20302,6 +20303,68 @@ static NP_NOINLINE int np_regression_cv_lp_gnn_continuous_route_parallel(
   np_regression_cv_lp_route_owner_init(&execution.owner);
   R_UnwindProtect(
     np_regression_cv_lp_gnn_route_execute, &execution,
+    np_regression_cv_lp_route_owner_cleanup, &execution.owner, NULL);
+  return execution.status;
+}
+
+static SEXP np_regression_cv_lp_ann_route_execute(void *data)
+{
+  NPRegressionCvLPRouteExecution * const execution =
+    (NPRegressionCvLPRouteExecution *)data;
+
+  execution->status =
+    np_regression_cv_lp_nn_continuous_route_parallel_body(
+      execution->call, &execution->owner);
+  return R_NilValue;
+}
+
+static NP_NOINLINE int np_regression_cv_lp_ann_continuous_route_parallel(
+  const int bwm,
+  const int KERNEL_unordered_reg,
+  const int KERNEL_ordered_reg,
+  const int BANDWIDTH_reg,
+  const int num_obs,
+  const int num_reg_unordered,
+  const int num_reg_ordered,
+  const int num_reg_continuous,
+  double **matrix_X_unordered,
+  double **matrix_X_ordered,
+  double **matrix_X_continuous,
+  double *vector_Y,
+  double *vector_scale_factor,
+  int *num_categories,
+  const NPContinuousKernelRoute * const kernel_route,
+  NPContinuousKernelDerivativeDiagnostics * const kernel_route_diagnostics,
+  const int categorical_compress,
+  double * const objective)
+{
+  const NPRegressionCvScalarRouteCall call = {
+    bwm,
+    KERNEL_unordered_reg,
+    KERNEL_ordered_reg,
+    BANDWIDTH_reg,
+    num_obs,
+    num_reg_unordered,
+    num_reg_ordered,
+    num_reg_continuous,
+    matrix_X_unordered,
+    matrix_X_ordered,
+    matrix_X_continuous,
+    vector_Y,
+    vector_scale_factor,
+    num_categories,
+    kernel_route,
+    kernel_route_diagnostics,
+    categorical_compress,
+    objective
+  };
+  NPRegressionCvLPRouteExecution execution;
+
+  execution.call = &call;
+  execution.status = 1;
+  np_regression_cv_lp_route_owner_init(&execution.owner);
+  R_UnwindProtect(
+    np_regression_cv_lp_ann_route_execute, &execution,
     np_regression_cv_lp_route_owner_cleanup, &execution.owner, NULL);
   return execution.status;
 }
@@ -20395,6 +20458,17 @@ const int categorical_compress)
          (bwm == RBWM_CVLS || bwm == RBWM_CVAIC) &&
          BANDWIDTH_reg == BW_GEN_NN)) {
       if(np_regression_cv_lp_gnn_continuous_route_parallel(
+           bwm, KERNEL_unordered_reg, KERNEL_ordered_reg, BANDWIDTH_reg,
+           num_obs, num_reg_unordered, num_reg_ordered, num_reg_continuous,
+           matrix_X_unordered, matrix_X_ordered, matrix_X_continuous,
+           vector_Y, vector_scale_factor, num_categories,
+           kernel_route, kernel_route_diagnostics, categorical_compress,
+           &objective) != 0)
+        return DBL_MAX;
+    } else if(np_objective_outer_rows_enabled(
+                (bwm == RBWM_CVLS || bwm == RBWM_CVAIC) &&
+                BANDWIDTH_reg == BW_ADAP_NN)) {
+      if(np_regression_cv_lp_ann_continuous_route_parallel(
            bwm, KERNEL_unordered_reg, KERNEL_ordered_reg, BANDWIDTH_reg,
            num_obs, num_reg_unordered, num_reg_ordered, num_reg_continuous,
            matrix_X_unordered, matrix_X_ordered, matrix_X_continuous,
