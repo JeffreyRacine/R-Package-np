@@ -21470,6 +21470,168 @@ cleanup_distribution_route:
   return status;
 }
 
+/*
+ * Active-MPI sibling of the local continuous beta CDF-CV engine above.
+ * Each rank forms complete evaluation rows and accumulates their complete
+ * empirical-CDF losses locally.  One O(num_obs_eval) canonical-index vector
+ * restores the serial evaluation order without a training-by-evaluation
+ * allocation or a collective inside the row primitive.
+ */
+static int np_distribution_cvls_continuous_route_mpi(
+  const NPContinuousKernelRoute *route,
+  NPContinuousKernelDerivativeDiagnostics *diagnostics,
+  const int bandwidth_mode,
+  const int num_obs_train,
+  const int num_obs_eval,
+  const int num_reg_unordered,
+  const int num_reg_ordered,
+  const int num_reg_continuous,
+  const int cdfontrain,
+  double **matrix_X_unordered_train,
+  double **matrix_X_ordered_train,
+  double **matrix_X_continuous_train,
+  double **matrix_X_unordered_eval,
+  double **matrix_X_ordered_eval,
+  double **matrix_X_continuous_eval,
+  double **matrix_bandwidth,
+  const int *operator_code,
+  const int *kernel_unordered,
+  const int *kernel_ordered,
+  const double *lambda,
+  const int *num_categories,
+  double **category_values,
+  const int categorical_compress,
+  double *cv)
+{
+  NPBetaScaledRowContext context;
+  NPContinuousKernelRowStatus row_status = NP_CONTINUOUS_ROW_OK;
+  const double ofac = num_obs_train - 1.0;
+  double *row = NULL;
+  double *contributions = NULL;
+  double cv_accumulator = 0.0;
+  int owned_start = 0;
+  int owned_rows = 0;
+  int local_fail = 0;
+  int evaluation;
+  int observation;
+  int status = 1;
+
+  if(route == NULL || diagnostics == NULL || cv == NULL ||
+     num_obs_train <= 1 || num_obs_eval <= 0 ||
+     num_reg_unordered != 0 || num_reg_continuous <= 0 ||
+     !np_objective_outer_rows_enabled(1))
+    return 1;
+
+  np_beta_scaled_row_context_init(&context);
+  if(np_objective_outer_buffer_prepare(1,
+                                       (size_t)num_obs_eval,
+                                       &contributions) != 0)
+    goto cleanup_distribution_route_mpi;
+  row = (double *)np_jksum_malloc_array_try(
+    (size_t)num_obs_train, sizeof(*row));
+  local_fail = row == NULL;
+  if(!local_fail) {
+    row_status = np_beta_scaled_row_context_prepare(
+      &context, route, diagnostics, bandwidth_mode,
+      num_obs_train, num_obs_eval, num_reg_continuous,
+      num_reg_unordered, num_reg_ordered,
+      matrix_X_continuous_train, matrix_X_continuous_eval,
+      matrix_X_unordered_train, matrix_X_unordered_eval,
+      matrix_X_ordered_train, matrix_X_ordered_eval,
+      matrix_bandwidth, matrix_bandwidth, operator_code,
+      kernel_unordered, kernel_ordered, lambda, num_categories,
+      category_values, categorical_compress, row);
+    local_fail = row_status != NP_CONTINUOUS_ROW_OK;
+  }
+#ifdef MPI2
+  {
+    int any_fail = 0;
+
+    MPI_Allreduce(&local_fail, &any_fail, 1, MPI_INT, MPI_MAX, comm[1]);
+    if(any_fail)
+      goto cleanup_distribution_route_mpi;
+  }
+#endif
+  if(local_fail)
+    goto cleanup_distribution_route_mpi;
+
+  np_objective_outer_owned_rows(0,
+                                num_obs_eval,
+                                1,
+                                &owned_start,
+                                &owned_rows);
+  for(evaluation = owned_start;
+      evaluation < owned_start + owned_rows;
+      ++evaluation) {
+    double scaled_sum = 0.0;
+    double common_log_scale = 0.0;
+    double common_scale = 0.0;
+    double row_sum;
+    double contribution;
+
+    if((evaluation & 31) == 0)
+      np_progress_bandwidth_loop_step();
+    row_status = np_beta_scaled_row_context_fill(
+      &context, evaluation, &scaled_sum, &common_log_scale);
+    if(row_status != NP_CONTINUOUS_ROW_OK ||
+       np_continuous_kernel_scaled_restore(
+         1.0, common_log_scale, 1, &common_scale) !=
+           NP_CONTINUOUS_ROW_OK) {
+      local_fail = 1;
+      break;
+    }
+    row_sum = scaled_sum*common_scale;
+    if(!R_FINITE(row_sum)) {
+      local_fail = 1;
+      break;
+    }
+    for(observation = 0; observation < num_obs_train; ++observation) {
+      row[observation] *= common_scale;
+      if(!R_FINITE(row[observation])) {
+        local_fail = 1;
+        break;
+      }
+    }
+    if(local_fail)
+      break;
+
+    contribution = np_distribution_cvls_accumulate_row(
+      evaluation, 0, num_obs_train - 1, cdfontrain,
+      num_reg_ordered, num_reg_continuous,
+      matrix_X_ordered_train, matrix_X_continuous_train,
+      matrix_X_ordered_eval, matrix_X_continuous_eval,
+      row_sum, ofac, row, 1, 0.0);
+    if(!R_FINITE(contribution)) {
+      local_fail = 1;
+      break;
+    }
+    contributions[evaluation] = contribution;
+  }
+
+  if(np_objective_outer_buffer_finish(
+       1,
+       num_obs_eval,
+       local_fail,
+       contributions,
+       "NP_RMPI_INJECT_UDIST_CVLS_FAIL_RANK",
+       "unconditional distribution beta CVLS contributions MPI_Allreduce") !=
+       0)
+    goto cleanup_distribution_route_mpi;
+  for(evaluation = 0; evaluation < num_obs_eval; ++evaluation)
+    cv_accumulator += contributions[evaluation];
+  cv_accumulator /= (double)num_obs_train*(double)num_obs_eval;
+  if(!R_FINITE(cv_accumulator))
+    goto cleanup_distribution_route_mpi;
+  *cv = cv_accumulator;
+  status = 0;
+
+cleanup_distribution_route_mpi:
+  np_beta_scaled_row_context_clear(&context);
+  free(row);
+  free(contributions);
+  return status;
+}
+
 double np_kernel_estimate_distribution_ls_cv( 
 int KERNEL_den,
 int KERNEL_den_unordered,
@@ -21671,19 +21833,32 @@ double * cv){
   }
 
   if(exact_beta_route) {
-    beta_row = (double *)np_jksum_malloc_array_or_die(
-      (size_t)num_obs_train, sizeof(double),
-      "np_kernel_estimate_distribution_ls_cv beta_row");
-    status = np_distribution_cvls_continuous_route(
-      kernel_route, kernel_route_diagnostics, BANDWIDTH_den,
-      num_obs_train, num_obs_eval, num_reg_unordered,
-      num_reg_ordered, num_reg_continuous, cdfontrain, is, ie,
-      matrix_X_unordered_train, matrix_X_ordered_train,
-      matrix_X_continuous_train, matrix_X_unordered_eval,
-      matrix_X_ordered_eval, matrix_X_continuous_eval,
-      matrix_bandwidth, operator, kernel_u, kernel_o, lambda,
-      num_categories, matrix_categorical_vals, categorical_compress,
-      beta_row, cv);
+    if(np_objective_outer_rows_enabled(1)) {
+      status = np_distribution_cvls_continuous_route_mpi(
+        kernel_route, kernel_route_diagnostics, BANDWIDTH_den,
+        num_obs_train, num_obs_eval, num_reg_unordered,
+        num_reg_ordered, num_reg_continuous, cdfontrain,
+        matrix_X_unordered_train, matrix_X_ordered_train,
+        matrix_X_continuous_train, matrix_X_unordered_eval,
+        matrix_X_ordered_eval, matrix_X_continuous_eval,
+        matrix_bandwidth, operator, kernel_u, kernel_o, lambda,
+        num_categories, matrix_categorical_vals, categorical_compress,
+        cv);
+    } else {
+      beta_row = (double *)np_jksum_malloc_array_or_die(
+        (size_t)num_obs_train, sizeof(double),
+        "np_kernel_estimate_distribution_ls_cv beta_row");
+      status = np_distribution_cvls_continuous_route(
+        kernel_route, kernel_route_diagnostics, BANDWIDTH_den,
+        num_obs_train, num_obs_eval, num_reg_unordered,
+        num_reg_ordered, num_reg_continuous, cdfontrain, is, ie,
+        matrix_X_unordered_train, matrix_X_ordered_train,
+        matrix_X_continuous_train, matrix_X_unordered_eval,
+        matrix_X_ordered_eval, matrix_X_continuous_eval,
+        matrix_bandwidth, operator, kernel_u, kernel_o, lambda,
+        num_categories, matrix_categorical_vals, categorical_compress,
+        beta_row, cv);
+    }
     goto cleanup_distribution_ls_cv;
   }
 
