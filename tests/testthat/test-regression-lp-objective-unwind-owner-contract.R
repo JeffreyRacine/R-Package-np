@@ -27,15 +27,44 @@ lp_objective_owner_region <- function(source) {
   paste(source[seq.int(start, stop - 1L)], collapse = "\n")
 }
 
+c_function_region <- function(source, signature) {
+  start <- grep(signature, source, fixed = TRUE)
+  stopifnot(length(start) == 1L)
+  depth <- 0L
+  opened <- FALSE
+  for (line in seq.int(start, length(source))) {
+    opens <- lengths(regmatches(source[[line]], gregexpr("{", source[[line]], fixed = TRUE)))
+    closes <- lengths(regmatches(source[[line]], gregexpr("}", source[[line]], fixed = TRUE)))
+    if (opens > 0L)
+      opened <- TRUE
+    depth <- depth + opens - closes
+    if (opened && depth == 0L)
+      return(paste(source[seq.int(start, line)], collapse = "\n"))
+  }
+  stop("unterminated C function: ", signature)
+}
+
 test_that("wider-LP regression objective has one complete unwind owner", {
   path <- locate_lp_objective_source()
   skip_if(is.null(path), "package sources unavailable")
-  region <- lp_objective_owner_region(readLines(path, warn = FALSE))
+  source <- readLines(path, warn = FALSE)
+  region <- lp_objective_owner_region(source)
 
-  expect_equal(
-    sum(gregexpr("R_UnwindProtect(", region, fixed = TRUE)[[1L]] > 0L),
-    1L
-  )
+  for (entry in c(
+    "static NP_NOINLINE int np_regression_cv_lp_continuous_route(",
+    "static NP_NOINLINE int np_regression_cv_lp_cvaic_continuous_route_parallel(",
+    "static NP_NOINLINE int np_regression_cv_lp_gnn_continuous_route_parallel(",
+    "static NP_NOINLINE int np_regression_cv_lp_ann_continuous_route_parallel("
+  )) {
+    function_region <- c_function_region(source, entry)
+    expect_equal(
+      sum(gregexpr(
+        "R_UnwindProtect(", function_region, fixed = TRUE
+      )[[1L]] > 0L),
+      1L,
+      info = entry
+    )
+  }
   expect_match(region, "NPReghatLPWorkspace lp_workspace;", fixed = TRUE)
   expect_match(region, "int matrix_bandwidth_columns;", fixed = TRUE)
   expect_match(
