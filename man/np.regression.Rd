@@ -18,20 +18,20 @@
 }
 
 \usage{
-npreg(bws, errors = TRUE, \dots)
+npreg(bws, \dots)
 
 \method{npreg}{formula}(bws, 
       data = NULL,
-      errors = TRUE,
       newdata = NULL, 
-      y.eval = FALSE, 
+      y.eval = FALSE,
+      errors = TRUE,
       \dots)
 
 \method{npreg}{default}(bws, 
       txdat, 
       tydat,
+      nomad = FALSE,
       errors = TRUE,
-      nomad = FALSE, 
       \dots)
 
 \method{npreg}{rbandwidth}(bws,
@@ -39,10 +39,10 @@ npreg(bws, errors = TRUE, \dots)
       tydat = stop("training data 'tydat' missing"),
       exdat,
       eydat,
-      errors = TRUE,
       gradient.order = 1L,
       gradients = FALSE,
       residuals = FALSE,
+      errors = TRUE,
       \dots)
 }
 

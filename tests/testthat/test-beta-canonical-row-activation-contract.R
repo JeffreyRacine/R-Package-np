@@ -733,7 +733,11 @@ test_that("scalar beta regression fits enter the canonical row engine", {
   expect_match(regression_engine, "np_regression_fit_statistics(",
                fixed = TRUE)
   expect_match(regression_engine, "return 0;", fixed = TRUE)
-  expect_match(regression_sibling, "do_grad != do_gerr", fixed = TRUE)
+  expect_match(
+    scalar_family,
+    "(do_gerr && (!do_grad || mean_stderr == NULL))",
+    fixed = TRUE
+  )
   expect_match(
     regression_sibling, "np_beta_bandwidth_prepare_matrix(", fixed = TRUE
   )
@@ -1614,8 +1618,11 @@ test_that("canonical beta regression moments preserve the sidecar transcript", {
   expect_match(owner, "const double new_total_weight", fixed = TRUE)
   expect_match(
     owner,
-    "weighted_m2 += weight * delta *\n            (response[observation] - new_mean);",
+    "weighted_m2 += weight * delta *",
     fixed = TRUE
+  )
+  expect_match(
+    owner, "(response[observation] - new_mean);", fixed = TRUE
   )
   expect_match(owner, "double weighted_response_sum = 0.0;", fixed = TRUE)
   expect_match(
@@ -1625,7 +1632,15 @@ test_that("canonical beta regression moments preserve the sidecar transcript", {
   expect_match(owner, "squared_weight_sum += weight * weight;", fixed = TRUE)
   expect_match(
     owner,
-    "mean_stderr[evaluation] = sqrt(\n      (weighted_m2 / total_weight) *\n      (squared_weight_sum / (total_weight * total_weight)));",
+    "mean_stderr[evaluation] = sqrt(",
+    fixed = TRUE
+  )
+  expect_match(
+    owner, "(weighted_m2 / total_weight) *", fixed = TRUE
+  )
+  expect_match(
+    owner,
+    "(squared_weight_sum / (total_weight * total_weight)));",
     fixed = TRUE
   )
   expect_false(grepl(

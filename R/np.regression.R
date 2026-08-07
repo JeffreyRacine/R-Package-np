@@ -1,6 +1,5 @@
 npreg <-
-  function(bws, errors = TRUE, ...){
-    errors <- npValidateScalarLogical(errors, "errors")
+  function(bws, ...){
     args <- list(...)
 
     if (!missing(bws)){
@@ -99,8 +98,8 @@ npreg <-
 }
 
 npreg.formula <-
-  function(bws, data = NULL, errors = TRUE, newdata = NULL,
-           y.eval = FALSE, ...){
+  function(bws, data = NULL, newdata = NULL, y.eval = FALSE,
+           errors = TRUE, ...){
 
     errors <- npValidateScalarLogical(errors, "errors")
 
@@ -253,9 +252,8 @@ npreg.rbandwidth <-
   function(bws,
            txdat = stop("training data 'txdat' missing"),
            tydat = stop("training data 'tydat' missing"),
-           exdat, eydat, errors = TRUE,
-           gradient.order = 1L, gradients = FALSE,
-           residuals = FALSE,
+           exdat, eydat, gradient.order = 1L, gradients = FALSE,
+           residuals = FALSE, errors = TRUE,
            ...){
     fit.start <- proc.time()[3]
     gradients <- npValidateScalarLogical(gradients, "gradients")
@@ -955,8 +953,8 @@ npreg.rbandwidth <-
     return(ev)
   }
 
-npreg.default <- function(bws, txdat, tydat, errors = TRUE,
-                          nomad = FALSE, ...){
+npreg.default <- function(bws, txdat, tydat, nomad = FALSE,
+                          errors = TRUE, ...){
   .npRmpi_require_active_slave_pool(where = "npreg()")
   .npRmpi_guard_no_auto_object_in_manual_bcast(bws, where = "npreg()")
   sc <- sys.call()
