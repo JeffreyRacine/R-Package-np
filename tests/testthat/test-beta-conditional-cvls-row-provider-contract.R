@@ -352,14 +352,62 @@ test_that("analytic routed CVLS uses bounded tiles and only an allocation fallba
     fixed = TRUE
   ))
   expect_false(grepl("kernel_weighted_sum_np(", route, fixed = TRUE))
+  expect_false(grepl("np_objective_outer_", route, fixed = TRUE))
+
+  parallel_start <- regexpr(
+    "static int np_conditional_density_cvls_provider_supertile_parallel(",
+    engine,
+    fixed = TRUE
+  )[[1L]]
+  parallel_finish <- regexpr(
+    "static int np_conditional_distribution_cvls_lp_adap_block_stream(",
+    engine,
+    fixed = TRUE
+  )[[1L]]
+  expect_gt(parallel_start, 0L)
+  expect_gt(parallel_finish, parallel_start)
+  parallel <- substr(engine, parallel_start, parallel_finish - 1L)
+  expect_match(
+    parallel,
+    paste0(
+      "nblocks/ownership_stride + ",
+      "((nblocks % ownership_stride) != 0)"
+    ),
+    fixed = TRUE
+  )
+  expect_match(parallel, "const int first_owned_block = my_rank;",
+               fixed = TRUE)
+  expect_match(parallel, "np_objective_outer_buffer_prepare(", fixed = TRUE)
+  expect_match(parallel, "np_objective_outer_buffer_finish(", fixed = TRUE)
+  expect_match(parallel, '"NP_RMPI_INJECT_CDEN_CVLS_FAIL_RANK"',
+               fixed = TRUE)
+  expect_match(parallel, "np_blas_dgemm_tn_int(", fixed = TRUE)
+  expect_false(grepl(
+    "np_cvls_workspace_matrix_try(num_obs, num_obs",
+    parallel,
+    fixed = TRUE
+  ))
+  expect_false(grepl("kernel_weighted_sum_np(", parallel, fixed = TRUE))
 
   sibling <- substr(engine, finish, nchar(engine))
   expect_match(
     sibling,
-    paste0(
-      "if(status == 2)\n",
-      "      status = np_conditional_density_cvls_lp_row_stream("
-    ),
+    "np_conditional_density_cvls_provider_supertile_parallel(",
+    fixed = TRUE
+  )
+  expect_match(
+    sibling,
+    "np_conditional_density_cvls_lp_row_parallel_stream(",
+    fixed = TRUE
+  )
+  expect_match(
+    sibling,
+    "np_conditional_density_cvls_provider_supertile_stream(",
+    fixed = TRUE
+  )
+  expect_match(
+    sibling,
+    "np_conditional_density_cvls_lp_row_stream(",
     fixed = TRUE
   )
 })

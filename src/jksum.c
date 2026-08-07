@@ -37222,6 +37222,221 @@ cleanup_cdist_lp_stream:
 }
 
 /*
+ * MPI-only analytic-Y routed CVLS owner.  The local provider supertile
+ * remains byte-stable; this sibling assigns each complete X block to exactly
+ * one rank, retains its B-by-B GEMM and scaled-restoration order, and restores
+ * ascending block order through O(n/B) storage.  Allocation failure may use
+ * only the provider-capable MPI row sibling, never replicated local work.
+ */
+static int np_conditional_density_cvls_provider_supertile_parallel(
+  double *vector_scale_factor,
+  double *cv,
+  const NPConditionalCVLSRowProvider *provider)
+{
+  const int num_obs = num_obs_train_extern;
+  const int block_size = MIN(
+    np_conditional_lp_cvls_block_size(num_obs, 6U, 0U),
+    MAX(1, num_obs));
+  double **xblocks[4] = {NULL, NULL, NULL, NULL};
+  double **shared_y = NULL;
+  double *quad_cross = NULL;
+  double *yconv_log_scale = NULL;
+  double *lin_rows = NULL;
+  double *quad_rows = NULL;
+  double *block_terms = NULL;
+  size_t grouped_rows;
+  int nblocks;
+  int group_width;
+  int first_block_id, j0, ii, jj, g;
+  int local_fail = 0;
+  int status = 1;
+  NPCVLSWorkspaceStatus workspace_status = NP_CVLS_WORKSPACE_OK;
+#ifdef MPI2
+  const int ownership_stride = iNum_Processors;
+  const int first_owned_block = my_rank;
+#else
+  const int ownership_stride = 1;
+  const int first_owned_block = 0;
+#endif
+
+  if(cv == NULL || vector_scale_factor == NULL || provider == NULL ||
+     provider->context == NULL || provider->x_row == NULL ||
+     provider->y_train_row == NULL ||
+     provider->y_convolution_row == NULL || num_obs <= 0)
+    return 1;
+  if(block_size <= 0)
+    return 2;
+  if(BANDWIDTH_den_extern != BW_FIXED &&
+     BANDWIDTH_den_extern != BW_GEN_NN &&
+     BANDWIDTH_den_extern != BW_ADAP_NN)
+    return 1;
+  if(!np_objective_outer_rows_enabled(
+       int_conditional_prepared_context_extern))
+    return 1;
+
+  nblocks = num_obs/block_size + ((num_obs % block_size) != 0);
+  group_width = MIN(
+    4,
+    nblocks/ownership_stride + ((nblocks % ownership_stride) != 0));
+  group_width = MAX(1, group_width);
+  if(!np_size_mul_checked((size_t)group_width,
+                          (size_t)block_size,
+                          &grouped_rows))
+    return 1;
+
+  for(g = 0; g < group_width; ++g) {
+    workspace_status = np_cvls_workspace_matrix_try(
+      num_obs, block_size, &xblocks[g]);
+    if(workspace_status != NP_CVLS_WORKSPACE_OK)
+      break;
+  }
+  if(workspace_status == NP_CVLS_WORKSPACE_OK)
+    workspace_status = np_cvls_workspace_matrix_try(
+      num_obs, block_size, &shared_y);
+  if(workspace_status == NP_CVLS_WORKSPACE_OK)
+    workspace_status = np_cvls_workspace_square_try(
+      block_size, &quad_cross);
+  if(workspace_status == NP_CVLS_WORKSPACE_OK)
+    workspace_status = np_cvls_workspace_vector_try(
+      (size_t)block_size, &yconv_log_scale);
+  if(workspace_status == NP_CVLS_WORKSPACE_OK)
+    workspace_status = np_cvls_workspace_vector_try(
+      grouped_rows, &lin_rows);
+  if(workspace_status == NP_CVLS_WORKSPACE_OK)
+    workspace_status = np_cvls_workspace_vector_try(
+      grouped_rows, &quad_rows);
+  workspace_status = np_cvls_workspace_collective_status(workspace_status);
+  if(workspace_status != NP_CVLS_WORKSPACE_OK)
+    goto cleanup_provider_supertile_parallel;
+  if(np_objective_outer_buffer_prepare(
+       1, (size_t)nblocks, &block_terms) != 0)
+    goto cleanup_provider_supertile_parallel;
+
+  for(first_block_id = first_owned_block;
+      first_block_id < nblocks && !local_fail;
+      first_block_id += group_width*ownership_stride) {
+    int block_id[4] = {0, 0, 0, 0};
+    int block_start[4] = {0, 0, 0, 0};
+    int block_rows[4] = {0, 0, 0, 0};
+    double block_sum[4] = {0.0, 0.0, 0.0, 0.0};
+
+    np_progress_bandwidth_loop_step();
+    for(g = 0; g < group_width; ++g) {
+      block_id[g] = first_block_id + g*ownership_stride;
+      if(block_id[g] >= nblocks)
+        continue;
+      block_start[g] = block_id[g]*block_size;
+      block_rows[g] = MIN(block_size, num_obs - block_start[g]);
+      for(ii = 0; ii < block_rows[g]; ++ii) {
+        const int evaluation = block_start[g] + ii;
+        const size_t row_index =
+          (size_t)g*(size_t)block_size + (size_t)ii;
+        double y_log_scale = 0.0;
+
+        if(provider->x_row(provider->context, evaluation,
+                           xblocks[g][ii]) != 0 ||
+           provider->y_train_row(provider->context, evaluation,
+                                 shared_y[ii], &y_log_scale) != 0) {
+          local_fail = 1;
+          break;
+        }
+        lin_rows[row_index] = np_blas_ddot_int(
+          num_obs, xblocks[g][ii], shared_y[ii]);
+        if(np_continuous_kernel_scaled_restore(
+             lin_rows[row_index], y_log_scale, 1,
+             &lin_rows[row_index]) != NP_CONTINUOUS_ROW_OK) {
+          local_fail = 1;
+          break;
+        }
+        quad_rows[row_index] = 0.0;
+      }
+      if(local_fail)
+        break;
+    }
+
+    for(j0 = 0; j0 < num_obs && !local_fail; j0 += block_size) {
+      const int jb = MIN(block_size, num_obs - j0);
+
+      for(jj = 0; jj < jb; ++jj) {
+        if(provider->y_convolution_row(
+             provider->context, j0 + jj, shared_y[jj],
+             &yconv_log_scale[jj]) != 0) {
+          local_fail = 1;
+          break;
+        }
+      }
+
+      for(g = 0; g < group_width && !local_fail; ++g) {
+        const int ib = block_rows[g];
+
+        if(ib <= 0)
+          continue;
+        np_blas_dgemm_tn_int(
+          ib, jb, num_obs, xblocks[g][0], shared_y[0], quad_cross);
+        for(ii = 0; ii < ib && !local_fail; ++ii) {
+          double * const xrow = xblocks[g][ii];
+          const size_t row_index =
+            (size_t)g*(size_t)block_size + (size_t)ii;
+
+          for(jj = 0; jj < jb; ++jj) {
+            double inner = quad_cross[ii + jj*ib];
+
+            if(xrow[j0 + jj] == 0.0)
+              continue;
+            if(np_continuous_kernel_scaled_restore(
+                 inner, yconv_log_scale[jj], 1,
+                 &inner) != NP_CONTINUOUS_ROW_OK) {
+              local_fail = 1;
+              break;
+            }
+            quad_rows[row_index] += xrow[j0 + jj]*inner;
+          }
+        }
+      }
+    }
+
+    if(!local_fail) {
+      for(g = 0; g < group_width; ++g) {
+        for(ii = 0; ii < block_rows[g]; ++ii) {
+          const size_t row_index =
+            (size_t)g*(size_t)block_size + (size_t)ii;
+          block_sum[g] +=
+            quad_rows[row_index] - 2.0*lin_rows[row_index];
+        }
+        if(block_rows[g] > 0)
+          block_terms[block_id[g]] = block_sum[g];
+      }
+    }
+  }
+
+  if(np_objective_outer_buffer_finish(
+       1, nblocks, local_fail, block_terms,
+       "NP_RMPI_INJECT_CDEN_CVLS_FAIL_RANK",
+       "conditional density routed CVLS blocks MPI_Allreduce") != 0)
+    goto cleanup_provider_supertile_parallel;
+  *cv = 0.0;
+  for(ii = 0; ii < nblocks; ++ii)
+    *cv += block_terms[ii];
+  *cv /= (double)num_obs;
+  status = 0;
+
+cleanup_provider_supertile_parallel:
+  for(g = 0; g < 4; ++g)
+    if(xblocks[g] != NULL)
+      free_tmat(xblocks[g]);
+  if(shared_y != NULL)
+    free_tmat(shared_y);
+  free(quad_cross);
+  free(yconv_log_scale);
+  free(lin_rows);
+  free(quad_rows);
+  free(block_terms);
+  if(workspace_status == NP_CVLS_WORKSPACE_UNAVAILABLE)
+    return 2;
+  return status;
+}
+
+/*
  * MPI-only adaptive row fallback.  Complete training rows are independent;
  * keep the incumbent indicator, CDF-row, dot-product, and loss order within
  * each row, then restore ascending training-row order through O(n) storage.
@@ -46475,11 +46690,20 @@ int np_conditional_density_cvls_lp_stream_ctx(
       "bounded npcdens cv.ls currently supports up to two continuous response variables");
     status = 1;
   } else {
-    status = np_conditional_density_cvls_provider_supertile_stream(
-      vector_scale_factor, cv, &provider);
-    if(status == 2)
-      status = np_conditional_density_cvls_lp_row_stream(
+    if(np_objective_outer_rows_enabled(
+         int_conditional_prepared_context_extern)) {
+      status = np_conditional_density_cvls_provider_supertile_parallel(
         vector_scale_factor, cv, &provider);
+      if(status == 2)
+        status = np_conditional_density_cvls_lp_row_parallel_stream(
+          vector_scale_factor, cv, &provider);
+    } else {
+      status = np_conditional_density_cvls_provider_supertile_stream(
+        vector_scale_factor, cv, &provider);
+      if(status == 2)
+        status = np_conditional_density_cvls_lp_row_stream(
+          vector_scale_factor, cv, &provider);
+    }
   }
 
 cleanup_route:
