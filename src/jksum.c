@@ -37221,6 +37221,328 @@ cleanup_cdist_lp_stream:
   return status;
 }
 
+/*
+ * MPI-only adaptive row fallback.  Complete training rows are independent;
+ * keep the incumbent indicator, CDF-row, dot-product, and loss order within
+ * each row, then restore ascending training-row order through O(n) storage.
+ */
+static int np_conditional_distribution_cvls_lp_adap_row_parallel_stream(
+  double *vector_scale_factor,
+  double *cv)
+{
+  const int num_train = num_obs_train_extern;
+  const int num_eval = num_obs_eval_extern;
+  double *xrow = NULL;
+  double *yint = NULL;
+  double *contributions = NULL;
+  NPConditionalXRowCtx xctx = {0};
+  NPConditionalYRowCtx yintctx = {0};
+  int owned_start = 0;
+  int owned_rows = 0;
+  int local_fail = 0;
+  int i, j;
+  int status = 1;
+  NPCVLSWorkspaceStatus workspace_status = NP_CVLS_WORKSPACE_OK;
+
+  if(cv == NULL || vector_scale_factor == NULL ||
+     num_train <= 0 || num_eval <= 0 ||
+     BANDWIDTH_den_extern != BW_ADAP_NN)
+    return 1;
+  if(!np_objective_outer_rows_enabled(
+       int_conditional_prepared_context_extern))
+    return 1;
+
+  workspace_status = np_cvls_workspace_vector_try(
+    (size_t)num_train, &xrow);
+  if(workspace_status == NP_CVLS_WORKSPACE_OK)
+    workspace_status = np_cvls_workspace_vector_try(
+      (size_t)num_train, &yint);
+  workspace_status = np_cvls_workspace_collective_status(workspace_status);
+  if(workspace_status != NP_CVLS_WORKSPACE_OK)
+    goto cleanup_cdist_adap_row_parallel;
+  if(np_objective_outer_buffer_prepare(
+       1, (size_t)num_train, &contributions) != 0)
+    goto cleanup_cdist_adap_row_parallel;
+
+  if(np_conditional_xrow_ctx_prepare(vector_scale_factor, &xctx) != 0)
+    local_fail = 1;
+  if(!local_fail && np_conditional_yrow_eval_ctx_prepare(
+       vector_scale_factor,
+       OP_INTEGRAL,
+       matrix_Y_unordered_eval_extern,
+       matrix_Y_ordered_eval_extern,
+       matrix_Y_continuous_eval_extern,
+       num_eval,
+       &yintctx) != 0)
+    local_fail = 1;
+  if(np_objective_outer_preflight_failed(1, local_fail))
+    goto cleanup_cdist_adap_row_parallel;
+
+  np_objective_outer_owned_rows(
+    0, num_train, 1, &owned_start, &owned_rows);
+  for(i = owned_start;
+      i < owned_start + owned_rows && !local_fail;
+      ++i) {
+    double row_loss = 0.0;
+
+    if((i & 15) == 0)
+      np_progress_bandwidth_loop_step();
+    if(np_conditional_xrow_from_ctx(&xctx, i, xrow) != 0) {
+      local_fail = 1;
+      break;
+    }
+    for(j = 0; j < num_eval; ++j) {
+      double fit;
+      double difference;
+      int indicator;
+
+      if(cdfontrain_extern && i == j)
+        continue;
+      if(np_conditional_y_eval_from_ctx(
+           &yintctx,
+           j,
+           matrix_Y_unordered_eval_extern,
+           matrix_Y_ordered_eval_extern,
+           matrix_Y_continuous_eval_extern,
+           num_eval,
+           cdfontrain_extern && num_eval == num_train,
+           yint) != 0) {
+        local_fail = 1;
+        break;
+      }
+      fit = np_blas_ddot_int(num_train, xrow, yint);
+      indicator = np_conditional_indicator_row_core(
+        i, j, cdfontrain_extern,
+        matrix_Y_ordered_train_extern,
+        matrix_Y_continuous_train_extern,
+        matrix_Y_ordered_eval_extern,
+        matrix_Y_continuous_eval_extern,
+        num_var_ordered_extern,
+        num_var_continuous_extern);
+      difference = (double)indicator - fit;
+      row_loss += difference*difference;
+    }
+    if(!local_fail)
+      contributions[i] = row_loss;
+  }
+
+  if(np_objective_outer_buffer_finish(
+       1, num_train, local_fail, contributions,
+       "NP_RMPI_INJECT_CDIST_CVLS_FAIL_RANK",
+       "conditional distribution adaptive CVLS rows MPI_Allreduce") != 0)
+    goto cleanup_cdist_adap_row_parallel;
+  *cv = 0.0;
+  for(i = 0; i < num_train; ++i)
+    *cv += contributions[i];
+  *cv /= (double)num_train*(double)MAX(1, num_eval);
+  status = 0;
+
+cleanup_cdist_adap_row_parallel:
+  np_conditional_xrow_ctx_clear(&xctx);
+  np_conditional_yrow_ctx_clear(&yintctx);
+  free(xrow);
+  free(yint);
+  free(contributions);
+  np_glp_cv_clear_extern();
+  if(workspace_status == NP_CVLS_WORKSPACE_UNAVAILABLE)
+    return 2;
+  return status;
+}
+
+/*
+ * Prepared adaptive conditional-distribution owner.  Partition canonical X
+ * blocks while preserving the incumbent B-by-B GEMM, indicator traversal,
+ * and within-block sum.  The contribution vector is O(n/B), and all setup
+ * and failure decisions rendezvous before collective completion.
+ */
+static int np_conditional_distribution_cvls_lp_adap_block_parallel_stream(
+  double *vector_scale_factor,
+  double *cv)
+{
+  const int num_train = num_obs_train_extern;
+  const int num_eval = num_obs_eval_extern;
+  const int block_size = MIN(
+    np_conditional_lp_cvls_block_size(num_train, 5U, 1U),
+    MAX(1, num_train));
+  double **xblocks[4] = {NULL, NULL, NULL, NULL};
+  double **yintblock = NULL;
+  double *fit_cross = NULL;
+  double *block_terms = NULL;
+  NPConditionalXRowCtx xctx = {0};
+  NPConditionalYRowCtx yintctx = {0};
+  int nblocks;
+  int group_width;
+  int first_block_id, j0, ii, jj, g;
+  int local_fail = 0;
+  int status = 1;
+  NPCVLSWorkspaceStatus workspace_status = NP_CVLS_WORKSPACE_OK;
+#ifdef MPI2
+  const int ownership_stride = iNum_Processors;
+  const int first_owned_block = my_rank;
+#else
+  const int ownership_stride = 1;
+  const int first_owned_block = 0;
+#endif
+
+  if(cv == NULL || vector_scale_factor == NULL ||
+     num_train <= 0 || num_eval <= 0 ||
+     BANDWIDTH_den_extern != BW_ADAP_NN)
+    return 1;
+  if(block_size <= 0)
+    return 2;
+  if(!np_objective_outer_rows_enabled(
+       int_conditional_prepared_context_extern))
+    return 1;
+
+  nblocks = num_train/block_size + ((num_train%block_size) != 0);
+  group_width = MIN(
+    4,
+    nblocks/ownership_stride + ((nblocks%ownership_stride) != 0));
+  group_width = MAX(1, group_width);
+
+  for(g = 0; g < group_width; ++g) {
+    workspace_status = np_cvls_workspace_matrix_try(
+      num_train, block_size, &xblocks[g]);
+    if(workspace_status != NP_CVLS_WORKSPACE_OK)
+      break;
+  }
+  if(workspace_status == NP_CVLS_WORKSPACE_OK)
+    workspace_status = np_cvls_workspace_matrix_try(
+      num_train, block_size, &yintblock);
+  if(workspace_status == NP_CVLS_WORKSPACE_OK)
+    workspace_status = np_cvls_workspace_square_try(
+      block_size, &fit_cross);
+  workspace_status = np_cvls_workspace_collective_status(workspace_status);
+  if(workspace_status != NP_CVLS_WORKSPACE_OK)
+    goto cleanup_cdist_adap_block_parallel;
+  if(np_objective_outer_buffer_prepare(
+       1, (size_t)nblocks, &block_terms) != 0)
+    goto cleanup_cdist_adap_block_parallel;
+
+  if(np_conditional_xrow_ctx_prepare(vector_scale_factor, &xctx) != 0)
+    local_fail = 1;
+  if(!local_fail && np_conditional_yrow_eval_ctx_prepare(
+       vector_scale_factor,
+       OP_INTEGRAL,
+       matrix_Y_unordered_eval_extern,
+       matrix_Y_ordered_eval_extern,
+       matrix_Y_continuous_eval_extern,
+       num_eval,
+       &yintctx) != 0)
+    local_fail = 1;
+  if(np_objective_outer_preflight_failed(1, local_fail))
+    goto cleanup_cdist_adap_block_parallel;
+
+  for(first_block_id = first_owned_block;
+      first_block_id < nblocks && !local_fail;
+      first_block_id += group_width*ownership_stride) {
+    int block_id[4] = {0, 0, 0, 0};
+    int block_start[4] = {0, 0, 0, 0};
+    int block_rows[4] = {0, 0, 0, 0};
+    double block_sum[4] = {0.0, 0.0, 0.0, 0.0};
+
+    np_progress_bandwidth_loop_step();
+    for(g = 0; g < group_width; ++g) {
+      block_id[g] = first_block_id + g*ownership_stride;
+      if(block_id[g] >= nblocks)
+        continue;
+      block_start[g] = block_id[g]*block_size;
+      block_rows[g] = MIN(block_size, num_train - block_start[g]);
+      for(ii = 0; ii < block_rows[g]; ++ii) {
+        if(np_conditional_xrow_from_ctx(
+             &xctx, block_start[g] + ii, xblocks[g][ii]) != 0) {
+          local_fail = 1;
+          break;
+        }
+      }
+      if(local_fail)
+        break;
+    }
+
+    for(j0 = 0; j0 < num_eval && !local_fail; j0 += block_size) {
+      const int jb = MIN(block_size, num_eval - j0);
+
+      for(jj = 0; jj < jb; ++jj) {
+        if(np_conditional_y_eval_from_ctx(
+             &yintctx,
+             j0 + jj,
+             matrix_Y_unordered_eval_extern,
+             matrix_Y_ordered_eval_extern,
+             matrix_Y_continuous_eval_extern,
+             num_eval,
+             cdfontrain_extern && num_eval == num_train,
+             yintblock[jj]) != 0) {
+          local_fail = 1;
+          break;
+        }
+      }
+
+      for(g = 0; g < group_width && !local_fail; ++g) {
+        const int ib = block_rows[g];
+
+        if(ib <= 0)
+          continue;
+        np_blas_dgemm_tn_int(
+          ib, jb, num_train, xblocks[g][0], yintblock[0], fit_cross);
+        for(ii = 0; ii < ib; ++ii) {
+          const int train_i = block_start[g] + ii;
+
+          for(jj = 0; jj < jb; ++jj) {
+            const int eval_j = j0 + jj;
+            double difference;
+            int indicator;
+
+            if(cdfontrain_extern && train_i == eval_j)
+              continue;
+            indicator = np_conditional_indicator_row_core(
+              train_i, eval_j, cdfontrain_extern,
+              matrix_Y_ordered_train_extern,
+              matrix_Y_continuous_train_extern,
+              matrix_Y_ordered_eval_extern,
+              matrix_Y_continuous_eval_extern,
+              num_var_ordered_extern,
+              num_var_continuous_extern);
+            difference = (double)indicator -
+              fit_cross[ii + jj*ib];
+            block_sum[g] += difference*difference;
+          }
+        }
+      }
+    }
+
+    if(!local_fail)
+      for(g = 0; g < group_width; ++g)
+        if(block_rows[g] > 0)
+          block_terms[block_id[g]] = block_sum[g];
+  }
+
+  if(np_objective_outer_buffer_finish(
+       1, nblocks, local_fail, block_terms,
+       "NP_RMPI_INJECT_CDIST_CVLS_FAIL_RANK",
+       "conditional distribution adaptive CVLS blocks MPI_Allreduce") != 0)
+    goto cleanup_cdist_adap_block_parallel;
+  *cv = 0.0;
+  for(ii = 0; ii < nblocks; ++ii)
+    *cv += block_terms[ii];
+  *cv /= (double)num_train*(double)MAX(1, num_eval);
+  status = 0;
+
+cleanup_cdist_adap_block_parallel:
+  np_conditional_xrow_ctx_clear(&xctx);
+  np_conditional_yrow_ctx_clear(&yintctx);
+  for(g = 0; g < 4; ++g)
+    if(xblocks[g] != NULL)
+      free_tmat(xblocks[g]);
+  if(yintblock != NULL)
+    free_tmat(yintblock);
+  free(fit_cross);
+  free(block_terms);
+  np_glp_cv_clear_extern();
+  if(workspace_status == NP_CVLS_WORKSPACE_UNAVAILABLE)
+    return 2;
+  return status;
+}
+
 static int np_conditional_distribution_cvls_lp_adap_block_stream(double *vector_scale_factor,
                                                                  double *cv){
   const int num_train = num_obs_train_extern;
@@ -39710,8 +40032,21 @@ int np_conditional_distribution_cvls_lp_stream(double *vector_scale_factor,
      (BANDWIDTH_den_extern != BW_ADAP_NN))
     return 1;
 
-  if(BANDWIDTH_den_extern == BW_ADAP_NN)
-    return np_conditional_distribution_cvls_lp_adap_block_stream(vector_scale_factor, cv);
+  if(BANDWIDTH_den_extern == BW_ADAP_NN) {
+    if(np_objective_outer_rows_enabled(
+         int_conditional_prepared_context_extern)) {
+      const int adaptive_status =
+        np_conditional_distribution_cvls_lp_adap_block_parallel_stream(
+          vector_scale_factor, cv);
+
+      if(adaptive_status == 2)
+        return np_conditional_distribution_cvls_lp_adap_row_parallel_stream(
+          vector_scale_factor, cv);
+      return adaptive_status;
+    }
+    return np_conditional_distribution_cvls_lp_adap_block_stream(
+      vector_scale_factor, cv);
+  }
 
   if(((int_TREE_X == NP_TREE_TRUE) || (int_TREE_Y == NP_TREE_TRUE)) &&
      (BANDWIDTH_den_extern != BW_FIXED))

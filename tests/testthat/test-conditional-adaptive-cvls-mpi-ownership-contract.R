@@ -102,3 +102,57 @@ test_that("adaptive block ownership is exactly once", {
     }
   }
 })
+
+test_that("adaptive conditional distribution has an isolated MPI owner", {
+  source <- conditional_adaptive_cvls_source()
+  skip_if(is.null(source), "package C source unavailable")
+  body <- conditional_adaptive_cvls_body(
+    source,
+    "static int np_conditional_distribution_cvls_lp_adap_block_parallel_stream(",
+    "static int np_conditional_distribution_cvls_lp_adap_block_stream("
+  )
+
+  expect_match(body, "const int ownership_stride = iNum_Processors;",
+               fixed = TRUE)
+  expect_match(body, "const int first_owned_block = my_rank;", fixed = TRUE)
+  expect_match(body, "np_objective_outer_buffer_prepare(", fixed = TRUE)
+  expect_match(body, "block_id[g] = first_block_id + g*ownership_stride;",
+               fixed = TRUE)
+  expect_match(body, "block_terms[block_id[g]] = block_sum[g];",
+               fixed = TRUE)
+  expect_match(body, "np_objective_outer_buffer_finish(", fixed = TRUE)
+  expect_match(body, '"NP_RMPI_INJECT_CDIST_CVLS_FAIL_RANK"', fixed = TRUE)
+  expect_match(body, "np_blas_dgemm_tn_int(", fixed = TRUE)
+  expect_false(grepl("num_train*num_eval", body, fixed = TRUE))
+  expect_false(grepl("num_train * num_eval", body, fixed = TRUE))
+  expect_false(grepl("alloc_matd(num_train, num_eval)", body, fixed = TRUE))
+})
+
+test_that("adaptive distribution allocation fallback remains MPI-owned", {
+  source <- conditional_adaptive_cvls_source()
+  skip_if(is.null(source), "package C source unavailable")
+  selector <- conditional_adaptive_cvls_body(
+    source,
+    "int np_conditional_distribution_cvls_lp_stream(",
+    "static inline int np_density_cvml_beta_row_contribution("
+  )
+  row_owner <- conditional_adaptive_cvls_body(
+    source,
+    "static int np_conditional_distribution_cvls_lp_adap_row_parallel_stream(",
+    "static int np_conditional_distribution_cvls_lp_adap_block_parallel_stream("
+  )
+
+  expect_match(
+    selector,
+    "np_conditional_distribution_cvls_lp_adap_block_parallel_stream(",
+    fixed = TRUE
+  )
+  expect_match(
+    selector,
+    "np_conditional_distribution_cvls_lp_adap_row_parallel_stream(",
+    fixed = TRUE
+  )
+  expect_match(row_owner, "np_objective_outer_owned_rows(", fixed = TRUE)
+  expect_match(row_owner, "contributions[i] = row_loss;", fixed = TRUE)
+  expect_match(row_owner, "np_objective_outer_buffer_finish(", fixed = TRUE)
+})
