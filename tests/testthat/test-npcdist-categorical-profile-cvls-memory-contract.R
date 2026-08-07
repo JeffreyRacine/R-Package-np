@@ -84,6 +84,38 @@ test_that("npcdist categorical profile CVLS owns a bounded MPI tri-state workspa
     "NP_RMPI_INJECT_CDIST_PROFILE_FAIL_RANK",
     fixed = TRUE
   )
+  expect_match(
+    implementation,
+    "np_objective_outer_rows_enabled",
+    fixed = TRUE
+  )
+  expect_match(
+    implementation,
+    "nprof_xy >= iNum_Processors",
+    fixed = TRUE
+  )
+  expect_match(
+    implementation,
+    "np_objective_outer_owned_rows",
+    fixed = TRUE
+  )
+  expect_match(
+    implementation,
+    "np_objective_outer_buffer_prepare",
+    fixed = TRUE
+  )
+  expect_match(
+    implementation,
+    "np_objective_outer_buffer_finish",
+    fixed = TRUE
+  )
+  expect_match(
+    implementation,
+    "conditional distribution categorical-profile CVLS MPI_Allreduce",
+    fixed = TRUE
+  )
+  expect_match(implementation, "double *profile_terms", fixed = TRUE)
+  expect_match(implementation, "profile_terms[g]", fixed = TRUE)
   expect_false(grepl(
     "alloc_vecd(nprof_x*nprof_x)",
     implementation,
@@ -91,6 +123,11 @@ test_that("npcdist categorical profile CVLS owns a bounded MPI tri-state workspa
   ))
   expect_false(grepl(
     "alloc_vecd(nprof_ey*nprof_ty)",
+    implementation,
+    fixed = TRUE
+  ))
+  expect_false(grepl(
+    "alloc_vecd(nprof_xy*nprof_xy)",
     implementation,
     fixed = TRUE
   ))

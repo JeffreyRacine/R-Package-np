@@ -39487,6 +39487,7 @@ double *cv){
   double *kx_cache = NULL, *kyi_cache = NULL;
   double *lambda_x = NULL, *lambda_y = NULL;
   double *kernel_workspace = NULL;
+  double *profile_terms = NULL;
   double *vsfx = NULL, *vsfy = NULL;
   int *x_cache_slot = NULL, *x_cache_owner = NULL;
   int *y_cache_slot = NULL, *y_cache_owner = NULL;
@@ -39502,6 +39503,10 @@ double *cv){
     np_conditional_profile_cv_serial_kernel_max_bytes;
   int use_x_cache = 0, use_y_cache = 0;
   int x_cache_rows = 0, y_cache_rows = 0;
+  int owned_profile_start = 0, owned_profile_rows = 0;
+  int local_profile_fail = 0;
+  int profile_interrupt_stride = 0;
+  int use_parallel_profiles = 0;
   int local_preflight_status =
     (int)NP_CONDITIONAL_PROFILE_CV_FAILURE;
   int global_preflight_status =
@@ -39584,6 +39589,17 @@ double *cv){
       (int)NP_CONDITIONAL_PROFILE_CV_NOT_APPLICABLE;
     goto preflight_cat_cdist;
   }
+
+  /*
+   * Prepared MPI owns complete canonical joint-profile rows whenever every
+   * participating rank can receive one.  The local profile algebra remains
+   * unchanged; only outer-row ownership and canonical contribution assembly
+   * differ from the serial schedule.
+   */
+  use_parallel_profiles =
+    np_objective_outer_rows_enabled(
+      int_conditional_prepared_context_extern) &&
+    (nprof_xy >= iNum_Processors);
 
   if(!np_size_mul_checked((size_t)nprof_x,
                           (size_t)nprof_x,
@@ -39836,8 +39852,10 @@ preflight_cat_cdist:
                                     NULL,
                                     kx,
                                     NULL);
-    if(status != 0)
-      goto cleanup_cat_cdist;
+    if(status != 0){
+      local_profile_fail = 1;
+      goto preflight_profile_rows_cat_cdist;
+    }
   } else {
     if(kernel_bandwidth_mean(KERNEL_reg_extern,
                              BANDWIDTH_den_extern,
@@ -39857,8 +39875,10 @@ preflight_cat_cdist:
                              NULL,
                              NULL,
                              NULL,
-                             lambda_x) == 1)
-      goto cleanup_cat_cdist;
+                             lambda_x) == 1){
+      local_profile_fail = 1;
+      goto preflight_profile_rows_cat_cdist;
+    }
 
     x_profile_spec.ntrain = nprof_x;
     x_profile_spec.neval = nprof_x;
@@ -39875,8 +39895,10 @@ preflight_cat_cdist:
     x_profile_spec.num_categories = num_categories_extern_X;
     x_profile_spec.category_values = matrix_categorical_vals_extern_X;
     if(np_categorical_profile_spec_validate(&x_profile_spec) !=
-       NP_PROFILE_TILE_OK)
-      goto cleanup_cat_cdist;
+       NP_PROFILE_TILE_OK){
+      local_profile_fail = 1;
+      goto preflight_profile_rows_cat_cdist;
+    }
 
     for(g = 0; g < nprof_x; g++){
       x_cache_slot[g] = -1;
@@ -39950,8 +39972,10 @@ preflight_cat_cdist:
                                     NULL,
                                     kyi,
                                     NULL);
-    if(status != 0)
-      goto cleanup_cat_cdist;
+    if(status != 0){
+      local_profile_fail = 1;
+      goto preflight_profile_rows_cat_cdist;
+    }
   } else {
     if(kernel_bandwidth_mean(KERNEL_den_extern,
                              BANDWIDTH_den_extern,
@@ -39971,8 +39995,10 @@ preflight_cat_cdist:
                              NULL,
                              NULL,
                              NULL,
-                             lambda_y) == 1)
-      goto cleanup_cat_cdist;
+                             lambda_y) == 1){
+      local_profile_fail = 1;
+      goto preflight_profile_rows_cat_cdist;
+    }
 
     y_profile_spec.ntrain = nprof_ty;
     y_profile_spec.neval = nprof_ey;
@@ -39989,8 +40015,10 @@ preflight_cat_cdist:
     y_profile_spec.num_categories = num_categories_extern_Y;
     y_profile_spec.category_values = matrix_categorical_vals_extern_Y;
     if(np_categorical_profile_spec_validate(&y_profile_spec) !=
-       NP_PROFILE_TILE_OK)
-      goto cleanup_cat_cdist;
+       NP_PROFILE_TILE_OK){
+      local_profile_fail = 1;
+      goto preflight_profile_rows_cat_cdist;
+    }
 
     for(e = 0; e < nprof_ey; e++)
       y_cache_slot[e] = (e < y_cache_rows - 1) ? e : -1;
@@ -40003,23 +40031,41 @@ preflight_cat_cdist:
       den_full[g] = 0.0;
       for(h = 0; h < nprof_x; h++)
         den_full[g] += counts_x[h]*kx[g*nprof_x + h];
-      if(!(den_full[g] > DBL_MIN) || (!R_FINITE(den_full[g])))
-        goto cleanup_cat_cdist;
+      if(!(den_full[g] > DBL_MIN) || (!R_FINITE(den_full[g]))){
+        local_profile_fail = 1;
+        goto preflight_profile_rows_cat_cdist;
+      }
     }
 
-  const int profile_interrupt_stride =
+preflight_profile_rows_cat_cdist:
+  if(np_objective_outer_preflight_failed(use_parallel_profiles,
+                                         local_profile_fail))
+    goto cleanup_cat_cdist;
+  if(np_objective_outer_buffer_prepare(use_parallel_profiles,
+                                       (size_t)nprof_xy,
+                                       &profile_terms) != 0)
+    goto cleanup_cat_cdist;
+  np_objective_outer_owned_rows(0,
+                                nprof_xy,
+                                use_parallel_profiles,
+                                &owned_profile_start,
+                                &owned_profile_rows);
+  profile_interrupt_stride =
     (use_x_cache || use_y_cache) ?
     np_hot_loop_interrupt_stride(nprof_xy) :
     0;
 
   *cv = 0.0;
-  for(g = 0; g < nprof_xy; g++){
+  for(g = owned_profile_start;
+      g < owned_profile_start + owned_profile_rows;
+      g++){
     const int rep_g = xy_rep[g];
     const int xg = x_id[rep_g];
     const int yg = ty_id[rep_g];
     const double cxg = counts_xy[g];
     double *kx_row;
     double den_loo;
+    double profile_term = 0.0;
 
     if(cxg <= 0.0)
       continue;
@@ -40044,8 +40090,10 @@ preflight_cat_cdist:
             1,
             kx_row,
             (size_t)nprof_x);
-        if(tile_status != NP_PROFILE_TILE_OK)
-          goto cleanup_cat_cdist;
+        if(tile_status != NP_PROFILE_TILE_OK){
+          local_profile_fail = 1;
+          goto finish_profile_rows_cat_cdist;
+        }
         x_cache_owner[cache_index] = xg;
 
         if(!R_FINITE(den_full[xg])){
@@ -40053,16 +40101,20 @@ preflight_cat_cdist:
           for(h = 0; h < nprof_x; h++)
             den_full[xg] += counts_x[h]*kx_row[h];
           if(!(den_full[xg] > DBL_MIN) ||
-             (!R_FINITE(den_full[xg])))
-            goto cleanup_cat_cdist;
+             (!R_FINITE(den_full[xg]))){
+            local_profile_fail = 1;
+            goto finish_profile_rows_cat_cdist;
+          }
         }
       }
     } else {
       kx_row = kx + (size_t)xg*(size_t)nprof_x;
     }
     den_loo = den_full[xg] - kx_row[xg];
-    if(!(den_loo > DBL_MIN) || (!R_FINITE(den_loo)))
-      goto cleanup_cat_cdist;
+    if(!(den_loo > DBL_MIN) || (!R_FINITE(den_loo))){
+      local_profile_fail = 1;
+      goto finish_profile_rows_cat_cdist;
+    }
 
     for(e = 0; e < nprof_ey; e++){
       double pair_count = cxg*counts_ey[e];
@@ -40103,8 +40155,10 @@ preflight_cat_cdist:
               1,
               kyi_row,
               (size_t)nprof_ty);
-          if(tile_status != NP_PROFILE_TILE_OK)
-            goto cleanup_cat_cdist;
+          if(tile_status != NP_PROFILE_TILE_OK){
+            local_profile_fail = 1;
+            goto finish_profile_rows_cat_cdist;
+          }
           y_cache_owner[cache_index] = e;
         }
       } else {
@@ -40121,11 +40175,29 @@ preflight_cat_cdist:
       fit = num/den_loo;
       {
         const double tvd = ((double)indy) - fit;
-        *cv += pair_count*tvd*tvd;
+        profile_term += pair_count*tvd*tvd;
       }
     }
+    if(use_parallel_profiles)
+      profile_terms[g] = profile_term;
+    else
+      *cv += profile_term;
   }
 
+finish_profile_rows_cat_cdist:
+  if(np_objective_outer_buffer_finish(
+       use_parallel_profiles,
+       nprof_xy,
+       local_profile_fail,
+       profile_terms,
+       NULL,
+       "conditional distribution categorical-profile CVLS MPI_Allreduce") != 0)
+    goto cleanup_cat_cdist;
+  if(use_parallel_profiles){
+    *cv = 0.0;
+    for(g = 0; g < nprof_xy; g++)
+      *cv += profile_terms[g];
+  }
   *cv /= ((double)num_train*(double)MAX(1, num_eval));
   result = NP_CONDITIONAL_PROFILE_CV_SUCCESS;
 
@@ -40149,6 +40221,7 @@ cleanup_cat_cdist:
   if(counts_x != NULL) free(counts_x);
   if(counts_ey != NULL) free(counts_ey);
   if(counts_xy != NULL) free(counts_xy);
+  if(profile_terms != NULL) free(profile_terms);
   if(kernel_workspace != NULL) free(kernel_workspace);
   if(den_full != NULL) free(den_full);
   if(lambda_x != NULL) free(lambda_x);
