@@ -34053,6 +34053,12 @@ typedef struct {
   double *hdiag_original_order;
 } NPConditionalLpAllLargeCtx;
 
+typedef enum {
+  NP_CONDITIONAL_ALL_LARGE_SUCCESS = 0,
+  NP_CONDITIONAL_ALL_LARGE_NOT_APPLICABLE = 1,
+  NP_CONDITIONAL_ALL_LARGE_FAILURE = 2
+} NPConditionalAllLargeCvStatus;
+
 static void np_conditional_lp_all_large_ctx_clear(NPConditionalLpAllLargeCtx *ctx){
   if(ctx == NULL)
     return;
@@ -34881,7 +34887,8 @@ cleanup_cvls_all_large:
  * rank owner, and an O(n) contribution vector restores the incumbent final
  * row order.  The local owner above remains unchanged.
  */
-static int np_conditional_density_cvls_lp_all_large_parallel_stream(
+static NPConditionalAllLargeCvStatus
+np_conditional_density_cvls_lp_all_large_parallel_stream(
   double *vector_scale_factor,
   double *cv)
 {
@@ -34897,8 +34904,10 @@ static int np_conditional_density_cvls_lp_all_large_parallel_stream(
   int owned_start = 0;
   int owned_rows = 0;
   int local_fail = 0;
+  int committed = 0;
   int i, j;
-  int status = 1;
+  NPConditionalAllLargeCvStatus status =
+    NP_CONDITIONAL_ALL_LARGE_NOT_APPLICABLE;
 
   if(cv == NULL || vector_scale_factor == NULL ||
      !np_objective_outer_rows_enabled(
@@ -34935,6 +34944,7 @@ static int np_conditional_density_cvls_lp_all_large_parallel_stream(
   if(np_objective_outer_buffer_prepare(
        1, (size_t)ctx.num_train, &contributions) != 0)
     goto cleanup_cvls_all_large_parallel;
+  committed = 1;
 
   np_objective_outer_owned_rows(
     0, ctx.num_train, 1, &owned_start, &owned_rows);
@@ -34992,7 +35002,7 @@ static int np_conditional_density_cvls_lp_all_large_parallel_stream(
   for(i = 0; i < ctx.num_train; ++i)
     *cv += contributions[i];
   *cv /= (double)ctx.num_train;
-  status = 0;
+  status = NP_CONDITIONAL_ALL_LARGE_SUCCESS;
 
 cleanup_cvls_all_large_parallel:
   free(quad_mat);
@@ -35004,10 +35014,13 @@ cleanup_cvls_all_large_parallel:
   free(beta);
   free(contributions);
   np_conditional_lp_all_large_ctx_clear(&ctx);
+  if(committed && status != NP_CONDITIONAL_ALL_LARGE_SUCCESS)
+    return NP_CONDITIONAL_ALL_LARGE_FAILURE;
   return status;
 }
 
-static int np_conditional_density_cvls_lp_all_large_dispatch(
+static NPConditionalAllLargeCvStatus
+np_conditional_density_cvls_lp_all_large_dispatch(
   double *vector_scale_factor,
   double *cv)
 {
@@ -35121,6 +35134,165 @@ cleanup_cdist_all_large:
   if(beta != NULL) free(beta);
   np_conditional_lp_all_large_ctx_clear(&ctx);
   return status;
+}
+
+/*
+ * MPI-only all-large conditional-distribution CVLS sibling.  Complete
+ * response-evaluation rows are independent, so each rank owns a contiguous
+ * subset, preserves the incumbent training-row arithmetic within each row,
+ * and returns one O(m) row-loss vector for canonical finishing order.
+ */
+static NPConditionalAllLargeCvStatus
+np_conditional_distribution_cvls_lp_all_large_parallel_stream(
+  double *vector_scale_factor,
+  double *cv)
+{
+  NPConditionalLpAllLargeCtx ctx = {0};
+  const int num_eval = num_obs_eval_extern;
+  double *yint = NULL;
+  double *yint_xorder = NULL;
+  double *cross_terms = NULL;
+  double *beta = NULL;
+  double *contributions = NULL;
+  int owned_start = 0;
+  int owned_rows = 0;
+  int local_fail = 0;
+  int committed = 0;
+  int i, j;
+  NPConditionalAllLargeCvStatus status =
+    NP_CONDITIONAL_ALL_LARGE_NOT_APPLICABLE;
+
+  if(cv == NULL || vector_scale_factor == NULL || num_eval <= 0 ||
+     !np_objective_outer_rows_enabled(
+       int_conditional_prepared_context_extern))
+    return 1;
+  if(np_conditional_lp_all_large_ctx_prepare_cvls_tree(
+       vector_scale_factor, &ctx) != 0)
+    local_fail = 1;
+  if(!local_fail) {
+    yint = alloc_vecd(MAX(1, ctx.num_train));
+    if(int_TREE_X == NP_TREE_TRUE)
+      yint_xorder = alloc_vecd(MAX(1, ctx.num_train));
+    cross_terms = alloc_vecd(MAX(1, ctx.nterms));
+    beta = alloc_vecd(MAX(1, ctx.nterms));
+    if(yint == NULL ||
+       (int_TREE_X == NP_TREE_TRUE && yint_xorder == NULL) ||
+       cross_terms == NULL || beta == NULL)
+      local_fail = 1;
+  }
+  if(np_objective_outer_preflight_failed(1, local_fail))
+    goto cleanup_cdist_all_large_parallel;
+  if(np_objective_outer_buffer_prepare(
+       1, (size_t)num_eval, &contributions) != 0)
+    goto cleanup_cdist_all_large_parallel;
+  committed = 1;
+
+  np_objective_outer_owned_rows(
+    0, num_eval, 1, &owned_start, &owned_rows);
+  for(j = owned_start;
+      j < owned_start + owned_rows && !local_fail;
+      ++j) {
+    double row_loss = 0.0;
+
+    if((j & 15) == 0)
+      np_progress_bandwidth_loop_step();
+    if(np_conditional_y_eval_row_stream_op_core(
+         vector_scale_factor, j, OP_INTEGRAL,
+         matrix_Y_unordered_eval_extern,
+         matrix_Y_ordered_eval_extern,
+         matrix_Y_continuous_eval_extern,
+         num_eval,
+         cdfontrain_extern && num_eval == ctx.num_train,
+         1,
+         yint) != 0) {
+      local_fail = 1;
+      break;
+    }
+
+    {
+      const double *rhs_row = yint;
+
+      if(int_TREE_X == NP_TREE_TRUE) {
+        if(ipt_extern_X == NULL || ipt_lookup_extern_X == NULL) {
+          local_fail = 1;
+          break;
+        }
+        for(i = 0; i < ctx.num_train; ++i)
+          yint_xorder[i] = yint[ipt_extern_X[i]];
+        rhs_row = yint_xorder;
+      }
+      (void)np_conditional_lp_all_large_row_fit(
+        &ctx, rhs_row, 0, cross_terms, beta, 0);
+    }
+
+    for(i = 0; i < ctx.num_train; ++i) {
+      double fit = 0.0;
+      double den;
+      const int train_i = int_TREE_X == NP_TREE_TRUE ?
+        ipt_extern_X[i] : i;
+      const int indicator = np_conditional_indicator_row_core(
+        train_i, j, cdfontrain_extern,
+        matrix_Y_ordered_train_extern,
+        matrix_Y_continuous_train_extern,
+        matrix_Y_ordered_eval_extern,
+        matrix_Y_continuous_eval_extern,
+        num_var_ordered_extern,
+        num_var_continuous_extern);
+
+      if(cdfontrain_extern && train_i == j)
+        continue;
+      for(int a = 0; a < ctx.nterms; ++a)
+        fit += ctx.basis[a][i]*beta[a];
+      if(!np_lp_delete_denominator(ctx.hdiag[i], &den)) {
+        local_fail = 1;
+        break;
+      }
+      fit = (fit - ctx.hdiag[i]*
+             (int_TREE_X == NP_TREE_TRUE ? yint_xorder[i] : yint[i])) /
+        den;
+      {
+        const double difference = (double)indicator - fit;
+        row_loss += difference*difference;
+      }
+    }
+    if(!local_fail)
+      contributions[j] = row_loss;
+  }
+
+  if(np_objective_outer_buffer_finish(
+       1, num_eval, local_fail, contributions,
+       "NP_RMPI_INJECT_CDIST_CVLS_FAIL_RANK",
+       "conditional distribution all-large CVLS rows MPI_Allreduce") != 0)
+    goto cleanup_cdist_all_large_parallel;
+  *cv = 0.0;
+  for(j = 0; j < num_eval; ++j)
+    *cv += contributions[j];
+  *cv /= (double)ctx.num_train*(double)MAX(1, num_eval);
+  status = NP_CONDITIONAL_ALL_LARGE_SUCCESS;
+
+cleanup_cdist_all_large_parallel:
+  free(yint);
+  free(yint_xorder);
+  free(cross_terms);
+  free(beta);
+  free(contributions);
+  np_conditional_lp_all_large_ctx_clear(&ctx);
+  if(committed && status != NP_CONDITIONAL_ALL_LARGE_SUCCESS)
+    return NP_CONDITIONAL_ALL_LARGE_FAILURE;
+  return status;
+}
+
+static NPConditionalAllLargeCvStatus
+np_conditional_distribution_cvls_lp_all_large_dispatch(
+  double *vector_scale_factor,
+  double *cv)
+{
+  if(np_objective_outer_rows_enabled(
+       int_conditional_prepared_context_extern))
+    return np_conditional_distribution_cvls_lp_all_large_parallel_stream(
+      vector_scale_factor, cv);
+  return np_conditional_distribution_cvls_lp_all_large_stream(
+    vector_scale_factor, cv);
 }
 
 static int np_conditional_density_cvml_lp_block_stream(double *vector_scale_factor,
@@ -36813,11 +36985,20 @@ int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
     }
   }
 
-  if((BANDWIDTH_den_extern == BW_FIXED) &&
-     (np_conditional_density_cvls_lp_all_large_dispatch(vector_scale_factor, cv) == 0)){
-    np_glp_cv_clear_extern();
-    np_fastcv_alllarge_hits++;
-    return 0;
+  if(BANDWIDTH_den_extern == BW_FIXED){
+    const NPConditionalAllLargeCvStatus all_large_status =
+      np_conditional_density_cvls_lp_all_large_dispatch(
+        vector_scale_factor, cv);
+
+    if(all_large_status == NP_CONDITIONAL_ALL_LARGE_SUCCESS){
+      np_glp_cv_clear_extern();
+      np_fastcv_alllarge_hits++;
+      return 0;
+    }
+    if(all_large_status == NP_CONDITIONAL_ALL_LARGE_FAILURE){
+      np_glp_cv_clear_extern();
+      return 1;
+    }
   }
 
   if(BANDWIDTH_den_extern == BW_ADAP_NN) {
@@ -37271,11 +37452,20 @@ static int np_conditional_distribution_cvls_lp_row_stream(double *vector_scale_f
      (BANDWIDTH_den_extern != BW_ADAP_NN))
     return 1;
 
-  if((BANDWIDTH_den_extern == BW_FIXED) &&
-     (np_conditional_distribution_cvls_lp_all_large_stream(vector_scale_factor, cv) == 0)){
-    np_glp_cv_clear_extern();
-    np_fastcv_alllarge_hits++;
-    return 0;
+  if(BANDWIDTH_den_extern == BW_FIXED){
+    const NPConditionalAllLargeCvStatus all_large_status =
+      np_conditional_distribution_cvls_lp_all_large_dispatch(
+        vector_scale_factor, cv);
+
+    if(all_large_status == NP_CONDITIONAL_ALL_LARGE_SUCCESS){
+      np_glp_cv_clear_extern();
+      np_fastcv_alllarge_hits++;
+      return 0;
+    }
+    if(all_large_status == NP_CONDITIONAL_ALL_LARGE_FAILURE){
+      np_glp_cv_clear_extern();
+      return 1;
+    }
   }
 
   xrow = alloc_vecd(MAX(1, num_train));
@@ -39936,11 +40126,20 @@ static int np_conditional_distribution_cvls_lp_supertile(double *vector_scale_fa
     }
   }
 
-  if((BANDWIDTH_den_extern == BW_FIXED) &&
-     (np_conditional_distribution_cvls_lp_all_large_stream(vector_scale_factor, cv) == 0)){
-    np_glp_cv_clear_extern();
-    np_fastcv_alllarge_hits++;
-    return 0;
+  if(BANDWIDTH_den_extern == BW_FIXED){
+    const NPConditionalAllLargeCvStatus all_large_status =
+      np_conditional_distribution_cvls_lp_all_large_dispatch(
+        vector_scale_factor, cv);
+
+    if(all_large_status == NP_CONDITIONAL_ALL_LARGE_SUCCESS){
+      np_glp_cv_clear_extern();
+      np_fastcv_alllarge_hits++;
+      return 0;
+    }
+    if(all_large_status == NP_CONDITIONAL_ALL_LARGE_FAILURE){
+      np_glp_cv_clear_extern();
+      return 1;
+    }
   }
 
   if(BANDWIDTH_den_extern == BW_ADAP_NN)
@@ -40224,11 +40423,20 @@ np_conditional_distribution_cvls_lp_one(double *vector_scale_factor,
     }
   }
 
-  if((BANDWIDTH_den_extern == BW_FIXED) &&
-     (np_conditional_distribution_cvls_lp_all_large_stream(vector_scale_factor, cv) == 0)){
-    np_glp_cv_clear_extern();
-    np_fastcv_alllarge_hits++;
-    return 0;
+  if(BANDWIDTH_den_extern == BW_FIXED){
+    const NPConditionalAllLargeCvStatus all_large_status =
+      np_conditional_distribution_cvls_lp_all_large_dispatch(
+        vector_scale_factor, cv);
+
+    if(all_large_status == NP_CONDITIONAL_ALL_LARGE_SUCCESS){
+      np_glp_cv_clear_extern();
+      np_fastcv_alllarge_hits++;
+      return 0;
+    }
+    if(all_large_status == NP_CONDITIONAL_ALL_LARGE_FAILURE){
+      np_glp_cv_clear_extern();
+      return 1;
+    }
   }
 
   if(BANDWIDTH_den_extern == BW_ADAP_NN)

@@ -30,7 +30,10 @@ test_that("local density all-large CVLS remains ownership-free", {
   local <- extract_conditional_alllarge_region(
     source,
     "static int np_conditional_density_cvls_lp_all_large_stream(",
-    "static int np_conditional_density_cvls_lp_all_large_parallel_stream("
+    paste0(
+      "static NPConditionalAllLargeCvStatus\n",
+      "np_conditional_density_cvls_lp_all_large_parallel_stream("
+    )
   )
 
   expect_match(local, "np_conditional_lp_all_large_build_conv_quad(",
@@ -46,8 +49,14 @@ test_that("MPI density all-large CVLS owns complete rows", {
   source <- paste(readLines(path, warn = FALSE), collapse = "\n")
   parallel <- extract_conditional_alllarge_region(
     source,
-    "static int np_conditional_density_cvls_lp_all_large_parallel_stream(",
-    "static int np_conditional_density_cvls_lp_all_large_dispatch("
+    paste0(
+      "static NPConditionalAllLargeCvStatus\n",
+      "np_conditional_density_cvls_lp_all_large_parallel_stream("
+    ),
+    paste0(
+      "static NPConditionalAllLargeCvStatus\n",
+      "np_conditional_density_cvls_lp_all_large_dispatch("
+    )
   )
 
   expect_match(parallel, "np_objective_outer_preflight_failed(", fixed = TRUE)
@@ -59,6 +68,8 @@ test_that("MPI density all-large CVLS owns complete rows", {
                fixed = TRUE)
   expect_match(parallel, "np_conditional_y_row_stream_op_core_suppress(",
                fixed = TRUE)
+  expect_match(parallel, "committed = 1;", fixed = TRUE)
+  expect_match(parallel, "NP_CONDITIONAL_ALL_LARGE_FAILURE", fixed = TRUE)
   expect_false(grepl("num_train*num_train", parallel, fixed = TRUE))
   expect_false(grepl("alloc_matd(ctx.num_train, ctx.num_train)",
                      parallel, fixed = TRUE))
@@ -70,7 +81,10 @@ test_that("density all-large dispatcher isolates local and MPI owners", {
   source <- paste(readLines(path, warn = FALSE), collapse = "\n")
   dispatch <- extract_conditional_alllarge_region(
     source,
-    "static int np_conditional_density_cvls_lp_all_large_dispatch(",
+    paste0(
+      "static NPConditionalAllLargeCvStatus\n",
+      "np_conditional_density_cvls_lp_all_large_dispatch("
+    ),
     "static int np_conditional_distribution_cvls_lp_all_large_stream("
   )
 
@@ -85,9 +99,98 @@ test_that("density all-large dispatcher isolates local and MPI owners", {
     "np_conditional_density_cvls_lp_all_large_stream(",
     fixed = TRUE
   )
-  expect_match(
+  calls <- gregexpr(
+    "np_conditional_density_cvls_lp_all_large_dispatch(",
     source,
-    "np_conditional_density_cvls_lp_all_large_dispatch(vector_scale_factor, cv)",
+    fixed = TRUE
+  )[[1L]]
+  expect_length(calls[calls > 0L], 2L)
+})
+
+test_that("local distribution all-large CVLS remains ownership-free", {
+  path <- locate_conditional_alllarge_source()
+  skip_if(is.null(path), "package source unavailable")
+  source <- paste(readLines(path, warn = FALSE), collapse = "\n")
+  local <- extract_conditional_alllarge_region(
+    source,
+    "static int np_conditional_distribution_cvls_lp_all_large_stream(",
+    paste0(
+      "static NPConditionalAllLargeCvStatus\n",
+      "np_conditional_distribution_cvls_lp_all_large_parallel_stream("
+    )
+  )
+
+  expect_match(local, "cv_accumulator += tvd*tvd;", fixed = TRUE)
+  expect_match(local, "np_conditional_lp_all_large_row_fit(", fixed = TRUE)
+  expect_false(grepl("np_objective_outer_", local, fixed = TRUE))
+  expect_false(grepl("num_train*num_train", local, fixed = TRUE))
+})
+
+test_that("MPI distribution all-large CVLS owns complete evaluation rows", {
+  path <- locate_conditional_alllarge_source()
+  skip_if(is.null(path), "package source unavailable")
+  source <- paste(readLines(path, warn = FALSE), collapse = "\n")
+  parallel <- extract_conditional_alllarge_region(
+    source,
+    paste0(
+      "static NPConditionalAllLargeCvStatus\n",
+      "np_conditional_distribution_cvls_lp_all_large_parallel_stream("
+    ),
+    paste0(
+      "static NPConditionalAllLargeCvStatus\n",
+      "np_conditional_distribution_cvls_lp_all_large_dispatch("
+    )
+  )
+
+  expect_match(parallel, "np_objective_outer_preflight_failed(", fixed = TRUE)
+  expect_match(parallel, "np_objective_outer_buffer_prepare(", fixed = TRUE)
+  expect_match(parallel, "np_objective_outer_owned_rows(", fixed = TRUE)
+  expect_match(parallel, "contributions[j] = row_loss;", fixed = TRUE)
+  expect_match(parallel, "np_objective_outer_buffer_finish(", fixed = TRUE)
+  expect_match(parallel, '"NP_RMPI_INJECT_CDIST_CVLS_FAIL_RANK"',
+               fixed = TRUE)
+  expect_match(parallel, "row_loss += difference*difference;", fixed = TRUE)
+  expect_match(parallel, "committed = 1;", fixed = TRUE)
+  expect_match(parallel, "NP_CONDITIONAL_ALL_LARGE_FAILURE", fixed = TRUE)
+  expect_false(grepl("num_train*num_train", parallel, fixed = TRUE))
+  expect_false(grepl("alloc_matd(ctx.num_train, ctx.num_train)",
+                     parallel, fixed = TRUE))
+})
+
+test_that("distribution all-large dispatcher isolates local and MPI owners", {
+  path <- locate_conditional_alllarge_source()
+  skip_if(is.null(path), "package source unavailable")
+  source <- paste(readLines(path, warn = FALSE), collapse = "\n")
+  dispatch <- extract_conditional_alllarge_region(
+    source,
+    paste0(
+      "static NPConditionalAllLargeCvStatus\n",
+      "np_conditional_distribution_cvls_lp_all_large_dispatch("
+    ),
+    "static int np_conditional_density_cvml_lp_block_stream("
+  )
+
+  expect_match(dispatch, "np_objective_outer_rows_enabled(", fixed = TRUE)
+  expect_match(
+    dispatch,
+    "np_conditional_distribution_cvls_lp_all_large_parallel_stream(",
     fixed = TRUE
   )
+  expect_match(
+    dispatch,
+    "np_conditional_distribution_cvls_lp_all_large_stream(",
+    fixed = TRUE
+  )
+  calls <- gregexpr(
+    "np_conditional_distribution_cvls_lp_all_large_dispatch(",
+    source,
+    fixed = TRUE
+  )[[1L]]
+  expect_length(calls[calls > 0L], 4L)
+  failures <- gregexpr(
+    "all_large_status == NP_CONDITIONAL_ALL_LARGE_FAILURE",
+    source,
+    fixed = TRUE
+  )[[1L]]
+  expect_length(failures[failures > 0L], 4L)
 })
