@@ -2951,6 +2951,242 @@ static int np_build_discrete_profile_index(const int num_xt,
   return 0;
 }
 
+typedef enum {
+  NP_CONDITIONAL_PROFILE_INDEX_NONE = 0,
+  NP_CONDITIONAL_PROFILE_INDEX_DENSITY = 1,
+  NP_CONDITIONAL_PROFILE_INDEX_DISTRIBUTION = 2
+} NPConditionalProfileIndexFamily;
+
+typedef struct {
+  int ready;
+  NPConditionalProfileIndexFamily family;
+  int num_train;
+  int num_eval;
+  int num_xu;
+  int num_xo;
+  int num_yu;
+  int num_yo;
+  double **x_unordered_train;
+  double **x_ordered_train;
+  double **y_unordered_train;
+  double **y_ordered_train;
+  double **y_unordered_eval;
+  double **y_ordered_eval;
+  int *x_id;
+  int *x_rep;
+  int *y_train_id;
+  int *y_train_rep;
+  int *y_eval_id;
+  int *y_eval_rep;
+  int *xy_id;
+  int *xy_rep;
+  int nprof_x;
+  int nprof_y_train;
+  int nprof_y_eval;
+  int nprof_xy;
+  double *counts_x;
+  double *counts_y_eval;
+  double *counts_xy;
+} NPConditionalProfileIndexState;
+
+/*
+ * Categorical profile identity and multiplicity depend only on the prepared
+ * data view, never on a bandwidth candidate.  Retain this O(n) state for the
+ * lifetime of one prepared conditional objective; np.c clears it before the
+ * backing matrices are released.  Pointer-and-shape matching is defensive:
+ * an unprepared one-shot caller owns a stack state and cannot reuse this one.
+ */
+static NPConditionalProfileIndexState
+  np_conditional_profile_prepared_index_state = {0};
+
+static void np_conditional_profile_index_state_clear(
+  NPConditionalProfileIndexState *state)
+{
+  if(state == NULL)
+    return;
+  free(state->x_id);
+  free(state->x_rep);
+  free(state->y_train_id);
+  free(state->y_train_rep);
+  free(state->y_eval_id);
+  free(state->y_eval_rep);
+  free(state->xy_id);
+  free(state->xy_rep);
+  free(state->counts_x);
+  free(state->counts_y_eval);
+  free(state->counts_xy);
+  memset(state, 0, sizeof(*state));
+}
+
+void np_conditional_profile_index_cache_clear_extern(void)
+{
+  np_conditional_profile_index_state_clear(
+    &np_conditional_profile_prepared_index_state);
+}
+
+static int np_conditional_profile_index_state_matches(
+  const NPConditionalProfileIndexState *state,
+  const NPConditionalProfileIndexFamily family,
+  const int num_train,
+  const int num_eval,
+  const int num_xu,
+  const int num_xo,
+  const int num_yu,
+  const int num_yo,
+  double **x_unordered_train,
+  double **x_ordered_train,
+  double **y_unordered_train,
+  double **y_ordered_train,
+  double **y_unordered_eval,
+  double **y_ordered_eval)
+{
+  return state != NULL && state->ready &&
+    state->family == family &&
+    state->num_train == num_train &&
+    state->num_eval == num_eval &&
+    state->num_xu == num_xu &&
+    state->num_xo == num_xo &&
+    state->num_yu == num_yu &&
+    state->num_yo == num_yo &&
+    state->x_unordered_train == x_unordered_train &&
+    state->x_ordered_train == x_ordered_train &&
+    state->y_unordered_train == y_unordered_train &&
+    state->y_ordered_train == y_ordered_train &&
+    state->y_unordered_eval == y_unordered_eval &&
+    state->y_ordered_eval == y_ordered_eval;
+}
+
+static int np_conditional_profile_index_state_prepare(
+  NPConditionalProfileIndexState *state,
+  const NPConditionalProfileIndexFamily family,
+  const int num_train,
+  const int num_eval,
+  const int num_xu,
+  const int num_xo,
+  const int num_yu,
+  const int num_yo,
+  double **x_unordered_train,
+  double **x_ordered_train,
+  double **y_unordered_train,
+  double **y_ordered_train,
+  double **y_unordered_eval,
+  double **y_ordered_eval)
+{
+  const int num_xyu = num_xu + num_yu;
+  const int num_xyo = num_xo + num_yo;
+  double **xy_unordered = NULL;
+  double **xy_ordered = NULL;
+  int observation;
+  int variable;
+
+  if(state == NULL ||
+     (family != NP_CONDITIONAL_PROFILE_INDEX_DENSITY &&
+      family != NP_CONDITIONAL_PROFILE_INDEX_DISTRIBUTION) ||
+     num_train <= 0 || num_eval <= 0 ||
+     num_xu + num_xo <= 0 || num_yu + num_yo <= 0)
+    return 0;
+  if(np_conditional_profile_index_state_matches(
+       state, family, num_train, num_eval,
+       num_xu, num_xo, num_yu, num_yo,
+       x_unordered_train, x_ordered_train,
+       y_unordered_train, y_ordered_train,
+       y_unordered_eval, y_ordered_eval))
+    return 1;
+
+  np_conditional_profile_index_state_clear(state);
+  xy_unordered = alloc_matd(num_train, num_xyu);
+  xy_ordered = alloc_matd(num_train, num_xyo);
+  if(((num_xyu > 0) && (xy_unordered == NULL)) ||
+     ((num_xyo > 0) && (xy_ordered == NULL)))
+    goto fail;
+  for(variable = 0; variable < num_xu; variable++)
+    memcpy(xy_unordered[variable], x_unordered_train[variable],
+           (size_t)num_train*sizeof(double));
+  for(variable = 0; variable < num_yu; variable++)
+    memcpy(xy_unordered[num_xu + variable], y_unordered_train[variable],
+           (size_t)num_train*sizeof(double));
+  for(variable = 0; variable < num_xo; variable++)
+    memcpy(xy_ordered[variable], x_ordered_train[variable],
+           (size_t)num_train*sizeof(double));
+  for(variable = 0; variable < num_yo; variable++)
+    memcpy(xy_ordered[num_xo + variable], y_ordered_train[variable],
+           (size_t)num_train*sizeof(double));
+
+  if(!np_build_discrete_profile_index(
+       num_train, num_xu, num_xo,
+       x_unordered_train, x_ordered_train,
+       &state->x_id, &state->x_rep, &state->nprof_x) ||
+     !np_build_discrete_profile_index(
+       num_train, num_yu, num_yo,
+       y_unordered_train, y_ordered_train,
+       &state->y_train_id, &state->y_train_rep,
+       &state->nprof_y_train) ||
+     !np_build_discrete_profile_index(
+       num_train, num_xyu, num_xyo,
+       xy_unordered, xy_ordered,
+       &state->xy_id, &state->xy_rep, &state->nprof_xy))
+    goto fail;
+
+  if(family == NP_CONDITIONAL_PROFILE_INDEX_DISTRIBUTION){
+    if(!np_build_discrete_profile_index(
+         num_eval, num_yu, num_yo,
+         y_unordered_eval, y_ordered_eval,
+         &state->y_eval_id, &state->y_eval_rep,
+         &state->nprof_y_eval))
+      goto fail;
+  } else {
+    state->nprof_y_eval = state->nprof_y_train;
+  }
+
+  state->counts_x = alloc_vecd(state->nprof_x);
+  state->counts_xy = alloc_vecd(state->nprof_xy);
+  if(family == NP_CONDITIONAL_PROFILE_INDEX_DISTRIBUTION)
+    state->counts_y_eval = alloc_vecd(state->nprof_y_eval);
+  if(state->counts_x == NULL || state->counts_xy == NULL ||
+     (family == NP_CONDITIONAL_PROFILE_INDEX_DISTRIBUTION &&
+      state->counts_y_eval == NULL))
+    goto fail;
+
+  memset(state->counts_x, 0,
+         (size_t)state->nprof_x*sizeof(*state->counts_x));
+  memset(state->counts_xy, 0,
+         (size_t)state->nprof_xy*sizeof(*state->counts_xy));
+  if(state->counts_y_eval != NULL)
+    memset(state->counts_y_eval, 0,
+           (size_t)state->nprof_y_eval*sizeof(*state->counts_y_eval));
+  for(observation = 0; observation < num_train; observation++){
+    state->counts_x[state->x_id[observation]] += 1.0;
+    state->counts_xy[state->xy_id[observation]] += 1.0;
+  }
+  if(family == NP_CONDITIONAL_PROFILE_INDEX_DISTRIBUTION)
+    for(observation = 0; observation < num_eval; observation++)
+      state->counts_y_eval[state->y_eval_id[observation]] += 1.0;
+
+  state->family = family;
+  state->num_train = num_train;
+  state->num_eval = num_eval;
+  state->num_xu = num_xu;
+  state->num_xo = num_xo;
+  state->num_yu = num_yu;
+  state->num_yo = num_yo;
+  state->x_unordered_train = x_unordered_train;
+  state->x_ordered_train = x_ordered_train;
+  state->y_unordered_train = y_unordered_train;
+  state->y_ordered_train = y_ordered_train;
+  state->y_unordered_eval = y_unordered_eval;
+  state->y_ordered_eval = y_ordered_eval;
+  state->ready = 1;
+  if(xy_unordered != NULL) free_mat(xy_unordered, num_xyu);
+  if(xy_ordered != NULL) free_mat(xy_ordered, num_xyo);
+  return 1;
+
+fail:
+  if(xy_unordered != NULL) free_mat(xy_unordered, num_xyu);
+  if(xy_ordered != NULL) free_mat(xy_ordered, num_xyo);
+  np_conditional_profile_index_state_clear(state);
+  return 0;
+}
+
 typedef struct {
   int valid;
   int num_xt;
@@ -38271,12 +38507,9 @@ double *cv){
   const int num_yo = num_var_ordered_extern;
   const int num_x = num_xu + num_xo;
   const int num_y = num_yu + num_yo;
-  const int num_xyu = num_xu + num_yu;
-  const int num_xyo = num_xo + num_yo;
-  int i, j, g, h, status;
-  int *x_id = NULL, *x_rep = NULL, *y_id = NULL, *y_rep = NULL, *xy_id = NULL, *xy_rep = NULL;
+  int j, g, h, status;
+  int *x_id = NULL, *x_rep = NULL, *y_id = NULL, *y_rep = NULL, *xy_rep = NULL;
   int nprof_x = 0, nprof_y = 0, nprof_xy = 0;
-  double **xy_uno = NULL, **xy_ord = NULL;
   double **profile_x_uno = NULL, **profile_x_ord = NULL;
   double **profile_y_uno = NULL, **profile_y_ord = NULL;
   double *counts_x = NULL, *counts_xy = NULL;
@@ -38316,6 +38549,8 @@ double *cv){
   NPCategoricalProfileKernelSpec x_profile_spec = {0};
   NPCategoricalProfileKernelSpec yn_profile_spec = {0};
   NPCategoricalProfileKernelSpec yc_profile_spec = {0};
+  NPConditionalProfileIndexState local_profile_index_state;
+  NPConditionalProfileIndexState *profile_index_state = NULL;
   NPConditionalProfileCvStatus result =
     NP_CONDITIONAL_PROFILE_CV_FAILURE;
 
@@ -38330,48 +38565,40 @@ double *cv){
      (num_y <= 0))
     return NP_CONDITIONAL_PROFILE_CV_NOT_APPLICABLE;
 
-  xy_uno = alloc_matd(num_obs, num_xyu);
-  xy_ord = alloc_matd(num_obs, num_xyo);
-  if(((num_xyu > 0) && (xy_uno == NULL)) ||
-     ((num_xyo > 0) && (xy_ord == NULL)))
-    goto preflight_cat_cvls;
+  if(int_conditional_prepared_context_extern)
+    profile_index_state = &np_conditional_profile_prepared_index_state;
+  else {
+    memset(&local_profile_index_state, 0,
+           sizeof(local_profile_index_state));
+    profile_index_state = &local_profile_index_state;
+  }
 
-  for(j = 0; j < num_xu; j++)
-    memcpy(xy_uno[j], matrix_X_unordered_train_extern[j], (size_t)num_obs*sizeof(double));
-  for(j = 0; j < num_yu; j++)
-    memcpy(xy_uno[num_xu + j], matrix_Y_unordered_train_extern[j], (size_t)num_obs*sizeof(double));
-  for(j = 0; j < num_xo; j++)
-    memcpy(xy_ord[j], matrix_X_ordered_train_extern[j], (size_t)num_obs*sizeof(double));
-  for(j = 0; j < num_yo; j++)
-    memcpy(xy_ord[num_xo + j], matrix_Y_ordered_train_extern[j], (size_t)num_obs*sizeof(double));
-
-  if(!np_build_discrete_profile_index(num_obs,
-                                      num_xu,
-                                      num_xo,
-                                      matrix_X_unordered_train_extern,
-                                      matrix_X_ordered_train_extern,
-                                      &x_id,
-                                      &x_rep,
-                                      &nprof_x))
+  if(!np_conditional_profile_index_state_prepare(
+       profile_index_state,
+       NP_CONDITIONAL_PROFILE_INDEX_DENSITY,
+       num_obs,
+       num_obs,
+       num_xu,
+       num_xo,
+       num_yu,
+       num_yo,
+       matrix_X_unordered_train_extern,
+       matrix_X_ordered_train_extern,
+       matrix_Y_unordered_train_extern,
+       matrix_Y_ordered_train_extern,
+       matrix_Y_unordered_train_extern,
+       matrix_Y_ordered_train_extern))
     goto preflight_cat_cvls;
-  if(!np_build_discrete_profile_index(num_obs,
-                                      num_yu,
-                                      num_yo,
-                                      matrix_Y_unordered_train_extern,
-                                      matrix_Y_ordered_train_extern,
-                                      &y_id,
-                                      &y_rep,
-                                      &nprof_y))
-    goto preflight_cat_cvls;
-  if(!np_build_discrete_profile_index(num_obs,
-                                      num_xyu,
-                                      num_xyo,
-                                      xy_uno,
-                                      xy_ord,
-                                      &xy_id,
-                                      &xy_rep,
-                                      &nprof_xy))
-    goto preflight_cat_cvls;
+  x_id = profile_index_state->x_id;
+  x_rep = profile_index_state->x_rep;
+  y_id = profile_index_state->y_train_id;
+  y_rep = profile_index_state->y_train_rep;
+  xy_rep = profile_index_state->xy_rep;
+  nprof_x = profile_index_state->nprof_x;
+  nprof_y = profile_index_state->nprof_y_train;
+  nprof_xy = profile_index_state->nprof_xy;
+  counts_x = profile_index_state->counts_x;
+  counts_xy = profile_index_state->counts_xy;
 
   if((nprof_x <= 0) || (nprof_y <= 0) || (nprof_xy <= 0) ||
      ((int64_t)4*nprof_x > (int64_t)3*num_obs) ||
@@ -38554,8 +38781,6 @@ double *cv){
   profile_x_ord = alloc_tmatd(nprof_x, num_xo);
   profile_y_uno = alloc_tmatd(nprof_y, num_yu);
   profile_y_ord = alloc_tmatd(nprof_y, num_yo);
-  counts_x = alloc_vecd(nprof_x);
-  counts_xy = alloc_vecd(nprof_xy);
   (void)np_native_malloc_array((void **)&kernel_workspace,
                                kernel_cells,
                                sizeof(*kernel_workspace));
@@ -38678,7 +38903,6 @@ preflight_cat_cvls:
 
   for(g = 0; g < nprof_x; g++){
     const int rep = x_rep[g];
-    counts_x[g] = 0.0;
     for(j = 0; j < num_xu; j++) profile_x_uno[j][g] = matrix_X_unordered_train_extern[j][rep];
     for(j = 0; j < num_xo; j++) profile_x_ord[j][g] = matrix_X_ordered_train_extern[j][rep];
   }
@@ -38687,13 +38911,6 @@ preflight_cat_cvls:
     for(j = 0; j < num_yu; j++) profile_y_uno[j][g] = matrix_Y_unordered_train_extern[j][rep];
     for(j = 0; j < num_yo; j++) profile_y_ord[j][g] = matrix_Y_ordered_train_extern[j][rep];
   }
-  for(g = 0; g < nprof_xy; g++)
-    counts_xy[g] = 0.0;
-  for(i = 0; i < num_obs; i++){
-    counts_x[x_id[i]] += 1.0;
-    counts_xy[xy_id[i]] += 1.0;
-  }
-
   for(j = 0; j < num_xu; j++) kernel_ux[j] = KERNEL_reg_unordered_extern;
   for(j = 0; j < num_xo; j++) kernel_ox[j] = KERNEL_reg_ordered_extern;
   for(j = 0; j < num_yu; j++) kernel_uy[j] = KERNEL_den_unordered_extern;
@@ -39420,20 +39637,10 @@ finish_profile_rows_cat_cvls:
   result = NP_CONDITIONAL_PROFILE_CV_SUCCESS;
 
 cleanup_cat_cvls:
-  if(x_id != NULL) free(x_id);
-  if(x_rep != NULL) free(x_rep);
-  if(y_id != NULL) free(y_id);
-  if(y_rep != NULL) free(y_rep);
-  if(xy_id != NULL) free(xy_id);
-  if(xy_rep != NULL) free(xy_rep);
-  if(xy_uno != NULL) free_mat(xy_uno, num_xyu);
-  if(xy_ord != NULL) free_mat(xy_ord, num_xyo);
   if(profile_x_uno != NULL) free_tmat(profile_x_uno);
   if(profile_x_ord != NULL) free_tmat(profile_x_ord);
   if(profile_y_uno != NULL) free_tmat(profile_y_uno);
   if(profile_y_ord != NULL) free_tmat(profile_y_ord);
-  if(counts_x != NULL) free(counts_x);
-  if(counts_xy != NULL) free(counts_xy);
   if(profile_terms != NULL) free(profile_terms);
   if(kernel_workspace != NULL) free(kernel_workspace);
   if(den_full != NULL) free(den_full);
@@ -39456,6 +39663,8 @@ cleanup_cat_cvls:
   if(kernel_ox != NULL) free(kernel_ox);
   if(kernel_uy != NULL) free(kernel_uy);
   if(kernel_oy != NULL) free(kernel_oy);
+  if(profile_index_state == &local_profile_index_state)
+    np_conditional_profile_index_state_clear(profile_index_state);
   return result;
 }
 
@@ -39472,13 +39681,10 @@ double *cv){
   const int num_yo = num_var_ordered_extern;
   const int num_x = num_xu + num_xo;
   const int num_y = num_yu + num_yo;
-  const int num_xyu = num_xu + num_yu;
-  const int num_xyo = num_xo + num_yo;
-  int i, j, g, h, e, status;
+  int j, g, h, e, status;
   int *x_id = NULL, *x_rep = NULL, *ty_id = NULL, *ty_rep = NULL;
-  int *ey_id = NULL, *ey_rep = NULL, *xy_id = NULL, *xy_rep = NULL;
+  int *ey_rep = NULL, *xy_rep = NULL;
   int nprof_x = 0, nprof_ty = 0, nprof_ey = 0, nprof_xy = 0;
-  double **xy_uno = NULL, **xy_ord = NULL;
   double **profile_x_uno = NULL, **profile_x_ord = NULL;
   double **profile_ty_uno = NULL, **profile_ty_ord = NULL;
   double **profile_ey_uno = NULL, **profile_ey_ord = NULL;
@@ -39513,6 +39719,8 @@ double *cv){
     (int)NP_CONDITIONAL_PROFILE_CV_FAILURE;
   NPCategoricalProfileKernelSpec x_profile_spec = {0};
   NPCategoricalProfileKernelSpec y_profile_spec = {0};
+  NPConditionalProfileIndexState local_profile_index_state;
+  NPConditionalProfileIndexState *profile_index_state = NULL;
   NPConditionalProfileCvStatus result =
     NP_CONDITIONAL_PROFILE_CV_FAILURE;
 
@@ -39528,57 +39736,43 @@ double *cv){
      (num_y <= 0))
     return NP_CONDITIONAL_PROFILE_CV_NOT_APPLICABLE;
 
-  xy_uno = alloc_matd(num_train, num_xyu);
-  xy_ord = alloc_matd(num_train, num_xyo);
-  if(((num_xyu > 0) && (xy_uno == NULL)) ||
-     ((num_xyo > 0) && (xy_ord == NULL)))
-    goto preflight_cat_cdist;
+  if(int_conditional_prepared_context_extern)
+    profile_index_state = &np_conditional_profile_prepared_index_state;
+  else {
+    memset(&local_profile_index_state, 0,
+           sizeof(local_profile_index_state));
+    profile_index_state = &local_profile_index_state;
+  }
 
-  for(j = 0; j < num_xu; j++)
-    memcpy(xy_uno[j], matrix_X_unordered_train_extern[j], (size_t)num_train*sizeof(double));
-  for(j = 0; j < num_yu; j++)
-    memcpy(xy_uno[num_xu + j], matrix_Y_unordered_train_extern[j], (size_t)num_train*sizeof(double));
-  for(j = 0; j < num_xo; j++)
-    memcpy(xy_ord[j], matrix_X_ordered_train_extern[j], (size_t)num_train*sizeof(double));
-  for(j = 0; j < num_yo; j++)
-    memcpy(xy_ord[num_xo + j], matrix_Y_ordered_train_extern[j], (size_t)num_train*sizeof(double));
-
-  if(!np_build_discrete_profile_index(num_train,
-                                      num_xu,
-                                      num_xo,
-                                      matrix_X_unordered_train_extern,
-                                      matrix_X_ordered_train_extern,
-                                      &x_id,
-                                      &x_rep,
-                                      &nprof_x))
+  if(!np_conditional_profile_index_state_prepare(
+       profile_index_state,
+       NP_CONDITIONAL_PROFILE_INDEX_DISTRIBUTION,
+       num_train,
+       num_eval,
+       num_xu,
+       num_xo,
+       num_yu,
+       num_yo,
+       matrix_X_unordered_train_extern,
+       matrix_X_ordered_train_extern,
+       matrix_Y_unordered_train_extern,
+       matrix_Y_ordered_train_extern,
+       matrix_Y_unordered_eval_extern,
+       matrix_Y_ordered_eval_extern))
     goto preflight_cat_cdist;
-  if(!np_build_discrete_profile_index(num_train,
-                                      num_yu,
-                                      num_yo,
-                                      matrix_Y_unordered_train_extern,
-                                      matrix_Y_ordered_train_extern,
-                                      &ty_id,
-                                      &ty_rep,
-                                      &nprof_ty))
-    goto preflight_cat_cdist;
-  if(!np_build_discrete_profile_index(num_eval,
-                                      num_yu,
-                                      num_yo,
-                                      matrix_Y_unordered_eval_extern,
-                                      matrix_Y_ordered_eval_extern,
-                                      &ey_id,
-                                      &ey_rep,
-                                      &nprof_ey))
-    goto preflight_cat_cdist;
-  if(!np_build_discrete_profile_index(num_train,
-                                      num_xyu,
-                                      num_xyo,
-                                      xy_uno,
-                                      xy_ord,
-                                      &xy_id,
-                                      &xy_rep,
-                                      &nprof_xy))
-    goto preflight_cat_cdist;
+  x_id = profile_index_state->x_id;
+  x_rep = profile_index_state->x_rep;
+  ty_id = profile_index_state->y_train_id;
+  ty_rep = profile_index_state->y_train_rep;
+  ey_rep = profile_index_state->y_eval_rep;
+  xy_rep = profile_index_state->xy_rep;
+  nprof_x = profile_index_state->nprof_x;
+  nprof_ty = profile_index_state->nprof_y_train;
+  nprof_ey = profile_index_state->nprof_y_eval;
+  nprof_xy = profile_index_state->nprof_xy;
+  counts_x = profile_index_state->counts_x;
+  counts_ey = profile_index_state->counts_y_eval;
+  counts_xy = profile_index_state->counts_xy;
 
   if((nprof_x <= 0) || (nprof_ty <= 0) || (nprof_ey <= 0) || (nprof_xy <= 0) ||
      ((int64_t)4*nprof_x > (int64_t)3*num_train) ||
@@ -39670,9 +39864,6 @@ double *cv){
   profile_ty_ord = alloc_tmatd(nprof_ty, num_yo);
   profile_ey_uno = alloc_tmatd(nprof_ey, num_yu);
   profile_ey_ord = alloc_tmatd(nprof_ey, num_yo);
-  counts_x = alloc_vecd(nprof_x);
-  counts_ey = alloc_vecd(nprof_ey);
-  counts_xy = alloc_vecd(nprof_xy);
   (void)np_native_malloc_array((void **)&kernel_workspace,
                                kernel_cells,
                                sizeof(*kernel_workspace));
@@ -39769,7 +39960,6 @@ preflight_cat_cdist:
 
   for(g = 0; g < nprof_x; g++){
     const int rep = x_rep[g];
-    counts_x[g] = 0.0;
     for(j = 0; j < num_xu; j++) profile_x_uno[j][g] = matrix_X_unordered_train_extern[j][rep];
     for(j = 0; j < num_xo; j++) profile_x_ord[j][g] = matrix_X_ordered_train_extern[j][rep];
   }
@@ -39780,18 +39970,9 @@ preflight_cat_cdist:
   }
   for(g = 0; g < nprof_ey; g++){
     const int rep = ey_rep[g];
-    counts_ey[g] = 0.0;
     for(j = 0; j < num_yu; j++) profile_ey_uno[j][g] = matrix_Y_unordered_eval_extern[j][rep];
     for(j = 0; j < num_yo; j++) profile_ey_ord[j][g] = matrix_Y_ordered_eval_extern[j][rep];
   }
-  for(g = 0; g < nprof_xy; g++)
-    counts_xy[g] = 0.0;
-  for(i = 0; i < num_train; i++){
-    counts_x[x_id[i]] += 1.0;
-    counts_xy[xy_id[i]] += 1.0;
-  }
-  for(i = 0; i < num_eval; i++)
-    counts_ey[ey_id[i]] += 1.0;
 
   for(j = 0; j < num_xu; j++) kernel_ux[j] = KERNEL_reg_unordered_extern;
   for(j = 0; j < num_xo; j++) kernel_ox[j] = KERNEL_reg_ordered_extern;
@@ -40202,25 +40383,12 @@ finish_profile_rows_cat_cdist:
   result = NP_CONDITIONAL_PROFILE_CV_SUCCESS;
 
 cleanup_cat_cdist:
-  if(x_id != NULL) free(x_id);
-  if(x_rep != NULL) free(x_rep);
-  if(ty_id != NULL) free(ty_id);
-  if(ty_rep != NULL) free(ty_rep);
-  if(ey_id != NULL) free(ey_id);
-  if(ey_rep != NULL) free(ey_rep);
-  if(xy_id != NULL) free(xy_id);
-  if(xy_rep != NULL) free(xy_rep);
-  if(xy_uno != NULL) free_mat(xy_uno, num_xyu);
-  if(xy_ord != NULL) free_mat(xy_ord, num_xyo);
   if(profile_x_uno != NULL) free_tmat(profile_x_uno);
   if(profile_x_ord != NULL) free_tmat(profile_x_ord);
   if(profile_ty_uno != NULL) free_tmat(profile_ty_uno);
   if(profile_ty_ord != NULL) free_tmat(profile_ty_ord);
   if(profile_ey_uno != NULL) free_tmat(profile_ey_uno);
   if(profile_ey_ord != NULL) free_tmat(profile_ey_ord);
-  if(counts_x != NULL) free(counts_x);
-  if(counts_ey != NULL) free(counts_ey);
-  if(counts_xy != NULL) free(counts_xy);
   if(profile_terms != NULL) free(profile_terms);
   if(kernel_workspace != NULL) free(kernel_workspace);
   if(den_full != NULL) free(den_full);
@@ -40239,6 +40407,8 @@ cleanup_cat_cdist:
   if(kernel_ox != NULL) free(kernel_ox);
   if(kernel_uy != NULL) free(kernel_uy);
   if(kernel_oy != NULL) free(kernel_oy);
+  if(profile_index_state == &local_profile_index_state)
+    np_conditional_profile_index_state_clear(profile_index_state);
   return result;
 }
 

@@ -5048,6 +5048,7 @@ static void np_conditional_density_prepared_context_clear_internal(void)
   const int num_all_uvar = num_reg_unordered_extern + num_var_unordered_extern;
   const int num_all_ovar = num_reg_ordered_extern + num_var_ordered_extern;
 
+  np_conditional_profile_index_cache_clear_extern();
   np_bounded_cvls_conditional_quad_context_clear_extern();
 
   if (!np_conditional_density_prepared_context.active && !np_conditional_density_prepared_context.owned)
@@ -15349,6 +15350,7 @@ cleanup_np_density_conditional_bw:
 static void np_conditional_distribution_prepared_context_destroy(
   NPConditionalDistributionPreparedCtx *context)
 {
+  np_conditional_profile_index_cache_clear_extern();
   if (context == NULL || !context->active)
     return;
 

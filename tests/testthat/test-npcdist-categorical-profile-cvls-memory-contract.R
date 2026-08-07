@@ -179,3 +179,62 @@ test_that("npcdist categorical profile CVLS remains numerically equivalent", {
 
   expect_equal(compressed, canonical, tolerance = 1e-12)
 })
+
+test_that("npcdist categorical profiles support nonidentical evaluation data", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(), add = TRUE)
+  set.seed(2026080702L)
+  n <- 240L
+  x <- data.frame(
+    xu = factor(sample(letters[1:4], n, TRUE), levels = letters[1:4]),
+    xo = ordered(sample(1:5, n, TRUE), levels = 1:5)
+  )
+  y <- data.frame(
+    yu = factor(sample(LETTERS[1:3], n, TRUE), levels = LETTERS[1:3]),
+    yo = ordered(sample(1:4, n, TRUE), levels = 1:4)
+  )
+  gydat <- expand.grid(
+    yu = LETTERS[1:3],
+    yo = 1:4,
+    KEEP.OUT.ATTRS = FALSE
+  )
+  gydat <- gydat[
+    rep(seq_len(nrow(gydat)), c(2, 1, 3, 1, 2, 1, 1, 3, 1, 2, 1, 2)),
+    ,
+    drop = FALSE
+  ]
+  gydat$yu <- factor(gydat$yu, levels = LETTERS[1:3])
+  gydat$yo <- ordered(gydat$yo, levels = 1:4)
+  state <- npcdistbw(
+    xdat = x,
+    ydat = y,
+    bwmethod = "cv.ls",
+    bwtype = "fixed",
+    regtype = "lc",
+    uxkertype = "liracine",
+    oxkertype = "racineliyan",
+    oykertype = "wangvanryzin",
+    bws = c(0.19, 0.24, 0.29, 0.34),
+    bandwidth.compute = FALSE
+  )
+  old <- options(np.categorical.compress = TRUE, np.tree = FALSE)
+  on.exit(options(old), add = TRUE)
+
+  compressed <- npRmpi:::.npcdistbw_eval_only(
+    xdat = x,
+    ydat = y,
+    gydat = gydat,
+    bws = state
+  )
+  options(np.categorical.compress = FALSE)
+  canonical <- npRmpi:::.npcdistbw_eval_only(
+    xdat = x,
+    ydat = y,
+    gydat = gydat,
+    bws = state
+  )
+
+  expect_equal(compressed$objective, canonical$objective, tolerance = 1e-12)
+  expect_equal(compressed$num.feval.fast, 1)
+  expect_equal(canonical$num.feval.fast, 0)
+})
