@@ -15350,6 +15350,8 @@ static void np_conditional_distribution_prepared_context_destroy(
   if (context == NULL || !context->active)
     return;
 
+  int_conditional_prepared_context_extern = 0;
+
   bwm_clear_floor_context();
   bwm_nn_cache_free();
   bwm_objective_cache_free();
@@ -15920,6 +15922,7 @@ static void np_distribution_conditional_bw_mode(double * c_uno, double * c_ord, 
   }
 
   prepared_context->active = 1;
+  int_conditional_prepared_context_extern = 1;
   prepared_context->cdfontrain = cdfontrain;
   prepared_context->num_all_var = num_all_var;
   prepared_context->num_var_unordered = num_var_unordered_extern;
