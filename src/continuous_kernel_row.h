@@ -184,14 +184,6 @@ np_continuous_kernel_beta_prepared_pdf_row_prepare(
   int omitted_observation,
   NPContinuousKernelRowResult *result);
 
-NPContinuousKernelRowStatus
-np_continuous_kernel_beta_prepared_derivative_row_prepare(
-  const NPContinuousKernelRowPlan *plan,
-  const NPContinuousKernelSegment *segment,
-  int evaluation_index,
-  int omitted_observation,
-  NPContinuousKernelRowResult *result);
-
 void np_continuous_kernel_row_workspace_release(
   NPContinuousKernelRowWorkspace *workspace);
 
