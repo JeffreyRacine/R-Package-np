@@ -1,5 +1,12 @@
 # npRmpi 0.70-6
 
+* Internal direct regression evaluators now enter native MPI collectives only
+  when the current call is executing symmetrically on every rank.  Master-only
+  fit, prediction, and test helpers remain local even when a slave pool is
+  active, preventing an unmatched collective wait; public auto-dispatched and
+  explicit broadcast regression calls retain their distributed owner and
+  estimator arithmetic.
+
 * Prepared local-polynomial conditional-density maximum-likelihood
   cross-validation now assigns each observation row to one MPI rank and
   reduces an order-preserving contribution vector once per objective. This

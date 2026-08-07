@@ -1430,7 +1430,7 @@ npreghat <-
   no.ex <- is.null(exdat)
   errors <- npValidateScalarLogical(errors, "errors")
   gradients <- npValidateScalarLogical(gradients, "gradients")
-  local.mode <- npValidateScalarLogical(local.mode, "local.mode")
+  local.mode <- .npRmpi_regression_native_local_mode(local.mode)
 
   txdat <- toFrame(txdat)
   if (!no.ex) {

@@ -393,6 +393,24 @@
   size >= 2L
 }
 
+.npRmpi_regression_native_local_mode <- function(local.mode = FALSE,
+                                                 comm = 1L) {
+  local.mode <- npValidateScalarLogical(local.mode, "local.mode")
+  if (local.mode)
+    return(TRUE)
+
+  ## A native regression call may use MPI collectives only when the current
+  ## R expression is executing symmetrically on every rank.  An active pool
+  ## alone is not sufficient: internal fit/predict helpers are also called
+  ## directly on the master.  Classify those calls positively as local so a
+  ## rank-local helper can never enter a collective without its workers.
+  if (isTRUE(.npRmpi_autodispatch_in_context()) ||
+      isTRUE(.npRmpi_autodispatch_called_from_bcast()))
+    return(FALSE)
+
+  .npRmpi_has_active_slave_pool(comm = comm)
+}
+
 .npRmpi_master_only_mode <- function(comm = 1L) {
   if (!isTRUE(getOption("npRmpi.master.only", FALSE)))
     return(FALSE)

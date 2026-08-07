@@ -183,3 +183,28 @@ test_that("beta regression validates bounds and general LP availability", {
   expect_s3_class(mixed_bw, "rbandwidth")
   expect_equal(mixed_bw$bw, c(0.1, 0.2))
 })
+
+test_that("native regression collectives require a rank-symmetric context", {
+  resolve_local <- getFromNamespace(
+    ".npRmpi_regression_native_local_mode", "npRmpi"
+  )
+
+  master_only <- testthat::with_mocked_bindings(
+    resolve_local(FALSE),
+    .npRmpi_autodispatch_in_context = function() FALSE,
+    .npRmpi_autodispatch_called_from_bcast = function() FALSE,
+    .npRmpi_has_active_slave_pool = function(comm = 1L) TRUE,
+    .package = "npRmpi"
+  )
+  symmetric <- testthat::with_mocked_bindings(
+    resolve_local(FALSE),
+    .npRmpi_autodispatch_in_context = function() TRUE,
+    .npRmpi_autodispatch_called_from_bcast = function() FALSE,
+    .npRmpi_has_active_slave_pool = function(comm = 1L) TRUE,
+    .package = "npRmpi"
+  )
+
+  expect_true(master_only)
+  expect_false(symmetric)
+  expect_true(resolve_local(TRUE))
+})
