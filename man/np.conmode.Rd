@@ -295,7 +295,9 @@ prediction/evaluation route, or plot route as appropriate.
     response level over two continuous conditioning variables; use
     \code{plot.vars} to name the displayed pair when more than two continuous
     conditioning variables are present; \code{renderer="rgl"} requests the
-    corresponding interactive surface when \pkg{rgl} is available. The public
+    corresponding interactive surface when \pkg{rgl} is available. Both
+    renderers use the package-wide viridis surface palette and neutral-gray
+    three-face reference grid. The public
     \code{output="both"} spelling is
     accepted as an alias for the historical \code{output="plot-data"}
     behavior. For class-probability plots, \code{errors="asymptotic"}

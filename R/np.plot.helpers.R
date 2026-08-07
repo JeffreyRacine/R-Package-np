@@ -11955,8 +11955,8 @@ plotFactor <- function(f, y, ...){
         y0 = pts$y[1L],
         x1 = pts$x[2L],
         y1 = pts$y[2L],
-        col = .np_plot_color("support_grid"),
-        lwd = .np_plot_lwd("support_grid")
+        col = .np_plot_color("surface_grid"),
+        lwd = .np_plot_lwd("surface_grid")
       ),
       grid.args
     )
@@ -11988,6 +11988,22 @@ plotFactor <- function(f, y, ...){
   invisible(TRUE)
 }
 
+.np_plot_render_surface_base_frame <- function(persp.args,
+                                               xlim,
+                                               ylim,
+                                               zlim,
+                                               grid.args = list()) {
+  persp.mat <- do.call(graphics::persp, persp.args)
+  .np_plot_draw_box_grid_persp(
+    xlim = xlim,
+    ylim = ylim,
+    zlim = zlim,
+    persp.mat = persp.mat,
+    grid.args = grid.args
+  )
+  persp.mat
+}
+
 .np_plot_match_renderer <- function(renderer) {
   match.arg(renderer, c("base", "rgl"))
 }
@@ -11999,22 +12015,41 @@ plotFactor <- function(f, y, ...){
   )
 }
 
+.np_plot_surface_palette <- function(num.colors = 1000L) {
+  grDevices::hcl.colors(as.integer(num.colors), palette = "viridis")
+}
+
+.np_plot_surface_alpha <- function(renderer = c("base", "rgl")) {
+  switch(match.arg(renderer), base = 0.5, rgl = 0.6)
+}
+
+.np_plot_surface_palette_values <- function(values,
+                                            z.range,
+                                            num.colors = 1000L) {
+  colorlut <- .np_plot_surface_palette(num.colors)
+  scaled <- 1L + floor(
+    (length(colorlut) - 1L) * (values - z.range[1L]) / diff(z.range)
+  )
+  scaled[!is.finite(scaled)] <- 1L
+  scaled <- pmax.int(1L, pmin.int(length(colorlut), scaled))
+  colorlut[scaled]
+}
+
 .np_plot_persp_surface_colors <- function(z, col = NULL, num.colors = 1000L) {
   if (!is.null(col))
     return(col)
 
   z <- as.matrix(z)
   z.range <- range(z, finite = TRUE)
-  palette_fun <- function(n) grDevices::hcl.colors(as.integer(n), palette = "viridis")
 
   if (!all(is.finite(z.range)))
-    return(palette_fun(1L))
+    return(.np_plot_surface_palette(1L))
 
   if (nrow(z) < 2L || ncol(z) < 2L)
-    return(palette_fun(1L))
+    return(.np_plot_surface_palette(1L))
 
   if (isTRUE(all.equal(z.range[1L], z.range[2L])))
-    return(palette_fun(1L))
+    return(.np_plot_surface_palette(1L))
 
   zfacet <- 0.25 * (
     z[-1L, -1L, drop = FALSE] +
@@ -12023,12 +12058,13 @@ plotFactor <- function(f, y, ...){
       z[-nrow(z), -ncol(z), drop = FALSE]
   )
 
-  colorlut <- palette_fun(num.colors)
-  scaled <- 1L + floor((length(colorlut) - 1L) * (zfacet - z.range[1L]) / diff(z.range))
-  scaled[!is.finite(scaled)] <- 1L
-  scaled <- pmax.int(1L, pmin.int(length(colorlut), scaled))
+  colors <- .np_plot_surface_palette_values(
+    values = zfacet,
+    z.range = z.range,
+    num.colors = num.colors
+  )
 
-  as.vector(matrix(colorlut[scaled], nrow = nrow(zfacet), ncol = ncol(zfacet)))
+  as.vector(matrix(colors, nrow = nrow(zfacet), ncol = ncol(zfacet)))
 }
 
 .np_plot_all_band_colors <- function() {
@@ -12068,7 +12104,7 @@ plotFactor <- function(f, y, ...){
     data_overlay = list(col = .np_plot_viridis_role(0.08), alpha = 0.35),
     support = list(col = .np_plot_viridis_role(0.12), alpha = 0.60),
     support_floor = list(col = .np_plot_viridis_role(0.18), alpha = 0.55),
-    support_grid = list(col = .np_plot_viridis_role(0.50), alpha = 0.45),
+    surface_grid = list(col = "gray", alpha = 1),
     component_context = list(col = .np_plot_viridis_role(0.68), alpha = 1),
     interval_context = list(col = .np_plot_viridis_role(0.78), alpha = 1),
     legend_bg = list(col = .np_plot_viridis_role(0.98), alpha = 0.18),
@@ -12107,7 +12143,7 @@ plotFactor <- function(f, y, ...){
     interval_surface = 2 * base,
     support = 1.25 * base,
     support_floor = 2 * base,
-    support_grid = 0.9 * base,
+    surface_grid = base,
     quantile_multi = 1.5 * base,
     component_context = base,
     stop("unknown plot line-width role: ", role, call. = FALSE)

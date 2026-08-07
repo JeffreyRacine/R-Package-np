@@ -1,5 +1,11 @@
 # npRmpi 0.70-6
 
+* Eligible bivariate surface plots now share one base-perspective frame owner,
+  one viridis palette mapper, and one neutral-gray three-face grid style across
+  the base and `rgl` renderers. The shared renderer is used by the regression,
+  density, distribution, conditional, semiparametric, conditional-mode, and
+  copula plot families; estimator and plot-data arithmetic are unchanged.
+
 * Internal direct regression evaluators now enter native MPI collectives only
   when the current call is executing symmetrically on every rank.  Master-only
   fit, prediction, and test helpers remain local even when a slave pool is

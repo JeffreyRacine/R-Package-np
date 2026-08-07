@@ -544,7 +544,7 @@
 
       persp.col = grDevices::adjustcolor(
         .np_plot_persp_surface_colors(z = treg, col = col),
-        alpha.f = 0.5
+        alpha.f = .np_plot_surface_alpha("base")
       )
       overlay.x1 <- xdat[,1]
       if (is.factor(overlay.x1) || is.ordered(overlay.x1))
@@ -585,14 +585,13 @@
                              phi = phi,
                              main = scalar_default(main, ""))
           persp.args <- .np_plot_merge_user_args(persp.args, persp.user.args)
-          persp.mat <- do.call(persp, persp.args)
-          .np_plot_first_render_end(first.render)
-          .np_plot_draw_box_grid_persp(
+          persp.mat <- .np_plot_render_surface_base_frame(
+            persp.args = persp.args,
             xlim = range(x1.eval, finite = TRUE),
             ylim = range(x2.eval, finite = TRUE),
-            zlim = zlim,
-            persp.mat = persp.mat
+            zlim = zlim
           )
+          .np_plot_first_render_end(first.render)
           if (plot.rug) {
             .np_plot_draw_floor_rug_persp(
               x1 = overlay.x1,
