@@ -79,7 +79,7 @@ test_that("the canonical beta row route has one unwind owner", {
   )
 
   fit_start <- regexpr(
-    "static NP_NOINLINE void np_beta_scalar_regression_fit_canonical(",
+    "static NP_NOINLINE int np_beta_scalar_regression_fit_block_canonical(",
     engine,
     fixed = TRUE
   )[[1L]]

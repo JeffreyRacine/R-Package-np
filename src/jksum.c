@@ -23579,13 +23579,55 @@ static int np_regression_prepared_bandwidth_copy(
   return 1;
 }
 
+enum {
+  NP_BETA_SCALAR_REGRESSION_FIT_OK = 0,
+  NP_BETA_SCALAR_REGRESSION_FIT_ERR_LAYOUT = 1,
+  NP_BETA_SCALAR_REGRESSION_FIT_ERR_CATEGORICAL_BANDWIDTH = 2,
+  NP_BETA_SCALAR_REGRESSION_FIT_ERR_PREPARED_BANDWIDTH = 3,
+  NP_BETA_SCALAR_REGRESSION_FIT_ERR_BANDWIDTH = 4,
+  NP_BETA_SCALAR_REGRESSION_FIT_ERR_ROUTE = 5,
+  NP_BETA_SCALAR_REGRESSION_FIT_ERR_MPI_LAYOUT = 6
+};
+
+static void np_beta_scalar_regression_fit_error(
+  const int status,
+  const np_beta_bandwidth_prepare_status bandwidth_status,
+  const NPContinuousKernelRowStatus row_status,
+  const NPContinuousKernelDerivativeDiagnostics *diagnostics)
+{
+  switch(status) {
+  case NP_BETA_SCALAR_REGRESSION_FIT_ERR_LAYOUT:
+    error("canonical beta regression route has an invalid layout");
+  case NP_BETA_SCALAR_REGRESSION_FIT_ERR_CATEGORICAL_BANDWIDTH:
+    error("\n** Error: invalid categorical bandwidth.");
+  case NP_BETA_SCALAR_REGRESSION_FIT_ERR_PREPARED_BANDWIDTH:
+    error("canonical beta regression route has an invalid prepared bandwidth view");
+  case NP_BETA_SCALAR_REGRESSION_FIT_ERR_BANDWIDTH:
+    error("\n** Error: %s.",
+          np_beta_bandwidth_prepare_status_message(bandwidth_status));
+  case NP_BETA_SCALAR_REGRESSION_FIT_ERR_ROUTE:
+    if(diagnostics != NULL && diagnostics->beta_status != NP_BETA_OK)
+      error("canonical beta regression row failed in continuous dimension %d: %s",
+            diagnostics->bad_coordinate + 1,
+            np_beta_status_message(diagnostics->beta_status));
+    if(row_status == NP_CONTINUOUS_ROW_ERR_ZERO_WEIGHT)
+      error("all beta regression weights are zero at an evaluation point");
+    error("canonical beta regression row failed: %s",
+          np_continuous_kernel_row_status_message(row_status));
+  case NP_BETA_SCALAR_REGRESSION_FIT_ERR_MPI_LAYOUT:
+    error("canonical beta regression MPI owner has an invalid layout");
+  default:
+    error("canonical beta regression route failed with an invalid status");
+  }
+}
+
 /*
- * Canonical scalar beta sibling.  The estimator owner remains
- * kernel_estimate_regression_categorical_tree_np(); this helper isolates the
- * beta signed-log row and bandwidth preparation from the large legacy/general
- * hot body so activating a beta capability cannot perturb its register layout.
+ * Canonical rank-local scalar beta sibling.  It owns no MPI policy: an
+ * operation owner may pass one contiguous evaluation view, while local and
+ * nested callers pass the complete view.  The beta signed-log mathematics
+ * and output arithmetic therefore remain single-source.
  */
-static NP_NOINLINE void np_beta_scalar_regression_fit_canonical(
+static NP_NOINLINE int np_beta_scalar_regression_fit_block_canonical(
   const int BANDWIDTH_reg,
   const int KERNEL_unordered_reg,
   const int KERNEL_ordered_reg,
@@ -23612,7 +23654,10 @@ static NP_NOINLINE void np_beta_scalar_regression_fit_canonical(
   NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
   const int categorical_compress,
   const NPRegressionStandardErrorMode standard_error_mode,
-  const NPContinuousPreparedBandwidthView *prepared_bandwidth)
+  const NPContinuousPreparedBandwidthView *prepared_bandwidth,
+  const int original_train_is_eval,
+  np_beta_bandwidth_prepare_status *bandwidth_status_out,
+  NPContinuousKernelRowStatus *row_status_out)
 {
   const int num_categorical = num_reg_unordered + num_reg_ordered;
   const int num_predictors = num_reg_continuous + num_categorical;
@@ -23632,6 +23677,11 @@ static NP_NOINLINE void np_beta_scalar_regression_fit_canonical(
   int route_status;
   int coordinate;
 
+  if(bandwidth_status_out != NULL)
+    *bandwidth_status_out = NP_BETA_BANDWIDTH_PREPARE_OK;
+  if(row_status_out != NULL)
+    *row_status_out = NP_CONTINUOUS_ROW_OK;
+
   if(np_continuous_kernel_route_validate(kernel_route,
                                          num_reg_continuous) !=
        NP_CKERNEL_ROUTE_OK ||
@@ -23645,7 +23695,7 @@ static NP_NOINLINE void np_beta_scalar_regression_fit_canonical(
      (categorical_compress != 0 && categorical_compress != 1) ||
      (standard_error_mode != NP_REGRESSION_STDERR_LOCAL_RESIDUAL &&
       standard_error_mode != NP_REGRESSION_STDERR_CONDITIONAL_INFLUENCE))
-    error("canonical beta regression route has an invalid layout");
+    return NP_BETA_SCALAR_REGRESSION_FIT_ERR_LAYOUT;
 
   operator = (int *)R_alloc((size_t)num_predictors, sizeof(int));
   for(coordinate = 0; coordinate < num_predictors; ++coordinate)
@@ -23674,7 +23724,7 @@ static NP_NOINLINE void np_beta_scalar_regression_fit_canonical(
        matrix_X_continuous_train, matrix_X_continuous_eval,
        NULL, matrix_bandwidth, lambda) == 1) {
     free_tmat(matrix_bandwidth);
-    error("\n** Error: invalid categorical bandwidth.");
+    return NP_BETA_SCALAR_REGRESSION_FIT_ERR_CATEGORICAL_BANDWIDTH;
   }
 
   if(BANDWIDTH_reg != BW_FIXED) {
@@ -23684,7 +23734,7 @@ static NP_NOINLINE void np_beta_scalar_regression_fit_canonical(
 
     if(prepared_status < 0) {
       free_tmat(matrix_bandwidth);
-      error("canonical beta regression route has an invalid prepared bandwidth view");
+      return NP_BETA_SCALAR_REGRESSION_FIT_ERR_PREPARED_BANDWIDTH;
     }
     if(prepared_status == 0) {
       const np_beta_bandwidth_prepare_status bandwidth_status =
@@ -23695,14 +23745,15 @@ static NP_NOINLINE void np_beta_scalar_regression_fit_canonical(
           matrix_X_continuous_train, matrix_X_continuous_eval,
           vector_scale_factor,
           num_obs_train, num_obs_eval, num_reg_continuous,
-          matrix_X_continuous_train == matrix_X_continuous_eval,
+          original_train_is_eval,
           BANDWIDTH_reg == BW_GEN_NN, BANDWIDTH_reg == BW_ADAP_NN,
           0, matrix_bandwidth, matrix_bandwidth);
 
       if(bandwidth_status != NP_BETA_BANDWIDTH_PREPARE_OK) {
+        if(bandwidth_status_out != NULL)
+          *bandwidth_status_out = bandwidth_status;
         free_tmat(matrix_bandwidth);
-        error("\n** Error: %s.",
-              np_beta_bandwidth_prepare_status_message(bandwidth_status));
+        return NP_BETA_SCALAR_REGRESSION_FIT_ERR_BANDWIDTH;
       }
     }
   }
@@ -23774,16 +23825,343 @@ static NP_NOINLINE void np_beta_scalar_regression_fit_canonical(
     route_status = np_beta_absolute_route(&route_call);
   }
 
+  if(row_status_out != NULL)
+    *row_status_out = regression_row_status;
   if(route_status != 0) {
-    if(kernel_route_diagnostics->beta_status != NP_BETA_OK)
-      error("canonical beta regression row failed in continuous dimension %d: %s",
-            kernel_route_diagnostics->bad_coordinate + 1,
-            np_beta_status_message(kernel_route_diagnostics->beta_status));
-    if(regression_row_status == NP_CONTINUOUS_ROW_ERR_ZERO_WEIGHT)
-      error("all beta regression weights are zero at an evaluation point");
-    error("canonical beta regression row failed: %s",
-          np_continuous_kernel_row_status_message(regression_row_status));
+    return NP_BETA_SCALAR_REGRESSION_FIT_ERR_ROUTE;
   }
+  return NP_BETA_SCALAR_REGRESSION_FIT_OK;
+}
+
+#ifdef MPI2
+static double **np_beta_scalar_regression_fit_matrix_view(
+  double ** const matrix,
+  const int columns,
+  const int offset)
+{
+  double **view;
+  int column;
+
+  if(columns <= 0)
+    return NULL;
+  if(matrix == NULL || offset < 0)
+    return NULL;
+  view = (double **)R_alloc((size_t)columns, (int)sizeof(*view));
+  for(column = 0; column < columns; ++column) {
+    if(matrix[column] == NULL)
+      return NULL;
+    view[column] = matrix[column] + offset;
+  }
+  return view;
+}
+
+static int np_beta_scalar_regression_prepared_view_slice(
+  const NPContinuousPreparedBandwidthView * const source,
+  const int bandwidth_mode,
+  const int num_obs_train,
+  const int num_obs_eval,
+  const int num_reg_continuous,
+  const int evaluation_start,
+  const int evaluation_count,
+  NPContinuousPreparedBandwidthView * const slice)
+{
+  if(source == NULL)
+    return 0;
+  if(slice == NULL || bandwidth_mode == BW_FIXED ||
+     source->bandwidth_mode != bandwidth_mode ||
+     source->num_train != num_obs_train ||
+     source->num_continuous != num_reg_continuous ||
+     source->evaluation_count != num_obs_eval ||
+     source->evaluation_offset < 0 || source->num_eval_total < num_obs_eval ||
+     source->evaluation_offset > source->num_eval_total - num_obs_eval ||
+     evaluation_start < 0 || evaluation_count <= 0 ||
+     evaluation_start > num_obs_eval - evaluation_count)
+    return -1;
+
+  *slice = *source;
+  slice->evaluation_offset += evaluation_start;
+  slice->evaluation_count = evaluation_count;
+  return 1;
+}
+#endif
+
+/*
+ * Operation owner for the scalar beta fit.  Active MPI partitions complete
+ * evaluation rows and invokes the same rank-local block on each contiguous
+ * view, and transports each requested result column once.  Nested conditional
+ * owners remain local so collectives are never entered recursively.
+ */
+static NP_NOINLINE void np_beta_scalar_regression_fit_canonical(
+  const int BANDWIDTH_reg,
+  const int KERNEL_unordered_reg,
+  const int KERNEL_ordered_reg,
+  const int num_obs_train,
+  const int num_obs_eval,
+  const int num_reg_unordered,
+  const int num_reg_ordered,
+  const int num_reg_continuous,
+  double **matrix_X_unordered_train,
+  double **matrix_X_ordered_train,
+  double **matrix_X_continuous_train,
+  double **matrix_X_unordered_eval,
+  double **matrix_X_ordered_eval,
+  double **matrix_X_continuous_eval,
+  const double *vector_Y,
+  double *vector_scale_factor,
+  int *num_categories,
+  double **matrix_categorical_vals,
+  double *mean,
+  double **gradient,
+  double *mean_stderr,
+  double **gradient_stderr,
+  const NPContinuousKernelRoute *kernel_route,
+  NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
+  const int categorical_compress,
+  const NPRegressionStandardErrorMode standard_error_mode,
+  const NPContinuousPreparedBandwidthView *prepared_bandwidth)
+{
+  const int original_train_is_eval =
+    matrix_X_continuous_train == matrix_X_continuous_eval;
+  np_beta_bandwidth_prepare_status bandwidth_status =
+    NP_BETA_BANDWIDTH_PREPARE_OK;
+  NPContinuousKernelRowStatus row_status = NP_CONTINUOUS_ROW_OK;
+  int status;
+
+#ifdef MPI2
+  if(iNum_Processors > 1 && !np_mpi_local_regression_active()) {
+    const int num_predictors =
+      num_reg_continuous + num_reg_unordered + num_reg_ordered;
+    const int stride =
+      num_obs_eval/iNum_Processors +
+      ((num_obs_eval%iNum_Processors) != 0);
+    size_t evaluation_start_size;
+    int evaluation_start;
+    int evaluation_count;
+    int *recvcounts;
+    int *displs;
+    int equal_counts = 0;
+    double **unordered_eval_view = NULL;
+    double **ordered_eval_view = NULL;
+    double **continuous_eval_view = NULL;
+    double **gradient_view = NULL;
+    double **gradient_stderr_view = NULL;
+    double **owned_prepared_matrix = NULL;
+    NPContinuousPreparedBandwidthView owned_prepared_view;
+    NPContinuousPreparedBandwidthView prepared_slice;
+    const NPContinuousPreparedBandwidthView *prepared_source =
+      prepared_bandwidth;
+    const NPContinuousPreparedBandwidthView *prepared_view = NULL;
+    NPContinuousKernelDerivativeDiagnostics local_diagnostics = {
+      .bad_coordinate = -1,
+      .bad_observation = -1,
+      .undefined_count = 0,
+      .beta_status = NP_BETA_OK
+    };
+    int failing_rank;
+    int payload[7];
+    int coordinate;
+
+    if(num_obs_eval <= 0 || stride <= 0 || num_predictors < 0) {
+      np_beta_scalar_regression_fit_error(
+        NP_BETA_SCALAR_REGRESSION_FIT_ERR_MPI_LAYOUT,
+        bandwidth_status, row_status, kernel_route_diagnostics);
+    }
+    evaluation_start_size = MIN(
+      (size_t)my_rank*(size_t)stride, (size_t)num_obs_eval);
+    evaluation_start = (int)evaluation_start_size;
+    evaluation_count = MIN(stride, num_obs_eval - evaluation_start);
+    recvcounts = (int *)R_alloc((size_t)iNum_Processors,
+                                (int)sizeof(*recvcounts));
+    displs = (int *)R_alloc((size_t)iNum_Processors,
+                            (int)sizeof(*displs));
+    if(!np_jksum_mpi_contiguous_row_layout(
+         num_obs_eval, stride, 1, recvcounts, displs, &equal_counts)) {
+      np_beta_scalar_regression_fit_error(
+        NP_BETA_SCALAR_REGRESSION_FIT_ERR_MPI_LAYOUT,
+        bandwidth_status, row_status, kernel_route_diagnostics);
+    }
+    (void)equal_counts;
+
+    /*
+     * Nearest-neighbour realization contains legacy rank-symmetric MPI
+     * collectives.  Complete it once on the unsliced invocation, then give
+     * every rank an immutable slice.  Entering it from unequal rank-local
+     * blocks would mismatch those collectives and would also repeat setup.
+     */
+    status = NP_BETA_SCALAR_REGRESSION_FIT_OK;
+    if(BANDWIDTH_reg != BW_FIXED && prepared_source == NULL) {
+      const int bandwidth_rows =
+        BANDWIDTH_reg == BW_GEN_NN ? num_obs_eval : num_obs_train;
+
+      owned_prepared_matrix = alloc_tmatd(
+        bandwidth_rows, num_reg_continuous);
+      bandwidth_status = np_beta_bandwidth_prepare_matrix(
+        BANDWIDTH_reg == BW_GEN_NN ?
+          NP_BETA_BANDWIDTH_GENERALIZED_NN :
+          NP_BETA_BANDWIDTH_ADAPTIVE_NN,
+        matrix_X_continuous_train, matrix_X_continuous_eval,
+        vector_scale_factor,
+        num_obs_train, num_obs_eval, num_reg_continuous,
+        original_train_is_eval,
+        BANDWIDTH_reg == BW_GEN_NN, BANDWIDTH_reg == BW_ADAP_NN,
+        0, owned_prepared_matrix, owned_prepared_matrix);
+      if(bandwidth_status != NP_BETA_BANDWIDTH_PREPARE_OK) {
+        status = NP_BETA_SCALAR_REGRESSION_FIT_ERR_BANDWIDTH;
+      } else {
+        owned_prepared_view.bandwidth_mode = BANDWIDTH_reg;
+        owned_prepared_view.num_train = num_obs_train;
+        owned_prepared_view.num_eval_total = num_obs_eval;
+        owned_prepared_view.num_continuous = num_reg_continuous;
+        owned_prepared_view.evaluation_offset = 0;
+        owned_prepared_view.evaluation_count = num_obs_eval;
+        owned_prepared_view.bandwidth_eval =
+          BANDWIDTH_reg == BW_GEN_NN ? owned_prepared_matrix : NULL;
+        owned_prepared_view.bandwidth_train =
+          BANDWIDTH_reg == BW_ADAP_NN ? owned_prepared_matrix : NULL;
+        prepared_source = &owned_prepared_view;
+      }
+    }
+
+    if(status == NP_BETA_SCALAR_REGRESSION_FIT_OK && evaluation_count > 0) {
+      unordered_eval_view = np_beta_scalar_regression_fit_matrix_view(
+        matrix_X_unordered_eval, num_reg_unordered, evaluation_start);
+      ordered_eval_view = np_beta_scalar_regression_fit_matrix_view(
+        matrix_X_ordered_eval, num_reg_ordered, evaluation_start);
+      continuous_eval_view = np_beta_scalar_regression_fit_matrix_view(
+        matrix_X_continuous_eval, num_reg_continuous, evaluation_start);
+      if((num_reg_unordered > 0 && unordered_eval_view == NULL) ||
+         (num_reg_ordered > 0 && ordered_eval_view == NULL) ||
+         (num_reg_continuous > 0 && continuous_eval_view == NULL))
+        status = NP_BETA_SCALAR_REGRESSION_FIT_ERR_MPI_LAYOUT;
+
+      if(status == NP_BETA_SCALAR_REGRESSION_FIT_OK && gradient != NULL) {
+        gradient_view = np_beta_scalar_regression_fit_matrix_view(
+          gradient, num_predictors, evaluation_start);
+        if(gradient_view == NULL)
+          status = NP_BETA_SCALAR_REGRESSION_FIT_ERR_MPI_LAYOUT;
+      }
+      if(status == NP_BETA_SCALAR_REGRESSION_FIT_OK &&
+         gradient_stderr != NULL) {
+        gradient_stderr_view = np_beta_scalar_regression_fit_matrix_view(
+          gradient_stderr, num_predictors, evaluation_start);
+        if(gradient_stderr_view == NULL)
+          status = NP_BETA_SCALAR_REGRESSION_FIT_ERR_MPI_LAYOUT;
+      }
+      if(status == NP_BETA_SCALAR_REGRESSION_FIT_OK &&
+         prepared_source != NULL) {
+        const int prepared_status =
+          np_beta_scalar_regression_prepared_view_slice(
+            prepared_source, BANDWIDTH_reg,
+            num_obs_train, num_obs_eval, num_reg_continuous,
+            evaluation_start, evaluation_count, &prepared_slice);
+        if(prepared_status < 0)
+          status = NP_BETA_SCALAR_REGRESSION_FIT_ERR_PREPARED_BANDWIDTH;
+        else if(prepared_status > 0)
+          prepared_view = &prepared_slice;
+      }
+      if(status == NP_BETA_SCALAR_REGRESSION_FIT_OK)
+        status = np_beta_scalar_regression_fit_block_canonical(
+          BANDWIDTH_reg, KERNEL_unordered_reg, KERNEL_ordered_reg,
+          num_obs_train, evaluation_count,
+          num_reg_unordered, num_reg_ordered, num_reg_continuous,
+          matrix_X_unordered_train, matrix_X_ordered_train,
+          matrix_X_continuous_train,
+          unordered_eval_view, ordered_eval_view, continuous_eval_view,
+          vector_Y, vector_scale_factor,
+          num_categories, matrix_categorical_vals,
+          mean + evaluation_start, gradient_view,
+          mean_stderr == NULL ? NULL : mean_stderr + evaluation_start,
+          gradient_stderr_view,
+          kernel_route, &local_diagnostics, categorical_compress,
+          standard_error_mode, prepared_view, original_train_is_eval,
+          &bandwidth_status, &row_status);
+    }
+    if(owned_prepared_matrix != NULL)
+      free_tmat(owned_prepared_matrix);
+
+    failing_rank =
+      status == NP_BETA_SCALAR_REGRESSION_FIT_OK ?
+      iNum_Processors : my_rank;
+    MPI_Allreduce(MPI_IN_PLACE, &failing_rank, 1, MPI_INT, MPI_MIN, comm[1]);
+    if(failing_rank < iNum_Processors) {
+      if(my_rank == failing_rank) {
+        payload[0] = status;
+        payload[1] = (int)bandwidth_status;
+        payload[2] = (int)row_status;
+        payload[3] = local_diagnostics.bad_coordinate;
+        payload[4] = local_diagnostics.bad_observation;
+        payload[5] = local_diagnostics.undefined_count;
+        payload[6] = (int)local_diagnostics.beta_status;
+      }
+      MPI_Bcast(payload, 7, MPI_INT, failing_rank, comm[1]);
+      if(kernel_route_diagnostics != NULL) {
+        kernel_route_diagnostics->bad_coordinate = payload[3];
+        kernel_route_diagnostics->bad_observation = payload[4];
+        kernel_route_diagnostics->undefined_count = payload[5];
+        kernel_route_diagnostics->beta_status = (np_beta_status)payload[6];
+      }
+      np_beta_scalar_regression_fit_error(
+        payload[0], (np_beta_bandwidth_prepare_status)payload[1],
+        (NPContinuousKernelRowStatus)payload[2], kernel_route_diagnostics);
+    }
+
+    np_mpi_allgatherv_in_place_double(
+      evaluation_count, mean, recvcounts, displs,
+      "beta scalar regression mean MPI_Allgatherv");
+    if(mean_stderr != NULL)
+      np_mpi_allgatherv_in_place_double(
+        evaluation_count, mean_stderr, recvcounts, displs,
+        "beta scalar regression standard error MPI_Allgatherv");
+    for(coordinate = 0; coordinate < num_predictors; ++coordinate) {
+      if(gradient != NULL)
+        np_mpi_allgatherv_in_place_double(
+          evaluation_count, gradient[coordinate], recvcounts, displs,
+          "beta scalar regression gradient MPI_Allgatherv");
+      if(gradient_stderr != NULL)
+        np_mpi_allgatherv_in_place_double(
+          evaluation_count, gradient_stderr[coordinate], recvcounts, displs,
+          "beta scalar regression gradient standard error MPI_Allgatherv");
+    }
+
+    {
+      const int diagnostics_rank =
+        MIN(iNum_Processors - 1, (num_obs_eval - 1)/stride);
+      if(my_rank == diagnostics_rank) {
+        payload[0] = local_diagnostics.bad_coordinate;
+        payload[1] = local_diagnostics.bad_observation;
+        payload[2] = local_diagnostics.undefined_count;
+        payload[3] = (int)local_diagnostics.beta_status;
+      }
+      MPI_Bcast(payload, 4, MPI_INT, diagnostics_rank, comm[1]);
+      if(kernel_route_diagnostics != NULL) {
+        kernel_route_diagnostics->bad_coordinate = payload[0];
+        kernel_route_diagnostics->bad_observation = payload[1];
+        kernel_route_diagnostics->undefined_count = payload[2];
+        kernel_route_diagnostics->beta_status = (np_beta_status)payload[3];
+      }
+    }
+    np_progress_fit_loop_step(num_obs_eval, num_obs_eval);
+    return;
+  }
+#endif
+
+  status = np_beta_scalar_regression_fit_block_canonical(
+    BANDWIDTH_reg, KERNEL_unordered_reg, KERNEL_ordered_reg,
+    num_obs_train, num_obs_eval,
+    num_reg_unordered, num_reg_ordered, num_reg_continuous,
+    matrix_X_unordered_train, matrix_X_ordered_train,
+    matrix_X_continuous_train,
+    matrix_X_unordered_eval, matrix_X_ordered_eval,
+    matrix_X_continuous_eval,
+    vector_Y, vector_scale_factor,
+    num_categories, matrix_categorical_vals,
+    mean, gradient, mean_stderr, gradient_stderr,
+    kernel_route, kernel_route_diagnostics, categorical_compress,
+    standard_error_mode, prepared_bandwidth, original_train_is_eval,
+    &bandwidth_status, &row_status);
+  if(status != NP_BETA_SCALAR_REGRESSION_FIT_OK)
+    np_beta_scalar_regression_fit_error(
+      status, bandwidth_status, row_status, kernel_route_diagnostics);
 }
 
 /*

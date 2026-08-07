@@ -718,6 +718,12 @@ test_that("scalar beta regression fits enter the canonical row engine", {
   expect_gt(sibling_start, 0L)
   expect_lt(sibling_start, engine_start)
   regression_sibling <- substr(engine, sibling_start, engine_start - 1L)
+  scalar_family_start <- regexpr(
+    "static void np_beta_scalar_regression_fit_error(",
+    engine, fixed = TRUE
+  )[[1L]]
+  expect_gt(scalar_family_start, 0L)
+  scalar_family <- substr(engine, scalar_family_start, engine_start - 1L)
   expect_match(regression_engine, "if(NP_UNLIKELY(kernel_route != NULL)",
                fixed = TRUE)
   expect_match(
@@ -731,9 +737,9 @@ test_that("scalar beta regression fits enter the canonical row engine", {
   expect_match(
     regression_sibling, "np_beta_bandwidth_prepare_matrix(", fixed = TRUE
   )
-  expect_match(regression_sibling, "NPBetaRegressionMomentCtx", fixed = TRUE)
+  expect_match(scalar_family, "NPBetaRegressionMomentCtx", fixed = TRUE)
   expect_match(
-    regression_sibling,
+    scalar_family,
     "static NP_NOINLINE int np_beta_regression_lp_moment_row_canonical(",
     fixed = TRUE
   )
@@ -746,16 +752,16 @@ test_that("scalar beta regression fits enter the canonical row engine", {
     fixed = TRUE
   )
   expect_match(
-    regression_sibling,
+    scalar_family,
     ".regression_moment_context = &regression_moment_context,",
     fixed = TRUE
   )
   expect_match(
-    regression_sibling, ".route_diagnostics = kernel_route_diagnostics,",
+    scalar_family, ".route_diagnostics = kernel_route_diagnostics,",
     fixed = TRUE
   )
   expect_match(
-    regression_sibling, "error(\"canonical beta regression row failed:",
+    scalar_family, "error(\"canonical beta regression row failed:",
     fixed = TRUE
   )
   expect_false(grepl("NPBetaRegressionMomentCtx", regression_engine,
@@ -1550,7 +1556,11 @@ test_that("every beta side enters the common conditional regression owner", {
   ))
   expect_match(
     engine,
-    "if(prepared_status < 0) {\n      free_tmat(matrix_bandwidth);\n      error(",
+    paste0(
+      "if(prepared_status < 0) {\n",
+      "      free_tmat(matrix_bandwidth);\n",
+      "      return NP_BETA_SCALAR_REGRESSION_FIT_ERR_PREPARED_BANDWIDTH;"
+    ),
     fixed = TRUE
   )
   expect_match(
