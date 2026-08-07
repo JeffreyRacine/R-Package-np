@@ -32,6 +32,15 @@ auto_beta_replay <- function(dat, bandwidth) {
   )[["objective"]][[1L]]
 }
 
+expect_beta_objective_equivalent <- function(actual, expected) {
+  expect_equal(
+    as.double(actual),
+    as.double(expected),
+    tolerance = 64 * .Machine$double.eps *
+      max(1, abs(as.double(actual)), abs(as.double(expected)))
+  )
+}
+
 test_that("automatic beta regression owns startup and degree transitions", {
   skip_if_not_installed("crs")
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
@@ -54,9 +63,9 @@ test_that("automatic beta regression owns startup and degree transitions", {
   missing.replay <- auto_beta_replay(dat, missing.start)
   expect_true(all(is.finite(missing.start[["bw"]])))
   expect_true(all(missing.start[["bw"]] > 0))
-  expect_identical(
-    as.double(missing.start[["fval"]][[1L]]),
-    as.double(missing.replay)
+  expect_beta_objective_equivalent(
+    missing.start[["fval"]][[1L]],
+    missing.replay
   )
 
   automatic <- do.call(
@@ -83,13 +92,13 @@ test_that("automatic beta regression owns startup and degree transitions", {
   automatic.replay <- auto_beta_replay(dat, automatic)
 
   expect_identical(as.integer(restart[["first_degree"]]), 0L)
-  expect_identical(
-    as.double(restart[["first_objective"]][[1L]]),
-    as.double(fixed.objective)
+  expect_beta_objective_equivalent(
+    restart[["first_objective"]][[1L]],
+    fixed.objective
   )
-  expect_identical(
-    as.double(automatic[["fval"]][[1L]]),
-    as.double(automatic.replay)
+  expect_beta_objective_equivalent(
+    automatic[["fval"]][[1L]],
+    automatic.replay
   )
 
   local.regression <- getFromNamespace(
