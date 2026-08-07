@@ -19388,6 +19388,257 @@ static NP_NOINLINE int np_regression_cv_lp_continuous_route(
 }
 
 /*
+ * Keep fixed wider-LP CVAIC ownership independent of the qualified CVLS/local
+ * dispatcher above.  This explicit sibling prevents compiler inlining and
+ * code-placement changes in the incumbent paths while retaining the same
+ * hoisted basis, LP influence-row algebra, canonical contribution order, and
+ * owner cleanup contract.  Its O(2n) buffer stores loss followed by leverage.
+ */
+static int np_regression_cv_lp_cvaic_continuous_route_parallel_body(
+  const NPRegressionCvScalarRouteCall *call,
+  NPRegressionCvLPRouteOwner *owner)
+{
+  const int num_obs = call->num_obs;
+  const int num_reg_unordered = call->num_reg_unordered;
+  const int num_reg_ordered = call->num_reg_ordered;
+  const int num_reg_continuous = call->num_reg_continuous;
+  const int num_reg =
+    num_reg_continuous + num_reg_unordered + num_reg_ordered;
+  const int use_bernstein = (int_glp_bernstein_extern != 0);
+  NPBetaScaledRowContext * const row_context = &owner->row_context;
+  NPReghatLPWorkspace * const lp_workspace = &owner->lp_workspace;
+  NPContinuousKernelRowStatus row_status = NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  double **matrix_bandwidth = NULL;
+  double *contributions = NULL;
+  double cv = 0.0;
+  double traceH = 0.0;
+  int nterms = 0;
+  int contribution_count;
+  int owned_start = 0;
+  int owned_rows = 0;
+  int local_fail = 0;
+  int evaluation;
+
+  if(call->objective == NULL || num_obs < 2 || num_reg_continuous <= 0 ||
+     call->matrix_X_continuous == NULL || call->response == NULL ||
+     call->scale_factor == NULL || call->kernel_route == NULL ||
+     call->kernel_route_diagnostics == NULL || call->bwm != RBWM_CVAIC ||
+     call->bandwidth_mode != BW_FIXED ||
+     (call->categorical_compress != 0 && call->categorical_compress != 1) ||
+     num_obs > INT_MAX/2)
+    return 1;
+
+  contribution_count = 2*num_obs;
+  if(np_objective_outer_buffer_prepare(
+       1, (size_t)contribution_count, &owner->contributions) != 0)
+    return 1;
+  contributions = owner->contributions;
+
+  if(!np_glp_cv_cache.ready ||
+     (np_glp_cv_cache.use_bernstein != use_bernstein) ||
+     (np_glp_cv_cache.basis_mode != int_glp_basis_extern) ||
+     (np_glp_cv_cache.num_obs != num_obs) ||
+     (np_glp_cv_cache.ncon != num_reg_continuous) ||
+     (np_glp_cv_cache.matrix_X_continuous_train_ptr !=
+      call->matrix_X_continuous)) {
+    if(!np_glp_cv_cache_prepare(NP_LP_ENGINE_GENERAL, num_obs,
+                                num_reg_continuous,
+                                call->matrix_X_continuous))
+      local_fail = 1;
+  }
+  if(!local_fail &&
+     (!np_glp_cv_cache.ready || np_glp_cv_cache.basis == NULL ||
+      np_glp_cv_cache.terms == NULL || np_glp_cv_cache.nterms <= 1))
+    local_fail = 1;
+  if(!local_fail) {
+    nterms = np_glp_cv_cache.nterms;
+    if(np_reghat_lp_workspace_prepare_columns(
+         lp_workspace, np_glp_cv_cache.basis, num_obs, nterms) !=
+       NP_REGHAT_LP_ROW_OK)
+      local_fail = 1;
+  }
+
+  if(!local_fail) {
+    owner->operator = (int *)np_jksum_malloc_array_try(
+      (size_t)MAX(1, num_reg), sizeof(*owner->operator));
+    owner->kernel_u = (int *)np_jksum_malloc_array_try(
+      (size_t)MAX(1, num_reg_unordered), sizeof(*owner->kernel_u));
+    owner->kernel_o = (int *)np_jksum_malloc_array_try(
+      (size_t)MAX(1, num_reg_ordered), sizeof(*owner->kernel_o));
+    owner->lambda = (double *)np_jksum_malloc_array_try(
+      (size_t)MAX(1, num_reg_unordered + num_reg_ordered),
+      sizeof(*owner->lambda));
+    owner->row = (double *)np_jksum_malloc_array_try(
+      (size_t)num_obs, sizeof(*owner->row));
+    owner->influence_row = (double *)np_jksum_malloc_array_try(
+      (size_t)num_obs, sizeof(*owner->influence_row));
+    owner->eval_basis = (double *)np_jksum_malloc_array_try(
+      (size_t)nterms, sizeof(*owner->eval_basis));
+    owner->matrix_bandwidth_columns = num_reg_continuous;
+    owner->matrix_bandwidth = np_objective_outer_matrix_try(
+      1, num_reg_continuous);
+    matrix_bandwidth = owner->matrix_bandwidth;
+    if(owner->operator == NULL || owner->kernel_u == NULL ||
+       owner->kernel_o == NULL || owner->lambda == NULL ||
+       owner->row == NULL || owner->influence_row == NULL ||
+       owner->eval_basis == NULL || matrix_bandwidth == NULL)
+      local_fail = 1;
+  }
+
+  if(!local_fail) {
+    for(evaluation = 0; evaluation < num_reg; ++evaluation)
+      owner->operator[evaluation] = OP_NORMAL;
+    for(evaluation = 0; evaluation < num_reg_unordered; ++evaluation)
+      owner->kernel_u[evaluation] = call->kernel_unordered;
+    for(evaluation = 0; evaluation < num_reg_ordered; ++evaluation)
+      owner->kernel_o[evaluation] = call->kernel_ordered;
+  }
+
+  if(!local_fail && np_beta_continuous_bandwidth_prepare_canonical(
+       BW_FIXED, num_obs, num_obs,
+       num_reg_unordered, num_reg_ordered, num_reg_continuous,
+       call->matrix_X_continuous, call->matrix_X_continuous,
+       call->scale_factor, matrix_bandwidth, NULL,
+       owner->lambda, NULL) != 0)
+    local_fail = 1;
+
+  if(!local_fail) {
+    row_status = np_beta_scaled_row_context_prepare(
+      row_context, call->kernel_route, call->kernel_route_diagnostics,
+      BW_FIXED, num_obs, num_obs, num_reg_continuous,
+      num_reg_unordered, num_reg_ordered,
+      call->matrix_X_continuous, call->matrix_X_continuous,
+      call->matrix_X_unordered, call->matrix_X_unordered,
+      call->matrix_X_ordered, call->matrix_X_ordered,
+      matrix_bandwidth, matrix_bandwidth, owner->operator,
+      owner->kernel_u, owner->kernel_o, owner->lambda,
+      call->num_categories, matrix_categorical_vals_extern,
+      call->categorical_compress, owner->row);
+    if(row_status != NP_CONTINUOUS_ROW_OK)
+      local_fail = 1;
+  }
+
+  np_objective_outer_owned_rows(
+    0, num_obs, 1, &owned_start, &owned_rows);
+  for(evaluation = owned_start;
+      evaluation < owned_start + owned_rows && !local_fail;
+      ++evaluation) {
+    double fitted = 0.0;
+    double leverage;
+    double residual;
+    int observation;
+    int term;
+
+    if((evaluation & 31) == 0)
+      np_progress_bandwidth_loop_step();
+    row_status = np_beta_scaled_row_context_fill(
+      row_context, evaluation, NULL, NULL);
+    if(row_status != NP_CONTINUOUS_ROW_OK) {
+      local_fail = 1;
+      break;
+    }
+    for(term = 0; term < nterms; ++term)
+      owner->eval_basis[term] =
+        np_glp_cv_cache.basis[term][evaluation];
+    if(np_reghat_lp_workspace_influence_row(
+         lp_workspace, owner->row, owner->eval_basis,
+         owner->influence_row, 1U) != NP_REGHAT_LP_ROW_OK) {
+      local_fail = 1;
+      break;
+    }
+    for(observation = 0; observation < num_obs; ++observation)
+      fitted += owner->influence_row[observation]*call->response[observation];
+    leverage = owner->influence_row[evaluation];
+    residual = call->response[evaluation] - fitted;
+    contributions[evaluation] = residual*residual;
+    contributions[num_obs + evaluation] = leverage;
+    if(!R_FINITE(contributions[evaluation]) || !R_FINITE(leverage)) {
+      local_fail = 1;
+      break;
+    }
+  }
+
+  if(np_objective_outer_buffer_finish(
+       1, contribution_count, local_fail, contributions,
+       "NP_RMPI_INJECT_REG_ROUTED_CV_FAIL_RANK",
+       "regression routed LP CVAIC contributions MPI_Allreduce") != 0)
+    return 1;
+  for(evaluation = 0; evaluation < num_obs; ++evaluation) {
+    cv += contributions[evaluation];
+    traceH += contributions[num_obs + evaluation];
+    if(!R_FINITE(cv) || !R_FINITE(traceH))
+      return 1;
+  }
+  if(np_regression_cv_finish_objective(
+       RBWM_CVAIC, num_obs, cv, traceH, call->objective) != 0)
+    return 1;
+
+  return 0;
+}
+
+static SEXP np_regression_cv_lp_cvaic_route_execute(void *data)
+{
+  NPRegressionCvLPRouteExecution * const execution =
+    (NPRegressionCvLPRouteExecution *)data;
+
+  execution->status =
+    np_regression_cv_lp_cvaic_continuous_route_parallel_body(
+      execution->call, &execution->owner);
+  return R_NilValue;
+}
+
+static NP_NOINLINE int np_regression_cv_lp_cvaic_continuous_route_parallel(
+  const int bwm,
+  const int KERNEL_unordered_reg,
+  const int KERNEL_ordered_reg,
+  const int BANDWIDTH_reg,
+  const int num_obs,
+  const int num_reg_unordered,
+  const int num_reg_ordered,
+  const int num_reg_continuous,
+  double **matrix_X_unordered,
+  double **matrix_X_ordered,
+  double **matrix_X_continuous,
+  double *vector_Y,
+  double *vector_scale_factor,
+  int *num_categories,
+  const NPContinuousKernelRoute * const kernel_route,
+  NPContinuousKernelDerivativeDiagnostics * const kernel_route_diagnostics,
+  const int categorical_compress,
+  double * const objective)
+{
+  const NPRegressionCvScalarRouteCall call = {
+    bwm,
+    KERNEL_unordered_reg,
+    KERNEL_ordered_reg,
+    BANDWIDTH_reg,
+    num_obs,
+    num_reg_unordered,
+    num_reg_ordered,
+    num_reg_continuous,
+    matrix_X_unordered,
+    matrix_X_ordered,
+    matrix_X_continuous,
+    vector_Y,
+    vector_scale_factor,
+    num_categories,
+    kernel_route,
+    kernel_route_diagnostics,
+    categorical_compress,
+    objective
+  };
+  NPRegressionCvLPRouteExecution execution;
+
+  execution.call = &call;
+  execution.status = 1;
+  np_regression_cv_lp_route_owner_init(&execution.owner);
+  R_UnwindProtect(
+    np_regression_cv_lp_cvaic_route_execute, &execution,
+    np_regression_cv_lp_route_owner_cleanup, &execution.owner, NULL);
+  return execution.status;
+}
+
+/*
  * Isolated route-bearing sibling for canonical continuous-kernel activation.
  * The incumbent ABI and hot body above stay literal. Null route state still
  * delegates to that exact owner; admitted route state must complete through
@@ -19448,14 +19699,26 @@ const int categorical_compress)
          &objective) != 0)
       return DBL_MAX;
   } else {
-    if(np_regression_cv_lp_continuous_route(
-         bwm, KERNEL_unordered_reg, KERNEL_ordered_reg, BANDWIDTH_reg,
-         num_obs, num_reg_unordered, num_reg_ordered, num_reg_continuous,
-         matrix_X_unordered, matrix_X_ordered, matrix_X_continuous,
-         vector_Y, vector_scale_factor, num_categories,
-         kernel_route, kernel_route_diagnostics, categorical_compress,
-         &objective) != 0)
-      return DBL_MAX;
+    if(np_objective_outer_rows_enabled(
+         bwm == RBWM_CVAIC && BANDWIDTH_reg == BW_FIXED)) {
+      if(np_regression_cv_lp_cvaic_continuous_route_parallel(
+           bwm, KERNEL_unordered_reg, KERNEL_ordered_reg, BANDWIDTH_reg,
+           num_obs, num_reg_unordered, num_reg_ordered, num_reg_continuous,
+           matrix_X_unordered, matrix_X_ordered, matrix_X_continuous,
+           vector_Y, vector_scale_factor, num_categories,
+           kernel_route, kernel_route_diagnostics, categorical_compress,
+           &objective) != 0)
+        return DBL_MAX;
+    } else {
+      if(np_regression_cv_lp_continuous_route(
+           bwm, KERNEL_unordered_reg, KERNEL_ordered_reg, BANDWIDTH_reg,
+           num_obs, num_reg_unordered, num_reg_ordered, num_reg_continuous,
+           matrix_X_unordered, matrix_X_ordered, matrix_X_continuous,
+           vector_Y, vector_scale_factor, num_categories,
+           kernel_route, kernel_route_diagnostics, categorical_compress,
+           &objective) != 0)
+        return DBL_MAX;
+    }
   }
   return objective;
 }

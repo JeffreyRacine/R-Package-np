@@ -147,6 +147,87 @@ test_that("wider LP owner admits fixed CVLS only", {
   expect_false(grepl("BW_ADAP_NN", gate, fixed = TRUE))
 })
 
+test_that("fixed wider LP CVAIC has an isolated complete-row MPI sibling", {
+  source <- npreg_beta_cv_mpi_source()
+  skip_if(is.null(source), "package C source unavailable")
+
+  body <- npreg_beta_cv_mpi_body(
+    source,
+    "static int np_regression_cv_lp_cvaic_continuous_route_parallel_body(",
+    "static SEXP np_regression_cv_lp_cvaic_route_execute"
+  )
+  expect_match(body, "call->bwm != RBWM_CVAIC", fixed = TRUE)
+  expect_match(body, "call->bandwidth_mode != BW_FIXED", fixed = TRUE)
+  expect_match(body, "num_obs > INT_MAX/2", fixed = TRUE)
+  expect_match(body, "contribution_count = 2*num_obs;", fixed = TRUE)
+  expect_match(body, "np_objective_outer_buffer_prepare(", fixed = TRUE)
+  expect_match(body, "np_objective_outer_owned_rows(", fixed = TRUE)
+  expect_match(
+    body,
+    "contributions[evaluation] = residual*residual;",
+    fixed = TRUE
+  )
+  expect_match(
+    body,
+    "contributions[num_obs + evaluation] = leverage;",
+    fixed = TRUE
+  )
+  expect_match(body, "np_objective_outer_buffer_finish(", fixed = TRUE)
+  expect_match(
+    body,
+    '"NP_RMPI_INJECT_REG_ROUTED_CV_FAIL_RANK"',
+    fixed = TRUE
+  )
+  expect_match(
+    body,
+    "RBWM_CVAIC, num_obs, cv, traceH, call->objective",
+    fixed = TRUE
+  )
+  expect_false(grepl("np_lp_delete_denominator", body, fixed = TRUE))
+  expect_false(grepl("evaluation % iNum_Processors", body, fixed = TRUE))
+  expect_false(grepl("MPI_Allreduce(", body, fixed = TRUE))
+  expect_false(grepl("alloc_matd(num_obs, num_obs)", body, fixed = TRUE))
+  expect_false(grepl("diag(num_obs)", body, fixed = TRUE))
+})
+
+test_that("fixed wider LP CVAIC dispatch cannot fall back silently", {
+  source <- npreg_beta_cv_mpi_source()
+  skip_if(is.null(source), "package C source unavailable")
+
+  wrapper <- npreg_beta_cv_mpi_body(
+    source,
+    "static NP_NOINLINE int np_regression_cv_lp_cvaic_continuous_route_parallel(",
+    "/*\n * Isolated route-bearing sibling for canonical continuous-kernel activation."
+  )
+  expect_match(wrapper, "R_UnwindProtect(", fixed = TRUE)
+  expect_match(
+    wrapper,
+    "np_regression_cv_lp_route_owner_cleanup",
+    fixed = TRUE
+  )
+
+  route <- npreg_beta_cv_mpi_body(
+    source,
+    "double np_kernel_estimate_regression_categorical_ls_aic_ctx(",
+    "typedef struct {\n  int nprof_train;"
+  )
+  expect_match(
+    route,
+    "bwm == RBWM_CVAIC && BANDWIDTH_reg == BW_FIXED",
+    fixed = TRUE
+  )
+  expect_match(
+    route,
+    "np_regression_cv_lp_cvaic_continuous_route_parallel(",
+    fixed = TRUE
+  )
+  expect_match(
+    route,
+    ") != 0)\n        return DBL_MAX;\n    } else {",
+    fixed = TRUE
+  )
+})
+
 test_that("incumbent local wider LP hot loop remains ownership-free", {
   source <- npreg_beta_cv_mpi_source()
   skip_if(is.null(source), "package C source unavailable")
