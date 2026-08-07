@@ -42145,7 +42145,6 @@ static NP_NOINLINE int np_conditional_density_cvml_continuous_route(
   int status = 1;
   NPCVLSWorkspaceStatus workspace_status = NP_CVLS_WORKSPACE_OK;
   const int use_parallel_rows =
-    BANDWIDTH_den == BW_FIXED &&
     np_conditional_cvml_prepared_outer_rows_enabled();
 
   if(cv == NULL || vector_scale_factor == NULL || num_obs < 2 ||

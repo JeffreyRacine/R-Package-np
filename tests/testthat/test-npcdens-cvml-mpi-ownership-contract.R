@@ -90,7 +90,7 @@ test_that("routed beta CVML uses the canonical prepared outer-row owner", {
     "np_conditional_cvml_prepared_outer_rows_enabled()",
     fixed = TRUE
   )
-  expect_match(routed, "BANDWIDTH_den == BW_FIXED", fixed = TRUE)
+  expect_false(grepl("BANDWIDTH_den == BW_FIXED", routed, fixed = TRUE))
   expect_match(
     routed,
     "np_conditional_cvml_contributions_prepare(",
