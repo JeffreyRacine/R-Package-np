@@ -38283,6 +38283,7 @@ double *cv){
   double *kx = NULL, *kyn = NULL, *kyc = NULL;
   double *kx_cache = NULL, *kyn_cache = NULL, *kyc_cache = NULL;
   double *kernel_workspace = NULL;
+  double *profile_terms = NULL;
   double *den_full = NULL;
   double *lambda_x = NULL, *lambda_y = NULL;
   double *vsfx = NULL, *vsfy = NULL;
@@ -38304,6 +38305,10 @@ double *cv){
   int x_cache_rows = 0, yn_cache_rows = 0, yc_cache_rows = 0;
   int profile_group_width = 1;
   int x_scratch_rows = 1, yn_scratch_rows = 1;
+  int owned_profile_start = 0, owned_profile_rows = 0;
+  int local_profile_fail = 0;
+  int profile_interrupt_stride = 0;
+  int use_parallel_profiles = 0;
   int local_preflight_status =
     (int)NP_CONDITIONAL_PROFILE_CV_FAILURE;
   int global_preflight_status =
@@ -38508,6 +38513,18 @@ double *cv){
   if(!use_x_cache && !use_yn_cache && !use_yc_cache)
     profile_group_width =
       MIN(NP_CDENS_PROFILE_GROUP_WIDTH, nprof_xy);
+
+  /*
+   * Ownership pays only when every participating rank receives at least one
+   * complete traversal group.  Smaller profile sets retain the incumbent
+   * replicated engine and avoid a collective whose fixed cost exceeds the
+   * already-cheap profile arithmetic.
+   */
+  use_parallel_profiles =
+    np_objective_outer_rows_enabled(
+      int_conditional_prepared_context_extern) &&
+    ((int64_t)nprof_xy >=
+     (int64_t)iNum_Processors*(int64_t)profile_group_width);
 
   if(!np_size_mul_checked((size_t)x_cache_rows,
                           (size_t)nprof_x,
@@ -38739,8 +38756,10 @@ preflight_cat_cvls:
                                     NULL,
                                     kx,
                                     NULL);
-    if(status != 0)
-      goto cleanup_cat_cvls;
+    if(status != 0){
+      local_profile_fail = 1;
+      goto preflight_profile_rows_cat_cvls;
+    }
   } else {
     if(kernel_bandwidth_mean(KERNEL_reg_extern,
                              BANDWIDTH_den_extern,
@@ -38760,8 +38779,10 @@ preflight_cat_cvls:
                              NULL,
                              NULL,
                              NULL,
-                             lambda_x) == 1)
-      goto cleanup_cat_cvls;
+                             lambda_x) == 1){
+      local_profile_fail = 1;
+      goto preflight_profile_rows_cat_cvls;
+    }
 
     x_profile_spec.ntrain = nprof_x;
     x_profile_spec.neval = nprof_x;
@@ -38778,8 +38799,10 @@ preflight_cat_cvls:
     x_profile_spec.num_categories = num_categories_extern_X;
     x_profile_spec.category_values = matrix_categorical_vals_extern_X;
     if(np_categorical_profile_spec_validate(&x_profile_spec) !=
-       NP_PROFILE_TILE_OK)
-      goto cleanup_cat_cvls;
+       NP_PROFILE_TILE_OK){
+      local_profile_fail = 1;
+      goto preflight_profile_rows_cat_cvls;
+    }
 
     for(g = 0; g < nprof_x; g++){
       x_cache_slot[g] = -1;
@@ -38820,8 +38843,10 @@ preflight_cat_cvls:
                              NULL,
                              NULL,
                              NULL,
-                             lambda_y) == 1)
-      goto cleanup_cat_cvls;
+                             lambda_y) == 1){
+      local_profile_fail = 1;
+      goto preflight_profile_rows_cat_cvls;
+    }
 
     for(g = 0; g < nprof_y; g++){
       y_cache_priority[g].profile_id = g;
@@ -38889,8 +38914,10 @@ preflight_cat_cvls:
                                     NULL,
                                     kyn,
                                     NULL);
-    if(status != 0)
-      goto cleanup_cat_cvls;
+    if(status != 0){
+      local_profile_fail = 1;
+      goto preflight_profile_rows_cat_cvls;
+    }
   } else {
     yn_profile_spec.ntrain = nprof_y;
     yn_profile_spec.neval = nprof_y;
@@ -38907,8 +38934,10 @@ preflight_cat_cvls:
     yn_profile_spec.num_categories = num_categories_extern_Y;
     yn_profile_spec.category_values = matrix_categorical_vals_extern_Y;
     if(np_categorical_profile_spec_validate(&yn_profile_spec) !=
-       NP_PROFILE_TILE_OK)
-      goto cleanup_cat_cvls;
+       NP_PROFILE_TILE_OK){
+      local_profile_fail = 1;
+      goto preflight_profile_rows_cat_cvls;
+    }
 
     for(g = 0; g < nprof_y; g++)
       yn_cache_slot[g] = -1;
@@ -38970,8 +38999,10 @@ preflight_cat_cvls:
                                     NULL,
                                     kyc,
                                     NULL);
-    if(status != 0)
-      goto cleanup_cat_cvls;
+    if(status != 0){
+      local_profile_fail = 1;
+      goto preflight_profile_rows_cat_cvls;
+    }
   } else {
     yc_profile_spec.ntrain = nprof_y;
     yc_profile_spec.neval = nprof_y;
@@ -38988,8 +39019,10 @@ preflight_cat_cvls:
     yc_profile_spec.num_categories = num_categories_extern_Y;
     yc_profile_spec.category_values = matrix_categorical_vals_extern_Y;
     if(np_categorical_profile_spec_validate(&yc_profile_spec) !=
-       NP_PROFILE_TILE_OK)
-      goto cleanup_cat_cvls;
+       NP_PROFILE_TILE_OK){
+      local_profile_fail = 1;
+      goto preflight_profile_rows_cat_cvls;
+    }
 
     for(g = 0; g < nprof_y; g++)
       yc_cache_slot[g] = -1;
@@ -39004,16 +39037,32 @@ preflight_cat_cvls:
       den_full[g] = 0.0;
       for(h = 0; h < nprof_x; h++)
         den_full[g] += counts_x[h]*kx[g*nprof_x + h];
-      if(!(den_full[g] > DBL_MIN) || (!R_FINITE(den_full[g])))
-        goto cleanup_cat_cvls;
+      if(!(den_full[g] > DBL_MIN) || (!R_FINITE(den_full[g]))){
+        local_profile_fail = 1;
+        goto preflight_profile_rows_cat_cvls;
+      }
     }
 
-  const int profile_interrupt_stride =
-    np_hot_loop_interrupt_stride(nprof_xy);
+preflight_profile_rows_cat_cvls:
+  if(np_objective_outer_preflight_failed(use_parallel_profiles,
+                                         local_profile_fail))
+    goto cleanup_cat_cvls;
+  if(np_objective_outer_buffer_prepare(use_parallel_profiles,
+                                       (size_t)nprof_xy,
+                                       &profile_terms) != 0)
+    goto cleanup_cat_cvls;
+  np_objective_outer_owned_rows(0,
+                                nprof_xy,
+                                use_parallel_profiles,
+                                &owned_profile_start,
+                                &owned_profile_rows);
+  profile_interrupt_stride = np_hot_loop_interrupt_stride(nprof_xy);
 
   *cv = 0.0;
   if(profile_group_width <= 1){
-    for(g = 0; g < nprof_xy; g++){
+    for(g = owned_profile_start;
+        g < owned_profile_start + owned_profile_rows;
+        g++){
     const int rep_g = xy_rep[g];
     const int xg = x_id[rep_g];
     const int yg = y_id[rep_g];
@@ -39047,8 +39096,10 @@ preflight_cat_cvls:
             1,
             kx_row,
             (size_t)nprof_x);
-        if(tile_status != NP_PROFILE_TILE_OK)
-          goto cleanup_cat_cvls;
+        if(tile_status != NP_PROFILE_TILE_OK){
+          local_profile_fail = 1;
+          goto finish_profile_rows_cat_cvls;
+        }
         x_cache_owner[cache_index] = xg;
       }
       if(!R_FINITE(den_full[xg])){
@@ -39056,15 +39107,19 @@ preflight_cat_cvls:
         for(h = 0; h < nprof_x; h++)
           den_full[xg] += counts_x[h]*kx_row[h];
         if(!(den_full[xg] > DBL_MIN) ||
-           (!R_FINITE(den_full[xg])))
-          goto cleanup_cat_cvls;
+           (!R_FINITE(den_full[xg]))){
+          local_profile_fail = 1;
+          goto finish_profile_rows_cat_cvls;
+        }
       }
     } else {
       kx_row = kx + (size_t)xg*(size_t)nprof_x;
     }
     den_loo = den_full[xg] - kx_row[xg];
-    if(!(den_loo > DBL_MIN) || (!R_FINITE(den_loo)))
-      goto cleanup_cat_cvls;
+    if(!(den_loo > DBL_MIN) || (!R_FINITE(den_loo))){
+      local_profile_fail = 1;
+      goto finish_profile_rows_cat_cvls;
+    }
 
     if(use_yn_cache){
       int cache_index = yn_cache_slot[yg];
@@ -39083,8 +39138,10 @@ preflight_cat_cvls:
             1,
             kyn_row,
             (size_t)nprof_y);
-        if(tile_status != NP_PROFILE_TILE_OK)
-          goto cleanup_cat_cvls;
+        if(tile_status != NP_PROFILE_TILE_OK){
+          local_profile_fail = 1;
+          goto finish_profile_rows_cat_cvls;
+        }
         yn_cache_owner[cache_index] = yg;
       }
     } else {
@@ -39126,8 +39183,10 @@ preflight_cat_cvls:
               1,
               kyc_row,
               (size_t)nprof_y);
-          if(tile_status != NP_PROFILE_TILE_OK)
-            goto cleanup_cat_cvls;
+          if(tile_status != NP_PROFILE_TILE_OK){
+            local_profile_fail = 1;
+            goto finish_profile_rows_cat_cvls;
+          }
           yc_cache_owner[cache_index] = yh;
         }
       } else {
@@ -39143,15 +39202,24 @@ preflight_cat_cvls:
       }
     }
 
-    *cv += cxg*((quad_num/(den_loo*den_loo)) -
-                2.0*(lin_num/den_loo));
+    if(use_parallel_profiles)
+      profile_terms[g] =
+        cxg*((quad_num/(den_loo*den_loo)) -
+             2.0*(lin_num/den_loo));
+    else
+      *cv += cxg*((quad_num/(den_loo*den_loo)) -
+                  2.0*(lin_num/den_loo));
     }
   } else {
     int g0;
+    const int owned_profile_end =
+      owned_profile_start + owned_profile_rows;
 
-    for(g0 = 0; g0 < nprof_xy; g0 += profile_group_width){
+    for(g0 = owned_profile_start;
+        g0 < owned_profile_end;
+        g0 += profile_group_width){
       const int group_count =
-        MIN(profile_group_width, nprof_xy - g0);
+        MIN(profile_group_width, owned_profile_end - g0);
       int group_yg[NP_CDENS_PROFILE_GROUP_WIDTH];
       double group_cxg[NP_CDENS_PROFILE_GROUP_WIDTH];
       double group_den_loo[NP_CDENS_PROFILE_GROUP_WIDTH];
@@ -39193,8 +39261,10 @@ preflight_cat_cvls:
                 1,
                 kx_row,
                 (size_t)nprof_x);
-            if(tile_status != NP_PROFILE_TILE_OK)
-              goto cleanup_cat_cvls;
+            if(tile_status != NP_PROFILE_TILE_OK){
+              local_profile_fail = 1;
+              goto finish_profile_rows_cat_cvls;
+            }
             x_cache_owner[cache_index] = xg;
           }
           if(!R_FINITE(den_full[xg])){
@@ -39202,16 +39272,20 @@ preflight_cat_cvls:
             for(h = 0; h < nprof_x; h++)
               den_full[xg] += counts_x[h]*kx_row[h];
             if(!(den_full[xg] > DBL_MIN) ||
-               (!R_FINITE(den_full[xg])))
-              goto cleanup_cat_cvls;
+               (!R_FINITE(den_full[xg]))){
+              local_profile_fail = 1;
+              goto finish_profile_rows_cat_cvls;
+            }
           }
         } else {
           kx_row = kx + (size_t)xg*(size_t)nprof_x;
         }
         group_den_loo[q] = den_full[xg] - kx_row[xg];
         if(!(group_den_loo[q] > DBL_MIN) ||
-           (!R_FINITE(group_den_loo[q])))
-          goto cleanup_cat_cvls;
+           (!R_FINITE(group_den_loo[q]))){
+          local_profile_fail = 1;
+          goto finish_profile_rows_cat_cvls;
+        }
 
         if(use_yn_cache){
           int cache_index = yn_cache_slot[yg];
@@ -39230,8 +39304,10 @@ preflight_cat_cvls:
                 1,
                 kyn_row,
                 (size_t)nprof_y);
-            if(tile_status != NP_PROFILE_TILE_OK)
-              goto cleanup_cat_cvls;
+            if(tile_status != NP_PROFILE_TILE_OK){
+              local_profile_fail = 1;
+              goto finish_profile_rows_cat_cvls;
+            }
             yn_cache_owner[cache_index] = yg;
           }
         } else {
@@ -39282,8 +39358,10 @@ preflight_cat_cvls:
                 1,
                 kyc_row,
                 (size_t)nprof_y);
-            if(tile_status != NP_PROFILE_TILE_OK)
-              goto cleanup_cat_cvls;
+            if(tile_status != NP_PROFILE_TILE_OK){
+              local_profile_fail = 1;
+              goto finish_profile_rows_cat_cvls;
+            }
             yc_cache_owner[cache_index] = yh;
           }
         } else {
@@ -39309,14 +39387,35 @@ preflight_cat_cvls:
         }
       }
 
-      for(q = 0; q < group_count; q++)
-        *cv += group_cxg[q]*
-          ((group_quad[q]/
-            (group_den_loo[q]*group_den_loo[q])) -
-           2.0*(group_lin[q]/group_den_loo[q]));
+      for(q = 0; q < group_count; q++){
+        const double profile_term =
+          group_cxg[q]*
+            ((group_quad[q]/
+              (group_den_loo[q]*group_den_loo[q])) -
+             2.0*(group_lin[q]/group_den_loo[q]));
+
+        if(use_parallel_profiles)
+          profile_terms[g0 + q] = profile_term;
+        else
+          *cv += profile_term;
+      }
     }
   }
 
+finish_profile_rows_cat_cvls:
+  if(np_objective_outer_buffer_finish(
+       use_parallel_profiles,
+       nprof_xy,
+       local_profile_fail,
+       profile_terms,
+       NULL,
+       "conditional density categorical-profile CVLS MPI_Allreduce") != 0)
+    goto cleanup_cat_cvls;
+  if(use_parallel_profiles){
+    *cv = 0.0;
+    for(g = 0; g < nprof_xy; g++)
+      *cv += profile_terms[g];
+  }
   *cv /= (double)num_obs;
   result = NP_CONDITIONAL_PROFILE_CV_SUCCESS;
 
@@ -39335,6 +39434,7 @@ cleanup_cat_cvls:
   if(profile_y_ord != NULL) free_tmat(profile_y_ord);
   if(counts_x != NULL) free(counts_x);
   if(counts_xy != NULL) free(counts_xy);
+  if(profile_terms != NULL) free(profile_terms);
   if(kernel_workspace != NULL) free(kernel_workspace);
   if(den_full != NULL) free(den_full);
   if(lambda_x != NULL) free(lambda_x);

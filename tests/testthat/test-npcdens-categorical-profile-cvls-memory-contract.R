@@ -122,6 +122,36 @@ test_that("npcdens categorical profile CVLS owns a bounded MPI tri-state workspa
     "NP_RMPI_INJECT_CDENS_PROFILE_FAIL_RANK",
     fixed = TRUE
   )
+  expect_match(
+    implementation,
+    "np_objective_outer_owned_rows(0,",
+    fixed = TRUE
+  )
+  expect_match(
+    implementation,
+    "np_objective_outer_buffer_prepare(use_parallel_profiles",
+    fixed = TRUE
+  )
+  expect_match(
+    implementation,
+    "conditional density categorical-profile CVLS MPI_Allreduce",
+    fixed = TRUE
+  )
+  expect_match(
+    implementation,
+    "iNum_Processors*(int64_t)profile_group_width",
+    fixed = TRUE
+  )
+  expect_match(
+    implementation,
+    "profile_terms[g0 + q] = profile_term",
+    fixed = TRUE
+  )
+  expect_false(grepl(
+    "alloc_vecd(num_obs*num_obs)",
+    implementation,
+    fixed = TRUE
+  ))
   expect_false(grepl(
     "alloc_vecd(nprof_x*nprof_x)",
     implementation,
