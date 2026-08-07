@@ -257,6 +257,7 @@ double np_kernel_estimate_regression_categorical_ls_aic_ctx(int lp_engine, int b
 int np_glp_cv_prepare_extern(const int lp_engine, const int num_obs, const int ncon, double **matrix_X_continuous_train);
 int np_glp_cv_prepare_original_order_extern(const int *ipt);
 void np_glp_cv_clear_extern(void);
+void np_conditional_profile_index_cache_clear_extern(void);
 int np_glp_cv_degree_admissible_extern(const int num_obs, const int ncon, const int *degree, const int basis_mode);
 void np_reg_cv_core_clear_extern(void);
 int np_bounded_cvls_conditional_quad_context_prepare_extern(void);
