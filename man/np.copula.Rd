@@ -229,7 +229,8 @@ displayed.
     plotting renderer for surface displays. \code{"base"} uses
     \code{\link{persp}}. \code{"rgl"} uses the shared interactive
     \pkg{rgl} surface renderer when the suggested package \pkg{rgl} is
-    installed.
+    installed. Both renderers use the package-wide viridis surface palette
+    and neutral-gray three-face reference grid.
   }
 
   \item{view}{

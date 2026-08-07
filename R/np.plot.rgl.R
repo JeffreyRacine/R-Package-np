@@ -248,21 +248,21 @@
 
   z <- as.matrix(z)
   z.range <- range(z, finite = TRUE)
-  palette_fun <- function(n) grDevices::hcl.colors(as.integer(n), palette = "viridis")
 
   if (!all(is.finite(z.range)))
-    return(palette_fun(1L))
+    return(.np_plot_surface_palette(1L))
 
   if (isTRUE(all.equal(z.range[1L], z.range[2L]))) {
-    return(matrix(palette_fun(1L), nrow = nrow(z), ncol = ncol(z)))
+    return(matrix(.np_plot_surface_palette(1L), nrow = nrow(z), ncol = ncol(z)))
   }
 
-  colorlut <- palette_fun(num.colors)
-  scaled <- 1L + floor((length(colorlut) - 1L) * (z - z.range[1L]) / diff(z.range))
-  scaled[!is.finite(scaled)] <- 1L
-  scaled <- pmax.int(1L, pmin.int(length(colorlut), scaled))
+  colors <- .np_plot_surface_palette_values(
+    values = z,
+    z.range = z.range,
+    num.colors = num.colors
+  )
 
-  matrix(colorlut[scaled], nrow = nrow(z), ncol = ncol(z))
+  matrix(colors, nrow = nrow(z), ncol = ncol(z))
 }
 
 .np_plot_validate_renderer_request <- function(renderer,
@@ -415,7 +415,7 @@
       ticktype = "detailed",
       border = border,
       color = .np_plot_rgl_surface_colors(z = z, col = col),
-      alpha = 0.6,
+      alpha = .np_plot_surface_alpha("rgl"),
       back = "lines",
       main = main
     ), persp3d.args)
@@ -429,7 +429,14 @@
       grid.side <- grid3d.args$side
       grid3d.args$side <- NULL
     }
-    grid3d.call <- c(list(grid.side), grid3d.args)
+    grid3d.call <- .np_plot_merge_override_args(
+      list(
+        side = grid.side,
+        col = .np_plot_color("surface_grid"),
+        lwd = .np_plot_lwd("surface_grid", 1)
+      ),
+      grid3d.args
+    )
     do.call(rgl::grid3d, grid3d.call)
     if (isTRUE(rgl::rgl.useNULL()) || isTRUE(getOption("rgl.printRglwidget"))) {
       scene <- rgl::scene3d()

@@ -337,7 +337,7 @@
       dtheta = rotate.defaults$dtheta
       persp.col = grDevices::adjustcolor(
         .np_plot_persp_surface_colors(z = tdens, col = col),
-        alpha.f = 0.5
+        alpha.f = .np_plot_surface_alpha("base")
       )
       frame.theta <- (0:((360 %/% dtheta - 1L) * rotate)) * dtheta + theta
       rotation.progress <- .np_plot_rotation_progress_begin(length(frame.theta))
@@ -346,31 +346,33 @@
       for (frame.idx in seq_along(frame.theta)){
           i <- frame.theta[[frame.idx]]
           .np_plot_first_render_begin(first.render)
-          persp.mat <- persp(x1.eval,
-                             x2.eval,
-                             tdens,
-                             zlim = zlim,
-                             col = persp.col,
-                             border = scalar_default(border, .np_plot_color("surface_border")),
-                             ticktype = "detailed",
-                             cex.axis = scalar_default(cex.axis, par()$cex.axis),
-                             cex.lab = scalar_default(cex.lab, par()$cex.lab),
-                             cex.main = scalar_default(cex.main, par()$cex.main),
-                             cex.sub = scalar_default(cex.sub, par()$cex.sub),
-                             lwd = .np_plot_lwd("surface_border", scalar_default(lwd, par()$lwd)),
-                             xlab = xlab.val,
-                             ylab = ylab.val,
-                             zlab = zlab.val,
-                             theta = i,
-                             phi = phi,
-                             main = scalar_default(main, ""))
-          .np_plot_first_render_end(first.render)
-          .np_plot_draw_box_grid_persp(
+          persp.args <- list(
+            x = x1.eval,
+            y = x2.eval,
+            z = tdens,
+            zlim = zlim,
+            col = persp.col,
+            border = scalar_default(border, .np_plot_color("surface_border")),
+            ticktype = "detailed",
+            cex.axis = scalar_default(cex.axis, par()$cex.axis),
+            cex.lab = scalar_default(cex.lab, par()$cex.lab),
+            cex.main = scalar_default(cex.main, par()$cex.main),
+            cex.sub = scalar_default(cex.sub, par()$cex.sub),
+            lwd = .np_plot_lwd("surface_border", scalar_default(lwd, par()$lwd)),
+            xlab = xlab.val,
+            ylab = ylab.val,
+            zlab = zlab.val,
+            theta = i,
+            phi = phi,
+            main = scalar_default(main, "")
+          )
+          persp.mat <- .np_plot_render_surface_base_frame(
+            persp.args = persp.args,
             xlim = range(x1.eval, finite = TRUE),
             ylim = range(x2.eval, finite = TRUE),
-            zlim = zlim,
-            persp.mat = persp.mat
+            zlim = zlim
           )
+          .np_plot_first_render_end(first.render)
           if (plot.rug) {
             .np_plot_draw_floor_rug_persp(
               x1 = xdat[,1],

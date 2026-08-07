@@ -293,7 +293,9 @@ Named options passed via \code{\dots} include:
         requested. When drawn, the \code{rgl} surface is displayed via
         the active \code{rgl} backend, which on this rollout path is
         typically the RStudio Viewer or a browser/WebGL window rather
-        than the base graphics plot pane. When \code{col} is omitted,
+        than the base graphics plot pane. The base and \code{rgl}
+        renderers share the same viridis palette mapper and neutral-gray
+        three-face reference-grid default. When \code{col} is omitted,
         the \code{rgl} surface uses a value-based
         \code{\link[grDevices]{hcl.colors}(..., "viridis")} gradient. When the
         inherited base-view defaults \code{theta=0} and \code{phi=20}

@@ -1,5 +1,11 @@
 # np 0.70-6
 
+* Eligible bivariate surface plots now share one base-perspective frame owner,
+  one viridis palette mapper, and one neutral-gray three-face grid style across
+  the base and `rgl` renderers. The shared renderer is used by the regression,
+  density, distribution, conditional, semiparametric, conditional-mode, and
+  copula plot families; estimator and plot-data arithmetic are unchanged.
+
 * `npreg()` now accepts `errors = TRUE`. The unchanged default computes and
   retains mean and gradient standard errors as before; `errors = FALSE`
   requests fitted values and optional gradients without constructing the

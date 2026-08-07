@@ -1768,7 +1768,7 @@ np_render_control <- function(style = c("band", "bar"),
     main = main,
     col = grDevices::adjustcolor(
       .np_plot_persp_surface_colors(z = z, col = dots$col),
-      alpha.f = 0.5
+      alpha.f = .np_plot_surface_alpha("base")
     ),
     border = border
   )
@@ -1776,7 +1776,12 @@ np_render_control <- function(style = c("band", "bar"),
     persp.args,
     .np_plot_user_args(dots, "persp")
   )
-  do.call(graphics::persp, persp.args)
+  .np_plot_render_surface_base_frame(
+    persp.args = persp.args,
+    xlim = range(x1, finite = TRUE),
+    ylim = range(x2, finite = TRUE),
+    zlim = zlim
+  )
   invisible(NULL)
 }
 

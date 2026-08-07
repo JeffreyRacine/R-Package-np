@@ -382,7 +382,7 @@ npcopula <- function(bws, ...) {
   z <- .npcopula_clip_z_for_display(grid$z, zlim)
   persp.col <- grDevices::adjustcolor(
     .np_plot_persp_surface_colors(z = z, col = col),
-    alpha.f = 0.5
+    alpha.f = .np_plot_surface_alpha("base")
   )
   persp.call <- list(x = grid$u1, y = grid$u2, z = z,
                      theta = theta, phi = phi,
@@ -391,7 +391,13 @@ npcopula <- function(bws, ...) {
                      main = main, col = persp.col, border = border)
   if (!is.null(zlim))
     persp.call$zlim <- zlim
-  do.call(graphics::persp, .np_plot_merge_user_args(persp.call, persp.args))
+  persp.call <- .np_plot_merge_user_args(persp.call, persp.args)
+  .np_plot_render_surface_base_frame(
+    persp.args = persp.call,
+    xlim = range(grid$u1, finite = TRUE),
+    ylim = range(grid$u2, finite = TRUE),
+    zlim = if (is.null(zlim)) range(z, finite = TRUE) else zlim
+  )
 }
 
 .npcopula_plot_all <- function(x,
@@ -1055,8 +1061,9 @@ plot.npcopula <- function(x,
     persp.args <- .np_plot_user_args(dots, "persp")
     persp.col <- grDevices::adjustcolor(
       .np_plot_persp_surface_colors(z = z.display, col = col),
-      alpha.f = 0.5
+      alpha.f = .np_plot_surface_alpha("base")
     )
+    grid.zlim <- if (is.null(zlim)) range(z.display, finite = TRUE) else zlim
     rotate.defaults <- .np_plot_rotate_defaults()
     dtheta <- rotate.defaults$dtheta
     frame.theta <- if (rotate.surface) {
@@ -1076,7 +1083,13 @@ plot.npcopula <- function(x,
                          main = main, col = persp.col, border = border)
       if (!is.null(zlim))
         persp.call$zlim <- zlim
-      persp.mat <- do.call(graphics::persp, .np_plot_merge_user_args(persp.call, persp.args))
+      persp.call <- .np_plot_merge_user_args(persp.call, persp.args)
+      persp.mat <- .np_plot_render_surface_base_frame(
+        persp.args = persp.call,
+        xlim = range(u1, finite = TRUE),
+        ylim = range(u2, finite = TRUE),
+        zlim = grid.zlim
+      )
       if (!is.null(payload)) {
         .np_plot_draw_error_wireframes_persp(
           x = u1,
