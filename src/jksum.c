@@ -29662,16 +29662,18 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_general_row_stream(
   const int nord = num_var_ordered_extern;
   int q = np_bounded_cvls_conditional_grid_points(ncon);
   const int block_size = MAX(1, MIN(np_conditional_lp_cvls_preferred_block_size(num_obs), 64));
+  const int max_group_width = 4;
   size_t total_eval = 0;
   NPConditionalYRowCtx yctx = {0};
   double *yrow = NULL, *eval_weight = NULL, *fit_block = NULL, *lin_block = NULL, *quad_block = NULL;
   double *yeval_log_scale = NULL;
-  double **xblock = NULL;
+  double **xblocks[4] = {NULL, NULL, NULL, NULL};
   double **cont_grid = NULL, **cont_weight = NULL;
   double **eval_yuno = NULL, **eval_yord = NULL, **eval_ycon = NULL, **yevalblock = NULL;
   double quad_lb[2] = {0.0, 0.0};
   double quad_ub[2] = {0.0, 0.0};
-  int i0, d;
+  size_t slab_cells = 0, slab_bytes = 0, budget_slabs = 0;
+  int i0, d, group_width = 0, requested_group_width;
   int status = 1;
 
   if((cv == NULL) || (vector_scale_factor == NULL) || (num_obs <= 0))
@@ -29685,12 +29687,45 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_general_row_stream(
   if(q < 2)
     return 1;
 
-  xblock = alloc_tmatd(num_obs, block_size);
+  /*
+   * Retain a bounded group of X slabs so each invariant response-quadrature
+   * slab is generated once per group.  The tile budget may reduce the group
+   * width, but never changes the row engine or the accumulation order.
+   */
+  if(!np_size_mul_checked((size_t)num_obs,
+                          (size_t)block_size,
+                          &slab_cells) ||
+     !np_size_array_bytes_checked(slab_cells,
+                                  sizeof(double),
+                                  &slab_bytes) ||
+     (slab_bytes == 0))
+    return 1;
+  budget_slabs = NP_CONDITIONAL_LP_TILE_BUDGET_BYTES / slab_bytes;
+  requested_group_width = MIN(
+    max_group_width,
+    (num_obs / block_size) + ((num_obs % block_size) != 0)
+  );
+  if(budget_slabs <= 1)
+    requested_group_width = 1;
+  else if((size_t)requested_group_width > (budget_slabs - 1))
+    requested_group_width = (int)(budget_slabs - 1);
+
+  for(group_width = 0;
+      group_width < requested_group_width;
+      group_width++){
+    if(np_cvls_workspace_matrix_try(num_obs,
+                                    block_size,
+                                    &xblocks[group_width]) !=
+       NP_CVLS_WORKSPACE_OK)
+      break;
+  }
+  if(group_width < 1)
+    goto cleanup_bounded_cvls_quad_general;
   yrow = alloc_vecd(MAX(1, num_obs));
   eval_weight = alloc_vecd(block_size);
   fit_block = alloc_vecd(block_size*block_size);
-  lin_block = alloc_vecd(block_size);
-  quad_block = alloc_vecd(block_size);
+  lin_block = alloc_vecd(group_width*block_size);
+  quad_block = alloc_vecd(group_width*block_size);
   cont_grid = alloc_matd(q, ncon);
   cont_weight = alloc_matd(q, ncon);
   if(nuno > 0) eval_yuno = alloc_matd(block_size, nuno);
@@ -29700,7 +29735,7 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_general_row_stream(
   if(provider != NULL)
     yeval_log_scale = alloc_vecd(block_size);
 
-  if((xblock == NULL) || (yrow == NULL) || (eval_weight == NULL) ||
+  if((yrow == NULL) || (eval_weight == NULL) ||
      (fit_block == NULL) || (lin_block == NULL) || (quad_block == NULL) ||
      (cont_grid == NULL) || (cont_weight == NULL) || (eval_ycon == NULL) ||
      (yevalblock == NULL) ||
@@ -29756,35 +29791,45 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_general_row_stream(
     goto cleanup_bounded_cvls_quad_general;
 
   *cv = 0.0;
-  for(i0 = 0; i0 < num_obs; i0 += block_size){
-    const int ib = MIN(block_size, num_obs - i0);
+  for(i0 = 0; i0 < num_obs; i0 += group_width*block_size){
+    int block_rows[4] = {0, 0, 0, 0};
     size_t eval_start = 0;
-    int b;
+    int b, g;
 
-    for(b = 0; b < ib; b++){
-      const int i = i0 + b;
-      double y_log_scale = 0.0;
+    for(g = 0; g < group_width; g++){
+      const int block_start = i0 + g*block_size;
+      const int ib = MIN(block_size, num_obs - block_start);
 
-      if(provider != NULL) {
-        if(provider->x_row(provider->context, i, xblock[b]) != 0 ||
-           provider->y_train_row(provider->context, i, yrow,
-                                 &y_log_scale) != 0)
+      if(ib <= 0)
+        break;
+      block_rows[g] = ib;
+
+      for(b = 0; b < ib; b++){
+        const int i = block_start + b;
+        const int row = g*block_size + b;
+        double y_log_scale = 0.0;
+
+        if(provider != NULL) {
+          if(provider->x_row(provider->context, i, xblocks[g][b]) != 0 ||
+             provider->y_train_row(provider->context, i, yrow,
+                                   &y_log_scale) != 0)
+            goto cleanup_bounded_cvls_quad_general;
+        } else {
+          if(np_conditional_x_weight_row_stream_core(
+               vector_scale_factor, i, xblocks[g][b]) != 0)
+            goto cleanup_bounded_cvls_quad_general;
+          if(np_conditional_yrow_from_ctx(&yctx, i, yrow) != 0)
+            goto cleanup_bounded_cvls_quad_general;
+        }
+
+        lin_block[row] = np_blas_ddot_int(num_obs, xblocks[g][b], yrow);
+        if(provider != NULL &&
+           np_continuous_kernel_scaled_restore(
+             lin_block[row], y_log_scale, 1, &lin_block[row]) !=
+           NP_CONTINUOUS_ROW_OK)
           goto cleanup_bounded_cvls_quad_general;
-      } else {
-        if(np_conditional_x_weight_row_stream_core(
-             vector_scale_factor, i, xblock[b]) != 0)
-          goto cleanup_bounded_cvls_quad_general;
-        if(np_conditional_yrow_from_ctx(&yctx, i, yrow) != 0)
-          goto cleanup_bounded_cvls_quad_general;
+        quad_block[row] = 0.0;
       }
-
-      lin_block[b] = np_blas_ddot_int(num_obs, xblock[b], yrow);
-      if(provider != NULL &&
-         np_continuous_kernel_scaled_restore(
-           lin_block[b], y_log_scale, 1, &lin_block[b]) !=
-         NP_CONTINUOUS_ROW_OK)
-        goto cleanup_bounded_cvls_quad_general;
-      quad_block[b] = 0.0;
     }
 
     while(eval_start < total_eval){
@@ -29817,28 +29862,37 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_general_row_stream(
         goto cleanup_bounded_cvls_quad_general;
       }
 
-      np_blas_dgemm_tn_int(eb, ib, num_obs, yevalblock[0], xblock[0], fit_block);
-      for(b = 0; b < ib; b++){
-        const int offset = b*eb;
-        int e;
+      for(g = 0; g < group_width && block_rows[g] > 0; g++){
+        const int ib = block_rows[g];
 
-        for(e = 0; e < eb; e++){
-          double fit = fit_block[offset + e];
+        np_blas_dgemm_tn_int(eb, ib, num_obs,
+                             yevalblock[0], xblocks[g][0], fit_block);
+        for(b = 0; b < ib; b++){
+          const int row = g*block_size + b;
+          const int offset = b*eb;
+          int e;
 
-          if(provider != NULL &&
-             np_continuous_kernel_scaled_restore(
-               fit, yeval_log_scale[e], 1, &fit) !=
-             NP_CONTINUOUS_ROW_OK)
-            goto cleanup_bounded_cvls_quad_general;
-          quad_block[b] += eval_weight[e]*fit*fit;
+          for(e = 0; e < eb; e++){
+            double fit = fit_block[offset + e];
+
+            if(provider != NULL &&
+               np_continuous_kernel_scaled_restore(
+                 fit, yeval_log_scale[e], 1, &fit) !=
+               NP_CONTINUOUS_ROW_OK)
+              goto cleanup_bounded_cvls_quad_general;
+            quad_block[row] += eval_weight[e]*fit*fit;
+          }
         }
       }
 
       eval_start += (size_t)eb;
     }
 
-    for(b = 0; b < ib; b++)
-      *cv += quad_block[b] - 2.0*lin_block[b];
+    for(g = 0; g < group_width && block_rows[g] > 0; g++)
+      for(b = 0; b < block_rows[g]; b++){
+        const int row = g*block_size + b;
+        *cv += quad_block[row] - 2.0*lin_block[row];
+      }
   }
 
   *cv /= (double)num_obs;
@@ -29847,7 +29901,8 @@ static int np_conditional_density_cvls_bounded_i1_quadrature_general_row_stream(
 cleanup_bounded_cvls_quad_general:
   np_conditional_yrow_ctx_clear(&yctx);
   np_glp_cv_clear_extern();
-  if(xblock != NULL) free_tmat(xblock);
+  for(d = 0; d < max_group_width; d++)
+    if(xblocks[d] != NULL) free_tmat(xblocks[d]);
   if(yrow != NULL) free(yrow);
   if(eval_weight != NULL) free(eval_weight);
   if(fit_block != NULL) free(fit_block);
