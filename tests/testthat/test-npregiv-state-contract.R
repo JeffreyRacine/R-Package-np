@@ -46,6 +46,17 @@ test_that("npregiv Tikhonov refinement preserves the T-star-r right-hand side", 
                          readLines(src_path, warn = FALSE), perl = TRUE)))
 })
 
+test_that("npregiv reuses the Tikhonov inverse for evaluation weights", {
+  src_path <- testthat::test_path("..", "..", "R", "npregiv.R")
+  txt <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
+
+  expect_match(
+    txt,
+    "H\\.eval <- KPHIWZ\\.eval%\\*%inverse\\.operator%\\*%KYW",
+    perl = TRUE
+  )
+})
+
 test_that("npregiv stop selection is boundary safe and deterministic", {
   select <- np:::.npregiv_select_stop_index
 
