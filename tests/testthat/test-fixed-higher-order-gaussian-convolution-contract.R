@@ -39,7 +39,12 @@ test_that("fixed higher-order Gaussian convolution is an isolated fallback", {
   )
   expect_match(
     helper,
-    "result[i] = xw[j]*kval/hy_power;",
+    "const double scale = ONE_OVER_SQRT_TWO_PI/(denominator*hy_power);",
+    fixed = TRUE
+  )
+  expect_match(
+    helper,
+    "result[i] = xw[j]*kval;",
     fixed = TRUE
   )
   expect_match(header, "attribute_hidden int", fixed = TRUE)

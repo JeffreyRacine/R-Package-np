@@ -40,10 +40,12 @@ attribute_hidden int np_fixed_gaussian_convolution_row_try(
     const double denominator =
       sqrt(hy2 + hx2)*4*hxy2*hxy2*hxy2*hxy2;
     const double hy_power = ipow(hy, power);
+    const double scale = ONE_OVER_SQRT_TWO_PI/(denominator*hy_power);
 
     for(i = 0, j = 0; i < num_xt; i++, j += multiply_existing){
       const double y = xt[i];
       const double y2 = y*y;
+      const double delta = x-y;
       double kval;
 
       if(xw[j] == 0.0)
@@ -59,9 +61,8 @@ attribute_hidden int np_fixed_gaussian_convolution_row_try(
             2*hx7*hy)*x2
          + 6*h*hy9 + 27*hx3*hy7 + 42*hx5*hy5 +
            27*hx7*hy3 + 6*hx9*hy)*
-        exp(-0.5*(x-y)*(x-y)/hxy2)*ONE_OVER_SQRT_TWO_PI/
-        denominator;
-      result[i] = xw[j]*kval/hy_power;
+        exp(-0.5*delta*delta/hxy2)*scale;
+      result[i] = xw[j]*kval;
     }
     return 1;
   }
@@ -95,6 +96,7 @@ attribute_hidden int np_fixed_gaussian_convolution_row_try(
     const double hxy8 = hxy4*hxy4;
     const double denominator = sqrt(hxy2)*64*hxy8;
     const double hy_power = ipow(hy, power);
+    const double scale = ONE_OVER_SQRT_TWO_PI/(denominator*hy_power);
 
     for(i = 0, j = 0; i < num_xt; i++, j += multiply_existing){
       const double y = xt[i];
@@ -105,6 +107,7 @@ attribute_hidden int np_fixed_gaussian_convolution_row_try(
       const double y6 = y3*y3;
       const double y7 = y*y6;
       const double y8 = y4*y4;
+      const double delta = x-y;
       double kval;
 
       if(xw[j] == 0.0)
@@ -156,9 +159,8 @@ attribute_hidden int np_fixed_gaussian_convolution_row_try(
          +3825*hx4*hy12+8040*hx6*hy10+10230*hx8*hy8
          +8040*hx10*hy6+3825*hx12*hy4+1020*hx14*hy2
          +120*hx16)*
-        exp(-0.5*(x-y)*(x-y)/hxy2)*ONE_OVER_SQRT_TWO_PI/
-        denominator;
-      result[i] = xw[j]*kval/hy_power;
+        exp(-0.5*delta*delta/hxy2)*scale;
+      result[i] = xw[j]*kval;
     }
   }
 
