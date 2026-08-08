@@ -201,7 +201,7 @@ npregiv.default <- function(y,
       if(cholesky) {
           return(chol2inv(chol(diag(alpha, nrow(CY)) + CY%*%CZ)) %*% Cr.r)
       } else {
-          return(solve(diag(alpha, nrow(CY)) + CY%*%CZ) %*% Cr.r)
+          return(solve(diag(alpha, nrow(CY)) + CY%*%CZ, Cr.r))
       }
   }
 
@@ -215,7 +215,7 @@ npregiv.default <- function(y,
     if(cholesky) {
         return(CY.eval%*%chol2inv(chol(diag(alpha, nrow(CY)) + CZ%*%CY)) %*% r)
     } else {
-        return(CY.eval%*%solve(diag(alpha, nrow(CY)) + CZ%*%CY) %*% r)
+        return(CY.eval%*%solve(diag(alpha, nrow(CY)) + CZ%*%CY, r))
     }
   }
 

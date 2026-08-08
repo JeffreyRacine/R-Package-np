@@ -18,6 +18,22 @@ test_that("npregiv uses shared seed enter helper", {
   expect_true(grepl("\\.np_seed_exit\\(seed\\.state, remove_if_absent = TRUE\\)", src))
 })
 
+test_that("npregiv Tikhonov single-RHS solves do not form full inverses", {
+  src_path <- testthat::test_path("..", "..", "R", "npregiv.R")
+  txt <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
+
+  expect_match(
+    txt,
+    "solve\\(diag\\(alpha, nrow\\(CY\\)\\) \\+ CY%\\*%CZ, Cr\\.r\\)",
+    perl = TRUE
+  )
+  expect_match(
+    txt,
+    "CY\\.eval%\\*%solve\\(diag\\(alpha, nrow\\(CY\\)\\) \\+ CZ%\\*%CY, r\\)",
+    perl = TRUE
+  )
+})
+
 test_that("npregiv Tikhonov refinement preserves the T-star-r right-hand side", {
   src_path <- testthat::test_path("..", "..", "R", "npregiv.R")
   skip_if_not(file.exists(src_path), "source R files unavailable in installed test context")
