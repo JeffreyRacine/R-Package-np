@@ -160,6 +160,7 @@ void np_progress_fit_loop_step_owned(
 int np_progress_fit_is_active(void);
 int np_progress_bandwidth_is_active(void);
 void np_progress_bandwidth_loop_step(void);
+int np_mseries_accelerate_enabled(void);
 
 double **alloc_matd(int nrows, int ncols);
 double **alloc_tmatd(int nrows, int ncols);

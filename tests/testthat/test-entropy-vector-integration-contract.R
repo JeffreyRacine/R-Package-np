@@ -89,3 +89,27 @@ test_that("native entropy callback rejects malformed inputs without fallback", {
     "finite and positive"
   )
 })
+
+test_that("entropy acceleration preserves the explicit scalar-option contract", {
+  set.seed(20260808)
+  x <- rnorm(64)
+  y <- rnorm(64)
+  points <- rbind(seq(-2, 2, length.out = 31L),
+                  seq(2, -2, length.out = 31L))
+  bandwidths <- c(0.4, 0.5, 0.45, 0.55)
+  old <- options(np.macMseries.accelerate = FALSE)
+  on.exit(options(old), add = TRUE)
+
+  scalar <- .Call("C_np_entropy_gaussian_integrand", points, x, y,
+                  bandwidths, PACKAGE = "npRmpi")
+  options(np.macMseries.accelerate = TRUE)
+  accelerated <- .Call("C_np_entropy_gaussian_integrand", points, x, y,
+                       bandwidths, PACKAGE = "npRmpi")
+  options(np.macMseries.accelerate = FALSE)
+  scalar.repeat <- .Call("C_np_entropy_gaussian_integrand", points, x, y,
+                         bandwidths, PACKAGE = "npRmpi")
+
+  expect_identical(scalar.repeat, scalar)
+  expect_equal(accelerated, scalar,
+               tolerance = 128 * .Machine$double.eps)
+})

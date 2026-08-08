@@ -1,9 +1,12 @@
 # npRmpi 0.70-6
 
 * Gaussian entropy integration now hoists validated bandwidth reciprocals out
-  of its training-by-evaluation kernel loop. This removes repeated divisions
-  from `npdeptest()` and `npsdeptest(method = "integration")` without changing
-  bandwidths, bootstrap decisions, storage order, or asymptotic memory use.
+  of its training-by-evaluation kernel loop and evaluates its three
+  exponentials in bounded vForce blocks on supported Apple silicon. This
+  accelerates `npdeptest()` and `npsdeptest(method = "integration")` without
+  changing bandwidths, bootstrap decisions, accumulation order, or asymptotic
+  memory use; `options(np.macMseries.accelerate = FALSE)` retains the scalar
+  route.
 
 * General bounded conditional-density CVLS now reuses each response-side
   quadrature kernel tile across a memory-bounded group of rank-owned

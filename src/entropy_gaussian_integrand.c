@@ -2,6 +2,13 @@
 #include <Rinternals.h>
 #include <math.h>
 
+#include "headers.h"
+
+#if defined(__APPLE__) && defined(__arm64__) && defined(NP_USE_ACCELERATE_GAUSS)
+extern void vvexp(double *, const double *, const int *);
+# define NP_ENTROPY_ACCEL_BLOCK 256
+#endif
+
 #define NP_ENTROPY_INTERRUPT_INTERVAL 65536
 
 /*
@@ -32,6 +39,9 @@ SEXP C_np_entropy_gaussian_integrand(SEXP xy,
   R_xlen_t n;
   int n_eval;
   int interrupt_countdown = NP_ENTROPY_INTERRUPT_INTERVAL;
+#if defined(__APPLE__) && defined(__arm64__) && defined(NP_USE_ACCELERATE_GAUSS)
+  int use_accelerate;
+#endif
 
   if (TYPEOF(xy) != REALSXP || !Rf_isMatrix(xy))
     Rf_error("entropy integration points must be a numeric matrix");
@@ -64,6 +74,9 @@ SEXP C_np_entropy_gaussian_integrand(SEXP xy,
   x_ptr = REAL(x);
   y_ptr = REAL(y);
   inverse_bw_joint_product = inverse_bandwidth[2] * inverse_bandwidth[3];
+#if defined(__APPLE__) && defined(__arm64__) && defined(NP_USE_ACCELERATE_GAUSS)
+  use_accelerate = n >= 50 && np_mseries_accelerate_enabled();
+#endif
 
   for (int j = 0; j < n_eval; ++j) {
     const double eval_x = xy_ptr[2 * j];
@@ -72,7 +85,46 @@ SEXP C_np_entropy_gaussian_integrand(SEXP xy,
     long double sum_y = 0.0L;
     long double sum_joint = 0.0L;
 
-    for (R_xlen_t i = 0; i < n; ++i) {
+#if defined(__APPLE__) && defined(__arm64__) && defined(NP_USE_ACCELERATE_GAUSS)
+    if (use_accelerate) {
+      double exp_argument[3][NP_ENTROPY_ACCEL_BLOCK];
+      double exp_value[3][NP_ENTROPY_ACCEL_BLOCK];
+
+      for (R_xlen_t block = 0; block < n;
+           block += NP_ENTROPY_ACCEL_BLOCK) {
+        const int count = (int)((n - block) < NP_ENTROPY_ACCEL_BLOCK ?
+          (n - block) : NP_ENTROPY_ACCEL_BLOCK);
+        for (int lane = 0; lane < count; ++lane) {
+          const R_xlen_t i = block + lane;
+          const double z_x = (eval_x - x_ptr[i]) * inverse_bandwidth[0];
+          const double z_y = (eval_y - y_ptr[i]) * inverse_bandwidth[1];
+          const double z_joint_x =
+            (eval_x - x_ptr[i]) * inverse_bandwidth[2];
+          const double z_joint_y =
+            (eval_y - y_ptr[i]) * inverse_bandwidth[3];
+          exp_argument[0][lane] = -0.5 * z_x * z_x;
+          exp_argument[1][lane] = -0.5 * z_y * z_y;
+          exp_argument[2][lane] = -0.5 *
+            (z_joint_x * z_joint_x + z_joint_y * z_joint_y);
+        }
+        for (int component = 0; component < 3; ++component)
+          vvexp(exp_value[component], exp_argument[component], &count);
+        for (int lane = 0; lane < count; ++lane) {
+          sum_x += normal_constant * exp_value[0][lane];
+          sum_y += normal_constant * exp_value[1][lane];
+          sum_joint += bivariate_normal_constant * exp_value[2][lane] *
+            inverse_bw_joint_product;
+
+          if (--interrupt_countdown == 0) {
+            R_CheckUserInterrupt();
+            interrupt_countdown = NP_ENTROPY_INTERRUPT_INTERVAL;
+          }
+        }
+      }
+    } else
+#endif
+    {
+      for (R_xlen_t i = 0; i < n; ++i) {
       const double z_x = (eval_x - x_ptr[i]) * inverse_bandwidth[0];
       const double z_y = (eval_y - y_ptr[i]) * inverse_bandwidth[1];
       const double z_joint_x = (eval_x - x_ptr[i]) * inverse_bandwidth[2];
@@ -90,6 +142,7 @@ SEXP C_np_entropy_gaussian_integrand(SEXP xy,
       if (--interrupt_countdown == 0) {
         R_CheckUserInterrupt();
         interrupt_countdown = NP_ENTROPY_INTERRUPT_INTERVAL;
+      }
       }
     }
 

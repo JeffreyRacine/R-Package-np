@@ -3451,6 +3451,12 @@ static inline void np_refresh_mseries_accelerate_option(void)
     0;
 }
 
+int np_mseries_accelerate_enabled(void)
+{
+  np_refresh_mseries_accelerate_option();
+  return np_mseries_accelerate_enabled_cache;
+}
+
 static inline void np_refresh_runtime_tolerances(void);
 
 static inline int np_largeh_enabled(void){
