@@ -1680,7 +1680,7 @@ npregiv.default <- function(y,
           phi.eval.mat <- cbind(phi.eval.mat,phi.eval)
           
           if(return.weights.phi) {
-              H.eval <- KPHIWZ.eval%*%solve(alpha.iter*diag(nrow(KPHIWZ)) + KPHIW%*%KPHIWZ)%*%KYW
+              H.eval <- KPHIWZ.eval%*%inverse.operator%*%KYW
           }
           
           KPHIWZ.eval.deriv.1 <- Kmat.lp.partials(deriv=1,
