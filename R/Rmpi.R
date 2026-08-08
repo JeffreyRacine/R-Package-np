@@ -1,4 +1,21 @@
-### Copyright (C) 2002 Hao Yu 
+### Copyright (C) 2002 Hao Yu
+.npRmpi_mpi_finalize_quiet <- function() {
+    if (!isTRUE(getOption("npRmpi.mpi.initialized", TRUE)))
+        return(invisible(FALSE))
+
+    out <- tryCatch(.Call("mpi_finalize", PACKAGE = "npRmpi"),
+                    error = function(e) NULL)
+    if (is.null(out))
+        return(invisible(FALSE))
+
+    options(
+        npRmpi.mpi.initialized = FALSE,
+        npRmpi.pool.active = FALSE,
+        npRmpi.master.only = FALSE
+    )
+    out
+}
+
 mpi.finalize <- function(){
     if (!isTRUE(getOption("npRmpi.mpi.initialized", TRUE)))
         return(invisible(FALSE))
@@ -7,11 +24,7 @@ mpi.finalize <- function(){
     if (!is.na(is.master) && isTRUE(is.master))
         message("Exiting Rmpi. Rmpi cannot be used unless relaunching R.")
 
-    out <- tryCatch(.Call("mpi_finalize",PACKAGE = "npRmpi"), error = function(e) NULL)
-    options(npRmpi.mpi.initialized = FALSE)
-    if (is.null(out))
-        return(invisible(FALSE))
-    out
+    .npRmpi_mpi_finalize_quiet()
 }
 
 mpi.exit <- function(){

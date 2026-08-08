@@ -1,5 +1,14 @@
 # npRmpi 0.70-6
 
+* Spawned MPI sessions now finalize the master during an early process-exit
+  finalizer, after closing and verifying any retained worker pool, instead of
+  deferring finalization until namespace teardown. Normal scripts consequently
+  return status zero without external `setsid` containment, including soft
+  pool reuse, forced close, and omitted explicit close. Public pool-reuse and
+  `mpi.finalize()` contracts are unchanged; standard tests and demo launchers
+  now require a clean exit and no longer accept status 137 or broadly kill
+  processes by name.
+
 * Fixed-bandwidth fourth- and sixth-order Gaussian convolution rows now hoist
   their invariant normalization scale out of the observation loop. Conditional
   CVLS objective values are unchanged while the affected higher-order kernel

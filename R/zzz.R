@@ -1,5 +1,74 @@
 .npRmpi_embedded_backend_version <- "0.7-3.3"
 
+.npRmpi_exit_finalizer_state <- new.env(parent = emptyenv())
+.npRmpi_exit_finalizer_state$running <- FALSE
+
+.npRmpi_finalize_before_unload <- function(where = "R process exit") {
+  state <- .npRmpi_exit_finalizer_state
+  if (isTRUE(state$running) ||
+      !isTRUE(getOption("npRmpi.mpi.initialized", FALSE)))
+    return(invisible(FALSE))
+
+  state$running <- TRUE
+  on.exit({ state$running <- FALSE }, add = TRUE)
+
+  comm.size <- tryCatch(as.integer(mpi.comm.size(1L)),
+                        error = function(e) NA_integer_)
+  if (length(comm.size) != 1L || is.na(comm.size)) {
+    warning(
+      sprintf("npRmpi could not determine worker-pool state during %s; MPI finalization was not attempted", where),
+      call. = FALSE
+    )
+    return(invisible(FALSE))
+  }
+  if (comm.size >= 2L) {
+    closed <- tryCatch({
+      npRmpi.quit(force = TRUE, comm = 1L, mode = "auto")
+      TRUE
+    }, error = function(e) FALSE)
+    if (!isTRUE(closed)) {
+      warning(
+        sprintf("npRmpi could not close its active worker pool during %s; MPI finalization was not attempted", where),
+        call. = FALSE
+      )
+      return(invisible(FALSE))
+    }
+  }
+
+  remaining <- tryCatch(as.integer(mpi.comm.size(1L)),
+                        error = function(e) NA_integer_)
+  if (length(remaining) != 1L || is.na(remaining)) {
+    warning(
+      sprintf("npRmpi could not verify worker-pool closure during %s; MPI finalization was not attempted", where),
+      call. = FALSE
+    )
+    return(invisible(FALSE))
+  }
+  if (remaining >= 2L) {
+    warning(
+      sprintf("npRmpi worker pool remained active during %s; MPI finalization was not attempted", where),
+      call. = FALSE
+    )
+    return(invisible(FALSE))
+  }
+
+  finalized <- tryCatch(.npRmpi_mpi_finalize_quiet(),
+                        error = function(e) FALSE)
+  if (!isTRUE(as.logical(finalized)[1L])) {
+    warning(
+      sprintf("npRmpi could not finalize MPI during %s", where),
+      call. = FALSE
+    )
+    return(invisible(FALSE))
+  }
+  invisible(TRUE)
+}
+
+.npRmpi_exit_finalizer <- function(envir) {
+  .npRmpi_finalize_before_unload("R process exit")
+  invisible(NULL)
+}
+
 .npRmpi_s3_generic_namespace <- function(generic) {
   switch(
     generic,
@@ -130,7 +199,7 @@
 .onUnload <- function (lpath){
   tryCatch(.Call("C_np_release_static_buffers", PACKAGE = "npRmpi"), error = function(e) NULL)
   if (isTRUE(getOption("npRmpi.mpi.initialized", FALSE)))
-    tryCatch(mpi.finalize(), error = function(e) NULL)
+    tryCatch(.npRmpi_finalize_before_unload("namespace unload"), error = function(e) NULL)
 }
 
 .onLoad <- function (lib, pkg) {
@@ -228,6 +297,11 @@
   if(!.Call("mpi_initialize",PACKAGE="npRmpi"))
     stop("Cannot start MPI_Init(). Exit")
   options(npRmpi.mpi.initialized = TRUE)
+  reg.finalizer(
+    .npRmpi_exit_finalizer_state,
+    .npRmpi_exit_finalizer,
+    onexit = TRUE
+  )
   
   if (is.null(getOption("np.messages")))
     options(np.messages = TRUE)
