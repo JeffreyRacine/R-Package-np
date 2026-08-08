@@ -1,5 +1,11 @@
 # np 0.70-6
 
+* General bounded conditional-density CVLS now reuses each response-side
+  quadrature kernel tile across a memory-bounded group of explanatory-row
+  tiles. Ordinary and beta kernels share the same canonical engine; objective
+  arithmetic and accumulation order are unchanged, and storage remains
+  `O(n B)` under the existing conditional-LP tile budget.
+
 * Eligible bivariate surface plots now share one base-perspective frame owner,
   one viridis palette mapper, and one neutral-gray three-face grid style across
   the base and `rgl` renderers. The shared renderer is used by the regression,
