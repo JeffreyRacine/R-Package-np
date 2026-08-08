@@ -1,5 +1,10 @@
 # np 0.70-6
 
+* Fixed-bandwidth fourth- and sixth-order Gaussian convolution rows now hoist
+  their invariant normalization scale out of the observation loop. Conditional
+  CVLS objective values are unchanged while the affected higher-order kernel
+  pass avoids two divisions per row element.
+
 * Gaussian entropy integration now hoists validated bandwidth reciprocals out
   of its training-by-evaluation kernel loop and evaluates its three
   exponentials in bounded vForce blocks on supported Apple silicon. This
