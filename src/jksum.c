@@ -11198,7 +11198,11 @@ NPPermutationWeightOutput * const pkw_output){
   for(l = num_reg_continuous; l < (num_reg_continuous + num_reg_unordered); l++)
     KERNEL_unordered_reg_np[l - num_reg_continuous] = KERNEL_unordered_reg[l - num_reg_continuous] + OP_UFUN_OFFSETS[operator[l]];
 
-  // todo - add (better) support for ordered integral / convolution kernels
+  /*
+   * Ordered standard, convolution, derivative, and integral operators share
+   * the canonical table-offset dispatch. Focused categorical-profile and
+   * ordered-distribution contracts protect the convolution/integral routes.
+   */
   for(l = (num_reg_continuous+num_reg_unordered); l < (num_reg_continuous + num_reg_unordered + num_reg_ordered); l++)
     KERNEL_ordered_reg_np[l - (num_reg_continuous + num_reg_unordered)] = KERNEL_ordered_reg[l - (num_reg_continuous + num_reg_unordered)] + OP_OFUN_OFFSETS[operator[l]];
 
