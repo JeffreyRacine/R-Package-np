@@ -128,7 +128,7 @@ test_that("MPI conditional-distribution grouped supertile remains repeatable", {
   )
 
   info <- paste(res$output, collapse = "\n")
-  expect_true(res$status %in% c(0L, 137L), info = info)
+  expect_equal(res$status, 0L, info = info)
   expect_true(
     any(grepl("MPI_CDIST_GROUPED_SUPERTILE_REPEATABLE_OK",
               res$output, fixed = TRUE)),

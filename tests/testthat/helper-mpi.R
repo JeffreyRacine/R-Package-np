@@ -57,17 +57,24 @@ close_mpi_slaves <- function(force = FALSE) {
   try(npRmpi.quit(force = force), silent = TRUE)
 }
 
-npRmpi_run_rscript_subprocess <- function(lines, timeout = 45L, env = character()) {
+npRmpi_run_rscript_subprocess <- function(lines,
+                                          timeout = 45L,
+                                          env = character(),
+                                          cleanup = TRUE) {
   script <- tempfile("npRmpi-subprocess-", fileext = ".R")
-  scoped.lines <- c(
-    "local({",
-    "  on.exit({",
-    "    if (exists('npRmpi.quit', mode = 'function')) try(npRmpi.quit(force = TRUE), silent = TRUE)",
-    "    if (exists('mpi.finalize', mode = 'function')) try(mpi.finalize(), silent = TRUE)",
-    "  }, add = TRUE)",
-    paste0("  ", lines),
-    "})"
-  )
+  if (isTRUE(cleanup)) {
+    scoped.lines <- c(
+      "local({",
+      "  on.exit({",
+      "    if (exists('npRmpi.quit', mode = 'function')) try(npRmpi.quit(force = TRUE), silent = TRUE)",
+      "    if (exists('mpi.finalize', mode = 'function')) try(mpi.finalize(), silent = TRUE)",
+      "  }, add = TRUE)",
+      paste0("  ", lines),
+      "})"
+    )
+  } else {
+    scoped.lines <- lines
+  }
   writeLines(scoped.lines, script, useBytes = TRUE)
   on.exit(unlink(script), add = TRUE)
 

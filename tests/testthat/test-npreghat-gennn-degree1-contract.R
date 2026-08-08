@@ -50,7 +50,7 @@ test_that("generalized-nn ll and canonical lp degree-1 share the same public/app
   )
 
   info <- paste(res$output, collapse = "\n")
-  expect_true(res$status %in% c(0L, 137L), info = info)
+  expect_equal(res$status, 0L, info = info)
   expect_true(any(grepl("NPREGHAT_GENNN_DEGREE1_SUBPROCESS_OK",
                         res$output,
                         fixed = TRUE)),

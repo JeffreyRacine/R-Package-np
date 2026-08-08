@@ -31,8 +31,8 @@ test_that("simplify validation preserves established earlier condition precedenc
       timeout = 45L
     )
     skip_if(is.null(result), "installed npRmpi unavailable for isolated no-pool contract")
-    expect_true(result$status %in% c(0L, 137L),
-                info = paste(result$output, collapse = "\n"))
+    expect_equal(result$status, 0L,
+                 info = paste(result$output, collapse = "\n"))
     expect_true(result$witnessed,
                 info = paste(result$output, collapse = "\n"))
     return(invisible(NULL))
@@ -80,7 +80,7 @@ test_that("invalid remote-exec simplify never dispatches and preserves the pool"
   )
 
   info <- paste(res$output, collapse = "\n")
-  expect_true(res$status %in% c(0L, 137L), info = info)
+  expect_equal(res$status, 0L, info = info)
   expect_true(any(grepl("SIMPLIFY_REMOTE_NO_DISPATCH_POOL_REUSE_OK",
                         res$output, fixed = TRUE)), info = info)
 })
@@ -123,7 +123,7 @@ test_that("parallel simplify controls reject before work and preserve three-slav
   )
 
   info <- paste(res$output, collapse = "\n")
-  expect_true(res$status %in% c(0L, 137L), info = info)
+  expect_equal(res$status, 0L, info = info)
   expect_true(any(grepl("SIMPLIFY_PARALLEL_NO_WORK_POOL_REUSE_OK",
                         res$output, fixed = TRUE)), info = info)
 })

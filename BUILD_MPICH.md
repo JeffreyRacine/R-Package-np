@@ -179,6 +179,6 @@ A release claim requires more than `R CMD check`. At minimum retain:
 - categorized examples, tests, demos, benchmarks, and rchk results;
 - large-workload scaling evidence.
 
-The known macOS MPICH teardown exit 137 is ignorable only when the proof log
-contains the substantive pass marker/table and a subsequent process scan shows
-that no route-scoped workers remain.
+Every macOS MPICH validation lane must return status zero and leave no
+route-scoped workers.  A substantive pass marker does not excuse a nonzero
+teardown status.

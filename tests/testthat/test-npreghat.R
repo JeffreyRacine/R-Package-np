@@ -8,8 +8,7 @@ test_that("npreghat contracts pass in an isolated MPI subprocess", {
     mustWork = TRUE
   )
   for (block in seq_len(10L)) {
-    # Each block owns its own subprocess MPI session; a success marker makes
-    # the known local MPI teardown 137 harmless for this contract.
+    # Each block owns its own subprocess MPI session and must exit cleanly.
     res <- npRmpi_run_rscript_subprocess(
       lines = c(
         sprintf("source(%s)", shQuote(fixture))
@@ -19,7 +18,7 @@ test_that("npreghat contracts pass in an isolated MPI subprocess", {
     )
 
     info <- paste(res$output, collapse = "\n")
-    expect_true(res$status %in% c(0L, 137L), info = info)
+    expect_equal(res$status, 0L, info = info)
     expect_true(
       any(grepl(sprintf("NPREGHAT_FIXTURE_BLOCK_OK %d", block),
                 res$output,

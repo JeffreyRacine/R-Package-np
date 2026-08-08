@@ -122,7 +122,7 @@ test_that("npseed synchronizes the C backend across an active MPI pool", {
   )
 
   info <- paste(res$output, collapse = "\n")
-  expect_true(res$status %in% c(0L, 137L), info = info)
+  expect_equal(res$status, 0L, info = info)
   expect_true(any(grepl("NPSEED_ACTIVE_POOL_OK", res$output, fixed = TRUE)),
               info = info)
 })

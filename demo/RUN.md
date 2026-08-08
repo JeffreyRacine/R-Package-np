@@ -59,9 +59,9 @@ The `tools/makefile` is the source of truth for launch semantics:
 - all mode loops are fail-fast per demo by default; set
   `CONTINUE_ON_ERROR=true` for archive/sentinel comparison runs where known
   failures should be recorded and the remaining demos should continue.
-- session scripts run under `setsid` when available so MPI spawn/finalize
-  signals do not terminate the launcher shell; the launcher cleans up spawned
-  slave daemons after each session demo.
+- session scripts run directly and must return status zero; package session
+  shutdown owns its spawned slaves.  The launcher never uses broad process-name
+  matching to terminate processes that may belong to another session.
 - session mode skips demos that do not yet have an explicit
   `*_npRmpi_session.R` script, so broad legacy demo sets remain runnable while
   session coverage is expanded family by family.

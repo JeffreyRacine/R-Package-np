@@ -84,5 +84,4 @@ Loopback settings are not multi-host release evidence.
 - After failures or timeouts, identify and clean only route-scoped processes.
 - Do not call a route validated merely because package loading or compilation
   succeeded; use an installed tarball and substantive runtime sentinels.
-- A teardown exit 137 is ignorable only after substantive pass output and proof
-  that no route-scoped workers remain.
+- Every session must return status zero and leave no route-scoped workers.

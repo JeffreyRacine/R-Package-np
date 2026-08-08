@@ -38,7 +38,7 @@ test_that("MPI examples from man pages work in an isolated session", {
   )
 
   info <- paste(res$output, collapse = "\n")
-  expect_true(res$status %in% c(0L, 137L), info = info)
+  expect_equal(res$status, 0L, info = info)
   expect_true(any(grepl("MPI_EXAMPLES_SUBPROCESS_OK", res$output, fixed = TRUE)),
               info = info)
 })

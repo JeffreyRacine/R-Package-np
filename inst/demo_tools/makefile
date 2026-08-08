@@ -11,8 +11,6 @@ NP_DEMO_CASES ?=
 NP_DEMO_MATRIX ?=
 RPROFILE ?= $(if $(wildcard $(DEMO_SRC)/../inst/Rprofile),$(DEMO_SRC)/../inst/Rprofile,$(if $(wildcard $(DEMO_SRC)/../.Rprofile),$(DEMO_SRC)/../.Rprofile,$(shell Rscript -e 'cat(system.file("Rprofile", package="npRmpi"))')))
 RSCRIPT_BIN ?= $(shell R RHOME)/bin/Rscript
-SETSID_BIN ?= $(shell command -v setsid 2>/dev/null)
-SESSION_LAUNCH = $(if $(SETSID_BIN),$(SETSID_BIN),)
 MPI_ENV_NP_DEMO_N = $(if $(NP_DEMO_N),-env NP_DEMO_N $(NP_DEMO_N),)
 MPI_ENV_NP_DEMO_N_FRAC = $(if $(NP_DEMO_N_FRAC),-env NP_DEMO_N_FRAC $(NP_DEMO_N_FRAC),)
 MPI_ENV_NP_DEMO_SRC = -env NP_DEMO_SRC $(DEMO_SRC)
@@ -100,16 +98,14 @@ run-session:
 			echo "[session][nslaves=$(NSLAVES)] $$d SKIPPED (no session demo script)"; \
 			continue; \
 		fi; \
-		if $(SESSION_LAUNCH) env NP_DEMO_SRC=$(DEMO_SRC) NP_DEMO_TIER=$(NP_DEMO_TIER) NP_DEMO_CASES="$(NP_DEMO_CASES)" NP_DEMO_MATRIX="$(NP_DEMO_MATRIX)" NP_DEMO_N=$(NP_DEMO_N) NP_DEMO_N_FRAC=$(NP_DEMO_N_FRAC) NP_DEMO_NSLAVES=$(NSLAVES) $(RSCRIPT_BIN) --vanilla $(DEMO_SRC)/$${d}_npRmpi_session.R > "$$tmp_file" 2>&1; then \
+		if env NP_DEMO_SRC=$(DEMO_SRC) NP_DEMO_TIER=$(NP_DEMO_TIER) NP_DEMO_CASES="$(NP_DEMO_CASES)" NP_DEMO_MATRIX="$(NP_DEMO_MATRIX)" NP_DEMO_N=$(NP_DEMO_N) NP_DEMO_N_FRAC=$(NP_DEMO_N_FRAC) NP_DEMO_NSLAVES=$(NSLAVES) $(RSCRIPT_BIN) --vanilla $(DEMO_SRC)/$${d}_npRmpi_session.R > "$$tmp_file" 2>&1; then \
 			{ $(PROVENANCE_CMD); cat "$$tmp_file"; } > "$$out_file"; \
 			rm -f "$$tmp_file"; \
-			pgrep -f 'slavedaemon\.R|Rslaves\.sh' | xargs kill >/dev/null 2>&1 || true; \
 			: ; \
 		else \
 			status=$$?; \
 			{ $(PROVENANCE_CMD); test -s "$$tmp_file" && cat "$$tmp_file"; echo "DEMO_STATUS demo=$$d mode=session nslaves=$(NSLAVES) status=failed exit_code=$$status timeout_sec=NA"; } > "$$out_file"; \
 			rm -f "$$tmp_file"; \
-			pgrep -f 'slavedaemon\.R|Rslaves\.sh' | xargs kill >/dev/null 2>&1 || true; \
 			echo "[session][nslaves=$(NSLAVES)] $$d FAILED"; \
 			if test "$(CONTINUE_ON_ERROR)" = "true"; then continue; else exit 1; fi; \
 		fi; \

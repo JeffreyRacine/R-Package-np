@@ -91,9 +91,8 @@ if (identical(mode, "serial")) {
   result$nslaves <- nslaves
   result$comm_size <- info$comm_size
 
-  # Write substantive results before teardown. A known teardown exit 137 is
-  # classifiable only when this file is complete and no route-scoped workers
-  # remain after the subprocess exits.
+  # Write substantive results before teardown; the process must also return
+  # status zero and leave no route-scoped workers after it exits.
   saveRDS(result, output, version = 3L)
   npRmpi.quit(force = TRUE)
   closed <- TRUE
