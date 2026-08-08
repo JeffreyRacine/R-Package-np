@@ -27,7 +27,8 @@ SEXP C_np_entropy_gaussian_integrand(SEXP xy,
   const double *y_ptr;
   const double *bw;
   double *answer_ptr;
-  double bw_joint_product;
+  double inverse_bandwidth[4];
+  double inverse_bw_joint_product;
   R_xlen_t n;
   int n_eval;
   int interrupt_countdown = NP_ENTROPY_INTERRUPT_INTERVAL;
@@ -53,6 +54,7 @@ SEXP C_np_entropy_gaussian_integrand(SEXP xy,
   for (int k = 0; k < 4; ++k) {
     if (!R_FINITE(bw[k]) || bw[k] <= 0.0)
       Rf_error("entropy integration bandwidths must be finite and positive");
+    inverse_bandwidth[k] = 1.0 / bw[k];
   }
 
   n_eval = INTEGER(xy_dim)[1];
@@ -61,7 +63,7 @@ SEXP C_np_entropy_gaussian_integrand(SEXP xy,
   xy_ptr = REAL(xy);
   x_ptr = REAL(x);
   y_ptr = REAL(y);
-  bw_joint_product = bw[2] * bw[3];
+  inverse_bw_joint_product = inverse_bandwidth[2] * inverse_bandwidth[3];
 
   for (int j = 0; j < n_eval; ++j) {
     const double eval_x = xy_ptr[2 * j];
@@ -71,10 +73,10 @@ SEXP C_np_entropy_gaussian_integrand(SEXP xy,
     long double sum_joint = 0.0L;
 
     for (R_xlen_t i = 0; i < n; ++i) {
-      const double z_x = (eval_x - x_ptr[i]) / bw[0];
-      const double z_y = (eval_y - y_ptr[i]) / bw[1];
-      const double z_joint_x = (eval_x - x_ptr[i]) / bw[2];
-      const double z_joint_y = (eval_y - y_ptr[i]) / bw[3];
+      const double z_x = (eval_x - x_ptr[i]) * inverse_bandwidth[0];
+      const double z_y = (eval_y - y_ptr[i]) * inverse_bandwidth[1];
+      const double z_joint_x = (eval_x - x_ptr[i]) * inverse_bandwidth[2];
+      const double z_joint_y = (eval_y - y_ptr[i]) * inverse_bandwidth[3];
       const double kernel_x = normal_constant * exp(-0.5 * z_x * z_x);
       const double kernel_y = normal_constant * exp(-0.5 * z_y * z_y);
       const double kernel_joint = bivariate_normal_constant * exp(
@@ -83,7 +85,7 @@ SEXP C_np_entropy_gaussian_integrand(SEXP xy,
 
       sum_x += kernel_x;
       sum_y += kernel_y;
-      sum_joint += kernel_joint / bw_joint_product;
+      sum_joint += kernel_joint * inverse_bw_joint_product;
 
       if (--interrupt_countdown == 0) {
         R_CheckUserInterrupt();
@@ -93,9 +95,9 @@ SEXP C_np_entropy_gaussian_integrand(SEXP xy,
 
     {
       const double density_x =
-        ((double)(sum_x / (long double)n)) / bw[0];
+        ((double)(sum_x / (long double)n)) * inverse_bandwidth[0];
       const double density_y =
-        ((double)(sum_y / (long double)n)) / bw[1];
+        ((double)(sum_y / (long double)n)) * inverse_bandwidth[1];
       const double density_joint =
         (double)(sum_joint / (long double)n);
       const double delta = sqrt(density_joint) -

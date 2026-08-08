@@ -1,5 +1,10 @@
 # npRmpi 0.70-6
 
+* Gaussian entropy integration now hoists validated bandwidth reciprocals out
+  of its training-by-evaluation kernel loop. This removes repeated divisions
+  from `npdeptest()` and `npsdeptest(method = "integration")` without changing
+  bandwidths, bootstrap decisions, storage order, or asymptotic memory use.
+
 * General bounded conditional-density CVLS now reuses each response-side
   quadrature kernel tile across a memory-bounded group of rank-owned
   explanatory-row tiles. Ordinary and beta kernels share the same canonical
