@@ -1,5 +1,13 @@
 # npRmpi 0.70-6
 
+* Degree-zero conditional-density and conditional-distribution CVLS objectives
+  now enter the same canonical all-large explanatory-bandwidth context as
+  positive-degree local polynomials. The width-one case uses its implicit unit
+  basis and scalar Gram inverse, avoiding the dense locally weighted pass while
+  preserving delete-one objective semantics and linear rank-local storage.
+  Conditional-distribution tree rows now translate their independent response
+  permutation once at the shared indicator boundary.
+
 * Fixed-bandwidth two-predictor local-linear CV objectives now keep sparse
   tree rows resident and accumulate the same unique symmetric Gram triangle as
   the canonical dense width-three engine before using their shared mirror,

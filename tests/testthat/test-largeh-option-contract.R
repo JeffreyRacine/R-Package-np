@@ -336,6 +336,49 @@ test_that("np.largeh toggles conditional density eval-only fast counts", {
               info = paste(res$output, collapse = "\n"))
 })
 
+test_that("np.largeh covers degree-zero conditional CVLS objectives", {
+  skip_on_cran()
+  env <- npRmpi_subprocess_env()
+  skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
+
+  res <- npRmpi_run_rscript_subprocess(
+    lines = c(
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "old <- options(np.messages = FALSE, np.largeh = TRUE)",
+      "on.exit(options(old), add = TRUE)",
+      "npRmpi.init(nslaves = 1, quiet = TRUE)",
+      "on.exit(try(npRmpi.quit(force = TRUE), silent = TRUE), add = TRUE)",
+      "set.seed(106)",
+      "n <- 80L",
+      "x <- data.frame(x = runif(n))",
+      "y <- data.frame(y = 1 + 2*x$x + rnorm(n, sd = 0.25))",
+      "common <- list(xdat=x, ydat=y, bws=c(0.24,1e8), regtype='lc', bwmethod='cv.ls', cxkertype='epanechnikov', cykertype='epanechnikov', bandwidth.compute=FALSE)",
+      "dbw <- do.call(npcdensbw, common)",
+      "Fbw <- do.call(npcdistbw, common)",
+      "for(tree in c(FALSE, TRUE)){",
+      "  options(np.tree=tree, np.largeh=TRUE)",
+      "  de <- npRmpi:::.npcdensbw_eval_only(x,y,dbw)",
+      "  Fe <- npRmpi:::.npcdistbw_eval_only(x,y,bws=Fbw,do.full.integral=TRUE)",
+      "  options(np.largeh=FALSE)",
+      "  dd <- npRmpi:::.npcdensbw_eval_only(x,y,dbw)",
+      "  Fd <- npRmpi:::.npcdistbw_eval_only(x,y,bws=Fbw,do.full.integral=TRUE)",
+      "  stopifnot(isTRUE(all.equal(de$objective,dd$objective,tolerance=1e-10)))",
+      "  stopifnot(isTRUE(all.equal(Fe$objective,Fd$objective,tolerance=1e-10)))",
+      "  stopifnot(de$num.feval.fast == 1, Fe$num.feval.fast == 1)",
+      "  stopifnot(dd$num.feval.fast == 0, Fd$num.feval.fast == 0)",
+      "}",
+      "cat('CONDITIONAL_LC_CVLS_LARGEH_OK\\n')"
+    ),
+    timeout = 60L,
+    env = env
+  )
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("CONDITIONAL_LC_CVLS_LARGEH_OK", res$output,
+                        fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
+
 test_that("np.largeh toggles unconditional distribution bandwidth fast counts", {
   skip_on_cran()
   env <- npRmpi_subprocess_env()
