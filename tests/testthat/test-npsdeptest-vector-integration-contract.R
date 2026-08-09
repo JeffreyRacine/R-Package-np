@@ -5,9 +5,9 @@ test_that("npsdeptest vector integration preserves a skewed-series oracle", {
   set.seed(84004)
   x <- rexp(20) - 1 + 0.25 * rt(20, df = 5)
   expected.bootstrap <- c(
-    0.00765793447646022, 0.00153415714572756, 0.00643904204910143,
-    0.00742057868607986, 0.00336669954750157, 0.00284925889569732,
-    0.00634086050185455, 0.00169752807402632, 0.00198953097270689
+    0.00765792704386238, 0.00153415516298009, 0.00643904665444113,
+    0.00742057756031198, 0.00336669996687301, 0.00284925725849309,
+    0.00634086244940879, 0.00169753885446266, 0.00198952590559565
   )
 
   out <- npsdeptest(
@@ -15,9 +15,9 @@ test_that("npsdeptest vector integration preserves a skewed-series oracle", {
     boot.num = 9, random.seed = 184004
   )
 
-  expect_lte(abs(out$Srho - 0.00563360528836586), 1e-9)
+  expect_lte(abs(out$Srho - 0.00563360665739774), 1e-10)
   expect_lte(max(abs(as.numeric(out$Srho.bootstrap.mat) -
-                     expected.bootstrap)), 1e-9)
+                     expected.bootstrap)), 1e-10)
   expect_identical(dim(out$Srho.bootstrap.mat), c(9L, 1L))
   expect_identical(out$P, 4 / 9)
   expect_identical(out$P.cumulant, 4 / 9)

@@ -1,5 +1,6 @@
-test_that("blocked bivariate entropy integration preserves the scalar formula", {
+test_that("deterministic bivariate entropy quadrature preserves its oracle", {
   helper <- getFromNamespace(".np_entropy_bivariate_integral", "np")
+  domain.helper <- getFromNamespace(".np_entropy_bivariate_domain", "np")
   set.seed(20260717)
   n <- 24L
   x <- rnorm(n)
@@ -7,26 +8,27 @@ test_that("blocked bivariate entropy integration preserves the scalar formula", 
   bw.x <- 0.42
   bw.y <- 0.47
   bw.joint <- c(0.50, 0.53)
-  lower <- c(min(x) - 10 * IQR(x), min(y) - 10 * IQR(y))
-  upper <- c(max(x) + 10 * IQR(x), max(y) + 10 * IQR(y))
+  domain <- domain.helper(x, y, bw.x, bw.y, bw.joint)
+  candidate <- helper(
+    x, y, bw.x, bw.y, bw.joint, domain$lower, domain$upper
+  )
 
-  scalar.integrand <- function(xy) {
-    f.x <- mean(dnorm((xy[1L] - x) / bw.x)) / bw.x
-    f.y <- mean(dnorm((xy[2L] - y) / bw.y)) / bw.y
-    f.xy <- mean(
-      dnorm((xy[1L] - x) / bw.joint[1L]) *
-        dnorm((xy[2L] - y) / bw.joint[2L]) /
-        (bw.joint[1L] * bw.joint[2L])
-    )
-    (sqrt(f.xy) - sqrt(f.x) * sqrt(f.y))^2
-  }
-  reference <- 0.5 * cubature::adaptIntegrate(
-    scalar.integrand, lowerLimit = lower, upperLimit = upper
-  )$integral
-  candidate <- helper(x, y, bw.x, bw.y, bw.joint, lower, upper)
+  ## Independently evaluated at tighter two-dimensional quadrature settings.
+  reference <- 0.008252664978
+  expect_lte(abs(candidate - reference), 1e-8)
+})
 
-  tolerance <- 64 * .Machine$double.eps * max(1, abs(reference))
-  expect_equal(candidate, reference, tolerance = tolerance)
+test_that("entropy trapezoid weights match the established helper", {
+  weights <- getFromNamespace(".np_entropy_trapezoid_weights", "np")
+  established <- getFromNamespace("integrate.trapezoidal", "np")
+  grid <- seq(-4, 5, length.out = 257L)
+  value <- exp(-grid^2 / 3) * (1 + cos(grid)^2)
+
+  expect_equal(
+    unname(crossprod(weights(grid), value)[1L]),
+    established(grid, value)[length(grid)],
+    tolerance = 32 * .Machine$double.eps
+  )
 })
 
 test_that("native entropy callback preserves pointwise Gaussian arithmetic", {

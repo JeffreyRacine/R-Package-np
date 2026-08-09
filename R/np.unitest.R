@@ -21,6 +21,7 @@ npunitest <- function(data.x = NULL,
   if(is.numeric(data.x) && (max(data.x) < min(data.y) || max(data.y) < min(data.x))) .np_warning("non-overlapping empirical distributions (see `Details' in ?npunidist)")
 
   method <- match.arg(method)
+  entropy.fast.gaussian <- length(list(...)) == 0L
 
   ## Save seed prior to setting
 
@@ -87,6 +88,11 @@ npunitest <- function(data.x = NULL,
         ## evaluating. This is proper and avoids division by
         ## zero. Note the difference between integration and summation
         ## in this case when the variables do not share common support.
+        if(entropy.fast.gaussian) {
+          return(.np_entropy_univariate_gaussian_summation(
+            data.x, data.y, bw.x, bw.y
+          ))
+        }
         f.data.x <- fitted(npudens(tdat=data.x,edat=data.x,bws=bw.x,...))
         f.data.y <- fitted(npudens(tdat=data.y,edat=data.x,bws=bw.y,...))
         summand <- f.data.y/f.data.x
@@ -104,14 +110,20 @@ npunitest <- function(data.x = NULL,
         return(Srho)
       } else {
         ## Integration
-        h <- function(x,data.x,data.y) {
-          f.data.x <- fitted(npudens(tdat=data.x,edat=x,bws=bw.x,...))
-          f.data.y <- fitted(npudens(tdat=data.y,edat=x,bws=bw.y,...))
-          return(0.5*(sqrt(f.data.x)-sqrt(f.data.y))**2)
+        if(entropy.fast.gaussian) {
+          return(.np_entropy_univariate_gaussian_integral(
+            data.x, data.y, bw.x, bw.y
+          ))
+        } else {
+          h <- function(x,data.x,data.y) {
+            f.data.x <- fitted(npudens(tdat=data.x,edat=x,bws=bw.x,...))
+            f.data.y <- fitted(npudens(tdat=data.y,edat=x,bws=bw.y,...))
+            return(0.5*(sqrt(f.data.x)-sqrt(f.data.y))**2)
+          }
+          return.integrate <- integrate(h,-Inf,Inf,subdivisions=1e+05,stop.on.error=FALSE,data.x=data.x,data.y=data.y)
+          if(return.integrate$message != "OK") .np_warning(return.integrate$message)
+          return(return.integrate$value)
         }
-        return.integrate <- integrate(h,-Inf,Inf,subdivisions=1e+05,stop.on.error=FALSE,data.x=data.x,data.y=data.y)      
-        if(return.integrate$message != "OK") .np_warning(return.integrate$message)
-        return(return.integrate$value)
       }
     } else {
       xeval <- unique(data.x)
@@ -159,19 +171,46 @@ npunitest <- function(data.x = NULL,
     resampled.stat <- numeric(boot.num)
     progress <- .np_progress_begin("Bootstrap replications", total = boot.num, surface = "bootstrap")
 
-    for (b in seq_len(boot.num)) {
-      progress <- .np_progress_step(progress, done = b)
+    if(method == "integration" && is.numeric(data.x) &&
+       entropy.fast.gaussian) {
+      bootstrap.result <- .np_entropy_univariate_iid_bootstrap(
+        data.null = data.null,
+        size.x = length(data.x),
+        size.y = length(data.y),
+        bw.x = bw.x,
+        bw.y = bw.y,
+        boot.num = boot.num,
+        progress = progress
+      )
+      resampled.stat <- bootstrap.result$values
+      progress <- bootstrap.result$progress
+    } else if(method == "summation" && is.numeric(data.x) &&
+              entropy.fast.gaussian) {
+      bootstrap.result <- .np_entropy_univariate_iid_summation_bootstrap(
+        data.null = data.null,
+        size.x = length(data.x),
+        size.y = length(data.y),
+        bw.x = bw.x,
+        bw.y = bw.y,
+        boot.num = boot.num,
+        progress = progress
+      )
+      resampled.stat <- bootstrap.result$values
+      progress <- bootstrap.result$progress
+    } else {
+      for (b in seq_len(boot.num)) {
+        progress <- .np_progress_step(progress, done = b)
 
-      ## Need to think this through... is the null one density? If so
-      ## resample from that density for both x and y?
-      
-      ## Conduct simple iid bootstrap resamples
-      
-      data.null.x <- data.null[sample.int(length(data.null), size = length(data.x), replace = TRUE)]
-      data.null.y <- data.null[sample.int(length(data.null), size = length(data.y), replace = TRUE)]
+        ## Need to think this through... is the null one density? If so
+        ## resample from that density for both x and y?
 
-      resampled.stat[b] <- Srho.univar(data.null.x,data.null.y,bw.x,bw.y,method=method)
+        ## Conduct simple iid bootstrap resamples
 
+        data.null.x <- data.null[sample.int(length(data.null), size = length(data.x), replace = TRUE)]
+        data.null.y <- data.null[sample.int(length(data.null), size = length(data.y), replace = TRUE)]
+
+        resampled.stat[b] <- Srho.univar(data.null.x,data.null.y,bw.x,bw.y,method=method)
+      }
     }
 
     progress <- .np_progress_end(progress)
