@@ -1,27 +1,30 @@
-test_that("npsdeptest summation density helper matches npudens", {
+test_that("fused bivariate summation matches direct npudens densities", {
   skip_on_cran()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
 
-  density_fast <- getFromNamespace(".np_sdeptest_fixed_density", "npRmpi")
+  helper <- getFromNamespace(
+    ".np_entropy_bivariate_gaussian_summation", "npRmpi"
+  )
+  x <- c(-2.5, -1, -1, -0.2, 0.3, 1.8, 4.5)
+  y <- c(3.2, 0.1, 0.1, -1.7, 0.8, 2.4, 8.0)
+  bw.x <- 0.73
+  bw.y <- 1.21
+  bw.joint <- c(0.81, 1.08)
 
-  cases <- list(
-    list(
-      data = c(-2.5, -1, -1, -0.2, 0.3, 1.8, 4.5),
-      bw = 0.73
-    ),
-    list(
-      data = cbind(
-        x = c(-2.5, -1, -1, -0.2, 0.3, 1.8, 4.5),
-        y = c(3.2, 0.1, 0.1, -1.7, 0.8, 2.4, 8.0)
-      ),
-      bw = c(0.73, 1.21)
-    )
+  density.x <- fitted(npudens(tdat = x, bws = bw.x))
+  density.y <- fitted(npudens(tdat = y, bws = bw.y))
+  density.joint <- fitted(npudens(
+    tdat = cbind(x, y), bws = bw.joint
+  ))
+  reference <- 0.5 * mean(
+    (1 - sqrt(density.x * density.y / density.joint))^2
   )
 
-  for (case in cases) {
-    reference <- fitted(npudens(tdat = case$data, bws = case$bw))
-    expect_identical(density_fast(case$data, case$bw), reference)
-  }
+  expect_equal(
+    helper(x, y, bw.x, bw.y, bw.joint),
+    reference,
+    tolerance = 128 * .Machine$double.eps
+  )
 })
 
 test_that("npsdeptest summation route retains its public result shape", {

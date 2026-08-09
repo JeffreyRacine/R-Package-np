@@ -145,19 +145,26 @@ Further arguments are passed to the bandwidth-selection routines used by the tes
   messages are produced should this occur (\sQuote{integration recommended})
   and should be heeded.
 
-  For numeric data when no density options are supplied through
-  \code{...}, the default Gaussian integration
+  For numeric data using the fixed second-order Gaussian density
+  estimator, the integration
   statistic uses deterministic corrected composite trapezoidal
   quadrature with four evaluation points per bandwidth and a domain
   extending eight bandwidths beyond the observed support. The density
   of each reflected bootstrap sample is obtained by reversing the
   density values on a grid symmetric about that sample's mean; the same
   reflection identity also avoids fitting a second density on the
-  summation route. This preserves the selected iid or
-  stationary-bootstrap sampling law while avoiding adaptive integration.
-  Supplying density options
-  through \code{...} retains the corresponding kernel-specific
-  numerical integration route.
+  summation route. For summation, the selected iid or stationary
+  bootstrap plan is generated once with the \pkg{boot} sampling law,
+  converted to bounded chunks of multiplicities, and evaluated by a
+  registered native routine without a sample-by-sample kernel matrix.
+
+  The accelerated route is also used when \code{...} contains only
+  \code{bwtype="fixed"}, \code{ckertype="gaussian"}, and
+  \code{ckerorder=2}. Other density options retain the general
+  kernel-specific route. Generalized and adaptive nearest-neighbour
+  bandwidths therefore continue to use the ordered, duplicate-preserving
+  bootstrap sample and recompute realized neighbour radii rather than
+  treating multiplicities as fixed-bandwidth weights.
 
 }
 

@@ -55,6 +55,7 @@
                                               bw.y,
                                               Srho.univar,
                                               method,
+                                              fast.fixed.gaussian = FALSE,
                                               progress = NULL,
                                               comm = 1L) {
   boot.num <- nrow(plan$x)
@@ -71,15 +72,44 @@
     fields = list(rank = rank, size = size, B = boot.num, local = length(local.idx))
   )
 
-  local.Srho <- numeric(length(local.idx))
-
-  for (jj in seq_along(local.idx)) {
-    b <- local.idx[[jj]]
-    data.null.x <- data.null[plan$x[b, ]]
-    data.null.y <- data.null[plan$y[b, ]]
-    local.Srho[[jj]] <- .npRmpi_with_local_regression(
-      Srho.univar(data.null.x, data.null.y, bw.x, bw.y, method = method)
+  if (isTRUE(fast.fixed.gaussian) && length(local.idx)) {
+    support.length <- length(data.null)
+    chunk.size <- .np_entropy_count_chunk_size(
+      support.length, bytes.per.support = 80, max.chunk = 16L
     )
+    local.Srho <- numeric(length(local.idx))
+    for (start in seq.int(1L, length(local.idx), by = chunk.size)) {
+      chunk <- start:min(length(local.idx), start + chunk.size - 1L)
+      replications <- local.idx[chunk]
+      counts.x <- vapply(
+        replications,
+        function(b) tabulate(plan$x[b, ], nbins = support.length),
+        integer(support.length)
+      )
+      counts.y <- vapply(
+        replications,
+        function(b) tabulate(plan$y[b, ], nbins = support.length),
+        integer(support.length)
+      )
+      local.Srho[chunk] <- .Call(
+        "C_np_entropy_univariate_summation_counts",
+        as.double(data.null),
+        matrix(as.double(counts.x), nrow = support.length),
+        matrix(as.double(counts.y), nrow = support.length),
+        as.double(c(bw.x, bw.y)),
+        PACKAGE = "npRmpi"
+      )
+    }
+  } else {
+    local.Srho <- numeric(length(local.idx))
+    for (jj in seq_along(local.idx)) {
+      b <- local.idx[[jj]]
+      data.null.x <- data.null[plan$x[b, ]]
+      data.null.y <- data.null[plan$y[b, ]]
+      local.Srho[[jj]] <- .npRmpi_with_local_regression(
+        Srho.univar(data.null.x, data.null.y, bw.x, bw.y, method = method)
+      )
+    }
   }
 
   invisible(gc(FALSE))
@@ -142,7 +172,7 @@ npunitest <- function(data.x = NULL,
   if(is.numeric(data.x) && (max(data.x) < min(data.y) || max(data.y) < min(data.x))) .np_warning("non-overlapping empirical distributions (see `Details' in ?npunidist)")
 
   method <- match.arg(method)
-  entropy.fast.gaussian <- length(list(...)) == 0L
+  entropy.fast.gaussian <- .np_entropy_uses_default_fixed_gaussian(list(...))
 
   ## Save seed prior to setting
 
@@ -306,6 +336,8 @@ npunitest <- function(data.x = NULL,
         bw.y = bw.y,
         Srho.univar = Srho.univar,
         method = method,
+        fast.fixed.gaussian = method == "summation" &&
+          is.numeric(data.x) && entropy.fast.gaussian,
         progress = progress
       )
       assign(".Random.seed", post.boot.seed, envir = .GlobalEnv)

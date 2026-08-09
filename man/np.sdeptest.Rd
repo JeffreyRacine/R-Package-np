@@ -150,6 +150,11 @@ These arguments control bootstrap execution and reproducibility settings.
   computationally demanding than \code{summation}, but avoids the density
   division that can make the summation statistic unstable.
 
+  The \code{summation} version fuses both marginal density sums and the
+  joint density sum in one registered native pass with constant auxiliary
+  storage. Bootstrap samples remain ordered index resamples: marginal
+  counts alone cannot represent the lag pairs used by the statistic.
+
 }
 
 \seealso{

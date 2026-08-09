@@ -58,6 +58,8 @@
 
 .npRmpi_sym_collective_bootstrap <- function(plan,
                                              boot.eval,
+                                             fast.data.null = NULL,
+                                             fast.bandwidth = NULL,
                                              progress = NULL,
                                              method,
                                              comm = 1L) {
@@ -72,13 +74,36 @@
     fields = list(rank = rank, size = size, B = boot.num, local = length(local.idx), method = method)
   )
 
-  local.Srho <- numeric(length(local.idx))
-
-  for (jj in seq_along(local.idx)) {
-    ii <- local.idx[[jj]]
-    local.Srho[[jj]] <- .npRmpi_with_local_regression(
-      boot.eval(plan[ii, ])
+  if (!is.null(fast.data.null) && length(local.idx)) {
+    support.length <- length(fast.data.null)
+    chunk.size <- .np_entropy_count_chunk_size(
+      support.length, bytes.per.support = 8, max.chunk = 64L
     )
+    local.Srho <- numeric(length(local.idx))
+    for (start in seq.int(1L, length(local.idx), by = chunk.size)) {
+      chunk <- start:min(length(local.idx), start + chunk.size - 1L)
+      replications <- local.idx[chunk]
+      counts <- vapply(
+        replications,
+        function(ii) tabulate(plan[ii, ], nbins = support.length),
+        integer(support.length)
+      )
+      local.Srho[chunk] <- .Call(
+        "C_np_entropy_symmetric_summation_counts",
+        as.double(fast.data.null),
+        matrix(as.double(counts), nrow = support.length),
+        as.double(fast.bandwidth),
+        PACKAGE = "npRmpi"
+      )
+    }
+  } else {
+    local.Srho <- numeric(length(local.idx))
+    for (jj in seq_along(local.idx)) {
+      ii <- local.idx[[jj]]
+      local.Srho[[jj]] <- .npRmpi_with_local_regression(
+        boot.eval(plan[ii, ])
+      )
+    }
   }
 
   invisible(gc(FALSE))
@@ -139,7 +164,7 @@ npsymtest <- function(data = NULL,
 
   boot.method <- match.arg(boot.method)
   method <- match.arg(method)
-  entropy.fast.gaussian <- length(list(...)) == 0L
+  entropy.fast.gaussian <- .np_entropy_uses_default_fixed_gaussian(list(...))
 
   ## Save seed prior to setting
 
@@ -324,32 +349,8 @@ npsymtest <- function(data = NULL,
     ## bootstrap with a block length of 1 which is presumed to
     ## generate an iid bootstrap.
 
-    if (collective.bootstrap) {
-      plan <- .npRmpi_sym_tsboot_index_plan(
-        tseries.idx = tseries.idx,
-        R = boot.num,
-        n.sim = length(data),
-        l = 1,
-        sim = "fixed"
-      )
-      post.boot.seed <- get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
-      resampled.stat <- .npRmpi_sym_collective_bootstrap(
-        plan = plan,
-        boot.eval = boot.eval,
-        progress = boot.state$progress,
-        method = "iid"
-      )
-      assign(".Random.seed", post.boot.seed, envir = .GlobalEnv)
-    } else {
-      resampled.stat <- tsboot(tseries = tseries.idx,
-                               statistic = boot.fun,
-                               R = boot.num,
-                               n.sim = length(data),
-                               l = 1,
-                               sim = "fixed",
-                               data.null = data.null,
-                               bw = bw)$t
-    }
+    boot.blocklen <- 1L
+    boot.sim <- "fixed"
 
   } else {
 
@@ -360,33 +361,52 @@ npsymtest <- function(data = NULL,
       boot.blocklen <- b.star(as.numeric(data.matrix(data)),round=TRUE)[1,1]
     }
 
-    if (collective.bootstrap) {
-      plan <- .npRmpi_sym_tsboot_index_plan(
-        tseries.idx = tseries.idx,
-        R = boot.num,
-        n.sim = length(data),
-        l = boot.blocklen,
-        sim = "geom"
-      )
-      post.boot.seed <- get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
-      resampled.stat <- .npRmpi_sym_collective_bootstrap(
-        plan = plan,
-        boot.eval = boot.eval,
-        progress = boot.state$progress,
-        method = "geom"
-      )
-      assign(".Random.seed", post.boot.seed, envir = .GlobalEnv)
-    } else {
-      resampled.stat <- tsboot(tseries = tseries.idx,
-                               statistic = boot.fun,
-                               R = boot.num,
-                               n.sim = length(data),
-                               l = boot.blocklen,
-                               sim = "geom",
-                               data.null = data.null,
-                               bw = bw)$t
-    }
+    boot.sim <- "geom"
 
+  }
+
+  if (collective.bootstrap) {
+    plan <- .npRmpi_sym_tsboot_index_plan(
+      tseries.idx = tseries.idx,
+      R = boot.num,
+      n.sim = length(data),
+      l = boot.blocklen,
+      sim = boot.sim
+    )
+    post.boot.seed <- get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
+    fast.fixed.gaussian <- is.numeric(data) && method == "summation" &&
+      entropy.fast.gaussian
+    resampled.stat <- .npRmpi_sym_collective_bootstrap(
+      plan = plan,
+      boot.eval = boot.eval,
+      fast.data.null = if (fast.fixed.gaussian) data.null else NULL,
+      fast.bandwidth = if (fast.fixed.gaussian) bw else NULL,
+      progress = boot.state$progress,
+      method = boot.method
+    )
+    assign(".Random.seed", post.boot.seed, envir = .GlobalEnv)
+  } else if (is.numeric(data) && method == "summation" &&
+             entropy.fast.gaussian) {
+    bootstrap.result <- .np_entropy_symmetric_summation_bootstrap(
+      data.null = data.null,
+      sample.size = length(data),
+      bandwidth = bw,
+      boot.num = boot.num,
+      blocklen = boot.blocklen,
+      sim = boot.sim,
+      progress = boot.state$progress
+    )
+    resampled.stat <- matrix(bootstrap.result$values, ncol = 1L)
+    boot.state$progress <- bootstrap.result$progress
+  } else {
+    resampled.stat <- tsboot(tseries = tseries.idx,
+                             statistic = boot.fun,
+                             R = boot.num,
+                             n.sim = length(data),
+                             l = boot.blocklen,
+                             sim = boot.sim,
+                             data.null = data.null,
+                             bw = bw)$t
   }
 
   boot.state$progress <- .np_progress_end(boot.state$progress)

@@ -171,27 +171,13 @@ npdeptest <- function(data.x = NULL,
     
     if(method=="summation") {
       
-      ## Summation version: \sum_i(1-sqrt(f(x_i)f(y_i)/f(x_i,y_i)))^2
-      ## We could code this by hand per below, however, there is no
-      ## performance penalty imposed by sum() so no need.
+      ## Summation version: \sum_i(1-sqrt(f(x_i)f(y_i)/f(x_i,y_i)))^2.
+      ## The fixed Gaussian marginal and joint sums share one native,
+      ## constant-workspace traversal.
       
-      f.x <- .np_entropy_fixed_density(x.dat, bw.x)
-      f.y <- .np_entropy_fixed_density(y.dat, bw.y)
-      f.xy <- .np_entropy_fixed_density(cbind(x.dat, y.dat), bw.joint)
-      summand <- f.x*f.y/f.xy
-      
-      ## In summation version we divide densities which can lead to
-      ## numerical instability issues not present in the integrand
-      ## version (which uses differences instead). We check for this
-      ## case, remove offending points, and warn. This traps -Inf,
-      ## Inf, and NaN.  
-
-      if(!all(is.finite(summand))) {
-        .np_warning(" non-finite value in summation-based statistic: integration recommended")
-        summand <- summand[is.finite(summand)]
-      }
-
-      return(0.5*mean((1-sqrt(summand))**2))
+      return(.np_entropy_bivariate_gaussian_summation(
+        x.dat, y.dat, bw.x, bw.y, bw.joint
+      ))
       
     } else {
       

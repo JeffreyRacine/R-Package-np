@@ -155,6 +155,12 @@ These arguments control bootstrap execution and reproducibility settings.
   computationally demanding than \code{summation}, but avoids the density
   division that can make the summation statistic unstable.
 
+  The \code{summation} version fuses both marginal density sums and the
+  joint density sum in one registered native pass with constant auxiliary
+  storage. Bootstrap resampling remains index based, rather than count
+  based, because the resampled \code{data.x} values must retain their
+  positionwise pairing with \code{data.y}.
+
 }
 
 \seealso{
