@@ -35,10 +35,29 @@ test_that("spawn sessions finalize cleanly at process exit", {
 })
 
 test_that("full-suite runner requires clean direct shard exits", {
-  runner <- testthat::test_path("..", "testthat.R")
-  skip_if_not(file.exists(runner), "source test runner unavailable")
-  text <- paste(readLines(runner, warn = FALSE), collapse = "\n")
+  parent_runner <- testthat::test_path("..", "testthat.R")
+  shard_runner <- testthat::test_path(
+    "..", "validation", "run_full_mpi_test_shard.R"
+  )
+  skip_if_not(
+    file.exists(parent_runner) && file.exists(shard_runner),
+    "source test runners unavailable"
+  )
+  parent_text <- paste(readLines(parent_runner, warn = FALSE), collapse = "\n")
+  shard_text <- paste(readLines(shard_runner, warn = FALSE), collapse = "\n")
 
-  expect_false(grepl("setsid", text, fixed = TRUE))
-  expect_false(grepl("137L", text, fixed = TRUE))
+  expect_false(grepl("setsid", parent_text, fixed = TRUE))
+  expect_false(grepl("137L", parent_text, fixed = TRUE))
+  expect_match(shard_text, "npRmpi_run_full_test_shard <- function(args)",
+               fixed = TRUE)
+  expect_match(shard_text, "npRmpi_shard_has_failures(result_summary)",
+               fixed = TRUE)
+  expect_match(shard_text, "npRmpi.quit(force = TRUE)", fixed = TRUE)
+  expect_match(shard_text, "file.rename(witness_tmp, witness)", fixed = TRUE)
+  expect_match(
+    shard_text,
+    "quit(save = \"no\", status = exit_status, runLast = FALSE)",
+    fixed = TRUE
+  )
+  expect_false(grepl("writeLines(marker, witness)", shard_text, fixed = TRUE))
 })
