@@ -1,5 +1,12 @@
 # npRmpi 0.70-6
 
+* Fixed-bandwidth two-predictor local-linear CV objectives now keep sparse
+  tree rows resident and accumulate the same unique symmetric Gram triangle as
+  the canonical dense width-three engine before using their shared mirror,
+  solve, and uncentered projection. Serial pair enumeration and rank-owned MPI
+  rows share this algebra; MPI still distributes complete outer rows and
+  performs one bounded collective reduction.
+
 * Bootstrap-intensive tests now reuse fixed kernel geometry in bounded,
   rank-local replication groups. `npcmstest()` and `npqcmstest()` keep one
   model refit per draw but contract the resulting residual or score columns
