@@ -13,6 +13,16 @@ with Mixed Data Types }
   Documentation guide: see \code{\link{np.kernels}} for kernels,
   \code{\link{np.options}} for global options, and
   \code{\link{plot}} for plotting options.
+
+  For \code{distribution = "bootstrap"}, each quantile model is still
+  refitted separately using the selected bootstrap law. The resulting score
+  vectors are collected in bounded groups, and the fixed-design kernel
+  contractions for \eqn{I_n} and, when requested, \eqn{\hat\Omega} are
+  evaluated as multi-response kernel sums. This reuses kernel geometry
+  without forming a dense observation-by-observation weight matrix or
+  changing score order, \code{tau}, \code{bwydat}, pivoting, density
+  weighting, or random draws. Each MPI rank batches only its assigned
+  replications; the asymptotic route is unchanged.
 }
 \usage{
 npqcmstest(formula,

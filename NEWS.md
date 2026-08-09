@@ -1,5 +1,17 @@
 # npRmpi 0.70-6
 
+* Bootstrap-intensive tests now reuse fixed kernel geometry in bounded,
+  rank-local replication groups. `npcmstest()` and `npqcmstest()` keep one
+  model refit per draw but contract the resulting residual or score columns
+  through multi-response kernel sums; fixed, unbounded `npdeneqtest()` routes
+  process pooled multiplicity columns while bounded and nearest-neighbour
+  routes keep literal duplicate resampling; and
+  `npdeptest(method = "summation")` uses a bounded native index batch that
+  shares only the invariant response-side marginal work. Draw order, complete
+  bootstrap payloads, bandwidth and model semantics, RNG restoration,
+  progress, rank-count independence, and bounded rank-local workspace are
+  preserved.
+
 * Spawned MPI sessions now finalize the master during an early process-exit
   finalizer, after closing and verifying any retained worker pool, instead of
   deferring finalization until namespace teardown. Normal scripts consequently

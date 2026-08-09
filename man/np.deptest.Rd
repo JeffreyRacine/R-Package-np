@@ -157,9 +157,13 @@ These arguments control bootstrap execution and reproducibility settings.
 
   The \code{summation} version fuses both marginal density sums and the
   joint density sum in one registered native pass with constant auxiliary
-  storage. Bootstrap resampling remains index based, rather than count
-  based, because the resampled \code{data.x} values must retain their
-  positionwise pairing with \code{data.y}.
+  storage. During bootstrapping, each MPI rank processes bounded groups of
+  its sampled \code{data.x} indices and shares the invariant \code{data.y}
+  marginal work while retaining every draw's positionwise pairing, reduction
+  order, and global output order. Rank-local workspace grows only with the
+  sample size times the bounded group size; no dense sample-by-sample kernel
+  matrix is retained. Counts alone are not used because they would discard
+  the required pairing with \code{data.y}.
 
 }
 

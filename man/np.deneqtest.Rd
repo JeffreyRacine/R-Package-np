@@ -108,6 +108,15 @@ Further arguments are passed to the bandwidth-selection routines used by the tes
   identical variables/datatypes. See Li, Maasoumi, and Racine (2009) for
   details.
 
+  With fixed, unbounded bandwidths, pooled bootstrap samples are represented
+  by multiplicities on their common support and processed in bounded groups
+  on each MPI rank. Multi-response kernel sums then reuse the fixed geometry
+  for the first- and second-power contractions without constructing a dense
+  kernel matrix. Bounded-kernel and nearest-neighbour bandwidth routes retain
+  literal duplicate resampling because their boundary corrections or
+  sample-owned radii cannot in general be represented by fixed-support
+  counts.
+
 }
 
 \section{Usage Issues}{
