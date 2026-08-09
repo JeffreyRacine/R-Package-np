@@ -409,6 +409,28 @@
   value
 }
 
+.np_entropy_bivariate_gaussian_summation_xindex <- function(x.dat,
+                                                             y.dat,
+                                                             index,
+                                                             bw.x,
+                                                             bw.y,
+                                                             bw.joint) {
+  value <- .Call(
+    "C_np_entropy_bivariate_summation_xindex",
+    as.double(x.dat),
+    as.double(y.dat),
+    index,
+    as.double(c(bw.x, bw.y, bw.joint)),
+    PACKAGE = "np"
+  )
+  if (any(!is.finite(value))) {
+    .np_warning(
+      " non-finite value in summation-based statistic: integration recommended"
+    )
+  }
+  value
+}
+
 .np_entropy_bivariate_domain <- function(x.dat,
                                          y.dat,
                                          bw.x,

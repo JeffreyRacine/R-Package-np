@@ -77,11 +77,13 @@ npqcmstest <- function(formula,
   bwydat = match.arg(bwydat)  
 
   qresidual <- function(resid, tau) {
+    resid.dim <- dim(resid)
     n.obs <- length(resid)
     out <- rep.int(-tau, n.obs)
     nonmissing <- !is.na(resid)
     out[nonmissing & resid <= 0] <- 1 - tau
     out[!nonmissing] <- NA_real_
+    dim(out) <- resid.dim
     out
   }
 
@@ -183,7 +185,7 @@ npqcmstest <- function(formula,
     mult
   }
 
-  boot.wild <- function(model.resid) {
+  resid.wild <- function(model.resid) {
 
     a <- -0.6180339887499 # (1-sqrt(5))/2
     P.a <-0.72360679774998 # (1+sqrt(5))/(2*sqrt(5))
@@ -202,11 +204,10 @@ npqcmstest <- function(formula,
 
     suppressWarnings(resid <- residuals(rq(y.star~ model$x - 1, tau=tau), type = "response"))
 
-    return(if (pivot) Jn(xdat, resid, bw)
-           else In(xdat, resid, bw))
+    resid
   }
 
-  boot.wild.rademacher <- function(model.resid) {
+  resid.wild.rademacher <- function(model.resid) {
 
     a <- -1
     P.a <- 0.5
@@ -222,11 +223,10 @@ npqcmstest <- function(formula,
 
     suppressWarnings(resid <- residuals(rq(y.star~ model$x - 1, tau=tau), type = "response"))
 
-    return(if (pivot) Jn(xdat, resid, bw)
-           else In(xdat, resid, bw))
+    resid
   }
 
-  boot.iid <- function(model.resid) {
+  resid.iid <- function(model.resid) {
 
     ## Simple iid resampling
 
@@ -234,22 +234,48 @@ npqcmstest <- function(formula,
 
     suppressWarnings(resid <- residuals(rq(y.star~ model$x - 1, tau=tau), type = "response"))
 
-    return(if (pivot) Jn(xdat, resid, bw)
-           else In(xdat, resid, bw))
+    resid
   }
 
   if(distribution == "bootstrap"){
     Sn.bootstrap <- numeric(boot.num)
     progress <- .np_progress_begin("Bootstrap replications", total = boot.num, surface = "bootstrap")
-    for (ii in seq_len(boot.num)) {
-      if(boot.method == "iid"){
-        Sn.bootstrap[ii] <- boot.iid(model.resid)
-      } else if(boot.method == "wild"){
-        Sn.bootstrap[ii] <- boot.wild(model.resid)
-      } else if(boot.method == "wild-rademacher"){
-        Sn.bootstrap[ii] <- boot.wild.rademacher(model.resid)
+    chunk.size <- .np_cms_bootstrap_chunk_size(
+      n = n,
+      boot.num = boot.num,
+      pivot = pivot
+    )
+    for (start in seq.int(1L, boot.num, by = chunk.size)) {
+      stopi <- min(boot.num, start + chunk.size - 1L)
+      idx <- seq.int(start, stopi)
+      residuals.chunk <- matrix(NA_real_, nrow = n, ncol = length(idx))
+
+      for (jj in seq_along(idx)) {
+        ii <- idx[[jj]]
+        residuals.chunk[, jj] <- if(boot.method == "iid") {
+          resid.iid(model.resid)
+        } else if(boot.method == "wild") {
+          resid.wild(model.resid)
+        } else {
+          resid.wild.rademacher(model.resid)
+        }
+        progress <- .np_progress_step(
+          progress,
+          done = ii
+        )
       }
-      progress <- .np_progress_step(progress, done = ii)
+
+      score <- qresidual(residuals.chunk, tau)
+      statistic <- .np_cms_statistics_batch(
+        xdat = xdat,
+        score = score,
+        bw = bw,
+        fhat = fhat,
+        prodh = prodh,
+        pivot = pivot,
+        kernel.args = list(...)
+      )
+      Sn.bootstrap[idx] <- if (pivot) statistic[["Jn"]] else statistic[["In"]]
     }
     progress <- .np_progress_end(progress)
     Sn.bootstrap <- sort(Sn.bootstrap)
