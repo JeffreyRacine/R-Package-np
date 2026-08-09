@@ -34478,7 +34478,13 @@ static int np_conditional_lp_all_large_ctx_prepare_core(double *vector_scale_fac
   if((!allow_tree) &&
      ((int_TREE_X == NP_TREE_TRUE) || (int_TREE_Y == NP_TREE_TRUE)))
     return 1;
-  if((num_train <= 0) || (num_reg_continuous_extern <= 0))
+  if(num_train <= 0)
+    return 1;
+  /* A scalar/degree-zero LP design has an implicit unit basis and therefore
+     remains well-defined when every X kernel is discrete and constant.  The
+     general LP engine still requires at least one continuous predictor. */
+  if((np_lp_engine_extern == NP_LP_ENGINE_GENERAL) &&
+     (num_reg_continuous_extern <= 0))
     return 1;
   if((np_lp_engine_extern == NP_LP_ENGINE_GENERAL) &&
      (vector_glp_degree_extern == NULL))
@@ -34536,7 +34542,9 @@ static int np_conditional_lp_all_large_ctx_prepare_core(double *vector_scale_fac
                            lambdax) == 1)
     goto cleanup_all_large_prepare;
 
-  if(!np_reg_cv_all_large_gate(BANDWIDTH_den_extern,
+  if(!np_reg_cv_all_large_gate(
+                               (num_reg_continuous_extern == 0) ?
+                               BW_FIXED : BANDWIDTH_den_extern,
                                num_train,
                                num_reg_continuous_extern,
                                num_reg_unordered_extern,

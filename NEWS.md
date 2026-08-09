@@ -1,5 +1,12 @@
 # npRmpi 0.70-6
 
+* Fixed-bandwidth degree-zero conditional-density CVLS now recognizes an
+  all-categorical explanatory side at its constant upper kernel limit as the
+  canonical global-X design. This restores the unconditional-density limit,
+  including the ordered Li-Racine case, and avoids redundant conditional X
+  weighting. Generalized/adaptive NN and response-side kernel limits are
+  unchanged.
+
 * Degree-zero conditional-density and conditional-distribution CVLS objectives
   now enter the same canonical all-large explanatory-bandwidth context as
   positive-degree local polynomials. The width-one case uses its implicit unit
