@@ -1,5 +1,16 @@
 # np 0.70-6
 
+* Bootstrap-intensive tests now reuse fixed kernel geometry in bounded
+  replication groups. `npcmstest()` and `npqcmstest()` keep one model refit
+  per draw but contract the resulting residual or score columns through
+  multi-response kernel sums; fixed, unbounded `npdeneqtest()` routes process
+  pooled multiplicity columns while bounded and nearest-neighbour routes keep
+  literal duplicate resampling; and `npdeptest(method = "summation")` uses a
+  bounded native index batch that shares only the invariant response-side
+  marginal work. Draw order, complete bootstrap payloads, bandwidth and model
+  semantics, RNG restoration, progress, and linear auxiliary-memory scaling
+  are preserved.
+
 * Fixed-bandwidth fourth- and sixth-order Gaussian convolution rows now hoist
   their invariant normalization scale out of the observation loop. Conditional
   CVLS objective values are unchanged while the affected higher-order kernel
