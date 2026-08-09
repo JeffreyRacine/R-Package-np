@@ -143,13 +143,18 @@ Further arguments are passed to the bandwidth-selection routines used by the tes
    messages are produced when this occurs (\sQuote{integration recommended})
    and should be heeded.
 
-   Numerical integration can occasionally fail when the \code{data.x}
-   and \code{data.y} distributions lack common support and/or lie an
-   extremely large distance from one another (the statistic in such
-   cases will be reported as exactly 0.5 or 0). However, in these
-   extreme cases, simple tests will reveal the obvious differences in
-   the distributions and entropy-based tests for equality will be
-   clearly unnecessary.
+   For numeric data when no density options are supplied through
+   \code{...}, the default Gaussian integration
+   statistic uses deterministic corrected composite trapezoidal
+   quadrature. The integration domain extends eight bandwidths beyond
+   the pooled observed support and uses four evaluation points per
+   smallest bandwidth. During a default numeric iid bootstrap,
+   resampling counts are evaluated in bounded chunks on the same
+   quadrature grid for \code{integration} or on the original support for
+   \code{summation}. This avoids repeated adaptive integration and
+   repeated reconstruction of resampled data.
+   Supplying density options through \code{...} retains the
+   corresponding kernel-specific numerical integration route.
 
 }
 

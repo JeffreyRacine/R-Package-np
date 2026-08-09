@@ -145,12 +145,15 @@ These arguments control bootstrap execution and reproducibility settings.
 
 \section{Usage Issues}{
 
-  The \code{integration} version of the statistic uses multidimensional
-  numerical methods from the \pkg{cubature} package. See
-  \pkg{adaptIntegrate} for details. The \code{integration}
-  version of the statistic will be substantially slower than the
-  \code{summation} version, however, it will likely be both more
-  accurate and powerful.
+  The \code{integration} version uses deterministic tensor-product,
+  corrected composite trapezoidal quadrature. Along each axis the domain
+  extends eight relevant bandwidths beyond the observed support and uses
+  two evaluation points per smallest relevant bandwidth. A registered
+  native callback evaluates the Gaussian marginal and joint densities in
+  bounded tiles, so package-owned working memory does not grow as a dense
+  sample-by-quadrature array. The integration version is generally more
+  computationally demanding than \code{summation}, but avoids the density
+  division that can make the summation statistic unstable.
 
 }
 
