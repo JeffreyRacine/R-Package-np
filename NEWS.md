@@ -1,5 +1,12 @@
 # npRmpi 0.70-6
 
+* Fixed-bandwidth compact-support regression trees now use a bounded generic
+  resident-row accumulator for local-polynomial basis widths above five,
+  sharing the canonical solve, deletion, and uncentered projection engine.
+  The MPI owner retains coarse outer-row distribution, so explicit
+  `np.tree = TRUE` and eligible `np.tree = "auto"` both use the repaired tree;
+  dense and smaller-width routes are unchanged.
+
 * Fixed-bandwidth degree-zero conditional-density CVLS now recognizes an
   all-categorical explanatory side at its constant upper kernel limit as the
   canonical global-X design. This restores the unconditional-density limit,
