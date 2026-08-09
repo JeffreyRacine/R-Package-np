@@ -14134,15 +14134,17 @@ static inline double np_regression_cv_loss_value(const int bwm,
 }
 
 /*
-  This performance-only cutoff is basis-neutral.  Retained paired objective
-  timings favor resident rows through width 5 and packed BLAS from width 6.
+  This dense-path performance cutoff is basis-neutral. Retained paired
+  objective timings favor resident rows through width 5 and packed BLAS from
+  width 6. Eligible sparse trees have their own generic wide resident row.
 */
 enum { NP_REG_CV_LP_RESIDENT_MAX_TERMS = 5 };
 
 static inline int np_reg_cv_use_canonical_lp_fixed_kernel(const int bwm,
                                                            const int BANDWIDTH_reg,
                                                            const int num_reg_continuous,
-                                                           const int nterms){
+                                                           const int nterms,
+                                                           const int use_tree){
   if((BANDWIDTH_reg != BW_FIXED) || (num_reg_continuous <= 0))
     return 0;
 
@@ -14153,7 +14155,7 @@ static inline int np_reg_cv_use_canonical_lp_fixed_kernel(const int bwm,
   if(int_glp_basis_extern != 1)
     return bwm == RBWM_CVAIC;
 
-  return nterms <= NP_REG_CV_LP_RESIDENT_MAX_TERMS;
+  return use_tree || (nterms <= NP_REG_CV_LP_RESIDENT_MAX_TERMS);
 }
 
 /*
@@ -14565,6 +14567,53 @@ static inline void np_lp_accumulate_pair(const int nterms,
   }
 }
 
+static inline void np_lp_accumulate_sparse_pair_wide_resident(
+    const int nterms,
+    double **basis,
+    double *vector_Y,
+    double *moments,
+    double *rhs,
+    double *row_moments,
+    double *row_rhs,
+    const double *eval_ybasis,
+    const double *eval_outer,
+    const int orig_ii,
+    const int tree_ii,
+    const double w){
+  const double yi = vector_Y[tree_ii];
+  double * const si = moments +
+    (size_t)orig_ii*(size_t)nterms*(size_t)nterms;
+  double * const ti = rhs + (size_t)orig_ii*(size_t)nterms;
+  int a, b;
+
+  for(a = 0; a < nterms; a++){
+    const double bia = basis[a][tree_ii];
+    const double wbia = w*bia;
+    const int aoff = a*nterms;
+
+    row_rhs[a] += wbia*yi;
+    ti[a] += w*eval_ybasis[a];
+    for(b = a; b < nterms; b++){
+      row_moments[aoff+b] += wbia*basis[b][tree_ii];
+      si[aoff+b] += w*eval_outer[aoff+b];
+    }
+  }
+}
+
+static void np_lp_mirror_sparse_moments_wide(double *moments,
+                                              const int num_obs,
+                                              const int nterms){
+  int i, a, b;
+
+  for(i = 0; i < num_obs; i++){
+    double * const row = moments +
+      (size_t)i*(size_t)nterms*(size_t)nterms;
+    for(a = 0; a < nterms; a++)
+      for(b = a + 1; b < nterms; b++)
+        row[b*nterms+a] = row[a*nterms+b];
+  }
+}
+
 /*
  * The sparse and dense width-three siblings share one symmetric-Gram
  * contract: accumulate the unique upper triangle while enumerating pairs,
@@ -14841,6 +14890,8 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
   double oracle_mean_dummy = 0.0;
   double *eval_ybasis = NULL;
   double *eval_outer = NULL;
+  double *resident_moments = NULL;
+  double *resident_rhs = NULL;
 
   if(!np_lp_fixed_tree_sparse_supported(num_reg_unordered,
                                          num_reg_ordered,
@@ -14856,7 +14907,13 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
 
   eval_ybasis = alloc_vecd(MAX(1, nterms));
   eval_outer = alloc_vecd(MAX(1, nterms*nterms));
-  if((eval_ybasis == NULL) || (eval_outer == NULL))
+  if(nterms > 5){
+    resident_moments = alloc_vecd(nterms*nterms);
+    resident_rhs = alloc_vecd(nterms);
+  }
+  if((eval_ybasis == NULL) || (eval_outer == NULL) ||
+     ((nterms > 5) &&
+      ((resident_moments == NULL) || (resident_rhs == NULL))))
     goto cleanup_sparse;
 
   if(!np_lp_tree_support_ctx_init(&sctx, num_reg_continuous))
@@ -14914,6 +14971,13 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
         row_moment4 = row_moments[4]; row_moment5 = row_moments[5];
         row_moment8 = row_moments[8];
         row_rhs0 = row_rhs[0]; row_rhs1 = row_rhs[1]; row_rhs2 = row_rhs[2];
+      } else if(nterms > 5){
+        memcpy(resident_moments,
+               moments + (size_t)j*(size_t)nterms*(size_t)nterms,
+               (size_t)nterms*(size_t)nterms*sizeof(double));
+        memcpy(resident_rhs,
+               rhs + (size_t)j*(size_t)nterms,
+               (size_t)nterms*sizeof(double));
       }
     }
 
@@ -15064,6 +15128,19 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
                                                w);
             } else if(nterms == 3){
               NP_LP_ACCUMULATE_SPARSE_PAIR3();
+            } else if(nterms > 5){
+              np_lp_accumulate_sparse_pair_wide_resident(nterms,
+                                                           basis,
+                                                           vector_Y,
+                                                           moments,
+                                                           rhs,
+                                                           resident_moments,
+                                                           resident_rhs,
+                                                           eval_ybasis,
+                                                           eval_outer,
+                                                           orig_ii,
+                                                           ii,
+                                                           w);
             } else {
               np_lp_accumulate_pair(nterms,
                                      basis,
@@ -15091,6 +15168,13 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
         row_moments[4] = row_moment4; row_moments[5] = row_moment5;
         row_moments[8] = row_moment8;
         row_rhs[0] = row_rhs0; row_rhs[1] = row_rhs1; row_rhs[2] = row_rhs2;
+      } else if(nterms > 5){
+        memcpy(moments + (size_t)j*(size_t)nterms*(size_t)nterms,
+               resident_moments,
+               (size_t)nterms*(size_t)nterms*sizeof(double));
+        memcpy(rhs + (size_t)j*(size_t)nterms,
+               resident_rhs,
+               (size_t)nterms*sizeof(double));
       }
       continue;
     }
@@ -15174,6 +15258,19 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
                                              w);
           } else if(nterms == 3){
             NP_LP_ACCUMULATE_SPARSE_PAIR3();
+          } else if(nterms > 5){
+            np_lp_accumulate_sparse_pair_wide_resident(nterms,
+                                                         basis,
+                                                         vector_Y,
+                                                         moments,
+                                                         rhs,
+                                                         resident_moments,
+                                                         resident_rhs,
+                                                         eval_ybasis,
+                                                         eval_outer,
+                                                         orig_ii,
+                                                         ii,
+                                                         w);
           } else {
             np_lp_accumulate_pair(nterms,
                                    basis,
@@ -15202,6 +15299,13 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
       row_moments[4] = row_moment4; row_moments[5] = row_moment5;
       row_moments[8] = row_moment8;
       row_rhs[0] = row_rhs0; row_rhs[1] = row_rhs1; row_rhs[2] = row_rhs2;
+    } else if(nterms > 5){
+      memcpy(moments + (size_t)j*(size_t)nterms*(size_t)nterms,
+             resident_moments,
+             (size_t)nterms*(size_t)nterms*sizeof(double));
+      memcpy(rhs + (size_t)j*(size_t)nterms,
+             resident_rhs,
+             (size_t)nterms*sizeof(double));
     }
 
     if(do_oracle){
@@ -15231,6 +15335,8 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
 cleanup_sparse:
   if(eval_ybasis != NULL) free(eval_ybasis);
   if(eval_outer != NULL) free(eval_outer);
+  if(resident_moments != NULL) free(resident_moments);
+  if(resident_rhs != NULL) free(resident_rhs);
   np_lp_tree_support_ctx_free(&sctx);
   if(kw_oracle != NULL) free(kw_oracle);
   if(oracle_mark != NULL) free(oracle_mark);
@@ -15634,6 +15740,8 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
 
   if(nterms == 3)
     np_lp_mirror_dense_moments_row3(moments, num_obs);
+  else if(use_sparse_tree && (nterms > 5))
+    np_lp_mirror_sparse_moments_wide(moments, num_obs, nterms);
 
   result.cv = 0.0;
   result.traceH = 0.0;
@@ -16340,7 +16448,8 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
       np_reg_cv_use_canonical_lp_fixed_kernel(bwm,
                                                BANDWIDTH_reg,
                                                num_reg_continuous,
-                                               glp_nterms);
+                                               glp_nterms,
+                                               ks_tree_use);
     const int all_large_gate = (bwm != RBWM_CVKS) &&
       np_reg_cv_all_large_gate(BANDWIDTH_reg,
                                num_obs,
