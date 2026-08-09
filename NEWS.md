@@ -93,12 +93,15 @@
   This removes redundant full-matrix copies before objective evaluation while
   preserving estimator arithmetic and conditions on every rank.
 
-* Bivariate entropy integration for `npdeptest()` and `npsdeptest()` now
-  evaluates the existing Gaussian integrand in one registered native callback
-  on every bootstrap worker. The cubature rule, limits, tolerances,
-  bandwidths, bootstrap, and statistic are unchanged; the callback no longer
-  constructs sample-by-quadrature distance matrices and evaluates the joint
-  Gaussian product with one bivariate exponential.
+* The integration routes for `npunitest()`, `npsymtest()`, `npdeptest()`, and
+  `npsdeptest()` now use bounded deterministic corrected-trapezoid quadrature
+  for their default Gaussian statistics. Univariate iid bootstraps reuse a
+  fixed grid and evaluate bounded chunks of resampling counts; symmetry
+  bootstraps reuse reflected density values; and bivariate quadrature calls
+  the registered constant-storage Gaussian evaluator in bounded tiles. This
+  removes the `cubature` dependency while preserving bootstrap sampling laws,
+  fixed bandwidth reuse, result shapes, seed restoration, nondefault kernel
+  routes, and existing MPI fanout and reassembly contracts.
 
 * Removed the private, unexported package-local `gsl.bs` bridge and its
   registered native wrappers. Public spline construction remains owned by
