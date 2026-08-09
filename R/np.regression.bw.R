@@ -288,7 +288,9 @@ npregbw.NULL <-
       bws,
       ncon = bws$ncon,
       ncat = bws$nuno + bws$nord,
-      regtype.engine = reg.spec$regtype.engine
+      regtype.engine = reg.spec$regtype.engine,
+      basis.engine = reg.spec$basis.engine,
+      degree.engine = reg.spec$degree.engine
     ),
     scale.init.categorical.sample = scale.init.categorical.sample,
     dfc.dir = 3L,
@@ -649,7 +651,9 @@ npregbw.rbandwidth <-
           bws,
           ncon = bws$ncon,
           ncat = bws$nuno + bws$nord,
-          regtype.engine = reg.spec$regtype.engine
+          regtype.engine = reg.spec$regtype.engine,
+          basis.engine = reg.spec$basis.engine,
+          degree.engine = reg.spec$degree.engine
         ),
         scale.init.categorical.sample = scale.init.categorical.sample,
         dfc.dir = dfc.dir,
@@ -803,7 +807,8 @@ npregbw.rbandwidth <-
   out
 }
 
-.npregbw_tree_code <- function(bws, ncon, ncat, regtype.engine) {
+.npregbw_tree_code <- function(bws, ncon, ncat, regtype.engine,
+                               basis.engine, degree.engine) {
   if (!is.character(regtype.engine) ||
       length(regtype.engine) != 1L ||
       is.na(regtype.engine) ||
@@ -815,6 +820,18 @@ npregbw.rbandwidth <-
 
   if (!identical(code, DO_TREE_YES))
     return(code)
+
+  ## Wide positive-degree LP objectives can benefit materially from an
+  ## explicitly requested compact-support tree at sparse bandwidths. Their
+  ## broad-support search trajectories remain slower than the dense canonical
+  ## engine. Keep TRUE authoritative and choose conservatively only while the
+  ## user-level "auto" state is still distinguishable.
+  if (identical(npTreeMode(), "auto") &&
+      identical(regtype.engine, "lp") &&
+      identical(as.character(bws[["type", exact = TRUE]]), "fixed") &&
+      npLpBasisNcol(basis = basis.engine, degree = degree.engine) > 5.0) {
+    return(DO_TREE_NO)
+  }
 
   method <- if (!is.null(bws$method) && length(bws$method)) {
     as.character(bws$method[1L])
@@ -984,7 +1001,9 @@ npregbw.rbandwidth <-
       bws,
       ncon = bws$ncon,
       ncat = bws$nuno + bws$nord,
-      regtype.engine = reg.spec$regtype.engine
+      regtype.engine = reg.spec$regtype.engine,
+      basis.engine = reg.spec$basis.engine,
+      degree.engine = reg.spec$degree.engine
     ),
     scale.init.categorical.sample = scale.init.categorical.sample,
     dfc.dir = dfc.dir,

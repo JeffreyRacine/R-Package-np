@@ -99,7 +99,9 @@ test_that("np.tree alone does not enable all-categorical profile helpers", {
       bws,
       ncon = bws$ncon,
       ncat = bws$nuno + bws$nord,
-      regtype.engine = bws[["regtype.engine"]]
+      regtype.engine = bws[["regtype.engine"]],
+      basis.engine = bws[["basis"]],
+      degree.engine = bws[["degree"]]
     ),
     np:::DO_TREE_YES
   )

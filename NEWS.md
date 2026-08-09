@@ -1,5 +1,12 @@
 # np 0.70-6
 
+* Fixed-bandwidth compact-support regression trees now use a bounded generic
+  resident-row accumulator for local-polynomial basis widths above five,
+  sharing the canonical solve, deletion, and uncentered projection engine.
+  Explicit `np.tree = TRUE` remains authoritative; serial `np.tree = "auto"`
+  conservatively selects the faster dense owner for these wide objectives.
+  Dense and smaller-width routes are unchanged.
+
 * Fixed-bandwidth degree-zero conditional-density CVLS now recognizes an
   all-categorical explanatory side at its constant upper kernel limit as the
   canonical global-X design. This restores the unconditional-density limit,
