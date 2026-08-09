@@ -25193,6 +25193,34 @@ static int np_conditional_indicator_row_core(const int train_idx,
   return indy;
 }
 
+static int np_conditional_indicator_original_order(const int train_idx,
+                                                   const int eval_idx){
+  int train_pos = train_idx;
+  int eval_pos = eval_idx;
+
+  /*
+   * Row-stream and all-large owners restore kernel rows to observation order,
+   * while the raw response matrices remain in their independent Y-tree order.
+   * Keep that translation at this explicit boundary; block owners that consume
+   * storage-order rows continue to call the raw helper above.
+   */
+  if((int_TREE_Y == NP_TREE_TRUE) && (ipt_lookup_extern_Y != NULL)){
+    train_pos = ipt_lookup_extern_Y[train_idx];
+    if(cdfontrain_extern)
+      eval_pos = ipt_lookup_extern_Y[eval_idx];
+  }
+
+  return np_conditional_indicator_row_core(train_pos,
+                                           eval_pos,
+                                           cdfontrain_extern,
+                                           matrix_Y_ordered_train_extern,
+                                           matrix_Y_continuous_train_extern,
+                                           matrix_Y_ordered_eval_extern,
+                                           matrix_Y_continuous_eval_extern,
+                                           num_var_ordered_extern,
+                                           num_var_continuous_extern);
+}
+
 static int np_conditional_kernel_row_core(const int *kernel_c,
                                                  const int *kernel_u,
                                                  const int *kernel_o,
@@ -28108,7 +28136,11 @@ static int np_conditional_y_eval_block_stream_op_core(double *vector_scale_facto
     goto cleanup_yweight_eval_block;
 
   for(i = 0; i < block_rows; i++){
-    const int eval_pos = eval_start + i;
+    const int eval_idx = eval_start + i;
+    const int eval_pos =
+      (cdfontrain_extern && (int_TREE_Y == NP_TREE_TRUE) &&
+       (ipt_lookup_extern_Y != NULL)) ?
+      ipt_lookup_extern_Y[eval_idx] : eval_idx;
 
     memset(rows_out[i], 0, (size_t)num_train*sizeof(double));
     for(l = 0; l < num_var_unordered_extern; l++)
@@ -30662,6 +30694,8 @@ typedef struct {
   int nterms;
   int basis_stride;
   double **basis;
+  int owns_basis;
+  int use_x_tree_order;
   NPLPFullRowWorkspace inverse_workspace;
   double *hdiag;
   NPLPFullRowWorkspace inverse_original_workspace;
@@ -30674,6 +30708,7 @@ typedef struct {
 static void np_conditional_lp_all_large_ctx_clear(NPConditionalLpAllLargeCtx *ctx){
   if(ctx == NULL)
     return;
+  if(ctx->owns_basis && ctx->basis != NULL) free_tmat(ctx->basis);
   np_lp_full_row_workspace_clear(&ctx->inverse_workspace);
   if(ctx->hdiag != NULL) free(ctx->hdiag);
   np_lp_full_row_workspace_clear(&ctx->inverse_original_workspace);
@@ -30701,7 +30736,8 @@ static int np_conditional_lp_all_large_ctx_prepare_core(double *vector_scale_fac
 
   np_conditional_lp_all_large_ctx_clear(ctx);
 
-  if(np_lp_engine_extern != NP_LP_ENGINE_GENERAL)
+  if(np_lp_engine_extern != NP_LP_ENGINE_SCALAR &&
+     np_lp_engine_extern != NP_LP_ENGINE_GENERAL)
     return 1;
   if(BANDWIDTH_den_extern != BW_FIXED)
     return 1;
@@ -30710,7 +30746,8 @@ static int np_conditional_lp_all_large_ctx_prepare_core(double *vector_scale_fac
     return 1;
   if((num_train <= 0) || (num_reg_continuous_extern <= 0))
     return 1;
-  if(vector_glp_degree_extern == NULL)
+  if((np_lp_engine_extern == NP_LP_ENGINE_GENERAL) &&
+     (vector_glp_degree_extern == NULL))
     return 1;
 
   vsfx = alloc_vecd(MAX(1, num_reg_tot));
@@ -30784,6 +30821,31 @@ static int np_conditional_lp_all_large_ctx_prepare_core(double *vector_scale_fac
                                &ov_cont_from_cache))
     goto cleanup_all_large_prepare;
 
+  if(np_lp_engine_extern == NP_LP_ENGINE_SCALAR){
+    const double leverage = 1.0/(double)num_train;
+
+    ctx->num_train = num_train;
+    ctx->nterms = 1;
+    ctx->basis_stride = num_train;
+    ctx->basis = alloc_tmatd(num_train, 1);
+    ctx->owns_basis = 1;
+    ctx->hdiag = alloc_vecd(MAX(1, num_train));
+    if((ctx->basis == NULL) || (ctx->hdiag == NULL) ||
+       !np_lp_full_row_workspace_reserve(&ctx->inverse_workspace, 1, 1))
+      goto cleanup_all_large_prepare;
+
+    for(i = 0; i < num_train; i++){
+      ctx->basis[0][i] = 1.0;
+      ctx->hdiag[i] = leverage;
+    }
+    ctx->inverse_workspace.gram[0] = (double)num_train;
+    if(!np_lp_full_row_workspace_invert(&ctx->inverse_workspace, 1, 1.0e-10) ||
+       !np_lp_full_row_workspace_pack_inverse_rows(&ctx->inverse_workspace, 1))
+      goto cleanup_all_large_prepare;
+
+    goto finalize_all_large_context;
+  }
+
   if(!np_glp_cv_cache.ready ||
      (np_glp_cv_cache.use_bernstein != use_bernstein) ||
      (np_glp_cv_cache.basis_mode != int_glp_basis_extern) ||
@@ -30806,6 +30868,7 @@ static int np_conditional_lp_all_large_ctx_prepare_core(double *vector_scale_fac
   ctx->nterms = np_glp_cv_cache.nterms;
   ctx->basis_stride = np_glp_cv_cache.basis_stride;
   ctx->basis = np_glp_cv_cache.basis;
+  ctx->use_x_tree_order = (int_TREE_X == NP_TREE_TRUE);
 
   if(!np_lp_full_row_workspace_reserve(&ctx->inverse_workspace,
                                        ctx->nterms,
@@ -30909,6 +30972,7 @@ static int np_conditional_lp_all_large_ctx_prepare_core(double *vector_scale_fac
     }
   }
 
+finalize_all_large_context:
   ctx->ready = 1;
   status = 0;
 
@@ -31084,14 +31148,14 @@ static int np_conditional_lp_all_large_moment_ddot(
   int j, a, b;
 
   for(j = 0; j < ctx->num_train; j++){
-    const int eval_orig = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
+    const int eval_orig = ctx->use_x_tree_order ? ipt_extern_X[j] : j;
     const double *rhs_row = yconv;
 
     if(np_conditional_y_row_stream_op_core(
          vector_scale_factor, eval_orig, OP_CONVOLUTION, yconv) != 0)
       return 1;
 
-    if(int_TREE_X == NP_TREE_TRUE){
+    if(ctx->use_x_tree_order){
       for(int jj = 0; jj < ctx->num_train; jj++)
         yconv_xorder[jj] = yconv[ipt_extern_X[jj]];
       rhs_row = yconv_xorder;
@@ -31133,14 +31197,14 @@ static int np_conditional_lp_all_large_moment_dgemv(
   int j, a, b;
 
   for(j = 0; j < ctx->num_train; j++){
-    const int eval_orig = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
+    const int eval_orig = ctx->use_x_tree_order ? ipt_extern_X[j] : j;
     const double *rhs_row = yconv;
 
     if(np_conditional_y_row_stream_op_core(
          vector_scale_factor, eval_orig, OP_CONVOLUTION, yconv) != 0)
       return 1;
 
-    if(int_TREE_X == NP_TREE_TRUE){
+    if(ctx->use_x_tree_order){
       for(int jj = 0; jj < ctx->num_train; jj++)
         yconv_xorder[jj] = yconv[ipt_extern_X[jj]];
       rhs_row = yconv_xorder;
@@ -31192,11 +31256,11 @@ static int np_conditional_lp_all_large_build_conv_quad(double *vector_scale_fact
   moment = alloc_vecd(ctx->nterms*ctx->nterms);
   temp = alloc_vecd(ctx->nterms*ctx->nterms);
   yconv = alloc_vecd(MAX(1, ctx->num_train));
-  if(int_TREE_X == NP_TREE_TRUE)
+  if(ctx->use_x_tree_order)
     yconv_xorder = alloc_vecd(MAX(1, ctx->num_train));
   cross_terms = alloc_vecd(MAX(1, ctx->nterms));
   if((moment == NULL) || (temp == NULL) || (yconv == NULL) ||
-     ((int_TREE_X == NP_TREE_TRUE) && (yconv_xorder == NULL)) ||
+     (ctx->use_x_tree_order && (yconv_xorder == NULL)) ||
      (cross_terms == NULL))
     goto cleanup_all_large_quad;
 
@@ -31204,7 +31268,7 @@ static int np_conditional_lp_all_large_build_conv_quad(double *vector_scale_fact
     for(b = 0; b < ctx->nterms; b++)
       moment[a*ctx->nterms+b] = 0.0;
 
-  if((int_TREE_X == NP_TREE_TRUE) &&
+  if(ctx->use_x_tree_order &&
      ((ipt_extern_X == NULL) || (ipt_lookup_extern_X == NULL)))
     goto cleanup_all_large_quad;
 
@@ -31283,12 +31347,12 @@ static int np_conditional_density_cvml_lp_all_large_stream(double *vector_scale_
     (ctx.basis_original_stride >= ctx.num_train);
 
   yrow = alloc_vecd(MAX(1, ctx.num_train));
-  if(int_TREE_X == NP_TREE_TRUE)
+  if(ctx.use_x_tree_order)
     yrow_xorder = alloc_vecd(MAX(1, ctx.num_train));
   cross_terms = alloc_vecd(MAX(1, ctx.nterms));
   beta = alloc_vecd(MAX(1, ctx.nterms));
   if((yrow == NULL) ||
-     ((int_TREE_X == NP_TREE_TRUE) && (yrow_xorder == NULL)) ||
+     (ctx.use_x_tree_order && (yrow_xorder == NULL)) ||
      (cross_terms == NULL) || (beta == NULL))
     goto cleanup_cvml_all_large;
 
@@ -31301,7 +31365,7 @@ static int np_conditional_density_cvml_lp_all_large_stream(double *vector_scale_
     if(np_conditional_y_row_stream_op_core(vector_scale_factor, i, OP_NORMAL, yrow) != 0)
       goto cleanup_cvml_all_large;
 
-    if((int_TREE_X == NP_TREE_TRUE) &&
+    if(ctx.use_x_tree_order &&
        (ctx.inverse_original_workspace.matrix_copy != NULL) &&
        (ctx.basis_original_order != NULL) &&
        (ctx.hdiag_original_order != NULL)){
@@ -31329,7 +31393,7 @@ static int np_conditional_density_cvml_lp_all_large_stream(double *vector_scale_
           beta,
           1);
     } else {
-      if(int_TREE_X == NP_TREE_TRUE){
+      if(ctx.use_x_tree_order){
         if((ipt_extern_X == NULL) || (ipt_lookup_extern_X == NULL))
           goto cleanup_cvml_all_large;
         eval_pos = ipt_lookup_extern_X[i];
@@ -31374,13 +31438,13 @@ static int np_conditional_density_cvls_lp_all_large_stream(double *vector_scale_
   conv_cross = alloc_vecd(MAX(1, ctx.num_train));
   conv_diag = alloc_vecd(MAX(1, ctx.num_train));
   yrow = alloc_vecd(MAX(1, ctx.num_train));
-  if(int_TREE_X == NP_TREE_TRUE)
+  if(ctx.use_x_tree_order)
     yrow_xorder = alloc_vecd(MAX(1, ctx.num_train));
   cross_terms = alloc_vecd(MAX(1, ctx.nterms));
   beta = alloc_vecd(MAX(1, ctx.nterms));
   if((quad_mat == NULL) || (conv_cross == NULL) || (conv_diag == NULL) ||
      (yrow == NULL) ||
-     ((int_TREE_X == NP_TREE_TRUE) && (yrow_xorder == NULL)) ||
+     (ctx.use_x_tree_order && (yrow_xorder == NULL)) ||
      (cross_terms == NULL) || (beta == NULL))
     goto cleanup_cvls_all_large;
 
@@ -31398,7 +31462,7 @@ static int np_conditional_density_cvls_lp_all_large_stream(double *vector_scale_
     if(np_conditional_y_row_stream_op_core(vector_scale_factor, i, OP_NORMAL, yrow) != 0)
       goto cleanup_cvls_all_large;
 
-    if(int_TREE_X == NP_TREE_TRUE){
+    if(ctx.use_x_tree_order){
       if((ipt_extern_X == NULL) || (ipt_lookup_extern_X == NULL))
         goto cleanup_cvls_all_large;
       eval_pos = ipt_lookup_extern_X[i];
@@ -31453,12 +31517,12 @@ static int np_conditional_distribution_cvls_lp_all_large_stream(double *vector_s
     goto cleanup_cdist_all_large;
 
   yint = alloc_vecd(MAX(1, ctx.num_train));
-  if(int_TREE_X == NP_TREE_TRUE)
+  if(ctx.use_x_tree_order)
     yint_xorder = alloc_vecd(MAX(1, ctx.num_train));
   cross_terms = alloc_vecd(MAX(1, ctx.nterms));
   beta = alloc_vecd(MAX(1, ctx.nterms));
   if((yint == NULL) ||
-     ((int_TREE_X == NP_TREE_TRUE) && (yint_xorder == NULL)) ||
+     (ctx.use_x_tree_order && (yint_xorder == NULL)) ||
      (cross_terms == NULL) || (beta == NULL))
     goto cleanup_cdist_all_large;
 
@@ -31480,7 +31544,7 @@ static int np_conditional_distribution_cvls_lp_all_large_stream(double *vector_s
     {
       const double *rhs_row = yint;
 
-      if(int_TREE_X == NP_TREE_TRUE){
+      if(ctx.use_x_tree_order){
         if((ipt_extern_X == NULL) || (ipt_lookup_extern_X == NULL))
           goto cleanup_cdist_all_large;
         for(i = 0; i < ctx.num_train; i++)
@@ -31493,23 +31557,15 @@ static int np_conditional_distribution_cvls_lp_all_large_stream(double *vector_s
 
     for(i = 0; i < ctx.num_train; i++){
       double fit = 0.0;
-      const int train_i = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[i] : i;
-      const int indy = np_conditional_indicator_row_core(train_i,
-                                                         j,
-                                                         cdfontrain_extern,
-                                                         matrix_Y_ordered_train_extern,
-                                                         matrix_Y_continuous_train_extern,
-                                                         matrix_Y_ordered_eval_extern,
-                                                         matrix_Y_continuous_eval_extern,
-                                                         num_var_ordered_extern,
-                                                         num_var_continuous_extern);
+      const int train_i = ctx.use_x_tree_order ? ipt_extern_X[i] : i;
+      const int indy = np_conditional_indicator_original_order(train_i, j);
 
       if(cdfontrain_extern && (train_i == j))
         continue;
 
       for(int a = 0; a < ctx.nterms; a++)
         fit += ctx.basis[a][i]*beta[a];
-      fit = (fit - ctx.hdiag[i]*((int_TREE_X == NP_TREE_TRUE) ? yint_xorder[i] : yint[i])) /
+      fit = (fit - ctx.hdiag[i]*(ctx.use_x_tree_order ? yint_xorder[i] : yint[i])) /
         NZD_POS(1.0 - ctx.hdiag[i]);
 
       {
@@ -32651,13 +32707,7 @@ static int np_conditional_distribution_cvls_provider_row_stream(
       if(np_continuous_kernel_scaled_restore(
            fit, y_log_scale, 1, &fit) != NP_CONTINUOUS_ROW_OK)
         goto cleanup_provider_row;
-      indicator = np_conditional_indicator_row_core(
-        i, j, cdfontrain_extern,
-        matrix_Y_ordered_train_extern,
-        matrix_Y_continuous_train_extern,
-        matrix_Y_ordered_eval_extern,
-        matrix_Y_continuous_eval_extern,
-        num_var_ordered_extern, num_var_continuous_extern);
+      indicator = np_conditional_indicator_original_order(i, j);
       difference = (double)indicator - fit;
       *cv += difference*difference;
     }
@@ -32778,13 +32828,8 @@ static int np_conditional_distribution_cvls_provider_supertile(
                  fit, y_log_scale[jj], 1, &fit) !=
                NP_CONTINUOUS_ROW_OK)
               goto cleanup_provider_supertile;
-            indicator = np_conditional_indicator_row_core(
-              train_i, eval_j, cdfontrain_extern,
-              matrix_Y_ordered_train_extern,
-              matrix_Y_continuous_train_extern,
-              matrix_Y_ordered_eval_extern,
-              matrix_Y_continuous_eval_extern,
-              num_var_ordered_extern, num_var_continuous_extern);
+            indicator = np_conditional_indicator_original_order(train_i,
+                                                                eval_j);
             difference = (double)indicator - fit;
             block_sum[g] += difference*difference;
           }
@@ -32861,15 +32906,7 @@ static int np_conditional_distribution_cvls_lp_row_stream(double *vector_scale_f
 
     for(j = 0; j < num_eval; j++){
       double fit = 0.0;
-      const int indy = np_conditional_indicator_row_core(i,
-                                                         j,
-                                                         cdfontrain_extern,
-                                                         matrix_Y_ordered_train_extern,
-                                                         matrix_Y_continuous_train_extern,
-                                                         matrix_Y_ordered_eval_extern,
-                                                         matrix_Y_continuous_eval_extern,
-                                                         num_var_ordered_extern,
-                                                         num_var_continuous_extern);
+      const int indy = np_conditional_indicator_original_order(i, j);
 
       if(use_xrow_ctx){
         if(np_conditional_y_eval_from_ctx(&yintctx,
@@ -33045,15 +33082,7 @@ static int np_conditional_distribution_cvls_lp_adap_block_stream(double *vector_
               continue;
 
             fit = fit_cross[ii + jj*ib];
-            indy = np_conditional_indicator_row_core(train_i,
-                                                     eval_j,
-                                                     cdfontrain_extern,
-                                                     matrix_Y_ordered_train_extern,
-                                                     matrix_Y_continuous_train_extern,
-                                                     matrix_Y_ordered_eval_extern,
-                                                     matrix_Y_continuous_eval_extern,
-                                                     num_var_ordered_extern,
-                                                     num_var_continuous_extern);
+            indy = np_conditional_indicator_original_order(train_i, eval_j);
             {
               const double tvd = ((double)indy) - fit;
               block_sum[g] += tvd*tvd;
@@ -33233,15 +33262,7 @@ static int np_conditional_distribution_cvls_lp_block_supertile(double *vector_sc
               continue;
 
             fit = fit_cross[ii + jj*ib];
-            indy = np_conditional_indicator_row_core(train_i,
-                                                     eval_j,
-                                                     cdfontrain_extern,
-                                                     matrix_Y_ordered_train_extern,
-                                                     matrix_Y_continuous_train_extern,
-                                                     matrix_Y_ordered_eval_extern,
-                                                     matrix_Y_continuous_eval_extern,
-                                                     num_var_ordered_extern,
-                                                     num_var_continuous_extern);
+            indy = np_conditional_indicator_original_order(train_i, eval_j);
             {
               const double tvd = ((double)indy) - fit;
               block_sum[g] += tvd*tvd;
@@ -33355,15 +33376,7 @@ np_conditional_distribution_cvls_lp_block_one(double *vector_scale_factor,
             continue;
 
           fit = fit_cross[ii + jj*ib];
-          indy = np_conditional_indicator_row_core(train_i,
-                                                   eval_j,
-                                                   cdfontrain_extern,
-                                                   matrix_Y_ordered_train_extern,
-                                                   matrix_Y_continuous_train_extern,
-                                                   matrix_Y_ordered_eval_extern,
-                                                   matrix_Y_continuous_eval_extern,
-                                                   num_var_ordered_extern,
-                                                   num_var_continuous_extern);
+          indy = np_conditional_indicator_original_order(train_i, eval_j);
           {
             const double tvd = ((double)indy) - fit;
             block_sum += tvd*tvd;

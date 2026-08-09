@@ -291,6 +291,56 @@ test_that("np.largeh toggles conditional density eval-only fast counts", {
   expect_equal(as.numeric(reenabled$num.feval.fast[1L]), 1)
 })
 
+test_that("np.largeh covers degree-zero conditional CVLS objectives", {
+  old.options <- options(np.messages = FALSE, np.tree = FALSE,
+                         np.largeh = TRUE, np.largelambda = TRUE)
+  on.exit(options(old.options), add = TRUE)
+
+  set.seed(106)
+  n <- 80L
+  xdat <- data.frame(x = runif(n))
+  ydat <- data.frame(y = 1 + 2 * xdat$x + rnorm(n, sd = 0.25))
+  npcdensbw <- getFromNamespace("npcdensbw", "np")
+  npcdistbw <- getFromNamespace("npcdistbw", "np")
+
+  evaluate_pair <- function(bw, evaluator, ...) {
+    options(np.largeh = TRUE)
+    enabled <- evaluator(xdat, ydat, bws = bw, ...)
+    options(np.largeh = FALSE)
+    disabled <- evaluator(xdat, ydat, bws = bw, ...)
+    options(np.largeh = TRUE)
+    reenabled <- evaluator(xdat, ydat, bws = bw, ...)
+
+    expect_equal(enabled$objective, disabled$objective, tolerance = 1e-10)
+    expect_equal(enabled$objective, reenabled$objective, tolerance = 1e-10)
+    expect_equal(as.numeric(enabled$num.feval.fast[1L]), 1)
+    expect_equal(as.numeric(disabled$num.feval.fast[1L]), 0)
+    expect_equal(as.numeric(reenabled$num.feval.fast[1L]), 1)
+  }
+
+  common <- list(
+    xdat = xdat,
+    ydat = ydat,
+    bws = c(0.24, 1e8),
+    regtype = "lc",
+    bwmethod = "cv.ls",
+    cxkertype = "epanechnikov",
+    cykertype = "epanechnikov",
+    bandwidth.compute = FALSE
+  )
+
+  density.bw <- do.call(npcdensbw, common)
+  distribution.bw <- do.call(npcdistbw, common)
+  for (use.tree in c(FALSE, TRUE)) {
+    options(np.tree = use.tree)
+    evaluate_pair(density.bw,
+                  getFromNamespace(".npcdensbw_eval_only", "np"))
+    evaluate_pair(distribution.bw,
+                  getFromNamespace(".npcdistbw_eval_only", "np"),
+                  do.full.integral = TRUE)
+  }
+})
+
 test_that("np.largeh toggles unconditional distribution bandwidth fast counts", {
   old.options <- options(np.messages = FALSE, np.tree = FALSE,
                          np.largeh = TRUE, np.largelambda = TRUE)
