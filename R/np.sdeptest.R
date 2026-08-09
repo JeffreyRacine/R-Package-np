@@ -4,11 +4,7 @@
 ## Time Series Analysis (2004), Vol. 25, No. 5, 649-669.
 
 .np_sdeptest_fixed_density <- function(data, bw) {
-  as.numeric(npksum(
-    txdat = data,
-    bws = bw,
-    bandwidth.divide = TRUE
-  )$ksum / NROW(data))
+  .np_entropy_fixed_density(data, bw)
 }
 
 .npRmpi_sdept_collective_context <- function() {
@@ -237,8 +233,9 @@ npsdeptest <- function(data = NULL,
       ## Integration version:
       ## \int\int (sqrt(f(x,y))-sqrt(f(x))sqrt(f(y)))^2 dx dy
       
-      lo.default <- c(min(x.dat)-10.0*IQR(x.dat),min(y.dat)-10.0*IQR(y.dat))
-      up.default <- c(max(x.dat)+10.0*IQR(x.dat),max(y.dat)+10.0*IQR(y.dat))
+      domain <- .np_entropy_bivariate_domain(
+        x.dat, y.dat, bw.x, bw.y, bw.joint
+      )
       
       return(.np_entropy_bivariate_integral(
         x.dat = x.dat,
@@ -246,8 +243,8 @@ npsdeptest <- function(data = NULL,
         bw.x = bw.x,
         bw.y = bw.y,
         bw.joint = bw.joint,
-        lower = lo.default,
-        upper = up.default
+        lower = domain$lower,
+        upper = domain$upper
       ))
     }
 

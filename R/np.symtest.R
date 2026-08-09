@@ -139,6 +139,7 @@ npsymtest <- function(data = NULL,
 
   boot.method <- match.arg(boot.method)
   method <- match.arg(method)
+  entropy.fast.gaussian <- length(list(...)) == 0L
 
   ## Save seed prior to setting
 
@@ -223,6 +224,9 @@ npsymtest <- function(data = NULL,
         ##  the evaluation points. We could also combine both data and
         ##  data.rotate for the evaluation points if we chose (would
         ##  this improve power?).
+        if(entropy.fast.gaussian) {
+          return(.np_entropy_symmetric_gaussian_summation(data, bw))
+        }
         f.data <- fitted(npudens(tdat=data,edat=data,bws=bw,...))
         f.data.rotate <- fitted(npudens(tdat=data.rotate,edat=data,bws=bw,...))
         ## In summation version we divide densities which can lead to
@@ -238,14 +242,18 @@ npsymtest <- function(data = NULL,
         return(0.5*mean((1-sqrt(summand))**2))
       } else {
         ## Integration version
-        h <- function(x,data,data.rotate) {
-          f.data <- fitted(npudens(tdat=data,edat=x,bws=bw,...))
-          f.data.rotate <- fitted(npudens(tdat=data.rotate,edat=x,bws=bw,...))
-          return(0.5*(sqrt(f.data)-sqrt(f.data.rotate))**2)
+        if(entropy.fast.gaussian) {
+          return(.np_entropy_symmetric_gaussian_integral(data, bw))
+        } else {
+          h <- function(x,data,data.rotate) {
+            f.data <- fitted(npudens(tdat=data,edat=x,bws=bw,...))
+            f.data.rotate <- fitted(npudens(tdat=data.rotate,edat=x,bws=bw,...))
+            return(0.5*(sqrt(f.data)-sqrt(f.data.rotate))**2)
+          }
+          return.integrate <- integrate(h,-Inf,Inf,subdivisions=1e+05,stop.on.error=FALSE,data=data,data.rotate=data.rotate)
+          if(return.integrate$message != "OK") .np_warning(return.integrate$message)
+          return(return.integrate$value)
         }
-        return.integrate <- integrate(h,-Inf,Inf,subdivisions=1e+05,stop.on.error=FALSE,data=data,data.rotate=data.rotate)
-        if(return.integrate$message != "OK") .np_warning(return.integrate$message)
-        return(return.integrate$value)
       }
     } else {
       xeval <- unique(data)
