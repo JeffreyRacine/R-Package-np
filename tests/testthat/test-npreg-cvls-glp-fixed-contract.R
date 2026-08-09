@@ -177,3 +177,47 @@ test_that("npregbw cv.ls fixed LP stream does not route through legacy tree rows
 
   expect_equal(lp.tree, lp.serial, tolerance = 1e-12)
 })
+
+test_that("fixed width-three LP tree uses canonical support and objective", {
+  set.seed(20260809)
+  n <- 128L
+  x <- data.frame(x1 = runif(n), x2 = runif(n))
+  y <- sin(2 * pi * x$x1) * cos(2 * pi * x$x2) + rnorm(n, sd = 0.1)
+  bw <- npregbw(
+    xdat = x,
+    ydat = y,
+    bws = c(0.24, 0.21),
+    regtype = "ll",
+    degree = c(1L, 1L),
+    ckertype = "epanechnikov",
+    bwmethod = "cv.ls",
+    bandwidth.compute = FALSE
+  )
+
+  old_opts <- options(np.tree = TRUE, np.categorical.compress = FALSE)
+  old_oracle <- Sys.getenv("NP_LP_TREE_ORACLE", unset = NA_character_)
+  on.exit({
+    options(old_opts)
+    if(is.na(old_oracle)) Sys.unsetenv("NP_LP_TREE_ORACLE")
+    else Sys.setenv(NP_LP_TREE_ORACLE = old_oracle)
+  }, add = TRUE)
+
+  Sys.setenv(NP_LP_TREE_ORACLE = "1")
+  tree_message <- capture.output(
+    tree_objective <- np:::.npregbw_eval_only(x, y, bw)$objective,
+    type = "message"
+  )
+  expect_true(any(grepl(
+    "NP_LP_TREE_ORACLE .*missing=0 mismatch=0",
+    tree_message
+  )))
+
+  Sys.unsetenv("NP_LP_TREE_ORACLE")
+  options(np.tree = "auto")
+  auto_objective <- np:::.npregbw_eval_only(x, y, bw)$objective
+  expect_identical(auto_objective, tree_objective)
+
+  options(np.tree = FALSE)
+  dense_objective <- np:::.npregbw_eval_only(x, y, bw)$objective
+  expect_equal(tree_objective, dense_objective, tolerance = 1e-12)
+})

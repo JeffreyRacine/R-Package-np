@@ -1,5 +1,12 @@
 # np 0.70-6
 
+* Fixed-bandwidth two-predictor local-linear CV objectives now keep the sparse
+  tree row resident and accumulate the same unique symmetric Gram triangle as
+  the canonical dense width-three engine before using their shared mirror,
+  solve, and uncentered projection. Compact-support tree support and kernel
+  semantics are unchanged; the redundant lower-triangle pair updates are
+  removed without additional sample-sized storage.
+
 * Bootstrap-intensive tests now reuse fixed kernel geometry in bounded
   replication groups. `npcmstest()` and `npqcmstest()` keep one model refit
   per draw but contract the resulting residual or score columns through
