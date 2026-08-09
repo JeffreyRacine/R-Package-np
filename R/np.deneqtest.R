@@ -4,10 +4,14 @@
 ## Categorical and Continuous Data," Journal of Econometrics, Volume
 ## 148, pp 186-200.
 
-.npdeneq_count_plan <- function(index, pool.n) {
-  counts <- tabulate(index, nbins = pool.n)
-  support <- which(counts > 0L)
-  list(index = support, counts = as.numeric(counts[support]))
+.npdeneq_count_chunk_size <- function(pool.n,
+                                      boot.num,
+                                      byte.budget = 16 * 1024^2,
+                                      progress.cap = 16L) {
+  pool.n <- as.double(pool.n)[1L]
+  boot.num <- as.integer(boot.num)[1L]
+  by.memory <- floor(byte.budget / (8 * pool.n * 6))
+  as.integer(max(1, min(boot.num, progress.cap, by.memory)))
 }
 
 .npdeneq_count_compression_eligible <- function(bw) {
@@ -75,7 +79,7 @@
                                                bw.x,
                                                bw.y,
                                                teststat,
-                                               teststat.counted = NULL,
+                                               teststat.counted.batch = NULL,
                                                compress.bootstrap = FALSE,
                                                progress = NULL,
                                                comm = 1L) {
@@ -96,27 +100,48 @@
   local.Tn <- numeric(length(local.idx))
   local.In <- numeric(length(local.idx))
 
-  for (jj in seq_along(local.idx)) {
-    i <- local.idx[[jj]]
-    output.boot <- if (compress.bootstrap) {
-      .npRmpi_with_local_regression(teststat.counted(
-        z = z,
-        x.count = .npdeneq_count_plan(plan$x[i, ], nrow(z)),
-        y.count = .npdeneq_count_plan(plan$y[i, ], nrow(z)),
-        bw.x = bw.x,
-        bw.y = bw.y,
-        n1 = ncol(plan$x),
-        n2 = ncol(plan$y)
-      ))
-    } else {
+  if (compress.bootstrap && length(local.idx)) {
+    chunk.size <- .npdeneq_count_chunk_size(
+      pool.n = nrow(z),
+      boot.num = length(local.idx)
+    )
+    for (start in seq.int(1L, length(local.idx), by = chunk.size)) {
+      stopi <- min(length(local.idx), start + chunk.size - 1L)
+      pos <- seq.int(start, stopi)
+      x.count <- matrix(0, nrow = nrow(z), ncol = length(pos))
+      y.count <- matrix(0, nrow = nrow(z), ncol = length(pos))
+
+      for (jj in seq_along(pos)) {
+        i <- local.idx[[pos[[jj]]]]
+        x.count[, jj] <- tabulate(plan$x[i, ], nbins = nrow(z))
+        y.count[, jj] <- tabulate(plan$y[i, ], nbins = nrow(z))
+      }
+
+      output.boot <- .npRmpi_with_local_regression(
+        teststat.counted.batch(
+          z = z,
+          x.count = x.count,
+          y.count = y.count,
+          bw.x = bw.x,
+          bw.y = bw.y,
+          n1 = ncol(plan$x),
+          n2 = ncol(plan$y)
+        )
+      )
+      local.Tn[pos] <- output.boot[["Tn"]]
+      local.In[pos] <- output.boot[["In"]]
+    }
+  } else {
+    for (jj in seq_along(local.idx)) {
+      i <- local.idx[[jj]]
       x.bootstrap <- data.frame(z[plan$x[i, ], , drop = FALSE])
       y.bootstrap <- data.frame(z[plan$y[i, ], , drop = FALSE])
-      .npRmpi_with_local_regression(
+      output.boot <- .npRmpi_with_local_regression(
         teststat(x.bootstrap, y.bootstrap, bw.x, bw.y)
       )
+      local.Tn[[jj]] <- output.boot$Tn
+      local.In[[jj]] <- output.boot$In
     }
-    local.Tn[[jj]] <- output.boot$Tn
-    local.In[[jj]] <- output.boot$In
   }
 
   payload <- c(as.numeric(local.idx), local.Tn, local.In)
@@ -243,45 +268,58 @@ npdeneqtest <- function(x = NULL,
     
   } ## End of test statistic
 
-  teststat.counted <- function(z, x.count, y.count, bw.x, bw.y, n1, n2) {
-    x.support <- z[x.count$index, , drop = FALSE]
-    y.support <- z[y.count$index, , drop = FALSE]
+  teststat.counted.batch <- function(z, x.count, y.count,
+                                     bw.x, bw.y, n1, n2) {
+    x.count <- as.matrix(x.count)
+    y.count <- as.matrix(y.count)
 
-    ksum.1 <- .npksum_power12_weighted(
-      txdat = x.support,
-      counts = x.count$counts,
+    ksum.x <- npksum(
+      txdat = z,
+      tydat = x.count,
+      exdat = z,
       bws = bw.x,
       bandwidth.divide = TRUE
-    )
-    sum.1 <- sum(x.count$counts *
-                 (as.numeric(ksum.1$ksum) -
-                  as.numeric(self.diagonal.x$ksum)))
-    sum2.1 <- sum(x.count$counts *
-                  (as.numeric(ksum.1$ksum.power2) -
-                   as.numeric(self.diagonal.x$ksum.power2)))
+    )[["ksum", exact = TRUE]]
+    dim(ksum.x) <- dim(x.count)
+    sum.1 <- colSums(x.count *
+                     (ksum.x - as.numeric(self.diagonal.x[["ksum", exact = TRUE]])))
+    sum.3 <- colSums(y.count * ksum.x)
 
-    ksum.2 <- .npksum_power12_weighted(
-      txdat = y.support,
-      counts = y.count$counts,
+    ksum.x2 <- npksum(
+      txdat = z,
+      tydat = x.count,
+      exdat = z,
+      bws = bw.x,
+      kernel.pow = 2,
+      bandwidth.divide = TRUE
+    )[["ksum", exact = TRUE]]
+    dim(ksum.x2) <- dim(x.count)
+    sum2.1 <- colSums(x.count *
+                      (ksum.x2 - as.numeric(self.diagonal.x[["ksum.power2", exact = TRUE]])))
+    sum2.3 <- colSums(y.count * ksum.x2)
+
+    ksum.y <- npksum(
+      txdat = z,
+      tydat = y.count,
+      exdat = z,
       bws = bw.y,
       bandwidth.divide = TRUE
-    )
-    sum.2 <- sum(y.count$counts *
-                 (as.numeric(ksum.2$ksum) -
-                  as.numeric(self.diagonal.y$ksum)))
-    sum2.2 <- sum(y.count$counts *
-                  (as.numeric(ksum.2$ksum.power2) -
-                   as.numeric(self.diagonal.y$ksum.power2)))
+    )[["ksum", exact = TRUE]]
+    dim(ksum.y) <- dim(y.count)
+    sum.2 <- colSums(y.count *
+                     (ksum.y - as.numeric(self.diagonal.y[["ksum", exact = TRUE]])))
 
-    ksum.3 <- .npksum_power12_weighted(
-      txdat = x.support,
-      counts = x.count$counts,
-      exdat = y.support,
-      bws = bw.x,
+    ksum.y2 <- npksum(
+      txdat = z,
+      tydat = y.count,
+      exdat = z,
+      bws = bw.y,
+      kernel.pow = 2,
       bandwidth.divide = TRUE
-    )
-    sum.3 <- sum(y.count$counts * as.numeric(ksum.3$ksum))
-    sum2.3 <- sum(y.count$counts * as.numeric(ksum.3$ksum.power2))
+    )[["ksum", exact = TRUE]]
+    dim(ksum.y2) <- dim(y.count)
+    sum2.2 <- colSums(y.count *
+                      (ksum.y2 - as.numeric(self.diagonal.y[["ksum.power2", exact = TRUE]])))
 
     In <- sum.1 / (n1 * (n1 - 1)) +
       sum.2 / (n2 * (n2 - 1)) -
@@ -322,21 +360,9 @@ npdeneqtest <- function(x = NULL,
     z <- bootstrap.pool
     x.index <- sample.int(nrow(z), size = n1, replace = TRUE)
     y.index <- sample.int(nrow(z), size = n2, replace = TRUE)
-    output.boot <- if (compress.bootstrap) {
-      teststat.counted(
-        z = z,
-        x.count = .npdeneq_count_plan(x.index, nrow(z)),
-        y.count = .npdeneq_count_plan(y.index, nrow(z)),
-        bw.x = bw.x,
-        bw.y = bw.y,
-        n1 = n1,
-        n2 = n2
-      )
-    } else {
-      x.bootstrap <- data.frame(z[x.index, , drop = FALSE])
-      y.bootstrap <- data.frame(z[y.index, , drop = FALSE])
-      teststat(x.bootstrap, y.bootstrap, bw.x, bw.y)
-    }
+    x.bootstrap <- data.frame(z[x.index, , drop = FALSE])
+    y.bootstrap <- data.frame(z[y.index, , drop = FALSE])
+    output.boot <- teststat(x.bootstrap, y.bootstrap, bw.x, bw.y)
     return(list(Tn=output.boot$Tn,
                 In=output.boot$In))
   }
@@ -361,13 +387,50 @@ npdeneqtest <- function(x = NULL,
       bw.x = bw.x,
       bw.y = bw.y,
       teststat = teststat,
-      teststat.counted = teststat.counted,
+      teststat.counted.batch = teststat.counted.batch,
       compress.bootstrap = compress.bootstrap,
       progress = progress
     )
     Tn.vector <- boot.out$Tn
     In.vector <- boot.out$In
     assign(".Random.seed", post.boot.seed, envir = .GlobalEnv)
+  } else if (compress.bootstrap) {
+    pool.n <- nrow(bootstrap.pool)
+    n1 <- nrow(x)
+    n2 <- nrow(y)
+    chunk.size <- .npdeneq_count_chunk_size(pool.n, boot.num)
+
+    for (start in seq.int(1L, boot.num, by = chunk.size)) {
+      stopi <- min(boot.num, start + chunk.size - 1L)
+      idx <- seq.int(start, stopi)
+      x.count <- matrix(0, nrow = pool.n, ncol = length(idx))
+      y.count <- matrix(0, nrow = pool.n, ncol = length(idx))
+
+      for (jj in seq_along(idx)) {
+        x.count[, jj] <- tabulate(
+          sample.int(pool.n, size = n1, replace = TRUE),
+          nbins = pool.n
+        )
+        y.count[, jj] <- tabulate(
+          sample.int(pool.n, size = n2, replace = TRUE),
+          nbins = pool.n
+        )
+      }
+
+      output.boot <- teststat.counted.batch(
+        z = bootstrap.pool,
+        x.count = x.count,
+        y.count = y.count,
+        bw.x = bw.x,
+        bw.y = bw.y,
+        n1 = n1,
+        n2 = n2
+      )
+      Tn.vector[idx] <- output.boot[["Tn"]]
+      In.vector[idx] <- output.boot[["In"]]
+      for (i in idx)
+        progress <- .np_progress_step(progress, done = i)
+    }
   } else {
     for (i in seq_len(boot.num)) {
       output.boot <- teststat.boot(x,y,bw.x,bw.y)

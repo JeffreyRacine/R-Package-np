@@ -1,5 +1,6 @@
 #include <R.h>
 #include <Rinternals.h>
+#include <limits.h>
 #include <math.h>
 
 #define NP_ENTROPY_SUMMATION_INTERRUPT_INTERVAL 65536
@@ -179,6 +180,126 @@ SEXP C_np_entropy_bivariate_summation(SEXP x,
   }
 
   return Rf_ScalarReal(0.5 * (double)(statistic_sum / n));
+}
+
+/*
+ * Evaluate a bounded chunk of dependence-test bootstrap assignments.  Each
+ * integer row maps the fixed y positions to resampled x observations.
+ * Looping over position pairs first reuses the invariant y marginal work
+ * across the chunk while retaining the scalar training order for every
+ * replication.  Workspace is O(chunk), in addition to the caller-owned
+ * O(n * chunk) index plan.
+ */
+SEXP C_np_entropy_bivariate_summation_xindex(SEXP x,
+                                             SEXP y,
+                                             SEXP index,
+                                             SEXP bandwidths)
+{
+  SEXP dim;
+  SEXP answer;
+  const double *x_ptr;
+  const double *y_ptr;
+  const double *bw;
+  const int *index_ptr;
+  double *out;
+  long double *sum_x;
+  long double *sum_joint;
+  long double *statistic_sum;
+  const R_xlen_t n = XLENGTH(x);
+  int n_replications;
+  int interrupt_countdown = NP_ENTROPY_SUMMATION_INTERRUPT_INTERVAL;
+
+  if (TYPEOF(x) != REALSXP || TYPEOF(y) != REALSXP ||
+      TYPEOF(index) != INTSXP || !Rf_isMatrix(index) ||
+      TYPEOF(bandwidths) != REALSXP || n < 1 || XLENGTH(y) != n ||
+      XLENGTH(bandwidths) != 4 || n > INT_MAX)
+    Rf_error("bivariate entropy index batch requires compatible inputs");
+
+  dim = Rf_getAttrib(index, R_DimSymbol);
+  if (INTEGER(dim)[0] < 1 || (R_xlen_t)INTEGER(dim)[1] != n)
+    Rf_error("bivariate entropy index batch has incompatible dimensions");
+  n_replications = INTEGER(dim)[0];
+
+  x_ptr = REAL(x);
+  y_ptr = REAL(y);
+  index_ptr = INTEGER(index);
+  bw = REAL(bandwidths);
+  for (int k = 0; k < 4; ++k)
+    if (!R_FINITE(bw[k]) || bw[k] <= 0.0)
+      Rf_error("bivariate entropy bandwidths must be finite and positive");
+  for (R_xlen_t i = 0; i < n; ++i)
+    if (!R_FINITE(x_ptr[i]) || !R_FINITE(y_ptr[i]))
+      Rf_error("bivariate entropy data must be finite");
+  for (R_xlen_t i = 0; i < XLENGTH(index); ++i)
+    if (index_ptr[i] < 1 || index_ptr[i] > n)
+      Rf_error("bivariate entropy bootstrap indices are out of range");
+
+  answer = PROTECT(Rf_allocVector(REALSXP, n_replications));
+  out = REAL(answer);
+  sum_x = (long double *)R_alloc((size_t)n_replications,
+                                 sizeof(long double));
+  sum_joint = (long double *)R_alloc((size_t)n_replications,
+                                     sizeof(long double));
+  statistic_sum = (long double *)R_alloc((size_t)n_replications,
+                                         sizeof(long double));
+  for (int replication = 0; replication < n_replications; ++replication)
+    statistic_sum[replication] = 0.0L;
+
+  for (R_xlen_t evaluation = 0; evaluation < n; ++evaluation) {
+    long double sum_y = 0.0L;
+
+    for (int replication = 0; replication < n_replications; ++replication) {
+      sum_x[replication] = 0.0L;
+      sum_joint[replication] = 0.0L;
+    }
+
+    for (R_xlen_t training = 0; training < n; ++training) {
+      const double z_y =
+        (y_ptr[evaluation] - y_ptr[training]) / bw[1];
+      const double z_joint_y =
+        (y_ptr[evaluation] - y_ptr[training]) / bw[3];
+      const double z_joint_y_squared = z_joint_y * z_joint_y;
+
+      sum_y += exp(-0.5 * z_y * z_y);
+
+      for (int replication = 0; replication < n_replications; ++replication) {
+        const double x_evaluation =
+          x_ptr[index_ptr[replication +
+                          (R_xlen_t)n_replications * evaluation] - 1];
+        const double x_training =
+          x_ptr[index_ptr[replication +
+                          (R_xlen_t)n_replications * training] - 1];
+        const double z_x = (x_evaluation - x_training) / bw[0];
+        const double z_joint_x =
+          (x_evaluation - x_training) / bw[2];
+
+        sum_x[replication] += exp(-0.5 * z_x * z_x);
+        sum_joint[replication] += exp(
+          -0.5 * (z_joint_x * z_joint_x + z_joint_y_squared)
+        );
+
+        if (--interrupt_countdown == 0) {
+          R_CheckUserInterrupt();
+          interrupt_countdown = NP_ENTROPY_SUMMATION_INTERRUPT_INTERVAL;
+        }
+      }
+    }
+
+    for (int replication = 0; replication < n_replications; ++replication) {
+      const long double ratio =
+        (sum_x[replication] * sum_y * bw[2] * bw[3]) /
+        ((long double)n * sum_joint[replication] * bw[0] * bw[1]);
+      const double term = 1.0 - sqrt((double)ratio);
+      statistic_sum[replication] += term * term;
+    }
+  }
+
+  for (int replication = 0; replication < n_replications; ++replication)
+    out[replication] =
+      0.5 * (double)(statistic_sum[replication] / n);
+
+  UNPROTECT(1);
+  return answer;
 }
 
 /*

@@ -59,11 +59,8 @@
                                                   yhat,
                                                   model,
                                                   tau,
-                                                  xdat,
-                                                  bw,
                                                   pivot,
-                                                  Jn,
-                                                  In,
+                                                  statistic.batch,
                                                   progress = NULL,
                                                   comm = 1L) {
   boot.num <- nrow(plan)
@@ -79,20 +76,36 @@
   )
 
   local.Sn <- numeric(length(local.idx))
+  chunk.size <- .np_cms_bootstrap_chunk_size(
+    n = length(model.resid),
+    boot.num = max(1L, length(local.idx)),
+    pivot = pivot
+  )
 
-  for (jj in seq_along(local.idx)) {
-    ii <- local.idx[[jj]]
-    y.star <- yhat + model.resid[plan[ii, ]]
-    suppressWarnings(
-      resid <- residuals(
-        rq(y.star ~ model$x - 1, tau = tau),
-        type = "response"
+  if (length(local.idx)) {
+    for (start in seq.int(1L, length(local.idx), by = chunk.size)) {
+      stopi <- min(length(local.idx), start + chunk.size - 1L)
+      pos <- seq.int(start, stopi)
+      residuals.chunk <- matrix(
+        NA_real_, nrow = length(model.resid), ncol = length(pos)
       )
-    )
 
-    local.Sn[[jj]] <- .npRmpi_with_local_regression(
-      if (pivot) Jn(xdat, resid, bw) else In(xdat, resid, bw)
-    )
+      for (jj in seq_along(pos)) {
+        ii <- local.idx[[pos[[jj]]]]
+        y.star <- yhat + model.resid[plan[ii, ]]
+        suppressWarnings(
+          residuals.chunk[, jj] <- residuals(
+            rq(y.star ~ model$x - 1, tau = tau),
+            type = "response"
+          )
+        )
+      }
+
+      statistic <- .npRmpi_with_local_regression(
+        statistic.batch(residuals.chunk)
+      )
+      local.Sn[pos] <- if (pivot) statistic[["Jn"]] else statistic[["In"]]
+    }
   }
 
   invisible(gc(FALSE))
@@ -140,11 +153,8 @@
                                                          yhat,
                                                          model,
                                                          tau,
-                                                         xdat,
-                                                         bw,
                                                          pivot,
-                                                         Jn,
-                                                         In,
+                                                         statistic.batch,
                                                          method,
                                                          progress = NULL,
                                                          comm = 1L) {
@@ -161,15 +171,36 @@
   )
 
   local.Sn <- numeric(length(local.idx))
+  chunk.size <- .np_cms_bootstrap_chunk_size(
+    n = length(model.resid),
+    boot.num = max(1L, length(local.idx)),
+    pivot = pivot
+  )
 
-  for (jj in seq_along(local.idx)) {
-    ii <- local.idx[[jj]]
-    y.star <- yhat + (model.resid - resid.mean) * plan[ii, ] + resid.mean
-    suppressWarnings(resid <- residuals(rq(y.star~ model$x - 1, tau=tau), type = "response"))
+  if (length(local.idx)) {
+    for (start in seq.int(1L, length(local.idx), by = chunk.size)) {
+      stopi <- min(length(local.idx), start + chunk.size - 1L)
+      pos <- seq.int(start, stopi)
+      residuals.chunk <- matrix(
+        NA_real_, nrow = length(model.resid), ncol = length(pos)
+      )
 
-    local.Sn[[jj]] <- .npRmpi_with_local_regression(
-      if (pivot) Jn(xdat, resid, bw) else In(xdat, resid, bw)
-    )
+      for (jj in seq_along(pos)) {
+        ii <- local.idx[[pos[[jj]]]]
+        y.star <- yhat + (model.resid - resid.mean) * plan[ii, ] + resid.mean
+        suppressWarnings(
+          residuals.chunk[, jj] <- residuals(
+            rq(y.star ~ model$x - 1, tau = tau),
+            type = "response"
+          )
+        )
+      }
+
+      statistic <- .npRmpi_with_local_regression(
+        statistic.batch(residuals.chunk)
+      )
+      local.Sn[pos] <- if (pivot) statistic[["Jn"]] else statistic[["In"]]
+    }
   }
 
   invisible(gc(FALSE))
@@ -293,11 +324,13 @@ npqcmstest <- function(formula,
   bwydat = match.arg(bwydat)  
 
   qresidual <- function(resid, tau) {
+    resid.dim <- dim(resid)
     n.obs <- length(resid)
     out <- rep.int(-tau, n.obs)
     nonmissing <- !is.na(resid)
     out[nonmissing & resid <= 0] <- 1 - tau
     out[!nonmissing] <- NA_real_
+    dim(out) <- resid.dim
     out
   }
 
@@ -384,6 +417,18 @@ npqcmstest <- function(formula,
     n*sqrt(prodh)*In(xdat, model.resid, bw)/sqrt(Omega.hat(xdat, model.resid, bw))
   }
 
+  statistic.batch <- function(model.resid) {
+    .np_cms_statistics_batch(
+      xdat = xdat,
+      score = qresidual(model.resid, tau),
+      bw = bw,
+      fhat = fhat,
+      prodh = prodh,
+      pivot = pivot,
+      kernel.args = list(...)
+    )
+  }
+
 
   ## Now conduct a wild bootstrap.. yhat is the fitted model, and we have
   ## rq.resid above... these are external in scope to boot.wild
@@ -399,7 +444,7 @@ npqcmstest <- function(formula,
     mult
   }
 
-  boot.wild <- function(model.resid) {
+  resid.wild <- function(model.resid) {
 
     a <- -0.6180339887499 # (1-sqrt(5))/2
     P.a <-0.72360679774998 # (1+sqrt(5))/(2*sqrt(5))
@@ -418,11 +463,10 @@ npqcmstest <- function(formula,
 
     suppressWarnings(resid <- residuals(rq(y.star~ model$x - 1, tau=tau), type = "response"))
 
-    return(if (pivot) Jn(xdat, resid, bw)
-           else In(xdat, resid, bw))
+    resid
   }
 
-  boot.wild.rademacher <- function(model.resid) {
+  resid.wild.rademacher <- function(model.resid) {
 
     a <- -1
     P.a <- 0.5
@@ -438,11 +482,10 @@ npqcmstest <- function(formula,
 
     suppressWarnings(resid <- residuals(rq(y.star~ model$x - 1, tau=tau), type = "response"))
 
-    return(if (pivot) Jn(xdat, resid, bw)
-           else In(xdat, resid, bw))
+    resid
   }
 
-  boot.iid <- function(model.resid) {
+  resid.iid <- function(model.resid) {
 
     ## Simple iid resampling
 
@@ -450,8 +493,7 @@ npqcmstest <- function(formula,
 
     suppressWarnings(resid <- residuals(rq(y.star~ model$x - 1, tau=tau), type = "response"))
 
-    return(if (pivot) Jn(xdat, resid, bw)
-           else In(xdat, resid, bw))
+    resid
   }
 
   if(distribution == "bootstrap"){
@@ -471,11 +513,8 @@ npqcmstest <- function(formula,
         yhat = yhat,
         model = model,
         tau = tau,
-        xdat = xdat,
-        bw = bw,
         pivot = pivot,
-        Jn = Jn,
-        In = In,
+        statistic.batch = statistic.batch,
         progress = progress
       )
       assign(".Random.seed", post.boot.seed, envir = .GlobalEnv)
@@ -494,11 +533,8 @@ npqcmstest <- function(formula,
         yhat = yhat,
         model = model,
         tau = tau,
-        xdat = xdat,
-        bw = bw,
         pivot = pivot,
-        Jn = Jn,
-        In = In,
+        statistic.batch = statistic.batch,
         method = "wild",
         progress = progress
       )
@@ -518,26 +554,38 @@ npqcmstest <- function(formula,
         yhat = yhat,
         model = model,
         tau = tau,
-        xdat = xdat,
-        bw = bw,
         pivot = pivot,
-        Jn = Jn,
-        In = In,
+        statistic.batch = statistic.batch,
         method = "wild-rademacher",
         progress = progress
       )
       assign(".Random.seed", post.boot.seed, envir = .GlobalEnv)
     } else {
       Sn.bootstrap <- numeric(boot.num)
-      for (ii in seq_len(boot.num)) {
-        if(boot.method == "iid"){
-          Sn.bootstrap[ii] <- boot.iid(model.resid)
-        } else if(boot.method == "wild"){
-          Sn.bootstrap[ii] <- boot.wild(model.resid)
-        } else if(boot.method == "wild-rademacher"){
-          Sn.bootstrap[ii] <- boot.wild.rademacher(model.resid)
+      chunk.size <- .np_cms_bootstrap_chunk_size(
+        n = n,
+        boot.num = boot.num,
+        pivot = pivot
+      )
+      for (start in seq.int(1L, boot.num, by = chunk.size)) {
+        stopi <- min(boot.num, start + chunk.size - 1L)
+        idx <- seq.int(start, stopi)
+        residuals.chunk <- matrix(NA_real_, nrow = n, ncol = length(idx))
+
+        for (jj in seq_along(idx)) {
+          ii <- idx[[jj]]
+          residuals.chunk[, jj] <- if(boot.method == "iid") {
+            resid.iid(model.resid)
+          } else if(boot.method == "wild") {
+            resid.wild(model.resid)
+          } else {
+            resid.wild.rademacher(model.resid)
+          }
+          progress <- .np_progress_step(progress, done = ii)
         }
-        progress <- .np_progress_step(progress, done = ii)
+
+        statistic <- statistic.batch(residuals.chunk)
+        Sn.bootstrap[idx] <- if (pivot) statistic[["Jn"]] else statistic[["In"]]
       }
     }
     progress <- .np_progress_end(progress)

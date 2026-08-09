@@ -27,6 +27,40 @@ test_that("fused bivariate summation matches direct npudens densities", {
   )
 })
 
+test_that("dependence bootstrap index batches preserve scalar assignments", {
+  scalar <- getFromNamespace(
+    ".np_entropy_bivariate_gaussian_summation", "npRmpi"
+  )
+  batch <- getFromNamespace(
+    ".np_entropy_bivariate_gaussian_summation_xindex", "npRmpi"
+  )
+  set.seed(72831)
+  x <- c(-2, -0.7, -0.7, 0.1, 0.8, 1.9, 4.2)
+  y <- c(1.4, -1.1, 0.2, 0.2, 1.7, 2.5, 7.1)
+  index <- t(replicate(5L, sample.int(length(x), replace = TRUE)))
+  bw.x <- 0.67
+  bw.y <- 0.83
+  bw.joint <- c(0.72, 0.91)
+  reference <- apply(index, 1L, function(draw) {
+    scalar(x[draw], y, bw.x, bw.y, bw.joint)
+  })
+
+  expect_identical(
+    batch(x, y, index, bw.x, bw.y, bw.joint),
+    unname(reference)
+  )
+  expect_error(
+    batch(x, y, index[, -1L, drop = FALSE], bw.x, bw.y, bw.joint),
+    "incompatible dimensions"
+  )
+  invalid <- index
+  invalid[[1L]] <- 0L
+  expect_error(
+    batch(x, y, invalid, bw.x, bw.y, bw.joint),
+    "out of range"
+  )
+})
+
 test_that("npsdeptest summation route retains its public result shape", {
   skip_on_cran()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")

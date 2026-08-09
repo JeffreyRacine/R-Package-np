@@ -69,12 +69,30 @@
 
   local.Srho <- numeric(length(local.idx))
 
-  for (jj in seq_along(local.idx)) {
-    b <- local.idx[[jj]]
-    data.x.boot <- data.x[plan[b, ]]
-    local.Srho[[jj]] <- .npRmpi_with_local_regression(
-      Srho.bivar(data.x.boot, data.y, bw.data.x, bw.data.y, bw.joint, method = method)
+  if (method == "summation" && length(local.idx)) {
+    chunk.size <- .np_entropy_count_chunk_size(
+      length(data.x), bytes.per.support = 4, max.chunk = 16L
     )
+    for (start in seq.int(1L, length(local.idx), by = chunk.size)) {
+      position <- start:min(
+        length(local.idx), start + chunk.size - 1L
+      )
+      local.Srho[position] <- .npRmpi_with_local_regression(
+        .np_entropy_bivariate_gaussian_summation_xindex(
+          data.x, data.y,
+          plan[local.idx[position], , drop = FALSE],
+          bw.data.x, bw.data.y, bw.joint
+        )
+      )
+    }
+  } else {
+    for (jj in seq_along(local.idx)) {
+      b <- local.idx[[jj]]
+      data.x.boot <- data.x[plan[b, ]]
+      local.Srho[[jj]] <- .npRmpi_with_local_regression(
+        Srho.bivar(data.x.boot, data.y, bw.data.x, bw.data.y, bw.joint, method = method)
+      )
+    }
   }
 
   invisible(gc(FALSE))
@@ -234,14 +252,39 @@ npdeptest <- function(data.x = NULL,
       )
       assign(".Random.seed", post.boot.seed, envir = .GlobalEnv)
     } else {
-      Srho.vec.boot <- numeric()
-      for (b in seq_len(boot.num)) {
-        ## Break systematic relationship between x and y (null)
+      Srho.vec.boot <- numeric(boot.num)
+      if (method == "summation") {
+        sample.size <- length(data.x)
+        chunk.size <- .np_entropy_count_chunk_size(
+          sample.size, bytes.per.support = 4, max.chunk = 16L
+        )
+        for (start in seq.int(1L, boot.num, by = chunk.size)) {
+          index <- start:min(boot.num, start + chunk.size - 1L)
+          bootstrap.index <- matrix(
+            NA_integer_, nrow = length(index), ncol = sample.size
+          )
+          for (row in seq_along(index)) {
+            bootstrap.index[row, ] <- sample.int(
+              sample.size, replace = TRUE
+            )
+          }
+          Srho.vec.boot[index] <-
+            .np_entropy_bivariate_gaussian_summation_xindex(
+              data.x, data.y, bootstrap.index,
+              bw.data.x, bw.data.y, bw.joint
+            )
+          for (done in index)
+            progress <- .np_progress_step(progress, done = done)
+        }
+      } else {
+        for (b in seq_len(boot.num)) {
+          ## Break systematic relationship between x and y (null)
 
-        data.x.boot <- data.x[sample.int(length(data.x), replace = TRUE)]
+          data.x.boot <- data.x[sample.int(length(data.x), replace = TRUE)]
 
-        Srho.vec.boot[b] <- Srho.bivar(data.x.boot,data.y,bw.data.x,bw.data.y,bw.joint,method=method)
-        progress <- .np_progress_step(progress, done = b)
+          Srho.vec.boot[b] <- Srho.bivar(data.x.boot,data.y,bw.data.x,bw.data.y,bw.joint,method=method)
+          progress <- .np_progress_step(progress, done = b)
+        }
       }
     }
 
