@@ -21,7 +21,7 @@ npunitest <- function(data.x = NULL,
   if(is.numeric(data.x) && (max(data.x) < min(data.y) || max(data.y) < min(data.x))) .np_warning("non-overlapping empirical distributions (see `Details' in ?npunidist)")
 
   method <- match.arg(method)
-  entropy.fast.gaussian <- length(list(...)) == 0L
+  entropy.fast.gaussian <- .np_entropy_uses_default_fixed_gaussian(list(...))
 
   ## Save seed prior to setting
 

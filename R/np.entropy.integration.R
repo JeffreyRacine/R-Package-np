@@ -2,6 +2,52 @@
 .np_entropy_tail_bandwidths <- 8
 .np_entropy_workspace_bytes <- 16 * 1024^2
 
+.np_entropy_count_chunk_size <- function(support.length,
+                                         bytes.per.support,
+                                         max.chunk) {
+  support.length <- as.double(support.length)
+  bytes.per.support <- as.double(bytes.per.support)
+  max.chunk <- as.integer(max.chunk)
+  if (length(support.length) != 1L || !is.finite(support.length) ||
+      support.length < 1 || length(bytes.per.support) != 1L ||
+      !is.finite(bytes.per.support) || bytes.per.support <= 0 ||
+      length(max.chunk) != 1L || is.na(max.chunk) || max.chunk < 1L) {
+    stop("invalid entropy count-chunk dimensions")
+  }
+  as.integer(max(
+    1L,
+    min(max.chunk, floor(
+      .np_entropy_workspace_bytes / (bytes.per.support * support.length)
+    ))
+  ))
+}
+
+.np_entropy_uses_default_fixed_gaussian <- function(dots) {
+  ## Only recognize explicit options that are exactly equivalent to the
+  ## default estimator.  Every other density option remains on the general
+  ## path; in particular, nearest-neighbour bandwidths must be refitted on the
+  ## duplicate-preserving bootstrap sample rather than compressed as weights.
+  if (!length(dots))
+    return(TRUE)
+  dot.names <- names(dots)
+  allowed <- c("bwtype", "ckertype", "ckerorder")
+  if (is.null(dot.names) || anyNA(dot.names) || any(!nzchar(dot.names)) ||
+      anyDuplicated(dot.names) || any(!dot.names %in% allowed))
+    return(FALSE)
+
+  if (!is.null(dots$bwtype) &&
+      !identical(dots$bwtype, "fixed"))
+    return(FALSE)
+  if (!is.null(dots$ckertype) &&
+      !identical(dots$ckertype, "gaussian"))
+    return(FALSE)
+  if (!is.null(dots$ckerorder) &&
+      (length(dots$ckerorder) != 1L || is.na(dots$ckerorder) ||
+       !is.numeric(dots$ckerorder) || dots$ckerorder != 2))
+    return(FALSE)
+  TRUE
+}
+
 .np_entropy_trapezoid_weights <- function(grid) {
   n <- length(grid)
   if (n < 4L || is.unsorted(grid) || anyNA(grid) ||
@@ -179,11 +225,9 @@
                                                            boot.num,
                                                            progress) {
   support.length <- length(data.null)
-  bytes.per.replication <- 80 * support.length
-  chunk.size <- as.integer(max(
-    1L,
-    min(16L, floor(.np_entropy_workspace_bytes / bytes.per.replication))
-  ))
+  chunk.size <- .np_entropy_count_chunk_size(
+    support.length, bytes.per.support = 80, max.chunk = 16L
+  )
   values <- numeric(boot.num)
 
   for (start in seq.int(1L, boot.num, by = chunk.size)) {
@@ -203,34 +247,14 @@
       )
     }
 
-    density.x <- .np_entropy_count_densities(
-      data.null, data.null, counts.x, bw.x, size.x
+    values[index] <- .Call(
+      "C_np_entropy_univariate_summation_counts",
+      as.double(data.null),
+      counts.x,
+      counts.y,
+      as.double(c(bw.x, bw.y)),
+      PACKAGE = "np"
     )
-    density.y <- .np_entropy_count_densities(
-      data.null, data.null, counts.y, bw.y, size.y
-    )
-    summand <- density.y / density.x
-    finite <- is.finite(summand)
-
-    for (column in seq_along(index)) {
-      if (any(counts.x[, column] > 0 & !finite[, column])) {
-        .np_warning(
-          " non-finite value in summation-based statistic: integration recommended"
-        )
-      }
-    }
-
-    term <- (1 - sqrt(summand))^2
-    term[!finite] <- 0
-    denominator <- colSums(counts.x * finite)
-    values[index] <- 0.5 * colSums(counts.x * term) / denominator
-
-    unstable <- which(values[index] < 0 | values[index] > 1)
-    for (unused in unstable) {
-      .np_warning(
-        " numerical instability in summation-based statistic: integration recommended"
-      )
-    }
   }
 
   list(values = values, progress = progress)
@@ -268,12 +292,121 @@
   0.5 * mean((1 - sqrt(summand))^2)
 }
 
-.np_entropy_fixed_density <- function(data, bandwidth) {
-  as.numeric(npksum(
-    txdat = data,
-    bws = bandwidth,
-    bandwidth.divide = TRUE
-  )$ksum / NROW(data))
+.np_entropy_tsboot_counts_drawer <- function(n,
+                                              B,
+                                              blocklen,
+                                              sim = c("fixed", "geom"),
+                                              n.sim,
+                                              endcorr = TRUE) {
+  sim <- match.arg(sim)
+  n <- as.integer(n)
+  B <- as.integer(B)
+  blocklen <- as.integer(blocklen)
+  n.sim <- as.integer(n.sim)
+  if (n < 1L || B < 1L || n.sim < 1L || length(blocklen) != 1L ||
+      is.na(blocklen) || blocklen < 1L || blocklen > n) {
+    stop("invalid entropy block-bootstrap dimensions")
+  }
+
+  ts.array <- utils::getFromNamespace("ts.array", "boot")
+  make.ends <- utils::getFromNamespace("make.ends", "boot")
+  draws <- ts.array(
+    n = n,
+    n.sim = n.sim,
+    R = B,
+    l = blocklen,
+    sim = sim,
+    endcorr = if (identical(sim, "geom")) TRUE else isTRUE(endcorr)
+  )
+  starts <- as.matrix(draws$starts)
+  lengths <- draws$lengths
+
+  function(start, stopi) {
+    start <- as.integer(start)
+    stopi <- as.integer(stopi)
+    if (start < 1L || stopi < start || stopi > B)
+      stop("invalid entropy block-bootstrap chunk bounds")
+
+    replications <- start:stopi
+    counts <- matrix(0, nrow = n, ncol = length(replications))
+    for (column in seq_along(replications)) {
+      replication <- replications[column]
+      if (identical(sim, "fixed") && identical(blocklen, 1L)) {
+        indices <- as.integer(starts[replication, seq_len(n.sim)])
+      } else {
+        ends <- if (identical(sim, "geom")) {
+          cbind(starts[replication, ], lengths[replication, ])
+        } else {
+          cbind(starts[replication, ], lengths)
+        }
+        indices <- apply(ends, 1L, make.ends, n)
+        indices <- if (is.list(indices)) {
+          as.integer(unlist(indices)[seq_len(n.sim)])
+        } else {
+          as.integer(indices)[seq_len(n.sim)]
+        }
+      }
+      counts[, column] <- tabulate(indices, nbins = n)
+    }
+    counts
+  }
+}
+
+.np_entropy_symmetric_summation_bootstrap <- function(data.null,
+                                                       sample.size,
+                                                       bandwidth,
+                                                       boot.num,
+                                                       blocklen,
+                                                       sim,
+                                                       progress) {
+  support.length <- length(data.null)
+  chunk.size <- .np_entropy_count_chunk_size(
+    support.length, bytes.per.support = 8, max.chunk = 64L
+  )
+  draw.counts <- .np_entropy_tsboot_counts_drawer(
+    n = support.length,
+    B = boot.num,
+    blocklen = blocklen,
+    sim = sim,
+    n.sim = sample.size
+  )
+  values <- numeric(boot.num)
+
+  for (start in seq.int(1L, boot.num, by = chunk.size)) {
+    index <- start:min(boot.num, start + chunk.size - 1L)
+    counts <- draw.counts(index[1L], index[length(index)])
+    values[index] <- .Call(
+      "C_np_entropy_symmetric_summation_counts",
+      as.double(data.null),
+      counts,
+      as.double(bandwidth),
+      PACKAGE = "np"
+    )
+    for (done in index)
+      progress <- .np_progress_step(progress, done = done)
+  }
+
+  list(values = values, progress = progress)
+}
+
+.np_entropy_bivariate_gaussian_summation <- function(x.dat,
+                                                      y.dat,
+                                                      bw.x,
+                                                      bw.y,
+                                                      bw.joint) {
+  value <- .Call(
+    "C_np_entropy_bivariate_summation",
+    as.double(x.dat),
+    as.double(y.dat),
+    as.double(c(bw.x, bw.y, bw.joint)),
+    PACKAGE = "np"
+  )
+  if (!is.finite(value)) {
+    .np_warning(
+      " non-finite value in summation-based statistic: integration recommended"
+    )
+  }
+  value
 }
 
 .np_entropy_bivariate_domain <- function(x.dat,

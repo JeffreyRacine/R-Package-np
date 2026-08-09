@@ -143,8 +143,8 @@ Further arguments are passed to the bandwidth-selection routines used by the tes
    messages are produced when this occurs (\sQuote{integration recommended})
    and should be heeded.
 
-   For numeric data when no density options are supplied through
-   \code{...}, the default Gaussian integration
+   For numeric data using the fixed second-order Gaussian density
+   estimator, the integration
    statistic uses deterministic corrected composite trapezoidal
    quadrature. The integration domain extends eight bandwidths beyond
    the pooled observed support and uses four evaluation points per
@@ -152,9 +152,18 @@ Further arguments are passed to the bandwidth-selection routines used by the tes
    resampling counts are evaluated in bounded chunks on the same
    quadrature grid for \code{integration} or on the original support for
    \code{summation}. This avoids repeated adaptive integration and
-   repeated reconstruction of resampled data.
-   Supplying density options through \code{...} retains the
-   corresponding kernel-specific numerical integration route.
+   repeated reconstruction of resampled data. The summation density
+   ratios are evaluated by a registered native routine without forming a
+   sample-by-sample kernel matrix.
+
+   The accelerated route is also used when \code{...} contains only
+   options explicitly equivalent to the defaults: \code{bwtype="fixed"},
+   \code{ckertype="gaussian"}, and \code{ckerorder=2}. Other density
+   options retain the corresponding general estimator and numerical
+   integration route. In particular, generalized and adaptive
+   nearest-neighbour bandwidths use duplicate-preserving resamples and
+   recompute their realized neighbour radii; bootstrap counts are not
+   treated as fixed-bandwidth observation weights.
 
 }
 

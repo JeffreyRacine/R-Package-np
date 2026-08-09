@@ -13,6 +13,16 @@
   memory use; `options(np.macMseries.accelerate = FALSE)` retains the scalar
   route.
 
+* Default fixed-Gaussian entropy summation now uses registered, streamed
+  native owners for `npunitest()`, `npsymtest()`, `npdeptest()`, and
+  `npsdeptest()`. Univariate and symmetry bootstraps consume bounded chunks of
+  multiplicities while preserving the exact incumbent `sample.int()` or
+  `boot::tsboot()` draw plan and RNG state; dependence statistics fuse their
+  marginal and joint kernel sums without an n-by-n cache. Explicit
+  generalized- and adaptive-nearest-neighbour requests remain on literal,
+  duplicate-preserving resample/refit routes so sample-owned radii and ordered
+  lag pairs are unchanged.
+
 * General bounded conditional-density CVLS now reuses each response-side
   quadrature kernel tile across a memory-bounded group of explanatory-row
   tiles. Ordinary and beta kernels share the same canonical engine; objective

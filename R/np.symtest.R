@@ -19,7 +19,7 @@ npsymtest <- function(data = NULL,
 
   boot.method <- match.arg(boot.method)
   method <- match.arg(method)
-  entropy.fast.gaussian <- length(list(...)) == 0L
+  entropy.fast.gaussian <- .np_entropy_uses_default_fixed_gaussian(list(...))
 
   ## Save seed prior to setting
 
@@ -199,14 +199,8 @@ npsymtest <- function(data = NULL,
     ## bootstrap with a block length of 1 which is presumed to
     ## generate an iid bootstrap.
 
-    resampled.stat <- tsboot(tseries = tseries.idx,
-                             statistic = boot.fun,
-                             R = boot.num,
-                             n.sim = length(data),
-                             l = 1,
-                             sim = "fixed",
-                             data.null = data.null,
-                             bw = bw)$t
+    boot.blocklen <- 1L
+    boot.sim <- "fixed"
 
   } else {
 
@@ -217,15 +211,32 @@ npsymtest <- function(data = NULL,
       boot.blocklen <- b.star(as.numeric(data.matrix(data)),round=TRUE)[1,1]
     }
 
+    boot.sim <- "geom"
+
+  }
+
+  if (is.numeric(data) && method == "summation" &&
+      entropy.fast.gaussian) {
+    bootstrap.result <- .np_entropy_symmetric_summation_bootstrap(
+      data.null = data.null,
+      sample.size = length(data),
+      bandwidth = bw,
+      boot.num = boot.num,
+      blocklen = boot.blocklen,
+      sim = boot.sim,
+      progress = boot.state$progress
+    )
+    resampled.stat <- matrix(bootstrap.result$values, ncol = 1L)
+    boot.state$progress <- bootstrap.result$progress
+  } else {
     resampled.stat <- tsboot(tseries = tseries.idx,
                              statistic = boot.fun,
                              R = boot.num,
                              n.sim = length(data),
                              l = boot.blocklen,
-                             sim = "geom",
+                             sim = boot.sim,
                              data.null = data.null,
                              bw = bw)$t
-
   }
 
   boot.state$progress <- .np_progress_end(boot.state$progress)
