@@ -8,7 +8,7 @@ test_that("fixed scalar npcdens CVLS uses the canonical constant-X limit", {
     np.largelambda = TRUE
   )
   on.exit(options(old), add = TRUE)
-  eval.only <- getFromNamespace(".npcdensbw_eval_only", "np")
+  eval.only <- getFromNamespace(".npcdensbw_eval_only", "npRmpi")
 
   set.seed(202608094L)
   n <- 120L
@@ -59,7 +59,7 @@ test_that("nonfixed conditional Y bandwidths do not enter the fixed X limit", {
     np.largelambda = TRUE
   )
   on.exit(options(old), add = TRUE)
-  eval.only <- getFromNamespace(".npcdensbw_eval_only", "np")
+  eval.only <- getFromNamespace(".npcdensbw_eval_only", "npRmpi")
 
   set.seed(202608095L)
   n <- 100L
@@ -98,7 +98,7 @@ test_that("constant X remains side-specific when Y is categorical or bounded", {
     np.largelambda = TRUE
   )
   on.exit(options(old), add = TRUE)
-  eval.only <- getFromNamespace(".npcdensbw_eval_only", "np")
+  eval.only <- getFromNamespace(".npcdensbw_eval_only", "npRmpi")
 
   set.seed(202608096L)
   n <- 120L
