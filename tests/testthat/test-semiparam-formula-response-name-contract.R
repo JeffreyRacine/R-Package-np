@@ -25,7 +25,7 @@ make_semiparam_formula_fits <- function(seed = 123, n = 24L) {
     degree = 1,
     bwtype = "fixed"
   )
-  fit_sc <- np::npscoef(bws = bw_sc, errors = FALSE, betas = FALSE)
+  fit_sc <- np::npscoef(bws = bw_sc, se = FALSE, betas = FALSE)
 
   dat_si <- data.frame(x1 = runif(n, -1, 1), x2 = runif(n, -1, 1))
   idx <- dat_si$x1 + 0.5 * dat_si$x2

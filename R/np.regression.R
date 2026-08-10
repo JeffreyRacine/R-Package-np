@@ -1,6 +1,7 @@
 npreg <-
   function(bws, ...){
     args <- list(...)
+    npRejectLegacyBooleanErrors(args, "npreg")
 
     if (!missing(bws)){
       if (inherits(bws, "formula") && is.null(args$txdat))
@@ -22,10 +23,10 @@ npreg <-
     }
   }
 
-.np_regression_output_request <- function(errors, gradients) {
-  errors <- npValidateScalarLogical(errors, "errors")
+.np_regression_output_request <- function(se, gradients) {
+  se <- npValidateScalarLogical(se, "se")
   gradients <- npValidateScalarLogical(gradients, "gradients")
-  as.integer(errors) + 2L * as.integer(gradients)
+  as.integer(se) + 2L * as.integer(gradients)
 }
 
 .npreg_fit_tree_code <- function(bws, ncon, ncat) {
@@ -99,9 +100,11 @@ npreg <-
 
 npreg.formula <-
   function(bws, data = NULL, newdata = NULL, y.eval = FALSE,
-           errors = TRUE, ...){
+           se = FALSE, ...){
 
-    errors <- npValidateScalarLogical(errors, "errors")
+    dots <- list(...)
+    npRejectLegacyBooleanErrors(dots, "npreg")
+    se <- npValidateScalarLogical(se, "se")
 
     tt <- terms(bws)
     tmf <- if (!is.null(bws$call)) {
@@ -171,7 +174,7 @@ npreg.formula <-
       if (y.eval)
         reg.args$eydat <- eydat
     }
-    ev <- do.call(npreg, c(reg.args, list(errors = errors), list(...)))
+    ev <- do.call(npreg, c(reg.args, list(se = se), dots))
     ev$call <- match.call(expand.dots = FALSE)
     environment(ev$call) <- parent.frame()
 
@@ -229,13 +232,14 @@ npreg.rbandwidth <-
            txdat = stop("training data 'txdat' missing"),
            tydat = stop("training data 'tydat' missing"),
            exdat, eydat, gradient.order = 1L, gradients = FALSE,
-           residuals = FALSE, errors = TRUE,
+           residuals = FALSE, se = FALSE,
            ...){
     fit.start <- proc.time()[3]
 
     no.ex = missing(exdat)
     no.ey = missing(eydat)
     dots <- list(...)
+    npRejectLegacyBooleanErrors(dots, "npreg")
     fit.progress.handoff <- isTRUE(dots$.np_fit_progress_handoff)
     if ("remin" %in% names(dots)) {
       warning("npreg: bandwidth-selection argument 'remin' is ignored when a bandwidth object is supplied",
@@ -246,7 +250,7 @@ npreg.rbandwidth <-
     warn.glp.gradient <- if (is.null(dots$warn.glp.gradient)) TRUE else isTRUE(dots$warn.glp.gradient)
 
     gradients <- npValidateScalarLogical(gradients, "gradients")
-    errors <- npValidateScalarLogical(errors, "errors")
+    se <- npValidateScalarLogical(se, "se")
     residuals <- npValidateScalarLogical(residuals, "residuals")
 
     txdat = toFrame(txdat)
@@ -476,7 +480,7 @@ npreg.rbandwidth <-
 
     if (residuals && !compute.resid.from.fit){
       resid <- tydat - npreg(txdat = txdat, tydat = tydat, bws = bws,
-                             errors = FALSE)$mean
+                             se = FALSE)$mean
     }
 
 
@@ -636,7 +640,7 @@ npreg.rbandwidth <-
             as.integer(enrow),
             as.integer(ncol),
             .np_regression_output_request(
-              errors = errors,
+              se = se,
               gradients = do.compiled.gradients
             ),
             as.double(cker.bounds.c$lb),
@@ -651,7 +655,7 @@ npreg.rbandwidth <-
       rorder[c(ord_idx[bws$icon], ord_idx[bws$iuno], ord_idx[bws$iord])] <- ord_idx
       myout$g = as.matrix(myout$g[,rorder])
 
-      if (errors) {
+      if (se) {
         myout$gerr = matrix(data=myout$gerr, nrow = enrow, ncol = ncol, byrow = FALSE)
         myout$gerr = as.matrix(myout$gerr[,rorder])
       }
@@ -667,7 +671,7 @@ npreg.rbandwidth <-
         nrow.eval = enrow,
         ncol.x = ncol
       )
-      myout$gerr <- if (errors)
+      myout$gerr <- if (se)
         matrix(NA_real_, nrow = enrow, ncol = ncol) else NULL
     }
 
@@ -685,7 +689,7 @@ npreg.rbandwidth <-
       merr = myout$merr,
       ntrain = tnrow,
       trainiseval = no.ex,
-      errors = errors,
+      se = se,
       gradients = gradients,
       residuals = residuals,
       xtra = myout$xtra,
@@ -699,7 +703,7 @@ npreg.rbandwidth <-
     )
     if (gradients) {
       ev.args$grad <- myout$g
-      if (errors)
+      if (se)
         ev.args$gerr <- myout$gerr
     }
     if (residuals)
@@ -717,10 +721,11 @@ npreg.rbandwidth <-
   }
 
 npreg.default <- function(bws, txdat, tydat, nomad = FALSE,
-                          errors = TRUE, ...){
+                          se = FALSE, ...){
   sc <- sys.call()
   sc.names <- names(sc)
-  errors <- npValidateScalarLogical(errors, "errors")
+  npRejectLegacyBooleanErrors(list(...), "npreg")
+  se <- npValidateScalarLogical(se, "se")
   nomad <- npValidateNomadControl(nomad, "nomad")
 
   if (!missing(bws) &&
@@ -742,7 +747,7 @@ npreg.default <- function(bws, txdat, tydat, nomad = FALSE,
     fit.dots <- dots
     fit.dots$remin <- NULL
     fit.dots$.np_fit_progress_handoff <- TRUE
-    return(do.call(npreg, c(reg.args, list(errors = errors), fit.dots)))
+    return(do.call(npreg, c(reg.args, list(se = se), fit.dots)))
   }
 
   ## here we check to see if the function was called with tdat =
@@ -771,7 +776,7 @@ npreg.default <- function(bws, txdat, tydat, nomad = FALSE,
     sc.bw <- sc
     sc.bw[[1]] <- quote(npregbw)
   }
-  sc.bw$errors <- NULL
+  sc.bw$se <- NULL
 
   ## if bws was passed in explicitly, do not compute bandwidths
     
@@ -822,7 +827,7 @@ npreg.default <- function(bws, txdat, tydat, nomad = FALSE,
   }
   if (!has.explicit.bws)
     call.args$.np_fit_progress_handoff <- TRUE
-  ev <- do.call(npreg, c(call.args, list(errors = errors), list(...)))
+  ev <- do.call(npreg, c(call.args, list(se = se), list(...)))
 
   ev$call <- match.call(expand.dots = FALSE)
   environment(ev$call) <- parent.frame()

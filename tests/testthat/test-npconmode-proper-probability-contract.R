@@ -239,7 +239,7 @@ test_that("npconmode binary class-probability gradients are stored and plotted",
     gradients = TRUE
   )
   expect_equal(as.vector(gout), as.vector(direct$congrad), tolerance = 1e-10)
-  expect_error(gradients(fit, errors = TRUE), "standard errors")
+  expect_error(gradients(fit, se = TRUE), "standard errors")
   expect_error(gradients(fit, level = "1"), "stored class-probability gradients")
 
   pdata <- plot(fit, output = "data")

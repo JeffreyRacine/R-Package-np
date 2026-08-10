@@ -87,7 +87,7 @@ test_that("core S3 logical arguments fail clearly", {
   bw.reg <- npregbw(y ~ x, data = dat, bws = 0.25, bandwidth.compute = FALSE)
   fit.reg <- npreg(bws = bw.reg, gradients = TRUE)
   expect_error(predict(fit.reg, se.fit = "yes"), "'se.fit' must be TRUE or FALSE", fixed = TRUE)
-  expect_error(gradients(fit.reg, errors = "yes"), "'errors' must be TRUE or FALSE", fixed = TRUE)
+  expect_error(gradients(fit.reg, se = "yes"), "'se' must be TRUE or FALSE", fixed = TRUE)
 
   bw.den <- npudensbw(~ x, data = dat, bws = 0.25, bandwidth.compute = FALSE)
   fit.den <- npudens(bws = bw.den)
@@ -100,10 +100,10 @@ test_that("core S3 logical arguments fail clearly", {
   bw.cd <- npcdensbw(y ~ x, data = dat, bws = c(0.25, 0.25), bandwidth.compute = FALSE)
   fit.cd <- npcdens(bws = bw.cd, gradients = TRUE)
   expect_error(predict(fit.cd, se.fit = "yes"), "'se.fit' must be TRUE or FALSE", fixed = TRUE)
-  expect_error(gradients(fit.cd, errors = "yes"), "'errors' must be TRUE or FALSE", fixed = TRUE)
+  expect_error(gradients(fit.cd, se = "yes"), "'se' must be TRUE or FALSE", fixed = TRUE)
 
   bw.cdist <- npcdistbw(y ~ x, data = dat, bws = c(0.25, 0.25), bandwidth.compute = FALSE)
   fit.cdist <- npcdist(bws = bw.cdist, gradients = TRUE)
   expect_error(predict(fit.cdist, se.fit = "yes"), "'se.fit' must be TRUE or FALSE", fixed = TRUE)
-  expect_error(gradients(fit.cdist, errors = "yes"), "'errors' must be TRUE or FALSE", fixed = TRUE)
+  expect_error(gradients(fit.cdist, se = "yes"), "'se' must be TRUE or FALSE", fixed = TRUE)
 })

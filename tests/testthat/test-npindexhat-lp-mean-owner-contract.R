@@ -42,7 +42,7 @@ test_that("npindexhat lp mean owner preserves fit and matrix/apply parity for no
       tydat = y,
       exdat = ex,
       gradients = FALSE,
-      errors = FALSE
+      se = FALSE
     )
 
     apply.mean <- npindexhat(

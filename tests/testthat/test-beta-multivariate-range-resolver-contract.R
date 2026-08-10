@@ -162,11 +162,11 @@ test_that("multivariate beta range matches padded fixed bounds unconditionally",
   )
   regression.range <- npreg(
     bws = regression.range.bw, txdat = training, tydat = response,
-    exdat = evaluation
+    exdat = evaluation, se = TRUE
   )
   regression.fixed <- npreg(
     bws = regression.fixed.bw, txdat = training, tydat = response,
-    exdat = evaluation
+    exdat = evaluation, se = TRUE
   )
   expect_identical(fitted(regression.range), fitted(regression.fixed))
   expect_identical(se(regression.range), se(regression.fixed))

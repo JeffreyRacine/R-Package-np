@@ -412,7 +412,7 @@ if (interactive()) Sys.sleep(5)
 # Retrieve the coefficient estimates and their standard errors...
 
 coef(pl)
-coef(pl, errors = TRUE)
+coef(pl, se = TRUE)
 
 # Compare the partially linear results to those from a correctly
 # specified model's coefficients for x1 and x2
@@ -487,7 +487,7 @@ if (interactive()) Sys.sleep(5)
 # Retrieve the coefficient estimates and their standard errors...
 
 coef(pl)
-coef(pl, errors = TRUE)
+coef(pl, se = TRUE)
 
 # Compare the partially linear results to those from a correctly
 # specified model's coefficients for x1 and x2

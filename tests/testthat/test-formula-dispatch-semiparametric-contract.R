@@ -10,8 +10,8 @@ test_that("named bws formula dispatch matches positional semiparametric routes",
     z1 = seq(0.8, 0.1, length.out = 7)
   )
 
-  sc.pos <- npscoef(y ~ x1 | z1, data = dat, newdata = ex, errors = FALSE, iterate = FALSE)
-  sc.named <- npscoef(bws = y ~ x1 | z1, data = dat, newdata = ex, errors = FALSE, iterate = FALSE)
+  sc.pos <- npscoef(y ~ x1 | z1, data = dat, newdata = ex, se = FALSE, iterate = FALSE)
+  sc.named <- npscoef(bws = y ~ x1 | z1, data = dat, newdata = ex, se = FALSE, iterate = FALSE)
   expect_equal(as.numeric(sc.named$mean), as.numeric(sc.pos$mean), tolerance = 0)
   expect_equal(as.numeric(sc.named$merr), as.numeric(sc.pos$merr), tolerance = 0)
 

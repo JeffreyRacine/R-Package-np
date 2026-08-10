@@ -56,13 +56,19 @@
   }
 
   dx <- diff(grid)
+  step <- dx[1L]
+  spacing.tol <- 64 * .Machine$double.eps *
+    max(1, abs(step), max(abs(grid)))
+  if (step <= 0 || any(abs(dx - step) > spacing.tol)) {
+    stop("entropy quadrature requires a uniformly spaced increasing grid")
+  }
   weights <- numeric(n)
   weights[1L] <- dx[1L] / 2
   weights[n] <- dx[n - 1L] / 2
   weights[2L:(n - 1L)] <- (dx[-length(dx)] + dx[-1L]) / 2
 
   ## Match the endpoint correction used by integrate.trapezoidal().
-  correction <- dx[1L] / 12
+  correction <- step / 12
   weights[1L] <- weights[1L] - correction
   weights[2L] <- weights[2L] + correction
   weights[n - 1L] <- weights[n - 1L] + correction

@@ -26,10 +26,10 @@ nplsqreg(bws, \dots)
 
 \method{nplsqreg}{formula}(bws, data = NULL, newdata = NULL, tau = 0.5,
        gradients = FALSE, residuals = FALSE, subset, na.action,
-       gradient.order = 1L, \dots)
+       gradient.order = 1L, se = FALSE, \dots)
 
 \method{nplsqreg}{lsqregressionbandwidth}(bws, txdat = NULL, tydat = NULL,
-       tau = bws$tau, \dots)
+       tau = bws$tau, se = FALSE, \dots)
 
 \method{nplsqreg}{default}(bws,
        txdat = stop("training data 'txdat' missing"),
@@ -39,6 +39,7 @@ nplsqreg(bws, \dots)
        gradients = FALSE,
        residuals = FALSE,
        gradient.order = 1L,
+       se = FALSE,
        \dots)
 }
 \arguments{
@@ -101,6 +102,12 @@ fitted quantities are returned.
     a logical value indicating whether gradients and categorical effects
     of the conditional quantile with respect to the conditioning variables
     should be computed and returned. Defaults to \code{FALSE}.
+  }
+
+  \item{se}{
+    a logical value indicating whether asymptotic standard errors should be
+    computed and retained. Defaults to \code{FALSE}. Request
+    \code{se=TRUE} when \code{se()} or gradient standard errors will be used.
   }
 
   \item{gradient.order}{

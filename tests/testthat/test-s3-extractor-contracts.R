@@ -8,7 +8,7 @@ test_that("core fitted and se extract stored quantities without recomputation", 
   expect_equal(se(dist), dist$derr)
 
   reg <- structure(
-    list(mean = c(2, 3), merr = c(0.2, 0.3), errors = TRUE,
+    list(mean = c(2, 3), merr = c(0.2, 0.3), se = TRUE,
          residuals = TRUE, resid = c(-0.1, 0.1)),
     class = "npregression"
   )
@@ -51,6 +51,7 @@ test_that("conditional and semiparametric extractors preserve stored shapes", {
     list(
       mean = c(1, 2),
       merr = c(0.2, 0.3),
+      se = TRUE,
       residuals = TRUE,
       resid = c(0.1, 0.2),
       beta = c(1, -0.5),
@@ -67,7 +68,8 @@ test_that("conditional and semiparametric extractors preserve stored shapes", {
   expect_equal(vcov(si), si$betavcov)
 
   sc <- structure(
-    list(mean = c(2, 4), merr = c(0.1, 0.2), residuals = TRUE, resid = c(0.2, 0.3)),
+    list(mean = c(2, 4), merr = c(0.1, 0.2), se = TRUE,
+         residuals = TRUE, resid = c(0.2, 0.3)),
     class = "smoothcoefficient"
   )
   expect_equal(fitted(sc), sc$mean)
@@ -78,13 +80,13 @@ test_that("conditional and semiparametric extractors preserve stored shapes", {
 test_that("extractors fail clearly when optional quantities were not stored", {
   qreg <- structure(list(quantgrad = NA, quantgerr = NA), class = "qregression")
   expect_error(gradients(qreg), "gradients are not available")
-  expect_error(gradients(qreg, errors = TRUE), "gradient standard errors are not available")
-  expect_error(gradients(qreg, errors = "yes"), "'errors' must be TRUE or FALSE", fixed = TRUE)
+  expect_error(gradients(qreg, se = TRUE), "gradient standard errors were not computed")
+  expect_error(gradients(qreg, se = "yes"), "'se' must be TRUE or FALSE", fixed = TRUE)
 
   conmode <- structure(list(), class = "conmode")
   expect_error(gradients(conmode), "class-probability gradients/effects are not available")
-  expect_error(gradients(conmode, errors = TRUE), "gradient standard errors are not available")
-  expect_error(gradients(conmode, errors = "yes"), "'errors' must be TRUE or FALSE", fixed = TRUE)
+  expect_error(gradients(conmode, se = TRUE), "gradient standard errors are not available")
+  expect_error(gradients(conmode, se = "yes"), "'se' must be TRUE or FALSE", fixed = TRUE)
 
   cdens <- structure(
     list(conderr = c(0.1, 0.2), proper.applied = TRUE),

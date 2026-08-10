@@ -35,7 +35,7 @@ npscoef_cat_profile_case <- function(kind = c("uno", "ord", "mixed", "rly"),
     txdat = xdat,
     tydat = ydat,
     tzdat = zdat,
-    errors = TRUE,
+    se = TRUE,
     iterate = FALSE,
     betas = TRUE
   )
@@ -144,10 +144,10 @@ test_that("npscoef categorical compression option leaves mixed z dense", {
 
   options(np.tree = FALSE, np.categorical.compress = FALSE)
   dense <- npscoef(bws = bw, txdat = xdat, tydat = ydat, tzdat = zdat,
-                  errors = FALSE, iterate = FALSE)
+                  se = FALSE, iterate = FALSE)
   options(np.tree = FALSE, np.categorical.compress = TRUE)
   profile <- npscoef(bws = bw, txdat = xdat, tydat = ydat, tzdat = zdat,
-                    errors = FALSE, iterate = FALSE)
+                    se = FALSE, iterate = FALSE)
   expect_equal(profile$mean, dense$mean, tolerance = 1e-10)
 })
 

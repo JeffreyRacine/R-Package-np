@@ -21560,7 +21560,7 @@ static NP_NOINLINE int np_beta_regression_lp_moment_row_canonical(
     bandwidth_mode == BW_FIXED ? NULL : matrix_bandwidth_eval,
     lambda, num_categories, matrix_categorical_vals, NULL,
     weighted_sum, NULL, scaled_kernel_weights, NULL,
-    weighted_sum_power2 != NULL ? &dual_power_context : NULL,
+    &dual_power_context,
     NULL, &execution_context, NULL, NULL);
 }
 
@@ -23122,6 +23122,15 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
   const int fit_tree_active =
     (BANDWIDTH_reg != BW_ADAP_NN) &&
     (call->tree_enabled == NP_TREE_TRUE);
+  /*
+   * Signed-log beta rows choose one common scale for every response/basis
+   * moment.  Keep the historical Y^2 scale anchor even when its standard-
+   * error consumer is disabled so requesting uncertainty can never change
+   * the fitted mean or gradient.  Peer-kernel routes retain their lean
+   * two-column no-error layout.
+   */
+  const int include_response_square =
+    call->do_merr || call->kernel_route != NULL;
   const int reuse_fit_dual_power =
     call->do_merr && (!reuse_fit_kernel_row) && (!fit_tree_active);
   NP_DualPowerCtx fit_dual_power_ctx = {
@@ -23149,8 +23158,8 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
     execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_DIMENSION;
     return R_NilValue;
   }
-  response_y_offset = call->do_merr ? 1 : 0;
-  response_basis_offset = call->do_merr ? 2 : 1;
+  response_y_offset = include_response_square ? 1 : 0;
+  response_basis_offset = include_response_square ? 2 : 1;
   moment_stride = owner->nterms + response_basis_offset;
   if(call->do_grad && call->do_gerr)
     for(l = 0; l < num_reg_continuous; ++l)
@@ -23181,7 +23190,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
     (size_t)moment_stride*sizeof(double *));
   owner->basis_columns = (double **)malloc(
     (size_t)owner->nterms*sizeof(double *));
-  if(call->do_merr)
+  if(include_response_square)
     owner->squared_response = (double *)malloc(
       (size_t)num_obs_train*sizeof(double));
   owner->moments = (double *)malloc(
@@ -23216,7 +23225,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
      (num_reg_unordered > 0 && owner->eval_unordered == NULL) ||
      (num_reg_ordered > 0 && owner->eval_ordered == NULL) ||
      owner->response_columns == NULL || owner->basis_columns == NULL ||
-     (call->do_merr && owner->squared_response == NULL) ||
+     (include_response_square && owner->squared_response == NULL) ||
      owner->moments == NULL ||
      (call->do_merr && owner->power2_moments == NULL) ||
      (call->do_merr && reuse_fit_kernel_row &&
@@ -23238,7 +23247,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
     fit_dual_power_ctx.ncol_W = owner->nterms;
   }
 
-  if(call->do_merr)
+  if(include_response_square)
     for(i = 0; i < num_obs_train; ++i)
       owner->squared_response[i] = call->vector_Y[i]*call->vector_Y[i];
 
@@ -23334,7 +23343,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	            owner->eval_ordered[l][0] =
 	              call->matrix_X_ordered_eval[l][jj];
 
-	          if(call->do_merr)
+	          if(include_response_square)
 	            owner->response_columns[0] = owner->squared_response;
 	          owner->response_columns[response_y_offset] = call->vector_Y;
 	          for(l = 0; l < owner->nterms; l++){
@@ -23710,7 +23719,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
     for(l = 0; l < num_reg_ordered; ++l)
       owner->eval_ordered[l][0] = call->matrix_X_ordered_eval[l][j];
 
-    if(call->do_merr)
+    if(include_response_square)
       owner->response_columns[0] = owner->squared_response;
     owner->response_columns[response_y_offset] = call->vector_Y;
     for(l = 0; l < owner->nterms; ++l) {

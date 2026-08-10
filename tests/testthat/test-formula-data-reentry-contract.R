@@ -120,21 +120,21 @@ test_that("stored formula reentry honors explicit data override", {
     bandwidth.compute = FALSE
   )
   .formula_reentry_expect(
-    npscoef(bws = bw.sc, data = data_b, errors = FALSE)$mean,
+    npscoef(bws = bw.sc, data = data_b, se = FALSE)$mean,
     npscoef(bws = bw.sc, txdat = data_b["x"], tzdat = data_b["z"],
-            tydat = data_b$y, errors = FALSE)$mean,
-    npscoef(bws = bw.sc, errors = FALSE)$mean,
-    npscoef(bws = bw.sc, data = NULL, errors = FALSE)$mean
+            tydat = data_b$y, se = FALSE)$mean,
+    npscoef(bws = bw.sc, se = FALSE)$mean,
+    npscoef(bws = bw.sc, data = NULL, se = FALSE)$mean
   )
   .formula_reentry_expect(
     npscoef(bws = bw.sc, data = data_b, newdata = eval_b,
-            errors = FALSE)$mean,
+            se = FALSE)$mean,
     npscoef(bws = bw.sc, txdat = data_b["x"], tzdat = data_b["z"],
             tydat = data_b$y, exdat = eval_b["x"], ezdat = eval_b["z"],
-            errors = FALSE)$mean,
-    npscoef(bws = bw.sc, newdata = eval_b, errors = FALSE)$mean,
+            se = FALSE)$mean,
+    npscoef(bws = bw.sc, newdata = eval_b, se = FALSE)$mean,
     npscoef(bws = bw.sc, data = NULL, newdata = eval_b,
-            errors = FALSE)$mean
+            se = FALSE)$mean
   )
 
   bw.pl <- npplregbw(

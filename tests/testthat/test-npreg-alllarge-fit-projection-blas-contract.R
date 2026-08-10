@@ -186,7 +186,8 @@ test_that("all-large fit BLAS agrees with scalar fallback and dense WLS", {
       ckerorder = 2L
     )
     options(np.macMseries.accelerate = accelerate)
-    npreg(bws = bw, txdat = tx, tydat = y, exdat = tx, gradients = FALSE)
+    npreg(bws = bw, txdat = tx, tydat = y, exdat = tx,
+          gradients = FALSE, se = TRUE)
   }
 
   active_scalar <- make_fit(c(2L, 2L), FALSE)

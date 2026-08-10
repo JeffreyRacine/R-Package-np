@@ -10,7 +10,7 @@ test_that("npindex ichimura lc gradients preserve the scalar-index fit contract"
   dat <- data.frame(x1 = x1, x2 = x2, y = y)
 
   bw <- npindexbw(formula = y ~ x1 + x2, data = dat)
-  fit <- npindex(bws = bw, gradients = TRUE)
+  fit <- npindex(bws = bw, gradients = TRUE, se = TRUE)
 
   index.df <- data.frame(index = as.vector(as.matrix(dat[c("x1", "x2")]) %*% bw$beta))
   oracle <- do.call(npreg, list(
@@ -60,6 +60,7 @@ test_that("npindex Ichimura covariance scales score columns by observation", {
     nmulti = 1L,
     random.seed = 20260626L,
     gradients = TRUE,
+    se = TRUE,
     residuals = TRUE
   )
 

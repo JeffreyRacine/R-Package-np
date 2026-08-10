@@ -119,7 +119,7 @@ test_that("npscoef core smoke stays alive", {
     bws = 0.25,
     bandwidth.compute = FALSE
   )
-  fit <- npscoef(bws = bw, iterate = FALSE, errors = FALSE)
+  fit <- npscoef(bws = bw, iterate = FALSE, se = FALSE)
 
   expect_s3_class(fit, "smoothcoefficient")
   expect_equal(length(predict(fit)), n)

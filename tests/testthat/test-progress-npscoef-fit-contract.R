@@ -78,7 +78,7 @@ test_that("npscoef direct bws fit emits fit progress", {
       txdat = fixture$tx,
       tzdat = fixture$tz,
       tydat = fixture$y,
-      errors = FALSE,
+      se = FALSE,
       iterate = FALSE
     ),
     force_renderer = "single_line",
@@ -114,7 +114,7 @@ test_that("npscoef direct bws fit stays silent below start grace without handoff
       txdat = fixture$tx,
       tzdat = fixture$tz,
       tydat = fixture$y,
-      errors = FALSE,
+      se = FALSE,
       iterate = FALSE
     ),
     force_renderer = "single_line",
@@ -189,7 +189,7 @@ test_that("npscoef nomad to powell to fit route preserves single-line fit handof
       bwtype = "fixed",
       bwmethod = "cv.ls",
       nmulti = 1L,
-      errors = FALSE,
+      se = FALSE,
       iterate = FALSE
     ),
     force_renderer = "single_line",
@@ -226,7 +226,7 @@ test_that("predict.smoothcoefficient re-entry emits fit progress", {
     txdat = fixture$tx,
     tzdat = fixture$tz,
     tydat = fixture$y,
-    errors = FALSE,
+    se = FALSE,
     iterate = FALSE
   )
 
@@ -238,7 +238,8 @@ test_that("predict.smoothcoefficient re-entry emits fit progress", {
   on.exit(options(old_opts), add = TRUE)
 
   actual <- capture_progress_shadow_trace(
-    predict(fit, newdata = fixture$dat[c(2L, 7L), c("x", "z")]),
+    predict(fit, newdata = fixture$dat[c(2L, 7L), c("x", "z")],
+            se.fit = TRUE),
     force_renderer = "single_line",
     now = npscoef_fit_progress_time_counter()
   )

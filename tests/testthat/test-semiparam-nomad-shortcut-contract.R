@@ -99,7 +99,7 @@ test_that("npscoef nomad shortcut matches the explicit smooth-coefficient preset
     nomad = TRUE,
     degree.max = 1L,
     nmulti = 1L,
-    errors = FALSE,
+    se = FALSE,
     betas = FALSE
   )
   fit_long <- np::npscoef(
@@ -115,7 +115,7 @@ test_that("npscoef nomad shortcut matches the explicit smooth-coefficient preset
     degree.verify = FALSE,
     bwtype = "fixed",
     nmulti = 1L,
-    errors = FALSE,
+    se = FALSE,
     betas = FALSE
   )
 
@@ -228,7 +228,7 @@ test_that("semiparametric NOMAD shortcut routes accept nomad.nmulti", {
     degree.max = 1L,
     nmulti = 1L,
     nomad.nmulti = 2L,
-    errors = FALSE,
+    se = FALSE,
     betas = FALSE
   )
   fit_si <- np::npindex(

@@ -136,7 +136,7 @@ test_that("scalar fixed objectives enter the resident LP0 owner without a basis"
   source <- paste(readLines(hits[[1L]], warn = FALSE), collapse = "\n")
 
   sparse_start <- regexpr(
-    "static int np_lp_fixed_tree_sparse_accumulate(",
+    "np_lp_fixed_tree_sparse_accumulate(",
     source,
     fixed = TRUE
   )

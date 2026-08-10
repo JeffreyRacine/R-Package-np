@@ -124,15 +124,19 @@ predict.qregression <- function(object, se.fit = FALSE, ...) {
     return(fitted(tr))
 }
 
-se.qregression <- function(x) { x$quanterr }
-gradients.qregression <- function(x, errors = FALSE, ...) {
-  errors <- npValidateScalarLogical(errors, "errors")
-  gout <- if (!errors) x$quantgrad else x$quantgerr
+se.qregression <- function(x) {
+  if (is.null(x$quanterr) || !length(x$quanterr))
+    stop("standard errors were not computed for this quantile regression", call. = FALSE)
+  x$quanterr
+}
+gradients.qregression <- function(x, se = FALSE, ...) {
+  se <- npValidateScalarLogical(se, "se")
+  gout <- if (!se) x$quantgrad else x$quantgerr
   if (is.null(gout) || (length(gout) == 1L && is.logical(gout) && is.na(gout)))
-    stop(if (!errors)
+    stop(if (!se)
       "gradients are not available: fit the model with gradients=TRUE"
     else
-      "gradient standard errors are not available: fit the model with gradients=TRUE")
+      "gradient standard errors were not computed: fit the model with gradients=TRUE and se=TRUE")
   gout
 }
 

@@ -18,6 +18,18 @@ test_that("deterministic bivariate entropy quadrature preserves its oracle", {
   expect_lte(abs(candidate - reference), 1e-8)
 })
 
+test_that("entropy quadrature weights enforce their uniform-grid contract", {
+  weights <- getFromNamespace(".np_entropy_trapezoid_weights", "np")
+  grid <- seq(-3, 4, length.out = 101L)
+  expect_equal(weights(grid), weights(as.numeric(grid)), tolerance = 0)
+  expect_error(
+    weights(c(0, 1, 2, 4)),
+    "uniformly spaced increasing grid",
+    fixed = TRUE
+  )
+  expect_error(weights(c(0, 1, 1, 2)), "uniformly spaced increasing grid", fixed = TRUE)
+})
+
 test_that("entropy trapezoid weights match the established helper", {
   weights <- getFromNamespace(".np_entropy_trapezoid_weights", "np")
   established <- getFromNamespace("integrate.trapezoidal", "np")

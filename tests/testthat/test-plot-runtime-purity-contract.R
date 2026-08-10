@@ -150,7 +150,7 @@ test_that("smooth coefficient coef/asymptotic plots avoid public npscoef re-entr
   ydat <- sin(2 * pi * zdat$z) + xdat$x * (1 + zdat$z) + rnorm(n, sd = 0.05)
 
   bw <- npscoefbw(xdat = xdat, ydat = ydat, zdat = zdat, regtype = "ll", nmulti = 1)
-  fit <- npscoef(bws = bw, txdat = xdat, tydat = ydat, tzdat = zdat, errors = TRUE, betas = TRUE)
+  fit <- npscoef(bws = bw, txdat = xdat, tydat = ydat, tzdat = zdat, se = TRUE, betas = TRUE)
 
   calls <- with_public_trace_counter("np", "npscoef", {
     out.bw.coef <- suppressWarnings(

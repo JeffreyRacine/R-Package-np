@@ -63,7 +63,7 @@ test_that("npscoef iterated fits preserve residual identity when errors are requ
       tydat = fixture$ydat,
       iterate = TRUE,
       residuals = TRUE,
-      errors = TRUE,
+      se = TRUE,
       maxiter = 50L,
       tol = 1e-8
     ),

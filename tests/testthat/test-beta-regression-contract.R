@@ -21,7 +21,8 @@ test_that("manual order-2 beta local-constant regression matches exact weights",
   fit <- do.call(npreg, c(list(
     txdat = training,
     tydat = response,
-    exdat = evaluation
+    exdat = evaluation,
+    se = TRUE
   ), args))
   sums <- do.call(npksum, c(list(
     txdat = training,
@@ -63,12 +64,14 @@ test_that("beta regression supports formula, object, prediction, and residual ro
   direct <- do.call(npreg, c(list(
     txdat = training["x"],
     tydat = training$y,
-    exdat = evaluation
+    exdat = evaluation,
+    se = TRUE
   ), args))
   formula <- do.call(npreg, c(list(
     y ~ x,
     data = training,
-    newdata = evaluation
+    newdata = evaluation,
+    se = TRUE
   ), args))
   bw <- do.call(npregbw, c(list(
     xdat = training["x"],
@@ -76,7 +79,7 @@ test_that("beta regression supports formula, object, prediction, and residual ro
     bandwidth.compute = FALSE
   ), args))
   object_fit <- npreg(bws = bw, txdat = training["x"],
-                      tydat = training$y, exdat = evaluation)
+                      tydat = training$y, exdat = evaluation, se = TRUE)
   direct_helper <- np:::.np_regression_direct(
     bws = bw, txdat = training["x"], tydat = training$y,
     exdat = evaluation
@@ -121,7 +124,7 @@ test_that("beta regression log-sum-exp survives complete raw-weight underflow", 
   fit <- npreg(
     bws = h, txdat = training, tydat = response, exdat = evaluation,
     regtype = "lc", ckertype = "beta", ckerorder = 2,
-    ckerbound = "fixed", ckerlb = 0, ckerub = 1
+    ckerbound = "fixed", ckerlb = 0, ckerub = 1, se = TRUE
   )
 
   expect_true(all(raw$kw == 0))

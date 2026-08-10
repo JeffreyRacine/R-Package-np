@@ -29,7 +29,7 @@ test_that("npindexhat lc owner preserves fit and matrix/apply parity across bwty
       tydat = y,
       exdat = ex,
       gradients = FALSE,
-      errors = FALSE
+      se = FALSE
     )
     fit.grad <- npindex(
       bws = bw,
@@ -37,7 +37,7 @@ test_that("npindexhat lc owner preserves fit and matrix/apply parity across bwty
       tydat = y,
       exdat = ex,
       gradients = TRUE,
-      errors = FALSE
+      se = FALSE
     )
 
     apply.mean <- npindexhat(

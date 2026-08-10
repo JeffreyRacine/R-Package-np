@@ -21,13 +21,13 @@ test_that("npreg request states preserve retained scalar and LP outputs", {
     bandwidth.compute = FALSE, regtype = "lp", degree = 0L
   )
   full0 <- npreg(bws = bw0, txdat = x["x1"], tydat = y,
-                 errors = TRUE)
+                 se = TRUE)
   lean0 <- npreg(bws = bw0, txdat = x["x1"], tydat = y,
-                 errors = FALSE)
+                 se = FALSE)
   expect_identical(lean0$mean, full0$mean)
   expect_null(lean0$merr)
-  expect_false(lean0$errors)
-  expect_error(se(lean0), "errors=TRUE", fixed = TRUE)
+  expect_false(lean0$se)
+  expect_error(se(lean0), "se=TRUE", fixed = TRUE)
 
   bw <- npregbw(
     xdat = x, ydat = y, bws = c(0.32, 0.36),
@@ -35,13 +35,13 @@ test_that("npreg request states preserve retained scalar and LP outputs", {
     degree.select = "manual", basis = "glp", bernstein.basis = FALSE
   )
   full <- npreg(bws = bw, txdat = x, tydat = y, exdat = ex,
-                errors = TRUE, gradients = TRUE)
+                se = TRUE, gradients = TRUE)
   mean.only <- npreg(bws = bw, txdat = x, tydat = y, exdat = ex,
-                     errors = FALSE, gradients = FALSE)
+                     se = FALSE, gradients = FALSE)
   mean.se <- npreg(bws = bw, txdat = x, tydat = y, exdat = ex,
-                   errors = TRUE, gradients = FALSE)
+                   se = TRUE, gradients = FALSE)
   mean.grad <- npreg(bws = bw, txdat = x, tydat = y, exdat = ex,
-                     errors = FALSE, gradients = TRUE)
+                     se = FALSE, gradients = TRUE)
 
   expect_equal(mean.only$mean, full$mean, tolerance = 2e-12)
   expect_identical(mean.se$mean, full$mean)
@@ -53,11 +53,11 @@ test_that("npreg request states preserve retained scalar and LP outputs", {
   expect_null(mean.only$gerr)
   expect_null(mean.grad$merr)
   expect_null(mean.grad$gerr)
-  expect_error(gradients(mean.grad, errors = TRUE),
-               "gradients=TRUE and errors=TRUE", fixed = TRUE)
+  expect_error(gradients(mean.grad, se = TRUE),
+               "gradients=TRUE and se=TRUE", fixed = TRUE)
 })
 
-test_that("errors preserves historical generic and positional dispatch", {
+test_that("se preserves generic and positional dispatch while defaulting off", {
   request_driven_regression_runtime()
   old <- options(np.messages = FALSE, np.tree = FALSE, np.largeh = FALSE)
   on.exit(options(old), add = TRUE)
@@ -78,17 +78,22 @@ test_that("errors preserves historical generic and positional dispatch", {
 
   named <- do.call(npreg, c(list(
     y ~ x, data = training, newdata = evaluation
-  ), common))
+  ), common, list(se = TRUE)))
   direct <- do.call(npreg, c(list(
     txdat = training["x"], tydat = training$y, exdat = evaluation
+  ), common, list(se = TRUE)))
+  default.off <- do.call(npreg, c(list(
+    y ~ x, data = training, newdata = evaluation
   ), common))
   lean <- do.call(npreg, c(list(
     y ~ x, data = training, newdata = evaluation
-  ), common, list(errors = FALSE)))
+  ), common, list(se = FALSE)))
 
   expect_identical(fitted(named), fitted(direct))
   expect_identical(se(named), se(direct))
   expect_identical(fitted(lean), fitted(named))
+  expect_identical(fitted(default.off), fitted(named))
+  expect_null(default.off$merr)
   expect_null(lean$merr)
 
   expect_identical(names(formals(npreg)), c("bws", "..."))
@@ -127,7 +132,7 @@ test_that("beta request suppression agrees with the independent LP apply owner",
   )
 
   lean <- npreg(bws = bw, txdat = x, tydat = y, exdat = ex,
-                errors = FALSE, gradients = TRUE)
+                se = FALSE, gradients = TRUE)
   oracle <- function(s) drop(.npreghat_exact_lp_apply_from_regression_core(
     bws = bw, txdat = x, y = matrix(y, ncol = 1L), exdat = ex,
     basis = "glp", degree = c(2L, 1L), bernstein.basis = TRUE,
@@ -155,8 +160,8 @@ test_that("all-categorical request suppression honors compression on and off", {
 
   for (compress in c(FALSE, TRUE)) {
     options(np.categorical.compress = compress)
-    full <- npreg(bws = bw, txdat = x, tydat = y, errors = TRUE)
-    lean <- npreg(bws = bw, txdat = x, tydat = y, errors = FALSE)
+    full <- npreg(bws = bw, txdat = x, tydat = y, se = TRUE)
+    lean <- npreg(bws = bw, txdat = x, tydat = y, se = FALSE)
     expect_identical(lean$mean, full$mean)
     expect_null(lean$merr)
   }
@@ -172,14 +177,14 @@ test_that("prediction and request boundary contracts are explicit", {
   y <- sin(2 * pi * x$x) + rnorm(80L, sd = 0.1)
   bw <- npregbw(xdat = x, ydat = y, bws = 0.18,
                 bandwidth.compute = FALSE, regtype = "lp", degree = 1L)
-  fit <- npreg(bws = bw, txdat = x, tydat = y, errors = FALSE)
+  fit <- npreg(bws = bw, txdat = x, tydat = y, se = FALSE)
 
   expect_error(npreg(bws = bw, txdat = x, tydat = y, errors = NA),
-               "errors")
+               "use 'se' instead", fixed = TRUE)
   expect_identical(predict(fit, newdata = x[1:7, , drop = FALSE]),
                    fitted(npreg(bws = bw, txdat = x, tydat = y,
                                 exdat = x[1:7, , drop = FALSE],
-                                errors = FALSE)))
+                                se = FALSE)))
   pred.se <- predict(fit, newdata = x[1:7, , drop = FALSE], se.fit = TRUE)
   expect_named(pred.se, c("fit", "se.fit", "df", "residual.scale"))
   expect_length(pred.se$fit, 7L)

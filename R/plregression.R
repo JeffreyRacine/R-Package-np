@@ -102,16 +102,19 @@ print.plregression <- function(x, digits=NULL, ...){
   invisible(x)
 }
 
-coef.plregression <- function(object, errors = FALSE, ...) {
-  errors <- npValidateScalarLogical(errors, "errors")
-  if(!errors)
+coef.plregression <- function(object, se = FALSE, ...) {
+  se <- npValidateScalarLogical(se, "se")
+  if(!se)
     return(object$xcoef)
-  else
-    return(object$xcoeferr)
+  if (is.null(object$xcoeferr) || !length(object$xcoeferr))
+    stop("coefficient standard errors were not computed", call. = FALSE)
+  object$xcoeferr
 }
 
 vcov.plregression <- function(object,...) {
-  return(object$xcoefvcov)
+  if (is.null(object$xcoefvcov) || !length(object$xcoefvcov))
+    stop("coefficient covariance was not computed", call. = FALSE)
+  object$xcoefvcov
 }
 
 fitted.plregression <- function(object, ...){

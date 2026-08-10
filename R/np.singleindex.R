@@ -16,6 +16,7 @@
 npindex <-
   function(bws, ...){
     args <- list(...)
+    npRejectLegacyBooleanErrors(args, "npindex")
     .np_singleindex_reject_higher_gradient_order(args, where = "npindex")
 
     if (!missing(bws)){
@@ -49,7 +50,12 @@ npindex <-
   }
 
 npindex.formula <-
-    function(bws, data = NULL, newdata = NULL, y.eval = FALSE, ...){
+    function(bws, data = NULL, newdata = NULL, y.eval = FALSE,
+             se = FALSE, ...){
+
+        dots <- list(...)
+        npRejectLegacyBooleanErrors(dots, "npindex")
+        se <- npValidateScalarLogical(se, "se")
 
         mc <- match.call(expand.dots = FALSE)
         tt <- terms(bws)
@@ -133,7 +139,7 @@ npindex.formula <-
             si.args$eydat <- eydat
         }
         si.args$bws <- si.bws
-        ev <- do.call(npindex, c(si.args, dots))
+        ev <- do.call(npindex, c(si.args, list(se = se), dots))
         ev$call <- mc
         environment(ev$call) <- parent.frame()
 
@@ -281,10 +287,13 @@ npindex.call <-
   .np_index_formula_reentry_xdat(mf)
 }
 
-npindex.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
+npindex.default <- function(bws, txdat, tydat, nomad = FALSE,
+                            se = FALSE, ...){
   sc <- sys.call()
   sc.names <- names(sc)
   nomad <- npValidateNomadControl(nomad, "nomad")
+  npRejectLegacyBooleanErrors(list(...), "npindex")
+  se <- npValidateScalarLogical(se, "se")
 
   ## here we check to see if the function was called with tdat =
   ## if it was, we need to catch that and map it to dat =
@@ -335,7 +344,7 @@ npindex.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
           caller_env = parent.frame()
         )
     }
-    return(do.call(npindex, c(fit.args, fit.dots)))
+    return(do.call(npindex, c(fit.args, list(se = se), fit.dots)))
   }
 
   ## if bws was passed in explicitly, do not compute bandwidths
@@ -346,6 +355,7 @@ npindex.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   sc.bw <- sc
   
   sc.bw[[1]] <- quote(npindexbw)
+  sc.bw$se <- NULL
 
   if (bws.formula) {
     ib <- match("bws", names(sc.bw), nomatch = 0L)
@@ -399,7 +409,7 @@ npindex.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   }
   if (no.bws || bws.formula || is.call(bws))
     call.args$.np_fit_progress_handoff <- TRUE
-  do.call(npindex, c(call.args, list(...)))
+  do.call(npindex, c(call.args, list(se = se), list(...)))
 }
 
 npindex.sibandwidth <-
@@ -409,9 +419,11 @@ npindex.sibandwidth <-
            exdat,
            eydat,
            boot.num = 399,
-           errors = FALSE,
+           se = FALSE,
            gradients = FALSE,
            residuals = FALSE, ...) {
+
+    npRejectLegacyBooleanErrors(list(...), "npindex")
 
     fit.start <- proc.time()[3]
     dots <- list(...)
@@ -419,7 +431,7 @@ npindex.sibandwidth <-
     fit.progress.allow <- isTRUE(.np_progress_enabled(domain = "bandwidth"))
     gradients <- npValidateScalarLogical(gradients, "gradients")
     residuals <- npValidateScalarLogical(residuals, "residuals")
-    errors <- npValidateScalarLogical(errors, "errors")
+    se <- npValidateScalarLogical(se, "se")
     if (!is.numeric(boot.num) || length(boot.num) != 1L || is.na(boot.num) ||
         !is.finite(boot.num) || boot.num < 1 || boot.num != floor(boot.num))
       stop("'boot.num' must be a positive integer")
@@ -556,7 +568,7 @@ npindex.sibandwidth <-
       identical(regtype, "lc") &&
       identical(bws$type, "fixed") &&
       !gradients &&
-      !errors &&
+      !se &&
       !residuals &&
       (no.ex || (!no.ex && no.ey)) &&
       (fit.progress.allow || fit.progress.handoff)
@@ -612,7 +624,7 @@ npindex.sibandwidth <-
     fast.largeh <- FALSE
     fast.largeh.eval.mean <- NULL
     fast.largeh.train.mean <- NULL
-    if (identical(regtype, "lc") && !gradients && !errors && !lc.fixed.progress.route &&
+    if (identical(regtype, "lc") && !gradients && !se && !lc.fixed.progress.route &&
         identical(bws$ckerbound, "none")) {
       gate.index <- if (no.ex) index else c(index, index.eval)
       fast.largeh <- .npindexbw_fast_eligible(
@@ -677,7 +689,7 @@ npindex.sibandwidth <-
 
         if (!no.ex && (no.ey || residuals)) {
 
-          ## want to evaluate on training data for in sample errors even
+          ## want to evaluate on training data for in sample se even
           ## if evaluation x's are different from training but no y's
           ## are specified
 
@@ -729,7 +741,7 @@ npindex.sibandwidth <-
 
       if (!no.ex) {
 
-        ## Want to evaluate on training data for in sample errors even
+        ## Want to evaluate on training data for in sample se even
         ## if evaluation x's are different from training but no y's
         ## are specified. Also, needed for variance-covariance matrix
         ## (uses on ly the training data)
@@ -760,7 +772,7 @@ npindex.sibandwidth <-
     ## (training X) - need gradients == TRUE in order for this to
     ## work.
 
-    if (bws$method == "ichimura" && gradients) {
+    if (bws$method == "ichimura" && gradients && se) {
 
       ## First row & column of covariance matrix `Bvcov' are zero due
       ## to identification condition that beta_1=1. Note the n n^{-1}
@@ -824,7 +836,7 @@ npindex.sibandwidth <-
 
       ## Now export this in an S3 method...
 
-    } else if (bws$method == "kleinspady" && gradients) {
+    } else if (bws$method == "kleinspady" && gradients && se) {
 
       ## We divide by P(1-P) so test for P=0 or 1...
 
@@ -916,7 +928,7 @@ npindex.sibandwidth <-
       }
     }
 
-    if (errors){
+    if (se){
 
       boot.out = suppressWarnings(boot(data.frame(txdat,tydat), boofun, R = boot.num))
 
@@ -986,16 +998,19 @@ npindex.sibandwidth <-
       ntrain = nrow(txdat),
       trainiseval = no.ex,
       residuals = residuals,
-      gradients = gradients
+      gradients = gradients,
+      se = se
     )
-    if (errors)
+    if (se)
       ev.args$merr <- index.merr
     if (gradients) {
       ev.args$grad <- index.grad
       ev.args$mean.grad <- colMeans(index.grad)
+    }
+    if (gradients && se) {
       ev.args$betavcov <- Bvcov
     }
-    if (errors && gradients) {
+    if (se && gradients) {
       ev.args$gerr <- index.gerr
       ev.args$mean.gerr <- index.mgerr
     }

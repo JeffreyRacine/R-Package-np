@@ -25,6 +25,7 @@ npindex(bws, \dots)
         data = NULL,
         newdata = NULL,
         y.eval = FALSE,
+        se = FALSE,
         \dots)
 
 
@@ -32,6 +33,7 @@ npindex(bws, \dots)
         txdat,
         tydat,
         nomad = FALSE,
+        se = FALSE,
         \dots) 
 
 \method{npindex}{sibandwidth}(bws,
@@ -40,7 +42,7 @@ npindex(bws, \dots)
         exdat,
         eydat,
         boot.num = 399,
-        errors = FALSE,
+        se = FALSE,
         gradients = FALSE,
         residuals = FALSE,
         \dots)
@@ -151,7 +153,7 @@ These arguments control residuals, gradients, and bootstrap standard errors.
   }
 
 
-  \item{errors}{
+  \item{se}{
     a logical value indicating that you want (bootstrapped)
     standard errors for the conditional mean, gradients (when
     \code{gradients=TRUE} is set), and average gradients (when
@@ -161,9 +163,10 @@ These arguments control residuals, gradients, and bootstrap standard errors.
 
 
   \item{gradients}{
-    a logical value indicating that you want gradients and the
-    asymptotic covariance matrix for beta computed and returned in the
-    resulting \code{singleindex} object. Defaults to \code{FALSE}.
+    a logical value indicating that you want gradients computed and returned
+    in the resulting \code{singleindex} object. The asymptotic covariance
+    matrix for beta is additionally computed when \code{se=TRUE}. Defaults to
+    \code{FALSE}.
   }
 
 

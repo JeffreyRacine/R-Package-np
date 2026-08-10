@@ -948,7 +948,7 @@ plot.out <- plot(fit,
 # are stored in objects rg1, rg2 etc.
 
 grad.eval <- gradients(plot.out$rg1)
-grad.se <- gradients(plot.out$rg1, errors = TRUE)
+grad.se <- gradients(plot.out$rg1, se = TRUE)
 grad.lower.ci <- grad.eval + grad.se[,1]
 grad.upper.ci <- grad.eval + grad.se[,2]
 

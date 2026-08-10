@@ -17,7 +17,7 @@ test_that("nearest-neighbor beta local-constant regression matches kernel weight
     )
     fit <- do.call(npreg, c(list(
       txdat = training, tydat = response, exdat = evaluation,
-      regtype = "lc"
+      regtype = "lc", se = TRUE
     ), common))
     sums <- do.call(npksum, c(list(
       txdat = training, exdat = evaluation,
@@ -51,10 +51,11 @@ test_that("nearest-neighbor beta regression preserves object and prediction rout
       ckerbound = "fixed", ckerlb = 0, ckerub = 1
     )
     direct <- do.call(npreg, c(list(
-      txdat = training["x"], tydat = training$y, exdat = evaluation
+      txdat = training["x"], tydat = training$y, exdat = evaluation,
+      se = TRUE
     ), common))
     formula <- do.call(npreg, c(list(
-      y ~ x, data = training, newdata = evaluation
+      y ~ x, data = training, newdata = evaluation, se = TRUE
     ), common))
     bw <- do.call(npregbw, c(list(
       xdat = training["x"], ydat = training$y,
@@ -62,7 +63,7 @@ test_that("nearest-neighbor beta regression preserves object and prediction rout
     ), common))
     object_fit <- npreg(
       bws = bw, txdat = training["x"], tydat = training$y,
-      exdat = evaluation
+      exdat = evaluation, se = TRUE
     )
     prediction <- predict(formula, newdata = evaluation, se.fit = TRUE)
 

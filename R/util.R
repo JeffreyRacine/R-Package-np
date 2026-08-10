@@ -247,6 +247,17 @@ npValidateScalarLogical <- function(value, argname) {
   value
 }
 
+npRejectLegacyBooleanErrors <- function(dots, where) {
+  dot.names <- if (is.list(dots)) names(dots) else as.character(dots)
+  if (!is.null(dot.names) && any(dot.names == "errors", na.rm = TRUE)) {
+    stop(sprintf(
+      "%s no longer accepts the Boolean estimation argument 'errors'; use 'se' instead",
+      where
+    ), call. = FALSE)
+  }
+  invisible(TRUE)
+}
+
 npValidateNomadControl <- function(value, argname = "nomad") {
   if (is.logical(value))
     return(if (npValidateScalarLogical(value, argname)) "true" else "false")

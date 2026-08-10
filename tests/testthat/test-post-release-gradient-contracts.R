@@ -59,14 +59,15 @@ test_that("nplsqreg gradient accessors enforce the stored derivative order", {
     regtype = "lp",
     degree = c(3L, 2L)
   )
-  fit <- nplsqreg(bw, gradients = TRUE, gradient.order = c(2L, 1L))
+  fit <- nplsqreg(bw, gradients = TRUE, se = TRUE,
+                  gradient.order = c(2L, 1L))
 
   expect_identical(
     gradients(fit, gradient.order = c(2L, 1L)),
     fit$quantgrad
   )
   expect_identical(
-    gradients(fit, errors = TRUE, gradient.order = c(2L, 1L)),
+    gradients(fit, se = TRUE, gradient.order = c(2L, 1L)),
     fit$quantgerr
   )
   expect_error(

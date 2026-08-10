@@ -194,6 +194,7 @@ npsigtest.rbandwidth <- function(bws,
                        tydat = ydat,
                        bws = bws,
                        gradients = TRUE,
+                       se = pivot,
                        ...)
 
     In <- if(!pivot) {
@@ -334,6 +335,7 @@ npsigtest.rbandwidth <- function(bws,
                             tydat = ydat.star,
                             bws = bws,
                             gradients = TRUE,
+                            se = pivot,
                             ...)
 
       } else {
@@ -342,6 +344,7 @@ npsigtest.rbandwidth <- function(bws,
                             tydat = ydat.star,
                             bws = bws,
                             gradients = TRUE,
+                            se = pivot,
                             ...)
 
       }
@@ -399,6 +402,7 @@ npsigtest.rbandwidth <- function(bws,
                          tydat = ydat,
                          bws = bws,
                          gradients = TRUE,
+                         se = pivot,
                          ...)
       
       In[ii] <- if(!pivot) {
@@ -537,6 +541,7 @@ npsigtest.rbandwidth <- function(bws,
                               tydat = ydat.star,
                               bws = bws,
                               gradients = TRUE,
+                              se = pivot,
                               ...)
           
         } else {
@@ -545,6 +550,7 @@ npsigtest.rbandwidth <- function(bws,
                               tydat = ydat.star,
                               bws = bws,
                               gradients = TRUE,
+                              se = pivot,
                               ...)
           
         }

@@ -75,7 +75,7 @@ test_that("semiparametric NN selectors honor the same floor on common-use routes
                      bwtype = "generalized_nn", nmulti = 1)
   expect_gte(as.integer(bw.si$bw[1]), 2L)
   fit.si <- npindex(bws = bw.si, txdat = tx, tydat = y, exdat = ex,
-                    gradients = FALSE, errors = FALSE)$mean
+                    gradients = FALSE, se = FALSE)$mean
   apply.si <- npindexhat(bws = bw.si, txdat = tx, exdat = ex, y = y, output = "apply", s = 0L)
   matrix.si <- drop(npindexhat(bws = bw.si, txdat = tx, exdat = ex, output = "matrix", s = 0L) %*% y)
   expect_equal(drop(apply.si), drop(fit.si), tolerance = 1e-10)

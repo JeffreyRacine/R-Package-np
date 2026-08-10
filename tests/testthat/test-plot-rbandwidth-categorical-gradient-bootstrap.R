@@ -114,7 +114,7 @@ test_that("ordered regression gradient wild bootstrap targets adjacent differenc
     txdat = xdat,
     tydat = y,
     gradients = TRUE,
-    errors = TRUE
+    se = TRUE
   )
   base <- plot(
     fit,
@@ -193,7 +193,7 @@ test_that("categorical regression gradient bootstrap works for default, inid, an
     txdat = xdat,
     tydat = y,
     gradients = TRUE,
-    errors = TRUE
+    se = TRUE
   )
 
   for (boot.method in c("default", "inid", "wild")) {
@@ -243,7 +243,7 @@ test_that("categorical regression gradient asymptotic intervals fail clearly", {
     txdat = xdat,
     tydat = y,
     gradients = TRUE,
-    errors = TRUE
+    se = TRUE
   )
 
   eval.count.name <- paste0("np_plot_regression_eval_count_", Sys.getpid())
@@ -300,7 +300,7 @@ test_that("continuous regression gradient asymptotic intervals remain available"
     txdat = xdat,
     tydat = y,
     gradients = TRUE,
-    errors = TRUE
+    se = TRUE
   )
 
   out <- expect_no_error(suppressWarnings(plot(

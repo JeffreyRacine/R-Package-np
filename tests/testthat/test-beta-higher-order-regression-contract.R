@@ -26,7 +26,7 @@ test_that("higher-order beta local-constant regression matches signed weights", 
       )
       fit <- do.call(npreg, c(list(
         txdat = training, tydat = response, exdat = evaluation,
-        regtype = "lc"
+        regtype = "lc", se = TRUE
       ), common))
       sums <- do.call(npksum, c(list(
         txdat = training, exdat = evaluation,
@@ -65,10 +65,11 @@ test_that("higher-order beta regression preserves formula, object, and predictio
         ckerbound = "fixed", ckerlb = 0, ckerub = 1
       )
       direct <- do.call(npreg, c(list(
-        txdat = training["x"], tydat = training$y, exdat = evaluation
+        txdat = training["x"], tydat = training$y, exdat = evaluation,
+        se = TRUE
       ), common))
       formula <- do.call(npreg, c(list(
-        y ~ x, data = training, newdata = evaluation
+        y ~ x, data = training, newdata = evaluation, se = TRUE
       ), common))
       bw <- do.call(npregbw, c(list(
         xdat = training["x"], ydat = training$y,
@@ -76,7 +77,7 @@ test_that("higher-order beta regression preserves formula, object, and predictio
       ), common))
       object_fit <- npreg(
         bws = bw, txdat = training["x"], tydat = training$y,
-        exdat = evaluation
+        exdat = evaluation, se = TRUE
       )
       prediction <- predict(formula, newdata = evaluation, se.fit = TRUE)
 
@@ -126,7 +127,7 @@ test_that("higher-order beta regression survives complete raw-weight underflow",
       bws = bandwidth, txdat = training, tydat = response,
       exdat = evaluation, regtype = "lc",
       ckertype = "beta", ckerorder = order,
-      ckerbound = "fixed", ckerlb = 0, ckerub = 1
+      ckerbound = "fixed", ckerlb = 0, ckerub = 1, se = TRUE
     )
 
     expect_true(all(raw$kw == 0))

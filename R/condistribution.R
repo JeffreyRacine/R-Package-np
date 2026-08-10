@@ -120,16 +120,18 @@ se.condistribution <- function(x){
   if (isTRUE(x$proper.applied)) {
     stop("standard errors are unavailable for repaired conditional distributions in tranche 1")
   }
+  if (is.null(x$conderr) || !length(x$conderr))
+    stop("standard errors were not computed for this conditional distribution", call. = FALSE)
   x$conderr
 }
-gradients.condistribution <- function(x, errors = FALSE, gradient.order = NULL, ...) {
-  errors <- npValidateScalarLogical(errors, "errors")
-  gout <- if (!errors) x$congrad else x$congerr
+gradients.condistribution <- function(x, se = FALSE, gradient.order = NULL, ...) {
+  se <- npValidateScalarLogical(se, "se")
+  gout <- if (!se) x$congrad else x$congerr
   if (is.null(gout) || (length(gout) == 1L && is.logical(gout) && is.na(gout)))
-    stop(if (!errors)
+    stop(if (!se)
       "gradients are not available: fit the model with gradients=TRUE"
     else
-      "gradient standard errors are not available: fit the model with gradients=TRUE")
+      "gradient standard errors were not computed: fit the model with gradients=TRUE and se=TRUE")
 
   reg.spec <- npConditionalRegEngineSpec(x$bws, where = "gradients.condistribution")
   if (isTRUE(x$bws$xncon == 0L)) {

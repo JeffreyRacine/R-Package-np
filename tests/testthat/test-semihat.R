@@ -117,7 +117,7 @@ test_that("npscoef and npscoefhat support ll/lp basis variants", {
       tzdat = tz,
       exdat = ex,
       ezdat = ez,
-      errors = FALSE,
+      se = FALSE,
       iterate = FALSE
     )
     H.eval <- npscoefhat(
@@ -173,11 +173,11 @@ test_that("npscoefhat leave.one.out honors lc and ll paths", {
   expect_gt(max(abs(H0.ll - H1.ll)), 1e-8)
   fit0.ll <- npscoef(
     bws = bw.ll, txdat = tx, tydat = y, tzdat = tz,
-    iterate = FALSE, errors = FALSE, leave.one.out = FALSE
+    iterate = FALSE, se = FALSE, leave.one.out = FALSE
   )
   fit1.ll <- npscoef(
     bws = bw.ll, txdat = tx, tydat = y, tzdat = tz,
-    iterate = FALSE, errors = FALSE, leave.one.out = TRUE
+    iterate = FALSE, se = FALSE, leave.one.out = TRUE
   )
   expect_gt(max(abs(fit0.ll$mean - fit1.ll$mean)), 1e-8)
 
@@ -605,7 +605,7 @@ test_that("semihat apply mode matches core fits across bwtypes", {
         exdat = ex.sc,
         ezdat = ez.sc,
         iterate = FALSE,
-        errors = FALSE
+        se = FALSE
       )
       sc.apply <- npscoefhat(
         bws = sc.bw,

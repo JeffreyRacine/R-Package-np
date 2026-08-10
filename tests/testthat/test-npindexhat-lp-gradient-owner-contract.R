@@ -42,7 +42,7 @@ test_that("npindexhat lp gradient owner preserves fit and matrix/apply parity", 
       tydat = y,
       exdat = ex,
       gradients = TRUE,
-      errors = FALSE
+      se = FALSE
     )
 
     apply.grad <- npindexhat(

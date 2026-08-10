@@ -105,7 +105,7 @@ test_that("npqreg NOMAD fit metadata propagates through prediction, gradients, a
   expect_identical(as.character(fit$bws$regtype.engine), "lp")
   expect_length(fitted(fit), nrow(nd))
   expect_equal(nrow(gradients(fit)), nrow(nd))
-  expect_equal(nrow(gradients(fit, errors = TRUE)), nrow(nd))
+  expect_equal(nrow(gradients(fit, se = TRUE)), nrow(nd))
 
   bw.calls <- count_namespace_calls("npcdistbw", {
     pred <- predict(fit, newdata = nd, tau = c(0.25, 0.5, 0.75))

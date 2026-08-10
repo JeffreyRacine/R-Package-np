@@ -260,9 +260,9 @@ predict.conmode <- function(object,
   }
   probs
 }
-gradients.conmode <- function(x, level = NULL, errors = FALSE, ...) {
-  errors <- npValidateScalarLogical(errors, "errors")
-  if (isTRUE(errors))
+gradients.conmode <- function(x, level = NULL, se = FALSE, ...) {
+  se <- npValidateScalarLogical(se, "se")
+  if (isTRUE(se))
     stop("gradient standard errors are not available for conmode objects")
   gout <- x$probability.gradients
   if (is.null(gout))

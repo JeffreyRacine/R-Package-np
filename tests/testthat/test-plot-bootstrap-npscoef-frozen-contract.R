@@ -63,7 +63,7 @@ test_that("npscoef exact helper matches duplicate-row oracle and frozen stays fi
       exdat = exdat,
       ezdat = ezdat,
       iterate = FALSE,
-      errors = FALSE
+      se = FALSE
     )$mean)
   }, numeric(nrow(exdat)))
   exact.oracle <- t(exact.oracle)
@@ -76,7 +76,7 @@ test_that("npscoef exact helper matches duplicate-row oracle and frozen stays fi
     exdat = exdat,
     ezdat = ezdat,
     iterate = FALSE,
-    errors = FALSE
+    se = FALSE
   )$mean)
 
   expect_equal(exact.out$t, exact.oracle, tolerance = 1e-10)
@@ -239,7 +239,7 @@ test_that("npscoef fixed lp helper matches duplicate-row oracle", {
       exdat = eval.grid["x"],
       ezdat = eval.grid["z"],
       iterate = FALSE,
-      errors = FALSE
+      se = FALSE
     )$mean)
   }, numeric(nrow(eval.grid)))
   oracle <- t(oracle)

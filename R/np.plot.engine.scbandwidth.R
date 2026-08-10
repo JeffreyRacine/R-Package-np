@@ -342,7 +342,7 @@
         tydat = ydat,
         bws = bws,
         iterate = FALSE,
-        errors = (plot.errors && identical(plot.errors.method, "asymptotic")),
+        se = (plot.errors && identical(plot.errors.method, "asymptotic")),
         betas = coef
       )
       if (!miss.z)
@@ -355,8 +355,7 @@
       }
       tobj <- do.call(.np_scoef_fit_internal, scoef.args)
 
-      terr = matrix(data = tobj$merr, nrow = dim(x.eval)[1], ncol = 3)
-      terr[,3] = NA
+      terr <- matrix(NA_real_, nrow = dim(x.eval)[1], ncol = 3)
       lerr.all <- NULL
       herr.all <- NULL
       
@@ -707,7 +706,7 @@
             tydat = ydat,
             exdat = ex.slice,
             bws = bws,
-            errors = (plot.errors && identical(plot.errors.method, "asymptotic")),
+            se = (plot.errors && identical(plot.errors.method, "asymptotic")),
             betas = coef
           )
           if (!miss.z) {
