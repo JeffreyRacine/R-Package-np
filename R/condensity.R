@@ -125,6 +125,7 @@ se.condensity <- function(x){
   x$conderr
 }
 gradients.condensity <- function(x, se = FALSE, gradient.order = NULL, ...) {
+  npRejectLegacyBooleanErrors(list(...), "gradients.condensity")
   se <- npValidateScalarLogical(se, "se")
   gout <- if (!se) x$congrad else x$congerr
   if (is.null(gout) || (length(gout) == 1L && is.logical(gout) && is.na(gout)))

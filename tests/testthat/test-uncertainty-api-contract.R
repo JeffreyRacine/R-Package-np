@@ -41,6 +41,47 @@ test_that("legacy Boolean errors spelling fails instead of translating", {
   expect_error(npscoef(errors = TRUE), "use 'se' instead", fixed = TRUE)
   expect_error(npindex(errors = TRUE), "use 'se' instead", fixed = TRUE)
   expect_error(nplsqreg(errors = TRUE), "use 'se' instead", fixed = TRUE)
+
+  gradient.classes <- c(
+    "npregression", "condensity", "condistribution", "lsqregression",
+    "qregression", "conmode", "singleindex"
+  )
+  for (class in gradient.classes) {
+    object <- structure(list(), class = class)
+    expect_error(
+      gradients(object, errors = TRUE),
+      "use 'se' instead",
+      fixed = TRUE,
+      info = class
+    )
+  }
+
+  expect_error(
+    gradients(structure(list(), class = "qregression"), errors = FALSE),
+    "use 'se' instead",
+    fixed = TRUE
+  )
+  expect_error(
+    coef(structure(list(), class = "plregression"), errors = TRUE),
+    "use 'se' instead",
+    fixed = TRUE
+  )
+})
+
+test_that("valid uncertainty extraction remains controlled only by se", {
+  qreg <- structure(
+    list(quantgrad = 1, quantgerr = 2),
+    class = "qregression"
+  )
+  expect_identical(gradients(qreg, se = FALSE), 1)
+  expect_identical(gradients(qreg, se = TRUE), 2)
+
+  plreg <- structure(
+    list(xcoef = 3, xcoeferr = 4),
+    class = "plregression"
+  )
+  expect_identical(coef(plreg, se = FALSE), 3)
+  expect_identical(coef(plreg, se = TRUE), 4)
 })
 
 test_that("missing uncertainty state fails helpfully", {

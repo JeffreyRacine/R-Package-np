@@ -551,6 +551,7 @@ residuals.lsqregression <- function(object, ...) {
 
 gradients.lsqregression <- function(x, se = FALSE,
                                     gradient.order = NULL, ...) {
+  npRejectLegacyBooleanErrors(list(...), "gradients.lsqregression")
   se <- npValidateScalarLogical(se, "se")
   gout <- if (!se) x$quantgrad else x$quantgerr
   if (is.null(gout) || (length(gout) == 1L && is.logical(gout) && is.na(gout)))
