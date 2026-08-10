@@ -85,6 +85,7 @@ test_that("scalar and general beta regression repeats are exact", {
       tydat = response,
       exdat = evaluation,
       gradients = TRUE,
+      se = TRUE,
       regtype = "lp",
       degree = rep.int(degree, 2L),
       bernstein.basis = FALSE,

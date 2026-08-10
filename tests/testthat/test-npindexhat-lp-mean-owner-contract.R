@@ -18,7 +18,7 @@ npindexhat_lp_mean_owner_case <- function() {
     "tx <- data.frame(x1 = x1, x2 = x2)",
     "ex <- data.frame(x1 = seq(min(x1) * 0.9, max(x1) * 0.9, length.out = 30L), x2 = seq(quantile(x2, 0.2), quantile(x2, 0.8), length.out = 30L))",
     "check_case <- function(label, bw) {",
-    "  fit.mean <- npindex(bws = bw, txdat = tx, tydat = y, exdat = ex, gradients = FALSE, errors = FALSE)",
+    "  fit.mean <- npindex(bws = bw, txdat = tx, tydat = y, exdat = ex, gradients = FALSE, se = FALSE)",
     "  apply.mean <- npindexhat(bws = bw, txdat = tx, exdat = ex, y = y, output = 'apply', s = 0L)",
     "  matrix.mean <- npindexhat(bws = bw, txdat = tx, exdat = ex, output = 'matrix', s = 0L)",
     "  stopifnot(isTRUE(all.equal(as.vector(apply.mean), as.vector(fit.mean$mean), tolerance = 1e-8)))",

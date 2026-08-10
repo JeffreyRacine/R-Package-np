@@ -167,7 +167,7 @@ test_that("npscoef core smoke stays alive", {
       "z <- data.frame(z = seq(1.0, 0.1, length.out = n))",
       "y <- x$x * z$z",
       "bw <- npscoefbw(xdat = x, zdat = z, ydat = y, bws = 0.25, bandwidth.compute = FALSE)",
-      "fit <- npscoef(bws = bw, iterate = FALSE, errors = FALSE)",
+      "fit <- npscoef(bws = bw, iterate = FALSE, se = FALSE)",
       "stopifnot(inherits(fit, 'smoothcoefficient'))",
       "pred <- predict(fit)",
       "stopifnot(length(pred) == n)",

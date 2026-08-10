@@ -27,7 +27,7 @@ test_that("npRmpi nplsqreg direct routes omit incomplete training rows and reali
     txdat = dat["x"], tydat = dat$y,
     bws = 0.25, bandwidth.compute = FALSE,
     scale = rep(1, n), tau = c(0.25, 0.5),
-    gradients = TRUE, residuals = TRUE
+    gradients = TRUE, se = TRUE, residuals = TRUE
   )
   expect_equal(dim(fit$quantile), c(n, 2L))
   expect_true(all(is.na(fit$quantile[5L, ])))

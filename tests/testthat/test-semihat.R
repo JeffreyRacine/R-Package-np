@@ -114,11 +114,11 @@ test_that("npscoefhat reproduces npscoef fitted values and supports matrix RHS",
   expect_gt(max(abs(H0.ll - H1.ll)), 1e-8)
   fit0.ll <- npscoef(
     bws = bw.ll, txdat = tx, tydat = y, tzdat = tz,
-    iterate = FALSE, errors = FALSE, leave.one.out = FALSE
+    iterate = FALSE, se = FALSE, leave.one.out = FALSE
   )
   fit1.ll <- npscoef(
     bws = bw.ll, txdat = tx, tydat = y, tzdat = tz,
-    iterate = FALSE, errors = FALSE, leave.one.out = TRUE
+    iterate = FALSE, se = FALSE, leave.one.out = TRUE
   )
   expect_gt(max(abs(fit0.ll$mean - fit1.ll$mean)), 1e-8)
 
@@ -1060,7 +1060,7 @@ test_that("npscoefhat apply mode matches green core fits across bwtypes", {
         exdat = ex.sc,
         ezdat = ez.sc,
         iterate = FALSE,
-        errors = FALSE
+        se = FALSE
       )
       sc.apply <- npscoefhat(
         bws = sc.bw,

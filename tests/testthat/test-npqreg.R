@@ -16,7 +16,7 @@ test_that("npqreg basic functionality works", {
   expect_equal(length(predict(model)), 50)
   expect_equal(model$tau, 0.5)
   expect_error(gradients(model), "fit the model with gradients=TRUE", fixed = TRUE)
-  expect_error(gradients(model, errors = TRUE), "fit the model with gradients=TRUE", fixed = TRUE)
+  expect_error(gradients(model, se = TRUE), "fit the model with gradients=TRUE", fixed = TRUE)
   
   expect_output(summary(model))
 })
@@ -235,7 +235,7 @@ test_that("npqreg gradients populate qregression objects", {
   expect_true(all(se(fit) > 0))
   expect_equal(fit$quantgrad, ref$quantgrad, tolerance = 0)
   expect_equal(gradients(fit), fit$quantgrad, tolerance = 0)
-  expect_equal(gradients(fit, errors = TRUE), fit$quantgerr, tolerance = 0)
+  expect_equal(gradients(fit, se = TRUE), fit$quantgerr, tolerance = 0)
 
   qdelta <- getFromNamespace(".npqreg_quantile_delta_from_conditional", "npRmpi")(
     bws = bw,
@@ -312,7 +312,7 @@ test_that("npqreg vector-tau gradient fanout matches local evaluator", {
   expect_equal(fitted(fit), fitted(ref), tolerance = 0)
   expect_equal(se(fit), se(ref), tolerance = 0)
   expect_equal(gradients(fit), gradients(ref), tolerance = 0)
-  expect_equal(gradients(fit, errors = TRUE), gradients(ref, errors = TRUE), tolerance = 0)
+  expect_equal(gradients(fit, se = TRUE), gradients(ref, se = TRUE), tolerance = 0)
 })
 
 test_that("npqreg plot vector-tau gradients use the coalesced evaluator", {
@@ -365,7 +365,7 @@ test_that("npqreg plot vector-tau gradients use the coalesced evaluator", {
   expect_equal(fitted(fit), fitted(ref), tolerance = 0)
   expect_equal(se(fit), se(ref), tolerance = 0)
   expect_equal(gradients(fit), gradients(ref), tolerance = 0)
-  expect_equal(gradients(fit, errors = TRUE), gradients(ref, errors = TRUE), tolerance = 0)
+  expect_equal(gradients(fit, se = TRUE), gradients(ref, se = TRUE), tolerance = 0)
 
   plot.data <- plot(
     fit,
@@ -407,7 +407,7 @@ test_that("npqreg gradient plots support asymptotic errors", {
 
   expect_true(all(vapply(out, inherits, logical(1), "qregression")))
   grad <- gradients(fit)
-  gerr <- gradients(fit, errors = TRUE)
+  gerr <- gradients(fit, se = TRUE)
   expect_true(any(is.finite(grad)))
   expect_true(any(is.finite(gerr)))
   expect_identical(is.na(gerr), is.na(grad))

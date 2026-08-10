@@ -94,7 +94,7 @@ test_that("npscoef all-categorical profile route preserves fitted values", {
     regtype = "lc"
   )
   fit <- npscoef(bws = bw, txdat = xdat, tydat = ydat, tzdat = zdat,
-                 errors = FALSE, iterate = FALSE, betas = TRUE)
+                 se = FALSE, iterate = FALSE, betas = TRUE)
   oracle <- npscoef_profile_oracle(xdat, ydat, zdat, bw)
   expect_equal(fit$mean, oracle$mean, tolerance = 1e-8)
   expect_equal(fit$beta, oracle$beta, tolerance = 1e-8)
@@ -126,7 +126,7 @@ test_that("npscoef all-categorical profile route preserves evaluation values", {
   ezdat <- zdat[seq_len(31L), , drop = FALSE]
   fit <- npscoef(bws = bw, txdat = xdat, tydat = ydat, tzdat = zdat,
                  exdat = exdat, ezdat = ezdat,
-                 errors = FALSE, iterate = FALSE, betas = TRUE)
+                 se = FALSE, iterate = FALSE, betas = TRUE)
   oracle <- npscoef_profile_oracle(xdat, ydat, zdat, bw,
                                    exdat = exdat, ezdat = ezdat)
   expect_equal(fit$mean, oracle$mean, tolerance = 1e-8)

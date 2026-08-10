@@ -1,8 +1,8 @@
 smoothcoefficient <- 
-  function(bws, eval, mean, merr = NA, beta = NA,
-           grad = NA, gerr = NA, resid = NA,
+  function(bws, eval, mean, merr = NULL, beta = NA,
+           grad = NA, gerr = NULL, resid = NA,
            ntrain, trainiseval = FALSE, residuals = FALSE,
-           betas = FALSE,
+           betas = FALSE, se = TRUE,
            xtra = rep(NA, 6),
            timing = NA, total.time = NA,
            optim.time = NA, fit.time = NA){
@@ -31,6 +31,7 @@ smoothcoefficient <-
       merr = merr,
       ntrain = ntrain,
       trainiseval = trainiseval,
+      se = se,
       residuals = residuals,
       betas = betas,
       beta = beta,
@@ -87,10 +88,18 @@ fitted.smoothcoefficient <- function(object, ...){
 residuals.smoothcoefficient <- function(object, ...) {
  if(object$residuals) { return(object$resid) } else { return(npscoef(bws = object$bws, residuals =TRUE)$resid) } 
 }
-se.smoothcoefficient <- function(x){ x$merr }
+se.smoothcoefficient <- function(x){
+  if (!isTRUE(x$se) || is.null(x$merr) ||
+      (length(x$merr) == 1L && is.na(x$merr)))
+    stop("standard errors were not computed: refit or predict/evaluate with se=TRUE", call. = FALSE)
+  x$merr
+}
 predict.smoothcoefficient <- function(object, se.fit = FALSE, ...) {
   se.fit <- npValidateScalarLogical(se.fit, "se.fit")
   dots <- list(...)
+  npRejectLegacyBooleanErrors(dots, "predict.smoothcoefficient")
+  if ("se" %in% names(dots))
+    stop("predict.smoothcoefficient uses 'se.fit', not 'se'", call. = FALSE)
   has.formula.route <- !is.null(object$bws$formula)
 
   if ((!is.null(dots$exdat) || !is.null(dots$ezdat)) && !is.null(dots$newdata)) {
@@ -111,7 +120,7 @@ predict.smoothcoefficient <- function(object, se.fit = FALSE, ...) {
     dots$newdata <- NULL
   }
 
-  tr <- do.call(npscoef, c(list(bws = object$bws), dots))
+  tr <- do.call(npscoef, c(list(bws = object$bws, se = se.fit), dots))
   if(se.fit)
     return(list(fit = fitted(tr), se.fit = se(tr), 
                 df = tr$nobs, residual.scale = tr$MSE))

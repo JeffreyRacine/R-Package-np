@@ -2447,7 +2447,7 @@ npscoefbw.scbandwidth <-
             bws = bws, txdat = xdat, tydat = ydat,
             leave.one.out = TRUE, iterate = TRUE,
             maxiter = backfit.maxiter, tol = backfit.tol,
-            betas = TRUE, errors = FALSE,
+            betas = TRUE, se = FALSE,
             .np_fit_progress_allow = FALSE
           )
           if (!miss.z)
@@ -2686,7 +2686,7 @@ npscoefbw.scbandwidth <-
               tydat = ydat,
               iterate = FALSE,
               betas = TRUE,
-              errors = FALSE,
+              se = FALSE,
               .np_fit_progress_allow = FALSE
             )
             if (!miss.z)
@@ -2741,7 +2741,7 @@ npscoefbw.scbandwidth <-
                   scoef.args <- list(
                     bws = bws, txdat = xdat, tydat = ydat,
                     iterate = TRUE, maxiter = backfit.maxiter,
-                    tol = backfit.tol, betas = TRUE, errors = FALSE,
+                    tol = backfit.tol, betas = TRUE, se = FALSE,
                     .np_fit_progress_allow = FALSE
                   )
                   if (!miss.z)
@@ -2782,7 +2782,7 @@ npscoefbw.scbandwidth <-
               bws = bws, txdat = xdat, tydat = ydat,
               iterate = TRUE, maxiter = backfit.maxiter,
               tol = backfit.tol, leave.one.out = TRUE,
-              errors = FALSE,
+              se = FALSE,
               .np_fit_progress_allow = FALSE
             )
             if (!miss.z)

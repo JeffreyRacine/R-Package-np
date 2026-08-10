@@ -63,6 +63,7 @@ test_that("directional LP variances agree with independent fixed-bandwidth WLS",
         list(
           tydat = response,
           gradients = TRUE,
+          se = TRUE,
           regtype = "lp",
           degree = degree,
           basis = "glp",
@@ -130,7 +131,7 @@ test_that("directional LP variances agree with independent fixed-bandwidth WLS",
       expect_equal(unname(se(fit)), expected_se, tolerance = 2e-8,
                    info = label)
       expect_equal(
-        unname(gradients(fit, errors = TRUE)),
+        unname(gradients(fit, se = TRUE)),
         expected_gerr,
         tolerance = 2e-7,
         info = label

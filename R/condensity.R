@@ -120,16 +120,18 @@ se.condensity <- function(x){
   if (isTRUE(x$proper.applied)) {
     stop("standard errors are unavailable for repaired conditional densities in tranche 1")
   }
+  if (is.null(x$conderr) || !length(x$conderr))
+    stop("standard errors were not computed for this conditional density", call. = FALSE)
   x$conderr
 }
-gradients.condensity <- function(x, errors = FALSE, gradient.order = NULL, ...) {
-  errors <- npValidateScalarLogical(errors, "errors")
-  gout <- if (!errors) x$congrad else x$congerr
+gradients.condensity <- function(x, se = FALSE, gradient.order = NULL, ...) {
+  se <- npValidateScalarLogical(se, "se")
+  gout <- if (!se) x$congrad else x$congerr
   if (is.null(gout) || (length(gout) == 1L && is.logical(gout) && is.na(gout)))
-    stop(if (!errors)
+    stop(if (!se)
       "gradients are not available: fit the model with gradients=TRUE"
     else
-      "gradient standard errors are not available: fit the model with gradients=TRUE")
+      "gradient standard errors were not computed: fit the model with gradients=TRUE and se=TRUE")
 
   reg.spec <- npConditionalRegEngineSpec(x$bws, where = "gradients.condensity")
   if (isTRUE(x$bws$xncon == 0L)) {

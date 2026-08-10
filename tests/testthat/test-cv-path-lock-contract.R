@@ -99,7 +99,7 @@ test_that("canonical LP CV route predicates remain centralized", {
     fixed = TRUE
   )))
   expect_true(grepl(
-    "return nterms <= NP_REG_CV_LP_RESIDENT_MAX_TERMS;",
+    "return use_tree || (nterms <= NP_REG_CV_LP_RESIDENT_MAX_TERMS);",
     canonical_body,
     fixed = TRUE
   ))

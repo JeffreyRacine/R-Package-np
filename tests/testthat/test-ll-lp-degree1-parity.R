@@ -243,14 +243,14 @@ test_that("npscoef cv and estimation match for ll and lp(degree=1) in 1D", {
     txdat = data.frame(x = x),
     tzdat = data.frame(z = z),
     tydat = y,
-    errors = FALSE
+    se = FALSE
   )
   fit.lp <- npscoef(
     bws = bw.lp,
     txdat = data.frame(x = x),
     tzdat = data.frame(z = z),
     tydat = y,
-    errors = FALSE
+    se = FALSE
   )
 
   expect_equal(as.numeric(fit.ll$mean), as.numeric(fit.lp$mean), tolerance = 1e-10)
@@ -460,8 +460,8 @@ test_that("npscoef multivariate cv and estimation match for ll and lp(degree=1)"
     bandwidth.compute = FALSE
   )
 
-  fit.ll <- npscoef(bws = bw.ll, txdat = tx, tzdat = tz, tydat = y, errors = FALSE)
-  fit.lp <- npscoef(bws = bw.lp, txdat = tx, tzdat = tz, tydat = y, errors = FALSE)
+  fit.ll <- npscoef(bws = bw.ll, txdat = tx, tzdat = tz, tydat = y, se = FALSE)
+  fit.lp <- npscoef(bws = bw.lp, txdat = tx, tzdat = tz, tydat = y, se = FALSE)
 
   expect_equal(as.numeric(fit.ll$mean), as.numeric(fit.lp$mean), tolerance = 1e-10)
   expect_equal(as.numeric(fit.ll$beta), as.numeric(fit.lp$beta), tolerance = 1e-10)

@@ -18,18 +18,18 @@ test_that("manual beta LL and raw degree-one LP share one fitted path", {
   ))
   ll <- npreg(
     bws = ll_bw, txdat = x, tydat = y, exdat = evaluation,
-    gradients = TRUE
+    gradients = TRUE, se = TRUE
   )
   lp <- npreg(
     bws = lp_bw, txdat = x, tydat = y, exdat = evaluation,
-    gradients = TRUE
+    gradients = TRUE, se = TRUE
   )
 
   expect_identical(fitted(ll), fitted(lp))
   expect_identical(se(ll), se(lp))
   expect_identical(gradients(ll), gradients(lp))
-  expect_identical(gradients(ll, errors = TRUE),
-                   gradients(lp, errors = TRUE))
+  expect_identical(gradients(ll, se = TRUE),
+                   gradients(lp, se = TRUE))
 })
 
 test_that("beta general LP agrees with independent uncentred WLS", {
@@ -99,7 +99,7 @@ test_that("beta general LP retains a common scale through raw-weight underflow",
       basis = "glp", bernstein.basis = FALSE,
       ckertype = "beta", ckerorder = order,
       ckerbound = "fixed", ckerlb = rep.int(0.0, p),
-      ckerub = rep.int(1.0, p)
+      ckerub = rep.int(1.0, p), se = TRUE
     )
 
     expect_true(all(raw$kw == 0.0), info = paste("order", order))

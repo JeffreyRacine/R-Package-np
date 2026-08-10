@@ -99,12 +99,12 @@ test_that("mixed beta scalar regression matches canonical kernel-weight oracles"
       options(np.categorical.compress = FALSE)
       dense <- npreg(
         bws = bws, txdat = training, tydat = response,
-        exdat = evaluation, gradients = TRUE
+        exdat = evaluation, gradients = TRUE, se = TRUE
       )
       options(np.categorical.compress = TRUE)
       compressed <- npreg(
         bws = bws, txdat = training, tydat = response,
-        exdat = evaluation, gradients = TRUE
+        exdat = evaluation, gradients = TRUE, se = TRUE
       )
 
       expect_equal(fitted(dense), expected$mean, tolerance = 3e-10)
@@ -198,11 +198,11 @@ test_that("mixed beta regression preserves public routes and objective search", 
   )
   direct <- do.call(npreg, c(list(
     txdat = training[c("x", "u", "o")], tydat = training$y,
-    exdat = evaluation, gradients = TRUE
+    exdat = evaluation, gradients = TRUE, se = TRUE
   ), common))
   formula <- do.call(npreg, c(list(
     y ~ x + u + o, data = training, newdata = evaluation,
-    gradients = TRUE
+    gradients = TRUE, se = TRUE
   ), common))
   bws <- do.call(npregbw, c(list(
     xdat = training[c("x", "u", "o")], ydat = training$y,
@@ -210,11 +210,11 @@ test_that("mixed beta regression preserves public routes and objective search", 
   ), common))
   object_fit <- npreg(
     bws = bws, txdat = training[c("x", "u", "o")],
-    tydat = training$y, exdat = evaluation, gradients = TRUE
+    tydat = training$y, exdat = evaluation, gradients = TRUE, se = TRUE
   )
   direct_helper <- np:::.np_regression_direct(
     bws = bws, txdat = training[c("x", "u", "o")],
-    tydat = training$y, exdat = evaluation, gradients = TRUE
+    tydat = training$y, exdat = evaluation, gradients = TRUE, se = TRUE
   )
   prediction <- predict(formula, newdata = evaluation, se.fit = TRUE)
 

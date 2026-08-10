@@ -5554,7 +5554,7 @@
       tydat = y.train,
       exdat = exdat,
       iterate = FALSE,
-      errors = FALSE,
+      se = FALSE,
       leave.one.out = leave.one.out
     )
     if (!miss.z) {
@@ -5758,7 +5758,7 @@
       tydat = y.train,
       exdat = tx.eval,
       iterate = FALSE,
-      errors = FALSE,
+      se = FALSE,
       leave.one.out = leave.one.out
     )
     if (!miss.z) {
@@ -13035,6 +13035,7 @@ plotFactor <- function(f, y, ...){
           tydat = ydat,
           exdat = exdat,
           bws = bws,
+          se = TRUE,
           gradients = gradients,
           gradient.order = gradient.order,
           warn.glp.gradient = FALSE
@@ -13259,6 +13260,7 @@ plotFactor <- function(f, y, ...){
         ckerorder = bws$ckerorder,
         regtype = regtype,
         gradients = gradients,
+        se = TRUE,
         warn.glp.gradient = FALSE
       )
       if (identical(regtype, "lp")) {
@@ -13341,7 +13343,8 @@ plotFactor <- function(f, y, ...){
       txdat = zdat,
       tydat = ydat,
       exdat = ezdat,
-      bws = bws$bw$yzbw
+      bws = bws$bw$yzbw,
+      se = TRUE
     )
 
     neval <- nrow(exdat)
@@ -13353,7 +13356,8 @@ plotFactor <- function(f, y, ...){
         txdat = zdat,
         tydat = xdat[, j],
         exdat = ezdat,
-        bws = bws$bw[[j + 1L]]
+        bws = bws$bw[[j + 1L]],
+        se = TRUE
       )
 
       if (is.factor(xdat[1L, j])) {

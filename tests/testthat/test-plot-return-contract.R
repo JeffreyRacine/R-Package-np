@@ -281,7 +281,7 @@ test_that("plot return contract: remaining public plot families return plot-data
     txdat = data.frame(x = x),
     tzdat = data.frame(z = z),
     tydat = y,
-    errors = FALSE
+    se = FALSE
   )
   expect_plot_modes_match(fit.sc, fields = c("eval", "mean", "grad"), perspective = FALSE)
 

@@ -45,7 +45,7 @@ test_that("beta ratio derivatives honor endpoint structural cancellation", {
 
   constant <- npreg(
     bws = .16, txdat = training, tydat = rep(7, nrow(training)),
-    exdat = evaluation, gradients = TRUE, regtype = "lc",
+    exdat = evaluation, gradients = TRUE, se = TRUE, regtype = "lc",
     ckertype = "beta", ckerorder = 8,
     ckerbound = "fixed", ckerlb = 0, ckerub = 1
   )
@@ -55,7 +55,7 @@ test_that("beta ratio derivatives honor endpoint structural cancellation", {
   varying <- NULL
   expect_warning(varying <- npreg(
     bws = .16, txdat = training, tydat = c(4, 1, 2, 3, 5, -1),
-    exdat = evaluation, gradients = TRUE, regtype = "lc",
+    exdat = evaluation, gradients = TRUE, se = TRUE, regtype = "lc",
     ckertype = "beta", ckerorder = 8,
     ckerbound = "fixed", ckerlb = 0, ckerub = 1
   ), "infinite endpoint")
@@ -179,7 +179,7 @@ test_that("conditional beta endpoint gradient limits survive response scaling", 
       gradient_se <- as.double(fit$congerr)
 
       expect_identical(
-        as.double(gradients(fit, errors = TRUE)),
+        as.double(gradients(fit, se = TRUE)),
         gradient_se
       )
       expect_true(all(is.infinite(actual[c(1L, 3L)])))

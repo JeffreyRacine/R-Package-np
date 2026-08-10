@@ -161,7 +161,7 @@ test_that("semiparametric plot labels are mathematical and reachable", {
     regtype = "lp",
     degree = 1L
   )
-  sc.fit <- npscoef(bws = sc.bw, gradients = TRUE, errors = FALSE)
+  sc.fit <- npscoef(bws = sc.bw, gradients = TRUE, se = FALSE)
   sc.labels <- capture_plot_axis_labels(plot(
     sc.fit,
     gradients = TRUE,

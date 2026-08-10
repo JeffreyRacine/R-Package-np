@@ -959,20 +959,31 @@ nplsqregbw <-
   out$delta <- bws$delta
   out$quantile <- do.call(cbind, lapply(fit.list, `[[`, "quantile"))
   colnames(out$quantile) <- labels
-  out$quanterr <- do.call(cbind, lapply(fit.list, `[[`, "quanterr"))
-  colnames(out$quanterr) <- labels
+  has.se <- all(vapply(fit.list, function(fit) isTRUE(fit$se), logical(1L)))
+  out$quanterr <- if (has.se) {
+    value <- do.call(cbind, lapply(fit.list, `[[`, "quanterr"))
+    colnames(value) <- labels
+    value
+  } else {
+    NA
+  }
   if (isTRUE(first$gradients)) {
     p <- ncol(fit.list[[1L]]$quantgrad)
     grad.names <- colnames(fit.list[[1L]]$quantgrad)
     out$quantgrad <- array(NA_real_,
                            dim = c(nrow(fit.list[[1L]]$quantgrad), p, length(tau)),
                            dimnames = list(NULL, grad.names, labels))
-    out$quantgerr <- array(NA_real_,
-                           dim = c(nrow(fit.list[[1L]]$quantgerr), p, length(tau)),
-                           dimnames = list(NULL, grad.names, labels))
+    out$quantgerr <- if (has.se) {
+      array(NA_real_,
+            dim = c(nrow(fit.list[[1L]]$quantgerr), p, length(tau)),
+            dimnames = list(NULL, grad.names, labels))
+    } else {
+      NA
+    }
     for (j in seq_along(tau)) {
       out$quantgrad[, , j] <- fit.list[[j]]$quantgrad
-      out$quantgerr[, , j] <- fit.list[[j]]$quantgerr
+      if (has.se)
+        out$quantgerr[, , j] <- fit.list[[j]]$quantgerr
     }
   } else {
     out$quantgrad <- NA
@@ -1419,7 +1430,7 @@ nplsqregbw.default <-
 nplsqreg.formula <-
   function(bws, data = NULL, newdata = NULL, tau = 0.5,
            gradients = FALSE, residuals = FALSE, subset, na.action,
-           gradient.order = 1L, ...) {
+           gradient.order = 1L, se = FALSE, ...) {
 
     .npRmpi_require_active_slave_pool(where = "nplsqreg()")
 
@@ -1468,13 +1479,13 @@ nplsqreg.formula <-
               c(list(txdat = xdat, tydat = ydat, tau = tau,
                      exdat = exdat, gradients = gradients,
                      residuals = residuals,
-                     gradient.order = gradient.order),
+                     gradient.order = gradient.order, se = se),
                 dots))
     } else {
       do.call(nplsqreg.default,
               c(list(txdat = xdat, tydat = ydat, tau = tau,
                      gradients = gradients, residuals = residuals,
-                     gradient.order = gradient.order),
+                     gradient.order = gradient.order, se = se),
                 dots))
     }
     out$call <- match.call(expand.dots = FALSE)
@@ -1503,7 +1514,8 @@ nplsqreg.formula <-
   }
 
 nplsqreg.lsqregressionbandwidth <-
-  function(bws, txdat = NULL, tydat = NULL, tau = bws$tau, ...) {
+  function(bws, txdat = NULL, tydat = NULL, tau = bws$tau,
+           se = FALSE, ...) {
     tau <- .nplsqreg_validate_tau_values(tau)
     if (length(tau) != length(bws$tau) || !isTRUE(all.equal(tau, bws$tau)))
       stop("cross-tau nplsqreg bandwidth-object reuse is not supported",
@@ -1523,6 +1535,7 @@ nplsqreg.lsqregressionbandwidth <-
                          txdat = txdat,
                          tydat = tydat,
                          tau = tau[[j]],
+                         se = se,
                          ...)
       })
       out <- .nplsqreg_combine_fits(
@@ -1534,7 +1547,8 @@ nplsqreg.lsqregressionbandwidth <-
       environment(out$call) <- parent.frame()
       return(out)
     }
-    nplsqreg.default(bws = bws, txdat = txdat, tydat = tydat, tau = tau, ...)
+    nplsqreg.default(bws = bws, txdat = txdat, tydat = tydat, tau = tau,
+                     se = se, ...)
   }
 
 nplsqreg.NULL <- function(...) {
@@ -1550,10 +1564,12 @@ nplsqreg.default <-
            gradients = FALSE,
            residuals = FALSE,
            gradient.order = 1L,
+           se = FALSE,
            ...) {
 
-    .npRmpi_require_active_slave_pool(where = "nplsqreg()")
     dots.dispatch <- list(...)
+    npRejectLegacyBooleanErrors(dots.dispatch, "nplsqreg")
+    .npRmpi_require_active_slave_pool(where = "nplsqreg()")
     if (length(dots.dispatch)) {
       dot.names <- names(dots.dispatch)
       if (!is.null(dot.names))
@@ -1573,6 +1589,7 @@ nplsqreg.default <-
     tau.raw <- .nplsqreg_validate_tau_values(tau)
     gradients <- npValidateScalarLogical(gradients, "gradients")
     residuals <- npValidateScalarLogical(residuals, "residuals")
+    se <- npValidateScalarLogical(se, "se")
     dots <- dots.dispatch
     native.newdata <- dots$newdata
     dots$newdata <- NULL
@@ -1585,7 +1602,7 @@ nplsqreg.default <-
       bw <- do.call("nplsqregbw", c(bw.args, dots))
       fit.args <- list(bws = bw, txdat = txdat, tydat = tydat,
                        gradients = gradients, residuals = residuals,
-                       gradient.order = gradient.order)
+                       gradient.order = gradient.order, se = se)
       if (!missing(exdat))
         fit.args$exdat <- exdat
       else if (!is.null(native.newdata))
@@ -1600,7 +1617,8 @@ nplsqreg.default <-
                          tau = tau.raw,
                          gradients = gradients,
                          residuals = residuals,
-                         gradient.order = gradient.order)
+                         gradient.order = gradient.order,
+                         se = se)
       if (!missing(exdat))
         reuse.args$exdat <- exdat
       else if (!is.null(native.newdata))
@@ -1622,7 +1640,8 @@ nplsqreg.default <-
 
     fit.args <- list(bws = bws$reg.bws, txdat = txdat, tydat = bws$qdat,
                      gradients = gradients,
-                     gradient.order = gradient.order)
+                     gradient.order = gradient.order,
+                     se = se)
     eval.present <- !missing(exdat) || !is.null(native.newdata)
     eval.omit <- NULL
     if (!missing(exdat)) {
@@ -1637,9 +1656,9 @@ nplsqreg.default <-
     fit <- do.call(npreg, c(fit.args, dots))
 
     quant <- fitted(fit)
-    qerr <- se(fit)
+    qerr <- if (se) se(fit) else NA
     qgrad <- if (gradients) gradients(fit) else NA
-    qgerr <- if (gradients) gradients(fit, errors = TRUE) else NA
+    qgerr <- if (gradients && se) gradients(fit, se = TRUE) else NA
     resid.out <- if (residuals) {
       if (eval.present) {
         tydat - fitted(npreg(bws = bws$reg.bws,
@@ -1665,6 +1684,7 @@ nplsqreg.default <-
       ntrain = nrow(txdat),
       trainiseval = !eval.present,
       gradients = gradients,
+      se = se,
       residuals = residuals,
       resid = resid.out,
       call = match.call(expand.dots = FALSE))

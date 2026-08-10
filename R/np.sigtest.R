@@ -437,7 +437,8 @@ npsigtest.rbandwidth <- function(bws,
                                 txdat = xdat,
                                 tydat = ydat,
                                 bws = bws,
-                                gradients = TRUE)
+                                gradients = TRUE,
+                                se = pivot)
 
     In <- if(!pivot) {
       mean(npreg.out$grad[,index]^2)
@@ -546,13 +547,15 @@ npsigtest.rbandwidth <- function(bws,
                                                  txdat = xdat.star,
                                                  tydat = ydat.star,
                                                  bws = bws,
-                                                 gradients = TRUE)
+                                                 gradients = TRUE,
+                                                 se = pivot)
         } else {
           npreg.boot <- .npRmpi_npsig_npreg_leaf(extra.args,
                                                  txdat = xdat,
                                                  tydat = ydat.star,
                                                  bws = bws,
-                                                 gradients = TRUE)
+                                                 gradients = TRUE,
+                                                 se = pivot)
         }
 
         In.vec[i.star] <- if (!pivot) {
@@ -585,7 +588,8 @@ npsigtest.rbandwidth <- function(bws,
                                                  txdat = xdat,
                                                  tydat = ydat.star,
                                                  bws = bws,
-                                                 gradients = TRUE)
+                                                 gradients = TRUE,
+                                                 se = pivot)
           } else if (boot.method == "wild") {
             ydat.star <- mhat.xi + ei * draw.wild.mult(num.obs, a, b, P.a)
             npreg.boot <- .npRmpi_npsig_do_local(extra.args,
@@ -686,7 +690,8 @@ npsigtest.rbandwidth <- function(bws,
                                   txdat = xdat,
                                   tydat = ydat,
                                   bws = bws,
-                                  gradients = TRUE)
+                                  gradients = TRUE,
+                                  se = pivot)
       
       In[ii] <- if(!pivot) {
         mean(npreg.out$grad[,i]^2)
@@ -792,13 +797,15 @@ npsigtest.rbandwidth <- function(bws,
                                                    txdat = xdat.star,
                                                    tydat = ydat.star,
                                                    bws = bws,
-                                                   gradients = TRUE)
+                                                   gradients = TRUE,
+                                                   se = pivot)
           } else {
             npreg.boot <- .npRmpi_npsig_npreg_leaf(extra.args,
                                                    txdat = xdat,
                                                    tydat = ydat.star,
                                                    bws = bws,
-                                                   gradients = TRUE)
+                                                   gradients = TRUE,
+                                                   se = pivot)
           }
 
           In.vec[i.star] <- if (!pivot) {
@@ -831,7 +838,8 @@ npsigtest.rbandwidth <- function(bws,
                                                    txdat = xdat,
                                                    tydat = ydat.star,
                                                    bws = bws,
-                                                   gradients = TRUE)
+                                                   gradients = TRUE,
+                                                   se = pivot)
             } else if (boot.method == "wild") {
               ydat.star <- mhat.xi + ei * draw.wild.mult(num.obs, a, b, P.a)
               npreg.boot <- .npRmpi_npsig_do_local(extra.args,

@@ -172,7 +172,7 @@ test_that("stored formula reentry passes explicit data to stalled MPI fit routes
   )
   cap.sc <- .formula_reentry_capture_default(
     "npscoef.scbandwidth",
-    npscoef(bws = bw.sc, data = data_b, errors = FALSE)
+    npscoef(bws = bw.sc, data = data_b, se = FALSE)
   )
   expect_equal(as.numeric(cap.sc$txdat$x), data_b$x, tolerance = 0)
   expect_equal(as.numeric(cap.sc$tzdat$z), data_b$z, tolerance = 0)

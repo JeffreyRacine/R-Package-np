@@ -1,6 +1,7 @@
 npreg <-
   function(bws, ...){
     args <- list(...)
+    npRejectLegacyBooleanErrors(args, "npreg")
 
     if (!missing(bws)){
       if (inherits(bws, "formula") && is.null(args$txdat))
@@ -22,10 +23,10 @@ npreg <-
     }
   }
 
-.np_regression_output_request <- function(errors, gradients) {
-  errors <- npValidateScalarLogical(errors, "errors")
+.np_regression_output_request <- function(se, gradients) {
+  se <- npValidateScalarLogical(se, "se")
   gradients <- npValidateScalarLogical(gradients, "gradients")
-  as.integer(errors) + 2L * as.integer(gradients)
+  as.integer(se) + 2L * as.integer(gradients)
 }
 
 .npreg_fit_tree_code <- function(bws, ncon, ncat) {
@@ -99,9 +100,10 @@ npreg <-
 
 npreg.formula <-
   function(bws, data = NULL, newdata = NULL, y.eval = FALSE,
-           errors = TRUE, ...){
+           se = FALSE, ...){
 
-    errors <- npValidateScalarLogical(errors, "errors")
+    npRejectLegacyBooleanErrors(list(...), "npreg")
+    se <- npValidateScalarLogical(se, "se")
 
     mc <- match.call(expand.dots = FALSE)
     tt <- terms(bws)
@@ -167,6 +169,7 @@ npreg.formula <-
     }
 
     dots <- list(...)
+    npRejectLegacyBooleanErrors(dots, "npreg")
     reg.bws <- if (!is.null(dots$bws)) {
       out <- dots$bws
       dots$bws <- NULL
@@ -181,7 +184,7 @@ npreg.formula <-
       if (y.eval)
         reg.args$eydat <- eydat
     }
-    ev <- do.call(npreg, c(reg.args, list(errors = errors), dots))
+    ev <- do.call(npreg, c(reg.args, list(se = se), dots))
     if (!is.null(ev$bws)) {
       preserve.bws.call <- inherits(bws, "rbandwidth") && !is.null(bws$call)
       bw.call <- mc[c(1, match(c("bws", "data", "subset", "na.action"),
@@ -253,14 +256,15 @@ npreg.rbandwidth <-
            txdat = stop("training data 'txdat' missing"),
            tydat = stop("training data 'tydat' missing"),
            exdat, eydat, gradient.order = 1L, gradients = FALSE,
-           residuals = FALSE, errors = TRUE,
+           residuals = FALSE, se = FALSE,
            ...){
     fit.start <- proc.time()[3]
     gradients <- npValidateScalarLogical(gradients, "gradients")
-    errors <- npValidateScalarLogical(errors, "errors")
+    se <- npValidateScalarLogical(se, "se")
     residuals <- npValidateScalarLogical(residuals, "residuals")
     .npRmpi_require_active_slave_pool(where = "npreg()")
     dots <- list(...)
+    npRejectLegacyBooleanErrors(dots, "npreg")
     fit.progress.handoff <- isTRUE(dots$.np_fit_progress_handoff)
     reg.spec.raw <- npValidatedConditionalRegSpec(
       bws,
@@ -366,7 +370,7 @@ npreg.rbandwidth <-
           bws = .npRmpi_autodispatch_untag(bws),
           txdat = txdat,
           tydat = tydat,
-          errors = errors,
+          se = se,
           gradient.order = gradient.order,
           gradients = gradients,
           residuals = residuals
@@ -654,7 +658,7 @@ npreg.rbandwidth <-
         resid <- tydat - as.vector(do.call(npreghat, mean.args))
       } else {
         resid <- tydat - npreg(txdat = txdat, tydat = tydat, bws = bws,
-                               errors = FALSE)$mean
+                               se = FALSE)$mean
       }
     }
 
@@ -819,7 +823,7 @@ npreg.rbandwidth <-
             as.integer(enrow),
             as.integer(ncol),
             .np_regression_output_request(
-              errors = errors,
+              se = se,
               gradients = do.compiled.gradients
             ),
             as.double(cker.bounds.c$lb),
@@ -879,7 +883,7 @@ npreg.rbandwidth <-
       rorder[c(ord_idx[bws$icon], ord_idx[bws$iuno], ord_idx[bws$iord])] <- ord_idx
       myout$g = as.matrix(myout$g[,rorder])
 
-      if (errors) {
+      if (se) {
         myout$gerr = matrix(data=myout$gerr, nrow = enrow, ncol = ncol, byrow = FALSE)
         myout$gerr = as.matrix(myout$gerr[,rorder])
       }
@@ -904,7 +908,7 @@ npreg.rbandwidth <-
         nrow.eval = enrow,
         ncol.x = ncol
       )
-      myout$gerr <- if (errors)
+      myout$gerr <- if (se)
         matrix(NA_real_, nrow = enrow, ncol = ncol) else NULL
     }
 
@@ -922,7 +926,7 @@ npreg.rbandwidth <-
       merr = myout$merr,
       ntrain = tnrow,
       trainiseval = no.ex,
-      errors = errors,
+      se = se,
       gradients = gradients,
       residuals = residuals,
       xtra = myout$xtra,
@@ -936,7 +940,7 @@ npreg.rbandwidth <-
     )
     if (gradients) {
       ev.args$grad <- myout$g
-      if (errors)
+      if (se)
         ev.args$gerr <- myout$gerr
     }
     if (residuals)
@@ -954,12 +958,13 @@ npreg.rbandwidth <-
   }
 
 npreg.default <- function(bws, txdat, tydat, nomad = FALSE,
-                          errors = TRUE, ...){
+                          se = FALSE, ...){
   .npRmpi_require_active_slave_pool(where = "npreg()")
   .npRmpi_guard_no_auto_object_in_manual_bcast(bws, where = "npreg()")
   sc <- sys.call()
   sc.names <- names(sc)
-  errors <- npValidateScalarLogical(errors, "errors")
+  npRejectLegacyBooleanErrors(list(...), "npreg")
+  se <- npValidateScalarLogical(se, "se")
   nomad <- npValidateNomadControl(nomad, "nomad")
 
   if (!missing(bws) &&
@@ -981,7 +986,7 @@ npreg.default <- function(bws, txdat, tydat, nomad = FALSE,
     fit.dots <- dots
     fit.dots$remin <- NULL
     fit.dots$.np_fit_progress_handoff <- TRUE
-    return(do.call(npreg, c(reg.args, list(errors = errors), fit.dots)))
+    return(do.call(npreg, c(reg.args, list(se = se), fit.dots)))
   }
 
   has.fixed.bws.value <- !missing(bws) && !isa(bws, "rbandwidth")
@@ -1017,7 +1022,7 @@ npreg.default <- function(bws, txdat, tydat, nomad = FALSE,
     sc.bw <- sc
     sc.bw[[1]] <- quote(npregbw)
   }
-  sc.bw$errors <- NULL
+  sc.bw$se <- NULL
 
   ## if bws was passed in explicitly, do not compute bandwidths
     
@@ -1068,7 +1073,7 @@ npreg.default <- function(bws, txdat, tydat, nomad = FALSE,
   }
   if (!has.explicit.bws)
     call.args$.np_fit_progress_handoff <- TRUE
-  ev <- do.call(npreg, c(call.args, list(errors = errors), list(...)))
+  ev <- do.call(npreg, c(call.args, list(se = se), list(...)))
 
   ev$call <- match.call(expand.dots = FALSE)
   environment(ev$call) <- parent.frame()

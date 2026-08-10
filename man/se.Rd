@@ -22,8 +22,8 @@ Object to interrogate for standard errors.
 \details{
   This function provides a generic interface for extraction of standard
   errors from objects. For \code{npregression} objects created with
-  \code{errors = FALSE}, standard errors are deliberately absent and this
-  accessor asks the user to refit or re-evaluate with \code{errors = TRUE}.
+  \code{se = FALSE}, standard errors are deliberately absent and this
+  accessor asks the user to refit or re-evaluate with \code{se = TRUE}.
 }
 \seealso{
   \code{\link{fitted}}, \code{\link{residuals}}, \code{\link{coef}},

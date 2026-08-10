@@ -114,6 +114,7 @@ lsqregression <-
            ntrain,
            trainiseval = FALSE,
            gradients = FALSE,
+           se = !(length(quanterr) == 1L && is.na(quanterr)),
            residuals = FALSE,
            resid = NA,
            call = NULL,
@@ -183,6 +184,7 @@ lsqregression <-
       ntrain = ntrain,
       trainiseval = trainiseval,
       gradients = gradients,
+      se = se,
       gradient.order = gradient.order,
       residuals = residuals,
       resid = resid,
@@ -522,6 +524,10 @@ quantile.lsqregression <- function(x, ...) {
 }
 
 se.lsqregression <- function(x) {
+  if (!isTRUE(x$se) || is.null(x$quanterr) || !length(x$quanterr) ||
+      (length(x$quanterr) == 1L && is.na(x$quanterr)))
+    stop("standard errors were not computed for this location-scale quantile regression",
+         call. = FALSE)
   x$quanterr
 }
 
@@ -551,12 +557,12 @@ residuals.lsqregression <- function(object, ...) {
   object$resid
 }
 
-gradients.lsqregression <- function(x, errors = FALSE,
+gradients.lsqregression <- function(x, se = FALSE,
                                     gradient.order = NULL, ...) {
-  errors <- npValidateScalarLogical(errors, "errors")
-  gout <- if (!errors) x$quantgrad else x$quantgerr
+  se <- npValidateScalarLogical(se, "se")
+  gout <- if (!se) x$quantgrad else x$quantgerr
   if (is.null(gout) || (length(gout) == 1L && is.logical(gout) && is.na(gout)))
-    stop(if (!errors)
+    stop(if (!se)
       "gradients are not available: fit the model with gradients=TRUE"
     else
       "gradient standard errors are not available: fit the model with gradients=TRUE")
@@ -617,7 +623,7 @@ gradients.lsqregression <- function(x, errors = FALSE,
       }
     }
     invisible(lapply(fit.list, function(fit)
-      gradients(fit, errors = errors, gradient.order = gradient.order)))
+      gradients(fit, se = se, gradient.order = gradient.order)))
   }
   gout
 }
@@ -699,6 +705,7 @@ gradients.lsqregression <- function(x, errors = FALSE,
           ntrain = nrow(txdat),
           trainiseval = FALSE,
           gradients = gradients,
+          se = need.errors,
           residuals = FALSE,
           resid = NA,
           call = NULL
@@ -767,6 +774,9 @@ predict.lsqregression <- function(object, se.fit = FALSE, ...) {
     return(out)
   }
   dots <- list(...)
+  npRejectLegacyBooleanErrors(dots, "predict.lsqregression")
+  if ("se" %in% names(dots))
+    stop("predict.lsqregression() uses se.fit=, not se=", call. = FALSE)
   has.formula.route <- !is.null(object$bws$formula)
 
   if (!is.null(dots$exdat) && !is.null(dots$newdata))
@@ -786,7 +796,8 @@ predict.lsqregression <- function(object, se.fit = FALSE, ...) {
 
   fit.args <- list(bws = object$reg.bws,
                    txdat = object$bws$xdat,
-                   tydat = object$bws$qdat)
+                   tydat = object$bws$qdat,
+                   se = se.fit)
   if (!is.null(dots$exdat))
     fit.args$exdat <- dots$exdat
   fit.args <- c(fit.args, dots[setdiff(names(dots), c("newdata", "exdat"))])

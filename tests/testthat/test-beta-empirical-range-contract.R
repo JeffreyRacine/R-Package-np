@@ -106,7 +106,7 @@ test_that("empirical-range beta gradients are finite at raw extrema", {
       bandwidth <- if (identical(bwtype, "fixed")) 0.55 else 3
       common <- list(
         txdat = training, tydat = response, exdat = evaluation,
-        bws = bandwidth, bwtype = bwtype, gradients = TRUE,
+        bws = bandwidth, bwtype = bwtype, gradients = TRUE, se = TRUE,
         regtype = "lc", ckertype = "beta", ckerorder = order
       )
       expect_warning(
@@ -131,6 +131,7 @@ test_that("empirical-range beta gradients are finite at raw extrema", {
   constant <- npreg(
     bws = 0.55, txdat = training, tydat = rep(7, nrow(training)),
     exdat = evaluation[c(1L, 3L), , drop = FALSE], gradients = TRUE,
+    se = TRUE,
     regtype = "lc", ckertype = "beta", ckerorder = 8,
     ckerbound = "range"
   )

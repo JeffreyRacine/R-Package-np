@@ -1,10 +1,10 @@
 singleindex = 
-  function(bws,  betavcov = NULL, index, mean, merr = NA,
-           grad = NA, gerr = NA,
-           mean.grad = NA, mean.gerr = NA,
+  function(bws,  betavcov = NULL, index, mean, merr = NULL,
+           grad = NA, gerr = NULL,
+           mean.grad = NA, mean.gerr = NULL,
            resid = NA,
            ntrain, trainiseval = FALSE, residuals = FALSE,
-           gradients = FALSE, xtra = NA,
+           gradients = FALSE, se = FALSE, xtra = NA,
            confusion.matrix = NA, CCR.overall = NA,
            CCR.byoutcome =  NA, fit.mcfadden = NA
            , timing = NA, total.time = NA,
@@ -41,6 +41,7 @@ singleindex =
       trainiseval = trainiseval,
       residuals = residuals,
       gradients = gradients,
+      se = se,
       R2 = xtra[1],
       MSE = xtra[2],
       MAE = xtra[3],
@@ -90,7 +91,8 @@ vcov.singleindex <- function(object, ...) {
   if(!is.null(tc)) {
     return(tc)
   } else {
-    .np_warning("variance-covariance matrix does not exist: verify gradients=TRUE")
+    stop("coefficient covariance was not computed: refit with gradients=TRUE and se=TRUE",
+         call. = FALSE)
   }
 }
 fitted.singleindex <- function(object, ...){
@@ -126,25 +128,32 @@ predict.singleindex <- function(object, se.fit = FALSE, ...) {
     return(fitted(object))
   }
 
-  tr <- do.call(npindex, c(list(bws = object$bws, errors = se.fit), dots))
+  npRejectLegacyBooleanErrors(dots, "predict.singleindex")
+  if ("se" %in% names(dots))
+    stop("predict.singleindex uses 'se.fit', not 'se'", call. = FALSE)
+  tr <- do.call(npindex, c(list(bws = object$bws, se = se.fit), dots))
   if (se.fit)
     return(list(fit = fitted(tr), se.fit = se(tr),
                 df = tr$nobs, residual.scale = tr$MSE))
   fitted(tr)
 }
-se.singleindex <- function(x){ x$merr }
-gradients.singleindex <- function(x, errors = FALSE, ...) {
-  errors <- npValidateScalarLogical(errors, "errors")
+se.singleindex <- function(x){
+  if (!isTRUE(x$se) || is.null(x$merr) || !length(x$merr))
+    stop("standard errors were not computed: refit or predict/evaluate with se=TRUE", call. = FALSE)
+  x$merr
+}
+gradients.singleindex <- function(x, se = FALSE, ...) {
+  se <- npValidateScalarLogical(se, "se")
   .np_singleindex_reject_higher_gradient_order(
     list(...),
     where = "gradients.singleindex"
   )
-  gout <- if (!errors) x$grad else x$gerr
+  gout <- if (!se) x$grad else x$gerr
   if (is.null(gout) || (length(gout) == 1L && is.logical(gout) && is.na(gout)))
-    stop(if (!errors)
+    stop(if (!se)
       "gradients are not available: fit the model with gradients=TRUE"
     else
-      "gradient standard errors are not available: fit the model with gradients=TRUE")
+      "gradient standard errors were not computed: fit the model with gradients=TRUE and se=TRUE")
   gout
 }
 

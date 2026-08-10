@@ -126,6 +126,7 @@ test_that("npreg lp mixed-degree derivatives preserve partial availability", {
       exdat = ex,
       bws = bw,
       gradients = TRUE,
+      se = TRUE,
       gradient.order = 1L
     )),
     "exceed polynomial degree"
@@ -141,7 +142,7 @@ test_that("npreg lp mixed-degree derivatives preserve partial availability", {
   )
   expect_equal(g1, fit1$grad, tolerance = 0)
   expect_warning(
-    ge1 <- gradients(fit1, errors = TRUE, gradient.order = 1L),
+    ge1 <- gradients(fit1, se = TRUE, gradient.order = 1L),
     "exceed polynomial degree"
   )
   expect_equal(ge1, fit1$gerr, tolerance = 0)
@@ -158,6 +159,7 @@ test_that("npreg lp mixed-degree derivatives preserve partial availability", {
       exdat = ex,
       bws = bw,
       gradients = TRUE,
+      se = TRUE,
       gradient.order = 2L
     )),
     "exceed polynomial degree"
@@ -174,7 +176,7 @@ test_that("npreg lp mixed-degree derivatives preserve partial availability", {
   )
   expect_equal(g2, fit2$grad, tolerance = 0)
   expect_warning(
-    ge2 <- gradients(fit2, errors = TRUE, gradient.order = 2L),
+    ge2 <- gradients(fit2, se = TRUE, gradient.order = 2L),
     "exceed polynomial degree"
   )
   expect_equal(ge2, fit2$gerr, tolerance = 0)
@@ -268,6 +270,7 @@ test_that("npreg lp gradients accessor honors stored derivative order", {
     tydat = y,
     bws = bw2,
     gradients = TRUE,
+    se = TRUE,
     gradient.order = 1L,
     warn.glp.gradient = FALSE
   ))
@@ -277,7 +280,7 @@ test_that("npreg lp gradients accessor honors stored derivative order", {
     "differs from the derivative order stored"
   )
   expect_error(
-    gradients(fit1, errors = TRUE, gradient.order = 2L),
+    gradients(fit1, se = TRUE, gradient.order = 2L),
     "differs from the derivative order stored"
   )
 
@@ -286,12 +289,13 @@ test_that("npreg lp gradients accessor honors stored derivative order", {
     tydat = y,
     bws = bw2,
     gradients = TRUE,
+    se = TRUE,
     gradient.order = 2L,
     warn.glp.gradient = FALSE
   ))
 
   expect_equal(gradients(fit2, gradient.order = 2L), fit2$grad, tolerance = 0)
-  expect_equal(gradients(fit2, errors = TRUE, gradient.order = 2L),
+  expect_equal(gradients(fit2, se = TRUE, gradient.order = 2L),
                fit2$gerr, tolerance = 0)
 
   bw1 <- npRmpi_local_regression(npregbw(
@@ -369,6 +373,7 @@ test_that("npreg lp Bernstein derivatives are returned on original scale", {
     tydat = y,
     bws = bw,
     gradients = TRUE,
+    se = TRUE,
     gradient.order = 2L,
     warn.glp.gradient = FALSE
   ))
@@ -376,6 +381,6 @@ test_that("npreg lp Bernstein derivatives are returned on original scale", {
   expect_equal(as.vector(fitted(fit)), y, tolerance = 1e-8)
   expect_equal(as.vector(gradients(fit, gradient.order = 2L)[, 1L]),
                rep(6, n), tolerance = 1e-8)
-  expect_true(all(is.finite(gradients(fit, errors = TRUE,
+  expect_true(all(is.finite(gradients(fit, se = TRUE,
                                       gradient.order = 2L)[, 1L])))
 })

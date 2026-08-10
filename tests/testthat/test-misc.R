@@ -30,7 +30,7 @@ test_that("se and gradients methods work", {
   data("cps71")
   cps71_sub <- cps71[1:50, ]
   bw <- npregbw(logwage~age, data=cps71_sub, bws=1.0, bandwidth.compute=FALSE)
-  model <- npreg(bws=bw, gradients=TRUE)
+  model <- npreg(bws=bw, gradients=TRUE, se=TRUE)
   
   expect_type(se(model), "double")
   expect_length(se(model), 50)

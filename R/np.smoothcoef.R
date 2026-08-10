@@ -1,6 +1,7 @@
 npscoef <-
   function(bws, ...){
     args <- list(...)
+    npRejectLegacyBooleanErrors(args, "npscoef")
 
     if (!missing(bws)){
       if (is.recursive(bws)){
@@ -21,7 +22,12 @@ npscoef <-
   }
 
 npscoef.formula <-
-  function(bws, data = NULL, newdata = NULL, y.eval = FALSE, ...){
+  function(bws, data = NULL, newdata = NULL, y.eval = FALSE,
+           se = FALSE, ...){
+
+    dots <- list(...)
+    npRejectLegacyBooleanErrors(dots, "npscoef")
+    se <- npValidateScalarLogical(se, "se")
 
     tt <- terms(bws)
     m <- match(c("formula", "data", "subset", "na.action"),
@@ -93,7 +99,7 @@ npscoef.formula <-
         sc.args$ezdat <- ezdat
     }
     sc.args$bws <- bws
-    ev <- do.call(npscoef, c(sc.args, list(...)))
+    ev <- do.call(npscoef, c(sc.args, list(se = se), dots))
 
     if (length(response.name) == 1L && !is.na(response.name) && nzchar(response.name)) {
       if (!is.null(ev$bws))
@@ -145,11 +151,14 @@ npscoef.call <-
   isa(bws, "scbandwidth") && identical(bws$type, "adaptive_nn")
 }
 
-npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
+npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
+                            se = FALSE, ...) {
   .npRmpi_require_active_slave_pool(where = "npscoef()")
   explicit.scbandwidth <- (!missing(bws)) && inherits(bws, "scbandwidth")
   formula.forwarded <- (!missing(txdat)) && inherits(txdat, "formula")
   nomad <- npValidateNomadControl(nomad, "nomad")
+  npRejectLegacyBooleanErrors(list(...), "npscoef")
+  se <- npValidateScalarLogical(se, "se")
   degree.select.value <- if (npNomadControlRequested(nomad)) {
     "coordinate"
   } else if ("degree.select" %in% names(list(...))) {
@@ -198,6 +207,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
   sc.bw <- sc
   
   sc.bw[[1]] <- quote(npscoefbw)
+  sc.bw$se <- NULL
 
   bws.formula <- (!no.bws) && inherits(bws, "formula")
   if (bws.formula) {
@@ -260,7 +270,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
   }
   if (!has.explicit.bws)
     call.args$.np_fit_progress_handoff <- TRUE
-  do.call(npscoef, c(call.args, list(...)))
+  do.call(npscoef, c(call.args, list(se = se), list(...)))
 
 }
 
@@ -273,7 +283,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
            eydat,
            ezdat,
            betas = FALSE,
-           errors = TRUE,
+           se = FALSE,
            iterate = TRUE,
            leave.one.out = FALSE,
            maxiter = 100,
@@ -283,7 +293,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
 
     fit.start <- proc.time()[3]
     residuals <- npValidateScalarLogical(residuals, "residuals")
-    errors <- npValidateScalarLogical(errors, "errors")
+    se <- npValidateScalarLogical(se, "se")
     iterate <- npValidateScalarLogical(iterate, "iterate")
     leave.one.out <- npValidateScalarLogical(leave.one.out, "leave.one.out")
     betas <- npValidateScalarLogical(betas, "betas")
@@ -333,7 +343,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
     ## if miss.ex then if !miss.ey then ey and tx must match, to get
     ## oos errors alternatively if miss.ey you get is errors if
     ## !miss.ex then if !miss.ey then ey and ex must match, to get oos
-    ## errors alternatively if miss.ey you get NO errors since we
+    ## se alternatively if miss.ey you get NO errors since we
     ## don't evaluate on the training data
 
     txdat <- toFrame(txdat)
@@ -985,13 +995,13 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
       SIGN = SIGNfunc(tydat, mean)
     }
 
-    if (errors && do.iterate) {
+    if (se && do.iterate) {
       .np_warning("standard errors are not available for iterated npscoef fits; returning fitted values without merr/gerr")
-      errors <- FALSE
+      se <- FALSE
     }
 
-    if (errors || (residuals && miss.ex)) {
-      if (errors) {
+    if (se || (residuals && miss.ex)) {
+      if (se) {
         if (fast.largeh.lc) {
           if (miss.ex) {
             train.solve <- fast.solve
@@ -1118,9 +1128,9 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
       }
     }
 
-    if (!errors)
+    if (!se)
       beta.se <- NULL
-    if(errors && !fast.largeh){
+    if(se && !fast.largeh){
       u2 <- as.double(u2.W)
       merr <- rep(NA_real_, enrow)
       beta.se <- matrix(NA_real_, nrow = enrow, ncol = nrow(coef.mat))
@@ -1154,14 +1164,15 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
       mean = mean,
       residuals = residuals,
       betas = betas,
+      se = se,
       ntrain = nrow(txdat),
       trainiseval = miss.ex
     )
-    if (errors && !do.iterate)
+    if (se && !do.iterate)
       sc.obj.args$merr <- merr
     if (ncol(txdat) > 0L) {
       sc.obj.args$grad <- t(coef.mat[-1,,drop = FALSE])
-      if (errors && !do.iterate && !is.null(beta.se))
+      if (se && !do.iterate && !is.null(beta.se))
         sc.obj.args$gerr <- beta.se[, -1, drop = FALSE]
     }
     if (betas)
@@ -1197,15 +1208,16 @@ npscoef.scbandwidth <-
            eydat,
            ezdat,
            betas = FALSE,
-           errors = TRUE,
+           se = FALSE,
            iterate = TRUE,
            leave.one.out = FALSE,
            maxiter = 100,
            residuals = FALSE,
            tol = .Machine$double.eps,
            ...){
+    npRejectLegacyBooleanErrors(list(...), "npscoef")
     residuals <- npValidateScalarLogical(residuals, "residuals")
-    errors <- npValidateScalarLogical(errors, "errors")
+    se <- npValidateScalarLogical(se, "se")
     iterate <- npValidateScalarLogical(iterate, "iterate")
     leave.one.out <- npValidateScalarLogical(leave.one.out, "leave.one.out")
     betas <- npValidateScalarLogical(betas, "betas")
@@ -1242,7 +1254,7 @@ npscoef.scbandwidth <-
       eydat = eydat,
       ezdat = ezdat,
       betas = betas,
-      errors = errors,
+      se = se,
       iterate = iterate,
       leave.one.out = leave.one.out,
       maxiter = maxiter,

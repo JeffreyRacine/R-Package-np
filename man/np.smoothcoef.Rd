@@ -25,6 +25,7 @@ npscoef(bws, \dots)
         data = NULL, 
         newdata = NULL, 
         y.eval = FALSE, 
+        se = FALSE,
         \dots)
 
 
@@ -33,6 +34,7 @@ npscoef(bws, \dots)
         tydat, 
         tzdat, 
         nomad = FALSE, 
+        se = FALSE,
         \dots)
 
 \method{npscoef}{scbandwidth}(bws,
@@ -43,7 +45,7 @@ npscoef(bws, \dots)
         eydat,
         ezdat,
         betas = FALSE,
-        errors = TRUE,
+        se = FALSE,
         iterate = TRUE,
         leave.one.out = FALSE,
         maxiter = 100,
@@ -184,10 +186,10 @@ These arguments control returned coefficient estimates, errors, residuals, and i
   }
 
 
-  \item{errors}{
+  \item{se}{
     a logical value indicating whether or not asymptotic standard errors
     should be computed and returned in the resulting
-    \code{smoothcoefficient} object. Defaults to \code{TRUE}.
+    \code{smoothcoefficient} object. Defaults to \code{FALSE}.
   }
 
 
@@ -252,7 +254,7 @@ Further arguments are passed to the bandwidth-selection counterpart when bandwid
   \item{eval}{ evaluation points }
   \item{mean}{ estimation of the regression function (conditional mean) at the
     evaluation points }
-  \item{merr}{ if \code{errors = TRUE}, standard errors of the
+  \item{merr}{ if \code{se = TRUE}, standard errors of the
     regression estimates }
   \item{beta}{ if \code{betas = TRUE}, estimates of the coefficients
     \eqn{\gamma}{gamma} at the
@@ -260,7 +262,7 @@ Further arguments are passed to the bandwidth-selection counterpart when bandwid
   \item{grad}{ estimated derivatives of the conditional mean with
     respect to the regressors in \code{xdat}; these correspond to the
     non-intercept smooth coefficient estimates at each evaluation point}
-  \item{gerr}{ if \code{errors = TRUE}, asymptotic standard errors for
+  \item{gerr}{ if \code{se = TRUE}, asymptotic standard errors for
     \code{grad} }
   \item{resid}{ if \code{residuals = TRUE}, in-sample or out-of-sample
     residuals where appropriate (or possible) }

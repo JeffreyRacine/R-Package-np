@@ -19,7 +19,7 @@ test_that("semiparametric formula estimators reject malformed newdata and retain
   bw.si <- npindexbw(y ~ x1 + x2, data = dat,
                      bws = c(0.25, 0.25, 1),
                      bandwidth.compute = FALSE)
-  fit.si <- npindex(bws = bw.si, gradients = TRUE, errors = TRUE)
+  fit.si <- npindex(bws = bw.si, gradients = TRUE, se = TRUE)
   expect_error(npindex(bws = bw.si, newdata = data.frame(q = 1:2)),
                "newdata must contain columns")
   expect_error(predict(fit.si, newdata = data.frame(q = 1:2)),
@@ -33,14 +33,14 @@ test_that("semiparametric formula estimators reject malformed newdata and retain
   )
   expect_error(predict(fit.si, se.fit = "yes"),
                "'se.fit' must be TRUE or FALSE", fixed = TRUE)
-  expect_error(gradients(fit.si, errors = "yes"),
-               "'errors' must be TRUE or FALSE", fixed = TRUE)
+  expect_error(gradients(fit.si, se = "yes"),
+               "'se' must be TRUE or FALSE", fixed = TRUE)
 
   bw.sc <- npscoefbw(y ~ x1 | z, data = dat, bws = 0.25,
                      bandwidth.compute = FALSE)
-  fit.sc <- npscoef(bws = bw.sc, errors = TRUE, iterate = FALSE)
+  fit.sc <- npscoef(bws = bw.sc, se = TRUE, iterate = FALSE)
   expect_error(npscoef(bws = bw.sc, newdata = data.frame(q = 1:2),
-                       errors = FALSE, iterate = FALSE),
+                       se = FALSE, iterate = FALSE),
                "newdata must contain columns")
   expect_error(predict(fit.sc, newdata = data.frame(q = 1:2)),
                "newdata must contain columns")

@@ -102,19 +102,18 @@
   original sibling kernels, avoiding nested ownership and adjacent timing
   regressions.
 
-* `npreg()` now accepts `errors = TRUE`. The unchanged default computes and
-  retains mean and gradient standard errors as before; `errors = FALSE`
-  requests fitted values and optional gradients without constructing the
-  unrequested standard-error moments, projections, solves, or native output
-  vectors. `predict(..., se.fit = FALSE)` and internal regression evaluators
-  use the corresponding lean request, while `se()` and
-  `gradients(..., errors = TRUE)` give a direct refit message when errors were
-  deliberately omitted. All four mean/SE/gradient request combinations share
-  the canonical scalar, local-polynomial, bounded-beta, and MPI regression
-  engines; bandwidth selection and objective functions are unchanged. The new
-  control is forwarded through the historical `npreg(bws, ...)` generic so
-  formula calls that also supply `bws` and all pre-existing positional method
-  arguments retain their established dispatch.
+* Fit and evaluation uncertainty now use one request vocabulary: `se = FALSE`
+  for `npreg()`, `npscoef()`, `npindex()`, and `nplsqreg()`;
+  `se.fit = FALSE` for
+  prediction; and `gradients(..., se = FALSE)` for gradient standard errors.
+  The former Boolean estimation argument `errors` is intentionally rejected
+  with a migration message, while plot methods retain their method-valued
+  `errors` control. Explicit `se = TRUE` reproduces the previous uncertainty
+  arithmetic; the default avoids unrequested moments, bootstrap work,
+  covariance assembly, and native output vectors. `se()`, `vcov()`, and
+  gradient-SE extraction fail helpfully when the required state was not
+  computed. Bandwidth objectives, MPI ownership, and plot interval semantics
+  are unchanged.
 
 * Conditional density and distribution kernel summaries now identify
   explanatory and dependent kernels separately for continuous, unordered, and

@@ -29,7 +29,7 @@ npindexhat_lp_gradient_owner_case <- function() {
     "for (cfg in cases) {",
     "  bw.args <- list(xdat = tx, ydat = y, regtype = 'lp', degree = cfg$degree, basis = cfg$basis, bernstein.basis = cfg$bern, bwtype = cfg$bwtype, bandwidth.compute = FALSE, bws = cfg$bws)",
     "  bw <- do.call(npindexbw, bw.args)",
-    "  fit.grad <- npindex(bws = bw, txdat = tx, tydat = y, exdat = ex, gradients = TRUE, errors = FALSE)",
+    "  fit.grad <- npindex(bws = bw, txdat = tx, tydat = y, exdat = ex, gradients = TRUE, se = FALSE)",
     "  apply.grad <- npindexhat(bws = bw, txdat = tx, exdat = ex, y = y, output = 'apply', s = 1L)",
     "  matrix.grad <- npindexhat(bws = bw, txdat = tx, exdat = ex, output = 'matrix', s = 1L)",
     "  stopifnot(isTRUE(all.equal(as.vector(apply.grad), as.vector(fit.grad$grad[, 1L]), tolerance = 1e-8)))",

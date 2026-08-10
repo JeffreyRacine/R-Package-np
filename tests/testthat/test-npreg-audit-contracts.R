@@ -25,8 +25,9 @@ test_that("npreg formula bandwidth honors explicit data override", {
     bw <- npRmpi::npregbw(y ~ x, data = d1, bws = 0.35, bandwidth.compute = FALSE)
     d1$y <- 100 + d1$x
 
-    fit <- npRmpi::npreg(bws = bw, data = d2)
-    direct <- npRmpi::npreg(txdat = d2["x"], tydat = d2$y, bws = bw)
+    fit <- npRmpi::npreg(bws = bw, data = d2, se = TRUE)
+    direct <- npRmpi::npreg(txdat = d2["x"], tydat = d2$y, bws = bw,
+                            se = TRUE)
 
     expect_identical(fit$ntrain, nrow(d2))
     expect_equal(fit$mean, direct$mean, tolerance = 1e-12)
@@ -120,7 +121,8 @@ test_that("npreg factor response and external-evaluation GOF sentinels remain st
     ex <- data.frame(x = seq(0.05, 0.95, length.out = 9))
     ey <- factor(rep(c("c", "a", "b"), length.out = 9), levels = levels(ty))
     bw.factor <- npRmpi::npregbw(xdat = tx, ydat = ty, bws = 0.4, bandwidth.compute = FALSE)
-    fit.factor <- npRmpi::npreg(bws = bw.factor, txdat = tx, tydat = ty, exdat = ex, eydat = ey)
+    fit.factor <- npRmpi::npreg(bws = bw.factor, txdat = tx, tydat = ty,
+                                exdat = ex, eydat = ey, se = TRUE)
     expect_equal(length(fit.factor$mean), nrow(ex))
     expect_equal(length(fit.factor$merr), nrow(ex))
     expect_null(fit.factor$xtra)
@@ -128,7 +130,8 @@ test_that("npreg factor response and external-evaluation GOF sentinels remain st
 
     y <- 1 + tx$x + rnorm(nrow(tx), sd = 0.01)
     bw.numeric <- npRmpi::npregbw(xdat = tx, ydat = y, bws = 0.35, bandwidth.compute = FALSE)
-    fit.no.ey <- npRmpi::npreg(bws = bw.numeric, txdat = tx, tydat = y, exdat = ex)
+    fit.no.ey <- npRmpi::npreg(bws = bw.numeric, txdat = tx, tydat = y,
+                               exdat = ex, se = TRUE)
     expect_equal(length(fit.no.ey$mean), nrow(ex))
     expect_equal(length(fit.no.ey$merr), nrow(ex))
     expect_null(fit.no.ey$xtra)
@@ -151,8 +154,10 @@ test_that("npreg compact kernels remain finite for far external evaluation", {
       bandwidth.compute = FALSE,
       ckertype = "uniform"
     )
-    mean.fit <- npRmpi::npreg(bws = bw, txdat = tx, tydat = ty, exdat = ex)
-    grad.fit <- npRmpi::npreg(bws = bw, txdat = tx, tydat = ty, exdat = ex, gradients = TRUE)
+    mean.fit <- npRmpi::npreg(bws = bw, txdat = tx, tydat = ty, exdat = ex,
+                              se = TRUE)
+    grad.fit <- npRmpi::npreg(bws = bw, txdat = tx, tydat = ty, exdat = ex,
+                              gradients = TRUE, se = TRUE)
 
     expect_true(all(is.finite(mean.fit$mean)))
     expect_true(all(is.finite(mean.fit$merr)))
