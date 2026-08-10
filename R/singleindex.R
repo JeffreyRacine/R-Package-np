@@ -143,9 +143,11 @@ se.singleindex <- function(x){
   x$merr
 }
 gradients.singleindex <- function(x, se = FALSE, ...) {
+  dots <- list(...)
+  npRejectLegacyBooleanErrors(dots, "gradients.singleindex")
   se <- npValidateScalarLogical(se, "se")
   .np_singleindex_reject_higher_gradient_order(
-    list(...),
+    dots,
     where = "gradients.singleindex"
   )
   gout <- if (!se) x$grad else x$gerr

@@ -137,6 +137,7 @@ se.qregression <- function(x) {
   x$quanterr
 }
 gradients.qregression <- function(x, se = FALSE, ...) {
+  npRejectLegacyBooleanErrors(list(...), "gradients.qregression")
   se <- npValidateScalarLogical(se, "se")
   gout <- if (!se) x$quantgrad else x$quantgerr
   if (is.null(gout) || (length(gout) == 1L && is.logical(gout) && is.na(gout)))

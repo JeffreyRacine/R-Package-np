@@ -104,6 +104,7 @@ print.plregression <- function(x, digits=NULL, ...){
 }
 
 coef.plregression <- function(object, se = FALSE, ...) {
+  npRejectLegacyBooleanErrors(list(...), "coef.plregression")
   se <- npValidateScalarLogical(se, "se")
   if(!se)
     return(object$xcoef)
