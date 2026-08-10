@@ -210,7 +210,7 @@
     !is.na(attach.rank) && attach.rank != 0L
 }
 
-.np_progress_with_nested_bandwidth_forwarding <- function(expr) {
+.np_progress_with_nested_bandwidth_heartbeat <- function(expr) {
   old.state <- .np_progress_runtime$bandwidth_state
   old.forward.active <- isTRUE(.np_progress_runtime$bandwidth_forward_active)
   old.forward.state <- .np_progress_runtime$bandwidth_forward_state
@@ -1900,6 +1900,13 @@
     .np_progress_runtime$bandwidth_forward_state
   } else {
     .np_progress_runtime$bandwidth_state
+  }
+
+  ## A nested bandwidth leaf reports activity, not ownership of the outer
+  ## objective counter.  Retain the parent's evolving heartbeat state while
+  ## preventing child-local counters from replacing the displayed outer count.
+  if (forwarding) {
+    done <- NULL
   }
 
   if (isTRUE(state$nomad_native_progress)) {
