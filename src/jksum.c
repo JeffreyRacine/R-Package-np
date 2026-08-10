@@ -15591,8 +15591,8 @@ static void np_lp_mirror_sparse_moments_wide(double *moments,
 } while(0)
 
 #define NP_LP_ACCUMULATE_MOVING_ROW3() do {                                 \
-  double * const np_si = moments + (size_t)orig_ii*9;                        \
-  double * const np_ti = rhs + (size_t)orig_ii*3;                            \
+  double * const np_si = moments + (size_t)ii*9;                             \
+  double * const np_ti = rhs + (size_t)ii*3;                                 \
   np_ti[0] += w*eval_ybasis[0];                                             \
   np_ti[1] += w*eval_ybasis[1];                                             \
   np_ti[2] += w*eval_ybasis[2];                                             \
@@ -15928,8 +15928,14 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
       goto cleanup_sparse;
   }
 
+  /*
+   * Non-MPI sparse pairs stay in tree order so leaf enumeration and symmetric
+   * partner-row stores are contiguous. MPI retains original-row ownership;
+   * ranks already keep complete owned rows resident and never update partners.
+   */
   for(j = 0; j < (use_mpi_transport ? num_obs : (num_obs - 1)); j++){
-    const int eval_idx = ipt_lookup_extern_X[j];
+    const int eval_idx = use_mpi_transport ? ipt_lookup_extern_X[j] : j;
+    const int orig_j = use_mpi_transport ? j : ipt_extern_X[j];
     const double yj = vector_Y[eval_idx];
     double row_moment0 = 0.0, row_moment1 = 0.0, row_moment2 = 0.0;
     double row_moment4 = 0.0, row_moment5 = 0.0, row_moment8 = 0.0;
@@ -16081,7 +16087,7 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
           if(use_mpi_transport){
             if(orig_ii == j)
               continue;
-          } else if(orig_ii <= j) {
+          } else if(ii <= j) {
             continue;
           }
 
@@ -16100,8 +16106,8 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
                                       support_data,
                                       support_weight);
               if(!use_mpi_transport)
-                np_lp_cvls_support_add(orig_ii,
-                                        j,
+                np_lp_cvls_support_add(ii,
+                                        orig_j,
                                         eval_idx,
                                         w,
                                         nterms,
@@ -16133,7 +16139,7 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
                                                              resident_rhs,
                                                              eval_ybasis,
                                                              eval_outer,
-                                                             orig_ii,
+                                                             ii,
                                                              ii,
                                                              w);
               }
@@ -16155,7 +16161,7 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
                                      j,
                                      eval_ybasis,
                                      eval_outer,
-                                     orig_ii,
+                                     ii,
                                      ii,
                                      w);
             }
@@ -16187,7 +16193,7 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
         if(use_mpi_transport){
           if(orig_ii == j)
             continue;
-        } else if(orig_ii <= j) {
+        } else if(ii <= j) {
           continue;
         }
 
@@ -16223,8 +16229,8 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
                                     support_data,
                                     support_weight);
             if(!use_mpi_transport)
-              np_lp_cvls_support_add(orig_ii,
-                                      j,
+              np_lp_cvls_support_add(ii,
+                                      orig_j,
                                       eval_idx,
                                       w,
                                       nterms,
@@ -16266,7 +16272,7 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
                                                            resident_rhs,
                                                            eval_ybasis,
                                                            eval_outer,
-                                                           orig_ii,
+                                                           ii,
                                                            ii,
                                                            w);
             }
@@ -16288,7 +16294,7 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
                                    j,
                                    eval_ybasis,
                                    eval_outer,
-                                   orig_ii,
+                                   ii,
                                    ii,
                                    w);
           }
@@ -16312,8 +16318,8 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
       const int orig_start = use_mpi_transport ? 0 : (j + 1);
       oracle_rows++;
       for(orig_ii = orig_start; orig_ii < num_obs; orig_ii++){
-        const int ii = ipt_lookup_extern_X[orig_ii];
-        if(orig_ii == j)
+        const int ii = use_mpi_transport ? ipt_lookup_extern_X[orig_ii] : orig_ii;
+        if(use_mpi_transport && (orig_ii == j))
           continue;
         if((kw_oracle[ii] != 0.0) && (oracle_mark[ii] != oracle_token))
           oracle_missing++;
@@ -16942,9 +16948,10 @@ lp_cv_collective_gate:
       np_progress_bandwidth_loop_step();
 
     const int eval_idx = use_tree ? ipt_lookup_extern_X[j] : j;
-    const double * const sj = moments + (size_t)j*(size_t)nterms*(size_t)nterms;
-    const double * const tj = rhs + (size_t)j*(size_t)nterms;
-    const size_t soff = (size_t)j*(size_t)nterms;
+    const int row_idx = (use_sparse_tree && !use_mpi_transport) ? eval_idx : j;
+    const double * const sj = moments + (size_t)row_idx*(size_t)nterms*(size_t)nterms;
+    const double * const tj = rhs + (size_t)row_idx*(size_t)nterms;
+    const size_t soff = (size_t)row_idx*(size_t)nterms;
     double nepsilon = 0.0;
     double fit = 0.0;
 
@@ -16973,9 +16980,9 @@ lp_cv_collective_gate:
     }
 
     if(track_lowsupport &&
-       (support_count[j] <= nterms) &&
+       (support_count[row_idx] <= nterms) &&
        np_lp_cvls_lowsupport_fit(nterms,
-                                  support_count[j],
+                                  support_count[row_idx],
                                   basis,
                                   vector_Y,
                                   eval_idx,
