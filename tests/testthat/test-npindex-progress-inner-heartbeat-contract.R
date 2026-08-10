@@ -1,4 +1,4 @@
-test_that("npindex LP via-npreg evaluators preserve outer bandwidth progress state", {
+test_that("npindex LP via-npreg evaluators forward heartbeat but not child counters", {
   runtime <- getFromNamespace(".np_progress_runtime", "np")
   old.state <- runtime$bandwidth_state
   old.forward.active <- runtime$bandwidth_forward_active
@@ -24,15 +24,29 @@ test_that("npindex LP via-npreg evaluators preserve outer bandwidth progress sta
     enabled = FALSE,
     known_total = FALSE,
     nomad_native_progress = FALSE,
+    label = "Bandwidth selection",
+    progress_provider = "npindex",
+    degree = c(1L, 2L),
+    bandwidth_multistart_current = 1L,
     current = 2L,
+    last_done = 2L,
     total = 5L
   )
+
+  seen.done <- list()
+  heartbeat.step <- function(state, now, done = NULL, detail = NULL, force = FALSE) {
+    seen.done <<- c(seen.done, list(done))
+    state$heartbeat_calls <- if (is.null(state$heartbeat_calls)) 1L else state$heartbeat_calls + 1L
+    state
+  }
 
   with_np_progress_bindings(
     list(
       .npindexbw_lp_regression_leaf = build.leaf,
+      .np_progress_step_at = heartbeat.step,
       .npregbw_eval_only = function(...) {
         getFromNamespace(".np_progress_bandwidth_activity_step", "np")(done = 3L)
+        getFromNamespace(".np_progress_bandwidth_activity_step", "np")(done = 99L)
         runtime$bandwidth_state <- list(id = "inner-npreg", current = 1L)
         list(objective = 1.25, num.feval.fast = 3L)
       }
@@ -49,7 +63,10 @@ test_that("npindex LP via-npreg evaluators preserve outer bandwidth progress sta
       )
 
       expect_identical(runtime$bandwidth_state$id, "outer-npindex")
-      expect_identical(runtime$bandwidth_state$last_done, 3L)
+      expect_identical(runtime$bandwidth_state$last_done, 2L)
+      expect_identical(runtime$bandwidth_state[names(outer.state)], outer.state)
+      expect_identical(runtime$bandwidth_state$heartbeat_calls, 2L)
+      expect_identical(seen.done, list(NULL, NULL))
       expect_false(runtime$bandwidth_forward_active)
       expect_equal(out$objective, 1.25)
       expect_equal(out$num.feval.fast, 3)
@@ -59,6 +76,7 @@ test_that("npindex LP via-npreg evaluators preserve outer bandwidth progress sta
   with_np_progress_bindings(
     list(
       .npindexbw_lp_regression_leaf = build.leaf,
+      .np_progress_step_at = heartbeat.step,
       .npregbw_eval_only = function(...) {
         getFromNamespace(".np_progress_bandwidth_activity_step", "np")(done = 4L)
         runtime$bandwidth_state <- list(id = "inner-npreg", current = 1L)
@@ -77,7 +95,8 @@ test_that("npindex LP via-npreg evaluators preserve outer bandwidth progress sta
       )
 
       expect_identical(runtime$bandwidth_state$id, "outer-npindex")
-      expect_identical(runtime$bandwidth_state$last_done, 4L)
+      expect_identical(runtime$bandwidth_state$last_done, 2L)
+      expect_identical(runtime$bandwidth_state[names(outer.state)], outer.state)
       expect_false(runtime$bandwidth_forward_active)
       expect_equal(out$objective, 77)
       expect_equal(out$num.feval.fast, 0)

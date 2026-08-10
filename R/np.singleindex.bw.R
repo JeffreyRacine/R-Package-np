@@ -717,7 +717,7 @@ npindexbw.NULL <-
   )
 
   out <- tryCatch(
-    .np_progress_with_nested_bandwidth_forwarding(
+    .np_progress_with_nested_bandwidth_heartbeat(
       .npregbw_eval_only(
         xdat = leaf$xdat,
         ydat = ydat,
@@ -755,7 +755,7 @@ npindexbw.NULL <-
   )
 
   out <- tryCatch(
-    .np_progress_with_nested_bandwidth_forwarding(
+    .np_progress_with_nested_bandwidth_heartbeat(
       .npregbw_eval_only(
         xdat = leaf$xdat,
         ydat = ydat,
