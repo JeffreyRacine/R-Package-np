@@ -14629,8 +14629,8 @@ static void np_lp_mirror_sparse_moments_wide(double *moments,
   const double np_wb0 = w*np_b0;                                            \
   const double np_wb1 = w*np_b1;                                            \
   const double np_wb2 = w*np_b2;                                            \
-  double * const np_si = moments + (size_t)orig_ii*9;                        \
-  double * const np_ti = rhs + (size_t)orig_ii*3;                            \
+  double * const np_si = moments + (size_t)ii*9;                             \
+  double * const np_ti = rhs + (size_t)ii*3;                                 \
   row_rhs0 += np_wb0*np_yi;                                                 \
   row_rhs1 += np_wb1*np_yi;                                                 \
   row_rhs2 += np_wb2*np_yi;                                                 \
@@ -14935,8 +14935,15 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
       goto cleanup_sparse;
   }
 
+  /*
+   * Keep sparse-tree rows and their symmetric partner updates in tree order.
+   * Tree support arrives in contiguous tree leaves; writing partner rows in
+   * original-observation order needlessly scattered the hot Gram/RHS stores.
+   * The common finisher maps each original observation back to its tree row.
+   */
   for(j = 0; j < num_obs - 1; j++){
-    const int eval_idx = ipt_lookup_extern_X[j];
+    const int eval_idx = j;
+    const int orig_j = ipt_extern_X[j];
     const double yj = vector_Y[eval_idx];
     double scalar_moment = 0.0;
     double scalar_rhs = 0.0;
@@ -15089,7 +15096,7 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
            * CVLS accumulates each unordered pair once.  Reject lower-triangle
            * and self pairs before evaluating compact-support weights.
            */
-          if(orig_ii <= j)
+          if(ii <= j)
             continue;
 
           w = np_lp_cont_weight_scaled(kc0,
@@ -15106,8 +15113,8 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
                                       support_orig,
                                       support_data,
                                       support_weight);
-              np_lp_cvls_support_add(orig_ii,
-                                      j,
+              np_lp_cvls_support_add(ii,
+                                      orig_j,
                                       eval_idx,
                                       w,
                                       nterms,
@@ -15123,7 +15130,7 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
                                                &scalar_moment,
                                                &scalar_rhs,
                                                yj,
-                                               orig_ii,
+                                               ii,
                                                ii,
                                                w);
             } else if(nterms == 3){
@@ -15138,7 +15145,7 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
                                                            resident_rhs,
                                                            eval_ybasis,
                                                            eval_outer,
-                                                           orig_ii,
+                                                           ii,
                                                            ii,
                                                            w);
             } else {
@@ -15150,7 +15157,7 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
                                      j,
                                      eval_ybasis,
                                      eval_outer,
-                                     orig_ii,
+                                     ii,
                                      ii,
                                      w);
             }
@@ -15192,7 +15199,7 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
          * CVLS accumulates each unordered pair once.  Reject lower-triangle
          * and self pairs before evaluating compact-support weights.
          */
-        if(orig_ii <= j)
+        if(ii <= j)
           continue;
 
         const double w = np_lp_tree_support_weight(&sctx,
@@ -15226,8 +15233,8 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
                                     support_orig,
                                     support_data,
                                     support_weight);
-            np_lp_cvls_support_add(orig_ii,
-                                    j,
+            np_lp_cvls_support_add(ii,
+                                    orig_j,
                                     eval_idx,
                                     w,
                                     nterms,
@@ -15253,7 +15260,7 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
                                              &scalar_moment,
                                              &scalar_rhs,
                                              yj,
-                                             orig_ii,
+                                             ii,
                                              ii,
                                              w);
           } else if(nterms == 3){
@@ -15268,7 +15275,7 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
                                                          resident_rhs,
                                                          eval_ybasis,
                                                          eval_outer,
-                                                         orig_ii,
+                                                         ii,
                                                          ii,
                                                          w);
           } else {
@@ -15280,7 +15287,7 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
                                    j,
                                    eval_ybasis,
                                    eval_outer,
-                                   orig_ii,
+                                   ii,
                                    ii,
                                    w);
           }
@@ -15312,7 +15319,7 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
       int orig_ii;
       oracle_rows++;
       for(orig_ii = j + 1; orig_ii < num_obs; orig_ii++){
-        const int ii = ipt_lookup_extern_X[orig_ii];
+        const int ii = orig_ii;
         if((kw_oracle[ii] != 0.0) && (oracle_mark[ii] != oracle_token))
           oracle_missing++;
       }
@@ -15751,9 +15758,10 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
       np_progress_bandwidth_loop_step();
 
     const int eval_idx = use_tree ? ipt_lookup_extern_X[j] : j;
-    const double * const sj = moments + (size_t)j*(size_t)nterms*(size_t)nterms;
-    const double * const tj = rhs + (size_t)j*(size_t)nterms;
-    const size_t soff = (size_t)j*(size_t)nterms;
+    const int row_idx = use_sparse_tree ? eval_idx : j;
+    const double * const sj = moments + (size_t)row_idx*(size_t)nterms*(size_t)nterms;
+    const double * const tj = rhs + (size_t)row_idx*(size_t)nterms;
+    const size_t soff = (size_t)row_idx*(size_t)nterms;
     double nepsilon = 0.0;
     double fit = 0.0;
 
@@ -15782,9 +15790,9 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
     }
 
     if(track_lowsupport &&
-       (support_count[j] <= nterms) &&
+       (support_count[row_idx] <= nterms) &&
        np_lp_cvls_lowsupport_fit(nterms,
-                                  support_count[j],
+                                  support_count[row_idx],
                                   basis,
                                   vector_Y,
                                   eval_idx,

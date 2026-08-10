@@ -157,9 +157,7 @@ test_that("npregbw cv.ls fixed LP stream does not route through legacy tree rows
       bw.lp,
       ncon = bw.lp$ncon,
       ncat = bw.lp$nuno + bw.lp$nord,
-      regtype.engine = bw.lp[["regtype.engine"]],
-      basis.engine = bw.lp[["basis"]],
-      degree.engine = bw.lp[["degree"]]
+      regtype.engine = bw.lp[["regtype.engine"]]
     ),
     np:::DO_TREE_YES
   )
@@ -168,9 +166,7 @@ test_that("npregbw cv.ls fixed LP stream does not route through legacy tree rows
       bw.lc,
       ncon = bw.lc$ncon,
       ncat = bw.lc$nuno + bw.lc$nord,
-      regtype.engine = bw.lc[["regtype.engine"]],
-      basis.engine = bw.lc[["basis"]],
-      degree.engine = bw.lc[["degree"]]
+      regtype.engine = bw.lc[["regtype.engine"]]
     ),
     np:::DO_TREE_YES
   )

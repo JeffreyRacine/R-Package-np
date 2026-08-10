@@ -537,9 +537,7 @@ nplsqregbw <-
     regtype = reg.c$code,
     int_do_tree = .npregbw_tree_code(bws, ncon = bws$ncon,
                                      ncat = bws$nuno + bws$nord,
-                                     regtype.engine = reg.spec$regtype.engine,
-                                     basis.engine = reg.spec$basis.engine,
-                                     degree.engine = reg.spec$degree.engine),
+                                     regtype.engine = reg.spec$regtype.engine),
     scale.init.categorical.sample = scale.init.categorical.sample,
     dfc.dir = opt.value("dfc.dir", 3),
     transform.bounds = transform.bounds
