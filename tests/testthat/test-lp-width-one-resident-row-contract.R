@@ -220,6 +220,11 @@ test_that("scalar fixed objectives enter the resident LP0 owner without a basis"
     fixed = TRUE
   ))
   expect_true(grepl(
+    "((bwm == RBWM_CVKS) && ks_tree_use &&",
+    source,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
     "np_regression_cv_lp_basis_fixed(bwm",
     scalar_owner,
     fixed = TRUE

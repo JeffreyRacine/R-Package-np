@@ -14297,8 +14297,10 @@ static inline int np_reg_cv_scalar_use_resident_fixed(
     const int ks_tree_use){
   return (BANDWIDTH_reg == BW_FIXED) &&
     (num_reg_continuous > 0) &&
-    ((bwm == RBWM_CVLS) || (bwm == RBWM_CVAIC)) &&
-    ((!ks_tree_use) || (num_reg_continuous <= 2));
+    ((((bwm == RBWM_CVLS) || (bwm == RBWM_CVAIC)) &&
+      ((!ks_tree_use) || (num_reg_continuous <= 2))) ||
+     ((bwm == RBWM_CVKS) && ks_tree_use &&
+      (num_reg_continuous <= 2)));
 }
 
 static int np_lp_fixed_tree_sparse_supported(const int num_reg_unordered,
