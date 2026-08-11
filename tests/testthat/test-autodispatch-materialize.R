@@ -72,6 +72,102 @@ test_that("autodispatch materialization evaluates proper arguments eagerly", {
   expect_identical(prepared$tmpvals[[control.ref]], proper.control)
 })
 
+test_that("autodispatch materialization resolves estimator uncertainty controls", {
+  materialize <- getFromNamespace(".npRmpi_autodispatch_materialize_call", "npRmpi")
+
+  bws <- structure(list(tag = "dummy"), class = "lsqregressionbandwidth")
+  gradients <- FALSE
+  residuals <- TRUE
+  se <- FALSE
+
+  mc <- quote(nplsqreg(
+    bws = bws,
+    gradients = gradients,
+    residuals = residuals,
+    se = se
+  ))
+  prepared <- materialize(mc = mc, caller_env = environment(), comm = 1L)
+
+  gradients.ref <- as.character(prepared$call$gradients)
+  residuals.ref <- as.character(prepared$call$residuals)
+  se.ref <- as.character(prepared$call$se)
+
+  expect_identical(prepared$tmpvals[[gradients.ref]], FALSE)
+  expect_identical(prepared$tmpvals[[residuals.ref]], TRUE)
+  expect_identical(prepared$tmpvals[[se.ref]], FALSE)
+  expect_false(identical(prepared$call$se, as.name("se")))
+})
+
+test_that("registered autodispatch call formals have an explicit transport owner", {
+  ns <- asNamespace("npRmpi")
+  targets <- getFromNamespace(".npRmpi_autodispatch_target_args", "npRmpi")()
+
+  character_constants <- function(expr) {
+    if (is.character(expr))
+      return(expr)
+    if (!is.recursive(expr))
+      return(character(0))
+    unlist(lapply(as.list(expr), character_constants), use.names = FALSE)
+  }
+
+  helper.names <- ls(ns, all.names = TRUE)
+  helper.names <- helper.names[
+    grepl("^\\.npRmpi_autodispatch_is_.*_core$", helper.names)
+  ]
+  call.heads <- unique(unlist(lapply(helper.names, function(nm) {
+    character_constants(body(get(nm, envir = ns, inherits = FALSE)))
+  }), use.names = FALSE))
+  call.heads <- unique(c(
+    call.heads,
+    "npregbw", "npscoefbw", "npplregbw", "npindexbw",
+    "npudensbw", "npudistbw", "npcdensbw", "npcdistbw"
+  ))
+  call.heads <- call.heads[vapply(call.heads, exists, logical(1),
+                                  envir = ns, mode = "function",
+                                  inherits = FALSE)]
+
+  formal.pairs <- do.call(rbind, lapply(sort(call.heads), function(head) {
+    args <- setdiff(names(formals(get(head, envir = ns, inherits = FALSE))), "...")
+    if (!length(args))
+      return(NULL)
+    data.frame(head = rep(head, length(args)), arg = args,
+               stringsAsFactors = FALSE)
+  }))
+
+  # `subset` must remain language for model-frame evaluation.  The internal
+  # formula-method `call` formal is deliberately reconstructed by its owner.
+  language.or.derived <- c("subset", "call")
+  unowned <- formal.pairs[
+    !formal.pairs$arg %in% c(targets, language.or.derived), , drop = FALSE
+  ]
+
+  expect_equal(unowned, formal.pairs[FALSE, , drop = FALSE],
+               info = paste(capture.output(print(unowned)), collapse = "\n"))
+})
+
+test_that("ordinary autodispatch controls are evaluated in the caller", {
+  materialize <- getFromNamespace(".npRmpi_autodispatch_materialize_call", "npRmpi")
+
+  probabilities <- TRUE
+  level <- "high"
+  pivot <- FALSE
+  bw.x <- 0.25
+  maxiter <- 17L
+  mc <- quote(npconmode(
+    probabilities = probabilities,
+    level = level,
+    pivot = pivot,
+    bw.x = bw.x,
+    maxiter = maxiter
+  ))
+  prepared <- materialize(mc = mc, caller_env = environment(), comm = 1L)
+
+  for (nm in c("probabilities", "level", "pivot", "bw.x", "maxiter")) {
+    ref <- as.character(prepared$call[[nm]])
+    expect_identical(prepared$tmpvals[[ref]], get(nm, inherits = FALSE))
+  }
+})
+
 test_that("autodispatch materialization preserves explicit NULL arguments without shifting later args", {
   materialize <- getFromNamespace(".npRmpi_autodispatch_materialize_call", "npRmpi")
 

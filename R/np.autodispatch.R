@@ -1524,7 +1524,7 @@
   TRUE
 }
 
-.npRmpi_autodispatch_target_args <- function() {
+.npRmpi_autodispatch_target_arg_names <-
   c("formula", "data", "bws",
      "dat", "tdat", "edat",
      "xdat", "ydat", "zdat", "txdat", "tydat", "tzdat",
@@ -1532,11 +1532,11 @@
      "gydat", "gdat", "wdat", "gdata",
      "data.x", "data.y", "model",
      "y", "z", "w", "x", "zeval", "weval", "xeval", "bw",
-     "method", "distribution", "boot.method", "bootstrap", "boot.num", "random.seed",
+     "method", "distribution", "boot.method", "boot.type", "bootstrap", "boot.num", "random.seed",
      "tau", "tau.search", "delta", "delta.bounds", "scale",
      "regtype.pilot", "nomad", "nomad.pilot", "pilot.args",
      "optim.control",
-     "bwydat", "joint", "lag.num", "index",
+     "bwydat", "joint", "lag.num", "index", "pivot", "density.weighted",
      "weights", "bandwidth.divide", "compute.ocg", "compute.score", "kernel.pow",
      "leave.one.out", "operator", "permutation.operator", "return.kernel.weights",
      "regtype", "basis", "degree", "bernstein.basis",
@@ -1551,14 +1551,21 @@
      "cykertype", "cykerorder", "cykerbound", "cykerlb", "cykerub",
      "ukertype", "okertype", "uxkertype", "oxkertype", "uykertype", "oykertype",
      "nmulti", "bandwidth.compute", "nomad.remin", "powell.remin", "itmax", "ftol", "tol", "small",
-     "gradients", "residuals", "errors", "gradient.order",
+     "gradients", "residuals", "se", "errors", "gradient.order",
+     "probabilities", "level", "y.eval", "na.action",
      "proper", "proper.method", "proper.control",
      "alpha", "alpha.iter", "alpha.max", "alpha.min", "alpha.tol",
      "constant", "iterate.diff.tol", "iterate.max", "iterate.Tikhonov", "iterate.Tikhonov.num",
      "optim.abstol", "optim.maxattempts", "optim.maxit", "optim.method", "optim.reltol",
      "p", "penalize.iteration", "return.weights.phi", "return.weights.phi.deriv.1",
      "return.weights.phi.deriv.2", "smooth.residuals", "start.from", "starting.values",
-     "stop.on.increase", "iterate.break", "n.quasi.inv", "er.quasi.inv")
+     "stop.on.increase", "iterate.break", "n.quasi.inv", "er.quasi.inv",
+     "bw.x", "bw.y", "only.optimize.beta",
+     "scale.factor.init.lower", "scale.factor.init.upper", "scale.factor.init",
+     "scale.factor.search.lower", "betas", "iterate", "maxiter")
+
+.npRmpi_autodispatch_target_args <- function() {
+  .npRmpi_autodispatch_target_arg_names
 }
 
 .npRmpi_autodispatch_failfast_formula_data <- function(mc, caller_env) {
