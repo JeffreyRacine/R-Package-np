@@ -365,6 +365,96 @@ npconmode.condbandwidth <-
   out
 }
 
+.npConmodeLevelBlockWidth <- function(enrow, xwidth, nlevels) {
+  if (length(enrow) != 1L || is.na(enrow) || enrow < 1L ||
+      length(xwidth) != 1L || is.na(xwidth) || xwidth < 0L ||
+      length(nlevels) != 1L || is.na(nlevels) || nlevels < 1L)
+    stop("internal error: invalid conditional-mode level-block dimensions")
+
+  # Bound the temporary replicated evaluation frame independently of the
+  # number of response levels.  The probability and error matrices are public
+  # O(n_eval * nlevels) results already required by the estimator; this cap
+  # prevents the batching workspace from adding an unbounded copy of them.
+  target.cells <- floor((64 * 1024^2) / 8)
+  cells.per.row <- max(1, as.double(xwidth) + 3)
+  row.cap <- max(1, min(65536, floor(target.cells / cells.per.row)))
+  max(1L, min(as.integer(nlevels), as.integer(floor(row.cap / enrow))))
+}
+
+.npConmodeEvaluateLevels <- function(bws,
+                                      txdat,
+                                      tydat,
+                                      xeval,
+                                      efac,
+                                      gradients,
+                                      gradient.level.index) {
+  enrow <- nrow(xeval)
+  nlev <- nlevels(efac)
+  block.width <- .npConmodeLevelBlockWidth(
+    enrow = enrow,
+    xwidth = ncol(xeval),
+    nlevels = nlev
+  )
+  pmat <- matrix(NA_real_, enrow, nlev,
+                 dimnames = list(NULL, levels(efac)))
+  perr <- matrix(NA_real_, enrow, nlev,
+                 dimnames = list(NULL, levels(efac)))
+  pgrad <- if (isTRUE(gradients)) {
+    matrix(NA_real_, nrow = enrow, ncol = bws$xndim,
+           dimnames = list(NULL, bws$xnames))
+  } else {
+    NULL
+  }
+
+  ordinary.levels <- seq_len(nlev)
+  if (isTRUE(gradients))
+    ordinary.levels <- ordinary.levels[-gradient.level.index]
+  ordinary.blocks <- if (length(ordinary.levels)) {
+    starts <- seq.int(1L, length(ordinary.levels), by = block.width)
+    lapply(starts, function(start) {
+      ordinary.levels[seq.int(start,
+                              min(length(ordinary.levels),
+                                  start + block.width - 1L))]
+    })
+  } else {
+    list()
+  }
+  blocks <- if (isTRUE(gradients)) {
+    c(ordinary.blocks, list(gradient.level.index))
+  } else {
+    ordinary.blocks
+  }
+
+  for (block in blocks) {
+    block.gradients <- isTRUE(gradients) &&
+      length(block) == 1L && block[[1L]] == gradient.level.index
+    eval.index <- rep.int(seq_len(enrow), times = length(block))
+    dens.obj <- npcdens(
+      txdat = txdat,
+      tydat = tydat,
+      exdat = xeval[eval.index,,drop = FALSE],
+      eydat = rep(efac[block], each = enrow),
+      bws = bws,
+      gradients = block.gradients
+    )
+
+    expected <- as.double(enrow) * length(block)
+    if (length(dens.obj$condens) != expected ||
+        length(dens.obj$conderr) != expected)
+      stop("internal error: conditional-mode density block has invalid size")
+    pmat[, block] <- matrix(dens.obj$condens, nrow = enrow)
+    perr[, block] <- matrix(dens.obj$conderr, nrow = enrow)
+
+    if (block.gradients) {
+      if (is.null(dens.obj$congrad))
+        stop("internal error: conditional-density gradient was not returned")
+      pgrad[,] <- dens.obj$congrad
+    }
+  }
+
+  list(probabilities = pmat, errors = perr, gradients = pgrad)
+}
+
 
 npconmode.conbandwidth <-
   function (bws,
@@ -455,34 +545,18 @@ npconmode.conbandwidth <-
       if (bws$xndim < 1L)
         stop("npconmode class-probability gradients/effects require at least one conditioning variable")
     }
-    pmat <- matrix(NA_real_, enrow, nlev, dimnames = list(NULL, level.values))
-    perr <- matrix(NA_real_, enrow, nlev, dimnames = list(NULL, level.values))
-    pgrad <- if (isTRUE(gradients)) {
-      matrix(NA_real_,
-             nrow = enrow,
-             ncol = bws$xndim,
-             dimnames = list(NULL, bws$xnames))
-    } else {
-      NULL
-    }
-
-    for (i in seq_len(nlevels(efac))) {
-        dens.obj <- npcdens(
-          txdat = txdat,
-          tydat = tydat,
-          exdat = if (no.ex) txdat else exdat,
-          eydat = rep(efac[i], enrow),
-          bws = bws,
-          gradients = isTRUE(gradients) && i == gradient.level.index
-        )
-        pmat[, i] <- dens.obj$condens
-        perr[, i] <- dens.obj$conderr
-        if (isTRUE(gradients) && i == gradient.level.index) {
-          if (is.null(dens.obj$congrad))
-            stop("internal error: conditional-density gradient was not returned")
-          pgrad[,] <- dens.obj$congrad
-        }
-    }
+    level.fit <- .npConmodeEvaluateLevels(
+      bws = bws,
+      txdat = txdat,
+      tydat = tydat,
+      xeval = if (no.ex) txdat else exdat,
+      efac = efac,
+      gradients = gradients,
+      gradient.level.index = gradient.level.index
+    )
+    pmat <- level.fit$probabilities
+    perr <- level.fit$errors
+    pgrad <- level.fit$gradients
 
     proper.effective <- .npConmodeEffectiveProper(bws, proper)
     proper.out <- .npConmodeProperProbabilities(

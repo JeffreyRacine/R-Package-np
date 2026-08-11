@@ -1,5 +1,13 @@
 # np 0.70-6
 
+* `npconmode()` now evaluates categorical response levels through one
+  memory-bounded conditional-density batch instead of rebuilding the same fit
+  lifecycle for every level. Requested class-probability gradients retain one
+  singleton evaluation for their selected level while all other levels share
+  the batch. The canonical `npcdens()` engine, probability repair, class
+  selection, and result arithmetic are unchanged; temporary evaluation rows
+  are capped independently of the number of response levels.
+
 * Eligible additive and tensor fixed-bandwidth local-polynomial CV objectives
   now use the canonical resident-row engine already shared by generalized LP.
   The capability boundary is kernel- and width-based: Gaussian widths through
