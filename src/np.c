@@ -136,6 +136,7 @@ int int_TREE_X;
 int int_TREE_Y;
 int int_TREE_XY;
 int int_TREE_PROFILE_X;
+int int_TREE_OUTER_BLAS;
 int int_nn_k_min_extern = 1;
 
 static int np_int_product_overflows(int a, int b)
@@ -19246,6 +19247,7 @@ static void np_kernelsum_common(double * tuno, double * tord, double * tcon,
   int do_divide_returned_weights, do_divide_returned_bw;
   int max_lev, no_weights, sum_element_length, return_kernel_weights;
   int p_operator, do_score, do_ocg, p_nvar = 0;
+  int tree_outer_blas_requested = 0;
 
   int use_tree = 0;
   int allocated_X_train = 1, allocated_X_eval = 1;
@@ -19301,6 +19303,8 @@ static void np_kernelsum_common(double * tuno, double * tord, double * tcon,
   ncol_W = myopti[KWS_WNCOLI];
 
   int_TREE_X = myopti[KWS_DOTREEI];
+  tree_outer_blas_requested =
+    (myopti[KWS_TREEBLASI] == 1) ? 1 : 0;
   return_kernel_weights = myopti[KWS_RKWI];
   p_operator = myopti[KWS_POPI];
   do_score = myopti[KWS_PSCOREI];
@@ -19731,6 +19735,7 @@ static void np_kernelsum_common(double * tuno, double * tord, double * tcon,
                                       kw,
                                       pkw);
   } else {
+    int_TREE_OUTER_BLAS = tree_outer_blas_requested;
     npks_err = kernel_weighted_sum_np(kernel_c,
                                       kernel_u,
                                       kernel_o,

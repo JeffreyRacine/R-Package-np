@@ -1,5 +1,12 @@
 # np 0.70-6
 
+* Fixed-bandwidth compact-support `npscoef` objectives now pack each sparse
+  tree row's active support into the existing BLAS outer-product engine for
+  moderate and wide local-polynomial moment systems. Dense, degree-zero,
+  nearest-neighbour, signed, derivative, and permutation routes retain their
+  existing arithmetic and storage contracts; scratch is bounded by
+  `support * (width_A + width_B) + width_A * width_B`, never by sample pairs.
+
 * Fixed-bandwidth degree-zero conditional-density CVLS now recognizes an
   all-categorical explanatory side at its constant upper kernel limit as the
   canonical global-X design. This restores the unconditional-density limit,

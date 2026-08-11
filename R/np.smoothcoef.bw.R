@@ -918,7 +918,7 @@ npscoefbw.scbandwidth <-
         leave.one.out = leave.one.out.eval,
         bandwidth.divide = TRUE
       )
-      main.ks <- do.call(npksum, ksum.args)$ksum
+      main.ks <- do.call(.npscoef_npksum, ksum.args)$ksum
       tyw <- main.ks[-1L, 1L, , drop = FALSE]
       if (length(dim(tyw)) == 3L)
         dim(tyw) <- c(dim(tyw)[1L], dim(tyw)[3L])
@@ -950,7 +950,7 @@ npscoefbw.scbandwidth <-
         leave.one.out = leave.one.out.eval,
         bandwidth.divide = TRUE
       )
-      main.ks <- do.call(npksum, ksum.args)$ksum
+      main.ks <- do.call(.npscoef_npksum, ksum.args)$ksum
       tyw <- main.ks[-1L, 1L, , drop = FALSE]
       if (length(dim(tyw)) == 3L)
         dim(tyw) <- c(dim(tyw)[1L], dim(tyw)[3L])
@@ -1942,7 +1942,7 @@ npscoefbw.scbandwidth <-
       bws = bws,
       leave.one.out = TRUE
     )
-    main.ks <- npksum(
+    main.ks <- .npscoef_npksum(
       txdat = moment.state$z.train,
       tydat = moment.state$ytensor,
       weights = moment.state$ytensor,

@@ -133,6 +133,8 @@ npksum.default <-
     internal.bandwidth.divide.weights <-
       isTRUE(dots$.np.internal.bandwidth.divide.weights)
     dots$.np.internal.bandwidth.divide.weights <- NULL
+    internal.tree.outer.blas <- isTRUE(dots$.np.internal.tree.outer.blas)
+    dots$.np.internal.tree.outer.blas <- NULL
     return.derivative.kernel.weights <- isTRUE(dots$return.derivative.kernel.weights)
 
     bandwidth.divide <- npValidateScalarLogical(bandwidth.divide, "bandwidth.divide")
@@ -430,13 +432,13 @@ npksum.default <-
       myopti <- c(myopti, list(
         divide.returned.kernel.weights = internal.bandwidth.divide.weights
       ))
-      if (beta.kernel &&
-          bws[["nuno", exact = TRUE]] + bws[["nord", exact = TRUE]] > 0L) {
-        myopti <- c(myopti, list(
-          categorical.compress =
-            npStrictLogicalOption("np.categorical.compress", TRUE)
-        ))
-      }
+      myopti <- c(myopti, list(
+        categorical.compress =
+          beta.kernel &&
+          bws[["nuno", exact = TRUE]] + bws[["nord", exact = TRUE]] > 0L &&
+          npStrictLogicalOption("np.categorical.compress", TRUE),
+        tree.outer.blas = internal.tree.outer.blas
+      ))
 
 	    cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
     

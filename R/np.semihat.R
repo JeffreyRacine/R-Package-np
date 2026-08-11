@@ -191,6 +191,10 @@
   )
 }
 
+.npscoef_npksum <- function(...) {
+  npksum(..., .np.internal.tree.outer.blas = TRUE)
+}
+
 .np_indexhat_scalar_source <- function(bws) {
   source <- bws
   if (identical(as.character(source$ckerbound)[1L], "range")) {
@@ -849,7 +853,7 @@
   z.eval.one <- lp_state$z.eval[1L, , drop = FALSE]
 
   ytensor <- cbind(tydat, tensor.train)
-  main.ks <- npksum(
+  main.ks <- .npscoef_npksum(
     txdat = lp_state$z.train,
     tydat = ytensor,
     weights = ytensor,
@@ -876,7 +880,7 @@
   )
 
   if (!is.null(u2)) {
-    out$s <- npksum(
+    out$s <- .npscoef_npksum(
       txdat = lp_state$z.train,
       tydat = tensor.train,
       weights = tensor.train * as.double(u2),

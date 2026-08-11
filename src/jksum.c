@@ -145,6 +145,7 @@ extern int int_TREE_X;
 extern int int_TREE_Y;
 extern int int_TREE_XY;
 extern int int_TREE_PROFILE_X;
+extern int int_TREE_OUTER_BLAS;
 extern int int_conditional_prepared_context_extern;
 
 /*
@@ -755,6 +756,104 @@ static int np_outer_weighted_sum_blas(double * const * const pmat_A,
   free(Apack);
   free(Bpack);
   free(C);
+  return 1;
+}
+
+/*
+ * Sparse tree rows historically reached the scalar outer-product loops below,
+ * even when a moderately wide response/design made the equivalent dense row
+ * a packed BLAS operation.  Pack only the tree support and retain the same
+ * generic outer-product contract.  Scratch is bounded by the active support
+ * and response widths; no sample-by-sample matrix is retained.
+ */
+static int np_outer_weighted_sum_tree_blas(
+    double * const * const pmat_A,
+    const int have_A,
+    const int max_A,
+    double * const * const pmat_B,
+    const int have_B,
+    const int max_B,
+    const double * const weights,
+    const int num_weights,
+    const int symmetric,
+    const double db,
+    double * const result,
+    const XL * const xl){
+  int support_count = 0;
+  size_t nA = 0, nB = 0, nC = 0;
+  double *scratch = NULL;
+  double *Apack = NULL;
+  double *Bpack = NULL;
+  double *C = NULL;
+
+  if((pmat_A == NULL) || (pmat_B == NULL) || (weights == NULL) ||
+     (result == NULL) || (xl == NULL) || (xl->n <= 0))
+    return 0;
+
+  for(int m = 0; m < xl->n; m++){
+    if(xl->nlev[m] < 0 || support_count > num_weights - xl->nlev[m])
+      return 0;
+    support_count += xl->nlev[m];
+  }
+
+  if(!np_outer_weighted_sum_blas_eligible(max_A, max_B, support_count,
+                                           symmetric, &nA, &nB, &nC))
+    return 0;
+
+  if((nA > SIZE_MAX - nB) || (nA + nB > SIZE_MAX - nC) ||
+     (nA + nB + nC > SIZE_MAX/sizeof(double)))
+    return 0;
+  scratch = (double *)malloc((nA + nB + nC)*sizeof(double));
+  if(scratch == NULL)
+    return 0;
+  Apack = scratch;
+  Bpack = Apack + nA;
+  C = Bpack + nB;
+
+  for(int j = 0; j < max_A; j++){
+    double * const Aj = Apack + (size_t)j*(size_t)support_count;
+    int out = 0;
+    for(int m = 0; m < xl->n; m++){
+      const int end = xl->istart[m] + xl->nlev[m];
+      for(int k = xl->istart[m]; k < end; k++)
+        Aj[out++] = pmat_A[j][k*have_A];
+    }
+  }
+
+  for(int i = 0; i < max_B; i++){
+    double * const Bi = Bpack + (size_t)i*(size_t)support_count;
+    int out = 0;
+    for(int m = 0; m < xl->n; m++){
+      const int end = xl->istart[m] + xl->nlev[m];
+      for(int k = xl->istart[m]; k < end; k++){
+        Bi[out++] = (weights[k] == 0.0) ?
+          0.0 : pmat_B[i][k*have_B]*weights[k]/db;
+      }
+    }
+  }
+
+  np_blas_dgemm_tn_int(max_A, max_B, support_count, Apack, Bpack, C);
+  for(size_t i = 0; i < nC; i++){
+    if(!np_fast_reduction_finite(C[i])){
+      free(scratch);
+      return 0;
+    }
+  }
+
+  if(!symmetric){
+    for(int j = 0; j < max_A; j++)
+      for(int i = 0; i < max_B; i++)
+        result[j*max_B+i] += C[j+i*max_A];
+  } else {
+    for(int j = 0; j < max_A; j++)
+      for(int i = 0; i <= j; i++)
+        result[j*max_B+i] += C[j+i*max_A];
+    for(int j = 0; j < max_A; j++)
+      for(int i = max_A - 1; i > j; i--)
+        result[j*max_B+i] = result[i*max_B+j];
+  }
+
+  free(scratch);
   return 1;
 }
 
@@ -7956,6 +8055,7 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
                            const int bandwidth_divide, const double dband,
                            double * const result,
                            const XL * const xl,
+                           const int tree_outer_blas,
                            const double * const Apack_pre){
 
   int i,j,k, l = parallel_sum?which_l:0;
@@ -8200,6 +8300,20 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
     if(do_leave_one_out)
       weights[which_k] = temp;
 
+    return;
+  }
+
+  if((xl != NULL) &&
+     tree_outer_blas &&
+     !have_sgn &&
+     (kpow == 1) &&
+     !parallel_sum &&
+     !gather_scatter &&
+     np_outer_weighted_sum_tree_blas(
+       pmat_A, have_A, max_A, pmat_B, have_B, max_B,
+       weights, num_weights, symmetric, db, result, xl)){
+    if(do_leave_one_out)
+      weights[which_k] = temp;
     return;
   }
   
@@ -8596,6 +8710,7 @@ typedef struct {
   int num_weights;
   int symmetric;
   int runtime_options_frozen;
+  int tree_outer_blas;
   NP_KernelRowTileSink *row_tile_sink;
 } NP_OuterPackCtx;
 
@@ -12023,6 +12138,7 @@ NPPermutationWeightOutput * const pkw_output){
                               gather_scatter,
                               1, dband,
                               ws, pxl,
+                              outer_pack_ctx != NULL && outer_pack_ctx->tree_outer_blas,
                               blas_Apack);
       }
 
@@ -12037,6 +12153,7 @@ NPPermutationWeightOutput * const pkw_output){
                               gather_scatter,
                               1, dband,
                               ws2, pxl,
+                              outer_pack_ctx != NULL && outer_pack_ctx->tree_outer_blas,
                               blas_Apack);
       }
 
@@ -12052,6 +12169,7 @@ NPPermutationWeightOutput * const pkw_output){
                                 gather_scatter,
                                 1, p_dband[ii],
                                 p_ws + ii*num_obs_eval*sum_element_length, (p_pxl == NULL) ? NULL : (p_pxl+ii),
+                                outer_pack_ctx != NULL && outer_pack_ctx->tree_outer_blas,
                                 blas_Apack);
         }
 
@@ -12682,7 +12800,6 @@ NPContinuousKernelProgressFunction progress)
   const NPContinuousKernelExecutionContext kernel_execution_context = {
     kernel_route, kernel_route_diagnostics, categorical_compress
   };
-
   return kernel_weighted_sum_np_ctx_ex(
     KERNEL_reg, KERNEL_unordered_reg, KERNEL_ordered_reg,
     BANDWIDTH_reg, num_obs_train, num_obs_eval,
@@ -12839,6 +12956,12 @@ NPContinuousKernelDerivativeDiagnostics * const kernel_route_diagnostics){
   const NPContinuousKernelExecutionContext kernel_execution_context = {
     kernel_route, kernel_route_diagnostics, categorical_compress
   };
+  const NP_OuterPackCtx route_outer_pack_ctx = {
+    .tree_outer_blas = int_TREE_OUTER_BLAS
+  };
+
+  /* Consume this one-call request before entering interruptible code. */
+  int_TREE_OUTER_BLAS = 0;
 
   status = kernel_weighted_sum_np_ctx_ex(KERNEL_reg,
                                     KERNEL_unordered_reg,
@@ -12894,7 +13017,8 @@ NPContinuousKernelDerivativeDiagnostics * const kernel_route_diagnostics){
                                     kw,
                                     NULL,
                                     NULL,
-                                    NULL,
+                                    route_outer_pack_ctx.tree_outer_blas ?
+                                      &route_outer_pack_ctx : NULL,
                                     kernel_route == NULL ? NULL :
                                       &kernel_execution_context,
                                     NULL,
@@ -21126,6 +21250,7 @@ static void np_lp_power2_moments_from_kernel_row(double **basis,
                         bandwidth_product,
                         moments,
                         NULL,
+                        0,
                         NULL);
 }
 

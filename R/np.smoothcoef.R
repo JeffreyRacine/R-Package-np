@@ -817,7 +817,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
       )
       if (!state$leave.one.out)
         ksum.args$exdat <- state$z.eval
-      main.ks <- do.call(npksum, ksum.args)$ksum
+      main.ks <- do.call(.npscoef_npksum, ksum.args)$ksum
       tyw.out <- main.ks[-1L, 1L, , drop = FALSE]
       if (length(dim(tyw.out)) == 3L)
         dim(tyw.out) <- c(dim(tyw.out)[1L], dim(tyw.out)[3L])
@@ -836,7 +836,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
         )
         if (!state$leave.one.out)
           cov.args$exdat <- state$z.eval
-        s.out <- do.call(npksum, cov.args)$ksum
+        s.out <- do.call(.npscoef_npksum, cov.args)$ksum
       }
 
       list(tyw = tyw.out, tww = tww.out, s = s.out)
