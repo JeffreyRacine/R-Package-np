@@ -1,5 +1,12 @@
 # npRmpi 0.70-6
 
+* Eligible additive and tensor fixed-bandwidth local-polynomial CV objectives
+  now use the canonical resident-row engine already shared by generalized LP.
+  The capability boundary is kernel- and width-based: Gaussian widths through
+  three, dense Epanechnikov widths through four, and qualified sparse-tree
+  Epanechnikov rows at wider widths. CVAIC is unchanged; uniform and routed
+  bounded kernels retain their incumbent low-support path.
+
 * Fixed-bandwidth compact-support `npscoef` objectives now pack each rank-local
   sparse tree row's active support into the existing BLAS outer-product engine
   for moderate and wide local-polynomial moment systems. Coarse outer-row MPI
