@@ -14263,12 +14263,16 @@ static inline double np_regression_cv_loss_value(const int bwm,
   width 6. Eligible sparse trees have their own generic wide resident row.
 */
 enum { NP_REG_CV_LP_RESIDENT_MAX_TERMS = 5 };
+enum { NP_REG_CV_LP_TOPOLOGY_GAUSSIAN_MAX_TERMS = 3 };
+enum { NP_REG_CV_LP_TOPOLOGY_EPAN_MAX_TERMS = 4 };
 
 static inline int np_reg_cv_use_canonical_lp_fixed_kernel(const int bwm,
                                                            const int BANDWIDTH_reg,
                                                            const int num_reg_continuous,
+                                                           const int *kernel_c,
                                                            const int nterms,
                                                            const int use_tree){
+  int l, all_gaussian = 1, all_epanechnikov = 1;
   if((BANDWIDTH_reg != BW_FIXED) || (num_reg_continuous <= 0))
     return 0;
 
@@ -14276,8 +14280,31 @@ static inline int np_reg_cv_use_canonical_lp_fixed_kernel(const int bwm,
      (bwm != RBWM_CVCHECK) && (bwm != RBWM_CVKS))
     return 0;
 
-  if(int_glp_basis_extern != 1)
-    return bwm == RBWM_CVAIC;
+  /* CVAIC already used the row engine for every topology. */
+  if(bwm == RBWM_CVAIC)
+    return 1;
+
+  /*
+   * The row arithmetic is topology-neutral, but its performance crossover is
+   * kernel-specific.  Preserve the incumbent non-generalized route for
+   * uniform and routed/bounded kernels: their low-support behavior is a
+   * separate numerical contract.  Compact-support tree rows retain their
+   * independently qualified wide-width route.
+   */
+  if(int_glp_basis_extern != 1){
+    for(l = 0; l < num_reg_continuous; l++){
+      all_gaussian = all_gaussian &&
+        ((kernel_c[l] >= 0) && (kernel_c[l] <= 3));
+      all_epanechnikov = all_epanechnikov &&
+        ((kernel_c[l] >= 4) && (kernel_c[l] <= 7));
+    }
+    if(all_epanechnikov)
+      return use_tree ||
+        (nterms <= NP_REG_CV_LP_TOPOLOGY_EPAN_MAX_TERMS);
+    if(all_gaussian)
+      return nterms <= NP_REG_CV_LP_TOPOLOGY_GAUSSIAN_MAX_TERMS;
+    return 0;
+  }
 
   return use_tree || (nterms <= NP_REG_CV_LP_RESIDENT_MAX_TERMS);
 }
@@ -16582,6 +16609,7 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
       np_reg_cv_use_canonical_lp_fixed_kernel(bwm,
                                                BANDWIDTH_reg,
                                                num_reg_continuous,
+                                               kernel_c,
                                                glp_nterms,
                                                ks_tree_use);
     const int all_large_gate = (bwm != RBWM_CVKS) &&
