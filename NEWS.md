@@ -1,5 +1,12 @@
 # npRmpi 0.70-6
 
+* Fixed-bandwidth compact-support `npscoef` objectives now pack each rank-local
+  sparse tree row's active support into the existing BLAS outer-product engine
+  for moderate and wide local-polynomial moment systems. Coarse outer-row MPI
+  ownership is unchanged, while dense, degree-zero, nearest-neighbour, signed,
+  derivative, and permutation routes retain their existing contracts and
+  rank-local workspace bounded by active support and moment-system width.
+
 * Fixed-bandwidth compact-support regression trees now use a bounded generic
   resident-row accumulator for local-polynomial basis widths above five,
   sharing the canonical solve, deletion, and uncentered projection engine.

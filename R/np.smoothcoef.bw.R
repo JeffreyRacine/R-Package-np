@@ -450,8 +450,8 @@ npscoefbw.NULL <-
 
 .npscoefbw_nomad_lp_npksum <- function(args, localize = TRUE) {
   if (isTRUE(localize))
-    return(.npRmpi_with_local_regression(do.call(npksum, args)))
-  do.call(npksum, args)
+    return(.npRmpi_with_local_regression(do.call(.npscoef_npksum, args)))
+  do.call(.npscoef_npksum, args)
 }
 
 .npscoefbw_nomad_solve_cv_moment_system <- function(tyw,
@@ -2205,7 +2205,7 @@ npscoefbw.scbandwidth <-
         leave.one.out = leave.one.out.eval,
         bandwidth.divide = TRUE
       )
-      main.ks <- do.call(npksum, ksum.args)$ksum
+      main.ks <- do.call(.npscoef_npksum, ksum.args)$ksum
       tyw <- main.ks[-1L, 1L, , drop = FALSE]
       if (length(dim(tyw)) == 3L)
         dim(tyw) <- c(dim(tyw)[1L], dim(tyw)[3L])
@@ -2237,7 +2237,7 @@ npscoefbw.scbandwidth <-
         leave.one.out = leave.one.out.eval,
         bandwidth.divide = TRUE
       )
-      main.ks <- do.call(npksum, ksum.args)$ksum
+      main.ks <- do.call(.npscoef_npksum, ksum.args)$ksum
       tyw <- main.ks[-1L, 1L, , drop = FALSE]
       if (length(dim(tyw)) == 3L)
         dim(tyw) <- c(dim(tyw)[1L], dim(tyw)[3L])

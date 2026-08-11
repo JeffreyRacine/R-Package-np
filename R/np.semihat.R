@@ -201,6 +201,10 @@
   )
 }
 
+.npscoef_npksum <- function(...) {
+  npksum(..., .np.internal.tree.outer.blas = TRUE)
+}
+
 .np_indexhat_scalar_source <- function(bws) {
   source <- bws
   if (identical(as.character(source$ckerbound)[1L], "range")) {
@@ -821,7 +825,7 @@
                                            leave.one.out = FALSE,
                                            where = "npscoef",
                                            solver,
-                                           ksum_fun = npksum) {
+                                           ksum_fun = .npscoef_npksum) {
   if (missing(solver) || !is.function(solver))
     stop("LP1 large-h global fit requires a solver function", call. = FALSE)
   if (!is.function(ksum_fun))

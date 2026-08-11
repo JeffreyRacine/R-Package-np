@@ -643,7 +643,8 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
     }
 
     moment_npksum <- function(args) {
-      do.call(npksum, args)
+      do.call(if (identical(reg.engine, "lc")) npksum else .npscoef_npksum,
+              args)
     }
     lp1_moment_npksum <- function(...) {
       moment_npksum(list(...))
