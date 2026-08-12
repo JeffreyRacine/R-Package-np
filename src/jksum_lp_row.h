@@ -42,7 +42,7 @@ typedef struct {
 /*
   A rank-owned MPI row is accumulated independently of every other row.
   Width one has a dedicated scalar caller and is deliberately excluded from
-  this wider-row context; width six and above retain the generic caller loop.
+  this wider-row context; width seven and above retain the generic caller loop.
 */
 typedef struct {
   int nterms;

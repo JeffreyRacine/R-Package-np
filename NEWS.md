@@ -1,5 +1,13 @@
 # npRmpi 0.70-6
 
+* Generalized fixed-bandwidth local-polynomial CV objectives of basis width
+  six now retain only the unique upper triangle of their symmetric weighted
+  Gram rows and mirror it once before solving. Serial unordered-pair and MPI
+  rank-owned rows share this arithmetic contract; the portable scalar and
+  Apple-arm64 vector siblings avoid the packed-width regression when optional
+  acceleration is disabled while preserving wider, tree, and nearest-neighbour
+  owners and linear-in-sample auxiliary storage.
+
 * `npconmode()` now evaluates categorical response levels through one
   memory-bounded conditional-density batch instead of paying a complete MPI
   fit lifecycle for every level. Requested class-probability gradients retain
