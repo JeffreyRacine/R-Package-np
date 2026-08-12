@@ -3473,14 +3473,144 @@ npLpBasisRepresentationLabel <- function(bernstein, basis = "glp"){
   "Bernstein"
 }
 
+.np_lp_term_capacity <- 100000L
+
+npLpCompleteTermStatus <- function(basis = "glp", degree, nobs = Inf,
+                                   capacity = .np_lp_term_capacity) {
+  basis <- match.arg(basis, c("glp", "additive", "tensor"))
+  degree <- npValidateGlpDegree(
+    regtype = "lp",
+    degree = degree,
+    ncon = length(degree),
+    argname = "degree"
+  )
+  if (length(nobs) != 1L || !is.numeric(nobs) || is.na(nobs) ||
+      nobs <= 0 || (!is.finite(nobs) && !identical(as.double(nobs), Inf)))
+    stop("nobs must be a single positive finite value or Inf", call. = FALSE)
+  if (is.finite(nobs) && nobs != floor(nobs))
+    stop("nobs must be integer-valued", call. = FALSE)
+  if (length(capacity) != 1L || !is.numeric(capacity) || is.na(capacity) ||
+      !is.finite(capacity) || capacity <= 0 || capacity != floor(capacity) ||
+      capacity >= .Machine$integer.max)
+    stop("capacity must be a single positive integer", call. = FALSE)
+
+  capacity <- as.integer(capacity)
+  ceiling <- as.integer(capacity) + 1L
+  nterms <- if (!length(degree)) {
+    1L
+  } else if (identical(basis, "additive")) {
+    value <- 1L
+    for (d in degree) {
+      if (d >= ceiling - value) {
+        value <- ceiling
+        break
+      }
+      value <- value + d
+    }
+    value
+  } else if (identical(basis, "tensor")) {
+    value <- 1L
+    for (d in degree) {
+      factor <- d + 1L
+      if (value > ceiling %/% factor) {
+        value <- ceiling
+        break
+      }
+      value <- value * factor
+    }
+    value
+  } else {
+    dmax <- max(degree)
+    count <- integer(dmax + 1L)
+    count[[1L]] <- 1L
+    for (d in degree) {
+      next.count <- integer(dmax + 1L)
+      for (total in 0L:dmax) {
+        if (count[[total + 1L]] == 0L)
+          next
+        upper <- min(d, dmax - total)
+        for (value in 0L:upper) {
+          idx <- total + value + 1L
+          add <- count[[total + 1L]]
+          next.count[[idx]] <- if (add >= ceiling - next.count[[idx]])
+            ceiling
+          else
+            next.count[[idx]] + add
+        }
+      }
+      count <- next.count
+    }
+    value <- 0L
+    for (add in count) {
+      if (add >= ceiling - value) {
+        value <- ceiling
+        break
+      }
+      value <- value + add
+    }
+    value
+  }
+
+  capacity.ok <- nterms <= capacity
+  rank.ok <- !is.finite(nobs) || nterms < as.double(nobs)
+  status <- if (!capacity.ok) {
+    "capacity_exceeded"
+  } else if (!rank.ok) {
+    "rank_inadmissible"
+  } else {
+    "valid"
+  }
+
+  structure(
+    list(
+      basis = basis,
+      nterms = nterms,
+      nobs = as.double(nobs),
+      capacity = as.double(capacity),
+      capacity.ok = capacity.ok,
+      rank.ok = rank.ok,
+      status = status
+    ),
+    class = "np.lp.term.status"
+  )
+}
+
+npValidateLpBasisAdmission <- function(basis = "glp", degree, nobs,
+                                       where = "local-polynomial estimator") {
+  admission <- npLpCompleteTermStatus(
+    basis = basis,
+    degree = degree,
+    nobs = nobs
+  )
+  if (!admission$capacity.ok) {
+    stop(sprintf(
+      "%s: LP basis dimension exceeds supported term capacity (%d); reduce degree",
+      where,
+      as.integer(admission$capacity)
+    ), call. = FALSE)
+  }
+  if (!admission$rank.ok) {
+    stop(sprintf(
+      "%s: LP basis dimension (%s) exceeds nobs - 1 (%s); reduce degree",
+      where,
+      format(admission$nterms, trim = TRUE, scientific = FALSE),
+      format(admission$nobs - 1.0, trim = TRUE, scientific = FALSE)
+    ), call. = FALSE)
+  }
+  invisible(admission)
+}
+
 npLpBasisNcol <- function(basis = "glp", degree){
   if (is.null(degree) || !length(degree))
     return(NA_real_)
-  d <- dim_basis(basis = basis,
-                 kernel = TRUE,
-                 degree = as.integer(degree),
-                 segments = rep.int(1L, length(degree)))
-  if (identical(tolower(basis), "tensor")) d else d + 1.0
+  admission <- npLpCompleteTermStatus(basis = basis, degree = degree)
+  if (!admission$capacity.ok) {
+    stop(sprintf(
+      "LP basis dimension exceeds supported term capacity (%d)",
+      as.integer(admission$capacity)
+    ), call. = FALSE)
+  }
+  admission$nterms
 }
 
 npFormatRegressionType <- function(x){
