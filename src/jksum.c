@@ -547,14 +547,15 @@ static double np_blas_ddot_i64(const int64_t n, const double *x, const double *y
 /* Bound both scratch space and work completed before fit progress resumes. */
 #define NP_REG_ALLLARGE_FIT_BLOCK_MAX_ROWS 8192
 
-static int np_glp_dgemv_profitable(const int nrows, const int nterms){
+static int np_apple_glp_dgemv_profitable(const int nrows, const int nterms){
 #if NP_ACCEL_GAUSS_COMPILED
   /*
    * Accelerate's transpose-GEMV kernel overtakes separate DDOT calls only
    * beyond a sharp size boundary.  Keep the exact established reduction
    * everywhere else, including unmeasured BLAS implementations.
    */
-  return (nrows >= NP_GLP_DGEMV_MIN_ROWS) &&
+  return np_mseries_accelerate_enabled_cache &&
+    (nrows >= NP_GLP_DGEMV_MIN_ROWS) &&
     (nterms >= NP_GLP_DGEMV_MIN_TERMS);
 #else
   (void)nrows;
@@ -563,7 +564,7 @@ static int np_glp_dgemv_profitable(const int nrows, const int nterms){
 #endif
 }
 
-static int np_conditional_x_weighted_blas_profitable(
+static int np_apple_conditional_x_weighted_blas_profitable(
   const int nrows,
   const int nterms,
   const int basis_stride)
@@ -571,7 +572,8 @@ static int np_conditional_x_weighted_blas_profitable(
 #if NP_ACCEL_GAUSS_COMPILED
   size_t count;
 
-  if((nrows < NP_CONDITIONAL_X_WEIGHTED_BLAS_MIN_ROWS) ||
+  if((!np_mseries_accelerate_enabled_cache) ||
+     (nrows < NP_CONDITIONAL_X_WEIGHTED_BLAS_MIN_ROWS) ||
      (nterms < 2) || (basis_stride < nrows) ||
      ((size_t)basis_stride > SIZE_MAX/(size_t)nterms))
     return 0;
@@ -17345,8 +17347,7 @@ static NP_NOINLINE NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas(
 #ifdef MPI2
   {
     int local_eligible =
-      np_mseries_accelerate_enabled_cache &&
-      np_conditional_x_weighted_blas_profitable(
+      np_apple_conditional_x_weighted_blas_profitable(
         num_obs, nterms, basis_stride);
     int all_eligible = 0;
 
@@ -17360,8 +17361,7 @@ static NP_NOINLINE NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas(
       goto cleanup_adaptive_blas;
   }
 #else
-  if(!np_mseries_accelerate_enabled_cache ||
-     !np_conditional_x_weighted_blas_profitable(
+  if(!np_apple_conditional_x_weighted_blas_profitable(
        num_obs, nterms, basis_stride))
     goto cleanup_adaptive_blas;
 #endif
@@ -29924,7 +29924,7 @@ static int np_conditional_xrow_ctx_prepare(double *vector_scale_factor,
      * when the measured Accelerate gate is inactive or allocation fails.
      */
     if((np_glp_cv_cache.nterms >= 4) &&
-       np_conditional_x_weighted_blas_profitable(
+       np_apple_conditional_x_weighted_blas_profitable(
          num_train,
          np_glp_cv_cache.nterms,
          np_glp_cv_cache.basis_stride)){
@@ -32276,7 +32276,7 @@ static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_f
      * Reuse the qualified bounded signed weighted-design algebra for full
      * and delete-one consumers without adding any collective.
      */
-    if(np_conditional_x_weighted_blas_profitable(
+    if(np_apple_conditional_x_weighted_blas_profitable(
          num_train,
          np_glp_cv_cache.nterms,
          np_glp_cv_cache.basis_stride)){
@@ -34737,6 +34737,7 @@ typedef struct {
   int num_train;
   int nterms;
   int basis_stride;
+  int use_apple_dgemv;
   double **basis;
   int owns_basis;
   int use_x_tree_order;
@@ -35031,6 +35032,8 @@ static int np_conditional_lp_all_large_ctx_prepare_core(double *vector_scale_fac
   }
 
 finalize_all_large_context:
+  ctx->use_apple_dgemv =
+    np_apple_glp_dgemv_profitable(ctx->num_train, ctx->nterms);
   ctx->ready = 1;
   status = 0;
 
@@ -35105,7 +35108,7 @@ static double np_conditional_lp_all_large_row_fit(const NPConditionalLpAllLargeC
                                                   double *cross_terms,
                                                   double *beta,
                                                   const int leave_one_out){
-  if(!np_glp_dgemv_profitable(ctx->num_train, ctx->nterms))
+  if(!ctx->use_apple_dgemv)
     return np_conditional_lp_all_large_row_fit_basis(ctx,
                                                      ctx->inverse_workspace.matrix_copy,
                                                      ctx->basis,
@@ -35330,7 +35333,7 @@ static int np_conditional_lp_all_large_build_conv_quad(double *vector_scale_fact
      ((ipt_extern_X == NULL) || (ipt_lookup_extern_X == NULL)))
     goto cleanup_all_large_quad;
 
-  if(np_glp_dgemv_profitable(ctx->num_train, ctx->nterms)){
+  if(ctx->use_apple_dgemv){
     if(np_conditional_lp_all_large_moment_dgemv(
          vector_scale_factor, ctx, moment, yconv, yconv_xorder, cross_terms,
          conv_cross, conv_diag) != 0)
@@ -35421,7 +35424,7 @@ static int np_conditional_density_cvml_lp_all_large_stream(double *vector_scale_
                                        &contributions) != 0)
     goto cleanup_cvml_all_large;
   use_original_dgemv =
-    np_glp_dgemv_profitable(ctx.num_train, ctx.nterms) &&
+    ctx.use_apple_dgemv &&
     (ctx.basis_original_order != NULL) &&
     (ctx.basis_original_stride >= ctx.num_train);
 

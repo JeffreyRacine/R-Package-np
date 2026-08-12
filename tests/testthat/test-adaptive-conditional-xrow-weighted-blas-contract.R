@@ -45,7 +45,7 @@ test_that("MPI adaptive X-row context owns one bounded rank-local slab", {
   expect_match(prepare, "np_glp_cv_cache.nterms >= 4", fixed = TRUE)
   expect_match(
     prepare,
-    "np_conditional_x_weighted_blas_profitable(",
+    "np_apple_conditional_x_weighted_blas_profitable(",
     fixed = TRUE
   )
   expect_match(
