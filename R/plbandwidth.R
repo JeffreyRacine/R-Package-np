@@ -91,16 +91,13 @@ plbandwidth <-
       kerub = ckerub,
       argprefix = "cker")
     ncon <- sum(zdati$icon)
-    if (identical(spec$regtype.engine, "lp") && ncon > 0L && is.finite(nobs)) {
-      lp.dim <- dim_basis(basis = spec$basis.engine,
-                          kernel = TRUE,
-                          degree = spec$degree.engine,
-                          segments = rep.int(1L, ncon))
-      if (is.finite(lp.dim) && lp.dim > (nobs - 1.0))
-        stop(sprintf("LP basis dimension (%s) exceeds nobs - 1 (%s); reduce degree",
-                     format(lp.dim, trim = TRUE, scientific = FALSE),
-                     format(nobs - 1.0, trim = TRUE, scientific = FALSE)))
-    }
+    if (identical(spec$regtype.engine, "lp") && ncon > 0L && is.finite(nobs))
+      npValidateLpBasisAdmission(
+        basis = spec$basis.engine,
+        degree = spec$degree.engine,
+        nobs = nobs,
+        where = "plbandwidth"
+      )
 
     porder = switch( ckerorder/2, "Second-Order", "Fourth-Order", "Sixth-Order",
       "Eighth-Order" )

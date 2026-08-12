@@ -155,6 +155,15 @@ conbandwidth <-
       !bounded_nonfixed_supported)
     stop("finite continuous kernel bounds require bwtype = \"fixed\"")
 
+  if (identical(regtype.engine, "lp") && sum(xdati$icon) > 0L &&
+      is.finite(nobs))
+    npValidateLpBasisAdmission(
+      basis = basis.engine,
+      degree = degree.engine,
+      nobs = nobs,
+      where = "conbandwidth"
+    )
+
   pxorder = switch( cxkerorder/2, "Second-Order", "Fourth-Order", "Sixth-Order", "Eighth-Order" )
   pyorder = switch( cykerorder/2, "Second-Order", "Fourth-Order", "Sixth-Order", "Eighth-Order" )
 

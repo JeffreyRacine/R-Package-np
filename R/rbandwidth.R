@@ -100,16 +100,13 @@ rbandwidth <-
     ncon = ncon,
     where = "rbandwidth"
   )
-  if (identical(regtype, "lp") && ncon > 0L && is.finite(nobs)) {
-    lp.dim <- dim_basis(basis = basis,
-                        kernel = TRUE,
-                        degree = degree,
-                        segments = rep.int(1L, ncon))
-    if (is.finite(lp.dim) && lp.dim > (nobs - 1.0))
-      stop(sprintf("LP basis dimension (%s) exceeds nobs - 1 (%s); reduce degree",
-                   format(lp.dim, trim = TRUE, scientific = FALSE),
-                   format(nobs - 1.0, trim = TRUE, scientific = FALSE)))
-  }
+  if (identical(reg.spec$regtype.engine, "lp") && ncon > 0L && is.finite(nobs))
+    npValidateLpBasisAdmission(
+      basis = reg.spec$basis.engine,
+      degree = reg.spec$degree.engine,
+      nobs = nobs,
+      where = "rbandwidth"
+    )
 
   porder = switch( ckerorder/2, "Second-Order", "Fourth-Order", "Sixth-Order", "Eighth-Order" )
   ## calculate some info to be pretty-printed
