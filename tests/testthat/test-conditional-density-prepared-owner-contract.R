@@ -54,7 +54,8 @@ test_that("MPI conditional-density bandwidth state has one typed owner", {
     "matrix_y_continuous_original", "matrix_xy_unordered_original",
     "matrix_xy_ordered_original", "matrix_xy_continuous_original",
     "extendednn_upper", "powell_directions", "vector_scale_factor",
-    "scale_factor_startbest", "powell_step", "ipt_x", "ipt_y", "ipt_xy"
+    "scale_factor_startbest", "powell_step", "ipt_x", "ipt_y", "ipt_xy",
+    "penalty_ready", "penalty_value"
   )) {
     expect_match(
       clear,
@@ -71,6 +72,14 @@ test_that("MPI conditional-density bandwidth state has one typed owner", {
     fixed = TRUE
   )
   expect_match(clear, "bwm_clear_floor_context();", fixed = TRUE)
+  expect_match(
+    source, "np_conditional_density_refresh_penalty_canonical(", fixed = TRUE
+  )
+  expect_match(
+    source,
+    "bwm_penalty_mode = np_conditional_density_prepared_context.penalty_ready;",
+    fixed = TRUE
+  )
   expect_false(grepl("nomad_shadow", source, fixed = TRUE))
 })
 

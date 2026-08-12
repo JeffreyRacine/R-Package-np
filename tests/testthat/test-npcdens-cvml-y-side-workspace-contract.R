@@ -177,3 +177,68 @@ test_that("scalar categorical-response CVML matches the direct fixed oracle", {
     expect_equal(native, oracle, tolerance = 2e-12, info = case_name)
   }
 })
+
+test_that("prepared scalar categorical CVML retains the canonical finite penalty", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  old_options <- options(npRmpi.autodispatch = FALSE)
+  on.exit(options(old_options), add = TRUE)
+
+  n <- 64L
+  x <- data.frame(x = seq(0, 1, length.out = n))
+  y <- data.frame(y = factor(rep(letters[1:5], length.out = n)))
+  local_eval <- getFromNamespace(".npRmpi_with_local_regression", "npRmpi")
+  bw <- local_eval(npcdensbw(
+    xdat = x, ydat = y, regtype = "lc", bwmethod = "cv.ml",
+    bwtype = "fixed", bws = c(0.4, 0.00025),
+    bandwidth.compute = FALSE
+  ))
+  oracle <- getFromNamespace(".npcdensbw_eval_only", "npRmpi")(
+    xdat = x, ydat = y, bws = bw,
+    invalid.penalty = "baseline", penalty.multiplier = 10
+  )
+  prep <- getFromNamespace(".npcdensbw_prepared_prepare_args", "npRmpi")(
+    xdat = x, ydat = y, bws = bw, start.bw = c(bw$ybw, bw$xbw),
+    invalid.penalty = "baseline", penalty.multiplier = 10,
+    degree.search = TRUE
+  )
+
+  cmd <- substitute(local({
+    ns <- asNamespace("npRmpi")
+    prepare <- get(
+      "npRmpiPreparedObjectivePrepareConditionalDensity", envir = ns
+    )
+    evaluate <- get(
+      "npRmpiPreparedObjectiveEvalConditionalDensity", envir = ns
+    )
+    destroy <- get(
+      "npRmpiPreparedObjectiveDestroyConditionalDensity", envir = ns
+    )
+    p <- PREP
+    prepared <- prepare(
+      c.uno = p$c.uno, c.ord = p$c.ord, c.con = p$c.con,
+      u.uno = p$u.uno, u.ord = p$u.ord, u.con = p$u.con,
+      mysd = p$mysd, myopti = p$myopti, myoptd = p$myoptd,
+      rbw = p$rbw, penalty.mode = p$penalty_mode,
+      penalty.multiplier = p$penalty_multiplier, degree = p$degree,
+      bernstein = p$bernstein, basis = p$basis, regtype = p$regtype,
+      cxkerlb = p$cxkerlb, cxkerub = p$cxkerub,
+      cykerlb = p$cykerlb, cykerub = p$cykerub
+    )
+    mpi.barrier(1L)
+    first <- evaluate(bw = as.double(p$rbw), degree = as.integer(p$degree))
+    second <- evaluate(bw = as.double(p$rbw), degree = as.integer(p$degree))
+    mpi.barrier(1L)
+    destroy()
+    list(prepared = prepared, first = first, second = second)
+  }), list(PREP = prep))
+  distributed <- getFromNamespace(".npRmpi_bcast_cmd_expr", "npRmpi")(
+    cmd, comm = 1L, caller.execute = TRUE
+  )
+
+  expect_true(distributed$prepared)
+  expect_lt(oracle$objective, -1e3)
+  expect_gt(oracle$objective, -1e7)
+  expect_equal(distributed$first[[1L]], oracle$objective, tolerance = 2e-12)
+  expect_identical(distributed$second, distributed$first)
+})

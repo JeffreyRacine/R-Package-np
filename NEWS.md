@@ -1,5 +1,13 @@
 # npRmpi 0.70-6
 
+* Conditional-density native degree search now constructs its finite invalid-
+  candidate penalty once from the same canonical baseline-and-retry rule as
+  the ordinary bandwidth route and restores that rank-common value before
+  every candidate. This repairs false `-10000000` NOMAD baselines in
+  `npcdens()` and `npconmode()` while preserving the incumbent vectorized
+  width-one CVML owner, public evaluation accounting, and linear rank-local
+  storage.
+
 * MPI autodispatch now materializes S3 forwarded arguments exclusively from
   the method frame that owns their promises. Named `...` controls, explicit
   `NULL`, and omitted arguments retain their identities without scanning
