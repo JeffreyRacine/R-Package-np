@@ -43,12 +43,7 @@ test_that("adaptive regression BLAS eligibility is narrow and bounded", {
   expect_match(compact, "nterms < 4", fixed = TRUE)
   expect_match(
     body,
-    "!np_mseries_accelerate_enabled_cache",
-    fixed = TRUE
-  )
-  expect_match(
-    body,
-    "!np_conditional_x_weighted_blas_profitable(",
+    "!np_apple_conditional_x_weighted_blas_profitable(",
     fixed = TRUE
   )
   expect_match(

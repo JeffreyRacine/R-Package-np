@@ -49,7 +49,7 @@ test_that("adaptive X-row context owns one bounded weighted-design slab", {
   )
   expect_match(
     prepare,
-    "np_conditional_x_weighted_blas_profitable(",
+    "np_apple_conditional_x_weighted_blas_profitable(",
     fixed = TRUE
   )
   expect_match(

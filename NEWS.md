@@ -1,5 +1,10 @@
 # np 0.70-6
 
+* `options(np.macMseries.accelerate = FALSE)` now disables the
+  Apple-qualified weighted-design and conditional LP transpose-GEMV siblings
+  consistently. Ordinary BLAS/LAPACK algebra remains available independently
+  of this option, and `TRUE`/`"auto"` retain the qualified Apple-arm64 owners.
+
 * Generalized fixed-bandwidth local-polynomial CV objectives of basis width
   six now retain only the unique upper triangle of their symmetric weighted
   Gram rows and mirror it once before solving. Serial unordered-pair and MPI

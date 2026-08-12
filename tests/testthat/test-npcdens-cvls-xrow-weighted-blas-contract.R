@@ -31,7 +31,7 @@ test_that("conditional CVLS weighted BLAS gate is narrow and memory bounded", {
   all_source <- paste(lines, collapse = "\n")
   gate <- xrow_weighted_blas_source_body(
     lines,
-    "^static int np_conditional_x_weighted_blas_profitable\\(",
+    "^static int np_apple_conditional_x_weighted_blas_profitable\\(",
     "^static void np_blas_dgemv_t_int\\("
   )
 
@@ -51,6 +51,7 @@ test_that("conditional CVLS weighted BLAS gate is narrow and memory bounded", {
     fixed = TRUE
   )
   expect_match(gate, "#if NP_ACCEL_GAUSS_COMPILED", fixed = TRUE)
+  expect_match(gate, "!np_mseries_accelerate_enabled_cache", fixed = TRUE)
   expect_match(
     gate,
     "nrows < NP_CONDITIONAL_X_WEIGHTED_BLAS_MIN_ROWS",
@@ -86,7 +87,7 @@ test_that("canonical CVLS weighted BLAS preserves signed row algebra and fallbac
   expect_match(body, "BANDWIDTH_den_extern != BW_GEN_NN", fixed = TRUE)
   expect_match(
     body,
-    "np_conditional_x_weighted_blas_profitable(",
+    "np_apple_conditional_x_weighted_blas_profitable(",
     fixed = TRUE
   )
   expect_match(
@@ -167,7 +168,7 @@ test_that("generalized-NN CVLS reaches the same weighted BLAS implementation", {
   expect_match(body, "BANDWIDTH_den_extern != BW_FIXED", fixed = TRUE)
   expect_match(
     body,
-    "np_conditional_x_weighted_blas_profitable(",
+    "np_apple_conditional_x_weighted_blas_profitable(",
     fixed = TRUE
   )
   expect_match(
@@ -246,7 +247,7 @@ test_that("shared conditional full-row blocks reuse bounded weighted BLAS", {
 
   expect_match(
     body,
-    "np_conditional_x_weighted_blas_profitable(",
+    "np_apple_conditional_x_weighted_blas_profitable(",
     fixed = TRUE
   )
   expect_match(
@@ -302,7 +303,7 @@ test_that("weighted BLAS remains isolated from adjacent conditional routes", {
   expect_false(grepl("weighted_design", density_body, fixed = TRUE))
   expect_false(grepl("weighted_design", distribution_body, fixed = TRUE))
   expect_false(grepl(
-    "np_conditional_x_weighted_blas_profitable",
+    "np_apple_conditional_x_weighted_blas_profitable",
     distribution_body,
     fixed = TRUE
   ))
