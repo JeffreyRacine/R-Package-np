@@ -103,10 +103,10 @@ test_that("canonical LP CV route predicates remain centralized", {
     canonical_body,
     fixed = TRUE
   ))
-  expect_true(grepl("const int *kernel_c", canonical_body, fixed = TRUE))
-  expect_true(grepl("int_glp_basis_extern != 1", canonical_body, fixed = TRUE))
-  expect_true(grepl("NP_REG_CV_LP_TOPOLOGY_GAUSSIAN_MAX_TERMS", canonical_body, fixed = TRUE))
-  expect_true(grepl("NP_REG_CV_LP_TOPOLOGY_EPAN_MAX_TERMS", canonical_body, fixed = TRUE))
+  expect_false(grepl("const int *kernel_c", canonical_body, fixed = TRUE))
+  expect_false(grepl("int_glp_basis_extern", canonical_body, fixed = TRUE))
+  expect_false(grepl("NP_REG_CV_LP_TOPOLOGY_GAUSSIAN_MAX_TERMS", canonical_body, fixed = TRUE))
+  expect_false(grepl("NP_REG_CV_LP_TOPOLOGY_EPAN_MAX_TERMS", canonical_body, fixed = TRUE))
   expect_false(grepl("use_bernstein", canonical_body, fixed = TRUE))
   expect_false(any(grepl(
     "np_regression_cv_lp_rawbasis_fixed",
