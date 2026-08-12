@@ -1,5 +1,13 @@
 # np 0.70-6
 
+* Fixed-bandwidth degree-zero conditional-density CVML with two or three
+  compact-support explanatory dimensions now retains sparse tree traversal in
+  the canonical scalar joint/marginal owner instead of entering the dense LP
+  block stream. The selector is based only on prepared engine topology and
+  preserves `np.tree = "auto"` kernel eligibility, LC/raw-LP0/Bernstein-LP0
+  equivalence, linear auxiliary storage, and existing wider, positive-degree,
+  nearest-neighbour, dense, and MPI owners.
+
 * `npconmode()` now evaluates categorical response levels through one
   memory-bounded conditional-density batch instead of rebuilding the same fit
   lifecycle for every level. Requested class-probability gradients retain one

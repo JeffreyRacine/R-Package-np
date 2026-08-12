@@ -277,7 +277,7 @@ test_that("conditional width-one blocks share one raw row without LAPACK", {
   expect_false(grepl("np_glp_qr_drop_workspace", body, fixed = TRUE))
 })
 
-test_that("conditional scalar fast streams retain the adaptive-NN oracle", {
+test_that("conditional scalar streams select their canonical topology owner", {
   candidates <- c(
     test_path("..", "..", "src", "jksum.c"),
     test_path("..", "..", "..", "src", "jksum.c"),
@@ -329,6 +329,48 @@ test_that("conditional scalar fast streams retain the adaptive-NN oracle", {
   )
   expect_true(grepl(
     "num_reg_continuous_extern > 1",
+    cvml_support,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
+    "np_conditional_density_cvml_scalar_sparse_batch_supported()",
+    cvml_support,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
+    "never public regtype spelling or measured run time",
+    cvml_support,
+    fixed = TRUE
+  ))
+  sparse_support_start <- regexpr(
+    "np_conditional_density_cvml_scalar_sparse_batch_supported(void){",
+    support,
+    fixed = TRUE
+  )
+  expect_gt(sparse_support_start, 0L)
+  sparse_support <- substr(
+    support,
+    sparse_support_start,
+    cvml_support_start - 1L
+  )
+  expect_true(grepl(
+    "BANDWIDTH_den_extern == BW_FIXED",
+    sparse_support,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
+    "num_reg_continuous_extern >= 2",
+    sparse_support,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
+    "num_reg_continuous_extern <= 3",
+    sparse_support,
+    fixed = TRUE
+  ))
+  expect_true(grepl("int_TREE_X == NP_TREE_TRUE", sparse_support, fixed = TRUE))
+  expect_true(grepl(
+    "Width one has two canonical serial microkernels",
     cvml_support,
     fixed = TRUE
   ))

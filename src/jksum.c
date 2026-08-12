@@ -31888,10 +31888,29 @@ int np_conditional_lp_stream_engine_supported(void){
      (BANDWIDTH_den_extern != BW_ADAP_NN));
 }
 
+static int
+np_conditional_density_cvml_scalar_sparse_batch_supported(void){
+  return (BANDWIDTH_den_extern == BW_FIXED) &&
+    (num_reg_continuous_extern >= 2) &&
+    (num_reg_continuous_extern <= 3) &&
+    (int_TREE_X == NP_TREE_TRUE);
+}
+
 int np_conditional_density_cvml_stream_engine_supported(void){
+  /*
+   * Width one has two canonical serial microkernels.  Dense rows and wider X
+   * topologies favor the conditional LP block stream.  For fixed bandwidths
+   * with two or three continuous X variables, an active X tree favors the
+   * maintained scalar joint/marginal batch, which preserves sparse traversal
+   * without materializing and normalizing complete X rows.  Generalized-NN
+   * rows retain their incumbent stream: their small-neighbor crossover is
+   * materially different.  This selector depends on engine width and
+   * prepared topology, never public regtype spelling or measured run time.
+   */
   return (np_lp_engine_extern == NP_LP_ENGINE_GENERAL) ||
     ((np_lp_engine_extern == NP_LP_ENGINE_SCALAR) &&
      (num_reg_continuous_extern > 1) &&
+     !np_conditional_density_cvml_scalar_sparse_batch_supported() &&
      (BANDWIDTH_den_extern != BW_ADAP_NN));
 }
 
