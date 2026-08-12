@@ -29,12 +29,14 @@
   selection, and result arithmetic are unchanged; temporary evaluation rows
   are capped independently of the number of response levels.
 
-* Eligible additive and tensor fixed-bandwidth local-polynomial CV objectives
-  now use the canonical resident-row engine already shared by generalized LP.
-  The capability boundary is kernel- and width-based: Gaussian widths through
-  three, dense Epanechnikov widths through four, and qualified sparse-tree
-  Epanechnikov rows at wider widths. CVAIC is unchanged; uniform and routed
-  bounded kernels retain their incumbent low-support path.
+* Eligible fixed-bandwidth local-polynomial CV objectives now apply the same
+  basis-neutral owner rule to generalized, additive, and tensor bases:
+  resident accumulation through basis width six, packed BLAS from width seven,
+  and the independently qualified generic resident owner for sparse tree rows.
+  The hoisted basis, canonical solve, deletion, projection, and loss arithmetic
+  are shared; no basis-family or kernel-spelling fallback remains. Widths five
+  and six retain only the unique symmetric Gram triangle during accumulation
+  and mirror it once before solving.
 
 * Fixed-bandwidth compact-support `npscoef` objectives now pack each sparse
   tree row's active support into the existing BLAS outer-product engine for
