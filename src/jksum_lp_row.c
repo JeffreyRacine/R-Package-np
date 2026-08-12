@@ -47,8 +47,8 @@ static inline void np_lp_dense_support_add(const int row,
 
 /*
   MPI transport assigns a complete evaluation row to one rank. For widths
-  2--5, retain every Gram cell in local accumulators across the observation
-  sweep and write it once. Width six has the explicit upper-triangle sibling
+  2--4, retain every Gram cell in local accumulators across the observation
+  sweep and write it once. Widths five and six have the symmetric siblings
   below. Width one remains in the caller's basis-free scalar route; widths
   seven and above retain the generic fallback.
 */
@@ -104,62 +104,68 @@ static void np_lp_accumulate_owned_row_##WIDTH(                             \
 NP_LP_DEFINE_OWNED_WIDTH(2)
 NP_LP_DEFINE_OWNED_WIDTH(3)
 NP_LP_DEFINE_OWNED_WIDTH(4)
-NP_LP_DEFINE_OWNED_WIDTH(5)
 
 #undef NP_LP_DEFINE_OWNED_WIDTH
 
 /*
- * A rank owns this complete evaluation row. At width six retain only the
- * unique upper Gram triangle; the caller mirrors it after the collective has
- * assembled the complete row set.
+ * A rank owns this complete evaluation row. At widths five and six retain
+ * only the unique upper Gram triangle; the caller mirrors it after the
+ * collective has assembled the complete row set. Compile-time widths keep
+ * the owned-row inner loop specialized without duplicating its lifecycle.
  */
-static void np_lp_accumulate_owned_row_6(
-    const NPLPOwnedRowContext *ctx)
-{
-  enum { width = 6 };
-  int i, a, b;
-  double fixed_moments[width*width];
-  double fixed_rhs[width];
-  double * const stored_moments =
-    ctx->moments + (size_t)ctx->row_j*(size_t)width*(size_t)width;
-  double * const stored_rhs =
-    ctx->rhs + (size_t)ctx->row_j*(size_t)width;
-
-  for(a = 0; a < width; a++){
-    fixed_rhs[a] = stored_rhs[a];
-    for(b = a; b < width; b++)
-      fixed_moments[a*width+b] = stored_moments[a*width+b];
-  }
-
-  for(i = 0; i < ctx->nobs; i++){
-    const int ii = ctx->use_tree ? ctx->tree_lookup[i] : i;
-    const double weight = ctx->weights[ii];
-    double yi;
-
-    if((i == ctx->row_j) || (weight == 0.0))
-      continue;
-
-    if(ctx->track_lowsupport)
-      np_lp_dense_support_add(ctx->row_j, i, ii, weight, width,
-                              ctx->support_count, ctx->support_orig,
-                              ctx->support_data, ctx->support_weight);
-
-    yi = ctx->response[ii];
-    for(a = 0; a < width; a++){
-      const double bia = ctx->basis[a][ii];
-      const double weighted_bia = weight*bia;
-      fixed_rhs[a] += weighted_bia*yi;
-      for(b = a; b < width; b++)
-        fixed_moments[a*width+b] += weighted_bia*ctx->basis[b][ii];
-    }
-  }
-
-  for(a = 0; a < width; a++){
-    stored_rhs[a] = fixed_rhs[a];
-    for(b = a; b < width; b++)
-      stored_moments[a*width+b] = fixed_moments[a*width+b];
-  }
+#define NP_LP_DEFINE_SYMMETRIC_OWNED_WIDTH(WIDTH)                           \
+static void np_lp_accumulate_owned_row_##WIDTH(                             \
+    const NPLPOwnedRowContext *ctx)                                         \
+{                                                                            \
+  int i, a, b;                                                               \
+  double fixed_moments[(WIDTH)*(WIDTH)];                                     \
+  double fixed_rhs[(WIDTH)];                                                 \
+  double * const stored_moments =                                           \
+    ctx->moments + (size_t)ctx->row_j*(size_t)(WIDTH)*(size_t)(WIDTH);       \
+  double * const stored_rhs =                                               \
+    ctx->rhs + (size_t)ctx->row_j*(size_t)(WIDTH);                           \
+                                                                             \
+  for(a = 0; a < (WIDTH); a++){                                              \
+    fixed_rhs[a] = stored_rhs[a];                                            \
+    for(b = a; b < (WIDTH); b++)                                             \
+      fixed_moments[a*(WIDTH)+b] = stored_moments[a*(WIDTH)+b];              \
+  }                                                                          \
+                                                                             \
+  for(i = 0; i < ctx->nobs; i++){                                            \
+    const int ii = ctx->use_tree ? ctx->tree_lookup[i] : i;                 \
+    const double weight = ctx->weights[ii];                                 \
+    double yi;                                                               \
+                                                                             \
+    if((i == ctx->row_j) || (weight == 0.0))                                \
+      continue;                                                              \
+                                                                             \
+    if(ctx->track_lowsupport)                                                \
+      np_lp_dense_support_add(ctx->row_j, i, ii, weight, (WIDTH),           \
+                              ctx->support_count, ctx->support_orig,          \
+                              ctx->support_data, ctx->support_weight);        \
+                                                                             \
+    yi = ctx->response[ii];                                                   \
+    for(a = 0; a < (WIDTH); a++){                                            \
+      const double bia = ctx->basis[a][ii];                                 \
+      const double weighted_bia = weight*bia;                               \
+      fixed_rhs[a] += weighted_bia*yi;                                      \
+      for(b = a; b < (WIDTH); b++)                                          \
+        fixed_moments[a*(WIDTH)+b] +=                                       \
+          weighted_bia*ctx->basis[b][ii];                                   \
+    }                                                                        \
+  }                                                                          \
+                                                                             \
+  for(a = 0; a < (WIDTH); a++){                                              \
+    stored_rhs[a] = fixed_rhs[a];                                            \
+    for(b = a; b < (WIDTH); b++)                                             \
+      stored_moments[a*(WIDTH)+b] = fixed_moments[a*(WIDTH)+b];              \
+  }                                                                          \
 }
+
+NP_LP_DEFINE_SYMMETRIC_OWNED_WIDTH(5)
+NP_LP_DEFINE_SYMMETRIC_OWNED_WIDTH(6)
+
+#undef NP_LP_DEFINE_SYMMETRIC_OWNED_WIDTH
 
 attribute_hidden int
 np_lp_accumulate_owned_resident_row(const NPLPOwnedRowContext *ctx)
@@ -319,7 +325,6 @@ static void np_lp_accumulate_dense_row_##WIDTH(                             \
 
 NP_LP_DEFINE_RESIDENT_WIDTH(2)
 NP_LP_DEFINE_RESIDENT_WIDTH(4)
-NP_LP_DEFINE_RESIDENT_WIDTH(5)
 NP_LP_DEFINE_RESIDENT_WIDTH(7)
 NP_LP_DEFINE_RESIDENT_WIDTH(8)
 NP_LP_DEFINE_RESIDENT_WIDTH(9)
@@ -334,95 +339,111 @@ NP_LP_DEFINE_RESIDENT_WIDTH(16)
 #undef NP_LP_DEFINE_RESIDENT_WIDTH
 
 /*
- * Width six is the first dense generalized-LP row for which the complete
- * Gram update loses to redundant symmetric arithmetic. Keep only the unique
- * upper triangle during the unordered-pair sweep; the caller mirrors it once
- * after every row is complete.
+ * At widths five and six, retaining the complete symmetric Gram row performs
+ * enough redundant arithmetic to lose to packed accumulation at scale. Keep
+ * only the unique upper triangle during the unordered-pair sweep; the caller
+ * mirrors it once after every row is complete. Compile-time widths preserve
+ * the small fixed-size specialization and keep the odd-width SIMD tail safe.
  */
-static void np_lp_accumulate_dense_row_6(
-    const NPLPDenseRowContext *ctx)
-{
-  enum { width = 6 };
-  int i, a, b;
-  double fixed_moments[width*width];
-  double fixed_rhs[width];
-  double * const stored_moments =
-    ctx->moments + (size_t)ctx->row_j*(size_t)width*(size_t)width;
-  double * const stored_rhs =
-    ctx->rhs + (size_t)ctx->row_j*(size_t)width;
+#define NP_LP_DEFINE_SYMMETRIC_RESIDENT_WIDTH(WIDTH)                        \
+static void np_lp_accumulate_dense_row_##WIDTH(                             \
+    const NPLPDenseRowContext *ctx)                                         \
+{                                                                            \
+  int i, a, b;                                                               \
+  double fixed_moments[(WIDTH)*(WIDTH)];                                     \
+  double fixed_rhs[(WIDTH)];                                                 \
+  double * const stored_moments =                                           \
+    ctx->moments + (size_t)ctx->row_j*(size_t)(WIDTH)*(size_t)(WIDTH);       \
+  double * const stored_rhs =                                               \
+    ctx->rhs + (size_t)ctx->row_j*(size_t)(WIDTH);                           \
+                                                                             \
+  for(a = 0; a < (WIDTH); a++){                                              \
+    fixed_rhs[a] = stored_rhs[a];                                            \
+    for(b = a; b < (WIDTH); b++)                                             \
+      fixed_moments[a*(WIDTH)+b] = stored_moments[a*(WIDTH)+b];              \
+  }                                                                          \
+                                                                             \
+  for(i = 0; i < ctx->nsub; i++){                                            \
+    const int orig_ii = ctx->row_j + 1 + i;                                 \
+    const int ii = ctx->use_tree ? ctx->tree_lookup[orig_ii] : orig_ii;      \
+    const int widx = ctx->use_tree ? ii : i;                                \
+    const double weight = ctx->weights[widx];                               \
+    double *moving_moments;                                                  \
+    double *moving_rhs;                                                      \
+    double yi;                                                               \
+                                                                             \
+    if(weight == 0.0)                                                        \
+      continue;                                                              \
+                                                                             \
+    if(ctx->track_lowsupport){                                               \
+      np_lp_dense_support_add(ctx->row_j, orig_ii, ii, weight, (WIDTH),      \
+                              ctx->support_count, ctx->support_orig,          \
+                              ctx->support_data, ctx->support_weight);        \
+      np_lp_dense_support_add(orig_ii, ctx->row_j, ctx->eval_idx, weight,    \
+                              (WIDTH), ctx->support_count,                    \
+                              ctx->support_orig, ctx->support_data,           \
+                              ctx->support_weight);                           \
+    }                                                                        \
+                                                                             \
+    yi = ctx->response[ii];                                                   \
+    moving_moments =                                                        \
+      ctx->moments + (size_t)orig_ii*(size_t)(WIDTH)*(size_t)(WIDTH);        \
+    moving_rhs = ctx->rhs + (size_t)orig_ii*(size_t)(WIDTH);                 \
+    for(a = 0; a < (WIDTH); a++){                                            \
+      const double bia = ctx->basis[a][ii];                                 \
+      const double weighted_bia = weight*bia;                               \
+      fixed_rhs[a] += weighted_bia*yi;                                      \
+      for(b = a; b < (WIDTH); b++)                                          \
+        fixed_moments[a*(WIDTH)+b] +=                                       \
+          weighted_bia*ctx->basis[b][ii];                                   \
+    }                                                                        \
+NP_LP_SYMMETRIC_MOVING_UPDATE(WIDTH)                                        \
+  }                                                                          \
+                                                                             \
+  for(a = 0; a < (WIDTH); a++){                                              \
+    stored_rhs[a] = fixed_rhs[a];                                            \
+    for(b = a; b < (WIDTH); b++)                                             \
+      stored_moments[a*(WIDTH)+b] = fixed_moments[a*(WIDTH)+b];              \
+  }                                                                          \
+}
 
-  for(a = 0; a < width; a++){
-    fixed_rhs[a] = stored_rhs[a];
-    for(b = a; b < width; b++)
-      fixed_moments[a*width+b] = stored_moments[a*width+b];
-  }
-
-  for(i = 0; i < ctx->nsub; i++){
-    const int orig_ii = ctx->row_j + 1 + i;
-    const int ii = ctx->use_tree ? ctx->tree_lookup[orig_ii] : orig_ii;
-    const int widx = ctx->use_tree ? ii : i;
-    const double weight = ctx->weights[widx];
-    double *moving_moments;
-    double *moving_rhs;
-    double yi;
-
-    if(weight == 0.0)
-      continue;
-
-    if(ctx->track_lowsupport){
-      np_lp_dense_support_add(ctx->row_j, orig_ii, ii, weight, width,
-                              ctx->support_count, ctx->support_orig,
-                              ctx->support_data, ctx->support_weight);
-      np_lp_dense_support_add(orig_ii, ctx->row_j, ctx->eval_idx, weight,
-                              width, ctx->support_count, ctx->support_orig,
-                              ctx->support_data, ctx->support_weight);
-    }
-
-    yi = ctx->response[ii];
-    moving_moments =
-      ctx->moments + (size_t)orig_ii*(size_t)width*(size_t)width;
-    moving_rhs = ctx->rhs + (size_t)orig_ii*(size_t)width;
-    for(a = 0; a < width; a++){
-      const double bia = ctx->basis[a][ii];
-      const double weighted_bia = weight*bia;
-      fixed_rhs[a] += weighted_bia*yi;
-      for(b = a; b < width; b++)
-        fixed_moments[a*width+b] += weighted_bia*ctx->basis[b][ii];
-    }
 #if NP_LP_ROW_NEON
-    {
-      const float64x2_t vw = vdupq_n_f64(weight);
-      for(a = 0; a < width; a += 2)
-        vst1q_f64(moving_rhs + a,
-                  vfmaq_f64(vld1q_f64(moving_rhs + a), vw,
-                            vld1q_f64(ctx->eval_ybasis + a)));
-      for(a = 0; a < width; a++){
-        const int begin = a*width+a;
-        const int end = a*width+width;
-        int pos = begin;
-        for(; pos + 1 < end; pos += 2)
-          vst1q_f64(moving_moments + pos,
-                    vfmaq_f64(vld1q_f64(moving_moments + pos), vw,
-                              vld1q_f64(ctx->eval_outer + pos)));
-        if(pos < end)
-          moving_moments[pos] += weight*ctx->eval_outer[pos];
-      }
+#define NP_LP_SYMMETRIC_MOVING_UPDATE(WIDTH)                                \
+    {                                                                        \
+      const float64x2_t vw = vdupq_n_f64(weight);                           \
+      for(a = 0; a + 1 < (WIDTH); a += 2)                                  \
+        vst1q_f64(moving_rhs + a,                                           \
+                  vfmaq_f64(vld1q_f64(moving_rhs + a), vw,                  \
+                            vld1q_f64(ctx->eval_ybasis + a)));               \
+      if(a < (WIDTH))                                                       \
+        moving_rhs[a] += weight*ctx->eval_ybasis[a];                        \
+      for(a = 0; a < (WIDTH); a++){                                         \
+        const int begin = a*(WIDTH)+a;                                      \
+        const int end = a*(WIDTH)+(WIDTH);                                  \
+        int pos = begin;                                                     \
+        for(; pos + 1 < end; pos += 2)                                      \
+          vst1q_f64(moving_moments + pos,                                   \
+                    vfmaq_f64(vld1q_f64(moving_moments + pos), vw,          \
+                              vld1q_f64(ctx->eval_outer + pos)));            \
+        if(pos < end)                                                       \
+          moving_moments[pos] += weight*ctx->eval_outer[pos];               \
+      }                                                                      \
     }
 #else
-    for(a = 0; a < width; a++){
-      moving_rhs[a] += weight*ctx->eval_ybasis[a];
-      for(b = a; b < width; b++)
-        moving_moments[a*width+b] += weight*ctx->eval_outer[a*width+b];
+#define NP_LP_SYMMETRIC_MOVING_UPDATE(WIDTH)                                \
+    for(a = 0; a < (WIDTH); a++){                                           \
+      moving_rhs[a] += weight*ctx->eval_ybasis[a];                          \
+      for(b = a; b < (WIDTH); b++)                                          \
+        moving_moments[a*(WIDTH)+b] +=                                      \
+          weight*ctx->eval_outer[a*(WIDTH)+b];                              \
     }
 #endif
-  }
 
-  for(a = 0; a < width; a++){
-    stored_rhs[a] = fixed_rhs[a];
-    for(b = a; b < width; b++)
-      stored_moments[a*width+b] = fixed_moments[a*width+b];
-  }
-}
+NP_LP_DEFINE_SYMMETRIC_RESIDENT_WIDTH(5)
+NP_LP_DEFINE_SYMMETRIC_RESIDENT_WIDTH(6)
+
+#undef NP_LP_DEFINE_SYMMETRIC_RESIDENT_WIDTH
+#undef NP_LP_SYMMETRIC_MOVING_UPDATE
 
 void np_lp_accumulate_dense_resident_row3(
     const int row_j,

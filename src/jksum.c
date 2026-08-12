@@ -17084,7 +17084,7 @@ lp_cv_collective_gate:
   if((nterms == 3) && (use_sparse_tree || !use_mpi_transport))
     np_lp_mirror_dense_moments_row3(moments, num_obs);
   else if((use_sparse_tree && (nterms > 5)) ||
-          (!use_sparse_tree && (nterms == 6)))
+          (!use_sparse_tree && ((nterms == 5) || (nterms == 6))))
     np_lp_mirror_upper_moments_wide(moments, num_obs, nterms);
 
   result.cv = 0.0;

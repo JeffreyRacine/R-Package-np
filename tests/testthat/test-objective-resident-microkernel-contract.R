@@ -37,7 +37,7 @@ test_that("LP row NEON is an Apple-arm64 moving-row specialization", {
                fixed = TRUE)
 })
 
-test_that("fixed width-six LP CV retains only the unique Gram triangle", {
+test_that("fixed widths five and six retain only the unique Gram triangle", {
   src_dir <- file.path(testthat::test_path("..", ".."), "src")
   row_file <- file.path(src_dir, "jksum_lp_row.c")
   sum_file <- file.path(src_dir, "jksum.c")
@@ -46,13 +46,23 @@ test_that("fixed width-six LP CV retains only the unique Gram triangle", {
 
   row_text <- paste(readLines(row_file, warn = FALSE), collapse = "\n")
   sum_text <- paste(readLines(sum_file, warn = FALSE), collapse = "\n")
-  expect_match(row_text, "static void np_lp_accumulate_dense_row_6\\(")
-  expect_false(grepl("NP_LP_DEFINE_RESIDENT_WIDTH(6)", row_text,
-                     fixed = TRUE))
-  expect_match(row_text, "for\\(b = a; b < width; b\\+\\+\\)")
+  for (width in 5:6) {
+    expect_match(
+      row_text,
+      paste0("NP_LP_DEFINE_SYMMETRIC_RESIDENT_WIDTH\\(", width, "\\)")
+    )
+    expect_false(grepl(
+      paste0("NP_LP_DEFINE_RESIDENT_WIDTH(", width, ")"),
+      row_text,
+      fixed = TRUE
+    ))
+  }
+  expect_match(row_text, "for\\(b = a; b < \\(WIDTH\\); b\\+\\+\\)")
+  expect_match(row_text, "a \\+ 1 < \\(WIDTH\\)")
+  expect_match(row_text, "if\\(a < \\(WIDTH\\)\\)")
   expect_match(
     sum_text,
-    "!use_sparse_tree && \\(nterms == 6\\)"
+    "!use_sparse_tree && \\(\\(nterms == 5\\) \\|\\| \\(nterms == 6\\)\\)"
   )
   expect_match(sum_text, "NP_REG_CV_LP_RESIDENT_MAX_TERMS = 6",
                fixed = TRUE)
@@ -71,14 +81,23 @@ test_that("MPI owned rows specialize widths two through six", {
     row_text,
     "attribute_hidden int\\s+np_lp_accumulate_owned_resident_row"
   )
-  for (width in 2:5)
+  for (width in 2:4)
     expect_match(
       row_text,
       paste0("NP_LP_DEFINE_OWNED_WIDTH\\(", width, "\\)")
     )
   expect_false(grepl("NP_LP_DEFINE_OWNED_WIDTH(1)", row_text, fixed = TRUE))
-  expect_false(grepl("NP_LP_DEFINE_OWNED_WIDTH(6)", row_text, fixed = TRUE))
-  expect_match(row_text, "static void np_lp_accumulate_owned_row_6\\(")
+  for (width in 5:6) {
+    expect_false(grepl(
+      paste0("NP_LP_DEFINE_OWNED_WIDTH(", width, ")"),
+      row_text,
+      fixed = TRUE
+    ))
+    expect_match(
+      row_text,
+      paste0("NP_LP_DEFINE_SYMMETRIC_OWNED_WIDTH\\(", width, "\\)")
+    )
+  }
   expect_match(row_text, "case 6: np_lp_accumulate_owned_row_6\\(ctx\\)")
   expect_match(sum_text, "if\\(nterms == 1\\)")
   expect_match(
