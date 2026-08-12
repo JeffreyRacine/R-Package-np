@@ -47,6 +47,51 @@ test_that("autodispatch materialization resolves ..n placeholders by argument na
   expect_identical(prepared$tmpvals[[bws.ref]], bw.j)
 })
 
+test_that("autodispatch materializes forwarded formals and named dots from one owner frame", {
+  materialize <- getFromNamespace(".npRmpi_autodispatch_materialize_call", "npRmpi")
+
+  owner <- function(dat, bws, ...) {
+    mc <- match.call()
+    mc[[1L]] <- as.name("npudistbw")
+    materialize(mc = mc, caller_env = environment(), comm = 1L)
+  }
+  forward <- function(...) owner(...)
+
+  dat.value <- c(2, 7, 1, 8)
+  bw.value <- 0.35
+  nmulti <- 99L
+  nomad.nmulti <- 77L
+  prepared <- forward(
+    dat = dat.value,
+    bws = bw.value,
+    nmulti = 1L,
+    nomad.nmulti = 0L,
+    proper.control = NULL
+  )
+
+  expect_identical(prepared$tmpvals[[as.character(prepared$call$dat)]], dat.value)
+  expect_identical(prepared$tmpvals[[as.character(prepared$call$bws)]], bw.value)
+  expect_identical(prepared$tmpvals[[as.character(prepared$call$nmulti)]], 1L)
+  expect_identical(prepared$tmpvals[[as.character(prepared$call$nomad.nmulti)]], 0L)
+  expect_true("proper.control" %in% names(as.list(prepared$call)))
+  expect_null(prepared$call$proper.control)
+})
+
+test_that("autodispatch does not discover unresolved arguments in dynamic frames", {
+  materialize <- getFromNamespace(".npRmpi_autodispatch_materialize_call", "npRmpi")
+
+  leaked.control <- 4L
+  owner <- new.env(parent = baseenv())
+  expect_error(
+    materialize(
+      mc = quote(npudistbw(nmulti = leaked.control)),
+      caller_env = owner,
+      comm = 1L
+    ),
+    "leaked.control"
+  )
+})
+
 test_that("autodispatch materialization evaluates proper arguments eagerly", {
   materialize <- getFromNamespace(".npRmpi_autodispatch_materialize_call", "npRmpi")
 

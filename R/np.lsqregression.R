@@ -1570,14 +1570,6 @@ nplsqreg.default <-
     dots.dispatch <- list(...)
     npRejectLegacyBooleanErrors(dots.dispatch, "nplsqreg")
     .npRmpi_require_active_slave_pool(where = "nplsqreg()")
-    if (length(dots.dispatch)) {
-      dot.names <- names(dots.dispatch)
-      if (!is.null(dot.names))
-        # Make S3 `..n` placeholders resolvable by the MPI call materializer.
-        for (nm in dot.names[!is.na(dot.names) & nzchar(dot.names)])
-          if (!exists(nm, envir = environment(), inherits = FALSE))
-            assign(nm, dots.dispatch[[nm]], envir = environment())
-    }
     mc.dispatch <- match.call()
     tau.dispatch <- try(.nplsqreg_validate_tau_values(tau),
                         silent = TRUE)

@@ -1,5 +1,13 @@
 # npRmpi 0.70-6
 
+* MPI autodispatch now materializes S3 forwarded arguments exclusively from
+  the method frame that owns their promises. Named `...` controls, explicit
+  `NULL`, and omitted arguments retain their identities without scanning
+  unrelated dynamic frames. This repairs stack-dependent NOMAD multistart
+  transport in `nplsqregbw()` and removes its obsolete route-local frame
+  assignment while preserving the documented public defaults and native
+  search semantics.
+
 * `options(np.macMseries.accelerate = FALSE)` now disables the
   Apple-qualified weighted-design and conditional LP transpose-GEMV siblings
   consistently. Ordinary BLAS/LAPACK algebra remains available independently

@@ -1573,43 +1573,100 @@
 }
 
 .npRmpi_autodispatch_eval_arg <- function(expr, caller_env) {
-  val <- tryCatch(.npRmpi_eval_scmd(expr, envir = caller_env), error = function(e) e)
-  if (!inherits(val, "error"))
-    return(val)
-
-  frames <- sys.frames()
-  for (i in rev(seq_along(frames))) {
-    env_i <- frames[[i]]
-    if (identical(env_i, caller_env))
-      next
-    val_i <- tryCatch(.npRmpi_eval_scmd(expr, envir = env_i), error = function(e) e)
-    if (!inherits(val_i, "error"))
-      return(val_i)
-  }
-
-  stop(conditionMessage(val), call. = FALSE)
+  .npRmpi_eval_scmd(expr, envir = caller_env)
 }
 
-.npRmpi_autodispatch_lookup_named_arg <- function(argname, caller_env) {
-  if (!is.character(argname) || length(argname) != 1L || is.na(argname) || !nzchar(argname))
-    return(NULL)
+.npRmpi_autodispatch_owner_dot_names <- function(caller_env) {
+  dots.call <- tryCatch(
+    evalq(substitute(list(...)), envir = caller_env),
+    error = function(e) NULL
+  )
+  if (!is.call(dots.call) || length(dots.call) < 1L ||
+      !is.symbol(dots.call[[1L]]) ||
+      !identical(as.character(dots.call[[1L]]), "list"))
+    return(character(0))
 
-  not_found <- new.env(parent = emptyenv())
-  val <- tryCatch(get0(argname, envir = caller_env, inherits = FALSE, ifnotfound = not_found),
-                  error = function(e) not_found)
-  if (!identical(val, not_found))
-    return(val)
+  dots <- as.list(dots.call)[-1L]
+  dot.names <- names(dots)
+  if (is.null(dot.names))
+    dot.names <- rep.int("", length(dots))
+  dot.names[is.na(dot.names)] <- ""
+  dot.names
+}
 
-  frames <- sys.frames()
-  for (i in rev(seq_along(frames))) {
-    env_i <- frames[[i]]
-    val_i <- tryCatch(get0(argname, envir = env_i, inherits = FALSE, ifnotfound = not_found),
-                      error = function(e) not_found)
-    if (!identical(val_i, not_found))
-      return(val_i)
+.npRmpi_autodispatch_owner_dot_value <- function(argname,
+                                                  caller_env,
+                                                  dot.names) {
+  if (!is.character(argname) || length(argname) != 1L ||
+      is.na(argname) || !nzchar(argname) || !length(dot.names))
+    return(list(found = FALSE, value = NULL))
+
+  idx <- which(dot.names == argname)
+  if (!length(idx))
+    return(list(found = FALSE, value = NULL))
+  if (length(idx) > 1L)
+    stop(sprintf("autodispatch cannot materialize duplicate '%s' arguments", argname),
+         call. = FALSE)
+
+  dot.expr <- as.name(sprintf("..%d", idx[[1L]]))
+  list(
+    found = TRUE,
+    value = .npRmpi_autodispatch_eval_arg(dot.expr, caller_env = caller_env)
+  )
+}
+
+.npRmpi_autodispatch_owner_binding <- function(argname, caller_env) {
+  if (!is.character(argname) || length(argname) != 1L ||
+      is.na(argname) || !nzchar(argname) ||
+      !exists(argname, envir = caller_env, inherits = FALSE))
+    return(list(found = FALSE, value = NULL))
+
+  list(
+    found = TRUE,
+    value = get(argname, envir = caller_env, inherits = FALSE)
+  )
+}
+
+.npRmpi_autodispatch_resolve_owned_arg <- function(expr,
+                                                    argname,
+                                                    caller_env,
+                                                    dot.names) {
+  dot.res <- .npRmpi_autodispatch_owner_dot_value(
+    argname = argname,
+    caller_env = caller_env,
+    dot.names = dot.names
+  )
+  if (isTRUE(dot.res$found))
+    return(dot.res$value)
+
+  forwarded <- is.symbol(expr) &&
+    grepl("^\\.\\.[0-9]+$", as.character(expr))
+  if (forwarded) {
+    binding.res <- .npRmpi_autodispatch_owner_binding(
+      argname,
+      caller_env = caller_env
+    )
+    if (!isTRUE(binding.res$found))
+      stop(sprintf("autodispatch cannot resolve forwarded argument '%s' in its owner frame",
+                   argname), call. = FALSE)
+    return(binding.res$value)
   }
 
-  NULL
+  eval.res <- tryCatch(
+    list(ok = TRUE,
+         value = .npRmpi_autodispatch_eval_arg(expr, caller_env = caller_env)),
+    error = function(e) list(ok = FALSE, error = e)
+  )
+  if (isTRUE(eval.res$ok))
+    return(eval.res$value)
+
+  binding.res <- .npRmpi_autodispatch_owner_binding(
+    argname,
+    caller_env = caller_env
+  )
+  if (isTRUE(binding.res$found))
+    return(binding.res$value)
+  stop(conditionMessage(eval.res$error), call. = FALSE)
 }
 
 .npRmpi_autodispatch_materialize_call <- function(mc, caller_env, comm = 1L) {
@@ -1637,6 +1694,14 @@
   prepublish <- list()
   idx <- 0L
   large.arg.threshold <- .npRmpi_autodispatch_large_arg_threshold_for_call(mc)
+  forwarded <- vapply(arg.list, function(expr) {
+    is.symbol(expr) && grepl("^\\.\\.[0-9]+$", as.character(expr))
+  }, logical(1L))
+  owner.dot.names <- if (any(forwarded)) {
+    .npRmpi_autodispatch_owner_dot_names(caller_env)
+  } else {
+    character(0)
+  }
 
   has_data_inputs <- !is.null(nms) && any(nms %in% c("data", "xdat", "ydat", "txdat", "tydat", "zdat"))
 
@@ -1645,26 +1710,53 @@
     formula.expr <- arg.list[[which(nms == "formula")[1L]]]
   } else if (!is.null(nms) && any(nms == "bws")) {
     bexpr <- arg.list[[which(nms == "bws")[1L]]]
-    bval <- tryCatch(.npRmpi_autodispatch_eval_arg(bexpr, caller_env = caller_env),
-                     error = function(e) NULL)
+    bval <- tryCatch(
+      .npRmpi_autodispatch_resolve_owned_arg(
+        expr = bexpr,
+        argname = "bws",
+        caller_env = caller_env,
+        dot.names = owner.dot.names
+      ),
+      error = function(e) NULL
+    )
     if (!is.null(bval) && inherits(bval, "formula"))
       formula.expr <- bexpr
   } else if (length(arg.list) >= 2L) {
     nm2 <- if (!is.null(nms) && length(nms) >= 2L) nms[[2L]] else ""
     if (is.null(nm2) || identical(nm2, "")) {
-      fval <- tryCatch(.npRmpi_autodispatch_eval_arg(arg.list[[2L]], caller_env = caller_env),
-                       error = function(e) NULL)
+      fval <- tryCatch(
+        .npRmpi_autodispatch_resolve_owned_arg(
+          expr = arg.list[[2L]],
+          argname = "bws",
+          caller_env = caller_env,
+          dot.names = owner.dot.names
+        ),
+        error = function(e) NULL
+      )
       if (!is.null(fval) && inherits(fval, "formula"))
         formula.expr <- arg.list[[2L]]
     }
   }
 
   if (!has_data_inputs && !is.null(formula.expr)) {
-    fval <- .npRmpi_autodispatch_eval_arg(formula.expr, caller_env = caller_env)
+    formula.argname <- if (!is.null(nms) && any(nms == "formula")) {
+      "formula"
+    } else {
+      "bws"
+    }
+    fval <- .npRmpi_autodispatch_resolve_owned_arg(
+      expr = formula.expr,
+      argname = formula.argname,
+      caller_env = caller_env,
+      dot.names = owner.dot.names
+    )
     vars <- all.vars(fval)
     if (length(vars)) {
+      formula.env <- environment(fval)
+      if (!is.environment(formula.env))
+        formula.env <- caller_env
       dlist <- setNames(lapply(vars, function(v) {
-        .npRmpi_autodispatch_eval_arg(as.name(v), caller_env = caller_env)
+        .npRmpi_autodispatch_eval_arg(as.name(v), caller_env = formula.env)
       }), vars)
       idx <- idx + 1L
       tmp <- sprintf(".__npRmpi_autod_data_%d", idx)
@@ -1689,28 +1781,16 @@
     if (!nm %in% targets) next
 
     expr_i <- arg.list[[i]]
-    # Nested S3/generic forwarding can emit placeholders like `..1` in
-    # match.call() output. Resolve these using the named formal from dynamic
-    # frames before falling back to raw expression evaluation.
-    if (is.symbol(expr_i) && grepl("^\\.\\.[0-9]+$", as.character(expr_i))) {
-      val <- .npRmpi_autodispatch_lookup_named_arg(nm, caller_env = caller_env)
-      if (is.null(val))
-        val <- .npRmpi_autodispatch_eval_arg(expr_i, caller_env = caller_env)
-    } else {
-      eval.res <- tryCatch(
-        list(ok = TRUE, value = .npRmpi_autodispatch_eval_arg(expr_i, caller_env = caller_env)),
-        error = function(e) list(ok = FALSE, error = e)
-      )
-      if (isTRUE(eval.res$ok)) {
-        val <- eval.res$value
-      } else {
-        not_found <- new.env(parent = emptyenv())
-        val <- tryCatch(get0(nm, envir = caller_env, inherits = FALSE, ifnotfound = not_found),
-                        error = function(e) not_found)
-        if (identical(val, not_found))
-          stop(conditionMessage(eval.res$error), call. = FALSE)
-      }
-    }
+    # S3 forwarding can encode a method formal or named `...` promise as a
+    # `..N` placeholder whose numeric position belongs to an outer generic.
+    # Materialize from the method frame that owns the promise; never search
+    # unrelated dynamic frames for a same-named binding.
+    val <- .npRmpi_autodispatch_resolve_owned_arg(
+      expr = expr_i,
+      argname = nm,
+      caller_env = caller_env,
+      dot.names = owner.dot.names
+    )
     ref <- .npRmpi_autodispatch_remote_ref(val)
     if (!is.null(ref) && .npRmpi_autodispatch_ref_is_current(val) &&
         (!identical(nm, "bws") || .npRmpi_autodispatch_can_reuse_bws_ref(val, call.base))) {
