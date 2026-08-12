@@ -35,6 +35,9 @@ Object to interrogate and whether gradient standard errors are requested.
     meaningful.}
   \item{se}{ a logical value specifying whether or not standard
     errors of gradients are desired. Defaults to \code{FALSE}.}
+  \item{level}{for \code{conmode} objects, an optional dependent-variable
+    class level identifying the stored class-probability gradients to extract.
+    If supplied, it must match the level requested when the object was fitted.}
 
 \subsection{Derivative Order Controls}{
 Optional local-polynomial derivative order controls.
