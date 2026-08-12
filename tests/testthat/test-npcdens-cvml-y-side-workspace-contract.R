@@ -178,6 +178,49 @@ test_that("scalar categorical-response CVML matches direct fixed and NN oracles"
   }
 })
 
+test_that("prepared scalar categorical CVML retains the canonical finite penalty", {
+  n <- 64L
+  x <- data.frame(x = seq(0, 1, length.out = n))
+  y <- data.frame(y = factor(rep(letters[1:5], length.out = n)))
+  bw <- npcdensbw(
+    xdat = x, ydat = y, regtype = "lc", bwmethod = "cv.ml",
+    bwtype = "fixed", bws = c(0.4, 0.00025),
+    bandwidth.compute = FALSE
+  )
+  oracle <- getFromNamespace(".npcdensbw_eval_only", "np")(
+    xdat = x, ydat = y, bws = bw,
+    invalid.penalty = "baseline", penalty.multiplier = 10
+  )
+  prep <- getFromNamespace(".npcdensbw_prepared_prepare_args", "np")(
+    xdat = x, ydat = y, bws = bw, start.bw = c(bw$ybw, bw$xbw),
+    invalid.penalty = "baseline", penalty.multiplier = 10,
+    degree.search = TRUE
+  )
+  prepare <- getFromNamespace("npPreparedObjectivePrepareConditionalDensity", "np")
+  evaluate <- getFromNamespace("npPreparedObjectiveEvalConditionalDensity", "np")
+  destroy <- getFromNamespace("npPreparedObjectiveDestroyConditionalDensity", "np")
+
+  prepared <- prepare(
+    c.uno = prep$c.uno, c.ord = prep$c.ord, c.con = prep$c.con,
+    u.uno = prep$u.uno, u.ord = prep$u.ord, u.con = prep$u.con,
+    mysd = prep$mysd, myopti = prep$myopti, myoptd = prep$myoptd,
+    rbw = prep$rbw, penalty.mode = prep$penalty_mode,
+    penalty.multiplier = prep$penalty_multiplier, degree = prep$degree,
+    bernstein = prep$bernstein, basis = prep$basis, regtype = prep$regtype,
+    cxkerlb = prep$cxkerlb, cxkerub = prep$cxkerub,
+    cykerlb = prep$cykerlb, cykerub = prep$cykerub
+  )
+  on.exit(if (isTRUE(prepared)) destroy(), add = TRUE)
+  first <- evaluate(bw = as.double(prep$rbw), degree = as.integer(prep$degree))
+  second <- evaluate(bw = as.double(prep$rbw), degree = as.integer(prep$degree))
+
+  expect_true(prepared)
+  expect_lt(oracle$objective, -1e3)
+  expect_gt(oracle$objective, -1e7)
+  expect_equal(first[[1L]], oracle$objective, tolerance = 2e-12)
+  expect_identical(second, first)
+})
+
 test_that("Powell and native MADS initialize scalar categorical-response CVML", {
   fixture <- npcdens_y_side_fixture()
   x <- fixture$x[seq_len(32L), c("x1", "x2"), drop = FALSE]

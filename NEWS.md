@@ -1,5 +1,13 @@
 # np 0.70-6
 
+* Conditional-density native degree search now constructs its finite invalid-
+  candidate penalty once from the same canonical baseline-and-retry rule as
+  the ordinary bandwidth route, retains that value in the prepared context,
+  and restores it before every candidate. This removes candidate-dependent
+  penalty recomputation, preserves public evaluation accounting, and carries
+  degree-search parameters through the retry workspace without quadratic
+  sample storage.
+
 * `options(np.macMseries.accelerate = FALSE)` now disables the
   Apple-qualified weighted-design and conditional LP transpose-GEMV siblings
   consistently. Ordinary BLAS/LAPACK algebra remains available independently

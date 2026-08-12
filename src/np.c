@@ -626,6 +626,7 @@ typedef struct {
   int num_var_ordered;
   int need_y_side;
   int penalty_mode;
+  int penalty_ready;
   int glp_original_order;
   int degree_search;
   int degree_state_ready;
@@ -635,6 +636,7 @@ typedef struct {
   int tree_y_ready;
   int tree_xy_ready;
   double penalty_multiplier;
+  double penalty_value;
   int *glp_degree;
   int *ipt_x;
   int *ipt_y;
@@ -4123,6 +4125,7 @@ static void np_conditional_density_prepared_context_clear_internal(void)
   np_conditional_density_prepared_context.num_var_ordered = 0;
   np_conditional_density_prepared_context.need_y_side = 0;
   np_conditional_density_prepared_context.penalty_mode = 0;
+  np_conditional_density_prepared_context.penalty_ready = 0;
   np_conditional_density_prepared_context.glp_original_order = 0;
   np_conditional_density_prepared_context.degree_search = 0;
   np_conditional_density_prepared_context.degree_state_ready = 0;
@@ -4132,6 +4135,7 @@ static void np_conditional_density_prepared_context_clear_internal(void)
   np_conditional_density_prepared_context.tree_y_ready = 0;
   np_conditional_density_prepared_context.tree_xy_ready = 0;
   np_conditional_density_prepared_context.penalty_multiplier = 0.0;
+  np_conditional_density_prepared_context.penalty_value = DBL_MAX;
 }
 
 static void np_conditional_density_prepared_context_activate_matrix_view(
@@ -4166,64 +4170,91 @@ static void np_conditional_density_prepared_context_activate_matrix_view(
     np_conditional_density_prepared_context.matrix_xy_continuous_original;
 }
 
-static void np_conditional_density_prepared_context_refresh_penalty(void)
+static void np_conditional_density_refresh_penalty_canonical(
+  double * const vector_scale_factor,
+  const int num_all_var,
+  const int penalty_mode,
+  const double penalty_multiplier,
+  const int account_probes)
 {
+  int i;
+  double baseline;
+  double pmult = penalty_multiplier;
+
   bwm_penalty_mode = 0;
   bwm_penalty_value = DBL_MAX;
 
-  if (np_conditional_density_prepared_context.penalty_mode != 1)
+  if (penalty_mode != 1 || vector_scale_factor == NULL ||
+      num_all_var <= 0 || bwmfunc_raw == NULL)
     return;
 
-  {
-    double pmult = np_conditional_density_prepared_context.penalty_multiplier;
-    double baseline;
-    int i;
+  if (pmult < 1.0)
+    pmult = 1.0;
 
-    if (pmult < 1.0)
-      pmult = 1.0;
+  baseline = bwmfunc_raw_current_scale(vector_scale_factor, num_all_var);
+  if (account_probes) {
+    bwm_eval_count += 1.0;
+    if (!R_FINITE(baseline) || baseline == DBL_MAX)
+      bwm_invalid_count += 1.0;
+  }
+  if (!R_FINITE(baseline) || baseline == DBL_MAX) {
+    double *tmp = bwm_alloc_transform_tmp(
+      num_all_var + bwm_num_extra_params + 1);
 
-    baseline = bwmfunc_raw_current_scale(
-      np_conditional_density_prepared_context.vector_scale_factor,
-      np_conditional_density_prepared_context.num_all_var);
-
-    if (!R_FINITE(baseline) || baseline == DBL_MAX) {
-      double *tmp = bwm_alloc_transform_tmp(np_conditional_density_prepared_context.num_all_var + 1);
-      if (tmp != NULL && np_copy_scale_factor_for_raw(
-          tmp,
-          np_conditional_density_prepared_context.vector_scale_factor,
-          np_conditional_density_prepared_context.num_all_var) == 0) {
-        for (i = 1; i <= (np_conditional_density_prepared_context.num_var_continuous +
-                          np_conditional_density_prepared_context.num_reg_continuous); i++)
-          tmp[i] *= 2.0;
-        for (i = 0; i < (np_conditional_density_prepared_context.num_var_unordered +
-                         np_conditional_density_prepared_context.num_reg_unordered); i++) {
-          int idx = np_conditional_density_prepared_context.num_var_continuous +
-            np_conditional_density_prepared_context.num_reg_continuous + 1 + i;
-          double maxbw = max_unordered_bw(num_categories_extern[i],
-                                          KERNEL_den_unordered_extern);
-          tmp[idx] = 0.5 * maxbw;
-        }
-        for (i = 0; i < (np_conditional_density_prepared_context.num_var_ordered +
-                         np_conditional_density_prepared_context.num_reg_ordered); i++) {
-          int idx = np_conditional_density_prepared_context.num_var_continuous +
-            np_conditional_density_prepared_context.num_reg_continuous +
-            np_conditional_density_prepared_context.num_var_unordered +
-            np_conditional_density_prepared_context.num_reg_unordered + 1 + i;
-          tmp[idx] = 0.5;
-        }
-        baseline = bwmfunc_raw(tmp);
-        safe_free(tmp);
+    if (tmp != NULL &&
+        np_copy_scale_factor_for_raw(
+          tmp, vector_scale_factor, num_all_var) == 0) {
+      for (i = 1; i <= bwm_num_extra_params; ++i)
+        tmp[num_all_var + i] = vector_scale_factor[num_all_var + i];
+      for (i = 1;
+           i <= num_var_continuous_extern + num_reg_continuous_extern;
+           ++i)
+        tmp[i] *= 2.0;
+      for (i = 0;
+           i < num_var_unordered_extern + num_reg_unordered_extern;
+           ++i) {
+        const int idx = num_var_continuous_extern +
+          num_reg_continuous_extern + 1 + i;
+        const double maxbw = max_unordered_bw(
+          num_categories_extern[i], KERNEL_den_unordered_extern);
+        tmp[idx] = 0.5*maxbw;
+      }
+      for (i = 0;
+           i < num_var_ordered_extern + num_reg_ordered_extern;
+           ++i) {
+        const int idx = num_var_continuous_extern +
+          num_reg_continuous_extern + num_var_unordered_extern +
+          num_reg_unordered_extern + 1 + i;
+        tmp[idx] = 0.5;
+      }
+      baseline = bwmfunc_raw(tmp);
+      if (account_probes) {
+        bwm_eval_count += 1.0;
+        if (!R_FINITE(baseline) || baseline == DBL_MAX)
+          bwm_invalid_count += 1.0;
       }
     }
-
-    if (!R_FINITE(baseline) || baseline == DBL_MAX)
-      bwm_penalty_value = pmult * 1.0e6;
-    else
-      bwm_penalty_value = baseline + (fabs(baseline) + 1.0) * pmult;
-
-    if (R_FINITE(bwm_penalty_value))
-      bwm_penalty_mode = 1;
+    safe_free(tmp);
   }
+
+  if (!R_FINITE(baseline) || baseline == DBL_MAX)
+    bwm_penalty_value = pmult * 1.0e6;
+  else
+    bwm_penalty_value = baseline + (fabs(baseline) + 1.0)*pmult;
+  if (R_FINITE(bwm_penalty_value))
+    bwm_penalty_mode = 1;
+}
+
+static void np_conditional_density_prepared_context_refresh_penalty(void)
+{
+  np_conditional_density_refresh_penalty_canonical(
+    np_conditional_density_prepared_context.vector_scale_factor,
+    np_conditional_density_prepared_context.num_all_var,
+    np_conditional_density_prepared_context.penalty_mode,
+    np_conditional_density_prepared_context.penalty_multiplier,
+    0);
+  np_conditional_density_prepared_context.penalty_ready = bwm_penalty_mode;
+  np_conditional_density_prepared_context.penalty_value = bwm_penalty_value;
 }
 
 static int np_conditional_density_prepared_context_refresh_degree(const int *degree)
@@ -5128,6 +5159,7 @@ static int np_conditional_density_prepared_context_prepare_internal(double *c_un
                                              bwm_num_reg_ordered);
     bwm_reset_counters();
     np_conditional_density_prepared_context_refresh_penalty();
+    bwm_reset_counters();
   }
 
 
@@ -5292,6 +5324,9 @@ static int np_conditional_density_prepared_context_eval_native_raw(const double 
       degree_work[i] = glp_degree[i];
   }
 
+  bwm_penalty_mode = np_conditional_density_prepared_context.penalty_ready;
+  bwm_penalty_value = bwm_penalty_mode ?
+    np_conditional_density_prepared_context.penalty_value : DBL_MAX;
 
   if (!np_conditional_density_prepared_context_refresh_degree(degree_work)) {
     bwm_eval_count += 1.0;
@@ -5312,10 +5347,6 @@ static int np_conditional_density_prepared_context_eval_native_raw(const double 
       np_conditional_density_prepared_context.num_all_var + i + 1] =
       (double)degree_work[i];
 
-  if (np_conditional_density_prepared_context.penalty_mode == 1) {
-    bwm_penalty_mode = 0;
-    bwm_penalty_value = DBL_MAX;
-  }
   eval_before = bwm_eval_count;
   fast_before = np_fastcv_alllarge_hits_get();
   guarded_before = np_guarded_cvml_hits_get();
@@ -5329,15 +5360,6 @@ static int np_conditional_density_prepared_context_eval_native_raw(const double 
     guarded = 0.0;
   if (evals < 0.0)
     evals = 0.0;
-
-  if ((!isfinite(val) || val == DBL_MAX) &&
-      np_conditional_density_prepared_context.penalty_mode == 1) {
-    np_conditional_density_prepared_context_refresh_penalty();
-    val = (bwm_penalty_mode == 1 && isfinite(bwm_penalty_value)) ? bwm_penalty_value : DBL_MAX;
-    evals = bwm_eval_count - eval_before;
-    if (evals < 0.0)
-      evals = 0.0;
-  }
 
   out[0] = -val;
   out[1] = evals;
@@ -14235,48 +14257,12 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
     num_categories_extern,
     scale_factor_lower_bound);
   bwm_reset_counters();
-  bwm_penalty_mode = 0;
-  bwm_penalty_value = DBL_MAX;
-  if (penalty_mode[0] == 1) {
-    double pmult = penalty_mult[0];
-    double baseline;
-    if (pmult < 1.0) pmult = 1.0;
-    baseline = bwmfunc_raw_current_scale(vector_scale_factor, num_all_var);
-    /* Penalty-baseline probes are real objective evaluations and must be
-       included in the evaluation/invalid accounting. */
-    bwm_eval_count += 1.0;
-    if (!R_FINITE(baseline) || baseline == DBL_MAX)
-      bwm_invalid_count += 1.0;
-    if (!R_FINITE(baseline) || baseline == DBL_MAX) {
-      double *tmp = bwm_alloc_transform_tmp(num_all_var + 1);
-      if (tmp != NULL && np_copy_scale_factor_for_raw(tmp, vector_scale_factor, num_all_var) == 0) {
-        for (i = 1; i <= (num_var_continuous_extern + num_reg_continuous_extern); i++)
-          tmp[i] *= 2.0;
-        for (i = 0; i < (num_var_unordered_extern + num_reg_unordered_extern); i++) {
-          int idx = num_var_continuous_extern + num_reg_continuous_extern + 1 + i;
-          double maxbw = max_unordered_bw(num_categories_extern[i], KERNEL_den_unordered_extern);
-          tmp[idx] = 0.5*maxbw;
-        }
-        for (i = 0; i < (num_var_ordered_extern + num_reg_ordered_extern); i++) {
-          int idx = num_var_continuous_extern + num_reg_continuous_extern +
-            num_var_unordered_extern + num_reg_unordered_extern + 1 + i;
-          tmp[idx] = 0.5;
-        }
-        baseline = bwmfunc_raw(tmp);
-        bwm_eval_count += 1.0;
-        if (!R_FINITE(baseline) || baseline == DBL_MAX)
-          bwm_invalid_count += 1.0;
-      }
-      safe_free(tmp);
-    }
-    if (!R_FINITE(baseline) || baseline == DBL_MAX) {
-      bwm_penalty_value = pmult * 1.0e6;
-    } else {
-      bwm_penalty_value = baseline + (fabs(baseline) + 1.0) * pmult;
-    }
-    if (R_FINITE(bwm_penalty_value))
-      bwm_penalty_mode = 1;
-  }
+  np_conditional_density_refresh_penalty_canonical(
+    vector_scale_factor,
+    num_all_var,
+    penalty_mode[0],
+    penalty_mult[0],
+    1);
 
   fret_initial = fret_best = bwmfunc_wrapper(vector_scale_factor);
   fret = fret_initial;
