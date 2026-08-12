@@ -1,5 +1,13 @@
 # np 0.70-6
 
+* Generalized fixed-bandwidth local-polynomial CV objectives of basis width
+  six now retain only the unique upper triangle of their symmetric weighted
+  Gram rows and mirror it once before solving. Serial unordered-pair and MPI
+  rank-owned rows share this arithmetic contract; the portable scalar and
+  Apple-arm64 vector siblings avoid the packed-width regression when optional
+  acceleration is disabled while preserving wider, tree, and nearest-neighbour
+  owners and linear-in-sample auxiliary storage.
+
 * Fixed-bandwidth degree-zero conditional-density CVML with two or three
   compact-support explanatory dimensions now retains sparse tree traversal in
   the canonical scalar joint/marginal owner instead of entering the dense LP

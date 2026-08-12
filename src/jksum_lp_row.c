@@ -7,9 +7,9 @@
 
 #if defined(__aarch64__) && defined(NP_USE_ACCELERATE_GAUSS) && NP_USE_ACCELERATE_GAUSS
 #include <arm_neon.h>
-#define NP_LP_ROW3_NEON 1
+#define NP_LP_ROW_NEON 1
 #else
-#define NP_LP_ROW3_NEON 0
+#define NP_LP_ROW_NEON 0
 #endif
 
 #include "headers.h"
@@ -191,7 +191,6 @@ static void np_lp_accumulate_dense_row_##WIDTH(                             \
 NP_LP_DEFINE_RESIDENT_WIDTH(2)
 NP_LP_DEFINE_RESIDENT_WIDTH(4)
 NP_LP_DEFINE_RESIDENT_WIDTH(5)
-NP_LP_DEFINE_RESIDENT_WIDTH(6)
 NP_LP_DEFINE_RESIDENT_WIDTH(7)
 NP_LP_DEFINE_RESIDENT_WIDTH(8)
 NP_LP_DEFINE_RESIDENT_WIDTH(9)
@@ -204,6 +203,98 @@ NP_LP_DEFINE_RESIDENT_WIDTH(15)
 NP_LP_DEFINE_RESIDENT_WIDTH(16)
 
 #undef NP_LP_DEFINE_RESIDENT_WIDTH
+
+/*
+ * Width six is the first dense generalized-LP row for which the complete
+ * Gram update loses to redundant symmetric arithmetic. Keep only the unique
+ * upper triangle during the unordered-pair sweep; the caller mirrors it once
+ * after every row is complete.
+ */
+static void np_lp_accumulate_dense_row_6(
+    const NPLPDenseRowContext *ctx)
+{
+  enum { width = 6 };
+  int i, a, b;
+  double fixed_moments[width*width];
+  double fixed_rhs[width];
+  double * const stored_moments =
+    ctx->moments + (size_t)ctx->row_j*(size_t)width*(size_t)width;
+  double * const stored_rhs =
+    ctx->rhs + (size_t)ctx->row_j*(size_t)width;
+
+  for(a = 0; a < width; a++){
+    fixed_rhs[a] = stored_rhs[a];
+    for(b = a; b < width; b++)
+      fixed_moments[a*width+b] = stored_moments[a*width+b];
+  }
+
+  for(i = 0; i < ctx->nsub; i++){
+    const int orig_ii = ctx->row_j + 1 + i;
+    const int ii = ctx->use_tree ? ctx->tree_lookup[orig_ii] : orig_ii;
+    const int widx = ctx->use_tree ? ii : i;
+    const double weight = ctx->weights[widx];
+    double *moving_moments;
+    double *moving_rhs;
+    double yi;
+
+    if(weight == 0.0)
+      continue;
+
+    if(ctx->track_lowsupport){
+      np_lp_dense_support_add(ctx->row_j, orig_ii, ii, weight, width,
+                              ctx->support_count, ctx->support_orig,
+                              ctx->support_data, ctx->support_weight);
+      np_lp_dense_support_add(orig_ii, ctx->row_j, ctx->eval_idx, weight,
+                              width, ctx->support_count, ctx->support_orig,
+                              ctx->support_data, ctx->support_weight);
+    }
+
+    yi = ctx->response[ii];
+    moving_moments =
+      ctx->moments + (size_t)orig_ii*(size_t)width*(size_t)width;
+    moving_rhs = ctx->rhs + (size_t)orig_ii*(size_t)width;
+    for(a = 0; a < width; a++){
+      const double bia = ctx->basis[a][ii];
+      const double weighted_bia = weight*bia;
+      fixed_rhs[a] += weighted_bia*yi;
+      for(b = a; b < width; b++){
+        fixed_moments[a*width+b] += weighted_bia*ctx->basis[b][ii];
+      }
+    }
+#if NP_LP_ROW_NEON
+    {
+      const float64x2_t vw = vdupq_n_f64(weight);
+      for(a = 0; a < width; a += 2)
+        vst1q_f64(moving_rhs + a,
+                  vfmaq_f64(vld1q_f64(moving_rhs + a), vw,
+                            vld1q_f64(ctx->eval_ybasis + a)));
+      for(a = 0; a < width; a++){
+        const int begin = a*width+a;
+        const int end = a*width+width;
+        int pos = begin;
+        for(; pos + 1 < end; pos += 2)
+          vst1q_f64(moving_moments + pos,
+                    vfmaq_f64(vld1q_f64(moving_moments + pos), vw,
+                              vld1q_f64(ctx->eval_outer + pos)));
+        if(pos < end)
+          moving_moments[pos] += weight*ctx->eval_outer[pos];
+      }
+    }
+#else
+    for(a = 0; a < width; a++){
+      moving_rhs[a] += weight*ctx->eval_ybasis[a];
+      for(b = a; b < width; b++)
+        moving_moments[a*width+b] += weight*ctx->eval_outer[a*width+b];
+    }
+#endif
+  }
+
+  for(a = 0; a < width; a++){
+    stored_rhs[a] = fixed_rhs[a];
+    for(b = a; b < width; b++)
+      stored_moments[a*width+b] = fixed_moments[a*width+b];
+  }
+}
 
 void np_lp_accumulate_dense_resident_row3(
     const int row_j,
@@ -234,7 +325,7 @@ void np_lp_accumulate_dense_resident_row3(
   double sj0 = sj[0], sj1 = sj[1], sj2 = sj[2];
   double sj4 = sj[4], sj5 = sj[5], sj8 = sj[8];
   double tj0 = tj[0], tj1 = tj[1], tj2 = tj[2];
-#if NP_LP_ROW3_NEON
+#if NP_LP_ROW_NEON
   const float64x2_t eval_y01 = vld1q_f64(eval_ybasis);
   const float64x2_t eval_outer01 = vld1q_f64(eval_outer);
   const float64x2_t eval_outer45 = vld1q_f64(eval_outer + 4);
@@ -280,7 +371,7 @@ void np_lp_accumulate_dense_resident_row3(
       sj5 += wb1*b2;
       sj8 += wb2*b2;
 
-#if NP_LP_ROW3_NEON
+#if NP_LP_ROW_NEON
       {
         const float64x2_t vw = vdupq_n_f64(w);
         vst1q_f64(ti,

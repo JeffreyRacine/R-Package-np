@@ -14259,10 +14259,10 @@ static inline double np_regression_cv_loss_value(const int bwm,
 
 /*
   This dense-path performance cutoff is basis-neutral. Retained paired
-  objective timings favor resident rows through width 5 and packed BLAS from
-  width 6. Eligible sparse trees have their own generic wide resident row.
+  objective timings favor resident rows through width 6 and packed BLAS from
+  width 7. Eligible sparse trees have their own generic wide resident row.
 */
-enum { NP_REG_CV_LP_RESIDENT_MAX_TERMS = 5 };
+enum { NP_REG_CV_LP_RESIDENT_MAX_TERMS = 6 };
 enum { NP_REG_CV_LP_TOPOLOGY_GAUSSIAN_MAX_TERMS = 3 };
 enum { NP_REG_CV_LP_TOPOLOGY_EPAN_MAX_TERMS = 4 };
 
@@ -14753,9 +14753,9 @@ static inline void np_lp_accumulate_sparse_pair_wide_resident(
   }
 }
 
-static void np_lp_mirror_sparse_moments_wide(double *moments,
-                                              const int num_obs,
-                                              const int nterms){
+static void np_lp_mirror_upper_moments_wide(double *moments,
+                                             const int num_obs,
+                                             const int nterms){
   int i, a, b;
 
   for(i = 0; i < num_obs; i++){
@@ -15900,8 +15900,9 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
 
   if(nterms == 3)
     np_lp_mirror_dense_moments_row3(moments, num_obs);
-  else if(use_sparse_tree && (nterms > 5))
-    np_lp_mirror_sparse_moments_wide(moments, num_obs, nterms);
+  else if((use_sparse_tree && (nterms > 5)) ||
+          (!use_sparse_tree && (nterms == 6)))
+    np_lp_mirror_upper_moments_wide(moments, num_obs, nterms);
 
   result.cv = 0.0;
   result.traceH = 0.0;
