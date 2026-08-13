@@ -148,9 +148,11 @@ These arguments control the main check-loss bandwidth and
   }
 
   \item{nomad}{
-    logical value indicating whether to use the local-polynomial NOMAD
-    route for joint bandwidth, \code{delta}, and continuous degree-vector
-    search. Defaults to \code{FALSE}.
+    logical value or the character string \code{"auto"}. \code{TRUE} uses
+    the local-polynomial NOMAD route for joint bandwidth, \code{delta}, and
+    continuous degree-vector search. \code{"auto"} uses exhaustive/cell
+    degree search for one continuous smoothing dimension and NOMAD/Powell for
+    two or more. Defaults to \code{FALSE}.
   }
 
   \item{nomad.opts}{
@@ -211,7 +213,11 @@ These arguments control the main check-loss bandwidth and
   local-polynomial degree vector in addition to bandwidths and
   \code{delta}. The \code{search.engine="nomad+powell"} route uses NOMAD
   for degree search and Powell for hot-start refinement at the selected
-  degree.
+  degree. When \code{nomad="auto"}, a one-dimensional smoothing problem
+  instead evaluates the complete requested degree lattice and jointly
+  optimizes bandwidth and \code{delta} at every degree; higher-dimensional
+  problems use the NOMAD/Powell policy. \code{nomad.pilot} remains an
+  independent logical control and is not enabled by primary AUTO.
 }
 \value{
   \code{nplsqregbw} returns an object of class

@@ -1,5 +1,12 @@
 # np 0.70-6
 
+* `nplsqregbw()` and `nplsqreg()` now support the package-wide
+  `nomad = "auto"` shortcut. One continuous smoothing dimension uses the
+  exhaustive degree lattice and jointly optimizes bandwidth and `delta` at
+  every degree; two or more dimensions use the existing NOMAD/Powell joint
+  search. Historical `nomad = FALSE` and `nomad = TRUE` routes are unchanged,
+  and the separate `nomad.pilot` control remains logical-only.
+
 * Conditional-density automatic degree search now provisions response-side
   categorical workspace for every engine that a later degree candidate can
   activate, rather than only the engine selected by the initial degree. This

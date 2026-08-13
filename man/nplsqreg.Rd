@@ -143,6 +143,9 @@ selection, prediction, or plotting route.
     \code{nomad}, \code{search.engine}, \code{tau.search},
     \code{delta}, \code{scale}, \code{regtype.pilot},
     \code{nomad.pilot}, and \code{pilot.args}.
+    The primary \code{nomad} control accepts \code{FALSE}, \code{TRUE}, or
+    \code{"auto"}; AUTO uses exhaustive/cell degree search with one
+    continuous smoothing dimension and NOMAD/Powell with two or more.
   }
 }
 \details{

@@ -831,6 +831,61 @@ nplsqregbw <-
   result
 }
 
+.nplsqreg_cell_search <- function(xdat, ydat, scale, tau, template,
+                                  delta, delta.bounds, opt.args,
+                                  degree.search) {
+  eval_fun <- function(degree) {
+    candidate.bws <- .nplsqreg_canonical_lp_template(
+      template = template,
+      degree = degree,
+      bernstein.basis = degree.search$bernstein.basis
+    )
+    candidate <- .nplsqreg_call_fixed_degree_core(
+      xdat = xdat,
+      ydat = ydat,
+      scale = scale,
+      tau = tau,
+      bws = candidate.bws,
+      delta = delta,
+      delta.bounds = delta.bounds,
+      opt.args = opt.args,
+      bandwidth.compute = TRUE
+    )
+    candidate$bws <- candidate.bws
+    candidate$bws$bw <- candidate$bw
+    candidate$bws <- .nplsqreg_canonical_lp_template(
+      template = candidate$bws,
+      degree = degree,
+      bernstein.basis = degree.search$bernstein.basis
+    )
+    list(
+      objective = as.numeric(candidate$objective[1L]),
+      payload = candidate,
+      num.feval = if (is.null(candidate$num.feval)) NA_real_ else
+        as.numeric(candidate$num.feval[1L]),
+      num.feval.fast = if (is.null(candidate$num.feval.fast)) NA_real_ else
+        as.numeric(candidate$num.feval.fast[1L]),
+      nn.cache = candidate$nn.cache
+    )
+  }
+
+  .np_degree_search(
+    method = degree.search$method,
+    candidates = degree.search$candidates,
+    baseline_degree = degree.search$baseline.degree,
+    start_degree = degree.search$start.degree,
+    restarts = degree.search$restarts,
+    max_cycles = degree.search$max.cycles,
+    verify = degree.search$verify,
+    eval_fun = eval_fun,
+    direction = "min",
+    trace_level = "full",
+    source = degree.search$source,
+    reason = degree.search$reason,
+    objective_name = "fval"
+  )
+}
+
 .nplsqreg_combine_bandwidths <- function(bw.list, tau, tau.search = "full",
                                          fit.order = seq_along(tau),
                                          warm.start.from = rep(NA_integer_, length(tau)),
@@ -1129,13 +1184,44 @@ nplsqregbw.default <-
     }
     tau <- .nplsqreg_validate_tau(tau.raw)
     regtype.pilot <- match.arg(regtype.pilot)
-    nomad <- npValidateScalarLogical(nomad, "nomad")
+    nomad <- npValidateNomadControl(nomad, "nomad")
     nomad.pilot <- npValidateScalarLogical(nomad.pilot, "nomad.pilot")
     bandwidth.compute <- npValidateScalarLogical(bandwidth.compute,
                                                  "bandwidth.compute")
     dots <- .nplsqreg_normalize_dots(
       c(list(...), if (length(nomad.opts)) list(nomad.opts = nomad.opts) else list()),
       where = "nplsqregbw")
+    scalar.mc <- match.call(expand.dots = FALSE)
+    scalar.mc.names <- names(scalar.mc)
+    dot.names <- names(dots)
+    dot.value <- function(name) dots[[name, exact = TRUE]]
+    nomad.shortcut <- .np_prepare_nomad_shortcut(
+      nomad = nomad,
+      call_names = unique(c(scalar.mc.names, dot.names)),
+      preset = list(
+        regtype = "lp",
+        search.engine = "nomad+powell",
+        degree.select = "coordinate",
+        bernstein.basis = TRUE,
+        degree.min = 0L,
+        degree.max = 3L,
+        degree.verify = FALSE,
+        bwtype = "fixed"
+      ),
+      values = list(
+        regtype = if (regtype.supplied) regtype else NULL,
+        search.engine = dot.value("search.engine"),
+        degree.select = dot.value("degree.select"),
+        bernstein.basis = dot.value("bernstein.basis"),
+        degree.min = dot.value("degree.min"),
+        degree.max = dot.value("degree.max"),
+        degree.verify = dot.value("degree.verify"),
+        bwtype = dot.value("bwtype"),
+        degree = dot.value("degree")
+      ),
+      where = "nplsqregbw"
+    )
+    nomad.enabled <- isTRUE(nomad.shortcut$enabled)
     controls <- .nplsqreg_optimizer_controls(dots, optim.control)
     prepared <- .nplsqreg_prepare_train_data(xdat, ydat, scale = scale)
     xdat <- prepared$xdat
@@ -1148,16 +1234,33 @@ nplsqregbw.default <-
       stop("'delta.bounds' must be a two-value numeric interval inside (0, 1)",
            call. = FALSE)
 
-    if (isTRUE(nomad) && !isTRUE(bandwidth.compute))
-      stop("nplsqregbw nomad=TRUE requires bandwidth.compute=TRUE",
+    if (nomad.enabled && !isTRUE(bandwidth.compute))
+      stop("nplsqregbw nomad=TRUE or \"auto\" requires bandwidth.compute=TRUE",
            call. = FALSE)
-    if (isTRUE(nomad) && regtype.supplied && !identical(regtype, "lp"))
-      stop("nplsqregbw nomad=TRUE requires regtype='lp' when regtype is supplied",
+    if (nomad.enabled && regtype.supplied &&
+        !identical(as.character(match.arg(regtype, c("lc", "ll", "lp")))[1L], "lp"))
+      stop("nplsqregbw nomad=TRUE or \"auto\" requires regtype='lp' when regtype is supplied",
+           call. = FALSE)
+    if (nomad.enabled && !is.null(dot.value("degree")))
+      stop("nomad=TRUE or \"auto\" does not support an explicit degree; remove degree or set nomad=FALSE",
+           call. = FALSE)
+    if (nomad.enabled && !is.null(dot.value("basis")) &&
+        !identical(as.character(match.arg(dot.value("basis"),
+                                         c("glp", "additive", "tensor")))[1L], "glp"))
+      stop("nplsqregbw nomad=TRUE or \"auto\" currently requires basis='glp'",
+           call. = FALSE)
+    if (nomad.enabled &&
+        !identical(nomad.shortcut$metadata$source, "auto") &&
+        !is.null(dot.value("search.engine")) &&
+        !(as.character(match.arg(dot.value("search.engine"),
+                                 c("nomad+powell", "cell", "nomad")))[1L] %in%
+          c("nomad", "nomad+powell")))
+      stop("nomad=TRUE requires search.engine='nomad' or 'nomad+powell'",
            call. = FALSE)
     reg.dots <- .nplsqreg_strip_optimizer_dots(dots)
     if (regtype.supplied)
       reg.dots$regtype <- regtype
-    if (isTRUE(nomad)) {
+    if (nomad.enabled) {
       reg.dots$regtype <- NULL
       reg.dots$degree <- NULL
       reg.dots$basis <- NULL
@@ -1215,24 +1318,36 @@ nplsqregbw.default <-
            call. = FALSE)
 
     search.result <- NULL
-    if (isTRUE(nomad)) {
+    if (nomad.enabled) {
       degree.search <- .npregbw_degree_search_controls(
         regtype = "lp",
         regtype.named = TRUE,
         ncon = start.bws$ncon,
         nobs = nrow(xdat),
-        basis = if (is.null(dots$basis)) start.bws$basis else dots$basis,
-        degree.select = if (is.null(dots$degree.select)) "coordinate" else dots$degree.select,
-        search.engine = if (is.null(dots$search.engine)) "nomad+powell" else dots$search.engine,
-        degree.min = dots$degree.min,
-        degree.max = dots$degree.max,
-        degree.start = dots$degree.start,
-        degree.restarts = if (is.null(dots$degree.restarts)) 0L else dots$degree.restarts,
-        degree.max.cycles = if (is.null(dots$degree.max.cycles)) 25L else dots$degree.max.cycles,
-        degree.verify = if (is.null(dots$degree.verify)) FALSE else dots$degree.verify,
-        bernstein.basis = if (is.null(dots$bernstein.basis)) TRUE else dots$bernstein.basis,
-        bernstein.named = !is.null(dots$bernstein.basis)
+        basis = if (is.null(dot.value("basis"))) start.bws$basis else dot.value("basis"),
+        degree.select = nomad.shortcut$values$degree.select,
+        search.engine = nomad.shortcut$values$search.engine,
+        degree.min = nomad.shortcut$values$degree.min,
+        degree.max = nomad.shortcut$values$degree.max,
+        degree.start = dot.value("degree.start"),
+        degree.restarts = if (is.null(dot.value("degree.restarts"))) 0L else dot.value("degree.restarts"),
+        degree.max.cycles = if (is.null(dot.value("degree.max.cycles"))) 25L else dot.value("degree.max.cycles"),
+        degree.verify = nomad.shortcut$values$degree.verify,
+        bernstein.basis = nomad.shortcut$values$bernstein.basis,
+        bernstein.named = TRUE,
+        nomad.source = nomad.shortcut$metadata$source,
+        nomad.auto.filled = nomad.shortcut$metadata$auto.filled
       )
+      nomad.inner.named <- !is.null(dot.value("nomad.nmulti"))
+      nomad.inner.nmulti <- if (nomad.inner.named) {
+        npValidateNonNegativeInteger(dot.value("nomad.nmulti"), "nomad.nmulti")
+      } else {
+        0L
+      }
+      if (nomad.inner.named && nomad.inner.nmulti > 0L &&
+          !(degree.search$engine %in% c("nomad", "nomad+powell")))
+        stop("positive nomad.nmulti is only supported when search.engine is 'nomad' or 'nomad+powell'",
+             call. = FALSE)
       if (isTRUE(degree.search$singleton)) {
         fixed.reg.dots <- reg.dots
         fixed.reg.dots$regtype <- "lp"
@@ -1273,6 +1388,18 @@ nplsqregbw.default <-
           direction = "min",
           objective_name = "fval"
         )
+      } else if (identical(degree.search$engine, "cell")) {
+        search.result <- .nplsqreg_cell_search(
+          xdat = xdat,
+          ydat = ydat,
+          scale = scale,
+          tau = tau,
+          template = start.bws,
+          delta = delta,
+          delta.bounds = delta.bounds,
+          opt.args = opt.args,
+          degree.search = degree.search
+        )
       } else {
         search.result <- .nplsqreg_nomad_search(
           xdat = xdat,
@@ -1284,9 +1411,9 @@ nplsqregbw.default <-
           delta.bounds = delta.bounds,
           opt.args = opt.args,
           degree.search = degree.search,
-          nomad.inner.nmulti = if (is.null(dots$nomad.nmulti)) 0L else dots$nomad.nmulti,
-          random.seed = if (is.null(dots$random.seed)) 42L else dots$random.seed,
-          nomad.opts = if (is.null(dots$nomad.opts)) list() else dots$nomad.opts
+          nomad.inner.nmulti = nomad.inner.nmulti,
+          random.seed = if (is.null(dot.value("random.seed"))) 42L else dot.value("random.seed"),
+          nomad.opts = if (is.null(dot.value("nomad.opts"))) list() else dot.value("nomad.opts")
         )
       }
       core <- search.result$best_payload
@@ -1329,7 +1456,7 @@ nplsqregbw.default <-
     reg.bws$nobs.omit <- .nplsqreg_omit_length(rows.omit)
     if (!is.null(search.result)) {
       reg.bws <- .npregbw_attach_degree_search(reg.bws, search.result)
-      reg.bws$nomad.shortcut <- list(enabled = TRUE, preset = "lp_nomad")
+      reg.bws <- .np_attach_nomad_shortcut(reg.bws, nomad.shortcut$metadata)
     }
 
     out <- lsqregressionbandwidth(
