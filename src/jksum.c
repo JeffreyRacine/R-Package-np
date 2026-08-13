@@ -15300,6 +15300,83 @@ static int np_lp_fixed_tree_sparse_supported(const int num_reg_unordered,
   return 1;
 }
 
+/*
+ * A compact-support tree cannot prune any pair when every observed
+ * continuous coordinate difference lies inside that coordinate's kernel
+ * support.  In that exact geometry the canonical dense owner evaluates the
+ * same weights in contiguous tree order and avoids the sparse iterator's
+ * node-list traffic.  The caller retains the validated resident/packed width
+ * policy.  This is an arithmetic capability check, not a timed crossover:
+ * any dimension that is uncertain retains the tree.
+ */
+#if NP_ACCEL_GAUSS_COMPILED
+static int np_reg_fixed_tree_dense_full_support_admitted(
+    const int nterms,
+    const int bandwidth_mode,
+    const int num_reg_unordered,
+    const int num_reg_ordered,
+    const int num_reg_continuous,
+    const KDT *tree,
+    const int *kernel_c,
+    const int *kernel_u,
+    const int *kernel_o,
+    const int *operator,
+    double * const *matrix_bandwidth)
+{
+  int l;
+
+  /*
+   * Width two is the sole retained full-support tree topology.  Powered
+   * Apple-on, Apple-off, and portable evidence shows that its resident tree
+   * iterator remains competitive or faster, while width one and widths three
+   * and above favor the dense sibling.  Keep this stable capability boundary
+   * independent of sample timing or optimizer trajectory.
+   */
+  if((nterms <= 0) || (nterms == 2) ||
+     (bandwidth_mode != BW_FIXED) ||
+     !np_lp_fixed_tree_sparse_supported(num_reg_unordered,
+                                        num_reg_ordered,
+                                        num_reg_continuous,
+                                        kernel_c,
+                                        kernel_u,
+                                        kernel_o,
+                                        operator) ||
+     (num_reg_continuous <= 0) || (tree == NULL) ||
+     (tree->kdn == NULL) || (tree->numnode <= 0) ||
+     (tree->kdn[0].bb == NULL) ||
+     (tree->ndim < num_reg_continuous) || (kernel_c == NULL) ||
+     (matrix_bandwidth == NULL))
+    return 0;
+
+  for(l = 0; l < num_reg_continuous; l++){
+    const int kc = kernel_c[l];
+    double xmin, xmax, h, support_lower, support_upper, range;
+
+    if((kc < 0) || (kc >= OP_NCFUN) ||
+       (matrix_bandwidth[l] == NULL))
+      return 0;
+
+    support_lower = cksup[kc][0];
+    support_upper = cksup[kc][1];
+    h = matrix_bandwidth[l][0];
+    xmin = tree->kdn[0].bb[2*l];
+    xmax = tree->kdn[0].bb[2*l + 1];
+    if((!isfinite(h)) || (h <= 0.0) || (!isfinite(xmin)) ||
+       (!isfinite(xmax)) ||
+       (!isfinite(support_lower)) || (!isfinite(support_upper)) ||
+       !(support_lower < 0.0) || !(support_upper > 0.0))
+      return 0;
+
+    range = xmax - xmin;
+    if((!isfinite(range)) || (range < 0.0) ||
+       (range > h*support_upper) || (range > -h*support_lower))
+      return 0;
+  }
+
+  return 1;
+}
+#endif
+
 static inline double np_lp_sparse_okernel_noop(const int kernel,
                                                 const double x,
                                                 const double y,
@@ -17818,6 +17895,32 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
     }
   }
 
+  /*
+   * Tree eligibility remains a structural package policy.  The row owner is
+   * nevertheless geometry-aware: when a fixed compact-support candidate
+   * covers the complete observed range in every continuous dimension, the
+   * prepared tree cannot prune any pair.  Use the existing dense arithmetic
+   * sibling for that exact candidate (resident at narrow LP widths, packed at
+   * wide widths) without changing the estimator or timing the workload.
+   * Root bounds already owned by the prepared tree make this an O(p),
+   * allocation-free certificate shared by scalar and general LP routes.
+   */
+#if NP_ACCEL_GAUSS_COMPILED
+  if((lp_engine == NP_LP_ENGINE_SCALAR) && ks_tree_use &&
+     np_reg_fixed_tree_dense_full_support_admitted(1,
+                                                    BANDWIDTH_reg,
+                                                    num_reg_unordered,
+                                                    num_reg_ordered,
+                                                    num_reg_continuous,
+                                                    kdt_extern_X,
+                                                    kernel_c,
+                                                    kernel_u,
+                                                    kernel_o,
+                                                    operator,
+                                                    matrix_bandwidth))
+    ks_tree_use = 0;
+#endif
+
   if(lp_engine == NP_LP_ENGINE_GENERAL){
     const int use_bernstein = (int_glp_bernstein_extern != 0);
     const int *glp_terms = NULL;
@@ -17859,6 +17962,22 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
       cv = DBL_MAX;
       goto finish_cv_path;
     }
+
+#if NP_ACCEL_GAUSS_COMPILED
+    if(ks_tree_use &&
+       np_reg_fixed_tree_dense_full_support_admitted(glp_nterms,
+                                                      BANDWIDTH_reg,
+                                                      num_reg_unordered,
+                                                      num_reg_ordered,
+                                                      num_reg_continuous,
+                                                      kdt_extern_X,
+                                                      kernel_c,
+                                                      kernel_u,
+                                                      kernel_o,
+                                                      operator,
+                                                      matrix_bandwidth))
+      ks_tree_use = 0;
+#endif
 
     {
       const int use_canonical_lp_kernel =
@@ -18389,9 +18508,21 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                                          1,
                                          nrc2,
                                          nrc2,
+#if NP_ACCEL_GAUSS_COMPILED
+                                         ((BANDWIDTH_reg == BW_ADAP_NN) ||
+                                          !ks_tree_use) ?
+                                           NP_TREE_FALSE : int_TREE_X,
+#else
                                          (BANDWIDTH_reg == BW_ADAP_NN) ? NP_TREE_FALSE : int_TREE_X,
+#endif
                                          0,
+#if NP_ACCEL_GAUSS_COMPILED
+                                         ((BANDWIDTH_reg == BW_ADAP_NN) ||
+                                          !ks_tree_use) ?
+                                           NULL : kdt_extern_X,
+#else
                                          (BANDWIDTH_reg == BW_ADAP_NN) ? NULL : kdt_extern_X,
+#endif
                                          NULL, NULL, NULL,
                                          PXU,
                                          PXO,
@@ -18553,9 +18684,21 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                                      0,
                                      nrc2,
                                      nrc2,
+#if NP_ACCEL_GAUSS_COMPILED
+                                     ((BANDWIDTH_reg == BW_ADAP_NN) ||
+                                      !ks_tree_use) ?
+                                       NP_TREE_FALSE : int_TREE_X,
+#else
                                      (BANDWIDTH_reg == BW_ADAP_NN) ? NP_TREE_FALSE : int_TREE_X,
+#endif
                                      0,
+#if NP_ACCEL_GAUSS_COMPILED
+                                     ((BANDWIDTH_reg == BW_ADAP_NN) ||
+                                      !ks_tree_use) ?
+                                       NULL : kdt_extern_X,
+#else
                                      (BANDWIDTH_reg == BW_ADAP_NN) ? NULL : kdt_extern_X,
+#endif
                                      NULL, NULL, NULL,
                                      PXU,
                                      PXO,
@@ -19044,9 +19187,17 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                            0, // don't explicitly suppress parallel
                            2, // 2 cols in Y
                            0, // 0 cols in W
+#if NP_ACCEL_GAUSS_COMPILED
+                           ks_tree_use ? int_TREE_X : NP_TREE_FALSE,
+#else
                            int_TREE_X,
+#endif
                            0,
+#if NP_ACCEL_GAUSS_COMPILED
+                           ks_tree_use ? kdt_extern_X : NULL,
+#else
                            kdt_extern_X,
+#endif
                            NULL,
                            NULL,
                            NULL,

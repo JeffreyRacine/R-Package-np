@@ -1,5 +1,13 @@
 # npRmpi 0.70-6
 
+* On Apple silicon, fixed-bandwidth compact-support regression CV candidates
+  whose kernel support covers the complete observed continuous range now use
+  the canonical dense LP owner when its qualified arithmetic is faster than
+  unproductive full-tree traversal. The allocation-free geometry certificate
+  is shared by scalar and basis-neutral LP objectives and preserves MPI outer-
+  row ownership; width-two, genuinely sparse, nearest-neighbour, non-compact,
+  and portable non-Apple owners remain unchanged.
+
 * Conditional-density native degree search now constructs its finite invalid-
   candidate penalty once from the same canonical baseline-and-retry rule as
   the ordinary bandwidth route and restores that rank-common value before
