@@ -17,6 +17,15 @@ expect_try_error <- function(expr, regexp) {
   invisible(out)
 }
 
+npreghat_numeric_matrix_payload <- function(value) {
+  matrix(
+    as.vector(value),
+    nrow = nrow(value),
+    ncol = ncol(value),
+    dimnames = dimnames(value)
+  )
+}
+
 npreghat_fixture_selected <- Sys.getenv("NPREGHAT_FIXTURE_BLOCK", "all")
 npreghat_fixture_index <- 0L
 test_that <- function(desc, code) {
@@ -82,8 +91,11 @@ test_that("npreghat reproduces npreg fitted values for mixed-data local constant
 
   ex <- tx[seq_len(10L), , drop = FALSE]
   H.ex <- npreghat(bws = bw, txdat = tx, exdat = ex, output = "matrix")
-  expect_equal(predict(H, newdata = ex, output = "matrix"), H.ex,
-               tolerance = 0, ignore_attr = TRUE)
+  expect_equal(
+    npreghat_numeric_matrix_payload(predict(H, newdata = ex, output = "matrix")),
+    npreghat_numeric_matrix_payload(H.ex),
+    tolerance = 0
+  )
 })
 
 test_that("npreghat supports lp/ll derivatives and matrix apply mode", {
@@ -347,7 +359,11 @@ test_that("npreghat nonfixed higher-order lp operator matches npreg and matrix a
     expect_equal(as.vector(case$H %*% case$y), as.vector(case$fit$mean), tolerance = 1e-8)
     expect_equal(as.vector(case$a.vec), as.vector(case$fit$mean), tolerance = 1e-8)
     expect_equal(as.vector(case$H %*% case$y), as.vector(case$a.vec), tolerance = 1e-10)
-    expect_equal(case$H %*% case$Y, case$a.mat, tolerance = 1e-10, ignore_attr = TRUE)
+    expect_equal(
+      npreghat_numeric_matrix_payload(case$H %*% case$Y),
+      npreghat_numeric_matrix_payload(case$a.mat),
+      tolerance = 1e-10
+    )
   }
 })
 
@@ -385,10 +401,9 @@ test_that("npreghat constraint output is exact row-weighted transpose", {
     H <- npreghat(bws = bw, txdat = tx, exdat = ex, output = "matrix")
     A <- npreghat(bws = bw, txdat = tx, exdat = ex, y = y, output = "constraint")
     expect_equal(
-      A,
-      t(H) * y,
+      npreghat_numeric_matrix_payload(A),
+      npreghat_numeric_matrix_payload(t(H) * y),
       tolerance = 0,
-      ignore_attr = TRUE,
       info = paste("mean", regtype, bwtype)
     )
 
@@ -397,10 +412,9 @@ test_that("npreghat constraint output is exact row-weighted transpose", {
       A.grad <- npreghat(bws = bw, txdat = tx, exdat = ex, y = y,
                          output = "constraint", s = 1L)
       expect_equal(
-        A.grad,
-        t(H.grad) * y,
+        npreghat_numeric_matrix_payload(A.grad),
+        npreghat_numeric_matrix_payload(t(H.grad) * y),
         tolerance = 1e-14,
-        ignore_attr = TRUE,
         info = paste("gradient", regtype, bwtype)
       )
     }
@@ -410,13 +424,21 @@ test_that("npreghat constraint output is exact row-weighted transpose", {
   H <- npreghat(bws = bw, txdat = tx, exdat = ex, output = "matrix")
   H.obj <- npreghat(bws = bw, txdat = tx, output = "matrix")
   A.stored <- predict(H, y = y, output = "constraint")
-  expect_equal(A.stored, t(H) * y, tolerance = 1e-14, ignore_attr = TRUE)
+  expect_equal(
+    npreghat_numeric_matrix_payload(A.stored),
+    npreghat_numeric_matrix_payload(t(H) * y),
+    tolerance = 1e-14
+  )
   expect_try_error(
     predict(H, output = "constraint"),
     "argument 'y' is required"
   )
   A.pred <- predict(H.obj, newdata = ex, y = y, output = "constraint")
-  expect_equal(A.pred, t(H) * y, tolerance = 1e-14, ignore_attr = TRUE)
+  expect_equal(
+    npreghat_numeric_matrix_payload(A.pred),
+    npreghat_numeric_matrix_payload(t(H) * y),
+    tolerance = 1e-14
+  )
 })
 
 run_npreghat_constraint_error_case <- function(case, regexp) {
