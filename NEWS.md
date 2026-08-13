@@ -1,5 +1,13 @@
 # npRmpi 0.70-6
 
+* `nplsqregbw()` and `nplsqreg()` now support the package-wide
+  `nomad = "auto"` shortcut. One continuous smoothing dimension uses a
+  family-local coordinator that gives each exhaustive fixed-degree candidate
+  its own complete autodispatch transaction; two or more dimensions retain
+  the existing NOMAD/Powell joint search. Historical `nomad = FALSE` and
+  `nomad = TRUE` routes, the shared MPI objective owner, and the separate
+  logical-only `nomad.pilot` control are unchanged.
+
 * Conditional-density automatic degree search now provisions response-side
   categorical workspace for every engine that a later degree candidate can
   activate, rather than only the engine selected by the initial degree. This
