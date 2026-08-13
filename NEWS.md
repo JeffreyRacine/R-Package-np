@@ -1,5 +1,13 @@
 # np 0.70-6
 
+* On Apple silicon, fixed-bandwidth compact-support regression CV candidates
+  whose kernel support covers the complete observed continuous range now use
+  the canonical dense LP owner when its qualified arithmetic is faster than
+  unproductive full-tree traversal. The exact geometry certificate is
+  allocation-free, applies to scalar and basis-neutral LP objectives, and
+  leaves width-two, genuinely sparse, nearest-neighbour, non-compact, and
+  portable non-Apple owners unchanged.
+
 * Conditional-density native degree search now constructs its finite invalid-
   candidate penalty once from the same canonical baseline-and-retry rule as
   the ordinary bandwidth route, retains that value in the prepared context,
