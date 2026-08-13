@@ -1,5 +1,12 @@
 # np 0.70-6
 
+* Conditional-density automatic degree search now provisions response-side
+  categorical workspace for every engine that a later degree candidate can
+  activate, rather than only the engine selected by the initial degree. This
+  restores `npcdensbw()` and `npconmode()` search-trajectory parity across
+  serial and MPI owners without changing fixed-candidate objective arithmetic,
+  degree policy, or public evaluation accounting.
+
 * On Apple silicon, fixed-bandwidth compact-support regression-tree CV
   objectives of local-polynomial basis width six now use a compile-time
   resident sparse-pair microkernel. It preserves tree and pair order, the

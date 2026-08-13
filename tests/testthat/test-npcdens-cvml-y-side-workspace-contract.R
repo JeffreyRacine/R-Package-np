@@ -58,7 +58,7 @@ npcdens_y_side_oracle <- function(x, y, bw) {
   sum(log(colSums(xweights * yweights) / colSums(xweights)))
 }
 
-test_that("conditional CVML Y-side ownership follows the selected stream", {
+test_that("conditional CVML Y-side ownership covers every searchable stream", {
   source <- npcdens_y_side_source("np.c")
   skip_if(is.null(source), "source file src/np.c unavailable")
 
@@ -67,16 +67,16 @@ test_that("conditional CVML Y-side ownership follows the selected stream", {
     source,
     fixed = TRUE
   ))
-  expect_true(grepl(
-    "np_conditional_density_cvml_stream_engine_supported());",
+  expect_match(
     source,
-    fixed = TRUE
-  ))
+    "\\(degree_search \\|\\|\\s*np_conditional_density_cvml_stream_engine_supported\\(\\)\\)\\);",
+    perl = TRUE
+  )
   expect_equal(
     lengths(regmatches(
       source,
       gregexpr(
-        "need_y_side = np_conditional_density_objective_needs_y_side(ibwmfunc);",
+        "need_y_side = np_conditional_density_objective_needs_y_side(\n    ibwmfunc, degree_search);",
         source,
         fixed = TRUE
       )
