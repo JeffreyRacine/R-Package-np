@@ -1,5 +1,13 @@
 # npRmpi 0.70-6
 
+* On Apple silicon, fixed-bandwidth compact-support regression-tree CV
+  objectives of local-polynomial basis width six now use compile-time
+  resident sparse-pair and rank-owned-row microkernels. Tree order, coarse MPI
+  outer-row ownership, the unique upper Gram triangle, and the common
+  mirror/solve finisher are unchanged. Widths below and above six are
+  unaffected, and portable builds retain the incumbent generic width-six
+  owner.
+
 * On Apple silicon, fixed-bandwidth compact-support regression CV candidates
   whose kernel support covers the complete observed continuous range now use
   the canonical dense LP owner when its qualified arithmetic is faster than

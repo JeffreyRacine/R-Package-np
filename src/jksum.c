@@ -16324,7 +16324,11 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
               NP_LP_ACCUMULATE_FIXED_ROW3();
               if(!use_mpi_transport)
                 NP_LP_ACCUMULATE_MOVING_ROW3();
+#if NP_LP_ROW_NEON
+            } else if(nterms > 6){
+#else
             } else if(nterms > 5){
+#endif
               if(use_mpi_transport){
                 np_lp_accumulate_sparse_row_wide_resident(nterms,
                                                             basis,
@@ -16347,6 +16351,29 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
                                                              ii,
                                                              w);
               }
+#if NP_LP_ROW_NEON
+            } else if(nterms == 6){
+              if(use_mpi_transport){
+                np_lp_accumulate_sparse_row_resident6(basis,
+                                                       vector_Y,
+                                                       resident_moments,
+                                                       resident_rhs,
+                                                       ii,
+                                                       w);
+              } else {
+                np_lp_accumulate_sparse_pair_resident6(basis,
+                                                        vector_Y,
+                                                        moments,
+                                                        rhs,
+                                                        resident_moments,
+                                                        resident_rhs,
+                                                        eval_ybasis,
+                                                        eval_outer,
+                                                        ii,
+                                                        ii,
+                                                        w);
+              }
+#endif
             } else if(use_mpi_transport){
               np_lp_accumulate_row(nterms,
                                     basis,
@@ -16457,7 +16484,11 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
             NP_LP_ACCUMULATE_FIXED_ROW3();
             if(!use_mpi_transport)
               NP_LP_ACCUMULATE_MOVING_ROW3();
+#if NP_LP_ROW_NEON
+          } else if(nterms > 6){
+#else
           } else if(nterms > 5){
+#endif
             if(use_mpi_transport){
               np_lp_accumulate_sparse_row_wide_resident(nterms,
                                                           basis,
@@ -16480,6 +16511,29 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
                                                            ii,
                                                            w);
             }
+#if NP_LP_ROW_NEON
+          } else if(nterms == 6){
+            if(use_mpi_transport){
+              np_lp_accumulate_sparse_row_resident6(basis,
+                                                     vector_Y,
+                                                     resident_moments,
+                                                     resident_rhs,
+                                                     ii,
+                                                     w);
+            } else {
+              np_lp_accumulate_sparse_pair_resident6(basis,
+                                                      vector_Y,
+                                                      moments,
+                                                      rhs,
+                                                      resident_moments,
+                                                      resident_rhs,
+                                                      eval_ybasis,
+                                                      eval_outer,
+                                                      ii,
+                                                      ii,
+                                                      w);
+            }
+#endif
           } else if(use_mpi_transport){
             np_lp_accumulate_row(nterms,
                                   basis,
