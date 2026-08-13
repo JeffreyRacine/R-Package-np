@@ -7,6 +7,12 @@
   serial and MPI owners without changing fixed-candidate objective arithmetic,
   degree policy, or public evaluation accounting.
 
+* Regression bandwidth plots now request standard errors on every direct
+  asymptotic-fit call used by the MPI-aware progress path. This preserves the
+  shared plotting contract for unavailable gradient panels, endpoint geometry,
+  and ordinary formula/session plots instead of failing during interval
+  assembly.
+
 * On Apple silicon, fixed-bandwidth compact-support regression-tree CV
   objectives of local-polynomial basis width six now use compile-time
   resident sparse-pair and rank-owned-row microkernels. Tree order, coarse MPI

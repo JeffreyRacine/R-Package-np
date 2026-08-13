@@ -325,6 +325,7 @@
             )
             tobj = npreg(txdat = xdat, tydat = ydat,
               exdat = x.eval, bws = bws,
+              se = TRUE,
               gradient.order = gradient.order,
               warn.glp.gradient = FALSE)
             engine.trace(
@@ -736,12 +737,14 @@
               tr <- if (gradients && identical(bws$regtype, "lp")) {
                 suppressWarnings(npreg(txdat = xdat, tydat = ydat,
                   exdat = eval.slice, bws = bws,
+                  se = TRUE,
                   gradients = gradients,
                   gradient.order = gradient.order,
                   warn.glp.gradient = FALSE))
               } else {
                 npreg(txdat = xdat, tydat = ydat,
                   exdat = eval.slice, bws = bws,
+                  se = TRUE,
                   gradients = gradients,
                   gradient.order = gradient.order,
                   warn.glp.gradient = FALSE)
