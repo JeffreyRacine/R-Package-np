@@ -1697,16 +1697,19 @@ static void np_reset_y_side_extern(void)
 
 /*
  * Keep Y-side workspace ownership aligned with the objective engine that will
- * actually run.  Scalar conditional-density CVML uses the stream engine when
- * it is profitable (currently fixed/generalized-NN with more than one
- * continuous X variable), and that engine consumes the same Y-only
- * categorical metadata as the general LP stream.
+ * actually run.  Automatic degree search must own the capability envelope,
+ * not only the engine selected by its initial degree: a later positive-degree
+ * CVML candidate activates the general-LP stream and consumes the same Y-only
+ * categorical metadata as an initially general-LP route.
  */
-static int np_conditional_density_objective_needs_y_side(const int objective)
+static int np_conditional_density_objective_needs_y_side(
+  const int objective,
+  const int degree_search)
 {
   return (objective == CBWM_CVLS) ||
     ((objective == CBWM_CVML) &&
-     np_conditional_density_cvml_stream_engine_supported());
+     (degree_search ||
+      np_conditional_density_cvml_stream_engine_supported()));
 }
 
 static void np_matrix_dims_or_zero(SEXP x, int *nrow, int *ncol)
@@ -5797,7 +5800,8 @@ static int np_conditional_density_prepared_context_prepare_internal(double *c_un
     vector_glp_degree_extern = NULL;
   }
 
-  need_y_side = np_conditional_density_objective_needs_y_side(ibwmfunc);
+  need_y_side = np_conditional_density_objective_needs_y_side(
+    ibwmfunc, degree_search);
   np_conditional_density_prepared_context.need_y_side = need_y_side;
   np_conditional_density_prepared_context.penalty_mode = penalty_mode[0];
   np_conditional_density_prepared_context.penalty_multiplier = penalty_mult[0];

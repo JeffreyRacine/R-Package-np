@@ -9,6 +9,7 @@ test_that("npcdensbw exhaustive degree search matches manual profile minimum", {
   dat <- data.frame(x = sort(runif(24)))
   dat$y <- dat$x + rnorm(nrow(dat), sd = 0.08)
 
+  npseed(20260319)
   bw0 <- npcdensbw(
     y ~ x,
     data = dat,
@@ -19,6 +20,7 @@ test_that("npcdensbw exhaustive degree search matches manual profile minimum", {
     bwmethod = "cv.ls",
     nmulti = 1L
   )
+  npseed(20260319)
   bw1 <- npcdensbw(
     y ~ x,
     data = dat,
@@ -29,6 +31,7 @@ test_that("npcdensbw exhaustive degree search matches manual profile minimum", {
     bwmethod = "cv.ls",
     nmulti = 1L
   )
+  npseed(20260319)
   auto <- npcdensbw(
     y ~ x,
     data = dat,
@@ -53,6 +56,7 @@ test_that("npcdensbw exhaustive degree search matches manual profile minimum", {
   expect_identical(nrow(auto$degree.search$trace), auto$degree.search$n.unique)
   expect_identical(auto$degree.search$n.cached, auto$degree.search$n.visits - auto$degree.search$n.unique)
 
+  npseed(20260319)
   manual <- npcdensbw(
     y ~ x,
     data = dat,
@@ -79,6 +83,7 @@ test_that("npcdensbw coordinate search can be exhaustively certified on a small 
   )
   dat$y <- dat$x1 + dat$x2^2 + rnorm(nrow(dat), sd = 0.08)
 
+  npseed(20260319)
   exhaustive <- npcdensbw(
     y ~ x1 + x2,
     data = dat,
@@ -91,6 +96,7 @@ test_that("npcdensbw coordinate search can be exhaustively certified on a small 
     bwmethod = "cv.ls",
     nmulti = 1L
   )
+  npseed(20260319)
   coordinate <- npcdensbw(
     y ~ x1 + x2,
     data = dat,
@@ -140,6 +146,7 @@ test_that("npcdensbw automatic degree search enforces pilot guardrails", {
     "automatic degree search currently requires regtype='lp'"
   )
 
+  npseed(20260319)
   bw <- npcdensbw(
     y ~ x,
     data = dat,
@@ -170,6 +177,7 @@ test_that("npcdens forwards automatic LP degree search through npcdensbw", {
   dat <- data.frame(x = runif(20))
   dat$y <- dat$x + rnorm(nrow(dat), sd = 0.08)
 
+  npseed(20260319)
   fit <- npcdens(
     y ~ x,
     data = dat,
