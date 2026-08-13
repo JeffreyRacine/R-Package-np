@@ -62,7 +62,7 @@ ensure_condensdist_subprocess_nprmpi_lib <- local({
     }
 
     pkg.root <- tryCatch(
-      normalizePath(testthat::test_path("..", ".."), mustWork = TRUE),
+      npRmpi_namespace_hygiene_root(),
       error = function(e) ""
     )
     if (!nzchar(pkg.root)) {

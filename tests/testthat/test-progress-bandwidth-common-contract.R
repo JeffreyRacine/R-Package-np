@@ -53,7 +53,7 @@ ensure_bandwidth_subprocess_nprmpi_lib <- local({
     }
 
     pkg.root <- tryCatch(
-      normalizePath(testthat::test_path("..", ".."), mustWork = TRUE),
+      npRmpi_namespace_hygiene_root(),
       error = function(e) ""
     )
     if (!nzchar(pkg.root)) {
@@ -584,8 +584,11 @@ test_that("dynamic optimization progress never formats objective values", {
 })
 
 test_that("obsolete spinner progress machinery is absent", {
-  pkg <- normalizePath(testthat::test_path("..", ".."), mustWork = TRUE)
-  sources <- file.path(pkg, "src", c("headers.h", "np.c", "nr.c"))
+  sources <- vapply(
+    c("headers.h", "np.c", "nr.c"),
+    function(file) npRmpi_test_source_path("src", file),
+    character(1L)
+  )
   text <- paste(unlist(lapply(sources, readLines, warn = FALSE), use.names = FALSE), collapse = "\n")
   expect_false(grepl("spinner(", text, fixed = TRUE))
 })

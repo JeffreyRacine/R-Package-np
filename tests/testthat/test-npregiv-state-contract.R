@@ -1,6 +1,9 @@
+npregiv_contract_source_path <- function() {
+  npRmpi_test_source_path("R", "npregiv.R")
+}
+
 test_that("npregiv ridging loops avoid superassignment", {
-  src_path <- testthat::test_path("..", "..", "R", "npregiv.R")
-  skip_if_not(file.exists(src_path), "source R files unavailable in installed test context")
+  src_path <- npregiv_contract_source_path()
   src <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
   lines <- grep("<<-", strsplit(src, "\n", fixed = TRUE)[[1L]], value = TRUE, fixed = TRUE)
   expect_false(any(grepl(
@@ -10,8 +13,7 @@ test_that("npregiv ridging loops avoid superassignment", {
 })
 
 test_that("npregiv uses shared seed enter helper", {
-  src_path <- testthat::test_path("..", "..", "R", "npregiv.R")
-  skip_if_not(file.exists(src_path), "source R files unavailable in installed test context")
+  src_path <- npregiv_contract_source_path()
   src <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
   expect_true(grepl("\\.np_seed_enter\\(random\\.seed\\)", src))
   expect_false(grepl("exists\\(\"\\.Random\\.seed\"", src))
@@ -19,7 +21,7 @@ test_that("npregiv uses shared seed enter helper", {
 })
 
 test_that("npregiv Tikhonov single-RHS solves do not form full inverses", {
-  src_path <- testthat::test_path("..", "..", "R", "npregiv.R")
+  src_path <- npregiv_contract_source_path()
   txt <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
 
   expect_match(
@@ -35,8 +37,7 @@ test_that("npregiv Tikhonov single-RHS solves do not form full inverses", {
 })
 
 test_that("npregiv Tikhonov refinement preserves the T-star-r right-hand side", {
-  src_path <- testthat::test_path("..", "..", "R", "npregiv.R")
-  skip_if_not(file.exists(src_path), "source R files unavailable in installed test context")
+  src_path <- npregiv_contract_source_path()
   src <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
   expect_match(src,
                "T\\.star\\.r <- .*glpreg\\(tydat=E\\.y\\.w",
@@ -47,7 +48,7 @@ test_that("npregiv Tikhonov refinement preserves the T-star-r right-hand side", 
 })
 
 test_that("npregiv reuses the Tikhonov inverse for evaluation weights", {
-  src_path <- testthat::test_path("..", "..", "R", "npregiv.R")
+  src_path <- npregiv_contract_source_path()
   txt <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
 
   expect_match(

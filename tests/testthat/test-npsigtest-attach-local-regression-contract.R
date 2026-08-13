@@ -19,7 +19,7 @@ ensure_attach_npsigtest_lib <- local({
       return(lib.path.cache)
 
     pkg.root <- tryCatch(
-      normalizePath(testthat::test_path("..", ".."), mustWork = TRUE),
+      npRmpi_namespace_hygiene_root(),
       error = function(e) ""
     )
     if (!nzchar(pkg.root))
