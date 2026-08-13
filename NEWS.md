@@ -1,5 +1,13 @@
 # np 0.70-6
 
+* On Apple silicon, fixed-bandwidth compact-support regression-tree CV
+  objectives of local-polynomial basis width six now use a compile-time
+  resident sparse-pair microkernel. It preserves tree and pair order, the
+  unique upper Gram triangle, and the shared mirror/solve finisher while
+  vectorizing only the contiguous moving-row update. Widths below and above
+  six are unchanged, and portable builds retain the incumbent generic width-
+  six owner.
+
 * On Apple silicon, fixed-bandwidth compact-support regression CV candidates
   whose kernel support covers the complete observed continuous range now use
   the canonical dense LP owner when its qualified arithmetic is faster than

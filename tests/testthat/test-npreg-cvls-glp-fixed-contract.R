@@ -221,3 +221,36 @@ test_that("fixed width-three LP tree uses canonical support and objective", {
   dense_objective <- np:::.npregbw_eval_only(x, y, bw)$objective
   expect_equal(tree_objective, dense_objective, tolerance = 1e-12)
 })
+
+test_that("fixed sparse width-six LP agrees with the independent hat oracle", {
+  set.seed(20260812)
+  n <- 128L
+  x <- data.frame(x1 = runif(n), x2 = runif(n))
+  y <- sin(4 * pi * x$x1) * cos(2 * pi * x$x2) + rnorm(n, sd = 0.1)
+  evaluate <- getFromNamespace(".npregbw_eval_only", "np")
+  old_opts <- options(np.tree = TRUE, np.categorical.compress = FALSE)
+  on.exit(options(old_opts), add = TRUE)
+
+  for (bernstein in c(FALSE, TRUE)) {
+    bw <- npregbw(
+      xdat = x,
+      ydat = y,
+      bws = c(0.22, 0.19),
+      regtype = "lp",
+      degree = c(2L, 3L),
+      basis = "additive",
+      bernstein.basis = bernstein,
+      ckertype = "epanechnikov",
+      bwmethod = "cv.ls",
+      bandwidth.compute = FALSE
+    )
+
+    native <- evaluate(x, y, bw)$objective
+    hat <- suppressWarnings(npreghat(bws = bw, txdat = x, output = "matrix"))
+    fitted <- drop(hat %*% y)
+    reference <- mean(((y - fitted) / (1.0 - diag(hat)))^2)
+
+    expect_equal(native, reference, tolerance = 2e-10,
+                 info = paste("Bernstein", bernstein))
+  }
+})

@@ -5,13 +5,6 @@
 
 #include <stddef.h>
 
-#if defined(__aarch64__) && defined(NP_USE_ACCELERATE_GAUSS) && NP_USE_ACCELERATE_GAUSS
-#include <arm_neon.h>
-#define NP_LP_ROW_NEON 1
-#else
-#define NP_LP_ROW_NEON 0
-#endif
-
 #include "headers.h"
 #include "jksum_lp_row.h"
 

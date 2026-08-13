@@ -15348,7 +15348,11 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
                                                w);
             } else if(nterms == 3){
               NP_LP_ACCUMULATE_SPARSE_PAIR3();
+#if NP_LP_ROW_NEON
+            } else if(nterms > 6){
+#else
             } else if(nterms > 5){
+#endif
               np_lp_accumulate_sparse_pair_wide_resident(nterms,
                                                            basis,
                                                            vector_Y,
@@ -15361,6 +15365,20 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
                                                            ii,
                                                            ii,
                                                            w);
+#if NP_LP_ROW_NEON
+            } else if(nterms == 6){
+              np_lp_accumulate_sparse_pair_resident6(basis,
+                                                      vector_Y,
+                                                      moments,
+                                                      rhs,
+                                                      resident_moments,
+                                                      resident_rhs,
+                                                      eval_ybasis,
+                                                      eval_outer,
+                                                      ii,
+                                                      ii,
+                                                      w);
+#endif
             } else {
               np_lp_accumulate_pair(nterms,
                                      basis,
@@ -15478,7 +15496,11 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
                                              w);
           } else if(nterms == 3){
             NP_LP_ACCUMULATE_SPARSE_PAIR3();
+#if NP_LP_ROW_NEON
+          } else if(nterms > 6){
+#else
           } else if(nterms > 5){
+#endif
             np_lp_accumulate_sparse_pair_wide_resident(nterms,
                                                          basis,
                                                          vector_Y,
@@ -15491,6 +15513,20 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
                                                          ii,
                                                          ii,
                                                          w);
+#if NP_LP_ROW_NEON
+          } else if(nterms == 6){
+            np_lp_accumulate_sparse_pair_resident6(basis,
+                                                    vector_Y,
+                                                    moments,
+                                                    rhs,
+                                                    resident_moments,
+                                                    resident_rhs,
+                                                    eval_ybasis,
+                                                    eval_outer,
+                                                    ii,
+                                                    ii,
+                                                    w);
+#endif
           } else {
             np_lp_accumulate_pair(nterms,
                                    basis,
