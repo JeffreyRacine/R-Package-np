@@ -90,6 +90,297 @@
   .npRmpi_eval_scmd(call, envir = caller_env)
 }
 
+.npRmpi_lease_process_state <- new.env(parent = emptyenv())
+.npRmpi_lease_process_state$counter <- 0
+
+.npRmpi_lease_state <- new.env(parent = emptyenv())
+.npRmpi_lease_state$session <- NULL
+.npRmpi_lease_state$status <- "open"
+.npRmpi_lease_state$store <- new.env(parent = emptyenv())
+.npRmpi_lease_state$registry <- new.env(parent = emptyenv())
+.npRmpi_lease_state$pending <- new.env(parent = emptyenv())
+
+.npRmpi_lease_next_id <- function(prefix) {
+  .npRmpi_lease_process_state$counter <- .npRmpi_lease_process_state$counter + 1
+  sprintf("%s_p%d_c%016.0f", prefix, Sys.getpid(), .npRmpi_lease_process_state$counter)
+}
+
+.npRmpi_lease_capability_table <- function() {
+  data.frame(
+    producer = c("npregbw", "nplsqregbw", "npplregbw", "npindexbw", "npscoefbw",
+                 ".npscoefbw_nomad_context_prepare"),
+    kind = c(rep("leased_public", 5L), "scoped_internal"),
+    capability = c("bw.npreg", "bw.nplsqreg", "bw.npplreg", "bw.npindex", "bw.npscoef",
+                   "internal.npscoef.nomad_context"),
+    consumer = c("npreg", "nplsqreg", "npplreg", "npindex", "npscoef",
+                 ".npscoefbw_nomad_pool_start"),
+    argument = c(rep("bws", 5L), "ctx"),
+    expected_class = c("rbandwidth", "lsqregressionbandwidth", "plbandwidth",
+                       "sibandwidth", "scbandwidth", "list"),
+    fingerprint_policy = c(rep("bandwidth.v1", 5L), "context.v1"),
+    stringsAsFactors = FALSE
+  )
+}
+
+.npRmpi_lease_is_context_call <- function(mc) {
+  if (!is.call(mc) || length(mc) < 1L || !is.function(mc[[1L]]))
+    return(FALSE)
+  target <- get0(".npscoefbw_nomad_context_prepare",
+                 envir = asNamespace("npRmpi"), mode = "function", inherits = FALSE)
+  is.function(target) && identical(mc[[1L]], target)
+}
+
+.npRmpi_lease_producer <- function(mc) {
+  if (.npRmpi_lease_is_context_call(mc))
+    return(".npscoefbw_nomad_context_prepare")
+  sub("\\..*$", "", .npRmpi_autodispatch_call_name(mc))
+}
+
+.npRmpi_lease_require_open <- function() {
+  if (!identical(.npRmpi_lease_state$status, "open"))
+    stop(sprintf("npRmpi autodispatch lease session is not reusable: state=%s",
+                 .npRmpi_lease_state$status), call. = FALSE)
+  invisible(TRUE)
+}
+
+.npRmpi_lease_ensure_session <- function() {
+  .npRmpi_lease_require_open()
+  if (is.null(.npRmpi_lease_state$session))
+    .npRmpi_lease_state$session <- .npRmpi_lease_next_id("session")
+  .npRmpi_lease_state$session
+}
+
+.npRmpi_lease_remove_local <- function(ids) {
+  ids <- unique(as.character(ids))
+  ids <- ids[nzchar(ids)]
+  for (id in ids) {
+    meta <- if (exists(id, envir = .npRmpi_lease_state$registry, inherits = FALSE))
+      get(id, envir = .npRmpi_lease_state$registry, inherits = FALSE) else NULL
+    if (is.list(meta) && identical(meta$kind, "scoped_internal") &&
+        is.character(meta$remote_name) && length(meta$remote_name) == 1L &&
+        exists(meta$remote_name, envir = .GlobalEnv, inherits = FALSE))
+      rm(list = meta$remote_name, envir = .GlobalEnv)
+    if (exists(id, envir = .npRmpi_lease_state$store, inherits = FALSE))
+      rm(list = id, envir = .npRmpi_lease_state$store)
+    if (exists(id, envir = .npRmpi_lease_state$registry, inherits = FALSE))
+      rm(list = id, envir = .npRmpi_lease_state$registry)
+  }
+  invisible(ids)
+}
+
+.npRmpi_lease_reset_local <- function() {
+  .npRmpi_lease_remove_local(ls(.npRmpi_lease_state$registry, all.names = TRUE))
+  pending <- ls(.npRmpi_lease_state$pending, all.names = TRUE)
+  if (length(pending))
+    rm(list = pending, envir = .npRmpi_lease_state$pending)
+  .npRmpi_lease_state$session <- NULL
+  .npRmpi_lease_state$status <- "open"
+  invisible(TRUE)
+}
+
+.npRmpi_lease_poison <- function() {
+  .npRmpi_lease_state$status <- "poisoned"
+  invisible(FALSE)
+}
+
+.npRmpi_lease_publication_plan <- function(mc) {
+  producer <- .npRmpi_lease_producer(mc)
+  policy <- .npRmpi_lease_capability_table()
+  hit <- which(policy$producer == producer)
+  if (length(hit) != 1L)
+    return(list(kind = "none", producer = producer))
+  row <- policy[hit, , drop = FALSE]
+  session <- .npRmpi_lease_ensure_session()
+  id <- paste(session, .npRmpi_lease_next_id("lease"), sep = "__")
+  list(
+    kind = row$kind[[1L]],
+    producer = row$producer[[1L]],
+    capability = row$capability[[1L]],
+    expected_class = row$expected_class[[1L]],
+    fingerprint_policy = row$fingerprint_policy[[1L]],
+    session = session,
+    id = id,
+    remote_name = if (identical(row$kind[[1L]], "scoped_internal"))
+      paste0(".__npRmpi_scoped_", id) else id
+  )
+}
+
+.npRmpi_lease_validate_plan <- function(plan) {
+  if (!is.list(plan) || !is.character(plan$kind) || length(plan$kind) != 1L)
+    stop("invalid autodispatch publication plan", call. = FALSE)
+  if (identical(plan$kind, "none"))
+    return(invisible(TRUE))
+  tab <- .npRmpi_lease_capability_table()
+  hit <- which(tab$producer == plan$producer & tab$kind == plan$kind &
+               tab$capability == plan$capability &
+               tab$expected_class == plan$expected_class &
+               tab$fingerprint_policy == plan$fingerprint_policy)
+  if (length(hit) != 1L)
+    stop("autodispatch publication plan is not capability-authorized", call. = FALSE)
+  req <- c("session", "id", "remote_name")
+  if (!all(vapply(req, function(nm) {
+    val <- plan[[nm]]
+    is.character(val) && length(val) == 1L && !is.na(val) && nzchar(val)
+  }, logical(1))))
+    stop("autodispatch publication plan has invalid identity", call. = FALSE)
+  invisible(TRUE)
+}
+
+.npRmpi_lease_adopt_session <- function(session) {
+  .npRmpi_lease_require_open()
+  if (is.null(.npRmpi_lease_state$session)) {
+    .npRmpi_lease_state$session <- session
+  } else if (!identical(.npRmpi_lease_state$session, session)) {
+    stop("autodispatch publication session-generation mismatch", call. = FALSE)
+  }
+  invisible(TRUE)
+}
+
+.npRmpi_lease_prepare_local <- function(value, plan) {
+  .npRmpi_lease_validate_plan(plan)
+  if (identical(plan$kind, "none"))
+    return(list(kind = "none", id = "", capability = "", fingerprint = ""))
+  .npRmpi_lease_adopt_session(plan$session)
+  class.ok <- if (identical(plan$expected_class, "list")) is.list(value) else inherits(value, plan$expected_class)
+  if (!isTRUE(class.ok))
+    stop(sprintf("autodispatch capability '%s' returned unexpected class", plan$capability), call. = FALSE)
+  if (exists(plan$id, envir = .npRmpi_lease_state$registry, inherits = FALSE) ||
+      exists(plan$id, envir = .npRmpi_lease_state$store, inherits = FALSE) ||
+      exists(plan$remote_name, envir = .GlobalEnv, inherits = FALSE))
+    stop("autodispatch publication identity collision", call. = FALSE)
+  fingerprint <- .npRmpi_autodispatch_fingerprint(value, policy = plan$fingerprint_policy)
+  if (!is.character(fingerprint) || length(fingerprint) != 1L || is.na(fingerprint))
+    stop("autodispatch canonical fingerprint failed", call. = FALSE)
+  assign(plan$id, value, envir = .npRmpi_lease_state$store)
+  assign(plan$id, list(
+    id = plan$id, session = plan$session, kind = plan$kind,
+    capability = plan$capability, fingerprint = fingerprint,
+    remote_name = plan$remote_name, state = "provisional",
+    estimated_bytes = as.numeric(object.size(value))
+  ), envir = .npRmpi_lease_state$registry)
+  list(kind = plan$kind, id = plan$id, capability = plan$capability,
+       fingerprint = fingerprint)
+}
+
+.npRmpi_lease_commit_local <- function(plan) {
+  .npRmpi_lease_validate_plan(plan)
+  .npRmpi_lease_adopt_session(plan$session)
+  if (!exists(plan$id, envir = .npRmpi_lease_state$registry, inherits = FALSE) ||
+      !exists(plan$id, envir = .npRmpi_lease_state$store, inherits = FALSE))
+    stop("autodispatch commit is missing provisional state", call. = FALSE)
+  meta <- get(plan$id, envir = .npRmpi_lease_state$registry, inherits = FALSE)
+  if (!identical(meta$state, "provisional") || !identical(meta$capability, plan$capability))
+    stop("autodispatch commit found contradictory provisional state", call. = FALSE)
+  if (identical(plan$kind, "scoped_internal")) {
+    if (exists(plan$remote_name, envir = .GlobalEnv, inherits = FALSE))
+      stop("autodispatch scoped publication would overwrite an existing binding", call. = FALSE)
+    assign(plan$remote_name,
+           get(plan$id, envir = .npRmpi_lease_state$store, inherits = FALSE),
+           envir = .GlobalEnv)
+    rm(list = plan$id, envir = .npRmpi_lease_state$store)
+  }
+  meta$state <- "live"
+  assign(plan$id, meta, envir = .npRmpi_lease_state$registry)
+  invisible(TRUE)
+}
+
+.npRmpi_lease_rollback_local <- function(ids) {
+  .npRmpi_lease_remove_local(ids)
+  invisible(TRUE)
+}
+
+.npRmpi_lease_session_drain_local <- function() {
+  .npRmpi_lease_remove_local(ls(.npRmpi_lease_state$registry, all.names = TRUE))
+  pending <- ls(.npRmpi_lease_state$pending, all.names = TRUE)
+  if (length(pending))
+    rm(list = pending, envir = .npRmpi_lease_state$pending)
+  .npRmpi_lease_state$session <- NULL
+  invisible(TRUE)
+}
+
+.npRmpi_lease_finalizer_factory <- function(id, pending) {
+  force(id)
+  force(pending)
+  function(e) {
+    if (!exists(id, envir = pending, inherits = FALSE))
+      assign(id, TRUE, envir = pending)
+    invisible(NULL)
+  }
+}
+
+.npRmpi_lease_attach_handle <- function(value, plan, fingerprint) {
+  handle <- new.env(parent = emptyenv())
+  handle$id <- plan$id
+  handle$session <- plan$session
+  handle$capability <- plan$capability
+  handle$fingerprint <- fingerprint
+  reg.finalizer(
+    handle,
+    .npRmpi_lease_finalizer_factory(plan$id, .npRmpi_lease_state$pending),
+    onexit = FALSE
+  )
+  attr(value, "npRmpi.autodispatch.lease") <- handle
+  value
+}
+
+.npRmpi_lease_handle_fields <- function(value) {
+  handle <- tryCatch(attr(value, "npRmpi.autodispatch.lease", exact = TRUE),
+                     error = function(e) NULL)
+  if (!is.environment(handle))
+    return(NULL)
+  needed <- c("id", "session", "capability", "fingerprint")
+  if (!all(vapply(needed, exists, logical(1), envir = handle, inherits = FALSE)))
+    return(NULL)
+  setNames(lapply(needed, get, envir = handle, inherits = FALSE), needed)
+}
+
+.npRmpi_lease_resolve <- function(value, consumer, argument) {
+  if (!identical(.npRmpi_lease_state$status, "open"))
+    return(NULL)
+  fields <- .npRmpi_lease_handle_fields(value)
+  if (is.null(fields) || is.null(.npRmpi_lease_state$session) ||
+      !identical(fields$session, .npRmpi_lease_state$session))
+    return(NULL)
+  tab <- .npRmpi_lease_capability_table()
+  hit <- which(tab$kind == "leased_public" & tab$capability == fields$capability &
+               tab$consumer == consumer & tab$argument == argument)
+  if (length(hit) != 1L || !inherits(value, tab$expected_class[[hit]]))
+    return(NULL)
+  if ((!is.null(value$call) && .npRmpi_autodispatch_has_tmp_symbols(value$call)) ||
+      (!is.null(value$formula) && .npRmpi_autodispatch_has_tmp_symbols(value$formula)))
+    return(NULL)
+  fingerprint <- .npRmpi_autodispatch_fingerprint(value, policy = tab$fingerprint_policy[[hit]])
+  if (!identical(fingerprint, fields$fingerprint) ||
+      !exists(fields$id, envir = .npRmpi_lease_state$registry, inherits = FALSE) ||
+      !exists(fields$id, envir = .npRmpi_lease_state$store, inherits = FALSE))
+    return(NULL)
+  meta <- get(fields$id, envir = .npRmpi_lease_state$registry, inherits = FALSE)
+  if (!identical(meta$state, "live") || !identical(meta$session, fields$session) ||
+      !identical(meta$capability, fields$capability) ||
+      !identical(meta$fingerprint, fields$fingerprint))
+    return(NULL)
+  list(id = fields$id, capability = fields$capability,
+       fingerprint = fields$fingerprint)
+}
+
+.npRmpi_lease_diagnostics <- function() {
+  ids <- ls(.npRmpi_lease_state$registry, all.names = TRUE)
+  rows <- lapply(ids, function(id) {
+    meta <- get(id, envir = .npRmpi_lease_state$registry, inherits = FALSE)
+    data.frame(id = id, capability = meta$capability, kind = meta$kind,
+               state = meta$state, estimated_bytes = meta$estimated_bytes,
+               stringsAsFactors = FALSE)
+  })
+  list(
+    session = if (is.null(.npRmpi_lease_state$session)) NA_character_ else .npRmpi_lease_state$session,
+    state = .npRmpi_lease_state$status,
+    pending_count = length(ls(.npRmpi_lease_state$pending, all.names = TRUE)),
+    entries = if (length(rows)) do.call(rbind, rows) else
+      data.frame(id = character(), capability = character(), kind = character(),
+                 state = character(), estimated_bytes = numeric(), stringsAsFactors = FALSE)
+  )
+}
+
 .npRmpi_autodispatch_next_remote_name <- function() {
   id <- getOption("npRmpi.autodispatch.remote.counter", 0L)
   id <- as.integer(id) + 1L
@@ -111,7 +402,15 @@
   unname(as.character(tools::md5sum(path)))
 }
 
-.npRmpi_autodispatch_fingerprint <- function(x) {
+.npRmpi_autodispatch_fingerprint <- function(x, policy = "bandwidth.v1") {
+  if (!is.character(policy) || length(policy) != 1L ||
+      !policy %in% c("bandwidth.v1", "context.v1"))
+    stop("unsupported autodispatch fingerprint policy", call. = FALSE)
+  timing.fields <- c(
+    "timing", "timing.profile", "total.time", "optim.time", "fit.time",
+    "nomad.time", "powell.time", "verify.time", "child.nomad.time",
+    "child.powell.time"
+  )
   normalize <- function(z) {
     if (is.environment(z))
       return(sprintf("<environment:%s>", environmentName(z)))
@@ -130,11 +429,19 @@
       return(as.pairlist(out))
     }
     if (is.list(z)) {
+      nms <- names(z)
+      if (!inherits(z, "data.frame") && !is.null(nms))
+        z[intersect(nms, timing.fields)] <- NULL
       for (i in seq_along(z))
         z[i] <- list(normalize(z[[i]]))
     }
     attrs <- attributes(z)
     if (length(attrs)) {
+      attrs[intersect(names(attrs), c(
+        "npRmpi.dispatch.mode", "npRmpi.autodispatch.remote",
+        "npRmpi.autodispatch.fingerprint", "npRmpi.autodispatch.lease",
+        "timing.profile"
+      ))] <- NULL
       attrs <- lapply(attrs, normalize)
       attributes(z) <- attrs
     }
@@ -144,6 +451,7 @@
   attr(y, "npRmpi.dispatch.mode") <- NULL
   attr(y, "npRmpi.autodispatch.remote") <- NULL
   attr(y, "npRmpi.autodispatch.fingerprint") <- NULL
+  attr(y, "npRmpi.autodispatch.lease") <- NULL
   y <- normalize(y)
   raw <- tryCatch(serialize(y, connection = NULL, xdr = FALSE), error = function(e) raw())
   if (!length(raw))
@@ -170,39 +478,33 @@
 }
 
 .npRmpi_autodispatch_ref_is_current <- function(val) {
-  if (is.null(.npRmpi_autodispatch_remote_ref(val)))
+  if (!identical(.npRmpi_lease_state$status, "open"))
     return(FALSE)
-  fp <- tryCatch(attr(val, "npRmpi.autodispatch.fingerprint", exact = TRUE), error = function(e) NULL)
-  if (!is.character(fp) || length(fp) != 1L || is.na(fp) ||
-      !identical(fp, .npRmpi_autodispatch_fingerprint(val)))
+  fields <- .npRmpi_lease_handle_fields(val)
+  if (is.null(fields) || is.null(.npRmpi_lease_state$session) ||
+      !identical(fields$session, .npRmpi_lease_state$session))
     return(FALSE)
-  TRUE
+  tab <- .npRmpi_lease_capability_table()
+  hit <- which(tab$kind == "leased_public" &
+               tab$capability == fields$capability)
+  if (length(hit) != 1L || !inherits(val, tab$expected_class[[hit]]))
+    return(FALSE)
+  fingerprint <- .npRmpi_autodispatch_fingerprint(
+    val,
+    policy = tab$fingerprint_policy[[hit]]
+  )
+  if (!identical(fingerprint, fields$fingerprint) ||
+      !exists(fields$id, envir = .npRmpi_lease_state$registry, inherits = FALSE) ||
+      !exists(fields$id, envir = .npRmpi_lease_state$store, inherits = FALSE))
+    return(FALSE)
+  meta <- get(fields$id, envir = .npRmpi_lease_state$registry, inherits = FALSE)
+  identical(meta$state, "live") && identical(meta$session, fields$session) &&
+    identical(meta$capability, fields$capability) &&
+    identical(meta$fingerprint, fields$fingerprint)
 }
 
 .npRmpi_autodispatch_can_reuse_bws_ref <- function(val, call.base) {
-  if (!.npRmpi_autodispatch_ref_is_current(val)) return(FALSE)
-
-  allowed <- list(
-    npreg = "rbandwidth",
-    nplsqreg = "lsqregressionbandwidth",
-    npplreg = "plbandwidth",
-    npindex = "sibandwidth",
-    npscoef = "scbandwidth"
-  )
-  cls <- allowed[[call.base]]
-  if (is.null(cls))
-    return(FALSE)
-
-  if (!inherits(val, cls))
-    return(FALSE)
-
-  if (!is.null(val$call) && .npRmpi_autodispatch_has_tmp_symbols(val$call))
-    return(FALSE)
-
-  if (!is.null(val$formula) && .npRmpi_autodispatch_has_tmp_symbols(val$formula))
-    return(FALSE)
-
-  TRUE
+  !is.null(.npRmpi_lease_resolve(val, consumer = call.base, argument = "bws"))
 }
 
 .npRmpi_autodispatch_large_arg_threshold <- function() {
@@ -545,7 +847,10 @@
   tmpvals <- payload$tmpvals
   tmpnames <- payload$tmpnames
   prepublish.names <- payload$prepublish.names
-  remote.name <- payload$remote.name
+  lease.bindings <- payload$lease.bindings
+  publication <- payload$publication
+  if (is.null(publication))
+    publication <- list(kind = "none", producer = "unknown")
 
   if (!is.null(opt.keys) && length(opt.keys)) {
     for (i in seq_along(opt.keys))
@@ -563,6 +868,21 @@
     for (nm in names(tmpvals))
       .GlobalEnv[[nm]] <- tmpvals[[nm]]
   }
+  if (!is.null(lease.bindings) && length(lease.bindings)) {
+    for (nm in names(lease.bindings)) {
+      id <- as.character(lease.bindings[[nm]])[1L]
+      if (exists(nm, envir = .GlobalEnv, inherits = FALSE))
+        stop(sprintf("autodispatch lease binding collision for '%s'", nm), call. = FALSE)
+      if (!exists(id, envir = .npRmpi_lease_state$store, inherits = FALSE))
+        stop(sprintf("autodispatch lease '%s' is unavailable", id), call. = FALSE)
+      meta <- if (exists(id, envir = .npRmpi_lease_state$registry, inherits = FALSE))
+        get(id, envir = .npRmpi_lease_state$registry, inherits = FALSE) else NULL
+      if (!is.list(meta) || !identical(meta$state, "live"))
+        stop(sprintf("autodispatch lease '%s' is not live", id), call. = FALSE)
+      assign(nm, get(id, envir = .npRmpi_lease_state$store, inherits = FALSE),
+             envir = .GlobalEnv)
+    }
+  }
 
   old.ctx <- getOption("npRmpi.autodispatch.context", FALSE)
   old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
@@ -572,6 +892,8 @@
   on.exit(options(npRmpi.autodispatch.disable = old.disable), add = TRUE)
   if (!is.null(tmpnames) && length(tmpnames))
     on.exit(get(".npRmpi_rm_existing", envir = asNamespace("npRmpi"), inherits = FALSE)(tmpnames, envir = .GlobalEnv), add = TRUE)
+  if (!is.null(lease.bindings) && length(lease.bindings))
+    on.exit(get(".npRmpi_rm_existing", envir = asNamespace("npRmpi"), inherits = FALSE)(names(lease.bindings), envir = .GlobalEnv), add = TRUE)
 
   res <- .npRmpi_eval_scmd(call.obj, envir = .GlobalEnv)
   tmpreplace <- tmpvals
@@ -584,9 +906,24 @@
   }
   if (!is.null(tmpreplace) && length(tmpreplace))
     res <- .npRmpi_autodispatch_sanitize_object(res, tmpvals = tmpreplace)
-  if (is.character(remote.name) && length(remote.name) == 1L && nzchar(remote.name))
-    .GlobalEnv[[remote.name]] <- res
-  res
+  publication.ack <- .npRmpi_lease_prepare_local(res, publication)
+  structure(
+    list(result = res, publication = publication.ack),
+    class = "npRmpi_spmd_internal_result"
+  )
+}
+
+.npRmpi_lease_lifecycle_handler <- function(payload, envelope) {
+  if (!is.list(payload))
+    stop("autodispatch lifecycle payload must be a list", call. = FALSE)
+  switch(
+    envelope$opcode,
+    "autodispatch.lifecycle.commit" = .npRmpi_lease_commit_local(payload$plan),
+    "autodispatch.lifecycle.rollback" = .npRmpi_lease_rollback_local(payload$ids),
+    "autodispatch.lifecycle.retire" = .npRmpi_lease_rollback_local(payload$ids),
+    "autodispatch.lifecycle.session_drain" = .npRmpi_lease_session_drain_local(),
+    stop("unsupported autodispatch lifecycle opcode", call. = FALSE)
+  )
 }
 
 .npRmpi_spmd_locked_opcodes <- function() {
@@ -621,6 +958,11 @@
     "autodispatch.npsigtest.core",
     "autodispatch.npsymtest.core",
     "autodispatch.npunitest.core"
+    ,"autodispatch.npscoefbw.nomad_context"
+    ,"autodispatch.lifecycle.commit"
+    ,"autodispatch.lifecycle.rollback"
+    ,"autodispatch.lifecycle.retire"
+    ,"autodispatch.lifecycle.session_drain"
   )
 }
 
@@ -683,6 +1025,23 @@
         payload = payload
       )
     })
+  }
+  if (!exists("autodispatch.npscoefbw.nomad_context", envir = .npRmpi_spmd_registry, inherits = FALSE)) {
+    .npRmpi_spmd_register_opcode(
+      "autodispatch.npscoefbw.nomad_context",
+      function(payload, envelope) {
+        if (!is.list(payload) || !.npRmpi_lease_is_context_call(payload$call))
+          stop("SPMD npscoef NOMAD context opcode received an unauthorized call", call. = FALSE)
+        .npRmpi_spmd_eval_payload(payload = payload, envelope = envelope)
+      }
+    )
+  }
+  for (opcode in c("autodispatch.lifecycle.commit",
+                   "autodispatch.lifecycle.rollback",
+                   "autodispatch.lifecycle.retire",
+                   "autodispatch.lifecycle.session_drain")) {
+    if (!exists(opcode, envir = .npRmpi_spmd_registry, inherits = FALSE))
+      .npRmpi_spmd_register_opcode(opcode, .npRmpi_lease_lifecycle_handler)
   }
   if (!exists("autodispatch.npregbw.cv_lllp", envir = .npRmpi_spmd_registry, inherits = FALSE)) {
     .npRmpi_spmd_register_opcode(
@@ -1037,13 +1396,22 @@
       )
     }
   )
+  publication <- list(kind = "", id = "", capability = "", fingerprint = "")
+  if (inherits(out, "npRmpi_spmd_internal_result")) {
+    publication <- out$publication
+    out <- out$result
+  }
 
   list(
     ok = TRUE,
     ack = list(
       seq_id = as.integer(envelope$seq_id),
       opcode = envelope$opcode,
-      status = "ACK"
+      status = "ACK",
+      publication_kind = as.character(publication$kind)[1L],
+      publication_id = as.character(publication$id)[1L],
+      publication_capability = as.character(publication$capability)[1L],
+      publication_fingerprint = as.character(publication$fingerprint)[1L]
     ),
     result = out
   )
@@ -1060,7 +1428,11 @@
         seq_id = if (is.list(envelope) && !is.null(envelope$seq_id)) as.integer(envelope$seq_id) else NA_integer_,
         opcode = if (is.list(envelope) && !is.null(envelope$opcode)) as.character(envelope$opcode)[1L] else NA_character_,
         status = "ERR",
-        error = conditionMessage(e)
+        error = conditionMessage(e),
+        publication_kind = "",
+        publication_id = "",
+        publication_capability = "",
+        publication_fingerprint = ""
       ),
       error = conditionMessage(e)
     )
@@ -1119,12 +1491,20 @@
   local.op <- if (is.list(local$ack) && !is.null(local$ack$opcode)) as.character(local$ack$opcode)[1L] else as.character(envelope$opcode)[1L]
   local.status <- if (isTRUE(local$ok)) "ACK" else "ERR"
   local.error <- if (isTRUE(local$ok)) "" else as.character(local$error)[1L]
+  publication.field <- function(name) {
+    val <- local$ack[[name]]
+    if (is.null(val) || !length(val) || is.na(val[[1L]])) "" else as.character(val[[1L]])
+  }
   ack.local <- c(
     rank = as.character(rank),
     seq_id = as.character(local.seq),
     opcode = local.op,
     status = local.status,
-    error = local.error
+    error = local.error,
+    publication_kind = publication.field("publication_kind"),
+    publication_id = publication.field("publication_id"),
+    publication_capability = publication.field("publication_capability"),
+    publication_fingerprint = publication.field("publication_fingerprint")
   )
 
   timeout.sec <- .npRmpi_spmd_timeout_seconds(timeout_class = envelope$timeout_class)
@@ -1143,7 +1523,7 @@
   )
 
   flat <- as.character(ack.gather)
-  expected <- 5L * size
+  expected <- 9L * size
   if (length(flat) != expected) {
     stop(
       sprintf("%s ACK gather shape mismatch [opcode=%s seq_id=%d]: expected %d fields, received %d",
@@ -1152,8 +1532,10 @@
     )
   }
 
-  ack.mat <- matrix(flat, nrow = 5L, byrow = FALSE,
-                    dimnames = list(c("rank", "seq_id", "opcode", "status", "error"), NULL))
+  ack.mat <- matrix(flat, nrow = 9L, byrow = FALSE,
+                    dimnames = list(c("rank", "seq_id", "opcode", "status", "error",
+                                      "publication_kind", "publication_id",
+                                      "publication_capability", "publication_fingerprint"), NULL))
   seq.vec <- suppressWarnings(as.integer(ack.mat["seq_id", ]))
   rank.vec <- suppressWarnings(as.integer(ack.mat["rank", ]))
   status.vec <- ack.mat["status", ]
@@ -1162,17 +1544,32 @@
                  (seq.vec != as.integer(envelope$seq_id)) |
                  (status.vec != "ACK") |
                  (opcode.vec != as.character(envelope$opcode)[1L]))
+  if (!length(bad)) {
+    publication.rows <- c("publication_kind", "publication_id",
+                          "publication_capability", "publication_fingerprint")
+    for (row in publication.rows)
+      bad <- union(bad, which(ack.mat[row, ] != ack.mat[row, 1L]))
+  }
 
   if (length(bad)) {
+    detail.index <- unique(c(1L, bad))
     details <- vapply(
-      bad,
+      detail.index,
       function(i) {
-        sprintf("rank=%s status=%s seq_id=%s opcode=%s err=%s",
+        sprintf(paste0(
+          "rank=%s status=%s seq_id=%s opcode=%s err=%s ",
+          "publication_kind=%s publication_id=%s publication_capability=%s ",
+          "publication_fingerprint=%s"
+        ),
                 if (is.na(rank.vec[[i]])) "NA" else as.character(rank.vec[[i]]),
                 as.character(status.vec[[i]]),
                 as.character(ack.mat["seq_id", i]),
                 as.character(opcode.vec[[i]]),
-                as.character(ack.mat["error", i]))
+                as.character(ack.mat["error", i]),
+                as.character(ack.mat["publication_kind", i]),
+                as.character(ack.mat["publication_id", i]),
+                as.character(ack.mat["publication_capability", i]),
+                as.character(ack.mat["publication_fingerprint", i]))
       },
       character(1)
     )
@@ -1430,6 +1827,8 @@
 }
 
 .npRmpi_spmd_opcode_from_call <- function(mc, caller_env) {
+  if (.npRmpi_lease_is_context_call(mc))
+    return("autodispatch.npscoefbw.nomad_context")
   if (.npRmpi_autodispatch_is_npregbw_lllp_cv(mc = mc, caller_env = caller_env))
     return("autodispatch.npregbw.cv_lllp")
   if (.npRmpi_autodispatch_is_npscoefbw_lllp_cv(mc = mc, caller_env = caller_env))
@@ -1692,6 +2091,8 @@
   tmpnames <- character(0)
   tmpvals <- list()
   prepublish <- list()
+  lease.bindings <- list()
+  lease.replacements <- list()
   idx <- 0L
   large.arg.threshold <- .npRmpi_autodispatch_large_arg_threshold_for_call(mc)
   forwarded <- vapply(arg.list, function(expr) {
@@ -1791,10 +2192,17 @@
       caller_env = caller_env,
       dot.names = owner.dot.names
     )
-    ref <- .npRmpi_autodispatch_remote_ref(val)
-    if (!is.null(ref) && .npRmpi_autodispatch_ref_is_current(val) &&
-        (!identical(nm, "bws") || .npRmpi_autodispatch_can_reuse_bws_ref(val, call.base))) {
-      out[[i]] <- as.name(ref)
+    lease <- if (identical(nm, "bws"))
+      .npRmpi_lease_resolve(val, consumer = call.base, argument = nm) else NULL
+    if (!is.null(lease)) {
+      binding <- paste0(".__npRmpi_lease_binding_", .npRmpi_lease_next_id("call"))
+      out[[i]] <- as.name(binding)
+      lease.bindings[[binding]] <- lease$id
+      # Keep the public call reconstructible without adding the bandwidth
+      # object back to the worker payload.  The leased binding is private
+      # transport state; returned estimator calls must retain the same
+      # untagged bandwidth value as the ordinary serialized route.
+      lease.replacements[[binding]] <- .npRmpi_autodispatch_untag(val)
       next
     }
     if (is.null(val)) {
@@ -1829,16 +2237,91 @@
     prepublish <- stored$prepublish
   }
 
-  list(call = out, tmpnames = unique(tmpnames), tmpvals = tmpvals, prepublish = prepublish)
+  list(call = out, tmpnames = unique(tmpnames), tmpvals = tmpvals,
+       prepublish = prepublish, lease.bindings = lease.bindings,
+       lease.replacements = lease.replacements)
+}
+
+.npRmpi_lease_run_lifecycle <- function(opcode, payload, comm = 1L, where = opcode) {
+  envelope <- .npRmpi_spmd_make_envelope(
+    opcode = opcode,
+    args_ref = if (is.list(payload)) payload$ids else NULL,
+    timeout_class = "default"
+  )
+  cmd <- substitute({
+    run <- get(".npRmpi_spmd_execute_step", envir = asNamespace("npRmpi"), inherits = FALSE)
+    run(envelope = ENVELOPE, payload = PAYLOAD, comm = COMM, where = WHERE)
+  }, list(ENVELOPE = envelope, PAYLOAD = payload, COMM = comm, WHERE = where))
+  .npRmpi_bcast_cmd_expr(cmd, comm = comm, caller.execute = TRUE)
+}
+
+.npRmpi_lease_drain_pending <- function(comm = 1L) {
+  .npRmpi_lease_require_open()
+  ids <- ls(.npRmpi_lease_state$pending, all.names = TRUE)
+  if (!length(ids))
+    return(invisible(character()))
+  out <- try(
+    .npRmpi_lease_run_lifecycle(
+      "autodispatch.lifecycle.retire", list(ids = ids), comm = comm,
+      where = "autodispatch pending lease retirement"
+    ),
+    silent = TRUE
+  )
+  if (inherits(out, "try-error")) {
+    .npRmpi_lease_poison()
+    stop(sprintf("autodispatch pending lease retirement failed: %s",
+                 paste(as.character(out), collapse = " ")), call. = FALSE)
+  }
+  present <- ids[vapply(ids, exists, logical(1), envir = .npRmpi_lease_state$pending,
+                        inherits = FALSE)]
+  if (length(present))
+    rm(list = present, envir = .npRmpi_lease_state$pending)
+  invisible(ids)
+}
+
+.npRmpi_lease_session_drain <- function(comm = 1L) {
+  if (!identical(.npRmpi_lease_state$status, "open"))
+    return(invisible(FALSE))
+  out <- try(
+    .npRmpi_lease_run_lifecycle(
+      "autodispatch.lifecycle.session_drain", list(ids = NULL), comm = comm,
+      where = "autodispatch session lease drain"
+    ),
+    silent = TRUE
+  )
+  if (inherits(out, "try-error")) {
+    .npRmpi_lease_poison()
+    stop(sprintf("autodispatch session lease drain failed: %s",
+                 paste(as.character(out), collapse = " ")), call. = FALSE)
+  }
+  invisible(TRUE)
 }
 
 .npRmpi_autodispatch_cleanup <- function(tmpnames, comm = 1L) {
   if (!length(tmpnames))
     return(invisible(TRUE))
-  .npRmpi_rm_existing(tmpnames, envir = .GlobalEnv)
-  cmd.rm <- substitute(get(".npRmpi_rm_existing", envir = asNamespace("npRmpi"), inherits = FALSE)(TMPS, envir = .GlobalEnv),
-                       list(TMPS = tmpnames))
-  .npRmpi_bcast_cmd_expr(cmd.rm, comm = comm, caller.execute = FALSE)
+  tmpnames <- unique(as.character(tmpnames))
+  registry.ids <- ls(.npRmpi_lease_state$registry, all.names = TRUE)
+  scoped.ids <- registry.ids[vapply(registry.ids, function(id) {
+    meta <- get(id, envir = .npRmpi_lease_state$registry, inherits = FALSE)
+    is.list(meta) && identical(meta$kind, "scoped_internal") &&
+      is.character(meta$remote_name) && meta$remote_name %in% tmpnames
+  }, logical(1))]
+  scoped.names <- if (length(scoped.ids)) vapply(scoped.ids, function(id) {
+    get(id, envir = .npRmpi_lease_state$registry, inherits = FALSE)$remote_name
+  }, character(1)) else character()
+  if (length(scoped.ids))
+    .npRmpi_lease_run_lifecycle(
+      "autodispatch.lifecycle.retire", list(ids = scoped.ids), comm = comm,
+      where = "autodispatch scoped context retirement"
+    )
+  ordinary <- setdiff(tmpnames, scoped.names)
+  if (length(ordinary)) {
+    .npRmpi_rm_existing(ordinary, envir = .GlobalEnv)
+    cmd.rm <- substitute(get(".npRmpi_rm_existing", envir = asNamespace("npRmpi"), inherits = FALSE)(TMPS, envir = .GlobalEnv),
+                         list(TMPS = ordinary))
+    .npRmpi_bcast_cmd_expr(cmd.rm, comm = comm, caller.execute = FALSE)
+  }
   invisible(TRUE)
 }
 
@@ -1973,9 +2456,29 @@
   invisible(present)
 }
 
-.npRmpi_autodispatch_tag_result <- function(x, mode = "auto", remote = NULL) {
+.npRmpi_autodispatch_tag_result <- function(x, mode = "auto", remote = NULL,
+                                            publication = NULL) {
   if (!is.null(x)) {
     attr(x, "npRmpi.dispatch.mode") <- mode
+    if (is.list(publication) && !identical(publication$kind, "none")) {
+      if (!exists(publication$id, envir = .npRmpi_lease_state$registry, inherits = FALSE))
+        stop("autodispatch publication metadata is unavailable after commit", call. = FALSE)
+      meta <- get(publication$id, envir = .npRmpi_lease_state$registry, inherits = FALSE)
+      if (!identical(meta$state, "live"))
+        stop("autodispatch publication is not live after commit", call. = FALSE)
+      current.fingerprint <- .npRmpi_autodispatch_fingerprint(
+        x, policy = publication$fingerprint_policy
+      )
+      if (!identical(current.fingerprint, meta$fingerprint)) {
+        .npRmpi_lease_poison()
+        stop("coordinator public-result fingerprint contradicts committed ranks", call. = FALSE)
+      }
+      attr(x, "npRmpi.autodispatch.remote") <- publication$remote_name
+      attr(x, "npRmpi.autodispatch.fingerprint") <- meta$fingerprint
+      if (identical(publication$kind, "leased_public"))
+        x <- .npRmpi_lease_attach_handle(x, publication, meta$fingerprint)
+      return(x)
+    }
     if (is.character(remote) && length(remote) == 1L && nzchar(remote)) {
       attr(x, "npRmpi.autodispatch.remote") <- remote
       attr(x, "npRmpi.autodispatch.fingerprint") <- .npRmpi_autodispatch_fingerprint(x)
@@ -1995,6 +2498,7 @@
   attr(x, "npRmpi.dispatch.mode") <- NULL
   attr(x, "npRmpi.autodispatch.remote") <- NULL
   attr(x, "npRmpi.autodispatch.fingerprint") <- NULL
+  attr(x, "npRmpi.autodispatch.lease") <- NULL
   x
 }
 
@@ -2107,6 +2611,8 @@
   if (!.npRmpi_autodispatch_preflight(comm = comm))
     return(.npRmpi_eval_without_dispatch(mc, caller_env))
 
+  rec.comm(.npRmpi_lease_drain_pending(comm = comm),
+           note = "autodispatch.lease.drain")
   prepared <- .npRmpi_autodispatch_materialize_call(mc = mc, caller_env = caller_env, comm = comm)
   cleaned <- FALSE
   if (length(prepared$tmpnames))
@@ -2141,8 +2647,9 @@
     opt.vals <- list()
   }
   opt.verify <- opt.sync && isTRUE(getOption("npRmpi.autodispatch.verify.options", FALSE))
-  remote.name <- .npRmpi_autodispatch_next_remote_name()
   opcode <- .npRmpi_spmd_opcode_from_call(mc = mc, caller_env = caller_env)
+  publication <- .npRmpi_lease_publication_plan(mc)
+  publication$opcode <- opcode
   timeout.class <- .npRmpi_spmd_timeout_class_from_opcode(opcode)
   envelope <- .npRmpi_spmd_make_envelope(
     opcode = opcode,
@@ -2157,7 +2664,8 @@
     opt.keys = opt.keys,
     opt.vals = opt.vals,
     opt.verify = opt.verify,
-    remote.name = remote.name
+    lease.bindings = prepared$lease.bindings,
+    publication = publication
   )
 
   cmd <- substitute({
@@ -2174,18 +2682,58 @@
           COMM = comm,
           WHERE = .npRmpi_autodispatch_call_name(mc)))
 
-  result <- rec.step(.npRmpi_bcast_cmd_expr(cmd, comm = comm, caller.execute = TRUE),
-                     note = "mpi.bcast.cmd.execute")
+  eval.out <- try(
+    rec.step(.npRmpi_bcast_cmd_expr(cmd, comm = comm, caller.execute = TRUE),
+             note = "mpi.bcast.cmd.execute"),
+    silent = TRUE
+  )
+  if (inherits(eval.out, "try-error")) {
+    if (!identical(publication$kind, "none")) {
+      rolled <- try(
+        rec.comm(.npRmpi_lease_run_lifecycle(
+          "autodispatch.lifecycle.rollback", list(ids = publication$id),
+          comm = comm, where = "autodispatch publication rollback"
+        ), note = "autodispatch.lease.rollback"),
+        silent = TRUE
+      )
+      if (inherits(rolled, "try-error"))
+        .npRmpi_lease_poison()
+    }
+    stop(paste(as.character(eval.out), collapse = " "), call. = FALSE)
+  }
+  result <- eval.out
+  if (!identical(publication$kind, "none")) {
+    committed <- try(
+      rec.comm(.npRmpi_lease_run_lifecycle(
+        "autodispatch.lifecycle.commit", list(plan = publication),
+        comm = comm, where = "autodispatch publication commit"
+      ), note = "autodispatch.lease.commit"),
+      silent = TRUE
+    )
+    if (inherits(committed, "try-error")) {
+      rolled <- try(
+        rec.comm(.npRmpi_lease_run_lifecycle(
+          "autodispatch.lifecycle.rollback", list(ids = publication$id),
+          comm = comm, where = "autodispatch failed-commit rollback"
+        ), note = "autodispatch.lease.rollback"),
+        silent = TRUE
+      )
+      if (inherits(rolled, "try-error"))
+        .npRmpi_lease_poison()
+      stop(paste(as.character(committed), collapse = " "), call. = FALSE)
+    }
+  }
   if (length(prepared$tmpnames))
     cleaned <- TRUE
-  tmpreplace <- c(prepared$tmpvals, prepared$prepublish)
+  tmpreplace <- c(prepared$tmpvals, prepared$prepublish,
+                  prepared$lease.replacements)
   rec <- make.rec()
 
   if (is.list(result))
     return(.npRmpi_autodispatch_attach_timing(
       .npRmpi_autodispatch_tag_result(
         .npRmpi_autodispatch_sanitize_object(result, tmpvals = tmpreplace),
-        mode = "auto", remote = remote.name
+        mode = "auto", publication = publication
       ),
       rec
     ))
@@ -2193,10 +2741,10 @@
   if (is.call(result))
     return(.npRmpi_autodispatch_tag_result(
       .npRmpi_autodispatch_replace_tmps(result, tmpvals = tmpreplace),
-      mode = "auto", remote = remote.name
+      mode = "auto", publication = publication
     ))
 
-  .npRmpi_autodispatch_tag_result(result, mode = "auto", remote = remote.name)
+  .npRmpi_autodispatch_tag_result(result, mode = "auto", publication = publication)
 }
 
 .npRmpi_autodispatch_call <- function(mc, caller_env = parent.frame(), comm = 1L) {

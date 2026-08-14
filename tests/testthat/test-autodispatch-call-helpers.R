@@ -71,7 +71,9 @@ test_that("autodispatch uses safe cleanup helper for temporary symbols", {
   impl.body <- paste(deparse(body(.npRmpi_distributed_call_impl), width.cutoff = 500L), collapse = " ")
   boot.body <- paste(deparse(body(.npRmpi_bootstrap_compute_payload), width.cutoff = 500L), collapse = " ")
 
-  expect_match(cleanup.body, "\\.npRmpi_rm_existing\\(tmpnames, envir = \\.GlobalEnv\\)")
+  expect_match(cleanup.body, "\\.npRmpi_lease_run_lifecycle")
+  expect_match(cleanup.body, "autodispatch.lifecycle.retire", fixed = TRUE)
+  expect_match(cleanup.body, "\\.npRmpi_rm_existing\\(ordinary, envir = \\.GlobalEnv\\)")
   expect_match(cleanup.body, "get\\(\"\\.npRmpi_rm_existing\"")
   expect_match(cleanup.body, "asNamespace\\(\"npRmpi\"\\)")
   expect_match(cleanup.body, "TMPS, envir = \\.GlobalEnv")
@@ -82,12 +84,12 @@ test_that("autodispatch uses safe cleanup helper for temporary symbols", {
   expect_match(boot.body, "TMP, envir = \\.GlobalEnv")
 })
 
-test_that("autodispatch return rewriting covers prepublished temporary arguments", {
+test_that("autodispatch return rewriting covers all coordinator replacements", {
   impl.body <- paste(deparse(body(.npRmpi_distributed_call_impl), width.cutoff = 500L), collapse = " ")
   sanitize.body <- paste(deparse(body(.npRmpi_autodispatch_sanitize_object), width.cutoff = 500L), collapse = " ")
   eval.body <- paste(deparse(body(getFromNamespace(".npRmpi_spmd_eval_payload", "npRmpi")), width.cutoff = 500L), collapse = " ")
 
-  expect_match(impl.body, "tmpreplace <- c\\(prepared\\$tmpvals, prepared\\$prepublish\\)")
+  expect_match(impl.body, "prepared\\$lease.replacements")
   expect_match(impl.body, "prepublish\\.names = names\\(prepared\\$prepublish\\)")
   expect_match(eval.body, "prepublish\\.names <- payload\\$prepublish\\.names")
   expect_match(impl.body, "\\.npRmpi_autodispatch_sanitize_object\\(result, tmpvals = tmpreplace\\)")
@@ -115,6 +117,13 @@ test_that("autodispatch prepublishes large implicit formula data", {
 test_that("autodispatch reuses semiparametric remote bandwidth references", {
   withr::local_options(npRmpi.autodispatch.arg.broadcast.threshold.regression = 1L)
 
+  reset <- getFromNamespace(".npRmpi_lease_reset_local", "npRmpi")
+  plan <- getFromNamespace(".npRmpi_lease_publication_plan", "npRmpi")
+  prepare <- getFromNamespace(".npRmpi_lease_prepare_local", "npRmpi")
+  commit <- getFromNamespace(".npRmpi_lease_commit_local", "npRmpi")
+  reset()
+  on.exit(reset(), add = TRUE)
+
   env <- new.env(parent = .GlobalEnv)
   env$sibw <- structure(
     list(call = quote(npindexbw(y ~ x1 + x2, data = mydat)),
@@ -122,20 +131,20 @@ test_that("autodispatch reuses semiparametric remote bandwidth references", {
          ballast = seq_len(100)),
     class = "sibandwidth"
   )
-  env$sibw <- .npRmpi_autodispatch_tag_result(
-    env$sibw,
-    remote = ".__npRmpi_remote_sibw"
-  )
+  si.plan <- plan(quote(npindexbw(xdat = x, ydat = y)))
+  prepare(env$sibw, si.plan)
+  commit(si.plan)
+  env$sibw <- .npRmpi_autodispatch_tag_result(env$sibw, publication = si.plan)
   env$scbw <- structure(
     list(call = quote(npscoefbw(y ~ x | z, data = mydat)),
          formula = y ~ x | z,
          ballast = seq_len(100)),
     class = "scbandwidth"
   )
-  env$scbw <- .npRmpi_autodispatch_tag_result(
-    env$scbw,
-    remote = ".__npRmpi_remote_scbw"
-  )
+  sc.plan <- plan(quote(npscoefbw(xdat = x, ydat = y, zdat = z)))
+  prepare(env$scbw, sc.plan)
+  commit(sc.plan)
+  env$scbw <- .npRmpi_autodispatch_tag_result(env$scbw, publication = sc.plan)
 
   si <- .npRmpi_autodispatch_materialize_call(
     quote(npindex(bws = sibw, gradients = FALSE)),
@@ -146,8 +155,22 @@ test_that("autodispatch reuses semiparametric remote bandwidth references", {
     caller_env = env
   )
 
-  expect_identical(as.character(si$call$bws), .npRmpi_autodispatch_remote_ref(env$sibw))
-  expect_identical(as.character(sc$call$bws), .npRmpi_autodispatch_remote_ref(env$scbw))
+  expect_length(si$lease.bindings, 1L)
+  expect_length(sc$lease.bindings, 1L)
+  expect_identical(unname(si$lease.bindings[[1L]]), si.plan$id)
+  expect_identical(unname(sc$lease.bindings[[1L]]), sc.plan$id)
+  expect_identical(as.character(si$call$bws), names(si$lease.bindings))
+  expect_identical(as.character(sc$call$bws), names(sc$lease.bindings))
+  expect_identical(names(si$lease.replacements), names(si$lease.bindings))
+  expect_identical(names(sc$lease.replacements), names(sc$lease.bindings))
+  expect_identical(si$lease.replacements[[1L]],
+                   getFromNamespace(".npRmpi_autodispatch_untag", "npRmpi")(env$sibw))
+  expect_identical(sc$lease.replacements[[1L]],
+                   getFromNamespace(".npRmpi_autodispatch_untag", "npRmpi")(env$scbw))
+  expect_false(names(si$lease.replacements) %in% names(si$tmpvals))
+  expect_false(names(sc$lease.replacements) %in% names(sc$tmpvals))
+  expect_false(names(si$lease.replacements) %in% names(si$prepublish))
+  expect_false(names(sc$lease.replacements) %in% names(sc$prepublish))
   expect_false(any(vapply(si$prepublish, inherits, logical(1), "sibandwidth")))
   expect_false(any(vapply(sc$prepublish, inherits, logical(1), "scbandwidth")))
 })

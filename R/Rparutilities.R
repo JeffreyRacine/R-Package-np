@@ -398,10 +398,11 @@ mpi.remote.exec <- function(cmd, ...,  simplify=TRUE, comm=1, ret=TRUE){
     #ret <- as.logical(tag.ret[2])
     #simplify <- as.logical(tag.ret[3])
     scmd.arg <- mpi.bcast.Robj(comm=.comm)
+    worker.env <- parent.frame()
 
 	    if (ret){
 	    size <- mpi.comm.size(.comm)
-	    out <- tryCatch(.npRmpi_eval_scmd(scmd.arg$scmd, scmd.arg$arg, envir = sys.parent()),
+	    out <- tryCatch(.npRmpi_eval_scmd(scmd.arg$scmd, scmd.arg$arg, envir = worker.env),
 	                    error = function(e) e)
 
 	    type <- .typeindex(out)
@@ -445,7 +446,7 @@ mpi.remote.exec <- function(cmd, ...,  simplify=TRUE, comm=1, ret=TRUE){
 	    }       
 	    }
     else {
-	        out <- tryCatch(.npRmpi_eval_scmd(scmd.arg$scmd, scmd.arg$arg, envir = parent.frame()),
+	        out <- tryCatch(.npRmpi_eval_scmd(scmd.arg$scmd, scmd.arg$arg, envir = worker.env),
 	                        error = function(e) e)
 	    }
     .npRmpi_transport_trace(

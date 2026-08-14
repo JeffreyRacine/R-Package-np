@@ -225,6 +225,19 @@ test_that("SPMD opcode selection tags LL/LP CV routes for core bw families", {
   expect_identical(op.noncv, "autodispatch.npregbw")
 })
 
+test_that("SPMD opcode selection gives the scoped NOMAD context a locked identity", {
+  opcode.fun <- getFromNamespace(".npRmpi_spmd_opcode_from_call", "npRmpi")
+  context.fun <- getFromNamespace(".npscoefbw_nomad_context_prepare", "npRmpi")
+  mc <- quote(.placeholder(xdat = x, ydat = y, zdat = z))
+  mc[[1L]] <- context.fun
+  expect_identical(
+    opcode.fun(mc = mc, caller_env = environment()),
+    "autodispatch.npscoefbw.nomad_context"
+  )
+  locked <- getFromNamespace(".npRmpi_spmd_locked_opcodes", "npRmpi")()
+  expect_true("autodispatch.npscoefbw.nomad_context" %in% locked)
+})
+
 test_that("SPMD timeout class marks LL/LP CV bw opcodes as cv-regression", {
   timeout.class <- getFromNamespace(".npRmpi_spmd_timeout_class_from_opcode", "npRmpi")
   expect_identical(timeout.class("autodispatch.npregbw.cv_lllp"), "cv-regression")

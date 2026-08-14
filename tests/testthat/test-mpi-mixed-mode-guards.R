@@ -32,6 +32,5 @@ test_that("autodispatch does not leak temporary names to .GlobalEnv", {
   expect_true(is.list(fit))
 
   leaked <- ls(envir = .GlobalEnv, pattern = "^\\.__npRmpi_autod_")
-  leaked.nonret <- leaked[!grepl("^\\.__npRmpi_autod_ret_", leaked)]
-  expect_length(leaked.nonret, 0L)
+  expect_length(leaked, 0L)
 })

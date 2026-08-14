@@ -17,6 +17,7 @@
   # SPMD sequencing must restart for each fresh session world.
   options(npRmpi.spmd.seq_id = 0L)
   options(npRmpi.autodispatch.remote.counter = 0L)
+  .npRmpi_lease_reset_local()
   invisible(TRUE)
 }
 
@@ -600,6 +601,22 @@ npRmpi.quit <- function(force = FALSE,
     return(invisible(FALSE))
   }
 
+  drain.leases <- function(comm) {
+    lease.drain <- try(.npRmpi_lease_session_drain(comm = comm), silent = TRUE)
+    ok <- !inherits(lease.drain, "try-error")
+    if (!ok) {
+      .np_warning(
+        paste(
+          "autodispatch lease drain failed before MPI shutdown;",
+          "the session is poisoned and worker teardown will continue.",
+          paste(as.character(lease.drain), collapse = " ")
+        ),
+        call. = FALSE
+      )
+    }
+    ok
+  }
+
   if (identical(mode, "attach")) {
     comm <- 1L
     attach.state <- as.character(getOption("npRmpi.attach.close.state", "open"))[1L]
@@ -615,6 +632,7 @@ npRmpi.quit <- function(force = FALSE,
               call. = FALSE)
       return(invisible(FALSE))
     }
+    lease.drain.ok <- drain.leases(comm)
     options(npRmpi.attach.close.state = "closing")
 
     size.attach <- .npRmpi_safe_int(mpi.comm.size(comm))
@@ -686,8 +704,10 @@ npRmpi.quit <- function(force = FALSE,
     return(invisible(TRUE))
   }
 
-  close.status <- mpi.close.Rslaves(dellog = dellog, comm = comm, force = force)
-  soft.kept.pool <- !isTRUE(force) &&
+  lease.drain.ok <- drain.leases(comm)
+  close.status <- mpi.close.Rslaves(dellog = dellog, comm = comm,
+                                    force = isTRUE(force) || !lease.drain.ok)
+  soft.kept.pool <- lease.drain.ok && !isTRUE(force) &&
     isTRUE(getOption("npRmpi.reuse.slaves", FALSE)) &&
     .npRmpi_session_has_active_pool(comm = comm)
   .npRmpi_session_reset_spmd_state()

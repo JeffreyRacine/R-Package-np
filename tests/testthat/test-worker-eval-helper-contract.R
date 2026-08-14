@@ -42,6 +42,19 @@ test_that(".mpi.worker.exec no longer uses .mpi.err side-channel", {
   expect_match(fn.body, "type <- \\.typeindex\\(out\\)")
 })
 
+test_that(".mpi.worker.exec uses one environment for both return branches", {
+  fn.body <- paste(deparse(body(.mpi.worker.exec), width.cutoff = 500L), collapse = " ")
+  expect_identical(
+    lengths(regmatches(fn.body, gregexpr("worker\\.env <- parent\\.frame\\(\\)", fn.body))),
+    1L
+  )
+  expect_identical(
+    lengths(regmatches(fn.body, gregexpr("envir = worker\\.env", fn.body))),
+    2L
+  )
+  expect_no_match(fn.body, "sys\\.parent\\(")
+})
+
 test_that("applyLB short-circuit paths use shared cache-clear helper", {
   body.lb <- paste(deparse(body(mpi.applyLB), width.cutoff = 500L), collapse = " ")
   body.ilb <- paste(deparse(body(mpi.iapplyLB), width.cutoff = 500L), collapse = " ")

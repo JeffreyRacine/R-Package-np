@@ -17,13 +17,22 @@ test_that("autodispatch materialization preserves explicit argument expressions"
 })
 
 test_that("autodispatch remote references are reused only while value-current", {
+  reset <- getFromNamespace(".npRmpi_lease_reset_local", "npRmpi")
+  plan <- getFromNamespace(".npRmpi_lease_publication_plan", "npRmpi")
+  prepare <- getFromNamespace(".npRmpi_lease_prepare_local", "npRmpi")
+  commit <- getFromNamespace(".npRmpi_lease_commit_local", "npRmpi")
   tag <- getFromNamespace(".npRmpi_autodispatch_tag_result", "npRmpi")
   current <- getFromNamespace(".npRmpi_autodispatch_ref_is_current", "npRmpi")
+  reset()
+  on.exit(reset(), add = TRUE)
 
-  value <- tag(list(norm.index = 2L, phi = c(1, 2)),
-               remote = ".__npRmpi_test_remote")
+  value <- structure(list(bws = c(1, 2), degree = c(1L, 1L)), class = "rbandwidth")
+  publication <- plan(quote(npregbw(xdat = x, ydat = y)))
+  prepare(value, publication)
+  commit(publication)
+  value <- tag(value, publication = publication)
   expect_true(current(value))
-  value$norm.index <- 1L
+  value$bws[[1L]] <- 3
   expect_false(current(value))
 })
 
