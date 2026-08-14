@@ -761,6 +761,18 @@ static int np_outer_weighted_sum_blas(double * const * const pmat_A,
   return 1;
 }
 
+typedef struct {
+  double *scratch;
+  size_t capacity;
+  double * const *matrix_A;
+  int have_A;
+  int max_A;
+  int max_B;
+  int num_weights;
+  int symmetric;
+  int Apack_ready;
+} NP_TreeOuterBlasWorkspace;
+
 /*
  * Sparse tree rows historically reached the scalar outer-product loops below,
  * even when a moderately wide response/design made the equivalent dense row
@@ -780,13 +792,15 @@ static int np_outer_weighted_sum_tree_blas(
     const int symmetric,
     const double db,
     double * const result,
-    const XL * const xl){
+    const XL * const xl,
+    NP_TreeOuterBlasWorkspace * const workspace){
   int support_count = 0;
   size_t nA = 0, nB = 0, nC = 0;
   double *scratch = NULL;
   double *Apack = NULL;
   double *Bpack = NULL;
   double *C = NULL;
+  int workspace_active = 0;
 
   if((pmat_A == NULL) || (pmat_B == NULL) || (weights == NULL) ||
      (result == NULL) || (xl == NULL) || (xl->n <= 0))
@@ -805,39 +819,91 @@ static int np_outer_weighted_sum_tree_blas(
   if((nA > SIZE_MAX - nB) || (nA + nB > SIZE_MAX - nC) ||
      (nA + nB + nC > SIZE_MAX/sizeof(double)))
     return 0;
-  scratch = (double *)malloc((nA + nB + nC)*sizeof(double));
-  if(scratch == NULL)
-    return 0;
-  Apack = scratch;
-  Bpack = Apack + nA;
-  C = Bpack + nB;
 
-  for(int j = 0; j < max_A; j++){
-    double * const Aj = Apack + (size_t)j*(size_t)support_count;
-    int out = 0;
-    for(int m = 0; m < xl->n; m++){
-      const int end = xl->istart[m] + xl->nlev[m];
-      for(int k = xl->istart[m]; k < end; k++)
-        Aj[out++] = pmat_A[j][k*have_A];
+  if((workspace != NULL) && (xl->n == 1) && (xl->istart[0] == 0) &&
+     (xl->nlev[0] == num_weights)){
+    const size_t required = nA + nB + nC;
+
+    if(workspace->capacity < required){
+      double * const grown =
+        (double *)realloc(workspace->scratch, required*sizeof(double));
+      if(grown != NULL){
+        workspace->scratch = grown;
+        workspace->capacity = required;
+        workspace->Apack_ready = 0;
+      }
     }
-  }
 
-  for(int i = 0; i < max_B; i++){
-    double * const Bi = Bpack + (size_t)i*(size_t)support_count;
-    int out = 0;
-    for(int m = 0; m < xl->n; m++){
-      const int end = xl->istart[m] + xl->nlev[m];
-      for(int k = xl->istart[m]; k < end; k++){
-        Bi[out++] = (weights[k] == 0.0) ?
-          0.0 : pmat_B[i][k*have_B]*weights[k]/db;
+    if(workspace->capacity >= required){
+      scratch = workspace->scratch;
+      Apack = scratch;
+      Bpack = Apack + nA;
+      C = Bpack + nB;
+      workspace_active = 1;
+
+      if(!workspace->Apack_ready ||
+         (workspace->matrix_A != pmat_A) ||
+         (workspace->have_A != have_A) ||
+         (workspace->max_A != max_A) ||
+         (workspace->max_B != max_B) ||
+         (workspace->num_weights != num_weights) ||
+         (workspace->symmetric != symmetric)){
+        for(int j = 0; j < max_A; j++){
+          double * const Aj = Apack + (size_t)j*(size_t)num_weights;
+          const double * const srcA = pmat_A[j];
+          for(int k = 0; k < num_weights; k++)
+            Aj[k] = srcA[k*have_A];
+        }
+        workspace->matrix_A = pmat_A;
+        workspace->have_A = have_A;
+        workspace->max_A = max_A;
+        workspace->max_B = max_B;
+        workspace->num_weights = num_weights;
+        workspace->symmetric = symmetric;
+        workspace->Apack_ready = 1;
       }
     }
   }
 
+  if(!workspace_active){
+    scratch = (double *)malloc((nA + nB + nC)*sizeof(double));
+    if(scratch == NULL)
+      return 0;
+    Apack = scratch;
+    Bpack = Apack + nA;
+    C = Bpack + nB;
+
+    for(int j = 0; j < max_A; j++){
+      double * const Aj = Apack + (size_t)j*(size_t)support_count;
+      int out = 0;
+      for(int m = 0; m < xl->n; m++){
+        const int end = xl->istart[m] + xl->nlev[m];
+        for(int k = xl->istart[m]; k < end; k++)
+          Aj[out++] = pmat_A[j][k*have_A];
+      }
+    }
+  }
+
+  if((!workspace_active) || (!have_B) ||
+     (!np_mseries_accelerate_enabled_cache) ||
+     !np_outer_weighted_sum_pack_B_accel_try(
+       pmat_B, have_B, max_B, weights, support_count, db, Bpack))
+    for(int i = 0; i < max_B; i++){
+      double * const Bi = Bpack + (size_t)i*(size_t)support_count;
+      int out = 0;
+      for(int m = 0; m < xl->n; m++){
+        const int end = xl->istart[m] + xl->nlev[m];
+        for(int k = xl->istart[m]; k < end; k++){
+          Bi[out++] = (weights[k] == 0.0) ?
+            0.0 : pmat_B[i][k*have_B]*weights[k]/db;
+        }
+      }
+    }
+
   np_blas_dgemm_tn_int(max_A, max_B, support_count, Apack, Bpack, C);
   for(size_t i = 0; i < nC; i++){
     if(!np_fast_reduction_finite(C[i])){
-      free(scratch);
+      if(!workspace_active) free(scratch);
       return 0;
     }
   }
@@ -855,7 +921,7 @@ static int np_outer_weighted_sum_tree_blas(
         result[j*max_B+i] = result[i*max_B+j];
   }
 
-  free(scratch);
+  if(!workspace_active) free(scratch);
   return 1;
 }
 
@@ -8058,7 +8124,8 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
                            double * const result,
                            const XL * const xl,
                            const int tree_outer_blas,
-                           const double * const Apack_pre){
+                           const double * const Apack_pre,
+                           NP_TreeOuterBlasWorkspace * const tree_workspace){
 
   int i,j,k, l = parallel_sum?which_l:0;
   const int kstride = (parallel_sum ? (MAX(ncol_A, 1)*MAX(ncol_B, 1)) : 0);
@@ -8313,7 +8380,7 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
      !gather_scatter &&
      np_outer_weighted_sum_tree_blas(
        pmat_A, have_A, max_A, pmat_B, have_B, max_B,
-       weights, num_weights, symmetric, db, result, xl)){
+       weights, num_weights, symmetric, db, result, xl, tree_workspace)){
     if(do_leave_one_out)
       weights[which_k] = temp;
     return;
@@ -10663,6 +10730,7 @@ NPPermutationWeightOutput * const pkw_output){
   double **bounded_cdf_den_fixed = NULL;
   double *blas_Apack_owned = NULL;
   const double *blas_Apack = NULL;
+  NP_TreeOuterBlasWorkspace tree_outer_workspace = {0};
   int use_disc_profile_cache = 0, disc_nprof = 0, disc_mark_token = 1;
   int disc_profile_from_override = 0;
   int disc_profile_from_global_cache = 0;
@@ -12141,7 +12209,8 @@ NPPermutationWeightOutput * const pkw_output){
                               1, dband,
                               ws, pxl,
                               outer_pack_ctx != NULL && outer_pack_ctx->tree_outer_blas,
-                              blas_Apack);
+                              blas_Apack,
+                              &tree_outer_workspace);
       }
 
       if(do_dual_power){
@@ -12156,7 +12225,8 @@ NPPermutationWeightOutput * const pkw_output){
                               1, dband,
                               ws2, pxl,
                               outer_pack_ctx != NULL && outer_pack_ctx->tree_outer_blas,
-                              blas_Apack);
+                              blas_Apack,
+                              &tree_outer_workspace);
       }
 
 
@@ -12172,7 +12242,8 @@ NPPermutationWeightOutput * const pkw_output){
                                 1, p_dband[ii],
                                 p_ws + ii*num_obs_eval*sum_element_length, (p_pxl == NULL) ? NULL : (p_pxl+ii),
                                 outer_pack_ctx != NULL && outer_pack_ctx->tree_outer_blas,
-                                blas_Apack);
+                                blas_Apack,
+                                &tree_outer_workspace);
         }
 
     }
@@ -12334,6 +12405,8 @@ cleanup:
   free(tprod);
   free(bpow);
   if(blas_Apack_owned != NULL) free(blas_Apack_owned);
+  if(tree_outer_workspace.scratch != NULL)
+    free(tree_outer_workspace.scratch);
   
   clean_xl(pxl);
   clean_nl(&nls);
@@ -21443,6 +21516,7 @@ static void np_lp_power2_moments_from_kernel_row(double **basis,
                         moments,
                         NULL,
                         0,
+                        NULL,
                         NULL);
 }
 

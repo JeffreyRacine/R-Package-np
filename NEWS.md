@@ -1,5 +1,13 @@
 # np 0.70-6
 
+* Broad-support positive-degree `npscoef` tree objectives now retain one
+  invocation-owned outer-product workspace across full-contiguous tree rows.
+  The unchanged design matrix is packed once while response/weight scratch is
+  reused; sparse, partial, and multi-segment support retains the incumbent
+  row-local owner. This removes repeated large workspace allocation and
+  design packing without changing public bandwidths, objectives, evaluation
+  accounting, or fitted results.
+
 * `nplsqregbw()` and `nplsqreg()` now support the package-wide
   `nomad = "auto"` shortcut. One continuous smoothing dimension uses the
   exhaustive degree lattice and jointly optimizes bandwidth and `delta` at
