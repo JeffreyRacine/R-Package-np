@@ -1,5 +1,12 @@
 # npRmpi 0.70-6
 
+* Broad-support positive-degree `npscoef` tree objectives now retain one
+  rank-local, invocation-owned outer-product workspace across full-contiguous
+  tree rows. The unchanged design matrix is packed once while response/weight
+  scratch is reused; sparse, partial, and multi-segment support retains the
+  incumbent row-local owner. Public bandwidths, objectives, evaluation
+  accounting, fitted results, and coarse MPI row ownership are unchanged.
+
 * `nplsqregbw()` and `nplsqreg()` now support the package-wide
   `nomad = "auto"` shortcut. One continuous smoothing dimension uses a
   family-local coordinator that gives each exhaustive fixed-degree candidate
