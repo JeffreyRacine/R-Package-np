@@ -122,12 +122,21 @@
   )
 }
 
+.npRmpi_lease_context_symbol <- function() {
+  as.name("npRmpi_internal_npscoefbw_nomad_context_prepare")
+}
+
 .npRmpi_lease_is_context_call <- function(mc) {
-  if (!is.call(mc) || length(mc) < 1L || !is.function(mc[[1L]]))
+  if (!is.call(mc) || length(mc) < 1L)
+    return(FALSE)
+  head <- mc[[1L]]
+  if (is.symbol(head))
+    return(identical(head, .npRmpi_lease_context_symbol()))
+  if (!is.function(head))
     return(FALSE)
   target <- get0(".npscoefbw_nomad_context_prepare",
                  envir = asNamespace("npRmpi"), mode = "function", inherits = FALSE)
-  is.function(target) && identical(mc[[1L]], target)
+  is.function(target) && identical(head, target)
 }
 
 .npRmpi_lease_producer <- function(mc) {
@@ -1107,6 +1116,12 @@
       function(payload, envelope) {
         if (!is.list(payload) || !.npRmpi_lease_is_context_call(payload$call))
           stop("SPMD npscoef NOMAD context opcode received an unauthorized call", call. = FALSE)
+        payload$call[[1L]] <- get(
+          ".npscoefbw_nomad_context_prepare",
+          envir = asNamespace("npRmpi"),
+          mode = "function",
+          inherits = FALSE
+        )
         .npRmpi_spmd_eval_payload(payload = payload, envelope = envelope)
       }
     )

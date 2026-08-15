@@ -227,6 +227,8 @@ test_that("SPMD opcode selection tags LL/LP CV routes for core bw families", {
 
 test_that("SPMD opcode selection gives the scoped NOMAD context a locked identity", {
   opcode.fun <- getFromNamespace(".npRmpi_spmd_opcode_from_call", "npRmpi")
+  context.symbol <- getFromNamespace(".npRmpi_lease_context_symbol", "npRmpi")()
+  context.call <- getFromNamespace(".npRmpi_lease_is_context_call", "npRmpi")
   context.fun <- getFromNamespace(".npscoefbw_nomad_context_prepare", "npRmpi")
   mc <- quote(.placeholder(xdat = x, ydat = y, zdat = z))
   mc[[1L]] <- context.fun
@@ -234,6 +236,33 @@ test_that("SPMD opcode selection gives the scoped NOMAD context a locked identit
     opcode.fun(mc = mc, caller_env = environment()),
     "autodispatch.npscoefbw.nomad_context"
   )
+
+  transported <- mc
+  transported[[1L]] <- context.symbol
+  transported <- unserialize(serialize(transported, NULL))
+  expect_true(context.call(transported))
+  expect_identical(
+    opcode.fun(mc = transported, caller_env = environment()),
+    "autodispatch.npscoefbw.nomad_context"
+  )
+
+  serialized.closure <- unserialize(serialize(mc, NULL))
+  expect_false(context.call(serialized.closure))
+  malformed <- transported
+  malformed[[1L]] <- as.name(".npscoefbw_nomad_context_prepare_lookalike")
+  expect_false(context.call(malformed))
+
+  handler <- getFromNamespace(".npRmpi_spmd_get_opcode", "npRmpi")(
+    "autodispatch.npscoefbw.nomad_context"
+  )
+  expect_error(
+    handler(
+      payload = list(call = malformed),
+      envelope = list(opcode = "autodispatch.npscoefbw.nomad_context")
+    ),
+    "received an unauthorized call"
+  )
+
   locked <- getFromNamespace(".npRmpi_spmd_locked_opcodes", "npRmpi")()
   expect_true("autodispatch.npscoefbw.nomad_context" %in% locked)
 })

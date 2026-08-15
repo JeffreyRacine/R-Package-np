@@ -1,5 +1,12 @@
 # npRmpi 0.70-6
 
+* Smooth-coefficient NOMAD degree search now transports its scoped prepared
+  context through an exact locked opcode token instead of comparing a
+  serialized function closure by process-local identity. Its service workers
+  are also stopped before the context lease is retired. This restores
+  one- and multi-worker `npscoefbw()` completion without changing objective
+  arithmetic, search policy, evaluation accounting, or message count.
+
 * Broad-support positive-degree `npscoef` tree objectives now retain one
   rank-local, invocation-owned outer-product workspace across full-contiguous
   tree rows. The unchanged design matrix is packed once while response/weight

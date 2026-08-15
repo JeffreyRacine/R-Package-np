@@ -705,7 +705,7 @@ npscoefbw.NULL <-
       !isTRUE(.npRmpi_autodispatch_called_from_bcast()) &&
       !isTRUE(getOption("npRmpi.local.regression.mode", FALSE))) {
     mc <- match.call()
-    mc[[1L]] <- get(".npscoefbw_nomad_context_prepare", envir = asNamespace("npRmpi"), inherits = FALSE)
+    mc[[1L]] <- .npRmpi_lease_context_symbol()
     return(.npRmpi_autodispatch_call(mc, parent.frame()))
   }
   ctx
@@ -1112,9 +1112,13 @@ npscoefbw.NULL <-
   nomad.num.feval.total <- 0
   nomad.num.feval.fast.total <- 0
   ctx <- .npscoefbw_nomad_context_prepare(xdat = xdat, ydat = ydat, zdat = zdat)
-  on.exit(.npscoefbw_nomad_context_cleanup(ctx, comm = 1L), add = TRUE)
+  pool <- NULL
+  on.exit({
+    if (!is.null(pool))
+      .npscoefbw_nomad_pool_stop(pool)
+    .npscoefbw_nomad_context_cleanup(ctx, comm = 1L)
+  }, add = TRUE)
   pool <- .npscoefbw_nomad_pool_start(ctx, comm = 1L)
-  on.exit(.npscoefbw_nomad_pool_stop(pool), add = TRUE)
   stop_pool_before_collective <- function() {
     if (!is.null(pool)) {
       .npscoefbw_nomad_pool_stop(pool)
