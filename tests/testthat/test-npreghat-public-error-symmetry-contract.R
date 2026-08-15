@@ -69,8 +69,56 @@ is_npreghat_error_symmetry_mpi_init_failure <- function(output) {
     any(grepl("MPI_Init", output, fixed = TRUE) & grepl("failed", output, ignore.case = TRUE))
 }
 
-test_that("public npreghat invalid derivative errors before active-pool broadcast", {
+test_that("public npreghat rank-local errors preserve a spawned worker pool", {
   skip_on_cran()
+
+  env.common <- npreghat_error_symmetry_attach_env()
+  skip_if(is.null(env.common), "local npRmpi install unavailable for spawn regression")
+
+  script <- tempfile("npRmpi-npreghat-spawn-error-symmetry-", fileext = ".R")
+  on.exit(unlink(script), add = TRUE)
+
+  writeLines(c(
+    "suppressPackageStartupMessages(library(npRmpi))",
+    "options(npRmpi.autodispatch = TRUE, np.messages = FALSE)",
+    "npRmpi.init(nslaves = 1L, quiet = TRUE)",
+    "on.exit(try(npRmpi.quit(force = TRUE), silent = TRUE), add = TRUE)",
+    "set.seed(20260815)",
+    "n <- 36L",
+    "x <- sort(runif(n))",
+    "y <- sin(2 * pi * x) + rnorm(n, sd = 0.03)",
+    "tx <- data.frame(x = x)",
+    "ex <- data.frame(x = seq(0.1, 0.9, length.out = 8L))",
+    "bw <- npregbw(xdat = tx, ydat = y, regtype = 'll', bws = 0.25, bandwidth.compute = FALSE)",
+    "missing.constraint <- try(npreghat(bws = bw, txdat = tx, exdat = ex, output = 'constraint'), silent = TRUE)",
+    "stopifnot(inherits(missing.constraint, 'try-error'))",
+    "stopifnot(grepl(\"argument 'y' is required when output='constraint'\", as.character(missing.constraint), fixed = TRUE))",
+    "missing.apply <- try(npreghat(bws = bw, txdat = tx, exdat = ex, output = 'apply'), silent = TRUE)",
+    "stopifnot(inherits(missing.apply, 'try-error'))",
+    "stopifnot(grepl(\"argument 'y' is required when output='apply'\", as.character(missing.apply), fixed = TRUE))",
+    "bad.output <- try(npreghat(bws = bw, txdat = tx, exdat = ex, output = 'invalid'), silent = TRUE)",
+    "stopifnot(inherits(bad.output, 'try-error'))",
+    "H <- npreghat(bws = bw, txdat = tx, exdat = ex)",
+    "out <- npreghat(bws = bw, txdat = tx, exdat = ex, y = y, output = 'apply')",
+    "stopifnot(is.matrix(H), all(is.finite(H)))",
+    "stopifnot(isTRUE(all.equal(as.vector(H %*% y), as.vector(out), tolerance = 1e-10)))",
+    "npRmpi.quit(force = TRUE)",
+    "cat('NPREGHAT_SPAWN_ERROR_SYMMETRY_OK\\n')"
+  ), script, useBytes = TRUE)
+
+  res <- run_npreghat_error_symmetry_subprocess(
+    file.path(R.home("bin"), "Rscript"),
+    args = c("--no-save", script),
+    timeout = 90L,
+    env = c(env.common, "R_PROFILE_USER=", "R_PROFILE=")
+  )
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("NPREGHAT_SPAWN_ERROR_SYMMETRY_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
+
+test_that("public npreghat invalid derivative errors before active-pool broadcast", {
   skip_on_cran()
 
   mpiexec <- Sys.which("mpiexec")
@@ -97,6 +145,9 @@ test_that("public npreghat invalid derivative errors before active-pool broadcas
     "tx <- data.frame(x1 = x1, x2 = x2)",
     "ex <- data.frame(x1 = seq(0.1, 0.9, length.out = 10L), x2 = seq(0.15, 0.85, length.out = 10L))",
     "bw <- npregbw(xdat = tx, ydat = y, regtype = 'lp', degree = c(0L, 2L), basis = 'glp', bws = c(0.3, 0.3), bandwidth.compute = FALSE)",
+    "missing.y <- try(npreghat(bws = bw, txdat = tx, exdat = ex, output = 'constraint'), silent = TRUE)",
+    "stopifnot(inherits(missing.y, 'try-error'))",
+    "stopifnot(grepl(\"argument 'y' is required when output='constraint'\", as.character(missing.y), fixed = TRUE))",
     "err <- try(npreghat(bws = bw, txdat = tx, exdat = ex, s = c(1L, 0L)), silent = TRUE)",
     "stopifnot(inherits(err, 'try-error'))",
     "stopifnot(grepl(\"exceeds local polynomial degree\", as.character(err)))",

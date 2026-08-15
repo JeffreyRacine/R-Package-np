@@ -1904,36 +1904,52 @@ npreghat.rbandwidth <-
         options(npRmpi.autodispatch.disable = TRUE)
         on.exit(options(npRmpi.autodispatch.context = old.ctx), add = TRUE)
         on.exit(options(npRmpi.autodispatch.disable = old.disable), add = TRUE)
-        if (NOEX) {
-          get("npreghat.rbandwidth", envir = asNamespace("npRmpi"), inherits = FALSE)(
-            bws = BWS,
-            txdat = TXDAT,
-            y = YDAT,
-            output = OUTPUT,
-            s = SVAL,
-            deriv = DERIV,
-            degree = DEGREE,
-            basis = BASIS,
-            bernstein.basis = BERN,
-            ridge = RIDGE,
-            leave.one.out = LOO
+        result <- tryCatch({
+          value <- if (NOEX) {
+            get("npreghat.rbandwidth", envir = asNamespace("npRmpi"), inherits = FALSE)(
+              bws = BWS,
+              txdat = TXDAT,
+              y = YDAT,
+              output = OUTPUT,
+              s = SVAL,
+              deriv = DERIV,
+              degree = DEGREE,
+              basis = BASIS,
+              bernstein.basis = BERN,
+              ridge = RIDGE,
+              leave.one.out = LOO
+            )
+          } else {
+            get("npreghat.rbandwidth", envir = asNamespace("npRmpi"), inherits = FALSE)(
+              bws = BWS,
+              txdat = TXDAT,
+              exdat = EXDAT,
+              y = YDAT,
+              output = OUTPUT,
+              s = SVAL,
+              deriv = DERIV,
+              degree = DEGREE,
+              basis = BASIS,
+              bernstein.basis = BERN,
+              ridge = RIDGE,
+              leave.one.out = LOO
+            )
+          }
+          list(
+            marker = "npRmpi.npreghat.rank.local.result.v1",
+            ok = TRUE,
+            value = value,
+            condition = NULL
           )
-        } else {
-          get("npreghat.rbandwidth", envir = asNamespace("npRmpi"), inherits = FALSE)(
-            bws = BWS,
-            txdat = TXDAT,
-            exdat = EXDAT,
-            y = YDAT,
-            output = OUTPUT,
-            s = SVAL,
-            deriv = DERIV,
-            degree = DEGREE,
-            basis = BASIS,
-            bernstein.basis = BERN,
-            ridge = RIDGE,
-            leave.one.out = LOO
+        }, error = function(e) {
+          list(
+            marker = "npRmpi.npreghat.rank.local.result.v1",
+            ok = FALSE,
+            value = NULL,
+            condition = e
           )
-        }
+        })
+        result
       }, list(
         NOEX = no.ex,
         BWS = bws,
@@ -1949,7 +1965,21 @@ npreghat.rbandwidth <-
         RIDGE = ridge,
         LOO = leave.one.out
       ))
-      return(.npRmpi_bcast_cmd_expr(expr, comm = 1L, caller.execute = TRUE))
+      rank.result <- .npRmpi_bcast_cmd_expr(expr, comm = 1L, caller.execute = TRUE)
+      if (!is.list(rank.result) ||
+          !identical(rank.result[["marker", exact = TRUE]],
+                     "npRmpi.npreghat.rank.local.result.v1") ||
+          !is.logical(rank.result[["ok", exact = TRUE]]) ||
+          length(rank.result[["ok", exact = TRUE]]) != 1L) {
+        stop("npreghat active-pool result envelope is malformed", call. = FALSE)
+      }
+      if (!isTRUE(rank.result[["ok", exact = TRUE]])) {
+        condition <- rank.result[["condition", exact = TRUE]]
+        if (inherits(condition, "condition"))
+          stop(condition)
+        stop("npreghat active-pool evaluation failed without a condition", call. = FALSE)
+      }
+      return(rank.result[["value", exact = TRUE]])
     }
 
     output <- match.arg(output)
