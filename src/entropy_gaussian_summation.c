@@ -330,8 +330,8 @@ SEXP C_np_entropy_univariate_summation_counts(SEXP support,
       XLENGTH(bandwidths) != 2)
     Rf_error("univariate entropy counts require numeric inputs");
 
-  dim_x = Rf_getAttrib(counts_x, R_DimSymbol);
-  dim_y = Rf_getAttrib(counts_y, R_DimSymbol);
+  dim_x = PROTECT(Rf_getAttrib(counts_x, R_DimSymbol));
+  dim_y = PROTECT(Rf_getAttrib(counts_y, R_DimSymbol));
   n_support = INTEGER(dim_x)[0];
   n_replications = INTEGER(dim_x)[1];
   if (n_support < 1 || n_replications < 1 ||
@@ -411,6 +411,6 @@ SEXP C_np_entropy_univariate_summation_counts(SEXP support,
     out[replication] = 0.5 * (double)(statistic_sum / size_x);
   }
 
-  UNPROTECT(1);
+  UNPROTECT(3);
   return answer;
 }
