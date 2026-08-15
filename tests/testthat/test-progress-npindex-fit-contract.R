@@ -19,6 +19,43 @@ npindex_fit_progress_lines <- function(shadow) {
   vapply(shadow$trace, `[[`, character(1L), "line")
 }
 
+npindex_fit_progress_coordinator_total <- function(neval) {
+  neval <- as.integer(neval)
+  size <- tryCatch(as.integer(mpi.comm.size(1L)), error = function(e) 1L)
+  rank <- tryCatch(as.integer(mpi.comm.rank(1L)), error = function(e) 0L)
+  if (is.na(size) || size < 1L) {
+    size <- 1L
+  }
+  if (is.na(rank) || rank < 0L || rank >= size) {
+    rank <- 0L
+  }
+
+  as.integer(neval %/% size + as.integer(rank < neval %% size))
+}
+
+npindex_fit_progress_step_pattern <- function(done, total) {
+  sprintf(
+    "^\\[npRmpi\\] Fitting regression %d/%d \\([0-9]+\\.[0-9]%%, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$",
+    as.integer(done),
+    as.integer(total)
+  )
+}
+
+npindex_fit_progress_finish_pattern <- function(total) {
+  sprintf(
+    "^\\[npRmpi\\] Fitting regression %d/%d \\(100\\.0%%, elapsed [0-9]+\\.[0-9]s, eta 0\\.0s\\)$",
+    as.integer(total),
+    as.integer(total)
+  )
+}
+
+npindex_fit_progress_start_pattern <- function(total) {
+  sprintf(
+    "^\\[npRmpi\\] Fitting regression 0/%d \\(0\\.0%%, elapsed 0\\.0s, eta 0\\.0s\\): starting$",
+    as.integer(total)
+  )
+}
+
 npindex_refinement_iterations <- function(lines) {
   refine.lines <- lines[grepl("^\\[npRmpi\\] Refining bandwidth \\(", lines)]
   iter.lines <- refine.lines[grepl("iter [0-9]+", refine.lines)]
@@ -102,15 +139,16 @@ test_that("npindex direct lp fit emits fit progress without handoff", {
   )
 
   lines <- npindex_fit_progress_lines(actual)
+  fit.total <- npindex_fit_progress_coordinator_total(nrow(fixture$tx))
 
   expect_s3_class(actual$value, "singleindex")
   expect_false(any(grepl(": starting$", lines)))
   expect_true(any(grepl(
-    "^\\[npRmpi\\] Fitting regression 1/12 \\([0-9]+\\.[0-9]%, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$",
+    npindex_fit_progress_step_pattern(1L, fit.total),
     lines
   )))
   expect_true(any(grepl(
-    "^\\[npRmpi\\] Fitting regression 12/12 \\(100\\.0%, elapsed [0-9]+\\.[0-9]s, eta 0\\.0s\\)$",
+    npindex_fit_progress_finish_pattern(fit.total),
     lines
   )))
 })
@@ -174,13 +212,14 @@ test_that("npindex lp bw to fit route hands off into the regression fit surface"
   )
 
   lines <- npindex_fit_progress_lines(actual)
+  fit.total <- npindex_fit_progress_coordinator_total(nrow(fixture$tx))
   bandwidth.pos <- npindex_degree_bandwidth_progress_positions(lines)
   fit.start.pos <- grep(
-    "^\\[npRmpi\\] Fitting regression 0/12 \\(0\\.0%, elapsed 0\\.0s, eta 0\\.0s\\): starting$",
+    npindex_fit_progress_start_pattern(fit.total),
     lines
   )
   fit.finish.pos <- grep(
-    "^\\[npRmpi\\] Fitting regression 12/12 \\(100\\.0%, elapsed [0-9]+\\.[0-9]s, eta 0\\.0s\\)$",
+    npindex_fit_progress_finish_pattern(fit.total),
     lines
   )
 
@@ -222,14 +261,15 @@ test_that("npindex lp nomad to powell to fit route preserves single-line handoff
   )
 
   lines <- npindex_fit_progress_lines(actual)
+  fit.total <- npindex_fit_progress_coordinator_total(nrow(fixture$tx))
   bandwidth.pos <- npindex_degree_bandwidth_progress_positions(lines)
   powell.pos <- grep("^\\[npRmpi\\] Refining bandwidth \\(", lines)
   fit.start.pos <- grep(
-    "^\\[npRmpi\\] Fitting regression 0/12 \\(0\\.0%, elapsed 0\\.0s, eta 0\\.0s\\): starting$",
+    npindex_fit_progress_start_pattern(fit.total),
     lines
   )
   fit.finish.pos <- grep(
-    "^\\[npRmpi\\] Fitting regression 12/12 \\(100\\.0%, elapsed [0-9]+\\.[0-9]s, eta 0\\.0s\\)$",
+    npindex_fit_progress_finish_pattern(fit.total),
     lines
   )
 
@@ -273,22 +313,20 @@ test_that("predict.singleindex lp re-entry emits evaluation and training fit pro
   )
 
   lines <- npindex_fit_progress_lines(actual)
+  eval.total <- npindex_fit_progress_coordinator_total(2L)
+  fit.total <- npindex_fit_progress_coordinator_total(nrow(fixture$tx))
 
   expect_false(any(grepl(": starting$", lines)))
   expect_true(any(grepl(
-    "^\\[npRmpi\\] Fitting regression 1/1 \\(100\\.0%, elapsed [0-9]+\\.[0-9]s, eta 0\\.0s\\)$",
+    npindex_fit_progress_finish_pattern(eval.total),
     lines
   )))
   expect_true(any(grepl(
-    "^\\[npRmpi\\] Fitting regression 1/1 \\(100\\.0%, elapsed [0-9]+\\.[0-9]s, eta 0\\.0s\\)$",
+    npindex_fit_progress_step_pattern(1L, fit.total),
     lines
   )))
   expect_true(any(grepl(
-    "^\\[npRmpi\\] Fitting regression 1/12 \\([0-9]+\\.[0-9]%, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$",
-    lines
-  )))
-  expect_true(any(grepl(
-    "^\\[npRmpi\\] Fitting regression 12/12 \\(100\\.0%, elapsed [0-9]+\\.[0-9]s, eta 0\\.0s\\)$",
+    npindex_fit_progress_finish_pattern(fit.total),
     lines
   )))
 })
@@ -318,15 +356,16 @@ test_that("npindex direct fixed lc fit emits fit progress without handoff", {
   )
 
   lines <- npindex_fit_progress_lines(actual)
+  fit.total <- npindex_fit_progress_coordinator_total(nrow(fixture$tx))
 
   expect_s3_class(actual$value, "singleindex")
   expect_false(any(grepl(": starting$", lines)))
   expect_true(any(grepl(
-    "^\\[npRmpi\\] Fitting regression 1/12 \\([0-9]+\\.[0-9]%, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$",
+    npindex_fit_progress_step_pattern(1L, fit.total),
     lines
   )))
   expect_true(any(grepl(
-    "^\\[npRmpi\\] Fitting regression 12/12 \\(100\\.0%, elapsed [0-9]+\\.[0-9]s, eta 0\\.0s\\)$",
+    npindex_fit_progress_finish_pattern(fit.total),
     lines
   )))
 })
@@ -386,13 +425,14 @@ test_that("npindex fixed lc bw to fit route hands off into the regression fit su
   )
 
   lines <- npindex_fit_progress_lines(actual)
+  fit.total <- npindex_fit_progress_coordinator_total(nrow(fixture$tx))
   bandwidth.pos <- grep("^\\[npRmpi\\] Bandwidth selection \\(", lines)
   fit.start.pos <- grep(
-    "^\\[npRmpi\\] Fitting regression 0/12 \\(0\\.0%, elapsed 0\\.0s, eta 0\\.0s\\): starting$",
+    npindex_fit_progress_start_pattern(fit.total),
     lines
   )
   fit.finish.pos <- grep(
-    "^\\[npRmpi\\] Fitting regression 12/12 \\(100\\.0%, elapsed [0-9]+\\.[0-9]s, eta 0\\.0s\\)$",
+    npindex_fit_progress_finish_pattern(fit.total),
     lines
   )
 
@@ -431,22 +471,20 @@ test_that("predict.singleindex fixed lc re-entry emits evaluation and training f
   )
 
   lines <- npindex_fit_progress_lines(actual)
+  eval.total <- npindex_fit_progress_coordinator_total(2L)
+  fit.total <- npindex_fit_progress_coordinator_total(nrow(fixture$tx))
 
   expect_false(any(grepl(": starting$", lines)))
   expect_true(any(grepl(
-    "^\\[npRmpi\\] Fitting regression 1/1 \\(100\\.0%, elapsed [0-9]+\\.[0-9]s, eta 0\\.0s\\)$",
+    npindex_fit_progress_finish_pattern(eval.total),
     lines
   )))
   expect_true(any(grepl(
-    "^\\[npRmpi\\] Fitting regression 1/1 \\(100\\.0%, elapsed [0-9]+\\.[0-9]s, eta 0\\.0s\\)$",
+    npindex_fit_progress_step_pattern(1L, fit.total),
     lines
   )))
   expect_true(any(grepl(
-    "^\\[npRmpi\\] Fitting regression 1/12 \\([0-9]+\\.[0-9]%, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$",
-    lines
-  )))
-  expect_true(any(grepl(
-    "^\\[npRmpi\\] Fitting regression 12/12 \\(100\\.0%, elapsed [0-9]+\\.[0-9]s, eta 0\\.0s\\)$",
+    npindex_fit_progress_finish_pattern(fit.total),
     lines
   )))
 })
