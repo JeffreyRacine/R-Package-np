@@ -246,8 +246,13 @@ test_that("SPMD opcode selection gives the scoped NOMAD context a locked identit
     "autodispatch.npscoefbw.nomad_context"
   )
 
-  serialized.closure <- unserialize(serialize(mc, NULL))
-  expect_false(context.call(serialized.closure))
+  lookalike.closure <- mc
+  lookalike.fun <- context.fun
+  environment(lookalike.fun) <- new.env(parent = environment(context.fun))
+  expect_identical(formals(lookalike.fun), formals(context.fun))
+  expect_identical(body(lookalike.fun), body(context.fun))
+  lookalike.closure[[1L]] <- lookalike.fun
+  expect_false(context.call(lookalike.closure))
   malformed <- transported
   malformed[[1L]] <- as.name(".npscoefbw_nomad_context_prepare_lookalike")
   expect_false(context.call(malformed))
