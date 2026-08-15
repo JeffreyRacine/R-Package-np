@@ -198,6 +198,202 @@ test_that("autodispatch remote bandwidth fingerprints use an MD5 digest", {
   expect_true(grepl("tools::md5sum", body_text, fixed = TRUE))
 })
 
+test_that("autodispatch fingerprints ignore only recognized rank-local telemetry", {
+  trace <- data.frame(
+    trace_id = 1:2,
+    eval_id = 1:2,
+    degree = c("0", "1"),
+    fval = c(2.1, 1.7),
+    status = c("ok", "ok"),
+    cached = c(FALSE, FALSE),
+    message = c("", ""),
+    elapsed = c(0.2, 0.3),
+    num.feval = c(10, 12),
+    num.feval.fast = c(3, 4),
+    stringsAsFactors = FALSE
+  )
+  trace.object <- list(degree.search = list(trace = trace))
+  trace.elapsed <- trace.object
+  trace.elapsed$degree.search$trace$elapsed <- c(9, 10)
+  expect_identical(
+    .npRmpi_autodispatch_fingerprint(trace.object),
+    .npRmpi_autodispatch_fingerprint(trace.elapsed)
+  )
+
+  objective.object <- trace.object
+  names(objective.object$degree.search$trace)[
+    names(objective.object$degree.search$trace) == "fval"
+  ] <- "objective"
+  objective.elapsed <- objective.object
+  objective.elapsed$degree.search$trace$elapsed <- c(4, 5)
+  expect_identical(
+    .npRmpi_autodispatch_fingerprint(objective.object),
+    .npRmpi_autodispatch_fingerprint(objective.elapsed)
+  )
+
+  restart <- list(
+    restart = 1L,
+    start = c(0.4, 0.6),
+    degree.start = 1L,
+    elapsed = 0.2,
+    status = "ok",
+    message = "",
+    objective = 1.4,
+    bbe = 20,
+    iterations = 5,
+    solution = c(0.5, 0.7)
+  )
+  restart.object <- list(nomad.restart.results = list(restart))
+  restart.elapsed <- restart.object
+  restart.elapsed$nomad.restart.results[[1L]]$elapsed <- 9
+  expect_identical(
+    .npRmpi_autodispatch_fingerprint(restart.object),
+    .npRmpi_autodispatch_fingerprint(restart.elapsed)
+  )
+
+  for (field in c(
+    "trace_id", "eval_id", "degree", "fval", "status", "cached", "message",
+    "num.feval", "num.feval.fast"
+  )) {
+    changed <- trace.object
+    value <- changed$degree.search$trace[[field]]
+    changed$degree.search$trace[[field]][[1L]] <-
+      if (is.numeric(value)) {
+        value[[1L]] + 1
+      } else if (is.logical(value)) {
+        !value[[1L]]
+      } else {
+        paste0(value[[1L]], "x")
+      }
+    expect_false(identical(
+      .npRmpi_autodispatch_fingerprint(trace.object),
+      .npRmpi_autodispatch_fingerprint(changed)
+    ), info = field)
+  }
+  objective.changed <- objective.object
+  objective.changed$degree.search$trace$objective[[1L]] <-
+    objective.changed$degree.search$trace$objective[[1L]] + 1
+  expect_false(identical(
+    .npRmpi_autodispatch_fingerprint(objective.object),
+    .npRmpi_autodispatch_fingerprint(objective.changed)
+  ))
+  for (field in c(
+    "restart", "start", "degree.start", "status", "message", "objective",
+    "bbe", "iterations", "solution"
+  )) {
+    changed <- restart.object
+    value <- changed$nomad.restart.results[[1L]][[field]]
+    changed$nomad.restart.results[[1L]][[field]] <-
+      if (is.numeric(value)) value + 1 else paste0(value, "x")
+    expect_false(identical(
+      .npRmpi_autodispatch_fingerprint(restart.object),
+      .npRmpi_autodispatch_fingerprint(changed)
+    ), info = field)
+  }
+})
+
+test_that("autodispatch fingerprints retain elapsed outside exact telemetry schemas", {
+  trace <- data.frame(
+    trace_id = 1L,
+    eval_id = 1L,
+    degree = "0",
+    fval = 2.1,
+    status = "ok",
+    cached = FALSE,
+    message = "",
+    elapsed = 0.2,
+    num.feval = 10,
+    num.feval.fast = 3,
+    stringsAsFactors = FALSE
+  )
+  wrong.path <- list(user.data = trace)
+  wrong.path.changed <- wrong.path
+  wrong.path.changed$user.data$elapsed <- 9
+  expect_false(identical(
+    .npRmpi_autodispatch_fingerprint(wrong.path),
+    .npRmpi_autodispatch_fingerprint(wrong.path.changed)
+  ))
+
+  near.trace <- list(degree.search = list(trace = trace[, -5L]))
+  near.trace.changed <- near.trace
+  near.trace.changed$degree.search$trace$elapsed <- 9
+  expect_false(identical(
+    .npRmpi_autodispatch_fingerprint(near.trace),
+    .npRmpi_autodispatch_fingerprint(near.trace.changed)
+  ))
+
+  restart <- list(
+    restart = 1L,
+    start = c(0.4, 0.6),
+    elapsed = 0.2,
+    status = "ok",
+    message = "",
+    objective = 1.4,
+    bbe = 20,
+    iterations = 5,
+    solution = c(0.5, 0.7)
+  )
+  wrong.restart.path <- list(user = restart)
+  wrong.restart.path.changed <- wrong.restart.path
+  wrong.restart.path.changed$user$elapsed <- 9
+  expect_false(identical(
+    .npRmpi_autodispatch_fingerprint(wrong.restart.path),
+    .npRmpi_autodispatch_fingerprint(wrong.restart.path.changed)
+  ))
+
+  near.restart <- list(
+    nomad.restart.results = list(restart[setdiff(names(restart), "bbe")])
+  )
+  near.restart.changed <- near.restart
+  near.restart.changed$nomad.restart.results[[1L]]$elapsed <- 9
+  expect_false(identical(
+    .npRmpi_autodispatch_fingerprint(near.restart),
+    .npRmpi_autodispatch_fingerprint(near.restart.changed)
+  ))
+
+  ordinary <- list(data = data.frame(elapsed = 1:3, value = 4:6))
+  ordinary.changed <- ordinary
+  ordinary.changed$data$elapsed[[1L]] <- 9L
+  expect_false(identical(
+    .npRmpi_autodispatch_fingerprint(ordinary),
+    .npRmpi_autodispatch_fingerprint(ordinary.changed)
+  ))
+
+  list.column <- data.frame(id = 1L)
+  list.column$degree.search <- I(list(list(trace = trace)))
+  list.column.changed <- list.column
+  list.column.changed$degree.search[[1L]]$trace$elapsed <- 9
+  expect_false(identical(
+    .npRmpi_autodispatch_fingerprint(list.column),
+    .npRmpi_autodispatch_fingerprint(list.column.changed)
+  ))
+})
+
+test_that("autodispatch fingerprint formula and attribute policy is unchanged", {
+  first <- list(formula = y ~ x, bw = 0.4)
+  second <- first
+  environment(first$formula) <- new.env(parent = globalenv())
+  environment(second$formula) <- new.env(parent = emptyenv())
+  expect_identical(
+    .npRmpi_autodispatch_fingerprint(first),
+    .npRmpi_autodispatch_fingerprint(second)
+  )
+
+  dispatch.changed <- first
+  attr(dispatch.changed, "npRmpi.dispatch.mode") <- "worker"
+  expect_identical(
+    .npRmpi_autodispatch_fingerprint(first),
+    .npRmpi_autodispatch_fingerprint(dispatch.changed)
+  )
+
+  ordinary.changed <- first
+  attr(ordinary.changed, "user.label") <- "substantive"
+  expect_false(identical(
+    .npRmpi_autodispatch_fingerprint(first),
+    .npRmpi_autodispatch_fingerprint(ordinary.changed)
+  ))
+})
+
 test_that("autodispatch target argument set covers gdat alias", {
   args <- .npRmpi_autodispatch_target_args()
   expect_true(is.character(args))

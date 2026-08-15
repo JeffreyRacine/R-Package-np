@@ -402,6 +402,48 @@
   unname(as.character(tools::md5sum(path)))
 }
 
+.npRmpi_autodispatch_is_degree_trace <- function(x) {
+  if (!is.data.frame(x) || is.null(names(x)) || anyDuplicated(names(x)))
+    return(FALSE)
+  objective <- intersect(c("objective", "fval"), names(x))
+  required <- c(
+    "trace_id", "eval_id", "degree", "status", "cached", "message",
+    "elapsed", "num.feval", "num.feval.fast"
+  )
+  if (length(objective) != 1L || !all(required %in% names(x)))
+    return(FALSE)
+  is.numeric(x$trace_id) &&
+    is.numeric(x$eval_id) &&
+    is.character(x$degree) &&
+    is.numeric(x[[objective]]) &&
+    is.character(x$status) &&
+    is.logical(x$cached) &&
+    is.character(x$message) &&
+    is.numeric(x$elapsed) &&
+    is.numeric(x$num.feval) &&
+    is.numeric(x$num.feval.fast)
+}
+
+.npRmpi_autodispatch_is_restart_record <- function(x) {
+  required <- c(
+    "restart", "start", "elapsed", "status", "message", "objective",
+    "bbe", "iterations", "solution"
+  )
+  if (!is.list(x) || is.data.frame(x) || is.null(names(x)) ||
+      anyDuplicated(names(x)) || !all(required %in% names(x)))
+    return(FALSE)
+  is.numeric(x$restart) && length(x$restart) == 1L &&
+    is.numeric(x$start) && length(x$start) > 0L &&
+    is.numeric(x$elapsed) && length(x$elapsed) == 1L &&
+    is.character(x$status) && length(x$status) == 1L &&
+    (is.null(x$message) ||
+       (is.character(x$message) && length(x$message) == 1L)) &&
+    is.numeric(x$objective) && length(x$objective) == 1L &&
+    is.numeric(x$bbe) && length(x$bbe) == 1L &&
+    is.numeric(x$iterations) && length(x$iterations) == 1L &&
+    (is.null(x$solution) || is.numeric(x$solution))
+}
+
 .npRmpi_autodispatch_fingerprint <- function(x, policy = "bandwidth.v1") {
   if (!is.character(policy) || length(policy) != 1L ||
       !policy %in% c("bandwidth.v1", "context.v1"))
@@ -410,6 +452,9 @@
     "timing", "timing.profile", "total.time", "optim.time", "fit.time",
     "nomad.time", "powell.time", "verify.time", "child.nomad.time",
     "child.powell.time"
+  )
+  restart.collections <- c(
+    "nomad.restarts", "nomad.restart.results", "restart.results"
   )
   normalize <- function(z) {
     if (is.environment(z))
@@ -430,6 +475,36 @@
     }
     if (is.list(z)) {
       nms <- names(z)
+      if (!inherits(z, "data.frame") && !is.null(nms)) {
+        # Ignore elapsed time only inside recognized package telemetry records.
+        for (degree.index in which(nms == "degree.search")) {
+          degree.search <- z[[degree.index]]
+          degree.names <- if (is.list(degree.search)) names(degree.search) else NULL
+          if (!is.null(degree.names)) {
+            for (trace.index in which(degree.names == "trace")) {
+              trace <- degree.search[[trace.index]]
+              if (.npRmpi_autodispatch_is_degree_trace(trace)) {
+                trace[["elapsed"]] <- NULL
+                degree.search[trace.index] <- list(trace)
+              }
+            }
+            z[degree.index] <- list(degree.search)
+          }
+        }
+        for (collection.index in which(nms %in% restart.collections)) {
+          records <- z[[collection.index]]
+          if (is.list(records)) {
+            for (record.index in seq_along(records)) {
+              record <- records[[record.index]]
+              if (.npRmpi_autodispatch_is_restart_record(record)) {
+                record[["elapsed"]] <- NULL
+                records[record.index] <- list(record)
+              }
+            }
+            z[collection.index] <- list(records)
+          }
+        }
+      }
       if (!inherits(z, "data.frame") && !is.null(nms))
         z[intersect(nms, timing.fields)] <- NULL
       for (i in seq_along(z))
