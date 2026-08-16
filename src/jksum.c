@@ -25062,7 +25062,6 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 #endif
 
   for(j = 0; j < num_obs_eval; ++j) {
-    double nepsilon = 0.0;
     double sk, ey, ey2, sigma2hat;
     int have_vcov = 0;
 
@@ -25588,32 +25587,12 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
           owner->moments[base + l + response_basis_offset];
     }
 
-    {
-      int ridge_steps = 0;
-      while(!np_lp_solve_workspace_solve(&owner->solve_workspace,
-                                         owner->nterms,
-                                         1)) {
-        if(ridge_steps >= NP_LP_SOLVE_MAX_RIDGE_STEPS ||
-           !np_lp_solve_workspace_sources_finite(&owner->solve_workspace,
-                                                 owner->nterms,
-                                                 1)) {
-          execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_SOLVE;
-          return R_NilValue;
-        }
-        for(i = 0; i < owner->nterms; ++i)
-          owner->solve_workspace.gram_source[i+i*owner->nterms] += epsilon;
-        nepsilon += epsilon;
-        ++ridge_steps;
-      }
-    }
-
-    owner->solve_workspace.rhs_source[0] +=
-      nepsilon*owner->solve_workspace.rhs_source[0]/
-      NZD_POS(owner->solve_workspace.gram_source[0]);
-    if(nepsilon > 0.0 &&
-       !np_lp_solve_workspace_solve(&owner->solve_workspace,
-                                    owner->nterms,
-                                    1)) {
+    if(np_lp_solve_workspace_solve_response(&owner->solve_workspace,
+                                            owner->nterms,
+                                            1,
+                                            epsilon,
+                                            NULL) !=
+       NP_LP_RESPONSE_SOLVE_OK) {
       execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_SOLVE;
       return R_NilValue;
     }
