@@ -422,3 +422,84 @@ test_that("public legacy LP mean matrices use the typed native capability", {
   expect_true(all(ridge.used >= 0))
   expect_gt(sum(ridge.used > 0), 0L)
 })
+
+test_that("public legacy LP mean multi-RHS apply uses the canonical response owner", {
+  candidate <- getFromNamespace(
+    ".npreghat_native_legacy_lp_mean_apply_candidate", "np"
+  )
+  has_extended_nn <- getFromNamespace("npRegressionHasExtendedNn", "np")
+  native_apply <- getFromNamespace(
+    ".npreghat_exact_lp_apply_from_regression_core", "np"
+  )
+
+  set.seed(20260817)
+  n <- 42L
+  x <- data.frame(
+    x1 = runif(n, -1, 1),
+    x2 = runif(n, -1, 1),
+    u = factor(rep(c("a", "b", "c"), length.out = n))
+  )
+  y1 <- sin(pi * x$x1) + 0.2 * x$x2 + 0.1 * (x$u == "b")
+  y2 <- cos(pi * x$x2) - 0.3 * x$x1 + seq_len(n) / 1000
+  Y <- cbind(y1, y2)
+
+  make_bw <- function(type, bws) {
+    npregbw(
+      xdat = x, ydat = y1, bws = bws,
+      bandwidth.compute = FALSE, bwmethod = "cv.ls",
+      bwtype = type, bwscaling = FALSE,
+      regtype = "lp", degree = c(2L, 1L), degree.select = "manual",
+      basis = "glp", bernstein.basis = FALSE,
+      ckertype = "gaussian", ckerorder = 2L
+    )
+  }
+
+  bw.fixed <- make_bw("fixed", c(0.48, 0.52, 0.35))
+  bw.gnn <- make_bw("generalized_nn", c(11L, 11L, 0.35))
+  bw.ann <- make_bw("adaptive_nn", c(11L, 11L, 0.35))
+  candidate_args <- function(bw, y = Y, s = c(0L, 0L)) list(
+    bws = bw, output = "apply", y = y, regtype = "lp",
+    degree = c(2L, 1L), basis = "glp", bernstein.basis = FALSE,
+    s = as.integer(s), leave.one.out = FALSE
+  )
+
+  expect_true(do.call(candidate, candidate_args(bw.fixed)))
+  expect_true(do.call(candidate, candidate_args(bw.gnn)))
+  expect_false(do.call(candidate, candidate_args(bw.ann)))
+  expect_false(do.call(
+    candidate,
+    candidate_args(bw.fixed, y = Y[, 1L, drop = FALSE])
+  ))
+  expect_false(do.call(candidate, candidate_args(bw.fixed, s = c(1L, 0L))))
+
+  bw.extended <- bw.gnn
+  bw.extended$bw[bw.extended$icon] <- bw.extended$nobs + 1L
+  expect_true(has_extended_nn(bw.extended))
+  expect_false(do.call(candidate, candidate_args(bw.extended)))
+
+  old.threshold <- getOption("np.npreghat.apply.memory.threshold.mb")
+  on.exit(
+    options(np.npreghat.apply.memory.threshold.mb = old.threshold),
+    add = TRUE
+  )
+  for (bw in list(bw.fixed, bw.gnn)) {
+    options(np.npreghat.apply.memory.threshold.mb = Inf)
+    public.inf <- npreghat(bws = bw, txdat = x, y = Y, output = "apply")
+    options(np.npreghat.apply.memory.threshold.mb = 0)
+    public.zero <- npreghat(bws = bw, txdat = x, y = Y, output = "apply")
+    native <- native_apply(
+      bw, txdat = x, y = Y, degree = c(2L, 1L), basis = "glp",
+      bernstein.basis = FALSE, s = c(0L, 0L), return.hat = FALSE
+    )
+
+    expect_identical(unname(public.inf), unname(native))
+    expect_identical(unname(public.zero), unname(native))
+    for (column in seq_len(ncol(Y))) {
+      fit <- npreg(
+        bws = bw, txdat = x, tydat = Y[, column],
+        warn.glp.gradient = FALSE
+      )$mean
+      expect_equal(public.inf[, column], fit, tolerance = 1e-10)
+    }
+  }
+})
