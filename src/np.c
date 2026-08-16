@@ -8603,29 +8603,30 @@ SEXP C_np_density_conditional(SEXP tyuno,
   return out;
 }
 
-SEXP C_np_regression_lp_apply_conditional(SEXP txuno,
-                                          SEXP txord,
-                                          SEXP txcon,
-                                          SEXP exuno,
-                                          SEXP exord,
-                                          SEXP excon,
-                                          SEXP rhs,
-                                          SEXP rbw,
-                                          SEXP bwtype,
-                                          SEXP kernel_x,
-                                          SEXP kernel_xu,
-                                          SEXP kernel_xo,
-                                          SEXP use_tree,
-                                          SEXP glp_degree,
-                                          SEXP glp_gradient_order,
-                                          SEXP glp_bernstein,
-                                          SEXP glp_basis,
-                                          SEXP continuous_kernel_family,
-                                          SEXP continuous_kernel_order,
-                                          SEXP ckerlb,
-                                          SEXP ckerub,
-                                          SEXP categorical_compress,
-                                          SEXP return_hat)
+static SEXP np_regression_lp_apply_conditional_impl(SEXP txuno,
+                                                     SEXP txord,
+                                                     SEXP txcon,
+                                                     SEXP exuno,
+                                                     SEXP exord,
+                                                     SEXP excon,
+                                                     SEXP rhs,
+                                                     SEXP rbw,
+                                                     SEXP bwtype,
+                                                     SEXP kernel_x,
+                                                     SEXP kernel_xu,
+                                                     SEXP kernel_xo,
+                                                     SEXP use_tree,
+                                                     SEXP glp_degree,
+                                                     SEXP glp_gradient_order,
+                                                     SEXP glp_bernstein,
+                                                     SEXP glp_basis,
+                                                     SEXP continuous_kernel_family,
+                                                     SEXP continuous_kernel_order,
+                                                     SEXP ckerlb,
+                                                     SEXP ckerub,
+                                                     SEXP categorical_compress,
+                                                     SEXP return_hat,
+                                                     SEXP train_is_eval)
 {
   SEXP txuno_r = R_NilValue, txord_r = R_NilValue, txcon_r = R_NilValue;
   SEXP exuno_r = R_NilValue, exord_r = R_NilValue, excon_r = R_NilValue;
@@ -8639,10 +8640,12 @@ SEXP C_np_regression_lp_apply_conditional(SEXP txuno,
   int tree_flag = asLogical(use_tree);
   int categorical_compress_flag = asInteger(categorical_compress);
   int return_hat_flag = asLogical(return_hat);
+  const int has_geometry_context = train_is_eval != R_NilValue;
+  int train_is_eval_flag = has_geometry_context ? asLogical(train_is_eval) : FALSE;
   int lp_engine = NP_LP_ENGINE_GENERAL;
   int derivative_variable = 0;
   int derivative_order = 0;
-  int compute_status = 1;
+  NPRegressionLPMatrixStatus compute_status = NP_REGRESSION_LP_MATRIX_ERROR;
   const char *failure_message = NULL;
   int int_large_sf_save = int_LARGE_SF;
   double nconfac_save = nconfac_extern;
@@ -8655,6 +8658,11 @@ SEXP C_np_regression_lp_apply_conditional(SEXP txuno,
   NPContinuousKernelDerivativeDiagnostics beta_diagnostics;
   const NPContinuousKernelRoute *active_route = NULL;
   NPContinuousKernelDerivativeDiagnostics *active_diagnostics = NULL;
+  NPNNGeometryContext nn_geometry_context = {
+    .mode = NP_NN_QUERY_EXTERNAL,
+    .eval_to_train = NULL
+  };
+  const NPNNGeometryContext *nn_geometry_context_ptr = NULL;
   int nprotect = 0;
   int i;
 
@@ -8710,6 +8718,10 @@ SEXP C_np_regression_lp_apply_conditional(SEXP txuno,
     error("C_np_regression_lp_apply_conditional: evaluation inputs must share the same row count");
   if(return_hat_flag == NA_LOGICAL)
     error("C_np_regression_lp_apply_conditional: invalid return-hat flag");
+  if(has_geometry_context && train_is_eval_flag == NA_LOGICAL)
+    error("C_np_regression_lp_apply_conditional: invalid training-identity flag");
+  if(train_is_eval_flag && num_obs_eval != num_obs_train)
+    error("C_np_regression_lp_apply_conditional: training identity requires equal row counts");
   if(!return_hat_flag && ((nrow_rhs <= 0) || (ncol_rhs <= 0)))
     error("C_np_regression_lp_apply_conditional: rhs must be a non-empty numeric matrix");
   if(!return_hat_flag && nrow_rhs != num_obs_train)
@@ -8860,13 +8872,24 @@ SEXP C_np_regression_lp_apply_conditional(SEXP txuno,
     } else {
       ipt_extern_X = NULL;
       ipt_lookup_extern_X = NULL;
-      kdt_extern_X = NULL;
-    }
+    kdt_extern_X = NULL;
+  }
+
   } else {
     int_TREE_X = int_TREE_Y = int_TREE_XY = NP_TREE_FALSE;
     ipt_extern_X = ipt_extern_Y = ipt_extern_XY = NULL;
     ipt_lookup_extern_X = ipt_lookup_extern_Y = ipt_lookup_extern_XY = NULL;
     kdt_extern_X = kdt_extern_Y = kdt_extern_XY = NULL;
+  }
+
+  if(has_geometry_context) {
+    nn_geometry_context_ptr = &nn_geometry_context;
+    if(train_is_eval_flag) {
+      nn_geometry_context.mode = int_TREE_X == NP_TREE_TRUE ?
+        NP_NN_QUERY_TRAINING_MAP : NP_NN_QUERY_TRAINING_IDENTITY;
+      nn_geometry_context.eval_to_train =
+        int_TREE_X == NP_TREE_TRUE ? ipt_lookup_extern_X : NULL;
+    }
   }
 
   num_categories_extern_X = alloc_vecu(num_reg_unordered_extern + num_reg_ordered_extern);
@@ -8900,9 +8923,13 @@ SEXP C_np_regression_lp_apply_conditional(SEXP txuno,
     nprotect++;
     compute_status = np_regression_lp_hat_matrix(
       REAL(rbw_r), derivative_variable, derivative_order, REAL(out),
-      active_route, active_diagnostics, categorical_compress_flag);
-    if(compute_status != 0)
-      failure_message = "LP hat helper failed";
+      active_route, active_diagnostics, categorical_compress_flag,
+      nn_geometry_context_ptr);
+    if(compute_status != NP_REGRESSION_LP_MATRIX_OK)
+      failure_message =
+        (compute_status == NP_REGRESSION_LP_MATRIX_ZERO_RADIUS) ?
+        "generalized nearest-neighbor bandwidth has a zero literal radius after occurrence exclusion" :
+        "LP hat helper failed";
   } else {
     rhs_cols = (double **)malloc((size_t)ncol_rhs*sizeof(double *));
     if(rhs_cols == NULL) {
@@ -8916,9 +8943,13 @@ SEXP C_np_regression_lp_apply_conditional(SEXP txuno,
     nprotect++;
     compute_status = np_regression_lp_apply_matrix(
       REAL(rbw_r), rhs_cols, ncol_rhs, REAL(out),
-      active_route, active_diagnostics, categorical_compress_flag);
-    if(compute_status != 0)
-      failure_message = "LP apply helper failed";
+      active_route, active_diagnostics, categorical_compress_flag,
+      nn_geometry_context_ptr);
+    if(compute_status != NP_REGRESSION_LP_MATRIX_OK)
+      failure_message =
+        (compute_status == NP_REGRESSION_LP_MATRIX_ZERO_RADIUS) ?
+        "generalized nearest-neighbor bandwidth has a zero literal radius after occurrence exclusion" :
+        "LP apply helper failed";
   }
 
 cleanup_lp_apply_wrapper:
@@ -8955,7 +8986,7 @@ cleanup_lp_apply_wrapper:
   np_native_estimator_state_active = 0;
 
   UNPROTECT(nprotect);
-  if(compute_status != 0 || failure_message != NULL) {
+  if(compute_status != NP_REGRESSION_LP_MATRIX_OK || failure_message != NULL) {
     if(descriptor.family == NP_CKERNEL_FAMILY_BETA &&
        beta_diagnostics.beta_status != NP_BETA_OK)
       error("C_np_regression_lp_apply_conditional: beta row failed in continuous dimension %d: %s",
@@ -8965,6 +8996,71 @@ cleanup_lp_apply_wrapper:
           failure_message != NULL ? failure_message : "LP computation failed");
   }
   return out;
+}
+
+SEXP C_np_regression_lp_apply_conditional(SEXP txuno,
+                                          SEXP txord,
+                                          SEXP txcon,
+                                          SEXP exuno,
+                                          SEXP exord,
+                                          SEXP excon,
+                                          SEXP rhs,
+                                          SEXP rbw,
+                                          SEXP bwtype,
+                                          SEXP kernel_x,
+                                          SEXP kernel_xu,
+                                          SEXP kernel_xo,
+                                          SEXP use_tree,
+                                          SEXP glp_degree,
+                                          SEXP glp_gradient_order,
+                                          SEXP glp_bernstein,
+                                          SEXP glp_basis,
+                                          SEXP continuous_kernel_family,
+                                          SEXP continuous_kernel_order,
+                                          SEXP ckerlb,
+                                          SEXP ckerub,
+                                          SEXP categorical_compress,
+                                          SEXP return_hat)
+{
+  return np_regression_lp_apply_conditional_impl(
+    txuno, txord, txcon, exuno, exord, excon, rhs, rbw, bwtype,
+    kernel_x, kernel_xu, kernel_xo, use_tree, glp_degree,
+    glp_gradient_order, glp_bernstein, glp_basis,
+    continuous_kernel_family, continuous_kernel_order, ckerlb, ckerub,
+    categorical_compress, return_hat, R_NilValue);
+}
+
+SEXP C_np_regression_lp_apply_conditional_ctx(SEXP txuno,
+                                              SEXP txord,
+                                              SEXP txcon,
+                                              SEXP exuno,
+                                              SEXP exord,
+                                              SEXP excon,
+                                              SEXP rhs,
+                                              SEXP rbw,
+                                              SEXP bwtype,
+                                              SEXP kernel_x,
+                                              SEXP kernel_xu,
+                                              SEXP kernel_xo,
+                                              SEXP use_tree,
+                                              SEXP glp_degree,
+                                              SEXP glp_gradient_order,
+                                              SEXP glp_bernstein,
+                                              SEXP glp_basis,
+                                              SEXP continuous_kernel_family,
+                                              SEXP continuous_kernel_order,
+                                              SEXP ckerlb,
+                                              SEXP ckerub,
+                                              SEXP categorical_compress,
+                                              SEXP return_hat,
+                                              SEXP train_is_eval)
+{
+  return np_regression_lp_apply_conditional_impl(
+    txuno, txord, txcon, exuno, exord, excon, rhs, rbw, bwtype,
+    kernel_x, kernel_xu, kernel_xo, use_tree, glp_degree,
+    glp_gradient_order, glp_bernstein, glp_basis,
+    continuous_kernel_family, continuous_kernel_order, ckerlb, ckerub,
+    categorical_compress, return_hat, train_is_eval);
 }
 
 static void np_density_bw_integer_contract_or_error(SEXP myopti,
@@ -17269,7 +17365,11 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                                                                (lp_engine_eff == NP_LP_ENGINE_SCALAR) ?
                                                                  NP_REGRESSION_STDERR_CONDITIONAL_INFLUENCE :
                                                                  NP_REGRESSION_STDERR_LOCAL_RESIDUAL,
-                                                               prepared_x_bandwidth_ptr);
+                                                               prepared_x_bandwidth_ptr,
+                                                               &(const NPNNGeometryContext){
+                                                                 .mode = NP_NN_QUERY_EXTERNAL,
+                                                                 .eval_to_train = NULL
+                                                               });
 
       if(status != 0)
         error("np_density_conditional: regression LP solve failed in conditional LP path");
@@ -19082,6 +19182,12 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
      - they have only one kernel type each at the moment 
   */
 
+  const NPNNGeometryContext nn_geometry_context = {
+    .mode = train_is_eval ?
+      NP_NN_QUERY_TRAINING_IDENTITY : NP_NN_QUERY_EXTERNAL,
+    .eval_to_train = NULL
+  };
+
   kernel_estimate_regression_categorical_tree_np(np_lp_engine_extern,
                                                    KERNEL_reg_extern,
                                                    KERNEL_reg_unordered_extern,
@@ -19119,7 +19225,8 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
                                                    kernel_route_diagnostics,
                                                    categorical_compress,
                                                    NP_REGRESSION_STDERR_LOCAL_RESIDUAL,
-                                                   NULL);
+                                                   NULL,
+                                                   &nn_geometry_context);
 
 
   for(i=0;i<num_obs_eval_extern;i++)

@@ -35,6 +35,8 @@ extern double * vector_continuous_stddev_extern;
 
 typedef struct {
 	int valid;
+	int geometry_contract;
+	NPNNQueryMode query_mode;
 	int num_obs_train;
 	int num_obs_eval;
 	int suppress_parallel;
@@ -45,6 +47,11 @@ typedef struct {
 	uint64_t eval_hash;
 	double *distance;
 } np_nn_distance_cache_entry;
+
+enum {
+	NP_NN_CACHE_INCUMBENT = 0,
+	NP_NN_CACHE_CANONICAL = 1
+};
 
 static np_nn_distance_cache_entry *np_nn_distance_cache = NULL;
 static int np_nn_distance_cache_size = 0;
@@ -64,6 +71,8 @@ static void np_nn_distance_cache_clear(void)
 }
 
 static int np_nn_distance_cache_entry_matches(const np_nn_distance_cache_entry *entry,
+const int geometry_contract,
+const NPNNQueryMode query_mode,
 const int num_obs_train,
 const int num_obs_eval,
 const int suppress_parallel,
@@ -75,6 +84,8 @@ const uint64_t eval_hash)
 {
 	return (entry != NULL) &&
 		entry->valid &&
+		(entry->geometry_contract == geometry_contract) &&
+		(entry->query_mode == query_mode) &&
 		(entry->num_obs_train == num_obs_train) &&
 		(entry->num_obs_eval == num_obs_eval) &&
 		(entry->suppress_parallel == suppress_parallel) &&
@@ -111,6 +122,8 @@ static uint64_t np_nn_distance_hash_vector(const double *x, const int n)
 static int np_nn_distance_cache_find(const int num_obs_train,
 const int num_obs_eval,
 const int suppress_parallel,
+const int geometry_contract,
+const NPNNQueryMode query_mode,
 const double *train,
 const double *eval,
 const int lookup_k,
@@ -121,6 +134,8 @@ const uint64_t eval_hash)
 	for(i=0; i < np_nn_distance_cache_size; i++)
 	{
 		if(np_nn_distance_cache_entry_matches(&np_nn_distance_cache[i],
+		                                       geometry_contract,
+		                                       query_mode,
 		                                       num_obs_train,
 		                                       num_obs_eval,
 		                                       suppress_parallel,
@@ -139,6 +154,8 @@ const uint64_t eval_hash)
 static np_nn_distance_cache_entry *np_nn_distance_cache_add(const int num_obs_train,
 const int num_obs_eval,
 const int suppress_parallel,
+const int geometry_contract,
+const NPNNQueryMode query_mode,
 const double *train,
 const double *eval,
 const int lookup_k,
@@ -186,6 +203,8 @@ const double *distance)
 
 	entry = &np_nn_distance_cache[np_nn_distance_cache_size++];
 	entry->valid = 1;
+	entry->geometry_contract = geometry_contract;
+	entry->query_mode = query_mode;
 	entry->num_obs_train = num_obs_train;
 	entry->num_obs_eval = num_obs_eval;
 	entry->suppress_parallel = suppress_parallel;
@@ -226,6 +245,8 @@ double *nn_distance)
 	idx = np_nn_distance_cache_find(num_obs_train,
 	                                 num_obs_eval,
 	                                 suppress_parallel,
+	                                 NP_NN_CACHE_INCUMBENT,
+	                                 NP_NN_QUERY_EXTERNAL,
 	                                 vector_data_train,
 	                                 vector_data_eval,
 	                                 lookup_k,
@@ -253,6 +274,8 @@ double *nn_distance)
 	np_nn_distance_cache_add(num_obs_train,
 	                          num_obs_eval,
 	                          suppress_parallel,
+	                          NP_NN_CACHE_INCUMBENT,
+	                          NP_NN_QUERY_EXTERNAL,
 	                          vector_data_train,
 	                          vector_data_eval,
 	                          lookup_k,
@@ -260,6 +283,67 @@ double *nn_distance)
 	                          eval_hash,
 	                          nn_distance);
 	return(0);
+}
+
+static NPNNGeometryStatus np_compute_nn_distance_train_eval_context_cached(
+const int num_obs_train,
+const int num_obs_eval,
+const int suppress_parallel,
+const double *vector_data_train,
+const double *vector_data_eval,
+const int lookup_k,
+const NPNNGeometryContext *geometry_context,
+const int use_cache,
+double *nn_distance)
+{
+	int idx;
+	uint64_t train_hash;
+	uint64_t eval_hash;
+	NPNNGeometryStatus status;
+
+	if(geometry_context == NULL)
+		return NP_NN_GEOMETRY_INVALID_ARGUMENT;
+	/* A map is caller-owned mutable identity state; bypass until a bounded,
+	 * content-complete map key is introduced with a measured need. */
+	if(geometry_context->mode == NP_NN_QUERY_TRAINING_MAP)
+		return compute_nn_distance_train_eval_ctx(
+			num_obs_train, num_obs_eval, suppress_parallel,
+			vector_data_train, vector_data_eval, lookup_k,
+			geometry_context, nn_distance);
+	if(!use_cache)
+		return compute_nn_distance_train_eval_ctx(
+			num_obs_train, num_obs_eval, suppress_parallel,
+			vector_data_train, vector_data_eval, lookup_k,
+			geometry_context, nn_distance);
+
+	train_hash = np_nn_distance_hash_vector(vector_data_train, num_obs_train);
+	eval_hash = np_nn_distance_hash_vector(vector_data_eval, num_obs_eval);
+
+	idx = np_nn_distance_cache_find(
+		num_obs_train, num_obs_eval, suppress_parallel,
+		NP_NN_CACHE_CANONICAL, geometry_context->mode,
+		vector_data_train, vector_data_eval,
+		lookup_k, train_hash, eval_hash);
+	if(idx >= 0)
+	{
+		memcpy(nn_distance, np_nn_distance_cache[idx].distance,
+		       (size_t)num_obs_eval*sizeof(double));
+		return NP_NN_GEOMETRY_OK;
+	}
+
+	status = compute_nn_distance_train_eval_ctx(
+		num_obs_train, num_obs_eval, suppress_parallel,
+		vector_data_train, vector_data_eval, lookup_k,
+		geometry_context, nn_distance);
+	if(status != NP_NN_GEOMETRY_OK)
+		return status;
+
+	np_nn_distance_cache_add(
+		num_obs_train, num_obs_eval, suppress_parallel,
+		NP_NN_CACHE_CANONICAL, geometry_context->mode,
+		vector_data_train, vector_data_eval,
+		lookup_k, train_hash, eval_hash, nn_distance);
+	return NP_NN_GEOMETRY_OK;
 }
 
 static int np_compute_nn_distance_cached(const int num_obs,
@@ -284,6 +368,8 @@ double *nn_distance)
 	idx = np_nn_distance_cache_find(num_obs,
 	                                num_obs,
 	                                suppress_parallel,
+	                                NP_NN_CACHE_INCUMBENT,
+	                                NP_NN_QUERY_EXTERNAL,
 	                                vector_data,
 	                                NULL,
 	                                lookup_k,
@@ -309,6 +395,8 @@ double *nn_distance)
 	np_nn_distance_cache_add(num_obs,
 	                         num_obs,
 	                         suppress_parallel,
+	                         NP_NN_CACHE_INCUMBENT,
+	                         NP_NN_QUERY_EXTERNAL,
 	                         vector_data,
 	                         NULL,
 	                         lookup_k,
@@ -394,7 +482,7 @@ int int_WEIGHTS;
 
 /* Overloaded these modules to handle conditional distributions */
 
-int kernel_bandwidth(int KERNEL,
+int kernel_bandwidth_ctx(int KERNEL,
 int BANDWIDTH,
 int num_obs_train,
 int num_obs_eval,
@@ -412,7 +500,10 @@ double **matrix_X_eval,
 double **matrix_bandwidth_Y,
 double **matrix_bandwidth_X,
 double *vector_lambda,
-double **matrix_bandwidth_deriv)
+double **matrix_bandwidth_deriv,
+const NPNNGeometryContext *x_geometry_context,
+const NPNNGeometryContext *y_geometry_context,
+NPNNGeometryStatus *geometry_status)
 {
 
 /* This computes a matrix of bandwidths for fixed, generalized nearest */
@@ -444,11 +535,14 @@ double **matrix_bandwidth_deriv)
 	double nn_scale;
 	int nn_extended;
 	int int_nn_k;
+	NPNNGeometryStatus nn_geometry_status = NP_NN_GEOMETRY_OK;
 
 #ifdef MPI2 
 	int stride;
 #endif
 
+	if(geometry_status != NULL)
+		*geometry_status = NP_NN_GEOMETRY_OK;
 	if(num_obs_train == 0) return(1);
 
 /* Don't compute unnecessary standard deviations  */
@@ -685,9 +779,21 @@ double **matrix_bandwidth_deriv)
 				goto cleanup;
 			}
 
-			if(np_compute_nn_distance_train_eval_cached(num_obs_train,num_obs_eval, 0,matrix_X_train[i], matrix_X_eval[i], int_nn_k, 1, nn_distance)==1)
-			{
-				status = 1;
+				if(x_geometry_context != NULL && !nn_extended)
+					nn_geometry_status = np_compute_nn_distance_train_eval_context_cached(
+						num_obs_train, num_obs_eval, 0,
+						matrix_X_train[i], matrix_X_eval[i], int_nn_k,
+						x_geometry_context, 1, nn_distance);
+				else if(np_compute_nn_distance_train_eval_cached(
+						num_obs_train, num_obs_eval, 0,
+						matrix_X_train[i], matrix_X_eval[i], int_nn_k,
+						1, nn_distance)==1)
+					nn_geometry_status = NP_NN_GEOMETRY_INVALID_ARGUMENT;
+				if(nn_geometry_status != NP_NN_GEOMETRY_OK)
+				{
+					if(geometry_status != NULL)
+						*geometry_status = nn_geometry_status;
+					status = 1;
 				goto cleanup;
 			}
 
@@ -718,9 +824,22 @@ double **matrix_bandwidth_deriv)
 				goto cleanup;
 			}
 
-			if(np_compute_nn_distance_train_eval_cached(num_obs_train,num_obs_eval, 0, matrix_Y_train[i], matrix_Y_eval[i], int_nn_k, 1, nn_distance)==1)
-			{
-				status = 1;
+				nn_geometry_status = NP_NN_GEOMETRY_OK;
+				if(y_geometry_context != NULL && !nn_extended)
+					nn_geometry_status = np_compute_nn_distance_train_eval_context_cached(
+						num_obs_train, num_obs_eval, 0,
+						matrix_Y_train[i], matrix_Y_eval[i], int_nn_k,
+						y_geometry_context, 1, nn_distance);
+				else if(np_compute_nn_distance_train_eval_cached(
+						num_obs_train, num_obs_eval, 0,
+						matrix_Y_train[i], matrix_Y_eval[i], int_nn_k,
+						1, nn_distance)==1)
+					nn_geometry_status = NP_NN_GEOMETRY_INVALID_ARGUMENT;
+				if(nn_geometry_status != NP_NN_GEOMETRY_OK)
+				{
+					if(geometry_status != NULL)
+						*geometry_status = nn_geometry_status;
+					status = 1;
 				goto cleanup;
 			}
 
@@ -878,9 +997,41 @@ cleanup:
 
 	return(status);
 
+	}
+
+int kernel_bandwidth(int KERNEL,
+int BANDWIDTH,
+int num_obs_train,
+int num_obs_eval,
+int num_var_cont,
+int num_var_un,
+int num_var_or,
+int num_reg_cont,
+int num_reg_un,
+int num_reg_or,
+double *vector_scale_factor,
+double **matrix_Y_train,
+double **matrix_Y_eval,
+double **matrix_X_train,
+double **matrix_X_eval,
+double **matrix_bandwidth_Y,
+double **matrix_bandwidth_X,
+double *vector_lambda,
+double **matrix_bandwidth_deriv)
+{
+	return kernel_bandwidth_ctx(
+		KERNEL, BANDWIDTH, num_obs_train, num_obs_eval,
+		num_var_cont, num_var_un, num_var_or,
+		num_reg_cont, num_reg_un, num_reg_or,
+		vector_scale_factor,
+		matrix_Y_train, matrix_Y_eval,
+		matrix_X_train, matrix_X_eval,
+		matrix_bandwidth_Y, matrix_bandwidth_X,
+		vector_lambda, matrix_bandwidth_deriv,
+		NULL, NULL, NULL);
 }
 
-static int np_kernel_bandwidth_continuous_nn_into(
+static int np_kernel_bandwidth_continuous_nn_into_ctx(
   int BANDWIDTH,
   int num_obs_train,
   int num_obs_eval,
@@ -890,46 +1041,70 @@ static int np_kernel_bandwidth_continuous_nn_into(
   double **matrix_train,
   double **matrix_eval,
   double **matrix_bandwidth,
-  double *nn_distance)
+  double *nn_distance,
+  const NPNNGeometryContext *geometry_context,
+  NPNNGeometryStatus *geometry_status)
 {
   int dimension;
   int observation;
   int int_nn_k;
   double nn_scale;
-#ifndef MPI2
   int nn_extended;
-#endif
+
+  if(geometry_status != NULL)
+    *geometry_status = NP_NN_GEOMETRY_OK;
 
   for(dimension = 0; dimension < num_cont; ++dimension) {
-#ifndef MPI2
     if(np_nn_lookup_from_scale(num_obs_train, 1,
                                vector_scale_factor[dimension],
                                &int_nn_k, &nn_scale, &nn_extended) == 1)
       return 1;
-#else
-    if(np_nn_lookup_from_scale(num_obs_train, 1,
-                               vector_scale_factor[dimension],
-                               &int_nn_k, &nn_scale) == 1)
-      return 1;
-#endif
 
     if(BANDWIDTH == BW_GEN_NN) {
+      NPNNGeometryStatus query_status = NP_NN_GEOMETRY_OK;
+      if(geometry_context != NULL && !nn_extended) {
 #ifndef MPI2
-      if(np_compute_nn_distance_train_eval_cached(
-           num_obs_train, num_obs_eval, suppress_parallel,
-           matrix_train[dimension], matrix_eval[dimension],
-           int_nn_k, 1, nn_distance) == 1)
-        return 1;
+        query_status = np_compute_nn_distance_train_eval_context_cached(
+          num_obs_train, num_obs_eval, suppress_parallel,
+          matrix_train[dimension], matrix_eval[dimension],
+          int_nn_k, geometry_context, 1, nn_distance);
 #else
-      if(compute_nn_distance_train_eval(
-           num_obs_train, num_obs_eval, suppress_parallel,
-           matrix_train[dimension], matrix_eval[dimension],
-           int_nn_k, nn_distance) == 1)
-        return 1;
+        query_status = compute_nn_distance_train_eval_ctx(
+          num_obs_train, num_obs_eval, suppress_parallel,
+          matrix_train[dimension], matrix_eval[dimension],
+          int_nn_k, geometry_context, nn_distance);
 #endif
-      for(observation = 0; observation < num_obs_eval; ++observation)
-        matrix_bandwidth[dimension][observation] =
-          nn_scale * nn_distance[observation];
+      } else {
+#ifndef MPI2
+        if(np_compute_nn_distance_train_eval_cached(
+             num_obs_train, num_obs_eval, suppress_parallel,
+             matrix_train[dimension], matrix_eval[dimension],
+             int_nn_k, 1, nn_distance) == 1)
+          query_status = NP_NN_GEOMETRY_INVALID_ARGUMENT;
+#else
+        if(compute_nn_distance_train_eval(
+             num_obs_train, num_obs_eval, suppress_parallel,
+             matrix_train[dimension], matrix_eval[dimension],
+             int_nn_k, nn_distance) == 1)
+          query_status = NP_NN_GEOMETRY_INVALID_ARGUMENT;
+#endif
+      }
+      if(query_status != NP_NN_GEOMETRY_OK) {
+        if(geometry_status != NULL)
+          *geometry_status = query_status;
+        return 1;
+      }
+      for(observation = 0; observation < num_obs_eval; ++observation) {
+        const double bandwidth = nn_scale*nn_distance[observation];
+        if(geometry_context != NULL && !nn_extended &&
+           (!isfinite(bandwidth) || bandwidth <= 0.0)) {
+          if(geometry_status != NULL)
+            *geometry_status = !isfinite(bandwidth) ?
+              NP_NN_GEOMETRY_NONFINITE_RADIUS : NP_NN_GEOMETRY_ZERO_RADIUS;
+          return 1;
+        }
+        matrix_bandwidth[dimension][observation] = bandwidth;
+      }
     } else {
 #ifndef MPI2
       if(np_compute_nn_distance_cached(
@@ -993,16 +1168,16 @@ int np_kernel_bandwidth_continuous_nn(
 #endif
 
   nn_distance = alloc_vecd(allocation_count);
-  status = np_kernel_bandwidth_continuous_nn_into(
+  status = np_kernel_bandwidth_continuous_nn_into_ctx(
     BANDWIDTH, num_obs_train, num_obs_eval, num_cont, suppress_parallel,
     vector_scale_factor, matrix_train, matrix_eval, matrix_bandwidth,
-    nn_distance);
+    nn_distance, NULL, NULL);
   free(nn_distance);
   return status;
 }
 
 
-int kernel_bandwidth_mean(int KERNEL,
+int kernel_bandwidth_mean_ctx(int KERNEL,
                           int BANDWIDTH,
                           int num_obs_train,
                           int num_obs_eval,
@@ -1020,7 +1195,10 @@ int kernel_bandwidth_mean(int KERNEL,
                           double **matrix_X_eval,
                           double **matrix_bandwidth_Y,
                           double **matrix_bandwidth_X,
-                          double *vector_lambda){
+                          double *vector_lambda,
+                          const NPNNGeometryContext *x_geometry_context,
+                          const NPNNGeometryContext *y_geometry_context,
+                          NPNNGeometryStatus *geometry_status){
 
 /* This computes a matrix of bandwidths for fixed, generalized nearest */
 /* neighbor, or adaptive nearest neighbor estimation for a density or */
@@ -1046,7 +1224,9 @@ int kernel_bandwidth_mean(int KERNEL,
 	int stride;
 #endif
 
-	if(num_obs_train == 0) return(1);
+		if(geometry_status != NULL)
+			*geometry_status = NP_NN_GEOMETRY_OK;
+		if(num_obs_train == 0) return(1);
 
 /* Don't compute unnecessary standard deviations  */
 
@@ -1174,21 +1354,23 @@ fact constant. */
 	}
 	else if(BANDWIDTH == BW_GEN_NN || BANDWIDTH == BW_ADAP_NN)
 	{
-		status = np_kernel_bandwidth_continuous_nn_into(
-			BANDWIDTH, num_obs_train, num_obs_eval, num_reg_cont,
-			suppress_parallel, vector_scale_factor,
-			matrix_X_train, matrix_X_eval, matrix_bandwidth_X,
-			nn_distance);
-		if(status != 0)
+			status = np_kernel_bandwidth_continuous_nn_into_ctx(
+				BANDWIDTH, num_obs_train, num_obs_eval, num_reg_cont,
+				suppress_parallel, vector_scale_factor,
+				matrix_X_train, matrix_X_eval, matrix_bandwidth_X,
+				nn_distance, x_geometry_context, geometry_status);
+		if(status != 0) {
 			goto cleanup;
+		}
 
-		status = np_kernel_bandwidth_continuous_nn_into(
-			BANDWIDTH, num_obs_train, num_obs_eval, num_var_cont,
-			suppress_parallel, vector_scale_factor + num_reg_cont,
-			matrix_Y_train, matrix_Y_eval, matrix_bandwidth_Y,
-			nn_distance);
-		if(status != 0)
+			status = np_kernel_bandwidth_continuous_nn_into_ctx(
+				BANDWIDTH, num_obs_train, num_obs_eval, num_var_cont,
+				suppress_parallel, vector_scale_factor + num_reg_cont,
+				matrix_Y_train, matrix_Y_eval, matrix_bandwidth_Y,
+				nn_distance, y_geometry_context, geometry_status);
+		if(status != 0) {
 			goto cleanup;
+		}
 	}
 
 /* In vector_scale_factor, order is continuous reg, continuous var, */
@@ -1259,6 +1441,37 @@ cleanup:
 
 	return(status);
 
+	}
+
+int kernel_bandwidth_mean(int KERNEL,
+                          int BANDWIDTH,
+                          int num_obs_train,
+                          int num_obs_eval,
+                          int num_var_cont,
+                          int num_var_un,
+                          int num_var_or,
+                          int num_reg_cont,
+                          int num_reg_un,
+                          int num_reg_or,
+                          int suppress_parallel,
+                          double *vector_scale_factor,
+                          double **matrix_Y_train,
+                          double **matrix_Y_eval,
+                          double **matrix_X_train,
+                          double **matrix_X_eval,
+                          double **matrix_bandwidth_Y,
+                          double **matrix_bandwidth_X,
+                          double *vector_lambda)
+{
+	return kernel_bandwidth_mean_ctx(
+		KERNEL, BANDWIDTH, num_obs_train, num_obs_eval,
+		num_var_cont, num_var_un, num_var_or,
+		num_reg_cont, num_reg_un, num_reg_or,
+		suppress_parallel, vector_scale_factor,
+		matrix_Y_train, matrix_Y_eval,
+		matrix_X_train, matrix_X_eval,
+		matrix_bandwidth_Y, matrix_bandwidth_X, vector_lambda,
+		NULL, NULL, NULL);
 }
 
 void np_nn_distance_cache_clear_extern(void)
