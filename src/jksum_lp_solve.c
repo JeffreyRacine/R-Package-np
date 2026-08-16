@@ -267,6 +267,63 @@ int np_lp_solve_workspace_solve_factored(NPLPSolveWorkspace *workspace,
   return 1;
 }
 
+NPLPResponseSolveStatus np_lp_solve_workspace_solve_response(
+  NPLPSolveWorkspace *workspace,
+  int p,
+  int nrhs,
+  double ridge_increment,
+  NPLPResponseSolveDiagnostics *diagnostics)
+{
+  double ridge_total = 0.0;
+  int ridge_steps = 0;
+  int i;
+
+  if(diagnostics != NULL){
+    diagnostics->ridge_steps = 0;
+    diagnostics->ridge_total = 0.0;
+  }
+
+  if(!np_lp_solve_workspace_shape(workspace, p, nrhs, NULL, NULL) ||
+     !R_FINITE(ridge_increment) || (ridge_increment <= 0.0))
+    return NP_LP_RESPONSE_SOLVE_INVALID;
+
+  while(!np_lp_solve_workspace_solve(workspace, p, nrhs)){
+    if(ridge_steps >= NP_LP_SOLVE_MAX_RIDGE_STEPS)
+      return NP_LP_RESPONSE_SOLVE_RIDGE_EXHAUSTED;
+    if(!np_lp_solve_workspace_sources_finite(workspace, p, nrhs))
+      return NP_LP_RESPONSE_SOLVE_NONFINITE;
+
+    for(i = 0; i < p; i++)
+      workspace->gram_source[i + i*p] += ridge_increment;
+    ridge_total += ridge_increment;
+    ridge_steps++;
+    if(diagnostics != NULL){
+      diagnostics->ridge_steps = ridge_steps;
+      diagnostics->ridge_total = ridge_total;
+    }
+  }
+
+  if(ridge_total > 0.0){
+    const double denominator =
+      (workspace->gram_source[0] > DBL_EPSILON) ?
+      workspace->gram_source[0] : DBL_EPSILON;
+    int rhs;
+
+    for(rhs = 0; rhs < nrhs; rhs++){
+      double * const intercept = workspace->rhs_source + (size_t)rhs*(size_t)p;
+      *intercept += ridge_total*(*intercept)/denominator;
+    }
+
+    if(!np_lp_solve_workspace_solve(workspace, p, nrhs)){
+      if(!np_lp_solve_workspace_sources_finite(workspace, p, nrhs))
+        return NP_LP_RESPONSE_SOLVE_NONFINITE;
+      return NP_LP_RESPONSE_SOLVE_FINAL_FAILED;
+    }
+  }
+
+  return NP_LP_RESPONSE_SOLVE_OK;
+}
+
 /*
  * A one-column weighted design has the exact influence row
  *

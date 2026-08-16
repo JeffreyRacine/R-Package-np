@@ -17,6 +17,19 @@ typedef struct {
   int factor_p;
 } NPLPSolveWorkspace;
 
+typedef enum {
+  NP_LP_RESPONSE_SOLVE_OK = 0,
+  NP_LP_RESPONSE_SOLVE_INVALID,
+  NP_LP_RESPONSE_SOLVE_NONFINITE,
+  NP_LP_RESPONSE_SOLVE_RIDGE_EXHAUSTED,
+  NP_LP_RESPONSE_SOLVE_FINAL_FAILED
+} NPLPResponseSolveStatus;
+
+typedef struct {
+  int ridge_steps;
+  double ridge_total;
+} NPLPResponseSolveDiagnostics;
+
 typedef struct {
   int p_capacity;
   int nrhs_capacity;
@@ -59,6 +72,24 @@ int np_lp_solve_workspace_reserve(NPLPSolveWorkspace *workspace,
 int np_lp_solve_workspace_solve(NPLPSolveWorkspace *workspace,
                                 int p,
                                 int nrhs);
+
+/*
+ * Canonical response-oriented bounded ridge transcript.  The caller fills
+ * the pristine Gram and response-moment columns, and supplies the fixed ridge
+ * increment owned by its statistical sample.  Failed solves add that
+ * increment to the source Gram diagonal in ascending order.  Once a ridged
+ * system solves, the accumulated intercept restoration is applied to every
+ * response RHS and the system is resolved, leaving the final factorization
+ * available to solve_factored().  This is deliberately response-only: the
+ * adjoint influence-row orientation has a different transform placement and
+ * enters only with its own direct identity proof.
+ */
+NPLPResponseSolveStatus np_lp_solve_workspace_solve_response(
+  NPLPSolveWorkspace *workspace,
+  int p,
+  int nrhs,
+  double ridge_increment,
+  NPLPResponseSolveDiagnostics *diagnostics);
 /* Cold-path validation used only after an ordinary solve has failed. */
 #if defined(__GNUC__) || defined(__clang__)
 #define NP_LP_COLD_PATH __attribute__((cold))
