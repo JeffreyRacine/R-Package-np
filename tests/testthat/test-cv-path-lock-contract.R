@@ -389,6 +389,16 @@ test_that("canonical LP hat and apply routes share the typed solve policy", {
     fixed = TRUE
   ))
   expect_true(grepl(
+    "&solve_diagnostics",
+    hat_body,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
+    "ridge_used_out[i] = solve_diagnostics.ridge_total;",
+    hat_body,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
     "np_conditional_kernel_row(kernel_cx,",
     hat_body,
     fixed = TRUE
@@ -411,6 +421,15 @@ test_that("canonical LP hat and apply routes share the typed solve policy", {
   expect_true(grepl(
     "matrix_bandwidth_eval_one,",
     apply_body,
+    fixed = TRUE
+  ))
+
+  np_source_file <- file.path(dirname(src_file), "np.c")
+  skip_if_not(file.exists(np_source_file), "source file src/np.c unavailable")
+  np_source <- paste(readLines(np_source_file, warn = FALSE), collapse = "\n")
+  expect_true(grepl(
+    "setAttrib(out, install(\"ridge.used\"), ridge_used);",
+    np_source,
     fixed = TRUE
   ))
 })

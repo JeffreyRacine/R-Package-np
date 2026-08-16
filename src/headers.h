@@ -311,7 +311,8 @@ void np_bounded_cvls_conditional_effective_integration_bounds_extern(
   double *quadrature_upper);
 int np_regression_lp_hat_matrix(
   double *vector_scale_factor, int deriv_var, int deriv_order,
-  double *weights_out, const NPContinuousKernelRoute *kernel_route,
+  double *weights_out, double *ridge_used_out,
+  const NPContinuousKernelRoute *kernel_route,
   NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
   int categorical_compress,
   const NPNNGeometryContext *nn_geometry_context);
