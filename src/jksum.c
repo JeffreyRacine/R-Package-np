@@ -15373,6 +15373,214 @@ static int np_lp_fixed_tree_sparse_supported(const int num_reg_unordered,
   return 1;
 }
 
+enum {
+  NP_REG_CV_LP_DENSE_MIN_TERMS = 10,
+  NP_REG_CV_LP_DENSE_OCCUPANCY_NUMERATOR = 9,
+  NP_REG_CV_LP_DENSE_OCCUPANCY_DENOMINATOR = 10
+};
+
+static int np_reg_cv_support_sort_increasing(double *values,
+                                             const int count){
+  const char order = 'I';
+  const La_INT lapack_count = (La_INT)count;
+  La_INT info = 0;
+
+  if((values == NULL) || (count < 0))
+    return 0;
+  F77_CALL(dlasrt)(&order, &lapack_count, values, &info FCONE);
+  return info == 0;
+}
+
+static int np_reg_cv_lp_compact_kernel_bound(const int kernel, double *bound){
+  if(bound == NULL)
+    return 0;
+  if(kernel == CK_EPAN2){
+    *bound = 5.0;
+    return 1;
+  }
+  if(kernel == CK_UNIF){
+    *bound = 1.0;
+    return 1;
+  }
+  return 0;
+}
+
+static int np_reg_cv_lp_compact_pair_active(const double lower,
+                                            const double upper,
+                                            const double inverse_bandwidth,
+                                            const double bound){
+  const double difference = upper - lower;
+  const double z = difference*inverse_bandwidth;
+  const double z2 = z*z;
+
+  return isfinite(difference) && isfinite(z) && isfinite(z2) && (z2 < bound);
+}
+
+static int np_reg_cv_unordered_pair_total(const int num_obs, size_t *total){
+  size_t a, b;
+
+  if((total == NULL) || (num_obs < 2))
+    return 0;
+  a = (size_t)num_obs;
+  b = (size_t)num_obs - 1u;
+  if((a & 1u) == 0u)
+    a /= 2u;
+  else
+    b /= 2u;
+  if((b != 0u) && (a > SIZE_MAX/b))
+    return 0;
+  *total = a*b;
+  return 1;
+}
+
+static int np_reg_cv_lp_dense_occupancy_threshold(const size_t total,
+                                                  size_t *threshold){
+  const size_t quotient =
+    total/(size_t)NP_REG_CV_LP_DENSE_OCCUPANCY_DENOMINATOR;
+  const size_t remainder =
+    total%(size_t)NP_REG_CV_LP_DENSE_OCCUPANCY_DENOMINATOR;
+  const size_t remainder_product =
+    (size_t)NP_REG_CV_LP_DENSE_OCCUPANCY_NUMERATOR*remainder;
+  const size_t remainder_ceil =
+    remainder_product/(size_t)NP_REG_CV_LP_DENSE_OCCUPANCY_DENOMINATOR +
+    ((remainder_product%(size_t)NP_REG_CV_LP_DENSE_OCCUPANCY_DENOMINATOR) != 0u);
+
+  if((threshold == NULL) ||
+     (quotient > (SIZE_MAX - remainder_ceil)/
+       (size_t)NP_REG_CV_LP_DENSE_OCCUPANCY_NUMERATOR))
+    return 0;
+  *threshold =
+    (size_t)NP_REG_CV_LP_DENSE_OCCUPANCY_NUMERATOR*quotient + remainder_ceil;
+  return 1;
+}
+
+/*
+ * Wide fixed CVLS rows can become almost dense while the compact-support tree
+ * remains active. Admit the existing dense sibling only after an exact
+ * active-pair certificate. All but at most one dimension must have strict
+ * full arithmetic support. For the sole partial dimension, temporarily
+ * borrow the already-owned general-LP intercept column as an allocation-free
+ * sort workspace, then restore its canonical 1.0 values at the single exit
+ * boundary for the borrow window.
+ */
+static int np_reg_fixed_tree_dense_high_occupancy_admitted(
+    const int bwm,
+    const int nterms,
+    const int bandwidth_mode,
+    const int num_obs,
+    const int num_reg_unordered,
+    const int num_reg_ordered,
+    const int num_reg_continuous,
+    const KDT *tree,
+    const int *kernel_c,
+    const int *kernel_u,
+    const int *kernel_o,
+    const int *operator,
+    double * const *matrix_X_continuous,
+    double * const *matrix_bandwidth,
+    const int *terms,
+    double **basis){
+  int partial_dimension = -1;
+  int partial_count = 0;
+  int l, i;
+  size_t active = 0u;
+  size_t total = 0u;
+  size_t threshold = 0u;
+  double inverse_bandwidth = 0.0;
+  double bound = 0.0;
+  double *sorted;
+  int certificate_ok = 1;
+
+  if((bwm != RBWM_CVLS) ||
+     (nterms < NP_REG_CV_LP_DENSE_MIN_TERMS) ||
+     (bandwidth_mode != BW_FIXED) ||
+     (num_obs < 2) ||
+     (num_reg_unordered != 0) ||
+     (num_reg_ordered != 0) ||
+     (num_reg_continuous <= 0) ||
+     !np_lp_fixed_tree_sparse_supported(num_reg_unordered,
+                                        num_reg_ordered,
+                                        num_reg_continuous,
+                                        kernel_c,
+                                        kernel_u,
+                                        kernel_o,
+                                        operator) ||
+     (tree == NULL) || (tree->kdn == NULL) || (tree->numnode <= 0) ||
+     (tree->kdn[0].bb == NULL) ||
+     (tree->ndim < num_reg_continuous) ||
+     (matrix_X_continuous == NULL) || (matrix_bandwidth == NULL) ||
+     (terms == NULL) || (basis == NULL) || (basis[0] == NULL))
+    return 0;
+
+  for(l = 0; l < num_reg_continuous; l++){
+    const int kernel = kernel_c[l];
+    const double h =
+      (matrix_bandwidth[l] == NULL) ? NA_REAL : matrix_bandwidth[l][0];
+    const double hinv = 1.0/h;
+    const double xmin = tree->kdn[0].bb[2*l];
+    const double xmax = tree->kdn[0].bb[2*l + 1];
+    const double difference = xmax - xmin;
+    double dimension_bound = 0.0;
+    double z, z2;
+
+    if(!np_reg_cv_lp_compact_kernel_bound(kernel, &dimension_bound) ||
+       (!isfinite(h)) || (h <= 0.0) || (!isfinite(hinv)) ||
+       (!isfinite(xmin)) || (!isfinite(xmax)) || (xmax < xmin) ||
+       (!isfinite(difference)))
+      return 0;
+    z = difference*hinv;
+    z2 = z*z;
+    if((!isfinite(z)) || (!isfinite(z2)))
+      return 0;
+    if(!(z2 < dimension_bound)){
+      partial_dimension = l;
+      partial_count++;
+      if(partial_count > 1)
+        return 0;
+      inverse_bandwidth = hinv;
+      bound = dimension_bound;
+    }
+  }
+
+  if(partial_count == 0)
+    return 1;
+  if(!np_reg_cv_unordered_pair_total(num_obs, &total) ||
+     !np_reg_cv_lp_dense_occupancy_threshold(total, &threshold))
+    return 0;
+  for(l = 0; l < num_reg_continuous; l++)
+    if(terms[l] != 0)
+      return 0;
+  for(i = 0; i < num_obs; i++)
+    if((matrix_X_continuous[partial_dimension] == NULL) ||
+       !isfinite(matrix_X_continuous[partial_dimension][i]) ||
+       (basis[0][i] != 1.0))
+      return 0;
+
+  sorted = basis[0];
+  for(i = 0; i < num_obs; i++)
+    sorted[i] = matrix_X_continuous[partial_dimension][i];
+  certificate_ok = np_reg_cv_support_sort_increasing(sorted, num_obs);
+  if(certificate_ok){
+    int left = 0;
+    int right;
+    for(right = 0; right < num_obs; right++){
+      while((left < right) &&
+            !np_reg_cv_lp_compact_pair_active(sorted[left], sorted[right],
+                                              inverse_bandwidth, bound))
+        left++;
+      if((size_t)(right - left) > SIZE_MAX - active){
+        certificate_ok = 0;
+        break;
+      }
+      active += (size_t)(right - left);
+    }
+  }
+  for(i = 0; i < num_obs; i++)
+    sorted[i] = 1.0;
+
+  return certificate_ok && (active <= total) && (active >= threshold);
+}
+
 /*
  * A compact-support tree cannot prune any pair when every observed
  * continuous coordinate difference lies inside that coordinate's kernel
@@ -18090,8 +18298,28 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
       goto finish_cv_path;
     }
 
+    const int dense_high_occupancy_admitted = ks_tree_use &&
+      np_reg_fixed_tree_dense_high_occupancy_admitted(
+        bwm,
+        glp_nterms,
+        BANDWIDTH_reg,
+        num_obs,
+        num_reg_unordered,
+        num_reg_ordered,
+        num_reg_continuous,
+        kdt_extern_X,
+        kernel_c,
+        kernel_u,
+        kernel_o,
+        operator,
+        matrix_X_continuous,
+        matrix_bandwidth,
+        glp_terms,
+        basis);
+    if(dense_high_occupancy_admitted)
+      ks_tree_use = 0;
 #if NP_ACCEL_GAUSS_COMPILED
-    if(ks_tree_use &&
+    else if(ks_tree_use &&
        np_reg_fixed_tree_dense_full_support_admitted(glp_nterms,
                                                       BANDWIDTH_reg,
                                                       num_reg_unordered,
