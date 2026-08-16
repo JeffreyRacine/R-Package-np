@@ -86,6 +86,22 @@ static int np_gnn_convolution_training_bandwidth_prepare(
   double *lambda,
   double ***matrix_alt_bandwidth);
 
+static int np_common_continuous_resident_geometry(
+  int num_obs_train,
+  int num_obs_eval,
+  int num_reg_continuous,
+  double * const *matrix_X_continuous_train,
+  double * const *matrix_X_continuous_eval);
+
+static NPTreeCapability np_fixed_tree_capability_from_common_root(
+  int bandwidth_mode,
+  int num_reg_continuous,
+  const KDT *tree,
+  const int *effective_kernel,
+  const int *alternate_effective_kernel,
+  const int *alternate_active,
+  double * const *matrix_bandwidth);
+
 /*
  * Keep independently timed hot row engines on a stable cache boundary.
  * This limits otherwise measurable code-placement drift when a neighboring
@@ -10614,6 +10630,9 @@ NPPermutationWeightOutput * const pkw_output){
 
   /* Trees are currently not compatible with all operations */
   int np_ks_tree_use = (int_TREE == NP_TREE_TRUE);
+  int np_ks_tree_requested;
+  int fixed_tree_common_geometry = 0;
+  NPTreeCapability fixed_tree_capability = NP_TREE_CAPABILITY_UNKNOWN;
   int any_convolution = 0;
   int is_adaptive = (BANDWIDTH_reg == BW_ADAP_NN);
   int tree_pkw_sparse = 0;
@@ -10647,6 +10666,7 @@ NPPermutationWeightOutput * const pkw_output){
   if(any_convolution && is_adaptive) np_ks_tree_use = 0;
 
   np_ks_tree_use &= (num_reg_continuous != 0);
+  np_ks_tree_requested = np_ks_tree_use;
 
   int p_ipow = 0, * bpow = NULL;
 
@@ -10956,6 +10976,52 @@ NPPermutationWeightOutput * const pkw_output){
       goto cleanup;
     }
 
+  }
+
+  /*
+   * A tree is an invocation-local arithmetic owner, not a persistent property
+   * of the prepared data.  When fixed primary and requested permutation
+   * kernels have full support over an exactly shared train/evaluation
+   * geometry, the tree cannot remove any pair.  Select the canonical dense
+   * sibling without changing the caller's tree readiness or data order.
+   *
+   * This admission rule is deliberately structural: it contains no sample-
+   * size, host, elapsed-time, or optimizer-dependent crossover.  Unknown,
+   * separate-evaluation, partial-tree, and genuinely prunable invocations
+   * retain the existing owner.
+   */
+  fixed_tree_common_geometry =
+    np_ks_tree_use &&
+    BANDWIDTH_reg == BW_FIXED &&
+    !do_partial_tree &&
+    np_common_continuous_resident_geometry(
+      num_obs_train, num_obs_eval, num_reg_continuous,
+      matrix_X_continuous_train, matrix_X_continuous_eval);
+  if(fixed_tree_common_geometry)
+    fixed_tree_capability = np_fixed_tree_capability_from_common_root(
+       BANDWIDTH_reg,
+       num_reg_continuous,
+       kdt,
+       KERNEL_reg_np,
+       do_perm ? permutation_kernel : NULL,
+       do_perm ? bpso : NULL,
+       matrix_bandwidth);
+  if(fixed_tree_capability == NP_TREE_CANNOT_PRUNE){
+    np_ks_tree_use = 0;
+    pxl = NULL;
+    free(p_pxl);
+    p_pxl = NULL;
+  }
+  {
+    const char * const owner_oracle =
+      getenv("NP_KWS_TREE_OWNER_ORACLE");
+    if(owner_oracle != NULL && owner_oracle[0] == '1' &&
+       owner_oracle[1] == '\0')
+      REprintf("NP_KWS_TREE_OWNER_ORACLE requested=%d common=%d capability=%d owner=%s\n",
+               np_ks_tree_requested,
+               fixed_tree_common_geometry,
+               (int)fixed_tree_capability,
+               np_ks_tree_use ? "tree" : "dense");
   }
 
   if((BANDWIDTH_reg == BW_FIXED) && int_cker_bound_extern &&
@@ -12424,7 +12490,7 @@ cleanup:
       free(ps_okernel);
     }
 
-    if(np_ks_tree_use){
+    if(p_pxl != NULL){
       if(permutation_operator == OP_INTEGRAL){
         for(l = 0, k = 0; l < num_reg_continuous; l++){
           if(bpso[l]){
@@ -14643,20 +14709,47 @@ static int np_reg_fixed_tree_dense_high_occupancy_admitted(
 }
 
 /*
- * A compact-support tree cannot prune any pair when every observed
- * continuous coordinate difference lies inside that coordinate's kernel
- * support.  In that exact geometry the canonical dense owner evaluates the
- * same weights in contiguous tree order and avoids the sparse iterator's
- * node-list traffic.  The caller retains the validated resident/packed width
- * policy.  This is an arithmetic capability check, not a timed crossover:
- * any dimension that is uncertain retains the tree.
+ * Pointer identity proves that the prepared training and evaluation views
+ * share one resident continuous geometry.  Equal values in separately owned
+ * matrices are intentionally insufficient: without an evaluation envelope,
+ * that topology retains its incumbent owner.
+ */
+static int np_common_continuous_resident_geometry(
+    const int num_obs_train,
+    const int num_obs_eval,
+    const int num_reg_continuous,
+    double * const *matrix_X_continuous_train,
+    double * const *matrix_X_continuous_eval)
+{
+  int coordinate;
+
+  if(num_obs_train <= 0 || num_obs_train != num_obs_eval ||
+     num_reg_continuous <= 0 || matrix_X_continuous_train == NULL ||
+     matrix_X_continuous_eval == NULL)
+    return 0;
+
+  for(coordinate = 0; coordinate < num_reg_continuous; ++coordinate)
+    if(matrix_X_continuous_train[coordinate] == NULL ||
+       matrix_X_continuous_train[coordinate] !=
+         matrix_X_continuous_eval[coordinate])
+      return 0;
+
+  return 1;
+}
+
+/*
+ * A tree cannot prune any pair when every effective primary and simultaneously
+ * requested alternate kernel spans the complete root envelope.  The caller
+ * retains its separately qualified owner policy.  This is an arithmetic
+ * capability check, not a timed crossover: uncertainty preserves the tree.
  */
 static NPTreeCapability np_fixed_tree_capability_from_common_root(
     const int bandwidth_mode,
     const int num_reg_continuous,
     const KDT *tree,
-    const int *kernel_c,
-    const int *operator,
+    const int *effective_kernel,
+    const int *alternate_effective_kernel,
+    const int *alternate_active,
     double * const *matrix_bandwidth)
 {
   NPTreeCapability capability = NP_TREE_CANNOT_PRUNE;
@@ -14665,26 +14758,22 @@ static NPTreeCapability np_fixed_tree_capability_from_common_root(
   if(bandwidth_mode != BW_FIXED || num_reg_continuous <= 0 ||
      tree == NULL || tree->kdn == NULL || tree->numnode <= 0 ||
      tree->kdn[0].bb == NULL || tree->ndim < num_reg_continuous ||
-     kernel_c == NULL || operator == NULL || matrix_bandwidth == NULL)
+     effective_kernel == NULL || matrix_bandwidth == NULL)
     return NP_TREE_CAPABILITY_UNKNOWN;
 
   for(coordinate = 0; coordinate < num_reg_continuous; ++coordinate) {
-    const int operation = operator[coordinate];
-    int effective_kernel;
+    const int primary_kernel = effective_kernel[coordinate];
     NPPruneSupportDescriptor support;
     NPTreeCoordinateEnvelope envelope;
 
-    if(operation < OP_NORMAL || operation > OP_INTEGRAL ||
-       kernel_c[coordinate] < 0 || kernel_c[coordinate] >= 10 ||
+    if(primary_kernel < 0 || primary_kernel >= OP_NCFUN ||
        matrix_bandwidth[coordinate] == NULL)
       return NP_TREE_CAPABILITY_UNKNOWN;
 
-    effective_kernel = kernel_c[coordinate] +
-      OP_CFUN_OFFSETS[operation];
     support = np_prune_support_descriptor(
-      effective_kernel,
-      cksup[effective_kernel][0],
-      cksup[effective_kernel][1]);
+      primary_kernel,
+      cksup[primary_kernel][0],
+      cksup[primary_kernel][1]);
     envelope.train_min = tree->kdn[0].bb[2*coordinate];
     envelope.train_max = tree->kdn[0].bb[2*coordinate + 1];
     envelope.eval_min = envelope.train_min;
@@ -14696,6 +14785,25 @@ static NPTreeCapability np_fixed_tree_capability_from_common_root(
     if(capability == NP_TREE_CAPABILITY_UNKNOWN ||
        capability == NP_TREE_CAN_PRUNE_ZERO_SUPPORT)
       return capability;
+
+    if(alternate_active != NULL && alternate_active[coordinate]) {
+      const int alternate_kernel = alternate_effective_kernel == NULL ?
+        -1 : alternate_effective_kernel[coordinate];
+
+      if(alternate_kernel < 0 || alternate_kernel >= OP_NCFUN)
+        return NP_TREE_CAPABILITY_UNKNOWN;
+      support = np_prune_support_descriptor(
+        alternate_kernel,
+        cksup[alternate_kernel][0],
+        cksup[alternate_kernel][1]);
+      capability = np_tree_capability_combine(
+        capability,
+        np_tree_fixed_coordinate_capability(
+          support, matrix_bandwidth[coordinate][0], envelope));
+      if(capability == NP_TREE_CAPABILITY_UNKNOWN ||
+         capability == NP_TREE_CAN_PRUNE_ZERO_SUPPORT)
+        return capability;
+    }
   }
 
   return capability;
@@ -14742,7 +14850,8 @@ static int np_reg_fixed_tree_dense_full_support_admitted(
     num_reg_continuous,
     tree,
     kernel_c,
-    operator,
+    NULL,
+    NULL,
     matrix_bandwidth) == NP_TREE_CANNOT_PRUNE;
 }
 
