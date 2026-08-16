@@ -90,6 +90,27 @@ NPLPSolvePolicyStatus np_lp_solve_workspace_solve_response(
   int nrhs,
   double ridge_increment,
   NPLPSolvePolicyDiagnostics *diagnostics);
+
+/*
+ * Adjoint sibling of solve_response().  It selects the identical Gram-owned
+ * factor/ridge state, solves evaluation-basis RHS columns, and only then
+ * applies the transposed accumulated-ridge intercept transform to each
+ * solution.  Moving that transform to the RHS side of the inverse would not
+ * reproduce the response fitted-value map.
+ */
+NPLPSolvePolicyStatus np_lp_solve_workspace_solve_adjoint(
+  NPLPSolveWorkspace *workspace,
+  int p,
+  int nrhs,
+  double ridge_increment,
+  NPLPSolvePolicyDiagnostics *diagnostics);
+
+/* Reuse a factor/ridge state retained by a prior response or adjoint solve. */
+NPLPSolvePolicyStatus np_lp_solve_workspace_solve_adjoint_factored(
+  NPLPSolveWorkspace *workspace,
+  int p,
+  int nrhs,
+  const NPLPSolvePolicyDiagnostics *diagnostics);
 /* Cold-path validation used only after an ordinary solve has failed. */
 #if defined(__GNUC__) || defined(__clang__)
 #define NP_LP_COLD_PATH __attribute__((cold))

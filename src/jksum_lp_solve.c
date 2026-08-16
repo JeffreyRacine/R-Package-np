@@ -264,16 +264,18 @@ int np_lp_solve_workspace_solve(NPLPSolveWorkspace *workspace,
     NP_LP_DGESV_OK;
 }
 
-int np_lp_solve_workspace_solve_factored(NPLPSolveWorkspace *workspace,
-                                         int p,
-                                         int nrhs)
+static int np_lp_solve_workspace_solve_factored_with_trans(
+  NPLPSolveWorkspace *workspace,
+  int p,
+  int nrhs,
+  const char trans)
 {
-  const char trans = 'N';
   size_t rhs_elements;
   int info = 0;
   size_t i;
 
-  if((workspace == NULL) || (p <= 0) || (nrhs <= 0) ||
+  if(((trans != 'N') && (trans != 'T')) ||
+     (workspace == NULL) || (p <= 0) || (nrhs <= 0) ||
      (!workspace->factor_ready) || (workspace->factor_p != p) ||
      (workspace->p_capacity < p) || (workspace->nrhs_capacity < nrhs) ||
      (workspace->rhs_source == NULL) || (workspace->gram_work == NULL) ||
@@ -305,6 +307,67 @@ int np_lp_solve_workspace_solve_factored(NPLPSolveWorkspace *workspace,
   return 1;
 }
 
+int np_lp_solve_workspace_solve_factored(NPLPSolveWorkspace *workspace,
+                                         int p,
+                                         int nrhs)
+{
+  return np_lp_solve_workspace_solve_factored_with_trans(
+    workspace, p, nrhs, 'N');
+}
+
+typedef enum {
+  NP_LP_FACTOR_OK = 0,
+  NP_LP_FACTOR_INVALID,
+  NP_LP_FACTOR_NONFINITE_SOURCE,
+  NP_LP_FACTOR_FAILED
+} NPLPFactorStatus;
+
+/* Direct influence-only owners need a factor without first solving a
+ * response.  Keep that two-call lifecycle local to those owners; ordinary
+ * response consumers retain the one-call DGESV path above. */
+static NPLPFactorStatus np_lp_solve_workspace_try_factor(
+  NPLPSolveWorkspace *workspace,
+  int p,
+  int nrhs)
+{
+  size_t gram_elements;
+  int info = 0;
+
+  if(workspace != NULL){
+    workspace->factor_ready = 0;
+    workspace->factor_p = 0;
+  }
+  if(!np_lp_solve_workspace_shape(workspace, p, nrhs,
+                                  &gram_elements, NULL))
+    return NP_LP_FACTOR_INVALID;
+
+  memcpy(workspace->gram_work,
+         workspace->gram_source,
+         gram_elements*sizeof(double));
+  if(p == 1){
+    if(!R_FINITE(workspace->gram_work[0]))
+      return NP_LP_FACTOR_NONFINITE_SOURCE;
+    if(workspace->gram_work[0] == 0.0)
+      return NP_LP_FACTOR_FAILED;
+    workspace->factor_ready = 1;
+    workspace->factor_p = 1;
+    return NP_LP_FACTOR_OK;
+  }
+
+  F77_CALL(dgetrf)(&p, &p,
+                   workspace->gram_work, &p,
+                   workspace->ipiv,
+                   &info);
+  if(info != 0) {
+    if(!np_lp_solve_workspace_sources_finite(workspace, p, nrhs))
+      return NP_LP_FACTOR_NONFINITE_SOURCE;
+    return NP_LP_FACTOR_FAILED;
+  }
+  workspace->factor_ready = 1;
+  workspace->factor_p = p;
+  return NP_LP_FACTOR_OK;
+}
+
 NPLPSolvePolicyStatus np_lp_solve_workspace_solve_response(
   NPLPSolveWorkspace *workspace,
   int p,
@@ -324,7 +387,6 @@ NPLPSolvePolicyStatus np_lp_solve_workspace_solve_response(
   if(!np_lp_solve_workspace_shape(workspace, p, nrhs, NULL, NULL) ||
      !R_FINITE(ridge_increment) || (ridge_increment <= 0.0))
     return NP_LP_SOLVE_POLICY_INVALID;
-
   for(;;){
     const NPLPDgesvStatus solve_status =
       np_lp_solve_workspace_try_dgesv(workspace, p, nrhs);
@@ -339,7 +401,6 @@ NPLPSolvePolicyStatus np_lp_solve_workspace_solve_response(
       return NP_LP_SOLVE_POLICY_FINAL_FAILED;
     if(ridge_steps >= NP_LP_SOLVE_MAX_RIDGE_STEPS)
       return NP_LP_SOLVE_POLICY_RIDGE_EXHAUSTED;
-
     for(i = 0; i < p; i++)
       workspace->gram_source[i + i*p] += ridge_increment;
     ridge_total += ridge_increment;
@@ -371,6 +432,89 @@ NPLPSolvePolicyStatus np_lp_solve_workspace_solve_response(
   }
 
   return NP_LP_SOLVE_POLICY_OK;
+}
+
+NPLPSolvePolicyStatus np_lp_solve_workspace_solve_adjoint_factored(
+  NPLPSolveWorkspace *workspace,
+  int p,
+  int nrhs,
+  const NPLPSolvePolicyDiagnostics *diagnostics)
+{
+  if((diagnostics == NULL) ||
+     (diagnostics->ridge_steps < 0) ||
+     !R_FINITE(diagnostics->ridge_total) ||
+     (diagnostics->ridge_total < 0.0))
+    return NP_LP_SOLVE_POLICY_INVALID;
+
+  if(!np_lp_solve_workspace_solve_factored_with_trans(
+       workspace, p, nrhs, 'T')) {
+    if(!np_lp_solve_workspace_sources_finite(workspace, p, nrhs))
+      return NP_LP_SOLVE_POLICY_NONFINITE;
+    return NP_LP_SOLVE_POLICY_FINAL_FAILED;
+  }
+
+  if(diagnostics->ridge_total > 0.0){
+    const double denominator =
+      (workspace->gram_source[0] > DBL_EPSILON) ?
+      workspace->gram_source[0] : DBL_EPSILON;
+    const double intercept_scale =
+      1.0 + diagnostics->ridge_total/denominator;
+    int rhs;
+
+    for(rhs = 0; rhs < nrhs; rhs++){
+      double * const intercept = workspace->rhs_work + (size_t)rhs*(size_t)p;
+      *intercept *= intercept_scale;
+      if(!R_FINITE(*intercept))
+        return NP_LP_SOLVE_POLICY_FINAL_FAILED;
+    }
+  }
+
+  return NP_LP_SOLVE_POLICY_OK;
+}
+
+NPLPSolvePolicyStatus np_lp_solve_workspace_solve_adjoint(
+  NPLPSolveWorkspace *workspace,
+  int p,
+  int nrhs,
+  double ridge_increment,
+  NPLPSolvePolicyDiagnostics *diagnostics)
+{
+  NPLPSolvePolicyDiagnostics local_diagnostics = {0, 0.0};
+  NPLPSolvePolicyDiagnostics * const policy_diagnostics =
+    (diagnostics != NULL) ? diagnostics : &local_diagnostics;
+  int ridge_steps = 0;
+  double ridge_total = 0.0;
+  int i;
+
+  policy_diagnostics->ridge_steps = 0;
+  policy_diagnostics->ridge_total = 0.0;
+  if(!np_lp_solve_workspace_shape(workspace, p, nrhs, NULL, NULL) ||
+     !R_FINITE(ridge_increment) || (ridge_increment <= 0.0))
+    return NP_LP_SOLVE_POLICY_INVALID;
+
+  for(;;){
+    const NPLPFactorStatus factor_status =
+      np_lp_solve_workspace_try_factor(workspace, p, nrhs);
+
+    if(factor_status == NP_LP_FACTOR_OK)
+      break;
+    if(factor_status == NP_LP_FACTOR_INVALID)
+      return NP_LP_SOLVE_POLICY_INVALID;
+    if(factor_status == NP_LP_FACTOR_NONFINITE_SOURCE)
+      return NP_LP_SOLVE_POLICY_NONFINITE;
+    if(ridge_steps >= NP_LP_SOLVE_MAX_RIDGE_STEPS)
+      return NP_LP_SOLVE_POLICY_RIDGE_EXHAUSTED;
+
+    for(i = 0; i < p; i++)
+      workspace->gram_source[i + i*p] += ridge_increment;
+    ridge_total += ridge_increment;
+    ridge_steps++;
+    policy_diagnostics->ridge_steps = ridge_steps;
+    policy_diagnostics->ridge_total = ridge_total;
+  }
+
+  return np_lp_solve_workspace_solve_adjoint_factored(
+    workspace, p, nrhs, policy_diagnostics);
 }
 
 /*
