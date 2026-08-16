@@ -337,3 +337,88 @@ test_that("tree-disabled higher-degree lp scalar apply routes through exact matr
   check_scalar_apply_contract(degree = c(2L, 2L), s = c(0L, 0L))
   check_scalar_apply_contract(degree = c(2L, 2L), s = c(1L, 0L))
 })
+
+test_that("public legacy LP mean matrices use the typed native capability", {
+  candidate <- getFromNamespace(".npreghat_native_matrix_candidate", "np")
+  has_extended_nn <- getFromNamespace("npRegressionHasExtendedNn", "np")
+  native_matrix <- getFromNamespace(
+    ".npreghat_exact_lp_matrix_from_regression_core", "np"
+  )
+
+  set.seed(20260816)
+  n <- 42L
+  x <- data.frame(x = sort(runif(n, -1, 1)))
+  y <- sin(pi * x$x) + seq_len(n) / 1000
+
+  make_bw <- function(type, bws, degree = 2L, kernel = "gaussian") {
+    npregbw(
+      xdat = x, ydat = y, bws = bws,
+      bandwidth.compute = FALSE, bwmethod = "cv.ls",
+      bwtype = type, bwscaling = FALSE,
+      regtype = "lp", degree = degree, degree.select = "manual",
+      basis = "glp", bernstein.basis = FALSE,
+      ckertype = kernel, ckerorder = 2L
+    )
+  }
+
+  bw.fixed <- make_bw("fixed", 0.32)
+  bw.gnn <- make_bw("generalized_nn", 9L)
+  bw.ann <- make_bw("adaptive_nn", 9L)
+
+  candidate_args <- function(bw, output = "matrix", s = 0L) list(
+    bws = bw, output = output, regtype = "lp", degree = 2L,
+    basis = "glp", bernstein.basis = FALSE, s = as.integer(s),
+    leave.one.out = FALSE
+  )
+  expect_true(do.call(candidate, candidate_args(bw.fixed)))
+  expect_true(do.call(candidate, candidate_args(bw.gnn)))
+  expect_false(do.call(candidate, candidate_args(bw.ann)))
+
+  bw.extended <- bw.gnn
+  bw.extended$bw[bw.extended$icon] <- bw.extended$nobs + 1L
+  expect_true(has_extended_nn(bw.extended))
+  expect_false(do.call(candidate, candidate_args(bw.extended)))
+
+  expect_true(do.call(candidate, candidate_args(bw.fixed, output = "constraint")))
+  expect_false(do.call(candidate, candidate_args(bw.fixed, s = 1L)))
+
+  for (bw in list(bw.fixed, bw.gnn)) {
+    public <- npreghat(bws = bw, txdat = x, output = "matrix")
+    native <- native_matrix(
+      bw, txdat = x, degree = 2L, basis = "glp",
+      bernstein.basis = FALSE, s = 0L
+    )
+    expect_identical(as.vector(public), as.vector(native))
+    expect_identical(
+      attr(public, "ridge.used", exact = TRUE),
+      attr(native, "ridge.used", exact = TRUE)
+    )
+    expect_s3_class(public, "npreghat")
+    expect_identical(attr(public, "trainiseval", exact = TRUE), TRUE)
+    public.with.y <- npreghat(
+      bws = bw, txdat = x, y = y, output = "matrix"
+    )
+    expect_equal(
+      attr(public.with.y, "Hy", exact = TRUE),
+      as.vector(public.with.y %*% y),
+      tolerance = 0
+    )
+    constraint <- npreghat(
+      bws = bw, txdat = x, y = y, output = "constraint"
+    )
+    expect_identical(as.vector(constraint), as.vector(t(public) * y))
+  }
+
+  bw.low.rank <- make_bw(
+    "fixed", 0.04, degree = 3L, kernel = "epanechnikov"
+  )
+  H.low.rank <- npreghat(
+    bws = bw.low.rank, txdat = x, output = "matrix"
+  )
+  ridge.used <- attr(H.low.rank, "ridge.used", exact = TRUE)
+  expect_true(is.double(ridge.used))
+  expect_length(ridge.used, nrow(H.low.rank))
+  expect_true(all(is.finite(ridge.used)))
+  expect_true(all(ridge.used >= 0))
+  expect_gt(sum(ridge.used > 0), 0L)
+})
