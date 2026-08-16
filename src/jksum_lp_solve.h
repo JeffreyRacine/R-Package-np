@@ -76,11 +76,13 @@ int np_lp_solve_workspace_solve(NPLPSolveWorkspace *workspace,
 /*
  * Canonical response-oriented bounded ridge transcript.  The caller fills
  * the pristine Gram and response-moment columns, and supplies the fixed ridge
- * increment owned by its statistical sample.  Failed solves add that
+ * increment owned by its statistical sample.  Failed Gram factorizations add that
  * increment to the source Gram diagonal in ascending order.  Once a ridged
- * system solves, the accumulated intercept restoration is applied to every
- * response RHS and the system is resolved, leaving the final factorization
- * available to solve_factored().  This is deliberately response-only: the
+ * system factors, the accumulated intercept restoration is applied to every
+ * response RHS and all columns are solved from that retained factorization.
+ * Response magnitude and batching therefore cannot select a different ridge.
+ * The final factorization remains available to solve_factored().  This is
+ * deliberately response-only: the
  * adjoint influence-row orientation has a different transform placement and
  * enters only with its own direct identity proof.
  */

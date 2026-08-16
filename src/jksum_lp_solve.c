@@ -267,6 +267,52 @@ int np_lp_solve_workspace_solve_factored(NPLPSolveWorkspace *workspace,
   return 1;
 }
 
+/*
+ * Select the factor/ridge state from the Gram system alone.  Response shape
+ * and magnitude must not choose a different statistical regularization.  The
+ * retained LU is consumed by both response and, in the next checkpoint,
+ * adjoint solves.
+ */
+static int np_lp_solve_workspace_factor(NPLPSolveWorkspace *workspace,
+                                        int p)
+{
+  size_t gram_elements, i;
+  int info = 0;
+
+  if(workspace != NULL){
+    workspace->factor_ready = 0;
+    workspace->factor_p = 0;
+  }
+  if(!np_lp_solve_workspace_shape(workspace, p, 1,
+                                  &gram_elements, NULL))
+    return 0;
+
+  memcpy(workspace->gram_work,
+         workspace->gram_source,
+         gram_elements*sizeof(double));
+  if(p == 1){
+    if(!R_FINITE(workspace->gram_work[0]) ||
+       (workspace->gram_work[0] == 0.0))
+      return 0;
+    workspace->factor_ready = 1;
+    workspace->factor_p = 1;
+    return 1;
+  }
+
+  F77_CALL(dgetrf)(&p, &p,
+                   workspace->gram_work, &p,
+                   workspace->ipiv,
+                   &info);
+  if(info != 0)
+    return 0;
+  for(i = 0; i < gram_elements; i++)
+    if(!R_FINITE(workspace->gram_work[i]))
+      return 0;
+  workspace->factor_ready = 1;
+  workspace->factor_p = p;
+  return 1;
+}
+
 NPLPResponseSolveStatus np_lp_solve_workspace_solve_response(
   NPLPSolveWorkspace *workspace,
   int p,
@@ -286,8 +332,10 @@ NPLPResponseSolveStatus np_lp_solve_workspace_solve_response(
   if(!np_lp_solve_workspace_shape(workspace, p, nrhs, NULL, NULL) ||
      !R_FINITE(ridge_increment) || (ridge_increment <= 0.0))
     return NP_LP_RESPONSE_SOLVE_INVALID;
+  if(!np_lp_solve_workspace_sources_finite(workspace, p, nrhs))
+    return NP_LP_RESPONSE_SOLVE_NONFINITE;
 
-  while(!np_lp_solve_workspace_solve(workspace, p, nrhs)){
+  while(!np_lp_solve_workspace_factor(workspace, p)){
     if(ridge_steps >= NP_LP_SOLVE_MAX_RIDGE_STEPS)
       return NP_LP_RESPONSE_SOLVE_RIDGE_EXHAUSTED;
     if(!np_lp_solve_workspace_sources_finite(workspace, p, nrhs))
@@ -314,11 +362,12 @@ NPLPResponseSolveStatus np_lp_solve_workspace_solve_response(
       *intercept += ridge_total*(*intercept)/denominator;
     }
 
-    if(!np_lp_solve_workspace_solve(workspace, p, nrhs)){
-      if(!np_lp_solve_workspace_sources_finite(workspace, p, nrhs))
-        return NP_LP_RESPONSE_SOLVE_NONFINITE;
-      return NP_LP_RESPONSE_SOLVE_FINAL_FAILED;
-    }
+  }
+
+  if(!np_lp_solve_workspace_solve_factored(workspace, p, nrhs)){
+    if(!np_lp_solve_workspace_sources_finite(workspace, p, nrhs))
+      return NP_LP_RESPONSE_SOLVE_NONFINITE;
+    return NP_LP_RESPONSE_SOLVE_FINAL_FAILED;
   }
 
   return NP_LP_RESPONSE_SOLVE_OK;
