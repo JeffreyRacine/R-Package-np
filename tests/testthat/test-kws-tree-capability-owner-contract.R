@@ -139,3 +139,27 @@ test_that("fixed KWS dense and tree siblings preserve all requested outputs", {
     }
   }
 })
+
+test_that("fixed tree ownership cannot depend on sample size", {
+  header <- paste(
+    readLines(np_test_source_path("src", "tree_capability.h"), warn = FALSE),
+    collapse = "\n"
+  )
+  source <- paste(
+    readLines(np_test_source_path("src", "jksum.c"), warn = FALSE),
+    collapse = "\n"
+  )
+  selector <- sub(
+    "(?s).*?(fixed_tree_common_geometry[[:space:]]*=[[:space:]]*np_ks_tree_use.*?const char \\* const owner_oracle).*",
+    "\\1", source, perl = TRUE
+  )
+
+  expect_false(grepl(
+    "\\b(num_obs|nobs|sample_size|sample_count)\\b",
+    header, perl = TRUE
+  ))
+  expect_false(grepl(
+    "num_obs_(train|eval)[[:space:]]*(<=|>=|<|>|==|!=)",
+    selector, perl = TRUE
+  ))
+})
