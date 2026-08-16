@@ -432,6 +432,54 @@ test_that("canonical LP hat and apply routes share the typed solve policy", {
     np_source,
     fixed = TRUE
   ))
+
+  solve_file <- file.path(dirname(src_file), "jksum_lp_solve.c")
+  skip_if_not(
+    file.exists(solve_file),
+    "source file src/jksum_lp_solve.c unavailable"
+  )
+  solve_lines <- readLines(solve_file, warn = FALSE)
+  solve_source <- paste(solve_lines, collapse = "\n")
+  expect_true(grepl(
+    "static int np_lp_solve_workspace_solve_factored_with_trans(",
+    solve_source,
+    fixed = TRUE
+  ))
+
+  response_start <- grep(
+    "^NPLPSolvePolicyStatus np_lp_solve_workspace_solve_response\\(",
+    solve_lines
+  )
+  adjoint_start <- grep(
+    "^NPLPSolvePolicyStatus np_lp_solve_workspace_solve_adjoint\\(",
+    solve_lines
+  )
+  adjoint_stop <- grep("^/\\*$", solve_lines)
+  adjoint_stop <- adjoint_stop[adjoint_stop > adjoint_start][1L]
+  expect_length(response_start, 1L)
+  expect_length(adjoint_start, 1L)
+  expect_length(adjoint_stop, 1L)
+  response_body <- paste(
+    solve_lines[response_start:(adjoint_start - 1L)], collapse = "\n"
+  )
+  adjoint_body <- paste(
+    solve_lines[adjoint_start:(adjoint_stop - 1L)], collapse = "\n"
+  )
+  expect_true(grepl(
+    "np_lp_solve_workspace_solve_factored(workspace, p, nrhs)",
+    response_body,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
+    "np_lp_solve_workspace_solve_factored_with_trans\\(\\s*workspace,\\s*p,\\s*nrhs,\\s*'T'\\)",
+    adjoint_body,
+    perl = TRUE
+  ))
+  expect_false(grepl(
+    "np_lp_solve_workspace_solve_factored(workspace, p, nrhs)",
+    adjoint_body,
+    fixed = TRUE
+  ))
 })
 
 test_that("LP LOO rows use signed full-row deletion and no QR", {

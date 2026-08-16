@@ -226,16 +226,18 @@ int np_lp_solve_workspace_solve(NPLPSolveWorkspace *workspace,
   return 1;
 }
 
-int np_lp_solve_workspace_solve_factored(NPLPSolveWorkspace *workspace,
-                                         int p,
-                                         int nrhs)
+static int np_lp_solve_workspace_solve_factored_with_trans(
+  NPLPSolveWorkspace *workspace,
+  int p,
+  int nrhs,
+  const char trans)
 {
-  const char trans = 'N';
   size_t rhs_elements;
   int info = 0;
   size_t i;
 
-  if((workspace == NULL) || (p <= 0) || (nrhs <= 0) ||
+  if((trans != 'N' && trans != 'T') ||
+     (workspace == NULL) || (p <= 0) || (nrhs <= 0) ||
      (!workspace->factor_ready) || (workspace->factor_p != p) ||
      (workspace->p_capacity < p) || (workspace->nrhs_capacity < nrhs) ||
      (workspace->rhs_source == NULL) || (workspace->gram_work == NULL) ||
@@ -265,6 +267,14 @@ int np_lp_solve_workspace_solve_factored(NPLPSolveWorkspace *workspace,
     if(!R_FINITE(workspace->rhs_work[i]))
       return 0;
   return 1;
+}
+
+int np_lp_solve_workspace_solve_factored(NPLPSolveWorkspace *workspace,
+                                         int p,
+                                         int nrhs)
+{
+  return np_lp_solve_workspace_solve_factored_with_trans(
+    workspace, p, nrhs, 'N');
 }
 
 /*
@@ -407,7 +417,8 @@ NPLPSolvePolicyStatus np_lp_solve_workspace_solve_adjoint(
 
   if(factor_status != NP_LP_SOLVE_POLICY_OK)
     return factor_status;
-  if(!np_lp_solve_workspace_solve_factored(workspace, p, nrhs)){
+  if(!np_lp_solve_workspace_solve_factored_with_trans(
+       workspace, p, nrhs, 'T')){
     if(!np_lp_solve_workspace_sources_finite(workspace, p, nrhs))
       return NP_LP_SOLVE_POLICY_NONFINITE;
     return NP_LP_SOLVE_POLICY_FINAL_FAILED;

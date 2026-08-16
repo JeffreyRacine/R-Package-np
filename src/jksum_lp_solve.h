@@ -95,10 +95,13 @@ NPLPSolvePolicyStatus np_lp_solve_workspace_solve_response(
 
 /*
  * Adjoint sibling of solve_response().  It selects the identical Gram-owned
- * factor/ridge state, solves evaluation-basis RHS columns, and only then
- * applies the transposed accumulated-ridge intercept transform to each
- * solution.  Moving that transform to the RHS side of the inverse would not
- * reproduce the response fitted-value map.
+ * factor/ridge state, solves the evaluation-basis RHS columns with the
+ * transpose of the retained LU, and only then applies the transposed
+ * accumulated-ridge intercept transform to each solution.  The stored Gram is
+ * mathematically symmetric, but independently accumulated moment columns need
+ * not be bitwise symmetric; an ordinary non-transposed solve is therefore not
+ * an adjoint.  Moving either transpose to the wrong side would not reproduce
+ * the response fitted-value map.
  */
 NPLPSolvePolicyStatus np_lp_solve_workspace_solve_adjoint(
   NPLPSolveWorkspace *workspace,
