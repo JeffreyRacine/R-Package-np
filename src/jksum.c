@@ -104,6 +104,13 @@ static int np_common_continuous_resident_geometry(
   double * const *matrix_X_continuous_train,
   double * const *matrix_X_continuous_eval);
 
+static NPTreeCapability np_fixed_tree_coordinate_capability_from_common_root(
+  int coordinate,
+  int num_reg_continuous,
+  const KDT *tree,
+  const int *effective_kernel,
+  double * const *matrix_bandwidth);
+
 static NPTreeCapability np_fixed_tree_capability_from_common_root(
   int bandwidth_mode,
   int num_reg_continuous,
@@ -11317,6 +11324,7 @@ NPPermutationWeightOutput * const pkw_output){
   int fixed_tree_common_geometry = 0;
   NPTreeCapability fixed_tree_capability = NP_TREE_CAPABILITY_UNKNOWN;
   int any_convolution = 0;
+  int all_continuous_normal = 1;
 
   int lod = 0;
 
@@ -11343,6 +11351,8 @@ NPPermutationWeightOutput * const pkw_output){
   for(i = 0; (i < (num_reg_unordered + num_reg_ordered + num_reg_continuous)); i++){
     any_convolution |= (operator[i] == OP_CONVOLUTION);
   }
+  for(i = 0; i < num_reg_continuous; ++i)
+    all_continuous_normal &= operator[i] == OP_NORMAL;
 
   if(any_convolution && is_adaptive) np_ks_tree_use = 0;
 
@@ -11447,6 +11457,7 @@ NPPermutationWeightOutput * const pkw_output){
   double *cont_largeh_hmin = NULL, *cont_largeh_k0 = NULL;
   double cont_largeh_rel_tol = 1e-3;
   int *cont_largeh_active = NULL, *cont_largeh_active_fixed = NULL;
+  int *fixed_tree_nonpruning_dimension = NULL;
   int *tree_active_dims = NULL;
   int cont_largeh_all_fixed = 0, cont_largeh_fixed_ready = 0;
   int cont_largeh_any_fixed = 0;
@@ -11696,6 +11707,38 @@ NPPermutationWeightOutput * const pkw_output){
     pxl = NULL;
     free(p_pxl);
     p_pxl = NULL;
+  }
+  if(fixed_tree_common_geometry && np_ks_tree_use &&
+     all_continuous_normal && !do_perm && (p_nvar == 0) &&
+     !int_cker_bound_extern){
+    int inactive_dimensions = 0;
+
+    fixed_tree_nonpruning_dimension =
+      (int *)calloc((size_t)num_reg_continuous, sizeof(int));
+    if(fixed_tree_nonpruning_dimension != NULL){
+      for(i = 0; i < num_reg_continuous; ++i){
+        const NPTreeCapability coordinate_capability =
+          np_fixed_tree_coordinate_capability_from_common_root(
+            i, num_reg_continuous, kdt, KERNEL_reg_np, matrix_bandwidth);
+        fixed_tree_nonpruning_dimension[i] =
+          coordinate_capability == NP_TREE_CANNOT_PRUNE;
+        inactive_dimensions += fixed_tree_nonpruning_dimension[i];
+      }
+      if(inactive_dimensions == 0){
+        free(fixed_tree_nonpruning_dimension);
+        fixed_tree_nonpruning_dimension = NULL;
+      }
+    }
+    {
+      const char * const dimension_oracle =
+        getenv("NP_KWS_TREE_DIMENSION_ORACLE");
+      if(dimension_oracle != NULL && dimension_oracle[0] == '1' &&
+         dimension_oracle[1] == '\0')
+        REprintf("NP_KWS_TREE_DIMENSION_ORACLE dimensions=%d inactive=%d active=%d\n",
+                 num_reg_continuous,
+                 inactive_dimensions,
+                 num_reg_continuous - inactive_dimensions);
+    }
   }
   {
     const char * const owner_oracle =
@@ -12376,7 +12419,8 @@ NPPermutationWeightOutput * const pkw_output){
       (!tree_alllarge_bypass) &&
       (p_nvar == 0) &&
       (!do_partial_tree) &&
-      (cont_largeh_active != NULL) &&
+      ((cont_largeh_active != NULL) ||
+       (fixed_tree_nonpruning_dimension != NULL)) &&
       (tree_active_dims != NULL);
 
     if(cont_largeh_fixed_ready){
@@ -12402,7 +12446,12 @@ NPPermutationWeightOutput * const pkw_output){
     if(tree_use_active_dims){
       tree_active_n = 0;
       for(i = 0; i < num_reg_continuous; i++){
-        if(!cont_largeh_active[i]){
+        const int approximate_constant =
+          cont_largeh_active != NULL && cont_largeh_active[i];
+        const int exact_nonpruning =
+          fixed_tree_nonpruning_dimension != NULL &&
+          fixed_tree_nonpruning_dimension[i];
+        if(!approximate_constant && !exact_nonpruning){
           tree_active_dims[tree_active_n++] = i;
         }
       }
@@ -13306,6 +13355,7 @@ cleanup:
   if((cont_largeh_k0 != NULL) && (!cont_largeh_from_override) && (!cont_largeh_from_global_cache)) free(cont_largeh_k0);
   if(cont_largeh_active != NULL) free(cont_largeh_active);
   if(cont_largeh_active_fixed != NULL) free(cont_largeh_active_fixed);
+  if(fixed_tree_nonpruning_dimension != NULL) free(fixed_tree_nonpruning_dimension);
   if(tree_active_dims != NULL) free(tree_active_dims);
 
   if(no_bpso)
@@ -15678,6 +15728,38 @@ static int np_common_continuous_resident_geometry(
   return 1;
 }
 
+static NPTreeCapability np_fixed_tree_coordinate_capability_from_common_root(
+    const int coordinate,
+    const int num_reg_continuous,
+    const KDT *tree,
+    const int *effective_kernel,
+    double * const *matrix_bandwidth)
+{
+  int kernel;
+  NPPruneSupportDescriptor support;
+  NPTreeCoordinateEnvelope envelope;
+
+  if(coordinate < 0 || coordinate >= num_reg_continuous ||
+     num_reg_continuous <= 0 || tree == NULL || tree->kdn == NULL ||
+     tree->numnode <= 0 || tree->kdn[0].bb == NULL ||
+     tree->ndim < num_reg_continuous || effective_kernel == NULL ||
+     matrix_bandwidth == NULL || matrix_bandwidth[coordinate] == NULL)
+    return NP_TREE_CAPABILITY_UNKNOWN;
+
+  kernel = effective_kernel[coordinate];
+  if(kernel < 0 || kernel >= OP_NCFUN)
+    return NP_TREE_CAPABILITY_UNKNOWN;
+
+  support = np_prune_support_descriptor(
+    kernel, cksup[kernel][0], cksup[kernel][1]);
+  envelope.train_min = tree->kdn[0].bb[2*coordinate];
+  envelope.train_max = tree->kdn[0].bb[2*coordinate + 1];
+  envelope.eval_min = envelope.train_min;
+  envelope.eval_max = envelope.train_max;
+  return np_tree_fixed_coordinate_capability(
+    support, matrix_bandwidth[coordinate][0], envelope);
+}
+
 /*
  * A tree cannot prune any pair when every effective primary and simultaneously
  * requested alternate kernel spans the complete root envelope.  The caller
@@ -15703,26 +15785,18 @@ static NPTreeCapability np_fixed_tree_capability_from_common_root(
     return NP_TREE_CAPABILITY_UNKNOWN;
 
   for(coordinate = 0; coordinate < num_reg_continuous; ++coordinate) {
-    const int primary_kernel = effective_kernel[coordinate];
     NPPruneSupportDescriptor support;
     NPTreeCoordinateEnvelope envelope;
 
-    if(primary_kernel < 0 || primary_kernel >= OP_NCFUN ||
-       matrix_bandwidth[coordinate] == NULL)
-      return NP_TREE_CAPABILITY_UNKNOWN;
-
-    support = np_prune_support_descriptor(
-      primary_kernel,
-      cksup[primary_kernel][0],
-      cksup[primary_kernel][1]);
     envelope.train_min = tree->kdn[0].bb[2*coordinate];
     envelope.train_max = tree->kdn[0].bb[2*coordinate + 1];
     envelope.eval_min = envelope.train_min;
     envelope.eval_max = envelope.train_max;
     capability = np_tree_capability_combine(
       capability,
-      np_tree_fixed_coordinate_capability(
-        support, matrix_bandwidth[coordinate][0], envelope));
+      np_fixed_tree_coordinate_capability_from_common_root(
+        coordinate, num_reg_continuous, tree, effective_kernel,
+        matrix_bandwidth));
     if(capability == NP_TREE_CAPABILITY_UNKNOWN ||
        capability == NP_TREE_CAN_PRUNE_ZERO_SUPPORT)
       return capability;
