@@ -43,13 +43,17 @@
   unaffected, and portable builds retain the incumbent generic width-six
   owner.
 
-* On Apple silicon, fixed-bandwidth compact-support regression CV candidates
-  whose kernel support covers the complete observed continuous range now use
-  the canonical dense LP owner when its qualified arithmetic is faster than
-  unproductive full-tree traversal. The allocation-free geometry certificate
-  is shared by scalar and basis-neutral LP objectives and preserves MPI outer-
-  row ownership; width-two, genuinely sparse, nearest-neighbour, non-compact,
-  and portable non-Apple owners remain unchanged.
+* Fixed-bandwidth compact-support regression CV candidates whose kernel
+  support covers the complete observed continuous range now use the canonical
+  dense LP owner instead of unproductive full-tree traversal. A shared,
+  operator-aware geometry classifier also routes full-support fixed kernel
+  sums to their dense sibling and searches mixed-support trees only over
+  coordinates whose kernels can prune, while continuing to evaluate every
+  kernel factor. These exact, allocation-free, rank-symmetric policies apply
+  to Apple and portable builds without sample-size or runtime thresholds and
+  without new communication; width-two regression CV, genuinely sparse,
+  nearest-neighbour, non-compact, and unsupported owners retain their
+  established routes.
 
 * Conditional-density native degree search now constructs its finite invalid-
   candidate penalty once from the same canonical baseline-and-retry rule as
