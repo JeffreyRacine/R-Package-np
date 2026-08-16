@@ -89,30 +89,18 @@ npreghat <-
   if (!base.candidate)
     return(FALSE)
 
-  if (identical(bws[["ckertype", exact = TRUE]], "beta")) {
-    return(
+  identical(bws[["ckertype", exact = TRUE]], "beta") &&
+    (
       sum(s) == 0L ||
         (any(as.integer(degree) > 0L) &&
          sum(s) == 1L && all(s %in% c(0L, 1L)))
     )
-  }
-
-  identical(regtype, "lp") &&
-    !any(s > 0L) &&
-    identical(as.character(bws$type), "fixed") &&
-    length(degree) == as.integer(bws$ncon) &&
-    all(as.integer(degree) == 1L) &&
-    identical(basis, "glp") &&
-    !isTRUE(bernstein.basis) &&
-    !isTRUE(any(bws$iord)) &&
-    !isTRUE(any(bws$iuno))
 }
 
-.npreghat_native_matrix_candidate <- function(bws, output, regtype, degree,
-                                              basis, bernstein.basis, s,
-                                              leave.one.out) {
-  output %in% c("matrix", "constraint") &&
-    !isTRUE(leave.one.out) &&
+.npreghat_native_legacy_lp_mean_capability <- function(bws, regtype, degree,
+                                                       basis, bernstein.basis,
+                                                       s, leave.one.out) {
+  !isTRUE(leave.one.out) &&
     identical(regtype, "lp") &&
     !identical(bws[["ckertype", exact = TRUE]], "beta") &&
     !npRegressionHasExtendedNn(bws) &&
@@ -125,6 +113,38 @@ npreghat <-
     !is.na(bernstein.basis) &&
     length(s) == as.integer(bws[["ncon", exact = TRUE]]) &&
     !any(as.integer(s) > 0L)
+}
+
+.npreghat_native_matrix_candidate <- function(bws, output, regtype, degree,
+                                              basis, bernstein.basis, s,
+                                              leave.one.out) {
+  output %in% c("matrix", "constraint") &&
+    .npreghat_native_legacy_lp_mean_capability(
+      bws = bws,
+      regtype = regtype,
+      degree = degree,
+      basis = basis,
+      bernstein.basis = bernstein.basis,
+      s = s,
+      leave.one.out = leave.one.out
+    )
+}
+
+.npreghat_native_legacy_lp_mean_apply_candidate <- function(
+    bws, output, y, regtype, degree, basis, bernstein.basis, s,
+    leave.one.out) {
+  identical(output, "apply") &&
+    is.matrix(y) &&
+    ncol(y) > 1L &&
+    .npreghat_native_legacy_lp_mean_capability(
+      bws = bws,
+      regtype = regtype,
+      degree = degree,
+      basis = basis,
+      bernstein.basis = bernstein.basis,
+      s = s,
+      leave.one.out = leave.one.out
+    )
 }
 
 .npreghat_native_ridge_used <- function(H, neval, where) {
@@ -1856,7 +1876,20 @@ npreghat.rbandwidth <-
       leave.one.out = leave.one.out
     )
 
-    if (.npreghat_native_apply_candidate(
+    native.lp.mean.multi.apply.route <-
+      .npreghat_native_legacy_lp_mean_apply_candidate(
+        bws = bws,
+        output = output,
+        y = y,
+        regtype = regtype,
+        degree = reg.spec$degree.engine,
+        basis = reg.spec$basis.engine,
+        bernstein.basis = reg.spec$bernstein.basis.engine,
+        s = s,
+        leave.one.out = leave.one.out
+      )
+
+    if (native.lp.mean.multi.apply.route || .npreghat_native_apply_candidate(
       bws = bws,
       output = output,
       y = y,
@@ -1867,11 +1900,15 @@ npreghat.rbandwidth <-
       s = s,
       leave.one.out = leave.one.out
     )) {
-      apply.strategy <- .npreghat_native_apply_strategy(
-        ntrain = nrow(txdat),
-        neval = if (no.ex) nrow(txdat) else nrow(exdat),
-        nrhs = ncol(y)
-      )
+      apply.strategy <- if (native.lp.mean.multi.apply.route) {
+        "direct"
+      } else {
+        .npreghat_native_apply_strategy(
+          ntrain = nrow(txdat),
+          neval = if (no.ex) nrow(txdat) else nrow(exdat),
+          nrhs = ncol(y)
+        )
+      }
       if (identical(apply.strategy, "direct")) {
         out <- .npreghat_exact_lp_apply_from_regression_core(
           bws = bws,
