@@ -83,6 +83,60 @@ test_that("fixed full-support tree candidates preserve canonical LP objectives",
   expect_identical(mixed_tree$num.feval.fast, mixed_dense$num.feval.fast)
 })
 
+test_that("fixed LP capability reaches the canonical row owner", {
+  old <- options(np.messages = FALSE, np.largeh = FALSE,
+                 np.macMseries.accelerate = FALSE)
+  on.exit({
+    options(old)
+    Sys.unsetenv("NP_LP_TREE_ORACLE")
+  }, add = TRUE)
+
+  set.seed(20260816L)
+  n <- 83L
+  x <- data.frame(x1 = runif(n), x2 = runif(n))
+  y <- x$x1 + x$x2 + rnorm(n, sd = 0.25)
+  ranges <- vapply(x, function(value) diff(range(value)), numeric(1L))
+  core <- getFromNamespace(".npregbw_call_fixed_degree_core", "np")
+
+  evaluate <- function(degree, bandwidth) {
+    bw <- npregbw(
+      xdat = x, ydat = y, regtype = "lp", degree = degree,
+      bwmethod = "cv.ls", bwtype = "fixed",
+      ckertype = "epanechnikov", bandwidth.compute = FALSE,
+      bws = bandwidth
+    )
+    options(np.tree = TRUE)
+    Sys.setenv(NP_LP_TREE_ORACLE = "1")
+    messages <- capture.output(
+      tree <- core(xdat = x, ydat = y, bws = bw, eval.only = TRUE),
+      type = "message"
+    )
+    Sys.unsetenv("NP_LP_TREE_ORACLE")
+    options(np.tree = FALSE)
+    dense <- core(xdat = x, ydat = y, bws = bw, eval.only = TRUE)
+    list(
+      sparse = any(grepl("NP_LP_TREE_ORACLE", messages, fixed = TRUE)),
+      tree = tree,
+      dense = dense
+    )
+  }
+
+  full <- evaluate(c(1L, 1L), 1.25 * ranges / sqrt(5))
+  expect_false(full$sparse)
+  expect_equal(full$tree$objective, full$dense$objective,
+               tolerance = 2e-11)
+
+  prunable <- evaluate(c(1L, 1L), 0.30 * ranges / sqrt(5))
+  expect_true(prunable$sparse)
+  expect_equal(prunable$tree$objective, prunable$dense$objective,
+               tolerance = 2e-11)
+
+  width_two <- evaluate(c(1L, 0L), 1.25 * ranges / sqrt(5))
+  expect_true(width_two$sparse)
+  expect_equal(width_two$tree$objective, width_two$dense$objective,
+               tolerance = 2e-11)
+})
+
 test_that("full-support owner is objective-method neutral", {
   old <- options(np.messages = FALSE, np.largeh = TRUE,
                  np.macMseries.accelerate = FALSE)

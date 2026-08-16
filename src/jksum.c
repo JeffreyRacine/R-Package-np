@@ -33,6 +33,7 @@
 #include "beta_bandwidth.h"
 #include "beta_scaled_row.h"
 #include "reghat_fast.h"
+#include "tree_capability.h"
 
 #include "hash.h"
 #include "tree.h"
@@ -14650,7 +14651,56 @@ static int np_reg_fixed_tree_dense_high_occupancy_admitted(
  * policy.  This is an arithmetic capability check, not a timed crossover:
  * any dimension that is uncertain retains the tree.
  */
-#if NP_ACCEL_GAUSS_COMPILED
+static NPTreeCapability np_fixed_tree_capability_from_common_root(
+    const int bandwidth_mode,
+    const int num_reg_continuous,
+    const KDT *tree,
+    const int *kernel_c,
+    const int *operator,
+    double * const *matrix_bandwidth)
+{
+  NPTreeCapability capability = NP_TREE_CANNOT_PRUNE;
+  int coordinate;
+
+  if(bandwidth_mode != BW_FIXED || num_reg_continuous <= 0 ||
+     tree == NULL || tree->kdn == NULL || tree->numnode <= 0 ||
+     tree->kdn[0].bb == NULL || tree->ndim < num_reg_continuous ||
+     kernel_c == NULL || operator == NULL || matrix_bandwidth == NULL)
+    return NP_TREE_CAPABILITY_UNKNOWN;
+
+  for(coordinate = 0; coordinate < num_reg_continuous; ++coordinate) {
+    const int operation = operator[coordinate];
+    int effective_kernel;
+    NPPruneSupportDescriptor support;
+    NPTreeCoordinateEnvelope envelope;
+
+    if(operation < OP_NORMAL || operation > OP_INTEGRAL ||
+       kernel_c[coordinate] < 0 || kernel_c[coordinate] >= 10 ||
+       matrix_bandwidth[coordinate] == NULL)
+      return NP_TREE_CAPABILITY_UNKNOWN;
+
+    effective_kernel = kernel_c[coordinate] +
+      OP_CFUN_OFFSETS[operation];
+    support = np_prune_support_descriptor(
+      effective_kernel,
+      cksup[effective_kernel][0],
+      cksup[effective_kernel][1]);
+    envelope.train_min = tree->kdn[0].bb[2*coordinate];
+    envelope.train_max = tree->kdn[0].bb[2*coordinate + 1];
+    envelope.eval_min = envelope.train_min;
+    envelope.eval_max = envelope.train_max;
+    capability = np_tree_capability_combine(
+      capability,
+      np_tree_fixed_coordinate_capability(
+        support, matrix_bandwidth[coordinate][0], envelope));
+    if(capability == NP_TREE_CAPABILITY_UNKNOWN ||
+       capability == NP_TREE_CAN_PRUNE_ZERO_SUPPORT)
+      return capability;
+  }
+
+  return capability;
+}
+
 static int np_reg_fixed_tree_dense_full_support_admitted(
     const int nterms,
     const int bandwidth_mode,
@@ -14664,8 +14714,6 @@ static int np_reg_fixed_tree_dense_full_support_admitted(
     const int *operator,
     double * const *matrix_bandwidth)
 {
-  int l;
-
   /*
    * Width two is the sole retained full-support tree topology.  Powered
    * Apple-on, Apple-off, and portable evidence shows that its resident tree
@@ -14689,34 +14737,14 @@ static int np_reg_fixed_tree_dense_full_support_admitted(
      (matrix_bandwidth == NULL))
     return 0;
 
-  for(l = 0; l < num_reg_continuous; l++){
-    const int kc = kernel_c[l];
-    double xmin, xmax, h, support_lower, support_upper, range;
-
-    if((kc < 0) || (kc >= OP_NCFUN) ||
-       (matrix_bandwidth[l] == NULL))
-      return 0;
-
-    support_lower = cksup[kc][0];
-    support_upper = cksup[kc][1];
-    h = matrix_bandwidth[l][0];
-    xmin = tree->kdn[0].bb[2*l];
-    xmax = tree->kdn[0].bb[2*l + 1];
-    if((!isfinite(h)) || (h <= 0.0) || (!isfinite(xmin)) ||
-       (!isfinite(xmax)) ||
-       (!isfinite(support_lower)) || (!isfinite(support_upper)) ||
-       !(support_lower < 0.0) || !(support_upper > 0.0))
-      return 0;
-
-    range = xmax - xmin;
-    if((!isfinite(range)) || (range < 0.0) ||
-       (range > h*support_upper) || (range > -h*support_lower))
-      return 0;
-  }
-
-  return 1;
+  return np_fixed_tree_capability_from_common_root(
+    bandwidth_mode,
+    num_reg_continuous,
+    tree,
+    kernel_c,
+    operator,
+    matrix_bandwidth) == NP_TREE_CANNOT_PRUNE;
 }
-#endif
 
 static inline double np_lp_sparse_okernel_noop(const int kernel,
                                                 const double x,
@@ -17002,7 +17030,6 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
   int ks_tree_use_active = ks_tree_use;
   if(dense_high_occupancy_admitted)
     ks_tree_use_active = 0;
-#if NP_ACCEL_GAUSS_COMPILED
   else if(ks_tree_use_active &&
      np_reg_fixed_tree_dense_full_support_admitted(glp_nterms,
                                                     BANDWIDTH_reg,
@@ -17016,7 +17043,6 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
                                                     operator,
                                                     matrix_bandwidth))
     ks_tree_use_active = 0;
-#endif
 
   {
     const int use_canonical_lp_kernel =
@@ -17064,7 +17090,7 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
                                                    matrix_bandwidth,
                                                    glp_nterms,
                                                    basis,
-                                                   ks_tree_use);
+                                                   ks_tree_use_active);
       goto cleanup_lp_cv;
     }
 
@@ -17875,7 +17901,6 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
    * Root bounds already owned by the prepared tree make this an O(p),
    * allocation-free certificate shared by scalar and general LP routes.
    */
-#if NP_ACCEL_GAUSS_COMPILED
   if((lp_engine == NP_LP_ENGINE_SCALAR) && ks_tree_use &&
      np_reg_fixed_tree_dense_full_support_admitted(1,
                                                     BANDWIDTH_reg,
@@ -17889,7 +17914,6 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                                                     operator,
                                                     matrix_bandwidth))
     ks_tree_use = 0;
-#endif
 
   if(lp_engine == NP_LP_ENGINE_GENERAL){
     NPRegCvLpResult lp_result = np_regression_cv_lp_objective(bwm,
