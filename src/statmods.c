@@ -402,138 +402,195 @@ int is_valid_unordered_bw(double lambda,
   return ((lambda >= 0.0) && (lambda <= max_unordered_bw(num_categories, kernel)));
 }
 
-static int build_sorted_unique_support(int n,
-                                       const double *vector_data,
-                                       double **support_out,
-                                       int **support_count_out,
-                                       int *support_n_out)
+static int build_sorted_observation_support(int n,
+                                            const double *vector_data,
+                                            double **sorted_out)
 {
-  int i, m;
-  double *support;
-  int *support_count;
+  double *sorted;
+  int i;
 
-  support = alloc_vecd(n);
-  support_count = NULL;
-
-  if (support_count_out != NULL)
-    support_count = alloc_vecu(n);
-
+  if (n <= 0 || vector_data == NULL || sorted_out == NULL)
+    return 1;
+  sorted = alloc_vecd(n);
   for (i = 0; i < n; i++)
-    support[i] = vector_data[i];
-
-  sort_safe(n, support);
-
-  m = 0;
-  for (i = 0; i < n; i++) {
-    if ((m == 0) || (support[i] != support[m - 1])) {
-      support[m] = support[i];
-      if (support_count != NULL)
-        support_count[m] = 1;
-      m++;
-    } else if (support_count != NULL) {
-      support_count[m - 1]++;
-    }
-  }
-
-  *support_out = support;
-  if (support_count_out != NULL)
-    *support_count_out = support_count;
-  *support_n_out = m;
-
+    sorted[i] = vector_data[i];
+  sort_safe(n, sorted);
+  *sorted_out = sorted;
   return 0;
 }
 
-static int find_support_index(int support_n,
-                              const double *support,
-                              double value)
+static int lower_bound_observation_support(int n,
+                                           const double *sorted,
+                                           double value)
 {
-  int lo, hi;
+  int lo = 0;
+  int hi = n;
+  while (lo < hi) {
+    const int mid = lo + (hi - lo) / 2;
+    if (sorted[mid] < value)
+      lo = mid + 1;
+    else
+      hi = mid;
+  }
+  return lo;
+}
 
-  lo = 0;
-  hi = support_n - 1;
+static int upper_bound_observation_support(int n,
+                                           const double *sorted,
+                                           double value)
+{
+  int lo = 0;
+  int hi = n;
+  while (lo < hi) {
+    const int mid = lo + (hi - lo) / 2;
+    if (!(value < sorted[mid]))
+      lo = mid + 1;
+    else
+      hi = mid;
+  }
+  return lo;
+}
+
+static double adaptive_left_distance(const double *sorted,
+                                     int position,
+                                     int index)
+{
+  return sorted[position] - sorted[position - 1 - index];
+}
+
+static double adaptive_right_distance(const double *sorted,
+                                      int position,
+                                      int index)
+{
+  return sorted[position + 1 + index] - sorted[position];
+}
+
+static double generalized_left_distance(const double *sorted,
+                                        int split,
+                                        double eval_value,
+                                        int index)
+{
+  return eval_value - sorted[split - 1 - index];
+}
+
+static double generalized_right_distance(const double *sorted,
+                                         int split,
+                                         double eval_value,
+                                         int index)
+{
+  return sorted[split + index] - eval_value;
+}
+
+/*
+ * Select the k-th member of two nondecreasing distance sequences without
+ * materializing their merge.  A valid partition takes k elements in total
+ * and leaves every selected boundary no larger than either unselected
+ * boundary.  The adaptive sequences omit exactly the focal observation;
+ * duplicate observations remain separate sequence members and therefore
+ * retain observation-count NN semantics.
+ */
+static int kth_observation_radius_sorted_adaptive(const double *sorted,
+                                                  int n,
+                                                  int position,
+                                                  int int_k_nn,
+                                                  double *radius_out)
+{
+  const int left_n = position;
+  const int right_n = n - position - 1;
+  int lo = (int_k_nn > right_n) ? int_k_nn - right_n : 0;
+  int hi = (int_k_nn < left_n) ? int_k_nn : left_n;
 
   while (lo <= hi) {
-    const int mid = lo + (hi - lo) / 2;
+    const int take_left = lo + (hi - lo) / 2;
+    const int take_right = int_k_nn - take_left;
+    const double left_before = (take_left > 0) ?
+      adaptive_left_distance(sorted, position, take_left - 1) : -INFINITY;
+    const double left_after = (take_left < left_n) ?
+      adaptive_left_distance(sorted, position, take_left) : INFINITY;
+    const double right_before = (take_right > 0) ?
+      adaptive_right_distance(sorted, position, take_right - 1) : -INFINITY;
+    const double right_after = (take_right < right_n) ?
+      adaptive_right_distance(sorted, position, take_right) : INFINITY;
 
-    if (support[mid] == value)
-      return mid;
-
-    if (support[mid] < value) {
-      lo = mid + 1;
+    if (left_before > right_after) {
+      hi = take_left - 1;
+    } else if (right_before > left_after) {
+      lo = take_left + 1;
     } else {
-      hi = mid - 1;
-    }
-  }
-
-  return -1;
-}
-
-static int nearest_positive_radius_from_support(int support_n,
-                                                const double *support,
-                                                int center_idx,
-                                                double *radius_out)
-{
-  const double dleft =
-    (center_idx > 0) ? (support[center_idx] - support[center_idx - 1]) : DBL_MAX;
-  const double dright =
-    (center_idx + 1 < support_n) ? (support[center_idx + 1] - support[center_idx]) : DBL_MAX;
-  const double distance = (dleft < dright) ? dleft : dright;
-
-  if (distance <= DBL_MIN)
-    return 1;
-
-  *radius_out = distance;
-  return 0;
-}
-
-static int kth_observation_radius_from_support(int support_n,
-                                               const double *support,
-                                               const int *support_count,
-                                               int center_idx,
-                                               int int_k_nn,
-                                               double *radius_out)
-{
-  int left, right, count;
-
-  left = center_idx - 1;
-  right = center_idx + 1;
-  count = support_count[center_idx] - 1;
-
-  if (count >= int_k_nn)
-    return nearest_positive_radius_from_support(support_n, support, center_idx, radius_out);
-
-  while ((left >= 0) || (right < support_n)) {
-    double dleft = DBL_MAX;
-    double dright = DBL_MAX;
-    double distance;
-
-    if (left >= 0)
-      dleft = support[center_idx] - support[left];
-    if (right < support_n)
-      dright = support[right] - support[center_idx];
-
-    distance = (dleft < dright) ? dleft : dright;
-
-    if (distance <= DBL_MIN)
-      return 1;
-
-    if ((left >= 0) && ((support[center_idx] - support[left]) == distance)) {
-      count += support_count[left];
-      left--;
-    }
-
-    if ((right < support_n) && ((support[right] - support[center_idx]) == distance)) {
-      count += support_count[right];
-      right++;
-    }
-
-    if (count >= int_k_nn) {
-      *radius_out = distance;
+      *radius_out = (left_before > right_before) ? left_before : right_before;
       return 0;
     }
   }
-
   return 1;
+}
+
+static int kth_observation_radius_sorted_generalized(const double *sorted,
+                                                     int n,
+                                                     int split,
+                                                     double eval_value,
+                                                     int int_k_nn,
+                                                     double *radius_out)
+{
+  const int left_n = split;
+  const int right_n = n - split;
+  int lo = (int_k_nn > right_n) ? int_k_nn - right_n : 0;
+  int hi = (int_k_nn < left_n) ? int_k_nn : left_n;
+
+  while (lo <= hi) {
+    const int take_left = lo + (hi - lo) / 2;
+    const int take_right = int_k_nn - take_left;
+    const double left_before = (take_left > 0) ?
+      generalized_left_distance(sorted, split, eval_value, take_left - 1) : -INFINITY;
+    const double left_after = (take_left < left_n) ?
+      generalized_left_distance(sorted, split, eval_value, take_left) : INFINITY;
+    const double right_before = (take_right > 0) ?
+      generalized_right_distance(sorted, split, eval_value, take_right - 1) : -INFINITY;
+    const double right_after = (take_right < right_n) ?
+      generalized_right_distance(sorted, split, eval_value, take_right) : INFINITY;
+
+    if (left_before > right_after) {
+      hi = take_left - 1;
+    } else if (right_before > left_after) {
+      lo = take_left + 1;
+    } else {
+      *radius_out = (left_before > right_before) ? left_before : right_before;
+      return 0;
+    }
+  }
+  return 1;
+}
+
+static int kth_observation_radius_for_eval_sorted(const double *sorted,
+                                                  int n,
+                                                  double eval_value,
+                                                  int int_k_nn,
+                                                  double *radius_out)
+{
+  const int split = lower_bound_observation_support(n, sorted, eval_value);
+  double nearest;
+  int status;
+
+  if (split < n && sorted[split] == eval_value) {
+    const int stop = upper_bound_observation_support(n, sorted, eval_value);
+    const double dleft = (split > 0) ? eval_value - sorted[split - 1] : DBL_MAX;
+    const double dright = (stop < n) ? sorted[stop] - eval_value : DBL_MAX;
+    nearest = (dleft < dright) ? dleft : dright;
+  } else {
+    const double dleft = (split > 0) ? eval_value - sorted[split - 1] : DBL_MAX;
+    const double dright = (split < n) ? sorted[split] - eval_value : DBL_MAX;
+    nearest = (dleft < dright) ? dleft : dright;
+  }
+  if (nearest <= DBL_MIN)
+    return 1;
+
+  status = kth_observation_radius_sorted_generalized(
+    sorted, n, split, eval_value, int_k_nn, radius_out);
+  /* Preserve the incumbent nearest-positive rule when duplicate mass fills k. */
+  if (status == 0 && *radius_out <= DBL_MIN)
+    *radius_out = nearest;
+  if (status == 0 && !isfinite(*radius_out))
+    return 1;
+  return status;
 }
 
 static int compute_nn_distance_observation_support_subset(int num_obs,
@@ -543,14 +600,9 @@ static int compute_nn_distance_observation_support_subset(int num_obs,
                                                           int query_end,
                                                           double *nn_distance)
 {
-  int i, j, support_n;
-  double *support;
-  int *support_count;
-  double *support_radius;
-
-  support = NULL;
-  support_count = NULL;
-  support_radius = NULL;
+  int i, j, start;
+  double *sorted = NULL;
+  double *sorted_radius = NULL;
 
   if (query_start > query_end)
     return 0;
@@ -558,143 +610,64 @@ static int compute_nn_distance_observation_support_subset(int num_obs,
   if ((query_start < 0) || (query_end >= num_obs))
     return 1;
 
-  if (build_sorted_unique_support(num_obs, vector_data, &support, &support_count, &support_n) != 0)
+  if (build_sorted_observation_support(num_obs, vector_data, &sorted) != 0)
     return 1;
 
   if ((int_k_nn < 1) || (int_k_nn > num_obs - 1)) {
-    free(support);
-    if (support_count != NULL)
-      free(support_count);
+    free(sorted);
     return 1;
   }
 
-  support_radius = alloc_vecd(support_n);
+  sorted_radius = alloc_vecd(num_obs);
+  start = 0;
+  while (start < num_obs) {
+    const int stop = upper_bound_observation_support(num_obs, sorted, sorted[start]);
+    const double dleft = (start > 0) ? sorted[start] - sorted[start - 1] : DBL_MAX;
+    const double dright = (stop < num_obs) ? sorted[stop] - sorted[start] : DBL_MAX;
+    const double nearest = (dleft < dright) ? dleft : dright;
+    double radius;
 
-  for (i = 0; i < support_n; i++) {
-    if (kth_observation_radius_from_support(
-          support_n,
-          support,
-          support_count,
-          i,
-          int_k_nn,
-          &support_radius[i]
-        ) != 0) {
-      free(support);
-      free(support_count);
-      free(support_radius);
+    if (nearest <= DBL_MIN ||
+        kth_observation_radius_sorted_adaptive(
+          sorted, num_obs, start, int_k_nn, &radius) != 0) {
+      free(sorted);
+      free(sorted_radius);
       return 1;
     }
+    /* All observations in a duplicate block have the same self-excluded radius. */
+    if (radius <= DBL_MIN)
+      radius = nearest;
+    if (!isfinite(radius)) {
+      free(sorted);
+      free(sorted_radius);
+      return 1;
+    }
+    for (i = start; i < stop; i++)
+      sorted_radius[i] = radius;
+    start = stop;
   }
 
   for (i = query_start, j = 0; i <= query_end; i++, j++) {
-    const int idx = find_support_index(support_n, support, vector_data[i]);
+    const int idx = lower_bound_observation_support(num_obs, sorted, vector_data[i]);
 
-    if (idx < 0) {
-      free(support);
-      free(support_count);
-      free(support_radius);
+    if (idx >= num_obs || sorted[idx] != vector_data[i]) {
+      free(sorted);
+      free(sorted_radius);
       return 1;
     }
 
-    nn_distance[j] = support_radius[idx];
+    nn_distance[j] = sorted_radius[idx];
     if (nn_distance[j] <= DBL_MIN) {
-      free(support);
-      free(support_count);
-      free(support_radius);
+      free(sorted);
+      free(sorted_radius);
       return 1;
     }
   }
 
-  free(support);
-  free(support_count);
-  free(support_radius);
+  free(sorted);
+  free(sorted_radius);
 
   return 0;
-}
-
-static int lower_bound_support(int support_n,
-                               const double *support,
-                               double value)
-{
-  int lo, hi;
-
-  lo = 0;
-  hi = support_n;
-
-  while (lo < hi) {
-    const int mid = lo + (hi - lo) / 2;
-
-    if (support[mid] < value) {
-      lo = mid + 1;
-    } else {
-      hi = mid;
-    }
-  }
-
-  return lo;
-}
-
-static int kth_observation_radius_for_eval_from_support(int support_n,
-                                                        const double *support,
-                                                        const int *support_count,
-                                                        double eval_value,
-                                                        int int_k_nn,
-                                                        double *radius_out)
-{
-  int left, right, count;
-  int insert_idx;
-  int exact_match;
-
-  insert_idx = lower_bound_support(support_n, support, eval_value);
-  exact_match = ((insert_idx < support_n) && (support[insert_idx] == eval_value));
-
-  if (exact_match) {
-    left = insert_idx - 1;
-    right = insert_idx + 1;
-    count = support_count[insert_idx];
-  } else {
-    left = insert_idx - 1;
-    right = insert_idx;
-    count = 0;
-  }
-
-  if (count >= int_k_nn) {
-    if (exact_match)
-      return nearest_positive_radius_from_support(support_n, support, insert_idx, radius_out);
-    return 1;
-  }
-
-  while ((left >= 0) || (right < support_n)) {
-    double dleft = DBL_MAX;
-    double dright = DBL_MAX;
-    double distance;
-
-    if (left >= 0)
-      dleft = eval_value - support[left];
-    if (right < support_n)
-      dright = support[right] - eval_value;
-
-    distance = (dleft < dright) ? dleft : dright;
-
-    if (distance <= DBL_MIN)
-      return 1;
-
-    if ((left >= 0) && ((eval_value - support[left]) == distance)) {
-      count += support_count[left];
-      left--;
-    }
-    if ((right < support_n) && ((support[right] - eval_value) == distance)) {
-      count += support_count[right];
-      right++;
-    }
-
-    if (count >= int_k_nn) {
-      *radius_out = distance;
-      return 0;
-    }
-  }
-
-  return 1;
 }
 
 static int compute_nn_distance_train_eval_observation_support_subset(int num_obs_train,
@@ -706,12 +679,8 @@ static int compute_nn_distance_train_eval_observation_support_subset(int num_obs
                                                                      int query_end,
                                                                      double *nn_distance)
 {
-  int i, j, support_n;
-  double *support;
-  int *support_count;
-
-  support = NULL;
-  support_count = NULL;
+  int i, j;
+  double *sorted = NULL;
 
   if (query_start > query_end)
     return 0;
@@ -719,27 +688,24 @@ static int compute_nn_distance_train_eval_observation_support_subset(int num_obs
   if ((query_start < 0) || (query_end >= num_obs_eval))
     return 1;
 
-  if (build_sorted_unique_support(num_obs_train, vector_data_train, &support, &support_count, &support_n) != 0)
+  if (build_sorted_observation_support(num_obs_train, vector_data_train, &sorted) != 0)
     return 1;
 
   if ((int_k_nn < 1) || (int_k_nn > num_obs_train - 1)) {
-    free(support);
-    free(support_count);
+    free(sorted);
     return 1;
   }
 
   for (i = query_start, j = 0; i <= query_end; i++, j++) {
-    if (kth_observation_radius_for_eval_from_support(
-          support_n, support, support_count, vector_data_eval[i], int_k_nn, &nn_distance[j]
+    if (kth_observation_radius_for_eval_sorted(
+          sorted, num_obs_train, vector_data_eval[i], int_k_nn, &nn_distance[j]
         ) != 0) {
-      free(support);
-      free(support_count);
+      free(sorted);
       return 1;
     }
   }
 
-  free(support);
-  free(support_count);
+  free(sorted);
   return 0;
 }
 
@@ -805,7 +771,9 @@ int int_k_nn, double *nn_distance)
     if (compute_nn_distance_observation_support_subset(num_obs, vector_data, int_k_nn, is, ie, nn_distance) != 0)
         return_flag_MPI = 1;
 
-    if(!suppress_parallel){
+    if(suppress_parallel){
+      return_flag = return_flag_MPI;
+    } else {
       MPI_Reduce(&return_flag_MPI, &return_flag, 1, MPI_INT, MPI_SUM, 0, comm[1]);
       MPI_Bcast(&return_flag, 1, MPI_INT, 0, comm[1]);
     }
@@ -900,7 +868,9 @@ int compute_nn_distance_train_eval(int num_obs_train,
         ) != 0)
       return_flag_MPI = 1;
 
-    if(!suppress_parallel){
+    if(suppress_parallel){
+      return_flag = return_flag_MPI;
+    } else {
       MPI_Reduce(&return_flag_MPI, &return_flag, 1, MPI_INT, MPI_SUM, 0, comm[1]);
       MPI_Bcast(&return_flag, 1, MPI_INT, 0, comm[1]);
     }
