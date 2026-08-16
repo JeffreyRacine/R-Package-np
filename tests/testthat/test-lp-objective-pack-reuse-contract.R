@@ -27,14 +27,19 @@ test_that("generic LP objectives reuse only a matching immutable outer pack", {
   expect_match(source, "if\\(blas_Apack_owned != NULL\\) free\\(blas_Apack_owned\\)")
 })
 
-test_that("objective pack reuse is scoped away from adaptive, tree, and reduced rows", {
+test_that("objective pack reuse is scoped away from adaptive, live-tree, and reduced rows", {
   src_file <- locate_objective_pack_source()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable")
   source <- paste(readLines(src_file, warn = FALSE), collapse = "\n")
 
   expect_match(
     source,
-    "if\\(\\(BANDWIDTH_reg != BW_ADAP_NN\\) &&\\s*!ks_tree_use &&\\s*np_reg_cv_use_symmetric_dropone_path"
+    paste0(
+      "if\\(\\(BANDWIDTH_reg != BW_ADAP_NN\\) &&\\s*",
+      "\\(\\(!ks_tree_use\\) \\|\\| dense_high_occupancy_admitted\\) &&\\s*",
+      "np_reg_cv_use_symmetric_dropone_path\\(bwm,\\s*",
+      "ks_tree_use_active,"
+    )
   )
   expect_match(
     source,
