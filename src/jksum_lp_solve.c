@@ -270,8 +270,7 @@ int np_lp_solve_workspace_solve_factored(NPLPSolveWorkspace *workspace,
 /*
  * Select the factor/ridge state from the Gram system alone.  Response shape
  * and magnitude must not choose a different statistical regularization.  The
- * retained LU is consumed by both response and, in the next checkpoint,
- * adjoint solves.
+ * retained LU is consumed by both response and adjoint solves.
  */
 static int np_lp_solve_workspace_factor(NPLPSolveWorkspace *workspace,
                                         int p)
@@ -313,12 +312,12 @@ static int np_lp_solve_workspace_factor(NPLPSolveWorkspace *workspace,
   return 1;
 }
 
-NPLPResponseSolveStatus np_lp_solve_workspace_solve_response(
+static NPLPSolvePolicyStatus np_lp_solve_workspace_prepare_policy_factor(
   NPLPSolveWorkspace *workspace,
   int p,
   int nrhs,
   double ridge_increment,
-  NPLPResponseSolveDiagnostics *diagnostics)
+  NPLPSolvePolicyDiagnostics *diagnostics)
 {
   double ridge_total = 0.0;
   int ridge_steps = 0;
@@ -331,15 +330,15 @@ NPLPResponseSolveStatus np_lp_solve_workspace_solve_response(
 
   if(!np_lp_solve_workspace_shape(workspace, p, nrhs, NULL, NULL) ||
      !R_FINITE(ridge_increment) || (ridge_increment <= 0.0))
-    return NP_LP_RESPONSE_SOLVE_INVALID;
+    return NP_LP_SOLVE_POLICY_INVALID;
   if(!np_lp_solve_workspace_sources_finite(workspace, p, nrhs))
-    return NP_LP_RESPONSE_SOLVE_NONFINITE;
+    return NP_LP_SOLVE_POLICY_NONFINITE;
 
   while(!np_lp_solve_workspace_factor(workspace, p)){
     if(ridge_steps >= NP_LP_SOLVE_MAX_RIDGE_STEPS)
-      return NP_LP_RESPONSE_SOLVE_RIDGE_EXHAUSTED;
+      return NP_LP_SOLVE_POLICY_RIDGE_EXHAUSTED;
     if(!np_lp_solve_workspace_sources_finite(workspace, p, nrhs))
-      return NP_LP_RESPONSE_SOLVE_NONFINITE;
+      return NP_LP_SOLVE_POLICY_NONFINITE;
 
     for(i = 0; i < p; i++)
       workspace->gram_source[i + i*p] += ridge_increment;
@@ -351,7 +350,27 @@ NPLPResponseSolveStatus np_lp_solve_workspace_solve_response(
     }
   }
 
-  if(ridge_total > 0.0){
+  return NP_LP_SOLVE_POLICY_OK;
+}
+
+NPLPSolvePolicyStatus np_lp_solve_workspace_solve_response(
+  NPLPSolveWorkspace *workspace,
+  int p,
+  int nrhs,
+  double ridge_increment,
+  NPLPSolvePolicyDiagnostics *diagnostics)
+{
+  NPLPSolvePolicyDiagnostics local_diagnostics;
+  NPLPSolvePolicyDiagnostics * const policy_diagnostics =
+    (diagnostics != NULL) ? diagnostics : &local_diagnostics;
+  const NPLPSolvePolicyStatus factor_status =
+    np_lp_solve_workspace_prepare_policy_factor(
+      workspace, p, nrhs, ridge_increment, policy_diagnostics);
+
+  if(factor_status != NP_LP_SOLVE_POLICY_OK)
+    return factor_status;
+
+  if(policy_diagnostics->ridge_total > 0.0){
     const double denominator =
       (workspace->gram_source[0] > DBL_EPSILON) ?
       workspace->gram_source[0] : DBL_EPSILON;
@@ -359,18 +378,58 @@ NPLPResponseSolveStatus np_lp_solve_workspace_solve_response(
 
     for(rhs = 0; rhs < nrhs; rhs++){
       double * const intercept = workspace->rhs_source + (size_t)rhs*(size_t)p;
-      *intercept += ridge_total*(*intercept)/denominator;
+      *intercept += policy_diagnostics->ridge_total*(*intercept)/denominator;
     }
-
   }
 
   if(!np_lp_solve_workspace_solve_factored(workspace, p, nrhs)){
     if(!np_lp_solve_workspace_sources_finite(workspace, p, nrhs))
-      return NP_LP_RESPONSE_SOLVE_NONFINITE;
-    return NP_LP_RESPONSE_SOLVE_FINAL_FAILED;
+      return NP_LP_SOLVE_POLICY_NONFINITE;
+    return NP_LP_SOLVE_POLICY_FINAL_FAILED;
   }
 
-  return NP_LP_RESPONSE_SOLVE_OK;
+  return NP_LP_SOLVE_POLICY_OK;
+}
+
+NPLPSolvePolicyStatus np_lp_solve_workspace_solve_adjoint(
+  NPLPSolveWorkspace *workspace,
+  int p,
+  int nrhs,
+  double ridge_increment,
+  NPLPSolvePolicyDiagnostics *diagnostics)
+{
+  NPLPSolvePolicyDiagnostics local_diagnostics;
+  NPLPSolvePolicyDiagnostics * const policy_diagnostics =
+    (diagnostics != NULL) ? diagnostics : &local_diagnostics;
+  const NPLPSolvePolicyStatus factor_status =
+    np_lp_solve_workspace_prepare_policy_factor(
+      workspace, p, nrhs, ridge_increment, policy_diagnostics);
+
+  if(factor_status != NP_LP_SOLVE_POLICY_OK)
+    return factor_status;
+  if(!np_lp_solve_workspace_solve_factored(workspace, p, nrhs)){
+    if(!np_lp_solve_workspace_sources_finite(workspace, p, nrhs))
+      return NP_LP_SOLVE_POLICY_NONFINITE;
+    return NP_LP_SOLVE_POLICY_FINAL_FAILED;
+  }
+
+  if(policy_diagnostics->ridge_total > 0.0){
+    const double denominator =
+      (workspace->gram_source[0] > DBL_EPSILON) ?
+      workspace->gram_source[0] : DBL_EPSILON;
+    const double intercept_scale =
+      1.0 + policy_diagnostics->ridge_total/denominator;
+    int rhs;
+
+    for(rhs = 0; rhs < nrhs; rhs++){
+      double * const intercept = workspace->rhs_work + (size_t)rhs*(size_t)p;
+      *intercept *= intercept_scale;
+      if(!R_FINITE(*intercept))
+        return NP_LP_SOLVE_POLICY_FINAL_FAILED;
+    }
+  }
+
+  return NP_LP_SOLVE_POLICY_OK;
 }
 
 /*

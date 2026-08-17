@@ -28202,7 +28202,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
                                             1,
                                             epsilon,
                                             NULL) !=
-       NP_LP_RESPONSE_SOLVE_OK) {
+       NP_LP_SOLVE_POLICY_OK) {
       execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_SOLVE;
       return R_NilValue;
     }
@@ -30163,7 +30163,6 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
   for(i = 0; i < num_eval; i++){
     const int which_var = deriv_var - 1;
     const double epsilon = 1.0/(double)MAX(1, num_train);
-    double nepsilon = 0.0;
     if(out2 != NULL)
       memset(out2, 0,
              (size_t)np_glp_cv_cache.nterms*
@@ -30235,7 +30234,7 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
                                  vector_cxkerlb_extern,
                                  vector_cxkerub_extern,
                                  &bounds_state);
-      if(np_conditional_kernel_row_raw(kernel_cx,
+      if(np_conditional_kernel_row(kernel_cx,
                                             kernel_ux,
                                             kernel_ox,
                                             x_operator,
@@ -30331,35 +30330,13 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
           out2[base + j];
     }
 
-    {
-      int ridge_steps = 0;
-      while(!np_lp_solve_workspace_solve(&solve_workspace,
-                                         np_glp_cv_cache.nterms,
-                                         1)){
-        if((ridge_steps >= NP_LP_SOLVE_MAX_RIDGE_STEPS) ||
-           !np_lp_solve_workspace_sources_finite(
-             &solve_workspace,
-             np_glp_cv_cache.nterms,
-             1))
-          goto cleanup_lp_hat;
-        for(l = 0; l < np_glp_cv_cache.nterms; l++)
-          solve_workspace.gram_source[
-            l+l*np_glp_cv_cache.nterms
-          ] += epsilon;
-        nepsilon += epsilon;
-        ridge_steps++;
-      }
-    }
-
-    if(nepsilon > 0.0){
-      solve_workspace.rhs_source[0] +=
-        nepsilon*solve_workspace.rhs_source[0]/
-        NZD_POS(solve_workspace.gram_source[0]);
-      if(!np_lp_solve_workspace_solve(&solve_workspace,
-                                      np_glp_cv_cache.nterms,
-                                      1))
-        goto cleanup_lp_hat;
-    }
+    if(np_lp_solve_workspace_solve_adjoint(&solve_workspace,
+                                           np_glp_cv_cache.nterms,
+                                           1,
+                                           epsilon,
+                                           NULL) !=
+       NP_LP_SOLVE_POLICY_OK)
+      goto cleanup_lp_hat;
 
     for(j = 0; j < num_train; j++){
       double zju = 0.0;
@@ -31066,7 +31043,7 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
   int *kernel_cx = NULL, *kernel_ux = NULL, *kernel_ox = NULL, *x_operator = NULL;
   double *vsfx = NULL, *lambdax = NULL;
   double *kw = NULL, *hat_block = NULL;
-  double **matrix_bandwidth_x = NULL;
+  double **matrix_bandwidth_x = NULL, **matrix_bandwidth_eval_one = NULL;
   double **TCON = NULL, **TUNO = NULL, **TORD = NULL;
   NPLPSolveWorkspace solve_workspace;
   NPReghatLPWorkspace reghat_workspace;
@@ -31129,6 +31106,8 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
     kw = alloc_vecd(MAX(1, num_train));
   matrix_bandwidth_x = alloc_tmatd(bw_rows, num_reg_continuous_extern);
   if(kernel_route == NULL) {
+    matrix_bandwidth_eval_one =
+      alloc_tmatd(1, num_reg_continuous_extern);
     TCON = alloc_matd(1, num_reg_continuous_extern);
     TUNO = alloc_matd(1, num_reg_unordered_extern);
     TORD = alloc_matd(1, num_reg_ordered_extern);
@@ -31143,7 +31122,7 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
      (kernel_route != NULL && kw == NULL) ||
      ((num_reg_continuous_extern > 0) && (matrix_bandwidth_x == NULL)) ||
      ((kernel_route == NULL && num_reg_continuous_extern > 0) &&
-      TCON == NULL) ||
+      (matrix_bandwidth_eval_one == NULL || TCON == NULL)) ||
      ((kernel_route == NULL && num_reg_unordered_extern > 0) &&
       TUNO == NULL) ||
      ((kernel_route == NULL && num_reg_ordered_extern > 0) &&
@@ -31409,10 +31388,13 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
   }
 
   for(j = 0; j < num_eval; j++){
-    double nepsilon = 0.0;
 
-    for(l = 0; l < num_reg_continuous_extern; l++)
+    for(l = 0; l < num_reg_continuous_extern; l++){
       TCON[l][0] = matrix_X_continuous_eval_extern[l][j];
+      matrix_bandwidth_eval_one[l][0] =
+        (BANDWIDTH_den_extern == BW_GEN_NN) ?
+          matrix_bandwidth_x[l][j] : matrix_bandwidth_x[l][0];
+    }
     for(l = 0; l < num_reg_unordered_extern; l++)
       TUNO[l][0] = matrix_X_unordered_eval_extern[l][j];
     for(l = 0; l < num_reg_ordered_extern; l++)
@@ -31460,7 +31442,7 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
                                   vector_scale_factor,
                                   1,
                                   matrix_bandwidth_x,
-                                  matrix_bandwidth_x,
+                                  matrix_bandwidth_eval_one,
                                   lambdax,
                                   num_categories_extern_X,
                                   matrix_categorical_vals_extern_X,
@@ -31484,38 +31466,13 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
         ] = out[base + n_rhs + l];
     }
 
-    {
-      int ridge_steps = 0;
-      while(!np_lp_solve_workspace_solve(&solve_workspace,
-                                         np_glp_cv_cache.nterms,
-                                         n_rhs)){
-        if((ridge_steps >= NP_LP_SOLVE_MAX_RIDGE_STEPS) ||
-           !np_lp_solve_workspace_sources_finite(
-             &solve_workspace,
-             np_glp_cv_cache.nterms,
-             n_rhs))
-          goto cleanup_lp_apply;
-        for(i = 0; i < np_glp_cv_cache.nterms; i++)
-          solve_workspace.gram_source[
-            i+i*np_glp_cv_cache.nterms
-          ] += epsilon;
-        nepsilon += epsilon;
-        ridge_steps++;
-      }
-    }
-
-    if(nepsilon > 0.0){
-      for(int rhs_idx = 0; rhs_idx < n_rhs; rhs_idx++)
-        solve_workspace.rhs_source[
-          rhs_idx*np_glp_cv_cache.nterms
-        ] += nepsilon*solve_workspace.rhs_source[
-          rhs_idx*np_glp_cv_cache.nterms
-        ]/NZD_POS(solve_workspace.gram_source[0]);
-      if(!np_lp_solve_workspace_solve(&solve_workspace,
-                                      np_glp_cv_cache.nterms,
-                                      n_rhs))
-        goto cleanup_lp_apply;
-    }
+    if(np_lp_solve_workspace_solve_response(&solve_workspace,
+                                            np_glp_cv_cache.nterms,
+                                            n_rhs,
+                                            epsilon,
+                                            NULL) !=
+       NP_LP_SOLVE_POLICY_OK)
+      goto cleanup_lp_apply;
 
     if(target_deriv >= 0){
       if(use_bernstein)
@@ -31571,6 +31528,8 @@ cleanup_lp_apply:
   np_reghat_lp_workspace_clear(&reghat_workspace);
   np_beta_scaled_row_context_clear(&beta_row_context);
   if(matrix_bandwidth_x != NULL) free_tmat(matrix_bandwidth_x);
+  if(matrix_bandwidth_eval_one != NULL)
+    free_tmat(matrix_bandwidth_eval_one);
   if((TCON != NULL) && (num_reg_continuous_extern > 0)) free_mat(TCON, num_reg_continuous_extern);
   if((TUNO != NULL) && (num_reg_unordered_extern > 0)) free_mat(TUNO, num_reg_unordered_extern);
   if((TORD != NULL) && (num_reg_ordered_extern > 0)) free_mat(TORD, num_reg_ordered_extern);

@@ -377,7 +377,7 @@ test_that("canonical LP fit and evaluation avoid legacy solve marshalling", {
   expect_false(grepl("SHIFT", helper_body, fixed = TRUE))
 })
 
-test_that("canonical LP hat and apply routes avoid legacy solve marshalling", {
+test_that("canonical LP hat and apply routes share the typed solve policy", {
   src_file <- locate_jksum_c()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
 
@@ -402,7 +402,7 @@ test_that("canonical LP hat and apply routes avoid legacy solve marshalling", {
       helper_body,
       fixed = TRUE
     ))
-    expect_true(grepl(
+    expect_false(grepl(
       "np_lp_solve_workspace_solve(&solve_workspace,",
       helper_body,
       fixed = TRUE
@@ -412,6 +412,36 @@ test_that("canonical LP hat and apply routes avoid legacy solve marshalling", {
     expect_false(grepl("MATRIX XTKY", helper_body, fixed = TRUE))
     expect_false(grepl("DELTA", helper_body, fixed = TRUE))
   }
+  expect_true(grepl(
+    "np_lp_solve_workspace_solve_adjoint(&solve_workspace,",
+    hat_body,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
+    "np_conditional_kernel_row(kernel_cx,",
+    hat_body,
+    fixed = TRUE
+  ))
+  expect_false(grepl(
+    "np_conditional_kernel_row_raw(kernel_cx,",
+    hat_body,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
+    "np_lp_solve_workspace_solve_response(&solve_workspace,",
+    apply_body,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
+    "matrix_bandwidth_eval_one[l][0] =",
+    apply_body,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
+    "matrix_bandwidth_eval_one,",
+    apply_body,
+    fixed = TRUE
+  ))
 })
 
 test_that("conditional LP LOO rows use signed full-row deletion and no QR", {
@@ -754,7 +784,7 @@ test_that("conditional LP all-large retained inverses use bounded workspace stor
   expect_false(grepl("np_mat_bad_rcond_sym(", helper_body, fixed = TRUE))
 })
 
-test_that("canonical LP direct-apply route avoids legacy solve marshalling", {
+test_that("canonical LP direct-apply route uses the typed response solve", {
   src_file <- locate_jksum_c()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
 
@@ -772,7 +802,7 @@ test_that("canonical LP direct-apply route avoids legacy solve marshalling", {
     fixed = TRUE
   ))
   expect_true(grepl(
-    "np_lp_solve_workspace_solve(&solve_workspace,",
+    "np_lp_solve_workspace_solve_response(&solve_workspace,",
     helper_body,
     fixed = TRUE
   ))
