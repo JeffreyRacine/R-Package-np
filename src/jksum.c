@@ -14649,6 +14649,165 @@ static void np_glp_fill_basis_eval_deriv(const int which_var,
   }
 }
 
+#define NP_GLP_RAW_BASIS_MIN_RCOND 1.0e-10
+
+static int np_glp_basis_ctx_array_prepare(
+  const int ncon,
+  const int *degree_vec,
+  const int basis_mode,
+  double **matrix_X_continuous_train,
+  const int num_obs_train,
+  NPGLPBasisCtx **basis_context)
+{
+  NPGLPBasisCtx *context;
+  int coordinate;
+  int observation;
+
+  if(basis_context == NULL)
+    return 0;
+  *basis_context = NULL;
+  if((ncon <= 0) || (degree_vec == NULL) ||
+     (matrix_X_continuous_train == NULL) || (num_obs_train <= 0))
+    return 0;
+
+  context = (NPGLPBasisCtx *)calloc((size_t)ncon, sizeof(NPGLPBasisCtx));
+  if(context == NULL)
+    return 0;
+  for(coordinate = 0; coordinate < ncon; coordinate++){
+    double xmin = matrix_X_continuous_train[coordinate][0];
+    double xmax = xmin;
+
+    for(observation = 1; observation < num_obs_train; observation++){
+      const double value =
+        matrix_X_continuous_train[coordinate][observation];
+      if(value < xmin) xmin = value;
+      if(value > xmax) xmax = value;
+    }
+    if(!np_glp_basis_ctx_init(&context[coordinate],
+                              degree_vec[coordinate],
+                              xmin,
+                              xmax,
+                              basis_mode == 1)){
+      int initialized;
+
+      for(initialized = 0; initialized <= coordinate; initialized++)
+        np_glp_basis_ctx_free(&context[initialized]);
+      free(context);
+      return 0;
+    }
+  }
+  *basis_context = context;
+  return 1;
+}
+
+/*
+ * Select one arithmetic representation for a complete fit invocation.  Raw
+ * polynomial coordinates remain the owner when they are well conditioned;
+ * otherwise the fit and every evaluation/derivative row use the same stable
+ * graded representation.  This is a global change of coordinates in the same
+ * polynomial span, never evaluation-point centering or a solve fallback.
+ */
+static int np_glp_fit_basis_prepare(
+  const int ncon,
+  const int *degree_vec,
+  const int *terms,
+  const int nterms,
+  double **matrix_X_continuous_train,
+  const int num_obs_train,
+  const int public_stable_basis,
+  const int basis_mode,
+  double **basis,
+  NPGLPBasisCtx **basis_context,
+  int *use_stable_basis)
+{
+  int requires_conditioning = 0;
+
+  if((ncon <= 0) || (degree_vec == NULL) ||
+     (terms == NULL) || (nterms <= 0) ||
+     (matrix_X_continuous_train == NULL) || (num_obs_train <= 0) ||
+     (basis == NULL) || (basis_context == NULL) ||
+     (use_stable_basis == NULL))
+    return 0;
+  *basis_context = NULL;
+  *use_stable_basis = 0;
+
+  if(!public_stable_basis){
+    NPLPBasisStatus assessment_status;
+
+    np_glp_fill_basis_raw_train(ncon,
+                                terms,
+                                nterms,
+                                matrix_X_continuous_train,
+                                num_obs_train,
+                                basis);
+    if(nterms == 1)
+      return 1;
+    assessment_status =
+      np_lp_basis_requires_conditioning(basis,
+                                        num_obs_train,
+                                        nterms,
+                                        num_obs_train,
+                                        NP_GLP_RAW_BASIS_MIN_RCOND,
+                                        &requires_conditioning);
+    if(assessment_status != NP_LP_BASIS_OK)
+      return 0;
+    if(!requires_conditioning)
+      return 1;
+  }
+
+  if(!np_glp_basis_ctx_array_prepare(ncon,
+                                     degree_vec,
+                                     basis_mode,
+                                     matrix_X_continuous_train,
+                                     num_obs_train,
+                                     basis_context))
+    return 0;
+  *use_stable_basis = 1;
+  np_glp_fill_basis_train(ncon,
+                          terms,
+                          nterms,
+                          matrix_X_continuous_train,
+                          num_obs_train,
+                          *basis_context,
+                          basis);
+  return 1;
+}
+
+typedef struct {
+  int ncon;
+  const int *degree_vec;
+  const int *terms;
+  int nterms;
+  double **matrix_X_continuous_train;
+  int num_obs_train;
+  int public_stable_basis;
+  int basis_mode;
+  double **basis;
+  NPGLPBasisCtx **basis_context;
+  int *use_stable_basis;
+  int status;
+} NPGLPFitBasisPrepareCall;
+
+static SEXP np_glp_fit_basis_prepare_execute(void *data)
+{
+  NPGLPFitBasisPrepareCall * const call =
+    (NPGLPFitBasisPrepareCall *)data;
+
+  call->status = np_glp_fit_basis_prepare(
+    call->ncon,
+    call->degree_vec,
+    call->terms,
+    call->nterms,
+    call->matrix_X_continuous_train,
+    call->num_obs_train,
+    call->public_stable_basis,
+    call->basis_mode,
+    call->basis,
+    call->basis_context,
+    call->use_stable_basis);
+  return R_NilValue;
+}
+
 typedef struct {
   int ready;
   int use_bernstein;
@@ -14721,7 +14880,6 @@ static int np_glp_cv_cache_prepare(const int lp_engine,
                                    const int num_obs,
                                    const int ncon,
                                    double **matrix_X_continuous_train){
-  int l, i;
   int *terms = NULL;
   int nterms = 0;
   int basis_stride = 0;
@@ -14755,28 +14913,15 @@ static int np_glp_cv_cache_prepare(const int lp_engine,
   }
 
   if(use_bernstein){
-    basis_ctx = (NPGLPBasisCtx *)calloc((size_t)ncon, sizeof(NPGLPBasisCtx));
-    if(basis_ctx == NULL){
+    if(!np_glp_basis_ctx_array_prepare(ncon,
+                                       degree_vec,
+                                       basis_mode,
+                                       matrix_X_continuous_train,
+                                       num_obs,
+                                       &basis_ctx)){
       free_tmat(basis);
       free(terms);
       return 0;
-    }
-    for(l = 0; l < ncon; l++){
-      double xmin = matrix_X_continuous_train[l][0];
-      double xmax = matrix_X_continuous_train[l][0];
-      for(i = 1; i < num_obs; i++){
-        const double xi = matrix_X_continuous_train[l][i];
-        if(xi < xmin) xmin = xi;
-        if(xi > xmax) xmax = xi;
-      }
-      if(!np_glp_basis_ctx_init(&basis_ctx[l], degree_vec[l], xmin, xmax,
-                                basis_mode == 1)){
-        for(i = 0; i <= l; i++) np_glp_basis_ctx_free(&basis_ctx[i]);
-        free(basis_ctx);
-        free_tmat(basis);
-        free(terms);
-        return 0;
-      }
     }
     np_glp_fill_basis_train(ncon, terms, nterms, matrix_X_continuous_train, num_obs, basis_ctx, basis);
   } else {
@@ -14803,7 +14948,6 @@ static int np_glp_cv_cache_prepare_influence_basis(void){
   double **conditioned_basis;
   NPGLPBasisCtx *basis_ctx = NULL;
   const int *degree_vec = vector_glp_degree_extern;
-  int i;
   int l;
   int requires_conditioning = 0;
 
@@ -14843,7 +14987,7 @@ static int np_glp_cv_cache_prepare_influence_basis(void){
                                         np_glp_cv_cache.num_obs,
                                         np_glp_cv_cache.nterms,
                                         np_glp_cv_cache.basis_stride,
-                                        1.0e-10,
+                                        NP_GLP_RAW_BASIS_MIN_RCOND,
                                         &requires_conditioning);
     if(assessment_basis != np_glp_cv_cache.source_basis)
       free_tmat(assessment_basis);
@@ -14875,30 +15019,15 @@ static int np_glp_cv_cache_prepare_influence_basis(void){
    * global change of basis, never evaluation-point centering, and leaves the
    * public basis and all coefficient/derivative owners untouched.
    */
-  basis_ctx = (NPGLPBasisCtx *)calloc((size_t)np_glp_cv_cache.ncon,
-                                      sizeof(NPGLPBasisCtx));
-  if(basis_ctx == NULL){
+  if(!np_glp_basis_ctx_array_prepare(
+       np_glp_cv_cache.ncon,
+       degree_vec,
+       np_glp_cv_cache.basis_mode,
+       np_glp_cv_cache.matrix_X_continuous_train_ptr,
+       np_glp_cv_cache.num_obs,
+       &basis_ctx)){
     free_tmat(conditioned_basis);
     return 0;
-  }
-  for(l = 0; l < np_glp_cv_cache.ncon; l++){
-    double xmin = np_glp_cv_cache.matrix_X_continuous_train_ptr[l][0];
-    double xmax = xmin;
-
-    for(i = 1; i < np_glp_cv_cache.num_obs; i++){
-      const double xi =
-        np_glp_cv_cache.matrix_X_continuous_train_ptr[l][i];
-      if(xi < xmin) xmin = xi;
-      if(xi > xmax) xmax = xi;
-    }
-    if(!np_glp_basis_ctx_init(&basis_ctx[l], degree_vec[l], xmin, xmax,
-                              np_glp_cv_cache.basis_mode == 1)){
-      for(i = 0; i <= l; i++)
-        np_glp_basis_ctx_free(&basis_ctx[i]);
-      free(basis_ctx);
-      free_tmat(conditioned_basis);
-      return 0;
-    }
   }
   np_glp_fill_basis_train(np_glp_cv_cache.ncon,
                           np_glp_cv_cache.terms,
@@ -28515,14 +28644,14 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
   const int num_reg_unordered = call->num_reg_unordered;
   const int num_reg_ordered = call->num_reg_ordered;
   const int num_reg_continuous = call->num_reg_continuous;
-  const int use_bernstein = (int_glp_bernstein_extern != 0);
+  const int public_stable_basis = (int_glp_bernstein_extern != 0);
   const double epsilon = 1.0/(double)MAX(1, num_obs_train);
   const int reuse_fit_kernel_row =
     (BANDWIDTH_reg == BW_FIXED) &&
     (call->tree_enabled != NP_TREE_TRUE) &&
     (num_reg_unordered == 0) &&
     (num_reg_ordered == 0) &&
-    (!use_bernstein) &&
+    (!public_stable_basis) &&
     (!int_cker_bound_extern);
   const int fit_tree_active =
     (BANDWIDTH_reg != BW_ADAP_NN) &&
@@ -28545,6 +28674,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
   int response_y_offset;
   int response_basis_offset;
   int moment_stride;
+  int use_stable_basis = 0;
   int i, j, l;
 
   if((vector_glp_degree_extern == NULL) || (num_reg_continuous <= 0)) {
@@ -28615,10 +28745,6 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
     (size_t)owner->nterms*sizeof(double));
   owner->eval_derivative = (double *)malloc(
     (size_t)owner->nterms*sizeof(double));
-  if(use_bernstein)
-    owner->basis_context = (NPGLPBasisCtx *)calloc(
-      (size_t)num_reg_continuous, sizeof(NPGLPBasisCtx));
-
   if(owner->basis == NULL ||
      ((BANDWIDTH_reg == BW_GEN_NN
 #ifdef MPI2
@@ -28638,8 +28764,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
      owner->coefficient == NULL ||
      (call->do_merr && owner->power2_projection == NULL) ||
      owner->eval_basis == NULL ||
-     owner->eval_derivative == NULL ||
-     (use_bernstein && owner->basis_context == NULL)) {
+     owner->eval_derivative == NULL) {
     execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_ALLOC;
     return R_NilValue;
   }
@@ -28656,39 +28781,19 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
     for(i = 0; i < num_obs_train; ++i)
       owner->squared_response[i] = call->vector_Y[i]*call->vector_Y[i];
 
-  if(use_bernstein) {
-    for(l = 0; l < num_reg_continuous; ++l) {
-      double xmin = call->matrix_X_continuous_train[l][0];
-      double xmax = xmin;
-
-      for(i = 1; i < num_obs_train; ++i) {
-        const double xi = call->matrix_X_continuous_train[l][i];
-        if(xi < xmin) xmin = xi;
-        if(xi > xmax) xmax = xi;
-      }
-      if(!np_glp_basis_ctx_init(&owner->basis_context[l],
-                                vector_glp_degree_extern[l],
-                                xmin,
-                                xmax,
-                                int_glp_basis_extern == 1)) {
-        execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_BASIS;
-        return R_NilValue;
-      }
-    }
-    np_glp_fill_basis_train(num_reg_continuous,
-                            owner->terms,
-                            owner->nterms,
-                            call->matrix_X_continuous_train,
-                            num_obs_train,
-                            owner->basis_context,
-                            owner->basis);
-  } else {
-    np_glp_fill_basis_raw_train(num_reg_continuous,
-                                owner->terms,
-                                owner->nterms,
-                                call->matrix_X_continuous_train,
-                                num_obs_train,
-                                owner->basis);
+  if(!np_glp_fit_basis_prepare(num_reg_continuous,
+                               vector_glp_degree_extern,
+                               owner->terms,
+                               owner->nterms,
+                               call->matrix_X_continuous_train,
+                               num_obs_train,
+                               public_stable_basis,
+                               int_glp_basis_extern,
+                               owner->basis,
+                               &owner->basis_context,
+                               &use_stable_basis)) {
+    execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_BASIS;
+    return R_NilValue;
   }
 
 #ifdef MPI2
@@ -28907,7 +29012,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	          for(i = 0; i < owner->nterms; i++)
 	            owner->coefficient[i] = owner->solve_workspace.rhs_work[i];
 
-	          if(use_bernstein)
+	          if(use_stable_basis)
 	            np_glp_fill_basis_eval(num_reg_continuous,
 	                                   owner->terms,
 	                                   owner->nterms,
@@ -28984,7 +29089,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	                  1 + call->do_merr +
 	                  l*(1 + (call->do_gerr ? 1 : 0));
 
-	                if(use_bernstein)
+	                if(use_stable_basis)
 	                  np_glp_fill_basis_eval_deriv(l,
 	                                               grad_order,
 	                                               num_reg_continuous,
@@ -29253,7 +29358,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
     for(i = 0; i < owner->nterms; ++i)
       owner->coefficient[i] = owner->solve_workspace.rhs_work[i];
 
-    if(use_bernstein)
+    if(use_stable_basis)
       np_glp_fill_basis_eval(num_reg_continuous,
                              owner->terms,
                              owner->nterms,
@@ -29357,7 +29462,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
               (size_t)variance_rhs*(size_t)owner->nterms :
             owner->eval_derivative;
 
-          if(use_bernstein)
+          if(use_stable_basis)
             np_glp_fill_basis_eval_deriv(l,
                                          grad_order,
                                          num_reg_continuous,
@@ -29465,10 +29570,10 @@ static int np_regression_general_lp_fit(
 }
 
 /*
- * The all-large shortcut allocates its fit workspace before Bernstein basis
+ * The all-large shortcut allocates its fit workspace before stable basis
  * construction and later optional projection blocks.  Keep the established
  * inline arithmetic untouched.  Local basis allocation returns status instead
- * of long-jumping; one failure-only owner covers Bernstein basis construction
+ * of long-jumping; one failure-only owner covers basis construction
  * and a progress signal when one is actually due.  Normal ownership and
  * release order remain with the incumbent route.
  */
@@ -29488,31 +29593,6 @@ typedef struct {
   NPLPFullRowWorkspace *inverse_workspace;
   NPRegressionFitOwner *enclosing_owner;
 } NPRegressionAllLargeLPFitOwner;
-
-typedef struct {
-  int num_reg_continuous;
-  const int *terms;
-  int nterms;
-  double **matrix_X_continuous_train;
-  int num_obs_train;
-  NPGLPBasisCtx *basis_context;
-  double **basis;
-} NPRegressionAllLargeBernsteinBasisCall;
-
-static SEXP np_regression_alllarge_bernstein_basis_execute(void *data)
-{
-  const NPRegressionAllLargeBernsteinBasisCall * const call =
-    (const NPRegressionAllLargeBernsteinBasisCall *)data;
-
-  np_glp_fill_basis_train(call->num_reg_continuous,
-                          call->terms,
-                          call->nterms,
-                          call->matrix_X_continuous_train,
-                          call->num_obs_train,
-                          call->basis_context,
-                          call->basis);
-  return R_NilValue;
-}
 
 static void np_regression_alllarge_lp_fit_cleanup(
   void *data,
@@ -30119,7 +30199,7 @@ const NPNNGeometryContext *nn_geometry_context){
         estimation_shortcut_done = 1;
       } else if(kconst_ok && lp_engine_est == NP_LP_ENGINE_GENERAL &&
                 (vector_glp_degree_extern != NULL) && (num_reg_continuous > 0)){
-        const int use_bernstein = (int_glp_bernstein_extern != 0);
+        const int public_stable_basis = (int_glp_bernstein_extern != 0);
         int *glp_terms = NULL;
         int glp_nterms = 0;
         double **basis = NULL;
@@ -30133,6 +30213,7 @@ const NPNNGeometryContext *nn_geometry_context){
         int eval_block_rows = 0;
         int basis_is_contiguous = 0;
         int use_fit_projection_blas = 0;
+        int use_stable_basis = 0;
         int fast_ok;
         NPRegressionAllLargeLPFitOwner all_large_owner = {
           .num_reg_continuous = num_reg_continuous,
@@ -30174,13 +30255,9 @@ const NPNNGeometryContext *nn_geometry_context){
           eval_basis = (double *)malloc((size_t)glp_nterms*sizeof(double));
           if(do_grad)
             eval_deriv = (double *)malloc((size_t)glp_nterms*sizeof(double));
-          if(use_bernstein)
-            basis_ctx = (NPGLPBasisCtx *)calloc(
-              (size_t)num_reg_continuous, sizeof(NPGLPBasisCtx));
           fast_ok = fast_ok && (basis != NULL) && (beta != NULL) &&
             (eval_basis != NULL) &&
-            ((!do_grad) || (eval_deriv != NULL)) &&
-            (!use_bernstein || (basis_ctx != NULL));
+            ((!do_grad) || (eval_deriv != NULL));
           all_large_owner.terms = glp_terms;
           all_large_owner.nterms = glp_nterms;
           all_large_owner.basis = basis;
@@ -30194,50 +30271,28 @@ const NPNNGeometryContext *nn_geometry_context){
         }
 
         if(fast_ok){
-          for(l = 0; l < num_reg_continuous; l++){
-            if(use_bernstein){
-              double xmin = matrix_X_continuous_train[l][0];
-              double xmax = matrix_X_continuous_train[l][0];
-              for(i = 1; i < num_obs_train; i++){
-                const double xi = matrix_X_continuous_train[l][i];
-                if(xi < xmin) xmin = xi;
-                if(xi > xmax) xmax = xi;
-              }
-              if(!np_glp_basis_ctx_init(
-                  &basis_ctx[l], vector_glp_degree_extern[l], xmin, xmax,
-                  int_glp_basis_extern == 1)){
-                fast_ok = 0;
-                break;
-              }
-            }
-          }
-        }
-
-        if(fast_ok){
-          if(use_bernstein){
-            const NPRegressionAllLargeBernsteinBasisCall basis_call = {
-              .num_reg_continuous = num_reg_continuous,
+          NPGLPFitBasisPrepareCall basis_call = {
+              .ncon = num_reg_continuous,
+              .degree_vec = vector_glp_degree_extern,
               .terms = glp_terms,
               .nterms = glp_nterms,
               .matrix_X_continuous_train = matrix_X_continuous_train,
               .num_obs_train = num_obs_train,
-              .basis_context = basis_ctx,
-              .basis = basis
+              .public_stable_basis = public_stable_basis,
+              .basis_mode = int_glp_basis_extern,
+              .basis = basis,
+              .basis_context = &all_large_owner.basis_context,
+              .use_stable_basis = &use_stable_basis,
+              .status = 0
             };
-            R_UnwindProtect(
-              np_regression_alllarge_bernstein_basis_execute,
-              (void *)&basis_call,
-              np_regression_alllarge_lp_fit_cleanup,
-              (void *)&all_large_owner,
-              NULL);
-          } else {
-            np_glp_fill_basis_raw_train(num_reg_continuous,
-                                        glp_terms,
-                                        glp_nterms,
-                                        matrix_X_continuous_train,
-                                        num_obs_train,
-                                        basis);
-          }
+          R_UnwindProtect(
+            np_glp_fit_basis_prepare_execute,
+            (void *)&basis_call,
+            np_regression_alllarge_lp_fit_cleanup,
+            (void *)&all_large_owner,
+            NULL);
+          fast_ok = basis_call.status;
+          basis_ctx = all_large_owner.basis_context;
         }
 
         if(fast_ok){
@@ -30351,7 +30406,7 @@ const NPNNGeometryContext *nn_geometry_context){
                  * leading dimension nblock, including the final short block.
                  */
                 for(int row = 0; row < nblock; row++){
-                  if(use_bernstein){
+                  if(use_stable_basis){
                     np_glp_fill_basis_eval(num_reg_continuous,
                                            glp_terms,
                                            glp_nterms,
@@ -30413,7 +30468,7 @@ const NPNNGeometryContext *nn_geometry_context){
                 double yhat = 0.0;
                 double q = 0.0;
 
-                if(use_bernstein){
+                if(use_stable_basis){
                   np_glp_fill_basis_eval(num_reg_continuous,
                                          glp_terms,
                                          glp_nterms,
@@ -30457,7 +30512,7 @@ const NPNNGeometryContext *nn_geometry_context){
                     double qg = 0.0;
                     double dg = 0.0;
 
-                    if(use_bernstein){
+                    if(use_stable_basis){
                       np_glp_fill_basis_eval_deriv(l,
                                                    grad_order,
                                                    num_reg_continuous,
@@ -30516,7 +30571,7 @@ const NPNNGeometryContext *nn_geometry_context){
           }
         }
 
-        if(use_bernstein && (basis_ctx != NULL)){
+        if(basis_ctx != NULL){
           for(l = 0; l < num_reg_continuous; l++) np_glp_basis_ctx_free(&basis_ctx[l]);
           free(basis_ctx);
         }

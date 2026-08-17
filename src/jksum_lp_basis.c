@@ -46,9 +46,11 @@ NPLPBasisStatus np_lp_basis_requires_conditioning(
   size_t gram_elements;
   int lwork = -1;
   int info = 0;
+  int contiguous = 1;
   int i;
   int j;
   int row;
+  uintptr_t base_address = 0;
   NPLPBasisStatus status = NP_LP_BASIS_INVALID;
 
   if((source == NULL) || (required == NULL) || (n <= 0) ||
@@ -70,10 +72,22 @@ NPLPBasisStatus np_lp_basis_requires_conditioning(
   }
 
   for(j = 0; j < p; j++){
+    size_t offset_elements;
+    uintptr_t offset_bytes;
+
     if(source[j] == NULL)
       goto cleanup;
-    if(source[j] != source[0] + (size_t)j*(size_t)leading_dimension)
-      goto cleanup;
+    if(j == 0){
+      base_address = (uintptr_t)(const void *)source[j];
+    } else if(((size_t)j > SIZE_MAX/(size_t)leading_dimension) ||
+              ((offset_elements = (size_t)j*(size_t)leading_dimension) >
+               UINTPTR_MAX/sizeof(double)) ||
+              ((offset_bytes = (uintptr_t)offset_elements*sizeof(double)) >
+               UINTPTR_MAX - base_address) ||
+              ((uintptr_t)(const void *)source[j] !=
+               base_address + offset_bytes)){
+      contiguous = 0;
+    }
     for(row = 0; row < n; row++)
       if(!isfinite(source[j][row])){
         *required = 1;
@@ -81,9 +95,20 @@ NPLPBasisStatus np_lp_basis_requires_conditioning(
         goto cleanup;
       }
   }
-  F77_CALL(dsyrk)(&uplo, &trans, &p, &n, &alpha,
-                  source[0], &leading_dimension, &beta, gram, &p
-                  FCONE FCONE);
+  if(contiguous){
+    F77_CALL(dsyrk)(&uplo, &trans, &p, &n, &alpha,
+                    source[0], &leading_dimension, &beta, gram, &p
+                    FCONE FCONE);
+  } else {
+    for(j = 0; j < p; j++)
+      for(i = 0; i <= j; i++){
+        double sum = 0.0;
+
+        for(row = 0; row < n; row++)
+          sum += source[i][row]*source[j][row];
+        gram[i + (size_t)j*(size_t)p] = sum;
+      }
+  }
   for(j = 0; j < p; j++)
     for(i = 0; i <= j; i++)
       if(!isfinite(gram[i + (size_t)j*(size_t)p])){

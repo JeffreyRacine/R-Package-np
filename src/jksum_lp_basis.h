@@ -34,9 +34,12 @@ attribute_hidden NPLPBasisStatus np_lp_conditioned_basis_prepare(
 /*
  * Decide once, before row traversal, whether the source basis carries a
  * representation-dependent unweighted Gram condition below min_rcond.
+ * Source columns may share contiguous column-major storage or be allocated
+ * independently; leading_dimension supplies the contiguous stride when that
+ * layout is present.  Both layouts evaluate the same p-by-p Gram diagnostic.
  * Non-finite source arithmetic requests conditioning so a finite canonical
- * representation can still be attempted.  Allocation or layout failures are
- * reported rather than silently selecting either representation.
+ * representation can still be attempted.  Allocation failures are reported
+ * rather than silently selecting either representation.
  */
 attribute_hidden NPLPBasisStatus np_lp_basis_requires_conditioning(
   double * const *source,

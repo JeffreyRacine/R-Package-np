@@ -1,5 +1,17 @@
 # npRmpi 0.70-6
 
+* Positive-degree local-polynomial fits now share the conditional objective's
+  canonical, basis-neutral coordinate policy across coordinator and rank-owned
+  routes. Raw polynomial coordinates are retained when well conditioned;
+  otherwise ordinary and all-large fit owners select one stable global
+  representation for training, evaluation, derivatives, and uncertainty
+  calculations. The shared design validator now assesses intrinsic rank in
+  those same stable coordinates, so calendar-scale predictors are no longer
+  mistaken for rank-deficient designs while genuine collinearity still fails.
+  This is a representation change within the same polynomial span, not
+  evaluation-point centering or an unbounded ridge fallback, and uses only
+  linear-in-sample basis storage without adding MPI communication.
+
 * Rank-local generalized nearest-neighbour regression evaluations now share
   one execution-context classifier across `npreg()` and `npreghat()`. This
   prevents a worker from re-entering a nested MPI kernel-weight owner merely

@@ -1314,10 +1314,15 @@ npCheckRegressionDesignCondition <- function(reg.code,
 
   if (is.null(degree))
     stop(sprintf("%s: LP degree vector missing for design-conditioning check", where))
+  ## Rank and condition are properties of the polynomial span, not of the
+  ## units carried by a particular coordinate representation.  Assess the
+  ## same stable global coordinates used by the canonical native fit policy;
+  ## the user's requested representation remains metadata and does not alter
+  ## the estimator's span.
   B <- W.lp(xdat = xcon,
             degree = degree,
             basis = basis,
-            bernstein.basis = isTRUE(bernstein.basis))
+            bernstein.basis = TRUE)
 
   p <- ncol(B)
   if (is.null(p) || p <= 0L)
