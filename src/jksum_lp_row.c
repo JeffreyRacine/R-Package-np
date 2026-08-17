@@ -8,36 +8,6 @@
 #include "headers.h"
 #include "jksum_lp_row.h"
 
-static inline void np_lp_dense_support_add(const int row,
-                                            const int orig_idx,
-                                            const int data_idx,
-                                            const double weight,
-                                            const int nterms,
-                                            int *support_count,
-                                            int *support_orig,
-                                            int *support_data,
-                                            double *support_weight)
-{
-  const int count = support_count[row];
-  const size_t off = (size_t)row*(size_t)nterms;
-
-  if(count > nterms)
-    return;
-
-  if(count == nterms){
-    support_count[row] = nterms + 1;
-    return;
-  }
-
-  if(count < nterms){
-    support_orig[off + (size_t)count] = orig_idx;
-    support_data[off + (size_t)count] = data_idx;
-    support_weight[off + (size_t)count] = weight;
-  }
-
-  support_count[row] = count + 1;
-}
-
 /*
   A one-column LP basis is the degree-zero constant basis.  Keep its resident
   row scalar and implicit: no basis loads or general outer-product algebra.
@@ -61,15 +31,6 @@ static void np_lp_accumulate_dense_row_1(
       if(weight == 0.0)
         continue;
 
-      if(ctx->track_lowsupport){
-        np_lp_dense_support_add(ctx->row_j, orig_ii, orig_ii, weight, 1,
-                                ctx->support_count, ctx->support_orig,
-                                ctx->support_data, ctx->support_weight);
-        np_lp_dense_support_add(orig_ii, ctx->row_j, ctx->eval_idx, weight, 1,
-                                ctx->support_count, ctx->support_orig,
-                                ctx->support_data, ctx->support_weight);
-      }
-
       fixed_rhs += weight*ctx->response[orig_ii];
       ctx->rhs[orig_ii] += weight*eval_response;
       fixed_moment += weight;
@@ -83,15 +44,6 @@ static void np_lp_accumulate_dense_row_1(
 
       if(weight == 0.0)
         continue;
-
-      if(ctx->track_lowsupport){
-        np_lp_dense_support_add(ctx->row_j, orig_ii, ii, weight, 1,
-                                ctx->support_count, ctx->support_orig,
-                                ctx->support_data, ctx->support_weight);
-        np_lp_dense_support_add(orig_ii, ctx->row_j, ctx->eval_idx, weight, 1,
-                                ctx->support_count, ctx->support_orig,
-                                ctx->support_data, ctx->support_weight);
-      }
 
       fixed_rhs += weight*ctx->response[ii];
       ctx->rhs[orig_ii] += weight*eval_response;
@@ -133,16 +85,6 @@ static void np_lp_accumulate_dense_row_##WIDTH(                             \
                                                                              \
     if(weight == 0.0)                                                        \
       continue;                                                              \
-                                                                             \
-    if(ctx->track_lowsupport){                                               \
-      np_lp_dense_support_add(ctx->row_j, orig_ii, ii, weight, (WIDTH),      \
-                              ctx->support_count, ctx->support_orig,          \
-                              ctx->support_data, ctx->support_weight);        \
-      np_lp_dense_support_add(orig_ii, ctx->row_j, ctx->eval_idx, weight,    \
-                              (WIDTH), ctx->support_count,                    \
-                              ctx->support_orig, ctx->support_data,           \
-                              ctx->support_weight);                           \
-    }                                                                        \
                                                                              \
     yi = ctx->response[ii];                                                   \
     moving_moments =                                                        \
@@ -233,16 +175,6 @@ static void np_lp_accumulate_dense_row_##WIDTH(                             \
     if(weight == 0.0)                                                        \
       continue;                                                              \
                                                                              \
-    if(ctx->track_lowsupport){                                               \
-      np_lp_dense_support_add(ctx->row_j, orig_ii, ii, weight, (WIDTH),      \
-                              ctx->support_count, ctx->support_orig,          \
-                              ctx->support_data, ctx->support_weight);        \
-      np_lp_dense_support_add(orig_ii, ctx->row_j, ctx->eval_idx, weight,    \
-                              (WIDTH), ctx->support_count,                    \
-                              ctx->support_orig, ctx->support_data,           \
-                              ctx->support_weight);                           \
-    }                                                                        \
-                                                                             \
     yi = ctx->response[ii];                                                   \
     moving_moments =                                                        \
       ctx->moments + (size_t)orig_ii*(size_t)(WIDTH)*(size_t)(WIDTH);        \
@@ -308,7 +240,6 @@ void np_lp_accumulate_dense_resident_row3(
     const int nsub,
     const int use_tree,
     const int eval_idx,
-    const int track_lowsupport,
     const int *tree_lookup,
     const double *weights,
     double * const *basis,
@@ -316,11 +247,7 @@ void np_lp_accumulate_dense_resident_row3(
     double *moments,
     double *rhs,
     const double *eval_ybasis,
-    const double *eval_outer,
-    int *support_count,
-    int *support_orig,
-    int *support_data,
-    double *support_weight)
+    const double *eval_outer)
 {
   /*
    * Keep the unique upper triangle resident in the non-MPI pairwise route.
@@ -346,15 +273,6 @@ void np_lp_accumulate_dense_resident_row3(
 
     if(w == 0.0)
       continue;
-
-    if(track_lowsupport){
-      np_lp_dense_support_add(row_j, orig_ii, ii, w, 3,
-                              support_count, support_orig,
-                              support_data, support_weight);
-      np_lp_dense_support_add(orig_ii, row_j, eval_idx, w, 3,
-                              support_count, support_orig,
-                              support_data, support_weight);
-    }
 
     {
       const double yi = response[ii];
@@ -444,15 +362,6 @@ static void np_lp_accumulate_dense_row_generic(
     if(weight == 0.0)
       continue;
 
-    if(ctx->track_lowsupport){
-      np_lp_dense_support_add(ctx->row_j, orig_ii, ii, weight, nterms,
-                              ctx->support_count, ctx->support_orig,
-                              ctx->support_data, ctx->support_weight);
-      np_lp_dense_support_add(orig_ii, ctx->row_j, ctx->eval_idx, weight,
-                              nterms, ctx->support_count, ctx->support_orig,
-                              ctx->support_data, ctx->support_weight);
-    }
-
     {
       const double yi = ctx->response[ii];
       double * const fixed_moments =
@@ -488,10 +397,9 @@ void np_lp_accumulate_dense_resident_row(const NPLPDenseRowContext *ctx)
   case 3:
     np_lp_accumulate_dense_resident_row3(
       ctx->row_j, ctx->nsub, ctx->use_tree, ctx->eval_idx,
-      ctx->track_lowsupport, ctx->tree_lookup, ctx->weights, ctx->basis,
+      ctx->tree_lookup, ctx->weights, ctx->basis,
       ctx->response, ctx->moments, ctx->rhs, ctx->eval_ybasis,
-      ctx->eval_outer, ctx->support_count, ctx->support_orig,
-      ctx->support_data, ctx->support_weight);
+      ctx->eval_outer);
     return;
   case 4: np_lp_accumulate_dense_row_4(ctx); return;
   case 5: np_lp_accumulate_dense_row_5(ctx); return;

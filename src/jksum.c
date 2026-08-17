@@ -15541,200 +15541,6 @@ static void np_lp_mirror_upper_moments_wide(double *moments,
   np_si[8] += w*eval_outer[8];                                              \
 } while(0)
 
-static inline void np_lp_cvls_support_add(const int row,
-                                           const int orig_idx,
-                                           const int data_idx,
-                                           const double w,
-                                           const int nterms,
-                                           int *support_count,
-                                           int *support_orig,
-                                           int *support_data,
-                                           double *support_weight){
-  const int count = support_count[row];
-  const size_t off = (size_t)row*(size_t)nterms;
-
-  if(count > nterms)
-    return;
-
-  if(count == nterms){
-    support_count[row] = nterms + 1;
-    return;
-  }
-
-  if(count < nterms){
-    support_orig[off + (size_t)count] = orig_idx;
-    support_data[off + (size_t)count] = data_idx;
-    support_weight[off + (size_t)count] = w;
-  }
-
-  support_count[row] = count + 1;
-}
-
-/*
- * Ordinary fixed Gaussian weights are strictly positive mathematically, but
- * the low-support fallback is keyed to the computed weight being nonzero.
- * Certify a conservative normal-range lower bound before eliding its tracking
- * arrays and branches. Any unsupported topology or doubtful range retains
- * the incumbent tracked path.
- */
-static int np_lp_fixed_gaussian_full_support_certified(
-    const int num_obs,
-    const int nterms,
-    const int num_reg_unordered,
-    const int num_reg_ordered,
-    const int num_reg_continuous,
-    double **matrix_X_continuous,
-    int *kernel_c,
-    int *operator,
-    double **matrix_bandwidth)
-{
-  int l, i;
-  double log_kernel_lower = 0.0;
-  double log_dband = 0.0;
-  const double log_safe_min = log(DBL_MIN) + 8.0;
-
-  if((num_obs - 1 <= nterms) ||
-     (num_reg_unordered != 0) || (num_reg_ordered != 0) ||
-     (num_reg_continuous <= 0) || int_cker_bound_extern ||
-     (matrix_X_continuous == NULL) || (kernel_c == NULL) ||
-     (operator == NULL) || (matrix_bandwidth == NULL))
-    return 0;
-
-  for(l = 0; l < num_reg_continuous; l++){
-    double xmin, xmax, h, zmax;
-
-    if((kernel_c[l] != CK_GAUSS2) || (operator[l] != OP_NORMAL) ||
-       (matrix_X_continuous[l] == NULL) ||
-       (matrix_bandwidth[l] == NULL))
-      return 0;
-
-    h = matrix_bandwidth[l][0];
-    xmin = matrix_X_continuous[l][0];
-    xmax = xmin;
-    if((!isfinite(h)) || (h <= 0.0) || (!isfinite(xmin)))
-      return 0;
-
-    for(i = 1; i < num_obs; i++){
-      const double x = matrix_X_continuous[l][i];
-      if(!isfinite(x))
-        return 0;
-      xmin = MIN(xmin, x);
-      xmax = MAX(xmax, x);
-    }
-
-    zmax = (xmax - xmin)/h;
-    if(!isfinite(zmax))
-      return 0;
-    log_kernel_lower +=
-      log(ONE_OVER_SQRT_TWO_PI) - 0.5*zmax*zmax;
-    log_dband += log(h);
-    if((!isfinite(log_kernel_lower)) || (!isfinite(log_dband)))
-      return 0;
-  }
-
-  return (log_kernel_lower > log_safe_min) &&
-    (log_kernel_lower - log_dband > log_safe_min);
-}
-
-static int np_glp_support_order_cmp(const void *pa, const void *pb){
-  const int *a = (const int *)pa;
-  const int *b = (const int *)pb;
-  return (a[0] > b[0]) - (a[0] < b[0]);
-}
-
-static int np_lp_cvls_lowsupport_fit(const int nterms,
-                                      const int m,
-                                      double **basis,
-                                      double *vector_Y,
-                                      const int eval_idx,
-                                      const double *eval_basis,
-                                      const int *support_orig,
-                                      const int *support_data,
-                                      const double *support_weight,
-                                      double *fit){
-  int i, a, info = 0, rank = 0;
-  const int nrhs = 1;
-  const int lda = MAX(1, m);
-  const int ldb = MAX(1, MAX(m, nterms));
-  const double rcond = sqrt(DBL_EPSILON);
-  int *order = NULL, *jpvt = NULL;
-  double *A = NULL, *B = NULL, *work = NULL;
-  double work_query = 0.0;
-  int lwork = -1;
-
-  if((m <= 0) || (m > nterms))
-    return 0;
-
-  if(nterms == 1){
-    const double value = vector_Y[support_data[0]];
-    if(!isfinite(value))
-      return 0;
-    *fit = value;
-    return 1;
-  }
-
-  order = (int *)malloc((size_t)m*(size_t)2*sizeof(int));
-  A = (double *)calloc((size_t)lda*(size_t)nterms, sizeof(double));
-  B = (double *)calloc((size_t)ldb, sizeof(double));
-  jpvt = (int *)calloc((size_t)nterms, sizeof(int));
-  if((order == NULL) || (A == NULL) || (B == NULL) || (jpvt == NULL))
-    goto cleanup_lowsupport;
-
-  for(i = 0; i < m; i++){
-    order[2*i] = support_orig[i];
-    order[2*i + 1] = i;
-  }
-  qsort(order, (size_t)m, (size_t)2*sizeof(int), np_glp_support_order_cmp);
-
-  for(i = 0; i < m; i++){
-    const int src = order[2*i + 1];
-    const int data_idx = support_data[src];
-    const double sw = sqrt(MAX(0.0, support_weight[src]));
-
-    if(sw == 0.0)
-      continue;
-
-    for(a = 0; a < nterms; a++)
-      A[i + a*lda] = sw*basis[a][data_idx];
-    B[i] = sw*vector_Y[data_idx];
-  }
-
-  F77_CALL(dgelsy)(&m, &nterms, &nrhs, A, &lda, B, &ldb, jpvt,
-                   &rcond, &rank, &work_query, &lwork, &info);
-  if(info != 0)
-    goto cleanup_lowsupport;
-
-  lwork = MAX(1, (int)work_query);
-  work = (double *)malloc((size_t)lwork*sizeof(double));
-  if(work == NULL)
-    goto cleanup_lowsupport;
-
-  memset(jpvt, 0, (size_t)nterms*sizeof(int));
-  F77_CALL(dgelsy)(&m, &nterms, &nrhs, A, &lda, B, &ldb, jpvt,
-                   &rcond, &rank, work, &lwork, &info);
-  if((info != 0) || (rank <= 0))
-    goto cleanup_lowsupport;
-
-  *fit = 0.0;
-  for(a = 0; a < nterms; a++)
-    *fit += eval_basis[a]*B[a];
-
-  free(order);
-  free(A);
-  free(B);
-  free(jpvt);
-  free(work);
-  return R_FINITE(*fit);
-
-cleanup_lowsupport:
-  if(order != NULL) free(order);
-  if(A != NULL) free(A);
-  if(B != NULL) free(B);
-  if(jpvt != NULL) free(jpvt);
-  if(work != NULL) free(work);
-  return 0;
-}
-
 static int np_lp_tree_oracle_enabled(void){
   const char *flag = getenv("NP_LP_TREE_ORACLE");
   if(flag == NULL)
@@ -15762,12 +15568,7 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
     const int nterms,
     double **basis,
     double *moments,
-    double *rhs,
-    const int track_lowsupport,
-    int *support_count,
-    int *support_orig,
-    int *support_data,
-    double *support_weight){
+    double *rhs){
   int i, j, k;
   int status = 0;
   NPLPTreeSupportCtx sctx = {0};
@@ -15835,7 +15636,6 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
    */
   for(j = 0; j < num_obs - 1; j++){
     const int eval_idx = j;
-    const int orig_j = ipt_extern_X[j];
     const double yj = vector_Y[eval_idx];
     double scalar_moment = 0.0;
     double scalar_rhs = 0.0;
@@ -15980,7 +15780,6 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
         const int iend = istart + sctx.xl.nlev[i];
 
         for(k = istart; k < iend; k++){
-          const int orig_ii = ipt_extern_X[k];
           const int ii = k;
           double w;
 
@@ -15995,26 +15794,6 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
                                         (xeval0 - matrix_X_continuous[0][ii])*hinv0,
                                         hinv0);
           if(w != 0.0){
-            if(track_lowsupport){
-              np_lp_cvls_support_add(j,
-                                      orig_ii,
-                                      ii,
-                                      w,
-                                      nterms,
-                                      support_count,
-                                      support_orig,
-                                      support_data,
-                                      support_weight);
-              np_lp_cvls_support_add(ii,
-                                      orig_j,
-                                      eval_idx,
-                                      w,
-                                      nterms,
-                                      support_count,
-                                      support_orig,
-                                      support_data,
-                                      support_weight);
-            }
             if(nterms == 1){
               np_lp_accumulate_pair_width_one(vector_Y,
                                                moments,
@@ -16101,7 +15880,6 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
       const int iend = istart + sctx.xl.nlev[i];
 
       for(k = istart; k < iend; k++){
-        const int orig_ii = ipt_extern_X[k];
         const int ii = k;
         int ok = 1;
 
@@ -16133,26 +15911,6 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
           goto cleanup_sparse;
 
         if(w != 0.0){
-          if(track_lowsupport){
-            np_lp_cvls_support_add(j,
-                                    orig_ii,
-                                    ii,
-                                    w,
-                                    nterms,
-                                    support_count,
-                                    support_orig,
-                                    support_data,
-                                    support_weight);
-            np_lp_cvls_support_add(ii,
-                                    orig_j,
-                                    eval_idx,
-                                    w,
-                                    nterms,
-                                    support_count,
-                                    support_orig,
-                                    support_data,
-                                    support_weight);
-          }
           if(do_oracle){
             const double ow = kw_oracle[ii];
             const double absdiff = fabs(w - ow);
@@ -16310,9 +16068,7 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
   int j, a, b, l, sf_flag = 0;
   int nterms = glp_nterms_in;
   double **basis = glp_basis_in;
-  int *support_count = NULL, *support_orig = NULL, *support_data = NULL;
   double *moments = NULL, *rhs = NULL, *kw = NULL;
-  double *support_weight = NULL;
   double *eval_basis = NULL;
   double *eval_ybasis = NULL, *eval_outer = NULL;
   double *vsf = NULL;
@@ -16327,10 +16083,6 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
   const NP_OuterPackCtx frozen_runtime_options = {
     .runtime_options_frozen = 1
   };
-  const int track_lowsupport_requested =
-    (bwm == RBWM_CVLS) || (bwm == RBWM_CVCHECK) || (bwm == RBWM_CVKS);
-  int track_lowsupport = track_lowsupport_requested;
-
   np_lp_solve_workspace_init(&solve_workspace);
 
   if((num_obs <= 0) || (num_reg_continuous <= 0))
@@ -16341,18 +16093,6 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
 
   if(nterms > INT_MAX/nterms)
     goto cleanup_lp_cv;
-
-  if(track_lowsupport &&
-     np_lp_fixed_gaussian_full_support_certified(num_obs,
-                                                  nterms,
-                                                  num_reg_unordered,
-                                                  num_reg_ordered,
-                                                  num_reg_continuous,
-                                                  matrix_X_continuous,
-                                                  kernel_c,
-                                                  operator,
-                                                  matrix_bandwidth))
-    track_lowsupport = 0;
 
   use_sparse_tree = use_tree &&
     np_lp_fixed_tree_sparse_supported(num_reg_unordered,
@@ -16379,12 +16119,6 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
 
   moments = (double *)calloc((size_t)num_obs, (size_t)nterms*(size_t)nterms*sizeof(double));
   rhs = (double *)calloc((size_t)num_obs, (size_t)nterms*sizeof(double));
-  if(track_lowsupport){
-    support_count = (int *)calloc((size_t)num_obs, sizeof(int));
-    support_orig = (int *)malloc((size_t)num_obs*(size_t)nterms*sizeof(int));
-    support_data = (int *)malloc((size_t)num_obs*(size_t)nterms*sizeof(int));
-    support_weight = (double *)malloc((size_t)num_obs*(size_t)nterms*sizeof(double));
-  }
   eval_basis = alloc_vecd(MAX(1, nterms));
 
   if(!use_sparse_tree){
@@ -16406,9 +16140,6 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
     error("np_regression_cv_lp_basis_fixed: workspace allocation failed\n");
 
   if((moments == NULL) || (rhs == NULL) ||
-     (track_lowsupport &&
-      ((support_count == NULL) || (support_orig == NULL) ||
-       (support_data == NULL) || (support_weight == NULL))) ||
      (eval_basis == NULL) ||
      (!use_sparse_tree && ((kw == NULL) ||
                            (train_u == NULL) || (train_o == NULL) || (train_c == NULL) ||
@@ -16519,12 +16250,7 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
                                             nterms,
                                             basis,
                                             moments,
-                                            rhs,
-                                            track_lowsupport,
-                                            support_count,
-                                            support_orig,
-                                            support_data,
-                                            support_weight))
+                                            rhs))
       goto cleanup_lp_cv;
   } else {
   for(j = 0; j < num_obs - 1; j++){
@@ -16633,7 +16359,6 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
         nsub,
         use_tree,
         eval_idx,
-        track_lowsupport,
         ipt_lookup_extern_X,
         kw,
         basis,
@@ -16641,31 +16366,22 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
         moments,
         rhs,
         eval_ybasis,
-        eval_outer,
-        support_count,
-        support_orig,
-        support_data,
-        support_weight);
+        eval_outer);
     } else {
       const NPLPDenseRowContext row_context = {
-        nterms,
-        j,
-        nsub,
-        use_tree,
-        eval_idx,
-        track_lowsupport,
-        ipt_lookup_extern_X,
-        kw,
-        basis,
-        vector_Y,
-        moments,
-        rhs,
-        eval_ybasis,
-        eval_outer,
-        support_count,
-        support_orig,
-        support_data,
-        support_weight
+        .nterms = nterms,
+        .row_j = j,
+        .nsub = nsub,
+        .use_tree = use_tree,
+        .eval_idx = eval_idx,
+        .tree_lookup = ipt_lookup_extern_X,
+        .weights = kw,
+        .basis = basis,
+        .response = vector_Y,
+        .moments = moments,
+        .rhs = rhs,
+        .eval_ybasis = eval_ybasis,
+        .eval_outer = eval_outer
       };
       np_lp_accumulate_dense_resident_row(&row_context);
     }
@@ -16689,7 +16405,6 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
     const int row_idx = use_sparse_tree ? eval_idx : j;
     const double * const sj = moments + (size_t)row_idx*(size_t)nterms*(size_t)nterms;
     const double * const tj = rhs + (size_t)row_idx*(size_t)nterms;
-    const size_t soff = (size_t)row_idx*(size_t)nterms;
     NPLPSolvePolicyDiagnostics solve_diagnostics;
     double fit = 0.0;
 
@@ -16716,29 +16431,16 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
       }
     }
 
-    if(!(track_lowsupport &&
-         (support_count[row_idx] <= nterms) &&
-         np_lp_cvls_lowsupport_fit(nterms,
-                                    support_count[row_idx],
-                                    basis,
-                                    vector_Y,
-                                    eval_idx,
-                                    eval_basis,
-                                    support_orig + soff,
-                                    support_data + soff,
-                                    support_weight + soff,
-                                    &fit))){
-      if(np_lp_solve_workspace_solve_response(&solve_workspace,
-                                              nterms,
-                                              1,
-                                              epsilon,
-                                              &solve_diagnostics) !=
-         NP_LP_SOLVE_POLICY_OK)
-        goto cleanup_lp_cv;
+    if(np_lp_solve_workspace_solve_response(&solve_workspace,
+                                            nterms,
+                                            1,
+                                            epsilon,
+                                            &solve_diagnostics) !=
+       NP_LP_SOLVE_POLICY_OK)
+      goto cleanup_lp_cv;
 
-      for(a = 0; a < nterms; a++)
-        fit += eval_basis[a]*solve_workspace.rhs_work[a];
-    }
+    for(a = 0; a < nterms; a++)
+      fit += eval_basis[a]*solve_workspace.rhs_work[a];
 
     {
       const double loss_y =
@@ -16777,10 +16479,6 @@ cleanup_lp_cv:
   np_lp_solve_workspace_clear(&solve_workspace);
   if(moments != NULL) free(moments);
   if(rhs != NULL) free(rhs);
-  if(support_count != NULL) free(support_count);
-  if(support_orig != NULL) free(support_orig);
-  if(support_data != NULL) free(support_data);
-  if(support_weight != NULL) free(support_weight);
   if(eval_basis != NULL) free(eval_basis);
   if(kw != NULL) free(kw);
   if(eval_ybasis != NULL) free(eval_ybasis);
