@@ -24,7 +24,7 @@ udist_literal_training_grid <- function(value, cdf_weight) {
         for (coordinate in seq_len(ncol(value)))
           product <- product * cdf_weight(
             value[evaluation, coordinate], value[donor, coordinate],
-            coordinate)
+            coordinate, held_out)
         product
       }, numeric(1L)))
       indicator <- all(value[held_out, ] <= value[evaluation, ])
@@ -52,11 +52,11 @@ test_that("unconditional continuous CDF-CV averages the admitted ordered pairs",
     bandwidth <- bandwidths[[fixture_name]]
     for (kernel_name in c("gaussian", "epanechnikov")) {
       kernel_cdf <- if (kernel_name == "gaussian") {
-        function(evaluation, donor, coordinate) {
+        function(evaluation, donor, coordinate, held_out) {
           stats::pnorm((evaluation - donor) / bandwidth[coordinate])
         }
       } else {
-        function(evaluation, donor, coordinate) {
+        function(evaluation, donor, coordinate, held_out) {
           u <- (evaluation - donor) / bandwidth[coordinate]
           edge <- sqrt(5)
           if (u <= -edge) return(0)
@@ -94,18 +94,16 @@ test_that("extended adaptive CDF-CV shares the empirical pair finalizer", {
   dat <- as.data.frame(value)
   names(dat) <- c("x1", "x2")
   extended_k <- c(nrow(value) + 2L, nrow(value) + 3L)
-  bandwidth <- vapply(seq_len(ncol(value)), function(coordinate) {
-    vapply(seq_len(nrow(value)), function(donor) {
-      max(abs(value[-donor, coordinate] - value[donor, coordinate])) *
-        extended_k[[coordinate]] / (nrow(value) - 1L)
-    }, numeric(1L))
-  }, numeric(nrow(value)))
   expected <- udist_literal_training_grid(
     value,
-    function(evaluation, donor, coordinate) {
+    function(evaluation, donor, coordinate, held_out) {
       donor_index <- match(donor, value[, coordinate])
+      fold_donors <- setdiff(seq_len(nrow(value)), c(held_out, donor_index))
+      bandwidth <-
+        max(abs(value[fold_donors, coordinate] - donor)) *
+        extended_k[[coordinate]] / length(fold_donors)
       stats::pnorm(
-        (evaluation - donor) / bandwidth[donor_index, coordinate]
+        (evaluation - donor) / bandwidth
       )
     }
   )
@@ -129,7 +127,7 @@ test_that("beta CDF-CV uses the same empirical training-grid normalization", {
   value <- c(0.04, 0.12, 0.27, 0.43, 0.61, 0.78, 0.93)
   dat <- data.frame(x = value)
   bandwidth <- 0.19
-  beta_cdf <- function(evaluation, donor, coordinate) {
+  beta_cdf <- function(evaluation, donor, coordinate, held_out) {
     concentration <- 1 / bandwidth^2
     stats::pbeta(evaluation,
                  1 + donor * concentration,
@@ -157,7 +155,7 @@ test_that("ordered-profile and dense CDF-CV share the empirical finalizer", {
   numeric_value <- as.numeric(value)
   dat <- data.frame(x = value)
   lambda <- 0.31
-  ordered_cdf <- function(evaluation, donor, coordinate) {
+  ordered_cdf <- function(evaluation, donor, coordinate, held_out) {
     if (evaluation == donor) return(1 - 0.5 * lambda)
     distance <- abs(evaluation - donor)
     if (evaluation < donor) 0.5 * lambda^distance else 1 - lambda^distance

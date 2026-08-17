@@ -1,5 +1,17 @@
 # npRmpi 0.70-6
 
+* Fixed-resident and adaptive-BLAS local-polynomial regression objectives now
+  use the same condition-aware response/factor policy as ordinary fits,
+  leave-one-out influence rows, and the independent hat-matrix owner. CVAIC
+  obtains leverage from the retained factor through the canonical adjoint
+  solve, so response and influence calculations share one bounded ridge
+  transcript instead of selecting regularization independently. The MPI
+  fixed-LP fit owner follows the same response policy without adding a
+  collective. This removes the remaining LU-failure-only ridge loops;
+  well-conditioned CVLS arithmetic is unchanged, while formerly
+  ill-conditioned objective and fit results can change to the canonical
+  condition-qualified solution.
+
 * Positive-degree local-polynomial fits now share the conditional objective's
   canonical, basis-neutral coordinate policy across coordinator and rank-owned
   routes. Raw polynomial coordinates are retained when well conditioned;

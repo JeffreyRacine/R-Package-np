@@ -15,15 +15,9 @@ locate_dead_output_source <- function() {
 }
 
 dead_output_body <- function(lines) {
-  start <- grep(
-    "^np_conditional_density_cvls_lp_supertile2_stream\\(",
-    lines
+  npRmpi_test_extract_c_function(
+    lines, "np_conditional_density_cvls_lp_supertile2_stream"
   )
-  stop <- grep("^int np_conditional_density_cvls_lp_stream\\(", lines)
-  expect_length(start, 1L)
-  stop <- stop[stop > start][1L]
-  expect_true(is.finite(stop))
-  paste(lines[start:(stop - 1L)], collapse = "\n")
 }
 
 test_that("quadratic output uses one bounded square tile without extra row slabs", {

@@ -12,15 +12,6 @@ locate_lp_source <- function(name) {
   if (length(hits) == 0L) NULL else hits[[1L]]
 }
 
-function_body <- function(lines, signature) {
-  start <- grep(signature, lines)
-  expect_length(start, 1L)
-  stops <- grep("^}$", lines)
-  stop <- stops[stops > start][1L]
-  expect_length(stop, 1L)
-  paste(lines[start:stop], collapse = "\n")
-}
-
 test_that("serial and MPI-owner LP covariance reuse validated factorizations", {
   jksum_file <- locate_lp_source("jksum.c")
   solve_file <- locate_lp_source("jksum_lp_solve.c")
@@ -45,17 +36,15 @@ test_that("serial and MPI-owner LP covariance reuse validated factorizations", {
   expect_true(any(grepl("int factor_ready;", header_lines, fixed = TRUE)))
   expect_true(any(grepl("int factor_p;", header_lines, fixed = TRUE)))
 
-  solve_body <- function_body(
-    solve_lines,
-    "^int np_lp_solve_workspace_solve\\("
+  solve_body <- npRmpi_test_extract_c_function(
+    solve_lines, "np_lp_solve_workspace_solve"
   )
   expect_true(grepl("workspace->factor_ready = 0;", solve_body, fixed = TRUE))
   expect_true(grepl("workspace->factor_ready = 1;", solve_body, fixed = TRUE))
   expect_true(grepl("workspace->factor_p = p;", solve_body, fixed = TRUE))
 
-  factored_body <- function_body(
-    solve_lines,
-    "^int np_lp_solve_workspace_solve_factored\\("
+  factored_body <- npRmpi_test_extract_c_function(
+    solve_lines, "np_lp_solve_workspace_solve_factored_with_trans"
   )
   expect_true(grepl("!workspace->factor_ready", factored_body, fixed = TRUE))
   expect_true(grepl("workspace->factor_p != p", factored_body, fixed = TRUE))
