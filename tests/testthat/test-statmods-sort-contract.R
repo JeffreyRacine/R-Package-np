@@ -20,7 +20,9 @@ test_that("generalized NN regression bandwidth is stable on duplicated continuou
     nmulti = 1
   )
 
-  expect_equal(as.numeric(bw$bw), 3)
+  # For duplicated support and exact delete-one accounting, k = 3 yields a zero
+  # radius at the training supports; k = 4 is the first feasible candidate.
+  expect_equal(as.numeric(bw$bw), 4)
   expect_equal(as.numeric(bw$fval), 0.1717472951192434, tolerance = 1e-14)
 })
 
