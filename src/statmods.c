@@ -716,6 +716,143 @@ static int compute_nn_distance_train_eval_observation_support_subset(int num_obs
  * identified training occurrence.  In particular, a zero order statistic is
  * reported as such rather than replaced by the nearest positive distance.
  */
+int np_nn_two_slot_radius_select(const double primary_radius,
+                                 const double successor_radius,
+                                 const double base_distance,
+                                 const int distinct_base_exclusion,
+                                 double *radius)
+{
+  if(radius == NULL || !isfinite(primary_radius) || primary_radius < 0.0 ||
+     (distinct_base_exclusion &&
+      (!isfinite(successor_radius) || successor_radius < primary_radius ||
+       !isfinite(base_distance) || base_distance < 0.0)))
+    return 1;
+
+  *radius = distinct_base_exclusion && base_distance <= primary_radius ?
+    successor_radius : primary_radius;
+  return 0;
+}
+
+typedef struct {
+  double value;
+  int occurrence;
+} NPNNTwoSlotOrderEntry;
+
+static int np_nn_two_slot_order_entry_compare(const void *left,
+                                              const void *right)
+{
+  const NPNNTwoSlotOrderEntry * const lhs =
+    (const NPNNTwoSlotOrderEntry *)left;
+  const NPNNTwoSlotOrderEntry * const rhs =
+    (const NPNNTwoSlotOrderEntry *)right;
+
+  if(lhs->value < rhs->value)
+    return -1;
+  if(lhs->value > rhs->value)
+    return 1;
+  if(lhs->occurrence < rhs->occurrence)
+    return -1;
+  if(lhs->occurrence > rhs->occurrence)
+    return 1;
+  return 0;
+}
+
+/* Prepare the occurrence-safe response order and, for every mapped query,
+ * the half-open interval of base occurrences whose deletion advances the
+ * prepared primary radius. Inclusive support-boundary ties are retained.
+ * Storage is linear and the single sort is shared by all fold queries. */
+int np_nn_two_slot_exclusion_intervals(
+  const double *primary_radius,
+  const double *successor_radius,
+  const double *training_values,
+  const int num_train,
+  const int *occurrence_to_position,
+  int *sorted_occurrences,
+  int *interval_start,
+  int *interval_end)
+{
+  NPNNTwoSlotOrderEntry *order = NULL;
+  unsigned char *seen_position = NULL;
+  int occurrence;
+  int status = 1;
+
+  if(primary_radius == NULL || successor_radius == NULL ||
+     training_values == NULL || num_train <= 0 ||
+     sorted_occurrences == NULL || interval_start == NULL ||
+     interval_end == NULL)
+    return 1;
+
+  order = (NPNNTwoSlotOrderEntry *)malloc(
+    (size_t)num_train*sizeof(NPNNTwoSlotOrderEntry));
+  seen_position = (unsigned char *)calloc(
+    (size_t)num_train, sizeof(unsigned char));
+  if(order == NULL || seen_position == NULL)
+    goto cleanup_two_slot_intervals;
+
+  for(occurrence = 0; occurrence < num_train; ++occurrence){
+    const int position = occurrence_to_position != NULL ?
+      occurrence_to_position[occurrence] : occurrence;
+
+    if(position < 0 || position >= num_train || seen_position[position] ||
+       !isfinite(training_values[position]) ||
+       !isfinite(primary_radius[position]) || primary_radius[position] < 0.0 ||
+       !isfinite(successor_radius[position]) ||
+       successor_radius[position] < primary_radius[position])
+      goto cleanup_two_slot_intervals;
+    seen_position[position] = 1U;
+    order[occurrence].value = training_values[position];
+    order[occurrence].occurrence = occurrence;
+  }
+
+  qsort(order,
+        (size_t)num_train,
+        sizeof(NPNNTwoSlotOrderEntry),
+        np_nn_two_slot_order_entry_compare);
+
+  for(occurrence = 0; occurrence < num_train; ++occurrence)
+    sorted_occurrences[occurrence] = order[occurrence].occurrence;
+
+  for(int query_rank = 0; query_rank < num_train; ++query_rank){
+    const int query_occurrence = order[query_rank].occurrence;
+    const int query_position = occurrence_to_position != NULL ?
+      occurrence_to_position[query_occurrence] : query_occurrence;
+    const double query_value = order[query_rank].value;
+    const double radius = primary_radius[query_position];
+    int lo = 0;
+    int hi = query_rank;
+
+    while(lo < hi){
+      const int mid = lo + (hi - lo)/2;
+      if(fabs(order[mid].value - query_value) > radius)
+        lo = mid + 1;
+      else
+        hi = mid;
+    }
+    interval_start[query_rank] = lo;
+
+    lo = query_rank;
+    hi = num_train;
+    while(lo < hi){
+      const int mid = lo + (hi - lo)/2;
+      if(fabs(order[mid].value - query_value) <= radius)
+        lo = mid + 1;
+      else
+        hi = mid;
+    }
+    interval_end[query_rank] = lo;
+    if(interval_start[query_rank] > query_rank ||
+       interval_end[query_rank] <= query_rank)
+      goto cleanup_two_slot_intervals;
+  }
+
+  status = 0;
+
+cleanup_two_slot_intervals:
+  free(order);
+  free(seen_position);
+  return status;
+}
+
 static NPNNGeometryStatus
 compute_nn_distance_train_eval_context_subset(
   const int num_obs_train,

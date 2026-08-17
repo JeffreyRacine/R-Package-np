@@ -7,14 +7,24 @@
   one- and multi-worker `npscoefbw()` completion without changing objective
   arithmetic, search policy, evaluation accounting, or message count.
 
+* Empirical-sample conditional-distribution CV now evaluates the documented
+  off-diagonal criterion with divisor `n(n - 1)`. Ordinary generalized
+  nearest-neighbour rows construct the explanatory radius from the delete-one
+  sample and the response radius from the occurrence union `{i, j}` required
+  by `Fhat_{-i}(Y_j | X_i)`. The exact row and bounded block owners share one
+  two-slot order-statistic selector, preserve duplicate occurrences, and add
+  no pair matrix or per-fold sort. Fixed, adaptive, and beta sample-grid
+  objectives receive only the normalization correction; genuine external and
+  default response grids are unchanged.
+
 * Ordinary generalized nearest-neighbour conditional-density and
   conditional-distribution training fits now construct explanatory and
   response radii after deleting the identified focal occurrence, while still
   retaining that observation in the estimator sum. Scalar and
   local-polynomial owners share the same explicit occurrence contract and
   reject literal zero radii. Equal-valued external queries, fixed and adaptive
-  bandwidths, beta kernels, extended nearest-neighbour bandwidths, and search
-  objectives retain their existing contracts.
+  bandwidths, beta kernels, extended nearest-neighbour bandwidths, and
+  external-grid search objectives retain their existing contracts.
 
 * Ordinary generalized nearest-neighbour conditional-density CVML now
   constructs both explanatory and response radii after deleting the focal
@@ -22,8 +32,8 @@
   local-polynomial row, and bounded block-stream owners share the same
   explicit occurrence contract; zero literal radii fail the candidate
   cleanly. Fixed and adaptive bandwidths, conditional-density CVLS,
-  conditional-distribution objectives, beta kernels, and extended
-  nearest-neighbour bandwidths retain their existing contracts.
+  conditional-distribution external-grid objectives, beta kernels, and
+  extended nearest-neighbour bandwidths retain their existing contracts.
 
 * Ordinary generalized nearest-neighbour unconditional density and
   distribution rows now distinguish identified training occurrences from
