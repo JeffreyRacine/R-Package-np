@@ -36,7 +36,7 @@ test_that("all-large conditional-distribution CVLS keeps its objective resident"
   expect_match(body, "cv_accumulator += tvd*tvd;", fixed = TRUE)
   expect_match(
     body,
-    "cv_accumulator /= ((double)ctx.num_train*(double)MAX(1, num_eval));",
+    "cv_accumulator /= np_conditional_distribution_cvls_pair_count(\n    ctx.num_train, num_eval, cdfontrain_extern);",
     fixed = TRUE
   )
   expect_match(body, "if(cv_started)\n    *cv = cv_accumulator;", fixed = TRUE)

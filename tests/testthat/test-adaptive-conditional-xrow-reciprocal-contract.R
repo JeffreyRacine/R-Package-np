@@ -102,7 +102,7 @@ adaptive_cdist_signed_wls_oracle <- function(xdat, ydat, bw) {
     keep <- seq_len(n) != training
     objective <- objective + sum((indicator[keep] - fit[keep])^2)
   }
-  objective / (n * n)
+  objective / (n * (n - 1L))
 }
 
 test_that("adaptive conditional X reciprocals remain a lazy optional sidecar", {

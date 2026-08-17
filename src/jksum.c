@@ -7484,6 +7484,64 @@ void np_ckernelv(const int KERNEL,
 
 }
 
+/* Portable two-bandwidth CDF sibling for the exact empirical-GNN correction.
+ * It shares each training-value load and output permutation while evaluating
+ * the same scalar kernel functions as two independent np_ckernelv() calls.
+ * Apple/vector acceleration retains its established owner. */
+static int np_ckernelv_cdf_pair_portable_try(
+  const int kernel,
+  const double * const train,
+  const int num_train,
+  const double evaluation,
+  const double primary_bandwidth,
+  const double successor_bandwidth,
+  const int * const position_to_occurrence,
+  double * const primary,
+  double * const successor)
+{
+  int i;
+
+  if(np_mseries_accelerate_enabled_cache || kernel < 30 || kernel > 38 ||
+     train == NULL || num_train <= 0 || !isfinite(evaluation) ||
+     !isfinite(primary_bandwidth) || primary_bandwidth <= 0.0 ||
+     !isfinite(successor_bandwidth) ||
+     successor_bandwidth < primary_bandwidth ||
+     primary == NULL || successor == NULL)
+    return 0;
+
+#define NP_CKERNELV_CDF_PAIR_APPLY(fn)                                      \
+  do {                                                                       \
+    const double primary_scale = 1.0/primary_bandwidth;                      \
+    const double successor_scale = 1.0/successor_bandwidth;                  \
+    for(i = 0; i < num_train; ++i){                                          \
+      const int output_position = position_to_occurrence != NULL ?           \
+        position_to_occurrence[i] : i;                                       \
+      const double difference = evaluation - train[i];                       \
+      if(output_position < 0 || output_position >= num_train)                \
+        return -1;                                                           \
+      primary[output_position] = fn(difference*primary_scale);               \
+      successor[output_position] = fn(difference*successor_scale);           \
+    }                                                                        \
+  } while(0)
+
+  switch(kernel){
+    case 30: NP_CKERNELV_CDF_PAIR_APPLY(np_cdf_gauss2); break;
+    case 31: NP_CKERNELV_CDF_PAIR_APPLY(np_cdf_gauss4); break;
+    case 32: NP_CKERNELV_CDF_PAIR_APPLY(np_cdf_gauss6); break;
+    case 33: NP_CKERNELV_CDF_PAIR_APPLY(np_cdf_gauss8); break;
+    case 34: NP_CKERNELV_CDF_PAIR_APPLY(np_cdf_epan2); break;
+    case 35: NP_CKERNELV_CDF_PAIR_APPLY(np_cdf_epan4); break;
+    case 36: NP_CKERNELV_CDF_PAIR_APPLY(np_cdf_epan6); break;
+    case 37: NP_CKERNELV_CDF_PAIR_APPLY(np_cdf_epan8); break;
+    case 38: NP_CKERNELV_CDF_PAIR_APPLY(np_cdf_rect); break;
+    default: return 0;
+  }
+
+#undef NP_CKERNELV_CDF_PAIR_APPLY
+
+  return 1;
+}
+
 void np_convol_ckernelv(const int KERNEL, 
                         const double * const xt, const int num_xt, 
                         const int do_xw,
@@ -20673,6 +20731,22 @@ np_conditional_distribution_cvls_categorical_profile_stream(
   double *vector_scale_factor,
   double *cv);
 
+static int np_conditional_distribution_cvls_gnn_empirical_stream(
+  double *vector_scale_factor,
+  double *cv);
+
+static double np_conditional_distribution_cvls_pair_count(
+  const int64_t num_train,
+  const int64_t num_eval,
+  const int cdf_on_train){
+  if(num_train <= 0 || num_eval <= 0)
+    return 0.0;
+  if(cdf_on_train)
+    return num_eval == num_train && num_train > 1 ?
+      (double)num_train*(double)(num_train - 1) : 0.0;
+  return (double)num_train*(double)num_eval;
+}
+
 int np_kernel_estimate_con_distribution_categorical_leave_one_out_ls_cv(
 int KERNEL_den,
 int KERNEL_unordered_den,
@@ -20710,6 +20784,10 @@ double *cv){
   NP_GateOverrideCtx gate_x_ctx, gate_y_ctx;
   np_gate_ctx_clear(&gate_x_ctx);
   np_gate_ctx_clear(&gate_y_ctx);
+
+  if(BANDWIDTH_den == BW_GEN_NN && cdfontrain)
+    return np_conditional_distribution_cvls_gnn_empirical_stream(
+      vector_scale_factor, cv);
 
   if(BANDWIDTH_den == BW_FIXED){
     const NPConditionalProfileCvStatus profile_status =
@@ -21524,7 +21602,8 @@ double *cv){
 #ifdef MPI2
     MPI_Allreduce(MPI_IN_PLACE, cv, 1, MPI_DOUBLE, MPI_SUM, comm[1]);
 #endif
-    *cv /= (double) num_obs_train*num_obs_eval;
+    *cv /= np_conditional_distribution_cvls_pair_count(
+      num_obs_train, num_obs_eval, cdfontrain);
 
     free(kwx);
     free(kwy);
@@ -21817,7 +21896,8 @@ double *cv){
 #ifdef MPI2
     MPI_Allreduce(MPI_IN_PLACE, cv, 1, MPI_DOUBLE, MPI_SUM, comm[1]);
 #endif
-    *cv /= (double) num_obs_train*num_obs_eval;
+    *cv /= np_conditional_distribution_cvls_pair_count(
+      num_obs_train, num_obs_eval, cdfontrain);
 
     free(kwx);
     free(kwy);
@@ -26839,12 +26919,14 @@ typedef struct {
   double *lambday;
   double *kw;
   double **matrix_bandwidth_y;
+  double **matrix_bandwidth_y_successor;
   double **matrix_bandwidth_eval_one;
   double **eval_yuno_one;
   double **eval_yord_one;
   double **eval_ycon_one;
   NPConditionalYRowReciprocalCache *reciprocal_cache;
   int reciprocal_cache_attempted;
+  int base_exclusion_successor_ready;
 } NPConditionalYRowCtx;
 
 static int NP_NOINLINE np_conditional_yrow_reciprocal_cache_try(
@@ -27971,6 +28053,8 @@ static void np_conditional_yrow_ctx_clear(NPConditionalYRowCtx *ctx){
   if(ctx->kw != NULL) free(ctx->kw);
   if(ctx->reciprocal_cache != NULL) free(ctx->reciprocal_cache);
   if(ctx->matrix_bandwidth_y != NULL) free_tmat(ctx->matrix_bandwidth_y);
+  if(ctx->matrix_bandwidth_y_successor != NULL)
+    free_tmat(ctx->matrix_bandwidth_y_successor);
   if(ctx->matrix_bandwidth_eval_one != NULL) free_tmat(ctx->matrix_bandwidth_eval_one);
   if(ctx->eval_yuno_one != NULL) free_mat(ctx->eval_yuno_one, num_var_unordered_extern);
   if(ctx->eval_yord_one != NULL) free_mat(ctx->eval_yord_one, num_var_ordered_extern);
@@ -28103,6 +28187,93 @@ static int np_conditional_yrow_eval_ctx_prepare(double *vector_scale_factor,
     vector_scale_factor, operator_code,
     matrix_Y_unordered_eval, matrix_Y_ordered_eval,
     matrix_Y_continuous_eval, num_eval, NULL, ctx);
+}
+
+/* Prepare the two adjacent mapped-query order statistics needed by a
+ * delete-one empirical CDF row. The pair-specific base occurrence can then
+ * select between them in O(1) per coordinate without another sort, scan, or
+ * auxiliary n-by-n radius matrix. */
+static int np_conditional_yrow_eval_two_slot_ctx_prepare(
+  double *vector_scale_factor,
+  int operator_code,
+  double **matrix_Y_unordered_eval,
+  double **matrix_Y_ordered_eval,
+  double **matrix_Y_continuous_eval,
+  int num_eval,
+  const NPNNGeometryContext *mapped_query_geometry,
+  NPConditionalYRowCtx *ctx){
+  const int num_train = num_obs_train_extern;
+  const int num_var_tot = num_var_continuous_extern +
+    num_var_unordered_extern + num_var_ordered_extern;
+  double *successor_scale = NULL;
+  double *successor_lambda = NULL;
+  int l;
+
+  if(BANDWIDTH_den_extern != BW_GEN_NN ||
+     mapped_query_geometry == NULL || ctx == NULL)
+    return 1;
+  if(np_conditional_yrow_eval_ctx_prepare_ctx(
+       vector_scale_factor, operator_code,
+       matrix_Y_unordered_eval, matrix_Y_ordered_eval,
+       matrix_Y_continuous_eval, num_eval,
+       mapped_query_geometry, ctx) != 0)
+    return 1;
+
+  if(num_var_continuous_extern <= 0){
+    ctx->base_exclusion_successor_ready = 1;
+    return 0;
+  }
+
+  successor_scale = alloc_vecd(MAX(1, num_var_tot));
+  successor_lambda = alloc_vecd(MAX(1, num_var_unordered_extern +
+                                         num_var_ordered_extern));
+  ctx->matrix_bandwidth_y_successor =
+    alloc_tmatd(num_eval, num_var_continuous_extern);
+  if(successor_scale == NULL || successor_lambda == NULL ||
+     ctx->matrix_bandwidth_y_successor == NULL)
+    goto fail_two_slot_prepare;
+
+  for(l = 0; l < num_var_tot; ++l)
+    successor_scale[l] = ctx->vsfy[l];
+  for(l = 0; l < num_var_continuous_extern; ++l){
+    const int k = np_fround(ctx->vsfy[l]);
+    if(k < 1 || k > num_train - 2)
+      goto fail_two_slot_prepare;
+    successor_scale[l] = (double)(k + 1);
+  }
+
+  /* This Y-only owner marshals its coordinates through the helper's X slots. */
+  if(kernel_bandwidth_mean_ctx(KERNEL_den_extern,
+                               BANDWIDTH_den_extern,
+                               num_train,
+                               num_eval,
+                               0, 0, 0,
+                               num_var_continuous_extern,
+                               num_var_unordered_extern,
+                               num_var_ordered_extern,
+                               0,
+                               successor_scale,
+                               NULL, NULL,
+                               matrix_Y_continuous_train_extern,
+                               matrix_Y_continuous_eval,
+                               NULL,
+                               ctx->matrix_bandwidth_y_successor,
+                               successor_lambda,
+                               mapped_query_geometry,
+                               NULL,
+                               NULL) == 1)
+    goto fail_two_slot_prepare;
+
+  free(successor_scale);
+  free(successor_lambda);
+  ctx->base_exclusion_successor_ready = 1;
+  return 0;
+
+fail_two_slot_prepare:
+  free(successor_scale);
+  free(successor_lambda);
+  np_conditional_yrow_ctx_clear(ctx);
+  return 1;
 }
 
 static int np_conditional_yrow_ctx_prepare_ctx(
@@ -28271,16 +28442,20 @@ static int np_conditional_yrow_from_ctx(NPConditionalYRowCtx *ctx,
   return 0;
 }
 
-static int np_conditional_y_eval_from_ctx(NPConditionalYRowCtx *ctx,
-                                          int eval_idx,
-                                          double **matrix_Y_unordered_eval,
-                                          double **matrix_Y_ordered_eval,
-                                          double **matrix_Y_continuous_eval,
-                                          int num_eval,
-                                          int map_train_tree_index,
-                                          double *row_out){
+static int np_conditional_y_eval_from_ctx_impl(NPConditionalYRowCtx *ctx,
+                                               int eval_idx,
+                                               double **matrix_Y_unordered_eval,
+                                               double **matrix_Y_ordered_eval,
+                                               double **matrix_Y_continuous_eval,
+                                               int num_eval,
+                                               int map_train_tree_index,
+                                               int base_exclusion,
+                                               uint64_t successor_mask,
+                                               int use_successor_mask,
+                                               double *row_out){
   const int num_train = num_obs_train_extern;
   int eval_pos = eval_idx;
+  int base_pos = base_exclusion;
   NPConditionalBoundState bounds_state;
   int j, l;
 
@@ -28288,11 +28463,18 @@ static int np_conditional_y_eval_from_ctx(NPConditionalYRowCtx *ctx,
     return 1;
   if((eval_idx < 0) || (eval_idx >= num_eval))
     return 1;
+  if(base_exclusion < -1 || base_exclusion >= num_train)
+    return 1;
+  if(use_successor_mask && !ctx->base_exclusion_successor_ready)
+    return 1;
 
   memset(row_out, 0, (size_t)num_train*sizeof(double));
 
   if(map_train_tree_index && (int_TREE_Y == NP_TREE_TRUE) && (ipt_lookup_extern_Y != NULL))
     eval_pos = ipt_lookup_extern_Y[eval_idx];
+  if(base_exclusion >= 0 && map_train_tree_index &&
+     (int_TREE_Y == NP_TREE_TRUE) && (ipt_lookup_extern_Y != NULL))
+    base_pos = ipt_lookup_extern_Y[base_exclusion];
 
   if(ctx->num_var_tot <= 0){
     for(j = 0; j < num_train; j++)
@@ -28305,9 +28487,33 @@ static int np_conditional_y_eval_from_ctx(NPConditionalYRowCtx *ctx,
   for(l = 0; l < num_var_ordered_extern; l++)
     ctx->eval_yord_one[l][0] = matrix_Y_ordered_eval[l][eval_pos];
   for(l = 0; l < num_var_continuous_extern; l++){
+    double bandwidth =
+      (BANDWIDTH_den_extern == BW_GEN_NN) ?
+      ctx->matrix_bandwidth_y[l][eval_pos] : ctx->matrix_bandwidth_y[l][0];
+
+    if(use_successor_mask){
+      if((successor_mask & (UINT64_C(1) << l)) != 0){
+        if(ctx->matrix_bandwidth_y_successor == NULL)
+          return 1;
+        bandwidth = ctx->matrix_bandwidth_y_successor[l][eval_pos];
+      }
+    } else if(base_exclusion >= 0 && base_pos != eval_pos){
+      const double successor =
+        ctx->base_exclusion_successor_ready &&
+        ctx->matrix_bandwidth_y_successor != NULL ?
+        ctx->matrix_bandwidth_y_successor[l][eval_pos] : bandwidth;
+      const double base_distance = fabs(
+        matrix_Y_continuous_train_extern[l][base_pos] -
+        matrix_Y_continuous_eval[l][eval_pos]);
+
+      if(!ctx->base_exclusion_successor_ready ||
+         np_nn_two_slot_radius_select(bandwidth, successor,
+                                      base_distance, 1,
+                                      &bandwidth) != 0)
+        return 1;
+    }
     ctx->eval_ycon_one[l][0] = matrix_Y_continuous_eval[l][eval_pos];
-    ctx->matrix_bandwidth_eval_one[l][0] =
-      (BANDWIDTH_den_extern == BW_GEN_NN) ? ctx->matrix_bandwidth_y[l][eval_pos] : ctx->matrix_bandwidth_y[l][0];
+    ctx->matrix_bandwidth_eval_one[l][0] = bandwidth;
   }
 
   np_conditional_push_bounds(int_cyker_bound_extern,
@@ -28350,6 +28556,219 @@ static int np_conditional_y_eval_from_ctx(NPConditionalYRowCtx *ctx,
     row_out[orig_j] = ctx->kw[j];
   }
 
+  return 0;
+}
+
+static int np_conditional_y_eval_from_ctx(NPConditionalYRowCtx *ctx,
+                                          int eval_idx,
+                                          double **matrix_Y_unordered_eval,
+                                          double **matrix_Y_ordered_eval,
+                                          double **matrix_Y_continuous_eval,
+                                          int num_eval,
+                                          int map_train_tree_index,
+                                          double *row_out){
+  return np_conditional_y_eval_from_ctx_impl(
+    ctx, eval_idx, matrix_Y_unordered_eval, matrix_Y_ordered_eval,
+    matrix_Y_continuous_eval, num_eval, map_train_tree_index, -1,
+    UINT64_C(0), 0, row_out);
+}
+
+static int np_conditional_y_eval_from_ctx_base_exclusion(
+  NPConditionalYRowCtx *ctx,
+  int eval_idx,
+  double **matrix_Y_unordered_eval,
+  double **matrix_Y_ordered_eval,
+  double **matrix_Y_continuous_eval,
+  int num_eval,
+  int map_train_tree_index,
+  int base_exclusion,
+  double *row_out){
+  return np_conditional_y_eval_from_ctx_impl(
+    ctx, eval_idx, matrix_Y_unordered_eval, matrix_Y_ordered_eval,
+    matrix_Y_continuous_eval, num_eval, map_train_tree_index,
+    base_exclusion, UINT64_C(0), 0, row_out);
+}
+
+static int np_conditional_y_eval_from_ctx_successor_mask(
+  NPConditionalYRowCtx *ctx,
+  int eval_idx,
+  double **matrix_Y_unordered_eval,
+  double **matrix_Y_ordered_eval,
+  double **matrix_Y_continuous_eval,
+  int num_eval,
+  int map_train_tree_index,
+  uint64_t successor_mask,
+  double *row_out){
+  return np_conditional_y_eval_from_ctx_impl(
+    ctx, eval_idx, matrix_Y_unordered_eval, matrix_Y_ordered_eval,
+    matrix_Y_continuous_eval, num_eval, map_train_tree_index, -1,
+    successor_mask, 1, row_out);
+}
+
+static int np_conditional_y_base_exclusion_successor_mask(
+  const NPConditionalYRowCtx *ctx,
+  int eval_idx,
+  double **matrix_Y_continuous_eval,
+  int num_eval,
+  int map_train_tree_index,
+  int base_exclusion,
+  uint64_t *successor_mask){
+  int eval_pos = eval_idx;
+  int base_pos = base_exclusion;
+  uint64_t mask = UINT64_C(0);
+  int l;
+
+  if(ctx == NULL || successor_mask == NULL ||
+     !ctx->base_exclusion_successor_ready ||
+     eval_idx < 0 || eval_idx >= num_eval ||
+     base_exclusion < 0 || base_exclusion >= num_obs_train_extern ||
+     num_var_continuous_extern >= 64)
+    return 1;
+  if(map_train_tree_index && int_TREE_Y == NP_TREE_TRUE &&
+     ipt_lookup_extern_Y != NULL){
+    eval_pos = ipt_lookup_extern_Y[eval_idx];
+    base_pos = ipt_lookup_extern_Y[base_exclusion];
+  }
+  if(base_pos == eval_pos){
+    *successor_mask = mask;
+    return 0;
+  }
+
+  for(l = 0; l < num_var_continuous_extern; ++l){
+    const double primary = ctx->matrix_bandwidth_y[l][eval_pos];
+    const double successor =
+      ctx->matrix_bandwidth_y_successor[l][eval_pos];
+    const double distance = fabs(
+      matrix_Y_continuous_train_extern[l][base_pos] -
+      matrix_Y_continuous_eval[l][eval_pos]);
+    double selected;
+
+    if(np_nn_two_slot_radius_select(primary, successor, distance, 1,
+                                    &selected) != 0)
+      return 1;
+    if(distance <= primary)
+      mask |= UINT64_C(1) << l;
+  }
+  *successor_mask = mask;
+  return 0;
+}
+
+/* Fill one generalized-NN empirical CDF radius variant through the same
+ * continuous-kernel vector owner used by kernel_weighted_sum_np().  The
+ * narrow capability boundary keeps categorical products, bounds, and
+ * multivariate response masks on the fully general row engine. */
+static int np_conditional_y_eval_univariate_pair_direct(
+  NPConditionalYRowCtx *ctx,
+  int eval_idx,
+  double **matrix_Y_continuous_eval,
+  int num_eval,
+  int map_train_tree_index,
+  double *primary,
+  double *successor)
+{
+  const int num_train = num_obs_train_extern;
+  int eval_pos = eval_idx;
+  int portable_status;
+
+  if(ctx == NULL || !ctx->ready || !ctx->base_exclusion_successor_ready ||
+     matrix_Y_continuous_eval == NULL ||
+     matrix_Y_continuous_eval[0] == NULL ||
+     primary == NULL || successor == NULL ||
+     eval_idx < 0 || eval_idx >= num_eval)
+    return 1;
+  if(BANDWIDTH_den_extern != BW_GEN_NN || ctx->num_var_tot != 1 ||
+     num_var_continuous_extern != 1 || num_var_unordered_extern != 0 ||
+     num_var_ordered_extern != 0 || ctx->operator_y == NULL ||
+     ctx->operator_y[0] != OP_INTEGRAL || int_cyker_bound_extern != 0 ||
+     ctx->kernel_cy == NULL || ctx->kernel_cy[0] < 0 ||
+     ctx->kernel_cy[0] > 8 || ctx->matrix_bandwidth_y == NULL ||
+     ctx->matrix_bandwidth_y_successor == NULL ||
+     matrix_Y_continuous_train_extern == NULL ||
+     matrix_Y_continuous_train_extern[0] == NULL)
+    return 2;
+
+  if(map_train_tree_index && int_TREE_Y == NP_TREE_TRUE){
+    if(ipt_lookup_extern_Y == NULL || ipt_extern_Y == NULL)
+      return 2;
+    eval_pos = ipt_lookup_extern_Y[eval_idx];
+  }
+
+  portable_status = np_ckernelv_cdf_pair_portable_try(
+    ctx->kernel_cy[0] + OP_CFUN_OFFSETS[OP_INTEGRAL],
+    matrix_Y_continuous_train_extern[0],
+    num_train,
+    matrix_Y_continuous_eval[0][eval_pos],
+    ctx->matrix_bandwidth_y[0][eval_pos],
+    ctx->matrix_bandwidth_y_successor[0][eval_pos],
+    int_TREE_Y == NP_TREE_TRUE ? ipt_extern_Y : NULL,
+    primary,
+    successor);
+  if(portable_status < 0)
+    return 1;
+  return portable_status == 1 ? 0 : 2;
+}
+
+static int np_conditional_y_eval_univariate_direct(
+  NPConditionalYRowCtx *ctx,
+  int eval_idx,
+  double **matrix_Y_continuous_eval,
+  int num_eval,
+  int map_train_tree_index,
+  int use_successor,
+  double *row_out)
+{
+  const int num_train = num_obs_train_extern;
+  int eval_pos = eval_idx;
+  int kernel;
+  double eval_y;
+  double bandwidth;
+  int j;
+
+  if(ctx == NULL || !ctx->ready || !ctx->base_exclusion_successor_ready ||
+     matrix_Y_continuous_eval == NULL ||
+     matrix_Y_continuous_eval[0] == NULL ||
+     row_out == NULL ||
+     eval_idx < 0 || eval_idx >= num_eval)
+    return 1;
+  if(BANDWIDTH_den_extern != BW_GEN_NN || ctx->num_var_tot != 1 ||
+     num_var_continuous_extern != 1 || num_var_unordered_extern != 0 ||
+     num_var_ordered_extern != 0 || ctx->operator_y == NULL ||
+     ctx->operator_y[0] != OP_INTEGRAL || int_cyker_bound_extern != 0 ||
+     ctx->kernel_cy == NULL || ctx->kernel_cy[0] < 0 ||
+     ctx->kernel_cy[0] > 8 || ctx->matrix_bandwidth_y == NULL ||
+     ctx->matrix_bandwidth_y_successor == NULL ||
+     matrix_Y_continuous_train_extern == NULL ||
+     matrix_Y_continuous_train_extern[0] == NULL)
+    return 2;
+
+  if(map_train_tree_index && int_TREE_Y == NP_TREE_TRUE){
+    if(ipt_lookup_extern_Y == NULL || ipt_extern_Y == NULL)
+      return 2;
+    eval_pos = ipt_lookup_extern_Y[eval_idx];
+  }
+  eval_y = matrix_Y_continuous_eval[0][eval_pos];
+  bandwidth = use_successor ?
+    ctx->matrix_bandwidth_y_successor[0][eval_pos] :
+    ctx->matrix_bandwidth_y[0][eval_pos];
+  if(!isfinite(eval_y) || !isfinite(bandwidth) || bandwidth <= 0.0)
+    return 1;
+
+  kernel = ctx->kernel_cy[0] + OP_CFUN_OFFSETS[OP_INTEGRAL];
+  if(int_TREE_Y == NP_TREE_TRUE){
+    np_ckernelv(kernel,
+                matrix_Y_continuous_train_extern[0],
+                num_train, 0, eval_y, bandwidth,
+                ctx->kw, NULL, 0, 1, 1.0, 0,
+                R_NegInf, R_PosInf, NULL, NULL);
+    for(j = 0; j < num_train; ++j)
+      row_out[ipt_extern_Y[j]] = ctx->kw[j];
+  } else {
+    np_ckernelv(kernel,
+                matrix_Y_continuous_train_extern[0],
+                num_train, 0, eval_y, bandwidth,
+                row_out, NULL, 0, 1, 1.0, 0,
+                R_NegInf, R_PosInf, NULL, NULL);
+  }
   return 0;
 }
 
@@ -32581,7 +33000,8 @@ static int np_conditional_distribution_cvls_lp_all_large_stream(double *vector_s
     }
   }
 
-  cv_accumulator /= ((double)ctx.num_train*(double)MAX(1, num_eval));
+  cv_accumulator /= np_conditional_distribution_cvls_pair_count(
+    ctx.num_train, num_eval, cdfontrain_extern);
   status = 0;
 
 cleanup_cdist_all_large:
@@ -33704,6 +34124,562 @@ cleanup_cvls_lp_block:
   return status;
 }
 
+/* Canonical generalized-NN empirical conditional-CDF row owner.  X row i is
+ * formed on D_n\{i}.  Response query j uses the bounded exclusion union
+ * D_n\{i,j}, while the estimator dot product still excludes only donor i via
+ * the X influence row.  The prepared adjacent response radii avoid per-pair
+ * sorting and retain O(n) auxiliary storage per coordinate. */
+static int np_conditional_distribution_cvls_gnn_empirical_row_stream(
+  double *vector_scale_factor,
+  double *cv)
+{
+  const int num_train = num_obs_train_extern;
+  const int num_eval = num_obs_eval_extern;
+  const double pair_count = np_conditional_distribution_cvls_pair_count(
+    num_train, num_eval, 1);
+  NPConditionalXRowCtx xctx = {0};
+  NPConditionalYRowCtx yctx = {0};
+  double *xrow = NULL;
+  double *yint = NULL;
+  int i, j;
+  int status = 1;
+
+  if(cv == NULL || vector_scale_factor == NULL ||
+     BANDWIDTH_den_extern != BW_GEN_NN ||
+     !cdfontrain_extern || pair_count <= 0.0)
+    return 1;
+
+  xrow = alloc_vecd(MAX(1, num_train));
+  yint = alloc_vecd(MAX(1, num_train));
+  if(xrow == NULL || yint == NULL)
+    goto cleanup_gnn_empirical_cdist;
+
+  if(np_conditional_xrow_ctx_prepare_ctx(
+       vector_scale_factor,
+       &np_conditional_training_identity_geometry,
+       &xctx) != 0)
+    goto cleanup_gnn_empirical_cdist;
+  if(np_conditional_yrow_eval_two_slot_ctx_prepare(
+       vector_scale_factor,
+       OP_INTEGRAL,
+       matrix_Y_unordered_eval_extern,
+       matrix_Y_ordered_eval_extern,
+       matrix_Y_continuous_eval_extern,
+       num_eval,
+       &np_conditional_training_identity_geometry,
+       &yctx) != 0)
+    goto cleanup_gnn_empirical_cdist;
+
+  *cv = 0.0;
+  for(i = 0; i < num_train; ++i){
+    if((i & 15) == 0)
+      np_progress_bandwidth_loop_step();
+    if(np_conditional_xrow_from_ctx(&xctx, i, xrow) != 0)
+      goto cleanup_gnn_empirical_cdist;
+
+    for(j = 0; j < num_eval; ++j){
+      double fit;
+      double difference;
+      int indicator;
+
+      if(i == j)
+        continue;
+      if(np_conditional_y_eval_from_ctx_base_exclusion(
+           &yctx,
+           j,
+           matrix_Y_unordered_eval_extern,
+           matrix_Y_ordered_eval_extern,
+           matrix_Y_continuous_eval_extern,
+           num_eval,
+           1,
+           i,
+           yint) != 0)
+        goto cleanup_gnn_empirical_cdist;
+
+      fit = np_blas_ddot_int(num_train, xrow, yint);
+      indicator = np_conditional_indicator_original_order(i, j);
+      difference = (double)indicator - fit;
+      *cv += difference*difference;
+    }
+  }
+
+  *cv /= pair_count;
+  status = 0;
+
+cleanup_gnn_empirical_cdist:
+  np_conditional_xrow_ctx_clear(&xctx);
+  np_conditional_yrow_ctx_clear(&yctx);
+  free(xrow);
+  free(yint);
+  np_glp_cv_clear_extern();
+  return status;
+}
+
+#define NP_CDIST_GNN_EMPIRICAL_MAX_MASKS 16
+
+/* Bounded-mask blocked sibling of the exact row owner. Each continuous
+ * response coordinate has only two admissible radii: the mapped-query radius
+ * and its adjacent successor. The primary fits retain the established blocked
+ * GEMM owner. Univariate successor corrections use response-ordered bounded
+ * microtiles when their mask occupancy justifies the extra cells; sparse and
+ * multivariate masks retain exact dot products. Auxiliary storage is O(nB+B^2)
+ * for bounded tile widths B. */
+static int np_conditional_distribution_cvls_gnn_empirical_block_stream(
+  double *vector_scale_factor,
+  double *cv)
+{
+  const int num_train = num_obs_train_extern;
+  const int num_eval = num_obs_eval_extern;
+  const int response_dimensions = num_var_continuous_extern;
+  const int variant_count = response_dimensions >= 0 && response_dimensions < 31 ?
+    (1 << response_dimensions) : 0;
+  const int block_size = MIN(
+    np_conditional_lp_cvls_block_size(
+      num_train, response_dimensions == 1 ? 6U : 5U, 1U),
+    MAX(1, num_train));
+  const int correction_tile = MIN(128, block_size);
+  const double pair_count = np_conditional_distribution_cvls_pair_count(
+    num_train, num_eval, 1);
+  NPConditionalXRowCtx xctx = {0};
+  NPConditionalYRowCtx yctx = {0};
+  double **xblocks[4] = {NULL, NULL, NULL, NULL};
+  double **yprimary = NULL;
+  double **ysuccessor = NULL;
+  double *yvariant = NULL;
+  double *variant_cross = NULL;
+  double *fit_cross = NULL;
+  double *row_sum = NULL;
+  uint64_t *selected_masks = NULL;
+  unsigned char *tile_advances = NULL;
+  int *mask_counts = NULL;
+  int *fold_order = NULL;
+  int *advance_start = NULL;
+  int *advance_end = NULL;
+  int requested_group_width;
+  int group_width = 1;
+  int i0, j0, ii, jj, g, mask;
+  int status = 1;
+  NPCVLSWorkspaceStatus workspace_status = NP_CVLS_WORKSPACE_OK;
+
+  if(cv == NULL || vector_scale_factor == NULL ||
+     BANDWIDTH_den_extern != BW_GEN_NN || !cdfontrain_extern ||
+     pair_count <= 0.0 || block_size <= 0 || variant_count <= 0 ||
+     variant_count > NP_CDIST_GNN_EMPIRICAL_MAX_MASKS)
+    return 1;
+  if(!np_conditional_lp_stream_engine_supported())
+    return 2;
+
+  requested_group_width = MIN(
+    4,
+    (num_train / block_size) + ((num_train % block_size) != 0));
+
+  workspace_status =
+    np_cvls_workspace_matrix_try(num_train, block_size, &xblocks[0]);
+  if(workspace_status == NP_CVLS_WORKSPACE_OK)
+    workspace_status =
+      np_cvls_workspace_matrix_try(num_train, block_size, &yprimary);
+  if(workspace_status == NP_CVLS_WORKSPACE_OK)
+    workspace_status =
+      np_cvls_workspace_square_try(block_size, &fit_cross);
+  if(workspace_status == NP_CVLS_WORKSPACE_OK && variant_count > 2)
+    workspace_status = np_cvls_workspace_vector_try(
+      (size_t)num_train, &yvariant);
+  if(workspace_status == NP_CVLS_WORKSPACE_OK)
+    workspace_status = np_cvls_workspace_vector_try(
+      (size_t)num_train, &row_sum);
+  if(workspace_status == NP_CVLS_WORKSPACE_OK && variant_count == 2)
+    workspace_status = np_cvls_workspace_matrix_try(
+      num_train, block_size, &ysuccessor);
+  if(workspace_status == NP_CVLS_WORKSPACE_OK && variant_count == 2)
+    workspace_status = np_cvls_workspace_square_try(
+      correction_tile, &variant_cross);
+  if(workspace_status != NP_CVLS_WORKSPACE_OK)
+    goto cleanup_gnn_empirical_block;
+
+  for(g = 1; g < requested_group_width; ++g){
+    workspace_status =
+      np_cvls_workspace_matrix_try(num_train, block_size, &xblocks[g]);
+    if(workspace_status != NP_CVLS_WORKSPACE_OK)
+      goto cleanup_gnn_empirical_block;
+    group_width = g + 1;
+  }
+
+  if(variant_count == 2){
+    tile_advances = (unsigned char *)calloc(
+      (size_t)correction_tile*(size_t)correction_tile,
+      sizeof(unsigned char));
+    if(tile_advances == NULL)
+      goto cleanup_gnn_empirical_block;
+  } else {
+    selected_masks = (uint64_t *)malloc(
+      (size_t)block_size*sizeof(uint64_t));
+    mask_counts = (int *)calloc((size_t)variant_count, sizeof(int));
+    if(selected_masks == NULL || mask_counts == NULL)
+      goto cleanup_gnn_empirical_block;
+  }
+
+  if(np_conditional_xrow_ctx_prepare_ctx(
+       vector_scale_factor,
+       &np_conditional_training_identity_geometry,
+       &xctx) != 0)
+    goto cleanup_gnn_empirical_block;
+  if(np_conditional_yrow_eval_two_slot_ctx_prepare(
+       vector_scale_factor,
+       OP_INTEGRAL,
+       matrix_Y_unordered_eval_extern,
+       matrix_Y_ordered_eval_extern,
+       matrix_Y_continuous_eval_extern,
+       num_eval,
+       &np_conditional_training_identity_geometry,
+       &yctx) != 0)
+    goto cleanup_gnn_empirical_block;
+
+  /* The NN core returns one occurrence-safe response order and each mapped
+   * query's half-open deletion interval. This permutation changes compute
+   * locality, not objective order: row sums remain indexed and finished in
+   * original occurrence order. */
+  if(variant_count == 2){
+    fold_order = (int *)malloc((size_t)num_train*sizeof(int));
+    advance_start = (int *)malloc((size_t)num_train*sizeof(int));
+    advance_end = (int *)malloc((size_t)num_train*sizeof(int));
+    if(fold_order == NULL || advance_start == NULL || advance_end == NULL ||
+       matrix_Y_continuous_train_extern == NULL ||
+       matrix_Y_continuous_train_extern[0] == NULL ||
+       yctx.matrix_bandwidth_y == NULL ||
+       yctx.matrix_bandwidth_y[0] == NULL ||
+       yctx.matrix_bandwidth_y_successor == NULL ||
+       yctx.matrix_bandwidth_y_successor[0] == NULL)
+      goto cleanup_gnn_empirical_block;
+    if(int_TREE_Y == NP_TREE_TRUE &&
+       (ipt_extern_Y == NULL || ipt_lookup_extern_Y == NULL))
+      goto cleanup_gnn_empirical_block;
+    if(np_nn_two_slot_exclusion_intervals(
+         yctx.matrix_bandwidth_y[0],
+         yctx.matrix_bandwidth_y_successor[0],
+         matrix_Y_continuous_train_extern[0],
+         num_train,
+         int_TREE_Y == NP_TREE_TRUE ? ipt_lookup_extern_Y : NULL,
+         fold_order,
+         advance_start,
+         advance_end) != 0)
+      goto cleanup_gnn_empirical_block;
+  }
+
+  for(ii = 0; ii < num_train; ++ii)
+    row_sum[ii] = 0.0;
+  for(i0 = 0; i0 < num_train; i0 += group_width*block_size){
+    int block_rows[4] = {0, 0, 0, 0};
+
+    np_progress_bandwidth_loop_step();
+    for(g = 0; g < group_width; ++g){
+      const int block_start = i0 + g*block_size;
+
+      block_rows[g] = MIN(block_size, MAX(0, num_train - block_start));
+      for(ii = 0; ii < block_rows[g]; ++ii){
+        const int fold_pos = block_start + ii;
+        const int i = fold_order != NULL ? fold_order[fold_pos] : fold_pos;
+
+        if(np_conditional_xrow_from_ctx(&xctx, i, xblocks[g][ii]) != 0)
+          goto cleanup_gnn_empirical_block;
+      }
+    }
+
+    for(j0 = 0; j0 < num_eval; j0 += block_size){
+      const int jb = MIN(block_size, num_eval - j0);
+
+      for(jj = 0; jj < jb; ++jj){
+        const int eval_pos = j0 + jj;
+        const int j = fold_order != NULL ? fold_order[eval_pos] : eval_pos;
+        int primary_status = 2;
+        int successor_status = 2;
+        int pair_status = 2;
+
+        if(variant_count == 2){
+          pair_status = np_conditional_y_eval_univariate_pair_direct(
+            &yctx,
+            j,
+            matrix_Y_continuous_eval_extern,
+            num_eval,
+            1,
+            yprimary[jj],
+            ysuccessor[jj]);
+          if(pair_status == 1)
+            goto cleanup_gnn_empirical_block;
+          if(pair_status == 0){
+            primary_status = 0;
+            successor_status = 0;
+          } else {
+            primary_status = np_conditional_y_eval_univariate_direct(
+              &yctx, j, matrix_Y_continuous_eval_extern, num_eval, 1,
+              0, yprimary[jj]);
+          }
+        }
+        if(primary_status == 1)
+          goto cleanup_gnn_empirical_block;
+        if(primary_status == 2 &&
+           np_conditional_y_eval_from_ctx_successor_mask(
+             &yctx,
+             j,
+             matrix_Y_unordered_eval_extern,
+             matrix_Y_ordered_eval_extern,
+             matrix_Y_continuous_eval_extern,
+             num_eval,
+             1,
+             UINT64_C(0),
+             yprimary[jj]) != 0)
+          goto cleanup_gnn_empirical_block;
+        if(variant_count == 2 && pair_status != 0)
+          successor_status = np_conditional_y_eval_univariate_direct(
+            &yctx, j, matrix_Y_continuous_eval_extern, num_eval, 1,
+            1, ysuccessor[jj]);
+        if(variant_count == 2){
+          if(successor_status == 1)
+            goto cleanup_gnn_empirical_block;
+          if(successor_status == 2 &&
+             np_conditional_y_eval_from_ctx_successor_mask(
+               &yctx,
+               j,
+               matrix_Y_unordered_eval_extern,
+               matrix_Y_ordered_eval_extern,
+               matrix_Y_continuous_eval_extern,
+               num_eval,
+               1,
+               UINT64_C(1),
+               ysuccessor[jj]) != 0)
+            goto cleanup_gnn_empirical_block;
+        }
+      }
+
+      for(g = 0; g < group_width; ++g){
+        const int block_start = i0 + g*block_size;
+        const int ib = block_rows[g];
+
+        if(ib <= 0)
+          continue;
+        np_blas_dgemm_tn_int(ib,
+                             jb,
+                             num_train,
+                             xblocks[g][0],
+                             yprimary[0],
+                             fit_cross);
+
+        for(jj = 0; jj < jb; ++jj){
+          const int eval_pos = j0 + jj;
+          const int j = fold_order != NULL ? fold_order[eval_pos] : eval_pos;
+
+          for(ii = 0; ii < ib; ++ii){
+            const int fold_pos = block_start + ii;
+            const int i = fold_order != NULL ? fold_order[fold_pos] : fold_pos;
+            const double primary_fit = fit_cross[ii + jj*ib];
+            const int indicator =
+              np_conditional_indicator_original_order(i, j);
+            const double primary_difference =
+              (double)indicator - primary_fit;
+
+            if(i != j)
+              row_sum[i] += primary_difference*primary_difference;
+          }
+        }
+
+        if(variant_count == 2){
+          int ic0, jc0;
+
+          for(ic0 = 0; ic0 < ib; ic0 += correction_tile){
+            const int mi = MIN(correction_tile, ib - ic0);
+
+            for(jc0 = 0; jc0 < jb; jc0 += correction_tile){
+              const int mj = MIN(correction_tile, jb - jc0);
+              int changed_pairs = 0;
+              int use_dense_correction;
+              int li, lj;
+
+              memset(tile_advances,
+                     0,
+                     (size_t)correction_tile*
+                     (size_t)correction_tile*sizeof(unsigned char));
+              for(lj = 0; lj < mj; ++lj){
+                const int local_j = jc0 + lj;
+                const int query_rank = j0 + local_j;
+                const int tile_start = block_start + ic0;
+                const int start = MAX(advance_start[query_rank], tile_start);
+                const int end = MIN(advance_end[query_rank], tile_start + mi);
+                int fold_rank;
+
+                for(fold_rank = start; fold_rank < end; ++fold_rank){
+                  const int li = fold_rank - tile_start;
+
+                  if(fold_rank == query_rank)
+                    continue;
+                  tile_advances[li + lj*correction_tile] = 1U;
+                  ++changed_pairs;
+                }
+              }
+
+              if(changed_pairs <= 0)
+                continue;
+
+              /* This arithmetic occupancy rule is independent of n and
+               * elapsed time. Dense masks amortize one GEMM; sparse masks
+               * avoid computing cells that the exact correction cannot use. */
+              use_dense_correction = 16*changed_pairs >= mi*mj;
+              if(use_dense_correction){
+                np_blas_dgemm_tn_int(mi,
+                                     mj,
+                                     num_train,
+                                     xblocks[g][ic0],
+                                     ysuccessor[jc0],
+                                     variant_cross);
+              }
+
+              for(lj = 0; lj < mj; ++lj){
+                const int local_j = jc0 + lj;
+                const int eval_pos = j0 + local_j;
+                const int j = fold_order[eval_pos];
+
+                for(li = 0; li < mi; ++li){
+                  const int local_i = ic0 + li;
+
+                  if(tile_advances[li + lj*correction_tile] == 0U)
+                    continue;
+                  {
+                    const int fold_pos = block_start + local_i;
+                    const int i = fold_order[fold_pos];
+                    const double primary_fit =
+                      fit_cross[local_i + local_j*ib];
+                    const double corrected_fit =
+                      use_dense_correction ?
+                      variant_cross[li + lj*mi] :
+                      np_blas_ddot_int(num_train,
+                                       xblocks[g][local_i],
+                                       ysuccessor[local_j]);
+                    const int indicator =
+                      np_conditional_indicator_original_order(i, j);
+                    const double primary_difference =
+                      (double)indicator - primary_fit;
+                    const double corrected_difference =
+                      (double)indicator - corrected_fit;
+
+                    row_sum[i] += corrected_difference*corrected_difference -
+                      primary_difference*primary_difference;
+                  }
+                }
+              }
+            }
+          }
+        } else {
+          for(jj = 0; jj < jb; ++jj){
+            const int j = j0 + jj;
+
+            memset(mask_counts, 0, (size_t)variant_count*sizeof(int));
+            for(ii = 0; ii < ib; ++ii){
+              const int i = block_start + ii;
+
+              selected_masks[ii] = UINT64_C(0);
+              if(i == j)
+                continue;
+              if(np_conditional_y_base_exclusion_successor_mask(
+                   &yctx, j, matrix_Y_continuous_eval_extern, num_eval,
+                   1, i, &selected_masks[ii]) != 0 ||
+                 selected_masks[ii] >= (uint64_t)variant_count)
+                goto cleanup_gnn_empirical_block;
+              if(selected_masks[ii] != UINT64_C(0))
+                ++mask_counts[(int)selected_masks[ii]];
+            }
+
+            for(mask = 1; mask < variant_count; ++mask){
+              if(mask_counts[mask] <= 0)
+                continue;
+              if(np_conditional_y_eval_from_ctx_successor_mask(
+                   &yctx,
+                   j,
+                   matrix_Y_unordered_eval_extern,
+                   matrix_Y_ordered_eval_extern,
+                   matrix_Y_continuous_eval_extern,
+                   num_eval,
+                   1,
+                   (uint64_t)mask,
+                   yvariant) != 0)
+                goto cleanup_gnn_empirical_block;
+
+              for(ii = 0; ii < ib; ++ii){
+                const int i = block_start + ii;
+
+                if(selected_masks[ii] == (uint64_t)mask){
+                  const double primary_fit = fit_cross[ii + jj*ib];
+                  const double corrected_fit = np_blas_ddot_int(
+                    num_train, xblocks[g][ii], yvariant);
+                  const int indicator =
+                    np_conditional_indicator_original_order(i, j);
+                  const double primary_difference =
+                    (double)indicator - primary_fit;
+                  const double corrected_difference =
+                    (double)indicator - corrected_fit;
+
+                  row_sum[i] += corrected_difference*corrected_difference -
+                    primary_difference*primary_difference;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  *cv = 0.0;
+  for(ii = 0; ii < num_train; ++ii)
+    *cv += row_sum[ii];
+  *cv /= pair_count;
+  status = 0;
+
+cleanup_gnn_empirical_block:
+  np_conditional_xrow_ctx_clear(&xctx);
+  np_conditional_yrow_ctx_clear(&yctx);
+  for(g = 0; g < 4; ++g)
+    if(xblocks[g] != NULL)
+      free_tmat(xblocks[g]);
+  if(yprimary != NULL)
+    free_tmat(yprimary);
+  if(ysuccessor != NULL)
+    free_tmat(ysuccessor);
+  free(yvariant);
+  free(variant_cross);
+  free(fit_cross);
+  free(row_sum);
+  free(selected_masks);
+  free(tile_advances);
+  free(mask_counts);
+  free(fold_order);
+  free(advance_start);
+  free(advance_end);
+  np_glp_cv_clear_extern();
+  if(workspace_status == NP_CVLS_WORKSPACE_UNAVAILABLE)
+    return 2;
+  return status;
+}
+
+static int np_conditional_distribution_cvls_gnn_empirical_stream(
+  double *vector_scale_factor,
+  double *cv)
+{
+  const int response_dimensions = num_var_continuous_extern;
+  const int variant_count = response_dimensions >= 0 && response_dimensions < 31 ?
+    (1 << response_dimensions) : 0;
+
+  if(variant_count > 0 &&
+     variant_count <= NP_CDIST_GNN_EMPIRICAL_MAX_MASKS){
+    const int status =
+      np_conditional_distribution_cvls_gnn_empirical_block_stream(
+        vector_scale_factor, cv);
+    if(status != 2)
+      return status;
+  }
+  return np_conditional_distribution_cvls_gnn_empirical_row_stream(
+    vector_scale_factor, cv);
+}
+
+#undef NP_CDIST_GNN_EMPIRICAL_MAX_MASKS
+
 /*
  * Linear-memory routed distribution owner.  This is used only when an
  * optional acceleration slab cannot be obtained.  It preserves the X-major,
@@ -33764,7 +34740,8 @@ static int np_conditional_distribution_cvls_provider_row_stream(
     }
   }
 
-  *cv /= (double)num_train*(double)MAX(1, num_eval);
+  *cv /= np_conditional_distribution_cvls_pair_count(
+    num_train, num_eval, cdfontrain_extern);
   status = 0;
 
 cleanup_provider_row:
@@ -33893,7 +34870,8 @@ static int np_conditional_distribution_cvls_provider_supertile(
         *cv += block_sum[g];
   }
 
-  *cv /= (double)num_train*(double)MAX(1, num_eval);
+  *cv /= np_conditional_distribution_cvls_pair_count(
+    num_train, num_eval, cdfontrain_extern);
   status = 0;
 
 cleanup_provider_supertile:
@@ -33994,7 +34972,8 @@ static int np_conditional_distribution_cvls_lp_row_stream(double *vector_scale_f
     }
   }
 
-  *cv /= ((double)num_train*(double)MAX(1, num_eval));
+  *cv /= np_conditional_distribution_cvls_pair_count(
+    num_train, num_eval, cdfontrain_extern);
   status = 0;
 
 cleanup_cdist_lp_stream:
@@ -34147,7 +35126,8 @@ static int np_conditional_distribution_cvls_lp_adap_block_stream(double *vector_
       *cv += block_sum[g];
   }
 
-  *cv /= ((double)num_train*(double)MAX(1, num_eval));
+  *cv /= np_conditional_distribution_cvls_pair_count(
+    num_train, num_eval, cdfontrain_extern);
   status = 0;
 
 cleanup_cdist_lp_adap_block:
@@ -34328,7 +35308,8 @@ static int np_conditional_distribution_cvls_lp_block_supertile(double *vector_sc
         *cv += block_sum[g];
   }
 
-  *cv /= ((double)num_train*(double)MAX(1, num_eval));
+  *cv /= np_conditional_distribution_cvls_pair_count(
+    num_train, num_eval, cdfontrain_extern);
   status = 0;
 
 cleanup_cdist_lp_block:
@@ -34439,7 +35420,8 @@ np_conditional_distribution_cvls_lp_block_one(double *vector_scale_factor,
     *cv += block_sum;
   }
 
-  *cv /= ((double)num_train*(double)MAX(1, num_eval));
+  *cv /= np_conditional_distribution_cvls_pair_count(
+    num_train, num_eval, cdfontrain_extern);
   status = 0;
 
 cleanup_cdist_lp_block_one:
@@ -36144,7 +37126,8 @@ double *cv){
     }
   }
 
-  *cv /= ((double)num_train*(double)MAX(1, num_eval));
+  *cv /= np_conditional_distribution_cvls_pair_count(
+    num_train, num_eval, cdfontrain_extern);
   result = NP_CONDITIONAL_PROFILE_CV_SUCCESS;
 
 cleanup_cat_cdist:
