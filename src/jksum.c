@@ -18040,18 +18040,20 @@ np_conditional_count_legacy_row(
   int *bad_dimension);
 
 /*
- * First exact adaptive delete-one consumer.  Geometry is prepared once as
+ * Exact scalar adaptive delete-one consumer.  Geometry is prepared once as
  * adjacent donor-self-excluded radii; each held-out row materializes its
  * pair-local bandwidths into caller-owned O(p*n) workspace and delegates all
  * kernel/categorical arithmetic to the canonical weighted-sum engine.
  *
- * This Phase-A1 owner is intentionally limited to scalar CVLS.  Wider local
- * polynomial rows and other objectives remain on their frozen baseline until
- * their separate migration tranche, but they will consume the same geometry
- * preparation and row-selection primitives rather than reimplementing rank
- * or tie semantics.
+ * CVLS, check-loss CV, and Klein--Spady CV differ only in the terminal loss;
+ * they therefore share this arithmetic owner.  CVAIC is intentionally absent
+ * because it is an in-sample objective, not a delete-one objective.  Wider
+ * local-polynomial rows remain on their separate migration tranche, but will
+ * consume the same geometry preparation and row-selection primitives rather
+ * than reimplementing rank or tie semantics.
  */
 static NPRegCvLpResult np_regression_cv_scalar_adaptive_exact(
+  const int bwm,
   const int num_obs,
   const int num_reg_unordered,
   const int num_reg_ordered,
@@ -18087,7 +18089,8 @@ static NPRegCvLpResult np_regression_cv_scalar_adaptive_exact(
   int regressor;
   size_t numeric_count;
 
-  if(num_obs < 3 || num_reg_continuous <= 0 ||
+  if((bwm != RBWM_CVLS && bwm != RBWM_CVCHECK && bwm != RBWM_CVKS) ||
+     num_obs < 3 || num_reg_continuous <= 0 ||
      num_reg_unordered < 0 || num_reg_ordered < 0 ||
      num_reg_continuous > INT_MAX - num_reg_unordered ||
      num_reg_continuous + num_reg_unordered > INT_MAX - num_reg_ordered ||
@@ -18186,7 +18189,6 @@ static NPRegCvLpResult np_regression_cv_scalar_adaptive_exact(
     double numerator = 0.0;
     double denominator = 0.0;
     double fitted;
-    double residual;
     int donor;
 
     if((held_out & 31) == 0)
@@ -18213,8 +18215,10 @@ static NPRegCvLpResult np_regression_cv_scalar_adaptive_exact(
        denominator == 0.0)
       goto cleanup_adaptive_exact_scalar;
     fitted = numerator/denominator;
-    residual = vector_Y[held_out] - fitted;
-    result.cv += residual*residual;
+    result.cv += np_regression_cv_loss_value(
+      bwm, fitted,
+      (bwm == RBWM_CVCHECK && vector_lsq_loss_extern != NULL) ?
+      vector_lsq_loss_extern[held_out] : vector_Y[held_out]);
     if(!isfinite(result.cv))
       goto cleanup_adaptive_exact_scalar;
     (void)common_log_scale;
@@ -18305,7 +18309,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
   lambda = np_reg_cv_core_cache.lambda;
   matrix_bandwidth = np_reg_cv_core_cache.matrix_bandwidth;
 
-  if(lp_engine == NP_LP_ENGINE_SCALAR && bwm == RBWM_CVLS &&
+  if(lp_engine == NP_LP_ENGINE_SCALAR && leave_one_out &&
      BANDWIDTH_reg == BW_ADAP_NN && num_reg_continuous > 0){
     adaptive_successor_bandwidth =
       alloc_tmatd(num_obs, num_reg_continuous);
@@ -18375,6 +18379,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
   if(adaptive_successor_bandwidth != NULL){
     const NPRegCvLpResult adaptive_exact =
       np_regression_cv_scalar_adaptive_exact(
+        bwm,
         num_obs,
         num_reg_unordered,
         num_reg_ordered,
