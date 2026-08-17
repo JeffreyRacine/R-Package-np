@@ -16,7 +16,8 @@
                                      y = NULL,
                                      output = c("matrix", "apply"),
                                      target.dist,
-                                     n.train = nrow(tdat)) {
+                                     n.train = nrow(tdat),
+                                     train.is.eval = FALSE) {
   output <- match.arg(output)
 
   if (identical(output, "apply")) {
@@ -37,7 +38,8 @@
           exdat = edat,
           operator = "integral",
           rhs = rhs.col,
-          where = "npudisthat direct operator apply"
+          where = "npudisthat direct operator apply",
+          train.is.eval = train.is.eval
         ) / n.train
         probe.sum <- .np_direct_operator_apply(
           kbw = bws,
@@ -45,7 +47,8 @@
           exdat = edat,
           operator = "integral",
           rhs = matrix(1.0, nrow = n.train, ncol = 1L),
-          where = "npudisthat direct operator probe"
+          where = "npudisthat direct operator probe",
+          train.is.eval = train.is.eval
         ) / n.train
       } else {
         out <- .np_exact_operator_apply(
@@ -54,7 +57,8 @@
           exdat = edat,
           operator = "integral",
           rhs = rhs.col,
-          where = "npudisthat exact operator apply"
+          where = "npudisthat exact operator apply",
+          train.is.eval = train.is.eval
         ) / n.train
         probe.sum <- .np_exact_operator_apply(
           kbw = bws,
@@ -62,7 +66,8 @@
           exdat = edat,
           operator = "integral",
           rhs = matrix(1.0, nrow = n.train, ncol = 1L),
-          where = "npudisthat exact operator probe"
+          where = "npudisthat exact operator probe",
+          train.is.eval = train.is.eval
         ) / n.train
       }
 
@@ -86,7 +91,8 @@
       txdat = tdat,
       exdat = edat,
       operator = "integral",
-      where = "npudisthat direct operator"
+      where = "npudisthat direct operator",
+      train.is.eval = train.is.eval
     ) / n.train
   } else {
     H <- .np_exact_operator_matrix(
@@ -94,7 +100,8 @@
       txdat = tdat,
       exdat = edat,
       operator = "integral",
-      where = "npudisthat exact operator"
+      where = "npudisthat exact operator",
+      train.is.eval = train.is.eval
     ) / n.train
   }
 
@@ -160,12 +167,12 @@ npudisthat <- function(bws,
 
   n.train <- nrow(tdat)
   edat.full <- if (no.e) tdat else edat
-  target.dist <- fitted(npudist(
-    bws = bws,
-    tdat = tdat,
-    edat = edat.full
-  ))
-  fanout <- .npRmpi_hat_operator_row_fanout(
+  target.dist <- fitted(if (no.e) {
+    npudist(bws = bws, tdat = tdat)
+  } else {
+    npudist(bws = bws, tdat = tdat, edat = edat)
+  })
+  fanout <- if (no.e) NULL else .npRmpi_hat_operator_row_fanout(
     fun.name = "npudisthat",
     bws = bws,
     tdat = tdat,
@@ -188,7 +195,8 @@ npudisthat <- function(bws,
     y = y,
     output = output,
     target.dist = target.dist,
-    n.train = n.train
+    n.train = n.train,
+    train.is.eval = no.e
   )
   if (identical(output, "apply"))
     return(H)
