@@ -10,15 +10,36 @@
   all-zero compact-kernel LOO rows now fail explicitly instead of returning a
   fabricated ridged estimate.
 
+* Exact adaptive-nearest-neighbour leave-one-out objectives now construct each
+  donor radius on the literal fold that excludes both the focal observation
+  and the donor itself. A shared adjacent-order-statistic owner supplies
+  regression, unconditional density, conditional density, and empirical
+  conditional-distribution rows without a per-fold sort or pair matrix.
+  Saturated and extended counts scale the largest available fold radius by
+  `k/(n - 2)`; the full-design integrated-square term in density CVLS retains
+  its distinct full-sample radius and `k/(n - 1)` extension. This repairs
+  formerly invalid high-count objectives and adaptive regression optimizer
+  handoffs while preserving literal duplicate occurrences, zero-radius
+  infeasibility, and linear-in-sample auxiliary storage.
+
+* Extended generalized-nearest-neighbour training queries now preserve the
+  supplied occurrence identity before applying the package's linear radius
+  extension. Regression, unconditional density/distribution, and conditional
+  mapped-training owners therefore select the farthest literal neighbour only
+  after deleting the identified focal occurrence. Equal-valued external
+  queries retain external geometry, and ordinary non-extended counts are
+  pointwise unchanged.
+
 * Empirical-sample conditional-distribution CV now evaluates the documented
   off-diagonal criterion with divisor `n(n - 1)`. Ordinary generalized
   nearest-neighbour rows construct the explanatory radius from the delete-one
   sample and the response radius from the occurrence union `{i, j}` required
   by `Fhat_{-i}(Y_j | X_i)`. The exact row and bounded block owners share one
   two-slot order-statistic selector, preserve duplicate occurrences, and add
-  no pair matrix or per-fold sort. Fixed, adaptive, and beta sample-grid
-  objectives receive only the normalization correction; genuine external and
-  default response grids are unchanged. Because the diagonal was already
+  no pair matrix or per-fold sort. Apart from the separately documented exact
+  adaptive-fold correction, fixed, adaptive, and beta sample-grid objectives
+  receive only the normalization correction; genuine external and default
+  response grids are unchanged. Because the diagonal was already
   omitted, this changes reported training-grid criterion values by the common
   positive factor `n/(n - 1)` relative to the former `n^2` divisor and does
   not change the mathematical minimizer on a common candidate domain.

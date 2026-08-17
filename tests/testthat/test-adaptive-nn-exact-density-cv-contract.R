@@ -17,8 +17,10 @@ adaptive_density_fold_fit <- function(x, k, kernel) {
     weight <- rep(1, length(donors))
     for (coordinate in seq_len(ncol(x))) {
       radius <- vapply(donors, function(donor) {
-        sort(abs(x[-c(held_out, donor), coordinate] -
-                   x[donor, coordinate]), method = "quick")[k[coordinate]]
+        distance <- sort(abs(x[-c(held_out, donor), coordinate] -
+                             x[donor, coordinate]), method = "quick")
+        lookup <- min(k[coordinate], length(distance))
+        distance[[lookup]] * k[coordinate] / lookup
       }, numeric(1L))
       weight <- weight * kernel(
         (x[held_out, coordinate] - x[donors, coordinate]) / radius) /
@@ -30,7 +32,9 @@ adaptive_density_fold_fit <- function(x, k, kernel) {
 }
 
 adaptive_density_full_radius <- function(x, donor, k) {
-  sort(abs(x[-donor] - x[donor]), method = "quick")[k]
+  distance <- sort(abs(x[-donor] - x[donor]), method = "quick")
+  lookup <- min(k, length(distance))
+  distance[[lookup]] * k / lookup
 }
 
 adaptive_density_gaussian_i1 <- function(x, k) {
@@ -154,9 +158,9 @@ test_that("adaptive density fold geometry composes with categorical kernels", {
                sum(-log(fit)), tolerance = 1e-10)
 })
 
-test_that("adaptive density CV honors fold saturation and serialized replay", {
+test_that("adaptive density CV honors extended folds and serialized replay", {
   old_options <- options(np.tree = FALSE, np.macMseries.accelerate = FALSE,
-                         np.messages = FALSE)
+                         np.messages = FALSE, np.extendednn = TRUE)
   on.exit(options(old_options), add = TRUE)
 
   dat <- data.frame(
@@ -176,8 +180,38 @@ test_that("adaptive density CV honors fold saturation and serialized replay", {
 
     saturated <- admitted
     saturated$bw[] <- nrow(dat) - 1L
+    expected <- adaptive_density_gaussian_i1(
+      dat$x, saturated$bw) -
+      2 * mean(adaptive_density_fold_fit(
+        dat$x, saturated$bw, adaptive_density_gaussian2))
+    if (identical(method, "cv.ml"))
+      expected <- sum(-log(adaptive_density_fold_fit(
+        dat$x, saturated$bw, adaptive_density_gaussian2)))
+    expect_equal(
+      adaptive_density_package_objective_from_bw(dat, saturated),
+      expected,
+      tolerance = 2e-9
+    )
+
+    beyond <- admitted
+    beyond$bw[] <- nrow(dat) + 2L
+    expected_beyond <- adaptive_density_gaussian_i1(
+      dat$x, beyond$bw) -
+      2 * mean(adaptive_density_fold_fit(
+        dat$x, beyond$bw, adaptive_density_gaussian2))
+    if (identical(method, "cv.ml"))
+      expected_beyond <- sum(-log(adaptive_density_fold_fit(
+        dat$x, beyond$bw, adaptive_density_gaussian2)))
+    expect_equal(
+      adaptive_density_package_objective_from_bw(dat, beyond),
+      expected_beyond,
+      tolerance = 2e-9
+    )
+
+    options(np.extendednn = FALSE)
     expect_error(
       adaptive_density_package_objective_from_bw(dat, saturated),
       "invalid bandwidth")
+    options(np.extendednn = TRUE)
   }
 })
