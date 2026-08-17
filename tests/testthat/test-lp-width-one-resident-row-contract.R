@@ -41,7 +41,7 @@ test_that("fixed-objective width-one rows use an implicit scalar basis", {
   expect_true(grepl("fixed_moment += weight", scalar, fixed = TRUE))
   expect_true(grepl("ctx->moments[orig_ii] += weight", scalar,
                     fixed = TRUE))
-  expect_true(grepl("np_lp_dense_support_add(", scalar, fixed = TRUE))
+  expect_false(grepl("support", scalar, fixed = TRUE))
   expect_false(grepl("ctx->basis", scalar, fixed = TRUE))
   expect_false(grepl("F77_", scalar, fixed = TRUE))
   expect_false(grepl("LL_LC", scalar, fixed = TRUE))
@@ -65,8 +65,11 @@ test_that("sparse-tree width-one pairs use the same implicit scalar algebra", {
 
   start <- regexpr("static inline void np_lp_accumulate_pair(", source,
                    fixed = TRUE)
-  stop <- regexpr("static inline void np_lp_cvls_support_add(", source,
-                  fixed = TRUE)
+  stop <- regexpr(
+    "static inline void np_lp_accumulate_sparse_pair_wide_resident(",
+    source,
+    fixed = TRUE
+  )
   expect_gt(start, 0L)
   expect_gt(stop, start)
   pair <- substr(source, start, stop - 1L)
@@ -80,6 +83,7 @@ test_that("sparse-tree width-one pairs use the same implicit scalar algebra", {
   expect_true(grepl("ti[0] += w*eval_ybasis[0]", scalar, fixed = TRUE))
   expect_true(grepl("sj[0] += w", scalar, fixed = TRUE))
   expect_true(grepl("si[0] += w", scalar, fixed = TRUE))
+  expect_false(grepl("support", scalar, fixed = TRUE))
   expect_false(grepl("(^|[^[:alnum:]_])basis\\[", scalar, perl = TRUE))
   expect_false(grepl("F77_", scalar, fixed = TRUE))
 })
@@ -229,7 +233,10 @@ test_that("conditional width-one blocks share one raw row without LAPACK", {
     "^static int np_conditional_x_weight_block_stream_core_impl\\(",
     lines
   )
-  stop <- grep("^static int np_conditional_x_weight_block_stream_core\\(", lines)
+  stop <- grep(
+    "^static int np_conditional_x_weight_block_stream_core_ctx\\(",
+    lines
+  )
   expect_length(start, 1L)
   expect_length(stop, 1L)
   expect_lt(start, stop)

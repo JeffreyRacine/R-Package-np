@@ -10,6 +10,16 @@
   Zero-ridge arithmetic is unchanged; formerly ill-conditioned objective and
   hat values can change to the scale-equivariant canonical result.
 
+* Fixed local-polynomial CVLS, check-loss, and Klein--Spady objectives no
+  longer divert rows with at most one donor per basis term through a private
+  `DGELSY` minimum-norm fit. Those rows now use the same condition-qualified,
+  bounded canonical response solve as every other fixed row and as public
+  leave-one-out matrix/apply. Removing the retired fork also removes its
+  observation-by-basis support-index, weight, and count workspaces, pair-loop
+  branches, and MPI support-only reductions. Objective values can change for
+  underdetermined compact-support rows that formerly entered the distinct
+  minimum-norm estimator.
+
 * Fixed-resident and adaptive-BLAS local-polynomial regression objectives now
   use the same condition-aware response/factor policy as ordinary fits,
   leave-one-out influence rows, and the independent hat-matrix owner. CVAIC

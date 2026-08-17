@@ -52,7 +52,7 @@ test_that("fixed LP topology objectives agree with independent hat oracles", {
   }
 })
 
-test_that("ridged fixed LP CV agrees with the exact delete-one owner", {
+test_that("ridged and low-support fixed LP CV use the exact delete-one owner", {
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   on.exit(close_mpi_slaves(), add = TRUE)
 
@@ -63,26 +63,37 @@ test_that("ridged fixed LP CV agrees with the exact delete-one owner", {
   n <- 97L
   x <- data.frame(x1 = runif(n), x2 = runif(n))
   y <- sin(4 * pi * x$x1) + 0.5 * x$x2 + rnorm(n, sd = 0.15)
-  bw <- npregbw(
-    xdat = x, ydat = y, regtype = "lp", bwmethod = "cv.ls",
-    bwtype = "fixed", ckertype = "uniform", bws = c(0.30, 0.30),
-    bandwidth.compute = FALSE, degree = c(2L, 2L),
-    degree.select = "manual", basis = "additive",
-    bernstein.basis = FALSE
-  )
   evaluate <- getFromNamespace(".npregbw_eval_only", "npRmpi")
-  native <- evaluate(x, y, bw, objective = "ls")$objective
-  loo.apply <- suppressWarnings(npreghat(
-    bws = bw, txdat = x, y = y, output = "apply", leave.one.out = TRUE
-  ))
-  loo.matrix <- suppressWarnings(npreghat(
-    bws = bw, txdat = x, output = "matrix", leave.one.out = TRUE
-  ))
-  ridge.used <- attr(loo.apply, "ridge.used", exact = TRUE)
+  for (h in c(0.18, 0.30)) {
+    bw <- npregbw(
+      xdat = x, ydat = y, regtype = "lp", bwmethod = "cv.ls",
+      bwtype = "fixed", ckertype = "uniform", bws = c(h, h),
+      bandwidth.compute = FALSE, degree = c(2L, 2L),
+      degree.select = "manual", basis = "additive",
+      bernstein.basis = FALSE
+    )
+    native <- vapply(c(FALSE, TRUE), function(use.tree) {
+      options(np.tree = use.tree)
+      evaluate(x, y, bw, objective = "ls")$objective
+    }, numeric(1))
+    options(np.tree = FALSE)
+    loo.apply <- suppressWarnings(npreghat(
+      bws = bw, txdat = x, y = y, output = "apply", leave.one.out = TRUE
+    ))
+    loo.matrix <- suppressWarnings(npreghat(
+      bws = bw, txdat = x, output = "matrix", leave.one.out = TRUE
+    ))
+    ridge.used <- attr(loo.apply, "ridge.used", exact = TRUE)
+    reference <- mean((y - drop(loo.apply))^2)
 
-  expect_gt(sum(ridge.used > 0.0), 0L)
-  expect_equal(
-    as.double(loo.apply), drop(loo.matrix %*% y), tolerance = 5e-14
-  )
-  expect_equal(native, mean((y - drop(loo.apply))^2), tolerance = 2e-10)
+    expect_gt(sum(ridge.used > 0.0), 0L)
+    expect_equal(
+      as.double(loo.apply), drop(loo.matrix %*% y), tolerance = 5e-14,
+      info = paste("h =", h)
+    )
+    expect_equal(native[[1L]], reference, tolerance = 5e-10,
+                 info = paste("dense h =", h))
+    expect_equal(native[[2L]], reference, tolerance = 5e-10,
+                 info = paste("tree h =", h))
+  }
 })

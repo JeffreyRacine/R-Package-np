@@ -32,7 +32,6 @@ typedef struct {
   int nsub;
   int use_tree;
   int eval_idx;
-  int track_lowsupport;
   const int *tree_lookup;
   const double *weights;
   double * const *basis;
@@ -41,10 +40,6 @@ typedef struct {
   double *rhs;
   const double *eval_ybasis;
   const double *eval_outer;
-  int *support_count;
-  int *support_orig;
-  int *support_data;
-  double *support_weight;
 } NPLPDenseRowContext;
 
 /*
@@ -144,17 +139,12 @@ typedef struct {
   int row_j;
   int nobs;
   int use_tree;
-  int track_lowsupport;
   const int *tree_lookup;
   const double *weights;
   double * const *basis;
   const double *response;
   double *moments;
   double *rhs;
-  int *support_count;
-  int *support_orig;
-  int *support_data;
-  double *support_weight;
 } NPLPOwnedRowContext;
 
 void np_lp_accumulate_dense_resident_row(const NPLPDenseRowContext *ctx);
@@ -170,7 +160,6 @@ void np_lp_accumulate_dense_resident_row3(
   int nsub,
   int use_tree,
   int eval_idx,
-  int track_lowsupport,
   const int *tree_lookup,
   const double *weights,
   double * const *basis,
@@ -178,10 +167,6 @@ void np_lp_accumulate_dense_resident_row3(
   double *moments,
   double *rhs,
   const double *eval_ybasis,
-  const double *eval_outer,
-  int *support_count,
-  int *support_orig,
-  int *support_data,
-  double *support_weight);
+  const double *eval_outer);
 
 #endif
