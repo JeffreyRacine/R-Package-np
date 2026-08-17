@@ -17398,6 +17398,11 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
   int saved_cker_bound;
   double * saved_ckerlb = NULL;
   double * saved_ckerub = NULL;
+  NPNNGeometryContext full_fit_nn_geometry_context = {
+    .mode = NP_NN_QUERY_EXTERNAL,
+    .eval_to_train = NULL
+  };
+  const NPNNGeometryContext *full_fit_nn_geometry_context_ptr = NULL;
 
   num_var_unordered_extern = myopti[CD_CNUNOI];
   num_var_ordered_extern = myopti[CD_CNORDI];
@@ -17465,6 +17470,11 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
 
   int_LARGE_SF = myopti[CD_LSFI];
   BANDWIDTH_den_extern = myopti[CD_DENI];
+  if(BANDWIDTH_den_extern == BW_GEN_NN){
+    full_fit_nn_geometry_context.mode = train_is_eval ?
+      NP_NN_QUERY_TRAINING_IDENTITY : NP_NN_QUERY_EXTERNAL;
+    full_fit_nn_geometry_context_ptr = &full_fit_nn_geometry_context;
+  }
   int_MINIMIZE_IO = myopti[CD_MINIOI];
   do_grad = myopti[CD_GRAD];
 
@@ -17805,7 +17815,8 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                                                    &log_likelihood,
                                                    NULL,
                                                    NULL,
-                                                   0);
+                                                   0,
+                                                   full_fit_nn_geometry_context_ptr);
   } else {
     int status = 0;
     int lp_eval_alloc = 1;
@@ -17818,10 +17829,14 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
     int *kernel_cy = NULL, *kernel_uy = NULL, *kernel_oy = NULL, *operator_y = NULL;
     const char *lp_error = NULL;
     double **matrix_bandwidth_y = NULL;
+    double **y_bandwidth_eval_one = NULL;
     NPContinuousPreparedBandwidthView prepared_x_bandwidth;
     NPContinuousPreparedBandwidthView *prepared_x_bandwidth_ptr = NULL;
     NPBetaScaledRowContext beta_y_row_context;
     const int beta_y_active = response_kernel_route != NULL;
+    const int ordinary_y_gnn =
+      (!beta_y_active) && (BANDWIDTH_den_extern == BW_GEN_NN) &&
+      (num_var_continuous_extern > 0);
     const int beta_y_bw_rows = (BANDWIDTH_den_extern == BW_FIXED) ? 1 :
       ((BANDWIDTH_den_extern == BW_GEN_NN) ? num_obs_eval_extern :
        num_obs_train_extern);
@@ -17872,12 +17887,15 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
     y_eval_one = alloc_vecd(1);
     mean_one = alloc_vecd(MAX(1, lp_eval_alloc));
     stderr_one = alloc_vecd(MAX(1, lp_eval_alloc));
-    if(beta_y_active) {
+    if(beta_y_active || ordinary_y_gnn) {
       lambda_y = alloc_vecd(MAX(
         1, num_var_unordered_extern + num_var_ordered_extern));
       matrix_bandwidth_y = alloc_tmatd(
         beta_y_bw_rows, num_var_continuous_extern);
     }
+    if(ordinary_y_gnn)
+      y_bandwidth_eval_one = (double **)calloc(
+        (size_t)num_var_continuous_extern, sizeof(double *));
 
     if(num_reg_unordered_extern > 0) xuno_eval_one = alloc_matd(1, num_reg_unordered_extern);
     if(num_reg_ordered_extern > 0) xord_eval_one = alloc_matd(1, num_reg_ordered_extern);
@@ -17901,8 +17919,9 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
        (y_eval_one == NULL) || (mean_one == NULL) || (stderr_one == NULL) ||
        (kernel_cy == NULL) || (kernel_uy == NULL) || (kernel_oy == NULL) ||
        (operator_y == NULL) ||
-       (beta_y_active &&
+       ((beta_y_active || ordinary_y_gnn) &&
         (lambda_y == NULL || matrix_bandwidth_y == NULL)) ||
+       (ordinary_y_gnn && y_bandwidth_eval_one == NULL) ||
        ((num_reg_unordered_extern > 0) && (xuno_eval_one == NULL)) ||
        ((num_reg_ordered_extern > 0) && (xord_eval_one == NULL)) ||
        ((num_reg_continuous_extern > 0) && (xcon_eval_one == NULL)) ||
@@ -18000,6 +18019,35 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
         error("np_density_conditional: canonical beta response-row preparation failed: %s",
               np_continuous_kernel_row_status_message(row_status));
       }
+    } else if(ordinary_y_gnn) {
+      NPNNGeometryStatus nn_geometry_status = NP_NN_GEOMETRY_OK;
+
+      /* The Y-only response row uses the bandwidth helper's X slots. */
+      if(kernel_bandwidth_mean_ctx(
+           KERNEL_den_extern,
+           BANDWIDTH_den_extern,
+           num_obs_train_extern,
+           num_obs_eval_extern,
+           0, 0, 0,
+           num_var_continuous_extern,
+           num_var_unordered_extern,
+           num_var_ordered_extern,
+           0,
+           vsf_y,
+           NULL,
+           NULL,
+           matrix_XY_continuous_train_extern + num_reg_continuous_extern,
+           matrix_XY_continuous_eval_extern + num_reg_continuous_extern,
+           NULL,
+           matrix_bandwidth_y,
+           lambda_y,
+           full_fit_nn_geometry_context_ptr,
+           NULL,
+           &nn_geometry_status) != 0) {
+        if(nn_geometry_status == NP_NN_GEOMETRY_ZERO_RADIUS)
+          error("conditional density/distribution fit encountered a zero literal response radius after occurrence exclusion");
+        error("np_density_conditional: invalid generalized-NN response bandwidth");
+      }
     }
 
     if(kernel_route != NULL &&
@@ -18028,6 +18076,15 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
     status = 0;
     for(j = lp_loop_start; j < lp_loop_stop; j++){
       double beta_y_log_scale = 0.0;
+      const int mapped_train_index = j;
+      const NPNNGeometryContext row_nn_geometry_context = {
+        .mode = train_is_eval ?
+          NP_NN_QUERY_TRAINING_MAP : NP_NN_QUERY_EXTERNAL,
+        .eval_to_train = train_is_eval ? &mapped_train_index : NULL
+      };
+      const NPNNGeometryContext * const row_nn_geometry_context_ptr =
+        (BANDWIDTH_den_extern == BW_GEN_NN) && !beta_y_active ?
+          &row_nn_geometry_context : NULL;
       if(prepared_x_bandwidth_ptr != NULL)
         prepared_x_bandwidth.evaluation_offset = j;
       for(i = 0; i < num_reg_unordered_extern; i++)
@@ -18043,6 +18100,9 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
         yord_eval_one[i][0] = matrix_XY_ordered_eval_extern[num_reg_ordered_extern + i][j];
       for(i = 0; i < num_var_continuous_extern; i++)
         ycon_eval_one[i][0] = matrix_XY_continuous_eval_extern[num_reg_continuous_extern + i][j];
+      if(ordinary_y_gnn)
+        for(i = 0; i < num_var_continuous_extern; i++)
+          y_bandwidth_eval_one[i] = matrix_bandwidth_y[i] + j;
 
       int_cker_bound_extern = int_cyker_bound_extern;
       vector_ckerlb_extern = vector_cykerlb_extern;
@@ -18105,10 +18165,10 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                                       NULL,
                                       NULL,
                                       vsf_y,
-                                      0,
+                                      ordinary_y_gnn,
                                       NULL,
-                                      NULL,
-                                      NULL,
+                                      ordinary_y_gnn ? y_bandwidth_eval_one : NULL,
+                                      ordinary_y_gnn ? lambda_y : NULL,
                                       num_categories_extern + ycat_offset,
                                       matrix_categorical_vals_extern + ycat_offset,
                                       NULL,
@@ -18166,11 +18226,10 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                                                                    NP_REGRESSION_STDERR_CONDITIONAL_INFLUENCE :
                                                                    NP_REGRESSION_STDERR_LOCAL_RESIDUAL,
                                                                  prepared_x_bandwidth_ptr,
-                                                                 &(const NPNNGeometryContext){
-                                                                   .mode = NP_NN_QUERY_EXTERNAL,
-                                                                   .eval_to_train = NULL
-                                                                 });
-        if(status != 0)
+                                                                 row_nn_geometry_context_ptr);
+        if(status == NP_REGRESSION_FIT_ERR_ZERO_NN_RADIUS)
+          lp_error = "conditional density/distribution fit encountered a zero literal explanatory radius after occurrence exclusion";
+        else if(status != NP_REGRESSION_FIT_OK)
           lp_error = "np_density_conditional: regression LP solve failed in conditional LP path";
       }
 
@@ -18298,6 +18357,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
     safe_free(kernel_uy);
     safe_free(kernel_oy);
     safe_free(operator_y);
+    safe_free(y_bandwidth_eval_one);
     if(matrix_bandwidth_y != NULL)
       free_tmat(matrix_bandwidth_y);
     np_beta_scaled_row_context_clear(&beta_y_row_context);
