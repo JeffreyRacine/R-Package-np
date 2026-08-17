@@ -36,9 +36,45 @@ test_that("all-large conditional-distribution CVLS keeps its objective resident"
   expect_match(body, "cv_accumulator += tvd*tvd;", fixed = TRUE)
   expect_match(
     body,
-    "cv_accumulator /= np_conditional_distribution_cvls_pair_count(\n    ctx.num_train, num_eval, cdfontrain_extern);",
+    "if(np_distribution_cvls_finalize(\n       cv_accumulator,",
     fixed = TRUE
   )
-  expect_match(body, "if(cv_started)\n    *cv = cv_accumulator;", fixed = TRUE)
+  expect_match(
+    body,
+    "&cv_accumulator) != NP_DISTRIBUTION_CVLS_FINALIZE_OK)",
+    fixed = TRUE
+  )
+  expect_match(
+    body,
+    "if(cv_started && status == 0)\n    *cv = cv_accumulator;",
+    fixed = TRUE
+  )
   expect_false(grepl("*cv += tvd*tvd;", body, fixed = TRUE))
+})
+
+test_that("empirical CDF-CV normalization has one checked finalizer", {
+  path <- locate_npcdist_resident_source()
+  skip_if(is.null(path), "package C source unavailable in this test context")
+  source <- paste(readLines(path, warn = FALSE), collapse = "\n")
+
+  expect_match(
+    source,
+    "static NPDistributionCvlsFinalizeStatus np_distribution_cvls_finalize(",
+    fixed = TRUE
+  )
+  calls <- gregexpr(
+    "np_distribution_cvls_finalize(", source, fixed = TRUE
+  )[[1L]]
+  expect_length(calls[calls > 0L], 18L)
+  expect_false(grepl(
+    "*cv /= np_distribution_cvls_pair_count(", source, fixed = TRUE
+  ))
+  expect_false(grepl(
+    "*cv /= np_conditional_distribution_cvls_pair_count(", source,
+    fixed = TRUE
+  ))
+  expect_false(grepl(
+    "cv_accumulator /= np_conditional_distribution_cvls_pair_count(",
+    source, fixed = TRUE
+  ))
 })
