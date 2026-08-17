@@ -16819,6 +16819,7 @@ static NP_NOINLINE NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas(
     double *lambda,
     double **matrix_bandwidth,
     double **adaptive_successor_bandwidth,
+    const double *adaptive_fold_scale,
     double **adaptive_selected_bandwidth,
     const int nterms,
     double **basis){
@@ -16856,6 +16857,8 @@ static NP_NOINLINE NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas(
     goto cleanup_adaptive_blas;
   if((adaptive_successor_bandwidth == NULL) !=
      (adaptive_selected_bandwidth == NULL))
+    goto cleanup_adaptive_blas;
+  if(exact_deleteone_geometry && adaptive_fold_scale == NULL)
     goto cleanup_adaptive_blas;
   if(exact_deleteone_geometry &&
      (bwm != RBWM_CVLS) && (bwm != RBWM_CVCHECK) && (bwm != RBWM_CVKS))
@@ -16969,7 +16972,8 @@ static NP_NOINLINE NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas(
     if(exact_deleteone_geometry){
       if(np_nn_adaptive_fold_select_row(
            num_obs, num_reg_continuous, matrix_X_continuous,
-           matrix_bandwidth, adaptive_successor_bandwidth, j,
+           matrix_bandwidth, adaptive_successor_bandwidth,
+           adaptive_fold_scale, j,
            adaptive_selected_bandwidth) != NP_NN_GEOMETRY_OK)
         goto cleanup_adaptive_blas;
       row_bandwidth = adaptive_selected_bandwidth;
@@ -17211,6 +17215,7 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
                                                      double *lambda,
                                                      double **matrix_bandwidth,
                                                      double **adaptive_successor_bandwidth,
+                                                     const double *adaptive_fold_scale,
                                                      double **adaptive_selected_bandwidth,
                                                      const int ks_tree_use){
   NPRegCvLpResult result = {DBL_MAX, 0.0, 0};
@@ -17260,6 +17265,8 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
     goto cleanup_lp_cv;
   if((adaptive_successor_bandwidth == NULL) !=
      (adaptive_selected_bandwidth == NULL))
+    goto cleanup_lp_cv;
+  if(exact_adaptive_deleteone && adaptive_fold_scale == NULL)
     goto cleanup_lp_cv;
   if(exact_adaptive_deleteone &&
      (bwm != RBWM_CVLS) && (bwm != RBWM_CVCHECK) && (bwm != RBWM_CVKS))
@@ -17581,6 +17588,7 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
           lambda,
           matrix_bandwidth,
           adaptive_successor_bandwidth,
+          adaptive_fold_scale,
           adaptive_selected_bandwidth,
           glp_nterms,
           basis);
@@ -17791,7 +17799,8 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
         if(exact_adaptive_deleteone){
           if(np_nn_adaptive_fold_select_row(
                num_obs, num_reg_continuous, matrix_X_continuous,
-               matrix_bandwidth, adaptive_successor_bandwidth, j,
+               matrix_bandwidth, adaptive_successor_bandwidth,
+               adaptive_fold_scale, j,
                adaptive_selected_bandwidth) != NP_NN_GEOMETRY_OK){
             glp_ok = 0;
             break;
@@ -18295,6 +18304,7 @@ static NPContinuousKernelRowStatus np_adaptive_fold_row_context_fill(
   double **matrix_X_continuous,
   double **primary_bandwidth,
   double **successor_bandwidth,
+  const double *fold_scale,
   double **selected_bandwidth,
   const int held_out,
   double * const common_log_scale)
@@ -18305,7 +18315,7 @@ static NPContinuousKernelRowStatus np_adaptive_fold_row_context_fill(
        context->plan.do_distribution ?
          context->plan.num_y_continuous : context->plan.num_x_continuous,
        matrix_X_continuous, primary_bandwidth, successor_bandwidth,
-       held_out, selected_bandwidth) != NP_NN_GEOMETRY_OK)
+       fold_scale, held_out, selected_bandwidth) != NP_NN_GEOMETRY_OK)
     return NP_CONTINUOUS_ROW_ERR_LAYOUT;
   return np_adaptive_fold_row_context_fill_selected(
     context, held_out, common_log_scale);
@@ -18340,6 +18350,7 @@ static int np_density_adaptive_exact_deleteone_term(
   double *lambda,
   double **primary_bandwidth,
   double **successor_bandwidth,
+  const double *fold_scale,
   double **selected_bandwidth,
   double * const objective_term)
 {
@@ -18351,7 +18362,8 @@ static int np_density_adaptive_exact_deleteone_term(
   if((term != NP_ADAPTIVE_DENSITY_CVML &&
       term != NP_ADAPTIVE_DENSITY_CVLS_CROSS) ||
      objective_term == NULL || primary_bandwidth == NULL ||
-     successor_bandwidth == NULL || selected_bandwidth == NULL ||
+     successor_bandwidth == NULL || fold_scale == NULL ||
+     selected_bandwidth == NULL ||
      !np_adaptive_fold_row_context_prepare(
        &row_context, num_obs, 0,
        num_reg_unordered, num_reg_ordered, num_reg_continuous,
@@ -18371,7 +18383,8 @@ static int np_density_adaptive_exact_deleteone_term(
       np_progress_bandwidth_loop_step();
     if(np_adaptive_fold_row_context_fill(
          &row_context, matrix_X_continuous,
-         primary_bandwidth, successor_bandwidth, selected_bandwidth,
+         primary_bandwidth, successor_bandwidth, fold_scale,
+         selected_bandwidth,
          held_out, &common_log_scale) != NP_CONTINUOUS_ROW_OK)
       goto cleanup_adaptive_density_term;
     for(donor = 0; donor < num_obs; ++donor)
@@ -18440,6 +18453,7 @@ static NPRegCvLpResult np_regression_cv_scalar_adaptive_exact(
   double *lambda,
   double **primary_bandwidth,
   double **successor_bandwidth,
+  const double *fold_scale,
   double **selected_bandwidth)
 {
   NPRegCvLpResult result = {DBL_MAX, 0.0, 0};
@@ -18451,7 +18465,7 @@ static NPRegCvLpResult np_regression_cv_scalar_adaptive_exact(
   if((bwm != RBWM_CVLS && bwm != RBWM_CVCHECK && bwm != RBWM_CVKS) ||
      vector_Y == NULL ||
      primary_bandwidth == NULL || successor_bandwidth == NULL ||
-     selected_bandwidth == NULL)
+     fold_scale == NULL || selected_bandwidth == NULL)
     return result;
   if(!np_adaptive_fold_row_context_prepare(
        &row_context, num_obs, 0,
@@ -18474,7 +18488,8 @@ static NPRegCvLpResult np_regression_cv_scalar_adaptive_exact(
       np_progress_bandwidth_loop_step();
     if(np_adaptive_fold_row_context_fill(
          &row_context, matrix_X_continuous,
-         primary_bandwidth, successor_bandwidth, selected_bandwidth,
+         primary_bandwidth, successor_bandwidth, fold_scale,
+         selected_bandwidth,
          held_out, &common_log_scale) != NP_CONTINUOUS_ROW_OK)
       goto cleanup_adaptive_exact_scalar;
     for(donor = 0; donor < num_obs; ++donor){
@@ -18538,6 +18553,7 @@ int *num_categories){
   double *lambda = NULL;
   double ** matrix_bandwidth = NULL;
   double **adaptive_successor_bandwidth = NULL;
+  double *adaptive_fold_scale = NULL;
   double **adaptive_selected_bandwidth = NULL;
 
   double aicc = 0.0;
@@ -18581,18 +18597,22 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
      num_reg_continuous > 0){
     adaptive_successor_bandwidth =
       alloc_tmatd(num_obs, num_reg_continuous);
+    adaptive_fold_scale = alloc_vecd(num_reg_continuous);
     adaptive_selected_bandwidth =
       alloc_tmatd(num_obs, num_reg_continuous);
     if(adaptive_successor_bandwidth == NULL ||
+       adaptive_fold_scale == NULL ||
        adaptive_selected_bandwidth == NULL){
       if(adaptive_successor_bandwidth != NULL)
         free_tmat(adaptive_successor_bandwidth);
       if(adaptive_selected_bandwidth != NULL)
         free_tmat(adaptive_selected_bandwidth);
+      free(adaptive_fold_scale);
       return DBL_MAX;
     }
     nn_geometry_context.mode = NP_NN_QUERY_ADAPTIVE_FOLD_PREPARE;
     nn_geometry_context.adaptive_successor = adaptive_successor_bandwidth;
+    nn_geometry_context.adaptive_fold_scale = adaptive_fold_scale;
   }
 
 #ifdef MPI2
@@ -18641,6 +18661,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
       free_tmat(adaptive_successor_bandwidth);
     if(adaptive_selected_bandwidth != NULL)
       free_tmat(adaptive_selected_bandwidth);
+    free(adaptive_fold_scale);
     return(DBL_MAX);
   }
 
@@ -18665,6 +18686,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
         lambda,
         matrix_bandwidth,
         adaptive_successor_bandwidth,
+        adaptive_fold_scale,
         adaptive_selected_bandwidth);
     cv = adaptive_exact.cv;
     goto finish_cv_path;
@@ -18714,6 +18736,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                                                               lambda,
                                                               matrix_bandwidth,
                                                               adaptive_successor_bandwidth,
+                                                              adaptive_fold_scale,
                                                               adaptive_selected_bandwidth,
                                                               ks_tree_use);
     cv = lp_result.cv;
@@ -19081,6 +19104,7 @@ finish_cv_path:
     free_tmat(adaptive_successor_bandwidth);
   if(adaptive_selected_bandwidth != NULL)
     free_tmat(adaptive_selected_bandwidth);
+  free(adaptive_fold_scale);
   if((ov_cont_ok != NULL) && (!ov_cont_from_cache)) free(ov_cont_ok);
   if((ov_cont_hmin != NULL) && (!ov_cont_from_cache)) free(ov_cont_hmin);
   if((ov_cont_k0 != NULL) && (!ov_cont_from_cache)) free(ov_cont_k0);
@@ -19933,6 +19957,7 @@ static int np_distribution_adaptive_exact_training_grid(
   double *lambda,
   double **primary_bandwidth,
   double **successor_bandwidth,
+  const double *fold_scale,
   double **selected_bandwidth,
   double * const cv)
 {
@@ -19945,7 +19970,8 @@ static int np_distribution_adaptive_exact_training_grid(
   np_adaptive_fold_row_context_init(&row_context);
   local_failure =
     cv == NULL || primary_bandwidth == NULL ||
-    successor_bandwidth == NULL || selected_bandwidth == NULL ||
+    successor_bandwidth == NULL || fold_scale == NULL ||
+    selected_bandwidth == NULL ||
     is < 0 || ie >= num_obs ||
     !np_adaptive_fold_row_context_prepare(
       &row_context, num_obs, 1,
@@ -19965,7 +19991,7 @@ static int np_distribution_adaptive_exact_training_grid(
       np_progress_bandwidth_loop_step();
     if(np_nn_adaptive_fold_select_row(
          num_obs, num_reg_continuous, matrix_X_continuous,
-         primary_bandwidth, successor_bandwidth, held_out,
+         primary_bandwidth, successor_bandwidth, fold_scale, held_out,
          selected_bandwidth) != NP_NN_GEOMETRY_OK){
       local_failure = 1;
       break;
@@ -21022,6 +21048,7 @@ double * cv){
   double *ov_cont_hmin = NULL, *ov_cont_k0 = NULL;
   double **matrix_bandwidth = NULL;
   double **adaptive_successor_bandwidth = NULL;
+  double *adaptive_fold_scale = NULL;
   double **adaptive_selected_bandwidth = NULL;
   double *lambda = NULL;
   double *beta_row = NULL;
@@ -21130,34 +21157,20 @@ double * cv){
   matrix_bandwidth = alloc_matd(bwmdim,num_reg_continuous);
   lambda = alloc_vecd(num_reg_unordered+num_reg_ordered);
 
-  /* Extended adaptive-NN radii have a distinct unresolved finite-sample
-   * contract. Preserve their incumbent owner rather than silently admitting
-   * them to the ordinary integer-k fold geometry. */
-  if(adaptive_exact_training_grid)
-    for(i = 0; i < num_reg_continuous; ++i){
-      int is_extended = 0;
-      int lookup_k;
-      double distance_scale;
-
-      if(np_nn_lookup_from_scale(
-           num_obs_train, 1, vsf[i], &lookup_k, &distance_scale,
-           &is_extended) == 0 && is_extended){
-        adaptive_exact_training_grid = 0;
-        break;
-      }
-    }
-
   if(adaptive_exact_training_grid){
     adaptive_successor_bandwidth =
       alloc_tmatd(num_obs_train, num_reg_continuous);
+    adaptive_fold_scale = alloc_vecd(num_reg_continuous);
     adaptive_selected_bandwidth =
       alloc_tmatd(num_obs_train, num_reg_continuous);
     adaptive_preparation_failure = adaptive_successor_bandwidth == NULL ||
+      adaptive_fold_scale == NULL ||
       adaptive_selected_bandwidth == NULL;
     if(!adaptive_preparation_failure){
       nn_geometry_context.mode = NP_NN_QUERY_ADAPTIVE_FOLD_PREPARE;
       nn_geometry_context.adaptive_successor =
         adaptive_successor_bandwidth;
+      nn_geometry_context.adaptive_fold_scale = adaptive_fold_scale;
     }
   }
 
@@ -21208,7 +21221,8 @@ double * cv){
         matrix_X_continuous_train, num_categories,
         matrix_categorical_vals, kernel_c, kernel_u, kernel_o,
         operator, lambda, matrix_bandwidth,
-        adaptive_successor_bandwidth, adaptive_selected_bandwidth,
+        adaptive_successor_bandwidth, adaptive_fold_scale,
+        adaptive_selected_bandwidth,
         &local_cv) != 0;
 #ifdef MPI2
     {
@@ -21481,6 +21495,7 @@ cleanup_distribution_ls_cv:
     free_tmat(adaptive_successor_bandwidth);
   if(adaptive_selected_bandwidth != NULL)
     free_tmat(adaptive_selected_bandwidth);
+  free(adaptive_fold_scale);
   free_mat(matrix_bandwidth, num_reg_continuous);
 
   free(matrix_wX_continuous_eval);
@@ -27841,6 +27856,7 @@ typedef struct {
   NPConditionalXRowReciprocalCache *reciprocal_cache;
   double **matrix_bandwidth_x;
   double **matrix_bandwidth_x_successor;
+  double *adaptive_fold_scale_x;
   double **matrix_bandwidth_x_selected;
   double **matrix_bandwidth_eval_one;
   double **eval_xuno_one;
@@ -27875,6 +27891,7 @@ typedef struct {
   double *kw;
   double **matrix_bandwidth_y;
   double **matrix_bandwidth_y_successor;
+  double *adaptive_fold_scale_y;
   double **matrix_bandwidth_y_selected;
   double **matrix_bandwidth_eval_one;
   double **eval_yuno_one;
@@ -27920,6 +27937,7 @@ static void np_conditional_xrow_ctx_clear(NPConditionalXRowCtx *ctx){
   if(ctx->matrix_bandwidth_x != NULL) free_tmat(ctx->matrix_bandwidth_x);
   if(ctx->matrix_bandwidth_x_successor != NULL)
     free_tmat(ctx->matrix_bandwidth_x_successor);
+  free(ctx->adaptive_fold_scale_x);
   if(ctx->matrix_bandwidth_x_selected != NULL)
     free_tmat(ctx->matrix_bandwidth_x_selected);
   if(ctx->matrix_bandwidth_eval_one != NULL) free_tmat(ctx->matrix_bandwidth_eval_one);
@@ -27999,6 +28017,8 @@ static int np_conditional_xrow_ctx_prepare_impl(
   if(adaptive_fold && num_reg_continuous_extern > 0){
     ctx->matrix_bandwidth_x_successor =
       alloc_tmatd(num_train, num_reg_continuous_extern);
+    ctx->adaptive_fold_scale_x =
+      alloc_vecd(num_reg_continuous_extern);
     ctx->matrix_bandwidth_x_selected =
       alloc_tmatd(num_train, num_reg_continuous_extern);
   }
@@ -28016,6 +28036,7 @@ static int np_conditional_xrow_ctx_prepare_impl(
      ((num_reg_continuous_extern > 0) && (ctx->matrix_bandwidth_x == NULL)) ||
      (adaptive_fold && num_reg_continuous_extern > 0 &&
       (ctx->matrix_bandwidth_x_successor == NULL ||
+       ctx->adaptive_fold_scale_x == NULL ||
        ctx->matrix_bandwidth_x_selected == NULL)) ||
      ((num_reg_continuous_extern > 0) && (ctx->matrix_bandwidth_eval_one == NULL)) ||
      ((num_reg_unordered_extern > 0) && (ctx->eval_xuno_one == NULL)) ||
@@ -28048,6 +28069,8 @@ static int np_conditional_xrow_ctx_prepare_impl(
     adaptive_geometry.mode = NP_NN_QUERY_ADAPTIVE_FOLD_PREPARE;
     adaptive_geometry.adaptive_successor =
       ctx->matrix_bandwidth_x_successor;
+    adaptive_geometry.adaptive_fold_scale =
+      ctx->adaptive_fold_scale_x;
     bandwidth_geometry = &adaptive_geometry;
   }
 
@@ -28259,6 +28282,7 @@ static int np_conditional_xrow_ctx_select_adaptive_fold(
        matrix_X_continuous_train_extern,
        ctx->matrix_bandwidth_x,
        ctx->matrix_bandwidth_x_successor,
+       ctx->adaptive_fold_scale_x,
        held_out_position,
        ctx->matrix_bandwidth_x_selected) != NP_NN_GEOMETRY_OK)
     return 1;
@@ -29450,6 +29474,7 @@ static void np_conditional_yrow_ctx_clear(NPConditionalYRowCtx *ctx){
   if(ctx->matrix_bandwidth_y != NULL) free_tmat(ctx->matrix_bandwidth_y);
   if(ctx->matrix_bandwidth_y_successor != NULL)
     free_tmat(ctx->matrix_bandwidth_y_successor);
+  free(ctx->adaptive_fold_scale_y);
   if(ctx->matrix_bandwidth_y_selected != NULL)
     free_tmat(ctx->matrix_bandwidth_y_selected);
   if(ctx->matrix_bandwidth_eval_one != NULL) free_tmat(ctx->matrix_bandwidth_eval_one);
@@ -29520,6 +29545,8 @@ static int np_conditional_yrow_eval_ctx_prepare_impl(
   if(adaptive_fold && num_var_continuous_extern > 0){
     ctx->matrix_bandwidth_y_successor =
       alloc_tmatd(num_train, num_var_continuous_extern);
+    ctx->adaptive_fold_scale_y =
+      alloc_vecd(num_var_continuous_extern);
     ctx->matrix_bandwidth_y_selected =
       alloc_tmatd(num_train, num_var_continuous_extern);
   }
@@ -29537,6 +29564,7 @@ static int np_conditional_yrow_eval_ctx_prepare_impl(
      ((num_var_continuous_extern > 0) && (ctx->matrix_bandwidth_y == NULL)) ||
      (adaptive_fold && num_var_continuous_extern > 0 &&
       (ctx->matrix_bandwidth_y_successor == NULL ||
+       ctx->adaptive_fold_scale_y == NULL ||
        ctx->matrix_bandwidth_y_selected == NULL)) ||
      ((num_var_continuous_extern > 0) && (ctx->matrix_bandwidth_eval_one == NULL)) ||
      ((num_var_unordered_extern > 0) && (ctx->eval_yuno_one == NULL)) ||
@@ -29569,6 +29597,8 @@ static int np_conditional_yrow_eval_ctx_prepare_impl(
     adaptive_geometry.mode = NP_NN_QUERY_ADAPTIVE_FOLD_PREPARE;
     adaptive_geometry.adaptive_successor =
       ctx->matrix_bandwidth_y_successor;
+    adaptive_geometry.adaptive_fold_scale =
+      ctx->adaptive_fold_scale_y;
     bandwidth_geometry = &adaptive_geometry;
   }
 
@@ -29784,6 +29814,7 @@ static int np_conditional_yrow_ctx_select_adaptive_fold(
        matrix_Y_continuous_train_extern,
        ctx->matrix_bandwidth_y,
        ctx->matrix_bandwidth_y_successor,
+       ctx->adaptive_fold_scale_y,
        held_out_position,
        ctx->matrix_bandwidth_y_selected) != NP_NN_GEOMETRY_OK)
     return 1;
@@ -34556,9 +34587,9 @@ int np_conditional_density_cvml_stream_engine_supported(void){
 }
 
 /*
- * Ordinary integer-k adaptive-NN candidates admit exact delete-one geometry.
- * Extended-NN scales retain their separate incumbent contract until that
- * finite-sample definition is resolved explicitly.
+ * Validate every adaptive-NN continuous count before exact fold preparation.
+ * The shared geometry owner resolves both saturated and extended counts
+ * against the fold cardinality, so no separate fallback capability remains.
  */
 static NPConditionalAdaptiveExactStatus
 np_conditional_adaptive_exact_scale_status(double *vector_scale_factor){
@@ -34596,33 +34627,23 @@ np_conditional_adaptive_exact_scale_status(double *vector_scale_factor){
 
   for(l = 0; l < num_reg_continuous_extern; ++l){
     int lookup_k;
-    int is_extended = 0;
     double distance_scale;
 
     if(np_nn_lookup_from_scale(num_obs_train_extern, 1, vsfx[l],
                                &lookup_k, &distance_scale,
-                               &is_extended) != 0){
+                               NULL) != 0){
       status = NP_CONDITIONAL_ADAPTIVE_EXACT_FAILURE;
-      goto cleanup_adaptive_scale_status;
-    }
-    if(is_extended){
-      status = NP_CONDITIONAL_ADAPTIVE_EXACT_NOT_APPLICABLE;
       goto cleanup_adaptive_scale_status;
     }
   }
   for(l = 0; l < num_var_continuous_extern; ++l){
     int lookup_k;
-    int is_extended = 0;
     double distance_scale;
 
     if(np_nn_lookup_from_scale(num_obs_train_extern, 1, vsfy[l],
                                &lookup_k, &distance_scale,
-                               &is_extended) != 0){
+                               NULL) != 0){
       status = NP_CONDITIONAL_ADAPTIVE_EXACT_FAILURE;
-      goto cleanup_adaptive_scale_status;
-    }
-    if(is_extended){
-      status = NP_CONDITIONAL_ADAPTIVE_EXACT_NOT_APPLICABLE;
       goto cleanup_adaptive_scale_status;
     }
   }
@@ -39277,6 +39298,7 @@ double *cv){
   int ov_cont_from_cache = 0;
   double **matrix_bandwidth = NULL;
   double **adaptive_successor_bandwidth = NULL;
+  double *adaptive_fold_scale = NULL;
   double **adaptive_selected_bandwidth = NULL;
   double *lambda = NULL;
   NPNNGeometryContext nn_geometry_context = {
@@ -39341,15 +39363,18 @@ double *cv){
      num_reg_continuous > 0){
     adaptive_successor_bandwidth =
       alloc_tmatd(num_obs, num_reg_continuous);
+    adaptive_fold_scale = alloc_vecd(num_reg_continuous);
     adaptive_selected_bandwidth =
       alloc_tmatd(num_obs, num_reg_continuous);
     if(adaptive_successor_bandwidth == NULL ||
+       adaptive_fold_scale == NULL ||
        adaptive_selected_bandwidth == NULL){
       status = 1;
       goto cleanup_density_leave_one_out_cv;
     }
     nn_geometry_context.mode = NP_NN_QUERY_ADAPTIVE_FOLD_PREPARE;
     nn_geometry_context.adaptive_successor = adaptive_successor_bandwidth;
+    nn_geometry_context.adaptive_fold_scale = adaptive_fold_scale;
   }
 
   if(kernel_bandwidth_mean_ctx(exact_beta_route ? 0 : KERNEL_den,
@@ -39391,6 +39416,7 @@ double *cv){
       num_categories, matrix_categorical_vals_extern,
       kernel_c, kernel_u, kernel_o, operator, lambda,
       matrix_bandwidth, adaptive_successor_bandwidth,
+      adaptive_fold_scale,
       adaptive_selected_bandwidth, cv);
     goto cleanup_density_leave_one_out_cv;
   }
@@ -39663,6 +39689,7 @@ cleanup_density_leave_one_out_cv:
     free_tmat(adaptive_successor_bandwidth);
   if(adaptive_selected_bandwidth != NULL)
     free_tmat(adaptive_selected_bandwidth);
+  free(adaptive_fold_scale);
   free_mat(matrix_bandwidth, num_reg_continuous);
   if(gate_override_active) np_gate_ctx_clear(&gate_ctx_local);
   if((ov_cont_ok != NULL) && (!ov_cont_from_cache)) free(ov_cont_ok);
@@ -39719,7 +39746,9 @@ double *cv){
   double *ov_disc_uno_const = NULL, *ov_disc_ord_const = NULL;
   int *kernel_c = NULL, *kernel_u = NULL, *kernel_o = NULL;
   double **matrix_bandwidth = NULL;
+  double **full_design_bandwidth = NULL;
   double **adaptive_successor_bandwidth = NULL;
+  double *adaptive_fold_scale = NULL;
   double **adaptive_selected_bandwidth = NULL;
   double *lambda = NULL;
   NPNNGeometryContext nn_geometry_context = {
@@ -39781,13 +39810,17 @@ double *cv){
      num_reg_continuous > 0){
     adaptive_successor_bandwidth =
       alloc_tmatd(num_obs, num_reg_continuous);
+    adaptive_fold_scale = alloc_vecd(num_reg_continuous);
     adaptive_selected_bandwidth =
       alloc_tmatd(num_obs, num_reg_continuous);
     if(adaptive_successor_bandwidth == NULL ||
+       adaptive_fold_scale == NULL ||
        adaptive_selected_bandwidth == NULL)
       goto cleanup_density_convolution_cv;
     nn_geometry_context.mode = NP_NN_QUERY_ADAPTIVE_FOLD_PREPARE;
     nn_geometry_context.adaptive_successor = adaptive_successor_bandwidth;
+    nn_geometry_context.adaptive_fold_scale = adaptive_fold_scale;
+    nn_geometry_context.adaptive_full = adaptive_selected_bandwidth;
   }
 
   if(kernel_bandwidth_mean_ctx(exact_beta_route ? 0 : KERNEL_den,
@@ -39816,6 +39849,8 @@ double *cv){
       goto cleanup_density_convolution_cv;
     error("\n** Error: invalid bandwidth.");
   }
+  full_design_bandwidth = adaptive_successor_bandwidth != NULL ?
+    adaptive_selected_bandwidth : matrix_bandwidth;
 
   if(!exact_beta_route && adaptive_successor_bandwidth == NULL &&
      np_density_categorical_profile_cv(kernel_c,
@@ -39868,7 +39903,7 @@ double *cv){
                                                      vector_scale_factor,
                                                      num_categories,
                                                      matrix_categorical_vals,
-                                                     matrix_bandwidth,
+                                                     full_design_bandwidth,
                                                      lambda,
                                                      operator,
                                                      kernel_u,
@@ -39923,7 +39958,7 @@ double *cv){
                            NULL, // no weights
                            NULL, // no sgn
                            vector_scale_factor,
-                           1,matrix_bandwidth,matrix_bandwidth,lambda,
+                           1,full_design_bandwidth,full_design_bandwidth,lambda,
                            num_categories,
                            matrix_categorical_vals,
                            NULL, // no ocg
@@ -39950,6 +39985,7 @@ double *cv){
          num_categories, matrix_categorical_vals,
          kernel_c, kernel_u, kernel_o, operator, lambda,
          matrix_bandwidth, adaptive_successor_bandwidth,
+         adaptive_fold_scale,
          adaptive_selected_bandwidth, &cv2) != 0)
       goto cleanup_density_convolution_cv;
     cv2 /= (double)num_obs;
@@ -40161,6 +40197,7 @@ cleanup_density_convolution_cv:
     free_tmat(adaptive_successor_bandwidth);
   if(adaptive_selected_bandwidth != NULL)
     free_tmat(adaptive_selected_bandwidth);
+  free(adaptive_fold_scale);
   free_mat(matrix_bandwidth, num_reg_continuous);
   if(gate_override_active) np_gate_ctx_clear(&gate_x_ctx);
   if(ov_cont_ok != NULL) free(ov_cont_ok);

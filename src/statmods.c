@@ -718,6 +718,7 @@ NPNNGeometryStatus np_nn_adaptive_fold_select_row(
   double **matrix_train,
   double **primary_bandwidth,
   double **successor_bandwidth,
+  const double *fold_scale,
   const int held_out,
   double **selected_bandwidth)
 {
@@ -726,14 +727,16 @@ NPNNGeometryStatus np_nn_adaptive_fold_select_row(
 
   if(num_obs < 3 || num_cont <= 0 || held_out < 0 || held_out >= num_obs ||
      matrix_train == NULL || primary_bandwidth == NULL ||
-     successor_bandwidth == NULL || selected_bandwidth == NULL)
+     successor_bandwidth == NULL || fold_scale == NULL ||
+     selected_bandwidth == NULL)
     return NP_NN_GEOMETRY_INVALID_ARGUMENT;
 
   for(coordinate = 0; coordinate < num_cont; ++coordinate){
     if(matrix_train[coordinate] == NULL ||
        primary_bandwidth[coordinate] == NULL ||
        successor_bandwidth[coordinate] == NULL ||
-       selected_bandwidth[coordinate] == NULL)
+       selected_bandwidth[coordinate] == NULL ||
+       !isfinite(fold_scale[coordinate]) || fold_scale[coordinate] < 1.0)
       return NP_NN_GEOMETRY_INVALID_ARGUMENT;
     selected_bandwidth[coordinate][held_out] = 1.0;
     for(donor = 0; donor < num_obs; ++donor){
@@ -743,7 +746,8 @@ NPNNGeometryStatus np_nn_adaptive_fold_select_row(
       if(donor == held_out)
         continue;
       distance = fabs(matrix_train[coordinate][held_out] -
-                      matrix_train[coordinate][donor]);
+                      matrix_train[coordinate][donor])*
+        fold_scale[coordinate];
       if(np_nn_two_slot_radius_select(
            primary_bandwidth[coordinate][donor],
            successor_bandwidth[coordinate][donor],

@@ -9,8 +9,10 @@ adaptive_conditional_cvls_epanechnikov2 <- function(u) {
 }
 
 adaptive_conditional_cvls_fold_radius <- function(value, held_out, donor, k) {
-  sort(abs(value[-c(held_out, donor)] - value[[donor]]),
-       method = "quick")[[k]]
+  distance <- sort(abs(value[-c(held_out, donor)] - value[[donor]]),
+                   method = "quick")
+  lookup <- min(k, length(distance))
+  distance[[lookup]] * k / lookup
 }
 
 adaptive_conditional_cvls_design <- function(train, evaluation, degree) {
@@ -234,9 +236,10 @@ test_that("adaptive conditional CVLS exact folds compose categorical sides", {
   expect_equal(observed, rep(expected, length(observed)), tolerance = 5e-9)
 })
 
-test_that("adaptive conditional CVLS honors saturation, replay, and failures", {
+test_that("adaptive conditional CVLS honors extension, replay, and failures", {
   old <- options(np.messages = FALSE, np.tree = FALSE,
-                 np.macMseries.accelerate = FALSE)
+                 np.macMseries.accelerate = FALSE,
+                 np.extendednn = TRUE)
   on.exit(options(old), add = TRUE)
 
   x <- matrix(c(-2.8, -1.5, -0.7, -0.1, 0.4, 1.2, 2.7, 4.1), ncol = 1L)
@@ -252,8 +255,22 @@ test_that("adaptive conditional CVLS honors saturation, replay, and failures", {
   saturated <- state
   saturated$bw$xbw[] <- n - 1L
   saturated$bw$ybw[] <- n - 1L
-  expect_identical(adaptive_conditional_cvls_objective(saturated, "dbmax"),
-                   -.Machine$double.xmax)
+  expect_equal(
+    adaptive_conditional_cvls_objective(saturated, "dbmax"),
+    adaptive_conditional_cvls_literal(
+      x, y, n - 1L, n - 1L, 0L,
+      "gaussian", adaptive_conditional_cvls_gaussian2),
+    tolerance = 5e-9)
+
+  beyond <- state
+  beyond$bw$xbw[] <- n + 2L
+  beyond$bw$ybw[] <- n + 2L
+  expect_equal(
+    adaptive_conditional_cvls_objective(beyond, "dbmax"),
+    adaptive_conditional_cvls_literal(
+      x, y, n + 2L, n + 2L, 0L,
+      "gaussian", adaptive_conditional_cvls_gaussian2),
+    tolerance = 5e-9)
 
   zero <- adaptive_conditional_cvls_bw(
     matrix(c(0, 0, 0, 0, 1, 2), ncol = 1L),

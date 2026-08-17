@@ -466,6 +466,34 @@ int *is_extended)
 	return(0);
 }
 
+/* Exact adaptive delete-one rows have one fewer donor-neighbour than the
+ * full sample.  Resolve the requested observation count against that fold
+ * cardinality once, using the same extended-NN linear radius convention as
+ * the ordinary bandwidth owner. */
+static int np_adaptive_fold_lookup_from_scale(const int num_obs_train,
+                                              const double scale_factor,
+                                              int *lookup_k,
+                                              double *distance_scale)
+{
+	const int max_k = num_obs_train - 2;
+	int requested_k;
+
+	if(lookup_k == NULL || distance_scale == NULL || max_k < 1 ||
+	   !isfinite(scale_factor) || scale_factor < 1.0 ||
+	   scale_factor > ((double)INT_MAX / 2.0))
+		return(1);
+
+	requested_k = np_fround(scale_factor);
+	if(requested_k < 1)
+		return(1);
+	if(requested_k > max_k && !np_extendednn_enabled())
+		return(1);
+
+	*lookup_k = MIN(requested_k, max_k);
+	*distance_scale = ((double)requested_k)/((double)*lookup_k);
+	return(0);
+}
+
 /*
 int int_DEBUG;
 int int_VERBOSE;
@@ -779,7 +807,7 @@ NPNNGeometryStatus *geometry_status)
 				goto cleanup;
 			}
 
-				if(x_geometry_context != NULL && !nn_extended)
+				if(x_geometry_context != NULL)
 					nn_geometry_status = np_compute_nn_distance_train_eval_context_cached(
 						num_obs_train, num_obs_eval, 0,
 						matrix_X_train[i], matrix_X_eval[i], int_nn_k,
@@ -825,7 +853,7 @@ NPNNGeometryStatus *geometry_status)
 			}
 
 				nn_geometry_status = NP_NN_GEOMETRY_OK;
-				if(y_geometry_context != NULL && !nn_extended)
+				if(y_geometry_context != NULL)
 					nn_geometry_status = np_compute_nn_distance_train_eval_context_cached(
 						num_obs_train, num_obs_eval, 0,
 						matrix_Y_train[i], matrix_Y_eval[i], int_nn_k,
@@ -1062,7 +1090,7 @@ static int np_kernel_bandwidth_continuous_nn_into_ctx(
 
     if(BANDWIDTH == BW_GEN_NN) {
       NPNNGeometryStatus query_status = NP_NN_GEOMETRY_OK;
-      if(geometry_context != NULL && !nn_extended) {
+      if(geometry_context != NULL) {
 #ifndef MPI2
         query_status = np_compute_nn_distance_train_eval_context_cached(
           num_obs_train, num_obs_eval, suppress_parallel,
@@ -1096,7 +1124,7 @@ static int np_kernel_bandwidth_continuous_nn_into_ctx(
       }
       for(observation = 0; observation < num_obs_eval; ++observation) {
         const double bandwidth = nn_scale*nn_distance[observation];
-        if(geometry_context != NULL && !nn_extended &&
+        if(geometry_context != NULL &&
            (!isfinite(bandwidth) || bandwidth <= 0.0)) {
           if(geometry_status != NULL)
             *geometry_status = !isfinite(bandwidth) ?
@@ -1108,19 +1136,26 @@ static int np_kernel_bandwidth_continuous_nn_into_ctx(
     } else {
       if(geometry_context != NULL &&
          geometry_context->mode == NP_NN_QUERY_ADAPTIVE_FOLD_PREPARE){
+        int fold_lookup_k;
+        double fold_scale;
         NPNNGeometryStatus pair_status;
 
-        if(nn_extended || nn_scale != 1.0 ||
-           num_obs_eval != num_obs_train ||
+        if(num_obs_eval != num_obs_train ||
            geometry_context->eval_to_train != NULL ||
            geometry_context->adaptive_successor == NULL ||
-           geometry_context->adaptive_successor[dimension] == NULL){
+           geometry_context->adaptive_fold_scale == NULL ||
+           geometry_context->adaptive_successor[dimension] == NULL ||
+           (geometry_context->adaptive_full != NULL &&
+            geometry_context->adaptive_full[dimension] == NULL) ||
+           np_adaptive_fold_lookup_from_scale(
+             num_obs_train, vector_scale_factor[dimension],
+             &fold_lookup_k, &fold_scale) != 0){
           if(geometry_status != NULL)
             *geometry_status = NP_NN_GEOMETRY_INVALID_ARGUMENT;
           return 1;
         }
         pair_status = compute_nn_adaptive_distance_pair(
-          num_obs_train, matrix_train[dimension], int_nn_k,
+          num_obs_train, matrix_train[dimension], fold_lookup_k,
           matrix_bandwidth[dimension],
           geometry_context->adaptive_successor[dimension]);
         if(pair_status != NP_NN_GEOMETRY_OK){
@@ -1128,6 +1163,28 @@ static int np_kernel_bandwidth_continuous_nn_into_ctx(
             *geometry_status = pair_status;
           return 1;
         }
+        geometry_context->adaptive_fold_scale[dimension] = fold_scale;
+        if(geometry_context->adaptive_full != NULL){
+          const int full_uses_successor = int_nn_k != fold_lookup_k;
+
+          if((!full_uses_successor && nn_scale != 1.0) ||
+             (full_uses_successor && int_nn_k != fold_lookup_k + 1)){
+            if(geometry_status != NULL)
+              *geometry_status = NP_NN_GEOMETRY_INVALID_ARGUMENT;
+            return 1;
+          }
+          for(observation = 0; observation < num_obs_train; ++observation)
+            geometry_context->adaptive_full[dimension][observation] =
+              nn_scale*(full_uses_successor ?
+                geometry_context->adaptive_successor[dimension][observation] :
+                matrix_bandwidth[dimension][observation]);
+        }
+        if(fold_scale != 1.0)
+          for(observation = 0; observation < num_obs_train; ++observation){
+            matrix_bandwidth[dimension][observation] *= fold_scale;
+            geometry_context->adaptive_successor[dimension][observation] *=
+              fold_scale;
+          }
         continue;
       }
 #ifndef MPI2
