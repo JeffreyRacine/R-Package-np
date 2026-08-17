@@ -9366,7 +9366,7 @@ static SEXP np_regression_lp_apply_conditional_impl(SEXP txuno,
   SEXP exuno_r = R_NilValue, exord_r = R_NilValue, excon_r = R_NilValue;
   SEXP rhs_r = R_NilValue, rbw_r = R_NilValue, degree_i = R_NilValue;
   SEXP grad_i = R_NilValue, ckerlb_r = R_NilValue, ckerub_r = R_NilValue;
-  SEXP out = R_NilValue;
+  SEXP out = R_NilValue, ridge_used = R_NilValue;
   int nrow_txuno = 0, ncol_txuno = 0, nrow_txord = 0, ncol_txord = 0, nrow_txcon = 0, ncol_txcon = 0;
   int nrow_exuno = 0, ncol_exuno = 0, nrow_exord = 0, ncol_exord = 0, nrow_excon = 0, ncol_excon = 0;
   int nrow_rhs = 0, ncol_rhs = 0;
@@ -9655,10 +9655,18 @@ static SEXP np_regression_lp_apply_conditional_impl(SEXP txuno,
   if(return_hat_flag) {
     out = PROTECT(allocMatrix(REALSXP, num_obs_eval, num_obs_train));
     nprotect++;
+    if(descriptor.family == NP_CKERNEL_FAMILY_LEGACY) {
+      ridge_used = PROTECT(allocVector(REALSXP, num_obs_eval));
+      nprotect++;
+    }
     compute_status = np_regression_lp_hat_matrix(
       REAL(rbw_r), derivative_variable, derivative_order, REAL(out),
+      (ridge_used != R_NilValue) ? REAL(ridge_used) : NULL,
       active_route, active_diagnostics, categorical_compress_flag,
       nn_geometry_context_ptr);
+    if(compute_status == NP_REGRESSION_LP_MATRIX_OK &&
+       ridge_used != R_NilValue)
+      setAttrib(out, install("ridge.used"), ridge_used);
     if(compute_status != NP_REGRESSION_LP_MATRIX_OK)
       failure_message =
         (compute_status == NP_REGRESSION_LP_MATRIX_ZERO_RADIUS) ?

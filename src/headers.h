@@ -322,7 +322,8 @@ int np_glp_cv_degree_admissible_extern(const int num_obs, const int ncon, const 
 void np_reg_cv_core_clear_extern(void);
 int np_regression_lp_hat_matrix(
   double *vector_scale_factor, int deriv_var, int deriv_order,
-  double *weights_out, const NPContinuousKernelRoute *kernel_route,
+  double *weights_out, double *ridge_used_out,
+  const NPContinuousKernelRoute *kernel_route,
   NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
   int categorical_compress,
   const NPNNGeometryContext *nn_geometry_context);
