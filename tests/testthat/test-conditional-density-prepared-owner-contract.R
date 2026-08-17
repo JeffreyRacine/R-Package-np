@@ -1,6 +1,5 @@
 np_conditional_density_prepared_source <- function() {
-  source_file <- file.path(npRmpi_namespace_hygiene_root(), "src", "np.c")
-  expect_true(file.exists(source_file))
+  source_file <- npRmpi_test_source_path("src", "np.c")
   paste(readLines(source_file, warn = FALSE), collapse = "\n")
 }
 
