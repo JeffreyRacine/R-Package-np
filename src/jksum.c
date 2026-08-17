@@ -36353,6 +36353,11 @@ double *cv){
   int ov_cont_from_cache = 0;
   double **matrix_bandwidth = NULL;
   double *lambda = NULL;
+  const NPNNGeometryContext nn_geometry_context = {
+    .mode = NP_NN_QUERY_TRAINING_IDENTITY,
+    .eval_to_train = NULL
+  };
+  NPNNGeometryStatus nn_geometry_status = NP_NN_GEOMETRY_OK;
 
   if(exact_beta_route &&
      (np_continuous_kernel_route_validate(
@@ -36405,7 +36410,7 @@ double *cv){
   matrix_bandwidth = alloc_matd(bwmdim,num_reg_continuous);
   lambda = alloc_vecd(num_reg_unordered+num_reg_ordered);
 
-  if(kernel_bandwidth_mean(exact_beta_route ? 0 : KERNEL_den,
+  if(kernel_bandwidth_mean_ctx(exact_beta_route ? 0 : KERNEL_den,
                            BANDWIDTH_den,
                            num_obs,
                            num_obs,
@@ -36420,12 +36425,19 @@ double *cv){
                            matrix_X_continuous,
                            NULL,
                            matrix_bandwidth,
-                           lambda)==1){
+                           lambda,
+                           exact_beta_route ? NULL : &nn_geometry_context,
+                           NULL,
+                           &nn_geometry_status)==1){
     /* Beta candidates participate in optimizer penalty handling.  Preserve
        the incumbent hard error for legacy callers, but let the canonical
        beta callback convert an invalid candidate into DBL_MAX. */
     if(exact_beta_route)
       goto cleanup_density_leave_one_out_cv;
+    if(nn_geometry_status == NP_NN_GEOMETRY_ZERO_RADIUS) {
+      status = 1;
+      goto cleanup_density_leave_one_out_cv;
+    }
     error("\n** Error: invalid bandwidth.");
   }
 
@@ -37182,7 +37194,8 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
                                               double *log_likelihood,
                                               const NPContinuousKernelRoute *kernel_route,
                                               NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
-                                              int categorical_compress){
+                                              int categorical_compress,
+                                              const NPNNGeometryContext *nn_geometry_context){
   /*
     These caches are keyed by call-local row pointers.  Density/distribution
     evaluation invokes this helper directly, so stale keys from an earlier
@@ -37220,6 +37233,7 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
   double *beta_fixed_bandwidth = NULL;
   double *beta_categorical_lambda = NULL;
   int beta_route_status = 0;
+  NPNNGeometryStatus nn_geometry_status = NP_NN_GEOMETRY_OK;
 
   double pnh = (double)num_obs_train;
 
@@ -37286,7 +37300,7 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
 
   if(!(exact_beta_route && BANDWIDTH_den == BW_FIXED &&
        num_reg_unordered == 0 && num_reg_ordered == 0) &&
-     kernel_bandwidth_mean(KERNEL_den,
+     kernel_bandwidth_mean_ctx(KERNEL_den,
                            BANDWIDTH_den,
                            num_obs_train,
                            num_obs_eval,
@@ -37301,11 +37315,16 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
                            matrix_X_continuous_eval,
                            NULL,
                            matrix_bandwidth,
-                           lambda)==1){
+                           lambda,
+                           exact_beta_route ? NULL : nn_geometry_context,
+                           NULL,
+                           &nn_geometry_status)==1){
 #ifdef MPI2
 		MPI_Barrier(comm[1]);
 		MPI_Finalize();
 #endif
+    if(nn_geometry_status == NP_NN_GEOMETRY_ZERO_RADIUS)
+      error("generalized nearest-neighbor bandwidth has a zero literal radius after occurrence exclusion");
     error("\n** Error: invalid bandwidth.");
   }
 

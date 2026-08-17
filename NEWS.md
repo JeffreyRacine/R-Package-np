@@ -1,5 +1,14 @@
 # np 0.70-6
 
+* Ordinary generalized nearest-neighbour unconditional density and
+  distribution rows now distinguish identified training occurrences from
+  equal-valued external evaluation points. Training fits and CVML construct
+  each query radius after deleting its focal occurrence, while full fitted
+  rows continue to use every observation in the kernel sum. External queries,
+  density CVLS, adaptive and extended nearest-neighbour bandwidths, and beta
+  kernels retain their existing contracts; a literal zero radius is rejected
+  rather than replaced by a positive neighbour.
+
 * Broad-support positive-degree `npscoef` tree objectives now retain one
   invocation-owned outer-product workspace across full-contiguous tree rows.
   The unchanged design matrix is packed once while response/weight scratch is
