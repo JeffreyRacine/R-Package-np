@@ -5329,7 +5329,8 @@ static void np_conditional_density_refresh_penalty_canonical(
   const int num_all_var,
   const int penalty_mode,
   const double penalty_multiplier,
-  const int account_probes)
+  const int account_probes,
+  const int allow_adaptive_lp_reseed)
 {
   int i;
   double baseline;
@@ -5354,16 +5355,27 @@ static void np_conditional_density_refresh_penalty_canonical(
   if (!R_FINITE(baseline) || baseline == DBL_MAX) {
     double *tmp = bwm_alloc_transform_tmp(
       num_all_var + bwm_num_extra_params + 1);
+    /* Exact adaptive LP folds can make the narrow automatic start singular
+     * in several coordinates at once. Powell cannot leave that disconnected
+     * invalid plateau by moving one coordinate. For automatic starts only,
+     * jointly enlarge ordinary integer k values until the objective certifies
+     * a finite seed. The admissible range and explicit user starts are
+     * unchanged, and every rank evaluates the same bounded probe sequence. */
+    int adaptive_lp_reseed =
+      allow_adaptive_lp_reseed &&
+      !bwm_use_transform &&
+      (BANDWIDTH_den_extern == BW_ADAP_NN) &&
+      (np_lp_engine_extern == NP_LP_ENGINE_GENERAL) &&
+      ((num_var_continuous_extern + num_reg_continuous_extern) > 0) &&
+      (num_obs_train_extern >= 3);
+    int probe_limit = 1;
+    int probe;
 
     if (tmp != NULL &&
         np_copy_scale_factor_for_raw(
           tmp, vector_scale_factor, num_all_var) == 0) {
       for (i = 1; i <= bwm_num_extra_params; ++i)
         tmp[num_all_var + i] = vector_scale_factor[num_all_var + i];
-      for (i = 1;
-           i <= num_var_continuous_extern + num_reg_continuous_extern;
-           ++i)
-        tmp[i] *= 2.0;
       for (i = 0;
            i < num_var_unordered_extern + num_reg_unordered_extern;
            ++i) {
@@ -5381,11 +5393,69 @@ static void np_conditional_density_refresh_penalty_canonical(
           num_reg_unordered_extern + 1 + i;
         tmp[idx] = 0.5;
       }
-      baseline = bwmfunc_raw(tmp);
-      if (account_probes) {
-        bwm_eval_count += 1.0;
-        if (!R_FINITE(baseline) || baseline == DBL_MAX)
-          bwm_invalid_count += 1.0;
+
+      if (adaptive_lp_reseed) {
+        int remaining = num_obs_train_extern - 2;
+
+        while (remaining > 1) {
+          ++probe_limit;
+          remaining = (remaining + 1)/2;
+        }
+        for (i = 1;
+             i <= num_var_continuous_extern + num_reg_continuous_extern;
+             ++i) {
+          int lookup_k = 0;
+          int is_extended = 0;
+          double distance_scale = 0.0;
+
+          if (np_nn_lookup_from_scale(
+                num_obs_train_extern, 1, tmp[i],
+                &lookup_k, &distance_scale, &is_extended) != 0 ||
+              is_extended || lookup_k < 1 ||
+              lookup_k > num_obs_train_extern - 2) {
+            adaptive_lp_reseed = 0;
+            probe_limit = 1;
+            break;
+          }
+        }
+      }
+
+      for (probe = 0; probe < probe_limit; ++probe) {
+        int advanced = 0;
+
+        for (i = 1;
+             i <= num_var_continuous_extern + num_reg_continuous_extern;
+             ++i) {
+          if (adaptive_lp_reseed) {
+            const int maximum_k = num_obs_train_extern - 2;
+            const int lookup_k = (int)tmp[i];
+            int next_k;
+
+            next_k = MIN(maximum_k, MAX(lookup_k + 1, 2*lookup_k));
+            if (next_k > lookup_k) {
+              tmp[i] = (double)next_k;
+              advanced = 1;
+            }
+          } else {
+            tmp[i] *= 2.0;
+            advanced = 1;
+          }
+        }
+        if (!advanced)
+          break;
+
+        baseline = bwmfunc_raw(tmp);
+        if (account_probes) {
+          bwm_eval_count += 1.0;
+          if (!R_FINITE(baseline) || baseline == DBL_MAX)
+            bwm_invalid_count += 1.0;
+        }
+        if (R_FINITE(baseline) && baseline != DBL_MAX) {
+          if (adaptive_lp_reseed)
+            np_copy_scale_factor(
+              vector_scale_factor, tmp, num_all_var);
+          break;
+        }
       }
     }
     safe_free(tmp);
@@ -5406,6 +5476,7 @@ static void np_conditional_density_prepared_context_refresh_penalty(void)
     np_conditional_density_prepared_context.num_all_var,
     np_conditional_density_prepared_context.penalty_mode,
     np_conditional_density_prepared_context.penalty_multiplier,
+    0,
     0);
   np_conditional_density_prepared_context.penalty_ready = bwm_penalty_mode;
   np_conditional_density_prepared_context.penalty_value = bwm_penalty_value;
@@ -15089,7 +15160,8 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
     num_all_var,
     penalty_mode[0],
     penalty_mult[0],
-    1);
+    1,
+    !myopti[CBW_USTARTI]);
 
   fret_initial = fret_best = bwmfunc_wrapper(vector_scale_factor);
   iImproved = 0;

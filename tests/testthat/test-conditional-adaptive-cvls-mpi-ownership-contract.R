@@ -156,3 +156,72 @@ test_that("adaptive distribution allocation fallback remains MPI-owned", {
   expect_match(row_owner, "contributions[i] = row_loss;", fixed = TRUE)
   expect_match(row_owner, "np_objective_outer_buffer_finish(", fixed = TRUE)
 })
+
+test_that("exact adaptive conditional owners share rank-symmetric bounded finishing", {
+  source <- conditional_adaptive_cvls_source()
+  skip_if(is.null(source), "package C source unavailable")
+  owners <- list(
+    cvml = list(
+      body = conditional_adaptive_cvls_body(
+        source,
+        "/* Exact ordinary adaptive-NN conditional-density CVML.",
+        "/* Exact ordinary adaptive-NN conditional-density CVLS."
+      ),
+      hook = "NP_RMPI_INJECT_CDEN_ADAPTIVE_CVML_FAIL_RANK"
+    ),
+    cvls = list(
+      body = conditional_adaptive_cvls_body(
+        source,
+        "/* Exact ordinary adaptive-NN conditional-density CVLS.",
+        "int np_conditional_density_cvml_lp_stream("
+      ),
+      hook = "NP_RMPI_INJECT_CDEN_ADAPTIVE_CVLS_FAIL_RANK"
+    ),
+    cdist = list(
+      body = conditional_adaptive_cvls_body(
+        source,
+        "/* Exact empirical-grid adaptive-NN conditional-distribution CV.",
+        "/* Canonical generalized-NN empirical conditional-CDF row owner."
+      ),
+      hook = "NP_RMPI_INJECT_CDIST_ADAPTIVE_EXACT_FAIL_RANK"
+    )
+  )
+
+  for (owner in owners) {
+    body <- owner$body
+    expect_match(
+      body,
+      "const int use_parallel_rows = np_objective_outer_rows_enabled(1);",
+      fixed = TRUE
+    )
+    expect_match(body, "np_objective_outer_preflight_failed(", fixed = TRUE)
+    expect_match(body, "np_objective_outer_buffer_prepare(", fixed = TRUE)
+    expect_match(body, "np_objective_outer_owned_rows(", fixed = TRUE)
+    expect_match(body, "np_objective_outer_buffer_finish(", fixed = TRUE)
+    expect_match(body, owner$hook, fixed = TRUE)
+    expect_false(grepl("num_obs*num_obs", body, fixed = TRUE))
+    expect_false(grepl("num_train*num_train", body, fixed = TRUE))
+    expect_false(grepl("alloc_matd(num_obs, num_obs)", body, fixed = TRUE))
+    expect_false(grepl("alloc_matd(num_train, num_train)", body, fixed = TRUE))
+  }
+})
+
+test_that("adaptive geometry preparation fails rank-symmetrically", {
+  source <- conditional_adaptive_cvls_source()
+  skip_if(is.null(source), "package C source unavailable")
+
+  expect_match(
+    source,
+    "static int np_adaptive_geometry_preflight_failed(",
+    fixed = TRUE
+  )
+  expect_match(
+    source,
+    "np_objective_outer_preflight_failed(\n    np_objective_outer_rows_enabled(1), local_fail);",
+    fixed = TRUE
+  )
+  calls <- gregexpr(
+    "np_adaptive_geometry_preflight_failed(", source, fixed = TRUE
+  )[[1L]]
+  expect_identical(length(calls[calls > 0L]), 5L)
+})
