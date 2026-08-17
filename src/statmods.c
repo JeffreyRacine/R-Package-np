@@ -620,6 +620,145 @@ static int compute_nn_distance_observation_support_subset(int num_obs,
   return 0;
 }
 
+/*
+ * Prepare the adjacent donor-self-excluded order statistics needed by exact
+ * adaptive delete-one geometry.  One occurrence-safe value sort serves every
+ * donor; duplicate observations remain separate multiset members.  Zero
+ * radii are retained for pair-local status handling rather than replaced by a
+ * nearest-positive distance.
+ */
+NPNNGeometryStatus compute_nn_adaptive_distance_pair(
+  const int num_obs,
+  const double *vector_data,
+  const int int_k_nn,
+  double *primary_distance,
+  double *successor_distance)
+{
+  double *sorted = NULL;
+  double *primary_sorted = NULL;
+  double *successor_sorted = NULL;
+  int start;
+  int observation;
+
+  if(num_obs < 3 || vector_data == NULL || primary_distance == NULL ||
+     successor_distance == NULL || int_k_nn < 1 ||
+     int_k_nn > num_obs - 2)
+    return NP_NN_GEOMETRY_INVALID_ARGUMENT;
+  for(observation = 0; observation < num_obs; ++observation)
+    if(!isfinite(vector_data[observation]))
+      return NP_NN_GEOMETRY_NONFINITE_RADIUS;
+
+  if(build_sorted_observation_support(
+       num_obs, vector_data, &sorted) != 0)
+    return NP_NN_GEOMETRY_ALLOCATION_FAILURE;
+  primary_sorted = alloc_vecd(num_obs);
+  successor_sorted = alloc_vecd(num_obs);
+  if(primary_sorted == NULL || successor_sorted == NULL){
+    free(sorted);
+    free(primary_sorted);
+    free(successor_sorted);
+    return NP_NN_GEOMETRY_ALLOCATION_FAILURE;
+  }
+
+  start = 0;
+  while(start < num_obs){
+    const int stop = upper_bound_observation_support(
+      num_obs, sorted, sorted[start]);
+    double primary;
+    double successor;
+
+    if(kth_observation_radius_sorted_adaptive(
+         sorted, num_obs, start, int_k_nn, &primary) != 0 ||
+       kth_observation_radius_sorted_adaptive(
+         sorted, num_obs, start, int_k_nn + 1, &successor) != 0 ||
+       !isfinite(primary) || !isfinite(successor) ||
+       primary < 0.0 || successor < primary){
+      free(sorted);
+      free(primary_sorted);
+      free(successor_sorted);
+      return NP_NN_GEOMETRY_NONFINITE_RADIUS;
+    }
+    for(observation = start; observation < stop; ++observation){
+      primary_sorted[observation] = primary;
+      successor_sorted[observation] = successor;
+    }
+    start = stop;
+  }
+
+  for(observation = 0; observation < num_obs; ++observation){
+    const int position = lower_bound_observation_support(
+      num_obs, sorted, vector_data[observation]);
+
+    if(position < 0 || position >= num_obs ||
+       sorted[position] != vector_data[observation]){
+      free(sorted);
+      free(primary_sorted);
+      free(successor_sorted);
+      return NP_NN_GEOMETRY_INVALID_ARGUMENT;
+    }
+    primary_distance[observation] = primary_sorted[position];
+    successor_distance[observation] = successor_sorted[position];
+  }
+
+  free(sorted);
+  free(primary_sorted);
+  free(successor_sorted);
+  return NP_NN_GEOMETRY_OK;
+}
+
+/*
+ * Materialize one exact adaptive-fold bandwidth row without allocation.  The
+ * held-out donor slot is never consumed by the delete-one estimator; give the
+ * generic row engine a finite positive placeholder so it cannot manufacture
+ * a division-by-zero before applying its structural omission.
+ */
+NPNNGeometryStatus np_nn_adaptive_fold_select_row(
+  const int num_obs,
+  const int num_cont,
+  double **matrix_train,
+  double **primary_bandwidth,
+  double **successor_bandwidth,
+  const int held_out,
+  double **selected_bandwidth)
+{
+  int coordinate;
+  int donor;
+
+  if(num_obs < 3 || num_cont <= 0 || held_out < 0 || held_out >= num_obs ||
+     matrix_train == NULL || primary_bandwidth == NULL ||
+     successor_bandwidth == NULL || selected_bandwidth == NULL)
+    return NP_NN_GEOMETRY_INVALID_ARGUMENT;
+
+  for(coordinate = 0; coordinate < num_cont; ++coordinate){
+    if(matrix_train[coordinate] == NULL ||
+       primary_bandwidth[coordinate] == NULL ||
+       successor_bandwidth[coordinate] == NULL ||
+       selected_bandwidth[coordinate] == NULL)
+      return NP_NN_GEOMETRY_INVALID_ARGUMENT;
+    selected_bandwidth[coordinate][held_out] = 1.0;
+    for(donor = 0; donor < num_obs; ++donor){
+      double selected;
+      double distance;
+
+      if(donor == held_out)
+        continue;
+      distance = fabs(matrix_train[coordinate][held_out] -
+                      matrix_train[coordinate][donor]);
+      if(np_nn_two_slot_radius_select(
+           primary_bandwidth[coordinate][donor],
+           successor_bandwidth[coordinate][donor],
+           distance, 1, &selected) != 0)
+        return NP_NN_GEOMETRY_INVALID_ARGUMENT;
+      if(!isfinite(selected))
+        return NP_NN_GEOMETRY_NONFINITE_RADIUS;
+      if(selected <= 0.0)
+        return NP_NN_GEOMETRY_ZERO_RADIUS;
+      selected_bandwidth[coordinate][donor] = selected;
+    }
+  }
+  return NP_NN_GEOMETRY_OK;
+}
+
 static int compute_nn_distance_train_eval_observation_support_subset(int num_obs_train,
                                                                      int num_obs_eval,
                                                                      double *vector_data_train,

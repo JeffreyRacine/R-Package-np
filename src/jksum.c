@@ -18026,6 +18026,214 @@ cleanup_lp_cv:
   return result;
 }
 
+static NPContinuousKernelRowStatus
+np_conditional_count_legacy_row(
+  const NPConditionalCountPlan *plan,
+  int is_x_side,
+  int evaluation,
+  const NPBetaScaledRowCategoricalContext *categorical_context,
+  double *log_absolute,
+  signed char *sign,
+  signed char *categorical_sign,
+  double *row,
+  double *common_log_scale,
+  int *bad_dimension);
+
+/*
+ * First exact adaptive delete-one consumer.  Geometry is prepared once as
+ * adjacent donor-self-excluded radii; each held-out row materializes its
+ * pair-local bandwidths into caller-owned O(p*n) workspace and delegates all
+ * kernel/categorical arithmetic to the canonical weighted-sum engine.
+ *
+ * This Phase-A1 owner is intentionally limited to scalar CVLS.  Wider local
+ * polynomial rows and other objectives remain on their frozen baseline until
+ * their separate migration tranche, but they will consume the same geometry
+ * preparation and row-selection primitives rather than reimplementing rank
+ * or tie semantics.
+ */
+static NPRegCvLpResult np_regression_cv_scalar_adaptive_exact(
+  const int num_obs,
+  const int num_reg_unordered,
+  const int num_reg_ordered,
+  const int num_reg_continuous,
+  double **matrix_X_unordered,
+  double **matrix_X_ordered,
+  double **matrix_X_continuous,
+  double *vector_Y,
+  int *num_categories,
+  int *kernel_c,
+  int *kernel_u,
+  int *kernel_o,
+  int *operator,
+  double *lambda,
+  double **primary_bandwidth,
+  double **successor_bandwidth,
+  double **selected_bandwidth)
+{
+  NPRegCvLpResult result = {DBL_MAX, 0.0, 0};
+  NPConditionalCountPlan row_plan = {0};
+  NPBetaScaledRowCategoricalContext categorical_context;
+  np_continuous_kernel_descriptor descriptor;
+  double *numeric = NULL;
+  double *row;
+  double *log_absolute;
+  double *categorical_scratch = NULL;
+  signed char *sign = NULL;
+  signed char *categorical_sign = NULL;
+  int categorical_context_initialized = 0;
+  int kernel_order;
+  int held_out;
+  int coordinate;
+  int regressor;
+  size_t numeric_count;
+
+  if(num_obs < 3 || num_reg_continuous <= 0 ||
+     num_reg_unordered < 0 || num_reg_ordered < 0 ||
+     num_reg_continuous > INT_MAX - num_reg_unordered ||
+     num_reg_continuous + num_reg_unordered > INT_MAX - num_reg_ordered ||
+     matrix_X_continuous == NULL || vector_Y == NULL ||
+     kernel_c == NULL || operator == NULL ||
+     primary_bandwidth == NULL || successor_bandwidth == NULL ||
+     selected_bandwidth == NULL ||
+     (num_reg_unordered > 0 &&
+      (matrix_X_unordered == NULL || kernel_u == NULL)) ||
+     (num_reg_ordered > 0 &&
+      (matrix_X_ordered == NULL || kernel_o == NULL)) ||
+     (num_reg_unordered + num_reg_ordered > 0 &&
+      (lambda == NULL || num_categories == NULL)))
+    return result;
+  for(regressor = 0;
+      regressor < num_reg_continuous + num_reg_unordered + num_reg_ordered;
+      ++regressor)
+    if(operator[regressor] != OP_NORMAL)
+      return result;
+
+  for(coordinate = 1; coordinate < num_reg_continuous; ++coordinate)
+    if(kernel_c[coordinate] != kernel_c[0])
+      return result;
+  if(kernel_c[0] < NP_CKERNEL_LEGACY_CODE_MIN ||
+     kernel_c[0] > NP_CKERNEL_LEGACY_CODE_MAX)
+    return result;
+  kernel_order = (kernel_c[0] == 8) ? 2 :
+    2*((kernel_c[0] % 4) + 1);
+  if(np_continuous_kernel_descriptor_init(
+       NP_CKERNEL_FAMILY_LEGACY, kernel_c[0], kernel_order,
+       &descriptor) != NP_CKERNEL_DESCRIPTOR_OK)
+    return result;
+
+  if(!np_size_mul_checked(
+       (num_reg_unordered + num_reg_ordered > 0) ? 3U : 2U,
+       (size_t)num_obs, &numeric_count) ||
+     np_native_malloc_array((void **)&numeric, numeric_count,
+                            sizeof(*numeric)) != NP_NATIVE_ALLOC_OK ||
+     np_native_malloc_array((void **)&sign, (size_t)num_obs,
+                            sizeof(*sign)) != NP_NATIVE_ALLOC_OK)
+    goto cleanup_adaptive_exact_scalar;
+  if(num_reg_unordered + num_reg_ordered > 0) {
+    if(np_native_malloc_array((void **)&categorical_sign,
+                              (size_t)num_obs,
+                              sizeof(*categorical_sign)) !=
+       NP_NATIVE_ALLOC_OK)
+      goto cleanup_adaptive_exact_scalar;
+  }
+  row = numeric;
+  log_absolute = row + num_obs;
+  if(num_reg_unordered + num_reg_ordered > 0)
+    categorical_scratch = log_absolute + num_obs;
+
+  row_plan.bandwidth_mode = BW_ADAP_NN;
+  row_plan.num_train = num_obs;
+  row_plan.num_eval = num_obs;
+  row_plan.num_x_continuous = num_reg_continuous;
+  row_plan.num_x_unordered = num_reg_unordered;
+  row_plan.num_x_ordered = num_reg_ordered;
+  row_plan.train_x = matrix_X_continuous;
+  row_plan.eval_x = matrix_X_continuous;
+  row_plan.train_x_unordered = matrix_X_unordered;
+  row_plan.eval_x_unordered = matrix_X_unordered;
+  row_plan.train_x_ordered = matrix_X_ordered;
+  row_plan.eval_x_ordered = matrix_X_ordered;
+  row_plan.bandwidth_train_x = selected_bandwidth;
+  row_plan.bandwidth_eval_x = selected_bandwidth;
+  row_plan.lower_x = vector_ckerlb_extern;
+  row_plan.upper_x = vector_ckerub_extern;
+  row_plan.operator_x = operator;
+  row_plan.kernel_x_unordered = kernel_u;
+  row_plan.kernel_x_ordered = kernel_o;
+  row_plan.lambda_x = lambda;
+  row_plan.num_categories_x = num_categories;
+  row_plan.category_values_x = matrix_categorical_vals_extern;
+  row_plan.descriptor_x = descriptor;
+
+  if(num_reg_unordered + num_reg_ordered > 0){
+    np_beta_categorical_factor_context_init_empty(&categorical_context);
+    categorical_context_initialized = 1;
+    if(np_beta_categorical_factor_context_prepare(
+         &categorical_context, num_obs, num_obs,
+         num_reg_unordered, num_reg_ordered,
+         matrix_X_unordered, matrix_X_ordered,
+         matrix_X_unordered, matrix_X_ordered,
+         kernel_u, kernel_o, operator + num_reg_continuous,
+         lambda, num_categories, matrix_categorical_vals_extern,
+         0, categorical_scratch) != NP_CONTINUOUS_ROW_OK)
+      goto cleanup_adaptive_exact_scalar;
+  }
+
+  result.cv = 0.0;
+  for(held_out = 0; held_out < num_obs; ++held_out){
+    NPNNGeometryStatus geometry_status;
+    double common_log_scale = 0.0;
+    double numerator = 0.0;
+    double denominator = 0.0;
+    double fitted;
+    double residual;
+    int donor;
+
+    if((held_out & 31) == 0)
+      np_progress_bandwidth_loop_step();
+    geometry_status = np_nn_adaptive_fold_select_row(
+      num_obs, num_reg_continuous, matrix_X_continuous,
+      primary_bandwidth, successor_bandwidth, held_out,
+      selected_bandwidth);
+    if(geometry_status != NP_NN_GEOMETRY_OK)
+      goto cleanup_adaptive_exact_scalar;
+    if(np_conditional_count_legacy_row(
+         &row_plan, 1, held_out,
+         categorical_context_initialized ? &categorical_context : NULL,
+         log_absolute, sign, categorical_sign,
+         row, &common_log_scale, NULL) != NP_CONTINUOUS_ROW_OK)
+      goto cleanup_adaptive_exact_scalar;
+    for(donor = 0; donor < num_obs; ++donor){
+      if(donor == held_out)
+        continue;
+      numerator += row[donor]*vector_Y[donor];
+      denominator += row[donor];
+    }
+    if(!isfinite(numerator) || !isfinite(denominator) ||
+       denominator == 0.0)
+      goto cleanup_adaptive_exact_scalar;
+    fitted = numerator/denominator;
+    residual = vector_Y[held_out] - fitted;
+    result.cv += residual*residual;
+    if(!isfinite(result.cv))
+      goto cleanup_adaptive_exact_scalar;
+    (void)common_log_scale;
+  }
+  result.ok = 1;
+
+cleanup_adaptive_exact_scalar:
+  if(categorical_context_initialized)
+    np_beta_categorical_factor_context_release(&categorical_context);
+  free(numeric);
+  free(sign);
+  free(categorical_sign);
+  if(!result.ok){
+    result.cv = DBL_MAX;
+    result.traceH = 0.0;
+  }
+  return result;
+}
+
 // Regression CV objective for local polynomial regression:
 // lc (degree 0), ll (degree 1), and lp (general degree vector).
 // The LL/LP branches solve weighted normal equations with ridge fallback if singular.
@@ -18057,12 +18265,15 @@ int *num_categories){
   double cv = 0.0;
   double *lambda = NULL;
   double ** matrix_bandwidth = NULL;
+  double **adaptive_successor_bandwidth = NULL;
+  double **adaptive_selected_bandwidth = NULL;
 
   double aicc = 0.0;
   double traceH = 0.0;
-  const NPNNGeometryContext nn_geometry_context = {
+  NPNNGeometryContext nn_geometry_context = {
     .mode = NP_NN_QUERY_TRAINING_IDENTITY,
-    .eval_to_train = NULL
+    .eval_to_train = NULL,
+    .adaptive_successor = NULL
   };
   NPNNGeometryStatus nn_geometry_status = NP_NN_GEOMETRY_OK;
 int * operator = NULL;
@@ -18093,6 +18304,24 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
   kernel_o = np_reg_cv_core_cache.kernel_o;
   lambda = np_reg_cv_core_cache.lambda;
   matrix_bandwidth = np_reg_cv_core_cache.matrix_bandwidth;
+
+  if(lp_engine == NP_LP_ENGINE_SCALAR && bwm == RBWM_CVLS &&
+     BANDWIDTH_reg == BW_ADAP_NN && num_reg_continuous > 0){
+    adaptive_successor_bandwidth =
+      alloc_tmatd(num_obs, num_reg_continuous);
+    adaptive_selected_bandwidth =
+      alloc_tmatd(num_obs, num_reg_continuous);
+    if(adaptive_successor_bandwidth == NULL ||
+       adaptive_selected_bandwidth == NULL){
+      if(adaptive_successor_bandwidth != NULL)
+        free_tmat(adaptive_successor_bandwidth);
+      if(adaptive_selected_bandwidth != NULL)
+        free_tmat(adaptive_selected_bandwidth);
+      return DBL_MAX;
+    }
+    nn_geometry_context.mode = NP_NN_QUERY_ADAPTIVE_FOLD_PREPARE;
+    nn_geometry_context.adaptive_successor = adaptive_successor_bandwidth;
+  }
 
 #ifdef MPI2
     int stride = 0;
@@ -18136,8 +18365,35 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                            &nn_geometry_context,
                            NULL,
                            &nn_geometry_status)==1){
-    
+    if(adaptive_successor_bandwidth != NULL)
+      free_tmat(adaptive_successor_bandwidth);
+    if(adaptive_selected_bandwidth != NULL)
+      free_tmat(adaptive_selected_bandwidth);
     return(DBL_MAX);
+  }
+
+  if(adaptive_successor_bandwidth != NULL){
+    const NPRegCvLpResult adaptive_exact =
+      np_regression_cv_scalar_adaptive_exact(
+        num_obs,
+        num_reg_unordered,
+        num_reg_ordered,
+        num_reg_continuous,
+        matrix_X_unordered,
+        matrix_X_ordered,
+        matrix_X_continuous,
+        vector_Y,
+        num_categories,
+        kernel_c,
+        kernel_u,
+        kernel_o,
+        operator,
+        lambda,
+        matrix_bandwidth,
+        adaptive_successor_bandwidth,
+        adaptive_selected_bandwidth);
+    cv = adaptive_exact.cv;
+    goto finish_cv_path;
   }
 
   /*
@@ -18545,6 +18801,10 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
   }
 
 finish_cv_path:
+  if(adaptive_successor_bandwidth != NULL)
+    free_tmat(adaptive_successor_bandwidth);
+  if(adaptive_selected_bandwidth != NULL)
+    free_tmat(adaptive_selected_bandwidth);
   if((ov_cont_ok != NULL) && (!ov_cont_from_cache)) free(ov_cont_ok);
   if((ov_cont_hmin != NULL) && (!ov_cont_from_cache)) free(ov_cont_hmin);
   if((ov_cont_k0 != NULL) && (!ov_cont_from_cache)) free(ov_cont_k0);
