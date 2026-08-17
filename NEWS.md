@@ -1,5 +1,19 @@
 # np 0.70-6
 
+* Conditioned local-polynomial influence and response owners now select the
+  same globally stable graded basis before applying the canonical diagonal
+  ridge policy. The former influence-only empirical QR rotation spanned the
+  same polynomial space, but diagonal ridging is not invariant to that extra
+  change of representation; on translated or calendar-scale predictors it
+  could therefore make `npreghat()` matrix/apply disagree with `npreg()` even
+  though both used the same factor policy. Objective, fit, matrix, apply, and
+  derivative consumers now share the fit-capable representation selected by
+  one helper. Positive-degree `npreghat()` and `npcdhat` matrix/apply routes
+  now enter that same regression core; the retired QR owner, private R
+  kernel-weight/chunk owner, conditional per-row owner, and their workspaces
+  have been removed. Raw well-conditioned arithmetic is unchanged and
+  auxiliary storage remains linear in the sample size.
+
 * Canonical wider-than-one local-polynomial ridge retries are now invariant to
   a common scaling of all kernel weights. The shared response/adjoint factor
   owner interprets `1/n.train` as a dimensionless fraction of the pristine

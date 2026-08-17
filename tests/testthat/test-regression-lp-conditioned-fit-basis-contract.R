@@ -78,6 +78,58 @@ test_that("ordinary and all-large LP fits share the conditioned basis owner", {
   }
 })
 
+test_that("conditioned generalized-NN fit and influence owners are identical", {
+  old <- options(np.messages = FALSE, np.tree = FALSE, np.largeh = FALSE)
+  on.exit(options(old), add = TRUE)
+
+  set.seed(20260817L)
+  n <- 43L
+  xdat <- data.frame(x = 10000 + 3.75 * sort(runif(n, -1.25, 1.35)))
+  centered <- (xdat$x - 10000) / 3.75
+  ydat <- sin(2.1 * centered) + 0.15 * centered^2 +
+    0.04 * seq_len(n) / n
+
+  for (kernel in c("gaussian", "epanechnikov")) {
+    for (degree in c(1L, 3L)) {
+      state <- npregbw(
+        xdat = xdat, ydat = ydat, bws = 2L,
+        bandwidth.compute = FALSE, bwscaling = FALSE,
+        bwmethod = "cv.ls", bwtype = "generalized_nn",
+        regtype = "lp", degree = degree,
+        bernstein.basis = FALSE, ckertype = kernel, ckerorder = 2L
+      )
+      fit <- npreg(bws = state, gradients = TRUE, se = FALSE)
+      mean.hat <- npreghat(bws = state, txdat = xdat, output = "matrix")
+      mean.apply <- npreghat(
+        bws = state, txdat = xdat, y = ydat, output = "apply"
+      )
+      gradient.hat <- npreghat(
+        bws = state, txdat = xdat, s = 1L, output = "matrix"
+      )
+      gradient.apply <- npreghat(
+        bws = state, txdat = xdat, y = ydat, s = 1L, output = "apply"
+      )
+
+      expect_equal(
+        drop(mean.hat %*% ydat), fit$mean, tolerance = 5e-11,
+        info = paste(kernel, degree, "mean H")
+      )
+      expect_equal(
+        mean.apply, fit$mean, tolerance = 5e-11,
+        info = paste(kernel, degree, "mean apply")
+      )
+      expect_equal(
+        drop(gradient.hat %*% ydat), fit$grad[, 1L], tolerance = 5e-11,
+        info = paste(kernel, degree, "gradient H")
+      )
+      expect_equal(
+        gradient.apply, fit$grad[, 1L], tolerance = 5e-11,
+        info = paste(kernel, degree, "gradient apply")
+      )
+    }
+  }
+})
+
 test_that("design validation is units neutral but preserves rank errors", {
   calendar <- data.frame(year = 1940 + seq(0, 40, length.out = 80L))
   expect_invisible(np:::npCheckRegressionDesignCondition(

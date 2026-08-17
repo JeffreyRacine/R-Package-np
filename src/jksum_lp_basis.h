@@ -13,25 +13,6 @@ typedef enum {
 } NPLPBasisStatus;
 
 /*
- * Construct a numerically conditioned representation of an existing
- * full-column-rank training basis.  Source and destination are column-major
- * n-by-p matrices with a shared leading dimension.  Each source column is
- * first scaled by its maximum magnitude, then a pivoted Householder QR
- * produces an orthonormal basis for exactly the same column space.
- *
- * The operation is blind to the public basis family and never translates
- * coordinates by an evaluation point.  It is intended for basis-invariant
- * influence-row algebra.  Callers own both matrices; this function retains no
- * storage and allocates only O(p) temporary LAPACK work.
- */
-attribute_hidden NPLPBasisStatus np_lp_conditioned_basis_prepare(
-  double * const *source,
-  int n,
-  int p,
-  int leading_dimension,
-  double *destination);
-
-/*
  * Decide once, before row traversal, whether the source basis carries a
  * representation-dependent unweighted Gram condition below min_rcond.
  * Source columns may share contiguous column-major storage or be allocated
