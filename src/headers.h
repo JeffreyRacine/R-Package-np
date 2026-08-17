@@ -42,6 +42,16 @@ typedef enum {
   NP_REGRESSION_LP_MATRIX_ZERO_RADIUS = 2
 } NPRegressionLPMatrixStatus;
 
+typedef enum {
+  NP_REGRESSION_FIT_OK = 0,
+  NP_REGRESSION_FIT_ERR_ALLOC = -1,
+  NP_REGRESSION_FIT_ERR_BANDWIDTH = -2,
+  NP_REGRESSION_FIT_ERR_HASH_CREATE = -3,
+  NP_REGRESSION_FIT_ERR_HASH_INSERT = -4,
+  NP_REGRESSION_FIT_ERR_HASH_LOOKUP = -5,
+  NP_REGRESSION_FIT_ERR_ZERO_NN_RADIUS = -6
+} NPRegressionFitStatus;
+
 typedef struct {
   const NPContinuousKernelRoute *x_route;
   NPContinuousKernelDerivativeDiagnostics *x_diagnostics;
@@ -501,7 +511,7 @@ int np_conditional_distribution_cvls_lp_stream_ctx(
   double *cv);
 
 
-void np_kernel_estimate_con_dens_dist_categorical(int KERNEL_Y,int KERNEL_unordered_Y,int KERNEL_ordered_Y,int KERNEL_X,int KERNEL_unordered_X,int KERNEL_ordered_X,int BANDWIDTH_den,int yop,int num_obs_train,int num_obs_eval,int num_Y_unordered,int num_Y_ordered,int num_Y_continuous,int num_X_unordered,int num_X_ordered,int num_X_continuous,double **matrix_XY_unordered_train, double **matrix_XY_ordered_train, double **matrix_XY_continuous_train, double **matrix_XY_unordered_eval, double **matrix_XY_ordered_eval, double **matrix_XY_continuous_eval, double *vector_scale_factor,int *num_categories,int *num_categories_XY, double ** matrix_categorical_vals, double ** matrix_categorical_vals_XY, double * kdf,double * kdf_stderr,double ** kdf_deriv,double ** kdf_deriv_stderr,double * log_likelihood,const NPContinuousKernelRoute *kernel_route,NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,int categorical_compress);
+void np_kernel_estimate_con_dens_dist_categorical(int KERNEL_Y,int KERNEL_unordered_Y,int KERNEL_ordered_Y,int KERNEL_X,int KERNEL_unordered_X,int KERNEL_ordered_X,int BANDWIDTH_den,int yop,int num_obs_train,int num_obs_eval,int num_Y_unordered,int num_Y_ordered,int num_Y_continuous,int num_X_unordered,int num_X_ordered,int num_X_continuous,double **matrix_XY_unordered_train, double **matrix_XY_ordered_train, double **matrix_XY_continuous_train, double **matrix_XY_unordered_eval, double **matrix_XY_ordered_eval, double **matrix_XY_continuous_eval, double *vector_scale_factor,int *num_categories,int *num_categories_XY, double ** matrix_categorical_vals, double ** matrix_categorical_vals_XY, double * kdf,double * kdf_stderr,double ** kdf_deriv,double ** kdf_deriv_stderr,double * log_likelihood,const NPContinuousKernelRoute *kernel_route,NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,int categorical_compress,const NPNNGeometryContext *nn_geometry_context);
 
 void np_splitxy_vsf_mcv_nc(const int num_var_unordered, const int num_var_ordered, const int num_var_continuous, const int num_reg_unordered, const int num_reg_ordered, const int num_reg_continuous, const double * const vector_scale_factor, const int * const num_categories, double ** matrix_categorical_vals, double * vsf_x, double * vsf_y, double * vsf_xy, int * nc_x, int * nc_y, int * nc_xy, double ** mcv_x, double ** mcv_y, double ** mcv_xy);
 
