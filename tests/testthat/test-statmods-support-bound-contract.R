@@ -40,7 +40,13 @@ test_that("explicit k may exceed empirical support size when observation count a
   )
 
   expect_no_error(
+    npreg(bws = bw.gen)
+  )
+
+  expect_error(
     npreg(bws = bw.gen, exdat = data.frame(x = x)),
+    "zero literal radius after occurrence exclusion",
+    fixed = TRUE
   )
 })
 

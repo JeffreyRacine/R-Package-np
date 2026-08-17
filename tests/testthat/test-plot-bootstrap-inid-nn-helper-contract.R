@@ -19,7 +19,14 @@ test_that("nearest-neighbor regression helper matches explicit resample refits",
   )
 
   for (bt in c("generalized_nn", "adaptive_nn")) {
-    bw.val <- if (identical(bt, "adaptive_nn")) c(5, 5) else c(2, 2)
+    # A multinomial resample can repeat an original evaluation point.  Keep
+    # this helper-equivalence fixture inside the literal-radius domain rather
+    # than relying on the retired nearest-positive substitution.
+    bw.val <- if (identical(bt, "adaptive_nn")) {
+      c(5, 5)
+    } else {
+      rep.int(max(counts) + 1L, 2L)
+    }
 
     for (cfg in cfgs) {
       bw.args <- list(
@@ -375,10 +382,11 @@ test_that("npindex nearest-neighbor inid helper matches explicit resample refits
 
   for (bt in c("generalized_nn", "adaptive_nn")) {
     for (cfg in cfgs) {
+      h <- if (identical(bt, "generalized_nn")) max(counts) + 1L else cfg$h
       bw.args <- list(
         xdat = tx,
         ydat = y,
-        bws = c(1, 1, cfg$h),
+        bws = c(1, 1, h),
         bandwidth.compute = FALSE,
         regtype = cfg$regtype,
         bwtype = bt

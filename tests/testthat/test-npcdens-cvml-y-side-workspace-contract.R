@@ -35,7 +35,6 @@ npcdens_y_side_fixture <- function() {
 npcdens_y_side_oracle <- function(x, y, bw) {
   xweights <- npksum(
     txdat = x,
-    exdat = x,
     bws = bw$xbw,
     bwtype = bw$type,
     ckertype = bw$cxkertype,
@@ -46,7 +45,6 @@ npcdens_y_side_oracle <- function(x, y, bw) {
   )$kw
   yweights <- npksum(
     txdat = y,
-    exdat = y,
     bws = bw$ybw,
     bwtype = bw$type,
     ukertype = bw$uykertype,

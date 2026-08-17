@@ -262,7 +262,9 @@ test_that("beta CDF cross-validation matches explicit leave-one-out matrices", {
     (matrix(colSums(train_weights), nrow(x), nrow(x), byrow = TRUE) -
        train_weights) / (nrow(x) - 1L)
   squared <- (outer(xval, xval, "<=") - fitted_loo)^2
-  expected_train <- (sum(squared) - sum(diag(squared))) / nrow(x)^2
+  expected_train <-
+    (sum(squared) - sum(diag(squared))) /
+    (nrow(x) * (nrow(x) - 1L))
   expect_equal(
     beta_distribution_objective(
       x, 0.15, 2L, do.full.integral = TRUE
@@ -346,7 +348,7 @@ test_that("mixed beta CDF cross-validation matches ordered-product oracles", {
       expected <- mean((empirical.cdf - fitted.loo)^2)
       squared <- (empirical.cdf - fitted.loo)^2
       expected.on.train <-
-        (sum(squared) - sum(diag(squared))) / n^2
+        (sum(squared) - sum(diag(squared))) / (n * (n - 1L))
 
       options(np.categorical.compress = FALSE)
       ordinary <- beta_distribution_objective(
