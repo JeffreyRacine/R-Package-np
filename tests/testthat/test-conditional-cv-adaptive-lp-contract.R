@@ -172,6 +172,27 @@ test_that("adaptive public conditional density CV LS separates lc from LP while 
 
 test_that("adaptive public conditional density CV ML separates lc from LP while preserving ll canonicalization", {
   fixture <- adaptive_cv_fixture(4202)
+  narrow <- npcdensbw(
+    xdat = fixture$x, ydat = fixture$y,
+    regtype = "lp", basis = "glp", degree = fixture$degree1,
+    bwtype = "adaptive_nn", bwmethod = "cv.ml",
+    bws = rep.int(3, 3L), bandwidth.compute = FALSE)
+  wider <- npcdensbw(
+    xdat = fixture$x, ydat = fixture$y,
+    regtype = "lp", basis = "glp", degree = fixture$degree1,
+    bwtype = "adaptive_nn", bwmethod = "cv.ml",
+    bws = rep.int(6, 3L), bandwidth.compute = FALSE)
+  narrow.objective <- np:::.npcdensbw_eval_only(
+    fixture$x, fixture$y, narrow,
+    invalid.penalty = "dbmax")$objective
+  wider.objective <- np:::.npcdensbw_eval_only(
+    fixture$x, fixture$y, wider,
+    invalid.penalty = "dbmax")$objective
+
+  expect_identical(narrow.objective, -.Machine$double.xmax)
+  expect_true(is.finite(wider.objective))
+  expect_gt(wider.objective, -.Machine$double.xmax)
+
   bw.lc <- npcdensbw(
     xdat = fixture$x,
     ydat = fixture$y,
