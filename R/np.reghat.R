@@ -115,6 +115,24 @@ npreghat <-
     !any(as.integer(s) > 0L)
 }
 
+.npreghat_native_loo_capability <- function(bws, regtype, degree, basis,
+                                            bernstein.basis, s,
+                                            leave.one.out) {
+  isTRUE(leave.one.out) &&
+    regtype %in% c("lc", "ll", "lp") &&
+    !identical(bws[["ckertype", exact = TRUE]], "beta") &&
+    !npRegressionHasExtendedNn(bws) &&
+    as.character(bws[["type", exact = TRUE]]) %in%
+      c("fixed", "generalized_nn", "adaptive_nn") &&
+    isTRUE(any(bws[["icon", exact = TRUE]])) &&
+    length(degree) == as.integer(bws[["ncon", exact = TRUE]]) &&
+    basis %in% c("glp", "additive", "tensor") &&
+    is.logical(bernstein.basis) && length(bernstein.basis) == 1L &&
+    !is.na(bernstein.basis) &&
+    length(s) == as.integer(bws[["ncon", exact = TRUE]]) &&
+    !any(as.integer(s) > 0L)
+}
+
 .npreghat_native_matrix_candidate <- function(bws, output, regtype, degree,
                                               basis, bernstein.basis, s,
                                               leave.one.out) {
@@ -981,7 +999,8 @@ npreghat <-
                                                           degree = integer(0),
                                                           bernstein.basis = FALSE,
                                                           s = NULL,
-                                                          return.hat = FALSE) {
+                                                          return.hat = FALSE,
+                                                          leave.one.out = FALSE) {
   no.ex <- is.null(exdat)
 
   txdat <- toFrame(txdat)
@@ -1134,6 +1153,7 @@ npreghat <-
     as.integer(categorical.compress),
     as.logical(return.hat),
     as.logical(no.ex),
+    as.logical(leave.one.out),
     PACKAGE = "np"
   )
 }
@@ -1144,7 +1164,8 @@ npreghat <-
                                                            basis = "glp",
                                                            degree = integer(0),
                                                            bernstein.basis = FALSE,
-                                                           s = NULL) {
+                                                           s = NULL,
+                                                           leave.one.out = FALSE) {
   .npreghat_exact_lp_apply_from_regression_core(
     bws = bws,
     txdat = txdat,
@@ -1154,7 +1175,8 @@ npreghat <-
     degree = degree,
     bernstein.basis = bernstein.basis,
     s = s,
-    return.hat = TRUE
+    return.hat = TRUE,
+    leave.one.out = leave.one.out
   )
 }
 
@@ -1860,16 +1882,27 @@ npreghat.rbandwidth <-
       !lc.derivative.exact.route &&
       (bws$ncon > 0L)
 
-    exact.core.route <- !isTRUE(leave.one.out) &&
-      simple.operator.request &&
-      (
-        exact.lc.kernel.route ||
-        exact.ll.kernel.route ||
-        exact.lp.kernel.route ||
-        lp.degree0.lc.derivative.route ||
-        lc.derivative.exact.route ||
-        FALSE
-      )
+    native.loo.route <- .npreghat_native_loo_capability(
+      bws = bws,
+      regtype = regtype,
+      degree = reg.spec$degree.engine,
+      basis = reg.spec$basis.engine,
+      bernstein.basis = reg.spec$bernstein.basis.engine,
+      s = s,
+      leave.one.out = leave.one.out
+    )
+
+    exact.core.route <- native.loo.route ||
+      (!isTRUE(leave.one.out) &&
+       simple.operator.request &&
+       (
+         exact.lc.kernel.route ||
+         exact.ll.kernel.route ||
+         exact.lp.kernel.route ||
+         lp.degree0.lc.derivative.route ||
+         lc.derivative.exact.route ||
+         FALSE
+       ))
 
     native.lp.mean.matrix.route <- .npreghat_native_matrix_candidate(
       bws = bws,
@@ -1894,6 +1927,28 @@ npreghat.rbandwidth <-
         s = s,
         leave.one.out = leave.one.out
       )
+
+    if (native.loo.route && identical(output, "apply")) {
+      out <- .npreghat_exact_lp_apply_from_regression_core(
+        bws = bws,
+        txdat = txdat,
+        y = y,
+        exdat = NULL,
+        basis = reg.spec$basis.engine,
+        degree = reg.spec$degree.engine,
+        bernstein.basis = reg.spec$bernstein.basis.engine,
+        s = s,
+        leave.one.out = TRUE
+      )
+      ridge.used <- .npreghat_native_ridge_used(
+        out, nrow(txdat), "npreghat leave-one-out apply owner"
+      )
+      if (ncol(out) == 1L) {
+        out <- as.vector(out)
+        attr(out, "ridge.used") <- ridge.used
+      }
+      return(out)
+    }
 
     if (native.lp.mean.multi.apply.route || .npreghat_native_apply_candidate(
       bws = bws,
@@ -1965,7 +2020,8 @@ npreghat.rbandwidth <-
     }
 
     if (exact.core.route) {
-      H <- if (exact.beta.native.route || native.lp.mean.matrix.route) {
+      H <- if (exact.beta.native.route || native.lp.mean.matrix.route ||
+                   native.loo.route) {
         .npreghat_exact_lp_matrix_from_regression_core(
           bws = bws,
           txdat = txdat,
@@ -1973,7 +2029,8 @@ npreghat.rbandwidth <-
           s = s,
           basis = reg.spec$basis.engine,
           degree = reg.spec$degree.engine,
-          bernstein.basis = reg.spec$bernstein.basis.engine
+          bernstein.basis = reg.spec$bernstein.basis.engine,
+          leave.one.out = native.loo.route
         )
       } else if (lc.derivative.exact.route) {
         .npreghat_exact_lc_derivative_matrix_from_npksum_chunked(
@@ -2026,7 +2083,7 @@ npreghat.rbandwidth <-
       if (constraint.output)
         return(.np_hat_constraint_from_matrix(H, y, "npreghat"))
 
-      ridge.used <- if (native.lp.mean.matrix.route) {
+      ridge.used <- if (native.lp.mean.matrix.route || native.loo.route) {
         .npreghat_native_ridge_used(
           H, nrow(H), "npreghat(..., output = 'matrix')"
         )
@@ -2097,40 +2154,40 @@ npreghat.rbandwidth <-
     if (nrow(W.eval) != neval)
       W.eval <- matrix(W.eval, nrow = neval, byrow = FALSE)
 
-    ridge.used <- rep.int(0.0, neval)
-
     if (matrix.output) {
-      H <- matrix(NA_real_, nrow = neval, ncol = ntrain)
+      H <- .Call(
+        "C_np_reghat_lp_matrix_fast",
+        as.matrix(kw),
+        as.matrix(W),
+        as.matrix(W.eval),
+        PACKAGE = "np"
+      )
+      if (is.null(H))
+        stop("invalid canonical LP influence-matrix input", call. = FALSE)
+      ridge.used <- .npreghat_native_ridge_used(
+        H, neval, "npreghat generic matrix owner"
+      )
     } else {
       if (is.null(y))
         stop("argument 'y' is required when output='apply'")
-      out <- matrix(0.0, nrow = neval, ncol = ncol(y))
-    }
-
-    for (i in seq_len(neval)) {
-      solve.out <- .npreghat_solve_eval(
-        W = W,
-        w.eval = W.eval[i, ],
-        k = kw[, i],
-        ridge.base = ridge
+      y <- matrix(as.double(y), nrow = ntrain, ncol = ncol(y))
+      out <- .Call(
+        "C_np_reghat_lp_apply_fast",
+        as.matrix(kw),
+        as.matrix(W),
+        as.matrix(W.eval),
+        y,
+        PACKAGE = "np"
       )
-
-      if (is.null(solve.out))
-        stop(sprintf("failed to solve local hat system at evaluation row %d", i))
-
-      ridge.used[i] <- solve.out$ridge
-      h.row <- kw[, i] * drop(W %*% solve.out$v)
-
-      if (matrix.output) {
-        H[i, ] <- h.row
-      } else {
-        out[i, ] <- drop(crossprod(h.row, y))
+      if (is.null(out))
+        stop("invalid canonical LP influence-apply input", call. = FALSE)
+      ridge.used <- .npreghat_native_ridge_used(
+        out, neval, "npreghat generic apply owner"
+      )
+      if (ncol(out) == 1L) {
+        out <- as.vector(out)
+        attr(out, "ridge.used") <- ridge.used
       }
-    }
-
-    if (identical(output, "apply")) {
-      if (ncol(out) == 1L)
-        return(as.vector(out))
       return(out)
     }
 

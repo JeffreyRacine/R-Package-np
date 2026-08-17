@@ -14,6 +14,18 @@
   The resolver is regression-scoped; density and distribution bandwidth
   classes retain their existing nearest-neighbour domains.
 
+* Regression leave-one-out hat-matrix and apply routes now share the objective's
+  occurrence-aware generalized/adaptive NN geometry, source basis, weighted
+  moment layout, factorization, bounded ridge transcript, and intercept
+  restoration. Matrix and apply consume the same completed influence row;
+  apply retains linear-in-sample auxiliary storage and does not construct an
+  evaluation-by-training matrix. The canonical factor owner now treats an LU
+  factor below the working-precision reciprocal-condition threshold as
+  numerically rank deficient before applying the existing bounded ridge rule.
+  Well-conditioned `k >= 2` objectives remain pointwise unchanged; formerly
+  unstable rank-deficient results can change, and all-zero compact-kernel LOO
+  rows now fail explicitly instead of returning a fabricated ridged estimate.
+
 * Empirical-sample conditional-distribution CV now evaluates the documented
   off-diagonal criterion with divisor `n(n - 1)`. Ordinary generalized
   nearest-neighbour rows construct the explanatory radius from the delete-one

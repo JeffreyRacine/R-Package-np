@@ -41,7 +41,8 @@ typedef struct {
 typedef enum {
   NP_REGRESSION_LP_MATRIX_OK = 0,
   NP_REGRESSION_LP_MATRIX_ERROR = 1,
-  NP_REGRESSION_LP_MATRIX_ZERO_RADIUS = 2
+  NP_REGRESSION_LP_MATRIX_ZERO_RADIUS = 2,
+  NP_REGRESSION_LP_MATRIX_ZERO_MASS = 3
 } NPRegressionLPMatrixStatus;
 
 typedef enum {
@@ -351,6 +352,9 @@ int np_regression_lp_apply_matrix(
   NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
   int categorical_compress,
   const NPNNGeometryContext *nn_geometry_context);
+int np_regression_lp_leave_one_out_influence(
+  double *vector_scale_factor, double **rhs_cols, int n_rhs,
+  double *weights_out, double *fitted_out, double *ridge_used_out);
 int np_conditional_density_cvml_lp_stream(double *vector_scale_factor, double *cv);
 int np_conditional_density_cvls_lp_stream(double *vector_scale_factor, double *cv);
 int np_conditional_distribution_cvls_lp_stream(double *vector_scale_factor, double *cv);
