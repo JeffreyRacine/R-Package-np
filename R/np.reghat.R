@@ -2356,7 +2356,7 @@ npreghat.rbandwidth <-
 
     use.local.kw <- identical(bws$type, "generalized_nn") &&
       identical(reg.spec$regtype.engine, "lp") &&
-      .npRmpi_has_active_slave_pool(comm = 1L)
+      .npRmpi_rank_local_regression_context(comm = 1L)
 
     kw <- if (use.local.kw) {
       direct.kw.args <- kw.args[intersect(
