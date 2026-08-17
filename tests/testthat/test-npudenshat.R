@@ -35,6 +35,31 @@ test_that("npudenshat matches npudens and preserves matrix/apply parity across b
   }
 })
 
+test_that("npudenshat distinguishes training identity from equal external values", {
+  npudenshat <- getFromNamespace("npudenshat", "np")
+
+  set.seed(20260817)
+  tx <- data.frame(x = sort(runif(48L)))
+  iota <- rep.int(1.0, nrow(tx))
+  bw <- npudensbw(
+    dat = tx,
+    bwtype = "generalized_nn",
+    bws = 7,
+    bandwidth.compute = FALSE
+  )
+
+  H.training <- npudenshat(bws = bw, tdat = tx)
+  H.external <- npudenshat(bws = bw, tdat = tx, edat = tx)
+  fit.training <- npudens(bws = bw, tdat = tx)
+  fit.external <- npudens(bws = bw, tdat = tx, edat = tx)
+
+  expect_equal(drop(H.training %*% iota), fit.training$dens,
+               tolerance = 1e-12)
+  expect_equal(drop(H.external %*% iota), fit.external$dens,
+               tolerance = 1e-12)
+  expect_gt(max(abs(H.training - H.external)), 1e-8)
+})
+
 test_that("npudenshat fixed-bandwidth count vectors reproduce resampled npudens fits", {
   npudenshat <- getFromNamespace("npudenshat", "np")
 

@@ -53,6 +53,45 @@ test_that("npcdenshat matches npcdens and preserves matrix/apply parity across s
   }
 })
 
+test_that("npcdenshat preserves generalized-NN training identity", {
+  npcdenshat <- getFromNamespace("npcdenshat", "np")
+
+  set.seed(20260817)
+  n <- 24L
+  x <- data.frame(x = sort(runif(n)))
+  y <- data.frame(y = sin(3 * x$x) + rnorm(n, sd = 0.1))
+  iota <- rep.int(1.0, n)
+
+  for (regtype in c("lc", "ll", "lp")) {
+    args <- list(
+      xdat = x,
+      ydat = y,
+      regtype = regtype,
+      bwtype = "generalized_nn",
+      bws = c(7, 7),
+      bandwidth.compute = FALSE
+    )
+    if (identical(regtype, "lp")) {
+      args$basis <- "glp"
+      args$degree <- 2L
+    }
+    bw <- do.call(npcdensbw, args)
+    fit <- npcdens(bws = bw, txdat = x, tydat = y)
+    H <- npcdenshat(bws = bw, txdat = x, tydat = y)
+
+    expect_equal(drop(H %*% iota), fit$condens, tolerance = 1e-11,
+                 info = regtype)
+  }
+
+  bw <- npcdensbw(
+    xdat = x, ydat = y, regtype = "lc", bwtype = "generalized_nn",
+    bws = c(7, 7), bandwidth.compute = FALSE
+  )
+  fit <- npcdens(bws = bw, txdat = x, tydat = y, gradients = TRUE)
+  H <- npcdenshat(bws = bw, txdat = x, tydat = y, s = 1L)
+  expect_equal(drop(H %*% iota), fit$congrad[, 1L], tolerance = 2e-11)
+})
+
 test_that("npcdenshat apply mode matches matrix RHS multiplication", {
   npcdenshat <- getFromNamespace("npcdenshat", "np")
 

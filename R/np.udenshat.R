@@ -74,7 +74,8 @@ npudenshat <- function(bws,
           exdat = if (no.e) tdat else edat,
           operator = "normal",
           rhs = rhs.col,
-          where = "npudenshat direct operator apply"
+          where = "npudenshat direct operator apply",
+          train.is.eval = no.e
         ) / n.train
       } else {
         .np_exact_operator_apply(
@@ -83,7 +84,8 @@ npudenshat <- function(bws,
           exdat = if (no.e) tdat else edat,
           operator = "normal",
           rhs = rhs.col,
-          where = "npudenshat exact operator apply"
+          where = "npudenshat exact operator apply",
+          train.is.eval = no.e
         ) / n.train
       }
     }
@@ -105,7 +107,8 @@ npudenshat <- function(bws,
       txdat = tdat,
       exdat = if (no.e) tdat else edat,
       operator = "normal",
-      where = "npudenshat direct operator"
+      where = "npudenshat direct operator",
+      train.is.eval = no.e
     ) / n.train
   } else {
     H <- .np_exact_operator_matrix(
@@ -113,7 +116,8 @@ npudenshat <- function(bws,
       txdat = tdat,
       exdat = if (no.e) tdat else edat,
       operator = "normal",
-      where = "npudenshat exact operator"
+      where = "npudenshat exact operator",
+      train.is.eval = no.e
     ) / n.train
   }
 
