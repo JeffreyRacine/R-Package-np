@@ -29936,6 +29936,7 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
                                 int deriv_var,
                                 int deriv_order,
                                 double *weights_out,
+                                double *ridge_used_out,
                                 const NPContinuousKernelRoute *kernel_route,
                                 NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
                                 int categorical_compress,
@@ -29993,6 +29994,8 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
   np_reghat_lp_workspace_init(&reghat_workspace);
   np_beta_scaled_row_context_init(&beta_row_context);
   memset(weights_out, 0, (size_t)num_eval*(size_t)num_train*sizeof(double));
+  if(ridge_used_out != NULL)
+    memset(ridge_used_out, 0, (size_t)num_eval*sizeof(double));
 
   vsfx = alloc_vecd(MAX(1, num_reg_tot));
   lambdax = alloc_vecd(MAX(1, num_reg_unordered_extern + num_reg_ordered_extern));
@@ -30163,6 +30166,7 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
   for(i = 0; i < num_eval; i++){
     const int which_var = deriv_var - 1;
     const double epsilon = 1.0/(double)MAX(1, num_train);
+    NPLPSolvePolicyDiagnostics solve_diagnostics;
     if(out2 != NULL)
       memset(out2, 0,
              (size_t)np_glp_cv_cache.nterms*
@@ -30334,9 +30338,11 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
                                            np_glp_cv_cache.nterms,
                                            1,
                                            epsilon,
-                                           NULL) !=
+                                           &solve_diagnostics) !=
        NP_LP_SOLVE_POLICY_OK)
       goto cleanup_lp_hat;
+    if(ridge_used_out != NULL)
+      ridge_used_out[i] = solve_diagnostics.ridge_total;
 
     for(j = 0; j < num_train; j++){
       double zju = 0.0;
