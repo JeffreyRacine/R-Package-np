@@ -9,8 +9,10 @@ adaptive_conditional_cvml_epanechnikov2 <- function(u) {
 }
 
 adaptive_conditional_cvml_fold_radius <- function(value, held_out, donor, k) {
-  sort(abs(value[-c(held_out, donor)] - value[[donor]]),
-       method = "quick")[[k]]
+  distance <- sort(abs(value[-c(held_out, donor)] - value[[donor]]),
+                   method = "quick")
+  lookup <- min(k, length(distance))
+  distance[[lookup]] * k / lookup
 }
 
 adaptive_conditional_cvml_design <- function(delta, degree) {
@@ -191,13 +193,14 @@ test_that("adaptive conditional CVML fold geometry composes categorical sides", 
   expect_equal(observed, rep(expected, length(observed)), tolerance = 2e-10)
 })
 
-test_that("adaptive conditional CVML honors saturation, replay, and failures", {
+test_that("adaptive conditional CVML honors extension, replay, and failures", {
   old_npRmpi_local_mode <- getOption("npRmpi.local.regression.mode", FALSE)
   options(npRmpi.local.regression.mode = TRUE)
   on.exit(options(npRmpi.local.regression.mode = old_npRmpi_local_mode),
           add = TRUE)
   old_options <- options(np.messages = FALSE, np.tree = FALSE,
-                         np.macMseries.accelerate = FALSE)
+                         np.macMseries.accelerate = FALSE,
+                         np.extendednn = TRUE)
   on.exit(options(old_options), add = TRUE)
 
   x <- data.frame(x = c(-2.8, -1.5, -0.7, -0.1, 0.4, 1.2, 2.7, 4.1))
@@ -213,9 +216,22 @@ test_that("adaptive conditional CVML honors saturation, replay, and failures", {
   saturated <- admitted
   saturated$xbw[] <- n - 1L
   saturated$ybw[] <- n - 1L
-  expect_identical(
+  expect_equal(
     adaptive_conditional_cvml_objective(x, y, saturated, "dbmax"),
-    -.Machine$double.xmax)
+    adaptive_conditional_cvml_literal(
+      x, y, n - 1L, n - 1L, 0L,
+      adaptive_conditional_cvml_gaussian2),
+    tolerance = 5e-9)
+
+  beyond <- admitted
+  beyond$xbw[] <- n + 2L
+  beyond$ybw[] <- n + 2L
+  expect_equal(
+    adaptive_conditional_cvml_objective(x, y, beyond, "dbmax"),
+    adaptive_conditional_cvml_literal(
+      x, y, n + 2L, n + 2L, 0L,
+      adaptive_conditional_cvml_gaussian2),
+    tolerance = 5e-9)
 
   zero_x <- data.frame(x = c(0, 0, 0, 0, 1, 2))
   zero_y <- c(0, 0, 0, 0, 1, 2)

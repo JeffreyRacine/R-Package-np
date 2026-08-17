@@ -36,6 +36,8 @@ typedef struct {
   NPNNQueryMode mode;
   const int *eval_to_train;
   double **adaptive_successor;
+  double *adaptive_fold_scale;
+  double **adaptive_full;
 } NPNNGeometryContext;
 
 typedef enum {
@@ -251,7 +253,7 @@ int compute_nn_distance(int num_obs, int suppress_parallel, double *vector_data,
 int compute_nn_distance_train_eval(int num_obs_train, int num_obs_eval, int suppress_parallel, double *vector_data_train, double *vector_data_eval, int int_k_nn, double *nn_distance);
 NPNNGeometryStatus compute_nn_distance_train_eval_ctx(int num_obs_train, int num_obs_eval, int suppress_parallel, const double *vector_data_train, const double *vector_data_eval, int int_k_nn, const NPNNGeometryContext *geometry_context, double *nn_distance);
 NPNNGeometryStatus compute_nn_adaptive_distance_pair(int num_obs, const double *vector_data, int int_k_nn, double *primary_distance, double *successor_distance);
-NPNNGeometryStatus np_nn_adaptive_fold_select_row(int num_obs, int num_cont, double **matrix_train, double **primary_bandwidth, double **successor_bandwidth, int held_out, double **selected_bandwidth);
+NPNNGeometryStatus np_nn_adaptive_fold_select_row(int num_obs, int num_cont, double **matrix_train, double **primary_bandwidth, double **successor_bandwidth, const double *fold_scale, int held_out, double **selected_bandwidth);
 int np_nn_lookup_from_scale(int num_obs_train, int allow_extended, double scale_factor, int *lookup_k, double *distance_scale, int *is_extended);
 
 int determine_categorical_vals(int num_obs, int num_var_unordered, int num_var_ordered, int num_reg_unordered, int num_reg_ordered, double **matrix_Y_unordered, double **matrix_Y_ordered, double **matrix_X_unordered, double **matrix_X_ordered, int *num_categories, double **matrix_categorical_vals);

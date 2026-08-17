@@ -9,7 +9,9 @@ adaptive_epanechnikov2 <- function(u) {
 }
 
 adaptive_literal_radius <- function(x, held_out, donor, k) {
-  sort(abs(x[-c(held_out, donor)] - x[donor]), method = "quick")[k]
+  distance <- sort(abs(x[-c(held_out, donor)] - x[donor]), method = "quick")
+  lookup <- min(k, length(distance))
+  distance[[lookup]] * k / lookup
 }
 
 adaptive_literal_lc_cvls <- function(x, y, k, kernel,
@@ -147,23 +149,36 @@ test_that("adaptive exact CVLS preserves categorical and owner-axis semantics", 
                tolerance = 4096 * .Machine$double.eps)
 })
 
-test_that("adaptive exact CVLS rejects impossible and zero-radius folds", {
+test_that("adaptive exact CVLS extends saturated folds and rejects zero radii", {
   old_npRmpi_local_mode <- getOption("npRmpi.local.regression.mode", FALSE)
   options(npRmpi.local.regression.mode = TRUE)
   on.exit(options(npRmpi.local.regression.mode = old_npRmpi_local_mode),
           add = TRUE)
-  old_options <- options()
+  old_options <- options(np.extendednn = TRUE)
   on.exit(options(old_options), add = TRUE)
 
   zero_radius <- adaptive_package_lc_cvls(
     matrix(c(0, 0, 0, 0, 1, 2), ncol = 1L),
     seq_len(6L) / 10, 2L, "gaussian",
     invalid.penalty = "dbmax")
-  impossible_rank <- adaptive_package_lc_cvls(
-    matrix(seq_len(6L), ncol = 1L), seq_len(6L),
+  extended_x <- matrix(seq_len(6L), ncol = 1L)
+  extended_y <- seq_len(6L)
+  extended <- adaptive_package_lc_cvls(
+    extended_x, extended_y,
     5L, "gaussian", invalid.penalty = "dbmax")
+  expected_extended <- adaptive_literal_lc_cvls(
+    extended_x, extended_y, 5L, adaptive_gaussian2)
 
   expect_true(is.finite(zero_radius))
   expect_gt(zero_radius, 1e300)
-  expect_identical(impossible_rank, .Machine$double.xmax)
+  expect_equal(extended, expected_extended,
+               tolerance = 4096 * .Machine$double.eps)
+
+  beyond <- adaptive_package_lc_cvls(
+    extended_x, extended_y,
+    8L, "gaussian", invalid.penalty = "dbmax")
+  expected_beyond <- adaptive_literal_lc_cvls(
+    extended_x, extended_y, 8L, adaptive_gaussian2)
+  expect_equal(beyond, expected_beyond,
+               tolerance = 4096 * .Machine$double.eps)
 })
