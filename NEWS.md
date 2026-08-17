@@ -15,7 +15,17 @@
   two-slot order-statistic selector, preserve duplicate occurrences, and add
   no pair matrix or per-fold sort. Fixed, adaptive, and beta sample-grid
   objectives receive only the normalization correction; genuine external and
-  default response grids are unchanged.
+  default response grids are unchanged. Because the diagonal was already
+  omitted, this changes reported training-grid criterion values by the common
+  positive factor `n/(n - 1)` relative to the former `n^2` divisor and does
+  not change the mathematical minimizer on a common candidate domain.
+
+* Empirical distribution and conditional-distribution CVLS owners now
+  finalize their shared pair-count normalization through one checked native
+  seam. Invalid training/evaluation shapes and non-finite accumulators return
+  the existing infeasible status instead of permitting a zero pair-count
+  division to produce `NaN` or `Inf`; valid objective arithmetic, MPI
+  reductions, search domains, and public interfaces are unchanged.
 
 * Ordinary generalized nearest-neighbour conditional-density and
   conditional-distribution training fits now construct explanatory and
