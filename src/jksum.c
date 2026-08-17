@@ -16818,6 +16818,8 @@ static NP_NOINLINE NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas(
     int *operator,
     double *lambda,
     double **matrix_bandwidth,
+    double **adaptive_successor_bandwidth,
+    double **adaptive_selected_bandwidth,
     const int nterms,
     double **basis){
   NPRegCvLpResult result = {DBL_MAX, 0.0, 0};
@@ -16840,6 +16842,9 @@ static NP_NOINLINE NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas(
   size_t allocation_count = 0;
   int sf_flag = 0;
   int reciprocal_eligible = 1;
+  const int exact_deleteone_geometry =
+    (adaptive_successor_bandwidth != NULL) &&
+    (adaptive_selected_bandwidth != NULL);
   int i, j, l;
 
   np_lp_solve_workspace_init(&solve_workspace);
@@ -16848,6 +16853,12 @@ static NP_NOINLINE NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas(
   if((num_obs < NP_CONDITIONAL_X_WEIGHTED_BLAS_MIN_ROWS) ||
      (num_reg_continuous <= 0) || (nterms < 4) ||
      (basis == NULL) || (basis_stride < num_obs))
+    goto cleanup_adaptive_blas;
+  if((adaptive_successor_bandwidth == NULL) !=
+     (adaptive_selected_bandwidth == NULL))
+    goto cleanup_adaptive_blas;
+  if(exact_deleteone_geometry &&
+     (bwm != RBWM_CVLS) && (bwm != RBWM_CVCHECK) && (bwm != RBWM_CVKS))
     goto cleanup_adaptive_blas;
   /*
    * The weighted-design transcript is signed algebra: B' diag(w) B and
@@ -16863,6 +16874,7 @@ static NP_NOINLINE NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas(
   }
   reciprocal_eligible =
     reciprocal_eligible &&
+    (!exact_deleteone_geometry) &&
     (num_reg_unordered == 0) &&
     (num_reg_ordered == 0) &&
     (!int_cker_bound_extern);
@@ -16944,6 +16956,7 @@ static NP_NOINLINE NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas(
   result.traceH = 0.0;
 
   for(j = 0; j < num_obs; j++){
+    double **row_bandwidth = matrix_bandwidth;
     const double yj = vector_Y[j];
     double self_weight;
     double nepsilon = 0.0;
@@ -16953,13 +16966,22 @@ static NP_NOINLINE NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas(
     if((j & 31) == 0)
       np_progress_bandwidth_loop_step();
 
+    if(exact_deleteone_geometry){
+      if(np_nn_adaptive_fold_select_row(
+           num_obs, num_reg_continuous, matrix_X_continuous,
+           matrix_bandwidth, adaptive_successor_bandwidth, j,
+           adaptive_selected_bandwidth) != NP_NN_GEOMETRY_OK)
+        goto cleanup_adaptive_blas;
+      row_bandwidth = adaptive_selected_bandwidth;
+    }
+
     for(l = 0; l < num_reg_unordered; l++)
       eval_u[l][0] = matrix_X_unordered[l][j];
     for(l = 0; l < num_reg_ordered; l++)
       eval_o[l][0] = matrix_X_ordered[l][j];
     for(l = 0; l < num_reg_continuous; l++){
       eval_c[l][0] = matrix_X_continuous[l][j];
-      matrix_bandwidth_eval[l][0] = matrix_bandwidth[l][j];
+      matrix_bandwidth_eval[l][0] = row_bandwidth[l][j];
     }
     for(l = 0; l < nterms; l++)
       eval_basis[l] = basis[l][j];
@@ -16974,7 +16996,7 @@ static NP_NOINLINE NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas(
                                       operator,
                                       matrix_X_continuous,
                                       eval_c,
-                                      matrix_bandwidth,
+                                      row_bandwidth,
                                       num_reg_continuous,
                                       num_obs,
                                       1,
@@ -16988,7 +17010,7 @@ static NP_NOINLINE NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas(
                                                operator,
                                                matrix_X_continuous,
                                                eval_c,
-                                               matrix_bandwidth,
+                                               row_bandwidth,
                                                reciprocal_workspace.ready ?
                                                  reciprocal_workspace.reciprocal_storage :
                                                  NULL,
@@ -17041,7 +17063,7 @@ static NP_NOINLINE NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas(
                                      NULL,
                                      vsf,
                                      1,
-                                     matrix_bandwidth,
+                                     row_bandwidth,
                                      matrix_bandwidth_eval,
                                      lambda,
                                      num_categories,
@@ -17188,6 +17210,8 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
                                                      int *operator,
                                                      double *lambda,
                                                      double **matrix_bandwidth,
+                                                     double **adaptive_successor_bandwidth,
+                                                     double **adaptive_selected_bandwidth,
                                                      const int ks_tree_use){
   NPRegCvLpResult result = {DBL_MAX, 0.0, 0};
   int i, j, l, sf_flag = 0, tsf;
@@ -17225,10 +17249,20 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
   double **XTKX = NULL;
   NPLPSolveWorkspace solve_workspace;
   int glp_ok = 1;
+  const int exact_adaptive_deleteone =
+    (BANDWIDTH_reg == BW_ADAP_NN) &&
+    (adaptive_successor_bandwidth != NULL) &&
+    (adaptive_selected_bandwidth != NULL);
 
   np_lp_solve_workspace_init(&solve_workspace);
 
   if((degree_vec == NULL) || (num_reg_continuous <= 0))
+    goto cleanup_lp_cv;
+  if((adaptive_successor_bandwidth == NULL) !=
+     (adaptive_selected_bandwidth == NULL))
+    goto cleanup_lp_cv;
+  if(exact_adaptive_deleteone &&
+     (bwm != RBWM_CVLS) && (bwm != RBWM_CVCHECK) && (bwm != RBWM_CVKS))
     goto cleanup_lp_cv;
 
   if(!np_glp_cv_cache.ready ||
@@ -17546,6 +17580,8 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
           operator,
           lambda,
           matrix_bandwidth,
+          adaptive_successor_bandwidth,
+          adaptive_selected_bandwidth,
           glp_nterms,
           basis);
       if(adaptive_result.ok){
@@ -17748,16 +17784,30 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
       result.traceH = 0.0;
 
       for(j = 0; j < num_obs; j++){
+        double **row_bandwidth = matrix_bandwidth;
         double nepsilon = 0.0;
         double pnh = 1.0;
         int ridge_steps = 0;
         double * const row_kwm = kwm + (size_t)j*(size_t)nrcc22;
+
+        if(exact_adaptive_deleteone){
+          if(np_nn_adaptive_fold_select_row(
+               num_obs, num_reg_continuous, matrix_X_continuous,
+               matrix_bandwidth, adaptive_successor_bandwidth, j,
+               adaptive_selected_bandwidth) != NP_NN_GEOMETRY_OK){
+            glp_ok = 0;
+            break;
+          }
+          row_bandwidth = adaptive_selected_bandwidth;
+        }
 
         if(np_reg_cv_use_symmetric_dropone_path(bwm, ks_tree_use, BANDWIDTH_reg)){
           for(l = 0; l < num_reg_continuous; l++){
             TCON[l][0] = matrix_X_continuous[l][j];
             if(BANDWIDTH_reg == BW_GEN_NN)
               matrix_bandwidth_eval[l][0] = matrix_bandwidth[l][j];
+            else if(exact_adaptive_deleteone)
+              matrix_bandwidth_eval[l][0] = row_bandwidth[l][j];
           }
           for(l = 0; l < num_reg_unordered; l++)
             TUNO[l][0] = matrix_X_unordered[l][j];
@@ -17809,7 +17859,7 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
                                      NULL,
                                      vsf,
                                      1,
-                                     matrix_bandwidth,
+                                     row_bandwidth,
                                      matrix_bandwidth_eval,
                                      lambda,
                                      num_categories,
@@ -18309,8 +18359,8 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
   lambda = np_reg_cv_core_cache.lambda;
   matrix_bandwidth = np_reg_cv_core_cache.matrix_bandwidth;
 
-  if(lp_engine == NP_LP_ENGINE_SCALAR && leave_one_out &&
-     BANDWIDTH_reg == BW_ADAP_NN && num_reg_continuous > 0){
+  if(leave_one_out && BANDWIDTH_reg == BW_ADAP_NN &&
+     num_reg_continuous > 0){
     adaptive_successor_bandwidth =
       alloc_tmatd(num_obs, num_reg_continuous);
     adaptive_selected_bandwidth =
@@ -18376,7 +18426,8 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
     return(DBL_MAX);
   }
 
-  if(adaptive_successor_bandwidth != NULL){
+  if(lp_engine == NP_LP_ENGINE_SCALAR &&
+     adaptive_successor_bandwidth != NULL){
     const NPRegCvLpResult adaptive_exact =
       np_regression_cv_scalar_adaptive_exact(
         bwm,
@@ -18444,6 +18495,8 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                                                               operator,
                                                               lambda,
                                                               matrix_bandwidth,
+                                                              adaptive_successor_bandwidth,
+                                                              adaptive_selected_bandwidth,
                                                               ks_tree_use);
     cv = lp_result.cv;
     traceH = lp_result.traceH;
