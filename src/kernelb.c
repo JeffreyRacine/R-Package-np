@@ -1106,6 +1106,30 @@ static int np_kernel_bandwidth_continuous_nn_into_ctx(
         matrix_bandwidth[dimension][observation] = bandwidth;
       }
     } else {
+      if(geometry_context != NULL &&
+         geometry_context->mode == NP_NN_QUERY_ADAPTIVE_FOLD_PREPARE){
+        NPNNGeometryStatus pair_status;
+
+        if(nn_extended || nn_scale != 1.0 ||
+           num_obs_eval != num_obs_train ||
+           geometry_context->eval_to_train != NULL ||
+           geometry_context->adaptive_successor == NULL ||
+           geometry_context->adaptive_successor[dimension] == NULL){
+          if(geometry_status != NULL)
+            *geometry_status = NP_NN_GEOMETRY_INVALID_ARGUMENT;
+          return 1;
+        }
+        pair_status = compute_nn_adaptive_distance_pair(
+          num_obs_train, matrix_train[dimension], int_nn_k,
+          matrix_bandwidth[dimension],
+          geometry_context->adaptive_successor[dimension]);
+        if(pair_status != NP_NN_GEOMETRY_OK){
+          if(geometry_status != NULL)
+            *geometry_status = pair_status;
+          return 1;
+        }
+        continue;
+      }
 #ifndef MPI2
       if(np_compute_nn_distance_cached(
            num_obs_train, suppress_parallel, matrix_train[dimension],
