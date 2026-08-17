@@ -367,3 +367,57 @@ test_that("public legacy LP mean matrices use the typed native capability", {
   expect_equal(res$status, 0L, info=info)
   expect_true(any(grepl(ok_tag, res$output, fixed=TRUE)), info=info)
 })
+
+test_that("public legacy LP mean multi-RHS apply uses the canonical response owner", {
+  env <- npRmpi_subprocess_env(c("NP_RMPI_NO_REUSE_SLAVES=1"))
+  skip_if(is.null(env), "installed npRmpi unavailable for subprocess proof")
+  ok_tag <- "NPRMPI_PUBLIC_LP_MULTI_RHS_APPLY_CONTRACT_OK"
+  lines <- c(
+    "suppressPackageStartupMessages(library(npRmpi))",
+    "options(npRmpi.autodispatch=TRUE, np.messages=FALSE)",
+    "npRmpi.init(nslaves=1L, quiet=TRUE)",
+    "on.exit(try(npRmpi.quit(force=TRUE), silent=TRUE), add=TRUE)",
+    "candidate <- getFromNamespace('.npreghat_native_legacy_lp_mean_apply_candidate', 'npRmpi')",
+    "has_extended_nn <- getFromNamespace('npRegressionHasExtendedNn', 'npRmpi')",
+    "native_apply <- getFromNamespace('.npreghat_exact_lp_apply_from_regression_core', 'npRmpi')",
+    "local_regression <- getFromNamespace('.npRmpi_with_local_regression', 'npRmpi')",
+    "set.seed(20260817)",
+    "n <- 42L",
+    "x <- data.frame(x1=runif(n,-1,1), x2=runif(n,-1,1), u=factor(rep(c('a','b','c'), length.out=n)))",
+    "y1 <- sin(pi*x$x1) + 0.2*x$x2 + 0.1*(x$u=='b')",
+    "y2 <- cos(pi*x$x2) - 0.3*x$x1 + seq_len(n)/1000",
+    "Y <- cbind(y1,y2)",
+    "make_bw <- function(type,bws) npregbw(xdat=x, ydat=y1, bws=bws, bandwidth.compute=FALSE, bwmethod='cv.ls', bwtype=type, bwscaling=FALSE, regtype='lp', degree=c(2L,1L), degree.select='manual', basis='glp', bernstein.basis=FALSE, ckertype='gaussian', ckerorder=2L)",
+    "bw.fixed <- make_bw('fixed', c(0.48,0.52,0.35))",
+    "bw.gnn <- make_bw('generalized_nn', c(11L,11L,0.35))",
+    "bw.ann <- make_bw('adaptive_nn', c(11L,11L,0.35))",
+    "candidate_args <- function(bw,y=Y,s=c(0L,0L)) list(bws=bw, output='apply', y=y, regtype='lp', degree=c(2L,1L), basis='glp', bernstein.basis=FALSE, s=as.integer(s), leave.one.out=FALSE)",
+    "stopifnot(do.call(candidate, candidate_args(bw.fixed)))",
+    "stopifnot(do.call(candidate, candidate_args(bw.gnn)))",
+    "stopifnot(!do.call(candidate, candidate_args(bw.ann)))",
+    "stopifnot(!do.call(candidate, candidate_args(bw.fixed, y=Y[,1L,drop=FALSE])))",
+    "stopifnot(!do.call(candidate, candidate_args(bw.fixed, s=c(1L,0L))))",
+    "bw.extended <- bw.gnn",
+    "bw.extended$bw[bw.extended$icon] <- bw.extended$nobs + 1L",
+    "stopifnot(has_extended_nn(bw.extended))",
+    "stopifnot(!do.call(candidate, candidate_args(bw.extended)))",
+    "for (bw in list(bw.fixed,bw.gnn)) {",
+    "  options(np.npreghat.apply.memory.threshold.mb=Inf)",
+    "  public.inf <- npreghat(bws=bw, txdat=x, y=Y, output='apply')",
+    "  options(np.npreghat.apply.memory.threshold.mb=0)",
+    "  public.zero <- npreghat(bws=bw, txdat=x, y=Y, output='apply')",
+    "  native <- local_regression(native_apply(bw, txdat=x, y=Y, degree=c(2L,1L), basis='glp', bernstein.basis=FALSE, s=c(0L,0L), return.hat=FALSE))",
+    "  stopifnot(identical(unname(public.inf), unname(native)))",
+    "  stopifnot(identical(unname(public.zero), unname(native)))",
+    "  for (column in seq_len(ncol(Y))) {",
+    "    fit <- npreg(bws=bw, txdat=x, tydat=Y[,column], warn.glp.gradient=FALSE)$mean",
+    "    stopifnot(isTRUE(all.equal(public.inf[,column], fit, tolerance=1e-10)))",
+    "  }",
+    "}",
+    sprintf("cat('%s\\n')", ok_tag)
+  )
+  res <- npRmpi_run_rscript_subprocess(lines=lines, timeout=90L, env=env)
+  info <- paste(res$output, collapse="\n")
+  expect_equal(res$status, 0L, info=info)
+  expect_true(any(grepl(ok_tag, res$output, fixed=TRUE)), info=info)
+})
