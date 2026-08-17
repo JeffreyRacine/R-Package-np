@@ -129,7 +129,7 @@ test_that("conditional beta objectives agree with independent fixed-bandwidth or
       oracle.train.dist <- oracle.train.dist + ((y[i] <= y[g]) - estimate)^2
     }
   }
-  oracle.train.dist <- oracle.train.dist / length(x)^2
+  oracle.train.dist <- oracle.train.dist / (length(x) * (length(x) - 1L))
   native.train.dist <- npRmpi:::.npcdistbw_eval_only(
     data.frame(x = x), data.frame(y = y), bws = distribution.bw,
     do.full.integral = TRUE
