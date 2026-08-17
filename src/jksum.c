@@ -27719,11 +27719,15 @@ typedef struct {
   double *weighted_design;
   NPConditionalXRowReciprocalCache *reciprocal_cache;
   double **matrix_bandwidth_x;
+  double **matrix_bandwidth_x_successor;
+  double **matrix_bandwidth_x_selected;
   double **matrix_bandwidth_eval_one;
   double **eval_xuno_one;
   double **eval_xord_one;
   double **eval_xcon_one;
   NPLPFullRowWorkspace full_row_workspace;
+  int adaptive_fold;
+  int adaptive_fold_selected;
 } NPConditionalXRowCtx;
 
 static int NP_NOINLINE np_conditional_xrow_reciprocal_cache_try(
@@ -27737,11 +27741,14 @@ typedef struct {
   int *kernel_uy;
   int *kernel_oy;
   int *operator_y;
+  int *num_categories;
+  double **matrix_categorical_vals;
   double *vsfy;
   double *lambday;
   double *kw;
   double **matrix_bandwidth_y;
   double **matrix_bandwidth_y_successor;
+  double **matrix_bandwidth_y_selected;
   double **matrix_bandwidth_eval_one;
   double **eval_yuno_one;
   double **eval_yord_one;
@@ -27749,6 +27756,8 @@ typedef struct {
   NPConditionalYRowReciprocalCache *reciprocal_cache;
   int reciprocal_cache_attempted;
   int base_exclusion_successor_ready;
+  int adaptive_fold;
+  int adaptive_fold_selected;
 } NPConditionalYRowCtx;
 
 static int NP_NOINLINE np_conditional_yrow_reciprocal_cache_try(
@@ -27777,6 +27786,10 @@ static void np_conditional_xrow_ctx_clear(NPConditionalXRowCtx *ctx){
   if(ctx->weighted_design != NULL) free(ctx->weighted_design);
   if(ctx->reciprocal_cache != NULL) free(ctx->reciprocal_cache);
   if(ctx->matrix_bandwidth_x != NULL) free_tmat(ctx->matrix_bandwidth_x);
+  if(ctx->matrix_bandwidth_x_successor != NULL)
+    free_tmat(ctx->matrix_bandwidth_x_successor);
+  if(ctx->matrix_bandwidth_x_selected != NULL)
+    free_tmat(ctx->matrix_bandwidth_x_selected);
   if(ctx->matrix_bandwidth_eval_one != NULL) free_tmat(ctx->matrix_bandwidth_eval_one);
   if(ctx->eval_xuno_one != NULL) free_mat(ctx->eval_xuno_one, num_reg_unordered_extern);
   if(ctx->eval_xord_one != NULL) free_mat(ctx->eval_xord_one, num_reg_ordered_extern);
@@ -27800,14 +27813,21 @@ np_conditional_gnn_training_geometry(const int bandwidth_mode){
     &np_conditional_training_identity_geometry : NULL;
 }
 
-static int np_conditional_xrow_ctx_prepare_ctx(
+static int np_conditional_xrow_ctx_prepare_impl(
   double *vector_scale_factor,
   const NPNNGeometryContext *nn_geometry_context,
+  const int adaptive_fold,
   NPConditionalXRowCtx *ctx){
   const int num_train = num_obs_train_extern;
   const int num_reg_tot = num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern;
   const int lp_engine = np_lp_engine_extern;
   const int bw_rows = (BANDWIDTH_den_extern == BW_FIXED) ? 1 : num_train;
+  NPNNGeometryContext adaptive_geometry = {
+    .mode = NP_NN_QUERY_TRAINING_IDENTITY,
+    .eval_to_train = NULL,
+    .adaptive_successor = NULL
+  };
+  const NPNNGeometryContext *bandwidth_geometry = nn_geometry_context;
   int i;
 
   if((ctx == NULL) || (vector_scale_factor == NULL))
@@ -27816,6 +27836,8 @@ static int np_conditional_xrow_ctx_prepare_ctx(
      (BANDWIDTH_den_extern != BW_GEN_NN) &&
      (BANDWIDTH_den_extern != BW_ADAP_NN))
     return 1;
+  if(adaptive_fold && BANDWIDTH_den_extern != BW_ADAP_NN)
+    return 1;
   if(num_train <= 0)
     return 1;
 
@@ -27823,6 +27845,7 @@ static int np_conditional_xrow_ctx_prepare_ctx(
   ctx->lp_engine = lp_engine;
   ctx->num_train = num_train;
   ctx->num_reg_tot = num_reg_tot;
+  ctx->adaptive_fold = adaptive_fold;
 
   if(num_reg_tot <= 0){
     ctx->ready = 1;
@@ -27834,6 +27857,12 @@ static int np_conditional_xrow_ctx_prepare_ctx(
   ctx->kw = alloc_vecd(MAX(1, num_train));
   ctx->mean_row = alloc_vecd(MAX(1, num_train));
   ctx->matrix_bandwidth_x = alloc_tmatd(bw_rows, num_reg_continuous_extern);
+  if(adaptive_fold && num_reg_continuous_extern > 0){
+    ctx->matrix_bandwidth_x_successor =
+      alloc_tmatd(num_train, num_reg_continuous_extern);
+    ctx->matrix_bandwidth_x_selected =
+      alloc_tmatd(num_train, num_reg_continuous_extern);
+  }
   ctx->matrix_bandwidth_eval_one = alloc_tmatd(1, num_reg_continuous_extern);
   if(num_reg_unordered_extern > 0) ctx->eval_xuno_one = alloc_matd(1, num_reg_unordered_extern);
   if(num_reg_ordered_extern > 0) ctx->eval_xord_one = alloc_matd(1, num_reg_ordered_extern);
@@ -27846,6 +27875,9 @@ static int np_conditional_xrow_ctx_prepare_ctx(
 
   if((ctx->vsfx == NULL) || (ctx->lambdax == NULL) || (ctx->kw == NULL) || (ctx->mean_row == NULL) ||
      ((num_reg_continuous_extern > 0) && (ctx->matrix_bandwidth_x == NULL)) ||
+     (adaptive_fold && num_reg_continuous_extern > 0 &&
+      (ctx->matrix_bandwidth_x_successor == NULL ||
+       ctx->matrix_bandwidth_x_selected == NULL)) ||
      ((num_reg_continuous_extern > 0) && (ctx->matrix_bandwidth_eval_one == NULL)) ||
      ((num_reg_unordered_extern > 0) && (ctx->eval_xuno_one == NULL)) ||
      ((num_reg_ordered_extern > 0) && (ctx->eval_xord_one == NULL)) ||
@@ -27873,6 +27905,13 @@ static int np_conditional_xrow_ctx_prepare_ctx(
   for(i = 0; i < num_reg_ordered_extern; i++) ctx->kernel_ox[i] = KERNEL_reg_ordered_extern;
   for(i = 0; i < num_reg_tot; i++) ctx->x_operator[i] = OP_NORMAL;
 
+  if(adaptive_fold && num_reg_continuous_extern > 0){
+    adaptive_geometry.mode = NP_NN_QUERY_ADAPTIVE_FOLD_PREPARE;
+    adaptive_geometry.adaptive_successor =
+      ctx->matrix_bandwidth_x_successor;
+    bandwidth_geometry = &adaptive_geometry;
+  }
+
   if(kernel_bandwidth_mean_ctx(KERNEL_reg_extern,
                            BANDWIDTH_den_extern,
                            num_train,
@@ -27892,7 +27931,7 @@ static int np_conditional_xrow_ctx_prepare_ctx(
                            NULL,
                            ctx->matrix_bandwidth_x,
                            ctx->lambdax,
-                           nn_geometry_context,
+                           bandwidth_geometry,
                            NULL,
                            NULL) == 1)
     goto fail_xrow_ctx_prepare;
@@ -27949,9 +27988,54 @@ fail_xrow_ctx_prepare:
   return 1;
 }
 
+static int np_conditional_xrow_ctx_prepare_ctx(
+  double *vector_scale_factor,
+  const NPNNGeometryContext *nn_geometry_context,
+  NPConditionalXRowCtx *ctx){
+  return np_conditional_xrow_ctx_prepare_impl(
+    vector_scale_factor, nn_geometry_context, 0, ctx);
+}
+
 static int np_conditional_xrow_ctx_prepare(double *vector_scale_factor,
                                            NPConditionalXRowCtx *ctx){
-  return np_conditional_xrow_ctx_prepare_ctx(vector_scale_factor, NULL, ctx);
+  return np_conditional_xrow_ctx_prepare_impl(
+    vector_scale_factor, NULL, 0, ctx);
+}
+
+static int np_conditional_xrow_ctx_prepare_adaptive_fold(
+  double *vector_scale_factor,
+  NPConditionalXRowCtx *ctx){
+  return np_conditional_xrow_ctx_prepare_impl(
+    vector_scale_factor, NULL, 1, ctx);
+}
+
+static int np_conditional_xrow_ctx_select_adaptive_fold(
+  NPConditionalXRowCtx *ctx,
+  const int held_out){
+  int held_out_position = held_out;
+
+  if(ctx == NULL || !ctx->ready || !ctx->adaptive_fold ||
+     held_out < 0 || held_out >= ctx->num_train)
+    return 1;
+  if(num_reg_continuous_extern <= 0){
+    ctx->adaptive_fold_selected = 1;
+    return 0;
+  }
+  if(int_TREE_X == NP_TREE_TRUE){
+    if(ipt_lookup_extern_X == NULL)
+      return 1;
+    held_out_position = ipt_lookup_extern_X[held_out];
+  }
+  if(np_nn_adaptive_fold_select_row(
+       ctx->num_train, num_reg_continuous_extern,
+       matrix_X_continuous_train_extern,
+       ctx->matrix_bandwidth_x,
+       ctx->matrix_bandwidth_x_successor,
+       held_out_position,
+       ctx->matrix_bandwidth_x_selected) != NP_NN_GEOMETRY_OK)
+    return 1;
+  ctx->adaptive_fold_selected = 1;
+  return 0;
 }
 
 static int np_conditional_xrow_from_ctx_impl(NPConditionalXRowCtx *ctx,
@@ -27961,6 +28045,7 @@ static int np_conditional_xrow_from_ctx_impl(NPConditionalXRowCtx *ctx,
   const int num_train = num_obs_train_extern;
   int eval_pos = eval_idx;
   NPConditionalBoundState bounds_state;
+  double **matrix_bandwidth_active;
   int j, l;
   int status = 1;
   int adaptive_gaussian_row = 0;
@@ -27969,6 +28054,10 @@ static int np_conditional_xrow_from_ctx_impl(NPConditionalXRowCtx *ctx,
     return 1;
   if((eval_idx < 0) || (eval_idx >= num_train))
     return 1;
+  if(ctx->adaptive_fold && !ctx->adaptive_fold_selected)
+    return 1;
+  matrix_bandwidth_active = ctx->adaptive_fold ?
+    ctx->matrix_bandwidth_x_selected : ctx->matrix_bandwidth_x;
 
   /*
    * Every admitted objective begins its row traversal at zero.  Prepare the
@@ -27978,6 +28067,7 @@ static int np_conditional_xrow_from_ctx_impl(NPConditionalXRowCtx *ctx,
    */
   if((eval_idx == 0) &&
      (BANDWIDTH_den_extern == BW_ADAP_NN) &&
+     (!ctx->adaptive_fold) &&
      (ctx->reciprocal_cache == NULL))
     (void)np_conditional_xrow_reciprocal_cache_try(ctx);
 
@@ -28002,7 +28092,8 @@ static int np_conditional_xrow_from_ctx_impl(NPConditionalXRowCtx *ctx,
   for(l = 0; l < num_reg_continuous_extern; l++){
     ctx->eval_xcon_one[l][0] = matrix_X_continuous_train_extern[l][eval_pos];
     ctx->matrix_bandwidth_eval_one[l][0] =
-      (BANDWIDTH_den_extern == BW_GEN_NN) ? ctx->matrix_bandwidth_x[l][eval_pos] : ctx->matrix_bandwidth_x[l][0];
+      (BANDWIDTH_den_extern == BW_FIXED) ?
+      ctx->matrix_bandwidth_x[l][0] : matrix_bandwidth_active[l][eval_pos];
   }
 
   np_conditional_push_bounds(int_cxker_bound_extern,
@@ -28020,7 +28111,7 @@ static int np_conditional_xrow_from_ctx_impl(NPConditionalXRowCtx *ctx,
                                     ctx->x_operator,
                                     matrix_X_continuous_train_extern,
                                     ctx->eval_xcon_one,
-                                    ctx->matrix_bandwidth_x,
+                                    matrix_bandwidth_active,
                                     num_reg_continuous_extern,
                                     num_train,
                                     1,
@@ -28037,7 +28128,7 @@ static int np_conditional_xrow_from_ctx_impl(NPConditionalXRowCtx *ctx,
         ctx->x_operator,
         matrix_X_continuous_train_extern,
         ctx->eval_xcon_one,
-        ctx->matrix_bandwidth_x,
+        matrix_bandwidth_active,
         (ctx->reciprocal_cache != NULL) &&
           ctx->reciprocal_cache->workspace.ready ?
           ctx->reciprocal_cache->workspace.reciprocal_storage :
@@ -28075,7 +28166,7 @@ static int np_conditional_xrow_from_ctx_impl(NPConditionalXRowCtx *ctx,
         ctx->eval_xcon_one,
         ctx->vsfx,
         1,
-        ctx->matrix_bandwidth_x,
+        matrix_bandwidth_active,
         ctx->matrix_bandwidth_eval_one,
         ctx->lambdax,
         num_categories_extern_X,
@@ -28895,6 +28986,8 @@ static void np_conditional_yrow_ctx_clear(NPConditionalYRowCtx *ctx){
   if(ctx->matrix_bandwidth_y != NULL) free_tmat(ctx->matrix_bandwidth_y);
   if(ctx->matrix_bandwidth_y_successor != NULL)
     free_tmat(ctx->matrix_bandwidth_y_successor);
+  if(ctx->matrix_bandwidth_y_selected != NULL)
+    free_tmat(ctx->matrix_bandwidth_y_selected);
   if(ctx->matrix_bandwidth_eval_one != NULL) free_tmat(ctx->matrix_bandwidth_eval_one);
   if(ctx->eval_yuno_one != NULL) free_mat(ctx->eval_yuno_one, num_var_unordered_extern);
   if(ctx->eval_yord_one != NULL) free_mat(ctx->eval_yord_one, num_var_ordered_extern);
@@ -28906,7 +28999,7 @@ static void np_conditional_yrow_ctx_clear(NPConditionalYRowCtx *ctx){
   memset(ctx, 0, sizeof(*ctx));
 }
 
-static int np_conditional_yrow_eval_ctx_prepare_ctx(
+static int np_conditional_yrow_eval_ctx_prepare_impl(
   double *vector_scale_factor,
   int operator_code,
   double **matrix_Y_unordered_eval,
@@ -28914,12 +29007,19 @@ static int np_conditional_yrow_eval_ctx_prepare_ctx(
   double **matrix_Y_continuous_eval,
   int num_eval,
   const NPNNGeometryContext *nn_geometry_context,
+  const int adaptive_fold,
   NPConditionalYRowCtx *ctx){
   const int num_train = num_obs_train_extern;
   const int num_var_tot = num_var_continuous_extern + num_var_unordered_extern + num_var_ordered_extern;
   const int bw_rows =
     (BANDWIDTH_den_extern == BW_FIXED) ? 1 :
     ((BANDWIDTH_den_extern == BW_GEN_NN) ? num_eval : num_train);
+  NPNNGeometryContext adaptive_geometry = {
+    .mode = NP_NN_QUERY_TRAINING_IDENTITY,
+    .eval_to_train = NULL,
+    .adaptive_successor = NULL
+  };
+  const NPNNGeometryContext *bandwidth_geometry = nn_geometry_context;
   int i;
 
   if((ctx == NULL) || (vector_scale_factor == NULL))
@@ -28928,12 +29028,21 @@ static int np_conditional_yrow_eval_ctx_prepare_ctx(
      (BANDWIDTH_den_extern != BW_GEN_NN) &&
      (BANDWIDTH_den_extern != BW_ADAP_NN))
     return 1;
+  if(adaptive_fold &&
+     (BANDWIDTH_den_extern != BW_ADAP_NN || num_eval != num_train ||
+      matrix_Y_unordered_eval != matrix_Y_unordered_train_extern ||
+      matrix_Y_ordered_eval != matrix_Y_ordered_train_extern ||
+      matrix_Y_continuous_eval != matrix_Y_continuous_train_extern))
+    return 1;
   if((num_train <= 0) || (num_eval <= 0))
     return 1;
 
   memset(ctx, 0, sizeof(*ctx));
   ctx->num_train = num_train;
   ctx->num_var_tot = num_var_tot;
+  ctx->adaptive_fold = adaptive_fold;
+  ctx->num_categories = num_categories_extern_Y;
+  ctx->matrix_categorical_vals = matrix_categorical_vals_extern_Y;
 
   if(num_var_tot <= 0){
     ctx->ready = 1;
@@ -28944,6 +29053,12 @@ static int np_conditional_yrow_eval_ctx_prepare_ctx(
   ctx->lambday = alloc_vecd(MAX(1, num_var_unordered_extern + num_var_ordered_extern));
   ctx->kw = alloc_vecd(MAX(1, num_train));
   ctx->matrix_bandwidth_y = alloc_tmatd(bw_rows, num_var_continuous_extern);
+  if(adaptive_fold && num_var_continuous_extern > 0){
+    ctx->matrix_bandwidth_y_successor =
+      alloc_tmatd(num_train, num_var_continuous_extern);
+    ctx->matrix_bandwidth_y_selected =
+      alloc_tmatd(num_train, num_var_continuous_extern);
+  }
   ctx->matrix_bandwidth_eval_one = alloc_tmatd(1, num_var_continuous_extern);
   if(num_var_unordered_extern > 0) ctx->eval_yuno_one = alloc_matd(1, num_var_unordered_extern);
   if(num_var_ordered_extern > 0) ctx->eval_yord_one = alloc_matd(1, num_var_ordered_extern);
@@ -28956,6 +29071,9 @@ static int np_conditional_yrow_eval_ctx_prepare_ctx(
 
   if((ctx->vsfy == NULL) || (ctx->lambday == NULL) || (ctx->kw == NULL) ||
      ((num_var_continuous_extern > 0) && (ctx->matrix_bandwidth_y == NULL)) ||
+     (adaptive_fold && num_var_continuous_extern > 0 &&
+      (ctx->matrix_bandwidth_y_successor == NULL ||
+       ctx->matrix_bandwidth_y_selected == NULL)) ||
      ((num_var_continuous_extern > 0) && (ctx->matrix_bandwidth_eval_one == NULL)) ||
      ((num_var_unordered_extern > 0) && (ctx->eval_yuno_one == NULL)) ||
      ((num_var_ordered_extern > 0) && (ctx->eval_yord_one == NULL)) ||
@@ -28983,6 +29101,13 @@ static int np_conditional_yrow_eval_ctx_prepare_ctx(
   for(i = 0; i < num_var_ordered_extern; i++) ctx->kernel_oy[i] = KERNEL_den_ordered_extern;
   for(i = 0; i < num_var_tot; i++) ctx->operator_y[i] = operator_code;
 
+  if(adaptive_fold && num_var_continuous_extern > 0){
+    adaptive_geometry.mode = NP_NN_QUERY_ADAPTIVE_FOLD_PREPARE;
+    adaptive_geometry.adaptive_successor =
+      ctx->matrix_bandwidth_y_successor;
+    bandwidth_geometry = &adaptive_geometry;
+  }
+
   /* This Y-only owner marshals its coordinates through the helper's X slots. */
   if(kernel_bandwidth_mean_ctx(KERNEL_den_extern,
                            BANDWIDTH_den_extern,
@@ -29003,7 +29128,7 @@ static int np_conditional_yrow_eval_ctx_prepare_ctx(
                            NULL,
                            ctx->matrix_bandwidth_y,
                            ctx->lambday,
-                           nn_geometry_context,
+                           bandwidth_geometry,
                            NULL,
                            NULL) == 1)
     goto fail_yrow_ctx_prepare;
@@ -29014,6 +29139,21 @@ static int np_conditional_yrow_eval_ctx_prepare_ctx(
 fail_yrow_ctx_prepare:
   np_conditional_yrow_ctx_clear(ctx);
   return 1;
+}
+
+static int np_conditional_yrow_eval_ctx_prepare_ctx(
+  double *vector_scale_factor,
+  int operator_code,
+  double **matrix_Y_unordered_eval,
+  double **matrix_Y_ordered_eval,
+  double **matrix_Y_continuous_eval,
+  int num_eval,
+  const NPNNGeometryContext *nn_geometry_context,
+  NPConditionalYRowCtx *ctx){
+  return np_conditional_yrow_eval_ctx_prepare_impl(
+    vector_scale_factor, operator_code,
+    matrix_Y_unordered_eval, matrix_Y_ordered_eval,
+    matrix_Y_continuous_eval, num_eval, nn_geometry_context, 0, ctx);
 }
 
 static int np_conditional_yrow_eval_ctx_prepare(double *vector_scale_factor,
@@ -29138,6 +29278,55 @@ static int np_conditional_yrow_ctx_prepare(double *vector_scale_factor,
     vector_scale_factor, operator_code, NULL, ctx);
 }
 
+static int np_conditional_yrow_ctx_prepare_adaptive_fold(
+  double *vector_scale_factor,
+  int operator_code,
+  int *num_categories,
+  double **matrix_categorical_vals,
+  NPConditionalYRowCtx *ctx){
+  const int status = np_conditional_yrow_eval_ctx_prepare_impl(
+    vector_scale_factor, operator_code,
+    matrix_Y_unordered_train_extern,
+    matrix_Y_ordered_train_extern,
+    matrix_Y_continuous_train_extern,
+    num_obs_train_extern, NULL, 1, ctx);
+
+  if(status == 0){
+    ctx->num_categories = num_categories;
+    ctx->matrix_categorical_vals = matrix_categorical_vals;
+  }
+  return status;
+}
+
+static int np_conditional_yrow_ctx_select_adaptive_fold(
+  NPConditionalYRowCtx *ctx,
+  const int held_out){
+  int held_out_position = held_out;
+
+  if(ctx == NULL || !ctx->ready || !ctx->adaptive_fold ||
+     held_out < 0 || held_out >= ctx->num_train)
+    return 1;
+  if(num_var_continuous_extern <= 0){
+    ctx->adaptive_fold_selected = 1;
+    return 0;
+  }
+  if(int_TREE_Y == NP_TREE_TRUE){
+    if(ipt_lookup_extern_Y == NULL)
+      return 1;
+    held_out_position = ipt_lookup_extern_Y[held_out];
+  }
+  if(np_nn_adaptive_fold_select_row(
+       ctx->num_train, num_var_continuous_extern,
+       matrix_Y_continuous_train_extern,
+       ctx->matrix_bandwidth_y,
+       ctx->matrix_bandwidth_y_successor,
+       held_out_position,
+       ctx->matrix_bandwidth_y_selected) != NP_NN_GEOMETRY_OK)
+    return 1;
+  ctx->adaptive_fold_selected = 1;
+  return 0;
+}
+
 static int np_conditional_y_scalar_fixed_row_direct(NPConditionalYRowCtx *ctx,
                                                     double eval_y,
                                                     double *row_out);
@@ -29148,6 +29337,7 @@ static int np_conditional_yrow_from_ctx(NPConditionalYRowCtx *ctx,
   const int num_train = num_obs_train_extern;
   int eval_pos = eval_idx;
   NPConditionalBoundState bounds_state;
+  double **matrix_bandwidth_active;
   int adaptive_gaussian_row = 0;
   int j, l;
 
@@ -29155,6 +29345,10 @@ static int np_conditional_yrow_from_ctx(NPConditionalYRowCtx *ctx,
     return 1;
   if((eval_idx < 0) || (eval_idx >= num_train))
     return 1;
+  if(ctx->adaptive_fold && !ctx->adaptive_fold_selected)
+    return 1;
+  matrix_bandwidth_active = ctx->adaptive_fold ?
+    ctx->matrix_bandwidth_y_selected : ctx->matrix_bandwidth_y;
 
   /*
    * Attempt the optional sidecar once on first local use.  Serial traversals
@@ -29163,6 +29357,7 @@ static int np_conditional_yrow_from_ctx(NPConditionalYRowCtx *ctx,
    * shapes explicit without retrying an ineligible or failed allocation.
    */
   if((BANDWIDTH_den_extern == BW_ADAP_NN) &&
+     (!ctx->adaptive_fold) &&
      (!ctx->reciprocal_cache_attempted)){
     ctx->reciprocal_cache_attempted = 1;
     (void)np_conditional_yrow_reciprocal_cache_try(ctx);
@@ -29200,7 +29395,7 @@ static int np_conditional_yrow_from_ctx(NPConditionalYRowCtx *ctx,
     ctx->matrix_bandwidth_eval_one[l][0] =
       ((BANDWIDTH_den_extern == BW_GEN_NN) ||
        (BANDWIDTH_den_extern == BW_ADAP_NN)) ?
-      ctx->matrix_bandwidth_y[l][eval_pos] : ctx->matrix_bandwidth_y[l][0];
+      matrix_bandwidth_active[l][eval_pos] : ctx->matrix_bandwidth_y[l][0];
   }
 
   np_conditional_push_bounds(int_cyker_bound_extern,
@@ -29236,7 +29431,7 @@ static int np_conditional_yrow_from_ctx(NPConditionalYRowCtx *ctx,
         ctx->operator_y,
         matrix_Y_continuous_train_extern,
         ctx->eval_ycon_one,
-        ctx->matrix_bandwidth_y,
+        matrix_bandwidth_active,
         num_var_continuous_extern,
         num_train,
         1,
@@ -29260,11 +29455,11 @@ static int np_conditional_yrow_from_ctx(NPConditionalYRowCtx *ctx,
                                        ctx->eval_ycon_one,
                                        ctx->vsfy,
                                        1,
-                                       ctx->matrix_bandwidth_y,
+                                       matrix_bandwidth_active,
                                        ctx->matrix_bandwidth_eval_one,
                                        ctx->lambday,
-                                       num_categories_extern_Y,
-                                       matrix_categorical_vals_extern_Y,
+                                       ctx->num_categories,
+                                       ctx->matrix_categorical_vals,
                                        int_TREE_Y,
                                        kdt_extern_Y,
                                        ctx->kw,
@@ -29380,8 +29575,8 @@ static int np_conditional_y_eval_from_ctx_impl(NPConditionalYRowCtx *ctx,
                                       ctx->matrix_bandwidth_y,
                                       ctx->matrix_bandwidth_eval_one,
                                       ctx->lambday,
-                                      num_categories_extern_Y,
-                                      matrix_categorical_vals_extern_Y,
+                                      ctx->num_categories,
+                                      ctx->matrix_categorical_vals,
                                       int_TREE_Y,
                                       kdt_extern_Y,
                                       ctx->kw,
@@ -29748,8 +29943,8 @@ static int np_conditional_y_scalar_eval_from_ctx(double *vector_scale_factor,
                                       ctx->matrix_bandwidth_y,
                                       ctx->matrix_bandwidth_eval_one,
                                       ctx->lambday,
-                                      num_categories_extern_Y,
-                                      matrix_categorical_vals_extern_Y,
+                                      ctx->num_categories,
+                                      ctx->matrix_categorical_vals,
                                       int_TREE_Y,
                                       kdt_extern_Y,
                                       ctx->kw,
@@ -33889,6 +34084,160 @@ int np_conditional_density_cvml_stream_engine_supported(void){
      (num_reg_continuous_extern > 1) &&
      !np_conditional_density_cvml_scalar_sparse_batch_supported() &&
      (BANDWIDTH_den_extern != BW_ADAP_NN));
+}
+
+typedef enum {
+  NP_CONDITIONAL_ADAPTIVE_EXACT_NOT_APPLICABLE = 0,
+  NP_CONDITIONAL_ADAPTIVE_EXACT_SUCCESS = 1,
+  NP_CONDITIONAL_ADAPTIVE_EXACT_FAILURE = -1
+} NPConditionalAdaptiveExactStatus;
+
+/*
+ * Ordinary integer-k adaptive-NN candidates admit exact delete-one geometry.
+ * Extended-NN scales retain their separate incumbent contract until that
+ * finite-sample definition is resolved explicitly.
+ */
+static NPConditionalAdaptiveExactStatus
+np_conditional_adaptive_exact_scale_status(double *vector_scale_factor){
+  const int num_x = num_reg_continuous_extern +
+    num_reg_unordered_extern + num_reg_ordered_extern;
+  const int num_y = num_var_continuous_extern +
+    num_var_unordered_extern + num_var_ordered_extern;
+  double *vsfx = NULL;
+  double *vsfy = NULL;
+  int l;
+  NPConditionalAdaptiveExactStatus status =
+    NP_CONDITIONAL_ADAPTIVE_EXACT_SUCCESS;
+
+  if(BANDWIDTH_den_extern != BW_ADAP_NN ||
+     vector_scale_factor == NULL ||
+     (num_reg_continuous_extern + num_var_continuous_extern) <= 0)
+    return NP_CONDITIONAL_ADAPTIVE_EXACT_NOT_APPLICABLE;
+
+  vsfx = alloc_vecd(MAX(1, num_x));
+  vsfy = alloc_vecd(MAX(1, num_y));
+  if(vsfx == NULL || vsfy == NULL){
+    status = NP_CONDITIONAL_ADAPTIVE_EXACT_FAILURE;
+    goto cleanup_adaptive_scale_status;
+  }
+
+  np_splitxy_vsf_mcv_nc(num_var_unordered_extern,
+                        num_var_ordered_extern,
+                        num_var_continuous_extern,
+                        num_reg_unordered_extern,
+                        num_reg_ordered_extern,
+                        num_reg_continuous_extern,
+                        vector_scale_factor,
+                        NULL, NULL, vsfx, vsfy, NULL,
+                        NULL, NULL, NULL, NULL, NULL, NULL);
+
+  for(l = 0; l < num_reg_continuous_extern; ++l){
+    int lookup_k;
+    int is_extended = 0;
+    double distance_scale;
+
+    if(np_nn_lookup_from_scale(num_obs_train_extern, 1, vsfx[l],
+                               &lookup_k, &distance_scale,
+                               &is_extended) != 0){
+      status = NP_CONDITIONAL_ADAPTIVE_EXACT_FAILURE;
+      goto cleanup_adaptive_scale_status;
+    }
+    if(is_extended){
+      status = NP_CONDITIONAL_ADAPTIVE_EXACT_NOT_APPLICABLE;
+      goto cleanup_adaptive_scale_status;
+    }
+  }
+  for(l = 0; l < num_var_continuous_extern; ++l){
+    int lookup_k;
+    int is_extended = 0;
+    double distance_scale;
+
+    if(np_nn_lookup_from_scale(num_obs_train_extern, 1, vsfy[l],
+                               &lookup_k, &distance_scale,
+                               &is_extended) != 0){
+      status = NP_CONDITIONAL_ADAPTIVE_EXACT_FAILURE;
+      goto cleanup_adaptive_scale_status;
+    }
+    if(is_extended){
+      status = NP_CONDITIONAL_ADAPTIVE_EXACT_NOT_APPLICABLE;
+      goto cleanup_adaptive_scale_status;
+    }
+  }
+
+cleanup_adaptive_scale_status:
+  if(vsfx != NULL) free(vsfx);
+  if(vsfy != NULL) free(vsfy);
+  return status;
+}
+
+static NPConditionalAdaptiveExactStatus
+np_conditional_density_cvml_adaptive_exact(double *vector_scale_factor,
+                                           int *num_categories_y,
+                                           double **matrix_categorical_vals_y,
+                                           double *cv){
+  const int num_obs = num_obs_train_extern;
+  NPConditionalXRowCtx xctx = {0};
+  NPConditionalYRowCtx yctx = {0};
+  double *xrow = NULL;
+  double *yrow = NULL;
+  int i;
+  NPConditionalAdaptiveExactStatus status;
+
+  if(cv == NULL || vector_scale_factor == NULL || num_obs < 3)
+    return NP_CONDITIONAL_ADAPTIVE_EXACT_FAILURE;
+
+  status = np_conditional_adaptive_exact_scale_status(vector_scale_factor);
+  if(status != NP_CONDITIONAL_ADAPTIVE_EXACT_SUCCESS)
+    return status;
+
+#ifdef MPI2
+  /* The rank-symmetric owner and its single terminal reduction are Phase A3. */
+  return NP_CONDITIONAL_ADAPTIVE_EXACT_NOT_APPLICABLE;
+#endif
+
+  xrow = alloc_vecd(MAX(1, num_obs));
+  yrow = alloc_vecd(MAX(1, num_obs));
+  if(xrow == NULL || yrow == NULL)
+    goto fail_adaptive_cvml;
+  if(np_conditional_xrow_ctx_prepare_adaptive_fold(
+       vector_scale_factor, &xctx) != 0)
+    goto fail_adaptive_cvml;
+  if(np_conditional_yrow_ctx_prepare_adaptive_fold(
+       vector_scale_factor, OP_NORMAL,
+       num_categories_y, matrix_categorical_vals_y, &yctx) != 0)
+    goto fail_adaptive_cvml;
+
+  *cv = 0.0;
+  for(i = 0; i < num_obs; ++i){
+    double fit;
+
+    if(np_conditional_xrow_ctx_select_adaptive_fold(&xctx, i) != 0)
+      goto fail_adaptive_cvml;
+    if(np_conditional_yrow_ctx_select_adaptive_fold(&yctx, i) != 0)
+      goto fail_adaptive_cvml;
+    if(np_conditional_xrow_from_ctx(&xctx, i, xrow) != 0)
+      goto fail_adaptive_cvml;
+    if(np_conditional_yrow_from_ctx(&yctx, i, yrow) != 0)
+      goto fail_adaptive_cvml;
+    fit = np_blas_ddot_int(num_obs, xrow, yrow);
+    if(!R_FINITE(fit))
+      goto fail_adaptive_cvml;
+    *cv += np_guarded_cvml_contribution(fit);
+  }
+
+  status = NP_CONDITIONAL_ADAPTIVE_EXACT_SUCCESS;
+  goto cleanup_adaptive_cvml;
+
+fail_adaptive_cvml:
+  status = NP_CONDITIONAL_ADAPTIVE_EXACT_FAILURE;
+
+cleanup_adaptive_cvml:
+  np_conditional_xrow_ctx_clear(&xctx);
+  np_conditional_yrow_ctx_clear(&yctx);
+  np_glp_cv_clear_extern();
+  if(xrow != NULL) free(xrow);
+  if(yrow != NULL) free(yrow);
+  return status;
 }
 
 int np_conditional_density_cvml_lp_stream(double *vector_scale_factor,
@@ -39827,6 +40176,22 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
       goto cleanup_cvml_return;
     }
     error("\n** Error: invalid bandwidth.");
+  }
+
+  if(BANDWIDTH_den == BW_ADAP_NN){
+    const NPConditionalAdaptiveExactStatus adaptive_status =
+      np_conditional_density_cvml_adaptive_exact(
+        vector_scale_factor, num_categories,
+        matrix_categorical_vals_extern, cv);
+
+    if(adaptive_status == NP_CONDITIONAL_ADAPTIVE_EXACT_SUCCESS){
+      ret = 0;
+      goto cleanup_cvml_return;
+    }
+    if(adaptive_status == NP_CONDITIONAL_ADAPTIVE_EXACT_FAILURE){
+      ret = 1;
+      goto cleanup_cvml_return;
+    }
   }
 
   if((int_TREE_PROFILE_X == NP_TREE_TRUE) &&
