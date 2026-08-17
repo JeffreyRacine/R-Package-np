@@ -19886,6 +19886,41 @@ static double np_distribution_cvls_pair_count(
   return (double)num_train*(double)num_eval;
 }
 
+typedef enum {
+  NP_DISTRIBUTION_CVLS_FINALIZE_OK = 0,
+  NP_DISTRIBUTION_CVLS_FINALIZE_INVALID_SHAPE,
+  NP_DISTRIBUTION_CVLS_FINALIZE_NONFINITE
+} NPDistributionCvlsFinalizeStatus;
+
+/*
+ * Transactional empirical-CDF CVLS finalization.  Callers retain ownership of
+ * family-specific failure statuses and cleanup; this seam owns validation of
+ * the common pair count and writes the normalized objective only on success.
+ */
+static NPDistributionCvlsFinalizeStatus np_distribution_cvls_finalize(
+  const double accumulator,
+  const int64_t num_train,
+  const int64_t num_eval,
+  const int cdf_on_train,
+  double *cv)
+{
+  const double pair_count = np_distribution_cvls_pair_count(
+    num_train, num_eval, cdf_on_train);
+  double normalized;
+
+  if(cv == NULL || !(pair_count > 0.0) || !R_FINITE(pair_count))
+    return NP_DISTRIBUTION_CVLS_FINALIZE_INVALID_SHAPE;
+  if(!R_FINITE(accumulator))
+    return NP_DISTRIBUTION_CVLS_FINALIZE_NONFINITE;
+
+  normalized = accumulator/pair_count;
+  if(!R_FINITE(normalized))
+    return NP_DISTRIBUTION_CVLS_FINALIZE_NONFINITE;
+
+  *cv = normalized;
+  return NP_DISTRIBUTION_CVLS_FINALIZE_OK;
+}
+
 /*
  * Exact adaptive-NN empirical CDF-CV owner.  For held-out observation i,
  * donor l uses the radius computed from D_n \ {i,l}; the resulting fold row
@@ -20502,10 +20537,12 @@ double * cv){
   if((engine_status != 0) || (row_tile_sink.count_rows != 0))
     goto cleanup_profile_cdf;
 
-  *cv = consumer.cv;
-  *cv /= np_distribution_cvls_pair_count(
-    num_obs_train, cdfontrain ? num_obs_train : num_obs_eval, cdfontrain);
-  if(R_FINITE(*cv)){
+  if(np_distribution_cvls_finalize(
+       consumer.cv,
+       num_obs_train,
+       cdfontrain ? num_obs_train : num_obs_eval,
+       cdfontrain,
+       cv) == NP_DISTRIBUTION_CVLS_FINALIZE_OK){
     np_fastcv_alllarge_hits++;
     result = NP_DISTRIBUTION_PROFILE_CV_SUCCESS;
   }
@@ -20918,9 +20955,9 @@ static int np_distribution_cvls_continuous_route(
 #ifdef MPI2
   MPI_Allreduce(MPI_IN_PLACE, cv, 1, MPI_DOUBLE, MPI_SUM, comm[1]);
 #endif
-  *cv /= np_distribution_cvls_pair_count(
-    num_obs_train, num_obs_eval, cdfontrain);
-  status = R_FINITE(*cv) ? 0 : 1;
+  status = np_distribution_cvls_finalize(
+    *cv, num_obs_train, num_obs_eval, cdfontrain, cv) ==
+      NP_DISTRIBUTION_CVLS_FINALIZE_OK ? 0 : 1;
 
 cleanup_distribution_route:
   np_beta_scaled_row_context_clear(&context);
@@ -21200,9 +21237,9 @@ double * cv){
     if(local_failure){
       status = 1;
     } else {
-      *cv = local_cv/np_distribution_cvls_pair_count(
-        num_obs_train, num_obs_train, 1);
-      status = R_FINITE(*cv) ? 0 : 1;
+      status = np_distribution_cvls_finalize(
+        local_cv, num_obs_train, num_obs_train, 1, cv) ==
+          NP_DISTRIBUTION_CVLS_FINALIZE_OK ? 0 : 1;
     }
     goto cleanup_distribution_ls_cv;
   }
@@ -21441,8 +21478,9 @@ double * cv){
   MPI_Allreduce(MPI_IN_PLACE, cv, 1, MPI_DOUBLE, MPI_SUM, comm[1]);
 #endif
 
-  *cv /= np_distribution_cvls_pair_count(
-    num_obs_train, num_obs_eval, cdfontrain);
+  status = np_distribution_cvls_finalize(
+    *cv, num_obs_train, num_obs_eval, cdfontrain, cv) ==
+      NP_DISTRIBUTION_CVLS_FINALIZE_OK ? 0 : 1;
 
   free(kwx);
 
@@ -21630,6 +21668,7 @@ double *cv){
   int64_t wx, wy, nwx, nwy;
 
   int * x_operator = NULL, * y_operator = NULL, * xy_operator = NULL;
+  int final_status = 1;
   int gate_x_active = 0, gate_y_active = 0;
   int gate_x_all_large_fixed = 0;
   int *x_cont_ok = NULL, *x_disc_uno_ok = NULL, *x_disc_ord_ok = NULL;
@@ -22411,8 +22450,9 @@ double *cv){
 #ifdef MPI2
     MPI_Allreduce(MPI_IN_PLACE, cv, 1, MPI_DOUBLE, MPI_SUM, comm[1]);
 #endif
-    *cv /= np_conditional_distribution_cvls_pair_count(
-      num_obs_train, num_obs_eval, cdfontrain);
+    final_status = np_distribution_cvls_finalize(
+      *cv, num_obs_train, num_obs_eval, cdfontrain, cv) ==
+        NP_DISTRIBUTION_CVLS_FINALIZE_OK ? 0 : 1;
 
     free(kwx);
     free(kwy);
@@ -22705,8 +22745,9 @@ double *cv){
 #ifdef MPI2
     MPI_Allreduce(MPI_IN_PLACE, cv, 1, MPI_DOUBLE, MPI_SUM, comm[1]);
 #endif
-    *cv /= np_conditional_distribution_cvls_pair_count(
-      num_obs_train, num_obs_eval, cdfontrain);
+    final_status = np_distribution_cvls_finalize(
+      *cv, num_obs_train, num_obs_eval, cdfontrain, cv) ==
+        NP_DISTRIBUTION_CVLS_FINALIZE_OK ? 0 : 1;
 
     free(kwx);
     free(kwy);
@@ -22767,7 +22808,7 @@ double *cv){
   np_disc_profile_cache_clear();
   np_cont_largeh_cache_clear();
 
-  return(0);
+  return(final_status);
 
 }
 
@@ -34011,12 +34052,17 @@ static int np_conditional_distribution_cvls_lp_all_large_stream(double *vector_s
     }
   }
 
-  cv_accumulator /= np_conditional_distribution_cvls_pair_count(
-    ctx.num_train, num_eval, cdfontrain_extern);
+  if(np_distribution_cvls_finalize(
+       cv_accumulator,
+       ctx.num_train,
+       num_eval,
+       cdfontrain_extern,
+       &cv_accumulator) != NP_DISTRIBUTION_CVLS_FINALIZE_OK)
+    goto cleanup_cdist_all_large;
   status = 0;
 
 cleanup_cdist_all_large:
-  if(cv_started)
+  if(cv_started && status == 0)
     *cv = cv_accumulator;
   if(yint != NULL) free(yint);
   if(yint_xorder != NULL) free(yint_xorder);
@@ -35489,7 +35535,10 @@ np_conditional_distribution_cvls_adaptive_exact(
       *cv += difference*difference;
     }
   }
-  *cv /= pair_count;
+  if(np_distribution_cvls_finalize(
+       *cv, num_train, num_eval, 1, cv) !=
+     NP_DISTRIBUTION_CVLS_FINALIZE_OK)
+    goto fail_adaptive_cdist;
 
   status = NP_CONDITIONAL_ADAPTIVE_EXACT_SUCCESS;
   goto cleanup_adaptive_cdist;
@@ -35585,7 +35634,10 @@ static int np_conditional_distribution_cvls_gnn_empirical_row_stream(
     }
   }
 
-  *cv /= pair_count;
+  if(np_distribution_cvls_finalize(
+       *cv, num_train, num_eval, 1, cv) !=
+     NP_DISTRIBUTION_CVLS_FINALIZE_OK)
+    goto cleanup_gnn_empirical_cdist;
   status = 0;
 
 cleanup_gnn_empirical_cdist:
@@ -36011,7 +36063,10 @@ static int np_conditional_distribution_cvls_gnn_empirical_block_stream(
   *cv = 0.0;
   for(ii = 0; ii < num_train; ++ii)
     *cv += row_sum[ii];
-  *cv /= pair_count;
+  if(np_distribution_cvls_finalize(
+       *cv, num_train, num_eval, 1, cv) !=
+     NP_DISTRIBUTION_CVLS_FINALIZE_OK)
+    goto cleanup_gnn_empirical_block;
   status = 0;
 
 cleanup_gnn_empirical_block:
@@ -36122,8 +36177,10 @@ static int np_conditional_distribution_cvls_provider_row_stream(
     }
   }
 
-  *cv /= np_conditional_distribution_cvls_pair_count(
-    num_train, num_eval, cdfontrain_extern);
+  if(np_distribution_cvls_finalize(
+       *cv, num_train, num_eval, cdfontrain_extern, cv) !=
+     NP_DISTRIBUTION_CVLS_FINALIZE_OK)
+    goto cleanup_provider_row;
   status = 0;
 
 cleanup_provider_row:
@@ -36252,8 +36309,10 @@ static int np_conditional_distribution_cvls_provider_supertile(
         *cv += block_sum[g];
   }
 
-  *cv /= np_conditional_distribution_cvls_pair_count(
-    num_train, num_eval, cdfontrain_extern);
+  if(np_distribution_cvls_finalize(
+       *cv, num_train, num_eval, cdfontrain_extern, cv) !=
+     NP_DISTRIBUTION_CVLS_FINALIZE_OK)
+    goto cleanup_provider_supertile;
   status = 0;
 
 cleanup_provider_supertile:
@@ -36354,8 +36413,10 @@ static int np_conditional_distribution_cvls_lp_row_stream(double *vector_scale_f
     }
   }
 
-  *cv /= np_conditional_distribution_cvls_pair_count(
-    num_train, num_eval, cdfontrain_extern);
+  if(np_distribution_cvls_finalize(
+       *cv, num_train, num_eval, cdfontrain_extern, cv) !=
+     NP_DISTRIBUTION_CVLS_FINALIZE_OK)
+    goto cleanup_cdist_lp_stream;
   status = 0;
 
 cleanup_cdist_lp_stream:
@@ -36508,8 +36569,10 @@ static int np_conditional_distribution_cvls_lp_adap_block_stream(double *vector_
       *cv += block_sum[g];
   }
 
-  *cv /= np_conditional_distribution_cvls_pair_count(
-    num_train, num_eval, cdfontrain_extern);
+  if(np_distribution_cvls_finalize(
+       *cv, num_train, num_eval, cdfontrain_extern, cv) !=
+     NP_DISTRIBUTION_CVLS_FINALIZE_OK)
+    goto cleanup_cdist_lp_adap_block;
   status = 0;
 
 cleanup_cdist_lp_adap_block:
@@ -36690,8 +36753,10 @@ static int np_conditional_distribution_cvls_lp_block_supertile(double *vector_sc
         *cv += block_sum[g];
   }
 
-  *cv /= np_conditional_distribution_cvls_pair_count(
-    num_train, num_eval, cdfontrain_extern);
+  if(np_distribution_cvls_finalize(
+       *cv, num_train, num_eval, cdfontrain_extern, cv) !=
+     NP_DISTRIBUTION_CVLS_FINALIZE_OK)
+    goto cleanup_cdist_lp_block;
   status = 0;
 
 cleanup_cdist_lp_block:
@@ -36802,8 +36867,10 @@ np_conditional_distribution_cvls_lp_block_one(double *vector_scale_factor,
     *cv += block_sum;
   }
 
-  *cv /= np_conditional_distribution_cvls_pair_count(
-    num_train, num_eval, cdfontrain_extern);
+  if(np_distribution_cvls_finalize(
+       *cv, num_train, num_eval, cdfontrain_extern, cv) !=
+     NP_DISTRIBUTION_CVLS_FINALIZE_OK)
+    goto cleanup_cdist_lp_block_one;
   status = 0;
 
 cleanup_cdist_lp_block_one:
@@ -38508,8 +38575,10 @@ double *cv){
     }
   }
 
-  *cv /= np_conditional_distribution_cvls_pair_count(
-    num_train, num_eval, cdfontrain_extern);
+  if(np_distribution_cvls_finalize(
+       *cv, num_train, num_eval, cdfontrain_extern, cv) !=
+     NP_DISTRIBUTION_CVLS_FINALIZE_OK)
+    goto cleanup_cat_cdist;
   result = NP_CONDITIONAL_PROFILE_CV_SUCCESS;
 
 cleanup_cat_cdist:
