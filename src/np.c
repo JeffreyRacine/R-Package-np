@@ -18663,6 +18663,11 @@ void np_density(double * tuno, double * tord, double * tcon,
   
   {
     const int dop = (dens_or_dist == NP_DO_DENS) ? OP_NORMAL : OP_INTEGRAL;
+    const NPNNGeometryContext nn_geometry_context = {
+      .mode = train_is_eval ?
+        NP_NN_QUERY_TRAINING_IDENTITY : NP_NN_QUERY_EXTERNAL,
+      .eval_to_train = NULL
+    };
 
     np_progress_fit_set_offset(0);
     kernel_estimate_dens_dist_categorical_np(KERNEL_den_extern,
@@ -18691,7 +18696,8 @@ void np_density(double * tuno, double * tord, double * tcon,
                                              &log_likelihood,
                                              kernel_route,
                                              kernel_route_diagnostics,
-                                             categorical_compress);
+                                             categorical_compress,
+                                             &nn_geometry_context);
   }
   
   
