@@ -2,7 +2,7 @@
   ntrain <- nrow(W.train)
   neval <- nrow(W.eval)
   H <- matrix(NA_real_, nrow = neval, ncol = ntrain)
-  eps <- 1.0 / max(1L, ntrain)
+  ridge.fraction <- 1.0 / max(1L, ntrain)
 
   for (j in seq_len(neval)) {
     w <- kw[, j]
@@ -12,10 +12,18 @@
 
     if (is.null(solved) || !all(is.finite(solved))) {
       A.try <- A.base
+      gram.scale <- max(abs(diag(A.base)))
+      if (!is.finite(gram.scale))
+        stop("non-finite reference Gram scale")
+      if (gram.scale == 0.0)
+        gram.scale <- max(abs(A.base))
+      if (gram.scale == 0.0)
+        gram.scale <- 1.0
+      ridge.increment <- ridge.fraction * gram.scale
       nepsilon <- 0.0
       repeat {
-        diag(A.try) <- diag(A.try) + eps
-        nepsilon <- nepsilon + eps
+        diag(A.try) <- diag(A.try) + ridge.increment
+        nepsilon <- nepsilon + ridge.increment
         solved <- tryCatch(solve(A.try, rhs), error = function(e) NULL)
         if (!is.null(solved) && all(is.finite(solved)))
           break
@@ -105,6 +113,44 @@ test_that("compiled LP hat matrix preserves the incumbent ridge sequence", {
   expect_equal(as.double(compiled), as.double(reference), tolerance = 5e-14)
   expect_length(attr(compiled, "ridge.used", exact = TRUE), nrow(compiled))
   expect_true(all(attr(compiled, "ridge.used", exact = TRUE) > 0.0))
+})
+
+test_that("canonical LP ridge is equivariant to common kernel-weight scale", {
+  set.seed(2026072300L)
+  n <- 41L
+  tx <- data.frame(x1 = runif(n), x2 = runif(n))
+  y <- sin(tx$x1) + rnorm(n, sd = 0.1)
+  bw <- suppressWarnings(npregbw(
+    xdat = tx, ydat = y, regtype = "lp", degree = c(2L, 2L),
+    degree.select = "manual", basis = "glp", bernstein.basis = FALSE,
+    bwmethod = "cv.ls", bwtype = "fixed", ckertype = "uniform",
+    ckerorder = 2L, bws = c(0.002, 0.002), bandwidth.compute = FALSE
+  ))
+  kw <- suppressWarnings(np:::.np_kernel_weights_direct(
+    bws = bw, txdat = tx, bandwidth.divide = TRUE, kernel.pow = 1.0,
+    int.do.tree = np:::.npreg_fit_tree_code(
+      bw, ncon = bw$ncon, ncat = bw$nuno + bw$nord
+    )
+  ))
+  W <- np:::W.lp(
+    xdat = tx, degree = c(2L, 2L), basis = "glp",
+    bernstein.basis = FALSE
+  )
+  scale <- 7.25
+  original <- .Call(
+    "C_np_reghat_lp_matrix_fast",
+    as.matrix(kw), as.matrix(W), as.matrix(W), PACKAGE = "np"
+  )
+  rescaled <- .Call(
+    "C_np_reghat_lp_matrix_fast",
+    as.matrix(scale * kw), as.matrix(W), as.matrix(W), PACKAGE = "np"
+  )
+  original.ridge <- attr(original, "ridge.used", exact = TRUE)
+  rescaled.ridge <- attr(rescaled, "ridge.used", exact = TRUE)
+
+  expect_gt(sum(original.ridge > 0.0), 0L)
+  expect_equal(as.double(rescaled), as.double(original), tolerance = 1e-14)
+  expect_equal(rescaled.ridge, scale * original.ridge, tolerance = 1e-15)
 })
 
 test_that("width-one scalar hats retain signed higher-order kernel weights", {

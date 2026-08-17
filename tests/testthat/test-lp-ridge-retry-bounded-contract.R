@@ -70,8 +70,21 @@ test_that("all canonical LP solve retries are bounded", {
   policy.body <- np_test_extract_c_function(
     solve.lines, "np_lp_solve_workspace_prepare_policy_factor"
   )
-  expect_match(policy.body, "while(!np_lp_solve_workspace_factor(",
-               fixed = TRUE)
+  expect_match(
+    policy.body,
+    "if(np_lp_solve_workspace_factor(workspace, p))",
+    fixed = TRUE
+  )
+  expect_match(
+    policy.body,
+    "np_lp_solve_workspace_ridge_scale(workspace, p, &ridge_scale)",
+    fixed = TRUE
+  )
+  expect_match(
+    policy.body,
+    "ridge_increment = ridge_fraction*ridge_scale;",
+    fixed = TRUE
+  )
   expect_match(policy.body, "np_lp_solve_workspace_sources_finite(",
                fixed = TRUE)
   expect_match(policy.body, "ridge_steps >= NP_LP_SOLVE_MAX_RIDGE_STEPS",
