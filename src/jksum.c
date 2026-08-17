@@ -22746,6 +22746,12 @@ double *cv){
 
 }
 
+static int np_conditional_density_cvls_lp_stream_impl(
+  double *vector_scale_factor,
+  int *num_categories_y,
+  double **matrix_categorical_vals_y,
+  double *cv);
+
 int np_kernel_estimate_con_density_categorical_leave_one_out_ls_cv(
 int KERNEL_var,
 int KERNEL_unordered_var,
@@ -22780,7 +22786,8 @@ double *cv){
      (BANDWIDTH_den != BW_ADAP_NN))
     return 1;
 
-  return np_conditional_density_cvls_lp_stream(vector_scale_factor, cv);
+  return np_conditional_density_cvls_lp_stream_impl(
+    vector_scale_factor, num_categories, matrix_categorical_vals, cv);
 }
 
 static void np_lp_power2_moments_from_kernel_row(double **basis,
@@ -34240,6 +34247,112 @@ cleanup_adaptive_cvml:
   return status;
 }
 
+/*
+ * Exact ordinary adaptive-NN conditional-density CVLS.  For each held-out
+ * observation i, the X smoother, the ordinary Y row, and both donor widths
+ * in every Y-convolution row use radii constructed on the same D_n\{i,j}
+ * fold.  Context preparation retains only adjacent radii and one selected
+ * row per continuous coordinate, so auxiliary storage is O(p*n + n) rather
+ * than an n-by-n pair cache.
+ */
+static NPConditionalAdaptiveExactStatus
+np_conditional_density_cvls_adaptive_exact(
+  double *vector_scale_factor,
+  int *num_categories_y,
+  double **matrix_categorical_vals_y,
+  double *cv)
+{
+  const int num_obs = num_obs_train_extern;
+  NPConditionalXRowCtx xctx = {0};
+  NPConditionalYRowCtx yctx = {0};
+  NPConditionalYRowCtx yconvctx = {0};
+  double *xrow = NULL;
+  double *yrow = NULL;
+  double *yconv = NULL;
+  int i, j;
+  NPConditionalAdaptiveExactStatus status;
+
+  if(cv == NULL || vector_scale_factor == NULL || num_obs < 3)
+    return NP_CONDITIONAL_ADAPTIVE_EXACT_FAILURE;
+
+  status = np_conditional_adaptive_exact_scale_status(vector_scale_factor);
+  if(status != NP_CONDITIONAL_ADAPTIVE_EXACT_SUCCESS)
+    return status;
+
+#ifdef MPI2
+  /* The rank-symmetric owner and its single terminal reduction are Phase A3. */
+  return NP_CONDITIONAL_ADAPTIVE_EXACT_NOT_APPLICABLE;
+#endif
+
+  xrow = alloc_vecd(MAX(1, num_obs));
+  yrow = alloc_vecd(MAX(1, num_obs));
+  yconv = alloc_vecd(MAX(1, num_obs));
+  if(xrow == NULL || yrow == NULL || yconv == NULL)
+    goto fail_adaptive_cvls;
+  if(np_conditional_xrow_ctx_prepare_adaptive_fold(
+       vector_scale_factor, &xctx) != 0)
+    goto fail_adaptive_cvls;
+  if(np_conditional_yrow_ctx_prepare_adaptive_fold(
+       vector_scale_factor, OP_NORMAL,
+       num_categories_y, matrix_categorical_vals_y, &yctx) != 0)
+    goto fail_adaptive_cvls;
+  if(np_conditional_yrow_ctx_prepare_adaptive_fold(
+       vector_scale_factor, OP_CONVOLUTION,
+       num_categories_y, matrix_categorical_vals_y, &yconvctx) != 0)
+    goto fail_adaptive_cvls;
+
+  *cv = 0.0;
+  for(i = 0; i < num_obs; ++i){
+    double linear;
+    double quadratic = 0.0;
+
+    if(np_conditional_xrow_ctx_select_adaptive_fold(&xctx, i) != 0 ||
+       np_conditional_yrow_ctx_select_adaptive_fold(&yctx, i) != 0 ||
+       np_conditional_yrow_ctx_select_adaptive_fold(&yconvctx, i) != 0)
+      goto fail_adaptive_cvls;
+    if(np_conditional_xrow_from_ctx(&xctx, i, xrow) != 0 ||
+       np_conditional_yrow_from_ctx(&yctx, i, yrow) != 0)
+      goto fail_adaptive_cvls;
+
+    linear = np_blas_ddot_int(num_obs, xrow, yrow);
+    if(!R_FINITE(linear))
+      goto fail_adaptive_cvls;
+
+    for(j = 0; j < num_obs; ++j){
+      double inner;
+
+      if(xrow[j] == 0.0)
+        continue;
+      if(np_conditional_yrow_from_ctx(&yconvctx, j, yconv) != 0)
+        goto fail_adaptive_cvls;
+      inner = np_blas_ddot_int(num_obs, xrow, yconv);
+      if(!R_FINITE(inner))
+        goto fail_adaptive_cvls;
+      quadratic += xrow[j]*inner;
+    }
+    if(!R_FINITE(quadratic))
+      goto fail_adaptive_cvls;
+    *cv += quadratic - 2.0*linear;
+  }
+  *cv /= (double)num_obs;
+
+  status = NP_CONDITIONAL_ADAPTIVE_EXACT_SUCCESS;
+  goto cleanup_adaptive_cvls;
+
+fail_adaptive_cvls:
+  status = NP_CONDITIONAL_ADAPTIVE_EXACT_FAILURE;
+
+cleanup_adaptive_cvls:
+  np_conditional_xrow_ctx_clear(&xctx);
+  np_conditional_yrow_ctx_clear(&yctx);
+  np_conditional_yrow_ctx_clear(&yconvctx);
+  np_glp_cv_clear_extern();
+  if(xrow != NULL) free(xrow);
+  if(yrow != NULL) free(yrow);
+  if(yconv != NULL) free(yconv);
+  return status;
+}
+
 int np_conditional_density_cvml_lp_stream(double *vector_scale_factor,
                                           double *cv){
   const int num_obs = num_obs_train_extern;
@@ -35120,8 +35233,11 @@ cleanup_cvls_lp_supertile2:
 
 #undef NP_CDENS_SUPERTILE_ALIGN
 
-int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
-                                          double *cv){
+static int np_conditional_density_cvls_lp_stream_impl(
+  double *vector_scale_factor,
+  int *num_categories_y,
+  double **matrix_categorical_vals_y,
+  double *cv){
   const int num_obs = num_obs_train_extern;
   const int block_size = MIN(np_conditional_lp_cvls_block_size(num_obs, 6U, 0U),
                              MAX(1, num_obs));
@@ -35151,6 +35267,18 @@ int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
   if(int_cyker_bound_extern != 0){
     np_bwm_set_deferred_error("bounded npcdens cv.ls currently supports up to two continuous response variables");
     return 1;
+  }
+
+  if(BANDWIDTH_den_extern == BW_ADAP_NN){
+    const NPConditionalAdaptiveExactStatus adaptive_status =
+      np_conditional_density_cvls_adaptive_exact(
+        vector_scale_factor, num_categories_y,
+        matrix_categorical_vals_y, cv);
+
+    if(adaptive_status == NP_CONDITIONAL_ADAPTIVE_EXACT_SUCCESS)
+      return 0;
+    if(adaptive_status == NP_CONDITIONAL_ADAPTIVE_EXACT_FAILURE)
+      return 1;
   }
 
   if(BANDWIDTH_den_extern == BW_FIXED){
@@ -35311,6 +35439,13 @@ cleanup_cvls_lp_block:
     return np_conditional_density_cvls_lp_row_stream(
       vector_scale_factor, cv, NULL);
   return status;
+}
+
+int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
+                                          double *cv){
+  return np_conditional_density_cvls_lp_stream_impl(
+    vector_scale_factor, num_categories_extern_Y,
+    matrix_categorical_vals_extern_Y, cv);
 }
 
 /* Canonical generalized-NN empirical conditional-CDF row owner.  X row i is
