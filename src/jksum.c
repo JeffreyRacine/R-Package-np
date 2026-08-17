@@ -28503,16 +28503,6 @@ static void np_regression_alllarge_lp_fit_cleanup(
     np_regression_fit_owner_clear(owner->enclosing_owner);
 }
 
-enum {
-  NP_REGRESSION_FIT_OK = 0,
-  NP_REGRESSION_FIT_ERR_ALLOC = -1,
-  NP_REGRESSION_FIT_ERR_BANDWIDTH = -2,
-  NP_REGRESSION_FIT_ERR_HASH_CREATE = -3,
-  NP_REGRESSION_FIT_ERR_HASH_INSERT = -4,
-  NP_REGRESSION_FIT_ERR_HASH_LOOKUP = -5,
-  NP_REGRESSION_FIT_ERR_ZERO_NN_RADIUS = -6
-};
-
 int kernel_estimate_regression_categorical_tree_np(
 int lp_engine,
 int KERNEL_reg,
@@ -45566,12 +45556,12 @@ double ** kdf_deriv_stderr,
 double * log_likelihood,
 const NPContinuousKernelRoute *kernel_route,
 NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
-int categorical_compress
+int categorical_compress,
+const NPNNGeometryContext *nn_geometry_context
 ){
 
-  /* P22A plumbing only: the incumbent conditional caller supplies a null
-     route, so the complete legacy X/Y arithmetic below remains literal.
-     Activation binds this family-neutral context in a separate tranche. */
+  /* Ordinary generalized-NN callers supply explicit query identity; fixed,
+     adaptive, beta, and extended-NN routes retain their incumbent geometry. */
   (void)kernel_route;
   (void)kernel_route_diagnostics;
   (void)categorical_compress;
@@ -45597,6 +45587,12 @@ int categorical_compress
 
   double ** matrix_bandwidth_Y = NULL, * lambda = NULL;
   double ** matrix_bandwidth_X = NULL;
+  double ** matrix_bandwidth_XY = NULL;
+  double *lambda_XY = NULL, *lambda_X = NULL;
+  const int ordinary_joint_gnn_prepared =
+    (BANDWIDTH_den == BW_GEN_NN) && (num_cXY > 0);
+  const int ordinary_x_gnn_prepared =
+    (BANDWIDTH_den == BW_GEN_NN) && (num_X_continuous > 0);
 
   const int do_grad = (kdf_deriv != NULL); 
   const int do_gerr = (kdf_deriv_stderr != NULL);
@@ -45747,8 +45743,24 @@ int categorical_compress
   matrix_bandwidth_Y = alloc_matd(bwmdim,num_Y_continuous);
   matrix_bandwidth_X = alloc_matd(bwmdim,num_X_continuous);
   lambda = alloc_vecd(num_uXY + num_oXY);
+  if(ordinary_joint_gnn_prepared)
+    matrix_bandwidth_XY = (double **)calloc(
+      (size_t)num_cXY, sizeof(double *));
+  if(ordinary_joint_gnn_prepared && (num_uXY + num_oXY) > 0)
+    lambda_XY = alloc_vecd(num_uXY + num_oXY);
+  if(ordinary_x_gnn_prepared && (num_X_unordered + num_X_ordered) > 0)
+    lambda_X = alloc_vecd(num_X_unordered + num_X_ordered);
+  if((ordinary_joint_gnn_prepared || ordinary_x_gnn_prepared) &&
+     ((ordinary_joint_gnn_prepared && matrix_bandwidth_XY == NULL) ||
+      ((num_uXY + num_oXY) > 0 && lambda_XY == NULL) ||
+      (ordinary_x_gnn_prepared &&
+       (num_X_unordered + num_X_ordered) > 0 && lambda_X == NULL)))
+    error("conditional density/distribution fit bandwidth-view allocation failed");
 
-  if(kernel_bandwidth_mean(KERNEL_Y,
+  {
+    NPNNGeometryStatus nn_geometry_status = NP_NN_GEOMETRY_OK;
+
+    if(kernel_bandwidth_mean_ctx(KERNEL_Y,
                            BANDWIDTH_den,
                            num_obs_train,
                            num_obs_eval,
@@ -45763,12 +45775,46 @@ int categorical_compress
                            matrix_XY_continuous_train + num_X_continuous,
                            matrix_XY_continuous_eval + num_X_continuous,
                            matrix_XY_continuous_train,
-	                           matrix_XY_continuous_eval,
-	                           matrix_bandwidth_Y,
-	                           matrix_bandwidth_X,
-	                           lambda)==1){
-	    error("\n** Error: invalid bandwidth.");
-	  }
+                           matrix_XY_continuous_eval,
+                           matrix_bandwidth_Y,
+                           matrix_bandwidth_X,
+                           lambda,
+                           nn_geometry_context,
+                           nn_geometry_context,
+                           &nn_geometry_status)==1){
+      if(nn_geometry_status == NP_NN_GEOMETRY_ZERO_RADIUS)
+        error("conditional density/distribution fit encountered a zero literal radius after occurrence exclusion");
+      error("\n** Error: invalid bandwidth.");
+    }
+  }
+
+  if(ordinary_joint_gnn_prepared){
+    int q = 0;
+
+    for(i = 0; i < num_X_continuous; i++)
+      matrix_bandwidth_XY[q++] = matrix_bandwidth_X[i];
+    for(i = 0; i < num_Y_continuous; i++)
+      matrix_bandwidth_XY[q++] = matrix_bandwidth_Y[i];
+
+    q = 0;
+    for(i = 0; i < num_X_unordered; i++)
+      lambda_XY[q++] = lambda[num_Y_unordered + num_Y_ordered + i];
+    for(i = 0; i < num_Y_unordered; i++)
+      lambda_XY[q++] = lambda[i];
+    for(i = 0; i < num_X_ordered; i++)
+      lambda_XY[q++] =
+        lambda[num_Y_unordered + num_Y_ordered + num_X_unordered + i];
+    for(i = 0; i < num_Y_ordered; i++)
+      lambda_XY[q++] = lambda[num_Y_unordered + i];
+  }
+
+  if(ordinary_x_gnn_prepared){
+    for(i = 0; i < num_X_unordered; i++)
+      lambda_X[i] = lambda[num_Y_unordered + num_Y_ordered + i];
+    for(i = 0; i < num_X_ordered; i++)
+      lambda_X[num_X_unordered + i] =
+        lambda[num_Y_unordered + num_Y_ordered + num_X_unordered + i];
+  }
 
 
   // relevant dimensions for partial tree search
@@ -45885,7 +45931,10 @@ int categorical_compress
                          NULL, // matrix w
                          NULL, // sgn
                          vsf_XY,
-                         0,NULL,NULL,NULL, 
+                         ordinary_joint_gnn_prepared,
+                         NULL,
+                         ordinary_joint_gnn_prepared ? matrix_bandwidth_XY : NULL,
+                         ordinary_joint_gnn_prepared ? lambda_XY : NULL,
                          num_categories_XY,
                          matrix_categorical_vals_XY,
                          matrix_ordered_indices, 
@@ -45939,7 +45988,10 @@ int categorical_compress
                          NULL,
                          NULL,
                          vsf_X,
-                         0,NULL,NULL,NULL,
+                         ordinary_x_gnn_prepared,
+                         NULL,
+                         ordinary_x_gnn_prepared ? matrix_bandwidth_X : NULL,
+                         ordinary_x_gnn_prepared ? lambda_X : NULL,
                          num_categories + num_Y_unordered + num_Y_ordered,
                          matrix_categorical_vals + num_Y_unordered + num_Y_ordered,
                          matrix_ordered_indices, // moo
@@ -46123,6 +46175,9 @@ cleanup_con_dens_dist_categorical:
   }
 
   free(lambda);
+  free(matrix_bandwidth_XY);
+  free(lambda_XY);
+  free(lambda_X);
   free_mat(matrix_bandwidth_Y, num_Y_continuous);
   free_mat(matrix_bandwidth_X, num_X_continuous);
 }
@@ -46280,7 +46335,8 @@ double * log_likelihood
                                                  &local_log_likelihood,
                                                  NULL,
                                                  NULL,
-                                                 0);
+                                                 0,
+                                                 NULL);
   }
 
   MPI_Allgatherv(kdf_local,
