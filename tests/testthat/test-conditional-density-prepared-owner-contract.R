@@ -1,15 +1,6 @@
-np_conditional_density_owner_root <- function() {
-  root <- Sys.getenv("NP_SOURCE_ROOT", unset = "")
-  if (nzchar(root))
-    return(normalizePath(root, mustWork = TRUE))
-  normalizePath(file.path(testthat::test_path(), "..", ".."), mustWork = TRUE)
-}
-
 np_conditional_density_owner_source <- function() {
-  paste(readLines(
-    file.path(np_conditional_density_owner_root(), "src", "np.c"),
-    warn = FALSE
-  ), collapse = "\n")
+  path <- np_test_source_path("src", "np.c")
+  paste(readLines(path, warn = FALSE), collapse = "\n")
 }
 
 np_conditional_density_owner_function <- function(source, name) {

@@ -1,8 +1,5 @@
 np_prepared_migration_root <- function() {
-  root <- Sys.getenv("NP_SOURCE_ROOT", unset = "")
-  if (nzchar(root))
-    return(normalizePath(root, mustWork = TRUE))
-  normalizePath(file.path(testthat::test_path(), "..", ".."), mustWork = TRUE)
+  dirname(np_test_source_path("DESCRIPTION"))
 }
 
 np_prepared_migration_text <- function(root, paths) {
@@ -56,4 +53,3 @@ test_that("prepared-objective migration closure cannot restore retired owners", 
   for (symbol in retired_r)
     expect_false(grepl(symbol, r_code, fixed = TRUE), info = symbol)
 })
-

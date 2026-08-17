@@ -1,10 +1,6 @@
 np_conditional_distribution_owner_source <- function() {
-  root <- Sys.getenv("NP_SOURCE_ROOT", unset = "")
-  if (!nzchar(root))
-    root <- normalizePath(file.path(testthat::test_path(), "..", ".."),
-                          mustWork = TRUE)
-  paste(readLines(file.path(root, "src", "np.c"), warn = FALSE),
-        collapse = "\n")
+  path <- np_test_source_path("src", "np.c")
+  paste(readLines(path, warn = FALSE), collapse = "\n")
 }
 
 np_conditional_distribution_owner_function <- function(source, name) {

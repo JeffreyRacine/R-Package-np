@@ -1,7 +1,15 @@
 np_namespace_hygiene_root <- function() {
+  source_root <- Sys.getenv("NP_SOURCE_ROOT", unset = "")
+  if (nzchar(source_root)) {
+    source_root <- tryCatch(
+      normalizePath(source_root, mustWork = TRUE),
+      error = function(e) ""
+    )
+  }
   starts <- unique(Filter(
     nzchar,
     c(
+      source_root,
       tryCatch(normalizePath(testthat::test_path("..", ".."), mustWork = TRUE), error = function(e) ""),
       tryCatch(normalizePath(getwd(), mustWork = TRUE), error = function(e) ""),
       tryCatch(normalizePath(file.path(getwd(), ".."), mustWork = TRUE), error = function(e) ""),
