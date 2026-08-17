@@ -208,6 +208,35 @@ npreghat <-
     !isTRUE(any(bws$iuno))
 }
 
+.npreghat_native_matrix_candidate <- function(bws, output, regtype, degree,
+                                              basis, bernstein.basis, s,
+                                              leave.one.out) {
+  output %in% c("matrix", "constraint") &&
+    !isTRUE(leave.one.out) &&
+    identical(regtype, "lp") &&
+    !identical(bws[["ckertype", exact = TRUE]], "beta") &&
+    !npRegressionHasExtendedNn(bws) &&
+    as.character(bws[["type", exact = TRUE]]) %in% c("fixed", "generalized_nn") &&
+    isTRUE(any(bws[["icon", exact = TRUE]])) &&
+    length(degree) == as.integer(bws[["ncon", exact = TRUE]]) &&
+    any(as.integer(degree) > 0L) &&
+    basis %in% c("glp", "additive", "tensor") &&
+    is.logical(bernstein.basis) && length(bernstein.basis) == 1L &&
+    !is.na(bernstein.basis) &&
+    length(s) == as.integer(bws[["ncon", exact = TRUE]]) &&
+    !any(as.integer(s) > 0L)
+}
+
+.npreghat_native_ridge_used <- function(H, neval, where) {
+  ridge.used <- attr(H, "ridge.used", exact = TRUE)
+  if (!is.double(ridge.used) || length(ridge.used) != neval ||
+      any(!is.finite(ridge.used)) || any(ridge.used < 0)) {
+    stop(sprintf("invalid canonical ridge transcript in %s", where),
+         call. = FALSE)
+  }
+  ridge.used
+}
+
 .npreghat_native_apply_strategy <- function(ntrain, neval, nrhs) {
   h.mb <- as.numeric(ntrain) * as.numeric(neval) * 8.0 / 1024^2
   threshold.mb <- getOption("np.npreghat.apply.memory.threshold.mb", 64.0)
@@ -2117,6 +2146,17 @@ npreghat.rbandwidth <-
         exact.beta.native.route
       )
 
+    native.lp.mean.matrix.route <- .npreghat_native_matrix_candidate(
+      bws = bws,
+      output = output,
+      regtype = regtype,
+      degree = reg.spec$degree.engine,
+      basis = reg.spec$basis.engine,
+      bernstein.basis = reg.spec$bernstein.basis.engine,
+      s = s,
+      leave.one.out = leave.one.out
+    )
+
     if (.npreghat_native_apply_candidate(
       bws = bws,
       output = output,
@@ -2170,7 +2210,7 @@ npreghat.rbandwidth <-
     }
 
     if (exact.core.route) {
-      H <- if (exact.beta.native.route) {
+      H <- if (exact.beta.native.route || native.lp.mean.matrix.route) {
         .npRmpi_with_local_regression(.npreghat_exact_lp_matrix_from_regression_core(
           bws = bws,
           txdat = txdat,
@@ -2231,6 +2271,14 @@ npreghat.rbandwidth <-
       if (constraint.output)
         return(.np_hat_constraint_from_matrix(H, y, "npreghat"))
 
+      ridge.used <- if (native.lp.mean.matrix.route) {
+        .npreghat_native_ridge_used(
+          H, nrow(H), "npreghat(..., output = 'matrix')"
+        )
+      } else {
+        rep.int(0.0, nrow(H))
+      }
+
       class(H) <- c("npreghat", "matrix")
       attr(H, "bws") <- bws
       attr(H, "txdat") <- txdat
@@ -2242,7 +2290,7 @@ npreghat.rbandwidth <-
       attr(H, "bernstein.basis") <- bernstein.basis
       attr(H, "s") <- s
       attr(H, "leave.one.out") <- leave.one.out
-      attr(H, "ridge.used") <- rep.int(0.0, nrow(H))
+      attr(H, "ridge.used") <- ridge.used
       attr(H, "rows.omit") <- rows.omit
       attr(H, "call") <- match.call(expand.dots = FALSE)
 
