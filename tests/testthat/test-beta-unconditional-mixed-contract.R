@@ -274,7 +274,7 @@ test_that("native distribution objective ingress requires compression state", {
   expect_true(is.finite(valid$fval[[1L]]))
 })
 
-test_that("native regression objective ingress requires compression state", {
+test_that("native regression objective ingress requires complete control state", {
   training <- data.frame(x = seq(0.05, 0.95, length.out = 12L))
   response <- sin(2 * pi * training$x)
   bw <- npregbw(
@@ -301,7 +301,14 @@ test_that("native regression objective ingress requires compression state", {
 
   expect_error(
     native_eval(prep$myopti[-length(prep$myopti)]),
-    "categorical-compression state is missing",
+    "regression NN minimum is missing",
+    fixed = TRUE
+  )
+  invalid_compression <- prep$myopti
+  invalid_compression[[length(invalid_compression) - 1L]] <- 2L
+  expect_error(
+    native_eval(invalid_compression),
+    "categorical compression must be TRUE or FALSE",
     fixed = TRUE
   )
   valid <- native_eval(prep$myopti)

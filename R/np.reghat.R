@@ -1174,6 +1174,12 @@ npreghat <-
       stop("'txdat' and 'exdat' are not similar data frames!")
   }
 
+  npRegressionK1GeometryValidate(
+    bws = bws,
+    txdat = txdat,
+    exdat = if (miss.ex) NULL else exdat
+  )
+
   if (!isa(bws, "kbandwidth"))
     bws <- kbandwidth(bws)
 

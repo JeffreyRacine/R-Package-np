@@ -1,5 +1,19 @@
 # np 0.70-6
 
+* Ordinary univariate generalized nearest-neighbour regression now admits
+  `k = 1` for the positive second-order Gaussian and Epanechnikov LC mean and
+  derivative operators, including the equivalent generalized-LP degree-zero
+  representation. One R-owned capability resolver supplies manual validation,
+  optimizer bounds, and the native lower bound; adaptive NN, mixed or
+  multivariate regressors, positive LP degree, higher-order/uniform/bounded
+  kernels, and semiparametric owners retain `k >= 2`. Literal zero radii remain
+  infeasible objectives and explicit fit/hat errors through the shared
+  occurrence-aware radius validator. Fixed-degree searches evaluate the newly
+  admitted discrete endpoint once, while automatic degree searches whose grid
+  includes a positive degree retain the safe joint `k >= 2` capability envelope.
+  The resolver is regression-scoped; density and distribution bandwidth
+  classes retain their existing nearest-neighbour domains.
+
 * Empirical-sample conditional-distribution CV now evaluates the documented
   off-diagonal criterion with divisor `n(n - 1)`. Ordinary generalized
   nearest-neighbour rows construct the explanatory radius from the delete-one
