@@ -310,3 +310,60 @@ npreghat_tree_disabled_lp_scalar_apply_guard_case <- function() {
 test_that("npRmpi tree-disabled higher-degree lp scalar apply routes through exact matrix contract", {
   npreghat_tree_disabled_lp_scalar_apply_guard_case()
 })
+
+test_that("public legacy LP mean matrices use the typed native capability", {
+  env <- npRmpi_subprocess_env(c("NP_RMPI_NO_REUSE_SLAVES=1"))
+  skip_if(is.null(env), "installed npRmpi unavailable for subprocess proof")
+  ok_tag <- "NPRMPI_PUBLIC_LP_NATIVE_MATRIX_CONTRACT_OK"
+  lines <- c(
+    "suppressPackageStartupMessages(library(npRmpi))",
+    "options(npRmpi.autodispatch=TRUE, np.messages=FALSE)",
+    "npRmpi.init(nslaves=1L, quiet=TRUE)",
+    "on.exit(try(npRmpi.quit(force=TRUE), silent=TRUE), add=TRUE)",
+    "candidate <- getFromNamespace('.npreghat_native_matrix_candidate', 'npRmpi')",
+    "has_extended_nn <- getFromNamespace('npRegressionHasExtendedNn', 'npRmpi')",
+    "native_matrix <- getFromNamespace('.npreghat_exact_lp_matrix_from_regression_core', 'npRmpi')",
+    "local_regression <- getFromNamespace('.npRmpi_with_local_regression', 'npRmpi')",
+    "set.seed(20260816)",
+    "n <- 42L",
+    "x <- data.frame(x=sort(runif(n, -1, 1)))",
+    "y <- sin(pi*x$x) + seq_len(n)/1000",
+    "make_bw <- function(type, bws, degree=2L, kernel='gaussian') npregbw(xdat=x, ydat=y, bws=bws, bandwidth.compute=FALSE, bwmethod='cv.ls', bwtype=type, bwscaling=FALSE, regtype='lp', degree=degree, degree.select='manual', basis='glp', bernstein.basis=FALSE, ckertype=kernel, ckerorder=2L)",
+    "bw.fixed <- make_bw('fixed', 0.32)",
+    "bw.gnn <- make_bw('generalized_nn', 9L)",
+    "bw.ann <- make_bw('adaptive_nn', 9L)",
+    "candidate_args <- function(bw, output='matrix', s=0L) list(bws=bw, output=output, regtype='lp', degree=2L, basis='glp', bernstein.basis=FALSE, s=as.integer(s), leave.one.out=FALSE)",
+    "stopifnot(do.call(candidate, candidate_args(bw.fixed)))",
+    "stopifnot(do.call(candidate, candidate_args(bw.gnn)))",
+    "stopifnot(!do.call(candidate, candidate_args(bw.ann)))",
+    "bw.extended <- bw.gnn",
+    "bw.extended$bw[bw.extended$icon] <- bw.extended$nobs + 1L",
+    "stopifnot(has_extended_nn(bw.extended))",
+    "stopifnot(!do.call(candidate, candidate_args(bw.extended)))",
+    "stopifnot(do.call(candidate, candidate_args(bw.fixed, output='constraint')))",
+    "stopifnot(!do.call(candidate, candidate_args(bw.fixed, s=1L)))",
+    "for (bw in list(bw.fixed, bw.gnn)) {",
+    "  public <- npreghat(bws=bw, txdat=x, output='matrix')",
+    "  native <- local_regression(native_matrix(bw, txdat=x, degree=2L, basis='glp', bernstein.basis=FALSE, s=0L))",
+    "  stopifnot(identical(as.vector(public), as.vector(native)))",
+    "  stopifnot(identical(attr(public, 'ridge.used', exact=TRUE), attr(native, 'ridge.used', exact=TRUE)))",
+    "  stopifnot(inherits(public, 'npreghat'))",
+    "  stopifnot(identical(attr(public, 'trainiseval', exact=TRUE), TRUE))",
+    "  public.with.y <- npreghat(bws=bw, txdat=x, y=y, output='matrix')",
+    "  stopifnot(identical(attr(public.with.y, 'Hy', exact=TRUE), as.vector(public.with.y %*% y)))",
+    "  constraint <- npreghat(bws=bw, txdat=x, y=y, output='constraint')",
+    "  stopifnot(identical(as.vector(constraint), as.vector(t(public)*y)))",
+    "}",
+    "bw.low.rank <- make_bw('fixed', 0.04, degree=3L, kernel='epanechnikov')",
+    "H.low.rank <- npreghat(bws=bw.low.rank, txdat=x, output='matrix')",
+    "ridge.used <- attr(H.low.rank, 'ridge.used', exact=TRUE)",
+    "stopifnot(is.double(ridge.used), length(ridge.used)==nrow(H.low.rank))",
+    "stopifnot(all(is.finite(ridge.used)), all(ridge.used >= 0))",
+    "stopifnot(sum(ridge.used > 0) > 0L)",
+    sprintf("cat('%s\\n')", ok_tag)
+  )
+  res <- npRmpi_run_rscript_subprocess(lines=lines, timeout=90L, env=env)
+  info <- paste(res$output, collapse="\n")
+  expect_equal(res$status, 0L, info=info)
+  expect_true(any(grepl(ok_tag, res$output, fixed=TRUE)), info=info)
+})
