@@ -1,5 +1,16 @@
 # np 0.70-6
 
+* Positive-degree local-polynomial fits now share the conditional objective's
+  canonical, basis-neutral coordinate policy. Raw polynomial coordinates are
+  retained when well conditioned; otherwise ordinary and all-large fit owners
+  select one stable global representation for training, evaluation,
+  derivatives, and uncertainty calculations. The shared design validator now
+  assesses intrinsic rank in those same stable coordinates, so calendar-scale
+  predictors are no longer mistaken for rank-deficient designs while genuine
+  collinearity still fails. This is a representation change within the same
+  polynomial span, not evaluation-point centering or an unbounded ridge
+  fallback, and uses only linear-in-sample basis storage.
+
 * Ordinary univariate generalized nearest-neighbour regression now admits
   `k = 1` for the positive second-order Gaussian and Epanechnikov LC mean and
   derivative operators, including the equivalent generalized-LP degree-zero
