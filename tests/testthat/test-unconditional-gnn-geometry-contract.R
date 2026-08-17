@@ -2,7 +2,9 @@ npRmpi_unconditional_gnn_literal_lines <- function() {
   c(
     "gnn_literal_radius <- function(train, evaluation, k, exclude=integer()) {",
     "  keep <- if (length(exclude)) setdiff(seq_along(train), exclude) else seq_along(train)",
-    "  sort(abs(evaluation-train[keep]), method='radix')[[k]]",
+    "  distance <- sort(abs(evaluation-train[keep]), method='radix')",
+    "  lookup <- min(k, length(distance))",
+    "  distance[[lookup]]*k/lookup",
     "}",
     "gnn_literal_density <- function(train, evaluation, k, mapped=FALSE, leave_one_out=FALSE) {",
     "  vapply(seq_along(evaluation), function(i) {",
@@ -55,6 +57,14 @@ npRmpi_run_unconditional_gnn_geometry_case <- function(case) {
       "eval_only <- npRmpi:::npudensbw.bandwidth(dat=dat, bws=density_bw, bandwidth.compute=TRUE, eval.only=TRUE, nmulti=1L)",
       "expected_cvml <- sum(log(gnn_literal_density(x,x,2L,mapped=TRUE,leave_one_out=TRUE)))",
       "stopifnot(isTRUE(all.equal(eval_only$fval[[1L]], expected_cvml, tolerance=2e-10)))",
+      "options(np.extendednn=TRUE)",
+      "extended_k <- length(x)+2L",
+      "extended_bw <- npudensbw(dat=dat, bwtype='generalized_nn', bwmethod='cv.ml', bws=extended_k, bandwidth.compute=FALSE)",
+      "expected_extended <- gnn_literal_density(x,x,extended_k,mapped=TRUE)",
+      "for (tree in c(FALSE,TRUE)) {",
+      "  options(np.tree=tree)",
+      "  stopifnot(isTRUE(all.equal(npudens(bws=extended_bw, tdat=dat)$dens, expected_extended, tolerance=2e-10)))",
+      "}",
       "cat('NPRMPI_UNCONDITIONAL_GNN_OWNERS_OK\\n')"
     ),
     zero_radius = c(
