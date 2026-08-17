@@ -7,6 +7,15 @@
   one- and multi-worker `npscoefbw()` completion without changing objective
   arithmetic, search policy, evaluation accounting, or message count.
 
+* Ordinary generalized nearest-neighbour conditional-density CVML now
+  constructs both explanatory and response radii after deleting the focal
+  training occurrence used by each leave-one-out objective row. The scalar,
+  local-polynomial row, and bounded block-stream owners share the same
+  explicit occurrence contract; zero literal radii fail the candidate
+  cleanly. Fixed and adaptive bandwidths, conditional-density CVLS,
+  conditional-distribution objectives, full fits, beta kernels, and extended
+  nearest-neighbour bandwidths retain their existing contracts.
+
 * Ordinary generalized nearest-neighbour unconditional density and
   distribution rows now distinguish identified training occurrences from
   equal-valued external evaluation points. Training fits and CVML construct
