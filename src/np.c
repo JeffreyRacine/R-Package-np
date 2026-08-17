@@ -7883,6 +7883,8 @@ static SEXP C_np_regression_bw_common(SEXP runo,
   if (XLENGTH(myopti_i) <= RBW_CATCOMPI &&
       INTEGER(myopti_i)[RBW_CKRNEVI] == NP_CKERNEL_COORDINATE_CODE)
     error("C_np_regression_bw: categorical-compression state is missing");
+  if (XLENGTH(myopti_i) <= RBW_NNMINI)
+    error("C_np_regression_bw: regression NN minimum is missing");
 
   ncon = (int)INTEGER(myopti_i)[RBW_NCONI];
   if (ncon < 0)
@@ -8049,6 +8051,8 @@ static SEXP C_np_lsqregression_bw_common(SEXP runo,
     error("C_np_lsqregression_bw: delta_bounds must have length 2");
   if (XLENGTH(scale_r) != XLENGTH(y_r))
     error("C_np_lsqregression_bw: scale length must match y length");
+  if (XLENGTH(myopti_i) < RBW_OPTIONS_COUNT)
+    error("C_np_lsqregression_bw: regression NN minimum is missing");
 
   ncon = (int)INTEGER(myopti_i)[RBW_NCONI];
   resolve_bounds_or_default(ckerlb_r, ckerub_r, ncon, &ckerlb_p, &ckerub_p);
@@ -12544,6 +12548,54 @@ SEXP C_np_kernelsum(SEXP tuno,
 
   UNPROTECT(22);
   return out;
+}
+
+SEXP C_np_regression_k1_geometry_validate(SEXP train,
+                                          SEXP evaluation,
+                                          SEXP train_is_eval)
+{
+  SEXP train_r = R_NilValue, evaluation_r = R_NilValue;
+  NPNNGeometryContext geometry_context = {
+    .mode = NP_NN_QUERY_EXTERNAL,
+    .eval_to_train = NULL,
+    .adaptive_successor = NULL
+  };
+  NPNNGeometryStatus status;
+  double *distance;
+  R_xlen_t ntrain_xlen, neval_xlen;
+  int ntrain, neval;
+  int identity = asLogical(train_is_eval);
+
+  if(identity == NA_LOGICAL)
+    error("regression k=1 geometry validation requires a logical query mode");
+
+  PROTECT(train_r = coerceVector(train, REALSXP));
+  PROTECT(evaluation_r = coerceVector(evaluation, REALSXP));
+  ntrain_xlen = XLENGTH(train_r);
+  neval_xlen = XLENGTH(evaluation_r);
+  if(ntrain_xlen <= 0 || neval_xlen <= 0 ||
+     ntrain_xlen > INT_MAX || neval_xlen > INT_MAX ||
+     (identity && ntrain_xlen != neval_xlen)) {
+    UNPROTECT(2);
+    error("invalid regression k=1 geometry dimensions");
+  }
+  ntrain = (int)ntrain_xlen;
+  neval = (int)neval_xlen;
+  distance = (double *)R_alloc((size_t)neval, sizeof(double));
+  geometry_context.mode = identity ?
+    NP_NN_QUERY_TRAINING_IDENTITY : NP_NN_QUERY_EXTERNAL;
+  status = compute_nn_distance_train_eval_ctx(
+    ntrain, neval, 1,
+    REAL(train_r), REAL(evaluation_r), 1,
+    &geometry_context, distance);
+  UNPROTECT(2);
+
+  if(status == NP_NN_GEOMETRY_ZERO_RADIUS)
+    error("generalized nearest-neighbor bandwidth has a zero literal radius for the requested k=1 query geometry");
+  if(status != NP_NN_GEOMETRY_OK)
+    error("generalized nearest-neighbor k=1 geometry failed with status %d",
+          (int)status);
+  return ScalarLogical(1);
 }
 
 SEXP C_np_kernelsum_power12(SEXP tuno,
@@ -19088,8 +19140,9 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
     prepared_context->requested_basis : 1;
   num_state_var = MAX(num_search_var,
                       num_var + prepared_context->degree_key_len);
-  int_nn_k_min_extern =
-    ((BANDWIDTH_reg_extern != BW_FIXED) && (num_reg_continuous_extern > 0)) ? 2 : 1;
+  int_nn_k_min_extern = myopti[RBW_NNMINI];
+  if(int_nn_k_min_extern != 1 && int_nn_k_min_extern != 2)
+    error("C_np_regression_bw: regression NN minimum must be 1 or 2");
 
   int_TREE_PROFILE_X = myopti[RBW_DOTREEI];
   int_TREE_X = myopti[RBW_DOTREEI];
@@ -19602,6 +19655,44 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
     have_start_best = 1;
     fret_start_best = fret;
     np_copy_scale_factor(vector_scale_factor_startbest, vector_scale_factor, num_search_var);
+  }
+
+  /* A newly admitted discrete NN lower endpoint is not guaranteed to be
+     visited by a continuous direction-set search.  Evaluate that endpoint
+     once and retain it through the same feasible-candidate owner used by all
+     other starts.  The R capability policy is the sole authority that may
+     transmit int_nn_k_min_extern == 1 to this owner. */
+  if (enforce_fixed_feasibility &&
+      int_nn_k_min_extern == 1 &&
+      BANDWIDTH_reg_extern == BW_GEN_NN) {
+    double fret_endpoint;
+    for(i = 1; i <= num_reg_continuous_extern; i++)
+      vector_scale_factor[i] = 1.0;
+    fret_endpoint = bwmfunc_wrapper(vector_scale_factor);
+    if (np_bw_candidate_is_admissible(
+          num_var,
+          bwm_use_transform,
+          KERNEL_reg_extern,
+          KERNEL_reg_unordered_extern,
+          BANDWIDTH_reg_extern,
+          BANDWIDTH_reg_extern,
+          0,
+          num_obs_train_extern,
+          0,
+          0,
+          0,
+          num_reg_continuous_extern,
+          num_reg_unordered_extern,
+          num_reg_ordered_extern,
+          num_categories_extern,
+          vector_scale_factor) &&
+        ((!have_start_best) || (fret_endpoint < fret_start_best))) {
+      have_start_best = 1;
+      fret_start_best = fret_endpoint;
+      np_copy_scale_factor(vector_scale_factor_startbest,
+                           vector_scale_factor,
+                           num_search_var);
+    }
   }
 
   if (enforce_fixed_feasibility) {

@@ -284,24 +284,33 @@ test_that("native regression objective ingress requires compression state", {
     ckerbound = "fixed", ckerlb = 0, ckerub = 1
   )
   prepare <- getFromNamespace(
-    ".npregbw_nomad_native_prepare_args", "np"
+    ".npregbw_prepared_args", "npRmpi"
   )
   prep <- prepare(training, response, bw, invalid.penalty = "dbmax")
   native_eval <- function(myopti) {
-    .Call(
-      "C_np_regression_bw_eval",
-      prep$runo, prep$rord, prep$rcon, prep$y, prep$mysd,
-      myopti, prep$myoptd, as.double(bw$bw), 1L,
-      prep$penalty_mode, prep$penalty_multiplier,
-      prep$degree, prep$bernstein, prep$basis,
-      prep$ckerlb, prep$ckerub,
-      PACKAGE = "np"
+    getFromNamespace(".npRmpi_with_local_regression", "npRmpi")(
+      .Call(
+        "C_np_regression_bw_eval",
+        prep$runo, prep$rord, prep$rcon, prep$ydat, prep$mysd,
+        myopti, prep$myoptd, prep$rbw, 1L,
+        prep$penalty_mode, prep$penalty_multiplier,
+        prep$degree, prep$bernstein, prep$basis,
+        prep$ckerlb, prep$ckerub,
+        PACKAGE = "npRmpi"
+      )
     )
   }
 
   expect_error(
     native_eval(prep$myopti[-length(prep$myopti)]),
-    "categorical-compression state is missing",
+    "regression NN minimum is missing",
+    fixed = TRUE
+  )
+  invalid_compression <- prep$myopti
+  invalid_compression[[length(invalid_compression) - 1L]] <- 2L
+  expect_error(
+    native_eval(invalid_compression),
+    "categorical compression must be TRUE or FALSE",
     fixed = TRUE
   )
   valid <- native_eval(prep$myopti)

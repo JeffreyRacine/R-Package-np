@@ -2487,17 +2487,102 @@ validateBandwidthTF <- function(bws){
   bws
 }
 
-npRegressionNnLowerBound <- function(bws) {
-  if (!inherits(bws, "rbandwidth"))
-    return(1L)
+npRegressionNnCapability <- function(bws, owner = c("regression", "lsq")) {
+  owner <- match.arg(owner)
+  type <- if (is.null(bws$type)) "" else as.character(bws$type)[1L]
+  ncon <- if (!is.null(bws$ncon)) {
+    as.integer(bws$ncon)[1L]
+  } else if (!is.null(bws$icon)) {
+    sum(as.logical(bws$icon))
+  } else {
+    0L
+  }
 
-  if (is.null(bws$type) || identical(bws$type, "fixed"))
-    return(1L)
+  if (is.na(ncon) || ncon <= 0L || identical(type, "fixed")) {
+    return(list(code = "not-continuous-nonfixed", lower = 1L))
+  }
 
-  if (is.null(bws$icon) || !any(bws$icon))
-    return(1L)
+  if (!inherits(bws, "rbandwidth")) {
+    if (identical(owner, "regression"))
+      return(list(code = "not-regression", lower = 1L))
+    return(list(code = "noncore-k2-only", lower = 2L))
+  }
 
-  2L
+  if (!identical(owner, "regression"))
+    return(list(code = "noncore-k2-only", lower = 2L))
+
+  nuno <- if (is.null(bws$nuno)) 0L else as.integer(bws$nuno)[1L]
+  nord <- if (is.null(bws$nord)) 0L else as.integer(bws$nord)[1L]
+  kernel <- if (is.null(bws$ckertype)) "" else as.character(bws$ckertype)[1L]
+  order <- if (is.null(bws$ckerorder)) NA_integer_ else as.integer(bws$ckerorder)[1L]
+  bound <- if (is.null(bws$ckerbound)) "" else as.character(bws$ckerbound)[1L]
+  engine <- if (is.null(bws$regtype.engine)) "" else as.character(bws$regtype.engine)[1L]
+  degree <- if (is.null(bws$degree.engine)) integer() else as.integer(bws$degree.engine)
+  ordinary.bounds <- length(bws$ckerlb) == 1L && length(bws$ckerub) == 1L &&
+    is.infinite(bws$ckerlb[[1L]]) && bws$ckerlb[[1L]] < 0 &&
+    is.infinite(bws$ckerub[[1L]]) && bws$ckerub[[1L]] > 0
+  scalar.mean <- identical(engine, "lc") ||
+    (identical(engine, "lp") && length(degree) == 1L && degree[[1L]] == 0L)
+
+  if (identical(type, "generalized_nn") &&
+      identical(ncon, 1L) && identical(nuno, 0L) && identical(nord, 0L) &&
+      kernel %in% c("gaussian", "epanechnikov") && identical(order, 2L) &&
+      identical(bound, "none") && ordinary.bounds && scalar.mean) {
+    return(list(code = "gnn-univariate-positive-lc-k1", lower = 1L))
+  }
+
+  list(code = "k2-only", lower = 2L)
+}
+
+npRegressionNnLowerBound <- function(bws, owner = c("regression", "lsq")) {
+  npRegressionNnCapability(bws, owner = match.arg(owner))$lower
+}
+
+npRegressionNnSearchLowerBound <- function(bws,
+                                           owner = c("regression", "lsq"),
+                                           degree.candidates = NULL) {
+  owner <- match.arg(owner)
+  fixed.lower <- npRegressionNnLowerBound(bws, owner = owner)
+  if (is.null(degree.candidates) || !identical(owner, "regression"))
+    return(fixed.lower)
+
+  ncon <- if (is.null(bws$ncon)) 0L else as.integer(bws$ncon)[1L]
+  if (is.na(ncon) || ncon != 1L || length(degree.candidates) != 1L)
+    return(2L)
+
+  candidates <- as.integer(degree.candidates[[1L]])
+  if (!length(candidates) || anyNA(candidates))
+    return(2L)
+  lower <- vapply(candidates, function(degree) {
+    candidate <- bws
+    candidate$regtype.engine <- "lp"
+    candidate$degree.engine <- degree
+    npRegressionNnLowerBound(candidate, owner = owner)
+  }, integer(1L))
+  max(lower)
+}
+
+npRegressionK1GeometryValidate <- function(bws, txdat, exdat = NULL) {
+  if (!inherits(bws, "rbandwidth") ||
+      !identical(npRegressionNnLowerBound(bws), 1L))
+    return(invisible(TRUE))
+
+  icon <- which(as.logical(bws$icon))
+  if (length(icon) != 1L || length(bws$bw) < icon ||
+      !is.finite(bws$bw[[icon]]) || bws$bw[[icon]] != 1)
+    return(invisible(TRUE))
+
+  train <- as.double(txdat[[icon]])
+  train.is.eval <- is.null(exdat)
+  evaluation <- if (train.is.eval) train else as.double(exdat[[icon]])
+  .Call(
+    "C_np_regression_k1_geometry_validate",
+    train,
+    evaluation,
+    train.is.eval,
+    PACKAGE = "npRmpi"
+  )
+  invisible(TRUE)
 }
 
 npExtendedNnEnabled <- function() {
@@ -2797,8 +2882,9 @@ npValidateRegressionExtendedNn <- function(bws,
 
 npValidateRegressionNnLowerBound <- function(bws,
                                              where,
+                                             owner = c("regression", "lsq"),
                                              allow.zero.placeholder = FALSE) {
-  lower <- npRegressionNnLowerBound(bws)
+  lower <- npRegressionNnLowerBound(bws, owner = match.arg(owner))
   if (lower <= 1L)
     return(invisible(bws))
 

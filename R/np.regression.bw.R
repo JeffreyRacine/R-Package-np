@@ -403,7 +403,8 @@ npregbw.rbandwidth <-
       myopti <- c(myopti, npContinuousKernelDescriptorOptions(bws))
       myopti <- c(
         myopti,
-        categorical.compress = npStrictLogicalOption("np.categorical.compress", TRUE)
+        categorical.compress = npStrictLogicalOption("np.categorical.compress", TRUE),
+        nn.minimum = npRegressionNnLowerBound(bws)
       )
 
       myoptd = list(ftol=ftol, tol=tol, small=small,
@@ -721,7 +722,8 @@ npregbw.rbandwidth <-
   myopti <- c(myopti, npContinuousKernelDescriptorOptions(bws))
   myopti <- c(
     myopti,
-    categorical.compress = npStrictLogicalOption("np.categorical.compress", TRUE)
+    categorical.compress = npStrictLogicalOption("np.categorical.compress", TRUE),
+    nn.minimum = npRegressionNnLowerBound(bws)
   )
   myoptd <- list(
     ftol = ftol,
@@ -1331,7 +1333,8 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
   myopti <- c(myopti, npContinuousKernelDescriptorOptions(bws))
   myopti <- c(
     myopti,
-    categorical.compress = npStrictLogicalOption("np.categorical.compress", TRUE)
+    categorical.compress = npStrictLogicalOption("np.categorical.compress", TRUE),
+    nn.minimum = npRegressionNnLowerBound(bws)
   )
   regtype.index <- match("regtype", names(myopti))
   if (is.na(regtype.index))
@@ -1970,7 +1973,10 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
   )
 }
 
-.npregbw_nomad_bw_bounds <- function(template, setup) {
+.npregbw_nomad_bw_bounds <- function(template, setup,
+                                     owner = c("regression", "lsq"),
+                                     degree.search = NULL) {
+  owner <- match.arg(owner)
   .np_nomad_bw_bounds(
     template = template,
     setup = setup,
@@ -1978,7 +1984,11 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
       template,
       argname = "template$scale.factor.search.lower"
     ),
-    nn.lower = npRegressionNnLowerBound(template),
+    nn.lower = npRegressionNnSearchLowerBound(
+      template,
+      owner = owner,
+      degree.candidates = if (is.null(degree.search)) NULL else degree.search$candidates
+    ),
     where = "npregbw"
   )
 }
@@ -2567,7 +2577,11 @@ npRmpiNomadPreparedSearchRegression <- function(template,
   }
   nomad.nmulti <- if (is.null(opt.args$nmulti)) npDefaultNmulti(dim(xdat)[2]) else npValidateNmulti(opt.args$nmulti[1L])
 
-  bw_bounds <- .npregbw_nomad_bw_bounds(template = template, setup = setup)
+  bw_bounds <- .npregbw_nomad_bw_bounds(
+    template = template,
+    setup = setup,
+    degree.search = degree.search
+  )
   bw_start_bounds <- .np_nomad_bw_restart_start_bounds(
     bounds = bw_bounds,
     setup = setup,
