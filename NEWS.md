@@ -1,5 +1,15 @@
 # npRmpi 0.70-6
 
+* Canonical wider-than-one local-polynomial ridge retries are now invariant to
+  a common scaling of all kernel weights. The shared response/adjoint factor
+  owner interprets `1/n.train` as a dimensionless fraction of the pristine
+  Gram scale, using one allocation-free diagonal scale for every bounded
+  retry. Fixed-objective, fit, leave-one-out apply, and hat owners therefore
+  select the same regularized estimator even when one kernel provider retains
+  the bandwidth normalization and another omits the cancelling common factor.
+  Zero-ridge arithmetic is unchanged; formerly ill-conditioned objective and
+  hat values can change to the scale-equivariant canonical result.
+
 * Fixed-resident and adaptive-BLAS local-polynomial regression objectives now
   use the same condition-aware response/factor policy as ordinary fits,
   leave-one-out influence rows, and the independent hat-matrix owner. CVAIC

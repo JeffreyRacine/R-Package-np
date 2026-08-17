@@ -369,13 +369,53 @@ static int np_lp_solve_workspace_factor(NPLPSolveWorkspace *workspace,
   return 1;
 }
 
+static int np_lp_solve_workspace_ridge_scale(
+  const NPLPSolveWorkspace *workspace,
+  int p,
+  double *scale_out)
+{
+  double scale = 0.0;
+  int i, j;
+
+  if((workspace == NULL) || (workspace->gram_source == NULL) ||
+     (p <= 0) || (workspace->p_capacity < p) || (scale_out == NULL))
+    return 0;
+
+  for(i = 0; i < p; i++){
+    const double value = fabs(workspace->gram_source[i + i*p]);
+    if(!R_FINITE(value))
+      return 0;
+    if(value > scale)
+      scale = value;
+  }
+
+  if(scale == 0.0){
+    for(j = 0; j < p; j++){
+      for(i = 0; i < p; i++){
+        const double value = fabs(workspace->gram_source[i + j*p]);
+        if(!R_FINITE(value))
+          return 0;
+        if(value > scale)
+          scale = value;
+      }
+    }
+  }
+
+  if(scale == 0.0)
+    scale = 1.0;
+  *scale_out = scale;
+  return R_FINITE(scale) && (scale > 0.0);
+}
+
 static NPLPSolvePolicyStatus np_lp_solve_workspace_prepare_policy_factor(
   NPLPSolveWorkspace *workspace,
   int p,
   int nrhs,
-  double ridge_increment,
+  double ridge_fraction,
   NPLPSolvePolicyDiagnostics *diagnostics)
 {
+  double ridge_scale = 0.0;
+  double ridge_increment = 0.0;
   double ridge_total = 0.0;
   int ridge_steps = 0;
   int i;
@@ -386,12 +426,21 @@ static NPLPSolvePolicyStatus np_lp_solve_workspace_prepare_policy_factor(
   }
 
   if(!np_lp_solve_workspace_shape(workspace, p, nrhs, NULL, NULL) ||
-     !R_FINITE(ridge_increment) || (ridge_increment <= 0.0))
+     !R_FINITE(ridge_fraction) || (ridge_fraction <= 0.0))
     return NP_LP_SOLVE_POLICY_INVALID;
   if(!np_lp_solve_workspace_sources_finite(workspace, p, nrhs))
     return NP_LP_SOLVE_POLICY_NONFINITE;
 
-  while(!np_lp_solve_workspace_factor(workspace, p)){
+  if(np_lp_solve_workspace_factor(workspace, p))
+    return NP_LP_SOLVE_POLICY_OK;
+
+  if(!np_lp_solve_workspace_ridge_scale(workspace, p, &ridge_scale))
+    return NP_LP_SOLVE_POLICY_NONFINITE;
+  ridge_increment = ridge_fraction*ridge_scale;
+  if(!R_FINITE(ridge_increment) || (ridge_increment <= 0.0))
+    return NP_LP_SOLVE_POLICY_INVALID;
+
+  for(;;){
     if(ridge_steps >= NP_LP_SOLVE_MAX_RIDGE_STEPS)
       return NP_LP_SOLVE_POLICY_RIDGE_EXHAUSTED;
     if(!np_lp_solve_workspace_sources_finite(workspace, p, nrhs))
@@ -405,6 +454,8 @@ static NPLPSolvePolicyStatus np_lp_solve_workspace_prepare_policy_factor(
       diagnostics->ridge_steps = ridge_steps;
       diagnostics->ridge_total = ridge_total;
     }
+    if(np_lp_solve_workspace_factor(workspace, p))
+      break;
   }
 
   return NP_LP_SOLVE_POLICY_OK;
@@ -414,7 +465,7 @@ NPLPSolvePolicyStatus np_lp_solve_workspace_solve_response(
   NPLPSolveWorkspace *workspace,
   int p,
   int nrhs,
-  double ridge_increment,
+  double ridge_fraction,
   NPLPSolvePolicyDiagnostics *diagnostics)
 {
   NPLPSolvePolicyDiagnostics local_diagnostics;
@@ -422,7 +473,7 @@ NPLPSolvePolicyStatus np_lp_solve_workspace_solve_response(
     (diagnostics != NULL) ? diagnostics : &local_diagnostics;
   const NPLPSolvePolicyStatus factor_status =
     np_lp_solve_workspace_prepare_policy_factor(
-      workspace, p, nrhs, ridge_increment, policy_diagnostics);
+      workspace, p, nrhs, ridge_fraction, policy_diagnostics);
 
   if(factor_status != NP_LP_SOLVE_POLICY_OK)
     return factor_status;
@@ -452,7 +503,7 @@ NPLPSolvePolicyStatus np_lp_solve_workspace_solve_adjoint(
   NPLPSolveWorkspace *workspace,
   int p,
   int nrhs,
-  double ridge_increment,
+  double ridge_fraction,
   NPLPSolvePolicyDiagnostics *diagnostics)
 {
   NPLPSolvePolicyDiagnostics local_diagnostics;
@@ -460,7 +511,7 @@ NPLPSolvePolicyStatus np_lp_solve_workspace_solve_adjoint(
     (diagnostics != NULL) ? diagnostics : &local_diagnostics;
   const NPLPSolvePolicyStatus factor_status =
     np_lp_solve_workspace_prepare_policy_factor(
-      workspace, p, nrhs, ridge_increment, policy_diagnostics);
+      workspace, p, nrhs, ridge_fraction, policy_diagnostics);
 
   if(factor_status != NP_LP_SOLVE_POLICY_OK)
     return factor_status;

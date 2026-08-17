@@ -77,9 +77,13 @@ int np_lp_solve_workspace_solve(NPLPSolveWorkspace *workspace,
 
 /*
  * Canonical response-oriented bounded ridge transcript.  The caller fills
- * the pristine Gram and response-moment columns, and supplies the fixed ridge
- * increment owned by its statistical sample.  Failed Gram factorizations add that
- * increment to the source Gram diagonal in ascending order.  Once a ridged
+ * the pristine Gram and response-moment columns, and supplies the dimensionless
+ * ridge fraction owned by its statistical sample.  After a failed zero-ridge
+ * factor/condition attempt, the shared owner multiplies that fraction by the
+ * pristine Gram's maximum absolute diagonal (or its maximum absolute entry for
+ * a zero diagonal).  This keeps proportional kernel-weight representations on
+ * one estimator.  Failed Gram factorizations add the resulting step to the
+ * source Gram diagonal in ascending order.  Once a ridged
  * system factors, the accumulated intercept restoration is applied to every
  * response RHS and all columns are solved from that retained factorization.
  * Response magnitude and batching therefore cannot select a different ridge.
@@ -92,7 +96,7 @@ NPLPSolvePolicyStatus np_lp_solve_workspace_solve_response(
   NPLPSolveWorkspace *workspace,
   int p,
   int nrhs,
-  double ridge_increment,
+  double ridge_fraction,
   NPLPSolvePolicyDiagnostics *diagnostics);
 
 /*
@@ -109,7 +113,7 @@ NPLPSolvePolicyStatus np_lp_solve_workspace_solve_adjoint(
   NPLPSolveWorkspace *workspace,
   int p,
   int nrhs,
-  double ridge_increment,
+  double ridge_fraction,
   NPLPSolvePolicyDiagnostics *diagnostics);
 
 /*
