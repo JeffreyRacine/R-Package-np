@@ -122,13 +122,10 @@ test_that("all canonical LP solve retries are bounded", {
     fixed = TRUE
   ))
 
+  expect_false(grepl("NP_LP_SOLVE_MAX_RIDGE_STEPS", reghat.c, fixed = TRUE))
+  expect_false(grepl("np_reghat_sources_finite", reghat.c, fixed = TRUE))
   expect_true(grepl(
-    "ridge_step < NP_LP_SOLVE_MAX_RIDGE_STEPS",
-    reghat.c,
-    fixed = TRUE
-  ))
-  expect_true(grepl(
-    "np_reghat_sources_finite(nterms, gram, rhs)",
+    "np_lp_solve_workspace_solve_adjoint(solve_workspace,",
     reghat.c,
     fixed = TRUE
   ))

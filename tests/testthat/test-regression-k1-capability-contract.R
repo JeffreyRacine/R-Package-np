@@ -77,8 +77,13 @@ test_that("regression k1 capability is narrow and R-owned", {
       objective <- npRmpi:::.npregbw_eval_only(x, y, bw)$objective
       expect_true(all(is.finite(H)))
       expect_true(all(attr(H, "ridge.used", exact = TRUE) == 0))
-      expect_equal(drop(H %*% y), applied, tolerance = 2e-13)
+      expect_equal(as.numeric(H %*% y), as.numeric(applied), tolerance = 2e-13)
       expect_true(is.finite(objective))
+      expect_equal(
+        as.numeric(objective),
+        mean((y - as.numeric(applied))^2),
+        tolerance = 2e-13
+      )
 
       setup <- setup_fun(xdat = x, template = bw, allow.extended.nn = FALSE)
       bounds <- bounds_fun(template = bw, setup = setup)
@@ -149,9 +154,13 @@ test_that("accepted k1 mean and derivative public owners agree", {
     ))
     fit <- mpi_local(npreg(bws = bw, exdat = ex, gradients = TRUE))
 
-    expect_equal(drop(H %*% y), applied, tolerance = 2e-13)
+    expect_equal(as.numeric(H %*% y), as.numeric(applied), tolerance = 2e-13)
     expect_equal(drop(H %*% y), fit$mean, tolerance = 2e-13)
-    expect_equal(drop(derivative_H %*% y), derivative_applied, tolerance = 2e-12)
+    expect_equal(
+      as.numeric(derivative_H %*% y),
+      as.numeric(derivative_applied),
+      tolerance = 2e-12
+    )
     expect_equal(drop(derivative_H %*% y), fit$grad[, 1L], tolerance = 2e-12)
     expect_true(all(attr(H, "ridge.used", exact = TRUE) == 0))
     expect_true(all(attr(derivative_H, "ridge.used", exact = TRUE) == 0))
@@ -178,6 +187,45 @@ test_that("k1 zero radii retain objective-penalty and fit-error symmetry", {
   expect_error(
     mpi_local(npreghat(bws = bw, txdat = x)),
     "zero literal radius",
+    fixed = TRUE
+  )
+})
+
+test_that("zero-mass compact-kernel LOO rows fail explicitly", {
+  set.seed(81702L)
+  x <- data.frame(
+    x1 = runif(47L, -1.2, 1.4),
+    x2 = runif(47L, -1.2, 1.4)
+  )
+  y <- sin(2.1 * x$x1) + 0.23 * x$x2^2
+  bw <- npregbw(
+    xdat = x,
+    ydat = y,
+    bws = c(4, 4),
+    regtype = "lc",
+    bwmethod = "cv.ls",
+    bwtype = "generalized_nn",
+    bwscaling = FALSE,
+    ckertype = "epanechnikov",
+    ckerorder = 2L,
+    bandwidth.compute = FALSE
+  )
+
+  expect_true(is.finite(np:::.npregbw_eval_only(x, y, bw)$objective))
+  expect_error(
+    npreghat(bws = bw, txdat = x, leave.one.out = TRUE),
+    "leave-one-out kernel row has zero effective mass",
+    fixed = TRUE
+  )
+  expect_error(
+    npreghat(
+      bws = bw,
+      txdat = x,
+      y = y,
+      leave.one.out = TRUE,
+      output = "apply"
+    ),
+    "leave-one-out kernel row has zero effective mass",
     fixed = TRUE
   )
 })

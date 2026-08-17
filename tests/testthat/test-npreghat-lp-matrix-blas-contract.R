@@ -31,7 +31,7 @@
   H
 }
 
-test_that("compiled LP hat matrix preserves the BLAS-backed R loop exactly", {
+test_that("compiled LP hat matrix agrees with the BLAS-backed R oracle", {
   old <- getOption("matprod")
   on.exit(options(matprod = old), add = TRUE)
   options(matprod = "default")
@@ -51,7 +51,10 @@ test_that("compiled LP hat matrix preserves the BLAS-backed R loop exactly", {
     "C_np_reghat_lp_matrix_fast",
     as.matrix(kw), as.matrix(W.train), as.matrix(W.eval), PACKAGE = "npRmpi"
   )
-  expect_identical(compiled, reference)
+  expect_identical(dim(compiled), dim(reference))
+  expect_equal(as.double(compiled), as.double(reference), tolerance = 5e-14)
+  expect_equal(attr(compiled, "ridge.used", exact = TRUE),
+               numeric(nrow(compiled)))
 })
 
 test_that("compiled LP hat matrix preserves the incumbent ridge sequence", {
@@ -73,7 +76,10 @@ test_that("compiled LP hat matrix preserves the incumbent ridge sequence", {
     "C_np_reghat_lp_matrix_fast",
     as.matrix(kw), as.matrix(W.train), as.matrix(W.eval), PACKAGE = "npRmpi"
   )
-  expect_identical(compiled, reference)
+  expect_identical(dim(compiled), dim(reference))
+  expect_equal(as.double(compiled), as.double(reference), tolerance = 5e-14)
+  expect_length(attr(compiled, "ridge.used", exact = TRUE), nrow(compiled))
+  expect_true(all(attr(compiled, "ridge.used", exact = TRUE) > 0.0))
 })
 
 test_that("width-one scalar hats retain signed higher-order kernel weights", {
@@ -93,7 +99,7 @@ test_that("width-one scalar hats retain signed higher-order kernel weights", {
     "C_np_reghat_lp_matrix_fast",
     as.matrix(kw), as.matrix(W.train), as.matrix(W.eval), PACKAGE = "npRmpi"
   )
-  expect_equal(compiled, reference, tolerance = 5e-15)
+  expect_equal(as.double(compiled), as.double(reference), tolerance = 5e-15)
 })
 
 test_that("width-one scalar hats own degenerate and non-finite systems", {
@@ -107,12 +113,15 @@ test_that("width-one scalar hats own degenerate and non-finite systems", {
     )
   }
 
-  expect_identical(scalar_hat(c(0.0, 0.0)), matrix(c(0.0, 0.0), 1L))
-  expect_identical(scalar_hat(c(1.0, -1.0)), matrix(c(4.0, -4.0), 1L))
-  expect_identical(
-    scalar_hat(c(1.0, -1.0 + 2^-50)),
-    matrix(c(2^50, -2^50 + 1.0), 1L)
-  )
+  zero <- scalar_hat(c(0.0, 0.0))
+  cancel <- scalar_hat(c(1.0, -1.0))
+  near <- scalar_hat(c(1.0, -1.0 + 2^-50))
+  expect_identical(as.double(zero), c(0.0, 0.0))
+  expect_identical(as.double(cancel), c(4.0, -4.0))
+  expect_identical(as.double(near), c(2^50, -2^50 + 1.0))
+  expect_identical(attr(zero, "ridge.used", exact = TRUE), 0.5)
+  expect_identical(attr(cancel, "ridge.used", exact = TRUE), 0.5)
+  expect_identical(attr(near, "ridge.used", exact = TRUE), 0.0)
   expect_error(
     scalar_hat(c(1.0, NaN)),
     "non-finite system",

@@ -13,6 +13,8 @@ typedef struct {
   double *gram_work;
   double *rhs_work;
   int *ipiv;
+  double *rcond_work;
+  int *rcond_iwork;
   int factor_ready;
   int factor_p;
 } NPLPSolveWorkspace;
@@ -109,6 +111,19 @@ NPLPSolvePolicyStatus np_lp_solve_workspace_solve_adjoint(
   int nrhs,
   double ridge_increment,
   NPLPSolvePolicyDiagnostics *diagnostics);
+
+/*
+ * Solve adjoint RHS columns from the factor/ridge state retained by a prior
+ * successful canonical response or adjoint solve.  The caller replaces only
+ * rhs_source and supplies that retained solve's diagnostics.  This supports a
+ * mixed response-plus-leverage consumer without refactorizing the same Gram or
+ * pretending an evaluation-basis RHS is a response column.
+ */
+NPLPSolvePolicyStatus np_lp_solve_workspace_solve_adjoint_factored(
+  NPLPSolveWorkspace *workspace,
+  int p,
+  int nrhs,
+  const NPLPSolvePolicyDiagnostics *diagnostics);
 /* Cold-path validation used only after an ordinary solve has failed. */
 #if defined(__GNUC__) || defined(__clang__)
 #define NP_LP_COLD_PATH __attribute__((cold))
@@ -146,7 +161,8 @@ NPLPWidthOneStatus np_lp_width_one_influence_row(
   const double *kw,
   double basis_eval,
   double *row_out,
-  size_t output_stride);
+  size_t output_stride,
+  NPLPSolvePolicyDiagnostics *diagnostics);
 
 /*
  * Reusable contiguous Gram/RHS/rcond/solve storage for full-weight LP rows.

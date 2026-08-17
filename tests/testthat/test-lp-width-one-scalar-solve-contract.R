@@ -39,8 +39,8 @@ test_that("canonical solve workspace dispatches width one only to scalar algebra
   )
   factored <- lp_width_one_region(
     source,
-    "int np_lp_solve_workspace_solve_factored(",
-    "NPLPWidthOneStatus np_lp_width_one_influence_row("
+    "static int np_lp_solve_workspace_solve_factored_with_trans(",
+    "int np_lp_solve_workspace_solve_factored("
   )
 
   expect_true(grepl("rhs_source[i]/gram", scalar, fixed = TRUE))
@@ -168,14 +168,24 @@ test_that("compiled width-one hats reuse the scalar influence primitive", {
   skip_if(is.null(hat_file), "source file src/reghat_fast.c unavailable")
   source <- paste(readLines(hat_file, warn = FALSE), collapse = "\n")
 
+  bind <- lp_width_one_region(
+    source,
+    "static void np_reghat_call_workspace_bind(",
+    "static NPReghatLPRowStatus np_reghat_call_influence_row("
+  )
   scalar_hat <- lp_width_one_region(
     source,
-    "static SEXP np_reghat_width_one_matrix(",
-    "static int np_reghat_solve_system("
+    "static NPReghatLPRowStatus np_reghat_call_influence_row(",
+    "static void np_reghat_check_row_status("
   )
-  hat_start <- regexpr("SEXP C_np_reghat_lp_matrix_fast(", source, fixed = TRUE)
-  expect_gt(hat_start, 0L)
-  hat <- substr(source, hat_start, nchar(source))
+  matrix_hat <- lp_width_one_region(
+    source,
+    "SEXP C_np_reghat_lp_matrix_fast(",
+    "SEXP C_np_reghat_lp_apply_fast("
+  )
+  apply_start <- regexpr("SEXP C_np_reghat_lp_apply_fast(", source, fixed = TRUE)
+  expect_gt(apply_start, 0L)
+  apply_hat <- substr(source, apply_start, nchar(source))
 
   expect_true(grepl("np_lp_width_one_influence_row(", scalar_hat,
                     fixed = TRUE))
@@ -183,10 +193,13 @@ test_that("compiled width-one hats reuse the scalar influence primitive", {
   expect_false(grepl("R_alloc(", scalar_hat, fixed = TRUE))
   expect_false(grepl("F77_CALL(", scalar_hat, fixed = TRUE))
   expect_false(grepl("positive_weights_only", scalar_hat, fixed = TRUE))
-  expect_true(grepl("if(nterms == 1)", hat, fixed = TRUE))
+  expect_true(grepl("if(nterms <= 1)", bind, fixed = TRUE))
   expect_lt(
-    regexpr("if(nterms == 1)", hat, fixed = TRUE),
-    regexpr("weighted_design = (double *)R_alloc", hat, fixed = TRUE)
+    regexpr("if(nterms <= 1)", bind, fixed = TRUE),
+    regexpr("weighted_design = (double *)R_alloc", bind, fixed = TRUE)
   )
-  expect_false(grepl("if((nterms == 1)", hat, fixed = TRUE))
+  expect_true(grepl("np_reghat_call_influence_row(", matrix_hat,
+                    fixed = TRUE))
+  expect_true(grepl("np_reghat_call_influence_row(", apply_hat,
+                    fixed = TRUE))
 })
