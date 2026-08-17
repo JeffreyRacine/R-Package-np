@@ -103,3 +103,32 @@ test_that("mixed lc first-derivative owner supports matrix, apply, and constrain
     "requested derivative order in 's' exceeds local polynomial degree"
   )
 })
+
+test_that("compact-support scalar derivative rows are tree invariant", {
+  set.seed(7331)
+  n <- 90L
+  tx <- data.frame(x = sort(runif(n)))
+  y <- sin(5 * tx$x) + rnorm(n, sd = 0.05)
+
+  for (bwtype in c("fixed", "generalized_nn")) {
+    bw <- npregbw(
+      xdat = tx,
+      ydat = y,
+      regtype = "lc",
+      bwtype = bwtype,
+      ckertype = "epanechnikov",
+      bws = if (identical(bwtype, "fixed")) 0.13 else 11,
+      bandwidth.compute = FALSE
+    )
+
+    withr::local_options(list(np.tree = FALSE))
+    dense <- npreghat(bws = bw, txdat = tx, s = 1L)
+    withr::local_options(list(np.tree = TRUE))
+    tree <- npreghat(bws = bw, txdat = tx, s = 1L)
+    fit <- npreg(bws = bw, gradients = TRUE)
+
+    expect_equal(tree, dense, tolerance = 1e-14, info = bwtype)
+    expect_equal(drop(tree %*% y), fit$grad[, 1L], tolerance = 1e-12,
+                 info = bwtype)
+  }
+})

@@ -128,7 +128,15 @@
        all(spec$degree.engine == 0L))
 }
 
-.npcdhat_make_xhat_matrix <- function(bws, txdat, exdat, s = NULL) {
+.npcdhat_make_xhat_matrix <- function(bws,
+                                      txdat,
+                                      exdat,
+                                      s = NULL,
+                                      train.is.eval = FALSE) {
+  train.is.eval <- npValidateScalarLogical(train.is.eval, "train.is.eval")
+  if (train.is.eval && nrow(exdat) != nrow(txdat))
+    stop("conditional X hat received inconsistent training-identity rows")
+  eval.arg <- if (train.is.eval) NULL else exdat
   xbw <- .npcdhat_make_xbw(bws = bws, txdat = txdat)
   spec <- npConditionalRegEngineSpec(
     xbw,
@@ -146,10 +154,23 @@
         ncon = xbw$ncon
       )) {
     if (.npcdhat_has_x_derivative(s)) {
+      if (!identical(xbw[["ckertype", exact = TRUE]], "beta")) {
+        if (identical(xbw[["ckertype", exact = TRUE]], "uniform"))
+          .np_warning("ignoring kernel order specified with uniform kernel type")
+        return(.npreghat_exact_lp_matrix_from_regression_core(
+          bws = xbw,
+          txdat = txdat,
+          exdat = eval.arg,
+          s = s,
+          basis = basis,
+          degree = degree,
+          bernstein.basis = bernstein
+        ))
+      }
       return(.npreghat_exact_lc_derivative_matrix_from_npksum_chunked(
         bws = xbw,
         txdat = txdat,
-        exdat = exdat,
+        exdat = eval.arg,
         s = s
       ))
     }
@@ -157,7 +178,7 @@
     return(.npreghat_exact_lc_matrix_from_kernel_weights(
       bws = xbw,
       txdat = txdat,
-      exdat = exdat
+      exdat = eval.arg
     ))
   }
 
@@ -165,7 +186,7 @@
     return(.npreghat_exact_ll_matrix_from_kernel_weights(
       bws = xbw,
       txdat = txdat,
-      exdat = exdat,
+      exdat = eval.arg,
       s = s
     ))
   }
@@ -177,6 +198,16 @@
       ncon = xbw$ncon,
       where = "npcdhat"
     )
+
+    if (identical(xbw$type, "generalized_nn") &&
+        any(degree > 1L) && train.is.eval) {
+      return(.npreghat_exact_matrix_from_core(
+        bws = xbw,
+        txdat = txdat,
+        exdat = NULL,
+        s = s
+      ))
+    }
 
     if (identical(xbw$type, "generalized_nn") && any(degree > 1L)) {
       H <- matrix(NA_real_, nrow = nrow(exdat), ncol = nrow(txdat))
@@ -194,7 +225,7 @@
     return(.npreghat_exact_lp_matrix_from_kernel_weights(
       bws = xbw,
       txdat = txdat,
-      exdat = exdat,
+      exdat = eval.arg,
       s = s,
       basis = basis,
       degree = degree,
@@ -205,14 +236,22 @@
   .npreghat_exact_matrix_from_core(
     bws = xbw,
     txdat = txdat,
-    exdat = exdat,
+    exdat = eval.arg,
     s = s
   )
 }
 
-.np_direct_operator_matrix <- function(kbw, txdat, exdat, operator, where) {
+.np_direct_operator_matrix <- function(kbw,
+                                       txdat,
+                                       exdat,
+                                       operator,
+                                       where,
+                                       train.is.eval = FALSE) {
   txdat <- toFrame(txdat)
   exdat <- toFrame(exdat)
+  train.is.eval <- npValidateScalarLogical(train.is.eval, "train.is.eval")
+  if (train.is.eval && nrow(exdat) != nrow(txdat))
+    stop(sprintf("%s received inconsistent training-identity rows", where))
   op.info <- .np_operator_kernel_weight_scale(
     bws = kbw,
     operator = operator,
@@ -222,7 +261,7 @@
   kw <- .np_kernel_weights_direct(
     bws = op.info$bws,
     txdat = txdat,
-    exdat = exdat,
+    exdat = if (train.is.eval) NULL else exdat,
     bandwidth.divide = op.info$bandwidth.divide,
     operator = op.info$operator
   )
@@ -235,9 +274,18 @@
   t(kw) / op.info$scale
 }
 
-.np_direct_operator_apply <- function(kbw, txdat, exdat, operator, rhs, where) {
+.np_direct_operator_apply <- function(kbw,
+                                      txdat,
+                                      exdat,
+                                      operator,
+                                      rhs,
+                                      where,
+                                      train.is.eval = FALSE) {
   txdat <- toFrame(txdat)
   exdat <- toFrame(exdat)
+  train.is.eval <- npValidateScalarLogical(train.is.eval, "train.is.eval")
+  if (train.is.eval && nrow(exdat) != nrow(txdat))
+    stop(sprintf("%s received inconsistent training-identity rows", where))
   rhs <- as.matrix(rhs)
   storage.mode(rhs) <- "double"
 
@@ -253,7 +301,7 @@
   kw <- .np_kernel_weights_direct(
     bws = op.info$bws,
     txdat = txdat,
-    exdat = exdat,
+    exdat = if (train.is.eval) NULL else exdat,
     bandwidth.divide = op.info$bandwidth.divide,
     operator = op.info$operator
   )
@@ -286,9 +334,13 @@
                                     operator,
                                     rhs,
                                     return.kernel.weights = FALSE,
-                                    where) {
+                                    where,
+                                    train.is.eval = FALSE) {
   txdat <- toFrame(txdat)
   exdat <- toFrame(exdat)
+  train.is.eval <- npValidateScalarLogical(train.is.eval, "train.is.eval")
+  if (train.is.eval && nrow(exdat) != nrow(txdat))
+    stop(sprintf("%s received inconsistent training-identity rows", where))
   rhs <- as.matrix(rhs)
   storage.mode(rhs) <- "double"
 
@@ -308,16 +360,22 @@
   npKernelBoundsCheckEval(exdat, bws$icon, bws$ckerlb, bws$ckerub, argprefix = "cker")
 
   txm <- toMatrix(txdat)
-  exm <- toMatrix(exdat)
   tuno <- txm[, bws$iuno, drop = FALSE]
   tcon <- txm[, bws$icon, drop = FALSE]
   tord <- txm[, bws$iord, drop = FALSE]
-  euno <- exm[, bws$iuno, drop = FALSE]
-  econ <- exm[, bws$icon, drop = FALSE]
-  eord <- exm[, bws$iord, drop = FALSE]
+  if (train.is.eval) {
+    euno <- data.frame()
+    econ <- data.frame()
+    eord <- data.frame()
+  } else {
+    exm <- toMatrix(exdat)
+    euno <- exm[, bws$iuno, drop = FALSE]
+    econ <- exm[, bws$icon, drop = FALSE]
+    eord <- exm[, bws$iord, drop = FALSE]
+  }
 
   tnrow <- nrow(txdat)
-  enrow <- nrow(exdat)
+  enrow <- if (train.is.eval) tnrow else nrow(exdat)
   nksum <- .np_native_output_extent(
     enrow,
     max(1L, ncol(rhs)),
@@ -363,7 +421,7 @@
       nliracine = OKER_NLR,
       racineliyan = OKER_RLY
     ),
-    miss.ex = FALSE,
+    miss.ex = train.is.eval,
     leave.one.out = FALSE,
     bandwidth.divide = op.info$bandwidth.divide,
     mcv.numRow = attr(bws$xmcv, "num.row"),
@@ -423,7 +481,13 @@
   list(ksum = out, kernel.weights = kw)
 }
 
-.np_exact_operator_apply <- function(kbw, txdat, exdat, operator, rhs, where) {
+.np_exact_operator_apply <- function(kbw,
+                                     txdat,
+                                     exdat,
+                                     operator,
+                                     rhs,
+                                     where,
+                                     train.is.eval = FALSE) {
   rhs <- as.matrix(rhs)
   storage.mode(rhs) <- "double"
 
@@ -434,7 +498,8 @@
     operator = operator,
     rhs = rhs,
     return.kernel.weights = FALSE,
-    where = where
+    where = where,
+    train.is.eval = train.is.eval
   )$ksum
 
   if (!is.matrix(out))
@@ -446,7 +511,12 @@
     out
 }
 
-.np_exact_operator_matrix <- function(kbw, txdat, exdat, operator, where) {
+.np_exact_operator_matrix <- function(kbw,
+                                      txdat,
+                                      exdat,
+                                      operator,
+                                      where,
+                                      train.is.eval = FALSE) {
   txdat <- toFrame(txdat)
   exdat <- toFrame(exdat)
 
@@ -457,7 +527,8 @@
     operator = operator,
     rhs = matrix(1.0, nrow = nrow(txdat), ncol = 1L),
     return.kernel.weights = TRUE,
-    where = where
+    where = where,
+    train.is.eval = train.is.eval
   )
 
   kw <- probe$kernel.weights
@@ -474,14 +545,19 @@
   sweep(H.raw, 1L, row.scale, "*")
 }
 
-.npcdhat_make_kernel_matrix <- function(kbw, txdat, exdat, operator) {
+.npcdhat_make_kernel_matrix <- function(kbw,
+                                        txdat,
+                                        exdat,
+                                        operator,
+                                        train.is.eval = FALSE) {
   if (!identical(kbw$type, "fixed")) {
     return(.np_exact_operator_matrix(
       kbw = kbw,
       txdat = txdat,
       exdat = exdat,
       operator = operator,
-      where = "conditional hat exact kernel matrix"
+      where = "conditional hat exact kernel matrix",
+      train.is.eval = train.is.eval
     ))
   }
 
@@ -490,31 +566,47 @@
     txdat = txdat,
     exdat = exdat,
     operator = operator,
-    where = "conditional hat direct kernel matrix"
+    where = "conditional hat direct kernel matrix",
+    train.is.eval = train.is.eval
   )
 }
 
-.npcdhat_ratio_matrix <- function(bws, txdat, tydat, exdat, eydat, operator) {
+.npcdhat_ratio_matrix <- function(bws,
+                                  txdat,
+                                  tydat,
+                                  exdat,
+                                  eydat,
+                                  operator,
+                                  train.is.eval = FALSE) {
   xkbw <- .npcdhat_make_xkbw(bws = bws, txdat = txdat)
   ybw <- .npcdhat_make_ybw(bws = bws, tydat = tydat)
   Kx <- .npcdhat_make_kernel_matrix(
     kbw = xkbw,
     txdat = txdat,
     exdat = exdat,
-    operator = rep.int("normal", ncol(txdat))
+    operator = rep.int("normal", ncol(txdat)),
+    train.is.eval = train.is.eval
   )
   Ky <- .npcdhat_make_kernel_matrix(
     kbw = ybw,
     txdat = tydat,
     exdat = eydat,
-    operator = rep.int(operator, ncol(tydat))
+    operator = rep.int(operator, ncol(tydat)),
+    train.is.eval = train.is.eval
   )
 
   denom <- rowSums(Kx) / nrow(txdat)
   sweep((Kx * Ky) / nrow(txdat), 1L, pmax(denom, .Machine$double.eps), "/")
 }
 
-.npcdhat_exact_matrix <- function(bws, txdat, tydat, exdat, eydat, operator, x.s = NULL) {
+.npcdhat_exact_matrix <- function(bws,
+                                  txdat,
+                                  tydat,
+                                  exdat,
+                                  eydat,
+                                  operator,
+                                  x.s = NULL,
+                                  train.is.eval = FALSE) {
   if (.npcdhat_use_adaptive_ratio(bws = bws, x.s = x.s)) {
     return(.npcdhat_ratio_matrix(
       bws = bws,
@@ -522,7 +614,8 @@
       tydat = tydat,
       exdat = exdat,
       eydat = eydat,
-      operator = operator
+      operator = operator,
+      train.is.eval = train.is.eval
     ))
   }
 
@@ -531,19 +624,29 @@
     bws = bws,
     txdat = txdat,
     exdat = exdat,
-    s = x.s
+    s = x.s,
+    train.is.eval = train.is.eval
   )
   Gy <- .npcdhat_make_kernel_matrix(
     kbw = ybw,
     txdat = tydat,
     exdat = eydat,
-    operator = rep.int(operator, ncol(tydat))
+    operator = rep.int(operator, ncol(tydat)),
+    train.is.eval = train.is.eval
   )
 
   Hx * Gy
 }
 
-.npcdhat_exact_apply <- function(bws, txdat, tydat, exdat, eydat, rhs, operator, x.s = NULL) {
+.npcdhat_exact_apply <- function(bws,
+                                 txdat,
+                                 tydat,
+                                 exdat,
+                                 eydat,
+                                 rhs,
+                                 operator,
+                                 x.s = NULL,
+                                 train.is.eval = FALSE) {
   if (.npcdhat_use_adaptive_ratio(bws = bws, x.s = x.s)) {
     H <- .npcdhat_ratio_matrix(
       bws = bws,
@@ -551,7 +654,8 @@
       tydat = tydat,
       exdat = exdat,
       eydat = eydat,
-      operator = operator
+      operator = operator,
+      train.is.eval = train.is.eval
     )
     return(H %*% rhs)
   }
@@ -561,13 +665,15 @@
     bws = bws,
     txdat = txdat,
     exdat = exdat,
-    s = x.s
+    s = x.s,
+    train.is.eval = train.is.eval
   )
   Gy <- .npcdhat_make_kernel_matrix(
     kbw = ybw,
     txdat = tydat,
     exdat = eydat,
-    operator = rep.int(operator, ncol(tydat))
+    operator = rep.int(operator, ncol(tydat)),
+    train.is.eval = train.is.eval
   )
 
   (Hx * Gy) %*% rhs
@@ -673,7 +779,8 @@
       eydat = eydat,
       rhs = y,
       operator = operator,
-      x.s = x.s
+      x.s = x.s,
+      train.is.eval = no.exy
     )
     if (ncol(out) == 1L)
       return(as.vector(out))
@@ -687,7 +794,8 @@
     exdat = exdat,
     eydat = eydat,
     operator = operator,
-    x.s = x.s
+    x.s = x.s,
+    train.is.eval = no.exy
   )
 
   class(H) <- c(class_name, "matrix")

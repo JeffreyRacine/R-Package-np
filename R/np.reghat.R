@@ -2014,8 +2014,13 @@ npreghat.rbandwidth <-
     }
 
     if (exact.core.route) {
+      if (lc.derivative.exact.route && !beta.kernel &&
+          identical(bws[["ckertype", exact = TRUE]], "uniform")) {
+        .np_warning("ignoring kernel order specified with uniform kernel type")
+      }
       H <- if (exact.beta.native.route || native.lp.mean.matrix.route ||
-                   native.loo.route) {
+                   native.loo.route ||
+                   (lc.derivative.exact.route && !beta.kernel)) {
         .npreghat_exact_lp_matrix_from_regression_core(
           bws = bws,
           txdat = txdat,
