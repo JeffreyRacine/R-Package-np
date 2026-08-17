@@ -622,7 +622,7 @@ test_that("conditional LP row contexts own reusable full-row solve storage", {
   struct_start <- grep("^typedef struct \\{$", lines)
   struct_stop <- grep("^} NPConditionalXRowCtx;$", lines)
   impl_start <- grep("^static int np_conditional_xrow_from_ctx_impl\\(", lines)
-  prepare_start <- grep("^static int np_conditional_xrow_ctx_prepare\\(", lines)
+  prepare_start <- grep("^static int np_conditional_xrow_ctx_prepare_impl\\(", lines)
   clear_start <- grep("^static void np_conditional_xrow_ctx_clear\\(", lines)
   wrapper_start <- grep("^static int np_conditional_xrow_from_ctx\\(", lines)
   expect_length(struct_stop, 1L)
