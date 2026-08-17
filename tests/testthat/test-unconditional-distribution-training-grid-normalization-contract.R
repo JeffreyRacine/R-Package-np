@@ -73,6 +73,44 @@ test_that("unconditional continuous CDF-CV averages the admitted ordered pairs",
   }
 })
 
+test_that("extended adaptive CDF-CV shares the empirical pair finalizer", {
+  old_options <- options(np.extendednn = TRUE)
+  on.exit(options(old_options), add = TRUE)
+
+  value <- cbind(
+    seq(-1.7, 2.2, length.out = 9L),
+    sin(seq_len(9L) * 0.71) + seq_len(9L) / 19
+  )
+  dat <- as.data.frame(value)
+  names(dat) <- c("x1", "x2")
+  extended_k <- c(nrow(value) + 2L, nrow(value) + 3L)
+  bandwidth <- vapply(seq_len(ncol(value)), function(coordinate) {
+    vapply(seq_len(nrow(value)), function(donor) {
+      max(abs(value[-donor, coordinate] - value[donor, coordinate])) *
+        extended_k[[coordinate]] / (nrow(value) - 1L)
+    }, numeric(1L))
+  }, numeric(nrow(value)))
+  expected <- udist_literal_training_grid(
+    value,
+    function(evaluation, donor, coordinate) {
+      donor_index <- match(donor, value[, coordinate])
+      stats::pnorm(
+        (evaluation - donor) / bandwidth[donor_index, coordinate]
+      )
+    }
+  )
+  state <- npudistbw(
+    dat = dat, bws = extended_k, bwmethod = "cv.cdf",
+    bwtype = "adaptive_nn", bwscaling = FALSE,
+    ckertype = "gaussian", bandwidth.compute = FALSE
+  )
+
+  expect_equal(
+    udist_training_grid_objective(dat, state, FALSE, FALSE),
+    expected, tolerance = 1e-10
+  )
+})
+
 test_that("beta CDF-CV uses the same empirical training-grid normalization", {
   value <- c(0.04, 0.12, 0.27, 0.43, 0.61, 0.78, 0.93)
   dat <- data.frame(x = value)
