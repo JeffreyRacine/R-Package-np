@@ -1,5 +1,15 @@
 # np 0.70-6
 
+* Regression leave-one-out hat-matrix and apply routes now share the objective's
+  occurrence-aware generalized/adaptive NN geometry, source basis, weighted
+  moment layout, factorization, bounded ridge transcript, and intercept
+  restoration. Matrix and apply consume the same completed influence row;
+  apply retains linear-in-sample auxiliary storage and does not construct an
+  evaluation-by-training matrix. The reconstructed owner preserves the
+  August-16 one-call response solve and existing bounded ridge boundary;
+  all-zero compact-kernel LOO rows now fail explicitly instead of returning a
+  fabricated ridged estimate.
+
 * Empirical-sample conditional-distribution CV now evaluates the documented
   off-diagonal criterion with divisor `n(n - 1)`. Ordinary generalized
   nearest-neighbour rows construct the explanatory radius from the delete-one

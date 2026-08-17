@@ -8699,7 +8699,8 @@ static SEXP np_regression_lp_apply_conditional_impl(SEXP txuno,
                                                      SEXP ckerub,
                                                      SEXP categorical_compress,
                                                      SEXP return_hat,
-                                                     SEXP train_is_eval)
+                                                     SEXP train_is_eval,
+                                                     SEXP leave_one_out)
 {
   SEXP txuno_r = R_NilValue, txord_r = R_NilValue, txcon_r = R_NilValue;
   SEXP exuno_r = R_NilValue, exord_r = R_NilValue, excon_r = R_NilValue;
@@ -8715,6 +8716,8 @@ static SEXP np_regression_lp_apply_conditional_impl(SEXP txuno,
   int return_hat_flag = asLogical(return_hat);
   const int has_geometry_context = train_is_eval != R_NilValue;
   int train_is_eval_flag = has_geometry_context ? asLogical(train_is_eval) : FALSE;
+  int leave_one_out_flag =
+    leave_one_out != R_NilValue ? asLogical(leave_one_out) : FALSE;
   int lp_engine = NP_LP_ENGINE_GENERAL;
   int derivative_variable = 0;
   int derivative_order = 0;
@@ -8793,6 +8796,10 @@ static SEXP np_regression_lp_apply_conditional_impl(SEXP txuno,
     error("C_np_regression_lp_apply_conditional: invalid return-hat flag");
   if(has_geometry_context && train_is_eval_flag == NA_LOGICAL)
     error("C_np_regression_lp_apply_conditional: invalid training-identity flag");
+  if(leave_one_out_flag == NA_LOGICAL)
+    error("C_np_regression_lp_apply_conditional: invalid leave-one-out flag");
+  if(leave_one_out_flag && !train_is_eval_flag)
+    error("C_np_regression_lp_apply_conditional: leave-one-out requires training identity");
   if(train_is_eval_flag && num_obs_eval != num_obs_train)
     error("C_np_regression_lp_apply_conditional: training identity requires equal row counts");
   if(!return_hat_flag && ((nrow_rhs <= 0) || (ncol_rhs <= 0)))
@@ -8998,19 +9005,29 @@ static SEXP np_regression_lp_apply_conditional_impl(SEXP txuno,
       ridge_used = PROTECT(allocVector(REALSXP, num_obs_eval));
       nprotect++;
     }
-    compute_status = np_regression_lp_hat_matrix(
-      REAL(rbw_r), derivative_variable, derivative_order, REAL(out),
-      (ridge_used != R_NilValue) ? REAL(ridge_used) : NULL,
-      active_route, active_diagnostics, categorical_compress_flag,
-      nn_geometry_context_ptr);
+    if(leave_one_out_flag){
+      if(descriptor.family != NP_CKERNEL_FAMILY_LEGACY ||
+         derivative_order != 0)
+        error("C_np_regression_lp_apply_conditional: unsupported leave-one-out route");
+      compute_status = np_regression_lp_leave_one_out_influence(
+        REAL(rbw_r), NULL, 0, REAL(out), NULL,
+        (ridge_used != R_NilValue) ? REAL(ridge_used) : NULL);
+    } else {
+      compute_status = np_regression_lp_hat_matrix(
+        REAL(rbw_r), derivative_variable, derivative_order, REAL(out),
+        (ridge_used != R_NilValue) ? REAL(ridge_used) : NULL,
+        active_route, active_diagnostics, categorical_compress_flag,
+        nn_geometry_context_ptr);
+    }
     if(compute_status == NP_REGRESSION_LP_MATRIX_OK &&
        ridge_used != R_NilValue)
       setAttrib(out, install("ridge.used"), ridge_used);
     if(compute_status != NP_REGRESSION_LP_MATRIX_OK)
-      failure_message =
-        (compute_status == NP_REGRESSION_LP_MATRIX_ZERO_RADIUS) ?
+      failure_message = compute_status == NP_REGRESSION_LP_MATRIX_ZERO_RADIUS ?
         "generalized nearest-neighbor bandwidth has a zero literal radius after occurrence exclusion" :
-        "LP hat helper failed";
+        (compute_status == NP_REGRESSION_LP_MATRIX_ZERO_MASS ?
+         "leave-one-out kernel row has zero effective mass" :
+         "LP hat helper failed");
   } else {
     rhs_cols = (double **)malloc((size_t)ncol_rhs*sizeof(double *));
     if(rhs_cols == NULL) {
@@ -9022,15 +9039,28 @@ static SEXP np_regression_lp_apply_conditional_impl(SEXP txuno,
 
     out = PROTECT(allocMatrix(REALSXP, num_obs_eval, ncol_rhs));
     nprotect++;
-    compute_status = np_regression_lp_apply_matrix(
-      REAL(rbw_r), rhs_cols, ncol_rhs, REAL(out),
-      active_route, active_diagnostics, categorical_compress_flag,
-      nn_geometry_context_ptr);
+    if(leave_one_out_flag){
+      if(descriptor.family != NP_CKERNEL_FAMILY_LEGACY ||
+         derivative_order != 0)
+        error("C_np_regression_lp_apply_conditional: unsupported leave-one-out route");
+      ridge_used = PROTECT(allocVector(REALSXP, num_obs_eval));
+      nprotect++;
+      compute_status = np_regression_lp_leave_one_out_influence(
+        REAL(rbw_r), rhs_cols, ncol_rhs, NULL, REAL(out), REAL(ridge_used));
+      if(compute_status == NP_REGRESSION_LP_MATRIX_OK)
+        setAttrib(out, install("ridge.used"), ridge_used);
+    } else {
+      compute_status = np_regression_lp_apply_matrix(
+        REAL(rbw_r), rhs_cols, ncol_rhs, REAL(out),
+        active_route, active_diagnostics, categorical_compress_flag,
+        nn_geometry_context_ptr);
+    }
     if(compute_status != NP_REGRESSION_LP_MATRIX_OK)
-      failure_message =
-        (compute_status == NP_REGRESSION_LP_MATRIX_ZERO_RADIUS) ?
+      failure_message = compute_status == NP_REGRESSION_LP_MATRIX_ZERO_RADIUS ?
         "generalized nearest-neighbor bandwidth has a zero literal radius after occurrence exclusion" :
-        "LP apply helper failed";
+        (compute_status == NP_REGRESSION_LP_MATRIX_ZERO_MASS ?
+         "leave-one-out kernel row has zero effective mass" :
+         "LP apply helper failed");
   }
 
 cleanup_lp_apply_wrapper:
@@ -9108,7 +9138,7 @@ SEXP C_np_regression_lp_apply_conditional(SEXP txuno,
     kernel_x, kernel_xu, kernel_xo, use_tree, glp_degree,
     glp_gradient_order, glp_bernstein, glp_basis,
     continuous_kernel_family, continuous_kernel_order, ckerlb, ckerub,
-    categorical_compress, return_hat, R_NilValue);
+    categorical_compress, return_hat, R_NilValue, R_NilValue);
 }
 
 SEXP C_np_regression_lp_apply_conditional_ctx(SEXP txuno,
@@ -9134,14 +9164,15 @@ SEXP C_np_regression_lp_apply_conditional_ctx(SEXP txuno,
                                               SEXP ckerub,
                                               SEXP categorical_compress,
                                               SEXP return_hat,
-                                              SEXP train_is_eval)
+                                              SEXP train_is_eval,
+                                              SEXP leave_one_out)
 {
   return np_regression_lp_apply_conditional_impl(
     txuno, txord, txcon, exuno, exord, excon, rhs, rbw, bwtype,
     kernel_x, kernel_xu, kernel_xo, use_tree, glp_degree,
     glp_gradient_order, glp_bernstein, glp_basis,
     continuous_kernel_family, continuous_kernel_order, ckerlb, ckerub,
-    categorical_compress, return_hat, train_is_eval);
+    categorical_compress, return_hat, train_is_eval, leave_one_out);
 }
 
 static void np_density_bw_integer_contract_or_error(SEXP myopti,
