@@ -21523,6 +21523,19 @@ static int np_conditional_distribution_cvls_gnn_empirical_stream(
   double *vector_scale_factor,
   double *cv);
 
+typedef enum {
+  NP_CONDITIONAL_ADAPTIVE_EXACT_NOT_APPLICABLE = 0,
+  NP_CONDITIONAL_ADAPTIVE_EXACT_SUCCESS = 1,
+  NP_CONDITIONAL_ADAPTIVE_EXACT_FAILURE = -1
+} NPConditionalAdaptiveExactStatus;
+
+static NPConditionalAdaptiveExactStatus
+np_conditional_distribution_cvls_adaptive_exact(
+  double *vector_scale_factor,
+  int *num_categories_y,
+  double **matrix_categorical_vals_y,
+  double *cv);
+
 static double np_conditional_distribution_cvls_pair_count(
   const int64_t num_train,
   const int64_t num_eval,
@@ -21572,6 +21585,18 @@ double *cv){
   if(BANDWIDTH_den == BW_GEN_NN && cdfontrain)
     return np_conditional_distribution_cvls_gnn_empirical_stream(
       vector_scale_factor, cv);
+
+  if(BANDWIDTH_den == BW_ADAP_NN && cdfontrain){
+    const NPConditionalAdaptiveExactStatus adaptive_status =
+      np_conditional_distribution_cvls_adaptive_exact(
+        vector_scale_factor, num_categories,
+        matrix_categorical_vals, cv);
+
+    if(adaptive_status == NP_CONDITIONAL_ADAPTIVE_EXACT_SUCCESS)
+      return 0;
+    if(adaptive_status == NP_CONDITIONAL_ADAPTIVE_EXACT_FAILURE)
+      return 1;
+  }
 
   if(BANDWIDTH_den == BW_FIXED){
     const NPConditionalProfileCvStatus profile_status =
@@ -34093,12 +34118,6 @@ int np_conditional_density_cvml_stream_engine_supported(void){
      (BANDWIDTH_den_extern != BW_ADAP_NN));
 }
 
-typedef enum {
-  NP_CONDITIONAL_ADAPTIVE_EXACT_NOT_APPLICABLE = 0,
-  NP_CONDITIONAL_ADAPTIVE_EXACT_SUCCESS = 1,
-  NP_CONDITIONAL_ADAPTIVE_EXACT_FAILURE = -1
-} NPConditionalAdaptiveExactStatus;
-
 /*
  * Ordinary integer-k adaptive-NN candidates admit exact delete-one geometry.
  * Extended-NN scales retain their separate incumbent contract until that
@@ -35446,6 +35465,101 @@ int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
   return np_conditional_density_cvls_lp_stream_impl(
     vector_scale_factor, num_categories_extern_Y,
     matrix_categorical_vals_extern_Y, cv);
+}
+
+/*
+ * Exact empirical-grid adaptive-NN conditional-distribution CV.  Fold i
+ * selects every retained donor k's X and Y radii from D_n\{i,k}; all mapped
+ * response queries j in that fold reuse those donor radii while the estimator
+ * sum excludes only i through the signed X influence row.  Primary/successor
+ * preparation and one selected row per coordinate keep auxiliary storage
+ * O(p*n + n), with no fold-by-donor radius matrix.
+ */
+static NPConditionalAdaptiveExactStatus
+np_conditional_distribution_cvls_adaptive_exact(
+  double *vector_scale_factor,
+  int *num_categories_y,
+  double **matrix_categorical_vals_y,
+  double *cv)
+{
+  const int num_train = num_obs_train_extern;
+  const int num_eval = num_obs_eval_extern;
+  const double pair_count = np_conditional_distribution_cvls_pair_count(
+    num_train, num_eval, 1);
+  NPConditionalXRowCtx xctx = {0};
+  NPConditionalYRowCtx yctx = {0};
+  double *xrow = NULL;
+  double *yint = NULL;
+  int i, j;
+  NPConditionalAdaptiveExactStatus status;
+
+  if(cv == NULL || vector_scale_factor == NULL || num_train < 3 ||
+     num_eval != num_train || !cdfontrain_extern || pair_count <= 0.0)
+    return NP_CONDITIONAL_ADAPTIVE_EXACT_FAILURE;
+
+  status = np_conditional_adaptive_exact_scale_status(vector_scale_factor);
+  if(status != NP_CONDITIONAL_ADAPTIVE_EXACT_SUCCESS)
+    return status;
+
+#ifdef MPI2
+  /* The rank-symmetric owner and its single terminal reduction are Phase A3. */
+  return NP_CONDITIONAL_ADAPTIVE_EXACT_NOT_APPLICABLE;
+#endif
+
+  xrow = alloc_vecd(MAX(1, num_train));
+  yint = alloc_vecd(MAX(1, num_train));
+  if(xrow == NULL || yint == NULL)
+    goto fail_adaptive_cdist;
+  if(np_conditional_xrow_ctx_prepare_adaptive_fold(
+       vector_scale_factor, &xctx) != 0)
+    goto fail_adaptive_cdist;
+  if(np_conditional_yrow_ctx_prepare_adaptive_fold(
+       vector_scale_factor, OP_INTEGRAL,
+       num_categories_y, matrix_categorical_vals_y, &yctx) != 0)
+    goto fail_adaptive_cdist;
+
+  *cv = 0.0;
+  for(i = 0; i < num_train; ++i){
+    if((i & 15) == 0)
+      np_progress_bandwidth_loop_step();
+    if(np_conditional_xrow_ctx_select_adaptive_fold(&xctx, i) != 0 ||
+       np_conditional_yrow_ctx_select_adaptive_fold(&yctx, i) != 0)
+      goto fail_adaptive_cdist;
+    if(np_conditional_xrow_from_ctx(&xctx, i, xrow) != 0)
+      goto fail_adaptive_cdist;
+
+    for(j = 0; j < num_eval; ++j){
+      double fit;
+      double difference;
+      int indicator;
+
+      if(i == j)
+        continue;
+      if(np_conditional_yrow_from_ctx(&yctx, j, yint) != 0)
+        goto fail_adaptive_cdist;
+      fit = np_blas_ddot_int(num_train, xrow, yint);
+      if(!R_FINITE(fit))
+        goto fail_adaptive_cdist;
+      indicator = np_conditional_indicator_original_order(i, j);
+      difference = (double)indicator - fit;
+      *cv += difference*difference;
+    }
+  }
+  *cv /= pair_count;
+
+  status = NP_CONDITIONAL_ADAPTIVE_EXACT_SUCCESS;
+  goto cleanup_adaptive_cdist;
+
+fail_adaptive_cdist:
+  status = NP_CONDITIONAL_ADAPTIVE_EXACT_FAILURE;
+
+cleanup_adaptive_cdist:
+  np_conditional_xrow_ctx_clear(&xctx);
+  np_conditional_yrow_ctx_clear(&yctx);
+  np_glp_cv_clear_extern();
+  if(xrow != NULL) free(xrow);
+  if(yint != NULL) free(yint);
+  return status;
 }
 
 /* Canonical generalized-NN empirical conditional-CDF row owner.  X row i is
