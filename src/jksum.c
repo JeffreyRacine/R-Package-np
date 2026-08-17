@@ -16330,7 +16330,6 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
   const int track_lowsupport_requested =
     (bwm == RBWM_CVLS) || (bwm == RBWM_CVCHECK) || (bwm == RBWM_CVKS);
   int track_lowsupport = track_lowsupport_requested;
-  const int solve_nrhs = (bwm == RBWM_CVAIC) ? 2 : 1;
 
   np_lp_solve_workspace_init(&solve_workspace);
 
@@ -16403,7 +16402,7 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
     }
   }
 
-  if(!np_lp_solve_workspace_reserve(&solve_workspace, nterms, solve_nrhs))
+  if(!np_lp_solve_workspace_reserve(&solve_workspace, nterms, 1))
     error("np_regression_cv_lp_basis_fixed: workspace allocation failed\n");
 
   if((moments == NULL) || (rhs == NULL) ||
@@ -16691,7 +16690,7 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
     const double * const sj = moments + (size_t)row_idx*(size_t)nterms*(size_t)nterms;
     const double * const tj = rhs + (size_t)row_idx*(size_t)nterms;
     const size_t soff = (size_t)row_idx*(size_t)nterms;
-    double nepsilon = 0.0;
+    NPLPSolvePolicyDiagnostics solve_diagnostics;
     double fit = 0.0;
 
     if(nterms == 1){
@@ -16710,7 +16709,6 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
     if(bwm == RBWM_CVAIC){
       for(a = 0; a < nterms; a++){
         const double ba = eval_basis[a];
-        solve_workspace.rhs_source[nterms + a] = ba;
         solve_workspace.rhs_source[a] += aicc*ba*vector_Y[eval_idx];
         for(b = 0; b < nterms; b++)
           solve_workspace.gram_source[a + b*nterms] +=
@@ -16718,49 +16716,28 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
       }
     }
 
-    if(track_lowsupport &&
-       (support_count[row_idx] <= nterms) &&
-       np_lp_cvls_lowsupport_fit(nterms,
-                                  support_count[row_idx],
-                                  basis,
-                                  vector_Y,
-                                  eval_idx,
-                                  eval_basis,
-                                  support_orig + soff,
-                                  support_data + soff,
-                                  support_weight + soff,
-                                  &fit)){
-      nepsilon = 0.0;
-    } else {
-    {
-      int ridge_steps = 0;
-      while(!np_lp_solve_workspace_solve(&solve_workspace,
-                                         nterms,
-                                         solve_nrhs)){
-        if((ridge_steps >= NP_LP_SOLVE_MAX_RIDGE_STEPS) ||
-           !np_lp_solve_workspace_sources_finite(&solve_workspace,
-                                                 nterms,
-                                                 solve_nrhs))
-          goto cleanup_lp_cv;
-        for(a = 0; a < nterms; a++)
-          solve_workspace.gram_source[a + a*nterms] += epsilon;
-        nepsilon += epsilon;
-        ridge_steps++;
-      }
-    }
-
-    solve_workspace.rhs_source[0] +=
-      nepsilon*solve_workspace.rhs_source[0]/
-      NZD_POS(solve_workspace.gram_source[0]);
-    if(nepsilon > 0.0){
-      if(!np_lp_solve_workspace_solve(&solve_workspace,
-                                       nterms,
-                                       solve_nrhs))
+    if(!(track_lowsupport &&
+         (support_count[row_idx] <= nterms) &&
+         np_lp_cvls_lowsupport_fit(nterms,
+                                    support_count[row_idx],
+                                    basis,
+                                    vector_Y,
+                                    eval_idx,
+                                    eval_basis,
+                                    support_orig + soff,
+                                    support_data + soff,
+                                    support_weight + soff,
+                                    &fit))){
+      if(np_lp_solve_workspace_solve_response(&solve_workspace,
+                                              nterms,
+                                              1,
+                                              epsilon,
+                                              &solve_diagnostics) !=
+         NP_LP_SOLVE_POLICY_OK)
         goto cleanup_lp_cv;
-    }
 
-    for(a = 0; a < nterms; a++)
-      fit += eval_basis[a]*solve_workspace.rhs_work[a];
+      for(a = 0; a < nterms; a++)
+        fit += eval_basis[a]*solve_workspace.rhs_work[a];
     }
 
     {
@@ -16774,7 +16751,15 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
     if(bwm == RBWM_CVAIC){
       double hii = 0.0;
       for(a = 0; a < nterms; a++)
-        hii += eval_basis[a]*solve_workspace.rhs_work[nterms + a];
+        solve_workspace.rhs_source[a] = eval_basis[a];
+      if(np_lp_solve_workspace_solve_adjoint_factored(
+           &solve_workspace,
+           nterms,
+           1,
+           &solve_diagnostics) != NP_LP_SOLVE_POLICY_OK)
+        goto cleanup_lp_cv;
+      for(a = 0; a < nterms; a++)
+        hii += eval_basis[a]*solve_workspace.rhs_work[a];
       result.traceH += hii*aicc;
     }
   }
@@ -16953,7 +16938,6 @@ static NP_NOINLINE NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas(
     const int nterms,
     double **basis){
   NPRegCvLpResult result = {DBL_MAX, 0.0, 0};
-  const int solve_nrhs = (bwm == RBWM_CVAIC) ? 2 : 1;
   const int basis_stride = np_glp_cv_cache.basis_stride;
   const double epsilon = 1.0/(double)MAX(1, num_obs);
   const NP_OuterPackCtx frozen_runtime_options = {
@@ -17061,7 +17045,7 @@ static NP_NOINLINE NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas(
      (eval_u == NULL) || (eval_o == NULL) || (eval_c == NULL) ||
      (matrix_bandwidth_eval == NULL) ||
      !np_lp_solve_workspace_reserve(
-       &solve_workspace, nterms, solve_nrhs))
+       &solve_workspace, nterms, 1))
     goto cleanup_adaptive_blas;
 
   if((sf_flag = (int_LARGE_SF == 0))){
@@ -17091,8 +17075,7 @@ static NP_NOINLINE NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas(
     double **row_bandwidth = matrix_bandwidth;
     const double yj = vector_Y[j];
     double self_weight;
-    double nepsilon = 0.0;
-    int ridge_steps = 0;
+    NPLPSolvePolicyDiagnostics solve_diagnostics;
     int adaptive_gaussian_row = 0;
 
     if((j & 31) == 0)
@@ -17255,7 +17238,6 @@ static NP_NOINLINE NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas(
     if(bwm == RBWM_CVAIC){
       for(l = 0; l < nterms; l++){
         const double bl = eval_basis[l];
-        solve_workspace.rhs_source[nterms + l] = bl;
         solve_workspace.rhs_source[l] += self_weight*bl*yj;
         for(i = 0; i < nterms; i++)
           solve_workspace.gram_source[l + i*nterms] +=
@@ -17263,26 +17245,13 @@ static NP_NOINLINE NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas(
       }
     }
 
-    while(!np_lp_solve_workspace_solve(
-      &solve_workspace, nterms, solve_nrhs)){
-      if((ridge_steps >= NP_LP_SOLVE_MAX_RIDGE_STEPS) ||
-         !np_lp_solve_workspace_sources_finite(
-           &solve_workspace, nterms, solve_nrhs))
-        goto cleanup_adaptive_blas;
-      for(l = 0; l < nterms; l++)
-        solve_workspace.gram_source[l + l*nterms] += epsilon;
-      nepsilon += epsilon;
-      ridge_steps++;
-    }
-
-    solve_workspace.rhs_source[0] +=
-      nepsilon*solve_workspace.rhs_source[0]/
-      NZD_POS(solve_workspace.gram_source[0]);
-    if(nepsilon > 0.0){
-      if(!np_lp_solve_workspace_solve(
-        &solve_workspace, nterms, solve_nrhs))
-        goto cleanup_adaptive_blas;
-    }
+    if(np_lp_solve_workspace_solve_response(&solve_workspace,
+                                            nterms,
+                                            1,
+                                            epsilon,
+                                            &solve_diagnostics) !=
+       NP_LP_SOLVE_POLICY_OK)
+      goto cleanup_adaptive_blas;
 
     {
       double fit = 0.0;
@@ -17296,7 +17265,15 @@ static NP_NOINLINE NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas(
     if(bwm == RBWM_CVAIC){
       double hii = 0.0;
       for(l = 0; l < nterms; l++)
-        hii += eval_basis[l]*solve_workspace.rhs_work[nterms + l];
+        solve_workspace.rhs_source[l] = eval_basis[l];
+      if(np_lp_solve_workspace_solve_adjoint_factored(
+           &solve_workspace,
+           nterms,
+           1,
+           &solve_diagnostics) != NP_LP_SOLVE_POLICY_OK)
+        goto cleanup_adaptive_blas;
+      for(l = 0; l < nterms; l++)
+        hii += eval_basis[l]*solve_workspace.rhs_work[l];
       result.traceH += self_weight*hii;
     }
   }
@@ -25192,7 +25169,6 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 
 	        local_pos = 0;
 	        for(int jj = chunk_start + my_rank; jj < chunk_end; jj += iNum_Processors){
-	          double nepsilon_owner = 0.0;
 	          double sk_owner, ey_owner, ey2_owner, sigma2_owner;
 	          int have_vcov_owner = 0;
 	          double * const out_owner = owner->mpi_owner_chunk.sendbuf + (size_t)local_pos*(size_t)owner_row_width_lp;
@@ -25323,40 +25299,14 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	              owner->solve_workspace.gram_source[i+l*owner->nterms] =
 	                owner->moments[base + l + response_basis_offset];
 	          }
-	          {
-	            int ridge_steps = 0;
-	            while(!np_lp_solve_workspace_solve(&owner->solve_workspace,
-	                                               owner->nterms,
-	                                               1)){
-	              if((ridge_steps >= NP_LP_SOLVE_MAX_RIDGE_STEPS) ||
-	                 !np_lp_solve_workspace_sources_finite(
-	                   &owner->solve_workspace,
-	                   owner->nterms,
-	                   1)){
-	                owner_solve_failed = 1;
-	                break;
-	              }
-	              for(i = 0; i < owner->nterms; i++)
-	                owner->solve_workspace.gram_source[
-	                  i+i*owner->nterms
-	                ] += epsilon;
-	              nepsilon_owner += epsilon;
-	              ridge_steps++;
-	            }
-	            if(owner_solve_failed)
-	              break;
-	          }
-
-	          owner->solve_workspace.rhs_source[0] +=
-	            nepsilon_owner*owner->solve_workspace.rhs_source[0]/
-	            NZD_POS(owner->solve_workspace.gram_source[0]);
-	          if(nepsilon_owner > 0.0){
-	            if(!np_lp_solve_workspace_solve(&owner->solve_workspace,
-	                                            owner->nterms,
-	                                            1)){
-	              owner_solve_failed = 1;
-	              break;
-	            }
+	          if(np_lp_solve_workspace_solve_response(
+	               &owner->solve_workspace,
+	               owner->nterms,
+	               1,
+	               epsilon,
+	               NULL) != NP_LP_SOLVE_POLICY_OK){
+	            owner_solve_failed = 1;
+	            break;
 	          }
 	          for(i = 0; i < owner->nterms; i++)
 	            owner->coefficient[i] = owner->solve_workspace.rhs_work[i];

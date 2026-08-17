@@ -146,19 +146,9 @@ test_that("fixed resident-row LP CV uses the reusable uncentered solve workspace
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
 
   lines <- readLines(src_file, warn = FALSE)
-  helper_start <- grep(
-    "^static NPRegCvLpResult np_regression_cv_lp_basis_fixed\\(",
-    lines
+  helper_body <- np_test_extract_c_function(
+    lines, "np_regression_cv_lp_basis_fixed"
   )
-  helper_stop <- grep(
-    "^static NPRegCvLpResult np_regression_cv_lp_objective\\(",
-    lines
-  )
-  expect_length(helper_start, 1L)
-  expect_length(helper_stop, 1L)
-  expect_lt(helper_start, helper_stop)
-
-  helper_body <- paste(lines[helper_start:(helper_stop - 1L)], collapse = "\n")
   expect_true(grepl(
     "solve_workspace.gram_source[a + b*nterms] = sj[a*nterms+b];",
     helper_body,
@@ -170,17 +160,17 @@ test_that("fixed resident-row LP CV uses the reusable uncentered solve workspace
     fixed = TRUE
   ))
   expect_true(grepl(
-    "hii += eval_basis[a]*solve_workspace.rhs_work[nterms + a];",
+    "hii += eval_basis[a]*solve_workspace.rhs_work[a];",
     helper_body,
     fixed = TRUE
   ))
   expect_true(grepl(
-    "np_lp_solve_workspace_sources_finite(",
+    "np_lp_solve_workspace_solve_response(&solve_workspace,",
     helper_body,
     fixed = TRUE
   ))
   expect_true(grepl(
-    "ridge_steps >= NP_LP_SOLVE_MAX_RIDGE_STEPS",
+    "np_lp_solve_workspace_solve_adjoint_factored(",
     helper_body,
     fixed = TRUE
   ))
@@ -189,6 +179,10 @@ test_that("fixed resident-row LP CV uses the reusable uncentered solve workspace
   expect_false(grepl("center_raw", helper_body, fixed = TRUE))
   expect_false(grepl("SHIFT", helper_body, fixed = TRUE))
   expect_false(grepl("mat_inv00", helper_body, fixed = TRUE))
+  expect_false(grepl("NP_LP_SOLVE_MAX_RIDGE_STEPS", helper_body,
+                     fixed = TRUE))
+  expect_false(grepl("np_lp_solve_workspace_sources_finite(", helper_body,
+                     fixed = TRUE))
 })
 
 test_that("all-large, packed, and nearest-neighbor LP CV avoid legacy solve marshalling", {

@@ -15,19 +15,6 @@ locate_kernel_bandwidth_source <- function() {
   paths[[1L]]
 }
 
-kernel_bandwidth_function_region <- function(source, name, next_name = NULL) {
-  start <- grep(paste0("^int ", name, "\\("), source)
-  stopifnot(length(start) == 1L)
-  if (is.null(next_name)) {
-    stop <- length(source)
-  } else {
-    next_start <- grep(paste0("^int ", next_name, "\\("), source)
-    stopifnot(length(next_start) == 1L)
-    stop <- next_start - 1L
-  }
-  paste(source[seq.int(start, stop)], collapse = "\n")
-}
-
 test_that("shared bandwidth owners clean ordinary NN failures", {
   path <- locate_kernel_bandwidth_source()
   skip_if(is.null(path), "package sources unavailable")
@@ -35,13 +22,11 @@ test_that("shared bandwidth owners clean ordinary NN failures", {
 
   regions <- list(
     kernel_bandwidth = list(
-      code = kernel_bandwidth_function_region(
-        source, "kernel_bandwidth", "np_kernel_bandwidth_continuous_nn"
-      ),
+      code = np_test_extract_c_function(source, "kernel_bandwidth_ctx"),
       cleanup_gotos = 8L
     ),
     kernel_bandwidth_mean = list(
-      code = kernel_bandwidth_function_region(source, "kernel_bandwidth_mean"),
+      code = np_test_extract_c_function(source, "kernel_bandwidth_mean_ctx"),
       cleanup_gotos = 2L
     )
   )
@@ -62,8 +47,8 @@ test_that("shared bandwidth owners clean ordinary NN failures", {
     expect_match(region, "return(status);", fixed = TRUE)
   }
 
-  owner <- kernel_bandwidth_function_region(
-    source, "np_kernel_bandwidth_continuous_nn", "kernel_bandwidth_mean"
+  owner <- np_test_extract_c_function(
+    source, "np_kernel_bandwidth_continuous_nn"
   )
   expect_match(owner, "nn_distance = alloc_vecd", fixed = TRUE)
   expect_match(owner, "free(nn_distance);", fixed = TRUE)

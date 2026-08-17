@@ -14,32 +14,16 @@ locate_adaptive_xrow_blas_source <- function() {
   if (!length(hits)) NULL else hits[[1L]]
 }
 
-adaptive_xrow_source_body <- function(lines, start_pattern, stop_pattern) {
-  start <- grep(start_pattern, lines)
-  stop <- grep(stop_pattern, lines)
-  expect_length(start, 1L)
-  expect_gte(length(stop), 1L)
-  stop <- stop[stop > start][1L]
-  expect_true(is.finite(stop))
-  paste(lines[start:(stop - 1L)], collapse = "\n")
-}
-
 test_that("adaptive X-row context owns one bounded weighted-design slab", {
   src_file <- locate_adaptive_xrow_blas_source()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable")
   lines <- readLines(src_file, warn = FALSE)
   all_source <- paste(lines, collapse = "\n")
-  prepare <- adaptive_xrow_source_body(
-    lines,
-    "^static int np_conditional_xrow_ctx_prepare\\(",
-    "^static int np_conditional_xrow_from_ctx_impl\\("
+  prepare <- np_test_extract_c_function(
+    lines, "np_conditional_xrow_ctx_prepare_impl"
   )
-  clear <- adaptive_xrow_source_body(
-    lines,
-    "^static void np_conditional_xrow_ctx_clear\\(",
-    "^static int np_conditional_xrow_ctx_prepare\\("
-  )
-  compact <- gsub("[[:space:]]+", " ", prepare)
+  clear <- np_test_extract_c_function(lines, "np_conditional_xrow_ctx_clear")
+  compact <- np_test_compact_source(prepare)
 
   expect_match(all_source, "double *weighted_design;", fixed = TRUE)
   expect_match(
@@ -69,12 +53,13 @@ test_that("adaptive X rows preserve signed solve deletion and scalar fallback", 
   src_file <- locate_adaptive_xrow_blas_source()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable")
   lines <- readLines(src_file, warn = FALSE)
-  body <- adaptive_xrow_source_body(
-    lines,
-    "^static int np_conditional_xrow_from_ctx_impl\\(",
-    "^static int np_conditional_xrow_from_ctx\\("
+  body <- np_test_extract_c_function(
+    lines, "np_conditional_xrow_legacy_influence"
   )
-  compact <- gsub("[[:space:]]+", " ", body)
+  dispatch <- np_test_extract_c_function(
+    lines, "np_conditional_xrow_from_ctx_impl"
+  )
+  compact <- np_test_compact_source(body)
 
   expect_match(
     body,
@@ -95,7 +80,7 @@ test_that("adaptive X rows preserve signed solve deletion and scalar fallback", 
   )
   expect_match(
     body,
-    "np_lp_delete_denominator(row_out[eval_idx], &den)",
+    "np_lp_delete_denominator(row_out[eval_idx], &denominator)",
     fixed = TRUE
   )
   expect_match(
@@ -113,6 +98,16 @@ test_that("adaptive X rows preserve signed solve deletion and scalar fallback", 
     "} else { for(j = 0; j < num_train; j++){ double zju = 0.0;",
     fixed = TRUE
   )
+  expect_match(
+    dispatch,
+    "np_conditional_xrow_legacy_influence(",
+    fixed = TRUE
+  )
+  expect_match(
+    dispatch,
+    "np_regression_xrow_canonical_influence(",
+    fixed = TRUE
+  )
 })
 
 test_that("adaptive objective families share the context without a proof graph", {
@@ -120,23 +115,22 @@ test_that("adaptive objective families share the context without a proof graph",
   skip_if(is.null(src_file), "source file src/jksum.c unavailable")
   lines <- readLines(src_file, warn = FALSE)
   all_source <- paste(lines, collapse = "\n")
-  cv <- adaptive_xrow_source_body(
-    lines,
-    "^int np_conditional_density_cvml_lp_stream\\(",
-    "^int np_kernel_estimate_density_categorical_leave_one_out_cv\\("
+  cv <- np_test_extract_c_function(
+    lines, "np_conditional_density_cvml_lp_stream"
   )
 
   expect_false(grepl("np_shadow_", all_source, fixed = TRUE))
   expect_match(
-    all_source,
-    "if(use_row_ctx){\n    if(np_conditional_xrow_ctx_prepare(",
+    cv,
+    "if(use_row_ctx){\n    if(np_conditional_xrow_ctx_prepare_ctx(",
     fixed = TRUE
   )
-  expect_gte(
-    length(gregexpr(
-      "np_conditional_xrow_from_ctx\\(&xctx",
-      cv
-    )[[1L]]),
-    3L
+  expect_equal(
+    sum(gregexpr("np_conditional_xrow_from_ctx\\(&xctx", cv)[[1L]] > 0L),
+    1L
+  )
+  expect_equal(
+    sum(gregexpr("np_conditional_yrow_from_ctx\\(&yctx", cv)[[1L]] > 0L),
+    1L
   )
 })
