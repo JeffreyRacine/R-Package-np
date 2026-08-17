@@ -413,7 +413,7 @@ static int np_extendednn_enabled(void)
 	return flag == TRUE;
 }
 
-static int np_nn_lookup_from_scale(const int num_obs_train,
+int np_nn_lookup_from_scale(const int num_obs_train,
 const int allow_extended,
 const double scale_factor,
 int *lookup_k,
