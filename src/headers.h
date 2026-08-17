@@ -249,6 +249,20 @@ NPNNGeometryStatus compute_nn_distance_train_eval_ctx(int num_obs_train, int num
 int determine_categorical_vals(int num_obs, int num_var_unordered, int num_var_ordered, int num_reg_unordered, int num_reg_ordered, double **matrix_Y_unordered, double **matrix_Y_ordered, double **matrix_X_unordered, double **matrix_X_ordered, int *num_categories, double **matrix_categorical_vals);
 
 int np_fround(double x);
+int np_nn_two_slot_radius_select(double primary_radius,
+                                 double successor_radius,
+                                 double base_distance,
+                                 int distinct_base_exclusion,
+                                 double *radius);
+int np_nn_two_slot_exclusion_intervals(
+  const double *primary_radius,
+  const double *successor_radius,
+  const double *training_values,
+  int num_train,
+  const int *occurrence_to_position,
+  int *sorted_occurrences,
+  int *interval_start,
+  int *interval_end);
 
 int initialize_kernel_regression_asymptotic_constants(int KERNEL, int num_reg_continuous, double *INT_KERNEL_P, double *K_INT_KERNEL_P, double *INT_KERNEL_PM_HALF, double *DIFF_KER_PPM); 
 
