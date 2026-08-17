@@ -26895,8 +26895,21 @@ static void np_conditional_xrow_ctx_clear(NPConditionalXRowCtx *ctx){
   memset(ctx, 0, sizeof(*ctx));
 }
 
-static int np_conditional_xrow_ctx_prepare(double *vector_scale_factor,
-                                           NPConditionalXRowCtx *ctx){
+static const NPNNGeometryContext np_conditional_training_identity_geometry = {
+  .mode = NP_NN_QUERY_TRAINING_IDENTITY,
+  .eval_to_train = NULL
+};
+
+static const NPNNGeometryContext *
+np_conditional_gnn_training_geometry(const int bandwidth_mode){
+  return bandwidth_mode == BW_GEN_NN ?
+    &np_conditional_training_identity_geometry : NULL;
+}
+
+static int np_conditional_xrow_ctx_prepare_ctx(
+  double *vector_scale_factor,
+  const NPNNGeometryContext *nn_geometry_context,
+  NPConditionalXRowCtx *ctx){
   const int num_train = num_obs_train_extern;
   const int num_reg_tot = num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern;
   const int lp_engine = np_lp_engine_extern;
@@ -26966,7 +26979,7 @@ static int np_conditional_xrow_ctx_prepare(double *vector_scale_factor,
   for(i = 0; i < num_reg_ordered_extern; i++) ctx->kernel_ox[i] = KERNEL_reg_ordered_extern;
   for(i = 0; i < num_reg_tot; i++) ctx->x_operator[i] = OP_NORMAL;
 
-  if(kernel_bandwidth_mean(KERNEL_reg_extern,
+  if(kernel_bandwidth_mean_ctx(KERNEL_reg_extern,
                            BANDWIDTH_den_extern,
                            num_train,
                            num_train,
@@ -26984,7 +26997,10 @@ static int np_conditional_xrow_ctx_prepare(double *vector_scale_factor,
                            matrix_X_continuous_train_extern,
                            NULL,
                            ctx->matrix_bandwidth_x,
-                           ctx->lambdax) == 1)
+                           ctx->lambdax,
+                           nn_geometry_context,
+                           NULL,
+                           NULL) == 1)
     goto fail_xrow_ctx_prepare;
 
   if(lp_engine == NP_LP_ENGINE_GENERAL){
@@ -27037,6 +27053,11 @@ static int np_conditional_xrow_ctx_prepare(double *vector_scale_factor,
 fail_xrow_ctx_prepare:
   np_conditional_xrow_ctx_clear(ctx);
   return 1;
+}
+
+static int np_conditional_xrow_ctx_prepare(double *vector_scale_factor,
+                                           NPConditionalXRowCtx *ctx){
+  return np_conditional_xrow_ctx_prepare_ctx(vector_scale_factor, NULL, ctx);
 }
 
 static int np_conditional_xrow_from_ctx_impl(NPConditionalXRowCtx *ctx,
@@ -27971,13 +27992,15 @@ static void np_conditional_yrow_ctx_clear(NPConditionalYRowCtx *ctx){
   memset(ctx, 0, sizeof(*ctx));
 }
 
-static int np_conditional_yrow_eval_ctx_prepare(double *vector_scale_factor,
-                                                int operator_code,
-                                                double **matrix_Y_unordered_eval,
-                                                double **matrix_Y_ordered_eval,
-                                                double **matrix_Y_continuous_eval,
-                                                int num_eval,
-                                                NPConditionalYRowCtx *ctx){
+static int np_conditional_yrow_eval_ctx_prepare_ctx(
+  double *vector_scale_factor,
+  int operator_code,
+  double **matrix_Y_unordered_eval,
+  double **matrix_Y_ordered_eval,
+  double **matrix_Y_continuous_eval,
+  int num_eval,
+  const NPNNGeometryContext *nn_geometry_context,
+  NPConditionalYRowCtx *ctx){
   const int num_train = num_obs_train_extern;
   const int num_var_tot = num_var_continuous_extern + num_var_unordered_extern + num_var_ordered_extern;
   const int bw_rows =
@@ -28046,7 +28069,8 @@ static int np_conditional_yrow_eval_ctx_prepare(double *vector_scale_factor,
   for(i = 0; i < num_var_ordered_extern; i++) ctx->kernel_oy[i] = KERNEL_den_ordered_extern;
   for(i = 0; i < num_var_tot; i++) ctx->operator_y[i] = operator_code;
 
-  if(kernel_bandwidth_mean(KERNEL_den_extern,
+  /* This Y-only owner marshals its coordinates through the helper's X slots. */
+  if(kernel_bandwidth_mean_ctx(KERNEL_den_extern,
                            BANDWIDTH_den_extern,
                            num_train,
                            num_eval,
@@ -28064,7 +28088,10 @@ static int np_conditional_yrow_eval_ctx_prepare(double *vector_scale_factor,
                            matrix_Y_continuous_eval,
                            NULL,
                            ctx->matrix_bandwidth_y,
-                           ctx->lambday) == 1)
+                           ctx->lambday,
+                           nn_geometry_context,
+                           NULL,
+                           NULL) == 1)
     goto fail_yrow_ctx_prepare;
 
   ctx->ready = 1;
@@ -28075,16 +28102,39 @@ fail_yrow_ctx_prepare:
   return 1;
 }
 
+static int np_conditional_yrow_eval_ctx_prepare(double *vector_scale_factor,
+                                                int operator_code,
+                                                double **matrix_Y_unordered_eval,
+                                                double **matrix_Y_ordered_eval,
+                                                double **matrix_Y_continuous_eval,
+                                                int num_eval,
+                                                NPConditionalYRowCtx *ctx){
+  return np_conditional_yrow_eval_ctx_prepare_ctx(
+    vector_scale_factor, operator_code,
+    matrix_Y_unordered_eval, matrix_Y_ordered_eval,
+    matrix_Y_continuous_eval, num_eval, NULL, ctx);
+}
+
+static int np_conditional_yrow_ctx_prepare_ctx(
+  double *vector_scale_factor,
+  int operator_code,
+  const NPNNGeometryContext *nn_geometry_context,
+  NPConditionalYRowCtx *ctx){
+  return np_conditional_yrow_eval_ctx_prepare_ctx(
+    vector_scale_factor, operator_code,
+    matrix_Y_unordered_train_extern,
+    matrix_Y_ordered_train_extern,
+    matrix_Y_continuous_train_extern,
+    num_obs_train_extern,
+    nn_geometry_context,
+    ctx);
+}
+
 static int np_conditional_yrow_ctx_prepare(double *vector_scale_factor,
                                            int operator_code,
                                            NPConditionalYRowCtx *ctx){
-  return np_conditional_yrow_eval_ctx_prepare(vector_scale_factor,
-                                              operator_code,
-                                              matrix_Y_unordered_train_extern,
-                                              matrix_Y_ordered_train_extern,
-                                              matrix_Y_continuous_train_extern,
-                                              num_obs_train_extern,
-                                              ctx);
+  return np_conditional_yrow_ctx_prepare_ctx(
+    vector_scale_factor, operator_code, NULL, ctx);
 }
 
 static int np_conditional_y_scalar_fixed_row_direct(NPConditionalYRowCtx *ctx,
@@ -31021,6 +31071,7 @@ static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_f
                                                           int block_rows,
                                                           int drop_eval_self,
                                                           const NPConditionalXBlockBwCtx *bwctx,
+                                                          const NPNNGeometryContext *nn_geometry_context,
                                                           double **rows_out){
   const int num_train = num_obs_train_extern;
   const int num_reg_tot = num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern;
@@ -31130,7 +31181,7 @@ static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_f
   for(i = 0; i < num_reg_tot; i++) x_operator[i] = OP_NORMAL;
 
   if(!use_bwctx){
-    if(kernel_bandwidth_mean(KERNEL_reg_extern,
+    if(kernel_bandwidth_mean_ctx(KERNEL_reg_extern,
                              BANDWIDTH_den_extern,
                              num_train,
                              block_rows,
@@ -31148,7 +31199,10 @@ static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_f
                              matrix_X_continuous_eval_block,
                              NULL,
                              matrix_bandwidth_x,
-                             lambdax) == 1)
+                             lambdax,
+                             nn_geometry_context,
+                             NULL,
+                             NULL) == 1)
       goto cleanup_xweight_block;
   }
 
@@ -31410,7 +31464,19 @@ static int np_conditional_x_weight_block_stream_core(double *vector_scale_factor
                                                         block_rows,
                                                         1,
                                                         NULL,
+                                                        NULL,
                                                         rows_out);
+}
+
+static int np_conditional_x_weight_block_stream_core_ctx(
+  double *vector_scale_factor,
+  int eval_start,
+  int block_rows,
+  const NPNNGeometryContext *nn_geometry_context,
+  double **rows_out){
+  return np_conditional_x_weight_block_stream_core_impl(
+    vector_scale_factor, eval_start, block_rows, 1, NULL,
+    nn_geometry_context, rows_out);
 }
 
 static int np_conditional_x_weight_block_full_stream_core(double *vector_scale_factor,
@@ -31422,14 +31488,17 @@ static int np_conditional_x_weight_block_full_stream_core(double *vector_scale_f
                                                         block_rows,
                                                         0,
                                                         NULL,
+                                                        NULL,
                                                         rows_out);
 }
 
-static int np_conditional_y_block_stream_op_core(double *vector_scale_factor,
-                                                 int eval_start,
-                                                 int block_rows,
-                                                 int operator_code,
-                                                 double **rows_out){
+static int np_conditional_y_block_stream_op_core_ctx(
+  double *vector_scale_factor,
+  int eval_start,
+  int block_rows,
+  int operator_code,
+  const NPNNGeometryContext *nn_geometry_context,
+  double **rows_out){
   const int num_train = num_obs_train_extern;
   const int num_var_tot = num_var_continuous_extern + num_var_unordered_extern + num_var_ordered_extern;
   const int bw_rows = (BANDWIDTH_den_extern == BW_FIXED) ? 1 : block_rows;
@@ -31511,7 +31580,8 @@ static int np_conditional_y_block_stream_op_core(double *vector_scale_factor,
   for(i = 0; i < num_var_ordered_extern; i++) kernel_oy[i] = KERNEL_den_ordered_extern;
   for(i = 0; i < num_var_tot; i++) operator_y[i] = operator_code;
 
-  if(kernel_bandwidth_mean(KERNEL_den_extern,
+  /* This Y-only owner marshals its coordinates through the helper's X slots. */
+  if(kernel_bandwidth_mean_ctx(KERNEL_den_extern,
                            BANDWIDTH_den_extern,
                            num_train,
                            block_rows,
@@ -31529,7 +31599,10 @@ static int np_conditional_y_block_stream_op_core(double *vector_scale_factor,
                            matrix_Y_continuous_eval_block,
                            NULL,
                            matrix_bandwidth_y,
-                           lambday) == 1)
+                           lambday,
+                           nn_geometry_context,
+                           NULL,
+                           NULL) == 1)
     goto cleanup_yweight_block;
 
   for(i = 0; i < block_rows; i++){
@@ -31608,6 +31681,16 @@ cleanup_yweight_block:
   if(kernel_oy != NULL) free(kernel_oy);
   if(operator_y != NULL) free(operator_y);
   return status;
+}
+
+static int np_conditional_y_block_stream_op_core(double *vector_scale_factor,
+                                                 int eval_start,
+                                                 int block_rows,
+                                                 int operator_code,
+                                                 double **rows_out){
+  return np_conditional_y_block_stream_op_core_ctx(
+    vector_scale_factor, eval_start, block_rows, operator_code, NULL,
+    rows_out);
 }
 
 typedef struct {
@@ -32563,6 +32646,8 @@ int np_conditional_density_cvml_lp_stream(double *vector_scale_factor,
   const int num_obs = num_obs_train_extern;
   const int use_row_ctx = (BANDWIDTH_den_extern == BW_GEN_NN) ||
     (BANDWIDTH_den_extern == BW_ADAP_NN);
+  const NPNNGeometryContext * const nn_geometry_context =
+    np_conditional_gnn_training_geometry(BANDWIDTH_den_extern);
   NPConditionalXRowCtx xctx = {0};
   NPConditionalYRowCtx yctx = {0};
   double *xrow = NULL, *yrow = NULL;
@@ -32596,9 +32681,11 @@ int np_conditional_density_cvml_lp_stream(double *vector_scale_factor,
     goto cleanup_cvml_lp_stream;
 
   if(use_row_ctx){
-    if(np_conditional_xrow_ctx_prepare(vector_scale_factor, &xctx) != 0)
+    if(np_conditional_xrow_ctx_prepare_ctx(
+         vector_scale_factor, nn_geometry_context, &xctx) != 0)
       goto cleanup_cvml_lp_stream;
-    if(np_conditional_yrow_ctx_prepare(vector_scale_factor, OP_NORMAL, &yctx) != 0)
+    if(np_conditional_yrow_ctx_prepare_ctx(
+         vector_scale_factor, OP_NORMAL, nn_geometry_context, &yctx) != 0)
       goto cleanup_cvml_lp_stream;
   }
 
@@ -32641,6 +32728,7 @@ static int np_conditional_density_cvml_lp_block_stream(double *vector_scale_fact
   const int block_size = MIN(np_conditional_lp_cvls_block_size(num_obs, 2U, 0U),
                              MAX(1, num_obs));
   double **xblock = NULL, **yblock = NULL;
+  int *eval_to_train = NULL;
   int i0, ii;
   int status = 1;
   NPCVLSWorkspaceStatus workspace_status = NP_CVLS_WORKSPACE_OK;
@@ -32666,13 +32754,31 @@ static int np_conditional_density_cvml_lp_block_stream(double *vector_scale_fact
   if(workspace_status != NP_CVLS_WORKSPACE_OK)
     goto cleanup_cvml_lp_block;
 
+  if(BANDWIDTH_den_extern == BW_GEN_NN){
+    eval_to_train = (int *)malloc((size_t)block_size*sizeof(int));
+    if(eval_to_train == NULL)
+      goto cleanup_cvml_lp_block;
+  }
+
   *cv = 0.0;
   for(i0 = 0; i0 < num_obs; i0 += block_size){
     const int ib = MIN(block_size, num_obs - i0);
+    NPNNGeometryContext block_geometry = {
+      .mode = NP_NN_QUERY_TRAINING_MAP,
+      .eval_to_train = eval_to_train
+    };
+    const NPNNGeometryContext * const nn_geometry_context =
+      BANDWIDTH_den_extern == BW_GEN_NN ? &block_geometry : NULL;
 
-    if(np_conditional_x_weight_block_stream_core(vector_scale_factor, i0, ib, xblock) != 0)
+    for(ii = 0; ii < ib && eval_to_train != NULL; ii++)
+      eval_to_train[ii] = i0 + ii;
+
+    if(np_conditional_x_weight_block_stream_core_ctx(
+         vector_scale_factor, i0, ib, nn_geometry_context, xblock) != 0)
       goto cleanup_cvml_lp_block;
-    if(np_conditional_y_block_stream_op_core(vector_scale_factor, i0, ib, OP_NORMAL, yblock) != 0)
+    if(np_conditional_y_block_stream_op_core_ctx(
+         vector_scale_factor, i0, ib, OP_NORMAL,
+         nn_geometry_context, yblock) != 0)
       goto cleanup_cvml_lp_block;
 
     for(ii = 0; ii < ib; ii++){
@@ -32685,6 +32791,7 @@ static int np_conditional_density_cvml_lp_block_stream(double *vector_scale_fact
   status = 0;
 
 cleanup_cvml_lp_block:
+  if(eval_to_train != NULL) free(eval_to_train);
   if(xblock != NULL) free_tmat(xblock);
   if(yblock != NULL) free_tmat(yblock);
   np_glp_cv_clear_extern();
@@ -33329,6 +33436,7 @@ np_conditional_density_cvls_lp_supertile2_stream(
              block_rows[g],
              1,
              &xbwctx,
+             NULL,
              xblocks[g]) != 0)
           goto cleanup_cvls_lp_supertile2;
         np_conditional_x_block_bw_ctx_clear(&xbwctx);
@@ -33534,6 +33642,7 @@ int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
            ib,
            1,
            &xbwctx,
+           NULL,
            xblock) != 0)
         goto cleanup_cvls_lp_block;
       np_conditional_x_block_bw_ctx_clear(&xbwctx);
@@ -37660,6 +37769,9 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
                              np_conditional_density_cvml_stream_engine_supported());
   const int bwmdim = (BANDWIDTH_den==BW_GEN_NN)?num_obs:
     ((BANDWIDTH_den==BW_ADAP_NN)?num_obs:1);
+  const NPNNGeometryContext * const nn_geometry_context =
+    np_conditional_gnn_training_geometry(BANDWIDTH_den);
+  NPNNGeometryStatus nn_geometry_status = NP_NN_GEOMETRY_OK;
 
 	//const double log_DBL_MIN = log(DBL_MIN);
 
@@ -37771,7 +37883,7 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
   lambda_x = alloc_vecd(num_reg_unordered+num_reg_ordered);
   lambda_xy = alloc_vecd(num_uvar+num_ovar);
 
-  if(kernel_bandwidth_mean(KERNEL_reg,
+  if(kernel_bandwidth_mean_ctx(KERNEL_reg,
                            BANDWIDTH_den,
                            num_obs,
                            num_obs,
@@ -37786,11 +37898,19 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
                            matrix_X_continuous,
                            NULL,
                            matrix_bandwidth_x,
-                           lambda_x)==1){
+                           lambda_x,
+                           nn_geometry_context,
+                           NULL,
+                           &nn_geometry_status)==1){
+    if(nn_geometry_status == NP_NN_GEOMETRY_ZERO_RADIUS){
+      ret = 1;
+      goto cleanup_cvml_return;
+    }
     error("\n** Error: invalid bandwidth.");
   }
 
-  if(kernel_bandwidth_mean(KERNEL_reg,
+  nn_geometry_status = NP_NN_GEOMETRY_OK;
+  if(kernel_bandwidth_mean_ctx(KERNEL_reg,
                            BANDWIDTH_den,
                            num_obs,
                            num_obs,
@@ -37805,7 +37925,14 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
                            matrix_XY_continuous,
                            NULL,
                            matrix_bandwidth_xy,
-                           lambda_xy)==1){
+                           lambda_xy,
+                           nn_geometry_context,
+                           NULL,
+                           &nn_geometry_status)==1){
+    if(nn_geometry_status == NP_NN_GEOMETRY_ZERO_RADIUS){
+      ret = 1;
+      goto cleanup_cvml_return;
+    }
     error("\n** Error: invalid bandwidth.");
   }
 
@@ -40807,6 +40934,8 @@ static NP_NOINLINE int np_conditional_density_cvml_continuous_route(
   const int beta_y = execution_context->y_route != NULL;
   const int use_general_lp = np_lp_engine_extern == NP_LP_ENGINE_GENERAL;
   const int use_bernstein = int_glp_bernstein_extern != 0;
+  const NPNNGeometryContext * const nn_geometry_context =
+    np_conditional_gnn_training_geometry(BANDWIDTH_den);
   NPConditionalRouteRowContext route_x;
   NPConditionalRouteRowContext route_y;
   NPConditionalXRowCtx legacy_x = {0};
@@ -40852,8 +40981,8 @@ static NP_NOINLINE int np_conditional_density_cvml_continuous_route(
          execution_context->x_diagnostics,
          execution_context->categorical_compress) != 0)
       goto cleanup_route;
-  } else if(np_conditional_xrow_ctx_prepare(
-              vector_scale_factor, &legacy_x) != 0) {
+  } else if(np_conditional_xrow_ctx_prepare_ctx(
+              vector_scale_factor, nn_geometry_context, &legacy_x) != 0) {
     goto cleanup_route;
   }
 
@@ -40870,8 +40999,9 @@ static NP_NOINLINE int np_conditional_density_cvml_continuous_route(
          execution_context->y_diagnostics,
          execution_context->categorical_compress) != 0)
       goto cleanup_route;
-  } else if(np_conditional_yrow_ctx_prepare(
-              vector_scale_factor, OP_NORMAL, &legacy_y) != 0) {
+  } else if(np_conditional_yrow_ctx_prepare_ctx(
+              vector_scale_factor, OP_NORMAL,
+              nn_geometry_context, &legacy_y) != 0) {
     goto cleanup_route;
   }
 
