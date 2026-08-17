@@ -9503,8 +9503,9 @@ static SEXP np_regression_lp_apply_conditional_impl(SEXP txuno,
     }
   }
   if(return_hat_flag && lp_engine == NP_LP_ENGINE_SCALAR &&
-     derivative_order > 0)
-    error("C_np_regression_lp_apply_conditional: scalar derivative hats use the canonical derivative route");
+     derivative_order > 0 &&
+     descriptor.family != NP_CKERNEL_FAMILY_LEGACY)
+    error("C_np_regression_lp_apply_conditional: scalar derivative hats require a legacy continuous kernel");
 
   if(descriptor.family == NP_CKERNEL_FAMILY_BETA) {
     if(XLENGTH(ckerlb_r) != ncol_txcon ||
@@ -9662,7 +9663,8 @@ static SEXP np_regression_lp_apply_conditional_impl(SEXP txuno,
   if(return_hat_flag) {
     out = PROTECT(allocMatrix(REALSXP, num_obs_eval, num_obs_train));
     nprotect++;
-    if(descriptor.family == NP_CKERNEL_FAMILY_LEGACY) {
+    if(descriptor.family == NP_CKERNEL_FAMILY_LEGACY &&
+       (lp_engine == NP_LP_ENGINE_GENERAL || leave_one_out_flag)) {
       ridge_used = PROTECT(allocVector(REALSXP, num_obs_eval));
       nprotect++;
     }
@@ -20355,12 +20357,15 @@ static void np_kernelsum_common(double * tuno, double * tord, double * tcon,
   /* the ys are the weights */
 
   double * vector_scale_factor, * ksum, * ksum2 = NULL, * p_ksum = NULL, pad_num, * kw = NULL, * pkw = NULL;
+  double **query_bandwidth = NULL;
+  double *query_lambda = NULL;
   int i,j,k, num_var, num_obs_eval_alloc;
   int no_y, leave_one_out, train_is_eval, do_divide_bw;
   int do_divide_returned_weights, do_divide_returned_bw;
   int max_lev, no_weights, sum_element_length, return_kernel_weights;
   int p_operator, do_score, do_ocg, p_nvar = 0;
   int tree_outer_blas_requested = 0;
+  int query_bandwidth_provided = 0;
   int suppress_parallel_ksum = 0;
 
   int use_tree = 0;
@@ -20799,6 +20804,64 @@ static void np_kernelsum_common(double * tuno, double * tord, double * tcon,
         bpso[i] = doscoreocg;
     }
   }
+
+  /*
+   * The kernel-sum ingress owns whether evaluation rows are the training
+   * occurrences themselves. Preserve that identity when generalized-NN
+   * radii are constructed. The existing O(n p) bandwidth workspace is
+   * prepared once and consumed by the unchanged serial/MPI weighted-sum
+   * owner; rank-local calls honor the caller's suppress-parallel contract.
+   */
+  if(BANDWIDTH_reg_extern == BW_GEN_NN && train_is_eval &&
+     num_reg_continuous_extern > 0){
+    const NPNNGeometryContext query_geometry = {
+      .mode = NP_NN_QUERY_TRAINING_IDENTITY,
+      .eval_to_train = NULL,
+      .adaptive_successor = NULL
+    };
+    NPNNGeometryStatus query_status = NP_NN_GEOMETRY_OK;
+
+    query_bandwidth = alloc_tmatd(num_obs_eval_extern,
+                                  num_reg_continuous_extern);
+    query_lambda = alloc_vecd(MAX(
+      1, num_reg_unordered_extern + num_reg_ordered_extern));
+    if(query_bandwidth == NULL || query_lambda == NULL){
+      free_tmat(query_bandwidth);
+      free(query_lambda);
+      error("C_np_kernelsum: generalized nearest-neighbor training geometry allocation failed");
+    }
+    if(kernel_bandwidth_mean_ctx(
+         KERNEL_reg_extern,
+         BANDWIDTH_reg_extern,
+         num_obs_train_extern,
+         num_obs_eval_extern,
+         0,
+         0,
+         0,
+         num_reg_continuous_extern,
+         num_reg_unordered_extern,
+         num_reg_ordered_extern,
+         suppress_parallel_ksum,
+         &vector_scale_factor[1],
+         NULL,
+         NULL,
+         matrix_X_continuous_train_extern,
+         matrix_X_continuous_eval_extern,
+         NULL,
+         query_bandwidth,
+         query_lambda,
+         &query_geometry,
+         NULL,
+         &query_status) != 0){
+      free_tmat(query_bandwidth);
+      free(query_lambda);
+      if(query_status == NP_NN_GEOMETRY_ZERO_RADIUS)
+        error("C_np_kernelsum: generalized nearest-neighbor training query has a zero literal radius after occurrence exclusion");
+      error("C_np_kernelsum: generalized nearest-neighbor training geometry failed with status %d",
+            (int)query_status);
+    }
+    query_bandwidth_provided = 1;
+  }
   
   
   if(weighted_sum_power2 != NULL){
@@ -20843,7 +20906,10 @@ static void np_kernelsum_common(double * tuno, double * tord, double * tcon,
                                       matrix_Y_ordered_train_extern,
                                       NULL,
                                       &vector_scale_factor[1],
-                                      0,NULL,NULL,NULL,
+                                      query_bandwidth_provided,
+                                      query_bandwidth,
+                                      query_bandwidth,
+                                      query_lambda,
                                       num_categories_extern,
                                       matrix_categorical_vals_extern,
                                       matrix_ordered_indices,
@@ -20894,7 +20960,10 @@ static void np_kernelsum_common(double * tuno, double * tord, double * tcon,
                                       matrix_Y_ordered_train_extern,
                                       NULL,
                                       &vector_scale_factor[1],
-                                      0,NULL,NULL,NULL,
+                                      query_bandwidth_provided,
+                                      query_bandwidth,
+                                      query_bandwidth,
+                                      query_lambda,
                                       num_categories_extern,
                                       matrix_categorical_vals_extern,
                                       matrix_ordered_indices,
@@ -20903,6 +20972,10 @@ static void np_kernelsum_common(double * tuno, double * tord, double * tcon,
                                       kw,
                                       pkw);
   }
+  if(query_bandwidth != NULL)
+    free_tmat(query_bandwidth);
+  free(query_lambda);
+
   if(npks_err != 0){
     error("kernel_weighted_sum_np failed with code %d", npks_err);
   }

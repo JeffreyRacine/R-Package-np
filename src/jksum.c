@@ -30997,7 +30997,8 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
     ((BANDWIDTH_den_extern == BW_GEN_NN) ? num_eval : num_train);
   const int use_bernstein = (int_glp_bernstein_extern != 0);
   int *kernel_cx = NULL, *kernel_ux = NULL, *kernel_ox = NULL, *x_operator = NULL;
-  double *vsfx = NULL, *lambdax = NULL, *kw = NULL, *mean_row = NULL;
+  double *vsfx = NULL, *lambdax = NULL, *kw = NULL, *pkw = NULL;
+  double *mean_row = NULL;
   double *out2 = NULL;
   double **matrix_bandwidth_x = NULL, **matrix_bandwidth_eval_one = NULL;
   double **eval_xuno_one = NULL, **eval_xord_one = NULL, **eval_xcon_one = NULL;
@@ -31034,9 +31035,15 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
       kernel_route_diagnostics == NULL ||
       categorical_compress < 0 || categorical_compress > 1))
     return 1;
-  if(np_lp_engine_extern == NP_LP_ENGINE_SCALAR &&
-     (kernel_route == NULL || deriv_order != 0))
-    return 1;
+  if(np_lp_engine_extern == NP_LP_ENGINE_SCALAR) {
+    const int scalar_legacy_derivative =
+      kernel_route == NULL && deriv_order == 1 && deriv_var > 0;
+    const int scalar_beta_mean =
+      kernel_route != NULL && deriv_order == 0 && deriv_var == 0;
+
+    if(!scalar_legacy_derivative && !scalar_beta_mean)
+      return 1;
+  }
 
   np_lp_solve_workspace_init(&solve_workspace);
   np_reghat_lp_workspace_init(&reghat_workspace);
@@ -31048,6 +31055,9 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
   vsfx = alloc_vecd(MAX(1, num_reg_tot));
   lambdax = alloc_vecd(MAX(1, num_reg_unordered_extern + num_reg_ordered_extern));
   kw = alloc_vecd(MAX(1, num_train));
+  if(np_lp_engine_extern == NP_LP_ENGINE_SCALAR &&
+     kernel_route == NULL && deriv_order == 1)
+    pkw = alloc_vecd(MAX(1, num_train));
   matrix_bandwidth_x = alloc_tmatd(bw_rows, num_reg_continuous_extern);
   if(kernel_route == NULL) {
     matrix_bandwidth_eval_one =
@@ -31070,6 +31080,8 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
   if(kernel_route == NULL)
     mean_row = alloc_vecd(MAX(1, num_train));
   if((vsfx == NULL) || (lambdax == NULL) || (kw == NULL) ||
+     (np_lp_engine_extern == NP_LP_ENGINE_SCALAR &&
+      kernel_route == NULL && deriv_order == 1 && pkw == NULL) ||
      (kernel_route == NULL && mean_row == NULL) ||
      ((num_reg_continuous_extern > 0) && (matrix_bandwidth_x == NULL)) ||
      ((kernel_route == NULL && num_reg_continuous_extern > 0) &&
@@ -31164,9 +31176,91 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
     goto cleanup_lp_hat;
 
   if(np_lp_engine_extern == NP_LP_ENGINE_SCALAR) {
-    double sum = 0.0;
+    if(kernel_route == NULL) {
+      const int which_var = deriv_var - 1;
+
+      for(i = 0; i < num_eval; ++i) {
+        double sum = 0.0;
+        double derivative_sum = 0.0;
+
+        for(l = 0; l < num_reg_unordered_extern; ++l)
+          eval_xuno_one[l][0] = matrix_X_unordered_eval_extern[l][i];
+        for(l = 0; l < num_reg_ordered_extern; ++l)
+          eval_xord_one[l][0] = matrix_X_ordered_eval_extern[l][i];
+        for(l = 0; l < num_reg_continuous_extern; ++l) {
+          eval_xcon_one[l][0] = matrix_X_continuous_eval_extern[l][i];
+          matrix_bandwidth_eval_one[l][0] =
+            (BANDWIDTH_den_extern == BW_GEN_NN) ?
+              matrix_bandwidth_x[l][i] : matrix_bandwidth_x[l][0];
+        }
+
+        if(np_conditional_kernel_row(kernel_cx, kernel_ux, kernel_ox,
+                                     x_operator, BANDWIDTH_den_extern,
+                                     num_train, num_reg_unordered_extern,
+                                     num_reg_ordered_extern,
+                                     num_reg_continuous_extern,
+                                     matrix_X_unordered_train_extern,
+                                     matrix_X_ordered_train_extern,
+                                     matrix_X_continuous_train_extern,
+                                     eval_xuno_one, eval_xord_one,
+                                     eval_xcon_one, vsfx, 1,
+                                     matrix_bandwidth_x,
+                                     matrix_bandwidth_eval_one, lambdax,
+                                     num_categories_extern_X,
+                                     matrix_categorical_vals_extern_X,
+                                     (BANDWIDTH_den_extern == BW_ADAP_NN) ?
+                                       NP_TREE_FALSE : int_TREE_X,
+                                     (BANDWIDTH_den_extern == BW_ADAP_NN) ?
+                                       NULL : kdt_extern_X,
+                                     kw, mean_row) != 0)
+          goto cleanup_lp_hat;
+
+        x_operator[which_var] = OP_DERIVATIVE;
+        if(np_conditional_kernel_row(kernel_cx, kernel_ux, kernel_ox,
+                                     x_operator, BANDWIDTH_den_extern,
+                                     num_train, num_reg_unordered_extern,
+                                     num_reg_ordered_extern,
+                                     num_reg_continuous_extern,
+                                     matrix_X_unordered_train_extern,
+                                     matrix_X_ordered_train_extern,
+                                     matrix_X_continuous_train_extern,
+                                     eval_xuno_one, eval_xord_one,
+                                     eval_xcon_one, vsfx, 1,
+                                     matrix_bandwidth_x,
+                                     matrix_bandwidth_eval_one, lambdax,
+                                     num_categories_extern_X,
+                                     matrix_categorical_vals_extern_X,
+                                     (BANDWIDTH_den_extern == BW_ADAP_NN) ?
+                                       NP_TREE_FALSE : int_TREE_X,
+                                     (BANDWIDTH_den_extern == BW_ADAP_NN) ?
+                                       NULL : kdt_extern_X,
+                                     pkw, mean_row) != 0) {
+          x_operator[which_var] = OP_NORMAL;
+          goto cleanup_lp_hat;
+        }
+        x_operator[which_var] = OP_NORMAL;
+
+        for(j = 0; j < num_train; ++j) {
+          sum += kw[j];
+          derivative_sum += pkw[j];
+        }
+        if(!R_FINITE(sum) || !R_FINITE(derivative_sum) || sum == 0.0)
+          goto cleanup_lp_hat;
+
+        for(j = 0; j < num_train; ++j) {
+          const int orig_j = (int_TREE_X == NP_TREE_TRUE) ?
+            ipt_extern_X[j] : j;
+          weights_out[(size_t)i +
+                      (size_t)num_eval*(size_t)orig_j] =
+            pkw[j]/sum - kw[j]*derivative_sum/(sum*sum);
+        }
+      }
+      status = NP_REGRESSION_LP_MATRIX_OK;
+      goto cleanup_lp_hat;
+    }
 
     for(i = 0; i < num_eval; ++i) {
+      double sum = 0.0;
       if(np_beta_scaled_row_context_fill(
            &beta_row_context, i, &sum, NULL) != NP_CONTINUOUS_ROW_OK ||
          !R_FINITE(sum) || sum == 0.0)
@@ -31411,6 +31505,7 @@ cleanup_lp_hat:
   if(vsfx != NULL) free(vsfx);
   if(lambdax != NULL) free(lambdax);
   if(kw != NULL) free(kw);
+  if(pkw != NULL) free(pkw);
   if(mean_row != NULL) free(mean_row);
   if(out2 != NULL) free(out2);
   if(matrix_bandwidth_x != NULL) free_tmat(matrix_bandwidth_x);

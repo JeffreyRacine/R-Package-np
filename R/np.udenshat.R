@@ -3,7 +3,8 @@
                                      edat,
                                      y = NULL,
                                      output = c("matrix", "apply"),
-                                     n.train = nrow(tdat)) {
+                                     n.train = nrow(tdat),
+                                     train.is.eval = FALSE) {
   output <- match.arg(output)
 
   if (identical(output, "apply")) {
@@ -24,7 +25,8 @@
           exdat = edat,
           operator = "normal",
           rhs = rhs.col,
-          where = "npudenshat direct operator apply"
+          where = "npudenshat direct operator apply",
+          train.is.eval = train.is.eval
         ) / n.train
       } else {
         .np_exact_operator_apply(
@@ -33,7 +35,8 @@
           exdat = edat,
           operator = "normal",
           rhs = rhs.col,
-          where = "npudenshat exact operator apply"
+          where = "npudenshat exact operator apply",
+          train.is.eval = train.is.eval
         ) / n.train
       }
     }
@@ -55,7 +58,8 @@
       txdat = tdat,
       exdat = edat,
       operator = "normal",
-      where = "npudenshat direct operator"
+      where = "npudenshat direct operator",
+      train.is.eval = train.is.eval
     ) / n.train
   } else {
     .np_exact_operator_matrix(
@@ -63,7 +67,8 @@
       txdat = tdat,
       exdat = edat,
       operator = "normal",
-      where = "npudenshat exact operator"
+      where = "npudenshat exact operator",
+      train.is.eval = train.is.eval
     ) / n.train
   }
 }
@@ -128,7 +133,7 @@ npudenshat <- function(bws,
   n.train <- nrow(tdat)
   edat.full <- if (no.e) tdat else edat
 
-  fanout <- .npRmpi_hat_operator_row_fanout(
+  fanout <- if (no.e) NULL else .npRmpi_hat_operator_row_fanout(
     fun.name = "npudenshat",
     bws = bws,
     tdat = tdat,
@@ -149,7 +154,8 @@ npudenshat <- function(bws,
     edat = edat.full,
     y = y,
     output = output,
-    n.train = n.train
+    n.train = n.train,
+    train.is.eval = no.e
   )
   if (identical(output, "apply"))
     return(H)

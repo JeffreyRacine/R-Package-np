@@ -54,6 +54,37 @@ test_that("npcdisthat matches npcdist and preserves matrix/apply parity across s
   }
 })
 
+test_that("npcdisthat preserves generalized-NN training identity", {
+  npcdisthat <- getFromNamespace("npcdisthat", "npRmpi")
+
+  set.seed(20260817)
+  n <- 24L
+  x <- data.frame(x = sort(runif(n)))
+  y <- data.frame(y = sin(3 * x$x) + rnorm(n, sd = 0.1))
+  iota <- rep.int(1.0, n)
+
+  for (regtype in c("lc", "ll", "lp")) {
+    args <- list(
+      xdat = x,
+      ydat = y,
+      regtype = regtype,
+      bwtype = "generalized_nn",
+      bws = c(7, 7),
+      bandwidth.compute = FALSE
+    )
+    if (identical(regtype, "lp")) {
+      args$basis <- "glp"
+      args$degree <- 2L
+    }
+    bw <- do.call(npcdistbw, args)
+    fit <- npcdist(bws = bw, txdat = x, tydat = y)
+    H <- npcdisthat(bws = bw, txdat = x, tydat = y)
+
+    expect_equal(drop(H %*% iota), fit$condist, tolerance = 1e-11,
+                 info = regtype)
+  }
+})
+
 test_that("npcdisthat apply mode matches matrix RHS multiplication", {
   skip_if_not(spawn_mpi_slaves(1), "MPI pool unavailable")
   on.exit(close_mpi_slaves(), add = TRUE)

@@ -1087,6 +1087,23 @@ npreghat <-
                                                           s = NULL,
                                                           return.hat = FALSE,
                                                           leave.one.out = FALSE) {
+  if (!isTRUE(getOption("npRmpi.local.regression.mode", FALSE))) {
+    return(.npRmpi_with_local_regression(
+      .npreghat_exact_lp_apply_from_regression_core(
+        bws = bws,
+        txdat = txdat,
+        y = y,
+        exdat = exdat,
+        basis = basis,
+        degree = degree,
+        bernstein.basis = bernstein.basis,
+        s = s,
+        return.hat = return.hat,
+        leave.one.out = leave.one.out
+      )
+    ))
+  }
+
   no.ex <- is.null(exdat)
 
   txdat <- toFrame(txdat)
@@ -2302,8 +2319,13 @@ npreghat.rbandwidth <-
     }
 
     if (exact.core.route) {
+      if (lc.derivative.exact.route && !beta.kernel &&
+          identical(bws[["ckertype", exact = TRUE]], "uniform")) {
+        .np_warning("ignoring kernel order specified with uniform kernel type")
+      }
       H <- if (exact.beta.native.route || native.lp.mean.matrix.route ||
-                   native.loo.route) {
+                   native.loo.route ||
+                   (lc.derivative.exact.route && !beta.kernel)) {
         .npRmpi_with_local_regression(.npreghat_exact_lp_matrix_from_regression_core(
           bws = bws,
           txdat = txdat,

@@ -60,7 +60,7 @@ capture_generalized_hat_contract <- function(expr) {
   list(value = value, warnings = warnings)
 }
 
-test_that("generalized-NN lc derivative fast routes preserve legacy matrices", {
+test_that("generalized-NN lc derivative native rows preserve the fitted statistic", {
   set.seed(2026072261L)
   n <- 65L
   tx <- data.frame(
@@ -95,7 +95,17 @@ test_that("generalized-NN lc derivative fast routes preserve legacy matrices", {
           bws = bw, txdat = tx, exdat = evaluation, s = c(0L, 1L)
         )
       )
-      expect_identical(as.double(fast$value), as.double(legacy$value))
+      fit <- if (is.null(evaluation)) {
+        npreg(bws = bw, gradients = TRUE)
+      } else {
+        npreg(bws = bw, exdat = evaluation, gradients = TRUE)
+      }
+      expect_equal(drop(fast$value %*% y), fit$grad[, 2L],
+                   tolerance = 1e-12)
+      if (!is.null(evaluation)) {
+        expect_equal(as.double(fast$value), as.double(legacy$value),
+                     tolerance = 1e-13)
+      }
       expect_identical(fast$warnings, legacy$warnings)
     }
   }
