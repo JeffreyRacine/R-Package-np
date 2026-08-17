@@ -118,6 +118,61 @@ test_that("public npreghat rank-local errors preserve a spawned worker pool", {
               info = paste(res$output, collapse = "\n"))
 })
 
+test_that("successive generalized NN regression owners preserve a spawned worker pool", {
+  skip_on_cran()
+
+  env.common <- npreghat_error_symmetry_attach_env()
+  skip_if(is.null(env.common), "local npRmpi install unavailable for spawn regression")
+
+  script <- tempfile("npRmpi-npreghat-persistent-pool-", fileext = ".R")
+  on.exit(unlink(script), add = TRUE)
+
+  writeLines(c(
+    "suppressPackageStartupMessages(library(npRmpi))",
+    "options(npRmpi.autodispatch = TRUE, np.messages = FALSE)",
+    "npRmpi.init(nslaves = 1L, quiet = TRUE)",
+    "on.exit(try(npRmpi.quit(force = TRUE), silent = TRUE), add = TRUE)",
+    "set.seed(20260817L)",
+    "x <- data.frame(x = sort(runif(41L, -1, 1)))",
+    "y <- sin(2 * x$x) + x$x^2",
+    "make_bw <- function(kernel, regtype) {",
+    "  args <- list(xdat = x, ydat = y, bws = 2, bwmethod = 'cv.ls',",
+    "               bwtype = 'generalized_nn', bwscaling = FALSE,",
+    "               ckertype = kernel, ckerorder = 2L,",
+    "               bandwidth.compute = FALSE, regtype = regtype)",
+    "  if (identical(regtype, 'lp')) {",
+    "    args$degree <- 0L",
+    "    args$degree.select <- 'manual'",
+    "    args$basis <- 'glp'",
+    "  }",
+    "  do.call(npregbw, args)",
+    "}",
+    "bw.lc <- make_bw('gaussian', 'lc')",
+    "H.lc <- npreghat(bws = bw.lc, txdat = x, leave.one.out = TRUE, output = 'matrix')",
+    "stopifnot(is.matrix(H.lc), all(is.finite(H.lc)))",
+    "bw.lp0 <- make_bw('gaussian', 'lp')",
+    "H.lp0 <- npreghat(bws = bw.lp0, txdat = x, leave.one.out = TRUE, output = 'matrix')",
+    "stopifnot(is.matrix(H.lp0), all(is.finite(H.lp0)))",
+    "npRmpi:::.npRmpi_spmd_tiny_smoke(label = 'after-generalized-nn-lp0', comm = 1L)",
+    "bw.compact <- make_bw('epanechnikov', 'lc')",
+    "stopifnot(inherits(bw.compact, 'rbandwidth'))",
+    "npRmpi:::.npRmpi_spmd_tiny_smoke(label = 'after-cross-kernel', comm = 1L)",
+    "npRmpi.quit(force = TRUE)",
+    "cat('NPREGHAT_PERSISTENT_POOL_OK\\n')"
+  ), script, useBytes = TRUE)
+
+  res <- run_npreghat_error_symmetry_subprocess(
+    file.path(R.home("bin"), "Rscript"),
+    args = c("--no-save", script),
+    timeout = 90L,
+    env = c(env.common, "R_PROFILE_USER=", "R_PROFILE=")
+  )
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("NPREGHAT_PERSISTENT_POOL_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
+
 test_that("public npreghat invalid derivative errors before active-pool broadcast", {
   skip_on_cran()
 

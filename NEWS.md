@@ -1,5 +1,13 @@
 # npRmpi 0.70-6
 
+* Rank-local generalized nearest-neighbour regression evaluations now share
+  one execution-context classifier across `npreg()` and `npreghat()`. This
+  prevents a worker from re-entering a nested MPI kernel-weight owner merely
+  because the active-pool flag is coordinator-local, preserving persistent
+  pools across successive kernel and local-polynomial calls without adding a
+  collective, changing numerical arithmetic, or introducing size-based
+  dispatch.
+
 * Smooth-coefficient NOMAD degree search now transports its scoped prepared
   context through an exact locked opcode token instead of comparing a
   serialized function closure by process-local identity. Its service workers

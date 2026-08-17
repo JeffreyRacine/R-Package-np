@@ -831,9 +831,7 @@ npreg.rbandwidth <-
             PACKAGE = "npRmpi")
     }
 
-    local.regression.context <- .npRmpi_has_active_slave_pool(comm = 1L) ||
-      isTRUE(.npRmpi_autodispatch_in_context()) ||
-      isTRUE(.npRmpi_autodispatch_called_from_bcast())
+    local.regression.context <- .npRmpi_rank_local_regression_context(comm = 1L)
 
     use.local.regression <- (
       identical(bws$type, "generalized_nn") &&

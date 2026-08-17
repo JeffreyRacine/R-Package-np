@@ -779,6 +779,14 @@
   size >= 2L
 }
 
+.npRmpi_rank_local_regression_context <- function(comm = 1L) {
+  isTRUE(getOption("npRmpi.local.regression.mode", FALSE)) ||
+    isTRUE(.npRmpi_autodispatch_in_context()) ||
+    isTRUE(.npRmpi_manual_bcast_in_context()) ||
+    isTRUE(.npRmpi_autodispatch_called_from_bcast()) ||
+    isTRUE(.npRmpi_has_active_slave_pool(comm = comm))
+}
+
 .npRmpi_regression_native_local_mode <- function(local.mode = FALSE,
                                                  comm = 1L) {
   local.mode <- npValidateScalarLogical(local.mode, "local.mode")
