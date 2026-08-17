@@ -1146,7 +1146,7 @@ npreghat <-
   )
 
   .Call(
-    "C_np_regression_lp_apply_conditional",
+    "C_np_regression_lp_apply_conditional_ctx",
     tuno,
     tord,
     tcon,
@@ -1170,6 +1170,7 @@ npreghat <-
     as.double(cker.ub),
     as.integer(categorical.compress),
     as.logical(return.hat),
+    as.logical(no.ex),
     PACKAGE = "npRmpi"
   )
 }

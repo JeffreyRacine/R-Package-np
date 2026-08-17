@@ -709,6 +709,111 @@ static int compute_nn_distance_train_eval_observation_support_subset(int num_obs
   return 0;
 }
 
+/*
+ * Canonical generalized-NN query primitive.  Occurrence identity is supplied
+ * by the caller; it is never inferred from pointer or value equality.  The
+ * selected radius is the literal order statistic after deleting at most one
+ * identified training occurrence.  In particular, a zero order statistic is
+ * reported as such rather than replaced by the nearest positive distance.
+ */
+static NPNNGeometryStatus
+compute_nn_distance_train_eval_context_subset(
+  const int num_obs_train,
+  const int num_obs_eval,
+  const double *vector_data_train,
+  const double *vector_data_eval,
+  const int int_k_nn,
+  const NPNNGeometryContext *geometry_context,
+  const int query_start,
+  const int query_end,
+  double *nn_distance)
+{
+  double *sorted = NULL;
+  int i, j;
+
+  if(num_obs_train <= 0 || num_obs_eval <= 0 ||
+     vector_data_train == NULL || vector_data_eval == NULL ||
+     geometry_context == NULL || nn_distance == NULL ||
+     query_start < 0 || query_end >= num_obs_eval)
+    return NP_NN_GEOMETRY_INVALID_ARGUMENT;
+
+  if(query_start > query_end)
+    return NP_NN_GEOMETRY_OK;
+
+  if(geometry_context->mode == NP_NN_QUERY_TRAINING_IDENTITY) {
+    if(num_obs_train != num_obs_eval || geometry_context->eval_to_train != NULL)
+      return NP_NN_GEOMETRY_INVALID_EXCLUSION;
+  } else if(geometry_context->mode == NP_NN_QUERY_TRAINING_MAP) {
+    if(geometry_context->eval_to_train == NULL)
+      return NP_NN_GEOMETRY_INVALID_EXCLUSION;
+  } else if(geometry_context->mode != NP_NN_QUERY_EXTERNAL ||
+            geometry_context->eval_to_train != NULL) {
+    return NP_NN_GEOMETRY_INVALID_EXCLUSION;
+  }
+
+  for(i = 0; i < num_obs_train; ++i)
+    if(!isfinite(vector_data_train[i]))
+      return NP_NN_GEOMETRY_NONFINITE_RADIUS;
+
+  if(build_sorted_observation_support(
+       num_obs_train, vector_data_train, &sorted) != 0)
+    return NP_NN_GEOMETRY_ALLOCATION_FAILURE;
+
+  for(i = query_start, j = 0; i <= query_end; ++i, ++j) {
+    const int exclude_training =
+      geometry_context->mode != NP_NN_QUERY_EXTERNAL;
+    const int excluded =
+      geometry_context->mode == NP_NN_QUERY_TRAINING_IDENTITY ? i :
+      (geometry_context->mode == NP_NN_QUERY_TRAINING_MAP ?
+       geometry_context->eval_to_train[i] : -1);
+    const int target_k = int_k_nn + exclude_training;
+    int split;
+    double radius = 0.0;
+
+    if(!isfinite(vector_data_eval[i])) {
+      free(sorted);
+      return NP_NN_GEOMETRY_NONFINITE_RADIUS;
+    }
+
+    if(exclude_training) {
+      if(excluded < 0 || excluded >= num_obs_train ||
+         vector_data_eval[i] != vector_data_train[excluded]) {
+        free(sorted);
+        return NP_NN_GEOMETRY_INVALID_EXCLUSION;
+      }
+    }
+
+    if(int_k_nn < 1 ||
+       int_k_nn > num_obs_train - exclude_training) {
+      free(sorted);
+      return NP_NN_GEOMETRY_INVALID_ARGUMENT;
+    }
+
+    split = lower_bound_observation_support(
+      num_obs_train, sorted, vector_data_eval[i]);
+
+    /* Identity mode deletes the zero self distance, hence selects k + 1. */
+    if(kth_observation_radius_sorted_generalized(
+         sorted, num_obs_train, split, vector_data_eval[i],
+         target_k, &radius) != 0) {
+      free(sorted);
+      return NP_NN_GEOMETRY_INVALID_ARGUMENT;
+    }
+    if(!isfinite(radius)) {
+      free(sorted);
+      return NP_NN_GEOMETRY_NONFINITE_RADIUS;
+    }
+    if(radius <= 0.0) {
+      free(sorted);
+      return NP_NN_GEOMETRY_ZERO_RADIUS;
+    }
+    nn_distance[j] = radius;
+  }
+
+  free(sorted);
+  return NP_NN_GEOMETRY_OK;
+}
+
 /* Population variance, double precision */
 /* Returns 0 upon success, 1 upon failure (constant most likely) */
 
@@ -887,6 +992,70 @@ int compute_nn_distance_train_eval(int num_obs_train,
 
     return(0);
 
+}
+
+NPNNGeometryStatus compute_nn_distance_train_eval_ctx(
+  const int num_obs_train,
+  const int num_obs_eval,
+  const int suppress_parallel,
+  const double *vector_data_train,
+  const double *vector_data_eval,
+  const int int_k_nn,
+  const NPNNGeometryContext *geometry_context,
+  double *nn_distance)
+{
+#ifdef MPI2
+  int stride = (int)ceil((double)num_obs_eval/(double)iNum_Processors);
+  int query_start;
+  int query_end;
+  int local_status;
+  int global_status = NP_NN_GEOMETRY_OK;
+
+  if(stride < 1)
+    stride = 1;
+  if(suppress_parallel) {
+    query_start = 0;
+    query_end = num_obs_eval - 1;
+  } else {
+    query_start = my_rank*stride;
+    query_end = MIN(num_obs_eval, (my_rank + 1)*stride) - 1;
+  }
+
+  local_status = (int)compute_nn_distance_train_eval_context_subset(
+    num_obs_train, num_obs_eval,
+    vector_data_train, vector_data_eval,
+    int_k_nn, geometry_context,
+    query_start, query_end, nn_distance);
+
+  if(!suppress_parallel) {
+    MPI_Reduce(&local_status, &global_status, 1, MPI_INT, MPI_MAX, 0, comm[1]);
+    MPI_Bcast(&global_status, 1, MPI_INT, 0, comm[1]);
+  } else {
+    global_status = local_status;
+  }
+
+  if(global_status != NP_NN_GEOMETRY_OK)
+    return (NPNNGeometryStatus)global_status;
+
+  if(!suppress_parallel) {
+    if(my_rank == 0) {
+      MPI_Gather(MPI_IN_PLACE, stride, MPI_DOUBLE,
+                 nn_distance, stride, MPI_DOUBLE, 0, comm[1]);
+    } else {
+      MPI_Gather(nn_distance, stride, MPI_DOUBLE,
+                 NULL, stride, MPI_DOUBLE, 0, comm[1]);
+    }
+    MPI_Bcast(nn_distance, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
+  }
+  return NP_NN_GEOMETRY_OK;
+#else
+  (void)suppress_parallel;
+  return compute_nn_distance_train_eval_context_subset(
+    num_obs_train, num_obs_eval,
+    vector_data_train, vector_data_eval,
+    int_k_nn, geometry_context,
+    0, num_obs_eval - 1, nn_distance);
+#endif
 }
 
 

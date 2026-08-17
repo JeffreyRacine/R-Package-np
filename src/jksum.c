@@ -18351,6 +18351,11 @@ int *num_categories){
 
   double aicc = 0.0;
   double traceH = 0.0;
+  const NPNNGeometryContext nn_geometry_context = {
+    .mode = NP_NN_QUERY_TRAINING_IDENTITY,
+    .eval_to_train = NULL
+  };
+  NPNNGeometryStatus nn_geometry_status = NP_NN_GEOMETRY_OK;
 int * operator = NULL;
 int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
   int *ov_cont_ok = NULL;
@@ -18400,7 +18405,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
 
     int ks_tree_use = (int_TREE_X == NP_TREE_TRUE);
 
-  if(kernel_bandwidth_mean(KERNEL_reg,
+  if(kernel_bandwidth_mean_ctx(KERNEL_reg,
                            BANDWIDTH_reg,
                            num_obs,
                            num_obs,
@@ -18418,7 +18423,10 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                            matrix_X_continuous,
                            NULL,					 // Not used 
                            matrix_bandwidth,
-                           lambda)==1){
+                           lambda,
+                           &nn_geometry_context,
+                           NULL,
+                           &nn_geometry_status)==1){
     
     return(DBL_MAX);
   }
@@ -26771,6 +26779,8 @@ typedef struct {
   double *kernel_power_integral;
   double *kernel_half_integral;
   double *kernel_difference;
+  const NPNNGeometryContext *nn_geometry_context;
+  NPNNGeometryStatus nn_geometry_status;
   int status;
 } NPRegressionFitBandwidthCall;
 
@@ -26795,7 +26805,7 @@ static SEXP np_regression_fit_bandwidth_execute(void *data)
       call->lambda,
       call->prepared_bandwidth);
   } else {
-    call->status = kernel_bandwidth(
+    call->status = kernel_bandwidth_ctx(
       call->kernel,
       call->bandwidth_mode,
       call->num_obs_train,
@@ -26811,7 +26821,10 @@ static SEXP np_regression_fit_bandwidth_execute(void *data)
       NULL,
       call->matrix_bandwidth,
       call->lambda,
-      call->matrix_bandwidth_deriv);
+      call->matrix_bandwidth_deriv,
+      call->nn_geometry_context,
+      NULL,
+      &call->nn_geometry_status);
   }
   if(call->status == 0) {
     if(call->use_canonical_beta) {
@@ -28517,7 +28530,8 @@ enum {
   NP_REGRESSION_FIT_ERR_BANDWIDTH = -2,
   NP_REGRESSION_FIT_ERR_HASH_CREATE = -3,
   NP_REGRESSION_FIT_ERR_HASH_INSERT = -4,
-  NP_REGRESSION_FIT_ERR_HASH_LOOKUP = -5
+  NP_REGRESSION_FIT_ERR_HASH_LOOKUP = -5,
+  NP_REGRESSION_FIT_ERR_ZERO_NN_RADIUS = -6
 };
 
 int kernel_estimate_regression_categorical_tree_np(
@@ -28556,7 +28570,8 @@ const NPContinuousKernelRoute *kernel_route,
 NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
 int categorical_compress,
 NPRegressionStandardErrorMode standard_error_mode,
-const NPContinuousPreparedBandwidthView *prepared_bandwidth){
+const NPContinuousPreparedBandwidthView *prepared_bandwidth,
+const NPNNGeometryContext *nn_geometry_context){
 
   // note that mean has 2*num_obs allocated for npksum
   int i, j, l;
@@ -28772,11 +28787,16 @@ const NPContinuousPreparedBandwidthView *prepared_bandwidth){
       .kernel_power_integral = &K_INT_KERNEL_P,
       .kernel_half_integral = &INT_KERNEL_PM_HALF,
       .kernel_difference = &DIFF_KER_PPM,
+      .nn_geometry_context = nn_geometry_context,
+      .nn_geometry_status = NP_NN_GEOMETRY_OK,
       .status = 1
     };
     if(np_regression_fit_bandwidth_prepare_owned(
          &bandwidth_call, &fit_owner) != 0) {
-      regression_fit_status = NP_REGRESSION_FIT_ERR_BANDWIDTH;
+      regression_fit_status =
+        bandwidth_call.nn_geometry_status == NP_NN_GEOMETRY_ZERO_RADIUS ?
+        NP_REGRESSION_FIT_ERR_ZERO_NN_RADIUS :
+        NP_REGRESSION_FIT_ERR_BANDWIDTH;
       goto finish_regression_estimation;
     }
   }
@@ -29615,6 +29635,8 @@ finish_regression_estimation:
     error("\n** Error: memory allocation failed.");
   if(regression_fit_status == NP_REGRESSION_FIT_ERR_BANDWIDTH)
     error("\n** Error: invalid bandwidth.");
+  if(regression_fit_status == NP_REGRESSION_FIT_ERR_ZERO_NN_RADIUS)
+    error("\n** Error: generalized nearest-neighbor bandwidth has a zero literal radius after occurrence exclusion.");
   if(regression_fit_status == NP_REGRESSION_FIT_ERR_HASH_CREATE)
     error("hash table creation failed");
   if(regression_fit_status == NP_REGRESSION_FIT_ERR_HASH_INSERT)
@@ -29937,7 +29959,8 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
                                 double *weights_out,
                                 const NPContinuousKernelRoute *kernel_route,
                                 NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
-                                int categorical_compress){
+                                int categorical_compress,
+                                const NPNNGeometryContext *nn_geometry_context){
   const int num_train = num_obs_train_extern;
   const int num_eval = num_obs_eval_extern;
   const int num_reg_tot =
@@ -29957,7 +29980,8 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
   double *eval_basis = NULL;
   NPConditionalBoundState bounds_state;
   int i, j, l;
-  int status = 1;
+  NPRegressionLPMatrixStatus status = NP_REGRESSION_LP_MATRIX_ERROR;
+  NPNNGeometryStatus nn_geometry_status = NP_NN_GEOMETRY_OK;
 
   if(np_lp_engine_extern != NP_LP_ENGINE_SCALAR &&
      np_lp_engine_extern != NP_LP_ENGINE_GENERAL)
@@ -30066,7 +30090,7 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
         lambdax,
         NULL) == 1)
       goto cleanup_lp_hat;
-  } else if(kernel_bandwidth_mean(KERNEL_reg_extern,
+  } else if(kernel_bandwidth_mean_ctx(KERNEL_reg_extern,
                            BANDWIDTH_den_extern,
                            num_train,
                            num_eval,
@@ -30084,8 +30108,14 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
                            matrix_X_continuous_eval_extern,
                            NULL,
                            matrix_bandwidth_x,
-                           lambdax) == 1)
+                           lambdax,
+                           nn_geometry_context,
+                           NULL,
+                           &nn_geometry_status) == 1) {
+    if(nn_geometry_status == NP_NN_GEOMETRY_ZERO_RADIUS)
+      status = NP_REGRESSION_LP_MATRIX_ZERO_RADIUS;
     goto cleanup_lp_hat;
+  }
 
   if(kernel_route != NULL &&
      np_beta_scaled_row_context_prepare(
@@ -30118,7 +30148,7 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
                     (size_t)num_eval*(size_t)orig_j] = kw[j]/sum;
       }
     }
-    status = 0;
+    status = NP_REGRESSION_LP_MATRIX_OK;
     goto cleanup_lp_hat;
   }
 
@@ -30362,7 +30392,7 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
     }
   }
 
-  status = 0;
+  status = NP_REGRESSION_LP_MATRIX_OK;
 
 cleanup_lp_hat:
   np_lp_solve_workspace_clear(&solve_workspace);
@@ -31044,7 +31074,8 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
                                   double *fitted_out,
                                   const NPContinuousKernelRoute *kernel_route,
                                   NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
-                                  int categorical_compress){
+                                  int categorical_compress,
+                                  const NPNNGeometryContext *nn_geometry_context){
   const int num_train = num_obs_train_extern;
   const int num_eval = num_obs_eval_extern;
   const int num_reg_tot = num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern;
@@ -31064,7 +31095,8 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
   double **Ycols = NULL, **Wcols = NULL;
   double *out = NULL, *eval_basis = NULL;
   int i, j, l;
-  int status = 1;
+  NPRegressionLPMatrixStatus status = NP_REGRESSION_LP_MATRIX_ERROR;
+  NPNNGeometryStatus nn_geometry_status = NP_NN_GEOMETRY_OK;
   int target_deriv = -1;
   int target_order = 0;
 
@@ -31179,7 +31211,7 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
         lambdax,
         NULL) == 1)
       goto cleanup_lp_apply;
-  } else if(kernel_bandwidth_mean(KERNEL_reg_extern,
+  } else if(kernel_bandwidth_mean_ctx(KERNEL_reg_extern,
                            BANDWIDTH_den_extern,
                            num_train,
                            num_eval,
@@ -31197,8 +31229,14 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
                            matrix_X_continuous_eval_extern,
                            NULL,
                            matrix_bandwidth_x,
-                           lambdax) == 1)
+                           lambdax,
+                           nn_geometry_context,
+                           NULL,
+                           &nn_geometry_status) == 1) {
+    if(nn_geometry_status == NP_NN_GEOMETRY_ZERO_RADIUS)
+      status = NP_REGRESSION_LP_MATRIX_ZERO_RADIUS;
     goto cleanup_lp_apply;
+  }
 
   if(kernel_route != NULL &&
      np_beta_scaled_row_context_prepare(
@@ -31237,7 +31275,7 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
         fitted_out[(size_t)j + (size_t)num_eval*(size_t)i] = fitted;
       }
     }
-    status = 0;
+    status = NP_REGRESSION_LP_MATRIX_OK;
     goto cleanup_lp_apply;
   }
 
@@ -31353,7 +31391,7 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
         block_count = 0;
       }
     }
-    status = 0;
+    status = NP_REGRESSION_LP_MATRIX_OK;
     goto cleanup_lp_apply;
   }
 
@@ -31367,7 +31405,7 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
                                              n_rhs,
                                              fitted_out,
                                              256) == 0)){
-    status = 0;
+    status = NP_REGRESSION_LP_MATRIX_OK;
     goto cleanup_lp_apply;
   }
 
@@ -31547,7 +31585,7 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
     }
   }
 
-  status = 0;
+  status = NP_REGRESSION_LP_MATRIX_OK;
 
 cleanup_lp_apply:
   np_lp_solve_workspace_clear(&solve_workspace);
