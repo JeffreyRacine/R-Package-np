@@ -605,7 +605,7 @@ test_that("conditional LP block rows reuse one canonical full-row workspace", {
     lines
   )
   helper_stop <- grep(
-    "^static int np_conditional_x_weight_block_stream_core\\(",
+    "^static int np_conditional_x_weight_block_stream_core_ctx\\(",
     lines
   )
   expect_length(helper_start, 1L)
@@ -655,7 +655,7 @@ test_that("conditional LP row contexts own reusable full-row solve storage", {
     "^static int (NP_NOINLINE )?(NP_HOT_ALIGN )?np_conditional_xrow_from_ctx_impl\\(",
     lines
   )
-  prepare_start <- grep("^static int np_conditional_xrow_ctx_prepare\\(", lines)
+  prepare_start <- grep("^static int np_conditional_xrow_ctx_prepare_impl\\(", lines)
   clear_start <- grep("^static void np_conditional_xrow_ctx_clear\\(", lines)
   wrapper_start <- grep("^static int np_conditional_xrow_from_ctx\\(", lines)
   expect_length(struct_stop, 1L)
@@ -713,7 +713,7 @@ test_that("conditional LP block rows reuse full-row solve storage", {
     lines
   )
   helper_stop <- grep(
-    "^static int np_conditional_x_weight_block_stream_core\\(",
+    "^static int np_conditional_x_weight_block_stream_core_ctx\\(",
     lines
   )
   expect_length(helper_start, 1L)
