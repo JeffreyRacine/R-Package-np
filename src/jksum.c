@@ -19821,6 +19821,24 @@ typedef enum {
 } NPDistributionProfileCvStatus;
 
 /*
+ * Canonical empirical-CDF pair count.  Training-grid objectives omit the
+ * diagonal and therefore average over n(n-1) ordered pairs.  External grids
+ * have no mapped diagonal and retain n*m normalization.
+ */
+static double np_distribution_cvls_pair_count(
+  const int64_t num_train,
+  const int64_t num_eval,
+  const int cdf_on_train)
+{
+  if(num_train <= 0 || num_eval <= 0)
+    return 0.0;
+  if(cdf_on_train)
+    return num_eval == num_train && num_train > 1 ?
+      (double)num_train*(double)(num_train - 1) : 0.0;
+  return (double)num_train*(double)num_eval;
+}
+
+/*
  * Keep the compressed ordered-profile CVLS workspace absolutely bounded.
  * The 64 MiB serial budget retained the gain across q = 1..5 and is
  * independent of n and p.
@@ -20314,7 +20332,8 @@ double * cv){
     goto cleanup_profile_cdf;
 
   *cv = consumer.cv;
-  *cv /= (double)num_obs_train*(double)(cdfontrain ? num_obs_train : num_obs_eval);
+  *cv /= np_distribution_cvls_pair_count(
+    num_obs_train, cdfontrain ? num_obs_train : num_obs_eval, cdfontrain);
   if(R_FINITE(*cv)){
     np_fastcv_alllarge_hits++;
     result = NP_DISTRIBUTION_PROFILE_CV_SUCCESS;
@@ -20728,7 +20747,8 @@ static int np_distribution_cvls_continuous_route(
 #ifdef MPI2
   MPI_Allreduce(MPI_IN_PLACE, cv, 1, MPI_DOUBLE, MPI_SUM, comm[1]);
 #endif
-  *cv /= (double)num_obs_train*(double)num_obs_eval;
+  *cv /= np_distribution_cvls_pair_count(
+    num_obs_train, num_obs_eval, cdfontrain);
   status = R_FINITE(*cv) ? 0 : 1;
 
 cleanup_distribution_route:
@@ -21161,7 +21181,8 @@ double * cv){
   MPI_Allreduce(MPI_IN_PLACE, cv, 1, MPI_DOUBLE, MPI_SUM, comm[1]);
 #endif
 
-  *cv /= (double) num_obs_train*num_obs_eval;
+  *cv /= np_distribution_cvls_pair_count(
+    num_obs_train, num_obs_eval, cdfontrain);
 
   free(kwx);
 
@@ -21242,12 +21263,8 @@ static double np_conditional_distribution_cvls_pair_count(
   const int64_t num_train,
   const int64_t num_eval,
   const int cdf_on_train){
-  if(num_train <= 0 || num_eval <= 0)
-    return 0.0;
-  if(cdf_on_train)
-    return num_eval == num_train && num_train > 1 ?
-      (double)num_train*(double)(num_train - 1) : 0.0;
-  return (double)num_train*(double)num_eval;
+  return np_distribution_cvls_pair_count(
+    num_train, num_eval, cdf_on_train);
 }
 
 int np_kernel_estimate_con_distribution_categorical_leave_one_out_ls_cv(
