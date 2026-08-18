@@ -18,17 +18,17 @@ typedef struct {
 } NPLPSolveWorkspace;
 
 typedef enum {
-  NP_LP_RESPONSE_SOLVE_OK = 0,
-  NP_LP_RESPONSE_SOLVE_INVALID,
-  NP_LP_RESPONSE_SOLVE_NONFINITE,
-  NP_LP_RESPONSE_SOLVE_RIDGE_EXHAUSTED,
-  NP_LP_RESPONSE_SOLVE_FINAL_FAILED
-} NPLPResponseSolveStatus;
+  NP_LP_SOLVE_POLICY_OK = 0,
+  NP_LP_SOLVE_POLICY_INVALID,
+  NP_LP_SOLVE_POLICY_NONFINITE,
+  NP_LP_SOLVE_POLICY_RIDGE_EXHAUSTED,
+  NP_LP_SOLVE_POLICY_FINAL_FAILED
+} NPLPSolvePolicyStatus;
 
 typedef struct {
   int ridge_steps;
   double ridge_total;
-} NPLPResponseSolveDiagnostics;
+} NPLPSolvePolicyDiagnostics;
 
 typedef struct {
   int p_capacity;
@@ -84,12 +84,12 @@ int np_lp_solve_workspace_solve(NPLPSolveWorkspace *workspace,
  * adjoint influence-row orientation has a different transform placement and
  * enters only with its own direct identity proof.
  */
-NPLPResponseSolveStatus np_lp_solve_workspace_solve_response(
+NPLPSolvePolicyStatus np_lp_solve_workspace_solve_response(
   NPLPSolveWorkspace *workspace,
   int p,
   int nrhs,
   double ridge_increment,
-  NPLPResponseSolveDiagnostics *diagnostics);
+  NPLPSolvePolicyDiagnostics *diagnostics);
 /* Cold-path validation used only after an ordinary solve has failed. */
 #if defined(__GNUC__) || defined(__clang__)
 #define NP_LP_COLD_PATH __attribute__((cold))
