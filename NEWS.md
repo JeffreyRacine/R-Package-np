@@ -8,6 +8,16 @@
   collective, changing numerical arithmetic, or introducing size-based
   dispatch.
 
+* Regression leave-one-out hat-matrix and apply routes now share the
+  objective's occurrence-aware generalized/adaptive NN geometry, source basis,
+  weighted moment layout, factorization, bounded ridge transcript, and
+  intercept restoration. Matrix and apply consume the same completed
+  influence row; apply retains linear-in-sample auxiliary storage and does not
+  construct an evaluation-by-training matrix. The reconstructed owner
+  preserves the August-16 one-call response solve and existing bounded ridge
+  boundary; all-zero compact-kernel LOO rows now fail explicitly instead of
+  returning a fabricated ridged estimate. No new MPI collective is added.
+
 * Smooth-coefficient NOMAD degree search now transports its scoped prepared
   context through an exact locked opcode token instead of comparing a
   serialized function closure by process-local identity. Its service workers

@@ -260,6 +260,21 @@ test_that("all-large, packed, and nearest-neighbor LP CV avoid legacy solve mars
     fixed = TRUE
   ))
   expect_true(grepl(
+    "np_lp_solve_workspace_solve(",
+    helper_body,
+    fixed = TRUE
+  ))
+  expect_false(grepl(
+    "np_lp_solve_workspace_solve_response(",
+    helper_body,
+    fixed = TRUE
+  ))
+  expect_false(grepl(
+    "np_lp_solve_workspace_solve_adjoint_factored(",
+    helper_body,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
     "hii += evalv[i]*solve_workspace.rhs_work[nrc1 + i];",
     helper_body,
     fixed = TRUE
@@ -596,7 +611,7 @@ test_that("conditional LP block rows reuse one canonical full-row workspace", {
   expect_false(grepl("np_mat_bad_rcond_sym(", helper_body, fixed = TRUE))
 })
 
-test_that("conditional LP row contexts own reusable full-row solve storage", {
+test_that("conditional and regression LP rows retain distinct canonical solve owners", {
   src_file <- locate_jksum_c()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
 
@@ -607,7 +622,9 @@ test_that("conditional LP row contexts own reusable full-row solve storage", {
     "^static int (NP_NOINLINE )?(NP_HOT_ALIGN )?np_conditional_xrow_from_ctx_impl\\(",
     lines
   )
-  prepare_start <- grep("^static int np_conditional_xrow_ctx_prepare\\(", lines)
+  legacy_start <- grep("^static int np_conditional_xrow_legacy_influence\\(", lines)
+  regression_start <- grep("^static int np_regression_xrow_canonical_influence\\(", lines)
+  prepare_start <- grep("^static int np_conditional_xrow_ctx_prepare_impl\\(", lines)
   clear_start <- grep("^static void np_conditional_xrow_ctx_clear\\(", lines)
   wrapper_start <- grep("^static int np_conditional_xrow_from_ctx\\(", lines)
   expect_length(struct_stop, 1L)
@@ -616,12 +633,16 @@ test_that("conditional LP row contexts own reusable full-row solve storage", {
   expect_length(struct_start, 1L)
   expect_length(clear_start, 1L)
   expect_length(prepare_start, 1L)
+  expect_length(legacy_start, 1L)
+  expect_length(regression_start, 1L)
   expect_length(impl_start, 1L)
   expect_length(wrapper_start, 1L)
 
   struct_body <- paste(lines[struct_start:struct_stop], collapse = "\n")
   clear_body <- paste(lines[clear_start:(prepare_start - 1L)], collapse = "\n")
-  prepare_body <- paste(lines[prepare_start:(impl_start - 1L)], collapse = "\n")
+  prepare_body <- paste(lines[prepare_start:(legacy_start - 1L)], collapse = "\n")
+  legacy_body <- paste(lines[legacy_start:(regression_start - 1L)], collapse = "\n")
+  regression_body <- paste(lines[regression_start:(impl_start - 1L)], collapse = "\n")
   impl_body <- paste(lines[impl_start:(wrapper_start - 1L)], collapse = "\n")
 
   expect_true(grepl(
@@ -630,7 +651,17 @@ test_that("conditional LP row contexts own reusable full-row solve storage", {
     fixed = TRUE
   ))
   expect_true(grepl(
+    "NPLPSolveWorkspace regression_solve_workspace;",
+    struct_body,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
     "np_lp_full_row_workspace_clear(&ctx->full_row_workspace);",
+    clear_body,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
+    "np_lp_solve_workspace_clear(&ctx->regression_solve_workspace);",
     clear_body,
     fixed = TRUE
   ))
@@ -641,11 +672,26 @@ test_that("conditional LP row contexts own reusable full-row solve storage", {
   ))
   expect_true(grepl(
     "np_lp_full_row_workspace_solve(&ctx->full_row_workspace,",
-    impl_body,
+    legacy_body,
     fixed = TRUE
   ))
   expect_true(grepl(
     "ctx->full_row_workspace.gram[a + b*k] += wj*za*zb;",
+    legacy_body,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
+    "np_lp_solve_workspace_solve_adjoint(",
+    regression_body,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
+    "np_conditional_xrow_legacy_influence(",
+    impl_body,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
+    "np_regression_xrow_canonical_influence(",
     impl_body,
     fixed = TRUE
   ))
