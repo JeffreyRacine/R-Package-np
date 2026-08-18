@@ -2494,11 +2494,17 @@ validateBandwidthTF <- function(bws){
 
 npRegressionNnCapability <- function(bws, owner = c("regression", "lsq")) {
   owner <- match.arg(owner)
-  type <- if (is.null(bws$type)) "" else as.character(bws$type)[1L]
-  ncon <- if (!is.null(bws$ncon)) {
-    as.integer(bws$ncon)[1L]
-  } else if (!is.null(bws$icon)) {
-    sum(as.logical(bws$icon))
+  field <- function(name, default = NULL) {
+    value <- bws[[name, exact = TRUE]]
+    if (is.null(value)) default else value
+  }
+  type <- as.character(field("type", ""))[1L]
+  ncon.value <- field("ncon")
+  icon <- field("icon")
+  ncon <- if (!is.null(ncon.value)) {
+    as.integer(ncon.value)[1L]
+  } else if (!is.null(icon)) {
+    sum(as.logical(icon))
   } else {
     0L
   }
@@ -2516,24 +2522,31 @@ npRegressionNnCapability <- function(bws, owner = c("regression", "lsq")) {
   if (!identical(owner, "regression"))
     return(list(code = "noncore-k2-only", lower = 2L))
 
-  nuno <- if (is.null(bws$nuno)) 0L else as.integer(bws$nuno)[1L]
-  nord <- if (is.null(bws$nord)) 0L else as.integer(bws$nord)[1L]
-  kernel <- if (is.null(bws$ckertype)) "" else as.character(bws$ckertype)[1L]
-  order <- if (is.null(bws$ckerorder)) NA_integer_ else as.integer(bws$ckerorder)[1L]
-  bound <- if (is.null(bws$ckerbound)) "" else as.character(bws$ckerbound)[1L]
-  engine <- if (is.null(bws$regtype.engine)) "" else as.character(bws$regtype.engine)[1L]
-  degree <- if (is.null(bws$degree.engine)) integer() else as.integer(bws$degree.engine)
-  ordinary.bounds <- length(bws$ckerlb) == 1L && length(bws$ckerub) == 1L &&
-    is.infinite(bws$ckerlb[[1L]]) && bws$ckerlb[[1L]] < 0 &&
-    is.infinite(bws$ckerub[[1L]]) && bws$ckerub[[1L]] > 0
-  scalar.mean <- identical(engine, "lc") ||
-    (identical(engine, "lp") && length(degree) == 1L && degree[[1L]] == 0L)
+  nuno <- as.integer(field("nuno", 0L))[1L]
+  nord <- as.integer(field("nord", 0L))[1L]
+  kernel <- as.character(field("ckertype", ""))[1L]
+  order <- as.integer(field("ckerorder", NA_integer_))[1L]
+  bound <- as.character(field("ckerbound", ""))[1L]
+  engine <- as.character(field("regtype.engine", ""))[1L]
+  basis <- as.character(field("basis.engine", ""))[1L]
+  degree <- as.integer(field("degree.engine", integer()))
+  lower.bound <- field("ckerlb", numeric())
+  upper.bound <- field("ckerub", numeric())
+  ordinary.bounds <- length(lower.bound) == 1L &&
+    length(upper.bound) == 1L &&
+    is.infinite(lower.bound[[1L]]) && lower.bound[[1L]] < 0 &&
+    is.infinite(upper.bound[[1L]]) && upper.bound[[1L]] > 0
+  degree.valid <- length(degree) == 1L && !is.na(degree[[1L]]) &&
+    degree[[1L]] >= 0L && degree[[1L]] <= .np_glp_degree_hard_max
+  canonical.mean <-
+    (identical(engine, "lc") && degree.valid && degree[[1L]] == 0L) ||
+    (identical(engine, "lp") && identical(basis, "glp") && degree.valid)
 
   if (identical(type, "generalized_nn") &&
       identical(ncon, 1L) && identical(nuno, 0L) && identical(nord, 0L) &&
       kernel %in% c("gaussian", "epanechnikov") && identical(order, 2L) &&
-      identical(bound, "none") && ordinary.bounds && scalar.mean) {
-    return(list(code = "gnn-univariate-positive-lc-k1", lower = 1L))
+      identical(bound, "none") && ordinary.bounds && canonical.mean) {
+    return(list(code = "gnn-univariate-positive-lp-k1", lower = 1L))
   }
 
   list(code = "k2-only", lower = 2L)
