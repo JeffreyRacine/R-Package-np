@@ -147,27 +147,18 @@ test_that("all canonical LP solve retries are bounded", {
     reghat.c
   ))
 
-  fallback.start <- regexpr(
+  expect_false(grepl(
     "\\.npreghat_exact_lp_matrix_from_kernel_weights <- function",
     reghat.r
-  )
-  fallback.stops <- c(
-    regexpr(
-      "\\.npreghat_exact_lp_apply_chunked_from_kernel_weights <- function",
-      reghat.r
-    ),
-    regexpr(
-      "\\.npreghat_exact_lp_apply_from_regression_core <- function",
-      reghat.r
-    )
-  )
-  fallback.stop <- min(fallback.stops[fallback.stops > fallback.start])
-  expect_gt(fallback.start, 0L)
-  expect_gt(fallback.stop, fallback.start)
-  fallback <- substr(reghat.r, fallback.start, fallback.stop - 1L)
-  expect_true(grepl("seq_len(128L)", fallback, fixed = TRUE))
-  expect_true(grepl("non-finite system", fallback, fixed = TRUE))
-  expect_false(grepl("repeat\\s*\\{", fallback))
+  ))
+  expect_false(grepl(
+    "\\.npreghat_exact_lp_apply_chunked_from_kernel_weights <- function",
+    reghat.r
+  ))
+  expect_true(grepl(
+    "\\.npreghat_exact_lp_apply_from_regression_core <- function",
+    reghat.r
+  ))
 })
 
 test_that("compiled LP hat path rejects a non-finite system promptly", {

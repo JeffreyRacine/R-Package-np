@@ -954,129 +954,6 @@ npreghat <-
   H
 }
 
-.npreghat_lp_explicit_first_derivative_operator_available <- function(degree, s) {
-  degree <- as.integer(degree)
-  s <- if (is.null(s)) integer(length(degree)) else as.integer(s)
-
-  length(s) == length(degree) &&
-    length(degree) > 0L &&
-    any(s > 0L) &&
-    sum(s) == 1L &&
-    all(s %in% c(0L, 1L)) &&
-    all(s <= degree) &&
-    any(rep.int(1L, length(degree)) > degree)
-}
-
-.npreghat_lp_generalized_nn_core_fallback_needed <- function(degree, s) {
-  degree <- as.integer(degree)
-  if (!any(degree > 1L))
-    return(FALSE)
-  !.npreghat_lp_explicit_first_derivative_operator_available(degree = degree, s = s)
-}
-
-.npreghat_exact_lp_matrix_from_kernel_weights <- function(bws,
-                                                          txdat,
-                                                          exdat = NULL,
-                                                          s = NULL,
-                                                          basis = "glp",
-                                                          degree = integer(0),
-                                                          bernstein.basis = FALSE) {
-  miss.ex <- is.null(exdat)
-  eval.data <- if (miss.ex) txdat else exdat
-  ntrain <- nrow(txdat)
-  neval <- nrow(eval.data)
-  degree <- as.integer(degree)
-  s <- if (is.null(s)) integer(length(degree)) else as.integer(s)
-  want.grad <- length(s) > 0L && any(s > 0L)
-  if (identical(bws$type, "generalized_nn") &&
-      .npreghat_lp_generalized_nn_core_fallback_needed(degree = degree, s = s)) {
-    return(.npreghat_exact_matrix_from_core(
-      bws = bws,
-      txdat = txdat,
-      exdat = if (miss.ex) NULL else exdat,
-      s = s
-    ))
-  }
-
-  kw <- .np_kernel_weights_direct(
-    bws = bws,
-    txdat = txdat,
-    exdat = if (miss.ex) NULL else eval.data,
-    leave.one.out = FALSE,
-    bandwidth.divide = TRUE,
-    kernel.pow = 1.0,
-    int.do.tree = .npreg_fit_tree_code(bws, ncon = bws$ncon, ncat = bws$nuno + bws$nord)
-  )
-
-  W.train <- W.lp(
-    xdat = txdat[, bws$icon, drop = FALSE],
-    degree = degree,
-    basis = basis,
-    bernstein.basis = bernstein.basis
-  )
-  W.eval <- W.lp(
-    xdat = txdat[, bws$icon, drop = FALSE],
-    exdat = if (miss.ex) NULL else eval.data[, bws$icon, drop = FALSE],
-    degree = degree,
-    gradient.vec = if (want.grad) s else NULL,
-    basis = basis,
-    bernstein.basis = bernstein.basis
-  )
-
-  matprod.mode <- getOption("matprod")
-  H.fast <- if (ncol(W.train) == 1L ||
-                identical(matprod.mode, "default") ||
-                identical(matprod.mode, "blas")) {
-    .Call(
-      "C_np_reghat_lp_matrix_fast",
-      as.matrix(kw),
-      as.matrix(W.train),
-      as.matrix(W.eval),
-      PACKAGE = "npRmpi"
-    )
-  } else {
-    NULL
-  }
-  if (!is.null(H.fast))
-    return(H.fast)
-
-  H <- matrix(NA_real_, nrow = neval, ncol = ntrain)
-  eps <- 1.0 / max(1L, ntrain)
-
-  for (j in seq_len(neval)) {
-    w <- kw[, j]
-    A.base <- crossprod(W.train, W.train * w)
-    rhs <- W.eval[j, ]
-    solved <- tryCatch(solve(A.base, rhs), error = function(e) NULL)
-
-    if (is.null(solved) || !all(is.finite(solved))) {
-      if (any(!is.finite(A.base)) || any(!is.finite(rhs)))
-        stop("LP solve failed in R hat-matrix path: non-finite system")
-      A.try <- A.base
-      nepsilon <- 0.0
-
-      for (ridge.step in seq_len(128L)) {
-        diag(A.try) <- diag(A.try) + eps
-        nepsilon <- nepsilon + eps
-        solved <- tryCatch(solve(A.try, rhs), error = function(e) NULL)
-        if (!is.null(solved) && all(is.finite(solved)))
-          break
-      }
-      if (is.null(solved) || !all(is.finite(solved)))
-        stop("LP solve failed in R hat-matrix path after bounded ridging")
-
-      denom <- A.try[1L, 1L]
-      if (!is.finite(denom) || abs(denom) < .Machine$double.xmin)
-        denom <- .Machine$double.xmin
-      solved[1L] <- solved[1L] * (1.0 + nepsilon / denom)
-    }
-
-    H[j, ] <- w * drop(W.train %*% solved)
-  }
-
-  H
-}
-
 .npreghat_exact_lp_apply_from_regression_core <- function(bws,
                                                           txdat,
                                                           y,
@@ -2363,7 +2240,7 @@ npreghat.rbandwidth <-
           s = s
         ))
       } else if (exact.lp.kernel.route) {
-        .npRmpi_with_local_regression(.npreghat_exact_lp_matrix_from_kernel_weights(
+        .npRmpi_with_local_regression(.npreghat_exact_lp_matrix_from_regression_core(
           bws = bws,
           txdat = txdat,
           exdat = if (no.ex) NULL else exdat,
