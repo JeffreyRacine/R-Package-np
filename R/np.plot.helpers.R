@@ -1063,14 +1063,20 @@
   all.bp
 }
 
-.np_plot_regression_exact_lc_derivative_requested <- function(bws, regtype, gradient.order) {
+.np_plot_regression_exact_lc_derivative_requested <- function(bws, gradient.order) {
   ncon <- bws$ncon
   if (is.null(ncon) || ncon < 1L)
     return(FALSE)
+  spec <- npValidatedConditionalRegSpec(
+    bws,
+    where = ".np_plot_regression_exact_lc_derivative_requested",
+    ncon.field = "ncon"
+  )
+  regtype.engine <- spec$regtype.engine
 
-  if (identical(regtype, "lc")) {
+  if (identical(regtype.engine, "lc")) {
     gradient.order <- npValidateLcGradientOrder(
-      regtype = regtype,
+      regtype = regtype.engine,
       gradient.order = gradient.order,
       ncon = ncon,
       where = ".np_plot_regression_exact_lc_derivative_requested"
@@ -1078,14 +1084,10 @@
     return(length(gradient.order) == ncon && all(gradient.order == 1L))
   }
 
-  identical(regtype, "lp") &&
+  identical(regtype.engine, "lp") &&
     npGlpDegree0FirstDerivativeLcOk(
-      regtype.engine = regtype,
-      degree.engine = npValidateGlpDegree(
-        regtype = "lp",
-        degree = bws$degree,
-        ncon = ncon
-      ),
+      regtype.engine = regtype.engine,
+      degree.engine = spec$degree.engine,
       gradient.order = npValidateGlpGradientOrder(
         regtype = "lp",
         gradient.order = gradient.order,
@@ -2624,7 +2626,6 @@
     if (!identical(regtype, "lc")) {
       use.exact.degree0.derivative <- .np_plot_regression_exact_lc_derivative_requested(
         bws = bws,
-        regtype = regtype,
         gradient.order = gradient.order
       )
 
@@ -11711,7 +11712,6 @@ compute.bootstrap.errors.rbandwidth =
           !isTRUE(xi.factor) &&
           .np_plot_regression_exact_lc_derivative_requested(
             bws = bws,
-            regtype = regtype,
             gradient.order = gradient.order
           )
 
