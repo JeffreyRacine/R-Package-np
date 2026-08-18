@@ -13208,8 +13208,8 @@ NPPermutationWeightOutput * const pkw_output){
   }
 
   if((!gather_scatter) && (!suppress_parallel)){ 
-    // gather_scatter is only used for the local-linear cv
-    // note: ll cv + adaptive_nn does not work in parallel
+    // gather_scatter is used only by the row-partitioned regression CV owner;
+    // that owner excludes adaptive NN.
 #ifdef MPI2
     if(!nws){
       if (BANDWIDTH_reg == BW_FIXED || BANDWIDTH_reg == BW_GEN_NN){
@@ -18654,9 +18654,9 @@ cleanup_adaptive_exact_scalar:
   return result;
 }
 
-// Regression CV objective for local polynomial regression:
-// lc (degree 0), ll (degree 1), and lp (general degree vector).
-// The LL/LP branches solve weighted normal equations with ridge fallback if singular.
+// Regression CV objective for the canonical local-polynomial engine.
+// Public lc maps to degree zero and public ll maps to raw GLP degree one;
+// positive-degree rows share the general LP solve and bounded ridge policy.
 
 double np_kernel_estimate_regression_categorical_ls_aic(
 int lp_engine,

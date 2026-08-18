@@ -1,5 +1,14 @@
 # npRmpi 0.70-6
 
+* Public `regtype="ll"` is now exclusively an API and reporting alias for the
+  canonical raw GLP degree-one engine. Regression fit, uncertainty, objective,
+  `npreghat()` matrix/apply/constraint, single-index hat, conditional X-side,
+  and plot/bootstrap consumers all select owners from canonical engine
+  metadata. The retired private local-linear matrix/ridge and single-index hat
+  routes have been removed. Results can change only where those private routes
+  formerly selected a different regularized fit; explicit raw LP degree one
+  and unaffected LC/LP configurations retain their canonical results.
+
 * Conditioned local-polynomial influence and response owners now select the
   same globally stable graded basis before applying the canonical diagonal
   ridge policy. The former influence-only empirical QR rotation spanned the

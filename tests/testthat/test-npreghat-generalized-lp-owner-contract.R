@@ -311,7 +311,7 @@ test_that("npRmpi tree-disabled higher-degree lp scalar apply routes through exa
   npreghat_tree_disabled_lp_scalar_apply_guard_case()
 })
 
-test_that("public legacy LP mean matrices use the typed native capability", {
+test_that("public positive LP mean matrices use the typed native capability", {
   env <- npRmpi_subprocess_env(c("NP_RMPI_NO_REUSE_SLAVES=1"))
   skip_if(is.null(env), "installed npRmpi unavailable for subprocess proof")
   ok_tag <- "NPRMPI_PUBLIC_LP_NATIVE_MATRIX_CONTRACT_OK"
@@ -332,7 +332,7 @@ test_that("public legacy LP mean matrices use the typed native capability", {
     "bw.fixed <- make_bw('fixed', 0.32)",
     "bw.gnn <- make_bw('generalized_nn', 9L)",
     "bw.ann <- make_bw('adaptive_nn', 9L)",
-    "candidate_args <- function(bw, output='matrix', s=0L) list(bws=bw, output=output, regtype='lp', degree=2L, basis='glp', bernstein.basis=FALSE, s=as.integer(s), leave.one.out=FALSE)",
+    "candidate_args <- function(bw, output='matrix', s=0L) list(bws=bw, output=output, regtype.engine='lp', degree=2L, basis='glp', bernstein.basis=FALSE, s=as.integer(s), leave.one.out=FALSE)",
     "stopifnot(do.call(candidate, candidate_args(bw.fixed)))",
     "stopifnot(do.call(candidate, candidate_args(bw.gnn)))",
     "stopifnot(!do.call(candidate, candidate_args(bw.ann)))",
@@ -368,7 +368,7 @@ test_that("public legacy LP mean matrices use the typed native capability", {
   expect_true(any(grepl(ok_tag, res$output, fixed=TRUE)), info=info)
 })
 
-test_that("public legacy LP mean multi-RHS apply uses the canonical response owner", {
+test_that("public positive LP mean multi-RHS apply uses the canonical response owner", {
   env <- npRmpi_subprocess_env(c("NP_RMPI_NO_REUSE_SLAVES=1"))
   skip_if(is.null(env), "installed npRmpi unavailable for subprocess proof")
   ok_tag <- "NPRMPI_PUBLIC_LP_MULTI_RHS_APPLY_CONTRACT_OK"
@@ -377,7 +377,7 @@ test_that("public legacy LP mean multi-RHS apply uses the canonical response own
     "options(npRmpi.autodispatch=TRUE, np.messages=FALSE)",
     "npRmpi.init(nslaves=1L, quiet=TRUE)",
     "on.exit(try(npRmpi.quit(force=TRUE), silent=TRUE), add=TRUE)",
-    "candidate <- getFromNamespace('.npreghat_native_legacy_lp_mean_apply_candidate', 'npRmpi')",
+    "candidate <- getFromNamespace('.npreghat_native_positive_lp_mean_apply_candidate', 'npRmpi')",
     "has_extended_nn <- getFromNamespace('npRegressionHasExtendedNn', 'npRmpi')",
     "native_apply <- getFromNamespace('.npreghat_exact_lp_apply_from_regression_core', 'npRmpi')",
     "local_regression <- getFromNamespace('.npRmpi_with_local_regression', 'npRmpi')",
@@ -391,7 +391,7 @@ test_that("public legacy LP mean multi-RHS apply uses the canonical response own
     "bw.fixed <- make_bw('fixed', c(0.48,0.52,0.35))",
     "bw.gnn <- make_bw('generalized_nn', c(11L,11L,0.35))",
     "bw.ann <- make_bw('adaptive_nn', c(11L,11L,0.35))",
-    "candidate_args <- function(bw,y=Y,s=c(0L,0L)) list(bws=bw, output='apply', y=y, regtype='lp', degree=c(2L,1L), basis='glp', bernstein.basis=FALSE, s=as.integer(s), leave.one.out=FALSE)",
+    "candidate_args <- function(bw,y=Y,s=c(0L,0L)) list(bws=bw, output='apply', y=y, regtype.engine='lp', degree=c(2L,1L), basis='glp', bernstein.basis=FALSE, s=as.integer(s), leave.one.out=FALSE)",
     "stopifnot(do.call(candidate, candidate_args(bw.fixed)))",
     "stopifnot(do.call(candidate, candidate_args(bw.gnn)))",
     "stopifnot(!do.call(candidate, candidate_args(bw.ann)))",

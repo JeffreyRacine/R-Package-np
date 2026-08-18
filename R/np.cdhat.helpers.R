@@ -182,15 +182,6 @@
     ))
   }
 
-  if (identical(regtype, "ll")) {
-    return(.npreghat_exact_ll_matrix_from_kernel_weights(
-      bws = xbw,
-      txdat = txdat,
-      exdat = eval.arg,
-      s = s
-    ))
-  }
-
   if (identical(regtype, "lp")) {
     .npcdhat_validate_lp_x_s(
       degree = degree,
