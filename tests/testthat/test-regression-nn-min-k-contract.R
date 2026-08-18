@@ -1,16 +1,26 @@
-test_that("nonfixed regression NN bandwidths enforce k >= 2 across lc ll and lp", {
+test_that("nonfixed regression NN floors follow the typed core capability", {
   set.seed(42)
   n <- 80
   x <- sort(rnorm(n))
   y <- x^2 + rnorm(n, sd = 0.15)
   tx <- data.frame(x = x)
-  ex <- data.frame(x = seq(min(x), max(x), length.out = 19))
+  span <- diff(range(x))
+  ex <- data.frame(x = seq(min(x) + 0.01 * span,
+                           max(x) - 0.01 * span,
+                           length.out = 19) + 1e-9)
 
-  expect_error(
-    npregbw(xdat = tx, ydat = y, regtype = "lc", bwtype = "generalized_nn",
-            bandwidth.compute = FALSE, bws = 1),
-    "nearest-neighbor bandwidth must be at least 2|nearest-neighbor bandwidth must be in \\[2,"
+  bw.lc <- npregbw(
+    xdat = tx, ydat = y, regtype = "lc", bwtype = "generalized_nn",
+    bandwidth.compute = FALSE, bwscaling = FALSE, bws = 1,
+    ckertype = "gaussian", ckerorder = 2L
   )
+  fit.lc <- npreg(bws = bw.lc, exdat = ex)
+  hat.lc <- npreghat(bws = bw.lc, txdat = tx, exdat = ex)
+  apply.lc <- npreghat(
+    bws = bw.lc, txdat = tx, exdat = ex, y = y, output = "apply"
+  )
+  expect_equal(drop(hat.lc %*% y), drop(fit.lc$mean), tolerance = 1e-10)
+  expect_equal(drop(apply.lc), drop(fit.lc$mean), tolerance = 1e-10)
 
   expect_error(
     npregbw(xdat = tx, ydat = y, regtype = "ll", bwtype = "generalized_nn",
@@ -22,6 +32,14 @@ test_that("nonfixed regression NN bandwidths enforce k >= 2 across lc ll and lp"
     npregbw(xdat = tx, ydat = y, regtype = "lp", degree = 2L, bwtype = "generalized_nn",
             bandwidth.compute = FALSE, bws = 1),
     "nearest-neighbor bandwidth must be at least 2|nearest-neighbor bandwidth must be in \\[2,"
+  )
+
+  expect_error(
+    nplsqregbw(
+      xdat = tx, ydat = y, scale = rep.int(1, n),
+      bwtype = "generalized_nn", bandwidth.compute = FALSE, bws = 1
+    ),
+    "nearest-neighbor bandwidth must be in \\[2,"
   )
 
   bw.ll <- npregbw(xdat = tx, ydat = y, regtype = "ll", bwtype = "generalized_nn",

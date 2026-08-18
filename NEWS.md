@@ -1,5 +1,18 @@
 # np 0.70-6
 
+* Ordinary univariate generalized-nearest-neighbour regression now admits
+  `k = 1` only for the mathematically certified positive scalar capability:
+  second-order Gaussian or Epanechnikov kernels with LC mean/derivative
+  operation, including the equivalent generalized-LP degree-zero
+  representation. One exact-field capability resolver supplies manual
+  validation, fixed-degree optimizer bounds, and the native lower endpoint;
+  an occurrence-aware geometry validator rejects literal zero radii. Adaptive
+  NN, mixed or multivariate regression, positive-degree LP (including the
+  public `ll` alias), other kernels/bounds, automatic degree domains that can
+  reach positive degree, and semiparametric owners retain `k >= 2`. The policy
+  contains no sample-size, timing, host, rank-count, or acceleration branch and
+  introduces only linear-in-evaluation geometry scratch.
+
 * Regression leave-one-out hat-matrix and apply routes now share the objective's
   occurrence-aware generalized/adaptive NN geometry, source basis, weighted
   moment layout, factorization, bounded ridge transcript, and intercept
