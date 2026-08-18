@@ -1,5 +1,16 @@
 # np 0.70-6
 
+* Fixed local-polynomial plot bootstraps now solve count-compressed response
+  moments through the same condition-qualified, Gram-scaled bounded-ridge
+  owner used by ordinary regression fits. Regression, single-index,
+  smooth-coefficient, partial-linear, and conditional density/distribution
+  bootstrap consumers share one native batched response solve; the former
+  private determinant, `solve()`, and absolute-ridge implementations have
+  been removed. Count construction, moment arithmetic, chunking, progress,
+  and MPI orchestration are unchanged. Results can change for
+  ill-conditioned bootstrap systems that the private path formerly accepted
+  under a different regularization policy.
+
 * Public `regtype="ll"` is now exclusively an API and reporting alias for the
   canonical raw GLP degree-one engine. Regression fit, uncertainty, objective,
   `npreghat()` matrix/apply/constraint, single-index hat, conditional X-side,
