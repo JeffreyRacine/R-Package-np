@@ -1,4 +1,4 @@
-test_that("nonfixed regression NN bandwidth constructor enforces k >= 2 across lc ll and lp", {
+test_that("nonfixed regression NN constructor follows the typed core capability", {
   set.seed(42)
   n <- 80
   x <- sort(rnorm(n))
@@ -6,12 +6,12 @@ test_that("nonfixed regression NN bandwidth constructor enforces k >= 2 across l
   xdati <- npRmpi:::untangle(data.frame(x = x))
   ydati <- npRmpi:::untangle(data.frame(y = y))
 
-  expect_error(
-    npRmpi:::rbandwidth(bw = 1, bandwidth = 1, regtype = "lc", bwtype = "generalized_nn",
-                        bandwidth.compute = FALSE, nobs = n,
-                        xdati = xdati, ydati = ydati, xnames = "x", ynames = "y"),
-    "nearest-neighbor bandwidth must be at least 2"
+  bw.lc <- npRmpi:::rbandwidth(
+    bw = 1, bandwidth = 1, regtype = "lc", bwtype = "generalized_nn",
+    bandwidth.compute = FALSE, nobs = n,
+    xdati = xdati, ydati = ydati, xnames = "x", ynames = "y"
   )
+  expect_identical(npRmpi:::npRegressionNnLowerBound(bw.lc), 1L)
 
   expect_error(
     npRmpi:::rbandwidth(bw = 1, bandwidth = 1, regtype = "ll", bwtype = "generalized_nn",

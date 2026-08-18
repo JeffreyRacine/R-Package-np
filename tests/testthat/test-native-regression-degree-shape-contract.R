@@ -27,7 +27,11 @@ test_that("native regression objectives reject malformed LP degree vectors", {
     get("DO_TREE_NO", ns),
     FALSE,
     3L,
-    FALSE
+    FALSE,
+    0L,
+    2L,
+    TRUE,
+    2L
   ))
 
   expect_error(

@@ -673,6 +673,19 @@ nplsqregbw <-
     dfc.dir = opt.value("dfc.dir", 3),
     transform.bounds = transform.bounds
   )
+  myopti <- c(myopti, npContinuousKernelDescriptorOptions(bws))
+  myopti <- c(
+    myopti,
+    categorical.compress = npStrictLogicalOption("np.categorical.compress", TRUE),
+    nn.minimum = npRegressionNnLowerBound(bws, owner = "lsq")
+  )
+  if (!isTRUE(bandwidth.compute)) {
+    npValidateRegressionNnLowerBound(
+      bws,
+      where = "nplsqregbw",
+      owner = "lsq"
+    )
+  }
   myoptd <- list(
     ftol = ftol,
     tol = tol,
@@ -777,7 +790,11 @@ nplsqregbw <-
   opt.value <- function(name, default) {
     if (is.null(opt.args[[name]])) default else opt.args[[name]]
   }
-  bw.bounds <- .npregbw_nomad_bw_bounds(template = template, setup = setup)
+  bw.bounds <- .npregbw_nomad_bw_bounds(
+    template = template,
+    setup = setup,
+    owner = "lsq"
+  )
   bw.start.bounds <- .np_nomad_bw_restart_start_bounds(
     bounds = bw.bounds,
     setup = setup,
