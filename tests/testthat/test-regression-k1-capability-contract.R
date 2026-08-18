@@ -46,6 +46,7 @@ test_that("regression k1 capability is narrow and R-owned", {
 
   admitted <- list(
     list(label = "lc", regtype = "lc", degree = NULL),
+    list(label = "ll", regtype = "ll", degree = NULL),
     list(label = "lp0", regtype = "lp", degree = 0L),
     list(label = "lp1", regtype = "lp", degree = 1L),
     list(label = "lp3", regtype = "lp", degree = 3L),
@@ -68,7 +69,7 @@ test_that("regression k1 capability is narrow and R-owned", {
       )
       expect_identical(lower(bw), 1L)
       expect_identical(lower(bw, owner = "lsq"), 2L)
-      expected.search.lower <- if (identical(operator$regtype, "lp")) 1L else 2L
+      expected.search.lower <- 1L
       expect_identical(
         search_lower(bw, degree.candidates = list(0:12)),
         expected.search.lower
@@ -88,7 +89,7 @@ test_that("regression k1 capability is narrow and R-owned", {
       expect_true(all(is.finite(H)))
       ridge <- attr(H, "ridge.used", exact = TRUE)
       expect_true(all(is.finite(ridge)))
-      if (is.null(operator$degree) || operator$degree == 0L)
+      if (identical(operator$label, "lc") || identical(operator$degree, 0L))
         expect_true(all(ridge == 0))
       expect_equal(as.numeric(H %*% y), as.numeric(applied), tolerance = 5e-9)
       expect_true(is.finite(objective))
@@ -120,7 +121,6 @@ test_that("regression k1 capability is narrow and R-owned", {
   rejected <- list(
     make_bw(bwtype = "adaptive_nn", bandwidth = 2),
     make_bw(xdat = p2, ydat = y, bandwidth = c(2, 2)),
-    make_bw(regtype = "ll", bandwidth = 2),
     make_bw(regtype = "lp", degree = 1L, basis = "tensor", bandwidth = 2),
     suppressWarnings(make_bw(kernel = "uniform", bandwidth = 2)),
     make_bw(kernel = "gaussian", order = 4L, bandwidth = 2),

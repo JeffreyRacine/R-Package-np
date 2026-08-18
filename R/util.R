@@ -2348,7 +2348,6 @@ npRegressionNnCapability <- function(bws, owner = c("regression", "lsq")) {
   kernel <- as.character(field("ckertype", ""))[1L]
   order <- as.integer(field("ckerorder", NA_integer_))[1L]
   bound <- as.character(field("ckerbound", ""))[1L]
-  public.regtype <- as.character(field("regtype", ""))[1L]
   engine <- as.character(field("regtype.engine", ""))[1L]
   basis <- as.character(field("basis.engine", ""))[1L]
   degree <- as.integer(field("degree.engine", integer()))
@@ -2361,10 +2360,8 @@ npRegressionNnCapability <- function(bws, owner = c("regression", "lsq")) {
   degree.valid <- length(degree) == 1L && !is.na(degree[[1L]]) &&
     degree[[1L]] >= 0L && degree[[1L]] <= .np_glp_degree_hard_max
   canonical.mean <-
-    (identical(public.regtype, "lc") && identical(engine, "lc") &&
-       degree.valid && degree[[1L]] == 0L) ||
-    (identical(public.regtype, "lp") && identical(engine, "lp") &&
-       identical(basis, "glp") && degree.valid)
+    (identical(engine, "lc") && degree.valid && degree[[1L]] == 0L) ||
+    (identical(engine, "lp") && identical(basis, "glp") && degree.valid)
 
   if (identical(type, "generalized_nn") &&
       identical(ncon, 1L) && identical(nuno, 0L) && identical(nord, 0L) &&

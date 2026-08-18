@@ -22,16 +22,16 @@ test_that("nonfixed regression NN floors follow the typed core capability", {
   expect_equal(drop(hat.lc %*% y), drop(fit.lc$mean), tolerance = 1e-10)
   expect_equal(drop(apply.lc), drop(fit.lc$mean), tolerance = 1e-10)
 
-  expect_error(
-    npregbw(xdat = tx, ydat = y, regtype = "ll", bwtype = "generalized_nn",
-            bandwidth.compute = FALSE, bws = 1),
-    "nearest-neighbor bandwidth must be at least 2|nearest-neighbor bandwidth must be in \\[2,"
+  bw.ll <- npregbw(
+    xdat = tx, ydat = y, regtype = "ll", bwtype = "generalized_nn",
+    bandwidth.compute = FALSE, bwscaling = FALSE, bws = 1,
+    ckertype = "gaussian", ckerorder = 2L
   )
-
-  expect_error(
-    npregbw(xdat = tx, ydat = y, regtype = "lp", degree = 2L, bwtype = "generalized_nn",
-            bandwidth.compute = FALSE, bws = 1),
-    "nearest-neighbor bandwidth must be at least 2|nearest-neighbor bandwidth must be in \\[2,"
+  bw.lp2 <- npregbw(
+    xdat = tx, ydat = y, regtype = "lp", degree = 2L,
+    degree.select = "manual", basis = "glp",
+    bwtype = "generalized_nn", bandwidth.compute = FALSE,
+    bwscaling = FALSE, bws = 1, ckertype = "gaussian", ckerorder = 2L
   )
 
   expect_error(
@@ -42,22 +42,15 @@ test_that("nonfixed regression NN floors follow the typed core capability", {
     "nearest-neighbor bandwidth must be in \\[2,"
   )
 
-  bw.ll <- npregbw(xdat = tx, ydat = y, regtype = "ll", bwtype = "generalized_nn",
-                   bandwidth.compute = FALSE, bws = 2)
   fit.ll <- npreg(bws = bw.ll, exdat = ex)
   hat.ll <- npreghat(bws = bw.ll, txdat = tx, exdat = ex)
   apply.ll <- npreghat(bws = bw.ll, txdat = tx, exdat = ex, y = y, output = "apply")
   expect_equal(drop(hat.ll %*% y), drop(fit.ll$mean), tolerance = 1e-10)
   expect_equal(drop(apply.ll), drop(fit.ll$mean), tolerance = 1e-10)
+  expect_true(all(is.finite(npreg(bws = bw.lp2, exdat = ex)$mean)))
 
   bw.auto <- npregbw(xdat = tx, ydat = y, regtype = "ll", bwtype = "generalized_nn", nmulti = 1)
-  expect_gte(as.integer(bw.auto$bw[1]), 2L)
-
-  bw.bad <- bw.ll
-  bw.bad$bw[1] <- 1
-  bw.bad$bandwidth$x[1] <- 1
-  expect_error(npreg(bws = bw.bad), "nearest-neighbor bandwidth must be in \\[2,")
-  expect_error(npreghat(bws = bw.bad, txdat = tx), "nearest-neighbor bandwidth must be in \\[2,")
+  expect_gte(as.integer(bw.auto$bw[1]), 1L)
 })
 
 test_that("semiparametric NN selectors honor the same floor on common-use routes", {

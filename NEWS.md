@@ -67,13 +67,14 @@
   fallback, and uses only linear-in-sample basis storage.
 
 * Ordinary univariate generalized nearest-neighbour regression now admits
-  `k = 1` for positive second-order Gaussian and Epanechnikov LC and public
-  generalized-LP mean/derivative operators through degree 12, in raw or
-  globally graded coordinates. One R-owned capability resolver supplies
+  `k = 1` for positive second-order Gaussian and Epanechnikov LC and canonical
+  generalized-LP mean/derivative operators through degree 12, including the
+  public `ll` alias for raw degree-1 LP, in raw or globally graded coordinates.
+  One R-owned capability resolver supplies
   manual validation, fixed- and automatic-degree optimizer bounds, and the
-  native lower bound; adaptive NN, mixed or multivariate regressors, the
-  distinct legacy `ll` fit owner, non-GLP bases, higher-order/uniform/bounded
-  kernels, and semiparametric owners retain `k >= 2`. Literal zero radii remain
+  native lower bound; adaptive NN, mixed or multivariate regressors, non-GLP
+  bases, higher-order/uniform/bounded kernels, and semiparametric owners retain
+  `k >= 2`. Literal zero radii remain
   infeasible objectives and explicit fit/hat errors through the shared
   occurrence-aware radius validator. Fixed- and automatic-degree searches
   evaluate the newly admitted discrete endpoint under the same capability as
