@@ -2286,7 +2286,7 @@ npreghat.rbandwidth <-
         as.matrix(kw),
         as.matrix(W),
         as.matrix(W.eval),
-        PACKAGE = "np"
+        PACKAGE = "npRmpi"
       )
       if (is.null(H))
         stop("invalid canonical LP influence-matrix input", call. = FALSE)
@@ -2303,7 +2303,7 @@ npreghat.rbandwidth <-
         as.matrix(W),
         as.matrix(W.eval),
         y,
-        PACKAGE = "np"
+        PACKAGE = "npRmpi"
       )
       if (is.null(out))
         stop("invalid canonical LP influence-apply input", call. = FALSE)
