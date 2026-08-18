@@ -70,7 +70,7 @@ test_that("a similarly prefixed bandwidth field cannot activate reghat", {
   arguments <- list(
     output = "apply",
     y = matrix(1, nrow = 3L, ncol = 2L),
-    regtype = "lp",
+    regtype.engine = "lp",
     degree = 1L,
     basis = "glp",
     bernstein.basis = FALSE,

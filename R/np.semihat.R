@@ -215,25 +215,6 @@
   )
 }
 
-.np_indexhat_ll_owner_rbw <- function(bws, idx.train) {
-  base <- .np_indexhat_rbw(bws = bws, idx.train = idx.train)
-  npregbw(
-    xdat = idx.train,
-    ydat = rep.int(0.0, nrow(idx.train)),
-    bws = base$bw,
-    regtype = "ll",
-    bwtype = base$type,
-    bandwidth.compute = FALSE,
-    ckertype = base$ckertype,
-    ckerorder = base$ckerorder,
-    ckerbound = base$ckerbound,
-    ckerlb = base$ckerlb,
-    ckerub = base$ckerub,
-    ukertype = base$ukertype,
-    okertype = base$okertype
-  )
-}
-
 .np_indexhat_numeric_y <- function(y) {
   if (is.factor(y) || is.vector(y))
     return(matrix(as.double(y), ncol = 1L))
@@ -339,11 +320,7 @@
     return(if (ncol(out) == 1L) as.vector(out) else out)
   }
 
-  degree <- if (identical(regtype, "ll")) {
-    1L
-  } else {
-    spec$degree.engine
-  }
+  degree <- spec$degree.engine
 
   W <- W.lp(
     xdat = idx.train,
@@ -514,15 +491,8 @@
 }
 
 .np_indexhat_gradient_matrix <- function(bws, idx.train, idx.eval) {
-  regtype <- if (!is.null(bws$regtype)) as.character(bws$regtype)[1L] else "lc"
-  owner.bw <- if (identical(regtype, "ll")) {
-    .np_indexhat_ll_owner_rbw(bws = bws, idx.train = idx.train)
-  } else {
-    .np_indexhat_rbw(bws = bws, idx.train = idx.train)
-  }
-
   out <- npreghat(
-    bws = owner.bw,
+    bws = .np_indexhat_rbw(bws = bws, idx.train = idx.train),
     txdat = idx.train,
     exdat = idx.eval,
     output = "matrix",
@@ -545,28 +515,7 @@
                                s = 0L) {
   output <- match.arg(output)
   spec <- .npindex_resolve_spec(bws, where = "npindexhat")
-  regtype <- if (!is.null(bws$regtype)) as.character(bws$regtype)[1L] else spec$regtype.engine
   regtype.engine <- spec$regtype.engine
-  if (identical(regtype, "ll")) {
-    out <- npreghat(
-      bws = .np_indexhat_ll_owner_rbw(bws = bws, idx.train = idx.train),
-      txdat = idx.train,
-      exdat = idx.eval,
-      y = y,
-      output = output,
-      s = s
-    )
-
-    if (!identical(output, "matrix"))
-      return(out)
-
-    return(matrix(
-      as.double(out),
-      nrow = nrow(out),
-      ncol = ncol(out),
-      dimnames = dimnames(out)
-    ))
-  }
 
   if (npIsCanonicalLp0Spec(spec, ncon = 1L)) {
     if (s == 1L) {
@@ -613,18 +562,13 @@
 
   lp.grad.owner.safe <- identical(output, "matrix") &&
     s == 1L &&
-    (
-      identical(regtype, "ll") ||
+    identical(regtype.engine, "lp") &&
+    !(
+      identical(bws$type, "generalized_nn") &&
+        all(as.integer(spec$degree.engine) == 1L) &&
         (
-          identical(regtype.engine, "lp") &&
-            !(
-              identical(bws$type, "generalized_nn") &&
-                all(as.integer(spec$degree.engine) == 1L) &&
-                (
-                  !identical(spec$basis.engine, "glp") ||
-                    isTRUE(spec$bernstein.basis.engine)
-                )
-            )
+          !identical(spec$basis.engine, "glp") ||
+            isTRUE(spec$bernstein.basis.engine)
         )
     )
 
