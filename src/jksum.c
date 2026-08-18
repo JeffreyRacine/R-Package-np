@@ -29259,7 +29259,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
                                             1,
                                             epsilon,
                                             NULL) !=
-       NP_LP_RESPONSE_SOLVE_OK) {
+       NP_LP_SOLVE_POLICY_OK) {
       execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_SOLVE;
       return R_NilValue;
     }
