@@ -116,6 +116,8 @@ void np_lp_solve_workspace_clear(NPLPSolveWorkspace *workspace)
   free(workspace->rhs_source);
   free(workspace->gram_work);
   free(workspace->rhs_work);
+  free(workspace->rank_values);
+  free(workspace->rank_work);
   free(workspace->ipiv);
   np_lp_solve_workspace_init(workspace);
 }
@@ -125,11 +127,14 @@ int np_lp_solve_workspace_reserve(NPLPSolveWorkspace *workspace,
                                   int nrhs)
 {
   size_t gram_elements, rhs_elements, gram_bytes, rhs_bytes, pivot_bytes;
+  size_t rank_values_bytes, rank_work_elements, rank_work_bytes;
   double *gram_source = NULL, *rhs_source = NULL;
   double *gram_work = NULL, *rhs_work = NULL;
+  double *rank_values = NULL, *rank_work = NULL;
   int *ipiv = NULL;
 
-  if((workspace == NULL) || (p <= 0) || (nrhs <= 0))
+  if((workspace == NULL) || (p <= 0) || (nrhs <= 0) ||
+     (p > INT_MAX/5))
     return 0;
   workspace->factor_ready = 0;
   workspace->factor_p = 0;
@@ -139,20 +144,28 @@ int np_lp_solve_workspace_reserve(NPLPSolveWorkspace *workspace,
      !np_lp_size_product((size_t)p, (size_t)nrhs, &rhs_elements) ||
      !np_lp_double_bytes(gram_elements, &gram_bytes) ||
      !np_lp_double_bytes(rhs_elements, &rhs_bytes) ||
-     !np_lp_size_product((size_t)p, sizeof(int), &pivot_bytes))
+     !np_lp_size_product((size_t)p, sizeof(int), &pivot_bytes) ||
+     !np_lp_double_bytes((size_t)p, &rank_values_bytes) ||
+     !np_lp_size_product(5U, (size_t)p, &rank_work_elements) ||
+     !np_lp_double_bytes(rank_work_elements, &rank_work_bytes))
     return 0;
 
   gram_source = (double *)malloc(gram_bytes);
   rhs_source = (double *)malloc(rhs_bytes);
   gram_work = (double *)malloc(gram_bytes);
   rhs_work = (double *)malloc(rhs_bytes);
+  rank_values = (double *)malloc(rank_values_bytes);
+  rank_work = (double *)malloc(rank_work_bytes);
   ipiv = (int *)malloc(pivot_bytes);
   if((gram_source == NULL) || (rhs_source == NULL) ||
-     (gram_work == NULL) || (rhs_work == NULL) || (ipiv == NULL)){
+     (gram_work == NULL) || (rhs_work == NULL) ||
+     (rank_values == NULL) || (rank_work == NULL) || (ipiv == NULL)){
     free(gram_source);
     free(rhs_source);
     free(gram_work);
     free(rhs_work);
+    free(rank_values);
+    free(rank_work);
     free(ipiv);
     return 0;
   }
@@ -166,6 +179,9 @@ int np_lp_solve_workspace_reserve(NPLPSolveWorkspace *workspace,
   workspace->rhs_source = rhs_source;
   workspace->gram_work = gram_work;
   workspace->rhs_work = rhs_work;
+  workspace->rank_values = rank_values;
+  workspace->rank_work = rank_work;
+  workspace->rank_work_capacity = rank_work_elements;
   workspace->ipiv = ipiv;
   return 1;
 }
@@ -315,6 +331,197 @@ int np_lp_solve_workspace_solve_factored(NPLPSolveWorkspace *workspace,
     workspace, p, nrhs, 'N');
 }
 
+static int np_lp_solve_workspace_rank_scratch_shape(
+  const NPLPSolveWorkspace *workspace,
+  int p)
+{
+  return (workspace != NULL) && (p > 0) &&
+    (workspace->p_capacity >= p) &&
+    (workspace->gram_source != NULL) &&
+    (workspace->gram_work != NULL) &&
+    (workspace->rank_values != NULL) &&
+    (workspace->rank_work != NULL) &&
+    (workspace->rank_work_capacity >= 5U*(size_t)p);
+}
+
+/*
+ * The LU diagonal screen is a backward-error-scale numerical-zero detector,
+ * not a condition-number policy.  gamma_p is the standard p-operation
+ * rounding envelope.  A clear pivot retains the already-computed factor;
+ * only its narrow ambiguity band pays for cold rank adjudication.
+ */
+static NPLPFactorAdmissionStatus np_lp_solve_workspace_lu_screen(
+  const NPLPSolveWorkspace *workspace,
+  int p)
+{
+  const double pu = (double)p*DBL_EPSILON;
+  const double gamma_p = (pu < 1.0) ? pu/(1.0 - pu) : 1.0;
+  double min_pivot = DBL_MAX;
+  double max_pivot = 0.0;
+  int i;
+
+  if(!np_lp_solve_workspace_rank_scratch_shape(workspace, p) ||
+     !workspace->factor_ready || (workspace->factor_p != p))
+    return NP_LP_FACTOR_ADMISSION_INVALID;
+  if(p == 1)
+    return NP_LP_FACTOR_ADMISSION_RETAINED;
+
+  for(i = 0; i < p; i++){
+    const double pivot = fabs(workspace->gram_work[i + i*p]);
+    if(!R_FINITE(pivot))
+      return NP_LP_FACTOR_ADMISSION_NONFINITE;
+    if(pivot < min_pivot)
+      min_pivot = pivot;
+    if(pivot > max_pivot)
+      max_pivot = pivot;
+  }
+  if(!(max_pivot > 0.0))
+    return NP_LP_FACTOR_ADMISSION_RANK_DEFICIENT;
+  return (min_pivot > gamma_p*max_pivot) ?
+    NP_LP_FACTOR_ADMISSION_RETAINED :
+    NP_LP_FACTOR_ADMISSION_REFACTOR;
+}
+
+/* Cold path: symmetrically equilibrate the pristine Gram before DGESVD.
+ * Nonzero diagonal scaling is exactly invariant to positive rescaling of any
+ * basis column and to a common kernel-weight normalization.  A zero diagonal
+ * uses that row's maximum absolute entry, preserving signed-kernel systems
+ * that can be nonsingular despite diagonal cancellation. */
+static NPLPFactorAdmissionStatus np_lp_solve_workspace_cold_rank(
+  NPLPSolveWorkspace *workspace,
+  int p)
+{
+  const char jobu = 'N';
+  const char jobvt = 'N';
+  const int ldu = 1;
+  const int ldvt = 1;
+  const int lwork = 5*p;
+  const double pu = (double)p*DBL_EPSILON;
+  const double gamma_p = (pu < 1.0) ? pu/(1.0 - pu) : 1.0;
+  double dummy_u = 0.0;
+  double dummy_vt = 0.0;
+  double max_singular;
+  double min_singular;
+  int info = 0;
+  int i, j;
+
+  if(!np_lp_solve_workspace_rank_scratch_shape(workspace, p))
+    return NP_LP_FACTOR_ADMISSION_INVALID;
+
+  workspace->factor_ready = 0;
+  workspace->factor_p = 0;
+  for(i = 0; i < p; i++){
+    const double diagonal = fabs(workspace->gram_source[i + i*p]);
+    double reference = diagonal;
+
+    if(!R_FINITE(diagonal))
+      return NP_LP_FACTOR_ADMISSION_NONFINITE;
+    if(!(reference > 0.0)){
+      for(j = 0; j < p; j++){
+        const double value = fabs(workspace->gram_source[i + j*p]);
+        if(!R_FINITE(value))
+          return NP_LP_FACTOR_ADMISSION_NONFINITE;
+        if(value > reference)
+          reference = value;
+      }
+    }
+    if(!(reference > 0.0))
+      return NP_LP_FACTOR_ADMISSION_RANK_DEFICIENT;
+    workspace->rank_values[i] = 1.0/sqrt(reference);
+    if(!R_FINITE(workspace->rank_values[i]))
+      return NP_LP_FACTOR_ADMISSION_NONFINITE;
+  }
+
+  for(j = 0; j < p; j++){
+    for(i = 0; i < p; i++){
+      workspace->gram_work[i + j*p] = workspace->gram_source[i + j*p]*
+        workspace->rank_values[i]*workspace->rank_values[j];
+      if(!R_FINITE(workspace->gram_work[i + j*p]))
+        return NP_LP_FACTOR_ADMISSION_NONFINITE;
+    }
+  }
+
+  F77_CALL(dgesvd)(&jobu, &jobvt, &p, &p,
+                   workspace->gram_work, &p,
+                   workspace->rank_values,
+                   &dummy_u, &ldu,
+                   &dummy_vt, &ldvt,
+                   workspace->rank_work, &lwork,
+                   &info FCONE FCONE);
+  if(info != 0)
+    return NP_LP_FACTOR_ADMISSION_FAILED;
+  max_singular = workspace->rank_values[0];
+  min_singular = workspace->rank_values[p - 1];
+  if(!R_FINITE(max_singular) || !R_FINITE(min_singular))
+    return NP_LP_FACTOR_ADMISSION_NONFINITE;
+  if(!(max_singular > 0.0) ||
+     (min_singular <= gamma_p*max_singular))
+    return NP_LP_FACTOR_ADMISSION_RANK_DEFICIENT;
+  return NP_LP_FACTOR_ADMISSION_REFACTOR;
+}
+
+NPLPFactorAdmissionStatus np_lp_solve_workspace_admit_factor(
+  NPLPSolveWorkspace *workspace,
+  int p,
+  int rank_upper_bound)
+{
+  NPLPFactorAdmissionStatus screen;
+
+  if((rank_upper_bound < NP_LP_RANK_UPPER_BOUND_UNKNOWN) ||
+     !np_lp_solve_workspace_rank_scratch_shape(workspace, p))
+    return NP_LP_FACTOR_ADMISSION_INVALID;
+  if((rank_upper_bound != NP_LP_RANK_UPPER_BOUND_UNKNOWN) &&
+     (rank_upper_bound < p)){
+    workspace->factor_ready = 0;
+    workspace->factor_p = 0;
+    return NP_LP_FACTOR_ADMISSION_RANK_DEFICIENT;
+  }
+
+  screen = np_lp_solve_workspace_lu_screen(workspace, p);
+  if(screen != NP_LP_FACTOR_ADMISSION_REFACTOR)
+    return screen;
+  return np_lp_solve_workspace_cold_rank(workspace, p);
+}
+
+int np_lp_solve_workspace_ridge_increment(
+  const NPLPSolveWorkspace *workspace,
+  int p,
+  double ridge_fraction,
+  double *ridge_increment_out)
+{
+  double scale = 0.0;
+  int i, j;
+
+  if((workspace == NULL) || (workspace->gram_source == NULL) ||
+     (p <= 0) || (workspace->p_capacity < p) ||
+     !R_FINITE(ridge_fraction) || !(ridge_fraction > 0.0) ||
+     (ridge_increment_out == NULL))
+    return 0;
+
+  for(i = 0; i < p; i++){
+    const double value = fabs(workspace->gram_source[i + i*p]);
+    if(!R_FINITE(value))
+      return 0;
+    if(value > scale)
+      scale = value;
+  }
+  if(!(scale > 0.0)){
+    for(j = 0; j < p; j++){
+      for(i = 0; i < p; i++){
+        const double value = fabs(workspace->gram_source[i + j*p]);
+        if(!R_FINITE(value))
+          return 0;
+        if(value > scale)
+          scale = value;
+      }
+    }
+  }
+  if(!(scale > 0.0) || !R_FINITE(scale))
+    return 0;
+  *ridge_increment_out = ridge_fraction*scale;
+  return R_FINITE(*ridge_increment_out) && (*ridge_increment_out > 0.0);
+}
+
 typedef enum {
   NP_LP_FACTOR_OK = 0,
   NP_LP_FACTOR_INVALID,
@@ -366,6 +573,219 @@ static NPLPFactorStatus np_lp_solve_workspace_try_factor(
   workspace->factor_ready = 1;
   workspace->factor_p = p;
   return NP_LP_FACTOR_OK;
+}
+
+static NPLPSolvePolicyStatus np_lp_solve_workspace_restore_factor(
+  NPLPSolveWorkspace *workspace,
+  int p,
+  int nrhs)
+{
+  const NPLPFactorStatus status =
+    np_lp_solve_workspace_try_factor(workspace, p, nrhs);
+
+  if(status == NP_LP_FACTOR_OK)
+    return NP_LP_SOLVE_POLICY_OK;
+  if(status == NP_LP_FACTOR_INVALID)
+    return NP_LP_SOLVE_POLICY_INVALID;
+  if(status == NP_LP_FACTOR_NONFINITE_SOURCE)
+    return NP_LP_SOLVE_POLICY_NONFINITE;
+  return NP_LP_SOLVE_POLICY_FINAL_FAILED;
+}
+
+static NPLPSolvePolicyStatus np_lp_solve_workspace_admit_retained_factor(
+  NPLPSolveWorkspace *workspace,
+  int p,
+  int nrhs,
+  int rank_upper_bound,
+  int *needs_ridge)
+{
+  const NPLPFactorAdmissionStatus admission =
+    np_lp_solve_workspace_admit_factor(workspace, p, rank_upper_bound);
+
+  if(needs_ridge == NULL)
+    return NP_LP_SOLVE_POLICY_INVALID;
+  *needs_ridge = 0;
+  if(admission == NP_LP_FACTOR_ADMISSION_RETAINED)
+    return NP_LP_SOLVE_POLICY_OK;
+  if(admission == NP_LP_FACTOR_ADMISSION_REFACTOR)
+    return np_lp_solve_workspace_restore_factor(workspace, p, nrhs);
+  if(admission == NP_LP_FACTOR_ADMISSION_RANK_DEFICIENT){
+    *needs_ridge = 1;
+    return NP_LP_SOLVE_POLICY_OK;
+  }
+  if(admission == NP_LP_FACTOR_ADMISSION_NONFINITE)
+    return NP_LP_SOLVE_POLICY_NONFINITE;
+  if(admission == NP_LP_FACTOR_ADMISSION_INVALID)
+    return NP_LP_SOLVE_POLICY_INVALID;
+  return NP_LP_SOLVE_POLICY_FINAL_FAILED;
+}
+
+NPLPSolvePolicyStatus np_lp_solve_workspace_solve_response_ranked(
+  NPLPSolveWorkspace *workspace,
+  int p,
+  int nrhs,
+  double ridge_fraction,
+  int rank_upper_bound,
+  NPLPSolvePolicyDiagnostics *diagnostics)
+{
+  double ridge_increment = 0.0;
+  double ridge_total = 0.0;
+  int ridge_steps = 0;
+  int i;
+
+  if(diagnostics != NULL){
+    diagnostics->ridge_steps = 0;
+    diagnostics->ridge_total = 0.0;
+  }
+  if((rank_upper_bound < NP_LP_RANK_UPPER_BOUND_UNKNOWN) ||
+     !np_lp_solve_workspace_shape(workspace, p, nrhs, NULL, NULL) ||
+     !np_lp_solve_workspace_ridge_increment(workspace, p, ridge_fraction,
+                                             &ridge_increment))
+    return NP_LP_SOLVE_POLICY_INVALID;
+
+  for(;;){
+    NPLPDgesvStatus solve_status;
+    int needs_ridge = 0;
+
+    if((ridge_steps == 0) &&
+       (rank_upper_bound != NP_LP_RANK_UPPER_BOUND_UNKNOWN) &&
+       (rank_upper_bound < p)){
+      needs_ridge = 1;
+    } else {
+      solve_status = np_lp_solve_workspace_try_dgesv(workspace, p, nrhs);
+      if(solve_status == NP_LP_DGESV_OK){
+        const NPLPSolvePolicyStatus admission_status =
+          np_lp_solve_workspace_admit_retained_factor(
+            workspace, p, nrhs,
+            (ridge_steps == 0) ? rank_upper_bound :
+              NP_LP_RANK_UPPER_BOUND_UNKNOWN,
+            &needs_ridge);
+        if(admission_status != NP_LP_SOLVE_POLICY_OK)
+          return admission_status;
+        if(!needs_ridge)
+          break;
+      } else if(solve_status == NP_LP_DGESV_INVALID) {
+        return NP_LP_SOLVE_POLICY_INVALID;
+      } else if(solve_status == NP_LP_DGESV_NONFINITE_SOURCE) {
+        return NP_LP_SOLVE_POLICY_NONFINITE;
+      } else if(solve_status == NP_LP_DGESV_SOLUTION_NONFINITE) {
+        int factor_needs_ridge = 0;
+        const NPLPSolvePolicyStatus admission_status =
+          np_lp_solve_workspace_admit_retained_factor(
+            workspace, p, nrhs,
+            (ridge_steps == 0) ? rank_upper_bound :
+              NP_LP_RANK_UPPER_BOUND_UNKNOWN,
+            &factor_needs_ridge);
+        if(admission_status != NP_LP_SOLVE_POLICY_OK)
+          return admission_status;
+        if(!factor_needs_ridge)
+          return NP_LP_SOLVE_POLICY_FINAL_FAILED;
+        needs_ridge = 1;
+      } else {
+        needs_ridge = 1;
+      }
+    }
+
+    if(!needs_ridge)
+      return NP_LP_SOLVE_POLICY_FINAL_FAILED;
+    if(ridge_steps >= NP_LP_SOLVE_MAX_RIDGE_STEPS)
+      return NP_LP_SOLVE_POLICY_RIDGE_EXHAUSTED;
+    for(i = 0; i < p; i++)
+      workspace->gram_source[i + i*p] += ridge_increment;
+    ridge_total += ridge_increment;
+    ridge_steps++;
+    if(diagnostics != NULL){
+      diagnostics->ridge_steps = ridge_steps;
+      diagnostics->ridge_total = ridge_total;
+    }
+  }
+
+  if(ridge_total > 0.0){
+    const double denominator =
+      (workspace->gram_source[0] > DBL_EPSILON) ?
+      workspace->gram_source[0] : DBL_EPSILON;
+    int rhs;
+
+    for(rhs = 0; rhs < nrhs; rhs++){
+      double * const intercept = workspace->rhs_source + (size_t)rhs*(size_t)p;
+      *intercept += ridge_total*(*intercept)/denominator;
+    }
+    if(!np_lp_solve_workspace_solve_factored(workspace, p, nrhs)){
+      if(!np_lp_solve_workspace_sources_finite(workspace, p, nrhs))
+        return NP_LP_SOLVE_POLICY_NONFINITE;
+      return NP_LP_SOLVE_POLICY_FINAL_FAILED;
+    }
+  }
+
+  return NP_LP_SOLVE_POLICY_OK;
+}
+
+NPLPSolvePolicyStatus np_lp_solve_workspace_solve_adjoint_ranked(
+  NPLPSolveWorkspace *workspace,
+  int p,
+  int nrhs,
+  double ridge_fraction,
+  int rank_upper_bound,
+  NPLPSolvePolicyDiagnostics *diagnostics)
+{
+  NPLPSolvePolicyDiagnostics local_diagnostics = {0, 0.0};
+  NPLPSolvePolicyDiagnostics * const policy_diagnostics =
+    (diagnostics != NULL) ? diagnostics : &local_diagnostics;
+  double ridge_increment = 0.0;
+  int ridge_steps = 0;
+  int i;
+
+  policy_diagnostics->ridge_steps = 0;
+  policy_diagnostics->ridge_total = 0.0;
+  if((rank_upper_bound < NP_LP_RANK_UPPER_BOUND_UNKNOWN) ||
+     !np_lp_solve_workspace_shape(workspace, p, nrhs, NULL, NULL) ||
+     !np_lp_solve_workspace_ridge_increment(workspace, p, ridge_fraction,
+                                             &ridge_increment))
+    return NP_LP_SOLVE_POLICY_INVALID;
+
+  for(;;){
+    int needs_ridge = 0;
+
+    if((ridge_steps == 0) &&
+       (rank_upper_bound != NP_LP_RANK_UPPER_BOUND_UNKNOWN) &&
+       (rank_upper_bound < p)){
+      needs_ridge = 1;
+    } else {
+      const NPLPFactorStatus factor_status =
+        np_lp_solve_workspace_try_factor(workspace, p, nrhs);
+      if(factor_status == NP_LP_FACTOR_OK){
+        const NPLPSolvePolicyStatus admission_status =
+          np_lp_solve_workspace_admit_retained_factor(
+            workspace, p, nrhs,
+            (ridge_steps == 0) ? rank_upper_bound :
+              NP_LP_RANK_UPPER_BOUND_UNKNOWN,
+            &needs_ridge);
+        if(admission_status != NP_LP_SOLVE_POLICY_OK)
+          return admission_status;
+        if(!needs_ridge)
+          break;
+      } else if(factor_status == NP_LP_FACTOR_INVALID) {
+        return NP_LP_SOLVE_POLICY_INVALID;
+      } else if(factor_status == NP_LP_FACTOR_NONFINITE_SOURCE) {
+        return NP_LP_SOLVE_POLICY_NONFINITE;
+      } else {
+        needs_ridge = 1;
+      }
+    }
+
+    if(!needs_ridge)
+      return NP_LP_SOLVE_POLICY_FINAL_FAILED;
+    if(ridge_steps >= NP_LP_SOLVE_MAX_RIDGE_STEPS)
+      return NP_LP_SOLVE_POLICY_RIDGE_EXHAUSTED;
+    for(i = 0; i < p; i++)
+      workspace->gram_source[i + i*p] += ridge_increment;
+    policy_diagnostics->ridge_total += ridge_increment;
+    ridge_steps++;
+    policy_diagnostics->ridge_steps = ridge_steps;
+  }
+
+  return np_lp_solve_workspace_solve_adjoint_factored(
+    workspace, p, nrhs, policy_diagnostics);
 }
 
 NPLPSolvePolicyStatus np_lp_solve_workspace_solve_response(

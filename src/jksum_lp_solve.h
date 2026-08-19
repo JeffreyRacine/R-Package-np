@@ -12,6 +12,9 @@ typedef struct {
   double *rhs_source;
   double *gram_work;
   double *rhs_work;
+  double *rank_values;
+  double *rank_work;
+  size_t rank_work_capacity;
   int *ipiv;
   int factor_ready;
   int factor_p;
@@ -29,6 +32,24 @@ typedef struct {
   int ridge_steps;
   double ridge_total;
 } NPLPSolvePolicyDiagnostics;
+
+/*
+ * A successful LU can still contain a working-precision zero pivot.  The
+ * ordinary case retains its factor; only the O(p) diagonal screen's narrow
+ * ambiguity band enters the cold, equilibrated singular-value adjudicator.
+ * A cold full-rank result has overwritten the LU and therefore explicitly
+ * requests one refactorization from its caller.
+ */
+typedef enum {
+  NP_LP_FACTOR_ADMISSION_RETAINED = 0,
+  NP_LP_FACTOR_ADMISSION_REFACTOR,
+  NP_LP_FACTOR_ADMISSION_RANK_DEFICIENT,
+  NP_LP_FACTOR_ADMISSION_NONFINITE,
+  NP_LP_FACTOR_ADMISSION_INVALID,
+  NP_LP_FACTOR_ADMISSION_FAILED
+} NPLPFactorAdmissionStatus;
+
+#define NP_LP_RANK_UPPER_BOUND_UNKNOWN (-1)
 
 typedef struct {
   int p_capacity;
@@ -131,6 +152,43 @@ int np_lp_solve_workspace_sources_finite(
 int np_lp_solve_workspace_solve_factored(NPLPSolveWorkspace *workspace,
                                          int p,
                                          int nrhs);
+
+/*
+ * Canonical rank/admission primitives.  They are internal C interfaces, not
+ * registered R entry points.  rank_upper_bound may be UNKNOWN; otherwise it
+ * is an exact structural upper bound supplied by an accumulation owner.
+ */
+NPLPFactorAdmissionStatus np_lp_solve_workspace_admit_factor(
+  NPLPSolveWorkspace *workspace,
+  int p,
+  int rank_upper_bound);
+int np_lp_solve_workspace_ridge_increment(
+  const NPLPSolveWorkspace *workspace,
+  int p,
+  double ridge_fraction,
+  double *ridge_increment_out);
+
+/*
+ * Canonical policy entry points.  ridge_fraction is converted once from the
+ * pristine Gram into an owner-invariant ridge increment.  rank_upper_bound
+ * may be UNKNOWN; otherwise it is the exact number of independent donor rows
+ * available before regularization.  Ordinary response rows retain one-call
+ * DGESV and the successful LU for later RHS/adjoint reuse.
+ */
+NPLPSolvePolicyStatus np_lp_solve_workspace_solve_response_ranked(
+  NPLPSolveWorkspace *workspace,
+  int p,
+  int nrhs,
+  double ridge_fraction,
+  int rank_upper_bound,
+  NPLPSolvePolicyDiagnostics *diagnostics);
+NPLPSolvePolicyStatus np_lp_solve_workspace_solve_adjoint_ranked(
+  NPLPSolveWorkspace *workspace,
+  int p,
+  int nrhs,
+  double ridge_fraction,
+  int rank_upper_bound,
+  NPLPSolvePolicyDiagnostics *diagnostics);
 
 /*
  * Exact basis-general influence row for a one-column signed weighted design:
