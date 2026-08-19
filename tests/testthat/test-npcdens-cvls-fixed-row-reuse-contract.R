@@ -70,20 +70,15 @@ test_that("conditional CVLS dispatch reaches only the canonical block owner", {
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
   lines <- readLines(src_file, warn = FALSE)
 
-  density_wrapper <- np_test_extract_c_function(
-    lines, "np_conditional_density_cvls_lp_stream"
+  density_body <- cvls_source_body(
+    lines,
+    "^int np_conditional_density_cvls_lp_stream\\(",
+    "^static int np_conditional_distribution_cvls_lp_row_stream\\("
   )
-  density_body <- np_test_extract_c_function(
-    lines, "np_conditional_density_cvls_lp_stream_impl"
-  )
-  distribution_body <- np_test_extract_c_function(
-    lines, "np_conditional_distribution_cvls_lp_stream"
-  )
-
-  expect_match(
-    density_wrapper,
-    "np_conditional_density_cvls_lp_stream_impl(",
-    fixed = TRUE
+  distribution_body <- cvls_source_body(
+    lines,
+    "^int np_conditional_distribution_cvls_lp_stream\\(",
+    "^int np_kernel_estimate_density_categorical_leave_one_out_cv\\("
   )
 
   expect_equal(lengths(regmatches(

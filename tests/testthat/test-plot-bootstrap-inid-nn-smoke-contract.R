@@ -20,37 +20,20 @@ test_that("nearest-neighbor plot helpers run for regression and density/distribu
   }
 
   for (bt in c("generalized_nn", "adaptive_nn")) {
-    # This is a plot-helper smoke test, not a bandwidth-search test.  A broad
-    # explicit count keeps every deterministic multinomial resample inside the
-    # literal NN-radius domain without retrying or altering bootstrap samples.
-    nn <- n - 1L
-    rbw <- npregbw(
-      xdat = x, ydat = y, regtype = "ll", bws = nn,
-      bandwidth.compute = FALSE, bwtype = bt
-    )
+    rbw <- npregbw(xdat = x, ydat = y, regtype = "ll", nmulti = 1, bwtype = bt)
     expect_type(run_plot(rbw, xdat = x, ydat = y), "list")
     expect_type(run_plot(rbw, xdat = x, ydat = y, gradients = TRUE), "list")
 
-    ubw <- npudensbw(
-      dat = x, bws = nn, bandwidth.compute = FALSE, bwtype = bt
-    )
+    ubw <- npudensbw(dat = x, nmulti = 1, bwtype = bt)
     expect_type(run_plot(ubw), "list")
 
-    dbw <- npudistbw(
-      dat = x, bws = nn, bandwidth.compute = FALSE, bwtype = bt
-    )
+    dbw <- npudistbw(dat = x, nmulti = 1, bwtype = bt)
     expect_type(run_plot(dbw), "list")
 
-    cbw <- npcdensbw(
-      xdat = x, ydat = yframe, bws = c(nn, nn),
-      bandwidth.compute = FALSE, bwtype = bt
-    )
+    cbw <- npcdensbw(xdat = x, ydat = yframe, nmulti = 1, bwtype = bt)
     expect_type(run_plot(cbw, xdat = x, ydat = yframe, view = "fixed"), "list")
 
-    cdbw <- npcdistbw(
-      xdat = x, ydat = yframe, bws = c(nn, nn),
-      bandwidth.compute = FALSE, bwtype = bt
-    )
+    cdbw <- npcdistbw(xdat = x, ydat = yframe, nmulti = 1, bwtype = bt)
     expect_type(run_plot(cdbw, xdat = x, ydat = yframe, view = "fixed"), "list")
   }
 })

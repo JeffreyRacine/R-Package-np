@@ -28,8 +28,10 @@ test_that("CVLS Y convolution supertile is memory bounded and topology isolated"
   src_file <- locate_yconv_supertile_source()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
   lines <- readLines(src_file, warn = FALSE)
-  body <- np_test_extract_c_function(
-    lines, "np_conditional_density_cvls_lp_supertile2_stream"
+  body <- yconv_source_body(
+    lines,
+    "^np_conditional_density_cvls_lp_supertile2_stream\\(",
+    "^int np_conditional_density_cvls_lp_stream\\("
   )
 
   expect_match(body, "num_obs <= block_size", fixed = TRUE)
@@ -78,8 +80,10 @@ test_that("CVLS Y convolution supertile preserves per-block consumer order", {
   src_file <- locate_yconv_supertile_source()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
   lines <- readLines(src_file, warn = FALSE)
-  body <- np_test_extract_c_function(
-    lines, "np_conditional_density_cvls_lp_supertile2_stream"
+  body <- yconv_source_body(
+    lines,
+    "^np_conditional_density_cvls_lp_supertile2_stream\\(",
+    "^int np_conditional_density_cvls_lp_stream\\("
   )
 
   markers <- c(
@@ -115,8 +119,10 @@ test_that("CVLS Y convolution supertile dispatch leaves excluded routes intact",
   src_file <- locate_yconv_supertile_source()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
   lines <- readLines(src_file, warn = FALSE)
-  body <- np_test_extract_c_function(
-    lines, "np_conditional_density_cvls_lp_stream_impl"
+  body <- yconv_source_body(
+    lines,
+    "^int np_conditional_density_cvls_lp_stream\\(",
+    "^static int np_conditional_distribution_cvls_lp_row_stream\\("
   )
 
   dispatch <- paste(

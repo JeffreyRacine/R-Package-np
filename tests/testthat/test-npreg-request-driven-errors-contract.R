@@ -192,11 +192,9 @@ test_that("prediction and request boundary contracts are explicit", {
 })
 
 test_that("request contract has one closed native state space", {
-  header <- readLines(
-    np_test_source_path("src", "regression_contract.h"),
-    warn = FALSE
-  )
-  source <- readLines(np_test_source_path("src", "np.c"), warn = FALSE)
+  header <- readLines(test_path("..", "..", "src", "regression_contract.h"),
+                      warn = FALSE)
+  source <- readLines(test_path("..", "..", "src", "np.c"), warn = FALSE)
 
   expect_true(any(grepl("NP_REGRESSION_OUTPUT_MEAN_ONLY = 0", header,
                         fixed = TRUE)))

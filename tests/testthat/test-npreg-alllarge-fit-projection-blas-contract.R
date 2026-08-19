@@ -78,7 +78,7 @@ test_that("all-large fit BLAS route is narrow, bounded, and fallback-complete", 
     compact,
     paste0(
       "R_UnwindProtect( ",
-      "np_glp_fit_basis_prepare_execute, ",
+      "np_regression_alllarge_bernstein_basis_execute, ",
       "(void *)&basis_call, ",
       "np_regression_alllarge_lp_fit_cleanup, ",
       "(void *)&all_large_owner, NULL);"
@@ -132,8 +132,9 @@ test_that("all-large fit BLAS route is narrow, bounded, and fallback-complete", 
   expect_match(
     compact,
     paste0(
-      ".basis_context = &all_large_owner.basis_context, ",
-      ".use_stable_basis = &use_stable_basis, .status = 0"
+      "} else { np_glp_fill_basis_raw_train(num_reg_continuous, ",
+      "glp_terms, glp_nterms, matrix_X_continuous_train, ",
+      "num_obs_train, basis);"
     ),
     fixed = TRUE
   )

@@ -338,7 +338,7 @@ test_that("tree-disabled higher-degree lp scalar apply routes through exact matr
   check_scalar_apply_contract(degree = c(2L, 2L), s = c(1L, 0L))
 })
 
-test_that("public positive LP mean matrices use the typed native capability", {
+test_that("public legacy LP mean matrices use the typed native capability", {
   candidate <- getFromNamespace(".npreghat_native_matrix_candidate", "np")
   has_extended_nn <- getFromNamespace("npRegressionHasExtendedNn", "np")
   native_matrix <- getFromNamespace(
@@ -366,7 +366,7 @@ test_that("public positive LP mean matrices use the typed native capability", {
   bw.ann <- make_bw("adaptive_nn", 9L)
 
   candidate_args <- function(bw, output = "matrix", s = 0L) list(
-    bws = bw, output = output, regtype.engine = "lp", degree = 2L,
+    bws = bw, output = output, regtype = "lp", degree = 2L,
     basis = "glp", bernstein.basis = FALSE, s = as.integer(s),
     leave.one.out = FALSE
   )
@@ -423,9 +423,9 @@ test_that("public positive LP mean matrices use the typed native capability", {
   expect_gt(sum(ridge.used > 0), 0L)
 })
 
-test_that("public positive LP mean multi-RHS apply uses the canonical response owner", {
+test_that("public legacy LP mean multi-RHS apply uses the canonical response owner", {
   candidate <- getFromNamespace(
-    ".npreghat_native_positive_lp_mean_apply_candidate", "np"
+    ".npreghat_native_legacy_lp_mean_apply_candidate", "np"
   )
   has_extended_nn <- getFromNamespace("npRegressionHasExtendedNn", "np")
   native_apply <- getFromNamespace(
@@ -458,7 +458,7 @@ test_that("public positive LP mean multi-RHS apply uses the canonical response o
   bw.gnn <- make_bw("generalized_nn", c(11L, 11L, 0.35))
   bw.ann <- make_bw("adaptive_nn", c(11L, 11L, 0.35))
   candidate_args <- function(bw, y = Y, s = c(0L, 0L)) list(
-    bws = bw, output = "apply", y = y, regtype.engine = "lp",
+    bws = bw, output = "apply", y = y, regtype = "lp",
     degree = c(2L, 1L), basis = "glp", bernstein.basis = FALSE,
     s = as.integer(s), leave.one.out = FALSE
   )

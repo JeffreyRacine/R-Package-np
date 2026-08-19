@@ -21,8 +21,6 @@ extern SEXP C_np_regression_lp_apply_conditional(SEXP, SEXP, SEXP, SEXP, SEXP, S
 extern SEXP C_np_regression_lp_apply_conditional_ctx(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_lc_hat_normalize(SEXP, SEXP);
 extern SEXP C_np_reghat_lp_matrix_fast(SEXP, SEXP, SEXP);
-extern SEXP C_np_reghat_lp_apply_fast(SEXP, SEXP, SEXP, SEXP);
-extern SEXP C_np_lp_batch_project(SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_npscoef_batch_zero_solve(SEXP, SEXP);
 extern SEXP C_np_npscoef_batch_project(SEXP, SEXP);
 extern SEXP C_np_entropy_gaussian_integrand(SEXP, SEXP, SEXP, SEXP);
@@ -74,8 +72,6 @@ static const R_CallMethodDef CallEntries[] = {
     {"C_np_regression_lp_apply_conditional_ctx",(DL_FUNC) &C_np_regression_lp_apply_conditional_ctx,25},
     {"C_np_lc_hat_normalize",             (DL_FUNC) &C_np_lc_hat_normalize,              2},
     {"C_np_reghat_lp_matrix_fast",       (DL_FUNC) &C_np_reghat_lp_matrix_fast,        3},
-    {"C_np_reghat_lp_apply_fast",        (DL_FUNC) &C_np_reghat_lp_apply_fast,         4},
-    {"C_np_lp_batch_project",            (DL_FUNC) &C_np_lp_batch_project,             5},
     {"C_np_npscoef_batch_zero_solve",    (DL_FUNC) &C_np_npscoef_batch_zero_solve,     2},
     {"C_np_npscoef_batch_project",       (DL_FUNC) &C_np_npscoef_batch_project,        2},
     {"C_np_entropy_gaussian_integrand",  (DL_FUNC) &C_np_entropy_gaussian_integrand,   4},

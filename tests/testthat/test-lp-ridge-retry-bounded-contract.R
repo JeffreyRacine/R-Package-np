@@ -43,8 +43,7 @@ test_that("all canonical LP solve retries are bounded", {
   )), "complete LP retry sources unavailable in this test context")
 
   jksum <- paste(readLines(jksum.file, warn = FALSE), collapse = "\n")
-  solve.lines <- readLines(solve.c.file, warn = FALSE)
-  solve.c <- paste(solve.lines, collapse = "\n")
+  solve.c <- paste(readLines(solve.c.file, warn = FALSE), collapse = "\n")
   solve.h <- paste(readLines(solve.h.file, warn = FALSE), collapse = "\n")
   reghat.c <- paste(readLines(reghat.c.file, warn = FALSE), collapse = "\n")
   reghat.r <- paste(readLines(reghat.r.file, warn = FALSE), collapse = "\n")
@@ -64,31 +63,9 @@ test_that("all canonical LP solve retries are bounded", {
     jksum,
     gregexpr("ridge_steps >= NP_LP_SOLVE_MAX_RIDGE_STEPS", jksum)
   ))
-  expect_identical(retry.count, 0L)
-  expect_identical(finite.guard.count, 0L)
-  expect_identical(step.guard.count, 0L)
-  policy.body <- np_test_extract_c_function(
-    solve.lines, "np_lp_solve_workspace_prepare_policy_factor"
-  )
-  expect_match(
-    policy.body,
-    "if(np_lp_solve_workspace_factor(workspace, p))",
-    fixed = TRUE
-  )
-  expect_match(
-    policy.body,
-    "np_lp_solve_workspace_ridge_scale(workspace, p, &ridge_scale)",
-    fixed = TRUE
-  )
-  expect_match(
-    policy.body,
-    "ridge_increment = ridge_fraction*ridge_scale;",
-    fixed = TRUE
-  )
-  expect_match(policy.body, "np_lp_solve_workspace_sources_finite(",
-               fixed = TRUE)
-  expect_match(policy.body, "ridge_steps >= NP_LP_SOLVE_MAX_RIDGE_STEPS",
-               fixed = TRUE)
+  expect_gt(retry.count, 0L)
+  expect_equal(finite.guard.count, retry.count)
+  expect_equal(step.guard.count, retry.count)
   expect_true(grepl(
     "execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_SOLVE;",
     jksum,
@@ -102,7 +79,7 @@ test_that("all canonical LP solve retries are bounded", {
   ))
   expect_true(grepl(
     "np_lp_solve_workspace_sources_finite(",
-    solve.c,
+    jksum,
     fixed = TRUE
   ))
   expect_true(grepl(
@@ -121,9 +98,19 @@ test_that("all canonical LP solve retries are bounded", {
     solve.c,
     fixed = TRUE
   ))
-  solve.body <- np_test_extract_c_function(
-    solve.lines, "np_lp_solve_workspace_solve"
+  solve.start <- regexpr(
+    "int np_lp_solve_workspace_solve(",
+    solve.c,
+    fixed = TRUE
   )
+  solve.stop <- regexpr(
+    "int np_lp_solve_workspace_solve_factored(",
+    solve.c,
+    fixed = TRUE
+  )
+  expect_gt(solve.start, 0L)
+  expect_gt(solve.stop, solve.start)
+  solve.body <- substr(solve.c, solve.start, solve.stop - 1L)
   expect_false(grepl(
     "np_lp_solve_workspace_shape(",
     solve.body,
@@ -135,10 +122,13 @@ test_that("all canonical LP solve retries are bounded", {
     fixed = TRUE
   ))
 
-  expect_false(grepl("NP_LP_SOLVE_MAX_RIDGE_STEPS", reghat.c, fixed = TRUE))
-  expect_false(grepl("np_reghat_sources_finite", reghat.c, fixed = TRUE))
   expect_true(grepl(
-    "np_lp_solve_workspace_solve_adjoint(solve_workspace,",
+    "ridge_step < NP_LP_SOLVE_MAX_RIDGE_STEPS",
+    reghat.c,
+    fixed = TRUE
+  ))
+  expect_true(grepl(
+    "np_reghat_sources_finite(nterms, gram, rhs)",
     reghat.c,
     fixed = TRUE
   ))
@@ -147,18 +137,27 @@ test_that("all canonical LP solve retries are bounded", {
     reghat.c
   ))
 
-  expect_false(grepl(
+  fallback.start <- regexpr(
     "\\.npreghat_exact_lp_matrix_from_kernel_weights <- function",
     reghat.r
-  ))
-  expect_false(grepl(
-    "\\.npreghat_exact_lp_apply_chunked_from_kernel_weights <- function",
-    reghat.r
-  ))
-  expect_true(grepl(
-    "\\.npreghat_exact_lp_apply_from_regression_core <- function",
-    reghat.r
-  ))
+  )
+  fallback.stops <- c(
+    regexpr(
+      "\\.npreghat_exact_lp_apply_chunked_from_kernel_weights <- function",
+      reghat.r
+    ),
+    regexpr(
+      "\\.npreghat_exact_lp_apply_from_regression_core <- function",
+      reghat.r
+    )
+  )
+  fallback.stop <- min(fallback.stops[fallback.stops > fallback.start])
+  expect_gt(fallback.start, 0L)
+  expect_gt(fallback.stop, fallback.start)
+  fallback <- substr(reghat.r, fallback.start, fallback.stop - 1L)
+  expect_true(grepl("seq_len(128L)", fallback, fixed = TRUE))
+  expect_true(grepl("non-finite system", fallback, fixed = TRUE))
+  expect_false(grepl("repeat\\s*\\{", fallback))
 })
 
 test_that("compiled LP hat path rejects a non-finite system promptly", {

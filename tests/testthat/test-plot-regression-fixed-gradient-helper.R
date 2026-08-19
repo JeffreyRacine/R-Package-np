@@ -1,26 +1,3 @@
-test_that("exact LC derivative capability uses canonical regression metadata", {
-  x <- data.frame(x = seq(-1, 1, length.out = 17L))
-  y <- x$x^2
-  make_bw <- function(regtype, degree = NULL) {
-    args <- list(
-      xdat = x, ydat = y, bws = 0.4, bandwidth.compute = FALSE,
-      regtype = regtype
-    )
-    if (!is.null(degree)) {
-      args$degree <- degree
-      args$degree.select <- "manual"
-    }
-    do.call(npregbw, args)
-  }
-  capability <- getFromNamespace(
-    ".np_plot_regression_exact_lc_derivative_requested", "np"
-  )
-
-  expect_true(capability(make_bw("lc"), gradient.order = 1L))
-  expect_false(capability(make_bw("ll"), gradient.order = 1L))
-  expect_true(capability(make_bw("lp", 0L), gradient.order = 1L))
-})
-
 test_that("fixed ll gradient helper matches explicit refits without direct regression calls", {
   skip_if_not_installed("np")
 

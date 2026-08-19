@@ -1,109 +1,27 @@
 # np 0.70-6
 
-* Fixed local-polynomial plot bootstraps now solve count-compressed response
-  moments through the same condition-qualified, Gram-scaled bounded-ridge
-  owner used by ordinary regression fits. Regression, single-index,
-  smooth-coefficient, partial-linear, and conditional density/distribution
-  bootstrap consumers share one native batched response solve; the former
-  private determinant, `solve()`, and absolute-ridge implementations have
-  been removed. Count construction, moment arithmetic, chunking, progress,
-  and MPI orchestration are unchanged. Results can change for
-  ill-conditioned bootstrap systems that the private path formerly accepted
-  under a different regularization policy.
-
-* Public `regtype="ll"` is now exclusively an API and reporting alias for the
-  canonical raw GLP degree-one engine. Regression fit, uncertainty, objective,
-  `npreghat()` matrix/apply/constraint, single-index hat, conditional X-side,
-  and plot/bootstrap consumers all select owners from canonical engine
-  metadata. The retired private local-linear matrix/ridge and single-index hat
-  routes have been removed. Results can change only where those private routes
-  formerly selected a different regularized fit; explicit raw LP degree one
-  and unaffected LC/LP configurations retain their canonical results.
-
-* Conditioned local-polynomial influence and response owners now select the
-  same globally stable graded basis before applying the canonical diagonal
-  ridge policy. The former influence-only empirical QR rotation spanned the
-  same polynomial space, but diagonal ridging is not invariant to that extra
-  change of representation; on translated or calendar-scale predictors it
-  could therefore make `npreghat()` matrix/apply disagree with `npreg()` even
-  though both used the same factor policy. Objective, fit, matrix, apply, and
-  derivative consumers now share the fit-capable representation selected by
-  one helper. Positive-degree `npreghat()` and `npcdhat` matrix/apply routes
-  now enter that same regression core; the retired QR owner, private R
-  kernel-weight/chunk owner, conditional per-row owner, and their workspaces
-  have been removed. Raw well-conditioned arithmetic is unchanged and
-  auxiliary storage remains linear in the sample size.
-
-* Canonical wider-than-one local-polynomial ridge retries are now invariant to
-  a common scaling of all kernel weights. The shared response/adjoint factor
-  owner interprets `1/n.train` as a dimensionless fraction of the pristine
-  Gram scale, using one allocation-free diagonal scale for every bounded
-  retry. Fixed-objective, fit, leave-one-out apply, and hat owners therefore
-  select the same regularized estimator even when one kernel provider retains
-  the bandwidth normalization and another omits the cancelling common factor.
-  Zero-ridge arithmetic is unchanged; formerly ill-conditioned objective and
-  hat values can change to the scale-equivariant canonical result.
-
-* Fixed local-polynomial CVLS, check-loss, and Klein--Spady objectives no
-  longer divert rows with at most one donor per basis term through a private
-  `DGELSY` minimum-norm fit. Those rows now use the same condition-qualified,
-  bounded canonical response solve as every other fixed row and as public
-  leave-one-out matrix/apply. Removing the retired fork also removes its
-  observation-by-basis support-index, weight, and count workspaces and the
-  corresponding pair-loop branches. Objective values can change for
-  underdetermined compact-support rows that formerly entered the distinct
-  minimum-norm estimator.
-
-* Fixed-resident and adaptive-BLAS local-polynomial regression objectives now
-  use the same condition-aware response/factor policy as ordinary fits,
-  leave-one-out influence rows, and the independent hat-matrix owner. CVAIC
-  obtains leverage from the retained factor through the canonical adjoint
-  solve, so response and influence calculations share one bounded ridge
-  transcript instead of selecting regularization independently. The MPI
-  fixed-LP fit owner follows the same response policy without adding a
-  collective. This removes the remaining LU-failure-only ridge loops;
-  well-conditioned CVLS arithmetic is unchanged, while formerly
-  ill-conditioned objective and fit results can change to the canonical
-  condition-qualified solution.
-
-* Positive-degree local-polynomial fits now share the conditional objective's
-  canonical, basis-neutral coordinate policy. Raw polynomial coordinates are
-  retained when well conditioned; otherwise ordinary and all-large fit owners
-  select one stable global representation for training, evaluation,
-  derivatives, and uncertainty calculations. The shared design validator now
-  assesses intrinsic rank in those same stable coordinates, so calendar-scale
-  predictors are no longer mistaken for rank-deficient designs while genuine
-  collinearity still fails. This is a representation change within the same
-  polynomial span, not evaluation-point centering or an unbounded ridge
-  fallback, and uses only linear-in-sample basis storage.
-
-* Ordinary univariate generalized nearest-neighbour regression now admits
-  `k = 1` for positive second-order Gaussian and Epanechnikov LC and canonical
-  generalized-LP mean/derivative operators through degree 12, including the
-  public `ll` alias for raw degree-1 LP, in raw or globally graded coordinates.
-  One R-owned capability resolver supplies
-  manual validation, fixed- and automatic-degree optimizer bounds, and the
-  native lower bound; adaptive NN, mixed or multivariate regressors, non-GLP
-  bases, higher-order/uniform/bounded kernels, and semiparametric owners retain
-  `k >= 2`. Literal zero radii remain
-  infeasible objectives and explicit fit/hat errors through the shared
-  occurrence-aware radius validator. Fixed- and automatic-degree searches
-  evaluate the newly admitted discrete endpoint under the same capability as
-  the selected final fit. The resolver is regression-scoped; density and
-  distribution bandwidth classes retain their existing nearest-neighbour
-  domains.
+* Ordinary univariate generalized-nearest-neighbour regression now admits
+  `k = 1` only for the mathematically certified positive scalar capability:
+  second-order Gaussian or Epanechnikov kernels with LC mean/derivative
+  operation, including the equivalent generalized-LP degree-zero
+  representation. One exact-field capability resolver supplies manual
+  validation, fixed-degree optimizer bounds, and the native lower endpoint;
+  an occurrence-aware geometry validator rejects literal zero radii. Adaptive
+  NN, mixed or multivariate regression, positive-degree LP (including the
+  public `ll` alias), other kernels/bounds, automatic degree domains that can
+  reach positive degree, and semiparametric owners retain `k >= 2`. The policy
+  contains no sample-size, timing, host, rank-count, or acceleration branch and
+  introduces only linear-in-evaluation geometry scratch.
 
 * Regression leave-one-out hat-matrix and apply routes now share the objective's
   occurrence-aware generalized/adaptive NN geometry, source basis, weighted
   moment layout, factorization, bounded ridge transcript, and intercept
   restoration. Matrix and apply consume the same completed influence row;
   apply retains linear-in-sample auxiliary storage and does not construct an
-  evaluation-by-training matrix. The canonical factor owner now treats an LU
-  factor below the working-precision reciprocal-condition threshold as
-  numerically rank deficient before applying the existing bounded ridge rule.
-  Well-conditioned `k >= 2` objectives remain pointwise unchanged; formerly
-  unstable rank-deficient results can change, and all-zero compact-kernel LOO
-  rows now fail explicitly instead of returning a fabricated ridged estimate.
+  evaluation-by-training matrix. The reconstructed owner preserves the
+  August-16 one-call response solve and existing bounded ridge boundary;
+  all-zero compact-kernel LOO rows now fail explicitly instead of returning a
+  fabricated ridged estimate.
 
 * Exact adaptive-nearest-neighbour leave-one-out objectives now construct each
   donor radius on the literal fold that excludes both the focal observation

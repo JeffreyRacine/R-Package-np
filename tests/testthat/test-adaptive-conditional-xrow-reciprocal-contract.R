@@ -13,6 +13,16 @@ locate_conditional_xrow_source <- function() {
   file.path(roots[[1L]], "src", "jksum.c")
 }
 
+adaptive_xrow_radius <- function(values, k) {
+  vapply(seq_along(values), function(index) {
+    distance <- abs(values - values[[index]])
+    duplicates <- sum(distance == 0) - 1L
+    positive <- sort(distance[distance > 0])
+    if (duplicates >= k) positive[[1L]] else
+      positive[[max(1L, k - duplicates)]]
+  }, numeric(1L))
+}
+
 adaptive_signed_wls_rows <- function(xdat, bw) {
   n <- nrow(xdat)
   basis <- np:::W.lp(
@@ -21,28 +31,33 @@ adaptive_signed_wls_rows <- function(xdat, bw) {
     basis = bw$basis.engine,
     bernstein.basis = bw$bernstein.basis.engine
   )
+  xraw <- npksum(
+    bws = bw$xbw,
+    txdat = xdat,
+    exdat = xdat,
+    bwtype = bw$type,
+    ckertype = bw$cxkertype,
+    ckerorder = bw$cxkerorder,
+    operator = "normal",
+    return.kernel.weights = TRUE,
+    bandwidth.divide = FALSE
+  )$kw
+  xdivisor <- Reduce(`*`, Map(
+    adaptive_xrow_radius, xdat, as.list(bw$xbw)
+  ))
+  xraw <- xraw / matrix(xdivisor, nrow = n, ncol = n)
   delete_one <- matrix(0, nrow = n, ncol = n)
 
-  for (held_out in seq_len(n)) {
-    donor <- setdiff(seq_len(n), held_out)
-    weight <- as.numeric(npksum(
-      bws = bw$xbw,
-      txdat = xdat[donor, , drop = FALSE],
-      exdat = xdat[held_out, , drop = FALSE],
-      bwtype = bw$type,
-      ckertype = bw$cxkertype,
-      ckerorder = bw$cxkerorder,
-      operator = "normal",
-      return.kernel.weights = TRUE,
-      bandwidth.divide = TRUE,
-      .np.internal.bandwidth.divide.weights = TRUE
-    )$kw)
-    donor_basis <- basis[donor, , drop = FALSE]
+  for (evaluation in seq_len(n)) {
+    weight <- xraw[, evaluation]
     coefficient <- solve(
-      crossprod(donor_basis, donor_basis * weight), basis[held_out, ]
+      crossprod(basis, basis * weight), basis[evaluation, ]
     )
-    delete_one[donor, held_out] <-
-      as.numeric(weight * (donor_basis %*% coefficient))
+    full <- as.numeric(weight * (basis %*% coefficient))
+    denominator <- 1 - full[[evaluation]]
+    stopifnot(is.finite(denominator), denominator != 0)
+    full[[evaluation]] <- 0
+    delete_one[, evaluation] <- full / denominator
   }
   delete_one
 }
@@ -50,22 +65,15 @@ adaptive_signed_wls_rows <- function(xdat, bw) {
 adaptive_cvml_signed_wls_oracle <- function(xdat, ydat, bw) {
   n <- nrow(xdat)
   delete_one <- adaptive_signed_wls_rows(xdat, bw)
-  fit <- vapply(seq_len(n), function(held_out) {
-    donor <- setdiff(seq_len(n), held_out)
-    ykernel <- as.numeric(npksum(
-      bws = bw$ybw,
-      txdat = ydat[donor, , drop = FALSE],
-      exdat = ydat[held_out, , drop = FALSE],
-      bwtype = bw$type,
-      ckertype = bw$cykertype,
-      ckerorder = bw$cykerorder,
-      operator = "normal",
-      return.kernel.weights = TRUE,
-      bandwidth.divide = TRUE,
-      .np.internal.bandwidth.divide.weights = TRUE
-    )$kw)
-    sum(delete_one[donor, held_out] * ykernel)
-  }, numeric(1L))
+  ybandwidth <- adaptive_xrow_radius(ydat[[1L]], bw$ybw[[1L]])
+  ydifference <- outer(
+    ydat[[1L]], ydat[[1L]], function(training, evaluation) {
+      evaluation - training
+    }
+  )
+  ykernel <- dnorm(ydifference / matrix(ybandwidth, n, n)) /
+    matrix(ybandwidth, n, n)
+  fit <- colSums(delete_one * ykernel)
 
   contribution <- vapply(fit, function(value) {
     if (value > .Machine$double.xmin) return(-log(value))
@@ -79,23 +87,19 @@ adaptive_cvml_signed_wls_oracle <- function(xdat, ydat, bw) {
 adaptive_cdist_signed_wls_oracle <- function(xdat, ydat, bw) {
   n <- nrow(xdat)
   delete_one <- adaptive_signed_wls_rows(xdat, bw)
+  ybandwidth <- adaptive_xrow_radius(ydat[[1L]], bw$ybw[[1L]])
+  ydifference <- outer(
+    ydat[[1L]], ydat[[1L]], function(training, evaluation) {
+      evaluation - training
+    }
+  )
+  yintegral <- pnorm(ydifference / matrix(ybandwidth, n, n))
   objective <- 0
 
-  for (held_out in seq_len(n)) {
-    donor <- setdiff(seq_len(n), held_out)
-    yintegral <- npksum(
-      bws = bw$ybw,
-      txdat = ydat[donor, , drop = FALSE],
-      exdat = ydat,
-      bwtype = bw$type,
-      ckertype = bw$cykertype,
-      ckerorder = bw$cykerorder,
-      operator = "integral",
-      return.kernel.weights = TRUE
-    )$kw
-    fit <- colSums(delete_one[donor, held_out] * yintegral)
-    indicator <- as.numeric(ydat[[1L]][[held_out]] <= ydat[[1L]])
-    keep <- seq_len(n) != held_out
+  for (training in seq_len(n)) {
+    fit <- colSums(delete_one[, training] * yintegral)
+    indicator <- as.numeric(ydat[[1L]][[training]] <= ydat[[1L]])
+    keep <- seq_len(n) != training
     objective <- objective + sum((indicator[keep] - fit[keep])^2)
   }
   objective / (n * (n - 1L))
