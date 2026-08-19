@@ -7,6 +7,13 @@
   identical(Sys.getenv("NP_RMPI_TEST_SUITE_POOL", ""), "1")
 }
 
+.mpi_suite_local_mode_owned <- function() {
+  identical(Sys.getenv("NP_RMPI_TEST_SUITE_LOCAL_MODE", ""), "1") &&
+    .mpi_suite_pool_owned() &&
+    isTRUE(getOption("npRmpi.local.regression.mode", FALSE)) &&
+    isTRUE(getOption("npRmpi.mpi.initialized", FALSE))
+}
+
 .mpi_pool_active <- function() {
   if (.mpi_check_context() && !.mpi_suite_pool_owned())
     return(FALSE)
@@ -25,6 +32,12 @@ spawn_mpi_slaves <- function(n = 1L) {
   }
 
   options(npRmpi.autodispatch = TRUE, np.messages = FALSE)
+
+  # The full-suite runner has already proved and owns the hidden pool before
+  # entering the canonical rank-local arithmetic mode.  Starting a nested
+  # pool here would violate that transaction.
+  if (.mpi_suite_local_mode_owned())
+    return(TRUE)
 
   # Reuse an active pool instead of re-initializing nested MPI sessions.
   if (.mpi_pool_active()) {
@@ -47,7 +60,7 @@ spawn_mpi_slaves <- function(n = 1L) {
 close_mpi_slaves <- function(force = FALSE) {
   # Individual tests may release pools they created, but never the one pool
   # owned by the full-suite runner.
-  if (.mpi_suite_pool_owned())
+  if (.mpi_suite_pool_owned() || .mpi_suite_local_mode_owned())
     return(invisible(TRUE))
   if (.mpi_check_context())
     return(invisible())

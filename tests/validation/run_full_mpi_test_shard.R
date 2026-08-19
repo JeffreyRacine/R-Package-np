@@ -34,6 +34,133 @@ npRmpi_shard_has_failures <- function(result_summary) {
   any(failed > 0L) || any(errors)
 }
 
+npRmpi_shard_open_pool <- function(nslaves) {
+  npRmpi.init(nslaves = nslaves, quiet = TRUE)
+  if (!npRmpi_shard_pool_active(nslaves))
+    stop("npRmpi shard failed to establish its owned pool")
+  invisible(TRUE)
+}
+
+npRmpi_shard_close_pool <- function(nslaves) {
+  cleanup_error <- tryCatch({
+    npRmpi.quit(force = TRUE)
+    NULL
+  }, error = identity)
+  if (inherits(cleanup_error, "error"))
+    stop("npRmpi shard pool cleanup failed: ", conditionMessage(cleanup_error))
+  if (npRmpi_shard_pool_active(nslaves))
+    stop("npRmpi shard pool remained active after cleanup")
+  invisible(TRUE)
+}
+
+npRmpi_shard_local_only_files <- function() {
+  c(
+    "test-adaptive-conditional-plot-session-contract.R",
+    "test-attach-gennn-exdat-contract.R"
+  )
+}
+
+npRmpi_shard_local_mode_files <- function() {
+  c(
+    "test-adaptive-nn-exact-conditional-density-cvls-contract.R",
+    "test-adaptive-nn-exact-conditional-density-cvml-contract.R",
+    "test-adaptive-nn-exact-conditional-distribution-cv-contract.R",
+    "test-adaptive-nn-exact-density-cv-contract.R",
+    "test-adaptive-nn-exact-distribution-cv-contract.R",
+    "test-adaptive-nn-exact-regression-cvls-contract.R",
+    "test-adaptive-nn-exact-regression-deleteone-objectives-contract.R",
+    "test-beta-bandwidth-objectives-contract.R",
+    "test-beta-conditional-contract.R",
+    "test-beta-conditional-count-canonical-contract.R"
+  )
+}
+
+npRmpi_shard_run_files <- function(test_dir_path, test_files) {
+  if (!length(test_files))
+    return(NULL)
+  stems <- sub("\\.[rR]$", "", sub("^test-", "", test_files))
+  filter <- paste0(
+    "^(", paste(regex_escape(stems), collapse = "|"), ")$"
+  )
+  reporter <- check_reporter()
+  test_dir(
+    test_dir_path,
+    filter = filter,
+    package = "npRmpi",
+    reporter = reporter,
+    load_package = "installed",
+    stop_on_failure = FALSE,
+    stop_on_warning = FALSE
+  )
+}
+
+npRmpi_shard_run_isolated_files <- function(test_dir_path, test_files) {
+  if (!length(test_files))
+    return(NULL)
+  result.frames <- vector("list", length(test_files))
+  for (index in seq_along(test_files)) {
+    test.file <- test_files[[index]]
+    started <- proc.time()[["elapsed"]]
+    cat(sprintf(
+      "NP_RMPI_LOCAL_FILE_START %d/%d file=%s\n",
+      index, length(test_files), test.file
+    ))
+    flush.console()
+    result <- test_file(
+      file.path(test_dir_path, test.file),
+      package = "npRmpi",
+      reporter = check_reporter(),
+      load_package = "installed",
+      stop_on_failure = FALSE,
+      stop_on_warning = FALSE
+    )
+    frame <- as.data.frame(result)
+    if (npRmpi_shard_has_failures(frame))
+      stop("npRmpi local-only file contains failed expectations: ", test.file)
+    result.frames[[index]] <- frame
+    elapsed <- proc.time()[["elapsed"]] - started
+    cat(sprintf(
+      "NP_RMPI_LOCAL_FILE_OK %d/%d file=%s elapsed=%.3f\n",
+      index, length(test_files), test.file, elapsed
+    ))
+    flush.console()
+  }
+  do.call(rbind, result.frames)
+}
+
+npRmpi_shard_run_local_mode_files <- function(test_dir_path, test_files) {
+  withr::local_envvar(NP_RMPI_TEST_SUITE_LOCAL_MODE = "1")
+  old.local <- getOption("npRmpi.local.regression.mode", FALSE)
+  old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
+  old.context <- getOption("npRmpi.autodispatch.context", FALSE)
+  old.native <- FALSE
+  native.active <- FALSE
+  on.exit({
+    if (native.active) {
+      try(.Call(
+        "C_np_set_local_regression_mode", old.native,
+        PACKAGE = "npRmpi"
+      ), silent = TRUE)
+    }
+    options(
+      npRmpi.local.regression.mode = old.local,
+      npRmpi.autodispatch.disable = old.disable,
+      npRmpi.autodispatch.context = old.context
+    )
+  }, add = TRUE)
+
+  options(
+    npRmpi.local.regression.mode = TRUE,
+    npRmpi.autodispatch.disable = TRUE,
+    npRmpi.autodispatch.context = TRUE
+  )
+  old.native <- .Call(
+    "C_np_set_local_regression_mode", TRUE, PACKAGE = "npRmpi"
+  )
+  native.active <- TRUE
+  npRmpi_shard_run_files(test_dir_path, test_files)
+}
+
 npRmpi_run_full_test_shard <- function(args) {
   if (length(args) != 6L) {
     stop(
@@ -81,9 +208,20 @@ npRmpi_run_full_test_shard <- function(args) {
   first <- (shard - 1L) * shard_size + 1L
   last <- min(shard * shard_size, length(test_files))
   assigned <- test_files[seq.int(first, last)]
-
-  stems <- sub("\\.[rR]$", "", sub("^test-", "", assigned))
-  filter <- paste0("^(", paste(regex_escape(stems), collapse = "|"), ")$")
+  local_registry <- npRmpi_shard_local_only_files()
+  local_mode_registry <- npRmpi_shard_local_mode_files()
+  if (anyDuplicated(c(local_registry, local_mode_registry)) ||
+      !all(c(local_registry, local_mode_registry) %in% test_files))
+    stop("npRmpi shard execution-owner registry is invalid")
+  local_assigned <- intersect(assigned, local_registry)
+  local_mode_assigned <- intersect(assigned, local_mode_registry)
+  pooled_assigned <- setdiff(
+    assigned, c(local_assigned, local_mode_assigned)
+  )
+  if (!setequal(
+    assigned, c(local_assigned, local_mode_assigned, pooled_assigned)
+  ))
+    stop("npRmpi shard lane partition lost or duplicated a test file")
 
   cat(
     sprintf(
@@ -94,36 +232,66 @@ npRmpi_run_full_test_shard <- function(args) {
   )
   flush.console()
 
-  options(npRmpi.autodispatch = TRUE, np.messages = FALSE)
-  Sys.setenv(NP_RMPI_TEST_SUITE_POOL = "1")
-  pool_owned <- TRUE
-  npRmpi.init(nslaves = nslaves, quiet = TRUE)
-  if (!npRmpi_shard_pool_active(nslaves))
-    stop("npRmpi shard failed to establish its owned pool")
-
   options(cli.hyperlink = FALSE)
   withr::local_envvar(TESTTHAT_IS_CHECKING = "true")
-  results <- test_dir(
-    test_dir_path, filter = filter, package = "npRmpi",
-    reporter = check_reporter(), load_package = "installed",
-    stop_on_failure = FALSE, stop_on_warning = FALSE
-  )
+  if (length(pooled_assigned)) {
+    options(npRmpi.autodispatch = TRUE, np.messages = FALSE)
+    Sys.setenv(NP_RMPI_TEST_SUITE_POOL = "1")
+    pool_owned <- TRUE
+    npRmpi_shard_open_pool(nslaves)
+    pooled_results <- npRmpi_shard_run_files(
+      test_dir_path, pooled_assigned
+    )
+    if (npRmpi_shard_has_failures(as.data.frame(pooled_results)))
+      stop("npRmpi shard pooled lane contains failed expectations")
+    if (!npRmpi_shard_pool_active(nslaves))
+      stop("npRmpi shard lost its owned pool")
+    npRmpi_shard_close_pool(nslaves)
+    pool_owned <- FALSE
+  }
 
-  result_summary <- as.data.frame(results)
-  if (npRmpi_shard_has_failures(result_summary))
-    stop("npRmpi shard contains failed expectations")
-  if (!npRmpi_shard_pool_active(nslaves))
-    stop("npRmpi shard lost its owned pool")
+  if (length(local_mode_assigned)) {
+    if (length(pooled_assigned)) {
+      cat(sprintf(
+        "NP_RMPI_FULL_SHARD_POOL_RESTART %d/%d\n", shard, shard_count
+      ))
+      flush.console()
+    }
+    options(npRmpi.autodispatch = TRUE, np.messages = FALSE)
+    Sys.setenv(NP_RMPI_TEST_SUITE_POOL = "1")
+    pool_owned <- TRUE
+    npRmpi_shard_open_pool(nslaves)
+    cat(sprintf(
+      "NP_RMPI_FULL_SHARD_LOCAL_MODE %d/%d files=%s\n",
+      shard, shard_count, paste(local_mode_assigned, collapse = ",")
+    ))
+    flush.console()
+    local_mode_results <- npRmpi_shard_run_local_mode_files(
+      test_dir_path, local_mode_assigned
+    )
+    if (npRmpi_shard_has_failures(as.data.frame(local_mode_results)))
+      stop("npRmpi shard local-mode lane contains failed expectations")
+    if (!npRmpi_shard_pool_active(nslaves))
+      stop("npRmpi shard local-mode lane damaged its owned pool")
+    npRmpi_shard_close_pool(nslaves)
+    pool_owned <- FALSE
+  }
 
-  cleanup_error <- tryCatch({
-    npRmpi.quit(force = TRUE)
-    NULL
-  }, error = identity)
-  if (inherits(cleanup_error, "error"))
-    stop("npRmpi shard pool cleanup failed: ", conditionMessage(cleanup_error))
-  if (npRmpi_shard_pool_active(nslaves))
-    stop("npRmpi shard pool remained active after cleanup")
-  pool_owned <- FALSE
+  if (length(local_assigned)) {
+    cat(sprintf(
+      "NP_RMPI_FULL_SHARD_LOCAL_ONLY %d/%d files=%s\n",
+      shard, shard_count, paste(local_assigned, collapse = ",")
+    ))
+    flush.console()
+    local_results <- withr::with_envvar(
+      c(NP_RMPI_TEST_SUITE_POOL = ""),
+      npRmpi_shard_run_isolated_files(test_dir_path, local_assigned)
+    )
+    if (npRmpi_shard_has_failures(as.data.frame(local_results)))
+      stop("npRmpi shard local-only lane contains failed expectations")
+    if (npRmpi_shard_pool_active(nslaves))
+      stop("npRmpi shard local-only lane established a slave pool")
+  }
 
   marker <- sprintf("NP_RMPI_FULL_SHARD_OK %d/%d", shard, shard_count)
   writeLines(marker, witness_tmp, useBytes = TRUE)

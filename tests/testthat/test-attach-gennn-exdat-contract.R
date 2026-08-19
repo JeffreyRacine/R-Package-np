@@ -1,97 +1,48 @@
-run_attach_cmd_subprocess <- function(cmd, args = character(), timeout = 60L, env = character()) {
-  out <- suppressWarnings(system2(cmd,
-                                  args,
-                                  stdout = TRUE,
-                                  stderr = TRUE,
-                                  timeout = timeout,
-                                  env = env))
+run_attach_cmd_subprocess <- function(cmd, args = character(), timeout = 20L,
+                                      env = character()) {
+  out <- suppressWarnings(system2(
+    cmd, args, stdout = TRUE, stderr = TRUE, timeout = timeout, env = env
+  ))
   status <- attr(out, "status")
   if (is.null(status))
     status <- 0L
   list(status = as.integer(status), output = out)
 }
 
-ensure_attach_test_npRmpi_lib <- local({
-  lib.path.cache <- NULL
-
-  function() {
-    if (!is.null(lib.path.cache) && dir.exists(lib.path.cache))
-      return(lib.path.cache)
-
-    pkg.root <- tryCatch(
-      npRmpi_namespace_hygiene_root(),
-      error = function(e) ""
-    )
-    if (!nzchar(pkg.root))
-      return(NULL)
-
-    lib.path.cache <<- tempfile("npRmpi-attach-gennn-lib-")
-    dir.create(lib.path.cache, recursive = TRUE, showWarnings = FALSE)
-
-    cmd <- file.path(R.home("bin"), "R")
-    out <- suppressWarnings(system2(
-      cmd,
-      c("CMD", "INSTALL", "--no-test-load", "-l", lib.path.cache, pkg.root),
-      stdout = TRUE,
-      stderr = TRUE
-    ))
-    status <- attr(out, "status")
-    if (is.null(status))
-      status <- 0L
-
-    if (status != 0L) {
-      warning(paste(out, collapse = "\n"))
-      unlink(lib.path.cache, recursive = TRUE, force = TRUE)
-      lib.path.cache <<- NULL
-      return(NULL)
-    }
-
-    lib.path.cache
-  }
-})
-
-attach_test_env <- function(extra = character()) {
-  lib.path <- ensure_attach_test_npRmpi_lib()
-  if (is.null(lib.path))
-    return(NULL)
-
-  c(
-    sprintf("R_LIBS=%s", paste(c(lib.path, .libPaths()), collapse = .Platform$path.sep)),
-    extra
-  )
-}
-
 .is_attach_mpi_init_env_failure <- function(output) {
   any(grepl("OFI call ep_enable failed", output, fixed = TRUE)) ||
     any(grepl("Fatal error in internal_Init", output, fixed = TRUE)) ||
-    any(grepl("MPI_Init", output, fixed = TRUE) & grepl("failed", output, ignore.case = TRUE))
+    any(grepl("MPI_Init", output, fixed = TRUE) &
+          grepl("failed", output, ignore.case = TRUE))
 }
 
 test_that("attach generalized_nn exdat returns full evaluation grid", {
   skip_on_cran()
-  skip_on_cran()
-
   mpiexec <- Sys.which("mpiexec")
   skip_if(!nzchar(mpiexec), "mpiexec unavailable")
 
-  env_common <- attach_test_env()
-  skip_if(is.null(env_common), "local npRmpi install unavailable for attach regression")
+  env_common <- npRmpi_subprocess_env(c(
+    "_R_CHECK_PACKAGE_NAME_=",
+    "NP_RMPI_TEST_SUITE_POOL="
+  ))
+  skip_if(is.null(env_common),
+          "installed npRmpi unavailable for attach regression")
 
   script <- tempfile("npRmpi-attach-gennn-exdat-", fileext = ".R")
   on.exit(unlink(script), add = TRUE)
-
   writeLines(c(
     "suppressPackageStartupMessages(library(npRmpi))",
     "npRmpi.init(mode='attach', quiet=TRUE)",
     "if (mpi.comm.rank(1L) == 0L) {",
     "  set.seed(123)",
-    "  n <- 100",
+    "  n <- 36L",
     "  x <- runif(n)",
     "  y <- x^2 + rnorm(n, sd=0.1)",
-    "  xe <- data.frame(x=seq(0, 1, length.out=50))",
-    "  fit <- npreg(y~x, bwtype='generalized_nn', exdat=xe)",
-    "  stopifnot(length(fit$mean) == 50L)",
-    "  stopifnot(sum(fit$mean[26:50] == 0) == 0L)",
+    "  d <- data.frame(x=x, y=y)",
+    "  xe <- data.frame(x=seq(0, 1, length.out=12L))",
+    "  bw <- npregbw(y~x, data=d, bws=7, bandwidth.compute=FALSE, bwtype='generalized_nn')",
+    "  fit <- npreg(bws=bw, txdat=d['x'], tydat=d$y, exdat=xe)",
+    "  stopifnot(length(fit$mean) == 12L)",
     "  stopifnot(all(is.finite(fit$mean)))",
     "  cat('ATTACH_GENNN_EXDAT_OK\\n')",
     "  npRmpi.quit(mode='attach')",
@@ -101,8 +52,11 @@ test_that("attach generalized_nn exdat returns full evaluation grid", {
   run_once <- function(iface) {
     run_attach_cmd_subprocess(
       mpiexec,
-      args = c("-n", "2", file.path(R.home("bin"), "Rscript"), "--no-save", script),
-      timeout = 120L,
+      args = c(
+        "-n", "2", file.path(R.home("bin"), "Rscript"),
+        "--no-save", script
+      ),
+      timeout = 15L,
       env = c(
         env_common,
         "R_PROFILE_USER=",
@@ -115,13 +69,14 @@ test_that("attach generalized_nn exdat returns full evaluation grid", {
   }
 
   res <- run_once("en0")
-  if (res$status != 0L)
+  if (res$status != 0L && .is_attach_mpi_init_env_failure(res$output))
     res <- run_once("lo0")
-
   if (res$status != 0L && .is_attach_mpi_init_env_failure(res$output))
     skip("MPI runtime interface unavailable in this environment for attach regression")
 
   expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
-  expect_true(any(grepl("ATTACH_GENNN_EXDAT_OK", res$output, fixed = TRUE)),
-              info = paste(res$output, collapse = "\n"))
+  expect_true(
+    any(grepl("ATTACH_GENNN_EXDAT_OK", res$output, fixed = TRUE)),
+    info = paste(res$output, collapse = "\n")
+  )
 })

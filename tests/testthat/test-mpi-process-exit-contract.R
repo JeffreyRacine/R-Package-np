@@ -50,8 +50,125 @@ test_that("full-suite runner requires clean direct shard exits", {
   expect_false(grepl("137L", parent_text, fixed = TRUE))
   expect_match(shard_text, "npRmpi_run_full_test_shard <- function(args)",
                fixed = TRUE)
-  expect_match(shard_text, "npRmpi_shard_has_failures(result_summary)",
+  expect_match(shard_text, "npRmpi_shard_local_only_files <- function()",
                fixed = TRUE)
+  expect_match(
+    shard_text,
+    "test-adaptive-conditional-plot-session-contract.R",
+    fixed = TRUE
+  )
+  expect_match(
+    shard_text,
+    "test-attach-gennn-exdat-contract.R",
+    fixed = TRUE
+  )
+  expect_match(
+    shard_text,
+    "test-adaptive-nn-exact-conditional-density-cvls-contract.R",
+    fixed = TRUE
+  )
+  expect_match(
+    shard_text,
+    "test-adaptive-nn-exact-conditional-density-cvml-contract.R",
+    fixed = TRUE
+  )
+  expect_match(
+    shard_text,
+    "test-adaptive-nn-exact-conditional-distribution-cv-contract.R",
+    fixed = TRUE
+  )
+  expect_match(
+    shard_text,
+    "test-adaptive-nn-exact-density-cv-contract.R",
+    fixed = TRUE
+  )
+  expect_match(
+    shard_text,
+    "test-adaptive-nn-exact-distribution-cv-contract.R",
+    fixed = TRUE
+  )
+  expect_match(
+    shard_text,
+    "test-adaptive-nn-exact-regression-cvls-contract.R",
+    fixed = TRUE
+  )
+  expect_match(
+    shard_text,
+    "test-adaptive-nn-exact-regression-deleteone-objectives-contract.R",
+    fixed = TRUE
+  )
+  expect_match(
+    shard_text,
+    "NP_RMPI_FULL_SHARD_LOCAL_ONLY",
+    fixed = TRUE
+  )
+  expect_match(shard_text, "NP_RMPI_LOCAL_FILE_START", fixed = TRUE)
+  expect_match(shard_text, "NP_RMPI_LOCAL_FILE_OK", fixed = TRUE)
+  expect_match(
+    shard_text,
+    "npRmpi local-only file contains failed expectations",
+    fixed = TRUE
+  )
+  expect_match(shard_text, "npRmpi_shard_local_mode_files <- function()",
+               fixed = TRUE)
+  expect_match(
+    shard_text,
+    "test-beta-bandwidth-objectives-contract.R",
+    fixed = TRUE
+  )
+  expect_match(
+    shard_text,
+    "test-beta-conditional-contract.R",
+    fixed = TRUE
+  )
+  expect_match(
+    shard_text,
+    "test-beta-conditional-count-canonical-contract.R",
+    fixed = TRUE
+  )
+  expect_match(
+    shard_text,
+    "NP_RMPI_FULL_SHARD_LOCAL_MODE",
+    fixed = TRUE
+  )
+  expect_match(
+    shard_text,
+    "NP_RMPI_FULL_SHARD_POOL_RESTART",
+    fixed = TRUE
+  )
+  expect_match(shard_text, "reporter <- check_reporter()", fixed = TRUE)
+  expect_match(shard_text, "test_dir(", fixed = TRUE)
+  expect_match(
+    shard_text,
+    "npRmpi shard pooled lane contains failed expectations",
+    fixed = TRUE
+  )
+  expect_match(
+    shard_text,
+    "C_np_set_local_regression_mode",
+    fixed = TRUE
+  )
+  expect_match(
+    shard_text,
+    "NP_RMPI_TEST_SUITE_LOCAL_MODE",
+    fixed = TRUE
+  )
+  expect_match(
+    shard_text,
+    "npRmpi shard local-mode lane damaged its owned pool",
+    fixed = TRUE
+  )
+  expect_match(
+    shard_text,
+    "npRmpi shard local-only lane established a slave pool",
+    fixed = TRUE
+  )
+  failure_checks <- gregexpr(
+    "npRmpi_shard_has_failures(as.data.frame(",
+    shard_text,
+    fixed = TRUE
+  )[[1L]]
+  expect_equal(sum(failure_checks > 0L), 3L)
   expect_match(shard_text, "npRmpi.quit(force = TRUE)", fixed = TRUE)
   expect_match(shard_text, "file.rename(witness_tmp, witness)", fixed = TRUE)
   expect_match(
