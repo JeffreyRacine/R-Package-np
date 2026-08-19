@@ -189,9 +189,13 @@ test_that("adaptive public conditional density CV ML separates lc from LP while 
     fixture$x, fixture$y, wider,
     invalid.penalty = "dbmax")$objective
 
-  expect_identical(narrow.objective, -.Machine$double.xmax)
+  # The canonical ranked LP owner may ridge this narrow finite candidate; it
+  # remains useful optimizer information rather than an infeasible sentinel.
+  expect_true(is.finite(narrow.objective))
+  expect_gt(narrow.objective, -.Machine$double.xmax)
   expect_true(is.finite(wider.objective))
   expect_gt(wider.objective, -.Machine$double.xmax)
+  expect_gt(abs(narrow.objective - wider.objective), 1e-6)
 
   bw.lc <- npcdensbw(
     xdat = fixture$x,

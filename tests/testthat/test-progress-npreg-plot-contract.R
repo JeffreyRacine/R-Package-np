@@ -47,7 +47,16 @@ test_that("regression helper labels carry target context for block bootstrap pha
   xdat <- data.frame(x1 = c(0, 1, 2), x2 = c(1, 2, 3))
   bws <- list(
     type = "fixed",
+    ncon = 2L,
     ndim = 2L,
+    regtype = "lp",
+    basis = "glp",
+    degree = c(1L, 1L),
+    bernstein.basis = FALSE,
+    regtype.engine = "lp",
+    basis.engine = "glp",
+    degree.engine = c(1L, 1L),
+    bernstein.basis.engine = FALSE,
     xnames = c("x1", "x2"),
     xdati = list(
       icon = c(TRUE, TRUE),
@@ -125,7 +134,16 @@ test_that("regression helper labels carry target context for wild bootstrap phas
   xdat <- data.frame(x1 = c(0, 1, 2), x2 = c(1, 2, 3))
   bws <- list(
     type = "fixed",
+    ncon = 2L,
     ndim = 2L,
+    regtype = "lp",
+    basis = "glp",
+    degree = c(1L, 1L),
+    bernstein.basis = FALSE,
+    regtype.engine = "lp",
+    basis.engine = "glp",
+    degree.engine = c(1L, 1L),
+    bernstein.basis.engine = FALSE,
     xnames = c("x1", "x2"),
     xdati = list(
       icon = c(TRUE, TRUE),
