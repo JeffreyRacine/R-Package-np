@@ -42,9 +42,6 @@ typedef struct {
   const double *eval_ybasis;
   const double *eval_outer;
   int *support_count;
-  int *support_orig;
-  int *support_data;
-  double *support_weight;
 } NPLPDenseRowContext;
 
 /*
@@ -129,9 +126,6 @@ void np_lp_accumulate_dense_resident_row3(
   double *rhs,
   const double *eval_ybasis,
   const double *eval_outer,
-  int *support_count,
-  int *support_orig,
-  int *support_data,
-  double *support_weight);
+  int *support_count);
 
 #endif
