@@ -338,7 +338,7 @@ test_that("tree-disabled higher-degree lp scalar apply routes through exact matr
   check_scalar_apply_contract(degree = c(2L, 2L), s = c(1L, 0L))
 })
 
-test_that("public legacy LP mean matrices use the typed native capability", {
+test_that("public LP mean matrices use the typed native capability", {
   candidate <- getFromNamespace(".npreghat_native_matrix_candidate", "np")
   has_extended_nn <- getFromNamespace("npRegressionHasExtendedNn", "np")
   native_matrix <- getFromNamespace(
@@ -423,9 +423,9 @@ test_that("public legacy LP mean matrices use the typed native capability", {
   expect_gt(sum(ridge.used > 0), 0L)
 })
 
-test_that("public legacy LP mean multi-RHS apply uses the canonical response owner", {
+test_that("public LP mean apply uses one canonical response owner for every RHS width", {
   candidate <- getFromNamespace(
-    ".npreghat_native_legacy_lp_mean_apply_candidate", "np"
+    ".npreghat_native_lp_mean_apply_candidate", "np"
   )
   has_extended_nn <- getFromNamespace("npRegressionHasExtendedNn", "np")
   native_apply <- getFromNamespace(
@@ -466,7 +466,7 @@ test_that("public legacy LP mean multi-RHS apply uses the canonical response own
   expect_true(do.call(candidate, candidate_args(bw.fixed)))
   expect_true(do.call(candidate, candidate_args(bw.gnn)))
   expect_false(do.call(candidate, candidate_args(bw.ann)))
-  expect_false(do.call(
+  expect_true(do.call(
     candidate,
     candidate_args(bw.fixed, y = Y[, 1L, drop = FALSE])
   ))
@@ -502,4 +502,32 @@ test_that("public legacy LP mean multi-RHS apply uses the canonical response own
       expect_equal(public.inf[, column], fit, tolerance = 1e-10)
     }
   }
+
+  x.low <- data.frame(x = sort(runif(n, -1, 1)))
+  y.low <- sin(pi * x.low$x) + seq_len(n) / 1000
+  Y.low <- cbind(y.low, y.low + 0.25)
+  bw.low <- npregbw(
+    xdat = x.low, ydat = y.low, bws = 0.04,
+    bandwidth.compute = FALSE, bwmethod = "cv.ls",
+    bwtype = "fixed", bwscaling = FALSE,
+    regtype = "lp", degree = 3L, degree.select = "manual",
+    basis = "glp", bernstein.basis = FALSE,
+    ckertype = "epanechnikov", ckerorder = 2L
+  )
+  H.low <- npreghat(bws = bw.low, txdat = x.low, output = "matrix")
+  scalar.low <- npreghat(
+    bws = bw.low, txdat = x.low, y = y.low, output = "apply"
+  )
+  multi.low <- npreghat(
+    bws = bw.low, txdat = x.low, y = Y.low, output = "apply"
+  )
+  fit.low <- npreg(
+    bws = bw.low, txdat = x.low, tydat = y.low,
+    warn.glp.gradient = FALSE
+  )$mean
+  expect_gt(sum(attr(H.low, "ridge.used", exact = TRUE) > 0), 0L)
+  expect_identical(as.vector(scalar.low), as.vector(multi.low[, 1L]))
+  expect_equal(as.vector(scalar.low), as.vector(H.low %*% y.low),
+               tolerance = 1e-8)
+  expect_equal(as.vector(scalar.low), as.vector(fit.low), tolerance = 1e-8)
 })

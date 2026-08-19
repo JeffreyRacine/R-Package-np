@@ -1,5 +1,14 @@
 # np 0.70-6
 
+* Eligible fixed and generalized-nearest-neighbour LP mean applications now
+  use the canonical regression response owner for one or more right-hand
+  sides. A one-column `npreghat(..., output = "apply")` no longer falls
+  through a separate kernel-weight matrix reconstruction that could disagree
+  with `npreghat(..., output = "matrix") %*% y` and `npreg()` on higher-degree
+  or low-rank local windows. Adaptive and extended nearest-neighbour routes,
+  beta kernels, derivative operators, ridge policy, and public interfaces are
+  unchanged.
+
 * Ordinary univariate generalized-nearest-neighbour regression now admits
   `k = 1` only for the mathematically certified positive scalar capability:
   second-order Gaussian or Epanechnikov kernels with LC mean/derivative

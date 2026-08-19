@@ -97,9 +97,9 @@ npreghat <-
     )
 }
 
-.npreghat_native_legacy_lp_mean_capability <- function(bws, regtype, degree,
-                                                       basis, bernstein.basis,
-                                                       s, leave.one.out) {
+.npreghat_native_lp_mean_capability <- function(bws, regtype, degree,
+                                                basis, bernstein.basis,
+                                                s, leave.one.out) {
   !isTRUE(leave.one.out) &&
     identical(regtype, "lp") &&
     !identical(bws[["ckertype", exact = TRUE]], "beta") &&
@@ -137,7 +137,7 @@ npreghat <-
                                               basis, bernstein.basis, s,
                                               leave.one.out) {
   output %in% c("matrix", "constraint") &&
-    .npreghat_native_legacy_lp_mean_capability(
+    .npreghat_native_lp_mean_capability(
       bws = bws,
       regtype = regtype,
       degree = degree,
@@ -148,13 +148,13 @@ npreghat <-
     )
 }
 
-.npreghat_native_legacy_lp_mean_apply_candidate <- function(
+.npreghat_native_lp_mean_apply_candidate <- function(
     bws, output, y, regtype, degree, basis, bernstein.basis, s,
     leave.one.out) {
   identical(output, "apply") &&
     is.matrix(y) &&
-    ncol(y) > 1L &&
-    .npreghat_native_legacy_lp_mean_capability(
+    ncol(y) >= 1L &&
+    .npreghat_native_lp_mean_capability(
       bws = bws,
       regtype = regtype,
       degree = degree,
@@ -1915,8 +1915,8 @@ npreghat.rbandwidth <-
       leave.one.out = leave.one.out
     )
 
-    native.lp.mean.multi.apply.route <-
-      .npreghat_native_legacy_lp_mean_apply_candidate(
+    native.lp.mean.apply.route <-
+      .npreghat_native_lp_mean_apply_candidate(
         bws = bws,
         output = output,
         y = y,
@@ -1950,7 +1950,7 @@ npreghat.rbandwidth <-
       return(out)
     }
 
-    if (native.lp.mean.multi.apply.route || .npreghat_native_apply_candidate(
+    if (native.lp.mean.apply.route || .npreghat_native_apply_candidate(
       bws = bws,
       output = output,
       y = y,
@@ -1961,7 +1961,7 @@ npreghat.rbandwidth <-
       s = s,
       leave.one.out = leave.one.out
     )) {
-      apply.strategy <- if (native.lp.mean.multi.apply.route) {
+      apply.strategy <- if (native.lp.mean.apply.route) {
         "direct"
       } else {
         .npreghat_native_apply_strategy(
