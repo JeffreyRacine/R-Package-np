@@ -9,15 +9,16 @@ beta_cvml_guard <- function(fit) {
 }
 
 beta_cvml_weights <- function(data, bandwidth, type, kernel, order,
-                              density = FALSE) {
+                              density = FALSE, evaluation = NULL) {
   arguments <- list(
     bws = bandwidth,
     txdat = data,
-    exdat = data,
     bwtype = type,
     ckertype = kernel,
     ckerorder = order
   )
+  if (!is.null(evaluation))
+    arguments$exdat <- evaluation
   if (identical(kernel, "beta")) {
     arguments$ckerbound <- "fixed"
     arguments$ckerlb <- 0
@@ -31,16 +32,17 @@ beta_cvml_weights <- function(data, bandwidth, type, kernel, order,
   # For peer kernels public returned `kw` deliberately omits this division.
   arguments$tydat <- diag(nrow(data))
   arguments$bandwidth.divide <- TRUE
-  t(do.call(npksum, arguments)$ksum)
+  out <- do.call(npksum, arguments)$ksum
+  if (is.null(dim(out))) as.numeric(out) else t(out)
 }
 
-beta_cvml_adaptive_radius <- function(train, k) {
+beta_cvml_adaptive_full_sample_radius <- function(train, k) {
   vapply(seq_along(train), function(index) {
     distance <- abs(train - train[[index]])
-    duplicate <- sum(distance == 0) - 1L
+    duplicates <- sum(distance == 0) - 1L
     positive <- sort(distance[distance > 0])
-    if (duplicate >= k) positive[[1L]] else
-      positive[[max(1L, k - duplicate)]]
+    if (duplicates >= k) positive[[1L]] else
+      positive[[max(1L, k - duplicates)]]
   }, numeric(1L))
 }
 
@@ -51,7 +53,7 @@ beta_cvml_ratio_oracle <- function(x, y, bandwidth, type,
   )
   if (identical(type, "adaptive_nn") &&
       !identical(xkernel, "beta")) {
-    xbandwidth <- beta_cvml_adaptive_radius(
+    xbandwidth <- beta_cvml_adaptive_full_sample_radius(
       x[[1L]], bandwidth[[2L]]
     )
     xweights <- xweights /
