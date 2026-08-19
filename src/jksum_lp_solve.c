@@ -638,8 +638,11 @@ NPLPSolvePolicyStatus np_lp_solve_workspace_solve_response_ranked(
     diagnostics->ridge_total = 0.0;
   }
   if((rank_upper_bound < NP_LP_RANK_UPPER_BOUND_UNKNOWN) ||
-     !np_lp_solve_workspace_shape(workspace, p, nrhs, NULL, NULL) ||
-     !np_lp_solve_workspace_ridge_increment(workspace, p, ridge_fraction,
+     !np_lp_solve_workspace_shape(workspace, p, nrhs, NULL, NULL))
+    return NP_LP_SOLVE_POLICY_INVALID;
+  if(!np_lp_solve_workspace_sources_finite(workspace, p, nrhs))
+    return NP_LP_SOLVE_POLICY_NONFINITE;
+  if(!np_lp_solve_workspace_ridge_increment(workspace, p, ridge_fraction,
                                              &ridge_increment))
     return NP_LP_SOLVE_POLICY_INVALID;
 
@@ -738,8 +741,11 @@ NPLPSolvePolicyStatus np_lp_solve_workspace_solve_adjoint_ranked(
   policy_diagnostics->ridge_steps = 0;
   policy_diagnostics->ridge_total = 0.0;
   if((rank_upper_bound < NP_LP_RANK_UPPER_BOUND_UNKNOWN) ||
-     !np_lp_solve_workspace_shape(workspace, p, nrhs, NULL, NULL) ||
-     !np_lp_solve_workspace_ridge_increment(workspace, p, ridge_fraction,
+     !np_lp_solve_workspace_shape(workspace, p, nrhs, NULL, NULL))
+    return NP_LP_SOLVE_POLICY_INVALID;
+  if(!np_lp_solve_workspace_sources_finite(workspace, p, nrhs))
+    return NP_LP_SOLVE_POLICY_NONFINITE;
+  if(!np_lp_solve_workspace_ridge_increment(workspace, p, ridge_fraction,
                                              &ridge_increment))
     return NP_LP_SOLVE_POLICY_INVALID;
 

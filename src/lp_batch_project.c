@@ -18,7 +18,7 @@
  * projection has length p and represented_mass has one positive finite entry
  * per system.  The bridge owns only marshaling and projection; all condition,
  * ridge, factorization, and response-solve policy remains in
- * np_lp_solve_workspace_solve_response().
+ * np_lp_solve_workspace_solve_response_ranked().
  *
  * The return value is a five-element list: values, status, failed_system,
  * ridge_steps, ridge_total.  values is committed only after the complete batch
@@ -220,8 +220,9 @@ SEXP C_np_lp_batch_project(SEXP packed_gram,
           ];
     }
 
-    status = np_lp_solve_workspace_solve_response(
-      &workspace, p, nrhs, 1.0/mass_ptr[system], &solve_diagnostics);
+    status = np_lp_solve_workspace_solve_response_ranked(
+      &workspace, p, nrhs, 1.0/mass_ptr[system],
+      NP_LP_RANK_UPPER_BOUND_UNKNOWN, &solve_diagnostics);
     if(want_diagnostics) {
       INTEGER(ridge_steps)[system] = solve_diagnostics.ridge_steps;
       REAL(ridge_total)[system] = solve_diagnostics.ridge_total;

@@ -28462,7 +28462,6 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 
 	        local_pos = 0;
 	        for(int jj = chunk_start + my_rank; jj < chunk_end; jj += iNum_Processors){
-	          double nepsilon_owner = 0.0;
 	          double sk_owner, ey_owner, ey2_owner, sigma2_owner;
 	          int have_vcov_owner = 0;
 	          double * const out_owner = owner->mpi_owner_chunk.sendbuf + (size_t)local_pos*(size_t)owner_row_width_lp;
@@ -28599,40 +28598,15 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	              owner->solve_workspace.gram_source[i+l*owner->nterms] =
 	                owner->moments[base + l + response_basis_offset];
 	          }
-	          {
-	            int ridge_steps = 0;
-	            while(!np_lp_solve_workspace_solve(&owner->solve_workspace,
-	                                               owner->nterms,
-	                                               1)){
-	              if((ridge_steps >= NP_LP_SOLVE_MAX_RIDGE_STEPS) ||
-	                 !np_lp_solve_workspace_sources_finite(
-	                   &owner->solve_workspace,
-	                   owner->nterms,
-	                   1)){
-	                owner_solve_failed = 1;
-	                break;
-	              }
-	              for(i = 0; i < owner->nterms; i++)
-	                owner->solve_workspace.gram_source[
-	                  i+i*owner->nterms
-	                ] += epsilon;
-	              nepsilon_owner += epsilon;
-	              ridge_steps++;
-	            }
-	            if(owner_solve_failed)
-	              break;
-	          }
-
-	          owner->solve_workspace.rhs_source[0] +=
-	            nepsilon_owner*owner->solve_workspace.rhs_source[0]/
-	            NZD_POS(owner->solve_workspace.gram_source[0]);
-	          if(nepsilon_owner > 0.0){
-	            if(!np_lp_solve_workspace_solve(&owner->solve_workspace,
-	                                            owner->nterms,
-	                                            1)){
-	              owner_solve_failed = 1;
-	              break;
-	            }
+	          if(np_lp_solve_workspace_solve_response_ranked(
+	               &owner->solve_workspace,
+	               owner->nterms,
+	               1,
+	               epsilon,
+	               NP_LP_RANK_UPPER_BOUND_UNKNOWN,
+	               NULL) != NP_LP_SOLVE_POLICY_OK){
+	            owner_solve_failed = 1;
+	            break;
 	          }
 	          for(i = 0; i < owner->nterms; i++)
 	            owner->coefficient[i] = owner->solve_workspace.rhs_work[i];
@@ -28971,11 +28945,13 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
           owner->moments[base + l + response_basis_offset];
     }
 
-    if(np_lp_solve_workspace_solve_response(&owner->solve_workspace,
-                                            owner->nterms,
-                                            1,
-                                            epsilon,
-                                            NULL) !=
+    if(np_lp_solve_workspace_solve_response_ranked(
+         &owner->solve_workspace,
+         owner->nterms,
+         1,
+         epsilon,
+         NP_LP_RANK_UPPER_BOUND_UNKNOWN,
+         NULL) !=
        NP_LP_SOLVE_POLICY_OK) {
       execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_SOLVE;
       return R_NilValue;
