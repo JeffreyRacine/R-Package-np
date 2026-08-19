@@ -227,7 +227,8 @@ test_that("high-occupancy certificate borrows and restores bounded workspace", {
   paths <- file.path(roots[nzchar(roots)], "src", "jksum.c")
   paths <- paths[file.exists(paths)]
   skip_if(!length(paths), "package sources unavailable")
-  source <- paste(readLines(paths[[1L]], warn = FALSE), collapse = "\n")
+  lines <- readLines(paths[[1L]], warn = FALSE)
+  source <- paste(lines, collapse = "\n")
 
   expect_match(source, "NP_REG_CV_LP_DENSE_MIN_TERMS = 10", fixed = TRUE)
   expect_match(source, "NP_REG_CV_LP_DENSE_OCCUPANCY_NUMERATOR = 9",
@@ -248,19 +249,9 @@ test_that("high-occupancy certificate borrows and restores bounded workspace", {
                "certificate_ok = np_reg_cv_support_sort_increasing(sorted, num_obs);",
                fixed = TRUE)
   expect_match(source, "single exit", fixed = TRUE)
-  helper.start <- regexpr(
-    "static int np_reg_fixed_tree_dense_high_occupancy_admitted(",
-    source,
-    fixed = TRUE
-  )[[1L]]
-  helper.end <- regexpr(
-    "/*\n * A compact-support tree cannot prune any pair",
-    source,
-    fixed = TRUE
-  )[[1L]]
-  expect_gt(helper.start, 0L)
-  expect_gt(helper.end, helper.start)
-  helper <- substr(source, helper.start, helper.end - 1L)
+  helper <- np_test_extract_c_function(
+    lines, "np_reg_fixed_tree_dense_high_occupancy_admitted"
+  )
   expect_false(grepl("malloc(", helper, fixed = TRUE))
   expect_false(grepl("calloc(", helper, fixed = TRUE))
   expect_false(grepl("realloc(", helper, fixed = TRUE))

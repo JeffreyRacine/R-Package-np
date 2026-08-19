@@ -15,28 +15,6 @@ locate_npc_cv_source <- function(filename) {
   hits[[1L]]
 }
 
-extract_c_function <- function(lines, name) {
-  start <- grep(
-    sprintf("^(static )?(inline )?(int|double|void|SEXP) %s\\(", name),
-    lines
-  )
-  if (length(start) != 1L) {
-    return(NULL)
-  }
-
-  depth <- 0L
-  opened <- FALSE
-  for (line_index in seq.int(start, length(lines))) {
-    chars <- strsplit(lines[[line_index]], "", fixed = TRUE)[[1L]]
-    depth <- depth + sum(chars == "{") - sum(chars == "}")
-    opened <- opened || any(chars == "{")
-    if (opened && depth == 0L) {
-      return(paste(lines[start:line_index], collapse = "\n"))
-    }
-  }
-  NULL
-}
-
 test_that("conditional LP objective streams retain bounded memory topology", {
   src_file <- locate_npc_cv_source("jksum.c")
   skip_if(is.null(src_file), "source file src/jksum.c unavailable")
@@ -45,12 +23,12 @@ test_that("conditional LP objective streams retain bounded memory topology", {
   owners <- c(
     "np_conditional_density_cvml_lp_stream",
     "np_conditional_density_cvls_lp_stream",
+    "np_conditional_density_cvls_lp_stream_impl",
     "np_conditional_distribution_cvls_lp_stream",
     "np_conditional_lp_all_large_ctx_prepare_core"
   )
   for (owner in owners) {
-    body <- extract_c_function(lines, owner)
-    expect_false(is.null(body), info = owner)
+    body <- np_test_extract_c_function(lines, owner)
     expect_false(
       grepl(
         paste0(
@@ -69,9 +47,16 @@ test_that("conditional CVLS production uses canonical block cores", {
   src_file <- locate_npc_cv_source("jksum.c")
   skip_if(is.null(src_file), "source file src/jksum.c unavailable")
   lines <- readLines(src_file, warn = FALSE)
-  body <- extract_c_function(lines, "np_conditional_density_cvls_lp_stream")
+  wrapper <- np_test_extract_c_function(
+    lines, "np_conditional_density_cvls_lp_stream"
+  )
+  body <- np_test_extract_c_function(
+    lines, "np_conditional_density_cvls_lp_stream_impl"
+  )
 
-  expect_false(is.null(body))
+  expect_match(
+    wrapper, "np_conditional_density_cvls_lp_stream_impl(", fixed = TRUE
+  )
   expect_true(grepl(
     "np_conditional_x_weight_block_stream_core(",
     body,

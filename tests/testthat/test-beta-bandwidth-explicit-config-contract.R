@@ -16,31 +16,17 @@ locate_beta_bandwidth_config_sources <- function() {
   NULL
 }
 
-beta_bandwidth_config_function_region <- function(source, name,
-                                                  next_name = NULL) {
-  start <- grep(paste0("^int ", name, "\\("), source)
-  stopifnot(length(start) == 1L)
-  if (is.null(next_name)) {
-    stop <- length(source)
-  } else {
-    next_start <- grep(paste0("^int ", next_name, "\\("), source)
-    stopifnot(length(next_start) == 1L)
-    stop <- next_start - 1L
-  }
-  paste(source[seq.int(start, stop)], collapse = "\n")
-}
-
 test_that("beta NN bandwidth preparation uses the state-free metric owner", {
   paths <- locate_beta_bandwidth_config_sources()
   skip_if(is.null(paths), "package sources unavailable")
 
   beta_source <- paste(readLines(paths[[1L]], warn = FALSE), collapse = "\n")
   kernel_source <- readLines(paths[[2L]], warn = FALSE)
-  owner <- beta_bandwidth_config_function_region(
-    kernel_source, "np_kernel_bandwidth_continuous_nn", "kernel_bandwidth_mean"
+  owner <- np_test_extract_c_function(
+    kernel_source, "np_kernel_bandwidth_continuous_nn"
   )
-  mean_owner <- beta_bandwidth_config_function_region(
-    kernel_source, "kernel_bandwidth_mean"
+  mean_owner <- np_test_extract_c_function(
+    kernel_source, "kernel_bandwidth_mean_ctx"
   )
 
   owner_calls <- gregexpr(
@@ -55,7 +41,7 @@ test_that("beta NN bandwidth preparation uses the state-free metric owner", {
   }
   expect_equal(
     sum(gregexpr(
-      "np_kernel_bandwidth_continuous_nn_into(", mean_owner, fixed = TRUE
+      "np_kernel_bandwidth_continuous_nn_into_ctx(", mean_owner, fixed = TRUE
     )[[1L]] > 0L),
     2L
   )

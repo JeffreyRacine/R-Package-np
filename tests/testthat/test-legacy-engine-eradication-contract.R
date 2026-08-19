@@ -179,23 +179,17 @@ test_that("conditional-density CVLS wrapper has no dormant second engine", {
   skip_if(is.null(root), "package sources unavailable")
 
   lines <- readLines(file.path(root, "src", "jksum.c"), warn = FALSE)
-  start <- grep(
-    "^int np_kernel_estimate_con_density_categorical_leave_one_out_ls_cv\\(",
-    lines
-  )
-  stop <- grep(
-    "^static void np_lp_power2_moments_from_kernel_row\\(",
-    lines
-  )
-  expect_length(start, 1L)
-  expect_length(stop, 1L)
-  expect_gt(stop, start)
-
-  wrapper <- lines[start:(stop - 1L)]
+  wrapper <- strsplit(
+    np_test_extract_c_function(
+      lines,
+      "np_kernel_estimate_con_density_categorical_leave_one_out_ls_cv"
+    ),
+    "\n", fixed = TRUE
+  )[[1L]]
   expect_lt(length(wrapper), 60L)
   expect_equal(
     sum(grepl(
-      "return np_conditional_density_cvls_lp_stream(vector_scale_factor, cv);",
+      "return np_conditional_density_cvls_lp_stream_impl(",
       wrapper,
       fixed = TRUE
     )),

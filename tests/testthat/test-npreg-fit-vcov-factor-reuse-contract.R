@@ -12,16 +12,7 @@ locate_lp_source <- function(name) {
   if (length(hits) == 0L) NULL else hits[[1L]]
 }
 
-function_body <- function(lines, signature) {
-  start <- grep(signature, lines)
-  expect_length(start, 1L)
-  stops <- grep("^}$", lines)
-  stop <- stops[stops > start][1L]
-  expect_length(stop, 1L)
-  paste(lines[start:stop], collapse = "\n")
-}
-
-test_that("serial and MPI-owner LP covariance reuse validated factorizations", {
+test_that("response and adjoint LP owners retain validated factorizations", {
   jksum_file <- locate_lp_source("jksum.c")
   solve_file <- locate_lp_source("jksum_lp_solve.c")
   header_file <- locate_lp_source("jksum_lp_solve.h")
@@ -45,17 +36,33 @@ test_that("serial and MPI-owner LP covariance reuse validated factorizations", {
   expect_true(any(grepl("int factor_ready;", header_lines, fixed = TRUE)))
   expect_true(any(grepl("int factor_p;", header_lines, fixed = TRUE)))
 
-  solve_body <- function_body(
-    solve_lines,
-    "^int np_lp_solve_workspace_solve\\("
+  response_body <- np_test_extract_c_function(
+    solve_lines, "np_lp_solve_workspace_try_dgesv"
   )
-  expect_true(grepl("workspace->factor_ready = 0;", solve_body, fixed = TRUE))
-  expect_true(grepl("workspace->factor_ready = 1;", solve_body, fixed = TRUE))
-  expect_true(grepl("workspace->factor_p = p;", solve_body, fixed = TRUE))
+  expect_true(grepl("workspace->factor_ready = 0;", response_body, fixed = TRUE))
+  expect_true(grepl("workspace->factor_ready = 1;", response_body, fixed = TRUE))
+  expect_true(grepl("workspace->factor_p = p;", response_body, fixed = TRUE))
+  expect_true(grepl("F77_CALL(dgesv)", response_body, fixed = TRUE))
 
-  factored_body <- function_body(
-    solve_lines,
-    "^int np_lp_solve_workspace_solve_factored\\("
+  response_policy <- np_test_extract_c_function(
+    solve_lines, "np_lp_solve_workspace_solve_response_ranked"
+  )
+  adjoint_policy <- np_test_extract_c_function(
+    solve_lines, "np_lp_solve_workspace_solve_adjoint_ranked"
+  )
+  for (body in list(response_policy, adjoint_policy)) {
+    expect_true(grepl(
+      "np_lp_solve_workspace_admit_retained_factor(", body, fixed = TRUE
+    ))
+  }
+  expect_true(grepl(
+    "np_lp_solve_workspace_solve_adjoint_factored(",
+    adjoint_policy,
+    fixed = TRUE
+  ))
+
+  factored_body <- np_test_extract_c_function(
+    solve_lines, "np_lp_solve_workspace_solve_factored_with_trans"
   )
   expect_true(grepl("!workspace->factor_ready", factored_body, fixed = TRUE))
   expect_true(grepl("workspace->factor_p != p", factored_body, fixed = TRUE))

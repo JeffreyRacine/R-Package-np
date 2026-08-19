@@ -131,18 +131,14 @@ test_that("reciprocal row use is optional in regression and conditional rows", {
   src_file <- locate_adaptive_regression_reciprocal_source()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable")
   lines <- readLines(src_file, warn = FALSE)
-  helper <- adaptive_regression_reciprocal_body(
-    lines,
-    "^static int NP_NOINLINE np_accel_gauss_adaptive_higher_row_try\\(",
-    "^/\\*"
+  helper <- np_test_extract_c_function(
+    lines, "np_accel_gauss_adaptive_higher_row_try"
   )
-  conditional <- adaptive_regression_reciprocal_body(
-    lines,
-    "^static int .*np_conditional_xrow_from_ctx_impl\\(",
-    "^static int np_conditional_xrow_from_ctx\\("
+  conditional <- np_test_extract_c_function(
+    lines, "np_conditional_xrow_from_ctx_impl"
   )
-  helper_compact <- gsub("[[:space:]]+", " ", helper)
-  conditional_compact <- gsub("[[:space:]]+", " ", conditional)
+  helper_compact <- np_test_compact_source(helper)
+  conditional_compact <- np_test_compact_source(conditional)
 
   expect_match(
     helper_compact,
@@ -168,7 +164,7 @@ test_that("reciprocal row use is optional in regression and conditional rows", {
   expect_match(
     conditional_compact,
     paste(
-      "ctx->matrix_bandwidth_x,",
+      "matrix_bandwidth_active,",
       "(ctx->reciprocal_cache != NULL) &&",
       "ctx->reciprocal_cache->workspace.ready ?",
       "ctx->reciprocal_cache->workspace.reciprocal_storage :",
