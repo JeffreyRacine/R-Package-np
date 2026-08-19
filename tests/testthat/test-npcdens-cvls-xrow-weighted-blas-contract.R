@@ -79,7 +79,7 @@ test_that("canonical CVLS weighted BLAS preserves signed row algebra and fallbac
   body <- xrow_weighted_blas_source_body(
     lines,
     "^static int np_conditional_x_weight_block_stream_core_impl\\(",
-    "^static int np_conditional_x_weight_block_stream_core\\("
+    "^static int np_conditional_x_weight_block_stream_core_ctx\\("
   )
   compact <- gsub("[[:space:]]+", " ", body)
 
@@ -125,7 +125,7 @@ test_that("canonical CVLS weighted BLAS preserves signed row algebra and fallbac
     "np_conditional_kernel_row_raw",
     "weighted_row[j] = basis_row[j]*kw[j]",
     "F77_CALL(dgemm)",
-    "np_lp_full_row_workspace_solve",
+    "np_lp_solve_workspace_solve_adjoint_ranked",
     "F77_CALL(dgemv)",
     "rows_out[i][orig_j] = kw[j]*mean_row[j]",
     "np_lp_delete_denominator(rows_out[i][eval_idx], &den)"
@@ -143,7 +143,7 @@ test_that("canonical CVLS weighted BLAS preserves signed row algebra and fallbac
   )
   expect_match(
     compact,
-    "} else { for(l = 0; l < k; l++) for(j = 0; j < k; j++) full_row_workspace.gram[l + j*k] = 0.0;",
+    "} else { for(l = 0; l < k; l++) for(j = 0; j < k; j++) solve_workspace.gram_source[l + j*k] = 0.0;",
     fixed = TRUE
   )
   expect_match(
@@ -160,7 +160,7 @@ test_that("generalized-NN CVLS reaches the same weighted BLAS implementation", {
   body <- xrow_weighted_blas_source_body(
     lines,
     "^static int np_conditional_x_weight_block_stream_core_impl\\(",
-    "^static int np_conditional_x_weight_block_stream_core\\("
+    "^static int np_conditional_x_weight_block_stream_core_ctx\\("
   )
   compact <- gsub("[[:space:]]+", " ", body)
 
@@ -206,7 +206,7 @@ test_that("generalized-NN CVLS reaches the same weighted BLAS implementation", {
     "np_conditional_kernel_row_raw",
     "weighted_row[j] = basis_row[j]*kw[j]",
     "F77_CALL(dgemm)",
-    "np_lp_full_row_workspace_solve",
+    "np_lp_solve_workspace_solve_adjoint_ranked",
     "F77_CALL(dgemv)",
     "rows_out[i][orig_j] = kw[j]*mean_row[j]",
     "np_lp_delete_denominator(rows_out[i][eval_idx], &den)"
@@ -224,7 +224,7 @@ test_that("generalized-NN CVLS reaches the same weighted BLAS implementation", {
   )
   expect_match(
     compact,
-    "} else { for(l = 0; l < k; l++) for(j = 0; j < k; j++) full_row_workspace.gram[l + j*k] = 0.0;",
+    "} else { for(l = 0; l < k; l++) for(j = 0; j < k; j++) solve_workspace.gram_source[l + j*k] = 0.0;",
     fixed = TRUE
   )
   expect_match(
@@ -241,7 +241,7 @@ test_that("shared conditional full-row blocks reuse bounded weighted BLAS", {
   body <- xrow_weighted_blas_source_body(
     lines,
     "^static int np_conditional_x_weight_block_stream_core_impl\\(",
-    "^static int np_conditional_x_weight_block_stream_core\\("
+    "^static int np_conditional_x_weight_block_stream_core_ctx\\("
   )
   compact <- gsub("[[:space:]]+", " ", body)
 
@@ -270,7 +270,7 @@ test_that("shared conditional full-row blocks reuse bounded weighted BLAS", {
   )
   expect_match(
     compact,
-    "} else { for(l = 0; l < k; l++) for(j = 0; j < k; j++) full_row_workspace.gram[l + j*k] = 0.0;",
+    "} else { for(l = 0; l < k; l++) for(j = 0; j < k; j++) solve_workspace.gram_source[l + j*k] = 0.0;",
     fixed = TRUE
   )
   expect_match(

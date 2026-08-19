@@ -49,7 +49,7 @@ test_that("fixed and generalized-NN CVLS share one canonical LOO block engine", 
   body <- cvls_source_body(
     lines,
     "^static int np_conditional_x_weight_block_stream_core_impl\\(",
-    "^static int np_conditional_x_weight_block_stream_core\\("
+    "^static int np_conditional_x_weight_block_stream_core_ctx\\("
   )
 
   expect_match(body, "BANDWIDTH_den_extern != BW_FIXED", fixed = TRUE)
@@ -68,7 +68,7 @@ test_that("fixed and generalized-NN CVLS share one canonical LOO block engine", 
   expect_false(grepl("self_weight = kw[eval_pos]", body, fixed = TRUE))
   markers <- c(
     "np_conditional_kernel_row_raw",
-    "np_lp_full_row_workspace_solve",
+    "np_lp_solve_workspace_solve_adjoint_ranked",
     "np_lp_delete_denominator(rows_out[i][eval_idx], &den)"
   )
   positions <- vapply(markers, function(marker) {
@@ -88,7 +88,7 @@ test_that("conditional CVLS dispatch reaches only the canonical block owner", {
 
   density_body <- cvls_source_body(
     lines,
-    "^int np_conditional_density_cvls_lp_stream\\(",
+    "^static int np_conditional_density_cvls_lp_stream_impl\\(",
     "^static int np_conditional_distribution_cvls_lp_row_stream\\("
   )
   distribution_body <- cvls_source_body(
@@ -119,7 +119,7 @@ test_that("conditional CVLS dispatch reaches only the canonical block owner", {
   shared_x_body <- cvls_source_body(
     lines,
     "^static int np_conditional_x_weight_block_stream_core_impl\\(",
-    "^static int np_conditional_x_weight_block_stream_core\\("
+    "^static int np_conditional_x_weight_block_stream_core_ctx\\("
   )
   expect_match(shared_x_body, "BANDWIDTH_den_extern != BW_FIXED", fixed = TRUE)
   expect_match(shared_x_body, "BANDWIDTH_den_extern != BW_GEN_NN", fixed = TRUE)

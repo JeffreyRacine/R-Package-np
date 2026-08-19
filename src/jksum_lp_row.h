@@ -149,9 +149,6 @@ typedef struct {
   double *moments;
   double *rhs;
   int *support_count;
-  int *support_orig;
-  int *support_data;
-  double *support_weight;
 } NPLPOwnedRowContext;
 
 void np_lp_accumulate_dense_resident_row(const NPLPDenseRowContext *ctx);

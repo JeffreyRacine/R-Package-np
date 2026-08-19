@@ -31,49 +31,81 @@
   H
 }
 
-test_that("compiled LP hat matrix preserves the BLAS-backed R loop exactly", {
+test_that("compiled LP hat matrix agrees with the public canonical owner", {
   old <- getOption("matprod")
   on.exit(options(matprod = old), add = TRUE)
   options(matprod = "default")
 
   set.seed(2026072299L)
   n <- 97L
-  x1 <- runif(n)
-  x2 <- runif(n)
-  W.train <- cbind(1.0, x1, x2)
-  W.eval <- W.train
-  d1 <- outer(x1, x1, "-") / 0.24
-  d2 <- outer(x2, x2, "-") / 0.29
-  kw <- exp(-0.5 * (d1^2 + d2^2))
+  tx <- data.frame(x1 = runif(n), x2 = runif(n))
+  y <- sin(tx$x1) - cos(tx$x2) + rnorm(n, sd = 0.1)
+  bw <- npregbw(
+    xdat = tx, ydat = y, regtype = "lp", degree = c(1L, 1L),
+    degree.select = "manual", basis = "glp", bernstein.basis = FALSE,
+    bwmethod = "cv.ls", bwtype = "fixed", ckertype = "gaussian",
+    ckerorder = 2L, bws = c(0.24, 0.29), bandwidth.compute = FALSE
+  )
+  kw <- suppressWarnings(npRmpi:::.np_kernel_weights_direct(
+    bws = bw, txdat = tx, bandwidth.divide = TRUE, kernel.pow = 1.0,
+    int.do.tree = npRmpi:::.npreg_fit_tree_code(
+      bw, ncon = bw$ncon, ncat = bw$nuno + bw$nord
+    )
+  ))
+  W.train <- npRmpi:::W.lp(xdat = tx, degree = c(1L, 1L), basis = "glp",
+                           bernstein.basis = FALSE)
+  W.eval <- npRmpi:::W.lp(xdat = tx, degree = c(1L, 1L), basis = "glp",
+                          bernstein.basis = FALSE)
 
   reference <- .np_test_lp_hat_matrix_reference(kw, W.train, W.eval)
   compiled <- .Call(
     "C_np_reghat_lp_matrix_fast",
     as.matrix(kw), as.matrix(W.train), as.matrix(W.eval), PACKAGE = "npRmpi"
   )
-  expect_identical(compiled, reference)
+  expect_equal(compiled, reference, tolerance = 1e-12)
+  expect_equal(as.double(npreghat(bws = bw, txdat = tx)),
+               as.double(reference), tolerance = 1e-12)
 })
 
-test_that("compiled LP hat matrix preserves the incumbent ridge sequence", {
+test_that("compiled and public LP hats share the canonical ridge policy", {
   old <- getOption("matprod")
   on.exit(options(matprod = old), add = TRUE)
   options(matprod = "default")
 
   set.seed(2026072300L)
   n <- 41L
-  x1 <- runif(n)
-  x2 <- runif(n)
-  W.train <- cbind(1.0, x1, x1^2, x2, x2^2, x1 * x2)
-  W.eval <- W.train
-  kw <- matrix(0.0, nrow = n, ncol = n)
-  diag(kw) <- 1.0
+  tx <- data.frame(x1 = runif(n), x2 = runif(n))
+  y <- sin(tx$x1) + rnorm(n, sd = 0.1)
+  bw <- suppressWarnings(npregbw(
+    xdat = tx, ydat = y, regtype = "lp", degree = c(2L, 2L),
+    degree.select = "manual", basis = "glp", bernstein.basis = FALSE,
+    bwmethod = "cv.ls", bwtype = "fixed", ckertype = "uniform",
+    ckerorder = 2L, bws = c(0.002, 0.002), bandwidth.compute = FALSE
+  ))
+  kw <- suppressWarnings(npRmpi:::.np_kernel_weights_direct(
+    bws = bw, txdat = tx, bandwidth.divide = TRUE, kernel.pow = 1.0,
+    int.do.tree = npRmpi:::.npreg_fit_tree_code(
+      bw, ncon = bw$ncon, ncat = bw$nuno + bw$nord
+    )
+  ))
+  W.train <- npRmpi:::W.lp(xdat = tx, degree = c(2L, 2L), basis = "glp",
+                           bernstein.basis = FALSE)
+  W.eval <- npRmpi:::W.lp(xdat = tx, degree = c(2L, 2L), basis = "glp",
+                          bernstein.basis = FALSE)
 
-  reference <- .np_test_lp_hat_matrix_reference(kw, W.train, W.eval)
   compiled <- .Call(
     "C_np_reghat_lp_matrix_fast",
     as.matrix(kw), as.matrix(W.train), as.matrix(W.eval), PACKAGE = "npRmpi"
   )
-  expect_identical(compiled, reference)
+  public <- npreghat(bws = bw, txdat = tx, output = "matrix")
+  fit <- npreg(
+    bws = bw, txdat = tx, tydat = y,
+    warn.glp.gradient = FALSE
+  )$mean
+
+  expect_gt(sum(attr(public, "ridge.used", exact = TRUE) > 0), 0L)
+  expect_equal(as.vector(compiled), as.vector(public), tolerance = 1e-10)
+  expect_equal(as.vector(compiled %*% y), as.vector(fit), tolerance = 1e-8)
 })
 
 test_that("width-one scalar hats retain signed higher-order kernel weights", {

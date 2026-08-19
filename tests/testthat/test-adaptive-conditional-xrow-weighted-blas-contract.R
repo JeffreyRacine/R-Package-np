@@ -31,13 +31,13 @@ test_that("MPI adaptive X-row context owns one bounded rank-local slab", {
   all_source <- paste(lines, collapse = "\n")
   prepare <- adaptive_xrow_source_body(
     lines,
-    "^static int np_conditional_xrow_ctx_prepare\\(",
-    "^static int (NP_NOINLINE )?(NP_HOT_ALIGN )?np_conditional_xrow_from_ctx_impl\\("
+    "^static int np_conditional_xrow_ctx_prepare_impl\\(",
+    "^static int np_conditional_xrow_ctx_prepare_canonical_influence\\("
   )
   clear <- adaptive_xrow_source_body(
     lines,
     "^static void np_conditional_xrow_ctx_clear\\(",
-    "^static int np_conditional_xrow_ctx_prepare\\("
+    "^static int np_conditional_xrow_ctx_prepare_impl\\("
   )
   compact <- gsub("[[:space:]]+", " ", prepare)
 
@@ -66,10 +66,11 @@ test_that("MPI adaptive X rows retain solve deletion and scalar fallback", {
   src_file <- locate_adaptive_xrow_blas_source()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable")
   lines <- readLines(src_file, warn = FALSE)
+  all_source <- paste(lines, collapse = "\n")
   body <- adaptive_xrow_source_body(
     lines,
-    "^static int (NP_NOINLINE )?(NP_HOT_ALIGN )?np_conditional_xrow_from_ctx_impl\\(",
-    "^static int np_conditional_xrow_from_ctx\\("
+    "^static int np_conditional_xrow_influence\\(",
+    "^static int np_regression_xrow_canonical_influence\\("
   )
   compact <- gsub("[[:space:]]+", " ", body)
 
@@ -87,7 +88,12 @@ test_that("MPI adaptive X rows retain solve deletion and scalar fallback", {
   )
   expect_match(
     body,
-    "np_lp_delete_denominator(row_out[eval_idx], &den)",
+    "np_lp_solve_workspace_solve_adjoint_ranked(",
+    fixed = TRUE
+  )
+  expect_match(
+    body,
+    "np_lp_delete_denominator(row_out[eval_idx], &denominator)",
     fixed = TRUE
   )
   expect_match(
@@ -97,7 +103,7 @@ test_that("MPI adaptive X rows retain solve deletion and scalar fallback", {
   )
   expect_match(
     compact,
-    "} else { for(l = 0; l < k; l++) for(j = 0; j < k; j++) ctx->full_row_workspace.gram[l + j*k] = 0.0;",
+    "} else { for(l = 0; l < k; l++) for(j = 0; j < k; j++) ctx->regression_solve_workspace.gram_source[l + j*k] = 0.0;",
     fixed = TRUE
   )
   expect_false(grepl("MPI_", body, fixed = TRUE))
@@ -124,6 +130,7 @@ test_that("MPI adaptive density CVML reuses rank-local row contexts", {
   src_file <- locate_adaptive_xrow_blas_source()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable")
   lines <- readLines(src_file, warn = FALSE)
+  all_source <- paste(lines, collapse = "\n")
   body <- adaptive_xrow_source_body(
     lines,
     "^static int np_conditional_density_cvml_lp_prepared_parallel_stream\\(",
@@ -137,13 +144,17 @@ test_that("MPI adaptive density CVML reuses rank-local row contexts", {
     fixed = TRUE
   )
   expect_match(
-    body,
-    "np_conditional_xrow_ctx_prepare(vector_scale_factor, &xctx)",
+    all_source,
+    "if((!local_fail) && use_xrow_ctx){\n    if(np_conditional_xrow_ctx_prepare_ctx(",
     fixed = TRUE
   )
   expect_match(
     compact,
-    "np_conditional_yrow_ctx_prepare(vector_scale_factor, OP_NORMAL, &yctx)",
+    paste(
+      "np_conditional_yrow_ctx_prepare_ctx(",
+      " vector_scale_factor, OP_NORMAL, nn_geometry_context, &yctx)",
+      sep = ""
+    ),
     fixed = TRUE
   )
   expect_match(

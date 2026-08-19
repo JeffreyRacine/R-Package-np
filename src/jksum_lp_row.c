@@ -51,9 +51,7 @@ static void np_lp_accumulate_owned_row_##WIDTH(                             \
       continue;                                                              \
                                                                              \
     if(ctx->track_lowsupport)                                                \
-      np_lp_dense_support_add(ctx->row_j, i, ii, weight, (WIDTH),           \
-                              ctx->support_count, ctx->support_orig,          \
-                              ctx->support_data, ctx->support_weight);        \
+      np_lp_dense_support_add(ctx->row_j, (WIDTH), ctx->support_count);       \
                                                                              \
     yi = ctx->response[ii];                                                   \
     for(a = 0; a < (WIDTH); a++){                                            \
@@ -112,9 +110,7 @@ static void np_lp_accumulate_owned_row_##WIDTH(                             \
       continue;                                                              \
                                                                              \
     if(ctx->track_lowsupport)                                                \
-      np_lp_dense_support_add(ctx->row_j, i, ii, weight, (WIDTH),           \
-                              ctx->support_count, ctx->support_orig,          \
-                              ctx->support_data, ctx->support_weight);        \
+      np_lp_dense_support_add(ctx->row_j, (WIDTH), ctx->support_count);       \
                                                                              \
     yi = ctx->response[ii];                                                   \
     for(a = 0; a < (WIDTH); a++){                                            \

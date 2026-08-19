@@ -1592,10 +1592,10 @@ npreghat <-
   }
 
   mean.override <- !isTRUE(gradients) &&
-    identical(regtype, "lc") &&
+    identical(regtype.engine, "lc") &&
     identical(bws$type, "adaptive_nn")
   grad.override <- isTRUE(gradients) &&
-    identical(regtype, "lc") &&
+    identical(regtype.engine, "lc") &&
     identical(bws$type, "adaptive_nn") &&
     !beta.kernel &&
     (bws$ncon > 0L)

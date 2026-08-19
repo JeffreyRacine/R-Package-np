@@ -6031,28 +6031,13 @@
     where = ".np_regression_localpoly_fixed_counts_precompute",
     ncon.field = "ncon"
   )
-  regtype <- reg.spec$regtype
-  if (identical(regtype, "lc"))
+  if (npIsCanonicalLp0Spec(reg.spec, ncon = bws$ncon))
     stop("local-polynomial state helper requires regtype='ll' or 'lp'")
 
   ncon <- bws$ncon
-  degree <- if (identical(regtype, "ll")) {
-    rep.int(1L, ncon)
-  } else {
-    npValidateGlpDegree(
-      regtype = "lp",
-      degree = reg.spec$degree,
-      ncon = ncon
-    )
-  }
-  basis <- npValidateLpBasis(
-    regtype = "lp",
-    basis = reg.spec$basis
-  )
-  bernstein.basis <- npValidateGlpBernstein(
-    regtype = "lp",
-    bernstein.basis = reg.spec$bernstein.basis
-  )
+  degree <- reg.spec$degree.engine
+  basis <- reg.spec$basis.engine
+  bernstein.basis <- reg.spec$bernstein.basis.engine
 
   kw <- .np_plot_kernel_weights_direct(
     bws = bws,

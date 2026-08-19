@@ -34,13 +34,13 @@ test_that("canonical solve workspace dispatches width one only to scalar algebra
   )
   solve <- lp_width_one_region(
     source,
-    "int np_lp_solve_workspace_solve(",
-    "int np_lp_solve_workspace_solve_factored("
+    "static NPLPDgesvStatus np_lp_solve_workspace_try_dgesv(",
+    "static int np_lp_solve_workspace_solve_factored_with_trans("
   )
   factored <- lp_width_one_region(
     source,
-    "int np_lp_solve_workspace_solve_factored(",
-    "NPLPWidthOneStatus np_lp_width_one_influence_row("
+    "static int np_lp_solve_workspace_solve_factored_with_trans(",
+    "int np_lp_solve_workspace_solve_factored("
   )
 
   expect_true(grepl("rhs_source[i]/gram", scalar, fixed = TRUE))
@@ -80,7 +80,7 @@ test_that("canonical solve workspace dispatches width one only to scalar algebra
   )
 })
 
-test_that("full-row workspace dispatches width one before every LAPACK owner", {
+test_that("retained full-row inverse workspace dispatches width one before LAPACK", {
   solve_file <- locate_lp_width_one_source("jksum_lp_solve.c")
   skip_if(is.null(solve_file), "source file src/jksum_lp_solve.c unavailable")
   source <- paste(readLines(solve_file, warn = FALSE), collapse = "\n")
@@ -88,11 +88,6 @@ test_that("full-row workspace dispatches width one before every LAPACK owner", {
   rcond <- lp_width_one_region(
     source,
     "static int np_lp_full_row_bad_rcond(",
-    "int np_lp_full_row_workspace_solve("
-  )
-  solve <- lp_width_one_region(
-    source,
-    "int np_lp_full_row_workspace_solve(",
     "static int np_lp_full_row_workspace_factor_invert("
   )
   invert <- lp_width_one_region(
@@ -110,13 +105,6 @@ test_that("full-row workspace dispatches width one before every LAPACK owner", {
   expect_lt(
     regexpr("if(p == 1)", rcond, fixed = TRUE),
     regexpr("F77_CALL(dsyev)", rcond, fixed = TRUE)
-  )
-
-  expect_true(grepl("if(p == 1)", solve, fixed = TRUE))
-  expect_true(grepl("np_lp_solve_width_one(", solve, fixed = TRUE))
-  expect_lt(
-    regexpr("if(p == 1)", solve, fixed = TRUE),
-    regexpr("F77_CALL(dgesv)", solve, fixed = TRUE)
   )
 
   expect_true(grepl("if(p == 1)", invert, fixed = TRUE))
@@ -171,7 +159,7 @@ test_that("compiled width-one hats reuse the scalar influence primitive", {
   scalar_hat <- lp_width_one_region(
     source,
     "static SEXP np_reghat_width_one_matrix(",
-    "static int np_reghat_solve_system("
+    "static NPReghatLPRowStatus np_reghat_lp_prediction_raw("
   )
   hat_start <- regexpr("SEXP C_np_reghat_lp_matrix_fast(", source, fixed = TRUE)
   expect_gt(hat_start, 0L)
@@ -186,7 +174,7 @@ test_that("compiled width-one hats reuse the scalar influence primitive", {
   expect_true(grepl("if(nterms == 1)", hat, fixed = TRUE))
   expect_lt(
     regexpr("if(nterms == 1)", hat, fixed = TRUE),
-    regexpr("weighted_design = (double *)R_alloc", hat, fixed = TRUE)
+    regexpr("np_reghat_lp_workspace_reserve", hat, fixed = TRUE)
   )
   expect_false(grepl("if((nterms == 1)", hat, fixed = TRUE))
 })
