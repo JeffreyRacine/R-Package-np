@@ -75,6 +75,84 @@ test_that("fixed ll gradient helper matches explicit refits without direct regre
   expect_identical(fast.calls, 0L)
 })
 
+test_that("public ll bootstrap-gradient plot consumes the validated LP1 engine spec", {
+  set.seed(20260819)
+  n <- 32L
+  x <- runif(n)
+  y <- 1 + 2 * x + rnorm(n, sd = 0.04)
+  tx <- data.frame(x = x)
+
+  bw.ll <- npregbw(
+    xdat = tx,
+    ydat = y,
+    regtype = "ll",
+    bws = 0.3,
+    bandwidth.compute = FALSE
+  )
+  fit.ll <- npreg(bws = bw.ll)
+
+  set.seed(20260820)
+  out.ll <- plot(
+    fit.ll,
+    perspective = FALSE,
+    errors = "bootstrap",
+    B = 2L,
+    output = "data",
+    gradients = TRUE,
+    neval = 8L
+  )
+
+  bw.lp1 <- npregbw(
+    xdat = tx,
+    ydat = y,
+    regtype = "lp",
+    basis = "glp",
+    degree = 1L,
+    bernstein.basis = FALSE,
+    bws = 0.3,
+    bandwidth.compute = FALSE
+  )
+  fit.lp1 <- npreg(bws = bw.lp1)
+  set.seed(20260820)
+  out.lp1 <- plot(
+    fit.lp1,
+    perspective = FALSE,
+    errors = "bootstrap",
+    B = 2L,
+    output = "data",
+    gradients = TRUE,
+    neval = 8L
+  )
+
+  expect_type(out.ll, "list")
+  expect_true(length(out.ll) >= 1L)
+  expect_true(all(is.finite(as.numeric(gradients(out.ll[[1L]])))))
+  expect_equal(fitted(out.ll[[1L]]), fitted(out.lp1[[1L]]), tolerance = 1e-12)
+  expect_equal(gradients(out.ll[[1L]]), gradients(out.lp1[[1L]]), tolerance = 1e-12)
+  expect_equal(se(out.ll[[1L]]), se(out.lp1[[1L]]), tolerance = 1e-12)
+  expect_identical(bw.ll$regtype, "ll")
+  expect_null(bw.ll$degree)
+  expect_identical(bw.ll$regtype.engine, "lp")
+  expect_identical(bw.ll$degree.engine, 1L)
+
+  bw.bad <- bw.ll
+  bw.bad$degree.engine <- 2L
+  expect_error(
+    plot(
+      bw.bad,
+      xdat = tx,
+      ydat = y,
+      perspective = FALSE,
+      errors = "bootstrap",
+      B = 2L,
+      output = "data",
+      gradients = TRUE,
+      neval = 4L
+    ),
+    "incoherent public and canonical engine metadata"
+  )
+})
+
 test_that("fixed lp gradient helper preserves derivative order and counts drawer semantics", {
   skip_if_not_installed("np")
 
