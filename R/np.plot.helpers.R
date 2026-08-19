@@ -2069,29 +2069,19 @@
     stop("length of ydat must match training rows")
   if (n < 1L || neval < 1L || B < 1L)
     stop("invalid inid regression bootstrap dimensions")
-  regtype <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
-  if (identical(regtype, "lc"))
+  reg.spec <- npValidatedConditionalRegSpec(
+    bws,
+    where = ".np_inid_boot_from_regression_localpoly_frozen",
+    ncon.field = "ncon"
+  )
+  reg.engine <- reg.spec$regtype.engine
+  if (npIsCanonicalLp0Spec(reg.spec, ncon = bws$ncon))
     stop("local-polynomial frozen regression helper requires regtype='ll' or 'lp'")
 
   ncon <- bws$ncon
-  degree <- if (identical(regtype, "ll")) {
-    rep.int(1L, ncon)
-  } else {
-    npValidateGlpDegree(
-      regtype = "lp",
-      degree = bws$degree,
-      ncon = ncon
-    )
-  }
-
-  basis <- npValidateLpBasis(
-    regtype = "lp",
-    basis = if (is.null(bws$basis)) "glp" else bws$basis
-  )
-  bernstein.basis <- npValidateGlpBernstein(
-    regtype = "lp",
-    bernstein.basis = isTRUE(bws$bernstein.basis)
-  )
+  degree <- reg.spec$degree.engine
+  basis <- reg.spec$basis.engine
+  bernstein.basis <- reg.spec$bernstein.basis.engine
 
   gradient.vec <- NULL
   if (isTRUE(gradients)) {
@@ -2101,28 +2091,24 @@
       stop("fixed regression gradient helper requires a continuous slice", call. = FALSE)
 
     gradient.vec <- integer(ncon)
-    if (identical(regtype, "lp")) {
-      gradient.order <- npValidateGlpGradientOrder(
-        regtype = "lp",
-        gradient.order = gradient.order,
-        ncon = ncon
-      )
-      if (gradient.order[cpos] > degree[cpos] &&
-          !npGlpDegree0FirstDerivativeLcOk(
-            regtype.engine = regtype,
-            degree.engine = degree,
-            gradient.order = gradient.order,
-            ncon = ncon
-          )) {
-        return(list(
-          t = matrix(NA_real_, nrow = B, ncol = neval),
-          t0 = rep(NA_real_, neval)
-        ))
-      }
-      gradient.vec[cpos] <- gradient.order[cpos]
-    } else {
-      gradient.vec[cpos] <- 1L
+    gradient.order <- npValidateGlpGradientOrder(
+      regtype = "lp",
+      gradient.order = gradient.order,
+      ncon = ncon
+    )
+    if (gradient.order[cpos] > degree[cpos] &&
+        !npGlpDegree0FirstDerivativeLcOk(
+          regtype.engine = reg.engine,
+          degree.engine = degree,
+          gradient.order = gradient.order,
+          ncon = ncon
+        )) {
+      return(list(
+        t = matrix(NA_real_, nrow = B, ncol = neval),
+        t0 = rep(NA_real_, neval)
+      ))
     }
+    gradient.vec[cpos] <- gradient.order[cpos]
   }
 
   kw <- npksum(
@@ -2838,7 +2824,6 @@
   }
 
   spec <- .npindex_resolve_spec(bws, where = "single-index inid helper")
-  regtype <- spec$regtype.engine
   kbw <- .np_indexhat_kbw(bws = bws, idx.train = idx.train)
   kw <- .np_kernel_weights_direct(
     bws = kbw,
@@ -2869,11 +2854,7 @@
     ))
   }
 
-  degree <- if (identical(regtype, "ll")) {
-    1L
-  } else {
-    spec$degree.engine
-  }
+  degree <- spec$degree.engine
 
   W <- W.lp(
     xdat = idx.train,
@@ -5311,7 +5292,7 @@
     options(np.plot.progress = old.progress)
   }, add = TRUE)
 
-  # Exact duplicate-sample refits for fixed conditional ll/lp reduce to
+  # Exact duplicate-sample refits for fixed conditional positive-degree LP reduce to
   # reusing the fixed x-side local-polynomial bootstrap helper on y-kernel
   # pseudo-responses, one evaluation row at a time.
   for (i in seq_len(neval)) {
@@ -5369,29 +5350,18 @@
     where = "conditional localpoly y-operator"
   )
 
-  regtype <- if (is.null(xbw$regtype)) "lc" else as.character(xbw$regtype)
-  if (identical(regtype, "lc"))
+  reg.spec <- npValidatedConditionalRegSpec(
+    xbw,
+    where = ".np_inid_boot_from_conditional_localpoly_fixed_precompute",
+    ncon.field = "ncon"
+  )
+  if (npIsCanonicalLp0Spec(reg.spec, ncon = xbw$ncon))
     stop("conditional localpoly fixed counts helper requires regtype='ll' or 'lp'")
 
   ncon <- xbw$ncon
-  degree <- if (identical(regtype, "ll")) {
-    rep.int(1L, ncon)
-  } else {
-    npValidateGlpDegree(
-      regtype = "lp",
-      degree = xbw$degree,
-      ncon = ncon
-    )
-  }
-
-  basis <- npValidateLpBasis(
-    regtype = "lp",
-    basis = if (is.null(xbw$basis)) "glp" else xbw$basis
-  )
-  bernstein.basis <- npValidateGlpBernstein(
-    regtype = "lp",
-    bernstein.basis = isTRUE(xbw$bernstein.basis)
-  )
+  degree <- reg.spec$degree.engine
+  basis <- reg.spec$basis.engine
+  bernstein.basis <- reg.spec$bernstein.basis.engine
 
   kw <- .np_kernel_weights_direct(
     bws = xbw,
@@ -11379,7 +11349,11 @@ compute.bootstrap.errors.rbandwidth =
     is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
     use.frozen.nonfixed <- identical(plot.errors.boot.nonfixed, "frozen") &&
       !identical(bws$type, "fixed")
-    regtype <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
+    regtype <- npValidatedConditionalRegSpec(
+      bws,
+      where = "compute.bootstrap.errors.rbandwidth",
+      ncon.field = "ncon"
+    )$regtype.engine
 
     cont.idx <- which(bws$xdati$icon)
     xi.factor <- isTRUE(slice.index > 0L) &&

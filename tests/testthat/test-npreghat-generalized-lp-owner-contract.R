@@ -366,7 +366,7 @@ test_that("public LP mean matrices use the typed native capability", {
   bw.ann <- make_bw("adaptive_nn", 9L)
 
   candidate_args <- function(bw, output = "matrix", s = 0L) list(
-    bws = bw, output = output, regtype = "lp", degree = 2L,
+    bws = bw, output = output, regtype.engine = "lp", degree = 2L,
     basis = "glp", bernstein.basis = FALSE, s = as.integer(s),
     leave.one.out = FALSE
   )
@@ -458,7 +458,7 @@ test_that("public LP mean apply uses one canonical response owner for every RHS 
   bw.gnn <- make_bw("generalized_nn", c(11L, 11L, 0.35))
   bw.ann <- make_bw("adaptive_nn", c(11L, 11L, 0.35))
   candidate_args <- function(bw, y = Y, s = c(0L, 0L)) list(
-    bws = bw, output = "apply", y = y, regtype = "lp",
+    bws = bw, output = "apply", y = y, regtype.engine = "lp",
     degree = c(2L, 1L), basis = "glp", bernstein.basis = FALSE,
     s = as.integer(s), leave.one.out = FALSE
   )
