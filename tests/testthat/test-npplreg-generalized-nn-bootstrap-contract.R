@@ -8,7 +8,10 @@ test_that("npplreg generalized-nn cv.aic bootstrap plot contract holds across re
 
   boot_methods <- c("inid", "fixed", "geom", "wild")
   regtypes <- c("lc", "ll", "lp")
-  bws.nn <- matrix(c(2, 9), nrow = 2L)
+  # Plot bootstrap samples are discrete even when the source data are not.
+  # Use the broadest admissible count so this route contract does not depend
+  # on the retired nearest-positive zero-radius substitution.
+  bws.nn <- matrix(rep.int(n - 1L, 2L), nrow = 2L)
 
   for (regtype in regtypes) {
     bw.args <- list(
