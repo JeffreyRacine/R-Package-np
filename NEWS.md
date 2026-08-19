@@ -1,5 +1,15 @@
 # np 0.70-6
 
+* Fixed local-polynomial plot bootstraps now solve count-compressed response
+  moments through the same canonical bounded-ridge response owner used by
+  ordinary regression fits. Regression, single-index, smooth-coefficient,
+  partial-linear, and conditional density/distribution bootstrap consumers
+  share one native batched response solve; the former private determinant,
+  `solve()`, and absolute-ridge implementations have been removed. Count
+  construction, moment arithmetic, chunking, progress, and MPI orchestration
+  are unchanged. Results can change for systems where the retired private
+  path imposed a different ridge decision.
+
 * Eligible fixed and generalized-nearest-neighbour LP mean applications now
   use the canonical regression response owner for one or more right-hand
   sides. A one-column `npreghat(..., output = "apply")` no longer falls
