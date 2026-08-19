@@ -3,8 +3,6 @@
 
 #include <stddef.h>
 
-#include "jksum_lp_solve.h"
-
 typedef enum {
   NP_REGHAT_LP_ROW_OK = 0,
   NP_REGHAT_LP_ROW_INVALID,
@@ -23,10 +21,17 @@ typedef struct {
   int ntrain;
   int nterms;
   size_t design_capacity;
+  size_t gram_capacity;
   double *design;
   double *weighted_design;
+  double *gram;
+  double *gram_work;
+  double *rhs;
+  double *solution;
   double *prediction;
-  NPLPSolveWorkspace solve_workspace;
+  double *condition_work;
+  int *pivot;
+  int *condition_iwork;
 } NPReghatLPWorkspace;
 
 void np_reghat_lp_workspace_init(NPReghatLPWorkspace *workspace);

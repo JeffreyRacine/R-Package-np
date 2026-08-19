@@ -182,6 +182,15 @@
     ))
   }
 
+  if (identical(regtype, "ll")) {
+    return(.npreghat_exact_ll_matrix_from_kernel_weights(
+      bws = xbw,
+      txdat = txdat,
+      exdat = eval.arg,
+      s = s
+    ))
+  }
+
   if (identical(regtype, "lp")) {
     .npcdhat_validate_lp_x_s(
       degree = degree,
@@ -190,7 +199,30 @@
       where = "npcdhat"
     )
 
-    return(.npreghat_exact_lp_matrix_from_regression_core(
+    if (identical(xbw$type, "generalized_nn") &&
+        any(degree > 1L) && train.is.eval) {
+      return(.npreghat_exact_matrix_from_core(
+        bws = xbw,
+        txdat = txdat,
+        exdat = NULL,
+        s = s
+      ))
+    }
+
+    if (identical(xbw$type, "generalized_nn") && any(degree > 1L)) {
+      H <- matrix(NA_real_, nrow = nrow(exdat), ncol = nrow(txdat))
+      for (i in seq_len(nrow(exdat))) {
+        H[i, ] <- .npreghat_exact_matrix_from_core(
+          bws = xbw,
+          txdat = txdat,
+          exdat = exdat[i, , drop = FALSE],
+          s = s
+        )[1L, ]
+      }
+      return(H)
+    }
+
+    return(.npreghat_exact_lp_matrix_from_kernel_weights(
       bws = xbw,
       txdat = txdat,
       exdat = eval.arg,

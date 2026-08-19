@@ -46,8 +46,10 @@ test_that("fixed and generalized-NN CVLS share one canonical LOO block engine", 
   lines <- readLines(src_file, warn = FALSE)
   source <- paste(lines, collapse = "\n")
 
-  body <- npRmpi_test_extract_c_function(
-    lines, "np_conditional_x_weight_block_stream_core_impl"
+  body <- cvls_source_body(
+    lines,
+    "^static int np_conditional_x_weight_block_stream_core_impl\\(",
+    "^static int np_conditional_x_weight_block_stream_core\\("
   )
 
   expect_match(body, "BANDWIDTH_den_extern != BW_FIXED", fixed = TRUE)
@@ -84,20 +86,15 @@ test_that("conditional CVLS dispatch reaches only the canonical block owner", {
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
   lines <- readLines(src_file, warn = FALSE)
 
-  density_wrapper <- npRmpi_test_extract_c_function(
-    lines, "np_conditional_density_cvls_lp_stream"
+  density_body <- cvls_source_body(
+    lines,
+    "^int np_conditional_density_cvls_lp_stream\\(",
+    "^static int np_conditional_distribution_cvls_lp_row_stream\\("
   )
-  density_body <- npRmpi_test_extract_c_function(
-    lines, "np_conditional_density_cvls_lp_stream_impl"
-  )
-  distribution_body <- npRmpi_test_extract_c_function(
-    lines, "np_conditional_distribution_cvls_lp_stream"
-  )
-
-  expect_match(
-    density_wrapper,
-    "np_conditional_density_cvls_lp_stream_impl(",
-    fixed = TRUE
+  distribution_body <- cvls_source_body(
+    lines,
+    "^int np_conditional_distribution_cvls_lp_stream\\(",
+    "^int np_kernel_estimate_density_categorical_leave_one_out_cv\\("
   )
 
   expect_equal(lengths(regmatches(
@@ -119,8 +116,10 @@ test_that("conditional CVLS dispatch reaches only the canonical block owner", {
     fixed = TRUE
   ))
 
-  shared_x_body <- npRmpi_test_extract_c_function(
-    lines, "np_conditional_x_weight_block_stream_core_impl"
+  shared_x_body <- cvls_source_body(
+    lines,
+    "^static int np_conditional_x_weight_block_stream_core_impl\\(",
+    "^static int np_conditional_x_weight_block_stream_core\\("
   )
   expect_match(shared_x_body, "BANDWIDTH_den_extern != BW_FIXED", fixed = TRUE)
   expect_match(shared_x_body, "BANDWIDTH_den_extern != BW_GEN_NN", fixed = TRUE)

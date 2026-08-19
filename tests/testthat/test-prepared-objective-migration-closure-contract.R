@@ -1,5 +1,8 @@
 np_prepared_migration_root <- function() {
-  dirname(npRmpi_test_source_path("DESCRIPTION"))
+  root <- Sys.getenv("NP_SOURCE_ROOT", unset = "")
+  if (nzchar(root))
+    return(normalizePath(root, mustWork = TRUE))
+  npRmpi_namespace_hygiene_root()
 }
 
 np_prepared_migration_text <- function(root, paths) {

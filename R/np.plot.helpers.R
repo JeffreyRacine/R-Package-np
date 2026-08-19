@@ -2461,6 +2461,7 @@
   }
 
   spec <- .npindex_resolve_spec(bws, where = "single-index inid helper")
+  regtype <- spec$regtype.engine
   kbw <- .np_indexhat_kbw(bws = bws, idx.train = idx.train)
   kw <- .np_kernel_weights_direct(
     bws = kbw,
@@ -2491,7 +2492,11 @@
     ))
   }
 
-  degree <- spec$degree.engine
+  degree <- if (identical(regtype, "ll")) {
+    1L
+  } else {
+    spec$degree.engine
+  }
 
   W <- W.lp(
     xdat = idx.train,
@@ -2511,6 +2516,7 @@
 
   p <- ncol(W)
   mcols <- p * (p + 1L) / 2L
+  ridge.grid <- npRidgeSequenceFromBase(n.train = n, ridge.base = 1.0e-12, cap = 1.0)
   rhs <- W.eval
   ones <- matrix(1.0, nrow = n, ncol = 1L)
 
@@ -2535,12 +2541,21 @@
 
     M0 <- crossprod(ones, mf)
     Z0 <- crossprod(ones, Zfeat[[i]])
-    t0[i] <- .np_inid_lp_batch_project(
-      Mvals = M0,
-      Zvals = Z0,
-      rhs = rhs[i, ],
-      represented.mass = n
-    )[1L]
+    t0[i] <- if (p > 3L) {
+      .np_inid_lp_predict_chunk_general(
+        Mvals = M0,
+        Zvals = Z0,
+        rhs = rhs[i, ],
+        ridge.grid = ridge.grid
+      )[1L]
+    } else {
+      .np_inid_lp_predict_chunk(
+        Mvals = M0,
+        Zvals = Z0,
+        rhs = rhs[i, ],
+        ridge.grid = ridge.grid
+      )[1L]
+    }
   }
 
   tmat <- matrix(NA_real_, nrow = B, ncol = neval)
@@ -2550,19 +2565,28 @@
     progress.label
   }
 
-  compute_chunk <- function(counts.chunk, represented.mass) {
+  compute_chunk <- function(counts.chunk) {
     counts.chunk <- as.matrix(counts.chunk)
     bsz <- ncol(counts.chunk)
     out <- matrix(NA_real_, nrow = bsz, ncol = neval)
     for (i in seq_len(neval)) {
       Mvals <- crossprod(counts.chunk, Mfeat[[i]])
       Zvals <- crossprod(counts.chunk, Zfeat[[i]])
-      out[, i] <- .np_inid_lp_batch_project(
-        Mvals = Mvals,
-        Zvals = Zvals,
-        rhs = rhs[i, ],
-        represented.mass = represented.mass
-      )
+      out[, i] <- if (p > 3L) {
+        .np_inid_lp_predict_chunk_general(
+          Mvals = Mvals,
+          Zvals = Zvals,
+          rhs = rhs[i, ],
+          ridge.grid = ridge.grid
+        )
+      } else {
+        .np_inid_lp_predict_chunk(
+          Mvals = Mvals,
+          Zvals = Zvals,
+          rhs = rhs[i, ],
+          ridge.grid = ridge.grid
+        )
+      }
     }
     out
   }
@@ -2588,11 +2612,7 @@
       worker <- function(task) {
         start <- as.integer(task$start)
         stopi <- start + as.integer(task$bsz) - 1L
-        counts.chunk <- counts.mat[, start:stopi, drop = FALSE]
-        compute_chunk(
-          counts.chunk = counts.chunk,
-          represented.mass = .np_inid_lp_represented_mass(counts.chunk)
-        )
+        compute_chunk(counts.chunk = counts.mat[, start:stopi, drop = FALSE])
       }
       tmat <- .npRmpi_bootstrap_run_fanout(
         tasks = tasks,
@@ -2632,10 +2652,7 @@
           B = as.integer(task$bsz),
           counts = counts.drawer(start, stopi)
         )
-        compute_chunk(
-          counts.chunk = counts.chunk,
-          represented.mass = .np_inid_lp_represented_mass(counts.chunk)
-        )
+        compute_chunk(counts.chunk = counts.chunk)
       }
       tmat <- .npRmpi_bootstrap_run_fanout(
         tasks = tasks,
@@ -2676,10 +2693,7 @@
       )
       worker <- function(task) {
         counts.chunk <- .npRmpi_bootstrap_task_rmultinom(task = task, n = n, prob = prob)
-        compute_chunk(
-          counts.chunk = counts.chunk,
-          represented.mass = rep.int(as.double(n), ncol(counts.chunk))
-        )
+        compute_chunk(counts.chunk = counts.chunk)
       }
       tmat <- .npRmpi_bootstrap_run_fanout(
         tasks = tasks,
@@ -3582,70 +3596,283 @@
   list(t = tmat, t0 = setup$t0)
 }
 
-.np_inid_lp_represented_mass <- function(counts.chunk, known.mass = NULL) {
-  bsz <- ncol(counts.chunk)
-  if (!is.null(known.mass))
-    return(rep.int(as.double(known.mass), bsz))
-  as.double(colSums(counts.chunk))
+.np_inid_lp_unpack_sym_row <- function(mrow, p) {
+  A <- matrix(0.0, nrow = p, ncol = p)
+  idx <- 1L
+  for (a in seq_len(p)) {
+    for (b in a:p) {
+      A[a, b] <- mrow[idx]
+      A[b, a] <- mrow[idx]
+      idx <- idx + 1L
+    }
+  }
+  A
 }
 
-.np_inid_lp_batch_project <- function(Mvals,
-                                       Zvals,
-                                       rhs,
-                                       represented.mass,
-                                       diagnostics = FALSE) {
+.np_inid_lp_predict_row <- function(A, z, rhs, ridge.grid) {
+  ridge.grid <- as.double(ridge.grid)
+  if (!length(ridge.grid) || anyNA(ridge.grid) || any(!is.finite(ridge.grid)) || any(ridge.grid < 0))
+    stop("argument 'ridge.grid' must be a non-empty non-negative finite numeric vector")
+  z <- as.double(z)
+  if (!length(z))
+    return(NA_real_)
+  z1 <- z[1L]
+
+  for (ridge in ridge.grid) {
+    Ar <- A
+    zr <- z
+    if (ridge > 0)
+      diag(Ar) <- diag(Ar) + ridge
+    if (ridge > 0)
+      zr[1L] <- z1 + ridge * z1 / NZD(Ar[1L, 1L])
+    beta <- tryCatch(
+      drop(solve(Ar, matrix(zr, ncol = 1L))),
+      error = function(e) NULL
+    )
+    if (!is.null(beta) && all(is.finite(beta)))
+      return(sum(rhs * beta))
+  }
+
+  NA_real_
+}
+
+.np_inid_lp_predict_chunk_general <- function(Mvals, Zvals, rhs, ridge.grid) {
   Mvals <- as.matrix(Mvals)
-  if (!is.double(Mvals))
-    storage.mode(Mvals) <- "double"
-  if (is.list(Zvals)) {
-    Zvals <- lapply(Zvals, function(zmat) {
-      zmat <- as.matrix(zmat)
-      if (!is.double(zmat))
-        storage.mode(zmat) <- "double"
-      zmat
-    })
-  } else {
-    Zvals <- as.matrix(Zvals)
-    if (!is.double(Zvals))
-      storage.mode(Zvals) <- "double"
+  Zvals <- as.matrix(Zvals)
+  rhs <- as.double(rhs)
+
+  bsz <- nrow(Mvals)
+  p <- ncol(Zvals)
+  out <- numeric(bsz)
+
+  for (ii in seq_len(bsz)) {
+    A <- .np_inid_lp_unpack_sym_row(mrow = Mvals[ii, ], p = p)
+    out[ii] <- .np_inid_lp_predict_row(
+      A = A,
+      z = as.double(Zvals[ii, ]),
+      rhs = rhs,
+      ridge.grid = ridge.grid
+    )
   }
 
-  native <- .Call(
-    "C_np_lp_batch_project",
-    Mvals,
-    Zvals,
-    as.double(rhs),
-    as.double(represented.mass),
-    isTRUE(diagnostics),
-    PACKAGE = "npRmpi"
-  )
-  status <- native[["status"]]
-  if (!identical(status, 0L)) {
-    status.label <- c(
-      "invalid input",
-      "non-finite system",
-      "bounded ridge exhausted",
-      "final solve failed"
-    )
-    label <- if (status >= 1L && status <= length(status.label)) {
-      status.label[[status]]
-    } else {
-      sprintf("unknown status %s", status)
+  out
+}
+
+.np_inid_lp_predict_chunk <- function(Mvals, Zvals, rhs, ridge.grid) {
+  Mvals <- as.matrix(Mvals)
+  Zvals <- as.matrix(Zvals)
+  rhs <- as.double(rhs)
+
+  bsz <- nrow(Mvals)
+  p <- ncol(Zvals)
+  out <- rep(NA_real_, bsz)
+
+  if (p == 1L) {
+    den <- as.double(Mvals[, 1L])
+    out <- rhs[1L] * as.double(Zvals[, 1L]) / pmax(den, .Machine$double.eps)
+    return(out)
+  }
+
+  if (p == 2L) {
+    a <- as.double(Mvals[, 1L])
+    b <- as.double(Mvals[, 2L])
+    c <- as.double(Mvals[, 3L])
+    u <- as.double(Zvals[, 1L])
+    v <- as.double(Zvals[, 2L])
+
+    det <- a * c - b * b
+    good <- is.finite(det) & (abs(det) > .Machine$double.eps)
+    if (any(good)) {
+      invdet <- 1 / det[good]
+      beta1 <- (c[good] * u[good] - b[good] * v[good]) * invdet
+      beta2 <- (a[good] * v[good] - b[good] * u[good]) * invdet
+      out[good] <- rhs[1L] * beta1 + rhs[2L] * beta2
     }
-    stop(
-      sprintf(
-        "canonical fixed-LP bootstrap solve failed at system %d: %s",
-        native[["failed_system"]],
-        label
-      ),
-      call. = FALSE
+  } else if (p == 3L) {
+    a <- as.double(Mvals[, 1L])
+    b <- as.double(Mvals[, 2L])
+    c <- as.double(Mvals[, 3L])
+    d <- as.double(Mvals[, 4L])
+    e <- as.double(Mvals[, 5L])
+    f <- as.double(Mvals[, 6L])
+    u <- as.double(Zvals[, 1L])
+    v <- as.double(Zvals[, 2L])
+    w <- as.double(Zvals[, 3L])
+
+    det <- a * (d * f - e * e) - b * (b * f - c * e) + c * (b * e - c * d)
+    good <- is.finite(det) & (abs(det) > .Machine$double.eps)
+    if (any(good)) {
+      c11 <- d[good] * f[good] - e[good] * e[good]
+      c12 <- c[good] * e[good] - b[good] * f[good]
+      c13 <- b[good] * e[good] - c[good] * d[good]
+      c22 <- a[good] * f[good] - c[good] * c[good]
+      c23 <- b[good] * c[good] - a[good] * e[good]
+      c33 <- a[good] * d[good] - b[good] * b[good]
+      invdet <- 1 / det[good]
+
+      beta1 <- (c11 * u[good] + c12 * v[good] + c13 * w[good]) * invdet
+      beta2 <- (c12 * u[good] + c22 * v[good] + c23 * w[good]) * invdet
+      beta3 <- (c13 * u[good] + c23 * v[good] + c33 * w[good]) * invdet
+      out[good] <- rhs[1L] * beta1 + rhs[2L] * beta2 + rhs[3L] * beta3
+    }
+  }
+
+  bad <- which(!is.finite(out))
+  if (length(bad)) {
+    p <- ncol(Zvals)
+    for (ii in bad) {
+      A <- .np_inid_lp_unpack_sym_row(mrow = Mvals[ii, ], p = p)
+      out[ii] <- .np_inid_lp_predict_row(
+        A = A,
+        z = as.double(Zvals[ii, ]),
+        rhs = rhs,
+        ridge.grid = ridge.grid
+      )
+    }
+  }
+
+  out
+}
+
+.np_inid_lp_predict_row_multi <- function(A, Z, rhs, ridge.grid) {
+  ridge.grid <- as.double(ridge.grid)
+  if (!length(ridge.grid) || anyNA(ridge.grid) || any(!is.finite(ridge.grid)) || any(ridge.grid < 0))
+    stop("argument 'ridge.grid' must be a non-empty non-negative finite numeric vector")
+  Z <- as.matrix(Z)
+  if (!length(Z))
+    return(numeric(0))
+  rhs <- as.double(rhs)
+  p <- nrow(Z)
+
+  if (p == 1L) {
+    den <- as.double(A[1L, 1L])
+    return(rhs[1L] * as.double(Z[1L, ]) / pmax(den, .Machine$double.eps))
+  }
+
+  if (p == 2L) {
+    a <- as.double(A[1L, 1L])
+    b <- as.double(A[1L, 2L])
+    c <- as.double(A[2L, 2L])
+    det <- a * c - b * b
+    if (is.finite(det) && abs(det) > .Machine$double.eps) {
+      coeff1 <- (rhs[1L] * c - rhs[2L] * b) / det
+      coeff2 <- (rhs[2L] * a - rhs[1L] * b) / det
+      return(coeff1 * as.double(Z[1L, ]) + coeff2 * as.double(Z[2L, ]))
+    }
+  } else if (p == 3L) {
+    a <- as.double(A[1L, 1L])
+    b <- as.double(A[1L, 2L])
+    c <- as.double(A[1L, 3L])
+    d <- as.double(A[2L, 2L])
+    e <- as.double(A[2L, 3L])
+    f <- as.double(A[3L, 3L])
+    det <- a * (d * f - e * e) - b * (b * f - c * e) + c * (b * e - c * d)
+    if (is.finite(det) && abs(det) > .Machine$double.eps) {
+      c11 <- d * f - e * e
+      c12 <- c * e - b * f
+      c13 <- b * e - c * d
+      c22 <- a * f - c * c
+      c23 <- b * c - a * e
+      c33 <- a * d - b * b
+      coeff1 <- (rhs[1L] * c11 + rhs[2L] * c12 + rhs[3L] * c13) / det
+      coeff2 <- (rhs[1L] * c12 + rhs[2L] * c22 + rhs[3L] * c23) / det
+      coeff3 <- (rhs[1L] * c13 + rhs[2L] * c23 + rhs[3L] * c33) / det
+      return(
+        coeff1 * as.double(Z[1L, ]) +
+          coeff2 * as.double(Z[2L, ]) +
+          coeff3 * as.double(Z[3L, ])
+      )
+    }
+  }
+
+  z1 <- Z[1L, , drop = TRUE]
+
+  for (ridge in ridge.grid) {
+    Ar <- A
+    Zr <- Z
+    if (ridge > 0)
+      diag(Ar) <- diag(Ar) + ridge
+    if (ridge > 0)
+      Zr[1L, ] <- z1 + ridge * z1 / NZD(Ar[1L, 1L])
+    beta <- tryCatch(
+      solve(Ar, Zr),
+      error = function(e) NULL
+    )
+    if (!is.null(beta) && all(is.finite(beta)))
+      return(as.numeric(crossprod(rhs, beta)))
+  }
+
+  rep(NA_real_, ncol(Z))
+}
+
+.np_inid_lp_predict_chunk_multi <- function(Mvals, Zmats, rhs, ridge.grid) {
+  Mvals <- as.matrix(Mvals)
+  rhs <- as.double(rhs)
+  if (!length(Zmats))
+    return(matrix(numeric(0), nrow = nrow(Mvals), ncol = 0L))
+
+  bsz <- nrow(Mvals)
+  p <- length(Zmats)
+  g <- ncol(Zmats[[1L]])
+  out <- matrix(NA_real_, nrow = bsz, ncol = g)
+
+  if (p == 1L) {
+    den <- as.double(Mvals[, 1L])
+    out <- rhs[1L] * as.matrix(Zmats[[1L]]) / pmax(den, .Machine$double.eps)
+    return(out)
+  } else if (p == 2L) {
+    a <- as.double(Mvals[, 1L])
+    b <- as.double(Mvals[, 2L])
+    c <- as.double(Mvals[, 3L])
+    det <- a * c - b * b
+    good <- is.finite(det) & (abs(det) > .Machine$double.eps)
+    if (any(good)) {
+      coeff1 <- (rhs[1L] * c[good] - rhs[2L] * b[good]) / det[good]
+      coeff2 <- (rhs[2L] * a[good] - rhs[1L] * b[good]) / det[good]
+      out[good, ] <-
+        sweep(as.matrix(Zmats[[1L]])[good, , drop = FALSE], 1L, coeff1, "*") +
+        sweep(as.matrix(Zmats[[2L]])[good, , drop = FALSE], 1L, coeff2, "*")
+    }
+  } else if (p == 3L) {
+    a <- as.double(Mvals[, 1L])
+    b <- as.double(Mvals[, 2L])
+    c <- as.double(Mvals[, 3L])
+    d <- as.double(Mvals[, 4L])
+    e <- as.double(Mvals[, 5L])
+    f <- as.double(Mvals[, 6L])
+    det <- a * (d * f - e * e) - b * (b * f - c * e) + c * (b * e - c * d)
+    good <- is.finite(det) & (abs(det) > .Machine$double.eps)
+    if (any(good)) {
+      c11 <- d[good] * f[good] - e[good] * e[good]
+      c12 <- c[good] * e[good] - b[good] * f[good]
+      c13 <- b[good] * e[good] - c[good] * d[good]
+      c22 <- a[good] * f[good] - c[good] * c[good]
+      c23 <- b[good] * c[good] - a[good] * e[good]
+      c33 <- a[good] * d[good] - b[good] * b[good]
+      coeff1 <- (rhs[1L] * c11 + rhs[2L] * c12 + rhs[3L] * c13) / det[good]
+      coeff2 <- (rhs[1L] * c12 + rhs[2L] * c22 + rhs[3L] * c23) / det[good]
+      coeff3 <- (rhs[1L] * c13 + rhs[2L] * c23 + rhs[3L] * c33) / det[good]
+      out[good, ] <-
+        sweep(as.matrix(Zmats[[1L]])[good, , drop = FALSE], 1L, coeff1, "*") +
+        sweep(as.matrix(Zmats[[2L]])[good, , drop = FALSE], 1L, coeff2, "*") +
+        sweep(as.matrix(Zmats[[3L]])[good, , drop = FALSE], 1L, coeff3, "*")
+    }
+  }
+
+  for (ii in seq_len(bsz)) {
+    if (all(is.finite(out[ii, ])))
+      next
+    A <- .np_inid_lp_unpack_sym_row(mrow = Mvals[ii, ], p = p)
+    Z <- do.call(rbind, lapply(Zmats, function(zmat) zmat[ii, , drop = FALSE]))
+    out[ii, ] <- .np_inid_lp_predict_row_multi(
+      A = A,
+      Z = Z,
+      rhs = rhs,
+      ridge.grid = ridge.grid
     )
   }
-  if (isTRUE(diagnostics))
-    return(native)
 
-  values <- native[["values"]]
-  if (is.list(Zvals)) values else as.double(values[, 1L])
+  out
 }
 
 .np_counts_to_indices <- function(counts.col) {
@@ -3875,6 +4102,7 @@
         prob = prob
       )
       worker <- function(task) {
+        bsz <- as.integer(task$bsz)
         counts.chunk <- .npRmpi_bootstrap_task_rmultinom(task = task, n = n, prob = prob)
         compute_chunk(counts.chunk = counts.chunk)
       }
@@ -4051,6 +4279,7 @@
                                                            B,
                                                            counts = NULL,
                                                            counts.drawer = NULL,
+                                                           ridge = 1.0e-12,
                                                            gradients = FALSE,
                                                            gradient.order = 1L,
                                                            slice.index = 1L,
@@ -4074,14 +4303,29 @@
     where = ".np_inid_boot_from_regression_localpoly_frozen",
     ncon.field = "ncon"
   )
-  reg.engine <- reg.spec$regtype.engine
-  if (npIsCanonicalLp0Spec(reg.spec, ncon = bws$ncon))
+  regtype <- reg.spec$regtype
+  if (identical(regtype, "lc"))
     stop("local-polynomial frozen regression helper requires regtype='ll' or 'lp'")
 
   ncon <- bws$ncon
-  degree <- reg.spec$degree.engine
-  basis <- reg.spec$basis.engine
-  bernstein.basis <- reg.spec$bernstein.basis.engine
+  degree <- if (identical(regtype, "ll")) {
+    rep.int(1L, ncon)
+  } else {
+    npValidateGlpDegree(
+      regtype = "lp",
+      degree = reg.spec$degree,
+      ncon = ncon
+    )
+  }
+
+  basis <- npValidateLpBasis(
+    regtype = "lp",
+    basis = reg.spec$basis
+  )
+  bernstein.basis <- npValidateGlpBernstein(
+    regtype = "lp",
+    bernstein.basis = reg.spec$bernstein.basis
+  )
 
   gradient.vec <- NULL
   if (isTRUE(gradients)) {
@@ -4091,24 +4335,28 @@
       stop("fixed regression gradient helper requires a continuous slice", call. = FALSE)
 
     gradient.vec <- integer(ncon)
-    gradient.order <- npValidateGlpGradientOrder(
-      regtype = "lp",
-      gradient.order = gradient.order,
-      ncon = ncon
-    )
-    if (gradient.order[cpos] > degree[cpos] &&
-        !npGlpDegree0FirstDerivativeLcOk(
-          regtype.engine = reg.engine,
-          degree.engine = degree,
-          gradient.order = gradient.order,
-          ncon = ncon
-        )) {
-      return(list(
-        t = matrix(NA_real_, nrow = B, ncol = neval),
-        t0 = rep(NA_real_, neval)
-      ))
+    if (identical(regtype, "lp")) {
+      gradient.order <- npValidateGlpGradientOrder(
+        regtype = "lp",
+        gradient.order = gradient.order,
+        ncon = ncon
+      )
+      if (gradient.order[cpos] > degree[cpos] &&
+          !npGlpDegree0FirstDerivativeLcOk(
+            regtype.engine = regtype,
+            degree.engine = degree,
+            gradient.order = gradient.order,
+            ncon = ncon
+          )) {
+        return(list(
+          t = matrix(NA_real_, nrow = B, ncol = neval),
+          t0 = rep(NA_real_, neval)
+        ))
+      }
+      gradient.vec[cpos] <- gradient.order[cpos]
+    } else {
+      gradient.vec[cpos] <- 1L
     }
-    gradient.vec[cpos] <- gradient.order[cpos]
   }
 
   kw <- .np_plot_kernel_weights_direct(
@@ -4146,6 +4394,7 @@
   mcols <- p * (p + 1L) / 2L
   rhs <- W.eval
   ones <- matrix(1.0, nrow = n, ncol = 1L)
+  ridge.grid <- npRidgeSequenceFromBase(n.train = n, ridge.base = ridge, cap = 1.0)
 
   Mfeat <- vector("list", neval)
   Zfeat <- vector("list", neval)
@@ -4168,27 +4417,45 @@
 
     M0 <- crossprod(ones, mf)
     Z0 <- crossprod(ones, Zfeat[[i]])
-    t0[i] <- .np_inid_lp_batch_project(
-      Mvals = M0,
-      Zvals = Z0,
-      rhs = rhs[i, ],
-      represented.mass = n
-    )[1L]
+    t0[i] <- if (p > 3L) {
+      .np_inid_lp_predict_chunk_general(
+        Mvals = M0,
+        Zvals = Z0,
+        rhs = rhs[i, ],
+        ridge.grid = ridge.grid
+      )[1L]
+    } else {
+      .np_inid_lp_predict_chunk(
+        Mvals = M0,
+        Zvals = Z0,
+        rhs = rhs[i, ],
+        ridge.grid = ridge.grid
+      )[1L]
+    }
   }
 
-  compute_chunk <- function(counts.chunk, represented.mass) {
+  compute_chunk <- function(counts.chunk) {
     counts.chunk <- as.matrix(counts.chunk)
     bsz <- ncol(counts.chunk)
     out <- matrix(NA_real_, nrow = bsz, ncol = neval)
     for (i in seq_len(neval)) {
       Mvals <- crossprod(counts.chunk, Mfeat[[i]])
       Zvals <- crossprod(counts.chunk, Zfeat[[i]])
-      out[, i] <- .np_inid_lp_batch_project(
-        Mvals = Mvals,
-        Zvals = Zvals,
-        rhs = rhs[i, ],
-        represented.mass = represented.mass
-      )
+      out[, i] <- if (p > 3L) {
+        .np_inid_lp_predict_chunk_general(
+          Mvals = Mvals,
+          Zvals = Zvals,
+          rhs = rhs[i, ],
+          ridge.grid = ridge.grid
+        )
+      } else {
+        .np_inid_lp_predict_chunk(
+          Mvals = Mvals,
+          Zvals = Zvals,
+          rhs = rhs[i, ],
+          ridge.grid = ridge.grid
+        )
+      }
     }
     out
   }
@@ -4216,11 +4483,7 @@
       worker <- function(task) {
         start <- as.integer(task$start)
         stopi <- start + as.integer(task$bsz) - 1L
-        counts.chunk <- counts.mat[, start:stopi, drop = FALSE]
-        compute_chunk(
-          counts.chunk = counts.chunk,
-          represented.mass = .np_inid_lp_represented_mass(counts.chunk)
-        )
+        compute_chunk(counts.chunk = counts.mat[, start:stopi, drop = FALSE])
       }
       tmat <- .npRmpi_bootstrap_run_fanout(
         tasks = tasks,
@@ -4262,10 +4525,7 @@
           B = as.integer(task$bsz),
           counts = counts.drawer(start, stopi)
         )
-        compute_chunk(
-          counts.chunk = counts.chunk,
-          represented.mass = .np_inid_lp_represented_mass(counts.chunk)
-        )
+        compute_chunk(counts.chunk = counts.chunk)
       }
       tmat <- .npRmpi_bootstrap_run_fanout(
         tasks = tasks,
@@ -4307,11 +4567,9 @@
         prob = prob
       )
       worker <- function(task) {
+        bsz <- as.integer(task$bsz)
         counts.chunk <- .npRmpi_bootstrap_task_rmultinom(task = task, n = n, prob = prob)
-        compute_chunk(
-          counts.chunk = counts.chunk,
-          represented.mass = rep.int(as.double(n), ncol(counts.chunk))
-        )
+        compute_chunk(counts.chunk = counts.chunk)
       }
       tmat <- .npRmpi_bootstrap_run_fanout(
         tasks = tasks,
@@ -4351,6 +4609,7 @@
                                                           B,
                                                           counts = NULL,
                                                           counts.drawer = NULL,
+                                                          ridge = 1.0e-12,
                                                           gradients = FALSE,
                                                           gradient.order = 1L,
                                                           slice.index = 1L,
@@ -4369,6 +4628,7 @@
     B = B,
     counts = counts,
     counts.drawer = counts.drawer,
+    ridge = ridge,
     gradients = gradients,
     gradient.order = gradient.order,
     slice.index = slice.index,
@@ -4386,6 +4646,7 @@
                                           B,
                                           counts = NULL,
                                           counts.drawer = NULL,
+                                          ridge = 1.0e-12,
                                           gradients = FALSE,
                                           gradient.order = 1L,
                                           slice.index = 1L,
@@ -4462,6 +4723,7 @@
     if (!identical(regtype, "lc")) {
       use.exact.degree0.derivative <- .np_plot_regression_exact_lc_derivative_requested(
         bws = bws,
+        regtype = regtype,
         gradient.order = gradient.order
       )
 
@@ -4491,6 +4753,7 @@
         B = B,
         counts = counts,
         counts.drawer = counts.drawer,
+        ridge = ridge,
         gradients = TRUE,
         gradient.order = gradient.order,
         slice.index = slice.index,
@@ -4555,6 +4818,7 @@
     B = B,
     counts = counts,
     counts.drawer = counts.drawer,
+    ridge = ridge,
     prefer.local.single_worker = prefer.local.single_worker,
     master_local_chunk = master_local_chunk,
     prep.label = prep.label,
@@ -4929,6 +5193,7 @@
                                                      counts = NULL,
                                                      counts.drawer = NULL,
                                                      leave.one.out = FALSE,
+                                                     ridge = 1.0e-12,
                                                      prep.label = NULL,
                                                      progress.label = NULL) {
   txdat <- toFrame(txdat)
@@ -5001,6 +5266,7 @@
   mcols <- p * (p + 1L) / 2L
   rhs <- tensor.eval
   ones <- matrix(1.0, nrow = n, ncol = 1L)
+  ridge.grid <- npRidgeSequenceFromBase(n.train = n, ridge.base = ridge, cap = 1.0)
 
   Mfeat <- vector("list", neval)
   Zfeat <- vector("list", neval)
@@ -5042,12 +5308,21 @@
 
     M0 <- crossprod(ones, mf)
     Z0 <- crossprod(ones, Zfeat[[i]])
-    t0[i] <- .np_inid_lp_batch_project(
-      Mvals = M0,
-      Zvals = Z0,
-      rhs = rhs[i, ],
-      represented.mass = n
-    )[1L]
+    t0[i] <- if (p > 3L) {
+      .np_inid_lp_predict_chunk_general(
+        Mvals = M0,
+        Zvals = Z0,
+        rhs = rhs[i, ],
+        ridge.grid = ridge.grid
+      )[1L]
+    } else {
+      .np_inid_lp_predict_chunk(
+        Mvals = M0,
+        Zvals = Z0,
+        rhs = rhs[i, ],
+        ridge.grid = ridge.grid
+      )[1L]
+    }
     prep.progress <- .np_plot_progress_tick(state = prep.progress, done = i)
   }
   .np_plot_progress_end(prep.progress)
@@ -5059,19 +5334,28 @@
   } else {
     progress.label
   }
-  compute_chunk <- function(counts.chunk, represented.mass) {
+  compute_chunk <- function(counts.chunk) {
     counts.chunk <- as.matrix(counts.chunk)
     bsz <- ncol(counts.chunk)
     out <- matrix(NA_real_, nrow = bsz, ncol = neval)
     for (i in seq_len(neval)) {
       Mvals <- crossprod(counts.chunk, Mfeat[[i]])
       Zvals <- crossprod(counts.chunk, Zfeat[[i]])
-      out[, i] <- .np_inid_lp_batch_project(
-        Mvals = Mvals,
-        Zvals = Zvals,
-        rhs = rhs[i, ],
-        represented.mass = represented.mass
-      )
+      out[, i] <- if (p > 3L) {
+        .np_inid_lp_predict_chunk_general(
+          Mvals = Mvals,
+          Zvals = Zvals,
+          rhs = rhs[i, ],
+          ridge.grid = ridge.grid
+        )
+      } else {
+        .np_inid_lp_predict_chunk(
+          Mvals = Mvals,
+          Zvals = Zvals,
+          rhs = rhs[i, ],
+          ridge.grid = ridge.grid
+        )
+      }
     }
     out
   }
@@ -5097,11 +5381,7 @@
       worker <- function(task) {
         start <- as.integer(task$start)
         stopi <- start + as.integer(task$bsz) - 1L
-        counts.chunk <- counts.mat[, start:stopi, drop = FALSE]
-        compute_chunk(
-          counts.chunk = counts.chunk,
-          represented.mass = .np_inid_lp_represented_mass(counts.chunk)
-        )
+        compute_chunk(counts.chunk = counts.mat[, start:stopi, drop = FALSE])
       }
       tmat <- .npRmpi_bootstrap_run_fanout(
         tasks = tasks,
@@ -5141,10 +5421,7 @@
           B = as.integer(task$bsz),
           counts = counts.drawer(start, stopi)
         )
-        compute_chunk(
-          counts.chunk = counts.chunk,
-          represented.mass = .np_inid_lp_represented_mass(counts.chunk)
-        )
+        compute_chunk(counts.chunk = counts.chunk)
       }
       tmat <- .npRmpi_bootstrap_run_fanout(
         tasks = tasks,
@@ -5185,10 +5462,7 @@
       )
       worker <- function(task) {
         counts.chunk <- .npRmpi_bootstrap_task_rmultinom(task = task, n = n, prob = prob)
-        compute_chunk(
-          counts.chunk = counts.chunk,
-          represented.mass = rep.int(as.double(n), ncol(counts.chunk))
-        )
+        compute_chunk(counts.chunk = counts.chunk)
       }
       tmat <- .npRmpi_bootstrap_run_fanout(
         tasks = tasks,
@@ -6011,7 +6285,8 @@
 .np_regression_localpoly_fixed_counts_precompute <- function(xdat,
                                                              exdat,
                                                              bws,
-                                                             ydat) {
+                                                             ydat,
+                                                             ridge = 1.0e-12) {
   xdat <- toFrame(xdat)
   exdat <- toFrame(exdat)
   ydat <- as.double(ydat)
@@ -6030,12 +6305,28 @@
     where = ".np_regression_localpoly_fixed_counts_precompute",
     ncon.field = "ncon"
   )
-  if (npIsCanonicalLp0Spec(reg.spec, ncon = bws$ncon))
+  regtype <- reg.spec$regtype
+  if (identical(regtype, "lc"))
     stop("local-polynomial state helper requires regtype='ll' or 'lp'")
 
-  degree <- reg.spec$degree.engine
-  basis <- reg.spec$basis.engine
-  bernstein.basis <- reg.spec$bernstein.basis.engine
+  ncon <- bws$ncon
+  degree <- if (identical(regtype, "ll")) {
+    rep.int(1L, ncon)
+  } else {
+    npValidateGlpDegree(
+      regtype = "lp",
+      degree = reg.spec$degree,
+      ncon = ncon
+    )
+  }
+  basis <- npValidateLpBasis(
+    regtype = "lp",
+    basis = reg.spec$basis
+  )
+  bernstein.basis <- npValidateGlpBernstein(
+    regtype = "lp",
+    bernstein.basis = reg.spec$bernstein.basis
+  )
 
   kw <- .np_plot_kernel_weights_direct(
     bws = bws,
@@ -6066,6 +6357,7 @@
 
   p <- ncol(W)
   mcols <- p * (p + 1L) / 2L
+  ridge.grid <- npRidgeSequenceFromBase(n.train = n, ridge.base = ridge, cap = 1.0)
   ones <- matrix(1.0, nrow = n, ncol = 1L)
 
   Mfeat <- vector("list", neval)
@@ -6090,27 +6382,37 @@
     Mfeat[[i]] <- mfeat
     Zfeat[[i]] <- zfeat
 
-    t0[i] <- .np_inid_lp_batch_project(
-      Mvals = M0,
-      Zvals = Z0,
-      rhs = W.eval[i, ],
-      represented.mass = n
-    )[1L]
+    if (p > 3L) {
+      t0[i] <- .np_inid_lp_predict_chunk_general(
+        Mvals = M0,
+        Zvals = Z0,
+        rhs = W.eval[i, ],
+        ridge.grid = ridge.grid
+      )[1L]
+    } else {
+      t0[i] <- .np_inid_lp_predict_chunk(
+        Mvals = M0,
+        Zvals = Z0,
+        rhs = W.eval[i, ],
+        ridge.grid = ridge.grid
+      )[1L]
+    }
   }
 
   list(
     n = n,
     neval = neval,
+    p = p,
     W.eval = W.eval,
     Mfeat = Mfeat,
     Zfeat = Zfeat,
+    ridge.grid = ridge.grid,
     t0 = t0
   )
 }
 
 .np_regression_localpoly_fixed_counts_from_state <- function(state,
-                                                            counts.chunk,
-                                                            represented.mass) {
+                                                            counts.chunk) {
   counts.chunk <- as.matrix(counts.chunk)
   if (nrow(counts.chunk) != state$n)
     stop("local-polynomial regression counts do not align with precomputed state")
@@ -6122,12 +6424,21 @@
   for (i in seq_len(state$neval)) {
     Mvals <- crossprod(counts.chunk, state$Mfeat[[i]])
     Zvals <- crossprod(counts.chunk, state$Zfeat[[i]])
-    out[, i] <- .np_inid_lp_batch_project(
-      Mvals = Mvals,
-      Zvals = Zvals,
-      rhs = state$W.eval[i, ],
-      represented.mass = represented.mass
-    )
+    if (state$p > 3L) {
+      out[, i] <- .np_inid_lp_predict_chunk_general(
+        Mvals = Mvals,
+        Zvals = Zvals,
+        rhs = state$W.eval[i, ],
+        ridge.grid = state$ridge.grid
+      )
+    } else {
+      out[, i] <- .np_inid_lp_predict_chunk(
+        Mvals = Mvals,
+        Zvals = Zvals,
+        rhs = state$W.eval[i, ],
+        ridge.grid = state$ridge.grid
+      )
+    }
   }
 
   out
@@ -6195,7 +6506,8 @@
 .np_plreg_component_state <- function(xdat,
                                       exdat,
                                       bws,
-                                      ydat) {
+                                      ydat,
+                                      ridge = 1.0e-12) {
   reg.spec <- npValidatedConditionalRegSpec(
     bws,
     where = ".np_plreg_component_state",
@@ -6240,15 +6552,14 @@
     xdat = xdat,
     exdat = exdat,
     bws = bws,
-    ydat = ydat
+    ydat = ydat,
+    ridge = ridge
   )
   state$type <- "lp"
   state
 }
 
-.np_plreg_component_state_counts <- function(state,
-                                             counts.chunk,
-                                             represented.mass) {
+.np_plreg_component_state_counts <- function(state, counts.chunk) {
   counts.chunk <- as.matrix(counts.chunk)
   if (identical(state$type, "lc")) {
     den <- crossprod(counts.chunk, state$W)
@@ -6258,8 +6569,7 @@
 
   .np_regression_localpoly_fixed_counts_from_state(
     state = state,
-    counts.chunk = counts.chunk,
-    represented.mass = represented.mass
+    counts.chunk = counts.chunk
   )
 }
 
@@ -6312,17 +6622,14 @@
   counts.chunk <- as.matrix(counts.chunk)
   p <- ncol(x.train.num)
   bsz <- ncol(counts.chunk)
-  represented.mass <- .np_inid_lp_represented_mass(counts.chunk)
 
   y.train.t <- .np_plreg_component_state_counts(
     state = y.train.state,
-    counts.chunk = counts.chunk,
-    represented.mass = represented.mass
+    counts.chunk = counts.chunk
   )
   y.eval.t <- .np_plreg_component_state_counts(
     state = y.eval.state,
-    counts.chunk = counts.chunk,
-    represented.mass = represented.mass
+    counts.chunk = counts.chunk
   )
 
   x.train.t.list <- vector("list", p)
@@ -6330,13 +6637,11 @@
   for (j in seq_len(p)) {
     x.train.t.list[[j]] <- .np_plreg_component_state_counts(
       state = x.train.states[[j]],
-      counts.chunk = counts.chunk,
-      represented.mass = represented.mass
+      counts.chunk = counts.chunk
     )
     x.eval.t.list[[j]] <- .np_plreg_component_state_counts(
       state = x.eval.states[[j]],
-      counts.chunk = counts.chunk,
-      represented.mass = represented.mass
+      counts.chunk = counts.chunk
     )
   }
 
@@ -6443,13 +6748,15 @@
     xdat = tzdat,
     exdat = tzdat,
     bws = bws$bw$yzbw,
-    ydat = y.num
+    ydat = y.num,
+    ridge = ridge
   )
   y.eval.state <- .np_plreg_component_state(
     xdat = tzdat,
     exdat = ezdat,
     bws = bws$bw$yzbw,
-    ydat = y.num
+    ydat = y.num,
+    ridge = ridge
   )
   x.train.states <- vector("list", p)
   x.eval.states <- vector("list", p)
@@ -6458,13 +6765,15 @@
       xdat = tzdat,
       exdat = tzdat,
       bws = bws$bw[[j + 1L]],
-      ydat = x.train.num[, j]
+      ydat = x.train.num[, j],
+      ridge = ridge
     )
     x.eval.states[[j]] <- .np_plreg_component_state(
       xdat = tzdat,
       exdat = ezdat,
       bws = bws$bw[[j + 1L]],
-      ydat = x.train.num[, j]
+      ydat = x.train.num[, j],
+      ridge = ridge
     )
   }
 
@@ -6569,12 +6878,12 @@
       .np_plreg_component_state_counts = .np_plreg_component_state_counts,
       .np_regression_localpoly_fixed_counts_from_state =
         .np_regression_localpoly_fixed_counts_from_state,
-      .np_inid_lp_batch_project = .np_inid_lp_batch_project,
-      .np_inid_lp_represented_mass = .np_inid_lp_represented_mass,
       .np_plreg_weighted_coef = .np_plreg_weighted_coef,
       .np_inid_boot_from_plreg_finish_chunk =
         .np_inid_boot_from_plreg_finish_chunk,
       .np_inid_counts_matrix = .np_inid_counts_matrix,
+      .np_inid_lp_predict_chunk = .np_inid_lp_predict_chunk,
+      .np_inid_lp_predict_chunk_general = .np_inid_lp_predict_chunk_general,
       n = n,
       prob.local = prob.local,
       counts.mat.local = counts.mat.local,
@@ -6867,6 +7176,7 @@
     ydat = y.num,
     B = B,
     counts = counts.mat,
+    ridge = ridge,
     prefer.local.single_worker = prefer.local.single_worker,
     master_local_chunk = TRUE,
     progress.label = progress.label
@@ -6878,6 +7188,7 @@
     ydat = y.num,
     B = B,
     counts = counts.mat,
+    ridge = ridge,
     prefer.local.single_worker = prefer.local.single_worker,
     master_local_chunk = TRUE,
     progress.label = progress.label
@@ -6893,6 +7204,7 @@
       ydat = x.train.num[, j],
       B = B,
       counts = counts.mat,
+      ridge = ridge,
       prefer.local.single_worker = prefer.local.single_worker,
       master_local_chunk = TRUE,
       progress.label = progress.label
@@ -6904,6 +7216,7 @@
       ydat = x.train.num[, j],
       B = B,
       counts = counts.mat,
+      ridge = ridge,
       prefer.local.single_worker = prefer.local.single_worker,
       master_local_chunk = TRUE,
       progress.label = progress.label
@@ -9073,7 +9386,7 @@
     options(np.plot.progress = old.progress)
   }, add = TRUE)
 
-  # Exact duplicate-sample refits for fixed conditional positive-degree LP reduce to
+  # Exact duplicate-sample refits for fixed conditional ll/lp reduce to
   # reusing the fixed x-side local-polynomial bootstrap helper on y-kernel
   # pseudo-responses, one evaluation row at a time.
   for (i in seq_len(neval)) {
@@ -9136,12 +9449,29 @@
     where = ".np_inid_boot_from_conditional_localpoly_fixed_precompute",
     ncon.field = "ncon"
   )
-  if (npIsCanonicalLp0Spec(reg.spec, ncon = xbw$ncon))
+  regtype <- reg.spec$regtype
+  if (identical(regtype, "lc"))
     stop("conditional localpoly fixed counts helper requires regtype='ll' or 'lp'")
 
-  degree <- reg.spec$degree.engine
-  basis <- reg.spec$basis.engine
-  bernstein.basis <- reg.spec$bernstein.basis.engine
+  ncon <- xbw$ncon
+  degree <- if (identical(regtype, "ll")) {
+    rep.int(1L, ncon)
+  } else {
+    npValidateGlpDegree(
+      regtype = "lp",
+      degree = reg.spec$degree,
+      ncon = ncon
+    )
+  }
+
+  basis <- npValidateLpBasis(
+    regtype = "lp",
+    basis = reg.spec$basis
+  )
+  bernstein.basis <- npValidateGlpBernstein(
+    regtype = "lp",
+    bernstein.basis = reg.spec$bernstein.basis
+  )
 
   kw <- .np_kernel_weights_direct(
     bws = xbw,
@@ -9177,6 +9507,7 @@
 
   p <- ncol(W)
   mcols <- p * (p + 1L) / 2L
+  ridge.grid <- npRidgeSequenceFromBase(n.train = n, ridge.base = 1.0e-12, cap = 1.0)
 
   list(
     n = n,
@@ -9189,7 +9520,8 @@
     W = W,
     W.eval = W.eval,
     p = p,
-    mcols = mcols
+    mcols = mcols,
+    ridge.grid = ridge.grid
   )
 }
 
@@ -9214,6 +9546,8 @@
 
   list(
     rows = rows,
+    Gy = Gy.group,
+    WK = WK,
     Mfeat = Mfeat,
     Zops = Zops,
     rhs = state$W.eval[i, ]
@@ -9221,35 +9555,33 @@
 }
 
 .np_inid_boot_from_conditional_localpoly_fixed_t0 <- function(state, feat) {
-  M0 <- matrix(colSums(feat$Mfeat), nrow = 1L)
-  Z0 <- lapply(feat$Zops, function(zop) matrix(colSums(zop), nrow = 1L))
-  as.double(.np_inid_lp_batch_project(
-    Mvals = M0,
-    Zvals = Z0,
+  A0 <- .np_inid_lp_unpack_sym_row(mrow = colSums(feat$Mfeat), p = state$p)
+  Z0 <- t(feat$Gy %*% feat$WK)
+  .np_inid_lp_predict_row_multi(
+    A = A0,
+    Z = Z0,
     rhs = feat$rhs,
-    represented.mass = state$n
-  )[1L, ])
+    ridge.grid = state$ridge.grid
+  )
 }
 
 .np_inid_boot_from_conditional_localpoly_fixed_chunk <- function(state,
                                                                  feat,
-                                                                 counts.chunk,
-                                                                 represented.mass) {
+                                                                 counts.chunk) {
   Mvals <- crossprod(counts.chunk, feat$Mfeat)
   Zmats <- lapply(feat$Zops, function(zop) crossprod(counts.chunk, zop))
 
-  .np_inid_lp_batch_project(
+  .np_inid_lp_predict_chunk_multi(
     Mvals = Mvals,
-    Zvals = Zmats,
+    Zmats = Zmats,
     rhs = feat$rhs,
-    represented.mass = represented.mass
+    ridge.grid = state$ridge.grid
   )
 }
 
 .np_inid_boot_from_conditional_localpoly_fixed_fill_chunk <- function(state,
                                                                       feat.list,
-                                                                      counts.chunk,
-                                                                      represented.mass) {
+                                                                      counts.chunk) {
   bsz <- ncol(counts.chunk)
   out <- matrix(NA_real_, nrow = bsz, ncol = state$neval)
 
@@ -9257,8 +9589,7 @@
     out[, feat$rows] <- .np_inid_boot_from_conditional_localpoly_fixed_chunk(
       state = state,
       feat = feat,
-      counts.chunk = counts.chunk,
-      represented.mass = represented.mass
+      counts.chunk = counts.chunk
     )
   }
 
@@ -9354,16 +9685,11 @@
           prob = rep.int(1 / state$n, state$n)
         )
       }
-      represented.mass <- .np_inid_lp_represented_mass(
-        counts.chunk,
-        known.mass = if (identical(counts.mode, "random")) state$n else NULL
-      )
 
       .np_inid_boot_from_conditional_localpoly_fixed_fill_chunk(
         state = state,
         feat.list = feat.list,
-        counts.chunk = counts.chunk,
-        represented.mass = represented.mass
+        counts.chunk = counts.chunk
       )
     }
 
@@ -9388,8 +9714,7 @@
             .np_inid_boot_from_conditional_localpoly_fixed_fill_chunk,
           .np_inid_boot_from_conditional_localpoly_fixed_chunk =
             .np_inid_boot_from_conditional_localpoly_fixed_chunk,
-          .np_inid_lp_batch_project = .np_inid_lp_batch_project,
-          .np_inid_lp_represented_mass = .np_inid_lp_represented_mass
+          .np_inid_lp_predict_chunk_multi = .np_inid_lp_predict_chunk_multi
         ),
         if (!is.null(counts.mat)) list(counts.mat = counts.mat) else list(),
         if (!is.null(counts.drawer)) list(counts.drawer = counts.drawer) else list()
@@ -9418,15 +9743,10 @@
     } else {
       .np_inid_counts_matrix(n = state$n, B = bsz)
     }
-    represented.mass <- .np_inid_lp_represented_mass(
-      counts.chunk,
-      known.mass = if (is.null(counts.mat) && is.null(counts.drawer)) state$n else NULL
-    )
     tmat[start:stopi, ] <- .np_inid_boot_from_conditional_localpoly_fixed_fill_chunk(
       state = state,
       feat.list = feat.list,
-      counts.chunk = counts.chunk,
-      represented.mass = represented.mass
+      counts.chunk = counts.chunk
     )
     progress <- .np_plot_progress_tick(state = progress, done = stopi)
     chunk.controller <- .np_plot_progress_chunk_observe(
@@ -15078,20 +15398,14 @@ compute.default.error.range <- function(center, err) {
     is.element(plot.errors.boot.method, c("inid", "fixed", "geom"))
 }
 
-.np_plot_regression_exact_lc_derivative_requested <- function(bws, gradient.order) {
+.np_plot_regression_exact_lc_derivative_requested <- function(bws, regtype, gradient.order) {
   ncon <- bws$ncon
   if (is.null(ncon) || ncon < 1L)
     return(FALSE)
-  spec <- npValidatedConditionalRegSpec(
-    bws,
-    where = ".np_plot_regression_exact_lc_derivative_requested",
-    ncon.field = "ncon"
-  )
-  regtype.engine <- spec$regtype.engine
 
-  if (identical(regtype.engine, "lc")) {
+  if (identical(regtype, "lc")) {
     gradient.order <- npValidateLcGradientOrder(
-      regtype = regtype.engine,
+      regtype = regtype,
       gradient.order = gradient.order,
       ncon = ncon,
       where = ".np_plot_regression_exact_lc_derivative_requested"
@@ -15099,10 +15413,14 @@ compute.default.error.range <- function(center, err) {
     return(length(gradient.order) == ncon && all(gradient.order == 1L))
   }
 
-  identical(regtype.engine, "lp") &&
+  identical(regtype, "lp") &&
     npGlpDegree0FirstDerivativeLcOk(
-      regtype.engine = regtype.engine,
-      degree.engine = spec$degree.engine,
+      regtype.engine = regtype,
+      degree.engine = npValidateGlpDegree(
+        regtype = "lp",
+        degree = bws$degree,
+        ncon = ncon
+      ),
       gradient.order = npValidateGlpGradientOrder(
         regtype = "lp",
         gradient.order = gradient.order,
@@ -16421,7 +16739,7 @@ compute.bootstrap.errors.rbandwidth =
       where = "regression plot bootstrap",
       ncon.field = "ncon"
     )
-    regtype <- reg.spec$regtype.engine
+    regtype <- reg.spec$regtype
 
     profile.setup <- NULL
     if (!isTRUE(gradients)) {
@@ -16559,6 +16877,7 @@ compute.bootstrap.errors.rbandwidth =
         !isTRUE(xi.factor) &&
         .np_plot_regression_exact_lc_derivative_requested(
           bws = bws,
+          regtype = regtype,
           gradient.order = gradient.order
         )
 

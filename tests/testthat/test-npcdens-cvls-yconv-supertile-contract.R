@@ -29,8 +29,10 @@ test_that("MPI CVLS Y convolution supertile is memory bounded and isolated", {
   src_file <- locate_yconv_supertile_source()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
   lines <- readLines(src_file, warn = FALSE)
-  body <- npRmpi_test_extract_c_function(
-    lines, "np_conditional_density_cvls_lp_supertile2_stream"
+  body <- yconv_source_body(
+    lines,
+    "^np_conditional_density_cvls_lp_supertile2_stream\\(",
+    "^int np_conditional_density_cvls_lp_stream\\("
   )
 
   expect_match(body, "nblocks <= 1", fixed = TRUE)
@@ -89,8 +91,10 @@ test_that("MPI CVLS supertile retains rank ownership and block-order reduction",
   src_file <- locate_yconv_supertile_source()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
   lines <- readLines(src_file, warn = FALSE)
-  body <- npRmpi_test_extract_c_function(
-    lines, "np_conditional_density_cvls_lp_supertile2_stream"
+  body <- yconv_source_body(
+    lines,
+    "^np_conditional_density_cvls_lp_supertile2_stream\\(",
+    "^int np_conditional_density_cvls_lp_stream\\("
   )
 
   expect_match(
@@ -158,8 +162,10 @@ test_that("MPI CVLS supertile dispatch leaves no-gain and excluded routes intact
   src_file <- locate_yconv_supertile_source()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
   lines <- readLines(src_file, warn = FALSE)
-  body <- npRmpi_test_extract_c_function(
-    lines, "np_conditional_density_cvls_lp_stream_impl"
+  body <- yconv_source_body(
+    lines,
+    "^int np_conditional_density_cvls_lp_stream\\(",
+    "^static int np_conditional_distribution_cvls_lp_row_stream\\("
   )
 
   dispatch <- paste(

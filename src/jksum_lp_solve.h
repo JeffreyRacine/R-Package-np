@@ -13,8 +13,6 @@ typedef struct {
   double *gram_work;
   double *rhs_work;
   int *ipiv;
-  double *rcond_work;
-  int *rcond_iwork;
   int factor_ready;
   int factor_p;
 } NPLPSolveWorkspace;
@@ -77,18 +75,12 @@ int np_lp_solve_workspace_solve(NPLPSolveWorkspace *workspace,
 
 /*
  * Canonical response-oriented bounded ridge transcript.  The caller fills
- * the pristine Gram and response-moment columns, and supplies the dimensionless
- * ridge fraction owned by its statistical sample.  After a failed zero-ridge
- * factor/condition attempt, the shared owner multiplies that fraction by the
- * pristine Gram's maximum absolute diagonal (or its maximum absolute entry for
- * a zero diagonal).  This keeps proportional kernel-weight representations on
- * one estimator.  Failed Gram factorizations add the resulting step to the
- * source Gram diagonal in ascending order.  Once a ridged
- * system factors, the accumulated intercept restoration is applied to every
- * response RHS and all columns are solved from that retained factorization.
- * Response magnitude and batching therefore cannot select a different ridge.
- * The final factorization remains available to solve_factored().  This is
- * deliberately response-only: the
+ * the pristine Gram and response-moment columns, and supplies the fixed ridge
+ * increment owned by its statistical sample.  Failed solves add that
+ * increment to the source Gram diagonal in ascending order.  Once a ridged
+ * system solves, the accumulated intercept restoration is applied to every
+ * response RHS and the system is resolved, leaving the final factorization
+ * available to solve_factored().  This is deliberately response-only: the
  * adjoint influence-row orientation has a different transform placement and
  * enters only with its own direct identity proof.
  */
@@ -96,33 +88,24 @@ NPLPSolvePolicyStatus np_lp_solve_workspace_solve_response(
   NPLPSolveWorkspace *workspace,
   int p,
   int nrhs,
-  double ridge_fraction,
+  double ridge_increment,
   NPLPSolvePolicyDiagnostics *diagnostics);
 
 /*
  * Adjoint sibling of solve_response().  It selects the identical Gram-owned
- * factor/ridge state, solves the evaluation-basis RHS columns with the
- * transpose of the retained LU, and only then applies the transposed
- * accumulated-ridge intercept transform to each solution.  The stored Gram is
- * mathematically symmetric, but independently accumulated moment columns need
- * not be bitwise symmetric; an ordinary non-transposed solve is therefore not
- * an adjoint.  Moving either transpose to the wrong side would not reproduce
- * the response fitted-value map.
+ * factor/ridge state, solves evaluation-basis RHS columns, and only then
+ * applies the transposed accumulated-ridge intercept transform to each
+ * solution.  Moving that transform to the RHS side of the inverse would not
+ * reproduce the response fitted-value map.
  */
 NPLPSolvePolicyStatus np_lp_solve_workspace_solve_adjoint(
   NPLPSolveWorkspace *workspace,
   int p,
   int nrhs,
-  double ridge_fraction,
+  double ridge_increment,
   NPLPSolvePolicyDiagnostics *diagnostics);
 
-/*
- * Solve adjoint RHS columns from the factor/ridge state retained by a prior
- * successful canonical response or adjoint solve.  The caller replaces only
- * rhs_source and supplies that retained solve's diagnostics.  This supports a
- * mixed response-plus-leverage consumer without refactorizing the same Gram or
- * pretending an evaluation-basis RHS is a response column.
- */
+/* Reuse a factor/ridge state retained by a prior response or adjoint solve. */
 NPLPSolvePolicyStatus np_lp_solve_workspace_solve_adjoint_factored(
   NPLPSolveWorkspace *workspace,
   int p,
@@ -165,8 +148,7 @@ NPLPWidthOneStatus np_lp_width_one_influence_row(
   const double *kw,
   double basis_eval,
   double *row_out,
-  size_t output_stride,
-  NPLPSolvePolicyDiagnostics *diagnostics);
+  size_t output_stride);
 
 /*
  * Reusable contiguous Gram/RHS/rcond/solve storage for full-weight LP rows.

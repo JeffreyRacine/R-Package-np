@@ -16,9 +16,16 @@ test_that("MPI high-occupancy certificate adds no allocation or collective", {
   path <- locate_high_occupancy_source()
   skip_if(is.null(path), "package sources unavailable")
   source <- readLines(path, warn = FALSE)
-  region <- npRmpi_test_extract_c_function(
-    source, "np_reg_fixed_tree_dense_high_occupancy_admitted"
+  start <- grep(
+    "^static int np_reg_fixed_tree_dense_high_occupancy_admitted\\($",
+    source
   )
+  stop <- grep("^/\\*$", source)
+  stop <- stop[stop > start][1L]
+  expect_length(start, 1L)
+  expect_length(stop, 1L)
+  expect_gt(stop, start)
+  region <- paste(source[seq.int(start, stop - 1L)], collapse = "\n")
   all.source <- paste(source, collapse = "\n")
 
   expect_match(region, "if(terms[l] != 0)", fixed = TRUE)

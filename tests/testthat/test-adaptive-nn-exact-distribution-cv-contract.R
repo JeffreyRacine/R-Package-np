@@ -7,9 +7,7 @@ adaptive_distribution_epanechnikov2_cdf <- function(u) {
 
 adaptive_distribution_fold_radius <- function(value, held_out, donor, k) {
   keep <- setdiff(seq_along(value), c(held_out, donor))
-  distances <- sort(abs(value[keep] - value[donor]), method = "radix")
-  lookup_k <- min(k, length(distances))
-  distances[[lookup_k]] * k / lookup_k
+  sort(abs(value[keep] - value[donor]), method = "radix")[[k]]
 }
 
 adaptive_distribution_literal_objective <- function(value, k, kernel,
@@ -150,7 +148,6 @@ test_that("adaptive empirical CDF-CV honors saturation and replay", {
   on.exit(options(npRmpi.local.regression.mode = old_npRmpi_local_mode),
           add = TRUE)
   old_options <- options(np.tree = FALSE,
-                         np.extendednn = FALSE,
                          np.macMseries.accelerate = FALSE,
                          np.messages = FALSE)
   on.exit(options(old_options), add = TRUE)
@@ -178,11 +175,6 @@ test_that("adaptive empirical CDF-CV honors saturation and replay", {
   expect_identical(evaluate(replay), evaluate(state))
   saturated <- state
   saturated$bw[] <- nrow(dat) - 1L
-  options(np.extendednn = TRUE)
-  saturated_expected <- adaptive_distribution_literal_objective(
-    as.matrix(dat), saturated$bw, "gaussian")
-  expect_equal(evaluate(saturated), saturated_expected, tolerance = 2e-10)
-  options(np.extendednn = FALSE)
   expect_identical(evaluate(saturated), .Machine$double.xmax)
 
   zero_radius <- npudistbw(

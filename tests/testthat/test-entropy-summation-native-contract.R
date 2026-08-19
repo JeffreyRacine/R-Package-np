@@ -167,11 +167,11 @@ test_that("explicit nearest-neighbour entropy routes bypass fixed counts", {
   for (bwtype in c("generalized_nn", "adaptive_nn")) {
     expect_s3_class(npunitest(
       x, y, method = "summation", boot.num = 9L,
-      bw.x = length(x) - 1L, bw.y = length(y) - 1L, bwtype = bwtype,
+      bw.x = 3L, bw.y = 3L, bwtype = bwtype,
       random.seed = 9182L
     ), "unitest")
     expect_s3_class(npsymtest(
-      x, method = "summation", boot.num = 9L, bw = length(x) - 1L,
+      x, method = "summation", boot.num = 9L, bw = 3L,
       bwtype = bwtype, random.seed = 2819L
     ), "symtest")
   }

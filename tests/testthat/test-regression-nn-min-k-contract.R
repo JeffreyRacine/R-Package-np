@@ -13,21 +13,24 @@ test_that("nonfixed regression NN constructor follows the typed core capability"
   )
   expect_identical(npRmpi:::npRegressionNnLowerBound(bw.lc), 1L)
 
-  bw.ll <- npRmpi:::rbandwidth(
-    bw = 1, bandwidth = 1, regtype = "ll", bwtype = "generalized_nn",
-    bandwidth.compute = FALSE, nobs = n,
-    xdati = xdati, ydati = ydati, xnames = "x", ynames = "y"
+  expect_error(
+    npRmpi:::rbandwidth(bw = 1, bandwidth = 1, regtype = "ll", bwtype = "generalized_nn",
+                        bandwidth.compute = FALSE, nobs = n,
+                        xdati = xdati, ydati = ydati, xnames = "x", ynames = "y"),
+    "nearest-neighbor bandwidth must be at least 2"
   )
-  bw.lp2 <- npRmpi:::rbandwidth(
-    bw = 1, bandwidth = 1, regtype = "lp", degree = 2L,
-    basis = "glp", bwtype = "generalized_nn",
-    bandwidth.compute = FALSE, nobs = n,
-    xdati = xdati, ydati = ydati, xnames = "x", ynames = "y"
+
+  expect_error(
+    npRmpi:::rbandwidth(bw = 1, bandwidth = 1, regtype = "lp", degree = 2L, bwtype = "generalized_nn",
+                        bandwidth.compute = FALSE, nobs = n,
+                        xdati = xdati, ydati = ydati, xnames = "x", ynames = "y"),
+    "nearest-neighbor bandwidth must be at least 2"
   )
-  expect_identical(npRmpi:::npRegressionNnLowerBound(bw.ll), 1L)
-  expect_identical(npRmpi:::npRegressionNnLowerBound(bw.lp2), 1L)
-  expect_equal(as.integer(bw.ll$bw[1]), 1L)
-  expect_equal(as.integer(bw.lp2$bw[1]), 1L)
+
+  bw.ll <- npRmpi:::rbandwidth(bw = 2, bandwidth = 2, regtype = "ll", bwtype = "generalized_nn",
+                               bandwidth.compute = FALSE, nobs = n,
+                               xdati = xdati, ydati = ydati, xnames = "x", ynames = "y")
+  expect_equal(as.integer(bw.ll$bw[1]), 2L)
 })
 
 test_that("semiparametric NN helper floors are aligned at k >= 2", {

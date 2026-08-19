@@ -13208,8 +13208,8 @@ NPPermutationWeightOutput * const pkw_output){
   }
 
   if((!gather_scatter) && (!suppress_parallel)){ 
-    // gather_scatter is used only by the row-partitioned regression CV owner;
-    // that owner excludes adaptive NN.
+    // gather_scatter is only used for the local-linear cv
+    // note: ll cv + adaptive_nn does not work in parallel
 #ifdef MPI2
     if(!nws){
       if (BANDWIDTH_reg == BW_FIXED || BANDWIDTH_reg == BW_GEN_NN){
@@ -14649,165 +14649,6 @@ static void np_glp_fill_basis_eval_deriv(const int which_var,
   }
 }
 
-#define NP_GLP_RAW_BASIS_MIN_RCOND 1.0e-10
-
-static int np_glp_basis_ctx_array_prepare(
-  const int ncon,
-  const int *degree_vec,
-  const int basis_mode,
-  double **matrix_X_continuous_train,
-  const int num_obs_train,
-  NPGLPBasisCtx **basis_context)
-{
-  NPGLPBasisCtx *context;
-  int coordinate;
-  int observation;
-
-  if(basis_context == NULL)
-    return 0;
-  *basis_context = NULL;
-  if((ncon <= 0) || (degree_vec == NULL) ||
-     (matrix_X_continuous_train == NULL) || (num_obs_train <= 0))
-    return 0;
-
-  context = (NPGLPBasisCtx *)calloc((size_t)ncon, sizeof(NPGLPBasisCtx));
-  if(context == NULL)
-    return 0;
-  for(coordinate = 0; coordinate < ncon; coordinate++){
-    double xmin = matrix_X_continuous_train[coordinate][0];
-    double xmax = xmin;
-
-    for(observation = 1; observation < num_obs_train; observation++){
-      const double value =
-        matrix_X_continuous_train[coordinate][observation];
-      if(value < xmin) xmin = value;
-      if(value > xmax) xmax = value;
-    }
-    if(!np_glp_basis_ctx_init(&context[coordinate],
-                              degree_vec[coordinate],
-                              xmin,
-                              xmax,
-                              basis_mode == 1)){
-      int initialized;
-
-      for(initialized = 0; initialized <= coordinate; initialized++)
-        np_glp_basis_ctx_free(&context[initialized]);
-      free(context);
-      return 0;
-    }
-  }
-  *basis_context = context;
-  return 1;
-}
-
-/*
- * Select one arithmetic representation for a complete fit invocation.  Raw
- * polynomial coordinates remain the owner when they are well conditioned;
- * otherwise the fit and every evaluation/derivative row use the same stable
- * graded representation.  This is a global change of coordinates in the same
- * polynomial span, never evaluation-point centering or a solve fallback.
- */
-static int np_glp_fit_basis_prepare(
-  const int ncon,
-  const int *degree_vec,
-  const int *terms,
-  const int nterms,
-  double **matrix_X_continuous_train,
-  const int num_obs_train,
-  const int public_stable_basis,
-  const int basis_mode,
-  double **basis,
-  NPGLPBasisCtx **basis_context,
-  int *use_stable_basis)
-{
-  int requires_conditioning = 0;
-
-  if((ncon <= 0) || (degree_vec == NULL) ||
-     (terms == NULL) || (nterms <= 0) ||
-     (matrix_X_continuous_train == NULL) || (num_obs_train <= 0) ||
-     (basis == NULL) || (basis_context == NULL) ||
-     (use_stable_basis == NULL))
-    return 0;
-  *basis_context = NULL;
-  *use_stable_basis = 0;
-
-  if(!public_stable_basis){
-    NPLPBasisStatus assessment_status;
-
-    np_glp_fill_basis_raw_train(ncon,
-                                terms,
-                                nterms,
-                                matrix_X_continuous_train,
-                                num_obs_train,
-                                basis);
-    if(nterms == 1)
-      return 1;
-    assessment_status =
-      np_lp_basis_requires_conditioning(basis,
-                                        num_obs_train,
-                                        nterms,
-                                        num_obs_train,
-                                        NP_GLP_RAW_BASIS_MIN_RCOND,
-                                        &requires_conditioning);
-    if(assessment_status != NP_LP_BASIS_OK)
-      return 0;
-    if(!requires_conditioning)
-      return 1;
-  }
-
-  if(!np_glp_basis_ctx_array_prepare(ncon,
-                                     degree_vec,
-                                     basis_mode,
-                                     matrix_X_continuous_train,
-                                     num_obs_train,
-                                     basis_context))
-    return 0;
-  *use_stable_basis = 1;
-  np_glp_fill_basis_train(ncon,
-                          terms,
-                          nterms,
-                          matrix_X_continuous_train,
-                          num_obs_train,
-                          *basis_context,
-                          basis);
-  return 1;
-}
-
-typedef struct {
-  int ncon;
-  const int *degree_vec;
-  const int *terms;
-  int nterms;
-  double **matrix_X_continuous_train;
-  int num_obs_train;
-  int public_stable_basis;
-  int basis_mode;
-  double **basis;
-  NPGLPBasisCtx **basis_context;
-  int *use_stable_basis;
-  int status;
-} NPGLPFitBasisPrepareCall;
-
-static SEXP np_glp_fit_basis_prepare_execute(void *data)
-{
-  NPGLPFitBasisPrepareCall * const call =
-    (NPGLPFitBasisPrepareCall *)data;
-
-  call->status = np_glp_fit_basis_prepare(
-    call->ncon,
-    call->degree_vec,
-    call->terms,
-    call->nterms,
-    call->matrix_X_continuous_train,
-    call->num_obs_train,
-    call->public_stable_basis,
-    call->basis_mode,
-    call->basis,
-    call->basis_context,
-    call->use_stable_basis);
-  return R_NilValue;
-}
-
 typedef struct {
   int ready;
   int use_bernstein;
@@ -14817,12 +14658,12 @@ typedef struct {
   int nterms;
   int basis_stride;
   int basis_original_stride;
-  int source_basis_stable;
   int influence_basis_ready;
   int influence_basis_conditioned;
   int *terms;
   double **basis;
   double **source_basis;
+  double **conditioned_basis;
   double **basis_original_order;
   const int *basis_original_ipt_ptr;
   NPGLPBasisCtx *basis_ctx;
@@ -14843,8 +14684,11 @@ static void np_glp_cv_cache_clear(void){
   int l;
   if(np_glp_cv_cache.source_basis != NULL)
     free_tmat(np_glp_cv_cache.source_basis);
-  else if(np_glp_cv_cache.basis != NULL)
+  else if((np_glp_cv_cache.basis != NULL) &&
+          (np_glp_cv_cache.basis != np_glp_cv_cache.conditioned_basis))
     free_tmat(np_glp_cv_cache.basis);
+  if(np_glp_cv_cache.conditioned_basis != NULL)
+    free_tmat(np_glp_cv_cache.conditioned_basis);
   if(np_glp_cv_cache.basis_original_order != NULL)
     free_tmat(np_glp_cv_cache.basis_original_order);
   if(np_glp_cv_cache.basis_ctx != NULL){
@@ -14861,12 +14705,12 @@ static void np_glp_cv_cache_clear(void){
   np_glp_cv_cache.nterms = 0;
   np_glp_cv_cache.basis_stride = 0;
   np_glp_cv_cache.basis_original_stride = 0;
-  np_glp_cv_cache.source_basis_stable = 0;
   np_glp_cv_cache.influence_basis_ready = 0;
   np_glp_cv_cache.influence_basis_conditioned = 0;
   np_glp_cv_cache.terms = NULL;
   np_glp_cv_cache.basis = NULL;
   np_glp_cv_cache.source_basis = NULL;
+  np_glp_cv_cache.conditioned_basis = NULL;
   np_glp_cv_cache.basis_original_order = NULL;
   np_glp_cv_cache.basis_original_ipt_ptr = NULL;
   np_glp_cv_cache.basis_ctx = NULL;
@@ -14877,6 +14721,7 @@ static int np_glp_cv_cache_prepare(const int lp_engine,
                                    const int num_obs,
                                    const int ncon,
                                    double **matrix_X_continuous_train){
+  int l, i;
   int *terms = NULL;
   int nterms = 0;
   int basis_stride = 0;
@@ -14885,7 +14730,6 @@ static int np_glp_cv_cache_prepare(const int lp_engine,
   const int basis_mode = int_glp_basis_extern;
   double **basis = NULL;
   NPGLPBasisCtx *basis_ctx = NULL;
-  int use_stable_basis = 0;
 
   np_glp_cv_cache_clear();
 
@@ -14910,20 +14754,33 @@ static int np_glp_cv_cache_prepare(const int lp_engine,
     return 0;
   }
 
-  if(!np_glp_fit_basis_prepare(ncon,
-                               degree_vec,
-                               terms,
-                               nterms,
-                               matrix_X_continuous_train,
-                               num_obs,
-                               use_bernstein,
-                               basis_mode,
-                               basis,
-                               &basis_ctx,
-                               &use_stable_basis)){
-    free_tmat(basis);
-    free(terms);
-    return 0;
+  if(use_bernstein){
+    basis_ctx = (NPGLPBasisCtx *)calloc((size_t)ncon, sizeof(NPGLPBasisCtx));
+    if(basis_ctx == NULL){
+      free_tmat(basis);
+      free(terms);
+      return 0;
+    }
+    for(l = 0; l < ncon; l++){
+      double xmin = matrix_X_continuous_train[l][0];
+      double xmax = matrix_X_continuous_train[l][0];
+      for(i = 1; i < num_obs; i++){
+        const double xi = matrix_X_continuous_train[l][i];
+        if(xi < xmin) xmin = xi;
+        if(xi > xmax) xmax = xi;
+      }
+      if(!np_glp_basis_ctx_init(&basis_ctx[l], degree_vec[l], xmin, xmax,
+                                basis_mode == 1)){
+        for(i = 0; i <= l; i++) np_glp_basis_ctx_free(&basis_ctx[i]);
+        free(basis_ctx);
+        free_tmat(basis);
+        free(terms);
+        return 0;
+      }
+    }
+    np_glp_fill_basis_train(ncon, terms, nterms, matrix_X_continuous_train, num_obs, basis_ctx, basis);
+  } else {
+    np_glp_fill_basis_raw_train(ncon, terms, nterms, matrix_X_continuous_train, num_obs, basis);
   }
 
   np_glp_cv_cache.ready = 1;
@@ -14933,7 +14790,6 @@ static int np_glp_cv_cache_prepare(const int lp_engine,
   np_glp_cv_cache.ncon = ncon;
   np_glp_cv_cache.nterms = nterms;
   np_glp_cv_cache.basis_stride = basis_stride;
-  np_glp_cv_cache.source_basis_stable = use_stable_basis;
   np_glp_cv_cache.terms = terms;
   np_glp_cv_cache.basis = basis;
   np_glp_cv_cache.source_basis = basis;
@@ -14943,80 +14799,131 @@ static int np_glp_cv_cache_prepare(const int lp_engine,
 }
 
 static int np_glp_cv_cache_prepare_influence_basis(void){
-  if((!np_glp_cv_cache.ready) ||
-     (np_glp_cv_cache.source_basis == NULL) ||
+  double **assessment_basis = NULL;
+  double **conditioned_basis;
+  NPGLPBasisCtx *basis_ctx = NULL;
+  const int *degree_vec = vector_glp_degree_extern;
+  int i;
+  int l;
+  int requires_conditioning = 0;
+
+  if((!np_glp_cv_cache.ready) || (np_glp_cv_cache.basis == NULL) ||
      (np_glp_cv_cache.nterms <= 0) ||
      (np_glp_cv_cache.basis_stride < np_glp_cv_cache.num_obs) ||
-     (np_glp_cv_cache.ncon <= 0) ||
+     (np_glp_cv_cache.ncon <= 0) || (degree_vec == NULL) ||
      (np_glp_cv_cache.matrix_X_continuous_train_ptr == NULL))
     return 0;
   if(np_glp_cv_cache.influence_basis_ready)
     return np_glp_cv_cache.basis != NULL;
-  np_glp_cv_cache.basis = np_glp_cv_cache.source_basis;
-  np_glp_cv_cache.influence_basis_ready = 1;
-  np_glp_cv_cache.influence_basis_conditioned =
-    np_glp_cv_cache.source_basis_stable;
-  return 1;
-}
+  if(np_glp_cv_cache.nterms == 1)
+    requires_conditioning = 0;
+  else {
+    NPLPBasisStatus assessment_status;
 
-/*
- * Evaluate the representation currently owned by the influence cache.  The
- * public basis flag alone is insufficient after a raw polynomial design has
- * selected the stable global coordinates.  Keeping this decision beside the
- * cache prevents matrix, apply, and derivative callers from pairing a stable
- * training basis with raw evaluation columns.
- */
-static int np_glp_cv_cache_fill_eval_basis(
-  double **matrix_X_continuous_eval,
-  int eval_index,
-  int derivative_coordinate,
-  int derivative_order,
-  double *eval_basis)
-{
-  const int use_stable_basis =
-    np_glp_cv_cache.source_basis_stable;
-  int term;
-
-  if(!np_glp_cv_cache.ready || np_glp_cv_cache.terms == NULL ||
-     np_glp_cv_cache.nterms <= 0 || np_glp_cv_cache.ncon <= 0 ||
-     matrix_X_continuous_eval == NULL || eval_index < 0 ||
-     derivative_order < 0 || eval_basis == NULL)
-    return 0;
-  if(derivative_order > 0 &&
-     (derivative_coordinate < 0 ||
-      derivative_coordinate >= np_glp_cv_cache.ncon))
-    return 0;
-
-  if(use_stable_basis){
-    if(np_glp_cv_cache.basis_ctx == NULL)
+    /*
+     * Representation policy must not depend on the user's display basis.
+     * Diagnose the raw polynomial coordinates in both cases; when the public
+     * cache is graded, construct only a temporary raw assessment view.
+     */
+    assessment_basis = np_glp_cv_cache.source_basis;
+    if(np_glp_cv_cache.use_bernstein){
+      assessment_basis = alloc_tmatd(np_glp_cv_cache.basis_stride,
+                                      np_glp_cv_cache.nterms);
+      if(assessment_basis == NULL)
+        return 0;
+      np_glp_fill_basis_raw_train(np_glp_cv_cache.ncon,
+                                  np_glp_cv_cache.terms,
+                                  np_glp_cv_cache.nterms,
+                                  np_glp_cv_cache.matrix_X_continuous_train_ptr,
+                                  np_glp_cv_cache.num_obs,
+                                  assessment_basis);
+    }
+    assessment_status =
+      np_lp_basis_requires_conditioning(assessment_basis,
+                                        np_glp_cv_cache.num_obs,
+                                        np_glp_cv_cache.nterms,
+                                        np_glp_cv_cache.basis_stride,
+                                        1.0e-10,
+                                        &requires_conditioning);
+    if(assessment_basis != np_glp_cv_cache.source_basis)
+      free_tmat(assessment_basis);
+    if(assessment_status != NP_LP_BASIS_OK)
       return 0;
-    if(derivative_order > 0)
-      np_glp_fill_basis_eval_deriv(
-        derivative_coordinate, derivative_order,
-        np_glp_cv_cache.ncon, np_glp_cv_cache.terms,
-        np_glp_cv_cache.nterms, matrix_X_continuous_eval, eval_index,
-        np_glp_cv_cache.basis_ctx, eval_basis);
-    else
-      np_glp_fill_basis_eval(
-        np_glp_cv_cache.ncon, np_glp_cv_cache.terms,
-        np_glp_cv_cache.nterms, matrix_X_continuous_eval, eval_index,
-        np_glp_cv_cache.basis_ctx, eval_basis);
-  } else if(derivative_order > 0) {
-    np_glp_fill_basis_eval_deriv_raw(
-      derivative_coordinate, derivative_order,
-      np_glp_cv_cache.ncon, np_glp_cv_cache.terms,
-      np_glp_cv_cache.nterms, matrix_X_continuous_eval, eval_index,
-      eval_basis);
-  } else {
-    np_glp_fill_basis_eval_raw(
-      np_glp_cv_cache.ncon, np_glp_cv_cache.terms,
-      np_glp_cv_cache.nterms, matrix_X_continuous_eval, eval_index,
-      eval_basis);
+  }
+  if(!requires_conditioning){
+    np_glp_cv_cache.influence_basis_ready = 1;
+    np_glp_cv_cache.influence_basis_conditioned = 0;
+    return 1;
+  }
+  if(np_glp_cv_cache.conditioned_basis != NULL){
+    np_glp_cv_cache.basis = np_glp_cv_cache.conditioned_basis;
+    np_glp_cv_cache.influence_basis_ready = 1;
+    np_glp_cv_cache.influence_basis_conditioned = 1;
+    return 1;
   }
 
-  for(term = 0; term < np_glp_cv_cache.nterms; term++)
-    if(!R_FINITE(eval_basis[term]))
+  conditioned_basis = alloc_tmatd(np_glp_cv_cache.basis_stride,
+                                   np_glp_cv_cache.nterms);
+  if(conditioned_basis == NULL)
+    return 0;
+
+  /*
+   * The public raw and Bernstein/graded representations describe the same
+   * polynomial span but can carry radically different units into a signed
+   * normal equation. Build the influence-only seed from one stable canonical
+   * representation for both public choices, then orthonormalize it. This is a
+   * global change of basis, never evaluation-point centering, and leaves the
+   * public basis and all coefficient/derivative owners untouched.
+   */
+  basis_ctx = (NPGLPBasisCtx *)calloc((size_t)np_glp_cv_cache.ncon,
+                                      sizeof(NPGLPBasisCtx));
+  if(basis_ctx == NULL){
+    free_tmat(conditioned_basis);
+    return 0;
+  }
+  for(l = 0; l < np_glp_cv_cache.ncon; l++){
+    double xmin = np_glp_cv_cache.matrix_X_continuous_train_ptr[l][0];
+    double xmax = xmin;
+
+    for(i = 1; i < np_glp_cv_cache.num_obs; i++){
+      const double xi =
+        np_glp_cv_cache.matrix_X_continuous_train_ptr[l][i];
+      if(xi < xmin) xmin = xi;
+      if(xi > xmax) xmax = xi;
+    }
+    if(!np_glp_basis_ctx_init(&basis_ctx[l], degree_vec[l], xmin, xmax,
+                              np_glp_cv_cache.basis_mode == 1)){
+      for(i = 0; i <= l; i++)
+        np_glp_basis_ctx_free(&basis_ctx[i]);
+      free(basis_ctx);
+      free_tmat(conditioned_basis);
       return 0;
+    }
+  }
+  np_glp_fill_basis_train(np_glp_cv_cache.ncon,
+                          np_glp_cv_cache.terms,
+                          np_glp_cv_cache.nterms,
+                          np_glp_cv_cache.matrix_X_continuous_train_ptr,
+                          np_glp_cv_cache.num_obs,
+                          basis_ctx,
+                          conditioned_basis);
+  for(l = 0; l < np_glp_cv_cache.ncon; l++)
+    np_glp_basis_ctx_free(&basis_ctx[l]);
+  free(basis_ctx);
+
+  if(np_lp_conditioned_basis_prepare(conditioned_basis,
+                                     np_glp_cv_cache.num_obs,
+                                     np_glp_cv_cache.nterms,
+                                     np_glp_cv_cache.basis_stride,
+                                     conditioned_basis[0]) !=
+     NP_LP_BASIS_OK){
+    free_tmat(conditioned_basis);
+    return 0;
+  }
+  np_glp_cv_cache.conditioned_basis = conditioned_basis;
+  np_glp_cv_cache.basis = conditioned_basis;
+  np_glp_cv_cache.influence_basis_ready = 1;
+  np_glp_cv_cache.influence_basis_conditioned = 1;
   return 1;
 }
 
@@ -16461,6 +16368,201 @@ static void np_lp_mirror_upper_moments_wide(double *moments,
   np_row_rhs[2] = row_rhs2;                                                 \
 } while(0)
 
+static inline void np_lp_cvls_support_add(const int row,
+                                           const int orig_idx,
+                                           const int data_idx,
+                                           const double w,
+                                           const int nterms,
+                                           int *support_count,
+                                           int *support_orig,
+                                           int *support_data,
+                                           double *support_weight){
+  const int count = support_count[row];
+  const size_t off = (size_t)row*(size_t)nterms;
+
+  if(count > nterms)
+    return;
+
+  if(count == nterms){
+    support_count[row] = nterms + 1;
+    return;
+  }
+
+  if(count < nterms){
+    support_orig[off + (size_t)count] = orig_idx;
+    support_data[off + (size_t)count] = data_idx;
+    support_weight[off + (size_t)count] = w;
+  }
+
+  support_count[row] = count + 1;
+}
+
+/*
+ * Ordinary fixed Gaussian weights are strictly positive mathematically, but
+ * the low-support fallback is keyed to the computed weight being nonzero.
+ * Certify a conservative normal-range lower bound before eliding its tracking
+ * arrays and branches. Any unsupported topology or doubtful range retains
+ * the incumbent tracked path.
+ */
+static int np_lp_fixed_gaussian_full_support_certified(
+    const int num_obs,
+    const int nterms,
+    const int num_reg_unordered,
+    const int num_reg_ordered,
+    const int num_reg_continuous,
+    double **matrix_X_continuous,
+    int *kernel_c,
+    int *operator,
+    double **matrix_bandwidth)
+{
+  int l, i;
+  double log_kernel_lower = 0.0;
+  double log_dband = 0.0;
+  const double log_safe_min = log(DBL_MIN) + 8.0;
+
+  if((num_obs - 1 <= nterms) ||
+     (num_reg_unordered != 0) || (num_reg_ordered != 0) ||
+     (num_reg_continuous <= 0) || int_cker_bound_extern ||
+     (matrix_X_continuous == NULL) || (kernel_c == NULL) ||
+     (operator == NULL) || (matrix_bandwidth == NULL))
+    return 0;
+
+  for(l = 0; l < num_reg_continuous; l++){
+    double xmin, xmax, h, zmax;
+
+    if((kernel_c[l] != CK_GAUSS2) || (operator[l] != OP_NORMAL) ||
+       (matrix_X_continuous[l] == NULL) ||
+       (matrix_bandwidth[l] == NULL))
+      return 0;
+
+    h = matrix_bandwidth[l][0];
+    xmin = matrix_X_continuous[l][0];
+    xmax = xmin;
+    if((!isfinite(h)) || (h <= 0.0) || (!isfinite(xmin)))
+      return 0;
+
+    for(i = 1; i < num_obs; i++){
+      const double x = matrix_X_continuous[l][i];
+      if(!isfinite(x))
+        return 0;
+      xmin = MIN(xmin, x);
+      xmax = MAX(xmax, x);
+    }
+
+    zmax = (xmax - xmin)/h;
+    if(!isfinite(zmax))
+      return 0;
+    log_kernel_lower +=
+      log(ONE_OVER_SQRT_TWO_PI) - 0.5*zmax*zmax;
+    log_dband += log(h);
+    if((!isfinite(log_kernel_lower)) || (!isfinite(log_dband)))
+      return 0;
+  }
+
+  return (log_kernel_lower > log_safe_min) &&
+    (log_kernel_lower - log_dband > log_safe_min);
+}
+
+static int np_glp_support_order_cmp(const void *pa, const void *pb){
+  const int *a = (const int *)pa;
+  const int *b = (const int *)pb;
+  return (a[0] > b[0]) - (a[0] < b[0]);
+}
+
+static int np_lp_cvls_lowsupport_fit(const int nterms,
+                                      const int m,
+                                      double **basis,
+                                      double *vector_Y,
+                                      const int eval_idx,
+                                      const double *eval_basis,
+                                      const int *support_orig,
+                                      const int *support_data,
+                                      const double *support_weight,
+                                      double *fit){
+  int i, a, info = 0, rank = 0;
+  const int nrhs = 1;
+  const int lda = MAX(1, m);
+  const int ldb = MAX(1, MAX(m, nterms));
+  const double rcond = sqrt(DBL_EPSILON);
+  int *order = NULL, *jpvt = NULL;
+  double *A = NULL, *B = NULL, *work = NULL;
+  double work_query = 0.0;
+  int lwork = -1;
+
+  if((m <= 0) || (m > nterms))
+    return 0;
+
+  if(nterms == 1){
+    const double value = vector_Y[support_data[0]];
+    if(!isfinite(value))
+      return 0;
+    *fit = value;
+    return 1;
+  }
+
+  order = (int *)malloc((size_t)m*(size_t)2*sizeof(int));
+  A = (double *)calloc((size_t)lda*(size_t)nterms, sizeof(double));
+  B = (double *)calloc((size_t)ldb, sizeof(double));
+  jpvt = (int *)calloc((size_t)nterms, sizeof(int));
+  if((order == NULL) || (A == NULL) || (B == NULL) || (jpvt == NULL))
+    goto cleanup_lowsupport;
+
+  for(i = 0; i < m; i++){
+    order[2*i] = support_orig[i];
+    order[2*i + 1] = i;
+  }
+  qsort(order, (size_t)m, (size_t)2*sizeof(int), np_glp_support_order_cmp);
+
+  for(i = 0; i < m; i++){
+    const int src = order[2*i + 1];
+    const int data_idx = support_data[src];
+    const double sw = sqrt(MAX(0.0, support_weight[src]));
+
+    if(sw == 0.0)
+      continue;
+
+    for(a = 0; a < nterms; a++)
+      A[i + a*lda] = sw*basis[a][data_idx];
+    B[i] = sw*vector_Y[data_idx];
+  }
+
+  F77_CALL(dgelsy)(&m, &nterms, &nrhs, A, &lda, B, &ldb, jpvt,
+                   &rcond, &rank, &work_query, &lwork, &info);
+  if(info != 0)
+    goto cleanup_lowsupport;
+
+  lwork = MAX(1, (int)work_query);
+  work = (double *)malloc((size_t)lwork*sizeof(double));
+  if(work == NULL)
+    goto cleanup_lowsupport;
+
+  memset(jpvt, 0, (size_t)nterms*sizeof(int));
+  F77_CALL(dgelsy)(&m, &nterms, &nrhs, A, &lda, B, &ldb, jpvt,
+                   &rcond, &rank, work, &lwork, &info);
+  if((info != 0) || (rank <= 0))
+    goto cleanup_lowsupport;
+
+  *fit = 0.0;
+  for(a = 0; a < nterms; a++)
+    *fit += eval_basis[a]*B[a];
+
+  free(order);
+  free(A);
+  free(B);
+  free(jpvt);
+  free(work);
+  return R_FINITE(*fit);
+
+cleanup_lowsupport:
+  if(order != NULL) free(order);
+  if(A != NULL) free(A);
+  if(B != NULL) free(B);
+  if(jpvt != NULL) free(jpvt);
+  if(work != NULL) free(work);
+  return 0;
+}
+
+
 static inline void np_lp_accumulate_row(const int nterms,
                                          double **basis,
                                          double *vector_Y,
@@ -16516,7 +16618,12 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
     double **basis,
     double *moments,
     double *rhs,
-    const int use_mpi_transport){
+    const int use_mpi_transport,
+    const int track_lowsupport,
+    int *support_count,
+    int *support_orig,
+    int *support_data,
+    double *support_weight){
   int i, j, k;
   int status = 0;
   NPLPTreeSupportCtx sctx = {0};
@@ -16583,6 +16690,7 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
    */
   for(j = 0; j < (use_mpi_transport ? num_obs : (num_obs - 1)); j++){
     const int eval_idx = use_mpi_transport ? ipt_lookup_extern_X[j] : j;
+    const int orig_j = use_mpi_transport ? j : ipt_extern_X[j];
     const double yj = vector_Y[eval_idx];
     double row_moment0 = 0.0, row_moment1 = 0.0, row_moment2 = 0.0;
     double row_moment4 = 0.0, row_moment5 = 0.0, row_moment8 = 0.0;
@@ -16742,6 +16850,27 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
                                         (xeval0 - matrix_X_continuous[0][ii])*hinv0,
                                         hinv0);
           if(w != 0.0){
+            if(track_lowsupport){
+              np_lp_cvls_support_add(j,
+                                      orig_ii,
+                                      ii,
+                                      w,
+                                      nterms,
+                                      support_count,
+                                      support_orig,
+                                      support_data,
+                                      support_weight);
+              if(!use_mpi_transport)
+                np_lp_cvls_support_add(ii,
+                                        orig_j,
+                                        eval_idx,
+                                        w,
+                                        nterms,
+                                        support_count,
+                                        support_orig,
+                                        support_data,
+                                        support_weight);
+            }
             if(nterms == 3){
               NP_LP_ACCUMULATE_FIXED_ROW3();
               if(!use_mpi_transport)
@@ -16871,6 +17000,27 @@ static int NP_NOINLINE np_lp_fixed_tree_sparse_accumulate(
           goto cleanup_sparse;
 
         if(w != 0.0){
+          if(track_lowsupport){
+            np_lp_cvls_support_add(j,
+                                    orig_ii,
+                                    ii,
+                                    w,
+                                    nterms,
+                                    support_count,
+                                    support_orig,
+                                    support_data,
+                                    support_weight);
+            if(!use_mpi_transport)
+              np_lp_cvls_support_add(ii,
+                                      orig_j,
+                                      eval_idx,
+                                      w,
+                                      nterms,
+                                      support_count,
+                                      support_orig,
+                                      support_data,
+                                      support_weight);
+          }
           if(do_oracle){
             const double ow = kw_oracle[ii];
             const double absdiff = fabs(w - ow);
@@ -17046,8 +17196,16 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
   int local_fail = 0;
   int nterms = glp_nterms_in;
   double **basis = glp_basis_in;
+  int *support_count = NULL, *support_orig = NULL, *support_data = NULL;
+#ifdef MPI2
+  int *support_count_local = NULL, *support_orig_local = NULL, *support_data_local = NULL;
+#endif
   double *moments = NULL, *rhs = NULL, *kw = NULL;
   double *moments_local = NULL, *rhs_local = NULL;
+  double *support_weight = NULL;
+#ifdef MPI2
+  double *support_weight_local = NULL;
+#endif
   double *eval_basis = NULL;
   double *eval_ybasis = NULL, *eval_outer = NULL;
   double *vsf = NULL;
@@ -17062,6 +17220,10 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
   const NP_OuterPackCtx frozen_runtime_options = {
     .runtime_options_frozen = 1
   };
+  const int track_lowsupport_requested =
+    (bwm == RBWM_CVLS) || (bwm == RBWM_CVCHECK) || (bwm == RBWM_CVKS);
+  int track_lowsupport = track_lowsupport_requested;
+  const int solve_nrhs = (bwm == RBWM_CVAIC) ? 2 : 1;
 #ifdef MPI2
   const int use_mpi_transport = (iNum_Processors > 1);
 #else
@@ -17080,6 +17242,18 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
 
   if(nterms > INT_MAX/nterms)
     NP_LP_CV_FAIL();
+
+  if(track_lowsupport &&
+     np_lp_fixed_gaussian_full_support_certified(num_obs,
+                                                  nterms,
+                                                  num_reg_unordered,
+                                                  num_reg_ordered,
+                                                  num_reg_continuous,
+                                                  matrix_X_continuous,
+                                                  kernel_c,
+                                                  operator,
+                                                  matrix_bandwidth))
+    track_lowsupport = 0;
 
   use_sparse_tree = use_tree &&
     np_lp_fixed_tree_sparse_supported(num_reg_unordered,
@@ -17106,6 +17280,20 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
 
   moments = (double *)calloc((size_t)num_obs, (size_t)nterms*(size_t)nterms*sizeof(double));
   rhs = (double *)calloc((size_t)num_obs, (size_t)nterms*sizeof(double));
+  if(track_lowsupport){
+    support_count = (int *)calloc((size_t)num_obs, sizeof(int));
+    support_orig = (int *)calloc((size_t)num_obs*(size_t)nterms, sizeof(int));
+    support_data = (int *)calloc((size_t)num_obs*(size_t)nterms, sizeof(int));
+    support_weight = (double *)calloc((size_t)num_obs*(size_t)nterms, sizeof(double));
+#ifdef MPI2
+    if(use_mpi_transport){
+      support_count_local = (int *)calloc((size_t)num_obs, sizeof(int));
+      support_orig_local = (int *)calloc((size_t)num_obs*(size_t)nterms, sizeof(int));
+      support_data_local = (int *)calloc((size_t)num_obs*(size_t)nterms, sizeof(int));
+      support_weight_local = (double *)calloc((size_t)num_obs*(size_t)nterms, sizeof(double));
+    }
+#endif
+  }
   eval_basis = alloc_vecd(MAX(1, nterms));
 
   if(!use_sparse_tree){
@@ -17122,10 +17310,19 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
       eval_outer = alloc_vecd(MAX(1, nterms*nterms));
     }
   }
-  if(!np_lp_solve_workspace_reserve(&solve_workspace, nterms, 1))
+  if(!np_lp_solve_workspace_reserve(&solve_workspace, nterms, solve_nrhs))
     NP_LP_CV_FAIL();
 
   if((moments == NULL) || (rhs == NULL) ||
+     (track_lowsupport &&
+      ((support_count == NULL) || (support_orig == NULL) ||
+       (support_data == NULL) || (support_weight == NULL)
+#ifdef MPI2
+       || (use_mpi_transport &&
+           ((support_count_local == NULL) || (support_orig_local == NULL) ||
+            (support_data_local == NULL) || (support_weight_local == NULL)))
+#endif
+       )) ||
      (eval_basis == NULL) ||
      (!use_sparse_tree && ((kw == NULL) ||
                            (train_u == NULL) || (train_o == NULL) || (train_c == NULL) ||
@@ -17230,6 +17427,10 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
   if(use_sparse_tree){
     double * const moments_acc = use_mpi_transport ? moments_local : moments;
     double * const rhs_acc = use_mpi_transport ? rhs_local : rhs;
+    int * const support_count_acc = use_mpi_transport ? support_count_local : support_count;
+    int * const support_orig_acc = use_mpi_transport ? support_orig_local : support_orig;
+    int * const support_data_acc = use_mpi_transport ? support_data_local : support_data;
+    double * const support_weight_acc = use_mpi_transport ? support_weight_local : support_weight;
 
     if(!np_lp_fixed_tree_sparse_accumulate(num_obs,
                                             num_reg_unordered,
@@ -17251,7 +17452,12 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
                                             basis,
                                             moments_acc,
                                             rhs_acc,
-                                            use_mpi_transport))
+                                            use_mpi_transport,
+                                            track_lowsupport,
+                                            support_count_acc,
+                                            support_orig_acc,
+                                            support_data_acc,
+                                            support_weight_acc))
       NP_LP_CV_FAIL();
   } else {
   for(j = 0; j < (use_mpi_transport ? num_obs : (num_obs - 1)); j++){
@@ -17267,12 +17473,20 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
 #ifdef MPI2
     double * const moments_acc = use_mpi_transport ? moments_local : moments;
     double * const rhs_acc = use_mpi_transport ? rhs_local : rhs;
+    int * const support_count_acc = use_mpi_transport ? support_count_local : support_count;
+    int * const support_orig_acc = use_mpi_transport ? support_orig_local : support_orig;
+    int * const support_data_acc = use_mpi_transport ? support_data_local : support_data;
+    double * const support_weight_acc = use_mpi_transport ? support_weight_local : support_weight;
 
     if(use_mpi_transport && ((j % iNum_Processors) != my_rank))
       continue;
 #else
     double * const moments_acc = moments;
     double * const rhs_acc = rhs;
+    int * const support_count_acc = support_count;
+    int * const support_orig_acc = support_orig;
+    int * const support_data_acc = support_data;
+    double * const support_weight_acc = support_weight;
 #endif
     if((j & 31) == 0)
       np_progress_bandwidth_loop_step();
@@ -17379,6 +17593,17 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
           if((i == j) || (w == 0.0))
             continue;
 
+          if(track_lowsupport)
+            np_lp_cvls_support_add(j,
+                                    i,
+                                    ii,
+                                    w,
+                                    1,
+                                    support_count_acc,
+                                    support_orig_acc,
+                                    support_data_acc,
+                                    support_weight_acc);
+
           tj0 += w*vector_Y[ii];
           sj0 += w;
         }
@@ -17387,16 +17612,21 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
         sj[0] = sj0;
       } else {
         const NPLPOwnedRowContext owned_context = {
-          .nterms = nterms,
-          .row_j = j,
-          .nobs = num_obs,
-          .use_tree = use_tree,
-          .tree_lookup = ipt_lookup_extern_X,
-          .weights = kw,
-          .basis = basis,
-          .response = vector_Y,
-          .moments = moments_acc,
-          .rhs = rhs_acc
+          nterms,
+          j,
+          num_obs,
+          use_tree,
+          track_lowsupport,
+          ipt_lookup_extern_X,
+          kw,
+          basis,
+          vector_Y,
+          moments_acc,
+          rhs_acc,
+          support_count_acc,
+          support_orig_acc,
+          support_data_acc,
+          support_weight_acc
         };
 
         if(!np_lp_accumulate_owned_resident_row(&owned_context)){
@@ -17407,6 +17637,17 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
 
             if((i == j) || (w == 0.0))
               continue;
+
+            if(track_lowsupport)
+              np_lp_cvls_support_add(j,
+                                      i,
+                                      ii,
+                                      w,
+                                      nterms,
+                                      support_count_acc,
+                                      support_orig_acc,
+                                      support_data_acc,
+                                      support_weight_acc);
 
             for(a = 0; a < nterms; a++){
               const double bia = basis[a][ii];
@@ -17423,6 +17664,7 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
         nsub,
         use_tree,
         eval_idx,
+        track_lowsupport,
         ipt_lookup_extern_X,
         kw,
         basis,
@@ -17430,22 +17672,31 @@ static NPRegCvLpResult np_regression_cv_lp_basis_fixed(
         moments_acc,
         rhs_acc,
         eval_ybasis,
-        eval_outer);
+        eval_outer,
+        support_count_acc,
+        support_orig_acc,
+        support_data_acc,
+        support_weight_acc);
     } else {
       const NPLPDenseRowContext row_context = {
-        .nterms = nterms,
-        .row_j = j,
-        .nsub = nsub,
-        .use_tree = use_tree,
-        .eval_idx = eval_idx,
-        .tree_lookup = ipt_lookup_extern_X,
-        .weights = kw,
-        .basis = basis,
-        .response = vector_Y,
-        .moments = moments_acc,
-        .rhs = rhs_acc,
-        .eval_ybasis = eval_ybasis,
-        .eval_outer = eval_outer
+        nterms,
+        j,
+        nsub,
+        use_tree,
+        eval_idx,
+        track_lowsupport,
+        ipt_lookup_extern_X,
+        kw,
+        basis,
+        vector_Y,
+        moments_acc,
+        rhs_acc,
+        eval_ybasis,
+        eval_outer,
+        support_count_acc,
+        support_orig_acc,
+        support_data_acc,
+        support_weight_acc
       };
       np_lp_accumulate_dense_resident_row(&row_context);
     }
@@ -17476,9 +17727,17 @@ lp_cv_collective_gate:
       np_jksum_size_mul_or_die((size_t)num_obs, (size_t)nterms,
                                "np_lp_cvls row-term Allreduce"),
       "np_lp_cvls row-term Allreduce");
+    const int row_count = np_jksum_mpi_count_or_die((size_t)num_obs,
+                                                    "np_lp_cvls row Allreduce");
 
     MPI_Allreduce(moments_local, moments, moments_count, MPI_DOUBLE, MPI_SUM, comm[1]);
     MPI_Allreduce(rhs_local, rhs, row_terms_count, MPI_DOUBLE, MPI_SUM, comm[1]);
+    if(track_lowsupport){
+      MPI_Allreduce(support_count_local, support_count, row_count, MPI_INT, MPI_SUM, comm[1]);
+      MPI_Allreduce(support_orig_local, support_orig, row_terms_count, MPI_INT, MPI_MAX, comm[1]);
+      MPI_Allreduce(support_data_local, support_data, row_terms_count, MPI_INT, MPI_MAX, comm[1]);
+      MPI_Allreduce(support_weight_local, support_weight, row_terms_count, MPI_DOUBLE, MPI_SUM, comm[1]);
+    }
   }
 #endif
 
@@ -17502,7 +17761,8 @@ lp_cv_collective_gate:
     const int row_idx = (use_sparse_tree && !use_mpi_transport) ? eval_idx : j;
     const double * const sj = moments + (size_t)row_idx*(size_t)nterms*(size_t)nterms;
     const double * const tj = rhs + (size_t)row_idx*(size_t)nterms;
-    NPLPSolvePolicyDiagnostics solve_diagnostics;
+    const size_t soff = (size_t)row_idx*(size_t)nterms;
+    double nepsilon = 0.0;
     double fit = 0.0;
 
     if(nterms == 1){
@@ -17521,6 +17781,7 @@ lp_cv_collective_gate:
     if(bwm == RBWM_CVAIC){
       for(a = 0; a < nterms; a++){
         const double ba = eval_basis[a];
+        solve_workspace.rhs_source[nterms + a] = ba;
         solve_workspace.rhs_source[a] += aicc*ba*vector_Y[eval_idx];
         for(b = 0; b < nterms; b++)
           solve_workspace.gram_source[a + b*nterms] +=
@@ -17528,16 +17789,50 @@ lp_cv_collective_gate:
       }
     }
 
-    if(np_lp_solve_workspace_solve_response(&solve_workspace,
-                                            nterms,
-                                            1,
-                                            epsilon,
-                                            &solve_diagnostics) !=
-       NP_LP_SOLVE_POLICY_OK)
-      goto cleanup_lp_cv;
+    if(track_lowsupport &&
+       (support_count[row_idx] <= nterms) &&
+       np_lp_cvls_lowsupport_fit(nterms,
+                                  support_count[row_idx],
+                                  basis,
+                                  vector_Y,
+                                  eval_idx,
+                                  eval_basis,
+                                  support_orig + soff,
+                                  support_data + soff,
+                                  support_weight + soff,
+                                  &fit)){
+      nepsilon = 0.0;
+    } else {
+    {
+      int ridge_steps = 0;
+      while(!np_lp_solve_workspace_solve(&solve_workspace,
+                                         nterms,
+                                         solve_nrhs)){
+        if((ridge_steps >= NP_LP_SOLVE_MAX_RIDGE_STEPS) ||
+           !np_lp_solve_workspace_sources_finite(&solve_workspace,
+                                                 nterms,
+                                                 solve_nrhs))
+          goto cleanup_lp_cv;
+        for(a = 0; a < nterms; a++)
+          solve_workspace.gram_source[a + a*nterms] += epsilon;
+        nepsilon += epsilon;
+        ridge_steps++;
+      }
+    }
+
+    solve_workspace.rhs_source[0] +=
+      nepsilon*solve_workspace.rhs_source[0]/
+      NZD_POS(solve_workspace.gram_source[0]);
+    if(nepsilon > 0.0){
+      if(!np_lp_solve_workspace_solve(&solve_workspace,
+                                       nterms,
+                                       solve_nrhs))
+        goto cleanup_lp_cv;
+    }
 
     for(a = 0; a < nterms; a++)
       fit += eval_basis[a]*solve_workspace.rhs_work[a];
+    }
 
     {
       const double loss_y =
@@ -17550,15 +17845,7 @@ lp_cv_collective_gate:
     if(bwm == RBWM_CVAIC){
       double hii = 0.0;
       for(a = 0; a < nterms; a++)
-        solve_workspace.rhs_source[a] = eval_basis[a];
-      if(np_lp_solve_workspace_solve_adjoint_factored(
-           &solve_workspace,
-           nterms,
-           1,
-           &solve_diagnostics) != NP_LP_SOLVE_POLICY_OK)
-        goto cleanup_lp_cv;
-      for(a = 0; a < nterms; a++)
-        hii += eval_basis[a]*solve_workspace.rhs_work[a];
+        hii += eval_basis[a]*solve_workspace.rhs_work[nterms + a];
       result.traceH += hii*aicc;
     }
   }
@@ -17578,6 +17865,16 @@ cleanup_lp_cv:
   if(moments_local != NULL) free(moments_local);
   if(rhs != NULL) free(rhs);
   if(rhs_local != NULL) free(rhs_local);
+  if(support_count != NULL) free(support_count);
+  if(support_orig != NULL) free(support_orig);
+  if(support_data != NULL) free(support_data);
+  if(support_weight != NULL) free(support_weight);
+#ifdef MPI2
+  if(support_count_local != NULL) free(support_count_local);
+  if(support_orig_local != NULL) free(support_orig_local);
+  if(support_data_local != NULL) free(support_data_local);
+  if(support_weight_local != NULL) free(support_weight_local);
+#endif
   if(eval_basis != NULL) free(eval_basis);
   if(kw != NULL) free(kw);
   if(eval_ybasis != NULL) free(eval_ybasis);
@@ -17654,6 +17951,7 @@ static NP_NOINLINE NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas(
     const int nterms,
     double **basis){
   NPRegCvLpResult result = {DBL_MAX, 0.0, 0};
+  const int solve_nrhs = (bwm == RBWM_CVAIC) ? 2 : 1;
   const int basis_stride = np_glp_cv_cache.basis_stride;
   const double epsilon = 1.0/(double)MAX(1, num_obs);
   const NP_OuterPackCtx frozen_runtime_options = {
@@ -17776,7 +18074,7 @@ static NP_NOINLINE NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas(
       (eval_o != NULL) && (eval_c != NULL) &&
       (matrix_bandwidth_eval != NULL) &&
       np_lp_solve_workspace_reserve(
-        &solve_workspace, nterms, 1);
+        &solve_workspace, nterms, solve_nrhs);
 #ifdef MPI2
     int all_ready = 0;
     local_ready = local_ready && (cv_rows != NULL) &&
@@ -17819,7 +18117,8 @@ static NP_NOINLINE NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas(
     double **row_bandwidth = matrix_bandwidth;
     const double yj = vector_Y[j];
     double self_weight;
-    NPLPSolvePolicyDiagnostics solve_diagnostics;
+    double nepsilon = 0.0;
+    int ridge_steps = 0;
     int adaptive_gaussian_row = 0;
 
     if((j & 31) == 0)
@@ -17981,6 +18280,7 @@ static NP_NOINLINE NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas(
     if(bwm == RBWM_CVAIC){
       for(l = 0; l < nterms; l++){
         const double bl = eval_basis[l];
+        solve_workspace.rhs_source[nterms + l] = bl;
         solve_workspace.rhs_source[l] += self_weight*bl*yj;
         for(i = 0; i < nterms; i++)
           solve_workspace.gram_source[l + i*nterms] +=
@@ -17988,14 +18288,29 @@ static NP_NOINLINE NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas(
       }
     }
 
-    if(np_lp_solve_workspace_solve_response(&solve_workspace,
-                                            nterms,
-                                            1,
-                                            epsilon,
-                                            &solve_diagnostics) !=
-       NP_LP_SOLVE_POLICY_OK){
-      local_fail = 1;
-      goto adaptive_blas_collective_gate;
+    while(!np_lp_solve_workspace_solve(
+      &solve_workspace, nterms, solve_nrhs)){
+      if((ridge_steps >= NP_LP_SOLVE_MAX_RIDGE_STEPS) ||
+         !np_lp_solve_workspace_sources_finite(
+           &solve_workspace, nterms, solve_nrhs)){
+        local_fail = 1;
+        goto adaptive_blas_collective_gate;
+      }
+      for(l = 0; l < nterms; l++)
+        solve_workspace.gram_source[l + l*nterms] += epsilon;
+      nepsilon += epsilon;
+      ridge_steps++;
+    }
+
+    solve_workspace.rhs_source[0] +=
+      nepsilon*solve_workspace.rhs_source[0]/
+      NZD_POS(solve_workspace.gram_source[0]);
+    if(nepsilon > 0.0){
+      if(!np_lp_solve_workspace_solve(
+        &solve_workspace, nterms, solve_nrhs)){
+        local_fail = 1;
+        goto adaptive_blas_collective_gate;
+      }
     }
 
     {
@@ -18017,17 +18332,7 @@ static NP_NOINLINE NPRegCvLpResult np_regression_cv_lp_basis_adaptive_blas(
     if(bwm == RBWM_CVAIC){
       double hii = 0.0;
       for(l = 0; l < nterms; l++)
-        solve_workspace.rhs_source[l] = eval_basis[l];
-      if(np_lp_solve_workspace_solve_adjoint_factored(
-           &solve_workspace,
-           nterms,
-           1,
-           &solve_diagnostics) != NP_LP_SOLVE_POLICY_OK){
-        local_fail = 1;
-        goto adaptive_blas_collective_gate;
-      }
-      for(l = 0; l < nterms; l++)
-        hii += eval_basis[l]*solve_workspace.rhs_work[l];
+        hii += eval_basis[l]*solve_workspace.rhs_work[nterms + l];
 #ifdef MPI2
       trace_rows[j] = self_weight*hii;
 #else
@@ -18654,9 +18959,9 @@ cleanup_adaptive_exact_scalar:
   return result;
 }
 
-// Regression CV objective for the canonical local-polynomial engine.
-// Public lc maps to degree zero and public ll maps to raw GLP degree one;
-// positive-degree rows share the general LP solve and bounded ridge policy.
+// Regression CV objective for local polynomial regression:
+// lc (degree 0), ll (degree 1), and lp (general degree vector).
+// The LL/LP branches solve weighted normal equations with ridge fallback if singular.
 
 double np_kernel_estimate_regression_categorical_ls_aic(
 int lp_engine,
@@ -19238,6 +19543,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
     size_t kwm_len = 0;
     size_t xtkx_pointer_count = 0;
     size_t mpi_reduction_count_size = 0;
+    const int solve_nrhs = (bwm == RBWM_CVAIC) ? 2 : 1;
     double **PXTKX = NULL;
     double *kwm = NULL;
     double *sgn = NULL;
@@ -19321,7 +19627,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
     glp_ok = glp_ok && np_lp_solve_workspace_reserve(
       &solve_workspace,
       nrc1,
-      1) &&
+      solve_nrhs) &&
       (TCON != NULL) && (TUNO != NULL) && (TORD != NULL) &&
       (matrix_bandwidth_eval != NULL) && (XTKX != NULL) &&
       (kwm != NULL) && (sgn != NULL) && (evalv != NULL);
@@ -19444,8 +19750,9 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
 
       const double epsilon = 1.0/(double)MAX(1, num_obs);
       for(j = 0; j < num_obs; j++){
+        double nepsilon = 0.0;
         double pnh = 1.0;
-        NPLPSolvePolicyDiagnostics solve_diagnostics;
+        int ridge_steps = 0;
         double * const row_kwm = kwm + (size_t)j*(size_t)nrcc22;
 
 #ifdef MPI2
@@ -19805,6 +20112,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
           const double self_weight = pnh*aicc;
           for(i = 0; i < nrc1; i++){
             const double bi = evalv[i];
+            solve_workspace.rhs_source[nrc1 + i] = bi;
             row_kwm[i+1] += self_weight*bi*vector_Y[j];
             for(int k = 0; k < nrc1; k++)
               row_kwm[(i+1)*nrc2+k+1] += self_weight*bi*evalv[k];
@@ -19818,14 +20126,37 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
             solve_workspace.gram_source[i+k*nrc1] =
               row_kwm[(i+1)*nrc2+k+1];
 
-        if(np_lp_solve_workspace_solve_response(
-             &solve_workspace,
-             nrc1,
-             1,
-             epsilon,
-             &solve_diagnostics) != NP_LP_SOLVE_POLICY_OK){
-          glp_ok = 0;
+        while(!np_lp_solve_workspace_solve(
+          &solve_workspace,
+          nrc1,
+          solve_nrhs)){
+          if((ridge_steps >= NP_LP_SOLVE_MAX_RIDGE_STEPS) ||
+             !np_lp_solve_workspace_sources_finite(&solve_workspace,
+                                                   nrc1,
+                                                   solve_nrhs)){
+            glp_ok = 0;
+            break;
+          }
+          for(i = 0; i < nrc1; i++){
+            row_kwm[(i+1)*nrc2+i+1] += epsilon;
+            solve_workspace.gram_source[i+i*nrc1] += epsilon;
+          }
+          nepsilon += epsilon;
+          ridge_steps++;
+        }
+        if(!glp_ok)
           break;
+
+        row_kwm[1] += nepsilon*row_kwm[1]/NZD_POS(row_kwm[nrc2+1]);
+        solve_workspace.rhs_source[0] = row_kwm[1];
+        if(nepsilon > 0.0){
+          if(!np_lp_solve_workspace_solve(
+            &solve_workspace,
+            nrc1,
+            solve_nrhs)){
+            glp_ok = 0;
+            break;
+          }
         }
 
         {
@@ -19844,19 +20175,8 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
         if(bwm == RBWM_CVAIC){
           {
             double hii = 0.0;
-
             for(i = 0; i < nrc1; i++)
-              solve_workspace.rhs_source[i] = evalv[i];
-            if(np_lp_solve_workspace_solve_adjoint_factored(
-                 &solve_workspace,
-                 nrc1,
-                 1,
-                 &solve_diagnostics) != NP_LP_SOLVE_POLICY_OK){
-              glp_ok = 0;
-              break;
-            }
-            for(i = 0; i < nrc1; i++)
-              hii += evalv[i]*solve_workspace.rhs_work[i];
+              hii += evalv[i]*solve_workspace.rhs_work[nrc1 + i];
             traceH += hii*pnh*aicc;
           }
         }
@@ -28210,14 +28530,14 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
   const int num_reg_unordered = call->num_reg_unordered;
   const int num_reg_ordered = call->num_reg_ordered;
   const int num_reg_continuous = call->num_reg_continuous;
-  const int public_stable_basis = (int_glp_bernstein_extern != 0);
+  const int use_bernstein = (int_glp_bernstein_extern != 0);
   const double epsilon = 1.0/(double)MAX(1, num_obs_train);
   const int reuse_fit_kernel_row =
     (BANDWIDTH_reg == BW_FIXED) &&
     (call->tree_enabled != NP_TREE_TRUE) &&
     (num_reg_unordered == 0) &&
     (num_reg_ordered == 0) &&
-    (!public_stable_basis) &&
+    (!use_bernstein) &&
     (!int_cker_bound_extern);
   const int fit_tree_active =
     (BANDWIDTH_reg != BW_ADAP_NN) &&
@@ -28240,7 +28560,6 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
   int response_y_offset;
   int response_basis_offset;
   int moment_stride;
-  int use_stable_basis = 0;
   int i, j, l;
 
   if((vector_glp_degree_extern == NULL) || (num_reg_continuous <= 0)) {
@@ -28311,6 +28630,10 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
     (size_t)owner->nterms*sizeof(double));
   owner->eval_derivative = (double *)malloc(
     (size_t)owner->nterms*sizeof(double));
+  if(use_bernstein)
+    owner->basis_context = (NPGLPBasisCtx *)calloc(
+      (size_t)num_reg_continuous, sizeof(NPGLPBasisCtx));
+
   if(owner->basis == NULL ||
      ((BANDWIDTH_reg == BW_GEN_NN
 #ifdef MPI2
@@ -28330,7 +28653,8 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
      owner->coefficient == NULL ||
      (call->do_merr && owner->power2_projection == NULL) ||
      owner->eval_basis == NULL ||
-     owner->eval_derivative == NULL) {
+     owner->eval_derivative == NULL ||
+     (use_bernstein && owner->basis_context == NULL)) {
     execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_ALLOC;
     return R_NilValue;
   }
@@ -28347,19 +28671,39 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
     for(i = 0; i < num_obs_train; ++i)
       owner->squared_response[i] = call->vector_Y[i]*call->vector_Y[i];
 
-  if(!np_glp_fit_basis_prepare(num_reg_continuous,
-                               vector_glp_degree_extern,
-                               owner->terms,
-                               owner->nterms,
-                               call->matrix_X_continuous_train,
-                               num_obs_train,
-                               public_stable_basis,
-                               int_glp_basis_extern,
-                               owner->basis,
-                               &owner->basis_context,
-                               &use_stable_basis)) {
-    execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_BASIS;
-    return R_NilValue;
+  if(use_bernstein) {
+    for(l = 0; l < num_reg_continuous; ++l) {
+      double xmin = call->matrix_X_continuous_train[l][0];
+      double xmax = xmin;
+
+      for(i = 1; i < num_obs_train; ++i) {
+        const double xi = call->matrix_X_continuous_train[l][i];
+        if(xi < xmin) xmin = xi;
+        if(xi > xmax) xmax = xi;
+      }
+      if(!np_glp_basis_ctx_init(&owner->basis_context[l],
+                                vector_glp_degree_extern[l],
+                                xmin,
+                                xmax,
+                                int_glp_basis_extern == 1)) {
+        execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_BASIS;
+        return R_NilValue;
+      }
+    }
+    np_glp_fill_basis_train(num_reg_continuous,
+                            owner->terms,
+                            owner->nterms,
+                            call->matrix_X_continuous_train,
+                            num_obs_train,
+                            owner->basis_context,
+                            owner->basis);
+  } else {
+    np_glp_fill_basis_raw_train(num_reg_continuous,
+                                owner->terms,
+                                owner->nterms,
+                                call->matrix_X_continuous_train,
+                                num_obs_train,
+                                owner->basis);
   }
 
 #ifdef MPI2
@@ -28403,6 +28747,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 
 	        local_pos = 0;
 	        for(int jj = chunk_start + my_rank; jj < chunk_end; jj += iNum_Processors){
+	          double nepsilon_owner = 0.0;
 	          double sk_owner, ey_owner, ey2_owner, sigma2_owner;
 	          int have_vcov_owner = 0;
 	          double * const out_owner = owner->mpi_owner_chunk.sendbuf + (size_t)local_pos*(size_t)owner_row_width_lp;
@@ -28539,19 +28884,45 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	              owner->solve_workspace.gram_source[i+l*owner->nterms] =
 	                owner->moments[base + l + response_basis_offset];
 	          }
-	          if(np_lp_solve_workspace_solve_response(
-	               &owner->solve_workspace,
-	               owner->nterms,
-	               1,
-	               epsilon,
-	               NULL) != NP_LP_SOLVE_POLICY_OK){
-	            owner_solve_failed = 1;
-	            break;
+	          {
+	            int ridge_steps = 0;
+	            while(!np_lp_solve_workspace_solve(&owner->solve_workspace,
+	                                               owner->nterms,
+	                                               1)){
+	              if((ridge_steps >= NP_LP_SOLVE_MAX_RIDGE_STEPS) ||
+	                 !np_lp_solve_workspace_sources_finite(
+	                   &owner->solve_workspace,
+	                   owner->nterms,
+	                   1)){
+	                owner_solve_failed = 1;
+	                break;
+	              }
+	              for(i = 0; i < owner->nterms; i++)
+	                owner->solve_workspace.gram_source[
+	                  i+i*owner->nterms
+	                ] += epsilon;
+	              nepsilon_owner += epsilon;
+	              ridge_steps++;
+	            }
+	            if(owner_solve_failed)
+	              break;
+	          }
+
+	          owner->solve_workspace.rhs_source[0] +=
+	            nepsilon_owner*owner->solve_workspace.rhs_source[0]/
+	            NZD_POS(owner->solve_workspace.gram_source[0]);
+	          if(nepsilon_owner > 0.0){
+	            if(!np_lp_solve_workspace_solve(&owner->solve_workspace,
+	                                            owner->nterms,
+	                                            1)){
+	              owner_solve_failed = 1;
+	              break;
+	            }
 	          }
 	          for(i = 0; i < owner->nterms; i++)
 	            owner->coefficient[i] = owner->solve_workspace.rhs_work[i];
 
-	          if(use_stable_basis)
+	          if(use_bernstein)
 	            np_glp_fill_basis_eval(num_reg_continuous,
 	                                   owner->terms,
 	                                   owner->nterms,
@@ -28628,7 +28999,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	                  1 + call->do_merr +
 	                  l*(1 + (call->do_gerr ? 1 : 0));
 
-	                if(use_stable_basis)
+	                if(use_bernstein)
 	                  np_glp_fill_basis_eval_deriv(l,
 	                                               grad_order,
 	                                               num_reg_continuous,
@@ -28897,7 +29268,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
     for(i = 0; i < owner->nterms; ++i)
       owner->coefficient[i] = owner->solve_workspace.rhs_work[i];
 
-    if(use_stable_basis)
+    if(use_bernstein)
       np_glp_fill_basis_eval(num_reg_continuous,
                              owner->terms,
                              owner->nterms,
@@ -29001,7 +29372,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
               (size_t)variance_rhs*(size_t)owner->nterms :
             owner->eval_derivative;
 
-          if(use_stable_basis)
+          if(use_bernstein)
             np_glp_fill_basis_eval_deriv(l,
                                          grad_order,
                                          num_reg_continuous,
@@ -29109,10 +29480,10 @@ static int np_regression_general_lp_fit(
 }
 
 /*
- * The all-large shortcut allocates its fit workspace before stable basis
+ * The all-large shortcut allocates its fit workspace before Bernstein basis
  * construction and later optional projection blocks.  Keep the established
  * inline arithmetic untouched.  Local basis allocation returns status instead
- * of long-jumping; one failure-only owner covers basis construction
+ * of long-jumping; one failure-only owner covers Bernstein basis construction
  * and a progress signal when one is actually due.  Normal ownership and
  * release order remain with the incumbent route.
  */
@@ -29132,6 +29503,31 @@ typedef struct {
   NPLPFullRowWorkspace *inverse_workspace;
   NPRegressionFitOwner *enclosing_owner;
 } NPRegressionAllLargeLPFitOwner;
+
+typedef struct {
+  int num_reg_continuous;
+  const int *terms;
+  int nterms;
+  double **matrix_X_continuous_train;
+  int num_obs_train;
+  NPGLPBasisCtx *basis_context;
+  double **basis;
+} NPRegressionAllLargeBernsteinBasisCall;
+
+static SEXP np_regression_alllarge_bernstein_basis_execute(void *data)
+{
+  const NPRegressionAllLargeBernsteinBasisCall * const call =
+    (const NPRegressionAllLargeBernsteinBasisCall *)data;
+
+  np_glp_fill_basis_train(call->num_reg_continuous,
+                          call->terms,
+                          call->nterms,
+                          call->matrix_X_continuous_train,
+                          call->num_obs_train,
+                          call->basis_context,
+                          call->basis);
+  return R_NilValue;
+}
 
 static void np_regression_alllarge_lp_fit_cleanup(
   void *data,
@@ -29738,7 +30134,7 @@ const NPNNGeometryContext *nn_geometry_context){
         estimation_shortcut_done = 1;
       } else if(kconst_ok && lp_engine_est == NP_LP_ENGINE_GENERAL &&
                 (vector_glp_degree_extern != NULL) && (num_reg_continuous > 0)){
-        const int public_stable_basis = (int_glp_bernstein_extern != 0);
+        const int use_bernstein = (int_glp_bernstein_extern != 0);
         int *glp_terms = NULL;
         int glp_nterms = 0;
         double **basis = NULL;
@@ -29752,7 +30148,6 @@ const NPNNGeometryContext *nn_geometry_context){
         int eval_block_rows = 0;
         int basis_is_contiguous = 0;
         int use_fit_projection_blas = 0;
-        int use_stable_basis = 0;
         int fast_ok;
         NPRegressionAllLargeLPFitOwner all_large_owner = {
           .num_reg_continuous = num_reg_continuous,
@@ -29794,9 +30189,13 @@ const NPNNGeometryContext *nn_geometry_context){
           eval_basis = (double *)malloc((size_t)glp_nterms*sizeof(double));
           if(do_grad)
             eval_deriv = (double *)malloc((size_t)glp_nterms*sizeof(double));
+          if(use_bernstein)
+            basis_ctx = (NPGLPBasisCtx *)calloc(
+              (size_t)num_reg_continuous, sizeof(NPGLPBasisCtx));
           fast_ok = fast_ok && (basis != NULL) && (beta != NULL) &&
             (eval_basis != NULL) &&
-            ((!do_grad) || (eval_deriv != NULL));
+            ((!do_grad) || (eval_deriv != NULL)) &&
+            (!use_bernstein || (basis_ctx != NULL));
           all_large_owner.terms = glp_terms;
           all_large_owner.nterms = glp_nterms;
           all_large_owner.basis = basis;
@@ -29810,28 +30209,50 @@ const NPNNGeometryContext *nn_geometry_context){
         }
 
         if(fast_ok){
-          NPGLPFitBasisPrepareCall basis_call = {
-              .ncon = num_reg_continuous,
-              .degree_vec = vector_glp_degree_extern,
+          for(l = 0; l < num_reg_continuous; l++){
+            if(use_bernstein){
+              double xmin = matrix_X_continuous_train[l][0];
+              double xmax = matrix_X_continuous_train[l][0];
+              for(i = 1; i < num_obs_train; i++){
+                const double xi = matrix_X_continuous_train[l][i];
+                if(xi < xmin) xmin = xi;
+                if(xi > xmax) xmax = xi;
+              }
+              if(!np_glp_basis_ctx_init(
+                  &basis_ctx[l], vector_glp_degree_extern[l], xmin, xmax,
+                  int_glp_basis_extern == 1)){
+                fast_ok = 0;
+                break;
+              }
+            }
+          }
+        }
+
+        if(fast_ok){
+          if(use_bernstein){
+            const NPRegressionAllLargeBernsteinBasisCall basis_call = {
+              .num_reg_continuous = num_reg_continuous,
               .terms = glp_terms,
               .nterms = glp_nterms,
               .matrix_X_continuous_train = matrix_X_continuous_train,
               .num_obs_train = num_obs_train,
-              .public_stable_basis = public_stable_basis,
-              .basis_mode = int_glp_basis_extern,
-              .basis = basis,
-              .basis_context = &all_large_owner.basis_context,
-              .use_stable_basis = &use_stable_basis,
-              .status = 0
+              .basis_context = basis_ctx,
+              .basis = basis
             };
-          R_UnwindProtect(
-            np_glp_fit_basis_prepare_execute,
-            (void *)&basis_call,
-            np_regression_alllarge_lp_fit_cleanup,
-            (void *)&all_large_owner,
-            NULL);
-          fast_ok = basis_call.status;
-          basis_ctx = all_large_owner.basis_context;
+            R_UnwindProtect(
+              np_regression_alllarge_bernstein_basis_execute,
+              (void *)&basis_call,
+              np_regression_alllarge_lp_fit_cleanup,
+              (void *)&all_large_owner,
+              NULL);
+          } else {
+            np_glp_fill_basis_raw_train(num_reg_continuous,
+                                        glp_terms,
+                                        glp_nterms,
+                                        matrix_X_continuous_train,
+                                        num_obs_train,
+                                        basis);
+          }
         }
 
         if(fast_ok){
@@ -29945,7 +30366,7 @@ const NPNNGeometryContext *nn_geometry_context){
                  * leading dimension nblock, including the final short block.
                  */
                 for(int row = 0; row < nblock; row++){
-                  if(use_stable_basis){
+                  if(use_bernstein){
                     np_glp_fill_basis_eval(num_reg_continuous,
                                            glp_terms,
                                            glp_nterms,
@@ -30007,7 +30428,7 @@ const NPNNGeometryContext *nn_geometry_context){
                 double yhat = 0.0;
                 double q = 0.0;
 
-                if(use_stable_basis){
+                if(use_bernstein){
                   np_glp_fill_basis_eval(num_reg_continuous,
                                          glp_terms,
                                          glp_nterms,
@@ -30051,7 +30472,7 @@ const NPNNGeometryContext *nn_geometry_context){
                     double qg = 0.0;
                     double dg = 0.0;
 
-                    if(use_stable_basis){
+                    if(use_bernstein){
                       np_glp_fill_basis_eval_deriv(l,
                                                    grad_order,
                                                    num_reg_continuous,
@@ -30110,7 +30531,7 @@ const NPNNGeometryContext *nn_geometry_context){
           }
         }
 
-        if(basis_ctx != NULL){
+        if(use_bernstein && (basis_ctx != NULL)){
           for(l = 0; l < num_reg_continuous; l++) np_glp_basis_ctx_free(&basis_ctx[l]);
           free(basis_ctx);
         }
@@ -30576,6 +30997,7 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
   const int bw_rows =
     (BANDWIDTH_den_extern == BW_FIXED) ? 1 :
     ((BANDWIDTH_den_extern == BW_GEN_NN) ? num_eval : num_train);
+  const int use_bernstein = (int_glp_bernstein_extern != 0);
   int *kernel_cx = NULL, *kernel_ux = NULL, *kernel_ox = NULL, *x_operator = NULL;
   double *vsfx = NULL, *lambdax = NULL, *kw = NULL, *pkw = NULL;
   double *mean_row = NULL;
@@ -30907,10 +31329,45 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
       }
     }
 
-    if(!np_glp_cv_cache_fill_eval_basis(
-         matrix_X_continuous_eval_extern, i, which_var, deriv_order,
-         eval_basis))
-      goto cleanup_lp_hat;
+    if(use_bernstein){
+      if(deriv_order > 0){
+        np_glp_fill_basis_eval_deriv(which_var,
+                                     deriv_order,
+                                     num_reg_continuous_extern,
+                                     np_glp_cv_cache.terms,
+                                     np_glp_cv_cache.nterms,
+                                     matrix_X_continuous_eval_extern,
+                                     i,
+                                     np_glp_cv_cache.basis_ctx,
+                                     eval_basis);
+      } else {
+        np_glp_fill_basis_eval(num_reg_continuous_extern,
+                               np_glp_cv_cache.terms,
+                               np_glp_cv_cache.nterms,
+                               matrix_X_continuous_eval_extern,
+                               i,
+                               np_glp_cv_cache.basis_ctx,
+                               eval_basis);
+      }
+    } else {
+      if(deriv_order > 0){
+        np_glp_fill_basis_eval_deriv_raw(which_var,
+                                         deriv_order,
+                                         num_reg_continuous_extern,
+                                         np_glp_cv_cache.terms,
+                                         np_glp_cv_cache.nterms,
+                                         matrix_X_continuous_eval_extern,
+                                         i,
+                                         eval_basis);
+      } else {
+        np_glp_fill_basis_eval_raw(num_reg_continuous_extern,
+                                   np_glp_cv_cache.terms,
+                                   np_glp_cv_cache.nterms,
+                                   matrix_X_continuous_eval_extern,
+                                   i,
+                                   eval_basis);
+      }
+    }
 
     if(kernel_route != NULL) {
       if(np_beta_scaled_row_context_fill(
@@ -32477,10 +32934,29 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
     }
 
     for(j = 0; j < num_eval; ++j) {
-      if(!np_glp_cv_cache_fill_eval_basis(
-           matrix_X_continuous_eval_extern, j, target_deriv,
-           target_deriv >= 0 ? target_order : 0, eval_basis))
-        goto cleanup_lp_apply;
+      if(target_deriv >= 0) {
+        if(use_bernstein)
+          np_glp_fill_basis_eval_deriv(
+            target_deriv, target_order, num_reg_continuous_extern,
+            np_glp_cv_cache.terms, np_glp_cv_cache.nterms,
+            matrix_X_continuous_eval_extern, j,
+            np_glp_cv_cache.basis_ctx, eval_basis);
+        else
+          np_glp_fill_basis_eval_deriv_raw(
+            target_deriv, target_order, num_reg_continuous_extern,
+            np_glp_cv_cache.terms, np_glp_cv_cache.nterms,
+            matrix_X_continuous_eval_extern, j, eval_basis);
+      } else if(use_bernstein) {
+        np_glp_fill_basis_eval(
+          num_reg_continuous_extern, np_glp_cv_cache.terms,
+          np_glp_cv_cache.nterms, matrix_X_continuous_eval_extern, j,
+          np_glp_cv_cache.basis_ctx, eval_basis);
+      } else {
+        np_glp_fill_basis_eval_raw(
+          num_reg_continuous_extern, np_glp_cv_cache.terms,
+          np_glp_cv_cache.nterms, matrix_X_continuous_eval_extern, j,
+          eval_basis);
+      }
 
       if(np_beta_scaled_row_context_fill(
            &beta_row_context, j, NULL, NULL) != NP_CONTINUOUS_ROW_OK ||
@@ -32639,10 +33115,42 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
        NP_LP_SOLVE_POLICY_OK)
       goto cleanup_lp_apply;
 
-    if(!np_glp_cv_cache_fill_eval_basis(
-         matrix_X_continuous_eval_extern, j, target_deriv,
-         target_deriv >= 0 ? target_order : 0, eval_basis))
-      goto cleanup_lp_apply;
+    if(target_deriv >= 0){
+      if(use_bernstein)
+        np_glp_fill_basis_eval_deriv(target_deriv,
+                                     target_order,
+                                     num_reg_continuous_extern,
+                                     np_glp_cv_cache.terms,
+                                     np_glp_cv_cache.nterms,
+                                     matrix_X_continuous_eval_extern,
+                                     j,
+                                     np_glp_cv_cache.basis_ctx,
+                                     eval_basis);
+      else
+        np_glp_fill_basis_eval_deriv_raw(target_deriv,
+                                         target_order,
+                                         num_reg_continuous_extern,
+                                         np_glp_cv_cache.terms,
+                                         np_glp_cv_cache.nterms,
+                                         matrix_X_continuous_eval_extern,
+                                         j,
+                                         eval_basis);
+    } else if(use_bernstein) {
+      np_glp_fill_basis_eval(num_reg_continuous_extern,
+                             np_glp_cv_cache.terms,
+                             np_glp_cv_cache.nterms,
+                             matrix_X_continuous_eval_extern,
+                             j,
+                             np_glp_cv_cache.basis_ctx,
+                             eval_basis);
+    } else {
+      np_glp_fill_basis_eval_raw(num_reg_continuous_extern,
+                                 np_glp_cv_cache.terms,
+                                 np_glp_cv_cache.nterms,
+                                 matrix_X_continuous_eval_extern,
+                                 j,
+                                 eval_basis);
+    }
 
     for(int rhs_idx = 0; rhs_idx < n_rhs; rhs_idx++){
       double fit = 0.0;

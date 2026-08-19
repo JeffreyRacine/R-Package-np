@@ -696,8 +696,7 @@ test_that("scalar beta regression fits enter the canonical row engine", {
       "                                                   kernel_route_diagnostics,\n",
       "                                                   categorical_compress,\n",
       "                                                   NP_REGRESSION_STDERR_LOCAL_RESIDUAL,\n",
-      "                                                   NULL,\n",
-      "                                                   &nn_geometry_context);"
+      "                                                   NULL);"
     ),
     fixed = TRUE
   )
@@ -896,7 +895,7 @@ test_that("legacy conditional scalar owner retains dormant route plumbing", {
   conditional <- substr(ingress, conditional_start, conditional_end - 1L)
   expect_match(
     gsub("[[:space:]]+", " ", conditional),
-    "pdf_deriv_stderr, &log_likelihood, NULL, NULL, 0, full_fit_nn_geometry_context_ptr);",
+    "pdf_deriv_stderr, &log_likelihood, NULL, NULL, 0);",
     fixed = TRUE
   )
 })
@@ -1505,9 +1504,7 @@ test_that("every beta side enters the common conditional regression owner", {
     fixed = TRUE
   )
   expect_match(
-    conditional,
-    "prepared_x_bandwidth_ptr,\n                                                                 row_nn_geometry_context_ptr);",
-    fixed = TRUE
+    conditional, "prepared_x_bandwidth_ptr);", fixed = TRUE
   )
   expect_match(
     conditional, "np_beta_continuous_bandwidth_prepare_canonical(",

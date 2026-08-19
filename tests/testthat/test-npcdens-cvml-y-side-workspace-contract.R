@@ -35,13 +35,13 @@ npcdens_y_side_fixture <- function() {
 npcdens_y_side_oracle <- function(x, y, bw) {
   local_eval <- getFromNamespace(".npRmpi_with_local_regression", "npRmpi")
   xweights <- local_eval(npksum(
-    txdat = x, bws = bw$xbw, bwtype = bw$type,
+    txdat = x, exdat = x, bws = bw$xbw, bwtype = bw$type,
     ckertype = bw$cxkertype, ckerorder = bw$cxkerorder,
     ukertype = bw$uxkertype, okertype = bw$oxkertype,
     return.kernel.weights = TRUE
   ))$kw
   yweights <- local_eval(npksum(
-    txdat = y, bws = bw$ybw, bwtype = bw$type,
+    txdat = y, exdat = y, bws = bw$ybw, bwtype = bw$type,
     ukertype = bw$uykertype, okertype = bw$oykertype,
     return.kernel.weights = TRUE
   ))$kw

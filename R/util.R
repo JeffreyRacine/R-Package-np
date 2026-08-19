@@ -1314,15 +1314,10 @@ npCheckRegressionDesignCondition <- function(reg.code,
 
   if (is.null(degree))
     stop(sprintf("%s: LP degree vector missing for design-conditioning check", where))
-  ## Rank and condition are properties of the polynomial span, not of the
-  ## units carried by a particular coordinate representation.  Assess the
-  ## same stable global coordinates used by the canonical native fit policy;
-  ## the user's requested representation remains metadata and does not alter
-  ## the estimator's span.
   B <- W.lp(xdat = xcon,
             degree = degree,
             basis = basis,
-            bernstein.basis = TRUE)
+            bernstein.basis = isTRUE(bernstein.basis))
 
   p <- ncol(B)
   if (is.null(p) || p <= 0L)
@@ -2528,7 +2523,6 @@ npRegressionNnCapability <- function(bws, owner = c("regression", "lsq")) {
   order <- as.integer(field("ckerorder", NA_integer_))[1L]
   bound <- as.character(field("ckerbound", ""))[1L]
   engine <- as.character(field("regtype.engine", ""))[1L]
-  basis <- as.character(field("basis.engine", ""))[1L]
   degree <- as.integer(field("degree.engine", integer()))
   lower.bound <- field("ckerlb", numeric())
   upper.bound <- field("ckerub", numeric())
@@ -2536,17 +2530,14 @@ npRegressionNnCapability <- function(bws, owner = c("regression", "lsq")) {
     length(upper.bound) == 1L &&
     is.infinite(lower.bound[[1L]]) && lower.bound[[1L]] < 0 &&
     is.infinite(upper.bound[[1L]]) && upper.bound[[1L]] > 0
-  degree.valid <- length(degree) == 1L && !is.na(degree[[1L]]) &&
-    degree[[1L]] >= 0L && degree[[1L]] <= .np_glp_degree_hard_max
-  canonical.mean <-
-    (identical(engine, "lc") && degree.valid && degree[[1L]] == 0L) ||
-    (identical(engine, "lp") && identical(basis, "glp") && degree.valid)
+  scalar.mean <- identical(engine, "lc") ||
+    (identical(engine, "lp") && length(degree) == 1L && degree[[1L]] == 0L)
 
   if (identical(type, "generalized_nn") &&
       identical(ncon, 1L) && identical(nuno, 0L) && identical(nord, 0L) &&
       kernel %in% c("gaussian", "epanechnikov") && identical(order, 2L) &&
-      identical(bound, "none") && ordinary.bounds && canonical.mean) {
-    return(list(code = "gnn-univariate-positive-lp-k1", lower = 1L))
+      identical(bound, "none") && ordinary.bounds && scalar.mean) {
+    return(list(code = "gnn-univariate-positive-lc-k1", lower = 1L))
   }
 
   list(code = "k2-only", lower = 2L)
@@ -2585,9 +2576,10 @@ npRegressionK1GeometryValidate <- function(bws, txdat, exdat = NULL) {
       !identical(npRegressionNnLowerBound(bws), 1L))
     return(invisible(TRUE))
 
-  icon <- which(as.logical(bws$icon))
-  if (length(icon) != 1L || length(bws$bw) < icon ||
-      !is.finite(bws$bw[[icon]]) || bws$bw[[icon]] != 1)
+  icon <- which(as.logical(bws[["icon", exact = TRUE]]))
+  bandwidth <- bws[["bw", exact = TRUE]]
+  if (length(icon) != 1L || length(bandwidth) < icon ||
+      !is.finite(bandwidth[[icon]]) || bandwidth[[icon]] != 1)
     return(invisible(TRUE))
 
   train <- as.double(txdat[[icon]])

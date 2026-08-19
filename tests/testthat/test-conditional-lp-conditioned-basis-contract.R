@@ -161,7 +161,7 @@ test_that("conditional LP influence coordinates are one cached global policy", {
   jksum <- paste(readLines(jksum_file, warn = FALSE), collapse = "\n")
   basis <- paste(readLines(basis_file, warn = FALSE), collapse = "\n")
   start <- regexpr(
-    "static int np_glp_cv_cache_prepare(const int lp_engine,",
+    "static int np_glp_cv_cache_prepare_influence_basis(void)",
     jksum, fixed = TRUE
   )[[1L]]
   stop <- regexpr(
@@ -172,22 +172,32 @@ test_that("conditional LP influence coordinates are one cached global policy", {
   expect_gt(stop, start)
   prepare <- substr(jksum, start, stop - 1L)
 
-  expect_match(prepare, "np_glp_fit_basis_prepare(", fixed = TRUE)
-  expect_match(prepare, "source_basis_stable = use_stable_basis;",
-               fixed = TRUE)
-  expect_match(prepare, "np_glp_cv_cache.basis = np_glp_cv_cache.source_basis;",
-               fixed = TRUE)
-  expect_match(prepare, "influence_basis_ready = 1;", fixed = TRUE)
+  ready <- regexpr(
+    "if(np_glp_cv_cache.influence_basis_ready)", prepare, fixed = TRUE
+  )[[1L]]
+  condition <- regexpr(
+    "np_lp_basis_requires_conditioning(", prepare, fixed = TRUE
+  )[[1L]]
+  expect_gt(ready, 0L)
+  expect_gt(condition, ready)
   expect_match(
     prepare,
-    "influence_basis_conditioned =\n    np_glp_cv_cache.source_basis_stable;",
+    "return np_glp_cv_cache.basis != NULL;",
     fixed = TRUE
   )
-  expect_false(grepl("np_lp_conditioned_basis_prepare(", prepare,
-                     fixed = TRUE))
-  expect_false(grepl("conditioned_basis", prepare, fixed = TRUE))
-  expect_false(grepl("dgeqp3", jksum, fixed = TRUE))
-  expect_false(grepl("dorgqr", jksum, fixed = TRUE))
+  expect_match(
+    prepare,
+    "np_glp_cv_cache.basis = np_glp_cv_cache.conditioned_basis;",
+    fixed = TRUE
+  )
+  expect_match(prepare, "influence_basis_conditioned = 0;", fixed = TRUE)
+  expect_match(prepare, "influence_basis_conditioned = 1;", fixed = TRUE)
+  expect_match(
+    prepare,
+    "Diagnose the raw polynomial coordinates in both cases",
+    fixed = TRUE
+  )
+  expect_match(prepare, "np_glp_fill_basis_raw_train(", fixed = TRUE)
   expect_false(grepl("kernel_c", prepare, fixed = TRUE))
   expect_false(grepl("NPGLPQRDropWorkspace", jksum, fixed = TRUE))
   expect_false(grepl("num_obs*num_obs", prepare, fixed = TRUE))

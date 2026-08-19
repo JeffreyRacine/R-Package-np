@@ -61,8 +61,10 @@ test_that("adaptive row context owns signed delete-one conversion", {
   files <- locate_adaptive_row_reuse_sources()
   skip_if(is.null(files), "package source files unavailable")
   lines <- readLines(files[[1L]], warn = FALSE)
-  implementation <- npRmpi_test_extract_c_function(
-    lines, "np_conditional_xrow_legacy_influence"
+  implementation <- adaptive_source_body(
+    lines,
+    "^static int (NP_NOINLINE )?(NP_HOT_ALIGN )?np_conditional_xrow_from_ctx_impl\\(",
+    "^static int np_conditional_xrow_from_ctx\\("
   )
   row_source <- paste(readLines(files[[2L]], warn = FALSE), collapse = "\n")
   header <- paste(readLines(files[[3L]], warn = FALSE), collapse = "\n")
@@ -70,12 +72,12 @@ test_that("adaptive row context owns signed delete-one conversion", {
   expect_match(implementation, "if(drop_eval_self){", fixed = TRUE)
   expect_match(
     implementation,
-    "if(!np_lp_delete_denominator(row_out[eval_idx], &denominator))",
+    "if(!np_lp_delete_denominator(row_out[eval_idx], &den))",
     fixed = TRUE
   )
   expect_match(
     implementation,
-    "j == eval_pos ? 0.0 : row_out[orig_j]/denominator",
+    "(j == eval_pos) ? 0.0 : row_out[orig_j]/den",
     fixed = TRUE
   )
   expect_false(grepl("NZD", implementation, fixed = TRUE))

@@ -170,7 +170,13 @@ npindexbw.NULL <-
     paste0("lp", paste(as.integer(spec$degree), collapse = ","))
   }
 
-  canonical.degree <- as.integer(spec$degree.engine)
+  canonical.degree <- if (identical(public.regtype, "lc")) {
+    0L
+  } else if (identical(public.regtype, "ll")) {
+    1L
+  } else {
+    as.integer(spec$degree.engine)
+  }
 
   canonical.degree0 <- length(canonical.degree) > 0L && all(canonical.degree == 0L)
   if (!(identical(method, "ichimura") || identical(method, "kleinspady"))) {
@@ -195,7 +201,7 @@ npindexbw.NULL <-
     public.regtype = public.regtype,
     public.degree = as.integer(spec$degree),
     route = route,
-    canonical.regtype = engine.regtype,
+    canonical.regtype = if (identical(public.regtype, "lc") || identical(public.regtype, "ll")) "lp" else engine.regtype,
     canonical.degree = canonical.degree,
     executor = executor,
     objective.spec = objective.spec,

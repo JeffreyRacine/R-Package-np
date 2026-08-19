@@ -11,10 +11,7 @@ test_that("npplreg generalized-nn cv.aic bootstrap representative session contra
   tz <- data.frame(z1 = runif(n))
   y <- 0.7 * tx$x1 + sin(2 * pi * tz$z1) + rnorm(n, sd = 0.06)
 
-  # Plot bootstrap samples are discrete even when the source data are not.
-  # Use the broadest admissible count so this route contract does not depend
-  # on the retired nearest-positive zero-radius substitution.
-  bws.nn <- matrix(rep.int(n - 1L, 2L), nrow = 2L)
+  bws.nn <- matrix(c(2, 9), nrow = 2L)
   cases <- list(
     list(regtype = "lp", boot_method = "inid")
   )

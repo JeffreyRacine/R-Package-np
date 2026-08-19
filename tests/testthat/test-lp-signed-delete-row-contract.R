@@ -145,9 +145,6 @@ test_that("remaining conditional higher-order LOO routes match signed-WLS oracle
     y = 0.4 + 0.3 * sin(2 * pi * xdat$x1) * cos(pi * xdat$x2) +
       rnorm(n, sd = 0.09)
   )
-  # These are adjacency transcripts for the high-order signed-row owners.
-  # Exact donor-fold NN geometry is proved independently by the dedicated
-  # adaptive/generalized conditional CV oracle contracts.
   cases <- list(
     list(
       route = "cdens", method = "cv.ml", bwtype = "fixed",
@@ -159,13 +156,13 @@ test_that("remaining conditional higher-order LOO routes match signed-WLS oracle
       route = "cdens", method = "cv.ls", bwtype = "adaptive_nn",
       kernel = "epanechnikov", order = 8L, bernstein = TRUE,
       degree = c(2L, 2L), bws = c(25L, 29L, 27L),
-      oracle = -46.797292511161814
+      oracle = -8.7619671096815512
     ),
     list(
       route = "cdist", method = "cv.ls", bwtype = "generalized_nn",
       kernel = "gaussian", order = 8L, bernstein = FALSE,
       degree = c(1L, 1L), bws = c(25L, 29L, 27L),
-      oracle = 3.066587903283053
+      oracle = 0.1435309775161671
     )
   )
 
