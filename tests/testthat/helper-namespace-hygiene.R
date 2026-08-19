@@ -1,7 +1,15 @@
 npRmpi_namespace_hygiene_root <- function() {
+  source_root <- Sys.getenv("NP_SOURCE_ROOT", unset = "")
+  if (nzchar(source_root)) {
+    source_root <- tryCatch(
+      normalizePath(source_root, mustWork = TRUE),
+      error = function(e) ""
+    )
+  }
   starts <- unique(Filter(
     nzchar,
     c(
+      source_root,
       tryCatch(normalizePath(testthat::test_path("..", ".."), mustWork = TRUE), error = function(e) ""),
       tryCatch(normalizePath(getwd(), mustWork = TRUE), error = function(e) ""),
       tryCatch(normalizePath(file.path(getwd(), ".."), mustWork = TRUE), error = function(e) ""),
@@ -59,6 +67,52 @@ npRmpi_test_source_path <- function(...) {
     paste("npRmpi package source file is unavailable:", path)
   )
   path
+}
+
+npRmpi_test_extract_c_function <- function(lines, name) {
+  stopifnot(is.character(lines), length(name) == 1L, nzchar(name))
+  candidates <- grep(
+    paste0("\\b", name, "[[:space:]]*\\("),
+    lines,
+    perl = TRUE
+  )
+
+  for (start in candidates) {
+    opened <- FALSE
+    depth <- 0L
+    rejected <- FALSE
+
+    for (line_index in seq.int(start, length(lines))) {
+      chars <- strsplit(lines[[line_index]], "", fixed = TRUE)[[1L]]
+      open_at <- match("{", chars, nomatch = 0L)
+      semicolon_at <- match(";", chars, nomatch = 0L)
+
+      if (!opened) {
+        if (semicolon_at > 0L && (open_at == 0L || semicolon_at < open_at)) {
+          rejected <- TRUE
+          break
+        }
+        if (open_at == 0L)
+          next
+        opened <- TRUE
+        chars <- chars[seq.int(open_at, length(chars))]
+      }
+
+      depth <- depth + sum(chars == "{") - sum(chars == "}")
+      if (depth == 0L)
+        return(paste(lines[start:line_index], collapse = "\n"))
+    }
+
+    if (opened && !rejected)
+      break
+  }
+
+  stop(sprintf("Could not extract C function definition: %s", name),
+       call. = FALSE)
+}
+
+npRmpi_test_compact_source <- function(source) {
+  gsub("[[:space:]]+", " ", source)
 }
 
 npRmpi_namespace_hygiene_scan <- function(root = npRmpi_namespace_hygiene_root(), pkg = "npRmpi") {
