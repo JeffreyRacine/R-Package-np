@@ -58,6 +58,66 @@ test_that("fixed ll gradient helper returns finite gradients without exact fallb
   expect_identical(fast.calls, 0L)
 })
 
+test_that("public ll bootstrap-gradient plot consumes the validated LP1 engine spec", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  old.auto <- getOption("npRmpi.autodispatch", FALSE)
+  on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
+  on.exit(close_mpi_slaves(), add = TRUE)
+  options(npRmpi.autodispatch = FALSE)
+
+  set.seed(20260819)
+  n <- 12L
+  x <- runif(n)
+  y <- 1 + 2 * x + rnorm(n, sd = 0.04)
+  tx <- data.frame(x = x)
+
+  bw.ll <- npregbw(
+    xdat = tx,
+    ydat = y,
+    regtype = "ll",
+    bws = 0.3,
+    bandwidth.compute = FALSE
+  )
+
+  set.seed(20260820)
+  out <- plot(
+    bw.ll,
+    xdat = tx,
+    ydat = y,
+    perspective = FALSE,
+    errors = "bootstrap",
+    B = 2L,
+    output = "data",
+    gradients = TRUE,
+    neval = 4L
+  )
+
+  expect_type(out, "list")
+  expect_true(length(out) >= 1L)
+  expect_true(all(is.finite(as.numeric(gradients(out[[1L]])))))
+  expect_identical(bw.ll$regtype, "ll")
+  expect_null(bw.ll$degree)
+  expect_identical(bw.ll$regtype.engine, "lp")
+  expect_identical(bw.ll$degree.engine, 1L)
+
+  bw.bad <- bw.ll
+  bw.bad$degree.engine <- 2L
+  expect_error(
+    plot(
+      bw.bad,
+      xdat = tx,
+      ydat = y,
+      perspective = FALSE,
+      errors = "bootstrap",
+      B = 2L,
+      output = "data",
+      gradients = TRUE,
+      neval = 4L
+    ),
+    "incoherent public and canonical engine metadata"
+  )
+})
+
 test_that("fixed lp gradient helper preserves derivative order and counts drawer semantics", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   old.auto <- getOption("npRmpi.autodispatch", FALSE)

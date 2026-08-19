@@ -4461,8 +4461,7 @@
     }
     if (!identical(regtype, "lc")) {
       use.exact.degree0.derivative <- .np_plot_regression_exact_lc_derivative_requested(
-        bws = bws,
-        regtype = regtype,
+        reg.spec = reg.spec,
         gradient.order = gradient.order
       )
 
@@ -15081,14 +15080,18 @@ compute.default.error.range <- function(center, err) {
     is.element(plot.errors.boot.method, c("inid", "fixed", "geom"))
 }
 
-.np_plot_regression_exact_lc_derivative_requested <- function(bws, regtype, gradient.order) {
-  ncon <- bws$ncon
-  if (is.null(ncon) || ncon < 1L)
+# `reg.spec` must be the result of npValidatedConditionalRegSpec() at the
+# owning plot stage; do not reconstruct engine state from public bws fields.
+.np_plot_regression_exact_lc_derivative_requested <- function(reg.spec, gradient.order) {
+  regtype.engine <- reg.spec[["regtype.engine"]]
+  degree.engine <- reg.spec[["degree.engine"]]
+  ncon <- length(degree.engine)
+  if (ncon < 1L)
     return(FALSE)
 
-  if (identical(regtype, "lc")) {
+  if (identical(regtype.engine, "lc")) {
     gradient.order <- npValidateLcGradientOrder(
-      regtype = regtype,
+      regtype = regtype.engine,
       gradient.order = gradient.order,
       ncon = ncon,
       where = ".np_plot_regression_exact_lc_derivative_requested"
@@ -15096,14 +15099,10 @@ compute.default.error.range <- function(center, err) {
     return(length(gradient.order) == ncon && all(gradient.order == 1L))
   }
 
-  identical(regtype, "lp") &&
+  identical(regtype.engine, "lp") &&
     npGlpDegree0FirstDerivativeLcOk(
-      regtype.engine = regtype,
-      degree.engine = npValidateGlpDegree(
-        regtype = "lp",
-        degree = bws$degree,
-        ncon = ncon
-      ),
+      regtype.engine = regtype.engine,
+      degree.engine = degree.engine,
       gradient.order = npValidateGlpGradientOrder(
         regtype = "lp",
         gradient.order = gradient.order,
@@ -16559,8 +16558,7 @@ compute.bootstrap.errors.rbandwidth =
       use.exact.degree0.derivative <- isTRUE(gradients) &&
         !isTRUE(xi.factor) &&
         .np_plot_regression_exact_lc_derivative_requested(
-          bws = bws,
-          regtype = regtype,
+          reg.spec = reg.spec,
           gradient.order = gradient.order
         )
 
