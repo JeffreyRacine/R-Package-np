@@ -31,13 +31,13 @@ test_that("adaptive X-row context owns one bounded weighted-design slab", {
   all_source <- paste(lines, collapse = "\n")
   prepare <- adaptive_xrow_source_body(
     lines,
-    "^static int np_conditional_xrow_ctx_prepare\\(",
-    "^static int np_conditional_xrow_from_ctx_impl\\("
+    "^static int np_conditional_xrow_ctx_prepare_impl\\(",
+    "^static int np_conditional_xrow_ctx_prepare\\("
   )
   clear <- adaptive_xrow_source_body(
     lines,
     "^static void np_conditional_xrow_ctx_clear\\(",
-    "^static int np_conditional_xrow_ctx_prepare\\("
+    "^static int np_conditional_xrow_ctx_prepare_impl\\("
   )
   compact <- gsub("[[:space:]]+", " ", prepare)
 
@@ -71,8 +71,8 @@ test_that("adaptive X rows preserve signed solve deletion and scalar fallback", 
   lines <- readLines(src_file, warn = FALSE)
   body <- adaptive_xrow_source_body(
     lines,
-    "^static int np_conditional_xrow_from_ctx_impl\\(",
-    "^static int np_conditional_xrow_from_ctx\\("
+    "^static int np_conditional_xrow_influence\\(",
+    "^static int np_regression_xrow_canonical_influence\\("
   )
   compact <- gsub("[[:space:]]+", " ", body)
 
@@ -90,12 +90,12 @@ test_that("adaptive X rows preserve signed solve deletion and scalar fallback", 
   )
   expect_match(
     body,
-    "np_lp_full_row_workspace_solve(&ctx->full_row_workspace",
+    "np_lp_solve_workspace_solve_adjoint_ranked(",
     fixed = TRUE
   )
   expect_match(
     body,
-    "np_lp_delete_denominator(row_out[eval_idx], &den)",
+    "np_lp_delete_denominator(row_out[eval_idx], &denominator)",
     fixed = TRUE
   )
   expect_match(
@@ -105,7 +105,7 @@ test_that("adaptive X rows preserve signed solve deletion and scalar fallback", 
   )
   expect_match(
     compact,
-    "} else { for(l = 0; l < k; l++) for(j = 0; j < k; j++) ctx->full_row_workspace.gram[l + j*k] = 0.0;",
+    "} else { for(l = 0; l < k; l++) for(j = 0; j < k; j++) ctx->regression_solve_workspace.gram_source[l + j*k] = 0.0;",
     fixed = TRUE
   )
   expect_match(
@@ -129,7 +129,7 @@ test_that("adaptive objective families share the context without a proof graph",
   expect_false(grepl("np_shadow_", all_source, fixed = TRUE))
   expect_match(
     all_source,
-    "if(use_row_ctx){\n    if(np_conditional_xrow_ctx_prepare(",
+    "if(use_row_ctx){\n    if(np_conditional_xrow_ctx_prepare_ctx(",
     fixed = TRUE
   )
   expect_gte(

@@ -31,7 +31,7 @@
   H
 }
 
-test_that("compiled LP hat matrix preserves the BLAS-backed R loop exactly", {
+test_that("compiled LP hat matrix agrees with the public canonical owner", {
   old <- getOption("matprod")
   on.exit(options(matprod = old), add = TRUE)
   options(matprod = "default")
@@ -62,12 +62,12 @@ test_that("compiled LP hat matrix preserves the BLAS-backed R loop exactly", {
     "C_np_reghat_lp_matrix_fast",
     as.matrix(kw), as.matrix(W.train), as.matrix(W.eval), PACKAGE = "np"
   )
-  expect_identical(compiled, reference)
-  expect_identical(as.double(npreghat(bws = bw, txdat = tx)),
-                   as.double(reference))
+  expect_equal(compiled, reference, tolerance = 1e-12)
+  expect_equal(as.double(npreghat(bws = bw, txdat = tx)),
+               as.double(reference), tolerance = 1e-12)
 })
 
-test_that("compiled LP hat matrix preserves the incumbent ridge sequence", {
+test_that("compiled and public LP hats share the canonical ridge policy", {
   old <- getOption("matprod")
   on.exit(options(matprod = old), add = TRUE)
   options(matprod = "default")
@@ -93,12 +93,19 @@ test_that("compiled LP hat matrix preserves the incumbent ridge sequence", {
   W.eval <- np:::W.lp(xdat = tx, degree = c(2L, 2L), basis = "glp",
                       bernstein.basis = FALSE)
 
-  reference <- .np_test_lp_hat_matrix_reference(kw, W.train, W.eval)
   compiled <- .Call(
     "C_np_reghat_lp_matrix_fast",
     as.matrix(kw), as.matrix(W.train), as.matrix(W.eval), PACKAGE = "np"
   )
-  expect_identical(compiled, reference)
+  public <- npreghat(bws = bw, txdat = tx, output = "matrix")
+  fit <- npreg(
+    bws = bw, txdat = tx, tydat = y,
+    warn.glp.gradient = FALSE
+  )$mean
+
+  expect_gt(sum(attr(public, "ridge.used", exact = TRUE) > 0), 0L)
+  expect_equal(as.vector(compiled), as.vector(public), tolerance = 1e-10)
+  expect_equal(as.vector(compiled %*% y), as.vector(fit), tolerance = 1e-8)
 })
 
 test_that("width-one scalar hats retain signed higher-order kernel weights", {

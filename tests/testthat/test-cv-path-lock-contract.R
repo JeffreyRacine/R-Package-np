@@ -175,11 +175,11 @@ test_that("fixed resident-row LP CV uses the reusable uncentered solve workspace
     fixed = TRUE
   ))
   expect_true(grepl(
-    "np_lp_solve_workspace_sources_finite(",
+    "np_lp_solve_workspace_solve_response_ranked(",
     helper_body,
     fixed = TRUE
   ))
-  expect_true(grepl(
+  expect_false(grepl(
     "ridge_steps >= NP_LP_SOLVE_MAX_RIDGE_STEPS",
     helper_body,
     fixed = TRUE
@@ -231,12 +231,12 @@ test_that("all-large, packed, and nearest-neighbor LP CV avoid legacy solve mars
     fixed = TRUE
   ))
   expect_true(grepl(
-    "np_lp_solve_workspace_solve(",
+    "np_lp_solve_workspace_solve_response_ranked(",
     helper_body,
     fixed = TRUE
   ))
   expect_false(grepl(
-    "np_lp_solve_workspace_solve_response(",
+    "np_lp_solve_workspace_solve_response(&solve_workspace,",
     helper_body,
     fixed = TRUE
   ))
@@ -399,7 +399,7 @@ test_that("canonical LP hat and apply routes share the typed solve policy", {
     expect_false(grepl("DELTA", helper_body, fixed = TRUE))
   }
   expect_true(grepl(
-    "np_lp_solve_workspace_solve_adjoint(&solve_workspace,",
+    "np_lp_solve_workspace_solve_adjoint_ranked(",
     hat_body,
     fixed = TRUE
   ))
@@ -424,7 +424,7 @@ test_that("canonical LP hat and apply routes share the typed solve policy", {
     fixed = TRUE
   ))
   expect_true(grepl(
-    "np_lp_solve_workspace_solve_response(&solve_workspace,",
+    "np_lp_solve_workspace_solve_response_ranked(",
     apply_body,
     fixed = TRUE
   ))
@@ -533,7 +533,7 @@ test_that("LP LOO rows use signed full-row deletion and no QR", {
   ))
 })
 
-test_that("conditional LP block rows reuse one canonical full-row workspace", {
+test_that("conditional LP block rows reuse one canonical solve workspace", {
   src_file <- locate_jksum_c()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
 
@@ -552,22 +552,22 @@ test_that("conditional LP block rows reuse one canonical full-row workspace", {
 
   helper_body <- paste(lines[helper_start:(helper_stop - 1L)], collapse = "\n")
   expect_true(grepl(
-    "NPLPFullRowWorkspace full_row_workspace;",
+    "NPLPSolveWorkspace solve_workspace;",
     helper_body,
     fixed = TRUE
   ))
   expect_true(grepl(
-    "np_lp_full_row_workspace_reserve(&full_row_workspace,",
+    "np_lp_solve_workspace_reserve(&solve_workspace,",
     helper_body,
     fixed = TRUE
   ))
   expect_true(grepl(
-    "np_lp_full_row_workspace_solve(&full_row_workspace,",
+    "np_lp_solve_workspace_solve_adjoint_ranked(",
     helper_body,
     fixed = TRUE
   ))
   expect_true(grepl(
-    "full_row_workspace.gram[a + b*k] += wj*za*zb;",
+    "solve_workspace.gram_source[a + b*k] += wj*za*zb;",
     helper_body,
     fixed = TRUE
   ))
@@ -581,7 +581,7 @@ test_that("conditional LP block rows reuse one canonical full-row workspace", {
   expect_false(grepl("np_mat_bad_rcond_sym(", helper_body, fixed = TRUE))
 })
 
-test_that("conditional and regression LP rows retain distinct canonical solve owners", {
+test_that("conditional and regression LP rows share one canonical solve policy", {
   src_file <- locate_jksum_c()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
 
@@ -589,7 +589,7 @@ test_that("conditional and regression LP rows retain distinct canonical solve ow
   struct_start <- grep("^typedef struct \\{$", lines)
   struct_stop <- grep("^} NPConditionalXRowCtx;$", lines)
   impl_start <- grep("^static int np_conditional_xrow_from_ctx_impl\\(", lines)
-  legacy_start <- grep("^static int np_conditional_xrow_legacy_influence\\(", lines)
+  conditional_start <- grep("^static int np_conditional_xrow_influence\\(", lines)
   regression_start <- grep("^static int np_regression_xrow_canonical_influence\\(", lines)
   prepare_start <- grep("^static int np_conditional_xrow_ctx_prepare_impl\\(", lines)
   clear_start <- grep("^static void np_conditional_xrow_ctx_clear\\(", lines)
@@ -600,31 +600,21 @@ test_that("conditional and regression LP rows retain distinct canonical solve ow
   expect_length(struct_start, 1L)
   expect_length(clear_start, 1L)
   expect_length(prepare_start, 1L)
-  expect_length(legacy_start, 1L)
+  expect_length(conditional_start, 1L)
   expect_length(regression_start, 1L)
   expect_length(impl_start, 1L)
   expect_length(wrapper_start, 1L)
 
   struct_body <- paste(lines[struct_start:struct_stop], collapse = "\n")
   clear_body <- paste(lines[clear_start:(prepare_start - 1L)], collapse = "\n")
-  prepare_body <- paste(lines[prepare_start:(legacy_start - 1L)], collapse = "\n")
-  legacy_body <- paste(lines[legacy_start:(regression_start - 1L)], collapse = "\n")
+  prepare_body <- paste(lines[prepare_start:(conditional_start - 1L)], collapse = "\n")
+  conditional_body <- paste(lines[conditional_start:(regression_start - 1L)], collapse = "\n")
   regression_body <- paste(lines[regression_start:(impl_start - 1L)], collapse = "\n")
   impl_body <- paste(lines[impl_start:(wrapper_start - 1L)], collapse = "\n")
 
   expect_true(grepl(
-    "NPLPFullRowWorkspace full_row_workspace;",
-    struct_body,
-    fixed = TRUE
-  ))
-  expect_true(grepl(
     "NPLPSolveWorkspace regression_solve_workspace;",
     struct_body,
-    fixed = TRUE
-  ))
-  expect_true(grepl(
-    "np_lp_full_row_workspace_clear(&ctx->full_row_workspace);",
-    clear_body,
     fixed = TRUE
   ))
   expect_true(grepl(
@@ -633,27 +623,27 @@ test_that("conditional and regression LP rows retain distinct canonical solve ow
     fixed = TRUE
   ))
   expect_true(grepl(
-    "np_lp_full_row_workspace_reserve(&ctx->full_row_workspace,",
+    "np_lp_solve_workspace_reserve(&ctx->regression_solve_workspace,",
     prepare_body,
     fixed = TRUE
   ))
   expect_true(grepl(
-    "np_lp_full_row_workspace_solve(&ctx->full_row_workspace,",
-    legacy_body,
+    "np_lp_solve_workspace_solve_adjoint_ranked(",
+    conditional_body,
     fixed = TRUE
   ))
   expect_true(grepl(
-    "ctx->full_row_workspace.gram[a + b*k] += wj*za*zb;",
-    legacy_body,
+    "ctx->regression_solve_workspace.gram_source[a + b*k] += wj*za*zb;",
+    conditional_body,
     fixed = TRUE
   ))
   expect_true(grepl(
-    "np_lp_solve_workspace_solve_adjoint(",
+    "np_lp_solve_workspace_solve_adjoint_ranked(",
     regression_body,
     fixed = TRUE
   ))
   expect_true(grepl(
-    "np_conditional_xrow_legacy_influence(",
+    "np_conditional_xrow_influence(",
     impl_body,
     fixed = TRUE
   ))
@@ -668,7 +658,7 @@ test_that("conditional and regression LP rows retain distinct canonical solve ow
   expect_false(grepl("np_mat_bad_rcond_sym(", impl_body, fixed = TRUE))
 })
 
-test_that("conditional LP block rows reuse full-row solve storage", {
+test_that("conditional LP block rows reuse canonical solve storage", {
   src_file <- locate_jksum_c()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
 
@@ -687,23 +677,23 @@ test_that("conditional LP block rows reuse full-row solve storage", {
 
   helper_body <- paste(lines[helper_start:(helper_stop - 1L)], collapse = "\n")
   expect_true(grepl(
-    "NPLPFullRowWorkspace full_row_workspace;",
+    "NPLPSolveWorkspace solve_workspace;",
     helper_body,
     fixed = TRUE
   ))
   expect_false(grepl("if((!drop_eval_self) &&", helper_body, fixed = TRUE))
   expect_true(grepl(
-    "np_lp_full_row_workspace_reserve(&full_row_workspace,",
+    "np_lp_solve_workspace_reserve(&solve_workspace,",
     helper_body,
     fixed = TRUE
   ))
   expect_true(grepl(
-    "np_lp_full_row_workspace_solve(&full_row_workspace,",
+    "np_lp_solve_workspace_solve_adjoint_ranked(",
     helper_body,
     fixed = TRUE
   ))
   expect_true(grepl(
-    "full_row_workspace.gram[a + b*k] += wj*za*zb;",
+    "solve_workspace.gram_source[a + b*k] += wj*za*zb;",
     helper_body,
     fixed = TRUE
   ))
@@ -729,7 +719,7 @@ test_that("conditional LP dense proof-row graph is absent from production", {
   }
 })
 
-test_that("conditional LP row-stream rows use bounded full-row solve storage", {
+test_that("conditional LP row-stream rows use bounded canonical solve storage", {
   src_file <- locate_jksum_c()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
 
@@ -748,23 +738,23 @@ test_that("conditional LP row-stream rows use bounded full-row solve storage", {
 
   helper_body <- paste(lines[helper_start:(helper_stop - 1L)], collapse = "\n")
   expect_true(grepl(
-    "NPLPFullRowWorkspace full_row_workspace;",
+    "NPLPSolveWorkspace solve_workspace;",
     helper_body,
     fixed = TRUE
   ))
   expect_false(grepl("if((!drop_eval_self) &&", helper_body, fixed = TRUE))
   expect_true(grepl(
-    "np_lp_full_row_workspace_reserve(&full_row_workspace,",
+    "np_lp_solve_workspace_reserve(&solve_workspace,",
     helper_body,
     fixed = TRUE
   ))
   expect_true(grepl(
-    "np_lp_full_row_workspace_solve(&full_row_workspace,",
+    "np_lp_solve_workspace_solve_adjoint_ranked(",
     helper_body,
     fixed = TRUE
   ))
   expect_true(grepl(
-    "full_row_workspace.gram[a + b*k] += wj*za*zb;",
+    "solve_workspace.gram_source[a + b*k] += wj*za*zb;",
     helper_body,
     fixed = TRUE
   ))

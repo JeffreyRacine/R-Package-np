@@ -52,7 +52,7 @@ test_that("fixed and generalized-NN CVLS share one canonical LOO block engine", 
   expect_false(grepl("self_weight = kw[eval_pos]", body, fixed = TRUE))
   markers <- c(
     "np_conditional_kernel_row_raw",
-    "np_lp_full_row_workspace_solve",
+    "np_lp_solve_workspace_solve_adjoint_ranked",
     "np_lp_delete_denominator(rows_out[i][eval_idx], &den)"
   )
   positions <- vapply(markers, function(marker) {
@@ -72,8 +72,8 @@ test_that("conditional CVLS dispatch reaches only the canonical block owner", {
 
   density_body <- cvls_source_body(
     lines,
-    "^int np_conditional_density_cvls_lp_stream\\(",
-    "^static int np_conditional_distribution_cvls_lp_row_stream\\("
+    "^#undef NP_CDENS_SUPERTILE_ALIGN$",
+    "^int np_conditional_density_cvls_lp_stream\\("
   )
   distribution_body <- cvls_source_body(
     lines,

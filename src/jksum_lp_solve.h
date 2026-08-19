@@ -90,43 +90,8 @@ void np_lp_solve_workspace_clear(NPLPSolveWorkspace *workspace);
 int np_lp_solve_workspace_reserve(NPLPSolveWorkspace *workspace,
                                   int p,
                                   int nrhs);
-int np_lp_solve_workspace_solve(NPLPSolveWorkspace *workspace,
-                                int p,
-                                int nrhs);
 
-/*
- * Canonical response-oriented bounded ridge transcript.  The caller fills
- * the pristine Gram and response-moment columns, and supplies the fixed ridge
- * increment owned by its statistical sample.  Failed solves add that
- * increment to the source Gram diagonal in ascending order.  Once a ridged
- * system solves, the accumulated intercept restoration is applied to every
- * response RHS and the system is resolved, leaving the final factorization
- * available to solve_factored().  This is deliberately response-only: the
- * adjoint influence-row orientation has a different transform placement and
- * enters only with its own direct identity proof.
- */
-NPLPSolvePolicyStatus np_lp_solve_workspace_solve_response(
-  NPLPSolveWorkspace *workspace,
-  int p,
-  int nrhs,
-  double ridge_increment,
-  NPLPSolvePolicyDiagnostics *diagnostics);
-
-/*
- * Adjoint sibling of solve_response().  It selects the identical Gram-owned
- * factor/ridge state, solves evaluation-basis RHS columns, and only then
- * applies the transposed accumulated-ridge intercept transform to each
- * solution.  Moving that transform to the RHS side of the inverse would not
- * reproduce the response fitted-value map.
- */
-NPLPSolvePolicyStatus np_lp_solve_workspace_solve_adjoint(
-  NPLPSolveWorkspace *workspace,
-  int p,
-  int nrhs,
-  double ridge_increment,
-  NPLPSolvePolicyDiagnostics *diagnostics);
-
-/* Reuse a factor/ridge state retained by a prior response or adjoint solve. */
+/* Reuse a factor/ridge state retained by a canonical response/adjoint solve. */
 NPLPSolvePolicyStatus np_lp_solve_workspace_solve_adjoint_factored(
   NPLPSolveWorkspace *workspace,
   int p,
@@ -171,9 +136,10 @@ int np_lp_solve_workspace_ridge_increment(
 /*
  * Canonical policy entry points.  ridge_fraction is converted once from the
  * pristine Gram into an owner-invariant ridge increment.  rank_upper_bound
- * may be UNKNOWN; otherwise it is the exact number of independent donor rows
- * available before regularization.  Ordinary response rows retain one-call
- * DGESV and the successful LU for later RHS/adjoint reuse.
+ * may be UNKNOWN; otherwise it is the exact number of nonzero donor rows and
+ * therefore a structural upper bound on rank before regularization. Ordinary
+ * response rows retain one-call DGESV and the successful LU for later
+ * RHS/adjoint reuse.
  */
 NPLPSolvePolicyStatus np_lp_solve_workspace_solve_response_ranked(
   NPLPSolveWorkspace *workspace,
@@ -189,6 +155,14 @@ NPLPSolvePolicyStatus np_lp_solve_workspace_solve_adjoint_ranked(
   double ridge_fraction,
   int rank_upper_bound,
   NPLPSolvePolicyDiagnostics *diagnostics);
+
+/*
+ * Exact structural rank upper bound for one weighted design row.  Each finite
+ * or non-finite nonzero weight can contribute at most one independent donor
+ * row, so the count is capped at p and requires no allocation.  Numerical
+ * finiteness remains the solve policy's responsibility after accumulation.
+ */
+int np_lp_rank_upper_bound_from_weights(const double *weights, int n, int p);
 
 /*
  * Exact basis-general influence row for a one-column signed weighted design:
@@ -209,22 +183,16 @@ NPLPWidthOneStatus np_lp_width_one_influence_row(
   size_t output_stride);
 
 /*
- * Reusable contiguous Gram/RHS/rcond/solve storage for full-weight LP rows.
- * Width one uses scalar condition, solve, and inverse algebra and never
- * enters LAPACK.  The row owner reconstructs wider Gram and RHS buffers
- * before every call, so dgesv may overwrite them directly.  Wider systems
- * retain the same dsyev eigenvalue-ratio gate and dgesv transcript as the
- * historical row-fragmented route.
+ * Reusable contiguous storage for retained full-Gram inverse owners. Width
+ * one uses scalar condition and inverse algebra and never enters LAPACK.
+ * Direct response and influence solves use NPLPSolveWorkspace above; this
+ * older workspace remains only for the all-row inverse topology.
  */
 void np_lp_full_row_workspace_init(NPLPFullRowWorkspace *workspace);
 void np_lp_full_row_workspace_clear(NPLPFullRowWorkspace *workspace);
 int np_lp_full_row_workspace_reserve(NPLPFullRowWorkspace *workspace,
                                      int p,
                                      int nrhs);
-int np_lp_full_row_workspace_solve(NPLPFullRowWorkspace *workspace,
-                                   int p,
-                                   int nrhs,
-                                   double min_rcond);
 
 /*
  * Invert the symmetric Gram buffer in place after the same dsyev rcond gate.

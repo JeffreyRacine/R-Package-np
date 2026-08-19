@@ -1,5 +1,15 @@
 # np 0.70-6
 
+* Local-polynomial response, influence-row, regression-CV, conditional X-row,
+  and bootstrap owners now share one typed numerical-rank and ridge policy.
+  Ordinary full-rank response rows retain the one-call `DGESV` lifecycle;
+  only an ambiguous working-precision pivot enters a cold, symmetrically
+  equilibrated singular-value check. Rank-deficient rows use one
+  Gram-relative bounded-ridge transcript for response and adjoint solves.
+  This restores dense/tree objective parity for sparse fixed-bandwidth LP
+  windows and makes `npreghat()` matrix/apply results agree with fitted values
+  on deficient rows without adding evaluation-by-training storage.
+
 * Public `regtype="ll"` is now exclusively an API and reporting alias for the
   canonical raw GLP degree-one engine. Regression fit, uncertainty, objective,
   `npreghat()` matrix/apply/constraint, single-index hat, conditional X-side,

@@ -48,24 +48,6 @@ test_that("all canonical LP solve retries are bounded", {
   reghat.c <- paste(readLines(reghat.c.file, warn = FALSE), collapse = "\n")
   reghat.r <- paste(readLines(reghat.r.file, warn = FALSE), collapse = "\n")
 
-  retry.count <- lengths(regmatches(
-    jksum,
-    gregexpr(
-      "while\\s*\\(\\s*!np_lp_solve_workspace_solve\\(",
-      jksum
-    )
-  ))
-  finite.guard.count <- lengths(regmatches(
-    jksum,
-    gregexpr("np_lp_solve_workspace_sources_finite\\(", jksum)
-  ))
-  step.guard.count <- lengths(regmatches(
-    jksum,
-    gregexpr("ridge_steps >= NP_LP_SOLVE_MAX_RIDGE_STEPS", jksum)
-  ))
-  expect_gt(retry.count, 0L)
-  expect_equal(finite.guard.count, retry.count)
-  expect_equal(step.guard.count, retry.count)
   expect_true(grepl(
     "execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_SOLVE;",
     jksum,
@@ -78,13 +60,13 @@ test_that("all canonical LP solve retries are bounded", {
     fixed = TRUE
   ))
   expect_true(grepl(
-    "np_lp_solve_workspace_sources_finite(",
-    jksum,
+    "np_lp_solve_workspace_solve_response_ranked(",
+    solve.c,
     fixed = TRUE
   ))
   expect_true(grepl(
-    "int np_lp_solve_workspace_sources_finite(",
-    solve.h,
+    "np_lp_solve_workspace_solve_adjoint_ranked(",
+    solve.c,
     fixed = TRUE
   ))
   expect_true(grepl("NP_LP_COLD_PATH", solve.h, fixed = TRUE))
@@ -98,43 +80,32 @@ test_that("all canonical LP solve retries are bounded", {
     solve.c,
     fixed = TRUE
   ))
-  solve.start <- regexpr(
-    "int np_lp_solve_workspace_solve(",
+  step.guard.count <- lengths(regmatches(
+    solve.c,
+    gregexpr(
+      "ridge_steps >= NP_LP_SOLVE_MAX_RIDGE_STEPS",
+      solve.c,
+      fixed = TRUE
+    )
+  ))
+  expect_gte(step.guard.count, 2L)
+  expect_true(grepl(
+    "np_lp_solve_workspace_sources_finite(workspace, p, nrhs)",
     solve.c,
     fixed = TRUE
-  )
-  solve.stop <- regexpr(
-    "int np_lp_solve_workspace_solve_factored(",
-    solve.c,
-    fixed = TRUE
-  )
-  expect_gt(solve.start, 0L)
-  expect_gt(solve.stop, solve.start)
-  solve.body <- substr(solve.c, solve.start, solve.stop - 1L)
-  expect_false(grepl(
-    "np_lp_solve_workspace_shape(",
-    solve.body,
-    fixed = TRUE
   ))
   expect_true(grepl(
-    "(workspace == NULL) || (p <= 0) || (nrhs <= 0)",
-    solve.body,
-    fixed = TRUE
-  ))
-
-  expect_true(grepl(
-    "ridge_step < NP_LP_SOLVE_MAX_RIDGE_STEPS",
-    reghat.c,
-    fixed = TRUE
-  ))
-  expect_true(grepl(
-    "np_reghat_sources_finite(nterms, gram, rhs)",
+    "np_lp_solve_workspace_solve_adjoint_ranked(",
     reghat.c,
     fixed = TRUE
   ))
   expect_false(grepl(
-    "while\\s*\\(\\s*!np_reghat_solve_system\\(",
+    "NP_LP_SOLVE_MAX_RIDGE_STEPS",
     reghat.c
+  ))
+  expect_false(grepl(
+    "np_lp_solve_workspace_solve\\(",
+    jksum
   ))
 
   fallback.start <- regexpr(
