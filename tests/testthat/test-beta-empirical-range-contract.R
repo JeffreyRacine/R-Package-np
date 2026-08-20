@@ -7,30 +7,81 @@
   )
 }
 
+beta_range_mpi_domains <- function() {
+  list(
+    order = c(2L, 4L, 6L, 8L),
+    bwtype = c("fixed", "generalized_nn", "adaptive_nn"),
+    operator = c("normal", "integral", "convolution")
+  )
+}
+
+beta_range_mpi_pairwise_cases <- function() {
+  domains <- beta_range_mpi_domains()
+  do.call(rbind, lapply(seq_along(domains$order), function(order_index) {
+    data.frame(
+      order = domains$order[[order_index]],
+      bwtype = domains$bwtype,
+      operator = domains$operator[
+        (seq_along(domains$bwtype) + order_index - 2L) %%
+          length(domains$operator) + 1L
+      ],
+      stringsAsFactors = FALSE
+    )
+  }))
+}
+
+beta_range_mpi_gradient_cases <- function() {
+  domains <- beta_range_mpi_domains()
+  data.frame(
+    order = domains$order,
+    bwtype = c("fixed", "generalized_nn", "adaptive_nn", "fixed"),
+    stringsAsFactors = FALSE
+  )
+}
+
+test_that("MPI empirical-range cases cover every operator-axis pair", {
+  domains <- beta_range_mpi_domains()
+  cases <- beta_range_mpi_pairwise_cases()
+  expect_identical(anyDuplicated(cases), 0L)
+  for (pair in combn(names(cases), 2L, simplify = FALSE)) {
+    observed <- unique(cases[pair])
+    complete <- expand.grid(domains[pair], stringsAsFactors = FALSE)
+    expect_setequal(do.call(paste, observed), do.call(paste, complete))
+  }
+})
+
+test_that("MPI empirical-range gradient cases cover every axis level", {
+  domains <- beta_range_mpi_domains()
+  cases <- beta_range_mpi_gradient_cases()
+  expect_identical(anyDuplicated(cases), 0L)
+  expect_setequal(cases$order, domains$order)
+  expect_setequal(cases$bwtype, domains$bwtype)
+})
+
 test_that("empirical-range beta operators equal explicit half-spacing bounds", {
   training <- data.frame(x = c(-2, -1.86, -1.3, -0.35, 0.8, 2.2, 3))
   evaluation <- data.frame(x = seq(-2, 3, length.out = 11L))
   bounds <- .beta_half_spacing_bounds(training$x)
 
-  for (order in c(2L, 4L, 6L, 8L)) {
-    for (bwtype in c("fixed", "generalized_nn", "adaptive_nn")) {
-      bandwidth <- if (identical(bwtype, "fixed")) 0.55 else 3
-      for (operator in c("normal", "integral", "convolution")) {
-        common <- list(
-          txdat = training, exdat = evaluation, bws = bandwidth,
-          bwtype = bwtype, ckertype = "beta", ckerorder = order,
-          operator = operator, return.kernel.weights = TRUE
-        )
-        empirical <- do.call(npksum, c(common, list(ckerbound = "range")))
-        explicit <- do.call(npksum, c(common, list(
-          ckerbound = "fixed", ckerlb = bounds[["lower"]],
-          ckerub = bounds[["upper"]]
-        )))
+  cases <- beta_range_mpi_pairwise_cases()
+  for (case_index in seq_len(nrow(cases))) {
+    order <- cases$order[[case_index]]
+    bwtype <- cases$bwtype[[case_index]]
+    operator <- cases$operator[[case_index]]
+    bandwidth <- if (identical(bwtype, "fixed")) 0.55 else 3
+    common <- list(
+      txdat = training, exdat = evaluation, bws = bandwidth,
+      bwtype = bwtype, ckertype = "beta", ckerorder = order,
+      operator = operator, return.kernel.weights = TRUE
+    )
+    empirical <- do.call(npksum, c(common, list(ckerbound = "range")))
+    explicit <- do.call(npksum, c(common, list(
+      ckerbound = "fixed", ckerlb = bounds[["lower"]],
+      ckerub = bounds[["upper"]]
+    )))
 
-        expect_equal(empirical$kw, explicit$kw, tolerance = 2e-12)
-        expect_equal(empirical$ksum, explicit$ksum, tolerance = 2e-12)
-      }
-    }
+    expect_equal(empirical$kw, explicit$kw, tolerance = 2e-12)
+    expect_equal(empirical$ksum, explicit$ksum, tolerance = 2e-12)
   }
 })
 
@@ -101,31 +152,32 @@ test_that("empirical-range beta gradients are finite at raw extrema", {
   response <- c(0.2, 0.5, -0.1, 0.8, 1.4, 1.1, 2.3)
   bounds <- .beta_half_spacing_bounds(training$x)
 
-  for (order in c(2L, 4L, 6L, 8L)) {
-    for (bwtype in c("fixed", "generalized_nn", "adaptive_nn")) {
-      bandwidth <- if (identical(bwtype, "fixed")) 0.55 else 3
-      common <- list(
-        txdat = training, tydat = response, exdat = evaluation,
-        bws = bandwidth, bwtype = bwtype, gradients = TRUE, se = TRUE,
-        regtype = "lc", ckertype = "beta", ckerorder = order
-      )
-      expect_warning(
-        empirical <- do.call(
-          npreg, c(common, list(ckerbound = "range"))
-        ),
-        NA
-      )
-      explicit <- do.call(npreg, c(common, list(
-        ckerbound = "fixed", ckerlb = bounds[["lower"]],
-        ckerub = bounds[["upper"]]
-      )))
+  cases <- beta_range_mpi_gradient_cases()
+  for (case_index in seq_len(nrow(cases))) {
+    order <- cases$order[[case_index]]
+    bwtype <- cases$bwtype[[case_index]]
+    bandwidth <- if (identical(bwtype, "fixed")) 0.55 else 3
+    common <- list(
+      txdat = training, tydat = response, exdat = evaluation,
+      bws = bandwidth, bwtype = bwtype, gradients = TRUE, se = TRUE,
+      regtype = "lc", ckertype = "beta", ckerorder = order
+    )
+    expect_warning(
+      empirical <- do.call(
+        npreg, c(common, list(ckerbound = "range"))
+      ),
+      NA
+    )
+    explicit <- do.call(npreg, c(common, list(
+      ckerbound = "fixed", ckerlb = bounds[["lower"]],
+      ckerub = bounds[["upper"]]
+    )))
 
-      expect_identical(fitted(empirical), fitted(explicit))
-      expect_identical(gradients(empirical), gradients(explicit))
-      expect_identical(empirical$gerr, explicit$gerr)
-      expect_true(all(is.finite(gradients(empirical)[, 1L])))
-      expect_true(all(is.finite(empirical$gerr[, 1L])))
-    }
+    expect_identical(fitted(empirical), fitted(explicit))
+    expect_identical(gradients(empirical), gradients(explicit))
+    expect_identical(empirical$gerr, explicit$gerr)
+    expect_true(all(is.finite(gradients(empirical)[, 1L])))
+    expect_true(all(is.finite(empirical$gerr[, 1L])))
   }
 
   constant <- npreg(

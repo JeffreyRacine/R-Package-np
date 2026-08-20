@@ -7,7 +7,10 @@ np_full_nslaves <- suppressWarnings(as.integer(
   Sys.getenv("NP_RMPI_TEST_NSLAVES", unset = "1")
 ))
 np_full_shard_size <- suppressWarnings(as.integer(
-  Sys.getenv("NP_RMPI_TEST_SHARD_SIZE", unset = "40")
+  Sys.getenv("NP_RMPI_TEST_SHARD_SIZE", unset = "10")
+))
+np_full_shard_timeout <- suppressWarnings(as.integer(
+  Sys.getenv("NP_RMPI_TEST_SHARD_TIMEOUT", unset = "300")
 ))
 
 local({
@@ -23,6 +26,11 @@ local({
                is.na(np_full_shard_size) || np_full_shard_size < 1L) {
       test_error <- simpleError(
         "NP_RMPI_TEST_SHARD_SIZE must be a positive integer for the full suite"
+      )
+    } else if (length(np_full_shard_timeout) != 1L ||
+               is.na(np_full_shard_timeout) || np_full_shard_timeout < 1L) {
+      test_error <- simpleError(
+        "NP_RMPI_TEST_SHARD_TIMEOUT must be a positive integer for the full suite"
       )
     } else {
       test_error <- tryCatch({
@@ -69,7 +77,8 @@ local({
           statuses[[shard]] <- system2(
             rscript,
             args = shard_args,
-            stdout = "", stderr = "", env = env
+            stdout = "", stderr = "", env = env,
+            timeout = np_full_shard_timeout
           )
 
           expected <- sprintf(

@@ -48,6 +48,21 @@ test_that("full-suite runner requires clean direct shard exits", {
 
   expect_false(grepl("setsid", parent_text, fixed = TRUE))
   expect_false(grepl("137L", parent_text, fixed = TRUE))
+  expect_match(
+    parent_text,
+    'Sys.getenv("NP_RMPI_TEST_SHARD_SIZE", unset = "10")',
+    fixed = TRUE
+  )
+  expect_match(
+    parent_text,
+    'Sys.getenv("NP_RMPI_TEST_SHARD_TIMEOUT", unset = "300")',
+    fixed = TRUE
+  )
+  expect_match(
+    parent_text,
+    "timeout = np_full_shard_timeout",
+    fixed = TRUE
+  )
   expect_match(shard_text, "npRmpi_run_full_test_shard <- function(args)",
                fixed = TRUE)
   expect_match(shard_text, "npRmpi_shard_local_only_files <- function()",
@@ -124,6 +139,21 @@ test_that("full-suite runner requires clean direct shard exits", {
   expect_match(
     shard_text,
     "test-beta-conditional-count-canonical-contract.R",
+    fixed = TRUE
+  )
+  expect_match(
+    shard_text,
+    "test-beta-gradient-estimator-contract.R",
+    fixed = TRUE
+  )
+  expect_match(
+    shard_text,
+    "test-beta-higher-order-regression-contract.R",
+    fixed = TRUE
+  )
+  expect_match(
+    shard_text,
+    "test-beta-regression-objective-canonical-contract.R",
     fixed = TRUE
   )
   expect_match(

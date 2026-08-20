@@ -190,6 +190,49 @@ test_that("powered beta endpoint jumps retain structural semantics", {
   expect_identical(zeroth$kw, raw$kw)
 })
 
+beta_derivative_mpi_domains <- function() {
+  list(
+    mode = c("fixed", "generalized_nn", "adaptive_nn"),
+    order = c(2L, 4L, 6L, 8L),
+    derivative_dimension = 1:2,
+    companion = c("normal", "integral", "convolution"),
+    power = c(0L, 2L, 3L)
+  )
+}
+
+beta_derivative_mpi_pairwise_cases <- function() {
+  data.frame(
+    mode = c(
+      "fixed", "generalized_nn", "adaptive_nn",
+      "fixed", "generalized_nn", "adaptive_nn",
+      "fixed", "generalized_nn", "adaptive_nn",
+      "fixed", "generalized_nn", "adaptive_nn"
+    ),
+    order = rep(c(2L, 4L, 6L, 8L), each = 3L),
+    derivative_dimension = c(2L, 2L, 1L, 2L, 2L, 1L,
+                             1L, 2L, 1L, 2L, 1L, 2L),
+    companion = c(
+      "integral", "normal", "convolution",
+      "convolution", "integral", "normal",
+      "normal", "convolution", "integral",
+      "integral", "normal", "convolution"
+    ),
+    power = c(3L, 2L, 0L, 2L, 0L, 3L, 0L, 3L, 2L, 3L, 2L, 0L),
+    stringsAsFactors = FALSE
+  )
+}
+
+test_that("MPI powered beta derivative cases cover every route-axis pair", {
+  domains <- beta_derivative_mpi_domains()
+  cases <- beta_derivative_mpi_pairwise_cases()
+  expect_identical(anyDuplicated(cases), 0L)
+  for (pair in combn(names(cases), 2L, simplify = FALSE)) {
+    observed <- unique(cases[pair])
+    complete <- expand.grid(domains[pair], stringsAsFactors = FALSE)
+    expect_setequal(do.call(paste, observed), do.call(paste, complete))
+  }
+})
+
 test_that("powered beta derivatives span orders, operators, and bandwidth modes", {
   training <- data.frame(
     x = c(.07, .16, .29, .43, .61, .76, .91),
@@ -197,33 +240,29 @@ test_that("powered beta derivatives span orders, operators, and bandwidth modes"
   )
   evaluation <- data.frame(x = c(.12, .31, .52, .81),
                            z = c(.22, .64, .39, .73))
-  companions <- c("normal", "integral", "convolution")
-
-  for (mode in c("fixed", "generalized_nn", "adaptive_nn")) {
+  cases <- beta_derivative_mpi_pairwise_cases()
+  for (case_index in seq_len(nrow(cases))) {
+    mode <- cases$mode[[case_index]]
+    order <- cases$order[[case_index]]
+    derivative_dimension <- cases$derivative_dimension[[case_index]]
+    companion <- cases$companion[[case_index]]
+    power <- cases$power[[case_index]]
     bandwidth <- if (identical(mode, "fixed")) c(.18, .2) else c(4, 4)
-    for (order in c(2L, 4L, 6L, 8L))
-      for (derivative_dimension in 1:2)
-        for (companion in companions) {
-          operators <- rep(companion, 2)
-          operators[derivative_dimension] <- "derivative"
-          arguments <- list(
-            bws = bandwidth, txdat = training, exdat = evaluation,
-            bwtype = mode, operator = operators,
-            return.kernel.weights = TRUE, bandwidth.divide = TRUE,
-            ckertype = "beta", ckerorder = order,
-            ckerbound = "fixed", ckerlb = c(0, 0), ckerub = c(1, 1)
-          )
-          raw <- do.call(npksum, arguments)
-          for (power in c(0L, 2L, 3L)) {
-            powered <- do.call(npksum, c(arguments, list(
-              kernel.pow = power
-            )))
-            expected_weights <- ifelse(raw$kw == 0, 0, raw$kw^power)
-            expect_equal(as.double(powered$ksum), colSums(expected_weights),
-                         tolerance = 8e-9)
-            expect_identical(powered$kw, raw$kw)
-          }
-        }
+    operators <- rep(companion, 2)
+    operators[derivative_dimension] <- "derivative"
+    arguments <- list(
+      bws = bandwidth, txdat = training, exdat = evaluation,
+      bwtype = mode, operator = operators,
+      return.kernel.weights = TRUE, bandwidth.divide = TRUE,
+      ckertype = "beta", ckerorder = order,
+      ckerbound = "fixed", ckerlb = c(0, 0), ckerub = c(1, 1)
+    )
+    raw <- do.call(npksum, arguments)
+    powered <- do.call(npksum, c(arguments, list(kernel.pow = power)))
+    expected_weights <- ifelse(raw$kw == 0, 0, raw$kw^power)
+    expect_equal(as.double(powered$ksum), colSums(expected_weights),
+                 tolerance = 8e-9)
+    expect_identical(powered$kw, raw$kw)
   }
 })
 

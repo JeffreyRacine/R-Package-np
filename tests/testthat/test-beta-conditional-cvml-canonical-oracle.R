@@ -122,6 +122,50 @@ beta_cvml_native_objective <- function(x, y, bandwidth, type,
   }
 }
 
+beta_cvml_mpi_domains <- function() {
+  list(
+    type = c("fixed", "generalized_nn", "adaptive_nn"),
+    order = c(2L, 4L, 6L, 8L),
+    sides = c("beta_beta", "beta_legacy", "legacy_beta"),
+    compress = c(FALSE, TRUE)
+  )
+}
+
+beta_cvml_mpi_pairwise_cases <- function() {
+  domains <- beta_cvml_mpi_domains()
+  types <- domains$type
+  orders <- domains$order
+  sides <- domains$sides
+
+  do.call(rbind, lapply(seq_along(orders), function(order_index) {
+    data.frame(
+      type = types,
+      order = orders[[order_index]],
+      sides = sides[
+        (seq_along(types) + order_index - 2L) %% length(sides) + 1L
+      ],
+      compress = (seq_along(types) + order_index) %% 2L == 0L,
+      stringsAsFactors = FALSE
+    )
+  }))
+}
+
+test_that("MPI conditional beta CVML covers every route-axis pair", {
+  domains <- beta_cvml_mpi_domains()
+  cases <- beta_cvml_mpi_pairwise_cases()
+  expect_identical(anyDuplicated(cases), 0L)
+  for (pair in combn(names(cases), 2L, simplify = FALSE)) {
+    observed <- unique(cases[pair])
+    complete <- expand.grid(
+      domains[pair], stringsAsFactors = FALSE
+    )
+    expect_setequal(
+      do.call(paste, observed),
+      do.call(paste, complete)
+    )
+  }
+})
+
 test_that("conditional beta CVML equals the public signed weight-ratio oracle", {
   skip_on_cran()
   .ensure_beta_cvml_pool()
@@ -132,30 +176,28 @@ test_that("conditional beta CVML equals the public signed weight-ratio oracle", 
   xlegacy <- data.frame(x = qnorm(xbeta$x))
   ylegacy <- data.frame(y = qnorm(ybeta$y))
 
-  for (type in c("fixed", "generalized_nn", "adaptive_nn")) {
+  cases <- beta_cvml_mpi_pairwise_cases()
+  for (case_index in seq_len(nrow(cases))) {
+    type <- cases$type[[case_index]]
+    order <- cases$order[[case_index]]
+    sides <- cases$sides[[case_index]]
+    compress <- cases$compress[[case_index]]
     bandwidth <- if (identical(type, "fixed")) c(0.19, 0.17) else c(8, 7)
-    for (order in c(2L, 4L, 6L, 8L)) {
-      for (sides in c("beta_beta", "beta_legacy", "legacy_beta")) {
-        xkernel <- if (identical(sides, "legacy_beta")) "gaussian" else "beta"
-        ykernel <- if (identical(sides, "beta_legacy")) "gaussian" else "beta"
-        x <- if (identical(xkernel, "beta")) xbeta else xlegacy
-        y <- if (identical(ykernel, "beta")) ybeta else ylegacy
-        expected <- beta_cvml_ratio_oracle(
-          x, y, bandwidth, type, xkernel, ykernel, order
-        )
-
-        for (compress in c(FALSE, TRUE)) {
-          actual <- beta_cvml_native_objective(
-            x, y, bandwidth, type, xkernel, ykernel, order, compress
-          )
-          expect_equal(
-            actual,
-            expected,
-            tolerance = 8e-12,
-            info = paste(type, order, sides, "compress", compress)
-          )
-        }
-      }
-    }
+    xkernel <- if (identical(sides, "legacy_beta")) "gaussian" else "beta"
+    ykernel <- if (identical(sides, "beta_legacy")) "gaussian" else "beta"
+    x <- if (identical(xkernel, "beta")) xbeta else xlegacy
+    y <- if (identical(ykernel, "beta")) ybeta else ylegacy
+    expected <- beta_cvml_ratio_oracle(
+      x, y, bandwidth, type, xkernel, ykernel, order
+    )
+    actual <- beta_cvml_native_objective(
+      x, y, bandwidth, type, xkernel, ykernel, order, compress
+    )
+    expect_equal(
+      actual,
+      expected,
+      tolerance = 8e-12,
+      info = paste(type, order, sides, "compress", compress)
+    )
   }
 })

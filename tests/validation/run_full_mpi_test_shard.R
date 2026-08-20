@@ -71,7 +71,10 @@ npRmpi_shard_local_mode_files <- function() {
     "test-adaptive-nn-exact-regression-deleteone-objectives-contract.R",
     "test-beta-bandwidth-objectives-contract.R",
     "test-beta-conditional-contract.R",
-    "test-beta-conditional-count-canonical-contract.R"
+    "test-beta-conditional-count-canonical-contract.R",
+    "test-beta-gradient-estimator-contract.R",
+    "test-beta-higher-order-regression-contract.R",
+    "test-beta-regression-objective-canonical-contract.R"
   )
 }
 
