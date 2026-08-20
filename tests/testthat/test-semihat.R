@@ -339,7 +339,7 @@ test_that("npplreg generalized-nn inid plot helper completes in session mode", {
     ydat = y,
     regtype = "ll",
     bwtype = "generalized_nn",
-    bws = matrix(c(2, 9), nrow = 2, ncol = 1),
+    bws = matrix(rep.int(n - 1L, 2L), nrow = 2, ncol = 1),
     bandwidth.compute = FALSE
   )
 
