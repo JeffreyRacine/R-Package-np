@@ -229,7 +229,10 @@ test_that("conditional width-one blocks share one raw row without LAPACK", {
     "^static int np_conditional_x_weight_block_stream_core_impl\\(",
     lines
   )
-  stop <- grep("^static int np_conditional_x_weight_block_stream_core\\(", lines)
+  stop <- grep(
+    "^static int np_conditional_x_weight_block_stream_core_ctx\\(",
+    lines
+  )
   expect_length(start, 1L)
   expect_length(stop, 1L)
   expect_lt(start, stop)
