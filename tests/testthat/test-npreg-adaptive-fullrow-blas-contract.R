@@ -147,7 +147,10 @@ test_that("adaptive regression BLAS MPI ownership and fallback are symmetric", {
   expect_match(owner, "if(adaptive_result.ok){", fixed = TRUE)
   expect_match(
     owner_compact,
-    "(BANDWIDTH_reg == BW_ADAP_NN) && (glp_nterms >= 4)",
+    paste0(
+      "BANDWIDTH_reg == BW_ADAP_NN && ",
+      "(glp_nterms >= 4 || adaptive_successor_bandwidth != NULL)"
+    ),
     fixed = TRUE
   )
   expect_match(
