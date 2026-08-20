@@ -5980,32 +5980,29 @@
   stop("plreg weighted solve failed")
 }
 
-.np_plreg_fixed_lc_components <- function(bws, p) {
+.np_plreg_fixed_component_owner <- function(bws, p) {
   if (!identical(bws$type, "fixed"))
-    return(FALSE)
+    return("fallback")
   component.bws <- c(list(bws$bw$yzbw), bws$bw[seq.int(2L, p + 1L)])
-  all(vapply(component.bws, function(bw) {
+  owners <- vapply(component.bws, function(bw) {
     spec <- npValidatedConditionalRegSpec(
       bw,
-      where = ".np_plreg_fixed_lc_components",
+      where = ".np_plreg_fixed_component_owner",
       ncon.field = "ncon"
     )
-    identical(spec$regtype, "lc")
-  }, logical(1L)))
-}
-
-.np_plreg_fixed_supported_components <- function(bws, p) {
-  if (!identical(bws$type, "fixed"))
-    return(FALSE)
-  component.bws <- c(list(bws$bw$yzbw), bws$bw[seq.int(2L, p + 1L)])
-  all(vapply(component.bws, function(bw) {
-    spec <- npValidatedConditionalRegSpec(
-      bw,
-      where = ".np_plreg_fixed_supported_components",
-      ncon.field = "ncon"
-    )
-    spec$regtype %in% c("lc", "ll", "lp")
-  }, logical(1L)))
+    if (npIsCanonicalLp0Spec(spec, ncon = bw$ncon))
+      "lp0"
+    else if (identical(spec$regtype.engine, "lp"))
+      "lp"
+    else
+      "fallback"
+  }, character(1L))
+  if (all(owners == "lp0"))
+    "lp0"
+  else if (all(owners == "lp"))
+    "lp"
+  else
+    "fallback"
 }
 
 .np_regression_localpoly_fixed_counts_precompute <- function(xdat,
@@ -6813,7 +6810,11 @@
 
   use.mpi <- isTRUE(getOption("npRmpi.mpi.initialized", FALSE)) &&
     isTRUE(.npRmpi_has_active_slave_pool(comm = 1L))
-  if (isTRUE(use.mpi) && isTRUE(.np_plreg_fixed_lc_components(bws = bws, p = p))) {
+  component.owner <- if (isTRUE(use.mpi))
+    .np_plreg_fixed_component_owner(bws = bws, p = p)
+  else
+    "fallback"
+  if (identical(component.owner, "lp0")) {
     return(.np_inid_boot_from_plreg_lc_fixed_fused(
       txdat = txdat,
       ydat = ydat,
@@ -6833,7 +6834,7 @@
     ))
   }
 
-  if (isTRUE(use.mpi) && isTRUE(.np_plreg_fixed_supported_components(bws = bws, p = p))) {
+  if (identical(component.owner, "lp")) {
     return(.np_inid_boot_from_plreg_fixed_fused(
       txdat = txdat,
       ydat = ydat,

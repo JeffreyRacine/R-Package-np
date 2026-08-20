@@ -1,5 +1,13 @@
 # npRmpi 0.70-6
 
+* Fixed partially linear plot bootstraps now select their distributed scalar
+  or general local-polynomial owner from canonical component specifications.
+  Explicit `regtype="lp", degree=0` therefore uses the same scalar LP0 owner
+  as public `regtype="lc"`, instead of being misrouted to a general-LP state
+  helper that correctly rejects degree zero. Bootstrap arithmetic, counts,
+  random draws, MPI tasks and collectives, and positive-degree LP routing are
+  unchanged.
+
 * Multi-response `npreghat(..., output = "apply")` results now retain the
   response column names consistently across native, leave-one-out, and
   row-local local-polynomial owners, matching the corresponding hat-matrix
