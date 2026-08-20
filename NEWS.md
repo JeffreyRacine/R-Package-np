@@ -1,5 +1,10 @@
 # np 0.70-6
 
+* Multi-response `npreghat(..., output = "apply")` results now retain the
+  response column names consistently across native, leave-one-out, and
+  row-local local-polynomial owners, matching the corresponding hat-matrix
+  application without changing numerical values or ridge diagnostics.
+
 * Local-polynomial response, influence-row, regression-CV, conditional X-row,
   and bootstrap owners now share one typed numerical-rank and ridge policy.
   Ordinary full-rank response rows retain the one-call `DGESV` lifecycle;
