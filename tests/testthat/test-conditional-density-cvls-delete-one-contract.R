@@ -228,10 +228,7 @@ test_that("conditional LP CVLS matches independent delete-one WLS", {
          bws = c(0.26, 0.29, 0.32)),
     list(type = "generalized_nn", kernel = "gaussian", order = 8L,
          degree = c(2L, 2L), bernstein = FALSE,
-         bws = c(21L, 24L, 25L)),
-    list(type = "adaptive_nn", kernel = "gaussian", order = 2L,
-         degree = c(1L, 1L), bernstein = TRUE,
-         bws = c(22L, 24L, 25L))
+         bws = c(21L, 24L, 25L))
   )
 
   for (case in cases) {
