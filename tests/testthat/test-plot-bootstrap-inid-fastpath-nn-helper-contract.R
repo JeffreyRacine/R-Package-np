@@ -18,7 +18,10 @@ test_that("generalized nearest-neighbor regression helper matches explicit refit
   reg.fast <- getFromNamespace(".np_inid_boot_from_regression", "npRmpi")
 
   for (bt in "generalized_nn") {
-    bw.val <- c(2, 2)
+    # A multinomial resample can repeat an original evaluation point. Keep
+    # this helper-equivalence fixture inside the literal-radius domain rather
+    # than relying on the retired nearest-positive substitution.
+    bw.val <- rep.int(max(counts) + 1L, 2L)
     rbw <- npregbw(
       xdat = tx,
       ydat = y,

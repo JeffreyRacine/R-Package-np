@@ -24,7 +24,10 @@ test_that("nearest-neighbor plot helpers run for regression and density/distribu
   }
 
   for (bt in c("generalized_nn", "adaptive_nn")) {
-    bw.val <- if (identical(bt, "adaptive_nn")) 5 else 2
+    # This is a plot-helper smoke test, not a bandwidth-search test. A broad
+    # explicit count keeps every deterministic resample inside the literal
+    # NN-radius domain without retrying or altering bootstrap samples.
+    bw.val <- n - 1L
     rbw <- do.call(npregbw, list(xdat = x, ydat = y, regtype = "ll",
                                  bws = bw.val, bwtype = bt,
                                  bandwidth.compute = FALSE))
@@ -77,7 +80,7 @@ test_that("nearest-neighbor frozen bootstrap plots run across regression and uns
   }
 
   for (bt in c("generalized_nn", "adaptive_nn")) {
-    bw.val <- if (identical(bt, "adaptive_nn")) 5 else 2
+    bw.val <- n - 1L
     rbw <- do.call(npregbw, list(xdat = x, ydat = y, regtype = "ll",
                                  bws = bw.val, bwtype = bt,
                                  bandwidth.compute = FALSE))
