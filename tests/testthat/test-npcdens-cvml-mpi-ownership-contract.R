@@ -171,17 +171,32 @@ test_that("outer CVML ownership suppresses nested kernel parallelism", {
 
   expect_match(
     block,
-    "np_conditional_x_weight_block_stream_core_suppress(",
+    "np_conditional_x_weight_block_stream_core_ctx(",
     fixed = TRUE
   )
   expect_match(
     block,
-    "np_conditional_y_block_stream_op_core(vector_scale_factor,",
+    paste0(
+      "vector_scale_factor, owned_start, owned_rows, 1,\n",
+      "         nn_geometry_context, xblock"
+    ),
     fixed = TRUE
   )
-  expect_match(block, "OP_NORMAL,\n                                             1,", fixed = TRUE)
+  expect_match(
+    block,
+    "np_conditional_y_block_stream_op_core_ctx(",
+    fixed = TRUE
+  )
+  expect_match(
+    block,
+    paste0(
+      "vector_scale_factor, owned_start, owned_rows, OP_NORMAL, 1,\n",
+      "         nn_geometry_context, yblock"
+    ),
+    fixed = TRUE
+  )
   expect_false(grepl(
-    "np_conditional_x_weight_block_stream_core(vector_scale_factor,",
+    "np_conditional_x_weight_block_stream_core_suppress(",
     block,
     fixed = TRUE
   ))
@@ -207,10 +222,30 @@ test_that("noneligible CVML retains the incumbent shared block kernel", {
   shared <- substr(source, shared_start, shared_start + shared_length - 2L)
   expect_match(
     shared,
-    "np_conditional_x_weight_block_stream_core(",
+    "np_conditional_x_weight_block_stream_core_ctx(",
     fixed = TRUE
   )
-  expect_match(shared, "OP_NORMAL, 0, yblock", fixed = TRUE)
+  expect_match(
+    shared,
+    paste0(
+      "vector_scale_factor, i0, ib, 0,\n",
+      "         nn_geometry_context, xblock"
+    ),
+    fixed = TRUE
+  )
+  expect_match(
+    shared,
+    "np_conditional_y_block_stream_op_core_ctx(",
+    fixed = TRUE
+  )
+  expect_match(
+    shared,
+    paste0(
+      "vector_scale_factor, i0, ib, OP_NORMAL, 0,\n",
+      "         nn_geometry_context, yblock"
+    ),
+    fixed = TRUE
+  )
   expect_false(grepl("contributions", shared, fixed = TRUE))
   expect_false(grepl("MPI_Allreduce", shared, fixed = TRUE))
 })
