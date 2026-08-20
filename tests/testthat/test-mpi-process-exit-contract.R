@@ -39,12 +39,17 @@ test_that("full-suite runner requires clean direct shard exits", {
   shard_runner <- testthat::test_path(
     "..", "validation", "run_full_mpi_test_shard.R"
   )
+  plan_helper <- testthat::test_path(
+    "..", "validation", "full_mpi_test_plan.R"
+  )
   skip_if_not(
-    file.exists(parent_runner) && file.exists(shard_runner),
+    file.exists(parent_runner) && file.exists(shard_runner) &&
+      file.exists(plan_helper),
     "source test runners unavailable"
   )
   parent_text <- paste(readLines(parent_runner, warn = FALSE), collapse = "\n")
   shard_text <- paste(readLines(shard_runner, warn = FALSE), collapse = "\n")
+  plan_text <- paste(readLines(plan_helper, warn = FALSE), collapse = "\n")
 
   expect_false(grepl("setsid", parent_text, fixed = TRUE))
   expect_false(grepl("137L", parent_text, fixed = TRUE))
@@ -61,6 +66,18 @@ test_that("full-suite runner requires clean direct shard exits", {
   expect_match(
     parent_text,
     "timeout = np_full_shard_timeout",
+    fixed = TRUE
+  )
+  expect_match(parent_text, "npRmpi_full_test_plan(", fixed = TRUE)
+  expect_match(shard_text, "npRmpi_full_test_plan(", fixed = TRUE)
+  expect_match(
+    plan_text,
+    "test-session-routing-subprocess-contract.R",
+    fixed = TRUE
+  )
+  expect_match(
+    plan_text,
+    "npRmpi full-suite plan lost or duplicated a test file",
     fixed = TRUE
   )
   expect_match(shard_text, "npRmpi_run_full_test_shard <- function(args)",

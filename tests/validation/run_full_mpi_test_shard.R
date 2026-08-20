@@ -205,12 +205,15 @@ npRmpi_run_full_test_shard <- function(args) {
   if (!length(test_files) || anyDuplicated(test_files))
     stop("npRmpi shard found no unique installed test files")
 
-  expected_count <- as.integer(ceiling(length(test_files) / shard_size))
+  plan_file <- normalizePath(file.path(
+    dirname(test_dir_path), "validation", "full_mpi_test_plan.R"
+  ), mustWork = TRUE)
+  source(plan_file, local = TRUE)
+  execution_plan <- npRmpi_full_test_plan(test_files, shard_size)
+  expected_count <- length(execution_plan)
   if (!identical(shard_count, expected_count))
     stop("npRmpi shard count disagrees with the installed test inventory")
-  first <- (shard - 1L) * shard_size + 1L
-  last <- min(shard * shard_size, length(test_files))
-  assigned <- test_files[seq.int(first, last)]
+  assigned <- execution_plan[[shard]]
   local_registry <- npRmpi_shard_local_only_files()
   local_mode_registry <- npRmpi_shard_local_mode_files()
   if (anyDuplicated(c(local_registry, local_mode_registry)) ||

@@ -1,5 +1,6 @@
 library(testthat)
 library(npRmpi)
+source(file.path("validation", "full_mpi_test_plan.R"), local = TRUE)
 
 np_check_filter <- Sys.getenv("NP_CHECK_FILTER", unset = "check-minimal")
 np_check_full <- identical(Sys.getenv("NP_CHECK_FULL", unset = ""), "1")
@@ -41,7 +42,10 @@ local({
           stop("npRmpi full-suite runner found no unique test files")
         }
 
-        shard_count <- as.integer(ceiling(length(test_files) / np_full_shard_size))
+        execution_plan <- npRmpi_full_test_plan(
+          test_files, np_full_shard_size
+        )
+        shard_count <- length(execution_plan)
         witness_dir <- normalizePath(
           file.path("testthat", "_npRmpi_full_shard_witnesses"),
           mustWork = FALSE
