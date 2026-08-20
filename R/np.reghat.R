@@ -273,6 +273,10 @@ npreghat <-
   ridge.used
 }
 
+.npreghat_apply_colnames <- function(y) {
+  colnames(y)
+}
+
 .npreghat_native_apply_strategy <- function(ntrain, neval, nrhs) {
   h.mb <- as.numeric(ntrain) * as.numeric(neval) * 8.0 / 1024^2
   threshold.mb <- getOption("np.npreghat.apply.memory.threshold.mb", 64.0)
@@ -2180,6 +2184,9 @@ npreghat.rbandwidth <-
         s = s,
         leave.one.out = TRUE
       ))
+      response.names <- .npreghat_apply_colnames(y)
+      if (!identical(colnames(out), response.names))
+        colnames(out) <- response.names
       ridge.used <- .npreghat_native_ridge_used(
         out, nrow(txdat), "npreghat leave-one-out apply owner"
       )
@@ -2223,6 +2230,9 @@ npreghat.rbandwidth <-
         ))
         if (ncol(out) == 1L)
           return(as.vector(out))
+        response.names <- .npreghat_apply_colnames(y)
+        if (!identical(colnames(out), response.names))
+          colnames(out) <- response.names
         return(out)
       }
     }
@@ -2437,6 +2447,9 @@ npreghat.rbandwidth <-
     if (identical(output, "apply")) {
       if (ncol(out) == 1L)
         return(as.vector(out))
+      response.names <- .npreghat_apply_colnames(y)
+      if (!identical(colnames(out), response.names))
+        colnames(out) <- response.names
       return(out)
     }
 
