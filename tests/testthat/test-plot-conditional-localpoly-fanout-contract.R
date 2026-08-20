@@ -23,7 +23,12 @@ test_that("conditional fixed localpoly bootstrap core fans out with an active po
     .np_inid_boot_from_conditional_localpoly_fixed_t0 = function(state, feat) {
       c(0.25, 0.75)
     },
-    .np_inid_boot_from_conditional_localpoly_fixed_fill_chunk = function(state, feat.list, counts.chunk) {
+    .np_inid_boot_from_conditional_localpoly_fixed_fill_chunk = function(
+        state, feat.list, counts.chunk, represented.mass) {
+      expect_identical(
+        represented.mass,
+        as.double(colSums(counts.chunk))
+      )
       bsz <- ncol(counts.chunk)
       matrix(seq_len(bsz * state$neval), nrow = bsz, ncol = state$neval)
     },
@@ -77,7 +82,12 @@ test_that("conditional fixed localpoly bootstrap core remains local without a po
     .np_inid_boot_from_conditional_localpoly_fixed_t0 = function(state, feat) {
       c(0.5, 1.5)
     },
-    .np_inid_boot_from_conditional_localpoly_fixed_fill_chunk = function(state, feat.list, counts.chunk) {
+    .np_inid_boot_from_conditional_localpoly_fixed_fill_chunk = function(
+        state, feat.list, counts.chunk, represented.mass) {
+      expect_identical(
+        represented.mass,
+        as.double(colSums(counts.chunk))
+      )
       called$fill <- called$fill + 1L
       bsz <- ncol(counts.chunk)
       matrix(rep(called$fill, bsz * state$neval), nrow = bsz, ncol = state$neval)
