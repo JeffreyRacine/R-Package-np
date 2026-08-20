@@ -3,8 +3,8 @@ suppressPackageStartupMessages(library(npRmpi))
 test_that("npRmpi nonfixed search accepts observation-count k beyond empirical support size", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
 
-  x <- data.frame(x = c(0, 0, 0, 1))
-  y <- c(0, 1, 2, 3)
+  x <- data.frame(x = c(0, 0, 0, 1, 2))
+  y <- c(0, 1, 2, 3, 4)
 
   bw.adap <- npregbw(
     ydat = y,
@@ -17,7 +17,7 @@ test_that("npRmpi nonfixed search accepts observation-count k beyond empirical s
     ydat = y,
     xdat = x,
     bwtype = "generalized_nn",
-    bws = 2L,
+    bws = length(y) - 1L,
     bandwidth.compute = FALSE
   )
 
@@ -40,7 +40,7 @@ test_that("npRmpi generalized observation-count radii handle low-support ties", 
     ydat = y,
     xdat = x,
     bwtype = "generalized_nn",
-    bws = 3L,
+    bws = 4L,
     bandwidth.compute = FALSE
   )
 
