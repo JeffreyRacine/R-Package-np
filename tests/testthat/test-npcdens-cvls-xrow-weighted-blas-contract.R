@@ -290,3 +290,135 @@ test_that("shared conditional full-row blocks reuse bounded weighted BLAS", {
     fixed = TRUE
   )
 })
+
+test_that("conditional weighted BLAS preserves fixed-candidate objectives at boundary widths", {
+  old_options <- options(
+    np.messages = FALSE,
+    np.tree = FALSE,
+    np.largeh = FALSE
+  )
+  old_seed_exists <- exists(".Random.seed", envir = .GlobalEnv,
+                            inherits = FALSE)
+  if (old_seed_exists)
+    old_seed <- get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
+  on.exit({
+    options(old_options)
+    if (old_seed_exists) {
+      assign(".Random.seed", old_seed, envir = .GlobalEnv)
+    } else if (exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)) {
+      rm(".Random.seed", envir = .GlobalEnv)
+    }
+  }, add = TRUE)
+
+  set.seed(20260822L)
+  seed_before <- get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
+  n <- 2048L
+  i <- seq_len(n)
+  xdat <- data.frame(x = (i - 0.5) / n)
+  ydat <- data.frame(
+    y = 0.35 * sin(2 * pi * xdat$x) +
+      0.13 * cos(17 * pi * xdat$x) +
+      0.08 * sin(i * sqrt(2))
+  )
+  cases <- data.frame(
+    method = c("cv.ml", "cv.ml", "cv.ml", "cv.ls", "cv.ls"),
+    degree = c(1L, 2L, 3L, 1L, 3L),
+    stringsAsFactors = FALSE
+  )
+
+  evaluate <- function(state, accelerate) {
+    options(np.macMseries.accelerate = accelerate)
+    first <- second <- NULL
+    expect_silent(first <- npRmpi:::.npcdensbw_eval_only(
+      xdat, ydat, state, force.local = TRUE
+    ))
+    expect_silent(second <- npRmpi:::.npcdensbw_eval_only(
+      xdat, ydat, state, force.local = TRUE
+    ))
+    expect_identical(first, second)
+    expect_identical(names(first),
+                     c("objective", "num.feval", "num.feval.fast",
+                       "num.feval.guarded"))
+    expect_true(is.finite(first$objective))
+    expect_identical(first$num.feval, 1L)
+    expect_identical(first$num.feval.fast, 0)
+    expect_length(first$num.feval.guarded, 1L)
+    expect_true(is.na(first$num.feval.guarded) ||
+                (is.finite(first$num.feval.guarded) &&
+                 first$num.feval.guarded >= 0))
+    first
+  }
+
+  make_state <- function(method, degree) {
+    reg_args <- list(
+      bwmethod = method,
+      bwscaling = FALSE,
+      bwtype = "fixed",
+      cxkertype = "gaussian",
+      cxkerorder = 2L,
+      cxkerbound = "none",
+      uxkertype = "aitchisonaitken",
+      oxkertype = "liracine",
+      cykertype = "gaussian",
+      cykerorder = 2L,
+      cykerbound = "none",
+      uykertype = "aitchisonaitken",
+      oykertype = "liracine",
+      regtype = "lp",
+      pregtype = "Local-Polynomial",
+      basis = "glp",
+      degree = degree,
+      bernstein.basis = FALSE,
+      regtype.engine = "lp",
+      basis.engine = "glp",
+      degree.engine = degree,
+      bernstein.basis.engine = FALSE,
+      scale.factor.search.lower = 0.1,
+      cvls.quadrature.grid = "hybrid",
+      cvls.quadrature.extend.factor = 1,
+      cvls.quadrature.points = c(100L, 50L),
+      cvls.quadrature.ratios = c(0.20, 0.55, 0.25)
+    )
+    npRmpi:::.npcdensbw_build_conbandwidth(
+      xdat = xdat,
+      ydat = ydat,
+      bws = c(0.22, 0.18),
+      bandwidth.compute = FALSE,
+      reg.args = reg_args
+    )
+  }
+
+  for (case in seq_len(nrow(cases))) {
+    method <- cases$method[[case]]
+    degree <- cases$degree[[case]]
+    state <- NULL
+    expect_silent(state <- make_state(method, degree))
+
+    expect_identical(state$method, method)
+    expect_identical(state$type, "fixed")
+    expect_identical(state$regtype.engine, "lp")
+    expect_identical(state$degree.engine, degree)
+    expect_identical(state$basis.engine, "glp")
+    expect_false(state$bernstein.basis.engine)
+
+    ordinary <- evaluate(state, FALSE)
+    accelerated <- evaluate(state, TRUE)
+    expect_identical(ordinary[names(ordinary) != "objective"],
+                     accelerated[names(accelerated) != "objective"])
+    scale <- max(1, abs(ordinary$objective), abs(accelerated$objective))
+    error_bound <- 1024 * .Machine$double.eps * scale
+    error <- abs(accelerated$objective - ordinary$objective)
+    expect_true(
+      error <= error_bound,
+      info = sprintf(
+        "%s width %d: abs.error=%.17g, bound=%.17g",
+        method, degree + 1L, error, error_bound
+      )
+    )
+  }
+
+  expect_identical(
+    get(".Random.seed", envir = .GlobalEnv, inherits = FALSE),
+    seed_before
+  )
+})
