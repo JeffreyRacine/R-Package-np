@@ -374,6 +374,22 @@ static int np_apple_conditional_x_weighted_blas_profitable(
 #endif
 }
 
+static int np_apple_conditional_x_block_weighted_blas_profitable(
+  const int nrows,
+  const int nterms,
+  const int basis_stride)
+{
+  /*
+   * The block-row owner amortizes its packed signed design from width four
+   * onward.  Keep the common Apple, row-count, stride, overflow, and
+   * memory capability policy above; the two independently qualified
+   * influence-row owners retain their established width-four contracts.
+   */
+  return (nterms >= 4) &&
+    np_apple_conditional_x_weighted_blas_profitable(
+      nrows, nterms, basis_stride);
+}
+
 static int np_reg_alllarge_blas_profitable(const int nrows,
                                            const int nterms,
                                            const int basis_stride)
@@ -32936,7 +32952,7 @@ static int np_conditional_x_weight_block_stream_core_impl(double *vector_scale_f
      * weighted-design algebra. Reuse it for full and delete-one consumers
      * without changing the scalar solver or deletion contract.
      */
-    if(np_apple_conditional_x_weighted_blas_profitable(
+    if(np_apple_conditional_x_block_weighted_blas_profitable(
          num_train,
          np_glp_cv_cache.nterms,
          np_glp_cv_cache.basis_stride)){
