@@ -65,6 +65,12 @@ test_that("conditional CVLS weighted BLAS gate is narrow and memory bounded", {
     "NP_CONDITIONAL_X_WEIGHTED_BLAS_MAX_BYTES/sizeof(double)",
     fixed = TRUE
   )
+  expect_match(
+    gate,
+    "np_apple_conditional_x_block_weighted_blas_profitable(",
+    fixed = TRUE
+  )
+  expect_match(gate, "return (nterms >= 4) &&", fixed = TRUE)
   expect_match(gate, "(void)nrows;", fixed = TRUE)
   expect_match(gate, "(void)nterms;", fixed = TRUE)
   expect_match(gate, "(void)basis_stride;", fixed = TRUE)
@@ -87,7 +93,7 @@ test_that("canonical CVLS weighted BLAS preserves signed row algebra and fallbac
   expect_match(body, "BANDWIDTH_den_extern != BW_GEN_NN", fixed = TRUE)
   expect_match(
     body,
-    "np_apple_conditional_x_weighted_blas_profitable(",
+    "np_apple_conditional_x_block_weighted_blas_profitable(",
     fixed = TRUE
   )
   expect_match(
@@ -168,7 +174,7 @@ test_that("generalized-NN CVLS reaches the same weighted BLAS implementation", {
   expect_match(body, "BANDWIDTH_den_extern != BW_FIXED", fixed = TRUE)
   expect_match(
     body,
-    "np_apple_conditional_x_weighted_blas_profitable(",
+    "np_apple_conditional_x_block_weighted_blas_profitable(",
     fixed = TRUE
   )
   expect_match(
@@ -247,7 +253,7 @@ test_that("shared conditional full-row blocks reuse bounded weighted BLAS", {
 
   expect_match(
     body,
-    "np_apple_conditional_x_weighted_blas_profitable(",
+    "np_apple_conditional_x_block_weighted_blas_profitable(",
     fixed = TRUE
   )
   expect_match(
