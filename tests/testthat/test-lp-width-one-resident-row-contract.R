@@ -214,13 +214,20 @@ test_that("scalar fixed objectives enter the resident LP0 owner without a basis"
     scalar_owner,
     fixed = TRUE
   ))
+  expect_true(grepl("ks_tree_use &&", source, fixed = TRUE))
   expect_true(grepl(
-    "((!ks_tree_use) || (num_reg_continuous <= 2))",
+    "(num_reg_continuous <= 2) &&",
     source,
     fixed = TRUE
   ))
   expect_true(grepl(
-    "((bwm == RBWM_CVKS) && ks_tree_use &&",
+    "((bwm == RBWM_CVLS) || (bwm == RBWM_CVAIC) ||",
+    source,
+    fixed = TRUE
+  ))
+  expect_true(grepl("(bwm == RBWM_CVKS));", source, fixed = TRUE))
+  expect_false(grepl(
+    "((!ks_tree_use) || (num_reg_continuous <= 2))",
     source,
     fixed = TRUE
   ))

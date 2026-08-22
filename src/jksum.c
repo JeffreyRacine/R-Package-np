@@ -14541,12 +14541,13 @@ static inline int np_reg_cv_use_canonical_lp_fixed_kernel(const int bwm,
 }
 
 /*
- * Width-one fixed objectives use two canonical scalar siblings.  Dense rows
- * and compact-support trees in one or two continuous dimensions favor the
- * symmetric resident-row traversal.  From three tree dimensions onward the
- * directed scalar traversal below is faster because it keeps one complete
- * fitted row local and avoids sparse partner-row traffic.  The selector is
- * topology-only: public LC and explicit LP0 reach the same sibling.
+ * Width-one fixed objectives use two canonical scalar siblings.  Compact-
+ * support trees in one or two continuous dimensions favor the symmetric
+ * resident-row traversal.  Dense rows, and trees from three dimensions
+ * onward, favor the directed scalar traversal below because it keeps one
+ * complete fitted row local and avoids repeated top-level row traffic.  The
+ * selector is topology-only: public LC and explicit LP0 reach the same
+ * sibling.
  */
 static inline int np_reg_cv_scalar_use_resident_fixed(
     const int bwm,
@@ -14555,10 +14556,10 @@ static inline int np_reg_cv_scalar_use_resident_fixed(
     const int ks_tree_use){
   return (BANDWIDTH_reg == BW_FIXED) &&
     (num_reg_continuous > 0) &&
-    ((((bwm == RBWM_CVLS) || (bwm == RBWM_CVAIC)) &&
-      ((!ks_tree_use) || (num_reg_continuous <= 2))) ||
-     ((bwm == RBWM_CVKS) && ks_tree_use &&
-      (num_reg_continuous <= 2)));
+    ks_tree_use &&
+    (num_reg_continuous <= 2) &&
+    ((bwm == RBWM_CVLS) || (bwm == RBWM_CVAIC) ||
+     (bwm == RBWM_CVKS));
 }
 
 static int np_lp_fixed_tree_sparse_supported(const int num_reg_unordered,
