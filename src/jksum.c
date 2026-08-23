@@ -14557,25 +14557,55 @@ static inline int np_reg_cv_use_canonical_lp_fixed_kernel(const int bwm,
 }
 
 /*
- * Width-one fixed objectives use two canonical scalar siblings.  Compact-
- * support trees in one or two continuous dimensions favor the symmetric
- * resident-row traversal.  Dense rows, and trees from three dimensions
- * onward, favor the directed scalar traversal below because it keeps one
- * complete fitted row local and avoids repeated top-level row traffic.  The
- * selector is topology-only: public LC and explicit LP0 reach the same
- * sibling.
+ * The dense directed scalar sibling is faster for the independently qualified
+ * univariate compact-zero-support CVLS/CVAIC capability.  Keep the established
+ * resident sibling for full-support, multivariate, and mixed-data dense rows.
+ * Tree ownership remains unchanged.  Kernel capability comes from the same
+ * operator-adjusted support metadata used by tree ownership; no kernel-name
+ * list, sample size, family name, host, or elapsed-time policy participates.
  */
 static inline int np_reg_cv_scalar_use_resident_fixed(
     const int bwm,
     const int BANDWIDTH_reg,
+    const int num_reg_unordered,
+    const int num_reg_ordered,
     const int num_reg_continuous,
+    const int * const kernel_c,
+    const int * const operator,
     const int ks_tree_use){
-  return (BANDWIDTH_reg == BW_FIXED) &&
-    (num_reg_continuous > 0) &&
-    ks_tree_use &&
-    (num_reg_continuous <= 2) &&
-    ((bwm == RBWM_CVLS) || (bwm == RBWM_CVAIC) ||
-     (bwm == RBWM_CVKS));
+  const int cvls_or_cvaic =
+    (bwm == RBWM_CVLS) || (bwm == RBWM_CVAIC);
+  int effective_kernel = -1;
+  int dense_directed_admitted = 0;
+  NPPruneSupportDescriptor support = {
+    NP_PRUNE_SUPPORT_UNKNOWN,
+    0.0,
+    0.0
+  };
+
+  if((BANDWIDTH_reg != BW_FIXED) || (num_reg_continuous <= 0))
+    return 0;
+  if(ks_tree_use)
+    return (num_reg_continuous <= 2) &&
+      (cvls_or_cvaic || (bwm == RBWM_CVKS));
+
+  if(cvls_or_cvaic &&
+     (num_reg_continuous == 1) &&
+     (num_reg_unordered == 0) &&
+     (num_reg_ordered == 0) &&
+     (kernel_c != NULL) && (operator != NULL) &&
+     (operator[0] == OP_NORMAL)){
+    effective_kernel = kernel_c[0] + OP_CFUN_OFFSETS[operator[0]];
+    if((effective_kernel >= 0) && (effective_kernel < OP_NCFUN))
+      support = np_prune_support_descriptor(
+        effective_kernel,
+        cksup[effective_kernel][0],
+        cksup[effective_kernel][1]);
+    dense_directed_admitted =
+      support.kind == NP_PRUNE_SUPPORT_COMPACT_ZERO;
+  }
+
+  return cvls_or_cvaic && !dense_directed_admitted;
 }
 
 static int np_lp_fixed_tree_sparse_supported(const int num_reg_unordered,
@@ -18654,7 +18684,11 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
   if((lp_engine == NP_LP_ENGINE_SCALAR) &&
      np_reg_cv_scalar_use_resident_fixed(bwm,
                                          BANDWIDTH_reg,
+                                         num_reg_unordered,
+                                         num_reg_ordered,
                                          num_reg_continuous,
+                                         kernel_c,
+                                         operator,
                                          ks_tree_use)){
     const NPRegCvLpResult lp0_result =
       np_regression_cv_lp_basis_fixed(bwm,

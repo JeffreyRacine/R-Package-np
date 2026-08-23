@@ -121,7 +121,65 @@ test_that("raw and Bernstein degree-zero objectives retain one scalar result", {
   expect_identical(raw, bernstein)
 })
 
-test_that("scalar fixed objectives enter the resident LP0 owner without a basis", {
+test_that("public LC and explicit raw LP0 agree across the scalar owner boundary", {
+  package_owner <- environmentName(environment(npregbw))
+  skip_if(
+    identical(package_owner, "npRmpi"),
+    "npRmpi numerical equality is covered by active-pool parity tests"
+  )
+  eval_only <- get(
+    ".npregbw_eval_only",
+    envir = asNamespace(package_owner),
+    inherits = FALSE
+  )
+
+  set.seed(20260823)
+  x <- data.frame(x1 = runif(96L), x2 = runif(96L))
+  y <- sin(2 * pi * x$x1) + x$x2 + rnorm(96L, sd = 0.15)
+  cells <- c(
+    lapply(c(2L, 4L, 6L, 8L), function(order) {
+      list(x = x["x1"], bws = 0.18, kernel = "epanechnikov",
+           order = order)
+    }),
+    lapply(c(2L, 4L, 6L, 8L), function(order) {
+      list(x = x["x1"], bws = 0.18, kernel = "gaussian",
+           order = order)
+    }),
+    list(
+      list(x = x["x1"], bws = 0.18, kernel = "uniform", order = NULL),
+      list(x = x, bws = c(0.18, 0.21), kernel = "epanechnikov",
+           order = 2L)
+    )
+  )
+
+  for (cell in cells) {
+    common <- list(
+      xdat = cell$x,
+      ydat = y,
+      bws = cell$bws,
+      ckertype = cell$kernel,
+      bwtype = "fixed",
+      bwmethod = "cv.ls",
+      bandwidth.compute = FALSE
+    )
+    if (!is.null(cell$order)) {
+      common$ckerorder <- cell$order
+    }
+    lc <- do.call(npregbw, c(common, list(regtype = "lc")))
+    lp0 <- do.call(npregbw, c(common, list(
+      regtype = "lp",
+      basis = "glp",
+      degree = rep.int(0L, ncol(cell$x)),
+      bernstein.basis = FALSE
+    )))
+    expect_identical(
+      eval_only(cell$x, y, lc)$objective,
+      eval_only(cell$x, y, lp0)$objective
+    )
+  }
+})
+
+test_that("scalar fixed objectives select the canonical LP0 owner by capability", {
   candidates <- c(
     test_path("..", "..", "src", "jksum.c"),
     test_path("..", "..", "..", "src", "jksum.c"),
@@ -214,23 +272,35 @@ test_that("scalar fixed objectives enter the resident LP0 owner without a basis"
     scalar_owner,
     fixed = TRUE
   ))
-  expect_true(grepl("ks_tree_use &&", source, fixed = TRUE))
+  expect_true(grepl("int dense_directed_admitted", source,
+                    fixed = TRUE))
   expect_true(grepl(
-    "(num_reg_continuous <= 2) &&",
+    "(num_reg_continuous == 1)",
     source,
     fixed = TRUE
   ))
   expect_true(grepl(
-    "((bwm == RBWM_CVLS) || (bwm == RBWM_CVAIC) ||",
+    "(num_reg_unordered == 0)",
     source,
     fixed = TRUE
   ))
-  expect_true(grepl("(bwm == RBWM_CVKS));", source, fixed = TRUE))
-  expect_false(grepl(
-    "((!ks_tree_use) || (num_reg_continuous <= 2))",
+  expect_true(grepl(
+    "(num_reg_ordered == 0)",
     source,
     fixed = TRUE
   ))
+  expect_true(grepl("np_prune_support_descriptor(", source,
+                    fixed = TRUE))
+  expect_true(grepl("cksup[effective_kernel][0]", source,
+                    fixed = TRUE))
+  expect_true(grepl("NP_PRUNE_SUPPORT_COMPACT_ZERO", source,
+                    fixed = TRUE))
+  expect_false(grepl("kernel_c[0] == CK_EPAN2", source, fixed = TRUE))
+  expect_true(grepl("operator[0] == OP_NORMAL", source, fixed = TRUE))
+  expect_true(grepl("if(ks_tree_use)", source, fixed = TRUE))
+  expect_true(grepl("(bwm == RBWM_CVKS)", source, fixed = TRUE))
+  expect_true(grepl("return cvls_or_cvaic && !dense_directed_admitted;",
+                    source, fixed = TRUE))
   expect_true(grepl(
     "np_regression_cv_lp_basis_fixed(bwm",
     scalar_owner,
