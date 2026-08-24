@@ -999,6 +999,8 @@
   if (!is.null(tmpreplace) && length(tmpreplace))
     res <- .npRmpi_autodispatch_sanitize_object(res, tmpvals = tmpreplace)
   publication.ack <- .npRmpi_lease_prepare_local(res, publication)
+  if (identical(publication$kind, "leased_public"))
+    .npRmpi_lease_commit_local(publication)
   structure(
     list(result = res, publication = publication.ack),
     class = "npRmpi_spmd_internal_result"
@@ -2800,7 +2802,7 @@
     stop(paste(as.character(eval.out), collapse = " "), call. = FALSE)
   }
   result <- eval.out
-  if (!identical(publication$kind, "none")) {
+  if (identical(publication$kind, "scoped_internal")) {
     committed <- try(
       rec.comm(.npRmpi_lease_run_lifecycle(
         "autodispatch.lifecycle.commit", list(plan = publication),

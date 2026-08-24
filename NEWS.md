@@ -1,5 +1,14 @@
 # npRmpi 0.70-6
 
+* Successful public bandwidth autodispatch now treats the existing collective
+  acknowledgement as the publication commit for the already rank-local lease.
+  This removes one redundant post-evaluation collective from `npregbw()`,
+  `nplsqregbw()`, `npplregbw()`, `npindexbw()`, and `npscoefbw()` while
+  preserving their supplied-bandwidth consumer leases. Scoped internal
+  contexts retain their explicit collective commit; bandwidth values,
+  objectives, optimizer evaluations, fitted results, failure rollback,
+  retirement, and public object shape are unchanged.
+
 * Fixed partially linear plot bootstraps now select their distributed scalar
   or general local-polynomial owner from canonical component specifications.
   Explicit `regtype="lp", degree=0` therefore uses the same scalar LP0 owner

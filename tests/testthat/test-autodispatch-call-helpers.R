@@ -97,6 +97,53 @@ test_that("autodispatch return rewriting covers all coordinator replacements", {
   expect_match(sanitize.body, "\\.npRmpi_autodispatch_replace_tmp_calls\\(x, tmpvals = tmpvals\\)")
 })
 
+test_that("public lease commit is fused into payload execution while scoped commit remains collective", {
+  reset <- getFromNamespace(".npRmpi_lease_reset_local", "npRmpi")
+  plan <- getFromNamespace(".npRmpi_lease_publication_plan", "npRmpi")
+  eval.payload <- getFromNamespace(".npRmpi_spmd_eval_payload", "npRmpi")
+  state <- getFromNamespace(".npRmpi_lease_state", "npRmpi")
+  reset()
+  on.exit(reset(), add = TRUE)
+
+  public.plan <- plan(quote(npregbw(xdat = x, ydat = y)))
+  public.out <- eval.payload(
+    payload = list(
+      call = quote(structure(list(bw = c(0.4, 0.6)), class = "rbandwidth")),
+      publication = public.plan
+    ),
+    envelope = list(opcode = "autodispatch.npregbw.cv_lllp")
+  )
+  expect_s3_class(public.out, "npRmpi_spmd_internal_result")
+  public.meta <- get(public.plan$id, envir = state$registry, inherits = FALSE)
+  expect_identical(public.meta$state, "live")
+  expect_true(exists(public.plan$id, envir = state$store, inherits = FALSE))
+
+  reset()
+  context.fun <- getFromNamespace(".npscoefbw_nomad_context_prepare", "npRmpi")
+  context.call <- quote(.placeholder(xdat = x, ydat = y, zdat = z))
+  context.call[[1L]] <- context.fun
+  scoped.plan <- plan(context.call)
+  scoped.out <- eval.payload(
+    payload = list(call = quote(list(context = TRUE)), publication = scoped.plan),
+    envelope = list(opcode = "autodispatch.npscoefbw.nomad_context")
+  )
+  expect_s3_class(scoped.out, "npRmpi_spmd_internal_result")
+  scoped.meta <- get(scoped.plan$id, envir = state$registry, inherits = FALSE)
+  expect_identical(scoped.meta$state, "provisional")
+  expect_true(exists(scoped.plan$id, envir = state$store, inherits = FALSE))
+  expect_false(exists(scoped.plan$remote_name, envir = .GlobalEnv,
+                      inherits = FALSE))
+
+  impl.body <- paste(
+    deparse(body(.npRmpi_distributed_call_impl), width.cutoff = 500L),
+    collapse = " "
+  )
+  expect_match(
+    impl.body,
+    "if \\(identical\\(publication\\$kind, \"scoped_internal\"\\)\\)"
+  )
+})
+
 test_that("autodispatch prepublishes large implicit formula data", {
   withr::local_options(npRmpi.autodispatch.arg.broadcast.threshold.regression = 1L)
 
