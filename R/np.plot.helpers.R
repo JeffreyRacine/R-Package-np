@@ -5943,7 +5943,7 @@
   list(t = out, t0 = t0)
 }
 
-.np_plreg_weighted_coef <- function(X, y, w, ridge = 1.0e-12) {
+.np_plreg_weighted_coef <- function(X, y, w, ridge = 0.0) {
   X <- as.matrix(X)
   y <- as.double(y)
   w <- as.double(w)
@@ -6767,7 +6767,7 @@
                                            B,
                                            counts = NULL,
                                            counts.drawer = NULL,
-                                           ridge = 1.0e-12,
+                                           ridge = 0.0,
                                            prefer.local.single_worker = FALSE,
                                            progress.label = NULL) {
   txdat <- toFrame(txdat)
@@ -7043,7 +7043,7 @@
                                             B,
                                             counts = NULL,
                                             counts.drawer = NULL,
-                                            ridge = 1.0e-12,
+                                            ridge = 0.0,
                                             prefer.local.single_worker = FALSE,
                                             progress.label = NULL) {
   txdat <- toFrame(txdat)
@@ -7262,7 +7262,7 @@
                                      B,
                                      counts = NULL,
                                      counts.drawer = NULL,
-                                     ridge = 1.0e-12,
+                                     ridge = 0.0,
                                      prefer.local.single_worker = FALSE,
                                      progress.label = NULL,
                                      mode = c("exact", "frozen")) {

@@ -1,5 +1,13 @@
 # npRmpi 0.70-6
 
+* Partial-linear INID bootstrap coefficient solves now attempt the identified
+  unregularized weighted least-squares system before entering their bounded
+  ridge ladder. The former positive `1e-12` default altered every identified
+  replicate and could make an exactly singular system appear solved before
+  the declared `1/n` stabilization step. Failed zero-ridge solves still enter
+  the existing `1/n`, `2/n`, ..., capped sequence; MPI orchestration and
+  public interfaces are unchanged.
+
 * Partial-linear bootstrap coefficient solves now ridge the
   Robinson-residualized regressors symmetrically. The former first-coordinate
   RHS adjustment treated a user regressor as an intercept and made ridged
