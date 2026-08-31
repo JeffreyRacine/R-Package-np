@@ -134,6 +134,35 @@ npRidgeSequenceFromBase <- function(n.train, ridge.base = 0.0, cap = 1.0) {
   unique(as.double(seq.out))
 }
 
+npRidgeInterceptCorrection <- function(ridge, intercept, pristine.anchor) {
+  lengths <- c(length(ridge), length(intercept), length(pristine.anchor))
+  target <- max(lengths)
+  if (any(lengths == 0L) || any(!(lengths %in% c(1L, target))))
+    stop("internal ridge-correction inputs are not conformable")
+
+  ridge <- rep_len(as.double(ridge), target)
+  intercept <- rep_len(as.double(intercept), target)
+  pristine.anchor <- rep_len(as.double(pristine.anchor), target)
+  correction <- rep.int(NA_real_, target)
+
+  zero <- is.finite(ridge) & ridge == 0.0
+  correction[zero] <- 0.0
+  active <- is.finite(ridge) & ridge > 0.0 & is.finite(intercept) &
+    is.finite(pristine.anchor) & pristine.anchor != 0.0
+  if (any(active)) {
+    value <- ridge[active] * (intercept[active] / pristine.anchor[active])
+    rescue <- !is.finite(value)
+    if (any(rescue))
+      value[rescue] <- (ridge[active][rescue] /
+                          pristine.anchor[active][rescue]) *
+        intercept[active][rescue]
+    keep <- is.finite(value)
+    correction[which(active)[keep]] <- value[keep]
+  }
+
+  if (target == 1L) correction[[1L]] else correction
+}
+
 .np_glp_degree_hard_max <- 100L
 .np_glp_degree_warn_threshold <- 25L
 
