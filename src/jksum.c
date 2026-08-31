@@ -28696,6 +28696,48 @@ static int np_conditional_x_weight_block_full_stream_core(double *vector_scale_f
                                                           int block_rows,
                                                           double **rows_out);
 
+static int np_regression_lp_apply_train_coordinates_match_eval(void){
+  const int num_train = num_obs_train_extern;
+  const int num_eval = num_obs_eval_extern;
+  int coordinate, observation;
+
+  if(num_train != num_eval)
+    return 0;
+
+  for(coordinate = 0; coordinate < num_reg_continuous_extern; coordinate++){
+    const double *train = matrix_X_continuous_train_extern[coordinate];
+    const double *eval = matrix_X_continuous_eval_extern[coordinate];
+
+    if(train == eval)
+      continue;
+    for(observation = 0; observation < num_train; observation++)
+      if(train[observation] != eval[observation])
+        return 0;
+  }
+  for(coordinate = 0; coordinate < num_reg_unordered_extern; coordinate++){
+    const double *train = matrix_X_unordered_train_extern[coordinate];
+    const double *eval = matrix_X_unordered_eval_extern[coordinate];
+
+    if(train == eval)
+      continue;
+    for(observation = 0; observation < num_train; observation++)
+      if(train[observation] != eval[observation])
+        return 0;
+  }
+  for(coordinate = 0; coordinate < num_reg_ordered_extern; coordinate++){
+    const double *train = matrix_X_ordered_train_extern[coordinate];
+    const double *eval = matrix_X_ordered_eval_extern[coordinate];
+
+    if(train == eval)
+      continue;
+    for(observation = 0; observation < num_train; observation++)
+      if(train[observation] != eval[observation])
+        return 0;
+  }
+
+  return 1;
+}
+
 static int np_regression_lp_apply_hatblock_matrix(double *vector_scale_factor,
                                                   double **rhs_cols,
                                                   int n_rhs,
@@ -29100,6 +29142,7 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
      (num_eval == num_train) &&
      (n_rhs > 16) &&
      (BANDWIDTH_den_extern == BW_FIXED) &&
+     np_regression_lp_apply_train_coordinates_match_eval() &&
      (np_regression_lp_apply_hatblock_matrix(vector_scale_factor,
                                              rhs_cols,
                                              n_rhs,
