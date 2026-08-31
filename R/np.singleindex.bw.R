@@ -751,6 +751,47 @@ npindexbw.NULL <-
     !identical(value, .Machine$double.xmax)
 }
 
+.npindexbw_ichimura_outer_penalty <- function(ydat) {
+  ydat <- as.double(ydat)
+  nobs <- length(ydat)
+  if (nobs <= 1L || anyNA(ydat) || any(!is.finite(ydat)))
+    return(.Machine$double.xmax)
+
+  center <- mean(ydat)
+  mse0 <- mean((ydat - center)^2)
+  loo.scale <- nobs / (nobs - 1)
+  reference <- loo.scale * loo.scale * mse0
+  if (!is.finite(reference) || reference < 0)
+    return(.Machine$double.xmax)
+
+  penalty <- 10 * reference
+  if (identical(penalty, reference)) {
+    if (identical(reference, 0))
+      penalty <- .Machine$double.xmin * .Machine$double.eps
+    else
+      return(.Machine$double.xmax)
+  }
+  if (!is.finite(penalty) || penalty <= reference ||
+      identical(penalty, .Machine$double.xmax))
+    return(.Machine$double.xmax)
+  as.double(penalty)
+}
+
+.npindexbw_map_ichimura_outer_result <- function(result, invalid.penalty) {
+  if (!is.list(result) || length(result$objective) != 1L)
+    stop("internal error: malformed npindex Ichimura objective result", call. = FALSE)
+  objective <- as.numeric(result$objective[1L])
+  if (.npindexbw_raw_objective_valid(objective))
+    return(result)
+  if (!identical(objective, .Machine$double.xmax))
+    stop("internal error: npindex Ichimura leaf returned a non-terminal invalid objective", call. = FALSE)
+  if (length(invalid.penalty) != 1L || is.na(invalid.penalty) ||
+      !is.finite(invalid.penalty))
+    stop("internal error: invalid npindex Ichimura outer guidance", call. = FALSE)
+  result$objective <- as.numeric(invalid.penalty)
+  result
+}
+
 .npindexbw_objective_result <- function(objective,
                                         num.feval.fast,
                                         certify = FALSE) {
@@ -768,7 +809,6 @@ npindexbw.NULL <-
                                                   h,
                                                   bws,
                                                   spec,
-                                                  invalid.penalty,
                                                   localize = TRUE,
                                                   leaf.descriptor = NULL) {
   leaf <- .npindexbw_lp_regression_leaf(
@@ -780,22 +820,21 @@ npindexbw.NULL <-
     spec = spec
   )
 
-  out <- tryCatch(
-    .np_progress_with_nested_bandwidth_heartbeat(
-      .npregbw_eval_only(
-        xdat = leaf$xdat,
-        ydat = ydat,
-        bws = leaf$bws,
-        invalid.penalty = "baseline",
-        penalty.multiplier = 10,
-        localize = localize
-      )
-    ),
-    error = function(e) NULL
+  out <- .np_progress_with_nested_bandwidth_heartbeat(
+    .npregbw_eval_only(
+      xdat = leaf$xdat,
+      ydat = ydat,
+      bws = leaf$bws,
+      invalid.penalty = "dbmax",
+      penalty.multiplier = 10,
+      localize = localize
+    )
   )
 
-  if (is.null(out) || !is.finite(out$objective[1L]))
-    return(list(objective = as.numeric(invalid.penalty), num.feval.fast = 0L))
+  if (!is.list(out) || length(out$objective) != 1L ||
+      length(out$num.feval.fast) < 1L || is.na(out$objective[1L]) ||
+      !is.finite(out$objective[1L]))
+    stop("internal error: malformed npreg result in npindex Ichimura leaf", call. = FALSE)
 
   list(
     objective = as.numeric(out$objective[1L]),
@@ -1004,7 +1043,8 @@ npindexbw.NULL <-
       bws = bws,
       spec = spec,
       leaf.descriptor = ctx$leaf.descriptor,
-      localize = FALSE
+      localize = FALSE,
+      invalid.penalty = ctx$invalid.penalty
     ),
     error = function(e) {
       list(
@@ -1256,7 +1296,7 @@ npindexbw.NULL <-
   )
   if (isTRUE(invalid.eval))
     return(list(
-      objective = 10 * mean(ydat^2),
+      objective = as.numeric(ctx$invalid.penalty),
       num.feval.fast = 0L
     ))
 
@@ -1648,7 +1688,8 @@ npindexbw.NULL <-
                                       bws,
                                       spec,
                                       leaf.descriptor = NULL,
-                                      localize = TRUE) {
+                                      localize = TRUE,
+                                      invalid.penalty = NULL) {
   p <- ncol(xmat)
   beta.idx <- if (p > 1L) seq_len(p - 1L) else integer(0)
   beta <- if (length(beta.idx)) as.double(param[beta.idx]) else numeric(0)
@@ -1668,7 +1709,8 @@ npindexbw.NULL <-
   spec <- policy$objective.spec
 
   if (identical(bws$method, "ichimura")) {
-    invalid.penalty <- 10 * mean(ydat^2)
+    if (is.null(invalid.penalty))
+      invalid.penalty <- .npindexbw_ichimura_outer_penalty(ydat)
   } else {
     invalid.penalty <- sqrt(.Machine$double.xmax)
   }
@@ -1681,16 +1723,16 @@ npindexbw.NULL <-
   index <- xmat %*% c(1, beta)
 
   if (identical(bws$method, "ichimura")) {
-    return(.npindexbw_eval_ichimura_lp_via_npreg(
+    result <- .npindexbw_eval_ichimura_lp_via_npreg(
       index = index,
       ydat = ydat,
       h = h,
       bws = bws,
       spec = spec,
-      invalid.penalty = invalid.penalty,
       localize = localize,
       leaf.descriptor = leaf.descriptor
-    ))
+    )
+    return(.npindexbw_map_ichimura_outer_result(result, invalid.penalty))
   }
 
   if (identical(bws$method, "kleinspady")) {
@@ -1853,6 +1895,11 @@ npindexbw.NULL <-
   else
     y.clean <- as.double(y.clean)
 
+  ichimura.invalid.penalty <- if (identical(baseline.bws$method, "ichimura"))
+    .npindexbw_ichimura_outer_penalty(y.clean)
+  else
+    NULL
+
   p <- ncol(x.clean)
   leaf.spec <- .npindex_objective_policy(
     bws = baseline.bws,
@@ -1983,6 +2030,7 @@ npindexbw.NULL <-
     }
   )
   service.ctx$leaf.descriptor <- leaf.descriptor
+  service.ctx$invalid.penalty <- ichimura.invalid.penalty
   if (isTRUE(service.ctx$active) && !isTRUE(service.ctx$root))
     return(.npindexbw_ichimura_lp_service_worker_loop(
       xmat = x.clean,
@@ -2074,7 +2122,8 @@ npindexbw.NULL <-
         ydat = y.clean,
         bws = baseline.bws,
         spec = eval.spec,
-        leaf.descriptor = leaf.descriptor
+        leaf.descriptor = leaf.descriptor,
+        invalid.penalty = ichimura.invalid.penalty
       )
     }
     nomad.num.feval.total <<- nomad.num.feval.total + 1L
@@ -2928,6 +2977,10 @@ npindexbw.sibandwidth <-
       where = "npindexbw"
     )
     objective.spec <- objective.policy$objective.spec
+    ichimuraMaxPenalty <- if (identical(bws$method, "ichimura"))
+      .npindexbw_ichimura_outer_penalty(ydat)
+    else
+      NULL
     leaf.descriptor <- if (isTRUE(bandwidth.compute)) {
       .npindexbw_prepare_lp_regression_leaf_owner(
         xmat = xdat,
@@ -2946,6 +2999,7 @@ npindexbw.sibandwidth <-
       service_id = "npindex_ichimura_lp_fixed"
     )
     service.ctx$leaf.descriptor <- leaf.descriptor
+    service.ctx$invalid.penalty <- ichimuraMaxPenalty
     if (isTRUE(service.ctx$active) && !isTRUE(service.ctx$root))
       return(.npindexbw_ichimura_lp_service_worker_loop(
         xmat = xdat,
@@ -3034,8 +3088,6 @@ npindexbw.sibandwidth <-
           ##objective function use c(1,beta). However, we do indeed return
           ##c(1,beta) which can be used in the index.model function above.
 
-          ichimuraMaxPenalty <- 10*mean(ydat^2)
-
           ichimura <- function(param) {
             bandwidth_progress_step()
 
@@ -3078,13 +3130,20 @@ npindexbw.sibandwidth <-
                   h = h,
                   bws = bws,
                   spec = objective.spec,
-                  invalid.penalty = ichimuraMaxPenalty,
                   leaf.descriptor = leaf.descriptor
                 )
               }
               num.feval.fast.overall <<- num.feval.fast.overall +
                 as.numeric(objective$num.feval.fast[1L])
-              as.numeric(objective$objective[1L])
+              as.numeric(if (isTRUE(service.ctx$active) &&
+                             isTRUE(service.ctx$root)) {
+                objective$objective[1L]
+              } else {
+                .npindexbw_map_ichimura_outer_result(
+                  objective,
+                  ichimuraMaxPenalty
+                )$objective[1L]
+              })
             }
 
             ## For the objective function, we require a positive bandwidth, so

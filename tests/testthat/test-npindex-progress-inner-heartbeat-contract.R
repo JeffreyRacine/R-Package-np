@@ -57,8 +57,7 @@ test_that("npindex LP via-npreg evaluators forward heartbeat but not child count
         ydat = c(1, 2, 3),
         h = 1,
         bws = list(),
-        spec = list(),
-        invalid.penalty = 99
+        spec = list()
       )
 
       expect_identical(runtime$bandwidth_state$id, "outer-npindex")
