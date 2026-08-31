@@ -30125,10 +30125,12 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	                                                  call->matrix_X_continuous_eval,
 	                                                  jj,
 	                                                  direction);
-	                for(i = 0; i < owner->nterms; i++)
-	                  grad_value += direction[i]*owner->coefficient[i];
-	                out_owner[output_offset] = preserve_point ?
-	                  call->gradient[l][jj] : grad_value;
+	                if(active)
+	                  for(i = 0; i < owner->nterms; i++)
+	                    grad_value += direction[i]*owner->coefficient[i];
+	                out_owner[output_offset] = active ?
+	                  (preserve_point ?
+	                   call->gradient[l][jj] : grad_value) : NA_REAL;
 	                if(call->do_gerr){
 	                  out_owner[output_offset + 1] =
 	                    active ? 0.0 : NA_REAL;
@@ -30613,11 +30615,12 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
                                              call->matrix_X_continuous_eval,
                                              j,
                                              direction);
-          if(!preserve_point) {
+          if(!preserve_point && active) {
             call->gradient[l][j] = 0.0;
             for(i = 0; i < owner->nterms; ++i)
               call->gradient[l][j] += direction[i]*owner->coefficient[i];
-          }
+          } else if(!active)
+            call->gradient[l][j] = NA_REAL;
           if(call->do_gerr) {
             call->gradient_stderr[l][j] = active ? 0.0 : NA_REAL;
             if(active)
@@ -31871,8 +31874,16 @@ const NPRegressionHC0Context *hc0_context){
                     const int grad_order =
                       (vector_glp_gradient_order_extern != NULL) ?
                       MAX(1, vector_glp_gradient_order_extern[l]) : 1;
+                    const int active = np_glp_gradient_direction_active(l);
                     double qg = 0.0;
                     double dg = 0.0;
+
+                    if(!active) {
+                      gradient[l][i] = NA_REAL;
+                      if(shortcut_do_gerr)
+                        gradient_stderr[l][i] = NA_REAL;
+                      continue;
+                    }
 
                     if(use_bernstein){
                       np_glp_fill_basis_eval_deriv(l,

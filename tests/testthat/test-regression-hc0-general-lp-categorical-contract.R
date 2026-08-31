@@ -127,15 +127,14 @@ test_that("H7B retains two bounded rows and removes estimator helper re-entry", 
     collapse = "\n"
   )
   start <- regexpr(
-    "if (gradients && !glp.gradient.partial)", r.source, fixed = TRUE
+    "if (gradients){", r.source, fixed = TRUE
   )[[1L]]
-  finish <- regexpr(
-    "} else if (gradients) {", r.source, fixed = TRUE
-  )[[1L]]
-  active.block <- substr(r.source, start, finish - 1L)
+  r.tail <- substr(r.source, start, nchar(r.source))
+  finish <- regexpr("if (compute.resid.from.fit)", r.tail, fixed = TRUE)[[1L]]
+  active.block <- substr(r.tail, 1L, finish - 1L)
 
   expect_gt(start, 0L)
-  expect_gt(finish, start)
+  expect_gt(finish, 0L)
   expect_false(grepl("npreghat", active.block, fixed = TRUE))
   expect_match(c.source, "categorical_base_kernel_row", fixed = TRUE)
   expect_match(c.source, "categorical_alternate_kernel_row", fixed = TRUE)
