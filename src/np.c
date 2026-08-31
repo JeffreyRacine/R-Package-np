@@ -611,7 +611,7 @@ static int np_regression_prepared_context_refresh_degree(
   NPRegressionPreparedCtx *context, const int *degree);
 static int np_regression_prepared_context_eval(
   NPRegressionPreparedCtx *context, const double *bw,
-  const int *degree, double out[5]);
+  const int *degree, const int raw_only, double out[5]);
 
 typedef struct {
   int active;
@@ -3300,6 +3300,7 @@ static double bwmfunc_wrapper(double *p)
     bwm_invalid_count += 1.0;
     if (bwm_penalty_mode == 1 && R_FINITE(bwm_penalty_value))
       return bwm_penalty_value;
+    return DBL_MAX;
   }
 
   return val;
@@ -6354,7 +6355,7 @@ static int np_regression_prepared_context_refresh_degree(
 
 static int np_regression_prepared_context_eval(
   NPRegressionPreparedCtx *context, const double *bw,
-  const int *degree, double out[5])
+  const int *degree, const int raw_only, double out[5])
 {
   double eval_before;
   double fast_before;
@@ -6367,8 +6368,8 @@ static int np_regression_prepared_context_eval(
       context->scale_factor == NULL || context->num_var <= 0)
     return 1;
   if (!np_regression_prepared_context_refresh_degree(context, degree)) {
-    value = (bwm_penalty_mode == 1 && R_FINITE(bwm_penalty_value)) ?
-      bwm_penalty_value : DBL_MAX;
+    value = (!raw_only && bwm_penalty_mode == 1 &&
+             R_FINITE(bwm_penalty_value)) ? bwm_penalty_value : DBL_MAX;
     bwm_eval_count += 1.0;
     bwm_invalid_count += 1.0;
     bwm_maybe_signal_activity();
@@ -6407,7 +6408,24 @@ static int np_regression_prepared_context_eval(
   invalid_before = bwm_invalid_count;
   fast_before = np_fastcv_alllarge_hits_get() +
     bwm_nn_cache_hits_window + bwm_objective_cache_hits_window;
-  value = bwmfunc_wrapper(context->scale_factor);
+  if (raw_only) {
+    bwm_eval_count += 1.0;
+    if (!bwm_active_floor_candidate_ok(context->scale_factor)) {
+      value = DBL_MAX;
+    } else {
+      bwm_progress_eval_active = 1;
+      value = bwmfunc_raw_current_scale(
+        context->scale_factor, context->num_var);
+      bwm_progress_eval_active = 0;
+    }
+    if (!R_FINITE(value) || value == DBL_MAX) {
+      bwm_invalid_count += 1.0;
+      value = DBL_MAX;
+    }
+    bwm_maybe_signal_activity();
+  } else {
+    value = bwmfunc_wrapper(context->scale_factor);
+  }
   fast_after = np_fastcv_alllarge_hits_get() +
     bwm_nn_cache_hits_window + bwm_objective_cache_hits_window;
 
@@ -6876,7 +6894,7 @@ static int np_regression_native_search_callback(int n,
   }
 
   status = np_regression_prepared_context_eval(
-    &context->prepared, eval_bw, degree_work, eval_out);
+    &context->prepared, eval_bw, degree_work, 0, eval_out);
   if (status != 0) {
     context->callback_failures++;
     return 1;
@@ -6951,6 +6969,7 @@ SEXP C_np_regression_nomad_native_search(SEXP runo,
   int bb_output_type[1] = {CRS_NOMAD_OUTPUT_OBJ};
   double crs_outputs[1];
   np_regression_native_search_context context;
+  double final_eval[5] = {DBL_MAX, 0.0, 0.0, 0.0, 1.0};
   double *solution = NULL;
   double *best_point = NULL;
   double *raw_start = NULL;
@@ -7032,6 +7051,7 @@ SEXP C_np_regression_nomad_native_search(SEXP runo,
   memset(&problem, 0, sizeof(problem));
   memset(&result, 0, sizeof(result));
   memset(&context, 0, sizeof(context));
+  context.best_objective = DBL_MAX;
   for (i = 0; i < 5; i++)
     context.best_eval[i] = R_NaN;
   for (i = 0; i < 5; i++)
@@ -7211,6 +7231,35 @@ SEXP C_np_regression_nomad_native_search(SEXP runo,
                                         &result);
   bwm_objective_cache_callback_option_end();
   nomad_degree_progress_active = 0;
+  if (context.callback_calls > 0 &&
+      np_regression_native_decode_eval_bw(
+        &context, best_point, context.eval_bw) == 0) {
+    int *final_degree = context.glp_degree;
+    int final_status;
+    if (context.ndegree > 0) {
+      for (i = 0; i < context.ndegree; i++)
+        context.degree_work[i] = context.best_degree[i];
+      final_degree = context.degree_work;
+    }
+    final_status = np_regression_prepared_context_eval(
+      &context.prepared, context.eval_bw, final_degree, 1, final_eval);
+    if (final_status == 0) {
+      context.total_num_feval += final_eval[2];
+      context.total_fast += final_eval[3];
+      context.total_invalid += final_eval[4];
+      context.best_objective = final_eval[0];
+      for (i = 0; i < 5; i++)
+        context.best_eval[i] = final_eval[i];
+    } else {
+      context.best_objective = DBL_MAX;
+      context.best_eval[0] = DBL_MAX;
+      context.best_eval[4] = 1.0;
+    }
+  } else {
+    context.best_objective = DBL_MAX;
+    context.best_eval[0] = DBL_MAX;
+    context.best_eval[4] = 1.0;
+  }
   R_Free(context.raw_point);
   R_Free(context.eval_bw);
   if (context.degree_work != NULL)

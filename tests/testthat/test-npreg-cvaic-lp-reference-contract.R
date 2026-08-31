@@ -61,3 +61,43 @@ test_that("LP CVAIC agrees with the independent exact-hat definition", {
     )
   }
 })
+
+test_that("CVAIC maps nonfinite raw objectives through the selected penalty", {
+  old_options <- options(np.tree = FALSE, np.messages = FALSE)
+  on.exit(options(old_options), add = TRUE)
+
+  x <- data.frame(x = seq(0, 1, length.out = 12L))
+  y <- numeric(nrow(x))
+  evaluate_objective <- getFromNamespace(".npregbw_eval_only", "np")
+  engines <- list(
+    list(regtype = "lc", degree = NULL),
+    list(regtype = "ll", degree = NULL),
+    list(regtype = "lp", degree = 2L)
+  )
+
+  for (engine in engines) {
+    call <- list(
+      xdat = x,
+      ydat = y,
+      regtype = engine$regtype,
+      bwmethod = "cv.aic",
+      bwtype = "fixed",
+      ckertype = "gaussian",
+      ckerorder = 2L,
+      bws = 0.3,
+      bandwidth.compute = FALSE
+    )
+    if (!is.null(engine$degree)) call$degree <- engine$degree
+    bw <- do.call(npregbw, call)
+    baseline <- evaluate_objective(
+      x, y, bw, invalid.penalty = "baseline", objective = "ls"
+    )$objective
+    dbmax <- evaluate_objective(
+      x, y, bw, invalid.penalty = "dbmax", objective = "ls"
+    )$objective
+
+    expect_true(is.finite(baseline))
+    expect_lt(baseline, .Machine$double.xmax)
+    expect_identical(as.numeric(dbmax), .Machine$double.xmax)
+  }
+})

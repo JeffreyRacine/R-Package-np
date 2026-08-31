@@ -148,6 +148,12 @@ npregbw.NULL <-
     engine %in% c("nomad", "nomad+powell")
 }
 
+.npregbw_native_raw_objective_valid <- function(value) {
+  value <- as.numeric(value)
+  length(value) == 1L && !is.na(value) && is.finite(value) &&
+    !identical(value, .Machine$double.xmax)
+}
+
 .npregbw_nomad_native_require_crs <- function() {
   if (!requireNamespace("crs", quietly = TRUE))
     stop("native npreg NOMAD route requires crs >= 0.15-46", call. = FALSE)
@@ -1379,7 +1385,6 @@ npregbw.rbandwidth <-
       native.elapsed <- proc.time()[3L] - native.start
       native.nomad.elapsed <- native.nomad.elapsed + native.elapsed
       .np_nomad_native_status(native.i, "native npreg NOMAD route")
-      official.objective.i <- as.numeric(native.i$official_objective[1L])
       objective.i <- as.numeric(native.i$objective[1L])
       native.results[[i]] <- list(
         restart = i,
@@ -1387,7 +1392,7 @@ npregbw.rbandwidth <-
         elapsed = native.elapsed,
         status = "ok",
         message = as.character(native.i$message[1L]),
-        objective = official.objective.i,
+        objective = objective.i,
         bbe = as.numeric(native.i$blackbox_evaluations[1L]),
         iterations = as.numeric(native.i$iterations[1L]),
         solution = as.numeric(native.i$solution),
@@ -1398,13 +1403,14 @@ npregbw.rbandwidth <-
       native.num.feval.total <- native.num.feval.total + as.numeric(native.i$total_num.feval[1L])
       native.num.feval.fast.total <- native.num.feval.fast.total + as.numeric(native.i$total_num.feval.fast[1L])
       native.num.feval.invalid.total <- native.num.feval.invalid.total + as.numeric(native.i$total_num.feval.invalid[1L])
-      if (is.finite(objective.i) && objective.i < native.best.objective) {
+      if (.npregbw_native_raw_objective_valid(objective.i) &&
+          objective.i < native.best.objective) {
         native.best.objective <- objective.i
         native.best.index <- i
       }
     }
     if (!is.finite(native.best.index))
-      stop("native npreg NOMAD route did not return a finite solution", call. = FALSE)
+      stop("native npreg NOMAD route did not return a raw-valid solution", call. = FALSE)
 
     native.best <- native.results[[native.best.index]]
     native.handoff.point <- as.numeric(native.best$best_point)
@@ -1452,7 +1458,7 @@ npregbw.rbandwidth <-
         bandwidth = native.bw,
         objective = native.best.objective,
         official.solution = as.numeric(native.best$solution),
-        official.objective = as.numeric(native.best$objective[1L]),
+        official.objective = as.numeric(native.best$native$official_objective[1L]),
         compiled.callback.count = as.integer(native.best$native$compiled_callback_calls[1L]),
         compiled.callback.failures = as.integer(native.best$native$compiled_callback_failures[1L]),
         crs.callback.evaluations = as.integer(native.best$native$crs_callback_evaluations[1L]),
@@ -2070,14 +2076,14 @@ npregbw.rbandwidth <-
           num.feval = NA_real_
         )
       }
-      if (is.finite(native.i$objective) &&
+      if (.npregbw_native_raw_objective_valid(native.i$objective) &&
           .np_degree_better(native.i$objective, native.best.objective, direction = "min")) {
         native.best.objective <- native.i$objective
         native.best.index <- i
       }
     }
     if (!is.finite(native.best.index))
-      stop("native npreg NOMAD degree-search route did not return a finite solution", call. = FALSE)
+      stop("native npreg NOMAD degree-search route did not return a raw-valid solution", call. = FALSE)
 
     if (isTRUE(opt.args$nomad.remin)) {
       remin.index <- length(native.results) + 1L
@@ -2093,7 +2099,7 @@ npregbw.rbandwidth <-
       native.num.feval.fast.total <- native.num.feval.fast.total + as.numeric(native.remin$native$total_num.feval.fast[1L])
       native.num.feval.invalid.total <- native.num.feval.invalid.total + as.numeric(native.remin$native$total_num.feval.invalid[1L])
       native.callback.total <- native.callback.total + as.integer(native.remin$native$compiled_callback_calls[1L])
-      if (is.finite(native.remin$objective) &&
+      if (.npregbw_native_raw_objective_valid(native.remin$objective) &&
           .np_degree_better(native.remin$objective, native.best.objective, direction = "min")) {
         native.best.objective <- native.remin$objective
         native.best.index <- remin.index

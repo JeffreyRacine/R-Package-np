@@ -18952,6 +18952,10 @@ finish_cv_path:
   if(!objective_storage_ok)
     return DBL_MAX;
 
+  /* Preserve the raw invalid sentinel for the outer penalty mapper. */
+  if(cv == DBL_MAX)
+    return DBL_MAX;
+
 	/* Negative penalties are treated as infinite: Hurvich et al pg 277 */
 
   cv /= (double)num_obs;
