@@ -482,20 +482,27 @@ npscoefbw.NULL <-
     iloo <- seq_len(neval)[doridge]
     for (ii in iloo) {
       doridge[ii] <- FALSE
-      ridge.val <- ridge[ii] * tyw[, ii][1L] / NZD(tww[, , ii][1L, 1L])
-      theta.ii <- tryCatch(
-        solve(
-          tww[, , ii] + diag(rep(ridge[ii], ncoef)),
-          tyw[, ii] + c(ridge.val, rep(0, ncoef - 1L))
-        ),
-        error = function(e) e
+      ridge.val <- npRidgeInterceptCorrection(
+        ridge = ridge[ii], intercept = tyw[, ii][1L],
+        pristine.anchor = tww[, , ii][1L, 1L]
       )
-      if (inherits(theta.ii, "error")) {
-        ridge.idx[ii] <- ridge.idx[ii] + 1L
-        if (ridge.idx[ii] <= length(ridge.grid)) {
-          ridge[ii] <- ridge.grid[ridge.idx[ii]]
-          doridge[ii] <- TRUE
+      if (is.finite(ridge.val)) {
+        theta.ii <- tryCatch(
+          solve(
+            tww[, , ii] + diag(rep(ridge[ii], ncoef)),
+            tyw[, ii] + c(ridge.val, rep(0, ncoef - 1L))
+          ),
+          error = function(e) e
+        )
+        if (inherits(theta.ii, "error")) {
+          ridge.idx[ii] <- ridge.idx[ii] + 1L
+          if (ridge.idx[ii] <= length(ridge.grid)) {
+            ridge[ii] <- ridge.grid[ridge.idx[ii]]
+            doridge[ii] <- TRUE
+          }
+          theta.ii <- rep(maxPenalty, ncoef)
         }
+      } else {
         theta.ii <- rep(maxPenalty, ncoef)
       }
 
@@ -1978,18 +1985,25 @@ npscoefbw.scbandwidth <-
         iloo <- seq_len(neval)[doridge]
         for (ii in iloo) {
           doridge[ii] <- FALSE
-          ridge.val <- ridge[ii]*tyw[,ii][1]/NZD(tww[,,ii][1,1])
-          theta.ii <- tryCatch(
-            solve(tww[,,ii] + diag(rep(ridge[ii], ncoef)),
-                  tyw[,ii] + c(ridge.val, rep(0, ncoef - 1))),
-            error = function(e) e
+          ridge.val <- npRidgeInterceptCorrection(
+            ridge = ridge[ii], intercept = tyw[, ii][1L],
+            pristine.anchor = tww[, , ii][1L, 1L]
           )
-          if (inherits(theta.ii, "error")) {
-            ridge.idx[ii] <- ridge.idx[ii] + 1L
-            if (ridge.idx[ii] <= length(ridge.grid)) {
-              ridge[ii] <- ridge.grid[ridge.idx[ii]]
-              doridge[ii] <- TRUE
+          if (is.finite(ridge.val)) {
+            theta.ii <- tryCatch(
+              solve(tww[,,ii] + diag(rep(ridge[ii], ncoef)),
+                    tyw[,ii] + c(ridge.val, rep(0, ncoef - 1))),
+              error = function(e) e
+            )
+            if (inherits(theta.ii, "error")) {
+              ridge.idx[ii] <- ridge.idx[ii] + 1L
+              if (ridge.idx[ii] <= length(ridge.grid)) {
+                ridge[ii] <- ridge.grid[ridge.idx[ii]]
+                doridge[ii] <- TRUE
+              }
+              theta.ii <- rep(maxPenalty, ncoef)
             }
+          } else {
             theta.ii <- rep(maxPenalty, ncoef)
           }
 
@@ -2090,7 +2104,12 @@ npscoefbw.scbandwidth <-
         ridge.idx <- 1L
         ridge <- ridge.grid[ridge.idx]
         repeat {
-          ridge.val <- ridge * tyw.ii[1L] / NZD(tww.ii[1L, 1L])
+          ridge.val <- npRidgeInterceptCorrection(
+            ridge = ridge, intercept = tyw.ii[1L],
+            pristine.anchor = tww.ii[1L, 1L]
+          )
+          if (!is.finite(ridge.val))
+            return(maxPenalty)
           beta.ii <- tryCatch(
             solve(tww.ii + diag(rep(ridge, nc)),
                   tyw.ii + c(ridge.val, rep(0, nc - 1L))),
@@ -2128,7 +2147,11 @@ npscoefbw.scbandwidth <-
         rhs <- matrix(tyw.full, nrow = length(idx), ncol = nc, byrow = TRUE)
         rhs <- rhs - sg * row.state$Wgy
         tww11 <- tww.full[1L, 1L] - sg * row.state$w1sq
-        rhs[, 1L] <- rhs[, 1L] + ridge * rhs[, 1L] / NZD(tww11)
+        ridge.correction <- npRidgeInterceptCorrection(
+          ridge = ridge, intercept = rhs[, 1L],
+          pristine.anchor = tww11
+        )
+        rhs[, 1L] <- rhs[, 1L] + ridge.correction
 
         u <- Wg %*% inv.full
         denom <- 1.0 - sg * rowSums(u * Wg)
@@ -2136,7 +2159,8 @@ npscoefbw.scbandwidth <-
         alpha <- rowSums(u * rhs)
         beta <- base + (sg * alpha / denom) * u
         pred <- rowSums(Wg * beta)
-        bad <- !is.finite(pred) | !is.finite(denom) |
+        bad <- !is.finite(ridge.correction) | !is.finite(pred) |
+          !is.finite(denom) |
           abs(denom) < sqrt(.Machine$double.eps)
         if (any(bad))
           pred[bad] <- vapply(idx[bad], solve_one, numeric(1))
@@ -2398,7 +2422,14 @@ npscoefbw.scbandwidth <-
                   iloo <- which(doridge)
                   for (ii in iloo) {
                     doridge[ii] <- FALSE
-                    ridge.val <- ridge[ii]*tww[-1,1,ii][1]/NZD(tww[-1,-1,ii][1,1])
+                    ridge.val <- npRidgeInterceptCorrection(
+                      ridge = ridge[ii], intercept = tww[-1, 1, ii][1L],
+                      pristine.anchor = tww[-1, -1, ii][1L, 1L]
+                    )
+                    if (!is.finite(ridge.val)) {
+                      mean.loo[ii] <- NA_real_
+                      next
+                    }
                     beta.ii <- tryCatch(
                       solve(tww[-1,-1,ii] + diag(rep(ridge[ii], nc)),
                             tww[-1,1,ii] + c(ridge.val, rep(0, nc - 1))),

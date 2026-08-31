@@ -1,5 +1,10 @@
 # npRmpi 0.70-6
 
+* Smooth-coefficient fit and bandwidth ridge corrections now use the finite,
+  nonzero signed pristine moment intercept. This preserves constant
+  reproduction under common moment scaling without changing ordinary
+  zero-ridge solves or the existing bounded ridge sequence.
+
 * Ridged local-polynomial response, influence, and R fallback solves now
   restore the intercept from the signed pristine Gram intercept rather than
   the already-ridged diagonal or a numerical floor. This restores constant

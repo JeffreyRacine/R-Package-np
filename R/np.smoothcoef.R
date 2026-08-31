@@ -569,26 +569,33 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
         iloo <- seq_len(neval.local)[doridge]
         for (ii in iloo) {
           doridge[ii] <- FALSE
-          ridge.val <- ridge[ii]*tyw[,ii][1]/NZD(tww[,,ii][1,1])
-          theta.ii <- fast_moment_solve(
-            tww.slice = tww[, , ii],
-            tyw.slice = tyw[, ii],
-            ridge.add = ridge[ii],
-            ridge.val = ridge.val
+          ridge.val <- npRidgeInterceptCorrection(
+            ridge = ridge[ii], intercept = tyw[, ii][1L],
+            pristine.anchor = tww[, , ii][1L, 1L]
           )
-          if (is.null(theta.ii)) {
-            theta.ii <- tryCatch(
-              solve(tww[,,ii] + diag(rep(ridge[ii], ncoef)),
-                    tyw[,ii] + c(ridge.val, rep(0, ncoef - 1))),
-              error = function(e) e
+          if (is.finite(ridge.val)) {
+            theta.ii <- fast_moment_solve(
+              tww.slice = tww[, , ii],
+              tyw.slice = tyw[, ii],
+              ridge.add = ridge[ii],
+              ridge.val = ridge.val
             )
-          }
-          if (inherits(theta.ii, "error")) {
-            ridge.idx[ii] <- ridge.idx[ii] + 1L
-            if (ridge.idx[ii] <= length(ridge.grid)) {
-              ridge[ii] <- ridge.grid[ridge.idx[ii]]
-              doridge[ii] <- TRUE
+            if (is.null(theta.ii)) {
+              theta.ii <- tryCatch(
+                solve(tww[,,ii] + diag(rep(ridge[ii], ncoef)),
+                      tyw[,ii] + c(ridge.val, rep(0, ncoef - 1))),
+                error = function(e) e
+              )
             }
+            if (inherits(theta.ii, "error")) {
+              ridge.idx[ii] <- ridge.idx[ii] + 1L
+              if (ridge.idx[ii] <= length(ridge.grid)) {
+                ridge[ii] <- ridge.grid[ridge.idx[ii]]
+                doridge[ii] <- TRUE
+              }
+              theta.ii <- rep(maxPenalty, ncoef)
+            }
+          } else {
             theta.ii <- rep(maxPenalty, ncoef)
           }
 
@@ -616,7 +623,12 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
       ridge.idx <- 1L
 
       repeat {
-        ridge.val <- ridge * tyw.vec[1L] / NZD(tww.mat[1L, 1L])
+        ridge.val <- npRidgeInterceptCorrection(
+          ridge = ridge, intercept = tyw.vec[1L],
+          pristine.anchor = tww.mat[1L, 1L]
+        )
+        if (!is.finite(ridge.val))
+          return(list(coef = rep(maxPenalty, ncoef), ridge = ridge))
         theta <- fast_moment_solve(
           tww.slice = tww.mat,
           tyw.slice = tyw.vec,
