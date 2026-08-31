@@ -3188,6 +3188,9 @@ np_continuous_kernel_beta_regression_moment_rows_validated(
   const NPContinuousKernelLogFactorProvider *provider,
   const double *response,
   int positive_weights,
+  const double *hc0_scaled_residual,
+  double hc0_residual_scale,
+  int preserve_mean,
   NPContinuousKernelRowWorkspace *workspace,
   NPContinuousKernelRowResult *row_result,
   double *mean,
@@ -3197,6 +3200,7 @@ np_continuous_kernel_beta_regression_moment_rows_validated(
 {
   NPContinuousKernelRowStatus status;
   const int compute_errors = mean_stderr != NULL;
+  const int ordinary_hc0 = hc0_scaled_residual != NULL;
   int evaluation;
   int coordinate;
   int observation;
@@ -3214,8 +3218,12 @@ np_continuous_kernel_beta_regression_moment_rows_validated(
      (leave_one_out != 0 && leave_one_out != 1) ||
      leave_one_out_offset < 0 ||
      (positive_weights != 0 && positive_weights != 1) ||
+     (preserve_mean != 0 && preserve_mean != 1) ||
      plan->operator == NULL || response == NULL || workspace == NULL ||
      row_result == NULL || mean == NULL ||
+     (ordinary_hc0 &&
+      (!compute_errors || !R_FINITE(hc0_residual_scale) ||
+       hc0_residual_scale < 0.0)) ||
      (leave_one_out &&
       (plan->num_eval > plan->num_train ||
        leave_one_out_offset > plan->num_train - plan->num_eval)))
@@ -3224,7 +3232,9 @@ np_continuous_kernel_beta_regression_moment_rows_validated(
     if(plan->operator[coordinate] != OP_NORMAL)
       return NP_CONTINUOUS_ROW_ERR_LAYOUT;
   for(observation = 0; observation < plan->num_train; ++observation)
-    if(!R_FINITE(response[observation])) {
+    if(!R_FINITE(response[observation]) ||
+       (ordinary_hc0 &&
+        !R_FINITE(hc0_scaled_residual[observation]))) {
       if(diagnostics != NULL)
         diagnostics->bad_observation = observation;
       return NP_CONTINUOUS_ROW_ERR_NUMERIC;
@@ -3237,6 +3247,7 @@ np_continuous_kernel_beta_regression_moment_rows_validated(
     double weighted_mean = 0.0;
     double weighted_m2 = 0.0;
     double squared_weight_sum = 0.0;
+    double hc0_moment = 0.0;
 
     status = np_continuous_kernel_beta_log_factor_row(
       plan, evaluation, omitted_observation, provider,
@@ -3273,9 +3284,16 @@ np_continuous_kernel_beta_regression_moment_rows_validated(
             (weight / new_total_weight) * delta;
 
           if(compute_errors) {
-            weighted_m2 += weight * delta *
-              (response[observation] - new_mean);
-            squared_weight_sum += weight * weight;
+            if(ordinary_hc0) {
+              const double influence =
+                weight * hc0_scaled_residual[observation];
+
+              hc0_moment += influence * influence;
+            } else {
+              weighted_m2 += weight * delta *
+                (response[observation] - new_mean);
+              squared_weight_sum += weight * weight;
+            }
           }
           total_weight = new_total_weight;
           weighted_mean = new_mean;
@@ -3307,12 +3325,20 @@ np_continuous_kernel_beta_regression_moment_rows_validated(
             0.0 : (double)workspace->primary_sign[observation] * exp(
               workspace->primary_log_absolute[observation] -
               row_result->total_log_scale);
-          const double residual = response[observation] - weighted_mean;
+          const double residual = ordinary_hc0 ?
+            hc0_scaled_residual[observation] :
+            response[observation] - weighted_mean;
 
           if(observation == omitted_observation)
             continue;
-          weighted_m2 += weight * residual * residual;
-          squared_weight_sum += weight * weight;
+          if(ordinary_hc0) {
+            const double influence = weight * residual;
+
+            hc0_moment += influence * influence;
+          } else {
+            weighted_m2 += weight * residual * residual;
+            squared_weight_sum += weight * weight;
+          }
         }
     }
 
@@ -3322,18 +3348,22 @@ np_continuous_kernel_beta_regression_moment_rows_validated(
         NP_CONTINUOUS_ROW_ERR_NUMERIC;
     if(!R_FINITE(weighted_mean) ||
        (compute_errors &&
-        (!R_FINITE(weighted_m2) || !R_FINITE(squared_weight_sum))))
+        (ordinary_hc0 ?
+         (!R_FINITE(hc0_moment) || hc0_moment < 0.0) :
+         (!R_FINITE(weighted_m2) || !R_FINITE(squared_weight_sum)))))
       return NP_CONTINUOUS_ROW_ERR_NUMERIC;
-    if(compute_errors &&
+    if(compute_errors && !ordinary_hc0 &&
        ((positive_weights && weighted_m2 < 0.0) ||
         (!positive_weights && weighted_m2 / total_weight < 0.0)))
       weighted_m2 = 0.0;
 
-    mean[evaluation] = weighted_mean;
+    if(!preserve_mean)
+      mean[evaluation] = weighted_mean;
     if(compute_errors) {
-      mean_stderr[evaluation] = sqrt(
-        (weighted_m2 / total_weight) *
-        (squared_weight_sum / (total_weight * total_weight)));
+      mean_stderr[evaluation] = ordinary_hc0 ?
+        hc0_residual_scale * sqrt(hc0_moment) / fabs(total_weight) :
+        sqrt((weighted_m2 / total_weight) *
+             (squared_weight_sum / (total_weight * total_weight)));
       if(!R_FINITE(mean_stderr[evaluation]))
         return NP_CONTINUOUS_ROW_ERR_NUMERIC;
     }

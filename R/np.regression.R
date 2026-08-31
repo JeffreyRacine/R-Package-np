@@ -244,9 +244,7 @@ npreg.call <-
     as.integer(enrow)
   }
   ordinary.hc0 <- isTRUE(se) &&
-    identical(as.integer(reg.code), as.integer(REGTYPE_LP0)) &&
-    !identical(as.character(bws$ckertype)[1L], "beta") &&
-    !identical(as.character(bws$type)[1L], "adaptive_nn")
+    identical(as.integer(reg.code), as.integer(REGTYPE_LP0))
 
   if (ordinary.hc0) as.integer(tnrow) + base.total else base.total
 }
