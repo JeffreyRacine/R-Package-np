@@ -534,7 +534,7 @@ npreg.rbandwidth <-
 
     hat.txdat <- txdat
     hat.exdat <- if (no.ex) NULL else exdat
-    do.compiled.gradients <- isTRUE(gradients) && !glp.gradient.partial
+    do.compiled.gradients <- isTRUE(gradients)
 
     ## re-assign levels in training and evaluation data to ensure correct
     ## conversion to numeric type.
@@ -676,7 +676,7 @@ npreg.rbandwidth <-
             PACKAGE = "np")
     )
 
-    if (gradients && !glp.gradient.partial){
+    if (gradients){
       myout$g = matrix(data=myout$g, nrow = enrow, ncol = ncol, byrow = FALSE) 
       rorder = numeric(ncol)
       ord_idx <- seq_len(ncol)
@@ -688,19 +688,12 @@ npreg.rbandwidth <-
         myout$gerr = as.matrix(myout$gerr[,rorder])
       }
 
-    } else if (gradients) {
-      myout$g <- .npreg_glp_partial_gradients_from_npreghat(
-        bws = bws,
-        txdat = hat.txdat,
-        tydat = tydat,
-        exdat = hat.exdat,
-        gradient.order = glp.gradient.order,
-        available = glp.gradient.available,
-        nrow.eval = enrow,
-        ncol.x = ncol
-      )
-      myout$gerr <- if (se)
-        matrix(NA_real_, nrow = enrow, ncol = ncol) else NULL
+      if (glp.gradient.partial) {
+        unavailable <- which(bws$icon)[!glp.gradient.available]
+        myout$g[, unavailable] <- NA_real_
+        if (se)
+          myout$gerr[, unavailable] <- NA_real_
+      }
     }
 
     if (compute.resid.from.fit)
