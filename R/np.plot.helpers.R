@@ -7349,7 +7349,15 @@
     ckerlb = if (!is.null(bws$ckerlb)) bws$ckerlb else NULL,
     ckerub = if (!is.null(bws$ckerub)) bws$ckerub else NULL,
     ukertype = bws$ukertype,
-    okertype = bws$okertype,
+    # Density/distribution bandwidth objects use "liracine" for the
+    # normalized ordered kernel. kbandwidth/npksum reserve that spelling for
+    # the unnormalized kernel and call the density-family kernel
+    # "nliracine". Translate only at this private family adapter.
+    okertype = if (identical(bws$okertype, "liracine")) {
+      "nliracine"
+    } else {
+      bws$okertype
+    },
     nobs = nrow(xdat),
     xdati = untangle(xdat),
     xnames = names(xdat)
