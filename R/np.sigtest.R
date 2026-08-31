@@ -397,6 +397,40 @@ npsigtest.npregression <-
   mean(bootstrap >= observed)
 }
 
+.np_npsig_validate_lp_degree <- function(bws, xdat, index) {
+  if (!identical(bws[["regtype", exact = TRUE]], "lp"))
+    return(invisible(TRUE))
+
+  icon <- bws[["icon", exact = TRUE]]
+  degree <- bws[["degree.engine", exact = TRUE]]
+  valid.degree <- is.numeric(degree) &&
+    all(is.finite(degree)) &&
+    all(degree >= 0) &&
+    all(degree == floor(degree))
+  if (!is.logical(icon) || length(icon) != ncol(xdat) || anyNA(icon) ||
+      length(degree) != sum(icon) || !valid.degree) {
+    stop("npsigtest() encountered inconsistent local-polynomial degree metadata", call. = FALSE)
+  }
+
+  continuous <- which(icon)
+  tested.continuous <- index[index %in% continuous]
+  position <- match(tested.continuous, continuous)
+  zero.degree <- tested.continuous[degree[position] == 0]
+  if (length(zero.degree)) {
+    stop(sprintf(
+      paste0(
+        "npsigtest() requires polynomial degree at least 1 for every tested ",
+        "continuous coordinate when regtype = 'lp'; degree 0 was selected ",
+        "for: %s. If this model was selected via NOMAD, refit with ",
+        "degree.min = 1."
+      ),
+      paste(names(xdat)[zero.degree], collapse = ", ")
+    ), call. = FALSE)
+  }
+
+  invisible(TRUE)
+}
+
 npsigtest.rbandwidth <- function(bws,
                                  xdat = stop("data xdat missing"),
                                  ydat = stop("data ydat missing"),
@@ -447,6 +481,8 @@ npsigtest.rbandwidth <- function(bws,
 
   if (is.factor(ydat))
     stop("dependent variable must be continuous.")
+
+  .np_npsig_validate_lp_degree(bws = bws, xdat = xdat, index = index)
 
   ## Save seed prior to setting
 
