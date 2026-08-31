@@ -1,5 +1,10 @@
 # npRmpi 0.70-6
 
+* Generalized-nearest-neighbor unconditional plot bootstraps now preserve
+  literal resample multiplicities when MPI workers own exact kernel-sum
+  evaluation. This matches serial resampling semantics; adaptive-nearest-
+  neighbor and fixed-bandwidth ownership are unchanged.
+
 * Mixed beta-kernel conditional hats now pass the validated categorical-
   compression state to their private direct kernel-weight owner. This repairs
   conditional density gradients and simultaneous beta-X/beta-Y fits that

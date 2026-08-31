@@ -7392,7 +7392,8 @@
                                                           bws,
                                                           kb,
                                                           operator) {
-  if (identical(bws$type, "adaptive_nn")) {
+  if (identical(bws$type, "generalized_nn") ||
+      identical(bws$type, "adaptive_nn")) {
     idx <- .np_counts_to_indices(counts.col)
     return(.np_ksum_unconditional_eval_exact(
       xdat = xdat[idx, , drop = FALSE],

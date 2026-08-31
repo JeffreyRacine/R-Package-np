@@ -13,7 +13,9 @@ test_that("nonfixed unconditional exact bootstrap matches duplicate-row oracle",
   storage.mode(counts) <- "double"
 
   for (bt in c("generalized_nn", "adaptive_nn")) {
-    bw.val <- if (identical(bt, "adaptive_nn")) 2 else 1
+    # Generalized evaluation at zero sees both coincident training rows; the
+    # third order statistic is the first strictly positive literal radius.
+    bw.val <- if (identical(bt, "adaptive_nn")) 2 else 3
     bw <- do.call(npudensbw, list(
       dat = xdat,
       bwtype = bt,
@@ -88,7 +90,7 @@ test_that("nonfixed unconditional exact helper matches direct kbandwidth precomp
   active <- counts > 0
 
   for (bt in c("generalized_nn", "adaptive_nn")) {
-    bw.val <- if (identical(bt, "adaptive_nn")) 2 else 1
+    bw.val <- if (identical(bt, "adaptive_nn")) 2 else 3
     bw <- do.call(npudensbw, list(
       dat = xdat,
       bwtype = bt,
@@ -203,12 +205,13 @@ test_that("adaptive conditional exact handles tiny-support resamples consistentl
   eydat <- data.frame(y = c(0, 1, 2, 4))
   counts <- matrix(c(0, 2, 1, 0, 3, 0), ncol = 1L)
   storage.mode(counts) <- "double"
+  positive.occurrence <- max(counts)
 
   bw <- npcdensbw(
     xdat = xdat,
     ydat = ydat,
     bwtype = "adaptive_nn",
-    bws = c(2, 2),
+    bws = rep.int(positive.occurrence, 2L),
     bandwidth.compute = FALSE
   )
 
@@ -254,7 +257,7 @@ test_that("npRmpi nonfixed unconditional exact helper fanout paths complete in s
       "exdat <- data.frame(x = c(0, 2, 5, 9))",
       "counts <- cbind(c(1,0,1,2,0,2), c(0,2,1,0,1,2))",
       "storage.mode(counts) <- 'double'",
-      "bw <- npudensbw(dat = xdat, bws = 1, bwtype = 'generalized_nn', bandwidth.compute = FALSE)",
+      "bw <- npudensbw(dat = xdat, bws = 4, bwtype = 'generalized_nn', bandwidth.compute = FALSE)",
       "fit_counts <- npRmpi:::.np_inid_boot_from_ksum_unconditional_exact(xdat = xdat, exdat = exdat, bws = bw, B = ncol(counts), operator = 'normal', counts = counts)",
       "drawer <- function(start, stop) {",
       "  counts.mat <- matrix(c(1,0,1,2,0,2,0,2,1,0,1,2), nrow = 6L)",
