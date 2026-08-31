@@ -32,15 +32,15 @@ hc0_explicit_lc_bw <- function(xdat, ydat, bws, bwtype = "fixed", ...) {
   )
 }
 
-test_that("scalar fixed and GNN mean SEs equal the ordinary-residual HC0 oracle", {
-  old <- options(np.messages = FALSE)
+test_that("scalar fixed, GNN, and adaptive-NN mean SEs equal the HC0 oracle", {
+  old <- options(np.messages = FALSE, np.tree = TRUE)
   on.exit(options(old), add = TRUE)
 
   xdat <- data.frame(x = seq(-1.2, 1.3, length.out = 31L))
   ydat <- sin(1.4 * xdat$x) + seq_len(nrow(xdat)) / 50
   exdat <- data.frame(x = c(-1.1, -0.35, 0.2, 1.15))
 
-  for (bwtype in c("fixed", "generalized_nn")) {
+  for (bwtype in c("fixed", "generalized_nn", "adaptive_nn")) {
     bw <- hc0_explicit_lc_bw(
       xdat,
       ydat,
@@ -63,6 +63,152 @@ test_that("scalar fixed and GNN mean SEs equal the ordinary-residual HC0 oracle"
       expect_true(all(is.finite(fit.se$merr)))
       expect_true(all(fit.se$merr >= 0))
     }
+  }
+})
+
+test_that("beta scalar mean SEs equal the HC0 oracle across orders and NN modes", {
+  old <- options(np.messages = FALSE)
+  on.exit(options(old), add = TRUE)
+
+  xdat <- data.frame(x = c(0.03, 0.10, 0.24, 0.43, 0.67, 0.82, 0.96))
+  ydat <- sin(2 * xdat$x) + xdat$x +
+    c(-0.03, 0.02, 0.01, -0.02, 0.04, -0.01, 0.02)
+  exdat <- data.frame(x = c(0.08, 0.38, 0.74, 0.92))
+
+  for (order in c(2L, 4L, 6L, 8L)) {
+    for (bwtype in c("fixed", "generalized_nn", "adaptive_nn")) {
+      bw <- hc0_explicit_lc_bw(
+        xdat,
+        ydat,
+        bws = if (identical(bwtype, "fixed")) 0.18 else 3,
+        bwtype = bwtype,
+        ckertype = "beta",
+        ckerorder = order,
+        ckerbound = "fixed",
+        ckerlb = 0,
+        ckerub = 1
+      )
+
+      for (external in c(FALSE, TRUE)) {
+        eval <- if (external) exdat else NULL
+        args <- list(bws = bw, txdat = xdat, tydat = ydat)
+        if (external)
+          args$exdat <- eval
+        fit.no.se <- do.call(npreg, c(args, list(se = FALSE)))
+        fit.se <- do.call(npreg, c(args, list(se = TRUE)))
+
+        expect_identical(fit.se$mean, fit.no.se$mean)
+        expect_equal(
+          fit.se$merr,
+          hc0_hat_oracle(bw, xdat, ydat, eval),
+          tolerance = 2e-14
+        )
+        expect_true(all(is.finite(fit.se$merr)))
+        expect_true(all(fit.se$merr >= 0))
+      }
+    }
+  }
+})
+
+test_that("mixed beta scalar HC0 preserves dense and compressed point routes", {
+  old <- options(np.messages = FALSE, np.categorical.compress = FALSE)
+  on.exit(options(old), add = TRUE)
+
+  x <- seq(0.025, 0.975, length.out = 24L)
+  xdat <- data.frame(
+    x = x,
+    u = factor(rep(letters[1:3], length.out = length(x))),
+    o = ordered(rep(1:4, each = 6L))
+  )
+  ydat <- sin(4 * x) + 0.12 * as.integer(xdat$u) +
+    0.07 * as.integer(xdat$o)
+  exdat <- xdat[c(2L, 5L, 9L, 14L, 20L, 23L), , drop = FALSE]
+
+  for (order in c(2L, 6L)) {
+    for (bwtype in c("fixed", "generalized_nn", "adaptive_nn")) {
+      bw <- hc0_explicit_lc_bw(
+        xdat,
+        ydat,
+        bws = if (identical(bwtype, "fixed")) {
+          c(0.15, 0.2, 0.25)
+        } else {
+          c(7, 0.2, 0.25)
+        },
+        bwtype = bwtype,
+        ckertype = "beta",
+        ckerorder = order,
+        ckerbound = "fixed",
+        ckerlb = 0,
+        ckerub = 1
+      )
+
+      for (external in c(FALSE, TRUE)) {
+        eval <- if (external) exdat else NULL
+        args <- list(
+          bws = bw,
+          txdat = xdat,
+          tydat = ydat,
+          gradients = TRUE
+        )
+        if (external)
+          args$exdat <- eval
+        fit.no.se <- do.call(npreg, c(args, list(se = FALSE)))
+
+        options(np.categorical.compress = FALSE)
+        dense <- do.call(npreg, c(args, list(se = TRUE)))
+        options(np.categorical.compress = TRUE)
+        compressed <- do.call(npreg, c(args, list(se = TRUE)))
+
+        expect_identical(dense$mean, fit.no.se$mean)
+        expect_identical(dense$grad, fit.no.se$grad)
+        expect_equal(
+          dense$merr,
+          hc0_hat_oracle(bw, xdat, ydat, eval),
+          tolerance = 3e-14
+        )
+        expect_true(all(is.na(dense$gerr)))
+        expect_identical(compressed$mean, dense$mean)
+        expect_identical(compressed$merr, dense$merr)
+        expect_identical(compressed$grad, dense$grad)
+        expect_identical(compressed$gerr, dense$gerr)
+      }
+    }
+  }
+})
+
+test_that("beta scalar HC0 survives complete raw-weight underflow", {
+  old <- options(np.messages = FALSE)
+  on.exit(options(old), add = TRUE)
+
+  xdat <- data.frame(x = 0.9 + c(0, 1e-7, 2e-7))
+  ydat <- c(1, 4, 9)
+  exdat <- data.frame(x = 0)
+
+  for (order in c(2L, 4L, 6L, 8L)) {
+    bw <- hc0_explicit_lc_bw(
+      xdat,
+      ydat,
+      bws = 0.001,
+      ckertype = "beta",
+      ckerorder = order,
+      ckerbound = "fixed",
+      ckerlb = 0,
+      ckerub = 1
+    )
+    fit.no.se <- npreg(
+      bws = bw, txdat = xdat, tydat = ydat, exdat = exdat, se = FALSE
+    )
+    fit.se <- npreg(
+      bws = bw, txdat = xdat, tydat = ydat, exdat = exdat, se = TRUE
+    )
+
+    expect_identical(fit.se$mean, fit.no.se$mean)
+    expect_equal(
+      fit.se$merr,
+      hc0_hat_oracle(bw, xdat, ydat, exdat),
+      tolerance = 3e-12
+    )
+    expect_true(all(is.finite(fit.se$merr)))
   }
 })
 
@@ -368,7 +514,7 @@ test_that("scalar HC0 is response-equivariant and constant responses are exact z
   expect_identical(constant$merr, rep(0, nrow(xdat)))
 })
 
-test_that("H2A source keeps HC0 private, linear-memory, and scalar-only", {
+test_that("H2B source keeps HC0 private, linear-memory, and scalar-only", {
   source <- paste(
     readLines(test_path("..", "..", "src", "np.c"), warn = FALSE),
     collapse = "\n"
@@ -395,13 +541,24 @@ test_that("H2A source keeps HC0 private, linear-memory, and scalar-only", {
   )
 
   expect_match(source, "NPRegressionHC0Context ordinary_hc0_context", fixed = TRUE)
-  expect_match(source, "BANDWIDTH_reg_extern != BW_ADAP_NN", fixed = TRUE)
-  expect_match(source, "kernel_route == NULL", fixed = TRUE)
+  expect_match(
+    source,
+    paste0(
+      "ordinary_hc0_active = do_merr &&\n",
+      "    np_lp_engine_extern == NP_LP_ENGINE_SCALAR;"
+    ),
+    fixed = TRUE
+  )
   expect_gt(hc0.start, 0L)
   expect_gt(hc0.end, 0L)
   expect_false(grepl("npreghat", hc0.source, fixed = TRUE))
   expect_false(grepl("np_regression_lp_hat_matrix", hc0.source, fixed = TRUE))
   expect_match(reducer, "ordinary_hc0 ? &hc0_dual_power_ctx : NULL", fixed = TRUE)
+  expect_match(
+    reducer,
+    "regression_moment_context.hc0_scaled_residual",
+    fixed = TRUE
+  )
   expect_match(reducer, "hc0_context == NULL", fixed = TRUE)
 })
 
@@ -424,10 +581,10 @@ test_that("the compiled-fit total accounts for both HC0 phases only", {
   )
   expect_identical(
     .np_reg_fit_total(beta, 24L, 3L, TRUE, REGTYPE_LP0),
-    3L
+    27L
   )
   expect_identical(
     .np_reg_fit_total(adaptive, 24L, 3L, TRUE, REGTYPE_LP0),
-    24L
+    48L
   )
 })

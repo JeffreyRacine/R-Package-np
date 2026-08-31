@@ -20455,9 +20455,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
   np_lp_engine_extern = np_regression_engine_or_error(
     myopti[REG_LL], "C_np_regression");
   ordinary_hc0_active = do_merr &&
-    np_lp_engine_extern == NP_LP_ENGINE_SCALAR &&
-    kernel_route == NULL &&
-    BANDWIDTH_reg_extern != BW_ADAP_NN;
+    np_lp_engine_extern == NP_LP_ENGINE_SCALAR;
   vector_glp_degree_extern = glp_degree;
   vector_glp_gradient_order_extern = glp_gradient_order;
   int_glp_bernstein_extern = *glp_bernstein;
@@ -20668,7 +20666,39 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
     double ** const training_gradient = train_is_eval ? eg : NULL;
     long double residual_scale = 0.0L;
     int constant_response = 1;
+    const int temporary_training_tree =
+      int_TREE_X == NP_TREE_TRUE &&
+      BANDWIDTH_reg_extern == BW_ADAP_NN &&
+      !train_is_eval && kernel_route == NULL;
+    KDT *outer_evaluation_kdt = NULL;
+    KDT *training_kdt = NULL;
     NPRegressionHC0Context residual_preparation_context;
+
+    if(temporary_training_tree) {
+      outer_evaluation_kdt = kdt_extern_X;
+      build_kdtree(
+        matrix_X_continuous_train_extern,
+        num_obs_train_extern,
+        num_reg_continuous_extern,
+        4*num_reg_continuous_extern,
+        ipt,
+        &training_kdt);
+      for(j = 0; j < num_reg_unordered_extern; j++)
+        for(i = 0; i < num_obs_train_extern; i++)
+          matrix_X_unordered_train_extern[j][i] =
+            tuno[j*num_obs_train_extern + ipt[i]];
+      for(j = 0; j < num_reg_ordered_extern; j++)
+        for(i = 0; i < num_obs_train_extern; i++)
+          matrix_X_ordered_train_extern[j][i] =
+            tord[j*num_obs_train_extern + ipt[i]];
+      for(j = 0; j < num_reg_continuous_extern; j++)
+        for(i = 0; i < num_obs_train_extern; i++)
+          matrix_X_continuous_train_extern[j][i] =
+            tcon[j*num_obs_train_extern + ipt[i]];
+      for(i = 0; i < num_obs_train_extern; i++)
+        vector_Y_extern[i] = ty[ipt[i]];
+      kdt_extern_X = training_kdt;
+    }
 
     ordinary_hc0_residual =
       (double *)R_alloc((size_t)num_obs_train_extern, sizeof(double));
@@ -20720,6 +20750,11 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
       &training_geometry_context,
       &residual_preparation_context);
 
+    if(temporary_training_tree) {
+      kdt_extern_X = outer_evaluation_kdt;
+      free_kdtree(&training_kdt);
+    }
+
     for(i = 0; i < num_obs_train_extern; i++) {
       const long double residual =
         (long double)vector_Y_extern[i] - (long double)training_mean[i];
@@ -20759,6 +20794,36 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
         if(!R_FINITE(ordinary_hc0_residual[i]))
           error("ordinary-regression HC0 scaled residual is not finite");
       }
+    }
+
+    if(temporary_training_tree) {
+      for(i = 0; i < num_obs_train_extern; i++) {
+        while(ipt[i] != i) {
+          const int destination = ipt[i];
+          const double residual = ordinary_hc0_residual[i];
+          const int permutation = ipt[i];
+
+          ordinary_hc0_residual[i] =
+            ordinary_hc0_residual[destination];
+          ordinary_hc0_residual[destination] = residual;
+          ipt[i] = ipt[destination];
+          ipt[destination] = permutation;
+        }
+      }
+      for(j = 0; j < num_reg_unordered_extern; j++)
+        for(i = 0; i < num_obs_train_extern; i++)
+          matrix_X_unordered_train_extern[j][i] =
+            tuno[j*num_obs_train_extern + i];
+      for(j = 0; j < num_reg_ordered_extern; j++)
+        for(i = 0; i < num_obs_train_extern; i++)
+          matrix_X_ordered_train_extern[j][i] =
+            tord[j*num_obs_train_extern + i];
+      for(j = 0; j < num_reg_continuous_extern; j++)
+        for(i = 0; i < num_obs_train_extern; i++)
+          matrix_X_continuous_train_extern[j][i] =
+            tcon[j*num_obs_train_extern + i];
+      for(i = 0; i < num_obs_train_extern; i++)
+        vector_Y_extern[i] = ty[i];
     }
 
     np_progress_fit_set_offset(num_obs_train_extern);

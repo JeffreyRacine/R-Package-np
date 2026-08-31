@@ -9292,6 +9292,9 @@ typedef struct {
 
 typedef struct {
   const double *response;
+  const double *hc0_scaled_residual;
+  double hc0_residual_scale;
+  int preserve_mean;
   double *mean;
   double *mean_stderr;
   double **gradient;
@@ -9560,6 +9563,9 @@ np_beta_regression_moment_rows_dispatch(
   const NPContinuousKernelLogFactorProvider *provider,
   const double *response,
   const int positive_weights,
+  const double *hc0_scaled_residual,
+  const double hc0_residual_scale,
+  const int preserve_mean,
   const NPRegressionStandardErrorMode standard_error_mode,
   NPContinuousKernelRowWorkspace *workspace,
   NPContinuousKernelRowResult *row_result,
@@ -9577,7 +9583,9 @@ np_beta_regression_moment_rows_dispatch(
     return NP_CONTINUOUS_ROW_ERR_LAYOUT;
   return np_continuous_kernel_beta_regression_moment_rows_validated(
     plan, leave_one_out, leave_one_out_offset, provider,
-    response, positive_weights, workspace, row_result,
+    response, positive_weights,
+    hc0_scaled_residual, hc0_residual_scale, preserve_mean,
+    workspace, row_result,
     mean, mean_stderr, diagnostics, progress);
 }
 
@@ -9692,7 +9700,7 @@ np_beta_regression_categorical_gradients_validated(
       context->compressed_spec.eval_unordered = alternate_unordered;
     status = np_beta_regression_moment_rows_dispatch(
       plan, leave_one_out, leave_one_out_offset, &provider,
-      response, positive_weights, standard_error_mode,
+      response, positive_weights, NULL, 0.0, 0, standard_error_mode,
       workspace, row_result,
       alternate_mean, do_gerr ? alternate_stderr : NULL, diagnostics, NULL);
     context->dense_spec.eval_unordered = eval_unordered;
@@ -9755,7 +9763,7 @@ np_beta_regression_categorical_gradients_validated(
       context->compressed_spec.eval_ordered = alternate_ordered;
     status = np_beta_regression_moment_rows_dispatch(
       plan, leave_one_out, leave_one_out_offset, &provider,
-      response, positive_weights, standard_error_mode,
+      response, positive_weights, NULL, 0.0, 0, standard_error_mode,
       workspace, row_result,
       alternate_mean, do_gerr ? alternate_stderr : NULL, diagnostics, NULL);
     context->dense_spec.eval_ordered = eval_ordered;
@@ -10434,9 +10442,19 @@ static int np_beta_absolute_route_body(
        regression_moment_context->gradient == NULL) ||
       (regression_moment_context->compute_gradient &&
        regression_moment_context->compute_errors &&
+       regression_moment_context->hc0_scaled_residual == NULL &&
        regression_moment_context->gradient_stderr == NULL) ||
       (regression_moment_context->positive_weights != 0 &&
        regression_moment_context->positive_weights != 1) ||
+      (regression_moment_context->preserve_mean != 0 &&
+       regression_moment_context->preserve_mean != 1) ||
+      (regression_moment_context->hc0_scaled_residual == NULL &&
+       (regression_moment_context->preserve_mean != 0 ||
+        regression_moment_context->hc0_residual_scale != 0.0)) ||
+      (regression_moment_context->hc0_scaled_residual != NULL &&
+       (!regression_moment_context->compute_errors ||
+        !R_FINITE(regression_moment_context->hc0_residual_scale) ||
+        regression_moment_context->hc0_residual_scale < 0.0)) ||
       derivative_coordinate >= 0 || kernel_power != 1 ||
       weighted_sum != NULL || weighted_sum_power2 != NULL ||
       centered_m2 != NULL || kw != NULL || ncol_Y != 0 || ncol_W != 0))
@@ -10497,6 +10515,9 @@ static int np_beta_absolute_route_body(
         has_categories ? &categorical_provider : NULL,
         regression_moment_context->response,
         regression_moment_context->positive_weights,
+        regression_moment_context->hc0_scaled_residual,
+        regression_moment_context->hc0_residual_scale,
+        regression_moment_context->preserve_mean,
         regression_moment_context->standard_error_mode,
         workspace, &row_result,
         regression_moment_context->mean,
@@ -26088,6 +26109,7 @@ static NP_NOINLINE int np_beta_scalar_regression_fit_block_canonical(
   const NPRegressionStandardErrorMode standard_error_mode,
   const NPContinuousPreparedBandwidthView *prepared_bandwidth,
   const int original_train_is_eval,
+  const NPRegressionHC0Context *hc0_context,
   np_beta_bandwidth_prepare_status *bandwidth_status_out,
   NPContinuousKernelRowStatus *row_status_out)
 {
@@ -26095,6 +26117,10 @@ static NP_NOINLINE int np_beta_scalar_regression_fit_block_canonical(
   const int num_predictors = num_reg_continuous + num_categorical;
   const int do_grad = gradient != NULL;
   const int do_gerr = gradient_stderr != NULL;
+  const int hc0_residual_preparing = hc0_context != NULL &&
+    hc0_context->status == NP_REGRESSION_HC0_RESIDUAL_PREPARING;
+  const int ordinary_hc0 = hc0_context != NULL &&
+    !hc0_residual_preparing;
   const int bwmdim = (BANDWIDTH_reg == BW_GEN_NN) ? num_obs_eval :
     ((BANDWIDTH_reg == BW_ADAP_NN) ? num_obs_train : 1);
   int *operator;
@@ -26126,7 +26152,12 @@ static NP_NOINLINE int np_beta_scalar_regression_fit_block_canonical(
      kernel_route_diagnostics == NULL ||
      (categorical_compress != 0 && categorical_compress != 1) ||
      (standard_error_mode != NP_REGRESSION_STDERR_LOCAL_RESIDUAL &&
-      standard_error_mode != NP_REGRESSION_STDERR_CONDITIONAL_INFLUENCE))
+      standard_error_mode != NP_REGRESSION_STDERR_CONDITIONAL_INFLUENCE) ||
+     (ordinary_hc0 &&
+      (hc0_context->scaled_residual == NULL ||
+       hc0_context->num_obs_train != num_obs_train ||
+       !R_FINITE(hc0_context->residual_scale) ||
+       hc0_context->residual_scale < 0.0)))
     return NP_BETA_SCALAR_REGRESSION_FIT_ERR_LAYOUT;
 
   operator = (int *)R_alloc((size_t)num_predictors, sizeof(int));
@@ -26193,6 +26224,12 @@ static NP_NOINLINE int np_beta_scalar_regression_fit_block_canonical(
   route_row = (double *)np_jksum_malloc_array_or_die(
     (size_t)num_obs_train, sizeof(double), "beta regression row");
   regression_moment_context.response = vector_Y;
+  regression_moment_context.hc0_scaled_residual = ordinary_hc0 ?
+    hc0_context->scaled_residual : NULL;
+  regression_moment_context.hc0_residual_scale = ordinary_hc0 ?
+    hc0_context->residual_scale : 0.0;
+  regression_moment_context.preserve_mean = ordinary_hc0 ?
+    hc0_context->point_already_computed : 0;
   regression_moment_context.mean = mean;
   regression_moment_context.mean_stderr = mean_stderr;
   regression_moment_context.gradient = gradient;
@@ -26351,7 +26388,8 @@ static NP_NOINLINE void np_beta_scalar_regression_fit_canonical(
   NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
   const int categorical_compress,
   const NPRegressionStandardErrorMode standard_error_mode,
-  const NPContinuousPreparedBandwidthView *prepared_bandwidth)
+  const NPContinuousPreparedBandwidthView *prepared_bandwidth,
+  const NPRegressionHC0Context *hc0_context)
 {
   const int original_train_is_eval =
     matrix_X_continuous_train == matrix_X_continuous_eval;
@@ -26507,6 +26545,7 @@ static NP_NOINLINE void np_beta_scalar_regression_fit_canonical(
           gradient_stderr_view,
           kernel_route, &local_diagnostics, categorical_compress,
           standard_error_mode, prepared_view, original_train_is_eval,
+          hc0_context,
           &bandwidth_status, &row_status);
     }
     if(owned_prepared_matrix != NULL)
@@ -26591,6 +26630,7 @@ static NP_NOINLINE void np_beta_scalar_regression_fit_canonical(
     mean, gradient, mean_stderr, gradient_stderr,
     kernel_route, kernel_route_diagnostics, categorical_compress,
     standard_error_mode, prepared_bandwidth, original_train_is_eval,
+    hc0_context,
     &bandwidth_status, &row_status);
   if(status != NP_BETA_SCALAR_REGRESSION_FIT_OK)
     np_beta_scalar_regression_fit_error(
@@ -29452,9 +29492,8 @@ const NPRegressionHC0Context *hc0_context){
     const int residual_preparing =
       hc0_context->status == NP_REGRESSION_HC0_RESIDUAL_PREPARING;
 
-    if(lp_engine_est != NP_LP_ENGINE_SCALAR || kernel_route != NULL ||
+    if(lp_engine_est != NP_LP_ENGINE_SCALAR ||
        standard_error_mode != NP_REGRESSION_STDERR_LOCAL_RESIDUAL ||
-       BANDWIDTH_reg == BW_ADAP_NN ||
        hc0_context->donor_to_canonical == NULL ||
        hc0_context->num_obs_train != num_obs_train ||
        (hc0_context->status != NP_REGRESSION_HC0_RESIDUAL_PREPARING &&
@@ -29502,7 +29541,7 @@ const NPRegressionHC0Context *hc0_context){
       num_categories, matrix_categorical_vals,
       mean, gradient, mean_stderr, gradient_stderr,
       kernel_route, kernel_route_diagnostics, categorical_compress,
-      standard_error_mode, prepared_bandwidth);
+      standard_error_mode, prepared_bandwidth, hc0_context);
     np_regression_fit_statistics(
       num_obs_eval, vector_Y_eval, mean,
       R_squared, MSE, MAE, MAPE, CORR, SIGN);
