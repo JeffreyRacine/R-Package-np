@@ -20928,8 +20928,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
       if(ordinary_hc0_active) {
         for(j=0;j<num_var;j++)
           for(i=0;i<num_obs_eval_extern;i++)
-            gerr[j*num_obs_eval_extern+ipe[i]] =
-              j < num_reg_continuous_extern ? egerr[j][i] : NA_REAL;
+            gerr[j*num_obs_eval_extern+ipe[i]] = egerr[j][i];
       } else {
         const int gradient_stderr_count =
           (kernel_route != NULL) ? num_var : num_reg_continuous_extern;

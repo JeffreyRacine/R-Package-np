@@ -31,7 +31,8 @@ beta_mixed_regression_kernel_args <- function(bws, training, evaluation) {
   arguments
 }
 
-beta_mixed_regression_moments <- function(weights, response) {
+beta_mixed_regression_moments <- function(weights, response,
+                                          hc0_residual = NULL) {
   denominator <- colSums(weights)
   normalized <- sweep(weights, 2L, denominator, "/")
   mean <- colSums(normalized * response)
@@ -42,9 +43,20 @@ beta_mixed_regression_moments <- function(weights, response) {
 
   list(
     mean = mean,
-    stderr = sqrt(variance * colSums(normalized^2)),
+    stderr = if (is.null(hc0_residual)) {
+      sqrt(variance * colSums(normalized^2))
+    } else {
+      sqrt(colSums((normalized * hc0_residual)^2))
+    },
+    normalized = normalized,
     denominator = denominator
   )
+}
+
+beta_mixed_regression_contrast_stderr <- function(level, alternate,
+                                                   hc0_residual) {
+  sqrt(colSums(((level$normalized - alternate$normalized) *
+                  hc0_residual)^2))
 }
 
 locate_beta_mixed_regression_sources <- function() {
@@ -94,7 +106,13 @@ test_that("mixed beta scalar regression matches canonical kernel-weight oracles"
         bws, training, evaluation
       )
       weights <- do.call(npksum, kernel_arguments)$kw
-      expected <- beta_mixed_regression_moments(weights, response)
+      training.hat <- unclass(npreghat(
+        bws = bws, txdat = training, output = "matrix"
+      ))
+      hc0.residual <- response - drop(training.hat %*% response)
+      expected <- beta_mixed_regression_moments(
+        weights, response, hc0.residual
+      )
 
       options(np.categorical.compress = FALSE)
       dense <- npreg(
@@ -136,7 +154,7 @@ test_that("mixed beta scalar regression matches canonical kernel-weight oracles"
       unordered_arguments <- kernel_arguments
       unordered_arguments$exdat <- unordered_evaluation
       unordered_expected <- beta_mixed_regression_moments(
-        do.call(npksum, unordered_arguments)$kw, response
+        do.call(npksum, unordered_arguments)$kw, response, hc0.residual
       )
       expect_equal(
         gradients(dense)[, 2L],
@@ -145,7 +163,9 @@ test_that("mixed beta scalar regression matches canonical kernel-weight oracles"
       )
       expect_equal(
         dense$gerr[, 2L],
-        sqrt(expected$stderr^2 + unordered_expected$stderr^2),
+        beta_mixed_regression_contrast_stderr(
+          expected, unordered_expected, hc0.residual
+        ),
         tolerance = 4e-10
       )
 
@@ -162,7 +182,7 @@ test_that("mixed beta scalar regression matches canonical kernel-weight oracles"
       ordered_arguments <- kernel_arguments
       ordered_arguments$exdat <- ordered_evaluation
       ordered_expected <- beta_mixed_regression_moments(
-        do.call(npksum, ordered_arguments)$kw, response
+        do.call(npksum, ordered_arguments)$kw, response, hc0.residual
       )
       expect_equal(
         gradients(dense)[, 3L],
@@ -172,7 +192,9 @@ test_that("mixed beta scalar regression matches canonical kernel-weight oracles"
       )
       expect_equal(
         dense$gerr[, 3L],
-        sqrt(expected$stderr^2 + ordered_expected$stderr^2),
+        beta_mixed_regression_contrast_stderr(
+          expected, ordered_expected, hc0.residual
+        ),
         tolerance = 4e-10
       )
     }

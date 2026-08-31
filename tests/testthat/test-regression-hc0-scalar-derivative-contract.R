@@ -87,9 +87,6 @@ h3_expect_fit_matches_oracle <- function(bws, xdat, ydat, exdat = NULL,
   )
   expect_true(all(is.finite(with.se$gerr[, bws$icon, drop = FALSE])))
   expect_true(all(with.se$gerr[, bws$icon, drop = FALSE] >= 0))
-  if (any(!bws$icon))
-    expect_true(all(is.na(with.se$gerr[, !bws$icon, drop = FALSE])))
-
   invisible(with.se)
 }
 
