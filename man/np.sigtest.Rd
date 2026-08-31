@@ -37,7 +37,7 @@ npsigtest(bws,
           boot.num = 399,
           boot.method = c("iid","wild","wild-rademacher","pairwise"),
           boot.type = c("I","II"),
-          pivot=TRUE,
+          pivot=NULL,
           joint=FALSE,
           index = seq_len(ncol(xdat)),
           random.seed = 42,
@@ -136,10 +136,18 @@ These arguments control bootstrap execution, tested effects, and reproducibility
 
 
   \item{pivot}{
-    a logical value which specifies whether to bootstrap a pivotal
-    statistic or not (pivoting is achieved by dividing gradient
-    estimates by their asymptotic standard errors). Defaults to
-    \code{TRUE}.
+    \code{NULL} or a logical value specifying whether to bootstrap a
+    pivotal statistic. With the method-aware default, \code{NULL}, an
+    individual test is pivotal for a continuous predictor and
+    unstandardized for a categorical predictor. A joint test is pivotal
+    only when every tested predictor is continuous; if any tested
+    predictor is categorical, the entire joint statistic is
+    unstandardized. \code{FALSE} requests the unstandardized statistic
+    for every tested predictor. \code{TRUE} requests the pivotal
+    statistic and is supported only when every tested predictor is
+    continuous; otherwise the function stops with an error. For
+    continuous predictors, pivoting divides gradient estimates by their
+    asymptotic standard errors.
   }
 
 
@@ -166,11 +174,37 @@ Further arguments are passed to the bandwidth-selection routines used by the tes
 
   \code{npsigtest} implements a variety of methods for computing the
   null distribution of the test statistic and allows the user to
-  investigate the impact of a variety of default settings including
-  whether or not to pivot the statistic (\code{pivot}), whether pairwise
+  investigate the impact of a variety of settings including whether or
+  not to pivot the statistic (\code{pivot}), whether pairwise
   or residual resampling is to be used (\code{boot.method}), and whether
   or not to recompute the bandwidths for the variables being tested
   (\code{boot.type}), among others.
+
+  The categorical statistic of Racine, Hart, and Li (2006) is the
+  unstandardized mean of squared finite-difference estimates. It is not
+  divided by the asymptotic standard errors used for continuous
+  gradients. Therefore \code{pivot=NULL} selects the statistically
+  defined statistic by predictor type, while explicit \code{pivot=TRUE}
+  fails for any test containing a categorical predictor. A requested
+  continuous pivotal statistic also fails if a required gradient
+  standard error is unavailable, non-positive, or non-finite; such a
+  value does not define the pivotal statistic.
+
+  When the supplied bandwidth object has \code{regtype="lp"}, every
+  tested continuous coordinate must have polynomial degree at least one.
+  A degree-zero local polynomial does not identify the derivative used by
+  this significance test, so the function stops before fitting or
+  bootstrap work and names the affected coordinate(s). If the degree was
+  selected by NOMAD, refit the bandwidth object with
+  \code{degree.min=1}. This restriction does not apply to an ordinary
+  \code{regtype="lc"} bandwidth object.
+
+  The empirical upper-tail P-value counts bootstrap statistics equal to
+  the observed statistic, that is,
+  \eqn{P=B^{-1}\sum_{b=1}^B 1\{I_b^*\ge I\}}. Thus equality with the
+  bootstrap critical value is non-rejection. In particular, when
+  smoothing makes both the observed statistic and every bootstrap
+  statistic exactly zero, the returned P-value is one rather than zero.
 
   Defaults are chosen so as to provide reasonable behaviour in a broad
   range of settings and this involves a trade-off between computational
@@ -202,7 +236,9 @@ Further arguments are passed to the bandwidth-selection routines used by the tes
   following components:
 
   \item{In}{ the vector of statistics \code{In} }
-  \item{P}{ the vector of P-values for each statistic in \code{In}}
+  \item{P}{ the vector of empirical upper-tail P-values for each statistic
+    in \code{In}; bootstrap values equal to the observed statistic are
+    included in the upper tail.}
   \item{In.bootstrap}{ contains a matrix of the bootstrap
     replications of the vector \code{In}, each column corresponding to
     replications associated with explanatory variables in \code{xdat}
@@ -210,6 +246,11 @@ Further arguments are passed to the bandwidth-selection routines used by the tes
     then In.bootstrap will have two columns, the first being the
     bootstrap replications of \code{In} associated with variable
     \code{1}, the second with variable \code{4}).}
+  \item{pivot}{the requested pivot mode: \code{NULL}, \code{TRUE}, or
+    \code{FALSE}.}
+  \item{pivot.effective}{a named logical vector recording the statistic
+    actually used for each tested predictor. For a joint test all entries
+    are identical.}
 
 }
 \section{Book And Method Pointers}{

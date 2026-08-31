@@ -6,10 +6,10 @@ progress_time_counter <- function(start = 0, by = 0.6) {
   }
 }
 
-shadow_bootstrap_signature <- function(shadow) {
+shadow_npsigtest_signature <- function(shadow) {
   lines <- vapply(shadow$trace, `[[`, character(1L), "line")
   events <- vapply(shadow$trace, `[[`, character(1L), "event")
-  keep <- grepl("^\\[npRmpi\\] Bootstrap replications", lines)
+  keep <- grepl("^\\[npRmpi\\] Testing (joint significance|variable )", lines)
 
   data.frame(
     event = events[keep],
@@ -19,7 +19,7 @@ shadow_bootstrap_signature <- function(shadow) {
 }
 
 shadow_lines <- function(shadow) {
-  shadow_bootstrap_signature(shadow)$line
+  shadow_npsigtest_signature(shadow)$line
 }
 
 skip_live_route_slice <- function() {
@@ -69,9 +69,9 @@ test_that("npsigtest joint single-line bootstrap progress matches legacy semanti
   lines <- shadow_lines(single_line)
 
   expect_s3_class(single_line$value, "sigtest")
-  expect_equal(shadow_bootstrap_signature(single_line), shadow_bootstrap_signature(legacy))
-  expect_true(any(grepl("^\\[npRmpi\\] Bootstrap replications [0-9]+/9 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
-  expect_true(any(grepl("^\\[npRmpi\\] Bootstrap replications 9/9 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_equal(shadow_npsigtest_signature(single_line), shadow_npsigtest_signature(legacy))
+  expect_true(any(grepl("^\\[npRmpi\\] Testing joint significance [0-9]+/9 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_true(any(grepl("^\\[npRmpi\\] Testing joint significance 9/9 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
 })
 
 test_that("npsigtest individual single-line bootstrap progress matches legacy semantics", {
@@ -100,9 +100,11 @@ test_that("npsigtest individual single-line bootstrap progress matches legacy se
   lines <- shadow_lines(single_line)
 
   expect_s3_class(single_line$value, "sigtest")
-  expect_equal(shadow_bootstrap_signature(single_line), shadow_bootstrap_signature(legacy))
-  expect_true(sum(grepl("^\\[npRmpi\\] Bootstrap replications [0-9]+/9 ", lines)) >= 2L)
-  expect_true(sum(grepl("^\\[npRmpi\\] Bootstrap replications 9/9 ", lines)) >= 2L)
+  expect_equal(shadow_npsigtest_signature(single_line), shadow_npsigtest_signature(legacy))
+  expect_true(any(grepl("^\\[npRmpi\\] Testing variable 1 of \\(1,2\\) [0-9]+/9 ", lines)))
+  expect_true(any(grepl("^\\[npRmpi\\] Testing variable 2 of \\(1,2\\) [0-9]+/9 ", lines)))
+  expect_true(any(grepl("^\\[npRmpi\\] Testing variable 1 of \\(1,2\\) 9/9 ", lines)))
+  expect_true(any(grepl("^\\[npRmpi\\] Testing variable 2 of \\(1,2\\) 9/9 ", lines)))
 })
 
 test_that("npsigtest progress respects np.messages FALSE", {
