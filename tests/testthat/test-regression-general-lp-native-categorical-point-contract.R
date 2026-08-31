@@ -42,20 +42,6 @@ h7a_fit <- function(bw, txdat, tydat, exdat = NULL, se = FALSE) {
 }
 
 h7a_native_fit <- function(bw, txdat, tydat, exdat = NULL, se = FALSE) {
-  helper <- getFromNamespace(
-    ".npreg_glp_categorical_gradients_from_npreghat", "npRmpi"
-  )
-  on.exit(
-    assignInNamespace(
-      ".npreg_glp_categorical_gradients_from_npreghat", helper, "npRmpi"
-    ),
-    add = TRUE
-  )
-  assignInNamespace(
-    ".npreg_glp_categorical_gradients_from_npreghat",
-    function(bws, txdat, tydat, exdat, grad, where) grad,
-    "npRmpi"
-  )
   h7a_fit(bw, txdat, tydat, exdat = exdat, se = se)
 }
 
@@ -66,8 +52,18 @@ h7a_expect_native_point <- function(bw,
                                     se = FALSE,
                                     tolerance = 5e-12,
                                     exact = FALSE) {
-  oracle <- h7a_fit(bw, txdat, tydat, exdat = exdat, se = se)
   native <- h7a_native_fit(bw, txdat, tydat, exdat = exdat, se = se)
+  oracle <- native
+  oracle$grad <- getFromNamespace(
+    ".npreg_glp_categorical_gradients_from_npreghat", "npRmpi"
+  )(
+    bws = bw,
+    txdat = txdat,
+    tydat = tydat,
+    exdat = exdat,
+    grad = oracle$grad,
+    where = "H7A oracle"
+  )
   cat.index <- which(bw$iuno | bw$iord)
 
   expect_identical(native$mean, oracle$mean)

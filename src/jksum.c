@@ -29053,6 +29053,76 @@ static int np_regression_hc0_lp_standard_error(
   return R_FINITE(*standard_error);
 }
 
+/* Reduce one paired-endpoint HC0 influence difference without retaining an
+ * influence matrix.  Each kernel row and projection uses the scale of its own
+ * accepted local system, so their product is the literal estimator map even
+ * when beta rows use different common logarithmic scales. */
+static int np_regression_hc0_lp_categorical_standard_error(
+  double **basis,
+  const int nterms,
+  const int num_obs_train,
+  const double *base_projection,
+  const double *alternate_projection,
+  const double *base_kernel_row,
+  const double *alternate_kernel_row,
+  const double *scaled_residual,
+  const double residual_scale,
+  double *standard_error)
+{
+  long double quadratic = 0.0L;
+  int observation;
+
+  if(basis == NULL || nterms <= 0 || num_obs_train <= 0 ||
+     base_projection == NULL || alternate_projection == NULL ||
+     base_kernel_row == NULL || alternate_kernel_row == NULL ||
+     scaled_residual == NULL || standard_error == NULL ||
+     !R_FINITE(residual_scale) || residual_scale < 0.0)
+    return 0;
+
+  for(observation = 0; observation < num_obs_train; ++observation) {
+    long double base_score = 0.0L;
+    long double alternate_score = 0.0L;
+    long double influence;
+    long double residual;
+    int term;
+
+    if(!R_FINITE(base_kernel_row[observation]) ||
+       !R_FINITE(alternate_kernel_row[observation]) ||
+       !R_FINITE(scaled_residual[observation]))
+      return 0;
+    for(term = 0; term < nterms; ++term) {
+      if(basis[term] == NULL || !R_FINITE(basis[term][observation]) ||
+         !R_FINITE(base_projection[term]) ||
+         !R_FINITE(alternate_projection[term]))
+        return 0;
+      base_score += (long double)basis[term][observation] *
+        (long double)base_projection[term];
+      alternate_score += (long double)basis[term][observation] *
+        (long double)alternate_projection[term];
+    }
+    influence = (long double)base_kernel_row[observation] * base_score -
+      (long double)alternate_kernel_row[observation] * alternate_score;
+    residual = (long double)scaled_residual[observation];
+    quadratic += influence * influence * residual * residual;
+  }
+
+  if(!isfinite(quadratic) || quadratic < 0.0L)
+    return 0;
+  if(quadratic == 0.0L || residual_scale == 0.0) {
+    *standard_error = 0.0;
+    return 1;
+  }
+  {
+    const long double value =
+      (long double)residual_scale * sqrtl(quadratic);
+
+    if(!isfinite(value) || value > (long double)DBL_MAX)
+      return 0;
+    *standard_error = (double)value;
+  }
+  return R_FINITE(*standard_error);
+}
+
 typedef struct {
   int *kernel_c;
   int *kernel_u;
@@ -29078,6 +29148,7 @@ typedef struct {
   double **matrix_bandwidth;
   double **categorical_matrix_bandwidth;
   int categorical_base_requires_refit;
+  int categorical_point_invariant;
   double *mean;
   double **gradient;
   double *mean_stderr;
@@ -29120,6 +29191,9 @@ typedef struct {
   double *eval_derivative;
   double *power2_projection;
   double *categorical_point;
+  double *categorical_stderr;
+  double *categorical_base_kernel_row;
+  double *categorical_alternate_kernel_row;
   NPLPSolveWorkspace solve_workspace;
 #ifdef MPI2
   NPRegMpiOwnerChunk mpi_owner_chunk;
@@ -29155,6 +29229,9 @@ static void np_regression_general_lp_fit_owner_init(
   owner->eval_derivative = NULL;
   owner->power2_projection = NULL;
   owner->categorical_point = NULL;
+  owner->categorical_stderr = NULL;
+  owner->categorical_base_kernel_row = NULL;
+  owner->categorical_alternate_kernel_row = NULL;
   np_lp_solve_workspace_init(&owner->solve_workspace);
 #ifdef MPI2
   owner->mpi_owner_chunk.recvcounts = NULL;
@@ -29195,6 +29272,9 @@ static void np_regression_general_lp_fit_owner_cleanup(
   free(owner->coefficient);
   free(owner->power2_projection);
   free(owner->categorical_point);
+  free(owner->categorical_stderr);
+  free(owner->categorical_base_kernel_row);
+  free(owner->categorical_alternate_kernel_row);
   if(owner->basis_context != NULL) {
     for(coordinate = 0; coordinate < call->num_reg_continuous; ++coordinate)
       np_glp_basis_ctx_free(&owner->basis_context[coordinate]);
@@ -29222,9 +29302,12 @@ static int np_regression_general_lp_point_at_frame(
   const int response_y_offset,
   const int response_basis_offset,
   const double epsilon,
-  double *point)
+  double *point,
+  double *kernel_row,
+  double *projection)
 {
   NPLPSolvePolicyDiagnostics solve_diagnostics = {0, 0.0};
+  double pristine_anchor;
   int i, term;
 
   if(call == NULL || owner == NULL || point == NULL ||
@@ -29264,7 +29347,7 @@ static int np_regression_general_lp_point_at_frame(
          owner->moments,
          NULL,
          NULL,
-         NULL,
+         kernel_row,
          call->kernel_route,
          call->kernel_route_diagnostics) != 0)
       return 0;
@@ -29279,7 +29362,7 @@ static int np_regression_general_lp_point_at_frame(
          call->num_reg_unordered,
          call->num_reg_ordered,
          call->num_reg_continuous,
-         0, 0, 1, 1, 0, 0, 0, 0, 0,
+         0, 0, 1, 1, kernel_row != NULL, 0, 0, 0, 0,
          call->operator,
          OP_NOOP,
          0, 0, NULL, 1,
@@ -29311,7 +29394,7 @@ static int np_regression_general_lp_point_at_frame(
          NULL,
          owner->moments,
          NULL,
-         NULL,
+         kernel_row,
          call->gate_context,
          NULL,
          NULL, NULL, NULL,
@@ -29331,6 +29414,7 @@ static int np_regression_general_lp_point_at_frame(
       owner->solve_workspace.gram_source[i + term*owner->nterms] =
         owner->moments[base + term + response_basis_offset];
   }
+  pristine_anchor = owner->solve_workspace.gram_source[0];
   if(np_lp_solve_workspace_solve_response_ranked(
        &owner->solve_workspace,
        owner->nterms,
@@ -29343,7 +29427,24 @@ static int np_regression_general_lp_point_at_frame(
   *point = 0.0;
   for(i = 0; i < owner->nterms; ++i)
     *point += owner->eval_basis[i]*owner->solve_workspace.rhs_work[i];
-  return R_FINITE(*point);
+  if(!R_FINITE(*point))
+    return 0;
+
+  if(projection != NULL) {
+    for(i = 0; i < owner->nterms; ++i)
+      owner->solve_workspace.rhs_source[i] = owner->eval_basis[i];
+    if(np_lp_solve_workspace_solve_adjoint_factored(
+         &owner->solve_workspace,
+         owner->nterms,
+         1,
+         pristine_anchor,
+         &solve_diagnostics) != NP_LP_SOLVE_POLICY_OK)
+      return 0;
+    memcpy(projection,
+           owner->solve_workspace.rhs_work,
+           (size_t)owner->nterms*sizeof(double));
+  }
+  return 1;
 }
 
 /* Construct the incumbent unordered-baseline and ordered-neighbor frames.
@@ -29358,7 +29459,8 @@ static int np_regression_general_lp_categorical_points(
   const int response_y_offset,
   const int response_basis_offset,
   const double epsilon,
-  const double fitted_point)
+  const double fitted_point,
+  const int compute_hc0)
 {
   double base_point = fitted_point;
   int coordinate;
@@ -29366,10 +29468,20 @@ static int np_regression_general_lp_categorical_points(
   if(call == NULL || owner == NULL || owner->categorical_point == NULL)
     return 0;
 
+  if(call->categorical_point_invariant) {
+    for(coordinate = 0;
+        coordinate < call->num_reg_unordered + call->num_reg_ordered;
+        ++coordinate)
+      owner->categorical_point[coordinate] = 0.0;
+    return 1;
+  }
+
   if(call->categorical_base_requires_refit &&
      !np_regression_general_lp_point_at_frame(
        call, owner, moment_stride, response_y_offset,
-       response_basis_offset, epsilon, &base_point))
+       response_basis_offset, epsilon, &base_point,
+       compute_hc0 ? owner->categorical_base_kernel_row : NULL,
+       compute_hc0 ? owner->power2_projection : NULL))
     return 0;
 
   for(coordinate = 0; coordinate < call->num_reg_unordered; ++coordinate) {
@@ -29379,17 +29491,34 @@ static int np_regression_general_lp_categorical_points(
 
     if(current == alternate) {
       owner->categorical_point[coordinate] = 0.0;
+      if(compute_hc0)
+        owner->categorical_stderr[coordinate] = 0.0;
       continue;
     }
     owner->eval_unordered[coordinate][0] = alternate;
     if(!np_regression_general_lp_point_at_frame(
          call, owner, moment_stride, response_y_offset,
-         response_basis_offset, epsilon, &alternate_point)) {
+         response_basis_offset, epsilon, &alternate_point,
+         compute_hc0 ? owner->categorical_alternate_kernel_row : NULL,
+         compute_hc0 ? owner->coefficient : NULL)) {
       owner->eval_unordered[coordinate][0] = current;
       return 0;
     }
     owner->eval_unordered[coordinate][0] = current;
     owner->categorical_point[coordinate] = base_point - alternate_point;
+    if(compute_hc0 &&
+       !np_regression_hc0_lp_categorical_standard_error(
+         owner->basis,
+         owner->nterms,
+         call->num_obs_train,
+         owner->power2_projection,
+         owner->coefficient,
+         owner->categorical_base_kernel_row,
+         owner->categorical_alternate_kernel_row,
+         call->hc0_context->scaled_residual,
+         call->hc0_context->residual_scale,
+         &owner->categorical_stderr[coordinate]))
+      return 0;
   }
 
   for(coordinate = 0; coordinate < call->num_reg_ordered; ++coordinate) {
@@ -29404,6 +29533,8 @@ static int np_regression_general_lp_categorical_points(
 
     if(count <= 1) {
       owner->categorical_point[category] = 0.0;
+      if(compute_hc0)
+        owner->categorical_stderr[category] = 0.0;
       continue;
     }
     for(index = 0; index < count; ++index)
@@ -29423,13 +29554,28 @@ static int np_regression_general_lp_categorical_points(
     owner->eval_ordered[coordinate][0] = alternate;
     if(!np_regression_general_lp_point_at_frame(
          call, owner, moment_stride, response_y_offset,
-         response_basis_offset, epsilon, &alternate_point)) {
+         response_basis_offset, epsilon, &alternate_point,
+         compute_hc0 ? owner->categorical_alternate_kernel_row : NULL,
+         compute_hc0 ? owner->coefficient : NULL)) {
       owner->eval_ordered[coordinate][0] = current;
       return 0;
     }
     owner->eval_ordered[coordinate][0] = current;
     owner->categorical_point[category] =
       sign*(base_point - alternate_point);
+    if(compute_hc0 &&
+       !np_regression_hc0_lp_categorical_standard_error(
+         owner->basis,
+         owner->nterms,
+         call->num_obs_train,
+         owner->power2_projection,
+         owner->coefficient,
+         owner->categorical_base_kernel_row,
+         owner->categorical_alternate_kernel_row,
+         call->hc0_context->scaled_residual,
+         call->hc0_context->residual_scale,
+         &owner->categorical_stderr[category]))
+      return 0;
   }
   return 1;
 }
@@ -29454,6 +29600,9 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
     !hc0_residual_preparing;
   const int preserve_point = ordinary_hc0 &&
     call->hc0_context->point_already_computed;
+  const int categorical_hc0 = ordinary_hc0 && call->do_gerr &&
+    (num_reg_unordered + num_reg_ordered > 0) &&
+    !call->categorical_point_invariant;
   const int reuse_fit_kernel_row =
     (BANDWIDTH_reg == BW_FIXED) &&
     (call->tree_enabled != NP_TREE_TRUE) &&
@@ -29556,6 +29705,14 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
   if(call->do_grad && (num_reg_unordered + num_reg_ordered > 0))
     owner->categorical_point = (double *)malloc(
       (size_t)(num_reg_unordered + num_reg_ordered)*sizeof(double));
+  if(categorical_hc0) {
+    owner->categorical_stderr = (double *)malloc(
+      (size_t)(num_reg_unordered + num_reg_ordered)*sizeof(double));
+    owner->categorical_base_kernel_row = (double *)malloc(
+      (size_t)num_obs_train*sizeof(double));
+    owner->categorical_alternate_kernel_row = (double *)malloc(
+      (size_t)num_obs_train*sizeof(double));
+  }
   if(use_bernstein)
     owner->basis_context = (NPGLPBasisCtx *)calloc(
       (size_t)num_reg_continuous, sizeof(NPGLPBasisCtx));
@@ -29582,6 +29739,10 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
      owner->eval_derivative == NULL ||
      (call->do_grad && (num_reg_unordered + num_reg_ordered > 0) &&
       owner->categorical_point == NULL) ||
+     (categorical_hc0 &&
+      (owner->categorical_stderr == NULL ||
+       owner->categorical_base_kernel_row == NULL ||
+       owner->categorical_alternate_kernel_row == NULL)) ||
      (use_bernstein && owner->basis_context == NULL)) {
     execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_ALLOC;
     return R_NilValue;
@@ -29648,7 +29809,8 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	                                  1 + call->do_merr +
 	                                  (call->do_grad ?
 	                                   num_reg_continuous*(1 + (call->do_gerr ? 1 : 0)) +
-	                                   num_reg_unordered + num_reg_ordered : 0));
+	                                   (num_reg_unordered + num_reg_ordered)*
+	                                     (1 + (call->do_gerr ? 1 : 0)) : 0));
 #endif
 
   for(j = 0; j < num_obs_eval; ++j) {
@@ -29664,7 +29826,8 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	        const int owner_row_width_lp = 1 + call->do_merr +
 	          (call->do_grad ?
 	           num_reg_continuous*(1 + (call->do_gerr ? 1 : 0)) +
-	           num_reg_unordered + num_reg_ordered : 0);
+	           (num_reg_unordered + num_reg_ordered)*
+	             (1 + (call->do_gerr ? 1 : 0)) : 0);
 	        int local_pos = 0;
 	        int owner_solve_failed = 0;
 
@@ -29674,10 +29837,12 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	                                    owner_row_width_lp,
 	                                    "npreg LP");
 	        /* The beta row provider returns its power-two moments directly. */
-	        if(call->do_merr && call->kernel_route == NULL)
+	        if(call->do_merr && call->kernel_route == NULL &&
+	           !categorical_hc0)
 	          owner->mpi_kernel_row = (double *)malloc(
 	            (size_t)num_obs_train*sizeof(double));
 	        if(call->do_merr && call->kernel_route == NULL &&
+	           !categorical_hc0 &&
 	           owner->mpi_kernel_row == NULL)
 	          error("\n** Error: memory allocation failed.");
 
@@ -29765,7 +29930,9 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	                                   NULL,
 	                                   owner->moments,
 	                                   NULL,
-	                                   owner->mpi_kernel_row,
+	                                   categorical_hc0 ?
+	                                     owner->categorical_base_kernel_row :
+	                                     owner->mpi_kernel_row,
 	                                   call->gate_context,
 	                                   NULL);
 	          else {
@@ -29807,7 +29974,8 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	                 call->do_merr ? owner->power2_moments : NULL,
 	                 ordinary_hc0 ?
 	                   call->hc0_context->scaled_residual : NULL,
-	                 NULL,
+	                 categorical_hc0 ?
+	                   owner->categorical_base_kernel_row : NULL,
 	                 call->kernel_route,
 	                 call->kernel_route_diagnostics) != 0) {
 	              owner_solve_failed = 1;
@@ -29889,7 +30057,10 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	              if(!np_regression_hc0_power2_outer_sum(
 	                   owner->basis, owner->nterms,
 	                   owner->basis, owner->nterms,
-	                   owner->mpi_kernel_row, num_obs_train,
+	                   categorical_hc0 ?
+	                     owner->categorical_base_kernel_row :
+	                     owner->mpi_kernel_row,
+	                   num_obs_train,
 	                   0, 0, 1.0,
 	                   call->hc0_context->scaled_residual,
 	                   owner->power2_moments, NULL)) {
@@ -29898,7 +30069,9 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	              }
 	            } else {
 	              for(i = 0; i < num_obs_train; i++){
-	                const double w = owner->mpi_kernel_row[i];
+	                const double w = categorical_hc0 ?
+	                  owner->categorical_base_kernel_row[i] :
+	                  owner->mpi_kernel_row[i];
 	                const double w2 = w*w;
 	                if(w2 == 0.0)
 	                  continue;
@@ -30046,19 +30219,19 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	              }
 	            }
 
+	            if(categorical_hc0 &&
+	               !call->categorical_base_requires_refit)
+	              memcpy(owner->power2_projection,
+	                     owner->solve_workspace.rhs_work,
+	                     (size_t)owner->nterms*sizeof(double));
+
 	            if(call->do_grad &&
 	               (num_reg_unordered + num_reg_ordered > 0)) {
 	              const int categorical_output_offset =
 	                1 + call->do_merr +
 	                num_reg_continuous*(1 + (call->do_gerr ? 1 : 0));
 
-	              if(preserve_point) {
-	                for(l = 0;
-	                    l < num_reg_unordered + num_reg_ordered;
-	                    ++l)
-	                  out_owner[categorical_output_offset + l] =
-	                    call->gradient[num_reg_continuous + l][jj];
-	              } else {
+	              if(!preserve_point || categorical_hc0) {
 	                if(include_response_square)
 	                  owner->response_columns[0] = owner->squared_response;
 	                owner->response_columns[response_y_offset] = call->vector_Y;
@@ -30078,15 +30251,26 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	                     response_y_offset,
 	                     response_basis_offset,
 	                     epsilon,
-	                     out_owner[0])) {
+	                     out_owner[0],
+	                     categorical_hc0)) {
 	                  owner_solve_failed = 1;
 	                  break;
 	                }
-	                for(l = 0;
-	                    l < num_reg_unordered + num_reg_ordered;
-	                    ++l)
-	                  out_owner[categorical_output_offset + l] =
-	                    owner->categorical_point[l];
+	              }
+	              for(l = 0;
+	                  l < num_reg_unordered + num_reg_ordered;
+	                  ++l) {
+	                const int output = categorical_output_offset +
+	                  l*(1 + (call->do_gerr ? 1 : 0));
+
+	                out_owner[output] = preserve_point ?
+	                  call->gradient[num_reg_continuous + l][jj] :
+	                  owner->categorical_point[l];
+	                if(call->do_gerr)
+	                  out_owner[output + 1] =
+	                    call->categorical_point_invariant ? 0.0 :
+	                    (categorical_hc0 ?
+	                     owner->categorical_stderr[l] : NA_REAL);
 	              }
 	            }
 	          }
@@ -30135,7 +30319,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	                    l++){
 	                  call->gradient[l][jj] = in[ipos++];
 	                  if(call->do_gerr)
-	                    call->gradient_stderr[l][jj] = NA_REAL;
+	                    call->gradient_stderr[l][jj] = in[ipos++];
 	                }
 	              }
 	              pos_i++;
@@ -30208,7 +30392,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	           owner->moments,
 	           call->do_merr ? owner->power2_moments : NULL,
            ordinary_hc0 ? call->hc0_context->scaled_residual : NULL,
-           NULL,
+           categorical_hc0 ? owner->categorical_base_kernel_row : NULL,
            call->kernel_route,
            call->kernel_route_diagnostics) != 0) {
         execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_ROUTE;
@@ -30224,7 +30408,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
                          num_reg_unordered,
                          num_reg_ordered,
                          num_reg_continuous,
-                         0, 0, 1, 1, 0, 0, 0, 0, 0,
+                         0, 0, 1, 1, categorical_hc0, 0, 0, 0, 0,
                          call->operator,
                          OP_NOOP,
                          0, 0, NULL, 1,
@@ -30255,8 +30439,10 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
                          NULL,
                          owner->moments,
                          NULL,
-                           (call->do_merr && reuse_fit_kernel_row) ?
-                           owner->retained_kernel_row : NULL,
+                         categorical_hc0 ?
+                           owner->categorical_base_kernel_row :
+                           ((call->do_merr && reuse_fit_kernel_row) ?
+                            owner->retained_kernel_row : NULL),
                          call->gate_context,
                          reuse_fit_dual_power ? &fit_dual_power_ctx : NULL,
                          NULL, NULL, NULL,
@@ -30519,7 +30705,13 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
         }
       }
 
-      if(call->do_grad && !preserve_point &&
+      if(categorical_hc0 && !call->categorical_base_requires_refit)
+        memcpy(owner->power2_projection,
+               owner->solve_workspace.rhs_work,
+               (size_t)owner->nterms*sizeof(double));
+
+      if(call->do_grad &&
+         (!preserve_point || categorical_hc0) &&
          (num_reg_unordered + num_reg_ordered > 0)) {
         if(include_response_square)
           owner->response_columns[0] = owner->squared_response;
@@ -30540,8 +30732,11 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
              response_y_offset,
              response_basis_offset,
              epsilon,
-             call->mean[j])) {
-          execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_SOLVE;
+             call->mean[j],
+             categorical_hc0)) {
+          execution->status = categorical_hc0 ?
+            NP_REGRESSION_GENERAL_LP_FIT_ERR_HC0 :
+            NP_REGRESSION_GENERAL_LP_FIT_ERR_SOLVE;
           return R_NilValue;
         }
       }
@@ -30554,7 +30749,10 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
             call->gradient[l][j] =
               owner->categorical_point[l - num_reg_continuous];
           if(call->do_gerr)
-            call->gradient_stderr[l][j] = NA_REAL;
+            call->gradient_stderr[l][j] =
+              call->categorical_point_invariant ? 0.0 :
+              (categorical_hc0 ?
+               owner->categorical_stderr[l - num_reg_continuous] : NA_REAL);
         }
       }
     }
@@ -30730,6 +30928,7 @@ const NPRegressionHC0Context *hc0_context){
   double *ov_disc_uno_const = NULL, *ov_disc_ord_const = NULL;
   int estimation_shortcut_done = 0;
   int hc0_point_shortcut_done = 0;
+  int categorical_point_invariant = 0;
   NPRegressionHC0Context hc0_point_context;
   const NPRegressionHC0Context *effective_hc0_context = hc0_context;
   int regression_fit_status = NP_REGRESSION_FIT_OK;
@@ -30977,10 +31176,7 @@ const NPRegressionHC0Context *hc0_context){
   if(kernel_route == NULL && BANDWIDTH_reg == BW_GEN_NN && do_grad &&
      (num_reg_unordered + num_reg_ordered > 0) &&
      nn_geometry_context != NULL &&
-     nn_geometry_context->mode != NP_NN_QUERY_EXTERNAL &&
-     !(hc0_context != NULL &&
-       hc0_context->status != NP_REGRESSION_HC0_RESIDUAL_PREPARING &&
-       hc0_context->point_already_computed)) {
+     nn_geometry_context->mode != NP_NN_QUERY_EXTERNAL) {
     const NPNNGeometryContext external_geometry = {
       .mode = NP_NN_QUERY_EXTERNAL,
       .eval_to_train = NULL
@@ -31259,6 +31455,9 @@ const NPRegressionHC0Context *hc0_context){
         }
       }
     }
+
+    categorical_point_invariant =
+      all_large_gate && lp_engine_est == NP_LP_ENGINE_GENERAL;
 
     if(all_large_gate &&
        (hc0_context == NULL ||
@@ -31847,6 +32046,7 @@ const NPRegressionHC0Context *hc0_context){
       .categorical_matrix_bandwidth = categorical_matrix_bandwidth,
       .categorical_base_requires_refit =
         categorical_base_requires_refit,
+      .categorical_point_invariant = categorical_point_invariant,
       .mean = mean,
       .gradient = gradient,
       .mean_stderr = mean_stderr,

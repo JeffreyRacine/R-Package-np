@@ -177,8 +177,10 @@ h6_expect_lp_derivative_contract <- function(
   expect_true(all(with.se$gerr[, bws$icon, drop = FALSE] >= 0))
 
   categorical <- setdiff(seq_len(ncol(with.se$gerr)), which(bws$icon))
-  if (length(categorical))
-    expect_true(all(is.na(with.se$gerr[, categorical, drop = FALSE])))
+  if (length(categorical)) {
+    expect_true(all(is.finite(with.se$gerr[, categorical, drop = FALSE])))
+    expect_true(all(with.se$gerr[, categorical, drop = FALSE] >= 0))
+  }
   invisible(list(fit = with.se, oracle = oracle))
 }
 
