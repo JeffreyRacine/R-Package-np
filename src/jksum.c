@@ -15404,6 +15404,17 @@ finish:
   return global_ok;
 }
 
+static inline double np_regression_cv_target_aware_loo_residual(
+  const double full_residual,
+  const double fit_response,
+  const double loss_response,
+  const double self_leverage,
+  const double denominator)
+{
+  return (full_residual +
+          self_leverage*(fit_response - loss_response))/denominator;
+}
+
 static inline double np_check_loss_value(const double residual, const double tau);
 
 static int np_extendednn_lc_fast_objective(const int bwm,
@@ -15433,7 +15444,10 @@ static int np_extendednn_lc_fast_objective(const int bwm,
 
     if((bwm == RBWM_CVLS) || (bwm == RBWM_CVCHECK)){
       const double den = NZD_POS(1.0 - hii);
-      const double err_loo = err/den;
+      const double err_loo = (bwm == RBWM_CVCHECK) ?
+        np_regression_cv_target_aware_loo_residual(
+          err, vector_Y[i], loss_y, hii, den) :
+        err/den;
       cv_sum += (bwm == RBWM_CVCHECK) ?
         np_check_loss_value(err_loo, np_lsq_tau_extern) :
         err_loo*err_loo;
@@ -19231,7 +19245,10 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                 const double err = loss_y - yhat;
                 if((bwm == RBWM_CVLS) || (bwm == RBWM_CVCHECK)){
                   const double den = NZD_POS(1.0 - hii);
-                  const double err_loo = err/den;
+                  const double err_loo = (bwm == RBWM_CVCHECK) ?
+                    np_regression_cv_target_aware_loo_residual(
+                      err, vector_Y[i], loss_y, hii, den) :
+                    err/den;
                   cv += (bwm == RBWM_CVCHECK) ?
                     np_check_loss_value(err_loo, np_lsq_tau_extern) :
                     err_loo*err_loo;
@@ -20041,7 +20058,10 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
           const double err = loss_y - yhat;
           if((bwm == RBWM_CVLS) || (bwm == RBWM_CVCHECK)){
             const double den = NZD_POS(1.0 - hii);
-            const double err_loo = err/den;
+            const double err_loo = (bwm == RBWM_CVCHECK) ?
+              np_regression_cv_target_aware_loo_residual(
+                err, vector_Y[i], loss_y, hii, den) :
+              err/den;
             cv += (bwm == RBWM_CVCHECK) ?
               np_check_loss_value(err_loo, np_lsq_tau_extern) :
               err_loo*err_loo;
