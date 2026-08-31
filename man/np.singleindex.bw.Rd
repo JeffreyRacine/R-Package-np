@@ -527,6 +527,13 @@ or standard-deviation factors.
     only}, while Ichimura's (1993) method can be applied for any outcome
   data type (i.e., continuous or discrete).
 
+  Invalid outer-search guidance uses the exact declared leave-one-out null:
+  the constant-model least-squares null for Ichimura and the clipped
+  Bernoulli likelihood null for Klein--Spady. Inner regression evaluation
+  remains raw; only terminal invalidity is mapped at the outer boundary.
+  The selected point is replayed once against the raw objective and is
+  rejected if it is not finite and valid.
+
   We impose the identification condition that the first element of the
   coefficient vector beta is equal to one, while identification also
   requires that the explanatory variables contain \emph{at least one}

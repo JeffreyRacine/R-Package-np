@@ -201,6 +201,14 @@ These arguments control the main check-loss bandwidth and
   are then used by \code{\link{nplsqreg}} for the final mixed-data
   \code{\link{npreg}} fit of the transformed response.
 
+  When the response fitted inside a leave-one-out fold differs from the
+  response entering the requested check loss, the deleted fitted value is
+  reconstructed with the fitted response while the residual is formed with
+  the requested loss response. Invalid search guidance is the exact
+  constrained constant-quantile check-loss null. A final NOMAD or Powell
+  payload is accepted only when replay of its selected point returns a raw
+  finite objective.
+
   The default pilot scale is a residual scale: first \code{\link{npreg}}
   estimates the conditional mean, then \code{\link{npreg}} smooths
   squared residuals using the same bandwidth object, and the square root

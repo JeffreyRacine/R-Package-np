@@ -450,9 +450,11 @@ These controls set numerical search starts, kernel choices, and support bounds.
 
   \item{invalid.penalty}{ a character string specifying the penalty
     used when the optimizer encounters invalid bandwidths.
-    \code{"baseline"} returns a finite penalty based on a baseline
-    objective; \code{"dbmax"} returns \code{DBL\_MAX}. Defaults to
-    \code{"baseline"}.}
+    \code{"baseline"} returns finite guidance derived from the exact
+    criterion-specific constant null; \code{"dbmax"} returns
+    \code{DBL\_MAX}. Terminal invalidity is preserved until finalization,
+    and an automatically selected point is checked once against the raw
+    criterion before it is accepted. Defaults to \code{"baseline"}.}
 
   \item{itmax}{
     integer number of iterations before failure in the numerical
@@ -488,7 +490,7 @@ These controls set numerical search starts, kernel choices, and support bounds.
 
   \item{penalty.multiplier}{ a numeric multiplier applied to the
     baseline penalty when \code{invalid.penalty="baseline"}.
-    Defaults to \code{10}.}
+    It must be finite and strictly greater than one. Defaults to \code{10}.}
 
   \item{powell.remin}{
     logical flag controlling Powell restart-from-minimum behavior. For
