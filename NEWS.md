@@ -1,5 +1,11 @@
 # npRmpi 0.70-6
 
+* Wide fixed-bandwidth local-polynomial `npreghat(..., output = "apply")`
+  calls now use the training-coordinate block shortcut only when evaluation
+  coordinates actually equal the training coordinates. Equal row counts no
+  longer misclassify a distinct external evaluation grid; the cutoff,
+  arithmetic owners, MPI orchestration, and public interface are unchanged.
+
 * Partial-linear INID bootstrap coefficient solves now attempt the identified
   unregularized weighted least-squares system before entering their bounded
   ridge ladder. The former positive `1e-12` default altered every identified
