@@ -10244,6 +10244,7 @@ typedef struct {
   double *row;
   double *weighted_sum;
   double *weighted_sum_power2;
+  const double *power2_observation_scale;
   int retain_common_scale;
   double *centered_m2;
   double *kw;
@@ -10702,6 +10703,7 @@ static int np_beta_absolute_route_body(
         matrix_Y, ncol_Y, matrix_W, ncol_W,
         matrix_Y_power2, ncol_Y_power2, matrix_W_power2, ncol_W_power2,
         workspace, &row_result, weighted_sum, weighted_sum_power2,
+        call->power2_observation_scale,
         retain_common_scale, retain_common_scale ? kw : NULL,
         route_diagnostics, progress);
 
@@ -11764,6 +11766,8 @@ NPPermutationWeightOutput * const pkw_output){
         .weighted_sum = weighted_sum,
         .weighted_sum_power2 =
           beta_dual_power ? dual_power_ctx->weighted_sum : NULL,
+        .power2_observation_scale = beta_dual_power ?
+          dual_power_ctx->observation_scale : NULL,
         .retain_common_scale = beta_retain_common_scale,
         .centered_m2 = beta_centered_moment ?
           centered_moment_ctx->centered_m2 : NULL,
@@ -26856,6 +26860,7 @@ static NP_NOINLINE int np_beta_scalar_regression_fit_block_canonical(
       .row = route_row,
       .weighted_sum = NULL,
       .weighted_sum_power2 = NULL,
+      .power2_observation_scale = NULL,
       .retain_common_scale = 0,
       .centered_m2 = NULL,
       .kw = NULL,
@@ -27319,12 +27324,14 @@ static NP_NOINLINE int np_beta_regression_lp_moment_row_canonical(
   const int categorical_compress,
   double *weighted_sum,
   double *weighted_sum_power2,
+  const double *power2_observation_scale,
   double *scaled_kernel_weights,
   const NPContinuousKernelRoute *kernel_route,
   NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics)
 {
   NP_DualPowerCtx dual_power_context = {
-    weighted_sum_power2, 2, basis, basis, nterms, nterms, NULL, 1, NULL, NULL
+    weighted_sum_power2, 2, basis, basis, nterms, nterms, NULL, 1, NULL,
+    power2_observation_scale
   };
   const NPContinuousKernelExecutionContext execution_context = {
     kernel_route, kernel_route_diagnostics, categorical_compress
@@ -29211,6 +29218,8 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
     call->hc0_context->status == NP_REGRESSION_HC0_RESIDUAL_PREPARING;
   const int ordinary_hc0 = call->hc0_context != NULL &&
     !hc0_residual_preparing;
+  const int preserve_point = ordinary_hc0 &&
+    call->hc0_context->point_already_computed;
   const int reuse_fit_kernel_row =
     (BANDWIDTH_reg == BW_FIXED) &&
     (call->tree_enabled != NP_TREE_TRUE) &&
@@ -29228,8 +29237,8 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
    * the fitted mean or gradient.  Peer-kernel routes retain their lean
    * two-column no-error layout.
    */
-  const int include_response_square = !ordinary_hc0 &&
-    (call->do_merr || call->kernel_route != NULL);
+  const int include_response_square = call->kernel_route != NULL ||
+    (!ordinary_hc0 && call->do_merr);
   const int reuse_fit_dual_power =
     call->do_merr && (!reuse_fit_kernel_row) &&
     (!fit_tree_active || ordinary_hc0);
@@ -29553,6 +29562,8 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	                 call->categorical_compress,
 	                 owner->moments,
 	                 call->do_merr ? owner->power2_moments : NULL,
+	                 ordinary_hc0 ?
+	                   call->hc0_context->scaled_residual : NULL,
 	                 NULL,
 	                 call->kernel_route,
 	                 call->kernel_route_diagnostics) != 0) {
@@ -29599,9 +29610,10 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	                                       jj,
 	                                       owner->eval_basis);
 
-	          out_owner[0] = 0.0;
-	          for(i = 0; i < owner->nterms; i++)
-	            out_owner[0] += owner->eval_basis[i]*owner->coefficient[i];
+	          out_owner[0] = preserve_point ? call->mean[jj] : 0.0;
+	          if(!preserve_point)
+	            for(i = 0; i < owner->nterms; i++)
+	              out_owner[0] += owner->eval_basis[i]*owner->coefficient[i];
 
 	          sigma2_owner = 0.0;
 	          if(call->do_merr && !ordinary_hc0) {
@@ -29699,7 +29711,8 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	                                                  direction);
 	                for(i = 0; i < owner->nterms; i++)
 	                  grad_value += direction[i]*owner->coefficient[i];
-	                out_owner[output_offset] = grad_value;
+	                out_owner[output_offset] = preserve_point ?
+	                  call->gradient[l][jj] : grad_value;
 	                if(call->do_gerr){
 	                  out_owner[output_offset + 1] =
 	                    ordinary_hc0 ? NA_REAL : 0.0;
@@ -29893,6 +29906,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	           call->categorical_compress,
 	           owner->moments,
 	           call->do_merr ? owner->power2_moments : NULL,
+           ordinary_hc0 ? call->hc0_context->scaled_residual : NULL,
            NULL,
            call->kernel_route,
            call->kernel_route_diagnostics) != 0) {
@@ -29994,9 +30008,11 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
                                  call->matrix_X_continuous_eval,
                                  j,
                                  owner->eval_basis);
-    call->mean[j] = 0.0;
-    for(i = 0; i < owner->nterms; ++i)
-      call->mean[j] += owner->eval_basis[i]*owner->coefficient[i];
+    if(!preserve_point) {
+      call->mean[j] = 0.0;
+      for(i = 0; i < owner->nterms; ++i)
+        call->mean[j] += owner->eval_basis[i]*owner->coefficient[i];
+    }
     sigma2hat = 0.0;
     if(call->do_merr && !ordinary_hc0) {
       sk = copysign(DBL_MIN, owner->moments[response_basis_offset]) +
@@ -30110,9 +30126,11 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
                                              call->matrix_X_continuous_eval,
                                              j,
                                              direction);
-          call->gradient[l][j] = 0.0;
-          for(i = 0; i < owner->nterms; ++i)
-            call->gradient[l][j] += direction[i]*owner->coefficient[i];
+          if(!preserve_point) {
+            call->gradient[l][j] = 0.0;
+            for(i = 0; i < owner->nterms; ++i)
+              call->gradient[l][j] += direction[i]*owner->coefficient[i];
+          }
           if(call->do_gerr) {
             call->gradient_stderr[l][j] = ordinary_hc0 ? NA_REAL : 0.0;
             if(!ordinary_hc0 && active)
@@ -30192,7 +30210,8 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
         for(l = num_reg_continuous;
             l < num_reg_continuous + num_reg_unordered + num_reg_ordered;
             ++l) {
-          call->gradient[l][j] = NA_REAL;
+          if(!preserve_point)
+            call->gradient[l][j] = NA_REAL;
           if(call->do_gerr)
             call->gradient_stderr[l][j] = NA_REAL;
         }
@@ -30367,6 +30386,9 @@ const NPRegressionHC0Context *hc0_context){
   double *ov_cont_hmin = NULL, *ov_cont_k0 = NULL;
   double *ov_disc_uno_const = NULL, *ov_disc_ord_const = NULL;
   int estimation_shortcut_done = 0;
+  int hc0_point_shortcut_done = 0;
+  NPRegressionHC0Context hc0_point_context;
+  const NPRegressionHC0Context *effective_hc0_context = hc0_context;
   int regression_fit_status = NP_REGRESSION_FIT_OK;
   int scalar_fit_status = NP_REGRESSION_SCALAR_FIT_OK;
   int general_lp_fit_status = NP_REGRESSION_GENERAL_LP_FIT_OK;
@@ -30852,16 +30874,27 @@ const NPRegressionHC0Context *hc0_context){
 
     if(all_large_gate &&
        (hc0_context == NULL ||
-        hc0_context->status == NP_REGRESSION_HC0_RESIDUAL_PREPARING) &&
+        hc0_context->status == NP_REGRESSION_HC0_RESIDUAL_PREPARING ||
+        (lp_engine_est == NP_LP_ENGINE_GENERAL &&
+         !hc0_context->point_already_computed &&
+         (hc0_context->status == NP_REGRESSION_HC0_RESIDUAL_READY ||
+          hc0_context->status == NP_REGRESSION_HC0_RESIDUAL_ALL_ZERO))) &&
        standard_error_mode == NP_REGRESSION_STDERR_LOCAL_RESIDUAL &&
        ((lp_engine_est == NP_LP_ENGINE_SCALAR) || (lp_engine_est == NP_LP_ENGINE_GENERAL))){
+      const int point_only_hc0_shortcut =
+        hc0_context != NULL && lp_engine_est == NP_LP_ENGINE_GENERAL &&
+        !hc0_context->point_already_computed &&
+        (hc0_context->status == NP_REGRESSION_HC0_RESIDUAL_READY ||
+         hc0_context->status == NP_REGRESSION_HC0_RESIDUAL_ALL_ZERO);
+      const int shortcut_do_merr = do_merr && !point_only_hc0_shortcut;
+      const int shortcut_do_gerr = do_gerr && !point_only_hc0_shortcut;
       double kconst = 1.0;
       int kconst_ok = 1;
       const double ridge_eps = 1.0/(double)MAX(1, num_obs_train);
       double sigma2hat = 0.0;
       const double ymean = meand(num_obs_train, vector_Y);
 
-      if(do_merr) {
+      if(shortcut_do_merr) {
         for(i = 0; i < num_obs_train; i++){
           const double dy = vector_Y[i] - ymean;
           sigma2hat += dy*dy;
@@ -30896,7 +30929,7 @@ const NPRegressionHC0Context *hc0_context){
         if (fit_progress_active) {
           for(i = 0; i < num_obs_eval; i++){
             mean[i] = ymean;
-            if(do_merr)
+            if(shortcut_do_merr)
               mean_stderr[i] = sefac;
             np_progress_fit_loop_step_owned(
               i + 1,
@@ -30907,12 +30940,13 @@ const NPRegressionHC0Context *hc0_context){
         } else {
           for(i = 0; i < num_obs_eval; i++){
             mean[i] = ymean;
-            if(do_merr)
+            if(shortcut_do_merr)
               mean_stderr[i] = sefac;
           }
         }
 
         estimation_shortcut_done = 1;
+        hc0_point_shortcut_done = point_only_hc0_shortcut;
       } else if(kconst_ok && lp_engine_est == NP_LP_ENGINE_GENERAL &&
                 (vector_glp_degree_extern != NULL) && (num_reg_continuous > 0)){
         const int use_bernstein = (int_glp_bernstein_extern != 0);
@@ -31056,12 +31090,12 @@ const NPRegressionHC0Context *hc0_context){
               eval_block_rows = (int)block_rows;
               eval_basis_block = (double *)malloc(
                 block_rows*(size_t)glp_nterms*sizeof(double));
-              if(do_merr)
+              if(shortcut_do_merr)
                 projection_block = (double *)malloc(
                   block_rows*(size_t)glp_nterms*sizeof(double));
               yhat_block = (double *)malloc(block_rows*sizeof(double));
               if((eval_basis_block == NULL) ||
-                 (do_merr && projection_block == NULL) ||
+                 (shortcut_do_merr && projection_block == NULL) ||
                  (yhat_block == NULL)){
                 free(eval_basis_block);
                 free(projection_block);
@@ -31174,7 +31208,7 @@ const NPRegressionHC0Context *hc0_context){
                                     eval_block_rows,
                                     beta,
                                     yhat_block);
-                if(do_merr)
+                if(shortcut_do_merr)
                   np_blas_project_inverse_block_int(
                     nblock,
                     glp_nterms,
@@ -31185,12 +31219,12 @@ const NPRegressionHC0Context *hc0_context){
 
                 for(int row = 0; row < nblock; row++){
                   double q = 0.0;
-                  if(do_merr)
+                  if(shortcut_do_merr)
                     for(j = 0; j < glp_nterms; j++)
                       q += eval_basis_block[j*eval_block_rows + row] *
                         projection_block[j*nblock + row];
                   mean[i + row] = yhat_block[row];
-                  if(do_merr) {
+                  if(shortcut_do_merr) {
                     const double mv = sigma2hat*q;
                     mean_stderr[i + row] =
                       (mv > 0.0 && isfinite(mv)) ?
@@ -31228,7 +31262,7 @@ const NPRegressionHC0Context *hc0_context){
 
                 for(j = 0; j < glp_nterms; j++)
                   yhat += eval_basis[j]*beta[j];
-                if(do_merr)
+                if(shortcut_do_merr)
                   for(j = 0; j < glp_nterms; j++){
                     const double zj = eval_basis[j];
                     for(int b = 0; b < glp_nterms; b++)
@@ -31238,7 +31272,7 @@ const NPRegressionHC0Context *hc0_context){
                   }
 
                 mean[i] = yhat;
-                if(do_merr) {
+                if(shortcut_do_merr) {
                   const double mv = sigma2hat*q;
                   mean_stderr[i] = (mv > 0.0 && isfinite(mv)) ?
                     sqrt(mv) : se_default;
@@ -31278,7 +31312,7 @@ const NPRegressionHC0Context *hc0_context){
                       dg += eval_deriv[j]*beta[j];
                     gradient[l][i] = dg;
 
-                    if(do_gerr){
+                    if(shortcut_do_gerr){
                       for(j = 0; j < glp_nterms; j++){
                         const double dj = eval_deriv[j];
                         for(int b = 0; b < glp_nterms; b++)
@@ -31297,7 +31331,7 @@ const NPRegressionHC0Context *hc0_context){
 
                   for(l = num_reg_continuous; l < nvars; l++){
                     gradient[l][i] = NA_REAL;
-                    if(do_gerr) gradient_stderr[l][i] = NA_REAL;
+                    if(shortcut_do_gerr) gradient_stderr[l][i] = NA_REAL;
                   }
                 }
                 if(fit_progress_active)
@@ -31309,6 +31343,7 @@ const NPRegressionHC0Context *hc0_context){
               }
             }
             estimation_shortcut_done = 1;
+            hc0_point_shortcut_done = point_only_hc0_shortcut;
           }
         }
 
@@ -31334,8 +31369,13 @@ const NPRegressionHC0Context *hc0_context){
     }
   }
 
-  if(estimation_shortcut_done)
-    goto finish_regression_estimation;
+  if(estimation_shortcut_done) {
+    if(!hc0_point_shortcut_done)
+      goto finish_regression_estimation;
+    hc0_point_context = *hc0_context;
+    hc0_point_context.point_already_computed = 1;
+    effective_hc0_context = &hc0_point_context;
+  }
 
   // Conduct the estimation
 
@@ -31432,7 +31472,7 @@ const NPRegressionHC0Context *hc0_context){
       .bandwidth_product = hprod,
       .kernel_route = kernel_route,
       .kernel_route_diagnostics = kernel_route_diagnostics,
-      .hc0_context = hc0_context,
+      .hc0_context = effective_hc0_context,
       .enclosing_owner = &fit_owner
     };
 

@@ -20476,7 +20476,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
     myopti[REG_LL], "C_np_regression");
   ordinary_hc0_active = do_merr &&
     (np_lp_engine_extern == NP_LP_ENGINE_SCALAR ||
-     (np_lp_engine_extern == NP_LP_ENGINE_GENERAL && kernel_route == NULL));
+     np_lp_engine_extern == NP_LP_ENGINE_GENERAL);
   vector_glp_degree_extern = glp_degree;
   vector_glp_gradient_order_extern = glp_gradient_order;
   int_glp_bernstein_extern = *glp_bernstein;

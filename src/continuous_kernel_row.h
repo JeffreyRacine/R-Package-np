@@ -321,6 +321,7 @@ np_continuous_kernel_beta_dual_power_rows_validated(
   NPContinuousKernelRowResult *row_result,
   double *weighted_sum,
   double *weighted_sum_power2,
+  const double *power2_observation_scale,
   int retain_common_scale,
   double *scaled_kernel_weights,
   NPContinuousKernelDerivativeDiagnostics *diagnostics,
