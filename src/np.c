@@ -11,6 +11,7 @@
 #include <time.h>
 
 #include <R.h>
+#include <Rmath.h>
 #include <R_ext/Arith.h>
 #include <R_ext/Memory.h>
 #include <R_ext/Rdynload.h>
@@ -1854,6 +1855,198 @@ double *vector_extendednn_upper_extern = NULL;
 int int_extendednn_upper_num_extern = 0;
 int int_conditional_prepared_context_extern = 0;
 static const char *bwm_deferred_error = NULL;
+
+static int np_minimized_nonnegative_reference_penalty(
+  const double reference,
+  const double multiplier,
+  double * const penalty)
+{
+  double candidate;
+
+  if (penalty == NULL)
+    return 0;
+  *penalty = DBL_MAX;
+  if (!R_FINITE(reference) || reference < 0.0 ||
+      !R_FINITE(multiplier) || multiplier < 1.0)
+    return 0;
+
+  candidate = multiplier * reference;
+  if (candidate == reference)
+    candidate = nextafter(reference, INFINITY);
+  if (!R_FINITE(candidate) || candidate <= reference || candidate >= DBL_MAX)
+    return 0;
+
+  *penalty = candidate;
+  return 1;
+}
+
+typedef struct {
+  double breakpoint;
+  double weight;
+  int index;
+} NPCvcCheckNullEntry;
+
+static int np_cvc_check_null_entry_compare(const void *left,
+                                           const void *right)
+{
+  const NPCvcCheckNullEntry *x = (const NPCvcCheckNullEntry *)left;
+  const NPCvcCheckNullEntry *y = (const NPCvcCheckNullEntry *)right;
+
+  if (x->breakpoint < y->breakpoint) return -1;
+  if (x->breakpoint > y->breakpoint) return 1;
+  if (x->weight < y->weight) return -1;
+  if (x->weight > y->weight) return 1;
+  if (x->index < y->index) return -1;
+  if (x->index > y->index) return 1;
+  return 0;
+}
+
+static int np_cvc_check_null_reference(
+  const double * const response,
+  const double * const scale,
+  const int n,
+  const double tau,
+  const double delta_lower,
+  const double delta_upper,
+  double * const reference)
+{
+  NPCvcCheckNullEntry *entry = NULL;
+  size_t allocation_bytes;
+  double response_sum = 0.0;
+  double response_mean;
+  double leave_one_factor;
+  double running_suffix = 0.0;
+  double running_prefix = 0.0;
+  double total_weight = 0.0;
+  double cumulative_weight = 0.0;
+  double threshold;
+  double selected_breakpoint = 0.0;
+  double z_lower;
+  double z_upper;
+  double z;
+  double loss_sum = 0.0;
+  int selected = 0;
+  int ok = 0;
+  int i;
+
+  if (reference == NULL)
+    return 0;
+  *reference = DBL_MAX;
+  if (response == NULL || scale == NULL || n <= 1 ||
+      !R_FINITE(tau) || tau <= 0.0 || tau >= 1.0 ||
+      !R_FINITE(delta_lower) || !R_FINITE(delta_upper) ||
+      delta_lower <= 0.0 || delta_upper >= 1.0 ||
+      delta_lower >= delta_upper ||
+      !np_size_mul_checked((size_t)n, sizeof(*entry), &allocation_bytes))
+    return 0;
+
+  entry = (NPCvcCheckNullEntry *)malloc(allocation_bytes);
+  if (entry == NULL)
+    return 0;
+
+  for (i = 0; i < n; i++) {
+    if (!R_FINITE(response[i]))
+      goto cleanup;
+    response_sum += response[i];
+    if (!R_FINITE(response_sum))
+      goto cleanup;
+  }
+  response_mean = response_sum/(double)n;
+  leave_one_factor = (double)n/((double)n - 1.0);
+  if (!R_FINITE(response_mean) || !R_FINITE(leave_one_factor))
+    goto cleanup;
+
+  for (i = n - 1; i >= 0; i--) {
+    if (!R_FINITE(scale[i]) || scale[i] <= 0.0)
+      goto cleanup;
+    entry[i].weight = running_suffix;
+    running_suffix += scale[i];
+    if (!R_FINITE(running_suffix))
+      goto cleanup;
+  }
+
+  for (i = 0; i < n; i++) {
+    const double leave_one_sum = running_prefix + entry[i].weight;
+    const double weight = leave_one_sum/((double)n - 1.0);
+    const double centered_response =
+      leave_one_factor*(response[i] - response_mean);
+    double breakpoint = centered_response/weight;
+
+    if (!R_FINITE(leave_one_sum) || !R_FINITE(weight) || weight <= 0.0 ||
+        !R_FINITE(centered_response) || !R_FINITE(breakpoint))
+      goto cleanup;
+    if (breakpoint == 0.0)
+      breakpoint = 0.0;
+    entry[i].breakpoint = breakpoint;
+    entry[i].weight = weight;
+    entry[i].index = i;
+    running_prefix += scale[i];
+    if (!R_FINITE(running_prefix))
+      goto cleanup;
+  }
+
+  qsort(entry, (size_t)n, sizeof(*entry), np_cvc_check_null_entry_compare);
+
+  for (i = 0; i < n; i++) {
+    total_weight += entry[i].weight;
+    if (!R_FINITE(total_weight))
+      goto cleanup;
+  }
+  threshold = tau*total_weight;
+  if (!R_FINITE(total_weight) || total_weight <= 0.0 ||
+      !R_FINITE(threshold) || threshold <= 0.0)
+    goto cleanup;
+  for (i = 0; i < n; i++) {
+    cumulative_weight += entry[i].weight;
+    if (!R_FINITE(cumulative_weight))
+      goto cleanup;
+    if (!selected && cumulative_weight >= threshold) {
+      selected_breakpoint = entry[i].breakpoint;
+      selected = 1;
+      break;
+    }
+  }
+  if (!selected)
+    goto cleanup;
+
+  z_lower = qnorm(delta_lower, 0.0, 1.0, 1, 0);
+  z_upper = qnorm(delta_upper, 0.0, 1.0, 1, 0);
+  if (!R_FINITE(z_lower) || !R_FINITE(z_upper))
+    goto cleanup;
+  if (z_lower > z_upper) {
+    const double temporary = z_lower;
+    z_lower = z_upper;
+    z_upper = temporary;
+  }
+  z = MIN(z_upper, MAX(z_lower, selected_breakpoint));
+  if (!R_FINITE(z))
+    goto cleanup;
+
+  for (i = 0; i < n; i++) {
+    const int index = entry[i].index;
+    const double centered_response =
+      leave_one_factor*(response[index] - response_mean);
+    const double residual = centered_response - entry[i].weight*z;
+    const double loss = residual*(tau - (residual < 0.0 ? 1.0 : 0.0));
+
+    if (!R_FINITE(centered_response) || !R_FINITE(residual) ||
+        !R_FINITE(loss) || loss < 0.0)
+      goto cleanup;
+    loss_sum += loss;
+    if (!R_FINITE(loss_sum))
+      goto cleanup;
+  }
+  loss_sum /= (double)n;
+  if (!R_FINITE(loss_sum) || loss_sum < 0.0)
+    goto cleanup;
+
+  *reference = loss_sum;
+  ok = 1;
+
+cleanup:
+  free(entry);
+  return ok;
+}
 
 void np_bwm_set_deferred_error(const char *msg)
 {
@@ -19347,30 +19540,47 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   bwm_penalty_mode = 0;
   bwm_penalty_value = DBL_MAX;
   if (penalty_mode[0] == 1) {
+    const int penalty_criterion =
+      lsq_check_mode ? RBWM_CVCHECK : myopti[RBW_MI];
     double pmult = penalty_mult[0];
-    double y_mean = 0.0;
-    double mse0 = 0.0;
     if (pmult < 1.0) pmult = 1.0;
-    for (i = 0; i < num_obs_train_extern; i++)
-      y_mean += vector_Y_extern[i];
-    y_mean /= (double) num_obs_train_extern;
-    for (i = 0; i < num_obs_train_extern; i++) {
-      const double dy = vector_Y_extern[i] - y_mean;
-      mse0 += dy*dy;
-    }
-    mse0 /= (double) num_obs_train_extern;
-    if (mse0 <= 0.0) mse0 = DBL_MIN;
-    if (myopti[RBW_MI] == RBWM_CVAIC) {
-      const double denom = 1.0 - 2.0/((double) num_obs_train_extern);
-      if (denom > 0.0) {
-        const double base_aic = log(mse0) + (1.0/denom);
-        bwm_penalty_value = base_aic + log(pmult);
+    if (penalty_criterion == RBWM_CVCHECK) {
+      double reference = DBL_MAX;
+      if (np_cvc_check_null_reference(
+            vector_Y_extern,
+            vector_lsq_scale_extern,
+            num_obs_train_extern,
+            np_lsq_tau_extern,
+            np_lsq_delta_lower_extern,
+            np_lsq_delta_upper_extern,
+            &reference)) {
+        bwm_penalty_mode = np_minimized_nonnegative_reference_penalty(
+          reference, pmult, &bwm_penalty_value);
       }
     } else {
-      bwm_penalty_value = pmult * mse0;
+      double y_mean = 0.0;
+      double mse0 = 0.0;
+      for (i = 0; i < num_obs_train_extern; i++)
+        y_mean += vector_Y_extern[i];
+      y_mean /= (double) num_obs_train_extern;
+      for (i = 0; i < num_obs_train_extern; i++) {
+        const double dy = vector_Y_extern[i] - y_mean;
+        mse0 += dy*dy;
+      }
+      mse0 /= (double) num_obs_train_extern;
+      if (mse0 <= 0.0) mse0 = DBL_MIN;
+      if (penalty_criterion == RBWM_CVAIC) {
+        const double denom = 1.0 - 2.0/((double) num_obs_train_extern);
+        if (denom > 0.0) {
+          const double base_aic = log(mse0) + (1.0/denom);
+          bwm_penalty_value = base_aic + log(pmult);
+        }
+      } else {
+        bwm_penalty_value = pmult * mse0;
+      }
+      if (R_FINITE(bwm_penalty_value))
+        bwm_penalty_mode = 1;
     }
-    if (R_FINITE(bwm_penalty_value))
-      bwm_penalty_mode = 1;
   }
 
   // initialize permutation arrays

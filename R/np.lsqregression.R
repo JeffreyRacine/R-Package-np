@@ -760,6 +760,44 @@ nplsqregbw <-
   )
 }
 
+.nplsqreg_raw_objective_valid <- function(value) {
+  value <- as.numeric(value)
+  length(value) == 1L && !is.na(value) && is.finite(value) &&
+    !identical(value, .Machine$double.xmax)
+}
+
+.nplsqreg_nomad_select_payload <- function(direct,
+                                            hot = NULL,
+                                            powell.time = NA_real_) {
+  direct.objective <- as.numeric(direct$objective[1L])
+  direct.valid <- .nplsqreg_raw_objective_valid(direct.objective)
+  hot.objective <- if (is.null(hot)) NA_real_ else
+    as.numeric(hot$objective[1L])
+  hot.valid <- !is.null(hot) &&
+    .nplsqreg_raw_objective_valid(hot.objective)
+
+  if (hot.valid &&
+      (!direct.valid ||
+       .np_degree_better(hot.objective, direct.objective, direction = "min"))) {
+    return(list(
+      payload = hot,
+      objective = hot.objective,
+      powell.time = powell.time
+    ))
+  }
+  if (direct.valid) {
+    return(list(
+      payload = direct,
+      objective = direct.objective,
+      powell.time = powell.time
+    ))
+  }
+  stop(
+    "nplsqregbw NOMAD route did not return a raw-valid solution",
+    call. = FALSE
+  )
+}
+
 .nplsqreg_nomad_search <- function(xdat, ydat, scale, tau, template,
                                    delta, delta.bounds, opt.args,
                                    degree.search,
@@ -879,11 +917,16 @@ nplsqregbw <-
       bws = tbw,
       delta = point[delta.idx],
       delta.bounds = delta.bounds,
-      opt.args = utils::modifyList(opt.args, list(nmulti = 1L)),
+      opt.args = utils::modifyList(
+        opt.args,
+        list(nmulti = 1L, invalid.penalty = "dbmax")
+      ),
       bandwidth.compute = FALSE
     )
-    direct$num.feval <- as.numeric(nomad.num.feval.total)
-    direct$num.feval.fast <- as.numeric(nomad.num.feval.fast.total)
+    direct$num.feval <- as.numeric(nomad.num.feval.total) +
+      as.numeric(direct$num.feval[1L])
+    direct$num.feval.fast <- as.numeric(nomad.num.feval.fast.total) +
+      as.numeric(direct$num.feval.fast[1L])
     direct$bws <- tbw
     direct$bws$bw <- direct$bw
     direct$bws <- .nplsqreg_canonical_lp_template(
@@ -891,8 +934,8 @@ nplsqregbw <-
       degree = degree,
       bernstein.basis = degree.search$bernstein.basis
     )
-    direct.objective <- as.numeric(direct$objective[1L])
     powell.elapsed <- NA_real_
+    hot <- NULL
 
     if (identical(degree.search$engine, "nomad+powell")) {
       hot.opt.args <- .np_nomad_powell_hotstart_opt_args(
@@ -925,16 +968,16 @@ nplsqregbw <-
         degree = degree,
         bernstein.basis = degree.search$bernstein.basis
       )
-      hot$num.feval <- as.numeric(direct$num.feval[1L]) + as.numeric(hot$num.feval[1L])
-      hot$num.feval.fast <- as.numeric(direct$num.feval.fast[1L]) + as.numeric(hot$num.feval.fast[1L])
-      if (is.finite(hot$objective) &&
-          .np_degree_better(hot$objective, direct.objective, direction = "min")) {
-        return(list(payload = hot, objective = hot$objective,
-                    powell.time = powell.elapsed))
-      }
+      hot$num.feval <- as.numeric(direct$num.feval[1L]) +
+        as.numeric(hot$num.feval[1L])
+      hot$num.feval.fast <- as.numeric(direct$num.feval.fast[1L]) +
+        as.numeric(hot$num.feval.fast[1L])
     }
-    list(payload = direct, objective = direct.objective,
-         powell.time = powell.elapsed)
+    .nplsqreg_nomad_select_payload(
+      direct = direct,
+      hot = hot,
+      powell.time = powell.elapsed
+    )
   }
 
   search.engine.used <- if (identical(degree.search$engine, "nomad+powell")) {
