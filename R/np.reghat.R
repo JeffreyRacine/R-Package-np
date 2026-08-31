@@ -1765,6 +1765,25 @@ npreghat <-
                      byrow = FALSE)
       out$gerr <- as.matrix(gerr[, rorder, drop = FALSE])
     }
+
+    if (npGlpCategoricalEffectsRequired(
+          regtype.engine = reg.spec$regtype.engine,
+          degree.engine = reg.spec$degree.engine,
+          ncat = bws$nuno + bws$nord,
+          gradients = gradients)) {
+      out$grad <- .npreg_glp_categorical_gradients_from_npreghat(
+        bws = bws,
+        txdat = txdat.frame,
+        tydat = tydat,
+        exdat = exdat.frame,
+        grad = out$grad,
+        where = ".np_regression_direct"
+      )
+      if (se) {
+        cat.idx <- which(bws$iuno | bws$iord)
+        out$gerr[, cat.idx] <- NA_real_
+      }
+    }
   } else if (gradients) {
     out$grad <- .npreg_glp_partial_gradients_from_npreghat(
       bws = bws,

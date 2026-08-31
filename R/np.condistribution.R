@@ -133,7 +133,8 @@ npcdist.condbandwidth <-
         gradient.order = glp.gradient.order.preflight,
         ncon = bws$xncon
       )
-      if (!any(glp.gradient.available.preflight)) {
+      if (!any(glp.gradient.available.preflight) &&
+          (bws$xnuno + bws$xnord == 0L)) {
         stop("npcdist has no available derivative components for the requested gradient.order and fitted polynomial degree",
              call. = FALSE)
       }
@@ -376,6 +377,12 @@ npcdist.condbandwidth <-
         )
       }
     }
+    glp.categorical.effects <- npGlpCategoricalEffectsRequired(
+      regtype.engine = reg.engine,
+      degree.engine = degree.engine,
+      ncat = bws$xnuno + bws$xnord,
+      gradients = gradients
+    )
     if (isTRUE(gradients) &&
         identical(reg.engine, "lp") &&
         (bws$xncon > 0L) &&
@@ -540,7 +547,8 @@ npcdist.condbandwidth <-
           }
         }
       }
-      if (glp.gradient.partial && (bws$xnuno + bws$xnord > 0L)) {
+      if ((glp.gradient.partial || glp.categorical.effects) &&
+          (bws$xnuno + bws$xnord > 0L)) {
         cat.grad <- npConditionalCategoricalFirstDifferences(
           hat.fun = npcdisthat,
           bws = bws,
@@ -552,6 +560,7 @@ npcdist.condbandwidth <-
         )
         cat.idx <- which(bws$ixuno | bws$ixord)
         myout$congrad[, cat.idx] <- cat.grad[, cat.idx, drop = FALSE]
+        myout$congerr[, cat.idx] <- NA_real_
       }
     } else {
       myout$congrad = NA

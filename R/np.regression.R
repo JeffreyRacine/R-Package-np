@@ -46,6 +46,39 @@ npreg <-
   code
 }
 
+.npreg_glp_categorical_gradients_from_npreghat <- function(bws,
+                                                            txdat,
+                                                            tydat,
+                                                            exdat,
+                                                            grad,
+                                                            where) {
+  cat.idx <- which(bws$iuno | bws$iord)
+  if (!length(cat.idx))
+    return(grad)
+
+  evaldat <- if (is.null(exdat)) txdat else exdat
+  eval.hat <- function(z) {
+    as.vector(npreghat(
+      bws = bws,
+      txdat = txdat,
+      exdat = z,
+      y = tydat,
+      output = "apply"
+    ))
+  }
+
+  for (jj in cat.idx) {
+    frames <- npCategoricalFirstDifferenceFrames(
+      exdat = evaldat,
+      index = jj,
+      where = where
+    )
+    grad[, jj] <- eval.hat(frames$upper) - eval.hat(frames$lower)
+  }
+
+  grad
+}
+
 .npreg_glp_partial_gradients_from_npreghat <- function(bws,
                                                        txdat,
                                                        tydat,
@@ -73,29 +106,14 @@ npreg <-
     grad[, cont.idx[jj]] <- as.vector(do.call(npreghat, hat.args))
   }
 
-  cat.idx <- which(bws$iuno | bws$iord)
-  if (length(cat.idx)) {
-    evaldat <- if (is.null(exdat)) txdat else exdat
-    for (jj in cat.idx) {
-      frames <- npCategoricalFirstDifferenceFrames(
-        exdat = evaldat,
-        index = jj,
-        where = "npreg"
-      )
-      eval.hat <- function(z) {
-        as.vector(npreghat(
-          bws = bws,
-          txdat = txdat,
-          exdat = z,
-          y = tydat,
-          output = "apply"
-        ))
-      }
-      grad[, jj] <- eval.hat(frames$upper) - eval.hat(frames$lower)
-    }
-  }
-
-  grad
+  .npreg_glp_categorical_gradients_from_npreghat(
+    bws = bws,
+    txdat = txdat,
+    tydat = tydat,
+    exdat = exdat,
+    grad = grad,
+    where = "npreg"
+  )
 }
 
 npreg.formula <-
@@ -893,6 +911,25 @@ npreg.rbandwidth <-
           tydat = tydat,
           exdat = exdat.frame
         )
+      }
+
+      if (npGlpCategoricalEffectsRequired(
+            regtype.engine = reg.spec$regtype.engine,
+            degree.engine = reg.spec$degree.engine,
+            ncat = bws$nuno + bws$nord,
+            gradients = gradients)) {
+        myout$g <- .npreg_glp_categorical_gradients_from_npreghat(
+          bws = bws,
+          txdat = txdat.frame,
+          tydat = tydat,
+          exdat = exdat.frame,
+          grad = myout$g,
+          where = "npreg"
+        )
+        if (se) {
+          cat.idx <- which(bws$iuno | bws$iord)
+          myout$gerr[, cat.idx] <- NA_real_
+        }
       }
 
     } else if (gradients) {

@@ -1,5 +1,12 @@
 # npRmpi 0.70-6
 
+* Positive-degree local-polynomial categorical gradients/effects now report
+  their documented fitted-value endpoint contrasts across regression,
+  conditional density/distribution, quantile regression, conditional mode,
+  location-scale quantile regression, and plot/bootstrap workflows instead of
+  native zero placeholders. Categorical asymptotic effect standard errors
+  remain unavailable and are reported as `NA`.
+
 * Successful public bandwidth autodispatch now treats the existing collective
   acknowledgement as the publication commit for the already rank-local lease.
   This removes one redundant post-evaluation collective from `npregbw()`,

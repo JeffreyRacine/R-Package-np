@@ -180,7 +180,12 @@ npqreg <-
                                                     ydat,
                                                     exdat,
                                                     quantile,
-                                                    gradients = FALSE) {
+                                                    gradients = FALSE,
+                                                    tau = NULL,
+                                                    tol = 1.490116e-04,
+                                                    small = 1.490116e-05,
+                                                    itmax = 10000L,
+                                                    cdf.cache = NULL) {
   xdat <- toFrame(xdat)
   ydat <- toFrame(ydat)
   exdat <- toFrame(exdat)
@@ -192,6 +197,21 @@ npqreg <-
   if (ncol(ydat) != 1L)
     stop("quantile delta helper requires a single response")
 
+  reg.spec <- npConditionalRegEngineSpec(
+    bws,
+    where = "npqreg categorical effects"
+  )
+  glp.categorical.effects <- npGlpCategoricalEffectsRequired(
+    regtype.engine = reg.spec$reg.engine,
+    degree.engine = reg.spec$degree.engine,
+    ncat = bws$xnuno + bws$xnord,
+    gradients = gradients
+  )
+  if (glp.categorical.effects &&
+      (is.null(tau) || length(tau) != 1L || !is.finite(tau))) {
+    stop("quantile delta helper requires a finite scalar tau for categorical effects")
+  }
+
   eydat <- stats::setNames(data.frame(quantile), names(ydat)[1L])
   cdf.obj <- .np_conditional_eval_selected(
     bws = bws,
@@ -200,7 +220,8 @@ npqreg <-
     exdat = exdat,
     eydat = eydat,
     cdf = TRUE,
-    gradients = gradients
+    gradients = gradients,
+    categorical.effects = !glp.categorical.effects
   )
   dens.obj <- .np_conditional_eval_selected(
     bws = bws,
@@ -234,6 +255,23 @@ npqreg <-
 
   gerr <- cdf.obj$congerr / dens.mat
   gerr[!is.finite(gerr) | gerr < 0.0] <- NA_real_
+
+  if (glp.categorical.effects) {
+    cat.grad <- .npqreg_categorical_first_differences(
+      bws = bws,
+      xdat = xdat,
+      ydat = ydat,
+      exdat = exdat,
+      tau = tau,
+      tol = tol,
+      small = small,
+      itmax = itmax,
+      cdf.cache = cdf.cache
+    )
+    cat.idx <- which(bws$ixuno | bws$ixord)
+    grad[, cat.idx] <- cat.grad[, cat.idx, drop = FALSE]
+    gerr[, cat.idx] <- NA_real_
+  }
 
   list(
     quanterr = quanterr,
@@ -312,6 +350,53 @@ npqreg <-
 .npqreg_selected_cdf_cache_should_enable <- function(tau, exdat) {
   isTRUE(npObjectiveCacheEnabled()) &&
     (length(tau) > 1L || anyDuplicated(as.data.frame(exdat)) > 0L)
+}
+
+.npqreg_categorical_first_differences <- function(bws,
+                                                   xdat,
+                                                   ydat,
+                                                   exdat,
+                                                   tau,
+                                                   tol,
+                                                   small,
+                                                   itmax,
+                                                   cdf.cache = NULL) {
+  cat.idx <- which(bws$ixuno | bws$ixord)
+  out <- matrix(NA_real_, nrow = nrow(exdat), ncol = bws$xndim)
+  if (!length(cat.idx))
+    return(out)
+
+  eval.quantile <- function(z) {
+    row.keys <- if (is.environment(cdf.cache) && isTRUE(cdf.cache$enabled)) {
+      .npqreg_selected_cdf_cache_row_keys(z)
+    } else {
+      NULL
+    }
+    as.vector(.npqreg_invert_selected_cdf(
+      bws = bws,
+      xdat = xdat,
+      ydat = ydat,
+      exdat = z,
+      tau = tau,
+      tol = tol,
+      small = small,
+      itmax = itmax,
+      cdf.cache = cdf.cache,
+      cdf.row.keys = row.keys
+    ))
+  }
+
+  for (jj in cat.idx) {
+    frames <- npCategoricalFirstDifferenceFrames(
+      exdat = exdat,
+      index = jj,
+      where = "npqreg"
+    )
+    out[, jj] <- eval.quantile(frames$upper) -
+      eval.quantile(frames$lower)
+  }
+
+  out
 }
 
 .npqreg_selected_cdf_values_cached <- function(bws,
@@ -564,7 +649,11 @@ npqreg <-
         ydat = ydat,
         exdat = ex.chunk,
         quantile = yq,
-        gradients = gradients
+        gradients = gradients,
+        tau = tau[[j]],
+        tol = tol,
+        small = small,
+        itmax = itmax
       ))
       delta <- .npqreg_mark_clamped_delta(delta, qclamp)
       pieces[[j]] <- cbind(yq, .npqreg_quantile_delta_matrix(delta, gradients = gradients))
@@ -611,7 +700,11 @@ npqreg <-
         ydat = ydat,
         exdat = ex.chunk,
         quantile = yq,
-        gradients = gradients
+        gradients = gradients,
+        tau = tau[[j]],
+        tol = tol,
+        small = small,
+        itmax = itmax
       ))
       delta <- .npqreg_mark_clamped_delta(delta, qclamp)
       pieces[[j]] <- cbind(yq, .npqreg_quantile_delta_matrix(delta, gradients = gradients))
@@ -1103,7 +1196,12 @@ npqreg.condbandwidth <-
             ydat = tydat.df,
             exdat = txeval,
             quantile = yq,
-            gradients = gradients
+            gradients = gradients,
+            tau = tau_i,
+            tol = tol,
+            small = small,
+            itmax = itmax,
+            cdf.cache = cdf.cache
           )
         )
         qdelta <- .npqreg_mark_clamped_delta(qdelta, qclamp)
