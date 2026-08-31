@@ -1055,21 +1055,18 @@ npreghat <-
   } else {
     FALSE
   }
-  if (beta.kernel) {
-    descriptor.family <- CKER_FAMILY_BETA
-    descriptor.order <- as.integer(bws[["ckerorder", exact = TRUE]])
-    cker.bounds <- npKernelBoundsMarshal(
-      bws[["ckerlb", exact = TRUE]][bws[["icon", exact = TRUE]]],
-      bws[["ckerub", exact = TRUE]][bws[["icon", exact = TRUE]]]
-    )
-    cker.lb <- cker.bounds$lb
-    cker.ub <- cker.bounds$ub
+  descriptor.family <- if (beta.kernel) {
+    CKER_FAMILY_BETA
   } else {
-    descriptor.family <- CKER_FAMILY_LEGACY
-    descriptor.order <- as.integer(bws[["ckerorder", exact = TRUE]])
-    cker.lb <- double()
-    cker.ub <- double()
+    CKER_FAMILY_LEGACY
   }
+  descriptor.order <- as.integer(bws[["ckerorder", exact = TRUE]])
+  cker.bounds <- npKernelBoundsMarshal(
+    bws[["ckerlb", exact = TRUE]][bws[["icon", exact = TRUE]]],
+    bws[["ckerub", exact = TRUE]][bws[["icon", exact = TRUE]]]
+  )
+  cker.lb <- cker.bounds$lb
+  cker.ub <- cker.bounds$ub
   grad.vec <- if (length(s) && any(s > 0L)) as.integer(s) else integer(0L)
   on.exit(
     tryCatch(.Call("C_np_reset_native_estimator_state", PACKAGE = "np"),

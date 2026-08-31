@@ -9046,6 +9046,9 @@ static SEXP np_regression_lp_apply_conditional_impl(SEXP txuno,
   double nconfac_save = nconfac_extern;
   double ncatfac_save = ncatfac_extern;
   double *vector_continuous_stddev_save = vector_continuous_stddev_extern;
+  int int_cxker_bound_save = int_cxker_bound_extern;
+  double *vector_cxkerlb_save = vector_cxkerlb_extern;
+  double *vector_cxkerub_save = vector_cxkerub_extern;
   double *shadow_continuous_stddev = NULL;
   double **rhs_cols = NULL;
   np_continuous_kernel_descriptor descriptor;
@@ -9183,6 +9186,10 @@ static SEXP np_regression_lp_apply_conditional_impl(SEXP txuno,
     beta_diagnostics.beta_status = NP_BETA_OK;
     active_route = &beta_route;
     active_diagnostics = &beta_diagnostics;
+  } else if(!((XLENGTH(ckerlb_r) == 0 && XLENGTH(ckerub_r) == 0) ||
+              (XLENGTH(ckerlb_r) == ncol_txcon &&
+               XLENGTH(ckerub_r) == ncol_txcon))) {
+    error("C_np_regression_lp_apply_conditional: legacy bounds length mismatch");
   }
 
   np_native_estimator_state_active = 1;
@@ -9317,6 +9324,15 @@ static SEXP np_regression_lp_apply_conditional_impl(SEXP txuno,
   vector_glp_gradient_order_extern = (XLENGTH(grad_i) > 0) ? INTEGER(grad_i) : NULL;
   int_glp_bernstein_extern = asInteger(glp_bernstein);
   int_glp_basis_extern = asInteger(glp_basis);
+  vector_cxkerlb_extern = (XLENGTH(ckerlb_r) == ncol_txcon) ?
+    REAL(ckerlb_r) : NULL;
+  vector_cxkerub_extern = (XLENGTH(ckerub_r) == ncol_txcon) ?
+    REAL(ckerub_r) : NULL;
+  int_cxker_bound_extern =
+    (vector_cxkerlb_extern != NULL && vector_cxkerub_extern != NULL) ?
+      np_has_finite_cker_bounds(vector_cxkerlb_extern,
+                                vector_cxkerub_extern,
+                                ncol_txcon) : 0;
 
   if(return_hat_flag) {
     out = PROTECT(allocMatrix(REALSXP, num_obs_eval, num_obs_train));
@@ -9410,6 +9426,9 @@ cleanup_lp_apply_wrapper:
   int_glp_basis_extern = 1;
   int_TREE_X = int_TREE_Y = int_TREE_XY = NP_TREE_FALSE;
   vector_continuous_stddev_extern = vector_continuous_stddev_save;
+  int_cxker_bound_extern = int_cxker_bound_save;
+  vector_cxkerlb_extern = vector_cxkerlb_save;
+  vector_cxkerub_extern = vector_cxkerub_save;
   int_LARGE_SF = int_large_sf_save;
   nconfac_extern = nconfac_save;
   ncatfac_extern = ncatfac_save;
@@ -19565,6 +19584,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
                    int categorical_compress){
 
   double * vector_scale_factor, * ecm = NULL, * ecmerr = NULL, ** eg = NULL, **egerr = NULL;
+  double **eg_hc0_storage = NULL;
   double RS, MSE, MAE, MAPE, CORR, SIGN, pad_num;
 
   int i,j, num_var;
@@ -19672,8 +19692,13 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
   ecm = alloc_vecd(num_obs_eval_alloc);
   if(do_merr)
     ecmerr = alloc_vecd(num_obs_eval_alloc);
-  if(do_grad)
+  if(do_grad && do_gerr && ordinary_hc0_active) {
+    eg_hc0_storage = alloc_tmatd(num_obs_eval_alloc, 2*num_var);
+    eg = eg_hc0_storage;
+    egerr = eg_hc0_storage + num_var;
+  } else if(do_grad) {
     eg = alloc_matd(num_obs_eval_alloc, num_var);
+  }
   if(do_gerr && !ordinary_hc0_active)
     egerr = alloc_matd(num_obs_eval_alloc, num_var);
   
@@ -19987,6 +20012,18 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
         vector_Y_extern[i] = ty[i];
     }
 
+    /*
+     * A training-point HC0 pass may reuse the internal continuous-gradient
+     * planes as adaptive-NN cross moments.  Preserve the already-computed
+     * point estimates directly in their final caller-owned storage first;
+     * this moves the ordinary output copy rather than allocating another
+     * O(n p) workspace.
+     */
+    if(train_is_eval && do_grad && do_gerr)
+      for(j = 0; j < num_var; ++j)
+        for(i = 0; i < num_obs_eval_extern; ++i)
+          g[j*num_obs_eval_extern + ipe[i]] = eg[j][i];
+
     np_progress_fit_set_offset(num_obs_train_extern);
   }
 
@@ -20014,10 +20051,9 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
                                                    num_categories_extern,
                                                    matrix_categorical_vals_extern,
                                                    ecm,
-                                                   ordinary_hc0_active &&
-                                                     train_is_eval ? NULL : eg,
+                                                   eg,
                                                    ecmerr,
-                                                   ordinary_hc0_active ? NULL : egerr,
+                                                   egerr,
                                                    &RS,
                                                    &MSE,
                                                    &MAE,
@@ -20043,9 +20079,10 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
 
 
   if(do_grad){
-    for(j=0;j<num_var;j++)
-      for(i=0;i<num_obs_eval_extern;i++)
-        g[j*num_obs_eval_extern+ipe[i]]=eg[j][i];
+    if(!(ordinary_hc0_active && train_is_eval && do_gerr))
+      for(j=0;j<num_var;j++)
+        for(i=0;i<num_obs_eval_extern;i++)
+          g[j*num_obs_eval_extern+ipe[i]]=eg[j][i];
 
     /* The canonical mixed beta route defines and returns discrete-contrast
        standard errors.  Preserve the historical non-beta bridge unchanged;
@@ -20054,7 +20091,8 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
       if(ordinary_hc0_active) {
         for(j=0;j<num_var;j++)
           for(i=0;i<num_obs_eval_extern;i++)
-            gerr[j*num_obs_eval_extern+ipe[i]]=NA_REAL;
+            gerr[j*num_obs_eval_extern+ipe[i]] =
+              j < num_reg_continuous_extern ? egerr[j][i] : NA_REAL;
       } else {
         const int gradient_stderr_count =
           (kernel_route != NULL) ? num_var : num_reg_continuous_extern;
@@ -20099,10 +20137,14 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
     int_TREE_X = NP_TREE_FALSE;
   }
 
-  if(do_grad)
-    free_mat(eg, num_var);
-  if(do_gerr)
-    free_mat(egerr, num_var);
+  if(eg_hc0_storage != NULL) {
+    free_tmat(eg_hc0_storage);
+  } else {
+    if(do_grad)
+      free_mat(eg, num_var);
+    if(do_gerr)
+      free_mat(egerr, num_var);
+  }
   
   free_mat(matrix_categorical_vals_extern, num_reg_unordered_extern+num_reg_ordered_extern);
 
