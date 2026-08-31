@@ -1250,6 +1250,12 @@ npreghat <-
   )
   myopti <- c(myopti, npContinuousKernelDescriptorOptions(bws))
   myopti <- c(myopti, list(divide.returned.kernel.weights = FALSE))
+  if (identical(bws$ckertype, "beta") && bws$nuno + bws$nord > 0L) {
+    myopti <- c(myopti, list(
+      categorical.compress =
+        npStrictLogicalOption("np.categorical.compress", TRUE)
+    ))
+  }
 
   cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
 

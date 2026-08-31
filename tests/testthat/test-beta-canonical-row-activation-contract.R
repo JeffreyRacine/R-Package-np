@@ -1811,3 +1811,21 @@ test_that("centered moments have one activated fail-closed route boundary", {
   )[[1L]]
   expect_length(occurrences[occurrences > 0L], 2L)
 })
+test_that("beta direct kernel-weight owner transports validated compression state", {
+  owner <- paste(deparse(getFromNamespace(
+    ".np_kernel_weights_direct", "np"
+  )), collapse = "\n")
+  compact <- gsub("[[:space:]]+", " ", owner)
+
+  expect_match(
+    compact,
+    "identical(bws$ckertype, \"beta\") && bws$nuno + bws$nord > 0L",
+    fixed = TRUE
+  )
+  expect_match(
+    compact,
+    "categorical.compress = npStrictLogicalOption(\"np.categorical.compress\", ",
+    fixed = TRUE
+  )
+  expect_false(grepl("tryCatch", owner, fixed = TRUE))
+})
