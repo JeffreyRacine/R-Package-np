@@ -83,21 +83,22 @@ test_that("npindex LP via-npreg evaluators forward heartbeat but not child count
     ),
     {
       runtime$bandwidth_state <- outer.state
-      out <- eval.kleinspady(
-        index = c(0.1, 0.2, 0.3),
-        ydat = c(0, 1, 1),
-        h = 1,
-        bws = list(),
-        spec = list(),
-        invalid.penalty = 77
+      expect_error(
+        eval.kleinspady(
+          index = c(0.1, 0.2, 0.3),
+          ydat = c(0, 1, 1),
+          h = 1,
+          bws = list(),
+          spec = list()
+        ),
+        "inner bandwidth failure",
+        fixed = TRUE
       )
 
       expect_identical(runtime$bandwidth_state$id, "outer-npindex")
       expect_identical(runtime$bandwidth_state$last_done, 2L)
       expect_identical(runtime$bandwidth_state[names(outer.state)], outer.state)
       expect_false(runtime$bandwidth_forward_active)
-      expect_equal(out$objective, 77)
-      expect_equal(out$num.feval.fast, 0)
     }
   )
 })
