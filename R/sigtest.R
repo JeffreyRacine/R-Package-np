@@ -7,7 +7,12 @@ sigtest <- function(In,
                     pivot,
                     joint,
                     boot.type,
-                    boot.num){
+                    boot.num,
+                    pivot.effective = NULL){
+
+  if (is.null(pivot.effective))
+    pivot.effective <- rep.int(isTRUE(pivot), length(ixvar))
+  names(pivot.effective) <- bws$xnames[ixvar]
 
   tsig <- list(In = In,
                In.bootstrap = In.bootstrap,
@@ -22,7 +27,8 @@ sigtest <- function(In,
                pivot = pivot,
                joint = joint,
                ptype = boot.type,
-               boot.num = boot.num)
+               boot.num = boot.num,
+               pivot.effective = pivot.effective)
   
   tsig$reject <- rep('', length(In))
   tsig$rejectNum <- rep(NA, length(In))
@@ -45,14 +51,37 @@ sigtest <- function(In,
 }
 
 print.sigtest <- function(x, ...){
+  pivot.requested <- x[["pivot", exact = TRUE]]
+  pivot.effective <- x[["pivot.effective", exact = TRUE]]
+  has.effective <- is.logical(pivot.effective) && length(pivot.effective) > 0L
+  pivot.label <- if (is.null(pivot.requested) && has.effective) {
+    if (length(unique(pivot.effective)) == 1L) {
+      paste0("automatic -> ", unique(pivot.effective))
+    } else {
+      "automatic by predictor type"
+    }
+  } else if (is.null(pivot.requested)) {
+    "NULL"
+  } else {
+    as.character(pivot.requested)
+  }
+
   cat("\nKernel Regression Significance Test",
       "\nType ", x$ptype,
       " Test with ", x$pmethod,
       " Bootstrap (",x$boot.num," replications,",
-      " Pivot = ", x$pivot,", joint = ",x$joint,")",
+      " Pivot = ", pivot.label,", joint = ",x$joint,")",
       "\nExplanatory variables tested for significance:\n",
       paste(paste(x$bws$xnames[x$ixvar]," (",x$ixvar,")", sep=""), collapse=", "),"\n\n",
       sep="")
+
+  if (is.null(pivot.requested) && has.effective &&
+      length(unique(pivot.effective)) > 1L) {
+    cat("Effective pivoting: ",
+        paste(paste(names(pivot.effective), pivot.effective, sep = "="),
+              collapse = ", "),
+        "\n\n", sep = "")
+  }
       
 
   if (!identical(x$bws,NA))
