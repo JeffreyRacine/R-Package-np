@@ -726,6 +726,40 @@ npindexbw.NULL <-
   as.double(penalty)
 }
 
+.npindexbw_kleinspady_outer_penalty <- function(ydat) {
+  ydat <- as.double(ydat)
+  nobs <- length(ydat)
+  if (nobs <= 1L || anyNA(ydat) || any(!is.finite(ydat)) ||
+      any(ydat != 0 & ydat != 1))
+    return(.Machine$double.xmax)
+
+  ones <- sum(ydat == 1)
+  zeros <- nobs - ones
+  probability.floor <- sqrt(.Machine$double.eps)
+  clip <- function(probability) {
+    min(1 - probability.floor, max(probability.floor, probability))
+  }
+
+  loss.sum <- 0
+  if (zeros > 0) {
+    probability <- clip(ones / (nobs - 1))
+    loss.sum <- zeros * -log1p(-probability)
+  }
+  if (ones > 0) {
+    probability <- clip((ones - 1) / (nobs - 1))
+    loss.sum <- loss.sum + ones * -log(probability)
+  }
+  reference <- loss.sum / nobs
+  if (!is.finite(reference) || reference < 0)
+    return(.Machine$double.xmax)
+
+  penalty <- 10 * reference
+  if (!is.finite(penalty) || penalty <= reference ||
+      identical(penalty, .Machine$double.xmax))
+    return(.Machine$double.xmax)
+  as.double(penalty)
+}
+
 .npindexbw_map_ichimura_outer_result <- function(result, invalid.penalty) {
   if (!is.list(result) || length(result$objective) != 1L)
     stop("internal error: malformed npindex Ichimura objective result", call. = FALSE)
@@ -737,6 +771,21 @@ npindexbw.NULL <-
   if (length(invalid.penalty) != 1L || is.na(invalid.penalty) ||
       !is.finite(invalid.penalty))
     stop("internal error: invalid npindex Ichimura outer guidance", call. = FALSE)
+  result$objective <- as.numeric(invalid.penalty)
+  result
+}
+
+.npindexbw_map_kleinspady_outer_result <- function(result, invalid.penalty) {
+  if (!is.list(result) || length(result$objective) != 1L)
+    stop("internal error: malformed npindex Klein-Spady objective result", call. = FALSE)
+  objective <- as.numeric(result$objective[1L])
+  if (.npindexbw_raw_objective_valid(objective))
+    return(result)
+  if (!identical(objective, .Machine$double.xmax))
+    stop("internal error: npindex Klein-Spady leaf returned a non-terminal invalid objective", call. = FALSE)
+  if (length(invalid.penalty) != 1L || is.na(invalid.penalty) ||
+      !is.finite(invalid.penalty))
+    stop("internal error: invalid npindex Klein-Spady outer guidance", call. = FALSE)
   result$objective <- as.numeric(invalid.penalty)
   result
 }
@@ -794,9 +843,7 @@ npindexbw.NULL <-
                                                      h,
                                                      bws,
                                                      spec,
-                                                     invalid.penalty,
-                                                     leaf.descriptor = NULL,
-                                                     certify = FALSE) {
+                                                     leaf.descriptor = NULL) {
   leaf <- .npindexbw_lp_regression_leaf(
     descriptor = leaf.descriptor,
     index = index,
@@ -806,33 +853,25 @@ npindexbw.NULL <-
     spec = spec
   )
 
-  out <- tryCatch(
-    .np_progress_with_nested_bandwidth_heartbeat(
-      .npregbw_eval_only(
-        xdat = leaf$xdat,
-        ydat = ydat,
-        bws = leaf$bws,
-        invalid.penalty = "dbmax",
-        penalty.multiplier = 10,
-        objective = "ks"
-      )
-    ),
-    error = function(e) NULL
+  out <- .np_progress_with_nested_bandwidth_heartbeat(
+    .npregbw_eval_only(
+      xdat = leaf$xdat,
+      ydat = ydat,
+      bws = leaf$bws,
+      invalid.penalty = "dbmax",
+      penalty.multiplier = 10,
+      objective = "ks"
+    )
   )
 
-  if (is.null(out) || !is.finite(out$objective[1L])) {
-    objective <- if (isTRUE(certify)) {
-      .Machine$double.xmax
-    } else {
-      as.numeric(invalid.penalty)
-    }
-    return(.npindexbw_objective_result(objective, 0L, certify))
-  }
+  if (!is.list(out) || length(out$objective) != 1L ||
+      length(out$num.feval.fast) < 1L || is.na(out$objective[1L]) ||
+      !is.finite(out$objective[1L]))
+    stop("internal error: malformed npreg result in npindex Klein-Spady leaf", call. = FALSE)
 
-  .npindexbw_objective_result(
+  list(
     objective = out$objective[1L],
-    num.feval.fast = out$num.feval.fast[1L],
-    certify = certify
+    num.feval.fast = out$num.feval.fast[1L]
   )
 }
 
@@ -932,7 +971,7 @@ npindexbw.NULL <-
       invalid.penalty <- .npindexbw_ichimura_outer_penalty(ydat)
   } else if (identical(bws$method, "kleinspady")) {
     if (is.null(invalid.penalty))
-      invalid.penalty <- sqrt(.Machine$double.xmax)
+      invalid.penalty <- .npindexbw_kleinspady_outer_penalty(ydat)
   } else {
     stop("unsupported npindex method", call. = FALSE)
   }
@@ -967,16 +1006,19 @@ npindexbw.NULL <-
   }
 
   if (identical(bws$method, "kleinspady")) {
-    return(.npindexbw_eval_kleinspady_lp_via_npreg(
+    result <- .npindexbw_eval_kleinspady_lp_via_npreg(
       index = index,
       ydat = ydat,
       h = h,
       bws = bws,
       spec = spec,
-      invalid.penalty = invalid.penalty,
-      leaf.descriptor = leaf.descriptor,
-      certify = certify
-    ))
+      leaf.descriptor = leaf.descriptor
+    )
+    if (isTRUE(certify))
+      return(.npindexbw_objective_result(
+        result$objective, result$num.feval.fast, TRUE
+      ))
+    return(.npindexbw_map_kleinspady_outer_result(result, invalid.penalty))
   }
 
   stop("unsupported npindex method", call. = FALSE)
@@ -1052,7 +1094,7 @@ npindexbw.NULL <-
   outer.invalid.penalty <- if (identical(baseline.bws$method, "ichimura")) {
     .npindexbw_ichimura_outer_penalty(y.clean)
   } else if (identical(baseline.bws$method, "kleinspady")) {
-    sqrt(.Machine$double.xmax)
+    .npindexbw_kleinspady_outer_penalty(y.clean)
   } else {
     stop("unsupported npindex method", call. = FALSE)
   }
@@ -2091,6 +2133,7 @@ npindexbw.sibandwidth <-
           ##c(1,beta) which can be used in the index.model function above.
 
           ichimuraMaxPenalty <- .npindexbw_ichimura_outer_penalty(ydat)
+          kleinspadyMaxPenalty <- .npindexbw_kleinspady_outer_penalty(ydat)
 
           ichimura <- function(param) {
             bandwidth_progress_step()
@@ -2163,10 +2206,10 @@ npindexbw.sibandwidth <-
             h <- param[p]
             h.candidate <- .npindex_nn_candidate_bandwidth(h = h, bwtype = bws$type, nobs = nobs)
             if (!h.candidate$ok)
-              return(sqrt(.Machine$double.xmax))
+              return(kleinspadyMaxPenalty)
             h <- h.candidate$value
             if (!is.null(fixed.h.lower) && h < fixed.h.lower)
-              return(sqrt(.Machine$double.xmax))
+              return(kleinspadyMaxPenalty)
             cache.hit <- r_nn_cache_lookup(beta, h)
             if (isTRUE(cache.hit$hit)) {
               num.feval.fast.overall <<- num.feval.fast.overall + 1L
@@ -2183,12 +2226,14 @@ npindexbw.sibandwidth <-
                 h = h,
                 bws = bws,
                 spec = objective.spec,
-                invalid.penalty = sqrt(.Machine$double.xmax),
                 leaf.descriptor = leaf.descriptor
               )
               num.feval.fast.overall <<- num.feval.fast.overall +
                 as.numeric(objective$num.feval.fast[1L])
-              as.numeric(objective$objective[1L])
+              as.numeric(.npindexbw_map_kleinspady_outer_result(
+                objective,
+                kleinspadyMaxPenalty
+              )$objective[1L])
             }
 
             ## For the objective function, we require a positive bandwidth, so
@@ -2196,11 +2241,10 @@ npindexbw.sibandwidth <-
 
             if(h > 0) {
               fv <- sum.log.leave.one.out(beta,h)
-              r_nn_cache_store(cache.hit$token, fv, sqrt(.Machine$double.xmax))
+              r_nn_cache_store(cache.hit$token, fv, kleinspadyMaxPenalty)
               return(fv)
             } else {
-              ## No natural counterpart to var of y here, unlike Ichimura above...
-              return(sqrt(.Machine$double.xmax))
+              return(kleinspadyMaxPenalty)
             }
 
           }
