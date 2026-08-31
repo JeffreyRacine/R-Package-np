@@ -548,7 +548,7 @@ test_that("HC0 activation remains private and linear-memory", {
     paste0(
       "ordinary_hc0_active = do_merr &&\n",
       "    (np_lp_engine_extern == NP_LP_ENGINE_SCALAR ||\n",
-      "     (np_lp_engine_extern == NP_LP_ENGINE_GENERAL && kernel_route == NULL));"
+      "     np_lp_engine_extern == NP_LP_ENGINE_GENERAL);"
     ),
     fixed = TRUE
   )

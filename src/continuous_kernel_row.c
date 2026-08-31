@@ -2750,6 +2750,7 @@ np_continuous_kernel_beta_dual_power_rows_validated(
   NPContinuousKernelRowResult *row_result,
   double *weighted_sum,
   double *weighted_sum_power2,
+  const double *power2_observation_scale,
   int retain_common_scale,
   double *scaled_kernel_weights,
   NPContinuousKernelDerivativeDiagnostics *diagnostics,
@@ -2787,7 +2788,8 @@ np_continuous_kernel_beta_dual_power_rows_validated(
      workspace == NULL || row_result == NULL || weighted_sum == NULL ||
      (!compute_power2 &&
       (power2_response != NULL || power2_response_columns != 0 ||
-       power2_case_weights != NULL || power2_weight_columns != 0)) ||
+       power2_case_weights != NULL || power2_weight_columns != 0 ||
+       power2_observation_scale != NULL)) ||
      (retain_common_scale != 0 && retain_common_scale != 1) ||
      (!retain_common_scale && scaled_kernel_weights != NULL) ||
      (retain_common_scale && row_result->row == NULL) ||
@@ -2868,8 +2870,12 @@ np_continuous_kernel_beta_dual_power_rows_validated(
       }
       if(compute_power2 && status == NP_CONTINUOUS_ROW_OK) {
         /* A dual consumer already owns K in representable arithmetic.  Square
-         * it directly instead of paying for a second exp(2 * log(K)). */
-        value_power2 = value * value;
+         * it directly instead of paying for a second exp(2 * log(K)).  A
+         * regression HC0 consumer can add its donor residual square without
+         * perturbing the common scale used by the power-one point moments. */
+        const double observation_scale = power2_observation_scale != NULL ?
+          power2_observation_scale[observation] : 1.0;
+        value_power2 = value * value * observation_scale * observation_scale;
         if(!R_FINITE(value_power2))
           status = NP_CONTINUOUS_ROW_ERR_NUMERIC;
       }

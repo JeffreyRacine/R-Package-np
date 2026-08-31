@@ -697,7 +697,9 @@ test_that("scalar beta regression fits enter the canonical row engine", {
       "                                                   categorical_compress,\n",
       "                                                   NP_REGRESSION_STDERR_LOCAL_RESIDUAL,\n",
       "                                                   NULL,\n",
-      "                                                   &nn_geometry_context);"
+      "                                                   &nn_geometry_context,\n",
+      "                                                   ordinary_hc0_active ?\n",
+      "                                                     &ordinary_hc0_context : NULL);"
     ),
     fixed = TRUE
   )
@@ -1492,7 +1494,11 @@ test_that("every beta side enters the common conditional regression owner", {
   )
   expect_match(
     conditional,
-    "prepared_x_bandwidth_ptr,\n                                                               row_nn_geometry_context_ptr);",
+    paste0(
+      "prepared_x_bandwidth_ptr,\n",
+      "                                                               row_nn_geometry_context_ptr,\n",
+      "                                                               NULL);"
+    ),
     fixed = TRUE
   )
   expect_match(
@@ -1617,7 +1623,12 @@ test_that("canonical beta regression moments preserve the sidecar transcript", {
   expect_match(owner, "squared_weight_sum += weight * weight;", fixed = TRUE)
   expect_match(
     owner,
-    "mean_stderr[evaluation] = sqrt(",
+    "mean_stderr[evaluation] = ordinary_hc0 ?",
+    fixed = TRUE
+  )
+  expect_match(
+    owner,
+    "hc0_residual_scale * sqrt(hc0_moment) / fabs(total_weight) :",
     fixed = TRUE
   )
   expect_match(
