@@ -516,7 +516,7 @@ test_that("scalar HC0 is response-equivariant and constant responses are exact z
   expect_identical(constant$merr, rep(0, nrow(xdat)))
 })
 
-test_that("H2B source keeps HC0 private, linear-memory, and scalar-only", {
+test_that("HC0 activation remains private and linear-memory", {
   source <- paste(
     readLines(test_path("..", "..", "src", "np.c"), warn = FALSE),
     collapse = "\n"
@@ -547,7 +547,8 @@ test_that("H2B source keeps HC0 private, linear-memory, and scalar-only", {
     source,
     paste0(
       "ordinary_hc0_active = do_merr &&\n",
-      "    np_lp_engine_extern == NP_LP_ENGINE_SCALAR;"
+      "    (np_lp_engine_extern == NP_LP_ENGINE_SCALAR ||\n",
+      "     (np_lp_engine_extern == NP_LP_ENGINE_GENERAL && kernel_route == NULL));"
     ),
     fixed = TRUE
   )

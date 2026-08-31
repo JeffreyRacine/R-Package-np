@@ -8861,6 +8861,7 @@ typedef struct {
   NPContinuousKernelProgressFunction progress;
   int retain_common_scale;
   const NPRegressionHC0DerivativeMomentCtx *regression_derivative;
+  const double *observation_scale;
 } NP_DualPowerCtx;
 
 typedef int (*NP_KernelRowTileConsumerFn)(
@@ -10529,6 +10530,70 @@ static int np_beta_absolute_route(const NPBetaAbsoluteRouteCall *call)
     np_beta_absolute_route_execute, &execution,
     np_beta_absolute_route_owner_cleanup, &execution.owner, NULL);
   return execution.status;
+}
+
+/* Regression-only HC0 meat adapter.  It mirrors the incumbent power-two
+ * outer product while multiplying each donor contribution by one bounded
+ * scaled residual square.  The null dual-power path remains in the mature
+ * accumulator, and no residual-weighted basis copy is materialized. */
+static int np_regression_hc0_power2_outer_sum(
+  double * const *matrix_A,
+  const int ncol_A,
+  double * const *matrix_B,
+  const int ncol_B,
+  const double *weights,
+  const int num_weights,
+  const int parallel_sum,
+  const int donor,
+  const double bandwidth_divisor,
+  const double *scaled_residual,
+  double *result,
+  const XL *support)
+{
+  size_t stride;
+  int range_count = support == NULL ? 1 : support->n;
+  int range;
+
+  if(matrix_A == NULL || matrix_B == NULL || weights == NULL ||
+     scaled_residual == NULL || result == NULL || ncol_A <= 0 ||
+     ncol_B <= 0 || num_weights <= 0 ||
+     ncol_A > INT_MAX/ncol_B ||
+     !R_FINITE(bandwidth_divisor) || bandwidth_divisor == 0.0 ||
+     (parallel_sum && donor < 0))
+    return 0;
+  stride = parallel_sum ? (size_t)ncol_A*(size_t)ncol_B : 0;
+  for(range = 0; range < range_count; ++range) {
+    const int start = support == NULL ? 0 : support->istart[range];
+    const int count = support == NULL ? num_weights : support->nlev[range];
+    const int end = start + count;
+    int weight_index;
+
+    if(start < 0 || count < 0 || end < start || end > num_weights)
+      return 0;
+    for(weight_index = start; weight_index < end; ++weight_index) {
+      const int observation = parallel_sum ? donor : weight_index;
+      const double weight = weights[weight_index] / bandwidth_divisor;
+      const double residual = scaled_residual[observation];
+      const double scaled_weight_square =
+        weight * weight * residual * residual;
+      double * const output = result + (size_t)weight_index*stride;
+      int a;
+
+      if(!R_FINITE(scaled_weight_square))
+        return 0;
+      if(scaled_weight_square == 0.0)
+        continue;
+      for(a = 0; a < ncol_A; ++a) {
+        const double za = matrix_A[a][observation];
+        int b;
+
+        for(b = 0; b < ncol_B; ++b)
+          output[a*ncol_B + b] += za * matrix_B[b][observation] *
+            scaled_weight_square;
+      }
+    }
+  }
+  return 1;
 }
 
 /*
@@ -12859,19 +12924,32 @@ NPPermutationWeightOutput * const pkw_output){
       }
 
       if(do_dual_power){
-        np_outer_weighted_sum(dual_matrix_W, sgn, dual_ncol_W,
-                              dual_matrix_Y, dual_ncol_Y,
-                              tprod, num_xt,
-                              leave_or_drop, lod,
-                              dual_power_ctx->kernel_pow,
-                              do_psum, j,
-                              symmetric,
-                              gather_scatter,
-                              1, dband,
-                              ws2, pxl,
-                              outer_pack_ctx != NULL && outer_pack_ctx->tree_outer_blas,
-                              blas_Apack,
-                              &tree_outer_workspace);
+        if(dual_power_ctx->observation_scale != NULL) {
+          if(dual_power_ctx->kernel_pow != 2 || sgn != NULL ||
+             leave_or_drop || symmetric || gather_scatter ||
+             !np_regression_hc0_power2_outer_sum(
+               dual_matrix_W, dual_ncol_W,
+               dual_matrix_Y, dual_ncol_Y,
+               tprod, num_xt, do_psum, j, dband,
+               dual_power_ctx->observation_scale, ws2, pxl)) {
+            status = KWSNP_ERR_BADINVOC;
+            goto cleanup;
+          }
+        } else {
+          np_outer_weighted_sum(dual_matrix_W, sgn, dual_ncol_W,
+                                dual_matrix_Y, dual_ncol_Y,
+                                tprod, num_xt,
+                                leave_or_drop, lod,
+                                dual_power_ctx->kernel_pow,
+                                do_psum, j,
+                                symmetric,
+                                gather_scatter,
+                                1, dband,
+                                ws2, pxl,
+                                outer_pack_ctx != NULL && outer_pack_ctx->tree_outer_blas,
+                                blas_Apack,
+                                &tree_outer_workspace);
+        }
       }
 
 
@@ -13461,7 +13539,7 @@ double * const pkw){
   NPPermutationWeightOutput * const pkw_output =
     pkw == NULL ? NULL : &pkw_storage;
   const NP_DualPowerCtx dual_power_ctx = {
-    weighted_sum_power2, 2, NULL, NULL, 0, 0, NULL, 0, NULL
+    weighted_sum_power2, 2, NULL, NULL, 0, 0, NULL, 0, NULL, NULL
   };
 
   status = kernel_weighted_sum_np_ctx_ex(
@@ -13566,7 +13644,7 @@ NPContinuousKernelDerivativeDiagnostics * const kernel_route_diagnostics,
 NPContinuousKernelProgressFunction progress)
 {
   const NP_DualPowerCtx dual_power_ctx = {
-    weighted_sum_power2, 2, NULL, NULL, 0, 0, progress, 0, NULL
+    weighted_sum_power2, 2, NULL, NULL, 0, 0, progress, 0, NULL, NULL
   };
   const NPContinuousKernelExecutionContext kernel_execution_context = {
     kernel_route, kernel_route_diagnostics, categorical_compress
@@ -23205,15 +23283,22 @@ double *cv){
     vector_scale_factor, num_categories, matrix_categorical_vals, cv);
 }
 
-static void np_lp_power2_moments_from_kernel_row(double **basis,
-                                                  const int nterms,
-                                                  double *kernel_row,
-                                                  const int num_obs_train,
-                                                  const double bandwidth_product,
-                                                  double *moments)
+static int np_lp_power2_moments_from_kernel_row(
+  double **basis,
+  const int nterms,
+  double *kernel_row,
+  const int num_obs_train,
+  const double bandwidth_product,
+  const double *scaled_residual,
+  double *moments)
 {
   memset(moments, 0,
          (size_t)nterms*(size_t)nterms*sizeof(double));
+  if(scaled_residual != NULL)
+    return np_regression_hc0_power2_outer_sum(
+      basis, nterms, basis, nterms,
+      kernel_row, num_obs_train, 0, 0, bandwidth_product,
+      scaled_residual, moments, NULL);
   np_outer_weighted_sum(basis,
                         NULL,
                         nterms,
@@ -23235,6 +23320,7 @@ static void np_lp_power2_moments_from_kernel_row(double **basis,
                         0,
                         NULL,
                         NULL);
+  return 1;
 }
 
 static void np_regression_fit_statistics(
@@ -23660,7 +23746,7 @@ static NP_NOINLINE int np_beta_regression_lp_moment_row_canonical(
   NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics)
 {
   NP_DualPowerCtx dual_power_context = {
-    weighted_sum_power2, 2, basis, basis, nterms, nterms, NULL, 1, NULL
+    weighted_sum_power2, 2, basis, basis, nterms, nterms, NULL, 1, NULL, NULL
   };
   const NPContinuousKernelExecutionContext execution_context = {
     kernel_route, kernel_route_diagnostics, categorical_compress
@@ -25274,7 +25360,8 @@ enum {
   NP_REGRESSION_GENERAL_LP_FIT_ERR_BASIS = -6,
   NP_REGRESSION_GENERAL_LP_FIT_ERR_ROUTE = -7,
   NP_REGRESSION_GENERAL_LP_FIT_ERR_SOLVE = -8,
-  NP_REGRESSION_GENERAL_LP_FIT_ERR_OWNER_SOLVE = -9
+  NP_REGRESSION_GENERAL_LP_FIT_ERR_OWNER_SOLVE = -9,
+  NP_REGRESSION_GENERAL_LP_FIT_ERR_HC0 = -10
 };
 
 static int np_glp_gradient_direction_active(const int coordinate)
@@ -25312,6 +25399,66 @@ static double np_lp_variance_quadratic(
     quadratic += projection[i]*power2_projection[i];
 
   return quadratic;
+}
+
+/* Evaluate the HC0 sandwich quadratic without forming an influence row.  A
+ * long-double reduction supplies a scale-aware cancellation bound; only a
+ * negative value beyond that bound is a construction failure. */
+static int np_regression_hc0_lp_standard_error(
+  const double *projection,
+  const double *power2_moments,
+  const int nterms,
+  const double residual_scale,
+  double *standard_error)
+{
+  long double quadratic = 0.0L;
+  long double absolute_sum = 0.0L;
+  int i;
+
+  if(projection == NULL || power2_moments == NULL || nterms <= 0 ||
+     standard_error == NULL || !R_FINITE(residual_scale) ||
+     residual_scale < 0.0)
+    return 0;
+  for(i = 0; i < nterms; ++i) {
+    long double projected_meat = 0.0L;
+    int ii;
+
+    if(!R_FINITE(projection[i]))
+      return 0;
+    for(ii = 0; ii < nterms; ++ii) {
+      const double meat = power2_moments[i*nterms + ii];
+
+      if(!R_FINITE(meat) || !R_FINITE(projection[ii]))
+        return 0;
+      projected_meat +=
+        (long double)meat * (long double)projection[ii];
+    }
+    {
+      const long double term =
+        (long double)projection[i] * projected_meat;
+
+      quadratic += term;
+      absolute_sum += fabsl(term);
+    }
+  }
+  {
+    const long double error_bound =
+      256.0L * (long double)DBL_EPSILON * absolute_sum;
+    long double value;
+
+    if(!isfinite(quadratic) || !isfinite(absolute_sum) ||
+       quadratic < -error_bound)
+      return 0;
+    if(quadratic <= 0.0L || residual_scale == 0.0) {
+      *standard_error = 0.0;
+      return 1;
+    }
+    value = (long double)residual_scale * sqrtl(quadratic);
+    if(!isfinite(value) || value > (long double)DBL_MAX)
+      return 0;
+    *standard_error = (double)value;
+  }
+  return R_FINITE(*standard_error);
 }
 
 typedef struct {
@@ -25355,6 +25502,7 @@ typedef struct {
   double bandwidth_product;
   const NPContinuousKernelRoute *kernel_route;
   NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics;
+  const NPRegressionHC0Context *hc0_context;
   NPRegressionFitOwner *enclosing_owner;
 } NPRegressionGeneralLPFitCall;
 
@@ -25480,6 +25628,10 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
   const int num_reg_continuous = call->num_reg_continuous;
   const int use_bernstein = (int_glp_bernstein_extern != 0);
   const double epsilon = 1.0/(double)MAX(1, num_obs_train);
+  const int hc0_residual_preparing = call->hc0_context != NULL &&
+    call->hc0_context->status == NP_REGRESSION_HC0_RESIDUAL_PREPARING;
+  const int ordinary_hc0 = call->hc0_context != NULL &&
+    !hc0_residual_preparing;
   const int reuse_fit_kernel_row =
     (BANDWIDTH_reg == BW_FIXED) &&
     (call->tree_enabled != NP_TREE_TRUE) &&
@@ -25497,12 +25649,13 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
    * the fitted mean or gradient.  Peer-kernel routes retain their lean
    * two-column no-error layout.
    */
-  const int include_response_square =
-    call->do_merr || call->kernel_route != NULL;
+  const int include_response_square = !ordinary_hc0 &&
+    (call->do_merr || call->kernel_route != NULL);
   const int reuse_fit_dual_power =
-    call->do_merr && (!reuse_fit_kernel_row) && (!fit_tree_active);
+    call->do_merr && (!reuse_fit_kernel_row) &&
+    (!fit_tree_active || ordinary_hc0);
   NP_DualPowerCtx fit_dual_power_ctx = {
-    NULL, 2, NULL, NULL, 0, 0, NULL, 0, NULL
+    NULL, 2, NULL, NULL, 0, 0, NULL, 0, NULL, NULL
   };
   int variance_nrhs = 1;
   int response_y_offset;
@@ -25529,7 +25682,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
   response_y_offset = include_response_square ? 1 : 0;
   response_basis_offset = include_response_square ? 2 : 1;
   moment_stride = owner->nterms + response_basis_offset;
-  if(call->do_grad && call->do_gerr)
+  if(!ordinary_hc0 && call->do_grad && call->do_gerr)
     for(l = 0; l < num_reg_continuous; ++l)
       if(np_glp_gradient_direction_active(l))
         ++variance_nrhs;
@@ -25613,6 +25766,8 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
     fit_dual_power_ctx.matrix_W = owner->basis;
     fit_dual_power_ctx.ncol_Y = owner->nterms;
     fit_dual_power_ctx.ncol_W = owner->nterms;
+    fit_dual_power_ctx.observation_scale = ordinary_hc0 ?
+      call->hc0_context->scaled_residual : NULL;
   }
 
   if(include_response_square)
@@ -25667,6 +25822,8 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 
   for(j = 0; j < num_obs_eval; ++j) {
     double sk, ey, ey2, sigma2hat;
+    double pristine_anchor = 0.0;
+    NPLPSolvePolicyDiagnostics solve_diagnostics = {0, 0.0};
     int have_vcov = 0;
 
 #ifdef MPI2
@@ -25692,6 +25849,8 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	        local_pos = 0;
 	        for(int jj = chunk_start + my_rank; jj < chunk_end; jj += iNum_Processors){
 	          double sk_owner, ey_owner, ey2_owner, sigma2_owner;
+	          double pristine_anchor_owner = 0.0;
+	          NPLPSolvePolicyDiagnostics solve_diagnostics_owner = {0, 0.0};
 	          int have_vcov_owner = 0;
 	          double * const out_owner = owner->mpi_owner_chunk.sendbuf + (size_t)local_pos*(size_t)owner_row_width_lp;
 
@@ -25821,13 +25980,14 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	              owner->solve_workspace.gram_source[i+l*owner->nterms] =
 	                owner->moments[base + l + response_basis_offset];
 	          }
+	          pristine_anchor_owner = owner->solve_workspace.gram_source[0];
 	          if(np_lp_solve_workspace_solve_response_ranked(
 	               &owner->solve_workspace,
 	               owner->nterms,
 	               1,
 	               epsilon,
 	               NP_LP_RANK_UPPER_BOUND_UNKNOWN,
-	               NULL) != NP_LP_SOLVE_POLICY_OK){
+	               &solve_diagnostics_owner) != NP_LP_SOLVE_POLICY_OK){
 	            owner_solve_failed = 1;
 	            break;
 	          }
@@ -25855,7 +26015,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	            out_owner[0] += owner->eval_basis[i]*owner->coefficient[i];
 
 	          sigma2_owner = 0.0;
-	          if(call->do_merr) {
+	          if(call->do_merr && !ordinary_hc0) {
 	            sk_owner = copysign(DBL_MIN,
 	              owner->moments[response_basis_offset]) +
 	              owner->moments[response_basis_offset];
@@ -25869,21 +26029,38 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	              out_owner[1] = (v_owner <= 0.0) ? 0.0 : sqrt(v_owner);
 	            }
 	            sigma2_owner = (sigma2_owner <= 0.0) ? 0.0 : sigma2_owner;
+	          } else if(call->do_merr) {
+	            out_owner[1] = 0.0;
 	          }
 
 	          if(call->do_merr && call->kernel_route == NULL) {
 	            for(i = 0; i < owner->nterms*owner->nterms; i++)
 	              owner->power2_moments[i] = 0.0;
 
-	            for(i = 0; i < num_obs_train; i++){
-	              const double w = owner->mpi_kernel_row[i];
-	              const double w2 = w*w;
-	              if(w2 == 0.0)
-	                continue;
-	              for(int a = 0; a < owner->nterms; a++){
-	                const double za = owner->basis[a][i];
-	                for(int b = 0; b < owner->nterms; b++)
-	                  owner->power2_moments[a*owner->nterms+b] += za*owner->basis[b][i]*w2;
+	            if(ordinary_hc0) {
+	              /* The fixed MPI owner retains already-normalized weights. */
+	              if(!np_regression_hc0_power2_outer_sum(
+	                   owner->basis, owner->nterms,
+	                   owner->basis, owner->nterms,
+	                   owner->mpi_kernel_row, num_obs_train,
+	                   0, 0, 1.0,
+	                   call->hc0_context->scaled_residual,
+	                   owner->power2_moments, NULL)) {
+	                owner_solve_failed = 1;
+	                break;
+	              }
+	            } else {
+	              for(i = 0; i < num_obs_train; i++){
+	                const double w = owner->mpi_kernel_row[i];
+	                const double w2 = w*w;
+	                if(w2 == 0.0)
+	                  continue;
+	                for(int a = 0; a < owner->nterms; a++){
+	                  const double za = owner->basis[a][i];
+	                  for(int b = 0; b < owner->nterms; b++)
+	                    owner->power2_moments[a*owner->nterms+b] +=
+	                      za*owner->basis[b][i]*w2;
+	                }
 	              }
 	            }
 	          }
@@ -25899,7 +26076,8 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	                  (vector_glp_gradient_order_extern != NULL) ?
 	                  MAX(1, vector_glp_gradient_order_extern[l]) : 1;
 	                const int active = np_glp_gradient_direction_active(l);
-	                double * const direction = (call->do_gerr && active) ?
+	                double * const direction =
+	                  (!ordinary_hc0 && call->do_gerr && active) ?
 	                  owner->solve_workspace.rhs_source +
 	                    (size_t)variance_rhs*(size_t)owner->nterms :
 	                  owner->eval_derivative;
@@ -25931,8 +26109,9 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	                  grad_value += direction[i]*owner->coefficient[i];
 	                out_owner[output_offset] = grad_value;
 	                if(call->do_gerr){
-	                  out_owner[output_offset + 1] = 0.0;
-	                  if(active)
+	                  out_owner[output_offset + 1] =
+	                    ordinary_hc0 ? NA_REAL : 0.0;
+	                  if(!ordinary_hc0 && active)
 	                    variance_rhs++;
 	                }
 	              }
@@ -25943,24 +26122,48 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	                owner_solve_failed = 1;
 	                break;
 	              }
-	              if(np_lp_solve_workspace_solve_factored(
-	                   &owner->solve_workspace,
-	                   owner->nterms,
-	                   variance_rhs))
+	              if(ordinary_hc0) {
+	                if(np_lp_solve_workspace_solve_adjoint_factored(
+	                     &owner->solve_workspace,
+	                     owner->nterms,
+	                     variance_rhs,
+	                     pristine_anchor_owner,
+	                     &solve_diagnostics_owner) != NP_LP_SOLVE_POLICY_OK) {
+	                  owner_solve_failed = 1;
+	                  break;
+	                }
 	                have_vcov_owner = 1;
+	              } else if(np_lp_solve_workspace_solve_factored(
+	                          &owner->solve_workspace,
+	                          owner->nterms,
+	                          variance_rhs)) {
+	                have_vcov_owner = 1;
+	              }
 	            }
 
 	            if(have_vcov_owner){
-	              const double q = np_lp_variance_quadratic(
-	                owner->solve_workspace.rhs_work,
-	                owner->power2_moments,
-	                owner->power2_projection,
-	                owner->nterms);
-	              const double mv = sigma2_owner*q;
-	              if((mv > 0.0) && isfinite(mv))
-	                out_owner[1] = sqrt(mv);
+	              if(ordinary_hc0) {
+	                if(!np_regression_hc0_lp_standard_error(
+	                     owner->solve_workspace.rhs_work,
+	                     owner->power2_moments,
+	                     owner->nterms,
+	                     call->hc0_context->residual_scale,
+	                     &out_owner[1])) {
+	                  owner_solve_failed = 1;
+	                  break;
+	                }
+	              } else {
+	                const double q = np_lp_variance_quadratic(
+	                  owner->solve_workspace.rhs_work,
+	                  owner->power2_moments,
+	                  owner->power2_projection,
+	                  owner->nterms);
+	                const double mv = sigma2_owner*q;
+	                if((mv > 0.0) && isfinite(mv))
+	                  out_owner[1] = sqrt(mv);
+	              }
 
-	              if(call->do_grad && call->do_gerr){
+	              if(!ordinary_hc0 && call->do_grad && call->do_gerr){
 	                int rhs = 1;
 	                for(l = 0; l < num_reg_continuous; l++){
 	                  if(np_glp_gradient_direction_active(l)){
@@ -26105,7 +26308,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
         return R_NilValue;
       }
     } else {
-      kernel_weighted_sum_np_ctx_ex(call->kernel_c,
+      const int moment_status = kernel_weighted_sum_np_ctx_ex(call->kernel_c,
                          call->kernel_u,
                          call->kernel_o,
                          BANDWIDTH_reg,
@@ -26154,6 +26357,10 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
                          0,
 #endif
                          NULL);
+      if(ordinary_hc0 && moment_status != 0) {
+        execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_HC0;
+        return R_NilValue;
+      }
     }
 
     for(i = 0; i < owner->nterms; ++i) {
@@ -26164,6 +26371,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
         owner->solve_workspace.gram_source[i+l*owner->nterms] =
           owner->moments[base + l + response_basis_offset];
     }
+    pristine_anchor = owner->solve_workspace.gram_source[0];
 
     if(np_lp_solve_workspace_solve_response_ranked(
          &owner->solve_workspace,
@@ -26171,7 +26379,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
          1,
          epsilon,
          NP_LP_RANK_UPPER_BOUND_UNKNOWN,
-         NULL) !=
+         &solve_diagnostics) !=
        NP_LP_SOLVE_POLICY_OK) {
       execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_SOLVE;
       return R_NilValue;
@@ -26198,7 +26406,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
     for(i = 0; i < owner->nterms; ++i)
       call->mean[j] += owner->eval_basis[i]*owner->coefficient[i];
     sigma2hat = 0.0;
-    if(call->do_merr) {
+    if(call->do_merr && !ordinary_hc0) {
       sk = copysign(DBL_MIN, owner->moments[response_basis_offset]) +
         owner->moments[response_basis_offset];
       ey = owner->moments[response_y_offset]/sk;
@@ -26208,6 +26416,8 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
         sqrt(sigma2hat*call->kernel_squared_integral/
              (sk*call->bandwidth_product));
       sigma2hat = sigma2hat <= 0.0 ? 0.0 : sigma2hat;
+    } else if(call->do_merr) {
+      call->mean_stderr[j] = 0.0;
     }
 
     for(l = 0; l < owner->nterms; ++l) {
@@ -26216,12 +26426,17 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
     }
 
     if(call->do_merr && reuse_fit_kernel_row) {
-      np_lp_power2_moments_from_kernel_row(owner->basis,
-                                            owner->nterms,
-                                            owner->retained_kernel_row,
-                                            num_obs_train,
-                                            call->bandwidth_product,
-                                            owner->power2_moments);
+      if(!np_lp_power2_moments_from_kernel_row(
+           owner->basis,
+           owner->nterms,
+           owner->retained_kernel_row,
+           num_obs_train,
+           call->bandwidth_product,
+           ordinary_hc0 ? call->hc0_context->scaled_residual : NULL,
+           owner->power2_moments)) {
+        execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_HC0;
+        return R_NilValue;
+      }
     } else if(call->do_merr && !reuse_fit_dual_power) {
       kernel_weighted_sum_np_ctx(call->kernel_c,
                          call->kernel_u,
@@ -26278,7 +26493,8 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
           const int grad_order = vector_glp_gradient_order_extern != NULL ?
             MAX(1, vector_glp_gradient_order_extern[l]) : 1;
           const int active = np_glp_gradient_direction_active(l);
-          double * const direction = (call->do_gerr && active) ?
+          double * const direction =
+            (!ordinary_hc0 && call->do_gerr && active) ?
             owner->solve_workspace.rhs_source +
               (size_t)variance_rhs*(size_t)owner->nterms :
             owner->eval_derivative;
@@ -26306,8 +26522,8 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
           for(i = 0; i < owner->nterms; ++i)
             call->gradient[l][j] += direction[i]*owner->coefficient[i];
           if(call->do_gerr) {
-            call->gradient_stderr[l][j] = 0.0;
-            if(active)
+            call->gradient_stderr[l][j] = ordinary_hc0 ? NA_REAL : 0.0;
+            if(!ordinary_hc0 && active)
               ++variance_rhs;
           }
         }
@@ -26318,23 +26534,48 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
           execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_DIMENSION;
           return R_NilValue;
         }
-        if(np_lp_solve_workspace_solve_factored(&owner->solve_workspace,
-                                                owner->nterms,
-                                                variance_rhs))
+        if(ordinary_hc0) {
+          if(np_lp_solve_workspace_solve_adjoint_factored(
+               &owner->solve_workspace,
+               owner->nterms,
+               variance_rhs,
+               pristine_anchor,
+               &solve_diagnostics) != NP_LP_SOLVE_POLICY_OK) {
+            execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_HC0;
+            return R_NilValue;
+          }
           have_vcov = 1;
+        } else if(np_lp_solve_workspace_solve_factored(
+                    &owner->solve_workspace,
+                    owner->nterms,
+                    variance_rhs)) {
+          have_vcov = 1;
+        }
       }
 
       if(have_vcov) {
-        const double q = np_lp_variance_quadratic(
-          owner->solve_workspace.rhs_work,
-          owner->power2_moments,
-          owner->power2_projection,
-          owner->nterms);
-        const double mv = sigma2hat*q;
-        if(mv > 0.0 && isfinite(mv))
-          call->mean_stderr[j] = sqrt(mv);
+        if(ordinary_hc0) {
+          if(!np_regression_hc0_lp_standard_error(
+               owner->solve_workspace.rhs_work,
+               owner->power2_moments,
+               owner->nterms,
+               call->hc0_context->residual_scale,
+               &call->mean_stderr[j])) {
+            execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_HC0;
+            return R_NilValue;
+          }
+        } else {
+          const double q = np_lp_variance_quadratic(
+            owner->solve_workspace.rhs_work,
+            owner->power2_moments,
+            owner->power2_projection,
+            owner->nterms);
+          const double mv = sigma2hat*q;
+          if(mv > 0.0 && isfinite(mv))
+            call->mean_stderr[j] = sqrt(mv);
+        }
 
-        if(call->do_grad && call->do_gerr) {
+        if(!ordinary_hc0 && call->do_grad && call->do_gerr) {
           int rhs = 1;
           for(l = 0; l < num_reg_continuous; ++l) {
             if(np_glp_gradient_direction_active(l)) {
@@ -26568,7 +26809,8 @@ const NPRegressionHC0Context *hc0_context){
     const int residual_preparing =
       hc0_context->status == NP_REGRESSION_HC0_RESIDUAL_PREPARING;
 
-    if(lp_engine_est != NP_LP_ENGINE_SCALAR ||
+    if((lp_engine_est != NP_LP_ENGINE_SCALAR &&
+        lp_engine_est != NP_LP_ENGINE_GENERAL) ||
        standard_error_mode != NP_REGRESSION_STDERR_LOCAL_RESIDUAL ||
        hc0_context->donor_to_canonical == NULL ||
        hc0_context->num_obs_train != num_obs_train ||
@@ -27580,6 +27822,7 @@ const NPRegressionHC0Context *hc0_context){
       .bandwidth_product = hprod,
       .kernel_route = kernel_route,
       .kernel_route_diagnostics = kernel_route_diagnostics,
+      .hc0_context = hc0_context,
       .enclosing_owner = &fit_owner
     };
 
@@ -27646,6 +27889,8 @@ finish_regression_estimation:
     error("LP solve failed in glp path");
   if(general_lp_fit_status == NP_REGRESSION_GENERAL_LP_FIT_ERR_OWNER_SOLVE)
     error("LP solve failed in MPI owner-row path");
+  if(general_lp_fit_status == NP_REGRESSION_GENERAL_LP_FIT_ERR_HC0)
+    error("ordinary-regression HC0 variance construction failed in glp path");
   if(general_lp_fit_status != NP_REGRESSION_GENERAL_LP_FIT_OK)
     error("invalid internal general LP fit status");
 
