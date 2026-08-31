@@ -49,16 +49,23 @@ test_that("npindex Ichimura covariance scales score columns by observation", {
   index.true <- as.vector(as.matrix(x) %*% beta.true)
   y <- sin(2 * index.true) + 0.5 * index.true + rnorm(n, sd = 0.35)
 
-  fit <- npindex(
-    txdat = x,
-    tydat = y,
+  bw <- npindexbw(
+    xdat = x,
+    ydat = y,
     method = "ichimura",
     regtype = "lc",
     bwtype = "fixed",
     ckertype = "epanechnikov",
-    optim.method = "BFGS",
-    nmulti = 1L,
-    random.seed = 20260626L,
+    bandwidth.compute = FALSE
+  )
+  bw$beta <- beta.true
+  bw$bw <- 0.25
+  bw$bandwidth[[1L]] <- bw$bw
+
+  fit <- npindex(
+    bws = bw,
+    txdat = x,
+    tydat = y,
     gradients = TRUE,
     se = TRUE,
     residuals = TRUE

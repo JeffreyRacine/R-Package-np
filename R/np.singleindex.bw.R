@@ -694,13 +694,32 @@ npindexbw.NULL <-
   )
 }
 
+.npindexbw_raw_objective_valid <- function(value) {
+  value <- as.numeric(value)
+  length(value) == 1L && !is.na(value) && is.finite(value) &&
+    !identical(value, .Machine$double.xmax)
+}
+
+.npindexbw_objective_result <- function(objective,
+                                        num.feval.fast,
+                                        certify = FALSE) {
+  result <- list(
+    objective = as.numeric(objective),
+    num.feval.fast = as.numeric(num.feval.fast)
+  )
+  if (isTRUE(certify))
+    result$raw.valid <- .npindexbw_raw_objective_valid(result$objective)
+  result
+}
+
 .npindexbw_eval_ichimura_lp_via_npreg <- function(index,
                                                   ydat,
                                                   h,
                                                   bws,
                                                   spec,
                                                   invalid.penalty,
-                                                  leaf.descriptor = NULL) {
+                                                  leaf.descriptor = NULL,
+                                                  certify = FALSE) {
   leaf <- .npindexbw_lp_regression_leaf(
     descriptor = leaf.descriptor,
     index = index,
@@ -716,19 +735,26 @@ npindexbw.NULL <-
         xdat = leaf$xdat,
         ydat = ydat,
         bws = leaf$bws,
-        invalid.penalty = "baseline",
+        invalid.penalty = if (isTRUE(certify)) "dbmax" else "baseline",
         penalty.multiplier = 10
       )
     ),
     error = function(e) NULL
   )
 
-  if (is.null(out) || !is.finite(out$objective[1L]))
-    return(list(objective = as.numeric(invalid.penalty), num.feval.fast = 0L))
+  if (is.null(out) || !is.finite(out$objective[1L])) {
+    objective <- if (isTRUE(certify)) {
+      .Machine$double.xmax
+    } else {
+      as.numeric(invalid.penalty)
+    }
+    return(.npindexbw_objective_result(objective, 0L, certify))
+  }
 
-  list(
-    objective = as.numeric(out$objective[1L]),
-    num.feval.fast = as.numeric(out$num.feval.fast[1L])
+  .npindexbw_objective_result(
+    objective = out$objective[1L],
+    num.feval.fast = out$num.feval.fast[1L],
+    certify = certify
   )
 }
 
@@ -738,7 +764,8 @@ npindexbw.NULL <-
                                                      bws,
                                                      spec,
                                                      invalid.penalty,
-                                                     leaf.descriptor = NULL) {
+                                                     leaf.descriptor = NULL,
+                                                     certify = FALSE) {
   leaf <- .npindexbw_lp_regression_leaf(
     descriptor = leaf.descriptor,
     index = index,
@@ -762,12 +789,19 @@ npindexbw.NULL <-
     error = function(e) NULL
   )
 
-  if (is.null(out) || !is.finite(out$objective[1L]))
-    return(list(objective = as.numeric(invalid.penalty), num.feval.fast = 0L))
+  if (is.null(out) || !is.finite(out$objective[1L])) {
+    objective <- if (isTRUE(certify)) {
+      .Machine$double.xmax
+    } else {
+      as.numeric(invalid.penalty)
+    }
+    return(.npindexbw_objective_result(objective, 0L, certify))
+  }
 
-  list(
-    objective = as.numeric(out$objective[1L]),
-    num.feval.fast = as.numeric(out$num.feval.fast[1L])
+  .npindexbw_objective_result(
+    objective = out$objective[1L],
+    num.feval.fast = out$num.feval.fast[1L],
+    certify = certify
   )
 }
 
@@ -809,7 +843,8 @@ npindexbw.NULL <-
   out
 }
 
-.npindexbw_run_fixed_degree <- function(xdat, ydat, bws, template, reg.args, opt.args) {
+.npindexbw_run_fixed_degree <- function(xdat, ydat, bws, template, reg.args,
+                                        opt.args, .certify.selected = TRUE) {
   tbw <- .npindexbw_build_sibandwidth(
     xdat = xdat,
     ydat = ydat,
@@ -819,7 +854,18 @@ npindexbw.NULL <-
     reg.args = reg.args
   )
 
-  do.call(npindexbw.sibandwidth, c(list(xdat = xdat, ydat = ydat, bws = tbw), opt.args))
+  do.call(
+    npindexbw.sibandwidth,
+    c(
+      list(
+        xdat = xdat,
+        ydat = ydat,
+        bws = tbw,
+        .certify.selected = .certify.selected
+      ),
+      opt.args
+    )
+  )
 }
 
 .npindexbw_eval_objective <- function(param,
@@ -827,7 +873,8 @@ npindexbw.NULL <-
                                       ydat,
                                       bws,
                                       spec,
-                                      leaf.descriptor = NULL) {
+                                      leaf.descriptor = NULL,
+                                      certify = FALSE) {
   p <- ncol(xmat)
   beta.idx <- if (p > 1L) seq_len(p - 1L) else integer(0)
   beta <- if (length(beta.idx)) as.double(param[beta.idx]) else numeric(0)
@@ -853,8 +900,14 @@ npindexbw.NULL <-
   }
 
   h.candidate <- .npindex_nn_candidate_bandwidth(h = h, bwtype = bws$type, nobs = nobs)
-  if (!h.candidate$ok)
-    return(list(objective = invalid.penalty, num.feval.fast = 0L))
+  if (!h.candidate$ok) {
+    objective <- if (isTRUE(certify)) {
+      .Machine$double.xmax
+    } else {
+      invalid.penalty
+    }
+    return(.npindexbw_objective_result(objective, 0L, certify))
+  }
   h <- h.candidate$value
 
   index <- xmat %*% c(1, beta)
@@ -867,7 +920,8 @@ npindexbw.NULL <-
       bws = bws,
       spec = spec,
       invalid.penalty = invalid.penalty,
-      leaf.descriptor = leaf.descriptor
+      leaf.descriptor = leaf.descriptor,
+      certify = certify
     ))
   }
 
@@ -879,11 +933,36 @@ npindexbw.NULL <-
       bws = bws,
       spec = spec,
       invalid.penalty = invalid.penalty,
-      leaf.descriptor = leaf.descriptor
+      leaf.descriptor = leaf.descriptor,
+      certify = certify
     ))
   }
 
   stop("unsupported npindex method", call. = FALSE)
+}
+
+.npindexbw_certify_selected_candidate <- function(param,
+                                                   xmat,
+                                                   ydat,
+                                                   bws,
+                                                   spec,
+                                                   leaf.descriptor = NULL) {
+  result <- .npindexbw_eval_objective(
+    param = param,
+    xmat = xmat,
+    ydat = ydat,
+    bws = bws,
+    spec = spec,
+    leaf.descriptor = leaf.descriptor,
+    certify = TRUE
+  )
+  if (!isTRUE(result$raw.valid)) {
+    stop(
+      "npindexbw search did not return a raw-valid selected candidate",
+      call. = FALSE
+    )
+  }
+  result
 }
 
 .npindexbw_nomad_search <- function(xdat,
@@ -1185,7 +1264,8 @@ npindexbw.NULL <-
           bws = bw.vec,
           template = template,
           reg.args = hot.reg.args,
-          opt.args = hot.opt.args
+          opt.args = hot.opt.args,
+          .certify.selected = FALSE
         )
       )
       powell.elapsed <- proc.time()[3L] - powell.start
@@ -1198,11 +1278,39 @@ npindexbw.NULL <-
       hot.objective <- as.numeric(hot.payload$fval[1L])
       if (is.finite(hot.objective) &&
           .np_degree_better(hot.objective, direct.objective, direction = "min")) {
-        return(list(payload = hot.payload, objective = hot.objective, powell.time = powell.elapsed))
+        selected.payload <- hot.payload
+      } else {
+        selected.payload <- direct.payload
       }
+    } else {
+      selected.payload <- direct.payload
     }
 
-    list(payload = direct.payload, objective = direct.objective, powell.time = powell.elapsed)
+    certificate.spec <- reg.args
+    certificate.spec$regtype.engine <- "lp"
+    certificate.spec$degree.engine <- degree
+    certificate.spec$bernstein.basis.engine <- degree.search$bernstein.basis
+    certificate.spec$basis.engine <- reg.args$basis.engine
+    certificate <- .npindexbw_certify_selected_candidate(
+      param = c(as.double(selected.payload$beta[-1L]),
+                as.double(selected.payload$bw[1L])),
+      xmat = x.clean,
+      ydat = y.clean,
+      bws = baseline.bws,
+      spec = certificate.spec,
+      leaf.descriptor = leaf.descriptor
+    )
+    selected.payload$fval <- as.numeric(certificate$objective[1L])
+    selected.payload$num.feval <- as.numeric(selected.payload$num.feval[1L]) + 1
+    selected.payload$num.feval.fast <-
+      as.numeric(selected.payload$num.feval.fast[1L]) +
+      as.numeric(certificate$num.feval.fast[1L])
+
+    list(
+      payload = selected.payload,
+      objective = as.numeric(certificate$objective[1L]),
+      powell.time = powell.elapsed
+    )
   }
 
   search.result <- .np_nomad_search(
@@ -1778,6 +1886,7 @@ npindexbw.sibandwidth <-
            ydat = stop("training data ydat missing"),
            bws,
            bandwidth.compute = TRUE,
+           .certify.selected = TRUE,
            nmulti,
            only.optimize.beta = FALSE,
            optim.abstol = .Machine$double.eps,
@@ -1807,6 +1916,10 @@ npindexbw.sibandwidth <-
       nmulti <- npDefaultNmulti(ncol(xdat))
     }
     bandwidth.compute <- npValidateScalarLogical(bandwidth.compute, "bandwidth.compute")
+    .certify.selected <- npValidateScalarLogical(
+      .certify.selected,
+      ".certify.selected"
+    )
     only.optimize.beta <- npValidateScalarLogical(only.optimize.beta, "only.optimize.beta")
     nmulti <- npValidateNmulti(nmulti)
     .np_progress_bandwidth_set_total(nmulti)
@@ -2188,7 +2301,7 @@ npindexbw.sibandwidth <-
               stop(paste("optim failed to converge after optim.maxattempts = ", optim.maxattempts, " iterations."))
 
             fval.value[i] <- optim.return$value
-            if(optim.return$value < fval.min) {
+            if(i == 1L || optim.return$value < fval.min) {
               param <- if(only.optimize.beta) {
                 c(beta.coord$to_public(optim.return$par), h)
               } else {
@@ -2204,6 +2317,21 @@ npindexbw.sibandwidth <-
 
             .np_progress_bandwidth_multistart_step(done = i, total = nmulti)
 
+          }
+
+          if (isTRUE(.certify.selected)) {
+            bandwidth_progress_step()
+            certificate <- .npindexbw_certify_selected_candidate(
+              param = param,
+              xmat = xmat,
+              ydat = ydat,
+              bws = bws,
+              spec = objective.spec,
+              leaf.descriptor = leaf.descriptor
+            )
+            fval.min <- as.numeric(certificate$objective[1L])
+            num.feval.fast.overall <- num.feval.fast.overall +
+              as.numeric(certificate$num.feval.fast[1L])
           }
 
           bws$beta <- c(1.0, param[beta.idx])
