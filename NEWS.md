@@ -1,5 +1,10 @@
 # np 0.70-6
 
+* Copula density helpers now translate the public normalized ordered
+  Li--Racine kernel name to the private `kbandwidth`/`npksum` spelling. This
+  restores ordered and mixed copula density semantics without changing public
+  kernel names or defaults.
+
 * Wide fixed-bandwidth local-polynomial `npreghat(..., output = "apply")`
   calls now use the training-coordinate block shortcut only when evaluation
   coordinates actually equal the training coordinates. Equal row counts no

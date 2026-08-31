@@ -32,6 +32,49 @@
   joint / nzd(denom)
 }
 
+test_that("copula density adapter preserves normalized ordered Li-Racine semantics", {
+  d <- data.frame(
+    x = seq(-1, 1, length.out = 48L),
+    z = ordered(rep(c("low", "mid", "high"), each = 16L))
+  )
+  eval <- d[c(3L, 11L, 19L, 27L, 35L, 43L), , drop = FALSE]
+  dbw <- npudensbw(
+    dat = d,
+    bws = c(0.35, 0.15),
+    bandwidth.compute = FALSE,
+    bwscaling = FALSE,
+    okertype = "liracine"
+  )
+  adapter <- getFromNamespace(".np_make_kbandwidth_unconditional", "np")
+  exact <- getFromNamespace(".np_ksum_unconditional_eval_exact", "np")
+  kb <- adapter(dbw, d)
+
+  expect_identical(dbw$okertype, "liracine")
+  expect_identical(kb$okertype, "nliracine")
+  expect_identical(
+    exact(d, eval, kb, operator = "normal"),
+    as.numeric(fitted(npudens(bws = dbw, tdat = d, edat = eval)))
+  )
+
+  cdf.bw <- npudistbw(
+    dat = d,
+    bws = c(0.35, 0.15),
+    bandwidth.compute = FALSE,
+    bwscaling = FALSE,
+    okertype = "liracine"
+  )
+  u <- data.frame(
+    u1 = seq(0.1, 0.9, length.out = 5L),
+    u2 = seq(0.1, 0.9, length.out = 5L)
+  )
+  fit <- npcopula(bws = cdf.bw, data = d, u = u, n.quasi.inv = 40L)
+  payload <- plot(fit, view = "all", output = "data")
+  expect_equal(nrow(payload$copula), 25L)
+  expect_equal(nrow(payload$empirical), nrow(d))
+  expect_equal(nrow(payload$density), 25L)
+  expect_true(all(is.finite(payload$density$copula)))
+})
+
 test_that("npcopula print and summary forward explicit formatting arguments", {
   obj <- structure(
     list(
