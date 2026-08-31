@@ -745,6 +745,24 @@ npindexbw.NULL <-
   )
 }
 
+.npindexbw_raw_objective_valid <- function(value) {
+  value <- as.numeric(value)
+  length(value) == 1L && !is.na(value) && is.finite(value) &&
+    !identical(value, .Machine$double.xmax)
+}
+
+.npindexbw_objective_result <- function(objective,
+                                        num.feval.fast,
+                                        certify = FALSE) {
+  result <- list(
+    objective = as.numeric(objective),
+    num.feval.fast = as.numeric(num.feval.fast)
+  )
+  if (isTRUE(certify))
+    result$raw.valid <- .npindexbw_raw_objective_valid(result$objective)
+  result
+}
+
 .npindexbw_eval_ichimura_lp_via_npreg <- function(index,
                                                   ydat,
                                                   h,
@@ -823,6 +841,46 @@ npindexbw.NULL <-
   list(
     objective = as.numeric(out$objective[1L]),
     num.feval.fast = as.numeric(out$num.feval.fast[1L])
+  )
+}
+
+.npindexbw_eval_raw_via_npreg <- function(index,
+                                          ydat,
+                                          h,
+                                          bws,
+                                          spec,
+                                          localize = TRUE,
+                                          leaf.descriptor = NULL,
+                                          objective = NULL) {
+  leaf <- .npindexbw_lp_regression_leaf(
+    descriptor = leaf.descriptor,
+    index = index,
+    ydat = ydat,
+    h = h,
+    bws = bws,
+    spec = spec
+  )
+  eval.args <- list(
+    xdat = leaf$xdat,
+    ydat = ydat,
+    bws = leaf$bws,
+    invalid.penalty = "dbmax",
+    penalty.multiplier = 10,
+    localize = localize
+  )
+  if (!is.null(objective)) eval.args$objective <- objective
+  out <- tryCatch(
+    .np_progress_with_nested_bandwidth_heartbeat(
+      do.call(.npregbw_eval_only, eval.args)
+    ),
+    error = function(e) NULL
+  )
+  if (is.null(out) || !is.finite(out$objective[1L]))
+    return(.npindexbw_objective_result(.Machine$double.xmax, 0L, TRUE))
+  .npindexbw_objective_result(
+    objective = out$objective[1L],
+    num.feval.fast = out$num.feval.fast[1L],
+    certify = TRUE
   )
 }
 
@@ -979,6 +1037,78 @@ npindexbw.NULL <-
   out
 }
 
+.npindexbw_eval_objective_raw_service_traced <- function(param,
+                                                         xmat,
+                                                         ydat,
+                                                         bws,
+                                                         spec,
+                                                         ctx,
+                                                         eval_id = NA_integer_) {
+  assignments <- .splitIndices(nrow(xmat), ctx$size)
+  local.idx <- if (length(assignments) >= (ctx$rank + 1L)) {
+    assignments[[ctx$rank + 1L]]
+  } else {
+    integer(0L)
+  }
+  started <- proc.time()[3L]
+  .npRmpi_transport_trace(
+    role = "npindex.npreg_loo.service",
+    event = "eval.enter",
+    fields = list(
+      service_id = ctx$service_id,
+      executor = if (is.null(ctx$executor)) "npreg_loo" else ctx$executor,
+      eval_id = eval_id,
+      rank = ctx$rank,
+      size = ctx$size,
+      nominal_partition_rows = length(local.idx),
+      objective_rows = nrow(xmat),
+      localize = FALSE,
+      certify = TRUE,
+      n = nrow(xmat)
+    )
+  )
+  out <- tryCatch(
+    .npindexbw_eval_objective_raw(
+      param = param,
+      xmat = xmat,
+      ydat = ydat,
+      bws = bws,
+      spec = spec,
+      leaf.descriptor = ctx$leaf.descriptor,
+      localize = FALSE
+    ),
+    error = function(e) {
+      list(
+        objective = NA_real_,
+        num.feval.fast = 0L,
+        error = conditionMessage(e)
+      )
+    }
+  )
+  .npRmpi_transport_trace(
+    role = "npindex.npreg_loo.service",
+    event = "eval.exit",
+    fields = list(
+      service_id = ctx$service_id,
+      executor = if (is.null(ctx$executor)) "npreg_loo" else ctx$executor,
+      eval_id = eval_id,
+      rank = ctx$rank,
+      size = ctx$size,
+      nominal_partition_rows = length(local.idx),
+      objective_rows = nrow(xmat),
+      localize = FALSE,
+      certify = TRUE,
+      elapsed = proc.time()[3L] - started,
+      objective = if (is.null(out$objective)) NA_real_ else as.numeric(out$objective[1L]),
+      ok = is.null(out$error),
+      error = if (is.null(out$error)) "" else out$error
+    )
+  )
+  if (!is.null(out$error))
+    stop(out$error, call. = FALSE)
+  out
+}
+
 .npindexbw_ichimura_lp_service_task_error <- function(message,
                                                       task,
                                                       ctx) {
@@ -1050,6 +1180,33 @@ npindexbw.NULL <-
       next
     }
 
+    if (identical(task$kind, "certify")) {
+      param <- if (is.null(task$param)) numeric(0L) else as.numeric(task$param)
+      invalid.eval <- .npindexbw_service_eval_preflight(
+        ok = .npindexbw_service_param_ok(param, ncol(xmat)),
+        comm = task.ctx$comm
+      )
+      if (isTRUE(invalid.eval)) {
+        .npindexbw_ichimura_lp_service_task_error(
+          "malformed npindex Ichimura LP certify task",
+          task = task,
+          ctx = task.ctx
+        )
+        next
+      }
+      task.spec <- if (is.null(task$spec)) spec else task$spec
+      .npindexbw_eval_objective_raw_service_traced(
+        param = param,
+        xmat = xmat,
+        ydat = ydat,
+        bws = bws,
+        spec = task.spec,
+        ctx = task.ctx,
+        eval_id = if (is.null(task$eval_id)) NA_integer_ else as.integer(task$eval_id[1L])
+      )
+      next
+    }
+
     if (identical(task$kind, "result")) {
       if (isTRUE(child.service))
         next
@@ -1104,6 +1261,41 @@ npindexbw.NULL <-
     ))
 
   .npindexbw_eval_objective_service_traced(
+    param = as.numeric(param),
+    xmat = xmat,
+    ydat = ydat,
+    bws = bws,
+    spec = spec,
+    ctx = ctx,
+    eval_id = eval_id
+  )
+}
+
+.npindexbw_ichimura_lp_service_certify <- function(param,
+                                                   xmat,
+                                                   ydat,
+                                                   bws,
+                                                   spec,
+                                                   ctx,
+                                                   eval_id = NA_integer_) {
+  mpi.bcast.Robj(
+    list(
+      kind = "certify",
+      service_id = ctx$service_id,
+      eval_id = eval_id,
+      param = as.numeric(param),
+      spec = spec
+    ),
+    rank = 0L,
+    comm = ctx$comm
+  )
+  invalid.eval <- .npindexbw_service_eval_preflight(
+    ok = .npindexbw_service_param_ok(param, ncol(xmat)),
+    comm = ctx$comm
+  )
+  if (isTRUE(invalid.eval))
+    return(.npindexbw_objective_result(.Machine$double.xmax, 0L, TRUE))
+  .npindexbw_eval_objective_raw_service_traced(
     param = as.numeric(param),
     xmat = xmat,
     ydat = ydat,
@@ -1240,6 +1432,34 @@ npindexbw.NULL <-
       next
     }
 
+    if (identical(task$kind, "certify")) {
+      beta <- if (is.null(task$beta)) numeric(0L) else as.double(task$beta)
+      h <- if (is.null(task$h)) NA_real_ else as.double(task$h[1L])
+      invalid.eval <- .npindexbw_service_eval_preflight(
+        ok = .npindexbw_service_param_ok(c(beta, h), ncol(xmat)),
+        comm = ctx$comm
+      )
+      if (isTRUE(invalid.eval)) {
+        .npindexbw_kleinspady_lp_service_task_error(
+          "malformed npindex Klein-Spady LP certify task",
+          task = task,
+          ctx = ctx
+        )
+        next
+      }
+      task.spec <- if (is.null(task$spec)) spec else task$spec
+      .npindexbw_eval_objective_raw_service_traced(
+        param = c(beta, h),
+        xmat = xmat,
+        ydat = ydat,
+        bws = bws,
+        spec = task.spec,
+        ctx = ctx,
+        eval_id = if (is.null(task$eval_id)) NA_integer_ else as.integer(task$eval_id[1L])
+      )
+      next
+    }
+
     if (identical(task$kind, "result"))
       return(task$value)
     if (identical(task$kind, "error"))
@@ -1298,6 +1518,43 @@ npindexbw.NULL <-
   list(
     objective = as.numeric(objective$objective[1L]),
     invalid = !is.finite(as.numeric(objective$objective[1L]))
+  )
+}
+
+.npindexbw_kleinspady_lp_service_certify <- function(beta,
+                                                     h,
+                                                     xmat,
+                                                     ydat,
+                                                     bws,
+                                                     spec,
+                                                     ctx,
+                                                     eval_id = NA_integer_) {
+  mpi.bcast.Robj(
+    list(
+      kind = "certify",
+      service_id = ctx$service_id,
+      eval_id = eval_id,
+      beta = as.numeric(beta),
+      h = as.numeric(h)[1L],
+      spec = spec
+    ),
+    rank = 0L,
+    comm = ctx$comm
+  )
+  invalid.eval <- .npindexbw_service_eval_preflight(
+    ok = .npindexbw_service_param_ok(c(beta, h), ncol(xmat)),
+    comm = ctx$comm
+  )
+  if (isTRUE(invalid.eval))
+    return(.npindexbw_objective_result(.Machine$double.xmax, 0L, TRUE))
+  .npindexbw_eval_objective_raw_service_traced(
+    param = c(as.numeric(beta), as.numeric(h)[1L]),
+    xmat = xmat,
+    ydat = ydat,
+    bws = bws,
+    spec = spec,
+    ctx = ctx,
+    eval_id = eval_id
   )
 }
 
@@ -1360,7 +1617,8 @@ npindexbw.NULL <-
   out
 }
 
-.npindexbw_run_fixed_degree <- function(xdat, ydat, bws, template, reg.args, opt.args) {
+.npindexbw_run_fixed_degree <- function(xdat, ydat, bws, template, reg.args,
+                                        opt.args, .certify.selected = TRUE) {
   tbw <- .npindexbw_build_sibandwidth(
     xdat = xdat,
     ydat = ydat,
@@ -1370,7 +1628,18 @@ npindexbw.NULL <-
     reg.args = reg.args
   )
 
-  do.call(npindexbw.sibandwidth, c(list(xdat = xdat, ydat = ydat, bws = tbw), opt.args))
+  do.call(
+    npindexbw.sibandwidth,
+    c(
+      list(
+        xdat = xdat,
+        ydat = ydat,
+        bws = tbw,
+        .certify.selected = .certify.selected
+      ),
+      opt.args
+    )
+  )
 }
 
 .npindexbw_eval_objective <- function(param,
@@ -1438,6 +1707,106 @@ npindexbw.NULL <-
   }
 
   stop("unsupported npindex method", call. = FALSE)
+}
+
+.npindexbw_eval_objective_raw <- function(param,
+                                          xmat,
+                                          ydat,
+                                          bws,
+                                          spec,
+                                          leaf.descriptor = NULL,
+                                          localize = TRUE) {
+  p <- ncol(xmat)
+  beta.idx <- if (p > 1L) seq_len(p - 1L) else integer(0)
+  beta <- if (length(beta.idx)) as.double(param[beta.idx]) else numeric(0)
+  h <- as.double(param[p])
+  policy <- .npindex_objective_policy(
+    bws = bws,
+    spec = spec,
+    bandwidth.compute = TRUE,
+    where = "npindexbw objective"
+  )
+  .npindexbw_check_index_bound_contract(
+    bws = bws,
+    policy = policy,
+    where = "npindexbw objective"
+  )
+  spec <- policy$objective.spec
+  h.candidate <- .npindex_nn_candidate_bandwidth(
+    h = h,
+    bwtype = bws$type,
+    nobs = nrow(xmat)
+  )
+  if (!h.candidate$ok)
+    return(.npindexbw_objective_result(.Machine$double.xmax, 0L, TRUE))
+  index <- xmat %*% c(1, beta)
+  if (identical(bws$method, "ichimura")) {
+    return(.npindexbw_eval_raw_via_npreg(
+      index = index, ydat = ydat, h = h.candidate$value, bws = bws,
+      spec = spec, localize = localize, leaf.descriptor = leaf.descriptor
+    ))
+  }
+  if (identical(bws$method, "kleinspady")) {
+    return(.npindexbw_eval_raw_via_npreg(
+      index = index, ydat = ydat, h = h.candidate$value, bws = bws,
+      spec = spec, localize = localize, leaf.descriptor = leaf.descriptor,
+      objective = "ks"
+    ))
+  }
+  stop("unsupported npindex method", call. = FALSE)
+}
+
+.npindexbw_certify_selected_candidate <- function(param,
+                                                   xmat,
+                                                   ydat,
+                                                   bws,
+                                                   spec,
+                                                   leaf.descriptor = NULL,
+                                                   service.ctx = NULL,
+                                                   ks.service.ctx = NULL,
+                                                   eval_id = NA_integer_) {
+  result <- if (identical(bws$method, "ichimura") &&
+                is.list(service.ctx) && isTRUE(service.ctx$active) &&
+                isTRUE(service.ctx$root)) {
+    .npindexbw_ichimura_lp_service_certify(
+      param = param,
+      xmat = xmat,
+      ydat = ydat,
+      bws = bws,
+      spec = spec,
+      ctx = service.ctx,
+      eval_id = eval_id
+    )
+  } else if (identical(bws$method, "kleinspady") &&
+             is.list(ks.service.ctx) && isTRUE(ks.service.ctx$active) &&
+             isTRUE(ks.service.ctx$root)) {
+    .npindexbw_kleinspady_lp_service_certify(
+      beta = as.double(param[-length(param)]),
+      h = as.double(param[length(param)]),
+      xmat = xmat,
+      ydat = ydat,
+      bws = bws,
+      spec = spec,
+      ctx = ks.service.ctx,
+      eval_id = eval_id
+    )
+  } else {
+    .npindexbw_eval_objective_raw(
+      param = param,
+      xmat = xmat,
+      ydat = ydat,
+      bws = bws,
+      spec = spec,
+      leaf.descriptor = leaf.descriptor
+    )
+  }
+  if (!isTRUE(result$raw.valid)) {
+    stop(
+      "npindexbw search did not return a raw-valid selected candidate",
+      call. = FALSE
+    )
+  }
+  result
 }
 
 .npindexbw_nomad_search <- function(xdat,
@@ -1783,7 +2152,8 @@ npindexbw.NULL <-
           bws = bw.vec,
           template = template,
           reg.args = hot.reg.args,
-          opt.args = hot.opt.args
+          opt.args = hot.opt.args,
+          .certify.selected = FALSE
         )
       )
       powell.elapsed <- proc.time()[3L] - powell.start
@@ -1796,11 +2166,42 @@ npindexbw.NULL <-
       hot.objective <- as.numeric(hot.payload$fval[1L])
       if (is.finite(hot.objective) &&
           .np_degree_better(hot.objective, direct.objective, direction = "min")) {
-        return(list(payload = hot.payload, objective = hot.objective, powell.time = powell.elapsed))
+        selected.payload <- hot.payload
+      } else {
+        selected.payload <- direct.payload
       }
+    } else {
+      selected.payload <- direct.payload
     }
 
-    list(payload = direct.payload, objective = direct.objective, powell.time = powell.elapsed)
+    certificate.spec <- reg.args
+    certificate.spec$regtype.engine <- "lp"
+    certificate.spec$degree.engine <- degree
+    certificate.spec$bernstein.basis.engine <- degree.search$bernstein.basis
+    certificate.spec$basis.engine <- reg.args$basis.engine
+    service.eval.counter <<- service.eval.counter + 1L
+    certificate <- .npindexbw_certify_selected_candidate(
+      param = c(as.double(selected.payload$beta[-1L]),
+                as.double(selected.payload$bw[1L])),
+      xmat = x.clean,
+      ydat = y.clean,
+      bws = baseline.bws,
+      spec = certificate.spec,
+      leaf.descriptor = leaf.descriptor,
+      service.ctx = service.ctx,
+      eval_id = service.eval.counter
+    )
+    selected.payload$fval <- as.numeric(certificate$objective[1L])
+    selected.payload$num.feval <- as.numeric(selected.payload$num.feval[1L]) + 1
+    selected.payload$num.feval.fast <-
+      as.numeric(selected.payload$num.feval.fast[1L]) +
+      as.numeric(certificate$num.feval.fast[1L])
+
+    list(
+      payload = selected.payload,
+      objective = as.numeric(certificate$objective[1L]),
+      powell.time = powell.elapsed
+    )
   }
 
   search.result <- .np_nomad_search(
@@ -2424,6 +2825,7 @@ npindexbw.sibandwidth <-
            ydat = stop("training data ydat missing"),
            bws,
            bandwidth.compute = TRUE,
+           .certify.selected = TRUE,
            nmulti,
            only.optimize.beta = FALSE,
            optim.abstol = .Machine$double.eps,
@@ -2453,6 +2855,10 @@ npindexbw.sibandwidth <-
       nmulti <- npDefaultNmulti(ncol(xdat))
     }
     bandwidth.compute <- npValidateScalarLogical(bandwidth.compute, "bandwidth.compute")
+    .certify.selected <- npValidateScalarLogical(
+      .certify.selected,
+      ".certify.selected"
+    )
     only.optimize.beta <- npValidateScalarLogical(only.optimize.beta, "only.optimize.beta")
     nmulti <- npValidateNmulti(nmulti)
     .np_progress_bandwidth_set_total(nmulti)
@@ -2923,7 +3329,7 @@ npindexbw.sibandwidth <-
               stop(paste("optim failed to converge after optim.maxattempts = ", optim.maxattempts, " iterations."))
 
             fval.value[i] <- optim.return$value
-            if(optim.return$value < fval.min) {
+            if(i == 1L || optim.return$value < fval.min) {
               param <- if(only.optimize.beta) {
                 c(beta.coord$to_public(optim.return$par), h)
               } else {
@@ -2939,6 +3345,25 @@ npindexbw.sibandwidth <-
 
             .np_progress_bandwidth_multistart_step(done = i, total = nmulti)
 
+          }
+
+          if (isTRUE(.certify.selected)) {
+            bandwidth_progress_step()
+            service.eval.counter <- service.eval.counter + 1L
+            certificate <- .npindexbw_certify_selected_candidate(
+              param = param,
+              xmat = xmat,
+              ydat = ydat,
+              bws = bws,
+              spec = objective.spec,
+              leaf.descriptor = leaf.descriptor,
+              service.ctx = service.ctx,
+              ks.service.ctx = ks.service.ctx,
+              eval_id = service.eval.counter
+            )
+            fval.min <- as.numeric(certificate$objective[1L])
+            num.feval.fast.overall <- num.feval.fast.overall +
+              as.numeric(certificate$num.feval.fast[1L])
           }
 
           bws$beta <- c(1.0, param[beta.idx])

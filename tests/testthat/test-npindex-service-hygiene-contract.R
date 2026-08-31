@@ -17,6 +17,42 @@ test_that("npindex service trace fields describe full-objective evaluation", {
   expect_true(grepl("nominal_partition_rows", body_text, fixed = TRUE))
   expect_true(grepl("objective_rows", body_text, fixed = TRUE))
   expect_true(grepl("localize = FALSE", body_text, fixed = TRUE))
+  expect_false(grepl(".npindexbw_eval_objective_raw", body_text, fixed = TRUE))
+  expect_false(grepl("certify", body_text, fixed = TRUE))
+})
+
+test_that("npindex service transports raw-certificate mode rank symmetrically", {
+  ich.worker <- getFromNamespace(
+    ".npindexbw_ichimura_lp_service_worker_loop",
+    "npRmpi"
+  )
+  ich.master <- getFromNamespace(
+    ".npindexbw_ichimura_lp_service_certify",
+    "npRmpi"
+  )
+  ks.worker <- getFromNamespace(
+    ".npindexbw_kleinspady_lp_service_worker_loop",
+    "npRmpi"
+  )
+  ks.master <- getFromNamespace(
+    ".npindexbw_kleinspady_lp_service_certify",
+    "npRmpi"
+  )
+
+  for (fn in list(ich.worker, ks.worker)) {
+    body_text <- paste(deparse(body(fn)), collapse = "\n")
+    expect_true(grepl("identical(task$kind, \"certify\")", body_text,
+                      fixed = TRUE))
+    expect_true(grepl(".npindexbw_eval_objective_raw_service_traced", body_text,
+                      fixed = TRUE))
+  }
+  for (fn in list(ich.master, ks.master)) {
+    body_text <- paste(deparse(body(fn)), collapse = "\n")
+    expect_true(grepl("kind = \"certify\"", body_text,
+                      fixed = TRUE))
+    expect_true(grepl(".npindexbw_eval_objective_raw_service_traced", body_text,
+                      fixed = TRUE))
+  }
 })
 
 test_that("npindex Ichimura service malformed tasks resync via task errors", {

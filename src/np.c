@@ -2048,6 +2048,55 @@ cleanup:
   return ok;
 }
 
+static int np_cvks_null_reference(const double * const response,
+                                  const int n,
+                                  double * const reference)
+{
+  int i;
+  int ones = 0;
+  int zeros;
+  const double floor = sqrt(DBL_EPSILON);
+  double loss_sum = 0.0;
+
+  if (reference == NULL)
+    return 0;
+  *reference = DBL_MAX;
+  if (response == NULL || n <= 1)
+    return 0;
+
+  for (i = 0; i < n; i++) {
+    if (!R_FINITE(response[i]) ||
+        (response[i] != 0.0 && response[i] != 1.0))
+      return 0;
+    if (response[i] == 1.0)
+      ones++;
+  }
+  zeros = n - ones;
+
+  if (zeros > 0) {
+    double probability = (double)ones/(double)(n - 1);
+    const double loss = -log1p(-MIN(1.0 - floor,
+                                    MAX(floor, probability)));
+    if (!R_FINITE(loss) || loss < 0.0)
+      return 0;
+    loss_sum = (double)zeros*loss;
+  }
+  if (ones > 0) {
+    double probability = (double)(ones - 1)/(double)(n - 1);
+    const double loss = -log(MIN(1.0 - floor,
+                                 MAX(floor, probability)));
+    if (!R_FINITE(loss) || loss < 0.0)
+      return 0;
+    loss_sum += (double)ones*loss;
+  }
+  loss_sum /= (double)n;
+  if (!R_FINITE(loss_sum) || loss_sum < 0.0)
+    return 0;
+
+  *reference = loss_sum;
+  return 1;
+}
+
 void np_bwm_set_deferred_error(const char *msg)
 {
   bwm_deferred_error = msg;
@@ -19554,6 +19603,13 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
             np_lsq_delta_lower_extern,
             np_lsq_delta_upper_extern,
             &reference)) {
+        bwm_penalty_mode = np_minimized_nonnegative_reference_penalty(
+          reference, pmult, &bwm_penalty_value);
+      }
+    } else if (penalty_criterion == RBWM_CVKS) {
+      double reference = DBL_MAX;
+      if (np_cvks_null_reference(
+            vector_Y_extern, num_obs_train_extern, &reference)) {
         bwm_penalty_mode = np_minimized_nonnegative_reference_penalty(
           reference, pmult, &bwm_penalty_value);
       }
