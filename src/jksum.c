@@ -28988,8 +28988,11 @@ static double np_lp_variance_quadratic(
 }
 
 /* Evaluate the HC0 sandwich quadratic without forming an influence row.  A
- * long-double reduction supplies a scale-aware cancellation bound; only a
- * negative value beyond that bound is a construction failure. */
+ * long-double reduction supplies a scale-aware cancellation bound.  The
+ * absolute pairwise quadratic, rather than the already-cancelled B*a result,
+ * retains the input scale needed when a direction is nearly orthogonal to a
+ * low-rank meat matrix.  Only a negative value beyond that bound is a
+ * construction failure. */
 static int np_regression_hc0_lp_standard_error(
   const double *projection,
   const double *power2_moments,
@@ -29018,13 +29021,16 @@ static int np_regression_hc0_lp_standard_error(
         return 0;
       projected_meat +=
         (long double)meat * (long double)projection[ii];
+      absolute_sum +=
+        fabsl((long double)projection[i]) *
+        fabsl((long double)meat) *
+        fabsl((long double)projection[ii]);
     }
     {
       const long double term =
         (long double)projection[i] * projected_meat;
 
       quadratic += term;
-      absolute_sum += fabsl(term);
     }
   }
   {
@@ -29270,7 +29276,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
   response_y_offset = include_response_square ? 1 : 0;
   response_basis_offset = include_response_square ? 2 : 1;
   moment_stride = owner->nterms + response_basis_offset;
-  if(!ordinary_hc0 && call->do_grad && call->do_gerr)
+  if(call->do_grad && call->do_gerr)
     for(l = 0; l < num_reg_continuous; ++l)
       if(np_glp_gradient_direction_active(l))
         ++variance_nrhs;
@@ -29681,7 +29687,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	                  MAX(1, vector_glp_gradient_order_extern[l]) : 1;
 	                const int active = np_glp_gradient_direction_active(l);
 	                double * const direction =
-	                  (!ordinary_hc0 && call->do_gerr && active) ?
+	                  (call->do_gerr && active) ?
 	                  owner->solve_workspace.rhs_source +
 	                    (size_t)variance_rhs*(size_t)owner->nterms :
 	                  owner->eval_derivative;
@@ -29715,8 +29721,8 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	                  call->gradient[l][jj] : grad_value;
 	                if(call->do_gerr){
 	                  out_owner[output_offset + 1] =
-	                    ordinary_hc0 ? NA_REAL : 0.0;
-	                  if(!ordinary_hc0 && active)
+	                    active ? 0.0 : NA_REAL;
+	                  if(active)
 	                    variance_rhs++;
 	                }
 	              }
@@ -29768,24 +29774,38 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	                  out_owner[1] = sqrt(mv);
 	              }
 
-	              if(!ordinary_hc0 && call->do_grad && call->do_gerr){
+	              if(call->do_grad && call->do_gerr){
 	                int rhs = 1;
 	                for(l = 0; l < num_reg_continuous; l++){
 	                  if(np_glp_gradient_direction_active(l)){
 	                    const double * const projection =
 	                      owner->solve_workspace.rhs_work +
 	                        (size_t)rhs*(size_t)owner->nterms;
-	                    const double grad_q = np_lp_variance_quadratic(
-	                      projection,
-	                      owner->power2_moments,
-	                      owner->power2_projection,
-	                      owner->nterms);
-	                    const double gv = sigma2_owner*grad_q;
-	                    if((gv > 0.0) && isfinite(gv))
-	                      out_owner[2 + call->do_merr + l*2] = sqrt(gv);
+	                    if(ordinary_hc0) {
+	                      if(!np_regression_hc0_lp_standard_error(
+	                           projection,
+	                           owner->power2_moments,
+	                           owner->nterms,
+	                           call->hc0_context->residual_scale,
+	                           &out_owner[2 + call->do_merr + l*2])) {
+	                        owner_solve_failed = 1;
+	                        break;
+	                      }
+	                    } else {
+	                      const double grad_q = np_lp_variance_quadratic(
+	                        projection,
+	                        owner->power2_moments,
+	                        owner->power2_projection,
+	                        owner->nterms);
+	                      const double gv = sigma2_owner*grad_q;
+	                      if((gv > 0.0) && isfinite(gv))
+	                        out_owner[2 + call->do_merr + l*2] = sqrt(gv);
+	                    }
 	                    rhs++;
 	                  }
 	                }
+	                if(owner_solve_failed)
+	                  break;
 	              }
 	            }
 	          }
@@ -30102,7 +30122,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
             MAX(1, vector_glp_gradient_order_extern[l]) : 1;
           const int active = np_glp_gradient_direction_active(l);
           double * const direction =
-            (!ordinary_hc0 && call->do_gerr && active) ?
+            (call->do_gerr && active) ?
             owner->solve_workspace.rhs_source +
               (size_t)variance_rhs*(size_t)owner->nterms :
             owner->eval_derivative;
@@ -30132,8 +30152,8 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
               call->gradient[l][j] += direction[i]*owner->coefficient[i];
           }
           if(call->do_gerr) {
-            call->gradient_stderr[l][j] = ordinary_hc0 ? NA_REAL : 0.0;
-            if(!ordinary_hc0 && active)
+            call->gradient_stderr[l][j] = active ? 0.0 : NA_REAL;
+            if(active)
               ++variance_rhs;
           }
         }
@@ -30185,21 +30205,33 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
             call->mean_stderr[j] = sqrt(mv);
         }
 
-        if(!ordinary_hc0 && call->do_grad && call->do_gerr) {
+        if(call->do_grad && call->do_gerr) {
           int rhs = 1;
           for(l = 0; l < num_reg_continuous; ++l) {
             if(np_glp_gradient_direction_active(l)) {
               const double * const projection =
                 owner->solve_workspace.rhs_work +
                   (size_t)rhs*(size_t)owner->nterms;
-              const double grad_q = np_lp_variance_quadratic(
-                projection,
-                owner->power2_moments,
-                owner->power2_projection,
-                owner->nterms);
-              const double gv = sigma2hat*grad_q;
-              if(gv > 0.0 && isfinite(gv))
-                call->gradient_stderr[l][j] = sqrt(gv);
+              if(ordinary_hc0) {
+                if(!np_regression_hc0_lp_standard_error(
+                     projection,
+                     owner->power2_moments,
+                     owner->nterms,
+                     call->hc0_context->residual_scale,
+                     &call->gradient_stderr[l][j])) {
+                  execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_HC0;
+                  return R_NilValue;
+                }
+              } else {
+                const double grad_q = np_lp_variance_quadratic(
+                  projection,
+                  owner->power2_moments,
+                  owner->power2_projection,
+                  owner->nterms);
+                const double gv = sigma2hat*grad_q;
+                if(gv > 0.0 && isfinite(gv))
+                  call->gradient_stderr[l][j] = sqrt(gv);
+              }
               ++rhs;
             }
           }

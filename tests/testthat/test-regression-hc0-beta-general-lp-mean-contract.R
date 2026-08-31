@@ -48,7 +48,11 @@ h5b_expect_beta_mean_contract <- function(bws, txdat, tydat, exdat = NULL,
   expect_equal(with_se$merr, oracle, tolerance = tolerance)
   expect_true(all(is.finite(with_se$merr)))
   expect_true(all(with_se$merr >= 0))
-  expect_true(all(is.na(with_se$gerr)))
+  expect_true(all(is.finite(with_se$gerr[, bws$icon, drop = FALSE])))
+  expect_true(all(with_se$gerr[, bws$icon, drop = FALSE] >= 0))
+  categorical <- setdiff(seq_len(ncol(with_se$gerr)), which(bws$icon))
+  if (length(categorical))
+    expect_true(all(is.na(with_se$gerr[, categorical, drop = FALSE])))
   invisible(with_se)
 }
 
@@ -169,9 +173,9 @@ test_that("beta general-LP HC0 follows the accepted map under response transform
   expect_lt(max(abs(shifted$merr - base$merr)), 2e-8)
   expect_equal(scaled$merr, 3.25 * base$merr, tolerance = 3e-8)
   expect_identical(constant$merr, rep(0, nrow(exdat)))
-  expect_true(all(is.na(shifted$gerr)))
-  expect_true(all(is.na(scaled$gerr)))
-  expect_true(all(is.na(constant$gerr)))
+  expect_lt(max(abs(shifted$gerr - base$gerr)), 1e-5)
+  expect_equal(scaled$gerr, 3.25 * base$gerr, tolerance = 3e-8)
+  expect_identical(constant$gerr, matrix(0, nrow(exdat), 1L))
 })
 
 test_that("beta general-LP HC0 survives complete absolute-weight underflow", {
@@ -211,7 +215,8 @@ test_that("beta general-LP HC0 survives complete absolute-weight underflow", {
   expect_identical(with_se$mean, without_se$mean)
   expect_identical(with_se$grad, without_se$grad)
   expect_lt(max(abs(with_se$merr - oracle)), 3e-14)
-  expect_true(all(is.na(with_se$gerr)))
+  expect_true(all(is.finite(with_se$gerr)))
+  expect_true(all(with_se$gerr >= 0))
 })
 
 test_that("all-large general-LP point shortcut cedes only HC0 uncertainty", {
