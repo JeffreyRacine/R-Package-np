@@ -68,6 +68,7 @@ npindexbw(\dots)
           ydat = stop("training data ydat missing"),
           bws,
           bandwidth.compute = TRUE,
+          .certify.selected = TRUE,
           nmulti,
           only.optimize.beta = FALSE,
           optim.abstol = .Machine$double.eps,
@@ -94,6 +95,12 @@ These arguments identify the data, formula interface, method label, and whether 
     bandwidths or not. If set to \code{FALSE}, a \code{bandwidth} object
     will be returned with bandwidths set to those specified
     in \code{bws}. Defaults to \code{TRUE}.
+  }
+
+  \item{.certify.selected}{
+    internal logical control requiring one raw-objective replay of the
+    selected search point. This argument is used by package search owners
+    and is not intended for direct user control.
   }
 
   \item{bws}{
