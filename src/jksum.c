@@ -1741,6 +1741,7 @@ typedef struct {
   double **matrix_categorical_vals;
   double *mean;
   double *mean_stderr;
+  int emit_fit_progress;
 } NPRegressionCategoricalProfileFitCall;
 
 typedef struct {
@@ -1778,6 +1779,7 @@ static int np_regression_categorical_profile_fit_body(
   double * const mean_stderr = call->mean_stderr;
   const int do_merr = mean_stderr != NULL;
   const int response_column_count = do_merr ? 3 : 2;
+  const int emit_fit_progress = call->emit_fit_progress;
 
   int i, j, g, status;
   int *train_prof_id = NULL, *train_prof_rep = NULL;
@@ -1906,6 +1908,8 @@ static int np_regression_categorical_profile_fit_body(
     sums[g] += vector_Y[i];
     if(do_merr)
       sums2[g] += vector_Y[i]*vector_Y[i];
+    if(emit_fit_progress)
+      np_progress_fit_loop_step(i + 1, num_obs_train);
   }
 
   profile_y[0] = sums;
@@ -2031,7 +2035,8 @@ int *num_categories,
 int *operator,
 double **matrix_categorical_vals,
 double *mean,
-double *mean_stderr)
+double *mean_stderr,
+const int emit_fit_progress)
 {
   const NPRegressionCategoricalProfileFitCall call = {
     .kernel_c = kernel_c,
@@ -2055,7 +2060,8 @@ double *mean_stderr)
     .operator = operator,
     .matrix_categorical_vals = matrix_categorical_vals,
     .mean = mean,
-    .mean_stderr = mean_stderr
+    .mean_stderr = mean_stderr,
+    .emit_fit_progress = emit_fit_progress
   };
   NPRegressionCategoricalProfileFitExecution execution;
 
@@ -24118,7 +24124,8 @@ enum {
   NP_REGRESSION_SCALAR_FIT_ERR_ALLOC = -3,
   NP_REGRESSION_SCALAR_FIT_ERR_TRAVERSAL = -4,
   NP_REGRESSION_SCALAR_FIT_ERR_INFLUENCE = -5,
-  NP_REGRESSION_SCALAR_FIT_ERR_WORKSPACE_DIMENSION = -6
+  NP_REGRESSION_SCALAR_FIT_ERR_WORKSPACE_DIMENSION = -6,
+  NP_REGRESSION_SCALAR_FIT_ERR_HC0 = -7
 };
 
 enum { NP_REGRESSION_SCALAR_RESPONSE_COLUMNS_MAX = 3 };
@@ -24158,6 +24165,7 @@ typedef struct {
   int do_grad;
   int do_gerr;
   NPRegressionStandardErrorMode standard_error_mode;
+  const NPRegressionHC0Context *hc0_context;
   const NP_GateOverrideCtx *gate_context;
   NPRegressionFitOwner *enclosing_owner;
   double kernel_squared_integral;
@@ -24219,13 +24227,22 @@ static SEXP np_regression_scalar_fit_execute(void *data)
   NPRegressionScalarFitOwner * const owner = &execution->owner;
   const int conditional_influence =
     call->standard_error_mode == NP_REGRESSION_STDERR_CONDITIONAL_INFLUENCE;
-  const int response_column_count = call->do_merr ? 3 : 2;
+  const int hc0_residual_preparing = call->hc0_context != NULL &&
+    call->hc0_context->status == NP_REGRESSION_HC0_RESIDUAL_PREPARING;
+  const int ordinary_hc0 = call->hc0_context != NULL &&
+    !hc0_residual_preparing;
+  const int point_already_computed = ordinary_hc0 &&
+    call->hc0_context->point_already_computed;
+  const int response_column_count = ordinary_hc0 ?
+    (point_already_computed ? 1 : 2) : (call->do_merr ? 3 : 2);
   const int p_nvar = call->do_grad ?
     (call->num_reg_continuous + call->num_reg_unordered +
      call->num_reg_ordered) : 0;
   double *response_columns[NP_REGRESSION_SCALAR_RESPONSE_COLUMNS_MAX] = {
-    call->vector_Y, NULL, NULL
+    NULL, NULL, NULL
   };
+  double *hc0_residual_columns[1] = {NULL};
+  NP_DualPowerCtx hc0_dual_power_ctx = {0};
   int permutation_operator = OP_NOOP;
   size_t allocation_count;
   size_t allocation_bytes;
@@ -24289,25 +24306,44 @@ static SEXP np_regression_scalar_fit_execute(void *data)
 
   owner->unit_response = (double *)malloc(
     (size_t)call->num_obs_train * sizeof(double));
-  if(call->do_merr)
+  if(call->do_merr && !ordinary_hc0)
     owner->squared_response = (double *)malloc(
       (size_t)call->num_obs_train * sizeof(double));
   if(owner->unit_response == NULL ||
-     (call->do_merr && owner->squared_response == NULL)) {
+     (call->do_merr && !ordinary_hc0 && owner->squared_response == NULL)) {
     execution->status = NP_REGRESSION_SCALAR_FIT_ERR_ALLOC;
     return R_NilValue;
   }
-  response_columns[1] = owner->unit_response;
-  if(call->do_merr)
-    response_columns[2] = owner->squared_response;
+
+  if(point_already_computed) {
+    response_columns[0] = owner->unit_response;
+  } else {
+    response_columns[0] = call->vector_Y;
+    response_columns[1] = owner->unit_response;
+    if(call->do_merr && !ordinary_hc0)
+      response_columns[2] = owner->squared_response;
+  }
 
   for(i = 0; i < call->num_obs_train; i++) {
     owner->unit_response[i] = 1.0;
-    if(call->do_merr)
+    if(call->do_merr && !ordinary_hc0)
       owner->squared_response[i] = call->vector_Y[i] * call->vector_Y[i];
   }
 
-  if((!conditional_influence) && (!call->do_grad) &&
+  if(ordinary_hc0) {
+    hc0_residual_columns[0] =
+      (double *)call->hc0_context->scaled_residual;
+    hc0_dual_power_ctx.weighted_sum = call->mean_stderr;
+    hc0_dual_power_ctx.kernel_pow = 2;
+    hc0_dual_power_ctx.matrix_Y = hc0_residual_columns;
+    hc0_dual_power_ctx.matrix_W = hc0_residual_columns;
+    hc0_dual_power_ctx.ncol_Y = 1;
+    hc0_dual_power_ctx.ncol_W = 1;
+    hc0_dual_power_ctx.progress = NULL;
+    hc0_dual_power_ctx.retain_common_scale = 0;
+  }
+
+  if((!ordinary_hc0) && (!conditional_influence) && (!call->do_grad) &&
      np_regression_categorical_profile_fit(
        call->kernel_c, call->kernel_u, call->kernel_o,
        call->lp_engine, call->bandwidth_mode,
@@ -24318,7 +24354,8 @@ static SEXP np_regression_scalar_fit_execute(void *data)
        call->matrix_X_unordered_eval, call->matrix_X_ordered_eval,
        call->vector_Y, call->vector_scale_factor, call->lambda,
        call->num_categories, call->operator,
-       call->matrix_categorical_vals, call->mean, call->mean_stderr)) {
+       call->matrix_categorical_vals, call->mean, call->mean_stderr,
+       hc0_residual_preparing)) {
     execution->status = NP_REGRESSION_SCALAR_FIT_PROFILE;
     return R_NilValue;
   }
@@ -24326,7 +24363,7 @@ static SEXP np_regression_scalar_fit_execute(void *data)
   {
     NPPermutationWeightOutput conditional_pkw_output = np_pkw_output_make(
       owner->conditional_permutation_weights, p_nvar);
-    const int weighted_sum_status = kernel_weighted_sum_np_ctx(
+    const int weighted_sum_status = kernel_weighted_sum_np_ctx_ex(
       call->kernel_c, call->kernel_u, call->kernel_o,
       call->bandwidth_mode,
       call->num_obs_train, call->num_obs_eval,
@@ -24351,6 +24388,8 @@ static SEXP np_regression_scalar_fit_execute(void *data)
       call->matrix_categorical_vals, call->matrix_ordered_indices,
       owner->mean_columns, owner->permutation_columns,
       owner->conditional_weights, call->gate_context,
+      ordinary_hc0 ? &hc0_dual_power_ctx : NULL,
+      NULL, NULL, NULL,
       owner->conditional_permutation_weights != NULL ?
         &conditional_pkw_output : NULL);
 
@@ -24362,11 +24401,29 @@ static SEXP np_regression_scalar_fit_execute(void *data)
 
   for(i = 0; i < call->num_obs_eval; i++) {
     const int response_offset = response_column_count * i;
+    const int denominator_column = point_already_computed ? 0 : 1;
     const double denominator =
-      copysign(DBL_MIN, owner->mean_columns[response_offset + 1]) +
-      owner->mean_columns[response_offset + 1];
-    call->mean[i] = owner->mean_columns[response_offset] / denominator;
-    if(call->do_merr) {
+      copysign(DBL_MIN,
+               owner->mean_columns[response_offset + denominator_column]) +
+      owner->mean_columns[response_offset + denominator_column];
+    if(!point_already_computed)
+      call->mean[i] = owner->mean_columns[response_offset] / denominator;
+    if(ordinary_hc0) {
+      const double moment = call->mean_stderr[i];
+      double se;
+
+      if(!R_FINITE(moment) || moment < 0.0) {
+        execution->status = NP_REGRESSION_SCALAR_FIT_ERR_HC0;
+        return R_NilValue;
+      }
+      se = call->hc0_context->residual_scale *
+        sqrt(moment) / fabs(denominator);
+      if(!R_FINITE(se)) {
+        execution->status = NP_REGRESSION_SCALAR_FIT_ERR_HC0;
+        return R_NilValue;
+      }
+      call->mean_stderr[i] = se;
+    } else if(call->do_merr) {
       call->mean_stderr[i] =
         owner->mean_columns[response_offset + 2] / denominator -
         call->mean[i] * call->mean[i];
@@ -25750,7 +25807,8 @@ NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
 int categorical_compress,
 NPRegressionStandardErrorMode standard_error_mode,
 const NPContinuousPreparedBandwidthView *prepared_bandwidth,
-const NPNNGeometryContext *nn_geometry_context){
+const NPNNGeometryContext *nn_geometry_context,
+const NPRegressionHC0Context *hc0_context){
 
   // note that mean has 2*num_obs allocated for npksum
   int i, j, l;
@@ -25803,6 +25861,40 @@ const NPNNGeometryContext *nn_geometry_context){
   if(lp_engine_est != NP_LP_ENGINE_SCALAR &&
      standard_error_mode == NP_REGRESSION_STDERR_CONDITIONAL_INFLUENCE)
     error("conditional influence standard errors require the scalar regression engine");
+  if(hc0_context != NULL) {
+    const int residual_preparing =
+      hc0_context->status == NP_REGRESSION_HC0_RESIDUAL_PREPARING;
+
+    if(lp_engine_est != NP_LP_ENGINE_SCALAR || kernel_route != NULL ||
+       standard_error_mode != NP_REGRESSION_STDERR_LOCAL_RESIDUAL ||
+       BANDWIDTH_reg == BW_ADAP_NN ||
+       hc0_context->donor_to_canonical == NULL ||
+       hc0_context->num_obs_train != num_obs_train ||
+       (hc0_context->status != NP_REGRESSION_HC0_RESIDUAL_PREPARING &&
+        hc0_context->status != NP_REGRESSION_HC0_RESIDUAL_READY &&
+        hc0_context->status != NP_REGRESSION_HC0_RESIDUAL_ALL_ZERO) ||
+       (residual_preparing && do_merr) ||
+       (!residual_preparing && !do_merr) ||
+       (!residual_preparing && hc0_context->scaled_residual == NULL) ||
+       (!residual_preparing && !R_FINITE(hc0_context->residual_scale)) ||
+       (!residual_preparing && hc0_context->residual_scale < 0.0) ||
+       (!residual_preparing &&
+        hc0_context->status == NP_REGRESSION_HC0_RESIDUAL_READY &&
+        hc0_context->residual_scale == 0.0) ||
+       (!residual_preparing &&
+        hc0_context->status == NP_REGRESSION_HC0_RESIDUAL_ALL_ZERO &&
+        hc0_context->residual_scale != 0.0) ||
+       (hc0_context->point_already_computed != 0 &&
+        hc0_context->point_already_computed != 1))
+      error("invalid internal ordinary-regression HC0 context");
+    for(i = 0; i < num_obs_train; i++) {
+      if(hc0_context->donor_to_canonical[i] < 0 ||
+         hc0_context->donor_to_canonical[i] >= num_obs_train ||
+         (!residual_preparing &&
+          !R_FINITE(hc0_context->scaled_residual[i])))
+        error("invalid internal ordinary-regression HC0 donor alignment");
+    }
+  }
   if(kernel_route == NULL &&
      standard_error_mode == NP_REGRESSION_STDERR_CONDITIONAL_INFLUENCE &&
      num_obs_eval != 1)
@@ -26215,6 +26307,8 @@ const NPNNGeometryContext *nn_geometry_context){
     }
 
     if(all_large_gate &&
+       (hc0_context == NULL ||
+        hc0_context->status == NP_REGRESSION_HC0_RESIDUAL_PREPARING) &&
        standard_error_mode == NP_REGRESSION_STDERR_LOCAL_RESIDUAL &&
        ((lp_engine_est == NP_LP_ENGINE_SCALAR) || (lp_engine_est == NP_LP_ENGINE_GENERAL))){
       double kconst = 1.0;
@@ -26729,6 +26823,7 @@ const NPNNGeometryContext *nn_geometry_context){
       .do_grad = do_grad,
       .do_gerr = do_gerr,
       .standard_error_mode = standard_error_mode,
+      .hc0_context = hc0_context,
       .gate_context = &gate_ctx_local,
       .enclosing_owner = &fit_owner,
       .kernel_squared_integral = K_INT_KERNEL_P,
@@ -26819,6 +26914,8 @@ finish_regression_estimation:
     error("conditional influence variance construction failed");
   if(scalar_fit_status == NP_REGRESSION_SCALAR_FIT_ERR_WORKSPACE_DIMENSION)
     error("scalar regression workspace dimensions overflow");
+  if(scalar_fit_status == NP_REGRESSION_SCALAR_FIT_ERR_HC0)
+    error("ordinary-regression HC0 variance construction failed");
   if(scalar_fit_status != NP_REGRESSION_SCALAR_FIT_OK &&
      scalar_fit_status != NP_REGRESSION_SCALAR_FIT_PROFILE)
     error("invalid internal scalar regression fit status");

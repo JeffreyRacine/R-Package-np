@@ -17908,7 +17908,8 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                                                                  NP_REGRESSION_STDERR_CONDITIONAL_INFLUENCE :
                                                                  NP_REGRESSION_STDERR_LOCAL_RESIDUAL,
                                                                prepared_x_bandwidth_ptr,
-                                                               row_nn_geometry_context_ptr);
+                                                               row_nn_geometry_context_ptr,
+                                                               NULL);
 
       if(status == NP_REGRESSION_FIT_ERR_ZERO_NN_RADIUS)
         error("conditional density/distribution fit encountered a zero literal explanatory radius after occurrence exclusion");
@@ -19569,6 +19570,9 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
   int i,j, num_var;
   int ey_is_ty, do_merr, do_grad, do_gerr;
   int train_is_eval, num_obs_eval_alloc, max_lev;
+  int ordinary_hc0_active = 0;
+  double *ordinary_hc0_residual = NULL;
+  NPRegressionHC0Context ordinary_hc0_context;
 
   int * ipt = NULL, * ipe = NULL;  // point permutation, see tree.c
   /* match integer options with their globals */
@@ -19612,6 +19616,10 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
     error("C_np_regression: inconsistent gradient output request");
   np_lp_engine_extern = np_regression_engine_or_error(
     myopti[REG_LL], "C_np_regression");
+  ordinary_hc0_active = do_merr &&
+    np_lp_engine_extern == NP_LP_ENGINE_SCALAR &&
+    kernel_route == NULL &&
+    BANDWIDTH_reg_extern != BW_ADAP_NN;
   vector_glp_degree_extern = glp_degree;
   vector_glp_gradient_order_extern = glp_gradient_order;
   int_glp_bernstein_extern = *glp_bernstein;
@@ -19668,7 +19676,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
     ecmerr = alloc_vecd(num_obs_eval_alloc);
   if(do_grad)
     eg = alloc_matd(num_obs_eval_alloc, num_var);
-  if(do_gerr)
+  if(do_gerr && !ordinary_hc0_active)
     egerr = alloc_matd(num_obs_eval_alloc, num_var);
   
   num_categories_extern = alloc_vecu(num_reg_unordered_extern+num_reg_ordered_extern);
@@ -19811,6 +19819,112 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
     .eval_to_train = NULL
   };
 
+  memset(&ordinary_hc0_context, 0, sizeof(ordinary_hc0_context));
+  if(ordinary_hc0_active) {
+    const NPNNGeometryContext training_geometry_context = {
+      .mode = NP_NN_QUERY_TRAINING_IDENTITY,
+      .eval_to_train = NULL
+    };
+    double *training_mean = NULL;
+    double ** const training_gradient = train_is_eval ? eg : NULL;
+    long double residual_scale = 0.0L;
+    int constant_response = 1;
+    NPRegressionHC0Context residual_preparation_context;
+
+    ordinary_hc0_residual =
+      (double *)R_alloc((size_t)num_obs_train_extern, sizeof(double));
+    training_mean = train_is_eval ? ecm : ordinary_hc0_residual;
+    memset(&residual_preparation_context, 0,
+           sizeof(residual_preparation_context));
+    residual_preparation_context.donor_to_canonical = ipt;
+    residual_preparation_context.num_obs_train = num_obs_train_extern;
+    residual_preparation_context.status =
+      NP_REGRESSION_HC0_RESIDUAL_PREPARING;
+
+    kernel_estimate_regression_categorical_tree_np(
+      np_lp_engine_extern,
+      KERNEL_reg_extern,
+      KERNEL_reg_unordered_extern,
+      KERNEL_reg_ordered_extern,
+      BANDWIDTH_reg_extern,
+      num_obs_train_extern,
+      num_obs_train_extern,
+      num_reg_unordered_extern,
+      num_reg_ordered_extern,
+      num_reg_continuous_extern,
+      matrix_X_unordered_train_extern,
+      matrix_X_ordered_train_extern,
+      matrix_X_continuous_train_extern,
+      matrix_X_unordered_train_extern,
+      matrix_X_ordered_train_extern,
+      matrix_X_continuous_train_extern,
+      vector_Y_extern,
+      vector_Y_extern,
+      &vector_scale_factor[1],
+      num_categories_extern,
+      matrix_categorical_vals_extern,
+      training_mean,
+      training_gradient,
+      NULL,
+      NULL,
+      &RS,
+      &MSE,
+      &MAE,
+      &MAPE,
+      &CORR,
+      &SIGN,
+      kernel_route,
+      kernel_route_diagnostics,
+      categorical_compress,
+      NP_REGRESSION_STDERR_LOCAL_RESIDUAL,
+      NULL,
+      &training_geometry_context,
+      &residual_preparation_context);
+
+    for(i = 0; i < num_obs_train_extern; i++) {
+      const long double residual =
+        (long double)vector_Y_extern[i] - (long double)training_mean[i];
+      const long double magnitude = fabsl(residual);
+
+      if(!isfinite((double)vector_Y_extern[i]) ||
+         !isfinite((double)training_mean[i]) || !isfinite(magnitude))
+        error("ordinary-regression HC0 training residual is not finite");
+      if(i > 0 && vector_Y_extern[i] != vector_Y_extern[0])
+        constant_response = 0;
+      if(magnitude > residual_scale)
+        residual_scale = magnitude;
+    }
+
+    if(constant_response)
+      residual_scale = 0.0L;
+
+    if(residual_scale > (long double)DBL_MAX)
+      error("ordinary-regression HC0 residual scale exceeds double range");
+
+    ordinary_hc0_context.scaled_residual = ordinary_hc0_residual;
+    ordinary_hc0_context.donor_to_canonical = ipt;
+    ordinary_hc0_context.num_obs_train = num_obs_train_extern;
+    ordinary_hc0_context.residual_scale = (double)residual_scale;
+    ordinary_hc0_context.point_already_computed = train_is_eval;
+
+    if(residual_scale == 0.0L) {
+      ordinary_hc0_context.status = NP_REGRESSION_HC0_RESIDUAL_ALL_ZERO;
+      for(i = 0; i < num_obs_train_extern; i++)
+        ordinary_hc0_residual[i] = 0.0;
+    } else {
+      ordinary_hc0_context.status = NP_REGRESSION_HC0_RESIDUAL_READY;
+      for(i = 0; i < num_obs_train_extern; i++) {
+        ordinary_hc0_residual[i] = (double)(
+          ((long double)vector_Y_extern[i] -
+           (long double)training_mean[i]) / residual_scale);
+        if(!R_FINITE(ordinary_hc0_residual[i]))
+          error("ordinary-regression HC0 scaled residual is not finite");
+      }
+    }
+
+    np_progress_fit_set_offset(num_obs_train_extern);
+  }
+
   kernel_estimate_regression_categorical_tree_np(np_lp_engine_extern,
                                                    KERNEL_reg_extern,
                                                    KERNEL_reg_unordered_extern,
@@ -19835,9 +19949,10 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
                                                    num_categories_extern,
                                                    matrix_categorical_vals_extern,
                                                    ecm,
-                                                   eg,
+                                                   ordinary_hc0_active &&
+                                                     train_is_eval ? NULL : eg,
                                                    ecmerr,
-                                                   egerr,
+                                                   ordinary_hc0_active ? NULL : egerr,
                                                    &RS,
                                                    &MSE,
                                                    &MAE,
@@ -19849,7 +19964,9 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
                                                    categorical_compress,
                                                    NP_REGRESSION_STDERR_LOCAL_RESIDUAL,
                                                    NULL,
-                                                   &nn_geometry_context);
+                                                   &nn_geometry_context,
+                                                   ordinary_hc0_active ?
+                                                     &ordinary_hc0_context : NULL);
 
 
   for(i=0;i<num_obs_eval_extern;i++)
@@ -19869,12 +19986,18 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
        standard errors.  Preserve the historical non-beta bridge unchanged;
        its narrower copy contract is tracked as separate legacy debt. */
     if(do_gerr) {
-      const int gradient_stderr_count =
-        (kernel_route != NULL) ? num_var : num_reg_continuous_extern;
+      if(ordinary_hc0_active) {
+        for(j=0;j<num_var;j++)
+          for(i=0;i<num_obs_eval_extern;i++)
+            gerr[j*num_obs_eval_extern+ipe[i]]=NA_REAL;
+      } else {
+        const int gradient_stderr_count =
+          (kernel_route != NULL) ? num_var : num_reg_continuous_extern;
 
-      for(j=0;j<gradient_stderr_count;j++)
-        for(i=0;i<num_obs_eval_extern;i++)
-          gerr[j*num_obs_eval_extern+ipe[i]]=egerr[j][i];
+        for(j=0;j<gradient_stderr_count;j++)
+          for(i=0;i<num_obs_eval_extern;i++)
+            gerr[j*num_obs_eval_extern+ipe[i]]=egerr[j][i];
+      }
     }
   }
 
