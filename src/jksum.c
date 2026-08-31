@@ -25243,9 +25243,9 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	                for(l = num_reg_continuous;
 	                    l < (num_reg_continuous + num_reg_unordered + num_reg_ordered);
 	                    l++){
-	                  call->gradient[l][jj] = 0.0;
+	                  call->gradient[l][jj] = NA_REAL;
 	                  if(call->do_gerr)
-	                    call->gradient_stderr[l][jj] = 0.0;
+	                    call->gradient_stderr[l][jj] = NA_REAL;
 	                }
 	              }
 	              pos_i++;
@@ -25578,9 +25578,9 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
         for(l = num_reg_continuous;
             l < num_reg_continuous + num_reg_unordered + num_reg_ordered;
             ++l) {
-          call->gradient[l][j] = 0.0;
+          call->gradient[l][j] = NA_REAL;
           if(call->do_gerr)
-            call->gradient_stderr[l][j] = 0.0;
+            call->gradient_stderr[l][j] = NA_REAL;
         }
       }
     }
@@ -26628,8 +26628,8 @@ const NPNNGeometryContext *nn_geometry_context){
                   }
 
                   for(l = num_reg_continuous; l < nvars; l++){
-                    gradient[l][i] = 0.0;
-                    if(do_gerr) gradient_stderr[l][i] = 0.0;
+                    gradient[l][i] = NA_REAL;
+                    if(do_gerr) gradient_stderr[l][i] = NA_REAL;
                   }
                 }
                 np_progress_fit_loop_step_owned(

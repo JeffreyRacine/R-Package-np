@@ -712,6 +712,17 @@ npGlpDegree0FirstDerivativeLcOk <- function(regtype.engine,
     all(gradient.order == 1L)
 }
 
+npGlpCategoricalEffectsRequired <- function(regtype.engine,
+                                             degree.engine,
+                                             ncat,
+                                             gradients) {
+  isTRUE(gradients) &&
+    identical(regtype.engine, "lp") &&
+    as.integer(ncat)[1L] > 0L &&
+    length(degree.engine) > 0L &&
+    any(as.integer(degree.engine) > 0L)
+}
+
 npGlpGradientAvailability <- function(regtype.engine,
                                       degree.engine,
                                       gradient.order,

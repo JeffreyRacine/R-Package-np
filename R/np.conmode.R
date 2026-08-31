@@ -387,7 +387,8 @@ npconmode.condbandwidth <-
                                       xeval,
                                       efac,
                                       gradients,
-                                      gradient.level.index) {
+                                      gradient.level.index,
+                                      direct.categorical.effects = FALSE) {
   enrow <- nrow(xeval)
   nlev <- nlevels(efac)
   block.width <- .npConmodeLevelBlockWidth(
@@ -435,7 +436,8 @@ npconmode.condbandwidth <-
       exdat = xeval[eval.index,,drop = FALSE],
       eydat = rep(efac[block], each = enrow),
       bws = bws,
-      gradients = block.gradients
+      gradients = block.gradients,
+      .np_categorical_effects = !isTRUE(direct.categorical.effects)
     )
 
     expected <- as.double(enrow) * length(block)
@@ -545,14 +547,26 @@ npconmode.conbandwidth <-
       if (bws$xndim < 1L)
         stop("npconmode class-probability gradients/effects require at least one conditioning variable")
     }
+    reg.spec <- npConditionalRegEngineSpec(
+      bws,
+      where = "npconmode categorical effects"
+    )
+    direct.categorical.effects <- npGlpCategoricalEffectsRequired(
+      regtype.engine = reg.spec$reg.engine,
+      degree.engine = reg.spec$degree.engine,
+      ncat = bws$xnuno + bws$xnord,
+      gradients = gradients
+    )
+    xeval <- if (no.ex) txdat else exdat
     level.fit <- .npConmodeEvaluateLevels(
       bws = bws,
       txdat = txdat,
       tydat = tydat,
-      xeval = if (no.ex) txdat else exdat,
+      xeval = xeval,
       efac = efac,
       gradients = gradients,
-      gradient.level.index = gradient.level.index
+      gradient.level.index = gradient.level.index,
+      direct.categorical.effects = direct.categorical.effects
     )
     pmat <- level.fit$probabilities
     perr <- level.fit$errors
@@ -565,6 +579,36 @@ npconmode.conbandwidth <-
       proper = proper.effective,
       proper.control = proper.control
     )
+    if (isTRUE(direct.categorical.effects)) {
+      eval.probability <- function(z) {
+        endpoint.fit <- .npConmodeEvaluateLevels(
+          bws = bws,
+          txdat = txdat,
+          tydat = tydat,
+          xeval = z,
+          efac = efac,
+          gradients = FALSE,
+          gradient.level.index = gradient.level.index
+        )
+        endpoint.proper <- .npConmodeProperProbabilities(
+          endpoint.fit$probabilities,
+          levels = levels(efac),
+          proper = proper.effective,
+          proper.control = proper.control
+        )
+        endpoint.proper$probabilities[, gradient.level.index]
+      }
+      cat.idx <- which(bws$ixuno | bws$ixord)
+      for (jj in cat.idx) {
+        frames <- npCategoricalFirstDifferenceFrames(
+          exdat = xeval,
+          index = jj,
+          where = "npconmode"
+        )
+        pgrad[, jj] <- eval.probability(frames$upper) -
+          eval.probability(frames$lower)
+      }
+    }
     select <- .npConmodeSelect(proper.out$probabilities, perr)
     indices <- select$indices
     mdens <- select$condens

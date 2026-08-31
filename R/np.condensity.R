@@ -100,6 +100,14 @@ npcdens.conbandwidth <- function(bws,
   dots <- list(...)
   fit.start <- proc.time()[3]
   fit.progress.handoff <- isTRUE(dots$.np_fit_progress_handoff)
+  categorical.effects <- if (is.null(dots$.np_categorical_effects)) {
+    TRUE
+  } else {
+    npValidateScalarLogical(
+      dots$.np_categorical_effects,
+      ".np_categorical_effects"
+    )
+  }
   gradients <- npValidateScalarLogical(gradients, "gradients")
   proper.args <- .np_condens_validate_proper_args(
     proper = proper,
@@ -301,8 +309,14 @@ npcdens.conbandwidth <- function(bws,
         available = glp.gradient.available,
         con.names = colnames(txdat)[bws$ixcon]
       )
-    }
+      }
   }
+  glp.categorical.effects <- npGlpCategoricalEffectsRequired(
+    regtype.engine = reg.engine,
+    degree.engine = degree.engine,
+    ncat = bws$xnuno + bws$xnord,
+    gradients = gradients && categorical.effects
+  )
   if (isTRUE(gradients) &&
       identical(reg.engine, "lp") &&
       (bws$xncon > 0L) &&
@@ -466,7 +480,9 @@ npcdens.conbandwidth <- function(bws,
         }
       }
     }
-    if (glp.gradient.partial && (bws$xnuno + bws$xnord > 0L)) {
+    if (isTRUE(categorical.effects) &&
+        (glp.gradient.partial || glp.categorical.effects) &&
+        (bws$xnuno + bws$xnord > 0L)) {
       cat.grad <- npConditionalCategoricalFirstDifferences(
         hat.fun = npcdenshat,
         bws = bws,
@@ -478,6 +494,7 @@ npcdens.conbandwidth <- function(bws,
       )
       cat.idx <- which(bws$ixuno | bws$ixord)
       myout$congrad[, cat.idx] <- cat.grad[, cat.idx, drop = FALSE]
+      myout$congerr[, cat.idx] <- NA_real_
     }
   } else {
     myout$congrad = NA

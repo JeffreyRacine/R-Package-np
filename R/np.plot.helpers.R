@@ -8891,7 +8891,12 @@ plotFactor <- function(f, y, ...){
           ydat = ydat.df,
           exdat = txeval,
           quantile = yq,
-          gradients = gradients
+          gradients = gradients,
+          tau = tau.i,
+          tol = tol,
+          small = small,
+          itmax = itmax,
+          cdf.cache = cdf.cache
         )
         qdelta <- .npqreg_mark_clamped_delta(qdelta, qclamp)
         list(
@@ -9009,12 +9014,17 @@ plotFactor <- function(f, y, ...){
                                           eydat,
                                           cdf = FALSE,
                                           gradients = FALSE,
+                                          categorical.effects = TRUE,
                                           gradient.order = 1L,
                                           proper = FALSE,
                                           proper.method = NULL,
                                           proper.control = list()) {
   fit.start <- proc.time()[3]
   proper <- npValidateScalarLogical(proper, "proper")
+  categorical.effects <- npValidateScalarLogical(
+    categorical.effects,
+    "categorical.effects"
+  )
 
   xdat <- toFrame(xdat)
   ydat <- toFrame(ydat)
@@ -9111,6 +9121,12 @@ plotFactor <- function(f, y, ...){
     glp.gradient.partial <- !lp.degree0.lc.gradient &&
       any(!glp.gradient.available)
   }
+  glp.categorical.effects <- npGlpCategoricalEffectsRequired(
+    regtype.engine = reg.engine,
+    degree.engine = degree.engine,
+    ncat = bws$xnuno + bws$xnord,
+    gradients = gradients && categorical.effects
+  )
   if (isTRUE(gradients) &&
       identical(reg.engine, "lp") &&
       !glp.gradient.partial) {
@@ -9287,22 +9303,27 @@ plotFactor <- function(f, y, ...){
         ))
       }
     }
-    if (bws$xnuno + bws$xnord > 0L) {
-      cat.grad <- npConditionalCategoricalFirstDifferences(
-        hat.fun = if (isTRUE(cdf)) npcdisthat else npcdenshat,
-        bws = bws,
-        txdat = hat.context$xdat,
-        tydat = hat.context$ydat,
-        exdat = hat.context$exdat,
-        eydat = hat.context$eydat,
-        where = "plot conditional"
-      )
-      cat.idx <- which(bws$ixuno | bws$ixord)
-      myout$congrad[, cat.idx] <- cat.grad[, cat.idx, drop = FALSE]
-    }
   } else {
     myout$congrad <- NA
     myout$congerr <- NA
+  }
+
+  if (isTRUE(gradients) &&
+      isTRUE(categorical.effects) &&
+      (glp.gradient.partial || glp.categorical.effects) &&
+      (bws$xnuno + bws$xnord > 0L)) {
+    cat.grad <- npConditionalCategoricalFirstDifferences(
+      hat.fun = if (isTRUE(cdf)) npcdisthat else npcdenshat,
+      bws = bws,
+      txdat = hat.context$xdat,
+      tydat = hat.context$ydat,
+      exdat = hat.context$exdat,
+      eydat = hat.context$eydat,
+      where = "plot conditional"
+    )
+    cat.idx <- which(bws$ixuno | bws$ixord)
+    myout$congrad[, cat.idx] <- cat.grad[, cat.idx, drop = FALSE]
+    myout$congerr[, cat.idx] <- NA_real_
   }
 
   fit.elapsed <- proc.time()[3] - fit.start
