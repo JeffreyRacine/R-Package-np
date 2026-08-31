@@ -63,8 +63,10 @@ h5a_expect_mean_contract <- function(bws, txdat, tydat, exdat = NULL,
   expect_true(all(is.finite(with_se$gerr[, bws$icon, drop = FALSE])))
   expect_true(all(with_se$gerr[, bws$icon, drop = FALSE] >= 0))
   categorical <- setdiff(seq_len(ncol(with_se$gerr)), which(bws$icon))
-  if (length(categorical))
-    expect_true(all(is.na(with_se$gerr[, categorical, drop = FALSE])))
+  if (length(categorical)) {
+    expect_true(all(is.finite(with_se$gerr[, categorical, drop = FALSE])))
+    expect_true(all(with_se$gerr[, categorical, drop = FALSE] >= 0))
+  }
   invisible(with_se)
 }
 

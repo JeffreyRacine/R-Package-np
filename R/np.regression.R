@@ -688,25 +688,6 @@ npreg.rbandwidth <-
         myout$gerr = as.matrix(myout$gerr[,rorder])
       }
 
-      if (npGlpCategoricalEffectsRequired(
-            regtype.engine = reg.spec$regtype.engine,
-            degree.engine = reg.spec$degree.engine,
-            ncat = bws$nuno + bws$nord,
-            gradients = gradients)) {
-        myout$g <- .npreg_glp_categorical_gradients_from_npreghat(
-          bws = bws,
-          txdat = hat.txdat,
-          tydat = tydat,
-          exdat = hat.exdat,
-          grad = myout$g,
-          where = "npreg"
-        )
-        if (se) {
-          cat.idx <- which(bws$iuno | bws$iord)
-          myout$gerr[, cat.idx] <- NA_real_
-        }
-      }
-
     } else if (gradients) {
       myout$g <- .npreg_glp_partial_gradients_from_npreghat(
         bws = bws,
