@@ -336,13 +336,70 @@ npsigtest.npregression <-
     return(ev)
   }
 
+.np_npsig_pivot_plan <- function(pivot, xdat, index, joint) {
+  categorical <- vapply(
+    xdat[index],
+    function(variable) is.factor(variable) || is.ordered(variable),
+    logical(1L)
+  )
+
+  if (!is.null(pivot)) {
+    pivot <- npValidateScalarLogical(pivot, "pivot")
+    if (pivot && any(categorical)) {
+      stop(sprintf(
+        paste0(
+          "pivot = TRUE is supported only when every tested predictor is ",
+          "continuous; the published categorical test is unstandardized ",
+          "(categorical predictor%s: %s). Use pivot = NULL (the ",
+          "method-aware default) or pivot = FALSE."
+        ),
+        if (sum(categorical) == 1L) "" else "s",
+        paste(names(xdat)[index][categorical], collapse = ", ")
+      ), call. = FALSE)
+    }
+    effective <- rep.int(pivot, length(index))
+  } else if (joint == TRUE) {
+    effective <- rep.int(!any(categorical), length(index))
+  } else {
+    effective <- !categorical
+  }
+
+  names(effective) <- names(xdat)[index]
+  list(requested = pivot, effective = effective)
+}
+
+.np_npsig_statistic <- function(fit, index, pivot) {
+  gradient <- fit$grad[, index, drop = FALSE]
+  if (any(!is.finite(gradient)))
+    stop("npsigtest cannot construct a statistic from non-finite gradient estimates", call. = FALSE)
+
+  if (!pivot)
+    return(mean(gradient^2))
+
+  if (is.null(fit$gerr))
+    stop("npsigtest cannot construct a pivotal statistic because gradient standard errors are unavailable", call. = FALSE)
+
+  gradient.stderr <- fit$gerr[, index, drop = FALSE]
+  if (any(!is.finite(gradient.stderr)) || any(gradient.stderr <= 0.0)) {
+    stop(paste0(
+      "npsigtest cannot construct a pivotal statistic because a required ",
+      "gradient standard error is non-positive or non-finite"
+    ), call. = FALSE)
+  }
+
+  statistic <- mean((gradient / gradient.stderr)^2)
+  if (!is.finite(statistic))
+    stop("npsigtest pivotal statistic is non-finite", call. = FALSE)
+  statistic
+}
+
 npsigtest.rbandwidth <- function(bws,
                                  xdat = stop("data xdat missing"),
                                  ydat = stop("data ydat missing"),
                                  boot.num = 399,
                                  boot.method = c("iid","wild","wild-rademacher","pairwise"),
                                  boot.type = c("I","II"),
-                                 pivot = TRUE,
+                                 pivot = NULL,
                                  joint = FALSE,
                                  index = seq_len(ncol(xdat)),
                                  random.seed = 42,
@@ -367,6 +424,14 @@ npsigtest.rbandwidth <- function(bws,
   ## Fast-fail contract for invalid index values must run before any
   ## expensive/distributed bandwidth/regression work.
   .npRmpi_npsig_validate_index(index = index, xdat = xdat)
+
+  pivot.plan <- .np_npsig_pivot_plan(
+    pivot = pivot,
+    xdat = xdat,
+    index = index,
+    joint = joint
+  )
+  pivot <- pivot.plan$requested
 
   bws <- local({
     old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
@@ -421,6 +486,8 @@ npsigtest.rbandwidth <- function(bws,
 
   if(joint==TRUE) {
 
+    pivot.use <- pivot.plan$effective[[1L]]
+
     ## Joint test
 
     In.mat = matrix(data = 0, ncol = 1, nrow = boot.num)
@@ -438,15 +505,9 @@ npsigtest.rbandwidth <- function(bws,
                                 tydat = ydat,
                                 bws = bws,
                                 gradients = TRUE,
-                                se = pivot)
+                                se = pivot.use)
 
-    In <- if(!pivot) {
-      mean(npreg.out$grad[,index]^2)
-    } else {
-      ## Temporarily trap NaN XXX
-      npreg.out$gerr[is.nan(npreg.out$gerr)] <- .Machine$double.xmax
-      mean((npreg.out$grad[,index]/NZD(npreg.out$gerr[,index]))^2)
-    }
+    In <- .np_npsig_statistic(npreg.out, index = index, pivot = pivot.use)
 
     if(boot.method != "pairwise") {
 
@@ -548,22 +609,21 @@ npsigtest.rbandwidth <- function(bws,
                                                  tydat = ydat.star,
                                                  bws = bws,
                                                  gradients = TRUE,
-                                                 se = pivot)
+                                                 se = pivot.use)
         } else {
           npreg.boot <- .npRmpi_npsig_npreg_leaf(extra.args,
                                                  txdat = xdat,
                                                  tydat = ydat.star,
                                                  bws = bws,
                                                  gradients = TRUE,
-                                                 se = pivot)
+                                                 se = pivot.use)
         }
 
-        In.vec[i.star] <- if (!pivot) {
-          mean(npreg.boot$grad[, index]^2)
-        } else {
-          npreg.boot$gerr[is.nan(npreg.boot$gerr)] <- .Machine$double.xmax
-          mean((npreg.boot$grad[, index] / NZD(npreg.boot$gerr[, index]))^2)
-        }
+        In.vec[i.star] <- .np_npsig_statistic(
+          npreg.boot,
+          index = index,
+          pivot = pivot.use
+        )
         progress <- .np_progress_step(progress, done = i.star)
       }
     } else {
@@ -589,21 +649,23 @@ npsigtest.rbandwidth <- function(bws,
                                                  tydat = ydat.star,
                                                  bws = bws,
                                                  gradients = TRUE,
-                                                 se = pivot)
+                                                 se = pivot.use)
           } else if (boot.method == "wild") {
             ydat.star <- mhat.xi + ei * draw.wild.mult(num.obs, a, b, P.a)
             npreg.boot <- .npRmpi_npsig_do_local(extra.args,
                                                  txdat = xdat,
                                                  tydat = ydat.star,
                                                  bws = bws,
-                                                 gradients = TRUE)
+                                                 gradients = TRUE,
+                                                 se = pivot.use)
           } else if (boot.method == "wild-rademacher") {
             ydat.star <- mhat.xi + ei * draw.wild.mult(num.obs, -1, 1, P.a)
             npreg.boot <- .npRmpi_npsig_do_local(extra.args,
                                                  txdat = xdat,
                                                  tydat = ydat.star,
                                                  bws = bws,
-                                                 gradients = TRUE)
+                                                 gradients = TRUE,
+                                                 se = pivot.use)
           } else {
             boot.index <- sample.int(num.obs, replace = TRUE)
             ydat.star <- ydat[boot.index]
@@ -614,15 +676,15 @@ npsigtest.rbandwidth <- function(bws,
                                                  txdat = xdat.star,
                                                  tydat = ydat.star,
                                                  bws = bws,
-                                                 gradients = TRUE)
+                                                 gradients = TRUE,
+                                                 se = pivot.use)
           }
 
-          out[kk] <- if (!pivot) {
-            mean(npreg.boot$grad[, index]^2)
-          } else {
-            npreg.boot$gerr[is.nan(npreg.boot$gerr)] <- .Machine$double.xmax
-            mean((npreg.boot$grad[, index] / NZD(npreg.boot$gerr[, index]))^2)
-          }
+          out[kk] <- .np_npsig_statistic(
+            npreg.boot,
+            index = index,
+            pivot = pivot.use
+          )
         }
         out
       }
@@ -633,7 +695,8 @@ npsigtest.rbandwidth <- function(bws,
         ydat = ydat,
         bws = bws,
         index = index,
-        pivot = pivot,
+        pivot.use = pivot.use,
+        .np_npsig_statistic = .np_npsig_statistic,
         num.obs = num.obs,
         draw.wild.mult = draw.wild.mult,
         a = a,
@@ -677,6 +740,7 @@ npsigtest.rbandwidth <- function(bws,
       ## Increment counter...
       
       ii <- ii + 1
+      pivot.use <- pivot.plan$effective[[ii]]
 
       if (boot.type == "II")
         bws <- bws.original
@@ -691,15 +755,9 @@ npsigtest.rbandwidth <- function(bws,
                                   tydat = ydat,
                                   bws = bws,
                                   gradients = TRUE,
-                                  se = pivot)
+                                  se = pivot.use)
       
-      In[ii] <- if(!pivot) {
-        mean(npreg.out$grad[,i]^2)
-      } else {
-        ## Temporarily trap NaN XXX
-        npreg.out$gerr[is.nan(npreg.out$gerr)] <- .Machine$double.xmax
-        mean((npreg.out$grad[,i]/NZD(npreg.out$gerr[,i]))^2)
-      }
+      In[ii] <- .np_npsig_statistic(npreg.out, index = i, pivot = pivot.use)
       
       if(boot.method != "pairwise") {
 
@@ -798,22 +856,21 @@ npsigtest.rbandwidth <- function(bws,
                                                    tydat = ydat.star,
                                                    bws = bws,
                                                    gradients = TRUE,
-                                                   se = pivot)
+                                                   se = pivot.use)
           } else {
             npreg.boot <- .npRmpi_npsig_npreg_leaf(extra.args,
                                                    txdat = xdat,
                                                    tydat = ydat.star,
                                                    bws = bws,
                                                    gradients = TRUE,
-                                                   se = pivot)
+                                                   se = pivot.use)
           }
 
-          In.vec[i.star] <- if (!pivot) {
-            mean(npreg.boot$grad[, i]^2)
-          } else {
-            npreg.boot$gerr[is.nan(npreg.boot$gerr)] <- .Machine$double.xmax
-            mean((npreg.boot$grad[, i] / NZD(npreg.boot$gerr[, i]))^2)
-          }
+          In.vec[i.star] <- .np_npsig_statistic(
+            npreg.boot,
+            index = i,
+            pivot = pivot.use
+          )
           progress <- .np_progress_step(progress, done = i.star)
         }
       } else {
@@ -839,21 +896,23 @@ npsigtest.rbandwidth <- function(bws,
                                                    tydat = ydat.star,
                                                    bws = bws,
                                                    gradients = TRUE,
-                                                   se = pivot)
+                                                   se = pivot.use)
             } else if (boot.method == "wild") {
               ydat.star <- mhat.xi + ei * draw.wild.mult(num.obs, a, b, P.a)
               npreg.boot <- .npRmpi_npsig_do_local(extra.args,
                                                    txdat = xdat,
                                                    tydat = ydat.star,
                                                    bws = bws,
-                                                   gradients = TRUE)
+                                                   gradients = TRUE,
+                                                   se = pivot.use)
             } else if (boot.method == "wild-rademacher") {
               ydat.star <- mhat.xi + ei * draw.wild.mult(num.obs, -1, 1, P.a)
               npreg.boot <- .npRmpi_npsig_do_local(extra.args,
                                                    txdat = xdat,
                                                    tydat = ydat.star,
                                                    bws = bws,
-                                                   gradients = TRUE)
+                                                   gradients = TRUE,
+                                                   se = pivot.use)
             } else {
               boot.index <- sample.int(num.obs, replace = TRUE)
               ydat.star <- ydat[boot.index]
@@ -863,15 +922,15 @@ npsigtest.rbandwidth <- function(bws,
                                                    txdat = xdat.star,
                                                    tydat = ydat.star,
                                                    bws = bws,
-                                                   gradients = TRUE)
+                                                   gradients = TRUE,
+                                                   se = pivot.use)
             }
 
-            out[kk] <- if (!pivot) {
-              mean(npreg.boot$grad[, i]^2)
-            } else {
-              npreg.boot$gerr[is.nan(npreg.boot$gerr)] <- .Machine$double.xmax
-              mean((npreg.boot$grad[, i] / NZD(npreg.boot$gerr[, i]))^2)
-            }
+            out[kk] <- .np_npsig_statistic(
+              npreg.boot,
+              index = i,
+              pivot = pivot.use
+            )
           }
           out
         }
@@ -882,7 +941,8 @@ npsigtest.rbandwidth <- function(bws,
           ydat = ydat,
           bws = bws,
           i = i,
-          pivot = pivot,
+          pivot.use = pivot.use,
+          .np_npsig_statistic = .np_npsig_statistic,
           num.obs = num.obs,
           draw.wild.mult = draw.wild.mult,
           a = a,
@@ -922,16 +982,17 @@ npsigtest.rbandwidth <- function(bws,
 
   .np_seed_exit(seed.state, remove_if_absent = TRUE)
 
-  sigtest(In=In,
-          In.mat,
-          P=P,
+  sigtest(In = In,
+          In.bootstrap = In.mat,
+          P = P,
           bws = bws,
           ixvar = index,
-          boot.method,
-          pivot,
-          joint,
-          boot.type,
-          boot.num)
+          boot.method = boot.method,
+          pivot = pivot,
+          pivot.effective = pivot.plan$effective,
+          joint = joint,
+          boot.type = boot.type,
+          boot.num = boot.num)
 
 }
 
