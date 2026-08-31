@@ -1,5 +1,11 @@
 # np 0.70-6
 
+* Partial-linear bootstrap coefficient solves now ridge the
+  Robinson-residualized regressors symmetrically. The former first-coordinate
+  RHS adjustment treated a user regressor as an intercept and made ridged
+  results depend on regressor order; weights, ridge ladder, resampling, and
+  public interfaces are unchanged.
+
 * Smooth-coefficient fit and bandwidth ridge corrections now use the finite,
   nonzero signed pristine moment intercept. This preserves constant
   reproduction under common moment scaling without changing ordinary
