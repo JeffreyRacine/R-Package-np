@@ -5954,7 +5954,6 @@
 
   XtWX <- crossprod(X, X * w)
   XtWy <- drop(crossprod(X, y * w))
-  XtWy0 <- XtWy[1L]
   ridge.grid <- npRidgeSequenceFromBase(
     n.train = nrow(X),
     ridge.base = max(0.0, as.double(ridge)),
@@ -5967,8 +5966,6 @@
     z <- XtWy
     if (ridge > 0)
       diag(A) <- diag(A) + ridge
-    if (ridge > 0)
-      z[1L] <- XtWy0 + ridge * XtWy0 / NZD(A[1L, 1L])
     beta <- tryCatch(
       drop(solve(A, matrix(z, ncol = 1L))),
       error = function(e) NULL
