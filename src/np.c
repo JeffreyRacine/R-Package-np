@@ -1418,7 +1418,7 @@ static int np_regression_prepared_context_refresh_degree(
   NPRegressionPreparedCtx *context, const int *degree);
 static int np_regression_prepared_context_eval(
   NPRegressionPreparedCtx *context, const double *bw,
-  const int *degree, double out[3]);
+  const int *degree, const int raw_only, double out[3]);
 static void np_regression_bw_mode(
   double *runo, double *rord, double *rcon, double *y,
   double *mysd, int *myopti, double *myoptd, double *rbw, double *fval,
@@ -3694,6 +3694,7 @@ static double bwmfunc_wrapper(double *p)
     bwm_invalid_count += 1.0;
     if (bwm_penalty_mode == 1 && R_FINITE(bwm_penalty_value))
       return bwm_penalty_value;
+    return DBL_MAX;
   }
 
   return val;
@@ -4519,6 +4520,7 @@ static int np_regression_prepared_eval_native_raw(const double *rbw,
                                                   const int *glp_degree,
                                                   double *rbw_work,
                                                   int *degree_work,
+                                                  const int raw_only,
                                                   double out[3])
 {
   int i;
@@ -4551,7 +4553,7 @@ static int np_regression_prepared_eval_native_raw(const double *rbw,
 #endif
 
   status = np_regression_prepared_context_eval(
-    &np_regression_prepared, rbw_work, degree_work, out);
+    &np_regression_prepared, rbw_work, degree_work, raw_only, out);
   return status;
 }
 
@@ -4587,6 +4589,7 @@ SEXP C_np_regression_prepared_eval(SEXP rbw, SEXP glp_degree)
                                              INTEGER(degree_i),
                                              rbw_work,
                                              degree_work,
+                                             0,
                                              eval_out) != 0) {
     UNPROTECT(2);
     error("prepared npreg objective evaluator failed");
@@ -4711,6 +4714,7 @@ static int np_regression_prepared_native_search_callback(int n,
     degree_work,
     eval_bw,
     degree_work,
+    0,
     eval_out);
   if (status != 0) {
     context->callback_failures++;
@@ -4769,6 +4773,7 @@ SEXP C_np_regression_prepared_native_search(SEXP x0,
   int bb_output_type[1] = {CRS_NOMAD_OUTPUT_OBJ};
   double crs_outputs[1];
   np_regression_prepared_native_search_context context;
+  double final_eval[3] = {DBL_MAX, 1.0, 0.0};
   double *solution = NULL, *best_point = NULL, *best_bw_d = NULL;
   int *best_degree_i = NULL, *first_degree_i = NULL;
   int n, nbw, ndegree, i, status, budget, seed, inner_count, n_options, objective_cache_enabled;
@@ -4882,6 +4887,7 @@ SEXP C_np_regression_prepared_native_search(SEXP x0,
 
   for (i = 0; i < 3; i++)
     context.best_eval[i] = R_NaN;
+  context.best_objective = DBL_MAX;
   context.first_objective = R_NaN;
 
   context.n = n;
@@ -4938,6 +4944,34 @@ SEXP C_np_regression_prepared_native_search(SEXP x0,
                                         &result);
   bwm_objective_cache_callback_option_end();
   nomad_degree_progress_active = 0;
+  if (context.callback_calls > 0) {
+    const int *final_degree = ndegree > 0 ?
+      best_degree_i : np_regression_prepared.degree;
+    int final_status = np_regression_prepared_eval_native_raw(
+      best_bw_d,
+      final_degree,
+      context.eval_bw,
+      context.degree_work,
+      1,
+      final_eval);
+    if (final_status == 0) {
+      context.total_num_feval += final_eval[1];
+      context.total_fast += final_eval[2];
+      context.best_objective = final_eval[0];
+      for (i = 0; i < 3; i++)
+        context.best_eval[i] = final_eval[i];
+    } else {
+      context.best_objective = DBL_MAX;
+      context.best_eval[0] = DBL_MAX;
+      context.best_eval[1] = 1.0;
+      context.best_eval[2] = 0.0;
+    }
+  } else {
+    context.best_objective = DBL_MAX;
+    context.best_eval[0] = DBL_MAX;
+    context.best_eval[1] = 1.0;
+    context.best_eval[2] = 0.0;
+  }
   if (context.ndegree > 0 && context.callback_calls > 0)
     np_progress_nomad_degree_step(context.callback_calls,
                                   context.best_degree,
@@ -7587,7 +7621,7 @@ static int np_regression_prepared_context_refresh_degree(
 
 static int np_regression_prepared_context_eval(
   NPRegressionPreparedCtx *context, const double *bw,
-  const int *degree, double out[3])
+  const int *degree, const int raw_only, double out[3])
 {
   double fast = 0.0;
   double fast_before = 0.0;
@@ -7610,7 +7644,8 @@ static int np_regression_prepared_context_eval(
     bwm_eval_count += 1.0;
     bwm_invalid_count += 1.0;
     bwm_maybe_signal_activity();
-    value = (bwm_penalty_mode == 1 && isfinite(bwm_penalty_value)) ?
+    value = (!raw_only && bwm_penalty_mode == 1 &&
+             isfinite(bwm_penalty_value)) ?
       bwm_penalty_value : DBL_MAX;
     out[0] = value;
     out[1] = 1.0;
@@ -7649,7 +7684,8 @@ static int np_regression_prepared_context_eval(
     bwm_eval_count += 1.0;
     bwm_invalid_count += 1.0;
     bwm_maybe_signal_activity();
-    value = (bwm_penalty_mode == 1 && isfinite(bwm_penalty_value)) ?
+    value = (!raw_only && bwm_penalty_mode == 1 &&
+             isfinite(bwm_penalty_value)) ?
       bwm_penalty_value : DBL_MAX;
     out[0] = value;
     out[1] = 1.0;
@@ -7658,7 +7694,20 @@ static int np_regression_prepared_context_eval(
   }
 
   fast_before = np_fastcv_alllarge_hits_get();
-  value = bwmfunc_wrapper(context->scale_factor);
+  if (raw_only) {
+    bwm_eval_count += 1.0;
+    bwm_progress_eval_active = 1;
+    value = bwmfunc_raw_current_scale(
+      context->scale_factor, context->num_var);
+    bwm_progress_eval_active = 0;
+    if (!isfinite(value) || value == DBL_MAX) {
+      bwm_invalid_count += 1.0;
+      value = DBL_MAX;
+    }
+    bwm_maybe_signal_activity();
+  } else {
+    value = bwmfunc_wrapper(context->scale_factor);
+  }
   fast = np_fastcv_alllarge_hits_get() - fast_before;
   if (fast < 0.0)
     fast = 0.0;

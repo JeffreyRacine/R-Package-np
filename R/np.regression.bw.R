@@ -1145,6 +1145,12 @@ npRmpiPreparedObjectiveClearRegression <- function() {
     engine %in% c("nomad", "nomad+powell")
 }
 
+.npregbw_native_raw_objective_valid <- function(value) {
+  value <- as.numeric(value)
+  length(value) == 1L && !is.na(value) && is.finite(value) &&
+    !identical(value, .Machine$double.xmax)
+}
+
 .npregbw_nomad_native_require_crs <- function() {
   if (!requireNamespace("crs", quietly = TRUE))
     stop("native npreg NOMAD route requires crs >= 0.15-46", call. = FALSE)
@@ -1783,14 +1789,15 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
       )
       native.num.feval.total <- native.num.feval.total + as.numeric(native.i$total_num.feval[1L])
       native.num.feval.fast.total <- native.num.feval.fast.total + as.numeric(native.i$total_num.feval.fast[1L])
-      if (is.finite(objective.i) && objective.i < native.best.objective) {
+      if (.npregbw_native_raw_objective_valid(objective.i) &&
+          objective.i < native.best.objective) {
         native.best.objective <- objective.i
         native.best.index <- i
       }
     }
 
     if (!is.finite(native.best.index))
-      stop("native npreg NOMAD route did not return a finite solution", call. = FALSE)
+      stop("native npreg NOMAD route did not return a raw-valid solution", call. = FALSE)
 
     native.best <- native.results[[native.best.index]]
     native.handoff.point <- as.numeric(native.best$best_point)
@@ -2364,7 +2371,7 @@ npRmpiNomadPreparedSearchRegression <- function(template,
           num.feval = NA_real_
         )
       }
-      if (is.finite(native.i$objective) &&
+      if (.npregbw_native_raw_objective_valid(native.i$objective) &&
           .np_degree_better(native.i$objective, native.best.objective, direction = "min")) {
         native.best.objective <- native.i$objective
         native.best.index <- i
@@ -2372,7 +2379,7 @@ npRmpiNomadPreparedSearchRegression <- function(template,
     }
 
     if (!is.finite(native.best.index))
-      stop("native npreg NOMAD degree-search route did not return a finite solution", call. = FALSE)
+      stop("native npreg NOMAD degree-search route did not return a raw-valid solution", call. = FALSE)
 
     if (isTRUE(remin)) {
       remin.index <- length(native.results) + 1L
@@ -2386,7 +2393,7 @@ npRmpiNomadPreparedSearchRegression <- function(template,
       native.num.feval.total <- native.num.feval.total + as.numeric(native.remin$native$total_num.feval[1L])
       native.num.feval.fast.total <- native.num.feval.fast.total + as.numeric(native.remin$native$total_num.feval.fast[1L])
       native.callback.total <- native.callback.total + as.integer(native.remin$native$compiled_callback_calls[1L])
-      if (is.finite(native.remin$objective) &&
+      if (.npregbw_native_raw_objective_valid(native.remin$objective) &&
           .np_degree_better(native.remin$objective, native.best.objective, direction = "min")) {
         native.best.objective <- native.remin$objective
         native.best.index <- remin.index
