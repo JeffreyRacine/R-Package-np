@@ -155,9 +155,10 @@ test_that("npsigtest no longer uses legacy console helpers", {
   src <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
 
   expect_false(grepl("printPush\\(|printPop\\(|printClear\\(|newLineConsole\\(", src))
-  expect_true(grepl("\\.np_progress_note\\(\"Testing joint significance\"\\)", src))
-  expect_true(grepl("\\.np_progress_note\\(sprintf\\(\"Testing variable %s of \\(%s\\)\",", src))
-  expect_true(grepl("\\.np_progress_begin\\(\"Bootstrap replications\"", src))
+  expect_false(grepl("\\.np_progress_note\\(\"Testing joint significance\"\\)", src))
+  expect_false(grepl("\\.np_progress_note\\(sprintf\\(\"Testing variable %s of \\(%s\\)\",", src))
+  expect_true(grepl("\\.np_progress_begin\\(\"Testing joint significance\"", src))
+  expect_true(grepl("sprintf\\(\"Testing variable %s of \\(%s\\)\",", src))
   expect_true(grepl("\\.np_progress_with_legacy_suppressed\\(", src))
 })
 

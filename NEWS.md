@@ -7,6 +7,15 @@
   native zero placeholders. Categorical asymptotic effect standard errors
   remain unavailable and are reported as `NA`.
 
+* `npsigtest()` now chooses pivotal continuous and unstandardized categorical
+  statistics by default, records the effective choice, and fails explicitly
+  when requested pivot standard errors do not define a statistic. Bootstrap
+  values equal to the observed statistic are included in the empirical upper
+  tail, so a completely smoothed-out predictor returns `P = 1` rather than a
+  false rejection. Explicit local-polynomial tests require degree at least one
+  only for tested continuous coordinates. Joint/predictor status now stays on
+  the existing live progress line instead of leaving permanent console notes.
+
 * Multi-response `npreghat(..., output = "apply")` results now retain the
   response column names consistently across native, leave-one-out, and
   row-local local-polynomial owners, matching the corresponding hat-matrix
