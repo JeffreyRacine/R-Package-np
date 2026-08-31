@@ -1,5 +1,23 @@
 # np 0.70-6
 
+* Regression bandwidth search now preserves terminal invalidity through
+  finalization and raw-certifies the selected point once outside the optimizer
+  loop. Finite invalid guidance uses the exact criterion-specific constant
+  null for CVLS, the trace-one null for CVAIC, and the Bernoulli null for
+  CVKS; penalty multipliers must be finite and strictly greater than one.
+
+* Location-scale quantile bandwidth selection now evaluates leave-one-out
+  check loss against the requested response when its fitted transformed
+  response differs, uses the exact constant-quantile check-loss null for
+  invalid guidance, and rejects an optimizer payload whose selected point is
+  raw-invalid. The chosen NOMAD/Powell semantics are unchanged.
+
+* Single-index bandwidth selection now raw-certifies selected Ichimura and
+  Klein--Spady candidates and uses their exact declared leave-one-out nulls
+  for outer invalid guidance. Inner regression evaluation returns raw
+  objective values or terminal invalidity and propagates implementation
+  errors; valid objectives, caches, and optimizer choices are unchanged.
+
 * Positive-degree local-polynomial categorical gradients/effects now report
   their documented fitted-value endpoint contrasts across regression,
   conditional density/distribution, quantile regression, conditional mode,
