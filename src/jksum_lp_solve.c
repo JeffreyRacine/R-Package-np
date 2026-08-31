@@ -612,6 +612,37 @@ static NPLPSolvePolicyStatus np_lp_solve_workspace_admit_retained_factor(
   return NP_LP_SOLVE_POLICY_FINAL_FAILED;
 }
 
+/* Apply the ridge response correction relative to the signed intercept of the
+ * pristine Gram.  Neither the already-ridged diagonal nor an absolute floor
+ * preserves the incoming constant response. */
+static int np_lp_apply_intercept_ridge_correction(
+  double value,
+  double ridge_total,
+  double pristine_anchor,
+  double *corrected_out)
+{
+  double correction;
+  double corrected;
+
+  if((corrected_out == NULL) || !R_FINITE(value) ||
+     !R_FINITE(ridge_total) || !(ridge_total >= 0.0) ||
+     !R_FINITE(pristine_anchor) || (pristine_anchor == 0.0))
+    return 0;
+  if(ridge_total == 0.0){
+    *corrected_out = value;
+    return 1;
+  }
+
+  correction = ridge_total*(value/pristine_anchor);
+  if(!R_FINITE(correction))
+    correction = (ridge_total/pristine_anchor)*value;
+  corrected = value + correction;
+  if(!R_FINITE(correction) || !R_FINITE(corrected))
+    return 0;
+  *corrected_out = corrected;
+  return 1;
+}
+
 NPLPSolvePolicyStatus np_lp_solve_workspace_solve_response_ranked(
   NPLPSolveWorkspace *workspace,
   int p,
@@ -622,6 +653,7 @@ NPLPSolvePolicyStatus np_lp_solve_workspace_solve_response_ranked(
 {
   double ridge_increment = 0.0;
   double ridge_total = 0.0;
+  double pristine_anchor;
   int ridge_steps = 0;
   int ridge_increment_ready = 0;
   int i;
@@ -634,6 +666,7 @@ NPLPSolvePolicyStatus np_lp_solve_workspace_solve_response_ranked(
      !np_lp_solve_workspace_shape(workspace, p, nrhs, NULL, NULL) ||
      !R_FINITE(ridge_fraction) || !(ridge_fraction > 0.0))
     return NP_LP_SOLVE_POLICY_INVALID;
+  pristine_anchor = workspace->gram_source[0];
 
   for(;;){
     NPLPDgesvStatus solve_status;
@@ -702,14 +735,17 @@ NPLPSolvePolicyStatus np_lp_solve_workspace_solve_response_ranked(
   }
 
   if(ridge_total > 0.0){
-    const double denominator =
-      (workspace->gram_source[0] > DBL_EPSILON) ?
-      workspace->gram_source[0] : DBL_EPSILON;
     int rhs;
 
     for(rhs = 0; rhs < nrhs; rhs++){
       double * const intercept = workspace->rhs_source + (size_t)rhs*(size_t)p;
-      *intercept += ridge_total*(*intercept)/denominator;
+      double corrected_intercept;
+
+      if(!np_lp_apply_intercept_ridge_correction(
+           *intercept, ridge_total, pristine_anchor,
+           &corrected_intercept))
+        return NP_LP_SOLVE_POLICY_FINAL_FAILED;
+      *intercept = corrected_intercept;
     }
     if(!np_lp_solve_workspace_solve_factored(workspace, p, nrhs)){
       if(!np_lp_solve_workspace_sources_finite(workspace, p, nrhs))
@@ -733,6 +769,7 @@ NPLPSolvePolicyStatus np_lp_solve_workspace_solve_adjoint_ranked(
   NPLPSolvePolicyDiagnostics * const policy_diagnostics =
     (diagnostics != NULL) ? diagnostics : &local_diagnostics;
   double ridge_increment = 0.0;
+  double pristine_anchor;
   int ridge_steps = 0;
   int i;
 
@@ -743,6 +780,7 @@ NPLPSolvePolicyStatus np_lp_solve_workspace_solve_adjoint_ranked(
     return NP_LP_SOLVE_POLICY_INVALID;
   if(!np_lp_solve_workspace_sources_finite(workspace, p, nrhs))
     return NP_LP_SOLVE_POLICY_NONFINITE;
+  pristine_anchor = workspace->gram_source[0];
   if(!np_lp_solve_workspace_ridge_increment(workspace, p, ridge_fraction,
                                              &ridge_increment))
     return NP_LP_SOLVE_POLICY_INVALID;
@@ -789,7 +827,7 @@ NPLPSolvePolicyStatus np_lp_solve_workspace_solve_adjoint_ranked(
   }
 
   return np_lp_solve_workspace_solve_adjoint_factored(
-    workspace, p, nrhs, policy_diagnostics);
+    workspace, p, nrhs, pristine_anchor, policy_diagnostics);
 }
 
 int np_lp_rank_upper_bound_from_weights(const double *weights, int n, int p)
@@ -809,6 +847,7 @@ NPLPSolvePolicyStatus np_lp_solve_workspace_solve_adjoint_factored(
   NPLPSolveWorkspace *workspace,
   int p,
   int nrhs,
+  double pristine_anchor,
   const NPLPSolvePolicyDiagnostics *diagnostics)
 {
   if((diagnostics == NULL) ||
@@ -825,17 +864,14 @@ NPLPSolvePolicyStatus np_lp_solve_workspace_solve_adjoint_factored(
   }
 
   if(diagnostics->ridge_total > 0.0){
-    const double denominator =
-      (workspace->gram_source[0] > DBL_EPSILON) ?
-      workspace->gram_source[0] : DBL_EPSILON;
-    const double intercept_scale =
-      1.0 + diagnostics->ridge_total/denominator;
     int rhs;
 
     for(rhs = 0; rhs < nrhs; rhs++){
       double * const intercept = workspace->rhs_work + (size_t)rhs*(size_t)p;
-      *intercept *= intercept_scale;
-      if(!R_FINITE(*intercept))
+
+      if(!np_lp_apply_intercept_ridge_correction(
+           *intercept, diagnostics->ridge_total, pristine_anchor,
+           intercept))
         return NP_LP_SOLVE_POLICY_FINAL_FAILED;
     }
   }

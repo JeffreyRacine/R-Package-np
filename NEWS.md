@@ -1,5 +1,11 @@
 # npRmpi 0.70-6
 
+* Ridged local-polynomial response, influence, and R fallback solves now
+  restore the intercept from the signed pristine Gram intercept rather than
+  the already-ridged diagonal or a numerical floor. This restores constant
+  reproduction on rank-deficient systems without changing ridge admission,
+  sequence, cap, diagnostics, or ordinary zero-ridge arithmetic.
+
 * Regression bandwidth search now preserves terminal invalidity through
   finalization and raw-certifies the selected point once outside the optimizer
   loop. Finite invalid guidance uses the exact criterion-specific constant

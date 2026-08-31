@@ -96,6 +96,7 @@ NPLPSolvePolicyStatus np_lp_solve_workspace_solve_adjoint_factored(
   NPLPSolveWorkspace *workspace,
   int p,
   int nrhs,
+  double pristine_anchor,
   const NPLPSolvePolicyDiagnostics *diagnostics);
 /* Cold-path validation used only after an ordinary solve has failed. */
 #if defined(__GNUC__) || defined(__clang__)
@@ -139,7 +140,9 @@ int np_lp_solve_workspace_ridge_increment(
  * may be UNKNOWN; otherwise it is the exact number of nonzero donor rows and
  * therefore a structural upper bound on rank before regularization. Ordinary
  * response rows retain one-call DGESV and the successful LU for later
- * RHS/adjoint reuse.
+ * RHS/adjoint reuse. A positive ridge restores the response intercept from
+ * the signed pristine Gram intercept; a zero or non-finite anchor fails
+ * closed.
  */
 NPLPSolvePolicyStatus np_lp_solve_workspace_solve_response_ranked(
   NPLPSolveWorkspace *workspace,

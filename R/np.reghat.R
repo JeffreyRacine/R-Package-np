@@ -1004,10 +1004,19 @@ npreghat <-
       if (is.null(solved) || !all(is.finite(solved)))
         stop("LP solve failed in R hat-matrix path after bounded ridging")
 
-      denom <- A.try[1L, 1L]
-      if (!is.finite(denom) || abs(denom) < .Machine$double.xmin)
-        denom <- .Machine$double.xmin
-      solved[1L] <- solved[1L] * (1.0 + nepsilon / denom)
+      pristine.anchor <- A.base[1L, 1L]
+      correction <- if (is.finite(pristine.anchor) &&
+                        pristine.anchor != 0.0) {
+        nepsilon * (solved[1L] / pristine.anchor)
+      } else {
+        NA_real_
+      }
+      if (!is.finite(correction))
+        correction <- (nepsilon / pristine.anchor) * solved[1L]
+      corrected <- solved[1L] + correction
+      if (!is.finite(correction) || !is.finite(corrected))
+        stop("LP solve failed in R hat-matrix path: invalid ridge intercept anchor")
+      solved[1L] <- corrected
     }
 
     H[j, ] <- w * drop(W.train %*% solved)
