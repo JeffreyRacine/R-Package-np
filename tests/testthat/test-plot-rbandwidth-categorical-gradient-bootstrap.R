@@ -124,7 +124,7 @@ test_that("session-route categorical regression gradient bootstrap works for def
               info = paste(res$output, collapse = "\n"))
 })
 
-test_that("session-route categorical gradient asymptotic intervals fail clearly", {
+test_that("session-route categorical gradient asymptotic intervals use native HC0 errors", {
   skip_on_cran()
   env <- npRmpi_subprocess_env()
   skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
@@ -148,13 +148,11 @@ test_that("session-route categorical gradient asymptotic intervals fail clearly"
       "invisible(trace('.np_plot_regression_eval', where = asNamespace('npRmpi'),",
       "  tracer = bquote(assign(.(eval_count_name), get(.(eval_count_name), envir = .GlobalEnv) + 1L, envir = .GlobalEnv)),",
       "  print = FALSE))",
-      "err <- tryCatch({",
-      "  suppressWarnings(plot(fit, xdat = xdat, ydat = y, output = 'data', perspective = FALSE, gradients = TRUE, errors = 'asymptotic', data_overlay = FALSE))",
-      "  NULL",
-      "}, error = conditionMessage)",
+      "out.cat <- suppressWarnings(plot(fit, xdat = xdat, ydat = y, output = 'data', perspective = FALSE, gradients = TRUE, errors = 'asymptotic', data_overlay = FALSE))",
       "untrace('.np_plot_regression_eval', where = asNamespace('npRmpi'))",
-      "stopifnot(is.character(err), grepl('categorical gradient contrast panels', err, fixed = TRUE))",
-      "stopifnot(identical(get(eval_count_name, envir = .GlobalEnv), 0L))",
+      "stopifnot(is.list(out.cat), all(vapply(out.cat, inherits, logical(1), 'npregression')))",
+      "stopifnot(all(is.finite(out.cat[[1L]]$grad)), all(is.finite(out.cat[[1L]]$gerr)))",
+      "stopifnot(get(eval_count_name, envir = .GlobalEnv) > 0L)",
       "rm(list = eval_count_name, envir = .GlobalEnv)",
       "xdat2 <- data.frame(x = runif(n), z = runif(n))",
       "y2 <- 1 + sin(2 * pi * xdat2$x) + 0.5 * xdat2$z + rnorm(n, sd = 0.05)",

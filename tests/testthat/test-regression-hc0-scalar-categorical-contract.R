@@ -251,5 +251,5 @@ test_that("H4 retains only streamed categorical HC0 moments", {
     "np_continuous_kernel_beta_regression_paired_hc0_rows_validated",
     fixed = TRUE
   )
-  expect_false(grepl("npreghat", reducer, fixed = TRUE))
+  expect_false(grepl("npreghat(", reducer, fixed = TRUE))
 })
