@@ -261,12 +261,18 @@ npreg.call <-
     return(ev)
   }
 
-.np_reg_fit_total <- function(bws, tnrow, enrow) {
-  if (identical(as.character(bws$type)[1L], "adaptive_nn")) {
+.np_reg_fit_total <- function(bws, tnrow, enrow, se, reg.code) {
+  base.total <- if (identical(as.character(bws$type)[1L], "adaptive_nn")) {
     as.integer(tnrow)
   } else {
     as.integer(enrow)
   }
+  ordinary.hc0 <- isTRUE(se) &&
+    identical(as.integer(reg.code), as.integer(REGTYPE_LP0)) &&
+    !identical(as.character(bws$ckertype)[1L], "beta") &&
+    !identical(as.character(bws$type)[1L], "adaptive_nn")
+
+  if (ordinary.hc0) as.integer(tnrow) + base.total else base.total
 }
 
 npreg.rbandwidth <-
@@ -873,7 +879,13 @@ npreg.rbandwidth <-
 
     myout <- .np_with_compiled_fit_progress(
       label = "Fitting regression",
-      total = .np_reg_fit_total(bws = bws, tnrow = tnrow, enrow = enrow),
+      total = .np_reg_fit_total(
+        bws = bws,
+        tnrow = tnrow,
+        enrow = enrow,
+        se = se,
+        reg.code = reg.c$code
+      ),
       handoff = fit.progress.handoff,
       handoff.detail = if (fit.progress.handoff) "starting" else NULL,
       if (use.local.regression) {

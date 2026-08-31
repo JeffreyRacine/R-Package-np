@@ -14,6 +14,27 @@ typedef enum {
 } NPRegressionStandardErrorMode;
 
 /*
+ * Private, invocation-owned ordinary-residual HC0 input.  Residuals are
+ * scaled once after the training-point fit and retained in the active donor
+ * order used by the kernel traversal.  donor_to_canonical makes that order
+ * explicit; the reducer must never infer it from pointer identity.
+ */
+typedef enum {
+  NP_REGRESSION_HC0_RESIDUAL_PREPARING = 0,
+  NP_REGRESSION_HC0_RESIDUAL_READY = 1,
+  NP_REGRESSION_HC0_RESIDUAL_ALL_ZERO = 2
+} NPRegressionHC0ResidualStatus;
+
+typedef struct {
+  const double *scaled_residual;
+  const int *donor_to_canonical;
+  int num_obs_train;
+  double residual_scale;
+  NPRegressionHC0ResidualStatus status;
+  int point_already_computed;
+} NPRegressionHC0Context;
+
+/*
  * Public regression fits select one explicit output contract at the native
  * boundary.  The values are intentionally bit flags so all owners can derive
  * the same request without route-specific boolean combinations or silent
