@@ -132,6 +132,40 @@ npsigtest.npregression <-
   mean(bootstrap >= observed)
 }
 
+.np_npsig_validate_lp_degree <- function(bws, xdat, index) {
+  if (!identical(bws[["regtype", exact = TRUE]], "lp"))
+    return(invisible(TRUE))
+
+  icon <- bws[["icon", exact = TRUE]]
+  degree <- bws[["degree.engine", exact = TRUE]]
+  valid.degree <- is.numeric(degree) &&
+    all(is.finite(degree)) &&
+    all(degree >= 0) &&
+    all(degree == floor(degree))
+  if (!is.logical(icon) || length(icon) != ncol(xdat) || anyNA(icon) ||
+      length(degree) != sum(icon) || !valid.degree) {
+    stop("npsigtest() encountered inconsistent local-polynomial degree metadata", call. = FALSE)
+  }
+
+  continuous <- which(icon)
+  tested.continuous <- index[index %in% continuous]
+  position <- match(tested.continuous, continuous)
+  zero.degree <- tested.continuous[degree[position] == 0]
+  if (length(zero.degree)) {
+    stop(sprintf(
+      paste0(
+        "npsigtest() requires polynomial degree at least 1 for every tested ",
+        "continuous coordinate when regtype = 'lp'; degree 0 was selected ",
+        "for: %s. If this model was selected via NOMAD, refit with ",
+        "degree.min = 1."
+      ),
+      paste(names(xdat)[zero.degree], collapse = ", ")
+    ), call. = FALSE)
+  }
+
+  invisible(TRUE)
+}
+
 .np_npsig_bootstrap_bw_reselect <- function(xdat,
                                             ydat,
                                             bws.seed,
@@ -183,6 +217,21 @@ npsigtest.rbandwidth <- function(bws,
   if (is.factor(ydat))
     stop("dependent variable must be continuous.")
 
+  ## Test for valid entries in index before RNG or estimator work.
+
+  if(anyNA(index)) stop("index must not contain missing values")
+  if(any(index < 1 | index > NCOL(xdat), na.rm = TRUE)) stop(paste("invalid index provided: index entries must lie between 1 and ",NCOL(xdat),sep=""))
+  if(length(unique(index)) < length(index)) stop("index contains repeated values (must be unique)")
+
+  pivot.plan <- .np_npsig_pivot_plan(
+    pivot = pivot,
+    xdat = xdat,
+    index = index,
+    joint = joint
+  )
+  pivot <- pivot.plan$requested
+  .np_npsig_validate_lp_degree(bws = bws, xdat = xdat, index = index)
+
   ## Save seed prior to setting
 
   seed.state <- .np_seed_enter(random.seed)
@@ -199,20 +248,6 @@ npsigtest.rbandwidth <- function(bws,
   }
 
   num.obs <- nrow(xdat)
-
-  ## Test for valid entries in index
-
-  if(anyNA(index)) stop("index must not contain missing values")
-  if(any(index < 1 | index > NCOL(xdat), na.rm = TRUE)) stop(paste("invalid index provided: index entries must lie between 1 and ",NCOL(xdat),sep=""))
-  if(length(unique(index)) < length(index)) stop("index contains repeated values (must be unique)")
-
-  pivot.plan <- .np_npsig_pivot_plan(
-    pivot = pivot,
-    xdat = xdat,
-    index = index,
-    joint = joint
-  )
-  pivot <- pivot.plan$requested
 
   if(!joint) {
 
