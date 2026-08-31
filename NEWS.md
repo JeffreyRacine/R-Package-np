@@ -1,5 +1,11 @@
 # npRmpi 0.70-6
 
+* Mixed beta-kernel conditional hats now pass the validated categorical-
+  compression state to their private direct kernel-weight owner. This repairs
+  conditional density gradients and simultaneous beta-X/beta-Y fits that
+  previously stopped for both dense and compressed execution; the two modes
+  remain numerically identical across active worker counts.
+
 * Copula density helpers now translate the public normalized ordered
   Li--Racine kernel name to the private `kbandwidth`/`npksum` spelling. This
   restores ordered and mixed copula density semantics without changing public
