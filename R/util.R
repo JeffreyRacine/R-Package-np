@@ -565,6 +565,16 @@ npValidatePositiveFiniteNumeric <- function(value, argname) {
   as.double(value)
 }
 
+npValidateRegressionPenaltyMultiplier <- function(value) {
+  if (!is.numeric(value) || length(value) != 1L || is.na(value) ||
+      !is.finite(value) || value < 1)
+    stop(paste(
+      "'penalty.multiplier' must be a finite numeric scalar",
+      "greater than or equal to 1"
+    ))
+  as.double(value)
+}
+
 npScaleFactorSearchOldNames <- c(
   "cfac.init",
   "lbc.init",

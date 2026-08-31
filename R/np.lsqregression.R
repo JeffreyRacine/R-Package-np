@@ -25,6 +25,9 @@ nplsqreg <-
 nplsqregbw <-
   function(bws, ...) {
     args <- list(...)
+    if ("penalty.multiplier" %in% names(args))
+      args$penalty.multiplier <-
+        npValidateRegressionPenaltyMultiplier(args$penalty.multiplier)
 
     if (!missing(bws)) {
       if (isa(bws, "lsqregressionbandwidth"))
@@ -584,8 +587,7 @@ nplsqregbw <-
   tol <- npValidatePositiveFiniteNumeric(opt.value("tol", 1.490116e-04), "tol")
   small <- npValidatePositiveFiniteNumeric(opt.value("small", 1.490116e-05), "small")
   penalty.multiplier <-
-    npValidatePositiveFiniteNumeric(opt.value("penalty.multiplier", 10),
-                                    "penalty.multiplier")
+    npValidateRegressionPenaltyMultiplier(opt.value("penalty.multiplier", 10))
   invalid.penalty <- match.arg(opt.value("invalid.penalty", "baseline"),
                                c("baseline", "dbmax"))
   penalty.mode <- if (invalid.penalty == "baseline") 1L else 0L
