@@ -128,6 +128,10 @@ npsigtest.npregression <-
   statistic
 }
 
+.np_npsig_upper_tail_p <- function(bootstrap, observed) {
+  mean(bootstrap >= observed)
+}
+
 .np_npsig_bootstrap_bw_reselect <- function(xdat,
                                             ydat,
                                             bws.seed,
@@ -422,7 +426,7 @@ npsigtest.rbandwidth <- function(bws,
 
     ## Compute the P-value
 
-    P <- mean(In.vec > In)
+    P <- .np_npsig_upper_tail_p(In.vec, In)
 
     In.mat[,1] = In.vec
 
@@ -622,7 +626,7 @@ npsigtest.rbandwidth <- function(bws,
       
       ## Compute the P-value
       
-      P[ii] <- mean(In.vec > In[ii])
+      P[ii] <- .np_npsig_upper_tail_p(In.vec, In[ii])
       
       In.mat[,ii] = In.vec
       
