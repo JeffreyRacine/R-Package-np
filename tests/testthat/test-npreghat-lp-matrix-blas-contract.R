@@ -20,10 +20,10 @@
         if (!is.null(solved) && all(is.finite(solved)))
           break
       }
-      denom <- A.try[1L, 1L]
-      if (!is.finite(denom) || abs(denom) < .Machine$double.xmin)
-        denom <- .Machine$double.xmin
-      solved[1L] <- solved[1L] * (1.0 + nepsilon / denom)
+      denom <- A.base[1L, 1L]
+      if (!is.finite(denom) || denom == 0.0)
+        stop("undefined pristine ridge intercept anchor")
+      solved[1L] <- solved[1L] + nepsilon * (solved[1L] / denom)
     }
 
     H[j, ] <- w * drop(W.train %*% solved)
@@ -106,6 +106,38 @@ test_that("compiled and public LP hats share the canonical ridge policy", {
   expect_gt(sum(attr(public, "ridge.used", exact = TRUE) > 0), 0L)
   expect_equal(as.vector(compiled), as.vector(public), tolerance = 1e-10)
   expect_equal(as.vector(compiled %*% y), as.vector(fit), tolerance = 1e-8)
+})
+
+test_that("canonical LP ridge uses the signed pristine intercept anchor", {
+  solve_response <- function(anchor) {
+    .Call(
+      "C_np_lp_batch_project",
+      matrix(c(anchor, 0, 0), nrow = 1L),
+      matrix(c(3 * anchor, 0), nrow = 1L),
+      c(1, 0), 2, TRUE, PACKAGE = "np"
+    )
+  }
+  influence <- function(anchor) {
+    .Call(
+      "C_np_reghat_lp_matrix_fast",
+      matrix(rep(anchor / 2, 2L), nrow = 2L),
+      rbind(c(1, 0), c(1, 0)),
+      matrix(c(1, 0), nrow = 1L), PACKAGE = "np"
+    )
+  }
+
+  for (anchor in c(1, 2^-900, -1)) {
+    response <- solve_response(anchor)
+    hat <- influence(anchor)
+    expect_identical(response$status, 0L)
+    expect_equal(response$values[[1L]], 3, tolerance = 4e-15)
+    expect_equal(sum(hat), 1, tolerance = 4e-15)
+  }
+
+  zero.response <- solve_response(0)
+  expect_identical(zero.response$status, 1L)
+  expect_null(zero.response$values)
+  expect_error(influence(0), "invalid wider-LP compiled hat-matrix input")
 })
 
 test_that("width-one scalar hats retain signed higher-order kernel weights", {

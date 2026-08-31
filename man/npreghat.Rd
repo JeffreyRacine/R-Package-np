@@ -87,7 +87,7 @@ These arguments control local-polynomial basis, degree, derivatives, leave-one-o
   \item{leave.one.out}{Logical; if \code{TRUE}, compute in-sample leave-one-out hat weights. This cannot be combined with explicit \code{exdat}/\code{newdata}.}
 
 
-  \item{ridge}{Base diagonal regularization used when local systems are ill-conditioned. The ridge sequence starts at \code{0} (no regularization) and then increments by \code{1/n.train} as needed for stable solves.}
+  \item{ridge}{Base diagonal regularization used when local systems are ill-conditioned. The ridge sequence starts at \code{0} (no regularization) and then increments by \code{1/n.train} as needed for stable solves. Wider systems restore the response intercept from the signed pristine Gram intercept.}
 
 
   \item{s}{Derivative multi-index over continuous predictors.}
