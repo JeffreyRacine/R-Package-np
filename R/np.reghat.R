@@ -1425,9 +1425,7 @@ npreghat <-
     tydat <- as.double(tydat)
   }
 
-  hat.txdat <- txdat
-  hat.exdat <- if (no.ex) NULL else exdat
-  do.compiled.gradients <- isTRUE(gradients) && !glp.gradient.partial
+  do.compiled.gradients <- isTRUE(gradients)
 
   txdat <- adjustLevels(txdat, bws$xdati)
   if (!no.ex) {
@@ -1550,7 +1548,7 @@ npreghat <-
   if (se)
     out$merr <- as.double(myout$merr)
 
-  if (gradients && !glp.gradient.partial) {
+  if (gradients) {
     grad <- matrix(data = myout$g, nrow = enrow, ncol = ncol.x, byrow = FALSE)
     rorder <- numeric(ncol.x)
     ord.idx <- seq_len(ncol.x)
@@ -1564,37 +1562,12 @@ npreghat <-
       out$gerr <- as.matrix(gerr[, rorder, drop = FALSE])
     }
 
-    if (npGlpCategoricalEffectsRequired(
-          regtype.engine = reg.spec$regtype.engine,
-          degree.engine = reg.spec$degree.engine,
-          ncat = bws$nuno + bws$nord,
-          gradients = gradients)) {
-      out$grad <- .npreg_glp_categorical_gradients_from_npreghat(
-        bws = bws,
-        txdat = hat.txdat,
-        tydat = tydat,
-        exdat = hat.exdat,
-        grad = out$grad,
-        where = ".np_regression_direct"
-      )
-      if (se) {
-        cat.idx <- which(bws$iuno | bws$iord)
-        out$gerr[, cat.idx] <- NA_real_
-      }
+    if (glp.gradient.partial) {
+      unavailable <- which(bws$icon)[!glp.gradient.available]
+      out$grad[, unavailable] <- NA_real_
+      if (se)
+        out$gerr[, unavailable] <- NA_real_
     }
-  } else if (gradients) {
-    out$grad <- .npreg_glp_partial_gradients_from_npreghat(
-      bws = bws,
-      txdat = hat.txdat,
-      tydat = tydat,
-      exdat = hat.exdat,
-      gradient.order = glp.gradient.order,
-      available = glp.gradient.available,
-      nrow.eval = enrow,
-      ncol.x = ncol.x
-    )
-    if (se)
-      out$gerr <- matrix(NA_real_, nrow = enrow, ncol = ncol.x)
   }
 
   out

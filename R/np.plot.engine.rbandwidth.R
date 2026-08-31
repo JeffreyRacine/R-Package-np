@@ -225,15 +225,6 @@
       gradients = gradients,
       plot.data.overlay.missing = missing(plot.data.overlay)
     )
-    if (plot.errors && gradients &&
-        identical(plot.errors.method, "asymptotic") &&
-        any(vapply(xdat, is.factor, logical(1)))) {
-      stop(
-        "asymptotic intervals for categorical gradient contrast panels are not available; use errors = \"bootstrap\"",
-        call. = FALSE
-      )
-    }
-
     surface.supported <- isTRUE((bws$ncon + bws$nord == 2) &&
                                 (bws$nuno == 0) &&
                                 !any(xor(bws$xdati$iord, bws$xdati$inumord)))

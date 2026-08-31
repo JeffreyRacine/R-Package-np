@@ -219,7 +219,7 @@ test_that("categorical regression gradient bootstrap works for default, inid, an
   }
 })
 
-test_that("categorical regression gradient asymptotic intervals fail clearly", {
+test_that("categorical regression gradient asymptotic intervals use native HC0 errors", {
   skip_if_not_installed("np")
 
   library(np)
@@ -262,18 +262,19 @@ test_that("categorical regression gradient asymptotic intervals fail clearly", {
   on.exit(untrace(".np_plot_regression_eval", where = asNamespace("np")),
           add = TRUE)
 
-  expect_error(
-    suppressWarnings(plot(
-      fit,
-      output = "data",
-      perspective = FALSE,
-      gradients = TRUE,
-      errors = "asymptotic",
-      data_overlay = FALSE
-    )),
-    "categorical gradient contrast panels"
-  )
-  expect_identical(get(eval.count.name, envir = .GlobalEnv), 0L)
+  out <- expect_no_error(suppressWarnings(plot(
+    fit,
+    output = "data",
+    perspective = FALSE,
+    gradients = TRUE,
+    errors = "asymptotic",
+    data_overlay = FALSE
+  )))
+  expect_type(out, "list")
+  expect_true(all(vapply(out, inherits, logical(1), "npregression")))
+  expect_true(all(is.finite(out[[1L]]$grad)))
+  expect_true(all(is.finite(out[[1L]]$gerr)))
+  expect_gt(get(eval.count.name, envir = .GlobalEnv), 0L)
 })
 
 test_that("continuous regression gradient asymptotic intervals remain available", {
