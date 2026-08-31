@@ -1806,6 +1806,30 @@ static int np_cvks_null_reference(const double * const response,
   return 1;
 }
 
+static int np_minimized_cvaic_reference_penalty(
+  const double reference,
+  const double multiplier,
+  double * const penalty)
+{
+  double candidate;
+
+  if (penalty == NULL)
+    return 0;
+  *penalty = DBL_MAX;
+  if (!R_FINITE(reference) ||
+      !R_FINITE(multiplier) || multiplier < 1.0)
+    return 0;
+
+  candidate = reference + log(multiplier);
+  if (candidate == reference)
+    candidate = nextafter(reference, INFINITY);
+  if (!R_FINITE(candidate) || candidate <= reference || candidate >= DBL_MAX)
+    return 0;
+
+  *penalty = candidate;
+  return 1;
+}
+
 void np_bwm_set_deferred_error(const char *msg)
 {
   bwm_deferred_error = msg;
@@ -18473,6 +18497,8 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
     error("C_np_regression_bw: prepare-only mode requires retained ownership");
   if (retained_context != NULL && retained_context->active)
     error("C_np_regression_bw: prepared context is already active");
+  if ((!R_FINITE(penalty_mult[0])) || (penalty_mult[0] < 1.0))
+    error("C_np_regression_bw: penalty.multiplier must be finite and greater than or equal to 1");
   memset(prepared_context, 0, sizeof(*prepared_context));
   //KDT * kdt = NULL; // tree structure
   //NL nl = { .node = NULL, .n = 0, .nalloc = 0 };// a node list structure -- used for searching - here for testing
@@ -18747,7 +18773,6 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
     const int penalty_criterion =
       lsq_check_mode ? RBWM_CVCHECK : myopti[RBW_MI];
     double pmult = penalty_mult[0];
-    if (pmult < 1.0) pmult = 1.0;
     if (penalty_criterion == RBWM_CVCHECK) {
       double reference = DBL_MAX;
       if (np_cvc_check_null_reference(
@@ -18779,18 +18804,29 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
         mse0 += dy*dy;
       }
       mse0 /= (double) num_obs_train_extern;
-      if (mse0 <= 0.0) mse0 = DBL_MIN;
-      if (penalty_criterion == RBWM_CVAIC) {
-        const double denom = 1.0 - 2.0/((double) num_obs_train_extern);
-        if (denom > 0.0) {
-          const double base_aic = log(mse0) + (1.0/denom);
-          bwm_penalty_value = base_aic + log(pmult);
+      if (penalty_criterion == RBWM_CVLS) {
+        if (num_obs_train_extern > 1) {
+          const double n = (double)num_obs_train_extern;
+          const double loo_scale = n / (n - 1.0);
+          const double reference = loo_scale * loo_scale * mse0;
+          bwm_penalty_mode = np_minimized_nonnegative_reference_penalty(
+            reference, pmult, &bwm_penalty_value);
+        }
+      } else if (penalty_criterion == RBWM_CVAIC) {
+        if (num_obs_train_extern > 3 &&
+            R_FINITE(mse0) && mse0 > 0.0) {
+          const double n = (double)num_obs_train_extern;
+          const double reference = log(mse0) +
+            (1.0 + 1.0/n)/(1.0 - 3.0/n);
+          bwm_penalty_mode = np_minimized_cvaic_reference_penalty(
+            reference, pmult, &bwm_penalty_value);
         }
       } else {
+        if (mse0 <= 0.0) mse0 = DBL_MIN;
         bwm_penalty_value = pmult * mse0;
+        if (R_FINITE(bwm_penalty_value))
+          bwm_penalty_mode = 1;
       }
-      if (R_FINITE(bwm_penalty_value))
-        bwm_penalty_mode = 1;
     }
   }
 

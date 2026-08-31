@@ -211,6 +211,8 @@ npregbw.NULL <-
                                                scale.init.categorical.sample = FALSE,
                                                transform.bounds = FALSE) {
   invalid.penalty <- match.arg(invalid.penalty)
+  penalty.multiplier <-
+    npValidateRegressionPenaltyMultiplier(penalty.multiplier)
   scale.factor.search.lower <- npResolveScaleFactorLowerBound(
     if (is.null(scale.factor.search.lower)) npGetScaleFactorSearchLower(bws) else scale.factor.search.lower
   )
@@ -466,7 +468,8 @@ npregbw.rbandwidth <-
     ftol <- npValidatePositiveFiniteNumeric(ftol, "ftol")
     tol <- npValidatePositiveFiniteNumeric(tol, "tol")
     small <- npValidatePositiveFiniteNumeric(small, "small")
-    penalty.multiplier <- npValidatePositiveFiniteNumeric(penalty.multiplier, "penalty.multiplier")
+    penalty.multiplier <-
+      npValidateRegressionPenaltyMultiplier(penalty.multiplier)
     scale.factor.search.lower <- npResolveScaleFactorLowerBound(
       if (is.null(scale.factor.search.lower)) npGetScaleFactorSearchLower(bws) else scale.factor.search.lower
     )
@@ -899,6 +902,8 @@ npregbw.rbandwidth <-
                                             objective = c("ls", "ks")) {
   invalid.penalty <- match.arg(invalid.penalty)
   objective <- match.arg(objective)
+  penalty.multiplier <-
+    npValidateRegressionPenaltyMultiplier(penalty.multiplier)
   if (identical(objective, "ks") && !isTRUE(eval.only))
     stop("internal Klein-Spady regression objective is eval-only", call. = FALSE)
   scale.factor.search.lower <- npResolveScaleFactorLowerBound(
