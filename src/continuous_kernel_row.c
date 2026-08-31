@@ -3375,6 +3375,153 @@ np_continuous_kernel_beta_regression_moment_rows_validated(
   return NP_CONTINUOUS_ROW_OK;
 }
 
+NPContinuousKernelRowStatus
+np_continuous_kernel_beta_regression_paired_hc0_rows_validated(
+  const NPContinuousKernelRowPlan *plan,
+  int leave_one_out,
+  int leave_one_out_offset,
+  const NPContinuousKernelLogFactorProvider *level_provider,
+  const NPContinuousKernelLogFactorProvider *alternate_provider,
+  const double *hc0_scaled_residual,
+  double hc0_residual_scale,
+  NPContinuousKernelRowWorkspace *workspace,
+  NPContinuousKernelRowResult *row_result,
+  double *level_coefficient,
+  size_t level_coefficient_capacity,
+  double *contrast_stderr,
+  NPContinuousKernelDerivativeDiagnostics *diagnostics)
+{
+  NPContinuousKernelRowStatus status = NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  int evaluation;
+  int observation;
+
+  if(diagnostics != NULL) {
+    diagnostics->bad_coordinate = -1;
+    diagnostics->bad_observation = -1;
+    diagnostics->undefined_count = 0;
+    diagnostics->beta_status = NP_BETA_OK;
+  }
+  if(plan == NULL || plan->route == NULL || plan->num_train <= 0 ||
+     plan->num_eval <= 0 || plan->num_continuous <= 0 ||
+     plan->route->segment_count != 1 ||
+     plan->route->segment[0].descriptor.family != NP_CKERNEL_FAMILY_BETA ||
+     (leave_one_out != 0 && leave_one_out != 1) ||
+     leave_one_out_offset < 0 || level_provider == NULL ||
+     alternate_provider == NULL || hc0_scaled_residual == NULL ||
+     !R_FINITE(hc0_residual_scale) || hc0_residual_scale < 0.0 ||
+     workspace == NULL || row_result == NULL ||
+     level_coefficient == NULL ||
+     level_coefficient_capacity < (size_t)plan->num_train ||
+     contrast_stderr == NULL ||
+     (leave_one_out &&
+      (plan->num_eval > plan->num_train ||
+       leave_one_out_offset > plan->num_train - plan->num_eval)))
+    return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  for(observation = 0; observation < plan->num_train; ++observation)
+    if(!R_FINITE(hc0_scaled_residual[observation])) {
+      if(diagnostics != NULL)
+        diagnostics->bad_observation = observation;
+      return NP_CONTINUOUS_ROW_ERR_NUMERIC;
+    }
+  for(evaluation = 0; evaluation < plan->num_eval; ++evaluation) {
+    const int omitted_observation = leave_one_out ?
+      evaluation + leave_one_out_offset : -1;
+    double level_total = 0.0;
+    double alternate_total = 0.0;
+    long double quadratic = 0.0L;
+
+    status = np_continuous_kernel_beta_log_factor_row(
+      plan, evaluation, omitted_observation, level_provider,
+      workspace, row_result);
+    if(status != NP_CONTINUOUS_ROW_OK)
+      goto row_failure;
+    if(row_result->total_log_scale == -INFINITY) {
+      status = NP_CONTINUOUS_ROW_ERR_ZERO_WEIGHT;
+      goto cleanup;
+    }
+    for(observation = 0; observation < plan->num_train; ++observation) {
+      const double weight = workspace->primary_sign[observation] == 0 ?
+        0.0 : (double)workspace->primary_sign[observation] * exp(
+          workspace->primary_log_absolute[observation] -
+          row_result->total_log_scale);
+
+      level_coefficient[observation] =
+        observation == omitted_observation ? 0.0 : weight;
+      level_total += level_coefficient[observation];
+    }
+    if(!R_FINITE(level_total) || level_total == 0.0) {
+      status = level_total == 0.0 ? NP_CONTINUOUS_ROW_ERR_ZERO_WEIGHT :
+        NP_CONTINUOUS_ROW_ERR_NUMERIC;
+      goto cleanup;
+    }
+    for(observation = 0; observation < plan->num_train; ++observation)
+      level_coefficient[observation] /= level_total;
+
+    status = np_continuous_kernel_beta_log_factor_row(
+      plan, evaluation, omitted_observation, alternate_provider,
+      workspace, row_result);
+    if(status != NP_CONTINUOUS_ROW_OK)
+      goto row_failure;
+    if(row_result->total_log_scale == -INFINITY) {
+      status = NP_CONTINUOUS_ROW_ERR_ZERO_WEIGHT;
+      goto cleanup;
+    }
+    for(observation = 0; observation < plan->num_train; ++observation) {
+      const double weight = workspace->primary_sign[observation] == 0 ?
+        0.0 : (double)workspace->primary_sign[observation] * exp(
+          workspace->primary_log_absolute[observation] -
+          row_result->total_log_scale);
+
+      if(observation != omitted_observation)
+        alternate_total += weight;
+    }
+    if(!R_FINITE(alternate_total) || alternate_total == 0.0) {
+      status = alternate_total == 0.0 ? NP_CONTINUOUS_ROW_ERR_ZERO_WEIGHT :
+        NP_CONTINUOUS_ROW_ERR_NUMERIC;
+      goto cleanup;
+    }
+    for(observation = 0; observation < plan->num_train; ++observation) {
+      const double weight = workspace->primary_sign[observation] == 0 ?
+        0.0 : (double)workspace->primary_sign[observation] * exp(
+          workspace->primary_log_absolute[observation] -
+          row_result->total_log_scale);
+      const double alternate_coefficient =
+        observation == omitted_observation ? 0.0 :
+        weight / alternate_total;
+      const long double influence =
+        (long double)level_coefficient[observation] -
+        (long double)alternate_coefficient;
+      const long double residual =
+        (long double)hc0_scaled_residual[observation];
+
+      quadratic += influence * influence * residual * residual;
+    }
+    if(quadratic < 0.0L || quadratic > (long double)DBL_MAX) {
+      status = NP_CONTINUOUS_ROW_ERR_NUMERIC;
+      goto cleanup;
+    }
+    contrast_stderr[evaluation] = hc0_residual_scale *
+      sqrt((double)quadratic);
+    if(!R_FINITE(contrast_stderr[evaluation])) {
+      status = NP_CONTINUOUS_ROW_ERR_NUMERIC;
+      goto cleanup;
+    }
+    if((evaluation & 31) == 0)
+      R_CheckUserInterrupt();
+  }
+  status = NP_CONTINUOUS_ROW_OK;
+  goto cleanup;
+
+row_failure:
+  if(diagnostics != NULL) {
+    diagnostics->bad_coordinate = row_result->bad_coordinate;
+    diagnostics->bad_observation = row_result->bad_observation;
+    diagnostics->beta_status = row_result->beta_status;
+  }
+cleanup:
+  return status;
+}
+
 /*
  * Conditional scalar estimators use an observation-influence variance that
  * is intentionally distinct from ordinary regression's local-residual

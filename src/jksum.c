@@ -8844,6 +8844,7 @@ typedef struct {
   double **gradient;
   double **gradient_stderr;
   int num_continuous;
+  int num_predictors;
   int num_eval;
   int num_eval_alloc;
   int response_column_count;
@@ -9263,7 +9264,10 @@ np_beta_regression_categorical_gradients_validated(
   int nordered,
   NPBetaScaledRowCategoricalContext *context,
   const double *response,
+  const double *hc0_scaled_residual,
+  double hc0_residual_scale,
   int positive_weights,
+  int preserve_gradient,
   NPRegressionStandardErrorMode standard_error_mode,
   NPContinuousKernelRowWorkspace *workspace,
   NPContinuousKernelRowResult *row_result,
@@ -9275,7 +9279,10 @@ np_beta_regression_categorical_gradients_validated(
 {
   NPContinuousKernelRowStatus status = NP_CONTINUOUS_ROW_OK;
   const int do_gerr = gradient_stderr != NULL;
+  const int ordinary_hc0 = hc0_scaled_residual != NULL;
   NPContinuousKernelLogFactorProvider provider;
+  NPContinuousKernelLogFactorProvider level_provider;
+  NPBetaScaledRowCategoricalContext level_context;
   double **alternate_unordered = NULL;
   double **alternate_ordered = NULL;
   double * const *eval_unordered;
@@ -9286,6 +9293,7 @@ np_beta_regression_categorical_gradients_validated(
   double *alternate_value;
   double *alternate_mean;
   double *alternate_stderr;
+  double *level_coefficient;
   signed char *direction;
   size_t pointer_bytes;
   size_t numeric_count;
@@ -9298,6 +9306,10 @@ np_beta_regression_categorical_gradients_validated(
      (nunordered + nordered) <= 0 ||
      context == NULL || response == NULL || workspace == NULL ||
      row_result == NULL || mean == NULL || gradient == NULL ||
+     (preserve_gradient != 0 && preserve_gradient != 1) ||
+     (ordinary_hc0 &&
+      (!do_gerr || !R_FINITE(hc0_residual_scale) ||
+       hc0_residual_scale < 0.0)) ||
      (do_gerr && mean_stderr == NULL) ||
      context->dense_spec.ntrain != plan->num_train ||
      context->dense_spec.neval != plan->num_eval ||
@@ -9307,7 +9319,9 @@ np_beta_regression_categorical_gradients_validated(
      context->dense_spec.category_values == NULL ||
      (nunordered > 0 && context->dense_spec.eval_unordered == NULL) ||
      (nordered > 0 && context->dense_spec.eval_ordered == NULL) ||
-     !np_size_mul_checked((size_t)plan->num_eval, 3U, &numeric_count))
+     !np_size_mul_checked((size_t)plan->num_eval, 3U, &numeric_count) ||
+     !np_size_add_checked(
+       numeric_count, (size_t)plan->num_train, &numeric_count))
     return NP_CONTINUOUS_ROW_ERR_LAYOUT;
 
   eval_unordered = context->dense_spec.eval_unordered;
@@ -9336,8 +9350,12 @@ np_beta_regression_categorical_gradients_validated(
   alternate_value = numeric_storage;
   alternate_mean = numeric_storage + plan->num_eval;
   alternate_stderr = numeric_storage + 2 * plan->num_eval;
+  level_coefficient = numeric_storage + 3 * plan->num_eval;
   provider.function = np_beta_categorical_log_factor;
   provider.context = context;
+  level_context = *context;
+  level_provider.function = np_beta_categorical_log_factor;
+  level_provider.context = &level_context;
 
   for(coordinate = 0; coordinate < nunordered; ++coordinate) {
     const int output_coordinate = plan->num_continuous + coordinate;
@@ -9357,7 +9375,16 @@ np_beta_regression_categorical_gradients_validated(
       plan, leave_one_out, leave_one_out_offset, &provider,
       response, positive_weights, NULL, 0.0, 0, standard_error_mode,
       workspace, row_result,
-      alternate_mean, do_gerr ? alternate_stderr : NULL, diagnostics, NULL);
+      alternate_mean, (do_gerr && !ordinary_hc0) ? alternate_stderr : NULL,
+      diagnostics, NULL);
+    if(status == NP_CONTINUOUS_ROW_OK && do_gerr && ordinary_hc0)
+      status =
+        np_continuous_kernel_beta_regression_paired_hc0_rows_validated(
+          plan, leave_one_out, leave_one_out_offset,
+          &level_provider, &provider, hc0_scaled_residual,
+          hc0_residual_scale, workspace, row_result,
+          level_coefficient, (size_t)plan->num_train,
+          gradient_stderr[output_coordinate], diagnostics);
     context->dense_spec.eval_unordered = eval_unordered;
     if(context->use_compressed)
       context->compressed_spec.eval_unordered = eval_unordered;
@@ -9365,9 +9392,10 @@ np_beta_regression_categorical_gradients_validated(
     if(status != NP_CONTINUOUS_ROW_OK)
       goto cleanup;
     for(evaluation = 0; evaluation < plan->num_eval; ++evaluation) {
-      gradient[output_coordinate][evaluation] =
-        mean[evaluation] - alternate_mean[evaluation];
-      if(do_gerr)
+      if(!preserve_gradient)
+        gradient[output_coordinate][evaluation] =
+          mean[evaluation] - alternate_mean[evaluation];
+      if(do_gerr && !ordinary_hc0)
         gradient_stderr[output_coordinate][evaluation] = sqrt(
           mean_stderr[evaluation] * mean_stderr[evaluation] +
           alternate_stderr[evaluation] * alternate_stderr[evaluation]);
@@ -9387,7 +9415,8 @@ np_beta_regression_categorical_gradients_validated(
     }
     if(category_count == 1) {
       for(evaluation = 0; evaluation < plan->num_eval; ++evaluation) {
-        gradient[output_coordinate][evaluation] = 0.0;
+        if(!preserve_gradient)
+          gradient[output_coordinate][evaluation] = 0.0;
         if(do_gerr)
           gradient_stderr[output_coordinate][evaluation] = 0.0;
       }
@@ -9420,7 +9449,16 @@ np_beta_regression_categorical_gradients_validated(
       plan, leave_one_out, leave_one_out_offset, &provider,
       response, positive_weights, NULL, 0.0, 0, standard_error_mode,
       workspace, row_result,
-      alternate_mean, do_gerr ? alternate_stderr : NULL, diagnostics, NULL);
+      alternate_mean, (do_gerr && !ordinary_hc0) ? alternate_stderr : NULL,
+      diagnostics, NULL);
+    if(status == NP_CONTINUOUS_ROW_OK && do_gerr && ordinary_hc0)
+      status =
+        np_continuous_kernel_beta_regression_paired_hc0_rows_validated(
+          plan, leave_one_out, leave_one_out_offset,
+          &level_provider, &provider, hc0_scaled_residual,
+          hc0_residual_scale, workspace, row_result,
+          level_coefficient, (size_t)plan->num_train,
+          gradient_stderr[output_coordinate], diagnostics);
     context->dense_spec.eval_ordered = eval_ordered;
     if(context->use_compressed)
       context->compressed_spec.eval_ordered = eval_ordered;
@@ -9428,10 +9466,11 @@ np_beta_regression_categorical_gradients_validated(
     if(status != NP_CONTINUOUS_ROW_OK)
       goto cleanup;
     for(evaluation = 0; evaluation < plan->num_eval; ++evaluation) {
-      gradient[output_coordinate][evaluation] =
-        (double)direction[evaluation] *
-        (mean[evaluation] - alternate_mean[evaluation]);
-      if(do_gerr)
+      if(!preserve_gradient)
+        gradient[output_coordinate][evaluation] =
+          (double)direction[evaluation] *
+          (mean[evaluation] - alternate_mean[evaluation]);
+      if(do_gerr && !ordinary_hc0)
         gradient_stderr[output_coordinate][evaluation] = sqrt(
           mean_stderr[evaluation] * mean_stderr[evaluation] +
           alternate_stderr[evaluation] * alternate_stderr[evaluation]);
@@ -10217,33 +10256,26 @@ static int np_beta_absolute_route_body(
          (infinite_count > 0 || undefined_count > 0))
         warning("beta regression gradient produced %d infinite endpoint value(s) and %d undefined cancellation(s)",
                 infinite_count, undefined_count);
-      if(has_categories && !regression_moment_context->preserve_mean) {
+      if(has_categories) {
         row_status =
           np_beta_regression_categorical_gradients_validated(
             &plan, leave_one_out, leave_one_out_offset,
             num_reg_unordered, num_reg_ordered,
             categorical_context, regression_moment_context->response,
+            regression_moment_context->hc0_scaled_residual,
+            regression_moment_context->hc0_residual_scale,
             regression_moment_context->positive_weights,
+            regression_moment_context->preserve_mean,
             regression_moment_context->standard_error_mode,
             workspace, &row_result,
             regression_moment_context->mean,
             regression_moment_context->mean_stderr,
             regression_moment_context->gradient,
-            regression_moment_context->hc0_scaled_residual != NULL ?
-              NULL : regression_moment_context->gradient_stderr,
+            regression_moment_context->gradient_stderr,
             route_diagnostics);
         *regression_moment_context->status = row_status;
         if(row_status != NP_CONTINUOUS_ROW_OK)
           goto cleanup;
-      } else if(has_categories &&
-                regression_moment_context->gradient_stderr != NULL) {
-        for(coordinate = num_reg_continuous;
-            coordinate < num_reg_continuous + num_reg_unordered +
-              num_reg_ordered;
-            ++coordinate)
-          for(evaluation = 0; evaluation < num_obs_eval; ++evaluation)
-            regression_moment_context->gradient_stderr[coordinate]
-              [evaluation] = NA_REAL;
       }
     }
     status = 0;
@@ -10500,11 +10532,12 @@ static int np_beta_absolute_route(const NPBetaAbsoluteRouteCall *call)
 }
 
 /*
- * Accumulate scalar-regression HC0 derivative quadratics while the complete
- * level and derivative rows are resident. Fixed/GNN rows already know their
- * normalizers and are finalized directly. ANN has donor-major geometry, so
- * the unavoidable internal gradient/gerr output planes temporarily own the
- * cross and derivative-square moments until the post-loop reduction.
+ * Accumulate scalar-regression HC0 derivative and categorical-contrast
+ * quadratics while the complete level and alternate rows are resident.
+ * Fixed/GNN rows already know their normalizers and are finalized directly.
+ * ANN has donor-major geometry, so the unavoidable internal gradient/gerr
+ * output planes temporarily own the cross and alternate-square moments until
+ * the post-loop reduction.
  */
 static int np_regression_hc0_derivative_moments_accumulate(
   const NPRegressionHC0DerivativeMomentCtx *context,
@@ -10530,7 +10563,10 @@ static int np_regression_hc0_derivative_moments_accumulate(
   response_columns = context->response_column_count;
   if(context->scaled_residual == NULL ||
      context->gradient == NULL || context->gradient_stderr == NULL ||
-     context->num_continuous <= 0 || context->num_eval <= 0 ||
+     context->num_continuous < 0 ||
+     context->num_predictors <= 0 ||
+     context->num_continuous > context->num_predictors ||
+     context->num_eval <= 0 ||
      context->num_eval_alloc < context->num_eval ||
      response_columns <= 0 || denominator_column < 0 ||
      denominator_column >= response_columns || level_weight == NULL ||
@@ -10594,6 +10630,57 @@ static int np_regression_hc0_derivative_moments_accumulate(
         }
       }
     }
+    for(coordinate = context->num_continuous;
+        coordinate < context->num_predictors;
+        ++coordinate) {
+      const double alternate_divisor =
+        derivative_bandwidth_divisor[coordinate];
+      const size_t alternate_offset =
+        (size_t)coordinate * (size_t)num_weights;
+
+      if(!R_FINITE(alternate_divisor) || alternate_divisor == 0.0)
+        return 0;
+      if(support == NULL) {
+        int evaluation;
+
+        for(evaluation = 0; evaluation < context->num_eval; ++evaluation) {
+          const double level =
+            level_weight[evaluation] / level_bandwidth_divisor;
+          const double alternate =
+            derivative_weight[alternate_offset + (size_t)evaluation] /
+            alternate_divisor;
+
+          context->gradient[coordinate][evaluation] +=
+            level * alternate * residual_square;
+          context->gradient_stderr[coordinate][evaluation] +=
+            alternate * alternate * residual_square;
+        }
+      } else {
+        int range;
+
+        for(range = 0; range < support->n; ++range) {
+          const int start = support->istart[range];
+          const int end = start + support->nlev[range];
+          int evaluation;
+
+          if(start < 0 || support->nlev[range] < 0 || end < start ||
+             end > context->num_eval)
+            return 0;
+          for(evaluation = start; evaluation < end; ++evaluation) {
+            const double level =
+              level_weight[evaluation] / level_bandwidth_divisor;
+            const double alternate =
+              derivative_weight[alternate_offset + (size_t)evaluation] /
+              alternate_divisor;
+
+            context->gradient[coordinate][evaluation] +=
+              level * alternate * residual_square;
+            context->gradient_stderr[coordinate][evaluation] +=
+              alternate * alternate * residual_square;
+          }
+        }
+      }
+    }
     return 1;
   }
 
@@ -10650,6 +10737,74 @@ static int np_regression_hc0_derivative_moments_accumulate(
             derivative_weight_offset + (size_t)observation] /
             derivative_divisor;
           const double influence = derivative - level * ratio;
+          const double residual = context->scaled_residual[observation];
+
+          quadratic += (long double)influence * (long double)influence *
+            (long double)residual * (long double)residual;
+        }
+      }
+    }
+    if(quadratic < 0.0L || quadratic > (long double)DBL_MAX)
+      return 0;
+    context->gradient_stderr[coordinate][evaluation_or_donor] =
+      (double)quadratic;
+  }
+  for(coordinate = context->num_continuous;
+      coordinate < context->num_predictors;
+      ++coordinate) {
+    const double alternate_divisor =
+      derivative_bandwidth_divisor[coordinate];
+    const size_t alternate_output_offset =
+      (size_t)coordinate * (size_t)context->num_eval *
+      (size_t)response_columns;
+    const size_t alternate_weight_offset =
+      (size_t)coordinate * (size_t)num_weights;
+    const double level_denominator =
+      copysign(DBL_MIN, weighted_sum[denominator_column]) +
+        weighted_sum[denominator_column];
+    const double alternate_denominator = weighted_permutation_sum[
+      alternate_output_offset + (size_t)denominator_column];
+    const double ratio = level_denominator / alternate_denominator;
+    long double quadratic = 0.0L;
+
+    if(!R_FINITE(alternate_divisor) || alternate_divisor == 0.0 ||
+       !R_FINITE(level_denominator) || level_denominator == 0.0 ||
+       !R_FINITE(alternate_denominator) || alternate_denominator == 0.0 ||
+       !R_FINITE(ratio))
+      return 0;
+    if(support == NULL) {
+      int observation;
+
+      for(observation = 0; observation < num_weights; ++observation) {
+        const double level =
+          level_weight[observation] / level_bandwidth_divisor;
+        const double alternate = derivative_weight[
+          alternate_weight_offset + (size_t)observation] /
+          alternate_divisor;
+        const double influence = level - alternate * ratio;
+        const double residual = context->scaled_residual[observation];
+
+        quadratic += (long double)influence * (long double)influence *
+          (long double)residual * (long double)residual;
+      }
+    } else {
+      int range;
+
+      for(range = 0; range < support->n; ++range) {
+        const int start = support->istart[range];
+        const int end = start + support->nlev[range];
+        int observation;
+
+        if(start < 0 || support->nlev[range] < 0 || end < start ||
+           end > num_weights)
+          return 0;
+        for(observation = start; observation < end; ++observation) {
+          const double level =
+            level_weight[observation] / level_bandwidth_divisor;
+          const double alternate = derivative_weight[
+            alternate_weight_offset + (size_t)observation] /
+            alternate_divisor;
+          const double influence = level - alternate * ratio;
           const double residual = context->scaled_residual[observation];
 
           quadratic += (long double)influence * (long double)influence *
@@ -11012,9 +11167,11 @@ NPPermutationWeightOutput * const pkw_output){
   assert(!(do_dual_power && nws));
   if(do_hc0_derivative &&
      (!do_dual_power || permutation_operator != OP_DERIVATIVE ||
-      p_nvar < num_reg_continuous || num_reg_continuous <= 0 ||
+      p_nvar != num_reg_continuous + num_reg_unordered + num_reg_ordered ||
+      p_nvar <= 0 ||
       leave_one_out || drop_one_train || gather_scatter ||
       hc0_derivative_ctx->num_continuous != num_reg_continuous ||
+      hc0_derivative_ctx->num_predictors != p_nvar ||
       hc0_derivative_ctx->num_eval != num_obs_eval ||
       hc0_derivative_ctx->response_column_count !=
         MAX(ncol_Y, 1)*MAX(ncol_W, 1)))
@@ -11801,7 +11958,7 @@ NPPermutationWeightOutput * const pkw_output){
       status = KWSNP_ERR_BADINVOC;
       goto cleanup;
     }
-    for(i = 0; i < num_reg_continuous; ++i) {
+    for(i = 0; i < p_nvar; ++i) {
       if(hc0_derivative_ctx->gradient[i] == NULL ||
          hc0_derivative_ctx->gradient_stderr[i] == NULL) {
         status = KWSNP_ERR_BADINVOC;
@@ -12874,14 +13031,14 @@ NPPermutationWeightOutput * const pkw_output){
 
     if(do_hc0_derivative) {
       if(BANDWIDTH_reg == BW_FIXED || BANDWIDTH_reg == BW_GEN_NN) {
-        for(ii = 0; ii < num_reg_continuous; ++ii)
+        for(ii = 0; ii < p_nvar; ++ii)
           MPI_Allgather(
             MPI_IN_PLACE, stride, MPI_DOUBLE,
             hc0_derivative_ctx->gradient_stderr[ii], stride,
             MPI_DOUBLE, comm[1]);
       } else {
         const size_t plane_count =
-          (size_t)num_reg_continuous*(size_t)num_obs_eval_alloc;
+          (size_t)p_nvar*(size_t)num_obs_eval_alloc;
         const int planes_are_adjacent =
           hc0_derivative_ctx->gradient_stderr[0] ==
             hc0_derivative_ctx->gradient[0] + plane_count;
@@ -12891,7 +13048,7 @@ NPPermutationWeightOutput * const pkw_output){
           status = KWSNP_ERR_BADINVOC;
           goto cleanup;
         }
-        for(ii = 1; ii < num_reg_continuous; ++ii) {
+        for(ii = 1; ii < p_nvar; ++ii) {
           if(hc0_derivative_ctx->gradient_stderr[ii] !=
              hc0_derivative_ctx->gradient_stderr[0] +
                (size_t)ii*(size_t)num_obs_eval_alloc ||
@@ -24729,12 +24886,13 @@ static SEXP np_regression_scalar_fit_execute(void *data)
     hc0_dual_power_ctx.ncol_W = 1;
     hc0_dual_power_ctx.progress = NULL;
     hc0_dual_power_ctx.retain_common_scale = 0;
-    if(call->do_gerr && call->num_reg_continuous > 0) {
+    if(call->do_gerr && p_nvar > 0) {
       hc0_derivative_ctx.scaled_residual =
         call->hc0_context->scaled_residual;
       hc0_derivative_ctx.gradient = call->gradient;
       hc0_derivative_ctx.gradient_stderr = call->gradient_stderr;
       hc0_derivative_ctx.num_continuous = call->num_reg_continuous;
+      hc0_derivative_ctx.num_predictors = p_nvar;
       hc0_derivative_ctx.num_eval = call->num_obs_eval;
       hc0_derivative_ctx.num_eval_alloc = call->num_obs_eval_alloc;
       hc0_derivative_ctx.response_column_count = response_column_count;
@@ -24899,37 +25057,66 @@ static SEXP np_regression_scalar_fit_execute(void *data)
     for(predictor = call->num_reg_continuous;
         predictor < call->num_reg_continuous + call->num_reg_unordered;
         predictor++) {
-      if(point_already_computed) {
-        if(call->do_gerr)
-          for(i = 0; i < call->num_obs_eval; ++i)
-            call->gradient_stderr[predictor][i] = NA_REAL;
-        continue;
-      }
       for(i = 0; i < call->num_obs_eval; i++) {
         const int response_offset =
           response_column_count * i;
         const int permutation_offset =
           predictor * call->num_obs_eval *
           response_column_count + response_offset;
-        const double denominator =
+        const int denominator_column = point_already_computed ? 0 : 1;
+        const double level_denominator =
           copysign(DBL_MIN,
-                   owner->permutation_columns[permutation_offset + 1]) +
-          owner->permutation_columns[permutation_offset + 1];
-        const double alternate_mean =
-          owner->permutation_columns[permutation_offset] / denominator;
+                   owner->mean_columns[
+                     response_offset + denominator_column]) +
+          owner->mean_columns[response_offset + denominator_column];
+        const double alternate_denominator =
+          copysign(DBL_MIN,
+                   owner->permutation_columns[
+                     permutation_offset + denominator_column]) +
+          owner->permutation_columns[
+            permutation_offset + denominator_column];
+        double hc0_cross_moment = 0.0;
+
+        if(ordinary_hc0 && call->bandwidth_mode == BW_ADAP_NN)
+          hc0_cross_moment = call->gradient[predictor][i];
         if(!point_already_computed)
-          call->gradient[predictor][i] = call->mean[i] - alternate_mean;
+          call->gradient[predictor][i] = call->mean[i] -
+            owner->permutation_columns[permutation_offset] /
+              alternate_denominator;
         if(call->do_gerr && ordinary_hc0) {
-          call->gradient_stderr[predictor][i] = NA_REAL;
+          double quadratic = call->gradient_stderr[predictor][i];
+
+          if(call->bandwidth_mode == BW_ADAP_NN &&
+             !np_regression_hc0_derivative_quadratic(
+               quadratic, call->mean_stderr[i], hc0_cross_moment,
+               level_denominator / alternate_denominator, &quadratic)) {
+            execution->status = NP_REGRESSION_SCALAR_FIT_ERR_HC0;
+            return R_NilValue;
+          }
+          if(!R_FINITE(quadratic) || quadratic < 0.0) {
+            execution->status = NP_REGRESSION_SCALAR_FIT_ERR_HC0;
+            return R_NilValue;
+          }
+          call->gradient_stderr[predictor][i] =
+            call->hc0_context->residual_scale * sqrt(quadratic) /
+            fabs(level_denominator);
+          if(!R_FINITE(call->gradient_stderr[predictor][i])) {
+            execution->status = NP_REGRESSION_SCALAR_FIT_ERR_HC0;
+            return R_NilValue;
+          }
         } else if(call->do_gerr && call->num_reg_continuous > 0) {
+          const double alternate_mean =
+            owner->permutation_columns[permutation_offset] /
+            alternate_denominator;
           const double variance =
-            owner->permutation_columns[permutation_offset + 2] / denominator -
+            owner->permutation_columns[permutation_offset + 2] /
+              alternate_denominator -
             alternate_mean * alternate_mean;
           const double nonnegative_variance = variance <= 0.0 ? 0.0 : variance;
           call->gradient_stderr[predictor][i] = sqrt(
             call->mean_stderr[i] * call->mean_stderr[i] +
             nonnegative_variance * call->kernel_squared_integral /
-            (denominator * call->bandwidth_product));
+            (alternate_denominator * call->bandwidth_product));
         } else if(call->do_gerr) {
           call->gradient_stderr[predictor][i] = 0.0;
         }
@@ -24938,10 +25125,17 @@ static SEXP np_regression_scalar_fit_execute(void *data)
 
     for(predictor = call->num_reg_continuous + call->num_reg_unordered;
         predictor < p_nvar; predictor++) {
-      if(point_already_computed) {
-        if(call->do_gerr)
-          for(i = 0; i < call->num_obs_eval; ++i)
-            call->gradient_stderr[predictor][i] = NA_REAL;
+      const int ordered_coordinate = predictor -
+        call->num_reg_continuous - call->num_reg_unordered;
+
+      if(call->num_categories[
+           call->num_reg_unordered + ordered_coordinate] == 1) {
+        for(i = 0; i < call->num_obs_eval; ++i) {
+          if(!point_already_computed)
+            call->gradient[predictor][i] = 0.0;
+          if(call->do_gerr)
+            call->gradient_stderr[predictor][i] = 0.0;
+        }
         continue;
       }
       for(i = 0; i < call->num_obs_eval; i++) {
@@ -24950,30 +25144,63 @@ static SEXP np_regression_scalar_fit_execute(void *data)
         const int permutation_offset =
           predictor * call->num_obs_eval *
           response_column_count + response_offset;
-        const double denominator =
+        const int denominator_column = point_already_computed ? 0 : 1;
+        const double level_denominator =
           copysign(DBL_MIN,
-                   owner->permutation_columns[permutation_offset + 1]) +
-          owner->permutation_columns[permutation_offset + 1];
-        const double alternate_mean =
-          owner->permutation_columns[permutation_offset] / denominator;
-        const int ordered_coordinate = predictor -
-          call->num_reg_continuous - call->num_reg_unordered;
+                   owner->mean_columns[
+                     response_offset + denominator_column]) +
+          owner->mean_columns[response_offset + denominator_column];
+        const double alternate_denominator =
+          copysign(DBL_MIN,
+                   owner->permutation_columns[
+                     permutation_offset + denominator_column]) +
+          owner->permutation_columns[
+            permutation_offset + denominator_column];
+        double hc0_cross_moment = 0.0;
+
+        if(ordinary_hc0 && call->bandwidth_mode == BW_ADAP_NN)
+          hc0_cross_moment = call->gradient[predictor][i];
         if(!point_already_computed)
           call->gradient[predictor][i] =
-            (call->mean[i] - alternate_mean) *
+            (call->mean[i] -
+             owner->permutation_columns[permutation_offset] /
+               alternate_denominator) *
             (call->matrix_ordered_indices[ordered_coordinate][i] != 0 ?
              1.0 : -1.0);
         if(call->do_gerr && ordinary_hc0) {
-          call->gradient_stderr[predictor][i] = NA_REAL;
+          double quadratic = call->gradient_stderr[predictor][i];
+
+          if(call->bandwidth_mode == BW_ADAP_NN &&
+             !np_regression_hc0_derivative_quadratic(
+               quadratic, call->mean_stderr[i], hc0_cross_moment,
+               level_denominator / alternate_denominator, &quadratic)) {
+            execution->status = NP_REGRESSION_SCALAR_FIT_ERR_HC0;
+            return R_NilValue;
+          }
+          if(!R_FINITE(quadratic) || quadratic < 0.0) {
+            execution->status = NP_REGRESSION_SCALAR_FIT_ERR_HC0;
+            return R_NilValue;
+          }
+          call->gradient_stderr[predictor][i] =
+            call->hc0_context->residual_scale * sqrt(quadratic) /
+            fabs(level_denominator);
+          if(!R_FINITE(call->gradient_stderr[predictor][i])) {
+            execution->status = NP_REGRESSION_SCALAR_FIT_ERR_HC0;
+            return R_NilValue;
+          }
         } else if(call->do_gerr && call->num_reg_continuous > 0) {
+          const double alternate_mean =
+            owner->permutation_columns[permutation_offset] /
+            alternate_denominator;
           const double variance =
-            owner->permutation_columns[permutation_offset + 2] / denominator -
+            owner->permutation_columns[permutation_offset + 2] /
+              alternate_denominator -
             alternate_mean * alternate_mean;
           const double nonnegative_variance = variance <= 0.0 ? 0.0 : variance;
           call->gradient_stderr[predictor][i] = sqrt(
             call->mean_stderr[i] * call->mean_stderr[i] +
             nonnegative_variance * call->kernel_squared_integral /
-            (denominator * call->bandwidth_product));
+            (alternate_denominator * call->bandwidth_product));
         } else if(call->do_gerr) {
           call->gradient_stderr[predictor][i] = 0.0;
         }

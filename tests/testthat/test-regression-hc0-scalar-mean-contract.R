@@ -167,7 +167,7 @@ test_that("mixed beta scalar HC0 preserves dense and compressed point routes", {
           tolerance = 3e-14
         )
         expect_true(all(is.finite(dense$gerr[, bw$icon, drop = FALSE])))
-        expect_true(all(is.na(dense$gerr[, !bw$icon, drop = FALSE])))
+        expect_true(all(is.finite(dense$gerr[, !bw$icon, drop = FALSE])))
         expect_identical(compressed$mean, dense$mean)
         expect_identical(compressed$merr, dense$merr)
         expect_identical(compressed$grad, dense$grad)
@@ -363,7 +363,7 @@ test_that("the scalar all-large point shortcut cedes without point drift", {
   )
 })
 
-test_that("scalar HC0 preserves point gradients and exposes continuous gerr", {
+test_that("scalar HC0 preserves point gradients and exposes every gerr", {
   old <- options(np.messages = FALSE)
   on.exit(options(old), add = TRUE)
 
@@ -392,7 +392,7 @@ test_that("scalar HC0 preserves point gradients and exposes continuous gerr", {
     expect_identical(fit.se$grad, fit.no.se$grad)
     expect_identical(fit.se$xtra, fit.no.se$xtra)
     expect_true(all(is.finite(fit.se$gerr[, bw$icon, drop = FALSE])))
-    expect_true(all(is.na(fit.se$gerr[, !bw$icon, drop = FALSE])))
+    expect_true(all(is.finite(fit.se$gerr[, !bw$icon, drop = FALSE])))
   }
 })
 

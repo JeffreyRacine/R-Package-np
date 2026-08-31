@@ -369,6 +369,25 @@ np_continuous_kernel_beta_regression_moment_rows_validated(
   NPContinuousKernelDerivativeDiagnostics *diagnostics,
   NPContinuousKernelProgressFunction progress);
 
+/* Reduce the HC0 variance of a normalized difference between two beta-row
+ * providers.  Only one normalized endpoint row is retained, so incremental
+ * storage is O(n_train) rather than O(n_train * n_eval). */
+NPContinuousKernelRowStatus
+np_continuous_kernel_beta_regression_paired_hc0_rows_validated(
+  const NPContinuousKernelRowPlan *plan,
+  int leave_one_out,
+  int leave_one_out_offset,
+  const NPContinuousKernelLogFactorProvider *level_provider,
+  const NPContinuousKernelLogFactorProvider *alternate_provider,
+  const double *hc0_scaled_residual,
+  double hc0_residual_scale,
+  NPContinuousKernelRowWorkspace *workspace,
+  NPContinuousKernelRowResult *row_result,
+  double *level_coefficient,
+  size_t level_coefficient_capacity,
+  double *contrast_stderr,
+  NPContinuousKernelDerivativeDiagnostics *diagnostics);
+
 /* Conditional scalar sibling with the established observation-influence
  * standard-error contract. All rows fuse M2 overflow validation into the
  * required influence pass; positive rows retain their stable online mean.
