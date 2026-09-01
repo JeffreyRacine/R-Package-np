@@ -1,5 +1,15 @@
 # npRmpi 0.70-6
 
+* Continuous generalized- and adaptive-nearest-neighbour bandwidths now use
+  the literal kth admitted distance throughout ordinary, beta-kernel, and
+  kernel-sum owners. Exact ties that make this radius zero invalidate the
+  requested bandwidth instead of silently widening it to the nearest
+  positive distance or replacing it by a numerical floor. Search candidates
+  retain their established invalid-objective mapping, while direct public
+  computation reports the zero-radius condition. Every represented strictly
+  positive radius remains admissible; k, occurrence exclusion, extended-NN
+  scaling, cache policy, MPI partitioning, and public interfaces are unchanged.
+
 * Generalized-nearest-neighbor unconditional plot bootstraps now preserve
   literal resample multiplicities when MPI workers own exact kernel-sum
   evaluation. This matches serial resampling semantics; adaptive-nearest-

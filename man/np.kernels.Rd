@@ -52,6 +52,16 @@
   \deqn{K_U(u)=\frac{1}{2}\mathbf{1}(|u|<1)}
   via \code{ckertype="uniform"} (order ignored).
 
+  For generalized- and adaptive-nearest-neighbor modes, each continuous
+  bandwidth is the literal \eqn{k}th admitted distance after any occurrence
+  exclusion required by the route. Exact ties can therefore make the radius
+  zero. A zero continuous radius does not define a positive metric bandwidth
+  and is rejected rather than widened to a more distant observation or
+  replaced by a numerical floor. Choose a larger \eqn{k} or correct an
+  unintended continuously coded tie. Any represented strictly positive
+  radius, including a positive subnormal value, is distinct from this
+  zero-radius condition.
+
   The beta associated-kernel family is available for continuous data with
   finite support. For an
   evaluation point \eqn{x}, observation \eqn{x_i}, fixed support

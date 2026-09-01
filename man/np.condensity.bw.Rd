@@ -864,6 +864,10 @@ or standard-deviation factors.
   bandwidths change with the point at which the density is estimated,
   \eqn{x}. Fixed bandwidths are constant over the support of \eqn{x}.
 
+  Exact ties can make the literal \eqn{k}th continuous nearest-neighbor
+  radius zero. Such a bandwidth is undefined and is rejected; see
+  \code{\link{np.kernels}} for the precise contract and remedies.
+
   \code{npcdensbw} may be invoked \emph{either} with a formula-like
   symbolic
   description of variables on which bandwidth selection is to be

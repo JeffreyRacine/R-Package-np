@@ -221,6 +221,10 @@ Further arguments passed to the default kernel-sum method.
   bandwidths change with the point at which the sum is computed,
   \eqn{x}. Fixed bandwidths are constant over the support of \eqn{x}.
 
+  Exact ties can make the literal \eqn{k}th continuous nearest-neighbor
+  radius zero. Such a bandwidth is undefined and is rejected; see
+  \code{\link{np.kernels}} for the precise contract and remedies.
+
   \code{npksum} computes \eqn{\sum_{j=1}^{n}{W_j^\prime Y_j
   K(X_j)}}{sum(t(W[j]) \%*\% Y[j] * K(X[j]))}, where \eqn{W_j}{W[j]}
   represents a row vector extracted from \eqn{W}.  That is, it computes

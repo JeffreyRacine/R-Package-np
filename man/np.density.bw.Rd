@@ -558,6 +558,10 @@ or standard-deviation factors.
   with the point at which the density is estimated, \eqn{x}. Fixed bandwidths
   are constant over the support of \eqn{x}.
 
+  Exact ties can make the literal \eqn{k}th continuous nearest-neighbor
+  radius zero. Such a bandwidth is undefined and is rejected; see
+  \code{\link{np.kernels}} for the precise contract and remedies.
+
   The Chen/Igarashi--Kakizawa beta family is available at orders 2, 4, 6,
   and 8 for fixed, generalized-NN, and adaptive-NN estimation of continuous
   variables on finite supports. Beta continuous coordinates may be combined
