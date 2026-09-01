@@ -120,6 +120,23 @@ test_that("nplsqreg fixed delta layout is preserved by the check-loss backend", 
                tolerance = 1e-12)
 })
 
+test_that("nplsqreg scale finalization preserves positive pilot values", {
+  finalize <- getFromNamespace(".nplsqreg_finalize_scale_pilot", "np")
+  residuals <- c(-2, -1, 1, 2)
+  variance <- c(4, .Machine$double.xmin, 0, -1)
+  scale <- finalize(variance, residuals)
+  expected.floor <- sqrt(mean(residuals^2)) * sqrt(.Machine$double.eps)
+
+  expect_identical(scale[1L], 2)
+  expect_identical(scale[2L], sqrt(.Machine$double.xmin))
+  expect_identical(scale[3:4], rep(expected.floor, 2L))
+  expect_identical(finalize(variance * 16^2, residuals * 16), scale * 16)
+  expect_error(finalize(c(1, NA, 1, 1), residuals),
+               "nonfinite fitted variance")
+  expect_error(finalize(c(1, 0), c(0, 0)),
+               "no positive residual scale")
+})
+
 test_that("nplsqreg refined tau search keeps full controls for the anchor", {
   set.seed(20260703)
   n <- 24L
