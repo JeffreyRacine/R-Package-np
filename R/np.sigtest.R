@@ -677,7 +677,10 @@ npsigtest.rbandwidth <- function(bws,
           )
           tile.rows <- tile.start:(tile.start + tile.count - 1L)
           In.vec[tile.rows] <- tile.statistic
-          progress <- .np_progress_step(progress, done = tail(tile.rows, 1L))
+          progress <- .np_progress_step(
+            progress,
+            done = tile.rows[[length(tile.rows)]]
+          )
         }
       } else for (i.star in seq_len(boot.num)) {
         if(boot.method == "iid") {
