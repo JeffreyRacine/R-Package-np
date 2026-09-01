@@ -21656,6 +21656,10 @@ double * cv){
         status = 1;
         goto cleanup_distribution_ls_cv;
       }
+      if(nn_geometry_status == NP_NN_GEOMETRY_ZERO_RADIUS) {
+        status = 1;
+        goto cleanup_distribution_ls_cv;
+      }
       error("\n** Error: invalid bandwidth.");
     }
   }
@@ -41896,6 +41900,10 @@ double *cv){
        are converted to the optimizer penalty by the callback. */
     if(exact_beta_route)
       goto cleanup_density_convolution_cv;
+    if(nn_geometry_status == NP_NN_GEOMETRY_ZERO_RADIUS) {
+      status = 1;
+      goto cleanup_density_convolution_cv;
+    }
     error("\n** Error: invalid bandwidth.");
   }
   full_design_bandwidth = adaptive_successor_bandwidth != NULL ?

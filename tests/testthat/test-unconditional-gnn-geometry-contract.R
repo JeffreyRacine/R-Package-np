@@ -119,4 +119,35 @@ test_that("ordinary generalized-NN unconditional fit reports zero literal radii"
     eval.only = TRUE, nmulti = 1L
   )
   expect_gt(sum(invalid$invalid.history), 0)
+
+  density_ls_bw <- npudensbw(
+    dat = dat, bwtype = "generalized_nn", bwmethod = "cv.ls",
+    bws = 2L, bandwidth.compute = FALSE
+  )
+  invalid_density_ls <- np:::npudensbw.bandwidth(
+    dat = dat, bws = density_ls_bw, bandwidth.compute = TRUE,
+    eval.only = TRUE, nmulti = 1L
+  )
+  invalid_distribution <- np:::npudistbw.dbandwidth(
+    dat = dat, bws = dist_bw, bandwidth.compute = TRUE,
+    eval.only = TRUE, nmulti = 1L
+  )
+  expect_gt(sum(invalid_density_ls$invalid.history), 0)
+  expect_gt(sum(invalid_distribution$invalid.history), 0)
+})
+
+test_that("mixed generalized-NN distribution search recovers from invalid candidates", {
+  old <- options(np.messages = FALSE, np.tree = FALSE)
+  on.exit(options(old), add = TRUE)
+
+  data("Italy")
+  dat <- transform(Italy[seq_len(20L), , drop = FALSE],
+                   year = ordered(year))
+  bw <- npudistbw(
+    ~ year + gdp, data = dat, bwtype = "generalized_nn", nmulti = 1L
+  )
+
+  expect_true(all(is.finite(bw$bw)))
+  expect_true(all(bw$bw > 0))
+  expect_gt(sum(bw$invalid.history), 0)
 })
