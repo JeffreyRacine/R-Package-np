@@ -8940,6 +8940,7 @@ SEXP C_np_density_conditional(SEXP tyuno,
 
   np_lp_engine_extern = np_regression_engine_or_error(
     asInteger(regtype_i), "C_np_conditional_density_bw");
+  vector_glp_gradient_order_extern = NULL;
   if ((np_lp_engine_extern == NP_LP_ENGINE_GENERAL) && (ncon_x > 0)) {
     if ((int)XLENGTH(glp_degree_i) != ncon_x)
       error("C_np_density_conditional: length(glp_degree) must equal number of continuous x variables");
@@ -8987,6 +8988,7 @@ SEXP C_np_density_conditional(SEXP tyuno,
   SET_STRING_ELT(out_names, 4, mkChar("log_likelihood"));
   setAttrib(out, R_NamesSymbol, out_names);
   vector_glp_degree_extern = NULL;
+  vector_glp_gradient_order_extern = NULL;
   int_glp_bernstein_extern = 0;
   int_glp_basis_extern = 1;
   np_lp_engine_extern = NP_LP_ENGINE_SCALAR;
