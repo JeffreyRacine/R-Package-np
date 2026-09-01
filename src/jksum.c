@@ -19523,7 +19523,12 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
 
     for(int ii = 0; ii < num_obs; ii++){
       const int ii2 = 2*ii;
-      const double sk = copysign(DBL_MIN, mean[ii2+1]) + mean[ii2+1];
+      const double normalizer = mean[ii2+1];
+      if(leave_one_out && normalizer == 0.0){
+        cv = DBL_MAX;
+        break;
+      }
+      const double sk = copysign(DBL_MIN, normalizer) + normalizer;
       const double loss_y =
         (bwm == RBWM_CVCHECK && vector_lsq_loss_extern != NULL) ?
         vector_lsq_loss_extern[ii] :
