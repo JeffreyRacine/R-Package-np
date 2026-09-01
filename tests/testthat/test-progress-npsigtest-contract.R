@@ -40,7 +40,7 @@ make_sigtest_fixture <- function(seed = 42, n = 30) {
   list(bw = bw)
 }
 
-test_that("npsigtest joint progress has one immediate call-wide owner", {
+test_that("npsigtest joint progress delays bootstrap ETA until work completes", {
   fixture <- make_sigtest_fixture()
 
   old_opts <- options(
@@ -66,13 +66,20 @@ test_that("npsigtest joint progress has one immediate call-wide owner", {
   single.signature <- shadow_npsigtest_signature(single_line)
 
   expect_s3_class(single_line$value, "sigtest")
-  expect_equal(single.signature[single.signature$event != "finish", ], legacy.signature)
+  expect_equal(
+    single.signature[single.signature$event != "finish", ],
+    legacy.signature[legacy.signature$event != "finish", ]
+  )
   expect_match(lines[[1L]], "^\\[np\\] Testing joint significance\\.\\.\\. elapsed 0\\.0s$")
+  expect_false(grepl("eta", lines[[1L]], fixed = TRUE))
+  expect_true(any(grepl("^\\[np\\] Testing joint significance 1/9 ", lines)))
+  expect_true(any(grepl("^\\[np\\] Testing joint significance 9/9 ", lines)))
+  expect_true(any(grepl("eta [0-9]+\\.[0-9]s", lines)))
   expect_length(unique(single.signature$id), 1L)
   expect_identical(tail(single.signature$event, 1L), "finish")
 })
 
-test_that("npsigtest individual progress has one compact call-wide owner", {
+test_that("npsigtest individual progress uses completed predictors for ETA", {
   fixture <- make_sigtest_fixture(seed = 99)
 
   old_opts <- options(
@@ -98,9 +105,15 @@ test_that("npsigtest individual progress has one compact call-wide owner", {
   single.signature <- shadow_npsigtest_signature(single_line)
 
   expect_s3_class(single_line$value, "sigtest")
-  expect_equal(single.signature[single.signature$event != "finish", ], legacy.signature)
+  expect_equal(
+    single.signature[single.signature$event != "finish", ],
+    legacy.signature[legacy.signature$event != "finish", ]
+  )
   expect_match(lines[[1L]], "^\\[np\\] Testing x1\\.\\.\\. elapsed 0\\.0s$")
-  expect_true(any(grepl("^\\[np\\] Testing x2", lines)))
+  expect_false(grepl("eta", lines[[1L]], fixed = TRUE))
+  expect_true(any(grepl("^\\[np\\] Testing x2 1/2 ", lines)))
+  expect_true(any(grepl("^\\[np\\] Testing x2 2/2 ", lines)))
+  expect_false(any(grepl("/[9] ", lines)))
   expect_false(any(grepl("of \\(1,2\\)", lines)))
   expect_length(unique(single.signature$id), 1L)
   expect_identical(tail(single.signature$event, 1L), "finish")
