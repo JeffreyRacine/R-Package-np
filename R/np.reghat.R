@@ -301,7 +301,7 @@ npreghat <-
   )
 
   denom <- colSums(kw)
-  denom[denom == 0.0] <- .Machine$double.xmin
+  denom[!is.finite(denom) | denom == 0.0] <- NA_real_
   .np_lc_hat_normalize(kw, denom)
 }
 

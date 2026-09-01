@@ -25076,11 +25076,23 @@ static SEXP np_regression_scalar_fit_execute(void *data)
     const int response_offset = response_column_count * i;
     const int denominator_column = point_already_computed ? 0 : 1;
     const double denominator =
-      copysign(DBL_MIN,
-               owner->mean_columns[response_offset + denominator_column]) +
       owner->mean_columns[response_offset + denominator_column];
-    if(!point_already_computed)
+
+    if(!R_FINITE(denominator) || denominator == 0.0) {
+      call->mean[i] = NA_REAL;
+      if(call->do_merr)
+        call->mean_stderr[i] = NA_REAL;
+      continue;
+    }
+    if(!point_already_computed) {
       call->mean[i] = owner->mean_columns[response_offset] / denominator;
+      if(!R_FINITE(call->mean[i])) {
+        call->mean[i] = NA_REAL;
+        if(call->do_merr)
+          call->mean_stderr[i] = NA_REAL;
+        continue;
+      }
+    }
     if(ordinary_hc0 && !defer_hc0_mean_stderr) {
       const double moment = call->mean_stderr[i];
       double se;
@@ -25091,11 +25103,7 @@ static SEXP np_regression_scalar_fit_execute(void *data)
       }
       se = call->hc0_context->residual_scale *
         sqrt(moment) / fabs(denominator);
-      if(!R_FINITE(se)) {
-        execution->status = NP_REGRESSION_SCALAR_FIT_ERR_HC0;
-        return R_NilValue;
-      }
-      call->mean_stderr[i] = se;
+      call->mean_stderr[i] = R_FINITE(se) ? se : NA_REAL;
     } else if(!ordinary_hc0 && call->do_merr) {
       call->mean_stderr[i] =
         owner->mean_columns[response_offset + 2] / denominator -
@@ -25103,6 +25111,8 @@ static SEXP np_regression_scalar_fit_execute(void *data)
       call->mean_stderr[i] = (call->mean_stderr[i] <= 0.0) ? 0.0 :
         sqrt(call->mean_stderr[i] * call->kernel_squared_integral /
              (denominator * call->bandwidth_product));
+      if(!R_FINITE(call->mean_stderr[i]))
+        call->mean_stderr[i] = NA_REAL;
     }
   }
 
@@ -25117,9 +25127,6 @@ static SEXP np_regression_scalar_fit_execute(void *data)
         const int derivative_denominator_column =
           point_already_computed ? 0 : 1;
         const double denominator =
-          copysign(DBL_MIN,
-                   owner->mean_columns[
-                     response_offset + derivative_denominator_column]) +
           owner->mean_columns[
             response_offset + derivative_denominator_column];
         const double derivative_denominator =
@@ -25129,12 +25136,25 @@ static SEXP np_regression_scalar_fit_execute(void *data)
           owner->permutation_columns[permutation_offset];
         double hc0_cross_moment = 0.0;
 
+        if(!R_FINITE(call->mean[i]) || !R_FINITE(denominator) ||
+           denominator == 0.0) {
+          call->gradient[predictor][i] = NA_REAL;
+          if(call->do_gerr)
+            call->gradient_stderr[predictor][i] = NA_REAL;
+          continue;
+        }
         if(ordinary_hc0 && call->bandwidth_mode == BW_ADAP_NN)
           hc0_cross_moment = call->gradient[predictor][i];
         if(!point_already_computed)
           call->gradient[predictor][i] =
             (derivative_numerator -
              call->mean[i] * derivative_denominator) / denominator;
+        if(!R_FINITE(call->gradient[predictor][i])) {
+          call->gradient[predictor][i] = NA_REAL;
+          if(call->do_gerr)
+            call->gradient_stderr[predictor][i] = NA_REAL;
+          continue;
+        }
         if(call->do_gerr && ordinary_hc0) {
           double quadratic = call->gradient_stderr[predictor][i];
 
@@ -25179,24 +25199,33 @@ static SEXP np_regression_scalar_fit_execute(void *data)
           response_column_count + response_offset;
         const int denominator_column = point_already_computed ? 0 : 1;
         const double level_denominator =
-          copysign(DBL_MIN,
-                   owner->mean_columns[
-                     response_offset + denominator_column]) +
           owner->mean_columns[response_offset + denominator_column];
         const double alternate_denominator =
-          copysign(DBL_MIN,
-                   owner->permutation_columns[
-                     permutation_offset + denominator_column]) +
           owner->permutation_columns[
             permutation_offset + denominator_column];
         double hc0_cross_moment = 0.0;
 
+        if(!R_FINITE(call->mean[i]) || !R_FINITE(level_denominator) ||
+           level_denominator == 0.0 ||
+           !R_FINITE(alternate_denominator) ||
+           alternate_denominator == 0.0) {
+          call->gradient[predictor][i] = NA_REAL;
+          if(call->do_gerr)
+            call->gradient_stderr[predictor][i] = NA_REAL;
+          continue;
+        }
         if(ordinary_hc0 && call->bandwidth_mode == BW_ADAP_NN)
           hc0_cross_moment = call->gradient[predictor][i];
         if(!point_already_computed)
           call->gradient[predictor][i] = call->mean[i] -
             owner->permutation_columns[permutation_offset] /
               alternate_denominator;
+        if(!R_FINITE(call->gradient[predictor][i])) {
+          call->gradient[predictor][i] = NA_REAL;
+          if(call->do_gerr)
+            call->gradient_stderr[predictor][i] = NA_REAL;
+          continue;
+        }
         if(call->do_gerr && ordinary_hc0) {
           double quadratic = call->gradient_stderr[predictor][i];
 
@@ -25245,9 +25274,14 @@ static SEXP np_regression_scalar_fit_execute(void *data)
       if(call->num_categories[
            call->num_reg_unordered + ordered_coordinate] == 1) {
         for(i = 0; i < call->num_obs_eval; ++i) {
-          if(!point_already_computed)
+          if(!R_FINITE(call->mean[i])) {
+            call->gradient[predictor][i] = NA_REAL;
+            if(call->do_gerr)
+              call->gradient_stderr[predictor][i] = NA_REAL;
+          } else if(!point_already_computed) {
             call->gradient[predictor][i] = 0.0;
-          if(call->do_gerr)
+          }
+          if(call->do_gerr && R_FINITE(call->mean[i]))
             call->gradient_stderr[predictor][i] = 0.0;
         }
         continue;
@@ -25260,18 +25294,21 @@ static SEXP np_regression_scalar_fit_execute(void *data)
           response_column_count + response_offset;
         const int denominator_column = point_already_computed ? 0 : 1;
         const double level_denominator =
-          copysign(DBL_MIN,
-                   owner->mean_columns[
-                     response_offset + denominator_column]) +
           owner->mean_columns[response_offset + denominator_column];
         const double alternate_denominator =
-          copysign(DBL_MIN,
-                   owner->permutation_columns[
-                     permutation_offset + denominator_column]) +
           owner->permutation_columns[
             permutation_offset + denominator_column];
         double hc0_cross_moment = 0.0;
 
+        if(!R_FINITE(call->mean[i]) || !R_FINITE(level_denominator) ||
+           level_denominator == 0.0 ||
+           !R_FINITE(alternate_denominator) ||
+           alternate_denominator == 0.0) {
+          call->gradient[predictor][i] = NA_REAL;
+          if(call->do_gerr)
+            call->gradient_stderr[predictor][i] = NA_REAL;
+          continue;
+        }
         if(ordinary_hc0 && call->bandwidth_mode == BW_ADAP_NN)
           hc0_cross_moment = call->gradient[predictor][i];
         if(!point_already_computed)
@@ -25281,6 +25318,12 @@ static SEXP np_regression_scalar_fit_execute(void *data)
                alternate_denominator) *
             (call->matrix_ordered_indices[ordered_coordinate][i] != 0 ?
              1.0 : -1.0);
+        if(!R_FINITE(call->gradient[predictor][i])) {
+          call->gradient[predictor][i] = NA_REAL;
+          if(call->do_gerr)
+            call->gradient_stderr[predictor][i] = NA_REAL;
+          continue;
+        }
         if(call->do_gerr && ordinary_hc0) {
           double quadratic = call->gradient_stderr[predictor][i];
 
@@ -25327,11 +25370,14 @@ static SEXP np_regression_scalar_fit_execute(void *data)
       const int response_offset = response_column_count * i;
       const int denominator_column = point_already_computed ? 0 : 1;
       const double denominator =
-        copysign(DBL_MIN,
-                 owner->mean_columns[response_offset + denominator_column]) +
         owner->mean_columns[response_offset + denominator_column];
       const double moment = call->mean_stderr[i];
 
+      if(!R_FINITE(call->mean[i]) || !R_FINITE(denominator) ||
+         denominator == 0.0) {
+        call->mean_stderr[i] = NA_REAL;
+        continue;
+      }
       if(!R_FINITE(moment) || moment < 0.0) {
         execution->status = NP_REGRESSION_SCALAR_FIT_ERR_HC0;
         return R_NilValue;
@@ -25345,18 +25391,24 @@ static SEXP np_regression_scalar_fit_execute(void *data)
     }
   }
 
-  if(conditional_influence && call->do_merr &&
-     !np_regression_conditional_influence_finish(
-       call->num_obs_train, p_nvar,
-       call->do_grad ? call->num_reg_continuous : 0,
-       call->do_grad ? call->num_reg_unordered : 0,
-       call->vector_Y, owner->conditional_weights,
-       owner->conditional_permutation_weights,
-       owner->mean_columns, owner->permutation_columns,
-       call->mean, call->gradient,
-       call->mean_stderr, call->gradient_stderr)) {
-    execution->status = NP_REGRESSION_SCALAR_FIT_ERR_INFLUENCE;
-    return R_NilValue;
+  if(conditional_influence && call->do_merr) {
+    if(!R_FINITE(call->mean[0])) {
+      call->mean_stderr[0] = NA_REAL;
+      if(call->do_gerr)
+        for(predictor = 0; predictor < p_nvar; ++predictor)
+          call->gradient_stderr[predictor][0] = NA_REAL;
+    } else if(!np_regression_conditional_influence_finish(
+                call->num_obs_train, p_nvar,
+                call->do_grad ? call->num_reg_continuous : 0,
+                call->do_grad ? call->num_reg_unordered : 0,
+                call->vector_Y, owner->conditional_weights,
+                owner->conditional_permutation_weights,
+                owner->mean_columns, owner->permutation_columns,
+                call->mean, call->gradient,
+                call->mean_stderr, call->gradient_stderr)) {
+      execution->status = NP_REGRESSION_SCALAR_FIT_ERR_INFLUENCE;
+      return R_NilValue;
+    }
   }
 
   execution->status = NP_REGRESSION_SCALAR_FIT_OK;
@@ -44105,8 +44157,21 @@ const NPNNGeometryContext *nn_geometry_context
     }
 
     for(i = 0; i < num_obs_eval; i++){
-      const double sk = copysign(DBL_MIN, ksd[i]) + ksd[i];
+      const double sk = ksd[i];
+
+      if(!R_FINITE(sk) || sk == 0.0) {
+        kdf[i] = NA_REAL;
+        kdf_stderr[i] = NA_REAL;
+        *log_likelihood = NA_REAL;
+        continue;
+      }
       kdf[i] = ksn[i]/sk;
+      if(!R_FINITE(kdf[i])) {
+        kdf[i] = NA_REAL;
+        kdf_stderr[i] = NA_REAL;
+        *log_likelihood = NA_REAL;
+        continue;
+      }
       *log_likelihood += (kdf[i] < DBL_MIN) ? log_DBL_MIN : log(kdf[i]);
 
       if(BANDWIDTH_den == BW_GEN_NN){
@@ -44120,6 +44185,8 @@ const NPNNGeometryContext *nn_geometry_context
       }
 
       kdf_stderr[i] = sqrt(kdf[i]*K_INT_KERNEL_P/(pnh*sk));
+      if(!R_FINITE(kdf_stderr[i]))
+        kdf_stderr[i] = NA_REAL;
    
     }
   } else {
@@ -44131,8 +44198,19 @@ const NPNNGeometryContext *nn_geometry_context
     }
 
     for(i = 0, *log_likelihood = 0.0; i < num_obs_eval; i++){
-      const double sk = copysign(DBL_MIN, ksd[i]) + ksd[i];
+      const double sk = ksd[i];
+
+      if(!R_FINITE(sk) || sk == 0.0) {
+        kdf[i] = NA_REAL;
+        kdf_stderr[i] = NA_REAL;
+        continue;
+      }
       kdf[i] = ksn[i]/sk;
+      if(!R_FINITE(kdf[i])) {
+        kdf[i] = NA_REAL;
+        kdf_stderr[i] = NA_REAL;
+        continue;
+      }
 
       if(BANDWIDTH_den == BW_GEN_NN){
         for(l = 0, pnh = 1.0; l < num_X_continuous; l++){
@@ -44141,6 +44219,8 @@ const NPNNGeometryContext *nn_geometry_context
       }
 
       kdf_stderr[i] = sqrt(kdf[i]*(1.0-kdf[i])*K_INT_KERNEL_P/(pnh*sk));
+      if(!R_FINITE(kdf_stderr[i]))
+        kdf_stderr[i] = NA_REAL;
     }
 
   }
@@ -44148,9 +44228,21 @@ const NPNNGeometryContext *nn_geometry_context
   if(do_grad) {
     for(l = 0; l < num_X_continuous; l++){
       for(i = 0; i < num_obs_eval; i++){
-        const double sk = copysign(DBL_MIN, ksd[i]) + ksd[i];
+        const double sk = ksd[i];
 
+        if(!R_FINITE(kdf[i]) || !R_FINITE(sk) || sk == 0.0) {
+          kdf_deriv[l][i] = NA_REAL;
+          if(do_gerr)
+            kdf_deriv_stderr[l][i] = NA_REAL;
+          continue;
+        }
         kdf_deriv[l][i] = (permn[l*num_obs_eval + i]-kdf[i]*permd[l*num_obs_eval + i])/sk;
+        if(!R_FINITE(kdf_deriv[l][i])) {
+          kdf_deriv[l][i] = NA_REAL;
+          if(do_gerr)
+            kdf_deriv_stderr[l][i] = NA_REAL;
+          continue;
+        }
 
         if(do_gerr){
           const double hfac = ((BANDWIDTH_den == BW_ADAP_NN) ? 1.0 : ((BANDWIDTH_den == BW_GEN_NN) ? matrix_bandwidth_X[l][i]:matrix_bandwidth_X[l][0]));
@@ -44162,9 +44254,22 @@ const NPNNGeometryContext *nn_geometry_context
     for(; l < num_X_continuous + num_X_unordered; l++){
       for(i = 0; i < num_obs_eval; i++){
         const int li = l*num_obs_eval + i;
-        const double sk = copysign(DBL_MIN, permd[li]) + permd[li];
-        const double s1 = permn[li]/sk;
+        const double sk = permd[li];
+        double s1;
 
+        if(!R_FINITE(kdf[i]) || !R_FINITE(sk) || sk == 0.0) {
+          kdf_deriv[l][i] = NA_REAL;
+          if(do_gerr)
+            kdf_deriv_stderr[l][i] = NA_REAL;
+          continue;
+        }
+        s1 = permn[li]/sk;
+        if(!R_FINITE(s1)) {
+          kdf_deriv[l][i] = NA_REAL;
+          if(do_gerr)
+            kdf_deriv_stderr[l][i] = NA_REAL;
+          continue;
+        }
         kdf_deriv[l][i] = kdf[i] - s1;
         
         // covariance is missing
@@ -44198,9 +44303,22 @@ const NPNNGeometryContext *nn_geometry_context
     for(; l < num_X; l++){
       for(i = 0; i < num_obs_eval; i++){
         const int li = l*num_obs_eval + i;
-        const double sk = copysign(DBL_MIN, permd[li]) + permd[li];
-        const double s1 = permn[li]/sk;
+        const double sk = permd[li];
+        double s1;
 
+        if(!R_FINITE(kdf[i]) || !R_FINITE(sk) || sk == 0.0) {
+          kdf_deriv[l][i] = NA_REAL;
+          if(do_gerr)
+            kdf_deriv_stderr[l][i] = NA_REAL;
+          continue;
+        }
+        s1 = permn[li]/sk;
+        if(!R_FINITE(s1)) {
+          kdf_deriv[l][i] = NA_REAL;
+          if(do_gerr)
+            kdf_deriv_stderr[l][i] = NA_REAL;
+          continue;
+        }
         kdf_deriv[l][i] = (kdf[i] - s1)*((matrix_ordered_indices[l - num_X_continuous - num_X_unordered][i] != 0) ? 1.0 : -1.0);
 
         // covariance is missing
