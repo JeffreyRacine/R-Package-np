@@ -1,5 +1,18 @@
 # npRmpi 0.70-6
 
+* Eligible individual \`npsigtest()\` calls with fixed bandwidths and IID
+  residual resampling now evaluate bootstrap statistics in bounded native
+  tiles. The streamed path preserves the incumbent bootstrap samples, random
+  number stream, statistics, and P-values across the serial and MPI paths;
+  unsupported configurations continue through the incumbent R loop.
+
+* Regression, conditional-density, and conditional-distribution evaluation
+  rows whose required kernel normalization is exactly zero or non-finite now
+  fail closed locally. Their estimate, standard error, gradient, and gradient
+  standard error components are returned as \`NA\` where requested, and the
+  corresponding hat row is \`NA\`, without invalidating defined rows. Every
+  finite nonzero normalization remains literal and unperturbed.
+
 * Fitted density and conditional-density log-likelihood aggregates now use the
   literal logarithm of every represented strictly positive estimate, including
   subnormal values. Exact zero and negative estimates retain the established

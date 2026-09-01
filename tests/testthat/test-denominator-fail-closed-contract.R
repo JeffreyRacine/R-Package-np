@@ -1,4 +1,13 @@
+denominator_fail_closed_run_local <- function(package, expression) {
+  if (identical(package, "npRmpi"))
+    getFromNamespace(".npRmpi_with_local_regression", package)(expression)
+  else
+    expression
+}
+
 test_that("regression fits and hats fail closed for exact zero mass", {
+  package <- if ("npRmpi" %in% loadedNamespaces()) "npRmpi" else "np"
+  denominator_fail_closed_run_local(package, {
   old <- options(np.messages = FALSE, np.tree = FALSE)
   on.exit(options(old), add = TRUE)
 
@@ -21,9 +30,12 @@ test_that("regression fits and hats fail closed for exact zero mass", {
   expect_true(all(is.na(fit$grad[2L, ])))
   expect_true(all(is.na(fit$gerr[2L, ])))
   expect_true(all(is.na(hat[2L, ])))
+  })
 })
 
 test_that("conditional fits and hats inherit row-local zero-mass missingness", {
+  package <- if ("npRmpi" %in% loadedNamespaces()) "npRmpi" else "np"
+  denominator_fail_closed_run_local(package, {
   old <- options(np.messages = FALSE, np.tree = FALSE)
   on.exit(options(old), add = TRUE)
 
@@ -69,9 +81,12 @@ test_that("conditional fits and hats inherit row-local zero-mass missingness", {
   expect_true(is.na(dist$condist[[2L]]))
   expect_true(is.na(dist$conderr[[2L]]))
   expect_true(all(is.na(chat[2L, ])))
+  })
 })
 
 test_that("positive-small required mass remains valid and unperturbed", {
+  package <- if ("npRmpi" %in% loadedNamespaces()) "npRmpi" else "np"
+  denominator_fail_closed_run_local(package, {
   old <- options(np.messages = FALSE, np.tree = FALSE)
   on.exit(options(old), add = TRUE)
 
@@ -107,9 +122,12 @@ test_that("positive-small required mass remains valid and unperturbed", {
   )
 
   expect_identical(fit$condens, as.vector(rowSums(hat)))
+  })
 })
 
 test_that("zero numerators remain legitimate when required mass is positive", {
+  package <- if ("npRmpi" %in% loadedNamespaces()) "npRmpi" else "np"
+  denominator_fail_closed_run_local(package, {
   old <- options(np.messages = FALSE, np.tree = FALSE)
   on.exit(options(old), add = TRUE)
 
@@ -127,4 +145,5 @@ test_that("zero numerators remain legitimate when required mass is positive", {
   )
 
   expect_identical(fit$condens, 0)
+  })
 })

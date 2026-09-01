@@ -125,6 +125,10 @@ e.g. \code{H \%*\% y}. Attributes on the matrix store metadata used by
 For \code{output = "apply"}, the function returns \code{H^{(s)} y} directly and
 accepts matrix right-hand sides for one-shot bootstrap-style calculations.
 
+An evaluation row whose required kernel normalization is exactly zero or
+non-finite is returned as an \code{NA} hat row. Defined rows remain available,
+and every finite nonzero normalization is used literally.
+
 For local-constant beta kernels, one first derivative is evaluated by the
 same analytic C kernel used by \code{npreg(..., gradients=TRUE)}. If an exact
 support endpoint creates a raw-kernel jump, the hat operator cannot know
