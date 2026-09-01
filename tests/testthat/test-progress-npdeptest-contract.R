@@ -44,14 +44,14 @@ test_that("npdeptest single-line bootstrap progress matches legacy semantics", {
   on.exit(options(old_opts), add = TRUE)
 
   legacy <- capture_progress_shadow_trace(
-    npdeptest_fun(data.x = x, data.y = y, boot.num = 9),
+    npdeptest_fun(data.x = x, data.y = y, B = 9),
     force_renderer = "legacy",
     now = progress_time_counter()
   )
 
   set.seed(42)
   single_line <- capture_progress_shadow_trace(
-    npdeptest_fun(data.x = x, data.y = y, boot.num = 9),
+    npdeptest_fun(data.x = x, data.y = y, B = 9),
     force_renderer = "single_line",
     now = progress_time_counter()
   )
@@ -78,7 +78,7 @@ test_that("npdeptest progress respects np.messages FALSE", {
   on.exit(options(old_opts), add = TRUE)
 
   res <- capture_progress_shadow_trace(
-    npdeptest_fun(data.x = x, data.y = y, boot.num = 9),
+    npdeptest_fun(data.x = x, data.y = y, B = 9),
     now = progress_time_counter()
   )
 
@@ -99,7 +99,7 @@ test_that("npdeptest progress respects suppressMessages", {
   on.exit(options(old_opts), add = TRUE)
 
   res <- capture_progress_shadow_trace(
-    suppressMessages(npdeptest_fun(data.x = x, data.y = y, boot.num = 9)),
+    suppressMessages(npdeptest_fun(data.x = x, data.y = y, B = 9)),
     now = progress_time_counter()
   )
 

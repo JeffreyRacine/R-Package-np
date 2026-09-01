@@ -73,7 +73,7 @@ nptest_demo_matrix <- function(family) {
   mat <- read.csv(path, stringsAsFactors = FALSE, na.strings = character())
   mat[is.na(mat)] <- ""
   required <- c("family", "case", "tier", "enabled", "default_n", "floor_n",
-                "boot.num", "method", "why")
+                "B", "method", "why")
   missing <- setdiff(required, names(mat))
   if (length(missing)) {
     stop(family, " demo matrix missing columns: ",
@@ -101,7 +101,7 @@ nptest_demo_ar_series <- function(phi, epsilon) {
 }
 
 nptest_demo_payload <- function(family, row, n) {
-  boot.num <- nptest_demo_int(row$boot.num, "boot.num")
+  B <- nptest_demo_int(row$B, "B")
   set.seed(42)
   switch(
     family,
@@ -109,31 +109,31 @@ nptest_demo_payload <- function(family, row, n) {
       list(fun = "npdeneqtest",
            args = list(x = data.frame(x = rnorm(n)),
                        y = data.frame(x = rnorm(n)),
-                       boot.num = boot.num))
+                       B = B))
     },
     npdeptest = {
       x <- rnorm(n)
       y <- 1.0 + x + rnorm(n)
       list(fun = "npdeptest",
            args = list(data.x = y, data.y = fitted(lm(y ~ x)),
-                       boot.num = boot.num, method = row$method))
+                       B = B, method = row$method))
     },
     npsdeptest = {
       list(fun = "npsdeptest",
            args = list(data = nptest_demo_ar_series(0.95, rnorm(n)),
-                       lag.num = 2L, boot.num = boot.num, method = row$method))
+                       lag.num = 2L, B = B, method = row$method))
     },
     npsymtest = {
       list(fun = "npsymtest",
            args = list(data = nptest_demo_ar_series(0.5, rnorm(n)),
-                       boot.num = boot.num, boot.method = "geom",
+                       B = B, boot.method = "geom",
                        method = row$method))
     },
     npunitest = {
       list(fun = "npunitest",
            args = list(data.x = rnorm(n), data.y = rnorm(n),
                        method = row$method, bootstrap = TRUE,
-                       boot.num = boot.num))
+                       B = B))
     },
     npsigtest = {
       z <- factor(rbinom(n, 1, .5))
@@ -142,7 +142,7 @@ nptest_demo_payload <- function(family, row, n) {
       y <- x1 + x2 + rnorm(n)
       list(fun = "npsigtest",
            args = list(mydat = data.frame(z = z, x1 = x1, x2 = x2, y = y),
-                       boot.num = boot.num))
+                       B = B))
     },
     stop("unsupported test demo family=", family, call. = FALSE)
   )
@@ -154,7 +154,7 @@ nptest_demo_run_payload <- function(payload) {
   mydat <- payload$args$mydat
   model <- npreg(y ~ z + x1 + x2, regtype = "ll", bwmethod = "cv.aic",
                  data = mydat)
-  npsigtest(model, boot.num = payload$args$boot.num)
+  npsigtest(model, B = payload$args$B)
 }
 
 nptest_demo_run_row <- function(family, row, mode) {
@@ -164,7 +164,7 @@ nptest_demo_run_row <- function(family, row, mode) {
   }
   default_n <- nptest_demo_int(row$default_n, "default_n")
   floor_n <- nptest_demo_int(row$floor_n, "floor_n")
-  boot.num <- nptest_demo_int(row$boot.num, "boot.num")
+  B <- nptest_demo_int(row$B, "B")
   n <- np_demo_n(default_n, floor = floor_n)
   payload <- nptest_demo_payload(family, row, n)
 
@@ -174,7 +174,7 @@ nptest_demo_run_row <- function(family, row, mode) {
       mydat <- payload$args$mydat
       model <- npreg(y ~ z + x1 + x2, regtype = "ll", bwmethod = "cv.aic",
                      data = mydat)
-      npsigtest(model, boot.num = payload$args$boot.num)
+      npsigtest(model, B = payload$args$B)
     } else {
       do.call(payload$fun, payload$args)
     }, caller.execute = TRUE))
@@ -191,7 +191,7 @@ nptest_demo_run_row <- function(family, row, mode) {
                  case = row$case,
                  tier = row$tier,
                  method = row$method,
-                 boot.num = boot.num,
+                 boot.num = B,
                  why = row$why,
                  statistic.first = nptest_demo_numeric_field(output, 1L),
                  statistic.second = nptest_demo_numeric_field(output, 2L),

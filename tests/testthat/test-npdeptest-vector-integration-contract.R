@@ -17,7 +17,7 @@ test_that("npdeptest vector integration preserves a skewed dependence oracle", {
     data.y = y,
     method = "integration",
     bootstrap = TRUE,
-    boot.num = 9,
+    B = 9,
     random.seed = 184005
   )
 

@@ -176,7 +176,7 @@ run_one <- function(fun, n, seed) {
       sample.A <- data.frame(x = rnorm(n))
       sample.B <- data.frame(x = rnorm(n))
       t1 <- proc.time()[["elapsed"]]
-      ans <- npdeneqtest(sample.A, sample.B, boot.num = 99)
+      ans <- npdeneqtest(sample.A, sample.B, B = 99)
       out$elapsed_main <- proc.time()[["elapsed"]] - t1
       out$sig_main <- sig_numeric(ans)
     } else if (fun == "npdeptest") {
@@ -186,7 +186,7 @@ run_one <- function(fun, n, seed) {
       y <- 1 + x + rnorm(n)
       y.fit <- fitted(lm(y ~ x))
       t1 <- proc.time()[["elapsed"]]
-      ans <- npdeptest(y, y.fit, boot.num = 99, method = "summation")
+      ans <- npdeptest(y, y.fit, B = 99, method = "summation")
       out$elapsed_main <- proc.time()[["elapsed"]] - t1
       out$sig_main <- sig_numeric(ans)
     } else if (fun == "npqreg") {
@@ -230,7 +230,7 @@ run_one <- function(fun, n, seed) {
       }
       yt <- ar.series(0.95, rnorm(n))
       t1 <- proc.time()[["elapsed"]]
-      ans <- npsdeptest(yt, lag.num = 2, boot.num = 399, method = "summation")
+      ans <- npsdeptest(yt, lag.num = 2, B = 399, method = "summation")
       out$elapsed_main <- proc.time()[["elapsed"]] - t1
       out$sig_main <- sig_numeric(ans)
     } else if (fun == "npsigtest") {
@@ -264,7 +264,7 @@ run_one <- function(fun, n, seed) {
       }
       yt <- ar.series(0.5, rnorm(n))
       t1 <- proc.time()[["elapsed"]]
-      ans <- npsymtest(yt, boot.num = 399, boot.method = "geom", method = "summation")
+      ans <- npsymtest(yt, B = 399, boot.method = "geom", method = "summation")
       out$elapsed_main <- proc.time()[["elapsed"]] - t1
       out$sig_main <- sig_numeric(ans)
     } else if (fun == "npunitest") {

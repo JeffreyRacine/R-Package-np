@@ -13,7 +13,7 @@ npsdeptest(data = NULL,
            lag.num = 1,
            method = c("integration","summation"),
            bootstrap = TRUE,
-           boot.num = 399,
+           B = 399,
            random.seed = 42)
 
 }
@@ -47,7 +47,7 @@ These arguments identify the data series, lag count, and statistic variant.
 These arguments control bootstrap execution and reproducibility settings.
 }
 
-  \item{boot.num}{
+  \item{B}{
     an integer value specifying the number of bootstrap
     replications to use. Defaults to \code{399}.
   }
@@ -208,7 +208,7 @@ yt <- ar.series(0.95,rnorm(n))
 
 output <- npsdeptest(yt,
                      lag.num=2,
-                     boot.num=29,
+                     B=29,
                      method="summation")
 
 summary(output)

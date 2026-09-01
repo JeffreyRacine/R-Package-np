@@ -12,7 +12,7 @@ npdeneqtest(x = NULL,
             y = NULL,
             bw.x = NULL,
             bw.y = NULL,
-            boot.num = 399,
+            B = 399,
             random.seed = 42,
             \dots)
 }
@@ -38,7 +38,7 @@ These arguments identify the two samples and any supplied bandwidths.
 These arguments control bootstrap replication and reproducibility settings.
 }
 
-  \item{boot.num}{
+  \item{B}{
     an integer value specifying the number of bootstrap
     replications to use. Defaults to \code{399}.
   }
@@ -170,7 +170,7 @@ n <- 100
 sample.A <- data.frame(x=rnorm(n))
 sample.B <- data.frame(x=rnorm(n))
 
-output <- npdeneqtest(sample.A,sample.B,boot.num=29)
+output <- npdeneqtest(sample.A,sample.B,B=29)
 
 output
 

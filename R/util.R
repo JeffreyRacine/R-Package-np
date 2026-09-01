@@ -287,6 +287,16 @@ npRejectLegacyBooleanErrors <- function(dots, where) {
   invisible(TRUE)
 }
 
+npRejectLegacyBootstrapCount <- function(dot.names, where) {
+  if (!is.null(dot.names) && any(dot.names == "boot.num", na.rm = TRUE)) {
+    stop(sprintf(
+      "%s no longer accepts 'boot.num'; use 'B' instead",
+      where
+    ), call. = FALSE)
+  }
+  invisible(TRUE)
+}
+
 npValidateNomadControl <- function(value, argname = "nomad") {
   if (is.logical(value))
     return(if (npValidateScalarLogical(value, argname)) "true" else "false")

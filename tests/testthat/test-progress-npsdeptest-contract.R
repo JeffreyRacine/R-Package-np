@@ -39,14 +39,14 @@ test_that("npsdeptest single-line lag and bootstrap progress match legacy semant
   on.exit(options(old_opts), add = TRUE)
 
   legacy <- capture_progress_shadow_trace(
-    npRmpi:::npsdeptest(y, lag.num = 2, method = "summation", boot.num = 9),
+    npRmpi:::npsdeptest(y, lag.num = 2, method = "summation", B = 9),
     force_renderer = "legacy",
     now = progress_time_counter()
   )
 
   set.seed(42)
   single_line <- capture_progress_shadow_trace(
-    npRmpi:::npsdeptest(y, lag.num = 2, method = "summation", boot.num = 9),
+    npRmpi:::npsdeptest(y, lag.num = 2, method = "summation", B = 9),
     force_renderer = "single_line",
     now = progress_time_counter()
   )
@@ -74,7 +74,7 @@ test_that("npsdeptest progress respects np.messages FALSE", {
   on.exit(options(old_opts), add = TRUE)
 
   res <- capture_progress_shadow_trace(
-    npRmpi:::npsdeptest(y, lag.num = 2, method = "summation", boot.num = 9),
+    npRmpi:::npsdeptest(y, lag.num = 2, method = "summation", B = 9),
     now = progress_time_counter()
   )
 
@@ -94,7 +94,7 @@ test_that("npsdeptest progress respects suppressMessages", {
   on.exit(options(old_opts), add = TRUE)
 
   res <- capture_progress_shadow_trace(
-    suppressMessages(npRmpi:::npsdeptest(y, lag.num = 2, method = "summation", boot.num = 9)),
+    suppressMessages(npRmpi:::npsdeptest(y, lag.num = 2, method = "summation", B = 9)),
     now = progress_time_counter()
   )
 

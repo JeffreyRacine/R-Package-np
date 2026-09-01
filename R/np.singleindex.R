@@ -14,9 +14,10 @@
 # value they so desire.
 
 npindex <-
-  function(bws, ...){
+  function(bws, ..., B = 399){
     args <- list(...)
     npRejectLegacyBooleanErrors(args, "npindex")
+    npRejectLegacyBootstrapCount(names(args), "npindex")
     .np_singleindex_reject_higher_gradient_order(args, where = "npindex")
 
     if (!missing(bws)){
@@ -26,6 +27,7 @@ npindex <-
         formula <- args[[1L]]
         args <- args[-1L]
         args$.np_index_explicit_bws <- bws
+        args$B <- B
         return(do.call(npindex.formula,
                        c(list(bws = formula), args),
                        envir = parent.frame()))
@@ -561,15 +563,15 @@ npindex.sibandwidth <-
            tydat = stop("training data 'tydat' missing"),
            exdat,
            eydat,
-           boot.num = 399,
+           B = 399,
            se = FALSE,
            gradients = FALSE,
            residuals = FALSE, ...) {
 
-    npRejectLegacyBooleanErrors(list(...), "npindex")
-
     fit.start <- proc.time()[3]
     dots <- list(...)
+    npRejectLegacyBooleanErrors(dots, "npindex")
+    npRejectLegacyBootstrapCount(names(dots), "npindex")
     fit.progress.handoff <- isTRUE(dots$.np_fit_progress_handoff)
     lc.fixed.progress.intent <- isTRUE(dots$.np_lc_fixed_progress_route)
     dots$.np_lc_fixed_progress_route <- NULL
@@ -577,10 +579,10 @@ npindex.sibandwidth <-
     gradients <- npValidateScalarLogical(gradients, "gradients")
     residuals <- npValidateScalarLogical(residuals, "residuals")
     se <- npValidateScalarLogical(se, "se")
-    if (!is.numeric(boot.num) || length(boot.num) != 1L || is.na(boot.num) ||
-        !is.finite(boot.num) || boot.num < 1 || boot.num != floor(boot.num))
-      stop("'boot.num' must be a positive integer")
-    boot.num <- as.integer(boot.num)
+    if (!is.numeric(B) || length(B) != 1L || is.na(B) ||
+        !is.finite(B) || B < 1 || B != floor(B))
+      stop("'B' must be a positive integer")
+    B <- as.integer(B)
     .npRmpi_require_active_slave_pool(where = "npindex()")
     spec <- .npindex_resolve_spec(bws, where = "npindex")
     no.ex = missing(exdat)
@@ -618,7 +620,7 @@ npindex.sibandwidth <-
           bws = .npRmpi_autodispatch_untag(bws),
           txdat = txdat,
           tydat = tydat,
-          boot.num = boot.num,
+          B = B,
           se = se,
           gradients = gradients,
           residuals = residuals
@@ -1281,7 +1283,7 @@ npindex.sibandwidth <-
         boot.plan <- suppressWarnings(boot(
           data.frame(txdat, tydat),
           function(data, indices) 0.0,
-          R = boot.num
+          R = B
         ))
         boot.indices <- boot.array(boot.plan, indices = TRUE)
         mpi.bcast.Robj(boot.indices, rank = 0L, comm = 1L)
@@ -1298,9 +1300,9 @@ npindex.sibandwidth <-
       boot.indices <- as.matrix(boot.indices)
       n.eval <- length(index.eval)
       ncol.boot <- n.eval + if (gradients) n.eval + 1L else 0L
-      boot.t <- matrix(NA_real_, nrow = boot.num, ncol = ncol.boot)
+      boot.t <- matrix(NA_real_, nrow = B, ncol = ncol.boot)
 
-      for (bb in seq_len(boot.num)) {
+      for (bb in seq_len(B)) {
         indices <- as.integer(boot.indices[bb, ])
         rindex <- txdat[indices, , drop = FALSE] %*% bws$beta
         rindex.df <- data.frame(index = as.vector(rindex))
@@ -1398,7 +1400,7 @@ npindex.sibandwidth <-
 
       boot.t <- spmd_bootstrap_t()
       if (is.null(boot.t)) {
-        boot.out = suppressWarnings(boot(data.frame(txdat,tydat), boofun, R = boot.num))
+        boot.out = suppressWarnings(boot(data.frame(txdat,tydat), boofun, R = B))
         boot.t <- boot.out$t
       }
 

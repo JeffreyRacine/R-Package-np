@@ -75,7 +75,7 @@ test_that("npsdeptest summation route retains its public result shape", {
     lag.num = 2,
     method = "summation",
     bootstrap = TRUE,
-    boot.num = 9,
+    B = 9,
     random.seed = 4817
   )
 

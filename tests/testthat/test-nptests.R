@@ -46,8 +46,8 @@ test_that("npdeneqtest basic functionality works", {
   n <- 50
   x <- data.frame(v1=rnorm(n))
   y <- data.frame(v1=rnorm(n, mean=0.5))
-  # Use small boot.num
-  test <- npdeneqtest(x, y, boot.num=9)
+  # Use a small B
+  test <- npdeneqtest(x, y, B=9)
   
   expect_s3_class(test, "deneqtest")
   expect_output(summary(test))
@@ -60,7 +60,7 @@ test_that("npsymtest basic functionality works", {
   set.seed(42)
   n <- 50
   x <- rgamma(n, shape=2)
-  test <- npsymtest(x, method="summation", boot.num=9)
+  test <- npsymtest(x, method="summation", B=9)
   
   expect_s3_class(test, "symtest")
   expect_output(summary(test))
@@ -74,7 +74,7 @@ test_that("npunitest basic functionality works", {
   n <- 50
   x <- rnorm(n)
   y <- rnorm(n, mean=0.5)
-  test <- npunitest(x, y, method="summation", boot.num=9)
+  test <- npunitest(x, y, method="summation", B=9)
   
   expect_s3_class(test, "unitest")
   expect_output(summary(test))

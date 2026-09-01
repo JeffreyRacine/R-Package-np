@@ -46,14 +46,14 @@ test_that("npcmstest single-line bootstrap progress matches legacy semantics", {
   on.exit(options(old_opts), add = TRUE)
 
   legacy <- capture_progress_shadow_trace(
-    npcmstest_fun(model = model, xdat = x, ydat = y, distribution = "bootstrap", boot.num = 9),
+    npcmstest_fun(model = model, xdat = x, ydat = y, distribution = "bootstrap", B = 9),
     force_renderer = "legacy",
     now = progress_time_counter()
   )
 
   set.seed(42)
   single_line <- capture_progress_shadow_trace(
-    npcmstest_fun(model = model, xdat = x, ydat = y, distribution = "bootstrap", boot.num = 9),
+    npcmstest_fun(model = model, xdat = x, ydat = y, distribution = "bootstrap", B = 9),
     force_renderer = "single_line",
     now = progress_time_counter()
   )
@@ -82,7 +82,7 @@ test_that("npcmstest progress respects np.messages FALSE", {
   on.exit(options(old_opts), add = TRUE)
 
   res <- capture_progress_shadow_trace(
-    npcmstest_fun(model = model, xdat = x, ydat = y, distribution = "bootstrap", boot.num = 9),
+    npcmstest_fun(model = model, xdat = x, ydat = y, distribution = "bootstrap", B = 9),
     now = progress_time_counter()
   )
 
@@ -105,7 +105,7 @@ test_that("npcmstest progress respects suppressMessages", {
   on.exit(options(old_opts), add = TRUE)
 
   res <- capture_progress_shadow_trace(
-    suppressMessages(npcmstest_fun(model = model, xdat = x, ydat = y, distribution = "bootstrap", boot.num = 9)),
+    suppressMessages(npcmstest_fun(model = model, xdat = x, ydat = y, distribution = "bootstrap", B = 9)),
     now = progress_time_counter()
   )
 

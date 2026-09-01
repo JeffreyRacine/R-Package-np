@@ -5,6 +5,14 @@ test_that("npsigtest orchestrates locally without whole-call autodispatch", {
   expect_false(grepl("\\.npRmpi_manual_distributed_call\\(", body.txt))
 })
 
+test_that("npsigtest accepts B and rejects the retired boot.num argument", {
+  expect_error(
+    npsigtest(boot.num = 9L),
+    "npsigtest no longer accepts 'boot.num'; use 'B' instead",
+    fixed = TRUE
+  )
+})
+
 test_that("npsigtest Type II hot-start helper honors nmulti contract", {
   helper <- getFromNamespace(".npRmpi_npsig_bootstrap_bw_reselect", "npRmpi")
   xdat <- data.frame(x = c(0.1, 0.4, 0.8))
@@ -101,7 +109,7 @@ test_that("npsigtest basic functionality works with autodispatch", {
   bw <- npregbw(y~x1+x2, data=mydat, bws=c(0.1, 0.5), bandwidth.compute=FALSE)
   
   # Significance test can be slow, use few boot replications
-  sig <- npsigtest(bws=bw, boot.num=19)
+  sig <- npsigtest(bws=bw, B=19)
   
   expect_s3_class(sig, "sigtest")
   expect_output(summary(sig))
@@ -123,7 +131,7 @@ test_that("npsigtest formula path works under autodispatch", {
 
   sig <- npsigtest(y ~ x1 + x2,
                    data = mydat,
-                   boot.num = 9)
+                   B = 9)
 
   expect_s3_class(sig, "sigtest")
   expect_true(is.numeric(sig$P))
@@ -149,7 +157,7 @@ test_that("npsigtest npregression path works under autodispatch", {
                  bwmethod = "cv.aic",
                  data = mydat)
 
-  sig <- npsigtest(model, boot.num = 9)
+  sig <- npsigtest(model, B = 9)
 
   expect_s3_class(sig, "sigtest")
   expect_true(is.numeric(sig$P))
@@ -172,7 +180,7 @@ test_that("npsigtest rejects duplicate index entries under autodispatch", {
   bw <- npregbw(y ~ x1 + x2, data = mydat, bws = c(0.2, 0.4), bandwidth.compute = FALSE)
 
   expect_error(
-    npsigtest(bws = bw, boot.num = 9, index = c(1, 1)),
+    npsigtest(bws = bw, B = 9, index = c(1, 1)),
     "repeated values"
   )
 })
@@ -213,7 +221,7 @@ test_that("npsigtest boot.type II works under autodispatch", {
   mydat <- data.frame(y, x1, x2)
   bw <- npregbw(y ~ x1 + x2, data = mydat, bws = c(0.2, 0.4), bandwidth.compute = FALSE)
 
-  sig <- npsigtest(bws = bw, boot.num = 9, boot.type = "II", joint = TRUE, index = 1)
+  sig <- npsigtest(bws = bw, B = 9, boot.type = "II", joint = TRUE, index = 1)
 
   expect_s3_class(sig, "sigtest")
   expect_identical(length(sig$P), 1L)

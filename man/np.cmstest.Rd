@@ -32,7 +32,7 @@ npcmstest(formula,
           model = stop(paste(sQuote("model")," has not been provided")),
           distribution = c("bootstrap", "asymptotic"),
           boot.method = c("iid","wild","wild-rademacher"),
-          boot.num = 399,
+          B = 399,
           pivot = TRUE,
           density.weighted = TRUE,
           random.seed = 42,
@@ -101,7 +101,7 @@ These arguments control the test statistic, bootstrap procedure, and reproducibi
   }
 
 
-  \item{boot.num}{
+  \item{B}{
     an integer value specifying the number of bootstrap replications to
     use. Defaults to \code{399}.
   }
@@ -267,7 +267,7 @@ data(cps71)
 model <- lm(logwage~age+I(age^2), data=cps71, x=TRUE, y=TRUE)
 
 npcmstest(model = model, xdat = cps71$age, ydat = cps71$logwage,
-          boot.num=9, nmulti = 1)
+          B=9, nmulti = 1)
 
 ## For the interactive run only we close the slaves perhaps to proceed
 ## with other examples and so forth. This is redundant in batch mode.

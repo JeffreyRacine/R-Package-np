@@ -48,8 +48,8 @@ test_that("core estimator methods reject non-scalar logical control flags", {
   )
   expect_error(
     npindex.sibandwidth(structure(list(), class = "sibandwidth"),
-                        txdat = tx, tydat = ty, boot.num = 0),
-    "'boot.num' must be a positive integer"
+                        txdat = tx, tydat = ty, B = 0),
+    "'B' must be a positive integer"
   )
   expect_error(
     npscoef.scbandwidth(structure(list(), class = "scbandwidth"),

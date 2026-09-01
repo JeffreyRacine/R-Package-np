@@ -8,7 +8,7 @@
 \usage{
 npsymtest(data = NULL,
           method = c("integration","summation"),
-          boot.num = 399,
+          B = 399,
           bw = NULL,
           boot.method = c("iid", "geom"),
           random.seed = 42,
@@ -48,7 +48,7 @@ These arguments control bootstrap execution and reproducibility settings.
   }
 
 
-  \item{boot.num}{
+  \item{B}{
     an integer value specifying the number of bootstrap
     replications to use. Defaults to \code{399}.
   }
@@ -235,7 +235,7 @@ yt <- ar.series(0.5,rnorm(n))
 ## A simple example of the test for symmetry
 
 output <- npsymtest(yt,
-                    boot.num=29,
+                    B=29,
                     boot.method="geom",
                     method="summation")
 

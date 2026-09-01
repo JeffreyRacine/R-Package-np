@@ -252,11 +252,14 @@ npqcmstest <- function(formula,
                        distribution = c("bootstrap", "asymptotic"),
                        bwydat = c("y","varepsilon"),
                        boot.method=c("iid","wild","wild-rademacher"),
-                       boot.num = 399,
+                       B = 399,
                        pivot = TRUE,
                        density.weighted = TRUE,
                        random.seed = 42,
                        ...) {
+
+  if (...length())
+    npRejectLegacyBootstrapCount(names(list(...)), "npqcmstest")
   .npRmpi_require_active_slave_pool(where = "npqcmstest()")
   if (.npRmpi_autodispatch_active())
     return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
@@ -273,7 +276,7 @@ npqcmstest <- function(formula,
 
   if(tau <=0 || tau >=1) stop("tau must lie in (0,1)")
 
-  if(boot.num < 9) stop("number of bootstrap replications must be >= 9")
+  if(B < 9) stop("number of bootstrap replications must be >= 9")
 
   ## checking for consistent interface usage
   miss.xy = c(missing(xdat),missing(ydat))
@@ -497,13 +500,13 @@ npqcmstest <- function(formula,
   }
 
   if(distribution == "bootstrap"){
-    progress <- .np_progress_begin("Bootstrap replications", total = boot.num, surface = "bootstrap")
+    progress <- .np_progress_begin("Bootstrap replications", total = B, surface = "bootstrap")
     collective.bootstrap <- .npRmpi_qcms_collective_context()
 
     if (collective.bootstrap && identical(boot.method, "iid")) {
       plan <- .npRmpi_qcms_iid_index_plan(
         n = length(model.resid),
-        boot.num = boot.num
+        boot.num = B
       )
       post.boot.seed <- get(".Random.seed", envir = .GlobalEnv,
                             inherits = FALSE)
@@ -521,7 +524,7 @@ npqcmstest <- function(formula,
     } else if (collective.bootstrap && identical(boot.method, "wild")) {
       plan <- .npRmpi_qcms_wild_multiplier_plan(
         n = length(model.resid),
-        boot.num = boot.num,
+        boot.num = B,
         a = -0.6180339887499,
         b = 1.6180339887499,
         p.a = 0.72360679774998
@@ -542,7 +545,7 @@ npqcmstest <- function(formula,
     } else if (collective.bootstrap && identical(boot.method, "wild-rademacher")) {
       plan <- .npRmpi_qcms_wild_multiplier_plan(
         n = length(model.resid),
-        boot.num = boot.num,
+        boot.num = B,
         a = -1,
         b = 1,
         p.a = 0.5
@@ -561,14 +564,14 @@ npqcmstest <- function(formula,
       )
       assign(".Random.seed", post.boot.seed, envir = .GlobalEnv)
     } else {
-      Sn.bootstrap <- numeric(boot.num)
+      Sn.bootstrap <- numeric(B)
       chunk.size <- .np_cms_bootstrap_chunk_size(
         n = n,
-        boot.num = boot.num,
+        boot.num = B,
         pivot = pivot
       )
-      for (start in seq.int(1L, boot.num, by = chunk.size)) {
-        stopi <- min(boot.num, start + chunk.size - 1L)
+      for (start in seq.int(1L, B, by = chunk.size)) {
+        stopi <- min(B, start + chunk.size - 1L)
         idx <- seq.int(start, stopi)
         residuals.chunk <- matrix(NA_real_, nrow = n, ncol = length(idx))
 
@@ -624,9 +627,9 @@ npqcmstest <- function(formula,
       Jn = n*sqrt(prodh)*tIn/sqrt(to.h),
       In = tIn,
       Omega.hat = to.h,
-      q.90=Sn.bootstrap[ceiling(0.90*boot.num)],
-      q.95=Sn.bootstrap[ceiling(0.95*boot.num)],
-      q.99=Sn.bootstrap[ceiling(0.99*boot.num)],
+      q.90=Sn.bootstrap[ceiling(0.90*B)],
+      q.95=Sn.bootstrap[ceiling(0.95*B)],
+      q.99=Sn.bootstrap[ceiling(0.99*B)],
       bw=bw,
       Jn.bootstrap = if(pivot) Sn.bootstrap else NA,
       In.bootstrap = if(pivot) NA else Sn.bootstrap,
@@ -659,6 +662,6 @@ npqcmstest <- function(formula,
           pivot = pivot,
           model = model,
           boot.method = boot.method,
-          boot.num = boot.num,
+          boot.num = B,
           na.index = na.index)
 }

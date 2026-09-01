@@ -1,5 +1,11 @@
 # npRmpi 0.70-6
 
+* Public bootstrap-count arguments for `npcmstest()`, `npqcmstest()`,
+  `npdeneqtest()`, `npdeptest()`, `npsdeptest()`, `npsigtest()`, `npindex()`,
+  `npsymtest()`, and `npunitest()` are now consistently named `B`, with the
+  historical default of 399. The former `boot.num` input is retired; existing
+  `$boot.num` result metadata is unchanged.
+
 * `npsigtest()` now displays one immediate, coordinator-owned progress row
   with compact predictor names. Individual tests report predictor-level
   completion and an ETA after the first test finishes; joint and

@@ -188,9 +188,12 @@ npdeneqtest <- function(x = NULL,
                         y = NULL,
                         bw.x = NULL,
                         bw.y = NULL,
-                        boot.num = 399,
+                        B = 399,
                         random.seed = 42,
                         ...) {
+
+  if (...length())
+    npRejectLegacyBootstrapCount(names(list(...)), "npdeneqtest")
   .npRmpi_require_active_slave_pool(where = "npdeneqtest()")
   if (.npRmpi_autodispatch_active())
     return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
@@ -200,7 +203,7 @@ npdeneqtest <- function(x = NULL,
   if(is.null(x) || is.null(y)) stop(" you must provide x and y data")
   if(!is.data.frame(x) || !is.data.frame(y)) stop(" x and y must be data frames")
   if(!identical(names(data.frame(x)),names(data.frame(y)))) stop(" data frames x and y must have identical variable names")
-  if(boot.num < 9) stop(" number of bootstrap replications must be >= 9")
+  if(B < 9) stop(" number of bootstrap replications must be >= 9")
 
   .np_progress_note("Computing bandwidths")
 
@@ -367,10 +370,10 @@ npdeneqtest <- function(x = NULL,
                 In=output.boot$In))
   }
   
-  Tn.vector <- numeric(boot.num)
-  In.vector <- numeric(boot.num)
+  Tn.vector <- numeric(B)
+  In.vector <- numeric(B)
 
-  progress <- .np_progress_begin("Bootstrap replications", total = boot.num, surface = "bootstrap")
+  progress <- .np_progress_begin("Bootstrap replications", total = B, surface = "bootstrap")
 
   if (.npRmpi_deneq_collective_context()) {
     z <- data.frame(rbind(x, y))
@@ -378,7 +381,7 @@ npdeneqtest <- function(x = NULL,
       pool.n = nrow(z),
       n1 = nrow(x),
       n2 = nrow(y),
-      boot.num = boot.num
+      boot.num = B
     )
     post.boot.seed <- get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
     boot.out <- .npRmpi_deneq_collective_bootstrap(
@@ -398,10 +401,10 @@ npdeneqtest <- function(x = NULL,
     pool.n <- nrow(bootstrap.pool)
     n1 <- nrow(x)
     n2 <- nrow(y)
-    chunk.size <- .npdeneq_count_chunk_size(pool.n, boot.num)
+    chunk.size <- .npdeneq_count_chunk_size(pool.n, B)
 
-    for (start in seq.int(1L, boot.num, by = chunk.size)) {
-      stopi <- min(boot.num, start + chunk.size - 1L)
+    for (start in seq.int(1L, B, by = chunk.size)) {
+      stopi <- min(B, start + chunk.size - 1L)
       idx <- seq.int(start, stopi)
       x.count <- matrix(0, nrow = pool.n, ncol = length(idx))
       y.count <- matrix(0, nrow = pool.n, ncol = length(idx))
@@ -432,7 +435,7 @@ npdeneqtest <- function(x = NULL,
         progress <- .np_progress_step(progress, done = i)
     }
   } else {
-    for (i in seq_len(boot.num)) {
+    for (i in seq_len(B)) {
       output.boot <- teststat.boot(x,y,bw.x,bw.y)
       Tn.vector[i] <- output.boot$Tn
       In.vector[i] <- output.boot$In
@@ -466,6 +469,6 @@ npdeneqtest <- function(x = NULL,
             In.bootstrap=In.vector,                
             Tn.P=Tn.P,
             In.P=In.P,
-            boot.num=boot.num)
+            boot.num=B)
   
 }

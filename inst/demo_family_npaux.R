@@ -63,6 +63,8 @@ npaux_demo_matrix <- function(family) {
   mat[is.na(mat)] <- ""
   required <- c("family", "case", "tier", "enabled", "default_n", "floor_n",
                 "why")
+  if (identical(family, "npcmstest"))
+    required <- c(required, "B")
   missing <- setdiff(required, names(mat))
   if (length(missing)) {
     stop(family, " demo matrix missing columns: ",
@@ -91,7 +93,7 @@ npaux_demo_payload <- function(family, row, n) {
       X <- data.frame(x1 = x1, x2 = x2)
       list(model = lm(y ~ x1 + x2, x = TRUE, y = TRUE),
            X = X, y = y,
-           boot.num = npaux_demo_int(row$boot.num, "boot.num"))
+           B = npaux_demo_int(row$B, "B"))
     },
     npconmode = {
       x1 <- factor(rbinom(n, 1, .5))
@@ -132,7 +134,7 @@ npaux_demo_execute <- function(family, payload) {
     npcmstest = {
       output <- npcmstest(model = payload$model, xdat = payload$X,
                           ydat = payload$y, nmulti = 1, ftol = .01, tol = .01,
-                          boot.num = payload$boot.num)
+                          B = payload$B)
       list(output = output,
            estimate.first = npaux_demo_num(output, 1L),
            estimate.second = npaux_demo_num(output, 2L),

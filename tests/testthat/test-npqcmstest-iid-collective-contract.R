@@ -57,7 +57,7 @@ test_that("npqcmstest IID bootstrap uses collective transport", {
     ydat = y,
     distribution = "bootstrap",
     boot.method = "iid",
-    boot.num = 9L,
+    B = 9L,
     random.seed = 8713,
     nmulti = 1L
   )

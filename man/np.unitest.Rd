@@ -11,7 +11,7 @@ npunitest(data.x = NULL,
           data.y = NULL,
           method = c("integration","summation"),
           bootstrap = TRUE,
-          boot.num = 399,
+          B = 399,
           bw.x = NULL,
           bw.y = NULL,
           random.seed = 42,
@@ -47,7 +47,7 @@ These arguments identify the two samples, statistic variant, and any supplied ba
 These arguments control bootstrap execution and reproducibility settings.
 }
 
-  \item{boot.num}{
+  \item{B}{
     an integer value specifying the number of bootstrap
     replications to use. Defaults to \code{399}.
   }
@@ -216,7 +216,7 @@ y <- rnorm(n)
 output <- npunitest(x,y,
                     method="summation",
                     bootstrap=TRUE,
-                    boot.num=29)
+                    B=29)
 
 summary(output)
 

@@ -153,7 +153,7 @@ npsdeptest <- function(data = NULL,
                        lag.num = 1,
                        method=c("integration","summation"),
                        bootstrap = TRUE,
-                       boot.num = 399,
+                       B = 399,
                        random.seed = 42) {
   .npRmpi_require_active_slave_pool(where = "npsdeptest()")
   if (.npRmpi_autodispatch_active())
@@ -165,7 +165,7 @@ npsdeptest <- function(data = NULL,
   if(is.null(data)) stop(" you must enter a data vector")
   if((lag.num < 1) || (lag.num > length(data))) stop(" lag.num must be a positive integer less than the number of observations")
   if(ncol(data.frame(data)) != 1) stop(" data must have one dimension only")
-  if(boot.num < 9) stop(" number of bootstrap replications must be >= 9")
+  if(B < 9) stop(" number of bootstrap replications must be >= 9")
 
   method <- match.arg(method)
 
@@ -277,10 +277,10 @@ npsdeptest <- function(data = NULL,
 
     ## Matrix for resamples
 
-    progress <- .np_progress_begin("Bootstrap replications", total = boot.num, surface = "bootstrap")
+    progress <- .np_progress_begin("Bootstrap replications", total = B, surface = "bootstrap")
 
     if (.npRmpi_sdept_collective_context()) {
-      plan <- .npRmpi_sdept_bootstrap_index_plan(length(data), boot.num)
+      plan <- .npRmpi_sdept_bootstrap_index_plan(length(data), B)
       post.boot.seed <- get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
       boot.out <- .npRmpi_sdept_collective_bootstrap(
         plan = plan,
@@ -302,10 +302,10 @@ npsdeptest <- function(data = NULL,
       ## `Portmanteau' cumulant of all lags
       Srho.cumulant.vec.boot <- numeric()
 
-      Srho.bootstrap.mat <- matrix(NA,boot.num,(lag.num))
-      Srho.cumulant.bootstrap.mat <- matrix(NA,boot.num,(lag.num))
+      Srho.bootstrap.mat <- matrix(NA,B,(lag.num))
+      Srho.cumulant.bootstrap.mat <- matrix(NA,B,(lag.num))
 
-      for (b in seq_len(boot.num)) {
+      for (b in seq_len(B)) {
 
         ## Resample under the null
 
@@ -353,7 +353,7 @@ npsdeptest <- function(data = NULL,
              P = P.vec,
              P.cumulant = P.cumulant.vec,
              bootstrap = bootstrap,
-             boot.num = boot.num,
+             boot.num = B,
              lag.num = lag.num,
              bw.y = bw.y,
              bw.y.lag = bw.y.lag,

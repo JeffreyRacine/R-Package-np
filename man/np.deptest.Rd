@@ -14,7 +14,7 @@ npdeptest(data.x = NULL,
           data.y = NULL,
           method = c("integration","summation"),
           bootstrap = TRUE,
-          boot.num = 399,
+          B = 399,
           random.seed = 42)
   
 }
@@ -45,7 +45,7 @@ These arguments identify the paired samples being tested.
 These arguments control bootstrap execution and reproducibility settings.
 }
 
-  \item{boot.num}{
+  \item{B}{
     an integer value specifying the number of bootstrap
     replications to use. Defaults to \code{399}.
   }
@@ -210,7 +210,7 @@ y.fit <- fitted(model)
 
 output <- npdeptest(y,
                     y.fit,
-                    boot.num=29,
+                    B=29,
                     method="summation")
 
 summary(output)

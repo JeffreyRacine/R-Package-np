@@ -155,11 +155,14 @@ npunitest <- function(data.x = NULL,
                       data.y = NULL,
                       method = c("integration","summation"),
                       bootstrap = TRUE,
-                      boot.num = 399,
+                      B = 399,
                       bw.x = NULL,
                       bw.y = NULL,                         
                       random.seed = 42,
                       ...) {
+
+  if (...length())
+    npRejectLegacyBootstrapCount(names(list(...)), "npunitest")
   .npRmpi_require_active_slave_pool(where = "npunitest()")
   if (.npRmpi_autodispatch_active())
     return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
@@ -168,7 +171,7 @@ npunitest <- function(data.x = NULL,
   if(is.data.frame(data.x) || is.data.frame(data.y)) stop(" you must enter data vectors (not data frames)")
   if(!identical(class(data.x), class(data.y))) stop(" data vectors must be of same data type")
   if((ncol(data.frame(data.x)) != 1) ||( ncol(data.frame(data.y)) != 1)) stop(" data vectors must have one dimension only")
-  if(boot.num < 9) stop(" number of bootstrap replications must be >= 9")
+  if(B < 9) stop(" number of bootstrap replications must be >= 9")
   if(is.numeric(data.x) && (max(data.x) < min(data.y) || max(data.y) < min(data.x))) .np_warning("non-overlapping empirical distributions (see `Details' in ?npunidist)")
 
   method <- match.arg(method)
@@ -319,14 +322,14 @@ npunitest <- function(data.x = NULL,
       
     }
     
-    progress <- .np_progress_begin("Bootstrap replications", total = boot.num, surface = "bootstrap")
+    progress <- .np_progress_begin("Bootstrap replications", total = B, surface = "bootstrap")
 
     if (.npRmpi_unit_collective_context()) {
       plan <- .npRmpi_unit_bootstrap_index_plan(
         pool.n = length(data.null),
         n.x = length(data.x),
         n.y = length(data.y),
-        boot.num = boot.num
+        boot.num = B
       )
       post.boot.seed <- get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
       resampled.stat <- .npRmpi_unit_collective_bootstrap(
@@ -349,7 +352,7 @@ npunitest <- function(data.x = NULL,
         size.y = length(data.y),
         bw.x = bw.x,
         bw.y = bw.y,
-        boot.num = boot.num,
+        boot.num = B,
         progress = progress
       )
       resampled.stat <- bootstrap.result$values
@@ -362,14 +365,14 @@ npunitest <- function(data.x = NULL,
         size.y = length(data.y),
         bw.x = bw.x,
         bw.y = bw.y,
-        boot.num = boot.num,
+        boot.num = B,
         progress = progress
       )
       resampled.stat <- bootstrap.result$values
       progress <- bootstrap.result$progress
     } else {
-      resampled.stat <- numeric(boot.num)
-      for (b in seq_len(boot.num)) {
+      resampled.stat <- numeric(B)
+      for (b in seq_len(B)) {
         progress <- .np_progress_step(progress, done = b)
 
         ## Need to think this through... is the null one density? If so
@@ -399,7 +402,7 @@ npunitest <- function(data.x = NULL,
                Srho.bootstrap = resampled.stat,
                P = p.value,
                bootstrap = bootstrap,
-               boot.num = boot.num,
+               boot.num = B,
                bw.x = bw.x,
                bw.y = bw.y)
   } else {
