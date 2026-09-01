@@ -319,6 +319,40 @@ nplsqregbw <-
   as.numeric(scale)
 }
 
+.nplsqreg_finalize_scale_pilot <- function(variance.hat, residuals) {
+  variance.hat <- as.numeric(variance.hat)
+  residuals <- as.numeric(residuals)
+  if (!length(variance.hat) || length(variance.hat) != length(residuals))
+    stop("internal error: nplsqreg scale pilot returned an invalid length",
+         call. = FALSE)
+  if (any(!is.finite(variance.hat)))
+    stop("automatic nplsqreg scale pilot produced a nonfinite fitted variance",
+         call. = FALSE)
+
+  nonpositive <- variance.hat <= 0
+  if (!any(nonpositive))
+    return(sqrt(variance.hat))
+
+  residual.reference <- max(abs(residuals))
+  if (!is.finite(residual.reference) || residual.reference <= 0)
+    stop("automatic nplsqreg scale pilot has no positive residual scale",
+         call. = FALSE)
+  residual.rms <- residual.reference *
+    sqrt(mean((residuals / residual.reference)^2))
+  scale.floor <- residual.rms * sqrt(.Machine$double.eps)
+  if (!is.finite(scale.floor) || scale.floor <= 0)
+    stop("automatic nplsqreg scale pilot has no representable positive scale",
+         call. = FALSE)
+
+  scale <- numeric(length(variance.hat))
+  scale[!nonpositive] <- sqrt(variance.hat[!nonpositive])
+  scale[nonpositive] <- scale.floor
+  if (any(!is.finite(scale)) || any(scale <= 0))
+    stop("automatic nplsqreg scale pilot produced an invalid scale",
+         call. = FALSE)
+  scale
+}
+
 .nplsqreg_scale_pilot_fit <- function(xdat, ydat, pilot.dots,
                                       regtype.pilot, nomad.pilot) {
   mean.bw <- do.call(npregbw, c(list(xdat = xdat, ydat = ydat), pilot.dots))
@@ -326,10 +360,7 @@ nplsqregbw <-
   res <- as.numeric(ydat) - as.numeric(fitted(mean.fit))
   scale.fit <- npreg(bws = mean.fit$bws, txdat = xdat, tydat = res^2)
   variance.hat <- as.numeric(fitted(scale.fit))
-  floor <- .Machine$double.eps
-  variance.hat <- pmax(floor, variance.hat)
-  variance.hat[!is.finite(variance.hat)] <- floor
-  scale <- sqrt(variance.hat)
+  scale <- .nplsqreg_finalize_scale_pilot(variance.hat, res)
   list(scale = scale, mean.fit = mean.fit, scale.fit = scale.fit,
        regtype.pilot = regtype.pilot, nomad.pilot = nomad.pilot)
 }
