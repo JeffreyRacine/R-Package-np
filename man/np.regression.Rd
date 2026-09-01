@@ -426,12 +426,17 @@ Further arguments are passed to \code{\link{npregbw}} when bandwidths are comput
 
   \item{eval}{ evaluation points }
   \item{mean}{ estimates of the regression function (conditional mean) at the
-  evaluation points }
+  evaluation points. An evaluation row whose required kernel normalization is
+  exactly zero or non-finite is returned as \code{NA}; other rows remain
+  available. }
   \item{merr}{ standard errors of the regression function estimates, or
-    \code{NULL} when \code{se = FALSE} }
-  \item{grad}{ estimates of the gradients at each evaluation point }
+    \code{NULL} when \code{se = FALSE}. Undefined normalization rows are
+    returned as \code{NA}. }
+  \item{grad}{ estimates of the gradients at each evaluation point. Undefined
+    normalization rows are returned as \code{NA}. }
   \item{gerr}{ standard errors of the gradient estimates, or \code{NULL}
-    when \code{se = FALSE} }
+    when \code{se = FALSE}. Undefined normalization rows are returned as
+    \code{NA}. }
   \item{resid}{ if \code{residuals = TRUE}, in-sample or out-of-sample
     residuals where appropriate (or possible) }
   \item{R2}{ coefficient of determination (Doksum and Samarov (1995))}

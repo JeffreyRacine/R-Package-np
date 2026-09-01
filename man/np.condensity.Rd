@@ -314,18 +314,21 @@ Further arguments are passed to \code{\link{npcdensbw}} when bandwidths are comp
   \item{xeval}{ the evaluation points of the explanatory data }
   \item{yeval}{ the evaluation points of the dependent data }
   \item{condens}{ estimates of the conditional density at the evaluation
-    points }
+    points. An evaluation row whose required explanatory normalization is
+    exactly zero or non-finite is returned as \code{NA}; other rows remain
+    available. }
   \item{conderr}{ standard errors of the conditional density
-    estimates }
+    estimates. Undefined normalization rows are returned as \code{NA}. }
   \item{congrad}{ if invoked with \code{gradients = TRUE}, estimates of
     the gradients at the evaluation points. For local-polynomial fits,
     continuous-coordinate derivative orders are controlled by
-    \code{gradient.order}. }
+    \code{gradient.order}. Undefined normalization rows are returned as
+    \code{NA}. }
   \item{congerr}{ if invoked with \code{gradients = TRUE}, standard
     errors of the gradients at the evaluation points. Higher-order
     continuous-coordinate derivative standard errors are currently
     returned as \code{NA}; bootstrap inference is preferred for those
-    targets. }
+    targets. Undefined normalization rows are returned as \code{NA}. }
   \item{log_likelihood}{ aggregate fitted conditional-density log likelihood.
     Every represented strictly positive estimate, including a positive
     subnormal value, contributes its literal logarithm. An exact zero or

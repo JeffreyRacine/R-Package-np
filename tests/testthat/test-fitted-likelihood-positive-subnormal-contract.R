@@ -75,6 +75,55 @@ test_that("represented fitted-density subnormals contribute literal logs", {
                    log(conditional_fit$condens))
 })
 
+test_that("categorical-profile and beta fitted subnormals use literal logs", {
+  package <- if ("npRmpi" %in% loadedNamespaces()) "npRmpi" else "np"
+  density <- getFromNamespace("npudens", package)
+  density_bw <- getFromNamespace("npudensbw", package)
+  old <- options(np.messages = FALSE, np.tree = FALSE, np.largeh = FALSE)
+  on.exit(options(old), add = TRUE)
+
+  categorical_training <- data.frame(
+    x = factor(rep("a", 5L), levels = c("a", "b"))
+  )
+  categorical_evaluation <- data.frame(
+    x = factor("b", levels = levels(categorical_training$x))
+  )
+  categorical_bw <- fitted_subnormal_run_local(package, density_bw(
+    dat = categorical_training,
+    bws = .Machine$double.xmin / 2,
+    bandwidth.compute = FALSE,
+    bwtype = "fixed",
+    bwscaling = FALSE,
+    ukertype = "aitchisonaitken"
+  ))
+  categorical_fit <- fitted_subnormal_run_local(package, density(
+    bws = categorical_bw,
+    tdat = categorical_training,
+    edat = categorical_evaluation
+  ))
+
+  beta_fit <- fitted_subnormal_run_local(package, suppressWarnings(density(
+    tdat = data.frame(x = rep(0.01, 5L)),
+    edat = data.frame(x = 0.99),
+    bws = 0.078,
+    bwtype = "fixed",
+    bwscaling = FALSE,
+    ckertype = "beta",
+    ckerorder = 2L,
+    ckerbound = "fixed",
+    ckerlb = 0,
+    ckerub = 1
+  )))
+
+  expect_true(categorical_fit$dens > 0 &&
+              categorical_fit$dens < .Machine$double.xmin)
+  expect_true(beta_fit$dens > 0 &&
+              beta_fit$dens < .Machine$double.xmin)
+  expect_identical(categorical_fit$log_likelihood,
+                   log(categorical_fit$dens))
+  expect_identical(beta_fit$log_likelihood, log(beta_fit$dens))
+})
+
 test_that("fitted densities already underflowed to zero retain the placeholder", {
   package <- if ("npRmpi" %in% loadedNamespaces()) "npRmpi" else "np"
   density <- getFromNamespace("npudens", package)

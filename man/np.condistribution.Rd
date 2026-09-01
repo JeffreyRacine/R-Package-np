@@ -320,18 +320,21 @@ Further arguments are passed to \code{\link{npcdistbw}} when bandwidths are comp
   \item{xeval}{ the evaluation points of the explanatory data }
   \item{yeval}{ the evaluation points of the dependent data }
   \item{condist}{ estimates of the conditional cumulative
-    distribution at the evaluation points }
+    distribution at the evaluation points. An evaluation row whose required
+    explanatory normalization is exactly zero or non-finite is returned as
+    \code{NA}; other rows remain available. }
   \item{conderr}{ standard errors of the cumulative conditional distribution
-    estimates }
+    estimates. Undefined normalization rows are returned as \code{NA}. }
   \item{congrad}{ if invoked with \code{gradients = TRUE}, estimates of
     the gradients at the evaluation points. For local-polynomial fits,
     continuous-coordinate derivative orders are controlled by
-    \code{gradient.order}. }
+    \code{gradient.order}. Undefined normalization rows are returned as
+    \code{NA}. }
   \item{congerr}{ if invoked with \code{gradients = TRUE}, standard
     errors of the gradients at the evaluation points. Higher-order
     continuous-coordinate derivative standard errors are currently
     returned as \code{NA}; bootstrap inference is preferred for those
-    targets. }
+    targets. Undefined normalization rows are returned as \code{NA}. }
   \item{log_likelihood}{ log likelihood of the cumulative conditional distribution estimate }
 
 }

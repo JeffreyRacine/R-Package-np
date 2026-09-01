@@ -179,6 +179,13 @@ Further arguments are passed to the bandwidth-selection routines used by the tes
   or not to recompute the bandwidths for the variables being tested
   (\code{boot.type}), among others.
 
+  Eligible individual tests with fixed bandwidths, IID residual resampling,
+  and a supported local-polynomial or categorical-only local-constant engine
+  evaluate bootstrap statistics in bounded native tiles. This is an internal
+  computational optimization: it preserves bootstrap draws, random-number
+  state, statistics, and P-values. Joint tests and configurations outside the
+  qualified set continue through the incumbent bootstrap loop.
+
   The categorical statistic of Racine, Hart, and Li (2006) is the
   unstandardized mean of squared finite-difference estimates. It is not
   divided by the asymptotic standard errors used for continuous
