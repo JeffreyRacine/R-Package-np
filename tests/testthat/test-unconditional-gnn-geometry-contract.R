@@ -77,7 +77,19 @@ npRmpi_run_unconditional_gnn_geometry_case <- function(case) {
       "stopifnot(grepl('zero literal radius after occurrence exclusion', distribution_error, fixed=TRUE))",
       "invalid <- npRmpi:::npudensbw.bandwidth(dat=dat, bws=bw, bandwidth.compute=TRUE, eval.only=TRUE, nmulti=1L)",
       "stopifnot(sum(invalid$invalid.history) > 0)",
+      "density_ls_bw <- npudensbw(dat=dat, bwtype='generalized_nn', bwmethod='cv.ls', bws=2L, bandwidth.compute=FALSE)",
+      "invalid_density_ls <- npRmpi:::npudensbw.bandwidth(dat=dat, bws=density_ls_bw, bandwidth.compute=TRUE, eval.only=TRUE, nmulti=1L)",
+      "invalid_distribution <- npRmpi:::npudistbw.dbandwidth(dat=dat, bws=dist_bw, bandwidth.compute=TRUE, eval.only=TRUE, nmulti=1L)",
+      "stopifnot(sum(invalid_density_ls$invalid.history) > 0)",
+      "stopifnot(sum(invalid_distribution$invalid.history) > 0)",
       "cat('NPRMPI_UNCONDITIONAL_GNN_ZERO_RADIUS_OK\\n')"
+    ),
+    search_recovery = c(
+      "data('Italy')",
+      "dat <- transform(Italy[seq_len(20L),,drop=FALSE], year=ordered(year))",
+      "bw <- npudistbw(~year+gdp, data=dat, bwtype='generalized_nn', nmulti=1L)",
+      "stopifnot(all(is.finite(bw$bw)), all(bw$bw > 0), sum(bw$invalid.history) > 0)",
+      "cat('NPRMPI_UNCONDITIONAL_GNN_SEARCH_RECOVERY_OK\\n')"
     ),
     stop("unknown case")
   )
@@ -102,5 +114,14 @@ test_that("ordinary generalized-NN unconditional fit reports zero literal radii"
   info <- paste(result$output, collapse = "\n")
   expect_equal(result$status, 0L, info = info)
   expect_true(any(grepl("NPRMPI_UNCONDITIONAL_GNN_ZERO_RADIUS_OK",
+                        result$output, fixed = TRUE)), info = info)
+})
+
+test_that("mixed generalized-NN distribution search recovers from invalid candidates", {
+  result <- npRmpi_run_unconditional_gnn_geometry_case("search_recovery")
+  skip_if(is.null(result), "installed npRmpi unavailable for subprocess proof")
+  info <- paste(result$output, collapse = "\n")
+  expect_equal(result$status, 0L, info = info)
+  expect_true(any(grepl("NPRMPI_UNCONDITIONAL_GNN_SEARCH_RECOVERY_OK",
                         result$output, fixed = TRUE)), info = info)
 })
