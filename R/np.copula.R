@@ -108,21 +108,56 @@ npcopula <- function(bws, ...) {
   num.var + 2L
 }
 
+.npcopula_warn_zero_marginal_rows <- function(zero.marginal.rows) {
+  rows <- which(zero.marginal.rows)
+  if (!length(rows))
+    return(invisible(NULL))
+
+  shown <- utils::head(rows, 8L)
+  omitted <- length(rows) - length(shown)
+  row.text <- paste(shown, collapse = ", ")
+  if (omitted > 0L)
+    row.text <- sprintf("%s, and %d others", row.text, omitted)
+
+  .np_warning(sprintf(
+    paste0(
+      "%d of %d external evaluation rows are undefined under the supplied ",
+      "sample, kernel, and bandwidth. At least one estimated marginal ",
+      "density is zero for rows %s, so the copula density ratio is ",
+      "undefined. The corresponding copula density estimates were returned ",
+      "as NA. This finite-sample result does not by itself imply that the ",
+      "points lie outside the population support."
+    ),
+    length(rows), length(zero.marginal.rows), row.text
+  ), call. = FALSE)
+  invisible(NULL)
+}
+
 .npcopula_eval_expanded_grid <- function(bws, data, x.u, density) {
   if (!isTRUE(density))
     return(fitted(npudist(bws = bws, tdat = data, edat = x.u)))
 
   copula <- fitted(npudens(bws = bws, tdat = data, edat = x.u))
+  zero.marginal.rows <- NULL
   for (j in seq_len(length(bws$xnames))) {
     bws.f.marginal <- .npcopula_marginal_bw(bws, data, j, target = "density")
     tdat <- .npcopula_marginal_data(bws, data, j)
     xeval <- .npcopula_marginal_eval_data(bws, x.u, j)
-    copula <- copula / NZD(fitted(npudens(
+    marginal <- fitted(npudens(
       bws = bws.f.marginal,
       tdat = tdat,
       edat = xeval
-    )))
+    ))
+    copula <- copula / NZD(marginal)
+    zero.now <- !is.na(marginal) & marginal == 0
+    if (any(zero.now)) {
+      copula[zero.now] <- NA_real_
+      zero.marginal.rows <- if (is.null(zero.marginal.rows))
+        zero.now else zero.marginal.rows | zero.now
+    }
   }
+  if (!is.null(zero.marginal.rows))
+    .npcopula_warn_zero_marginal_rows(zero.marginal.rows)
   copula
 }
 
