@@ -58,6 +58,20 @@ test_that("canonical conditional CVLS rows use exact signed deletion", {
   ))
 })
 
+test_that("optimized LOO leverage owners never floor one minus leverage", {
+  paths <- locate_signed_delete_sources()
+  skip_if(is.null(paths), "package C sources unavailable in this test context")
+
+  source <- paste(readLines(paths$jksum, warn = FALSE), collapse = "\n")
+  expect_false(grepl("NZD_POS(1.0 -", source, fixed = TRUE))
+  expect_false(grepl("NZD(1.0 -", source, fixed = TRUE))
+  matches <- regmatches(
+    source,
+    gregexpr("np_lp_delete_denominator(", source, fixed = TRUE)
+  )[[1L]]
+  expect_gte(length(matches), 10L)
+})
+
 test_that("higher-order fixed and generalized-NN CVLS match signed-WLS oracles", {
   skip_if_not_installed("npRmpi")
   suppressPackageStartupMessages(library(npRmpi))

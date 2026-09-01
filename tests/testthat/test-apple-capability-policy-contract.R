@@ -71,8 +71,8 @@ test_that("all-large Apple permission is frozen in prepared context", {
   source <- paste(lines, collapse = "\n")
   row_fit <- apple_policy_source_body(
     lines,
-    "^static double np_conditional_lp_all_large_row_fit\\(",
-    "^static double np_conditional_lp_all_large_row_fit_basis\\("
+    "^static int np_conditional_lp_all_large_row_fit\\(",
+    "^static int np_conditional_lp_all_large_row_fit_basis\\("
   )
 
   expect_match(source, "int use_apple_dgemv;", fixed = TRUE)
