@@ -163,7 +163,7 @@ test_that("k1 zero radii retain objective-penalty and fit-error symmetry", {
 
   expect_identical(
     as.numeric(np:::.npregbw_eval_only(x, y, bw)$objective),
-    10 * mean((y - mean(y))^2)
+    10 * (nrow(x) / (nrow(x) - 1))^2 * mean((y - mean(y))^2)
   )
   expect_error(npreg(bws = bw), "zero literal radius", fixed = TRUE)
   expect_error(

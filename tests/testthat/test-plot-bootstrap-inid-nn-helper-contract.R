@@ -10,6 +10,7 @@ test_that("nearest-neighbor regression helper matches explicit resample refits",
   ex <- tx[seq_len(15), , drop = FALSE]
   B <- 9L
   counts <- rmultinom(n = B, size = n, prob = rep.int(1 / n, n))
+  positive.occurrence <- max(counts) + 1L
   fast.fun <- getFromNamespace(".np_inid_boot_from_reghat_exact", "np")
 
   cfgs <- list(
@@ -22,11 +23,7 @@ test_that("nearest-neighbor regression helper matches explicit resample refits",
     # A multinomial resample can repeat an original evaluation point.  Keep
     # this helper-equivalence fixture inside the literal-radius domain rather
     # than relying on the retired nearest-positive substitution.
-    bw.val <- if (identical(bt, "adaptive_nn")) {
-      c(5, 5)
-    } else {
-      rep.int(max(counts) + 1L, 2L)
-    }
+    bw.val <- rep.int(positive.occurrence, 2L)
 
     for (cfg in cfgs) {
       bw.args <- list(
@@ -139,12 +136,13 @@ test_that("nearest-neighbor ksum helpers match explicit resample refits", {
   ey <- data.frame(y = seq(0.1, 0.9, length.out = 11))
   B <- 9L
   counts <- rmultinom(n = B, size = n, prob = rep.int(1 / n, n))
+  positive.occurrence <- max(counts) + 1L
 
   fast.u <- getFromNamespace(".np_inid_boot_from_ksum_unconditional", "np")
   fast.c <- getFromNamespace(".np_inid_boot_from_ksum_conditional", "np")
 
   for (bt in c("generalized_nn", "adaptive_nn")) {
-    bw.val <- if (identical(bt, "adaptive_nn")) 5 else 2
+    bw.val <- if (identical(bt, "adaptive_nn")) positive.occurrence else 2
     cbw.val <- rep.int(bw.val, 2L)
 
     u.dens.bw <- npudensbw(dat = tx, bws = bw.val, bwtype = bt, bandwidth.compute = FALSE)
@@ -372,21 +370,21 @@ test_that("npindex nearest-neighbor inid helper matches explicit resample refits
   tx <- data.frame(x1 = x1, x2 = x2)
   B <- 9L
   counts <- rmultinom(n = B, size = n, prob = rep.int(1 / n, n))
+  positive.occurrence <- max(counts) + 1L
   fast.fun <- getFromNamespace(".np_inid_boot_from_index", "np")
 
   cfgs <- list(
-    list(regtype = "lc", basis = NULL, degree = NULL, h = 5L),
-    list(regtype = "ll", basis = NULL, degree = NULL, h = 5L),
-    list(regtype = "lp", basis = "tensor", degree = 2L, h = 5L)
+    list(regtype = "lc", basis = NULL, degree = NULL),
+    list(regtype = "ll", basis = NULL, degree = NULL),
+    list(regtype = "lp", basis = "tensor", degree = 2L)
   )
 
   for (bt in c("generalized_nn", "adaptive_nn")) {
     for (cfg in cfgs) {
-      h <- if (identical(bt, "generalized_nn")) max(counts) + 1L else cfg$h
       bw.args <- list(
         xdat = tx,
         ydat = y,
-        bws = c(1, 1, h),
+        bws = c(1, 1, positive.occurrence),
         bandwidth.compute = FALSE,
         regtype = cfg$regtype,
         bwtype = bt

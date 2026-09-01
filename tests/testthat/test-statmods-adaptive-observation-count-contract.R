@@ -1,6 +1,6 @@
 suppressPackageStartupMessages(library(np))
 
-test_that("adaptive duplicate mass promotes zero-radius neighborhoods to the nearest positive radius", {
+test_that("adaptive duplicate mass rejects a literal zero-radius neighborhood", {
   x <- data.frame(x = c(0, 0, 0, 1))
   y <- c(0, 1, 2, 3)
 
@@ -11,18 +11,11 @@ test_that("adaptive duplicate mass promotes zero-radius neighborhoods to the nea
     bws = 2,
     bandwidth.compute = FALSE
   )
-  bw3 <- npregbw(
-    ydat = y,
-    xdat = x,
-    bwtype = "adaptive_nn",
-    bws = 3,
-    bandwidth.compute = FALSE
+  expect_error(
+    npreg(bws = bw2, exdat = x),
+    "adaptive nearest-neighbor bandwidth has a zero literal radius",
+    fixed = TRUE
   )
-
-  fit2 <- npreg(bws = bw2, exdat = x)
-  fit3 <- npreg(bws = bw3, exdat = x)
-
-  expect_equal(fit2$mean, fit3$mean, tolerance = 0)
 })
 
 test_that("adaptive observation-count bandwidths handle tied supports that formerly failed", {

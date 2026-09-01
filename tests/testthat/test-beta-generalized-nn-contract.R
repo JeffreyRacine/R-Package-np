@@ -96,10 +96,10 @@ test_that("generalized-NN beta PDF preserves affine support units", {
 test_that("generalized-NN beta PDF preserves observation-support tie handling", {
   train <- data.frame(x = c(0.10, 0.10, 0.40, 0.80, 0.95))
   evaluation <- data.frame(x = c(0.10, 0.40, 0.50))
-  expected_bandwidth <- c(0.30, 0.30, 0.30)
+  expected_bandwidth <- c(0.30, 0.30, 0.40)
 
   fit <- npksum(
-    bws = 2,
+    bws = 3,
     txdat = train,
     exdat = evaluation,
     bwtype = "generalized_nn",
@@ -125,19 +125,21 @@ test_that("generalized-NN beta PDF preserves observation-support tie handling", 
     expect_equal(fit$kw[, j], fixed$kw[, 1L], tolerance = 2e-14)
   }
 
-  constant <- npksum(
-    bws = 2,
-    txdat = data.frame(x = rep(0.4, 5)),
-    exdat = data.frame(x = 0.4),
-    bwtype = "generalized_nn",
-    ckertype = "beta",
-    ckerbound = "fixed",
-    ckerlb = 0,
-    ckerub = 1,
-    return.kernel.weights = TRUE
+  expect_error(
+    npksum(
+      bws = 2,
+      txdat = data.frame(x = rep(0.4, 5)),
+      exdat = data.frame(x = 0.4),
+      bwtype = "generalized_nn",
+      ckertype = "beta",
+      ckerbound = "fixed",
+      ckerlb = 0,
+      ckerub = 1,
+      return.kernel.weights = TRUE
+    ),
+    "zero literal radius",
+    fixed = TRUE
   )
-  expect_identical(constant$kw[, 1L], rep(1, 5))
-  expect_identical(as.double(constant$ksum), 5)
 })
 
 test_that("generalized-NN beta PDF retains the extended-NN policy", {
