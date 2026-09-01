@@ -150,10 +150,15 @@ npsigtest.npregression <-
     (identical(pivot, FALSE) && all(categorical)) ||
     (identical(pivot, TRUE) && !any(categorical))
 
+  regression.engine <- bws[["regtype.engine", exact = TRUE]]
+  engine.supported <- identical(regression.engine, "lp") ||
+    (identical(regression.engine, "lc") &&
+       identical(bws[["ncon", exact = TRUE]], 0L))
+
   if (joint || !identical(boot.type, "I") ||
       !identical(boot.method, "iid") || !equivalent.pivot ||
       length(extra.args) || !identical(bws[["type", exact = TRUE]], "fixed") ||
-      !identical(bws[["regtype.engine", exact = TRUE]], "lp") ||
+      !engine.supported ||
       !identical(bws[["basis.engine", exact = TRUE]], "glp") ||
       !identical(bws[["bernstein.basis.engine", exact = TRUE]], FALSE) ||
       identical(bws[["ckertype", exact = TRUE]], "beta"))

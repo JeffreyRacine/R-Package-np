@@ -110,3 +110,72 @@ test_that("streamed IID capability is deterministic and semantics-exact", {
   expect_identical(.Random.seed, before)
   expect_identical(dim(result$In.bootstrap), c(9L, 2L))
 })
+
+test_that("streamed IID categorical-only tiles reproduce scalar-LP fits", {
+  set.seed(906)
+  n <- 48L
+  xdat <- data.frame(
+    u = factor(rep(c("a", "b", "c"), length.out = n)),
+    o = ordered(rep(c("low", "mid", "high", "top"), each = 12L),
+                levels = c("low", "mid", "high", "top"))
+  )
+  ydat <- 0.5 + c(a = 0, b = 0.45, c = -0.3)[xdat$u] +
+    c(low = -0.25, mid = 0, high = 0.35, top = 0.6)[xdat$o] +
+    rnorm(n, sd = 0.12)
+  bw <- npregbw(
+    xdat = xdat, ydat = ydat,
+    bws = c(0.2, 0.2), bandwidth.compute = FALSE,
+    regtype = "lc", bwtype = "fixed"
+  )
+  unrestricted <- npreg(
+    txdat = xdat, tydat = ydat, bws = bw,
+    gradients = FALSE, se = FALSE
+  )
+  unrestricted.scaled <- scale(residuals(unrestricted))
+  unrestricted.scale <- attr(unrestricted.scaled, "scaled:scale")
+  unrestricted.center <- attr(unrestricted.scaled, "scaled:center")
+
+  set.seed(118)
+  donor <- vapply(
+    seq_len(8L),
+    function(unused) sample.int(n, replace = TRUE),
+    integer(n)
+  )
+
+  for (tested.index in seq_len(ncol(xdat))) {
+    null.frame <- xdat
+    xq <- uocquantile(xdat[[tested.index]], 0.5)
+    null.frame[[tested.index]] <- np:::cast(
+      xq, xdat[[tested.index]], same.levels = TRUE
+    )
+    null.mean <- npreg(
+      txdat = xdat, tydat = ydat, exdat = null.frame, bws = bw,
+      gradients = FALSE, se = FALSE
+    )$mean
+    residual.pool <- as.numeric(
+      scale(ydat - null.mean) * unrestricted.scale + unrestricted.center
+    )
+    residual.pool <- residual.pool - mean(residual.pool)
+
+    streamed <- np:::.np_npsig_streamed_iid_tile(
+      bws = bw,
+      xdat = xdat,
+      tested.index = tested.index,
+      donor.index = donor,
+      null.mean = null.mean,
+      residual.pool = residual.pool
+    )
+    incumbent <- vapply(seq_len(ncol(donor)), function(replication) {
+      ystar <- null.mean + residual.pool[donor[, replication]]
+      fit <- npreg(
+        txdat = xdat, tydat = ystar, bws = bw,
+        gradients = TRUE, se = FALSE
+      )
+      np:::.np_npsig_statistic(
+        fit, index = tested.index, pivot = FALSE
+      )
+    }, numeric(1L))
+
+    expect_equal(streamed, incumbent, tolerance = 2e-12)
+  }
+})

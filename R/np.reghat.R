@@ -1094,7 +1094,7 @@ npreghat <-
       as.integer(kernel.x.c),
       as.integer(kernel.xu.c),
       as.integer(kernel.xo.c),
-      as.logical(tree.flag),
+      FALSE,
       as.integer(degree),
       grad.vec,
       as.integer(isTRUE(bernstein.basis)),
