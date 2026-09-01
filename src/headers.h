@@ -183,6 +183,11 @@ static inline double np_guarded_cvml_log_contribution(
     return log_fit - 2.0*log_dbl_min;
   return -log_dbl_min;
 }
+static inline double np_fitted_log_likelihood_contribution(const double fit){
+  if(fit > 0.0 || ISNAN(fit))
+    return log(fit);
+  return log(DBL_MIN);
+}
 void np_fastcv_alllarge_hits_reset(void);
 double np_fastcv_alllarge_hits_get(void);
 void np_cont_largeh_cache_clear_extern(void);

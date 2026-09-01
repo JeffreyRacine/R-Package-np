@@ -18837,8 +18837,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
       }
 
       if(dens_or_dist == NP_DO_DENS){
-        const double val = (pdf[j] < DBL_MIN) ? DBL_MIN : pdf[j];
-        log_likelihood += log(val);
+        log_likelihood += np_fitted_log_likelihood_contribution(pdf[j]);
       }
 
       if(do_grad){

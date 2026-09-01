@@ -1,5 +1,10 @@
 # npRmpi 0.70-6
 
+* Fitted density and conditional-density log-likelihood aggregates now use the
+  literal logarithm of every represented strictly positive estimate, including
+  subnormal values. Exact zero and negative estimates retain the established
+  computational placeholder; no underflow-recovery owner is introduced.
+
 * Density likelihood cross-validation now takes the true logarithm of every
   represented strictly positive contribution, including positive subnormal
   values and positive values retained only in signed-log form. Exact zero and

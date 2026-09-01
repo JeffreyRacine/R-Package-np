@@ -2435,7 +2435,6 @@ static int np_density_categorical_profile_fit_body(
   double *counts = NULL, *profile_pdf_sum = NULL;
   double *profile_y[1];
   int ok = 0;
-  const double log_DBL_MIN = log(DBL_MIN);
   int operator_kind = OP_NORMAL;
 
   if((int_TREE_PROFILE_X != NP_TREE_TRUE) ||
@@ -2595,7 +2594,7 @@ static int np_density_categorical_profile_fit_body(
     pdf[i] = p;
     if(operator_kind == OP_NORMAL){
       pdf_stderr[i] = sqrt(p/(double)num_obs_train);
-      *log_likelihood += (p < DBL_MIN) ? log_DBL_MIN : log(p);
+      *log_likelihood += np_fitted_log_likelihood_contribution(p);
     } else {
       pdf_stderr[i] = sqrt(p*(1.0-p)/(double)num_obs_train);
     }
@@ -49166,8 +49165,6 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
 
   double pnh = (double)num_obs_train;
 
-	const double log_DBL_MIN = log(DBL_MIN);
-
   if(exact_beta_route &&
      (np_continuous_kernel_route_validate(kernel_route,
                                           num_reg_continuous) !=
@@ -49491,7 +49488,8 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
       pdf_stderr[i] = num_obs_train > 1 ?
         sqrt(variance / (double)(num_obs_train - 1)) : 0.0;
       if(dop == OP_NORMAL)
-        *log_likelihood += estimate < DBL_MIN ? log_DBL_MIN : log(estimate);
+        *log_likelihood +=
+          np_fitted_log_likelihood_contribution(estimate);
     }
   } else {
     kernel_weighted_sum_np_ctx(kernel_c,
@@ -49553,7 +49551,8 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
     if (dop == OP_NORMAL) {
       for(i = 0, *log_likelihood = 0.0; i < num_obs_eval; i++){
         pdf[i] /= (double)num_obs_train;
-        *log_likelihood += (pdf[i] < DBL_MIN) ? log_DBL_MIN : log(pdf[i]);
+        *log_likelihood +=
+          np_fitted_log_likelihood_contribution(pdf[i]);
 
         if((BANDWIDTH_den == BW_GEN_NN) && (dop == OP_NORMAL)){
           for(l = 0, pnh = num_obs_train; l < num_reg_continuous; l++){
@@ -50857,7 +50856,7 @@ static int np_conditional_categorical_profile_fit_body(
     const double val = profile_num[eval_xy_id[i]]/sk;
     kdf[i] = val;
     if(is_cpdf){
-      *log_likelihood += (val < DBL_MIN) ? log(DBL_MIN) : log(val);
+      *log_likelihood += np_fitted_log_likelihood_contribution(val);
       kdf_stderr[i] = sqrt(val*K_INT_KERNEL_P/sk);
     } else {
       kdf_stderr[i] = sqrt(val*(1.0-val)*K_INT_KERNEL_P/sk);
@@ -51043,8 +51042,6 @@ const NPNNGeometryContext *nn_geometry_context
     ((BANDWIDTH_den==BW_ADAP_NN)?num_obs_train:1);
 
   double pnh = 1.0;
-
-  const double log_DBL_MIN = log(DBL_MIN);
 
   int num_obs_eval_alloc;
 
@@ -51466,7 +51463,7 @@ const NPNNGeometryContext *nn_geometry_context
         *log_likelihood = NA_REAL;
         continue;
       }
-      *log_likelihood += (kdf[i] < DBL_MIN) ? log_DBL_MIN : log(kdf[i]);
+      *log_likelihood += np_fitted_log_likelihood_contribution(kdf[i]);
 
       if(BANDWIDTH_den == BW_GEN_NN){
         for(l = 0, pnh = 1.0; l < num_X_continuous; l++){      
