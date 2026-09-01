@@ -12,7 +12,8 @@ typedef enum {
 typedef enum {
   NP_BETA_BANDWIDTH_PREPARE_OK = 0,
   NP_BETA_BANDWIDTH_PREPARE_ERR_LAYOUT = 1,
-  NP_BETA_BANDWIDTH_PREPARE_ERR_DISTANCE = 2
+  NP_BETA_BANDWIDTH_PREPARE_ERR_DISTANCE = 2,
+  NP_BETA_BANDWIDTH_PREPARE_ERR_ZERO_RADIUS = 3
 } np_beta_bandwidth_prepare_status;
 
 np_beta_bandwidth_prepare_status
@@ -73,6 +74,7 @@ int np_beta_continuous_bandwidth_prepare_canonical(
   double **matrix_bandwidth,
   double **matrix_bandwidth_deriv,
   double *lambda,
-  const NPContinuousPreparedBandwidthView *prepared_bandwidth);
+  const NPContinuousPreparedBandwidthView *prepared_bandwidth,
+  NPNNGeometryStatus *geometry_status);
 
 #endif

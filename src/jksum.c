@@ -84,7 +84,8 @@ static int np_gnn_convolution_training_bandwidth_prepare(
   double *vector_scale_factor,
   double **matrix_X_continuous_train,
   double *lambda,
-  double ***matrix_alt_bandwidth);
+  double ***matrix_alt_bandwidth,
+  NPNNGeometryStatus *geometry_status);
 
 static int np_common_continuous_resident_geometry(
   int num_obs_train,
@@ -11147,6 +11148,7 @@ NPPermutationWeightOutput * const pkw_output){
   int i, ii, j, kk, k, l, mstep, js, je, num_obs_eval_alloc, sum_element_length, ip;
   int status = 0;
   int do_psum, swap_xxt;
+  NPNNGeometryStatus nn_geometry_status = NP_NN_GEOMETRY_OK;
 
   int * permutation_kernel = NULL;
   int doscoreocg = do_score || do_ocg;
@@ -11499,7 +11501,7 @@ NPPermutationWeightOutput * const pkw_output){
   }
 
   if(!bandwidth_provided){
-    if(kernel_bandwidth_mean((num_reg_continuous != 0) ? KERNEL_reg[0]: 0,
+    if(kernel_bandwidth_mean_ctx((num_reg_continuous != 0) ? KERNEL_reg[0]: 0,
                              BANDWIDTH_reg,
                              num_obs_train,
                              num_obs_eval,
@@ -11517,9 +11519,11 @@ NPPermutationWeightOutput * const pkw_output){
                              matrix_X_continuous_eval,
                              matrix_bandwidth,						 /* Not used */
                              matrix_bandwidth,
-                             lambda)==1){
+                             lambda,
+                             NULL, NULL, &nn_geometry_status)==1){
 
-      status = KWSNP_ERR_BADBW;
+      status = nn_geometry_status == NP_NN_GEOMETRY_ZERO_RADIUS ?
+        KWSNP_ERR_ZERO_NN_RADIUS : KWSNP_ERR_BADBW;
       goto cleanup;
     }
   }
@@ -11532,8 +11536,9 @@ NPPermutationWeightOutput * const pkw_output){
          num_obs_train, num_reg_unordered, num_reg_ordered,
          num_reg_continuous, suppress_parallel, vector_scale_factor,
          matrix_X_continuous_train, lambda,
-         &matrix_alt_bandwidth) != 0){
-      status = KWSNP_ERR_BADBW;
+         &matrix_alt_bandwidth, &nn_geometry_status) != 0){
+      status = nn_geometry_status == NP_NN_GEOMETRY_ZERO_RADIUS ?
+        KWSNP_ERR_ZERO_NN_RADIUS : KWSNP_ERR_BADBW;
       goto cleanup;
     }
   }
@@ -11542,7 +11547,8 @@ NPPermutationWeightOutput * const pkw_output){
     matrix_alt_bandwidth = alloc_tmatd(num_obs_eval, num_reg_continuous);  
 
     // Adaptive convolution requires an auxiliary BW_GEN_NN bandwidth matrix.
-    if(kernel_bandwidth_mean((num_reg_continuous != 0) ? KERNEL_reg[0]: 0,
+    nn_geometry_status = NP_NN_GEOMETRY_OK;
+    if(kernel_bandwidth_mean_ctx((num_reg_continuous != 0) ? KERNEL_reg[0]: 0,
                              BW_GEN_NN, // this is not an error!
                              num_obs_train,
                              num_obs_eval,
@@ -11560,9 +11566,11 @@ NPPermutationWeightOutput * const pkw_output){
                              matrix_X_continuous_eval,
                              NULL,						 /* Not used */
                              matrix_alt_bandwidth,
-                             lambda)==1){
+                             lambda,
+                             NULL, NULL, &nn_geometry_status)==1){
 
-      status = KWSNP_ERR_BADBW;
+      status = nn_geometry_status == NP_NN_GEOMETRY_ZERO_RADIUS ?
+        KWSNP_ERR_ZERO_NN_RADIUS : KWSNP_ERR_BADBW;
       goto cleanup;
     }
 
@@ -13261,7 +13269,8 @@ static int NP_NOINLINE np_gnn_convolution_training_bandwidth_prepare(
   double * const vector_scale_factor,
   double ** const matrix_X_continuous_train,
   double * const lambda,
-  double *** const matrix_alt_bandwidth)
+  double *** const matrix_alt_bandwidth,
+  NPNNGeometryStatus * const geometry_status)
 {
   double **bandwidth;
 
@@ -13272,13 +13281,16 @@ static int NP_NOINLINE np_gnn_convolution_training_bandwidth_prepare(
     return 1;
   *matrix_alt_bandwidth = NULL;
   bandwidth = alloc_tmatd(num_obs_train, num_reg_continuous);
-  if(kernel_bandwidth_mean(
+  if(geometry_status != NULL)
+    *geometry_status = NP_NN_GEOMETRY_OK;
+  if(kernel_bandwidth_mean_ctx(
        kernel, BW_GEN_NN, num_obs_train, num_obs_train,
        0, 0, 0, num_reg_continuous,
        num_reg_unordered, num_reg_ordered, suppress_parallel,
        vector_scale_factor, NULL, NULL,
        matrix_X_continuous_train, matrix_X_continuous_train,
-       bandwidth, bandwidth, lambda) != 0){
+       bandwidth, bandwidth, lambda,
+       NULL, NULL, geometry_status) != 0){
     free_tmat(bandwidth);
     return 1;
   }
@@ -19768,7 +19780,7 @@ static int np_regression_cv_scalar_continuous_route_body(
        BANDWIDTH_reg, num_obs, num_obs,
        num_reg_unordered, num_reg_ordered, num_reg_continuous,
        matrix_X_continuous, matrix_X_continuous,
-       vector_scale_factor, matrix_bandwidth, NULL, lambda, NULL) != 0)
+       vector_scale_factor, matrix_bandwidth, NULL, lambda, NULL, NULL) != 0)
     goto cleanup_route;
 
   row_status = np_beta_scaled_row_context_prepare(
@@ -20076,7 +20088,7 @@ static int np_regression_cv_lp_continuous_route_body(
        BANDWIDTH_reg, num_obs, num_obs,
        num_reg_unordered, num_reg_ordered, num_reg_continuous,
        matrix_X_continuous, matrix_X_continuous,
-       vector_scale_factor, matrix_bandwidth, NULL, lambda, NULL) != 0)
+       vector_scale_factor, matrix_bandwidth, NULL, lambda, NULL, NULL) != 0)
     goto cleanup_lp_route;
 
   row_status = np_beta_scaled_row_context_prepare(
@@ -23656,9 +23668,13 @@ NP_NOINLINE NP_COLD int np_beta_continuous_bandwidth_prepare_canonical(
   double **matrix_bandwidth,
   double **matrix_bandwidth_deriv,
   double *lambda,
-  const NPContinuousPreparedBandwidthView *prepared_bandwidth)
+  const NPContinuousPreparedBandwidthView *prepared_bandwidth,
+  NPNNGeometryStatus *geometry_status)
 {
   int coordinate;
+
+  if(geometry_status != NULL)
+    *geometry_status = NP_NN_GEOMETRY_OK;
 
   if(bandwidth_mode != BW_FIXED &&
      bandwidth_mode != BW_GEN_NN &&
@@ -23696,8 +23712,12 @@ NP_NOINLINE NP_COLD int np_beta_continuous_bandwidth_prepare_canonical(
           bandwidth_mode == BW_ADAP_NN,
           0, matrix_bandwidth, matrix_bandwidth);
 
-      if(status != NP_BETA_BANDWIDTH_PREPARE_OK)
+      if(status != NP_BETA_BANDWIDTH_PREPARE_OK) {
+        if(geometry_status != NULL &&
+           status == NP_BETA_BANDWIDTH_PREPARE_ERR_ZERO_RADIUS)
+          *geometry_status = NP_NN_GEOMETRY_ZERO_RADIUS;
         return 1;
+      }
     }
   }
 
@@ -24664,7 +24684,8 @@ static SEXP np_regression_fit_bandwidth_execute(void *data)
       call->matrix_bandwidth,
       call->matrix_bandwidth_deriv,
       call->lambda,
-      call->prepared_bandwidth);
+      call->prepared_bandwidth,
+      &call->nn_geometry_status);
   } else {
     call->status = kernel_bandwidth_ctx(
       call->kernel,
@@ -28410,7 +28431,8 @@ finish_regression_estimation:
   if(regression_fit_status == NP_REGRESSION_FIT_ERR_BANDWIDTH)
     error("\n** Error: invalid bandwidth.");
   if(regression_fit_status == NP_REGRESSION_FIT_ERR_ZERO_NN_RADIUS)
-    error("\n** Error: generalized nearest-neighbor bandwidth has a zero literal radius after occurrence exclusion.");
+    error("\n** Error: %s nearest-neighbor bandwidth has a zero literal radius after occurrence exclusion.",
+          BANDWIDTH_reg == BW_ADAP_NN ? "adaptive" : "generalized");
   if(regression_fit_status == NP_REGRESSION_FIT_ERR_HASH_CREATE)
     error("hash table creation failed");
   if(regression_fit_status == NP_REGRESSION_FIT_ERR_HASH_INSERT)
@@ -28890,8 +28912,12 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
         matrix_bandwidth_x,
         NULL,
         lambdax,
-        NULL) == 1)
+        NULL,
+        &nn_geometry_status) == 1) {
+      if(nn_geometry_status == NP_NN_GEOMETRY_ZERO_RADIUS)
+        status = NP_REGRESSION_LP_MATRIX_ZERO_RADIUS;
       goto cleanup_lp_hat;
+    }
   } else if(kernel_bandwidth_mean_ctx(KERNEL_reg_extern,
                            BANDWIDTH_den_extern,
                            num_train,
@@ -30586,8 +30612,12 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
         matrix_bandwidth_x,
         NULL,
         lambdax,
-        NULL) == 1)
+        NULL,
+        &nn_geometry_status) == 1) {
+      if(nn_geometry_status == NP_NN_GEOMETRY_ZERO_RADIUS)
+        status = NP_REGRESSION_LP_MATRIX_ZERO_RADIUS;
       goto cleanup_lp_apply;
+    }
   } else if(kernel_bandwidth_mean_ctx(KERNEL_reg_extern,
                            BANDWIDTH_den_extern,
                            num_train,
@@ -41877,7 +41907,8 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
 		MPI_Finalize();
 #endif
     if(nn_geometry_status == NP_NN_GEOMETRY_ZERO_RADIUS)
-      error("generalized nearest-neighbor bandwidth has a zero literal radius after occurrence exclusion");
+      error("%s nearest-neighbor bandwidth has a zero literal radius after occurrence exclusion",
+            BANDWIDTH_den == BW_ADAP_NN ? "adaptive" : "generalized");
     error("\n** Error: invalid bandwidth.");
   }
 
@@ -45323,7 +45354,7 @@ static int np_conditional_route_bandwidth_prepare(
     bandwidth_mode, num_train, num_eval,
     num_unordered, num_ordered, num_continuous,
     matrix_continuous_train, matrix_continuous_eval,
-    scale_factor, matrix_bandwidth, NULL, lambda, NULL);
+    scale_factor, matrix_bandwidth, NULL, lambda, NULL, NULL);
   vector_continuous_stddev_extern = saved_standard_deviation;
   return status;
 }
@@ -46031,7 +46062,7 @@ static int np_conditional_cvls_provider_y_eval_block(
     num_var_continuous_extern,
     matrix_Y_continuous_train_extern, matrix_Y_continuous_eval,
     context->route_y.scale_factor, matrix_bandwidth, NULL,
-    context->route_y.lambda, NULL);
+    context->route_y.lambda, NULL, NULL);
   vector_continuous_stddev_extern = saved_standard_deviation;
   if(status != 0)
     goto cleanup_eval;

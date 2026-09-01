@@ -9361,7 +9361,7 @@ static SEXP np_regression_lp_apply_conditional_impl(SEXP txuno,
       setAttrib(out, install("ridge.used"), ridge_used);
     if(compute_status != NP_REGRESSION_LP_MATRIX_OK)
       failure_message = compute_status == NP_REGRESSION_LP_MATRIX_ZERO_RADIUS ?
-        "generalized nearest-neighbor bandwidth has a zero literal radius after occurrence exclusion" :
+        "nearest-neighbor bandwidth has a zero literal radius after occurrence exclusion" :
         (compute_status == NP_REGRESSION_LP_MATRIX_ZERO_MASS ?
          "leave-one-out kernel row has zero effective mass" :
          "LP hat helper failed");
@@ -9394,7 +9394,7 @@ static SEXP np_regression_lp_apply_conditional_impl(SEXP txuno,
     }
     if(compute_status != NP_REGRESSION_LP_MATRIX_OK)
       failure_message = compute_status == NP_REGRESSION_LP_MATRIX_ZERO_RADIUS ?
-        "generalized nearest-neighbor bandwidth has a zero literal radius after occurrence exclusion" :
+        "nearest-neighbor bandwidth has a zero literal radius after occurrence exclusion" :
         (compute_status == NP_REGRESSION_LP_MATRIX_ZERO_MASS ?
          "leave-one-out kernel row has zero effective mass" :
          "LP apply helper failed");
@@ -17681,6 +17681,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
           matrix_bandwidth_y,
           NULL,
           lambda_y,
+          NULL,
           NULL) == 0 ?
             np_beta_scaled_row_context_prepare(
               &beta_y_row_context,
@@ -20809,6 +20810,8 @@ static void np_kernelsum_common(double * tuno, double * tord, double * tcon,
   free(query_lambda);
 
   if(npks_err != 0){
+    if(npks_err == KWSNP_ERR_ZERO_NN_RADIUS)
+      error("nearest-neighbor bandwidth has a zero literal radius");
     error("kernel_weighted_sum_np failed with code %d", npks_err);
   }
 
