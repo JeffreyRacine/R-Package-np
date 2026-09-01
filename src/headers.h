@@ -162,7 +162,7 @@ void np_guarded_cvml_hits_reset(void);
 void np_guarded_cvml_hit(void);
 double np_guarded_cvml_hits_get(void);
 static inline double np_guarded_cvml_contribution(const double fit){
-  if(fit > DBL_MIN)
+  if(fit > 0.0)
     return -log(fit);
   np_guarded_cvml_hit();
   if(fit < -DBL_MIN)
@@ -176,7 +176,7 @@ static inline double np_guarded_cvml_log_contribution(
   const double log_dbl_min = log(DBL_MIN);
   const double log_fit = log_absolute_sum - log((double)denominator);
 
-  if(sign > 0 && log_fit > log_dbl_min)
+  if(sign > 0 && log_fit > -INFINITY)
     return -log_fit;
   np_guarded_cvml_hit();
   if(sign < 0 && log_fit > log_dbl_min)
