@@ -34030,6 +34030,415 @@ static int np_conditional_xrow_from_ctx_diagnostics(
     ctx, eval_idx, 1, 1, row_out, diagnostics);
 }
 
+enum {
+  NP_NPSIGTEST_STAT_CONTINUOUS = 1,
+  NP_NPSIGTEST_STAT_UNORDERED = 2,
+  NP_NPSIGTEST_STAT_ORDERED = 3
+};
+
+/*
+ * Fill one fixed-bandwidth regression influence row at either the observed
+ * frame or the established categorical alternate.  This is deliberately a
+ * private npsigtest consumer of the canonical kernel-row and stabilized LP
+ * influence primitives.  It retains one O(n) row and never forms a hat
+ * matrix.
+ */
+static int np_npsigtest_fixed_influence_row(
+  NPConditionalXRowCtx *ctx,
+  NPReghatLPWorkspace *lp_workspace,
+  const int eval_idx,
+  const int derivative_coordinate,
+  const int categorical_mode,
+  const int categorical_coordinate,
+  const int alternate_frame,
+  double *eval_basis,
+  double *row_out)
+{
+  const int num_train = num_obs_train_extern;
+  const int num_unordered = num_reg_unordered_extern;
+  const int num_ordered = num_reg_ordered_extern;
+  const int num_continuous = num_reg_continuous_extern;
+  NPConditionalBoundState bounds_state;
+  int observation;
+  int coordinate;
+
+  if(ctx == NULL || !ctx->ready || row_out == NULL ||
+     eval_idx < 0 || eval_idx >= num_train ||
+     BANDWIDTH_den_extern != BW_FIXED || int_TREE_X == NP_TREE_TRUE)
+    return 1;
+
+  for(coordinate = 0; coordinate < num_unordered; ++coordinate)
+    ctx->eval_xuno_one[coordinate][0] =
+      matrix_X_unordered_train_extern[coordinate][eval_idx];
+  for(coordinate = 0; coordinate < num_ordered; ++coordinate)
+    ctx->eval_xord_one[coordinate][0] =
+      matrix_X_ordered_train_extern[coordinate][eval_idx];
+  for(coordinate = 0; coordinate < num_continuous; ++coordinate) {
+    ctx->eval_xcon_one[coordinate][0] =
+      matrix_X_continuous_train_extern[coordinate][eval_idx];
+    ctx->matrix_bandwidth_eval_one[coordinate][0] =
+      ctx->matrix_bandwidth_x[coordinate][0];
+  }
+
+  if(alternate_frame) {
+    if(categorical_mode == NP_NPSIGTEST_STAT_UNORDERED) {
+      if(categorical_coordinate < 0 ||
+         categorical_coordinate >= num_unordered ||
+         num_categories_extern_X[categorical_coordinate] <= 0)
+        return 1;
+      ctx->eval_xuno_one[categorical_coordinate][0] =
+        matrix_categorical_vals_extern_X[categorical_coordinate][0];
+    } else if(categorical_mode == NP_NPSIGTEST_STAT_ORDERED) {
+      const int category = num_unordered + categorical_coordinate;
+      const int count =
+        (categorical_coordinate >= 0 && categorical_coordinate < num_ordered) ?
+          num_categories_extern_X[category] : 0;
+      const double current =
+        (count > 0) ? ctx->eval_xord_one[categorical_coordinate][0] : 0.0;
+      int level = -1;
+
+      if(count <= 0)
+        return 1;
+      if(count == 1)
+        ctx->eval_xord_one[categorical_coordinate][0] =
+          matrix_categorical_vals_extern_X[category][0];
+      else {
+        for(coordinate = 0; coordinate < count; ++coordinate)
+          if(matrix_categorical_vals_extern_X[category][coordinate] == current) {
+            level = coordinate;
+            break;
+          }
+        if(level < 0)
+          return 1;
+        ctx->eval_xord_one[categorical_coordinate][0] =
+          level == 0 ?
+            matrix_categorical_vals_extern_X[category][1] :
+            matrix_categorical_vals_extern_X[category][level - 1];
+      }
+    } else {
+      return 1;
+    }
+  }
+
+  np_conditional_push_bounds(int_cxker_bound_extern,
+                             vector_cxkerlb_extern,
+                             vector_cxkerub_extern,
+                             &bounds_state);
+  if(np_conditional_kernel_row_raw(
+       ctx->kernel_cx, ctx->kernel_ux, ctx->kernel_ox,
+       ctx->x_operator, BANDWIDTH_den_extern, num_train,
+       num_unordered, num_ordered, num_continuous,
+       matrix_X_unordered_train_extern,
+       matrix_X_ordered_train_extern,
+       matrix_X_continuous_train_extern,
+       ctx->eval_xuno_one, ctx->eval_xord_one, ctx->eval_xcon_one,
+       ctx->vsfx, 1, ctx->matrix_bandwidth_x,
+       ctx->matrix_bandwidth_eval_one, ctx->lambdax,
+       num_categories_extern_X, matrix_categorical_vals_extern_X,
+       NP_TREE_FALSE, NULL, ctx->kw, ctx->mean_row) != 0) {
+    np_conditional_pop_bounds(&bounds_state);
+    return 1;
+  }
+  np_conditional_pop_bounds(&bounds_state);
+
+  if(np_lp_engine_extern == NP_LP_ENGINE_SCALAR) {
+    double denominator = 0.0;
+
+    if(derivative_coordinate >= 0)
+      return 1;
+    for(observation = 0; observation < num_train; ++observation) {
+      if(!R_FINITE(ctx->kw[observation]))
+        return 1;
+      denominator += ctx->kw[observation];
+    }
+    if(!R_FINITE(denominator) || fabs(denominator) <= DBL_MIN)
+      return 1;
+    for(observation = 0; observation < num_train; ++observation)
+      row_out[observation] = ctx->kw[observation]/denominator;
+    return 0;
+  }
+
+  if(lp_workspace == NULL || eval_basis == NULL ||
+     !np_glp_cv_cache.ready || np_glp_cv_cache.nterms <= 1)
+    return 1;
+  if(derivative_coordinate >= 0) {
+    if(derivative_coordinate >= num_continuous)
+      return 1;
+    np_glp_fill_basis_eval_deriv_raw(
+      derivative_coordinate, 1, num_continuous,
+      np_glp_cv_cache.terms, np_glp_cv_cache.nterms,
+      matrix_X_continuous_train_extern, eval_idx, eval_basis);
+  } else {
+    np_glp_fill_basis_eval_raw(
+      num_continuous, np_glp_cv_cache.terms, np_glp_cv_cache.nterms,
+      matrix_X_continuous_train_extern, eval_idx, eval_basis);
+  }
+  return np_reghat_lp_workspace_influence_row(
+           lp_workspace, ctx->kw, eval_basis, row_out, 1U) ==
+         NP_REGHAT_LP_ROW_OK ? 0 : 1;
+}
+
+/*
+ * Stateless eight-column Bootstrap-I IID reducer.  R owns sample.int() and
+ * supplies its 1-based donor indices; this routine reconstructs y* on demand.
+ * Categorical statistics need one paired-endpoint pass.  Continuous pivotal
+ * statistics use a mean/residual pass followed by the derivative/HC0 pass.
+ */
+int np_regression_lp_sigtest_iid(
+  double *vector_scale_factor,
+  const double *donor_index,
+  int n_rhs,
+  const double *null_mean,
+  const double *residual_pool,
+  int statistic_mode,
+  int statistic_coordinate,
+  double *statistic_out)
+{
+  const int num_train = num_obs_train_extern;
+  NPConditionalXRowCtx xctx;
+  NPReghatLPWorkspace lp_workspace;
+  double *row = NULL;
+  double *residual_tile = NULL;
+  double *eval_basis = NULL;
+  double *base_fit = NULL;
+  double *residual_scale = NULL;
+  long double *statistic_sum = NULL;
+  int status = NP_REGRESSION_LP_MATRIX_ERROR;
+  int eval_idx;
+  int rhs;
+
+  memset(&xctx, 0, sizeof(xctx));
+  np_reghat_lp_workspace_init(&lp_workspace);
+  if(vector_scale_factor == NULL || donor_index == NULL ||
+     null_mean == NULL || residual_pool == NULL || statistic_out == NULL ||
+     num_train <= 0 || n_rhs <= 0 || n_rhs > 8 ||
+     num_obs_eval_extern != num_train ||
+     BANDWIDTH_den_extern != BW_FIXED || int_TREE_X == NP_TREE_TRUE ||
+     int_glp_bernstein_extern != 0 || int_glp_basis_extern != 1 ||
+     (statistic_mode != NP_NPSIGTEST_STAT_CONTINUOUS &&
+      statistic_mode != NP_NPSIGTEST_STAT_UNORDERED &&
+      statistic_mode != NP_NPSIGTEST_STAT_ORDERED))
+    goto cleanup_sigtest_iid;
+  if(statistic_mode == NP_NPSIGTEST_STAT_CONTINUOUS) {
+    if(np_lp_engine_extern != NP_LP_ENGINE_GENERAL ||
+       statistic_coordinate < 0 ||
+       statistic_coordinate >= num_reg_continuous_extern)
+      goto cleanup_sigtest_iid;
+  } else if(statistic_mode == NP_NPSIGTEST_STAT_UNORDERED) {
+    if(statistic_coordinate < 0 ||
+       statistic_coordinate >= num_reg_unordered_extern)
+      goto cleanup_sigtest_iid;
+  } else if(statistic_coordinate < 0 ||
+            statistic_coordinate >= num_reg_ordered_extern) {
+    goto cleanup_sigtest_iid;
+  }
+
+  for(rhs = 0; rhs < n_rhs; ++rhs)
+    for(eval_idx = 0; eval_idx < num_train; ++eval_idx) {
+      const double donor = donor_index[
+        (size_t)eval_idx + (size_t)num_train*(size_t)rhs];
+
+      if(!R_FINITE(donor) || donor < 1.0 || donor > (double)num_train ||
+         donor != floor(donor))
+        goto cleanup_sigtest_iid;
+    }
+  for(eval_idx = 0; eval_idx < num_train; ++eval_idx)
+    if(!R_FINITE(null_mean[eval_idx]) ||
+       !R_FINITE(residual_pool[eval_idx]))
+      goto cleanup_sigtest_iid;
+
+  if(np_conditional_xrow_ctx_prepare_ctx(
+       vector_scale_factor, &np_conditional_training_identity_geometry,
+       &xctx) != 0)
+    goto cleanup_sigtest_iid;
+  if(np_lp_engine_extern == NP_LP_ENGINE_GENERAL) {
+    if(!np_glp_cv_cache.ready || np_glp_cv_cache.basis == NULL ||
+       np_glp_cv_cache.nterms <= 1 ||
+       np_reghat_lp_workspace_prepare_columns(
+         &lp_workspace, np_glp_cv_cache.basis, num_train,
+         np_glp_cv_cache.nterms) != NP_REGHAT_LP_ROW_OK)
+      goto cleanup_sigtest_iid;
+    eval_basis = alloc_vecd(np_glp_cv_cache.nterms);
+    if(eval_basis == NULL)
+      goto cleanup_sigtest_iid;
+  }
+
+  row = alloc_vecd(num_train);
+  base_fit = alloc_vecd(n_rhs);
+  statistic_sum = (long double *)calloc((size_t)n_rhs,
+                                        sizeof(long double));
+  if(row == NULL || base_fit == NULL || statistic_sum == NULL)
+    goto cleanup_sigtest_iid;
+
+  if(statistic_mode != NP_NPSIGTEST_STAT_CONTINUOUS) {
+    for(eval_idx = 0; eval_idx < num_train; ++eval_idx) {
+      double sign = 1.0;
+
+      if(np_npsigtest_fixed_influence_row(
+           &xctx, &lp_workspace, eval_idx, -1, statistic_mode,
+           statistic_coordinate, 0, eval_basis, row) != 0)
+        goto cleanup_sigtest_iid;
+      for(rhs = 0; rhs < n_rhs; ++rhs) {
+        double fit = 0.0;
+        int observation;
+
+        for(observation = 0; observation < num_train; ++observation) {
+          const int donor = (int)donor_index[
+            (size_t)observation + (size_t)num_train*(size_t)rhs] - 1;
+          fit += row[observation] *
+            (null_mean[observation] + residual_pool[donor]);
+        }
+        base_fit[rhs] = fit;
+      }
+
+      if(statistic_mode == NP_NPSIGTEST_STAT_ORDERED) {
+        const int category = num_reg_unordered_extern + statistic_coordinate;
+        const double current =
+          matrix_X_ordered_train_extern[statistic_coordinate][eval_idx];
+
+        if(num_categories_extern_X[category] > 1 &&
+           matrix_categorical_vals_extern_X[category][0] == current)
+          sign = -1.0;
+      }
+      if(np_npsigtest_fixed_influence_row(
+           &xctx, &lp_workspace, eval_idx, -1, statistic_mode,
+           statistic_coordinate, 1, eval_basis, row) != 0)
+        goto cleanup_sigtest_iid;
+      for(rhs = 0; rhs < n_rhs; ++rhs) {
+        double alternate_fit = 0.0;
+        double effect;
+        int observation;
+
+        for(observation = 0; observation < num_train; ++observation) {
+          const int donor = (int)donor_index[
+            (size_t)observation + (size_t)num_train*(size_t)rhs] - 1;
+          alternate_fit += row[observation] *
+            (null_mean[observation] + residual_pool[donor]);
+        }
+        effect = sign*(base_fit[rhs] - alternate_fit);
+        if(!R_FINITE(effect))
+          goto cleanup_sigtest_iid;
+        statistic_sum[rhs] += (long double)effect*(long double)effect;
+      }
+      if((eval_idx & 31) == 0)
+        R_CheckUserInterrupt();
+    }
+  } else {
+    size_t residual_count;
+
+    if((size_t)num_train > SIZE_MAX/(size_t)n_rhs)
+      goto cleanup_sigtest_iid;
+    residual_count = (size_t)num_train*(size_t)n_rhs;
+    if(residual_count > SIZE_MAX/sizeof(double))
+      goto cleanup_sigtest_iid;
+    residual_tile = (double *)malloc(residual_count*sizeof(double));
+    residual_scale = alloc_vecd(n_rhs);
+    if(residual_tile == NULL || residual_scale == NULL)
+      goto cleanup_sigtest_iid;
+    memset(residual_scale, 0, (size_t)n_rhs*sizeof(double));
+
+    for(eval_idx = 0; eval_idx < num_train; ++eval_idx) {
+      if(np_npsigtest_fixed_influence_row(
+           &xctx, &lp_workspace, eval_idx, -1, 0, 0, 0,
+           eval_basis, row) != 0)
+        goto cleanup_sigtest_iid;
+      for(rhs = 0; rhs < n_rhs; ++rhs) {
+        const int own_donor = (int)donor_index[
+          (size_t)eval_idx + (size_t)num_train*(size_t)rhs] - 1;
+        const double own_response =
+          null_mean[eval_idx] + residual_pool[own_donor];
+        double fitted = 0.0;
+        double residual;
+        int observation;
+
+        for(observation = 0; observation < num_train; ++observation) {
+          const int donor = (int)donor_index[
+            (size_t)observation + (size_t)num_train*(size_t)rhs] - 1;
+          fitted += row[observation] *
+            (null_mean[observation] + residual_pool[donor]);
+        }
+        residual = own_response - fitted;
+        if(!R_FINITE(residual))
+          goto cleanup_sigtest_iid;
+        residual_tile[(size_t)eval_idx +
+                      (size_t)num_train*(size_t)rhs] = residual;
+        if(fabs(residual) > residual_scale[rhs])
+          residual_scale[rhs] = fabs(residual);
+      }
+      if((eval_idx & 31) == 0)
+        R_CheckUserInterrupt();
+    }
+
+    for(eval_idx = 0; eval_idx < num_train; ++eval_idx) {
+      if(np_npsigtest_fixed_influence_row(
+           &xctx, &lp_workspace, eval_idx, statistic_coordinate,
+           0, 0, 0, eval_basis, row) != 0)
+        goto cleanup_sigtest_iid;
+      for(rhs = 0; rhs < n_rhs; ++rhs) {
+        double gradient = 0.0;
+        long double quadratic = 0.0L;
+        const double scale = residual_scale[rhs];
+        double stderr;
+        double ratio;
+        int observation;
+
+        for(observation = 0; observation < num_train; ++observation) {
+          const int donor = (int)donor_index[
+            (size_t)observation + (size_t)num_train*(size_t)rhs] - 1;
+          const double influence = row[observation];
+          const double scaled_residual = scale == 0.0 ? 0.0 :
+            residual_tile[(size_t)observation +
+                          (size_t)num_train*(size_t)rhs]/scale;
+
+          gradient += influence *
+            (null_mean[observation] + residual_pool[donor]);
+          quadratic += (long double)influence*(long double)influence *
+            (long double)scaled_residual*(long double)scaled_residual;
+        }
+        if(!R_FINITE(gradient) || !isfinite(quadratic) ||
+           quadratic <= 0.0L || scale <= 0.0)
+          goto cleanup_sigtest_iid;
+        {
+          const long double stderr_ld =
+            (long double)scale*sqrtl(quadratic);
+
+          if(!isfinite(stderr_ld) || stderr_ld > (long double)DBL_MAX)
+            goto cleanup_sigtest_iid;
+          stderr = (double)stderr_ld;
+        }
+        if(!R_FINITE(stderr) || stderr <= 0.0)
+          goto cleanup_sigtest_iid;
+        ratio = gradient/stderr;
+        if(!R_FINITE(ratio))
+          goto cleanup_sigtest_iid;
+        statistic_sum[rhs] += (long double)ratio*(long double)ratio;
+      }
+      if((eval_idx & 31) == 0)
+        R_CheckUserInterrupt();
+    }
+  }
+
+  for(rhs = 0; rhs < n_rhs; ++rhs) {
+    const long double value = statistic_sum[rhs]/(long double)num_train;
+
+    if(!isfinite(value) || value > (long double)DBL_MAX)
+      goto cleanup_sigtest_iid;
+    statistic_out[rhs] = (double)value;
+  }
+  status = NP_REGRESSION_LP_MATRIX_OK;
+
+cleanup_sigtest_iid:
+  np_conditional_xrow_ctx_clear(&xctx);
+  np_reghat_lp_workspace_clear(&lp_workspace);
+  free(row);
+  free(residual_tile);
+  free(eval_basis);
+  free(base_fit);
+  free(residual_scale);
+  free(statistic_sum);
+  return status;
+}
+
 /*
  * Canonical delete-one regression influence owner.  The row context owns
  * occurrence-aware generalized-NN radii and exact adaptive fold radii; the

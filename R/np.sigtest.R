@@ -397,6 +397,95 @@ npsigtest.npregression <-
   mean(bootstrap >= observed)
 }
 
+.np_npsig_streamed_iid_eligible <- function(bws,
+                                             xdat,
+                                             index,
+                                             joint,
+                                             boot.type,
+                                             boot.method,
+                                             pivot,
+                                             extra.args) {
+  tested <- xdat[index]
+  categorical <- vapply(
+    tested,
+    function(variable) is.factor(variable) || is.ordered(variable),
+    logical(1L)
+  )
+  equivalent.pivot <- is.null(pivot) ||
+    (identical(pivot, FALSE) && all(categorical)) ||
+    (identical(pivot, TRUE) && !any(categorical))
+
+  regression.engine <- bws[["regtype.engine", exact = TRUE]]
+  engine.supported <- identical(regression.engine, "lp") ||
+    (identical(regression.engine, "lc") &&
+       identical(bws[["ncon", exact = TRUE]], 0L))
+
+  if (joint || !identical(boot.type, "I") ||
+      !identical(boot.method, "iid") || !equivalent.pivot ||
+      length(extra.args) || !identical(bws[["type", exact = TRUE]], "fixed") ||
+      !engine.supported ||
+      !identical(bws[["basis.engine", exact = TRUE]], "glp") ||
+      !identical(bws[["bernstein.basis.engine", exact = TRUE]], FALSE) ||
+      identical(bws[["ckertype", exact = TRUE]], "beta"))
+    return(FALSE)
+
+  degree <- bws[["degree.engine", exact = TRUE]]
+  if (bws[["ncon", exact = TRUE]] > 0L &&
+      (!is.numeric(degree) || length(degree) != bws[["ncon", exact = TRUE]] ||
+       anyNA(degree) || any(degree != 1)))
+    return(FALSE)
+
+  all(vapply(
+    tested,
+    function(variable)
+      is.factor(variable) || is.ordered(variable) ||
+        inherits(variable, c("integer", "numeric")),
+    logical(1L)
+  ))
+}
+
+.np_npsig_streamed_iid_tile <- function(bws,
+                                         xdat,
+                                         tested.index,
+                                         donor.index,
+                                         null.mean,
+                                         residual.pool) {
+  continuous <- which(bws[["icon", exact = TRUE]])
+  unordered <- which(bws[["iuno", exact = TRUE]])
+  ordered <- which(bws[["iord", exact = TRUE]])
+  gradient.order <- integer(bws[["ncon", exact = TRUE]])
+
+  if (tested.index %in% continuous) {
+    mode <- 1L
+    coordinate <- match(tested.index, continuous) - 1L
+    gradient.order[coordinate + 1L] <- 1L
+  } else if (tested.index %in% unordered) {
+    mode <- 2L
+    coordinate <- match(tested.index, unordered) - 1L
+  } else if (tested.index %in% ordered) {
+    mode <- 3L
+    coordinate <- match(tested.index, ordered) - 1L
+  } else {
+    stop("private npsigtest tile received an unsupported predictor", call. = FALSE)
+  }
+
+  as.numeric(.npreghat_exact_lp_apply_from_regression_core(
+    bws = bws,
+    txdat = xdat,
+    y = donor.index,
+    basis = bws[["basis.engine", exact = TRUE]],
+    degree = as.integer(bws[["degree.engine", exact = TRUE]]),
+    bernstein.basis = bws[["bernstein.basis.engine", exact = TRUE]],
+    s = gradient.order,
+    sigtest = list(
+      mode = mode,
+      coordinate = coordinate,
+      null.mean = null.mean,
+      residual.pool = residual.pool
+    )
+  ))
+}
+
 .np_npsig_validate_lp_degree <- function(bws, xdat, index) {
   if (!identical(bws[["regtype", exact = TRUE]], "lp"))
     return(invisible(TRUE))
@@ -484,20 +573,31 @@ npsigtest.rbandwidth <- function(bws,
 
   .np_npsig_validate_lp_degree(bws = bws, xdat = xdat, index = index)
 
-  ## Save seed prior to setting
+  extra.args <- list(...)
+  boot.type <- match.arg(boot.type)
+  boot.method <- match.arg(boot.method)
+  streamed.iid <- .np_npsig_streamed_iid_eligible(
+    bws = bws,
+    xdat = xdat,
+    index = index,
+    joint = joint,
+    boot.type = boot.type,
+    boot.method = boot.method,
+    pivot = pivot,
+    extra.args = extra.args
+  )
+
+  ## Save seed prior to setting.  The computational owner is selected before
+  ## this boundary so unsupported calls enter the incumbent without RNG work.
 
   seed.state <- .np_seed_enter(random.seed)
   on.exit(.np_seed_exit(seed.state, remove_if_absent = TRUE), add = TRUE)
 
-
-  boot.type <- match.arg(boot.type)
-  boot.method <- match.arg(boot.method)
   collective.mode <- .npRmpi_npsig_collective_context()
   if (boot.type == "II")
     bws.original <- bws
 
   num.obs <- nrow(xdat)
-  extra.args <- list(...)
   npreg.eval.fun <- if (boot.type == "II") .npRmpi_npsig_npreg_leaf else .npRmpi_npsig_do_local
 
   if(!joint) {
@@ -929,6 +1029,31 @@ npsigtest.rbandwidth <- function(bws,
 
         indiv.eval <- function(task.idx, seed.plan) {
           out <- numeric(length(task.idx))
+          if (streamed.iid) {
+            tile.width <- 8L
+            for (tile.start in seq.int(1L, length(task.idx), by = tile.width)) {
+              tile.count <- min(tile.width, length(task.idx) - tile.start + 1L)
+              tile.position <- tile.start:(tile.start + tile.count - 1L)
+              donor.index <- vapply(
+                tile.position,
+                function(position) {
+                  assign(".Random.seed", seed.plan[[task.idx[position]]],
+                         envir = .GlobalEnv)
+                  sample.int(num.obs, replace = TRUE)
+                },
+                integer(num.obs)
+              )
+              out[tile.position] <- .np_npsig_streamed_iid_tile(
+                bws = bws,
+                xdat = xdat,
+                tested.index = i,
+                donor.index = donor.index,
+                null.mean = mhat.xi,
+                residual.pool = ei
+              )
+            }
+            return(out)
+          }
           for (kk in seq_along(task.idx)) {
             assign(".Random.seed", seed.plan[[task.idx[kk]]], envir = .GlobalEnv)
             if (boot.method == "iid") {
@@ -990,7 +1115,9 @@ npsigtest.rbandwidth <- function(bws,
           a = a,
           b = b,
           P.a = P.a,
-          extra.args = extra.args
+          extra.args = extra.args,
+          streamed.iid = streamed.iid,
+          .np_npsig_streamed_iid_tile = .np_npsig_streamed_iid_tile
         )
         if (boot.method != "pairwise")
           indiv.bindings <- c(indiv.bindings, list(mhat.xi = mhat.xi, ei = ei))
