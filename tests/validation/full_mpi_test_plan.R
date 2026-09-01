@@ -1,5 +1,9 @@
 npRmpi_full_test_singleton_files <- function() {
-  c("test-session-routing-subprocess-contract.R")
+  c(
+    "test-regression-hc0-general-lp-derivative-contract.R",
+    "test-regression-hc0-scalar-categorical-contract.R",
+    "test-session-routing-subprocess-contract.R"
+  )
 }
 
 npRmpi_full_test_plan <- function(test_files, shard_size) {

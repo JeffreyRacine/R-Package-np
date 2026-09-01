@@ -222,6 +222,22 @@ test_that("ordinary autodispatch controls are evaluated in the caller", {
   }
 })
 
+test_that("npindex certification control is materialized from its owner frame", {
+  materialize <- getFromNamespace(".npRmpi_autodispatch_materialize_call", "npRmpi")
+
+  certify.selected <- FALSE
+  mc <- quote(npindexbw.sibandwidth(
+    bandwidth.compute = TRUE,
+    .certify.selected = certify.selected
+  ))
+  prepared <- materialize(mc = mc, caller_env = environment(), comm = 1L)
+
+  transported <- prepared$call[[".certify.selected"]]
+  expect_true(is.symbol(transported))
+  expect_false(identical(transported, as.name("certify.selected")))
+  expect_identical(prepared$tmpvals[[as.character(transported)]], FALSE)
+})
+
 test_that("autodispatch materialization preserves explicit NULL arguments without shifting later args", {
   materialize <- getFromNamespace(".npRmpi_autodispatch_materialize_call", "npRmpi")
 

@@ -39,5 +39,7 @@ test_that("statmods selects exact observation-count radii from sorted observatio
 
   expect_gte(sum(grepl("compute_nn_distance_observation_support_subset\\(", lines)), 3L)
   expect_gte(sum(grepl("compute_nn_distance_train_eval_observation_support_subset\\(", lines)), 3L)
-  expect_gte(sum(grepl("return_flag = return_flag_MPI", lines, fixed = TRUE)), 2L)
+  expect_gte(sum(grepl("local_status = (int)compute_nn_distance_", lines, fixed = TRUE)), 2L)
+  expect_gte(sum(grepl("MPI_Reduce(&local_status, &global_status", lines, fixed = TRUE)), 2L)
+  expect_gte(sum(grepl("return (NPNNGeometryStatus)global_status", lines, fixed = TRUE)), 2L)
 })

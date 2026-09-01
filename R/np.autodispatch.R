@@ -2059,7 +2059,7 @@
      "p", "penalize.iteration", "return.weights.phi", "return.weights.phi.deriv.1",
      "return.weights.phi.deriv.2", "smooth.residuals", "start.from", "starting.values",
      "stop.on.increase", "iterate.break", "n.quasi.inv", "er.quasi.inv",
-     "bw.x", "bw.y", "only.optimize.beta",
+     "bw.x", "bw.y", "only.optimize.beta", ".certify.selected",
      "scale.factor.init.lower", "scale.factor.init.upper", "scale.factor.init",
      "scale.factor.search.lower", "betas", "iterate", "maxiter")
 

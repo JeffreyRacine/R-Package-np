@@ -72,6 +72,16 @@ test_that("full-suite runner requires clean direct shard exits", {
   expect_match(shard_text, "npRmpi_full_test_plan(", fixed = TRUE)
   expect_match(
     plan_text,
+    "test-regression-hc0-general-lp-derivative-contract.R",
+    fixed = TRUE
+  )
+  expect_match(
+    plan_text,
+    "test-regression-hc0-scalar-categorical-contract.R",
+    fixed = TRUE
+  )
+  expect_match(
+    plan_text,
     "test-session-routing-subprocess-contract.R",
     fixed = TRUE
   )
