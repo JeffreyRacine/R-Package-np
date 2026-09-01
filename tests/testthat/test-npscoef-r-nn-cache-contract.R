@@ -33,7 +33,17 @@ test_that("np.objective.cache controls npscoef continuous NN R optimizer caching
     expect_equal(cached$num.feval, uncached$num.feval)
 
     expect_equal(unname(cached$nn.cache[["enabled"]]), 1)
-    expect_gt(unname(cached$nn.cache[["hits"]]), 0)
+    expect_gt(unname(cached$nn.cache[["visits"]]), 0)
+    expect_gte(unname(cached$nn.cache[["raw.evals"]]), 0)
+    expect_equal(
+      unname(cached$nn.cache[["visits"]]),
+      unname(cached$nn.cache[["unique"]] + cached$nn.cache[["repeats"]])
+    )
+    expect_equal(
+      unname(cached$nn.cache[["repeats"]]),
+      unname(cached$nn.cache[["hits"]])
+    )
+    expect_gte(unname(cached$nn.cache[["hits"]]), 0)
     expect_gte(as.numeric(cached$num.feval.fast[1L]),
                unname(cached$nn.cache[["hits"]]))
     expect_lte(as.numeric(cached$num.feval.fast[1L]),

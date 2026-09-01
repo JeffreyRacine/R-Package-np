@@ -355,7 +355,7 @@ test_that("sibandwidth bootstrap helper routes work across bwtype, regtype, and 
   )
 
   for (bt in c("fixed", "generalized_nn", "adaptive_nn")) {
-    h <- if (identical(bt, "fixed")) 0.25 else 5L
+    h <- if (identical(bt, "fixed")) 0.25 else 15L
     for (cfg in cfgs) {
       bw.args <- list(
         xdat = tx,

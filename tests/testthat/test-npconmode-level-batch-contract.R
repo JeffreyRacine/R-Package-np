@@ -38,7 +38,7 @@ test_that("npconmode level batching matches independent density evaluations", {
 test_that("npconmode batches ordinary levels around one gradient singleton", {
   calls <- list()
   local_mocked_bindings(
-    npcdens = function(bws, txdat, tydat, exdat, eydat, gradients) {
+    npcdens = function(bws, txdat, tydat, exdat, eydat, gradients, ...) {
       calls[[length(calls) + 1L]] <<- list(
         levels = unique(as.character(eydat)),
         gradients = gradients

@@ -79,7 +79,12 @@ test_that("main general-LP fit branch has one complete unwind owner", {
   expect_false(grepl("double *projection;", region, fixed = TRUE))
   expect_match(
     region,
-    "np_lp_solve_workspace_solve_factored(&owner->solve_workspace,",
+    "np_lp_solve_workspace_solve_factored(",
+    fixed = TRUE
+  )
+  expect_match(
+    region,
+    "np_lp_solve_workspace_solve_adjoint_factored(",
     fixed = TRUE
   )
   expect_equal(

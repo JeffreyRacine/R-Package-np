@@ -1,3 +1,22 @@
+beta_regression_hc0_oracle <- function(training, response, evaluation, args) {
+  bw <- do.call(npregbw, c(list(
+    xdat = training,
+    ydat = response,
+    bandwidth.compute = FALSE,
+    regtype = "lc"
+  ), args[setdiff(names(args), "regtype")]))
+  training.hat <- unclass(npreghat(
+    bws = bw, txdat = training, output = "matrix"
+  ))
+  evaluation.hat <- unclass(npreghat(
+    bws = bw, txdat = training, exdat = evaluation, output = "matrix"
+  ))
+  residual <- as.double(response) -
+    drop(training.hat %*% as.double(response))
+
+  sqrt(drop((evaluation.hat^2) %*% (residual^2)))
+}
+
 test_that("manual order-2 beta local-constant regression matches exact weights", {
   training <- data.frame(
     x1 = c(0, 0.002, 0.02, 0.1, 0.32, 0.61, 0.86, 0.985, 1),
@@ -31,12 +50,9 @@ test_that("manual order-2 beta local-constant regression matches exact weights",
   ), args[setdiff(names(args), "regtype")]))
   normalized <- sweep(sums$kw, 2L, colSums(sums$kw), "/")
   expected_mean <- colSums(normalized * response)
-  centered <- response - matrix(expected_mean,
-                                nrow = nrow(training),
-                                ncol = nrow(evaluation),
-                                byrow = TRUE)
-  expected_variance <- colSums(normalized * centered^2)
-  expected_se <- sqrt(expected_variance * colSums(normalized^2))
+  expected_se <- beta_regression_hc0_oracle(
+    training, response, evaluation, args
+  )
 
   expect_equal(fitted(fit), expected_mean, tolerance = 2e-12)
   expect_lt(max(abs(se(fit) - expected_se)), 2e-12)
@@ -112,8 +128,15 @@ test_that("beta regression log-sum-exp survives complete raw-weight underflow", 
   normalized <- exp(log_weights - max(log_weights))
   normalized <- normalized / sum(normalized)
   expected_mean <- sum(normalized * response)
-  expected_variance <- sum(normalized * (response - expected_mean)^2)
-  expected_se <- sqrt(expected_variance * sum(normalized^2))
+  expected_se <- beta_regression_hc0_oracle(
+    training,
+    response,
+    evaluation,
+    list(
+      bws = h, regtype = "lc", ckertype = "beta", ckerorder = 2,
+      ckerbound = "fixed", ckerlb = 0, ckerub = 1
+    )
+  )
 
   raw <- npksum(
     bws = h, txdat = training, exdat = evaluation,

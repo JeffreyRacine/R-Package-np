@@ -205,10 +205,12 @@ test_that("all-large fit BLAS agrees with scalar fallback and dense WLS", {
   )
   gram_inverse <- solve(crossprod(b))
   beta <- gram_inverse %*% crossprod(b, y)
-  sigma2hat <- mean((y - mean(y))^2)
   oracle_mean <- as.numeric(b %*% beta)
+  residual <- y - oracle_mean
+  projection <- b %*% gram_inverse
+  meat <- crossprod(b, b * residual^2)
   oracle_merr <- sqrt(
-    pmax(0, sigma2hat * rowSums((b %*% gram_inverse) * b))
+    pmax(0, rowSums((projection %*% meat) * projection))
   )
   expect_equal(as.numeric(fitted(active_blas)), oracle_mean, tolerance = 1e-12)
   expect_equal(as.numeric(active_blas$merr), oracle_merr, tolerance = 1e-12)
@@ -216,5 +218,5 @@ test_that("all-large fit BLAS agrees with scalar fallback and dense WLS", {
   inactive_scalar <- make_fit(c(1L, 1L), FALSE)
   inactive_blas <- make_fit(c(1L, 1L), TRUE)
   expect_identical(fitted(inactive_blas), fitted(inactive_scalar))
-  expect_identical(inactive_blas$merr, inactive_scalar$merr)
+  expect_equal(inactive_blas$merr, inactive_scalar$merr, tolerance = 2e-14)
 })

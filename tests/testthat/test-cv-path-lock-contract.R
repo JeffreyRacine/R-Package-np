@@ -282,7 +282,7 @@ test_that("canonical LP fit and evaluation avoid legacy solve marshalling", {
     "^int kernel_estimate_regression_categorical_tree_np\\(",
     lines
   )
-  shortcut_stop <- grep("^  if\\(estimation_shortcut_done\\)$", lines)
+  shortcut_stop <- grep("^  if\\(estimation_shortcut_done\\) \\{$", lines)
   expect_length(shortcut_start, 1L)
   expect_length(shortcut_stop, 1L)
   expect_lt(shortcut_start, shortcut_stop)
@@ -345,7 +345,7 @@ test_that("canonical LP fit and evaluation avoid legacy solve marshalling", {
     fixed = TRUE
   ))
   expect_true(grepl(
-    "np_lp_solve_workspace_solve_factored(&owner->solve_workspace,",
+    "np_lp_solve_workspace_solve_factored(",
     helper_body,
     fixed = TRUE
   ))

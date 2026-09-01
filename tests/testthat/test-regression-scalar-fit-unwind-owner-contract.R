@@ -54,7 +54,7 @@ test_that("the generic scalar fit has one complete unwind owner", {
     "np_regression_conditional_influence_finish(",
     fixed = TRUE
   )
-  expect_match(owner, "kernel_weighted_sum_np_ctx(", fixed = TRUE)
+  expect_match(owner, "kernel_weighted_sum_np_ctx_ex(", fixed = TRUE)
 })
 
 test_that("the generic scalar branch delegates without duplicate ownership", {

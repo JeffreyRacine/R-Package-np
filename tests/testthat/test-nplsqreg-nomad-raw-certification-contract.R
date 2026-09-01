@@ -73,8 +73,10 @@ test_that("nplsqreg Powell can recover an invalid direct NOMAD payload", {
   expect_s3_class(bw, "lsqregressionbandwidth")
   expect_true(is.finite(bw$objective))
   expect_false(identical(bw$objective, .Machine$double.xmax))
-  expect_equal(bw$objective, 0.01174402187, tolerance = 1e-9)
-  expect_equal(bw$bw, 0.07777644704, tolerance = 1e-9)
+  # Candidate-local invalid penalties can move the Powell endpoint while
+  # preserving the recovered raw-valid solution and selected degree.
+  expect_lt(abs(bw$objective - 0.01174402187), 1e-6)
+  expect_lt(abs(bw$bw - 0.07777644704), 1e-6)
   expect_identical(bw$degree, 1L)
   expect_gte(bw$num.feval, 114)
   expect_identical(bw$reg.bws$nomad.restart.fval, 3.374004)

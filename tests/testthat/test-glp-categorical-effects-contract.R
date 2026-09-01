@@ -76,7 +76,9 @@ test_that("general-LP regression categorical gradients are endpoint effects", {
   )$mean
 
   expect_equal(fit$grad[, 2L], oracle, tolerance = 1e-10)
-  expect_true(all(is.na(fit$gerr[, 2L])))
+  expect_true(all(is.finite(fit$gerr[, 2L])))
+  expect_true(all(fit$gerr[, 2L] >= 0))
+  expect_true(any(fit$gerr[, 2L] > 0))
   expect_identical(dat$x, x.before)
   expect_identical(dat$ex, ex.before)
 
@@ -118,7 +120,9 @@ test_that("general-LP regression categorical gradients are endpoint effects", {
   )$mean
 
   expect_equal(ofit$grad[, 2L], ooracle, tolerance = 1e-10)
-  expect_true(all(is.na(ofit$gerr[, 2L])))
+  expect_true(all(is.finite(ofit$gerr[, 2L])))
+  expect_true(all(ofit$gerr[, 2L] >= 0))
+  expect_true(any(ofit$gerr[, 2L] > 0))
 })
 
 test_that("general-LP conditional and quantile effects use target endpoints", {
@@ -315,5 +319,7 @@ test_that("general-LP conmode and nplsqreg effects use public target endpoints",
   )$quantile
 
   expect_equal(ls.fit$quantgrad[, 2L], ls.oracle, tolerance = 1e-10)
-  expect_true(all(is.na(ls.fit$quantgerr[, 2L])))
+  expect_true(all(is.finite(ls.fit$quantgerr[, 2L])))
+  expect_true(all(ls.fit$quantgerr[, 2L] >= 0))
+  expect_true(any(ls.fit$quantgerr[, 2L] > 0))
 })
