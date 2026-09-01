@@ -692,6 +692,25 @@ npsigtest.rbandwidth <- function(bws,
 
     ii <- 0
 
+    if (streamed.iid) {
+      progress <- .np_progress_step(progress)
+      streamed.unrestricted <- npreg(
+        txdat = xdat,
+        tydat = ydat,
+        bws = bws,
+        gradients = TRUE,
+        se = any(pivot.plan$effective),
+        ...
+      )
+      progress <- .np_progress_step(progress)
+      progress <- .np_progress_step(progress)
+      streamed.ei.unres <- scale(residuals(npreg(bws = bws)))
+      streamed.ei.unres.scale <- attr(streamed.ei.unres, "scaled:scale")
+      streamed.ei.unres.center <- attr(streamed.ei.unres, "scaled:center")
+      streamed.ei.unres <- NULL
+      progress <- .np_progress_step(progress)
+    }
+
     for(i in index) {
       
       ## Increment counter...
@@ -715,13 +734,17 @@ npsigtest.rbandwidth <- function(bws,
       ## Construct In, the average value of the squared derivatives of
       ## the jth element, discrete or continuous
       
-      progress <- .np_progress_step(progress)
-      npreg.out <- npreg(txdat = xdat,
-                         tydat = ydat,
-                         bws = bws,
-                         gradients = TRUE,
-                         se = pivot.use,
-                         ...)
+      if (streamed.iid) {
+        npreg.out <- streamed.unrestricted
+      } else {
+        progress <- .np_progress_step(progress)
+        npreg.out <- npreg(txdat = xdat,
+                           tydat = ydat,
+                           bws = bws,
+                           gradients = TRUE,
+                           se = pivot.use,
+                           ...)
+      }
       
       In[ii] <- .np_npsig_statistic(npreg.out, index = i, pivot = pivot.use)
       progress <- .np_progress_step(progress)
@@ -730,11 +753,16 @@ npsigtest.rbandwidth <- function(bws,
 
         ## Compute scale and mean of unrestricted residuals
 
-        progress <- .np_progress_step(progress)
-        ei.unres <- scale(residuals(npreg(bws=bws)))
-        ei.unres.scale <- attr(ei.unres,"scaled:scale")
-        ei.unres.center <- attr(ei.unres,"scaled:center")      
-        progress <- .np_progress_step(progress)
+        if (streamed.iid) {
+          ei.unres.scale <- streamed.ei.unres.scale
+          ei.unres.center <- streamed.ei.unres.center
+        } else {
+          progress <- .np_progress_step(progress)
+          ei.unres <- scale(residuals(npreg(bws=bws)))
+          ei.unres.scale <- attr(ei.unres,"scaled:scale")
+          ei.unres.center <- attr(ei.unres,"scaled:center")
+          progress <- .np_progress_step(progress)
+        }
 
         ## We now construct mhat.xi holding constant the variable whose
         ## significance is being tested at its median. First, make a copy
