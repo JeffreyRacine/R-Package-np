@@ -138,9 +138,15 @@ test_that("nonfixed conditional exact bootstrap matches duplicate-row oracle", {
     c(0, 2, 1, 0, 1, 2)
   )
   storage.mode(counts) <- "double"
+  positive.occurrence <- max(vapply(seq_len(ncol(counts)), function(j) {
+    max(c(
+      tapply(counts[, j], xdat$x, sum),
+      tapply(counts[, j], ydat$y, sum)
+    ))
+  }, numeric(1L))) + 1L
 
   for (bt in c("generalized_nn", "adaptive_nn")) {
-    bw.val <- if (identical(bt, "adaptive_nn")) c(2, 2) else c(1, 1)
+    bw.val <- rep.int(positive.occurrence, 2L)
     bw <- do.call(npcdensbw, list(
       xdat = xdat,
       ydat = ydat,
@@ -205,7 +211,7 @@ test_that("adaptive conditional exact handles tiny-support resamples consistentl
   eydat <- data.frame(y = c(0, 1, 2, 4))
   counts <- matrix(c(0, 2, 1, 0, 3, 0), ncol = 1L)
   storage.mode(counts) <- "double"
-  positive.occurrence <- max(counts)
+  positive.occurrence <- max(counts) + 1L
 
   bw <- npcdensbw(
     xdat = xdat,
