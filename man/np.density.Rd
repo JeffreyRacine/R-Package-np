@@ -259,8 +259,8 @@ Further arguments are passed to \code{\link{npudensbw}} when bandwidths are comp
     subnormal value, contributes its literal logarithm. An exact zero or
     negative density estimate has no mathematical logarithm and is represented
     in this aggregate by the established computational placeholder
-    \eqn{\log(\texttt{DBL_MIN})}{log(DBL_MIN)}. Consequently this component
-    is not a literal log likelihood if any fitted density is nonpositive. }
+    \code{log(DBL_MIN)}. Consequently this component is not a literal log
+    likelihood if any fitted density is nonpositive. }
 
 }
 \section{Book And Method Pointers}{
