@@ -1,5 +1,15 @@
 # np 0.70-6
 
+* Continuous generalized- and adaptive-nearest-neighbour bandwidths now use
+  the literal kth admitted distance throughout ordinary, beta-kernel, and
+  kernel-sum owners. Exact ties that make this radius zero invalidate the
+  requested bandwidth instead of silently widening it to the nearest
+  positive distance or replacing it by a numerical floor. Search candidates
+  retain their established invalid-objective mapping, while direct public
+  computation reports the zero-radius condition. Every represented strictly
+  positive radius remains admissible; k, occurrence exclusion, extended-NN
+  scaling, cache policy, and public interfaces are unchanged.
+
 * Mixed beta-kernel conditional hats now pass the validated categorical-
   compression state to their private direct kernel-weight owner. This repairs
   conditional density gradients and simultaneous beta-X/beta-Y fits that
