@@ -1,5 +1,11 @@
 # np 0.70-6
 
+* `npsigtest()` now displays one immediate, call-owned progress row with
+  compact predictor names. Individual tests report predictor-level completion
+  and an ETA after the first test finishes; joint and single-predictor tests
+  retain bootstrap-level progress. Statistical results and random-number
+  streams are unchanged.
+
 * Eligible individual \`npsigtest()\` calls with fixed bandwidths and IID
   residual resampling now evaluate bootstrap statistics in bounded native
   tiles. The streamed path preserves the incumbent bootstrap samples, random
