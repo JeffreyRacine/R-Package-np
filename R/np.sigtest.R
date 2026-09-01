@@ -435,9 +435,7 @@ npsigtest.npregression <-
     (identical(pivot, TRUE) && !any(categorical))
 
   regression.engine <- bws[["regtype.engine", exact = TRUE]]
-  engine.supported <- identical(regression.engine, "lp") ||
-    (identical(regression.engine, "lc") &&
-       identical(bws[["ncon", exact = TRUE]], 0L))
+  engine.supported <- regression.engine %in% c("lc", "lp")
 
   if (joint || !identical(boot.type, "I") ||
       !identical(boot.method, "iid") || !equivalent.pivot ||
@@ -449,10 +447,13 @@ npsigtest.npregression <-
     return(FALSE)
 
   degree <- bws[["degree.engine", exact = TRUE]]
-  if (bws[["ncon", exact = TRUE]] > 0L &&
-      (!is.numeric(degree) || length(degree) != bws[["ncon", exact = TRUE]] ||
-       anyNA(degree) || any(degree != 1)))
-    return(FALSE)
+  if (bws[["ncon", exact = TRUE]] > 0L) {
+    expected.degree <- if (identical(regression.engine, "lc")) 0L else 1L
+    if (!is.numeric(degree) ||
+        length(degree) != bws[["ncon", exact = TRUE]] ||
+        anyNA(degree) || any(degree != expected.degree))
+      return(FALSE)
+  }
 
   all(vapply(
     tested,
