@@ -587,7 +587,17 @@
   )
 
   denom <- rowSums(Kx) / nrow(txdat)
-  sweep((Kx * Ky) / nrow(txdat), 1L, pmax(denom, .Machine$double.eps), "/")
+  if (length(denom) &&
+      !anyNA(denom) &&
+      min(denom) > -Inf &&
+      max(denom) < Inf &&
+      !any(denom == 0.0))
+    return(sweep((Kx * Ky) / nrow(txdat), 1L, denom, "/"))
+
+  finite.nonzero <- is.finite(denom) & denom != 0.0
+  divisor <- pmax(denom, .Machine$double.eps)
+  divisor[finite.nonzero] <- denom[finite.nonzero]
+  sweep((Kx * Ky) / nrow(txdat), 1L, divisor, "/")
 }
 
 .npcdhat_exact_matrix <- function(bws,
