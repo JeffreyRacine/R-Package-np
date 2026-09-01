@@ -135,7 +135,9 @@ test_that("npreg lp mixed-degree derivatives preserve partial availability", {
                                           exdat = ex, s = c(0L, 1L)))
   expect_true(all(is.na(fit1$grad[, 1L])))
   expect_equal(as.vector(fit1$grad[, 2L]), as.vector(H01 %*% y), tolerance = 1e-8)
-  expect_true(all(is.na(fit1$gerr)))
+  expect_true(all(is.na(fit1$gerr[, 1L])))
+  expect_true(all(is.finite(fit1$gerr[, 2L])))
+  expect_true(all(fit1$gerr[, 2L] >= 0))
   expect_warning(
     g1 <- gradients(fit1, gradient.order = 1L),
     "exceed polynomial degree"
@@ -168,7 +170,9 @@ test_that("npreg lp mixed-degree derivatives preserve partial availability", {
                                           exdat = ex, s = c(0L, 2L)))
   expect_true(all(is.na(fit2$grad[, 1L])))
   expect_equal(as.vector(fit2$grad[, 2L]), as.vector(H02 %*% y), tolerance = 1e-8)
-  expect_true(all(is.na(fit2$gerr)))
+  expect_true(all(is.na(fit2$gerr[, 1L])))
+  expect_true(all(is.finite(fit2$gerr[, 2L])))
+  expect_true(all(fit2$gerr[, 2L] >= 0))
 
   expect_warning(
     g2 <- gradients(fit2, gradient.order = 2L),

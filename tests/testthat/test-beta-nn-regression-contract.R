@@ -1,3 +1,22 @@
+beta_nn_hc0_oracle <- function(training, response, evaluation, common) {
+  bw <- do.call(npregbw, c(list(
+    xdat = training,
+    ydat = response,
+    bandwidth.compute = FALSE,
+    regtype = "lc"
+  ), common))
+  training.hat <- unclass(npreghat(
+    bws = bw, txdat = training, output = "matrix"
+  ))
+  evaluation.hat <- unclass(npreghat(
+    bws = bw, txdat = training, exdat = evaluation, output = "matrix"
+  ))
+  residual <- as.double(response) -
+    drop(training.hat %*% as.double(response))
+
+  sqrt(drop((evaluation.hat^2) %*% (residual^2)))
+}
+
 test_that("nearest-neighbor beta local-constant regression matches kernel weights", {
   training <- data.frame(
     x1 = c(0.01, 0.05, 0.14, 0.31, 0.55, 0.73, 0.9, 0.99),
@@ -25,12 +44,9 @@ test_that("nearest-neighbor beta local-constant regression matches kernel weight
     ), common))
     normalized <- sweep(sums$kw, 2L, colSums(sums$kw), "/")
     expected_mean <- colSums(normalized * response)
-    centered <- response - matrix(expected_mean,
-                                  nrow = nrow(training),
-                                  ncol = nrow(evaluation),
-                                  byrow = TRUE)
-    expected_variance <- colSums(normalized * centered^2)
-    expected_se <- sqrt(expected_variance * colSums(normalized^2))
+    expected_se <- beta_nn_hc0_oracle(
+      training, response, evaluation, common
+    )
 
     expect_equal(fitted(fit), expected_mean, tolerance = 3e-12)
     expect_equal(se(fit), expected_se, tolerance = 3e-12)

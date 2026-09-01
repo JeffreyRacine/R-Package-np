@@ -140,7 +140,7 @@ test_that("npreg factor response and external-evaluation GOF sentinels remain st
   })
 })
 
-test_that("npreg compact kernels remain finite for far external evaluation", {
+test_that("npreg compact kernels expose undefined far external rows", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
 
   local_npreg_quiet({
@@ -159,9 +159,9 @@ test_that("npreg compact kernels remain finite for far external evaluation", {
     grad.fit <- npRmpi::npreg(bws = bw, txdat = tx, tydat = ty, exdat = ex,
                               gradients = TRUE, se = TRUE)
 
-    expect_true(all(is.finite(mean.fit$mean)))
-    expect_true(all(is.finite(mean.fit$merr)))
-    expect_true(all(is.finite(grad.fit$grad)))
-    expect_true(all(is.finite(grad.fit$gerr)))
+    expect_true(all(is.na(mean.fit$mean)))
+    expect_true(all(is.na(mean.fit$merr)))
+    expect_true(all(is.na(grad.fit$grad)))
+    expect_true(all(is.na(grad.fit$gerr)))
   })
 })

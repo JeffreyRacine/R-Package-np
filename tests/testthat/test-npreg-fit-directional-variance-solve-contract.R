@@ -93,37 +93,39 @@ test_that("directional LP variances agree with independent fixed-bandwidth WLS",
           gradient.vec = order, basis = "glp", Bernstein = bernstein
         )
       })
+      training.common <- common
+      training.common$exdat <- NULL
+      training.fit <- do.call(npreg, c(
+        training.common,
+        list(
+          tydat = response,
+          gradients = FALSE,
+          se = FALSE,
+          regtype = "lp",
+          degree = degree,
+          basis = "glp",
+          bernstein.basis = bernstein
+        )
+      ))
+      residual <- response - fitted(training.fit)
 
       expected_se <- numeric(nrow(evaluation))
       expected_gerr <- matrix(0, nrow(evaluation), length(degree))
       for (row in seq_len(nrow(evaluation))) {
         weight <- weights[, row]
-        denominator <- sum(weight)
         gram <- crossprod(design, design * weight)
-        power_two <- crossprod(design, design * (weight * weight))
-        weighted_mean <- sum(weight * response) / denominator
-        variance <- max(
-          0,
-          sum(weight * response * response) / denominator -
-            weighted_mean * weighted_mean
-        )
         projection <- solve(gram, evaluation_design[row, ])
-        expected_se[[row]] <- sqrt(max(
-          0,
-          variance * drop(crossprod(projection, power_two %*% projection))
-        ))
+        influence <- weight * drop(design %*% projection)
+        expected_se[[row]] <- sqrt(sum((influence * residual)^2))
         for (coordinate in seq_along(degree)) {
           derivative_projection <- solve(
             gram,
             derivatives[[coordinate]][row, ]
           )
-          expected_gerr[row, coordinate] <- sqrt(max(
-            0,
-            variance * drop(crossprod(
-              derivative_projection,
-              power_two %*% derivative_projection
-            ))
-          ))
+          derivative_influence <-
+            weight * drop(design %*% derivative_projection)
+          expected_gerr[row, coordinate] <-
+            sqrt(sum((derivative_influence * residual)^2))
         }
       }
 

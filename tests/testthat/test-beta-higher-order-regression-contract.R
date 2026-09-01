@@ -6,6 +6,26 @@ beta_regression_order_coefficients <- function(order) {
          `8` = c(4, -6, 4, -1))
 }
 
+beta_higher_order_hc0_oracle <- function(training, response, evaluation,
+                                          common) {
+  bw <- do.call(npregbw, c(list(
+    xdat = training,
+    ydat = response,
+    bandwidth.compute = FALSE,
+    regtype = "lc"
+  ), common))
+  training.hat <- unclass(npreghat(
+    bws = bw, txdat = training, output = "matrix"
+  ))
+  evaluation.hat <- unclass(npreghat(
+    bws = bw, txdat = training, exdat = evaluation, output = "matrix"
+  ))
+  residual <- as.double(response) -
+    drop(training.hat %*% as.double(response))
+
+  sqrt(drop((evaluation.hat^2) %*% (residual^2)))
+}
+
 test_that("higher-order beta local-constant regression matches signed weights", {
   training <- data.frame(
     x1 = c(0.01, 0.05, 0.14, 0.31, 0.55, 0.73, 0.9, 0.99),
@@ -36,12 +56,9 @@ test_that("higher-order beta local-constant regression matches signed weights", 
       expect_true(all(abs(denominator) > 1e-8))
       normalized <- sweep(sums$kw, 2L, denominator, "/")
       expected_mean <- colSums(normalized * response)
-      centered <- response - matrix(expected_mean,
-                                    nrow = nrow(training),
-                                    ncol = nrow(evaluation),
-                                    byrow = TRUE)
-      expected_variance <- pmax(colSums(normalized * centered^2), 0)
-      expected_se <- sqrt(expected_variance * colSums(normalized^2))
+      expected_se <- beta_higher_order_hc0_oracle(
+        training, response, evaluation, common
+      )
 
       expect_equal(fitted(fit), expected_mean, tolerance = 2e-10)
       expect_equal(se(fit), expected_se, tolerance = 2e-10)
@@ -115,8 +132,20 @@ test_that("higher-order beta regression survives complete raw-weight underflow",
     normalized <- exp(log_absolute_weights - max(log_absolute_weights))
     normalized <- normalized / sum(normalized)
     expected_mean <- sum(normalized * response)
-    expected_variance <- sum(normalized * (response - expected_mean)^2)
-    expected_se <- sqrt(expected_variance * sum(normalized^2))
+    expected_se <- beta_higher_order_hc0_oracle(
+      training,
+      response,
+      evaluation,
+      list(
+        bws = bandwidth,
+        bwtype = "fixed",
+        ckertype = "beta",
+        ckerorder = order,
+        ckerbound = "fixed",
+        ckerlb = 0,
+        ckerub = 1
+      )
+    )
     raw <- npksum(
       bws = bandwidth, txdat = training, exdat = evaluation,
       ckertype = "beta", ckerorder = order,
