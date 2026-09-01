@@ -878,3 +878,11 @@ test_that("rotation helper emits bounded progress with eta on master", {
   expect_true(any(grepl("^\\[npRmpi\\] Rotating plot 1/8 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
   expect_true(any(grepl("^\\[npRmpi\\] Rotating plot 8/8 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
 })
+test_that("bootstrap fanout progress context cannot partially match worker arguments", {
+  formal.names <- names(formals(getFromNamespace(
+    ".npRmpi_bootstrap_run_fanout",
+    "npRmpi"
+  )))
+
+  expect_gt(match("progress.context", formal.names), match("...", formal.names))
+})

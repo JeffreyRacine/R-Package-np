@@ -1538,8 +1538,8 @@
                                          prefer.local.single_worker = FALSE,
                                          master_local_chunk = TRUE,
                                          required.bindings = NULL,
-                                         progress.context = NULL,
-                                         ...) {
+                                         ...,
+                                         progress.context = NULL) {
   rng.final.state <- attr(tasks, "rng_final_state", exact = TRUE)
   if (!is.null(rng.final.state)) {
     on.exit({
