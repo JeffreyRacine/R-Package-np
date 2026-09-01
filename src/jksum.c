@@ -17978,7 +17978,12 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
                 vector_Y[i];
               const double err = loss_y - yhat;
               if((bwm == RBWM_CVLS) || (bwm == RBWM_CVCHECK)){
-                const double den = NZD_POS(1.0 - hii);
+                double den;
+
+                if(!np_lp_delete_denominator(hii, &den)){
+                  fast_ok = 0;
+                  break;
+                }
                 const double err_loo = (bwm == RBWM_CVCHECK) ?
                   np_regression_cv_target_aware_loo_residual(
                     err, vector_Y[i], loss_y, hii, den) :
@@ -19275,7 +19280,12 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
             vector_Y[i];
           const double err = loss_y - yhat;
           if((bwm == RBWM_CVLS) || (bwm == RBWM_CVCHECK)){
-            const double den = NZD_POS(1.0 - hii);
+            double den;
+
+            if(!np_lp_delete_denominator(hii, &den)){
+              cv = DBL_MAX;
+              goto finish_cv_path;
+            }
             const double err_loo = (bwm == RBWM_CVCHECK) ?
               np_regression_cv_target_aware_loo_residual(
                 err, vector_Y[i], loss_y, hii, den) :
@@ -35961,17 +35971,18 @@ static int np_conditional_lp_all_large_ctx_prepare_cvls_tree(double *vector_scal
   return np_conditional_lp_all_large_ctx_prepare_core(vector_scale_factor, ctx, 1, 0);
 }
 
-static double np_conditional_lp_all_large_row_fit_basis(const NPConditionalLpAllLargeCtx *ctx,
-                                                        const double *XtXINVRows,
-                                                        double **basis,
-                                                        const double *hdiag,
-                                                        const double *rhs_row,
-                                                        const int eval_pos,
-                                                        double *cross_terms,
-                                                        double *beta,
-                                                        const int leave_one_out);
+static int np_conditional_lp_all_large_row_fit_basis(const NPConditionalLpAllLargeCtx *ctx,
+                                                     const double *XtXINVRows,
+                                                     double **basis,
+                                                     const double *hdiag,
+                                                     const double *rhs_row,
+                                                     const int eval_pos,
+                                                     double *cross_terms,
+                                                     double *beta,
+                                                     const int leave_one_out,
+                                                     double *fit_out);
 
-static inline double np_conditional_lp_all_large_row_finish(
+static inline int np_conditional_lp_all_large_row_finish(
   const NPConditionalLpAllLargeCtx *ctx,
   const double *XtXINVRows,
   double **basis,
@@ -35980,9 +35991,13 @@ static inline double np_conditional_lp_all_large_row_finish(
   const int eval_pos,
   const double *cross_terms,
   double *beta,
-  const int leave_one_out){
+  const int leave_one_out,
+  double *fit_out){
   double fit = 0.0;
   int a, b;
+
+  if(fit_out == NULL)
+    return 1;
 
   for(a = 0; a < ctx->nterms; a++){
     double s = 0.0;
@@ -35992,19 +36007,25 @@ static inline double np_conditional_lp_all_large_row_finish(
     fit += basis[a][eval_pos]*s;
   }
 
-  if(leave_one_out)
-    fit = (fit - hdiag[eval_pos]*rhs_row[eval_pos]) /
-      NZD_POS(1.0 - hdiag[eval_pos]);
+  if(leave_one_out){
+    double denominator;
 
-  return fit;
+    if(!np_lp_delete_denominator(hdiag[eval_pos], &denominator))
+      return 1;
+    fit = (fit - hdiag[eval_pos]*rhs_row[eval_pos])/denominator;
+  }
+
+  *fit_out = fit;
+  return 0;
 }
 
-static double np_conditional_lp_all_large_row_fit(const NPConditionalLpAllLargeCtx *ctx,
-                                                  const double *rhs_row,
-                                                  const int eval_pos,
-                                                  double *cross_terms,
-                                                  double *beta,
-                                                  const int leave_one_out){
+static int np_conditional_lp_all_large_row_fit(const NPConditionalLpAllLargeCtx *ctx,
+                                               const double *rhs_row,
+                                               const int eval_pos,
+                                               double *cross_terms,
+                                               double *beta,
+                                               const int leave_one_out,
+                                               double *fit_out){
   if(!ctx->use_apple_dgemv)
     return np_conditional_lp_all_large_row_fit_basis(ctx,
                                                      ctx->inverse_workspace.matrix_copy,
@@ -36014,7 +36035,8 @@ static double np_conditional_lp_all_large_row_fit(const NPConditionalLpAllLargeC
                                                      eval_pos,
                                                      cross_terms,
                                                      beta,
-                                                     leave_one_out);
+                                                     leave_one_out,
+                                                     fit_out);
 
   np_blas_dgemv_t_int(ctx->num_train,
                       ctx->nterms,
@@ -36032,18 +36054,20 @@ static double np_conditional_lp_all_large_row_fit(const NPConditionalLpAllLargeC
     eval_pos,
     cross_terms,
     beta,
-    leave_one_out);
+    leave_one_out,
+    fit_out);
 }
 
-static double np_conditional_lp_all_large_row_fit_basis(const NPConditionalLpAllLargeCtx *ctx,
-                                                        const double *XtXINVRows,
-                                                        double **basis,
-                                                        const double *hdiag,
-                                                        const double *rhs_row,
-                                                        const int eval_pos,
-                                                        double *cross_terms,
-                                                        double *beta,
-                                                        const int leave_one_out){
+static int np_conditional_lp_all_large_row_fit_basis(const NPConditionalLpAllLargeCtx *ctx,
+                                                     const double *XtXINVRows,
+                                                     double **basis,
+                                                     const double *hdiag,
+                                                     const double *rhs_row,
+                                                     const int eval_pos,
+                                                     double *cross_terms,
+                                                     double *beta,
+                                                     const int leave_one_out,
+                                                     double *fit_out){
   int a;
 
   for(a = 0; a < ctx->nterms; a++)
@@ -36057,10 +36081,11 @@ static double np_conditional_lp_all_large_row_fit_basis(const NPConditionalLpAll
                                                 eval_pos,
                                                 cross_terms,
                                                 beta,
-                                                leave_one_out);
+                                                leave_one_out,
+                                                fit_out);
 }
 
-static double np_conditional_lp_all_large_row_fit_basis_dgemv(
+static int np_conditional_lp_all_large_row_fit_basis_dgemv(
   const NPConditionalLpAllLargeCtx *ctx,
   const double *XtXINVRows,
   double **basis,
@@ -36070,7 +36095,8 @@ static double np_conditional_lp_all_large_row_fit_basis_dgemv(
   const int eval_pos,
   double *cross_terms,
   double *beta,
-  const int leave_one_out){
+  const int leave_one_out,
+  double *fit_out){
   /*
    * Contiguous-basis sibling only.  Keep the established DDOT and primary
    * cached-basis routes unchanged so tree-CVML activation has no adjacent
@@ -36091,7 +36117,8 @@ static double np_conditional_lp_all_large_row_fit_basis_dgemv(
                                                 eval_pos,
                                                 cross_terms,
                                                 beta,
-                                                leave_one_out);
+                                                leave_one_out,
+                                                fit_out);
 }
 
 static int np_conditional_lp_all_large_moment_ddot(
@@ -36328,7 +36355,7 @@ static int np_conditional_density_cvml_lp_all_large_stream(double *vector_scale_
        (ctx.basis_original_order != NULL) &&
        (ctx.hdiag_original_order != NULL)){
       if(use_original_dgemv)
-        fit = np_conditional_lp_all_large_row_fit_basis_dgemv(
+        status = np_conditional_lp_all_large_row_fit_basis_dgemv(
           &ctx,
           ctx.inverse_original_workspace.matrix_copy,
           ctx.basis_original_order,
@@ -36338,9 +36365,10 @@ static int np_conditional_density_cvml_lp_all_large_stream(double *vector_scale_
           i,
           cross_terms,
           beta,
-          1);
+          1,
+          &fit);
       else
-        fit = np_conditional_lp_all_large_row_fit_basis(
+        status = np_conditional_lp_all_large_row_fit_basis(
           &ctx,
           ctx.inverse_original_workspace.matrix_copy,
           ctx.basis_original_order,
@@ -36349,7 +36377,8 @@ static int np_conditional_density_cvml_lp_all_large_stream(double *vector_scale_
           i,
           cross_terms,
           beta,
-          1);
+          1,
+          &fit);
     } else {
       if(ctx.use_x_tree_order){
         if((ipt_extern_X == NULL) || (ipt_lookup_extern_X == NULL))
@@ -36359,9 +36388,12 @@ static int np_conditional_density_cvml_lp_all_large_stream(double *vector_scale_
           yrow_xorder[j] = yrow[ipt_extern_X[j]];
         rhs_row = yrow_xorder;
       }
-      fit = np_conditional_lp_all_large_row_fit(&ctx, rhs_row, eval_pos, cross_terms, beta, 1);
+      status = np_conditional_lp_all_large_row_fit(
+        &ctx, rhs_row, eval_pos, cross_terms, beta, 1, &fit);
     }
 
+    if(status != 0)
+      goto cleanup_cvml_all_large;
     *cv += np_guarded_cvml_contribution(fit);
   }
 
@@ -36429,7 +36461,9 @@ static int np_conditional_density_cvls_lp_all_large_stream(double *vector_scale_
       rhs_row = yrow_xorder;
     }
 
-    lin = np_conditional_lp_all_large_row_fit(&ctx, rhs_row, eval_pos, cross_terms, beta, 1);
+    if(np_conditional_lp_all_large_row_fit(
+         &ctx, rhs_row, eval_pos, cross_terms, beta, 1, &lin) != 0)
+      goto cleanup_cvls_all_large;
     {
       double den;
       const double h = ctx.hdiag[eval_pos];
@@ -36510,7 +36544,13 @@ static int np_conditional_distribution_cvls_lp_all_large_stream(double *vector_s
         rhs_row = yint_xorder;
       }
 
-      (void)np_conditional_lp_all_large_row_fit(&ctx, rhs_row, 0, cross_terms, beta, 0);
+      {
+        double fit_at_zero;
+
+        if(np_conditional_lp_all_large_row_fit(
+             &ctx, rhs_row, 0, cross_terms, beta, 0, &fit_at_zero) != 0)
+          goto cleanup_cdist_all_large;
+      }
     }
 
     for(i = 0; i < ctx.num_train; i++){
@@ -36523,8 +36563,15 @@ static int np_conditional_distribution_cvls_lp_all_large_stream(double *vector_s
 
       for(int a = 0; a < ctx.nterms; a++)
         fit += ctx.basis[a][i]*beta[a];
-      fit = (fit - ctx.hdiag[i]*(ctx.use_x_tree_order ? yint_xorder[i] : yint[i])) /
-        NZD_POS(1.0 - ctx.hdiag[i]);
+      {
+        double denominator;
+
+        if(!np_lp_delete_denominator(ctx.hdiag[i], &denominator))
+          goto cleanup_cdist_all_large;
+        fit = (fit - ctx.hdiag[i]*
+               (ctx.use_x_tree_order ? yint_xorder[i] : yint[i])) /
+          denominator;
+      }
 
       {
         const double tvd = ((double)indy) - fit;

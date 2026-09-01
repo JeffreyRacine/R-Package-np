@@ -1,5 +1,11 @@
 # np 0.70-6
 
+* Leave-one-out regression and conditional objective shortcuts now preserve
+  every finite nonzero `1 - h_ii` leverage denominator exactly. Near-saturated
+  all-large polynomial designs no longer replace a positive representable
+  denominator by machine epsilon; zero or non-finite deletion denominators
+  cede to the established invalid-objective path.
+
 * Continuous generalized- and adaptive-nearest-neighbour bandwidths now use
   the literal kth admitted distance throughout ordinary, beta-kernel, and
   kernel-sum owners. Exact ties that make this radius zero invalidate the
