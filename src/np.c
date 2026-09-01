@@ -9152,7 +9152,6 @@ static SEXP np_regression_lp_apply_conditional_impl(SEXP txuno,
       sigtest_coordinate_flag < 0 || return_hat_flag ||
       leave_one_out_flag || !train_is_eval_flag ||
       ncol_rhs > 8 || asInteger(bwtype) != BW_FIXED || tree_flag ||
-      asInteger(glp_bernstein) != 0 || asInteger(glp_basis) != 1 ||
       XLENGTH(sigtest_null_mean_r) != num_obs_train ||
       XLENGTH(sigtest_residual_pool_r) != num_obs_train))
     error("C_np_regression_lp_apply_conditional: invalid npsigtest tile contract");

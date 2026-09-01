@@ -30525,14 +30525,27 @@ static int np_npsigtest_fixed_influence_row(
   if(derivative_coordinate >= 0) {
     if(derivative_coordinate >= num_continuous)
       return 1;
-    np_glp_fill_basis_eval_deriv_raw(
-      derivative_coordinate, 1, num_continuous,
-      np_glp_cv_cache.terms, np_glp_cv_cache.nterms,
-      matrix_X_continuous_train_extern, eval_idx, eval_basis);
+    if(int_glp_bernstein_extern != 0)
+      np_glp_fill_basis_eval_deriv(
+        derivative_coordinate, 1, num_continuous,
+        np_glp_cv_cache.terms, np_glp_cv_cache.nterms,
+        matrix_X_continuous_train_extern, eval_idx,
+        np_glp_cv_cache.basis_ctx, eval_basis);
+    else
+      np_glp_fill_basis_eval_deriv_raw(
+        derivative_coordinate, 1, num_continuous,
+        np_glp_cv_cache.terms, np_glp_cv_cache.nterms,
+        matrix_X_continuous_train_extern, eval_idx, eval_basis);
   } else {
-    np_glp_fill_basis_eval_raw(
-      num_continuous, np_glp_cv_cache.terms, np_glp_cv_cache.nterms,
-      matrix_X_continuous_train_extern, eval_idx, eval_basis);
+    if(int_glp_bernstein_extern != 0)
+      np_glp_fill_basis_eval(
+        num_continuous, np_glp_cv_cache.terms,
+        np_glp_cv_cache.nterms, matrix_X_continuous_train_extern,
+        eval_idx, np_glp_cv_cache.basis_ctx, eval_basis);
+    else
+      np_glp_fill_basis_eval_raw(
+        num_continuous, np_glp_cv_cache.terms, np_glp_cv_cache.nterms,
+        matrix_X_continuous_train_extern, eval_idx, eval_basis);
   }
   return np_reghat_lp_workspace_influence_row(
            lp_workspace, ctx->kw, eval_basis, row_out, 1U) ==
@@ -30577,7 +30590,6 @@ int np_regression_lp_sigtest_iid(
      num_train <= 0 || n_rhs <= 0 || n_rhs > 8 ||
      num_obs_eval_extern != num_train ||
      BANDWIDTH_den_extern != BW_FIXED || int_TREE_X == NP_TREE_TRUE ||
-     int_glp_bernstein_extern != 0 || int_glp_basis_extern != 1 ||
      (statistic_mode != NP_NPSIGTEST_STAT_CONTINUOUS &&
       statistic_mode != NP_NPSIGTEST_STAT_UNORDERED &&
       statistic_mode != NP_NPSIGTEST_STAT_ORDERED))
@@ -30611,7 +30623,7 @@ int np_regression_lp_sigtest_iid(
        !R_FINITE(residual_pool[eval_idx]))
       goto cleanup_sigtest_iid;
 
-  if(np_conditional_xrow_ctx_prepare_ctx(
+  if(np_regression_xrow_ctx_prepare(
        vector_scale_factor, &np_conditional_training_identity_geometry,
        &xctx) != 0)
     goto cleanup_sigtest_iid;

@@ -175,17 +175,16 @@ npsigtest.npregression <-
       !identical(boot.method, "iid") || !equivalent.pivot ||
       length(extra.args) || !identical(bws[["type", exact = TRUE]], "fixed") ||
       !engine.supported ||
-      !identical(bws[["basis.engine", exact = TRUE]], "glp") ||
-      !identical(bws[["bernstein.basis.engine", exact = TRUE]], FALSE) ||
       identical(bws[["ckertype", exact = TRUE]], "beta"))
     return(FALSE)
 
   degree <- bws[["degree.engine", exact = TRUE]]
   if (bws[["ncon", exact = TRUE]] > 0L) {
-    expected.degree <- if (identical(regression.engine, "lc")) 0L else 1L
     if (!is.numeric(degree) ||
         length(degree) != bws[["ncon", exact = TRUE]] ||
-        anyNA(degree) || any(degree != expected.degree))
+        anyNA(degree) || any(!is.finite(degree)) ||
+        any(degree < 0) || any(degree != floor(degree)) ||
+        (identical(regression.engine, "lc") && any(degree != 0L)))
       return(FALSE)
   }
 
