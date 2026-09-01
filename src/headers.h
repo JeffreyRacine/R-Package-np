@@ -356,6 +356,10 @@ int np_regression_lp_apply_matrix(
   NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
   int categorical_compress,
   const NPNNGeometryContext *nn_geometry_context);
+int np_regression_lp_sigtest_iid(
+  double *vector_scale_factor, const double *donor_index, int n_rhs,
+  const double *null_mean, const double *residual_pool,
+  int statistic_mode, int statistic_coordinate, double *statistic_out);
 int np_regression_lp_leave_one_out_influence(
   double *vector_scale_factor, double **rhs_cols, int n_rhs,
   double *weights_out, double *fitted_out, double *ridge_used_out);

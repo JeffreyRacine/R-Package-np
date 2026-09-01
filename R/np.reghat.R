@@ -950,7 +950,8 @@ npreghat <-
                                                           bernstein.basis = FALSE,
                                                           s = NULL,
                                                           return.hat = FALSE,
-                                                          leave.one.out = FALSE) {
+                                                          leave.one.out = FALSE,
+                                                          sigtest = NULL) {
   no.ex <- is.null(exdat)
 
   txdat <- toFrame(txdat)
@@ -1073,6 +1074,46 @@ npreghat <-
              error = function(e) NULL),
     add = TRUE
   )
+
+  if (!is.null(sigtest)) {
+    if (!is.list(sigtest) ||
+        !identical(sort(names(sigtest)),
+                   sort(c("mode", "coordinate", "null.mean", "residual.pool"))))
+      stop("invalid private npsigtest tile payload", call. = FALSE)
+    return(.Call(
+      "C_np_regression_lp_sigtest_conditional_ctx",
+      tuno,
+      tord,
+      tcon,
+      euno,
+      eord,
+      econ,
+      y,
+      bw.vec,
+      as.integer(bwtype.c),
+      as.integer(kernel.x.c),
+      as.integer(kernel.xu.c),
+      as.integer(kernel.xo.c),
+      as.logical(tree.flag),
+      as.integer(degree),
+      grad.vec,
+      as.integer(isTRUE(bernstein.basis)),
+      as.integer(npLpBasisCode(basis)),
+      as.integer(descriptor.family),
+      as.integer(descriptor.order),
+      as.double(cker.lb),
+      as.double(cker.ub),
+      as.integer(categorical.compress),
+      FALSE,
+      TRUE,
+      FALSE,
+      as.integer(sigtest$mode),
+      as.integer(sigtest$coordinate),
+      as.double(sigtest$null.mean),
+      as.double(sigtest$residual.pool),
+      PACKAGE = "np"
+    ))
+  }
 
   .Call(
     "C_np_regression_lp_apply_conditional_ctx",

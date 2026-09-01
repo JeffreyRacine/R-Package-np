@@ -9019,12 +9019,18 @@ static SEXP np_regression_lp_apply_conditional_impl(SEXP txuno,
                                                      SEXP categorical_compress,
                                                      SEXP return_hat,
                                                      SEXP train_is_eval,
-                                                     SEXP leave_one_out)
+                                                     SEXP leave_one_out,
+                                                     SEXP sigtest_mode,
+                                                     SEXP sigtest_coordinate,
+                                                     SEXP sigtest_null_mean,
+                                                     SEXP sigtest_residual_pool)
 {
   SEXP txuno_r = R_NilValue, txord_r = R_NilValue, txcon_r = R_NilValue;
   SEXP exuno_r = R_NilValue, exord_r = R_NilValue, excon_r = R_NilValue;
   SEXP rhs_r = R_NilValue, rbw_r = R_NilValue, degree_i = R_NilValue;
   SEXP grad_i = R_NilValue, ckerlb_r = R_NilValue, ckerub_r = R_NilValue;
+  SEXP sigtest_null_mean_r = R_NilValue;
+  SEXP sigtest_residual_pool_r = R_NilValue;
   SEXP out = R_NilValue, ridge_used = R_NilValue;
   int nrow_txuno = 0, ncol_txuno = 0, nrow_txord = 0, ncol_txord = 0, nrow_txcon = 0, ncol_txcon = 0;
   int nrow_exuno = 0, ncol_exuno = 0, nrow_exord = 0, ncol_exord = 0, nrow_excon = 0, ncol_excon = 0;
@@ -9037,6 +9043,10 @@ static SEXP np_regression_lp_apply_conditional_impl(SEXP txuno,
   int train_is_eval_flag = has_geometry_context ? asLogical(train_is_eval) : FALSE;
   int leave_one_out_flag =
     leave_one_out != R_NilValue ? asLogical(leave_one_out) : FALSE;
+  int sigtest_mode_flag =
+    sigtest_mode != R_NilValue ? asInteger(sigtest_mode) : 0;
+  int sigtest_coordinate_flag =
+    sigtest_coordinate != R_NilValue ? asInteger(sigtest_coordinate) : -1;
   int lp_engine = NP_LP_ENGINE_GENERAL;
   int derivative_variable = 0;
   int derivative_order = 0;
@@ -9088,6 +9098,13 @@ static SEXP np_regression_lp_apply_conditional_impl(SEXP txuno,
   nprotect++;
   ckerub_r = PROTECT(coerceVector(ckerub, REALSXP));
   nprotect++;
+  if(sigtest_mode_flag != 0) {
+    sigtest_null_mean_r = PROTECT(coerceVector(sigtest_null_mean, REALSXP));
+    nprotect++;
+    sigtest_residual_pool_r = PROTECT(
+      coerceVector(sigtest_residual_pool, REALSXP));
+    nprotect++;
+  }
 
   np_matrix_dims_or_zero(txuno, &nrow_txuno, &ncol_txuno);
   np_matrix_dims_or_zero(txord, &nrow_txord, &ncol_txord);
@@ -9128,6 +9145,15 @@ static SEXP np_regression_lp_apply_conditional_impl(SEXP txuno,
     error("C_np_regression_lp_apply_conditional: rhs must be a non-empty numeric matrix");
   if(!return_hat_flag && nrow_rhs != num_obs_train)
     error("C_np_regression_lp_apply_conditional: rhs row count must match training row count");
+  if(sigtest_mode_flag != 0 &&
+     (sigtest_mode_flag < 1 || sigtest_mode_flag > 3 ||
+      sigtest_coordinate_flag < 0 || return_hat_flag ||
+      leave_one_out_flag || !train_is_eval_flag ||
+      ncol_rhs > 8 || asInteger(bwtype) != BW_FIXED || tree_flag ||
+      asInteger(glp_bernstein) != 0 || asInteger(glp_basis) != 1 ||
+      XLENGTH(sigtest_null_mean_r) != num_obs_train ||
+      XLENGTH(sigtest_residual_pool_r) != num_obs_train))
+    error("C_np_regression_lp_apply_conditional: invalid npsigtest tile contract");
   if((asInteger(bwtype) != BW_FIXED) &&
      (asInteger(bwtype) != BW_GEN_NN) &&
      (asInteger(bwtype) != BW_ADAP_NN))
@@ -9169,6 +9195,8 @@ static SEXP np_regression_lp_apply_conditional_impl(SEXP txuno,
     error("C_np_regression_lp_apply_conditional: scalar derivative hats require a legacy continuous kernel");
 
   if(descriptor.family == NP_CKERNEL_FAMILY_BETA) {
+    if(sigtest_mode_flag != 0)
+      error("C_np_regression_lp_apply_conditional: npsigtest tile does not admit beta kernels");
     if(XLENGTH(ckerlb_r) != ncol_txcon ||
        XLENGTH(ckerub_r) != ncol_txcon)
       error("C_np_regression_lp_apply_conditional: beta bounds length mismatch");
@@ -9334,7 +9362,16 @@ static SEXP np_regression_lp_apply_conditional_impl(SEXP txuno,
                                 vector_cxkerub_extern,
                                 ncol_txcon) : 0;
 
-  if(return_hat_flag) {
+  if(sigtest_mode_flag != 0) {
+    out = PROTECT(allocVector(REALSXP, ncol_rhs));
+    nprotect++;
+    compute_status = np_regression_lp_sigtest_iid(
+      REAL(rbw_r), REAL(rhs_r), ncol_rhs,
+      REAL(sigtest_null_mean_r), REAL(sigtest_residual_pool_r),
+      sigtest_mode_flag, sigtest_coordinate_flag, REAL(out));
+    if(compute_status != NP_REGRESSION_LP_MATRIX_OK)
+      failure_message = "npsigtest IID tile reduction failed";
+  } else if(return_hat_flag) {
     out = PROTECT(allocMatrix(REALSXP, num_obs_eval, num_obs_train));
     nprotect++;
     if(descriptor.family == NP_CKERNEL_FAMILY_LEGACY &&
@@ -9478,7 +9515,8 @@ SEXP C_np_regression_lp_apply_conditional(SEXP txuno,
     kernel_x, kernel_xu, kernel_xo, use_tree, glp_degree,
     glp_gradient_order, glp_bernstein, glp_basis,
     continuous_kernel_family, continuous_kernel_order, ckerlb, ckerub,
-    categorical_compress, return_hat, R_NilValue, R_NilValue);
+    categorical_compress, return_hat, R_NilValue, R_NilValue,
+    R_NilValue, R_NilValue, R_NilValue, R_NilValue);
 }
 
 SEXP C_np_regression_lp_apply_conditional_ctx(SEXP txuno,
@@ -9512,7 +9550,49 @@ SEXP C_np_regression_lp_apply_conditional_ctx(SEXP txuno,
     kernel_x, kernel_xu, kernel_xo, use_tree, glp_degree,
     glp_gradient_order, glp_bernstein, glp_basis,
     continuous_kernel_family, continuous_kernel_order, ckerlb, ckerub,
-    categorical_compress, return_hat, train_is_eval, leave_one_out);
+    categorical_compress, return_hat, train_is_eval, leave_one_out,
+    R_NilValue, R_NilValue, R_NilValue, R_NilValue);
+}
+
+SEXP C_np_regression_lp_sigtest_conditional_ctx(
+  SEXP txuno,
+  SEXP txord,
+  SEXP txcon,
+  SEXP exuno,
+  SEXP exord,
+  SEXP excon,
+  SEXP donor_index,
+  SEXP rbw,
+  SEXP bwtype,
+  SEXP kernel_x,
+  SEXP kernel_xu,
+  SEXP kernel_xo,
+  SEXP use_tree,
+  SEXP glp_degree,
+  SEXP glp_gradient_order,
+  SEXP glp_bernstein,
+  SEXP glp_basis,
+  SEXP continuous_kernel_family,
+  SEXP continuous_kernel_order,
+  SEXP ckerlb,
+  SEXP ckerub,
+  SEXP categorical_compress,
+  SEXP return_hat,
+  SEXP train_is_eval,
+  SEXP leave_one_out,
+  SEXP sigtest_mode,
+  SEXP sigtest_coordinate,
+  SEXP sigtest_null_mean,
+  SEXP sigtest_residual_pool)
+{
+  return np_regression_lp_apply_conditional_impl(
+    txuno, txord, txcon, exuno, exord, excon, donor_index, rbw, bwtype,
+    kernel_x, kernel_xu, kernel_xo, use_tree, glp_degree,
+    glp_gradient_order, glp_bernstein, glp_basis,
+    continuous_kernel_family, continuous_kernel_order, ckerlb, ckerub,
+    categorical_compress, return_hat, train_is_eval, leave_one_out,
+    sigtest_mode, sigtest_coordinate, sigtest_null_mean,
+    sigtest_residual_pool);
 }
 
 static void np_density_bw_integer_contract_or_error(SEXP myopti,
