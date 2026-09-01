@@ -403,6 +403,7 @@ npsigtest.rbandwidth <- function(bws,
     boot.method %in% c("iid", "wild", "wild-rademacher")
   direct.pairwise <- direct.statistic && !joint && identical(boot.type, "I") &&
     identical(boot.method, "pairwise")
+  direct.type2 <- direct.statistic && !joint && identical(boot.type, "II")
 
   tested.names <- names(xdat)[index]
   missing.names <- is.na(tested.names) | !nzchar(tested.names)
@@ -661,11 +662,11 @@ npsigtest.rbandwidth <- function(bws,
 
       }
 
-      if (direct.pairwise) {
+      if (direct.pairwise || direct.type2) {
 
         In.vec[i.star] <- .np_npsig_streamed_response_statistic(
           bws = bws,
-          xdat = xdat.star,
+          xdat = if (identical(boot.method, "pairwise")) xdat.star else xdat,
           index = index,
           response.matrix = matrix(ydat.star, ncol = 1L),
           pivotal = pivot.use
@@ -691,7 +692,7 @@ npsigtest.rbandwidth <- function(bws,
 
       }
 
-      if (!direct.pairwise)
+      if (!direct.pairwise && !direct.type2)
         In.vec[i.star] <- .np_npsig_statistic(
           npreg.boot,
           index = index,
@@ -954,11 +955,11 @@ npsigtest.rbandwidth <- function(bws,
           
         }
         
-        if (direct.pairwise) {
+        if (direct.pairwise || direct.type2) {
 
           In.vec[i.star] <- .np_npsig_streamed_response_statistic(
             bws = bws,
-            xdat = xdat.star,
+            xdat = if (identical(boot.method, "pairwise")) xdat.star else xdat,
             index = i,
             response.matrix = matrix(ydat.star, ncol = 1L),
             pivotal = pivot.use
@@ -984,7 +985,7 @@ npsigtest.rbandwidth <- function(bws,
           
         }
         
-        if (!direct.pairwise)
+        if (!direct.pairwise && !direct.type2)
           In.vec[i.star] <- .np_npsig_statistic(
             npreg.boot,
             index = i,
