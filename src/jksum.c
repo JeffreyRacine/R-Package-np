@@ -30367,7 +30367,9 @@ static int np_npsigtest_fixed_influence_row(
 
   if(ctx == NULL || !ctx->ready || row_out == NULL ||
      eval_idx < 0 || eval_idx >= num_train ||
-     BANDWIDTH_den_extern != BW_FIXED || int_TREE_X == NP_TREE_TRUE)
+     (BANDWIDTH_den_extern != BW_FIXED &&
+      BANDWIDTH_den_extern != BW_GEN_NN) ||
+     int_TREE_X == NP_TREE_TRUE)
     return 1;
 
   for(coordinate = 0; coordinate < num_unordered; ++coordinate)
@@ -30380,7 +30382,9 @@ static int np_npsigtest_fixed_influence_row(
     ctx->eval_xcon_one[coordinate][0] =
       matrix_X_continuous_train_extern[coordinate][eval_idx];
     ctx->matrix_bandwidth_eval_one[coordinate][0] =
-      ctx->matrix_bandwidth_x[coordinate][0];
+      BANDWIDTH_den_extern == BW_FIXED ?
+        ctx->matrix_bandwidth_x[coordinate][0] :
+        ctx->matrix_bandwidth_x[coordinate][eval_idx];
   }
 
   if(alternate_frame) {
@@ -30589,7 +30593,9 @@ int np_regression_lp_sigtest_iid(
      null_mean == NULL || residual_pool == NULL || statistic_out == NULL ||
      num_train <= 0 || n_rhs <= 0 || n_rhs > 8 ||
      num_obs_eval_extern != num_train ||
-     BANDWIDTH_den_extern != BW_FIXED || int_TREE_X == NP_TREE_TRUE ||
+     (BANDWIDTH_den_extern != BW_FIXED &&
+      BANDWIDTH_den_extern != BW_GEN_NN) ||
+     int_TREE_X == NP_TREE_TRUE ||
      (statistic_mode != NP_NPSIGTEST_STAT_CONTINUOUS &&
       statistic_mode != NP_NPSIGTEST_STAT_UNORDERED &&
       statistic_mode != NP_NPSIGTEST_STAT_ORDERED))
@@ -30624,7 +30630,10 @@ int np_regression_lp_sigtest_iid(
       goto cleanup_sigtest_iid;
 
   if(np_regression_xrow_ctx_prepare(
-       vector_scale_factor, &np_conditional_training_identity_geometry,
+       vector_scale_factor,
+       (statistic_mode != NP_NPSIGTEST_STAT_CONTINUOUS &&
+        BANDWIDTH_den_extern == BW_GEN_NN) ?
+         NULL : &np_conditional_training_identity_geometry,
        &xctx) != 0)
     goto cleanup_sigtest_iid;
   if(xctx.lp_engine == NP_LP_ENGINE_GENERAL) {
