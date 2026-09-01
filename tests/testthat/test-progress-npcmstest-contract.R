@@ -42,7 +42,7 @@ test_that("npcmstest single-line bootstrap progress matches legacy semantics", {
       xdat = x,
       ydat = y,
       distribution = "bootstrap",
-      boot.num = 9
+      B = 9
     ),
     force_renderer = "legacy",
     now = progress_time_counter()
@@ -55,7 +55,7 @@ test_that("npcmstest single-line bootstrap progress matches legacy semantics", {
       xdat = x,
       ydat = y,
       distribution = "bootstrap",
-      boot.num = 9
+      B = 9
     ),
     force_renderer = "single_line",
     now = progress_time_counter()
@@ -85,7 +85,7 @@ test_that("npcmstest progress respects np.messages FALSE", {
       xdat = x,
       ydat = y,
       distribution = "bootstrap",
-      boot.num = 9
+      B = 9
     ),
     now = progress_time_counter()
   )
@@ -110,7 +110,7 @@ test_that("npcmstest progress respects suppressMessages", {
         xdat = x,
         ydat = y,
         distribution = "bootstrap",
-        boot.num = 9
+        B = 9
       )
     ),
     now = progress_time_counter()

@@ -16,8 +16,9 @@
   and Racine (1997).
 }
 \usage{
-npsigtest(bws, 
-          \dots)
+npsigtest(bws,
+          \dots,
+          B = 399)
 
 \method{npsigtest}{formula}(bws, 
           data = NULL, 

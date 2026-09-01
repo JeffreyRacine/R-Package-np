@@ -6,16 +6,19 @@
 
 npsymtest <- function(data = NULL,
                       method = c("integration","summation"),
-                      boot.num = 399,
+                      B = 399,
                       bw = NULL,
                       boot.method = c("iid", "geom"),
                       random.seed = 42,
                       ...) {
 
+  if (...length())
+    npRejectLegacyBootstrapCount(names(list(...)), "npsymtest")
+
   if(is.data.frame(data)) stop(" you must enter a data vector (not data frame)")
   if(is.null(data)) stop(" you must enter a data vector")
   if(ncol(data.frame(data)) != 1) stop(" data must have one dimension only")
-  if(boot.num < 9) stop(" number of bootstrap replications must be >= 9")
+  if(B < 9) stop(" number of bootstrap replications must be >= 9")
 
   boot.method <- match.arg(boot.method)
   method <- match.arg(method)
@@ -156,7 +159,7 @@ npsymtest <- function(data = NULL,
 
   boot.state <- new.env(parent = emptyenv())
   boot.state$counter <- 0L
-  boot.state$progress <- .np_progress_begin("Bootstrap replications", total = boot.num, surface = "bootstrap")
+  boot.state$progress <- .np_progress_begin("Bootstrap replications", total = B, surface = "bootstrap")
 
   ## Function to be fed to tsboot - accepts a vector of integers
   ## corresponding to all observations in the sample (1,2,...) that
@@ -221,7 +224,7 @@ npsymtest <- function(data = NULL,
       data.null = data.null,
       sample.size = length(data),
       bandwidth = bw,
-      boot.num = boot.num,
+      boot.num = B,
       blocklen = boot.blocklen,
       sim = boot.sim,
       progress = boot.state$progress
@@ -231,7 +234,7 @@ npsymtest <- function(data = NULL,
   } else {
     resampled.stat <- tsboot(tseries = tseries.idx,
                              statistic = boot.fun,
-                             R = boot.num,
+                             R = B,
                              n.sim = length(data),
                              l = boot.blocklen,
                              sim = boot.sim,
@@ -250,7 +253,7 @@ npsymtest <- function(data = NULL,
   symtest(Srho = test.stat,
           Srho.bootstrap = resampled.stat,
           P = p.value,
-          boot.num = boot.num,
+          boot.num = B,
           data.rotate = data.rotate,
           bw = bw)
 

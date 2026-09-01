@@ -136,7 +136,7 @@ test_that("density-equality count batches preserve literal resampling", {
 
   out <- npdeneqtest(
     x, y, bw.x = bw.x, bw.y = bw.y,
-    boot.num = 9L, random.seed = random.seed
+    B = 9L, random.seed = random.seed
   )
   expect_equal(out[["Tn"]], unname(observed[["Tn"]]), tolerance = 2e-13)
   expect_equal(out[["In"]], unname(observed[["In"]]), tolerance = 2e-13)

@@ -209,7 +209,7 @@ test_that("npindex bootstrap error SD recovery matches covariance diagonal reduc
   )
 })
 
-test_that("predict.singleindex forwards explicit boot.num without changing fitted predictions", {
+test_that("predict.singleindex forwards explicit B without changing fitted predictions", {
   set.seed(20260323)
   n <- 60L
   x1 <- runif(n)
@@ -228,7 +228,7 @@ test_that("predict.singleindex forwards explicit boot.num without changing fitte
   fit <- npindex(bws = bw, txdat = tx, tydat = y)
 
   pred <- predict(fit, newdata = nd)
-  pred.se <- predict(fit, newdata = nd, se.fit = TRUE, boot.num = 10)
+  pred.se <- predict(fit, newdata = nd, se.fit = TRUE, B = 10)
 
   expect_equal(as.numeric(pred.se$fit), as.numeric(pred), tolerance = 0)
   expect_equal(length(pred.se$se.fit), nrow(nd))

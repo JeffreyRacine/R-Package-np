@@ -6,8 +6,9 @@
 # the test is to be run (default = all).
 
 npsigtest <-
-  function(bws, ...){
+  function(bws, ..., B = 399){
     args <- list(...)
+    npRejectLegacyBootstrapCount(names(args), "npsigtest")
 
     if (!missing(bws)){
       if (is.recursive(bws)){
@@ -297,7 +298,7 @@ npsigtest.npregression <-
 npsigtest.rbandwidth <- function(bws,
                                  xdat = stop("data xdat missing"),
                                  ydat = stop("data ydat missing"),
-                                 boot.num = 399,
+                                 B = 399,
                                  boot.method = c("iid","wild","wild-rademacher","pairwise"),
                                  boot.type = c("I","II"),
                                  pivot = NULL,
@@ -308,7 +309,7 @@ npsigtest.rbandwidth <- function(bws,
 
   xdat <- toFrame(xdat)
 
-  if(boot.num < 9) stop("number of bootstrap replications must be >= 9")
+  if(B < 9) stop("number of bootstrap replications must be >= 9")
 
   ## catch and destroy NA's
   goodrows <- seq_len(nrow(xdat))
@@ -340,6 +341,7 @@ npsigtest.rbandwidth <- function(bws,
   .np_npsig_validate_lp_degree(bws = bws, xdat = xdat, index = index)
 
   extra.args <- list(...)
+  npRejectLegacyBootstrapCount(names(extra.args), "npsigtest")
 
 
   boot.type <- match.arg(boot.type)
@@ -405,7 +407,7 @@ npsigtest.rbandwidth <- function(bws,
 
   ## A vector for storing the resampled statistics
 
-  In.vec <- numeric(boot.num)
+  In.vec <- numeric(B)
 
   if(joint==TRUE) {
 
@@ -413,7 +415,7 @@ npsigtest.rbandwidth <- function(bws,
 
     ## Joint test
 
-    In.mat = matrix(data = 0, ncol = 1, nrow = boot.num)
+    In.mat = matrix(data = 0, ncol = 1, nrow = B)
 
     if(boot.type=="II") {
 
@@ -492,7 +494,7 @@ npsigtest.rbandwidth <- function(bws,
     if(boot.type=="II")
       bws.boot.prev <- bws.original
 
-    for (i.star in seq_len(boot.num)) {
+    for (i.star in seq_len(B)) {
       if(boot.method == "iid") {
 
         ydat.star <- mhat.xi + ei[sample.int(num.obs, replace = TRUE)]
@@ -593,7 +595,7 @@ npsigtest.rbandwidth <- function(bws,
       )
       if (!isTRUE(progress$known_total)) {
         progress <- .np_npsig_progress_promote(
-          progress, total = boot.num, done = i.star
+          progress, total = B, done = i.star
         )
       } else {
         progress <- .np_progress_step(progress, done = i.star)
@@ -612,7 +614,7 @@ npsigtest.rbandwidth <- function(bws,
 
     ## ii is the counter for successive elements of In and P...
 
-    In.mat = matrix(data = 0, ncol = length(index), nrow = boot.num)
+    In.mat = matrix(data = 0, ncol = length(index), nrow = B)
 
     ii <- 0
 
@@ -701,8 +703,8 @@ npsigtest.rbandwidth <- function(bws,
 
       if (streamed.iid) {
         tile.width <- 8L
-        for (tile.start in seq.int(1L, boot.num, by = tile.width)) {
-          tile.count <- min(tile.width, boot.num - tile.start + 1L)
+        for (tile.start in seq.int(1L, B, by = tile.width)) {
+          tile.count <- min(tile.width, B - tile.start + 1L)
           donor.index <- vapply(
             seq_len(tile.count),
             function(unused) sample.int(num.obs, replace = TRUE),
@@ -721,7 +723,7 @@ npsigtest.rbandwidth <- function(bws,
           tile.done <- tile.rows[[length(tile.rows)]]
           if (length(index) == 1L && !isTRUE(progress$known_total)) {
             progress <- .np_npsig_progress_promote(
-              progress, total = boot.num, done = tile.done
+              progress, total = B, done = tile.done
             )
           } else if (length(index) == 1L) {
             progress <- .np_progress_step(progress, done = tile.done)
@@ -729,7 +731,7 @@ npsigtest.rbandwidth <- function(bws,
             progress <- .np_progress_step(progress)
           }
         }
-      } else for (i.star in seq_len(boot.num)) {
+      } else for (i.star in seq_len(B)) {
         if(boot.method == "iid") {
           
           ydat.star <- mhat.xi + ei[sample.int(num.obs, replace = TRUE)]
@@ -830,7 +832,7 @@ npsigtest.rbandwidth <- function(bws,
         )
         if (length(index) == 1L && !isTRUE(progress$known_total)) {
           progress <- .np_npsig_progress_promote(
-            progress, total = boot.num, done = i.star
+            progress, total = B, done = i.star
           )
         } else if (length(index) == 1L) {
           progress <- .np_progress_step(progress, done = i.star)
@@ -878,7 +880,7 @@ npsigtest.rbandwidth <- function(bws,
           pivot.effective = pivot.plan$effective,
           joint = joint,
           boot.type = boot.type,
-          boot.num = boot.num)
+          boot.num = B)
 
 }
 

@@ -1,3 +1,11 @@
+test_that("npsigtest accepts B and rejects the retired boot.num argument", {
+  expect_error(
+    npsigtest(boot.num = 9L),
+    "npsigtest no longer accepts 'boot.num'; use 'B' instead",
+    fixed = TRUE
+  )
+})
+
 test_that("npsigtest basic functionality works", {
   set.seed(42)
   n <- 50 # Keep it small for speed
@@ -8,7 +16,7 @@ test_that("npsigtest basic functionality works", {
   bw <- npregbw(y~x1+x2, bws=c(0.1, 0.5), bandwidth.compute=FALSE)
   
   # Significance test can be slow, use few boot replications
-  sig <- npsigtest(bws=bw, boot.num=19)
+  sig <- npsigtest(bws=bw, B=19)
   
   expect_s3_class(sig, "sigtest")
   expect_output(summary(sig))
@@ -86,7 +94,7 @@ test_that("npsigtest formula interface path works", {
 
   sig <- npsigtest(y ~ x1 + x2,
                    data = mydat,
-                   boot.num = 9)
+                   B = 9)
 
   expect_s3_class(sig, "sigtest")
   expect_true(is.numeric(sig$P))
@@ -100,7 +108,7 @@ test_that("npsigtest Type II remains functional with hot-start reselection", {
   y <- x1 + rnorm(n, sd = 0.15)
 
   bw <- npregbw(y ~ x1 + x2, bws = c(0.2, 0.4), bandwidth.compute = FALSE)
-  sig <- npsigtest(bws = bw, boot.num = 9, boot.type = "II")
+  sig <- npsigtest(bws = bw, B = 9, boot.type = "II")
 
   expect_s3_class(sig, "sigtest")
   expect_true(is.numeric(sig$P))
@@ -116,7 +124,7 @@ test_that("npsigtest rejects duplicate index entries", {
   bw <- npregbw(y ~ x1 + x2, bws = c(0.2, 0.4), bandwidth.compute = FALSE)
 
   expect_error(
-    npsigtest(bws = bw, boot.num = 9, index = c(1, 1)),
+    npsigtest(bws = bw, B = 9, index = c(1, 1)),
     "repeated values"
   )
 })

@@ -31,7 +31,7 @@ test_that("npunitest count reduction preserves the summation bootstrap", {
     y,
     method = "summation",
     bootstrap = TRUE,
-    boot.num = 9L,
+    B = 9L,
     bw.x = bw.x,
     bw.y = bw.y,
     random.seed = random.seed

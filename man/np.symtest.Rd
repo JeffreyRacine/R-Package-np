@@ -8,7 +8,7 @@
 \usage{
 npsymtest(data = NULL,
           method = c("integration","summation"),
-          boot.num = 399,
+          B = 399,
           bw = NULL,
           boot.method = c("iid", "geom"),
           random.seed = 42,
@@ -48,7 +48,7 @@ These arguments control bootstrap execution and reproducibility settings.
   }
 
 
-  \item{boot.num}{
+  \item{B}{
     an integer value specifying the number of bootstrap
     replications to use. Defaults to \code{399}.
   }
@@ -193,28 +193,28 @@ n <- 100
 ## Asymmetric discrete probability distribution function
 
 x <- factor(rbinom(n,2,.8))
-npsymtest(x,boot.num=99)
+npsymtest(x,B=99)
 
 if (interactive()) Sys.sleep(5)
 
 ## Symmetric discrete probability distribution function
 
 x <- factor(rbinom(n,2,.5))
-npsymtest(x,boot.num=99)
+npsymtest(x,B=99)
 
 if (interactive()) Sys.sleep(5)
 
 ## Asymmetric continuous distribution function
 
 y <- rchisq(n,df=2)
-npsymtest(y,boot.num=99)
+npsymtest(y,B=99)
 
 if (interactive()) Sys.sleep(5)
 
 ## Symmetric continuous distribution function
 
 y <- rnorm(n)
-npsymtest(y,boot.num=99)
+npsymtest(y,B=99)
 
 ## Time-series bootstrap
 
@@ -231,12 +231,12 @@ ar.series <- function(phi,epsilon) {
 ## Asymmetric time-series
 
 yt <- ar.series(0.5,rchisq(n,df=3))
-npsymtest(yt,boot.num=99,boot.method="geom")
+npsymtest(yt,B=99,boot.method="geom")
 
 ## Symmetric time-series
 
 yt <- ar.series(0.5,rnorm(n))
-npsymtest(yt,boot.num=99,boot.method="geom")
+npsymtest(yt,B=99,boot.method="geom")
 
 } % enddontrun
 

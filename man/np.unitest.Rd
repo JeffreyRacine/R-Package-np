@@ -11,7 +11,7 @@ npunitest(data.x = NULL,
           data.y = NULL,
           method = c("integration","summation"),
           bootstrap = TRUE,
-          boot.num = 399,
+          B = 399,
           bw.x = NULL,
           bw.y = NULL,
           random.seed = 42,
@@ -47,7 +47,7 @@ These arguments identify the two samples, statistic variant, and any supplied ba
 These arguments control bootstrap execution and reproducibility settings.
 }
 
-  \item{boot.num}{
+  \item{B}{
     an integer value specifying the number of bootstrap
     replications to use. Defaults to \code{399}.
   }
@@ -194,7 +194,7 @@ if (interactive()) Sys.sleep(5)
 
 ## Conduct the test for this data
 
-npunitest(x,y,boot.num=99)
+npunitest(x,y,B=99)
 
 if (interactive()) Sys.sleep(5)
 
@@ -208,7 +208,7 @@ mean(y)
 sd(x)
 sd(y)
 
-npunitest(x,y,boot.num=99)
+npunitest(x,y,B=99)
 
 if (interactive()) Sys.sleep(5)
 
@@ -237,7 +237,7 @@ with(wage1, {
 lwage.male <- lwage[female=="Male"]
 lwage.female <- lwage[female=="Female"]
 
-npunitest(lwage.male,lwage.female,boot.num=99)
+npunitest(lwage.male,lwage.female,B=99)
 
 if (interactive()) Sys.sleep(5)
 
@@ -264,7 +264,7 @@ if (interactive()) Sys.sleep(5)
 x <- factor(rbinom(n,2,.5))
 y <- factor(rbinom(n,2,.1))
 
-npunitest(x,y,boot.num=99)
+npunitest(x,y,B=99)
 } % enddontrun
 }
 \keyword{ univar }

@@ -164,12 +164,12 @@ test_that("explicit nearest-neighbour entropy routes bypass fixed counts", {
 
   for (bwtype in c("generalized_nn", "adaptive_nn")) {
     expect_s3_class(npunitest(
-      x, y, method = "summation", boot.num = 9L,
+      x, y, method = "summation", B = 9L,
       bw.x = length(x) - 1L, bw.y = length(y) - 1L, bwtype = bwtype,
       random.seed = 9182L
     ), "unitest")
     expect_s3_class(npsymtest(
-      x, method = "summation", boot.num = 9L, bw = length(x) - 1L,
+      x, method = "summation", B = 9L, bw = length(x) - 1L,
       bwtype = bwtype, random.seed = 2819L
     ), "symtest")
   }
@@ -180,7 +180,7 @@ test_that("fast symmetry bootstrap retains its historical matrix shape", {
   on.exit(options(old), add = TRUE)
   out <- npsymtest(
     c(-2, -1.1, -0.4, 0, 0.3, 0.9, 1.7, 2.8),
-    method = "summation", boot.num = 9L, bw = 0.58,
+    method = "summation", B = 9L, bw = 0.58,
     random.seed = 6193L
   )
 

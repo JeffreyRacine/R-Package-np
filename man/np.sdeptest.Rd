@@ -13,7 +13,7 @@ npsdeptest(data = NULL,
            lag.num = 1,
            method = c("integration","summation"),
            bootstrap = TRUE,
-           boot.num = 399,
+           B = 399,
            random.seed = 42)
 
 }
@@ -47,7 +47,7 @@ These arguments identify the data series, lag count, and statistic variant.
 These arguments control bootstrap execution and reproducibility settings.
 }
 
-  \item{boot.num}{
+  \item{B}{
     an integer value specifying the number of bootstrap
     replications to use. Defaults to \code{399}.
   }
@@ -183,26 +183,26 @@ n <- 100
 ## Stationary persistent time-series
 
 yt <- ar.series(0.95,rnorm(n))
-npsdeptest(yt,lag.num=2,boot.num=99,method="summation")
+npsdeptest(yt,lag.num=2,B=99,method="summation")
 
 if (interactive()) Sys.sleep(5)
 
 ## Stationary independent time-series
 
 yt <- ar.series(0.0,rnorm(n))
-npsdeptest(yt,lag.num=2,boot.num=99,method="summation")
+npsdeptest(yt,lag.num=2,B=99,method="summation")
 
 ## Stationary persistent time-series
 
 yt <- ar.series(0.95,rnorm(n))
-npsdeptest(yt,lag.num=2,boot.num=99,method="integration")
+npsdeptest(yt,lag.num=2,B=99,method="integration")
 
 if (interactive()) Sys.sleep(5)
 
 ## Stationary independent time-series
 
 yt <- ar.series(0.0,rnorm(n))
-npsdeptest(yt,lag.num=2,boot.num=99,method="integration")
+npsdeptest(yt,lag.num=2,B=99,method="integration")
 
 } % enddontrun
 

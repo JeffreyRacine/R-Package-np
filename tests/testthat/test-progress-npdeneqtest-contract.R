@@ -36,14 +36,14 @@ test_that("npdeneqtest single-line bootstrap progress matches legacy semantics",
   on.exit(options(old_opts), add = TRUE)
 
   legacy <- capture_progress_shadow_trace(
-    npdeneqtest_fun(x, y, boot.num = 9),
+    npdeneqtest_fun(x, y, B = 9),
     force_renderer = "legacy",
     now = progress_time_counter()
   )
 
   set.seed(42)
   single_line <- capture_progress_shadow_trace(
-    npdeneqtest_fun(x, y, boot.num = 9),
+    npdeneqtest_fun(x, y, B = 9),
     force_renderer = "single_line",
     now = progress_time_counter()
   )
@@ -66,7 +66,7 @@ test_that("npdeneqtest progress respects np.messages FALSE", {
   on.exit(options(old_opts), add = TRUE)
 
   res <- capture_progress_shadow_trace(
-    npdeneqtest_fun(x, y, boot.num = 9),
+    npdeneqtest_fun(x, y, B = 9),
     now = progress_time_counter()
   )
 
@@ -83,7 +83,7 @@ test_that("npdeneqtest progress respects suppressMessages", {
   on.exit(options(old_opts), add = TRUE)
 
   res <- capture_progress_shadow_trace(
-    suppressMessages(npdeneqtest_fun(x, y, boot.num = 9)),
+    suppressMessages(npdeneqtest_fun(x, y, B = 9)),
     now = progress_time_counter()
   )
 

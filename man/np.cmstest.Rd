@@ -30,7 +30,7 @@ npcmstest(formula,
           model = stop(paste(sQuote("model")," has not been provided")),
           distribution = c("bootstrap", "asymptotic"),
           boot.method = c("iid","wild","wild-rademacher"),
-          boot.num = 399,
+          B = 399,
           pivot = TRUE,
           density.weighted = TRUE,
           random.seed = 42,
@@ -99,7 +99,7 @@ These arguments control the test statistic, bootstrap procedure, and reproducibi
   }
 
 
-  \item{boot.num}{
+  \item{B}{
     an integer value specifying the number of bootstrap replications to
     use. Defaults to \code{399}.
   }
@@ -250,7 +250,7 @@ lines(age, fitted(model))
 # Note - this may take a few minutes depending on the speed of your
 # computer...
 
-npcmstest(model = model, xdat = age, ydat = logwage, boot.num=9, nmulti = 1)
+npcmstest(model = model, xdat = age, ydat = logwage, B=9, nmulti = 1)
 
 # Next try Murphy & Welch's (1990) suggested quintic specification.
 
@@ -264,7 +264,7 @@ X <- data.frame(age)
 # Note - this may take a few minutes depending on the speed of your
 # computer...
 
-npcmstest(model = model, xdat = age, ydat = logwage, boot.num=9, nmulti = 1)
+npcmstest(model = model, xdat = age, ydat = logwage, B=9, nmulti = 1)
 
 # Note - you can pass in multiple arguments to this function. For
 # instance, to use local linear rather than local constant regression,
@@ -299,7 +299,7 @@ model <- lm(growth ~ oecd +
 
 X <- data.frame(factor(oecd), factor(year), initgdp, popgro, inv, humancap)
 
-npcmstest(model = model, xdat = X, ydat = growth, boot.num=9, nmulti = 1)
+npcmstest(model = model, xdat = X, ydat = growth, B=9, nmulti = 1)
 
 })
 } % enddontrun

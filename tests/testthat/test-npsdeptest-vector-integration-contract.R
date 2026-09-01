@@ -12,7 +12,7 @@ test_that("npsdeptest vector integration preserves a skewed-series oracle", {
 
   out <- npsdeptest(
     data = x, lag.num = 1, method = "integration", bootstrap = TRUE,
-    boot.num = 9, random.seed = 184004
+    B = 9, random.seed = 184004
   )
 
   expect_lte(abs(out$Srho - 0.00563360665739774), 1e-10)

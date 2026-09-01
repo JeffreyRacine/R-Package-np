@@ -33,7 +33,7 @@ npqcmstest(formula,
            distribution = c("bootstrap", "asymptotic"),
            bwydat = c("y","varepsilon"),
            boot.method = c("iid","wild","wild-rademacher"),
-           boot.num = 399,
+           B = 399,
            pivot = TRUE,
            density.weighted = TRUE,
            random.seed = 42,
@@ -98,7 +98,7 @@ These arguments control the quantile level, test statistic, bootstrap procedure,
   }
 
 
-  \item{boot.num}{
+  \item{B}{
     an integer value specifying the number of bootstrap replications to
     use. Defaults to \code{399}.
   }

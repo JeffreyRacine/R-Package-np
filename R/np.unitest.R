@@ -7,17 +7,20 @@ npunitest <- function(data.x = NULL,
                       data.y = NULL,
                       method = c("integration","summation"),
                       bootstrap = TRUE,
-                      boot.num = 399,
+                      B = 399,
                       bw.x = NULL,
                       bw.y = NULL,                         
                       random.seed = 42,
                       ...) {
 
+  if (...length())
+    npRejectLegacyBootstrapCount(names(list(...)), "npunitest")
+
   if(is.null(data.x) || is.null(data.y)) stop(" you must enter data vectors for x and y")
   if(is.data.frame(data.x) || is.data.frame(data.y)) stop(" you must enter data vectors (not data frames)")
   if(!identical(class(data.x), class(data.y))) stop(" data vectors must be of same data type")
   if((ncol(data.frame(data.x)) != 1) ||( ncol(data.frame(data.y)) != 1)) stop(" data vectors must have one dimension only")
-  if(boot.num < 9) stop(" number of bootstrap replications must be >= 9")
+  if(B < 9) stop(" number of bootstrap replications must be >= 9")
   if(is.numeric(data.x) && (max(data.x) < min(data.y) || max(data.y) < min(data.x))) .np_warning("non-overlapping empirical distributions (see `Details' in ?npunidist)")
 
   method <- match.arg(method)
@@ -168,8 +171,8 @@ npunitest <- function(data.x = NULL,
       
     }
     
-    resampled.stat <- numeric(boot.num)
-    progress <- .np_progress_begin("Bootstrap replications", total = boot.num, surface = "bootstrap")
+    resampled.stat <- numeric(B)
+    progress <- .np_progress_begin("Bootstrap replications", total = B, surface = "bootstrap")
 
     if(method == "integration" && is.numeric(data.x) &&
        entropy.fast.gaussian) {
@@ -179,7 +182,7 @@ npunitest <- function(data.x = NULL,
         size.y = length(data.y),
         bw.x = bw.x,
         bw.y = bw.y,
-        boot.num = boot.num,
+        boot.num = B,
         progress = progress
       )
       resampled.stat <- bootstrap.result$values
@@ -192,13 +195,13 @@ npunitest <- function(data.x = NULL,
         size.y = length(data.y),
         bw.x = bw.x,
         bw.y = bw.y,
-        boot.num = boot.num,
+        boot.num = B,
         progress = progress
       )
       resampled.stat <- bootstrap.result$values
       progress <- bootstrap.result$progress
     } else {
-      for (b in seq_len(boot.num)) {
+      for (b in seq_len(B)) {
         progress <- .np_progress_step(progress, done = b)
 
         ## Need to think this through... is the null one density? If so
@@ -228,7 +231,7 @@ npunitest <- function(data.x = NULL,
                Srho.bootstrap = resampled.stat,
                P = p.value,
                bootstrap = bootstrap,
-               boot.num = boot.num,
+               boot.num = B,
                bw.x = bw.x,
                bw.y = bw.y)
   } else {

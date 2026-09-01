@@ -14,9 +14,10 @@
 # value they so desire.
 
 npindex <-
-  function(bws, ...){
+  function(bws, ..., B = 399){
     args <- list(...)
     npRejectLegacyBooleanErrors(args, "npindex")
+    npRejectLegacyBootstrapCount(names(args), "npindex")
     .np_singleindex_reject_higher_gradient_order(args, where = "npindex")
 
     if (!missing(bws)){
@@ -26,6 +27,7 @@ npindex <-
         formula <- args[[1L]]
         args <- args[-1L]
         args$.np_index_explicit_bws <- bws
+        args$B <- B
         return(do.call(npindex.formula,
                        c(list(bws = formula), args),
                        envir = parent.frame()))
@@ -418,24 +420,24 @@ npindex.sibandwidth <-
            tydat = stop("training data 'tydat' missing"),
            exdat,
            eydat,
-           boot.num = 399,
+           B = 399,
            se = FALSE,
            gradients = FALSE,
            residuals = FALSE, ...) {
 
-    npRejectLegacyBooleanErrors(list(...), "npindex")
-
     fit.start <- proc.time()[3]
     dots <- list(...)
+    npRejectLegacyBooleanErrors(dots, "npindex")
+    npRejectLegacyBootstrapCount(names(dots), "npindex")
     fit.progress.handoff <- isTRUE(dots$.np_fit_progress_handoff)
     fit.progress.allow <- isTRUE(.np_progress_enabled(domain = "bandwidth"))
     gradients <- npValidateScalarLogical(gradients, "gradients")
     residuals <- npValidateScalarLogical(residuals, "residuals")
     se <- npValidateScalarLogical(se, "se")
-    if (!is.numeric(boot.num) || length(boot.num) != 1L || is.na(boot.num) ||
-        !is.finite(boot.num) || boot.num < 1 || boot.num != floor(boot.num))
-      stop("'boot.num' must be a positive integer")
-    boot.num <- as.integer(boot.num)
+    if (!is.numeric(B) || length(B) != 1L || is.na(B) ||
+        !is.finite(B) || B < 1 || B != floor(B))
+      stop("'B' must be a positive integer")
+    B <- as.integer(B)
 
     no.ex = missing(exdat)
     no.ey = missing(eydat)
@@ -930,7 +932,7 @@ npindex.sibandwidth <-
 
     if (se){
 
-      boot.out = suppressWarnings(boot(data.frame(txdat,tydat), boofun, R = boot.num))
+      boot.out = suppressWarnings(boot(data.frame(txdat,tydat), boofun, R = B))
 
       index.merr = matrix(data = 0, ncol = 1, nrow = length(index.eval))
       index.merr[,] = .np_plot_bootstrap_col_sds(boot.out$t[, seq_len(length(index.eval)), drop = FALSE])

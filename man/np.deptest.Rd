@@ -14,7 +14,7 @@ npdeptest(data.x = NULL,
           data.y = NULL,
           method = c("integration","summation"),
           bootstrap = TRUE,
-          boot.num = 399,
+          B = 399,
           random.seed = 42)
   
 }
@@ -45,7 +45,7 @@ These arguments identify the paired samples being tested.
 These arguments control bootstrap execution and reproducibility settings.
 }
 
-  \item{boot.num}{
+  \item{B}{
     an integer value specifying the number of bootstrap
     replications to use. Defaults to \code{399}.
   }
@@ -184,7 +184,7 @@ y <- 1 + x + rnorm(n)
 model <- lm(y~x)
 y.fit <- fitted(model)
 
-npdeptest(y,y.fit,boot.num=99,method="summation")
+npdeptest(y,y.fit,B=99,method="summation")
 
 if (interactive()) Sys.sleep(5)
 
@@ -197,7 +197,7 @@ y <- 1 + rnorm(n)
 model <- lm(y~x)
 y.fit <- fitted(model)
 
-npdeptest(y,y.fit,boot.num=99,method="summation")
+npdeptest(y,y.fit,B=99,method="summation")
 
 ## Test/measure lack of fit between y and its fitted value from a
 ## regression model when x is relevant using the `integration'
@@ -209,7 +209,7 @@ y <- 1 + x + rnorm(n)
 model <- lm(y~x)
 y.fit <- fitted(model)
 
-npdeptest(y,y.fit,boot.num=99)
+npdeptest(y,y.fit,B=99)
 
 if (interactive()) Sys.sleep(5)
 
@@ -223,7 +223,7 @@ y <- 1 + rnorm(n)
 model <- lm(y~x)
 y.fit <- fitted(model)
 
-npdeptest(y,y.fit,boot.num=99)
+npdeptest(y,y.fit,B=99)
 } % enddontrun
 }
 \keyword{ univar }

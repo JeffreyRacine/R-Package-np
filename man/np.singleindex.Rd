@@ -19,7 +19,7 @@
 }
 
 \usage{
-npindex(bws, \dots)
+npindex(bws, \dots, B = 399)
 
 \method{npindex}{formula}(bws,
         data = NULL,
@@ -41,7 +41,7 @@ npindex(bws, \dots)
         tydat = stop("training data 'tydat' missing"),
         exdat,
         eydat,
-        boot.num = 399,
+        B = 399,
         se = FALSE,
         gradients = FALSE,
         residuals = FALSE,
@@ -146,7 +146,7 @@ These arguments control where the single-index fit is evaluated and which evalua
 These arguments control residuals, gradients, and bootstrap standard errors.
 }
 
-  \item{boot.num}{
+  \item{B}{
     an integer specifying the number of bootstrap replications to use
     when performing standard error calculations. Defaults to
     \code{399}.

@@ -7,7 +7,7 @@ npdeptest <- function(data.x = NULL,
                       data.y = NULL,
                       method=c("integration","summation"),
                       bootstrap = TRUE,
-                      boot.num = 399,
+                      B = 399,
                       random.seed = 42) {
   
   ## Trap fatal errors
@@ -17,7 +17,7 @@ npdeptest <- function(data.x = NULL,
   if(is.null(data.x)||is.null(data.y)) stop(" you must enter x and y data vectors")
   if(ncol(data.frame(data.x)) != 1) stop(" data must have one dimension only")
   if(length(data.x)!=length(data.y)) stop(" data vectors must be of equal length")
-  if(boot.num < 9) stop(" number of bootstrap replications must be >= 9")
+  if(B < 9) stop(" number of bootstrap replications must be >= 9")
 
   method <- match.arg(method)
 
@@ -101,16 +101,16 @@ npdeptest <- function(data.x = NULL,
 
   if(bootstrap) {
 
-    Srho.vec.boot <- numeric(boot.num)
-    progress <- .np_progress_begin("Bootstrap replications", total = boot.num, surface = "bootstrap")
+    Srho.vec.boot <- numeric(B)
+    progress <- .np_progress_begin("Bootstrap replications", total = B, surface = "bootstrap")
 
     if (method == "summation") {
       sample.size <- length(data.x)
       chunk.size <- .np_entropy_count_chunk_size(
         sample.size, bytes.per.support = 4, max.chunk = 16L
       )
-      for (start in seq.int(1L, boot.num, by = chunk.size)) {
-        index <- start:min(boot.num, start + chunk.size - 1L)
+      for (start in seq.int(1L, B, by = chunk.size)) {
+        index <- start:min(B, start + chunk.size - 1L)
         bootstrap.index <- matrix(
           NA_integer_, nrow = length(index), ncol = sample.size
         )
@@ -128,7 +128,7 @@ npdeptest <- function(data.x = NULL,
           progress <- .np_progress_step(progress, done = done)
       }
     } else {
-      for (b in seq_len(boot.num)) {
+      for (b in seq_len(B)) {
         ## Break systematic relationship between x and y (null)
 
         data.x.boot <- data.x[sample.int(length(data.x), replace = TRUE)]
@@ -156,7 +156,7 @@ npdeptest <- function(data.x = NULL,
             Srho.bootstrap.vec = Srho.vec.boot,
             P = P,
             bootstrap = bootstrap,
-            boot.num = boot.num,
+            boot.num = B,
             bw.data.x = bw.data.x,
             bw.data.y = bw.data.y,
             bw.joint = bw.joint)
