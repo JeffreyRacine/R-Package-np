@@ -261,6 +261,27 @@ npsigtest.npregression <-
   ))
 }
 
+.np_npsig_streamed_response_statistic <- function(bws,
+                                                    xdat,
+                                                    index,
+                                                    response.matrix,
+                                                    pivotal) {
+  statistic <- numeric(ncol(response.matrix))
+  placeholder <- response.matrix[, 1L]
+  for (tested.index in index) {
+    statistic <- statistic + .np_npsig_streamed_iid_tile(
+      bws = bws,
+      xdat = xdat,
+      tested.index = tested.index,
+      response.matrix = response.matrix,
+      null.mean = placeholder,
+      residual.pool = placeholder,
+      pivotal = pivotal
+    ) / length(index)
+  }
+  statistic
+}
+
 .np_npsig_validate_lp_degree <- function(bws, xdat, index) {
   if (!identical(bws[["regtype", exact = TRUE]], "lp"))
     return(invisible(TRUE))
@@ -368,16 +389,20 @@ npsigtest.rbandwidth <- function(bws,
   boot.type <- match.arg(boot.type)
   boot.method <- match.arg(boot.method)
 
-  streamed.iid <- .np_npsig_streamed_iid_eligible(
+  direct.statistic <- .np_npsig_streamed_iid_eligible(
     bws = bws,
     xdat = xdat,
     index = index,
     joint = joint,
-    boot.type = boot.type,
-    boot.method = boot.method,
+    boot.type = "I",
+    boot.method = "iid",
     pivot = pivot,
     extra.args = extra.args
   )
+  streamed.iid <- direct.statistic && identical(boot.type, "I") &&
+    boot.method %in% c("iid", "wild", "wild-rademacher")
+  direct.pairwise <- direct.statistic && !joint && identical(boot.type, "I") &&
+    identical(boot.method, "pairwise")
 
   tested.names <- names(xdat)[index]
   missing.names <- is.na(tested.names) | !nzchar(tested.names)
@@ -543,19 +568,13 @@ npsigtest.rbandwidth <- function(bws,
             numeric(num.obs)
           )
         }
-        tile.statistic <- numeric(tile.count)
-        for (tested.index in index) {
-          tile.statistic <- tile.statistic +
-            .np_npsig_streamed_iid_tile(
-              bws = bws,
-              xdat = xdat,
-              tested.index = tested.index,
-              response.matrix = response.matrix,
-              null.mean = mhat.xi,
-              residual.pool = ei,
-              pivotal = pivot.use
-            ) / length(index)
-        }
+        tile.statistic <- .np_npsig_streamed_response_statistic(
+          bws = bws,
+          xdat = xdat,
+          index = index,
+          response.matrix = response.matrix,
+          pivotal = pivot.use
+        )
         tile.rows <- tile.start:(tile.start + tile.count - 1L)
         In.vec[tile.rows] <- tile.statistic
         tile.done <- tile.rows[[length(tile.rows)]]
@@ -642,7 +661,17 @@ npsigtest.rbandwidth <- function(bws,
 
       }
 
-      if(boot.method == "pairwise") {
+      if (direct.pairwise) {
+
+        In.vec[i.star] <- .np_npsig_streamed_response_statistic(
+          bws = bws,
+          xdat = xdat.star,
+          index = index,
+          response.matrix = matrix(ydat.star, ncol = 1L),
+          pivotal = pivot.use
+        )
+
+      } else if(boot.method == "pairwise") {
 
         npreg.boot <- npreg(txdat = xdat.star,
                             tydat = ydat.star,
@@ -662,11 +691,12 @@ npsigtest.rbandwidth <- function(bws,
 
       }
 
-      In.vec[i.star] <- .np_npsig_statistic(
-        npreg.boot,
-        index = index,
-        pivot = pivot.use
-      )
+      if (!direct.pairwise)
+        In.vec[i.star] <- .np_npsig_statistic(
+          npreg.boot,
+          index = index,
+          pivot = pivot.use
+        )
       if (!isTRUE(progress$known_total)) {
         progress <- .np_npsig_progress_promote(
           progress, total = B, done = i.star
@@ -924,7 +954,17 @@ npsigtest.rbandwidth <- function(bws,
           
         }
         
-        if(boot.method == "pairwise") {
+        if (direct.pairwise) {
+
+          In.vec[i.star] <- .np_npsig_streamed_response_statistic(
+            bws = bws,
+            xdat = xdat.star,
+            index = i,
+            response.matrix = matrix(ydat.star, ncol = 1L),
+            pivotal = pivot.use
+          )
+
+        } else if(boot.method == "pairwise") {
           
           npreg.boot <- npreg(txdat = xdat.star,
                               tydat = ydat.star,
@@ -944,11 +984,12 @@ npsigtest.rbandwidth <- function(bws,
           
         }
         
-        In.vec[i.star] <- .np_npsig_statistic(
-          npreg.boot,
-          index = i,
-          pivot = pivot.use
-        )
+        if (!direct.pairwise)
+          In.vec[i.star] <- .np_npsig_statistic(
+            npreg.boot,
+            index = i,
+            pivot = pivot.use
+          )
         if (length(index) == 1L && !isTRUE(progress$known_total)) {
           progress <- .np_npsig_progress_promote(
             progress, total = B, done = i.star

@@ -453,6 +453,46 @@ test_that("streamed IID capability is deterministic and semantics-exact", {
   expect_identical(dim(result$In.bootstrap), c(9L, 2L))
 })
 
+test_that("direct individual pairwise statistics reproduce public fits", {
+  set.seed(20260905)
+  n <- 30L
+  xdat <- data.frame(
+    z = factor(rep(c("a", "b"), length.out = n)),
+    x = seq(-1, 1, length.out = n)
+  )
+  ydat <- 0.4 * (xdat$z == "b") + 0.7 * xdat$x + rnorm(n, sd = 0.1)
+  bw <- npregbw(
+    xdat = xdat, ydat = ydat,
+    bws = c(0.2, 0.55), bandwidth.compute = FALSE,
+    regtype = "ll", bwtype = "fixed"
+  )
+  seed <- 867L
+  result <- npsigtest(
+    bw, xdat = xdat, ydat = ydat,
+    B = 9L, boot.method = "pairwise", random.seed = seed
+  )
+
+  set.seed(seed)
+  oracle <- matrix(0, nrow = 9L, ncol = ncol(xdat))
+  for (tested.index in seq_len(ncol(xdat))) {
+    categorical <- is.factor(xdat[[tested.index]]) ||
+      is.ordered(xdat[[tested.index]])
+    for (replication in seq_len(nrow(oracle))) {
+      donor <- sample.int(n, replace = TRUE)
+      xstar <- xdat
+      xstar[, -tested.index] <- xdat[donor, -tested.index, drop = FALSE]
+      fit <- npreg(
+        txdat = xstar, tydat = ydat[donor], bws = bw,
+        gradients = TRUE, se = !categorical
+      )
+      oracle[replication, tested.index] <- np:::.np_npsig_statistic(
+        fit, index = tested.index, pivot = !categorical
+      )
+    }
+  }
+  expect_equal(result$In.bootstrap, oracle, tolerance = 2e-10)
+})
+
 test_that("streamed IID categorical-only tiles reproduce scalar-LP fits", {
   set.seed(906)
   n <- 48L
