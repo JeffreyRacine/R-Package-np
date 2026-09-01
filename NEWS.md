@@ -1,5 +1,10 @@
 # npRmpi 0.70-6
 
+* Density likelihood cross-validation now takes the true logarithm of every
+  represented strictly positive contribution, including positive subnormal
+  values and positive values retained only in signed-log form. Exact zero and
+  negative contributions retain the established guarded mapping.
+
 * Leave-one-out regression and conditional objective shortcuts now preserve
   every finite nonzero `1 - h_ii` leverage denominator exactly. Near-saturated
   all-large polynomial designs no longer replace a positive representable

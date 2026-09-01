@@ -808,14 +808,18 @@ or standard-deviation factors.
   zero leave-one-out conditional-density estimates, and local-polynomial
   or higher-order-kernel fits can yield negative estimates. In those
   cases the package optimizes a guarded CVML criterion rather than the
-  literal log likelihood. Let \eqn{\epsilon}{epsilon} denote the
-  positive machine floor used for the guard. Positive fitted values use
-  the ordinary branch \eqn{-\log(\hat f_i)}{-log(fhat_i)}. Near-zero
-  fitted values use \eqn{-\log(\epsilon)}{-log(epsilon)}, and negative
-  fitted values use the smooth penalty
+  literal log likelihood. Every represented strictly positive fitted value,
+  including a positive subnormal value retained in log form, uses the
+  ordinary branch \eqn{-\log(\hat f_i)}{-log(fhat_i)}. Let
+  \eqn{\epsilon}{epsilon} denote the positive machine floor used only to
+  encode an invalid nonpositive contribution. Exact zero and negative values
+  with magnitude no greater than \eqn{\epsilon}{epsilon} use
+  \eqn{-\log(\epsilon)}{-log(epsilon)}; negative values of larger magnitude
+  use the smooth penalty
   \eqn{\log(-\hat f_i)-2\log(\epsilon)}{log(-fhat_i)-2*log(epsilon)}.
   The \code{guarded} count reported in bandwidth summaries records
-  objective evaluations in which this guard was used. The
+  objective evaluations containing an invalid nonpositive contribution; a
+  positive value is not guarded merely because it is small. The
   \code{bwmethod="cv.ls"} criterion remains well defined for negative
   kernel density estimates and is not modified by this CVML guard.
 
