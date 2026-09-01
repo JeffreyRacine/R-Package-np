@@ -43,7 +43,7 @@ test_that("npsigtest rejects tested LP degree zero before RNG work", {
   before <- get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
 
   expect_error(
-    npsigtest(bw, index = 1L, pivot = FALSE, boot.num = 9L),
+    npsigtest(bw, index = 1L, pivot = FALSE, B = 9L),
     "degree.min = 1",
     fixed = TRUE
   )
@@ -53,7 +53,7 @@ test_that("npsigtest rejects tested LP degree zero before RNG work", {
     bw,
     index = 2L,
     pivot = FALSE,
-    boot.num = 9L,
+    B = 9L,
     random.seed = 42L,
     warn.glp.gradient = FALSE
   ))

@@ -183,7 +183,7 @@ test_that("streamed IID capability is deterministic and semantics-exact", {
   before <- .Random.seed
   result <- npsigtest(
     bw, xdat = xdat, ydat = ydat,
-    boot.num = 9L, random.seed = 81L
+    B = 9L, random.seed = 81L
   )
   expect_identical(.Random.seed, before)
   expect_identical(dim(result$In.bootstrap), c(9L, 2L))
