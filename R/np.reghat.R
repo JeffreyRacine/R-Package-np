@@ -1078,7 +1078,8 @@ npreghat <-
   if (!is.null(sigtest)) {
     if (!is.list(sigtest) ||
         !identical(sort(names(sigtest)),
-                   sort(c("mode", "coordinate", "null.mean", "residual.pool"))))
+                   sort(c("mode", "coordinate", "response.ready",
+                          "null.mean", "residual.pool"))))
       stop("invalid private npsigtest tile payload", call. = FALSE)
     return(.Call(
       "C_np_regression_lp_sigtest_conditional_ctx",
@@ -1109,6 +1110,7 @@ npreghat <-
       FALSE,
       as.integer(sigtest$mode),
       as.integer(sigtest$coordinate),
+      as.integer(isTRUE(sigtest$response.ready)),
       as.double(sigtest$null.mean),
       as.double(sigtest$residual.pool),
       PACKAGE = "np"

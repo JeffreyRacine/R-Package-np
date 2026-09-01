@@ -30584,6 +30584,7 @@ int np_regression_lp_sigtest_iid(
   const double *residual_pool,
   int statistic_mode,
   int statistic_coordinate,
+  int response_ready,
   double *statistic_out)
 {
   const int num_train = num_obs_train_extern;
@@ -30595,6 +30596,8 @@ int np_regression_lp_sigtest_iid(
   double *eval_basis = NULL;
   double *base_fit = NULL;
   double *residual_scale = NULL;
+  double *owned_response_tile = NULL;
+  const double *response_tile = donor_index;
   int *scalar_derivative_mask = NULL;
   long double *statistic_sum = NULL;
   int status = NP_REGRESSION_LP_MATRIX_ERROR;
@@ -30606,6 +30609,7 @@ int np_regression_lp_sigtest_iid(
   if(vector_scale_factor == NULL || donor_index == NULL ||
      null_mean == NULL || residual_pool == NULL || statistic_out == NULL ||
      num_train <= 0 || n_rhs <= 0 || n_rhs > 8 ||
+     (response_ready != 0 && response_ready != 1) ||
      num_obs_eval_extern != num_train ||
      (BANDWIDTH_den_extern != BW_FIXED &&
       BANDWIDTH_den_extern != BW_GEN_NN &&
@@ -30630,19 +30634,41 @@ int np_regression_lp_sigtest_iid(
     goto cleanup_sigtest_iid;
   }
 
-  for(rhs = 0; rhs < n_rhs; ++rhs)
-    for(eval_idx = 0; eval_idx < num_train; ++eval_idx) {
-      const double donor = donor_index[
-        (size_t)eval_idx + (size_t)num_train*(size_t)rhs];
+  if(response_ready) {
+    for(rhs = 0; rhs < n_rhs; ++rhs)
+      for(eval_idx = 0; eval_idx < num_train; ++eval_idx)
+        if(!R_FINITE(response_tile[
+             (size_t)eval_idx + (size_t)num_train*(size_t)rhs]))
+          goto cleanup_sigtest_iid;
+  } else {
+    size_t response_count;
 
-      if(!R_FINITE(donor) || donor < 1.0 || donor > (double)num_train ||
-         donor != floor(donor))
-        goto cleanup_sigtest_iid;
-    }
-  for(eval_idx = 0; eval_idx < num_train; ++eval_idx)
-    if(!R_FINITE(null_mean[eval_idx]) ||
-       !R_FINITE(residual_pool[eval_idx]))
+    if((size_t)num_train > SIZE_MAX/(size_t)n_rhs)
       goto cleanup_sigtest_iid;
+    response_count = (size_t)num_train*(size_t)n_rhs;
+    if(response_count > SIZE_MAX/sizeof(double))
+      goto cleanup_sigtest_iid;
+    owned_response_tile = (double *)malloc(response_count*sizeof(double));
+    if(owned_response_tile == NULL)
+      goto cleanup_sigtest_iid;
+    response_tile = owned_response_tile;
+    for(eval_idx = 0; eval_idx < num_train; ++eval_idx)
+      if(!R_FINITE(null_mean[eval_idx]) ||
+         !R_FINITE(residual_pool[eval_idx]))
+        goto cleanup_sigtest_iid;
+    for(rhs = 0; rhs < n_rhs; ++rhs)
+      for(eval_idx = 0; eval_idx < num_train; ++eval_idx) {
+        const double donor = donor_index[
+          (size_t)eval_idx + (size_t)num_train*(size_t)rhs];
+
+        if(!R_FINITE(donor) || donor < 1.0 || donor > (double)num_train ||
+           donor != floor(donor))
+          goto cleanup_sigtest_iid;
+        owned_response_tile[
+          (size_t)eval_idx + (size_t)num_train*(size_t)rhs] =
+          null_mean[eval_idx] + residual_pool[(int)donor - 1];
+      }
+  }
 
   if(np_regression_xrow_ctx_prepare(
        vector_scale_factor,
@@ -30698,10 +30724,8 @@ int np_regression_lp_sigtest_iid(
         int observation;
 
         for(observation = 0; observation < num_train; ++observation) {
-          const int donor = (int)donor_index[
-            (size_t)observation + (size_t)num_train*(size_t)rhs] - 1;
-          fit += row[observation] *
-            (null_mean[observation] + residual_pool[donor]);
+          fit += row[observation] * response_tile[
+            (size_t)observation + (size_t)num_train*(size_t)rhs];
         }
         base_fit[rhs] = fit;
       }
@@ -30726,10 +30750,8 @@ int np_regression_lp_sigtest_iid(
         int observation;
 
         for(observation = 0; observation < num_train; ++observation) {
-          const int donor = (int)donor_index[
-            (size_t)observation + (size_t)num_train*(size_t)rhs] - 1;
-          alternate_fit += row[observation] *
-            (null_mean[observation] + residual_pool[donor]);
+          alternate_fit += row[observation] * response_tile[
+            (size_t)observation + (size_t)num_train*(size_t)rhs];
         }
         effect = sign*(base_fit[rhs] - alternate_fit);
         if(!R_FINITE(effect))
@@ -30760,19 +30782,15 @@ int np_regression_lp_sigtest_iid(
            eval_basis, row) != 0)
         goto cleanup_sigtest_iid;
       for(rhs = 0; rhs < n_rhs; ++rhs) {
-        const int own_donor = (int)donor_index[
-          (size_t)eval_idx + (size_t)num_train*(size_t)rhs] - 1;
-        const double own_response =
-          null_mean[eval_idx] + residual_pool[own_donor];
+        const double own_response = response_tile[
+          (size_t)eval_idx + (size_t)num_train*(size_t)rhs];
         double fitted = 0.0;
         double residual;
         int observation;
 
         for(observation = 0; observation < num_train; ++observation) {
-          const int donor = (int)donor_index[
-            (size_t)observation + (size_t)num_train*(size_t)rhs] - 1;
-          fitted += row[observation] *
-            (null_mean[observation] + residual_pool[donor]);
+          fitted += row[observation] * response_tile[
+            (size_t)observation + (size_t)num_train*(size_t)rhs];
         }
         residual = own_response - fitted;
         if(!R_FINITE(residual))
@@ -30801,15 +30819,13 @@ int np_regression_lp_sigtest_iid(
         int observation;
 
         for(observation = 0; observation < num_train; ++observation) {
-          const int donor = (int)donor_index[
-            (size_t)observation + (size_t)num_train*(size_t)rhs] - 1;
           const double influence = row[observation];
           const double scaled_residual = scale == 0.0 ? 0.0 :
             residual_tile[(size_t)observation +
                           (size_t)num_train*(size_t)rhs]/scale;
 
-          gradient += influence *
-            (null_mean[observation] + residual_pool[donor]);
+          gradient += influence * response_tile[
+            (size_t)observation + (size_t)num_train*(size_t)rhs];
           quadratic += (long double)influence*(long double)influence *
             (long double)scaled_residual*(long double)scaled_residual;
         }
@@ -30854,6 +30870,7 @@ cleanup_sigtest_iid:
   free(eval_basis);
   free(base_fit);
   free(residual_scale);
+  free(owned_response_tile);
   free(scalar_derivative_mask);
   free(statistic_sum);
   return status;

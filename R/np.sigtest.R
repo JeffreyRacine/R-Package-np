@@ -172,7 +172,8 @@ npsigtest.npregression <-
   engine.supported <- regression.engine %in% c("lc", "lp")
 
   if (joint || !identical(boot.type, "I") ||
-      !identical(boot.method, "iid") || !equivalent.pivot ||
+      !boot.method %in% c("iid", "wild", "wild-rademacher") ||
+      !equivalent.pivot ||
       length(extra.args) ||
       !bws[["type", exact = TRUE]] %in%
         c("fixed", "generalized_nn", "adaptive_nn") ||
@@ -202,7 +203,8 @@ npsigtest.npregression <-
 .np_npsig_streamed_iid_tile <- function(bws,
                                          xdat,
                                          tested.index,
-                                         donor.index,
+                                         donor.index = NULL,
+                                         response.matrix = NULL,
                                          null.mean,
                                          residual.pool) {
   continuous <- which(bws[["icon", exact = TRUE]])
@@ -224,10 +226,14 @@ npsigtest.npregression <-
     stop("private npsigtest tile received an unsupported predictor", call. = FALSE)
   }
 
+  response.ready <- !is.null(response.matrix)
+  if (response.ready == !is.null(donor.index))
+    stop("private npsigtest tile requires exactly one response payload", call. = FALSE)
+
   as.numeric(.npreghat_exact_lp_apply_from_regression_core(
     bws = bws,
     txdat = xdat,
-    y = donor.index,
+    y = if (response.ready) response.matrix else donor.index,
     basis = bws[["basis.engine", exact = TRUE]],
     degree = as.integer(bws[["degree.engine", exact = TRUE]]),
     bernstein.basis = bws[["bernstein.basis.engine", exact = TRUE]],
@@ -235,6 +241,7 @@ npsigtest.npregression <-
     sigtest = list(
       mode = mode,
       coordinate = coordinate,
+      response.ready = response.ready,
       null.mean = null.mean,
       residual.pool = residual.pool
     )
@@ -706,16 +713,33 @@ npsigtest.rbandwidth <- function(bws,
         tile.width <- 8L
         for (tile.start in seq.int(1L, B, by = tile.width)) {
           tile.count <- min(tile.width, B - tile.start + 1L)
-          donor.index <- vapply(
-            seq_len(tile.count),
-            function(unused) sample.int(num.obs, replace = TRUE),
-            integer(num.obs)
-          )
+          donor.index <- NULL
+          response.matrix <- NULL
+          if (identical(boot.method, "iid")) {
+            donor.index <- vapply(
+              seq_len(tile.count),
+              function(unused) sample.int(num.obs, replace = TRUE),
+              integer(num.obs)
+            )
+          } else {
+            wild.values <- if (identical(boot.method, "wild"))
+              c(a, b, P.a) else c(-1, 1, P.a)
+            response.matrix <- vapply(
+              seq_len(tile.count),
+              function(unused)
+                mhat.xi + ei * draw.wild.mult(
+                  num.obs, wild.values[[1L]], wild.values[[2L]],
+                  wild.values[[3L]]
+                ),
+              numeric(num.obs)
+            )
+          }
           tile.statistic <- .np_npsig_streamed_iid_tile(
             bws = bws,
             xdat = xdat,
             tested.index = i,
             donor.index = donor.index,
+            response.matrix = response.matrix,
             null.mean = mhat.xi,
             residual.pool = ei
           )
