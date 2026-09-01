@@ -1538,6 +1538,7 @@
                                          prefer.local.single_worker = FALSE,
                                          master_local_chunk = TRUE,
                                          required.bindings = NULL,
+                                         progress.context = NULL,
                                          ...) {
   rng.final.state <- attr(tasks, "rng_final_state", exact = TRUE)
   if (!is.null(rng.final.state)) {
@@ -1546,18 +1547,45 @@
     }, add = TRUE)
   }
   total.boot <- sum(vapply(tasks, function(tt) as.integer(tt$bsz), integer(1)))
+  external.progress <- !is.null(progress.context)
+  if (external.progress &&
+      (!is.environment(progress.context) || is.null(progress.context$state))) {
+    stop("invalid internal bootstrap progress context", call. = FALSE)
+  }
   progress.label <- if (is.null(progress.label)) {
     sprintf("Plot bootstrap %s", what)
   } else {
     as.character(progress.label)[1L]
   }
-  progress <- .np_plot_bootstrap_progress_begin(
-    total = total.boot,
-    label = progress.label
-  )
-  on.exit({
-    .np_plot_progress_end(progress)
-  }, add = TRUE)
+  if (external.progress) {
+    progress <- progress.context$state
+    progress.tick <- function(state, done, force = FALSE) {
+      external.done <- if (isTRUE(progress.context$use.bootstrap.done)) {
+        done
+      } else {
+        progress.context$done
+      }
+      external.force <- isTRUE(progress.context$force.next) ||
+        (isTRUE(progress.context$use.bootstrap.done) && isTRUE(force))
+      progress.context$state <- .np_progress_step_at(
+        progress.context$state,
+        now = .np_progress_now(),
+        done = external.done,
+        force = external.force
+      )
+      progress.context$force.next <- FALSE
+      progress.context$state
+    }
+  } else {
+    progress <- .np_plot_bootstrap_progress_begin(
+      total = total.boot,
+      label = progress.label
+    )
+    progress.tick <- .np_plot_progress_tick
+    on.exit({
+      .np_plot_progress_end(progress)
+    }, add = TRUE)
+  }
 
   .npRmpi_bootstrap_phase_mark(
     what = what,
@@ -1613,7 +1641,7 @@
         task <- tasks[[ii]]
         parts.local[[ii]] <- do.call(worker.exec, c(list(task), list(...)))
         done.boot <- done.boot + as.integer(task$bsz)
-        progress <- .np_plot_progress_tick(state = progress, done = done.boot)
+        progress <- progress.tick(state = progress, done = done.boot)
       }
       .npRmpi_bootstrap_transport_trace(
         what = what,
@@ -1669,7 +1697,7 @@
             boot <- suppressWarnings(as.integer(res$boot)[1L])
             if (!is.na(boot) && boot > 0L) {
               done.boot <<- done.boot + boot
-              progress <<- .np_plot_progress_tick(state = progress, done = done.boot)
+              progress <<- progress.tick(state = progress, done = done.boot)
             }
             return(invisible(TRUE))
           }
@@ -1698,7 +1726,7 @@
               }
             }
           }
-          progress <<- .np_plot_progress_tick(state = progress, done = done.boot)
+          progress <<- progress.tick(state = progress, done = done.boot)
           invisible(TRUE)
         }
 
@@ -1767,7 +1795,7 @@
           )
           parts.out[[task.local.idx]] <- do.call(worker.exec, c(list(tasks[[task.local.idx]]), list(...)))
           done.boot <- done.boot + as.integer(tasks[[task.local.idx]]$bsz)
-          progress <- .np_plot_progress_tick(state = progress, done = done.boot)
+          progress <- progress.tick(state = progress, done = done.boot)
           local.done <- local.done + 1L
           .npRmpi_bootstrap_transport_trace(
             what = what,
@@ -1876,7 +1904,7 @@
             task.idx <- remote.idx[tag]
             parts.out[[task.idx]] <- res
             done.boot <- done.boot + as.integer(tasks[[task.idx]]$bsz)
-            progress <- .np_plot_progress_tick(state = progress, done = done.boot)
+            progress <- progress.tick(state = progress, done = done.boot)
 
             sent <- sent + 1L
             if (sent <= n.remote) {
@@ -1973,7 +2001,7 @@
     )
   }
 
-  progress <- .np_plot_progress_tick(state = progress, done = total.boot, force = TRUE)
+  progress <- progress.tick(state = progress, done = total.boot, force = TRUE)
 
   .npRmpi_bootstrap_phase_mark(
     what = what,

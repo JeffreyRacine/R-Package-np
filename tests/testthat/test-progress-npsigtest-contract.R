@@ -78,6 +78,7 @@ test_that("npsigtest joint progress has one immediate call-wide owner", {
   )
   expect_match(lines[[1L]], "^\\[npRmpi\\] Testing joint significance\\.\\.\\. elapsed 0\\.0s$")
   expect_false(grepl("eta", lines[[1L]], fixed = TRUE))
+  expect_true(any(grepl("^\\[npRmpi\\] Testing joint significance [1-8]/9 ", lines)))
   expect_true(any(grepl("^\\[npRmpi\\] Testing joint significance 9/9 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
   expect_length(unique(single.signature$id), 1L)
   expect_identical(tail(single.signature$event, 1L), "finish")

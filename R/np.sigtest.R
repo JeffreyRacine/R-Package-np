@@ -190,6 +190,7 @@ if (getRversion() >= "2.15.1")
                                                required.bindings = NULL,
                                                what = "npsigtest",
                                                profile.where = NA_character_,
+                                               progress.context = NULL,
                                                comm = 1L) {
   n.boot <- length(boot.seeds)
   if (n.boot < 1L)
@@ -234,6 +235,7 @@ if (getRversion() >= "2.15.1")
     comm = comm,
     master_local_chunk = TRUE,
     required.bindings = bindings,
+    progress.context = progress.context,
     boot.seeds = boot.seeds
   )
 
@@ -613,6 +615,7 @@ npsigtest.rbandwidth <- function(bws,
   )
   progress <- .np_progress_show_now(progress)
   progress.active <- TRUE
+  progress.context <- new.env(parent = emptyenv())
   on.exit({
     if (isTRUE(progress.active))
       .np_progress_abort(progress)
@@ -887,14 +890,27 @@ npsigtest.rbandwidth <- function(bws,
       if (boot.method != "pairwise")
         joint.bindings <- c(joint.bindings, list(mhat.xi = mhat.xi, ei = ei))
 
+      progress$known_total <- TRUE
+      progress$total <- boot.num
+      progress$throttle_sec <- .np_progress_interval_sec(
+        known_total = TRUE,
+        domain = progress$domain
+      )
+      progress.context$state <- progress
+      progress.context$done <- NULL
+      progress.context$use.bootstrap.done <- TRUE
+      progress.context$force.next <- TRUE
+
       In.vec <- .npRmpi_npsig_parallel_boot_values(
         boot.seeds = boot.seeds,
         worker = joint.eval,
         required.bindings = joint.bindings,
         what = "npsigtest",
-        profile.where = "npsigtest:joint"
+        profile.where = "npsigtest:joint",
+        progress.context = progress.context
       )
       assign(".Random.seed", post.boot.seed, envir = .GlobalEnv)
+      progress <- progress.context$state
       progress <- .np_npsig_progress_promote(
         progress, total = boot.num, done = boot.num
       )
@@ -1173,14 +1189,29 @@ npsigtest.rbandwidth <- function(bws,
         if (boot.method != "pairwise")
           indiv.bindings <- c(indiv.bindings, list(mhat.xi = mhat.xi, ei = ei))
 
+        if (length(index) == 1L) {
+          progress$known_total <- TRUE
+          progress$total <- boot.num
+          progress$throttle_sec <- .np_progress_interval_sec(
+            known_total = TRUE,
+            domain = progress$domain
+          )
+        }
+        progress.context$state <- progress
+        progress.context$done <- progress$last_done
+        progress.context$use.bootstrap.done <- length(index) == 1L
+        progress.context$force.next <- length(index) == 1L
+
         In.vec <- .npRmpi_npsig_parallel_boot_values(
           boot.seeds = boot.seeds,
           worker = indiv.eval,
           required.bindings = indiv.bindings,
           what = "npsigtest",
-          profile.where = "npsigtest:indiv"
+          profile.where = "npsigtest:indiv",
+          progress.context = progress.context
         )
         assign(".Random.seed", post.boot.seed, envir = .GlobalEnv)
+        progress <- progress.context$state
         if (length(index) == 1L) {
           progress <- .np_npsig_progress_promote(
             progress, total = boot.num, done = boot.num
