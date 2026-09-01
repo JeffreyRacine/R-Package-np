@@ -393,6 +393,23 @@ npsigtest.npregression <-
   statistic
 }
 
+.np_npsig_progress_promote <- function(state, total, done) {
+  if (!isTRUE(state$known_total)) {
+    state$known_total <- TRUE
+    state$total <- total
+    state$throttle_sec <- .np_progress_interval_sec(
+      known_total = TRUE,
+      domain = state$domain
+    )
+  }
+  .np_progress_step_at(
+    state,
+    now = .np_progress_now(),
+    done = done,
+    force = TRUE
+  )
+}
+
 .np_npsig_upper_tail_p <- function(bootstrap, observed) {
   mean(bootstrap >= observed)
 }
@@ -587,6 +604,20 @@ npsigtest.rbandwidth <- function(bws,
     extra.args = extra.args
   )
 
+  tested.names <- names(xdat)[index]
+  missing.names <- is.na(tested.names) | !nzchar(tested.names)
+  tested.names[missing.names] <- paste("variable", index[missing.names])
+  progress <- .np_progress_begin(
+    if (joint) "Testing joint significance" else paste("Testing", tested.names[[1L]]),
+    surface = "bootstrap"
+  )
+  progress <- .np_progress_show_now(progress)
+  progress.active <- TRUE
+  on.exit({
+    if (isTRUE(progress.active))
+      .np_progress_abort(progress)
+  }, add = TRUE)
+
   ## Save seed prior to setting.  The computational owner is selected before
   ## this boundary so unsupported calls enter the incumbent without RNG work.
 
@@ -640,6 +671,7 @@ npsigtest.rbandwidth <- function(bws,
     ## Construct In, the average value of the squared derivatives of
     ## the jth element, discrete or continuous
 
+    progress <- .np_progress_step(progress)
     npreg.out <- npreg.eval.fun(extra.args,
                                 txdat = xdat,
                                 tydat = ydat,
@@ -648,11 +680,13 @@ npsigtest.rbandwidth <- function(bws,
                                 se = pivot.use)
 
     In <- .np_npsig_statistic(npreg.out, index = index, pivot = pivot.use)
+    progress <- .np_progress_step(progress)
 
     if(boot.method != "pairwise") {
 
       ## Compute scale and mean of unrestricted residuals
 
+      progress <- .np_progress_step(progress)
       npreg.unres <- npreg.eval.fun(extra.args,
                                     txdat = xdat,
                                     tydat = ydat,
@@ -661,6 +695,7 @@ npsigtest.rbandwidth <- function(bws,
       ei.unres <- scale(npreg.unres$resid)
       ei.unres.scale <- attr(ei.unres,"scaled:scale")
       ei.unres.center <- attr(ei.unres,"scaled:center")      
+      progress <- .np_progress_step(progress)
 
       ## We now construct mhat.xi holding constant the variable whose
       ## significance is being tested at its median. First, make a copy
@@ -681,11 +716,13 @@ npsigtest.rbandwidth <- function(bws,
         }
       }
       
+      progress <- .np_progress_step(progress)
       mhat.xi <-  npreg.eval.fun(extra.args,
                                  txdat = xdat,
                                  tydat = ydat,
                                  exdat = xdat.eval,
                                  bws = bws)$mean
+      progress <- .np_progress_step(progress)
 
       ## Rescale and recenter the residuals under the null to those
       ## under the alternative
@@ -698,8 +735,6 @@ npsigtest.rbandwidth <- function(bws,
       
     }
 
-    progress <- .np_progress_begin("Testing joint significance", total = boot.num, surface = "bootstrap")
-    
     if (boot.type == "II") {
       bws.boot.prev <- bws.original
 
@@ -763,7 +798,13 @@ npsigtest.rbandwidth <- function(bws,
           index = index,
           pivot = pivot.use
         )
-        progress <- .np_progress_step(progress, done = i.star)
+        if (!isTRUE(progress$known_total)) {
+          progress <- .np_npsig_progress_promote(
+            progress, total = boot.num, done = i.star
+          )
+        } else {
+          progress <- .np_progress_step(progress, done = i.star)
+        }
       }
     } else {
       boot.seeds <- .npRmpi_npsig_bootstrap_seed_plan(
@@ -854,9 +895,10 @@ npsigtest.rbandwidth <- function(bws,
         profile.where = "npsigtest:joint"
       )
       assign(".Random.seed", post.boot.seed, envir = .GlobalEnv)
+      progress <- .np_npsig_progress_promote(
+        progress, total = boot.num, done = boot.num
+      )
     }
-
-    progress <- .np_progress_end(progress)
 
     ## Compute the P-value
 
@@ -879,6 +921,7 @@ npsigtest.rbandwidth <- function(bws,
       ## Increment counter...
       
       ii <- ii + 1
+      progress$label <- paste("Testing", tested.names[[ii]])
       pivot.use <- pivot.plan$effective[[ii]]
 
       if (boot.type == "II")
@@ -889,6 +932,7 @@ npsigtest.rbandwidth <- function(bws,
       ## Construct In, the average value of the squared derivatives of
       ## the jth element, discrete or continuous
       
+      progress <- .np_progress_step(progress)
       npreg.out <- npreg.eval.fun(extra.args,
                                   txdat = xdat,
                                   tydat = ydat,
@@ -897,11 +941,13 @@ npsigtest.rbandwidth <- function(bws,
                                   se = pivot.use)
       
       In[ii] <- .np_npsig_statistic(npreg.out, index = i, pivot = pivot.use)
+      progress <- .np_progress_step(progress)
       
       if(boot.method != "pairwise") {
 
         ## Compute scale and mean of unrestricted residuals
 
+        progress <- .np_progress_step(progress)
         npreg.unres <- npreg.eval.fun(extra.args,
                                       txdat = xdat,
                                       tydat = ydat,
@@ -910,6 +956,7 @@ npsigtest.rbandwidth <- function(bws,
         ei.unres <- scale(npreg.unres$resid)
         ei.unres.scale <- attr(ei.unres,"scaled:scale")
         ei.unres.center <- attr(ei.unres,"scaled:center")      
+        progress <- .np_progress_step(progress)
 
         ## We now construct mhat.xi holding constant the variable whose
         ## significance is being tested at its median. First, make a copy
@@ -928,11 +975,13 @@ npsigtest.rbandwidth <- function(bws,
           xdat.eval[,i] <- xq
         }
         
+        progress <- .np_progress_step(progress)
         mhat.xi <-  npreg.eval.fun(extra.args,
                                    txdat = xdat,
                                    tydat = ydat,
                                    exdat = xdat.eval,
                                    bws = bws)$mean
+        progress <- .np_progress_step(progress)
         
         ## Rescale and recenter the residuals under the null to those
         ## under the alternative
@@ -945,12 +994,6 @@ npsigtest.rbandwidth <- function(bws,
         
       }
 
-      progress <- .np_progress_begin(
-        sprintf("Testing variable %s of (%s)", i, paste(index, collapse = ",")),
-        total = boot.num,
-        surface = "bootstrap"
-      )
-      
       if (boot.type == "II") {
         bws.boot.prev <- bws.original
 
@@ -1013,7 +1056,15 @@ npsigtest.rbandwidth <- function(bws,
             index = i,
             pivot = pivot.use
           )
-          progress <- .np_progress_step(progress, done = i.star)
+          if (length(index) == 1L && !isTRUE(progress$known_total)) {
+            progress <- .np_npsig_progress_promote(
+              progress, total = boot.num, done = i.star
+            )
+          } else if (length(index) == 1L) {
+            progress <- .np_progress_step(progress, done = i.star)
+          } else {
+            progress <- .np_progress_step(progress)
+          }
         }
       } else {
         boot.seeds <- .npRmpi_npsig_bootstrap_seed_plan(
@@ -1130,19 +1181,33 @@ npsigtest.rbandwidth <- function(bws,
           profile.where = "npsigtest:indiv"
         )
         assign(".Random.seed", post.boot.seed, envir = .GlobalEnv)
+        if (length(index) == 1L) {
+          progress <- .np_npsig_progress_promote(
+            progress, total = boot.num, done = boot.num
+          )
+        }
       }
-
-      progress <- .np_progress_end(progress)
       
       ## Compute the P-value
       
       P[ii] <- .np_npsig_upper_tail_p(In.vec, In[ii])
       
       In.mat[,ii] = In.vec
+
+      if (length(index) > 1L) {
+        if (ii < length(index))
+          progress$label <- paste("Testing", tested.names[[ii + 1L]])
+        progress <- .np_npsig_progress_promote(
+          progress, total = length(index), done = ii
+        )
+      }
       
     }
     
   } ## End invididual test
+
+  progress <- .np_progress_end(progress)
+  progress.active <- FALSE
 
   ## Return a list containing the statistic and its P-value
   ## bootstrapped In.vec for each variable...
