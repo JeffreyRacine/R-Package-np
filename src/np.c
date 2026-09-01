@@ -9025,6 +9025,7 @@ static SEXP np_regression_lp_apply_conditional_impl(SEXP txuno,
                                                      SEXP sigtest_mode,
                                                      SEXP sigtest_coordinate,
                                                      SEXP sigtest_response_ready,
+                                                     SEXP sigtest_pivotal,
                                                      SEXP sigtest_null_mean,
                                                      SEXP sigtest_residual_pool)
 {
@@ -9053,6 +9054,8 @@ static SEXP np_regression_lp_apply_conditional_impl(SEXP txuno,
   int sigtest_response_ready_flag =
     sigtest_response_ready != R_NilValue ?
       asInteger(sigtest_response_ready) : 0;
+  int sigtest_pivotal_flag =
+    sigtest_pivotal != R_NilValue ? asInteger(sigtest_pivotal) : 0;
   int lp_engine = NP_LP_ENGINE_GENERAL;
   int derivative_variable = 0;
   int derivative_order = 0;
@@ -9157,6 +9160,7 @@ static SEXP np_regression_lp_apply_conditional_impl(SEXP txuno,
       leave_one_out_flag || !train_is_eval_flag ||
       (sigtest_response_ready_flag != 0 &&
        sigtest_response_ready_flag != 1) ||
+      (sigtest_pivotal_flag != 0 && sigtest_pivotal_flag != 1) ||
       ncol_rhs > 8 || tree_flag ||
       XLENGTH(sigtest_null_mean_r) != num_obs_train ||
       XLENGTH(sigtest_residual_pool_r) != num_obs_train))
@@ -9376,7 +9380,7 @@ static SEXP np_regression_lp_apply_conditional_impl(SEXP txuno,
       REAL(rbw_r), REAL(rhs_r), ncol_rhs,
       REAL(sigtest_null_mean_r), REAL(sigtest_residual_pool_r),
       sigtest_mode_flag, sigtest_coordinate_flag,
-      sigtest_response_ready_flag, REAL(out));
+      sigtest_response_ready_flag, sigtest_pivotal_flag, REAL(out));
     if(compute_status != NP_REGRESSION_LP_MATRIX_OK)
       failure_message = "npsigtest IID tile reduction failed";
   } else if(return_hat_flag) {
@@ -9524,7 +9528,8 @@ SEXP C_np_regression_lp_apply_conditional(SEXP txuno,
     glp_gradient_order, glp_bernstein, glp_basis,
     continuous_kernel_family, continuous_kernel_order, ckerlb, ckerub,
     categorical_compress, return_hat, R_NilValue, R_NilValue,
-    R_NilValue, R_NilValue, R_NilValue, R_NilValue, R_NilValue);
+    R_NilValue, R_NilValue, R_NilValue, R_NilValue, R_NilValue,
+    R_NilValue);
 }
 
 SEXP C_np_regression_lp_apply_conditional_ctx(SEXP txuno,
@@ -9559,7 +9564,8 @@ SEXP C_np_regression_lp_apply_conditional_ctx(SEXP txuno,
     glp_gradient_order, glp_bernstein, glp_basis,
     continuous_kernel_family, continuous_kernel_order, ckerlb, ckerub,
     categorical_compress, return_hat, train_is_eval, leave_one_out,
-    R_NilValue, R_NilValue, R_NilValue, R_NilValue, R_NilValue);
+    R_NilValue, R_NilValue, R_NilValue, R_NilValue, R_NilValue,
+    R_NilValue);
 }
 
 SEXP C_np_regression_lp_sigtest_conditional_ctx(
@@ -9591,6 +9597,7 @@ SEXP C_np_regression_lp_sigtest_conditional_ctx(
   SEXP sigtest_mode,
   SEXP sigtest_coordinate,
   SEXP sigtest_response_ready,
+  SEXP sigtest_pivotal,
   SEXP sigtest_null_mean,
   SEXP sigtest_residual_pool)
 {
@@ -9601,7 +9608,7 @@ SEXP C_np_regression_lp_sigtest_conditional_ctx(
     continuous_kernel_family, continuous_kernel_order, ckerlb, ckerub,
     categorical_compress, return_hat, train_is_eval, leave_one_out,
     sigtest_mode, sigtest_coordinate, sigtest_response_ready,
-    sigtest_null_mean,
+    sigtest_pivotal, sigtest_null_mean,
     sigtest_residual_pool);
 }
 

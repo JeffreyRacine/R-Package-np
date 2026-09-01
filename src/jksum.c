@@ -30573,8 +30573,9 @@ static int np_npsigtest_fixed_influence_row(
 /*
  * Stateless eight-column Bootstrap-I IID reducer.  R owns sample.int() and
  * supplies its 1-based donor indices; this routine reconstructs y* on demand.
- * Categorical statistics need one paired-endpoint pass.  Continuous pivotal
- * statistics use a mean/residual pass followed by the derivative/HC0 pass.
+ * Categorical and raw-continuous statistics need one pass.  Continuous
+ * pivotal statistics use a mean/residual pass followed by the derivative/HC0
+ * pass.
  */
 int np_regression_lp_sigtest_iid(
   double *vector_scale_factor,
@@ -30585,6 +30586,7 @@ int np_regression_lp_sigtest_iid(
   int statistic_mode,
   int statistic_coordinate,
   int response_ready,
+  int pivotal,
   double *statistic_out)
 {
   const int num_train = num_obs_train_extern;
@@ -30610,6 +30612,7 @@ int np_regression_lp_sigtest_iid(
      null_mean == NULL || residual_pool == NULL || statistic_out == NULL ||
      num_train <= 0 || n_rhs <= 0 || n_rhs > 8 ||
      (response_ready != 0 && response_ready != 1) ||
+     (pivotal != 0 && pivotal != 1) ||
      num_obs_eval_extern != num_train ||
      (BANDWIDTH_den_extern != BW_FIXED &&
       BANDWIDTH_den_extern != BW_GEN_NN &&
@@ -30618,6 +30621,8 @@ int np_regression_lp_sigtest_iid(
      (statistic_mode != NP_NPSIGTEST_STAT_CONTINUOUS &&
       statistic_mode != NP_NPSIGTEST_STAT_UNORDERED &&
       statistic_mode != NP_NPSIGTEST_STAT_ORDERED))
+    goto cleanup_sigtest_iid;
+  if(pivotal && statistic_mode != NP_NPSIGTEST_STAT_CONTINUOUS)
     goto cleanup_sigtest_iid;
   if(statistic_mode == NP_NPSIGTEST_STAT_CONTINUOUS) {
     if((np_lp_engine_extern != NP_LP_ENGINE_SCALAR &&
@@ -30757,6 +30762,27 @@ int np_regression_lp_sigtest_iid(
         if(!R_FINITE(effect))
           goto cleanup_sigtest_iid;
         statistic_sum[rhs] += (long double)effect*(long double)effect;
+      }
+      if((eval_idx & 31) == 0)
+        R_CheckUserInterrupt();
+    }
+  } else if(!pivotal) {
+    for(eval_idx = 0; eval_idx < num_train; ++eval_idx) {
+      if(np_npsigtest_fixed_influence_row(
+           &xctx, &lp_workspace, eval_idx, statistic_coordinate,
+           0, 0, 0, scalar_derivative_weight,
+           scalar_derivative_mask, eval_basis, row) != 0)
+        goto cleanup_sigtest_iid;
+      for(rhs = 0; rhs < n_rhs; ++rhs) {
+        double gradient = 0.0;
+        int observation;
+
+        for(observation = 0; observation < num_train; ++observation)
+          gradient += row[observation] * response_tile[
+            (size_t)observation + (size_t)num_train*(size_t)rhs];
+        if(!R_FINITE(gradient))
+          goto cleanup_sigtest_iid;
+        statistic_sum[rhs] += (long double)gradient*(long double)gradient;
       }
       if((eval_idx & 31) == 0)
         R_CheckUserInterrupt();

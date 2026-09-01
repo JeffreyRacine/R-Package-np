@@ -375,6 +375,31 @@ test_that("streamed response tiles reproduce wild-bootstrap statistics", {
       )
     }, numeric(1L))
     expect_equal(streamed, incumbent, tolerance = 2e-10)
+    if (!categorical) {
+      streamed.raw <- np:::.np_npsig_streamed_iid_tile(
+        bws = bw,
+        xdat = xdat,
+        tested.index = tested.index,
+        response.matrix = response,
+        null.mean = null.mean,
+        residual.pool = residual.pool,
+        pivotal = FALSE
+      )
+      incumbent.raw <- vapply(
+        seq_len(ncol(response)),
+        function(replication) {
+          fit <- npreg(
+            txdat = xdat, tydat = response[, replication], bws = bw,
+            gradients = TRUE, se = FALSE
+          )
+          np:::.np_npsig_statistic(
+            fit, index = tested.index, pivot = FALSE
+          )
+        },
+        numeric(1L)
+      )
+      expect_equal(streamed.raw, incumbent.raw, tolerance = 2e-10)
+    }
   }
 })
 
@@ -408,8 +433,14 @@ test_that("streamed IID capability is deterministic and semantics-exact", {
   expect_false(np:::.np_npsig_streamed_iid_eligible(
     bw, xdat, 2L, FALSE, "I", "iid", FALSE, list()
   ))
-  expect_false(np:::.np_npsig_streamed_iid_eligible(
+  expect_true(np:::.np_npsig_streamed_iid_eligible(
     bw, xdat, 1:2, TRUE, "I", "iid", NULL, list()
+  ))
+  expect_true(np:::.np_npsig_streamed_iid_eligible(
+    bw, xdat, 1:2, TRUE, "I", "wild", FALSE, list()
+  ))
+  expect_false(np:::.np_npsig_streamed_iid_eligible(
+    bw, xdat, 1:2, TRUE, "I", "iid", TRUE, list()
   ))
 
   set.seed(31415)

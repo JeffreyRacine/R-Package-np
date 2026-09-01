@@ -164,14 +164,19 @@ npsigtest.npregression <-
     function(variable) is.factor(variable) || is.ordered(variable),
     logical(1L)
   )
-  equivalent.pivot <- is.null(pivot) ||
-    (identical(pivot, FALSE) && all(categorical)) ||
-    (identical(pivot, TRUE) && !any(categorical))
+  equivalent.pivot <- if (joint) {
+    is.null(pivot) || identical(pivot, FALSE) ||
+      (identical(pivot, TRUE) && !any(categorical))
+  } else {
+    is.null(pivot) ||
+      (identical(pivot, FALSE) && all(categorical)) ||
+      (identical(pivot, TRUE) && !any(categorical))
+  }
 
   regression.engine <- bws[["regtype.engine", exact = TRUE]]
   engine.supported <- regression.engine %in% c("lc", "lp")
 
-  if (joint || !identical(boot.type, "I") ||
+  if (!identical(boot.type, "I") ||
       !boot.method %in% c("iid", "wild", "wild-rademacher") ||
       !equivalent.pivot ||
       length(extra.args) ||
@@ -206,7 +211,8 @@ npsigtest.npregression <-
                                          donor.index = NULL,
                                          response.matrix = NULL,
                                          null.mean,
-                                         residual.pool) {
+                                         residual.pool,
+                                         pivotal = NULL) {
   continuous <- which(bws[["icon", exact = TRUE]])
   unordered <- which(bws[["iuno", exact = TRUE]])
   ordered <- which(bws[["iord", exact = TRUE]])
@@ -226,6 +232,12 @@ npsigtest.npregression <-
     stop("private npsigtest tile received an unsupported predictor", call. = FALSE)
   }
 
+  if (is.null(pivotal))
+    pivotal <- identical(mode, 1L)
+  pivotal <- npValidateScalarLogical(pivotal, "pivotal")
+  if (pivotal && !identical(mode, 1L))
+    stop("private npsigtest categorical tiles cannot be pivotal", call. = FALSE)
+
   response.ready <- !is.null(response.matrix)
   if (response.ready == !is.null(donor.index))
     stop("private npsigtest tile requires exactly one response payload", call. = FALSE)
@@ -242,6 +254,7 @@ npsigtest.npregression <-
       mode = mode,
       coordinate = coordinate,
       response.ready = response.ready,
+      pivotal = pivotal,
       null.mean = null.mean,
       residual.pool = residual.pool
     )
@@ -502,7 +515,60 @@ npsigtest.rbandwidth <- function(bws,
     if(boot.type=="II")
       bws.boot.prev <- bws.original
 
-    for (i.star in seq_len(B)) {
+    if (streamed.iid) {
+      tile.width <- 8L
+      for (tile.start in seq.int(1L, B, by = tile.width)) {
+        tile.count <- min(tile.width, B - tile.start + 1L)
+        if (identical(boot.method, "iid")) {
+          donor.index <- vapply(
+            seq_len(tile.count),
+            function(unused) sample.int(num.obs, replace = TRUE),
+            integer(num.obs)
+          )
+          response.matrix <- matrix(
+            mhat.xi + ei[donor.index],
+            nrow = num.obs,
+            ncol = tile.count
+          )
+        } else {
+          wild.values <- if (identical(boot.method, "wild"))
+            c(a, b, P.a) else c(-1, 1, P.a)
+          response.matrix <- vapply(
+            seq_len(tile.count),
+            function(unused)
+              mhat.xi + ei * draw.wild.mult(
+                num.obs, wild.values[[1L]], wild.values[[2L]],
+                wild.values[[3L]]
+              ),
+            numeric(num.obs)
+          )
+        }
+        tile.statistic <- numeric(tile.count)
+        for (tested.index in index) {
+          tile.statistic <- tile.statistic +
+            .np_npsig_streamed_iid_tile(
+              bws = bws,
+              xdat = xdat,
+              tested.index = tested.index,
+              response.matrix = response.matrix,
+              null.mean = mhat.xi,
+              residual.pool = ei,
+              pivotal = pivot.use
+            ) / length(index)
+        }
+        tile.rows <- tile.start:(tile.start + tile.count - 1L)
+        In.vec[tile.rows] <- tile.statistic
+        tile.done <- tile.rows[[length(tile.rows)]]
+        if (!isTRUE(progress$known_total)) {
+          progress <- .np_npsig_progress_promote(
+            progress, total = B, done = tile.start
+          )
+          progress <- .np_progress_step(progress, done = tile.done)
+        } else {
+          progress <- .np_progress_step(progress, done = tile.done)
+        }
+      }
+    } else for (i.star in seq_len(B)) {
       if(boot.method == "iid") {
 
         ydat.star <- mhat.xi + ei[sample.int(num.obs, replace = TRUE)]

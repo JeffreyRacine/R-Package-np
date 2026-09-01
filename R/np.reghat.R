@@ -1078,7 +1078,7 @@ npreghat <-
   if (!is.null(sigtest)) {
     if (!is.list(sigtest) ||
         !identical(sort(names(sigtest)),
-                   sort(c("mode", "coordinate", "response.ready",
+                   sort(c("mode", "coordinate", "response.ready", "pivotal",
                           "null.mean", "residual.pool"))))
       stop("invalid private npsigtest tile payload", call. = FALSE)
     return(.Call(
@@ -1111,6 +1111,7 @@ npreghat <-
       as.integer(sigtest$mode),
       as.integer(sigtest$coordinate),
       as.integer(isTRUE(sigtest$response.ready)),
+      as.integer(isTRUE(sigtest$pivotal)),
       as.double(sigtest$null.mean),
       as.double(sigtest$residual.pool),
       PACKAGE = "np"
