@@ -70,6 +70,9 @@ expect_adaptive_nn_lp_contract <- function(family) {
   expect_true(all(is.finite(fitted(fit.ll))))
   expect_true(all(is.finite(fitted(fit.lp1))))
   expect_true(all(is.finite(fitted(fit.lp2))))
+  expect_true(all(is.finite(fit.ll$congrad)))
+  expect_true(all(is.finite(fit.lp1$congrad)))
+  expect_true(all(is.finite(fit.lp2$congrad)))
   expect_equal(fitted(fit.ll), fitted(fit.lp1), tolerance = 1e-10)
   expect_equal(fit.ll$congrad, fit.lp1$congrad, tolerance = 1e-10)
 
@@ -129,5 +132,27 @@ test_that("adaptive-nn conditional distribution lp honors degree metadata", {
   if (!spawn_mpi_slaves(1L)) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
 
+  expect_adaptive_nn_lp_contract("dist")
+})
+
+test_that("failed local higher-order regression cannot poison MPI conditional gradients", {
+  if (!spawn_mpi_slaves(1L)) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+
+  local_regression <- getFromNamespace(".npRmpi_with_local_regression", "npRmpi")
+  x <- data.frame(x = c(0, 0, 0, 1, 2))
+  y <- c(0, 1, 2, 3, 4)
+  bw <- local_regression(npregbw(
+    xdat = x, ydat = y, bws = 2, bandwidth.compute = FALSE,
+    bwtype = "adaptive_nn", regtype = "lp", degree = 2L,
+    basis = "glp"
+  ))
+
+  expect_error(
+    local_regression(npreg(
+      bws = bw, exdat = x, gradients = TRUE, gradient.order = 2L
+    )),
+    "zero literal radius", fixed = TRUE
+  )
   expect_adaptive_nn_lp_contract("dist")
 })
