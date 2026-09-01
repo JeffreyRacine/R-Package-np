@@ -3,6 +3,13 @@ h8_direct <- function(...) {
   getFromNamespace(".np_regression_direct", package)(...)
 }
 
+h8_run_local <- function(package, expression) {
+  if (identical(package, "npRmpi"))
+    getFromNamespace(".npRmpi_with_local_regression", package)(expression)
+  else
+    expression
+}
+
 h8_bw <- function(x, y, degree) {
   npregbw(
     xdat = x, ydat = y,
@@ -27,6 +34,8 @@ h8_fixture <- function(n = 19L) {
 }
 
 test_that("direct regression helper consumes the complete native HC0 payload", {
+  package <- environmentName(environment(npreg))
+  h8_run_local(package, {
   old <- options(np.messages = FALSE, np.tree = TRUE)
   on.exit(options(old), add = TRUE)
   fixture <- h8_fixture()
@@ -60,9 +69,12 @@ test_that("direct regression helper consumes the complete native HC0 payload", {
   expect_match(implementation,
                "do.compiled.gradients <- isTRUE(gradients)", fixed = TRUE)
   expect_true(nzchar(direct.body))
+  })
 })
 
 test_that("regression accessors expose the same cumulative HC0 result", {
+  package <- environmentName(environment(npreg))
+  h8_run_local(package, {
   old <- options(np.messages = FALSE, np.tree = FALSE)
   on.exit(options(old), add = TRUE)
   fixture <- h8_fixture()
@@ -87,9 +99,12 @@ test_that("regression accessors expose the same cumulative HC0 result", {
   expect_identical(predicted$se.fit, explicit$merr)
   expect_output(print(fit), "Regression Data", fixed = TRUE)
   expect_output(summary(fit), "Regression Data", fixed = TRUE)
+  })
 })
 
 test_that("categorical asymptotic plot panels consume native HC0 errors", {
+  package <- environmentName(environment(npreg))
+  h8_run_local(package, {
   old <- options(np.messages = FALSE, np.tree = FALSE)
   on.exit(options(old), add = TRUE)
   fixture <- h8_fixture()
@@ -110,9 +125,12 @@ test_that("categorical asymptotic plot panels consume native HC0 errors", {
   expect_true(all(is.finite(out[[3L]]$gerr)))
   expect_true(all(is.finite(out[[4L]]$grad)))
   expect_true(all(is.finite(out[[4L]]$gerr)))
+  })
 })
 
 test_that("formula NA restoration preserves mean and every gradient SE column", {
+  package <- environmentName(environment(npreg))
+  h8_run_local(package, {
   old <- options(np.messages = FALSE, np.tree = FALSE,
                  na.action = "na.exclude")
   on.exit(options(old), add = TRUE)
@@ -147,4 +165,5 @@ test_that("formula NA restoration preserves mean and every gradient SE column", 
   expect_true(all(is.finite(fit$merr[kept])))
   expect_true(all(is.finite(fit$grad[kept, , drop = FALSE])))
   expect_true(all(is.finite(fit$gerr[kept, , drop = FALSE])))
+  })
 })
