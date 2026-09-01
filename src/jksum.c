@@ -30368,7 +30368,8 @@ static int np_npsigtest_fixed_influence_row(
   if(ctx == NULL || !ctx->ready || row_out == NULL ||
      eval_idx < 0 || eval_idx >= num_train ||
      (BANDWIDTH_den_extern != BW_FIXED &&
-      BANDWIDTH_den_extern != BW_GEN_NN) ||
+      BANDWIDTH_den_extern != BW_GEN_NN &&
+      BANDWIDTH_den_extern != BW_ADAP_NN) ||
      int_TREE_X == NP_TREE_TRUE)
     return 1;
 
@@ -30489,18 +30490,31 @@ static int np_npsigtest_fixed_influence_row(
                              vector_cxkerlb_extern,
                              vector_cxkerub_extern,
                              &bounds_state);
-  if(np_conditional_kernel_row_raw(
-       ctx->kernel_cx, ctx->kernel_ux, ctx->kernel_ox,
-       ctx->x_operator, BANDWIDTH_den_extern, num_train,
-       num_unordered, num_ordered, num_continuous,
-       matrix_X_unordered_train_extern,
-       matrix_X_ordered_train_extern,
-       matrix_X_continuous_train_extern,
-       ctx->eval_xuno_one, ctx->eval_xord_one, ctx->eval_xcon_one,
-       ctx->vsfx, 1, ctx->matrix_bandwidth_x,
-       ctx->matrix_bandwidth_eval_one, ctx->lambdax,
-       num_categories_extern_X, matrix_categorical_vals_extern_X,
-       NP_TREE_FALSE, NULL, ctx->kw, ctx->mean_row) != 0) {
+  if((BANDWIDTH_den_extern == BW_ADAP_NN ?
+      np_conditional_kernel_row(
+        ctx->kernel_cx, ctx->kernel_ux, ctx->kernel_ox,
+        ctx->x_operator, BANDWIDTH_den_extern, num_train,
+        num_unordered, num_ordered, num_continuous,
+        matrix_X_unordered_train_extern,
+        matrix_X_ordered_train_extern,
+        matrix_X_continuous_train_extern,
+        ctx->eval_xuno_one, ctx->eval_xord_one, ctx->eval_xcon_one,
+        ctx->vsfx, 1, ctx->matrix_bandwidth_x,
+        ctx->matrix_bandwidth_eval_one, ctx->lambdax,
+        num_categories_extern_X, matrix_categorical_vals_extern_X,
+        NP_TREE_FALSE, NULL, ctx->kw, ctx->mean_row) :
+      np_conditional_kernel_row_raw(
+        ctx->kernel_cx, ctx->kernel_ux, ctx->kernel_ox,
+        ctx->x_operator, BANDWIDTH_den_extern, num_train,
+        num_unordered, num_ordered, num_continuous,
+        matrix_X_unordered_train_extern,
+        matrix_X_ordered_train_extern,
+        matrix_X_continuous_train_extern,
+        ctx->eval_xuno_one, ctx->eval_xord_one, ctx->eval_xcon_one,
+        ctx->vsfx, 1, ctx->matrix_bandwidth_x,
+        ctx->matrix_bandwidth_eval_one, ctx->lambdax,
+        num_categories_extern_X, matrix_categorical_vals_extern_X,
+        NP_TREE_FALSE, NULL, ctx->kw, ctx->mean_row)) != 0) {
     np_conditional_pop_bounds(&bounds_state);
     return 1;
   }
@@ -30594,7 +30608,8 @@ int np_regression_lp_sigtest_iid(
      num_train <= 0 || n_rhs <= 0 || n_rhs > 8 ||
      num_obs_eval_extern != num_train ||
      (BANDWIDTH_den_extern != BW_FIXED &&
-      BANDWIDTH_den_extern != BW_GEN_NN) ||
+      BANDWIDTH_den_extern != BW_GEN_NN &&
+      BANDWIDTH_den_extern != BW_ADAP_NN) ||
      int_TREE_X == NP_TREE_TRUE ||
      (statistic_mode != NP_NPSIGTEST_STAT_CONTINUOUS &&
       statistic_mode != NP_NPSIGTEST_STAT_UNORDERED &&

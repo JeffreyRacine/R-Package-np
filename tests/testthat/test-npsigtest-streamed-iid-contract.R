@@ -181,9 +181,7 @@ test_that("streamed IID tiles preserve generalized and adaptive NN geometry", {
     eligible <- np:::.np_npsig_streamed_iid_eligible(
       bw, xdat, seq_len(ncol(xdat)), FALSE, "I", "iid", NULL, list()
     )
-    expect_identical(eligible, identical(bwtype, "generalized_nn"))
-    if (!eligible)
-      next
+    expect_true(eligible)
     unrestricted <- npreg(
       txdat = xdat, tydat = ydat, bws = bw,
       gradients = FALSE, se = FALSE
@@ -226,7 +224,12 @@ test_that("streamed IID tiles preserve generalized and adaptive NN geometry", {
           fit, index = tested.index, pivot = !categorical
         )
       }, numeric(1L))
-      expect_equal(streamed, incumbent, tolerance = 2e-10)
+      expect_equal(
+        streamed,
+        incumbent,
+        tolerance = if (identical(bwtype, "adaptive_nn") && !categorical)
+          5e-7 else 2e-10
+      )
     }
   }
 })

@@ -174,7 +174,8 @@ npsigtest.npregression <-
   if (joint || !identical(boot.type, "I") ||
       !identical(boot.method, "iid") || !equivalent.pivot ||
       length(extra.args) ||
-      !bws[["type", exact = TRUE]] %in% c("fixed", "generalized_nn") ||
+      !bws[["type", exact = TRUE]] %in%
+        c("fixed", "generalized_nn", "adaptive_nn") ||
       !engine.supported ||
       identical(bws[["ckertype", exact = TRUE]], "beta"))
     return(FALSE)
