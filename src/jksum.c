@@ -30347,6 +30347,8 @@ static int np_npsigtest_fixed_influence_row(
   const int categorical_mode,
   const int categorical_coordinate,
   const int alternate_frame,
+  double *scalar_derivative_weight,
+  int *scalar_derivative_mask,
   double *eval_basis,
   double *row_out)
 {
@@ -30414,6 +30416,64 @@ static int np_npsigtest_fixed_influence_row(
     } else {
       return 1;
     }
+  }
+
+  if(ctx->lp_engine == NP_LP_ENGINE_SCALAR &&
+     derivative_coordinate >= 0) {
+    double denominator = 0.0;
+    double derivative_denominator = 0.0;
+    double derivative_sum_output[1] = {0.0};
+    int row_status;
+    NPPermutationWeightOutput derivative_output;
+
+    if(derivative_coordinate >= num_continuous ||
+       scalar_derivative_weight == NULL ||
+       scalar_derivative_mask == NULL)
+      return 1;
+    derivative_output = np_pkw_output_make(scalar_derivative_weight, 1);
+    np_conditional_push_bounds(int_cxker_bound_extern,
+                               vector_cxkerlb_extern,
+                               vector_cxkerub_extern,
+                               &bounds_state);
+    row_status = kernel_weighted_sum_np_ctx(
+      ctx->kernel_cx, ctx->kernel_ux, ctx->kernel_ox,
+      BANDWIDTH_den_extern, num_train, 1,
+      num_unordered, num_ordered, num_continuous,
+      0, 0, 1, 1, 1, 0, 0, 0, 0,
+      ctx->x_operator, OP_DERIVATIVE,
+      0, 0, scalar_derivative_mask, 1,
+      0, 0, NP_TREE_FALSE, 0, NULL,
+      NULL, NULL, NULL,
+      matrix_X_unordered_train_extern,
+      matrix_X_ordered_train_extern,
+      matrix_X_continuous_train_extern,
+      ctx->eval_xuno_one, ctx->eval_xord_one, ctx->eval_xcon_one,
+      NULL, NULL, NULL,
+      ctx->vsfx, 1, ctx->matrix_bandwidth_x,
+      ctx->matrix_bandwidth_eval_one, ctx->lambdax,
+      num_categories_extern_X, matrix_categorical_vals_extern_X,
+      NULL, ctx->mean_row, derivative_sum_output, ctx->kw,
+      NULL, &derivative_output);
+    np_conditional_pop_bounds(&bounds_state);
+    if(row_status != 0)
+      return 1;
+
+    for(observation = 0; observation < num_train; ++observation) {
+      if(!R_FINITE(ctx->kw[observation]) ||
+         !R_FINITE(scalar_derivative_weight[observation]))
+        return 1;
+      denominator += ctx->kw[observation];
+      derivative_denominator += scalar_derivative_weight[observation];
+    }
+    if(!R_FINITE(denominator) || !R_FINITE(derivative_denominator) ||
+       fabs(denominator) <= DBL_MIN)
+      return 1;
+    for(observation = 0; observation < num_train; ++observation)
+      row_out[observation] =
+        scalar_derivative_weight[observation]/denominator -
+        ctx->kw[observation]*derivative_denominator/
+          (denominator*denominator);
+    return 0;
   }
 
   np_conditional_push_bounds(int_cxker_bound_extern,
@@ -30494,10 +30554,12 @@ int np_regression_lp_sigtest_iid(
   NPConditionalXRowCtx xctx;
   NPReghatLPWorkspace lp_workspace;
   double *row = NULL;
+  double *scalar_derivative_weight = NULL;
   double *residual_tile = NULL;
   double *eval_basis = NULL;
   double *base_fit = NULL;
   double *residual_scale = NULL;
+  int *scalar_derivative_mask = NULL;
   long double *statistic_sum = NULL;
   int status = NP_REGRESSION_LP_MATRIX_ERROR;
   int eval_idx;
@@ -30516,7 +30578,8 @@ int np_regression_lp_sigtest_iid(
       statistic_mode != NP_NPSIGTEST_STAT_ORDERED))
     goto cleanup_sigtest_iid;
   if(statistic_mode == NP_NPSIGTEST_STAT_CONTINUOUS) {
-    if(np_lp_engine_extern != NP_LP_ENGINE_GENERAL ||
+    if((np_lp_engine_extern != NP_LP_ENGINE_SCALAR &&
+        np_lp_engine_extern != NP_LP_ENGINE_GENERAL) ||
        statistic_coordinate < 0 ||
        statistic_coordinate >= num_reg_continuous_extern)
       goto cleanup_sigtest_iid;
@@ -30563,7 +30626,21 @@ int np_regression_lp_sigtest_iid(
   base_fit = alloc_vecd(n_rhs);
   statistic_sum = (long double *)calloc((size_t)n_rhs,
                                         sizeof(long double));
+  if(statistic_mode == NP_NPSIGTEST_STAT_CONTINUOUS &&
+     np_lp_engine_extern == NP_LP_ENGINE_SCALAR) {
+    scalar_derivative_weight = alloc_vecd(num_train);
+    scalar_derivative_mask = (int *)calloc(
+      (size_t)MAX(1, num_reg_continuous_extern +
+                     num_reg_unordered_extern + num_reg_ordered_extern),
+      sizeof(int));
+    if(scalar_derivative_mask != NULL)
+      scalar_derivative_mask[statistic_coordinate] = 1;
+  }
   if(row == NULL || base_fit == NULL || statistic_sum == NULL)
+    goto cleanup_sigtest_iid;
+  if(statistic_mode == NP_NPSIGTEST_STAT_CONTINUOUS &&
+     np_lp_engine_extern == NP_LP_ENGINE_SCALAR &&
+     (scalar_derivative_weight == NULL || scalar_derivative_mask == NULL))
     goto cleanup_sigtest_iid;
 
   if(statistic_mode != NP_NPSIGTEST_STAT_CONTINUOUS) {
@@ -30572,7 +30649,8 @@ int np_regression_lp_sigtest_iid(
 
       if(np_npsigtest_fixed_influence_row(
            &xctx, &lp_workspace, eval_idx, -1, statistic_mode,
-           statistic_coordinate, 0, eval_basis, row) != 0)
+           statistic_coordinate, 0, scalar_derivative_weight,
+           scalar_derivative_mask, eval_basis, row) != 0)
         goto cleanup_sigtest_iid;
       for(rhs = 0; rhs < n_rhs; ++rhs) {
         double fit = 0.0;
@@ -30598,7 +30676,8 @@ int np_regression_lp_sigtest_iid(
       }
       if(np_npsigtest_fixed_influence_row(
            &xctx, &lp_workspace, eval_idx, -1, statistic_mode,
-           statistic_coordinate, 1, eval_basis, row) != 0)
+           statistic_coordinate, 1, scalar_derivative_weight,
+           scalar_derivative_mask, eval_basis, row) != 0)
         goto cleanup_sigtest_iid;
       for(rhs = 0; rhs < n_rhs; ++rhs) {
         double alternate_fit = 0.0;
@@ -30636,6 +30715,7 @@ int np_regression_lp_sigtest_iid(
     for(eval_idx = 0; eval_idx < num_train; ++eval_idx) {
       if(np_npsigtest_fixed_influence_row(
            &xctx, &lp_workspace, eval_idx, -1, 0, 0, 0,
+           scalar_derivative_weight, scalar_derivative_mask,
            eval_basis, row) != 0)
         goto cleanup_sigtest_iid;
       for(rhs = 0; rhs < n_rhs; ++rhs) {
@@ -30668,7 +30748,8 @@ int np_regression_lp_sigtest_iid(
     for(eval_idx = 0; eval_idx < num_train; ++eval_idx) {
       if(np_npsigtest_fixed_influence_row(
            &xctx, &lp_workspace, eval_idx, statistic_coordinate,
-           0, 0, 0, eval_basis, row) != 0)
+           0, 0, 0, scalar_derivative_weight,
+           scalar_derivative_mask, eval_basis, row) != 0)
         goto cleanup_sigtest_iid;
       for(rhs = 0; rhs < n_rhs; ++rhs) {
         double gradient = 0.0;
@@ -30727,10 +30808,12 @@ cleanup_sigtest_iid:
   np_conditional_xrow_ctx_clear(&xctx);
   np_reghat_lp_workspace_clear(&lp_workspace);
   free(row);
+  free(scalar_derivative_weight);
   free(residual_tile);
   free(eval_basis);
   free(base_fit);
   free(residual_scale);
+  free(scalar_derivative_mask);
   free(statistic_sum);
   return status;
 }
