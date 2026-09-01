@@ -338,6 +338,20 @@ npsigtest.rbandwidth <- function(bws,
     extra.args = extra.args
   )
 
+  tested.names <- names(xdat)[index]
+  missing.names <- is.na(tested.names) | !nzchar(tested.names)
+  tested.names[missing.names] <- paste("variable", index[missing.names])
+  progress <- .np_progress_begin(
+    if (joint) "Testing joint significance" else paste("Testing", tested.names[[1L]]),
+    surface = "bootstrap"
+  )
+  progress <- .np_progress_show_now(progress)
+  progress.active <- TRUE
+  on.exit({
+    if (isTRUE(progress.active))
+      .np_progress_abort(progress)
+  }, add = TRUE)
+
   ## Save seed prior to setting.  The computational owner is selected before
   ## this boundary so unsupported calls enter the incumbent without RNG work.
 
@@ -454,8 +468,6 @@ npsigtest.rbandwidth <- function(bws,
     if(boot.type=="II")
       bws.boot.prev <- bws.original
 
-    progress <- .np_progress_begin("Testing joint significance", total = boot.num, surface = "bootstrap")
-
     for (i.star in seq_len(boot.num)) {
       if(boot.method == "iid") {
 
@@ -558,8 +570,6 @@ npsigtest.rbandwidth <- function(bws,
       progress <- .np_progress_step(progress, done = i.star)
     }
 
-    progress <- .np_progress_end(progress)
-
     ## Compute the P-value
 
     P <- .np_npsig_upper_tail_p(In.vec, In)
@@ -581,6 +591,7 @@ npsigtest.rbandwidth <- function(bws,
       ## Increment counter...
       
       ii <- ii + 1
+      progress$label <- paste("Testing", tested.names[[ii]])
       pivot.use <- pivot.plan$effective[[ii]]
       
       if(boot.type=="II") {
@@ -651,12 +662,6 @@ npsigtest.rbandwidth <- function(bws,
       
       if(boot.type=="II")
         bws.boot.prev <- bws.original
-
-      progress <- .np_progress_begin(
-        sprintf("Testing variable %s of (%s)", i, paste(index, collapse = ",")),
-        total = boot.num,
-        surface = "bootstrap"
-      )
 
       if (streamed.iid) {
         tile.width <- 8L
@@ -785,8 +790,6 @@ npsigtest.rbandwidth <- function(bws,
 
       }
 
-      progress <- .np_progress_end(progress)
-      
       ## Compute the P-value
       
       P[ii] <- .np_npsig_upper_tail_p(In.vec, In[ii])
@@ -796,6 +799,9 @@ npsigtest.rbandwidth <- function(bws,
     }
     
   } ## End invididual test
+
+  progress <- .np_progress_end(progress)
+  progress.active <- FALSE
 
   ## Return a list containing the statistic and its P-value
   ## bootstrapped In.vec for each variable...

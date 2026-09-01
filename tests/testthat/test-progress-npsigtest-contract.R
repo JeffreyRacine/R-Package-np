@@ -9,9 +9,10 @@ progress_time_counter <- function(start = 0, by = 0.6) {
 shadow_npsigtest_signature <- function(shadow) {
   lines <- vapply(shadow$trace, `[[`, character(1L), "line")
   events <- vapply(shadow$trace, `[[`, character(1L), "event")
-  keep <- grepl("^\\[np\\] Testing (joint significance|variable )", lines)
+  keep <- grepl("^\\[np\\] Testing ", lines)
 
   data.frame(
+    id = vapply(shadow$trace, `[[`, character(1L), "id")[keep],
     event = events[keep],
     line = lines[keep],
     stringsAsFactors = FALSE
@@ -39,7 +40,7 @@ make_sigtest_fixture <- function(seed = 42, n = 30) {
   list(bw = bw)
 }
 
-test_that("npsigtest joint single-line bootstrap progress matches legacy semantics", {
+test_that("npsigtest joint progress has one immediate call-wide owner", {
   fixture <- make_sigtest_fixture()
 
   old_opts <- options(
@@ -61,14 +62,17 @@ test_that("npsigtest joint single-line bootstrap progress matches legacy semanti
   )
 
   lines <- shadow_lines(single_line)
+  legacy.signature <- shadow_npsigtest_signature(legacy)
+  single.signature <- shadow_npsigtest_signature(single_line)
 
   expect_s3_class(single_line$value, "sigtest")
-  expect_equal(shadow_npsigtest_signature(single_line), shadow_npsigtest_signature(legacy))
-  expect_true(any(grepl("^\\[np\\] Testing joint significance [0-9]+/9 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
-  expect_true(any(grepl("^\\[np\\] Testing joint significance 9/9 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_equal(single.signature[single.signature$event != "finish", ], legacy.signature)
+  expect_match(lines[[1L]], "^\\[np\\] Testing joint significance\\.\\.\\. elapsed 0\\.0s$")
+  expect_length(unique(single.signature$id), 1L)
+  expect_identical(tail(single.signature$event, 1L), "finish")
 })
 
-test_that("npsigtest individual single-line bootstrap progress matches legacy semantics", {
+test_that("npsigtest individual progress has one compact call-wide owner", {
   fixture <- make_sigtest_fixture(seed = 99)
 
   old_opts <- options(
@@ -90,13 +94,16 @@ test_that("npsigtest individual single-line bootstrap progress matches legacy se
   )
 
   lines <- shadow_lines(single_line)
+  legacy.signature <- shadow_npsigtest_signature(legacy)
+  single.signature <- shadow_npsigtest_signature(single_line)
 
   expect_s3_class(single_line$value, "sigtest")
-  expect_equal(shadow_npsigtest_signature(single_line), shadow_npsigtest_signature(legacy))
-  expect_true(any(grepl("^\\[np\\] Testing variable 1 of \\(1,2\\) [0-9]+/9 ", lines)))
-  expect_true(any(grepl("^\\[np\\] Testing variable 2 of \\(1,2\\) [0-9]+/9 ", lines)))
-  expect_true(any(grepl("^\\[np\\] Testing variable 1 of \\(1,2\\) 9/9 ", lines)))
-  expect_true(any(grepl("^\\[np\\] Testing variable 2 of \\(1,2\\) 9/9 ", lines)))
+  expect_equal(single.signature[single.signature$event != "finish", ], legacy.signature)
+  expect_match(lines[[1L]], "^\\[np\\] Testing x1\\.\\.\\. elapsed 0\\.0s$")
+  expect_true(any(grepl("^\\[np\\] Testing x2", lines)))
+  expect_false(any(grepl("of \\(1,2\\)", lines)))
+  expect_length(unique(single.signature$id), 1L)
+  expect_identical(tail(single.signature$event, 1L), "finish")
 })
 
 test_that("npsigtest progress respects np.messages FALSE", {
