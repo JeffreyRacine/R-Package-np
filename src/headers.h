@@ -251,6 +251,8 @@ double standerrd(int n, double *vector);
 
 int compute_nn_distance(int num_obs, int suppress_parallel, double *vector_data, int int_k_nn, double *nn_distance);
 int compute_nn_distance_train_eval(int num_obs_train, int num_obs_eval, int suppress_parallel, double *vector_data_train, double *vector_data_eval, int int_k_nn, double *nn_distance);
+NPNNGeometryStatus compute_nn_distance_status(int num_obs, int suppress_parallel, double *vector_data, int int_k_nn, double *nn_distance);
+NPNNGeometryStatus compute_nn_distance_train_eval_status(int num_obs_train, int num_obs_eval, int suppress_parallel, double *vector_data_train, double *vector_data_eval, int int_k_nn, double *nn_distance);
 NPNNGeometryStatus compute_nn_distance_train_eval_ctx(int num_obs_train, int num_obs_eval, int suppress_parallel, const double *vector_data_train, const double *vector_data_eval, int int_k_nn, const NPNNGeometryContext *geometry_context, double *nn_distance);
 NPNNGeometryStatus compute_nn_adaptive_distance_pair(int num_obs, const double *vector_data, int int_k_nn, double *primary_distance, double *successor_distance);
 NPNNGeometryStatus np_nn_adaptive_fold_select_row(int num_obs, int num_cont, double **matrix_train, double **primary_bandwidth, double **successor_bandwidth, const double *fold_scale, int held_out, double **selected_bandwidth);
@@ -281,7 +283,7 @@ int initialize_nr_directions(int BANDWIDTH,int num_obs,int num_reg_continuous,in
 int kernel_bandwidth(int KERNEL, int BANDWIDTH, int num_obs_train, int num_obs_eval, int num_var_cont, int num_var_un, int num_var_or, int num_reg_cont, int num_reg_un, int num_reg_or, double *vector_scale_factor, double **matrix_Y_train, double **matrix_Y_eval, double **matrix_X_train, double **matrix_X_eval, double **matrix_bandwidth_Y, double **matrix_bandwidth_X, double *vector_lambda, double **matrix_bandwidth_deriv);
 int kernel_bandwidth_ctx(int KERNEL, int BANDWIDTH, int num_obs_train, int num_obs_eval, int num_var_cont, int num_var_un, int num_var_or, int num_reg_cont, int num_reg_un, int num_reg_or, double *vector_scale_factor, double **matrix_Y_train, double **matrix_Y_eval, double **matrix_X_train, double **matrix_X_eval, double **matrix_bandwidth_Y, double **matrix_bandwidth_X, double *vector_lambda, double **matrix_bandwidth_deriv, const NPNNGeometryContext *x_geometry_context, const NPNNGeometryContext *y_geometry_context, NPNNGeometryStatus *geometry_status);
 
-int np_kernel_bandwidth_continuous_nn(int BANDWIDTH, int num_obs_train, int num_obs_eval, int num_cont, int suppress_parallel, double *vector_scale_factor, double **matrix_train, double **matrix_eval, double **matrix_bandwidth);
+int np_kernel_bandwidth_continuous_nn(int BANDWIDTH, int num_obs_train, int num_obs_eval, int num_cont, int suppress_parallel, double *vector_scale_factor, double **matrix_train, double **matrix_eval, double **matrix_bandwidth, NPNNGeometryStatus *geometry_status);
 int kernel_bandwidth_mean(int KERNEL, int BANDWIDTH, int num_obs_train, int num_obs_eval, int num_var_cont, int num_var_un, int num_var_or, int num_reg_cont, int num_reg_un, int num_reg_or, int suppress_parallel, double *vector_scale_factor, double **matrix_Y_train, double **matrix_Y_eval, double **matrix_X_train, double **matrix_X_eval, double **matrix_bandwidth_Y, double **matrix_bandwidth_X, double *vector_lambda);
 int kernel_bandwidth_mean_ctx(int KERNEL, int BANDWIDTH, int num_obs_train, int num_obs_eval, int num_var_cont, int num_var_un, int num_var_or, int num_reg_cont, int num_reg_un, int num_reg_or, int suppress_parallel, double *vector_scale_factor, double **matrix_Y_train, double **matrix_Y_eval, double **matrix_X_train, double **matrix_X_eval, double **matrix_bandwidth_Y, double **matrix_bandwidth_X, double *vector_lambda, const NPNNGeometryContext *x_geometry_context, const NPNNGeometryContext *y_geometry_context, NPNNGeometryStatus *geometry_status);
 
@@ -1037,6 +1039,7 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 4, 8, 12 };
 #define KWSNP_ERR_NOEVAL 1
 #define KWSNP_ERR_BADBW 2
 #define KWSNP_ERR_BADINVOC 3
+#define KWSNP_ERR_ZERO_NN_RADIUS 4
 
 #define UKERNEL_UAA 0
 #define UKERNEL_ULIR 1

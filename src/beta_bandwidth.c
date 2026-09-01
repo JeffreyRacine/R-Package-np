@@ -16,6 +16,8 @@ const char *np_beta_bandwidth_prepare_status_message(
     return "invalid beta nearest-neighbor bandwidth layout";
   case NP_BETA_BANDWIDTH_PREPARE_ERR_DISTANCE:
     return "invalid beta nearest-neighbor bandwidth or distance neighborhood";
+  case NP_BETA_BANDWIDTH_PREPARE_ERR_ZERO_RADIUS:
+    return "beta nearest-neighbor bandwidth has a zero literal radius";
   default:
     return "unknown beta nearest-neighbor bandwidth status";
   }
@@ -39,6 +41,7 @@ np_beta_bandwidth_prepare_matrix(
 {
   int status = 0;
   int dimension;
+  NPNNGeometryStatus geometry_status = NP_NN_GEOMETRY_OK;
 
   if((bandwidth_mode != NP_BETA_BANDWIDTH_GENERALIZED_NN &&
       bandwidth_mode != NP_BETA_BANDWIDTH_ADAPTIVE_NN) ||
@@ -64,7 +67,7 @@ np_beta_bandwidth_prepare_matrix(
       num_train, num_train, num_continuous, suppress_parallel,
       (double *)nearest_neighbor,
       (double **)train_continuous, (double **)train_continuous,
-      bandwidth_train);
+      bandwidth_train, &geometry_status);
 
   if(status == 0 && need_eval) {
     if(bandwidth_mode == NP_BETA_BANDWIDTH_ADAPTIVE_NN && train_is_eval) {
@@ -80,11 +83,14 @@ np_beta_bandwidth_prepare_matrix(
         BW_GEN_NN, num_train, num_eval, num_continuous, suppress_parallel,
         (double *)nearest_neighbor,
         (double **)train_continuous, (double **)eval_continuous,
-        bandwidth_eval);
+        bandwidth_eval, &geometry_status);
     }
   }
 
-  return status == 0 ? NP_BETA_BANDWIDTH_PREPARE_OK :
+  if(status == 0)
+    return NP_BETA_BANDWIDTH_PREPARE_OK;
+  return geometry_status == NP_NN_GEOMETRY_ZERO_RADIUS ?
+    NP_BETA_BANDWIDTH_PREPARE_ERR_ZERO_RADIUS :
     NP_BETA_BANDWIDTH_PREPARE_ERR_DISTANCE;
 }
 

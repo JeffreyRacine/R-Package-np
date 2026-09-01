@@ -560,87 +560,82 @@ static int kth_observation_radius_sorted_generalized(const double *sorted,
   return 1;
 }
 
-static int kth_observation_radius_for_eval_sorted(const double *sorted,
-                                                  int n,
-                                                  double eval_value,
-                                                  int int_k_nn,
-                                                  double *radius_out)
+static NPNNGeometryStatus
+kth_observation_radius_for_eval_sorted(const double *sorted,
+                                       int n,
+                                       double eval_value,
+                                       int int_k_nn,
+                                       double *radius_out)
 {
   const int split = lower_bound_observation_support(n, sorted, eval_value);
-  double nearest;
-  int status;
-
-  if (split < n && sorted[split] == eval_value) {
-    const int stop = upper_bound_observation_support(n, sorted, eval_value);
-    const double dleft = (split > 0) ? eval_value - sorted[split - 1] : DBL_MAX;
-    const double dright = (stop < n) ? sorted[stop] - eval_value : DBL_MAX;
-    nearest = (dleft < dright) ? dleft : dright;
-  } else {
-    const double dleft = (split > 0) ? eval_value - sorted[split - 1] : DBL_MAX;
-    const double dright = (split < n) ? sorted[split] - eval_value : DBL_MAX;
-    nearest = (dleft < dright) ? dleft : dright;
-  }
-  if (nearest <= DBL_MIN)
-    return 1;
-
-  status = kth_observation_radius_sorted_generalized(
-    sorted, n, split, eval_value, int_k_nn, radius_out);
-  /* Preserve the incumbent nearest-positive rule when duplicate mass fills k. */
-  if (status == 0 && *radius_out <= DBL_MIN)
-    *radius_out = nearest;
-  if (status == 0 && !isfinite(*radius_out))
-    return 1;
-  return status;
+  if (kth_observation_radius_sorted_generalized(
+        sorted, n, split, eval_value, int_k_nn, radius_out) != 0)
+    return NP_NN_GEOMETRY_INVALID_ARGUMENT;
+  if (!isfinite(*radius_out))
+    return NP_NN_GEOMETRY_NONFINITE_RADIUS;
+  if (*radius_out == 0.0)
+    return NP_NN_GEOMETRY_ZERO_RADIUS;
+  if (*radius_out < 0.0)
+    return NP_NN_GEOMETRY_INVALID_ARGUMENT;
+  return NP_NN_GEOMETRY_OK;
 }
 
-static int compute_nn_distance_observation_support_subset(int num_obs,
-                                                          double *vector_data,
-                                                          int int_k_nn,
-                                                          int query_start,
-                                                          int query_end,
-                                                          double *nn_distance)
+static NPNNGeometryStatus
+compute_nn_distance_observation_support_subset(int num_obs,
+                                               double *vector_data,
+                                               int int_k_nn,
+                                               int query_start,
+                                               int query_end,
+                                               double *nn_distance)
 {
   int i, j, start;
   double *sorted = NULL;
   double *sorted_radius = NULL;
 
+  if (num_obs <= 0 || vector_data == NULL || nn_distance == NULL ||
+      query_start < 0 || query_end >= num_obs)
+    return NP_NN_GEOMETRY_INVALID_ARGUMENT;
   if (query_start > query_end)
-    return 0;
-
-  if ((query_start < 0) || (query_end >= num_obs))
-    return 1;
+    return NP_NN_GEOMETRY_OK;
+  for (i = 0; i < num_obs; ++i)
+    if (!isfinite(vector_data[i]))
+      return NP_NN_GEOMETRY_NONFINITE_RADIUS;
 
   if (build_sorted_observation_support(num_obs, vector_data, &sorted) != 0)
-    return 1;
+    return NP_NN_GEOMETRY_ALLOCATION_FAILURE;
 
   if ((int_k_nn < 1) || (int_k_nn > num_obs - 1)) {
     free(sorted);
-    return 1;
+    return NP_NN_GEOMETRY_INVALID_ARGUMENT;
   }
 
   sorted_radius = alloc_vecd(num_obs);
   start = 0;
   while (start < num_obs) {
     const int stop = upper_bound_observation_support(num_obs, sorted, sorted[start]);
-    const double dleft = (start > 0) ? sorted[start] - sorted[start - 1] : DBL_MAX;
-    const double dright = (stop < num_obs) ? sorted[stop] - sorted[start] : DBL_MAX;
-    const double nearest = (dleft < dright) ? dleft : dright;
     double radius;
 
-    if (nearest <= DBL_MIN ||
-        kth_observation_radius_sorted_adaptive(
+    if (kth_observation_radius_sorted_adaptive(
           sorted, num_obs, start, int_k_nn, &radius) != 0) {
       free(sorted);
       free(sorted_radius);
-      return 1;
+      return NP_NN_GEOMETRY_INVALID_ARGUMENT;
     }
     /* All observations in a duplicate block have the same self-excluded radius. */
-    if (radius <= DBL_MIN)
-      radius = nearest;
     if (!isfinite(radius)) {
       free(sorted);
       free(sorted_radius);
-      return 1;
+      return NP_NN_GEOMETRY_NONFINITE_RADIUS;
+    }
+    if (radius == 0.0) {
+      free(sorted);
+      free(sorted_radius);
+      return NP_NN_GEOMETRY_ZERO_RADIUS;
+    }
+    if (radius < 0.0) {
+      free(sorted);
+      free(sorted_radius);
+      return NP_NN_GEOMETRY_INVALID_ARGUMENT;
     }
     for (i = start; i < stop; i++)
       sorted_radius[i] = radius;
@@ -653,21 +648,28 @@ static int compute_nn_distance_observation_support_subset(int num_obs,
     if (idx >= num_obs || sorted[idx] != vector_data[i]) {
       free(sorted);
       free(sorted_radius);
-      return 1;
+      return NP_NN_GEOMETRY_INVALID_ARGUMENT;
     }
 
     nn_distance[j] = sorted_radius[idx];
-    if (nn_distance[j] <= DBL_MIN) {
+    if (nn_distance[j] == 0.0) {
       free(sorted);
       free(sorted_radius);
-      return 1;
+      return NP_NN_GEOMETRY_ZERO_RADIUS;
+    }
+    if (nn_distance[j] < 0.0 || !isfinite(nn_distance[j])) {
+      const NPNNGeometryStatus status = !isfinite(nn_distance[j]) ?
+        NP_NN_GEOMETRY_NONFINITE_RADIUS : NP_NN_GEOMETRY_INVALID_ARGUMENT;
+      free(sorted);
+      free(sorted_radius);
+      return status;
     }
   }
 
   free(sorted);
   free(sorted_radius);
 
-  return 0;
+  return NP_NN_GEOMETRY_OK;
 }
 
 /*
@@ -813,43 +815,55 @@ NPNNGeometryStatus np_nn_adaptive_fold_select_row(
   return NP_NN_GEOMETRY_OK;
 }
 
-static int compute_nn_distance_train_eval_observation_support_subset(int num_obs_train,
-                                                                     int num_obs_eval,
-                                                                     double *vector_data_train,
-                                                                     double *vector_data_eval,
-                                                                     int int_k_nn,
-                                                                     int query_start,
-                                                                     int query_end,
-                                                                     double *nn_distance)
+static NPNNGeometryStatus
+compute_nn_distance_train_eval_observation_support_subset(
+  int num_obs_train,
+  int num_obs_eval,
+  double *vector_data_train,
+  double *vector_data_eval,
+  int int_k_nn,
+  int query_start,
+  int query_end,
+  double *nn_distance)
 {
   int i, j;
   double *sorted = NULL;
 
+  if (num_obs_train <= 0 || num_obs_eval <= 0 ||
+      vector_data_train == NULL || vector_data_eval == NULL ||
+      nn_distance == NULL || query_start < 0 || query_end >= num_obs_eval)
+    return NP_NN_GEOMETRY_INVALID_ARGUMENT;
   if (query_start > query_end)
-    return 0;
-
-  if ((query_start < 0) || (query_end >= num_obs_eval))
-    return 1;
+    return NP_NN_GEOMETRY_OK;
+  for (i = 0; i < num_obs_train; ++i)
+    if (!isfinite(vector_data_train[i]))
+      return NP_NN_GEOMETRY_NONFINITE_RADIUS;
 
   if (build_sorted_observation_support(num_obs_train, vector_data_train, &sorted) != 0)
-    return 1;
+    return NP_NN_GEOMETRY_ALLOCATION_FAILURE;
 
   if ((int_k_nn < 1) || (int_k_nn > num_obs_train - 1)) {
     free(sorted);
-    return 1;
+    return NP_NN_GEOMETRY_INVALID_ARGUMENT;
   }
 
   for (i = query_start, j = 0; i <= query_end; i++, j++) {
-    if (kth_observation_radius_for_eval_sorted(
-          sorted, num_obs_train, vector_data_eval[i], int_k_nn, &nn_distance[j]
-        ) != 0) {
+    NPNNGeometryStatus status;
+
+    if (!isfinite(vector_data_eval[i])) {
       free(sorted);
-      return 1;
+      return NP_NN_GEOMETRY_NONFINITE_RADIUS;
+    }
+    status = kth_observation_radius_for_eval_sorted(
+      sorted, num_obs_train, vector_data_eval[i], int_k_nn, &nn_distance[j]);
+    if (status != NP_NN_GEOMETRY_OK) {
+      free(sorted);
+      return status;
     }
   }
 
   free(sorted);
-  return 0;
+  return NP_NN_GEOMETRY_OK;
 }
 
 /*
@@ -1083,9 +1097,13 @@ compute_nn_distance_train_eval_context_subset(
       free(sorted);
       return NP_NN_GEOMETRY_NONFINITE_RADIUS;
     }
-    if(radius <= 0.0) {
+    if(radius == 0.0) {
       free(sorted);
       return NP_NN_GEOMETRY_ZERO_RADIUS;
+    }
+    if(radius < 0.0) {
+      free(sorted);
+      return NP_NN_GEOMETRY_INVALID_ARGUMENT;
     }
     nn_distance[j] = radius;
   }
@@ -1098,16 +1116,20 @@ compute_nn_distance_train_eval_context_subset(
 /* Returns 0 upon success, 1 upon failure (constant most likely) */
 
 
-int compute_nn_distance(int num_obs, int suppress_parallel, double *vector_data,
-int int_k_nn, double *nn_distance)
+NPNNGeometryStatus compute_nn_distance_status(
+  int num_obs,
+  int suppress_parallel,
+  double *vector_data,
+  int int_k_nn,
+  double *nn_distance)
 {
 
 #ifdef MPI2
     int stride = 0;
-    int return_flag = 0;
-    int return_flag_MPI = 0;
+    int global_status = NP_NN_GEOMETRY_OK;
+    int local_status = NP_NN_GEOMETRY_OK;
     if(!np_int_ceil_div_nonnegative(num_obs, iNum_Processors, &stride))
-      return 1;
+      return NP_NN_GEOMETRY_INVALID_ARGUMENT;
     if(stride < 1)
       stride = 1;
 
@@ -1122,10 +1144,11 @@ int int_k_nn, double *nn_distance)
         {
 					REprintf("\n** Error: Invalid Kth nearest neighbor (%d).", int_k_nn);
         }
-			return(1);
+			return NP_NN_GEOMETRY_INVALID_ARGUMENT;
     }
 
-    return(compute_nn_distance_observation_support_subset(num_obs, vector_data, int_k_nn, 0, num_obs - 1, nn_distance));
+    return compute_nn_distance_observation_support_subset(
+      num_obs, vector_data, int_k_nn, 0, num_obs - 1, nn_distance);
 
 #endif
 
@@ -1140,7 +1163,7 @@ int int_k_nn, double *nn_distance)
                 REprintf("\n** Error: Invalid Kth nearest neighbor (%d).", int_k_nn);
             }
         }
-        return(1);
+        return NP_NN_GEOMETRY_INVALID_ARGUMENT;
     }
 
 
@@ -1153,48 +1176,57 @@ int int_k_nn, double *nn_distance)
       ie = num_obs - 1;
     }
 
-    if (compute_nn_distance_observation_support_subset(num_obs, vector_data, int_k_nn, is, ie, nn_distance) != 0)
-        return_flag_MPI = 1;
+    local_status = (int)compute_nn_distance_observation_support_subset(
+      num_obs, vector_data, int_k_nn, is, ie, nn_distance);
 
     if(suppress_parallel){
-      return_flag = return_flag_MPI;
+      global_status = local_status;
     } else {
-      MPI_Reduce(&return_flag_MPI, &return_flag, 1, MPI_INT, MPI_SUM, 0, comm[1]);
-      MPI_Bcast(&return_flag, 1, MPI_INT, 0, comm[1]);
+      MPI_Reduce(&local_status, &global_status, 1, MPI_INT, MPI_MAX, 0, comm[1]);
+      MPI_Bcast(&global_status, 1, MPI_INT, 0, comm[1]);
     }
 
-		if(return_flag > 0) {
-			return(1);
+		if(global_status != NP_NN_GEOMETRY_OK) {
+			return (NPNNGeometryStatus)global_status;
 		}
 
 	    if(!suppress_parallel){
 	      if (mpi_gatherv_nn_distance_exact(num_obs, stride, nn_distance) != 0)
-	        return(1);
+	        return NP_NN_GEOMETRY_INVALID_ARGUMENT;
 	      MPI_Bcast(nn_distance, num_obs, MPI_DOUBLE, 0, comm[1]);
 	    }
 #endif
 
-    return(0);
+    return NP_NN_GEOMETRY_OK;
 
 }
 
+int compute_nn_distance(int num_obs, int suppress_parallel, double *vector_data,
+                        int int_k_nn, double *nn_distance)
+{
+  return compute_nn_distance_status(
+    num_obs, suppress_parallel, vector_data, int_k_nn, nn_distance) ==
+    NP_NN_GEOMETRY_OK ? 0 : 1;
+}
 
-int compute_nn_distance_train_eval(int num_obs_train,
-                                   int num_obs_eval,
-                                   int suppress_parallel,
-                                   double *vector_data_train,
-                                   double *vector_data_eval,
-                                   int int_k_nn,
-                                   double *nn_distance){
+NPNNGeometryStatus compute_nn_distance_train_eval_status(
+  int num_obs_train,
+  int num_obs_eval,
+  int suppress_parallel,
+  double *vector_data_train,
+  double *vector_data_eval,
+  int int_k_nn,
+  double *nn_distance)
+{
 
 #ifdef MPI2
     int stride = 0;
-    int return_flag = 0;
-    int return_flag_MPI = 0;
+    int global_status = NP_NN_GEOMETRY_OK;
+    int local_status = NP_NN_GEOMETRY_OK;
     if(!np_int_ceil_div_nonnegative(num_obs_eval,
                                     iNum_Processors,
                                     &stride))
-      return 1;
+      return NP_NN_GEOMETRY_INVALID_ARGUMENT;
     if(stride < 1)
       stride = 1;
     int is, ie;
@@ -1214,11 +1246,11 @@ int compute_nn_distance_train_eval(int num_obs_train,
 #endif
 
         }
-        return(1);
+        return NP_NN_GEOMETRY_INVALID_ARGUMENT;
     }
 
 #ifndef MPI2
-    return(compute_nn_distance_train_eval_observation_support_subset(
+    return compute_nn_distance_train_eval_observation_support_subset(
       num_obs_train,
       num_obs_eval,
       vector_data_train,
@@ -1227,7 +1259,7 @@ int compute_nn_distance_train_eval(int num_obs_train,
       0,
       num_obs_eval - 1,
       nn_distance
-    ));
+    );
 
 #endif
 
@@ -1241,7 +1273,7 @@ int compute_nn_distance_train_eval(int num_obs_train,
       ie = num_obs_eval - 1;
     }
 
-    if (compute_nn_distance_train_eval_observation_support_subset(
+    local_status = (int)compute_nn_distance_train_eval_observation_support_subset(
           num_obs_train,
           num_obs_eval,
           vector_data_train,
@@ -1250,28 +1282,41 @@ int compute_nn_distance_train_eval(int num_obs_train,
           is,
           ie,
           nn_distance
-        ) != 0)
-      return_flag_MPI = 1;
+        );
 
     if(suppress_parallel){
-      return_flag = return_flag_MPI;
+      global_status = local_status;
     } else {
-      MPI_Reduce(&return_flag_MPI, &return_flag, 1, MPI_INT, MPI_SUM, 0, comm[1]);
-      MPI_Bcast(&return_flag, 1, MPI_INT, 0, comm[1]);
+      MPI_Reduce(&local_status, &global_status, 1, MPI_INT, MPI_MAX, 0, comm[1]);
+      MPI_Bcast(&global_status, 1, MPI_INT, 0, comm[1]);
     }
-		if(return_flag > 0) {
-			return(1);
+		if(global_status != NP_NN_GEOMETRY_OK) {
+			return (NPNNGeometryStatus)global_status;
 		}
 
 	    if(!suppress_parallel){
 	      if (mpi_gatherv_nn_distance_exact(num_obs_eval, stride, nn_distance) != 0)
-	        return(1);
+	        return NP_NN_GEOMETRY_INVALID_ARGUMENT;
 	      MPI_Bcast(nn_distance, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
 	    }
 #endif
 
-    return(0);
+    return NP_NN_GEOMETRY_OK;
 
+}
+
+int compute_nn_distance_train_eval(int num_obs_train,
+                                   int num_obs_eval,
+                                   int suppress_parallel,
+                                   double *vector_data_train,
+                                   double *vector_data_eval,
+                                   int int_k_nn,
+                                   double *nn_distance)
+{
+  return compute_nn_distance_train_eval_status(
+    num_obs_train, num_obs_eval, suppress_parallel,
+    vector_data_train, vector_data_eval, int_k_nn, nn_distance) ==
+    NP_NN_GEOMETRY_OK ? 0 : 1;
 }
 
 NPNNGeometryStatus compute_nn_distance_train_eval_ctx(
