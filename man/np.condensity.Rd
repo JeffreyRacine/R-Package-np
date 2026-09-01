@@ -326,7 +326,13 @@ Further arguments are passed to \code{\link{npcdensbw}} when bandwidths are comp
     continuous-coordinate derivative standard errors are currently
     returned as \code{NA}; bootstrap inference is preferred for those
     targets. }
-  \item{log_likelihood}{ log likelihood of the conditional density estimate }
+  \item{log_likelihood}{ aggregate fitted conditional-density log likelihood.
+    Every represented strictly positive estimate, including a positive
+    subnormal value, contributes its literal logarithm. An exact zero or
+    negative estimate has no mathematical logarithm and is represented in this
+    aggregate by the established computational placeholder
+    \eqn{\log(\texttt{DBL_MIN})}{log(DBL_MIN)}. Consequently this component is
+    not a literal log likelihood if any fitted density is nonpositive. }
 
 }
 

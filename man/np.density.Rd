@@ -221,7 +221,13 @@ Further arguments are passed to \code{\link{npudensbw}} when bandwidths are comp
   \item{eval}{ the evaluation points. }
   \item{dens}{ estimation of the density at the evaluation points }
   \item{derr}{ standard errors of the density estimates }
-  \item{log_likelihood}{ log likelihood of the density estimates }
+  \item{log_likelihood}{ aggregate fitted-density log likelihood. Every
+    represented strictly positive density estimate, including a positive
+    subnormal value, contributes its literal logarithm. An exact zero or
+    negative density estimate has no mathematical logarithm and is represented
+    in this aggregate by the established computational placeholder
+    \eqn{\log(\texttt{DBL_MIN})}{log(DBL_MIN)}. Consequently this component
+    is not a literal log likelihood if any fitted density is nonpositive. }
 
 }
 \section{Book And Method Pointers}{
