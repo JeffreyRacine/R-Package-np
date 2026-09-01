@@ -75,27 +75,27 @@ test_that("npsigtest public pivot modes agree under MPI autodispatch", {
     regtype = "ll"
   )
 
-  categorical.auto <- npsigtest(bw, boot.num = 9, index = 1L, random.seed = 81)
+  categorical.auto <- npsigtest(bw, B = 9, index = 1L, random.seed = 81)
   categorical.raw <- npsigtest(
-    bw, boot.num = 9, index = 1L, pivot = FALSE, random.seed = 81
+    bw, B = 9, index = 1L, pivot = FALSE, random.seed = 81
   )
   expect_identical(categorical.auto$In, categorical.raw$In)
   expect_identical(categorical.auto$In.bootstrap, categorical.raw$In.bootstrap)
   expect_identical(categorical.auto$pivot.effective, c(z = FALSE))
 
-  continuous.auto <- npsigtest(bw, boot.num = 9, index = 2L, random.seed = 82)
+  continuous.auto <- npsigtest(bw, B = 9, index = 2L, random.seed = 82)
   continuous.pivot <- npsigtest(
-    bw, boot.num = 9, index = 2L, pivot = TRUE, random.seed = 82
+    bw, B = 9, index = 2L, pivot = TRUE, random.seed = 82
   )
   expect_identical(continuous.auto$In, continuous.pivot$In)
   expect_identical(continuous.auto$In.bootstrap, continuous.pivot$In.bootstrap)
   expect_identical(continuous.auto$pivot.effective, c(x = TRUE))
 
   joint.auto <- npsigtest(
-    bw, boot.num = 9, index = 1:2, joint = TRUE, random.seed = 83
+    bw, B = 9, index = 1:2, joint = TRUE, random.seed = 83
   )
   joint.raw <- npsigtest(
-    bw, boot.num = 9, index = 1:2, joint = TRUE,
+    bw, B = 9, index = 1:2, joint = TRUE,
     pivot = FALSE, random.seed = 83
   )
   expect_identical(joint.auto$In, joint.raw$In)
@@ -103,7 +103,7 @@ test_that("npsigtest public pivot modes agree under MPI autodispatch", {
   expect_identical(joint.auto$pivot.effective, c(z = FALSE, x = FALSE))
 
   expect_error(
-    npsigtest(bw, boot.num = 9, index = 1L, pivot = TRUE),
+    npsigtest(bw, B = 9, index = 1L, pivot = TRUE),
     "published categorical test is unstandardized",
     fixed = TRUE
   )

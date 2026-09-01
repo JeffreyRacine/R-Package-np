@@ -7,11 +7,11 @@ with_mpi_pool <- function(code) {
 test_that("npsigtest maps to locked SPMD opcode", {
   opcode.fun <- getFromNamespace(".npRmpi_spmd_opcode_from_call", "npRmpi")
 
-  mc.base <- quote(npsigtest(bws = bw, boot.num = 9))
+  mc.base <- quote(npsigtest(bws = bw, B = 9))
   op.base <- opcode.fun(mc = mc.base, caller_env = environment())
   expect_identical(op.base, "autodispatch.npsigtest.core")
 
-  mc.form <- quote(npsigtest.formula(y ~ x1 + x2, data = d, boot.num = 9))
+  mc.form <- quote(npsigtest.formula(y ~ x1 + x2, data = d, B = 9))
   op.form <- opcode.fun(mc = mc.form, caller_env = environment())
   expect_identical(op.form, "autodispatch.npsigtest.core")
 })

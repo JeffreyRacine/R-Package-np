@@ -94,7 +94,7 @@ test_that("attach npsigtest npregression route remains valid under local regress
     "  mydat <- data.frame(z, x1, x2, y)",
     "  rm(z, x1, x2, y)",
     "  model <- npreg(y ~ z + x1 + x2, regtype='ll', bwmethod='cv.aic', data=mydat)",
-    "  out <- npsigtest(model, boot.num=9)",
+    "  out <- npsigtest(model, B=9)",
     "  stopifnot(inherits(out, 'sigtest'))",
     "  stopifnot(length(out$P) >= 1L)",
     "  cat('ATTACH_NPSIGTEST_OK\\n')",

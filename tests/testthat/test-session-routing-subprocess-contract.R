@@ -408,7 +408,7 @@ test_that("session npsigtest fast-fail contract completes in installed-build sub
       "y <- rnorm(n)",
       "d <- data.frame(y=y, x1=x1, x2=x2)",
       "bw <- npregbw(y~x1+x2, data=d, bws=c(0.2, 0.4), bandwidth.compute=FALSE)",
-      "err <- try(npsigtest(bws=bw, boot.num=9, random.seed=13, index=0), silent=TRUE)",
+      "err <- try(npsigtest(bws=bw, B=9, random.seed=13, index=0), silent=TRUE)",
       "stopifnot(inherits(err, 'try-error'))",
       "msg <- as.character(err)",
       "stopifnot(any(grepl('invalid index provided', msg, fixed=TRUE)))",

@@ -41,7 +41,7 @@ test_that("npsigtest reports a smoothed-out categorical point mass as nonrejecti
     bw,
     index = 2L,
     pivot = FALSE,
-    boot.num = 9L,
+    B = 9L,
     random.seed = 42L
   )
 

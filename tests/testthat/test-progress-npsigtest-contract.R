@@ -56,13 +56,13 @@ test_that("npsigtest joint progress has one immediate call-wide owner", {
   on.exit(options(old_opts), add = TRUE)
 
   legacy <- capture_progress_shadow_trace(
-    npsigtest_fun(bws = fixture$bw, boot.num = 9, joint = TRUE, index = 1),
+    npsigtest_fun(bws = fixture$bw, B = 9, joint = TRUE, index = 1),
     force_renderer = "legacy",
     now = progress_time_counter()
   )
 
   single_line <- capture_progress_shadow_trace(
-    npsigtest_fun(bws = fixture$bw, boot.num = 9, joint = TRUE, index = 1),
+    npsigtest_fun(bws = fixture$bw, B = 9, joint = TRUE, index = 1),
     force_renderer = "single_line",
     now = progress_time_counter()
   )
@@ -96,13 +96,13 @@ test_that("npsigtest individual progress uses completed predictors for ETA", {
   on.exit(options(old_opts), add = TRUE)
 
   legacy <- capture_progress_shadow_trace(
-    npsigtest_fun(bws = fixture$bw, boot.num = 9, joint = FALSE, index = c(1, 2)),
+    npsigtest_fun(bws = fixture$bw, B = 9, joint = FALSE, index = c(1, 2)),
     force_renderer = "legacy",
     now = progress_time_counter()
   )
 
   single_line <- capture_progress_shadow_trace(
-    npsigtest_fun(bws = fixture$bw, boot.num = 9, joint = FALSE, index = c(1, 2)),
+    npsigtest_fun(bws = fixture$bw, B = 9, joint = FALSE, index = c(1, 2)),
     force_renderer = "single_line",
     now = progress_time_counter()
   )
@@ -138,7 +138,7 @@ test_that("npsigtest progress respects np.messages FALSE", {
   on.exit(options(old_opts), add = TRUE)
 
   res <- capture_progress_shadow_trace(
-    npsigtest_fun(bws = fixture$bw, boot.num = 9, joint = TRUE, index = 1),
+    npsigtest_fun(bws = fixture$bw, B = 9, joint = TRUE, index = 1),
     now = progress_time_counter()
   )
 
@@ -157,7 +157,7 @@ test_that("npsigtest progress respects suppressMessages", {
   on.exit(options(old_opts), add = TRUE)
 
   res <- capture_progress_shadow_trace(
-    suppressMessages(npsigtest_fun(bws = fixture$bw, boot.num = 9, joint = TRUE, index = 1)),
+    suppressMessages(npsigtest_fun(bws = fixture$bw, B = 9, joint = TRUE, index = 1)),
     now = progress_time_counter()
   )
 

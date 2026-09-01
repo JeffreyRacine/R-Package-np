@@ -35,7 +35,7 @@ npsigtest(bws,
 \method{npsigtest}{rbandwidth}(bws,
           xdat = stop("data xdat missing"),
           ydat = stop("data ydat missing"),
-          boot.num = 399,
+          B = 399,
           boot.method = c("iid","wild","wild-rademacher","pairwise"),
           boot.type = c("I","II"),
           pivot=NULL,
@@ -101,7 +101,7 @@ These arguments control bootstrap execution, tested effects, and reproducibility
   }
 
 
-  \item{boot.num}{
+  \item{B}{
     an integer value specifying the number of bootstrap replications to
     use. Defaults to \code{399}.
   }
@@ -320,7 +320,7 @@ Further arguments are passed to the bandwidth-selection routines used by the tes
   intensive}. This can be frustrating for users possessing large
   datasets. For exploratory purposes, you may wish to override the
   default number of bootstrap replications, say, setting them to
-  \code{boot.num=99}. A version of this package using the \code{Rmpi}
+  \code{B=99}. A version of this package using the \code{Rmpi}
   wrapper is under development that allows one to deploy this software
   in a clustered computing environment to facilitate computation
   involving large datasets.
@@ -371,7 +371,7 @@ model <- npreg(y~z+x1+x2,
                regtype="ll",
                bwmethod="cv.aic")
 
-output <- npsigtest(model,boot.num=29)
+output <- npsigtest(model,B=29)
 
 summary(output)
 
