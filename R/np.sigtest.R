@@ -431,28 +431,35 @@ npsigtest.npregression <-
     function(variable) is.factor(variable) || is.ordered(variable),
     logical(1L)
   )
-  equivalent.pivot <- is.null(pivot) ||
-    (identical(pivot, FALSE) && all(categorical)) ||
-    (identical(pivot, TRUE) && !any(categorical))
+  equivalent.pivot <- if (joint) {
+    is.null(pivot) || identical(pivot, FALSE) ||
+      (identical(pivot, TRUE) && !any(categorical))
+  } else {
+    is.null(pivot) ||
+      (identical(pivot, FALSE) && all(categorical)) ||
+      (identical(pivot, TRUE) && !any(categorical))
+  }
 
   regression.engine <- bws[["regtype.engine", exact = TRUE]]
   engine.supported <- regression.engine %in% c("lc", "lp")
 
-  if (joint || !identical(boot.type, "I") ||
-      !identical(boot.method, "iid") || !equivalent.pivot ||
-      length(extra.args) || !identical(bws[["type", exact = TRUE]], "fixed") ||
+  if (!identical(boot.type, "I") ||
+      !boot.method %in% c("iid", "wild", "wild-rademacher") ||
+      !equivalent.pivot ||
+      length(extra.args) ||
+      !bws[["type", exact = TRUE]] %in%
+        c("fixed", "generalized_nn", "adaptive_nn") ||
       !engine.supported ||
-      !identical(bws[["basis.engine", exact = TRUE]], "glp") ||
-      !identical(bws[["bernstein.basis.engine", exact = TRUE]], FALSE) ||
       identical(bws[["ckertype", exact = TRUE]], "beta"))
     return(FALSE)
 
   degree <- bws[["degree.engine", exact = TRUE]]
   if (bws[["ncon", exact = TRUE]] > 0L) {
-    expected.degree <- if (identical(regression.engine, "lc")) 0L else 1L
     if (!is.numeric(degree) ||
         length(degree) != bws[["ncon", exact = TRUE]] ||
-        anyNA(degree) || any(degree != expected.degree))
+        anyNA(degree) || any(!is.finite(degree)) ||
+        any(degree < 0) || any(degree != floor(degree)) ||
+        (identical(regression.engine, "lc") && any(degree != 0L)))
       return(FALSE)
   }
 
@@ -468,9 +475,11 @@ npsigtest.npregression <-
 .np_npsig_streamed_iid_tile <- function(bws,
                                          xdat,
                                          tested.index,
-                                         donor.index,
+                                         donor.index = NULL,
+                                         response.matrix = NULL,
                                          null.mean,
-                                         residual.pool) {
+                                         residual.pool,
+                                         pivotal = NULL) {
   continuous <- which(bws[["icon", exact = TRUE]])
   unordered <- which(bws[["iuno", exact = TRUE]])
   ordered <- which(bws[["iord", exact = TRUE]])
@@ -490,10 +499,20 @@ npsigtest.npregression <-
     stop("private npsigtest tile received an unsupported predictor", call. = FALSE)
   }
 
+  if (is.null(pivotal))
+    pivotal <- identical(mode, 1L)
+  pivotal <- npValidateScalarLogical(pivotal, "pivotal")
+  if (pivotal && !identical(mode, 1L))
+    stop("private npsigtest categorical tiles cannot be pivotal", call. = FALSE)
+
+  response.ready <- !is.null(response.matrix)
+  if (response.ready == !is.null(donor.index))
+    stop("private npsigtest tile requires exactly one response payload", call. = FALSE)
+
   as.numeric(.npreghat_exact_lp_apply_from_regression_core(
     bws = bws,
     txdat = xdat,
-    y = donor.index,
+    y = if (response.ready) response.matrix else donor.index,
     basis = bws[["basis.engine", exact = TRUE]],
     degree = as.integer(bws[["degree.engine", exact = TRUE]]),
     bernstein.basis = bws[["bernstein.basis.engine", exact = TRUE]],
@@ -501,10 +520,33 @@ npsigtest.npregression <-
     sigtest = list(
       mode = mode,
       coordinate = coordinate,
+      response.ready = response.ready,
+      pivotal = pivotal,
       null.mean = null.mean,
       residual.pool = residual.pool
     )
   ))
+}
+
+.np_npsig_streamed_response_statistic <- function(bws,
+                                                    xdat,
+                                                    index,
+                                                    response.matrix,
+                                                    pivotal) {
+  statistic <- numeric(ncol(response.matrix))
+  placeholder <- response.matrix[, 1L]
+  for (tested.index in index) {
+    statistic <- statistic + .np_npsig_streamed_iid_tile(
+      bws = bws,
+      xdat = xdat,
+      tested.index = tested.index,
+      response.matrix = response.matrix,
+      null.mean = placeholder,
+      residual.pool = placeholder,
+      pivotal = pivotal
+    ) / length(index)
+  }
+  statistic
 }
 
 .np_npsig_validate_lp_degree <- function(bws, xdat, index) {
@@ -598,16 +640,20 @@ npsigtest.rbandwidth <- function(bws,
   npRejectLegacyBootstrapCount(names(extra.args), "npsigtest")
   boot.type <- match.arg(boot.type)
   boot.method <- match.arg(boot.method)
-  streamed.iid <- .np_npsig_streamed_iid_eligible(
+  direct.statistic <- .np_npsig_streamed_iid_eligible(
     bws = bws,
     xdat = xdat,
     index = index,
     joint = joint,
-    boot.type = boot.type,
-    boot.method = boot.method,
+    boot.type = "I",
+    boot.method = "iid",
     pivot = pivot,
     extra.args = extra.args
   )
+  streamed.iid <- direct.statistic && identical(boot.type, "I") &&
+    boot.method %in% c("iid", "wild", "wild-rademacher")
+  direct.pairwise <- direct.statistic && !joint && identical(boot.type, "I") &&
+    identical(boot.method, "pairwise")
 
   tested.names <- names(xdat)[index]
   missing.names <- is.na(tested.names) | !nzchar(tested.names)
@@ -826,6 +872,40 @@ npsigtest.rbandwidth <- function(bws,
 
       joint.eval <- function(task.idx, seed.plan) {
         out <- numeric(length(task.idx))
+        if (streamed.iid) {
+          tile.width <- 8L
+          for (tile.start in seq.int(1L, length(task.idx), by = tile.width)) {
+            tile.count <- min(tile.width, length(task.idx) - tile.start + 1L)
+            tile.position <- tile.start:(tile.start + tile.count - 1L)
+            response.matrix <- vapply(
+              tile.position,
+              function(position) {
+                assign(".Random.seed", seed.plan[[task.idx[position]]],
+                       envir = .GlobalEnv)
+                if (identical(boot.method, "iid")) {
+                  donor <- sample.int(num.obs, replace = TRUE)
+                  mhat.xi + ei[donor]
+                } else {
+                  wild.values <- if (identical(boot.method, "wild"))
+                    c(a, b, P.a) else c(-1, 1, P.a)
+                  mhat.xi + ei * draw.wild.mult(
+                    num.obs, wild.values[[1L]], wild.values[[2L]],
+                    wild.values[[3L]]
+                  )
+                }
+              },
+              numeric(num.obs)
+            )
+            out[tile.position] <- .np_npsig_streamed_response_statistic(
+              bws = bws,
+              xdat = xdat,
+              index = index,
+              response.matrix = response.matrix,
+              pivotal = pivot.use
+            )
+          }
+          return(out)
+        }
         for (kk in seq_along(task.idx)) {
           assign(".Random.seed", seed.plan[[task.idx[kk]]], envir = .GlobalEnv)
           if (boot.method == "iid") {
@@ -888,7 +968,11 @@ npsigtest.rbandwidth <- function(bws,
         a = a,
         b = b,
         P.a = P.a,
-        extra.args = extra.args
+        extra.args = extra.args,
+        streamed.iid = streamed.iid,
+        .np_npsig_streamed_iid_tile = .np_npsig_streamed_iid_tile,
+        .np_npsig_streamed_response_statistic =
+          .np_npsig_streamed_response_statistic
       )
       if (boot.method != "pairwise")
         joint.bindings <- c(joint.bindings, list(mhat.xi = mhat.xi, ei = ei))
@@ -935,6 +1019,33 @@ npsigtest.rbandwidth <- function(bws,
 
     ii <- 0
 
+    if (streamed.iid) {
+      progress <- .np_progress_step(progress)
+      streamed.unrestricted <- npreg.eval.fun(
+        extra.args,
+        txdat = xdat,
+        tydat = ydat,
+        bws = bws,
+        gradients = TRUE,
+        se = any(pivot.plan$effective)
+      )
+      progress <- .np_progress_step(progress)
+      progress <- .np_progress_step(progress)
+      streamed.unres <- npreg.eval.fun(
+        extra.args,
+        txdat = xdat,
+        tydat = ydat,
+        bws = bws,
+        residuals = TRUE
+      )
+      streamed.ei.unres <- scale(streamed.unres$resid)
+      streamed.ei.unres.scale <- attr(streamed.ei.unres, "scaled:scale")
+      streamed.ei.unres.center <- attr(streamed.ei.unres, "scaled:center")
+      streamed.unres <- NULL
+      streamed.ei.unres <- NULL
+      progress <- .np_progress_step(progress)
+    }
+
     for(i in index) {
       
       ## Increment counter...
@@ -951,13 +1062,17 @@ npsigtest.rbandwidth <- function(bws,
       ## Construct In, the average value of the squared derivatives of
       ## the jth element, discrete or continuous
       
-      progress <- .np_progress_step(progress)
-      npreg.out <- npreg.eval.fun(extra.args,
-                                  txdat = xdat,
-                                  tydat = ydat,
-                                  bws = bws,
-                                  gradients = TRUE,
-                                  se = pivot.use)
+      if (streamed.iid) {
+        npreg.out <- streamed.unrestricted
+      } else {
+        progress <- .np_progress_step(progress)
+        npreg.out <- npreg.eval.fun(extra.args,
+                                    txdat = xdat,
+                                    tydat = ydat,
+                                    bws = bws,
+                                    gradients = TRUE,
+                                    se = pivot.use)
+      }
       
       In[ii] <- .np_npsig_statistic(npreg.out, index = i, pivot = pivot.use)
       progress <- .np_progress_step(progress)
@@ -966,16 +1081,21 @@ npsigtest.rbandwidth <- function(bws,
 
         ## Compute scale and mean of unrestricted residuals
 
-        progress <- .np_progress_step(progress)
-        npreg.unres <- npreg.eval.fun(extra.args,
-                                      txdat = xdat,
-                                      tydat = ydat,
-                                      bws = bws,
-                                      residuals = TRUE)
-        ei.unres <- scale(npreg.unres$resid)
-        ei.unres.scale <- attr(ei.unres,"scaled:scale")
-        ei.unres.center <- attr(ei.unres,"scaled:center")      
-        progress <- .np_progress_step(progress)
+        if (streamed.iid) {
+          ei.unres.scale <- streamed.ei.unres.scale
+          ei.unres.center <- streamed.ei.unres.center
+        } else {
+          progress <- .np_progress_step(progress)
+          npreg.unres <- npreg.eval.fun(extra.args,
+                                        txdat = xdat,
+                                        tydat = ydat,
+                                        bws = bws,
+                                        residuals = TRUE)
+          ei.unres <- scale(npreg.unres$resid)
+          ei.unres.scale <- attr(ei.unres,"scaled:scale")
+          ei.unres.center <- attr(ei.unres,"scaled:center")
+          progress <- .np_progress_step(progress)
+        }
 
         ## We now construct mhat.xi holding constant the variable whose
         ## significance is being tested at its median. First, make a copy
@@ -1104,22 +1224,43 @@ npsigtest.rbandwidth <- function(bws,
             for (tile.start in seq.int(1L, length(task.idx), by = tile.width)) {
               tile.count <- min(tile.width, length(task.idx) - tile.start + 1L)
               tile.position <- tile.start:(tile.start + tile.count - 1L)
-              donor.index <- vapply(
-                tile.position,
-                function(position) {
-                  assign(".Random.seed", seed.plan[[task.idx[position]]],
-                         envir = .GlobalEnv)
-                  sample.int(num.obs, replace = TRUE)
-                },
-                integer(num.obs)
-              )
+              donor.index <- NULL
+              response.matrix <- NULL
+              if (identical(boot.method, "iid")) {
+                donor.index <- vapply(
+                  tile.position,
+                  function(position) {
+                    assign(".Random.seed", seed.plan[[task.idx[position]]],
+                           envir = .GlobalEnv)
+                    sample.int(num.obs, replace = TRUE)
+                  },
+                  integer(num.obs)
+                )
+              } else {
+                wild.values <- if (identical(boot.method, "wild"))
+                  c(a, b, P.a) else c(-1, 1, P.a)
+                response.matrix <- vapply(
+                  tile.position,
+                  function(position) {
+                    assign(".Random.seed", seed.plan[[task.idx[position]]],
+                           envir = .GlobalEnv)
+                    mhat.xi + ei * draw.wild.mult(
+                      num.obs, wild.values[[1L]], wild.values[[2L]],
+                      wild.values[[3L]]
+                    )
+                  },
+                  numeric(num.obs)
+                )
+              }
               out[tile.position] <- .np_npsig_streamed_iid_tile(
                 bws = bws,
                 xdat = xdat,
                 tested.index = i,
                 donor.index = donor.index,
+                response.matrix = response.matrix,
                 null.mean = mhat.xi,
-                residual.pool = ei
+                residual.pool = ei,
+                pivotal = pivot.use
               )
             }
             return(out)
@@ -1155,19 +1296,30 @@ npsigtest.rbandwidth <- function(bws,
               ydat.star <- ydat[boot.index]
               xdat.star <- xdat
               xdat.star[, -i] <- xdat[boot.index, -i]
-              npreg.boot <- .npRmpi_npsig_do_local(extra.args,
-                                                   txdat = xdat.star,
-                                                   tydat = ydat.star,
-                                                   bws = bws,
-                                                   gradients = TRUE,
-                                                   se = pivot.use)
+              if (direct.pairwise) {
+                out[kk] <- .np_npsig_streamed_response_statistic(
+                  bws = bws,
+                  xdat = xdat.star,
+                  index = i,
+                  response.matrix = matrix(ydat.star, ncol = 1L),
+                  pivotal = pivot.use
+                )
+              } else {
+                npreg.boot <- .npRmpi_npsig_do_local(extra.args,
+                                                     txdat = xdat.star,
+                                                     tydat = ydat.star,
+                                                     bws = bws,
+                                                     gradients = TRUE,
+                                                     se = pivot.use)
+              }
             }
 
-            out[kk] <- .np_npsig_statistic(
-              npreg.boot,
-              index = i,
-              pivot = pivot.use
-            )
+            if (!direct.pairwise)
+              out[kk] <- .np_npsig_statistic(
+                npreg.boot,
+                index = i,
+                pivot = pivot.use
+              )
           }
           out
         }
@@ -1187,7 +1339,10 @@ npsigtest.rbandwidth <- function(bws,
           P.a = P.a,
           extra.args = extra.args,
           streamed.iid = streamed.iid,
-          .np_npsig_streamed_iid_tile = .np_npsig_streamed_iid_tile
+          direct.pairwise = direct.pairwise,
+          .np_npsig_streamed_iid_tile = .np_npsig_streamed_iid_tile,
+          .np_npsig_streamed_response_statistic =
+            .np_npsig_streamed_response_statistic
         )
         if (boot.method != "pairwise")
           indiv.bindings <- c(indiv.bindings, list(mhat.xi = mhat.xi, ei = ei))

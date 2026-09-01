@@ -43,7 +43,7 @@ extern SEXP C_np_lsqregression_bw_eval(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP,
 extern SEXP C_np_regression(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_regression_lp_apply_conditional(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_regression_lp_apply_conditional_ctx(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
-extern SEXP C_np_regression_lp_sigtest_conditional_ctx(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP C_np_regression_lp_sigtest_conditional_ctx(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_lc_hat_normalize(SEXP, SEXP);
 extern SEXP C_np_lp_batch_project(SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_reghat_lp_matrix_fast(SEXP, SEXP, SEXP);
@@ -184,7 +184,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"C_np_regression",                (DL_FUNC) &C_np_regression,                24},
     {"C_np_regression_lp_apply_conditional",(DL_FUNC) &C_np_regression_lp_apply_conditional,23},
     {"C_np_regression_lp_apply_conditional_ctx",(DL_FUNC) &C_np_regression_lp_apply_conditional_ctx,25},
-    {"C_np_regression_lp_sigtest_conditional_ctx",(DL_FUNC) &C_np_regression_lp_sigtest_conditional_ctx,29},
+    {"C_np_regression_lp_sigtest_conditional_ctx",(DL_FUNC) &C_np_regression_lp_sigtest_conditional_ctx,31},
     {"C_np_lc_hat_normalize",             (DL_FUNC) &C_np_lc_hat_normalize,              2},
     {"C_np_lp_batch_project",             (DL_FUNC) &C_np_lp_batch_project,              5},
     {"C_np_reghat_lp_matrix_fast",       (DL_FUNC) &C_np_reghat_lp_matrix_fast,        3},
