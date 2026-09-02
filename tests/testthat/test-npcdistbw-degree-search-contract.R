@@ -306,3 +306,136 @@ test_that("npcdistbw native NOMAD route has an explicit crs availability guard",
   expect_true(grepl("packageVersion(\"crs\") < \"0.15.46\"", require_body, fixed = TRUE))
   expect_true(grepl("native npcdist NOMAD route requires crs >= 0.15-46", require_body, fixed = TRUE))
 })
+
+test_that("npcdistbw native prepared search result has a unique exact schema", {
+  native_result <- list(
+    best_point = c(0.4, 1),
+    best_degree = 1L,
+    first_degree = 0L,
+    first_objective = 3,
+    message = "ok",
+    objective = 2,
+    blackbox_evaluations = 4L,
+    iterations = 2L,
+    solution = c(0.4, 1),
+    total_num.feval = 5,
+    total_num.feval.fast = 3,
+    compiled_callback_calls = 4L,
+    best_num.feval = 5,
+    best_num.feval.fast = 3,
+    official_objective = 2,
+    compiled_callback_failures = 0L,
+    crs_callback_evaluations = 4L,
+    cache_hits = 0L,
+    cache_size = 4L,
+    total_evaluations = 4L
+  )
+
+  with_nprmpi_npcdist_degree_bindings(list(
+    .npcdistbw_nomad_degree_native_target = function(...) TRUE,
+    .npcdistbw_nomad_native_require_crs = function(...) invisible(TRUE),
+    .np_nomad_bw_restart_start_bounds = function(...) {
+      list(lower = 0.1, upper = 1)
+    },
+    .np_nomad_prepare_solver_opts = function(...) list(),
+    .npcdistbw_nomad_native_option_vectors = function(...) {
+      list(names = character(), values = character())
+    },
+    .np_nomad_build_starts = function(...) matrix(c(0.4, 1), nrow = 1L),
+    .npcdistbw_nomad_native_prepare_args = function(...) list(),
+    .np_nomad_native_progress_begin = function(...) new.env(parent = emptyenv()),
+    .np_nomad_native_progress_restart = function(...) invisible(NULL),
+    .np_nomad_native_progress_end = function(...) invisible(NULL),
+    .np_nomad_native_progress_abort = function(...) invisible(NULL),
+    npNomadNativeSearchConditionalDistribution = function(...) native_result,
+    .np_nomad_native_status = function(...) invisible(NULL)
+  ), {
+    result <- npRmpi:::npRmpiPreparedSearchConditionalDistribution(
+      xdat = data.frame(x = seq(0.1, 0.9, length.out = 6L)),
+      ydat = data.frame(y = seq(0.2, 0.8, length.out = 6L)),
+      template = list(),
+      setup = list(cont_flat = 1, cat_flat = numeric()),
+      reg.args = list(),
+      opt.args = list(nomad.opts = list(), nomad.remin = FALSE),
+      degree.search = list(
+        engine = "nomad",
+        start.degree = 0L,
+        candidates = list(0:1),
+        lower = 0L,
+        upper = 1L,
+        basis = "glp",
+        nobs = 6L,
+        start.user = FALSE,
+        bernstein.basis = TRUE
+      ),
+      x0 = c(0.4, 0),
+      bbin = c(0L, 1L),
+      lb = c(0.1, 0),
+      ub = c(1, 1),
+      source = "unit",
+      reason = "schema"
+    )
+
+    expected_names <- c(
+      "method", "source", "reason", "direction", "verify", "completed",
+      "certified", "interrupted", "baseline", "best", "best_payload",
+      "best_point", "n.unique", "n.visits", "n.cached", "nomad.time",
+      "powell.time", "optim.time", "grid.size", "best.restart",
+      "nomad.remin", "nomad.remin.index", "nomad.remin.roundtrip",
+      "restart.starts", "restart.degree.starts", "restart.bandwidth.starts",
+      "restart.start.info", "restart.results", "trace",
+      "native.diagnostics", "num.feval.total", "num.feval.fast.total"
+    )
+    expect_identical(anyDuplicated(names(result)), 0L)
+    expect_identical(names(result), expected_names)
+    expect_identical(result$method, "nomad")
+    expect_identical(result$source, "unit")
+    expect_identical(result$reason, "schema")
+    expect_identical(result$direction, "min")
+    expect_identical(result$verify, FALSE)
+    expect_identical(result$completed, TRUE)
+    expect_identical(result$certified, FALSE)
+    expect_identical(result$interrupted, FALSE)
+    expect_type(result$baseline, "list")
+    expect_type(result$best, "list")
+    expect_null(result$best_payload)
+    expect_identical(result$best_point, c(0.4, 1))
+    expect_identical(result$n.unique, 4L)
+    expect_identical(result$n.visits, 4L)
+    expect_identical(result$n.cached, 0L)
+    expect_type(result$nomad.time, "double")
+    expect_identical(result$powell.time, NA_real_)
+    expect_type(result$optim.time, "double")
+    expect_identical(result$grid.size, NA_integer_)
+    expect_identical(result$best.restart, 1L)
+    expect_identical(result$nomad.remin, FALSE)
+    expect_identical(result$nomad.remin.index, NA_integer_)
+    expect_null(result$nomad.remin.roundtrip)
+    expect_type(result$restart.starts, "list")
+    expect_type(result$restart.degree.starts, "list")
+    expect_type(result$restart.bandwidth.starts, "list")
+    expect_type(result$restart.start.info, "list")
+    expect_type(result$restart.results, "list")
+    expect_s3_class(result$trace, "data.frame")
+    expect_type(result$native.diagnostics, "list")
+    expect_identical(result$num.feval.total, 5)
+    expect_identical(result$num.feval.fast.total, 3)
+
+    metadata <- npRmpi:::.np_degree_search_metadata(result, "min")
+    expect_identical(metadata$mode, "nomad")
+    expect_identical(metadata$source, "unit")
+    expect_identical(metadata$reason, "schema")
+    expect_identical(metadata$best.degree, 1L)
+    expect_identical(metadata$best.fval, 2)
+    expect_identical(metadata$best.restart, 1L)
+
+    attached <- npRmpi:::.npcdistbw_attach_degree_search(
+      bws = structure(list(), class = "condbandwidth"),
+      search_result = result
+    )
+    expect_s3_class(attached, "condbandwidth")
+    expect_identical(attached$degree.search, metadata)
+    expect_identical(unserialize(serialize(result, NULL)), result)
+    expect_identical(unserialize(serialize(attached, NULL)), attached)
+  })
+})
