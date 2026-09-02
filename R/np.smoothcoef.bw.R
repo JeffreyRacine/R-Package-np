@@ -2584,6 +2584,7 @@ npscoefbw.scbandwidth <-
       source = source,
       reason = reason,
       progress_label = progress_label,
+      handoff_before_build = nn.search,
       start.lower = c(bw_start_bounds$lower, degree.search$lower),
       start.upper = c(bw_start_bounds$upper, degree.search$upper),
       coordinate.roles = coordinate.roles,

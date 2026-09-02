@@ -303,6 +303,7 @@ test_that("npscoefbw NN NOMAD recovery preserves the actual configured start", {
       ),
       .np_nomad_search = function(...) {
         search.args <- list(...)
+        expect_true(search.args$handoff_before_build)
         invalid.point <- search.args$x0
         invalid.point[1L] <- 1
         condition <- tryCatch(
@@ -333,6 +334,38 @@ test_that("npscoefbw NN NOMAD recovery preserves the actual configured start", {
       expect_true(is.finite(bw$degree.search$powell.time))
     }
   }
+})
+
+test_that("npscoefbw invalid NN handoffs do not announce or enter Powell", {
+  skip_if_not_installed("crs")
+  old <- options(np.messages = TRUE)
+  on.exit(options(old), add = TRUE)
+  n <- 24L
+  xdat <- data.frame(x = seq_len(n) / n)
+  zdat <- data.frame(u = factor(rep(c("a", "b"), n / 2L)),
+                    z = c(rep(0, 16L), seq_len(8L)))
+  y <- 1 + xdat$x + 0.2 * zdat$z + sin(seq_len(n)) / 10
+  announced <- entered <- 0L
+  original.stage <- getFromNamespace(".np_nomad_progress_enter_powell", "np")
+  original.fixed <- getFromNamespace(".npscoefbw_run_fixed_degree", "np")
+  expect_error(testthat::with_mocked_bindings(
+    npscoefbw(xdat = xdat, ydat = y, zdat = zdat, bws = c(0.25, 5),
+               bwtype = "generalized_nn", nomad = TRUE,
+               search.engine = "nomad+powell", degree.max = 1L,
+               nmulti = 1L, nomad.opts = list(MAX_BB_EVAL = 1L)),
+    .np_progress_is_interactive = function() TRUE,
+    .np_nomad_progress_enter_powell = function(...) {
+      announced <<- announced + 1L
+      original.stage(...)
+    },
+    .npscoefbw_run_fixed_degree = function(...) {
+      entered <<- entered + 1L
+      original.fixed(...)
+    },
+    .package = "np"
+  ), "npscoefbw NOMAD degree search did not return a raw-valid solution", fixed = TRUE)
+  expect_identical(announced, 0L)
+  expect_identical(entered, 0L)
 })
 
 test_that("npscoefbw NOMAD raw evaluation propagates unrelated errors", {
