@@ -192,14 +192,62 @@ if (flag)
 	} 
 }
 
+SEXP mpi_runtime_state(void){
+	int initialized=0, finalized=0;
+	SEXP out, out_names;
+
+	if (MPI_Initialized(&initialized) != MPI_SUCCESS)
+		error("MPI_Initialized failed while querying MPI lifecycle state");
+	if (initialized && MPI_Finalized(&finalized) != MPI_SUCCESS)
+		error("MPI_Finalized failed while querying MPI lifecycle state");
+
+	PROTECT(out = allocVector(LGLSXP, 2));
+	LOGICAL(out)[0] = initialized;
+	LOGICAL(out)[1] = finalized;
+	PROTECT(out_names = allocVector(STRSXP, 2));
+	SET_STRING_ELT(out_names, 0, mkChar("initialized"));
+	SET_STRING_ELT(out_names, 1, mkChar("finalized"));
+	setAttrib(out, R_NamesSymbol, out_names);
+	UNPROTECT(2);
+	return out;
+}
+
 SEXP mpi_finalize(void){
-	MPI_Finalize();
-	Free(comm);
-	Free(status);
-	Free(request);
-	Free(datatype);
-	Free(xdouble);
-	Free(info);
+	int initialized=0, finalized=0, finalize_status=MPI_SUCCESS;
+
+	if (MPI_Initialized(&initialized) != MPI_SUCCESS)
+		return AsInt(0);
+	if (initialized && MPI_Finalized(&finalized) != MPI_SUCCESS)
+		return AsInt(0);
+	if (initialized && !finalized)
+		finalize_status=MPI_Finalize();
+	if (finalize_status != MPI_SUCCESS)
+		return AsInt(0);
+
+	if (comm != NULL) {
+		Free(comm);
+		comm=NULL;
+	}
+	if (status != NULL) {
+		Free(status);
+		status=NULL;
+	}
+	if (request != NULL) {
+		Free(request);
+		request=NULL;
+	}
+	if (datatype != NULL) {
+		Free(datatype);
+		datatype=NULL;
+	}
+	if (xdouble != NULL) {
+		Free(xdouble);
+		xdouble=NULL;
+	}
+	if (info != NULL) {
+		Free(info);
+		info=NULL;
+	}
 	return AsInt(1);
 }
 

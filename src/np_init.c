@@ -67,6 +67,7 @@ extern SEXP C_np_mpi_init(void);
 extern SEXP mpidist(void);
 extern SEXP mkstr(SEXP);
 extern SEXP mpi_initialize(void);
+extern SEXP mpi_runtime_state(void);
 extern SEXP mpi_finalize(void);
 extern SEXP mpi_get_version(void);
 extern SEXP mpi_get_processor_name(void);
@@ -205,6 +206,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"mpidist",                       (DL_FUNC) &mpidist,                         0},
     {"mkstr",                         (DL_FUNC) &mkstr,                           1},
     {"mpi_initialize",                (DL_FUNC) &mpi_initialize,                  0},
+    {"mpi_runtime_state",             (DL_FUNC) &mpi_runtime_state,               0},
     {"mpi_finalize",                  (DL_FUNC) &mpi_finalize,                    0},
     {"mpi_get_version",               (DL_FUNC) &mpi_get_version,                 0},
     {"mpi_get_processor_name",        (DL_FUNC) &mpi_get_processor_name,          0},

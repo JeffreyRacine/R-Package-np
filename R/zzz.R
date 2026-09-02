@@ -12,6 +12,18 @@
   state$running <- TRUE
   on.exit({ state$running <- FALSE }, add = TRUE)
 
+  runtime <- tryCatch(.npRmpi_mpi_runtime_state(), error = function(e) NULL)
+  if (is.null(runtime)) {
+    warning(
+      sprintf("npRmpi could not determine MPI lifecycle state during %s; MPI finalization was not attempted", where),
+      call. = FALSE
+    )
+    return(invisible(FALSE))
+  }
+  if (!isTRUE(runtime[["initialized"]]) || isTRUE(runtime[["finalized"]])) {
+    .npRmpi_sync_mpi_inactive()
+    return(invisible(isTRUE(runtime[["finalized"]])))
+  }
   comm.size <- tryCatch(as.integer(mpi.comm.size(1L)),
                         error = function(e) NA_integer_)
   if (length(comm.size) != 1L || is.na(comm.size)) {
@@ -22,8 +34,13 @@
     return(invisible(FALSE))
   }
   if (comm.size >= 2L) {
+    close.mode <- if (isTRUE(getOption("npRmpi.profile.active", FALSE))) {
+      "spawn"
+    } else {
+      "auto"
+    }
     closed <- tryCatch({
-      npRmpi.quit(force = TRUE, comm = 1L, mode = "auto")
+      npRmpi.quit(force = TRUE, comm = 1L, mode = close.mode)
       TRUE
     }, error = function(e) FALSE)
     if (!isTRUE(closed)) {
@@ -35,8 +52,13 @@
     }
   }
 
-  remaining <- tryCatch(as.integer(mpi.comm.size(1L)),
-                        error = function(e) NA_integer_)
+  remaining.null <- tryCatch(isTRUE(mpi.comm.is.null(1L)),
+                             error = function(e) NA)
+  remaining <- if (isTRUE(remaining.null)) {
+    0L
+  } else {
+    tryCatch(as.integer(mpi.comm.size(1L)), error = function(e) NA_integer_)
+  }
   if (length(remaining) != 1L || is.na(remaining)) {
     warning(
       sprintf("npRmpi could not verify worker-pool closure during %s; MPI finalization was not attempted", where),
