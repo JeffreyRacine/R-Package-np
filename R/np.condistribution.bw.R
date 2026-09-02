@@ -1330,7 +1330,36 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
     )
   }
 
+  raw_eval_fun <- function(point) {
+    bw_vec <- .npcdistbw_nomad_point_to_bw(
+      point[seq_len(bwdim)], template = template, setup = setup
+    )
+    tbw <- .npcdistbw_build_condbandwidth(
+      xdat = xdat,
+      ydat = ydat,
+      bws = bw_vec,
+      bandwidth.compute = FALSE,
+      reg.args = reg.args
+    )
+    out <- .npcdistbw_eval_only(
+      xdat = xdat,
+      ydat = ydat,
+      gydat = opt.args$gydat,
+      bws = tbw,
+      do.full.integral = opt.value("do.full.integral", FALSE),
+      ngrid = opt.value("ngrid", 100L),
+      invalid.penalty = "dbmax",
+      penalty.multiplier = opt.value("penalty.multiplier", 10)
+    )
+    as.numeric(out$objective[1L])
+  }
+
   build_payload <- function(point, best_record, solution, interrupted) {
+    direct.objective <- .np_nn_certify_raw_point(
+      point = point[seq_len(bwdim)],
+      raw.eval = raw_eval_fun,
+      owner = "native npcdist fixed-degree NOMAD route"
+    )
     bw_vec <- .npcdistbw_nomad_point_to_bw(point[seq_len(bwdim)], template = template, setup = setup)
     final.tbw <- .npcdistbw_build_condbandwidth(
       xdat = xdat,
@@ -1339,11 +1368,11 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
       bandwidth.compute = FALSE,
       reg.args = reg.args
     )
-    final.tbw$fval <- as.numeric(best_record$objective)
-    final.tbw$ifval <- as.numeric(best_record$objective)
+    final.tbw$fval <- direct.objective
+    final.tbw$ifval <- direct.objective
     final.tbw$num.feval <- as.numeric(mads.num.feval.total)
     final.tbw$num.feval.fast <- as.numeric(mads.num.feval.fast.total)
-    final.tbw$fval.history <- as.numeric(best_record$objective)
+    final.tbw$fval.history <- direct.objective
     final.tbw$eval.history <- if (!is.null(solution$bbe)) rep(1, max(1L, as.integer(solution$bbe))) else 1
     final.tbw$invalid.history <- 0
     final.tbw$timing <- NA_real_
@@ -1356,7 +1385,6 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
     )
     direct.payload$num.feval <- as.numeric(mads.num.feval.total)
     direct.payload$num.feval.fast <- as.numeric(mads.num.feval.fast.total)
-    direct.objective <- as.numeric(best_record$objective)
     powell.elapsed <- NA_real_
 
     if (identical(bwsolver, "mads+powell")) {
@@ -1384,8 +1412,17 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
       direct.payload$num.feval.fast <- as.numeric(direct.payload$num.feval.fast[1L]) + as.numeric(hot.payload$num.feval.fast[1L])
       hot.payload$num.feval <- direct.payload$num.feval
       hot.payload$num.feval.fast <- direct.payload$num.feval.fast
-      hot.objective <- as.numeric(hot.payload$fval[1L])
-      if (is.finite(hot.objective) &&
+      hot.point <- .npcdistbw_nomad_bw_to_point(
+        c(hot.payload$ybw, hot.payload$xbw),
+        template = template,
+        setup = setup
+      )
+      hot.objective <- .np_nn_certify_raw_point(
+        point = hot.point,
+        raw.eval = raw_eval_fun,
+        owner = "npcdist MADS+Powell handoff"
+      )
+      if (
           .np_degree_better(hot.objective, direct.objective, direction = "min"))
         return(list(payload = hot.payload, objective = hot.objective, powell.time = powell.elapsed))
     }
@@ -1484,6 +1521,12 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
       .np_nomad_native_status(native.i, "native npcdist NOMAD route")
       official.objective.i <- as.numeric(native.i$official_objective[1L])
       objective.i <- as.numeric(native.i$objective[1L])
+      raw.objective.i <- if (is.null(native.i$best_point) ||
+                             any(!is.finite(native.i$best_point))) {
+        NA_real_
+      } else {
+        raw_eval_fun(as.numeric(native.i$best_point))
+      }
       native.results[[i]] <- list(
         restart = i,
         start = as.numeric(native.start.matrix[i, ]),
@@ -1496,18 +1539,20 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
         solution = as.numeric(native.i$solution),
         best_point = as.numeric(native.i$best_point),
         best_objective = objective.i,
+        raw_objective = raw.objective.i,
         native = native.i
       )
       native.num.feval.total <- native.num.feval.total + as.numeric(native.i$total_num.feval[1L])
       native.num.feval.fast.total <- native.num.feval.fast.total + as.numeric(native.i$total_num.feval.fast[1L])
       native.num.feval.guarded.total <- native.num.feval.guarded.total + as.numeric(native.i$total_num.feval.guarded[1L])
-      if (is.finite(objective.i) && objective.i < native.best.objective) {
-        native.best.objective <- objective.i
+      if (.np_nn_raw_objective_valid(raw.objective.i) &&
+          raw.objective.i < native.best.objective) {
+        native.best.objective <- raw.objective.i
         native.best.index <- i
       }
     }
     if (!is.finite(native.best.index))
-      stop("native npcdist NOMAD route did not return a finite solution", call. = FALSE)
+      stop("native npcdist NOMAD route did not return a raw-valid solution", call. = FALSE)
 
     native.best <- native.results[[native.best.index]]
     native.handoff.point <- as.numeric(native.best$best_point)
