@@ -361,9 +361,9 @@
   candidates <- switch(
     key,
     "bootstrap:pmzsd" = c(
-      sprintf("%s symmetric variability band (normal quantile × bootstrap SD)", level),
-      sprintf("%s symmetric variability band: z × bootstrap SD", level),
-      sprintf("%s bootstrap z × SD band", level)
+      sprintf("%s symmetric variability band (normal quantile \u00d7 bootstrap SD)", level),
+      sprintf("%s symmetric variability band: z \u00d7 bootstrap SD", level),
+      sprintf("%s bootstrap z \u00d7 SD band", level)
     ),
     "bootstrap:pointwise" = c(
       sprintf("%s pointwise bootstrap variability band (quantiles)", level),
@@ -386,14 +386,14 @@
     ),
     "asymptotic:pmzsd" =,
     "asymptotic:pointwise" = c(
-      sprintf("%s symmetric variability band (normal quantile × asymptotic SE)", level),
-      sprintf("%s symmetric variability band: z × asymptotic SE", level),
-      sprintf("%s asymptotic z × SE band", level)
+      sprintf("%s symmetric variability band (normal quantile \u00d7 asymptotic SE)", level),
+      sprintf("%s symmetric variability band: z \u00d7 asymptotic SE", level),
+      sprintf("%s asymptotic z \u00d7 SE band", level)
     ),
     "asymptotic:bonferroni" = c(
-      sprintf("%s Bonferroni-adjusted asymptotic variability band (normal quantile × SE)", level),
-      sprintf("%s Bonferroni asymptotic band: adjusted z × SE", level),
-      sprintf("%s Bonferroni z × SE band", level)
+      sprintf("%s Bonferroni-adjusted asymptotic variability band (normal quantile \u00d7 SE)", level),
+      sprintf("%s Bonferroni asymptotic band: adjusted z \u00d7 SE", level),
+      sprintf("%s Bonferroni z \u00d7 SE band", level)
     ),
     "asymptotic:simultaneous" = character(),
     "asymptotic:all" = c(
@@ -7871,9 +7871,9 @@ plotFactor <- function(f, y, ...){
       simultaneous = "Simultaneous (rank-based)",
       bonferroni = "Bonferroni (quantiles)")
   } else {
-    c(pointwise = "Pointwise (z × SE)",
+    c(pointwise = "Pointwise (z \u00d7 SE)",
       simultaneous = "Simultaneous",
-      bonferroni = "Bonferroni (adjusted z × SE)")
+      bonferroni = "Bonferroni (adjusted z \u00d7 SE)")
   }
 }
 
