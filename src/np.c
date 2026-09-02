@@ -3580,6 +3580,30 @@ static void np_copy_scale_factor(double *dest, const double *src, int n)
     dest[i] = src[i];
 }
 
+static int np_adaptive_nn_joint_ordinary_advance(double *candidate,
+                                                 const int num_continuous,
+                                                 const int maximum_k)
+{
+  int i;
+  int advanced = 0;
+
+  if (candidate == NULL || num_continuous <= 0 || maximum_k < 1)
+    return 0;
+
+  for (i = 1; i <= num_continuous; ++i) {
+    const int lookup_k = (int)candidate[i];
+    const int next_k = MIN(maximum_k,
+                           MAX(lookup_k + 1, 2*lookup_k));
+
+    if (next_k > lookup_k) {
+      candidate[i] = (double)next_k;
+      advanced = 1;
+    }
+  }
+
+  return advanced;
+}
+
 static int np_copy_scale_factor_for_raw(double *dest, const double *src, int n)
 {
   if (dest == NULL || src == NULL)
@@ -4541,20 +4565,15 @@ static void np_conditional_density_refresh_penalty_canonical(
       for (probe = 0; probe < probe_limit; ++probe) {
         int advanced = 0;
 
-        for (i = 1;
-             i <= num_var_continuous_extern + num_reg_continuous_extern;
-             ++i) {
-          if (adaptive_lp_reseed) {
-            const int maximum_k = num_obs_train_extern - 2;
-            const int lookup_k = (int)tmp[i];
-            int next_k;
-
-            next_k = MIN(maximum_k, MAX(lookup_k + 1, 2*lookup_k));
-            if (next_k > lookup_k) {
-              tmp[i] = (double)next_k;
-              advanced = 1;
-            }
-          } else {
+        if (adaptive_lp_reseed) {
+          advanced = np_adaptive_nn_joint_ordinary_advance(
+            tmp,
+            num_var_continuous_extern + num_reg_continuous_extern,
+            num_obs_train_extern - 2);
+        } else {
+          for (i = 1;
+               i <= num_var_continuous_extern + num_reg_continuous_extern;
+               ++i) {
             tmp[i] *= 2.0;
             advanced = 1;
           }
