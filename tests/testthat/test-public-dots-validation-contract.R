@@ -54,6 +54,19 @@ test_that("unnamed and duplicate valid dots pass through the name validator", {
   expect_invisible(validate(duplicate, "npreg"))
 })
 
+test_that("npindex admits only its exact internal fixed-lc progress token", {
+  validate <- getFromNamespace(".np_validate_public_dots", environmentName(environment(npindex)))
+  expect_invisible(validate(
+    pairlist(.np_lc_fixed_progress_route = quote(stop("internal token was forced"))),
+    "npindex"
+  ))
+  expect_error(
+    validate(pairlist(.np_lc_fixed_progress_routes = TRUE), "npindex"),
+    "unused argument '.np_lc_fixed_progress_routes'",
+    fixed = TRUE
+  )
+})
+
 test_that("specialized retired-argument diagnostics retain precedence", {
   expect_error(npreg(errors = TRUE), "use 'se' instead", fixed = TRUE)
   expect_error(npindex(boot.num = 9L), "use 'B' instead", fixed = TRUE)
