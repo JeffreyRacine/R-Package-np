@@ -198,7 +198,7 @@ test_that("autodispatch reuses semiparametric remote bandwidth references", {
     caller_env = env
   )
   sc <- .npRmpi_autodispatch_materialize_call(
-    quote(npscoef(bws = scbw, gradients = FALSE)),
+    quote(npscoef(bws = scbw)),
     caller_env = env
   )
 
@@ -208,6 +208,7 @@ test_that("autodispatch reuses semiparametric remote bandwidth references", {
   expect_identical(unname(sc$lease.bindings[[1L]]), sc.plan$id)
   expect_identical(as.character(si$call$bws), names(si$lease.bindings))
   expect_identical(as.character(sc$call$bws), names(sc$lease.bindings))
+  expect_false("gradients" %in% names(as.list(sc$call)))
   expect_identical(names(si$lease.replacements), names(si$lease.bindings))
   expect_identical(names(sc$lease.replacements), names(sc$lease.bindings))
   expect_identical(si$lease.replacements[[1L]],

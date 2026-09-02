@@ -148,13 +148,15 @@ test_that("SPMD opcode selection tags LL/LP CV routes for core bw families", {
   op.reg.est <- opcode.fun(mc = mc.reg.est, caller_env = environment())
   expect_identical(op.reg.est, "autodispatch.npreg.core")
 
-  mc.sc.est <- quote(npscoef(bws = bw, gradients = FALSE))
+  mc.sc.est <- quote(npscoef(bws = bw))
   op.sc.est <- opcode.fun(mc = mc.sc.est, caller_env = environment())
   expect_identical(op.sc.est, "autodispatch.npscoef.core")
+  expect_false("gradients" %in% names(as.list(mc.sc.est)))
 
-  mc.pl.est <- quote(npplreg(bws = bw, gradients = FALSE))
+  mc.pl.est <- quote(npplreg(bws = bw))
   op.pl.est <- opcode.fun(mc = mc.pl.est, caller_env = environment())
   expect_identical(op.pl.est, "autodispatch.npplreg.core")
+  expect_false("gradients" %in% names(as.list(mc.pl.est)))
 
   mc.ud.est <- quote(npudens(tdat = x, bws = bw))
   op.ud.est <- opcode.fun(mc = mc.ud.est, caller_env = environment())
