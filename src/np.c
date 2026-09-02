@@ -19804,6 +19804,67 @@ regression_powell_attempt:
           goto regression_powell_attempt;
         }
       }
+      if ((!adaptive_retry_attempted) &&
+          (!eval_only) &&
+          (!int_use_starting_values) &&
+          (BANDWIDTH_reg_extern == BW_GEN_NN) &&
+          (num_reg_continuous_extern > 0) &&
+          (num_obs_train_extern >= 3)) {
+        double finite_seed = DBL_MAX;
+        int found_finite_seed;
+
+        adaptive_retry_history_index =
+          (iImproved > 0) ? iImproved - 1 : 0;
+        adaptive_retry_improved = iImproved;
+        bwm_reset_counters();
+        found_finite_seed = np_ordinary_nn_find_finite_raw_seed(
+          vector_scale_factor,
+          num_reg_continuous_extern,
+          num_obs_train_extern,
+          num_obs_train_extern - 1,
+          num_var,
+          &finite_seed);
+        if (found_finite_seed &&
+            bwm_penalty_mode == 1 &&
+            (!(bwm_penalty_value > finite_seed))) {
+          found_finite_seed = np_minimized_seed_dominating_penalty(
+            finite_seed, penalty_mult[0], &bwm_penalty_value);
+        }
+        if (found_finite_seed) {
+          initialize_nr_directions(BANDWIDTH_reg_extern,
+                                   num_obs_train_extern,
+                                   num_reg_continuous_extern,
+                                   num_reg_unordered_extern,
+                                   num_reg_ordered_extern,
+                                   0,
+                                   0,
+                                   0,
+                                   vsfh,
+                                   num_categories_extern,
+                                   matrix_y,
+                                   0, int_RANDOM_SEED,
+                                   lbc_dir, dfc_dir, c_dir, initc_dir,
+                                   lbd_dir, hbd_dir, d_dir, initd_dir,
+                                   matrix_X_continuous_train_extern,
+                                   matrix_Y_continuous_train_extern);
+          if(lsq_check_mode){
+            for(i = 1; i <= num_search_var; i++){
+              matrix_y[i][num_var + 1] = 0.0;
+              matrix_y[num_var + 1][i] = 0.0;
+            }
+            matrix_y[num_var + 1][num_var + 1] =
+              0.25*(lsq_delta_upper - lsq_delta_lower);
+          }
+          fret_initial = fret_best = fret_start_best = fret = finite_seed;
+          have_start_best = 1;
+          have_multistart_best = 0;
+          np_copy_scale_factor(vector_scale_factor_startbest,
+                               vector_scale_factor,
+                               num_search_var);
+          adaptive_retry_attempted = 1;
+          goto regression_powell_attempt;
+        }
+      }
       bw_error_msg = "C_np_regression_bw: optimizer returned a fixed-bandwidth candidate with invalid raw objective";
       goto cleanup_np_regression_bw_mode;
     }
