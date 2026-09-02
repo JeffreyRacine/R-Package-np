@@ -1,3 +1,117 @@
+.np_nn_raw_objective_valid <- function(value) {
+  is.numeric(value) && length(value) == 1L && !is.na(value) &&
+    is.finite(value) && abs(value) < .Machine$double.xmax
+}
+
+.np_nn_candidate_invalid_condition <- function(message,
+                                                owner = NULL,
+                                                point = NULL,
+                                                raw.objective = NULL) {
+  if (!is.character(message) || length(message) != 1L || is.na(message) ||
+      !nzchar(message)) {
+    stop("internal NN candidate-invalid condition requires one message",
+         call. = FALSE)
+  }
+  structure(
+    list(
+      message = message,
+      call = NULL,
+      owner = owner,
+      point = point,
+      raw.objective = raw.objective
+    ),
+    class = c("np_nn_candidate_invalid", "error", "condition")
+  )
+}
+
+.np_nn_abort_candidate_invalid <- function(message,
+                                           owner = NULL,
+                                           point = NULL,
+                                           raw.objective = NULL) {
+  stop(.np_nn_candidate_invalid_condition(
+    message = message,
+    owner = owner,
+    point = point,
+    raw.objective = raw.objective
+  ))
+}
+
+.np_nn_ordinary_schedule <- function(point, nn.indices, caps) {
+  point <- as.double(point)
+  nn.indices <- as.integer(nn.indices)
+  caps <- as.double(caps)
+
+  if (!length(nn.indices)) return(list())
+  if (length(caps) == 1L) caps <- rep.int(caps, length(nn.indices))
+  if (length(caps) != length(nn.indices) || anyNA(nn.indices) ||
+      anyDuplicated(nn.indices) || any(nn.indices < 1L) ||
+      any(nn.indices > length(point))) {
+    stop("internal NN recovery adapter has invalid coordinate indices",
+         call. = FALSE)
+  }
+  if (anyNA(caps) || any(!is.finite(caps)) || any(caps < 1) ||
+      any(caps > .Machine$integer.max) || any(caps != floor(caps))) {
+    stop("internal NN recovery adapter has invalid ordinary caps",
+         call. = FALSE)
+  }
+
+  current <- point[nn.indices]
+  if (anyNA(current) || any(!is.finite(current)) ||
+      any(current > .Machine$integer.max)) {
+    stop("internal NN recovery incumbent has invalid NN coordinates",
+         call. = FALSE)
+  }
+  current <- round(current)
+  if (any(current < 1) || any(current > caps)) {
+    stop("internal NN recovery incumbent lies outside the ordinary NN domain",
+         call. = FALSE)
+  }
+  point[nn.indices] <- current
+
+  out <- list()
+  repeat {
+    incremented <- pmin(caps, current + 1)
+    doubled <- ifelse(current <= floor(caps / 2), 2 * current, caps)
+    next.value <- pmin(caps, pmax(incremented, doubled))
+    if (identical(next.value, current)) break
+    current <- next.value
+    point[nn.indices] <- current
+    if (!length(out) || !identical(out[[length(out)]], point))
+      out[[length(out) + 1L]] <- point
+  }
+  out
+}
+
+.np_nn_find_raw_valid_start <- function(point, nn.indices, caps, raw.eval) {
+  if (!is.function(raw.eval))
+    stop("internal NN recovery adapter requires a raw evaluator", call. = FALSE)
+
+  schedule <- .np_nn_ordinary_schedule(point, nn.indices, caps)
+  for (i in seq_along(schedule)) {
+    candidate <- schedule[[i]]
+    value <- tryCatch(
+      raw.eval(candidate),
+      np_nn_candidate_invalid = function(e) e
+    )
+    if (inherits(value, "np_nn_candidate_invalid")) next
+    if (.np_nn_raw_objective_valid(value)) {
+      return(list(
+        found = TRUE,
+        point = candidate,
+        objective = as.double(value),
+        evaluations = i
+      ))
+    }
+  }
+
+  list(
+    found = FALSE,
+    point = NULL,
+    objective = NA_real_,
+    evaluations = length(schedule)
+  )
+}
+
 .np_degree_eval_key <- function(degree) {
   paste(as.integer(degree), collapse = ",")
 }
