@@ -65,3 +65,26 @@ test_that("raw objective certification rejects penalties at the terminal scale",
   expect_false(np:::.np_nn_raw_objective_valid(.Machine$double.xmax))
   expect_false(np:::.np_nn_raw_objective_valid(-.Machine$double.xmax))
 })
+
+test_that("raw endpoint certification returns a scalar or a typed condition", {
+  point <- c(4, 0.25)
+  expect_identical(
+    np:::.np_nn_certify_raw_point(
+      point, raw.eval = function(x) 1.5, owner = "synthetic MADS"
+    ),
+    1.5
+  )
+
+  condition <- tryCatch(
+    np:::.np_nn_certify_raw_point(
+      point,
+      raw.eval = function(x) .Machine$double.xmax,
+      owner = "synthetic MADS"
+    ),
+    np_nn_candidate_invalid = identity
+  )
+  expect_s3_class(condition, "np_nn_candidate_invalid")
+  expect_identical(condition$owner, "synthetic MADS")
+  expect_identical(condition$point, point)
+  expect_identical(condition$raw.objective, .Machine$double.xmax)
+})

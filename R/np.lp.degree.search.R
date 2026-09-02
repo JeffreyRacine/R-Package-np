@@ -36,6 +36,22 @@
   ))
 }
 
+.np_nn_certify_raw_point <- function(point, raw.eval, owner) {
+  if (!is.function(raw.eval))
+    stop("internal NN endpoint certification requires a raw evaluator",
+         call. = FALSE)
+  value <- raw.eval(point)
+  if (!.np_nn_raw_objective_valid(value)) {
+    .np_nn_abort_candidate_invalid(
+      sprintf("%s returned a candidate with invalid raw objective", owner),
+      owner = owner,
+      point = point,
+      raw.objective = value
+    )
+  }
+  as.double(value)
+}
+
 .np_nn_ordinary_schedule <- function(point, nn.indices, caps) {
   point <- as.double(point)
   nn.indices <- as.integer(nn.indices)
