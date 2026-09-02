@@ -454,8 +454,10 @@
   scaling at two device pixels per CSS pixel, retains native rgl axis labels
   and interaction, and preserves all existing `rgl.*` user overrides. Shared
   rgl setup and option routing now have one internal owner across supported
-  plot families; estimator, bootstrap, interval, and base-renderer arithmetic
-  are unchanged.
+  plot families. Existing `band = "all"` legends now use the same
+  construction-aware quantile, rank, and normal-SE labels as the base renderer,
+  without adding an rgl subtitle or footer; estimator, bootstrap, interval,
+  and base-renderer arithmetic are unchanged.
 
 * `npindexbw()` now canonicalizes its numeric design matrix once at the public
   boundary and reuses that matrix during internal index and coordinate setup.

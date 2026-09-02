@@ -1,6 +1,7 @@
 .np_plot_error_surfaces_rgl <- function(x,
                                         y,
                                         plot.errors.type,
+                                        plot.errors.method,
                                         lerr = NULL,
                                         herr = NULL,
                                         lerr.all = NULL,
@@ -53,9 +54,9 @@
     legend3d.call <- .np_plot_merge_override_args(
       list(
         "topright",
-        legend = c(pointwise = "Pointwise",
-                   simultaneous = "Simultaneous",
-                   bonferroni = "Bonferroni")[drawn.bands],
+        legend = unname(
+          .np_plot_all_band_legend_labels(plot.errors.method)[drawn.bands]
+        ),
         col = unname(band.cols[drawn.bands]),
         lty = .np_plot_lty("solid"),
         lwd = .np_plot_lwd("band_all_surface"),

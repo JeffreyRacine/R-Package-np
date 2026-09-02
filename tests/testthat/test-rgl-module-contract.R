@@ -75,6 +75,106 @@ test_that("canonical rgl controls retain every legend condition contract", {
   expect_error(controls(list(), list(show = 1)), "legend\\$show")
 })
 
+test_that("rgl all-band legends use the canonical construction labels", {
+  skip_if_not(suppressWarnings(requireNamespace("rgl", quietly = TRUE)))
+
+  draw <- getFromNamespace(".np_plot_error_surfaces_rgl", .rgl_test_package)
+  z <- matrix(c(0.2, 0.3, 0.4, 0.5), 2L, 2L)
+
+  capture.legend <- function(method,
+                             simultaneous = TRUE,
+                             legend3d.args = list()) {
+    lower <- list(
+      pointwise = z - 0.05,
+      simultaneous = if (isTRUE(simultaneous)) z - 0.08 else z + NA_real_,
+      bonferroni = z - 0.1
+    )
+    upper <- list(
+      pointwise = z + 0.05,
+      simultaneous = if (isTRUE(simultaneous)) z + 0.08 else z + NA_real_,
+      bonferroni = z + 0.1
+    )
+    captured <- new.env(parent = emptyenv())
+    result <- testthat::with_mocked_bindings(
+      draw(
+        x = 0:1,
+        y = 0:1,
+        plot.errors.type = "all",
+        plot.errors.method = method,
+        lerr.all = lower,
+        herr.all = upper,
+        legend3d.args = legend3d.args
+      ),
+      surface3d = function(...) invisible(NULL),
+      legend3d = function(...) {
+        captured$args <- list(...)
+        invisible(NULL)
+      },
+      .package = "rgl"
+    )
+    expect_true(result)
+    captured$args
+  }
+
+  bootstrap <- capture.legend("bootstrap")
+  expect_identical(
+    bootstrap$legend,
+    c("Pointwise (quantiles)", "Simultaneous (rank-based)",
+      "Bonferroni (quantiles)")
+  )
+
+  asymptotic <- capture.legend("asymptotic", simultaneous = FALSE)
+  expect_identical(
+    asymptotic$legend,
+    c("Pointwise (z × SE)", "Bonferroni (adjusted z × SE)")
+  )
+
+  custom <- c("First", "Second", "Third")
+  expect_identical(
+    capture.legend("bootstrap", legend3d.args = list(legend = custom))$legend,
+    custom
+  )
+  expect_false(
+    capture.legend("bootstrap", legend3d.args = list(plot = FALSE))$plot
+  )
+})
+
+test_that("every rgl error-surface caller passes the resolved error method", {
+  root <- normalizePath(testthat::test_path("..", ".."), mustWork = TRUE)
+  caller.files <- file.path(
+    root,
+    "R",
+    c("np.copula.R",
+      "np.plot.engine.bandwidth.R",
+      "np.plot.engine.conbandwidth.R",
+      "np.plot.engine.condbandwidth.R",
+      "np.plot.engine.dbandwidth.R",
+      "np.plot.engine.plbandwidth.R",
+      "np.plot.engine.rbandwidth.R",
+      "np.plot.engine.scbandwidth.R")
+  )
+  skip_if_not(all(file.exists(caller.files)),
+              "source R files unavailable in installed test context")
+
+  for (i in seq_along(caller.files)) {
+    source <- readLines(caller.files[i], warn = FALSE)
+    call.line <- grep(".np_plot_error_surfaces_rgl(", source, fixed = TRUE)
+    expect_identical(length(call.line), 1L)
+    call.block <- source[call.line:min(call.line + 15L, length(source))]
+    expected <- if (identical(basename(caller.files[i]), "np.copula.R")) {
+      "errors"
+    } else {
+      "plot.errors.method"
+    }
+    method.line <- grep(
+      paste0("plot.errors.method = ", expected),
+      call.block,
+      fixed = TRUE
+    )
+    expect_identical(length(method.line), 1L)
+  }
+})
+
 test_that("supported plot routes use one rgl control owner", {
   root <- normalizePath(testthat::test_path("..", ".."), mustWork = TRUE)
   module <- file.path(root, "R", "np.plot.rgl.R")
