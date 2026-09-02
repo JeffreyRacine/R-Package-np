@@ -14,13 +14,18 @@ npreg_frozen_plot_case <- function(label, bwtype, boot.method) {
     "n <- 80L",
     "x <- runif(n)",
     "y <- x + rnorm(n)",
-    sprintf("fit <- suppressWarnings(npreg(y ~ x, regtype='ll', degree=c(1), bernstein=TRUE, bwtype='%s', nmulti=1))", bwtype),
+    sprintf("fit <- suppressWarnings(npreg(y ~ x, regtype='lp', degree=1L, bernstein.basis=TRUE, bwtype='%s', nmulti=1))", bwtype),
+    "stopifnot(isTRUE(fit$bws$bernstein.basis))",
+    "stopifnot(isTRUE(fit$bws$bernstein.basis.engine))",
+    "stopifnot(all(is.finite(fit$mean)))",
     "tf <- tempfile(fileext='.pdf')",
     "grDevices::pdf(tf)",
     "on.exit({ try(grDevices::dev.off(), silent=TRUE); unlink(tf) }, add=TRUE)",
     sprintf("args <- list(x=fit, neval=20L, errors='bootstrap', bootstrap='%s', boot_control=np_boot_control(nonfixed='frozen'), B=41L, band='pointwise', gradients=TRUE)", boot.method),
     "if (identical(args$bootstrap, 'geom')) args$boot_control <- np_boot_control(nonfixed='frozen', blocklen=4L)",
     "capture.output(do.call(plot, args))",
+    "grDevices::dev.off()",
+    "stopifnot(isTRUE(file.info(tf)$size > 0))",
     sprintf("cat('%s\\n')", ok_tag)
   )
 
