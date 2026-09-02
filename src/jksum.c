@@ -24429,7 +24429,7 @@ static int NP_NOINLINE np_regression_conditional_influence_finish(
   double *mean_stderr,
   double **gradient_stderr)
 {
-  const double denominator = weighted_sums[1];
+  double denominator;
   double influence_scale = 0.0;
   double influence_sum_squares = 1.0;
   int predictor;
@@ -24438,12 +24438,14 @@ static int NP_NOINLINE np_regression_conditional_influence_finish(
   if(num_obs_train <= 0 || num_predictors < 0 || num_continuous < 0 ||
      num_unordered < 0 || num_continuous + num_unordered > num_predictors ||
      response == NULL || kernel_weights == NULL || weighted_sums == NULL ||
-     mean == NULL || mean_stderr == NULL || !R_FINITE(denominator) ||
-     denominator == 0.0 || !R_FINITE(mean[0]) ||
+     mean == NULL || mean_stderr == NULL ||
      (num_predictors > 0 &&
       (permuted_kernel_weights == NULL ||
        permuted_weighted_sums == NULL || gradient == NULL ||
        gradient_stderr == NULL)))
+    return 0;
+  denominator = weighted_sums[1];
+  if(!R_FINITE(denominator) || denominator == 0.0 || !R_FINITE(mean[0]))
     return 0;
   if(num_obs_train <= 1) {
     mean_stderr[0] = 0.0;

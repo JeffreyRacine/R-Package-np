@@ -100,3 +100,37 @@ test_that("the generic scalar branch delegates without duplicate ownership", {
     fixed = TRUE
   )
 })
+
+test_that("conditional influence validates pointers before dereference", {
+  path <- locate_scalar_fit_source()
+  skip_if(is.null(path), "package sources unavailable")
+  engine <- paste(readLines(path, warn = FALSE), collapse = "\n")
+  start <- regexpr(
+    "static int NP_NOINLINE np_regression_conditional_influence_finish(",
+    engine,
+    fixed = TRUE
+  )[[1L]]
+  end <- regexpr(
+    "#define NP_ACCUMULATE_SQUARE(value_)",
+    engine,
+    fixed = TRUE
+  )[[1L]]
+  expect_gt(start, 0L)
+  expect_gt(end, start)
+  finisher <- substr(engine, start, end - 1L)
+
+  pointer.guard <- regexpr("weighted_sums == NULL", finisher, fixed = TRUE)[[1L]]
+  dereference <- regexpr("denominator = weighted_sums[1];", finisher,
+                        fixed = TRUE)[[1L]]
+  value.guard <- regexpr("!R_FINITE(denominator)", finisher,
+                        fixed = TRUE)[[1L]]
+
+  expect_match(finisher, "double denominator;", fixed = TRUE)
+  expect_false(grepl("const double denominator = weighted_sums[1];",
+                     finisher, fixed = TRUE))
+  expect_gt(pointer.guard, 0L)
+  expect_gt(dereference, pointer.guard)
+  expect_gt(value.guard, dereference)
+  expect_identical(fixed_occurrences(finisher,
+                                     "denominator = weighted_sums[1];"), 1L)
+})
