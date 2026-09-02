@@ -19151,10 +19151,10 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
         BANDWIDTH_reg_extern,
         KERNEL_reg_extern,
         num_obs_train_extern,
-        num_obs_eval_extern,
+        num_obs_train_extern,
         num_reg_continuous_extern,
         matrix_X_continuous_train_extern,
-        matrix_X_continuous_eval_extern) :
+        matrix_X_continuous_train_extern) :
       np_continuous_extendednn_eval_upper_alloc(
         BANDWIDTH_reg_extern,
         num_obs_train_extern,
