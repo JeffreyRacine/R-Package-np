@@ -9,6 +9,7 @@ np_round_half_to_even <- getFromNamespace(".np_round_half_to_even", "np")
 validate_bandwidth <- getFromNamespace("validateBandwidthTF", "np")
 npscoef_raw_objective_valid <- getFromNamespace(".npscoefbw_raw_objective_valid", "np")
 npscoef_assert_training_radius <- getFromNamespace(".npscoef_nn_assert_training_radius", "np")
+semihat_regbw_args <- getFromNamespace(".np_semihat_make_regbw_args", "np")
 
 test_that("npscoefbw surfaces fixed-start controls as formal arguments", {
   expect_true(all(c("scale.factor.init.lower", "scale.factor.init.upper", "scale.factor.init", "lbd.init", "hbd.init", "dfac.init") %in%
@@ -201,6 +202,14 @@ test_that("npscoefbw nearest-neighbor helpers preserve categorical coordinates",
     bwtype = "generalized_nn"
   )
   expect_equal(manual$bw, c(0.25, 12, 0.4))
+  helper.args <- semihat_regbw_args(
+    source = manual,
+    xdat = zdat,
+    ydat = seq_len(80L),
+    bw = manual$bw
+  )
+  expect_length(helper.args$ckerlb, ncol(zdat))
+  expect_length(helper.args$ckerub, ncol(zdat))
 })
 
 test_that("npscoefbw NN radius admission uses exact training multiplicities", {

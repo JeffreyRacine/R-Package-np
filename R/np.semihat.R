@@ -21,7 +21,8 @@
     vv <- as.double(v)
     if (ncon.target <= 0L)
       return(NULL)
-    if (length(vv) <= 1L || length(vv) == ncon.target)
+    if (length(vv) <= 1L || length(vv) == ncon.target ||
+        length(vv) == ncol(xdat))
       return(vv)
     if (ncon.target == 1L) {
       uu <- unique(vv)
