@@ -149,12 +149,6 @@ npregbw.NULL <-
     engine %in% c("nomad", "nomad+powell")
 }
 
-.npregbw_native_raw_objective_valid <- function(value) {
-  value <- as.numeric(value)
-  length(value) == 1L && !is.na(value) && is.finite(value) &&
-    !identical(value, .Machine$double.xmax)
-}
-
 .npregbw_nomad_native_require_crs <- function() {
   if (!requireNamespace("crs", quietly = TRUE))
     stop("native npreg NOMAD route requires crs >= 0.15-46", call. = FALSE)
@@ -1838,7 +1832,7 @@ npregbw.rbandwidth <-
 
   .np_nomad_baseline_note(degree.search$start.degree)
 
-  eval_fun <- function(point) {
+  eval_point <- function(point, invalid.penalty) {
     point <- as.numeric(point)
     degree <- as.integer(round(point[ncon + ncat + seq_len(ncon)]))
     degree <- .np_degree_clip_to_grid(degree, degree.search$candidates)
@@ -1862,11 +1856,9 @@ npregbw.rbandwidth <-
       xdat = xdat,
       ydat = ydat,
       bws = tbw,
-      invalid.penalty = "baseline",
+      invalid.penalty = invalid.penalty,
       penalty.multiplier = if (is.null(opt.args$penalty.multiplier)) 10 else opt.args$penalty.multiplier
     )
-    nomad.num.feval.total <<- nomad.num.feval.total + as.numeric(out$num.feval[1L])
-    nomad.num.feval.fast.total <<- nomad.num.feval.fast.total + as.numeric(out$num.feval.fast[1L])
 
     list(
       objective = out$objective,
@@ -1874,6 +1866,21 @@ npregbw.rbandwidth <-
       num.feval = out$num.feval,
       num.feval.fast = out$num.feval.fast
     )
+  }
+
+  eval_fun <- function(point) {
+    out <- eval_point(point, invalid.penalty = "baseline")
+    nomad.num.feval.total <<- nomad.num.feval.total +
+      as.numeric(out$num.feval[1L])
+    nomad.num.feval.fast.total <<- nomad.num.feval.fast.total +
+      as.numeric(out$num.feval.fast[1L])
+    out
+  }
+
+  eval_raw_point <- function(point) eval_point(point, invalid.penalty = "dbmax")
+
+  raw_eval_fun <- function(point) {
+    as.numeric(eval_raw_point(point)$objective[1L])
   }
 
   build_payload <- function(point, best_record, solution, interrupted) {
@@ -1894,24 +1901,28 @@ npregbw.rbandwidth <-
       yname = yname
     )
 
+    direct.objective <- .np_nn_certify_raw_point(
+      point = point,
+      raw.eval = raw_eval_fun,
+      owner = "native npreg NOMAD degree-search route"
+    )
     direct.payload <- .npregbw_finalize_fixed_degree_payload(
       xdat = xdat,
       ydat = ydat,
       bws = final.tbw,
       core = list(
         bw = as.numeric(final.tbw$bw),
-        objective = as.numeric(best_record$objective),
-        ifval = as.numeric(best_record$objective),
+        objective = direct.objective,
+        ifval = direct.objective,
         num.feval = as.numeric(nomad.num.feval.total),
         num.feval.fast = as.numeric(nomad.num.feval.fast.total),
-        fval.history = as.numeric(best_record$objective),
+        fval.history = direct.objective,
         eval.history = if (!is.null(solution$bbe)) rep(1, max(1L, as.integer(solution$bbe))) else 1,
         invalid.history = 0,
         timing = NA_real_
       ),
       total.time = NA_real_
     )
-    direct.objective <- as.numeric(best_record$objective)
 
     if (identical(degree.search$engine, "nomad+powell")) {
       hot.opt.args <- .np_nomad_powell_hotstart_opt_args(
@@ -2075,7 +2086,7 @@ npregbw.rbandwidth <-
       } else {
         as.integer(round(native$best_point[degree.idx]))
       }
-      native.objective <- as.numeric(native$objective[1L])
+      raw.objective <- raw_eval_fun(as.numeric(native$best_point))
       list(
         restart = as.integer(restart.index),
         remin = isTRUE(remin),
@@ -2084,7 +2095,7 @@ npregbw.rbandwidth <-
         elapsed = native.elapsed,
         status = "ok",
         message = as.character(native$message[1L]),
-        objective = native.objective,
+        objective = raw.objective,
         bbe = as.numeric(native$blackbox_evaluations[1L]),
         iterations = as.numeric(native$iterations[1L]),
         solution = as.numeric(native$solution),
@@ -2119,10 +2130,62 @@ npregbw.rbandwidth <-
           num.feval = NA_real_
         )
       }
-      if (.npregbw_native_raw_objective_valid(native.i$objective) &&
+      if (.np_nn_raw_objective_valid(native.i$objective) &&
           .np_degree_better(native.i$objective, native.best.objective, direction = "min")) {
         native.best.objective <- native.i$objective
         native.best.index <- i
+      }
+    }
+
+    if (!is.finite(native.best.index) &&
+        all(template$bw == 0) &&
+        template$type %in% c("generalized_nn", "adaptive_nn")) {
+      recovery.raw.eval <- function(point) {
+        out <- eval_raw_point(point)
+        raw.objective <- as.numeric(out$objective[1L])
+        native.num.feval.total <<- native.num.feval.total +
+          as.numeric(out$num.feval[1L])
+        native.num.feval.fast.total <<- native.num.feval.fast.total +
+          as.numeric(out$num.feval.fast[1L])
+        if (!.np_nn_raw_objective_valid(raw.objective)) {
+          native.num.feval.invalid.total <<- native.num.feval.invalid.total +
+            as.numeric(out$num.feval[1L])
+        }
+        raw.objective
+      }
+      ordinary.cap <- if (identical(template$type, "adaptive_nn")) {
+        nrow(xdat) - 2L
+      } else {
+        nrow(xdat) - 1L
+      }
+      recovery <- .np_nn_find_raw_valid_start(
+        point = as.numeric(native.start.matrix[1L, ]),
+        nn.indices = seq_len(ncon),
+        caps = rep.int(ordinary.cap, ncon),
+        raw.eval = recovery.raw.eval
+      )
+      if (isTRUE(recovery$found)) {
+        native.start.matrix <- rbind(native.start.matrix, recovery$point)
+        recovery.index <- nrow(native.start.matrix)
+        native.recovery <- run_native_restart(
+          start = as.numeric(recovery$point),
+          restart.index = recovery.index
+        )
+        native.results[[recovery.index]] <- native.recovery
+        native.nomad.elapsed <- native.nomad.elapsed +
+          as.numeric(native.recovery$elapsed[1L])
+        native.num.feval.total <- native.num.feval.total +
+          as.numeric(native.recovery$native$total_num.feval[1L])
+        native.num.feval.fast.total <- native.num.feval.fast.total +
+          as.numeric(native.recovery$native$total_num.feval.fast[1L])
+        native.num.feval.invalid.total <- native.num.feval.invalid.total +
+          as.numeric(native.recovery$native$total_num.feval.invalid[1L])
+        native.callback.total <- native.callback.total +
+          as.integer(native.recovery$native$compiled_callback_calls[1L])
+        if (.np_nn_raw_objective_valid(native.recovery$objective)) {
+          native.best.objective <- native.recovery$objective
+          native.best.index <- recovery.index
+        }
       }
     }
     if (!is.finite(native.best.index))
@@ -2142,7 +2205,7 @@ npregbw.rbandwidth <-
       native.num.feval.fast.total <- native.num.feval.fast.total + as.numeric(native.remin$native$total_num.feval.fast[1L])
       native.num.feval.invalid.total <- native.num.feval.invalid.total + as.numeric(native.remin$native$total_num.feval.invalid[1L])
       native.callback.total <- native.callback.total + as.integer(native.remin$native$compiled_callback_calls[1L])
-      if (.npregbw_native_raw_objective_valid(native.remin$objective) &&
+      if (.np_nn_raw_objective_valid(native.remin$objective) &&
           .np_degree_better(native.remin$objective, native.best.objective, direction = "min")) {
         native.best.objective <- native.remin$objective
         native.best.index <- remin.index

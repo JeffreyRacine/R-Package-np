@@ -44,3 +44,39 @@ test_that("failure-only retry never rewrites explicit adaptive-NN starts", {
     fixed = TRUE
   )
 })
+
+test_that("automatic generalized-NN NOMAD degree search retries only after raw failure", {
+  skip_if_not_installed("crs", minimum_version = "0.15.46")
+  old <- options(np.messages = FALSE)
+  on.exit(options(old), add = TRUE)
+  data("wage1", package = "np")
+
+  bw <- npregbw(
+    lwage ~ educ + exper + tenure,
+    data = wage1,
+    bwtype = "generalized_nn",
+    regtype = "lp",
+    degree.select = "coordinate",
+    search.engine = "nomad",
+    degree.min = 0L,
+    degree.max = 2L,
+    degree.max.cycles = 3L,
+    nmulti = 1L,
+    itmax = 240L,
+    powell.remin = FALSE
+  )
+  raw <- getFromNamespace(".npregbw_eval_only", "np")(
+    xdat = wage1[c("educ", "exper", "tenure")],
+    ydat = wage1$lwage,
+    bws = bw,
+    invalid.penalty = "dbmax"
+  )$objective
+
+  expect_identical(bw$degree.search$mode, "nomad")
+  expect_gt(bw$nomad.best.restart, 1L)
+  expect_identical(
+    bw$nomad.restart.degree.starts[[bw$nomad.best.restart]],
+    bw$nomad.restart.degree.starts[[1L]]
+  )
+  expect_identical(as.double(bw$fval), as.double(raw))
+})
