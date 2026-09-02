@@ -41,3 +41,30 @@ for (nn.type in c("generalized_nn", "adaptive_nn")) {
     })
   }
 }
+
+for (nn.type in c("generalized_nn", "adaptive_nn")) {
+  for (nn.family in c("regression", "density", "distribution",
+                      "conditional-distribution")) {
+    test_that(paste(nn.family, nn.type, "MADS preserves public restart shape"), {
+      old <- options(np.messages = FALSE, np.tree = FALSE)
+      on.exit(options(old), add = TRUE)
+      x <- data.frame(x = seq(-1, 1, length.out = 24L))
+      y <- data.frame(y = sin(2 * x$x) + seq_len(24L) / 100)
+      controls <- list(bwtype = nn.type, bwsolver = "mads", nmulti = 1L,
+                       powell.remin = FALSE,
+                       nomad.opts = list(MAX_BB_EVAL = 40L))
+      bw <- switch(nn.family,
+        regression = do.call(npregbw, c(list(xdat = x, ydat = y$y,
+                                             regtype = "lc"), controls)),
+        density = do.call(npudensbw, c(list(dat = x), controls)),
+        distribution = do.call(npudistbw, c(list(dat = x), controls)),
+        `conditional-distribution` = do.call(npcdistbw,
+          c(list(xdat = x, ydat = y, regtype = "lc"), controls)))
+      expect_length(bw$nomad.restart.results, 1L)
+      expect_identical(names(bw$nomad.restart.results[[1L]]),
+        c("restart", "start", "elapsed", "status", "message", "objective",
+          "bbe", "iterations", "solution", "best_point", "best_objective",
+          "native"))
+    })
+  }
+}

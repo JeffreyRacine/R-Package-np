@@ -634,7 +634,6 @@ npNomadNativeSearchDistribution <- function(prep,
         solution = as.numeric(native.i$solution),
         best_point = as.numeric(native.i$best_point),
         best_objective = objective.i,
-        raw_objective = raw.objective.i,
         native = native.i
       )
       native.num.feval.total <- native.num.feval.total + as.numeric(native.i$total_num.feval[1L])
