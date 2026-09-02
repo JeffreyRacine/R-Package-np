@@ -3580,9 +3580,9 @@ static void np_copy_scale_factor(double *dest, const double *src, int n)
     dest[i] = src[i];
 }
 
-static int np_adaptive_nn_joint_ordinary_advance(double *candidate,
-                                                 const int num_continuous,
-                                                 const int maximum_k)
+static int np_ordinary_nn_joint_advance(double *candidate,
+                                        const int num_continuous,
+                                        const int maximum_k)
 {
   int i;
   int advanced = 0;
@@ -3592,8 +3592,15 @@ static int np_adaptive_nn_joint_ordinary_advance(double *candidate,
 
   for (i = 1; i <= num_continuous; ++i) {
     const int lookup_k = (int)candidate[i];
-    const int next_k = MIN(maximum_k,
-                           MAX(lookup_k + 1, 2*lookup_k));
+    int next_k = maximum_k;
+
+    if (lookup_k < maximum_k) {
+      const int incremented_k = lookup_k + 1;
+      const int doubled_k = (lookup_k <= maximum_k/2) ?
+        2*lookup_k : maximum_k;
+
+      next_k = MIN(maximum_k, MAX(incremented_k, doubled_k));
+    }
 
     if (next_k > lookup_k) {
       candidate[i] = (double)next_k;
@@ -3658,7 +3665,7 @@ static double bwmfunc_raw_current_scale(double *vector_scale_factor, int n)
   return val;
 }
 
-static int np_adaptive_nn_find_finite_raw_seed(
+static int np_ordinary_nn_find_finite_raw_seed(
   double *candidate,
   const int num_continuous,
   const int num_obs,
@@ -3696,7 +3703,7 @@ static int np_adaptive_nn_find_finite_raw_seed(
   for (probe = 0; probe < probe_limit; ++probe) {
     double value;
 
-    if (!np_adaptive_nn_joint_ordinary_advance(
+    if (!np_ordinary_nn_joint_advance(
           candidate, num_continuous, maximum_k))
       break;
 
@@ -4646,7 +4653,7 @@ static void np_conditional_density_refresh_penalty_canonical(
         int advanced = 0;
 
         if (adaptive_lp_reseed) {
-          advanced = np_adaptive_nn_joint_ordinary_advance(
+          advanced = np_ordinary_nn_joint_advance(
             tmp,
             num_var_continuous_extern + num_reg_continuous_extern,
             num_obs_train_extern - 2);
@@ -19749,7 +19756,7 @@ regression_powell_attempt:
           (iImproved > 0) ? iImproved - 1 : 0;
         adaptive_retry_improved = iImproved;
         bwm_reset_counters();
-        found_finite_seed = np_adaptive_nn_find_finite_raw_seed(
+        found_finite_seed = np_ordinary_nn_find_finite_raw_seed(
           vector_scale_factor,
           num_reg_continuous_extern,
           num_obs_train_extern,
