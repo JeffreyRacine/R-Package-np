@@ -101,7 +101,7 @@ test_that("ordinary generalized-NN unconditional fit reports zero literal radii"
   )
   expect_error(
     npudens(bws = bw, tdat = dat),
-    "zero literal radius after occurrence exclusion",
+    "zero literal radius",
     fixed = TRUE
   )
   dist_bw <- npudistbw(
@@ -110,7 +110,7 @@ test_that("ordinary generalized-NN unconditional fit reports zero literal radii"
   )
   expect_error(
     npudist(bws = dist_bw, tdat = dat),
-    "zero literal radius after occurrence exclusion",
+    "zero literal radius",
     fixed = TRUE
   )
 

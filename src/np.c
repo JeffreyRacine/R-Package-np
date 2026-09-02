@@ -43,6 +43,7 @@ extern MPI_Comm	*comm;
 /* headers.h has all definitions of routines used by main() and related modules */
 
 #include "headers.h"
+#include "nn_radius_error.h"
 #include "beta_bandwidth.h"
 #include "continuous_kernel_row.h"
 #include "beta_scaled_row.h"
@@ -8698,6 +8699,12 @@ SEXP C_np_conditional_count_levels(SEXP txcon,
         num_train_x, num_eval_x, num_x, 0,
         need_eval, need_train, 0,
         bandwidth_eval_x_storage, bandwidth_train_x_storage);
+      if(bandwidth_status == NP_BETA_BANDWIDTH_PREPARE_ERR_ZERO_RADIUS) {
+        const NPNNZeroRadiusInfo info = np_nn_zero_radius_info_flat(
+          need_eval ? BW_GEN_NN : BW_ADAP_NN, num_train_x, num_eval_x, num_x,
+          REAL(txcon_r), REAL(excon_r), REAL(rbwx_r), NULL, 0);
+        np_nn_zero_radius_error(&info);
+      }
       if(bandwidth_status != NP_BETA_BANDWIDTH_PREPARE_OK)
         error("C_np_conditional_count_levels: x-side %s",
               np_beta_bandwidth_prepare_status_message(bandwidth_status));
@@ -8708,6 +8715,12 @@ SEXP C_np_conditional_count_levels(SEXP txcon,
         num_train_y, num_eval_y, num_y, 0,
         need_eval, need_train, 0,
         bandwidth_eval_y_storage, bandwidth_train_y_storage);
+      if(bandwidth_status == NP_BETA_BANDWIDTH_PREPARE_ERR_ZERO_RADIUS) {
+        const NPNNZeroRadiusInfo info = np_nn_zero_radius_info_flat(
+          need_eval ? BW_GEN_NN : BW_ADAP_NN, num_train_y, num_eval_y, num_y,
+          REAL(tycon_r), REAL(eycon_r), REAL(rbwy_r), NULL, num_x);
+        np_nn_zero_radius_error(&info);
+      }
       if(bandwidth_status != NP_BETA_BANDWIDTH_PREPARE_OK)
         error("C_np_conditional_count_levels: y-side %s",
               np_beta_bandwidth_prepare_status_message(bandwidth_status));
@@ -9166,6 +9179,7 @@ static SEXP np_regression_lp_apply_conditional_impl(SEXP txuno,
   int derivative_variable = 0;
   int derivative_order = 0;
   NPRegressionLPMatrixStatus compute_status = NP_REGRESSION_LP_MATRIX_ERROR;
+  NPNNZeroRadiusInfo zero_radius_info;
   const char *failure_message = NULL;
   int int_large_sf_save = int_LARGE_SF;
   double nconfac_save = nconfac_extern;
@@ -9557,6 +9571,13 @@ static SEXP np_regression_lp_apply_conditional_impl(SEXP txuno,
 
 cleanup_lp_apply_wrapper:
 
+  if(compute_status == NP_REGRESSION_LP_MATRIX_ZERO_RADIUS)
+    zero_radius_info = np_nn_zero_radius_info(
+      BANDWIDTH_den_extern, num_obs_train, num_obs_eval, ncol_txcon,
+      matrix_X_continuous_train_extern, matrix_X_continuous_eval_extern,
+      REAL(rbw_r), descriptor.family == NP_CKERNEL_FAMILY_BETA ?
+        NULL : nn_geometry_context_ptr, 0);
+
   if(kdt_extern_X != NULL) free_kdtree(&kdt_extern_X);
   safe_free(ipt_extern_X); safe_free(ipt_lookup_extern_X);
   if(matrix_X_unordered_train_extern != NULL) free_mat(matrix_X_unordered_train_extern, num_reg_unordered_extern);
@@ -9593,6 +9614,8 @@ cleanup_lp_apply_wrapper:
 
   UNPROTECT(nprotect);
   if(compute_status != NP_REGRESSION_LP_MATRIX_OK || failure_message != NULL) {
+    if(compute_status == NP_REGRESSION_LP_MATRIX_ZERO_RADIUS)
+      np_nn_zero_radius_error(&zero_radius_info);
     if(descriptor.family == NP_CKERNEL_FAMILY_BETA &&
        beta_diagnostics.beta_status != NP_BETA_OK)
       error("C_np_regression_lp_apply_conditional: beta row failed in continuous dimension %d: %s",
@@ -12171,6 +12194,12 @@ SEXP C_np_kernelsum(SEXP tuno,
         num_train, num_eval, ncon, train_is_eval,
         need_eval, need_train, 0,
         bandwidth_eval_storage, bandwidth_train_storage);
+      if(bandwidth_status == NP_BETA_BANDWIDTH_PREPARE_ERR_ZERO_RADIUS) {
+        const NPNNZeroRadiusInfo info = np_nn_zero_radius_info_flat(
+          beta_bandwidth_code, num_train, num_eval, ncon,
+          REAL(tcon_r), train_is_eval ? NULL : REAL(econ_r), REAL(bw_r), NULL, 0);
+        np_nn_zero_radius_error(&info);
+      }
       if(bandwidth_status != NP_BETA_BANDWIDTH_PREPARE_OK)
         error("C_np_kernelsum: %s",
               np_beta_bandwidth_prepare_status_message(bandwidth_status));
@@ -12416,10 +12445,16 @@ SEXP C_np_regression_k1_geometry_validate(SEXP train,
     ntrain, neval, 1,
     REAL(train_r), REAL(evaluation_r), 1,
     &geometry_context, distance);
+  if(status == NP_NN_GEOMETRY_ZERO_RADIUS) {
+    const double k = 1.0;
+    const NPNNZeroRadiusInfo info = np_nn_zero_radius_info_flat(
+      BW_GEN_NN, ntrain, neval, 1, REAL(train_r), REAL(evaluation_r),
+      &k, &geometry_context, 0);
+    UNPROTECT(2);
+    np_nn_zero_radius_error(&info);
+  }
   UNPROTECT(2);
 
-  if(status == NP_NN_GEOMETRY_ZERO_RADIUS)
-    error("generalized nearest-neighbor bandwidth has a zero literal radius for the requested k=1 query geometry");
   if(status != NP_NN_GEOMETRY_OK)
     error("generalized nearest-neighbor k=1 geometry failed with status %d",
           (int)status);
@@ -12617,6 +12652,12 @@ SEXP C_np_kernelsum_power12(SEXP tuno,
         REAL(bw_r), num_train, num_eval, ncon, train_is_eval,
         need_eval, need_train, 0,
         bandwidth_eval_storage, bandwidth_train_storage);
+      if(bandwidth_status == NP_BETA_BANDWIDTH_PREPARE_ERR_ZERO_RADIUS) {
+        const NPNNZeroRadiusInfo info = np_nn_zero_radius_info_flat(
+          bandwidth_code, num_train, num_eval, ncon,
+          REAL(tcon_r), train_is_eval ? NULL : REAL(econ_r), REAL(bw_r), NULL, 0);
+        np_nn_zero_radius_error(&info);
+      }
       if(bandwidth_status != NP_BETA_BANDWIDTH_PREPARE_OK)
         error("C_np_kernelsum_power12: %s",
               np_beta_bandwidth_prepare_status_message(bandwidth_status));
@@ -17623,6 +17664,13 @@ static int np_beta_prepared_bandwidth_view_init_or_error(
     need_eval, need_train, 0,
     need_eval ? bandwidth_columns : NULL,
     need_train ? bandwidth_columns : NULL);
+  if(status == NP_BETA_BANDWIDTH_PREPARE_ERR_ZERO_RADIUS) {
+    const NPNNZeroRadiusInfo info = np_nn_zero_radius_info(
+      bandwidth_mode, num_obs_train, num_obs_eval, num_reg_continuous,
+      matrix_X_continuous_train, matrix_X_continuous_eval,
+      (double *)vector_scale_factor, NULL, 0);
+    np_nn_zero_radius_error(&info);
+  }
   if(status != NP_BETA_BANDWIDTH_PREPARE_OK)
     error("np_density_conditional: %s",
           np_beta_bandwidth_prepare_status_message(status));
@@ -18169,6 +18217,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                             num_var_unordered_extern + i];
 
     if(beta_y_active) {
+      NPNNGeometryStatus beta_y_geometry_status = NP_NN_GEOMETRY_OK;
       const NPContinuousKernelRowStatus row_status =
         np_beta_continuous_bandwidth_prepare_canonical(
           BANDWIDTH_den_extern,
@@ -18184,7 +18233,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
           NULL,
           lambda_y,
           NULL,
-          NULL) == 0 ?
+          &beta_y_geometry_status) == 0 ?
             np_beta_scaled_row_context_prepare(
               &beta_y_row_context,
               response_kernel_route,
@@ -18227,6 +18276,15 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
 
       if(row_status != NP_CONTINUOUS_ROW_OK) {
         np_beta_scaled_row_context_clear(&beta_y_row_context);
+        if(beta_y_geometry_status == NP_NN_GEOMETRY_ZERO_RADIUS) {
+          const NPNNZeroRadiusInfo info = np_nn_zero_radius_info(
+            BANDWIDTH_den_extern, num_obs_train_extern, num_obs_eval_extern,
+            num_var_continuous_extern,
+            matrix_XY_continuous_train_extern + num_reg_continuous_extern,
+            matrix_XY_continuous_eval_extern + num_reg_continuous_extern,
+            vsf_y, NULL, num_reg_continuous_extern);
+          np_nn_zero_radius_error(&info);
+        }
         error("np_density_conditional: canonical beta response-row preparation failed: %s",
               np_continuous_kernel_row_status_message(row_status));
       }
@@ -18255,8 +18313,15 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
            full_fit_nn_geometry_context_ptr,
            NULL,
            &nn_geometry_status) != 0) {
-        if(nn_geometry_status == NP_NN_GEOMETRY_ZERO_RADIUS)
-          error("conditional density/distribution fit encountered a zero literal response radius after occurrence exclusion");
+        if(nn_geometry_status == NP_NN_GEOMETRY_ZERO_RADIUS) {
+          const NPNNZeroRadiusInfo info = np_nn_zero_radius_info(
+            BANDWIDTH_den_extern, num_obs_train_extern, num_obs_eval_extern,
+            num_var_continuous_extern,
+            matrix_XY_continuous_train_extern + num_reg_continuous_extern,
+            matrix_XY_continuous_eval_extern + num_reg_continuous_extern,
+            vsf_y, full_fit_nn_geometry_context_ptr, num_reg_continuous_extern);
+          np_nn_zero_radius_error(&info);
+        }
         error("np_density_conditional: invalid generalized-NN response bandwidth");
       }
     }
@@ -18382,6 +18447,14 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                                       NULL,
                                       ykw,
                                       NULL);
+      }
+      if(status == KWSNP_ERR_ZERO_NN_RADIUS) {
+        const NPNNZeroRadiusInfo info = np_nn_zero_radius_info(
+          BANDWIDTH_den_extern, num_obs_train_extern, 1,
+          num_var_continuous_extern,
+          matrix_XY_continuous_train_extern + num_reg_continuous_extern,
+          ycon_eval_one, vsf_y, NULL, num_reg_continuous_extern);
+        np_nn_zero_radius_error(&info);
       }
       if(status != 0)
         error("np_density_conditional: y-kernel response construction failed in LP path");
@@ -21327,8 +21400,13 @@ static void np_kernelsum_common(double * tuno, double * tord, double * tcon,
          &query_status) != 0){
       free_tmat(query_bandwidth);
       free(query_lambda);
-      if(query_status == NP_NN_GEOMETRY_ZERO_RADIUS)
-        error("C_np_kernelsum: generalized nearest-neighbor training query has a zero literal radius after occurrence exclusion");
+      if(query_status == NP_NN_GEOMETRY_ZERO_RADIUS) {
+        const NPNNZeroRadiusInfo info = np_nn_zero_radius_info(
+          BANDWIDTH_reg_extern, num_obs_train_extern, num_obs_eval_extern,
+          num_reg_continuous_extern, matrix_X_continuous_train_extern,
+          matrix_X_continuous_eval_extern, &vector_scale_factor[1], &query_geometry, 0);
+        np_nn_zero_radius_error(&info);
+      }
       error("C_np_kernelsum: generalized nearest-neighbor training geometry failed with status %d",
             (int)query_status);
     }
@@ -21447,8 +21525,13 @@ static void np_kernelsum_common(double * tuno, double * tord, double * tcon,
   free(query_lambda);
 
   if(npks_err != 0){
-    if(npks_err == KWSNP_ERR_ZERO_NN_RADIUS)
-      error("nearest-neighbor bandwidth has a zero literal radius");
+    if(npks_err == KWSNP_ERR_ZERO_NN_RADIUS) {
+      const NPNNZeroRadiusInfo info = np_nn_zero_radius_info(
+        BANDWIDTH_reg_extern, num_obs_train_extern, num_obs_eval_extern,
+        num_reg_continuous_extern, matrix_X_continuous_train_extern,
+        matrix_X_continuous_eval_extern, &vector_scale_factor[1], NULL, 0);
+      np_nn_zero_radius_error(&info);
+    }
     error("kernel_weighted_sum_np failed with code %d", npks_err);
   }
 

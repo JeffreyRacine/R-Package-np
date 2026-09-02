@@ -645,7 +645,7 @@ npreg.rbandwidth <-
       integer(1)
     }
 
-    myout <- .np_with_compiled_fit_progress(
+    myout <- .np_with_nn_radius_context(.np_with_compiled_fit_progress(
       label = "Fitting regression",
       total = .np_reg_fit_total(
         bws = bws,
@@ -676,7 +676,7 @@ npreg.rbandwidth <-
             as.double(cker.bounds.c$lb),
             as.double(cker.bounds.c$ub),
             PACKAGE = "np")
-    )
+    ), continuous.names = bws[["xnames", exact = TRUE]][bws[["icon", exact = TRUE]]])
 
     if (gradients){
       myout$g = matrix(data=myout$g, nrow = enrow, ncol = ncol, byrow = FALSE) 

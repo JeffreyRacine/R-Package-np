@@ -1,5 +1,11 @@
 # np 0.70-6
 
+* Terminal nearest-neighbor zero-radius errors now share a diagnostic that
+  identifies the continuous variable and tied-donor geometry and suggests
+  fixed bandwidths (the default). `npsigtest()` also identifies the failing
+  stage. Successful fits, positive radii, and optimizer trial rejection are
+  unchanged; repeated values alone are not rejected.
+
 * Principal estimator and bandwidth entry points now reject unknown named
   arguments passed through `...` before evaluating their values. Diagnostics
   suggest an unambiguous canonical spelling when one is available, while

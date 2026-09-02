@@ -432,6 +432,9 @@ npsigtest.rbandwidth <- function(bws,
 
   num.obs <- nrow(xdat)
 
+  nn.stage <- "unrestricted gradient evaluation"
+  .np_with_nn_radius_context({
+
   if(!joint) {
 
     In <- numeric(length(index))
@@ -481,6 +484,7 @@ npsigtest.rbandwidth <- function(bws,
     ## the jth element, discrete or continuous
 
     progress <- .np_progress_step(progress)
+    nn.stage <- "unrestricted gradient evaluation"
     npreg.out <- npreg(txdat = xdat,
                        tydat = ydat,
                        bws = bws,
@@ -496,6 +500,7 @@ npsigtest.rbandwidth <- function(bws,
       ## Compute scale and mean of unrestricted residuals
 
       progress <- .np_progress_step(progress)
+      nn.stage <- "unrestricted residual fit"
       ei.unres <- scale(residuals(npreg(bws=bws)))
       ei.unres.scale <- attr(ei.unres,"scaled:scale")
       ei.unres.center <- attr(ei.unres,"scaled:center")      
@@ -521,6 +526,7 @@ npsigtest.rbandwidth <- function(bws,
       }
       
       progress <- .np_progress_step(progress)
+      nn.stage <- "null-model evaluation"
       mhat.xi <-  npreg(txdat = xdat,
                         tydat = ydat,
                         exdat = xdat.eval,
@@ -542,6 +548,7 @@ npsigtest.rbandwidth <- function(bws,
     if(boot.type=="II")
       bws.boot.prev <- bws.original
 
+    nn.stage <- "bootstrap"
     if (streamed.iid) {
       tile.width <- 8L
       for (tile.start in seq.int(1L, B, by = tile.width)) {
@@ -728,6 +735,7 @@ npsigtest.rbandwidth <- function(bws,
 
     if (streamed.iid) {
       progress <- .np_progress_step(progress)
+      nn.stage <- "unrestricted gradient evaluation"
       streamed.unrestricted <- npreg(
         txdat = xdat,
         tydat = ydat,
@@ -738,6 +746,7 @@ npsigtest.rbandwidth <- function(bws,
       )
       progress <- .np_progress_step(progress)
       progress <- .np_progress_step(progress)
+      nn.stage <- "unrestricted residual fit"
       streamed.ei.unres <- scale(residuals(npreg(bws = bws)))
       streamed.ei.unres.scale <- attr(streamed.ei.unres, "scaled:scale")
       streamed.ei.unres.center <- attr(streamed.ei.unres, "scaled:center")
@@ -772,6 +781,7 @@ npsigtest.rbandwidth <- function(bws,
         npreg.out <- streamed.unrestricted
       } else {
         progress <- .np_progress_step(progress)
+        nn.stage <- "unrestricted gradient evaluation"
         npreg.out <- npreg(txdat = xdat,
                            tydat = ydat,
                            bws = bws,
@@ -792,6 +802,7 @@ npsigtest.rbandwidth <- function(bws,
           ei.unres.center <- streamed.ei.unres.center
         } else {
           progress <- .np_progress_step(progress)
+          nn.stage <- "unrestricted residual fit"
           ei.unres <- scale(residuals(npreg(bws=bws)))
           ei.unres.scale <- attr(ei.unres,"scaled:scale")
           ei.unres.center <- attr(ei.unres,"scaled:center")
@@ -816,6 +827,7 @@ npsigtest.rbandwidth <- function(bws,
         }
         
         progress <- .np_progress_step(progress)
+        nn.stage <- "null-model evaluation"
         mhat.xi <-  npreg(txdat = xdat,
                           tydat = ydat,
                           exdat = xdat.eval,
@@ -837,6 +849,7 @@ npsigtest.rbandwidth <- function(bws,
       if(boot.type=="II")
         bws.boot.prev <- bws.original
 
+      nn.stage <- "bootstrap"
       if (streamed.iid) {
         tile.width <- 8L
         for (tile.start in seq.int(1L, B, by = tile.width)) {
@@ -1047,7 +1060,17 @@ npsigtest.rbandwidth <- function(bws,
           joint = joint,
           boot.type = boot.type,
           boot.num = B)
-
+  }, continuous.names = names(xdat)[bws[["icon", exact = TRUE]]], context = {
+    if (identical(nn.stage, "bootstrap")) {
+      if (streamed.iid)
+        sprintf("npsigtest during bootstrap replications %d-%d",
+                tile.start, tile.start + tile.count - 1L)
+      else
+        sprintf("npsigtest during bootstrap replication %d", i.star)
+    } else {
+      paste("npsigtest during", nn.stage)
+    }
+  })
 }
 
 .np_npsig_default_test_args <- c(
