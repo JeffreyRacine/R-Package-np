@@ -695,6 +695,7 @@ npsigtest.rbandwidth <- function(bws,
   a <- -0.6180339887499  # (1-sqrt(5))/2
   b <- 1.6180339887499   # (1+sqrt(5))/2
   P.a <-0.72360679774998 # (1+sqrt(5))/(2*sqrt(5))
+  P.rademacher <- 0.5
 
   draw.wild.mult <- function(n.obs, a, b, p.a) {
     u <- stats::runif(n.obs)
@@ -796,7 +797,9 @@ npsigtest.rbandwidth <- function(bws,
         } else if (boot.method == "wild") {
           ydat.star <- mhat.xi + ei * draw.wild.mult(num.obs, a, b, P.a)
         } else if (boot.method == "wild-rademacher") {
-          ydat.star <- mhat.xi + ei * draw.wild.mult(num.obs, -1, 1, P.a)
+          ydat.star <- mhat.xi + ei * draw.wild.mult(
+            num.obs, -1, 1, P.rademacher
+          )
         } else {
           boot.index <- sample.int(num.obs, replace = TRUE)
           ydat.star <- ydat[boot.index]
@@ -866,7 +869,7 @@ npsigtest.rbandwidth <- function(bws,
         draw.wild.mult = draw.wild.mult,
         a = a,
         b = b,
-        p.a = P.a
+        p.a = if (identical(boot.method, "wild-rademacher")) P.rademacher else P.a
       )
       post.boot.seed <- get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
 
@@ -887,7 +890,7 @@ npsigtest.rbandwidth <- function(bws,
                   mhat.xi + ei[donor]
                 } else {
                   wild.values <- if (identical(boot.method, "wild"))
-                    c(a, b, P.a) else c(-1, 1, P.a)
+                    c(a, b, P.a) else c(-1, 1, P.rademacher)
                   mhat.xi + ei * draw.wild.mult(
                     num.obs, wild.values[[1L]], wild.values[[2L]],
                     wild.values[[3L]]
@@ -925,7 +928,9 @@ npsigtest.rbandwidth <- function(bws,
                                                  gradients = TRUE,
                                                  se = pivot.use)
           } else if (boot.method == "wild-rademacher") {
-            ydat.star <- mhat.xi + ei * draw.wild.mult(num.obs, -1, 1, P.a)
+            ydat.star <- mhat.xi + ei * draw.wild.mult(
+              num.obs, -1, 1, P.rademacher
+            )
             npreg.boot <- .npRmpi_npsig_do_local(extra.args,
                                                  txdat = xdat,
                                                  tydat = ydat.star,
@@ -1142,7 +1147,9 @@ npsigtest.rbandwidth <- function(bws,
           } else if (boot.method == "wild") {
             ydat.star <- mhat.xi + ei * draw.wild.mult(num.obs, a, b, P.a)
           } else if (boot.method == "wild-rademacher") {
-            ydat.star <- mhat.xi + ei * draw.wild.mult(num.obs, -1, 1, P.a)
+            ydat.star <- mhat.xi + ei * draw.wild.mult(
+              num.obs, -1, 1, P.rademacher
+            )
           } else {
             boot.index <- sample.int(num.obs, replace = TRUE)
             ydat.star <- ydat[boot.index]
@@ -1213,7 +1220,7 @@ npsigtest.rbandwidth <- function(bws,
           draw.wild.mult = draw.wild.mult,
           a = a,
           b = b,
-          p.a = P.a
+          p.a = if (identical(boot.method, "wild-rademacher")) P.rademacher else P.a
         )
         post.boot.seed <- get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
 
@@ -1238,7 +1245,7 @@ npsigtest.rbandwidth <- function(bws,
                 )
               } else {
                 wild.values <- if (identical(boot.method, "wild"))
-                  c(a, b, P.a) else c(-1, 1, P.a)
+                  c(a, b, P.a) else c(-1, 1, P.rademacher)
                 response.matrix <- vapply(
                   tile.position,
                   function(position) {
@@ -1284,7 +1291,9 @@ npsigtest.rbandwidth <- function(bws,
                                                    gradients = TRUE,
                                                    se = pivot.use)
             } else if (boot.method == "wild-rademacher") {
-              ydat.star <- mhat.xi + ei * draw.wild.mult(num.obs, -1, 1, P.a)
+              ydat.star <- mhat.xi + ei * draw.wild.mult(
+                num.obs, -1, 1, P.rademacher
+              )
               npreg.boot <- .npRmpi_npsig_do_local(extra.args,
                                                    txdat = xdat,
                                                    tydat = ydat.star,
