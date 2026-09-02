@@ -779,7 +779,7 @@ npsigtest.rbandwidth <- function(bws,
                            se = pivot.use,
                            ...)
       }
-      
+
       In[ii] <- .np_npsig_statistic(npreg.out, index = i, pivot = pivot.use)
       progress <- .np_progress_step(progress)
       
