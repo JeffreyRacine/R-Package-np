@@ -1005,6 +1005,7 @@ plot.npcopula <- function(x,
   if (identical(errors, "bootstrap"))
     .np_plot_reject_wild_unsupervised(bootstrap, "copula estimators")
   dots <- list(...)
+  sub.supplied <- "sub" %in% names(dots)
   target <- x$target
   target.label <- if (identical(target, "density")) "Copula Density" else "Copula"
   main.supplied <- !missing(main) && !is.null(main)
@@ -1231,11 +1232,30 @@ plot.npcopula <- function(x,
           lerr.all = lerr.all,
           herr.all = herr.all,
           border = .np_plot_color("context_wire"),
-          lwd = .np_plot_scalar_default(dots$lwd, par()$lwd)
+          lwd = .np_plot_scalar_default(dots$lwd, par()$lwd),
+          annotation = .np_plot_variability_annotation_spec(
+            plot.errors.method = errors,
+            plot.errors.type = band,
+            plot.errors.alpha = alpha,
+            plot.errors.center = center,
+            sub.supplied = sub.supplied,
+            plot.args = persp.call,
+            eligible = .np_plot_variability_single_panel(
+              plot.par.mfrow = TRUE,
+              continuous = TRUE,
+              fixed = !rotate.surface
+            )
+          )
         )
         if (identical(band, "all") && !is.null(lerr.all) && !is.null(herr.all) &&
             isTRUE(legend)) {
-          .np_plot_draw_all_band_legend(legend = TRUE, x = "topright")
+          .np_plot_draw_all_band_legend(
+            legend = TRUE,
+            x = "topright",
+            plot.errors.method = errors,
+            lerr.all = lerr.all,
+            herr.all = herr.all
+          )
         }
       }
       rotation.progress <- .np_plot_rotation_progress_tick(rotation.progress, done = frame.idx)

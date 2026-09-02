@@ -161,7 +161,11 @@ Named options passed via \code{\dots} include:
     \describe{
       \item{\code{alpha}}{
         the nominal significance level used for interval/band
-        construction.
+        construction. The default is \code{0.05}, corresponding to a
+        nominal variability level of \eqn{1-\alpha=0.95}{1-alpha=0.95}.
+        This nominal level describes the construction; it is not by itself
+        a claim that smoothing bias is negligible or that the displayed
+        bounds have literal confidence coverage for the unknown target.
       }
       \item{\code{B}}{
         the bootstrap replication count.
@@ -169,6 +173,11 @@ Named options passed via \code{\dots} include:
       \item{\code{band}}{
         one of \code{"pmzsd"}, \code{"pointwise"},
         \code{"bonferroni"}, \code{"simultaneous"}, or \code{"all"}.
+        The common bandwidth-engine default is \code{"pmzsd"}; direct
+        \code{npcopula} and \code{npconmode} plots retain their
+        method-specific \code{"pointwise"} default. The meaning of a band
+        name depends on whether \code{errors="bootstrap"} or
+        \code{errors="asymptotic"}; see Details.
       }
       \item{\code{boot_control}}{
         optional detailed bootstrap controls created by
@@ -207,7 +216,12 @@ Named options passed via \code{\dots} include:
       }
       \item{\code{errors}}{
         one of \code{"none"}, \code{"bootstrap"}, or
-        \code{"asymptotic"}.
+        \code{"asymptotic"}. The default is \code{"none"}.
+        Bootstrap errors can use either a symmetric normal-quantile rule
+        based on bootstrap standard deviations or full bootstrap
+        quantile/rank distributions, according to \code{band}.
+        Asymptotic errors use pointwise standard errors and normal
+        quantiles where available.
       }
     }
 
@@ -430,17 +444,80 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   extended-real estimates to retain their mathematical meaning without
   passing invalid coordinates or limits to a graphics backend.
 
-  Plot interval/error types are:
+  Plot variability-band constructions are:
   \preformatted{
-  "pmzsd"        : point estimate +/- z_(1-alpha/2) * standard error
-  "pointwise"    : per-point two-sided interval from N(0,1) quantiles
-  "bonferroni"   : pointwise interval with alpha replaced by alpha/m
-  "simultaneous" : joint-band interval (bootstrap route)
+  errors       band             construction
+  bootstrap    pmzsd            center +/- z_(1-alpha/2) * bootstrap SD
+  bootstrap    pointwise        pointwise bootstrap quantiles
+  bootstrap    bonferroni       Bonferroni-adjusted bootstrap quantiles
+  bootstrap    simultaneous     rank-based joint bootstrap band
+  bootstrap    all              all three bootstrap quantile/rank families
+  asymptotic   pmzsd/pointwise  center +/- z_(1-alpha/2) * asymptotic SE
+  asymptotic   bonferroni       normal rule with alpha replaced by alpha/m
+  asymptotic   simultaneous     unavailable (NA bounds)
+  asymptotic   all              finite pointwise-normal and Bonferroni-normal families
   }
   where \eqn{m} is the number of evaluation points used in the plotted
   curve/surface (\eqn{m=\texttt{neval}}{m=neval} for univariate curves,
   typically \eqn{m=\texttt{neval}^2}{m=neval^2} for full 2D perspective
   surfaces).
+
+  Thus \code{errors="bootstrap", band="pmzsd"} summarizes each
+  bootstrap distribution by its standard deviation and imposes a symmetric
+  normal-quantile shape on the displayed band. In contrast, bootstrap
+  \code{"pointwise"} and \code{"bonferroni"} bands use the corresponding
+  lower and upper empirical bootstrap quantiles separately and may be
+  asymmetric at each evaluation point. Bootstrap \code{"simultaneous"}
+  uses a joint rank construction rather than either pointwise standard
+  deviations or pointwise tail quantiles. With \code{band="all"}, these
+  distinct bootstrap families are displayed together where supported.
+
+  For asymptotic errors, \code{"pmzsd"} and \code{"pointwise"} are two
+  names for the same symmetric normal construction. Let \eqn{T(x)} denote
+  the plotted functional (mean, gradient, density, distribution, etc.) and
+  \eqn{\widehat{se}(x)} its asymptotic standard error. Both use
+  \eqn{T(x)\pm z_{1-\alpha/2}\widehat{se}(x)}{T(x) +/- z_(1-alpha/2) se(x)}.
+  \code{"bonferroni"} applies the same rule with \eqn{\alpha/m} in place
+  of \eqn{\alpha}. Asymptotic simultaneous bands are not generally
+  available for the kernel estimators in this package, so
+  \code{errors="asymptotic", band="simultaneous"} returns \code{NA}
+  bounds; \code{band="all"} therefore has finite pointwise-normal and
+  Bonferroni-normal families only.
+
+  On an eligible continuous single-panel plot rendered by base graphics,
+  a missing \code{sub} argument allows the plot method to add a concise
+  variability-band subtitle after finite bounds have actually been drawn.
+  The wording distinguishes symmetric \eqn{z}{z}-times-standard-error
+  bands from bootstrap quantile and rank constructions. For example, at
+  the default \code{alpha=0.05}, labels include
+  \code{"95\% symmetric variability band (normal quantile × asymptotic SE)"}
+  and
+  \code{"95\% pointwise bootstrap variability band (quantiles)"}.
+  Bias-corrected bootstrap labels also identify their center.
+
+  The automatic subtitle uses the effective subtitle typography (including
+  \code{cex.sub}) and only appears when an approved one-line wording fits
+  the existing plot width and bottom-margin clearance. It does not enlarge
+  margins or reduce the plotting region; when no wording fits, it is
+  silently omitted. Supplying \code{sub}, including \code{sub=""}, suppresses
+  the automatic label without changing that route's existing handling of the
+  supplied subtitle. Package-generated multi-panel and categorical displays
+  are not annotated automatically.
+
+  On these eligible base plots, with \code{band="all"}, default legend
+  labels also identify the
+  construction, for example \code{"Pointwise (quantiles)"} and
+  \code{"Simultaneous (rank-based)"} for bootstrap bands, or
+  \code{"Pointwise (z × SE)"} and
+  \code{"Bonferroni (adjusted z × SE)"} for asymptotic bands. A default
+  legend omits any family for which no finite band was drawn. Explicit
+  user-supplied legend labels are preserved without relabelling or
+  filtering.
+
+  These automatic annotations apply to the base renderer. The \code{"rgl"}
+  renderer retains its sparse interactive presentation so panning, zooming,
+  responsive sizing, and widget geometry are not changed by an automatic
+  footer or subtitle.
 
   When \code{center="bias-corrected"} and \code{output="data"} (or
   \code{output="both"}) is requested, returned
@@ -547,17 +624,6 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   bias correction can increase variance and may have larger mean squared
   error than the uncorrected estimator.
 
-  For asymptotic intervals, let \eqn{T(x)} denote the plotted functional
-  (mean, gradient, density, distribution, etc.) and \eqn{\widehat{se}(x)}
-  its asymptotic standard error:
-  \eqn{T(x)\pm z_{1-\alpha/2}\widehat{se}(x)} for \code{"pmzsd"} and
-  \eqn{[T(x)+z_{\alpha/2}\widehat{se}(x),\ T(x)+z_{1-\alpha/2}\widehat{se}(x)]}
-  for \code{"pointwise"}.
-  \code{"bonferroni"} applies the same pointwise construction with
-  \eqn{\alpha/m} in place of \eqn{\alpha}. For the kernel estimators in
-  this package, asymptotic simultaneous bands are not generally
-  available, so \code{"simultaneous"} with
-  \code{errors="asymptotic"} returns \code{NA} bands.
   Asymptotic standard errors are taken from fitted-object components such as
   \code{merr}, \code{gerr}, \code{derr}, \code{conderr}, and
   \code{congerr} where implemented.

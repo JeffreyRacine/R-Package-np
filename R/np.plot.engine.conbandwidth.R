@@ -56,6 +56,8 @@
            ...,
            random.seed){
 
+    sub.supplied <- !missing(sub)
+
     plot.gradient.available <- rep.int(TRUE, bws$xndim)
     if (isTRUE(gradients)) {
       reg.spec <- npConditionalRegEngineSpec(bws, where = "plot.conbandwidth()")
@@ -395,7 +397,8 @@
           zlim =
               if (plot.errors){
                   if (plot.errors.type == "all" && !is.null(lerr.all))
-                    c(min(c(unlist(lerr.all), lerr)), max(c(unlist(herr.all), herr)))
+                    .np_plot_all_surface_range(tcomp, lerr, herr,
+                                               lerr.all, herr.all)
                   else
                     c(min(lerr),max(herr))
               } else
@@ -565,14 +568,34 @@
               lerr.all = lerr.all,
               herr.all = herr.all,
               border = scalar_default(border, .np_plot_color("context_border")),
-              lwd = scalar_default(lwd, par()$lwd)
+              lwd = scalar_default(lwd, par()$lwd),
+              annotation = .np_plot_variability_annotation_spec(
+                plot.errors.method = plot.errors.method,
+                plot.errors.type = plot.errors.type,
+                plot.errors.alpha = plot.errors.alpha,
+                plot.errors.center = plot.errors.center,
+                sub.supplied = sub.supplied,
+                plot.args = persp.args,
+                eligible = .np_plot_variability_single_panel(
+                  plot.par.mfrow = plot.par.mfrow,
+                  continuous = if (quantreg) {
+                    isTRUE(bws$xncon == 2L)
+                  } else {
+                    isTRUE(bws$xncon + bws$yncon == 2L)
+                  },
+                  fixed = !isTRUE(rotate)
+                )
+              )
             )
             if (plot.errors.type == "all" && !is.null(lerr.all) && !is.null(herr.all)) {
               .np_plot_draw_all_band_legend(
                 legend = plot.legend,
                 x = "topright",
                 lty = .np_plot_lty("solid"),
-                lwd = .np_plot_lwd("band_all_surface", scalar_default(lwd, par()$lwd))
+                lwd = .np_plot_lwd("band_all_surface", scalar_default(lwd, par()$lwd)),
+                plot.errors.method = plot.errors.method,
+                lerr.all = lerr.all,
+                herr.all = herr.all
               )
             }
           }
@@ -861,13 +884,27 @@
             ## error plotting evaluation
             if (plot.errors && component.available &&
                 !(xi.factor && plot.bootstrap && plot.bxp)){
+              panel.annotation <- .np_plot_variability_annotation_spec(
+                plot.errors.method = plot.errors.method,
+                plot.errors.type = plot.errors.type,
+                plot.errors.alpha = plot.errors.alpha,
+                plot.errors.center = plot.errors.center,
+                sub.supplied = sub.supplied,
+                plot.args = plot.args,
+                eligible = .np_plot_variability_single_panel(
+                  plot.par.mfrow = plot.par.mfrow,
+                  continuous = !xi.factor
+                )
+              )
               if (plot.errors.type == "all") {
                 draw.all.error.types(
                   ex = as.numeric(ei),
                   center = .np_plot_error_center(temp.dens, temp.err, plotOnEstimate),
                   all.err = temp.all.err,
+                  plot.errors.method = plot.errors.method,
                   xi.factor = xi.factor,
-                  legend = plot.legend)
+                  legend = plot.legend,
+                  annotation = panel.annotation)
                 .np_plot_draw_bias_center_1d(
                   x = ei,
                   center = .np_plot_error_center(temp.dens, temp.err, plotOnEstimate),
@@ -896,7 +933,8 @@
                   plot.errors.style = if (xi.factor) "bar" else plot.errors.style,
                   plot.errors.bar = if (xi.factor) "I" else plot.errors.bar,
                   plot.errors.bar.num = plot.errors.bar.num,
-                  lty = if (xi.factor) 1 else 2
+                  lty = if (xi.factor) 1 else 2,
+                  annotation = panel.annotation
                 )
                 do.call(draw.errors, draw.args)
               }
@@ -1130,13 +1168,27 @@
               ## error plotting evaluation
               if (plot.errors && component.available &&
                   !(xi.factor && plot.bootstrap && plot.bxp)){
+                panel.annotation <- .np_plot_variability_annotation_spec(
+                  plot.errors.method = plot.errors.method,
+                  plot.errors.type = plot.errors.type,
+                  plot.errors.alpha = plot.errors.alpha,
+                  plot.errors.center = plot.errors.center,
+                  sub.supplied = sub.supplied,
+                  plot.args = plot.args,
+                  eligible = .np_plot_variability_single_panel(
+                    plot.par.mfrow = plot.par.mfrow,
+                    continuous = !xi.factor
+                  )
+                )
                 if (plot.errors.type == "all") {
                   draw.all.error.types(
                     ex = as.numeric(ei),
                     center = .np_plot_error_center(temp.dens, temp.err, plotOnEstimate),
                     all.err = temp.all.err,
+                    plot.errors.method = plot.errors.method,
                     xi.factor = xi.factor,
-                  legend = plot.legend)
+                  legend = plot.legend,
+                    annotation = panel.annotation)
                   .np_plot_draw_bias_center_1d(
                     x = ei,
                     center = .np_plot_error_center(temp.dens, temp.err, plotOnEstimate),
@@ -1165,7 +1217,8 @@
                     plot.errors.style = if (xi.factor) "bar" else plot.errors.style,
                     plot.errors.bar = if (xi.factor) "I" else plot.errors.bar,
                     plot.errors.bar.num = plot.errors.bar.num,
-                    lty = if (xi.factor) 1 else 2
+                    lty = if (xi.factor) 1 else 2,
+                    annotation = panel.annotation
                   )
                   do.call(draw.errors, draw.args)
                 }
@@ -1301,13 +1354,27 @@
             ## error plotting evaluation
             if (plot.errors && !(xi.factor && plot.bootstrap && plot.bxp)){
               err.block <- data.err[, seq(3*idx - 2L, length.out = 3L), drop = FALSE]
+              panel.annotation <- .np_plot_variability_annotation_spec(
+                plot.errors.method = plot.errors.method,
+                plot.errors.type = plot.errors.type,
+                plot.errors.alpha = plot.errors.alpha,
+                plot.errors.center = plot.errors.center,
+                sub.supplied = sub.supplied,
+                plot.args = plot.args,
+                eligible = .np_plot_variability_single_panel(
+                  plot.par.mfrow = plot.par.mfrow,
+                  continuous = !xi.factor
+                )
+              )
               if (plot.errors.type == "all") {
                 draw.all.error.types(
                   ex = as.numeric(allei[,plot.index]),
                   center = .np_plot_error_center(data.eval[,idx], err.block, plotOnEstimate),
                   all.err = data.err.all[[idx]],
+                  plot.errors.method = plot.errors.method,
                   xi.factor = xi.factor,
-                  legend = plot.legend)
+                  legend = plot.legend,
+                  annotation = panel.annotation)
                 .np_plot_draw_bias_center_1d(
                   x = allei[,plot.index],
                   center = .np_plot_error_center(data.eval[,idx], err.block, plotOnEstimate),
@@ -1336,7 +1403,8 @@
                   plot.errors.style = if (xi.factor) "bar" else plot.errors.style,
                   plot.errors.bar = if (xi.factor) "I" else plot.errors.bar,
                   plot.errors.bar.num = plot.errors.bar.num,
-                  lty = if (xi.factor) 1 else 2
+                  lty = if (xi.factor) 1 else 2,
+                  annotation = panel.annotation
                 )
                 do.call(draw.errors, draw.args)
               }

@@ -345,6 +345,245 @@
   )
 }
 
+.np_plot_variability_level <- function(alpha) {
+  level <- 100 * (1 - as.double(alpha)[1L])
+  value <- formatC(level, digits = 7L, format = "fg", flag = "#")
+  value <- sub("0+$", "", value)
+  value <- sub("\\.$", "", value)
+  paste0(value, "%")
+}
+
+.np_plot_variability_descriptor <- function(plot.errors.method,
+                                            plot.errors.type,
+                                            plot.errors.alpha,
+                                            plot.errors.center = "estimate") {
+  method <- match.arg(as.character(plot.errors.method)[1L],
+                      c("bootstrap", "asymptotic"))
+  band <- match.arg(as.character(plot.errors.type)[1L],
+                    c("pmzsd", "pointwise", "bonferroni",
+                      "simultaneous", "all"))
+  center <- match.arg(as.character(plot.errors.center)[1L],
+                      c("estimate", "bias-corrected"))
+  level <- .np_plot_variability_level(plot.errors.alpha)
+  key <- paste(method, band, sep = ":")
+  candidates <- switch(
+    key,
+    "bootstrap:pmzsd" = c(
+      sprintf("%s symmetric variability band (normal quantile × bootstrap SD)", level),
+      sprintf("%s symmetric variability band: z × bootstrap SD", level),
+      sprintf("%s bootstrap z × SD band", level)
+    ),
+    "bootstrap:pointwise" = c(
+      sprintf("%s pointwise bootstrap variability band (quantiles)", level),
+      sprintf("%s pointwise bootstrap band: quantiles", level),
+      sprintf("%s bootstrap quantile band", level)
+    ),
+    "bootstrap:bonferroni" = c(
+      sprintf("%s Bonferroni-adjusted bootstrap variability band (quantiles)", level),
+      sprintf("%s Bonferroni bootstrap band: quantiles", level),
+      sprintf("%s Bonferroni bootstrap quantiles", level)
+    ),
+    "bootstrap:simultaneous" = c(
+      sprintf("%s simultaneous bootstrap variability band (rank-based)", level),
+      sprintf("%s simultaneous bootstrap band: rank-based", level),
+      sprintf("%s bootstrap rank band", level)
+    ),
+    "bootstrap:all" = c(
+      sprintf("%s bootstrap variability bands", level),
+      sprintf("%s bootstrap bands", level)
+    ),
+    "asymptotic:pmzsd" =,
+    "asymptotic:pointwise" = c(
+      sprintf("%s symmetric variability band (normal quantile × asymptotic SE)", level),
+      sprintf("%s symmetric variability band: z × asymptotic SE", level),
+      sprintf("%s asymptotic z × SE band", level)
+    ),
+    "asymptotic:bonferroni" = c(
+      sprintf("%s Bonferroni-adjusted asymptotic variability band (normal quantile × SE)", level),
+      sprintf("%s Bonferroni asymptotic band: adjusted z × SE", level),
+      sprintf("%s Bonferroni z × SE band", level)
+    ),
+    "asymptotic:simultaneous" = character(),
+    "asymptotic:all" = c(
+      sprintf("%s asymptotic variability bands", level),
+      sprintf("%s asymptotic bands", level)
+    )
+  )
+
+  if (identical(method, "bootstrap") && identical(center, "bias-corrected")) {
+    suffix <- if (length(candidates) >= 3L) {
+      c(rep.int("; bias-corrected center", length(candidates) - 1L),
+        "; bias-corrected")
+    } else {
+      rep.int("; bias-corrected center", length(candidates))
+    }
+    candidates <- paste0(candidates, suffix)
+  }
+
+  list(
+    method = method,
+    band = band,
+    alpha = as.double(plot.errors.alpha)[1L],
+    level = level,
+    center = center,
+    candidates = unname(candidates)
+  )
+}
+
+.np_plot_variability_annotation_spec <- function(plot.errors.method,
+                                                 plot.errors.type,
+                                                 plot.errors.alpha,
+                                                 plot.errors.center,
+                                                 sub.supplied,
+                                                 plot.args,
+                                                 eligible = TRUE) {
+  if (!isTRUE(eligible) || isTRUE(sub.supplied) ||
+      identical(as.character(plot.errors.method)[1L], "none"))
+    return(NULL)
+  list(
+    plot.errors.method = as.character(plot.errors.method)[1L],
+    plot.errors.type = as.character(plot.errors.type)[1L],
+    plot.errors.alpha = as.double(plot.errors.alpha)[1L],
+    plot.errors.center = as.character(plot.errors.center)[1L],
+    plot.args = plot.args
+  )
+}
+
+.np_plot_variability_label_select <- function(candidates,
+                                              widths,
+                                              available) {
+  candidates <- as.character(candidates)
+  widths <- as.double(widths)
+  available <- as.double(available)[1L]
+  if (!length(candidates) || length(widths) != length(candidates) ||
+      !is.finite(available) || available <= 0)
+    return(NULL)
+  hit <- which(is.finite(widths) & widths <= available)[1L]
+  if (is.na(hit)) NULL else candidates[[hit]]
+}
+
+.np_plot_variability_typography <- function(plot.args = list()) {
+  scalar <- function(name, default) {
+    value <- plot.args[[name]]
+    if (is.null(value) || !length(value)) default else value[[1L]]
+  }
+  list(
+    cex.sub = scalar("cex.sub", par("cex.sub")),
+    font.sub = scalar("font.sub", par("font.sub")),
+    col.sub = scalar("col.sub", par("col.sub")),
+    family = scalar("family", par("family")),
+    cex.lab = scalar("cex.lab", par("cex.lab")),
+    font.lab = scalar("font.lab", par("font.lab")),
+    mgp = if (is.null(plot.args$mgp)) par("mgp") else plot.args$mgp
+  )
+}
+
+.np_plot_variability_vertical_clearance <- function(text,
+                                                    xlab,
+                                                    typography,
+                                                    pad.inches = 0.02) {
+  if (is.null(text) || !length(text))
+    return(FALSE)
+  sub.height <- graphics::strheight(
+    text,
+    units = "inches",
+    cex = typography$cex.sub,
+    font = typography$font.sub,
+    family = typography$family
+  )
+  xlab.height <- if (is.null(xlab) || !length(xlab)) {
+    0
+  } else {
+    max(graphics::strheight(
+      xlab,
+      units = "inches",
+      cex = typography$cex.lab,
+      font = typography$font.lab,
+      family = typography$family
+    ))
+  }
+  line.height <- par("csi") * par("mex")
+  mgp <- as.double(typography$mgp)
+  xlab.line <- if (length(mgp) && is.finite(mgp[[1L]])) mgp[[1L]] else 3
+  bottom.required <- 4 * line.height + sub.height / 2 + pad.inches
+  separation <- abs(4 - xlab.line) * line.height
+  separation.required <- (sub.height + xlab.height) / 2 + pad.inches
+  isTRUE(par("mai")[[1L]] >= bottom.required &&
+         separation >= separation.required)
+}
+
+.np_plot_draw_variability_annotation <- function(spec,
+                                                 width.fraction = 0.92) {
+  if (is.null(spec))
+    return(invisible(FALSE))
+  descriptor <- .np_plot_variability_descriptor(
+    plot.errors.method = spec$plot.errors.method,
+    plot.errors.type = spec$plot.errors.type,
+    plot.errors.alpha = spec$plot.errors.alpha,
+    plot.errors.center = spec$plot.errors.center
+  )
+  if (!length(descriptor$candidates))
+    return(invisible(FALSE))
+  typography <- .np_plot_variability_typography(spec$plot.args)
+  widths <- vapply(
+    descriptor$candidates,
+    graphics::strwidth,
+    numeric(1L),
+    units = "inches",
+    cex = typography$cex.sub,
+    font = typography$font.sub,
+    family = typography$family
+  )
+  label <- .np_plot_variability_label_select(
+    candidates = descriptor$candidates,
+    widths = widths,
+    available = par("pin")[[1L]] * width.fraction
+  )
+  if (is.null(label) || !.np_plot_variability_vertical_clearance(
+    text = label,
+    xlab = spec$plot.args$xlab,
+    typography = typography
+  ))
+    return(invisible(FALSE))
+  graphics::title(
+    sub = label,
+    cex.sub = typography$cex.sub,
+    font.sub = typography$font.sub,
+    col.sub = typography$col.sub,
+    family = typography$family
+  )
+  invisible(TRUE)
+}
+
+.np_plot_variability_single_panel <- function(plot.par.mfrow,
+                                              continuous = TRUE,
+                                              fixed = TRUE) {
+  isTRUE(plot.par.mfrow) && isTRUE(continuous) && isTRUE(fixed) &&
+    identical(as.integer(prod(par("mfrow"))), 1L)
+}
+
+.np_plot_finite_band_pair <- function(lower, upper) {
+  if (is.null(lower) || is.null(upper))
+    return(FALSE)
+  n <- min(length(lower), length(upper))
+  n > 0L && any(is.finite(lower[seq_len(n)]) &
+                is.finite(upper[seq_len(n)]))
+}
+
+.np_plot_all_surface_range <- function(center,
+                                       lower,
+                                       upper,
+                                       lower.all,
+                                       upper.all) {
+  lower.values <- c(unlist(lower.all, use.names = FALSE), lower)
+  upper.values <- c(unlist(upper.all, use.names = FALSE), upper)
+  lower.values <- lower.values[is.finite(lower.values)]
+  upper.values <- upper.values[is.finite(upper.values)]
+  if (length(lower.values) && length(upper.values))
+    return(c(min(lower.values), max(upper.values)))
+  .np_plot_finite_range(center)
+}
+
 .np_plot_interval_payload <- function(estimate,
                                       se,
                                       plot.errors.method,
@@ -10836,7 +11075,8 @@ draw.errors =
            plot.errors.bar,
            plot.errors.bar.num,
            lty,
-           col = par("col")){
+           col = par("col"),
+           annotation = NULL){
     n <- min(length(ex), length(ely), length(ehy))
     if (!n)
       return(invisible(NULL))
@@ -10866,6 +11106,7 @@ draw.errors =
                        lty = lty,
                        col = col)
     }
+    .np_plot_draw_variability_annotation(annotation)
   }
 
 draw.all.error.types <- function(ex, center, all.err,
@@ -10874,7 +11115,9 @@ draw.all.error.types <- function(ex, center, all.err,
                                  plot.errors.bar.num = min(length(ex), 25),
                                  lty = .np_plot_lty("interval"), add.legend = TRUE, legend.loc = "topleft",
                                  legend = TRUE,
-                                 xi.factor = FALSE){
+                                 xi.factor = FALSE,
+                                 plot.errors.method,
+                                 annotation = NULL){
   if (is.null(all.err)) return(invisible(NULL))
 
   if (xi.factor) {
@@ -10883,47 +11126,42 @@ draw.all.error.types <- function(ex, center, all.err,
   }
 
   draw_one <- function(err, col) {
-    if (is.null(err)) return(invisible(NULL))
+    if (is.null(err)) return(invisible(FALSE))
     lower <- center - err[,1]
     upper <- center + err[,2]
     n <- min(length(ex), length(lower), length(upper))
-    if (!n) return(invisible(NULL))
+    if (!n) return(invisible(FALSE))
     idx <- seq_len(n)
     good <- is.finite(ex[idx]) & is.finite(lower[idx]) & is.finite(upper[idx])
-    if (!any(good)) return(invisible(NULL))
+    if (!any(good)) return(invisible(FALSE))
     draw.errors(ex = ex[idx][good], ely = lower[idx][good], ehy = upper[idx][good],
                 plot.errors.style = plot.errors.style,
                 plot.errors.bar = plot.errors.bar,
                 plot.errors.bar.num = plot.errors.bar.num,
                 lty = lty, col = col)
+    invisible(TRUE)
   }
 
   band.cols <- .np_plot_all_band_colors()
 
-  draw_one(all.err$pointwise, band.cols[["pointwise"]])
-  draw_one(all.err$simultaneous, band.cols[["simultaneous"]])
-  draw_one(all.err$bonferroni, band.cols[["bonferroni"]])
+  drawn <- c(
+    pointwise = draw_one(all.err$pointwise, band.cols[["pointwise"]]),
+    simultaneous = draw_one(all.err$simultaneous, band.cols[["simultaneous"]]),
+    bonferroni = draw_one(all.err$bonferroni, band.cols[["bonferroni"]])
+  )
 
-  if (add.legend) {
-    legend.value <- if (is.list(legend) && any(names(legend) %in% c("tau", "bands"))) {
-      if (!is.null(legend$bands)) legend$bands else TRUE
-    } else {
-      legend
-    }
-    legend.args <- .np_plot_legend_args(
-      list(x = legend.loc,
-           legend = c("Pointwise","Simultaneous","Bonferroni"),
-           lty = .np_plot_lty("interval"),
-           col = unname(band.cols[c("pointwise", "simultaneous", "bonferroni")]),
-           lwd = .np_plot_lwd("band_all_1d"),
-           cex = .np_plot_cex("legend"),
-           bty = "n"),
-      legend = legend.value,
-      context = "legend"
+  if (add.legend)
+    .np_plot_draw_all_band_legend(
+      legend = legend,
+      x = legend.loc,
+      lty = .np_plot_lty("interval"),
+      lwd = .np_plot_lwd("band_all_1d"),
+      plot.errors.method = plot.errors.method,
+      drawn = drawn
     )
-    if (!is.null(legend.args))
-      do.call(graphics::legend, legend.args)
-  }
+  if (any(drawn))
+    .np_plot_draw_variability_annotation(annotation)
+  invisible(NULL)
 }
 
 plotFactor <- function(f, y, ...){
@@ -12069,7 +12307,8 @@ plotFactor <- function(f, y, ...){
                                                  lerr.all = NULL,
                                                  herr.all = NULL,
                                                  border = .np_plot_color("context_border"),
-                                                 lwd = .np_plot_lwd("surface_border")) {
+                                                 lwd = .np_plot_lwd("surface_border"),
+                                                 annotation = NULL) {
   templates <- .np_plot_wireframe_templates_persp(x = x, y = y)
 
   if (identical(as.character(plot.errors.type)[1L], "all") &&
@@ -12077,6 +12316,11 @@ plotFactor <- function(f, y, ...){
     band.cols <- .np_plot_all_band_colors()
     band.alpha <- .np_plot_all_band_alpha()
     band.lwd <- .np_plot_lwd("band_all_surface", lwd)
+    drawn <- vapply(
+      c("pointwise", "simultaneous", "bonferroni"),
+      function(bn) .np_plot_finite_band_pair(lerr.all[[bn]], herr.all[[bn]]),
+      logical(1L)
+    )
 
     for (bn in c("pointwise", "simultaneous", "bonferroni")) {
       band.col <- grDevices::adjustcolor(band.cols[[bn]], alpha.f = band.alpha[[bn]])
@@ -12098,8 +12342,13 @@ plotFactor <- function(f, y, ...){
       )
     }
 
+    if (any(drawn))
+      .np_plot_draw_variability_annotation(annotation)
+
     return(invisible(NULL))
   }
+
+  drawn <- .np_plot_finite_band_pair(lerr, herr)
 
   wire.col <- grDevices::adjustcolor(
     .np_plot_color("primary"),
@@ -12122,6 +12371,9 @@ plotFactor <- function(f, y, ...){
     col = wire.col,
     lwd = wire.lwd
   )
+
+  if (isTRUE(drawn))
+    .np_plot_draw_variability_annotation(annotation)
 
   invisible(NULL)
 }
@@ -12240,27 +12492,113 @@ plotFactor <- function(f, y, ...){
        call. = FALSE)
 }
 
-.np_plot_draw_all_band_legend <- function(legend = TRUE,
-                                          x = "topright",
-                                          lty = .np_plot_lty("solid"),
-                                          lwd = .np_plot_lwd("band_all_1d"),
-                                          bty = "n") {
+.np_plot_all_band_legend_labels <- function(plot.errors.method) {
+  method <- match.arg(as.character(plot.errors.method)[1L],
+                      c("bootstrap", "asymptotic"))
+  if (identical(method, "bootstrap")) {
+    c(pointwise = "Pointwise (quantiles)",
+      simultaneous = "Simultaneous (rank-based)",
+      bonferroni = "Bonferroni (quantiles)")
+  } else {
+    c(pointwise = "Pointwise (z × SE)",
+      simultaneous = "Simultaneous",
+      bonferroni = "Bonferroni (adjusted z × SE)")
+  }
+}
+
+.np_plot_all_band_drawn <- function(drawn = NULL,
+                                    lerr.all = NULL,
+                                    herr.all = NULL) {
+  band.names <- c("pointwise", "simultaneous", "bonferroni")
+  if (is.null(drawn) && !is.null(lerr.all) && !is.null(herr.all)) {
+    drawn <- vapply(
+      band.names,
+      function(name) .np_plot_finite_band_pair(lerr.all[[name]],
+                                               herr.all[[name]]),
+      logical(1L)
+    )
+  }
+  if (is.null(drawn))
+    return(stats::setNames(rep.int(TRUE, length(band.names)), band.names))
+  result <- stats::setNames(rep.int(FALSE, length(band.names)), band.names)
+  if (is.null(names(drawn))) {
+    n <- min(length(drawn), length(result))
+    result[seq_len(n)] <- as.logical(drawn[seq_len(n)])
+  } else {
+    common <- intersect(names(drawn), band.names)
+    result[common] <- as.logical(drawn[common])
+  }
+  result[is.na(result)] <- FALSE
+  result
+}
+
+.np_plot_all_band_legend_args <- function(legend.value,
+                                          x,
+                                          lty,
+                                          lwd,
+                                          bty,
+                                          plot.errors.method,
+                                          drawn = NULL,
+                                          lerr.all = NULL,
+                                          herr.all = NULL) {
   band.cols <- .np_plot_all_band_colors()
-  legend.value <- if (is.list(legend) && any(names(legend) %in% c("tau", "bands"))) {
-      if (!is.null(legend$bands)) legend$bands else TRUE
-    } else {
-      legend
-    }
-  legend.args <- .np_plot_legend_args(
+  band.names <- c("pointwise", "simultaneous", "bonferroni")
+  explicit.labels <- is.list(legend.value) && !is.null(legend.value$legend)
+  if (!explicit.labels) {
+    keep <- .np_plot_all_band_drawn(
+      drawn = drawn,
+      lerr.all = lerr.all,
+      herr.all = herr.all
+    )
+    band.names <- band.names[keep[band.names]]
+  }
+  if (!length(band.names))
+    return(NULL)
+  labels <- .np_plot_all_band_legend_labels(plot.errors.method)
+  .np_plot_legend_args(
     list(x = x,
-         legend = c("Pointwise","Simultaneous","Bonferroni"),
+         legend = unname(labels[band.names]),
          lty = lty,
-         col = unname(band.cols[c("pointwise", "simultaneous", "bonferroni")]),
+         col = unname(band.cols[band.names]),
          lwd = lwd,
          cex = .np_plot_cex("legend"),
          bty = bty),
     legend = legend.value,
     context = "legend"
+  )
+}
+
+.np_plot_draw_all_band_legend <- function(legend = TRUE,
+                                          x = "topright",
+                                          lty = .np_plot_lty("solid"),
+                                          lwd = .np_plot_lwd("band_all_1d"),
+                                          bty = "n",
+                                          plot.errors.method = NULL,
+                                          drawn = NULL,
+                                          lerr.all = NULL,
+                                          herr.all = NULL) {
+  if (is.null(plot.errors.method))
+    plot.errors.method <- if (!is.null(lerr.all$simultaneous) ||
+                              !is.null(herr.all$simultaneous)) {
+      "bootstrap"
+    } else {
+      "asymptotic"
+    }
+  legend.value <- if (is.list(legend) && any(names(legend) %in% c("tau", "bands"))) {
+      if (!is.null(legend$bands)) legend$bands else TRUE
+    } else {
+      legend
+    }
+  legend.args <- .np_plot_all_band_legend_args(
+    legend.value = legend.value,
+    x = x,
+    lty = lty,
+    lwd = lwd,
+    bty = bty,
+    plot.errors.method = plot.errors.method,
+    drawn = drawn,
+    lerr.all = lerr.all,
+    herr.all = herr.all
   )
   if (!is.null(legend.args))
     do.call(graphics::legend, legend.args)

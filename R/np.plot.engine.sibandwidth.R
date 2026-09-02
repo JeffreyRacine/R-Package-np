@@ -39,6 +39,8 @@
            ...,
            random.seed){
 
+    sub.supplied <- !missing(sub)
+
     dots <- list(...)
     .np_singleindex_reject_higher_gradient_order(
       dots,
@@ -337,6 +339,17 @@
                     c(list(x = train.index, y = ydat), overlay.points.args))
           if (plot.rug)
             .np_plot_draw_rug_1d(train.index)
+          panel.annotation <- .np_plot_variability_annotation_spec(
+            plot.errors.method = plot.errors.method,
+            plot.errors.type = plot.errors.type,
+            plot.errors.alpha = plot.errors.alpha,
+            plot.errors.center = plot.errors.center,
+            sub.supplied = sub.supplied,
+            plot.args = plot.args,
+            eligible = .np_plot_variability_single_panel(
+              plot.par.mfrow = plot.par.mfrow
+            )
+          )
           if (plot.errors.type == "all") {
             sorted.all.err <- lapply(temp.all.err, function(err) {
               if (is.null(err)) return(NULL)
@@ -346,11 +359,13 @@
               ex = na.omit(tobj$index[i.sort]),
               center = na.omit(if (plot.errors.center == "estimate") temp.mean[i.sort] else temp.err[i.sort,3]),
               all.err = sorted.all.err,
+              plot.errors.method = plot.errors.method,
               plot.errors.style = plot.errors.style,
               plot.errors.bar = plot.errors.bar,
               plot.errors.bar.num = plot.errors.bar.num,
               lty = .np_plot_lty("interval"),
-              legend = plot.legend)
+              legend = plot.legend,
+              annotation = panel.annotation)
           } else if (plot.errors.center == "estimate") {
             draw.errors(ex = na.omit(tobj$index[i.sort]),
                         ely = na.omit(temp.mean[i.sort] - temp.err[i.sort,1]),
@@ -358,7 +373,8 @@
                         plot.errors.style = plot.errors.style,
                         plot.errors.bar = plot.errors.bar,
                         plot.errors.bar.num = plot.errors.bar.num,
-                        lty = .np_plot_lty("interval"))
+                        lty = .np_plot_lty("interval"),
+                        annotation = panel.annotation)
           } else if (.np_plot_center_is_bias_corrected(plot.errors.center)) {
             lines(na.omit(tobj$index[i.sort]), na.omit(temp.err[i.sort,3]), lty = .np_plot_lty("center"))
             draw.errors(ex = na.omit(tobj$index[i.sort]),
@@ -367,7 +383,8 @@
                         plot.errors.style  = plot.errors.style,
                         plot.errors.bar = plot.errors.bar,
                         plot.errors.bar.num = plot.errors.bar.num,
-                        lty = .np_plot_lty("interval"))
+                        lty = .np_plot_lty("interval"),
+                        annotation = panel.annotation)
             .np_plot_draw_bias_center_legend(
               legend = plot.legend,
               estimate.col = scalar_default(col, par()$col),
@@ -498,6 +515,17 @@
               .np_plot_draw_rug_1d(train.index)
             
             if (plot.errors){
+              panel.annotation <- .np_plot_variability_annotation_spec(
+                plot.errors.method = plot.errors.method,
+                plot.errors.type = plot.errors.type,
+                plot.errors.alpha = plot.errors.alpha,
+                plot.errors.center = plot.errors.center,
+                sub.supplied = sub.supplied,
+                plot.args = plot.args,
+                eligible = .np_plot_variability_single_panel(
+                  plot.par.mfrow = plot.par.mfrow
+                )
+              )
               if (plot.errors.type == "all") {
                 scaled.all.err <- lapply(temp.all.err, function(err) {
                   if (is.null(err)) return(NULL)
@@ -507,11 +535,13 @@
                   ex = na.omit(tobj$index[i.sort]),
                   center = na.omit(bws$beta[i] * if (plot.errors.center == "estimate") temp.mean[i.sort] else temp.err[i.sort,3]),
                   all.err = scaled.all.err,
+                  plot.errors.method = plot.errors.method,
                   plot.errors.style = plot.errors.style,
                   plot.errors.bar = plot.errors.bar,
                   plot.errors.bar.num = plot.errors.bar.num,
                   lty = .np_plot_lty("interval"),
-                  legend = plot.legend)
+                  legend = plot.legend,
+                  annotation = panel.annotation)
               } else if (plot.errors.center == "estimate") {
                 lo.i <- bws$beta[i] * (temp.mean[i.sort] - temp.err[i.sort,1])
                 hi.i <- bws$beta[i] * (temp.mean[i.sort] + temp.err[i.sort,2])
@@ -521,7 +551,8 @@
                             plot.errors.style = plot.errors.style,
                             plot.errors.bar = plot.errors.bar,
                             plot.errors.bar.num = plot.errors.bar.num,
-                            lty = .np_plot_lty("interval"))
+                            lty = .np_plot_lty("interval"),
+                            annotation = panel.annotation)
               } else if (.np_plot_center_is_bias_corrected(plot.errors.center)) {
                 lo.i <- bws$beta[i] * (temp.err[i.sort,3] - temp.err[i.sort,1])
                 hi.i <- bws$beta[i] * (temp.err[i.sort,3] + temp.err[i.sort,2])
@@ -532,7 +563,8 @@
                             plot.errors.style  = plot.errors.style,
                             plot.errors.bar = plot.errors.bar,
                             plot.errors.bar.num = plot.errors.bar.num,
-                            lty = .np_plot_lty("interval"))
+                            lty = .np_plot_lty("interval"),
+                            annotation = panel.annotation)
                 .np_plot_draw_bias_center_legend(
                   legend = plot.legend,
                   estimate.col = scalar_default(col, par()$col),
