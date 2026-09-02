@@ -444,6 +444,7 @@ npsigtest.rbandwidth <- function(bws,
   a <- -0.6180339887499  # (1-sqrt(5))/2
   b <- 1.6180339887499   # (1+sqrt(5))/2
   P.a <-0.72360679774998 # (1+sqrt(5))/(2*sqrt(5))
+  P.rademacher <- 0.5
 
   draw.wild.mult <- function(n.obs, a, b, p.a) {
     u <- stats::runif(n.obs)
@@ -558,7 +559,7 @@ npsigtest.rbandwidth <- function(bws,
           )
         } else {
           wild.values <- if (identical(boot.method, "wild"))
-            c(a, b, P.a) else c(-1, 1, P.a)
+            c(a, b, P.a) else c(-1, 1, P.rademacher)
           response.matrix <- vapply(
             seq_len(tile.count),
             function(unused)
@@ -609,7 +610,9 @@ npsigtest.rbandwidth <- function(bws,
         ## holding the variable tested at its median, and add to that
         ## a wild bootstrap draw from the original disturbance vector
 
-        ydat.star <- mhat.xi + ei * draw.wild.mult(num.obs, -1, 1, P.a)
+        ydat.star <- mhat.xi + ei * draw.wild.mult(
+          num.obs, -1, 1, P.rademacher
+        )
 
       } else if(boot.method =="pairwise") {
 
@@ -848,7 +851,7 @@ npsigtest.rbandwidth <- function(bws,
             )
           } else {
             wild.values <- if (identical(boot.method, "wild"))
-              c(a, b, P.a) else c(-1, 1, P.a)
+              c(a, b, P.a) else c(-1, 1, P.rademacher)
             response.matrix <- vapply(
               seq_len(tile.count),
               function(unused)
@@ -902,7 +905,9 @@ npsigtest.rbandwidth <- function(bws,
           ## holding the variable tested at its median, and add to that
           ## a wild bootstrap draw from the original disturbance vector
           
-          ydat.star <- mhat.xi + ei * draw.wild.mult(num.obs, -1, 1, P.a)
+          ydat.star <- mhat.xi + ei * draw.wild.mult(
+            num.obs, -1, 1, P.rademacher
+          )
           
         } else if(boot.method =="pairwise") {
           
