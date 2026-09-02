@@ -255,3 +255,131 @@ test_that("npscoefbw mixed generalized-NN search crosses a zero-radius plateau",
   expect_identical(bw$bw[bw$icon], as.double(as.integer(bw$bw[bw$icon])))
   expect_true(validate_bandwidth(bw))
 })
+
+test_that("npscoefbw NN NOMAD recovery preserves the actual configured start", {
+  skip_if_not_installed("crs")
+  old <- options(np.messages = FALSE,
+                 np.nomad.degree.start.policy = "low_first_full_random")
+  on.exit(options(old), add = TRUE)
+
+  n <- 24L
+  xdat <- data.frame(x = seq_len(n) / n)
+  zdat <- data.frame(
+    u = factor(rep(c("a", "b"), n / 2L)),
+    z = c(rep(0, 16L), seq_len(8L))
+  )
+  y <- 1 + xdat$x + 0.2 * zdat$z + sin(seq_len(n)) / 10
+  original.search <- getFromNamespace(".np_nomad_search", "np")
+
+  for (bwtype in c("generalized_nn", "adaptive_nn"))
+    for (engine in c("nomad", "nomad+powell")) {
+    expect_error(
+      npscoefbw(
+        xdat = xdat,
+        ydat = y,
+        zdat = zdat,
+        bws = c(0.25, 5),
+        bwtype = bwtype,
+        nomad = TRUE,
+        search.engine = engine,
+        degree.max = 1L,
+        nmulti = 1L,
+        nomad.opts = list(MAX_BB_EVAL = 1L)
+      ),
+      "npscoefbw NOMAD degree search did not return a raw-valid solution",
+      fixed = TRUE
+    )
+    bw <- testthat::with_mocked_bindings(
+      npscoefbw(
+        xdat = xdat,
+        ydat = y,
+        zdat = zdat,
+        bwtype = bwtype,
+        nomad = TRUE,
+        search.engine = engine,
+        degree.max = 1L,
+        nmulti = 1L,
+        nomad.opts = list(MAX_BB_EVAL = 1L)
+      ),
+      .np_nomad_search = function(...) {
+        search.args <- list(...)
+        invalid.point <- search.args$x0
+        invalid.point[1L] <- 1
+        condition <- tryCatch(
+          search.args$eval_fun(invalid.point),
+          error = identity
+        )
+        expect_s3_class(condition, "np_nn_candidate_invalid")
+        do.call(original.search, search.args)
+      },
+      .package = "np"
+    )
+    starts <- bw$degree.search$restart.starts
+    expect_length(starts, 2L)
+    expect_gt(starts[[2L]][1L], starts[[1L]][1L])
+    expect_identical(starts[[2L]][-1L], starts[[1L]][-1L])
+    expect_identical(bw$degree.search$restart.degree.starts[[1L]], 0L)
+    expect_identical(bw$degree.search$restart.degree.starts[[2L]], 0L)
+    expect_false(bw$degree.search$restart.start.info$user_supplied_start)
+    expect_false(bw$degree.search$certified)
+    expect_true(npscoef_raw_objective_valid(bw$fval))
+
+    ctx <- np:::.npscoefbw_nomad_context_prepare(xdat, y, zdat)
+    raw <- np:::.npscoefbw_nomad_eval_direct(ctx, bw)
+    expect_true(raw$raw.valid)
+    if (identical(engine, "nomad")) {
+      expect_identical(raw$objective, as.numeric(bw$fval))
+    } else {
+      expect_true(is.finite(bw$degree.search$powell.time))
+    }
+  }
+})
+
+test_that("npscoefbw NOMAD raw evaluation propagates unrelated errors", {
+  skip_if_not_installed("crs")
+  old <- options(np.messages = FALSE)
+  on.exit(options(old), add = TRUE)
+  xdat <- data.frame(x = seq_len(12L))
+  zdat <- data.frame(z = seq_len(12L))
+  y <- xdat$x + sin(xdat$x)
+  bw <- npscoefbw(
+    xdat = xdat,
+    ydat = y,
+    zdat = zdat,
+    bws = 6,
+    bwtype = "generalized_nn",
+    regtype = "lp",
+    degree = 0L,
+    bandwidth.compute = FALSE
+  )
+  ctx <- np:::.npscoefbw_nomad_context_prepare(xdat, y, zdat)
+  expect_error(
+    testthat::with_mocked_bindings(
+      np:::.npscoefbw_nomad_eval_direct(ctx, bw),
+      .npscoef_npksum = function(...) stop("synthetic unrelated failure"),
+      .package = "np"
+    ),
+    "synthetic unrelated failure",
+    fixed = TRUE
+  )
+  expect_error(
+    testthat::with_mocked_bindings(
+      npscoefbw(
+        xdat = xdat,
+        ydat = y,
+        zdat = zdat,
+        bws = 6,
+        bwtype = "generalized_nn",
+        nomad = TRUE,
+        search.engine = "nomad",
+        degree.max = 1L,
+        nmulti = 1L,
+        nomad.opts = list(MAX_BB_EVAL = 1L)
+      ),
+      .npscoef_npksum = function(...) stop("synthetic unrelated failure"),
+      .package = "np"
+    ),
+    "synthetic unrelated failure",
+    fixed = TRUE
+  )
+})
