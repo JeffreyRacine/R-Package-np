@@ -3998,6 +3998,28 @@ static int np_adaptive_nn_joint_ordinary_advance(double *candidate,
   return advanced;
 }
 
+static int np_minimized_seed_dominating_penalty(
+  const double finite_seed,
+  const double multiplier,
+  double * const penalty)
+{
+  double candidate;
+
+  if (penalty == NULL || !R_FINITE(finite_seed) || finite_seed == DBL_MAX ||
+      !R_FINITE(multiplier) || multiplier < 1.0)
+    return 0;
+
+  candidate = finite_seed + (fabs(finite_seed) + 1.0)*multiplier;
+  if (candidate == finite_seed)
+    candidate = nextafter(finite_seed, INFINITY);
+  if (!R_FINITE(candidate) || candidate <= finite_seed ||
+      candidate >= DBL_MAX)
+    return 0;
+
+  *penalty = candidate;
+  return 1;
+}
+
 static int np_copy_scale_factor_for_raw(double *dest, const double *src, int n)
 {
   if (dest == NULL || src == NULL)
@@ -4028,6 +4050,64 @@ static double bwmfunc_raw_current_scale(double *vector_scale_factor, int n)
   val = bwmfunc_raw(tmp);
   safe_free(tmp);
   return val;
+}
+
+static int np_adaptive_nn_find_finite_raw_seed(
+  double *candidate,
+  const int num_continuous,
+  const int num_obs,
+  const int maximum_k,
+  const int num_raw_var,
+  double * const objective)
+{
+  int i;
+  int probe;
+  int probe_limit = 1;
+  int remaining = maximum_k;
+
+  if (candidate == NULL || objective == NULL || num_continuous <= 0 ||
+      num_obs < 3 || maximum_k < 1 || num_raw_var < num_continuous)
+    return 0;
+
+  for (i = 1; i <= num_continuous; ++i) {
+    int lookup_k = 0;
+    int is_extended = 0;
+    double distance_scale = 0.0;
+
+    if (np_nn_lookup_from_scale(
+          num_obs, 1, candidate[i],
+          &lookup_k, &distance_scale, &is_extended) != 0 ||
+        is_extended || lookup_k < 1 || lookup_k > maximum_k)
+      return 0;
+    candidate[i] = (double)lookup_k;
+  }
+
+  while (remaining > 1) {
+    ++probe_limit;
+    remaining = (remaining + 1)/2;
+  }
+
+  for (probe = 0; probe < probe_limit; ++probe) {
+    double value;
+
+    if (!np_adaptive_nn_joint_ordinary_advance(
+          candidate, num_continuous, maximum_k))
+      break;
+
+    bwm_progress_eval_active = 1;
+    value = bwmfunc_raw_current_scale(candidate, num_raw_var);
+    bwm_progress_eval_active = 0;
+    bwm_eval_count += 1.0;
+    if (!R_FINITE(value) || value == DBL_MAX)
+      bwm_invalid_count += 1.0;
+    bwm_maybe_signal_activity();
+    if (R_FINITE(value) && value != DBL_MAX) {
+      *objective = value;
+      return 1;
+    }
+  }
+
+  return 0;
 }
 
 extern double *vector_continuous_stddev_extern;
@@ -19507,6 +19587,9 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   int iMultistart, iMs_counter, iNum_Multistart, iImproved;
   int enforce_fixed_feasibility;
   int have_start_best, have_multistart_best;
+  int adaptive_retry_attempted = 0;
+  int adaptive_retry_history_index = 0;
+  int adaptive_retry_improved = 0;
   int itmax, iter;
   int int_use_starting_values;
 
@@ -20092,6 +20175,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
     np_copy_scale_factor(vector_scale_factor_startbest, vector_scale_factor, num_search_var);
   }
 
+regression_powell_attempt:
   if(!eval_only){
     powell(0,
            0,
@@ -20227,15 +20311,25 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
   iImproved = (enforce_fixed_feasibility && have_start_best) ? (fret_start_best < fret_initial) : (fret < fret_best);
   *timing = timing_extern;
 
-  objective_function_values[0]=fret;
-  objective_function_evals[0]=bwm_eval_count;
-  objective_function_invalid[0]=bwm_invalid_count;
-  bwm_snapshot_fast_counters();
-  fast_eval_total += bwm_fast_eval_count;
+  if (!adaptive_retry_attempted) {
+    objective_function_values[0]=fret;
+    objective_function_evals[0]=bwm_eval_count;
+    objective_function_invalid[0]=bwm_invalid_count;
+    bwm_snapshot_fast_counters();
+    fast_eval_total += bwm_fast_eval_count;
+  } else {
+    objective_function_values[adaptive_retry_history_index]=fret;
+    objective_function_evals[adaptive_retry_history_index] += bwm_eval_count;
+    objective_function_invalid[adaptive_retry_history_index] += bwm_invalid_count;
+    bwm_snapshot_fast_counters();
+    fast_eval_total += bwm_fast_eval_count;
+    iImproved = adaptive_retry_improved;
+  }
   /* When multistarting save initial minimum of objective function and scale factors */
 
 
-  if((!eval_only) && (iMultistart == IMULTI_TRUE)){
+  if((!eval_only) && (!adaptive_retry_attempted) &&
+     (iMultistart == IMULTI_TRUE)){
     if (enforce_fixed_feasibility) {
       if (have_start_best) {
         have_multistart_best = 1;
@@ -20479,6 +20573,67 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
     }
     final_raw = bwmfunc_raw_current_scale(vector_scale_factor, num_var);
     if (!R_FINITE(final_raw) || final_raw == DBL_MAX) {
+      if ((!adaptive_retry_attempted) &&
+          (!eval_only) &&
+          (!int_use_starting_values) &&
+          (BANDWIDTH_reg_extern == BW_ADAP_NN) &&
+          (num_reg_continuous_extern > 0) &&
+          (num_obs_train_extern >= 3)) {
+        double finite_seed = DBL_MAX;
+        int found_finite_seed;
+
+        adaptive_retry_history_index =
+          (iImproved > 0) ? iImproved - 1 : 0;
+        adaptive_retry_improved = iImproved;
+        bwm_reset_counters();
+        found_finite_seed = np_adaptive_nn_find_finite_raw_seed(
+          vector_scale_factor,
+          num_reg_continuous_extern,
+          num_obs_train_extern,
+          num_obs_train_extern - 2,
+          num_var,
+          &finite_seed);
+        if (found_finite_seed &&
+            bwm_penalty_mode == 1 &&
+            (!(bwm_penalty_value > finite_seed))) {
+          found_finite_seed = np_minimized_seed_dominating_penalty(
+            finite_seed, penalty_mult[0], &bwm_penalty_value);
+        }
+        if (found_finite_seed) {
+          initialize_nr_directions(BANDWIDTH_reg_extern,
+                                   num_obs_train_extern,
+                                   num_reg_continuous_extern,
+                                   num_reg_unordered_extern,
+                                   num_reg_ordered_extern,
+                                   0,
+                                   0,
+                                   0,
+                                   vsfh,
+                                   num_categories_extern,
+                                   matrix_y,
+                                   0, int_RANDOM_SEED,
+                                   lbc_dir, dfc_dir, c_dir, initc_dir,
+                                   lbd_dir, hbd_dir, d_dir, initd_dir,
+                                   matrix_X_continuous_train_extern,
+                                   matrix_Y_continuous_train_extern);
+          if(lsq_check_mode){
+            for(i = 1; i <= num_search_var; i++){
+              matrix_y[i][num_var + 1] = 0.0;
+              matrix_y[num_var + 1][i] = 0.0;
+            }
+            matrix_y[num_var + 1][num_var + 1] =
+              0.25*(lsq_delta_upper - lsq_delta_lower);
+          }
+          fret_initial = fret_best = fret_start_best = fret = finite_seed;
+          have_start_best = 1;
+          have_multistart_best = 0;
+          np_copy_scale_factor(vector_scale_factor_startbest,
+                               vector_scale_factor,
+                               num_search_var);
+          adaptive_retry_attempted = 1;
+          goto regression_powell_attempt;
+        }
+      }
       bw_error_msg = "C_np_regression_bw: optimizer returned a fixed-bandwidth candidate with invalid raw objective";
       goto cleanup_np_regression_bw_mode;
     }
