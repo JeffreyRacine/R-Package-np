@@ -43,9 +43,34 @@ for (nn.type in c("generalized_nn", "adaptive_nn")) {
 }
 
 for (nn.type in c("generalized_nn", "adaptive_nn")) {
+  test_that(paste(nn.type, "conditional-distribution handoff retains NN accounting"), {
+    skip_if_not_installed("crs", minimum_version = "0.15.46")
+    old <- options(np.messages = FALSE, np.tree = FALSE,
+                   np.objective.cache = TRUE)
+    on.exit(options(old), add = TRUE)
+    x <- data.frame(x = seq(-1, 1, length.out = 24L))
+    y <- data.frame(y = sin(2 * x$x) + seq_len(24L) / 100)
+    bw <- npcdistbw(xdat = x, ydat = y, regtype = "lc", bwtype = nn.type,
+                   bwsolver = "mads+powell", nmulti = 1L, itmax = 120L,
+                   powell.remin = FALSE,
+                   nomad.opts = list(MAX_BB_EVAL = 40L))
+    native.calls <- sum(vapply(bw$nomad.restart.results,
+      function(x) as.numeric(x$native$total_num.feval), numeric(1L)))
+    powell.calls <- as.numeric(bw$num.feval) - native.calls
+    expect_gt(powell.calls, 0)
+    expect_identical(powell.calls,
+      as.numeric(sum(bw$nn.cache[c("raw.evals", "hits")])))
+    raw <- np:::.npcdistbw_eval_only(x, y, bws = bw,
+                                    invalid.penalty = "dbmax")$objective
+    expect_identical(as.numeric(raw), as.numeric(bw$fval))
+  })
+}
+
+for (nn.type in c("generalized_nn", "adaptive_nn")) {
   for (nn.family in c("regression", "density", "distribution",
                       "conditional-distribution")) {
     test_that(paste(nn.family, nn.type, "MADS preserves public restart shape"), {
+      skip_if_not_installed("crs", minimum_version = "0.15.46")
       old <- options(np.messages = FALSE, np.tree = FALSE)
       on.exit(options(old), add = TRUE)
       x <- data.frame(x = seq(-1, 1, length.out = 24L))

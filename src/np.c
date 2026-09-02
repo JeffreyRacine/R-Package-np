@@ -13442,7 +13442,7 @@ static void np_density_bw_internal(double * myuno, double * myord, double * myco
 
   bwmfunc_raw = bwmfunc;
   bwm_set_floor_context(
-    enforce_fixed_feasibility,
+    enforce_fixed_feasibility && (BANDWIDTH_den_extern == BW_FIXED),
     num_var,
     bwm_use_transform,
     KERNEL_den_extern,
@@ -14479,7 +14479,7 @@ static void np_distribution_bw_internal(
 
   bwmfunc_raw = bwmfunc;
   bwm_set_floor_context(
-    enforce_fixed_feasibility,
+    enforce_fixed_feasibility && (BANDWIDTH_den_extern == BW_FIXED),
     num_var,
     bwm_use_transform,
     KERNEL_den_extern,
@@ -15194,7 +15194,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   np_bwm_clear_deferred_error();
   bwmfunc_raw = bwmfunc;
   bwm_set_floor_context(
-    enforce_fixed_feasibility,
+    enforce_fixed_feasibility && (BANDWIDTH_den_extern == BW_FIXED),
     num_all_var,
     bwm_use_transform,
     KERNEL_den_extern,
@@ -17028,7 +17028,7 @@ static void np_distribution_conditional_bw_mode(double * c_uno, double * c_ord, 
 
   bwmfunc_raw = bwmfunc;
   bwm_set_floor_context(
-    enforce_fixed_feasibility,
+    enforce_fixed_feasibility && (BANDWIDTH_den_extern == BW_FIXED),
     num_all_var,
     bwm_use_transform,
     KERNEL_den_extern,
