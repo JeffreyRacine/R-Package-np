@@ -501,6 +501,7 @@
                 x = x1.eval,
                 y = z1.eval,
                 plot.errors.type = plot.errors.type,
+                plot.errors.method = plot.errors.method,
                 lerr = lerr,
                 herr = herr,
                 lerr.all = lerr.all,

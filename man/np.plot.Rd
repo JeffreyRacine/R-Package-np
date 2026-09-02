@@ -347,7 +347,8 @@ Named options passed via \code{\dots} include:
         \code{rgl.points3d.<arg>} customizes observed-point overlays
         and \code{rgl.surface3d.<arg>} customizes interval surfaces.
         When \code{band="all"} is used on supported
-        \code{rgl} routes, a matching interactive legend is drawn, and
+        \code{rgl} routes, a matching construction-aware interactive legend
+        is drawn using the same default labels as the base renderer, and
         \code{rgl.legend3d.<arg>} may be used to customize it, for
         example \code{rgl.legend3d.bty="o"} to restore a legend box or
         \code{rgl.legend3d.magnify=1} to request the original legend texture
@@ -514,10 +515,11 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   user-supplied legend labels are preserved without relabelling or
   filtering.
 
-  These automatic annotations apply to the base renderer. The \code{"rgl"}
-  renderer retains its sparse interactive presentation so panning, zooming,
-  responsive sizing, and widget geometry are not changed by an automatic
-  footer or subtitle.
+  These automatic subtitle annotations apply to the base renderer. The
+  \code{"rgl"} renderer uses the same construction-aware default labels in
+  its existing \code{band="all"} legend, but retains its sparse interactive
+  presentation: it adds no automatic footer or subtitle, and panning, zooming,
+  responsive sizing, and widget geometry are unchanged.
 
   When \code{center="bias-corrected"} and \code{output="data"} (or
   \code{output="both"}) is requested, returned
