@@ -1428,6 +1428,10 @@ npsigtest.rbandwidth <- function(bws,
 
 }
 
+.np_npsig_default_test_args <- c(
+  "B", "boot.method", "boot.type", "pivot", "joint", "index", "random.seed"
+)
+
 npsigtest.default <- function(bws, xdat, ydat, ...){
   .npRmpi_require_active_slave_pool(where = "npsigtest()")
 
@@ -1461,7 +1465,7 @@ npsigtest.default <- function(bws, xdat, ydat, ...){
     sc.bw <- sc
     sc.bw[[1]] <- quote(npregbw)
   }
-  sc.bw$B <- NULL
+  sc.bw[.np_npsig_default_test_args] <- NULL
 
   if(xdat.named)
     xdat <- toFrame(xdat)
