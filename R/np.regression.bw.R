@@ -1249,7 +1249,32 @@ npregbw.rbandwidth <-
     )
   }
 
+  raw_eval_fun <- function(point) {
+    bw_vec <- .npregbw_nomad_point_to_bw(point, template = template, setup = setup)
+    tbw <- .npregbw_build_rbandwidth(
+      xdat = xdat,
+      ydat = ydat,
+      bws = bw_vec,
+      bandwidth.compute = FALSE,
+      reg.args = reg.args,
+      yname = yname
+    )
+    out <- .npregbw_eval_only(
+      xdat = xdat,
+      ydat = ydat,
+      bws = tbw,
+      invalid.penalty = "dbmax",
+      penalty.multiplier = opt.value("penalty.multiplier", 10)
+    )
+    as.numeric(out$objective[1L])
+  }
+
   build_payload <- function(point, best_record, solution, interrupted) {
+    direct.objective <- .np_nn_certify_raw_point(
+      point = point,
+      raw.eval = raw_eval_fun,
+      owner = "native npreg fixed-degree NOMAD route"
+    )
     bw_vec <- .npregbw_nomad_point_to_bw(point, template = template, setup = setup)
     final.tbw <- .npregbw_build_rbandwidth(
       xdat = xdat,
@@ -1266,19 +1291,17 @@ npregbw.rbandwidth <-
       bws = final.tbw,
       core = list(
         bw = as.numeric(final.tbw$bw),
-        objective = as.numeric(best_record$objective),
-        ifval = as.numeric(best_record$objective),
+        objective = direct.objective,
+        ifval = direct.objective,
         num.feval = as.numeric(mads.num.feval.total),
         num.feval.fast = as.numeric(mads.num.feval.fast.total),
-        fval.history = as.numeric(best_record$objective),
+        fval.history = direct.objective,
         eval.history = if (!is.null(solution$bbe)) rep(1, max(1L, as.integer(solution$bbe))) else 1,
         invalid.history = 0,
         timing = NA_real_
       ),
       total.time = NA_real_
     )
-    direct.objective <- as.numeric(best_record$objective)
-
     if (identical(bwsolver, "mads+powell")) {
       hot.opt.args <- .np_nomad_powell_hotstart_opt_args(
         opt.args,
@@ -1300,8 +1323,15 @@ npregbw.rbandwidth <-
       powell.elapsed <- proc.time()[3L] - powell.start
       hot.payload$num.feval <- as.numeric(direct.payload$num.feval[1L]) + as.numeric(hot.payload$num.feval[1L])
       hot.payload$num.feval.fast <- as.numeric(direct.payload$num.feval.fast[1L]) + as.numeric(hot.payload$num.feval.fast[1L])
-      hot.objective <- as.numeric(hot.payload$fval[1L])
-      if (is.finite(hot.objective) &&
+      hot.point <- .npregbw_nomad_bw_to_point(
+        hot.payload$bw, template = template, setup = setup
+      )
+      hot.objective <- .np_nn_certify_raw_point(
+        point = hot.point,
+        raw.eval = raw_eval_fun,
+        owner = "npreg MADS+Powell handoff"
+      )
+      if (
           .np_degree_better(hot.objective, direct.objective, direction = "min")) {
         return(list(payload = hot.payload, objective = hot.objective, powell.time = powell.elapsed))
       }
@@ -1392,6 +1422,12 @@ npregbw.rbandwidth <-
       native.nomad.elapsed <- native.nomad.elapsed + native.elapsed
       .np_nomad_native_status(native.i, "native npreg NOMAD route")
       objective.i <- as.numeric(native.i$objective[1L])
+      raw.objective.i <- if (is.null(native.i$best_point) ||
+                             any(!is.finite(native.i$best_point))) {
+        NA_real_
+      } else {
+        raw_eval_fun(as.numeric(native.i$best_point))
+      }
       native.results[[i]] <- list(
         restart = i,
         start = as.numeric(native.start.matrix[i, ]),
@@ -1404,14 +1440,15 @@ npregbw.rbandwidth <-
         solution = as.numeric(native.i$solution),
         best_point = as.numeric(native.i$best_point),
         best_objective = objective.i,
+        raw_objective = raw.objective.i,
         native = native.i
       )
       native.num.feval.total <- native.num.feval.total + as.numeric(native.i$total_num.feval[1L])
       native.num.feval.fast.total <- native.num.feval.fast.total + as.numeric(native.i$total_num.feval.fast[1L])
       native.num.feval.invalid.total <- native.num.feval.invalid.total + as.numeric(native.i$total_num.feval.invalid[1L])
-      if (.npregbw_native_raw_objective_valid(objective.i) &&
-          objective.i < native.best.objective) {
-        native.best.objective <- objective.i
+      if (.np_nn_raw_objective_valid(raw.objective.i) &&
+          raw.objective.i < native.best.objective) {
+        native.best.objective <- raw.objective.i
         native.best.index <- i
       }
     }
