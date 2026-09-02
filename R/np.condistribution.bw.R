@@ -1774,6 +1774,54 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
   )
 }
 
+.npcdistbw_nomad_eval_point <- function(point,
+                                        template,
+                                        setup,
+                                        degree.search,
+                                        xdat,
+                                        ydat,
+                                        reg.args,
+                                        opt.args,
+                                        invalid.penalty) {
+  point <- as.numeric(point)
+  bwdim <- length(setup$cont_flat) + length(setup$cat_flat)
+  ndeg <- length(degree.search$start.degree)
+  degree <- as.integer(round(point[bwdim + seq_len(ndeg)]))
+  degree <- .np_degree_clip_to_grid(degree, degree.search$candidates)
+  bw_vec <- .npcdistbw_nomad_point_to_bw(
+    point[seq_len(bwdim)], template = template, setup = setup
+  )
+
+  eval.reg.args <- reg.args
+  eval.reg.args$regtype <- "lp"
+  eval.reg.args$pregtype <- "Local-Polynomial"
+  eval.reg.args$degree <- degree
+  eval.reg.args$bernstein.basis <- degree.search$bernstein.basis
+  eval.reg.args$regtype.engine <- "lp"
+  eval.reg.args$degree.engine <- degree
+  eval.reg.args$bernstein.basis.engine <- degree.search$bernstein.basis
+  tbw <- .npcdistbw_build_condbandwidth(
+    xdat = xdat,
+    ydat = ydat,
+    bws = bw_vec,
+    bandwidth.compute = FALSE,
+    reg.args = eval.reg.args
+  )
+
+  out <- .npcdistbw_eval_only(
+    xdat = xdat,
+    ydat = ydat,
+    gydat = opt.args$gydat,
+    bws = tbw,
+    do.full.integral = if (is.null(opt.args$do.full.integral)) FALSE else opt.args$do.full.integral,
+    ngrid = if (is.null(opt.args$ngrid)) 100L else opt.args$ngrid,
+    invalid.penalty = invalid.penalty,
+    penalty.multiplier = if (is.null(opt.args$penalty.multiplier)) 10 else opt.args$penalty.multiplier
+  )
+  out$degree <- degree
+  out
+}
+
 .npcdistbw_nomad_search <- function(xdat,
                                     ydat,
                                     bws,
@@ -1861,46 +1909,39 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
   .np_nomad_baseline_note(degree.search$start.degree)
 
   eval_fun <- function(point) {
-    point <- as.numeric(point)
-    degree <- as.integer(round(point[bwdim + seq_len(ndeg)]))
-    degree <- .np_degree_clip_to_grid(degree, degree.search$candidates)
-    bw_vec <- .npcdistbw_nomad_point_to_bw(point[seq_len(bwdim)], template = template, setup = setup)
-
-    eval.reg.args <- reg.args
-    eval.reg.args$regtype <- "lp"
-    eval.reg.args$pregtype <- "Local-Polynomial"
-    eval.reg.args$degree <- degree
-    eval.reg.args$bernstein.basis <- degree.search$bernstein.basis
-    eval.reg.args$regtype.engine <- "lp"
-    eval.reg.args$degree.engine <- degree
-    eval.reg.args$bernstein.basis.engine <- degree.search$bernstein.basis
-
-    tbw <- .npcdistbw_build_condbandwidth(
+    out <- .npcdistbw_nomad_eval_point(
+      point = point,
+      template = template,
+      setup = setup,
+      degree.search = degree.search,
       xdat = xdat,
       ydat = ydat,
-      bws = bw_vec,
-      bandwidth.compute = FALSE,
-      reg.args = eval.reg.args
-    )
-
-    out <- .npcdistbw_eval_only(
-      xdat = xdat,
-      ydat = ydat,
-      gydat = opt.args$gydat,
-      bws = tbw,
-      do.full.integral = if (is.null(opt.args$do.full.integral)) FALSE else opt.args$do.full.integral,
-      ngrid = if (is.null(opt.args$ngrid)) 100L else opt.args$ngrid,
-      invalid.penalty = "baseline",
-      penalty.multiplier = if (is.null(opt.args$penalty.multiplier)) 10 else opt.args$penalty.multiplier
+      reg.args = reg.args,
+      opt.args = opt.args,
+      invalid.penalty = "baseline"
     )
     nomad.num.feval.total <<- nomad.num.feval.total + as.numeric(out$num.feval[1L])
     nomad.num.feval.fast.total <<- nomad.num.feval.fast.total + as.numeric(out$num.feval.fast[1L])
 
     list(
       objective = out$objective,
-      degree = degree,
+      degree = out$degree,
       num.feval = out$num.feval
     )
+  }
+
+  raw_eval_fun <- function(point) {
+    as.numeric(.npcdistbw_nomad_eval_point(
+      point = point,
+      template = template,
+      setup = setup,
+      degree.search = degree.search,
+      xdat = xdat,
+      ydat = ydat,
+      reg.args = reg.args,
+      opt.args = opt.args,
+      invalid.penalty = "dbmax"
+    )$objective[1L])
   }
 
   build_payload <- function(point, best_record, solution, interrupted) {
@@ -1908,6 +1949,11 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
     degree <- as.integer(best_record$degree)
     bw_vec <- .npcdistbw_nomad_point_to_bw(point[seq_len(bwdim)], template = template, setup = setup)
     powell.elapsed <- NA_real_
+    direct.objective <- .np_nn_certify_raw_point(
+      point = point,
+      raw.eval = raw_eval_fun,
+      owner = "npcdist NOMAD degree-search route"
+    )
 
     build_direct_payload <- function() {
       final.reg.args <- reg.args
@@ -1926,11 +1972,11 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
         bandwidth.compute = FALSE,
         reg.args = final.reg.args
       )
-      tbw$fval <- as.numeric(best_record$objective)
-      tbw$ifval <- as.numeric(best_record$objective)
+      tbw$fval <- direct.objective
+      tbw$ifval <- direct.objective
       tbw$num.feval <- as.numeric(nomad.num.feval.total)
       tbw$num.feval.fast <- as.numeric(nomad.num.feval.fast.total)
-      tbw$fval.history <- as.numeric(best_record$objective)
+      tbw$fval.history <- direct.objective
       tbw$eval.history <- if (!is.null(solution$bbe)) rep(1, max(1L, as.integer(solution$bbe))) else 1
       tbw$invalid.history <- 0
       tbw$timing <- NA_real_
@@ -1948,7 +1994,6 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
     }
 
     direct.payload <- build_direct_payload()
-    direct.objective <- as.numeric(best_record$objective)
 
     if (identical(degree.search$engine, "nomad+powell")) {
       hot.reg.args <- reg.args
@@ -2112,6 +2157,7 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
       } else {
         as.integer(round(native$best_point[degree.idx]))
       }
+      raw.objective <- raw_eval_fun(as.numeric(native$best_point))
       list(
         restart = as.integer(restart.index),
         remin = isTRUE(remin),
@@ -2120,7 +2166,7 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
         elapsed = native.elapsed,
         status = "ok",
         message = as.character(native$message[1L]),
-        objective = as.numeric(native$objective[1L]),
+        objective = raw.objective,
         bbe = as.numeric(native$blackbox_evaluations[1L]),
         iterations = as.numeric(native$iterations[1L]),
         solution = as.numeric(native$solution),
@@ -2155,7 +2201,7 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
           num.feval = NA_real_
         )
       }
-      if (is.finite(native.i$objective) &&
+      if (.np_nn_raw_objective_valid(native.i$objective) &&
           .np_degree_better(native.i$objective, native.best.objective, direction = "min")) {
         native.best.objective <- native.i$objective
         native.best.index <- i
@@ -2178,7 +2224,7 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
       native.num.feval.fast.total <- native.num.feval.fast.total + as.numeric(native.remin$native$total_num.feval.fast[1L])
       native.num.feval.guarded.total <- native.num.feval.guarded.total + as.numeric(native.remin$native$total_num.feval.guarded[1L])
       native.callback.total <- native.callback.total + as.integer(native.remin$native$compiled_callback_calls[1L])
-      if (is.finite(native.remin$objective) &&
+      if (.np_nn_raw_objective_valid(native.remin$objective) &&
           .np_degree_better(native.remin$objective, native.best.objective, direction = "min")) {
         native.best.objective <- native.remin$objective
         native.best.index <- remin.index
