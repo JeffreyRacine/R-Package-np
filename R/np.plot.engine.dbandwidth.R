@@ -47,6 +47,8 @@
            ...,
            random.seed){
 
+    sub.supplied <- !missing(sub)
+
     engine.ctx <- .np_plot_engine_begin(plot.par.mfrow = plot.par.mfrow)
     on.exit(.np_plot_restore_par(engine.ctx$oldpar), add = TRUE)
     plot.par.mfrow <- engine.ctx$plot.par.mfrow
@@ -253,7 +255,8 @@
           zlim =
               if (plot.errors){
                   if (plot.errors.type == "all" && !is.null(lerr.all))
-                  c(min(c(unlist(lerr.all), lerr)), max(c(unlist(herr.all), herr)))
+                  .np_plot_all_surface_range(tobj$dist, lerr, herr,
+                                             lerr.all, herr.all)
                   else
                       c(min(lerr),max(herr))
               } else
@@ -393,14 +396,30 @@
               lerr.all = lerr.all,
               herr.all = herr.all,
               border = scalar_default(border, .np_plot_color("context_border")),
-              lwd = scalar_default(lwd, par()$lwd)
+              lwd = scalar_default(lwd, par()$lwd),
+              annotation = .np_plot_variability_annotation_spec(
+                plot.errors.method = plot.errors.method,
+                plot.errors.type = plot.errors.type,
+                plot.errors.alpha = plot.errors.alpha,
+                plot.errors.center = plot.errors.center,
+                sub.supplied = sub.supplied,
+                plot.args = persp.args,
+                eligible = .np_plot_variability_single_panel(
+                  plot.par.mfrow = plot.par.mfrow,
+                  continuous = isTRUE(bws$ncon == 2L),
+                  fixed = !isTRUE(rotate)
+                )
+              )
             )
             if (plot.errors.type == "all" && !is.null(lerr.all) && !is.null(herr.all)) {
               .np_plot_draw_all_band_legend(
                 legend = plot.legend,
                 x = "topright",
                 lty = .np_plot_lty("solid"),
-                lwd = .np_plot_lwd("band_all_surface", scalar_default(lwd, par()$lwd))
+                lwd = .np_plot_lwd("band_all_surface", scalar_default(lwd, par()$lwd)),
+                plot.errors.method = plot.errors.method,
+                lerr.all = lerr.all,
+                herr.all = herr.all
               )
             }
           }
@@ -583,6 +602,18 @@
 
           ## error plotting evaluation
           if (plot.errors && !(xi.factor && plot.bootstrap && plot.bxp)){
+            panel.annotation <- .np_plot_variability_annotation_spec(
+              plot.errors.method = plot.errors.method,
+              plot.errors.type = plot.errors.type,
+              plot.errors.alpha = plot.errors.alpha,
+              plot.errors.center = plot.errors.center,
+              sub.supplied = sub.supplied,
+              plot.args = plot.args,
+              eligible = .np_plot_variability_single_panel(
+                plot.par.mfrow = plot.par.mfrow,
+                continuous = !xi.factor
+              )
+            )
             if (!xi.factor && !plotOnEstimate)
               lines(na.omit(ei), na.omit(temp.err[,3]), lty = .np_plot_lty("center"))
 
@@ -591,12 +622,14 @@
                 ex = as.numeric(na.omit(ei)),
                 center = as.numeric(na.omit(if (plotOnEstimate) temp.dens else temp.err[,3])),
                 all.err = temp.all.err,
+                plot.errors.method = plot.errors.method,
                 plot.errors.style = if (xi.factor) "bar" else plot.errors.style,
                 plot.errors.bar = if (xi.factor) "I" else plot.errors.bar,
                 plot.errors.bar.num = plot.errors.bar.num,
                 lty = .np_plot_lty("interval"),
                 add.legend = TRUE,
-                legend = plot.legend)
+                legend = plot.legend,
+                annotation = panel.annotation)
             } else {
               draw.args <- list(
                 ex = as.numeric(na.omit(ei)),
@@ -605,7 +638,8 @@
                 plot.errors.style = if (xi.factor) "bar" else plot.errors.style,
                 plot.errors.bar = if (xi.factor) "I" else plot.errors.bar,
                 plot.errors.bar.num = plot.errors.bar.num,
-                lty = if (xi.factor) 1 else 2
+                lty = if (xi.factor) 1 else 2,
+                annotation = panel.annotation
               )
               do.call(draw.errors, draw.args)
             }
@@ -734,6 +768,18 @@
 
           ## error plotting evaluation
           if (plot.errors && !(xi.factor && plot.bootstrap && plot.bxp)){
+            panel.annotation <- .np_plot_variability_annotation_spec(
+              plot.errors.method = plot.errors.method,
+              plot.errors.type = plot.errors.type,
+              plot.errors.alpha = plot.errors.alpha,
+              plot.errors.center = plot.errors.center,
+              sub.supplied = sub.supplied,
+              plot.args = plot.args,
+              eligible = .np_plot_variability_single_panel(
+                plot.par.mfrow = plot.par.mfrow,
+                continuous = !xi.factor
+              )
+            )
             if (!xi.factor && !plotOnEstimate)
               lines(na.omit(ei), na.omit(temp.err[,3]), lty = .np_plot_lty("center"))
 
@@ -742,12 +788,14 @@
                 ex = as.numeric(na.omit(allei[,i])),
                 center = as.numeric(na.omit(if (plotOnEstimate) data.eval[,i] else data.err[,3*i])),
                 all.err = data.err.all[[i]],
+                plot.errors.method = plot.errors.method,
                 plot.errors.style = if (xi.factor) "bar" else plot.errors.style,
                 plot.errors.bar = if (xi.factor) "I" else plot.errors.bar,
                 plot.errors.bar.num = plot.errors.bar.num,
                 lty = .np_plot_lty("interval"),
                 add.legend = TRUE,
-                legend = plot.legend)
+                legend = plot.legend,
+                annotation = panel.annotation)
             } else {
               draw.args <- list(
                 ex = as.numeric(na.omit(allei[,i])),
@@ -756,7 +804,8 @@
                 plot.errors.style = if (xi.factor) "bar" else plot.errors.style,
                 plot.errors.bar = if (xi.factor) "I" else plot.errors.bar,
                 plot.errors.bar.num = plot.errors.bar.num,
-                lty = if (xi.factor) 1 else 2
+                lty = if (xi.factor) 1 else 2,
+                annotation = panel.annotation
               )
               do.call(draw.errors, draw.args)
             }
