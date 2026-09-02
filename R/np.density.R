@@ -1,5 +1,7 @@
 npudens <-
   function(bws, ...){
+    mc <- match.call(expand.dots = FALSE)
+    .np_validate_public_dots(mc[["..."]], "npudens")
     args <- list(...)
 
     if (!missing(bws)){
@@ -335,6 +337,7 @@ npudens.default <- function(bws, tdat, ...){
   if(any(m.txy > 0)) {
     names(sc.bw)[m.txy] <- nstxy[m.txy > 0]
   }
+  sc.bw <- .np_public_dots_filter_call(sc.bw, "npudensbw")
     
   tbw <- if (!has.explicit.bws) {
     .np_progress_select_bandwidth_enhanced(

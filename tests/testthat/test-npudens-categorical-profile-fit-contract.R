@@ -48,7 +48,6 @@ test_that("npudens all-categorical tree profile fit matches dense fit", {
     bw.dense <- npudensbw(
       form,
       data = dat,
-      edat = edat,
       bws = bws,
       bandwidth.compute = FALSE,
       ukertype = ukertype,
@@ -60,7 +59,6 @@ test_that("npudens all-categorical tree profile fit matches dense fit", {
     bw.profile <- npudensbw(
       form,
       data = dat,
-      edat = edat,
       bws = bws,
       bandwidth.compute = FALSE,
       ukertype = ukertype,
@@ -124,21 +122,21 @@ test_that("one-coordinate categorical tree profiles match dense density and dist
     edat <- edat[sample.int(nrow(edat), ne, TRUE), , drop = FALSE]
 
     options(np.tree = FALSE, np.categorical.compress = FALSE)
-    dens.bw.dense <- npudensbw(~ x, data = dat, edat = edat,
+    dens.bw.dense <- npudensbw(~ x, data = dat,
                                bws = bws, bandwidth.compute = FALSE)
     dens.dense <- npudens(bws = dens.bw.dense)
     if (identical(kind, "ordered")) {
-      dist.bw.dense <- npudistbw(~ x, data = dat, edat = edat,
+      dist.bw.dense <- npudistbw(~ x, data = dat,
                                  bws = bws, bandwidth.compute = FALSE)
       dist.dense <- npudist(bws = dist.bw.dense)
     }
 
     options(np.tree = FALSE, np.categorical.compress = TRUE)
-    dens.bw.profile <- npudensbw(~ x, data = dat, edat = edat,
+    dens.bw.profile <- npudensbw(~ x, data = dat,
                                  bws = bws, bandwidth.compute = FALSE)
     dens.profile <- npudens(bws = dens.bw.profile)
     if (identical(kind, "ordered")) {
-      dist.bw.profile <- npudistbw(~ x, data = dat, edat = edat,
+      dist.bw.profile <- npudistbw(~ x, data = dat,
                                    bws = bws, bandwidth.compute = FALSE)
       dist.profile <- npudist(bws = dist.bw.profile)
     }
@@ -209,7 +207,7 @@ test_that("npudens categorical bootstrap profile route matches dense count algeb
     x = ordered(rbinom(300L, 10L, 0.5))
   )
   edat <- data.frame(x = ordered(levels(dat$x), levels = levels(dat$x)))
-  bw <- npudensbw(~ x, data = dat, edat = edat,
+  bw <- npudensbw(~ x, data = dat,
                   bws = 0.25, bandwidth.compute = FALSE)
   counts <- replicate(5L, tabulate(sample.int(nrow(dat), nrow(dat), TRUE),
                                    nbins = nrow(dat)))

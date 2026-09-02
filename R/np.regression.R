@@ -1,5 +1,7 @@
 npreg <-
   function(bws, ...){
+    mc <- match.call(expand.dots = FALSE)
+    .np_validate_public_dots(mc[["..."]], "npreg")
     args <- list(...)
     npRejectLegacyBooleanErrors(args, "npreg")
 
@@ -1004,7 +1006,10 @@ npreg.default <- function(bws, txdat, tydat, nomad = FALSE,
     } else {
       list(xdat = txdat, ydat = tydat)
     }
-    tbw <- do.call(npregbw, c(bw.args, dots))
+    tbw <- do.call(
+      npregbw,
+      .np_public_dots_filter_args(c(bw.args, dots), "npregbw")
+    )
     reg.args <- list(bws = tbw)
     if (!missing(txdat))
       reg.args$txdat <- txdat
@@ -1068,6 +1073,7 @@ npreg.default <- function(bws, txdat, tydat, nomad = FALSE,
   if(any(m.txy > 0)) {
     names(sc.bw)[m.txy] <- nstxy[m.txy > 0]
   }
+  sc.bw <- .np_public_dots_filter_call(sc.bw, "npregbw")
     
   use.outer.bandwidth.progress <- !.np_bw_call_uses_nomad_degree_search(
     sc.bw,

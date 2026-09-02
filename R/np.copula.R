@@ -2,6 +2,8 @@
 ## return columns while the public wrapper adds formula routing and S3 metadata.
 
 npcopula <- function(bws, ...) {
+  mc <- match.call(expand.dots = FALSE)
+  .np_validate_public_dots(mc[["..."]], "npcopula")
   if (!missing(bws)) {
     UseMethod("npcopula", bws)
   } else {

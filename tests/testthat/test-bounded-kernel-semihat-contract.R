@@ -321,9 +321,7 @@ test_that("bounded nonfixed semihat support is widened for pl, index, and scoef"
     regtype = "lc",
     bwtype = "generalized_nn",
     ckerbound = "range",
-    nmulti = 1,
-    itmax = 40,
-    tol = 0.1
+    nmulti = 1
   )
   bw.sc.adapt <- npscoefbw(
     xdat = tx1,
@@ -332,9 +330,7 @@ test_that("bounded nonfixed semihat support is widened for pl, index, and scoef"
     regtype = "lc",
     bwtype = "adaptive_nn",
     ckerbound = "range",
-    nmulti = 1,
-    itmax = 40,
-    tol = 0.1
+    nmulti = 1
   )
   fit.sc.gnn <- npscoef(bws = bw.sc.gnn, txdat = tx1, tydat = y_sc, tzdat = tz, iterate = FALSE)
   fit.sc.adapt <- npscoef(bws = bw.sc.adapt, txdat = tx1, tydat = y_sc, tzdat = tz, iterate = FALSE)

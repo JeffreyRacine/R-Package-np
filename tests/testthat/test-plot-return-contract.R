@@ -47,7 +47,7 @@ test_that("plot return contract: 3D plot-data matches data mode for regression a
       bandwidth.compute = FALSE,
       regtype = "lp",
       degree = 4L,
-      bernstein = TRUE
+      bernstein.basis = TRUE
     ),
     txdat = data.frame(x = x),
     tydat = data.frame(y = y),
@@ -72,7 +72,7 @@ test_that("plot return contract: 3D plot-data matches data mode for regression a
       bandwidth.compute = FALSE,
       regtype = "lp",
       degree = 4L,
-      bernstein = TRUE
+      bernstein.basis = TRUE
     ),
     txdat = data.frame(x = x),
     tydat = data.frame(y = y),
@@ -411,7 +411,7 @@ test_that("plot return contract: rgl plot-data returns the usual data payload", 
       bandwidth.compute = FALSE,
       regtype = "lp",
       degree = 4L,
-      bernstein = TRUE
+      bernstein.basis = TRUE
     ),
     txdat = data.frame(x = x),
     tydat = data.frame(y = y),

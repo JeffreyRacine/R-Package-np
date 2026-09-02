@@ -2,6 +2,7 @@ npplregbw <-
   function(...){
     mc <- match.call(expand.dots = FALSE)
     npRejectRenamedScaleFactorSearchArgs(names(mc$...), where = "npplregbw")
+    .np_validate_public_dots(mc[["..."]], "npplregbw")
     target <- .np_bw_dispatch_target(dots = mc$...,
                                      data_arg_names = c("xdat", "ydat", "zdat"),
                                      eval_env = parent.frame())

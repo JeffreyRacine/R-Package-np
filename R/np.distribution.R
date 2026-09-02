@@ -1,5 +1,7 @@
 npudist <-
   function(bws, ...){
+    mc <- match.call(expand.dots = FALSE)
+    .np_validate_public_dots(mc[["..."]], "npudist")
     args <- list(...)
 
     if (!missing(bws)){
@@ -274,7 +276,13 @@ npudist.default <- function(bws, tdat, ...){
 
   if (!missing(bws) && inherits(bws, "formula")) {
     dots <- list(...)
-    tbw <- do.call(npudistbw, c(list(formula = bws), dots))
+    tbw <- do.call(
+      npudistbw,
+      .np_public_dots_filter_args(
+        c(list(formula = bws), dots),
+        "npudistbw"
+      )
+    )
     return(npudist(bws = tbw, ...))
   }
 
@@ -315,6 +323,7 @@ npudist.default <- function(bws, tdat, ...){
   if(any(m.txy > 0)) {
     names(sc.bw)[m.txy] <- nstxy[m.txy > 0]
   }
+  sc.bw <- .np_public_dots_filter_call(sc.bw, "npudistbw")
     
   tbw <- if (!has.explicit.bws) {
     .np_progress_select_bandwidth_enhanced(

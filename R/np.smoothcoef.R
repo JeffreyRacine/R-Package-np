@@ -1,5 +1,7 @@
 npscoef <-
   function(bws, ...){
+    mc <- match.call(expand.dots = FALSE)
+    .np_validate_public_dots(mc[["..."]], "npscoef")
     args <- list(...)
     npRejectLegacyBooleanErrors(args, "npscoef")
 
@@ -227,6 +229,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
   if(any(m.txy > 0)) {
     names(sc.bw)[m.txy] <- nstxy[m.txy > 0]
   }
+  sc.bw <- .np_public_dots_filter_call(sc.bw, "npscoefbw")
     
   use.outer.bandwidth.progress <- !.np_bw_call_uses_nomad_degree_search(
     sc.bw,
