@@ -40,6 +40,39 @@ test_that("npcdensbw direct nomad payload preserves CV metadata", {
   expect_match(printed, "achieved on multistart 1", fixed = TRUE)
 })
 
+test_that("npcdensbw generalized-NN degree endpoints equal their raw replay", {
+  skip_if_not_installed("crs", minimum_version = "0.15.46")
+  old_opts <- options(np.messages = FALSE, np.tree = FALSE)
+  on.exit(options(old_opts), add = TRUE)
+  data("wage1", package = "np")
+
+  bw <- np::npcdensbw(
+    lwage ~ married + female + nonwhite + educ + exper + tenure,
+    data = wage1,
+    bwtype = "generalized_nn",
+    regtype = "lp",
+    degree.select = "coordinate",
+    search.engine = "nomad",
+    degree.min = 0L,
+    degree.max = 1L,
+    degree.start = rep.int(0L, 3L),
+    degree.max.cycles = 2L,
+    degree.verify = FALSE,
+    nomad.opts = list(MAX_BB_EVAL = 120L),
+    nmulti = 1L,
+    powell.remin = FALSE
+  )
+  raw <- np:::.npcdensbw_eval_only(
+    xdat = wage1[c("married", "female", "nonwhite", "educ", "exper", "tenure")],
+    ydat = wage1["lwage"],
+    bws = bw,
+    invalid.penalty = "dbmax"
+  )$objective
+
+  expect_identical(as.double(bw$fval), as.double(raw))
+  expect_true(np:::.np_nn_raw_objective_valid(raw))
+})
+
 test_that("npcdens direct nomad payload retains summary bandwidth metadata", {
   skip_if_not_installed("crs")
 
