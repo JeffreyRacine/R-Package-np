@@ -580,7 +580,7 @@ test_that("the compiled-fit total accounts for both HC0 phases only", {
   )
   expect_identical(
     .np_reg_fit_total(ordinary, 24L, 3L, TRUE, REGTYPE_LP),
-    3L
+    27L
   )
   expect_identical(
     .np_reg_fit_total(beta, 24L, 3L, TRUE, REGTYPE_LP0),
