@@ -2031,7 +2031,7 @@
      "gydat", "gdat", "wdat", "gdata",
      "data.x", "data.y", "model",
      "y", "z", "w", "x", "zeval", "weval", "xeval", "bw",
-     "method", "distribution", "boot.method", "boot.type", "bootstrap", "boot.num", "random.seed",
+     "method", "distribution", "boot.method", "boot.type", "bootstrap", "B", "boot.num", "random.seed",
      "tau", "tau.search", "delta", "delta.bounds", "scale",
      "regtype.pilot", "nomad", "nomad.pilot", "pilot.args",
      "optim.control",

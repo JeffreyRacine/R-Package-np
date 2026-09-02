@@ -56,6 +56,98 @@ test_that("autodispatch materialization resolves ..n placeholders by argument na
   expect_identical(prepared$tmpvals[[bws.ref]], bw.j)
 })
 
+test_that("autodispatch materializes public bootstrap counts exactly once", {
+  materialize <- getFromNamespace(".npRmpi_autodispatch_materialize_call", "npRmpi")
+  targets <- getFromNamespace(".npRmpi_autodispatch_target_args", "npRmpi")()
+
+  expect_true("B" %in% targets)
+  expect_true("boot.num" %in% targets)
+
+  requested_B <- 9L
+  prepared <- materialize(
+    quote(npdeptest(B = requested_B)),
+    caller_env = environment(), comm = 1L
+  )
+  B.ref <- as.character(prepared$call$B)
+  expect_identical(prepared$tmpvals[[B.ref]], requested_B)
+  expect_false(identical(prepared$call$B, as.name("requested_B")))
+
+  evaluations <- 0L
+  prepared.computed <- materialize(
+    quote(npdeptest(B = {
+      evaluations <- evaluations + 1L
+      9L
+    })),
+    caller_env = environment(), comm = 1L
+  )
+  computed.ref <- as.character(prepared.computed$call$B)
+  expect_identical(evaluations, 1L)
+  expect_identical(prepared.computed$tmpvals[[computed.ref]], 9L)
+
+  prepared.literal <- materialize(
+    quote(npdeptest(B = 9L)),
+    caller_env = environment(), comm = 1L
+  )
+  literal.ref <- as.character(prepared.literal$call$B)
+  expect_identical(prepared.literal$tmpvals[[literal.ref]], 9L)
+
+  prepared.omitted <- materialize(
+    quote(npdeptest(method = "summation")),
+    caller_env = environment(), comm = 1L
+  )
+  expect_false("B" %in% names(as.list(prepared.omitted$call)))
+
+  private.boot.num <- 13L
+  prepared.private <- materialize(
+    quote(internal.bootstrap(boot.num = private.boot.num)),
+    caller_env = environment(), comm = 1L
+  )
+  private.ref <- as.character(prepared.private$call$boot.num)
+  expect_identical(prepared.private$tmpvals[[private.ref]], private.boot.num)
+
+  leaked_B <- 17L
+  unrelated.frame <- new.env(parent = baseenv())
+  expect_error(
+    materialize(
+      quote(npdeptest(B = leaked_B)),
+      caller_env = unrelated.frame, comm = 1L
+    ),
+    "leaked_B"
+  )
+})
+
+test_that("bootstrap-count ownership survives nested formals and ..n forwarding", {
+  materialize <- getFromNamespace(".npRmpi_autodispatch_materialize_call", "npRmpi")
+
+  nested.owner <- function(B) {
+    inner.owner <- function(B) {
+      materialize(
+        quote(npdeptest(B = B)),
+        caller_env = environment(), comm = 1L
+      )
+    }
+    inner.owner(B)
+  }
+
+  B <- 101L
+  nested <- nested.owner(9L)
+  nested.ref <- as.character(nested$call$B)
+  expect_identical(nested$tmpvals[[nested.ref]], 9L)
+
+  owner <- function(B, ...) {
+    mc <- match.call()
+    mc[[1L]] <- as.name("npdeptest")
+    materialize(mc = mc, caller_env = environment(), comm = 1L)
+  }
+  forward <- function(...) owner(...)
+
+  requested_B <- 9L
+  forwarded <- forward(B = requested_B)
+  forwarded.ref <- as.character(forwarded$call$B)
+  expect_identical(forwarded$tmpvals[[forwarded.ref]], 9L)
+  expect_false(identical(forwarded$call$B, as.name("..1")))
+})
+
 test_that("autodispatch materializes forwarded formals and named dots from one owner frame", {
   materialize <- getFromNamespace(".npRmpi_autodispatch_materialize_call", "npRmpi")
 
