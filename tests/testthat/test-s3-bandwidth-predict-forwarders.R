@@ -135,7 +135,7 @@ test_that("bandwidth predict methods forward object through bws", {
     npplreg(bws = bw.pl, newdata = nd.xz)$mean
   )
 
-  bw.sc <- npscoefbw(y ~ x | z, data = semidat, nmulti = 1, tol = 0.1, ftol = 0.1)
+  bw.sc <- npscoefbw(y ~ x | z, data = semidat, nmulti = 1)
   check_numeric_equal(predict(bw.sc)$mean, npscoef(bws = bw.sc)$mean)
   check_numeric_equal(
     predict(bw.sc, newdata = nd.xz)$mean,

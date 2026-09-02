@@ -18,7 +18,6 @@ test_that("npreg nonfixed frozen plot bootstrap supports continuous gradients", 
         y ~ x,
         regtype = "ll",
         degree = c(1),
-        bernstein = TRUE,
         bwtype = bwtype,
         nmulti = 1
       )

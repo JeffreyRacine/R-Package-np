@@ -1,5 +1,7 @@
 npcdens <-
   function(bws, ...){
+    mc <- match.call(expand.dots = FALSE)
+    .np_validate_public_dots(mc[["..."]], "npcdens")
     args <- list(...)
 
     if (!missing(bws)){
@@ -592,6 +594,7 @@ npcdens.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   sc.bw$proper <- NULL
   sc.bw$proper.method <- NULL
   sc.bw$proper.control <- NULL
+  sc.bw <- .np_public_dots_filter_call(sc.bw, "npcdensbw")
     
   use.outer.bandwidth.progress <- !.np_bw_call_uses_nomad_degree_search(
     sc.bw,

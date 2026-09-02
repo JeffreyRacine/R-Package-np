@@ -1,5 +1,7 @@
 npconmode <-
   function(bws, ...){
+    mc <- match.call(expand.dots = FALSE)
+    .np_validate_public_dots(mc[["..."]], "npconmode")
     args <- list(...)
 
     if (!missing(bws)){
@@ -762,6 +764,7 @@ npconmode.default <- function(bws, txdat, tydat,
   if(any(m.txy > 0)) {
     names(sc.bw)[m.txy] <- nstxy[m.txy > 0]
   }
+  sc.bw <- .np_public_dots_filter_call(sc.bw, "npcdensbw")
 
   if (bws.formula && no.tydat) {
     mf.call <- sc.bw

@@ -1,5 +1,7 @@
 npqreg <-
   function(bws, ...){
+    mc <- match.call(expand.dots = FALSE)
+    .np_validate_public_dots(mc[["..."]], "npqreg")
     args <- list(...)
 
     if (!missing(bws)){
@@ -892,6 +894,7 @@ npqreg.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   if(any(m.txy > 0)) {
     names(sc.bw)[m.txy] <- nstxy[m.txy > 0]
   }
+  sc.bw <- .np_public_dots_filter_call(sc.bw, "npcdistbw")
 
   use.outer.bandwidth.progress <- !.np_bw_call_uses_nomad_degree_search(
     sc.bw,

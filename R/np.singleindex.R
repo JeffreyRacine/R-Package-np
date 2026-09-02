@@ -15,6 +15,8 @@
 
 npindex <-
   function(bws, ..., B = 399){
+    mc <- match.call(expand.dots = FALSE)
+    .np_validate_public_dots(mc[["..."]], "npindex")
     args <- list(...)
     npRejectLegacyBooleanErrors(args, "npindex")
     npRejectLegacyBootstrapCount(names(args), "npindex")
@@ -332,7 +334,10 @@ npindex.default <- function(bws, txdat, tydat, nomad = FALSE,
     if (bws.formula)
       bw.dots[c("subset", "na.action")] <- NULL
     bw.args <- c(list(xdat = txdat, ydat = tydat, nomad = nomad), bw.dots)
-    tbw <- do.call(npindexbw, bw.args)
+    tbw <- do.call(
+      npindexbw,
+      .np_public_dots_filter_args(bw.args, "npindexbw")
+    )
 
     fit.args <- list(bws = tbw, txdat = txdat, tydat = tydat)
     fit.dots <- dots
@@ -379,6 +384,7 @@ npindex.default <- function(bws, txdat, tydat, nomad = FALSE,
   if(!bws.formula && any(m.txy > 0)) {
     names(sc.bw)[m.txy] <- nstxy[m.txy > 0]
   }
+  sc.bw <- .np_public_dots_filter_call(sc.bw, "npindexbw")
     
   use.outer.bandwidth.progress <- !.np_bw_call_uses_nomad_degree_search(
     sc.bw,

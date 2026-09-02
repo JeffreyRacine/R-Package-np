@@ -2,6 +2,7 @@ npudensbw <- function(...){
   mc <- match.call(expand.dots = FALSE)
   npRejectRenamedScaleFactorSearchArgs(names(mc$...), where = "npudensbw")
   npRejectUnsupportedLpDegreeSearchArgs(names(mc$...), where = "npudensbw")
+  .np_validate_public_dots(mc[["..."]], "npudensbw")
   target <- .np_bw_dispatch_target(dots = mc$...,
                                    data_arg_names = "dat",
                                    eval_env = parent.frame())

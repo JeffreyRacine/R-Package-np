@@ -184,7 +184,7 @@ test_that("conditional and conmode plots retain categorical effects beside NA de
   ))
   cm <- np_partial_gradient_local(suppressWarnings(npconmode(
     bw.cm, txdat = x, tydat = yc, probabilities = TRUE,
-    gradients = TRUE, gradient.level = "low"
+    gradients = TRUE, level = "low"
   )))
   cm.plot <- np_partial_gradient_local(suppressWarnings(plot(
     cm, gradients = TRUE, view = "fixed", neval = 5L, output = "data"

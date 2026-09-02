@@ -160,7 +160,7 @@ test_that("npreghat lp bernstein path matches predict semantics", {
     bws = 0.18,
     regtype = "lp",
     degree = 3L,
-    bernstein = FALSE,
+    bernstein.basis = FALSE,
     bandwidth.compute = FALSE
   )
   bw.bern <- npregbw(
@@ -169,7 +169,7 @@ test_that("npreghat lp bernstein path matches predict semantics", {
     bws = 0.18,
     regtype = "lp",
     degree = 3L,
-    bernstein = TRUE,
+    bernstein.basis = TRUE,
     bandwidth.compute = FALSE
   )
 

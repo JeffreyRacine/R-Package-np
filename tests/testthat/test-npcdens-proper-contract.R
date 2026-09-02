@@ -9,7 +9,7 @@ test_that("formula npcdens keeps estimator-only proper arguments out of bandwidt
     y ~ x,
     regtype = "lp",
     degree = 1L,
-    bernstein = TRUE,
+    bernstein.basis = TRUE,
     proper = TRUE,
     gradients = TRUE,
     nmulti = 1

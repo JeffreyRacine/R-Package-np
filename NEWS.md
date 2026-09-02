@@ -1,5 +1,11 @@
 # np 0.70-6
 
+* Principal estimator and bandwidth entry points now reject unknown named
+  arguments passed through `...` before evaluating their values. Diagnostics
+  suggest an unambiguous canonical spelling when one is available, while
+  unnamed arguments and established retired-argument diagnostics retain their
+  existing behavior.
+
 * Public bootstrap-count arguments for `npcmstest()`, `npqcmstest()`,
   `npdeneqtest()`, `npdeptest()`, `npsdeptest()`, `npsigtest()`, `npindex()`,
   `npsymtest()`, and `npunitest()` are now consistently named `B`, with the
