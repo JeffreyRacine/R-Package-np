@@ -6,6 +6,9 @@ npscoef_random_start_bandwidth <- getFromNamespace(".npscoef_random_start_bandwi
 npscoef_nn_candidate_bandwidth <- getFromNamespace(".npscoef_nn_candidate_bandwidth", "np")
 npscoef_candidate_is_admissible <- getFromNamespace(".npscoef_candidate_is_admissible", "np")
 np_round_half_to_even <- getFromNamespace(".np_round_half_to_even", "np")
+validate_bandwidth <- getFromNamespace("validateBandwidthTF", "np")
+npscoef_raw_objective_valid <- getFromNamespace(".npscoefbw_raw_objective_valid", "np")
+npscoef_assert_training_radius <- getFromNamespace(".npscoef_nn_assert_training_radius", "np")
 
 test_that("npscoefbw surfaces fixed-start controls as formal arguments", {
   expect_true(all(c("scale.factor.init.lower", "scale.factor.init.upper", "scale.factor.init", "lbd.init", "hbd.init", "dfac.init") %in%
@@ -198,4 +201,48 @@ test_that("npscoefbw nearest-neighbor helpers preserve categorical coordinates",
     bwtype = "generalized_nn"
   )
   expect_equal(manual$bw, c(0.25, 12, 0.4))
+})
+
+test_that("npscoefbw NN radius admission uses exact training multiplicities", {
+  zdat <- data.frame(x = c(0, 0, 0, 1, 2), u = factor(c("a", "b", "a", "b", "a")))
+  invalid <- list(type = "generalized_nn", icon = c(TRUE, FALSE), bw = c(2, 0.25))
+  valid <- invalid
+  valid$bw[[1L]] <- 3
+
+  condition <- tryCatch(
+    npscoef_assert_training_radius(invalid, zdat, "synthetic npscoef owner"),
+    np_nn_candidate_invalid = identity
+  )
+  expect_s3_class(condition, "np_nn_candidate_invalid")
+  expect_identical(condition$owner, "synthetic npscoef owner")
+  expect_true(npscoef_assert_training_radius(valid, zdat, "synthetic npscoef owner"))
+
+  penalty <- sqrt(.Machine$double.xmax)
+  expect_true(npscoef_raw_objective_valid(1, penalty))
+  expect_false(npscoef_raw_objective_valid(penalty, penalty))
+  expect_false(npscoef_raw_objective_valid(Inf, penalty))
+})
+
+test_that("npscoefbw mixed generalized-NN search crosses a zero-radius plateau", {
+  old <- options(np.messages = FALSE)
+  on.exit(options(old), add = TRUE)
+  data("wage1", package = "np")
+
+  bw <- npscoefbw(
+    lwage ~ numdep + smsa |
+      married + female + nonwhite + educ + exper + tenure,
+    data = wage1,
+    bwtype = "generalized_nn",
+    regtype = "lc",
+    nmulti = 1L,
+    optim.maxattempts = 1L,
+    optim.maxit = 120L,
+    powell.remin = FALSE,
+    random.seed = 2026090201L
+  )
+
+  expect_true(is.finite(bw$fval) && bw$fval < sqrt(.Machine$double.xmax))
+  expect_true(all(bw$bw[bw$icon] >= 2L))
+  expect_identical(bw$bw[bw$icon], as.double(as.integer(bw$bw[bw$icon])))
+  expect_true(validate_bandwidth(bw))
 })
