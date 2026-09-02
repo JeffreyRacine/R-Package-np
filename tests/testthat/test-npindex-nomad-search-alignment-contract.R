@@ -17,7 +17,7 @@ test_that("npindex NOMAD shortcut stays near the Powell basin on the canonical I
     tydat = dat$y,
     method = "ichimura",
     regtype = "lp",
-    bernstein = TRUE,
+    bernstein.basis = TRUE,
     degree = 1L
   )
   fit_nomad <- np::npindex(

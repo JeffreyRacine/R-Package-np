@@ -1045,7 +1045,7 @@ npsigtest.rbandwidth <- function(bws,
 
 }
 
-npsigtest.default <- function(bws, xdat, ydat, ...){
+npsigtest.default <- function(bws, xdat, ydat, B = 399, ...){
   sc <- sys.call()
   sc.names <- names(sc)
 
@@ -1069,6 +1069,7 @@ npsigtest.default <- function(bws, xdat, ydat, ...){
   sc.bw <- sc
   
   sc.bw[[1]] <- quote(npregbw)
+  sc.bw$B <- NULL
 
   if(bws.named){
     sc.bw$bandwidth.compute <- FALSE
@@ -1085,7 +1086,7 @@ npsigtest.default <- function(bws, xdat, ydat, ...){
   dots <- list(...)
   dots[c("bws", "bandwidth.compute", "formula", "data", "xdat", "ydat")] <- NULL
 
-  ev <- do.call(npsigtest, c(call.args, dots))
+  ev <- do.call(npsigtest, c(call.args, list(B = B), dots))
 
   ev$call <- match.call(expand.dots = FALSE)
   environment(ev$call) <- parent.frame()
