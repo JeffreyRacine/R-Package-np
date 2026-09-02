@@ -3975,16 +3975,6 @@ npcdensbw.default <-
     reg.args$cvls.quadrature.extend.factor <- cvls.quadrature.extend.factor
     reg.args$cvls.quadrature.points <- cvls.quadrature.points
     reg.args$cvls.quadrature.ratios <- cvls.quadrature.ratios
-    reg.bwmethod <- if (is.null(reg.args$bwmethod)) "cv.ls" else reg.args$bwmethod
-    if (isTRUE(bandwidth.compute) &&
-        identical(as.character(reg.bwmethod)[1L], "cv.ls")) {
-      .npcdensbw_warn_infinite_response_quadrature(
-        reg.args$cykerlb,
-        reg.args$cykerub,
-        reg.args$cykerbound,
-        points.supplied = "cvls.quadrature.points" %in% mc.names
-      )
-    }
     if (is.null(degree.search)) {
       tbw <- do.call(conbandwidth, bw.args)
       .npRmpi_require_active_slave_pool(where = "npcdensbw()")
@@ -3997,6 +3987,16 @@ npcdensbw.default <-
         return(.npRmpi_autodispatch_call(
           .npRmpi_autodispatch_expand_dots_call(match.call(expand.dots = FALSE)),
           parent.frame()))
+    }
+    reg.bwmethod <- if (is.null(reg.args$bwmethod)) "cv.ls" else reg.args$bwmethod
+    if (isTRUE(bandwidth.compute) &&
+        identical(as.character(reg.bwmethod)[1L], "cv.ls")) {
+      .npcdensbw_warn_infinite_response_quadrature(
+        reg.args$cykerlb,
+        reg.args$cykerub,
+        reg.args$cykerbound,
+        points.supplied = "cvls.quadrature.points" %in% mc.names
+      )
     }
     npWarnIgnoredUniformKernelOrder(
       call.names = mc.names,

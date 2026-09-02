@@ -18,17 +18,22 @@ test_that("bounded conditional kernels change npcdens on bounded-support DGP", {
     cykertype = "gaussian",
     cykerbound = "range"
   )
-  b_inf <- npcdensbw(
-    y ~ x,
-    data = dat,
-    bwmethod = "cv.ls",
-    nmulti = 1,
-    cxkertype = "gaussian",
-    cykertype = "gaussian",
-    cykerbound = "fixed",
-    cykerlb = -Inf,
-    cykerub = Inf
+  expect_warning(
+    b_inf <- npcdensbw(
+      y ~ x,
+      data = dat,
+      bwmethod = "cv.ls",
+      nmulti = 1,
+      cxkertype = "gaussian",
+      cykertype = "gaussian",
+      cykerbound = "fixed",
+      cykerlb = -Inf,
+      cykerub = Inf
+    ),
+    "fixed infinite response bounds uses a finite cv.ls quadrature surrogate",
+    fixed = TRUE
   )
+  expect_s3_class(b_inf, "conbandwidth")
 
   f_emp <- npcdens(bws = b_emp)
   f_inf <- npcdens(bws = b_inf)
