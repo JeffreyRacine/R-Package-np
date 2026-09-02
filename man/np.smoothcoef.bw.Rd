@@ -914,7 +914,7 @@ bw <- npscoefbw(y~x|z)
 
 summary(bw)
 
-model <- npscoef(bws=bw, gradients=TRUE)
+model <- npscoef(bws=bw)
 
 summary(model)
 
