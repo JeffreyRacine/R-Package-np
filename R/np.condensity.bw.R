@@ -2342,7 +2342,33 @@ npPreparedObjectiveSearchConditionalDensity <- function(template,
     )
   }
 
+  raw_eval_fun <- function(point) {
+    bw_vec <- .npcdensbw_nomad_point_to_bw(
+      point[seq_len(bwdim)], template = template, setup = setup
+    )
+    tbw <- .npcdensbw_build_conbandwidth(
+      xdat = xdat,
+      ydat = ydat,
+      bws = bw_vec,
+      bandwidth.compute = FALSE,
+      reg.args = reg.args
+    )
+    out <- .npcdensbw_eval_only(
+      xdat = xdat,
+      ydat = ydat,
+      bws = tbw,
+      invalid.penalty = "dbmax",
+      penalty.multiplier = opt.value("penalty.multiplier", 10)
+    )
+    as.numeric(out$objective[1L])
+  }
+
   build_payload <- function(point, best_record, solution, interrupted) {
+    direct.objective <- .np_nn_certify_raw_point(
+      point = point[seq_len(bwdim)],
+      raw.eval = raw_eval_fun,
+      owner = "native npcdens fixed-degree NOMAD route"
+    )
     bw_vec <- .npcdensbw_nomad_point_to_bw(point[seq_len(bwdim)], template = template, setup = setup)
     final.tbw <- .npcdensbw_build_conbandwidth(
       xdat = xdat,
@@ -2351,7 +2377,7 @@ npPreparedObjectiveSearchConditionalDensity <- function(template,
       bandwidth.compute = FALSE,
       reg.args = reg.args
     )
-    final.tbw$fval <- as.numeric(best_record$objective)
+    final.tbw$fval <- direct.objective
     final.tbw$ifval <- NA_real_
     final.tbw$num.feval <- as.numeric(mads.num.feval.total)
     final.tbw$num.feval.fast <- as.numeric(mads.num.feval.fast.total)
@@ -2360,7 +2386,7 @@ npPreparedObjectiveSearchConditionalDensity <- function(template,
     } else {
       NA_real_
     }
-    final.tbw$fval.history <- as.numeric(best_record$objective)
+    final.tbw$fval.history <- direct.objective
     final.tbw$eval.history <- if (!is.null(solution$bbe)) rep(1, max(1L, as.integer(solution$bbe))) else 1
     final.tbw$invalid.history <- 0
     final.tbw$timing <- NA_real_
@@ -2374,7 +2400,6 @@ npPreparedObjectiveSearchConditionalDensity <- function(template,
     direct.payload$num.feval <- as.numeric(mads.num.feval.total)
     direct.payload$num.feval.fast <- as.numeric(mads.num.feval.fast.total)
     direct.payload$num.feval.guarded <- final.tbw$num.feval.guarded
-    direct.objective <- as.numeric(best_record$objective)
     powell.elapsed <- NA_real_
 
     if (identical(bwsolver, "mads+powell")) {
@@ -2409,8 +2434,17 @@ npPreparedObjectiveSearchConditionalDensity <- function(template,
       hot.payload$num.feval <- direct.payload$num.feval
       hot.payload$num.feval.fast <- direct.payload$num.feval.fast
       hot.payload$num.feval.guarded <- direct.payload$num.feval.guarded
-      hot.objective <- as.numeric(hot.payload$fval[1L])
-      if (is.finite(hot.objective) &&
+      hot.point <- .npcdensbw_nomad_bw_to_point(
+        c(hot.payload$ybw, hot.payload$xbw),
+        template = template,
+        setup = setup
+      )
+      hot.objective <- .np_nn_certify_raw_point(
+        point = hot.point,
+        raw.eval = raw_eval_fun,
+        owner = "npcdens MADS+Powell handoff"
+      )
+      if (
           .np_degree_better(hot.objective, direct.objective, direction = objective.direction))
         return(list(payload = hot.payload, objective = hot.objective, powell.time = powell.elapsed))
     }
