@@ -1,7 +1,19 @@
- .np_scbandwidth_manual_nn_validate <- function(bw, nobs, where = "scbandwidth") {
-  vapply(bw, function(h) {
+ .np_scbandwidth_manual_nn_validate <- function(bw, nobs, icon = NULL,
+                                                where = "scbandwidth") {
+  if (is.null(icon)) {
+    icon <- rep_len(TRUE, length(bw))
+  } else {
+    icon <- as.logical(icon)
+    if (length(icon) != length(bw) || anyNA(icon))
+      stop(sprintf("%s: invalid nearest-neighbor coordinate map", where),
+           call. = FALSE)
+  }
+
+  out <- as.double(bw)
+  out[icon] <- vapply(out[icon], function(h) {
     .np_sibandwidth_manual_nn_validate(h = h, nobs = nobs, where = where)
   }, numeric(1))
+  out
 }
 
 scbandwidth <-
@@ -83,7 +95,9 @@ scbandwidth <-
   if (bwtype != "fixed" && cbounds$bound != "none" && !bounded_nonfixed_supported)
     stop("finite continuous kernel bounds require bwtype = \"fixed\"")
   if (bwtype != "fixed" && (!bandwidth.compute || any(bw != 0)))
-    bw <- .np_scbandwidth_manual_nn_validate(bw = bw, nobs = nobs, where = "scbandwidth")
+    bw <- .np_scbandwidth_manual_nn_validate(
+      bw = bw, nobs = nobs, icon = tdati$icon, where = "scbandwidth"
+    )
   ncon <- sum(tdati$icon)
   degree <- npValidateGlpDegree(regtype = regtype,
                                 degree = degree,
