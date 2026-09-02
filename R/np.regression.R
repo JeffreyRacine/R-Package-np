@@ -270,7 +270,7 @@ npreg.call <-
     as.integer(enrow)
   }
   ordinary.hc0 <- isTRUE(se) &&
-    identical(as.integer(reg.code), as.integer(REGTYPE_LP0))
+    as.integer(reg.code) %in% as.integer(c(REGTYPE_LP0, REGTYPE_LP))
 
   if (ordinary.hc0) as.integer(tnrow) + base.total else base.total
 }
