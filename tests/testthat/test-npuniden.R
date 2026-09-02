@@ -35,8 +35,12 @@ test_that("npuniden.sc basic functionality works", {
   n <- 50
   X <- rbeta(n, 5, 1)
   # Shape constrained density estimation
-  model <- npuniden.sc(X, h=0.05, a=0, b=1, lb=0, ub=Inf, constraint="density")
+  model <- npRmpi_expect_warning_messages(
+    npuniden.sc(X, h=0.05, a=0, b=1, lb=0, ub=Inf, constraint="density"),
+    "solve.QP was unable to find a solution, unconstrained estimate returned"
+  )
   
   expect_type(model, "list")
   expect_true("f" %in% names(model))
+  expect_true(all(is.finite(model$f)))
 })

@@ -11,23 +11,26 @@ h3_explicit_lc_bw <- function(xdat, ydat, bws, bwtype = "fixed", ...) {
   )
 }
 
-h3_hc0_derivative_oracle <- function(bws, txdat, tydat, exdat = NULL) {
-  H0 <- unclass(suppressWarnings(npreghat(
-    bws = bws,
-    txdat = txdat,
-    output = "matrix"
-  )))
+h3_hc0_derivative_oracle <- function(bws, txdat, tydat, exdat = NULL,
+                                     expect.uniform.warning = FALSE) {
+  expected.warning <- if (isTRUE(expect.uniform.warning)) {
+    "ignoring kernel order specified with uniform kernel type"
+  } else {
+    character()
+  }
+  H0 <- unclass(npRmpi_expect_warning_messages(
+    npreghat(bws = bws, txdat = txdat, output = "matrix"),
+    expected.warning
+  ))
   residual <- as.double(tydat) - drop(H0 %*% as.double(tydat))
   eval <- if (is.null(exdat)) txdat else exdat
   H.eval <- if (is.null(exdat)) {
     H0
   } else {
-    unclass(suppressWarnings(npreghat(
-      bws = bws,
-      txdat = txdat,
-      exdat = exdat,
-      output = "matrix"
-    )))
+    unclass(npRmpi_expect_warning_messages(
+      npreghat(bws = bws, txdat = txdat, exdat = exdat, output = "matrix"),
+      expected.warning
+    ))
   }
   gradient <- matrix(NA_real_, nrow = nrow(eval), ncol = bws$ncon)
   stderr <- matrix(NA_real_, nrow = nrow(eval), ncol = bws$ncon)
@@ -43,7 +46,10 @@ h3_hc0_derivative_oracle <- function(bws, txdat, tydat, exdat = NULL) {
     )
     if (!is.null(exdat))
       hat.args$exdat <- exdat
-    Hd <- unclass(suppressWarnings(do.call(npreghat, hat.args)))
+    Hd <- unclass(npRmpi_expect_warning_messages(
+      do.call(npreghat, hat.args),
+      expected.warning
+    ))
 
     gradient[, coordinate] <- drop(Hd %*% as.double(tydat))
     stderr[, coordinate] <- sqrt(drop((Hd^2) %*% (residual^2)))
@@ -57,7 +63,8 @@ h3_hc0_derivative_oracle <- function(bws, txdat, tydat, exdat = NULL) {
 }
 
 h3_expect_fit_matches_oracle <- function(bws, xdat, ydat, exdat = NULL,
-                                         tolerance = 8e-13) {
+                                         tolerance = 8e-13,
+                                         expect.uniform.warning = FALSE) {
   args <- list(
     bws = bws,
     txdat = xdat,
@@ -67,9 +74,23 @@ h3_expect_fit_matches_oracle <- function(bws, xdat, ydat, exdat = NULL,
   if (!is.null(exdat))
     args$exdat <- exdat
 
-  without.se <- do.call(npreg, c(args, list(se = FALSE)))
-  with.se <- do.call(npreg, c(args, list(se = TRUE)))
-  oracle <- h3_hc0_derivative_oracle(bws, xdat, ydat, exdat)
+  expected.warning <- if (isTRUE(expect.uniform.warning)) {
+    "ignoring kernel order specified with uniform kernel type"
+  } else {
+    character()
+  }
+  without.se <- npRmpi_expect_warning_messages(
+    do.call(npreg, c(args, list(se = FALSE))),
+    expected.warning
+  )
+  with.se <- npRmpi_expect_warning_messages(
+    do.call(npreg, c(args, list(se = TRUE))),
+    expected.warning
+  )
+  oracle <- h3_hc0_derivative_oracle(
+    bws, xdat, ydat, exdat,
+    expect.uniform.warning = expect.uniform.warning
+  )
 
   expect_identical(with.se$mean, without.se$mean)
   expect_identical(with.se$grad, without.se$grad)
@@ -109,15 +130,25 @@ test_that("legacy scalar derivative SEs equal explicit HC0 derivative hats", {
   )
 
   for (case in cases) {
-    bw <- suppressWarnings(h3_explicit_lc_bw(
-      xdat,
-      ydat,
-      case$bw,
-      bwtype = case$type,
-      ckertype = case$kernel
-    ))
-    h3_expect_fit_matches_oracle(bw, xdat, ydat)
-    h3_expect_fit_matches_oracle(bw, xdat, ydat, exdat)
+    bw <- npRmpi_expect_warning_messages(
+      h3_explicit_lc_bw(
+        xdat,
+        ydat,
+        case$bw,
+        bwtype = case$type,
+        ckertype = case$kernel
+      ),
+      character()
+    )
+    expect.uniform.warning <- identical(case$kernel, "uniform")
+    h3_expect_fit_matches_oracle(
+      bw, xdat, ydat,
+      expect.uniform.warning = expect.uniform.warning
+    )
+    h3_expect_fit_matches_oracle(
+      bw, xdat, ydat, exdat,
+      expect.uniform.warning = expect.uniform.warning
+    )
   }
 })
 

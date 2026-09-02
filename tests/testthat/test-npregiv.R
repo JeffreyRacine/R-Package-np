@@ -11,7 +11,10 @@ test_that("npregiv basic functionality works", {
   
   mydat <- data.frame(y, w, z)
   # Let's try a very small example
-  model <- npregiv(y=y, w=w, z=z, method="Landweber-Fridman", iterate.max=10)
+  model <- npRmpi_expect_warning_messages(
+    npregiv(y=y, w=w, z=z, method="Landweber-Fridman", iterate.max=10),
+    "iterate.max reached: increase iterate.max or inspect norm.stop vector"
+  )
   
   expect_s3_class(model, "npregiv")
   expect_true("phi" %in% names(model))
@@ -30,7 +33,13 @@ test_that("npregivderiv basic functionality works", {
   
   mydat <- data.frame(y, z, w)
   # Just check if it runs
-  model <- npregivderiv(y=y, z=z, w=w, iterate.max=2)
+  model <- npRmpi_expect_warning_messages(
+    npregivderiv(y=y, z=z, w=w, iterate.max=2),
+    c(
+      "Stopping rule increases monotonically (consult model$norm.stop)",
+      "iterate.max reached: increase iterate.max or inspect norm.stop vector"
+    )
+  )
   expect_s3_class(model, "npregivderiv")
   expect_true("phi.prime" %in% names(model))
   expect_false(is.null(model$call))

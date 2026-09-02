@@ -17,23 +17,27 @@ test_that("Powell hot-start respects fixed continuous lower bound", {
   y <- rchisq(n, df = 2 + 4 * (x - 0.5)^2)
   floor_y <- floor_value(y, n)
 
-  nom <- npcdensbw(
-    xdat = data.frame(x = x),
-    ydat = data.frame(y = y),
-    bwmethod = "cv.ls",
-    regtype = "lp",
-    bwtype = "fixed",
-    search.engine = "nomad",
-    degree.select = "coordinate",
-    degree.min = 0L,
-    degree.max = 10L,
-    bernstein.basis = TRUE,
-    nmulti = 2,
-    nomad = TRUE,
-    cxkerbound = "fixed", cxkerlb = 0, cxkerub = 1,
-    cykerbound = "fixed", cykerlb = 0, cykerub = Inf
+  nom <- npRmpi_expect_warning_messages(
+    npcdensbw(
+      xdat = data.frame(x = x),
+      ydat = data.frame(y = y),
+      bwmethod = "cv.ls",
+      regtype = "lp",
+      bwtype = "fixed",
+      search.engine = "nomad",
+      degree.select = "coordinate",
+      degree.min = 0L,
+      degree.max = 10L,
+      bernstein.basis = TRUE,
+      nmulti = 2,
+      nomad = TRUE,
+      cxkerbound = "fixed", cxkerlb = 0, cxkerub = 1,
+      cykerbound = "fixed", cykerlb = 0, cykerub = Inf
+    ),
+    "fixed infinite response bounds uses a finite cv.ls quadrature surrogate"
   )
 
+  expect_s3_class(nom, "conbandwidth")
   expect_gte(nom$ybw[1], floor_y)
 
   nom$degree <- 0L

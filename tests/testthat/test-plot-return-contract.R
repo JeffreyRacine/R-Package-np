@@ -11,7 +11,7 @@ test_that("plot return contract: 3D plot-data matches data mode for regression a
   with_plot_device <- function(expr) {
     pdf(file = tempfile(fileext = ".pdf"))
     on.exit(dev.off(), add = TRUE)
-    suppressWarnings(force(expr))
+    force(expr)
   }
 
   set.seed(107)
@@ -53,8 +53,15 @@ test_that("plot return contract: 3D plot-data matches data mode for regression a
     tydat = data.frame(y = y),
     proper = TRUE
   )
-  cdata <- plot(cfit, output = "data", view = "fixed")
-  cplotdata <- with_plot_device(plot(cfit, output = "plot-data", view = "fixed"))
+  undercoverage <- "the supplied y-grid may under-cover response support"
+  cdata <- npRmpi_expect_warning_messages(
+    plot(cfit, output = "data", view = "fixed"),
+    undercoverage
+  )
+  cplotdata <- npRmpi_expect_warning_messages(
+    with_plot_device(plot(cfit, output = "plot-data", view = "fixed")),
+    undercoverage
+  )
 
   expect_type(cplotdata, "list")
   expect_named(cplotdata, names(cdata))
@@ -78,8 +85,14 @@ test_that("plot return contract: 3D plot-data matches data mode for regression a
     tydat = data.frame(y = y),
     proper = TRUE
   )
-  ddata <- suppressWarnings(plot(dfit, output = "data", view = "fixed"))
-  dplotdata <- with_plot_device(plot(dfit, output = "plot-data", view = "fixed"))
+  ddata <- npRmpi_expect_warning_messages(
+    plot(dfit, output = "data", view = "fixed"),
+    character()
+  )
+  dplotdata <- npRmpi_expect_warning_messages(
+    with_plot_device(plot(dfit, output = "plot-data", view = "fixed")),
+    character()
+  )
 
   expect_type(dplotdata, "list")
   expect_named(dplotdata, names(ddata))
@@ -353,6 +366,8 @@ test_that("plot return contract: npRmpi npscoef fitted perspective path preserve
 })
 
 test_that("plot return contract: rgl plot-data returns the usual data payload", {
+  old.opts <- options(rgl.useNULL = TRUE, rgl.printRglwidget = TRUE)
+  on.exit(options(old.opts), add = TRUE)
   skip_if_not_installed("rgl")
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(), add = TRUE)
@@ -360,9 +375,6 @@ test_that("plot return contract: rgl plot-data returns the usual data payload", 
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
   on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
   options(npRmpi.autodispatch = TRUE)
-
-  old.opts <- options(rgl.useNULL = TRUE, rgl.printRglwidget = TRUE)
-  on.exit(options(old.opts), add = TRUE)
 
   set.seed(110)
   n <- 50
@@ -381,21 +393,27 @@ test_that("plot return contract: rgl plot-data returns the usual data payload", 
     tydat = y
   )
 
-  rdata <- suppressWarnings(plot(
-    rfit,
-    output = "data",
-    renderer = "rgl",
-    view = "fixed",
-    data_overlay = FALSE
-  ))
+  rdata <- npRmpi_expect_warning_messages(
+    plot(
+      rfit,
+      output = "data",
+      renderer = "rgl",
+      view = "fixed",
+      data_overlay = FALSE
+    ),
+    character()
+  )
 
-  rplotdata <- suppressWarnings(plot(
-    rfit,
-    output = "plot-data",
-    renderer = "rgl",
-    view = "fixed",
-    data_overlay = FALSE
-  ))
+  rplotdata <- npRmpi_expect_warning_messages(
+    plot(
+      rfit,
+      output = "plot-data",
+      renderer = "rgl",
+      view = "fixed",
+      data_overlay = FALSE
+    ),
+    character()
+  )
 
   expect_type(rplotdata, "list")
   expect_named(rplotdata, names(rdata))
@@ -418,19 +436,26 @@ test_that("plot return contract: rgl plot-data returns the usual data payload", 
     proper = TRUE
   )
 
-  cdata <- suppressWarnings(plot(
-    cfit,
-    output = "data",
-    renderer = "rgl",
-    view = "fixed"
-  ))
+  undercoverage <- "the supplied y-grid may under-cover response support"
+  cdata <- npRmpi_expect_warning_messages(
+    plot(
+      cfit,
+      output = "data",
+      renderer = "rgl",
+      view = "fixed"
+    ),
+    undercoverage
+  )
 
-  cplotdata <- suppressWarnings(plot(
-    cfit,
-    output = "plot-data",
-    renderer = "rgl",
-    view = "fixed"
-  ))
+  cplotdata <- npRmpi_expect_warning_messages(
+    plot(
+      cfit,
+      output = "plot-data",
+      renderer = "rgl",
+      view = "fixed"
+    ),
+    undercoverage
+  )
 
   expect_type(cplotdata, "list")
   expect_named(cplotdata, names(cdata))
