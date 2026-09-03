@@ -2463,7 +2463,8 @@ npRmpiNomadPreparedSearchRegression <- function(template,
     }
 
     if (!is.finite(native.best.index))
-      stop("native npreg NOMAD degree-search route did not return a raw-valid solution", call. = FALSE)
+      return(.npRmpi_nomad_collective_failure(
+        "native npreg NOMAD degree-search route did not return a raw-valid solution", rank))
 
     if (isTRUE(remin)) {
       remin.index <- length(native.results) + 1L

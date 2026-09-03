@@ -3,6 +3,14 @@
     is.finite(value) && abs(value) < .Machine$double.xmax
 }
 
+# Only for a package-owned prepared search whose terminal failure is already
+# agreed on all ranks. Workers must unwind cleanup and return to their daemon;
+# throwing there would kill the daemon after the master reports the same error.
+.npRmpi_nomad_collective_failure <- function(message, rank) {
+  if (isTRUE(rank == 0L)) stop(message, call. = FALSE)
+  invisible(NULL)
+}
+
 # Prepared search owns a manual command rather than the SPMD option envelope.
 # Send the same search snapshot before every master-owned prepared command;
 # native collective eligibility must not depend on stale worker options.
