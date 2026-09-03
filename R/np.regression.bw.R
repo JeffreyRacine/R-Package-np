@@ -2964,7 +2964,7 @@ npRmpiNomadPreparedSearchRegression <- function(template,
     penalty.multiplier = if (is.null(opt.args$penalty.multiplier)) 10 else opt.args$penalty.multiplier
   )
 
-  eval_fun <- function(point) {
+  eval_point <- function(point, raw = FALSE) {
     point <- as.numeric(point)
     degree <- as.integer(round(point[ncon + ncat + seq_len(ncon)]))
     degree <- .np_degree_clip_to_grid(degree, degree.search$candidates)
@@ -2989,7 +2989,7 @@ npRmpiNomadPreparedSearchRegression <- function(template,
       myopti = eval.myopti,
       myoptd = prep$myoptd,
       bw = as.double(flat.bw),
-      penalty.mode = prep$penalty_mode,
+      penalty.mode = if (isTRUE(raw)) 0L else prep$penalty_mode,
       penalty.multiplier = prep$penalty_multiplier,
       degree = as.integer(degree),
       bernstein = prep$bernstein,
@@ -3004,9 +3004,23 @@ npRmpiNomadPreparedSearchRegression <- function(template,
       objective = as.numeric(out$fval[1L]),
       degree = degree,
       num.feval = 1L,
-      num.feval.fast = as.numeric(out$fast.history[1L])
+      num.feval.fast = as.numeric(out$fast.history[1L]),
+      admissible = .np_nn_single_eval_admissible(out)
     )
   }
+
+  eval_fun <- function(point) eval_point(point)
+  recover_start <- if (is.null(point.start) &&
+                       template$type %in% c("generalized_nn", "adaptive_nn")) {
+    function(point) {
+      ordinary.cap <- setup$nobs - if (identical(template$type, "adaptive_nn")) 2L else 1L
+      .np_nn_find_raw_valid_start(
+        point = point, nn.indices = seq_len(ncon),
+        caps = rep.int(ordinary.cap, ncon),
+        raw.eval = function(candidate) eval_point(candidate, raw = TRUE)$objective
+      )
+    }
+  } else NULL
 
   search.engine.used <- if (identical(degree.search$engine, "nomad+powell")) {
     "nomad"
@@ -3024,6 +3038,7 @@ npRmpiNomadPreparedSearchRegression <- function(template,
     ub = ub,
     eval_fun = eval_fun,
     build_payload = build_payload,
+    recover_start = recover_start,
     direction = "min",
     objective_name = "fval",
     nmulti = nomad.nmulti,
