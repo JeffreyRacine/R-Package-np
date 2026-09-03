@@ -740,6 +740,45 @@ np_nomad_fixed_degree_problem(const crs_nomad_problem *problem,
   return effective_problem;
 }
 
+static int
+np_nomad_fixed_degree_solution_status(const crs_nomad_problem *problem,
+                                      const np_nomad_progress_spec *progress_spec,
+                                      crs_nomad_result *result,
+                                      int status)
+{
+  int i, j;
+
+  if (status != CRS_NOMAD_OK || result == NULL ||
+      result->status != CRS_NOMAD_OK || progress_spec == NULL ||
+      progress_spec->ndegree <= 0)
+    return status;
+  if (result->solution == NULL || result->solution_len < problem->n) {
+    result->status = CRS_NOMAD_INTERNAL_ERROR;
+    snprintf(result->message, sizeof(result->message),
+             "native NOMAD returned a malformed fixed-degree solution");
+    return CRS_NOMAD_INTERNAL_ERROR;
+  }
+
+  for (j = 0; j < progress_spec->ndegree; j++) {
+    double expected, observed;
+
+    i = progress_spec->degree_offset + j;
+    if (problem->lower[i] != problem->upper[i])
+      continue;
+    expected = problem->lower[i];
+    observed = result->solution[i];
+    if (!R_FINITE(observed) || observed != expected) {
+      result->status = CRS_NOMAD_INTERNAL_ERROR;
+      snprintf(result->message, sizeof(result->message),
+               "native NOMAD violated fixed-degree coordinate %d: requested %.17g, returned %.17g",
+               i + 1, expected, observed);
+      return CRS_NOMAD_INTERNAL_ERROR;
+    }
+  }
+
+  return status;
+}
+
 static int np_nomad_solve_with_progress(const crs_nomad_problem *problem,
                                         crs_nomad_eval_fn eval,
                                         void *user_data,
@@ -800,6 +839,8 @@ static int np_nomad_solve_with_progress(const crs_nomad_problem *problem,
                           result);
   nomad_c_callback_active = previous_callback_state;
   np_crs_nomad_observer_poll = NULL;
+  status = np_nomad_fixed_degree_solution_status(
+    problem, progress_spec, result, status);
 
   if (observer_enabled &&
       observer.outcome == CRS_NOMAD_OBSERVER_OUTCOME_ERROR)
