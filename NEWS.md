@@ -1,5 +1,9 @@
 # npRmpi 0.70-6
 
+* Formula-created single-index fits now reuse their retained training data for
+  prediction and subsequent evaluation, avoiding spurious missing-variable
+  errors when response and predictor columns are not separate workspace objects.
+
 * Principal estimator and bandwidth entry points now reject unknown named
   arguments passed through `...` before evaluating their values. Diagnostics
   suggest an unambiguous canonical spelling when one is available, while
