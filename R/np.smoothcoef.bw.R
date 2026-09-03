@@ -1746,6 +1746,45 @@ npscoefbw.NULL <-
   as.double(candidate)
 }
 
+.npscoefbw_raw_objective_valid <- function(value,
+                                           invalid.objective = sqrt(.Machine$double.xmax)) {
+  is.numeric(value) && length(value) == 1L && !is.na(value) &&
+    is.finite(value) && value < invalid.objective
+}
+
+.npscoef_nn_assert_training_radius <- function(scbw, eval.zdat, owner) {
+  if (!(scbw$type %in% c("generalized_nn", "adaptive_nn")) ||
+      !any(scbw$icon))
+    return(invisible(TRUE))
+
+  eval.zdat <- toFrame(eval.zdat)
+  if (ncol(eval.zdat) != length(scbw$icon))
+    stop("internal npscoefbw NN radius check has an invalid coordinate map",
+         call. = FALSE)
+  continuous <- which(scbw$icon)
+  bandwidth <- .npscoef_nn_candidate_bandwidth(
+    param = scbw$bw,
+    bwtype = scbw$type,
+    nobs = nrow(eval.zdat),
+    icon = scbw$icon
+  )[continuous]
+  if (any(!is.finite(bandwidth)))
+    return(invisible(TRUE))
+
+  tie.maximum <- vapply(continuous, function(j) {
+    value <- eval.zdat[[j]]
+    max(tabulate(match(value, value), nbins = length(value)))
+  }, integer(1L))
+  if (any(bandwidth < tie.maximum)) {
+    .np_nn_abort_candidate_invalid(
+      sprintf("%s produced a zero literal nearest-neighbor radius", owner),
+      owner = owner,
+      point = as.double(scbw$bw)
+    )
+  }
+  invisible(TRUE)
+}
+
 .npscoef_cg_diagnostic <- function(expr, method) {
   if (!identical(method, "CG"))
     return(expr)
@@ -2477,21 +2516,33 @@ npscoefbw.scbandwidth <-
           }
 
           overall.cache <- NULL
-          overall.cv.ls <- function(param) {
-            cv_state$objective_fast <- FALSE
+          overall.cv.ls.raw <- function(param, account = TRUE) {
+            if (account)
+              cv_state$objective_fast <- FALSE
             sbw <- apply_bw_to_scbw(bws, param)
             if (!validateBandwidthTF(sbw) ||
                 (!is.null(fixed.lower) && any(param < fixed.lower)) ||
                 ((bws$nord+bws$nuno > 0) && any(param[!bws$icon] > 2.0*x.scale[!bws$icon])))
               return(maxPenalty)
-            cache.hit <- r_objective_cache_lookup(overall.cache, sbw)
+            .npscoef_nn_assert_training_radius(
+              scbw = sbw,
+              eval.zdat = zdat,
+              owner = "npscoefbw overall CV objective"
+            )
+            cache.hit <- if (account) {
+              r_objective_cache_lookup(overall.cache, sbw)
+            } else {
+              list(hit = FALSE, token = NULL)
+            }
             if (isTRUE(cache.hit$hit)) {
               cv_progress_step()
               cv_state$fast_total <- cv_state$fast_total + 1L
               return(cache.hit$value)
             }
-            cv_state$objective_fast <- npscoef_fast_eligible(sbw) ||
+            objective.fast <- npscoef_fast_eligible(sbw) ||
               use_cat_profile_cv_lc(sbw)
+            if (account)
+              cv_state$objective_fast <- objective.fast
 
             if (identical(reg.engine, "lc")) {
               if (use_cat_profile_cv_lc(sbw)) {
@@ -2545,27 +2596,42 @@ npscoefbw.scbandwidth <-
             }
 
             if (!all(is.finite(mean.loo))) {
-              cv_progress_step(ridging = TRUE)
-              if (isTRUE(cv_state$objective_fast))
+              if (account)
+                cv_progress_step(ridging = TRUE)
+              if (account && isTRUE(objective.fast))
                 cv_state$fast_total <- cv_state$fast_total + 1L
-              r_objective_cache_store(overall.cache, cache.hit$token, maxPenalty)
+              if (account)
+                r_objective_cache_store(overall.cache, cache.hit$token, maxPenalty)
               return(maxPenalty)
             }
 
             if(!any(mean.loo == maxPenalty)){
               fv <- sum((ydat-mean.loo)^2)/n
-              cv_progress_step()
+              if (account)
+                cv_progress_step()
             } else {
-              cv_progress_step(ridging = TRUE)
+              if (account)
+                cv_progress_step(ridging = TRUE)
               fv <- maxPenalty
             }
 
-            if (isTRUE(cv_state$objective_fast))
+            if (account && isTRUE(objective.fast))
               cv_state$fast_total <- cv_state$fast_total + 1L
-            r_objective_cache_store(overall.cache, cache.hit$token, fv)
+            if (account)
+              r_objective_cache_store(overall.cache, cache.hit$token, fv)
 
             return((if (is.finite(fv)) fv else maxPenalty))
 
+          }
+
+          overall.cv.ls <- function(param) {
+            tryCatch(
+              overall.cv.ls.raw(param),
+              np_nn_candidate_invalid = function(e) {
+                cv_progress_step(ridging = TRUE)
+                maxPenalty
+              }
+            )
           }
 
           scoef.loo.args <- list(
@@ -2581,7 +2647,7 @@ npscoefbw.scbandwidth <-
           current.partial.profile <- NULL
           current.partial.cache <- NULL
 
-          partial.cv.ls <- function(param, partial.index) {
+          partial.cv.ls.raw <- function(param, partial.index) {
             cv_state$objective_fast <- FALSE
             sbw <- apply_bw_to_scbw(bws, param)
 
@@ -2589,6 +2655,11 @@ npscoefbw.scbandwidth <-
                 (!is.null(fixed.lower) && any(param < fixed.lower)) ||
                 ((bws$nord+bws$nuno > 0) && any(param[!bws$icon] > 2.0*x.scale[!bws$icon])))
               return(maxPenalty)
+            .npscoef_nn_assert_training_radius(
+              scbw = sbw,
+              eval.zdat = zdat,
+              owner = "npscoefbw partial CV objective"
+            )
             cache.hit <- r_objective_cache_lookup(current.partial.cache, sbw)
             if (isTRUE(cache.hit$hit)) {
               cv_state$fast_total <- cv_state$fast_total + 1L
@@ -2652,6 +2723,16 @@ npscoefbw.scbandwidth <-
             return((if (is.finite(fv)) fv else maxPenalty))
           }
 
+          partial.cv.ls <- function(param, partial.index) {
+            tryCatch(
+              partial.cv.ls.raw(param, partial.index),
+              np_nn_candidate_invalid = function(e) {
+                partial_progress_step(fv = maxPenalty)
+                maxPenalty
+              }
+            )
+          }
+
           ## Now we implement multistarting
 
           fval.min <- .Machine$double.xmax
@@ -2660,6 +2741,8 @@ npscoefbw.scbandwidth <-
           value.overall <- numeric(nmulti)
           num.feval.overall <- 0
           overall.cache <- r_objective_cache_new()
+          automatic.start <- all(bws$bw == 0)
+          first.automatic.start <- NULL
 
           x.scale <- sapply(seq_len(bws$ndim), function(i){
             if (dati$icon[i]){
@@ -2687,9 +2770,9 @@ npscoefbw.scbandwidth <-
           optim.control <- list(abstol = optim.abstol,
                                 reltol = optim.reltol,
                                 maxit = optim.maxit)
+          configured.optim.control <- optim.control
 
           for (i in seq_len(nmulti)) {
-
             cv_state$multistart_index <- i
             cv_progress_begin()
 
@@ -2717,6 +2800,8 @@ npscoefbw.scbandwidth <-
                   where = "npscoefbw"
                 )
               }
+              if (automatic.start)
+                first.automatic.start <- tbw
             } else {
               tbw <- .npscoef_random_start_bandwidth(
                 param = x.scale,
@@ -2761,7 +2846,10 @@ npscoefbw.scbandwidth <-
 
             value.overall[i] <- optim.return$value
 
-            if (.npscoef_candidate_is_admissible(
+            if (.npscoefbw_raw_objective_valid(
+                  optim.return$value,
+                  invalid.objective = maxPenalty
+                ) && .npscoef_candidate_is_admissible(
               param = optim.return$par,
               bwtype = bws$type,
               nobs = n,
@@ -2786,6 +2874,85 @@ npscoefbw.scbandwidth <-
 
             .np_progress_bandwidth_multistart_step(done = i, total = nmulti)
           }
+
+          if (automatic.start &&
+              bws$type %in% c("generalized_nn", "adaptive_nn") &&
+              (!have_best || !is.finite(fval.min) || fval.min >= maxPenalty)) {
+            cv_state$multistart_index <- if (have_best) best.overall else 1L
+            cv_progress_begin()
+            recovery.raw.eval <- function(point) {
+              value <- overall.cv.ls.raw(point)
+              if (!.npscoefbw_raw_objective_valid(
+                    value,
+                    invalid.objective = maxPenalty
+                  )) {
+                .np_nn_abort_candidate_invalid(
+                  "npscoefbw overall CV objective returned an invalid raw objective",
+                  owner = "npscoefbw overall CV objective",
+                  point = point,
+                  raw.objective = value
+                )
+              }
+              as.double(value)
+            }
+            ordinary.caps <- rep.int(n - 1L, sum(dati$icon))
+            ordinary.start <- first.automatic.start[dati$icon]
+            recovery <- if (length(ordinary.start) &&
+                            all(ordinary.caps >= 2L) &&
+                            all(ordinary.start >= 2L) &&
+                            all(ordinary.start <= ordinary.caps)) {
+              .np_nn_find_raw_valid_start(
+                point = first.automatic.start,
+                nn.indices = which(dati$icon),
+                caps = ordinary.caps,
+                raw.eval = recovery.raw.eval
+              )
+            } else {
+              list(found = FALSE, point = NULL, objective = NA_real_, evaluations = 0L)
+            }
+            num.feval.overall <- num.feval.overall + recovery$evaluations
+
+            if (isTRUE(recovery$found)) {
+              suppressWarnings(recovery.optim <- .npscoef_cg_diagnostic(optim(
+                recovery$point,
+                fn = overall.cv.ls,
+                method = optim.method,
+                control = configured.optim.control
+              ), optim.method))
+              if (!is.null(recovery.optim$counts) && length(recovery.optim$counts) > 0L)
+                num.feval.overall <- num.feval.overall + recovery.optim$counts[1L]
+
+              final.raw <- tryCatch(
+                recovery.raw.eval(recovery.optim$par),
+                np_nn_candidate_invalid = identity
+              )
+              num.feval.overall <- num.feval.overall + 1L
+              if (!inherits(final.raw, "np_nn_candidate_invalid") &&
+                  .npscoef_candidate_is_admissible(
+                    param = recovery.optim$par,
+                    bwtype = bws$type,
+                    nobs = n,
+                    upper = candidate.upper,
+                    icon = dati$icon
+                  )) {
+                param <- .npscoef_finalize_bandwidth(
+                  param = recovery.optim$par,
+                  bwtype = bws$type,
+                  nobs = n,
+                  icon = dati$icon,
+                  where = "npscoefbw"
+                )
+                min.overall <- as.double(final.raw)
+                fval.min <- min.overall
+                best.overall <- cv_state$multistart_index
+                value.overall[best.overall] <- min.overall
+                numimp.overall <- if (exists("numimp.overall", inherits = FALSE))
+                  numimp.overall + 1L else 1L
+                have_best <- TRUE
+              }
+            }
+            cv_progress_finish()
+          }
           r_objective_cache_record(overall.cache)
 
           if (!have_best) {
@@ -2793,6 +2960,18 @@ npscoefbw.scbandwidth <-
               stop("npscoefbw: no feasible fixed bandwidths found", call. = FALSE)
             }
             stop("npscoefbw: no feasible bandwidths found", call. = FALSE)
+          }
+          if (!is.finite(fval.min) || fval.min >= maxPenalty)
+            stop("npscoefbw: optimizer returned a bandwidth candidate with invalid objective",
+                 call. = FALSE)
+
+          if (bws$type %in% c("generalized_nn", "adaptive_nn") && !cv.iterate) {
+            final.raw <- overall.cv.ls.raw(param, account = FALSE)
+            if (!.npscoefbw_raw_objective_valid(final.raw, maxPenalty) ||
+                !identical(as.numeric(final.raw), as.numeric(fval.min))) {
+              stop("npscoefbw: optimizer endpoint failed raw-objective certification",
+                   call. = FALSE)
+            }
           }
 
           param.overall <- bws$bw <- .npscoef_finalize_bandwidth(
