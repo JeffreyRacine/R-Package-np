@@ -1,5 +1,9 @@
 # np 0.70-6
 
+* `npksum(..., permutation.operator = "integral")` now initializes and
+  independently owns its tree-range workspaces, preventing invalid memory
+  access and double-free behavior without changing the integral result.
+
 * Gradient standard errors for a single-level ordered predictor no longer read
   beyond the predictor's category table; its identically zero contrast remains
   unchanged.
