@@ -1,5 +1,9 @@
 # npRmpi 0.70-6
 
+* Long-double entropy-bootstrap work arrays now use R's aligned long-double
+  allocator, avoiding undefined behavior on platforms that require stricter
+  alignment.
+
 * `npksum(..., permutation.operator = "integral")` now initializes and
   independently owns its tree-range workspaces, preventing invalid memory
   access and double-free behavior without changing the integral result.
