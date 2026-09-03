@@ -682,8 +682,9 @@ test_that("scalar beta regression fits enter the canonical row engine", {
     substr(ingress, owner_start + 1L, nchar(ingress)),
     fixed = TRUE
   )[[1L]] + owner_start
-  owner_end <- regexpr("static void np_kernelsum_common(", ingress,
-                       fixed = TRUE)[[1L]]
+  owner_tail <- substr(ingress, owner_start, nchar(ingress))
+  owner_end <- regexpr("static void np_kernelsum_common(", owner_tail,
+                       fixed = TRUE)[[1L]] + owner_start - 1L
   expect_gt(owner_start, 0L)
   expect_gt(owner_end, owner_start)
   owner <- substr(ingress, owner_start, owner_end - 1L)

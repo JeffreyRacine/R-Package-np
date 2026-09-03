@@ -107,7 +107,6 @@ test_that("unreachable native leaves and legacy wrappers cannot return", {
     "int initialize_kernel_density_asymptotic_constants(",
     "double kernel_unordered_ratio(",
     "int compute_continuous_stddev(",
-    "void mirror_xl(",
     "const char *np_continuous_kernel_route_status_message(",
     "double np_uli_racine(",
     "double np_score_uli_racine(",

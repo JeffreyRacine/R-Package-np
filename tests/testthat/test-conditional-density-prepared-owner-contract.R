@@ -77,7 +77,7 @@ test_that("MPI conditional-density bandwidth state has one typed owner", {
   )
   expect_match(
     source,
-    "bwm_penalty_mode = np_conditional_density_prepared_context.penalty_ready;",
+    "bwm_penalty_mode = raw_only ? 0 :\n    np_conditional_density_prepared_context.penalty_ready;",
     fixed = TRUE
   )
   expect_false(grepl("nomad_shadow", source, fixed = TRUE))
