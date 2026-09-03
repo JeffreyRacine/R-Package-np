@@ -433,7 +433,7 @@ npindexbw.NULL <-
     beta.start.raw[!is.finite(beta.start.raw)] <- 0
   fit.proxy <- .npindex_index_from_beta_tail(xmat, beta.start.raw)
 
-  if (isTRUE(all.equal(as.double(baseline.bws$bw[1L]), 0))) {
+  if (identical(as.double(baseline.bws$bw[1L]), 0)) {
     h.start.raw <- .npindex_default_start_bandwidth(
       fit = fit.proxy,
       bwtype = "fixed",
@@ -443,20 +443,12 @@ npindexbw.NULL <-
   } else {
     h.lower.raw <- h.start.controls$scale.factor.search.lower *
       .npindex_start_bandwidth_scale(fit = fit.proxy, nobs = nobs)
-    h.start.raw <- tryCatch(
-      .npindex_finalize_bandwidth(
-        h = baseline.bws$bw[1L],
-        bwtype = "fixed",
-        nobs = nobs,
-        lower = h.lower.raw,
-        where = "npindexbw"
-      ),
-      error = function(e) .npindex_default_start_bandwidth(
-        fit = fit.proxy,
-        bwtype = "fixed",
-        nobs = nobs,
-        start.controls = h.start.controls
-      )
+    h.start.raw <- .npindex_finalize_bandwidth(
+      h = baseline.bws$bw[1L],
+      bwtype = "fixed",
+      nobs = nobs,
+      lower = h.lower.raw,
+      where = "npindexbw"
     )
   }
   if (!is.finite(h.start.raw) || h.start.raw <= 0)
@@ -2777,18 +2769,18 @@ npindexbw.default <-
     if (isTRUE(bandwidth.compute) &&
         !is.null(degree.search) &&
         initial.bwtype %in% c("generalized_nn", "adaptive_nn")) {
-      h.candidate <- .npindex_nn_candidate_bandwidth(
-        h = bws[p + 1L],
-        bwtype = initial.bwtype,
-        nobs = nrow(xdat)
-      )
-      bws[p + 1L] <- if (isTRUE(h.candidate$ok)) {
-        h.candidate$value
-      } else {
+      bws[p + 1L] <- if (identical(as.double(bws[p + 1L]), 0)) {
         .npindex_default_start_bandwidth(
           fit = NULL,
           bwtype = initial.bwtype,
           nobs = nrow(xdat)
+        )
+      } else {
+        .npindex_finalize_bandwidth(
+          h = bws[p + 1L],
+          bwtype = initial.bwtype,
+          nobs = nrow(xdat),
+          where = "npindexbw"
         )
       }
     }
@@ -3369,20 +3361,12 @@ npindexbw.sibandwidth <-
                   start.controls = h.start.controls
                 )
               else
-                h <- tryCatch(
-                  .npindex_finalize_bandwidth(
-                    h = bws$bw,
-                    bwtype = bws$type,
-                    nobs = nobs,
-                    lower = fixed.h.lower,
-                    where = "npindexbw"
-                  ),
-                  error = function(e) .npindex_default_start_bandwidth(
-                    fit = fit,
-                    bwtype = bws$type,
-                    nobs = nobs,
-                    start.controls = h.start.controls
-                  )
+                h <- .npindex_finalize_bandwidth(
+                  h = bws$bw,
+                  bwtype = bws$type,
+                  nobs = nobs,
+                  lower = fixed.h.lower,
+                  where = "npindexbw"
                 )
             } else {
               ## Random initialization used for remaining multistarts
