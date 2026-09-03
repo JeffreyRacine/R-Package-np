@@ -3,6 +3,17 @@
     is.finite(value) && abs(value) < .Machine$double.xmax
 }
 
+# Prepared search owns a manual command rather than the SPMD option envelope.
+# Send the same search snapshot before every master-owned prepared command;
+# native collective eligibility must not depend on stale worker options.
+.npRmpi_sync_prepared_search_options <- function(comm = 1L) {
+  npObjectiveCacheEnabled()
+  snapshot <- .npRmpi_autodispatch_option_snapshot()
+  command <- substitute(do.call("options", OPTS), list(OPTS = snapshot))
+  .npRmpi_bcast_cmd_expr(command, comm = comm, caller.execute = FALSE)
+  invisible(NULL)
+}
+
 .np_nn_candidate_invalid_condition <- function(message,
                                                 owner = NULL,
                                                 point = NULL,

@@ -2844,9 +2844,7 @@ npRmpiNomadPreparedSearchRegression <- function(template,
     if (isTRUE(.npRmpi_autodispatch_called_from_bcast())) {
       search.result <- eval(mc, envir = environment())
     } else {
-      npObjectiveCacheEnabled()
-      # Prime the first spawned-worker broadcast before the rank-wide NOMAD search.
-      .npRmpi_bcast_cmd_expr(quote(invisible(NULL)), comm = 1L, caller.execute = TRUE)
+      .npRmpi_sync_prepared_search_options(comm = 1L)
       search.result <- .npRmpi_bcast_cmd_expr(mc, comm = 1L, caller.execute = TRUE)
     }
     if (!is.null(search.result$num.feval.total))
