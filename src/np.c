@@ -1757,6 +1757,8 @@ extern void np_accel_gauss_release_buffers(void);
  */
 static void bwm_search_context_release(void)
 {
+  /* Pointer-keyed geometry belongs to this immutable search data owner. */
+  np_cont_largeh_cache_clear_extern();
   safe_free(bwm_kernel_unordered_vec);
   bwm_kernel_unordered_vec = NULL;
   bwm_kernel_unordered_len = 0;

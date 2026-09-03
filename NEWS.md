@@ -1,5 +1,9 @@
 # npRmpi 0.70-6
 
+* Bandwidth searches no longer reuse large-bandwidth geometry from an earlier
+  dataset. This fixes history-dependent density cross-validation values and
+  protects subsequent searches and regression fits from stale geometry.
+
 * Adaptive-nearest-neighbour distribution cross-validation on external grids
   now gathers all required donor weights across MPI ranks. This corrects
   allocation-dependent objectives without changing fixed/generalized-NN

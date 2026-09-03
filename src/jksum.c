@@ -28154,6 +28154,8 @@ static void np_regression_fit_owner_init(
   const int num_reg_continuous,
   NP_GateOverrideCtx *gate_context)
 {
+  /* Never inherit pointer-keyed geometry from a preceding native owner. */
+  np_cont_largeh_cache_clear();
   memset(owner, 0, sizeof(*owner));
   owner->num_reg_continuous = num_reg_continuous;
   owner->gate_context = gate_context;
