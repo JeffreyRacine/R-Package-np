@@ -1,5 +1,5 @@
 test_that("mapped generalized-NN sums preserve training occurrence geometry", {
-  
+
   old <- options(np.messages = FALSE, np.extendednn = TRUE)
   on.exit(options(old), add = TRUE)
   i <- seq_len(17L)
