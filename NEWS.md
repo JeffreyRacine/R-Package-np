@@ -1,5 +1,9 @@
 # np 0.70-6
 
+* NN recovery now leaves an allowed extended-NN incumbent unchanged and
+  proceeds to the existing fail-closed result instead of reporting an internal
+  ordinary-domain error.
+
 * Source builds on R versions before 4.4 now provide the LAPACK integer type
   used by compact-support regression checks, while newer R versions retain
   their native LAPACK type definition.

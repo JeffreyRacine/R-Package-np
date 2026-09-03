@@ -57,6 +57,32 @@ test_that("ordinary NN recovery propagates unknown errors", {
   )
 })
 
+test_that("extended NN incumbents skip ordinary recovery without clamping", {
+  evaluated <- FALSE
+  result <- np:::.np_nn_find_raw_valid_start(
+    point = c(12, 2),
+    nn.indices = 1:2,
+    caps = c(9, 9),
+    raw.eval = function(point) {
+      evaluated <<- TRUE
+      1
+    }
+  )
+
+  expect_false(result$found)
+  expect_null(result$point)
+  expect_identical(result$evaluations, 0L)
+  expect_false(evaluated)
+  expect_error(
+    np:::.np_nn_find_raw_valid_start(
+      point = c(0, 2), nn.indices = 1:2, caps = c(9, 9),
+      raw.eval = function(point) 1
+    ),
+    "outside the ordinary NN domain",
+    fixed = TRUE
+  )
+})
+
 test_that("raw objective certification rejects penalties at the terminal scale", {
   expect_true(np:::.np_nn_raw_objective_valid(0))
   expect_true(np:::.np_nn_raw_objective_valid(-1e7))
