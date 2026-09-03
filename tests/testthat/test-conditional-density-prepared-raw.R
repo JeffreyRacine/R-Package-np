@@ -48,4 +48,3 @@ test_that("conditional-density raw probes preserve resident exploration", {
     expect_match(observed$inactive, "state is not active", fixed = TRUE)
   }
 })
-
