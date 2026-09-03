@@ -1133,18 +1133,24 @@ static int np_kernel_bandwidth_continuous_nn_into_ctx(
         double fold_scale;
         NPNNGeometryStatus pair_status;
 
-        if(num_obs_eval != num_obs_train ||
+        if(num_obs_train < 3 || num_obs_eval != num_obs_train ||
            geometry_context->eval_to_train != NULL ||
            geometry_context->adaptive_successor == NULL ||
            geometry_context->adaptive_fold_scale == NULL ||
            geometry_context->adaptive_successor[dimension] == NULL ||
            (geometry_context->adaptive_full != NULL &&
-            geometry_context->adaptive_full[dimension] == NULL) ||
-           np_adaptive_fold_lookup_from_scale(
+            geometry_context->adaptive_full[dimension] == NULL)){
+          if(geometry_status != NULL)
+            *geometry_status = NP_NN_GEOMETRY_INVALID_ARGUMENT;
+          return 1;
+        }
+        /* A full-sample NN count can be outside the delete-one domain.
+           Keep candidate rejection distinct from a malformed fold owner. */
+        if(np_adaptive_fold_lookup_from_scale(
              num_obs_train, vector_scale_factor[dimension],
              &fold_lookup_k, &fold_scale) != 0){
           if(geometry_status != NULL)
-            *geometry_status = NP_NN_GEOMETRY_INVALID_ARGUMENT;
+            *geometry_status = NP_NN_GEOMETRY_INVALID_SCALE;
           return 1;
         }
         pair_status = compute_nn_adaptive_distance_pair(

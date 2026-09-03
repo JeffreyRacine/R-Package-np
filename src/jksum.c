@@ -41641,7 +41641,8 @@ double *cv){
        beta callback convert an invalid candidate into DBL_MAX. */
     if(exact_beta_route)
       goto cleanup_density_leave_one_out_cv;
-    if(nn_geometry_status == NP_NN_GEOMETRY_ZERO_RADIUS) {
+    if(nn_geometry_status == NP_NN_GEOMETRY_ZERO_RADIUS ||
+       nn_geometry_status == NP_NN_GEOMETRY_INVALID_SCALE) {
       status = 1;
       goto cleanup_density_leave_one_out_cv;
     }
@@ -42087,7 +42088,8 @@ double *cv){
        are converted to the optimizer penalty by the callback. */
     if(exact_beta_route)
       goto cleanup_density_convolution_cv;
-    if(nn_geometry_status == NP_NN_GEOMETRY_ZERO_RADIUS) {
+    if(nn_geometry_status == NP_NN_GEOMETRY_ZERO_RADIUS ||
+       nn_geometry_status == NP_NN_GEOMETRY_INVALID_SCALE) {
       status = 1;
       goto cleanup_density_convolution_cv;
     }
