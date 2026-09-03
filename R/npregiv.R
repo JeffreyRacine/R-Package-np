@@ -98,6 +98,7 @@ npregiv.default <- function(y,
                     ...) {
 
   ptm.start <- proc.time()
+  .np_iv_require_fixed_bandwidth(...)
   p.missing <- missing(p)
   cl <- match.call()
   cl[[1L]] <- quote(npregiv)

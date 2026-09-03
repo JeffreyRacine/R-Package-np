@@ -97,6 +97,7 @@ npregivderiv.default <- function(y,
                          ...) {
 
   ptm.start <- proc.time()
+  .np_iv_require_fixed_bandwidth(...)
   regtype.missing <- missing(regtype)
   degree.missing <- missing(degree)
   nomad.missing <- missing(nomad)
