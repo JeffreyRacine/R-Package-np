@@ -1,5 +1,9 @@
 # np 0.70-6
 
+* Bandwidth searches no longer reuse large-bandwidth geometry from an earlier
+  dataset. This fixes history-dependent density cross-validation values and
+  protects subsequent searches and regression fits from stale geometry.
+
 * Nearest-neighbour bandwidth searches now certify selected objectives and
   optimizer handoffs against the underlying objective. When an automatic
   search ends on an invalid NN plateau, eligible owners can make one
