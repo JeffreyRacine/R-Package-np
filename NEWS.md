@@ -1,5 +1,9 @@
 # npRmpi 0.70-6
 
+* Gradient standard errors for a single-level ordered predictor no longer read
+  beyond the predictor's category table; its identically zero contrast remains
+  unchanged.
+
 * Automatic cell-based coordinate/exhaustive polynomial-degree searches now
   preserve a configuration error when every degree candidate fails with the same
   condition. Missing fixed `cker*`, `cxker*`, or `cyker*` limits, and missing
