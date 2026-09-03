@@ -12,6 +12,7 @@ extern SEXP C_np_density_bw_eval(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP,
 extern SEXP C_np_density_nomad_native_search(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_density_conditional_prepared_prepare(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_density_conditional_prepared_eval(SEXP, SEXP);
+extern SEXP C_np_density_conditional_prepared_eval_raw(SEXP, SEXP);
 extern SEXP C_np_density_conditional_prepared_native_search(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_density_conditional_prepared_fixed_native_search(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_density_conditional_prepared_destroy(void);
@@ -65,6 +66,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"C_np_density_nomad_native_search",(DL_FUNC) &C_np_density_nomad_native_search,19},
     {"C_np_density_conditional_prepared_prepare",(DL_FUNC) &C_np_density_conditional_prepared_prepare,20},
     {"C_np_density_conditional_prepared_eval",(DL_FUNC) &C_np_density_conditional_prepared_eval,2},
+    {"C_np_density_conditional_prepared_eval_raw",(DL_FUNC) &C_np_density_conditional_prepared_eval_raw,2},
     {"C_np_density_conditional_prepared_native_search",(DL_FUNC) &C_np_density_conditional_prepared_native_search,12},
     {"C_np_density_conditional_prepared_fixed_native_search",(DL_FUNC) &C_np_density_conditional_prepared_fixed_native_search,12},
     {"C_np_density_conditional_prepared_destroy",(DL_FUNC) &C_np_density_conditional_prepared_destroy,0},

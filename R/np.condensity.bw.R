@@ -1315,6 +1315,15 @@ npPreparedObjectiveEvalConditionalDensity <- function(bw, degree) {
   )
 }
 
+npPreparedObjectiveEvalConditionalDensityRaw <- function(bw, degree) {
+  .Call(
+    "C_np_density_conditional_prepared_eval_raw",
+    bw,
+    degree,
+    PACKAGE = "np"
+  )
+}
+
 npPreparedObjectiveNativeSearchConditionalDensity <- function(x0,
                                                             bbin,
                                                             lb,

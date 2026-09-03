@@ -5748,6 +5748,7 @@ SEXP C_np_density_conditional_prepared_prepare(SEXP c_uno,
 
 static int np_conditional_density_prepared_context_eval_native_raw(const double *rbw,
                                                                const int *glp_degree,
+                                                               const int raw_only,
                                                                double out[4])
 {
   int i;
@@ -5777,7 +5778,8 @@ static int np_conditional_density_prepared_context_eval_native_raw(const double 
       degree_work[i] = glp_degree[i];
   }
 
-  bwm_penalty_mode = np_conditional_density_prepared_context.penalty_ready;
+  bwm_penalty_mode = raw_only ? 0 :
+    np_conditional_density_prepared_context.penalty_ready;
   bwm_penalty_value = bwm_penalty_mode ?
     np_conditional_density_prepared_context.penalty_value : DBL_MAX;
 
@@ -5821,7 +5823,8 @@ static int np_conditional_density_prepared_context_eval_native_raw(const double 
   return 0;
 }
 
-SEXP C_np_density_conditional_prepared_eval(SEXP rbw, SEXP glp_degree)
+static SEXP np_density_conditional_prepared_eval_mode(SEXP rbw, SEXP glp_degree,
+                                                     const int raw_only)
 {
   SEXP rbw_r = R_NilValue, degree_i = R_NilValue, out = R_NilValue;
   double eval_out[4];
@@ -5843,6 +5846,7 @@ SEXP C_np_density_conditional_prepared_eval(SEXP rbw, SEXP glp_degree)
 
   if (np_conditional_density_prepared_context_eval_native_raw(REAL(rbw_r),
                                                           INTEGER(degree_i),
+                                                          raw_only,
                                                           eval_out) != 0) {
     UNPROTECT(2);
     error("resident npcdens prepared objective native evaluator failed");
@@ -5855,6 +5859,16 @@ SEXP C_np_density_conditional_prepared_eval(SEXP rbw, SEXP glp_degree)
   REAL(out)[3] = eval_out[3];
   UNPROTECT(3);
   return out;
+}
+
+SEXP C_np_density_conditional_prepared_eval(SEXP rbw, SEXP glp_degree)
+{
+  return np_density_conditional_prepared_eval_mode(rbw, glp_degree, 0);
+}
+
+SEXP C_np_density_conditional_prepared_eval_raw(SEXP rbw, SEXP glp_degree)
+{
+  return np_density_conditional_prepared_eval_mode(rbw, glp_degree, 1);
 }
 
 typedef struct {
@@ -5964,7 +5978,7 @@ static int np_cdens_native_search_callback(int n,
       degree[j] = context->fixed_degree[j];
   }
 
-  status = np_conditional_density_prepared_context_eval_native_raw(flat_bw, degree, eval_out);
+  status = np_conditional_density_prepared_context_eval_native_raw(flat_bw, degree, 0, eval_out);
   if (status != 0) {
     context->callback_failures++;
     NP_NOMAD_CALLBACK_FREE(flat_bw);
