@@ -1243,7 +1243,7 @@ npregbw.rbandwidth <-
     )
   }
 
-  raw_eval_fun <- function(point) {
+  eval_raw_point <- function(point) {
     bw_vec <- .npregbw_nomad_point_to_bw(point, template = template, setup = setup)
     tbw <- .npregbw_build_rbandwidth(
       xdat = xdat,
@@ -1260,15 +1260,18 @@ npregbw.rbandwidth <-
       invalid.penalty = "dbmax",
       penalty.multiplier = opt.value("penalty.multiplier", 10)
     )
-    as.numeric(out$objective[1L])
+    out
   }
 
+  raw_eval_fun <- function(point) as.numeric(eval_raw_point(point)$objective[1L])
+
   build_payload <- function(point, best_record, solution, interrupted) {
-    direct.objective <- .np_nn_certify_raw_point(
+    .np_nn_certify_raw_point(
       point = point,
       raw.eval = raw_eval_fun,
       owner = "native npreg fixed-degree NOMAD route"
     )
+    direct.objective <- as.numeric(best_record$objective[1L])
     bw_vec <- .npregbw_nomad_point_to_bw(point, template = template, setup = setup)
     final.tbw <- .npregbw_build_rbandwidth(
       xdat = xdat,
@@ -1320,11 +1323,12 @@ npregbw.rbandwidth <-
       hot.point <- .npregbw_nomad_bw_to_point(
         hot.payload$bw, template = template, setup = setup
       )
-      hot.objective <- .np_nn_certify_raw_point(
+      .np_nn_certify_raw_point(
         point = hot.point,
         raw.eval = raw_eval_fun,
         owner = "npreg MADS+Powell handoff"
       )
+      hot.objective <- as.numeric(hot.payload$fval[1L])
       if (
           .np_degree_better(hot.objective, direct.objective, direction = "min")) {
         return(list(payload = hot.payload, objective = hot.objective, powell.time = powell.elapsed))
@@ -1398,11 +1402,11 @@ npregbw.rbandwidth <-
     native.num.feval.total <- 0
     native.num.feval.fast.total <- 0
     native.num.feval.invalid.total <- 0
-    for (i in seq_len(nrow(native.start.matrix))) {
+    run_native_restart <- function(start, restart.index) {
       native.start <- proc.time()[3L]
       native.i <- npNomadNativeSearchRegression(
         prep = native.prep,
-        x0 = as.numeric(native.start.matrix[i, ]),
+        x0 = as.numeric(start),
         bbin = bounds$bbin,
         lb = bounds$lower,
         ub = bounds$upper,
@@ -1413,7 +1417,7 @@ npregbw.rbandwidth <-
         option.values = native.option.vectors$values
       )
       native.elapsed <- proc.time()[3L] - native.start
-      native.nomad.elapsed <- native.nomad.elapsed + native.elapsed
+      native.nomad.elapsed <<- native.nomad.elapsed + native.elapsed
       .np_nomad_native_status(native.i, "native npreg NOMAD route")
       objective.i <- as.numeric(native.i$objective[1L])
       raw.objective.i <- if (is.null(native.i$best_point) ||
@@ -1422,9 +1426,9 @@ npregbw.rbandwidth <-
       } else {
         raw_eval_fun(as.numeric(native.i$best_point))
       }
-      native.results[[i]] <- list(
-        restart = i,
-        start = as.numeric(native.start.matrix[i, ]),
+      record <- list(
+        restart = restart.index,
+        start = as.numeric(start),
         elapsed = native.elapsed,
         status = "ok",
         message = as.character(native.i$message[1L]),
@@ -1436,13 +1440,52 @@ npregbw.rbandwidth <-
         best_objective = objective.i,
         native = native.i
       )
-      native.num.feval.total <- native.num.feval.total + as.numeric(native.i$total_num.feval[1L])
-      native.num.feval.fast.total <- native.num.feval.fast.total + as.numeric(native.i$total_num.feval.fast[1L])
-      native.num.feval.invalid.total <- native.num.feval.invalid.total + as.numeric(native.i$total_num.feval.invalid[1L])
-      if (.np_nn_raw_objective_valid(raw.objective.i) &&
-          raw.objective.i < native.best.objective) {
-        native.best.objective <- raw.objective.i
+      native.num.feval.total <<- native.num.feval.total + as.numeric(native.i$total_num.feval[1L])
+      native.num.feval.fast.total <<- native.num.feval.fast.total + as.numeric(native.i$total_num.feval.fast[1L])
+      native.num.feval.invalid.total <<- native.num.feval.invalid.total + as.numeric(native.i$total_num.feval.invalid[1L])
+      list(record = record, raw.valid = .np_nn_raw_objective_valid(raw.objective.i) &&
+        .np_nn_raw_objective_valid(objective.i))
+    }
+    for (i in seq_len(nrow(native.start.matrix))) {
+      result <- run_native_restart(as.numeric(native.start.matrix[i, ]), i)
+      native.results[[i]] <- result$record
+      if (result$raw.valid && result$record$objective < native.best.objective) {
+        native.best.objective <- result$record$objective
         native.best.index <- i
+      }
+    }
+    if (!is.finite(native.best.index) && is.null(point.start) &&
+        template$type %in% c("generalized_nn", "adaptive_nn") &&
+        length(setup$cont_idx) > 0L) {
+      incumbent <- vapply(native.results, function(z) z$objective, numeric(1L))
+      incumbent[!is.finite(incumbent)] <- Inf
+      incumbent.index <- if (any(is.finite(incumbent))) which.min(incumbent) else 1L
+      recovery.raw.eval <- function(point) {
+        out <- eval_raw_point(point)
+        native.num.feval.total <<- native.num.feval.total + as.numeric(out$num.feval[1L])
+        native.num.feval.fast.total <<- native.num.feval.fast.total + as.numeric(out$num.feval.fast[1L])
+        value <- as.numeric(out$objective[1L])
+        if (!.np_nn_raw_objective_valid(value))
+          native.num.feval.invalid.total <<- native.num.feval.invalid.total + as.numeric(out$num.feval[1L])
+        value
+      }
+      ordinary.cap <- setup$nobs - if (identical(template$type, "adaptive_nn")) 2L else 1L
+      recovery <- .np_nn_find_raw_valid_start(
+        point = native.results[[incumbent.index]]$best_point,
+        nn.indices = seq_along(setup$cont_idx),
+        caps = rep.int(ordinary.cap, length(setup$cont_idx)),
+        raw.eval = recovery.raw.eval
+      )
+      if (isTRUE(recovery$found)) {
+        recovery.index <- length(native.results) + 1L
+        result <- run_native_restart(recovery$point, recovery.index)
+        result$record$recovery <- TRUE
+        result$record$recovery_witness <- recovery
+        native.results[[recovery.index]] <- result$record
+        if (result$raw.valid) {
+          native.best.objective <- result$record$objective
+          native.best.index <- recovery.index
+        }
       }
     }
     if (!is.finite(native.best.index))
