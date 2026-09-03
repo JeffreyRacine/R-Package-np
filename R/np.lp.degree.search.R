@@ -2944,8 +2944,8 @@
       state$restart_starts[[i]] <- point
       if (!is.null(state$restart_degree_starts)) {
         q <- length(degree_spec$lower)
-        state$restart_degree_starts[[i]] <- as.integer(tail(point, q))
-        state$restart_bandwidth_starts[[i]] <- head(point, length(point) - q)
+        state$restart_degree_starts[[i]] <- as.integer(utils::tail(point, q))
+        state$restart_bandwidth_starts[[i]] <- utils::head(point, length(point) - q)
       }
       if (!is.null(state$progress_state))
         state$progress_state$nomad_nmulti <- nrow(start_matrix)
