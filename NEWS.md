@@ -1,5 +1,10 @@
 # np 0.70-6
 
+* NOMAD degree searches now honor mixed fixed/free degree bounds such as
+  `degree.min = c(0, 0)` with `degree.max = c(1, 0)`. Fixed coordinates remain
+  fixed through starts, restarts, optional Powell refinement, and result
+  metadata; all-free, all-fixed, and exhaustive searches are unchanged.
+
 * Evaluation-only bandwidth calls now return one initialized history entry,
   rather than exposing unused entries when more than one start was requested.
 

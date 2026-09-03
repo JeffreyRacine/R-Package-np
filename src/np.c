@@ -1,6 +1,7 @@
 /* Copyright (C) Jeff Racine, 1995-2004 */
 
 #include <float.h>
+#include <ctype.h>
 #include <limits.h>
 #include <math.h>
 #include <stdio.h>
@@ -1080,6 +1081,153 @@ static void np_nomad_progress_observer_report(const char *message)
   UNPROTECT(5);
 }
 
+static int np_nomad_option_name_equal(const char *name, const char *expected)
+{
+  const char *end;
+  size_t i, name_len, expected_len;
+
+  if (name == NULL || expected == NULL)
+    return 0;
+  while (*name != '\0' && isspace((unsigned char)*name))
+    name++;
+  end = name + strlen(name);
+  while (end > name && isspace((unsigned char)end[-1]))
+    end--;
+  name_len = (size_t)(end - name);
+  expected_len = strlen(expected);
+  if (name_len != expected_len)
+    return 0;
+  for (i = 0; i < name_len; i++)
+    if (toupper((unsigned char)name[i]) !=
+        toupper((unsigned char)expected[i]))
+      return 0;
+  return 1;
+}
+
+static const crs_nomad_problem *
+np_nomad_fixed_degree_problem(const crs_nomad_problem *problem,
+                              const np_nomad_progress_spec *progress_spec,
+                              crs_nomad_problem *effective_problem)
+{
+  crs_nomad_option *effective_options;
+  double *effective_lower;
+  double *effective_upper;
+  char *fixed_option;
+  size_t fixed_option_capacity, used;
+  int i, j, fixed_count, wrote;
+
+  if (progress_spec == NULL || progress_spec->ndegree <= 0)
+    return problem;
+  if (problem == NULL || effective_problem == NULL || problem->n <= 0 ||
+      progress_spec->degree_offset < 0 ||
+      progress_spec->degree_offset > problem->n - progress_spec->ndegree ||
+      problem->lower == NULL || problem->upper == NULL ||
+      problem->x0 == NULL || problem->bb_input_type == NULL)
+    error("internal NOMAD fixed-degree metadata is inconsistent");
+
+  fixed_count = 0;
+  for (j = 0; j < progress_spec->ndegree; j++) {
+    i = progress_spec->degree_offset + j;
+    if (problem->lower[i] == problem->upper[i])
+      fixed_count++;
+  }
+  if (fixed_count == 0)
+    return problem;
+  if (fixed_count == progress_spec->ndegree)
+    error("internal NOMAD degree search received an all-fixed degree vector; the singleton bypass should have handled it");
+
+  if (problem->option_count < 0 ||
+      (problem->option_count > 0 && problem->options == NULL) ||
+      problem->option_count == INT_MAX)
+    error("internal NOMAD option metadata is inconsistent");
+  for (i = 0; i < problem->option_count; i++)
+    if (np_nomad_option_name_equal(problem->options[i].name,
+                                   "FIXED_VARIABLE"))
+      error("'FIXED_VARIABLE' is reserved internally when NOMAD searches mixed fixed/free degree bounds");
+
+  for (j = 0; j < progress_spec->ndegree; j++) {
+    double value;
+    int start;
+
+    i = progress_spec->degree_offset + j;
+    if (problem->lower[i] != problem->upper[i])
+      continue;
+    value = problem->lower[i];
+    if (!R_FINITE(value) || value < 0.0 || value > (double)INT_MAX ||
+        value != nearbyint(value) ||
+        problem->bb_input_type[i] != CRS_NOMAD_INPUT_INTEGER)
+      error("internal NOMAD fixed degree is not a valid integer coordinate");
+    if (problem->x0[i] != value)
+      error("internal NOMAD initial point does not preserve a fixed degree");
+    if (problem->starts != NULL) {
+      if (problem->start_count <= 0)
+        error("internal NOMAD explicit start metadata is inconsistent");
+      for (start = 0; start < problem->start_count; start++)
+        if (problem->starts[(size_t)start*(size_t)problem->n + (size_t)i] != value)
+          error("internal NOMAD start does not preserve a fixed degree");
+    }
+  }
+
+  effective_lower = (double *)R_alloc((size_t)problem->n, sizeof(double));
+  effective_upper = (double *)R_alloc((size_t)problem->n, sizeof(double));
+  for (i = 0; i < problem->n; i++) {
+    effective_lower[i] = problem->lower[i];
+    effective_upper[i] = problem->upper[i];
+  }
+  for (j = 0; j < progress_spec->ndegree; j++) {
+    const double value = problem->lower[progress_spec->degree_offset + j];
+
+    i = progress_spec->degree_offset + j;
+    if (value != problem->upper[i])
+      continue;
+    if (value == 0.0) {
+      effective_lower[i] = 0.0;
+      effective_upper[i] = 1.0;
+    } else {
+      effective_lower[i] = value - 1.0;
+      effective_upper[i] = value;
+    }
+  }
+
+  if ((size_t)problem->n > (SIZE_MAX - (size_t)8)/(size_t)16)
+    error("internal NOMAD fixed-variable option is too large");
+  fixed_option_capacity = (size_t)problem->n*(size_t)16 + (size_t)8;
+  fixed_option = (char *)R_alloc(fixed_option_capacity, sizeof(char));
+  used = 0;
+  fixed_option[used++] = '(';
+  fixed_option[used] = '\0';
+  for (i = 0; i < problem->n; i++) {
+    if (i >= progress_spec->degree_offset &&
+        i < progress_spec->degree_offset + progress_spec->ndegree &&
+        problem->lower[i] == problem->upper[i]) {
+      wrote = snprintf(fixed_option + used, fixed_option_capacity - used,
+                       " %d", (int)nearbyint(problem->lower[i]));
+    } else {
+      wrote = snprintf(fixed_option + used, fixed_option_capacity - used, " -");
+    }
+    if (wrote < 0 || (size_t)wrote >= fixed_option_capacity - used)
+      error("failed to format internal NOMAD fixed-variable option");
+    used += (size_t)wrote;
+  }
+  wrote = snprintf(fixed_option + used, fixed_option_capacity - used, " )");
+  if (wrote < 0 || (size_t)wrote >= fixed_option_capacity - used)
+    error("failed to format internal NOMAD fixed-variable option");
+
+  effective_options = (crs_nomad_option *)R_alloc(
+    (size_t)problem->option_count + (size_t)1, sizeof(crs_nomad_option));
+  for (i = 0; i < problem->option_count; i++)
+    effective_options[i] = problem->options[i];
+  effective_options[problem->option_count].name = "FIXED_VARIABLE";
+  effective_options[problem->option_count].value = fixed_option;
+
+  *effective_problem = *problem;
+  effective_problem->lower = effective_lower;
+  effective_problem->upper = effective_upper;
+  effective_problem->option_count = problem->option_count + 1;
+  effective_problem->options = effective_options;
+  return effective_problem;
+}
+
 static int np_nomad_solve_with_progress(const crs_nomad_problem *problem,
                                         crs_nomad_eval_fn eval,
                                         void *user_data,
@@ -1088,6 +1236,8 @@ static int np_nomad_solve_with_progress(const crs_nomad_problem *problem,
 {
   crs_nomad_solve_observed_fn solve_observed;
   crs_nomad_observer_poll_fn observer_poll;
+  crs_nomad_problem fixed_degree_problem;
+  const crs_nomad_problem *solve_problem;
   crs_nomad_observer observer;
   double interval_sec = 2.0;
   int observer_enabled;
@@ -1102,6 +1252,8 @@ static int np_nomad_solve_with_progress(const crs_nomad_problem *problem,
   if (solve_observed == NULL || observer_poll == NULL)
     error("required crs 0.15-46 native NOMAD observer capability is unavailable");
   np_crs_nomad_observer_poll = observer_poll;
+  solve_problem = np_nomad_fixed_degree_problem(
+    problem, progress_spec, &fixed_degree_problem);
 
   observer_enabled = np_nomad_progress_observer_config(&interval_sec);
   memset(&observer, 0, sizeof(observer));
@@ -1114,9 +1266,10 @@ static int np_nomad_solve_with_progress(const crs_nomad_problem *problem,
   }
 
   previous_callback_state = nomad_c_callback_active;
-  if (problem != NULL && problem->callback_mode == CRS_NOMAD_CALLBACK_C)
+  if (solve_problem != NULL &&
+      solve_problem->callback_mode == CRS_NOMAD_CALLBACK_C)
     nomad_c_callback_active = 1;
-  status = solve_observed(problem,
+  status = solve_observed(solve_problem,
                           eval,
                           user_data,
                           observer_enabled ? &observer : NULL,
