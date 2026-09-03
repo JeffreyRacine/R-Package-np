@@ -9904,7 +9904,7 @@
     FALSE
   }
 
-  .Call(
+  .np_with_nn_radius_context(.Call(
     "C_np_conditional_count_levels",
     xstate$train.continuous, ystate$train.continuous,
     xstate$eval.continuous, ystate$eval.continuous,
@@ -9931,7 +9931,7 @@
     categorical.compress,
     counts,
     PACKAGE = "npRmpi"
-  )
+  ), continuous.names = c(bws[["xnames", exact = TRUE]][bws[["ixcon", exact = TRUE]]], bws[["ynames", exact = TRUE]][bws[["iycon", exact = TRUE]]]))
 }
 
 .np_inid_boot_from_conditional_count_evaluator <- function(n,

@@ -238,7 +238,7 @@ npudens.bandwidth <-
     )
   cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
 
-  myout <- .np_with_compiled_fit_progress(
+  myout <- .np_with_nn_radius_context(.np_with_compiled_fit_progress(
     label = "Fitting density",
     total = .np_densdist_fit_total(bws = bws, tnrow = tnrow, enrow = enrow),
     handoff = fit.progress.handoff,
@@ -254,7 +254,7 @@ npudens.bandwidth <-
           as.double(cker.bounds.c$lb),
           as.double(cker.bounds.c$ub),
           PACKAGE = "npRmpi")
-  )
+  ), continuous.names = bws[["xnames", exact = TRUE]][bws[["icon", exact = TRUE]]])
 
   ## For purely categorical density with zero bandwidths, the variance of
   ## the sample proportion is p(1-p)/n. The C routine returns p/n; fix here.

@@ -885,7 +885,7 @@ npreg.rbandwidth <-
       isTRUE(local.regression.context)
     )
 
-    myout <- .np_with_compiled_fit_progress(
+    myout <- .np_with_nn_radius_context(.np_with_compiled_fit_progress(
       label = "Fitting regression",
       total = .np_reg_fit_total(
         bws = bws,
@@ -901,7 +901,7 @@ npreg.rbandwidth <-
       } else {
         call_regression()
       }
-    )
+    ), continuous.names = bws[["xnames", exact = TRUE]][bws[["icon", exact = TRUE]]])
 
     if (mean.override) {
       myout$mean <- .np_regression_lc_mean_from_kernel_weights(

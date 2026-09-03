@@ -2645,13 +2645,13 @@ npRegressionK1GeometryValidate <- function(bws, txdat, exdat = NULL) {
   train <- as.double(txdat[[icon]])
   train.is.eval <- is.null(exdat)
   evaluation <- if (train.is.eval) train else as.double(exdat[[icon]])
-  .Call(
+  .np_with_nn_radius_context(.Call(
     "C_np_regression_k1_geometry_validate",
     train,
     evaluation,
     train.is.eval,
     PACKAGE = "npRmpi"
-  )
+  ), continuous.names = bws[["xnames", exact = TRUE]][icon])
   invisible(TRUE)
 }
 

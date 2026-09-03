@@ -375,6 +375,8 @@ mpi.remote.exec <- function(cmd, ...,  simplify=TRUE, comm=1, ret=TRUE){
     out <- .np_try_eval_in_frames(scmd, eval_env = envir, search_frames = FALSE)
     if (isTRUE(out$ok))
         return(out$value)
+    if (inherits(out$error, "np_nn_zero_radius"))
+        stop(out$error)
     if (inherits(out$error, "error"))
         stop(conditionMessage(out$error), call. = FALSE)
     stop("unable to evaluate MPI command expression", call. = FALSE)

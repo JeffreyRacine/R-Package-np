@@ -1489,6 +1489,8 @@
   out <- tryCatch(
     handler(payload, envelope),
     error = function(e) {
+      if (inherits(e, "np_nn_zero_radius"))
+        stop(e)
       stop(
         sprintf("%s opcode failure [opcode=%s seq_id=%d]: %s",
                 where, envelope$opcode, envelope$seq_id, conditionMessage(e)),
@@ -1534,7 +1536,8 @@
         publication_capability = "",
         publication_fingerprint = ""
       ),
-      error = conditionMessage(e)
+      error = conditionMessage(e),
+      condition = e
     )
   )
 }
@@ -1652,6 +1655,13 @@
   }
 
   if (length(bad)) {
+    unanimous.nn.radius <- !is.na(rank) && rank == 0L &&
+      inherits(local$condition, "np_nn_zero_radius") &&
+      all(status.vec == "ERR") &&
+      all(ack.mat["error", ] == conditionMessage(local$condition))
+    if (isTRUE(unanimous.nn.radius))
+      stop(local$condition)
+
     detail.index <- unique(c(1L, bad))
     details <- vapply(
       detail.index,
@@ -2788,6 +2798,7 @@
     silent = TRUE
   )
   if (inherits(eval.out, "try-error")) {
+    eval.condition <- attr(eval.out, "condition", exact = TRUE)
     if (!identical(publication$kind, "none")) {
       rolled <- try(
         rec.comm(.npRmpi_lease_run_lifecycle(
@@ -2799,6 +2810,8 @@
       if (inherits(rolled, "try-error"))
         .npRmpi_lease_poison()
     }
+    if (inherits(eval.condition, "np_nn_zero_radius"))
+      stop(eval.condition)
     stop(paste(as.character(eval.out), collapse = " "), call. = FALSE)
   }
   result <- eval.out

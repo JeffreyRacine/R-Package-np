@@ -57,8 +57,13 @@
   exclusion required by the route. Exact ties can therefore make the radius
   zero. A zero continuous radius does not define a positive metric bandwidth
   and is rejected rather than widened to a more distant observation or
-  replaced by a numerical floor. Choose a larger \eqn{k} or correct an
-  unintended continuously coded tie. Any represented strictly positive
+  replaced by a numerical floor. Fixed bandwidths (\code{bwtype="fixed"},
+  the default) avoid this nearest-neighbor radius limitation. Alternatively,
+  choose a larger \eqn{k} or correct an unintended continuously coded tie.
+  Repeated values alone are not an error: only a requested radius that is
+  actually zero is rejected. Training fits and external evaluations can
+  differ at a tie boundary because their occurrence exclusions differ.
+  Any represented strictly positive
   radius, including a positive subnormal value, is distinct from this
   zero-radius condition.
 

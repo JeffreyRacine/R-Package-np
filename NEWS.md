@@ -1,5 +1,11 @@
 # npRmpi 0.70-6
 
+* Terminal nearest-neighbor zero-radius errors now share a diagnostic that
+  identifies the continuous variable and tied-donor geometry and suggests
+  fixed bandwidths (the default). `npsigtest()` also identifies the failing
+  stage. Successful fits, positive radii, and optimizer trial rejection are
+  unchanged; repeated values alone are not rejected.
+
 * Nearest-neighbour bandwidth searches now reject constant continuous training
   dimensions before native allocation or collective evaluation, matching the
   serial input-support contract. Fixed bandwidths are unaffected.

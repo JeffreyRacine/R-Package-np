@@ -1183,7 +1183,7 @@ npreghat <-
                    sort(c("mode", "coordinate", "response.ready", "pivotal",
                           "null.mean", "residual.pool"))))
       stop("invalid private npsigtest tile payload", call. = FALSE)
-    return(.Call(
+    return(.np_with_nn_radius_context(.Call(
       "C_np_regression_lp_sigtest_conditional_ctx",
       tuno,
       tord,
@@ -1217,10 +1217,10 @@ npreghat <-
       as.double(sigtest$null.mean),
       as.double(sigtest$residual.pool),
       PACKAGE = "npRmpi"
-    ))
+    ), continuous.names = bws[["xnames", exact = TRUE]][bws[["icon", exact = TRUE]]]))
   }
 
-  .Call(
+  .np_with_nn_radius_context(.Call(
     "C_np_regression_lp_apply_conditional_ctx",
     tuno,
     tord,
@@ -1248,7 +1248,7 @@ npreghat <-
     as.logical(no.ex),
     as.logical(leave.one.out),
     PACKAGE = "npRmpi"
-  )
+  ), continuous.names = bws[["xnames", exact = TRUE]][bws[["icon", exact = TRUE]]])
 }
 
 .npreghat_exact_lp_matrix_from_regression_core <- function(bws,
@@ -1762,7 +1762,7 @@ npreghat <-
     on.exit(.Call("C_np_set_local_regression_mode", old.mode, PACKAGE = "npRmpi"), add = TRUE)
   }
 
-  myout <- .Call(
+  myout <- .np_with_nn_radius_context(.Call(
     "C_np_regression",
     asDouble(tuno), asDouble(tord), asDouble(tcon), as.double(tydat),
     asDouble(euno), asDouble(eord), asDouble(econ), as.double(double()),
@@ -1783,7 +1783,7 @@ npreghat <-
     as.double(cker.bounds.c$lb),
     as.double(cker.bounds.c$ub),
     PACKAGE = "npRmpi"
-  )
+  ), continuous.names = bws[["xnames", exact = TRUE]][bws[["icon", exact = TRUE]]])
 
   mean.out <- as.double(myout$mean)
   if (mean.override) {

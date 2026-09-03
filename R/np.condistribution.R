@@ -474,7 +474,7 @@ npcdist.condbandwidth <-
     cxker.bounds.c <- npKernelBoundsMarshal(bws$cxkerlb[bws$ixcon], bws$cxkerub[bws$ixcon])
     cyker.bounds.c <- npKernelBoundsMarshal(bws$cykerlb[bws$iycon], bws$cykerub[bws$iycon])
 
-    myout <- .np_with_compiled_fit_progress(
+    myout <- .np_with_nn_radius_context(.np_with_compiled_fit_progress(
       label = "Fitting conditional distribution",
       total = .np_condensdist_fit_total(bws = bws, tnrow = tnrow, enrow = enrow),
       handoff = fit.progress.handoff,
@@ -502,7 +502,7 @@ npcdist.condbandwidth <-
             as.integer(bernstein.engine),
             basis.code,
             PACKAGE = "npRmpi")
-    )
+    ), continuous.names = c(bws[["xnames", exact = TRUE]][bws[["ixcon", exact = TRUE]]], bws[["ynames", exact = TRUE]][bws[["iycon", exact = TRUE]]]))
     names(myout)[1] <- "condist"
 
     if(gradients){

@@ -208,6 +208,16 @@ Further arguments are passed to the bandwidth-selection routines used by the tes
   \code{degree.min=1}. This restriction does not apply to an ordinary
   \code{regtype="lc"} bandwidth object.
 
+  With nearest-neighbor bandwidths, repeated continuous values can give a
+  required radius of zero. In this case the test stops with the shared
+  nearest-neighbor diagnostic, identifying the affected variable and the
+  failing stage. This can occur during bootstrap-geometry preflight, the
+  unrestricted gradient, or null-model evaluation, before bootstrap
+  replications. It is not a blanket restriction on repeated values. Refit
+  using \code{bwtype="fixed"} (the
+  default) to avoid this nearest-neighbor radius limitation; see
+  \code{\link{np.kernels}}.
+
   The empirical upper-tail P-value counts bootstrap statistics equal to
   the observed statistic, that is,
   \eqn{P=B^{-1}\sum_{b=1}^B 1\{I_b^*\ge I\}}. Thus equality with the

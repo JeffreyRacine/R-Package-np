@@ -528,6 +528,62 @@ npsigtest.npregression <-
   ))
 }
 
+# The streamed categorical statistic evaluates generalized-NN radii at external
+# query points even when the earlier unrestricted gradient uses training points.
+# This cheap screen decides only whether to invoke the existing native tile;
+# that tile remains the sole authority allowed to raise the typed condition.
+.np_npsig_streamed_gnn_zero_radius_candidate <- function(bws, xdat, index) {
+  if (!identical(bws[["type", exact = TRUE]], "generalized_nn"))
+    return(FALSE)
+
+  categorical <- vapply(
+    xdat[index],
+    function(variable) is.factor(variable) || is.ordered(variable),
+    logical(1L)
+  )
+  if (!any(categorical))
+    return(FALSE)
+
+  icon <- as.logical(bws[["icon", exact = TRUE]])
+  bandwidth <- as.double(bws[["bw", exact = TRUE]][icon])
+  continuous <- xdat[icon]
+  n <- nrow(xdat)
+  if (!length(continuous) || n < 2L || length(bandwidth) != length(continuous) ||
+      anyNA(bandwidth) || any(!is.finite(bandwidth)) || any(bandwidth < 1))
+    return(FALSE)
+
+  # R's round() mirrors the native np_fround() tie-to-even conversion here.
+  lookup.k <- pmin(round(bandwidth), n - 1L)
+  any(vapply(seq_along(continuous), function(j) {
+    values <- continuous[[j]]
+    multiplicity <- tabulate(match(values, unique(values)))
+    length(multiplicity) && max(multiplicity) >= lookup.k[[j]]
+  }, logical(1L)))
+}
+
+.np_npsig_streamed_gnn_zero_radius_preflight <- function(bws, xdat, ydat,
+                                                          index) {
+  if (!.np_npsig_streamed_gnn_zero_radius_candidate(
+        bws = bws, xdat = xdat, index = index))
+    return(invisible(FALSE))
+
+  categorical <- index[vapply(
+    xdat[index],
+    function(variable) is.factor(variable) || is.ordered(variable),
+    logical(1L)
+  )]
+  .np_npsig_streamed_iid_tile(
+    bws = bws,
+    xdat = xdat,
+    tested.index = categorical[[1L]],
+    response.matrix = matrix(as.double(ydat), ncol = 1L),
+    null.mean = as.double(ydat),
+    residual.pool = as.double(ydat),
+    pivotal = FALSE
+  )
+  invisible(TRUE)
+}
+
 .np_npsig_streamed_response_statistic <- function(bws,
                                                     xdat,
                                                     index,
@@ -683,6 +739,17 @@ npsigtest.rbandwidth <- function(bws,
   num.obs <- nrow(xdat)
   npreg.eval.fun <- if (boot.type == "II") .npRmpi_npsig_npreg_leaf else .npRmpi_npsig_do_local
 
+  nn.stage <- "unrestricted gradient evaluation"
+  .np_with_nn_radius_context({
+
+  if (streamed.iid) {
+    nn.stage <- "bootstrap geometry preflight"
+    .np_npsig_streamed_gnn_zero_radius_preflight(
+      bws = bws, xdat = xdat, ydat = ydat, index = index
+    )
+    nn.stage <- "unrestricted gradient evaluation"
+  }
+
   if(!joint) {
 
     In <- numeric(length(index))
@@ -725,6 +792,7 @@ npsigtest.rbandwidth <- function(bws,
     ## the jth element, discrete or continuous
 
     progress <- .np_progress_step(progress)
+    nn.stage <- "unrestricted gradient evaluation"
     npreg.out <- npreg.eval.fun(extra.args,
                                 txdat = xdat,
                                 tydat = ydat,
@@ -740,6 +808,7 @@ npsigtest.rbandwidth <- function(bws,
       ## Compute scale and mean of unrestricted residuals
 
       progress <- .np_progress_step(progress)
+      nn.stage <- "unrestricted residual fit"
       npreg.unres <- npreg.eval.fun(extra.args,
                                     txdat = xdat,
                                     tydat = ydat,
@@ -770,6 +839,7 @@ npsigtest.rbandwidth <- function(bws,
       }
       
       progress <- .np_progress_step(progress)
+      nn.stage <- "null-model evaluation"
       mhat.xi <-  npreg.eval.fun(extra.args,
                                  txdat = xdat,
                                  tydat = ydat,
@@ -791,6 +861,7 @@ npsigtest.rbandwidth <- function(bws,
     if (boot.type == "II") {
       bws.boot.prev <- bws.original
 
+      nn.stage <- "bootstrap"
       for (i.star in seq_len(B)) {
         if (boot.method == "iid") {
           ydat.star <- mhat.xi + ei[sample.int(num.obs, replace = TRUE)]
@@ -993,6 +1064,7 @@ npsigtest.rbandwidth <- function(bws,
       progress.context$use.bootstrap.done <- TRUE
       progress.context$force.next <- TRUE
 
+      nn.stage <- "bootstrap"
       In.vec <- .npRmpi_npsig_parallel_boot_values(
         boot.seeds = boot.seeds,
         worker = joint.eval,
@@ -1026,6 +1098,7 @@ npsigtest.rbandwidth <- function(bws,
 
     if (streamed.iid) {
       progress <- .np_progress_step(progress)
+      nn.stage <- "unrestricted gradient evaluation"
       streamed.unrestricted <- npreg.eval.fun(
         extra.args,
         txdat = xdat,
@@ -1036,6 +1109,7 @@ npsigtest.rbandwidth <- function(bws,
       )
       progress <- .np_progress_step(progress)
       progress <- .np_progress_step(progress)
+      nn.stage <- "unrestricted residual fit"
       streamed.unres <- npreg.eval.fun(
         extra.args,
         txdat = xdat,
@@ -1071,6 +1145,7 @@ npsigtest.rbandwidth <- function(bws,
         npreg.out <- streamed.unrestricted
       } else {
         progress <- .np_progress_step(progress)
+        nn.stage <- "unrestricted gradient evaluation"
         npreg.out <- npreg.eval.fun(extra.args,
                                     txdat = xdat,
                                     tydat = ydat,
@@ -1091,6 +1166,7 @@ npsigtest.rbandwidth <- function(bws,
           ei.unres.center <- streamed.ei.unres.center
         } else {
           progress <- .np_progress_step(progress)
+          nn.stage <- "unrestricted residual fit"
           npreg.unres <- npreg.eval.fun(extra.args,
                                         txdat = xdat,
                                         tydat = ydat,
@@ -1120,6 +1196,7 @@ npsigtest.rbandwidth <- function(bws,
         }
         
         progress <- .np_progress_step(progress)
+        nn.stage <- "null-model evaluation"
         mhat.xi <-  npreg.eval.fun(extra.args,
                                    txdat = xdat,
                                    tydat = ydat,
@@ -1141,6 +1218,7 @@ npsigtest.rbandwidth <- function(bws,
       if (boot.type == "II") {
         bws.boot.prev <- bws.original
 
+        nn.stage <- "bootstrap"
         for (i.star in seq_len(B)) {
           if (boot.method == "iid") {
             ydat.star <- mhat.xi + ei[sample.int(num.obs, replace = TRUE)]
@@ -1369,6 +1447,7 @@ npsigtest.rbandwidth <- function(bws,
         progress.context$use.bootstrap.done <- length(index) == 1L
         progress.context$force.next <- length(index) == 1L
 
+        nn.stage <- "bootstrap"
         In.vec <- .npRmpi_npsig_parallel_boot_values(
           boot.seeds = boot.seeds,
           worker = indiv.eval,
@@ -1425,6 +1504,8 @@ npsigtest.rbandwidth <- function(bws,
           joint = joint,
           boot.type = boot.type,
           boot.num = B)
+  }, continuous.names = names(xdat)[bws[["icon", exact = TRUE]]],
+     context = paste("npsigtest during", nn.stage))
 
 }
 

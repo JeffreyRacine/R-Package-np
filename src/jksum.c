@@ -23,6 +23,7 @@
 #include <Rinternals.h>
 
 #include "headers.h"
+#include "nn_radius_error.h"
 #include "gsl_bspline.h"
 #include "jksum_gaussian_density.h"
 #include "jksum_gaussian_fixed.h"
@@ -27221,6 +27222,14 @@ static NP_NOINLINE void np_beta_scalar_regression_fit_canonical(
         kernel_route_diagnostics->undefined_count = payload[5];
         kernel_route_diagnostics->beta_status = (np_beta_status)payload[6];
       }
+      if(payload[0] == NP_BETA_SCALAR_REGRESSION_FIT_ERR_BANDWIDTH &&
+         payload[1] == NP_BETA_BANDWIDTH_PREPARE_ERR_ZERO_RADIUS) {
+        const NPNNZeroRadiusInfo info = np_nn_zero_radius_info(
+          BANDWIDTH_reg, num_obs_train, num_obs_eval, num_reg_continuous,
+          matrix_X_continuous_train, matrix_X_continuous_eval,
+          vector_scale_factor, NULL, 0);
+        np_nn_zero_radius_error(&info);
+      }
       np_beta_scalar_regression_fit_error(
         payload[0], (np_beta_bandwidth_prepare_status)payload[1],
         (NPContinuousKernelRowStatus)payload[2], kernel_route_diagnostics);
@@ -27281,6 +27290,14 @@ static NP_NOINLINE void np_beta_scalar_regression_fit_canonical(
     standard_error_mode, prepared_bandwidth, original_train_is_eval,
     hc0_context,
     &bandwidth_status, &row_status);
+  if(status == NP_BETA_SCALAR_REGRESSION_FIT_ERR_BANDWIDTH &&
+     bandwidth_status == NP_BETA_BANDWIDTH_PREPARE_ERR_ZERO_RADIUS) {
+    const NPNNZeroRadiusInfo info = np_nn_zero_radius_info(
+      BANDWIDTH_reg, num_obs_train, num_obs_eval, num_reg_continuous,
+      matrix_X_continuous_train, matrix_X_continuous_eval,
+      vector_scale_factor, NULL, 0);
+    np_nn_zero_radius_error(&info);
+  }
   if(status != NP_BETA_SCALAR_REGRESSION_FIT_OK)
     np_beta_scalar_regression_fit_error(
       status, bandwidth_status, row_status, kernel_route_diagnostics);
@@ -31072,6 +31089,7 @@ const NPRegressionHC0Context *hc0_context){
   NPRegressionHC0Context hc0_point_context;
   const NPRegressionHC0Context *effective_hc0_context = hc0_context;
   int regression_fit_status = NP_REGRESSION_FIT_OK;
+  int zero_radius_external_query = 0;
   int scalar_fit_status = NP_REGRESSION_SCALAR_FIT_OK;
   int general_lp_fit_status = NP_REGRESSION_GENERAL_LP_FIT_OK;
   NPRegressionFitOwner fit_owner;
@@ -31348,6 +31366,7 @@ const NPRegressionHC0Context *hc0_context){
         external_geometry_status == NP_NN_GEOMETRY_ZERO_RADIUS ?
         NP_REGRESSION_FIT_ERR_ZERO_NN_RADIUS :
         NP_REGRESSION_FIT_ERR_BANDWIDTH;
+      zero_radius_external_query = 1;
       goto finish_regression_estimation;
     }
     categorical_matrix_bandwidth = matrix_bandwidth_deriv;
@@ -32227,9 +32246,22 @@ finish_regression_estimation:
     error("\n** Error: memory allocation failed.");
   if(regression_fit_status == NP_REGRESSION_FIT_ERR_BANDWIDTH)
     error("\n** Error: invalid bandwidth.");
-  if(regression_fit_status == NP_REGRESSION_FIT_ERR_ZERO_NN_RADIUS)
-    error("\n** Error: %s nearest-neighbor bandwidth has a zero literal radius after occurrence exclusion.",
-          BANDWIDTH_reg == BW_ADAP_NN ? "adaptive" : "generalized");
+  if(regression_fit_status == NP_REGRESSION_FIT_ERR_ZERO_NN_RADIUS) {
+#ifdef MPI2
+    /* A conditional-density owner may invoke this fit on one rank-local
+     * evaluation block. Return the typed status to that owner so every rank
+     * reaches its existing failure Allreduce before any R condition is raised. */
+    if(np_mpi_local_regression_active())
+      return NP_REGRESSION_FIT_ERR_ZERO_NN_RADIUS;
+#endif
+    const NPNNGeometryContext external_geometry = {.mode = NP_NN_QUERY_EXTERNAL};
+    const NPNNZeroRadiusInfo info = np_nn_zero_radius_info(
+      BANDWIDTH_reg, num_obs_train, num_obs_eval, num_reg_continuous,
+      matrix_X_continuous_train, matrix_X_continuous_eval, vector_scale_factor,
+      kernel_route != NULL ? NULL :
+        (zero_radius_external_query ? &external_geometry : nn_geometry_context), 0);
+    np_nn_zero_radius_error(&info);
+  }
   if(regression_fit_status == NP_REGRESSION_FIT_ERR_HASH_CREATE)
     error("hash table creation failed");
   if(regression_fit_status == NP_REGRESSION_FIT_ERR_HASH_INSERT)
@@ -34365,6 +34397,7 @@ int np_regression_lp_sigtest_iid(
   const double *response_tile = donor_index;
   int *scalar_derivative_mask = NULL;
   long double *statistic_sum = NULL;
+  int prepare_status;
   int status = NP_REGRESSION_LP_MATRIX_ERROR;
   int eval_idx;
   int rhs;
@@ -34438,13 +34471,17 @@ int np_regression_lp_sigtest_iid(
       }
   }
 
-  if(np_regression_xrow_ctx_prepare(
-       vector_scale_factor,
-       (statistic_mode != NP_NPSIGTEST_STAT_CONTINUOUS &&
-        BANDWIDTH_den_extern == BW_GEN_NN) ?
-         NULL : &np_conditional_training_identity_geometry,
-       &xctx) != 0)
+  prepare_status = np_regression_xrow_ctx_prepare(
+    vector_scale_factor,
+    (statistic_mode != NP_NPSIGTEST_STAT_CONTINUOUS &&
+     BANDWIDTH_den_extern == BW_GEN_NN) ?
+      NULL : &np_conditional_training_identity_geometry,
+    &xctx);
+  if(prepare_status != 0) {
+    if(prepare_status == 2)
+      status = NP_REGRESSION_LP_MATRIX_ZERO_RADIUS;
     goto cleanup_sigtest_iid;
+  }
   if(np_lp_engine_extern == NP_LP_ENGINE_GENERAL) {
     if(!np_glp_cv_cache.ready || np_glp_cv_cache.basis == NULL ||
        np_glp_cv_cache.nterms <= 1 ||
@@ -49461,9 +49498,13 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
                            exact_beta_route ? NULL : nn_geometry_context,
                            NULL,
                            &nn_geometry_status)==1){
-    if(nn_geometry_status == NP_NN_GEOMETRY_ZERO_RADIUS)
-      error("%s nearest-neighbor bandwidth has a zero literal radius after occurrence exclusion",
-            BANDWIDTH_den == BW_ADAP_NN ? "adaptive" : "generalized");
+    if(nn_geometry_status == NP_NN_GEOMETRY_ZERO_RADIUS) {
+      const NPNNZeroRadiusInfo info = np_nn_zero_radius_info(
+        BANDWIDTH_den, num_obs_train, num_obs_eval, num_reg_continuous,
+        matrix_X_continuous_train, matrix_X_continuous_eval, vector_scale_factor,
+        nn_geometry_context, 0);
+      np_nn_zero_radius_error(&info);
+    }
     error("\n** Error: invalid bandwidth.");
   }
 
@@ -51433,8 +51474,14 @@ const NPNNGeometryContext *nn_geometry_context
                            nn_geometry_context,
                            nn_geometry_context,
                            &nn_geometry_status)==1){
-      if(nn_geometry_status == NP_NN_GEOMETRY_ZERO_RADIUS)
-        error("conditional density/distribution fit encountered a zero literal radius after occurrence exclusion");
+      if(nn_geometry_status == NP_NN_GEOMETRY_ZERO_RADIUS) {
+        const NPNNZeroRadiusInfo info = np_nn_zero_radius_info(
+          BANDWIDTH_den, num_obs_train, num_obs_eval,
+          num_X_continuous + num_Y_continuous,
+          matrix_XY_continuous_train, matrix_XY_continuous_eval,
+          vector_scale_factor, nn_geometry_context, 0);
+        np_nn_zero_radius_error(&info);
+      }
       error("\n** Error: invalid bandwidth.");
     }
   }

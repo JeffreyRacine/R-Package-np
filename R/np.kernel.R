@@ -502,7 +502,7 @@ npksum.default <-
 
     if (internal.power12) {
       myout <-
-        .Call("C_np_kernelsum_power12",
+        .np_with_nn_radius_context(.Call("C_np_kernelsum_power12",
               asDouble(tuno), asDouble(tord), asDouble(tcon),
               asDouble(tydat), asDouble(weights),
               asDouble(euno), asDouble(eord), asDouble(econ),
@@ -515,10 +515,10 @@ npksum.default <-
               as.integer(nkw),
               as.double(cker.bounds.c$lb),
               as.double(cker.bounds.c$ub),
-              PACKAGE="npRmpi")[return.names]
+              PACKAGE="npRmpi"), continuous.names = bws[["xnames", exact = TRUE]][bws[["icon", exact = TRUE]]])[return.names]
     } else {
       myout <-
-        .Call("C_np_kernelsum",
+        .np_with_nn_radius_context(.Call("C_np_kernelsum",
               asDouble(tuno), asDouble(tord), asDouble(tcon),
               asDouble(tydat), asDouble(weights),
               asDouble(euno), asDouble(eord), asDouble(econ),
@@ -531,7 +531,7 @@ npksum.default <-
               as.integer(nkw),
               as.double(cker.bounds.c$lb),
               as.double(cker.bounds.c$ub),
-              PACKAGE="npRmpi")[return.names]
+              PACKAGE="npRmpi"), continuous.names = bws[["xnames", exact = TRUE]][bws[["icon", exact = TRUE]]])[return.names]
     }
 
     if (dim.out[1] > 1){
