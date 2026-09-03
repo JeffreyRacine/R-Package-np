@@ -862,7 +862,8 @@ npcdistbw.condbandwidth <-
                                  ngrid = 100L,
                                  invalid.penalty = c("baseline", "dbmax"),
                                  penalty.multiplier = 10,
-                                 force.local = TRUE) {
+                                 force.local = TRUE,
+                                 return.admissible = FALSE) {
   invalid.penalty <- match.arg(invalid.penalty)
 
   ydat <- toFrame(ydat)
@@ -1059,11 +1060,14 @@ npcdistbw.condbandwidth <-
     eval_call()
   }
 
-  list(
+  result <- list(
     objective = as.numeric(out$fval[1L]),
     num.feval = 1L,
     num.feval.fast = as.numeric(as.numeric(out$fast.history[1L]) > 0)
   )
+  if (isTRUE(return.admissible))
+    result$admissible <- .np_nn_single_eval_admissible(out)
+  result
 }
 
 .npcdistbw_run_fixed_degree <- function(xdat, ydat, bws, reg.args, opt.args) {
@@ -2630,7 +2634,8 @@ npRmpiPreparedSearchConditionalDistribution <- function(xdat,
       ngrid = if (is.null(opt.args$ngrid)) 100L else opt.args$ngrid,
       invalid.penalty = "baseline",
       penalty.multiplier = if (is.null(opt.args$penalty.multiplier)) 10 else opt.args$penalty.multiplier,
-      force.local = TRUE
+      force.local = TRUE,
+      return.admissible = TRUE
     )
     nomad.num.feval.total <<- nomad.num.feval.total + as.numeric(out$num.feval[1L])
     nomad.num.feval.fast.total <<- nomad.num.feval.fast.total + as.numeric(out$num.feval.fast[1L])
@@ -2639,7 +2644,8 @@ npRmpiPreparedSearchConditionalDistribution <- function(xdat,
       objective = out$objective,
       degree = degree,
       num.feval = out$num.feval,
-      num.feval.fast = out$num.feval.fast
+      num.feval.fast = out$num.feval.fast,
+      admissible = out$admissible
     )
   }
 
@@ -2935,6 +2941,32 @@ npRmpiPreparedSearchConditionalDistribution <- function(xdat,
 
   .np_nomad_baseline_note(degree.search$start.degree)
 
+  recover_start <- if (is.null(point.start) && length(setup$cont_flat) > 0L &&
+                       setup$nobs >= 3L &&
+                       template$type %in% c("generalized_nn", "adaptive_nn")) {
+    function(point) {
+      caps <- .npcdistbw_nn_recovery_caps(template, setup, opt.args$gydat,
+        isTRUE(opt.args$do.full.integral))
+      nn.indices <- seq_along(setup$cont_flat)
+      nn.point <- round(point[nn.indices])
+      if (any(nn.point < 1L | nn.point > caps))
+        return(list(found = FALSE))
+      .np_nn_find_raw_valid_start(
+        point = point, nn.indices = nn.indices, caps = caps,
+        raw.eval = function(candidate) {
+          out <- .npcdistbw_nomad_eval_point(
+            point = candidate, template = template, setup = setup,
+            degree.search = degree.search, xdat = xdat, ydat = ydat,
+            reg.args = reg.args, opt.args = opt.args, invalid.penalty = "dbmax")
+          nomad.num.feval.total <<- nomad.num.feval.total + as.numeric(out$num.feval[1L])
+          nomad.num.feval.fast.total <<- nomad.num.feval.fast.total + as.numeric(out$num.feval.fast[1L])
+          .np_progress_bandwidth_activity_step()
+          out$objective
+        }
+      )
+    }
+  } else NULL
+
   .np_nomad_search(
     engine = degree.search$engine,
     baseline_record = baseline.record,
@@ -2945,6 +2977,7 @@ npRmpiPreparedSearchConditionalDistribution <- function(xdat,
     ub = ub,
     eval_fun = eval_fun,
     build_payload = build_payload,
+    recover_start = recover_start,
     direction = "min",
     objective_name = "fval",
     nmulti = nomad.nmulti,
