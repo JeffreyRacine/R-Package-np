@@ -1,5 +1,17 @@
 # np 0.70-6
 
+* Nearest-neighbour bandwidth searches now certify selected objectives and
+  optimizer handoffs against the underlying objective. When an automatic
+  search ends on an invalid NN plateau, eligible owners can make one
+  deterministic same-optimizer restart from a verified ordinary-NN point.
+  Invalid trial points remain penalized during search; mandatory refinement,
+  explicit starting values, and already-valid search paths are preserved.
+
+* Smooth-coefficient NN searches now distinguish categorical smoothing
+  bandwidths from continuous NN indices. Single-index searches also preserve
+  explicit starting-bandwidth validation instead of silently replacing an
+  invalid supplied start.
+
 * The proof-of-concept `npregiv()` and `npregivderiv()` estimators now reject
   unsupported nearest-neighbour bandwidths early with a clear message.
   Fixed bandwidths remain the default and are unchanged.
