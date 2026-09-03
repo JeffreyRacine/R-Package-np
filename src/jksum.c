@@ -25011,7 +25011,9 @@ double * cv){
                               NULL,
                               NULL,
                               NULL,
-                              1,
+                              /* ANN owns training rows; each CDF loss row
+                               * needs every donor's retained weight. */
+                              BANDWIDTH_den != BW_ADAP_NN,
                               NULL);
     
 #ifdef MPI2

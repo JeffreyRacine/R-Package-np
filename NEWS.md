@@ -1,5 +1,10 @@
 # npRmpi 0.70-6
 
+* Adaptive-nearest-neighbour distribution cross-validation on external grids
+  now gathers all required donor weights across MPI ranks. This corrects
+  allocation-dependent objectives without changing fixed/generalized-NN
+  ownership, the objective formula, or bandwidth geometry.
+
 * The proof-of-concept `npregiv()` and `npregivderiv()` estimators now reject
   unsupported nearest-neighbour bandwidths early with a clear message.
   Fixed bandwidths remain the default and are unchanged.
