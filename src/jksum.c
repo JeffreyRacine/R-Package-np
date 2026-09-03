@@ -24686,6 +24686,7 @@ double * cv){
   double **matrix_wX_unordered_eval=NULL;
   double **matrix_wX_ordered_eval=NULL;
   double **matrix_wX_continuous_eval=NULL;
+  double **matrix_wbandwidth=NULL;
 
   int64_t num_obs_eval_alloc, num_obs_train_alloc, num_obs_wx_alloc;
   int64_t wx, nwx;
@@ -24745,9 +24746,11 @@ double * cv){
     (((num_obs_eval_alloc % wx) > 0) ? 1 : 0);
 
   // allocate some pointers
-  matrix_wX_continuous_eval = (double **)np_jksum_malloc_array_or_die((size_t)num_reg_continuous, sizeof(double *), "np_kernel_estimate_density_categorical_leave_one_out_cv matrix_wX_continuous_eval");
+  matrix_wX_continuous_eval = (double **)np_jksum_malloc_array_or_die(((BANDWIDTH_den == BW_GEN_NN) ? 2U : 1U)*(size_t)num_reg_continuous, sizeof(double *), "np_kernel_estimate_density_categorical_leave_one_out_cv matrix_wX_continuous_eval");
   matrix_wX_unordered_eval = (double **)np_jksum_malloc_array_or_die((size_t)num_reg_unordered, sizeof(double *), "np_kernel_estimate_density_categorical_leave_one_out_cv matrix_wX_unordered_eval");
   matrix_wX_ordered_eval = (double **)np_jksum_malloc_array_or_die((size_t)num_reg_ordered, sizeof(double *), "np_kernel_estimate_density_categorical_leave_one_out_cv matrix_wX_ordered_eval");
+  if((BANDWIDTH_den == BW_GEN_NN) && (num_reg_continuous > 0))
+    matrix_wbandwidth = matrix_wX_continuous_eval + num_reg_continuous;
  
   double * mean = (double *)np_jksum_malloc_array_or_die((size_t)num_obs_wx_alloc, sizeof(double), "np_kernel_estimate_density_categorical_leave_one_out_cv mean");
 
@@ -24992,6 +24995,10 @@ double * cv){
     for(l = 0; l < num_reg_ordered; l++)
       matrix_wX_ordered_eval[l] = matrix_X_ordered_eval[l] + wxo;
 
+    if(BANDWIDTH_den == BW_GEN_NN)
+      for(l = 0; l < num_reg_continuous; l++)
+        matrix_wbandwidth[l] = matrix_bandwidth[l] + wxo;
+
 
     kernel_weighted_sum_np_ctx_ex(kernel_c,
                               kernel_u,
@@ -25033,7 +25040,10 @@ double * cv){
                               NULL,
                               NULL,
                               vsf,
-                              1,matrix_bandwidth,matrix_bandwidth,lambda,
+                              1,matrix_bandwidth,
+                              (BANDWIDTH_den == BW_GEN_NN) ?
+                                matrix_wbandwidth : matrix_bandwidth,
+                              lambda,
                               num_categories,
                               matrix_categorical_vals,
                               NULL,
