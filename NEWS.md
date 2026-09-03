@@ -1,5 +1,9 @@
 # npRmpi 0.70-6
 
+* NN recovery now leaves an allowed extended-NN incumbent unchanged and
+  proceeds to the existing fail-closed result instead of reporting an internal
+  ordinary-domain error.
+
 * Smooth-coefficient NOMAD evaluation now maps every invalid raw objective to
   the declared search penalty, independent of bandwidth type, and normalizes
   the selected bandwidth payload before final certification and publication.

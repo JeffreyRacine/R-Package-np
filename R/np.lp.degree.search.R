@@ -114,10 +114,12 @@
          call. = FALSE)
   }
   current <- round(current)
-  if (any(current < 1) || any(current > caps)) {
+  if (any(current < 1)) {
     stop("internal NN recovery incumbent lies outside the ordinary NN domain",
          call. = FALSE)
   }
+  if (any(current > caps))
+    return(list())
   point[nn.indices] <- current
 
   out <- list()
