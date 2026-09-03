@@ -1479,6 +1479,15 @@ npRmpiPreparedObjectiveEvalConditionalDensity <- function(bw, degree) {
   )
 }
 
+npRmpiPreparedObjectiveEvalConditionalDensityRaw <- function(bw, degree) {
+  .Call(
+    "C_np_density_conditional_prepared_eval_raw",
+    bw,
+    degree,
+    PACKAGE = "npRmpi"
+  )
+}
+
 npRmpiPreparedObjectiveNativeSearchConditionalDensity <- function(x0,
                                                             bbin,
                                                             lb,
