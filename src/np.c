@@ -4971,7 +4971,8 @@ static int np_regression_prepared_eval_native_raw(const double *rbw,
   return status;
 }
 
-SEXP C_np_regression_prepared_eval(SEXP rbw, SEXP glp_degree)
+static SEXP np_regression_prepared_eval_entry(SEXP rbw, SEXP glp_degree,
+                                              const int raw_only)
 {
   SEXP rbw_r = R_NilValue, degree_i = R_NilValue, out = R_NilValue;
   double *rbw_work;
@@ -5003,7 +5004,7 @@ SEXP C_np_regression_prepared_eval(SEXP rbw, SEXP glp_degree)
                                              INTEGER(degree_i),
                                              rbw_work,
                                              degree_work,
-                                             0,
+                                             raw_only,
                                              eval_out) != 0) {
     UNPROTECT(2);
     error("prepared npreg objective evaluator failed");
@@ -5014,6 +5015,16 @@ SEXP C_np_regression_prepared_eval(SEXP rbw, SEXP glp_degree)
   REAL(out)[1] = eval_out[2];
   UNPROTECT(3);
   return out;
+}
+
+SEXP C_np_regression_prepared_eval(SEXP rbw, SEXP glp_degree)
+{
+  return np_regression_prepared_eval_entry(rbw, glp_degree, 0);
+}
+
+SEXP C_np_regression_prepared_eval_raw(SEXP rbw, SEXP glp_degree)
+{
+  return np_regression_prepared_eval_entry(rbw, glp_degree, 1);
 }
 
 typedef struct {

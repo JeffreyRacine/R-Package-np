@@ -36,6 +36,7 @@ extern SEXP C_np_regression_bw(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, S
 extern SEXP C_np_regression_bw_eval(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_regression_prepared_prepare(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_regression_prepared_eval(SEXP, SEXP);
+extern SEXP C_np_regression_prepared_eval_raw(SEXP, SEXP);
 extern SEXP C_np_regression_prepared_native_search(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_regression_prepared_clear(void);
 extern SEXP C_np_lsqregression_bw(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
@@ -178,6 +179,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"C_np_regression_bw_eval",        (DL_FUNC) &C_np_regression_bw_eval,        16},
     {"C_np_regression_prepared_prepare",(DL_FUNC) &C_np_regression_prepared_prepare,16},
     {"C_np_regression_prepared_eval",(DL_FUNC) &C_np_regression_prepared_eval,2},
+    {"C_np_regression_prepared_eval_raw",(DL_FUNC) &C_np_regression_prepared_eval_raw,2},
     {"C_np_regression_prepared_native_search",(DL_FUNC) &C_np_regression_prepared_native_search,11},
     {"C_np_regression_prepared_clear",(DL_FUNC) &C_np_regression_prepared_clear,0},
     {"C_np_lsqregression_bw",          (DL_FUNC) &C_np_lsqregression_bw,          20},

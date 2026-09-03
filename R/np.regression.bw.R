@@ -1064,6 +1064,15 @@ npRmpiPreparedObjectiveEvalRegression <- function(bw, degree) {
   )
 }
 
+npRmpiPreparedObjectiveEvalRegressionRaw <- function(bw, degree) {
+  .Call(
+    "C_np_regression_prepared_eval_raw",
+    bw,
+    degree,
+    PACKAGE = "npRmpi"
+  )
+}
+
 npRmpiPreparedObjectiveNativeSearchRegression <- function(x0,
                                                            bbin,
                                                            lb,
