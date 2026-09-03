@@ -1,5 +1,12 @@
 # npRmpi 0.70-6
 
+* Automatic cell-based coordinate/exhaustive polynomial-degree searches now
+  preserve a configuration error when every degree candidate fails with the same
+  condition. Missing fixed `cker*`, `cxker*`, or `cyker*` limits, and missing
+  required beta-kernel support specifications, now produce the same actionable
+  messages as NOMAD searches; heterogeneous or numerical candidate failures
+  retain the generic no-admissible-model error.
+
 * NOMAD degree searches now honor mixed fixed/free degree bounds such as
   `degree.min = c(0, 0)` with `degree.max = c(1, 0)`. Fixed coordinates remain
   fixed through starts, restarts, optional Powell refinement, and result

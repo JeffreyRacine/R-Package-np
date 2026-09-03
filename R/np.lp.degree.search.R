@@ -1037,6 +1037,9 @@
   state$baseline_record <- NULL
   state$interrupted <- FALSE
   state$progress_state <- NULL
+  state$first_error <- NULL
+  state$uniform_error <- TRUE
+  state$error_count <- 0L
 
   state$record_trace <- function(rec) {
     if (!isTRUE(state$trace_enabled))
@@ -1104,6 +1107,16 @@
         NULL
       },
       error = function(e) {
+        if (is.null(state$first_error)) {
+          state$first_error <- e
+        } else if (!identical(class(e), class(state$first_error)) ||
+                   !identical(conditionMessage(e),
+                              conditionMessage(state$first_error)) ||
+                   !identical(conditionCall(e),
+                              conditionCall(state$first_error))) {
+          state$uniform_error <- FALSE
+        }
+        state$error_count <- state$error_count + 1L
         status <<- "error"
         msg <<- conditionMessage(e)
         NULL
@@ -1249,8 +1262,16 @@
     interrupted = state$interrupted
   )
 
-  if (is.null(state$best_payload))
+  if (is.null(state$best_payload)) {
+    if (!isTRUE(state$interrupted) &&
+        state$error_count > 0L &&
+        identical(state$error_count, state$eval_id) &&
+        isTRUE(state$uniform_error) &&
+        !is.null(state$first_error)) {
+      stop(state$first_error)
+    }
     stop("automatic degree search failed to obtain any admissible fitted model")
+  }
 
   search_elapsed <- as.numeric(proc.time()[3] - search_started)
 
