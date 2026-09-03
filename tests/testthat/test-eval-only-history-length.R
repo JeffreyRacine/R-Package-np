@@ -12,7 +12,8 @@ test_that("evaluation-only histories describe one actual evaluation", {
       bandwidth.compute = FALSE))
     method <- getFromNamespace(paste0(family, "bw.",
       if (family == "npudens") "bandwidth" else "dbandwidth"), "npRmpi")
-    raw <- method(dat = dat, bws = bw, eval.only = TRUE, nmulti = 3L)
+    raw <- do.call(method, list(dat = dat, bws = bw, eval.only = TRUE,
+                               nmulti = 3L))
     fields <- raw[c("fval.history", "eval.history", "invalid.history")]
     expect_identical(lengths(fields), setNames(rep(1L, 3L), names(fields)))
     expect_true(all(is.finite(unlist(fields))))
