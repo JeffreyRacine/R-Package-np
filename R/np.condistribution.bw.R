@@ -1997,8 +1997,8 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
     )
   }
 
-  raw_eval_fun <- function(point) {
-    as.numeric(.npcdistbw_nomad_eval_point(
+  raw_eval_point <- function(point) {
+    .npcdistbw_nomad_eval_point(
       point = point,
       template = template,
       setup = setup,
@@ -2008,7 +2008,11 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
       reg.args = reg.args,
       opt.args = opt.args,
       invalid.penalty = "dbmax"
-    )$objective[1L])
+    )
+  }
+
+  raw_eval_fun <- function(point) {
+    as.numeric(raw_eval_point(point)$objective[1L])
   }
 
   build_payload <- function(point, best_record, solution, interrupted) {
@@ -2095,6 +2099,11 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
       hot.payload$num.feval.fast <- direct.payload$num.feval.fast
       if (!is.null(hot.payload$method) && length(hot.payload$method))
         hot.payload$pmethod <- bwmToPrint(as.character(hot.payload$method[1L]))
+      hot.point <- c(.npcdistbw_nomad_bw_to_point(
+        c(hot.payload$ybw, hot.payload$xbw), template = template, setup = setup), degree)
+      .np_nn_certify_raw_point(
+        point = hot.point, raw.eval = raw_eval_fun,
+        owner = "npcdist NOMAD degree-search Powell handoff")
       hot.objective <- as.numeric(hot.payload$fval[1L])
       if (is.finite(hot.objective) &&
           .np_degree_better(hot.objective, direct.objective, direction = "min")) {
@@ -2274,8 +2283,49 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
         native.best.index <- i
       }
     }
+    if (!is.finite(native.best.index) && is.null(point.start) &&
+        template$type %in% c("generalized_nn", "adaptive_nn") &&
+        length(setup$cont_flat) > 0L && setup$nobs >= 3L) {
+      incumbent <- vapply(native.results, function(z) z$objective, numeric(1L))
+      incumbent[!is.finite(incumbent)] <- Inf
+      incumbent.index <- if (any(is.finite(incumbent))) which.min(incumbent) else 1L
+      recovery.raw.eval <- function(point) {
+        out <- raw_eval_point(point)
+        native.num.feval.total <<- native.num.feval.total + as.numeric(out$num.feval[1L])
+        native.num.feval.fast.total <<- native.num.feval.fast.total + as.numeric(out$num.feval.fast[1L])
+        .np_progress_bandwidth_activity_step()
+        out$objective
+      }
+      incumbent.point <- native.results[[incumbent.index]]$best_point
+      caps <- .npcdistbw_nn_recovery_caps(template, setup, opt.args$gydat,
+        isTRUE(opt.args$do.full.integral))
+      nn.point <- round(incumbent.point[seq_along(setup$cont_flat)])
+      recovery <- if (all(nn.point >= 1L & nn.point <= caps)) {
+        .np_nn_find_raw_valid_start(point = incumbent.point,
+          nn.indices = seq_along(setup$cont_flat), caps = caps,
+          raw.eval = recovery.raw.eval)
+      } else NULL
+      if (isTRUE(recovery$found)) {
+        .np_progress_bandwidth_activity_step(force = TRUE)
+        native.start.matrix <- rbind(native.start.matrix, recovery$point)
+        recovery.index <- nrow(native.start.matrix)
+        native.i <- run_native_restart(recovery$point, recovery.index)
+        native.i$recovery <- TRUE
+        native.i$recovery_witness <- recovery
+        native.results[[recovery.index]] <- native.i
+        native.nomad.elapsed <- native.nomad.elapsed + as.numeric(native.i$elapsed[1L])
+        native.num.feval.total <- native.num.feval.total + as.numeric(native.i$native$total_num.feval[1L])
+        native.num.feval.fast.total <- native.num.feval.fast.total + as.numeric(native.i$native$total_num.feval.fast[1L])
+        native.num.feval.guarded.total <- native.num.feval.guarded.total + as.numeric(native.i$native$total_num.feval.guarded[1L])
+        native.callback.total <- native.callback.total + as.integer(native.i$native$compiled_callback_calls[1L])
+        if (.np_nn_raw_objective_valid(native.i$objective)) {
+          native.best.objective <- native.i$objective
+          native.best.index <- recovery.index
+        }
+      }
+    }
     if (!is.finite(native.best.index))
-      stop("native npcdist NOMAD degree-search route did not return a finite solution", call. = FALSE)
+      stop("native npcdist NOMAD degree-search route did not return a raw-valid solution", call. = FALSE)
 
     if (isTRUE(opt.args$nomad.remin)) {
       remin.index <- length(native.results) + 1L
