@@ -80,11 +80,21 @@ npindex.formula <-
         if (!missing(data) && !is.null(data))
           tmf[["data"]] <- substitute(data)
         mf.args <- as.list(tmf)[-1L]
-        umf <- tmf <- do.call(stats::model.frame, mf.args, envir = environment(tt))
-
-        response.name <- attr(tmf, "names")[attr(attr(tmf, "terms"), "response")]
-        tydat <- model.response(tmf)
-        txdat <- tmf[, attr(attr(tmf, "terms"),"term.labels"), drop = FALSE]
+        if (inherits(bws, "sibandwidth") &&
+            (missing(data) || is.null(data)) &&
+            all(c("xdat", "ydat") %in% names(bws[["call"]]))) {
+          # Automatic formula fits retain already-prepared native training
+          # inputs. Recover them as plot does; do not apply the formula twice.
+          txdat <- toFrame(.np_eval_bws_call_arg(bws, "xdat"))
+          tydat <- .np_eval_bws_call_arg(bws, "ydat")
+          response.name <- bws[["ynames"]]
+          umf <- tmf <- NULL
+        } else {
+          umf <- tmf <- do.call(stats::model.frame, mf.args, envir = environment(tt))
+          response.name <- attr(tmf, "names")[attr(attr(tmf, "terms"), "response")]
+          tydat <- model.response(tmf)
+          txdat <- tmf[, attr(attr(tmf, "terms"),"term.labels"), drop = FALSE]
+        }
         has.eval <- !is.null(newdata)
         if (has.eval) {
           if (!y.eval){

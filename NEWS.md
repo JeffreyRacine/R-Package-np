@@ -1,5 +1,9 @@
 # np 0.70-6
 
+* Formula-created single-index fits now reuse their retained training data for
+  prediction and subsequent evaluation, avoiding spurious missing-variable
+  errors when response and predictor columns are not separate workspace objects.
+
 * Terminal nearest-neighbor zero-radius errors now share a diagnostic that
   identifies the continuous variable and tied-donor geometry and suggests
   fixed bandwidths (the default). `npsigtest()` also identifies the failing

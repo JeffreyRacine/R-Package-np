@@ -1,3 +1,24 @@
+test_that("npindex formula fits reuse retained native training data", {
+  i <- seq_len(36L)
+  dat <- data.frame(x = seq(-1, 1, length.out = 36L), z = sin(i))
+  dat$y <- sin(3 * dat$x) + dat$z / 5
+  nd <- data.frame(x = c(-0.23, 0.27), z = c(0.31, -0.41))
+
+  for (bt in c("fixed", "generalized_nn", "adaptive_nn")) {
+    fit <- npindex(y ~ x + z, data = dat,
+                   bws = c(1, 0.3, if (bt == "fixed") 0.5 else 12),
+                   bandwidth.compute = FALSE, bwtype = bt)
+    native <- npindex(bws = fit$bws, txdat = dat[c("x", "z")],
+                       tydat = dat$y, exdat = nd)
+    native.train <- npindex(bws = fit$bws, txdat = dat[c("x", "z")],
+                             tydat = dat$y)
+    expect_identical(predict(fit, newdata = nd), fitted(native))
+    expect_identical(fitted(npindex(bws = fit$bws)), fitted(native.train))
+    expect_identical(predict(fit, newdata = nd, exdat = nd), fitted(native))
+    expect_error(predict(fit, newdata = nd["x"]), "z")
+  }
+})
+
 test_that("npindex formula newdata path matches explicit data path", {
   set.seed(20260223)
   dat <- data.frame(
