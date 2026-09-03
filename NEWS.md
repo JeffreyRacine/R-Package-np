@@ -1,5 +1,9 @@
 # npRmpi 0.70-6
 
+* Smooth-coefficient NOMAD evaluation now maps every invalid raw objective to
+  the declared search penalty, independent of bandwidth type, and normalizes
+  the selected bandwidth payload before final certification and publication.
+
 * Prepared MPI regression MADS restarts are now admitted only after raw
   endpoint certification, matching the serial search contract; fixed-degree
   regression and conditional-density prepared searches also synchronize the

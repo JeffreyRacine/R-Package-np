@@ -741,8 +741,7 @@ npscoefbw.NULL <-
       objective <- as.numeric(mean((ctx$ydat - mean.loo)^2))
       raw.valid <- .npscoefbw_raw_objective_valid(objective, maxPenalty)
       list(
-        objective = if (!raw.valid && bws$type %in% c("generalized_nn", "adaptive_nn"))
-          penalty else objective,
+        objective = if (raw.valid) objective else penalty,
         num.feval = 1L,
         num.feval.fast = if (.npscoefbw_fast_eligible(bws, eval.zdat = ctx$zdat.df)) 1L else 0L,
         raw.valid = raw.valid
@@ -1103,8 +1102,7 @@ npscoefbw.NULL <-
   raw.valid <- .npscoefbw_raw_objective_valid(objective)
 
   list(
-    objective = if (!raw.valid && bws$type %in% c("generalized_nn", "adaptive_nn"))
-      penalty else objective,
+    objective = if (raw.valid) objective else penalty,
     num.feval = 1L,
     num.feval.fast = if (.npscoefbw_fast_eligible(bws, eval.zdat = ctx$zdat.df)) 1L else 0L,
     raw.valid = raw.valid
@@ -1581,6 +1579,11 @@ npscoefbw.NULL <-
     stop(message, call. = FALSE)
   }
 
+  search.result$best_payload <- .npscoefbw_normalize_nomad_scbw(
+    scbw = search.result$best_payload,
+    eval.zdat = eval.zdat,
+    bw = search.result$best_payload$bw
+  )
   if (!isTRUE(powell.payload.raw.valid)) {
     final.raw <- evaluate.bandwidth(
       tbw = search.result$best_payload,
