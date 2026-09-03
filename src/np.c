@@ -4011,9 +4011,9 @@ static void np_copy_scale_factor(double *dest, const double *src, int n)
     dest[i] = src[i];
 }
 
-static int np_adaptive_nn_joint_ordinary_advance(double *candidate,
-                                                 const int num_continuous,
-                                                 const int maximum_k)
+static int np_ordinary_nn_joint_advance(double *candidate,
+                                        const int num_continuous,
+                                        const int maximum_k)
 {
   int i;
   int advanced = 0;
@@ -4023,8 +4023,15 @@ static int np_adaptive_nn_joint_ordinary_advance(double *candidate,
 
   for (i = 1; i <= num_continuous; ++i) {
     const int lookup_k = (int)candidate[i];
-    const int next_k = MIN(maximum_k,
-                           MAX(lookup_k + 1, 2*lookup_k));
+    int next_k = maximum_k;
+
+    if (lookup_k < maximum_k) {
+      const int incremented_k = lookup_k + 1;
+      const int doubled_k = (lookup_k <= maximum_k/2) ?
+        2*lookup_k : maximum_k;
+
+      next_k = MIN(maximum_k, MAX(incremented_k, doubled_k));
+    }
 
     if (next_k > lookup_k) {
       candidate[i] = (double)next_k;
@@ -4089,7 +4096,7 @@ static double bwmfunc_raw_current_scale(double *vector_scale_factor, int n)
   return val;
 }
 
-static int np_adaptive_nn_find_finite_raw_seed(
+static int np_ordinary_nn_find_finite_raw_seed(
   double *candidate,
   const int num_continuous,
   const int num_obs,
@@ -4127,7 +4134,7 @@ static int np_adaptive_nn_find_finite_raw_seed(
   for (probe = 0; probe < probe_limit; ++probe) {
     double value;
 
-    if (!np_adaptive_nn_joint_ordinary_advance(
+    if (!np_ordinary_nn_joint_advance(
           candidate, num_continuous, maximum_k))
       break;
 
@@ -5865,7 +5872,7 @@ static void np_conditional_density_refresh_penalty_canonical(
         int advanced = 0;
 
         if (adaptive_lp_reseed) {
-          advanced = np_adaptive_nn_joint_ordinary_advance(
+          advanced = np_ordinary_nn_joint_advance(
             tmp,
             num_var_continuous_extern + num_reg_continuous_extern,
             num_obs_train_extern - 2);
@@ -13853,6 +13860,9 @@ static void np_density_bw_internal(double * myuno, double * myord, double * myco
   int iMultistart, iMs_counter, iNum_Multistart, iImproved;
   int enforce_fixed_feasibility;
   int have_start_best, have_multistart_best;
+  int nn_retry_attempted = 0;
+  int nn_retry_history_index = 0;
+  int nn_retry_improved = 0;
   int itmax, iter;
   int int_use_starting_values;
   int scale_cat;
@@ -13905,7 +13915,10 @@ static void np_density_bw_internal(double * myuno, double * myord, double * myco
   int_use_starting_values= myopti[BW_USTARTI];
   int_LARGE_SF=myopti[BW_LSFI];
   BANDWIDTH_den_extern=myopti[BW_DENI];
-  enforce_fixed_feasibility = ((BANDWIDTH_den_extern == BW_FIXED) && (!eval_only));
+  enforce_fixed_feasibility =
+    (((BANDWIDTH_den_extern == BW_FIXED) ||
+      (BANDWIDTH_den_extern == BW_GEN_NN) ||
+      (BANDWIDTH_den_extern == BW_ADAP_NN)) && (!eval_only));
   int_RESTART_FROM_MIN = myopti[BW_REMINI];
   int_MINIMIZE_IO = myopti[BW_MINIOI];
 
@@ -14188,7 +14201,7 @@ static void np_density_bw_internal(double * myuno, double * myord, double * myco
   np_bwm_clear_deferred_error();
   bwmfunc_raw = bwmfunc;
   bwm_set_floor_context(
-    enforce_fixed_feasibility,
+    enforce_fixed_feasibility && (BANDWIDTH_den_extern == BW_FIXED),
     num_var,
     bwm_use_transform,
     KERNEL_den_extern,
@@ -14240,6 +14253,7 @@ static void np_density_bw_internal(double * myuno, double * myord, double * myco
   }
 
   fret = fret_initial;
+density_powell_attempt:
   if(!eval_only){
     powell(0,
            0,
@@ -14331,14 +14345,25 @@ static void np_density_bw_internal(double * myuno, double * myord, double * myco
   *timing = timing_extern;
 
   /* When multistarting save initial minimum of objective function and scale factors */
-  objective_function_values[0]=-fret;
-  objective_function_evals[0]=bwm_eval_count;
-  objective_function_invalid[0]=bwm_invalid_count;
-  bwm_snapshot_fast_counters();
-  fast_eval_total += bwm_fast_eval_count;
-  guarded_eval_total += bwm_guarded_eval_count;
+  if (!nn_retry_attempted) {
+    objective_function_values[0]=-fret;
+    objective_function_evals[0]=bwm_eval_count;
+    objective_function_invalid[0]=bwm_invalid_count;
+    bwm_snapshot_fast_counters();
+    fast_eval_total += bwm_fast_eval_count;
+    guarded_eval_total += bwm_guarded_eval_count;
+  } else {
+    objective_function_values[nn_retry_history_index]=-fret;
+    objective_function_evals[nn_retry_history_index] += bwm_eval_count;
+    objective_function_invalid[nn_retry_history_index] += bwm_invalid_count;
+    bwm_snapshot_fast_counters();
+    fast_eval_total += bwm_fast_eval_count;
+    guarded_eval_total += bwm_guarded_eval_count;
+    iImproved = nn_retry_improved;
+  }
 
-  if((!eval_only) && (iMultistart == IMULTI_TRUE)){
+  if((!eval_only) && (!nn_retry_attempted) &&
+     (iMultistart == IMULTI_TRUE)){
     if (enforce_fixed_feasibility) {
       if (have_start_best) {
         have_multistart_best = 1;
@@ -14561,6 +14586,62 @@ static void np_density_bw_internal(double * myuno, double * myord, double * myco
     }
     final_raw = bwmfunc_raw_current_scale(vector_scale_factor, num_var);
     if (!R_FINITE(final_raw) || final_raw == DBL_MAX) {
+      if ((!nn_retry_attempted) &&
+          (!eval_only) &&
+          (!int_use_starting_values) &&
+          ((BANDWIDTH_den_extern == BW_GEN_NN) ||
+           (BANDWIDTH_den_extern == BW_ADAP_NN)) &&
+          (num_reg_continuous_extern > 0) &&
+          (num_obs_train_extern >= 3)) {
+        double finite_seed = DBL_MAX;
+        int found_finite_seed;
+        const int maximum_k =
+          (BANDWIDTH_den_extern == BW_GEN_NN) ?
+          num_obs_train_extern - 1 : num_obs_train_extern - 2;
+
+        nn_retry_history_index = (iImproved > 0) ? iImproved - 1 : 0;
+        nn_retry_improved = iImproved;
+        bwm_reset_counters();
+        found_finite_seed = np_ordinary_nn_find_finite_raw_seed(
+          vector_scale_factor,
+          num_reg_continuous_extern,
+          num_obs_train_extern,
+          maximum_k,
+          num_var,
+          &finite_seed);
+        if (found_finite_seed &&
+            bwm_penalty_mode == 1 &&
+            (!(bwm_penalty_value > finite_seed))) {
+          found_finite_seed = np_minimized_seed_dominating_penalty(
+            finite_seed, penalty_mult[0], &bwm_penalty_value);
+        }
+        if (found_finite_seed) {
+          initialize_nr_directions(BANDWIDTH_den_extern,
+                                   num_obs_train_extern,
+                                   num_reg_continuous_extern,
+                                   num_reg_unordered_extern,
+                                   num_reg_ordered_extern,
+                                   0,
+                                   0,
+                                   0,
+                                   vsfh,
+                                   num_categories_extern,
+                                   matrix_y,
+                                   0, int_RANDOM_SEED,
+                                   lbc_dir, dfc_dir, c_dir, initc_dir,
+                                   lbd_dir, hbd_dir, d_dir, initd_dir,
+                                   matrix_X_continuous_train_extern,
+                                   matrix_Y_continuous_train_extern);
+          fret_initial = fret_best = fret_start_best = fret = finite_seed;
+          have_start_best = 1;
+          have_multistart_best = 0;
+          np_copy_scale_factor(vector_scale_factor_startbest,
+                               vector_scale_factor,
+                               num_var);
+          nn_retry_attempted = 1;
+          goto density_powell_attempt;
+        }
+      }
       bw_error_msg = "C_np_density_bw: optimizer returned a fixed-bandwidth candidate with invalid raw objective";
       goto cleanup_np_density_bw;
     }
@@ -14748,6 +14829,9 @@ static void np_distribution_bw_internal(
   int iMultistart, iMs_counter, iNum_Multistart, iImproved;
   int enforce_fixed_feasibility;
   int have_start_best, have_multistart_best;
+  int nn_retry_attempted = 0;
+  int nn_retry_history_index = 0;
+  int nn_retry_improved = 0;
   int itmax, iter;
   int int_use_starting_values, cdfontrain;
 
@@ -14806,7 +14890,10 @@ static void np_distribution_bw_internal(
   int_use_starting_values= myopti[DBW_USTARTI];
   int_LARGE_SF=myopti[DBW_LSFI];
   BANDWIDTH_den_extern=myopti[DBW_DENI];
-  enforce_fixed_feasibility = ((BANDWIDTH_den_extern == BW_FIXED) && (!eval_only));
+  enforce_fixed_feasibility =
+    (((BANDWIDTH_den_extern == BW_FIXED) ||
+      (BANDWIDTH_den_extern == BW_GEN_NN) ||
+      (BANDWIDTH_den_extern == BW_ADAP_NN)) && (!eval_only));
   int_RESTART_FROM_MIN = myopti[DBW_REMINI];
   int_MINIMIZE_IO = myopti[DBW_MINIOI];
 
@@ -15154,7 +15241,7 @@ static void np_distribution_bw_internal(
   np_bwm_clear_deferred_error();
   bwmfunc_raw = bwmfunc;
   bwm_set_floor_context(
-    enforce_fixed_feasibility,
+    enforce_fixed_feasibility && (BANDWIDTH_den_extern == BW_FIXED),
     num_var,
     bwm_use_transform,
     KERNEL_den_extern,
@@ -15205,6 +15292,7 @@ static void np_distribution_bw_internal(
   }
 
   fret = fret_initial;
+distribution_powell_attempt:
   if(!eval_only){
     powell(0,
            0,
@@ -15294,14 +15382,24 @@ static void np_distribution_bw_internal(
   iImproved = (enforce_fixed_feasibility && have_start_best) ? (fret_start_best < fret_initial) : (fret < fret_best);
   *timing = timing_extern;
 
-  objective_function_values[0]=fret;
-  objective_function_evals[0]=bwm_eval_count;
-  objective_function_invalid[0]=bwm_invalid_count;
-  bwm_snapshot_fast_counters();
-  fast_eval_total += bwm_fast_eval_count;
+  if (!nn_retry_attempted) {
+    objective_function_values[0]=fret;
+    objective_function_evals[0]=bwm_eval_count;
+    objective_function_invalid[0]=bwm_invalid_count;
+    bwm_snapshot_fast_counters();
+    fast_eval_total += bwm_fast_eval_count;
+  } else {
+    objective_function_values[nn_retry_history_index]=fret;
+    objective_function_evals[nn_retry_history_index] += bwm_eval_count;
+    objective_function_invalid[nn_retry_history_index] += bwm_invalid_count;
+    bwm_snapshot_fast_counters();
+    fast_eval_total += bwm_fast_eval_count;
+    iImproved = nn_retry_improved;
+  }
   /* When multistarting save initial minimum of objective function and scale factors */
 
-  if((!eval_only) && (iMultistart == IMULTI_TRUE)){
+  if((!eval_only) && (!nn_retry_attempted) &&
+     (iMultistart == IMULTI_TRUE)){
     if (enforce_fixed_feasibility) {
       if (have_start_best) {
         have_multistart_best = 1;
@@ -15522,6 +15620,62 @@ static void np_distribution_bw_internal(
     }
     final_raw = bwmfunc_raw_current_scale(vector_scale_factor, num_var);
     if (!R_FINITE(final_raw) || final_raw == DBL_MAX) {
+      if ((!nn_retry_attempted) &&
+          (!eval_only) &&
+          (!int_use_starting_values) &&
+          ((BANDWIDTH_den_extern == BW_GEN_NN) ||
+           (BANDWIDTH_den_extern == BW_ADAP_NN)) &&
+          (num_reg_continuous_extern > 0) &&
+          (num_obs_train_extern >= 3)) {
+        double finite_seed = DBL_MAX;
+        int found_finite_seed;
+        const int maximum_k =
+          (BANDWIDTH_den_extern == BW_GEN_NN) ?
+          num_obs_train_extern - 1 : num_obs_train_extern - 2;
+
+        nn_retry_history_index = (iImproved > 0) ? iImproved - 1 : 0;
+        nn_retry_improved = iImproved;
+        bwm_reset_counters();
+        found_finite_seed = np_ordinary_nn_find_finite_raw_seed(
+          vector_scale_factor,
+          num_reg_continuous_extern,
+          num_obs_train_extern,
+          maximum_k,
+          num_var,
+          &finite_seed);
+        if (found_finite_seed &&
+            bwm_penalty_mode == 1 &&
+            (!(bwm_penalty_value > finite_seed))) {
+          found_finite_seed = np_minimized_seed_dominating_penalty(
+            finite_seed, penalty_mult[0], &bwm_penalty_value);
+        }
+        if (found_finite_seed) {
+          initialize_nr_directions(BANDWIDTH_den_extern,
+                                   num_obs_train_extern,
+                                   num_reg_continuous_extern,
+                                   num_reg_unordered_extern,
+                                   num_reg_ordered_extern,
+                                   0,
+                                   0,
+                                   0,
+                                   vsfh,
+                                   num_categories_extern,
+                                   matrix_y,
+                                   0, int_RANDOM_SEED,
+                                   lbc_dir, dfc_dir, c_dir, initc_dir,
+                                   lbd_dir, hbd_dir, d_dir, initd_dir,
+                                   matrix_X_continuous_train_extern,
+                                   matrix_Y_continuous_train_extern);
+          fret_initial = fret_best = fret_start_best = fret = finite_seed;
+          have_start_best = 1;
+          have_multistart_best = 0;
+          np_copy_scale_factor(vector_scale_factor_startbest,
+                               vector_scale_factor,
+                               num_var);
+          nn_retry_attempted = 1;
+          goto distribution_powell_attempt;
+        }
+      }
       bw_error_msg = "C_np_distribution_bw: optimizer returned a fixed-bandwidth candidate with invalid raw objective";
       goto cleanup_np_distribution_bw;
     }
@@ -15703,6 +15857,9 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   int iMultistart, iMs_counter, iNum_Multistart, num_all_var, iImproved;
   int enforce_fixed_feasibility;
   int have_start_best, have_multistart_best;
+  int nn_retry_attempted = 0;
+  int nn_retry_history_index = 0;
+  int nn_retry_improved = 0;
   int itmax, iter;
   int ibwmfunc, scale_cat;
   const char *bw_error_msg = NULL;
@@ -15736,7 +15893,9 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   int_LARGE_SF = myopti[CBW_LSFI];
   BANDWIDTH_den_extern = myopti[CBW_DENI];
   enforce_fixed_feasibility =
-    ((BANDWIDTH_den_extern == BW_FIXED) && (!eval_only));
+    (((BANDWIDTH_den_extern == BW_FIXED) ||
+      (BANDWIDTH_den_extern == BW_GEN_NN) ||
+      (BANDWIDTH_den_extern == BW_ADAP_NN)) && (!eval_only));
   int_RESTART_FROM_MIN = myopti[CBW_REMINI];
   int_MINIMIZE_IO = myopti[CBW_MINIOI];
   itmax = myopti[CBW_ITMAXI];
@@ -15802,7 +15961,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   np_bwm_clear_deferred_error();
   bwmfunc_raw = bwmfunc;
   bwm_set_floor_context(
-    enforce_fixed_feasibility,
+    enforce_fixed_feasibility && (BANDWIDTH_den_extern == BW_FIXED),
     num_all_var,
     bwm_use_transform,
     KERNEL_den_extern,
@@ -15857,6 +16016,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
     np_copy_scale_factor(vector_scale_factor_startbest, vector_scale_factor, num_all_var);
   }
 
+conditional_density_powell_attempt:
   if(!eval_only){
     powell(0,
            0,
@@ -15951,16 +16111,27 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   iImproved = (enforce_fixed_feasibility && have_start_best) ? (fret_start_best < fret_initial) : (fret < fret_best);
   *timing = timing_extern;
 
-  objective_function_values[0]=-fret;
-  objective_function_evals[0]=bwm_eval_count;
-  objective_function_invalid[0]=bwm_invalid_count;
-  bwm_snapshot_fast_counters();
-  fast_eval_total += bwm_fast_eval_count;
-  guarded_eval_total += bwm_guarded_eval_count;
+  if (!nn_retry_attempted) {
+    objective_function_values[0]=-fret;
+    objective_function_evals[0]=bwm_eval_count;
+    objective_function_invalid[0]=bwm_invalid_count;
+    bwm_snapshot_fast_counters();
+    fast_eval_total += bwm_fast_eval_count;
+    guarded_eval_total += bwm_guarded_eval_count;
+  } else {
+    objective_function_values[nn_retry_history_index]=-fret;
+    objective_function_evals[nn_retry_history_index] += bwm_eval_count;
+    objective_function_invalid[nn_retry_history_index] += bwm_invalid_count;
+    bwm_snapshot_fast_counters();
+    fast_eval_total += bwm_fast_eval_count;
+    guarded_eval_total += bwm_guarded_eval_count;
+    iImproved = nn_retry_improved;
+  }
   /* When multistarting save initial minimum of objective function and scale factors */
 
 
-  if((!eval_only) && (iMultistart == IMULTI_TRUE)){
+  if((!eval_only) && (!nn_retry_attempted) &&
+     (iMultistart == IMULTI_TRUE)){
     if (enforce_fixed_feasibility) {
       if (have_start_best) {
         have_multistart_best = 1;
@@ -16183,6 +16354,66 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
     }
     final_raw = bwmfunc_raw_current_scale(vector_scale_factor, num_all_var);
     if (!R_FINITE(final_raw) || final_raw == DBL_MAX) {
+      if ((!nn_retry_attempted) &&
+          (!eval_only) &&
+          (!myopti[CBW_USTARTI]) &&
+          ((BANDWIDTH_den_extern == BW_GEN_NN) ||
+           (BANDWIDTH_den_extern == BW_ADAP_NN)) &&
+          ((num_var_continuous_extern + num_reg_continuous_extern) > 0) &&
+          (num_obs_train_extern >= 3)) {
+        double finite_seed = DBL_MAX;
+        int found_finite_seed;
+        const int maximum_k =
+          (BANDWIDTH_den_extern == BW_GEN_NN) ?
+          num_obs_train_extern - 1 : num_obs_train_extern - 2;
+
+        nn_retry_history_index = (iImproved > 0) ? iImproved - 1 : 0;
+        nn_retry_improved = iImproved;
+        bwm_reset_counters();
+        found_finite_seed = np_ordinary_nn_find_finite_raw_seed(
+          vector_scale_factor,
+          num_var_continuous_extern + num_reg_continuous_extern,
+          num_obs_train_extern,
+          maximum_k,
+          num_all_var,
+          &finite_seed);
+        if (np_bwm_get_deferred_error() != NULL) {
+          bw_error_msg = np_bwm_get_deferred_error();
+          goto cleanup_np_density_conditional_bw;
+        }
+        if (found_finite_seed &&
+            bwm_penalty_mode == 1 &&
+            (!(bwm_penalty_value > finite_seed))) {
+          found_finite_seed = np_minimized_seed_dominating_penalty(
+            finite_seed, penalty_mult[0], &bwm_penalty_value);
+        }
+        if (found_finite_seed) {
+          initialize_nr_directions(BANDWIDTH_den_extern,
+                                   num_obs_train_extern,
+                                   num_reg_continuous_extern,
+                                   num_reg_unordered_extern,
+                                   num_reg_ordered_extern,
+                                   num_var_continuous_extern,
+                                   num_var_unordered_extern,
+                                   num_var_ordered_extern,
+                                   vsfh,
+                                   num_categories_extern,
+                                   matrix_y,
+                                   0, int_RANDOM_SEED,
+                                   lbc_dir, dfc_dir, c_dir, initc_dir,
+                                   lbd_dir, hbd_dir, d_dir, initd_dir,
+                                   matrix_X_continuous_train_extern,
+                                   matrix_Y_continuous_train_extern);
+          fret_initial = fret_best = fret_start_best = fret = finite_seed;
+          have_start_best = 1;
+          have_multistart_best = 0;
+          np_copy_scale_factor(vector_scale_factor_startbest,
+                               vector_scale_factor,
+                               num_all_var);
+          nn_retry_attempted = 1;
+          goto conditional_density_powell_attempt;
+        }
+      }
       bw_error_msg = "C_np_density_conditional_bw: optimizer returned a fixed-bandwidth candidate with invalid raw objective";
       goto cleanup_np_density_conditional_bw;
     }
@@ -16701,6 +16932,9 @@ static void np_distribution_conditional_bw_mode(double * c_uno, double * c_ord, 
   int iMultistart, iMs_counter, iNum_Multistart, num_all_var, num_var_var, iImproved;
   int enforce_fixed_feasibility;
   int have_start_best, have_multistart_best;
+  int nn_retry_attempted = 0;
+  int nn_retry_history_index = 0;
+  int nn_retry_improved = 0;
   int itmax, iter;
   int int_use_starting_values, ibwmfunc;
   int cdfontrain;
@@ -16842,7 +17076,11 @@ static void np_distribution_conditional_bw_mode(double * c_uno, double * c_ord, 
   int_use_starting_values= myopti[CDBW_USTARTI];
   int_LARGE_SF=myopti[CDBW_LSFI];
   BANDWIDTH_den_extern=myopti[CDBW_DENI];
-  enforce_fixed_feasibility = ((BANDWIDTH_den_extern == BW_FIXED) && (!eval_only));
+  enforce_fixed_feasibility =
+    (((BANDWIDTH_den_extern == BW_FIXED) ||
+      ((!degree_search) &&
+       ((BANDWIDTH_den_extern == BW_GEN_NN) ||
+        (BANDWIDTH_den_extern == BW_ADAP_NN)))) && (!eval_only));
   int_RESTART_FROM_MIN = myopti[CDBW_REMINI];
   int_MINIMIZE_IO = myopti[CDBW_MINIOI];
 
@@ -17558,7 +17796,7 @@ static void np_distribution_conditional_bw_mode(double * c_uno, double * c_ord, 
 
   bwmfunc_raw = bwmfunc;
   bwm_set_floor_context(
-    enforce_fixed_feasibility,
+    enforce_fixed_feasibility && (BANDWIDTH_den_extern == BW_FIXED),
     num_all_var,
     bwm_use_transform,
     KERNEL_den_extern,
@@ -17642,6 +17880,7 @@ static void np_distribution_conditional_bw_mode(double * c_uno, double * c_ord, 
     np_copy_scale_factor(vector_scale_factor_startbest, vector_scale_factor, num_all_var);
   }
 
+conditional_distribution_powell_attempt:
   if(!eval_only){
     powell(0,
            0,
@@ -17730,15 +17969,25 @@ static void np_distribution_conditional_bw_mode(double * c_uno, double * c_ord, 
   iImproved = (enforce_fixed_feasibility && have_start_best) ? (fret_start_best < fret_initial) : (fret < fret_best);
   *timing = timing_extern;
 
-  objective_function_values[0]=fret;
-  objective_function_evals[0]=bwm_eval_count;
-  objective_function_invalid[0]=bwm_invalid_count;
-  bwm_snapshot_fast_counters();
-  fast_eval_total += bwm_fast_eval_count;
+  if (!nn_retry_attempted) {
+    objective_function_values[0]=fret;
+    objective_function_evals[0]=bwm_eval_count;
+    objective_function_invalid[0]=bwm_invalid_count;
+    bwm_snapshot_fast_counters();
+    fast_eval_total += bwm_fast_eval_count;
+  } else {
+    objective_function_values[nn_retry_history_index]=fret;
+    objective_function_evals[nn_retry_history_index] += bwm_eval_count;
+    objective_function_invalid[nn_retry_history_index] += bwm_invalid_count;
+    bwm_snapshot_fast_counters();
+    fast_eval_total += bwm_fast_eval_count;
+    iImproved = nn_retry_improved;
+  }
   /* When multistarting save initial minimum of objective function and scale factors */
 
 
-  if((!eval_only) && (iMultistart == IMULTI_TRUE)){
+  if((!eval_only) && (!nn_retry_attempted) &&
+     (iMultistart == IMULTI_TRUE)){
     if (enforce_fixed_feasibility) {
       if (have_start_best) {
         have_multistart_best = 1;
@@ -17956,6 +18205,63 @@ static void np_distribution_conditional_bw_mode(double * c_uno, double * c_ord, 
     }
     final_raw = bwmfunc_raw_current_scale(vector_scale_factor, num_all_var);
     if (!R_FINITE(final_raw) || final_raw == DBL_MAX) {
+      if ((!nn_retry_attempted) &&
+          (!eval_only) &&
+          (!degree_search) &&
+          (!int_use_starting_values) &&
+          ((BANDWIDTH_den_extern == BW_GEN_NN) ||
+           (BANDWIDTH_den_extern == BW_ADAP_NN)) &&
+          ((num_var_continuous_extern + num_reg_continuous_extern) > 0) &&
+          (num_obs_train_extern >= 3)) {
+        double finite_seed = DBL_MAX;
+        int found_finite_seed;
+        const int maximum_k =
+          (BANDWIDTH_den_extern == BW_GEN_NN) ?
+          num_obs_train_extern - 1 : num_obs_train_extern - 2;
+
+        nn_retry_history_index = (iImproved > 0) ? iImproved - 1 : 0;
+        nn_retry_improved = iImproved;
+        bwm_reset_counters();
+        found_finite_seed = np_ordinary_nn_find_finite_raw_seed(
+          vector_scale_factor,
+          num_var_continuous_extern + num_reg_continuous_extern,
+          num_obs_train_extern,
+          maximum_k,
+          num_all_var,
+          &finite_seed);
+        if (found_finite_seed &&
+            bwm_penalty_mode == 1 &&
+            (!(bwm_penalty_value > finite_seed))) {
+          found_finite_seed = np_minimized_seed_dominating_penalty(
+            finite_seed, penalty_mult[0], &bwm_penalty_value);
+        }
+        if (found_finite_seed) {
+          initialize_nr_directions(BANDWIDTH_den_extern,
+                                   num_obs_train_extern,
+                                   num_reg_continuous_extern,
+                                   num_reg_unordered_extern,
+                                   num_reg_ordered_extern,
+                                   num_var_continuous_extern,
+                                   num_var_unordered_extern,
+                                   num_var_ordered_extern,
+                                   vsfh,
+                                   num_categories_extern,
+                                   matrix_y,
+                                   0, int_RANDOM_SEED,
+                                   lbc_dir, dfc_dir, c_dir, initc_dir,
+                                   lbd_dir, hbd_dir, d_dir, initd_dir,
+                                   matrix_X_continuous_train_extern,
+                                   matrix_Y_continuous_train_extern);
+          fret_initial = fret_best = fret_start_best = fret = finite_seed;
+          have_start_best = 1;
+          have_multistart_best = 0;
+          np_copy_scale_factor(vector_scale_factor_startbest,
+                               vector_scale_factor,
+                               num_all_var);
+          nn_retry_attempted = 1;
+          goto conditional_distribution_powell_attempt;
+        }
+      }
       bw_error_msg = "C_np_distribution_conditional_bw: optimizer returned a fixed-bandwidth candidate with invalid raw objective";
       goto cleanup_np_distribution_conditional_bw;
     }
@@ -20044,11 +20350,11 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
         BANDWIDTH_reg_extern,
         KERNEL_reg_extern,
         num_obs_train_extern,
-        num_obs_eval_extern,
+        num_obs_train_extern,
         num_reg_continuous_extern,
         0,
         matrix_X_continuous_train_extern,
-        matrix_X_continuous_eval_extern) :
+        matrix_X_continuous_train_extern) :
       np_continuous_extendednn_eval_upper_alloc(
         BANDWIDTH_reg_extern,
         num_obs_train_extern,
@@ -20640,11 +20946,72 @@ regression_powell_attempt:
           (iImproved > 0) ? iImproved - 1 : 0;
         adaptive_retry_improved = iImproved;
         bwm_reset_counters();
-        found_finite_seed = np_adaptive_nn_find_finite_raw_seed(
+        found_finite_seed = np_ordinary_nn_find_finite_raw_seed(
           vector_scale_factor,
           num_reg_continuous_extern,
           num_obs_train_extern,
           num_obs_train_extern - 2,
+          num_var,
+          &finite_seed);
+        if (found_finite_seed &&
+            bwm_penalty_mode == 1 &&
+            (!(bwm_penalty_value > finite_seed))) {
+          found_finite_seed = np_minimized_seed_dominating_penalty(
+            finite_seed, penalty_mult[0], &bwm_penalty_value);
+        }
+        if (found_finite_seed) {
+          initialize_nr_directions(BANDWIDTH_reg_extern,
+                                   num_obs_train_extern,
+                                   num_reg_continuous_extern,
+                                   num_reg_unordered_extern,
+                                   num_reg_ordered_extern,
+                                   0,
+                                   0,
+                                   0,
+                                   vsfh,
+                                   num_categories_extern,
+                                   matrix_y,
+                                   0, int_RANDOM_SEED,
+                                   lbc_dir, dfc_dir, c_dir, initc_dir,
+                                   lbd_dir, hbd_dir, d_dir, initd_dir,
+                                   matrix_X_continuous_train_extern,
+                                   matrix_Y_continuous_train_extern);
+          if(lsq_check_mode){
+            for(i = 1; i <= num_search_var; i++){
+              matrix_y[i][num_var + 1] = 0.0;
+              matrix_y[num_var + 1][i] = 0.0;
+            }
+            matrix_y[num_var + 1][num_var + 1] =
+              0.25*(lsq_delta_upper - lsq_delta_lower);
+          }
+          fret_initial = fret_best = fret_start_best = fret = finite_seed;
+          have_start_best = 1;
+          have_multistart_best = 0;
+          np_copy_scale_factor(vector_scale_factor_startbest,
+                               vector_scale_factor,
+                               num_search_var);
+          adaptive_retry_attempted = 1;
+          goto regression_powell_attempt;
+        }
+      }
+      if ((!adaptive_retry_attempted) &&
+          (!eval_only) &&
+          (!int_use_starting_values) &&
+          (BANDWIDTH_reg_extern == BW_GEN_NN) &&
+          (num_reg_continuous_extern > 0) &&
+          (num_obs_train_extern >= 3)) {
+        double finite_seed = DBL_MAX;
+        int found_finite_seed;
+
+        adaptive_retry_history_index =
+          (iImproved > 0) ? iImproved - 1 : 0;
+        adaptive_retry_improved = iImproved;
+        bwm_reset_counters();
+        found_finite_seed = np_ordinary_nn_find_finite_raw_seed(
+          vector_scale_factor,
+          num_reg_continuous_extern,
+          num_obs_train_extern,
+          num_obs_train_extern - 1,
           num_var,
           &finite_seed);
         if (found_finite_seed &&
