@@ -405,19 +405,43 @@ npRmpiNomadNativeSearchDensity <- function(prep,
     list(objective = -as.numeric(out$fval[1L]), degree = integer(0L), num.feval = out$num.feval)
   }
 
+  raw_eval_fun <- function(point) {
+    bw_vec <- .npregbw_nomad_point_to_bw(point, template = template, setup = setup)
+    tbw <- bws
+    tbw$bw <- bw_vec
+    out <- npudensbw.bandwidth(
+      dat = dat,
+      bws = tbw,
+      bandwidth.compute = TRUE,
+      nmulti = 1L,
+      powell.remin = FALSE,
+      invalid.penalty = "dbmax",
+      penalty.multiplier = opt.value("penalty.multiplier", 10),
+      scale.factor.search.lower = opt.value("scale.factor.search.lower", NULL),
+      bwsolver = "powell",
+      eval.only = TRUE
+    )
+    -as.numeric(out$fval[1L])
+  }
+
   build_payload <- function(point, best_record, solution, interrupted) {
+    .np_nn_certify_raw_point(
+      point = point,
+      raw.eval = raw_eval_fun,
+      owner = "native npudens fixed-degree NOMAD route"
+    )
+    direct.objective <- as.numeric(best_record$objective)
     bw_vec <- .npregbw_nomad_point_to_bw(point, template = template, setup = setup)
     final.tbw <- bws
     final.tbw$bw <- bw_vec
-    final.tbw$fval <- final.tbw$ifval <- -as.numeric(best_record$objective)
+    final.tbw$fval <- final.tbw$ifval <- -direct.objective
     final.tbw$num.feval <- as.numeric(mads.num.feval.total)
     final.tbw$num.feval.fast <- as.numeric(mads.num.feval.fast.total)
-    final.tbw$fval.history <- -as.numeric(best_record$objective)
+    final.tbw$fval.history <- -direct.objective
     final.tbw$eval.history <- if (!is.null(solution$bbe)) rep(1, max(1L, as.integer(solution$bbe))) else 1
     final.tbw$invalid.history <- 0
     final.tbw$timing <- NA_real_
     direct.payload <- npudensbw.bandwidth(dat = dat, bws = final.tbw, bandwidth.compute = FALSE)
-    direct.objective <- as.numeric(best_record$objective)
     powell.elapsed <- NA_real_
 
     if (identical(bwsolver, "mads+powell")) {
@@ -442,8 +466,16 @@ npRmpiNomadNativeSearchDensity <- function(prep,
       powell.elapsed <- proc.time()[3L] - hot.start
       hot.payload$num.feval <- as.numeric(direct.payload$num.feval[1L]) + as.numeric(hot.payload$num.feval[1L])
       hot.payload$num.feval.fast <- as.numeric(direct.payload$num.feval.fast[1L]) + as.numeric(hot.payload$num.feval.fast[1L])
+      hot.point <- .npregbw_nomad_bw_to_point(
+        hot.payload$bw, template = template, setup = setup
+      )
+      .np_nn_certify_raw_point(
+        point = hot.point,
+        raw.eval = raw_eval_fun,
+        owner = "npudens MADS+Powell handoff"
+      )
       hot.objective <- -as.numeric(hot.payload$fval[1L])
-      if (is.finite(hot.objective) &&
+      if (
           .np_degree_better(hot.objective, direct.objective, direction = "min"))
         return(list(payload = hot.payload, objective = hot.objective, powell.time = powell.elapsed))
     }
@@ -543,6 +575,12 @@ npRmpiNomadNativeSearchDensity <- function(prep,
       .np_nomad_native_status(native.i, "native npudens NOMAD route")
       official.objective.i <- as.numeric(native.i$official_objective[1L])
       objective.i <- as.numeric(native.i$objective[1L])
+      raw.objective.i <- if (is.null(native.i$best_point) ||
+                             any(!is.finite(native.i$best_point))) {
+        NA_real_
+      } else {
+        raw_eval_fun(as.numeric(native.i$best_point))
+      }
       native.results[[i]] <- list(
         restart = i,
         start = as.numeric(native.start.matrix[i, ]),
@@ -560,13 +598,90 @@ npRmpiNomadNativeSearchDensity <- function(prep,
       native.num.feval.total <- native.num.feval.total + as.numeric(native.i$total_num.feval[1L])
       native.num.feval.fast.total <- native.num.feval.fast.total + as.numeric(native.i$total_num.feval.fast[1L])
       native.num.feval.guarded.total <- native.num.feval.guarded.total + as.numeric(native.i$total_num.feval.guarded[1L])
-      if (is.finite(objective.i) && objective.i < native.best.objective) {
+      if (.np_nn_raw_objective_valid(raw.objective.i) &&
+          objective.i < native.best.objective) {
         native.best.objective <- objective.i
         native.best.index <- i
       }
     }
+    if (!is.finite(native.best.index) && is.null(point.start) &&
+        template$type %in% c("generalized_nn", "adaptive_nn") &&
+        bounds$ncon > 0L) {
+      penalty.objectives <- vapply(
+        native.results,
+        function(result) as.numeric(result$best_objective[1L]),
+        numeric(1L)
+      )
+      penalty.objectives[!is.finite(penalty.objectives)] <- Inf
+      incumbent.index <- if (any(is.finite(penalty.objectives))) {
+        which.min(penalty.objectives)
+      } else {
+        1L
+      }
+      ordinary.cap <- if (identical(template$type, "adaptive_nn")) {
+        setup$nobs - 2L
+      } else {
+        setup$nobs - 1L
+      }
+      recovery <- .np_nn_find_raw_valid_start(
+        point = native.results[[incumbent.index]]$best_point,
+        nn.indices = seq_len(bounds$ncon),
+        caps = rep.int(ordinary.cap, bounds$ncon),
+        raw.eval = raw_eval_fun
+      )
+      if (isTRUE(recovery$found)) {
+        recovery.index <- length(native.results) + 1L
+        native.start <- proc.time()[3L]
+        native.i <- npRmpiNomadNativeSearchDensity(
+          prep = native.prep,
+          x0 = as.numeric(recovery$point),
+          bbin = bounds$bbin,
+          lb = bounds$lower,
+          ub = bounds$upper,
+          max.eval = 0L,
+          random.seed = native.random.seed,
+          inner.start.count = native.inner.nmulti,
+          option.names = native.option.vectors$names,
+          option.values = native.option.vectors$values
+        )
+        native.elapsed <- proc.time()[3L] - native.start
+        native.nomad.elapsed <- native.nomad.elapsed + native.elapsed
+        .np_nomad_native_status(native.i, "native npudens NOMAD recovery route")
+        if (is.null(native.i$best_point) || any(!is.finite(native.i$best_point)))
+          stop("native npudens NOMAD recovery route did not return a finite best point", call. = FALSE)
+        official.objective.i <- as.numeric(native.i$official_objective[1L])
+        objective.i <- as.numeric(native.i$objective[1L])
+        raw.objective.i <- raw_eval_fun(as.numeric(native.i$best_point))
+        native.results[[recovery.index]] <- list(
+          restart = recovery.index,
+          start = as.numeric(recovery$point),
+          elapsed = native.elapsed,
+          status = "ok",
+          message = as.character(native.i$message[1L]),
+          objective = official.objective.i,
+          bbe = as.numeric(native.i$blackbox_evaluations[1L]),
+          iterations = as.numeric(native.i$iterations[1L]),
+          solution = as.numeric(native.i$solution),
+          best_point = as.numeric(native.i$best_point),
+          best_objective = objective.i,
+          native = native.i,
+          recovery = TRUE,
+          recovery_witness = recovery
+        )
+        native.num.feval.total <- native.num.feval.total +
+          as.numeric(native.i$total_num.feval[1L])
+        native.num.feval.fast.total <- native.num.feval.fast.total +
+          as.numeric(native.i$total_num.feval.fast[1L])
+        native.num.feval.guarded.total <- native.num.feval.guarded.total +
+          as.numeric(native.i$total_num.feval.guarded[1L])
+        if (.np_nn_raw_objective_valid(raw.objective.i)) {
+          native.best.objective <- objective.i
+          native.best.index <- recovery.index
+        }
+      }
+    }
     if (!is.finite(native.best.index))
-      stop("native npudens NOMAD route did not return a finite solution", call. = FALSE)
+      stop("native npudens NOMAD route did not return a raw-valid solution", call. = FALSE)
 
     native.best <- native.results[[native.best.index]]
     native.handoff.point <- as.numeric(native.best$best_point)
