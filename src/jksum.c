@@ -20142,6 +20142,35 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
       for(j = 0; j < num_obs; j++){
         double pnh = 1.0;
         double * const row_kwm = kwm + (size_t)j*(size_t)nrcc22;
+        double **row_bandwidth = matrix_bandwidth;
+
+        /* The generic fallback must retain the exact delete-one geometry
+         * used by the adaptive owner, including a rejected donor radius.
+         * Agree before row arithmetic/Allgather so no rank can continue on
+         * full-sample radii when another rank has rejected its fold. */
+        if(adaptive_successor_bandwidth != NULL){
+          int row = j;
+          int prepare_row = 1;
+          int local_geometry_failed = 0;
+#ifdef MPI2
+          row += my_rank;
+          prepare_row = (j % iNum_Processors) == 0;
+#endif
+          if(prepare_row){
+            if(row < num_obs)
+              local_geometry_failed = np_nn_adaptive_fold_select_row(
+                num_obs, num_reg_continuous, matrix_X_continuous,
+                matrix_bandwidth, adaptive_successor_bandwidth,
+                adaptive_fold_scale, row,
+                adaptive_selected_bandwidth) != NP_NN_GEOMETRY_OK;
+            if(np_adaptive_geometry_preflight_failed(1,
+                                                     local_geometry_failed)){
+              glp_ok = 0;
+              break;
+            }
+            row_bandwidth = adaptive_selected_bandwidth;
+          }
+        }
 
 #ifdef MPI2
         if(np_reg_cv_use_symmetric_dropone_path(bwm, ks_tree_use, BANDWIDTH_reg)){
@@ -20151,6 +20180,8 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                 TCON[l][0] = matrix_X_continuous[l][j+my_rank];
                 if(BANDWIDTH_reg == BW_GEN_NN)
                   matrix_bandwidth_eval[l][0] = matrix_bandwidth[l][j+my_rank];
+                else if(adaptive_successor_bandwidth != NULL)
+                  matrix_bandwidth_eval[l][0] = row_bandwidth[l][j+my_rank];
               }
               for(l = 0; l < num_reg_unordered; l++)
                 TUNO[l][0] = matrix_X_unordered[l][j+my_rank];
@@ -20210,7 +20241,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                                          NULL,
                                          vsf,
                                          1,
-                                         matrix_bandwidth,
+                                         row_bandwidth,
                                          matrix_bandwidth_eval,
                                          lambda,
                                          num_categories,
@@ -20327,6 +20358,8 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
             TCON[l][0] = matrix_X_continuous[l][j];
             if(BANDWIDTH_reg == BW_GEN_NN)
               matrix_bandwidth_eval[l][0] = matrix_bandwidth[l][j];
+            else if(adaptive_successor_bandwidth != NULL)
+              matrix_bandwidth_eval[l][0] = row_bandwidth[l][j];
           }
           for(l = 0; l < num_reg_unordered; l++)
             TUNO[l][0] = matrix_X_unordered[l][j];
@@ -20386,7 +20419,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                                      NULL,
                                      vsf,
                                      1,
-                                     matrix_bandwidth,
+                                     row_bandwidth,
                                      matrix_bandwidth_eval,
                                      lambda,
                                      num_categories,
