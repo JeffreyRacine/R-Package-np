@@ -645,6 +645,14 @@ npscoefbw.NULL <-
   )
 }
 
+.npscoefbw_nomad_unknown_nn_error <- function(condition, bws) {
+  if (bws$type %in% c("generalized_nn", "adaptive_nn") &&
+      !inherits(condition, "np_nn_candidate_invalid"))
+    condition
+  else
+    NULL
+}
+
 .npscoefbw_nomad_eval_direct <- function(ctx,
                                          bws,
                                          invalid.penalty = c("baseline", "large"),
@@ -666,12 +674,16 @@ npscoefbw.NULL <-
     return(list(
       objective = penalty,
       num.feval = 1L,
-      num.feval.fast = 0L
+      num.feval.fast = 0L,
+      raw.valid = FALSE
     ))
 
   maxPenalty <- sqrt(.Machine$double.xmax)
 
   result <- tryCatch({
+    .npscoef_nn_assert_training_radius(
+      bws, ctx$zdat.df, owner = "npscoefbw NOMAD degree objective"
+    )
     moment.state <- .npscoefbw_nomad_moment_state(
       ctx = ctx,
       bws = bws,
@@ -703,16 +715,24 @@ npscoefbw.NULL <-
     mean.loo <- rowSums(ctx$W * t(coef.loo))
 
     if (any(!is.finite(mean.loo)) || any(mean.loo == maxPenalty)) {
-      list(objective = penalty, num.feval = 1L, num.feval.fast = 0L)
+      list(objective = penalty, num.feval = 1L, num.feval.fast = 0L,
+           raw.valid = FALSE)
     } else {
+      objective <- as.numeric(mean((ctx$ydat - mean.loo)^2))
+      raw.valid <- .npscoefbw_raw_objective_valid(objective, maxPenalty)
       list(
-        objective = as.numeric(mean((ctx$ydat - mean.loo)^2)),
+        objective = if (!raw.valid && bws$type %in% c("generalized_nn", "adaptive_nn"))
+          penalty else objective,
         num.feval = 1L,
-        num.feval.fast = if (.npscoefbw_fast_eligible(bws, eval.zdat = ctx$zdat.df)) 1L else 0L
+        num.feval.fast = if (.npscoefbw_fast_eligible(bws, eval.zdat = ctx$zdat.df)) 1L else 0L,
+        raw.valid = raw.valid
       )
     }
   }, error = function(e) {
-    list(objective = penalty, num.feval = 1L, num.feval.fast = 0L)
+    unknown <- .npscoefbw_nomad_unknown_nn_error(e, bws)
+    if (!is.null(unknown)) stop(unknown)
+    list(objective = penalty, num.feval = 1L, num.feval.fast = 0L,
+         raw.valid = FALSE)
   })
 
   result
@@ -844,13 +864,16 @@ npscoefbw.NULL <-
 
 .npscoefbw_nomad_invalid_worker_result <- function(message,
                                                    task,
-                                                   rank) {
+                                                   rank,
+                                                   condition = NULL) {
   .npscoefbw_nomad_service_task_error(
     message = message,
     task = task,
     rank = rank
   )
-  list(sse = 0.0, invalid = 1L)
+  out <- list(sse = 0.0, invalid = 1L)
+  if (!is.null(condition)) out$error <- condition
+  out
 }
 
 .npscoefbw_nomad_slave_loop <- function(REF,
@@ -941,7 +964,8 @@ npscoefbw.NULL <-
         .npscoefbw_nomad_invalid_worker_result(
           message = conditionMessage(e),
           task = msg,
-          rank = rank
+          rank = rank,
+          condition = .npscoefbw_nomad_unknown_nn_error(e, msg$bws)
         )
       }
     )
@@ -975,7 +999,8 @@ npscoefbw.NULL <-
     return(list(
       objective = penalty,
       num.feval = 1L,
-      num.feval.fast = 0L
+      num.feval.fast = 0L,
+      raw.valid = FALSE
     ))
   }
 
@@ -988,6 +1013,16 @@ npscoefbw.NULL <-
       localize = TRUE
     ))
   }
+
+  radius.valid <- tryCatch({
+    .npscoef_nn_assert_training_radius(
+      bws, ctx$zdat.df, owner = "npscoefbw NOMAD degree objective"
+    )
+    TRUE
+  }, np_nn_candidate_invalid = function(e) FALSE)
+  if (!radius.valid)
+    return(list(objective = penalty, num.feval = 1L, num.feval.fast = 0L,
+                raw.valid = FALSE))
 
   size <- pool$nslaves + 1L
   assignments <- .splitIndices(ctx$n, size)
@@ -1014,7 +1049,8 @@ npscoefbw.NULL <-
       maxPenalty = sqrt(.Machine$double.xmax),
       localize = TRUE
     ),
-    error = function(e) list(sse = 0.0, invalid = 1L)
+    error = function(e) list(sse = 0.0, invalid = 1L,
+      error = .npscoefbw_nomad_unknown_nn_error(e, bws))
   )
 
   worker.out <- lapply(seq_len(pool$nslaves), function(rk) {
@@ -1025,21 +1061,33 @@ npscoefbw.NULL <-
     )
   })
 
+  # Drain every outstanding reply before surfacing a coordinator/worker error.
+  # Preserve the condition and deterministic coordinator-then-rank ordering.
+  if (!is.null(local.out[["error", exact = TRUE]]))
+    stop(local.out[["error", exact = TRUE]])
+  for (out in worker.out)
+    if (!is.null(out[["error", exact = TRUE]])) stop(out[["error", exact = TRUE]])
+
   invalid.total <- local.out$invalid + sum(vapply(worker.out, `[[`, numeric(1), "invalid"))
   if (invalid.total > 0) {
     return(list(
       objective = penalty,
       num.feval = 1L,
-      num.feval.fast = 0L
+      num.feval.fast = 0L,
+      raw.valid = FALSE
     ))
   }
 
   total.sse <- local.out$sse + sum(vapply(worker.out, `[[`, numeric(1), "sse"))
+  objective <- as.numeric(total.sse / ctx$n)
+  raw.valid <- .npscoefbw_raw_objective_valid(objective)
 
   list(
-    objective = as.numeric(total.sse / ctx$n),
+    objective = if (!raw.valid && bws$type %in% c("generalized_nn", "adaptive_nn"))
+      penalty else objective,
     num.feval = 1L,
-    num.feval.fast = if (.npscoefbw_fast_eligible(bws, eval.zdat = ctx$zdat.df)) 1L else 0L
+    num.feval.fast = if (.npscoefbw_fast_eligible(bws, eval.zdat = ctx$zdat.df)) 1L else 0L,
+    raw.valid = raw.valid
   )
 }
 
