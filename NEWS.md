@@ -1,5 +1,9 @@
 # npRmpi 0.70-6
 
+* The proof-of-concept `npregiv()` and `npregivderiv()` estimators now reject
+  unsupported nearest-neighbour bandwidths early with a clear message.
+  Fixed bandwidths remain the default and are unchanged.
+
 * Formula-created single-index fits now reuse their retained training data for
   prediction and subsequent evaluation, avoiding spurious missing-variable
   errors when response and predictor columns are not separate workspace objects.

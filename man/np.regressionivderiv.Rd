@@ -252,8 +252,11 @@ These arguments control all internal \code{npreg} stages consistently.
 Further arguments are passed to \code{\link{npreg}} and \code{\link{npksum}}.
 }
 
-  \item{...}{ 
-    additional arguments supplied to \code{\link{npreg}} and
+  \item{...}{
+    Only fixed bandwidths are currently supported. Supplying
+    \code{bwtype="generalized_nn"} or \code{bwtype="adaptive_nn"} raises an
+    informative error; use \code{bwtype="fixed"} (the default).
+    Additional arguments supplied to \code{\link{npreg}} and
     \code{\link{npksum}}. The private integral kernel sum in the empirical
     adjoint always uses \code{bandwidth.divide = TRUE}, as required for the
     ordinary CDF normalization; a \code{bandwidth.divide} value in

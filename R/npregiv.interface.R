@@ -1,3 +1,12 @@
+.np_iv_require_fixed_bandwidth <- function(..., bwtype = "fixed") {
+  bwtype <- match.arg(bwtype, c("fixed", "generalized_nn", "adaptive_nn"))
+  if (bwtype != "fixed")
+    stop(paste0("npregiv() and npregivderiv() do not currently support ",
+                "nearest-neighbour bandwidths; use bwtype = \"fixed\" (the default)."),
+         call. = FALSE)
+  invisible(NULL)
+}
+
 .np_iv_validate_flag <- function(x, name) {
   if (!is.logical(x) || length(x) != 1L || is.na(x))
     stop(sprintf("%s must be TRUE or FALSE", name), call. = FALSE)

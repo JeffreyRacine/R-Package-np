@@ -96,6 +96,7 @@ npregivderiv.default <- function(y,
                          nomad=FALSE,
                          ...) {
   .npRmpi_require_active_slave_pool(where = "npregivderiv()")
+  .np_iv_require_fixed_bandwidth(...)
   if (.npRmpi_autodispatch_active()) {
     dispatch.call <- match.call()
     dispatch.call[[1L]] <- quote(npregivderiv)

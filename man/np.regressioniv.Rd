@@ -401,7 +401,10 @@ Further arguments are passed to lower-level kernel-sum and estimation routines.
 }
 
   \item{\dots}{
-    additional kernel and bandwidth-scaling arguments supplied to the private
+    Only fixed bandwidths are currently supported. Supplying
+    \code{bwtype="generalized_nn"} or \code{bwtype="adaptive_nn"} raises an
+    informative error; use \code{bwtype="fixed"} (the default).
+    Additional kernel and bandwidth-scaling arguments supplied to the private
     IV regression and kernel-sum stages. In particular,
     \code{bandwidth.divide}, \code{ukertype}, and \code{okertype} retain their
     ordinary lower-level meanings and are owned once per call, avoiding
