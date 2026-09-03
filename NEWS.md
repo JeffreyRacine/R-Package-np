@@ -1,5 +1,9 @@
 # npRmpi 0.70-6
 
+* Nearest-neighbour bandwidth searches now reject constant continuous training
+  dimensions before native allocation or collective evaluation, matching the
+  serial input-support contract. Fixed bandwidths are unaffected.
+
 * Evaluation-only bandwidth calls now return one initialized history entry,
   rather than exposing unused entries when more than one start was requested.
 

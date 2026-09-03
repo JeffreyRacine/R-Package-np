@@ -1235,6 +1235,41 @@ static int np_nonfixed_support_failure_extern(const int bandwidth)
   return NP_SUPPORT_FAILURE_NONE;
 }
 
+/* All participating ranks receive the same complete training input. Reject
+ * constant support before owner allocation or collective evaluation, without
+ * changing the existing prepared conditional-density status protocol. */
+static void np_validate_nonfixed_support_input(const char *where,
+                                               const int bandwidth,
+                                               const int nobs,
+                                               const int nx,
+                                               const double *x,
+                                               const int ny,
+                                               const double *y)
+{
+  int side, j, i;
+  if (bandwidth == BW_FIXED)
+    return;
+  for (side = 0; side < 2; side++) {
+    const int ncon = side == 0 ? nx : ny;
+    const double *data = side == 0 ? x : y;
+    for (j = 0; j < ncon; j++) {
+      int distinct = 0;
+      if (data != NULL && nobs > 1) {
+        const double *column = data + (size_t)j * (size_t)nobs;
+        for (i = 1; i < nobs; i++) {
+          if (column[i] != column[0]) {
+            distinct = 1;
+            break;
+          }
+        }
+      }
+      if (!distinct)
+        error("%s: nonfixed nearest-neighbour bandwidths require at least two distinct continuous %s values per dimension",
+              where, side == 0 ? "regressor" : "variable");
+    }
+  }
+}
+
 /* these are data which are sorted into an 'alternate' order */
 /* this allows us to support 2 trees simultaneously !*/
 
@@ -13786,6 +13821,8 @@ static void np_density_bw_internal(double * myuno, double * myord, double * myco
     retained_context != NULL ? retained_context : &local_context;
   if (retained_context != NULL && retained_context->active)
     error("C_np_density_bw: prepared context is already active");
+  np_validate_nonfixed_support_input("C_np_density_bw", myopti[BW_DENI],
+    myopti[BW_NOBSI], myopti[BW_NCONI], mycon, 0, NULL);
   memset(prepared_context, 0, sizeof(*prepared_context));
   int_nn_k_min_extern = 1;
   /* Likelihood bandwidth selection for density estimation */
@@ -14680,6 +14717,8 @@ static void np_distribution_bw_internal(
     retained_context != NULL ? retained_context : &local_context;
   if (retained_context != NULL && retained_context->active)
     error("C_np_distribution_bw: prepared context is already active");
+  np_validate_nonfixed_support_input("C_np_distribution_bw", myopti[DBW_DENI],
+    myopti[DBW_NOBSI], myopti[DBW_NCONI], mycon, 0, NULL);
   memset(prepared_context, 0, sizeof(*prepared_context));
   int_nn_k_min_extern = 1;
   /* Likelihood bandwidth selection for density estimation */
@@ -15672,6 +15711,9 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   iNum_Multistart = myopti[CBW_NMULTII];
   if (!eval_only && iNum_Multistart < 1)
     error("C_np_density_conditional_bw: nmulti must be a positive integer");
+
+  np_validate_nonfixed_support_input("C_np_density_conditional_bw", myopti[CBW_DENI],
+    myopti[CBW_NOBSI], myopti[CBW_UNCONI], u_con, myopti[CBW_CNCONI], c_con);
 
   if (!np_conditional_density_prepared_context_prepare_internal(
         c_uno, c_ord, c_con, u_uno, u_ord, u_con,
@@ -16680,6 +16722,8 @@ static void np_distribution_conditional_bw_mode(double * c_uno, double * c_ord, 
     error("C_np_distribution_conditional_bw: degree_search must be zero or one");
   if (prepared_context->active)
     error("C_np_distribution_conditional_bw: prepared context is already active");
+  np_validate_nonfixed_support_input("C_np_distribution_conditional_bw", myopti[CDBW_DENI],
+    myopti[CDBW_NOBSI], myopti[CDBW_UNCONI], u_con, myopti[CDBW_CNCONI], c_con);
   memset(prepared_context, 0, sizeof(*prepared_context));
 
   cdfontrain_extern = cdfontrain =  myopti[CDBW_CDFONTRAIN];
@@ -19564,6 +19608,8 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
     error("C_np_regression_bw: prepared context is already active");
   if ((!R_FINITE(penalty_mult[0])) || (penalty_mult[0] < 1.0))
     error("C_np_regression_bw: penalty.multiplier must be finite and greater than or equal to 1");
+  np_validate_nonfixed_support_input("C_np_regression_bw", myopti[RBW_REGI],
+    myopti[RBW_NOBSI], myopti[RBW_NCONI], rcon, 0, NULL);
   memset(prepared_context, 0, sizeof(*prepared_context));
   //KDT * kdt = NULL; // tree structure
   //NL nl = { .node = NULL, .n = 0, .nalloc = 0 };// a node list structure -- used for searching - here for testing
