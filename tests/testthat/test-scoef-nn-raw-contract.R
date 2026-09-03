@@ -33,6 +33,7 @@ test_that("smooth-coefficient radius admission respects typed training coordinat
 
 test_that("fixed-owner wrappers penalize only typed NN candidate invalidity", {
   find.definition <- function(e, name) {
+    if(missing(e)) return(NULL)
     if(!is.call(e)) return(NULL)
     if(length(e) == 3L && identical(e[[1L]], as.name("<-")) &&
        identical(e[[2L]], as.name(name))) return(e[[3L]])
