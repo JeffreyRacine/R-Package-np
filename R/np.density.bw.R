@@ -414,11 +414,12 @@ npNomadNativeSearchDensity <- function(prep,
   }
 
   build_payload <- function(point, best_record, solution, interrupted) {
-    direct.objective <- .np_nn_certify_raw_point(
+    .np_nn_certify_raw_point(
       point = point,
       raw.eval = raw_eval_fun,
       owner = "native npudens fixed-degree NOMAD route"
     )
+    direct.objective <- as.numeric(best_record$objective)
     bw_vec <- .npregbw_nomad_point_to_bw(point, template = template, setup = setup)
     final.tbw <- bws
     final.tbw$bw <- bw_vec
@@ -457,11 +458,12 @@ npNomadNativeSearchDensity <- function(prep,
       hot.point <- .npregbw_nomad_bw_to_point(
         hot.payload$bw, template = template, setup = setup
       )
-      hot.objective <- .np_nn_certify_raw_point(
+      .np_nn_certify_raw_point(
         point = hot.point,
         raw.eval = raw_eval_fun,
         owner = "npudens MADS+Powell handoff"
       )
+      hot.objective <- -as.numeric(hot.payload$fval[1L])
       if (
           .np_degree_better(hot.objective, direct.objective, direction = "min"))
         return(list(payload = hot.payload, objective = hot.objective, powell.time = powell.elapsed))
@@ -586,8 +588,8 @@ npNomadNativeSearchDensity <- function(prep,
       native.num.feval.fast.total <- native.num.feval.fast.total + as.numeric(native.i$total_num.feval.fast[1L])
       native.num.feval.guarded.total <- native.num.feval.guarded.total + as.numeric(native.i$total_num.feval.guarded[1L])
       if (.np_nn_raw_objective_valid(raw.objective.i) &&
-          raw.objective.i < native.best.objective) {
-        native.best.objective <- raw.objective.i
+          objective.i < native.best.objective) {
+        native.best.objective <- objective.i
         native.best.index <- i
       }
     }
@@ -662,7 +664,7 @@ npNomadNativeSearchDensity <- function(prep,
         native.num.feval.guarded.total <- native.num.feval.guarded.total +
           as.numeric(native.i$total_num.feval.guarded[1L])
         if (.np_nn_raw_objective_valid(raw.objective.i)) {
-          native.best.objective <- raw.objective.i
+          native.best.objective <- objective.i
           native.best.index <- recovery.index
         }
       }
