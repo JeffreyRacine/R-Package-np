@@ -737,7 +737,8 @@ npcdistbw.condbandwidth <-
                                  do.full.integral = FALSE,
                                  ngrid = 100L,
                                  invalid.penalty = c("baseline", "dbmax"),
-                                 penalty.multiplier = 10) {
+                                 penalty.multiplier = 10,
+                                 return.admissible = FALSE) {
   invalid.penalty <- match.arg(invalid.penalty)
 
   ydat <- toFrame(ydat)
@@ -926,11 +927,14 @@ npcdistbw.condbandwidth <-
     PACKAGE = "np"
   )
 
-  list(
+  result <- list(
     objective = as.numeric(out$fval[1L]),
     num.feval = 1L,
     num.feval.fast = as.numeric(as.numeric(out$fast.history[1L]) > 0)
   )
+  if (isTRUE(return.admissible))
+    result$admissible <- .np_nn_single_eval_admissible(out)
+  result
 }
 
 .npcdistbw_run_fixed_degree <- function(xdat, ydat, bws, reg.args, opt.args) {
