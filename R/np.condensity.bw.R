@@ -1324,6 +1324,19 @@ npPreparedObjectiveEvalConditionalDensityRaw <- function(bw, degree) {
   )
 }
 
+.npcdensbw_prepared_raw_point <- function(point, template, setup, degree,
+                                         broadcast = FALSE) {
+  bwdim <- length(setup$cont_flat) + length(setup$cat_flat)
+  bandwidth <- .npcdensbw_nomad_point_to_bw(
+    point[seq_len(bwdim)], template = template, setup = setup)
+  x.offset <- length(template[["ybw"]])
+  flat <- c(x.offset + which(template[["ixcon"]]), which(template[["iycon"]]),
+    which(template[["iyuno"]]), which(template[["iyord"]]),
+    x.offset + which(template[["ixuno"]]), x.offset + which(template[["ixord"]]))
+  npPreparedObjectiveEvalConditionalDensityRaw(
+    as.double(bandwidth[flat]), as.integer(degree))
+}
+
 npPreparedObjectiveNativeSearchConditionalDensity <- function(x0,
                                                             bbin,
                                                             lb,
@@ -2641,7 +2654,11 @@ npPreparedObjectiveSearchConditionalDensity <- function(template,
     )
     if (!isTRUE(prepared))
       stop("failed to prepare native npcdens fixed-degree route", call. = FALSE)
-    on.exit(npPreparedObjectiveDestroyConditionalDensity(), add = TRUE)
+    prepared.active <- TRUE
+    on.exit({
+      if (isTRUE(prepared.active))
+        npPreparedObjectiveDestroyConditionalDensity()
+    }, add = TRUE)
 
     native.results <- vector("list", nrow(native.start.matrix))
     native.best.index <- NA_integer_
@@ -2671,7 +2688,9 @@ npPreparedObjectiveSearchConditionalDensity <- function(template,
       .np_nomad_native_status(native, "native npcdens fixed-degree NOMAD route")
       if (is.null(native$best_point) || any(!is.finite(native$best_point)))
         stop("native npcdens fixed-degree NOMAD route did not return a finite best point", call. = FALSE)
-      list(
+      raw <- .npcdensbw_prepared_raw_point(native$best_point, template, setup,
+        native.prep$degree, broadcast = FALSE)
+      record <- list(
         restart = as.integer(restart.index),
         start = as.numeric(start),
         elapsed = native.elapsed,
@@ -2685,39 +2704,83 @@ npPreparedObjectiveSearchConditionalDensity <- function(template,
         best_flat_bandwidth = as.numeric(native$best_flat_bandwidth),
         native = native
       )
+      list(record = record, raw.valid = .np_nn_raw_objective_valid(raw[[1L]]) &&
+        .np_nn_raw_objective_valid(record$objective))
     }
 
     for (i in seq_len(nrow(native.start.matrix))) {
-      native.i <- run_native_restart(
+      result <- run_native_restart(
         start = as.numeric(native.start.matrix[i, ]),
         restart.index = i
       )
+      native.i <- result$record
       native.results[[i]] <- native.i
       native.nomad.elapsed <- native.nomad.elapsed + as.numeric(native.i$elapsed[1L])
       native.num.feval.total <- native.num.feval.total + as.numeric(native.i$native$total_num.feval[1L])
       native.num.feval.fast.total <- native.num.feval.fast.total + as.numeric(native.i$native$total_num.feval.fast[1L])
       native.num.feval.guarded.total <- native.num.feval.guarded.total + as.numeric(native.i$native$total_num.feval.guarded[1L])
-      if (is.finite(native.i$objective) &&
+      if (result$raw.valid &&
           .np_degree_better(native.i$objective, native.best.objective, direction = objective.direction)) {
         native.best.objective <- native.i$objective
         native.best.index <- i
       }
     }
+    if (!is.finite(native.best.index) && is.null(point.start) &&
+        template$type %in% c("generalized_nn", "adaptive_nn") &&
+        length(setup$cont_flat) > 0L) {
+      incumbent <- vapply(native.results, function(z) z$objective, numeric(1L))
+      incumbent[!is.finite(incumbent)] <- -Inf
+      incumbent.index <- if (any(is.finite(incumbent))) which.max(incumbent) else 1L
+      recovery.raw.eval <- function(point) {
+        out <- .npcdensbw_prepared_raw_point(point, template, setup,
+          native.prep$degree, broadcast = FALSE)
+        .np_progress_bandwidth_activity_step()
+        native.num.feval.total <<- native.num.feval.total + out[[2L]]
+        native.num.feval.fast.total <<- native.num.feval.fast.total + out[[3L]]
+        native.num.feval.guarded.total <<- native.num.feval.guarded.total + out[[4L]]
+        out[[1L]]
+      }
+      ordinary.cap <- setup$nobs - if (identical(template$type, "adaptive_nn")) 2L else 1L
+      recovery <- .np_nn_find_raw_valid_start(
+        point = native.results[[incumbent.index]]$best_point,
+        nn.indices = seq_along(setup$cont_flat),
+        caps = rep.int(ordinary.cap, length(setup$cont_flat)),
+        raw.eval = recovery.raw.eval)
+      if (isTRUE(recovery$found)) {
+        .np_progress_bandwidth_activity_step(force = TRUE)
+        native.start.matrix <- rbind(native.start.matrix, recovery$point)
+        recovery.index <- nrow(native.start.matrix)
+        result <- run_native_restart(recovery$point, recovery.index)
+        native.recovery <- result$record
+        native.recovery$recovery <- TRUE
+        native.recovery$recovery_witness <- recovery
+        native.results[[recovery.index]] <- native.recovery
+        native.nomad.elapsed <- native.nomad.elapsed + native.recovery$elapsed
+        native.num.feval.total <- native.num.feval.total + native.recovery$native$total_num.feval
+        native.num.feval.fast.total <- native.num.feval.fast.total + native.recovery$native$total_num.feval.fast
+        native.num.feval.guarded.total <- native.num.feval.guarded.total + native.recovery$native$total_num.feval.guarded
+        if (result$raw.valid) {
+          native.best.objective <- native.recovery$objective
+          native.best.index <- recovery.index
+        }
+      }
+    }
     if (!is.finite(native.best.index))
-      stop("native npcdens fixed-degree NOMAD route did not return a finite solution", call. = FALSE)
+      stop("native npcdens fixed-degree NOMAD route did not return a raw-valid solution", call. = FALSE)
 
     if (isTRUE(opt.args$nomad.remin)) {
       remin.index <- length(native.results) + 1L
-      native.remin <- run_native_restart(
+      result <- run_native_restart(
         start = as.numeric(native.results[[native.best.index]]$best_point),
         restart.index = remin.index
       )
+      native.remin <- result$record
       native.results[[remin.index]] <- native.remin
       native.nomad.elapsed <- native.nomad.elapsed + as.numeric(native.remin$elapsed[1L])
       native.num.feval.total <- native.num.feval.total + as.numeric(native.remin$native$total_num.feval[1L])
       native.num.feval.fast.total <- native.num.feval.fast.total + as.numeric(native.remin$native$total_num.feval.fast[1L])
       native.num.feval.guarded.total <- native.num.feval.guarded.total + as.numeric(native.remin$native$total_num.feval.guarded[1L])
-      if (is.finite(native.remin$objective) &&
+      if (result$raw.valid &&
           .np_degree_better(native.remin$objective, native.best.objective, direction = objective.direction)) {
         native.best.objective <- native.remin$objective
         native.best.index <- remin.index
@@ -2727,6 +2790,8 @@ npPreparedObjectiveSearchConditionalDensity <- function(template,
     native.best <- native.results[[native.best.index]]
     native.handoff.point <- as.numeric(native.best$best_point)
     native.bw <- .npcdensbw_nomad_point_to_bw(native.handoff.point[seq_len(bwdim)], template = template, setup = setup)
+    npPreparedObjectiveDestroyConditionalDensity()
+    prepared.active <- FALSE
     native.record <- list(
       eval_id = as.integer(native.best$native$compiled_callback_calls[1L]),
       degree = integer(0L),
