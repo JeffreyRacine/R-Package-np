@@ -236,12 +236,9 @@ SEXP C_np_entropy_bivariate_summation_xindex(SEXP x,
 
   answer = PROTECT(Rf_allocVector(REALSXP, n_replications));
   out = REAL(answer);
-  sum_x = (long double *)R_alloc((size_t)n_replications,
-                                 sizeof(long double));
-  sum_joint = (long double *)R_alloc((size_t)n_replications,
-                                     sizeof(long double));
-  statistic_sum = (long double *)R_alloc((size_t)n_replications,
-                                         sizeof(long double));
+  sum_x = R_allocLD((size_t)n_replications);
+  sum_joint = R_allocLD((size_t)n_replications);
+  statistic_sum = R_allocLD((size_t)n_replications);
   for (int replication = 0; replication < n_replications; ++replication)
     statistic_sum[replication] = 0.0L;
 
