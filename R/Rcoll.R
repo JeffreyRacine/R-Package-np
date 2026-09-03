@@ -463,7 +463,7 @@ mpi.bcast.data2slave <- function(obj, comm=1, buffunit=100){
 	mpi.bcast(objname, type=4, rank=0, comm=comm)
 	
 	if (is.vector(obj)){
-		mpi.bcast.cmd(.tmp.obj <- mpi.bcast(double(.tinfo[2]*(.tinfo[3]+(.tinfo[4]>0))),type=5, buffunit=.tinfo[2]),rank=0,comm=comm)
+		mpi.bcast.cmd(.tmp.obj <- mpi.bcast(double(.tinfo[2]*.tinfo[3]+.tinfo[4]),type=5, buffunit=.tinfo[2]),rank=0,comm=comm)
 		mpi.bcast(obj,type=5,rank=0,comm=comm,buffunit=buffunit)
 			mpi.bcast.cmd(assign(.tname,.tmp.obj[seq_len(.tinfo[2]*.tinfo[3]+.tinfo[4])]), rank=0, comm=comm)
 		mpi.bcast.cmd(rm(".tmp.obj"))

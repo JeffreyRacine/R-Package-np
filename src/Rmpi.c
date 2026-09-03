@@ -692,14 +692,31 @@ SEXP mpi_bcast(SEXP sexp_data,
                 errcode=MPI_Bcast(RAW(sexp_data), len, MPI_BYTE, rank, comm[commn]);
                 break;
 	case 5:
+	{
+		R_xlen_t full_blocks;
+		R_xlen_t tail;
+		R_xlen_t tail_offset;
+
 		if (buffunit <= 0)
 			error("mpi_bcast: buffunit must be positive for type=5");
-		mpi_errhandler(MPI_Type_contiguous(buffunit, MPI_DOUBLE, xdouble));
-		mpi_errhandler(MPI_Type_commit(xdouble));
-		if ((xlen % buffunit) > 0) len=1+(xlen/buffunit); else len=xlen/buffunit;
-        mpi_errhandler(MPI_Bcast(REAL(sexp_data), len, xdouble[0], rank, comm[commn]));
-		MPI_Type_free(xdouble);
+		full_blocks = xlen / (R_xlen_t)buffunit;
+		tail = xlen % (R_xlen_t)buffunit;
+		if (full_blocks > INT_MAX)
+			error("mpi_bcast: type=5 full-block count exceeds the MPI limit");
+		if (full_blocks > 0) {
+			mpi_errhandler(MPI_Type_contiguous(buffunit, MPI_DOUBLE, xdouble));
+			mpi_errhandler(MPI_Type_commit(xdouble));
+			mpi_errhandler(MPI_Bcast(REAL(sexp_data), (int)full_blocks,
+			                         xdouble[0], rank, comm[commn]));
+			mpi_errhandler(MPI_Type_free(xdouble));
+		}
+		if (tail > 0) {
+			tail_offset = full_blocks * (R_xlen_t)buffunit;
+			mpi_errhandler(MPI_Bcast(REAL(sexp_data) + tail_offset, (int)tail,
+			                         MPI_DOUBLE, rank, comm[commn]));
+		}
 		break;
+	}
 	default:
 		error("mpi_bcast: unsupported type %d", type);
 	}

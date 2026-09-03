@@ -44,12 +44,12 @@ Sender rank, communicator, and buffer-unit controls.
   \code{\link{mpi.bcast.Robj}}, \code{\link{mpi.bcast.cmd}}, and 
   \code{\link{mpi.bcast.Robj2slave}}.
   
-  When type=5, MPI continuous datatype (double) is defined with unit given by 
-  \code{buffunit}. It is used to transfer huge data where a double vector or matrix
-  is divided into many chunks with unit \code{buffunit}. Total 
-  ceiling(length(obj)/buffunit) units are transferred. Due to MPI specification, both
-  \code{buffunit} and total units transferred cannot be over 2^31-1. Notice that the last 
-  chunk may not have full length of data due to rounding. Special care is needed.
+  When type=5, MPI continuous datatype (double) is defined with unit given by
+  \code{buffunit}. It is used to transfer huge data where a double vector or
+  matrix is divided into full chunks with unit \code{buffunit}; any final
+  partial chunk is transferred separately. Due to MPI specification, both
+  \code{buffunit} and the total number of full units transferred cannot be over
+  2^31-1.
   }
 \references{
   \url{https://www.mpich.org/}, 

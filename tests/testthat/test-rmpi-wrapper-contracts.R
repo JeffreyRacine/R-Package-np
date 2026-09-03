@@ -62,6 +62,8 @@ test_that("wrapper preserved self and collective routes stay green in session su
       "rank <- mpi.comm.rank(0L)",
       "stopifnot(identical(as.numeric(mpi_sendrecv(3.25, sendtype = 2L, dest = rank, sendtag = 31L, recvdata = double(1), recvtype = 2L, source = rank, recvtag = 31L, comm = 0L, status = 0L)), 3.25))",
       "stopifnot(identical(as.numeric(mpi.bcast(3.25, type = 5L, rank = 0L, comm = 0L, buffunit = 100L)), 3.25))",
+      "stopifnot(identical(as.numeric(mpi.bcast(as.double(1:150), type = 5L, rank = 0L, comm = 0L, buffunit = 100L)), as.double(1:150)))",
+      "stopifnot(identical(as.numeric(mpi.bcast(as.double(1:200), type = 5L, rank = 0L, comm = 0L, buffunit = 100L)), as.double(1:200)))",
       "stopifnot(identical(as.numeric(mpi_reduce(3.25, type = 2L, op = 'sum', dest = 0L, comm = 0L)), 3.25))",
       "stopifnot(identical(as.numeric(mpi_allreduce(3.25, type = 2L, op = 'sum', comm = 0L)), 3.25))",
       "stopifnot(identical(as.integer(mpi_gather(7L, type = 1L, rdata = integer(1), root = 0L, comm = 0L)), 7L))",

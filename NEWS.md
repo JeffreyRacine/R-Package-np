@@ -1,5 +1,9 @@
 # npRmpi 0.70-6
 
+* `mpi.bcast(..., type = 5)` now transfers an incomplete final chunk
+  separately, preventing reads and writes beyond vectors whose lengths are not
+  multiples of `buffunit`.
+
 * Source builds on R versions before 4.4 now provide the LAPACK integer type
   used by compact-support regression checks, while newer R versions retain
   their native LAPACK type definition.
