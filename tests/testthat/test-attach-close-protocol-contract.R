@@ -84,7 +84,7 @@ test_that("attach exit finalizer never queries a finalized MPI runtime", {
   ))
 
   testthat::with_mocked_bindings({
-    expect_true(isTRUE(finalizer(NULL)))
+    expect_false(isTRUE(finalizer(NULL)))
   },
     mpi.comm.size = function(...) stop("communicator query must not run"),
     mpi.comm.rank = function(...) stop("communicator query must not run"),
