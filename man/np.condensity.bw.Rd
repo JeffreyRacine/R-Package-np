@@ -44,6 +44,7 @@ npcdensbw(\dots)
           memfac = 500,
           nmulti,
           penalty.multiplier = 10,
+          nomad.remin = FALSE,
           powell.remin = TRUE,
           bwsolver = c("powell", "mads", "mads+powell"),
           scale.init.categorical.sample = FALSE,
