@@ -22,6 +22,10 @@
 #include <Rmath.h>
 #include <Rinternals.h>
 
+#ifndef La_INT
+# define La_INT int
+#endif
+
 #include "headers.h"
 #include "nn_radius_error.h"
 #include "gsl_bspline.h"

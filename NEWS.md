@@ -1,5 +1,9 @@
 # npRmpi 0.70-6
 
+* Source builds on R versions before 4.4 now provide the LAPACK integer type
+  used by compact-support regression checks, while newer R versions retain
+  their native LAPACK type definition.
+
 * Long-double entropy-bootstrap work arrays now use R's aligned long-double
   allocator, avoiding undefined behavior on platforms that require stricter
   alignment.
