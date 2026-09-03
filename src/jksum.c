@@ -7941,8 +7941,8 @@ void np_p_okernelv(const int KERNEL,
 
   double s_cat = 0.0;
 
-  if((!swap_xxt) && do_ocg){
-    s_cat = cats[abs(swapped_index - 1)];
+  if((!swap_xxt) && do_ocg && (cats != NULL)){
+    s_cat = cats[(ncat > 1) ? abs(swapped_index - 1) : 0];
   }
   
   const double cl = (cats != NULL)? cats[0] : 0.0;
