@@ -1,5 +1,8 @@
 # npRmpi 0.70-6
 
+* Evaluation-only bandwidth calls now return one initialized history entry,
+  rather than exposing unused entries when more than one start was requested.
+
 * Bandwidth searches no longer reuse large-bandwidth geometry from an earlier
   dataset. This fixes history-dependent density cross-validation values and
   protects subsequent searches and regression fits from stale geometry.

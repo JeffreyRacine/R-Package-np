@@ -8242,6 +8242,12 @@ void np_quantile_conditional(double * tc_con,
                              int * myopti, double * myoptd,
                              double * yq, double * yqerr, double *yg);
 
+/* An eval-only invocation writes one history entry, irrespective of nmulti. */
+static int np_bw_history_length(SEXP hist_len, const int eval_only)
+{
+  return eval_only ? 1 : asInteger(hist_len);
+}
+
 static SEXP C_np_regression_bw_common(SEXP runo,
                                       SEXP rord,
                                       SEXP rcon,
@@ -8267,7 +8273,7 @@ static SEXP C_np_regression_bw_common(SEXP runo,
   SEXP out_bw = R_NilValue, out_fval = R_NilValue, out_fval_hist = R_NilValue;
   SEXP out_eval_hist = R_NilValue, out_invalid_hist = R_NilValue, out_timing = R_NilValue;
   SEXP out_fast = R_NilValue, out_nn_cache = R_NilValue;
-  int hlen = asInteger(hist_len);
+  int hlen = np_bw_history_length(hist_len, eval_only);
   int pmode = asInteger(penalty_mode);
   double pmult = asReal(penalty_mult);
   int bern = asInteger(glp_bernstein);
@@ -8434,7 +8440,7 @@ static SEXP C_np_lsqregression_bw_common(SEXP runo,
   SEXP out_fval_hist = R_NilValue, out_eval_hist = R_NilValue;
   SEXP out_invalid_hist = R_NilValue, out_timing = R_NilValue;
   SEXP out_fast = R_NilValue, out_nn_cache = R_NilValue;
-  int hlen = asInteger(hist_len);
+  int hlen = np_bw_history_length(hist_len, eval_only);
   int pmode = asInteger(penalty_mode);
   double pmult = asReal(penalty_mult);
   int bern = asInteger(glp_bernstein);
@@ -10405,7 +10411,7 @@ static SEXP C_np_density_bw_common(SEXP myuno,
   SEXP out=R_NilValue, out_names=R_NilValue;
   SEXP out_bw=R_NilValue, out_fval=R_NilValue, out_fval_hist=R_NilValue, out_eval_hist=R_NilValue;
   SEXP out_invalid_hist=R_NilValue, out_timing=R_NilValue, out_fast=R_NilValue, out_guarded=R_NilValue, out_nn_cache=R_NilValue;
-  int hlen = asInteger(hist_len);
+  int hlen = np_bw_history_length(hist_len, eval_only);
   int pmode = asInteger(penalty_mode);
   double pmult = asReal(penalty_mult);
   int ncon = 0;
@@ -10950,7 +10956,7 @@ static SEXP C_np_distribution_bw_common(SEXP myuno,
   SEXP out=R_NilValue, out_names=R_NilValue;
   SEXP out_bw=R_NilValue, out_fval=R_NilValue, out_fval_hist=R_NilValue, out_eval_hist=R_NilValue;
   SEXP out_invalid_hist=R_NilValue, out_timing=R_NilValue, out_fast=R_NilValue, out_nn_cache=R_NilValue;
-  int hlen = asInteger(hist_len);
+  int hlen = np_bw_history_length(hist_len, eval_only);
   int pmode = asInteger(penalty_mode);
   double pmult = asReal(penalty_mult);
   int ncon = 0;
@@ -11534,7 +11540,7 @@ static SEXP C_np_density_conditional_bw_common(SEXP c_uno,
   SEXP out=R_NilValue, out_names=R_NilValue;
   SEXP out_bw=R_NilValue, out_fval=R_NilValue, out_fval_hist=R_NilValue, out_eval_hist=R_NilValue;
   SEXP out_invalid_hist=R_NilValue, out_timing=R_NilValue, out_fast=R_NilValue, out_guarded=R_NilValue, out_nn_cache=R_NilValue;
-  int hlen = asInteger(hist_len);
+  int hlen = np_bw_history_length(hist_len, eval_only);
   int pmode = asInteger(penalty_mode);
   double pmult = asReal(penalty_mult);
   int bern = asInteger(glp_bernstein);
@@ -11656,7 +11662,7 @@ static SEXP C_np_distribution_conditional_bw_common(SEXP c_uno,
   SEXP out=R_NilValue, out_names=R_NilValue;
   SEXP out_bw=R_NilValue, out_fval=R_NilValue, out_fval_hist=R_NilValue, out_eval_hist=R_NilValue;
   SEXP out_invalid_hist=R_NilValue, out_timing=R_NilValue, out_fast=R_NilValue, out_nn_cache=R_NilValue;
-  int hlen = asInteger(hist_len);
+  int hlen = np_bw_history_length(hist_len, eval_only);
   int pmode = asInteger(penalty_mode);
   double pmult = asReal(penalty_mult);
   int bern = asInteger(glp_bernstein);
