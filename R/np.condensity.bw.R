@@ -327,6 +327,7 @@ npcdensbw.conbandwidth <-
            memfac = 500.0,
            nmulti,
            penalty.multiplier = 10,
+           nomad.remin = FALSE,
            powell.remin = TRUE,
            bwsolver = c("powell", "mads", "mads+powell"),
            scale.init.categorical.sample = FALSE,
@@ -374,6 +375,7 @@ npcdensbw.conbandwidth <-
     }
     bandwidth.compute <- npValidateScalarLogical(bandwidth.compute, "bandwidth.compute")
     bwsolver <- npValidateBwsolver(bwsolver)
+    nomad.remin <- npValidateScalarLogical(nomad.remin, "nomad.remin")
     remin <- npValidateScalarLogical(powell.remin, "powell.remin")
     scale.init.categorical.sample <-
       npValidateScalarLogical(scale.init.categorical.sample, "scale.init.categorical.sample")
@@ -483,7 +485,7 @@ npcdensbw.conbandwidth <-
           nmulti = nmulti,
           mads.nmulti = dot.args$mads.nmulti,
           nomad.nmulti = dot.args$nomad.nmulti,
-          nomad.remin = FALSE,
+          nomad.remin = nomad.remin,
           powell.remin = powell.remin,
           itmax = itmax,
           ftol = ftol,
@@ -2168,7 +2170,7 @@ npRmpiPreparedObjectiveSearchConditionalDensity <- function(template,
     )
     on.exit(.np_nomad_native_progress_abort(native.progress), add = TRUE)
 
-    run_native_restart <- function(start, restart.index) {
+    run_native_restart <- function(start, restart.index, remin = FALSE) {
       native.restart.degree <- if (ndeg > 0L) {
         as.integer(round(start[bwdim + seq_len(ndeg)]))
       } else {
@@ -2207,6 +2209,7 @@ npRmpiPreparedObjectiveSearchConditionalDensity <- function(template,
         native.degree)
       record <- list(
         restart = as.integer(restart.index),
+        remin = isTRUE(remin),
         start = as.numeric(start),
         degree.start = native.restart.degree,
         elapsed = native.elapsed,
@@ -2293,7 +2296,8 @@ npRmpiPreparedObjectiveSearchConditionalDensity <- function(template,
       remin.start <- as.numeric(native.results[[native.best.index]]$best_point)
       result <- run_native_restart(
         start = remin.start,
-        restart.index = remin.index
+        restart.index = remin.index,
+        remin = TRUE
       )
       native.remin <- result$record
       native.results[[remin.index]] <- native.remin
@@ -2350,6 +2354,13 @@ npRmpiPreparedObjectiveSearchConditionalDensity <- function(template,
       grid.size = NA_integer_,
       nomad.time = native.nomad.elapsed,
       powell.time = NA_real_,
+      nomad.remin = isTRUE(remin),
+      nomad.remin.index = if (any(vapply(native.results, function(x) isTRUE(x$remin), logical(1L)))) {
+        which(vapply(native.results, function(x) isTRUE(x$remin), logical(1L)))[1L]
+      } else {
+        NA_integer_
+      },
+      nomad.remin.roundtrip = NULL,
       num.feval.total = nomad.num.feval.total,
       num.feval.fast.total = nomad.num.feval.fast.total,
       num.feval.guarded.total = nomad.num.feval.guarded.total,
@@ -2906,7 +2917,7 @@ npRmpiPreparedObjectiveSearchConditionalDensity <- function(template,
     native.num.feval.fast.total <- 0
     native.num.feval.guarded.total <- 0
 
-    run_native_restart <- function(start, restart.index) {
+    run_native_restart <- function(start, restart.index, remin = FALSE) {
       native.start <- proc.time()[3L]
       native.call <- substitute(
         local({
@@ -2962,6 +2973,7 @@ npRmpiPreparedObjectiveSearchConditionalDensity <- function(template,
         stop("native npcdens fixed-degree NOMAD route did not return a finite best point", call. = FALSE)
       record <- list(
         restart = as.integer(restart.index),
+        remin = isTRUE(remin),
         start = as.numeric(start),
         elapsed = native.elapsed,
         status = "ok",
@@ -3044,7 +3056,8 @@ npRmpiPreparedObjectiveSearchConditionalDensity <- function(template,
       remin.index <- length(native.results) + 1L
       result <- run_native_restart(
         start = as.numeric(native.results[[native.best.index]]$best_point),
-        restart.index = remin.index
+        restart.index = remin.index,
+        remin = TRUE
       )
       native.remin <- result$record
       native.results[[remin.index]] <- native.remin
@@ -3099,6 +3112,13 @@ npRmpiPreparedObjectiveSearchConditionalDensity <- function(template,
       nomad.time = native.nomad.elapsed,
       powell.time = payload.result$powell.time,
       optim.time = native.nomad.elapsed + as.numeric(payload.result$powell.time[1L]),
+      nomad.remin = isTRUE(opt.args$nomad.remin),
+      nomad.remin.index = if (any(vapply(native.results, function(x) isTRUE(x$remin), logical(1L)))) {
+        which(vapply(native.results, function(x) isTRUE(x$remin), logical(1L)))[1L]
+      } else {
+        NA_integer_
+      },
+      nomad.remin.roundtrip = NULL,
       num.feval.total = native.num.feval.total,
       num.feval.fast.total = native.num.feval.fast.total,
       num.feval.guarded.total = native.num.feval.guarded.total,
