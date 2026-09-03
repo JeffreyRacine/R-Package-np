@@ -476,7 +476,13 @@ npscoefbw.NULL <-
     )
   }
   if (identical(bwtype, "fixed") && any(candidate <= 0)) {
-    stop(sprintf("%s: bandwidth must be strictly positive", where), call. = FALSE)
+    icon <- if (is.null(icon)) rep.int(TRUE, length(candidate)) else as.logical(icon)
+    if (length(icon) != length(candidate) || anyNA(icon))
+      stop(sprintf("%s: invalid bandwidth coordinate map", where), call. = FALSE)
+    if (any(candidate[icon] <= 0))
+      stop(sprintf("%s: bandwidth must be strictly positive", where), call. = FALSE)
+    if (any(candidate[!icon] < 0))
+      stop(sprintf("%s: categorical bandwidth must be nonnegative", where), call. = FALSE)
   }
   if (identical(bwtype, "fixed") && !is.null(lower) && any(candidate < lower)) {
     stop(sprintf("%s: bandwidth is below the continuous scale-factor lower bound", where),
@@ -1488,11 +1494,7 @@ npscoefbw.scbandwidth <-
                 iord = dati$iord,
                 iuno = dati$iuno
               )
-              if (all(bws$bw != 0) &&
-                  .npscoef_candidate_is_admissible(param = bws$bw, bwtype = bws$type, nobs = n,
-                                                   lower = fixed.lower,
-                                                   upper = candidate.upper,
-                                                   icon = dati$icon)) {
+              if (!automatic.start) {
                 tbw <- .npscoef_finalize_bandwidth(
                   param = bws$bw,
                   bwtype = bws$type,
@@ -1501,6 +1503,12 @@ npscoefbw.scbandwidth <-
                   icon = dati$icon,
                   where = "npscoefbw"
                 )
+                if (!.npscoef_candidate_is_admissible(
+                  param = tbw, bwtype = bws$type, nobs = n,
+                  lower = fixed.lower, upper = candidate.upper, icon = dati$icon
+                ))
+                  stop("npscoefbw: supplied starting bandwidth is outside the admissible search domain",
+                       call. = FALSE)
               }
               if (automatic.start)
                 first.automatic.start <- tbw
