@@ -1943,11 +1943,12 @@ npregbw.rbandwidth <-
       yname = yname
     )
 
-    direct.objective <- .np_nn_certify_raw_point(
+    .np_nn_certify_raw_point(
       point = point,
       raw.eval = raw_eval_fun,
       owner = "native npreg NOMAD degree-search route"
     )
+    direct.objective <- as.numeric(best_record$objective[1L])
     direct.payload <- .npregbw_finalize_fixed_degree_payload(
       xdat = xdat,
       ydat = ydat,
@@ -1994,9 +1995,13 @@ npregbw.rbandwidth <-
       if (!is.null(hot.payload$method) && length(hot.payload$method))
         hot.payload$pmethod <- bwmToPrint(as.character(hot.payload$method[1L]))
 
+      .np_nn_certify_raw_point(
+        point = c(.npregbw_nomad_bw_to_point(hot.payload$bw, template, setup), degree),
+        raw.eval = raw_eval_fun,
+        owner = "npreg NOMAD degree-search Powell handoff"
+      )
       hot.objective <- as.numeric(hot.payload$fval[1L])
-      if (is.finite(hot.objective) &&
-          .np_degree_better(hot.objective, direct.objective, direction = "min")) {
+      if (.np_degree_better(hot.objective, direct.objective, direction = "min")) {
         return(list(payload = hot.payload, objective = hot.objective, powell.time = powell.elapsed))
       }
     }
@@ -2129,6 +2134,11 @@ npregbw.rbandwidth <-
         as.integer(round(native$best_point[degree.idx]))
       }
       raw.objective <- raw_eval_fun(as.numeric(native$best_point))
+      objective <- if (.np_nn_raw_objective_valid(raw.objective)) {
+        as.numeric(native$objective[1L])
+      } else {
+        .Machine$double.xmax
+      }
       list(
         restart = as.integer(restart.index),
         remin = isTRUE(remin),
@@ -2137,7 +2147,7 @@ npregbw.rbandwidth <-
         elapsed = native.elapsed,
         status = "ok",
         message = as.character(native$message[1L]),
-        objective = raw.objective,
+        objective = objective,
         bbe = as.numeric(native$blackbox_evaluations[1L]),
         iterations = as.numeric(native$iterations[1L]),
         solution = as.numeric(native$solution),
@@ -2213,6 +2223,8 @@ npregbw.rbandwidth <-
           start = as.numeric(recovery$point),
           restart.index = recovery.index
         )
+        native.recovery$recovery <- TRUE
+        native.recovery$recovery_witness <- recovery
         native.results[[recovery.index]] <- native.recovery
         native.nomad.elapsed <- native.nomad.elapsed +
           as.numeric(native.recovery$elapsed[1L])
