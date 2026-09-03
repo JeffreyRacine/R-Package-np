@@ -1,5 +1,8 @@
 # np 0.70-6
 
+* Mixed fixed/free degree searches now assert after NOMAD returns that every
+  fixed degree coordinate still equals its requested value.
+
 * NN recovery now leaves an allowed extended-NN incumbent unchanged and
   proceeds to the existing fail-closed result instead of reporting an internal
   ordinary-domain error.

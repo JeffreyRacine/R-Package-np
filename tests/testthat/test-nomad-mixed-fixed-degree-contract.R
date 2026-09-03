@@ -32,11 +32,53 @@ test_that("NOMAD mixed fixed/free degree geometry is isolated", {
     add_option(original_options, mixed)$FIXED_VARIABLE,
     mixed$option.value
   )
+  assert_solution <- getFromNamespace(
+    ".np_nomad_assert_fixed_degree_solution", pkg
+  )
+  expect_true(assert_solution(c(0.5, 0.5, 0, 2), mixed))
+  expect_error(
+    assert_solution(c(0.5, 0.5, 0, 1), mixed, "synthetic NOMAD"),
+    "coordinate 4: requested 2, returned 1",
+    fixed = TRUE
+  )
   expect_error(
     add_option(list(` fixed_variable ` = "( - - - 2 )"), mixed),
     "'FIXED_VARIABLE' is reserved internally",
     fixed = TRUE
   )
+})
+
+test_that("R-bridge NOMAD search asserts mixed fixed degrees", {
+  skip_on_cran()
+  skip_if_not_installed("crs", minimum_version = "0.15.46")
+
+  result <- .np_nomad_search(
+    engine = "nomad",
+    baseline_record = NULL,
+    start_degree = c(1L, 0L),
+    x0 = c(1, 0),
+    bbin = c(1L, 1L),
+    lb = c(1, 0),
+    ub = c(1, 1),
+    eval_fun = function(point) list(
+      objective = (point[2L] - 1)^2,
+      degree = as.integer(round(point)),
+      num.feval = 1L
+    ),
+    build_payload = function(point, best_record, solution, interrupted)
+      list(payload = list(point = point)),
+    nmulti = 1L,
+    degree_spec = list(
+      initial = c(1L, 0L), lower = c(1L, 0L), upper = c(1L, 1L),
+      basis = "glp", nobs = 20L, user_supplied = TRUE
+    ),
+    nomad.opts = list(MAX_BB_EVAL = 12L),
+    native.r.bridge = TRUE
+  )
+
+  expect_identical(result$best_point[1L], 1)
+  expect_true(all(vapply(result$restart.results, function(x)
+    identical(as.numeric(x$solution[1L]), 1), logical(1L))))
 })
 
 test_that("prepared NOMAD search honors a positive fixed degree", {

@@ -1900,6 +1900,29 @@
   c(opts, list(FIXED_VARIABLE = geometry$option.value))
 }
 
+.np_nomad_assert_fixed_degree_solution <- function(solution, geometry,
+                                                   where = "native NOMAD route") {
+  if (is.null(geometry))
+    return(invisible(TRUE))
+  solution <- as.numeric(solution)
+  if (!length(solution) || any(geometry$fixed.index > length(solution)))
+    stop(sprintf("%s returned a malformed fixed-degree solution", where),
+         call. = FALSE)
+
+  for (i in seq_along(geometry$fixed.index)) {
+    index <- geometry$fixed.index[i]
+    expected <- as.numeric(geometry$fixed.value[i])
+    observed <- solution[index]
+    if (!is.finite(observed) || !identical(observed, expected)) {
+      stop(sprintf(
+        "%s violated fixed-degree coordinate %d: requested %.17g, returned %.17g",
+        where, index, expected, observed
+      ), call. = FALSE)
+    }
+  }
+  invisible(TRUE)
+}
+
 .np_nomad_native_option_vectors <- function(opts) {
   if (is.null(opts) || !length(opts))
     return(list(names = character(), values = character()))
@@ -2846,6 +2869,11 @@
       )
       native.value <- native.call$value
       .np_nomad_native_status(native.value, "native NOMAD R-callback route")
+      .np_nomad_assert_fixed_degree_solution(
+        solution = native.value$solution,
+        geometry = fixed.degree.geometry,
+        where = "native NOMAD R-callback route"
+      )
       return(native.call)
     }
 
