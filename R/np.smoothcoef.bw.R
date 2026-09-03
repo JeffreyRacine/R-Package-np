@@ -579,8 +579,7 @@ npscoefbw.NULL <-
     leave.one.out = FALSE,
     eval.idx = idx
   )
-  main.ks <- .npscoefbw_nomad_lp_npksum(
-    args = list(
+  kernel.args <- list(
       txdat = moment.state$z.train,
       exdat = moment.state$z.eval,
       tydat = moment.state$ytensor,
@@ -588,10 +587,21 @@ npscoefbw.NULL <-
       bws = moment.state$kernel.bws,
       leave.one.out = FALSE,
       bandwidth.divide = moment.state$bandwidth.divide
-    ),
-    localize = localize
-  )$ksum
-  kw.self <- .np_kernel_weights_direct(
+    )
+  if (bws$type %in% c("generalized_nn", "adaptive_nn")) {
+    # Use the same realized NN geometry and scale for moments and self weight.
+    kernel.args$return.kernel.weights <- TRUE
+    kernel.args$.np.internal.bandwidth.divide.weights <- moment.state$bandwidth.divide
+    if (bws$type == "generalized_nn" && bws$ncon > 0L &&
+        !identical(bws$ckertype, "beta"))
+      kernel.args$.np.internal.eval.train.index <- idx
+    kernel.out <- .npscoefbw_nomad_lp_npksum(kernel.args, localize = localize)
+    main.ks <- kernel.out$ksum
+    kw.self <- kernel.out$kw
+    bw.divisor <- 1.0
+  } else {
+    main.ks <- .npscoefbw_nomad_lp_npksum(kernel.args, localize = localize)$ksum
+    kw.self <- .np_kernel_weights_direct(
     bws = moment.state$kernel.bws,
     txdat = moment.state$z.train,
     exdat = moment.state$z.eval,
@@ -603,6 +613,7 @@ npscoefbw.NULL <-
     prod(as.double(bwv[moment.state$kernel.bws$icon]))
   else
     1.0
+  }
 
   for (jj in seq_along(idx)) {
     main.ks[, , jj] <- main.ks[, , jj] -

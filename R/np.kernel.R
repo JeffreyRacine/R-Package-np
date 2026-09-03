@@ -158,6 +158,8 @@ npksum.default <-
     internal.bandwidth.divide.weights <-
       isTRUE(dots$.np.internal.bandwidth.divide.weights)
     dots$.np.internal.bandwidth.divide.weights <- NULL
+    internal.eval.train.index <- dots$.np.internal.eval.train.index
+    dots$.np.internal.eval.train.index <- NULL
     internal.tree.outer.blas <- isTRUE(dots$.np.internal.tree.outer.blas)
     dots$.np.internal.tree.outer.blas <- NULL
     return.derivative.kernel.weights <- isTRUE(dots$return.derivative.kernel.weights)
@@ -345,6 +347,16 @@ npksum.default <-
 
     tnrow = nrow(txdat)
     enrow = (if (miss.ex) tnrow else nrow(exdat))
+    if (!is.null(internal.eval.train.index)) {
+      if (miss.ex || leave.one.out || internal.power12 || beta.kernel ||
+          bws$type != "generalized_nn" || bws$ncon < 1L ||
+          length(rows.omit) || length(attr(exdat, "na.action")) ||
+          !is.integer(internal.eval.train.index) ||
+          length(internal.eval.train.index) != enrow ||
+          anyNA(internal.eval.train.index) ||
+          any(internal.eval.train.index < 1L | internal.eval.train.index > tnrow))
+        stop("invalid use of the internal mapped NN kernel-sum route")
+    }
     twncol = (if (miss.weights) 0 else ncol(weights))
     tyncol = (if (miss.ty) 0 else ncol(tydat))
 
@@ -473,7 +485,10 @@ npksum.default <-
         tree.outer.blas = internal.tree.outer.blas
       ))
 
-	    cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
+    cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
+    myopti <- as.integer(myopti)
+    if (!is.null(internal.eval.train.index))
+      attr(myopti, "np.eval.train.index") <- internal.eval.train.index - 1L
     
    asDouble <- function(data){
 	   if (is.null(data)){
@@ -494,7 +509,7 @@ npksum.default <-
               as.double(c(bws$bw[bws$icon], bws$bw[bws$iuno], bws$bw[bws$iord])),
               as.double(bws$xmcv), as.double(attr(bws$xmcv, "pad.num")),
               as.integer(c(operator.num[bws$icon], operator.num[bws$iuno], operator.num[bws$iord])),
-              as.integer(myopti), as.double(kernel.pow),
+              myopti, as.double(kernel.pow),
               as.integer(length.out),
               as.integer(p.length.out),
               as.integer(nkw),
@@ -510,7 +525,7 @@ npksum.default <-
               as.double(c(bws$bw[bws$icon], bws$bw[bws$iuno], bws$bw[bws$iord])),
               as.double(bws$xmcv), as.double(attr(bws$xmcv, "pad.num")),
               as.integer(c(operator.num[bws$icon], operator.num[bws$iuno], operator.num[bws$iord])),
-              as.integer(myopti), as.double(kernel.pow),
+              myopti, as.double(kernel.pow),
               as.integer(length.out),
               as.integer(p.length.out),
               as.integer(nkw),
