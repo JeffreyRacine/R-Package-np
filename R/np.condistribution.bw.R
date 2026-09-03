@@ -1352,6 +1352,21 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
                                                        inner.start.count = 0L,
                                                        option.names = character(),
                                                        option.values = character()) {
+  if (!isTRUE(.npRmpi_autodispatch_called_from_bcast()) &&
+      !isTRUE(getOption("npRmpi.local.regression.mode", FALSE)) &&
+      .npRmpi_has_active_slave_pool(comm = 1L)) {
+    native.args <- list(prep = prep, x0 = x0, bbin = bbin, lb = lb, ub = ub,
+      max.eval = max.eval, random.seed = random.seed,
+      inner.start.count = inner.start.count,
+      option.names = option.names, option.values = option.values)
+    command <- substitute(
+      do.call(get("npNomadNativeSearchConditionalDistribution",
+                  envir = asNamespace("npRmpi"), inherits = FALSE), ARGS),
+      list(ARGS = native.args)
+    )
+    .npRmpi_sync_prepared_search_options(comm = 1L)
+    return(.npRmpi_bcast_cmd_expr(command, comm = 1L, caller.execute = TRUE))
+  }
   native.call <- .np_nomad_capture_solver_output(.Call(
     "C_np_distribution_conditional_nomad_native_search",
     as.double(prep$yuno),
