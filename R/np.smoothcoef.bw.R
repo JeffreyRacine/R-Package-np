@@ -1746,7 +1746,29 @@ npscoefbw.NULL <-
   as.double(candidate)
 }
 
-npscoefbw.scbandwidth <-
+.npscoef_cg_diagnostic <- function(expr, method) {
+  if (!identical(method, "CG"))
+    return(expr)
+  withCallingHandlers(expr, error = function(e) {
+    if (!identical(conditionMessage(e),
+                   gettext("non-finite value supplied by optim", domain = "R-stats")))
+      return(invisible(NULL))
+    # Native optim errors name optim; objective errors name the callback.
+    origin <- conditionCall(e)
+    if (!is.call(origin) ||
+        !(identical(origin[[1L]], quote(optim)) ||
+          identical(origin[[1L]], quote(stats::optim))))
+      return(invisible(NULL))
+    stop(errorCondition(
+      paste0("npscoefbw: CG bandwidth search could not continue with finite parameters. ",
+             "This can occur when CG's numerical gradient crosses a bandwidth boundary. ",
+             "Try optim.method = \"Nelder-Mead\". Original error: ", conditionMessage(e)),
+      class = "np_cg_numerical_error", call = conditionCall(e), parent = e
+    ))
+  })
+}
+
+npscoefbw.scbandwidth <- 
   function(xdat = stop("invoked without data 'xdat'"),
            ydat = stop("invoked without data 'ydat'"),
            zdat = NULL,
@@ -2707,10 +2729,10 @@ npscoefbw.scbandwidth <-
               )
             }
 
-            suppressWarnings(optim.return <- optim(tbw,
+            suppressWarnings(optim.return <- .npscoef_cg_diagnostic(optim(tbw,
                                                    fn = overall.cv.ls,
                                                    method = optim.method,
-                                                   control = optim.control))
+                                                   control = optim.control), optim.method))
             if(!is.null(optim.return$counts) && length(optim.return$counts) > 0)
               num.feval.overall <- num.feval.overall + optim.return$counts[1]
             attempts <- 0
@@ -2726,10 +2748,10 @@ npscoefbw.scbandwidth <-
                 iuno = dati$iuno
               )
               optim.control <- lapply(optim.control, '*', 10.0)
-              suppressWarnings(optim.return <- optim(tbw,
+              suppressWarnings(optim.return <- .npscoef_cg_diagnostic(optim(tbw,
                                                      fn = overall.cv.ls,
                                                      method = optim.method,
-                                                     control = optim.control))
+                                                     control = optim.control), optim.method))
               if(!is.null(optim.return$counts) && length(optim.return$counts) > 0)
                 num.feval.overall <- num.feval.overall + optim.return$counts[1]
 
@@ -2834,10 +2856,10 @@ npscoefbw.scbandwidth <-
                 ## minimise
                 partial.start <- bws$bw.fitted[, j]
                 suppressWarnings(optim.return <-
-                                 optim(partial.start, fn = partial.cv.ls,
+                                 .npscoef_cg_diagnostic(optim(partial.start, fn = partial.cv.ls,
                                        method = optim.method,
                                        control = optim.control,
-                                       partial.index = j))
+                                       partial.index = j), optim.method))
                 if(!is.null(optim.return$counts) && length(optim.return$counts) > 0)
                   num.feval.overall <- num.feval.overall + optim.return$counts[1]
                 partial_progress_finish(fv = optim.return$value)
