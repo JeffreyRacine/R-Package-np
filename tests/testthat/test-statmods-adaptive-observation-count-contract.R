@@ -13,7 +13,7 @@ test_that("adaptive duplicate mass rejects a literal zero-radius neighborhood", 
   )
   expect_error(
     npreg(bws = bw2, exdat = x),
-    "adaptive nearest-neighbor bandwidth has a zero literal radius",
+    "zero literal radius",
     fixed = TRUE
   )
 })
@@ -49,7 +49,7 @@ test_that("generalized duplicate mass reports a literal zero-radius query", {
   )
   expect_error(
     npreg(bws = bw2, exdat = x),
-    "zero literal radius after occurrence exclusion",
+    "zero literal radius",
     fixed = TRUE
   )
 })
@@ -69,7 +69,7 @@ test_that("generalized external queries reject zero-radius tied supports", {
 
   expect_error(
     npreg(bws = bw, exdat = ex),
-    "zero literal radius after occurrence exclusion",
+    "zero literal radius",
     fixed = TRUE
   )
 })

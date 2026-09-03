@@ -1,6 +1,6 @@
-test_that("native npreg raw-objective validity excludes the DBL_MAX sentinel", {
+test_that("shared raw-objective validity excludes the DBL_MAX sentinel", {
   raw_valid <- getFromNamespace(
-    ".npregbw_native_raw_objective_valid", "np"
+    ".np_nn_raw_objective_valid", "np"
   )
 
   expect_true(raw_valid(0))

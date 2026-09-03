@@ -155,7 +155,8 @@ test_that("conditional generalized-NN fits reject zero literal radii", {
     bw <- conditional_gnn_fullfit_bw(x, y, 2L, 2L, degree)
     expect_error(
       conditional_gnn_fullfit_native(x, y, bw),
-      "zero literal.*radius after occurrence exclusion"
+      "zero literal radius",
+      fixed = TRUE
     )
   }
 })

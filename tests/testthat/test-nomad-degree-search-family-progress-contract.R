@@ -94,6 +94,7 @@ test_that("remaining serial NOMAD families use unknown-bound restart progress", 
       degree.max = 1L,
       degree.verify = FALSE,
       bwtype = "fixed",
+      scale.factor.search.lower = 0,
       nmulti = 2L
     )
   )

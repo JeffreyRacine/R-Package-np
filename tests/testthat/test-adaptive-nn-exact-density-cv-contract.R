@@ -210,8 +210,8 @@ test_that("adaptive density CV honors extended folds and serialized replay", {
 
     options(np.extendednn = FALSE)
     expect_error(
-      adaptive_density_package_objective_from_bw(dat, saturated),
-      "invalid bandwidth")
+      adaptive_density_package_objective_from_bw(dat, beyond),
+      "nearest-neighbor bandwidth exceeds n-1")
     options(np.extendednn = TRUE)
   }
 })

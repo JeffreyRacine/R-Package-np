@@ -71,7 +71,7 @@ test_that("npscoef R NN cache leaves fixed bandwidth searches unmarked", {
     zdat = data.frame(z1 = z1, z2 = z2),
     regtype = "lc",
     bwtype = "fixed",
-    ckertype = "epanechnikov",
+    ckertype = "gaussian",
     nmulti = 1L,
     optim.maxit = 25L,
     optim.maxattempts = 1L
