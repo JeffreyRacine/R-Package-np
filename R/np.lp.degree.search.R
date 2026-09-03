@@ -3,6 +3,23 @@
     is.finite(value) && abs(value) < .Machine$double.xmax
 }
 
+# A single native eval records invalidity before replacing it by a finite
+# exploration penalty. Aggregate search histories cannot certify an endpoint.
+.np_nn_single_eval_admissible <- function(out) {
+  if (!is.list(out))
+    stop("raw admission requires a native evaluation result", call. = FALSE)
+  evaluations <- out[["eval.history"]]
+  invalid <- out[["invalid.history"]]
+  value <- out[["fval"]]
+  if (!is.numeric(evaluations) || length(evaluations) != 1L ||
+      is.na(evaluations) || evaluations != 1 ||
+      !is.numeric(invalid) || length(invalid) != 1L || is.na(invalid) ||
+      !(invalid %in% c(0, 1)) || !is.numeric(value) || !length(value))
+    stop("raw admission requires a single native evaluation with valid status history",
+         call. = FALSE)
+  invalid == 0 && .np_nn_raw_objective_valid(value[1L])
+}
+
 .np_nn_candidate_invalid_condition <- function(message,
                                                 owner = NULL,
                                                 point = NULL,
@@ -2436,9 +2453,12 @@
                              native.r.bridge = FALSE,
                              source = "explicit",
                              reason = NULL,
-                             progress_label = NULL) {
+                             progress_label = NULL,
+                             recover_start = NULL) {
   engine <- match.arg(engine)
   direction <- match.arg(direction)
+  if (!is.null(recover_start) && !is.function(recover_start))
+    stop("'recover_start' must be NULL or a function", call. = FALSE)
   source <- as.character(source)[1L]
   if (is.na(source) || !nzchar(source))
     source <- "explicit"
@@ -2538,8 +2558,8 @@
     invisible(rec)
   }
 
-  state$update_best <- function(rec, point) {
-    if (!identical(rec$status, "ok") || !is.finite(rec$objective))
+  state$update_best <- function(rec, point, admissible = TRUE) {
+    if (!isTRUE(admissible) || !identical(rec$status, "ok") || !is.finite(rec$objective))
       return(invisible(NULL))
 
     incumbent <- if (is.null(state$best_record)) {
@@ -2567,6 +2587,7 @@
     degree <- integer(0)
     num.feval <- NA_real_
     num.feval.fast <- NA_real_
+    admissible <- TRUE
 
     result <- tryCatch(
       eval_fun(point),
@@ -2594,6 +2615,11 @@
         num.feval <- as.numeric(result$num.feval[1L])
       if (!is.null(result$num.feval.fast))
         num.feval.fast <- as.numeric(result$num.feval.fast[1L])
+      if (!is.null(result[["admissible"]])) {
+        admissible <- result[["admissible"]]
+        if (!is.logical(admissible) || length(admissible) != 1L || is.na(admissible))
+          stop("NOMAD evaluator 'admissible' must be TRUE or FALSE", call. = FALSE)
+      }
     }
 
     state$eval_id <- state$eval_id + 1L
@@ -2611,7 +2637,7 @@
     if (is.null(state$baseline_record))
       state$baseline_record <- rec
     state$record_trace(rec)
-    state$update_best(rec, point = point)
+    state$update_best(rec, point = point, admissible = admissible)
     state$restart_eval_id <- state$restart_eval_id + 1L
     state$progress_state$nomad_current_degree <- degree
     state$progress_state$nomad_best_record <- state$best_record
@@ -2698,7 +2724,34 @@
   restart_results <- vector("list", nomad.nmulti)
   best_solution <- NULL
   nomad.elapsed <- 0
-  for (i in seq_len(nomad.nmulti)) {
+  for (i in seq_len(nomad.nmulti + as.integer(!is.null(recover_start)))) {
+    if (i > nomad.nmulti) {
+      if (!is.null(state$best_point) || isTRUE(state$interrupted))
+        break
+      recovery.started <- proc.time()[3L]
+      recovery <- recover_start(as.numeric(start_matrix[1L, ]))
+      nomad.elapsed <- nomad.elapsed + proc.time()[3L] - recovery.started
+      if (!is.list(recovery) || !is.logical(recovery[["found"]]) ||
+          length(recovery[["found"]]) != 1L || is.na(recovery[["found"]]))
+        stop("NOMAD recovery must return a scalar logical 'found'", call. = FALSE)
+      if (!isTRUE(recovery[["found"]]))
+        break
+      point <- recovery[["point"]]
+      if (!is.numeric(point) || length(point) != length(x0) ||
+          any(!is.finite(point)) || any(point < lb | point > ub) ||
+          any(point[bbin != 0L] != round(point[bbin != 0L])))
+        stop("NOMAD recovery returned an invalid start point", call. = FALSE)
+      point <- as.numeric(point)
+      start_matrix <- rbind(start_matrix, point)
+      state$restart_starts[[i]] <- point
+      if (!is.null(state$restart_degree_starts)) {
+        q <- length(degree_spec$lower)
+        state$restart_degree_starts[[i]] <- as.integer(tail(point, q))
+        state$restart_bandwidth_starts[[i]] <- head(point, length(point) - q)
+      }
+      if (!is.null(state$progress_state))
+        state$progress_state$nomad_nmulti <- nrow(start_matrix)
+    }
     state$current_restart <- as.integer(i)
     state$restart_eval_id <- 0L
     restart_degree <- if (!is.null(state$restart_degree_starts) &&
@@ -2792,6 +2845,11 @@
       }
     )
 
+    if (i > nomad.nmulti) {
+      restart_results[[i]]$recovery <- TRUE
+      restart_results[[i]]$recovery_witness <- recovery
+    }
+
     if (isTRUE(state$interrupted))
       break
 
@@ -2848,6 +2906,7 @@
       state$progress_state$nomad_current_degree <- remin.degree
       state$progress_state$nomad_best_record <- state$best_record
       state$progress_state$nomad_restart_index <- remin.index
+      state$progress_state$nomad_nmulti <- max(nomad.nmulti, remin.index)
       state$progress_state$nomad_restart_durations <- state$restart_durations
       state$progress_state <- .np_degree_progress_step(
         state = state$progress_state,
