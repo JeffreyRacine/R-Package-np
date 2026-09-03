@@ -2286,18 +2286,18 @@ npRmpiNomadPreparedSearchRegression <- function(template,
   nomad.num.feval.total <- 0
   nomad.num.feval.fast.total <- 0
 
-  eval_fun <- function(point) {
+  eval_point <- function(point, raw = FALSE) {
     point <- as.numeric(point)
     degree <- as.integer(round(point[ncon + ncat + seq_len(ncon)]))
     degree <- .np_degree_clip_to_grid(degree, degree.search$candidates)
     bw_vec <- .npregbw_nomad_point_to_bw(point[seq_len(ncon + ncat)], template = template, setup = setup)
     flat.bw <- c(bw_vec[template$icon], bw_vec[template$iuno], bw_vec[template$iord])
-    out <- npRmpiPreparedObjectiveEvalRegression(
+    evaluator <- if (isTRUE(raw)) npRmpiPreparedObjectiveEvalRegressionRaw else
+      npRmpiPreparedObjectiveEvalRegression
+    out <- evaluator(
       bw = as.double(flat.bw),
       degree = as.integer(degree)
     )
-    nomad.num.feval.total <<- nomad.num.feval.total + 1L
-    nomad.num.feval.fast.total <<- nomad.num.feval.fast.total + as.numeric(out[2L])
 
     list(
       objective = as.numeric(out[1L]),
@@ -2305,6 +2305,13 @@ npRmpiNomadPreparedSearchRegression <- function(template,
       num.feval = 1L,
       num.feval.fast = as.numeric(out[2L])
     )
+  }
+
+  eval_fun <- function(point) {
+    out <- eval_point(point)
+    nomad.num.feval.total <<- nomad.num.feval.total + out$num.feval
+    nomad.num.feval.fast.total <<- nomad.num.feval.fast.total + out$num.feval.fast
+    out
   }
 
   search.engine.used <- if (identical(degree.search$engine, "nomad+powell")) {
@@ -2462,6 +2469,41 @@ npRmpiNomadPreparedSearchRegression <- function(template,
       }
     }
 
+    if (!is.finite(native.best.index) && all(template$bw == 0) &&
+        template$type %in% c("generalized_nn", "adaptive_nn")) {
+      recovery.raw.eval <- function(point) {
+        out <- eval_point(point, raw = TRUE)
+        native.num.feval.total <<- native.num.feval.total + out$num.feval
+        native.num.feval.fast.total <<- native.num.feval.fast.total + out$num.feval.fast
+        out$objective
+      }
+      ordinary.cap <- setup$nobs - if (identical(template$type, "adaptive_nn")) 2L else 1L
+      recovery <- .np_nn_find_raw_valid_start(
+        point = as.numeric(native.start.matrix[1L, ]),
+        nn.indices = seq_len(ncon),
+        caps = rep.int(ordinary.cap, ncon),
+        raw.eval = recovery.raw.eval
+      )
+      if (isTRUE(recovery$found)) {
+        native.start.matrix <- rbind(native.start.matrix, recovery$point)
+        recovery.index <- nrow(native.start.matrix)
+        native.recovery <- run_native_restart(recovery$point, recovery.index)
+        native.recovery$recovery <- TRUE
+        native.recovery$recovery_witness <- recovery
+        native.results[[recovery.index]] <- native.recovery
+        native.nomad.elapsed <- native.nomad.elapsed + native.recovery$elapsed
+        native.num.feval.total <- native.num.feval.total +
+          as.numeric(native.recovery$native$total_num.feval[1L])
+        native.num.feval.fast.total <- native.num.feval.fast.total +
+          as.numeric(native.recovery$native$total_num.feval.fast[1L])
+        native.callback.total <- native.callback.total +
+          as.integer(native.recovery$native$compiled_callback_calls[1L])
+        if (.np_nn_raw_objective_valid(native.recovery$objective)) {
+          native.best.objective <- native.recovery$objective
+          native.best.index <- recovery.index
+        }
+      }
+    }
     if (!is.finite(native.best.index))
       return(.npRmpi_nomad_collective_failure(
         "native npreg NOMAD degree-search route did not return a raw-valid solution", rank))
@@ -2732,6 +2774,20 @@ npRmpiNomadPreparedSearchRegression <- function(template,
       yname = yname
     )
 
+    raw_eval_bw <- function(bw) {
+      tbw <- .npregbw_build_rbandwidth(
+        xdat = xdat, ydat = ydat, bws = bw, bandwidth.compute = FALSE,
+        reg.args = final.reg.args, yname = yname
+      )
+      out <- .npregbw_eval_only(xdat = xdat, ydat = ydat, bws = tbw,
+        invalid.penalty = "dbmax",
+        penalty.multiplier = opt.value("penalty.multiplier", 10))
+      as.numeric(out$objective[1L])
+    }
+    .np_nn_certify_raw_point(
+      point = final.tbw$bw, raw.eval = raw_eval_bw,
+      owner = "native npreg NOMAD degree-search route"
+    )
     direct.payload <- .npregbw_finalize_fixed_degree_payload(
       xdat = xdat,
       ydat = ydat,
@@ -2776,9 +2832,12 @@ npRmpiNomadPreparedSearchRegression <- function(template,
       direct.payload$num.feval.fast <- as.numeric(direct.payload$num.feval.fast[1L]) + as.numeric(hot.payload$num.feval.fast[1L])
       hot.payload$num.feval <- direct.payload$num.feval
       hot.payload$num.feval.fast <- direct.payload$num.feval.fast
+      .np_nn_certify_raw_point(
+        point = hot.payload$bw, raw.eval = raw_eval_bw,
+        owner = "npreg NOMAD degree-search Powell handoff"
+      )
       hot.objective <- as.numeric(hot.payload$fval[1L])
-      if (is.finite(hot.objective) &&
-          .np_degree_better(hot.objective, direct.objective, direction = "min")) {
+      if (.np_degree_better(hot.objective, direct.objective, direction = "min")) {
         return(list(payload = hot.payload, objective = hot.objective, powell.time = powell.elapsed))
       }
     }
