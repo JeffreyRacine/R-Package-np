@@ -1768,7 +1768,7 @@ npscoefbw.NULL <-
   })
 }
 
-npscoefbw.scbandwidth <- 
+npscoefbw.scbandwidth <-
   function(xdat = stop("invoked without data 'xdat'"),
            ydat = stop("invoked without data 'ydat'"),
            zdat = NULL,
