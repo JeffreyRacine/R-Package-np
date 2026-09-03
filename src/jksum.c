@@ -11949,7 +11949,14 @@ NPPermutationWeightOutput * const pkw_output){
   XL * p_pxl =  NULL;
 
   if((np_ks_tree_use) && (p_nvar > 0)){
-    p_pxl = (XL *)malloc(p_nvar*sizeof(XL));
+    p_pxl = (XL *)np_jksum_malloc_array_or_die(
+      (size_t)p_nvar, sizeof(XL), "kernel weighted sum permutation ranges");
+    for(k = 0; k < p_nvar; k++){
+      p_pxl[k].istart = NULL;
+      p_pxl[k].nlev = NULL;
+      p_pxl[k].n = 0;
+      p_pxl[k].nalloc = 0;
+    }
   }
 
   // root node
@@ -13151,7 +13158,7 @@ NPPermutationWeightOutput * const pkw_output){
             p_pxl[k].n = 0;
 
             if(all_cont_largeh){
-              p_pxl[k] = pxl[0];
+              mirror_xl(pxl, p_pxl + k);
             } else if(!do_partial_tree){
               for(i = 0; i < num_reg_continuous; i++){
                 const int knp = (i == ii) ? permutation_kernel[i] : KERNEL_reg_np[i];
