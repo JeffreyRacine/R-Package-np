@@ -653,11 +653,10 @@ npscoefbw.NULL <-
     NULL
 }
 
-.npscoefbw_nomad_eval_direct <- function(ctx,
-                                         bws,
-                                         invalid.penalty = c("baseline", "large"),
-                                         penalty.multiplier = 10,
-                                         localize = TRUE) {
+.npscoefbw_nomad_invalid_objective <- function(bws,
+                                               invalid.penalty = c("baseline", "large"),
+                                               penalty.multiplier = 10,
+                                               invalid.objective = NULL) {
   invalid.penalty <- match.arg(invalid.penalty)
   base.penalty <- switch(
     invalid.penalty,
@@ -665,7 +664,28 @@ npscoefbw.NULL <-
     large = 1
   )
   base.penalty <- max(abs(base.penalty), 1)
-  penalty <- penalty.multiplier * base.penalty
+  if (is.null(invalid.objective)) {
+    penalty.multiplier * base.penalty
+  } else {
+    invalid.objective <- as.numeric(invalid.objective)[1L]
+    if (!is.finite(invalid.objective) || invalid.objective <= 0)
+      stop("invalid NOMAD smooth-coefficient objective penalty")
+    invalid.objective
+  }
+}
+
+.npscoefbw_nomad_eval_direct <- function(ctx,
+                                         bws,
+                                         invalid.penalty = c("baseline", "large"),
+                                         penalty.multiplier = 10,
+                                         invalid.objective = NULL,
+                                         localize = TRUE) {
+  penalty <- .npscoefbw_nomad_invalid_objective(
+    bws = bws,
+    invalid.penalty = invalid.penalty,
+    penalty.multiplier = penalty.multiplier,
+    invalid.objective = invalid.objective
+  )
 
   if (!is.list(ctx) || is.null(ctx$W) || is.null(ctx$ydat) || is.null(ctx$zdat.df))
     stop("invalid NOMAD smooth-coefficient context")
@@ -985,15 +1005,14 @@ npscoefbw.NULL <-
                                  bws,
                                  pool,
                                  invalid.penalty = c("baseline", "large"),
-                                 penalty.multiplier = 10) {
-  invalid.penalty <- match.arg(invalid.penalty)
-  base.penalty <- switch(
-    invalid.penalty,
-    baseline = if (is.finite(bws$fval[1L])) as.numeric(bws$fval[1L]) else 1,
-    large = 1
+                                 penalty.multiplier = 10,
+                                 invalid.objective = NULL) {
+  penalty <- .npscoefbw_nomad_invalid_objective(
+    bws = bws,
+    invalid.penalty = invalid.penalty,
+    penalty.multiplier = penalty.multiplier,
+    invalid.objective = invalid.objective
   )
-  base.penalty <- max(abs(base.penalty), 1)
-  penalty <- penalty.multiplier * base.penalty
 
   if (!validateBandwidthTF(bws)) {
     return(list(
@@ -1010,6 +1029,7 @@ npscoefbw.NULL <-
       bws = bws,
       invalid.penalty = invalid.penalty,
       penalty.multiplier = penalty.multiplier,
+      invalid.objective = invalid.objective,
       localize = TRUE
     ))
   }
@@ -1112,6 +1132,7 @@ npscoefbw.NULL <-
     stop("automatic degree search with search.engine='nomad' requires bandwidth.compute=TRUE")
 
   eval.zdat <- if (is.null(zdat)) xdat else zdat
+  automatic.start <- is.numeric(bws) && length(bws) > 0L && all(bws == 0)
 
   template.reg.args <- reg.args
   template.reg.args$regtype <- "lp"
@@ -1144,6 +1165,7 @@ npscoefbw.NULL <-
 
   if (!(template$type %in% c("fixed", "generalized_nn", "adaptive_nn")))
     stop("automatic degree search with search.engine='nomad' requires bwtype='fixed', 'generalized_nn', or 'adaptive_nn'")
+  nn.search <- template$type %in% c("generalized_nn", "adaptive_nn")
   setup <- .npregbw_nomad_bw_setup(xdat = eval.zdat, template = template, allow.extended.nn = TRUE)
   ncon <- length(setup$cont_idx)
   ncat <- length(setup$cat_idx)
@@ -1179,6 +1201,15 @@ npscoefbw.NULL <-
   nomad.num.feval.total <- 0
   nomad.num.feval.fast.total <- 0
   ctx <- .npscoefbw_nomad_context_prepare(xdat = xdat, ydat = ydat, zdat = zdat)
+  raw.valid.points <- new.env(hash = TRUE, parent = emptyenv())
+  invalid.objective.override <- NULL
+  evaluator.error <- NULL
+  collective.owner <- isTRUE(.npRmpi_autodispatch_called_from_bcast()) &&
+    .npRmpi_safe_int(mpi.comm.size(1L)) > 1L
+  collective.rank <- if (collective.owner)
+    tryCatch(as.integer(mpi.comm.rank(1L)), error = function(e) 0L)
+  else
+    0L
   pool <- NULL
   on.exit({
     if (!is.null(pool))
@@ -1186,6 +1217,11 @@ npscoefbw.NULL <-
     .npscoefbw_nomad_context_cleanup(ctx, comm = 1L)
   }, add = TRUE)
   pool <- .npscoefbw_nomad_pool_start(ctx, comm = 1L)
+  start_pool_if_needed <- function() {
+    if (!collective.owner && is.null(pool))
+      pool <<- .npscoefbw_nomad_pool_start(ctx, comm = 1L)
+    invisible(pool)
+  }
   stop_pool_before_collective <- function() {
     if (!is.null(pool)) {
       .npscoefbw_nomad_pool_stop(pool)
@@ -1193,14 +1229,60 @@ npscoefbw.NULL <-
     }
     invisible(NULL)
   }
+  point.key <- function(point) {
+    paste(sprintf("%.17g", as.numeric(point)), collapse = ",")
+  }
+  point.degree <- function(point) {
+    .np_degree_clip_to_grid(
+      as.integer(round(point[ncon + ncat + seq_len(ndeg)])),
+      degree.search$candidates
+    )
+  }
 
   .np_nomad_baseline_note(degree.search$start.degree)
 
-  eval_fun <- function(point) {
+  evaluate.bandwidth <- function(tbw,
+                                 invalid.penalty = "baseline",
+                                 invalid.objective = invalid.objective.override) {
+    penalty.multiplier <- if (is.null(opt.args$penalty.multiplier)) 10 else opt.args$penalty.multiplier
+    if (collective.owner) {
+      .npscoefbw_nomad_eval_direct(
+        ctx = ctx,
+        bws = tbw,
+        invalid.penalty = invalid.penalty,
+        penalty.multiplier = penalty.multiplier,
+        invalid.objective = invalid.objective,
+        localize = FALSE
+      )
+    } else {
+      start_pool_if_needed()
+      .npscoefbw_eval_pool(
+        ctx = ctx,
+        bws = tbw,
+        pool = pool,
+        invalid.penalty = invalid.penalty,
+        penalty.multiplier = penalty.multiplier,
+        invalid.objective = invalid.objective
+      )
+    }
+  }
+
+  evaluate.point <- function(point) {
     point <- as.numeric(point)
-    degree <- as.integer(round(point[ncon + ncat + seq_len(ndeg)]))
-    degree <- .np_degree_clip_to_grid(degree, degree.search$candidates)
+    degree <- point.degree(point)
     bw_vec <- .npregbw_nomad_point_to_bw(point[seq_len(ncon + ncat)], template = template, setup = setup)
+    if (nn.search && !.npscoef_candidate_is_admissible(
+          param = bw_vec,
+          bwtype = template$type,
+          nobs = NROW(eval.zdat),
+          icon = template$icon
+        )) {
+      .np_nn_abort_candidate_invalid(
+        "npscoefbw NOMAD candidate lies outside the admissible NN domain",
+        owner = "npscoefbw NOMAD degree objective",
+        point = point
+      )
+    }
 
     eval.reg.args <- reg.args
     eval.reg.args$regtype <- "lp"
@@ -1222,25 +1304,9 @@ npscoefbw.NULL <-
       bw = bw_vec
     )
 
-    penalty.multiplier <- if (is.null(opt.args$penalty.multiplier)) 10 else opt.args$penalty.multiplier
-    out <- if (isTRUE(.npRmpi_autodispatch_called_from_bcast()) &&
-               .npRmpi_safe_int(mpi.comm.size(1L)) > 1L) {
-      .npscoefbw_nomad_eval_direct(
-        ctx = ctx,
-        bws = tbw,
-        invalid.penalty = "baseline",
-        penalty.multiplier = penalty.multiplier,
-        localize = FALSE
-      )
-    } else {
-      .npscoefbw_eval_pool(
-        ctx = ctx,
-        bws = tbw,
-        pool = pool,
-        invalid.penalty = "baseline",
-        penalty.multiplier = penalty.multiplier
-      )
-    }
+    out <- evaluate.bandwidth(tbw)
+    if (nn.search)
+      assign(point.key(point), isTRUE(out$raw.valid), envir = raw.valid.points)
     nomad.num.feval.total <<- nomad.num.feval.total + as.numeric(out$num.feval[1L])
     nomad.num.feval.fast.total <<- nomad.num.feval.fast.total + as.numeric(out$num.feval.fast[1L])
 
@@ -1248,10 +1314,23 @@ npscoefbw.NULL <-
       objective = out$objective,
       degree = degree,
       num.feval = out$num.feval,
-      num.feval.fast = out$num.feval.fast
+      num.feval.fast = out$num.feval.fast,
+      raw.valid = out$raw.valid
     )
   }
 
+  eval_fun <- function(point) {
+    tryCatch(
+      evaluate.point(point),
+      error = function(e) {
+        if (!inherits(e, "np_nn_candidate_invalid"))
+          evaluator.error <<- e
+        stop(e)
+      }
+    )
+  }
+
+  powell.payload.raw.valid <- FALSE
   build_payload <- function(point, best_record, solution, interrupted) {
     point <- as.numeric(point)
     degree <- as.integer(best_record$degree)
@@ -1295,7 +1374,12 @@ npscoefbw.NULL <-
       direct.payload$timing.profile <- best_record$timing.profile
     direct.objective <- as.numeric(best_record$objective)
 
-    if (identical(degree.search$engine, "nomad+powell")) {
+    point.is.raw.valid <- !nn.search || (
+      exists(point.key(point), envir = raw.valid.points, inherits = FALSE) &&
+      isTRUE(get(point.key(point), envir = raw.valid.points, inherits = FALSE))
+    )
+    if (identical(degree.search$engine, "nomad+powell") &&
+        point.is.raw.valid) {
       hot.reg.args <- reg.args
       hot.reg.args$regtype <- "lp"
       hot.reg.args$degree <- degree
@@ -1331,6 +1415,7 @@ npscoefbw.NULL <-
       hot.objective <- as.numeric(hot.payload$fval[1L])
       if (is.finite(hot.objective) &&
           .np_degree_better(hot.objective, direct.objective, direction = "min")) {
+        powell.payload.raw.valid <<- TRUE
         return(list(payload = hot.payload, objective = hot.objective, powell.time = powell.elapsed))
       }
     }
@@ -1338,39 +1423,180 @@ npscoefbw.NULL <-
     list(payload = direct.payload, objective = direct.objective, powell.time = powell.elapsed)
   }
 
-  .np_nomad_search(
-    engine = degree.search$engine,
-    baseline_record = baseline.record,
-    start_degree = degree.search$start.degree,
-    x0 = x0,
-    bbin = bbin,
-    lb = lb,
-    ub = ub,
-    eval_fun = eval_fun,
-    build_payload = build_payload,
-    direction = "min",
-    objective_name = "fval",
-    nmulti = nomad.nmulti,
-    nomad.inner.nmulti = nomad.inner.nmulti,
-    random.seed = if (!is.null(opt.args$random.seed)) opt.args$random.seed else 42L,
-    remin = isTRUE(opt.args$nomad.remin),
-    nomad.opts = if (is.null(opt.args$nomad.opts)) list() else opt.args$nomad.opts,
-    native.r.bridge = TRUE,
-    source = source,
-    reason = reason,
-    progress_label = progress_label,
-    start.lower = c(bw_start_bounds$lower, degree.search$lower),
-    start.upper = c(bw_start_bounds$upper, degree.search$upper),
-    coordinate.roles = coordinate.roles,
-    degree_spec = list(
-      initial = degree.search$start.degree,
-      lower = degree.search$lower,
-      upper = degree.search$upper,
-      basis = degree.search$basis,
-      nobs = degree.search$nobs,
-      user_supplied = degree.search$start.user
+  run.search <- function(start, nmulti, preserve.start.degree = FALSE) {
+    start.degree <- if (isTRUE(preserve.start.degree)) {
+      as.integer(start[ncon + ncat + seq_len(ndeg)])
+    } else {
+      degree.search$start.degree
+    }
+    result <- tryCatch(.np_nomad_search(
+      engine = degree.search$engine,
+      baseline_record = baseline.record,
+      start_degree = start.degree,
+      x0 = start,
+      bbin = bbin,
+      lb = lb,
+      ub = ub,
+      eval_fun = eval_fun,
+      build_payload = build_payload,
+      direction = "min",
+      objective_name = "fval",
+      nmulti = nmulti,
+      nomad.inner.nmulti = nomad.inner.nmulti,
+      random.seed = if (!is.null(opt.args$random.seed)) opt.args$random.seed else 42L,
+      remin = isTRUE(opt.args$nomad.remin),
+      nomad.opts = if (is.null(opt.args$nomad.opts)) list() else opt.args$nomad.opts,
+      native.r.bridge = TRUE,
+      source = source,
+      reason = reason,
+      progress_label = progress_label,
+      handoff_before_build = nn.search,
+      start.lower = c(bw_start_bounds$lower, degree.search$lower),
+      start.upper = c(bw_start_bounds$upper, degree.search$upper),
+      coordinate.roles = coordinate.roles,
+      degree_spec = list(
+        initial = start.degree,
+        lower = degree.search$lower,
+        upper = degree.search$upper,
+        basis = degree.search$basis,
+        nobs = degree.search$nobs,
+        user_supplied = isTRUE(preserve.start.degree) || degree.search$start.user
+      )
+    ), error = function(e) {
+      if (!is.null(evaluator.error))
+        stop(evaluator.error)
+      stop(e)
+    })
+    if (!is.null(evaluator.error))
+      stop(evaluator.error)
+    result
+  }
+
+  result.raw.valid <- function(result) {
+    if (!is.null(result$best_point)) {
+      key <- point.key(result$best_point)
+      if (exists(key, envir = raw.valid.points, inherits = FALSE) &&
+          isTRUE(get(key, envir = raw.valid.points, inherits = FALSE))) {
+        return(TRUE)
+      }
+    }
+    identical(degree.search$engine, "nomad+powell") &&
+      isTRUE(powell.payload.raw.valid)
+  }
+
+  append.search.history <- function(incumbent, recovered) {
+    offset <- length(incumbent$restart.results)
+    if (length(recovered$restart.results)) {
+      for (i in seq_along(recovered$restart.results))
+        recovered$restart.results[[i]]$restart <- offset + i
+    }
+    recovered$baseline <- incumbent$baseline
+    recovered$restart.start.info <- incumbent$restart.start.info
+    if (!is.null(recovered$best.restart) && length(recovered$best.restart) &&
+        !is.na(recovered$best.restart)) {
+      recovered$best.restart <- offset + recovered$best.restart
+    }
+    if (!is.null(recovered$nomad.remin.index) &&
+        length(recovered$nomad.remin.index) &&
+        !is.na(recovered$nomad.remin.index)) {
+      recovered$nomad.remin.index <- offset + recovered$nomad.remin.index
+    }
+    recovered$restart.starts <- c(
+      incumbent$restart.starts,
+      recovered$restart.starts
     )
-  )
+    recovered$restart.degree.starts <- c(
+      incumbent$restart.degree.starts,
+      recovered$restart.degree.starts
+    )
+    recovered$restart.bandwidth.starts <- c(
+      incumbent$restart.bandwidth.starts,
+      recovered$restart.bandwidth.starts
+    )
+    recovered$restart.results <- c(
+      incumbent$restart.results,
+      recovered$restart.results
+    )
+    recovered$n.unique <- incumbent$n.unique + recovered$n.unique
+    recovered$n.visits <- incumbent$n.visits + recovered$n.visits
+    recovered$n.cached <- incumbent$n.cached + recovered$n.cached
+    recovered$nomad.time <- incumbent$nomad.time + recovered$nomad.time
+    recovered$optim.time <- incumbent$optim.time + recovered$optim.time
+    trace <- rbind(incumbent$trace, recovered$trace)
+    if (nrow(trace)) {
+      trace$trace_id <- seq_len(nrow(trace))
+      trace$eval_id <- seq_len(nrow(trace))
+    }
+    recovered$trace <- trace
+    recovered
+  }
+
+  search.result <- run.search(x0, nomad.nmulti)
+  if (!nn.search)
+    return(search.result)
+
+  if (!result.raw.valid(search.result) && automatic.start) {
+    recovery.start <- as.numeric(search.result$restart.starts[[1L]])
+    recovery.raw.eval <- function(point) {
+      out <- eval_fun(point)
+      if (!isTRUE(out$raw.valid)) {
+        .np_nn_abort_candidate_invalid(
+          "npscoefbw NOMAD degree objective returned an invalid raw objective",
+          owner = "npscoefbw NOMAD degree objective",
+          point = point,
+          raw.objective = out$objective
+        )
+      }
+      as.double(out$objective)
+    }
+    ordinary.caps <- rep.int(NROW(eval.zdat) - 1L, ncon)
+    ordinary.start <- recovery.start[seq_len(ncon)]
+    recovery <- if (length(ordinary.start) &&
+                    all(ordinary.caps >= 2L) &&
+                    all(ordinary.start >= 2L) &&
+                    all(ordinary.start <= ordinary.caps)) {
+      .np_nn_find_raw_valid_start(
+        point = recovery.start,
+        nn.indices = seq_len(ncon),
+        caps = ordinary.caps,
+        raw.eval = recovery.raw.eval
+      )
+    } else {
+      list(found = FALSE, point = NULL, objective = NA_real_, evaluations = 0L)
+    }
+    if (isTRUE(recovery$found)) {
+      incumbent <- search.result
+      invalid.objective.override <- sqrt(.Machine$double.xmax)
+      search.result <- append.search.history(
+        incumbent = incumbent,
+        recovered = run.search(recovery$point, 1L, preserve.start.degree = TRUE)
+      )
+    }
+  }
+
+  if (!result.raw.valid(search.result)) {
+    message <- "npscoefbw NOMAD degree search did not return a raw-valid solution"
+    if (collective.owner)
+      return(.npRmpi_nomad_collective_failure(message, collective.rank))
+    stop(message, call. = FALSE)
+  }
+
+  if (!isTRUE(powell.payload.raw.valid)) {
+    final.raw <- evaluate.bandwidth(
+      tbw = search.result$best_payload,
+      invalid.penalty = "large",
+      invalid.objective = sqrt(.Machine$double.xmax)
+    )
+    reported.objective <- as.numeric(search.result$best_payload$fval[1L])
+    if (!isTRUE(final.raw$raw.valid) ||
+        !identical(as.numeric(final.raw$objective), reported.objective)) {
+      message <- "npscoefbw NOMAD degree search failed final raw-objective certification"
+      if (collective.owner)
+        return(.npRmpi_nomad_collective_failure(message, collective.rank))
+      stop(message, call. = FALSE)
+    }
+  }
+  search.result
 }
 
 .npscoefbw_degree_search_controls <- function(regtype,
