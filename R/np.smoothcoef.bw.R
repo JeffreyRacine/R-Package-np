@@ -1428,14 +1428,24 @@ npscoefbw.NULL <-
   bws
 }
 
-.npscoef_nn_candidate_bandwidth <- function(param, bwtype, nobs) {
+.npscoef_nn_candidate_bandwidth <- function(param, bwtype, nobs, icon = NULL) {
   if (identical(bwtype, "fixed"))
     return(as.double(param))
+
+  if (is.null(icon)) {
+    icon <- rep_len(TRUE, length(param))
+  } else {
+    icon <- as.logical(icon)
+    if (length(icon) != length(param) || anyNA(icon))
+      stop("npscoefbw: invalid nearest-neighbor coordinate map", call. = FALSE)
+  }
 
   lower <- 2L
   upper <- max(1L, as.integer(nobs) - 1L)
   hard.upper <- .Machine$integer.max / 2
-  vapply(param, function(h) {
+  candidate <- as.double(param)
+  candidate[!is.finite(candidate)] <- NA_real_
+  candidate[icon] <- vapply(candidate[icon], function(h) {
     if (!is.finite(h))
       return(NA_real_)
     k <- .np_round_half_to_even(h)
@@ -1451,6 +1461,7 @@ npscoefbw.NULL <-
       return(NA_real_)
     as.double(k)
   }, numeric(1))
+  candidate
 }
 
 .npscoef_bw_scale_multiplier <- function(scbw) {
@@ -1478,7 +1489,8 @@ npscoefbw.NULL <-
 .npscoef_apply_bw_to_scbw <- function(scbw, param, nobs = scbw$nobs) {
   param <- .npscoef_nn_candidate_bandwidth(param = param,
                                            bwtype = scbw$type,
-                                           nobs = nobs)
+                                           nobs = nobs,
+                                           icon = scbw$icon)
   if (length(param) != length(scbw$bw))
     stop("smooth-coefficient bandwidth candidate has wrong length",
          call. = FALSE)
@@ -1587,10 +1599,23 @@ npscoefbw.NULL <-
   } else {
     sqrt(nobs)
   }
+  candidate <- as.double(
+    param * .npscoef_start_factor_vector(
+      param = param,
+      icon = icon,
+      iord = iord,
+      iuno = iuno,
+      continuous.factor = 1.0,
+      categorical.factor = start.controls$dfac.init
+    )
+  )
+  continuous <- if (is.null(icon)) rep_len(TRUE, length(param)) else as.logical(icon)
+  candidate[continuous] <- as.double(start)
   .npscoef_nn_candidate_bandwidth(
-    param = rep.int(as.double(start), length(param)),
+    param = candidate,
     bwtype = bwtype,
-    nobs = nobs
+    nobs = nobs,
+    icon = icon
   )
 }
 
@@ -1624,21 +1649,48 @@ npscoefbw.NULL <-
   }
 
   upper <- max(1L, as.integer(nobs) - 1L)
+  if (is.null(icon) || all(as.logical(icon))) {
+    return(.npscoef_nn_candidate_bandwidth(
+      param = runif(length(param), min = 2, max = max(2L, upper)),
+      bwtype = bwtype,
+      nobs = nobs,
+      icon = icon
+    ))
+  }
+
+  .npscoef_start_factor_vector(
+    param = param,
+    icon = icon,
+    iord = iord,
+    iuno = iuno,
+    continuous.factor = 1.0,
+    categorical.factor = 1.0
+  )
+  icon <- as.logical(icon)
+  candidate <- as.double(param)
+  candidate[icon] <- runif(sum(icon), min = 2, max = max(2L, upper))
+  candidate[!icon] <- candidate[!icon] *
+    runif(sum(!icon), min = start.controls$lbd.init,
+           max = start.controls$hbd.init)
   .npscoef_nn_candidate_bandwidth(
-    param = runif(length(param), min = 2, max = max(2L, upper)),
+    param = candidate,
     bwtype = bwtype,
-    nobs = nobs
+    nobs = nobs,
+    icon = icon
   )
 }
 
 .npscoef_candidate_is_admissible <- function(param,
                                             bwtype,
                                             nobs,
-                                            lower = NULL) {
+                                            lower = NULL,
+                                            upper = NULL,
+                                            icon = NULL) {
   candidate <- .npscoef_nn_candidate_bandwidth(
     param = param,
     bwtype = bwtype,
-    nobs = nobs
+    nobs = nobs,
+    icon = icon
   )
   if (any(!is.finite(candidate)))
     return(FALSE)
@@ -1647,6 +1699,18 @@ npscoefbw.NULL <-
       return(all(candidate >= lower))
     return(all(candidate > 0))
   }
+  if (!is.null(icon)) {
+    icon <- as.logical(icon)
+    categorical <- !icon
+    if (any(candidate[categorical] < 0))
+      return(FALSE)
+    if (!is.null(upper)) {
+      if (length(upper) != length(candidate) || anyNA(upper))
+        stop("npscoefbw: invalid nearest-neighbor upper-bound map", call. = FALSE)
+      if (any(candidate[categorical] > upper[categorical]))
+        return(FALSE)
+    }
+  }
   TRUE
 }
 
@@ -1654,8 +1718,11 @@ npscoefbw.NULL <-
                                         bwtype,
                                         nobs,
                                         lower = NULL,
+                                        icon = NULL,
                                         where = "npscoefbw") {
-  candidate <- .npscoef_nn_candidate_bandwidth(param = param, bwtype = bwtype, nobs = nobs)
+  candidate <- .npscoef_nn_candidate_bandwidth(
+    param = param, bwtype = bwtype, nobs = nobs, icon = icon
+  )
   if (any(!is.finite(candidate))) {
     if (identical(bwtype, "fixed")) {
       stop(sprintf("%s: bandwidth must be finite", where), call. = FALSE)
@@ -2592,6 +2659,8 @@ npscoefbw.scbandwidth <-
           } else {
             NULL
           }
+          candidate.upper <- rep.int(Inf, length(x.scale))
+          candidate.upper[!dati$icon] <- 2.0*x.scale[!dati$icon]
 
           optim.control <- list(abstol = optim.abstol,
                                 reltol = optim.reltol,
@@ -2614,12 +2683,15 @@ npscoefbw.scbandwidth <-
               )
               if (all(bws$bw != 0) &&
                   .npscoef_candidate_is_admissible(param = bws$bw, bwtype = bws$type, nobs = n,
-                                                   lower = fixed.lower)) {
+                                                   lower = fixed.lower,
+                                                   upper = candidate.upper,
+                                                   icon = dati$icon)) {
                 tbw <- .npscoef_finalize_bandwidth(
                   param = bws$bw,
                   bwtype = bws$type,
                   nobs = n,
                   lower = fixed.lower,
+                  icon = dati$icon,
                   where = "npscoefbw"
                 )
               }
@@ -2671,13 +2743,16 @@ npscoefbw.scbandwidth <-
               param = optim.return$par,
               bwtype = bws$type,
               nobs = n,
-              lower = fixed.lower
+              lower = fixed.lower,
+              upper = candidate.upper,
+              icon = dati$icon
             ) && (!have_best || optim.return$value < fval.min)) {
               param <- .npscoef_finalize_bandwidth(
                 param = optim.return$par,
                 bwtype = bws$type,
                 nobs = n,
                 lower = fixed.lower,
+                icon = dati$icon,
                 where = "npscoefbw"
               )
               min.overall <- optim.return$value
@@ -2702,6 +2777,7 @@ npscoefbw.scbandwidth <-
             param = param,
             bwtype = bws$type,
             nobs = n,
+            icon = dati$icon,
             where = "npscoefbw"
           )
           bws <- apply_bw_to_scbw(bws, bws$bw)
