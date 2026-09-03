@@ -102,7 +102,8 @@
 .npRmpi_attach_exit_finalizer <- function(e) {
   tryCatch({
     state <- as.character(getOption("npRmpi.attach.close.state", "closed"))[1L]
-    if (!identical(state, "open"))
+    if (!identical(state, "open") ||
+        !isTRUE(getOption("npRmpi.mpi.initialized", FALSE)))
       return(invisible(FALSE))
     world <- .npRmpi_safe_int(mpi.comm.size(0L))
     comm <- .npRmpi_safe_int(mpi.comm.size(1L))

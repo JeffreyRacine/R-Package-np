@@ -72,7 +72,24 @@ test_that("attach init registers a master-side process-exit close finalizer", {
   expect_match(register_txt, "reg\\.finalizer\\(")
   expect_match(register_txt, "onexit = TRUE")
   expect_match(finalizer_txt, "npRmpi\\.attach\\.close\\.state")
+  expect_match(finalizer_txt, "npRmpi\\.mpi\\.initialized")
   expect_match(finalizer_txt, "npRmpi\\.quit\\(mode = \"attach\"")
+})
+
+test_that("attach exit finalizer never queries a finalized MPI runtime", {
+  finalizer <- getFromNamespace(".npRmpi_attach_exit_finalizer", "npRmpi")
+  withr::local_options(list(
+    npRmpi.attach.close.state = "open",
+    npRmpi.mpi.initialized = FALSE
+  ))
+
+  testthat::with_mocked_bindings({
+    expect_true(isTRUE(finalizer(NULL)))
+  },
+    mpi.comm.size = function(...) stop("communicator query must not run"),
+    mpi.comm.rank = function(...) stop("communicator query must not run"),
+    .package = "npRmpi"
+  )
 })
 
 test_that("attach ACK collector marks complete ACK sets as OK", {

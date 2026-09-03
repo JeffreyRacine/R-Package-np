@@ -1,5 +1,8 @@
 # npRmpi 0.70-6
 
+* The attach-mode process-exit finalizer now checks MPI lifecycle state before
+  querying communicators, avoiding a crash after an explicit MPI finalization.
+
 * `mpi.bcast(..., type = 5)` now transfers an incomplete final chunk
   separately, preventing reads and writes beyond vectors whose lengths are not
   multiples of `buffunit`.
