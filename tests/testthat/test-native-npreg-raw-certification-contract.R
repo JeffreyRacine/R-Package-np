@@ -1,7 +1,7 @@
-test_that("native npreg raw-objective validity excludes the DBL_MAX sentinel", {
+test_that("shared raw-objective validity excludes the DBL_MAX sentinel", {
   package <- packageName(environment(npregbw))
   raw_valid <- getFromNamespace(
-    ".npregbw_native_raw_objective_valid", package
+    ".np_nn_raw_objective_valid", package
   )
 
   expect_true(raw_valid(0))

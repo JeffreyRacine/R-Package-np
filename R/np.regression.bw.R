@@ -1161,12 +1161,6 @@ npRmpiPreparedObjectiveClearRegression <- function() {
     engine %in% c("nomad", "nomad+powell")
 }
 
-.npregbw_native_raw_objective_valid <- function(value) {
-  value <- as.numeric(value)
-  length(value) == 1L && !is.na(value) && is.finite(value) &&
-    !identical(value, .Machine$double.xmax)
-}
-
 .npregbw_nomad_native_require_crs <- function() {
   if (!requireNamespace("crs", quietly = TRUE))
     stop("native npreg NOMAD route requires crs >= 0.15-46", call. = FALSE)
@@ -1743,6 +1737,7 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
       !isTRUE(getOption("npRmpi.local.regression.mode", FALSE))
     called.from.bcast <- isTRUE(.npRmpi_autodispatch_called_from_bcast())
     if (active.pool && !called.from.bcast) {
+      .npRmpi_sync_prepared_search_options(comm = 1L)
       .npRmpi_bcast_cmd_expr(quote(invisible(NULL)), comm = 1L, caller.execute = TRUE)
     }
     prepared <- .npregbw_prepared_begin(
@@ -1767,6 +1762,27 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
     native.nomad.elapsed <- 0
     native.num.feval.total <- 0
     native.num.feval.fast.total <- 0
+
+    recovery.degree <- .npregbw_prepared_args(xdat, ydat, template,
+      start.bw = start.bw)$degree
+    raw_eval_point <- function(point, count = FALSE) {
+      bw_vec <- .npregbw_nomad_point_to_bw(point, template = template, setup = setup)
+      raw.call <- substitute(
+        get("npRmpiPreparedObjectiveEvalRegressionRaw", envir = asNamespace("npRmpi"), inherits = FALSE)(BW, DEGREE),
+        list(BW = as.double(c(bw_vec[template$icon], bw_vec[template$iuno], bw_vec[template$iord])),
+             DEGREE = as.integer(recovery.degree))
+      )
+      out <- if (active.pool && !called.from.bcast) {
+        .npRmpi_bcast_cmd_expr(raw.call, comm = 1L, caller.execute = TRUE)
+      } else {
+        eval(raw.call, envir = environment())
+      }
+      if (isTRUE(count)) {
+        native.num.feval.total <<- native.num.feval.total + 1L
+        native.num.feval.fast.total <<- native.num.feval.fast.total + as.numeric(out[2L])
+      }
+      as.numeric(out[1L])
+    }
 
     run_native_restart <- function(start, restart.index) {
       native.start <- proc.time()[3L]
@@ -1809,6 +1825,12 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
       .np_nomad_native_status(native.i, "native npreg NOMAD route")
 
       objective.i <- as.numeric(native.i$objective[1L])
+      raw.objective.i <- if (is.null(native.i$best_point) ||
+                             any(!is.finite(native.i$best_point))) {
+        NA_real_
+      } else {
+        raw_eval_point(as.numeric(native.i$best_point))
+      }
       record <- list(
         restart = restart.index,
         start = as.numeric(start),
@@ -1825,14 +1847,15 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
       )
       native.num.feval.total <<- native.num.feval.total + as.numeric(native.i$total_num.feval[1L])
       native.num.feval.fast.total <<- native.num.feval.fast.total + as.numeric(native.i$total_num.feval.fast[1L])
-      record
+      list(record = record,
+        raw.valid = .np_nn_raw_objective_valid(raw.objective.i) &&
+          .np_nn_raw_objective_valid(objective.i))
     }
     for (i in seq_len(nrow(native.start.matrix))) {
-      record <- run_native_restart(as.numeric(native.start.matrix[i, ]), i)
-      native.results[[i]] <- record
-      if (.np_nn_raw_objective_valid(record$objective) &&
-          record$objective < native.best.objective) {
-        native.best.objective <- record$objective
+      result <- run_native_restart(as.numeric(native.start.matrix[i, ]), i)
+      native.results[[i]] <- result$record
+      if (result$raw.valid && result$record$objective < native.best.objective) {
+        native.best.objective <- result$record$objective
         native.best.index <- i
       }
     }
@@ -1843,23 +1866,8 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
       incumbent <- vapply(native.results, function(z) z$objective, numeric(1L))
       incumbent[!is.finite(incumbent)] <- Inf
       incumbent.index <- if (any(is.finite(incumbent))) which.min(incumbent) else 1L
-      recovery.degree <- .npregbw_prepared_args(xdat, ydat, template,
-        start.bw = start.bw)$degree
       recovery.raw.eval <- function(point) {
-        bw_vec <- .npregbw_nomad_point_to_bw(point, template = template, setup = setup)
-        raw.call <- substitute(
-          get("npRmpiPreparedObjectiveEvalRegressionRaw", envir = asNamespace("npRmpi"), inherits = FALSE)(BW, DEGREE),
-          list(BW = as.double(c(bw_vec[template$icon], bw_vec[template$iuno], bw_vec[template$iord])),
-               DEGREE = as.integer(recovery.degree))
-        )
-        out <- if (active.pool && !called.from.bcast) {
-          .npRmpi_bcast_cmd_expr(raw.call, comm = 1L, caller.execute = TRUE)
-        } else {
-          eval(raw.call, envir = environment())
-        }
-        native.num.feval.total <<- native.num.feval.total + 1L
-        native.num.feval.fast.total <<- native.num.feval.fast.total + as.numeric(out[2L])
-        as.numeric(out[1L])
+        raw_eval_point(point, count = TRUE)
       }
       ordinary.cap <- setup$nobs - if (identical(template$type, "adaptive_nn")) 2L else 1L
       recovery <- .np_nn_find_raw_valid_start(
@@ -1870,12 +1878,12 @@ npRmpiNomadEvalOnlyRegression <- function(runo,
       )
       if (isTRUE(recovery$found)) {
         recovery.index <- length(native.results) + 1L
-        record <- run_native_restart(recovery$point, recovery.index)
-        record$recovery <- TRUE
-        record$recovery_witness <- recovery
-        native.results[[recovery.index]] <- record
-        if (.np_nn_raw_objective_valid(record$objective)) {
-          native.best.objective <- record$objective
+        result <- run_native_restart(recovery$point, recovery.index)
+        result$record$recovery <- TRUE
+        result$record$recovery_witness <- recovery
+        native.results[[recovery.index]] <- result$record
+        if (result$raw.valid) {
+          native.best.objective <- result$record$objective
           native.best.index <- recovery.index
         }
       }
@@ -2414,6 +2422,12 @@ npRmpiNomadPreparedSearchRegression <- function(template,
       } else {
         as.integer(round(native$best_point[degree.idx]))
       }
+      raw.objective <- as.numeric(eval_point(native$best_point, raw = TRUE)$objective[1L])
+      objective <- if (.np_nn_raw_objective_valid(raw.objective)) {
+        as.numeric(native$objective[1L])
+      } else {
+        .Machine$double.xmax
+      }
       list(
         restart = as.integer(restart.index),
         remin = isTRUE(remin),
@@ -2422,7 +2436,7 @@ npRmpiNomadPreparedSearchRegression <- function(template,
         elapsed = native.elapsed,
         status = "ok",
         message = as.character(native$message[1L]),
-        objective = as.numeric(native$objective[1L]),
+        objective = objective,
         bbe = as.numeric(native$blackbox_evaluations[1L]),
         iterations = as.numeric(native$iterations[1L]),
         solution = as.numeric(native$solution),
@@ -2462,7 +2476,7 @@ npRmpiNomadPreparedSearchRegression <- function(template,
           num.feval = NA_real_
         )
       }
-      if (.npregbw_native_raw_objective_valid(native.i$objective) &&
+      if (.np_nn_raw_objective_valid(native.i$objective) &&
           .np_degree_better(native.i$objective, native.best.objective, direction = "min")) {
         native.best.objective <- native.i$objective
         native.best.index <- i
@@ -2520,7 +2534,7 @@ npRmpiNomadPreparedSearchRegression <- function(template,
       native.num.feval.total <- native.num.feval.total + as.numeric(native.remin$native$total_num.feval[1L])
       native.num.feval.fast.total <- native.num.feval.fast.total + as.numeric(native.remin$native$total_num.feval.fast[1L])
       native.callback.total <- native.callback.total + as.integer(native.remin$native$compiled_callback_calls[1L])
-      if (.npregbw_native_raw_objective_valid(native.remin$objective) &&
+      if (.np_nn_raw_objective_valid(native.remin$objective) &&
           .np_degree_better(native.remin$objective, native.best.objective, direction = "min")) {
         native.best.objective <- native.remin$objective
         native.best.index <- remin.index

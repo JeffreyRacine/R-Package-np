@@ -2783,6 +2783,8 @@ npRmpiPreparedObjectiveSearchConditionalDensity <- function(template,
       .npRmpi_has_active_slave_pool(comm = 1L) &&
       !isTRUE(getOption("npRmpi.local.regression.mode", FALSE))
     called.from.bcast <- isTRUE(.npRmpi_autodispatch_called_from_bcast())
+    if (active.pool && !called.from.bcast)
+      .npRmpi_sync_prepared_search_options(comm = 1L)
 
     native.nmulti <- npValidateNmulti(
       opt.value("nmulti", npDefaultNmulti(dim(ydat)[2L] + dim(xdat)[2L]))

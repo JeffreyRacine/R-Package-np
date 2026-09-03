@@ -1,5 +1,10 @@
 # npRmpi 0.70-6
 
+* Prepared MPI regression MADS restarts are now admitted only after raw
+  endpoint certification, matching the serial search contract; fixed-degree
+  regression and conditional-density prepared searches also synchronize the
+  current master search options before entering collectives.
+
 * Raw-only regression objective certification now applies the same active
   continuous scale-factor floor as serial `np`, preventing an inadmissible
   endpoint from being certified only in MPI.
