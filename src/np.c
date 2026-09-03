@@ -6943,6 +6943,16 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                                     double * cxkerlb, double * cxkerub,
                                     double * cykerlb, double * cykerub,
                                     const int eval_only);
+static void np_kernelsum_common(double *tuno, double *tord, double *tcon,
+                                double *ty, double *weights,
+                                double *euno, double *eord, double *econ,
+                                double *bw, double *mcv, double *padnum,
+                                int *operator, int *myopti, double *kpow,
+                                double *weighted_sum, double *weighted_sum_power2,
+                                double *weighted_p_sum, double *kernel_weights,
+                                double *permutation_kernel_weights,
+                                double *ckerlb, double *ckerub,
+                                const int *eval_to_train);
 void np_kernelsum(double * tuno, double * tord, double * tcon,
                   double * ty, double * weights,
                   double * euno, double * eord, double * econ,
@@ -12053,6 +12063,7 @@ SEXP C_np_kernelsum(SEXP tuno,
   int n_kw = asInteger(kw_len);
   int ncon = 0, nuno = 0, nord = 0, p_operator = 0, do_score = 0, do_ocg = 0, return_kernel_weights = 0, p_nvar = 0;
   R_xlen_t n_pkw = 0;
+  const int *eval_to_train = NULL;
   double * ckerlb_p = NULL;
   double * ckerub_p = NULL;
   np_continuous_kernel_descriptor descriptor;
@@ -12097,6 +12108,25 @@ SEXP C_np_kernelsum(SEXP tuno,
   p_nvar = ((p_operator != OP_NOOP) ? ncon : 0) + ((do_score || do_ocg) ? (nuno + nord) : 0);
   n_pkw = (return_kernel_weights && (p_nvar > 0)) ? ((R_xlen_t)n_kw * (R_xlen_t)p_nvar) : 0;
   resolve_bounds_or_default(ckerlb_r, ckerub_r, ncon, &ckerlb_p, &ckerub_p);
+
+  if(INTEGER(myopti_i)[KWS_BWI] == BW_GEN_NN) {
+    SEXP map = getAttrib(myopti, install("np.eval.train.index"));
+    if(map != R_NilValue) {
+      const int nt = INTEGER(myopti_i)[KWS_TNOBSI];
+      const int ne = INTEGER(myopti_i)[KWS_ENOBSI];
+      if(TYPEOF(map) != INTSXP || nt <= 0 || ne <= 0 ||
+         XLENGTH(map) != ne || ncon <= 0 ||
+         descriptor.family == NP_CKERNEL_FAMILY_BETA ||
+         INTEGER(myopti_i)[KWS_TISEI] || INTEGER(myopti_i)[KWS_LOOI] ||
+         !np_real_buffer_has_matrix(tcon_r, nt, ncon) ||
+         !np_real_buffer_has_matrix(econ_r, ne, ncon))
+        error("C_np_kernelsum: invalid internal NN training map");
+      eval_to_train = INTEGER(map);
+      for(int j = 0; j < ne; ++j)
+        if(eval_to_train[j] < 0 || eval_to_train[j] >= nt)
+          error("C_np_kernelsum: invalid internal NN training index");
+    }
+  }
 
   PROTECT(out_ksum = allocVector(REALSXP, n_ksum));
   PROTECT(out_pksum = allocVector(REALSXP, n_pksum));
@@ -12402,14 +12432,14 @@ SEXP C_np_kernelsum(SEXP tuno,
                 infinite_count, undefined_count);
     }
   } else {
-    np_kernelsum(REAL(tuno_r), REAL(tord_r), REAL(tcon_r),
+    np_kernelsum_common(REAL(tuno_r), REAL(tord_r), REAL(tcon_r),
                  REAL(ty_r), REAL(weights_r),
                  REAL(euno_r), REAL(eord_r), REAL(econ_r),
                  REAL(bw_r),
                  REAL(mcv_r), REAL(padnum_r),
                  INTEGER(op_i), INTEGER(myopti_i), REAL(kpow_r),
-                 REAL(out_ksum), REAL(out_pksum), REAL(out_kw), REAL(out_pkw),
-                 ckerlb_p, ckerub_p);
+                 REAL(out_ksum), NULL, REAL(out_pksum), REAL(out_kw), REAL(out_pkw),
+                 ckerlb_p, ckerub_p, eval_to_train);
   }
 
   PROTECT(out = allocVector(VECSXP, 4));
@@ -20918,7 +20948,8 @@ static void np_kernelsum_common(double * tuno, double * tord, double * tcon,
                                 double * weighted_p_sum,
                                 double * kernel_weights,
                                 double * permutation_kernel_weights,
-                                double * ckerlb, double * ckerub){
+                                double * ckerlb, double * ckerub,
+                                const int *eval_to_train){
 
   int * ipt = NULL, * ipe = NULL;  // point permutation, see tree.c
       
@@ -21379,11 +21410,22 @@ static void np_kernelsum_common(double * tuno, double * tord, double * tcon,
    * matrix, apply, density, distribution, and derivative consumers share one
    * geometry contract while the weighted-sum engine remains unchanged.
    */
-  if(BANDWIDTH_reg_extern == BW_GEN_NN && train_is_eval &&
+  if(BANDWIDTH_reg_extern == BW_GEN_NN && (train_is_eval || eval_to_train != NULL) &&
      num_reg_continuous_extern > 0){
+    const int *query_map = eval_to_train;
+    if(eval_to_train != NULL && use_tree) {
+      int *inverse_train = (int *)R_alloc((size_t)num_obs_train_extern, sizeof(int));
+      int *permuted_map = (int *)R_alloc((size_t)num_obs_eval_extern, sizeof(int));
+      for(i = 0; i < num_obs_train_extern; ++i)
+        inverse_train[ipt[i]] = i;
+      for(i = 0; i < num_obs_eval_extern; ++i)
+        permuted_map[i] = inverse_train[eval_to_train[ipe[i]]];
+      query_map = permuted_map;
+    }
     const NPNNGeometryContext query_geometry = {
-      .mode = NP_NN_QUERY_TRAINING_IDENTITY,
-      .eval_to_train = NULL,
+      .mode = query_map == NULL ? NP_NN_QUERY_TRAINING_IDENTITY :
+                                 NP_NN_QUERY_TRAINING_MAP,
+      .eval_to_train = query_map,
       .adaptive_successor = NULL
     };
     NPNNGeometryStatus query_status = NP_NN_GEOMETRY_OK;
@@ -21705,7 +21747,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
                       operator, myopti, kpow,
                       weighted_sum, NULL, weighted_p_sum,
                       kernel_weights, permutation_kernel_weights,
-                      ckerlb, ckerub);
+                      ckerlb, ckerub, NULL);
 }
 
 void np_kernelsum_power12(double * tuno, double * tord, double * tcon,
@@ -21726,7 +21768,7 @@ void np_kernelsum_power12(double * tuno, double * tord, double * tcon,
                       operator, myopti, kpow,
                       weighted_sum, weighted_sum_power2, weighted_p_sum,
                       kernel_weights, permutation_kernel_weights,
-                      ckerlb, ckerub);
+                      ckerlb, ckerub, NULL);
 }
 
 
