@@ -1,5 +1,9 @@
 # npRmpi 0.70-6
 
+* Raw-only regression objective certification now applies the same active
+  continuous scale-factor floor as serial `np`, preventing an inadmissible
+  endpoint from being certified only in MPI.
+
 * The attach-mode process-exit finalizer now checks MPI lifecycle state before
   querying communicators, avoiding a crash after an explicit MPI finalization.
 

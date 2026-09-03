@@ -8283,10 +8283,14 @@ static int np_regression_prepared_context_eval(
   fast_before = np_fastcv_alllarge_hits_get();
   if (raw_only) {
     bwm_eval_count += 1.0;
-    bwm_progress_eval_active = 1;
-    value = bwmfunc_raw_current_scale(
-      context->scale_factor, context->num_var);
-    bwm_progress_eval_active = 0;
+    if (!bwm_active_floor_candidate_ok(context->scale_factor)) {
+      value = DBL_MAX;
+    } else {
+      bwm_progress_eval_active = 1;
+      value = bwmfunc_raw_current_scale(
+        context->scale_factor, context->num_var);
+      bwm_progress_eval_active = 0;
+    }
     if (!isfinite(value) || value == DBL_MAX) {
       bwm_invalid_count += 1.0;
       value = DBL_MAX;
