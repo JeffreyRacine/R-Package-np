@@ -1,5 +1,10 @@
 # npRmpi 0.70-6
 
+* NOMAD degree searches now honor mixed fixed/free degree bounds such as
+  `degree.min = c(0, 0)` with `degree.max = c(1, 0)`. Fixed coordinates remain
+  fixed through starts, restarts, optional Powell refinement, and result
+  metadata; all-free, all-fixed, and exhaustive searches are unchanged.
+
 * Terminal nearest-neighbor zero-radius errors now share a diagnostic that
   identifies the continuous variable and tied-donor geometry and suggests
   fixed bandwidths (the default). `npsigtest()` also identifies the failing

@@ -2072,6 +2072,105 @@
   list(value = value, output = output)
 }
 
+.np_nomad_fixed_degree_geometry <- function(degree_spec,
+                                            ncoordinate,
+                                            bbin,
+                                            lb,
+                                            ub,
+                                            start_matrix) {
+  if (is.null(degree_spec) || !length(degree_spec$lower))
+    return(NULL)
+
+  q <- length(degree_spec$lower)
+  if (length(degree_spec$upper) != q || q > ncoordinate)
+    stop("internal NOMAD degree geometry is inconsistent", call. = FALSE)
+
+  degree.offset <- ncoordinate - q
+  fixed.count <- 0L
+  for (j in seq_len(q)) {
+    idx <- degree.offset + j
+    spec.fixed <- isTRUE(degree_spec$lower[j] == degree_spec$upper[j])
+    bound.fixed <- isTRUE(lb[idx] == ub[idx])
+    if (!identical(spec.fixed, bound.fixed)) {
+      stop(
+        "internal NOMAD degree bounds disagree with the normalized degree specification",
+        call. = FALSE
+      )
+    }
+    if (spec.fixed)
+      fixed.count <- fixed.count + 1L
+  }
+
+  if (fixed.count == 0L)
+    return(NULL)
+  if (fixed.count == q) {
+    stop(
+      "internal NOMAD degree search received an all-fixed degree vector; the singleton bypass should have handled it",
+      call. = FALSE
+    )
+  }
+
+  carrier.lower <- as.numeric(lb)
+  carrier.upper <- as.numeric(ub)
+  fixed.tokens <- rep.int("-", ncoordinate)
+  fixed.index <- integer(fixed.count)
+  fixed.value <- integer(fixed.count)
+  k <- 0L
+  for (j in seq_len(q)) {
+    idx <- degree.offset + j
+    if (!isTRUE(degree_spec$lower[j] == degree_spec$upper[j]))
+      next
+
+    value <- degree_spec$lower[j]
+    if (!is.finite(value) || value < 0 || value != round(value) ||
+        value > .Machine$integer.max || bbin[idx] != 1L) {
+      stop("internal NOMAD fixed degree is not a valid integer coordinate", call. = FALSE)
+    }
+    value <- as.integer(value)
+    for (i in seq_len(nrow(start_matrix))) {
+      if (!identical(as.numeric(start_matrix[i, idx]), as.numeric(value))) {
+        stop("internal NOMAD start does not preserve a fixed degree", call. = FALSE)
+      }
+    }
+
+    k <- k + 1L
+    fixed.index[k] <- idx
+    fixed.value[k] <- value
+    fixed.tokens[idx] <- as.character(value)
+    if (value == 0L) {
+      carrier.lower[idx] <- 0
+      carrier.upper[idx] <- 1
+    } else {
+      carrier.lower[idx] <- value - 1
+      carrier.upper[idx] <- value
+    }
+  }
+
+  list(
+    lower = carrier.lower,
+    upper = carrier.upper,
+    option.value = paste0("( ", paste(fixed.tokens, collapse = " "), " )"),
+    fixed.index = fixed.index,
+    fixed.value = fixed.value
+  )
+}
+
+.np_nomad_add_fixed_degree_option <- function(opts, geometry) {
+  if (is.null(geometry))
+    return(opts)
+
+  option.names <- names(opts)
+  if (length(opts) && !is.null(option.names) &&
+      any(toupper(trimws(option.names)) == "FIXED_VARIABLE")) {
+    stop(
+      "'FIXED_VARIABLE' is reserved internally when NOMAD searches mixed fixed/free degree bounds",
+      call. = FALSE
+    )
+  }
+
+  c(opts, list(FIXED_VARIABLE = geometry$option.value))
+}
+
 .np_nomad_native_option_vectors <- function(opts) {
   if (is.null(opts) || !length(opts))
     return(list(names = character(), values = character()))
@@ -2532,6 +2631,14 @@
     ncol(start_matrix),
     where = ".np_nomad_search"
   )
+  fixed.degree.geometry <- .np_nomad_fixed_degree_geometry(
+    degree_spec = degree_spec,
+    ncoordinate = ncol(start_matrix),
+    bbin = bbin,
+    lb = lb,
+    ub = ub,
+    start_matrix = start_matrix
+  )
   state$restart_starts <- lapply(
     seq_len(nrow(start_matrix)),
     function(i) as.numeric(start_matrix[i, ])
@@ -2711,6 +2818,8 @@
       geometry.policy = if (is.null(coordinate.roles)) "user-only" else "generate-central",
       where = ".np_nomad_search source geometry"
     )
+    if (!is.null(fixed.degree.geometry))
+      solver.opts <- .np_nomad_add_fixed_degree_option(solver.opts, fixed.degree.geometry)
     start <- as.numeric(start)
 
     if (isTRUE(state$native.r.bridge)) {
@@ -2724,8 +2833,8 @@
           eval.f = native.eval,
           x0 = start,
           bbin = bbin,
-          lb = lb,
-          ub = ub,
+          lb = if (is.null(fixed.degree.geometry)) lb else fixed.degree.geometry$lower,
+          ub = if (is.null(fixed.degree.geometry)) ub else fixed.degree.geometry$upper,
           random.seed = random.seed,
           inner.start.count = nomad.inner.nmulti,
           option.names = native.option.vectors$names,
