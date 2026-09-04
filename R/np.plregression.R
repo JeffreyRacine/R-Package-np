@@ -38,8 +38,8 @@ npplreg.formula <-
     tmf.xf[["formula"]] <- tt.xf
     tmf[["formula"]] <- tt
     if (!is.null(data)) {
-      tmf[["data"]] <- substitute(data)
-      tmf.xf[["data"]] <- substitute(data)
+      tmf[["data"]] <- data
+      tmf.xf[["data"]] <- data
     }
 
     mf.args <- as.list(tmf)[-1L]
