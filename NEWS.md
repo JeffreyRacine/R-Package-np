@@ -1,5 +1,10 @@
 # npRmpi 0.80-1
 
+* Smooth-coefficient NOMAD bandwidth objects now publish complete bandwidth
+  and scale metadata. This fixes multi-smoother summaries and NA fits or
+  predictions from malformed scalar degree-zero fixed-bandwidth objects,
+  without changing the selected bandwidth, objective or search evaluations.
+
 * Automatic MPI dispatch now transports ordinary bandwidth-search controls
   from their caller's frame, including solver, bounds-transform, penalty,
   initialization and smooth-coefficient iteration controls. Local variables

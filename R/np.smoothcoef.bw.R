@@ -443,6 +443,7 @@ npscoefbw.NULL <-
   scbw$bw <- rbw$bw
   scbw$bandwidth[[1L]] <- rbw$bandwidth[[1L]]
   scbw$sfactor[[1L]] <- rbw$sfactor[[1L]]
+  scbw$sumNum[[1L]] <- rbw$sumNum[[1L]]
   scbw$nconfac <- rbw$nconfac
   scbw$ncatfac <- rbw$ncatfac
   scbw$sdev <- rbw$sdev
@@ -1530,8 +1531,13 @@ npscoefbw.NULL <-
   }
 
   search.result <- run.search(x0, nomad.nmulti)
-  if (!nn.search)
+  if (!nn.search) {
+    search.result$best_payload <- .npscoefbw_normalize_nomad_scbw(
+      scbw = search.result$best_payload,
+      eval.zdat = eval.zdat
+    )
     return(search.result)
+  }
 
   if (!result.raw.valid(search.result) && automatic.start) {
     recovery.start <- as.numeric(search.result$restart.starts[[1L]])
