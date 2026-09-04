@@ -1,5 +1,8 @@
 # np 0.80-1
 
+* Smooth-coefficient bandwidth selection skips redundant scalar zero-ridge
+  correction work, retaining the existing ridge safeguards and results.
+
 * Base plots now annotate supported variability intervals consistently for
   levels and gradients/effects: individual full-frame figures retain subtitles
   even with `options(plot.par.mfrow=FALSE)`, while package-managed multi-panel
