@@ -394,6 +394,7 @@ double cv_func_regression_categorical_ls(double *vector_scale_factor){
   if(check_valid_scale_factor_cv(
                                  KERNEL_reg_extern,
                                  KERNEL_reg_unordered_extern,
+                                 KERNEL_reg_unordered_extern,
                                  BANDWIDTH_reg_extern,
                                  BANDWIDTH_reg_extern,
                                  0,
@@ -446,6 +447,7 @@ double cv_func_regression_categorical_ks(double *vector_scale_factor){
 
   if(check_valid_scale_factor_cv(
                                  KERNEL_reg_extern,
+                                 KERNEL_reg_unordered_extern,
                                  KERNEL_reg_unordered_extern,
                                  BANDWIDTH_reg_extern,
                                  BANDWIDTH_reg_extern,
@@ -505,6 +507,7 @@ double cv_func_lsqregression_categorical_check(double *vector_scale_factor){
 
   if(check_valid_scale_factor_cv(
                                  KERNEL_reg_extern,
+                                 KERNEL_reg_unordered_extern,
                                  KERNEL_reg_unordered_extern,
                                  BANDWIDTH_reg_extern,
                                  BANDWIDTH_reg_extern,
@@ -596,6 +599,7 @@ double np_cv_func_density_categorical_ml(double *vector_scale_factor)
     if(active_route == NULL && check_valid_scale_factor_cv(
         KERNEL_den_extern,
         KERNEL_den_unordered_extern,
+        KERNEL_den_unordered_extern,
         BANDWIDTH_den_extern,
         BANDWIDTH_den_extern,
         0,
@@ -665,7 +669,8 @@ double cv_func_con_distribution_categorical_ls(double *vector_scale_factor)
 
     if(check_valid_scale_factor_cv(
         KERNEL_den_extern,
-        KERNEL_reg_unordered_extern, /* Only for conditioning vars in conditional den */
+        KERNEL_den_unordered_extern,
+        KERNEL_reg_unordered_extern,
         BANDWIDTH_den_extern,
         BANDWIDTH_den_extern,
         0,
@@ -765,7 +770,8 @@ double np_cv_func_con_density_categorical_ml(double *vector_scale_factor){
 
     if(check_valid_scale_factor_cv(
         KERNEL_den_extern,
-        KERNEL_reg_unordered_extern, /* Only for conditioning vars in conditional den */
+        KERNEL_den_unordered_extern,
+        KERNEL_reg_unordered_extern,
         BANDWIDTH_den_extern,
         BANDWIDTH_den_extern,
         0,
@@ -857,7 +863,8 @@ double np_cv_func_con_density_categorical_ls_npksum(double *vector_scale_factor)
   }
 
   if(check_valid_scale_factor_cv(KERNEL_den_extern,
-                                 KERNEL_reg_unordered_extern,  /* Only for conditioning vars in conditional den */
+                                 KERNEL_den_unordered_extern,
+                                 KERNEL_reg_unordered_extern,
                                  BANDWIDTH_den_extern,
                                  BANDWIDTH_den_extern,
                                  0,
@@ -966,6 +973,7 @@ double np_cv_func_density_categorical_ls(double *vector_scale_factor){
     if(active_route == NULL && check_valid_scale_factor_cv(
         KERNEL_den_extern,
         KERNEL_den_unordered_extern,
+        KERNEL_den_unordered_extern,
         BANDWIDTH_den_extern,
         BANDWIDTH_den_extern,
         0,
@@ -1065,6 +1073,7 @@ double cv_func_distribution_categorical_ls(double *vector_scale_factor)
 
     if(active_route == NULL && check_valid_scale_factor_cv(
         KERNEL_den_extern,
+        KERNEL_den_unordered_extern,
         KERNEL_den_unordered_extern,
         BANDWIDTH_den_extern,
         BANDWIDTH_den_extern,
@@ -1215,6 +1224,7 @@ double cv_func_regression_categorical_aic_c(double *vector_scale_factor)
 
   if(check_valid_scale_factor_cv(
                                  KERNEL_reg_extern,
+                                 KERNEL_reg_unordered_extern,
                                  KERNEL_reg_unordered_extern,
                                  BANDWIDTH_reg_extern,
                                  BANDWIDTH_reg_extern,

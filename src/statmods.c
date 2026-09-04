@@ -2164,7 +2164,8 @@ double **matrix_categorical_vals)
 
 int check_valid_scale_factor_cv(
 int KERNEL,
-int KERNEL_unordered_liracine,
+int KERNEL_var_unordered_liracine,
+int KERNEL_reg_unordered_liracine,
 int BANDWIDTH,
 int BANDWIDTH_den_ml,
 int REGRESSION_ML,
@@ -2330,7 +2331,7 @@ double *vector_scale_factor)
     for(i = num_var_continuous+num_reg_continuous+1; i <= num_var_continuous+num_reg_continuous+num_var_unordered; i++)
     {
 /* Check for admissible value of lambda - in inadmissible, set to admissible */
-      if(KERNEL_unordered_liracine == 1) {
+      if(KERNEL_var_unordered_liracine == 1) {
         /* If using the unordered li_racine kernel use ordered bounds */
         if(int_LARGE_SF == 0)
         {
@@ -2392,7 +2393,7 @@ double *vector_scale_factor)
     for(i = num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+1; i <= num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered; i++)
     {
 /* Check for admissible value of lambda - in inadmissible, set to admissible */
-      if(KERNEL_unordered_liracine == 1) {
+      if(KERNEL_reg_unordered_liracine == 1) {
         /* If using the unordered li_racine kernel use ordered bounds */
         if(int_LARGE_SF == 0)
         {
