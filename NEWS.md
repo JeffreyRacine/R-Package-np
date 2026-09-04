@@ -1,5 +1,11 @@
 # np 0.80-1
 
+* Conditional categorical bandwidth admission now applies the response and
+  regressor unordered-kernel bounds independently. Mixed Li-Racine and
+  Aitchison-Aitken conditional-density searches no longer reject valid
+  response bandwidths or admit response bandwidths above their kernel bound;
+  objective arithmetic and same-kernel behavior are unchanged.
+
 * Cell and exhaustive degree searches now skip only typed LP-admissibility
   and NN-candidate rejections. Unexpected evaluator errors propagate with
   their original condition instead of silently selecting a surviving degree.
