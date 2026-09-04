@@ -1,5 +1,11 @@
 # np 0.80-1
 
+* Undefined external smooth-coefficient fits now return NA for the affected
+  fitted values, coefficients and requested standard errors, with one
+  informative warning, instead of publishing an internal finite penalty.
+  Valid rows and the ridge schedule are unchanged. Required training and
+  bootstrap fits still fail when their local systems cannot be solved.
+
 * Regression uncertainty documentation now describes the already implemented
   fitted-residual HC0 standard errors, including derivatives, categorical
   contrasts, beta kernels and continuous pivotal npsigtest statistics. The

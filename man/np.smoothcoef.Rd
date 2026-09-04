@@ -239,6 +239,15 @@ Further arguments are passed to the bandwidth-selection counterpart when bandwid
   }
 }
 \value{
+  When an external evaluation row has no usable kernel support or its
+  kernel-weighted system cannot be solved, the corresponding fitted value,
+  coefficients and requested standard errors are \code{NA}. One warning
+  identifies affected rows; valid rows are retained in their original order.
+  A larger bandwidth or another kernel may provide usable support.
+  Required training and bootstrap fits instead signal an error on this
+  failure; they do not silently discard rows. Being outside the training
+  range alone does not imply that a local fit is undefined.
+
   \code{npscoef} returns a \code{smoothcoefficient} object.   The generic
   functions \code{\link{fitted}}, \code{\link{residuals}}, \code{\link{coef}},
   \code{\link{se}}, and \code{\link{predict}},
