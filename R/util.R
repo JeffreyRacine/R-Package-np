@@ -135,6 +135,14 @@ npRidgeSequenceFromBase <- function(n.train, ridge.base = 0.0, cap = 1.0) {
 }
 
 npRidgeInterceptCorrection <- function(ridge, intercept, pristine.anchor) {
+  # Scalar zero-ridge solves need no correction, even for nonfinite moments.
+  # Keep coercion and conformance checks on the original path for other inputs.
+  if (identical(ridge, 0.0) &&
+      is.double(intercept) && !is.object(intercept) && length(intercept) == 1L &&
+      is.double(pristine.anchor) && !is.object(pristine.anchor) &&
+      length(pristine.anchor) == 1L)
+    return(0.0)
+
   lengths <- c(length(ridge), length(intercept), length(pristine.anchor))
   target <- max(lengths)
   if (any(lengths == 0L) || any(!(lengths %in% c(1L, target))))
