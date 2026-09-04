@@ -142,6 +142,8 @@ se.singleindex <- function(x){
   x$merr
 }
 gradients.singleindex <- function(x, se = FALSE, ...) {
+  .np_reject_gradient_order_alias(substitute(list(...))[-1L],
+                                  "gradients.singleindex", suggest = TRUE)
   dots <- list(...)
   npRejectLegacyBooleanErrors(dots, "gradients.singleindex")
   se <- npValidateScalarLogical(se, "se")

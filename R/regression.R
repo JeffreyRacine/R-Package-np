@@ -105,6 +105,8 @@ se.npregression <- function(x) {
   x$merr
 }
 gradients.npregression <- function(x, se = FALSE, gradient.order = NULL, ...) {
+  .np_reject_gradient_order_alias(substitute(list(...))[-1L],
+                                  "gradients.npregression", suggest = TRUE)
   npRejectLegacyBooleanErrors(list(...), "gradients.npregression")
   se <- npValidateScalarLogical(se, "se")
   gout <- if (!se) x$grad else x$gerr

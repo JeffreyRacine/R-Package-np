@@ -130,6 +130,8 @@ se.qregression <- function(x) {
   x$quanterr
 }
 gradients.qregression <- function(x, se = FALSE, ...) {
+  .np_reject_gradient_order_alias(substitute(list(...))[-1L],
+                                  "gradients.qregression")
   npRejectLegacyBooleanErrors(list(...), "gradients.qregression")
   se <- npValidateScalarLogical(se, "se")
   gout <- if (!se) x$quantgrad else x$quantgerr

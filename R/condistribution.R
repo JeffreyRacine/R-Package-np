@@ -125,6 +125,8 @@ se.condistribution <- function(x){
   x$conderr
 }
 gradients.condistribution <- function(x, se = FALSE, gradient.order = NULL, ...) {
+  .np_reject_gradient_order_alias(substitute(list(...))[-1L],
+                                  "gradients.condistribution", suggest = TRUE)
   npRejectLegacyBooleanErrors(list(...), "gradients.condistribution")
   se <- npValidateScalarLogical(se, "se")
   gout <- if (!se) x$congrad else x$congerr

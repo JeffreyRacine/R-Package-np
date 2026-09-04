@@ -1,5 +1,7 @@
 nplsqreg <-
   function(bws, ...) {
+    .np_reject_gradient_order_alias(substitute(list(...))[-1L],
+                                    "nplsqreg", suggest = TRUE)
     args <- list(...)
 
     if (!missing(bws)) {

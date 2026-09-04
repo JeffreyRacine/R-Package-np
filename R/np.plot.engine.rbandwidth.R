@@ -68,7 +68,7 @@
         regtype = reg.spec$regtype,
         gradient.order = gradient.order,
         ncon = bws$ncon,
-        argname = "gradient_order",
+        argname = "gradient.order",
         where = "plot.rbandwidth()"
       )
     }

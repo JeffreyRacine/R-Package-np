@@ -1,5 +1,10 @@
 # np 0.70-6
 
+* `gradient.order` is the sole supported derivative-order spelling. The
+  `gradient_order` plot/single-index alias is no longer accepted, and gradient
+  accessors reject that spelling instead of ignoring it. Diagnostics suggest
+  `gradient.order` only on routes that support derivative-order requests.
+
 * Mixed fixed/free degree searches now assert after NOMAD returns that every
   fixed degree coordinate still equals its requested value.
 

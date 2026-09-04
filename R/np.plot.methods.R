@@ -121,7 +121,7 @@ np_render_control <- function(style = c("band", "bar"),
   c("errors", "band", "alpha", "bootstrap", "B", "center",
     "output", "data_overlay", "data_rug", "layout", "legend",
     "factor_boxplot", "boxplot_outliers", "coef_index",
-    "gradient_order", "common_scale", "proper_method", "proper_control",
+    "common_scale", "proper_method", "proper_control",
     "renderer", "neval", "perspective",
     "boot_control", "grid_control", "render_control")
 }
@@ -163,7 +163,10 @@ np_render_control <- function(style = c("band", "bar"),
     method <- .np_plot_engine_for_bws(bws)
   if (is.null(method))
     return(character())
-  setdiff(names(formals(method)), c("bws", "..."))
+  args <- setdiff(names(formals(method)), c("bws", "..."))
+  if (identical(method, .np_plot_sibandwidth_engine))
+    args <- c(args, "gradient.order")
+  args
 }
 
 .np_plot_validate_public_dots <- function(dots_call,
@@ -186,6 +189,12 @@ np_render_control <- function(style = c("band", "bar"),
   canonical <- .np_plot_canonical_arg_names()
   legacy <- .np_plot_legacy_arg_names()
   engine <- .np_plot_allowed_engine_args(method = method, bws = bws)
+  if ("gradient_order" %in% dot.names)
+    .np_reject_gradient_order_alias(
+      dots_call, context,
+      suggest = "gradient.order" %in% engine &&
+        !identical(context, "plot.qregression")
+    )
   dispatcher <- "random.seed"
   allowed <- unique(c(canonical, legacy, dispatcher, engine,
                       .np_plot_graphics_arg_names(),
@@ -339,17 +348,6 @@ np_render_control <- function(style = c("band", "bar"),
     dots$coef_index <- NULL
     dots <- .np_plot_set_normalized_arg(dots, "coef_index",
                                         "coef.index", as.integer(coef_index))
-  }
-  if (has("gradient_order")) {
-    gradient_order <- dots$gradient_order
-    if (!is.numeric(gradient_order) || any(is.na(gradient_order)) ||
-        any(gradient_order < 1L))
-      stop("gradient_order must contain positive numeric values",
-           call. = FALSE)
-    dots$gradient_order <- NULL
-    dots <- .np_plot_set_normalized_arg(dots, "gradient_order",
-                                        "gradient.order",
-                                        as.integer(gradient_order))
   }
   if (has("common_scale")) {
     common_scale <- .np_plot_match_flag(dots$common_scale, "common_scale")
@@ -1886,6 +1884,7 @@ np_render_control <- function(style = c("band", "bar"),
                              layout = TRUE,
                              legend = TRUE,
                              .plot_dots_call = NULL) {
+  .np_reject_gradient_order_alias(substitute(list(...))[-1L], "plot.conmode")
   dots <- list(...)
   dot.names <- .np_plot_dot_names(.plot_dots_call)
   if (any(!nzchar(dot.names)))

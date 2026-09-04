@@ -261,6 +261,8 @@ predict.conmode <- function(object,
   probs
 }
 gradients.conmode <- function(x, level = NULL, se = FALSE, ...) {
+  .np_reject_gradient_order_alias(substitute(list(...))[-1L],
+                                  "gradients.conmode")
   npRejectLegacyBooleanErrors(list(...), "gradients.conmode")
   se <- npValidateScalarLogical(se, "se")
   if (isTRUE(se))

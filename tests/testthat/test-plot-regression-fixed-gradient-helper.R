@@ -264,7 +264,7 @@ test_that("fixed lp plot output records requested gradient order", {
   out <- plot(
     fit,
     gradients = TRUE,
-    gradient_order = 2L,
+    gradient.order = 2L,
     errors = "none",
     output = "data",
     neval = 20
