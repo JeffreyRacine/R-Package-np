@@ -1,5 +1,11 @@
 # npRmpi 0.80-1
 
+* Conditional bandwidth transforms and categorical baseline probes now
+  preserve the raw Y-unordered, Y-ordered, X-unordered, X-ordered layout and
+  the corresponding per-side kernel caps. This corrects mistyped coordinates
+  when ordered responses and unordered regressors coexist; objective kernels
+  and the penalty formula are unchanged.
+
 * Adaptive-NN local-constant regression overrides now preserve NA at
   zero-support external rows instead of replacing the fitted value by zero.
   A single warning identifies the undefined rows; associated requested
