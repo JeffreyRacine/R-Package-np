@@ -115,6 +115,11 @@
 * Evaluation-only bandwidth calls now return one initialized history entry,
   rather than exposing unused entries when more than one start was requested.
 
+* Automatic NN search recovery uses a bounded deterministic schedule of
+  ordinary-NN points. It does not exhaust all feasible NN indices; failure to
+  find a valid restart is not a proof of infeasibility. Explicit starts,
+  raw-objective certification and mandatory optimizer refinement are unchanged.
+
 * Bandwidth searches no longer reuse large-bandwidth geometry from an earlier
   dataset. This fixes history-dependent density cross-validation values and
   protects subsequent searches and regression fits from stale geometry.

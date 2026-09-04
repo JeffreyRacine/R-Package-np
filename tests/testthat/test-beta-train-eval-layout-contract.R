@@ -1,6 +1,7 @@
 .native_beta_self_map_call <- function(bandwidth.mode,
                                        train.is.eval = 1L,
-                                       num.eval = 4L) {
+                                       num.eval = 4L,
+                                       entry = "C_np_kernelsum") {
   constant <- function(name) get(name, envir = asNamespace("npRmpi"),
                                  inherits = FALSE)
   options <- list(
@@ -33,7 +34,7 @@
   )
 
   .Call(
-    "C_np_kernelsum",
+    entry,
     numeric(), numeric(), c(0.1, 0.5, 0.9), numeric(), numeric(),
     numeric(), numeric(), numeric(),
     if (bandwidth.mode == constant("BW_FIXED")) 0.2 else 2,
@@ -44,22 +45,23 @@
 }
 
 test_that("beta native self maps reject inconsistent layouts", {
-  expect_error(
-    .native_beta_self_map_call(getFromNamespace("BW_FIXED", "npRmpi")),
-    "invalid beta kernel-sum dimensions", fixed = TRUE
-  )
-  expect_error(
-    .native_beta_self_map_call(getFromNamespace("BW_GEN_NN", "npRmpi")),
-    "invalid beta kernel-sum dimensions", fixed = TRUE
-  )
-  expect_error(
-    .native_beta_self_map_call(
-      getFromNamespace("BW_GEN_NN", "npRmpi"),
-      train.is.eval = 2L,
-      num.eval = 3L
-    ),
-    "invalid beta kernel-sum dimensions", fixed = TRUE
-  )
+  for (entry in c("C_np_kernelsum", "C_np_kernelsum_power12")) {
+    message <- if (entry == "C_np_kernelsum")
+      "invalid beta kernel-sum dimensions" else "invalid beta dual-power layout"
+    for (mode in c("BW_FIXED", "BW_GEN_NN", "BW_ADAP_NN")) {
+      expect_error(
+        .native_beta_self_map_call(getFromNamespace(mode, "npRmpi"),
+                                  entry = entry),
+        message, fixed = TRUE
+      )
+      expect_error(
+        .native_beta_self_map_call(getFromNamespace(mode, "npRmpi"),
+                                  train.is.eval = 2L, num.eval = 3L,
+                                  entry = entry),
+        message, fixed = TRUE
+      )
+    }
+  }
 })
 
 test_that("ordinary beta self maps retain all bandwidth topologies", {
