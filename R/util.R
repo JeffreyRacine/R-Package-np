@@ -3467,21 +3467,24 @@ npValidateLpBasisAdmission <- function(basis = "glp", degree, nobs,
     nobs = nobs
   )
   if (!admission$capacity.ok) {
-    stop(sprintf(
+    message <- sprintf(
       "%s: LP basis dimension exceeds supported term capacity (%d); reduce degree",
       where,
       as.integer(admission$capacity)
-    ), call. = FALSE)
-  }
-  if (!admission$rank.ok) {
-    stop(sprintf(
+    )
+  } else if (!admission$rank.ok) {
+    message <- sprintf(
       "%s: LP basis dimension (%s) exceeds nobs - 1 (%s); reduce degree",
       where,
       format(admission$nterms, trim = TRUE, scientific = FALSE),
       format(admission$nobs - 1.0, trim = TRUE, scientific = FALSE)
-    ), call. = FALSE)
+    )
+  } else {
+    return(invisible(admission))
   }
-  invisible(admission)
+  stop(errorCondition(message, call = NULL,
+    class = "np_degree_candidate_invalid",
+    degree = as.integer(degree), admission = admission))
 }
 
 npLpBasisNcol <- function(basis = "glp", degree){

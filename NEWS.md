@@ -1,5 +1,11 @@
 # np 0.80-1
 
+* Cell and exhaustive degree searches now skip only typed LP-admissibility
+  and NN-candidate rejections. Unexpected evaluator errors propagate with
+  their original condition instead of silently selecting a surviving degree.
+  LP rank/capacity rejection messages and successful search arithmetic are
+  unchanged; failed searches also release their progress display.
+
 * Conditional bandwidth transforms and categorical baseline probes now
   preserve the raw Y-unordered, Y-ordered, X-unordered, X-ordered layout and
   the corresponding per-side kernel caps. This corrects mistyped coordinates
