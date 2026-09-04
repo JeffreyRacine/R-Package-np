@@ -1,5 +1,11 @@
 # np 0.80-1
 
+* Conditional bandwidth transforms and categorical baseline probes now
+  preserve the raw Y-unordered, Y-ordered, X-unordered, X-ordered layout and
+  the corresponding per-side kernel caps. This corrects mistyped coordinates
+  when ordered responses and unordered regressors coexist; objective kernels
+  and the penalty formula are unchanged.
+
 * Undefined external smooth-coefficient fits now return NA for the affected
   fitted values, coefficients and requested standard errors, with one
   informative warning, instead of publishing an internal finite penalty.

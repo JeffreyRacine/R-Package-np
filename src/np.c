@@ -1642,6 +1642,8 @@ static int bwm_use_transform = 0;
 static int bwm_num_reg_continuous = 0;
 static int bwm_num_reg_unordered = 0;
 static int bwm_num_reg_ordered = 0;
+static int bwm_num_y_unordered = 0;
+static int bwm_num_y_ordered = 0;
 static int bwm_num_extra_params = 0;
 static int bwm_kernel_unordered = 0;
 static int *bwm_num_categories = NULL;
@@ -1669,6 +1671,8 @@ static void bwm_search_context_release(void)
   bwm_num_reg_continuous = 0;
   bwm_num_reg_unordered = 0;
   bwm_num_reg_ordered = 0;
+  bwm_num_y_unordered = 0;
+  bwm_num_y_ordered = 0;
   bwm_num_extra_params = 0;
   bwm_kernel_unordered = 0;
   bwm_num_categories = NULL;
@@ -1686,6 +1690,7 @@ static void bwm_search_context_configure_uniform(
   bwm_num_reg_continuous = num_continuous;
   bwm_num_reg_unordered = num_unordered;
   bwm_num_reg_ordered = num_ordered;
+  bwm_num_y_unordered = num_unordered;
   bwm_num_extra_params = num_extra_params;
   bwm_kernel_unordered = kernel_unordered;
   bwm_num_categories = num_categories;
@@ -1695,7 +1700,8 @@ static void bwm_search_context_configure_split(
   const int num_continuous,
   const int num_y_unordered,
   const int num_x_unordered,
-  const int num_ordered,
+  const int num_y_ordered,
+  const int num_x_ordered,
   const int num_extra_params,
   const int kernel_y_unordered,
   const int kernel_x_unordered,
@@ -1705,8 +1711,10 @@ static void bwm_search_context_configure_split(
   const int num_unordered = num_y_unordered + num_x_unordered;
 
   bwm_search_context_configure_uniform(
-    num_continuous, num_unordered, num_ordered, num_extra_params,
+    num_continuous, num_unordered, num_y_ordered + num_x_ordered, num_extra_params,
     kernel_y_unordered, num_categories);
+  bwm_num_y_unordered = num_y_unordered;
+  bwm_num_y_ordered = num_y_ordered;
   bwm_kernel_unordered_len = num_unordered;
   if (num_unordered <= 0)
     return;
@@ -1716,6 +1724,39 @@ static void bwm_search_context_configure_split(
     bwm_kernel_unordered_vec[i] = kernel_y_unordered;
   for (i = 0; i < num_x_unordered; i++)
     bwm_kernel_unordered_vec[num_y_unordered + i] = kernel_x_unordered;
+}
+
+/* Category ordinals follow the raw decoder: Yu, Yo, Xu, Xo.  Uniform
+ * owners set Yu to all unordered and Yo to zero, retaining U, O order. */
+static int bwm_unordered_category_index(const int i)
+{
+  return i + (i < bwm_num_y_unordered ? 0 : bwm_num_y_ordered);
+}
+
+static int bwm_ordered_category_index(const int i)
+{
+  return i + (i < bwm_num_y_ordered ?
+              bwm_num_y_unordered : bwm_num_reg_unordered);
+}
+
+static double bwm_unordered_maximum(const int i)
+{
+  const int kernel = (bwm_kernel_unordered_vec != NULL &&
+                      i < bwm_kernel_unordered_len) ?
+    bwm_kernel_unordered_vec[i] : bwm_kernel_unordered;
+  return bwm_num_categories != NULL ?
+    max_unordered_bw(bwm_num_categories[bwm_unordered_category_index(i)], kernel) :
+    1.0;
+}
+
+static void bwm_set_categorical_midpoints(double * const p)
+{
+  int i;
+  for (i = 0; i < bwm_num_reg_unordered; ++i)
+    p[bwm_num_reg_continuous + 1 + bwm_unordered_category_index(i)] =
+      0.5 * bwm_unordered_maximum(i);
+  for (i = 0; i < bwm_num_reg_ordered; ++i)
+    p[bwm_num_reg_continuous + 1 + bwm_ordered_category_index(i)] = 0.5;
 }
 
 static int bwm_reserve_transform_buf(int needed_len)
@@ -3511,20 +3552,13 @@ static void bwm_apply_transform(const double *p, double *out, int n)
 
   /* unordered categorical */
   for (i = 0; i < bwm_num_reg_unordered; i++) {
-    idx = bwm_num_reg_continuous + 1 + i;
-    if (bwm_num_categories != NULL) {
-    int kern = (bwm_kernel_unordered_vec != NULL && i < bwm_kernel_unordered_len) ?
-      bwm_kernel_unordered_vec[i] : bwm_kernel_unordered;
-    double maxbw = max_unordered_bw(bwm_num_categories[i], kern);
-      out[idx] = bwm_sigmoid(p[idx]) * maxbw;
-    } else {
-      out[idx] = bwm_sigmoid(p[idx]);
-    }
+    idx = bwm_num_reg_continuous + 1 + bwm_unordered_category_index(i);
+    out[idx] = bwm_sigmoid(p[idx]) * bwm_unordered_maximum(i);
   }
 
   /* ordered categorical (0..1) */
   for (i = 0; i < bwm_num_reg_ordered; i++) {
-    idx = bwm_num_reg_continuous + bwm_num_reg_unordered + 1 + i;
+    idx = bwm_num_reg_continuous + 1 + bwm_ordered_category_index(i);
     out[idx] = bwm_sigmoid(p[idx]);
   }
 }
@@ -3556,10 +3590,8 @@ static int bwm_to_unconstrained(double *p, int n)
 
   /* unordered */
   for (i = 0; i < bwm_num_reg_unordered; i++) {
-    idx = bwm_num_reg_continuous + 1 + i;
-    int kern = (bwm_kernel_unordered_vec != NULL && i < bwm_kernel_unordered_len) ?
-      bwm_kernel_unordered_vec[i] : bwm_kernel_unordered;
-    double maxbw = (bwm_num_categories != NULL) ? max_unordered_bw(bwm_num_categories[i], kern) : 1.0;
+    idx = bwm_num_reg_continuous + 1 + bwm_unordered_category_index(i);
+    double maxbw = bwm_unordered_maximum(i);
     double v = bwm_transform_buf[idx];
     if (maxbw <= 0.0) {
       p[idx] = 0.0;
@@ -3571,7 +3603,7 @@ static int bwm_to_unconstrained(double *p, int n)
 
   /* ordered */
   for (i = 0; i < bwm_num_reg_ordered; i++) {
-    idx = bwm_num_reg_continuous + bwm_num_reg_unordered + 1 + i;
+    idx = bwm_num_reg_continuous + 1 + bwm_ordered_category_index(i);
     p[idx] = bwm_logit(bwm_transform_buf[idx]);
   }
 
@@ -4802,23 +4834,7 @@ static void np_conditional_density_refresh_penalty_canonical(
           tmp, vector_scale_factor, num_all_var) == 0) {
       for (i = 1; i <= bwm_num_extra_params; ++i)
         tmp[num_all_var + i] = vector_scale_factor[num_all_var + i];
-      for (i = 0;
-           i < num_var_unordered_extern + num_reg_unordered_extern;
-           ++i) {
-        const int idx = num_var_continuous_extern +
-          num_reg_continuous_extern + 1 + i;
-        const double maxbw = max_unordered_bw(
-          num_categories_extern[i], KERNEL_den_unordered_extern);
-        tmp[idx] = 0.5*maxbw;
-      }
-      for (i = 0;
-           i < num_var_ordered_extern + num_reg_ordered_extern;
-           ++i) {
-        const int idx = num_var_continuous_extern +
-          num_reg_continuous_extern + num_var_unordered_extern +
-          num_reg_unordered_extern + 1 + i;
-        tmp[idx] = 0.5;
-      }
+      bwm_set_categorical_midpoints(tmp);
 
       if (adaptive_lp_reseed) {
         int remaining = num_obs_train_extern - 2;
@@ -5783,7 +5799,8 @@ static int np_conditional_density_prepared_context_prepare_internal(double *c_un
     num_all_cvar,
     num_var_unordered_extern,
     num_reg_unordered_extern,
-    num_all_ovar,
+    num_var_ordered_extern,
+    num_reg_ordered_extern,
     degree_key_len,
     KERNEL_den_unordered_extern,
     KERNEL_reg_unordered_extern,
@@ -15466,7 +15483,8 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
     num_var_continuous_extern + num_reg_continuous_extern,
     num_var_unordered_extern,
     num_reg_unordered_extern,
-    num_var_ordered_extern + num_reg_ordered_extern,
+    num_var_ordered_extern,
+    num_reg_ordered_extern,
     0,
     KERNEL_den_unordered_extern,
     KERNEL_reg_unordered_extern,
@@ -16288,20 +16306,7 @@ static void np_conditional_distribution_prepared_context_refresh_penalty(
       for (i = 1; i <= context->num_var_continuous +
                         context->num_reg_continuous; i++)
         tmp[i] *= 2.0;
-      for (i = 0; i < context->num_var_unordered +
-                       context->num_reg_unordered; i++) {
-        const int index = context->num_var_continuous +
-          context->num_reg_continuous + 1 + i;
-        tmp[index] = 0.5 * max_unordered_bw(
-          num_categories_extern[i], KERNEL_den_unordered_extern);
-      }
-      for (i = 0; i < context->num_var_ordered +
-                       context->num_reg_ordered; i++) {
-        const int index = context->num_var_continuous +
-          context->num_reg_continuous + context->num_var_unordered +
-          context->num_reg_unordered + 1 + i;
-        tmp[index] = 0.5;
-      }
+      bwm_set_categorical_midpoints(tmp);
       baseline = bwmfunc_raw(tmp);
     }
     safe_free(tmp);
@@ -17301,7 +17306,8 @@ static void np_distribution_conditional_bw_mode(double * c_uno, double * c_ord, 
     num_var_continuous_extern + num_reg_continuous_extern,
     num_var_unordered_extern,
     num_reg_unordered_extern,
-    num_var_ordered_extern + num_reg_ordered_extern,
+    num_var_ordered_extern,
+    num_reg_ordered_extern,
     degree_key_len,
     KERNEL_den_unordered_extern,
     KERNEL_reg_unordered_extern,
@@ -17345,16 +17351,7 @@ static void np_distribution_conditional_bw_mode(double * c_uno, double * c_ord, 
       if (tmp != NULL && np_copy_scale_factor_for_raw(tmp, vector_scale_factor, num_all_var) == 0) {
         for (i = 1; i <= (num_var_continuous_extern + num_reg_continuous_extern); i++)
           tmp[i] *= 2.0;
-        for (i = 0; i < (num_var_unordered_extern + num_reg_unordered_extern); i++) {
-          int idx = num_var_continuous_extern + num_reg_continuous_extern + 1 + i;
-          double maxbw = max_unordered_bw(num_categories_extern[i], KERNEL_den_unordered_extern);
-          tmp[idx] = 0.5*maxbw;
-        }
-        for (i = 0; i < (num_var_ordered_extern + num_reg_ordered_extern); i++) {
-          int idx = num_var_continuous_extern + num_reg_continuous_extern +
-            num_var_unordered_extern + num_reg_unordered_extern + 1 + i;
-          tmp[idx] = 0.5;
-        }
+        bwm_set_categorical_midpoints(tmp);
         baseline = bwmfunc_raw(tmp);
       }
       safe_free(tmp);
