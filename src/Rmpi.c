@@ -1462,8 +1462,17 @@ SEXP mpi_cart_create(SEXP sexp_comm_old,  SEXP sexp_dims, SEXP sexp_periods, SEX
 }
 
 SEXP mpi_dims_create(SEXP sexp_nnodes, SEXP sexp_ndims, SEXP sexp_dims) {
-        int nnodes = INTEGER(sexp_nnodes)[0];
-        int ndims = INTEGER(sexp_ndims)[0];
+        int nnodes, ndims;
+        if (TYPEOF(sexp_nnodes) != INTSXP || XLENGTH(sexp_nnodes) != 1 ||
+            INTEGER(sexp_nnodes)[0] == NA_INTEGER)
+            error("mpi_dims_create: 'nnodes' must be a non-missing integer scalar");
+        if (TYPEOF(sexp_ndims) != INTSXP || XLENGTH(sexp_ndims) != 1 ||
+            INTEGER(sexp_ndims)[0] == NA_INTEGER || INTEGER(sexp_ndims)[0] < 0)
+            error("mpi_dims_create: 'ndims' must be a nonnegative integer scalar");
+        nnodes = INTEGER(sexp_nnodes)[0];
+        ndims = INTEGER(sexp_ndims)[0];
+        if (TYPEOF(sexp_dims) != INTSXP || XLENGTH(sexp_dims) < ndims)
+            error("mpi_dims_create: 'dims' must be an integer vector with length at least 'ndims'");
         mpi_errhandler(MPI_Dims_create(nnodes, ndims, INTEGER(sexp_dims)));
         return sexp_dims;
 }

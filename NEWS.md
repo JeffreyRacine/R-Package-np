@@ -1,5 +1,9 @@
 # npRmpi 0.80-1
 
+* MPI dimension creation now validates scalar counts and dimension-buffer
+  capacity before entering MPI, preventing out-of-bounds access for malformed
+  inputs while preserving valid factorizations and the R wrapper's coercion.
+
 * Growing the MPI request array now first reserves matching status capacity.
   This prevents bulk request completion from writing past the status buffer
   after an explicit request-capacity increase; default completion paths and
