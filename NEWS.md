@@ -1,5 +1,10 @@
 # npRmpi 0.80-1
 
+* Automatic MPI dispatch now transports ordinary bandwidth-search controls
+  from their caller's frame, including solver, bounds-transform, penalty,
+  initialization and smooth-coefficient iteration controls. Local variables
+  and forwarded arguments now retain the same values as literal controls.
+
 * Smooth-coefficient bandwidth selection skips redundant scalar zero-ridge
   correction work, retaining the existing ridge safeguards and results.
 

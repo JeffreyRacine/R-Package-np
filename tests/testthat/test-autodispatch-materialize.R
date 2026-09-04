@@ -265,6 +265,8 @@ test_that("registered autodispatch call formals have an explicit transport owner
   }), use.names = FALSE))
   call.heads <- unique(c(
     call.heads,
+    grep("^np(reg|udens|udist|cdens|cdist|scoef|plreg|index)bw($|\\.)",
+         helper.names, value = TRUE),
     "npregbw", "npscoefbw", "npplregbw", "npindexbw",
     "npudensbw", "npudistbw", "npcdensbw", "npcdistbw"
   ))
@@ -289,6 +291,46 @@ test_that("registered autodispatch call formals have an explicit transport owner
 
   expect_equal(unowned, formal.pairs[FALSE, , drop = FALSE],
                info = paste(capture.output(print(unowned)), collapse = "\n"))
+})
+
+test_that("search control transport preserves owner values without forcing NSE", {
+  materialize <- getFromNamespace(".npRmpi_autodispatch_materialize_call", "npRmpi")
+  controls <- c("backfit.iterate", "backfit.maxiter", "backfit.tol", "bwsolver",
+                "cfac.dir", "cv.iterate", "cv.num.iterations", "dfac.dir",
+                "dfac.init", "dfc.dir", "eval.only", "hbd.dir", "hbd.init",
+                "initc.dir", "initd.dir", "invalid.penalty", "lbc.dir",
+                "lbd.dir", "lbd.init", "memfac", "penalty.multiplier",
+                "scale.init.categorical.sample", "transform.bounds")
+  owner <- new.env(parent = baseenv())
+  owner$local.control <- 123L
+  for (arg in controls) {
+    mc <- as.call(c(list(as.name("npregbw")),
+                   setNames(list(as.name("local.control")), arg)))
+    prepared <- materialize(mc, caller_env = owner)
+    ref <- as.character(prepared$call[[arg]])
+    expect_identical(prepared$tmpvals[[ref]], 123L, info = arg)
+    mc[[arg]] <- 123L
+    literal <- materialize(mc, caller_env = owner)
+    expect_identical(literal$tmpvals, prepared$tmpvals, info = arg)
+  }
+  evaluations <- 0L
+  prepared <- materialize(quote(npregbw(transform.bounds = {
+    evaluations <- evaluations + 1L
+    TRUE
+  }, subset = nonexistent > 0)), caller_env = environment())
+  expect_identical(evaluations, 1L)
+  expect_identical(prepared$call$subset, quote(nonexistent > 0))
+  expect_false("bwsolver" %in% names(as.list(prepared$call)))
+
+  owner.fun <- function(...) {
+    mc <- match.call()
+    mc[[1L]] <- as.name("npregbw")
+    materialize(mc, caller_env = environment())
+  }
+  forwarded <- (function(...) owner.fun(...))(bwsolver = "mads")
+  expect_identical(forwarded$tmpvals[[as.character(forwarded$call$bwsolver)]], "mads")
+  expect_error(materialize(quote(npregbw(bwsolver = missing.control)),
+                           caller_env = owner), "missing.control")
 })
 
 test_that("ordinary autodispatch controls are evaluated in the caller", {
