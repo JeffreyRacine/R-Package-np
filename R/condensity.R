@@ -125,6 +125,8 @@ se.condensity <- function(x){
   x$conderr
 }
 gradients.condensity <- function(x, se = FALSE, gradient.order = NULL, ...) {
+  .np_reject_gradient_order_alias(substitute(list(...))[-1L],
+                                  "gradients.condensity", suggest = TRUE)
   npRejectLegacyBooleanErrors(list(...), "gradients.condensity")
   se <- npValidateScalarLogical(se, "se")
   gout <- if (!se) x$congrad else x$congerr

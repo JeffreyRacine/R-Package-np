@@ -44,7 +44,7 @@
   npindexbw = "remin",
   npindex = c("remin", "warn.glp.gradient", ".np_fit_progress_handoff",
               ".np_index_explicit_bws", ".np_lc_fixed_progress_route",
-              "gradient.order", "gradient_order"),
+              "gradient.order"),
   npplregbw = c("random.seed", "remin"),
   npplreg = c("random.seed", "remin", ".np_fit_progress_handoff"),
   npqreg = c("random.seed", "mads.nmulti", ".np_fit_progress_handoff"),
@@ -171,5 +171,15 @@
   message <- sprintf("%s(): unused argument '%s'", route, unused)
   if (!is.null(suggestion))
     message <- sprintf("%s; did you mean '%s'?", message, suggestion)
+  stop(message, call. = FALSE)
+}
+
+# Inspect names only: retired arguments must not force their values.
+.np_reject_gradient_order_alias <- function(dots.call, where, suggest = FALSE) {
+  if (!"gradient_order" %in% names(dots.call))
+    return(invisible(NULL))
+  message <- sprintf("%s(): unused argument 'gradient_order'", where)
+  if (suggest)
+    message <- paste0(message, "; did you mean 'gradient.order'?")
   stop(message, call. = FALSE)
 }

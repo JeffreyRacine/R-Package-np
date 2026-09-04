@@ -247,7 +247,7 @@ test_that("conditional plot labels map components by type and order", {
   lp.labels <- capture_plot_axis_labels(plot(
     lp.bw,
     gradients = TRUE,
-    gradient_order = 2L,
+    gradient.order = 2L,
     perspective = FALSE,
     errors = "none",
     neval = 7L

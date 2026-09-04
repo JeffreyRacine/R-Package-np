@@ -990,6 +990,8 @@ fitted.npregiv <- function(object, ...) {
 }
 
 gradients.npregiv <- function(x, ...) {
+  .np_reject_gradient_order_alias(substitute(list(...))[-1L],
+                                  "gradients.npregiv")
   if (is.null(x$phi.deriv.1))
     stop("structural derivatives are not available in this npregiv object",
          call. = FALSE)
@@ -1009,6 +1011,8 @@ fitted.npregivderiv <- function(object, ...) {
 }
 
 gradients.npregivderiv <- function(x, ...) {
+  .np_reject_gradient_order_alias(substitute(list(...))[-1L],
+                                  "gradients.npregivderiv")
   if (is.null(x$phi.prime))
     stop("structural derivatives are not available in this npregivderiv object",
          call. = FALSE)

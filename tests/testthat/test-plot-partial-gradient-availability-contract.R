@@ -112,7 +112,7 @@ test_that("derived local-polynomial families preserve partial availability", {
     bw.lsq, gradients = TRUE, gradient.order = c(2L, 2L)
   )))
   lsq.plot <- np_partial_gradient_local(suppressWarnings(plot(
-    lsq, gradients = TRUE, gradient_order = c(2L, 2L),
+    lsq, gradients = TRUE, gradient.order = c(2L, 2L),
     errors = "none", output = "data", neval = 5L,
     perspective = FALSE
   )))

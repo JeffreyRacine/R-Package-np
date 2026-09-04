@@ -95,7 +95,7 @@ test_that("snake_case plot controls normalize to engine controls", {
       factor_boxplot = TRUE,
       boxplot_outliers = FALSE,
       coef_index = 2L,
-      gradient_order = c(1L, 2L),
+      gradient.order = c(1L, 2L),
       common_scale = FALSE,
       proper_method = "isotonic",
       proper_control = list(mode = "slice"),

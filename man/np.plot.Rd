@@ -96,10 +96,10 @@ Named options passed via \code{\dots} include:
         a logical value specifying whether multiple panels should share a
         common plotting scale when feasible.
       }
-      \item{\code{gradient_order}, \code{gradients}}{
+      \item{\code{gradient.order}, \code{gradients}}{
         derivative plotting controls for families that support
         gradients/derivatives. For \code{npreg} local-polynomial
-        objects, \code{gradient_order} requests the continuous-predictor
+        objects, \code{gradient.order} requests the continuous-predictor
         derivative order to generate on the plot evaluation grid; if
         omitted the first derivative/effect is plotted. Location-scale
         quantile-regression \code{nplsqreg} objects use the same

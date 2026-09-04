@@ -877,7 +877,7 @@ npValidateCategoricalFirstDifferenceGradientOrder <- function(
 .np_singleindex_reject_higher_gradient_order <- function(
     dots,
     where = "npindex") {
-  order.names <- intersect(c("gradient.order", "gradient_order"), names(dots))
+  order.names <- intersect("gradient.order", names(dots))
   for (argname in order.names) {
     value <- dots[[argname]]
     if (is.null(value))
