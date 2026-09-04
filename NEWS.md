@@ -79,6 +79,8 @@
   optimizer handoffs against the underlying objective. When an automatic
   search ends on an invalid NN plateau, eligible owners can make one
   deterministic same-optimizer restart from a verified ordinary-NN point.
+  The recovery schedule is bounded and does not exhaust all feasible NN
+  indices; failure to find a valid restart is not a proof of infeasibility.
   Invalid trial points remain penalized during search; mandatory refinement,
   explicit starting values, and already-valid search paths are preserved.
 
