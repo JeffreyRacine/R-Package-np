@@ -1,5 +1,10 @@
 # npRmpi 0.80-1
 
+* Formula estimators and regression inference helpers now retain explicitly
+  supplied data values in wrapper calls, instead of looking up their argument
+  names again in the formula environment. Formula expressions and retained
+  data behavior are unchanged.
+
 * Smooth-coefficient NOMAD bandwidth objects now publish complete bandwidth
   and scale metadata. This fixes multi-smoother summaries and NA fits or
   predictions from malformed scalar degree-zero fixed-bandwidth objects,

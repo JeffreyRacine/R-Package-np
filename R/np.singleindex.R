@@ -78,7 +78,7 @@ npindex.formula <-
         tmf[[1]] <- as.name("model.frame")
         tmf[["formula"]] <- tt
         if (!missing(data) && !is.null(data))
-          tmf[["data"]] <- substitute(data)
+          tmf[["data"]] <- data
         mf.args <- as.list(tmf)[-1L]
         if (inherits(bws, "sibandwidth") &&
             (missing(data) || is.null(data)) &&
