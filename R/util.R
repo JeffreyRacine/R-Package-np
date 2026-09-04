@@ -3739,6 +3739,23 @@ npLpCompleteTermStatus <- function(basis = "glp", degree, nobs = Inf,
   )
 }
 
+.np_undefined_fit_rows <- function(rows, where, external = FALSE,
+                                   reason = "kernel-weighted system has no usable support or could not be solved") {
+  location <- paste(utils::head(rows, 6L), collapse = ", ")
+  if (length(rows) > 6L)
+    location <- paste0(location, ", ...")
+  message <- sprintf("%s: local fit is undefined at %d row(s) (%s): %s",
+                     where, length(rows), location, reason)
+  if (!external)
+    stop(message, call. = FALSE)
+  if (!isTRUE(getOption("npRmpi.mpi.initialized", FALSE)) ||
+      (isTRUE(mpi.is.master()) && isTRUE(mpi.comm.rank(0L) == 0L)))
+    .np_warning(paste0(message,
+      "; returning NA for fitted values and associated outputs. ",
+      "Consider a larger bandwidth or another kernel."), call. = FALSE)
+  invisible(NULL)
+}
+
 npValidateLpBasisAdmission <- function(basis = "glp", degree, nobs,
                                        where = "local-polynomial estimator") {
   admission <- npLpCompleteTermStatus(

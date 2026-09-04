@@ -1,5 +1,16 @@
 # npRmpi 0.80-1
 
+* Adaptive-NN local-constant regression overrides now preserve NA at
+  zero-support external rows instead of replacing the fitted value by zero.
+  A single warning identifies the undefined rows; associated requested
+  gradients and standard errors retain NA, matching serial results.
+
+* Undefined external smooth-coefficient fits now return NA for the affected
+  fitted values, coefficients and requested standard errors, with one
+  informative warning, instead of publishing an internal finite penalty.
+  Valid rows and the ridge schedule are unchanged. Required training and
+  bootstrap fits still fail when their local systems cannot be solved.
+
 * MPI dimension creation now validates scalar counts and dimension-buffer
   capacity before entering MPI, preventing out-of-bounds access for malformed
   inputs while preserving valid factorizations and the R wrapper's coercion.

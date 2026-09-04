@@ -1433,7 +1433,8 @@ npreghat <-
 .np_regression_lc_mean_from_kernel_weights <- function(bws,
                                                        txdat,
                                                        tydat,
-                                                       exdat = NULL) {
+                                                       exdat = NULL,
+                                                       return.status = FALSE) {
   kw <- .np_kernel_weights_direct(
     bws = bws,
     txdat = txdat,
@@ -1444,14 +1445,21 @@ npreghat <-
     kernel.pow = 1.0
   )
   kw.sum <- colSums(kw)
-  kw.sum[kw.sum == 0.0] <- .Machine$double.xmin
-  drop(crossprod(kw, as.double(tydat)) / kw.sum)
+  invalid <- which(kw.sum == 0.0)
+  kw.sum[invalid] <- NA_real_
+  value <- drop(crossprod(kw, as.double(tydat)) / kw.sum)
+  if (return.status)
+    return(list(value = value, invalid = invalid))
+  if (length(invalid))
+    .np_undefined_fit_rows(invalid, "npreg()", reason = "kernel weight sum is zero")
+  value
 }
 
 .np_regression_lc_gradient_from_kernel_weights <- function(bws,
                                                            txdat,
                                                            tydat,
-                                                           exdat = NULL) {
+                                                           exdat = NULL,
+                                                           return.status = FALSE) {
   no.ex <- is.null(exdat)
   txdat <- toFrame(txdat)
   if (!no.ex) {
@@ -1498,7 +1506,8 @@ npreghat <-
   }
 
   denom <- ks[2L, ]
-  denom[denom == 0.0] <- .Machine$double.xmin
+  invalid <- which(denom == 0.0)
+  denom[invalid] <- NA_real_
   numer <- ks[1L, ]
 
   grad <- matrix(0.0, nrow = nrow(eval.data), ncol = bws$ncon)
@@ -1507,6 +1516,10 @@ npreghat <-
     grad[, j] <- (ps.j[1L, ] / denom) - (numer * ps.j[2L, ] / (denom^2))
   }
 
+  if (return.status)
+    return(list(value = grad, invalid = invalid))
+  if (length(invalid))
+    .np_undefined_fit_rows(invalid, "npreg()", reason = "kernel weight sum is zero")
   grad
 }
 

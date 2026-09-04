@@ -820,6 +820,7 @@
     coef = coef,
     theta = theta,
     ridge = solve.out$ridge,
+    invalid = solve.out[["invalid"]],
     tww = tww
   )
 

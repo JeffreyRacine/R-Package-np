@@ -342,6 +342,12 @@ Further arguments are passed to \code{\link{npregbw}} when bandwidths are comput
   adaptive-NN modes. An evaluation point
   with no supported observation weight also produces an explicit error.
 
+  For ordinary adaptive-NN local-constant regression, an external evaluation
+  row with zero total kernel weight has an undefined fitted value and is
+  returned as \code{NA}, together with its requested gradients and standard
+  errors. A single warning identifies affected rows. Valid rows are retained;
+  internal computations that require these fits do not silently omit them.
+
   \subsection{Standard Errors}{
   Ordinary regression standard errors use the uncorrected fitted-residual
   HC0 sandwich for the actual fitted linear map, conditional on the selected

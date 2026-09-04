@@ -292,6 +292,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
            maxiter = 100,
            residuals = FALSE,
            tol = .Machine$double.eps,
+           .np_allow_undefined = FALSE,
            ...){
 
     fit.start <- proc.time()[3]
@@ -487,7 +488,6 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
     else
       spec$regtype.engine
     W.train <- W <- as.matrix(data.frame(1,txdat))
-    maxPenalty <- sqrt(.Machine$double.xmax)
     tnrow <- nrow(txdat)
     enrow <- (if (miss.ex) nrow(txdat) else nrow(exdat))
 
@@ -540,11 +540,12 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
       NULL
     }
 
-    solve_moment_system <- function(tyw, tww, W.eval.design, Wz.eval = NULL, progress_detail = NULL) {
+    solve_moment_system <- function(tyw, tww, W.eval.design, Wz.eval = NULL,
+                                     progress_detail = NULL, allow.undefined = FALSE) {
       neval.local <- ncol(tyw)
       ncoef <- nrow(tyw)
       pcoef <- ncol(W.eval.design)
-      coef.out <- matrix(maxPenalty, nrow = pcoef, ncol = neval.local)
+      coef.out <- matrix(NA_real_, nrow = pcoef, ncol = neval.local)
       theta.out <- if (is.null(Wz.eval)) NULL else matrix(NA_real_, nrow = ncoef, ncol = neval.local)
       theta.batch <- .npscoef_batch_zero_solve(tyw = tyw, tww = tww)
       if (!is.null(theta.batch)) {
@@ -564,6 +565,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
         ))
       }
       ridge.grid <- npRidgeSequenceAdditive(n.train = tnrow, cap = 1.0)
+      invalid <- rep.int(FALSE, neval.local)
       ridge <- rep.int(ridge.grid[1L], neval.local)
       ridge.idx <- rep.int(1L, neval.local)
       doridge <- rep.int(TRUE, neval.local)
@@ -596,10 +598,15 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
                 ridge[ii] <- ridge.grid[ridge.idx[ii]]
                 doridge[ii] <- TRUE
               }
-              theta.ii <- rep(maxPenalty, ncoef)
+              theta.ii <- rep(NA_real_, ncoef)
             }
           } else {
-            theta.ii <- rep(maxPenalty, ncoef)
+            theta.ii <- rep(NA_real_, ncoef)
+          }
+
+          if (!doridge[ii] && any(!is.finite(theta.ii))) {
+            invalid[ii] <- TRUE
+            theta.ii[] <- NA_real_
           }
 
           if (is.null(Wz.eval)) {
@@ -616,10 +623,13 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
         }
       }
 
-      list(coef = coef.out, theta = theta.out, ridge = ridge)
+      invalid <- which(invalid)
+      if (length(invalid) && !allow.undefined)
+        .np_undefined_fit_rows(invalid, "npscoef()")
+      list(coef = coef.out, theta = theta.out, ridge = ridge, invalid = invalid)
     }
 
-    solve_single_moment_system <- function(tyw.vec, tww.mat) {
+    solve_single_moment_system <- function(tyw.vec, tww.mat, allow.undefined = FALSE) {
       ncoef <- length(tyw.vec)
       ridge.grid <- npRidgeSequenceAdditive(n.train = tnrow, cap = 1.0)
       ridge <- ridge.grid[1L]
@@ -631,7 +641,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
           pristine.anchor = tww.mat[1L, 1L]
         )
         if (!is.finite(ridge.val))
-          return(list(coef = rep(maxPenalty, ncoef), ridge = ridge))
+          break
         theta <- fast_moment_solve(
           tww.slice = tww.mat,
           tyw.slice = tyw.vec,
@@ -647,14 +657,20 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
             error = function(e) e
           )
         }
-        if (!inherits(theta, "error"))
-          return(list(coef = as.double(theta), ridge = ridge))
+        if (!inherits(theta, "error")) {
+          if (all(is.finite(theta)))
+            return(list(coef = as.double(theta), ridge = ridge))
+          break
+        }
 
         ridge.idx <- ridge.idx + 1L
         if (ridge.idx > length(ridge.grid))
-          return(list(coef = rep(maxPenalty, ncoef), ridge = ridge))
+          break
         ridge <- ridge.grid[ridge.idx]
       }
+      if (!allow.undefined)
+        .np_undefined_fit_rows(1L, "npscoef()")
+      list(coef = rep(NA_real_, ncoef), ridge = ridge, invalid = 1L)
     }
 
     moment_npksum <- function(args) {
@@ -889,6 +905,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
     }
 
     moments <- NULL
+    allow.undefined <- !miss.ex && isTRUE(.np_allow_undefined)
     if (fast.largeh.lc) {
       eval.z.one <- if (miss.ex) tzdat[1L, , drop = FALSE] else ezdat[1L, , drop = FALSE]
       fast.eval <- lc_fast_global_moments(z.eval.one = eval.z.one)
@@ -896,7 +913,8 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
         fit.progress.step("solving global coefficients")
       fast.solve <- solve_single_moment_system(
         tyw.vec = fast.eval$tyw,
-        tww.mat = fast.eval$tww
+        tww.mat = fast.eval$tww,
+        allow.undefined = allow.undefined
       )
       if (!is.null(fit.progress.step))
         fit.progress.step("assembling fitted values")
@@ -912,7 +930,8 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
         tydat = tydat,
         leave.one.out = leave.one.out,
         where = "npscoef",
-        solver = solve_single_moment_system,
+        solver = function(a, b)
+          solve_single_moment_system(a, b, allow.undefined = allow.undefined),
         ksum_fun = lp1_moment_npksum
       )
       if (!is.null(fit.progress.step))
@@ -928,7 +947,8 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
         tyw = moments$tyw,
         tww = moments$tww,
         W.eval.design = W,
-        progress_detail = "solving coefficient rows"
+        progress_detail = "solving coefficient rows",
+        allow.undefined = allow.undefined
       )
     } else {
       moments <- lp_tensor_moments(lp_state)
@@ -937,13 +957,18 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
         tww = moments$tww,
         W.eval.design = W,
         Wz.eval = lp_state$W.eval,
-        progress_detail = "solving coefficient rows"
+        progress_detail = "solving coefficient rows",
+        allow.undefined = allow.undefined
       )
     }
 
     if (!fast.largeh) {
       coef.mat <- solver$coef
       ridge <- solver$ridge
+    }
+    invalid.rows <- if (!fast.largeh) solver[["invalid"]] else {
+      invalid <- if (fast.largeh.lc) fast.solve[["invalid"]] else fast.eval[["invalid"]]
+      if (length(invalid)) seq_len(enrow) else integer()
     }
 
     if (iterate && !is.null(bws$bw.fitted) && miss.ex && !identical(reg.engine, "lc"))
@@ -1038,7 +1063,8 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
           )$s
           if (!is.null(fit.progress.step))
             fit.progress.step("estimating standard errors")
-          cm.fast <- safe_chol2inv(fast.eval$tww, fast.solve$ridge, 1.0 / nrow(txdat))
+          cm.fast <- if (length(invalid.rows)) NULL else
+            safe_chol2inv(fast.eval$tww, fast.solve$ridge, 1.0 / nrow(txdat))
           merr <- rep(NA_real_, enrow)
           beta.se <- matrix(NA_real_, nrow = enrow, ncol = nrow(coef.mat))
           if (!is.null(cm.fast)) {
@@ -1080,7 +1106,8 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
           )$s
           if (!is.null(fit.progress.step))
             fit.progress.step("estimating standard errors")
-          cm.fast <- safe_chol2inv(fast.eval$tww, fast.eval$ridge, 1.0 / nrow(txdat))
+          cm.fast <- if (length(invalid.rows)) NULL else
+            safe_chol2inv(fast.eval$tww, fast.eval$ridge, 1.0 / nrow(txdat))
           merr <- rep(NA_real_, enrow)
           beta.se <- matrix(NA_real_, nrow = enrow, ncol = nrow(coef.mat))
           if (!is.null(cm.fast)) {
@@ -1150,7 +1177,10 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
       u2 <- as.double(u2.W)
       merr <- rep(NA_real_, enrow)
       beta.se <- matrix(NA_real_, nrow = enrow, ncol = nrow(coef.mat))
-      for (i in seq_len(enrow)) {
+      valid.rows <- seq_len(enrow)
+      if (length(invalid.rows))
+        valid.rows <- valid.rows[-invalid.rows]
+      for (i in valid.rows) {
         cm <- safe_chol2inv(moments$tww[,,i], ridge[i], 1.0 / nrow(txdat))
         if (is.null(cm))
           next
@@ -1211,6 +1241,8 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
       fit.progress <- .np_progress_end(fit.progress)
       fit.progress.active <- FALSE
     }
+    if (length(invalid.rows))
+      .np_undefined_fit_rows(invalid.rows, "npscoef()", external = TRUE)
     ev
 
   }
@@ -1276,6 +1308,7 @@ npscoef.scbandwidth <-
       maxiter = maxiter,
       residuals = residuals,
       tol = tol,
+      .np_allow_undefined = TRUE,
       ...
     )
   }

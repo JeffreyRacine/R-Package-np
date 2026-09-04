@@ -903,13 +903,17 @@ npreg.rbandwidth <-
       }
     ), continuous.names = bws[["xnames", exact = TRUE]][bws[["icon", exact = TRUE]]])
 
+    invalid.rows <- integer()
     if (mean.override) {
-      myout$mean <- .np_regression_lc_mean_from_kernel_weights(
+      override <- .np_regression_lc_mean_from_kernel_weights(
         bws = bws,
         txdat = txdat.frame,
         tydat = tydat,
-        exdat = exdat.frame
+        exdat = exdat.frame,
+        return.status = TRUE
       )
+      myout$mean <- override$value
+      invalid.rows <- override$invalid
     }
 
     if (gradients){
@@ -925,12 +929,15 @@ npreg.rbandwidth <-
       }
 
       if (grad.override) {
-        myout$g[, bws$icon] <- .np_regression_lc_gradient_from_kernel_weights(
+        override <- .np_regression_lc_gradient_from_kernel_weights(
           bws = bws,
           txdat = txdat.frame,
           tydat = tydat,
-          exdat = exdat.frame
+          exdat = exdat.frame,
+          return.status = TRUE
         )
+        myout$g[, bws$icon] <- override$value
+        invalid.rows <- override$invalid
       }
 
       if (glp.gradient.partial) {
@@ -938,6 +945,17 @@ npreg.rbandwidth <-
         myout$g[, unavailable] <- NA_real_
         if (se)
           myout$gerr[, unavailable] <- NA_real_
+      }
+    }
+
+    if (length(invalid.rows)) {
+      myout$mean[invalid.rows] <- NA_real_
+      if (se)
+        myout$merr[invalid.rows] <- NA_real_
+      if (gradients) {
+        myout$g[invalid.rows, ] <- NA_real_
+        if (se)
+          myout$gerr[invalid.rows, ] <- NA_real_
       }
     }
 
@@ -983,6 +1001,9 @@ npreg.rbandwidth <-
 
     ev$call <- match.call(expand.dots = FALSE)
     environment(ev$call) <- parent.frame()
+    if (length(invalid.rows))
+      .np_undefined_fit_rows(invalid.rows, "npreg()", external = !no.ex,
+                             reason = "kernel weight sum is zero")
     return(ev)
   }
 
