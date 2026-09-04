@@ -1,5 +1,10 @@
 # npRmpi 0.80-1
 
+* Growing the MPI request array now first reserves matching status capacity.
+  This prevents bulk request completion from writing past the status buffer
+  after an explicit request-capacity increase; default completion paths and
+  estimator arithmetic are unchanged.
+
 * Regression uncertainty documentation now describes the already implemented
   fitted-residual HC0 standard errors, including derivatives, categorical
   contrasts, beta kernels and continuous pivotal npsigtest statistics. The

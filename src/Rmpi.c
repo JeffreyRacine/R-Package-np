@@ -368,14 +368,18 @@ SEXP mpi_comm_maxsize(void){
 	return AsInt(COMM_MAXSIZE);
 }
 
-SEXP mpi_realloc_status(SEXP sexp_newnstatus){
-	int newsize=INTEGER(sexp_newnstatus)[0];
-	if (newsize <= 0)
-		error("mpi_realloc_status: new size must be positive");
+static void rmpi_reserve_status(int newsize){
 	if (newsize > STATUS_MAXSIZE){
 		status=(MPI_Status *)Realloc(status, newsize, MPI_Status); 
 		STATUS_MAXSIZE=newsize;
 	}
+}
+
+SEXP mpi_realloc_status(SEXP sexp_newnstatus){
+	int newsize=INTEGER(sexp_newnstatus)[0];
+	if (newsize <= 0)
+		error("mpi_realloc_status: new size must be positive");
+	rmpi_reserve_status(newsize);
 	return AsInt(1);
 }
 
@@ -388,6 +392,9 @@ SEXP mpi_realloc_request(SEXP sexp_newnrequest){
 	if (newsize <= 0)
 		error("mpi_realloc_request: new size must be positive");
 	if (newsize > REQUEST_MAXSIZE){
+		/* Bulk completion can write one status for every request. Reserve
+		 * first so an allocation error never leaves insufficient statuses. */
+		rmpi_reserve_status(newsize);
 		request=(MPI_Request *)Realloc(request, newsize , MPI_Request); 
 		for (i=REQUEST_MAXSIZE; i< newsize; request[i++]=MPI_REQUEST_NULL);	
 		REQUEST_MAXSIZE=newsize;
