@@ -199,6 +199,14 @@ Further arguments are passed to the bandwidth-selection routines used by the tes
   standard error is unavailable, non-positive, or non-finite; such a
   value does not define the pivotal statistic.
 
+  Continuous pivotal statistics use the fitted-residual HC0 gradient
+  standard errors described in \code{\link{npreg}}. Each bootstrap response
+  is fitted and its own training residuals are used in its HC0 quadratic;
+  the original-response standard errors are not held fixed across
+  replications. The admitted streamed implementation computes this same
+  statistic without retaining a full influence matrix. Categorical
+  statistics remain unstandardized.
+
   When the supplied bandwidth object has \code{regtype="lp"}, every
   tested continuous coordinate must have polynomial degree at least one.
   A degree-zero local polynomial does not identify the derivative used by

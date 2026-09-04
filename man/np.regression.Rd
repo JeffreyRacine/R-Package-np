@@ -113,7 +113,7 @@ These arguments control where the regression is evaluated and which fitted quant
 }
 
   \item{se}{
-    a logical value indicating whether asymptotic standard errors are
+    a logical value indicating whether fitted-residual HC0 standard errors are
     computed and retained. Defaults to \code{FALSE}.
     With \code{se = FALSE}, fitted values and any requested
     gradients are still computed, but the returned \code{merr} and
@@ -285,7 +285,7 @@ Further arguments are passed to \code{\link{npregbw}} when bandwidths are comput
   for continuous data types include the second, fourth, sixth, and eighth
   order Gaussian and Epanechnikov kernels, and the uniform
   kernel. Beta associated kernels of orders 2, 4, 6, and 8 are also available
-  for the local-constant route described below. Unordered
+  for local-constant and local-polynomial regression. Unordered
   discrete data types use a variation on Aitchison and
   Aitken's (1976) kernel, while ordered data types use a variation of the
   Wang and van Ryzin (1981) kernel.
@@ -319,19 +319,18 @@ Further arguments are passed to \code{\link{npregbw}} when bandwidths are comput
 
   Products and ratios are evaluated in the log domain, so representable beta
   regression results are retained even when every unscaled product would
-  underflow to zero. If \eqn{\ell_i=K_i/\sum_r K_r}, the reported beta-route
-  standard error is
-  \deqn{\left\{\left[\sum_i \ell_i(Y_i-\widehat m)^2\right]
-                    \left[\sum_i \ell_i^2\right]\right\}^{1/2},}
-  preserving the established uncorrected local-variance convention while
-  using the exact effective-sample factor for these associated weights.
+  underflow to zero. In the local-constant case,
+  \eqn{\ell_i(x)=K_i(x)/\sum_r K_r(x)}. The reported standard error uses
+  the fitted-residual HC0 formula below, also for beta kernels; it is not a
+  local residual-variance estimate multiplied by an effective-sample factor.
 
-  The beta regression route requires \code{regtype="lc"},
-  \code{ckerorder} in \code{c(2,4,6,8)}, finite fixed or sample-range bounds,
-  and continuous predictors only. First derivatives requested with
-  \code{gradients=TRUE} are analytic C implementations; \code{gerr} uses the
-  derivative of the normalized local-constant weights together with the beta
-  route's local residual-variance convention. At exact support endpoints,
+  The beta regression route requires \code{ckerorder} in
+  \code{c(2,4,6,8)} and finite fixed or sample-range bounds for each continuous
+  predictor. It supports local-constant, local-linear and local-polynomial
+  fits, including mixed continuous and categorical predictors. Local-constant
+  first derivatives requested with \code{gradients=TRUE} are analytic C
+  implementations; their HC0 errors use the derivative of the normalized
+  weights. At exact support endpoints,
   normalized numerator/denominator jumps are cancelled first. A genuine
   estimator jump is returned as a signed infinity with \code{gerr=NA}; an
   indeterminate numerical cancellation is returned as \code{NA} with a
@@ -340,9 +339,33 @@ Further arguments are passed to \code{\link{npregbw}} when bandwidths are comput
   temporary drawing geometry, so an endpoint singularity breaks the plotted
   line without changing the returned estimate. Manual and
   cross-validated bandwidth objects support fixed, generalized-NN, and
-  adaptive-NN modes. Categorical predictors and local-linear/local-polynomial
-  fits fail explicitly. An evaluation point
+  adaptive-NN modes. An evaluation point
   with no supported observation weight also produces an explicit error.
+
+  \subsection{Standard Errors}{
+  Ordinary regression standard errors use the uncorrected fitted-residual
+  HC0 sandwich for the actual fitted linear map, conditional on the selected
+  bandwidths and polynomial specification. Let
+  \eqn{e_i=Y_i-\widehat m(X_i)} be the training fitted residual, and let
+  \eqn{\ell_i(x)} be the influence of response \eqn{Y_i} on the fitted mean
+  at \eqn{x}. Then
+  \deqn{\operatorname{se}\{\widehat m(x)\}
+    =\left\{\sum_i \ell_i(x)^2 e_i^2\right\}^{1/2}.}
+  The same rule applies to a derivative's influence row. For a categorical
+  finite difference, it uses the difference between the two influence rows,
+  thereby retaining their covariance. Local-polynomial influence rows use
+  the fitted basis and the accepted regularized solve when regularization
+  is required. No leverage or degrees-of-freedom correction is applied.
+
+  This convention applies to fixed, generalized-NN and adaptive-NN
+  bandwidths and to beta kernels. Evaluation-point errors continue to use
+  training fitted residuals, not residuals centred on that evaluation-point
+  mean. These errors do not incorporate bandwidth-selection uncertainty.
+  \code{se()}, derivative-error accessors, prediction standard errors and
+  asymptotic plot intervals consume the corresponding retained errors.
+  Continuous pivotal \code{\link{npsigtest}} statistics use gradient HC0
+  errors, recomputed from each bootstrap response when bootstrapping.
+  }
 
   When bandwidths are obtained with \code{regtype="lp"}, C-level
   \code{npreg} supports heterogeneous continuous polynomial degrees via

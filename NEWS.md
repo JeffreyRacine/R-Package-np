@@ -1,5 +1,11 @@
 # npRmpi 0.80-1
 
+* Regression uncertainty documentation now describes the already implemented
+  fitted-residual HC0 standard errors, including derivatives, categorical
+  contrasts, beta kernels and continuous pivotal npsigtest statistics. The
+  stale beta local-variance formula and capability restrictions were corrected;
+  this documentation update does not change numerical results.
+
 * Formula estimators and regression inference helpers now retain explicitly
   supplied data values in wrapper calls, instead of looking up their argument
   names again in the formula environment. Formula expressions and retained
