@@ -348,13 +348,23 @@ test_that("npcdistbw native prepared search result has a unique exact schema", {
     .np_nomad_native_progress_end = function(...) invisible(NULL),
     .np_nomad_native_progress_abort = function(...) invisible(NULL),
     npNomadNativeSearchConditionalDistribution = function(...) native_result,
+    .npcdistbw_nomad_eval_point = function(...) {
+      list(objective = 2, num.feval = 0, num.feval.fast = 0)
+    },
     .np_nomad_native_status = function(...) invisible(NULL)
   ), {
     result <- npRmpi:::npRmpiPreparedSearchConditionalDistribution(
       xdat = data.frame(x = seq(0.1, 0.9, length.out = 6L)),
       ydat = data.frame(y = seq(0.2, 0.8, length.out = 6L)),
-      template = list(),
-      setup = list(cont_flat = 1, cat_flat = numeric()),
+      template = list(type = "fixed", scaling = TRUE, ybw = 0.4, xbw = numeric()),
+      setup = list(
+        type = "fixed",
+        cont_flat = 1L,
+        cont_scale = 1,
+        cat_flat = integer(),
+        cat_upper = numeric(),
+        nobs = 6L
+      ),
       reg.args = list(),
       opt.args = list(nomad.opts = list(), nomad.remin = FALSE),
       degree.search = list(

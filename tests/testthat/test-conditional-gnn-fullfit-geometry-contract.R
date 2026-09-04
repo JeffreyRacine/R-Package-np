@@ -83,7 +83,7 @@ test_that("conditional generalized-NN full fits use exact query geometry", {
     "for (degree in 0:1) {",
     "  bwdup <- make_bw(xdup,ydup,2L,2L,degree)",
     "  message <- tryCatch({fit_values(xdup,ydup,bwdup); NA_character_},error=function(e) conditionMessage(e))",
-    "  stopifnot(is.character(message),length(message)==1L,grepl('zero literal.*radius after occurrence exclusion',message))",
+    "  stopifnot(is.character(message),length(message)==1L,grepl('zero literal radius',message,fixed=TRUE))",
     "}",
     sprintf("cat('%s\\n')", ok_tag)
   )

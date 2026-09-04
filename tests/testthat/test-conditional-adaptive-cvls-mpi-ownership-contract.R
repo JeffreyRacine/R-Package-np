@@ -223,5 +223,7 @@ test_that("adaptive geometry preparation fails rank-symmetrically", {
   calls <- gregexpr(
     "np_adaptive_geometry_preflight_failed(", source, fixed = TRUE
   )[[1L]]
-  expect_identical(length(calls[calls > 0L]), 5L)
+  # One helper definition plus five audited call sites: two regression,
+  # one conditional-distribution, and two conditional-density owners.
+  expect_identical(length(calls[calls > 0L]), 6L)
 })
