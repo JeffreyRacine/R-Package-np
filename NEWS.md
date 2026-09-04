@@ -1,5 +1,10 @@
 # np 0.80-1
 
+* Smooth-coefficient NOMAD bandwidth objects now publish complete bandwidth
+  and scale metadata. This fixes multi-smoother summaries and NA fits or
+  predictions from malformed scalar degree-zero fixed-bandwidth objects,
+  without changing the selected bandwidth, objective or search evaluations.
+
 * Smooth-coefficient bandwidth selection skips redundant scalar zero-ridge
   correction work, retaining the existing ridge safeguards and results.
 
