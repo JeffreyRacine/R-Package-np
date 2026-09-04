@@ -21471,6 +21471,8 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
   int ey_is_ty, do_merr, do_grad, do_gerr;
   int train_is_eval, num_obs_eval_alloc, max_lev;
   int ordinary_hc0_active = 0;
+  int regression_fit_status = NP_REGRESSION_FIT_OK;
+  NPNNZeroRadiusInfo zero_radius_info;
   double *ordinary_hc0_residual = NULL;
   NPRegressionHC0Context ordinary_hc0_context;
 
@@ -21778,7 +21780,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
     residual_preparation_context.status =
       NP_REGRESSION_HC0_RESIDUAL_PREPARING;
 
-    kernel_estimate_regression_categorical_tree_np(
+    regression_fit_status = kernel_estimate_regression_categorical_tree_np(
       np_lp_engine_extern,
       KERNEL_reg_extern,
       KERNEL_reg_unordered_extern,
@@ -21818,10 +21820,24 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
       &training_geometry_context,
       &residual_preparation_context);
 
+    if(regression_fit_status != NP_REGRESSION_FIT_OK) {
+      if(regression_fit_status == NP_REGRESSION_FIT_ERR_ZERO_NN_RADIUS)
+        zero_radius_info = np_nn_zero_radius_info(
+          BANDWIDTH_reg_extern, num_obs_train_extern, num_obs_train_extern,
+          num_reg_continuous_extern,
+          matrix_X_continuous_train_extern,
+          matrix_X_continuous_train_extern,
+          &vector_scale_factor[1],
+          kernel_route != NULL ? NULL : &training_geometry_context, 0);
+    }
+
     if(temporary_training_tree) {
       kdt_extern_X = outer_evaluation_kdt;
       free_kdtree(&training_kdt);
     }
+
+    if(regression_fit_status != NP_REGRESSION_FIT_OK)
+      goto cleanup_np_regression;
 
     for(i = 0; i < num_obs_train_extern; i++) {
       const long double residual =
@@ -21909,7 +21925,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
     np_progress_fit_set_offset(num_obs_train_extern);
   }
 
-  kernel_estimate_regression_categorical_tree_np(np_lp_engine_extern,
+  regression_fit_status = kernel_estimate_regression_categorical_tree_np(np_lp_engine_extern,
                                                    KERNEL_reg_extern,
                                                    KERNEL_reg_unordered_extern,
                                                    KERNEL_reg_ordered_extern,
@@ -21950,6 +21966,34 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
                                                    &nn_geometry_context,
                                                    ordinary_hc0_active ?
                                                      &ordinary_hc0_context : NULL);
+  if(regression_fit_status != NP_REGRESSION_FIT_OK) {
+    if(regression_fit_status == NP_REGRESSION_FIT_ERR_ZERO_NN_RADIUS) {
+      zero_radius_info = np_nn_zero_radius_info(
+        BANDWIDTH_reg_extern, num_obs_train_extern, num_obs_eval_extern,
+        num_reg_continuous_extern,
+        matrix_X_continuous_train_extern,
+        matrix_X_continuous_eval_extern,
+        &vector_scale_factor[1],
+        kernel_route != NULL ? NULL : &nn_geometry_context, 0);
+      if(zero_radius_info.coordinate == NA_INTEGER &&
+         kernel_route == NULL && BANDWIDTH_reg_extern == BW_GEN_NN &&
+         nn_geometry_context.mode != NP_NN_QUERY_EXTERNAL) {
+        const NPNNGeometryContext external_geometry = {
+          .mode = NP_NN_QUERY_EXTERNAL,
+          .eval_to_train = NULL
+        };
+        const NPNNZeroRadiusInfo external_info = np_nn_zero_radius_info(
+          BANDWIDTH_reg_extern, num_obs_train_extern, num_obs_eval_extern,
+          num_reg_continuous_extern,
+          matrix_X_continuous_train_extern,
+          matrix_X_continuous_eval_extern,
+          &vector_scale_factor[1], &external_geometry, 0);
+        if(external_info.coordinate != NA_INTEGER)
+          zero_radius_info = external_info;
+      }
+    }
+    goto cleanup_np_regression;
+  }
   for(i=0;i<num_obs_eval_extern;i++)
     cm[ipe[i]] = ecm[i];
       
@@ -21993,6 +22037,8 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
   xtra[3] = MAPE;
   xtra[4] = CORR;
   xtra[5] = SIGN;
+
+cleanup_np_regression:
 
   /* clean up and wave goodbye */
 
@@ -22048,6 +22094,11 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
   int_glp_bernstein_extern = 0;
   int_glp_basis_extern = 1;
   int_TREE_PROFILE_X = NP_TREE_FALSE;
+
+  if(regression_fit_status == NP_REGRESSION_FIT_ERR_ZERO_NN_RADIUS)
+    np_nn_zero_radius_error(&zero_radius_info);
+  if(regression_fit_status != NP_REGRESSION_FIT_OK)
+    error("np_regression: invalid internal regression fit status");
 
   return;
 }
