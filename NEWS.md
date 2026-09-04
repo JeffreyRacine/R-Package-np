@@ -1,5 +1,10 @@
 # npRmpi 0.80-1
 
+* MPI communicator rank, size and intercommunicator queries now reject null
+  handles and propagate MPI query failures instead of publishing an
+  uninitialized scalar. Valid communicator results and estimator paths are
+  unchanged.
+
 * Conditional categorical bandwidth admission now applies the response and
   regressor unordered-kernel bounds independently. Mixed Li-Racine and
   Aitchison-Aitken conditional-density searches no longer reject valid

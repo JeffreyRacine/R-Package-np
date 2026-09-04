@@ -1067,14 +1067,18 @@ SEXP mpi_comm_is_null(SEXP sexp_comm){
 SEXP mpi_comm_size(SEXP sexp_comm){
 	int commn = rmpi_require_index(sexp_comm, COMM_MAXSIZE, "communicator");
 	int size;
-	MPI_Comm_size(comm[commn], &size); 
+	if (comm[commn] == MPI_COMM_NULL)
+		error("mpi_comm_size: communicator is NULL");
+	mpi_errhandler(MPI_Comm_size(comm[commn], &size));
 	return AsInt(size);
 }
 
 SEXP mpi_comm_rank(SEXP sexp_comm){
 	int commn = rmpi_require_index(sexp_comm, COMM_MAXSIZE, "communicator");
 	int rank;
-	MPI_Comm_rank(comm[commn], &rank);
+	if (comm[commn] == MPI_COMM_NULL)
+		error("mpi_comm_rank: communicator is NULL");
+	mpi_errhandler(MPI_Comm_rank(comm[commn], &rank));
 	return AsInt(rank);
 }
 
@@ -1129,7 +1133,9 @@ SEXP mpi_comm_set_errhandler(SEXP sexp_comm){
 SEXP mpi_comm_test_inter(SEXP sexp_comm){
 	int commn = rmpi_require_index(sexp_comm, COMM_MAXSIZE, "communicator");
 	int flag;
-	MPI_Comm_test_inter(comm[commn], &flag);
+	if (comm[commn] == MPI_COMM_NULL)
+		error("mpi_comm_test_inter: communicator is NULL");
+	mpi_errhandler(MPI_Comm_test_inter(comm[commn], &flag));
 	return AsInt(flag);
 }
 
