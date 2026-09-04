@@ -313,6 +313,7 @@
 
       if (plot.behavior != "data"){      
         plot.layout <- .np_plot_layout_activate(plot.layout)
+        .np_plot_variability_panel_begin(engine.ctx$annotation)
         if (plot.errors){
           plot.args <- list(x = tobj$index[i.sort],
                             y = temp.mean[i.sort],
@@ -346,9 +347,7 @@
             plot.errors.center = plot.errors.center,
             sub.supplied = sub.supplied,
             plot.args = plot.args,
-            eligible = .np_plot_variability_single_panel(
-              plot.par.mfrow = plot.par.mfrow
-            )
+            context = engine.ctx$annotation
           )
           if (plot.errors.type == "all") {
             sorted.all.err <- lapply(temp.all.err, function(err) {
@@ -474,6 +473,7 @@
         for (i in seq_len(ncol(xdat))) {
           if (plot.behavior != "data"){
             plot.layout <- .np_plot_layout_activate(plot.layout)
+            .np_plot_variability_panel_begin(engine.ctx$annotation)
 
             if (is.null(ylim)) {
               if (!common.scale) {
@@ -522,9 +522,7 @@
                 plot.errors.center = plot.errors.center,
                 sub.supplied = sub.supplied,
                 plot.args = plot.args,
-                eligible = .np_plot_variability_single_panel(
-                  plot.par.mfrow = plot.par.mfrow
-                )
+                context = engine.ctx$annotation
               )
               if (plot.errors.type == "all") {
                 scaled.all.err <- lapply(temp.all.err, function(err) {
