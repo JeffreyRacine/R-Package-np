@@ -179,3 +179,130 @@ test_that("base annotation uses existing subtitle space without changing geometr
   after <- graphics::par(c("mar", "oma", "fig", "fin", "pin", "plt", "usr"))
   expect_identical(after, before)
 })
+
+test_that("annotation placement follows actual geometry and figure ownership", {
+  placement <- getFromNamespace(".np_plot_variability_placement", .plot_annotation_package)
+  context <- getFromNamespace(".np_plot_variability_context", .plot_annotation_package)
+  begin <- getFromNamespace(".np_plot_variability_panel_begin", .plot_annotation_package)
+  grDevices::pdf(NULL, width = 9, height = 8.5)
+  on.exit(grDevices::dev.off(), add = TRUE)
+  graphics::plot(1:3)
+  expect_identical(placement(context(FALSE)), "subtitle")
+  expect_identical(placement(context(TRUE)), "subtitle")
+  graphics::par(mfrow = c(2, 2))
+  caller <- context(FALSE)
+  begin(caller)
+  expect_identical(placement(caller), "none")
+  owned <- context(TRUE)
+  expect_identical(placement(owned), "none")
+  begin(owned)
+  expect_identical(placement(owned), "shared")
+  graphics::par(mfrow = c(1, 1), fig = c(0, 0.5, 0, 1))
+  expect_identical(placement(caller), "none")
+})
+
+test_that("shared annotations draw once per page including missing-first panels", {
+  context <- getFromNamespace(".np_plot_variability_context", .plot_annotation_package)(TRUE)
+  begin <- getFromNamespace(".np_plot_variability_panel_begin", .plot_annotation_package)
+  spec <- getFromNamespace(".np_plot_variability_annotation_spec", .plot_annotation_package)
+  draw <- getFromNamespace(".np_plot_draw_variability_annotation", .plot_annotation_package)
+  grDevices::pdf(NULL, width = 9, height = 8.5)
+  on.exit(grDevices::dev.off(), add = TRUE)
+  graphics::par(mfrow = c(2, 2))
+  # No interval at each page's first panel; draw once at the second instead.
+  for (i in seq_len(10L)) {
+    begin(context)
+    graphics::plot(1:3, xlab = "x", ylab = "value")
+    if (i %% 4L == 1L) next
+    before <- graphics::par(c("mar", "oma", "fig", "fin", "pin", "plt", "usr", "mfg", "cex"))
+    annotation <- spec("bootstrap", "simultaneous", 0.05, "estimate",
+                        FALSE, list(xlab = "x"), context = context)
+    expect_identical(draw(annotation), i %% 4L == 2L)
+    expect_identical(graphics::par(names(before)), before)
+    expect_false(draw(annotation))
+  }
+})
+
+test_that("individual pages retain subtitles including categorical intervals", {
+  context <- getFromNamespace(".np_plot_variability_context", .plot_annotation_package)(FALSE)
+  spec <- getFromNamespace(".np_plot_variability_annotation_spec", .plot_annotation_package)
+  draw <- getFromNamespace(".np_plot_draw_variability_annotation", .plot_annotation_package)
+  descriptor <- getFromNamespace(".np_plot_variability_descriptor", .plot_annotation_package)
+  grDevices::pdf(NULL, width = 9, height = 8.5)
+  on.exit(grDevices::dev.off(), add = TRUE)
+  for (continuous in c(TRUE, FALSE, TRUE)) {
+    graphics::plot(1:3, xlab = "x")
+    expect_true(draw(spec("bootstrap", "pointwise", 0.05, "estimate",
+                          FALSE, list(xlab = "x"), context = context,
+                          continuous = continuous)))
+  }
+  categorical <- descriptor("bootstrap", "pointwise", 0.05,
+                             continuous = FALSE)
+  expect_match(categorical$candidates[[1L]], "variability interval", fixed = TRUE)
+  shared <- descriptor("bootstrap", "simultaneous", 0.05,
+                        "bias-corrected", shared = TRUE)
+  expect_true(all(grepl("within each panel", shared$candidates, fixed = TRUE)))
+  expect_true(all(grepl("rank-based", shared$candidates, fixed = TRUE)))
+  expect_true(all(grepl("bias-corrected", shared$candidates, fixed = TRUE)))
+})
+
+test_that("shared annotations respect title clearance and no-fit typography", {
+  context <- getFromNamespace(".np_plot_variability_context", .plot_annotation_package)(TRUE)
+  begin <- getFromNamespace(".np_plot_variability_panel_begin", .plot_annotation_package)
+  spec <- getFromNamespace(".np_plot_variability_annotation_spec", .plot_annotation_package)
+  draw <- getFromNamespace(".np_plot_draw_variability_annotation", .plot_annotation_package)
+  grDevices::pdf(NULL, width = 9, height = 8.5)
+  on.exit(grDevices::dev.off(), add = TRUE)
+  graphics::par(mfrow = c(2, 2))
+  begin(context)
+  graphics::plot(1:3, main = "User title")
+  make <- function(args) spec("bootstrap", "pointwise", 0.05, "estimate",
+                               FALSE, args, context = context)
+  expect_false(draw(make(list(main = expression(beta)))))
+  expect_false(draw(make(list(main = "User title", cex.main = 12))))
+  expect_false(draw(make(list(cex.sub = 50))))
+  expect_false(draw(make(list(main = "Positioned", line = 1))))
+  expect_true(draw(make(list(main = "User title"))))
+  graphics::par(mfrow = c(2, 2), mar = c(5.1, 4.1, 0.2, 2.1))
+  begin(context)
+  graphics::plot(1:3)
+  expect_false(draw(make(list())))
+})
+
+test_that("multi-quantile annotations consume one finite draw and state their scope", {
+  descriptor <- getFromNamespace(".np_plot_variability_descriptor", .plot_annotation_package)
+  labels <- descriptor("bootstrap", "simultaneous", 0.05,
+                       shared = TRUE, per.quantile = TRUE)$candidates
+  expect_true(all(grepl("within each quantile curve", labels, fixed = TRUE)))
+  expect_false(any(grepl("within each panel", labels, fixed = TRUE)))
+  helper <- getFromNamespace(".np_plot_draw_multi_tau_errors", .plot_annotation_package)
+  # Only intercept the final drawing seam; both actual finite-bound gates
+  # and the multi-tau loop remain the production implementations.
+  env <- new.env(parent = environment(helper))
+  draw.errors <- getFromNamespace("draw.errors", .plot_annotation_package)
+  environment(draw.errors) <- env
+  env$draw.errors <- draw.errors
+  env$.np_plot_draw_variability_annotation <- function(annotation) {
+    if (is.null(annotation)) return(invisible(FALSE))
+    env$count <- env$count + 1L
+    invisible(TRUE)
+  }
+  environment(helper) <- env
+  grDevices::pdf(NULL)
+  on.exit(grDevices::dev.off(), add = TRUE)
+  graphics::plot(1:3, type = "n")
+  value <- matrix(1, 3, 2)
+  err <- array(0.1, c(3, 3, 2))
+  for (band in c("pointwise", "all")) {
+    for (finite in c(FALSE, TRUE)) {
+      env$count <- 0L
+      err[,,1] <- NA_real_
+      err[,,2] <- if (finite) 0.1 else NA_real_
+      all.err <- lapply(1:2, function(j) list(pointwise = err[,1:2,j],
+                                             bonferroni = err[,1:2,j]))
+      helper(1:3, value, err, all.err, FALSE, TRUE, c(1,2),
+             band, "band", "|", 3, annotation = list())
+      expect_identical(env$count, if (finite) 1L else 0L)
+    }
+  }
+})

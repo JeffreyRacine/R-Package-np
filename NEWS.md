@@ -1,4 +1,13 @@
-# np 0.70-6
+# np 0.80-1
+
+* Base plots now annotate supported variability intervals consistently for
+  levels and gradients/effects: individual full-frame figures retain subtitles
+  even with `options(plot.par.mfrow=FALSE)`, while package-managed multi-panel
+  pages receive one shared top annotation. Categorical bars and multi-quantile
+  overlays use appropriate interval and coverage-scope wording. Explicit
+  subtitles and existing graphics geometry are preserved; labels that cannot
+  fit safely are omitted. Class-probability plots now honor the same global
+  layout option.
 
 * `gradient.order` is the sole supported derivative-order spelling. The
   `gradient_order` plot/single-index alias is no longer accepted, and gradient

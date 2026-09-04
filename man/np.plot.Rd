@@ -483,9 +483,14 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   bounds; \code{band="all"} therefore has finite pointwise-normal and
   Bonferroni-normal families only.
 
-  On an eligible continuous single-panel plot rendered by base graphics,
+  On an eligible single-panel plot rendered by base graphics,
   a missing \code{sub} argument allows the plot method to add a concise
-  variability-band subtitle after finite bounds have actually been drawn.
+  variability subtitle after finite bounds have actually been drawn. This
+  includes individual figures in a sequence with
+  \code{options(plot.par.mfrow=FALSE)} when the active graphics layout is
+  a full-frame single panel. Levels and supported gradients/effects follow
+  the same rule. Categorical interval bars use interval rather than band
+  terminology.
   The wording distinguishes symmetric \eqn{z}{z}-times-standard-error
   bands from bootstrap quantile and rank constructions. For example, at
   the default \code{alpha=0.05}, labels include
@@ -498,10 +503,22 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   \code{cex.sub}) and only appears when an approved one-line wording fits
   the existing plot width and bottom-margin clearance. It does not enlarge
   margins or reduce the plotting region; when no wording fits, it is
-  silently omitted. Supplying \code{sub}, including \code{sub=""}, suppresses
+  silently omitted. Supplying \code{sub}, including \code{sub=""} or
+  \code{sub=NULL}, suppresses
   the automatic label without changing that route's existing handling of the
-  supplied subtitle. Package-generated multi-panel and categorical displays
-  are not annotated automatically.
+  supplied subtitle.
+
+  Package-managed multi-panel base figures instead receive one shared
+  annotation at the top of each page, using existing whitespace without
+  changing margins, panel sizes, or fonts. Simultaneous and Bonferroni wording
+  identifies the within-panel scope; for multiple quantile curves, the scope
+  is within each quantile curve, not joint across quantiles. An annotation
+  is omitted if its text does not fit or clearance from a main title cannot
+  be established. Caller-managed multi-panel layouts and partial figure
+  regions are not labelled with a figure-wide annotation. Bootstrap boxplots
+  and coefficient displays of plus/minus one standard error are not labelled
+  as nominal variability intervals. The global \code{plot.par.mfrow} option
+  also governs automatic layout for class-probability plots.
 
   On these eligible base plots, with \code{band="all"}, default legend
   labels also identify the
@@ -513,7 +530,7 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   user-supplied legend labels are preserved without relabelling or
   filtering.
 
-  These automatic subtitle annotations apply to the base renderer. The
+  These automatic annotations apply to the base renderer. The
   \code{"rgl"} renderer uses the same construction-aware default labels in
   its existing \code{band="all"} legend, but retains its sparse interactive
   presentation: it adds no automatic footer or subtitle, and panning, zooming,

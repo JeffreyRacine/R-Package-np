@@ -1148,11 +1148,8 @@ plot.npcopula <- function(x,
             plot.errors.center = center,
             sub.supplied = sub.supplied,
             plot.args = persp.call,
-            eligible = .np_plot_variability_single_panel(
-              plot.par.mfrow = TRUE,
-              continuous = TRUE,
-              fixed = !rotate.surface
-            )
+            continuous = TRUE,
+            fixed = !rotate.surface
           )
         )
         if (identical(band, "all") && !is.null(lerr.all) && !is.null(herr.all) &&

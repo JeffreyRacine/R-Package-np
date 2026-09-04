@@ -322,19 +322,44 @@
   if (is.null(value)) default else value
 }
 
-.np_plot_engine_begin <- function(plot.par.mfrow = TRUE) {
+.np_plot_resolve_mfrow <- function(plot.par.mfrow) {
   plot.par.mfrow.opt <- getOption("plot.par.mfrow")
   if (!is.null(plot.par.mfrow.opt))
     plot.par.mfrow <- plot.par.mfrow.opt
+  plot.par.mfrow
+}
 
+.np_plot_engine_begin <- function(plot.par.mfrow = TRUE) {
+  plot.par.mfrow <- .np_plot_resolve_mfrow(plot.par.mfrow)
   oldpar.names <- "cex"
   if (isTRUE(plot.par.mfrow))
     oldpar.names <- c("mfrow", oldpar.names)
 
   list(
     oldpar = .np_plot_capture_par(oldpar.names),
-    plot.par.mfrow = plot.par.mfrow
+    plot.par.mfrow = plot.par.mfrow,
+    annotation = .np_plot_variability_context(plot.par.mfrow)
   )
+}
+
+.np_plot_variability_context <- function(plot.par.mfrow) {
+  context <- new.env(parent = emptyenv())
+  context$layout <- isTRUE(plot.par.mfrow)
+  context$owned <- FALSE
+  context$drawn <- FALSE
+  context
+}
+
+.np_plot_variability_panel_begin <- function(context) {
+  if (is.null(context) || !isTRUE(context$layout))
+    return(invisible(NULL))
+  context$owned <- TRUE
+  mfg <- graphics::par("mfg")
+  # Called before every high-level panel, including panels without intervals.
+  # The last slot precedes a new page (also immediately after setting mfrow).
+  if (identical(mfg[1:2], mfg[3:4]))
+    context$drawn <- FALSE
+  invisible(NULL)
 }
 
 .np_plot_variability_level <- function(alpha) {
@@ -348,7 +373,10 @@
 .np_plot_variability_descriptor <- function(plot.errors.method,
                                             plot.errors.type,
                                             plot.errors.alpha,
-                                            plot.errors.center = "estimate") {
+                                            plot.errors.center = "estimate",
+                                            continuous = TRUE,
+                                            shared = FALSE,
+                                            per.quantile = FALSE) {
   method <- match.arg(as.character(plot.errors.method)[1L],
                       c("bootstrap", "asymptotic"))
   band <- match.arg(as.character(plot.errors.type)[1L],
@@ -402,6 +430,27 @@
     )
   )
 
+  if (isTRUE(shared)) {
+    candidates <- gsub("\\bbands?\\b", "intervals", candidates)
+    if (identical(key, "bootstrap:simultaneous")) {
+      candidates <- c(
+        sprintf("%s bootstrap variability intervals; simultaneous within each panel (rank-based)", level),
+        sprintf("%s bootstrap intervals; simultaneous within each panel (rank-based)", level)
+      )
+    } else if (band %in% c("bonferroni", "all")) {
+      candidates <- paste0(candidates, "; within each panel")
+    }
+  } else if (!isTRUE(continuous)) {
+    candidates <- gsub("\\bband(s?)\\b", "interval\\1", candidates)
+  }
+
+  if (isTRUE(per.quantile) && band %in% c("simultaneous", "bonferroni", "all")) {
+    candidates <- sub("; within each panel$", "", candidates)
+    candidates <- sub("simultaneous within each panel", "simultaneous", candidates,
+                      fixed = TRUE)
+    candidates <- paste0(candidates, "; within each quantile curve")
+  }
+
   if (identical(method, "bootstrap") && identical(center, "bias-corrected")) {
     suffix <- if (length(candidates) >= 3L) {
       c(rep.int("; bias-corrected center", length(candidates) - 1L),
@@ -428,8 +477,13 @@
                                                  plot.errors.center,
                                                  sub.supplied,
                                                  plot.args,
-                                                 eligible = TRUE) {
+                                                 eligible = TRUE,
+                                                 context = NULL,
+                                                 continuous = TRUE,
+                                                 fixed = TRUE,
+                                                 per.quantile = FALSE) {
   if (!isTRUE(eligible) || isTRUE(sub.supplied) ||
+      !isTRUE(fixed) ||
       identical(as.character(plot.errors.method)[1L], "none"))
     return(NULL)
   list(
@@ -437,7 +491,10 @@
     plot.errors.type = as.character(plot.errors.type)[1L],
     plot.errors.alpha = as.double(plot.errors.alpha)[1L],
     plot.errors.center = as.character(plot.errors.center)[1L],
-    plot.args = plot.args
+    plot.args = plot.args,
+    context = context,
+    continuous = continuous,
+    per.quantile = per.quantile
   )
 }
 
@@ -508,15 +565,28 @@
                                                  width.fraction = 0.92) {
   if (is.null(spec))
     return(invisible(FALSE))
+  placement <- .np_plot_variability_placement(spec$context)
+  if (identical(placement, "none"))
+    return(invisible(FALSE))
+  shared <- identical(placement, "shared")
+  if (shared && isTRUE(spec$context$drawn))
+    return(invisible(FALSE))
   descriptor <- .np_plot_variability_descriptor(
     plot.errors.method = spec$plot.errors.method,
     plot.errors.type = spec$plot.errors.type,
     plot.errors.alpha = spec$plot.errors.alpha,
-    plot.errors.center = spec$plot.errors.center
+    plot.errors.center = spec$plot.errors.center,
+    continuous = spec$continuous,
+    shared = shared,
+    per.quantile = spec$per.quantile
   )
   if (!length(descriptor$candidates))
     return(invisible(FALSE))
   typography <- .np_plot_variability_typography(spec$plot.args)
+  if (shared)
+    return(.np_plot_draw_shared_variability_annotation(
+      spec, descriptor$candidates, typography, width.fraction
+    ))
   widths <- vapply(
     descriptor$candidates,
     graphics::strwidth,
@@ -547,11 +617,68 @@
   invisible(TRUE)
 }
 
-.np_plot_variability_single_panel <- function(plot.par.mfrow,
-                                              continuous = TRUE,
-                                              fixed = TRUE) {
-  isTRUE(plot.par.mfrow) && isTRUE(continuous) && isTRUE(fixed) &&
-    identical(as.integer(prod(par("mfrow"))), 1L)
+.np_plot_variability_placement <- function(context = NULL) {
+  geometry <- graphics::par(c("mfrow", "fig"))
+  if (identical(as.integer(prod(geometry$mfrow)), 1L) &&
+      identical(as.double(geometry$fig), c(0, 1, 0, 1)))
+    return("subtitle")
+  if (prod(geometry$mfrow) > 1L && !is.null(context) &&
+      isTRUE(context$owned))
+    return("shared")
+  "none"
+}
+
+.np_plot_draw_shared_variability_annotation <- function(spec, candidates,
+                                                        typography,
+                                                        width.fraction) {
+  # mtext's explicit cex is absolute; strwidth/strheight also multiply par(cex).
+  # Compensate only for measurement, never shrink the drawn subtitle to fit.
+  geometry <- graphics::par(c("cex", "din", "omi", "mai", "csi", "mex"))
+  if (!is.finite(geometry$cex) || geometry$cex <= 0)
+    return(invisible(FALSE))
+  measure.cex <- typography$cex.sub / geometry$cex
+  widths <- vapply(candidates, graphics::strwidth, numeric(1L),
+                   units = "inches", cex = measure.cex,
+                   font = typography$font.sub, family = typography$family)
+  label <- .np_plot_variability_label_select(
+    candidates, widths,
+    (geometry$din[[1L]] - sum(geometry$omi[c(2L, 4L)])) * width.fraction
+  )
+  if (is.null(label))
+    return(invisible(FALSE))
+  height <- graphics::strheight(label, units = "inches", cex = measure.cex,
+                                font = typography$font.sub,
+                                family = typography$family)
+  available <- geometry$mai[[3L]]
+  main <- spec$plot.args$main
+  if (!is.null(main) && length(main)) {
+    # title() centers an ordinary main in margin 3. Complex/list titles or
+    # custom placement cannot be certified here; leave them untouched.
+    if (!is.character(main) || anyNA(main) ||
+        !is.null(spec$plot.args$line) || isTRUE(spec$plot.args$outer))
+      return(invisible(FALSE))
+    if (any(nzchar(main))) {
+      main.height <- graphics::strheight(
+        paste(main, collapse = "\n"), units = "inches",
+        cex = if (is.null(spec$plot.args$cex.main)) par("cex.main") else spec$plot.args$cex.main,
+        font = if (is.null(spec$plot.args$font.main)) par("font.main") else spec$plot.args$font.main,
+        family = typography$family
+      )
+      available <- available / 2 - main.height / 2 - 0.02
+    }
+  }
+  inset <- 1.3 * geometry$csi * geometry$mex
+  inset <- min(inset, available - height / 2 - 0.02)
+  if (!isTRUE(inset - height / 2 >= 0.02 &&
+              inset + height / 2 + 0.02 <= available))
+    return(invisible(FALSE))
+  graphics::mtext(label, side = 3L, outer = TRUE,
+                  line = -inset / (geometry$csi * geometry$mex),
+                  at = 0.5, adj = 0.5, cex = typography$cex.sub,
+                  font = typography$font.sub, col = typography$col.sub,
+                  family = typography$family, xpd = NA)
+  spec$context$drawn <- TRUE
+  invisible(TRUE)
 }
 
 .np_plot_finite_band_pair <- function(lower, upper) {
@@ -8023,7 +8150,8 @@ plotFactor <- function(f, y, ...){
                                            plot.errors.type,
                                            plot.errors.style,
                                            plot.errors.bar,
-                                           plot.errors.bar.num) {
+                                           plot.errors.bar.num,
+                                           annotation = NULL) {
   if (is.null(err))
     return(invisible(NULL))
   nkeep <- nrow(value)
@@ -8041,7 +8169,7 @@ plotFactor <- function(f, y, ...){
         err.k <- all.k[[nm]]
         if (is.null(err.k))
           next
-        draw.errors(
+        annotated <- draw.errors(
           ex = mat.x,
           ely = center.k - err.k[, 1L],
           ehy = center.k + err.k[, 2L],
@@ -8049,8 +8177,10 @@ plotFactor <- function(f, y, ...){
           plot.errors.bar = if (xi.factor) "I" else plot.errors.bar,
           plot.errors.bar.num = plot.errors.bar.num,
           lty = lty.map[[nm]],
-          col = cols[[kk]]
+          col = cols[[kk]],
+          annotation = annotation
         )
+        if (isTRUE(annotated)) annotation <- NULL
       }
     } else {
       if (!xi.factor && !plotOnEstimate)
@@ -8060,7 +8190,7 @@ plotFactor <- function(f, y, ...){
       good <- complete.cases(mat.x, lower.k, upper.k)
       if (!any(good))
         next
-      draw.errors(
+      annotated <- draw.errors(
         ex = mat.x[good],
         ely = lower.k[good],
         ehy = upper.k[good],
@@ -8068,8 +8198,10 @@ plotFactor <- function(f, y, ...){
         plot.errors.bar = if (xi.factor) "I" else plot.errors.bar,
         plot.errors.bar.num = plot.errors.bar.num,
         lty = if (xi.factor) 1 else 2,
-        col = cols[[kk]]
+        col = cols[[kk]],
+        annotation = annotation
       )
+      if (isTRUE(annotated)) annotation <- NULL
     }
   }
   invisible(NULL)
@@ -8106,7 +8238,8 @@ plotFactor <- function(f, y, ...){
                                          cex.axis = NULL,
                                          cex.lab = NULL,
                                          cex.main = NULL,
-                                         cex.sub = NULL) {
+                                         cex.sub = NULL,
+                                         annotation = NULL) {
   scalar_default <- function(value, default) {
     if (is.null(value)) default else value
   }
@@ -8195,6 +8328,8 @@ plotFactor <- function(f, y, ...){
   if (!has.finite.value)
     return(invisible(NULL))
 
+  if (!is.null(annotation))
+    annotation$plot.args <- plot.args
   .np_plot_draw_multi_tau_errors(
     ei = ei,
     value = value,
@@ -8206,7 +8341,8 @@ plotFactor <- function(f, y, ...){
     plot.errors.type = plot.errors.type,
     plot.errors.style = plot.errors.style,
     plot.errors.bar = plot.errors.bar,
-    plot.errors.bar.num = plot.errors.bar.num
+    plot.errors.bar.num = plot.errors.bar.num,
+    annotation = annotation
   )
   for (kk in seq_len(ncol(value))) {
     graphics::lines(mat.x, value[, kk], type = scalar_default(type, "l"),

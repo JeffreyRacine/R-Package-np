@@ -1792,7 +1792,8 @@ np_render_control <- function(style = c("band", "bar"),
                                    data_rug = FALSE,
                                    main = NULL,
                                    xlab = NULL,
-                                   ylab = NULL) {
+                                   ylab = NULL,
+                                   annotation = NULL) {
   x <- dat$x
   y <- if (isTRUE(gradients)) dat$effect else dat$probability
   y <- .np_plot_geometry_values(y)
@@ -1870,6 +1871,12 @@ np_render_control <- function(style = c("band", "bar"),
       } else {
         graphics::lines(xord[good], lower[good], col = .np_plot_color("interval_context"), lty = .np_plot_lty("interval"))
         graphics::lines(xord[good], upper[good], col = .np_plot_color("interval_context"), lty = .np_plot_lty("interval"))
+      }
+      if (!is.null(annotation)) {
+        annotation$plot.args$main <- args$main
+        annotation$plot.args$xlab <- args$xlab
+        annotation$continuous <- !is.factor(x)
+        .np_plot_draw_variability_annotation(annotation)
       }
     }
   }
@@ -2026,7 +2033,7 @@ np_render_control <- function(style = c("band", "bar"),
   }
   if (is.null(xtrim))
     xtrim <- c(0, 1)
-  plot.par.mfrow <- .np_plot_match_layout(layout)
+  plot.par.mfrow <- .np_plot_resolve_mfrow(.np_plot_match_layout(layout))
   output <- match.arg(output)
   if (identical(output, "both"))
     output <- "plot-data"
@@ -2109,6 +2116,9 @@ np_render_control <- function(style = c("band", "bar"),
     return(plot.data)
 
   oldpar <- NULL
+  annotation.context <- .np_plot_variability_context(
+    isTRUE(plot.par.mfrow) && length(plot.data) > 1L
+  )
   if (isTRUE(plot.par.mfrow) && length(plot.data) > 1L) {
     oldpar <- graphics::par(no.readonly = TRUE)
     on.exit(graphics::par(oldpar), add = TRUE)
@@ -2116,6 +2126,7 @@ np_render_control <- function(style = c("band", "bar"),
   }
 
   for (i in seq_along(plot.data)) {
+    .np_plot_variability_panel_begin(annotation.context)
     panel.dots <- plot.user.args
     if (!is.null(dots$main) && length(plot.data) > 1L)
       panel.dots$main <- paste(dots$main, names(plot.data)[i], sep = ": ")
@@ -2125,7 +2136,13 @@ np_render_control <- function(style = c("band", "bar"),
       level = level,
       plot.user.args = panel.dots,
       line.user.args = line.user.args,
-      data_rug = data_rug
+      data_rug = data_rug,
+      annotation = .np_plot_variability_annotation_spec(
+        errors, band, alpha, center,
+        sub.supplied = "sub" %in% names(dots),
+        plot.args = dots,
+        context = annotation.context
+      )
     )
   }
 

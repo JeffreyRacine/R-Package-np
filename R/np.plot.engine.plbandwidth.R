@@ -608,11 +608,9 @@
                 plot.errors.center = plot.errors.center,
                 sub.supplied = sub.supplied,
                 plot.args = persp.args,
-                eligible = .np_plot_variability_single_panel(
-                  plot.par.mfrow = plot.par.mfrow,
-                  continuous = isTRUE(nxcon == 1L && nzcon == 1L),
-                  fixed = !isTRUE(rotate)
-                )
+                context = engine.ctx$annotation,
+                continuous = isTRUE(nxcon == 1L && nzcon == 1L),
+                fixed = !isTRUE(rotate)
               )
             )
             if (plot.errors.type == "all" && !is.null(lerr.all) && !is.null(herr.all)) {
@@ -803,6 +801,7 @@
           }
         } else if (plot.behavior != "data") {
           plot.layout <- .np_plot_layout_activate(plot.layout)
+          .np_plot_variability_panel_begin(engine.ctx$annotation)
           ## plot evaluation
           plot.fun <- if (xi.factor) {
             .np_plot_panel_fun(plot.bootstrap = plot.bootstrap, plot.bxp = plot.bxp)
@@ -935,10 +934,8 @@
               plot.errors.center = plot.errors.center,
               sub.supplied = sub.supplied,
               plot.args = plot.args,
-              eligible = .np_plot_variability_single_panel(
-                plot.par.mfrow = plot.par.mfrow,
-                continuous = !xi.factor
-              )
+              context = engine.ctx$annotation,
+              continuous = !xi.factor
             )
             .np_plot_draw_bias_center_1d(
               x = ei,
@@ -1109,6 +1106,7 @@
           }
         } else if (plot.behavior != "data") {
           plot.layout <- .np_plot_layout_activate(plot.layout)
+          .np_plot_variability_panel_begin(engine.ctx$annotation)
           ## plot evaluation
           plot.fun <- if (xi.factor) {
             .np_plot_panel_fun(plot.bootstrap = plot.bootstrap, plot.bxp = plot.bxp)
@@ -1236,10 +1234,8 @@
               plot.errors.center = plot.errors.center,
               sub.supplied = sub.supplied,
               plot.args = plot.args,
-              eligible = .np_plot_variability_single_panel(
-                plot.par.mfrow = plot.par.mfrow,
-                continuous = !xi.factor
-              )
+              context = engine.ctx$annotation,
+              continuous = !xi.factor
             )
             .np_plot_draw_bias_center_1d(
               x = ei,
@@ -1361,6 +1357,7 @@
         
         for (plot.index in seq_len(bws$xndim + bws$zndim)){
           plot.layout <- .np_plot_layout_activate(plot.layout)
+          .np_plot_variability_panel_begin(engine.ctx$annotation)
           i = if (plot.index <= bws$xndim) plot.index else plot.index - bws$xndim
 
           if (plot.index > bws$xndim)
@@ -1489,10 +1486,8 @@
               plot.errors.center = plot.errors.center,
               sub.supplied = sub.supplied,
               plot.args = plot.args,
-              eligible = .np_plot_variability_single_panel(
-                plot.par.mfrow = plot.par.mfrow,
-                continuous = !xi.factor
-              )
+              context = engine.ctx$annotation,
+              continuous = !xi.factor
             )
             .np_plot_draw_bias_center_1d(
               x = allei[, plot.index],
