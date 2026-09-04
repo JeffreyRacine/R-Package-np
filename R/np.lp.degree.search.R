@@ -1040,8 +1040,13 @@
   state$interrupted <- FALSE
   state$progress_state <- NULL
   state$first_error <- NULL
-  state$uniform_error <- TRUE
   state$error_count <- 0L
+  on.exit({
+    if (!is.null(state$progress_state))
+      try(.np_progress_abort(state$progress_state,
+                             detail = "Polynomial degree search failed"),
+          silent = TRUE)
+  }, add = TRUE)
 
   state$record_trace <- function(rec) {
     if (!isTRUE(state$trace_enabled))
@@ -1095,6 +1100,14 @@
     num.feval <- NA_real_
     num.feval.fast <- NA_real_
     nn.cache <- NULL
+    reject_candidate <- function(e) {
+      if (is.null(state$first_error))
+        state$first_error <- e
+      state$error_count <- state$error_count + 1L
+      status <<- "error"
+      msg <<- conditionMessage(e)
+      NULL
+    }
 
     result <- tryCatch(
       {
@@ -1108,21 +1121,8 @@
         state$interrupted <- TRUE
         NULL
       },
-      error = function(e) {
-        if (is.null(state$first_error)) {
-          state$first_error <- e
-        } else if (!identical(class(e), class(state$first_error)) ||
-                   !identical(conditionMessage(e),
-                              conditionMessage(state$first_error)) ||
-                   !identical(conditionCall(e),
-                              conditionCall(state$first_error))) {
-          state$uniform_error <- FALSE
-        }
-        state$error_count <- state$error_count + 1L
-        status <<- "error"
-        msg <<- conditionMessage(e)
-        NULL
-      }
+      np_degree_candidate_invalid = reject_candidate,
+      np_nn_candidate_invalid = reject_candidate
     )
 
     if (isTRUE(state$interrupted)) {
@@ -1263,12 +1263,12 @@
     ),
     interrupted = state$interrupted
   )
+  state$progress_state <- NULL
 
   if (is.null(state$best_payload)) {
     if (!isTRUE(state$interrupted) &&
         state$error_count > 0L &&
         identical(state$error_count, state$eval_id) &&
-        isTRUE(state$uniform_error) &&
         !is.null(state$first_error)) {
       stop(state$first_error)
     }
