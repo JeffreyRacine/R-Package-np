@@ -129,7 +129,8 @@
     }
   }
 
-  if (ncon > 0L) {
+  # Continuous NN coordinates remain counts in both metadata fields.
+  if (ncon > 0L && bwtype == "fixed") {
     dfactor <- sdev * nconfac
     if (scaling) {
       bandwidth[xdati$icon] <- bandwidth[xdati$icon] * dfactor

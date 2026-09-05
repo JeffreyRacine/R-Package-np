@@ -1403,26 +1403,28 @@ static int np_conditional_density_objective_needs_y_side(
       np_conditional_density_cvml_stream_engine_supported()));
 }
 
-static void np_validate_nonfixed_support_counts_extern(const char *where, const int bandwidth)
+/* Return the diagnostic so allocating callers can unwind their owner first. */
+static const char *np_nonfixed_support_error_extern(const int bandwidth)
 {
   int j;
 
   if (bandwidth == BW_FIXED)
-    return;
+    return NULL;
 
   for (j = 0; j < num_reg_continuous_extern; j++) {
     if ((vector_X_support_count_extern == NULL) ||
         (vector_X_support_count_extern[j] <= 1)) {
-      error("%s: nonfixed nearest-neighbour bandwidths require at least two distinct continuous regressor values per dimension", where);
+      return "nonfixed nearest-neighbour bandwidths require at least two distinct continuous regressor values per dimension";
     }
   }
 
   for (j = 0; j < num_var_continuous_extern; j++) {
     if ((vector_Y_support_count_extern == NULL) ||
         (vector_Y_support_count_extern[j] <= 1)) {
-      error("%s: nonfixed nearest-neighbour bandwidths require at least two distinct continuous variable values per dimension", where);
+      return "nonfixed nearest-neighbour bandwidths require at least two distinct continuous variable values per dimension";
     }
   }
+  return NULL;
 }
 
 SEXP C_np_progress_signal(SEXP event, SEXP surface, SEXP current, SEXP total)
@@ -1649,6 +1651,9 @@ static int bwm_kernel_unordered = 0;
 static int *bwm_num_categories = NULL;
 static int *bwm_kernel_unordered_vec = NULL;
 static int bwm_kernel_unordered_len = 0;
+/* Maximum in optimizer units; physical reference-point caps stay unchanged. */
+static double bwm_categorical_transform_scale = 1.0;
+extern double ncatfac_extern;
 static double *bwm_transform_buf = NULL;
 static int bwm_transform_buf_len = 0;
 static void bwm_nn_cache_free(void);
@@ -1668,6 +1673,7 @@ static void bwm_search_context_release(void)
   safe_free(bwm_kernel_unordered_vec);
   bwm_kernel_unordered_vec = NULL;
   bwm_kernel_unordered_len = 0;
+  bwm_categorical_transform_scale = 1.0;
   bwm_num_reg_continuous = 0;
   bwm_num_reg_unordered = 0;
   bwm_num_reg_ordered = 0;
@@ -1694,6 +1700,9 @@ static void bwm_search_context_configure_uniform(
   bwm_num_extra_params = num_extra_params;
   bwm_kernel_unordered = kernel_unordered;
   bwm_num_categories = num_categories;
+  if (bwm_use_transform && int_LARGE_SF == SF_NORMAL &&
+      (num_unordered > 0 || num_ordered > 0))
+    bwm_categorical_transform_scale = 1.0 / ncatfac_extern;
 }
 
 static void bwm_search_context_configure_split(
@@ -1747,6 +1756,11 @@ static double bwm_unordered_maximum(const int i)
   return bwm_num_categories != NULL ?
     max_unordered_bw(bwm_num_categories[bwm_unordered_category_index(i)], kernel) :
     1.0;
+}
+
+static double bwm_unordered_transform_maximum(const int i)
+{
+  return bwm_unordered_maximum(i) * bwm_categorical_transform_scale;
 }
 
 static void bwm_set_categorical_midpoints(double * const p)
@@ -3553,13 +3567,13 @@ static void bwm_apply_transform(const double *p, double *out, int n)
   /* unordered categorical */
   for (i = 0; i < bwm_num_reg_unordered; i++) {
     idx = bwm_num_reg_continuous + 1 + bwm_unordered_category_index(i);
-    out[idx] = bwm_sigmoid(p[idx]) * bwm_unordered_maximum(i);
+    out[idx] = bwm_sigmoid(p[idx]) * bwm_unordered_transform_maximum(i);
   }
 
-  /* ordered categorical (0..1) */
+  /* ordered categorical: physical maximum 1, expressed in optimizer units */
   for (i = 0; i < bwm_num_reg_ordered; i++) {
     idx = bwm_num_reg_continuous + 1 + bwm_ordered_category_index(i);
-    out[idx] = bwm_sigmoid(p[idx]);
+    out[idx] = bwm_sigmoid(p[idx]) * bwm_categorical_transform_scale;
   }
 }
 
@@ -3591,7 +3605,7 @@ static int bwm_to_unconstrained(double *p, int n)
   /* unordered */
   for (i = 0; i < bwm_num_reg_unordered; i++) {
     idx = bwm_num_reg_continuous + 1 + bwm_unordered_category_index(i);
-    double maxbw = bwm_unordered_maximum(i);
+    double maxbw = bwm_unordered_transform_maximum(i);
     double v = bwm_transform_buf[idx];
     if (maxbw <= 0.0) {
       p[idx] = 0.0;
@@ -3604,7 +3618,7 @@ static int bwm_to_unconstrained(double *p, int n)
   /* ordered */
   for (i = 0; i < bwm_num_reg_ordered; i++) {
     idx = bwm_num_reg_continuous + 1 + bwm_ordered_category_index(i);
-    p[idx] = bwm_logit(bwm_transform_buf[idx]);
+    p[idx] = bwm_logit(bwm_transform_buf[idx] / bwm_categorical_transform_scale);
   }
 
   return 0;
@@ -5081,6 +5095,7 @@ static int np_conditional_density_prepared_context_prepare_internal(double *c_un
   double *vsfh = NULL;
   double *vector_continuous_stddev = NULL;
   double lbc_dir, c_dir, initc_dir;
+  const char *support_error = NULL;
   double lbd_dir, hbd_dir, d_dir, initd_dir;
   double lbc_init, hbc_init, c_init;
   double lbd_init, hbd_init, d_init;
@@ -5441,8 +5456,9 @@ static int np_conditional_density_prepared_context_prepare_internal(double *c_un
   /* Preserve the legacy/full-owner nonfixed support contract before any
    * tree permutation changes the resident matrix view. */
   np_refresh_support_counts_extern();
-  np_validate_nonfixed_support_counts_extern(
-    "C_np_density_conditional_bw", BANDWIDTH_den_extern);
+  support_error = np_nonfixed_support_error_extern(BANDWIDTH_den_extern);
+  if (support_error != NULL)
+    goto fail;
 
   ipt_X = (int *)malloc((size_t)num_obs_train_extern * sizeof(int));
   ipt_lookup_X = (int *)malloc((size_t)num_obs_train_extern * sizeof(int));
@@ -5867,6 +5883,8 @@ fail:
     safe_free(ipt_lookup_Y);
   safe_free(ipt_lookup_XY);
   np_conditional_density_prepared_context_clear_internal();
+  if (support_error != NULL)
+    error("C_np_density_conditional_bw: %s", support_error);
   return 0;
 }
 
@@ -13423,6 +13441,7 @@ static void np_density_bw_internal(double * myuno, double * myord, double * myco
   const char *bw_error_msg = NULL;
 
   int * ipt = NULL;  // point permutation, see tree.c
+  const char *support_error = NULL;
 
 
   num_reg_unordered_extern = myopti[BW_NUNOI];
@@ -13632,7 +13651,9 @@ static void np_density_bw_internal(double * myuno, double * myord, double * myco
 
   vector_continuous_stddev_extern = vector_continuous_stddev;
   np_refresh_support_counts_extern();
-  np_validate_nonfixed_support_counts_extern("C_np_density_bw", BANDWIDTH_den_extern);
+  support_error = np_nonfixed_support_error_extern(BANDWIDTH_den_extern);
+  if (support_error != NULL)
+    goto cleanup_np_density_bw;
 
   vector_extendednn_upper_extern = (!eval_only) ?
     np_continuous_extendednn_upper_alloc(
@@ -14233,6 +14254,8 @@ density_powell_attempt:
 cleanup_np_density_bw:
   np_density_prepared_context_destroy(prepared_context);
 
+  if (support_error != NULL)
+    error("C_np_density_bw: %s", support_error);
   if (bw_error_msg != NULL)
     error("%s", bw_error_msg);
 
@@ -14395,6 +14418,7 @@ static void np_distribution_bw_internal(
   const char *bw_error_msg = NULL;
 
   int * ipt = NULL, * ipe = NULL;
+  const char *support_error = NULL;
 
   cdfontrain_extern = cdfontrain =  myopti[DBW_CDFONTRAIN];
 
@@ -14674,7 +14698,9 @@ static void np_distribution_bw_internal(
 
   vector_continuous_stddev_extern = vector_continuous_stddev;
   np_refresh_support_counts_extern();
-  np_validate_nonfixed_support_counts_extern("C_np_distribution_bw", BANDWIDTH_den_extern);
+  support_error = np_nonfixed_support_error_extern(BANDWIDTH_den_extern);
+  if (support_error != NULL)
+    goto cleanup_np_distribution_bw;
 
   vector_extendednn_upper_extern = (!eval_only) ?
     np_continuous_extendednn_upper_alloc(
@@ -15269,6 +15295,8 @@ distribution_powell_attempt:
 cleanup_np_distribution_bw:
   np_distribution_prepared_context_destroy(prepared_context);
 
+  if (support_error != NULL)
+    error("C_np_distribution_bw: %s", support_error);
   if (bw_error_msg != NULL)
     error("%s", bw_error_msg);
 
@@ -16492,6 +16520,7 @@ static void np_distribution_conditional_bw_mode(double * c_uno, double * c_ord, 
   const char *bw_error_msg = NULL;
 
   int num_all_cvar, num_all_uvar, num_all_ovar;
+  const char *support_error = NULL;
 
   int * ipt_X = NULL, * ipt_XY = NULL, * ipt_Y = NULL; 
   int * ipt_lookup_XY = NULL, * ipt_lookup_Y = NULL, * ipt_lookup_X = NULL;
@@ -17190,7 +17219,9 @@ static void np_distribution_conditional_bw_mode(double * c_uno, double * c_ord, 
 
   vector_continuous_stddev = vector_continuous_stddev_extern = mysd;
   np_refresh_support_counts_extern();
-  np_validate_nonfixed_support_counts_extern("C_np_distribution_conditional_bw", BANDWIDTH_den_extern);
+  support_error = np_nonfixed_support_error_extern(BANDWIDTH_den_extern);
+  if (support_error != NULL)
+    goto cleanup_np_distribution_conditional_bw;
 
   vector_extendednn_upper_extern = (!eval_only) ?
     np_conditional_extendednn_upper_alloc(
@@ -17838,6 +17869,8 @@ conditional_distribution_powell_attempt:
 cleanup_np_distribution_conditional_bw:
   np_conditional_distribution_prepared_context_destroy(prepared_context);
 
+  if (support_error != NULL)
+    error("C_np_distribution_conditional_bw: %s", support_error);
   if (bw_error_msg != NULL)
     error("%s", bw_error_msg);
 
@@ -19405,6 +19438,7 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
 
   int scale_cat;
   const char *bw_error_msg = NULL;
+  const char *support_error = NULL;
 
   np_cont_largeh_cache_clear_extern();
   num_reg_continuous_extern = myopti[RBW_NCONI];
@@ -19786,7 +19820,9 @@ static void np_regression_bw_mode(double * runo, double * rord, double * rcon, d
     error("C_np_regression_bw: regression NN minimum must be 1 or 2");
 
   np_refresh_support_counts_extern();
-  np_validate_nonfixed_support_counts_extern("C_np_regression_bw", BANDWIDTH_reg_extern);
+  support_error = np_nonfixed_support_error_extern(BANDWIDTH_reg_extern);
+  if (support_error != NULL)
+    goto cleanup_np_regression_bw_mode;
 
   vector_extendednn_upper_extern = prepare_only ?
     np_continuous_extendednn_upper_alloc(
@@ -20547,6 +20583,8 @@ cleanup_np_regression_bw_mode:
   /* Free data objects */
   np_regression_prepared_context_destroy(prepared_context);
 
+  if (support_error != NULL)
+    error("C_np_regression_bw: %s", support_error);
   if (bw_error_msg != NULL)
     error("%s", bw_error_msg);
 

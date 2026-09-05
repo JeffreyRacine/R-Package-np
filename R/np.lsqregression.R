@@ -1111,6 +1111,8 @@ nplsqregbw.formula <-
       names(tmf)[names(tmf) == "bws"] <- "formula"
     tmf[[1]] <- as.name("model.frame")
     tmf[["formula"]] <- tt
+    if (!missing(data) && !is.null(data))
+      tmf[["data"]] <- data
     mf.args <- as.list(tmf)[-1L]
     mf <- do.call(stats::model.frame, mf.args, envir = environment(tt))
     train.omit <- attr(mf, "na.action")
@@ -1593,6 +1595,8 @@ nplsqreg.formula <-
       names(tmf)[names(tmf) == "bws"] <- "formula"
     tmf[[1]] <- as.name("model.frame")
     tmf[["formula"]] <- tt
+    if (!missing(data) && !is.null(data))
+      tmf[["data"]] <- data
     mf.args <- as.list(tmf)[-1L]
     mf <- do.call(stats::model.frame, mf.args, envir = environment(tt))
     train.omit <- attr(mf, "na.action")

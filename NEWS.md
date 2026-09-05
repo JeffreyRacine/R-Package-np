@@ -1,5 +1,38 @@
 # np 0.80-1
 
+* Nearest-neighbour bandwidth metadata retains continuous neighbour counts
+  with either bandwidth-scaling setting, including semiparametric helpers.
+  Conditional bandwidth constructors normalize categorical metadata before
+  validation. Fixed continuous bandwidth scaling is unchanged.
+
+* Supplied categorical scale factors are validated in physical kernel units.
+  Fixed-bandwidth categorical optimizer transforms now use the corresponding
+  scale-factor bounds in both directions; physical kernel caps, penalties
+  and optimizer algorithms are unchanged.
+
+* MADS/NOMAD+Powell endpoint checks now evaluate the exact returned
+  bandwidths without a round trip through optimizer coordinates. This
+  avoids rounding the point being certified; search coordinates, objective
+  arithmetic and the number of certification evaluations are unchanged.
+
+* Conditional-distribution NOMAD+Powell refinement compares and publishes
+  the raw endpoint objective already obtained by certification, while
+  preserving the optimizer's initial-value and history diagnostics.
+
+* NN bandwidth owners release their existing native workspaces before
+  reporting constant continuous support. The diagnostic and successful
+  search calculations are unchanged; this does not change fitted-value
+  error unwinding.
+
+* Regression gradients and their standard errors retain a one-row matrix
+  for a single evaluation point, including categorical asymptotic plot
+  slices; values and multirow output are unchanged.
+
+* Conditional-distribution cross-validation now rejects failed nearest-neighbour
+  bandwidth preparation before using its output. Zero-radius trial candidates
+  no longer depend on uninitialized memory; valid-candidate objectives and
+  the existing invalid-candidate penalty are unchanged.
+
 * Conditional categorical bandwidth admission now applies the response and
   regressor unordered-kernel bounds independently. Mixed Li-Racine and
   Aitchison-Aitken conditional-density searches no longer reject valid
@@ -32,7 +65,8 @@
 
 * Formula estimators and regression inference helpers now retain explicitly
   supplied data values in wrapper calls, instead of looking up their argument
-  names again in the formula environment. Formula expressions and retained
+  names again in the formula environment, including least-squares quantile
+  regression bandwidth and fitted-object formula calls. Formula expressions and retained
   data behavior are unchanged.
 
 * Smooth-coefficient NOMAD bandwidth objects now publish complete bandwidth
@@ -77,8 +111,8 @@
   access and double-free behavior without changing the integral result.
 
 * Gradient standard errors for a single-level ordered predictor no longer read
-  beyond the predictor's category table; its identically zero contrast remains
-  unchanged.
+  beyond the predictor's category table, including adaptive-NN dense and tree
+  routes; its identically zero contrast remains unchanged.
 
 * Automatic cell-based coordinate/exhaustive polynomial-degree searches now
   preserve a configuration error when every degree candidate fails with the same

@@ -58,6 +58,12 @@
     stop("internal NN endpoint certification requires a raw evaluator",
          call. = FALSE)
   value <- raw.eval(point)
+  .np_nn_certify_raw_value(value, point = point, owner = owner)
+}
+
+# Validate an existing raw evaluation without changing its coordinate identity.
+# Final bandwidth payloads need not round-trip through optimizer coordinates.
+.np_nn_certify_raw_value <- function(value, point, owner) {
   if (!.np_nn_raw_objective_valid(value)) {
     .np_nn_abort_candidate_invalid(
       sprintf("%s returned a candidate with invalid raw objective", owner),

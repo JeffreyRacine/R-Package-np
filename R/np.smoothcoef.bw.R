@@ -214,13 +214,16 @@ npscoefbw.NULL <-
          call. = FALSE)
 
   out[] <- as.double(scbw$ncatfac)
-  if (any(scbw$icon)) {
+  if (any(scbw$icon) && scbw$type == "fixed") {
     if (is.null(scbw$sdev) || any(!is.finite(scbw$sdev)))
       stop("scaled smooth-coefficient bandwidth state is missing continuous scales",
            call. = FALSE)
     icon.cumsum <- cumsum(scbw$icon)
     out[scbw$icon] <- as.double(scbw$nconfac) *
       as.double(scbw$sdev)[icon.cumsum[scbw$icon]]
+  } else {
+    # Continuous NN coordinates are counts; only categorical lambdas scale.
+    out[scbw$icon] <- 1.0
   }
   out
 }
@@ -1830,10 +1833,12 @@ npscoefbw.scbandwidth <-
     
     bws$sfactor <- bws$bandwidth <- bws$bw
     nfactor <- nrow^(-2.0/(2.0*bws$ckerorder+bws$ncon))
-    dfactor <- EssDee(zdat[, dati$icon, drop = FALSE])*nrow^(-1.0/(2.0*bws$ckerorder+sum(dati$icon)))
+    if (bws$type == "fixed")
+      dfactor <- EssDee(zdat[, dati$icon, drop = FALSE])*nrow^(-1.0/(2.0*bws$ckerorder+sum(dati$icon)))
 
     if (bws$scaling) {
-      bws$bandwidth[dati$icon] <- bws$bandwidth[dati$icon]*dfactor
+      if (bws$type == "fixed")
+        bws$bandwidth[dati$icon] <- bws$bandwidth[dati$icon]*dfactor
 
       if(bws$nuno > 0)
         bws$bandwidth[dati$iuno] <- bws$bandwidth[dati$iuno]*nfactor
@@ -1842,7 +1847,8 @@ npscoefbw.scbandwidth <-
         bws$bandwidth[dati$iord] <- bws$bandwidth[dati$iord]*nfactor
       
     } else {
-      bws$sfactor[dati$icon] <- bws$sfactor[dati$icon]/dfactor
+      if (bws$type == "fixed")
+        bws$sfactor[dati$icon] <- bws$sfactor[dati$icon]/dfactor
 
       if(bws$nuno > 0)
         bws$sfactor[dati$iuno] <- bws$sfactor[dati$iuno]/nfactor

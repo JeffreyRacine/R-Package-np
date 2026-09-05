@@ -398,6 +398,10 @@ npNomadNativeSearchDensity <- function(prep,
     bw_vec <- .npregbw_nomad_point_to_bw(point, template = template, setup = setup)
     tbw <- bws
     tbw$bw <- bw_vec
+    raw_eval_bandwidth(tbw)
+  }
+
+  raw_eval_bandwidth <- function(tbw) {
     out <- npudensbw.bandwidth(
       dat = dat,
       bws = tbw,
@@ -455,12 +459,8 @@ npNomadNativeSearchDensity <- function(prep,
       powell.elapsed <- proc.time()[3L] - hot.start
       hot.payload$num.feval <- as.numeric(direct.payload$num.feval[1L]) + as.numeric(hot.payload$num.feval[1L])
       hot.payload$num.feval.fast <- as.numeric(direct.payload$num.feval.fast[1L]) + as.numeric(hot.payload$num.feval.fast[1L])
-      hot.point <- .npregbw_nomad_bw_to_point(
-        hot.payload$bw, template = template, setup = setup
-      )
-      .np_nn_certify_raw_point(
-        point = hot.point,
-        raw.eval = raw_eval_fun,
+      .np_nn_certify_raw_value(
+        value = raw_eval_bandwidth(hot.payload), point = hot.payload$bw,
         owner = "npudens MADS+Powell handoff"
       )
       hot.objective <- -as.numeric(hot.payload$fval[1L])
@@ -1065,7 +1065,8 @@ npudensbw.bandwidth <-
     }
 
 
-    if (tbw$ncon > 0){
+    ## Continuous NN coordinates remain counts in both metadata fields.
+    if (tbw$ncon > 0 && tbw$type == "fixed"){
       dfactor <- mysd*nconfac
 
       if (tbw$scaling) {

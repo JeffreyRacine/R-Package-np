@@ -232,6 +232,23 @@ test_that("ordered first interior last and singleton conventions remain intact",
   expect_identical(singleton.fit$gerr, matrix(0, 9L, 1L))
 })
 
+test_that("singleton ordered contrasts remain zero with nearest-neighbour bandwidths", {
+  old <- options(np.messages=FALSE)
+  on.exit(options(old),add=TRUE)
+  n <- 12L
+  x <- data.frame(z=sin(seq_len(n)*sqrt(2))+seq_len(n)/n,
+    o=ordered(rep("only",n)))
+  y <- x$z+seq_len(n)/7
+  for(type in c("generalized_nn","adaptive_nn")) for(tree in c(FALSE,TRUE)) {
+    options(np.tree=tree)
+    bw <- h4_explicit_lc_bw(x,y,c(3,0.2),bwtype=type)
+    fit <- npreg(bws=bw,txdat=x,tydat=y,gradients=TRUE,se=TRUE)
+    expect_identical(as.double(fit$grad[,2]),rep(0,n))
+    expect_identical(as.double(fit$gerr[,2]),rep(0,n))
+    expect_true(all(is.finite(fitted(fit))))
+  }
+})
+
 test_that("H4 retains only streamed categorical HC0 moments", {
   reducer <- paste(
     readLines(test_path("..", "..", "src", "jksum.c"), warn = FALSE),

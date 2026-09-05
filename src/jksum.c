@@ -7943,9 +7943,10 @@ void np_p_okernelv(const int KERNEL,
     if(kbuf == NULL) error("memory allocation failed");
   }
 
+  const int swap_category = swap_xxt && ncat > 1;
   double s_cat = 0.0;
 
-  if((!swap_xxt) && do_ocg && (cats != NULL)){
+  if((!swap_category) && do_ocg && (cats != NULL)){
     s_cat = cats[(ncat > 1) ? abs(swapped_index - 1) : 0];
   }
   
@@ -7966,7 +7967,7 @@ void np_p_okernelv(const int KERNEL,
 
     if(xl == NULL){
       for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
-        const double cat = do_ocg ? (swap_xxt ? cats[abs(ordered_indices[i] - 1)] : s_cat) : 0.0;
+        const double cat = do_ocg ? (swap_category ? cats[abs(ordered_indices[i] - 1)] : s_cat) : 0.0;
         const double c1 = swap_xxt ? x : xt[i];
         const double c2 = swap_xxt ? xt[i] : x;
         const double c3 = do_ocg ? cat : (swap_xxt ? xt[i] : x);
@@ -8015,7 +8016,7 @@ void np_p_okernelv(const int KERNEL,
           const int istart = p_xl->istart[m];
           const int nlev = p_xl->nlev[m];
           for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw){
-            const double cat = do_ocg ? (swap_xxt ? cats[abs(ordered_indices[i] - 1)] : s_cat) : 0.0;
+            const double cat = do_ocg ? (swap_category ? cats[abs(ordered_indices[i] - 1)] : s_cat) : 0.0;
             const double c1 = swap_xxt ? x : xt[i];
             const double c3 = do_ocg ? cat : (swap_xxt ? xt[i] : x);
 
@@ -22332,7 +22333,7 @@ double *cv){
   matrix_bandwidth_x = alloc_matd(nbwmx, num_reg_continuous);
   matrix_bandwidth_y = alloc_matd(nbwmy, num_var_continuous);
 
-  kernel_bandwidth_mean(KERNEL_den,
+  if(kernel_bandwidth_mean(KERNEL_den,
                         BANDWIDTH_den,
                         num_obs_train,
                         nbwmx,
@@ -22350,9 +22351,10 @@ double *cv){
                         matrix_X_continuous_train,
                         NULL,					 // Not used 
                         matrix_bandwidth_x,
-                        lambdax);
+                        lambdax) != 0)
+    goto cleanup_cdist_loo;
 
-  kernel_bandwidth_mean(KERNEL_reg,
+  if(kernel_bandwidth_mean(KERNEL_reg,
                         BANDWIDTH_den,
                         num_obs_train,
                         nbwmy,
@@ -22370,7 +22372,8 @@ double *cv){
                         matrix_Y_continuous_eval,
                         NULL,					 // Not used 
                         matrix_bandwidth_y,
-                        lambday);
+                        lambday) != 0)
+    goto cleanup_cdist_loo;
 
   if(num_reg_continuous > 0 || num_reg_unordered > 0 || num_reg_ordered > 0){
     int ok_all = 1;
@@ -23241,6 +23244,7 @@ double *cv){
     clean_xl(&xl);
   }
 
+cleanup_cdist_loo:
   free(x_operator);
   free(y_operator);
   free(xy_operator);

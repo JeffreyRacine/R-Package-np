@@ -729,7 +729,8 @@ npregbw.rbandwidth <-
       }
     }
 
-    if (tbw$ncon > 0){
+    ## Continuous NN coordinates remain counts in both metadata fields.
+    if (tbw$ncon > 0 && tbw$type == "fixed"){
       dfactor <- mysd*nconfac
 
       if (tbw$scaling) {
@@ -839,6 +840,14 @@ npregbw.rbandwidth <-
   }
 
   code
+}
+
+.npregbw_certify_raw_bandwidth <- function(bws, xdat, ydat, opt.args, owner) {
+  out <- .npregbw_eval_only(
+    xdat = xdat, ydat = ydat, bws = bws, invalid.penalty = "dbmax",
+    penalty.multiplier = if (is.null(opt.args$penalty.multiplier)) 10 else opt.args$penalty.multiplier
+  )
+  .np_nn_certify_raw_value(out$objective, point = bws$bw, owner = owner)
 }
 
 .npregbw_eval_only <- function(xdat,
@@ -1320,12 +1329,8 @@ npregbw.rbandwidth <-
       powell.elapsed <- proc.time()[3L] - powell.start
       hot.payload$num.feval <- as.numeric(direct.payload$num.feval[1L]) + as.numeric(hot.payload$num.feval[1L])
       hot.payload$num.feval.fast <- as.numeric(direct.payload$num.feval.fast[1L]) + as.numeric(hot.payload$num.feval.fast[1L])
-      hot.point <- .npregbw_nomad_bw_to_point(
-        hot.payload$bw, template = template, setup = setup
-      )
-      .np_nn_certify_raw_point(
-        point = hot.point,
-        raw.eval = raw_eval_fun,
+      .npregbw_certify_raw_bandwidth(
+        bws = hot.payload, xdat = xdat, ydat = ydat, opt.args = opt.args,
         owner = "npreg MADS+Powell handoff"
       )
       hot.objective <- as.numeric(hot.payload$fval[1L])
@@ -1995,9 +2000,8 @@ npregbw.rbandwidth <-
       if (!is.null(hot.payload$method) && length(hot.payload$method))
         hot.payload$pmethod <- bwmToPrint(as.character(hot.payload$method[1L]))
 
-      .np_nn_certify_raw_point(
-        point = c(.npregbw_nomad_bw_to_point(hot.payload$bw, template, setup), degree),
-        raw.eval = raw_eval_fun,
+      .npregbw_certify_raw_bandwidth(
+        bws = hot.payload, xdat = xdat, ydat = ydat, opt.args = opt.args,
         owner = "npreg NOMAD degree-search Powell handoff"
       )
       hot.objective <- as.numeric(hot.payload$fval[1L])

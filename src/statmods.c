@@ -1451,6 +1451,17 @@ int initialize_nr_directions(int BANDWIDTH,
 
 }
 
+/* Supplied categorical starts use scale-factor units when int_large is zero.
+ * Validate their physical lambda without changing the supplied value.  Keep
+ * this conversion at initialization, not in the objective evaluation path. */
+static int np_categorical_start_is_valid(double value, double maximum,
+                                         int int_large, double ncatfac)
+{
+  if (!int_large)
+    value *= ncatfac;
+  return value >= 0.0 && value <= maximum;
+}
+
 void initialize_nr_vector_scale_factor(int BANDWIDTH,
                                        int RANDOM,
                                        int seed,
@@ -1591,7 +1602,8 @@ void initialize_nr_vector_scale_factor(int BANDWIDTH,
     if(!int_use_starting_values){
       vector_scale_factor[l+1] = bwi*(RANDOM ? (hbd_init-lbd_init)*ran3(&seed)+lbd_init : d_init);
     } else {
-      if(!is_valid_unordered_bw(vector_scale_factor[l+1], num_categories[l-ncon], kernel_yu)){
+      if(!np_categorical_start_is_valid(vector_scale_factor[l+1],
+             max_unordered_bw(num_categories[l-ncon], kernel_yu), int_large, ncatfac)){
         REprintf("\n** Warning: invalid sf in init_nr_sf() [%g]\n", vector_scale_factor[l+1]);
         vector_scale_factor[l+1] = bwi;
       }
@@ -1604,7 +1616,7 @@ void initialize_nr_vector_scale_factor(int BANDWIDTH,
     if(!int_use_starting_values){
       vector_scale_factor[l+1] = bwi*(RANDOM ? (hbd_init-lbd_init)*ran3(&seed)+lbd_init : d_init);
     } else {
-      if((vector_scale_factor[l+1] < 0.0) || (vector_scale_factor[l+1] > 1.0)){
+      if(!np_categorical_start_is_valid(vector_scale_factor[l+1], 1.0, int_large, ncatfac)){
         REprintf("\n** Warning: invalid sf in init_nr_sf() [%g]\n", vector_scale_factor[l+1]);
         vector_scale_factor[l+1] = bwi;
       }
@@ -1617,7 +1629,8 @@ void initialize_nr_vector_scale_factor(int BANDWIDTH,
     if(!int_use_starting_values){
       vector_scale_factor[l+1] = bwi*(RANDOM ? (hbd_init-lbd_init)*ran3(&seed)+lbd_init : d_init);
     } else {
-      if(!is_valid_unordered_bw(vector_scale_factor[l+1], num_categories[l-ncon], kernel_xu)){
+      if(!np_categorical_start_is_valid(vector_scale_factor[l+1],
+             max_unordered_bw(num_categories[l-ncon], kernel_xu), int_large, ncatfac)){
         REprintf("\n** Warning: invalid sf in init_nr_sf() [%g]\n", vector_scale_factor[l+1]);
         vector_scale_factor[l+1] = bwi;
       }
@@ -1630,7 +1643,7 @@ void initialize_nr_vector_scale_factor(int BANDWIDTH,
     if(!int_use_starting_values){
       vector_scale_factor[l+1] = bwi*(RANDOM ? (hbd_init-lbd_init)*ran3(&seed)+lbd_init : d_init);
     } else {
-      if((vector_scale_factor[l+1] < 0.0) || (vector_scale_factor[l+1] > 1.0)){
+      if(!np_categorical_start_is_valid(vector_scale_factor[l+1], 1.0, int_large, ncatfac)){
         REprintf("\n** Warning: invalid sf in init_nr_sf() [%g]\n", vector_scale_factor[l+1]);
         vector_scale_factor[l+1] = bwi;
       }

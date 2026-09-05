@@ -769,50 +769,12 @@ npcdensbw.conbandwidth <-
 
     tbw <- npSetScaleFactorSearchLower(tbw, npGetScaleFactorSearchLower(bws))
     
-    ## bandwidth metadata
-    tbw$sfactor <- tbw$bandwidth <- list(x = tbw$xbw, y = tbw$ybw)
+    ## Normalize physical metadata before constructor validation.
+    tbw$nconfac <- nconfac
+    tbw$ncatfac <- ncatfac
+    tbw$sdev <- mysd
+    tbw <- .np_refresh_xy_bandwidth_metadata(tbw)
 
-    apply_bw_meta <- function(tl, dfactor){
-      for (nm in names(tl)) {
-        idx <- tl[[nm]]
-        if (length(idx) == 0L)
-          next
-        if (tbw$scaling) {
-          tbw$bandwidth[[nm]][idx] <- tbw$bandwidth[[nm]][idx] * dfactor[[nm]]
-        } else {
-          tbw$sfactor[[nm]][idx] <- tbw$sfactor[[nm]][idx] / dfactor[[nm]]
-        }
-      }
-    }
-    
-    if ((tbw$xnuno+tbw$ynuno) > 0){
-      dfactor <- ncatfac
-      dfactor <- list(x = dfactor, y = dfactor)
-
-      tl <- list(x = tbw$xdati$iuno, y = tbw$ydati$iuno)
-
-      apply_bw_meta(tl = tl, dfactor = dfactor)
-    }
-
-    if ((tbw$xnord+tbw$ynord) > 0){
-      dfactor <- ncatfac
-      dfactor <- list(x = dfactor, y = dfactor)
-
-      tl <- list(x = tbw$xdati$iord, y = tbw$ydati$iord)
-
-      apply_bw_meta(tl = tl, dfactor = dfactor)
-    }
-
-      
-    if (tbw$ncon > 0){
-      dfactor <- nconfac
-      dfactor <- list(x = EssDee(xcon)*dfactor, y = EssDee(ycon)*dfactor)
-
-      tl <- list(x = tbw$xdati$icon, y = tbw$ydati$icon)
-
-      apply_bw_meta(tl = tl, dfactor = dfactor)
-    }
-  
     tbw <- conbandwidth(xbw = tbw$xbw,
                         ybw = tbw$ybw,
                         bwmethod = tbw$method,
@@ -870,7 +832,6 @@ npcdensbw.conbandwidth <-
     tbw$cvls.quadrature.points <- bws$cvls.quadrature.points
     tbw$cvls.quadrature.ratios <- bws$cvls.quadrature.ratios
     
-    tbw <- .np_refresh_xy_bandwidth_metadata(tbw)
     tbw <- .npcdensbw_restore_explicit_fixed_y_bounds(tbw, bws)
 
     tbw
@@ -1031,6 +992,16 @@ npcdensbw.conbandwidth <-
   }
 
   npKernelBoundsMarshal(kerlb, kerub)
+}
+
+.npcdensbw_certify_raw_bandwidth <- function(bws, xdat, ydat, opt.args, owner) {
+  out <- .npcdensbw_eval_only(
+    xdat = xdat, ydat = ydat, bws = bws, invalid.penalty = "dbmax",
+    penalty.multiplier = if (is.null(opt.args$penalty.multiplier)) 10 else opt.args$penalty.multiplier
+  )
+  .np_nn_certify_raw_value(
+    out$objective, point = c(bws$ybw, bws$xbw), owner = owner
+  )
 }
 
 .npcdensbw_eval_only <- function(xdat,
@@ -2371,11 +2342,10 @@ npPreparedObjectiveSearchConditionalDensity <- function(template,
         hot.payload$num.feval.guarded <- direct.payload$num.feval.guarded
         if (!is.null(hot.payload$method) && length(hot.payload$method))
           hot.payload$pmethod <- bwmToPrint(as.character(hot.payload$method[1L]))
-        hot.point <- c(.npcdensbw_nomad_bw_to_point(
-          c(hot.payload$ybw, hot.payload$xbw), template = template, setup = setup), degree)
-        hot.objective <- .np_nn_certify_raw_point(
-          point = hot.point, raw.eval = raw_eval_fun,
-          owner = "npcdens NOMAD+Powell degree handoff")
+        hot.objective <- .npcdensbw_certify_raw_bandwidth(
+          bws = hot.payload, xdat = xdat, ydat = ydat, opt.args = opt.args,
+          owner = "npcdens NOMAD+Powell degree handoff"
+        )
         if (
             .np_degree_better(hot.objective, direct.objective, direction = "max")) {
           return(list(payload = hot.payload, objective = hot.objective, powell.time = powell.elapsed))
@@ -2601,14 +2571,8 @@ npPreparedObjectiveSearchConditionalDensity <- function(template,
       hot.payload$num.feval <- direct.payload$num.feval
       hot.payload$num.feval.fast <- direct.payload$num.feval.fast
       hot.payload$num.feval.guarded <- direct.payload$num.feval.guarded
-      hot.point <- .npcdensbw_nomad_bw_to_point(
-        c(hot.payload$ybw, hot.payload$xbw),
-        template = template,
-        setup = setup
-      )
-      hot.objective <- .np_nn_certify_raw_point(
-        point = hot.point,
-        raw.eval = raw_eval_fun,
+      hot.objective <- .npcdensbw_certify_raw_bandwidth(
+        bws = hot.payload, xdat = xdat, ydat = ydat, opt.args = opt.args,
         owner = "npcdens MADS+Powell handoff"
       )
       if (

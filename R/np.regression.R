@@ -683,11 +683,11 @@ npreg.rbandwidth <-
       rorder = numeric(ncol)
       ord_idx <- seq_len(ncol)
       rorder[c(ord_idx[bws$icon], ord_idx[bws$iuno], ord_idx[bws$iord])] <- ord_idx
-      myout$g = as.matrix(myout$g[,rorder])
+      myout$g = as.matrix(myout$g[,rorder, drop = FALSE])
 
       if (se) {
         myout$gerr = matrix(data=myout$gerr, nrow = enrow, ncol = ncol, byrow = FALSE)
-        myout$gerr = as.matrix(myout$gerr[,rorder])
+        myout$gerr = as.matrix(myout$gerr[,rorder, drop = FALSE])
       }
 
       if (glp.gradient.partial) {
