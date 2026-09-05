@@ -3,6 +3,8 @@ test_that("npsdeptest vector integration preserves a skewed-series oracle", {
   old <- options(np.messages = FALSE)
   on.exit(options(old), add = TRUE)
 
+  # The oracle also fixes the independent C bandwidth-search seed.
+  npseed(42)
   set.seed(84004)
   x <- rexp(20) - 1 + 0.25 * rt(20, df = 5)
   expected.bootstrap <- c(
