@@ -1,8 +1,22 @@
+.nplsqreg_formula_dispatch_args <- function(...) {
+  expressions <- substitute(list(...))[-1L]
+  indices <- seq_along(expressions)
+  dot.names <- names(expressions)
+  if (!is.null(dot.names))
+    indices <- indices[is.na(pmatch(dot.names, "subset"))]
+  args <- lapply(indices, function(i) ...elt(i))
+  if (!is.null(dot.names))
+    names(args) <- dot.names[indices]
+  args
+}
+
 nplsqreg <-
   function(bws, ...) {
     .np_reject_gradient_order_alias(substitute(list(...))[-1L],
                                     "nplsqreg", suggest = TRUE)
-    args <- list(...)
+    args <- if (!missing(bws) && inherits(bws, "formula"))
+      .nplsqreg_formula_dispatch_args(...)
+    else list(...)
 
     if (!missing(bws)) {
       if (isa(bws, "lsqregressionbandwidth"))
@@ -26,7 +40,9 @@ nplsqreg <-
 
 nplsqregbw <-
   function(bws, ...) {
-    args <- list(...)
+    args <- if (!missing(bws) && inherits(bws, "formula"))
+      .nplsqreg_formula_dispatch_args(...)
+    else list(...)
     if ("penalty.multiplier" %in% names(args))
       args$penalty.multiplier <-
         npValidateRegressionPenaltyMultiplier(args$penalty.multiplier)

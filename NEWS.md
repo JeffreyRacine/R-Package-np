@@ -1,5 +1,8 @@
 # npRmpi 0.80-1
 
+* Least-squares quantile formula dispatch preserves named subset expressions for
+  evaluation in the formula method's data mask.
+
 * Formula subsets in npcmstest, npqcmstest and npksum resolve data columns
   before caller-local bindings. Data and subset expressions are evaluated
   once, including before automatic MPI dispatch.
