@@ -12,10 +12,60 @@ run_wrapper_cmd_subprocess <- function(cmd, args = character(), timeout = 60L, e
 }
 
 .wrapper_mpi_init_env_failure <- function(output) {
+  if (any(grepl("WRAPPER_.*_OK", output)))
+    return(FALSE)
   any(grepl("OFI call ep_enable failed", output, fixed = TRUE)) ||
     any(grepl("Fatal error in internal_Init", output, fixed = TRUE)) ||
     any(grepl("MPI_Init", output, fixed = TRUE) & grepl("failed", output, ignore.case = TRUE))
 }
+
+.wrapper_run_with_interface_retry <- function(run_once) {
+  first <- run_once("en0")
+  # A completed-body error or shutdown timeout is not an interface failure.
+  if (first$status == 0L ||
+      !.wrapper_mpi_init_env_failure(first$output))
+    return(first)
+  result <- run_once("lo0")
+  # Keep the first attempt without contaminating classification of the second.
+  result$first_attempt <- first
+  result
+}
+
+wrapper_world_bcast_lines <- function() {
+  c(
+    "  mpi.bcast.cmd({",
+    "    rank <- mpi.comm.rank(0L)",
+    "    value <- if (rank == 0L) 3.25 else 0",
+    "    stopifnot(identical(as.numeric(mpi.bcast(value, type = 5L, rank = 0L, comm = 0L, buffunit = 100L)), 3.25))",
+    "    cat(sprintf('WRAPPER_WORLD_BCAST_OK rank=%d\\n', rank))",
+    "  }, caller.execute = TRUE, comm = 1L)"
+  )
+}
+
+test_that("wrapper interface retry cannot hide a non-environment failure", {
+  success <- list(status = 0L, output = "WRAPPER_ATTACH_OK")
+  timeout <- list(status = 124L, output = "WRAPPER_ATTACH_OK")
+  failure <- list(status = 1L, output = "assertion failed")
+  unavailable <- list(status = 1L, output = "Fatal error in internal_Init")
+  expect_false(.wrapper_mpi_init_env_failure(c(timeout$output, unavailable$output)))
+  cases <- list(
+    list(success, success, 1L), list(timeout, success, 1L),
+    list(failure, success, 1L), list(unavailable, success, 2L),
+    list(unavailable, failure, 2L), list(unavailable, unavailable, 2L)
+  )
+  for (case in cases) {
+    calls <- character()
+    result <- .wrapper_run_with_interface_retry(function(iface) {
+      calls <<- c(calls, iface)
+      case[[length(calls)]]
+    })
+    expected <- case[[case[[3L]]]]
+    expect_identical(calls, c("en0", "lo0")[seq_len(case[[3L]])])
+    expect_identical(result$status, expected$status)
+    expect_identical(result$output, expected$output)
+    if (case[[3L]] == 2L) expect_identical(result$first_attempt, unavailable)
+  }
+})
 
 wrapper_subprocess_env <- function(extra = character()) {
   npRmpi_subprocess_env(c("NP_RMPI_NO_REUSE_SLAVES=1", extra))
@@ -239,14 +289,12 @@ test_that("wrapper attach smoke stays green under mpiexec when enabled", {
     "ns <- asNamespace('npRmpi')",
     "mpi_sendrecv_replace <- get('mpi.sendrecv.replace', envir = ns, inherits = FALSE)",
     "is.master <- isTRUE(npRmpi.init(mode = 'attach', quiet = TRUE, autodispatch = TRUE))",
-    "on.exit({",
-    "  try(npRmpi.quit(mode = 'attach'), silent = TRUE)",
-    "  if (isTRUE(is.master)) try(Rmpi::mpi.quit(), silent = TRUE)",
-    "}, add = TRUE)",
     "if (isTRUE(is.master)) {",
     "  stopifnot(identical(as.numeric(mpi_sendrecv_replace(3.25, type = 5L, dest = 0L, sendtag = 41L, source = 0L, recvtag = 41L, comm = 0L, status = 0L)), 3.25))",
-    "  stopifnot(identical(as.numeric(mpi.bcast(3.25, type = 5L, rank = 0L, comm = 0L, buffunit = 100L)), 3.25))",
+    wrapper_world_bcast_lines(),
     "  cat('WRAPPER_ATTACH_OK\\n')",
+    "  npRmpi.quit(mode = 'attach', comm = 1L)",
+    "  get('mpi.finalize', envir = ns, inherits = FALSE)()",
     "}"
   ), script, useBytes = TRUE)
 
@@ -266,9 +314,7 @@ test_that("wrapper attach smoke stays green under mpiexec when enabled", {
     )
   }
 
-  res <- run_once("en0")
-  if (res$status != 0L)
-    res <- run_once("lo0")
+  res <- .wrapper_run_with_interface_retry(run_once)
 
   if (res$status != 0L && .wrapper_mpi_init_env_failure(res$output))
     skip("MPI runtime interface unavailable in this environment for attach-mode wrapper smoke")
@@ -276,6 +322,9 @@ test_that("wrapper attach smoke stays green under mpiexec when enabled", {
   expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
   expect_true(any(grepl("WRAPPER_ATTACH_OK", res$output, fixed = TRUE)),
               info = paste(res$output, collapse = "\n"))
+  for (rank in 0:1)
+    expect_true(any(grepl(paste0("WRAPPER_WORLD_BCAST_OK rank=", rank),
+                         res$output, fixed = TRUE)))
 })
 
 test_that("wrapper profile smoke stays green under mpiexec when enabled", {
@@ -301,7 +350,7 @@ test_that("wrapper profile smoke stays green under mpiexec when enabled", {
     "  mpi_sendrecv_replace <- get('mpi.sendrecv.replace', envir = ns, inherits = FALSE)",
     "  mpi.bcast.cmd(np.mpi.initialize(), caller.execute = TRUE)",
     "  stopifnot(identical(as.numeric(mpi_sendrecv_replace(3.25, type = 5L, dest = 0L, sendtag = 41L, source = 0L, recvtag = 41L, comm = 0L, status = 0L)), 3.25))",
-    "  stopifnot(identical(as.numeric(mpi.bcast(3.25, type = 5L, rank = 0L, comm = 0L, buffunit = 100L)), 3.25))",
+    wrapper_world_bcast_lines(),
     "  cat('WRAPPER_PROFILE_OK\\n')",
     "  mpi.bcast.cmd(mpi.quit(), caller.execute = TRUE)",
     "}"
@@ -324,9 +373,7 @@ test_that("wrapper profile smoke stays green under mpiexec when enabled", {
     )
   }
 
-  res <- run_once("en0")
-  if (res$status != 0L)
-    res <- run_once("lo0")
+  res <- .wrapper_run_with_interface_retry(run_once)
 
   if (res$status != 0L && .wrapper_mpi_init_env_failure(res$output))
     skip("MPI runtime interface unavailable in this environment for profile-mode wrapper smoke")
@@ -334,6 +381,9 @@ test_that("wrapper profile smoke stays green under mpiexec when enabled", {
   expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
   expect_true(any(grepl("WRAPPER_PROFILE_OK", res$output, fixed = TRUE)),
               info = paste(res$output, collapse = "\n"))
+  for (rank in 0:1)
+    expect_true(any(grepl(paste0("WRAPPER_WORLD_BCAST_OK rank=", rank),
+                         res$output, fixed = TRUE)))
 })
 
 test_that("supported string send/recv and bcast stay green under profile mpiexec when enabled", {
@@ -405,9 +455,7 @@ test_that("supported string send/recv and bcast stay green under profile mpiexec
     )
   }
 
-  res <- run_once("en0")
-  if (res$status != 0L)
-    res <- run_once("lo0")
+  res <- .wrapper_run_with_interface_retry(run_once)
 
   if (res$status != 0L && .wrapper_mpi_init_env_failure(res$output))
     skip("MPI runtime interface unavailable in this environment for profile-mode wrapper smoke")
