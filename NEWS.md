@@ -1,5 +1,9 @@
 # npRmpi 0.80-1
 
+* Pooled conditional-distribution degree searches preserve extended
+  nearest-neighbour bounds when scoring restarts. Searches with multiple
+  starts can now select the better restart under the default extended bounds.
+
 * Nearest-neighbour bandwidth metadata retains continuous neighbour counts
   with either bandwidth-scaling setting, including semiparametric helpers.
   Conditional bandwidth constructors normalize categorical metadata before

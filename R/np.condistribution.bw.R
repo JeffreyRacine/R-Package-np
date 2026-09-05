@@ -2738,6 +2738,7 @@ npRmpiPreparedSearchConditionalDistribution <- function(xdat,
       ncatfac = setup$ncatfac,
       bandwidth.scale.categorical = setup$bandwidth.scale.categorical,
       cat_upper = setup$cat_upper,
+      cont_extendednn_upper = setup$cont_extendednn_upper,
       nobs = setup$nobs
     )
     search.degree <- list(
