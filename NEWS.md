@@ -1,5 +1,9 @@
 # npRmpi 0.80-1
 
+* Formula subsets in npcmstest, npqcmstest and npksum resolve data columns
+  before caller-local bindings. Data and subset expressions are evaluated
+  once, including before automatic MPI dispatch.
+
 * Pooled conditional-distribution degree searches preserve extended
   nearest-neighbour bounds when scoring restarts. Searches with multiple
   starts can now select the better restart under the default extended bounds.

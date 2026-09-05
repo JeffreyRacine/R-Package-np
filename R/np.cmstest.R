@@ -309,8 +309,13 @@ npcmstest <- function(formula,
   if (...length())
     npRejectLegacyBootstrapCount(names(list(...)), "npcmstest")
   .npRmpi_require_active_slave_pool(where = "npcmstest()")
-  if (.npRmpi_autodispatch_active())
-    return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+  if (.npRmpi_autodispatch_active()) {
+    dispatch.call <- match.call()
+    if (!missing(formula) && missing(xdat) && missing(ydat) && !missing(subset))
+      dispatch.call[c("data", "subset")] <- .np_formula_subset_inputs(
+        data, substitute(subset), parent.frame())
+    return(.npRmpi_autodispatch_call(dispatch.call, parent.frame()))
+  }
   
   pcall = paste(deparse(model$call),collapse="")
   if(length(grep("x = (T|TRUE)[ ,)]", pcall)) == 0 || length(grep("y = (T|TRUE)[ ,)]", pcall)) == 0)
@@ -333,7 +338,8 @@ npcmstest <- function(formula,
   else if(all(miss.xy) & !miss.f){
     mf.args <- list(formula = formula, data = data, na.action = na.omit)
     if (!missing(subset))
-      mf.args$subset <- subset
+      mf.args[c("data", "subset")] <- .np_formula_subset_inputs(
+        data, substitute(subset), parent.frame())
     mf <- do.call(model.frame, mf.args)
     
     ydat <- model.response(mf)
