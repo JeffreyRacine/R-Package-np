@@ -1,5 +1,46 @@
 # npRmpi 0.80-1
 
+* Nearest-neighbour bandwidth metadata retains continuous neighbour counts
+  with either bandwidth-scaling setting, including semiparametric helpers.
+  Conditional bandwidth constructors normalize categorical metadata before
+  validation. Fixed continuous bandwidth scaling is unchanged.
+
+* Supplied categorical scale factors are validated in physical kernel units.
+  Fixed-bandwidth categorical optimizer transforms now use the corresponding
+  scale-factor bounds in both directions; physical kernel caps, penalties
+  and optimizer algorithms are unchanged.
+
+* MADS/NOMAD+Powell endpoint checks now evaluate the exact returned
+  bandwidths without a round trip through optimizer coordinates. This
+  avoids rounding the point being certified; search coordinates, objective
+  arithmetic and the number of certification evaluations are unchanged.
+
+* Conditional-distribution native NOMAD searches rank admissible restarts
+  and publish selected endpoints using their existing raw objective checks.
+  Powell refinement likewise retains its certified endpoint value. No
+  objective evaluations, penalties or recovery-policy changes are added.
+
+* Communicator bridge calls now report unavailable storage after MPI
+  finalization instead of dereferencing the freed table. Existing index
+  validation and live-communicator behavior are unchanged.
+
+* Regression gradients and their standard errors retain a one-row matrix
+  for a single evaluation point, including categorical asymptotic plot
+  slices; values and multirow output are unchanged.
+
+* The MPI local-constant NN gradient adapter preserves the known weighted
+  derivative axes when kernel sums collapse singleton dimensions, including
+  one-point predictions. Kernel sums and derivative formulas are unchanged.
+
+* Conditional-density NOMAD degree searches now retain the extended-NN bounds
+  when sending prepared search metadata to workers, so candidate decoding
+  honors the same bounds as the optimizer when extended NN is enabled.
+
+* Conditional-distribution cross-validation now rejects failed nearest-neighbour
+  bandwidth preparation before using its output. Zero-radius trial candidates
+  no longer depend on uninitialized memory; valid-candidate objectives and
+  the existing invalid-candidate penalty are unchanged.
+
 * MPI communicator rank, size and intercommunicator queries now reject null
   handles and propagate MPI query failures instead of publishing an
   uninitialized scalar. Valid communicator results and estimator paths are
@@ -51,7 +92,8 @@
 
 * Formula estimators and regression inference helpers now retain explicitly
   supplied data values in wrapper calls, instead of looking up their argument
-  names again in the formula environment. Formula expressions and retained
+  names again in the formula environment, including least-squares quantile
+  regression bandwidth and fitted-object formula calls. Formula expressions and retained
   data behavior are unchanged.
 
 * Smooth-coefficient NOMAD bandwidth objects now publish complete bandwidth
@@ -121,8 +163,8 @@
   access and double-free behavior without changing the integral result.
 
 * Gradient standard errors for a single-level ordered predictor no longer read
-  beyond the predictor's category table; its identically zero contrast remains
-  unchanged.
+  beyond the predictor's category table, including adaptive-NN dense and tree
+  routes; its identically zero contrast remains unchanged.
 
 * Automatic cell-based coordinate/exhaustive polynomial-degree searches now
   preserve a configuration error when every degree candidate fails with the same

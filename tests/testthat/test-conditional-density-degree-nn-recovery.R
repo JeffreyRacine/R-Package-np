@@ -37,3 +37,38 @@ test_that("conditional-density degree search recovers only automatic invalid NN 
     expect_true(.np_nn_raw_objective_valid(explicit$fval))
   }
 })
+
+test_that("prepared conditional-density degree searches transport extended NN bounds", {
+  expect_true(spawn_mpi_slaves(1L))
+  on.exit(close_mpi_slaves(force=TRUE),add=TRUE)
+  old <- options(np.messages=FALSE)
+  on.exit(options(old),add=TRUE)
+  observed <- new.env(parent=emptyenv())
+  original <- .npRmpi_bcast_cmd_expr
+  testthat::local_mocked_bindings(
+    .npRmpi_bcast_cmd_expr=function(expr,...) {
+      if(is.call(expr) && is.call(expr[[1L]]) &&
+         identical(expr[[1L]][[1L]],as.name("get")) &&
+         identical(expr[[1L]][[2L]],"npRmpiPreparedObjectiveSearchConditionalDensity")) {
+        observed$setup <- expr[[3L]]
+        observed$upper <- expr[[9L]]
+      }
+      original(expr,...)
+    }, .package="npRmpi")
+  n <- 24L
+  x <- data.frame(x=sin(seq_len(n)*sqrt(2))+seq_len(n)/n,
+                  u=factor(rep(c("a","b"),n/2)))
+  y <- cos(seq_len(n)/3)+x$x
+  for(type in c("generalized_nn","adaptive_nn")) for(extended in c(FALSE,TRUE)) {
+    options(np.extendednn=extended)
+    observed$setup <- NULL
+    bw <- npcdensbw(xdat=x,ydat=y,bwtype=type,regtype="lp",nomad=TRUE,
+      search.engine="nomad",nmulti=1L,nomad.nmulti=1L,degree.min=0L,
+      degree.max=2L,degree.start=1L,degree.verify=FALSE,random.seed=42L,
+      nomad.opts=list(MAX_BB_EVAL=4L))
+    expect_type(observed$setup,"list")
+    expect_equal(observed$setup$cont_extendednn_upper,
+      observed$upper[seq_along(observed$setup$cont_flat)],tolerance=0)
+    expect_true(is.finite(bw$fval))
+  }
+})

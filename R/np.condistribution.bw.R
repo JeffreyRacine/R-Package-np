@@ -661,51 +661,13 @@ npcdistbw.condbandwidth <-
       tbw$total.time <- total.time
     }
 
-    ## bandwidth metadata
-    tbw$sfactor <- tbw$bandwidth <- list(x = tbw$xbw, y = tbw$ybw)
-
-    apply_bw_meta <- function(tl, dfactor){
-      for (nm in names(tl)) {
-        idx <- tl[[nm]]
-        if (length(idx) == 0L)
-          next
-        if (tbw$scaling) {
-          tbw$bandwidth[[nm]][idx] <- tbw$bandwidth[[nm]][idx] * dfactor[[nm]]
-        } else {
-          tbw$sfactor[[nm]][idx] <- tbw$sfactor[[nm]][idx] / dfactor[[nm]]
-        }
-      }
-    }
-
-    if ((tbw$xnuno+tbw$ynuno) > 0){
-      dfactor <- ncatfac
-      dfactor <- list(x = dfactor, y = dfactor)
-
-      tl <- list(x = tbw$xdati$iuno, y = tbw$ydati$iuno)
-
-      apply_bw_meta(tl = tl, dfactor = dfactor)
-    }
-
-    if ((tbw$xnord+tbw$ynord) > 0){
-      dfactor <- ncatfac
-      dfactor <- list(x = dfactor, y = dfactor)
-
-      tl <- list(x = tbw$xdati$iord, y = tbw$ydati$iord)
-
-      apply_bw_meta(tl = tl, dfactor = dfactor)
-    }
-
-
-    if (tbw$ncon > 0){
-      dfactor <- nconfac
-      dfactor <- list(x = EssDee(xcon)*dfactor, y = EssDee(ycon)*dfactor)
-
-      tl <- list(x = tbw$xdati$icon, y = tbw$ydati$icon)
-
-      apply_bw_meta(tl = tl, dfactor = dfactor)
-    }
-
+    ## Normalize physical metadata before constructor validation.
     initial.fval <- tbw$initial.fval
+    tbw$nconfac <- nconfac
+    tbw$ncatfac <- ncatfac
+    tbw$sdev <- mysd
+    tbw <- .np_refresh_xy_bandwidth_metadata(tbw)
+
     tbw <- condbandwidth(xbw = tbw$xbw,
                          ybw = tbw$ybw,
                          bwmethod = tbw$method,
@@ -758,7 +720,6 @@ npcdistbw.condbandwidth <-
                          bernstein.basis.engine = tbw$bernstein.basis.engine)
     tbw <- npSetScaleFactorSearchLower(tbw, scale.factor.search.lower)
 
-    tbw <- .np_refresh_xy_bandwidth_metadata(tbw)
     tbw$initial.fval <- if (!is.null(initial.fval)) initial.fval else NA_real_
 
     tbw
@@ -851,6 +812,19 @@ npcdistbw.condbandwidth <-
     bws = bws,
     reg.args = reg.args,
     opt.args = opt.args
+  )
+}
+
+.npcdistbw_certify_raw_bandwidth <- function(bws, xdat, ydat, opt.args, owner) {
+  out <- .npcdistbw_eval_only(
+    xdat = xdat, ydat = ydat, bws = bws, gydat = opt.args$gydat,
+    do.full.integral = if (is.null(opt.args$do.full.integral)) FALSE else opt.args$do.full.integral,
+    ngrid = if (is.null(opt.args$ngrid)) 100L else opt.args$ngrid,
+    invalid.penalty = "dbmax",
+    penalty.multiplier = if (is.null(opt.args$penalty.multiplier)) 10 else opt.args$penalty.multiplier
+  )
+  .np_nn_certify_raw_value(
+    out$objective, point = c(bws$ybw, bws$xbw), owner = owner
   )
 }
 
@@ -1524,7 +1498,7 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
   }
 
   build_payload <- function(point, best_record, solution, interrupted) {
-    .np_nn_certify_raw_point(
+    direct.objective <- .np_nn_certify_raw_point(
       point = point[seq_len(bwdim)], raw.eval = raw_eval_fun,
       owner = "native npcdist fixed-degree NOMAD route")
     bw_vec <- .npcdistbw_nomad_point_to_bw(point[seq_len(bwdim)], template = template, setup = setup)
@@ -1535,11 +1509,11 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
       bandwidth.compute = FALSE,
       reg.args = reg.args
     )
-    final.tbw$fval <- as.numeric(best_record$objective)
-    final.tbw$ifval <- as.numeric(best_record$objective)
+    final.tbw$fval <- direct.objective
+    final.tbw$ifval <- direct.objective
     final.tbw$num.feval <- as.numeric(mads.num.feval.total)
     final.tbw$num.feval.fast <- as.numeric(mads.num.feval.fast.total)
-    final.tbw$fval.history <- as.numeric(best_record$objective)
+    final.tbw$fval.history <- direct.objective
     final.tbw$eval.history <- if (!is.null(solution$bbe)) rep(1, max(1L, as.integer(solution$bbe))) else 1
     final.tbw$invalid.history <- 0
     final.tbw$timing <- NA_real_
@@ -1552,7 +1526,6 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
     )
     direct.payload$num.feval <- as.numeric(mads.num.feval.total)
     direct.payload$num.feval.fast <- as.numeric(mads.num.feval.fast.total)
-    direct.objective <- as.numeric(best_record$objective)
     powell.elapsed <- NA_real_
 
     if (identical(bwsolver, "mads+powell")) {
@@ -1580,12 +1553,11 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
       direct.payload$num.feval.fast <- as.numeric(direct.payload$num.feval.fast[1L]) + as.numeric(hot.payload$num.feval.fast[1L])
       hot.payload$num.feval <- direct.payload$num.feval
       hot.payload$num.feval.fast <- direct.payload$num.feval.fast
-      hot.point <- .npcdistbw_nomad_bw_to_point(
-        c(hot.payload$ybw, hot.payload$xbw), template = template, setup = setup)
-      .np_nn_certify_raw_point(
-        point = hot.point, raw.eval = raw_eval_fun,
-        owner = "npcdist MADS+Powell handoff")
-      hot.objective <- as.numeric(hot.payload$fval[1L])
+      hot.objective <- .npcdistbw_certify_raw_bandwidth(
+        bws = hot.payload, xdat = xdat, ydat = ydat, opt.args = opt.args,
+        owner = "npcdist MADS+Powell handoff"
+      )
+      hot.payload$fval <- hot.objective
       if (is.finite(hot.objective) &&
           .np_degree_better(hot.objective, direct.objective, direction = "min"))
         return(list(payload = hot.payload, objective = hot.objective, powell.time = powell.elapsed))
@@ -1718,8 +1690,8 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
       native.num.feval.total <- native.num.feval.total + as.numeric(native.i$native$total_num.feval[1L])
       native.num.feval.fast.total <- native.num.feval.fast.total + as.numeric(native.i$native$total_num.feval.fast[1L])
       native.num.feval.guarded.total <- native.num.feval.guarded.total + as.numeric(native.i$native$total_num.feval.guarded[1L])
-      if (result$raw.valid && native.i$best_objective < native.best.objective) {
-        native.best.objective <- native.i$best_objective
+      if (result$raw.valid && result$raw.objective < native.best.objective) {
+        native.best.objective <- result$raw.objective
         native.best.index <- i
       }
     }
@@ -1761,7 +1733,7 @@ npNomadNativeSearchConditionalDistribution <- function(prep,
           native.num.feval.fast.total <- native.num.feval.fast.total + as.numeric(native.i$native$total_num.feval.fast[1L])
           native.num.feval.guarded.total <- native.num.feval.guarded.total + as.numeric(native.i$native$total_num.feval.guarded[1L])
           if (result$raw.valid) {
-            native.best.objective <- native.i$best_objective
+            native.best.objective <- result$raw.objective
             native.best.index <- recovery.index
           }
         }
@@ -2266,7 +2238,7 @@ npRmpiPreparedSearchConditionalDistribution <- function(xdat,
           elapsed = native.elapsed,
           status = "ok",
           message = as.character(native$message[1L]),
-          objective = as.numeric(native$objective[1L]),
+          objective = as.numeric(raw$objective[1L]),
           bbe = as.numeric(native$blackbox_evaluations[1L]),
           iterations = as.numeric(native$iterations[1L]),
           solution = as.numeric(native$solution),
@@ -2277,7 +2249,7 @@ npRmpiPreparedSearchConditionalDistribution <- function(xdat,
           native = native
         )
         list(record = record, raw.valid = .np_nn_raw_objective_valid(raw$objective) &&
-          .np_nn_raw_objective_valid(record$objective))
+          .np_nn_raw_objective_valid(native$objective))
       }
 
       for (i in seq_len(nrow(native.start.matrix))) {
@@ -2313,7 +2285,8 @@ npRmpiPreparedSearchConditionalDistribution <- function(xdat,
           all(c(template[["ybw"]], template[["xbw"]]) == 0) &&
           template$type %in% c("generalized_nn", "adaptive_nn") &&
           length(setup$cont_flat) > 0L && setup$nobs >= 3L) {
-        incumbent <- vapply(native.results, function(z) z$objective, numeric(1L))
+        # Recovery still uses the prepared incumbent; accepted restarts use raw CV.
+        incumbent <- vapply(native.results, function(z) z$native$objective, numeric(1L))
         incumbent[!is.finite(incumbent)] <- Inf
         incumbent.index <- if (any(is.finite(incumbent))) which.min(incumbent) else 1L
         recovery.raw.eval <- function(point) {
@@ -2659,7 +2632,7 @@ npRmpiPreparedSearchConditionalDistribution <- function(xdat,
   build_payload <- function(point, best_record, solution, interrupted) {
     point <- as.numeric(point)
     degree <- as.integer(best_record$degree)
-    .np_nn_certify_raw_point(
+    direct.objective <- .np_nn_certify_raw_point(
       point = point, raw.eval = raw_eval_fun,
       owner = "npcdist NOMAD degree-search route")
     bw_vec <- .npcdistbw_nomad_point_to_bw(point[seq_len(bwdim)], template = template, setup = setup)
@@ -2682,11 +2655,11 @@ npRmpiPreparedSearchConditionalDistribution <- function(xdat,
         bandwidth.compute = FALSE,
         reg.args = final.reg.args
       )
-      tbw$fval <- as.numeric(best_record$objective)
-      tbw$ifval <- as.numeric(best_record$objective)
+      tbw$fval <- direct.objective
+      tbw$ifval <- direct.objective
       tbw$num.feval <- as.numeric(nomad.num.feval.total)
       tbw$num.feval.fast <- as.numeric(nomad.num.feval.fast.total)
-      tbw$fval.history <- as.numeric(best_record$objective)
+      tbw$fval.history <- direct.objective
       tbw$eval.history <- if (isTRUE(nomad.num.feval.total > 0)) rep(1, max(1L, as.integer(nomad.num.feval.total))) else 1
       tbw$invalid.history <- 0
       tbw$timing <- NA_real_
@@ -2706,7 +2679,6 @@ npRmpiPreparedSearchConditionalDistribution <- function(xdat,
     direct.payload <- build_direct_payload()
     if (is.null(direct.payload$timing.profile) && is.list(best_record$timing.profile))
       direct.payload$timing.profile <- best_record$timing.profile
-    direct.objective <- as.numeric(best_record$objective)
 
     if (identical(degree.search$engine, "nomad+powell")) {
       hot.reg.args <- reg.args
@@ -2741,12 +2713,11 @@ npRmpiPreparedSearchConditionalDistribution <- function(xdat,
       hot.payload$num.feval.fast <- direct.payload$num.feval.fast
       if (!is.null(hot.payload$method) && length(hot.payload$method))
         hot.payload$pmethod <- bwmToPrint(as.character(hot.payload$method[1L]))
-      hot.point <- c(.npcdistbw_nomad_bw_to_point(
-        c(hot.payload$ybw, hot.payload$xbw), template = template, setup = setup), degree)
-      .np_nn_certify_raw_point(
-        point = hot.point, raw.eval = raw_eval_fun,
-        owner = "npcdist NOMAD degree-search Powell handoff")
-      hot.objective <- as.numeric(hot.payload$fval[1L])
+      hot.objective <- .npcdistbw_certify_raw_bandwidth(
+        bws = hot.payload, xdat = xdat, ydat = ydat, opt.args = opt.args,
+        owner = "npcdist NOMAD degree-search Powell handoff"
+      )
+      hot.payload$fval <- hot.objective
       if (is.finite(hot.objective) &&
           .np_degree_better(hot.objective, direct.objective, direction = "min")) {
         return(list(payload = hot.payload, objective = hot.objective, powell.time = powell.elapsed))

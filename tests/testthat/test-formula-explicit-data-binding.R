@@ -1,3 +1,35 @@
+test_that("least-squares quantile formula owners bind wrapper data values", {
+  expect_true(spawn_mpi_slaves(1L))
+  on.exit(close_mpi_slaves(force=TRUE),add=TRUE)
+  old <- options(np.messages=FALSE)
+  on.exit(options(old),add=TRUE)
+  fixture <- data.frame(x=seq(.05,.95,length.out=24),
+    y=sin(seq_len(24)/3)+seq_len(24)/24)
+  fo <- y~x
+  dd <- transform(fixture,y=y+100)
+  controls <- list(scale=rep(1,24),bandwidth.compute=FALSE,nomad=FALSE,
+    regtype="ll",nmulti=1L,itmax=5L,random.seed=17L)
+  for(fun in list(nplsqregbw,nplsqreg)) {
+    reference <- do.call(fun,c(list(bws=fo,data=fixture),controls))
+    wrapped <- function(dd) fun(fo,data=dd,scale=rep(1,nrow(dd)),
+      bandwidth.compute=FALSE,nomad=FALSE,regtype="ll",nmulti=1L,
+      itmax=5L,random.seed=17L)
+    expression <- function(dd) fun(fo,data=dd[,],scale=rep(1,nrow(dd)),
+      bandwidth.compute=FALSE,nomad=FALSE,regtype="ll",nmulti=1L,
+      itmax=5L,random.seed=17L)
+    for(actual in list(wrapped(fixture),expression(fixture))) {
+      expect_identical(class(actual),class(reference))
+      if(inherits(actual,"lsqregression")) {
+        expect_identical(fitted(actual),fitted(reference))
+      } else {
+        expect_identical(actual$xdat,reference$xdat)
+        expect_identical(actual$ydat,reference$ydat)
+        expect_identical(actual$reg.bws$bw,reference$reg.bws$bw)
+      }
+    }
+  }
+})
+
 test_that("formula owners bind explicit data values without rebinding their names", {
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)

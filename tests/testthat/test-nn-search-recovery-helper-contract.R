@@ -113,4 +113,15 @@ test_that("raw endpoint certification returns a scalar or a typed condition", {
   expect_identical(condition$owner, "synthetic MADS")
   expect_identical(condition$point, point)
   expect_identical(condition$raw.objective, .Machine$double.xmax)
+  expect_identical(
+    npRmpi:::.np_nn_certify_raw_value(1.5, point, "synthetic MADS"),
+    1.5
+  )
+  direct.condition <- tryCatch(
+    npRmpi:::.np_nn_certify_raw_value(
+      .Machine$double.xmax, point, "synthetic MADS"
+    ),
+    np_nn_candidate_invalid = identity
+  )
+  expect_identical(direct.condition, condition)
 })

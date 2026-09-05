@@ -1973,6 +1973,9 @@ static int bwm_kernel_unordered = 0;
 static int *bwm_num_categories = NULL;
 static int *bwm_kernel_unordered_vec = NULL;
 static int bwm_kernel_unordered_len = 0;
+/* Maximum in optimizer units; physical reference-point caps stay unchanged. */
+static double bwm_categorical_transform_scale = 1.0;
+extern double ncatfac_extern;
 static double *bwm_transform_buf = NULL;
 static int bwm_transform_buf_len = 0;
 
@@ -1993,6 +1996,7 @@ static void bwm_search_context_release(void)
   safe_free(bwm_kernel_unordered_vec);
   bwm_kernel_unordered_vec = NULL;
   bwm_kernel_unordered_len = 0;
+  bwm_categorical_transform_scale = 1.0;
   bwm_num_reg_continuous = 0;
   bwm_num_reg_unordered = 0;
   bwm_num_reg_ordered = 0;
@@ -2019,6 +2023,9 @@ static void bwm_search_context_configure_uniform(
   bwm_num_extra_params = num_extra_params;
   bwm_kernel_unordered = kernel_unordered;
   bwm_num_categories = num_categories;
+  if (bwm_use_transform && int_LARGE_SF == SF_NORMAL &&
+      (num_unordered > 0 || num_ordered > 0))
+    bwm_categorical_transform_scale = 1.0 / ncatfac_extern;
 }
 
 static void bwm_search_context_configure_split(
@@ -2072,6 +2079,11 @@ static double bwm_unordered_maximum(const int i)
   return bwm_num_categories != NULL ?
     max_unordered_bw(bwm_num_categories[bwm_unordered_category_index(i)], kernel) :
     1.0;
+}
+
+static double bwm_unordered_transform_maximum(const int i)
+{
+  return bwm_unordered_maximum(i) * bwm_categorical_transform_scale;
 }
 
 static void bwm_set_categorical_midpoints(double * const p)
@@ -3967,13 +3979,13 @@ static void bwm_apply_transform(const double *p, double *out, int n)
   /* unordered categorical */
   for (i = 0; i < bwm_num_reg_unordered; i++) {
     idx = bwm_num_reg_continuous + 1 + bwm_unordered_category_index(i);
-    out[idx] = bwm_sigmoid(p[idx]) * bwm_unordered_maximum(i);
+    out[idx] = bwm_sigmoid(p[idx]) * bwm_unordered_transform_maximum(i);
   }
 
-  /* ordered categorical (0..1) */
+  /* ordered categorical: physical maximum 1, expressed in optimizer units */
   for (i = 0; i < bwm_num_reg_ordered; i++) {
     idx = bwm_num_reg_continuous + 1 + bwm_ordered_category_index(i);
-    out[idx] = bwm_sigmoid(p[idx]);
+    out[idx] = bwm_sigmoid(p[idx]) * bwm_categorical_transform_scale;
   }
 }
 
@@ -4005,7 +4017,7 @@ static int bwm_to_unconstrained(double *p, int n)
   /* unordered */
   for (i = 0; i < bwm_num_reg_unordered; i++) {
     idx = bwm_num_reg_continuous + 1 + bwm_unordered_category_index(i);
-    double maxbw = bwm_unordered_maximum(i);
+    double maxbw = bwm_unordered_transform_maximum(i);
     double v = bwm_transform_buf[idx];
     if (maxbw <= 0.0) {
       p[idx] = 0.0;
@@ -4018,7 +4030,7 @@ static int bwm_to_unconstrained(double *p, int n)
   /* ordered */
   for (i = 0; i < bwm_num_reg_ordered; i++) {
     idx = bwm_num_reg_continuous + 1 + bwm_ordered_category_index(i);
-    p[idx] = bwm_logit(bwm_transform_buf[idx]);
+    p[idx] = bwm_logit(bwm_transform_buf[idx] / bwm_categorical_transform_scale);
   }
 
   return 0;

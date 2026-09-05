@@ -1,3 +1,34 @@
+test_that("CDF NN rejection handles X and Y failures without poisoning later calls", {
+  expect_true(spawn_mpi_slaves(1L))
+  on.exit(close_mpi_slaves(force=TRUE),add=TRUE)
+  old <- options(np.messages=FALSE,np.tree=FALSE)
+  on.exit(options(old),add=TRUE)
+  n <- 24L
+  z <- sin(seq_len(n)*sqrt(2))+seq_len(n)/n
+  w <- sin(seq_len(n)*sqrt(3))+seq_len(n)/(2*n)
+  tied <- c(rep(0,16),seq_len(8)/8)
+  grid <- data.frame(y=c(0,.17,.31,.49,.71,.89,1.11))
+  for(side in c("X","Y")) {
+    x <- data.frame(x1=if(side=="X")tied else z,x2=w)
+    y <- data.frame(y=if(side=="Y")tied else sin(seq_len(n)/3)+seq_len(n)/90)
+    evaluate <- function(k) {
+      bw <- npcdistbw(xdat=x,ydat=y,bwtype="adaptive_nn",regtype="lp",
+        degree=c(0L,0L),nomad=FALSE,bws=rep(k,3L),bandwidth.compute=FALSE)
+      .npcdistbw_eval_only(xdat=x,ydat=y,bws=bw,gydat=grid,ngrid=7L,
+        invalid.penalty="dbmax",return.admissible=TRUE)
+    }
+    first <- evaluate(22)
+    invalid <- evaluate(2)
+    changed <- evaluate(20)
+    expect_true(first$admissible)
+    expect_false(invalid$admissible)
+    expect_identical(invalid$objective,.Machine$double.xmax)
+    expect_true(changed$admissible)
+    expect_identical(evaluate(22),first)
+    expect_identical(evaluate(20),changed)
+  }
+})
+
 test_that("CDF single-evaluation admission is opt-in and preserves default results", {
   expect_true(spawn_mpi_slaves(1L))
   on.exit(close_mpi_slaves(force=TRUE),add=TRUE)

@@ -2516,7 +2516,8 @@ validateBandwidthTF <- function(bws){
     }
   }
 
-  if ((bws$xncon + bws$yncon) > 0L) {
+  # Continuous NN coordinates remain counts, not fixed physical widths.
+  if ((bws$xncon + bws$yncon) > 0L && bws$type == "fixed") {
     sdev <- as.numeric(bws$sdev)
     sx <- if (bws$xncon > 0L) sdev[seq_len(bws$xncon)] else numeric(0L)
     sy <- if (bws$yncon > 0L) sdev[bws$xncon + seq_len(bws$yncon)] else numeric(0L)

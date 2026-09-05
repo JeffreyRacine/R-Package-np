@@ -1499,11 +1499,8 @@ npreghat <-
   else
     ks <- as.matrix(ks)
 
-  if (is.null(dim(ps))) {
-    ps <- array(ps, dim = c(2L, nrow(eval.data), 1L))
-  } else if (length(dim(ps)) == 2L) {
-    ps <- array(ps, dim = c(dim(ps), 1L))
-  }
+  if (length(dim(ps)) != 3L)
+    dim(ps) <- c(2L, nrow(eval.data), bws$ncon)
 
   denom <- ks[2L, ]
   invalid <- which(denom == 0.0)
@@ -1512,8 +1509,7 @@ npreghat <-
 
   grad <- matrix(0.0, nrow = nrow(eval.data), ncol = bws$ncon)
   for (j in seq_len(bws$ncon)) {
-    ps.j <- ps[, , j, drop = TRUE]
-    grad[, j] <- (ps.j[1L, ] / denom) - (numer * ps.j[2L, ] / (denom^2))
+    grad[, j] <- (ps[1L, , j] / denom) - (numer * ps[2L, , j] / (denom^2))
   }
 
   if (return.status)
