@@ -58,7 +58,13 @@
   regressor unordered-kernel bounds independently. Mixed Li-Racine and
   Aitchison-Aitken conditional-density searches no longer reject valid
   response bandwidths or admit response bandwidths above their kernel bound;
-  objective arithmetic and same-kernel behavior are unchanged.
+  objective arithmetic and same-kernel behavior are unchanged. Selected
+  bandwidths and estimates can change when the response and regressor use
+  different unordered kernels.
+
+* The embedded wage1 example bandwidth objects were regenerated with current
+  constructors. Their printed bandwidths and derived example results can differ
+  from earlier releases.
 
 * Cell and exhaustive degree searches now skip only typed LP-admissibility
   and NN-candidate rejections. Unexpected evaluator errors propagate with
