@@ -81,6 +81,7 @@ npindexbw(\dots)
           scale.factor.init.upper = 2.0,
           scale.factor.init = 0.5,
           scale.factor.search.lower = NULL,
+          .restore.first.start = TRUE,
           \dots)
 
 }
@@ -101,6 +102,12 @@ These arguments identify the data, formula interface, method label, and whether 
     internal logical control requiring one raw-objective replay of the
     selected search point. This argument is used by package search owners
     and is not intended for direct user control.
+  }
+
+  \item{.restore.first.start}{
+    internal logical control enabling bounded restoration of eligible
+    automatically generated raw-invalid first optimizer evaluations.
+    It is used by package search owners and is not intended for direct user control.
   }
 
   \item{bws}{
@@ -242,7 +249,11 @@ These controls define deterministic and random continuous scale-factor starts an
     to \code{0.1}. The value supplied by the user is not rewritten, but
     the effective random-start lower endpoint is
     \code{max(scale.factor.init.lower, scale.factor.search.lower)}. See
-    Details.
+    Details. Random fixed-bandwidth restarts use the index scale at their
+    own drawn beta. After conversion to search coordinates, an automatically
+    generated bandwidth outside the existing search bounds is set to the
+    nearest bound without drawing a new random value. The first start and
+    explicitly supplied or held bandwidths are not changed by this step.
   }
   \item{scale.factor.init.upper}{
     upper endpoint for random continuous scale-factor starts. Defaults

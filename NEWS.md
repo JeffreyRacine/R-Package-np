@@ -1,5 +1,15 @@
 # npRmpi 0.80-1
 
+* Automatic fixed-bandwidth single-index restarts use the index scale of
+  their drawn beta, with generated h restricted to the existing search bounds.
+  The scale correction can change fresh multistart search results; explicit
+  bandwidths, first starts, RNG draws and the search domain are unchanged.
+* Kernel-sum formula calls with a subset again allow data to be omitted.
+* The internal single-index first-start restoration control is documented;
+  npRmpi also transports caller-local values of that control.
+* Unconditional-density MADS searches decode categorical coordinates for
+  nearest-neighbour bandwidths as well as fixed bandwidths, matching np.
+
 * Fitted regression releases its owned buffers and partial trees when an error
   leaves the native fit, preserving the original condition and numerical path.
 

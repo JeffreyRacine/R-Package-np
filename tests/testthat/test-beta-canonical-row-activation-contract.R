@@ -675,13 +675,11 @@ test_that("scalar beta regression fits enter the canonical row engine", {
   expect_false(file.exists(file.path(root, "src", "beta_regression.c")))
   expect_false(file.exists(file.path(root, "src", "beta_regression.h")))
 
-  owner_start <- regexpr("void np_regression(", ingress,
-                         fixed = TRUE)[[1L]]
   owner_start <- regexpr(
-    "void np_regression(",
-    substr(ingress, owner_start + 1L, nchar(ingress)),
+    "static SEXP np_regression_fitted_execute(",
+    ingress,
     fixed = TRUE
-  )[[1L]] + owner_start
+  )[[1L]]
   owner_tail <- substr(ingress, owner_start, nchar(ingress))
   owner_end <- regexpr("static void np_kernelsum_common(", owner_tail,
                        fixed = TRUE)[[1L]] + owner_start - 1L

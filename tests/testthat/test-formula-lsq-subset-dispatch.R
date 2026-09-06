@@ -1,4 +1,7 @@
 test_that("least-squares quantile generics preserve formula subset evaluation", {
+  skip_on_cran()
+  if (!spawn_mpi_slaves(1L)) skip("MPI pool unavailable")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   old <- options(np.messages = FALSE)
   on.exit(options(old), add = TRUE)
   dat <- data.frame(x = seq(.05, .95, length.out = 24),
@@ -48,6 +51,9 @@ test_that("least-squares quantile generics preserve formula subset evaluation", 
 })
 
 test_that("least-squares formula subsets retain omission and environment policy", {
+  skip_on_cran()
+  if (!spawn_mpi_slaves(1L)) skip("MPI pool unavailable")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   old <- options(np.messages = FALSE)
   on.exit(options(old), add = TRUE)
   dat <- data.frame(x = seq(.05, .95, length.out = 24), y = sin(seq_len(24)))
@@ -85,7 +91,8 @@ test_that("least-squares formula subsets retain omission and environment policy"
 test_that("least-squares dispatch retains non-subset dots and promise caching", {
   calls <- 0L
   forward <- function(...) {
-    args <- .nplsqreg_formula_dispatch_args(...)
+    args <- .nplsqreg_formula_dispatch_args(
+      nplsqreg.formula, substitute(list(...))[-1L], environment())
     all <- list(...)
     list(args = args, all = all)
   }
@@ -93,7 +100,9 @@ test_that("least-squares dispatch retains non-subset dots and promise caching", 
                unnamed = 3, FALSE)
   expect_identical(calls, 1L)
   expect_identical(z$args, z$all[-2L])
-  expect_identical(.nplsqreg_formula_dispatch_args(data = 1,
+  lazy <- function(...) .nplsqreg_formula_dispatch_args(
+    nplsqreg.formula, substitute(list(...))[-1L], environment())
+  expect_identical(lazy(data = 1,
     subset = stop("must remain lazy")), list(data = 1))
-  expect_identical(.nplsqreg_formula_dispatch_args(1, sub = stop("lazy")), setNames(list(1), ""))
+  expect_identical(lazy(1, sub = stop("lazy")), setNames(list(1), ""))
 })

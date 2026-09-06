@@ -271,7 +271,7 @@ test_that("H3 keeps derivative HC0 streamed and scalar-only", {
     collapse = "\n"
   )
 
-  expect_match(source, "eg_hc0_storage = alloc_tmatd", fixed = TRUE)
+  expect_match(source, "eg_hc0_storage = owner->hc0_gradient = alloc_tmatd", fixed = TRUE)
   expect_match(
     reducer,
     "np_regression_hc0_derivative_moments_accumulate",
