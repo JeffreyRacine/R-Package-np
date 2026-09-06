@@ -1,5 +1,10 @@
 # npRmpi 0.80-1
 
+* Local-polynomial matrix application keeps training and evaluation bases in
+  the same public coordinates when an optional conditioned hat-block attempt
+  returns failure. The existing generic computation reuses the retained source
+  basis; conditioning, solver and failure policies are unchanged.
+
 * Direct degree-zero single-index R optim searches with unbounded second-order
   Epanechnikov or uniform kernels restore raw-invalid automatic initial
   bandwidths by at most eight doublings. Valid original starts use the same

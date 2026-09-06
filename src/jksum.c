@@ -35300,9 +35300,10 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
 
   for(i = 0; i < n_rhs; i++)
     Ycols[i] = rhs_cols[i];
+  /* Generic evaluation uses the public basis, even after a failed conditioned hatblock. */
   for(l = 0; l < np_glp_cv_cache.nterms; l++){
-    Ycols[n_rhs + l] = np_glp_cv_cache.basis[l];
-    Wcols[l] = np_glp_cv_cache.basis[l];
+    Ycols[n_rhs + l] = np_glp_cv_cache.source_basis[l];
+    Wcols[l] = np_glp_cv_cache.source_basis[l];
   }
 
   for(j = 0; j < num_eval; j++){
