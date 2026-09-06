@@ -122,8 +122,10 @@ npreg.formula <-
   function(bws, data = NULL, newdata = NULL, y.eval = FALSE,
            se = FALSE, ...){
 
-    npRejectLegacyBooleanErrors(list(...), "npreg")
+    dots <- list(...)
+    npRejectLegacyBooleanErrors(dots, "npreg")
     se <- npValidateScalarLogical(se, "se")
+    explicit.eval.exclude <- .npreg_explicit_eval_exclude(dots)
 
     mc <- match.call(expand.dots = FALSE)
     tt <- terms(bws)
@@ -179,6 +181,8 @@ npreg.formula <-
       if (y.eval)
         npValidateNewdataFormula(newdata, tt, include.response = TRUE)
       umf.args <- list(formula = tt, data = newdata)
+      if (explicit.eval.exclude)
+        umf.args$na.action <- stats::na.exclude
       umf <- do.call(stats::model.frame, umf.args, envir = parent.frame())
       emf <- umf
 
@@ -225,6 +229,31 @@ npreg.formula <-
     if (length(response.name) == 1L && !is.na(response.name) && nzchar(response.name)) {
       if (!is.null(ev$bws))
         ev$bws$ynames <- response.name
+    }
+
+    if (explicit.eval.exclude && !isTRUE(ev$trainiseval)) {
+      # Frame omissions index the original rows; native omissions index the
+      # remaining frame. Keep their composition separate from training rows.
+      eval.omit <- if (has.eval) {
+        .npreg_compose_eval_omissions(attr(umf, "na.action"),
+                                     ev$eval.rows.omit, nrow(umf), ev$nobs)
+      } else {
+        .npreg_eval_omit_indices(ev$eval.rows.omit)
+      }
+      train.action <- attr(tmf, "na.action")
+      train.omit <- as.vector(train.action)
+      ev$omit <- structure(eval.omit, class = "exclude")
+      ev$rows.omit <- as.vector(eval.omit)
+      ev$nobs.omit <- length(eval.omit)
+      ev$train.rows.omit <- if (length(train.omit)) train.omit else NA
+      ev$train.nobs.omit <- length(train.omit)
+      ev$eval.rows.omit <- if (length(eval.omit)) as.vector(eval.omit) else NA
+      ev$eval.nobs.omit <- length(eval.omit)
+      ev <- .npreg_restore_eval_exclude(
+        ev, fields = c("mean", "merr", if (ev$gradients) c("grad", "gerr")))
+      if (ev$residuals)
+        ev$resid <- naresid(train.action, ev$resid)
+      return(ev)
     }
 
     ev$omit <- attr(umf,"na.action")

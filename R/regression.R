@@ -201,6 +201,70 @@ gradients.npregression <- function(x, se = FALSE, gradient.order = NULL, ...) {
   }
   gout.masked
 }
+.npreg_explicit_eval_exclude <- function(dots) {
+  if (sum(names(dots) %in% "na.action") != 1L)
+    return(FALSE)
+  action <- dots[["na.action", exact = TRUE]]
+  identical(action, stats::na.exclude) || identical(action, "na.exclude")
+}
+
+.npreg_eval_omit_indices <- function(omit, rows = NULL) {
+  if (is.null(omit) || !length(omit) ||
+      (length(omit) == 1L && is.na(omit)))
+    return(integer(0L))
+  if (!is.numeric(omit) || anyNA(omit) || any(!is.finite(omit)) ||
+      any(omit != trunc(omit)) || any(omit < 1) || anyDuplicated(omit) ||
+      (!is.null(rows) && any(omit > rows)))
+    stop("invalid regression evaluation omission metadata", call. = FALSE)
+  out <- as.integer(omit)
+  names(out) <- names(omit)
+  out[order(out)]
+}
+
+.npreg_compose_eval_omissions <- function(frame.omit, native.omit,
+                                         frame.rows, compact.rows) {
+  native.omit <- .npreg_eval_omit_indices(native.omit, frame.rows)
+  if (length(frame.rows) != 1L || !is.finite(frame.rows) ||
+      frame.rows != compact.rows + length(native.omit))
+    stop("inconsistent regression evaluation row counts", call. = FALSE)
+  frame.omit <- .npreg_eval_omit_indices(frame.omit)
+  full.rows <- frame.rows + length(frame.omit)
+  frame.omit <- .npreg_eval_omit_indices(frame.omit, full.rows)
+  if (!length(frame.omit))
+    return(native.omit)
+  if (!length(native.omit))
+    return(frame.omit)
+  kept <- seq_len(full.rows)[-frame.omit]
+  mapped <- kept[native.omit]
+  names(mapped) <- names(native.omit)
+  omitted <- c(frame.omit, mapped)
+  omitted[order(omitted)]
+}
+
+.npreg_restore_eval_exclude <- function(object, fields = c("mean", "merr")) {
+  omitted <- .npreg_eval_omit_indices(
+    object[["eval.rows.omit", exact = TRUE]])
+  if (!length(omitted))
+    return(object)
+  compact.rows <- object[["nobs", exact = TRUE]]
+  if (length(compact.rows) != 1L || !is.finite(compact.rows) ||
+      compact.rows < 1 || compact.rows != trunc(compact.rows))
+    stop("invalid regression evaluation row count", call. = FALSE)
+  full.rows <- compact.rows + length(omitted)
+  omitted <- .npreg_eval_omit_indices(omitted, full.rows)
+  action <- structure(omitted, class = "exclude")
+  for (field in fields) {
+    value <- object[[field, exact = TRUE]]
+    if (is.null(value) || NROW(value) == full.rows)
+      next
+    if (NROW(value) != compact.rows)
+      stop(sprintf("inconsistent regression evaluation rows in '%s'", field),
+           call. = FALSE)
+    object[[field]] <- stats::napredict(action, value)
+  }
+  object
+}
+
 predict.npregression <- function(object, se.fit = FALSE, ...) {
   se.fit <- npValidateScalarLogical(se.fit, "se.fit")
   dots <- list(...)
@@ -225,6 +289,9 @@ predict.npregression <- function(object, se.fit = FALSE, ...) {
   } else {
     .npRmpi_with_local_regression(call.predict())
   }
+  if (.npreg_explicit_eval_exclude(dots) && !isTRUE(tr$trainiseval))
+    tr <- .npreg_restore_eval_exclude(
+      tr, fields = c("mean", if (se.fit) "merr"))
   if(se.fit)
     return(list(fit = fitted(tr), se.fit = se(tr), 
                 df = tr$nobs, residual.scale = tr$MSE))
