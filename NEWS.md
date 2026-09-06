@@ -50,13 +50,14 @@
   returns failure. The existing generic computation reuses the retained source
   basis; conditioning, solver and failure policies are unchanged.
 
-* Direct degree-zero single-index R optim searches with unbounded second-order
-  Epanechnikov or uniform kernels restore raw-invalid automatic initial
-  bandwidths by at most eight doublings. Valid original starts use the same
+* Fixed-bandwidth single-index R optim searches restore raw-invalid automatic
+  initial bandwidths by at most eight doublings across all supported kernels,
+  orders and regression types, including automatic degree-search children.
+  Each restart retains its own index scale. Valid original starts use the same
   optimizer invocation without an extra objective evaluation; rejected first
   scalars are counted and incur no gradient stencil. Explicit or held invalid
-  starts and exhausted restoration fail the call. Later trials, other kernels,
-  NN, automatic degree-search children and final certification are unchanged.
+  starts and exhausted restoration fail the call. Later trials, NN bandwidths,
+  NOMAD's direct search and final certification are unchanged.
 
 * Least-squares quantile formula dispatch preserves named subset expressions for
   evaluation in the formula method's data mask.

@@ -131,28 +131,24 @@ test_that("first-scalar failures never become a survivor or generic rescue", {
   expect_false(guard$active)
 })
 
-test_that("restoration admission follows resolved numerical and owner metadata", {
+test_that("restoration admission depends only on fixed bandwidth and ownership", {
   b <- list(type = "fixed", ckerbound = "none", ckertype = "epanechnikov", ckerorder = 2L)
-  spec <- list(degree.engine = 0L)
-  eligible <- function(bw = b, sp = spec, method = "BFGS", owner = TRUE)
-    .npindexbw_restore_start_eligible(bw, sp, method, owner)
+  eligible <- function(bw = b, owner = TRUE)
+    .npindexbw_restore_start_eligible(bw, owner)
   expect_true(eligible())
   expect_false(eligible(owner = FALSE))
   for (type in c("generalized_nn", "adaptive_nn")) {
     alt <- b; alt$type <- type; expect_false(eligible(alt))
   }
   for (bound in c("range", "fixed")) {
-    alt <- b; alt$ckerbound <- bound; expect_false(eligible(alt))
+    alt <- b; alt$ckerbound <- bound; expect_true(eligible(alt))
   }
   for (kernel in c("gaussian", "beta")) {
-    alt <- b; alt$ckertype <- kernel; expect_false(eligible(alt))
+    alt <- b; alt$ckertype <- kernel; expect_true(eligible(alt))
   }
   for (order in c(4L, 6L, 8L)) {
-    alt <- b; alt$ckerorder <- order; expect_false(eligible(alt))
+    alt <- b; alt$ckerorder <- order; expect_true(eligible(alt))
   }
-  for (degree in c(1L, 2L, 3L)) expect_false(eligible(sp = list(degree.engine = degree)))
-  for (method in c("Nelder-Mead", "BFGS", "CG")) expect_true(eligible(method = method))
-  expect_false(eligible(method = "L-BFGS-B"))
   alt <- b; alt$ckertype <- "uniform"; alt$ckerorder <- 8L
   expect_true(eligible(alt))
 })

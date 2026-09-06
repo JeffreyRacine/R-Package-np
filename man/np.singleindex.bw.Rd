@@ -573,11 +573,12 @@ or standard-deviation factors.
     regressor deliberately when interpretation is important.
   }
 
-  For ordinary fixed-bandwidth R \code{optim} searches with effective
-  degree zero (local constant or an equivalent degree-zero local polynomial),
-  \code{ckerbound="none"}, and second-order Epanechnikov or uniform kernels,
-  an automatic raw-invalid starting bandwidth is doubled at fixed starting
-  coefficients and index scale. Only the first scalar evaluation already
+  For fixed-bandwidth R \code{optim} searches, an automatic raw-invalid
+  starting bandwidth is doubled while keeping its starting coefficients and
+  degree fixed. This applies to all supported regression types, kernel orders
+  and support options, including generated starts in automatic degree-search
+  children. Each multistart uses its own coefficients' index scale.
+  Only the first scalar evaluation already
   requested by \code{optim} is checked. A valid original start continues in
   that same optimizer invocation without an additional objective evaluation.
   A rejected start does not incur a numerical-gradient stencil.
@@ -595,10 +596,11 @@ or standard-deviation factors.
   This rule does not change subsequent optimizer trials, finite differences,
   penalties, convergence-retry controls or final exact-point certification.
   A valid start does not guarantee convergence or a valid final point.
-  Gaussian kernels, higher-order Epanechnikov kernels, positive polynomial
-  degrees, nearest-neighbour bandwidths, bounded kernels, and child searches
-  used by automatic degree selection or NOMAD refinement/verification retain
-  their existing behavior. No alternative solver or earlier multistart winner
+  Increasing the bandwidth does not guarantee feasibility for higher-order
+  kernels or local-polynomial fits; every attempted start must pass the same
+  raw-objective check. Nearest-neighbour bandwidths and NOMAD's own direct
+  search retain their existing feasibility mechanisms. An explicit NOMAD
+  refinement start is checked but not expanded. No alternative solver or earlier multistart winner
   is substituted when restoration fails.
 
   \subsection{Choosing \code{optim.method}}{

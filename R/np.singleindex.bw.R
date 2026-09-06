@@ -305,16 +305,10 @@ npindexbw.NULL <-
   h
 }
 
-.npindexbw_restore_start_eligible <- function(bws, spec, optim.method, owner) {
-  degree <- as.integer(spec$degree.engine)
-  bound <- if (is.null(bws$ckerbound) || !length(bws$ckerbound)) "none" else
-    as.character(bws$ckerbound[1L])
-  kernel <- as.character(bws$ckertype[1L])
-  isTRUE(owner) && identical(bws$type, "fixed") && identical(bound, "none") &&
-    length(degree) > 0L && all(degree == 0L) &&
-    (identical(kernel, "uniform") ||
-       (identical(kernel, "epanechnikov") && identical(as.integer(bws$ckerorder), 2L))) &&
-    optim.method %in% c("Nelder-Mead", "BFGS", "CG")
+.npindexbw_restore_start_eligible <- function(bws, owner) {
+  # Kernel/degree validity is resolved before search. First-start feasibility
+  # is independent of those choices and of final endpoint certification.
+  isTRUE(owner) && identical(bws$type, "fixed")
 }
 
 .npindexbw_first_scalar_guard <- function(objective.method, to.public = identity) {
@@ -1893,8 +1887,7 @@ npindexbw.NULL <-
         xdat = xdat,
         ydat = ydat,
         bws = tbw,
-        .certify.selected = .certify.selected,
-        .restore.first.start = FALSE
+        .certify.selected = .certify.selected
       ),
       opt.args
     )
@@ -3324,8 +3317,7 @@ npindexbw.sibandwidth <-
           fixed.h.lower <- NULL
           start.scale <- NULL
           start.guard <- if (.npindexbw_restore_start_eligible(
-            bws, objective.spec, optim.method,
-            isTRUE(.restore.first.start) && isTRUE(.certify.selected)
+            bws, isTRUE(.restore.first.start)
           )) .npindexbw_first_scalar_guard(bws$method, beta.coord$to_public) else NULL
 
           ## Note - there are two methods currently implemented, Ichimura's
