@@ -25,16 +25,16 @@ npindex(bws, \dots, B = 399)
         data = NULL,
         newdata = NULL,
         y.eval = FALSE,
-        se = FALSE,
-        \dots)
+        se = TRUE,
+        \dots, se.type = c("asymptotic", "bootstrap"))
 
 
 \method{npindex}{default}(bws,
         txdat,
         tydat,
         nomad = FALSE,
-        se = FALSE,
-        \dots) 
+        se = TRUE,
+        \dots, se.type = c("asymptotic", "bootstrap"))
 
 \method{npindex}{sibandwidth}(bws,
         txdat = stop("training data 'txdat' missing"),
@@ -42,10 +42,10 @@ npindex(bws, \dots, B = 399)
         exdat,
         eydat,
         B = 399,
-        se = FALSE,
+        se = TRUE,
         gradients = FALSE,
         residuals = FALSE,
-        \dots)
+        \dots, se.type = c("asymptotic", "bootstrap"))
 }
 
 \arguments{
@@ -143,30 +143,38 @@ These arguments control where the single-index fit is evaluated and which evalua
 
 
 \subsection{Fitted Quantities And Inference}{
-These arguments control residuals, gradients, and bootstrap standard errors.
+These arguments control residuals, gradients, and asymptotic or bootstrap inference.
 }
 
   \item{B}{
     an integer specifying the number of bootstrap replications to use
-    when performing standard error calculations. Defaults to
+    when \code{se=TRUE, se.type="bootstrap"}. Defaults to
     \code{399}.
   }
 
 
   \item{se}{
-    a logical value indicating that you want (bootstrapped)
-    standard errors for the conditional mean, gradients (when
-    \code{gradients=TRUE} is set), and average gradients (when
-    \code{gradients=TRUE} is set), computed and returned in the
-    resulting \code{singleindex} object. Defaults to \code{FALSE}.
+    a logical value requesting asymptotic coefficient covariance and standard
+    errors for the conditional mean and, when \code{gradients=TRUE}, gradients.
+    Defaults to \code{TRUE} for this estimator. Set \code{FALSE} to omit all
+    covariance and standard-error calculations, independently of whether
+    gradient estimates are requested.
   }
 
+  \item{se.type}{
+    the standard-error method for the conditional mean and gradients:
+    \code{"asymptotic"} (the default) or \code{"bootstrap"}. The latter also
+    supplies bootstrap standard errors for average gradients and uses \code{B}
+    replications. Coefficient covariance is asymptotic in both modes: the
+    fitted-value/gradient bootstrap holds beta and the selected bandwidth fixed
+    while resampling observations. No bootstrap is run when \code{se=FALSE}
+    or \code{se.type="asymptotic"}.
+  }
 
   \item{gradients}{
-    a logical value indicating that you want gradients and the asymptotic
-    covariance matrix for beta computed and returned in the resulting
-    \code{singleindex} object. This covariance calculation does not require
-    \code{se=TRUE} and does not use the bootstrap. Defaults to \code{FALSE}.
+    a logical value indicating that you want gradients computed and returned.
+    Defaults to \code{FALSE}. Their standard errors additionally require
+    \code{se=TRUE}. Coefficient covariance does not require this flag.
   }
 
 
@@ -240,12 +248,12 @@ Further arguments are passed to the bandwidth-selection counterpart when bandwid
 
 \value{
 
-  \code{npindex} returns a \code{npsingleindex} object.  The generic
+  \code{npindex} returns a \code{singleindex} object.  The generic
   functions \code{\link{fitted}}, \code{\link{residuals}},
   \code{\link{coef}}, \code{\link{vcov}}, \code{\link{se}},
   \code{\link{predict}}, and \code{\link{gradients}}, extract (or
   generate) estimated values, residuals, coefficients,
-  variance-covariance matrix, bootstrapped standard errors on estimates,
+  variance-covariance matrix, asymptotic or bootstrap standard errors on estimates,
   predictions, and gradients, respectively, from the returned
   object. Furthermore, the functions \code{\link{summary}} and
   \code{\link{plot}} support objects of this type. The returned object
@@ -347,10 +355,25 @@ Further arguments are passed to the bandwidth-selection counterpart when bandwid
   \code{readRDS()} in a fresh R session, supply the required data
   arguments explicitly.
 
-  \code{\link{vcov}} requires that \code{gradients=TRUE} be set; it returns
-  the asymptotic coefficient covariance matrix, independently of \code{se}.
-  For coefficient inference without bootstrap standard errors of fitted
-  values or gradients, use \code{gradients=TRUE, se=FALSE}.
+  \code{\link{vcov}} extracts the asymptotic coefficient covariance computed
+  when \code{se=TRUE}, independently of \code{gradients} and \code{se.type}.
+  Its first row and column are zero because the first coefficient is normalized
+  to one. A singular free-coefficient information matrix raises an informative
+  error; the calculation does not substitute a generalized inverse or bootstrap.
+  Asymptotic fitted-value and gradient standard errors use the same scalar-index
+  regression calculation as the asymptotic plot intervals, treating the fitted
+  index coefficients as fixed. Asymptotic standard errors of average gradients
+  are not supplied; \code{mean.gerr} is available only in bootstrap mode.
+
+  Missing quantities can be computed without repeating bandwidth search.
+  After \code{model <- npindex(...)}, use
+  \code{model <- npindex(bws=model$bws, gradients=TRUE, se=TRUE)} to add gradients
+  and asymptotic inference, or \code{se=FALSE} for gradients alone. This reuses
+  both the fitted beta and bandwidth, just as fitting an object returned by
+  \code{npindexbw()} does. The training data must remain recoverable from the
+  retained state/call, or be supplied explicitly. \code{predict(..., se.fit=TRUE)}
+  uses the fitted object's stored \code{se.type} for new evaluation data unless
+  an explicit \code{se.type} is supplied.
 }
 
 \seealso{

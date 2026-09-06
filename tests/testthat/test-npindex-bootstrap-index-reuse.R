@@ -25,7 +25,7 @@ test_that("single-index pairs SDs match an explicit Gaussian resample oracle", {
       as.vector(weight %*% y[take])/rowSums(weight)
     }, numeric(n))
     set.seed(619L)
-    fit <- npindex(bws = bw, txdat = x, tydat = y, se = TRUE, B = 3L)
+    fit <- npindex(bws = bw, txdat = x, tydat = y, se = TRUE, se.type = "bootstrap", B = 3L)
     expect_equal(as.vector(se(fit)), apply(means, 1L, sd), tolerance = 1e-12)
     expect_identical(.Random.seed, expected.rng)
     expect_true(all(is.finite(se(fit))))

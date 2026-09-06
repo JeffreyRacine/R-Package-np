@@ -8,7 +8,7 @@ singleindex =
            confusion.matrix = NA, CCR.overall = NA,
            CCR.byoutcome =  NA, fit.mcfadden = NA
            , timing = NA, total.time = NA,
-           optim.time = NA, fit.time = NA
+           optim.time = NA, fit.time = NA, se.type = NULL
            ){
 
     if (missing(bws) || missing(index) || missing(mean) || missing(ntrain))
@@ -42,6 +42,7 @@ singleindex =
       residuals = residuals,
       gradients = gradients,
       se = se,
+      se.type = se.type,
       R2 = xtra[1],
       MSE = xtra[2],
       MAE = xtra[3],
@@ -91,7 +92,8 @@ vcov.singleindex <- function(object, ...) {
   if(!is.null(tc)) {
     return(tc)
   } else {
-    stop("coefficient covariance was not computed: refit with gradients=TRUE",
+    stop(paste("coefficient covariance was not computed.",
+               .np_index_refit_hint(substitute(object), se = TRUE)),
          call. = FALSE)
   }
 }
@@ -131,6 +133,8 @@ predict.singleindex <- function(object, se.fit = FALSE, ...) {
   npRejectLegacyBooleanErrors(dots, "predict.singleindex")
   if ("se" %in% names(dots))
     stop("predict.singleindex uses 'se.fit', not 'se'", call. = FALSE)
+  if (se.fit && is.null(dots$se.type) && !is.null(object[["se.type"]]))
+    dots$se.type <- object[["se.type"]]
   tr <- do.call(npindex, c(list(bws = object$bws, se = se.fit), dots))
   if (se.fit)
     return(list(fit = fitted(tr), se.fit = se(tr),
@@ -139,7 +143,8 @@ predict.singleindex <- function(object, se.fit = FALSE, ...) {
 }
 se.singleindex <- function(x){
   if (!isTRUE(x$se) || is.null(x$merr) || !length(x$merr))
-    stop("standard errors were not computed: refit or predict/evaluate with se=TRUE", call. = FALSE)
+    stop(paste("standard errors were not computed.",
+               .np_index_refit_hint(substitute(x), se = TRUE)), call. = FALSE)
   x$merr
 }
 gradients.singleindex <- function(x, se = FALSE, ...) {
@@ -154,10 +159,10 @@ gradients.singleindex <- function(x, se = FALSE, ...) {
   )
   gout <- if (!se) x$grad else x$gerr
   if (is.null(gout) || (length(gout) == 1L && is.logical(gout) && is.na(gout)))
-    stop(if (!se)
-      "gradients are not available: fit the model with gradients=TRUE"
-    else
-      "gradient standard errors were not computed: fit the model with gradients=TRUE and se=TRUE")
+    stop(paste(if (!se) "gradients are not available." else
+                 "gradient standard errors were not computed.",
+               .np_index_refit_hint(substitute(x), gradients = TRUE, se = se)),
+         call. = FALSE)
   gout
 }
 

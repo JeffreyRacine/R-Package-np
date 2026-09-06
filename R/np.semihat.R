@@ -405,10 +405,12 @@
          call. = FALSE)
   }
 
-  kw <- .npRmpi_with_local_regression(npksum(
+  kw <- .npRmpi_with_local_regression(.np_index_kernel_sum(
     txdat = idx.train,
     exdat = idx.eval,
-    bws = bws$bw,
+    bws = if (identical(bws$type, "adaptive_nn"))
+      .np_indexhat_kbw(bws, idx.train) else bws$bw,
+    .np.internal.bandwidth.divide.weights = identical(bws$type, "adaptive_nn"),
     bwtype = bws$type,
     ckertype = bws$ckertype,
     ckerorder = bws$ckerorder,

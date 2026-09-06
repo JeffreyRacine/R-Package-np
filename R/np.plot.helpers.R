@@ -13477,10 +13477,11 @@ plotFactor <- function(f, y, ...){
       }
 
       fit <- do.call(npreg, npreg.args)
+      uncertainty <- .np_index_asymptotic_outputs(fit, bws$beta, gradients)
       out <- list(
         index = index.eval,
         mean = as.vector(fit$mean),
-        merr = as.double(fit$merr)
+        merr = uncertainty$merr
       )
 
       if (gradients) {
@@ -13490,7 +13491,7 @@ plotFactor <- function(f, y, ...){
         out$grad.index <- grad.index
         out$gerr.index <- gerr.index
         out$grad <- grad.index %o% beta
-        out$gerr <- gerr.index %o% abs(beta)
+        out$gerr <- uncertainty$gerr
       }
 
       out

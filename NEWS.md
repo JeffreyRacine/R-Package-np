@@ -1,5 +1,20 @@
 # npRmpi 0.80-1
 
+* Single-index fits now default to `se = TRUE, se.type = "asymptotic"`,
+  providing asymptotic coefficient covariance and fitted-value standard errors;
+  `gradients = TRUE` also provides gradients and their asymptotic standard errors.
+  Use `se = FALSE` to omit all uncertainty calculations, or explicitly select
+  `se.type = "bootstrap"` for the previous fitted/gradient bootstrap standard
+  errors. Coefficient covariance remains asymptotic in either mode. Reusing
+  `npindex(bws = model$bws, ...)` adds requested outputs without repeating search.
+  Singular coefficient-information matrices produce an informative error.
+
+* Adaptive-NN single-index kernel sums now use donor-bandwidth normalization
+  consistently for fitted values, bootstrap fits and covariance conditional
+  moments, including the shared LC hat/plot helpers. This corrects an existing
+  discrepancy between mean-only and gradient fits; fixed and generalized-NN
+  weighting is unchanged.
+
 * Single-index pairs bootstraps reuse the already-computed training index,
   avoiding a sampled predictor-matrix copy and repeated matrix-vector product
   per replication. Resampled fits and NN radii are still recomputed. This also
@@ -12,11 +27,6 @@
 * Ichimura single-index coefficient covariance with generalized-nearest-neighbor
   bandwidths now preserves conditional-moment matrix dimensions when the model
   has more than two predictors.
-
-* `npindex(..., gradients = TRUE)` again returns asymptotic coefficient
-  covariance for `vcov()` without requiring `se = TRUE`, restoring 0.70-5
-  behavior. Bootstrap standard errors of fitted values and gradients remain
-  separately controlled by `se`; the coefficient covariance is not bootstrapped.
 
 * Automatic bandwidth calls no longer repeat an entire failed search in other
   calling frames. Original computation errors propagate normally; namespace-only

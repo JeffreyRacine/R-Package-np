@@ -331,7 +331,7 @@ test_that("predict.singleindex forwards explicit B without changing fitted predi
   fit <- npindex(bws = bw, txdat = tx, tydat = y)
 
   pred <- predict(fit, newdata = nd)
-  pred.se <- predict(fit, newdata = nd, se.fit = TRUE, B = 10)
+  pred.se <- predict(fit, newdata = nd, se.fit = TRUE, se.type = "bootstrap", B = 10)
 
   expect_equal(as.numeric(pred.se$fit), as.numeric(pred), tolerance = 0)
   expect_equal(length(pred.se$se.fit), nrow(nd))
