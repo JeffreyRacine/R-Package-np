@@ -99,13 +99,17 @@
   if (!is.call(call_obj))
     stop("bandwidth selector call is malformed", call. = FALSE)
 
-  fallback <- .np_try_eval_in_frames(call_obj, eval_env = caller_env)
-  if (isTRUE(fallback$ok))
-    return(fallback$value)
+  # Namespace-only estimator calls reconstruct an unqualified selector name.
+  # Resolve that name before executing; never replay a failed search in other
+  # frames. The existence check must not force a caller's active binding, and
+  # arguments must still be evaluated in the original caller environment.
+  selector <- call_obj[[1L]]
+  if (is.symbol(selector) &&
+      !exists(as.character(selector), envir = caller_env, inherits = TRUE) &&
+      as.character(selector) %in% getNamespaceExports("npRmpi"))
+    call_obj[[1L]] <- call("::", as.name("npRmpi"), selector)
 
-  if (inherits(fallback$error, "error"))
-    stop(conditionMessage(fallback$error), call. = FALSE)
-  stop("bandwidth selector call evaluation failed", call. = FALSE)
+  eval(call_obj, envir = caller_env)
 }
 
 .np_bw_call_uses_nomad_degree_search <- function(call_obj, caller_env = parent.frame()) {

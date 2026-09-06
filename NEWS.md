@@ -1,5 +1,9 @@
 # npRmpi 0.80-1
 
+* Automatic bandwidth calls no longer repeat an entire failed search in other
+  calling frames. Original computation errors propagate normally; namespace-only
+  calls resolve the package selector before execution.
+
 * Automatic fixed-bandwidth single-index restarts use the index scale of
   their drawn beta, with generated h restricted to the existing search bounds.
   The scale correction can change fresh multistart search results; explicit
