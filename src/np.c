@@ -10893,19 +10893,14 @@ static int np_udens_native_decode_eval_bw(const np_udens_native_search_context *
                                           const double *raw_point,
                                           double *eval_bw)
 {
-  int j, ncon, ncat, scaling;
+  int j, ncon, ncat, scaling, bandwidth;
   double nconfac, ncatfac;
 
   if (context == NULL || raw_point == NULL || eval_bw == NULL ||
       context->myopti == NULL || context->myoptd == NULL)
     return 1;
 
-  if (context->myopti[BW_DENI] != BW_FIXED) {
-    for (j = 0; j < context->n; j++)
-      eval_bw[j] = raw_point[j];
-    return 0;
-  }
-
+  bandwidth = context->myopti[BW_DENI];
   ncon = context->myopti[BW_NCONI];
   ncat = context->myopti[BW_NUNOI] + context->myopti[BW_NORDI];
   if (ncon < 0 || ncat < 0 || ncon + ncat != context->n)
@@ -10916,12 +10911,16 @@ static int np_udens_native_decode_eval_bw(const np_udens_native_search_context *
   ncatfac = context->myoptd[BW_NCATFD];
 
   for (j = 0; j < ncon; j++) {
-    if (scaling) {
-      eval_bw[j] = raw_point[j];
+    if (bandwidth == BW_FIXED) {
+      if (scaling) {
+        eval_bw[j] = raw_point[j];
+      } else {
+        if (context->mysd == NULL)
+          return 1;
+        eval_bw[j] = raw_point[j] * context->mysd[j] * nconfac;
+      }
     } else {
-      if (context->mysd == NULL)
-        return 1;
-      eval_bw[j] = raw_point[j] * context->mysd[j] * nconfac;
+      eval_bw[j] = raw_point[j];
     }
   }
 
