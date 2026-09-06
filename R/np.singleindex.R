@@ -1319,6 +1319,9 @@ npindex.sibandwidth <-
       boot.t <- matrix(NA_real_, nrow = B, ncol = ncol.boot)
 
       for (bb in seq_len(B)) {
+        if (!is.null(progress))
+          .np_bootstrap_progress_step(progress, bb - 1L,
+            sprintf("replication %d of %d", bb, B))
         indices <- as.integer(boot.indices[bb, ])
         rindex <- txdat[indices, , drop = FALSE] %*% bws$beta
         rindex.df <- data.frame(index = as.vector(rindex))
@@ -1408,17 +1411,23 @@ npindex.sibandwidth <-
           )
           boot.t[bb, ] <- out[, 1L]
         }
+        if (!is.null(progress))
+          .np_bootstrap_progress_step(progress, bb)
       }
       boot.t
     }
 
     if (se){
 
+      progress <- .np_bootstrap_progress_begin(B, "Bootstrapping single-index fit")
+      on.exit(.np_bootstrap_progress_end(progress), add = TRUE)
       boot.t <- spmd_bootstrap_t()
       if (is.null(boot.t)) {
-        boot.out = suppressWarnings(boot(data.frame(txdat,tydat), boofun, R = B))
+        boot.out = suppressWarnings(boot(data.frame(txdat,tydat),
+          .np_bootstrap_progress_statistic(progress, boofun), R = B))
         boot.t <- boot.out$t
       }
+      .np_bootstrap_progress_step(progress, B, "computing bootstrap standard errors")
 
       index.merr = matrix(data = 0, ncol = 1, nrow = length(index.eval))
       index.merr[,] = .np_plot_bootstrap_col_sds(boot.t[, seq_len(length(index.eval)), drop = FALSE])
@@ -1435,6 +1444,7 @@ npindex.sibandwidth <-
         index.mgerr = sd(boot.t[,2*length(index.eval)+1])
         index.mgerr = abs(bws$beta)*index.mgerr
       }
+      .np_bootstrap_progress_end(progress, completed = TRUE)
     }
     ## goodness of fit
 

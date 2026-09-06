@@ -132,6 +132,7 @@
   env$bandwidth_old_messages <- NULL
   env$bandwidth_context_label <- NULL
   env$fit_state <- NULL
+  env$fit_forward <- NULL
   env$iv_depth <- 0L
   env$iv_label <- NULL
   env$iv_state <- NULL
@@ -1960,7 +1961,69 @@
   invisible(NULL)
 }
 
+.np_bootstrap_progress_begin <- function(total, label) {
+  if (!isTRUE(.np_progress_enabled(domain = "bandwidth")))
+    return(NULL)
+  context <- new.env(parent = emptyenv())
+  context$state <- .np_progress_begin(label, total, domain = "bandwidth",
+                                     surface = "bandwidth")
+  # Retain the silent owner's reservation while row-local fits temporarily
+  # suspend MPI state, so those children cannot acquire a worker display.
+  if (.np_progress_bandwidth_worker_silent())
+    context$state$visible <- FALSE
+  context$done <- 0L
+  context$detail <- "preparing resamples"
+  context$closed <- FALSE
+  context$previous <- .np_progress_runtime$fit_forward
+  context$state <- .np_progress_show_now(context$state, done = 0L,
+                                        detail = context$detail)
+  .np_progress_runtime$fit_forward <- function() {
+    .np_bootstrap_progress_step(context, context$done, context$detail)
+  }
+  context
+}
+
+.np_bootstrap_progress_step <- function(context, done, detail = NULL) {
+  if (is.null(context) || isTRUE(context$closed))
+    return(invisible(NULL))
+  context$done <- done
+  context$detail <- detail
+  context$state <- .np_progress_step(context$state, done = done, detail = detail)
+  invisible(NULL)
+}
+
+.np_bootstrap_progress_end <- function(context, completed = FALSE) {
+  if (is.null(context) || isTRUE(context$closed))
+    return(invisible(NULL))
+  .np_progress_runtime$fit_forward <- context$previous
+  context$closed <- TRUE
+  if (isTRUE(completed))
+    .np_progress_end(context$state)
+  else
+    .np_progress_abort(context$state)
+  invisible(NULL)
+}
+
+.np_bootstrap_progress_statistic <- function(context, statistic) {
+  if (is.null(context))
+    return(statistic)
+  counter <- new.env(parent = emptyenv())
+  counter$replicate <- -1L
+  function(data, indices) {
+    counter$replicate <- counter$replicate + 1L
+    replicate <- counter$replicate
+    detail <- if (replicate == 0L) "initial statistic" else
+      sprintf("replication %d of %d", replicate, context$state$total)
+    .np_bootstrap_progress_step(context, max(0L, replicate - 1L), detail)
+    value <- statistic(data, indices)
+    .np_bootstrap_progress_step(context, replicate)
+    value
+  }
+}
+
 .np_fit_progress_begin <- function(label, total, handoff = FALSE, detail = NULL) {
+  if (!is.null(.np_progress_runtime$fit_forward))
+    return(invisible(NULL))
   total <- suppressWarnings(as.integer(total)[1L])
   if (is.na(total) || total < 1L) {
     .np_progress_runtime$fit_state <- NULL
@@ -1998,6 +2061,8 @@
 }
 
 .np_fit_progress_step <- function(done = NULL, detail = NULL) {
+  if (!is.null(.np_progress_runtime$fit_forward))
+    return(.np_progress_runtime$fit_forward())
   state <- .np_progress_runtime$fit_state
 
   if (is.null(state)) {
@@ -2021,6 +2086,8 @@
 }
 
 .np_fit_progress_finish <- function(detail = NULL) {
+  if (!is.null(.np_progress_runtime$fit_forward))
+    return(invisible(NULL))
   state <- .np_progress_runtime$fit_state
 
   if (is.null(state)) {
@@ -2033,6 +2100,8 @@
 }
 
 .np_fit_progress_abort <- function(detail = NULL) {
+  if (!is.null(.np_progress_runtime$fit_forward))
+    return(invisible(NULL))
   state <- .np_progress_runtime$fit_state
 
   if (is.null(state)) {

@@ -1,5 +1,9 @@
 # npRmpi 0.80-1
 
+* Single-index bootstrap standard errors now report bootstrap replications,
+  forwarding nested regression-fit activity to the same progress display.
+  Resampling, numerical results and the number of replications are unchanged.
+
 * Ichimura single-index coefficient covariance with generalized-nearest-neighbor
   bandwidths now preserves conditional-moment matrix dimensions when the model
   has more than two predictors.
