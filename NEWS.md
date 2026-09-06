@@ -1,5 +1,8 @@
 # npRmpi 0.80-1
 
+* Fitted regression releases its owned buffers and partial trees when an error
+  leaves the native fit, preserving the original condition and numerical path.
+
 * Explicit na.exclude predictions restore omitted evaluation rows, including
   native evaluation arguments and composed formula/native omission maps.
 

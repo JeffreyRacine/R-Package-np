@@ -21491,24 +21491,151 @@ cleanup_np_regression_bw_mode:
   
 }
 
-void np_regression(double * tuno, double * tord, double * tcon, double * ty,
-                   double * euno, double * eord, double * econ, double * ey,
-                   double * rbw, 
-                   double * mcv, double * padnum, 
-                   double * nconfac, double * ncatfac, double * mysd,
-                   int * myopti, 
-                   int * glp_degree,
-                   int * glp_gradient_order,
-                   int * glp_bernstein,
-                   int * glp_basis,
-                   double * cm, double * cmerr, double * g, double *gerr, 
-                   double * xtra,
-                   double * ckerlb, double * ckerub,
-                   const NPContinuousKernelRoute *kernel_route,
-                   NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
-                   int categorical_compress){
+/* One fitted invocation owns these buffers; globals are borrowed views. */
+typedef struct {
+  double **x_train[3], **x_eval[3];
+  int x_columns[3], num_var;
+  double *y_train, *y_eval, *mean, *mean_error, *scale;
+  double **gradient, **gradient_error, **hc0_gradient, **categories;
+  int *category_counts, *training_order, *evaluation_order;
+  KDT *outer_tree, *training_tree;
+  int active;
+  int fit_status;
+  NPNNZeroRadiusInfo zero_radius_info;
+} NPRegressionFittedOwner;
 
-  double * vector_scale_factor, * ecm = NULL, * ecmerr = NULL, ** eg = NULL, **egerr = NULL;
+static void np_regression_fitted_clear(NPRegressionFittedOwner *owner)
+{
+  if(!owner->active)
+    return;
+
+  for(int k = 0; k < 3; k++) {
+    free_mat(owner->x_train[k], owner->x_columns[k]);
+    owner->x_train[k] = NULL;
+    free_mat(owner->x_eval[k], owner->x_columns[k]);
+    owner->x_eval[k] = NULL;
+  }
+  free(owner->training_order);
+  owner->training_order = NULL;
+  free(owner->evaluation_order);
+  owner->evaluation_order = NULL;
+  if(owner->training_tree != NULL)
+    free_kdtree(&owner->training_tree);
+  if(owner->outer_tree != NULL)
+    free_kdtree(&owner->outer_tree);
+  free_tmat(owner->hc0_gradient);
+  owner->hc0_gradient = NULL;
+  free_mat(owner->gradient, owner->num_var);
+  owner->gradient = NULL;
+  free_mat(owner->gradient_error, owner->num_var);
+  owner->gradient_error = NULL;
+  free_mat(owner->categories, owner->x_columns[0] + owner->x_columns[1]);
+  owner->categories = NULL;
+  free(owner->y_train);
+  owner->y_train = NULL;
+  free(owner->y_eval);
+  owner->y_eval = NULL;
+  free(owner->mean);
+  owner->mean = NULL;
+  free(owner->mean_error);
+  owner->mean_error = NULL;
+  free(owner->category_counts);
+  owner->category_counts = NULL;
+  free(owner->scale);
+  owner->scale = NULL;
+
+  np_clear_estimator_extern_aliases();
+  vector_Y_extern = NULL;
+  vector_Y_eval_extern = NULL;
+  int_TREE_X = NP_TREE_FALSE;
+  int_cker_bound_extern = 0;
+  vector_ckerlb_extern = NULL;
+  vector_ckerub_extern = NULL;
+  np_reset_y_side_extern();
+  vector_glp_degree_extern = NULL;
+  vector_glp_gradient_order_extern = NULL;
+  int_glp_bernstein_extern = 0;
+  int_glp_basis_extern = 1;
+  int_TREE_PROFILE_X = NP_TREE_FALSE;
+  owner->active = 0;
+}
+
+static void np_regression_fitted_unwind(void *data, Rboolean jump)
+{
+  if(jump)
+    np_regression_fitted_clear((NPRegressionFittedOwner *)data);
+}
+
+typedef struct {
+  NPRegressionFittedOwner owner;
+  double * tuno;
+  double * tord;
+  double * tcon;
+  double * ty;
+  double * euno;
+  double * eord;
+  double * econ;
+  double * ey;
+  double * rbw;
+  double * mcv;
+  double * padnum;
+  double * nconfac;
+  double * ncatfac;
+  double * mysd;
+  int * myopti;
+  int * glp_degree;
+  int * glp_gradient_order;
+  int * glp_bernstein;
+  int * glp_basis;
+  double * cm;
+  double * cmerr;
+  double * g;
+  double *gerr;
+  double * xtra;
+  double * ckerlb;
+  double * ckerub;
+  const NPContinuousKernelRoute *kernel_route;
+  NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics;
+  int categorical_compress;
+} NPRegressionFittedCall;
+
+static SEXP np_regression_fitted_execute(void *data)
+{
+  NPRegressionFittedCall *call = (NPRegressionFittedCall *)data;
+  NPRegressionFittedOwner *owner = &call->owner;
+  double * tuno = call->tuno;
+  double * tord = call->tord;
+  double * tcon = call->tcon;
+  double * ty = call->ty;
+  double * euno = call->euno;
+  double * eord = call->eord;
+  double * econ = call->econ;
+  double * ey = call->ey;
+  double * rbw = call->rbw;
+  double * mcv = call->mcv;
+  double * padnum = call->padnum;
+  double * nconfac = call->nconfac;
+  double * ncatfac = call->ncatfac;
+  double * mysd = call->mysd;
+  int * myopti = call->myopti;
+  int * glp_degree = call->glp_degree;
+  int * glp_gradient_order = call->glp_gradient_order;
+  int * glp_bernstein = call->glp_bernstein;
+  int * glp_basis = call->glp_basis;
+  double * cm = call->cm;
+  double * cmerr = call->cmerr;
+  double * g = call->g;
+  double *gerr = call->gerr;
+  double * xtra = call->xtra;
+  double * ckerlb = call->ckerlb;
+  double * ckerub = call->ckerub;
+  const NPContinuousKernelRoute *kernel_route = call->kernel_route;
+  NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics = call->kernel_route_diagnostics;
+  int categorical_compress = call->categorical_compress;
+  owner->active = 1;
+
+
+  double * vector_scale_factor = NULL, * ecm = NULL, * ecmerr = NULL, ** eg = NULL, **egerr = NULL;
   double **eg_hc0_storage = NULL;
   double RS, MSE, MAE, MAPE, CORR, SIGN, pad_num;
 
@@ -21590,19 +21717,19 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
 
   /* Allocate memory for objects */
 
-  matrix_X_unordered_train_extern = alloc_matd(num_obs_train_extern, num_reg_unordered_extern);
-  matrix_X_ordered_train_extern = alloc_matd(num_obs_train_extern, num_reg_ordered_extern);
-  matrix_X_continuous_train_extern = alloc_matd(num_obs_train_extern, num_reg_continuous_extern);
+  matrix_X_unordered_train_extern = owner->x_train[0] = alloc_matd(num_obs_train_extern, num_reg_unordered_extern);
+  matrix_X_ordered_train_extern = owner->x_train[1] = alloc_matd(num_obs_train_extern, num_reg_ordered_extern);
+  matrix_X_continuous_train_extern = owner->x_train[2] = alloc_matd(num_obs_train_extern, num_reg_continuous_extern);
 
-  vector_Y_extern = alloc_vecd(num_obs_train_extern);
+  vector_Y_extern = owner->y_train = alloc_vecd(num_obs_train_extern);
 
   if(!train_is_eval){
-    matrix_X_unordered_eval_extern = alloc_matd(num_obs_eval_extern, num_reg_unordered_extern);
-    matrix_X_ordered_eval_extern = alloc_matd(num_obs_eval_extern, num_reg_ordered_extern);
-    matrix_X_continuous_eval_extern = alloc_matd(num_obs_eval_extern, num_reg_continuous_extern);
+    matrix_X_unordered_eval_extern = owner->x_eval[0] = alloc_matd(num_obs_eval_extern, num_reg_unordered_extern);
+    matrix_X_ordered_eval_extern = owner->x_eval[1] = alloc_matd(num_obs_eval_extern, num_reg_ordered_extern);
+    matrix_X_continuous_eval_extern = owner->x_eval[2] = alloc_matd(num_obs_eval_extern, num_reg_continuous_extern);
 
     if(!ey_is_ty)
-      vector_Y_eval_extern = alloc_vecd(num_obs_eval_extern);
+      vector_Y_eval_extern = owner->y_eval = alloc_vecd(num_obs_eval_extern);
     else
       vector_Y_eval_extern = NULL;
 
@@ -21612,28 +21739,28 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
     matrix_X_continuous_eval_extern = matrix_X_continuous_train_extern;
 
     if(!ey_is_ty)
-      vector_Y_eval_extern = alloc_vecd(num_obs_eval_extern);
+      vector_Y_eval_extern = owner->y_eval = alloc_vecd(num_obs_eval_extern);
     else
       vector_Y_eval_extern = vector_Y_extern;
 
   }
 
-  ecm = alloc_vecd(num_obs_eval_alloc);
+  ecm = owner->mean = alloc_vecd(num_obs_eval_alloc);
   if(do_merr)
-    ecmerr = alloc_vecd(num_obs_eval_alloc);
+    ecmerr = owner->mean_error = alloc_vecd(num_obs_eval_alloc);
   if(do_grad && do_gerr && ordinary_hc0_active) {
-    eg_hc0_storage = alloc_tmatd(num_obs_eval_alloc, 2*num_var);
+    eg_hc0_storage = owner->hc0_gradient = alloc_tmatd(num_obs_eval_alloc, 2*num_var);
     eg = eg_hc0_storage;
     egerr = eg_hc0_storage + num_var;
   } else if(do_grad) {
-    eg = alloc_matd(num_obs_eval_alloc, num_var);
+    eg = owner->gradient = alloc_matd(num_obs_eval_alloc, num_var);
   }
   if(do_gerr && !ordinary_hc0_active)
-    egerr = alloc_matd(num_obs_eval_alloc, num_var);
-  
-  num_categories_extern = alloc_vecu(num_reg_unordered_extern+num_reg_ordered_extern);
-  vector_scale_factor = alloc_vecd(num_var + 1);
-  matrix_categorical_vals_extern = alloc_matd(max_lev, num_reg_unordered_extern + num_reg_ordered_extern);
+    egerr = owner->gradient_error = alloc_matd(num_obs_eval_alloc, num_var);
+
+  num_categories_extern = owner->category_counts = alloc_vecu(num_reg_unordered_extern+num_reg_ordered_extern);
+  vector_scale_factor = owner->scale = alloc_vecd(num_var + 1);
+  matrix_categorical_vals_extern = owner->categories = alloc_matd(max_lev, num_reg_unordered_extern + num_reg_ordered_extern);
 
   vector_continuous_stddev_extern = mysd;
   /* train */
@@ -21681,13 +21808,13 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
 
   for(j=0; j < (num_reg_unordered_extern + num_reg_ordered_extern); j++){
     i = 0;
-    do { 
+    do {
       matrix_categorical_vals_extern[j][i] = mcv[j*max_lev+i];
     } while(++i < max_lev && mcv[j*max_lev+i] != pad_num);
     num_categories_extern[j] = i;
   }
 
-  ipt = (int *)malloc(num_obs_train_extern*sizeof(int));
+  ipt = owner->training_order = (int *)malloc(num_obs_train_extern*sizeof(int));
   if(!(ipt != NULL))
     error("!(ipt != NULL)");
 
@@ -21696,7 +21823,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
   }
 
   if(!train_is_eval) {
-    ipe = (int *)malloc(num_obs_eval_extern*sizeof(int));
+    ipe = owner->evaluation_order = (int *)malloc(num_obs_eval_extern*sizeof(int));
     if(!(ipe != NULL))
       error("!(ipe != NULL)");
 
@@ -21707,21 +21834,22 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
     ipe = ipt;
   }
 
-  // attempt tree build, if enabled 
+  // attempt tree build, if enabled
   int_TREE_X = int_TREE_X && ((num_reg_continuous_extern != 0) ? NP_TREE_TRUE : NP_TREE_FALSE);
 
   if(int_TREE_X == NP_TREE_TRUE){
     if((BANDWIDTH_reg_extern != BW_ADAP_NN) || ((BANDWIDTH_reg_extern == BW_ADAP_NN) && train_is_eval)){
-      build_kdtree(matrix_X_continuous_train_extern, num_obs_train_extern, num_reg_continuous_extern, 
-                   4*num_reg_continuous_extern, ipt, &kdt_extern_X);
+      build_kdtree(matrix_X_continuous_train_extern, num_obs_train_extern, num_reg_continuous_extern,
+                   4*num_reg_continuous_extern, ipt, &owner->outer_tree);
+      kdt_extern_X = owner->outer_tree;
 
       //put training data into tree-order using the index array
 
       for( j=0;j<num_reg_unordered_extern;j++)
         for( i=0;i<num_obs_train_extern;i++ )
           matrix_X_unordered_train_extern[j][i]=tuno[j*num_obs_train_extern+ipt[i]];
-    
-    
+
+
       for( j=0;j<num_reg_ordered_extern;j++)
         for( i=0;i<num_obs_train_extern;i++ )
           matrix_X_ordered_train_extern[j][i]=tord[j*num_obs_train_extern+ipt[i]];
@@ -21735,8 +21863,9 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
         vector_Y_extern[i] = ty[ipt[i]];
 
     } else {
-      build_kdtree(matrix_X_continuous_eval_extern, num_obs_eval_extern, num_reg_continuous_extern, 
-                   4*num_reg_continuous_extern, ipe, &kdt_extern_X);
+      build_kdtree(matrix_X_continuous_eval_extern, num_obs_eval_extern, num_reg_continuous_extern,
+                   4*num_reg_continuous_extern, ipe, &owner->outer_tree);
+      kdt_extern_X = owner->outer_tree;
 
       for( j=0;j<num_reg_unordered_extern;j++)
         for( i=0;i<num_obs_eval_extern;i++ )
@@ -21759,10 +21888,10 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
 
 
   /* Conduct estimation */
-	
-  /* 
-     nb - KERNEL_(|un)ordered_den are set to zero upon declaration 
-     - they have only one kernel type each at the moment 
+
+  /*
+     nb - KERNEL_(|un)ordered_den are set to zero upon declaration
+     - they have only one kernel type each at the moment
   */
 
   const NPNNGeometryContext nn_geometry_context = {
@@ -21786,7 +21915,6 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
       BANDWIDTH_reg_extern == BW_ADAP_NN &&
       !train_is_eval && kernel_route == NULL;
     KDT *outer_evaluation_kdt = NULL;
-    KDT *training_kdt = NULL;
     NPRegressionHC0Context residual_preparation_context;
 
     if(temporary_training_tree) {
@@ -21797,7 +21925,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
         num_reg_continuous_extern,
         4*num_reg_continuous_extern,
         ipt,
-        &training_kdt);
+        &owner->training_tree);
       for(j = 0; j < num_reg_unordered_extern; j++)
         for(i = 0; i < num_obs_train_extern; i++)
           matrix_X_unordered_train_extern[j][i] =
@@ -21812,7 +21940,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
             tcon[j*num_obs_train_extern + ipt[i]];
       for(i = 0; i < num_obs_train_extern; i++)
         vector_Y_extern[i] = ty[ipt[i]];
-      kdt_extern_X = training_kdt;
+      kdt_extern_X = owner->training_tree;
     }
 
     ordinary_hc0_residual =
@@ -21878,7 +22006,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
 
     if(temporary_training_tree) {
       kdt_extern_X = outer_evaluation_kdt;
-      free_kdtree(&training_kdt);
+      free_kdtree(&owner->training_tree);
     }
 
     if(regression_fit_status != NP_REGRESSION_FIT_OK)
@@ -22041,7 +22169,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
   }
   for(i=0;i<num_obs_eval_extern;i++)
     cm[ipe[i]] = ecm[i];
-      
+
   if(do_merr)
     for(i=0;i<num_obs_eval_extern;i++)
       cmerr[ipe[i]] = ecmerr[i];
@@ -22085,67 +22213,71 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
 
 cleanup_np_regression:
 
-  /* clean up and wave goodbye */
-
-  free_mat(matrix_X_unordered_train_extern, num_reg_unordered_extern);
-  free_mat(matrix_X_ordered_train_extern, num_reg_ordered_extern);
-  free_mat(matrix_X_continuous_train_extern, num_reg_continuous_extern);
-
-  if(!train_is_eval){
-    free_mat(matrix_X_unordered_eval_extern, num_reg_unordered_extern);
-    free_mat(matrix_X_ordered_eval_extern, num_reg_ordered_extern);
-    free_mat(matrix_X_continuous_eval_extern, num_reg_continuous_extern);
-  }
-
-  safe_free(ipt);
-
-  if(!train_is_eval)
-    safe_free(ipe);
-
-  if(int_TREE_X == NP_TREE_TRUE){
-    free_kdtree(&kdt_extern_X);
-    int_TREE_X = NP_TREE_FALSE;
-  }
-
-  if(eg_hc0_storage != NULL) {
-    free_tmat(eg_hc0_storage);
-  } else {
-    if(do_grad)
-      free_mat(eg, num_var);
-    if(do_gerr)
-      free_mat(egerr, num_var);
-  }
-  
-  free_mat(matrix_categorical_vals_extern, num_reg_unordered_extern+num_reg_ordered_extern);
-
-  safe_free(vector_Y_extern);
-  if(!ey_is_ty)
-    safe_free(vector_Y_eval_extern);
-
-  safe_free(ecm);
-  if(do_merr)
-    safe_free(ecmerr);
-
-  safe_free(num_categories_extern);
-  safe_free(vector_scale_factor);
-  np_clear_estimator_extern_aliases();
-
-  int_cker_bound_extern = 0;
-  vector_ckerlb_extern = NULL;
-  vector_ckerub_extern = NULL;
-  np_reset_y_side_extern();
-  vector_glp_degree_extern = NULL;
-  vector_glp_gradient_order_extern = NULL;
-  int_glp_bernstein_extern = 0;
-  int_glp_basis_extern = 1;
-  int_TREE_PROFILE_X = NP_TREE_FALSE;
-
+  owner->fit_status = regression_fit_status;
   if(regression_fit_status == NP_REGRESSION_FIT_ERR_ZERO_NN_RADIUS)
-    np_nn_zero_radius_error(&zero_radius_info);
-  if(regression_fit_status != NP_REGRESSION_FIT_OK)
-    error("np_regression: invalid internal regression fit status");
+    owner->zero_radius_info = zero_radius_info;
+  return R_NilValue;
+}
 
-  return;
+void np_regression(double * tuno, double * tord, double * tcon, double * ty,
+                   double * euno, double * eord, double * econ, double * ey,
+                   double * rbw,
+                   double * mcv, double * padnum,
+                   double * nconfac, double * ncatfac, double * mysd,
+                   int * myopti,
+                   int * glp_degree,
+                   int * glp_gradient_order,
+                   int * glp_bernstein,
+                   int * glp_basis,
+                   double * cm, double * cmerr, double * g, double *gerr,
+                   double * xtra,
+                   double * ckerlb, double * ckerub,
+                   const NPContinuousKernelRoute *kernel_route,
+                   NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
+                   int categorical_compress){
+  NPRegressionFittedCall call = {0};
+  call.tuno = tuno;
+  call.tord = tord;
+  call.tcon = tcon;
+  call.ty = ty;
+  call.euno = euno;
+  call.eord = eord;
+  call.econ = econ;
+  call.ey = ey;
+  call.rbw = rbw;
+  call.mcv = mcv;
+  call.padnum = padnum;
+  call.nconfac = nconfac;
+  call.ncatfac = ncatfac;
+  call.mysd = mysd;
+  call.myopti = myopti;
+  call.glp_degree = glp_degree;
+  call.glp_gradient_order = glp_gradient_order;
+  call.glp_bernstein = glp_bernstein;
+  call.glp_basis = glp_basis;
+  call.cm = cm;
+  call.cmerr = cmerr;
+  call.g = g;
+  call.gerr = gerr;
+  call.xtra = xtra;
+  call.ckerlb = ckerlb;
+  call.ckerub = ckerub;
+  call.kernel_route = kernel_route;
+  call.kernel_route_diagnostics = kernel_route_diagnostics;
+  call.categorical_compress = categorical_compress;
+  call.owner.x_columns[0] = myopti[REG_NUNOI];
+  call.owner.x_columns[1] = myopti[REG_NORDI];
+  call.owner.x_columns[2] = myopti[REG_NCONI];
+  call.owner.num_var = call.owner.x_columns[0] + call.owner.x_columns[1] +
+    call.owner.x_columns[2];
+  call.owner.fit_status = NP_REGRESSION_FIT_OK;
+  R_UnwindProtect(np_regression_fitted_execute, &call,
+                  np_regression_fitted_unwind, &call.owner, NULL);
+  np_regression_fitted_clear(&call.owner);
+  if(call.owner.fit_status == NP_REGRESSION_FIT_ERR_ZERO_NN_RADIUS)
+    np_nn_zero_radius_error(&call.owner.zero_radius_info);
+  if(call.owner.fit_status != NP_REGRESSION_FIT_OK)
+    error("np_regression: invalid internal regression fit status");
 }
 
 static void np_kernelsum_common(double * tuno, double * tord, double * tcon,
