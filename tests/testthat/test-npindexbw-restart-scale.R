@@ -17,8 +17,8 @@ test_that("automatic optim restarts use the drawn beta and preserve the U draw",
     expect_identical(.Random.seed, after)
     if (p > 1L)
       expect_false(isTRUE(all.equal(got, u * EssDee(first) * length(i)^(-1/5))))
-    expect_error(.npindex_random_restart_bandwidth(x, beta, first, "fixed",
-      length(i), controls, 1e6), "below the continuous scale-factor lower bound")
+    expect_identical(.npindex_random_restart_bandwidth(x, beta, first, "fixed",
+      length(i), controls, 1e6), 1e6)
     for (type in c("generalized_nn", "adaptive_nn")) {
       set.seed(817)
       old <- .npindex_random_start_bandwidth(first, type, length(i), controls)
@@ -45,7 +45,7 @@ test_that("NOMAD preparation preserves first and non-bandwidth coordinates", {
     starts[,p+1L] <- c(0,1,2,1)
     set.seed(817)
     before <- .Random.seed
-    got <- .npindexbw_prepare_fixed_starts(starts,x,coord,first.scale)
+    got <- .npindexbw_prepare_fixed_starts(starts,x,coord,first.scale,0,Inf)
     expect_identical(.Random.seed,before)
     expect_identical(got[1,],starts[1,])
     expect_identical(got[,-p,drop=FALSE],starts[,-p,drop=FALSE])
@@ -61,7 +61,7 @@ test_that("NOMAD preparation preserves first and non-bandwidth coordinates", {
   warnings <- character()
   withCallingHandlers(
     expect_error(.npindexbw_prepare_fixed_starts(rbind(c(0,.5,0),c(-1,.7,1)),
-      x,coord,1), "nonpositive or nonfinite index scale"),
+      x,coord,1,0,Inf), "nonpositive or nonfinite index scale"),
     warning=function(w) {warnings <<- c(warnings,conditionMessage(w)); invokeRestart("muffleWarning")})
   expect_length(warnings,2L)
   expect_match(warnings[1L],"variable 1 appears to be constant")

@@ -274,6 +274,11 @@ npindexbw.NULL <-
   runif(1, min = 2, max = max(2L, upper))
 }
 
+.npindex_bound_automatic_start <- function(h, lower, upper = Inf) {
+  # Bound generated starts only; invalid arithmetic still reaches validation.
+  if (is.finite(h)) min(upper, max(lower, h)) else h
+}
+
 .npindex_random_restart_bandwidth <- function(xmat, beta, fit, bwtype, nobs,
                                                start.controls, fixed.h.lower,
                                                retain.scale = FALSE) {
@@ -289,7 +294,8 @@ npindexbw.NULL <-
   if (!is.null(details))
     h <- details$h
   h <- .npindex_finalize_bandwidth(
-    h = h, bwtype = bwtype, nobs = nobs, lower = fixed.h.lower,
+    h = .npindex_bound_automatic_start(h, fixed.h.lower),
+    bwtype = bwtype, nobs = nobs, lower = fixed.h.lower,
     where = "npindexbw automatic restart"
   )
   if (!is.null(details)) {
@@ -419,7 +425,8 @@ npindexbw.NULL <-
   guard
 }
 
-.npindexbw_prepare_fixed_starts <- function(starts, xmat, beta.coord, h.scale) {
+.npindexbw_prepare_fixed_starts <- function(starts, xmat, beta.coord, h.scale,
+                                           h.lower, h.upper) {
   h.col <- ncol(xmat)
   if (nrow(starts) <= 1L || h.col == 1L)
     return(starts)
@@ -432,6 +439,8 @@ npindexbw.NULL <-
            call. = FALSE)
     if (scale != h.scale)
       starts[j, h.col] <- (starts[j, h.col] * scale) / h.scale
+    starts[j, h.col] <- .npindex_bound_automatic_start(
+      starts[j, h.col], h.lower, h.upper)
   }
   starts
 }
@@ -2506,7 +2515,8 @@ npindexbw.NULL <-
     progress_label = progress_label,
     handoff_before_build = isTRUE(handoff_before_build),
     prepare_starts = if (fixed.nomad && !isTRUE(opt.args$only.optimize.beta)) function(starts)
-      .npindexbw_prepare_fixed_starts(starts, x.clean, beta.coord, fixed.setup$h.scale) else NULL,
+      .npindexbw_prepare_fixed_starts(starts, x.clean, beta.coord,
+                                    fixed.setup$h.scale, h.lower, h.upper) else NULL,
     nomad.opts = if (is.null(opt.args$nomad.opts)) list() else opt.args$nomad.opts,
     native.r.bridge = TRUE,
     start.lower = start.lb,
