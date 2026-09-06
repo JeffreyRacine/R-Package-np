@@ -2623,11 +2623,14 @@
                              source = "explicit",
                              reason = NULL,
                              progress_label = NULL,
-                             recover_start = NULL) {
+                             recover_start = NULL,
+                             prepare_starts = NULL) {
   engine <- match.arg(engine)
   direction <- match.arg(direction)
   if (!is.null(recover_start) && !is.function(recover_start))
     stop("'recover_start' must be NULL or a function", call. = FALSE)
+  if (!is.null(prepare_starts) && !is.function(prepare_starts))
+    stop("'prepare_starts' must be NULL or a function", call. = FALSE)
   .np_nomad_require_crs()
 
   state <- new.env(parent = emptyenv())
@@ -2678,6 +2681,19 @@
     start.lower = start.lower,
     start.upper = start.upper
   )
+  if (!is.null(prepare_starts)) {
+    prepared <- prepare_starts(start_matrix)
+    if (!is.matrix(prepared) || !is.numeric(prepared) ||
+        !identical(dim(prepared), dim(start_matrix)) ||
+        any(!is.finite(prepared)) ||
+        any(sweep(prepared, 2L, lb, "<")) ||
+        any(sweep(prepared, 2L, ub, ">")) ||
+        any(prepared[, bbin != 0L, drop = FALSE] !=
+              round(prepared[, bbin != 0L, drop = FALSE])))
+      stop("NOMAD prepared starts violate the existing coordinate dimensions or search bounds",
+           call. = FALSE)
+    start_matrix <- prepared
+  }
   coordinate.roles <- .np_nomad_validate_coordinate_roles(
     coordinate.roles,
     ncol(start_matrix),

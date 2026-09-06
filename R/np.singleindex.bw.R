@@ -269,6 +269,38 @@ npindexbw.NULL <-
   runif(1, min = 2, max = max(2L, upper))
 }
 
+.npindex_random_restart_bandwidth <- function(xmat, beta, fit, bwtype, nobs,
+                                               start.controls, fixed.h.lower) {
+  if (identical(bwtype, "fixed") && length(beta))
+    fit <- .npindex_index_from_beta_tail(xmat, beta)
+  h <- .npindex_random_start_bandwidth(
+    fit = fit, bwtype = bwtype, nobs = nobs, start.controls = start.controls
+  )
+  if (!identical(bwtype, "fixed"))
+    return(h)
+  .npindex_finalize_bandwidth(
+    h = h, bwtype = bwtype, nobs = nobs, lower = fixed.h.lower,
+    where = "npindexbw automatic restart"
+  )
+}
+
+.npindexbw_prepare_fixed_starts <- function(starts, xmat, beta.coord, h.scale) {
+  h.col <- ncol(xmat)
+  if (nrow(starts) <= 1L || h.col == 1L)
+    return(starts)
+  for (j in 2:nrow(starts)) {
+    beta <- beta.coord$to_public(starts[j, seq_len(h.col - 1L)])
+    fit <- .npindex_index_from_beta_tail(xmat, beta)
+    scale <- .npindex_start_bandwidth_scale(fit = fit, nobs = nrow(xmat))
+    if (!is.finite(scale) || scale <= 0)
+      stop("npindexbw automatic NOMAD restart has a nonpositive or nonfinite index scale",
+           call. = FALSE)
+    if (scale != h.scale)
+      starts[j, h.col] <- (starts[j, h.col] * scale) / h.scale
+  }
+  starts
+}
+
 .npindex_ols_beta_tail <- function(ols.fit) {
   slopes <- as.double(coef(ols.fit)[-1L])
   if (length(slopes) <= 1L)
@@ -2323,6 +2355,8 @@ npindexbw.NULL <-
     reason = reason,
     progress_label = progress_label,
     handoff_before_build = isTRUE(handoff_before_build),
+    prepare_starts = if (fixed.nomad && !isTRUE(opt.args$only.optimize.beta)) function(starts)
+      .npindexbw_prepare_fixed_starts(starts, x.clean, beta.coord, fixed.setup$h.scale) else NULL,
     nomad.opts = if (is.null(opt.args$nomad.opts)) list() else opt.args$nomad.opts,
     native.r.bridge = TRUE,
     start.lower = start.lb,
@@ -3375,11 +3409,14 @@ npindexbw.sibandwidth <-
               beta.length <- length(ols.beta)
               beta <- runif(beta.length,min=0.5,max=1.5)*ols.beta
               if (!only.optimize.beta)
-                h <- .npindex_random_start_bandwidth(
+                h <- .npindex_random_restart_bandwidth(
+                  xmat = xmat,
+                  beta = beta,
                   fit = fit,
                   bwtype = bws$type,
                   nobs = nobs,
-                  start.controls = h.start.controls
+                  start.controls = h.start.controls,
+                  fixed.h.lower = fixed.h.lower
                 )
             }
 
@@ -3404,11 +3441,14 @@ npindexbw.sibandwidth <-
               beta.length <- length(ols.beta)
               beta <- runif(beta.length,min=0.5,max=1.5)*ols.beta
               if(!only.optimize.beta)
-                h <- .npindex_random_start_bandwidth(
+                h <- .npindex_random_restart_bandwidth(
+                  xmat = xmat,
+                  beta = beta,
                   fit = fit,
                   bwtype = bws$type,
                   nobs = nobs,
-                  start.controls = h.start.controls
+                  start.controls = h.start.controls,
+                  fixed.h.lower = fixed.h.lower
                 )
 
               if(optim.return$convergence == 1){
