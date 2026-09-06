@@ -562,6 +562,34 @@ or standard-deviation factors.
     regressor deliberately when interpretation is important.
   }
 
+  For ordinary fixed-bandwidth R \code{optim} searches with effective
+  degree zero (local constant or an equivalent degree-zero local polynomial),
+  \code{ckerbound="none"}, and second-order Epanechnikov or uniform kernels,
+  an automatic raw-invalid starting bandwidth is doubled at fixed starting
+  coefficients and index scale. Only the first scalar evaluation already
+  requested by \code{optim} is checked. A valid original start continues in
+  that same optimizer invocation without an additional objective evaluation.
+  A rejected start does not incur a numerical-gradient stencil.
+
+  Restoration permits at most eight doublings (nine starting scalar
+  evaluations) for each multistart or existing convergence-retry start and
+  respects the existing search bounds. Each rejected start adds one scalar
+  evaluation, which can be costly. The random-draw control
+  \code{scale.factor.init.upper} is not a search upper bound, so restoration
+  may exceed it. Explicit initial bandwidths and bandwidths held by
+  \code{only.optimize.beta=TRUE} are never expanded; a raw-invalid first
+  evaluation fails with the method, start/retry, attempted bandwidth range,
+  count and reason. Budget exhaustion also fails the complete call.
+
+  This rule does not change subsequent optimizer trials, finite differences,
+  penalties, convergence-retry controls or final exact-point certification.
+  A valid start does not guarantee convergence or a valid final point.
+  Gaussian kernels, higher-order Epanechnikov kernels, positive polynomial
+  degrees, nearest-neighbour bandwidths, bounded kernels, and child searches
+  used by automatic degree selection or NOMAD refinement/verification retain
+  their existing behavior. No alternative solver or earlier multistart winner
+  is substituted when restoration fails.
+
   \subsection{Choosing \code{optim.method}}{
     The default \code{"Nelder-Mead"} search is often a good starting
     point for low-dimensional single-index problems because it uses only

@@ -1,5 +1,13 @@
 # npRmpi 0.80-1
 
+* Direct degree-zero single-index R optim searches with unbounded second-order
+  Epanechnikov or uniform kernels restore raw-invalid automatic initial
+  bandwidths by at most eight doublings. Valid original starts use the same
+  optimizer invocation without an extra objective evaluation; rejected first
+  scalars are counted and incur no gradient stencil. Explicit or held invalid
+  starts and exhausted restoration fail the call. Later trials, other kernels,
+  NN, automatic degree-search children and final certification are unchanged.
+
 * Least-squares quantile formula dispatch preserves named subset expressions for
   evaluation in the formula method's data mask.
 
