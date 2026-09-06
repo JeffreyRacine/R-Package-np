@@ -646,8 +646,10 @@ npscoefbw.NULL <-
   )
 }
 
-.npscoefbw_nomad_unknown_nn_error <- function(condition, bws) {
-  if (bws$type %in% c("generalized_nn", "adaptive_nn") &&
+.npscoefbw_nomad_unknown_nn_error <- function(condition, bws,
+                                             preserve.eval.error = FALSE) {
+  if ((isTRUE(preserve.eval.error) ||
+       bws$type %in% c("generalized_nn", "adaptive_nn")) &&
       !inherits(condition, "np_nn_candidate_invalid"))
     condition
   else
@@ -777,7 +779,8 @@ npscoefbw.NULL <-
   invisible(NULL)
 }
 
-.npscoefbw_nomad_pool_start <- function(ctx, comm = 1L) {
+.npscoefbw_nomad_pool_start <- function(ctx, comm = 1L,
+                                        preserve.eval.error = FALSE) {
   if (!.npRmpi_has_active_slave_pool(comm = comm) ||
       isTRUE(.npRmpi_autodispatch_called_from_bcast()) ||
       isTRUE(getOption("npRmpi.local.regression.mode", FALSE))) {
@@ -788,6 +791,11 @@ npscoefbw.NULL <-
   if (is.null(ref))
     stop("invalid NOMAD smooth-coefficient context: missing remote reference")
 
+  nslaves <- max(0L, .npRmpi_safe_int(mpi.comm.size(comm)) - 1L)
+  preserve.eval.error <- isTRUE(preserve.eval.error) &&
+    isTRUE(tryCatch(as.integer(mpi.comm.rank(comm)),
+                    error = function(e) NA_integer_) == 0L) &&
+    nslaves > 0L
   req.base <- .npRmpi_protocol_tag("scoef_req_base")
   res.base <- .npRmpi_protocol_tag("scoef_res_base")
 
@@ -796,13 +804,15 @@ npscoefbw.NULL <-
       REF = REF,
       COMM = COMM,
       REQ_BASE = REQ_BASE,
-      RES_BASE = RES_BASE
+      RES_BASE = RES_BASE,
+      PRESERVE_EVAL_ERROR = PRESERVE_EVAL_ERROR
     )
   }, list(
     REF = ref,
     COMM = comm,
     REQ_BASE = req.base,
-    RES_BASE = res.base
+    RES_BASE = res.base,
+    PRESERVE_EVAL_ERROR = preserve.eval.error
   ))
   .npRmpi_bcast_cmd_expr(mc, comm = comm, caller.execute = FALSE)
 
@@ -810,7 +820,8 @@ npscoefbw.NULL <-
     comm = comm,
     req.base = req.base,
     res.base = res.base,
-    nslaves = max(0L, .npRmpi_safe_int(mpi.comm.size(comm)) - 1L)
+    nslaves = nslaves,
+    preserve.eval.error = preserve.eval.error
   )
 }
 
@@ -899,7 +910,8 @@ npscoefbw.NULL <-
 .npscoefbw_nomad_slave_loop <- function(REF,
                                         COMM = 1L,
                                         REQ_BASE = .npRmpi_protocol_tag("scoef_req_base"),
-                                        RES_BASE = .npRmpi_protocol_tag("scoef_res_base")) {
+                                        RES_BASE = .npRmpi_protocol_tag("scoef_res_base"),
+                                        PRESERVE_EVAL_ERROR = FALSE) {
   rank <- tryCatch(as.integer(mpi.comm.rank(COMM)), error = function(e) 0L)
   if (isTRUE(rank == 0L))
     return(invisible(NULL))
@@ -985,7 +997,8 @@ npscoefbw.NULL <-
           message = conditionMessage(e),
           task = msg,
           rank = rank,
-          condition = .npscoefbw_nomad_unknown_nn_error(e, msg$bws)
+          condition = .npscoefbw_nomad_unknown_nn_error(
+            e, msg$bws, preserve.eval.error = PRESERVE_EVAL_ERROR)
         )
       }
     )
@@ -1070,7 +1083,8 @@ npscoefbw.NULL <-
       localize = TRUE
     ),
     error = function(e) list(sse = 0.0, invalid = 1L,
-      error = .npscoefbw_nomad_unknown_nn_error(e, bws))
+      error = .npscoefbw_nomad_unknown_nn_error(
+        e, bws, preserve.eval.error = pool[["preserve.eval.error", exact = TRUE]]))
   )
 
   worker.out <- lapply(seq_len(pool$nslaves), function(rk) {
@@ -1215,10 +1229,10 @@ npscoefbw.NULL <-
       .npscoefbw_nomad_pool_stop(pool)
     .npscoefbw_nomad_context_cleanup(ctx, comm = 1L)
   }, add = TRUE)
-  pool <- .npscoefbw_nomad_pool_start(ctx, comm = 1L)
+  pool <- .npscoefbw_nomad_pool_start(ctx, comm = 1L, preserve.eval.error = TRUE)
   start_pool_if_needed <- function() {
     if (!collective.owner && is.null(pool))
-      pool <<- .npscoefbw_nomad_pool_start(ctx, comm = 1L)
+      pool <<- .npscoefbw_nomad_pool_start(ctx, comm = 1L, preserve.eval.error = TRUE)
     invisible(pool)
   }
   stop_pool_before_collective <- function() {
@@ -1446,6 +1460,7 @@ npscoefbw.NULL <-
       remin = isTRUE(opt.args$nomad.remin),
       nomad.opts = if (is.null(opt.args$nomad.opts)) list() else opt.args$nomad.opts,
       native.r.bridge = TRUE,
+      preserve.eval.error = isTRUE(pool[["preserve.eval.error", exact = TRUE]]),
       source = source,
       reason = reason,
       progress_label = progress_label,

@@ -14,6 +14,11 @@
 * Unconditional-density MADS searches decode categorical coordinates for
   nearest-neighbour bandwidths as well as fixed bandwidths, matching np.
 
+* Root-owned smooth-coefficient NOMAD request/reply searches preserve unexpected
+  evaluator conditions, drain the current replies, and stop further evaluator and
+  payload work before existing pool cleanup. Typed invalid candidates retain
+  their handling; collective and no-pool routes retain their existing policy.
+
 * Fitted regression releases its owned buffers and partial trees when an error
   leaves the native fit, preserving the original condition and numerical path.
 
