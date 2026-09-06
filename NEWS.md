@@ -8,6 +8,7 @@
 
 * LSQ formula dispatch preserves positional subset expressions for the existing formula owner.
 * Unconditional NOMAD restart reports and selection now use the existing raw certificate while preserving native recovery scores and official diagnostics.
+* Regression MADS restart reports and selection use their existing raw endpoint certificates while preserving native admission and recovery diagnostics.
 * Conditional-distribution fixed-degree native restart summaries report their
   existing raw endpoint scores. Official solver diagnostics retain the score
   for the official solution; selection and recovery are unchanged.
