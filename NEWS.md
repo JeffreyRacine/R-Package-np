@@ -1,5 +1,6 @@
 # npRmpi 0.80-1
 
+* Unconditional NOMAD restart reports and selection now use the existing raw certificate while preserving native recovery scores and official diagnostics.
 * Conditional-distribution fixed-degree native restart summaries report their
   existing raw endpoint scores. Official solver diagnostics retain the score
   for the official solution; selection and recovery are unchanged.

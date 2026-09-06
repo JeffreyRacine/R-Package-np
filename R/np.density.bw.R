@@ -587,7 +587,7 @@ npRmpiNomadNativeSearchDensity <- function(prep,
         elapsed = native.elapsed,
         status = "ok",
         message = as.character(native.i$message[1L]),
-        objective = official.objective.i,
+        objective = raw.objective.i,
         bbe = as.numeric(native.i$blackbox_evaluations[1L]),
         iterations = as.numeric(native.i$iterations[1L]),
         solution = as.numeric(native.i$solution),
@@ -599,9 +599,11 @@ npRmpiNomadNativeSearchDensity <- function(prep,
       native.num.feval.fast.total <- native.num.feval.fast.total + as.numeric(native.i$total_num.feval.fast[1L])
       native.num.feval.guarded.total <- native.num.feval.guarded.total + as.numeric(native.i$total_num.feval.guarded[1L])
       if (.np_nn_raw_objective_valid(raw.objective.i) &&
-          objective.i < native.best.objective) {
-        native.best.objective <- objective.i
-        native.best.index <- i
+          objective.i < Inf) {
+        if (raw.objective.i < native.best.objective) {
+          native.best.objective <- raw.objective.i
+          native.best.index <- i
+        }
       }
     }
     if (!is.finite(native.best.index) && is.null(point.start) &&
@@ -658,7 +660,7 @@ npRmpiNomadNativeSearchDensity <- function(prep,
           elapsed = native.elapsed,
           status = "ok",
           message = as.character(native.i$message[1L]),
-          objective = official.objective.i,
+          objective = raw.objective.i,
           bbe = as.numeric(native.i$blackbox_evaluations[1L]),
           iterations = as.numeric(native.i$iterations[1L]),
           solution = as.numeric(native.i$solution),
@@ -675,7 +677,7 @@ npRmpiNomadNativeSearchDensity <- function(prep,
         native.num.feval.guarded.total <- native.num.feval.guarded.total +
           as.numeric(native.i$total_num.feval.guarded[1L])
         if (.np_nn_raw_objective_valid(raw.objective.i)) {
-          native.best.objective <- objective.i
+          native.best.objective <- raw.objective.i
           native.best.index <- recovery.index
         }
       }
@@ -732,7 +734,7 @@ npRmpiNomadNativeSearchDensity <- function(prep,
         bandwidth = native.bw,
         objective = native.best.objective,
         official.solution = as.numeric(native.best$solution),
-        official.objective = as.numeric(native.best$objective[1L]),
+        official.objective = as.numeric(native.best$native$official_objective[1L]),
         compiled.callback.count = as.integer(native.best$native$compiled_callback_calls[1L]),
         compiled.callback.failures = as.integer(native.best$native$compiled_callback_failures[1L]),
         crs.callback.evaluations = as.integer(native.best$native$crs_callback_evaluations[1L]),
