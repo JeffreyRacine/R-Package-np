@@ -48,4 +48,12 @@ test_that("formula subsets select rows once with data-column precedence", {
     model = m, B = 19L, nmulti = 1L, random.seed = 42L)
   expect_equal(actual[c("Jn", "In", "P")], expected[c("Jn", "In", "P")],
     tolerance = 1e-12)
+  # Discriminate the repaired data-mask contract from the old caller-only
+  # resolution: the two bindings select different rows.
+  d$keep <- keep
+  keep <- !keep
+  shadowed <- npcmstest(y ~ x, data = d, subset = keep, model = m,
+    B = 19L, nmulti = 1L, random.seed = 42L)
+  expect_equal(shadowed[c("Jn", "In", "P")], expected[c("Jn", "In", "P")],
+    tolerance = 1e-12)
 })

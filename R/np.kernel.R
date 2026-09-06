@@ -28,7 +28,7 @@ npksum.formula <-
       dispatch.call <- match.call()
       if (!missing(subset))
         dispatch.call[c("data", "subset")] <- .np_formula_subset_inputs(
-          data, substitute(subset), parent.frame())
+          if (missing(data)) NULL else data, substitute(subset), parent.frame())
       return(.npRmpi_autodispatch_call(dispatch.call, parent.frame()))
     }
 
@@ -40,7 +40,7 @@ npksum.formula <-
     mf.args <- as.list(mf[-1L])
     if (!missing(subset))
       mf.args[c("data", "subset")] <- .np_formula_subset_inputs(
-        data, substitute(subset), parent.frame())
+        if (missing(data)) NULL else data, substitute(subset), parent.frame())
     mf <- do.call(stats::model.frame, mf.args, envir = parent.frame())
     
     tydat <- model.response(mf)
