@@ -1227,7 +1227,7 @@ npindex.sibandwidth <-
 
     if (gradients){
       boofun = function(data, indices){
-        rindex <- txdat[indices,] %*% bws$beta
+        rindex <- index[indices]
         boot.args <- list(
           txdat = rindex,
           tydat = tydat[indices],
@@ -1253,7 +1253,7 @@ npindex.sibandwidth <-
 
     } else {
       boofun = function(data, indices){
-        rindex = txdat[indices,] %*% bws$beta
+        rindex <- index[indices]
         if (identical(regtype, "lc")) {
           tww <- npksum(txdat = rindex,
                         tydat = cbind(tydat[indices],1),
@@ -1323,7 +1323,7 @@ npindex.sibandwidth <-
           .np_bootstrap_progress_step(progress, bb - 1L,
             sprintf("replication %d of %d", bb, B))
         indices <- as.integer(boot.indices[bb, ])
-        rindex <- txdat[indices, , drop = FALSE] %*% bws$beta
+        rindex <- index[indices]
         rindex.df <- data.frame(index = as.vector(rindex))
 
         if (gradients) {

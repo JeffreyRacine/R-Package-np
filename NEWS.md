@@ -1,5 +1,10 @@
 # npRmpi 0.80-1
 
+* Single-index pairs bootstraps reuse the already-computed training index,
+  avoiding a sampled predictor-matrix copy and repeated matrix-vector product
+  per replication. Resampled fits and NN radii are still recomputed. This also
+  removes a one-predictor bootstrap dimension-dropping error.
+
 * Single-index bootstrap standard errors now report bootstrap replications,
   forwarding nested regression-fit activity to the same progress display.
   Resampling, numerical results and the number of replications are unchanged.
