@@ -338,12 +338,15 @@ npindexbw.NULL <-
     current$seen <- TRUE
     current$point <- point
     current$invalid <- identical(as.double(raw), .Machine$double.xmax)
+    guard$active <- FALSE
     if (isTRUE(current$invalid)) {
       stop(structure(list(message = "npindexbw private invalid first scalar",
         call = NULL, token = token, logical.id = logical.id,
         start = current$start, retry = current$retry, attempt = current$attempt,
         point = point), class = c("np_index_first_scalar_invalid", "error", "condition")))
     }
+    if (!is.null(current$restoration.note))
+      .np_progress_note(current$restoration.note)
     invisible(NULL)
   }
   guard$run <- function(args, automatic, held, scale, lower, h, start, retry,
@@ -352,7 +355,6 @@ npindexbw.NULL <-
     original.h <- as.double(h)
     h <- original.h
     expansion <- 0L
-    fn <- args$fn
     beta.search <- if (isTRUE(held)) args$par else args$par[-length(args$par)]
     expected.beta <- as.double(to.public(beta.search))
     on.exit({ guard$active <- FALSE; current <<- NULL }, add = TRUE)
@@ -365,7 +367,6 @@ npindexbw.NULL <-
       ". The starting h may be too small; review scale.factor.init, random-start controls or explicit h."),
       call. = FALSE)
     repeat {
-      first <- TRUE
       state <- new.env(parent = emptyenv())
       state$seen <- FALSE
       state$invalid <- FALSE
@@ -375,24 +376,12 @@ npindexbw.NULL <-
       state$start <- start
       state$retry <- retry
       state$attempt <- expansion + 1L
+      state$restoration.note <- if (expansion > 0L)
+        paste0(description(expansion + 1L), "; restored a raw-valid start") else NULL
       current <<- state
-      args$fn <- function(param, ...) {
-        if (!first)
-          return(fn(param, ...))
-        first <<- FALSE
-        if (!identical(as.double(param), as.double(args$par)))
-          stop("internal error: npindexbw first scalar does not match the current optim start",
-               call. = FALSE)
-        guard$active <- TRUE
-        on.exit({ guard$active <- FALSE }, add = TRUE)
-        value <- fn(param, ...)
-        if (!isTRUE(state$seen))
-          stop("internal error: npindexbw first scalar returned without its current ordinary raw objective",
-               call. = FALSE)
-        if (expansion > 0L)
-          .np_progress_note(paste0(description(expansion + 1L), "; restored a raw-valid start"))
-        value
-      }
+      # The objective already reports its raw first result. Leave optim's
+      # function untouched; observe() disarms this hook before later trials.
+      guard$active <- TRUE
       result <- tryCatch(do.call(optim, args), np_index_first_scalar_invalid = function(e) {
         if (!identical(e$token, token) || !identical(e$logical.id, logical.id) ||
             !identical(e$start, start) || !identical(e$retry, retry) ||
@@ -401,8 +390,12 @@ npindexbw.NULL <-
           stop(e)
         e
       })
-      if (!inherits(result, "np_index_first_scalar_invalid"))
+      if (!inherits(result, "np_index_first_scalar_invalid")) {
+        if (!isTRUE(state$seen))
+          stop("internal error: npindexbw first scalar returned without its current ordinary raw objective",
+               call. = FALSE)
         return(result)
+      }
       if (isTRUE(held))
         fail("raw-invalid held bandwidth; restoration is disabled")
       if (!isTRUE(automatic))

@@ -9,6 +9,7 @@ test_that("first-scalar restoration has exact bounded work and no rejected stenc
       scope$.np_progress_note <- function(label) invisible(NULL)
       scope$optim <- function(par, fn, gr, method, control) {
         expect_identical(control, controls)
+        expect_identical(fn, args$fn)
         value <- fn(par)
         if (method != "Nelder-Mead") {
           gradients <<- c(gradients, par[2L])
