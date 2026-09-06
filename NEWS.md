@@ -12,6 +12,10 @@
   existing raw endpoint scores. Official solver diagnostics retain the score
   for the official solution; selection and recovery are unchanged.
 
+* Conditional-density native restart summaries and selection now reuse the
+  existing raw endpoint score, retaining native-score admission and recovery
+  seed policy. No objective evaluation is added.
+
 * Local-polynomial matrix application keeps training and evaluation bases in
   the same public coordinates when an optional conditioned hat-block attempt
   returns failure. The existing generic computation reuses the retained source
