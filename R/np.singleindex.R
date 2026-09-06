@@ -1094,7 +1094,7 @@ npindex.sibandwidth <-
     ## (training X) - need gradients == TRUE in order for this to
     ## work.
 
-    if (bws$method == "ichimura" && gradients && se) {
+    if (bws$method == "ichimura" && gradients) {
 
       ## First row & column of covariance matrix `Bvcov' are zero due
       ## to identification condition that beta_1=1. Note the n n^{-1}
@@ -1202,7 +1202,7 @@ npindex.sibandwidth <-
 
       ## Now export this in an S3 method...
 
-    } else if (bws$method == "kleinspady" && gradients && se) {
+    } else if (bws$method == "kleinspady" && gradients) {
 
       ## We divide by P(1-P) so test for P=0 or 1...
 
@@ -1494,8 +1494,6 @@ npindex.sibandwidth <-
     if (gradients) {
       ev.args$grad <- index.grad
       ev.args$mean.grad <- colMeans(index.grad)
-    }
-    if (gradients && se) {
       ev.args$betavcov <- Bvcov
     }
     if (se && gradients) {

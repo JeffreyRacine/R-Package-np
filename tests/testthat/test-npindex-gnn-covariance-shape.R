@@ -12,8 +12,7 @@ test_that("Ichimura GNN covariance preserves all free predictor rows", {
     bw <- npindexbw(xdat = xp, ydat = y, method = "ichimura",
       bwtype = "generalized_nn", bws = c(beta[seq_len(p)], 20),
       bandwidth.compute = FALSE)
-    fit <- npindex(bws = bw, txdat = xp, tydat = y, gradients = TRUE,
-      se = TRUE, B = 2L)
+    fit <- npindex(bws = bw, txdat = xp, tydat = y, gradients = TRUE)
     expect_identical(dim(vcov(fit)), c(p, p))
     expect_true(all(is.finite(vcov(fit))))
     expect_identical(unname(vcov(fit)[1L, ]), rep(0, p))

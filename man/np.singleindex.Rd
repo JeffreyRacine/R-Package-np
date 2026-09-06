@@ -163,10 +163,10 @@ These arguments control residuals, gradients, and bootstrap standard errors.
 
 
   \item{gradients}{
-    a logical value indicating that you want gradients computed and returned
-    in the resulting \code{singleindex} object. The asymptotic covariance
-    matrix for beta is additionally computed when \code{se=TRUE}. Defaults to
-    \code{FALSE}.
+    a logical value indicating that you want gradients and the asymptotic
+    covariance matrix for beta computed and returned in the resulting
+    \code{singleindex} object. This covariance calculation does not require
+    \code{se=TRUE} and does not use the bootstrap. Defaults to \code{FALSE}.
   }
 
 
@@ -347,7 +347,10 @@ Further arguments are passed to the bandwidth-selection counterpart when bandwid
   \code{readRDS()} in a fresh R session, supply the required data
   arguments explicitly.
 
-  \code{\link{vcov}} requires that \code{gradients=TRUE} be set.
+  \code{\link{vcov}} requires that \code{gradients=TRUE} be set; it returns
+  the asymptotic coefficient covariance matrix, independently of \code{se}.
+  For coefficient inference without bootstrap standard errors of fitted
+  values or gradients, use \code{gradients=TRUE, se=FALSE}.
 }
 
 \seealso{

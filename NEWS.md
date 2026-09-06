@@ -4,6 +4,11 @@
   bandwidths now preserves conditional-moment matrix dimensions when the model
   has more than two predictors.
 
+* `npindex(..., gradients = TRUE)` again returns asymptotic coefficient
+  covariance for `vcov()` without requiring `se = TRUE`, restoring 0.70-5
+  behavior. Bootstrap standard errors of fitted values and gradients remain
+  separately controlled by `se`; the coefficient covariance is not bootstrapped.
+
 * Automatic bandwidth calls no longer repeat an entire failed search in other
   calling frames. Original computation errors propagate normally; namespace-only
   calls resolve the package selector before execution.
@@ -802,8 +807,9 @@
   arithmetic; the default avoids unrequested moments, bootstrap work,
   covariance assembly, and native output vectors. `se()`, `vcov()`, and
   gradient-SE extraction fail helpfully when the required state was not
-  computed. Bandwidth objectives, MPI ownership, and plot interval semantics
-  are unchanged.
+  computed. Single-index gradient requests retain their asymptotic coefficient
+  covariance independently of `se`. Bandwidth objectives, MPI ownership, and
+  plot interval semantics are unchanged.
 
 * Conditional density and distribution kernel summaries now identify
   explanatory and dependent kernels separately for continuous, unordered, and

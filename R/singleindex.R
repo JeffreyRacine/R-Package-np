@@ -91,7 +91,7 @@ vcov.singleindex <- function(object, ...) {
   if(!is.null(tc)) {
     return(tc)
   } else {
-    stop("coefficient covariance was not computed: refit with gradients=TRUE and se=TRUE",
+    stop("coefficient covariance was not computed: refit with gradients=TRUE",
          call. = FALSE)
   }
 }
