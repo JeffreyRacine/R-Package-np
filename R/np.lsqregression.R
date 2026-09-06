@@ -1,10 +1,26 @@
-.nplsqreg_formula_dispatch_args <- function(...) {
-  expressions <- substitute(list(...))[-1L]
+.nplsqreg_formula_dispatch_args <- function(method, expressions, promise.frame) {
   indices <- seq_along(expressions)
   dot.names <- names(expressions)
   if (!is.null(dot.names))
     indices <- indices[is.na(pmatch(dot.names, "subset"))]
-  args <- lapply(indices, function(i) ...elt(i))
+
+  markers <- lapply(seq_along(expressions), function(i)
+    as.name(paste0(".np_lsq_dispatch_dot_", i)))
+  names(markers) <- dot.names
+  synthetic <- as.call(c(list(as.name(".nplsqreg_dispatch")),
+                         list(bws = as.name(".np_lsq_dispatch_bws")), markers))
+  # This classifies syntax only. An invalid match stays with the original
+  # generic/method condition path and its original argument forcing order.
+  matched <- tryCatch(match.call(definition = method, call = synthetic,
+                                expand.dots = FALSE),
+                      error = function(e) NULL)
+  if (!is.null(matched) && "subset" %in% names(matched)) {
+    subset.index <- which(vapply(markers, identical, logical(1L),
+                                 matched[["subset"]]))
+    indices <- indices[!indices %in% subset.index]
+  }
+  args <- lapply(indices, function(i)
+    eval(substitute(...elt(index), list(index = i)), envir = promise.frame))
   if (!is.null(dot.names))
     names(args) <- dot.names[indices]
   args
@@ -15,7 +31,8 @@ nplsqreg <-
     .np_reject_gradient_order_alias(substitute(list(...))[-1L],
                                     "nplsqreg", suggest = TRUE)
     args <- if (!missing(bws) && inherits(bws, "formula"))
-      .nplsqreg_formula_dispatch_args(...)
+      .nplsqreg_formula_dispatch_args(
+        nplsqreg.formula, substitute(list(...))[-1L], environment())
     else list(...)
 
     if (!missing(bws)) {
@@ -41,7 +58,8 @@ nplsqreg <-
 nplsqregbw <-
   function(bws, ...) {
     args <- if (!missing(bws) && inherits(bws, "formula"))
-      .nplsqreg_formula_dispatch_args(...)
+      .nplsqreg_formula_dispatch_args(
+        nplsqregbw.formula, substitute(list(...))[-1L], environment())
     else list(...)
     if ("penalty.multiplier" %in% names(args))
       args$penalty.multiplier <-
