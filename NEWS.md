@@ -1,5 +1,9 @@
 # npRmpi 0.80-1
 
+* Conditional-distribution fixed-degree native restart summaries report their
+  existing raw endpoint scores. Official solver diagnostics retain the score
+  for the official solution; selection and recovery are unchanged.
+
 * Local-polynomial matrix application keeps training and evaluation bases in
   the same public coordinates when an optional conditioned hat-block attempt
   returns failure. The existing generic computation reuses the retained source
