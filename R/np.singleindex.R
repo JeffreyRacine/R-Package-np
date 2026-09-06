@@ -1160,7 +1160,7 @@ npindex.sibandwidth <-
         )
         if (!is.matrix(kw))
           kw <- matrix(kw, nrow = nrow(index.df))
-        tyindex <- structure(as.vector(t(W) %*% kw), dim = nrow(index.df))
+        tyindex <- t(W) %*% kw
         tindex <- colSums(kw)
       } else {
         cond.index <- eval_ichimura_conditional_index(

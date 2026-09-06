@@ -1,5 +1,9 @@
 # npRmpi 0.80-1
 
+* Ichimura single-index coefficient covariance with generalized-nearest-neighbor
+  bandwidths now preserves conditional-moment matrix dimensions when the model
+  has more than two predictors.
+
 * Automatic bandwidth calls no longer repeat an entire failed search in other
   calling frames. Original computation errors propagate normally; namespace-only
   calls resolve the package selector before execution.
