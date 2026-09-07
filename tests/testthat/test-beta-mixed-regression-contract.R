@@ -320,7 +320,7 @@ test_that("mixed beta regression is structurally canonical and linear-memory", {
   ))
 })
 
-test_that("mixed beta native MADS returns the point it evaluated", {
+test_that("mixed beta native MADS retains its point and publishes the raw certificate", {
   skip_if_not_installed("crs")
   old <- options(np.messages = FALSE, np.categorical.compress = TRUE)
   on.exit(options(old), add = TRUE)
@@ -353,11 +353,32 @@ test_that("mixed beta native MADS returns the point it evaluated", {
     nmulti = 1L,
     nomad.opts = list(MAX_BB_EVAL = 20L)
   )
-  replay <- np:::.npregbw_eval_only(
+  replay <- getFromNamespace(".npregbw_eval_only", "npRmpi")(
     training, response, bandwidth, invalid.penalty = "baseline"
   )$objective[[1L]]
+  serial.replay <- np:::.npregbw_eval_only(
+    training, response, bandwidth, invalid.penalty = "baseline"
+  )$objective[[1L]]
+  selected <- bandwidth$nomad.restart.results[[bandwidth$nomad.best.restart]]
+  setup <- getFromNamespace(".npregbw_nomad_bw_setup", "npRmpi")(
+    training, bandwidth
+  )
+  decoded.bws <- bandwidth
+  decoded.bws$bw <- getFromNamespace(".npregbw_nomad_point_to_bw", "npRmpi")(
+    selected$best_point, bandwidth, setup
+  )
+  certificate.replay <- getFromNamespace(".npregbw_eval_only", "npRmpi")(
+    training, response, decoded.bws, invalid.penalty = "baseline"
+  )$objective[[1L]]
 
-  expect_identical(as.numeric(bandwidth$fval[[1L]]), as.numeric(replay))
+  # B4R reports the decoded-point raw certificate, while preserving the native
+  # evaluated bandwidth. Those points can differ by one floating-point step;
+  # prove each score at its own point without replacing identity by a tolerance.
+  expect_identical(as.numeric(bandwidth$bw), as.numeric(selected$native$best_bw))
+  expect_identical(as.numeric(replay), as.numeric(selected$native$objective))
+  expect_identical(as.numeric(replay), as.numeric(serial.replay))
+  expect_identical(as.numeric(bandwidth$fval[[1L]]), as.numeric(selected$objective))
+  expect_identical(as.numeric(bandwidth$fval[[1L]]), as.numeric(certificate.replay))
 })
 
 test_that("mixed beta native degree search preserves evaluated bandwidth order", {
