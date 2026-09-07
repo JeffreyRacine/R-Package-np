@@ -34706,7 +34706,7 @@ int np_regression_lp_sigtest_iid(
         double gradient = 0.0;
         long double quadratic = 0.0L;
         const double scale = residual_scale[rhs];
-        double stderr;
+        double gradient_se;
         double ratio;
         int observation;
 
@@ -34730,11 +34730,11 @@ int np_regression_lp_sigtest_iid(
 
           if(!isfinite(stderr_ld) || stderr_ld > (long double)DBL_MAX)
             goto cleanup_sigtest_iid;
-          stderr = (double)stderr_ld;
+          gradient_se = (double)stderr_ld;
         }
-        if(!R_FINITE(stderr) || stderr <= 0.0)
+        if(!R_FINITE(gradient_se) || gradient_se <= 0.0)
           goto cleanup_sigtest_iid;
-        ratio = gradient/stderr;
+        ratio = gradient/gradient_se;
         if(!R_FINITE(ratio))
           goto cleanup_sigtest_iid;
         statistic_sum[rhs] += (long double)ratio*(long double)ratio;
