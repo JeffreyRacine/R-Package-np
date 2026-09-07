@@ -115,9 +115,12 @@ test_that("bandwidth predict methods forward object through bws", {
   bw.si <- npindexbw(
     xdat = data.frame(x = x$x, w = w$w),
     ydat = y,
-    bws = c(0.25, 1, 0),
+    # Index bandwidth vectors contain beta first, then the positive h.
+    bws = c(1, 0, 0.25),
     bandwidth.compute = FALSE
   )
+  expect_identical(as.numeric(bw.si$beta), c(1, 0))
+  expect_identical(as.numeric(bw.si$bw), 0.25)
   check_numeric_equal(predict(bw.si)$mean, npindex(bws = bw.si)$mean)
   check_numeric_equal(
     predict(bw.si, newdata = nd.xw)$mean,

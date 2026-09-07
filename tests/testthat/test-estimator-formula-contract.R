@@ -11,10 +11,15 @@ test_that("npindex formula fits reuse retained native training data", {
                    bws = c(1, 0.3, if (bt == "fixed") 0.5 else 12),
                    bandwidth.compute = FALSE, bwtype = bt)
     native <- npindex(bws = fit$bws, txdat = dat[c("x", "z")],
-                       tydat = dat$y, exdat = nd)
+                       tydat = dat$y, exdat = nd, se = FALSE)
+    native.se <- npindex(bws = fit$bws, txdat = dat[c("x", "z")],
+                          tydat = dat$y, exdat = nd, se = TRUE)
     native.train <- npindex(bws = fit$bws, txdat = dat[c("x", "z")],
                              tydat = dat$y)
     expect_identical(predict(fit, newdata = nd), fitted(native))
+    predicted.se <- predict(fit, newdata = nd, se.fit = TRUE)
+    expect_identical(predicted.se$fit, fitted(native.se))
+    expect_identical(predicted.se$se.fit, se(native.se))
     expect_identical(fitted(npindex(bws = fit$bws)), fitted(native.train))
     expect_identical(predict(fit, newdata = nd, exdat = nd), fitted(native))
     expect_error(predict(fit, newdata = nd["x"]), "z")

@@ -39,7 +39,7 @@ make_nprmpi_npindex_invalid_legacy_fixture <- function(method) {
   list(xdat = x, ydat = y, bws = bws)
 }
 
-test_that("npRmpi npindexbw legacy owners reject an invalid selected candidate", {
+test_that("npRmpi npindexbw legacy owners reject a raw-invalid held start", {
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
 
@@ -55,7 +55,7 @@ test_that("npRmpi npindexbw legacy owners reject an invalid selected candidate",
         optim.maxit = 5L,
         scale.factor.search.lower = 0
       ),
-      "npindexbw search did not return a raw-valid selected candidate",
+      "raw-invalid held bandwidth; restoration is disabled",
       fixed = TRUE,
       info = method
     )
@@ -91,16 +91,45 @@ make_nprmpi_npindex_invalid_nomad_fixture <- function(engine) {
   )
 }
 
-test_that("npRmpi npindexbw NOMAD boundaries reject an invalid selected candidate", {
+test_that("npRmpi npindexbw NOMAD boundaries reject invalid starts or endpoints", {
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
 
   for (engine in c("nomad", "nomad+powell")) {
     expect_error(
       do.call(npindexbw, make_nprmpi_npindex_invalid_nomad_fixture(engine)),
-      "npindexbw search did not return a raw-valid selected candidate",
+      if (engine == "nomad+powell")
+        "raw-invalid held bandwidth; restoration is disabled" else
+        "npindexbw search did not return a raw-valid selected candidate",
       fixed = TRUE,
       info = engine
     )
   }
+})
+
+test_that("npRmpi npindexbw final certificate preserves the point and rejects raw invalidity", {
+  certify <- getFromNamespace(".npindexbw_certify_selected_candidate", "npRmpi")
+  result <- getFromNamespace(".npindexbw_objective_result", "npRmpi")
+  point <- c(0.5, 0.75)
+  seen <- NULL
+  raw <- 0.25
+  testthat::local_mocked_bindings(
+    # MPI has a dedicated raw evaluator, rather than the serial certify flag.
+    .npindexbw_eval_objective_raw = function(param, xmat, ydat, bws, spec,
+                                            leaf.descriptor) {
+      seen <<- param
+      result(raw, 1L, TRUE)
+    },
+    .package = "npRmpi"
+  )
+  args <- list(param = point, xmat = matrix(1, 2L, 2L), ydat = c(0, 1),
+               bws = list(), spec = list())
+  expect_identical(do.call(certify, args), result(raw, 1L, TRUE))
+  expect_identical(seen, point)
+  raw <- .Machine$double.xmax
+  seen <- NULL
+  expect_error(do.call(certify, args),
+               "npindexbw search did not return a raw-valid selected candidate",
+               fixed = TRUE)
+  expect_identical(seen, point)
 })

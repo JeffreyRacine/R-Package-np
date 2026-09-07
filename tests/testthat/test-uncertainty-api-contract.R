@@ -6,9 +6,6 @@ test_that("public uncertainty controls use one canonical naming contract", {
     getS3method("npscoef", "formula"),
     getS3method("npscoef", "default"),
     getS3method("npscoef", "scbandwidth"),
-    getS3method("npindex", "formula"),
-    getS3method("npindex", "default"),
-    getS3method("npindex", "sibandwidth"),
     getS3method("nplsqreg", "formula"),
     getS3method("nplsqreg", "default"),
     getS3method("nplsqreg", "lsqregressionbandwidth")
@@ -16,6 +13,14 @@ test_that("public uncertainty controls use one canonical naming contract", {
   for (fun in fit.methods) {
     expect_true("se" %in% names(formals(fun)))
     expect_identical(formals(fun)$se, FALSE)
+    expect_false("errors" %in% names(formals(fun)))
+  }
+
+  # npindex deliberately defaults to asymptotic fit/coefficient uncertainty.
+  for (class in c("formula", "default", "sibandwidth")) {
+    fun <- getS3method("npindex", class)
+    expect_identical(formals(fun)$se, TRUE)
+    expect_identical(formals(fun)$se.type, quote(c("asymptotic", "bootstrap")))
     expect_false("errors" %in% names(formals(fun)))
   }
 
@@ -92,7 +97,12 @@ test_that("missing uncertainty state fails helpfully", {
   expect_error(se(sc), "se=TRUE", fixed = TRUE)
 
   si <- structure(list(merr = NULL), class = "singleindex")
-  expect_error(se(si), "se=TRUE", fixed = TRUE)
+  expect_error(
+    se(si),
+    paste0("Refit without repeating bandwidth search: ",
+           "npindex(bws = si$bws, gradients = FALSE, se = TRUE)."),
+    fixed = TRUE
+  )
 
   pl <- structure(list(xcoef = 1, xcoeferr = NULL, xcoefvcov = NULL),
                   class = "plregression")
