@@ -386,7 +386,12 @@
       break
 
     msg <- .npRmpi_worker_normalize_message(msg)
-    res <- try(.npRmpi_eval_scmd(msg, envir = .GlobalEnv), silent = TRUE)
+    res <- try({
+      .npRmpi_eval_scmd(msg, envir = .GlobalEnv)
+      # Successful commands may themselves return error/try-error objects.
+      # Only an exception raised during evaluation is a failed command.
+      invisible(NULL)
+    }, silent = TRUE)
     if (inherits(res, "try-error")) {
       cmd <- paste(utils::capture.output(print(msg)), collapse = " ")
       err <- as.character(res)

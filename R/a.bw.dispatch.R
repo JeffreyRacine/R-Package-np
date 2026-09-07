@@ -68,17 +68,21 @@
     # Guarded by helper contracts in tests/testthat:
     # - test-call-eval-helpers-contract.R
     # - test-bw-eval-helper-contract.R
-    function(env) tryCatch(eval(expr, envir = env), error = function(e) e)
+    function(env) tryCatch(
+      list(ok = TRUE, value = eval(expr, envir = env), error = NULL),
+      error = function(e) list(ok = FALSE, value = NULL, error = e))
   } else {
     # Same contract path when an explicit enclos is supplied.
-    function(env) tryCatch(eval(expr, envir = env, enclos = enclos), error = function(e) e)
+    function(env) tryCatch(
+      list(ok = TRUE, value = eval(expr, envir = env, enclos = enclos), error = NULL),
+      error = function(e) list(ok = FALSE, value = NULL, error = e))
   }
 
   val <- eval_once(eval_env)
-  if (!inherits(val, "error"))
-    return(list(ok = TRUE, value = val, error = NULL))
+  if (isTRUE(val$ok))
+    return(val)
 
-  first_error <- val
+  first_error <- val$error
   if (!isTRUE(search_frames))
     return(list(ok = FALSE, value = NULL, error = first_error))
 
@@ -88,8 +92,8 @@
     if (identical(env_i, eval_env))
       next
     val_i <- eval_once(env_i)
-    if (!inherits(val_i, "error"))
-      return(list(ok = TRUE, value = val_i, error = NULL))
+    if (isTRUE(val_i$ok))
+      return(val_i)
   }
 
   list(ok = FALSE, value = NULL, error = first_error)
