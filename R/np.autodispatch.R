@@ -2065,7 +2065,7 @@
      "lbc.dir", "lbd.dir", "lbd.init", "hbd.init", "dfac.init",
      "scale.init.categorical.sample", "memfac", "eval.only",
      "backfit.iterate", "backfit.maxiter", "backfit.tol", "cv.iterate", "cv.num.iterations",
-     "gradients", "residuals", "se", "errors", "gradient.order",
+     "gradients", "residuals", "se", "se.type", "errors", "gradient.order",
      "probabilities", "level", "y.eval", "na.action",
      "proper", "proper.method", "proper.control",
      "alpha", "alpha.iter", "alpha.max", "alpha.min", "alpha.tol",

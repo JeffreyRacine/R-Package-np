@@ -244,6 +244,40 @@ test_that("autodispatch materialization resolves estimator uncertainty controls"
   expect_false(identical(prepared$call$se, as.name("se")))
 })
 
+test_that("single-index uncertainty type has one caller-owned transport value", {
+  materialize <- getFromNamespace(".npRmpi_autodispatch_materialize_call", "npRmpi")
+  owner <- new.env(parent = baseenv())
+  owner$choice <- "bootstrap"
+  owner$evaluations <- 0L
+
+  for (head in c("npindex", "npindex.default", "npindex.formula",
+                 "npindex.sibandwidth")) {
+    for (expr in list("bootstrap", quote(choice),
+                     quote({ evaluations <- evaluations + 1L; choice }))) {
+      call <- as.call(c(list(as.name(head)), list(se.type = expr)))
+      before <- owner$evaluations
+      prepared <- materialize(call, caller_env = owner)
+      ref <- as.character(prepared$call$se.type)
+      expect_identical(prepared$tmpvals[[ref]], "bootstrap", info = head)
+      expect_identical(owner$evaluations - before,
+                       if (is.call(expr)) 1L else 0L, info = head)
+      worker <- list2env(prepared$tmpvals, parent = baseenv())
+      expect_identical(eval(prepared$call$se.type, worker), "bootstrap")
+    }
+  }
+
+  forwarded.owner <- function(...) {
+    materialize(quote(npindex(se.type = ..1)), caller_env = environment())
+  }
+  forwarded <- forwarded.owner(se.type = "asymptotic")
+  ref <- as.character(forwarded$call$se.type)
+  expect_identical(forwarded$tmpvals[[ref]], "asymptotic")
+  omitted <- materialize(quote(npindex(se = FALSE, subset = keep)), owner)
+  expect_false("se.type" %in% names(as.list(omitted$call)))
+  expect_identical(omitted$call$subset, quote(keep))
+  expect_identical(omitted$tmpvals[[as.character(omitted$call$se)]], FALSE)
+})
+
 test_that("registered autodispatch call formals have an explicit transport owner", {
   ns <- asNamespace("npRmpi")
   targets <- getFromNamespace(".npRmpi_autodispatch_target_args", "npRmpi")()

@@ -68,8 +68,9 @@ test_that("adaptive-NN mean and bootstrap use the same donor normalization", {
   plot.mean <- .np_plot_singleindex_hat_apply_index(b, data.frame(index = index),
                                                     data.frame(index = index), y)
   expect_equal(as.vector(plot.mean), as.vector(fitted(reference)), tolerance = 1e-10)
+  requested.type <- "bootstrap"
   set.seed(42)
-  boot.mean <- npindex(bws = b, txdat = x, tydat = y, se.type = "bootstrap", B = 3L)
+  boot.mean <- npindex(bws = b, txdat = x, tydat = y, se.type = requested.type, B = 3L)
   rng <- .Random.seed
   set.seed(42)
   boot.grad <- npindex(bws = b, txdat = x, tydat = y, se.type = "bootstrap",

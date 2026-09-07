@@ -1,5 +1,9 @@
 # npRmpi 0.80-1
 
+* Single-index autodispatch now materializes caller-local `se.type` values
+  through the shared argument transport owner, just like `se`. Literal choices,
+  defaults and uncertainty calculations are unchanged.
+
 * Public plot arguments now use dotted names: data.overlay, data.rug,
   factor.boxplot, boxplot.outliers, coef.index, common.scale, proper.method,
   proper.control, boot.control, grid.control and render.control. Plot helpers
