@@ -6,7 +6,7 @@ test_that("first-scalar restoration has exact bounded work and no rejected stenc
       factory <- .npindexbw_first_scalar_guard
       scope <- new.env(parent = environment(factory))
       environment(factory) <- scope
-      scope$.np_progress_note <- function(label) invisible(NULL)
+      scope$.np_progress_bandwidth_notice <- function(labels) invisible(NULL)
       scope$optim <- function(par, fn, gr, method, control) {
         expect_identical(control, controls)
         expect_identical(fn, args$fn)
@@ -72,7 +72,7 @@ test_that("first-scalar failures never become a survivor or generic rescue", {
     invocations <<- invocations + 1L
     list(par = par, value = fn(par, ...), convergence = 0L)
   }
-  scope$.np_progress_note <- function(label) invisible(NULL)
+  scope$.np_progress_bandwidth_notice <- function(labels) invisible(NULL)
   guard <- factory("ichimura")
   fn <- function(par, h = NULL) {
     guard$observe(.Machine$double.xmax, if (is.null(h)) par else c(par, h))

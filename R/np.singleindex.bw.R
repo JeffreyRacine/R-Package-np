@@ -340,7 +340,9 @@ npindexbw.NULL <-
         point = point), class = c("np_index_first_scalar_invalid", "error", "condition")))
     }
     if (!is.null(current$restoration.note))
-      .np_progress_note(current$restoration.note)
+      .np_progress_bandwidth_notice(c(
+        sprintf("start %d retry %d: valid start restored", current$start, current$retry),
+        sprintf("start %d restored", current$start), "start restored"))
     invisible(NULL)
   }
   guard$run <- function(args, automatic, held, scale, lower, h, start, retry,

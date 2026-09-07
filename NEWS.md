@@ -1,5 +1,10 @@
 # npRmpi 0.80-1
 
+* Single-index starting-bandwidth restoration now shares the active search
+  progress line. Its width-aware notice clears with the search rather than
+  leaving a separate message; search computations and failure diagnostics
+  are unchanged.
+
 * Finite-data local-constant single-index hat and plot apply helpers now use
   shared kernel moments instead of materializing the full weight matrix.
   Existing bandwidth normalization and denominator floors are preserved;

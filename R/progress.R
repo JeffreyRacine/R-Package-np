@@ -157,6 +157,29 @@
   invisible(NULL)
 }
 
+.np_progress_bandwidth_notice <- function(labels) {
+  forwarding <- isTRUE(.np_progress_runtime$bandwidth_forward_active)
+  slot <- if (forwarding) "bandwidth_forward_state" else "bandwidth_state"
+  state <- .np_progress_runtime[[slot]]
+  if (!isTRUE(state$enabled) || !isTRUE(state$visible) ||
+      .np_progress_bandwidth_worker_silent())
+    return(invisible(NULL))
+  # Only the next ordinary update consumes this event. Do not advance the
+  # owner's counters, force its throttle, or create another display owner.
+  state$bandwidth_notice <- labels
+  .np_progress_runtime[[slot]] <- state
+  invisible(NULL)
+}
+
+.np_progress_bandwidth_notice_line <- function(line, prefix, labels, width) {
+  candidates <- c(paste0(line, "; ", labels[1L]),
+                  paste0(prefix, " Bandwidth selection (", labels, ")"),
+                  paste0(prefix, " BW search (", tail(labels, 1L), ")"),
+                  paste(prefix, "restored"))
+  fits <- nchar(candidates, type = "width") <= width
+  candidates[which(fits)[1L]]
+}
+
 .np_progress_bandwidth_enter_provider_stage <- function(state,
                                                         provider,
                                                         label,
@@ -838,10 +861,18 @@
     return(state)
   }
 
-  render_line <- if (identical(state$renderer, "single_line")) {
-    .np_progress_fit_single_line(line)
+  if (identical(event, "update") && !is.null(state$bandwidth_notice)) {
+    line <- .np_progress_bandwidth_notice_line(
+      line, state$pkg_prefix, state$bandwidth_notice,
+      if (identical(state$renderer, "single_line")) .np_progress_output_width() else Inf)
+    state$bandwidth_notice <- NULL
+    render_line <- line
   } else {
-    line
+    render_line <- if (identical(state$renderer, "single_line")) {
+      .np_progress_fit_single_line(line)
+    } else {
+      line
+    }
   }
 
   snapshot <- .np_progress_make_snapshot(
