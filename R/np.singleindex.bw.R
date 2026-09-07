@@ -516,9 +516,12 @@ npindexbw.NULL <-
                                         bwtype,
                                         nobs,
                                         lower = NULL,
-                                        where = "npindexbw") {
+                                        where = "npindexbw",
+                                        strict = TRUE) {
   candidate <- .npindex_nn_candidate_bandwidth(h = h, bwtype = bwtype, nobs = nobs)
   if (!candidate$ok) {
+    if (!strict)
+      return(NULL)
     if (identical(bwtype, "fixed")) {
       stop(sprintf("%s: bandwidth must be positive and finite", where), call. = FALSE)
     }
@@ -544,6 +547,8 @@ npindexbw.NULL <-
   }
 
   if (identical(bwtype, "fixed") && !is.null(lower) && candidate$value < lower) {
+    if (!strict)
+      return(NULL)
     stop(sprintf("%s: bandwidth is below the continuous scale-factor lower bound", where),
          call. = FALSE)
   }
@@ -2296,7 +2301,7 @@ npindexbw.NULL <-
     point
   }
 
-  point_to_param <- function(point) {
+  point_to_param <- function(point, strict = TRUE) {
     beta.tail <- if (length(beta.free)) beta.coord$to_public(point[seq_along(beta.free)]) else numeric(0)
     h <- point_h_to_raw(point[length(beta.free) + 1L])
     h <- .npindex_finalize_bandwidth(
@@ -2304,8 +2309,11 @@ npindexbw.NULL <-
       bwtype = baseline.bws$type,
       nobs = nrow(x.clean),
       lower = if (fixed.nomad) h.start.controls$scale.factor.search.lower * fixed.setup$h.scale else NULL,
-      where = "npindexbw"
+      where = "npindexbw",
+      strict = strict
     )
+    if (is.null(h))
+      return(NULL)
     c(beta.tail, h)
   }
 
@@ -2327,10 +2335,15 @@ npindexbw.NULL <-
     eval.spec$degree.engine <- degree
     eval.spec$bernstein.basis.engine <- degree.search$bernstein.basis
     eval.spec$basis.engine <- reg.args$basis.engine
+    # Reject only a mathematical trial-domain failure, not callback errors.
+    param <- point_to_param(point, strict = !fixed.nomad)
+    if (is.null(param))
+      return(list(objective = Inf, degree = as.integer(degree),
+                  admissible = FALSE, num.feval = 0, num.feval.fast = 0))
     service.eval.counter <<- service.eval.counter + 1L
     objective <- if (isTRUE(service.ctx$active) && isTRUE(service.ctx$root)) {
       .npindexbw_ichimura_lp_service_eval(
-        param = point_to_param(point),
+        param = param,
         xmat = x.clean,
         ydat = y.clean,
         bws = baseline.bws,
@@ -2340,7 +2353,7 @@ npindexbw.NULL <-
       )
     } else {
       .npindexbw_eval_objective(
-        param = point_to_param(point),
+        param = param,
         xmat = x.clean,
         ydat = y.clean,
         bws = baseline.bws,

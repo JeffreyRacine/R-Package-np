@@ -1,5 +1,9 @@
 # npRmpi 0.80-1
 
+* Single-index fixed-bandwidth NOMAD searches reject out-of-domain exploratory
+  bandwidths without terminating the search. Explicit input and final-result
+  validation remain strict, and unexpected callback errors still propagate.
+
 * Single-index distributed objective services now coordinate R preparation
   and result-handling failures before closing the search. Unexpected NOMAD
   evaluator errors remain terminal instead of publishing a surviving candidate;
