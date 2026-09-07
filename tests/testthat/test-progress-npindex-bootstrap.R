@@ -16,7 +16,7 @@ test_that("profile workers cannot own bootstrap progress", {
   prior <- runtime$fit_forward
   actual <- capture_progress_shadow_trace(local({
     context <- bootstrap_progress_get(".np_bootstrap_progress_begin")(3L, "Bootstrap")
-    on.exit(bootstrap_progress_get(".np_bootstrap_progress_end")(context), add = TRUE)
+    on.exit(bootstrap_progress_get(".np_progress_activity_end")(context), add = TRUE)
     expect_false(context$state$visible)
     bootstrap_progress_get(".np_fit_progress_begin")("Child fit", 2L)
     bootstrap_progress_get(".np_fit_progress_step")(1L)
@@ -40,7 +40,7 @@ test_that("disabled bootstrap progress preserves the statistic and parent", {
   expect_null(context)
   expect_identical(bootstrap_progress_get(".np_bootstrap_progress_statistic")(
     context, statistic), statistic)
-  bootstrap_progress_get(".np_bootstrap_progress_end")(context)
+  bootstrap_progress_get(".np_progress_activity_end")(context)
   expect_identical(runtime$fit_forward, parent)
 })
 
@@ -48,7 +48,7 @@ test_that("bootstrap progress counts t0 separately and forwards fit activity", {
   old <- options(np.messages = TRUE, np.progress.interval.sec = .1)
   on.exit(options(old), add = TRUE)
   begin <- bootstrap_progress_get(".np_bootstrap_progress_begin")
-  end <- bootstrap_progress_get(".np_bootstrap_progress_end")
+  end <- bootstrap_progress_get(".np_progress_activity_end")
   wrap <- bootstrap_progress_get(".np_bootstrap_progress_statistic")
   fit.begin <- bootstrap_progress_get(".np_fit_progress_begin")
   fit.step <- bootstrap_progress_get(".np_fit_progress_step")
@@ -89,7 +89,7 @@ test_that("bootstrap scopes restore the parent and abort exactly once", {
                  np.progress.interval.sec = 0)
   on.exit(options(old), add = TRUE)
   begin <- bootstrap_progress_get(".np_bootstrap_progress_begin")
-  end <- bootstrap_progress_get(".np_bootstrap_progress_end")
+  end <- bootstrap_progress_get(".np_progress_activity_end")
   runtime <- bootstrap_progress_get(".np_progress_runtime")
   prior <- runtime$fit_forward
   err <- simpleError("bootstrap witness")

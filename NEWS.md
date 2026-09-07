@@ -1,5 +1,10 @@
 # npRmpi 0.80-1
 
+* Single-index fitting now shows one immediate activity line with native
+  heartbeats for fitted values and coefficient covariance. Explicit bootstrap
+  standard errors retain their separate replication progress, without repeated
+  child-regression messages.
+
 * Single-index fits now default to `se = TRUE, se.type = "asymptotic"`,
   providing asymptotic coefficient covariance and fitted-value standard errors;
   `gradients = TRUE` also provides gradients and their asymptotic standard errors.

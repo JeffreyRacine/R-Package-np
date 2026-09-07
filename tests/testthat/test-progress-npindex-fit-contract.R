@@ -1,490 +1,85 @@
-npindex_fit_progress_time_counter <- function(start = 0, by = 1.7) {
-  current <- start
-  function() {
-    current <<- current + by
-    current
-  }
+# One tiny fixture covers the estimator-owned activity surface, not child totals.
+npindex_activity_clock <- function() {
+  state <- new.env(parent = emptyenv())
+  state$time <- 0
+  function() { state$time <- state$time + .25; state$time }
 }
 
-npindex_fit_progress_time_values <- function(values) {
-  force(values)
-  i <- 0L
-  function() {
-    i <<- min(i + 1L, length(values))
-    values[[i]]
-  }
-}
-
-npindex_fit_progress_lines <- function(shadow) {
-  vapply(shadow$trace, `[[`, character(1L), "line")
-}
-
-npindex_fit_progress_coordinator_total <- function(neval) {
-  neval <- as.integer(neval)
-  size <- tryCatch(as.integer(mpi.comm.size(1L)), error = function(e) 1L)
-  rank <- tryCatch(as.integer(mpi.comm.rank(1L)), error = function(e) 0L)
-  if (is.na(size) || size < 1L) {
-    size <- 1L
-  }
-  if (is.na(rank) || rank < 0L || rank >= size) {
-    rank <- 0L
-  }
-
-  as.integer(neval %/% size + as.integer(rank < neval %% size))
-}
-
-npindex_fit_progress_step_pattern <- function(done, total) {
-  sprintf(
-    "^\\[npRmpi\\] Fitting regression %d/%d \\([0-9]+\\.[0-9]%%, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$",
-    as.integer(done),
-    as.integer(total)
-  )
-}
-
-npindex_fit_progress_finish_pattern <- function(total) {
-  sprintf(
-    "^\\[npRmpi\\] Fitting regression %d/%d \\(100\\.0%%, elapsed [0-9]+\\.[0-9]s, eta 0\\.0s\\)$",
-    as.integer(total),
-    as.integer(total)
-  )
-}
-
-npindex_fit_progress_start_pattern <- function(total) {
-  sprintf(
-    "^\\[npRmpi\\] Fitting regression 0/%d \\(0\\.0%%, elapsed 0\\.0s, eta 0\\.0s\\): starting$",
-    as.integer(total)
-  )
-}
-
-npindex_refinement_iterations <- function(lines) {
-  refine.lines <- lines[grepl("^\\[npRmpi\\] Refining bandwidth \\(", lines)]
-  iter.lines <- refine.lines[grepl("iter [0-9]+", refine.lines)]
-  if (!length(iter.lines)) {
-    return(integer())
-  }
-
-  as.integer(sub(
-    ".*iter ([0-9]+).*",
-    "\\1",
-    iter.lines
-  ))
-}
-
-npindex_degree_bandwidth_progress_positions <- function(lines) {
-  grep(
-    "^\\[npRmpi\\] (Bandwidth selection|Selecting degree and bandwidth|Degree/bw|NOMAD degree/bw|NOMAD deg/bw|Exhaustive degree/bw|Exhaustive deg/bw|Auto:NOMAD degree/bw|Auto:NOMAD deg/bw|Auto:exhaustive degree/bw|Auto:exhaustive deg/bw)",
-    lines
-  )
-}
-
-make_npindex_fit_progress_fixture <- function() {
+npindex_activity_fixture <- function() {
   set.seed(20260404)
-  n <- 24L
-  dat <- data.frame(
-    x1 = runif(n, -1, 1),
-    x2 = runif(n, -1, 1)
-  )
-  index <- dat$x1 + 0.6 * dat$x2
-  dat$y <- sin(index) + 0.2 * index^2 + rnorm(n, sd = 0.05)
-
-  list(
-    dat = dat,
-    tx = dat[c("x1", "x2")],
-    y = dat$y,
-    bw = npindexbw(
-      xdat = dat[c("x1", "x2")],
-      ydat = dat$y,
-      bws = c(1, 0.6, 0.35),
-      method = "ichimura",
-      regtype = "lp",
-      degree = 1L,
-      bernstein.basis = TRUE,
-      bwtype = "fixed",
-      bandwidth.compute = FALSE
-    ),
-    bw_lc_fixed = npindexbw(
-      xdat = dat[c("x1", "x2")],
-      ydat = dat$y,
-      bws = c(1, 0.6, 0.35),
-      method = "ichimura",
-      regtype = "lc",
-      bwtype = "fixed",
-      bandwidth.compute = FALSE
-    )
-  )
+  x <- data.frame(x1 = runif(24, -1, 1), x2 = runif(24, -1, 1))
+  z <- x$x1 + .6 * x$x2
+  list(x = x, y = sin(z) + .2*z^2 + rnorm(24, sd = .05))
 }
 
-test_that("npindex direct lp fit emits fit progress without handoff", {
+test_that("index fitting owns initial activity, inference, prediction and bootstrap", {
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
-
-  fixture <- make_npindex_fit_progress_fixture()
-
-  old_opts <- options(
-    np.messages = TRUE,
-    np.tree = FALSE,
-    np.progress.start.grace.known.sec = 0,
-    np.progress.interval.known.sec = 0
-  )
-  on.exit(options(old_opts), add = TRUE)
-
+  old <- options(np.messages = FALSE, np.tree = FALSE,
+                 np.progress.interval.sec = 0)
+  on.exit(options(old), add = TRUE)
+  f <- npindex_activity_fixture()
+  for (reg in c("lc", "lp")) {
+    args <- list(xdat=f$x, ydat=f$y, bws=c(1,.6,.35),
+                 method="ichimura", regtype=reg, bandwidth.compute=FALSE)
+    if (reg=="lp") args$degree <- 1L
+    bw <- do.call(npindexbw,args)
+    for (uncertainty in c(FALSE,TRUE)) {
+      call <- list(bws=bw,txdat=f$x,tydat=f$y,se=uncertainty)
+      options(np.messages=FALSE)
+      quiet <- do.call(npindex,call)
+      options(np.messages=TRUE)
+      actual <- capture_progress_shadow_trace(do.call(npindex,call),
+        force_renderer="single_line",now=npindex_activity_clock())
+      lines <- vapply(actual$trace,`[[`,"","line")
+      events <- vapply(actual$trace,`[[`,"","event")
+      expect_match(lines[1L],"Fitting single-index model.*elapsed 0.0s: fitted values")
+      expect_false(any(grepl("Fitting regression",lines,fixed=TRUE)))
+      expect_equal(sum(events=="finish"),1L)
+      expect_equal(actual$value$mean,quiet$mean,tolerance=1e-14)
+      expect_identical(actual$value$betavcov,quiet$betavcov)
+      if(uncertainty)
+        expect_true(any(grepl("coefficient covariance",lines,fixed=TRUE)))
+    }
+    pred <- capture_progress_shadow_trace(
+      predict(quiet,newdata=f$x[c(2L,7L),],se.fit=TRUE),
+      force_renderer="single_line",now=npindex_activity_clock())
+    expect_match(pred$trace[[1L]]$line,"Fitting single-index model.*fitted values")
+    expect_equal(sum(vapply(pred$trace,`[[`,"","event")=="finish"),1L)
+  }
   actual <- capture_progress_shadow_trace(
-    npindex(
-      bws = fixture$bw,
-      txdat = fixture$tx,
-      tydat = fixture$y
-    ),
-    force_renderer = "single_line",
-    now = npindex_fit_progress_time_counter()
-  )
-
-  lines <- npindex_fit_progress_lines(actual)
-  fit.total <- npindex_fit_progress_coordinator_total(nrow(fixture$tx))
-
-  expect_s3_class(actual$value, "singleindex")
-  expect_false(any(grepl(": starting$", lines)))
-  expect_true(any(grepl(
-    npindex_fit_progress_step_pattern(1L, fit.total),
-    lines
-  )))
-  expect_true(any(grepl(
-    npindex_fit_progress_finish_pattern(fit.total),
-    lines
-  )))
+    npindex(bws=bw,txdat=f$x,tydat=f$y,se.type="bootstrap",B=2L),
+    force_renderer="single_line",now=npindex_activity_clock())
+  lines <- vapply(actual$trace,`[[`,"","line")
+  events <- vapply(actual$trace,`[[`,"","event")
+  fit.end <- which(grepl("Fitting single-index model",lines,fixed=TRUE)&events=="finish")
+  boot.start <- which(grepl("Bootstrapping single-index fit",lines,fixed=TRUE))[1L]
+  expect_lt(fit.end,boot.start)
+  expect_false(any(grepl("Fitting regression",lines,fixed=TRUE)))
+  runtime <- getFromNamespace(".np_progress_runtime","npRmpi")
+  expect_null(runtime$fit_forward)
+  expect_null(runtime$fit_state)
 })
 
-test_that("npindex direct lp fit stays silent below start grace without handoff", {
+test_that("search progress hands off once to the index activity owner", {
   skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
-
-  fixture <- make_npindex_fit_progress_fixture()
-
-  old_opts <- options(
-    np.messages = TRUE,
-    np.tree = FALSE,
-    np.progress.start.grace.known.sec = 0.75,
-    np.progress.interval.known.sec = 0.5
-  )
-  on.exit(options(old_opts), add = TRUE)
-
-  actual <- capture_progress_shadow_trace(
-    npindex(
-      bws = fixture$bw,
-      txdat = fixture$tx,
-      tydat = fixture$y
-    ),
-    force_renderer = "single_line",
-    now = npindex_fit_progress_time_values(c(0, 0.2, 0.4, 0.6))
-  )
-
-  expect_length(actual$trace, 0L)
-})
-
-test_that("npindex lp bw to fit route hands off into the regression fit surface", {
-  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
-
-  fixture <- make_npindex_fit_progress_fixture()
-
-  old_opts <- options(
-    np.messages = TRUE,
-    np.tree = FALSE,
-    np.progress.start.grace.known.sec = 0,
-    np.progress.interval.known.sec = 0
-  )
-  on.exit(options(old_opts), add = TRUE)
-
-  actual <- capture_progress_shadow_trace(
-    npindex(
-      y ~ x1 + x2,
-      data = fixture$dat,
-      method = "ichimura",
-      regtype = "lp",
-      degree.select = "coordinate",
-      search.engine = "cell",
-      degree.min = 0L,
-      degree.max = 1L,
-      bwtype = "fixed",
-      nmulti = 1L
-    ),
-    force_renderer = "single_line",
-    now = npindex_fit_progress_time_counter()
-  )
-
-  lines <- npindex_fit_progress_lines(actual)
-  fit.total <- npindex_fit_progress_coordinator_total(nrow(fixture$tx))
-  bandwidth.pos <- npindex_degree_bandwidth_progress_positions(lines)
-  fit.start.pos <- grep(
-    npindex_fit_progress_start_pattern(fit.total),
-    lines
-  )
-  fit.finish.pos <- grep(
-    npindex_fit_progress_finish_pattern(fit.total),
-    lines
-  )
-
-  expect_s3_class(actual$value, "singleindex")
-  expect_true(length(bandwidth.pos) > 0L)
-  expect_true(length(fit.start.pos) == 1L)
-  expect_true(length(fit.finish.pos) >= 1L)
-  expect_lt(max(bandwidth.pos), fit.start.pos[[1L]])
-  expect_lt(fit.start.pos[[1L]], fit.finish.pos[[1L]])
-})
-
-test_that("npindex lp nomad to powell to fit route preserves single-line handoff", {
   skip_if_not_installed("crs")
-  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
-
-  fixture <- make_npindex_fit_progress_fixture()
-
-  old_opts <- options(
-    np.messages = TRUE,
-    np.tree = FALSE,
-    np.progress.start.grace.known.sec = 0,
-    np.progress.interval.known.sec = 0
-  )
-  on.exit(options(old_opts), add = TRUE)
-
-  actual <- capture_progress_shadow_trace(
-    npindex(
-      y ~ x1 + x2,
-      data = fixture$dat,
-      method = "ichimura",
-      nomad = TRUE,
-      degree.min = 0L,
-      degree.max = 1L,
-      nmulti = 1L
-    ),
-    force_renderer = "single_line",
-    now = npindex_fit_progress_time_counter()
-  )
-
-  lines <- npindex_fit_progress_lines(actual)
-  fit.total <- npindex_fit_progress_coordinator_total(nrow(fixture$tx))
-  bandwidth.pos <- npindex_degree_bandwidth_progress_positions(lines)
-  powell.pos <- grep("^\\[npRmpi\\] Refining bandwidth \\(", lines)
-  fit.start.pos <- grep(
-    npindex_fit_progress_start_pattern(fit.total),
-    lines
-  )
-  fit.finish.pos <- grep(
-    npindex_fit_progress_finish_pattern(fit.total),
-    lines
-  )
-
-  expect_s3_class(actual$value, "singleindex")
-  expect_true(length(bandwidth.pos) > 0L)
-  expect_true(length(powell.pos) > 0L)
-  powell.iter <- npindex_refinement_iterations(lines)
-  expect_true(length(powell.iter) > 0L)
-  expect_true(length(unique(powell.iter)) >= 2L)
-  expect_true(length(fit.start.pos) == 1L)
-  expect_true(length(fit.finish.pos) >= 1L)
-  expect_lt(max(bandwidth.pos), fit.start.pos[[1L]])
-  expect_lt(max(powell.pos), fit.start.pos[[1L]])
-  expect_lt(fit.start.pos[[1L]], fit.finish.pos[[1L]])
-})
-
-test_that("predict.singleindex lp re-entry emits evaluation and training fit progress without handoff", {
-  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
-
-  fixture <- make_npindex_fit_progress_fixture()
-
-  fit <- npindex(
-    bws = fixture$bw,
-    txdat = fixture$tx,
-    tydat = fixture$y
-  )
-
-  old_opts <- options(
-    np.messages = TRUE,
-    np.tree = FALSE,
-    np.progress.start.grace.known.sec = 0,
-    np.progress.interval.known.sec = 0
-  )
-  on.exit(options(old_opts), add = TRUE)
-
-  actual <- capture_progress_shadow_trace(
-    predict(fit, newdata = fixture$dat[c(2L, 7L), c("x1", "x2")]),
-    force_renderer = "single_line",
-    now = npindex_fit_progress_time_counter()
-  )
-
-  lines <- npindex_fit_progress_lines(actual)
-  eval.total <- npindex_fit_progress_coordinator_total(2L)
-  fit.total <- npindex_fit_progress_coordinator_total(nrow(fixture$tx))
-
-  expect_false(any(grepl(": starting$", lines)))
-  expect_true(any(grepl(
-    npindex_fit_progress_finish_pattern(eval.total),
-    lines
-  )))
-  expect_true(any(grepl(
-    npindex_fit_progress_step_pattern(1L, fit.total),
-    lines
-  )))
-  expect_true(any(grepl(
-    npindex_fit_progress_finish_pattern(fit.total),
-    lines
-  )))
-})
-
-test_that("npindex direct fixed lc fit emits fit progress without handoff", {
-  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
-
-  fixture <- make_npindex_fit_progress_fixture()
-
-  old_opts <- options(
-    np.messages = TRUE,
-    np.tree = FALSE,
-    np.progress.start.grace.known.sec = 0,
-    np.progress.interval.known.sec = 0
-  )
-  on.exit(options(old_opts), add = TRUE)
-
-  actual <- capture_progress_shadow_trace(
-    npindex(
-      bws = fixture$bw_lc_fixed,
-      txdat = fixture$tx,
-      tydat = fixture$y
-    ),
-    force_renderer = "single_line",
-    now = npindex_fit_progress_time_counter()
-  )
-
-  lines <- npindex_fit_progress_lines(actual)
-  fit.total <- npindex_fit_progress_coordinator_total(nrow(fixture$tx))
-
-  expect_s3_class(actual$value, "singleindex")
-  expect_false(any(grepl(": starting$", lines)))
-  expect_true(any(grepl(
-    npindex_fit_progress_step_pattern(1L, fit.total),
-    lines
-  )))
-  expect_true(any(grepl(
-    npindex_fit_progress_finish_pattern(fit.total),
-    lines
-  )))
-})
-
-test_that("npindex direct fixed lc fit stays silent below start grace without handoff", {
-  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
-
-  fixture <- make_npindex_fit_progress_fixture()
-
-  old_opts <- options(
-    np.messages = TRUE,
-    np.tree = FALSE,
-    np.progress.start.grace.known.sec = 0.75,
-    np.progress.interval.known.sec = 0.5
-  )
-  on.exit(options(old_opts), add = TRUE)
-
-  actual <- capture_progress_shadow_trace(
-    npindex(
-      bws = fixture$bw_lc_fixed,
-      txdat = fixture$tx,
-      tydat = fixture$y
-    ),
-    force_renderer = "single_line",
-    now = npindex_fit_progress_time_values(c(0, 0.2, 0.4, 0.6))
-  )
-
-  expect_length(actual$trace, 0L)
-})
-
-test_that("npindex fixed lc bw to fit route hands off into the regression fit surface", {
-  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
-
-  fixture <- make_npindex_fit_progress_fixture()
-
-  old_opts <- options(
-    np.messages = TRUE,
-    np.tree = FALSE,
-    np.progress.start.grace.known.sec = 0,
-    np.progress.interval.known.sec = 0
-  )
-  on.exit(options(old_opts), add = TRUE)
-
-  actual <- capture_progress_shadow_trace(
-    npindex(
-      y ~ x1 + x2,
-      data = fixture$dat,
-      method = "ichimura",
-      regtype = "lc",
-      bwtype = "fixed",
-      nmulti = 1L
-    ),
-    force_renderer = "single_line",
-    now = npindex_fit_progress_time_counter()
-  )
-
-  lines <- npindex_fit_progress_lines(actual)
-  fit.total <- npindex_fit_progress_coordinator_total(nrow(fixture$tx))
-  bandwidth.pos <- grep("^\\[npRmpi\\] Bandwidth selection \\(", lines)
-  fit.start.pos <- grep(
-    npindex_fit_progress_start_pattern(fit.total),
-    lines
-  )
-  fit.finish.pos <- grep(
-    npindex_fit_progress_finish_pattern(fit.total),
-    lines
-  )
-
-  expect_s3_class(actual$value, "singleindex")
-  expect_true(length(bandwidth.pos) > 0L)
-  expect_true(length(fit.start.pos) == 1L)
-  expect_true(length(fit.finish.pos) >= 1L)
-  expect_lt(max(bandwidth.pos), fit.start.pos[[1L]])
-  expect_lt(fit.start.pos[[1L]], fit.finish.pos[[1L]])
-})
-
-test_that("predict.singleindex fixed lc re-entry emits evaluation and training fit progress without handoff", {
-  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
-  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
-
-  fixture <- make_npindex_fit_progress_fixture()
-
-  fit <- npindex(
-    bws = fixture$bw_lc_fixed,
-    txdat = fixture$tx,
-    tydat = fixture$y
-  )
-
-  old_opts <- options(
-    np.messages = TRUE,
-    np.tree = FALSE,
-    np.progress.start.grace.known.sec = 0,
-    np.progress.interval.known.sec = 0
-  )
-  on.exit(options(old_opts), add = TRUE)
-
-  actual <- capture_progress_shadow_trace(
-    predict(fit, newdata = fixture$dat[c(2L, 7L), c("x1", "x2")]),
-    force_renderer = "single_line",
-    now = npindex_fit_progress_time_counter()
-  )
-
-  lines <- npindex_fit_progress_lines(actual)
-  eval.total <- npindex_fit_progress_coordinator_total(2L)
-  fit.total <- npindex_fit_progress_coordinator_total(nrow(fixture$tx))
-
-  expect_false(any(grepl(": starting$", lines)))
-  expect_true(any(grepl(
-    npindex_fit_progress_finish_pattern(eval.total),
-    lines
-  )))
-  expect_true(any(grepl(
-    npindex_fit_progress_step_pattern(1L, fit.total),
-    lines
-  )))
-  expect_true(any(grepl(
-    npindex_fit_progress_finish_pattern(fit.total),
-    lines
-  )))
+  old <- options(np.messages=TRUE,np.tree=FALSE,np.progress.interval.sec=0)
+  on.exit(options(old),add=TRUE)
+  f <- npindex_activity_fixture()
+  dat <- cbind(f$x,y=f$y)
+  for (nomad in c(FALSE,TRUE)) {
+    actual <- capture_progress_shadow_trace(
+      do.call(npindex,list(bws=y~x1+x2,data=dat,method="ichimura",
+        nomad=nomad,degree.min=0L,degree.max=1L,nmulti=1L,se=FALSE)),
+      force_renderer="single_line",now=npindex_activity_clock())
+    lines <- vapply(actual$trace,`[[`,"","line")
+    events <- vapply(actual$trace,`[[`,"","event")
+    fit <- grep("Fitting single-index model",lines,fixed=TRUE)
+    expect_gt(min(fit),1L)
+    expect_true(any(grepl("bandwidth|Bandwidth|degree|Degree",lines[seq_len(min(fit)-1L)])))
+    expect_equal(sum(events[fit]=="finish"),1L)
+    expect_false(any(grepl("Fitting regression",lines[fit],fixed=TRUE)))
+  }
 })

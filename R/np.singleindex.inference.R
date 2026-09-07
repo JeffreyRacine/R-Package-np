@@ -1,8 +1,17 @@
 # Single-index inference uses the regression engine on the fitted scalar index.
 # These helpers do not select bandwidths or resample beta.
 .np_index_kernel_sum <- function(..., bwtype) {
-  npksum(..., bwtype = bwtype,
-         bandwidth.divide = identical(bwtype, "adaptive_nn"))
+  if (is.null(.np_progress_runtime$fit_forward))
+    return(npksum(..., bwtype = bwtype,
+                  bandwidth.divide = identical(bwtype, "adaptive_nn")))
+  # The parent reports activity, not a percentage across heterogeneous calls.
+  # Enable the existing native row callbacks only during this scoped activity.
+  args <- list(...)
+  total <- max(NROW(args[["txdat"]]), NROW(args[["exdat"]]))
+  .np_with_compiled_fit_progress(
+    label = "Fitting single-index model", total = total,
+    expr = npksum(..., bwtype = bwtype,
+                  bandwidth.divide = identical(bwtype, "adaptive_nn")))
 }
 
 .np_index_asymptotic_outputs <- function(fit, beta, gradients = FALSE) {
