@@ -192,7 +192,7 @@ test_that("beta NN frozen bootstrap plots and bivariate plot evaluation run", {
         output = "data",
         neval = 11L,
         errors = "bootstrap",
-        boot_control = np_boot_control(nonfixed = "frozen"),
+        boot.control = np_boot_control(nonfixed = "frozen"),
         B = 2L,
         random.seed = 1705L
       ),
@@ -204,7 +204,7 @@ test_that("beta NN frozen bootstrap plots and bivariate plot evaluation run", {
         output = "data",
         neval = 11L,
         errors = "bootstrap",
-        boot_control = np_boot_control(nonfixed = "frozen"),
+        boot.control = np_boot_control(nonfixed = "frozen"),
         B = 2L,
         random.seed = 1705L
       ),

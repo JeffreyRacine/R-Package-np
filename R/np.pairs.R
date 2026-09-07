@@ -1,14 +1,18 @@
-np.pairs <- function(y_vars, y_dat, ...) {
+np.pairs <- function(y.vars, y.dat, ...) {
+  .np_plot_reject_retired_spelling(substitute(list(...))[-1L], c("y.vars", "y.dat"))
   .npRmpi_require_active_slave_pool(where = "np.pairs()")
 
-  if (missing(y_vars) || missing(y_dat))
-    stop("'y_vars' and 'y_dat' are required")
+  if (missing(y.vars) || missing(y.dat))
+    stop("'y.vars' and 'y.dat' are required")
+  # Retain the internal data symbols used in generated estimator labels.
+  y_vars <- y.vars
+  y_dat <- y.dat
   if (!is.data.frame(y_dat))
     y_dat <- as.data.frame(y_dat)
   if (is.null(names(y_vars)))
     names(y_vars) <- y_vars
   if (any(!y_vars %in% names(y_dat)))
-    stop("all elements of 'y_vars' must be column names in 'y_dat'")
+    stop("all elements of 'y.vars' must be column names in 'y.dat'")
 
   pair_names <- expand.grid(y_vars, y_vars, stringsAsFactors = FALSE)
   pair_kerns <- lapply(seq_len(nrow(pair_names)), function(i) {
@@ -27,14 +31,14 @@ np.pairs <- function(y_vars, y_dat, ...) {
   list(y_vars = y_vars, pair_names = pair_names, pair_kerns = pair_kerns)
 }
 
-np.pairs.plot <- function(pair_list) {
+np.pairs.plot <- function(pair.list) {
   .npRmpi_require_active_slave_pool(where = "np.pairs.plot()")
-  if (length(pair_list) < 3)
-    stop("pair_list must be created by np.pairs")
+  if (length(pair.list) < 3)
+    stop("pair.list must be created by np.pairs")
 
-  pair_names <- pair_list[["pair_names"]]
-  pair_kerns <- pair_list[["pair_kerns"]]
-  y_vars <- pair_list[["y_vars"]]
+  pair_names <- pair.list[["pair_names"]]
+  pair_kerns <- pair.list[["pair_kerns"]]
+  y_vars <- pair.list[["y_vars"]]
   y_labels <- names(y_vars)
 
   oldpar <- .np_plot_capture_par(c("mfrow", "mar"))

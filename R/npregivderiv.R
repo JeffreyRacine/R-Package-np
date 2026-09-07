@@ -649,13 +649,13 @@ summary.npregivderiv <- function(object, ...) {
 
 plot.npregivderiv <- function(x,
                               gradients = TRUE,
-                              data_overlay = TRUE,
-                              data_rug = FALSE,
+                              data.overlay = TRUE,
+                              data.rug = FALSE,
                               ...) {
   matched.call <- match.call(expand.dots = FALSE)
   .np_plot_validate_npregiv_call(
     sys.call(),
-    method_args = c("gradients", "data_overlay", "data_rug"),
+    method_args = c("gradients", "data.overlay", "data.rug"),
     context = "plot.npregivderiv",
     dots_call = matched.call[["..."]]
   )
@@ -663,8 +663,8 @@ plot.npregivderiv <- function(x,
     object = x,
     family = "npregivderiv",
     gradients = gradients,
-    data_overlay = data_overlay,
-    data_rug = data_rug,
+    data_overlay = data.overlay,
+    data_rug = data.rug,
     dots = list(...)
   )
   .np_iv_plot_render(spec)

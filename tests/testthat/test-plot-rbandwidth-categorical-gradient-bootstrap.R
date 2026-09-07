@@ -143,7 +143,7 @@ test_that("session-route categorical gradient asymptotic intervals use native HC
       "xdat <- data.frame(g = g, x = x)",
       "bw <- npregbw(xdat = xdat, ydat = y, regtype = 'll', bwtype = 'fixed', bws = c(0.25, 0.3), bandwidth.compute = FALSE)",
       "fit <- npreg(bws = bw, txdat = xdat, tydat = y, gradients = TRUE, se = TRUE)",
-      "out.cat <- suppressWarnings(plot(fit, xdat = xdat, ydat = y, output = 'data', perspective = FALSE, gradients = TRUE, errors = 'asymptotic', data_overlay = FALSE))",
+      "out.cat <- suppressWarnings(plot(fit, xdat = xdat, ydat = y, output = 'data', perspective = FALSE, gradients = TRUE, errors = 'asymptotic', data.overlay = FALSE))",
       "stopifnot(is.list(out.cat), all(vapply(out.cat, inherits, logical(1), 'npregression')))",
       "stopifnot(all(is.finite(out.cat[[1L]]$grad)), all(is.finite(out.cat[[1L]]$gerr)))",
       "oracle.cat <- npreg(bws = bw, txdat = xdat, tydat = y, exdat = out.cat[[1L]]$eval, gradients = TRUE, se = TRUE)",
@@ -154,7 +154,7 @@ test_that("session-route categorical gradient asymptotic intervals use native HC
       "y2 <- 1 + sin(2 * pi * xdat2$x) + 0.5 * xdat2$z + rnorm(n, sd = 0.05)",
       "bw2 <- npregbw(xdat = xdat2, ydat = y2, regtype = 'll', bwtype = 'fixed', bws = c(0.25, 0.3), bandwidth.compute = FALSE)",
       "fit2 <- npreg(bws = bw2, txdat = xdat2, tydat = y2, gradients = TRUE, se = TRUE)",
-      "out <- suppressWarnings(plot(fit2, xdat = xdat2, ydat = y2, output = 'data', perspective = FALSE, gradients = TRUE, errors = 'asymptotic', data_overlay = FALSE))",
+      "out <- suppressWarnings(plot(fit2, xdat = xdat2, ydat = y2, output = 'data', perspective = FALSE, gradients = TRUE, errors = 'asymptotic', data.overlay = FALSE))",
       "stopifnot(is.list(out), all(vapply(out, inherits, logical(1), 'npregression')))",
       "cat('RBAND_CATGRAD_ASYMPTOTIC_CONTRACT_OK\\n')"
     ),

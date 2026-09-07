@@ -7,26 +7,26 @@ Compute pairwise nonparametric regressions and densities for a set of
 variables, then plot a pairs-style display with fitted smoothers.
 }
 \usage{
-np.pairs(y_vars, y_dat, ...)
-np.pairs.plot(pair_list)
+np.pairs(y.vars, y.dat, ...)
+np.pairs.plot(pair.list)
 }
 \arguments{
 \subsection{Data, Bandwidth Inputs And Formula Interface}{
 These arguments identify the variables, data, and pair specifications to plot.
 }
 
-  \item{pair_list}{
+  \item{pair.list}{
     list returned by \code{np.pairs}.
   }
 
 
-  \item{y_dat}{
-    data frame containing the variables listed in \code{y_vars}.
+  \item{y.dat}{
+    data frame containing the variables listed in \code{y.vars}.
   }
 
 
-  \item{y_vars}{
-    character vector of column names in \code{y_dat}. If \code{y_vars}
+  \item{y.vars}{
+    character vector of column names in \code{y.dat}. If \code{y.vars}
     is named, the names are used as plot labels.
   }
 
@@ -82,14 +82,14 @@ if (!in.check) {
 npRmpi.init(nslaves=1)
 
 data("USArrests")
-y_vars <- c("Murder", "UrbanPop")
-names(y_vars) <- c("Murder Arrests per 100K", "Pop. Percent Urban")
+y.vars <- c("Murder", "UrbanPop")
+names(y.vars) <- c("Murder Arrests per 100K", "Pop. Percent Urban")
 
-pair_list <- np.pairs(y_vars = y_vars, y_dat = USArrests,
+pair.list <- np.pairs(y.vars = y.vars, y.dat = USArrests,
                       ckertype = "epanechnikov",
                       bwscaling = TRUE)
 
-np.pairs.plot(pair_list)
+np.pairs.plot(pair.list)
 
 ## For the interactive run only we close the slaves perhaps to proceed
 ## with other examples and so forth. This is redundant in batch mode.

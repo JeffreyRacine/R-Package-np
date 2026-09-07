@@ -63,7 +63,7 @@ Named options passed via \code{\dots} include:
         formula calls when explicit training data arguments are not
         supplied.
       }
-      \item{\code{grid_control}}{
+      \item{\code{grid.control}}{
         optional detailed grid controls created by
         \code{\link{np_grid_control}}.
       }
@@ -88,11 +88,11 @@ Named options passed via \code{\dots} include:
 
     \strong{Plot content controls}
     \describe{
-      \item{\code{coef}, \code{coef_index}}{
+      \item{\code{coef}, \code{coef.index}}{
         coefficient-function plotting controls for semiparametric
         families where supported.
       }
-      \item{\code{common_scale}}{
+      \item{\code{common.scale}}{
         a logical value specifying whether multiple panels should share a
         common plotting scale when feasible.
       }
@@ -139,7 +139,7 @@ Named options passed via \code{\dots} include:
         \code{"both"} is the public spelling for the historical
         \code{"plot-data"} behavior.
       }
-      \item{\code{proper}, \code{proper_control}, \code{proper_method}}{
+      \item{\code{proper}, \code{proper.control}, \code{proper.method}}{
         controls for proper conditional density/distribution handling
         where implemented.
       }
@@ -179,7 +179,7 @@ Named options passed via \code{\dots} include:
         name depends on whether \code{errors="bootstrap"} or
         \code{errors="asymptotic"}; see Details.
       }
-      \item{\code{boot_control}}{
+      \item{\code{boot.control}}{
         optional detailed bootstrap controls created by
         \code{\link{np_boot_control}}. This controls non-fixed bootstrap
         behavior, wild-bootstrap multipliers, and dependent-bootstrap
@@ -191,7 +191,7 @@ Named options passed via \code{\dots} include:
         \code{"geom"}; density/distribution-family plots support
         \code{"inid"}, \code{"fixed"}, and \code{"geom"}.
       }
-      \item{\code{boxplot_outliers}, \code{factor_boxplot}}{
+      \item{\code{boxplot.outliers}, \code{factor.boxplot}}{
         boxplot-style bootstrap summary controls for factor/categorical
         displays when available.
       }
@@ -227,7 +227,7 @@ Named options passed via \code{\dots} include:
 
     \strong{Rendering and view controls}
     \describe{
-      \item{\code{data_overlay}}{
+      \item{\code{data.overlay}}{
         logical; when \code{TRUE}, overlay raw data on regression,
         quantile-regression, single-index, partially linear, and smooth
         coefficient plot surfaces and expand plot limits to include the data. For
@@ -254,22 +254,22 @@ Named options passed via \code{\dots} include:
         \code{legend=list(tau=list(x="topright"), bands=FALSE)} may
         be used when a route distinguishes those legend roles.
       }
-      \item{\code{data_rug}}{
+      \item{\code{data.rug}}{
         logical; when \code{TRUE}, draw a rug-style support cue for the
         plotted coordinates. For ordinary 1D base plots this behaves
         like a standard rug. For eligible 2D surface plots, the base
         renderer draws short floor-rug ticks and
         \code{renderer="rgl"} draws the analogous 3D floor-rug ticks
         on supported surface routes. In this rollout tranche,
-        \code{data_rug=TRUE} is implemented across the current base
+        \code{data.rug=TRUE} is implemented across the current base
         plot families and across supported \code{rgl} surface routes;
         unsupported renderer/geometry combinations still fail clearly
         rather than being ignored silently. On mixed base plot layouts,
         rug marks are drawn for continuous panels and omitted for
         categorical panels.
-        This option is distinct from \code{data_overlay}:
-        \code{data_rug} shows where observations lie in the plotted
-        covariate support, while \code{data_overlay} is the
+        This option is distinct from \code{data.overlay}:
+        \code{data.rug} shows where observations lie in the plotted
+        covariate support, while \code{data.overlay} is the
         regression-only 3D response overlay used on supported surface
         plots. On supported regression surfaces, both options may be
         used together. Default is \code{FALSE}.
@@ -281,7 +281,7 @@ Named options passed via \code{\dots} include:
       \item{\code{phi}, \code{theta}, \code{view}}{
         view controls for bivariate continuous surface plots.
       }
-      \item{\code{render_control}}{
+      \item{\code{render.control}}{
         optional detailed rendering controls created by
         \code{\link{np_render_control}}, including band-versus-bar
         uncertainty display controls.
@@ -320,7 +320,7 @@ Named options passed via \code{\dots} include:
         high-DPI displays. Axis titles retain rgl's native screen-facing text
         orientation while the scene is rotated. For the currently supported \code{npreg},
         \code{npplreg}, and plain mean-surface
-        \code{npscoef} surface routes, \code{data_overlay=TRUE}
+        \code{npscoef} surface routes, \code{data.overlay=TRUE}
         adds observed data as an interactive point cloud. For all
         currently supported \code{rgl} surface routes,
         \code{errors != "none"} adds interval surfaces;
@@ -676,8 +676,8 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   }
   For non-fixed density/distribution bootstrap, an explicit experimental
   approximation is available via
-  \code{boot_control = np_boot_control(nonfixed = "exact")} or
-  \code{boot_control = np_boot_control(nonfixed = "frozen")}. The default
+  \code{boot.control = np_boot_control(nonfixed = "exact")} or
+  \code{boot.control = np_boot_control(nonfixed = "frozen")}. The default
   \code{"exact"} route recomputes the non-fixed geometry for each resample.
   The experimental \code{"frozen"} route reuses the original-sample
   non-fixed geometry throughout the bootstrap run. This option is currently
@@ -766,7 +766,7 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   New public plot controls use \code{snake_case}. Dotted names are reserved for
   S3 methods and internal plot-engine plumbing. Use \code{errors},
   \code{bootstrap}, \code{B}, \code{band}, \code{alpha}, \code{center},
-  \code{output}, \code{data_overlay}, \code{data_rug}, \code{layout}, and the
+  \code{output}, \code{data.overlay}, \code{data.rug}, \code{layout}, and the
   control constructors documented in \code{\link{np_boot_control}},
   \code{\link{np_grid_control}}, and \code{\link{np_render_control}}.
 

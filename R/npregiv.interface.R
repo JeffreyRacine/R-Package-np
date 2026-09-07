@@ -800,8 +800,8 @@ npregivderiv.formula <- function(y, data = NULL, subset, na.action,
                              dots) {
   family <- match.arg(family)
   gradients <- npValidateScalarLogical(gradients, "gradients")
-  data_overlay <- npValidateScalarLogical(data_overlay, "data_overlay")
-  data_rug <- npValidateScalarLogical(data_rug, "data_rug")
+  data_overlay <- npValidateScalarLogical(data_overlay, "data.overlay")
+  data_rug <- npValidateScalarLogical(data_rug, "data.rug")
 
   z <- object[["z"]]
   if (is.null(z) || NCOL(z) != 1L)

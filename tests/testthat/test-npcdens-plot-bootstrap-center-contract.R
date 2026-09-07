@@ -21,7 +21,7 @@ test_that("npcdens plot-data centers stay on predict and bootstrap offsets remai
       bootstrap = "inid",
       B = 39L,
       band = "pointwise",
-      boot_control = np_boot_control(nonfixed = nonfixed_mode)
+      boot.control = np_boot_control(nonfixed = nonfixed_mode)
     ))
 
     expect_true(length(out) > 0L)

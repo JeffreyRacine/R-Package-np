@@ -56,7 +56,7 @@ npscoef_semiparam_frozen_contract_case <- function() {
     "  }, ns = 'npRmpi')",
     "  on.exit(assignInNamespace('.np_inid_boot_from_scoef', orig, ns = 'npRmpi'), add = TRUE)",
     "  on.exit(assignInNamespace('compute.bootstrap.errors.scbandwidth', orig.compute, ns = 'npRmpi'), add = TRUE)",
-    "  capture.output(plot(bw, xdat = xdat, ydat = y, zdat = zdat, neval = 6L, coef = FALSE, output = 'data', errors = 'bootstrap', bootstrap = 'inid', boot_control = np_boot_control(nonfixed = 'frozen'), B = 41L, band = 'pointwise'))",
+    "  capture.output(plot(bw, xdat = xdat, ydat = y, zdat = zdat, neval = 6L, coef = FALSE, output = 'data', errors = 'bootstrap', bootstrap = 'inid', boot.control = np_boot_control(nonfixed = 'frozen'), B = 41L, band = 'pointwise'))",
     "  stopifnot(length(modes) >= 1L)",
     "  stopifnot(all(modes == 'frozen'))",
     "  stopifnot(isTRUE(all.equal(seen.ex[[1L]], expected.plot$eval$exdat, tolerance = 1e-10)))",

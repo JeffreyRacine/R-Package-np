@@ -29,14 +29,14 @@ iv_deriv_plot_object <- function() {
   )
 }
 
-iv_plot_spec <- function(object, family, gradients, data_overlay, data_rug,
+iv_plot_spec <- function(object, family, gradients, data.overlay, data.rug,
                          dots = list()) {
   getFromNamespace(".np_iv_plot_spec", iv_plot_package)(
     object = object,
     family = family,
     gradients = gradients,
-    data_overlay = data_overlay,
-    data_rug = data_rug,
+    data_overlay = data.overlay,
+    data_rug = data.rug,
     dots = dots
   )
 }
@@ -44,19 +44,19 @@ iv_plot_spec <- function(object, family, gradients, data_overlay, data_rug,
 test_that("IV plot methods expose the canonical interface and class defaults", {
   expect_identical(
     names(formals(getS3method("plot", "npregiv"))),
-    c("x", "gradients", "data_overlay", "data_rug", "...")
+    c("x", "gradients", "data.overlay", "data.rug", "...")
   )
   expect_identical(formals(getS3method("plot", "npregiv"))$gradients, FALSE)
-  expect_identical(formals(getS3method("plot", "npregiv"))$data_overlay, TRUE)
-  expect_identical(formals(getS3method("plot", "npregiv"))$data_rug, FALSE)
+  expect_identical(formals(getS3method("plot", "npregiv"))$data.overlay, TRUE)
+  expect_identical(formals(getS3method("plot", "npregiv"))$data.rug, FALSE)
 
   expect_identical(
     names(formals(getS3method("plot", "npregivderiv"))),
-    c("x", "gradients", "data_overlay", "data_rug", "...")
+    c("x", "gradients", "data.overlay", "data.rug", "...")
   )
   expect_identical(formals(getS3method("plot", "npregivderiv"))$gradients, TRUE)
-  expect_identical(formals(getS3method("plot", "npregivderiv"))$data_overlay, TRUE)
-  expect_identical(formals(getS3method("plot", "npregivderiv"))$data_rug, FALSE)
+  expect_identical(formals(getS3method("plot", "npregivderiv"))$data.overlay, TRUE)
+  expect_identical(formals(getS3method("plot", "npregivderiv"))$data.rug, FALSE)
 })
 
 test_that("IV plot specifications select exact training and evaluation fields", {
@@ -231,12 +231,12 @@ test_that("IV renderer routes frame, overlay, curve, and rug arguments once", {
 test_that("retired IV plot controls fail with canonical migration guidance", {
   iv <- iv_plot_object()
   deriv <- iv_deriv_plot_object()
-  expect_error(plot(iv, plot.data = TRUE), "use data_overlay", fixed = TRUE)
+  expect_error(plot(iv, plot.data = TRUE), "use data.overlay", fixed = TRUE)
   expect_error(plot(iv, deriv = TRUE), "use gradients", fixed = TRUE)
   expect_error(plot(iv, phi = 30), "not a supported IV plot argument",
                fixed = TRUE)
   expect_error(plot(deriv, phi = TRUE), "use gradients = FALSE", fixed = TRUE)
-  expect_error(plot(deriv, plot.data = TRUE), "use data_overlay", fixed = TRUE)
+  expect_error(plot(deriv, plot.data = TRUE), "use data.overlay", fixed = TRUE)
   expect_error(plot(iv, 1, 2, 3, 4), "unnamed plot arguments", fixed = TRUE)
   expect_error(plot(iv, not_a_plot_argument = TRUE), "unused plot argument",
                fixed = TRUE)
@@ -248,10 +248,10 @@ test_that("all IV plot flags are validated before object fields or devices", {
   empty.iv <- structure(list(), class = "npregiv")
   expect_error(plot(empty.iv, gradients = NA), "'gradients' must be TRUE or FALSE",
                fixed = TRUE)
-  expect_error(plot(empty.iv, data_overlay = NA),
-               "'data_overlay' must be TRUE or FALSE", fixed = TRUE)
-  expect_error(plot(empty.iv, data_rug = NA),
-               "'data_rug' must be TRUE or FALSE", fixed = TRUE)
+  expect_error(plot(empty.iv, data.overlay = NA),
+               "'data.overlay' must be TRUE or FALSE", fixed = TRUE)
+  expect_error(plot(empty.iv, data.rug = NA),
+               "'data.rug' must be TRUE or FALSE", fixed = TRUE)
 })
 
 test_that("real devices show expanded IV geometry without state leakage", {
@@ -269,15 +269,15 @@ test_that("real devices show expanded IV geometry without state leakage", {
   }, add = TRUE)
   stable.par <- graphics::par(c("mfrow", "mar", "oma"))
 
-  value <- withVisible(plot(iv, xaxs = "i", yaxs = "i", data_rug = TRUE))
+  value <- withVisible(plot(iv, xaxs = "i", yaxs = "i", data.rug = TRUE))
   expect_identical(value, list(value = NULL, visible = FALSE))
   expect_equal(graphics::par("usr"), c(-2, 2, -10, 10), tolerance = 0)
   expect_identical(graphics::par(c("mfrow", "mar", "oma")), stable.par)
 
-  derivative.value <- withVisible(plot(deriv, data_rug = TRUE))
+  derivative.value <- withVisible(plot(deriv, data.rug = TRUE))
   expect_identical(derivative.value, list(value = NULL, visible = FALSE))
   level.value <- withVisible(plot(deriv, gradients = FALSE,
-                                  data_overlay = FALSE))
+                                  data.overlay = FALSE))
   expect_identical(level.value, list(value = NULL, visible = FALSE))
   expect_identical(iv, iv.before)
   expect_identical(deriv, deriv.before)
@@ -324,5 +324,5 @@ test_that("categorical IV displays retain base behavior and omit numerical rugs"
     grDevices::dev.off()
     unlink(path)
   }, add = TRUE)
-  expect_silent(plot(categorical, data_rug = TRUE, xlim = explicit.xlim))
+  expect_silent(plot(categorical, data.rug = TRUE, xlim = explicit.xlim))
 })

@@ -966,7 +966,7 @@ plot.npcopula <- function(x,
                           bootstrap = c("inid", "fixed", "geom"),
                           B = 1999,
                           center = c("estimate", "bias-corrected"),
-                          boot_control = np_boot_control(),
+                          boot.control = np_boot_control(),
                           output = c("plot", "data", "plot-data", "both"),
                           legend = TRUE,
                           theta = 0.0,
@@ -979,6 +979,7 @@ plot.npcopula <- function(x,
                           border = .np_plot_color("surface_border"),
                           zlim = NULL,
                           ...) {
+  .np_plot_reject_retired_spelling(substitute(list(...))[-1L], "boot.control")
   bootstrap.supplied <- !missing(bootstrap) || !missing(B) || !missing(center)
   interval.supplied <- !missing(band) || !missing(alpha)
   view <- match.arg(view)
@@ -998,8 +999,8 @@ plot.npcopula <- function(x,
   if (!is.numeric(B) || length(B) != 1L || is.na(B) || B < 1L)
     stop("B must be a positive numeric scalar", call. = FALSE)
   zlim <- .npcopula_validate_zlim(zlim)
-  if (!inherits(boot_control, "np_boot_control"))
-    stop("boot_control must be created by np_boot_control()", call. = FALSE)
+  if (!inherits(boot.control, "np_boot_control"))
+    stop("boot.control must be created by np_boot_control()", call. = FALSE)
   if (!identical(errors, "bootstrap") && bootstrap.supplied)
     stop("bootstrap controls require errors = \"bootstrap\"", call. = FALSE)
   if (identical(errors, "none") && interval.supplied)
@@ -1103,7 +1104,7 @@ plot.npcopula <- function(x,
     plot.errors.center = center,
     plot.errors.boot.method = bootstrap,
     plot.errors.boot.num = as.integer(B),
-    plot.errors.boot.blocklen = boot_control$blocklen
+    plot.errors.boot.blocklen = boot.control$blocklen
   )
   plot.data <- .npcopula_add_interval_columns(x, payload)
   if (identical(output, "data"))

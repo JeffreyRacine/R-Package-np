@@ -126,7 +126,7 @@ test_that("npindex plot labels use the index and named marginal effects", {
     fit,
     gradients = TRUE,
     errors = "none",
-    data_rug = FALSE
+    data.rug = FALSE
   ))
   expect_true("Index, X' beta" %in% labels$xlab)
   expect_true(all(c("d y / d x1", "d y / d x2") %in% labels$ylab))
@@ -137,7 +137,7 @@ test_that("npindex plot labels use the index and named marginal effects", {
     errors = "none",
     xlab = "custom x",
     ylab = "custom y",
-    data_rug = FALSE
+    data.rug = FALSE
   ))
   expect_true(length(override$xlab) > 0L)
   expect_true(length(override$ylab) > 0L)
@@ -165,12 +165,12 @@ test_that("semiparametric plot labels are mathematical and reachable", {
   sc.labels <- capture_plot_axis_labels(plot(
     sc.fit,
     gradients = TRUE,
-    coef_index = 1L,
+    coef.index = 1L,
     perspective = FALSE,
-    common_scale = FALSE,
+    common.scale = FALSE,
     errors = "none",
-    data_overlay = FALSE,
-    data_rug = FALSE,
+    data.overlay = FALSE,
+    data.rug = FALSE,
     neval = 7L
   ))
   expect_true("d y / d x" %in% sc.labels$ylab)
@@ -187,10 +187,10 @@ test_that("semiparametric plot labels are mathematical and reachable", {
   pl.labels <- capture_plot_axis_labels(plot(
     pl.fit,
     perspective = FALSE,
-    common_scale = FALSE,
+    common.scale = FALSE,
     errors = "none",
-    data_overlay = FALSE,
-    data_rug = FALSE,
+    data.overlay = FALSE,
+    data.rug = FALSE,
     neval = 7L
   ))
   expect_true(length(pl.labels$ylab) > 0L)
@@ -224,7 +224,7 @@ test_that("conditional plot labels map components by type and order", {
     bw,
     gradients = TRUE,
     perspective = FALSE,
-    common_scale = FALSE,
+    common.scale = FALSE,
     errors = "none",
     neval = 7L
   ))

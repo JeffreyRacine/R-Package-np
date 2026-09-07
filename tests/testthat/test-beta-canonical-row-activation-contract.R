@@ -1242,12 +1242,12 @@ test_that("beta distribution CVLS enters the canonical row owner", {
     engine,
     paste0(
       "np_continuous_kernel_scaled_restore(\n",
-      "         1.0, common_log_scale, 1, &common_scale)"
+      "         1.0, common_log_scale, 1, &common.scale)"
     ),
     fixed = TRUE
   )
-  expect_match(engine, "row_sum = scaled_sum*common_scale;", fixed = TRUE)
-  expect_match(engine, "row[observation] *= common_scale;", fixed = TRUE)
+  expect_match(engine, "row_sum = scaled_sum*common.scale;", fixed = TRUE)
+  expect_match(engine, "row[observation] *= common.scale;", fixed = TRUE)
   expect_false(grepl("&row[observation]", engine, fixed = TRUE))
   expect_match(owner, "goto cleanup_distribution_ls_cv;", fixed = TRUE)
   expect_false(grepl("NPContinuousKernelExecutionContext", owner,

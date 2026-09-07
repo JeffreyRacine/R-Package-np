@@ -121,7 +121,7 @@ test_that("plot return contract: bounded conditional bootstrap data stays availa
     cfit,
     output = "data",
     view = "fixed",
-    data_overlay = FALSE,
+    data.overlay = FALSE,
     errors = "bootstrap",
     bootstrap = "inid",
     B = 5L,
@@ -137,7 +137,7 @@ test_that("plot return contract: bounded conditional bootstrap data stays availa
     dfit,
     output = "data",
     view = "fixed",
-    data_overlay = FALSE,
+    data.overlay = FALSE,
     errors = "bootstrap",
     bootstrap = "inid",
     B = 5L,
@@ -356,7 +356,7 @@ test_that("plot return contract: npRmpi npscoef fitted perspective path preserve
     view = "fixed",
     renderer = "base",
     output = "data",
-    data_overlay = FALSE,
+    data.overlay = FALSE,
     errors = "none"
   ))
 
@@ -399,7 +399,7 @@ test_that("plot return contract: rgl plot-data returns the usual data payload", 
       output = "data",
       renderer = "rgl",
       view = "fixed",
-      data_overlay = FALSE
+      data.overlay = FALSE
     ),
     character()
   )
@@ -410,7 +410,7 @@ test_that("plot return contract: rgl plot-data returns the usual data payload", 
       output = "plot-data",
       renderer = "rgl",
       view = "fixed",
-      data_overlay = FALSE
+      data.overlay = FALSE
     ),
     character()
   )

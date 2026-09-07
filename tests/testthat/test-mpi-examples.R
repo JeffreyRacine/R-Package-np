@@ -28,7 +28,7 @@ test_that("MPI examples from man pages work in an isolated session", {
       "stopifnot(inherits(model.iv, 'npregiv'))",
       "data('USArrests')",
       "dat <- USArrests[1:20, ]",
-      "pair_list <- np.pairs(y_vars = c('Murder', 'UrbanPop'), y_dat = dat)",
+      "pair_list <- np.pairs(y.vars = c('Murder', 'UrbanPop'), y.dat = dat)",
       "stopifnot(is.list(pair_list))",
       "stopifnot(identical(length(pair_list$pair_kerns), 4L))",
       "cat('MPI_EXAMPLES_SUBPROCESS_OK\\n')"

@@ -83,24 +83,24 @@ test_that("common plot option validation reports current public names", {
   expect_false(grepl("plot.errors.method", msg, fixed = TRUE))
 })
 
-test_that("snake_case plot controls normalize to engine controls", {
+test_that("dotted plot controls normalize to engine controls", {
   normalize <- getFromNamespace(".np_plot_normalize_public_dots", "npRmpi")
 
   dots <- normalize(
     list(
       output = "both",
-      data_overlay = FALSE,
-      data_rug = TRUE,
+      data.overlay = FALSE,
+      data.rug = TRUE,
       layout = "current",
-      factor_boxplot = TRUE,
-      boxplot_outliers = FALSE,
-      coef_index = 2L,
+      factor.boxplot = TRUE,
+      boxplot.outliers = FALSE,
+      coef.index = 2L,
       gradient.order = c(1L, 2L),
-      common_scale = FALSE,
-      proper_method = "isotonic",
-      proper_control = list(mode = "slice"),
+      common.scale = FALSE,
+      proper.method = "isotonic",
+      proper.control = list(mode = "slice"),
       errors = "asymptotic",
-      render_control = np_render_control(style = "bar", bar = "I", bar_num = 7L)
+      render.control = np_render_control(style = "bar", bar = "I", bar.num = 7L)
     )
   )
 
@@ -125,9 +125,9 @@ test_that("plot count controls require positive integer scalar counts", {
   expect_null(np_boot_control(blocklen = NULL)$blocklen)
   expect_identical(np_boot_control(blocklen = 1L)$blocklen, 1L)
   expect_equal(np_boot_control(blocklen = 2)$blocklen, 2)
-  expect_null(np_render_control(bar_num = NULL)$bar_num)
-  expect_identical(np_render_control(bar_num = 1L)$bar_num, 1L)
-  expect_equal(np_render_control(bar_num = 2)$bar_num, 2)
+  expect_null(np_render_control(bar.num = NULL)$bar_num)
+  expect_identical(np_render_control(bar.num = 1L)$bar_num, 1L)
+  expect_equal(np_render_control(bar.num = 2)$bar_num, 2)
 
   bad <- list(2.5, 0, -1, NA_real_, NaN, Inf, c(1L, 2L), "2", TRUE)
   for (value in bad) {
@@ -136,8 +136,8 @@ test_that("plot count controls require positive integer scalar counts", {
       "blocklen must be a positive integer scalar"
     )
     expect_error(
-      np_render_control(bar_num = value),
-      "bar_num must be a positive integer scalar"
+      np_render_control(bar.num = value),
+      "bar.num must be a positive integer scalar"
     )
   }
 })
@@ -150,15 +150,15 @@ test_that("snake_case plot controls fail cleanly on conflicts", {
     "conflicting plot arguments: output and plot.behavior"
   )
   expect_error(
-    normalize(list(data_rug = TRUE, plot.rug = FALSE)),
-    "conflicting plot arguments: data_rug and plot.rug"
+    normalize(list(data.rug = TRUE, plot.rug = FALSE)),
+    "conflicting plot arguments: data.rug and plot.rug"
   )
   expect_error(
     normalize(list(layout = "maybe")),
     "layout must be one of"
   )
   expect_error(
-    np_render_control(bar.num = 3L),
+    np_render_control(bar_num = 3L),
     "unused argument"
   )
 })

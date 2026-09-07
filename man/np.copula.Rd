@@ -60,7 +60,7 @@ npcopula(bws, \dots)
      bootstrap = c("inid", "fixed", "geom"),
      B = 1999,
      center = c("estimate", "bias-corrected"),
-     boot_control = np_boot_control(),
+     boot.control = np_boot_control(),
      output = c("plot", "data", "plot-data", "both"),
      legend = TRUE,
      theta = 0.0,
@@ -279,7 +279,7 @@ surface plots.
     \code{"geom"}. Wild bootstrap is not defined for copula surfaces.
   }
 
-  \item{boot_control}{
+  \item{boot.control}{
     optional \code{\link{np_boot_control}} object. For copula surfaces
     the block length is used by the \code{"fixed"} and \code{"geom"}
     block bootstrap routes.

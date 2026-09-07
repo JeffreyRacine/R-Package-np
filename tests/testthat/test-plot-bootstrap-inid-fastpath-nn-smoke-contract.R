@@ -73,7 +73,7 @@ test_that("nearest-neighbor frozen bootstrap plots run across regression and uns
       output = "data",
       perspective = FALSE,
       errors = "bootstrap",
-      boot_control = np_boot_control(nonfixed = "frozen"),
+      boot.control = np_boot_control(nonfixed = "frozen"),
       B = 3,
       ...
     ))

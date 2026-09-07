@@ -1,5 +1,12 @@
 # npRmpi 0.80-1
 
+* Public plot arguments now use dotted names: data.overlay, data.rug,
+  factor.boxplot, boxplot.outliers, coef.index, common.scale, proper.method,
+  proper.control, boot.control, grid.control and render.control. Plot helpers
+  similarly use bar.num, y.vars, y.dat and pair.list. Retired underscore
+  spellings are no longer accepted. Function names, saved-object fields,
+  defaults and numerical behavior are unchanged; typo hints use the new names.
+
 * Single-index starting-bandwidth restoration now shares the active search
   progress line. Its width-aware notice clears with the search rather than
   leaving a separate message; search computations and failure diagnostics

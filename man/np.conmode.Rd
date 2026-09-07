@@ -281,9 +281,9 @@ prediction/evaluation route, or plot route as appropriate.
     \code{eydat} take precedence over \code{newdata}. In
     \code{plot.conmode}, additional arguments control the object-fed
     probability/effect display; common controls include
-    \code{gradients}, \code{level}, \code{output}, \code{data_rug},
+    \code{gradients}, \code{level}, \code{output}, \code{data.rug},
     \code{layout}, \code{legend}, \code{view}, \code{neval},
-    \code{grid_control}, \code{perspective}, \code{plot.vars},
+    \code{grid.control}, \code{perspective}, \code{plot.vars},
     \code{renderer}, and graphics arguments. The default
     \code{view="sample"} draws the stored fitted probabilities/effects at the
     fitted evaluation points. The \code{view="fixed"} route constructs

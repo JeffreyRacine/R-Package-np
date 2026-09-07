@@ -18,7 +18,7 @@ np_grid_control(xtrim = NULL, xq = NULL, slices = NULL)
 
 np_render_control(style = c("band", "bar"),
                   bar = c("|", "I"),
-                  bar_num = NULL)
+                  bar.num = NULL)
 }
 \arguments{
   \item{nonfixed}{Bootstrap behavior for non-fixed bandwidth routes.
@@ -32,16 +32,17 @@ np_render_control(style = c("band", "bar"),
   \item{slices}{Optional slice specification for routes that support it.}
   \item{style}{Interval display style.}
   \item{bar}{Bar style when \code{style = "bar"}.}
-  \item{bar_num}{Optional number of bars.}
+  \item{bar.num}{Optional number of bars.}
 }
 \details{
   These helpers validate names and values early. Raw lists are deliberately not
   accepted as substitutes, so misspelled detailed controls fail before plot
   computation or MPI fanout begins.
 
-  New public plot arguments use \code{snake_case}. Dotted argument names are
-  reserved for S3 methods and internal plot-engine plumbing. Common rendering
-  controls such as \code{data_overlay}, \code{data_rug}, \code{layout}, and
+  Compound public plot arguments use dotted names, consistently with the
+  established package API. Constructor function names and returned object
+  fields are unchanged. Common rendering
+  controls such as \code{data.overlay}, \code{data.rug}, \code{layout}, and
   \code{output} are supplied directly to \code{plot(...)} rather than through
   \code{np_render_control()}.
 
@@ -62,7 +63,7 @@ plot(fit,
      bootstrap = "inid",
      B = 1999,
      band = "pointwise",
-     boot_control = np_boot_control(nonfixed = "exact"))
+     boot.control = np_boot_control(nonfixed = "exact"))
 }
 }
 \keyword{hplot}
