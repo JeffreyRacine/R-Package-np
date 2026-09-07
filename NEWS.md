@@ -1,5 +1,10 @@
 # npRmpi 0.80-1
 
+* Finite-data local-constant single-index hat and plot apply helpers now use
+  shared kernel moments instead of materializing the full weight matrix.
+  Existing bandwidth normalization and denominator floors are preserved;
+  explicit matrix outputs and non-finite-input matrix semantics are unchanged.
+
 * Ichimura coefficient covariance now computes its conditional moments and
   common denominator in one kernel-sum call. Covariance formulas, MPI row
   ownership and random-number generation are unchanged; no kernel-weight

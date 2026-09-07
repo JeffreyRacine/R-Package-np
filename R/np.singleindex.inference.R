@@ -11,10 +11,11 @@
        denominator = as.numeric(sums[ncol(y) + 1L, ]))
 }
 
-.np_index_kernel_sum <- function(..., bwtype) {
+.np_index_kernel_sum <- function(..., bwtype,
+                                 bandwidth.divide = identical(bwtype, "adaptive_nn")) {
   if (is.null(.np_progress_runtime$fit_forward))
     return(npksum(..., bwtype = bwtype,
-                  bandwidth.divide = identical(bwtype, "adaptive_nn")))
+                  bandwidth.divide = bandwidth.divide))
   # The parent reports activity, not a percentage across heterogeneous calls.
   # Enable the existing native row callbacks only during this scoped activity.
   args <- list(...)
@@ -22,7 +23,7 @@
   .np_with_compiled_fit_progress(
     label = "Fitting single-index model", total = total,
     expr = npksum(..., bwtype = bwtype,
-                  bandwidth.divide = identical(bwtype, "adaptive_nn")))
+                  bandwidth.divide = bandwidth.divide))
 }
 
 .np_index_asymptotic_outputs <- function(fit, beta, gradients = FALSE) {
