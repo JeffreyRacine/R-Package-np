@@ -763,8 +763,8 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   plot(fit, errors="bootstrap", bootstrap="inid")
   }
 
-  New public plot controls use \code{snake_case}. Dotted names are reserved for
-  S3 methods and internal plot-engine plumbing. Use \code{errors},
+  Compound public plot argument names use dots, consistent with the package
+  interface. Retired underscore spellings are not accepted. Use \code{errors},
   \code{bootstrap}, \code{B}, \code{band}, \code{alpha}, \code{center},
   \code{output}, \code{data.overlay}, \code{data.rug}, \code{layout}, and the
   control constructors documented in \code{\link{np_boot_control}},

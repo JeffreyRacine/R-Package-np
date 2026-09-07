@@ -1,3 +1,10 @@
+.np_plot_match_coef_index <- function(value) {
+  if (!is.numeric(value) || length(value) != 1L || is.na(value) ||
+      !is.finite(value) || value < 1L || value > .Machine$integer.max)
+    stop("coef.index must be a positive finite numeric scalar", call. = FALSE)
+  as.integer(value)
+}
+
 .np_plot_scalar_match <- function(value, choices, argname) {
   if (is.null(value))
     return(NULL)
@@ -346,6 +353,10 @@ np_render_control <- function(style = c("band", "bar"),
     dots <- .np_plot_set_normalized_arg(dots, "boxplot.outliers",
                                         "plot.bxp.out", boxplot_outliers)
   }
+  if (has("coef.index"))
+    dots$coef.index <- .np_plot_match_coef_index(dots$coef.index)
+  if (has("common.scale"))
+    dots$common.scale <- .np_plot_match_flag(dots$common.scale, "common.scale")
   if (has("perspective")) {
     perspective <- isTRUE(dots$perspective)
     dots$perspective <- NULL

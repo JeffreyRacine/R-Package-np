@@ -58,6 +58,8 @@
            random.seed){
 
     sub.supplied <- !missing(sub)
+    coef.index <- .np_plot_match_coef_index(coef.index)
+    common.scale <- .np_plot_match_flag(common.scale, "common.scale")
 
     engine.ctx <- .np_plot_engine_begin(plot.par.mfrow = plot.par.mfrow)
     on.exit(.np_plot_restore_par(engine.ctx$oldpar), add = TRUE)
@@ -89,9 +91,6 @@
     coef <- isTRUE(coef)
     if (coef && gradients)
       stop("coef=TRUE and gradients=TRUE cannot be combined for smooth coefficient plots.", call. = FALSE)
-    coef.index <- as.integer(coef.index)[1L]
-    if (!is.finite(coef.index) || is.na(coef.index) || coef.index < 1L)
-      coef.index <- 1L
     gradient.index <- coef.index
     response.axis.label <- .np_plot_resolve_axis_label(
       bws$ynames,
