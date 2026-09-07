@@ -146,7 +146,7 @@
     tmf[[1]] <- as.name("model.frame")
     tmf[["formula"]] <- tt
     mf.args <- as.list(tmf)[-1L]
-    umf <- tmf <- do.call(stats::model.frame, mf.args, envir = environment(tt))
+    umf <- tmf <- .np_bws_formula_model_frame(bws, mf.args)
 
       ydat <- model.response(tmf)
       xdat <- tmf[, attr(attr(tmf, "terms"),"term.labels"), drop = FALSE]

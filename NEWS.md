@@ -15,6 +15,11 @@
   indices, and NOMAD-only index searches report cumulative evaluations plus
   the existing final certification count.
 
+* Regression fits and plots replay a saved formula data expression in the
+  bandwidth call's existing environment, so wrapper-local data remains usable
+  after the wrapper returns and after saving and reloading the bandwidth object.
+
+
 * Single-index autodispatch now materializes caller-local `se.type` values
   through the shared argument transport owner, just like `se`. Literal choices,
   defaults and uncertainty calculations are unchanged.

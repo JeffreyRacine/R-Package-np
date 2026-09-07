@@ -115,3 +115,26 @@ test_that("explicit regression data preserves formula scope, subset, NA and pred
   expect_output(summary(actual))
   expect_error(predict(actual, newdata = data.frame(wrong = 1:2)), "newdata")
 })
+
+test_that("regression replay resolves data in the retained call owner", {
+  skip_if_not(spawn_mpi_slaves(1L), "MPI pool unavailable")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  old <- options(np.messages = FALSE)
+  on.exit(options(old), add = TRUE)
+  fixture <- data.frame(x = seq(-1, 1, length.out = 12L), y = sin(1:12))
+  fo <- y ~ x
+  build <- function() {
+    dd <- fixture
+    npregbw(fo, data = dd, bws = .4, bandwidth.compute = FALSE)
+  }
+  bw <- unserialize(serialize(build(), NULL))
+  expected <- npreg(bw, txdat = fixture["x"], tydat = fixture$y)
+  expect_identical(fitted(npreg(bw)), fitted(expected))
+  expect_identical(fitted(npreg(bw, data = NULL)), fitted(expected))
+  changed <- transform(fixture, y = y + 2)
+  assign("dd", changed, envir = environment(bw$call))
+  expect_identical(fitted(npreg(bw)), fitted(npreg(bw, data = changed)))
+  rm("dd", envir = environment(bw$call))
+  expect_error(npreg(bw), "dd.*not found")
+  expect_identical(fitted(npreg(bw, data = fixture)), fitted(expected))
+})

@@ -147,7 +147,8 @@ npreg.formula <-
     if (!missing(data) && !is.null(data))
       tmf[["data"]] <- data
     mf.args <- as.list(tmf)[-1L]
-    umf <- tmf <- do.call(stats::model.frame, mf.args, envir = environment(tt))
+    umf <- tmf <- .np_bws_formula_model_frame(
+      bws, mf.args, data.override = !missing(data) && !is.null(data))
 
     response.name <- attr(tmf, "names")[attr(attr(tmf, "terms"), "response")]
     tydat <- model.response(tmf)
