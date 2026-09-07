@@ -283,7 +283,7 @@ npreghat <-
   rows <- which(empty.rows == 1L)
   .np_warning(sprintf(
     "npreghat: all computed kernel weights are zero at %d external evaluation row(s) (%s%s); returning NA for those rows",
-    length(rows), paste(head(rows, 8L), collapse = ", "),
+    length(rows), paste(utils::head(rows, 8L), collapse = ", "),
     if (length(rows) > 8L) ", ..." else ""), call. = FALSE)
   value
 }
