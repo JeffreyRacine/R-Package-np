@@ -1,5 +1,16 @@
 # Single-index inference uses the regression engine on the fitted scalar index.
 # These helpers do not select bandwidths or resample beta.
+# Sum response moments and their common denominator without kernel matrices.
+# Stabilization belongs to the caller, not to this raw-moment owner.
+.np_index_kernel_moments <- function(y, ...) {
+  y <- as.matrix(y)
+  sums <- .np_index_kernel_sum(
+    ..., tydat = rep.int(1.0, nrow(y)), weights = cbind(y, 1.0)
+  )$ksum
+  list(numerator = sums[seq_len(ncol(y)), , drop = FALSE],
+       denominator = as.numeric(sums[ncol(y) + 1L, ]))
+}
+
 .np_index_kernel_sum <- function(..., bwtype) {
   if (is.null(.np_progress_runtime$fit_forward))
     return(npksum(..., bwtype = bwtype,

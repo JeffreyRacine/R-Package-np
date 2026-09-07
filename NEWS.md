@@ -1,5 +1,10 @@
 # npRmpi 0.80-1
 
+* Ichimura coefficient covariance now computes its conditional moments and
+  common denominator in one kernel-sum call. Covariance formulas, MPI row
+  ownership and random-number generation are unchanged; no kernel-weight
+  matrix is constructed.
+
 * Single-index fitting now shows one immediate activity line with native
   heartbeats for fitted values and coefficient covariance. Explicit bootstrap
   standard errors retain their separate replication progress, without repeated

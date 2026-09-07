@@ -1174,21 +1174,8 @@ npindex.sibandwidth <-
           worker = function(rows) {
             if (!length(rows))
               return(matrix(numeric(0L), nrow = 0L, ncol = n.w + 1L))
-            ty.local <- .npRmpi_with_local_regression(.np_index_kernel_sum(
-              txdat = index.df,
-              tydat = rep(1, length(tydat)),
-              weights = W,
-              exdat = eval.df[rows, , drop = FALSE],
-              .np.internal.eval.train.index = if (identical(bws$type, "generalized_nn")) as.integer(rows) else NULL,
-              bws = covariance.kbw,
-              bwtype = bws$type,
-              ckertype = bws$ckertype,
-              ckerorder = bws$ckerorder,
-              ckerbound = bws$ckerbound
-            ))$ksum
-            if (length(dim(ty.local)) == 1L)
-              ty.local <- matrix(ty.local, nrow = n.w, ncol = length(rows))
-            den.local <- .npRmpi_with_local_regression(.np_index_kernel_sum(
+            moments <- .npRmpi_with_local_regression(.np_index_kernel_moments(
+              y = W,
               txdat = index.df,
               exdat = eval.df[rows, , drop = FALSE],
               .np.internal.eval.train.index = if (identical(bws$type, "generalized_nn")) as.integer(rows) else NULL,
@@ -1197,8 +1184,8 @@ npindex.sibandwidth <-
               ckertype = bws$ckertype,
               ckerorder = bws$ckerorder,
               ckerbound = bws$ckerbound
-            ))$ksum
-            cbind(t(ty.local), as.numeric(den.local))
+            ))
+            cbind(t(moments$numerator), moments$denominator)
           }
         )
         list(
