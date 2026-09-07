@@ -4,7 +4,7 @@
 \alias{cps71}
 \title{ Canadian High School Graduate Earnings  }
 \description{
-	Canadian cross-section wage data consisting of a random sample taken
+  Canadian cross-section wage data consisting of a random sample taken
   from the 1971 Canadian Census Public Use Tapes for male individuals
   having common education (grade 13). There are 205 observations in total.
 }
@@ -71,6 +71,6 @@ npRmpi.quit()               ## soft close (may keep slaves alive)
 }
 \references{
   Pagan, A. and A. Ullah (1999), \emph{Nonparametric Econometrics,}
-  Cambridge	University Press.
+  Cambridge University Press.
 }
 \keyword{datasets}

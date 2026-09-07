@@ -123,7 +123,7 @@ npcdensbw(\dots)
           search.engine = c("nomad+powell", "cell", "nomad"),
           nomad = FALSE,
           nomad.nmulti = 0L,
-            degree.min = NULL,
+          degree.min = NULL,
           degree.max = NULL,
           degree.start = NULL,
           degree.restarts = 0L,
