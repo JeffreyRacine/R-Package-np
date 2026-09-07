@@ -1,5 +1,11 @@
 # npRmpi 0.80-1
 
+* Single-index distributed objective services now coordinate R preparation
+  and result-handling failures before closing the search. Unexpected NOMAD
+  evaluator errors remain terminal instead of publishing a surviving candidate;
+  workers remain available for subsequent calls. Scientific objective arithmetic
+  and normal search budgets are unchanged.
+
 * Generalized-NN single-index training summaries and coefficient covariance
   use a consistent training-evaluation convention when external predictions
   or different inference outputs are requested. Previously affected serial

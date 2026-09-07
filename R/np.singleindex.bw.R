@@ -1017,7 +1017,8 @@ npindexbw.NULL <-
                                                   bws,
                                                   spec,
                                                   localize = TRUE,
-                                                  leaf.descriptor = NULL) {
+                                                  leaf.descriptor = NULL,
+                                                  .entry.guard = NULL) {
   leaf <- .npindexbw_lp_regression_leaf(
     descriptor = leaf.descriptor,
     index = index,
@@ -1034,7 +1035,8 @@ npindexbw.NULL <-
       bws = leaf$bws,
       invalid.penalty = "dbmax",
       penalty.multiplier = 10,
-      localize = localize
+      localize = localize,
+      .entry.guard = .entry.guard
     )
   )
 
@@ -1055,7 +1057,8 @@ npindexbw.NULL <-
                                                      bws,
                                                      spec,
                                                      localize = TRUE,
-                                                     leaf.descriptor = NULL) {
+                                                     leaf.descriptor = NULL,
+                                                     .entry.guard = NULL) {
   leaf <- .npindexbw_lp_regression_leaf(
     descriptor = leaf.descriptor,
     index = index,
@@ -1073,7 +1076,8 @@ npindexbw.NULL <-
       invalid.penalty = "dbmax",
       penalty.multiplier = 10,
       localize = localize,
-      objective = "ks"
+      objective = "ks",
+      .entry.guard = .entry.guard
     )
   )
 
@@ -1095,7 +1099,8 @@ npindexbw.NULL <-
                                           spec,
                                           localize = TRUE,
                                           leaf.descriptor = NULL,
-                                          objective = NULL) {
+                                          objective = NULL,
+                                          .entry.guard = NULL) {
   leaf <- .npindexbw_lp_regression_leaf(
     descriptor = leaf.descriptor,
     index = index,
@@ -1110,14 +1115,18 @@ npindexbw.NULL <-
     bws = leaf$bws,
     invalid.penalty = "dbmax",
     penalty.multiplier = 10,
-    localize = localize
+    localize = localize,
+    .entry.guard = .entry.guard
   )
   if (!is.null(objective)) eval.args$objective <- objective
   out <- tryCatch(
     .np_progress_with_nested_bandwidth_heartbeat(
       do.call(.npregbw_eval_only, eval.args)
     ),
-    error = function(e) NULL
+    error = function(e) {
+      if (!is.null(.entry.guard)) stop(e)
+      NULL
+    }
   )
   if (is.null(out) || !is.finite(out$objective[1L]))
     return(.npindexbw_objective_result(.Machine$double.xmax, 0L, TRUE))
@@ -1165,16 +1174,6 @@ npindexbw.NULL <-
   )
 }
 
-.npindexbw_service_eval_preflight <- function(ok,
-                                              comm = 1L) {
-  local.invalid <- if (isTRUE(ok)) 0.0 else 1.0
-  total.invalid <- mpi.allreduce(as.double(local.invalid),
-                                 type = 2,
-                                 op = "sum",
-                                 comm = comm)
-  as.numeric(total.invalid[1L]) > 0.0
-}
-
 .npindexbw_service_param_ok <- function(param, expected.length) {
   param <- as.numeric(param)
   expected.length <- as.integer(expected.length)[1L]
@@ -1211,6 +1210,61 @@ npindexbw.NULL <-
   invisible(err)
 }
 
+# These phases cover R preparation and R result handling after native return.
+# An unwind inside collective native work is not a completed transaction and
+# must not be followed by a mismatched R recovery collective.
+.npindexbw_service_transaction <- function(ctx, evaluate) {
+  guard <- new.env(parent = emptyenv())
+  guard$phase <- "preparing"
+  guard$error <- NULL
+  shared.error <- function(error) {
+    source <- mpi.allreduce(if (is.null(error)) ctx$size else ctx$rank,
+                            type = 1L, op = "min", comm = ctx$comm)
+    received <- mpi.bcast.Robj(if (ctx$rank == source) error else NULL,
+                               rank = source, comm = ctx$comm)
+    if (ctx$rank == source) error else received
+  }
+  guard$enter <- function(native, error = NULL) {
+    guard$phase <- "agreement"
+    counts <- mpi.allreduce(c(as.integer(!is.null(error)), as.integer(native)),
+                            type = 1L, op = "sum", comm = ctx$comm)
+    if (counts[1L] > 0L) {
+      guard$error <- shared.error(error)
+      guard$phase <- "agreed.error"
+      stop(guard$error)
+    }
+    if (!(counts[2L] %in% c(0L, ctx$size))) {
+      guard$error <- simpleError("npindex service ranks disagree on native entry")
+      guard$phase <- "agreed.error"
+      stop(guard$error)
+    }
+    guard$phase <- if (native) "native" else "skipped"
+    invisible(NULL)
+  }
+  capture <- function(expr) tryCatch(list(value = force(expr)),
+    error = function(e) list(error = e), interrupt = function(e) list(error = e))
+  result <- capture(evaluate(guard))
+  if (identical(guard$phase, "preparing")) {
+    ready <- capture(guard$enter(native = FALSE, error = result$error))
+    if (!is.null(ready$error)) result <- ready
+  }
+  if (identical(guard$phase, "returned")) {
+    failed <- mpi.allreduce(as.integer(!is.null(result$error)),
+                             type = 1L, op = "sum", comm = ctx$comm)
+    if (failed > 0L) {
+      guard$error <- shared.error(result$error)
+      guard$phase <- "agreed.error"
+    }
+  }
+  if (identical(guard$phase, "agreed.error")) {
+    if (isTRUE(ctx$root)) stop(guard$error)
+    # Workers stay in this service until its existing terminal command arrives.
+    return(invisible(list(service.error = guard$error)))
+  }
+  if (!is.null(result$error)) stop(result$error)
+  result$value
+}
+
 .npindexbw_eval_objective_service_traced <- function(param,
                                                      xmat,
                                                      ydat,
@@ -1218,7 +1272,12 @@ npindexbw.NULL <-
                                                      spec,
                                                      ctx,
                                                      eval_id = NA_integer_,
-                                                     retain.raw = FALSE) {
+                                                     retain.raw = FALSE,
+                                                     .entry.guard = NULL) {
+  if (is.null(.entry.guard))
+    return(.npindexbw_service_transaction(ctx, function(guard)
+      .npindexbw_eval_objective_service_traced(param, xmat, ydat, bws, spec,
+        ctx, eval_id, retain.raw, .entry.guard = guard)))
   assignments <- .splitIndices(nrow(xmat), ctx$size)
   local.idx <- if (length(assignments) >= (ctx$rank + 1L)) {
     assignments[[ctx$rank + 1L]]
@@ -1251,13 +1310,14 @@ npindexbw.NULL <-
       leaf.descriptor = ctx$leaf.descriptor,
       localize = FALSE,
       invalid.penalty = ctx$invalid.penalty,
-      retain.raw = retain.raw
+      retain.raw = retain.raw,
+      .entry.guard = .entry.guard
     ),
     error = function(e) {
       list(
         objective = NA_real_,
         num.feval.fast = 0L,
-        error = conditionMessage(e)
+        error = e
       )
     }
   )
@@ -1276,11 +1336,11 @@ npindexbw.NULL <-
       elapsed = proc.time()[3L] - started,
       objective = if (is.null(out$objective)) NA_real_ else as.numeric(out$objective[1L]),
       ok = is.null(out$error),
-      error = if (is.null(out$error)) "" else out$error
+      error = if (is.null(out$error)) "" else conditionMessage(out$error)
     )
   )
   if (!is.null(out$error))
-    stop(out$error, call. = FALSE)
+    stop(out$error)
   out
 }
 
@@ -1290,7 +1350,12 @@ npindexbw.NULL <-
                                                          bws,
                                                          spec,
                                                          ctx,
-                                                         eval_id = NA_integer_) {
+                                                         eval_id = NA_integer_,
+                                                         .entry.guard = NULL) {
+  if (is.null(.entry.guard))
+    return(.npindexbw_service_transaction(ctx, function(guard)
+      .npindexbw_eval_objective_raw_service_traced(param, xmat, ydat, bws, spec,
+        ctx, eval_id, .entry.guard = guard)))
   assignments <- .splitIndices(nrow(xmat), ctx$size)
   local.idx <- if (length(assignments) >= (ctx$rank + 1L)) {
     assignments[[ctx$rank + 1L]]
@@ -1322,13 +1387,14 @@ npindexbw.NULL <-
       bws = bws,
       spec = spec,
       leaf.descriptor = ctx$leaf.descriptor,
-      localize = FALSE
+      localize = FALSE,
+      .entry.guard = .entry.guard
     ),
     error = function(e) {
       list(
         objective = NA_real_,
         num.feval.fast = 0L,
-        error = conditionMessage(e)
+        error = e
       )
     }
   )
@@ -1348,11 +1414,11 @@ npindexbw.NULL <-
       elapsed = proc.time()[3L] - started,
       objective = if (is.null(out$objective)) NA_real_ else as.numeric(out$objective[1L]),
       ok = is.null(out$error),
-      error = if (is.null(out$error)) "" else out$error
+      error = if (is.null(out$error)) "" else conditionMessage(out$error)
     )
   )
   if (!is.null(out$error))
-    stop(out$error, call. = FALSE)
+    stop(out$error)
   out
 }
 
@@ -1401,19 +1467,7 @@ npindexbw.NULL <-
       task.ctx$service_id <- task.service
 
     if (identical(task$kind, "eval")) {
-      param <- if (is.null(task$param)) numeric(0L) else as.numeric(task$param)
-      invalid.eval <- .npindexbw_service_eval_preflight(
-        ok = .npindexbw_service_param_ok(param, ncol(xmat)),
-        comm = task.ctx$comm
-      )
-      if (isTRUE(invalid.eval)) {
-        .npindexbw_ichimura_lp_service_task_error(
-          "malformed npindex Ichimura LP eval task",
-          task = task,
-          ctx = task.ctx
-        )
-        next
-      }
+      param <- task$param
       task.spec <- if (is.null(task$spec)) spec else task$spec
       .npindexbw_eval_objective_service_traced(
         param = param,
@@ -1428,19 +1482,7 @@ npindexbw.NULL <-
     }
 
     if (identical(task$kind, "certify")) {
-      param <- if (is.null(task$param)) numeric(0L) else as.numeric(task$param)
-      invalid.eval <- .npindexbw_service_eval_preflight(
-        ok = .npindexbw_service_param_ok(param, ncol(xmat)),
-        comm = task.ctx$comm
-      )
-      if (isTRUE(invalid.eval)) {
-        .npindexbw_ichimura_lp_service_task_error(
-          "malformed npindex Ichimura LP certify task",
-          task = task,
-          ctx = task.ctx
-        )
-        next
-      }
+      param <- task$param
       task.spec <- if (is.null(task$spec)) spec else task$spec
       .npindexbw_eval_objective_raw_service_traced(
         param = param,
@@ -1498,15 +1540,6 @@ npindexbw.NULL <-
     comm = ctx$comm
   )
 
-  invalid.eval <- .npindexbw_service_eval_preflight(
-    ok = .npindexbw_service_param_ok(param, ncol(xmat)),
-    comm = ctx$comm
-  )
-  if (isTRUE(invalid.eval))
-    return(list(
-      objective = as.numeric(ctx$invalid.penalty),
-      num.feval.fast = 0L
-    ))
 
   .npindexbw_eval_objective_service_traced(
     param = as.numeric(param),
@@ -1538,12 +1571,6 @@ npindexbw.NULL <-
     rank = 0L,
     comm = ctx$comm
   )
-  invalid.eval <- .npindexbw_service_eval_preflight(
-    ok = .npindexbw_service_param_ok(param, ncol(xmat)),
-    comm = ctx$comm
-  )
-  if (isTRUE(invalid.eval))
-    return(.npindexbw_objective_result(.Machine$double.xmax, 0L, TRUE))
   .npindexbw_eval_objective_raw_service_traced(
     param = as.numeric(param),
     xmat = xmat,
@@ -1654,20 +1681,8 @@ npindexbw.NULL <-
     }
 
     if (identical(task$kind, "eval")) {
-      beta <- if (is.null(task$beta)) numeric(0L) else as.double(task$beta)
-      h <- if (is.null(task$h)) NA_real_ else as.double(task$h[1L])
-      invalid.eval <- .npindexbw_service_eval_preflight(
-        ok = .npindexbw_service_param_ok(c(beta, h), ncol(xmat)),
-        comm = ctx$comm
-      )
-      if (isTRUE(invalid.eval)) {
-        .npindexbw_kleinspady_lp_service_task_error(
-          "malformed npindex Klein-Spady LP eval task",
-          task = task,
-          ctx = ctx
-        )
-        next
-      }
+      beta <- task$beta
+      h <- task$h
       task.spec <- if (is.null(task$spec)) spec else task$spec
       .npindexbw_eval_objective_service_traced(
         param = c(beta, h),
@@ -1682,20 +1697,8 @@ npindexbw.NULL <-
     }
 
     if (identical(task$kind, "certify")) {
-      beta <- if (is.null(task$beta)) numeric(0L) else as.double(task$beta)
-      h <- if (is.null(task$h)) NA_real_ else as.double(task$h[1L])
-      invalid.eval <- .npindexbw_service_eval_preflight(
-        ok = .npindexbw_service_param_ok(c(beta, h), ncol(xmat)),
-        comm = ctx$comm
-      )
-      if (isTRUE(invalid.eval)) {
-        .npindexbw_kleinspady_lp_service_task_error(
-          "malformed npindex Klein-Spady LP certify task",
-          task = task,
-          ctx = ctx
-        )
-        next
-      }
+      beta <- task$beta
+      h <- task$h
       task.spec <- if (is.null(task$spec)) spec else task$spec
       .npindexbw_eval_objective_raw_service_traced(
         param = c(beta, h),
@@ -1746,15 +1749,6 @@ npindexbw.NULL <-
     comm = ctx$comm
   )
 
-  invalid.eval <- .npindexbw_service_eval_preflight(
-    ok = .npindexbw_service_param_ok(c(beta, h), ncol(xmat)),
-    comm = ctx$comm
-  )
-  if (isTRUE(invalid.eval))
-    return(list(
-      objective = as.numeric(ctx$invalid.penalty),
-      invalid = TRUE
-    ))
 
   objective <- .npindexbw_eval_objective_service_traced(
     param = c(as.numeric(beta), as.numeric(h)[1L]),
@@ -1795,12 +1789,6 @@ npindexbw.NULL <-
     rank = 0L,
     comm = ctx$comm
   )
-  invalid.eval <- .npindexbw_service_eval_preflight(
-    ok = .npindexbw_service_param_ok(c(beta, h), ncol(xmat)),
-    comm = ctx$comm
-  )
-  if (isTRUE(invalid.eval))
-    return(.npindexbw_objective_result(.Machine$double.xmax, 0L, TRUE))
   .npindexbw_eval_objective_raw_service_traced(
     param = c(as.numeric(beta), as.numeric(h)[1L]),
     xmat = xmat,
@@ -1904,7 +1892,8 @@ npindexbw.NULL <-
                                       leaf.descriptor = NULL,
                                       localize = TRUE,
                                       invalid.penalty = NULL,
-                                      retain.raw = FALSE) {
+                                      retain.raw = FALSE,
+                                      .entry.guard = NULL) {
   p <- ncol(xmat)
   beta.idx <- if (p > 1L) seq_len(p - 1L) else integer(0)
   beta <- if (length(beta.idx)) as.double(param[beta.idx]) else numeric(0)
@@ -1933,6 +1922,8 @@ npindexbw.NULL <-
     stop("unsupported npindex method", call. = FALSE)
   }
 
+  if (!is.null(.entry.guard) && !.npindexbw_service_param_ok(param, p))
+    return(list(objective = invalid.penalty, num.feval.fast = 0L))
   h.candidate <- .npindex_nn_candidate_bandwidth(h = h, bwtype = bws$type, nobs = nobs)
   if (!h.candidate$ok)
     return(list(objective = invalid.penalty, num.feval.fast = 0L))
@@ -1948,7 +1939,8 @@ npindexbw.NULL <-
       bws = bws,
       spec = spec,
       localize = localize,
-      leaf.descriptor = leaf.descriptor
+      leaf.descriptor = leaf.descriptor,
+      .entry.guard = .entry.guard
     )
     if (isTRUE(retain.raw))
       result$raw.objective <- result$objective
@@ -1963,7 +1955,8 @@ npindexbw.NULL <-
       bws = bws,
       spec = spec,
       localize = localize,
-      leaf.descriptor = leaf.descriptor
+      leaf.descriptor = leaf.descriptor,
+      .entry.guard = .entry.guard
     )
     if (isTRUE(retain.raw))
       result$raw.objective <- result$objective
@@ -1979,7 +1972,10 @@ npindexbw.NULL <-
                                           bws,
                                           spec,
                                           leaf.descriptor = NULL,
-                                          localize = TRUE) {
+                                          localize = TRUE,
+                                          .entry.guard = NULL) {
+  if (!is.null(.entry.guard) && !.npindexbw_service_param_ok(param, ncol(xmat)))
+    return(.npindexbw_objective_result(.Machine$double.xmax, 0L, TRUE))
   p <- ncol(xmat)
   beta.idx <- if (p > 1L) seq_len(p - 1L) else integer(0)
   beta <- if (length(beta.idx)) as.double(param[beta.idx]) else numeric(0)
@@ -2007,14 +2003,15 @@ npindexbw.NULL <-
   if (identical(bws$method, "ichimura")) {
     return(.npindexbw_eval_raw_via_npreg(
       index = index, ydat = ydat, h = h.candidate$value, bws = bws,
-      spec = spec, localize = localize, leaf.descriptor = leaf.descriptor
+      spec = spec, localize = localize, leaf.descriptor = leaf.descriptor,
+      .entry.guard = .entry.guard
     ))
   }
   if (identical(bws$method, "kleinspady")) {
     return(.npindexbw_eval_raw_via_npreg(
       index = index, ydat = ydat, h = h.candidate$value, bws = bws,
       spec = spec, localize = localize, leaf.descriptor = leaf.descriptor,
-      objective = "ks"
+      objective = "ks", .entry.guard = .entry.guard
     ))
   }
   stop("unsupported npindex method", call. = FALSE)
@@ -2507,6 +2504,7 @@ npindexbw.NULL <-
                                     fixed.setup$h.scale, h.lower, h.upper) else NULL,
     nomad.opts = if (is.null(opt.args$nomad.opts)) list() else opt.args$nomad.opts,
     native.r.bridge = TRUE,
+    preserve.eval.error = TRUE,
     start.lower = start.lb,
     start.upper = start.ub,
     coordinate.roles = coordinate.roles,

@@ -623,7 +623,8 @@ npregbw.rbandwidth <-
                                             scale.factor.search.lower = NULL,
                                             eval.only = FALSE,
                                             localize = TRUE,
-                                            objective = c("ls", "ks")) {
+                                            objective = c("ls", "ks"),
+                                            .entry.guard = NULL) {
   invalid.penalty <- match.arg(invalid.penalty)
   objective <- match.arg(objective)
   penalty.multiplier <-
@@ -758,8 +759,17 @@ npregbw.rbandwidth <-
   cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
 
   if (isTRUE(eval.only)) {
+    # Force the R payload before the service's native-entry agreement. The
+    # ordinary (non-service) route retains the direct .Call primitive.
+    eval.native <- if (is.null(.entry.guard)) .Call else function(...) {
+      args <- list(...)
+      .entry.guard$enter(native = TRUE)
+      value <- do.call(.Call, args)
+      .entry.guard$phase <- "returned"
+      value
+    }
     eval_core <- function() {
-      .Call(
+      eval.native(
         C_np_regression_bw_eval,
         as.double(runo),
         as.double(rord),
@@ -982,7 +992,8 @@ npregbw.rbandwidth <-
                                invalid.penalty = c("baseline", "dbmax"),
                                penalty.multiplier = 10,
                                localize = TRUE,
-                               objective = c("ls", "ks")) {
+                                objective = c("ls", "ks"),
+                                .entry.guard = NULL) {
   objective <- match.arg(objective)
   out <- .npregbw_call_fixed_degree_core(
     xdat = xdat,
@@ -992,7 +1003,8 @@ npregbw.rbandwidth <-
     penalty.multiplier = penalty.multiplier,
     eval.only = TRUE,
     localize = localize,
-    objective = objective
+    objective = objective,
+    .entry.guard = .entry.guard
   )
 
   list(
