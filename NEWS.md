@@ -1,5 +1,10 @@
 # npRmpi 0.80-1
 
+* Single-index NOMAD refinements retain the original physical bandwidth
+  lower bound. A valid incumbent is no longer rejected because its changed
+  index coefficients imply a different scale at the refinement handoff.
+  Direct fixed-degree calls and actual-beta restart scaling are unchanged.
+
 * Single-index fixed-bandwidth NOMAD searches reject out-of-domain exploratory
   bandwidths without terminating the search. Explicit input and final-result
   validation remain strict, and unexpected callback errors still propagate.

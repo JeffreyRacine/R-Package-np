@@ -74,3 +74,29 @@ test_that("index NOMAD preserves unexpected callback errors", {
                "index-boundary injected implementation error")
 })
 
+test_that("index refinement keeps the outer physical bandwidth domain", {
+  skip_if_not_installed("crs")
+  old <- options(np.messages = FALSE, np.tree = FALSE)
+  on.exit(options(old), add = TRUE)
+  search <- .np_nomad_search
+  refine <- .npindexbw_run_fixed_degree
+  expected.floor <- NULL
+  floors <- numeric()
+  local_mocked_bindings(.np_nomad_search = function(...) {
+    args <- list(...)
+    owner <- environment(args$eval_fun)
+    expected.floor <<- owner$h.start.controls$scale.factor.search.lower *
+      owner$fixed.setup$h.scale
+    do.call(search, args)
+  }, .npindexbw_run_fixed_degree = function(..., .fixed.h.lower = NULL) {
+    expect_identical(.fixed.h.lower, expected.floor)
+    floors <<- c(floors, .fixed.h.lower)
+    result <- refine(..., .fixed.h.lower = .fixed.h.lower)
+    expect_gte(result$bw, .fixed.h.lower)
+    result
+  }, .package = "npRmpi")
+  zero <- index_boundary_fixture("nomad+powell", floor = 0)
+  positive <- index_boundary_fixture("nomad+powell", floor = NULL)
+  expect_identical(floors, c(0, .1 * .19865932637018829))
+  expect_true(all(is.finite(c(zero$fval, positive$fval))))
+})

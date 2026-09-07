@@ -1865,7 +1865,8 @@ npindexbw.NULL <-
 }
 
 .npindexbw_run_fixed_degree <- function(xdat, ydat, bws, template, reg.args,
-                                        opt.args, .certify.selected = TRUE) {
+                                        opt.args, .certify.selected = TRUE,
+                                        .fixed.h.lower = NULL) {
   tbw <- .npindexbw_build_sibandwidth(
     xdat = xdat,
     ydat = ydat,
@@ -1882,7 +1883,8 @@ npindexbw.NULL <-
         xdat = xdat,
         ydat = ydat,
         bws = tbw,
-        .certify.selected = .certify.selected
+        .certify.selected = .certify.selected,
+        .fixed.h.lower = .fixed.h.lower
       ),
       opt.args
     )
@@ -2441,7 +2443,10 @@ npindexbw.NULL <-
           template = template,
           reg.args = hot.reg.args,
           opt.args = hot.opt.args,
-          .certify.selected = FALSE
+          .certify.selected = FALSE,
+          .fixed.h.lower = if (fixed.nomad)
+            h.start.controls$scale.factor.search.lower * fixed.setup$h.scale
+          else NULL
         )
       )
       powell.elapsed <- proc.time()[3L] - powell.start
@@ -3131,7 +3136,8 @@ npindexbw.sibandwidth <-
            scale.factor.init = 0.5,
            scale.factor.search.lower = NULL,
            .restore.first.start = TRUE,
-           ...){
+           ...,
+           .fixed.h.lower = NULL){
 
     dots <- list(...)
     npRejectUnsupportedBwsolver(dots, "npindexbw")
@@ -3153,6 +3159,12 @@ npindexbw.sibandwidth <-
       ".certify.selected"
     )
     .restore.first.start <- npValidateScalarLogical(.restore.first.start, ".restore.first.start")
+    if (!is.null(.fixed.h.lower) &&
+        (!identical(bws$type, "fixed") || !is.numeric(.fixed.h.lower) ||
+         length(.fixed.h.lower) != 1L || !is.finite(.fixed.h.lower) ||
+         .fixed.h.lower < 0))
+      stop("npindexbw: internal fixed-bandwidth floor must be finite and nonnegative",
+           call. = FALSE)
     only.optimize.beta <- npValidateScalarLogical(only.optimize.beta, "only.optimize.beta")
     nmulti <- npValidateNmulti(nmulti)
     .np_progress_bandwidth_set_total(nmulti)
@@ -3563,7 +3575,10 @@ npindexbw.sibandwidth <-
               fit <- .npindex_index_from_beta_tail(xmat, beta)
               fixed.h.lower <- if (identical(bws$type, "fixed")) {
                 start.scale <- .npindex_start_bandwidth_scale(fit = fit, nobs = nobs)
-                h.start.controls$scale.factor.search.lower * start.scale
+                # Refinement inherits the physical domain of its NOMAD owner.
+                if (is.null(.fixed.h.lower))
+                  h.start.controls$scale.factor.search.lower * start.scale
+                else .fixed.h.lower
               } else {
                 NULL
               }

@@ -82,7 +82,8 @@ npindexbw(\dots)
           scale.factor.init = 0.5,
           scale.factor.search.lower = NULL,
           .restore.first.start = TRUE,
-          \dots)
+          \dots,
+          .fixed.h.lower = NULL)
 
 }
 
@@ -108,6 +109,12 @@ These arguments identify the data, formula interface, method label, and whether 
     internal logical control enabling bounded restoration of eligible
     automatically generated raw-invalid first optimizer evaluations.
     It is used by package search owners and is not intended for direct user control.
+  }
+
+  \item{.fixed.h.lower}{
+    internal physical-bandwidth floor passed from a NOMAD search to its
+    fixed-degree refinement. The default retains the direct-call scale-factor
+    domain. This argument is not intended for direct user control.
   }
 
   \item{bws}{

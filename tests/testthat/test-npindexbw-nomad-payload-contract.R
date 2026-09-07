@@ -84,7 +84,8 @@ test_that("npindexbw retains Powell evaluation counts when Powell does not impro
       .np_nomad_with_powell_progress = function(degree, expr, best_record = NULL) expr,
       .npindexbw_run_fixed_degree = function(xdat, ydat, bws, template,
                                              reg.args, opt.args,
-                                             .certify.selected = TRUE) {
+                                             .certify.selected = TRUE,
+                                             .fixed.h.lower = NULL) {
         hot.certify <<- .certify.selected
         list(
           beta = c(1, 0.5),
