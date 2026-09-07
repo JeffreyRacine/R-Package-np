@@ -51,4 +51,6 @@ test_that("single-index refit hints never evaluate object expressions", {
   expect_error(.np_index_covariance_inverse(matrix(0, 1, 1)),
                "free-coefficient information matrix is singular", fixed = TRUE)
   expect_identical(.np_index_covariance_inverse(diag(2)), diag(2))
+  expect_error(.np_index_covariance_inverse(matrix(0, 1, 1)),
+               "Use se = FALSE", fixed = TRUE)
 })

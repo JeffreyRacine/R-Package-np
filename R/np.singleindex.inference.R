@@ -38,6 +38,7 @@
   factor <- tryCatch(chol(information), error = function(e) {
     stop(paste0("npindex(): asymptotic coefficient covariance could not be computed: ",
                 "the free-coefficient information matrix is singular or not positive definite. ",
+                "Use se = FALSE for point estimates without inference. ",
                 "Original factorization error: ", conditionMessage(e)),
          call. = FALSE)
   })

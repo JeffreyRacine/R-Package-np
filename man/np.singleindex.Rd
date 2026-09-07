@@ -360,6 +360,14 @@ Further arguments are passed to the bandwidth-selection counterpart when bandwid
   Its first row and column are zero because the first coefficient is normalized
   to one. A singular free-coefficient information matrix raises an informative
   error; the calculation does not substitute a generalized inverse or bootstrap.
+  In particular, the local-constant uniform kernel has zero first derivative
+  away from its support boundaries and cannot supply this covariance for free
+  coefficients. Use \code{se=FALSE} for point estimates in that case.
+  Selecting \code{se.type="bootstrap"} does not replace the coefficient
+  covariance calculation, which remains asymptotic.
+  The default inference requires additional training derivatives and moments;
+  it can cost appreciably more than a point-estimate-only fit, especially when
+  bandwidths have already been selected. Use \code{se=FALSE} to omit that work.
   Asymptotic fitted-value and gradient standard errors use the same scalar-index
   regression calculation as the asymptotic plot intervals, treating the fitted
   index coefficients as fixed. Asymptotic standard errors of average gradients
