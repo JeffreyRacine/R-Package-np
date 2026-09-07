@@ -107,6 +107,10 @@ npscoef_demo_validate_row <- function(row) {
     stop("npscoef demo matrix currently supports bwtype=fixed only",
          call. = FALSE)
   }
+  if (npscoef_demo_bool(row$gradients, "gradients")) {
+    stop("npscoef does not support a gradients argument; demo rows require gradients=FALSE",
+         call. = FALSE)
+  }
   nomad <- npscoef_demo_bool(row$nomad, "nomad")
   if (nomad && !identical(row$regtype, "lp")) {
     stop("npscoef nomad rows must use regtype=lp", call. = FALSE)
@@ -159,14 +163,13 @@ npscoef_demo_run_row <- function(row, mode) {
   if (identical(mode, "profile")) {
     mpi.bcast.Robj2slave(mydat)
     mpi.bcast.Robj2slave(bw_args)
-    mpi.bcast.Robj2slave(gradients)
     t <- system.time(mpi.bcast.cmd(bw <- do.call(npscoefbw, bw_args),
                                    caller.execute = TRUE))
-    t <- t + system.time(mpi.bcast.cmd(model <- npscoef(bws = bw, gradients = gradients),
+    t <- t + system.time(mpi.bcast.cmd(model <- npscoef(bws = bw),
                                        caller.execute = TRUE))
   } else {
     t <- system.time(bw <- do.call(npscoefbw, bw_args))
-    t <- t + system.time(model <- npscoef(bws = bw, gradients = gradients))
+    t <- t + system.time(model <- npscoef(bws = bw))
   }
 
   summary(bw)
