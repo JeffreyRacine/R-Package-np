@@ -174,7 +174,7 @@
 .np_progress_bandwidth_notice_line <- function(line, prefix, labels, width) {
   candidates <- c(paste0(line, "; ", labels[1L]),
                   paste0(prefix, " Bandwidth selection (", labels, ")"),
-                  paste0(prefix, " BW search (", tail(labels, 1L), ")"),
+                  paste0(prefix, " BW search (", utils::tail(labels, 1L), ")"),
                   paste(prefix, "restored"))
   fits <- nchar(candidates, type = "width") <= width
   candidates[which(fits)[1L]]
