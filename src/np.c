@@ -10121,7 +10121,8 @@ static SEXP np_regression_lp_apply_conditional_impl(SEXP txuno,
                                                      SEXP sigtest_response_ready,
                                                      SEXP sigtest_pivotal,
                                                      SEXP sigtest_null_mean,
-                                                     SEXP sigtest_residual_pool)
+                                                     SEXP sigtest_residual_pool,
+                                                     SEXP allow_empty_rows)
 {
   SEXP txuno_r = R_NilValue, txord_r = R_NilValue, txcon_r = R_NilValue;
   SEXP exuno_r = R_NilValue, exord_r = R_NilValue, excon_r = R_NilValue;
@@ -10130,6 +10131,11 @@ static SEXP np_regression_lp_apply_conditional_impl(SEXP txuno,
   SEXP sigtest_null_mean_r = R_NilValue;
   SEXP sigtest_residual_pool_r = R_NilValue;
   SEXP out = R_NilValue, ridge_used = R_NilValue;
+  SEXP empty_flags = R_NilValue;
+  NPRegressionLPEmptyRows empty_rows = {NULL, 0};
+  NPRegressionLPEmptyRows *empty_rows_ptr = NULL;
+  const int allow_empty_flag = allow_empty_rows != R_NilValue ?
+    asLogical(allow_empty_rows) : FALSE;
   int nrow_txuno = 0, ncol_txuno = 0, nrow_txord = 0, ncol_txord = 0, nrow_txcon = 0, ncol_txcon = 0;
   int nrow_exuno = 0, ncol_exuno = 0, nrow_exord = 0, ncol_exord = 0, nrow_excon = 0, ncol_excon = 0;
   int nrow_rhs = 0, ncol_rhs = 0;
@@ -10327,6 +10333,21 @@ static SEXP np_regression_lp_apply_conditional_impl(SEXP txuno,
     error("C_np_regression_lp_apply_conditional: legacy bounds length mismatch");
   }
 
+  if(allow_empty_flag == NA_LOGICAL ||
+     (allow_empty_flag && (!has_geometry_context || train_is_eval_flag ||
+       leave_one_out_flag || sigtest_mode_flag != 0 ||
+       lp_engine != NP_LP_ENGINE_GENERAL || derivative_order != 0 ||
+       descriptor.family != NP_CKERNEL_FAMILY_LEGACY ||
+       asInteger(bwtype) == BW_ADAP_NN)))
+    error("C_np_regression_lp_apply_conditional: invalid partial-row policy");
+  if(allow_empty_flag) {
+    empty_flags = PROTECT(allocVector(INTSXP, num_obs_eval));
+    nprotect++;
+    memset(INTEGER(empty_flags), 0, (size_t)num_obs_eval*sizeof(int));
+    empty_rows.flags = INTEGER(empty_flags);
+    empty_rows_ptr = &empty_rows;
+  }
+
   np_native_estimator_state_active = 1;
   num_obs_train_extern = num_obs_train;
   num_obs_eval_extern = num_obs_eval;
@@ -10499,7 +10520,7 @@ static SEXP np_regression_lp_apply_conditional_impl(SEXP txuno,
         REAL(rbw_r), derivative_variable, derivative_order, REAL(out),
         (ridge_used != R_NilValue) ? REAL(ridge_used) : NULL,
         active_route, active_diagnostics, categorical_compress_flag,
-        nn_geometry_context_ptr);
+        nn_geometry_context_ptr, empty_rows_ptr);
     }
     if(compute_status == NP_REGRESSION_LP_MATRIX_OK &&
        ridge_used != R_NilValue)
@@ -10535,7 +10556,7 @@ static SEXP np_regression_lp_apply_conditional_impl(SEXP txuno,
       compute_status = np_regression_lp_apply_matrix(
         REAL(rbw_r), rhs_cols, ncol_rhs, REAL(out),
         active_route, active_diagnostics, categorical_compress_flag,
-        nn_geometry_context_ptr);
+        nn_geometry_context_ptr, empty_rows_ptr);
     }
     if(compute_status != NP_REGRESSION_LP_MATRIX_OK)
       failure_message = compute_status == NP_REGRESSION_LP_MATRIX_ZERO_RADIUS ?
@@ -10593,6 +10614,9 @@ cleanup_lp_apply_wrapper:
   safe_free(rhs_cols);
   np_native_estimator_state_active = 0;
 
+  if(compute_status == NP_REGRESSION_LP_MATRIX_OK &&
+     failure_message == NULL && empty_rows.count > 0)
+    setAttrib(out, install(".np.empty.rows"), empty_flags);
   UNPROTECT(nprotect);
   if(compute_status != NP_REGRESSION_LP_MATRIX_OK || failure_message != NULL) {
     if(compute_status == NP_REGRESSION_LP_MATRIX_ZERO_RADIUS)
@@ -10638,7 +10662,7 @@ SEXP C_np_regression_lp_apply_conditional(SEXP txuno,
     continuous_kernel_family, continuous_kernel_order, ckerlb, ckerub,
     categorical_compress, return_hat, R_NilValue, R_NilValue,
     R_NilValue, R_NilValue, R_NilValue, R_NilValue,
-    R_NilValue, R_NilValue);
+    R_NilValue, R_NilValue, R_NilValue);
 }
 
 SEXP C_np_regression_lp_apply_conditional_ctx(SEXP txuno,
@@ -10665,7 +10689,8 @@ SEXP C_np_regression_lp_apply_conditional_ctx(SEXP txuno,
                                               SEXP categorical_compress,
                                               SEXP return_hat,
                                               SEXP train_is_eval,
-                                              SEXP leave_one_out)
+                                              SEXP leave_one_out,
+                                              SEXP allow_empty_rows)
 {
   return np_regression_lp_apply_conditional_impl(
     txuno, txord, txcon, exuno, exord, excon, rhs, rbw, bwtype,
@@ -10674,7 +10699,7 @@ SEXP C_np_regression_lp_apply_conditional_ctx(SEXP txuno,
     continuous_kernel_family, continuous_kernel_order, ckerlb, ckerub,
     categorical_compress, return_hat, train_is_eval, leave_one_out,
     R_NilValue, R_NilValue, R_NilValue, R_NilValue,
-    R_NilValue, R_NilValue);
+    R_NilValue, R_NilValue, allow_empty_rows);
 }
 
 SEXP C_np_regression_lp_sigtest_conditional_ctx(
@@ -10718,7 +10743,7 @@ SEXP C_np_regression_lp_sigtest_conditional_ctx(
     categorical_compress, return_hat, train_is_eval, leave_one_out,
     sigtest_mode, sigtest_coordinate, sigtest_response_ready,
     sigtest_pivotal, sigtest_null_mean,
-    sigtest_residual_pool);
+    sigtest_residual_pool, R_NilValue);
 }
 
 static void np_density_bw_integer_contract_or_error(SEXP myopti,

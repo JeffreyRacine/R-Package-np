@@ -32607,6 +32607,39 @@ static void np_conditional_push_bounds(int new_bound_flag,
                                        NPConditionalBoundState *saved);
 static void np_conditional_pop_bounds(const NPConditionalBoundState *saved);
 
+/* Classify only after a failed solve. Zero complete computed weights do not
+   distinguish geometric support loss from floating-point underflow. */
+static int np_lp_failed_system_is_finite(const NPLPSolveWorkspace *workspace,
+                                         int nterms, int nrhs)
+{
+  for(size_t i = 0; i < (size_t)nterms*(size_t)nterms; ++i)
+    if(!R_FINITE(workspace->gram_source[i]))
+      return 0;
+  for(size_t i = 0; i < (size_t)nterms*(size_t)nrhs; ++i)
+    if(!R_FINITE(workspace->rhs_source[i]))
+      return 0;
+  return 1;
+}
+
+static int np_lp_record_empty_row(const double *weights, int ntrain,
+                                  int row, int nrow, int ncol,
+                                  double *out, double *ridge,
+                                  NPRegressionLPEmptyRows *empty_rows)
+{
+  if(empty_rows == NULL)
+    return 0;
+  for(int i = 0; i < ntrain; ++i)
+    if(weights[i] != 0.0) /* Also rejects NaN, Inf and signed cancellation. */
+      return 0;
+  empty_rows->flags[row] = 1;
+  ++empty_rows->count;
+  for(int i = 0; i < ncol; ++i)
+    out[(size_t)row + (size_t)nrow*(size_t)i] = NA_REAL;
+  if(ridge != NULL)
+    ridge[row] = NA_REAL;
+  return 1;
+}
+
 int np_regression_lp_hat_matrix(double *vector_scale_factor,
                                 int deriv_var,
                                 int deriv_order,
@@ -32615,7 +32648,8 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
                                 const NPContinuousKernelRoute *kernel_route,
                                 NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
                                 int categorical_compress,
-                                const NPNNGeometryContext *nn_geometry_context){
+                                const NPNNGeometryContext *nn_geometry_context,
+                                NPRegressionLPEmptyRows *empty_rows){
   const int num_train = num_obs_train_extern;
   const int num_eval = num_obs_eval_extern;
   const int num_reg_tot =
@@ -33130,8 +33164,15 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
          ridge_fraction,
          NP_LP_RANK_UPPER_BOUND_UNKNOWN,
          &solve_diagnostics) !=
-       NP_LP_SOLVE_POLICY_OK)
+       NP_LP_SOLVE_POLICY_OK) {
+      if(empty_rows != NULL &&
+         np_lp_failed_system_is_finite(&solve_workspace,
+                                       np_glp_cv_cache.nterms, 1) &&
+         np_lp_record_empty_row(kw, num_train, i, num_eval, num_train,
+                                weights_out, ridge_used_out, empty_rows))
+        continue;
       goto cleanup_lp_hat;
+    }
     if(ridge_used_out != NULL)
       ridge_used_out[i] = solve_diagnostics.ridge_total;
 
@@ -34944,7 +34985,8 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
                                   const NPContinuousKernelRoute *kernel_route,
                                   NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
                                   int categorical_compress,
-                                  const NPNNGeometryContext *nn_geometry_context){
+                                  const NPNNGeometryContext *nn_geometry_context,
+                                  NPRegressionLPEmptyRows *empty_rows){
   const int num_train = num_obs_train_extern;
   const int num_eval = num_obs_eval_extern;
   const int num_reg_tot = num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern;
@@ -35392,8 +35434,36 @@ int np_regression_lp_apply_matrix(double *vector_scale_factor,
          ridge_fraction,
          NP_LP_RANK_UPPER_BOUND_UNKNOWN,
          NULL) !=
-       NP_LP_SOLVE_POLICY_OK)
+       NP_LP_SOLVE_POLICY_OK) {
+      if(empty_rows != NULL &&
+         np_lp_failed_system_is_finite(&solve_workspace,
+                                       np_glp_cv_cache.nterms, n_rhs)) {
+        double mean_row = 0.0;
+        NPConditionalBoundState bounds_state;
+        if(kw == NULL)
+          kw = (double *)malloc((size_t)num_train*sizeof(double));
+        if(kw == NULL)
+          goto cleanup_lp_apply;
+        np_conditional_push_bounds(int_cxker_bound_extern,
+                                   vector_cxkerlb_extern,
+                                   vector_cxkerub_extern, &bounds_state);
+        const int row_status = np_conditional_kernel_row(
+          kernel_cx, kernel_ux, kernel_ox, x_operator, BANDWIDTH_den_extern,
+          num_train, num_reg_unordered_extern, num_reg_ordered_extern,
+          num_reg_continuous_extern, matrix_X_unordered_train_extern,
+          matrix_X_ordered_train_extern, matrix_X_continuous_train_extern,
+          TUNO, TORD, TCON, vector_scale_factor, 1,
+          matrix_bandwidth_x, matrix_bandwidth_eval_one, lambdax,
+          num_categories_extern_X, matrix_categorical_vals_extern_X,
+          int_TREE_X, kdt_extern_X, kw, &mean_row);
+        np_conditional_pop_bounds(&bounds_state);
+        if(row_status == 0 &&
+           np_lp_record_empty_row(kw, num_train, j, num_eval, n_rhs,
+                                  fitted_out, NULL, empty_rows))
+          continue;
+      }
       goto cleanup_lp_apply;
+    }
 
     if(target_deriv >= 0){
       if(use_bernstein)

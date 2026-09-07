@@ -6116,7 +6116,7 @@
   while (start <= neval) {
     stopi <- min(neval, start + block.rows - 1L)
     rows <- seq.int(start, stopi)
-    val <- npreghat(
+    val <- .npreghat_complete(
       bws = bws,
       txdat = txdat,
       exdat = exdat[rows, , drop = FALSE],
@@ -16090,14 +16090,14 @@ compute.default.error.range <- function(center, err) {
                                                   profile.setup = NULL) {
   bws.pilot <- .np_plot_oversmooth_regression_bws(bws)
   if (.np_plot_is_wild_method(plot.errors.boot.method)) {
-    fit.h.train <- as.vector(suppressWarnings(npreghat(
+    fit.h.train <- as.vector(suppressWarnings(.npreghat_complete(
       bws = bws,
       txdat = xdat,
       exdat = xdat,
       y = ydat,
       output = "apply"
     )))
-    fit.g.train <- as.vector(suppressWarnings(npreghat(
+    fit.g.train <- as.vector(suppressWarnings(.npreghat_complete(
       bws = bws.pilot,
       txdat = xdat,
       exdat = xdat,
@@ -16122,14 +16122,14 @@ compute.default.error.range <- function(center, err) {
       s.vec[cpos] <- gorder[cpos]
     }
 
-    H <- suppressWarnings(npreghat(
+    H <- suppressWarnings(.npreghat_complete(
       bws = bws,
       txdat = xdat,
       exdat = exdat,
       s = s.vec,
       output = "matrix"
     ))
-    H.pilot <- suppressWarnings(npreghat(
+    H.pilot <- suppressWarnings(.npreghat_complete(
       bws = bws.pilot,
       txdat = xdat,
       exdat = exdat,

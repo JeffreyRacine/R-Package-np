@@ -60,7 +60,7 @@ npreg <-
 
   evaldat <- if (is.null(exdat)) txdat else exdat
   eval.hat <- function(z) {
-    as.vector(npreghat(
+    as.vector(.npreghat_complete(
       bws = bws,
       txdat = txdat,
       exdat = z,
@@ -105,7 +105,7 @@ npreg <-
     if (!is.null(exdat))
       hat.args$exdat <- exdat
 
-    grad[, cont.idx[jj]] <- as.vector(do.call(npreghat, hat.args))
+    grad[, cont.idx[jj]] <- as.vector(do.call(.npreghat_complete, hat.args))
   }
 
   .npreg_glp_categorical_gradients_from_npreghat(
@@ -717,7 +717,7 @@ npreg.rbandwidth <-
           output = "apply",
           s = integer(bws$ncon)
         )
-        resid <- tydat - as.vector(do.call(npreghat, mean.args))
+        resid <- tydat - as.vector(do.call(.npreghat_complete, mean.args))
       } else {
         resid <- tydat - npreg(txdat = txdat, tydat = tydat, bws = bws,
                                se = FALSE)$mean

@@ -241,7 +241,8 @@
       )
       if (!is.null(s.vec))
         hat.args$s <- as.integer(s.vec)
-      as.vector(do.call(npreghat.rbandwidth, hat.args))
+      as.vector(do.call(npreghat.rbandwidth,
+        c(hat.args, list(.np.require.finite = TRUE))))
     }
     surface.supported <- isTRUE((bws$ncon + bws$nord == 2) &&
                                 (bws$nuno == 0) &&

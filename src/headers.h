@@ -48,6 +48,12 @@ typedef enum {
   NP_REGRESSION_LP_MATRIX_ZERO_MASS = 3
 } NPRegressionLPMatrixStatus;
 
+/* Invocation-owned, R-protected row flags; NULL keeps strict consumers strict. */
+typedef struct {
+  int *flags;
+  int count;
+} NPRegressionLPEmptyRows;
+
 typedef enum {
   NP_REGRESSION_FIT_OK = 0,
   NP_REGRESSION_FIT_ERR_ALLOC = -1,
@@ -337,13 +343,15 @@ int np_regression_lp_hat_matrix(
   const NPContinuousKernelRoute *kernel_route,
   NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
   int categorical_compress,
-  const NPNNGeometryContext *nn_geometry_context);
+  const NPNNGeometryContext *nn_geometry_context,
+  NPRegressionLPEmptyRows *empty_rows);
 int np_regression_lp_apply_matrix(
   double *vector_scale_factor, double **rhs_cols, int n_rhs,
   double *fitted_out, const NPContinuousKernelRoute *kernel_route,
   NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
   int categorical_compress,
-  const NPNNGeometryContext *nn_geometry_context);
+  const NPNNGeometryContext *nn_geometry_context,
+  NPRegressionLPEmptyRows *empty_rows);
 int np_regression_lp_sigtest_iid(
   double *vector_scale_factor, const double *donor_index, int n_rhs,
   const double *null_mean, const double *residual_pool,

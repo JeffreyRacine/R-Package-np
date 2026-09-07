@@ -491,7 +491,7 @@
                                        y = NULL,
                                        output = c("matrix", "apply")) {
   output <- match.arg(output)
-  out <- .npRmpi_with_local_hat_helper(npreghat(
+  out <- .npRmpi_with_local_hat_helper(.npreghat_complete(
     bws = .np_indexhat_rbw(bws = bws, idx.train = idx.train),
     txdat = idx.train,
     exdat = idx.eval,
@@ -512,7 +512,7 @@
 }
 
 .np_indexhat_lp_mean_matrix <- function(bws, idx.train, idx.eval) {
-  out <- .npRmpi_with_local_hat_helper(npreghat(
+  out <- .npRmpi_with_local_hat_helper(.npreghat_complete(
     bws = .np_indexhat_rbw(bws = bws, idx.train = idx.train),
     txdat = idx.train,
     exdat = idx.eval,
@@ -529,7 +529,7 @@
 }
 
 .np_indexhat_gradient_matrix <- function(bws, idx.train, idx.eval) {
-  out <- .npRmpi_with_local_hat_helper(npreghat(
+  out <- .npRmpi_with_local_hat_helper(.npreghat_complete(
     bws = .np_indexhat_rbw(bws = bws, idx.train = idx.train),
     txdat = idx.train,
     exdat = idx.eval,
@@ -1148,7 +1148,7 @@ npindexhat <-
   pre <- .npRmpi_with_local_hat_helper({
     resx.train <- matrix(0.0, nrow = n, ncol = p)
     for (j in seq_len(p)) {
-      xhat.train <- npreghat(
+      xhat.train <- .npreghat_complete(
         bws = bws$bw[[j + 1L]],
         txdat = tzdat,
         y = x.train.num[, j],
@@ -1159,7 +1159,7 @@ npindexhat <-
 
     qrR <- qr(resx.train, tol = .Machine$double.eps)
 
-    Hy.train <- npreghat(
+    Hy.train <- .npreghat_complete(
       bws = bws$bw$yzbw,
       txdat = tzdat,
       y = yy,
@@ -1184,7 +1184,7 @@ npindexhat <-
     rows <- as.integer(task$rows)
     resx.eval <- matrix(0.0, nrow = length(rows), ncol = p)
     for (j in seq_len(p)) {
-      xhat.eval <- npreghat(
+      xhat.eval <- .npreghat_complete(
         bws = bws$bw[[j + 1L]],
         txdat = tzdat,
         exdat = ezdat[rows, , drop = FALSE],
@@ -1194,7 +1194,7 @@ npindexhat <-
       resx.eval[, j] <- x.eval.num[rows, j] - as.vector(xhat.eval)
     }
 
-    Hy.eval <- npreghat(
+    Hy.eval <- .npreghat_complete(
       bws = bws$bw$yzbw,
       txdat = tzdat,
       exdat = ezdat[rows, , drop = FALSE],
@@ -1297,7 +1297,7 @@ npplreghat <-
     resx.eval <- matrix(0.0, nrow = m, ncol = p)
 
     if (matrix.output) {
-      H.y.eval <- npreghat(
+      H.y.eval <- .npreghat_complete(
         bws = bws$bw$yzbw,
         txdat = tzdat,
         exdat = ezdat,
@@ -1305,13 +1305,13 @@ npplreghat <-
       )
 
       for (j in seq_len(p)) {
-        xhat.train <- as.vector(npreghat(
+        xhat.train <- as.vector(.npreghat_complete(
           bws = bws$bw[[j + 1L]],
           txdat = tzdat,
           y = x.train.num[, j],
           output = "apply"
         ))
-        xhat.eval <- as.vector(npreghat(
+        xhat.eval <- as.vector(.npreghat_complete(
           bws = bws$bw[[j + 1L]],
           txdat = tzdat,
           exdat = ezdat,
@@ -1324,7 +1324,7 @@ npplreghat <-
       }
 
       qrR <- qr(resx.train, tol = .Machine$double.eps)
-      H.y.train <- npreghat(
+      H.y.train <- .npreghat_complete(
         bws = bws$bw$yzbw,
         txdat = tzdat,
         output = "matrix"
@@ -1361,13 +1361,13 @@ npplreghat <-
 
     out <- .npRmpi_with_local_hat_helper({
       for (j in seq_len(p)) {
-        xhat.train <- npreghat(
+        xhat.train <- .npreghat_complete(
           bws = bws$bw[[j + 1L]],
           txdat = tzdat,
           y = x.train.num[, j],
           output = "apply"
         )
-        xhat.eval <- npreghat(
+        xhat.eval <- .npreghat_complete(
           bws = bws$bw[[j + 1L]],
           txdat = tzdat,
           exdat = ezdat,
@@ -1380,7 +1380,7 @@ npplreghat <-
 
       qrR <- qr(resx.train, tol = .Machine$double.eps)
 
-      Hy.eval <- npreghat(
+      Hy.eval <- .npreghat_complete(
         bws = bws$bw$yzbw,
         txdat = tzdat,
         exdat = ezdat,
@@ -1390,7 +1390,7 @@ npplreghat <-
       if (!is.matrix(Hy.eval))
         Hy.eval <- matrix(Hy.eval, ncol = ncol(yy))
 
-      Hy.train <- npreghat(
+      Hy.train <- .npreghat_complete(
         bws = bws$bw$yzbw,
         txdat = tzdat,
         y = yy,

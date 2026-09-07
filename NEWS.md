@@ -19,6 +19,11 @@
   bandwidth call's existing environment, so wrapper-local data remains usable
   after the wrapper returns and after saving and reloading the bandwidth object.
 
+* External local-polynomial npreghat mean rows with finite moment systems but
+  exactly zero computed kernel weights now return NA with one informative
+  warning. Defined rows, kernel accumulation, solver arithmetic and internal
+  complete-operator failure behavior are unchanged. The same row contract
+  covers matrix, apply, constraint and recomputed prediction outputs.
 
 * Single-index autodispatch now materializes caller-local `se.type` values
   through the shared argument transport owner, just like `se`. Literal choices,

@@ -129,6 +129,18 @@ An evaluation row whose required kernel normalization is exactly zero or
 non-finite is returned as an \code{NA} hat row. Defined rows remain available,
 and every finite nonzero normalization is used literally.
 
+For non-beta local-polynomial mean operators with fixed or generalized
+nearest-neighbor bandwidths, a failed external evaluation row is returned as
+\code{NA} only when its pristine moment system is finite and every computed
+kernel weight is exactly zero. One warning identifies the affected result rows
+(after missing evaluation rows are omitted). This reports the computed weights;
+it does not distinguish absence of geometric support from numerical underflow.
+Defined rows retain their ordinary values. In matrix output, the corresponding
+\code{ridge.used} entries are \code{NA}; apply output has undefined rows, and
+constraint output has the corresponding undefined columns. Other solve failures
+and zero nearest-neighbor radii remain errors. Training, leave-one-out and
+internal complete-operator consumers retain strict failure behavior.
+
 For local-constant beta kernels, one first derivative is evaluated by the
 same analytic C kernel used by \code{npreg(..., gradients=TRUE)}. If an exact
 support endpoint creates a raw-kernel jump, the hat operator cannot know
