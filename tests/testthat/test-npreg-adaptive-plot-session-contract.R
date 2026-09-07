@@ -136,6 +136,9 @@ test_that("session adaptive-nn lc plot-data mean matches public npreg and npregh
 test_that("session adaptive-nn lc exact geom plot-data completes and reports bootstrap progress", {
   skip_on_cran()
 
+  # Qualify the plotting route independently of bandwidth selection. A small
+  # selected k can legitimately have zero radii in a resample; that rejection
+  # is covered by test-nn-literal-zero-radius-contract.R.
   env <- npRmpi_subprocess_env(c("NP_RMPI_NO_REUSE_SLAVES=1"))
   skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
   res <- npRmpi_run_rscript_subprocess(
@@ -149,7 +152,8 @@ test_that("session adaptive-nn lc exact geom plot-data completes and reports boo
       "x <- runif(n, -1, 1)",
       "y <- x^2 + rnorm(n, sd = 0.25 * stats::sd(x))",
       "dat <- data.frame(x=x, y=y)",
-      "fit <- npreg(y ~ x, data=dat, nmulti=1L, regtype='lc', bwtype='adaptive_nn')",
+      "bw <- npregbw(y ~ x, data=dat, regtype='lc', bwtype='adaptive_nn', bws=35L, bandwidth.compute=FALSE)",
+      "fit <- npreg(bws=bw, data=dat)",
       "out <- suppressWarnings(plot(",
       "  fit,",
       "  output = 'data',",
