@@ -1,5 +1,9 @@
 # npRmpi 0.80-1
 
+* Single-index fits, predictions and bootstrap row calculations now complete
+  their MPI result exchange before reporting a cooperative local fitting
+  error. The original error is preserved and the worker pool remains reusable.
+
 * Single-index NOMAD refinements retain the original physical bandwidth
   lower bound. A valid incumbent is no longer rejected because its changed
   index coefficients imply a different scale at the refinement handoff.

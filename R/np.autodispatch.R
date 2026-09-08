@@ -1489,7 +1489,8 @@
   out <- tryCatch(
     handler(payload, envelope),
     error = function(e) {
-      if (inherits(e, "np_nn_zero_radius"))
+      if (inherits(e, "np_nn_zero_radius") ||
+          inherits(e, "npRmpi_index_rows_error"))
         stop(e)
       stop(
         sprintf("%s opcode failure [opcode=%s seq_id=%d]: %s",
@@ -1660,6 +1661,15 @@
       all(status.vec == "ERR") &&
       all(ack.mat["error", ] == conditionMessage(local$condition))
     if (isTRUE(unanimous.nn.radius))
+      stop(local$condition)
+
+    unanimous.index.rows <- !is.na(rank) && rank == 0L &&
+      inherits(local$condition, "npRmpi_index_rows_error") &&
+      all(status.vec == "ERR") &&
+      all(seq.vec == as.integer(envelope$seq_id)) &&
+      all(opcode.vec == as.character(envelope$opcode)[1L]) &&
+      all(ack.mat["error", ] == conditionMessage(local$condition))
+    if (isTRUE(unanimous.index.rows))
       stop(local$condition)
 
     detail.index <- unique(c(1L, bad))
@@ -2818,6 +2828,8 @@
     }
     if (inherits(eval.condition, "np_nn_zero_radius"))
       stop(eval.condition)
+    if (inherits(eval.condition, "npRmpi_index_rows_error"))
+      stop(eval.condition[["cause", exact = TRUE]])
     stop(paste(as.character(eval.out), collapse = " "), call. = FALSE)
   }
   result <- eval.out
