@@ -1902,7 +1902,8 @@ nplsqreg.lsqregressionbandwidth <-
       fit.dots <- list(...)
       defer.empty <- isTRUE(fit.dots[[".np.defer.empty.rows", exact = TRUE]])
       fit.dots$.np.defer.empty.rows <- TRUE
-      empty.rows <- NULL
+      empty.state <- new.env(hash = FALSE, parent = emptyenv())
+      empty.state$rows <- NULL
       fit.list <- lapply(seq_along(tau), function(j) {
         one.bws <- bws$tau.bws[[j]]
         one.bws$formula <- bws$formula
@@ -1910,7 +1911,7 @@ nplsqreg.lsqregressionbandwidth <-
                          txdat = txdat, tydat = tydat,
                          tau = tau[[j]], se = se), fit.dots))
         flags <- attr(fit, ".np.empty.rows", exact = TRUE)
-        empty.rows <<- .npreg_merge_empty_rows(empty.rows, flags)
+        empty.state$rows <- .npreg_merge_empty_rows(empty.state$rows, flags)
         if(!is.null(flags)) attr(fit, ".np.empty.rows") <- NULL
         fit
       })
@@ -1921,7 +1922,7 @@ nplsqreg.lsqregressionbandwidth <-
         tau.search = if (is.null(bws$tau.search)) "full" else bws$tau.search,
         call = match.call(expand.dots = FALSE))
       environment(out$call) <- parent.frame()
-      return(.npreg_finish_empty_rows(out, empty.rows, defer = defer.empty,
+      return(.npreg_finish_empty_rows(out, empty.state$rows, defer = defer.empty,
         owner = "nplsqreg", row.labels = row.names(out$xeval)))
     }
     nplsqreg.default(bws = bws, txdat = txdat, tydat = tydat, tau = tau,

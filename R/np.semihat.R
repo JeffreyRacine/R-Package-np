@@ -663,7 +663,8 @@
     return(H)
   }
 
-  empty.rows <- NULL
+  empty.state <- new.env(hash = FALSE, parent = emptyenv())
+  empty.state$rows <- NULL
   fit_one <- function(ycol) {
     fit <- .npRmpi_with_local_regression(.np_regression_direct(
       bws = rbw,
@@ -673,7 +674,7 @@
       gradients = FALSE,
       allow.empty.rows = isTRUE(allow.empty.rows) && identical(output, "apply")
     ))
-    empty.rows <<- .npreg_merge_empty_rows(empty.rows,
+    empty.state$rows <- .npreg_merge_empty_rows(empty.state$rows,
       attr(fit, ".np.empty.rows", exact = TRUE))
     fit$mean
   }
@@ -702,7 +703,7 @@
     out[, j] <- fit_one(y[, j])
 
   value <- if (ncol(out) == 1L) as.vector(out) else out
-  if(!is.null(empty.rows)) attr(value, ".np.empty.rows") <- empty.rows
+  if(!is.null(empty.state$rows)) attr(value, ".np.empty.rows") <- empty.state$rows
   value
 }
 

@@ -52,18 +52,19 @@
 # Each callback belongs to one public plot invocation. Grid/row identifiers
 # distinguish separate evaluation grids; required failures never call finish.
 .npreg_plot_empty_publisher <- function(owner = "plot()") {
-  rows <- character()
-  grid <- 0L
+  state <- new.env(hash = FALSE, parent = emptyenv())
+  state$rows <- character()
+  state$grid <- 0L
   list(record = function(flags, labels = NULL) {
-    grid <<- grid + 1L
+    state$grid <- state$grid + 1L
     if(is.null(flags)) return(invisible(NULL))
     missing <- which(flags == 1L)
-    rows <<- c(rows, paste0(grid, "/", missing))
+    state$rows <- c(state$rows, paste0(state$grid, "/", missing))
     invisible(NULL)
   }, finish = function() {
-    if(length(rows))
-      .npreg_finish_empty_rows(list(), rep.int(1L, length(rows)),
-        owner = paste0(owner, " [grid/row]"), row.labels = rows)
+    if(length(state$rows))
+      .npreg_finish_empty_rows(list(), rep.int(1L, length(state$rows)),
+        owner = paste0(owner, " [grid/row]"), row.labels = state$rows)
     invisible(NULL)
   })
 }

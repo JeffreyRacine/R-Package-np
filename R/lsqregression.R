@@ -686,11 +686,12 @@ gradients.lsqregression <- function(x, se = FALSE,
       tydat <- as.numeric(toFrame(tydat)[[1L]])
       exdat <- toFrame(exdat)
 
-      empty.rows <- NULL
+      empty.state <- new.env(hash = FALSE, parent = emptyenv())
+      empty.state$rows <- NULL
       capture.rows <- function(flags, labels = NULL) {
-        empty.rows <<- .npreg_merge_empty_rows(empty.rows, flags)
+        empty.state$rows <- .npreg_merge_empty_rows(empty.state$rows, flags)
       }
-      finish <- function(value) .npreg_publish_plot_rows(value, empty.rows,
+      finish <- function(value) .npreg_publish_plot_rows(value, empty.state$rows,
         report = .np.empty.report, row.labels = row.names(exdat))
       fit.one <- function(one.bws, tau.i) {
         fit <- .np_plot_regression_eval(
@@ -773,14 +774,15 @@ predict.lsqregression <- function(object, se.fit = FALSE, ...) {
     if (is.null(object$tau.fits) || length(object$tau.fits) != length(object$tau))
       stop("vector nplsqreg object lacks per-tau fit state", call. = FALSE)
     labels <- .nplsqreg_tau_labels(object$tau)
-    empty.rows <- NULL
+    empty.state <- new.env(hash = FALSE, parent = emptyenv())
+    empty.state$rows <- NULL
     child.dots <- dots
     child.dots$.np.defer.empty.rows <- TRUE
     pred <- lapply(object$tau.fits, function(one) {
       value <- do.call(predict.lsqregression,
         c(list(object = one, se.fit = se.fit), child.dots))
       flags <- attr(value, ".np.empty.rows", exact = TRUE)
-      empty.rows <<- .npreg_merge_empty_rows(empty.rows, flags)
+      empty.state$rows <- .npreg_merge_empty_rows(empty.state$rows, flags)
       if(!is.null(flags)) attr(value, ".np.empty.rows") <- NULL
       value
     })
@@ -791,12 +793,12 @@ predict.lsqregression <- function(object, se.fit = FALSE, ...) {
       colnames(se.out) <- labels
       out <- list(fit = fit, se.fit = se.out, df = pred[[1L]]$df,
                   residual.scale = pred[[1L]]$residual.scale)
-      return(.npreg_finish_empty_rows(out, empty.rows, defer = defer.empty,
+      return(.npreg_finish_empty_rows(out, empty.state$rows, defer = defer.empty,
         owner = "predict.nplsqreg"))
     }
     out <- do.call(cbind, pred)
     colnames(out) <- labels
-    return(.npreg_finish_empty_rows(out, empty.rows, defer = defer.empty,
+    return(.npreg_finish_empty_rows(out, empty.state$rows, defer = defer.empty,
       owner = "predict.nplsqreg"))
   }
   npRejectLegacyBooleanErrors(dots, "predict.lsqregression")

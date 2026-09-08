@@ -1,10 +1,11 @@
 a2_capture <- function(expr) {
-  warnings <- character()
+  warning.state <- new.env(hash = FALSE, parent = emptyenv())
+  warning.state$messages <- character()
   value <- withCallingHandlers(tryCatch(expr, error = identity), warning = function(w) {
-    warnings <<- c(warnings, conditionMessage(w))
+    warning.state$messages <- c(warning.state$messages, conditionMessage(w))
     invokeRestart("muffleWarning")
   })
-  list(value = value, warnings = warnings[grepl("all computed kernel weights", warnings)])
+  list(value = value, warnings = warning.state$messages[grepl("all computed kernel weights", warning.state$messages)])
 }
 
 a2_fixture <- function() {

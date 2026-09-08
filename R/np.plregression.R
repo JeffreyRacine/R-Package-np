@@ -382,7 +382,8 @@ npplreg.call <-
       profile.mean[eval.cache$id]
     }
 
-    empty.rows <- NULL
+    empty.state <- new.env(hash = FALSE, parent = emptyenv())
+    empty.state$rows <- NULL
     reg_mean <- function(regbw, ytrain, zeval = NULL) {
       out <- reg_mean_cat_cached(regbw = regbw, ytrain = ytrain, zeval = zeval)
       if (is.null(out)) {
@@ -406,7 +407,7 @@ npplreg.call <-
         args$exdat <- zeval
       args$allow.empty.rows <- !is.null(zeval)
       fit <- .npRmpi_with_local_regression(do.call(.np_regression_direct, args))
-      empty.rows <<- .npreg_merge_empty_rows(empty.rows,
+      empty.state$rows <- .npreg_merge_empty_rows(empty.state$rows,
         attr(fit, ".np.empty.rows", exact = TRUE))
       as.vector(fit$mean)
     }
@@ -485,7 +486,7 @@ npplreg.call <-
       residuals = FALSE,
       xtra = c(RSQ, MSE, MAE, MAPE, CORR, SIGN)
     ))
-    .npreg_publish_plot_rows(fit, empty.rows, report = .np.empty.report,
+    .npreg_publish_plot_rows(fit, empty.state$rows, report = .np.empty.report,
       omitted = if(no.exz) integer(0) else which(!keep.eval),
       row.labels = if(no.exz) NULL else row.names(ezdat))
   }
@@ -568,7 +569,8 @@ npplreg.plbandwidth <-
     if (!no.ey)
       tmp.ey <- .np_plreg_numeric_response(eydat, bws$bw$yzbw$ydati)
 
-    empty.eval.rows <- NULL
+    empty.state <- new.env(hash = FALSE, parent = emptyenv())
+    empty.state$rows <- NULL
     reg_mean <- function(regbw, ytrain, zeval = NULL) {
       out <- .np_regression_cat_profile_mean(
         bws = regbw,
@@ -584,7 +586,7 @@ npplreg.plbandwidth <-
         args$exdat <- zeval
       args$.np.defer.empty.rows <- TRUE
       fit <- do.call(npreg, args)
-      empty.eval.rows <<- .npreg_merge_empty_rows(empty.eval.rows,
+      empty.state$rows <- .npreg_merge_empty_rows(empty.state$rows,
         attr(fit, ".np.empty.rows", exact = TRUE))
       as.vector(fitted(fit))
     }
@@ -726,7 +728,7 @@ npplreg.plbandwidth <-
     environment(ev$call) <- parent.frame()
     fit.progress <- .np_progress_end(fit.progress)
     fit.progress.active <- FALSE
-    return(.npreg_finish_empty_rows(ev, empty.eval.rows,
+    return(.npreg_finish_empty_rows(ev, empty.state$rows,
       omitted = if(no.exz) integer(0) else which(!keep.eval),
       defer = isTRUE(list(...)[[".np.defer.empty.rows", exact = TRUE]]),
       owner = "npplreg", row.labels = if(no.exz) NULL else row.names(exdat)))

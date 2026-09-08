@@ -839,7 +839,8 @@ npindex.sibandwidth <-
     } else {
       NULL
     }
-    empty.eval.rows <- NULL
+    empty.state <- new.env(hash = FALSE, parent = emptyenv())
+    empty.state$rows <- NULL
     next_npreg_fit_args <- function(exdat = NULL, gradients = FALSE, se = FALSE,
                                     allow.empty.rows = FALSE) {
       args <- if (identical(regtype, "lp") || lc.fixed.progress.route) {
@@ -961,7 +962,7 @@ npindex.sibandwidth <-
           values
         }
       )
-      empty.eval.rows <<- .npreg_merge_empty_rows(empty.eval.rows,
+      empty.state$rows <- .npreg_merge_empty_rows(empty.state$rows,
         attr(out, ".np.empty.rows", exact = TRUE))
       list(
         mean = as.vector(out[, 1L]),
@@ -994,7 +995,7 @@ npindex.sibandwidth <-
             values
           }
         )
-        empty.eval.rows <<- .npreg_merge_empty_rows(empty.eval.rows,
+        empty.state$rows <- .npreg_merge_empty_rows(empty.state$rows,
           attr(out, ".np.empty.rows", exact = TRUE))
         list(mean = as.vector(out[, 1L]), grad = matrix(out[, 2L], ncol = 1L))
       } else {
@@ -1602,7 +1603,7 @@ npindex.sibandwidth <-
     ev$fit.time <- fit.elapsed
     ev$nomad.time <- if (!is.null(bws$nomad.time) && is.finite(bws$nomad.time)) as.double(bws$nomad.time) else NA_real_
     ev$powell.time <- if (!is.null(bws$powell.time) && is.finite(bws$powell.time)) as.double(bws$powell.time) else NA_real_
-    .npreg_finish_empty_rows(ev, empty.eval.rows,
+    .npreg_finish_empty_rows(ev, empty.state$rows,
       omitted = if(no.ex) integer(0) else which(!keep.eval),
       defer = isTRUE(dots[[".np.defer.empty.rows", exact = TRUE]]),
       owner = "npindex", row.labels = if(no.ex) NULL else row.names(exdat))

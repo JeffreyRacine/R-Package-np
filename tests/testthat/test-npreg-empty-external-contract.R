@@ -1,10 +1,11 @@
 a_capture_empty <- function(expr) {
-  warnings <- character()
+  warning.state <- new.env(hash = FALSE, parent = emptyenv())
+  warning.state$messages <- character()
   value <- withCallingHandlers(expr, warning = function(w) {
-    warnings <<- c(warnings, conditionMessage(w))
+    warning.state$messages <- c(warning.state$messages, conditionMessage(w))
     invokeRestart("muffleWarning")
   })
-  list(value = value, warnings = warnings[grepl("all computed kernel weights", warnings)])
+  list(value = value, warnings = warning.state$messages[grepl("all computed kernel weights", warning.state$messages)])
 }
 
 test_that("LL and parameterized LP publish only undefined external components", {
@@ -132,12 +133,13 @@ test_that("composite callers publish once and required bootstrap errors remain t
   expect_length(index$warnings,1L)
   expect_true(is.na(index$value$mean[2L]))
   # A later required replicate must not publish the initial permissive fit.
-  warnings<-character()
+  warning.state <- new.env(hash = FALSE, parent = emptyenv())
+  warning.state$messages <- character()
   err<-withCallingHandlers(tryCatch(npindex(bi,txdat=z,tydat=y,exdat=ez,
     se=TRUE,gradients=TRUE,se.type="bootstrap",B=3L),error=identity),
-    warning=function(w){warnings<<-c(warnings,conditionMessage(w));invokeRestart("muffleWarning")})
+    warning=function(w){warning.state$messages<-c(warning.state$messages,conditionMessage(w));invokeRestart("muffleWarning")})
   expect_s3_class(err,"error")
-  expect_false(any(grepl("all computed kernel weights",warnings)))
+  expect_false(any(grepl("all computed kernel weights",warning.state$messages)))
   bp<-npplregbw(xdat=x,zdat=z,ydat=y,bws=matrix(.4,2,1),bandwidth.compute=FALSE,
     regtype="lp",degree=3L,ckertype="epanechnikov")
   p<-a_capture_empty(npplreg(bp,txdat=x,tydat=y,tzdat=z,exdat=ex,ezdat=ez))
