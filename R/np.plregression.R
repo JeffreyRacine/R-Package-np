@@ -226,7 +226,8 @@ npplreg.call <-
            ydat,
            zdat,
            exdat,
-           ezdat) {
+           ezdat,
+           .np.empty.report = NULL) {
     activity <- .np_plot_activity_begin("Computing partially linear plot fit")
     on.exit(.np_plot_activity_end(activity), add = TRUE)
 
@@ -381,6 +382,7 @@ npplreg.call <-
       profile.mean[eval.cache$id]
     }
 
+    empty.rows <- NULL
     reg_mean <- function(regbw, ytrain, zeval = NULL) {
       out <- reg_mean_cat_cached(regbw = regbw, ytrain = ytrain, zeval = zeval)
       if (is.null(out)) {
@@ -402,7 +404,11 @@ npplreg.call <-
       )
       if (!is.null(zeval))
         args$exdat <- zeval
-      as.vector(.npRmpi_with_local_regression(do.call(.np_regression_direct, args))$mean)
+      args$allow.empty.rows <- !is.null(zeval)
+      fit <- .npRmpi_with_local_regression(do.call(.np_regression_direct, args))
+      empty.rows <<- .npreg_merge_empty_rows(empty.rows,
+        attr(fit, ".np.empty.rows", exact = TRUE))
+      as.vector(fit$mean)
     }
 
     yhat.train <- reg_mean(regbw = bws$bw$yzbw, ytrain = ydat)
@@ -466,7 +472,7 @@ npplreg.call <-
       as.vector(yhat.eval + resx.eval %*% B)
     }
 
-    do.call(plregression, list(
+    fit <- do.call(plregression, list(
       bws = bws,
       xcoef = B,
       xcoeferr = Berr,
@@ -479,6 +485,9 @@ npplreg.call <-
       residuals = FALSE,
       xtra = c(RSQ, MSE, MAE, MAPE, CORR, SIGN)
     ))
+    .npreg_publish_plot_rows(fit, empty.rows, report = .np.empty.report,
+      omitted = if(no.exz) integer(0) else which(!keep.eval),
+      row.labels = if(no.exz) NULL else row.names(ezdat))
   }
 
 

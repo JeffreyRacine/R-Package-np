@@ -37,7 +37,7 @@
            plot.data.overlay = TRUE,
            plot.rug = FALSE,
            ...,
-           random.seed){
+           random.seed, .np.empty.report = NULL){
 
     sub.supplied <- !missing(sub)
 
@@ -178,7 +178,8 @@
         txdat = xdat,
         tydat = ydat,
         gradients = gradients,
-        index.eval = eval.info$index.eval
+        index.eval = eval.info$index.eval,
+        .np.empty.report = .np.empty.report
       )
     } else {
       tobj <- .np_plot_singleindex_local_eval(
@@ -186,7 +187,8 @@
         idx.train = eval.info$idx.train,
         idx.eval = eval.info$idx.eval,
         ydat = ydat,
-        gradients = gradients
+        gradients = gradients,
+        .np.empty.report = .np.empty.report
       )
     }
     

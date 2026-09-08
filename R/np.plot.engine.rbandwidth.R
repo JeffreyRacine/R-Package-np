@@ -52,7 +52,7 @@
            plot.data.overlay = TRUE,
            plot.rug = FALSE,
            ...,
-           random.seed){
+           random.seed, .np.empty.report = NULL){
 
     sub.supplied <- !missing(sub)
 
@@ -241,8 +241,13 @@
       )
       if (!is.null(s.vec))
         hat.args$s <- as.integer(s.vec)
-      as.vector(do.call(npreghat.rbandwidth,
-        c(hat.args, list(.np.require.finite = TRUE))))
+      # Keep the incumbent hat-apply owner. Only public LL/LP point rows
+      # use its qualified empty-row policy; required bootstrap fits stay strict.
+      value <- do.call(npreghat.rbandwidth,
+        c(hat.args, list(.np.require.finite = !(bws$regtype %in% c("ll", "lp")),
+                         .np.defer.empty.rows = TRUE)))
+      flags <- attr(value, ".np.empty.rows", exact = TRUE)
+      .npreg_publish_plot_rows(as.vector(value), flags, report = .np.empty.report)
     }
     surface.supported <- isTRUE((bws$ncon + bws$nord == 2) &&
                                 (bws$nuno == 0) &&
@@ -321,12 +326,12 @@
               exdat = x.eval, bws = bws,
               se = TRUE,
               gradient.order = gradient.order,
-              warn.glp.gradient = FALSE)
+              warn.glp.gradient = FALSE, .np.defer.empty.rows = TRUE)
             engine.trace(
               event = "npreg.done",
               fields = list(slice = 0L, gradients = gradients, n_eval = length(tobj$mean))
             )
-            tobj
+            .npreg_publish_plot_rows(tobj, report = .np.empty.report)
           }
         )
       } else if (!identical(bws$type, "fixed")) {
@@ -340,7 +345,8 @@
           ydat = ydat,
           exdat = x.eval,
           gradient.order = gradient.order,
-          need.asymptotic = FALSE
+          need.asymptotic = FALSE,
+          .np.empty.report = .np.empty.report
         )
         engine.trace(
           event = "direct.fit.done",
@@ -750,20 +756,20 @@
                   se = TRUE,
                   gradients = gradients,
                   gradient.order = gradient.order,
-                  warn.glp.gradient = FALSE))
+                  warn.glp.gradient = FALSE, .np.defer.empty.rows = TRUE))
               } else {
                 npreg(txdat = xdat, tydat = ydat,
                   exdat = eval.slice, bws = bws,
                   se = TRUE,
                   gradients = gradients,
                   gradient.order = gradient.order,
-                  warn.glp.gradient = FALSE)
+                  warn.glp.gradient = FALSE, .np.defer.empty.rows = TRUE)
               }
               engine.trace(
                 event = "npreg.done",
                 fields = list(slice = i, gradients = gradients, n_eval = xi.neval)
               )
-              tr
+              .npreg_publish_plot_rows(tr, report = .np.empty.report)
             }
           )
         } else {
@@ -778,7 +784,8 @@
             exdat = eval.slice,
             gradients = gradients,
             gradient.order = gradient.order,
-            need.asymptotic = FALSE
+            need.asymptotic = FALSE,
+          .np.empty.report = .np.empty.report
           )
           engine.trace(
             event = "direct.fit.done",

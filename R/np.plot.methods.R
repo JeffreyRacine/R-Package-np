@@ -176,7 +176,7 @@ np_render_control <- function(style = c("band", "bar"),
     method <- .np_plot_engine_for_bws(bws)
   if (is.null(method))
     return(character())
-  args <- setdiff(names(formals(method)), c("bws", "..."))
+  args <- setdiff(names(formals(method)), c("bws", "...", ".np.empty.report"))
   if (identical(method, .np_plot_sibandwidth_engine))
     args <- c(args, "gradient.order")
   args
@@ -516,10 +516,17 @@ np_render_control <- function(style = c("band", "bar"),
     }
   }
 
-  .np_with_seed(
-    random.seed,
-    do.call(method, c(list(bws = .npRmpi_autodispatch_untag(bws)), dots))
-  )
+  owns.empty.rows <- identical(method, .np_plot_rbandwidth_engine) ||
+    identical(method, .np_plot_plbandwidth_engine) ||
+    identical(method, .np_plot_sibandwidth_engine) ||
+    (identical(method, .np_plot_compat_dispatch) &&
+     any(c("rbandwidth", "plbandwidth", "sibandwidth") %in% class(bws)))
+  if(!owns.empty.rows)
+    return(.np_with_seed(random.seed, do.call(method, c(list(bws = .npRmpi_autodispatch_untag(bws)), dots))))
+  publisher <- .npreg_plot_empty_publisher(.plot_context)
+  dots$.np.empty.report <- publisher$record
+  .npreg_finish_plot_call(
+    .np_with_seed(random.seed, do.call(method, c(list(bws = .npRmpi_autodispatch_untag(bws)), dots))), publisher)
 }
 
 .np_plot_compat_dispatch <- function(bws, ...) {

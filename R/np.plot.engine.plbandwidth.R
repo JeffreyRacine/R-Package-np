@@ -54,7 +54,7 @@
            plot.data.overlay = TRUE,
            plot.rug = FALSE,
            ...,
-           random.seed){
+           random.seed, .np.empty.report = NULL){
 
     sub.supplied <- !missing(sub)
 
@@ -228,7 +228,8 @@
           bws = bws,
           xdat = xdat,
           ydat = ydat,
-          zdat = zdat
+          zdat = zdat,
+          .np.empty.report = .np.empty.report
         )
       }
       cf <- as.double(fit.coef$xcoef)
@@ -341,7 +342,8 @@
           ydat = ydat,
           zdat = zdat,
           exdat = x.eval[,1, drop = FALSE],
-          ezdat = x.eval[,2, drop = FALSE]
+          ezdat = x.eval[,2, drop = FALSE],
+          .np.empty.report = .np.empty.report
         )
       } else {
         .np_plot_plreg_local_fit(
@@ -350,7 +352,8 @@
           ydat = ydat,
           zdat = zdat,
           exdat = x.eval[,1, drop = FALSE],
-          ezdat = x.eval[,2, drop = FALSE]
+          ezdat = x.eval[,2, drop = FALSE],
+          .np.empty.report = .np.empty.report
         )
       }
 
@@ -726,7 +729,8 @@
             ydat = ydat,
             zdat = zdat,
             exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
-            ezdat = ezdat[seq_len(xi.neval),, drop = FALSE]
+            ezdat = ezdat[seq_len(xi.neval),, drop = FALSE],
+            .np.empty.report = .np.empty.report
           )
         } else {
           .np_plot_plreg_local_fit(
@@ -735,7 +739,8 @@
             ydat = ydat,
             zdat = zdat,
             exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
-            ezdat = ezdat[seq_len(xi.neval),, drop = FALSE]
+            ezdat = ezdat[seq_len(xi.neval),, drop = FALSE],
+            .np.empty.report = .np.empty.report
           )
         }
 
@@ -1031,7 +1036,8 @@
             ydat = ydat,
             zdat = zdat,
             exdat = exdat[seq_len(xi.neval),, drop = FALSE],
-            ezdat = subcol(ezdat,ei,i)[seq_len(xi.neval),, drop = FALSE]
+            ezdat = subcol(ezdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
+            .np.empty.report = .np.empty.report
           )
         } else {
           .np_plot_plreg_local_fit(
@@ -1040,7 +1046,8 @@
             ydat = ydat,
             zdat = zdat,
             exdat = exdat[seq_len(xi.neval),, drop = FALSE],
-            ezdat = subcol(ezdat,ei,i)[seq_len(xi.neval),, drop = FALSE]
+            ezdat = subcol(ezdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
+            .np.empty.report = .np.empty.report
           )
         }
 

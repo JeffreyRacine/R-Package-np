@@ -669,6 +669,7 @@ gradients.lsqregression <- function(x, se = FALSE,
                                         gradients = FALSE,
                                         need.errors = TRUE,
                                         gradient.order = 1L,
+                                        .np.empty.report = NULL,
                                         ...) {
   .np_plot_activity_run(
     label = if (length(tau) == 1L) {
@@ -685,6 +686,12 @@ gradients.lsqregression <- function(x, se = FALSE,
       tydat <- as.numeric(toFrame(tydat)[[1L]])
       exdat <- toFrame(exdat)
 
+      empty.rows <- NULL
+      capture.rows <- function(flags, labels = NULL) {
+        empty.rows <<- .npreg_merge_empty_rows(empty.rows, flags)
+      }
+      finish <- function(value) .npreg_publish_plot_rows(value, empty.rows,
+        report = .np.empty.report, row.labels = row.names(exdat))
       fit.one <- function(one.bws, tau.i) {
         fit <- .np_plot_regression_eval(
           bws = one.bws$reg.bws,
@@ -693,7 +700,8 @@ gradients.lsqregression <- function(x, se = FALSE,
           exdat = exdat,
           gradients = gradients,
           gradient.order = gradient.order,
-          need.asymptotic = need.errors
+          need.asymptotic = need.errors,
+          .np.empty.report = capture.rows
         )
         lsqregression(
           bws = one.bws,
@@ -721,7 +729,8 @@ gradients.lsqregression <- function(x, se = FALSE,
         if (is.null(one.bws))
           stop("vector nplsqreg bandwidth object lacks per-tau bandwidth state",
                call. = FALSE)
-        return(fit.one(one.bws, tau))
+        fit <- fit.one(one.bws, tau)
+        return(finish(fit))
       }
 
       idx <- .nplsqreg_match_plot_tau(tau, bws$tau)
@@ -735,13 +744,14 @@ gradients.lsqregression <- function(x, se = FALSE,
         tau = tau,
         tau.search = if (is.null(bws$tau.search)) "full" else bws$tau.search
       )
-      .nplsqreg_combine_fits(
+      fit <- .nplsqreg_combine_fits(
         fit.list = fit.list,
         tau = tau,
         bws = sub.bws,
         tau.search = if (is.null(bws$tau.search)) "full" else bws$tau.search,
         call = NULL
       )
+      finish(fit)
     }
   )
 }
@@ -756,27 +766,39 @@ gradients.lsqregression <- function(x, se = FALSE,
 
 predict.lsqregression <- function(object, se.fit = FALSE, ...) {
   se.fit <- npValidateScalarLogical(se.fit, "se.fit")
+  dots <- list(...)
+  defer.empty <- isTRUE(dots[[".np.defer.empty.rows", exact = TRUE]])
+  dots$.np.defer.empty.rows <- NULL
   if (length(object$tau) > 1L) {
     if (is.null(object$tau.fits) || length(object$tau.fits) != length(object$tau))
       stop("vector nplsqreg object lacks per-tau fit state", call. = FALSE)
     labels <- .nplsqreg_tau_labels(object$tau)
-    pred <- lapply(object$tau.fits, predict.lsqregression,
-                   se.fit = se.fit, ...)
+    empty.rows <- NULL
+    child.dots <- dots
+    child.dots$.np.defer.empty.rows <- TRUE
+    pred <- lapply(object$tau.fits, function(one) {
+      value <- do.call(predict.lsqregression,
+        c(list(object = one, se.fit = se.fit), child.dots))
+      flags <- attr(value, ".np.empty.rows", exact = TRUE)
+      empty.rows <<- .npreg_merge_empty_rows(empty.rows, flags)
+      if(!is.null(flags)) attr(value, ".np.empty.rows") <- NULL
+      value
+    })
     if (se.fit) {
       fit <- do.call(cbind, lapply(pred, `[[`, "fit"))
       se.out <- do.call(cbind, lapply(pred, `[[`, "se.fit"))
       colnames(fit) <- labels
       colnames(se.out) <- labels
-      return(list(fit = fit,
-                  se.fit = se.out,
-                  df = pred[[1L]]$df,
-                  residual.scale = pred[[1L]]$residual.scale))
+      out <- list(fit = fit, se.fit = se.out, df = pred[[1L]]$df,
+                  residual.scale = pred[[1L]]$residual.scale)
+      return(.npreg_finish_empty_rows(out, empty.rows, defer = defer.empty,
+        owner = "predict.nplsqreg"))
     }
     out <- do.call(cbind, pred)
     colnames(out) <- labels
-    return(out)
+    return(.npreg_finish_empty_rows(out, empty.rows, defer = defer.empty,
+      owner = "predict.nplsqreg"))
   }
-  dots <- list(...)
   npRejectLegacyBooleanErrors(dots, "predict.lsqregression")
   if ("se" %in% names(dots))
     stop("predict.lsqregression() uses se.fit=, not se=", call. = FALSE)
@@ -805,13 +827,16 @@ predict.lsqregression <- function(object, se.fit = FALSE, ...) {
     fit.args$exdat <- dots$exdat
   fit.args <- c(fit.args, dots[setdiff(names(dots), c("newdata", "exdat"))])
 
+  fit.args$.np.defer.empty.rows <- TRUE
   tr <- do.call(npreg, fit.args)
-  if (se.fit) {
+  out <- if (se.fit) {
     list(fit = fitted(tr), se.fit = se(tr),
          df = tr$nobs, residual.scale = tr$MSE)
   } else {
     fitted(tr)
   }
+  .npreg_finish_empty_rows(out, attr(tr, ".np.empty.rows", exact = TRUE),
+    defer = defer.empty, owner = "predict.nplsqreg", row.labels = row.names(tr$eval))
 }
 
 plot.lsqregression <- function(x, tau = NULL, gradient = FALSE,
@@ -873,7 +898,10 @@ plot.lsqregression <- function(x, tau = NULL, gradient = FALSE,
     ),
     dots
   )
-  .np_with_seed(random.seed, do.call(.np_plot_condbandwidth_engine, args))
+  publisher <- .npreg_plot_empty_publisher("plot.nplsqreg")
+  args$.np.empty.report <- publisher$record
+  .npreg_finish_plot_call(
+    .np_with_seed(random.seed, do.call(.np_plot_condbandwidth_engine, args)), publisher)
 }
 
 compute.bootstrap.errors.lsqregressionbandwidth <-

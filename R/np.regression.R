@@ -49,6 +49,48 @@
   value
 }
 
+# Each callback belongs to one public plot invocation. Grid/row identifiers
+# distinguish separate evaluation grids; required failures never call finish.
+.npreg_plot_empty_publisher <- function(owner = "plot()") {
+  rows <- character()
+  grid <- 0L
+  list(record = function(flags, labels = NULL) {
+    grid <<- grid + 1L
+    if(is.null(flags)) return(invisible(NULL))
+    missing <- which(flags == 1L)
+    rows <<- c(rows, paste0(grid, "/", missing))
+    invisible(NULL)
+  }, finish = function() {
+    if(length(rows))
+      .npreg_finish_empty_rows(list(), rep.int(1L, length(rows)),
+        owner = paste0(owner, " [grid/row]"), row.labels = rows)
+    invisible(NULL)
+  })
+}
+
+.npreg_publish_plot_rows <- function(value, flags = NULL, report = NULL,
+                                      omitted = integer(0), row.labels = NULL,
+                                      owner = "plot()") {
+  if(is.null(flags)) flags <- attr(value, ".np.empty.rows", exact = TRUE)
+  if(is.null(report))
+    return(.npreg_finish_empty_rows(value, flags, omitted = omitted,
+      row.labels = row.labels, owner = owner))
+  if(!is.null(flags)) {
+    value <- .npreg_finish_empty_rows(value, flags, omitted = omitted,
+      row.labels = row.labels, defer = TRUE)
+    flags <- attr(value, ".np.empty.rows", exact = TRUE)
+    attr(value, ".np.empty.rows") <- NULL
+  }
+  report(flags, names(flags))
+  value
+}
+
+.npreg_finish_plot_call <- function(expr, publisher) {
+  result <- withVisible(force(expr))
+  publisher$finish()
+  if(result$visible) result$value else invisible(result$value)
+}
+
 npreg <-
   function(bws, ...){
     mc <- match.call(expand.dots = FALSE)

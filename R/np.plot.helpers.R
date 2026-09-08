@@ -13228,7 +13228,8 @@ plotFactor <- function(f, y, ...){
                                      exdat,
                                      gradients = FALSE,
                                      gradient.order = 1L,
-                                     need.asymptotic = FALSE) {
+                                     need.asymptotic = FALSE,
+                                     .np.empty.report = NULL) {
   .np_plot_activity_run(
     if (isTRUE(need.asymptotic)) {
       "Computing regression plot asymptotic fit"
@@ -13237,7 +13238,7 @@ plotFactor <- function(f, y, ...){
     },
     {
       if (isTRUE(need.asymptotic)) {
-        return(npreg(
+        fit <- npreg(
           txdat = xdat,
           tydat = ydat,
           exdat = exdat,
@@ -13245,8 +13246,10 @@ plotFactor <- function(f, y, ...){
           se = TRUE,
           gradients = gradients,
           gradient.order = gradient.order,
-          warn.glp.gradient = FALSE
-        ))
+          warn.glp.gradient = FALSE, .np.defer.empty.rows = TRUE
+        )
+        return(.npreg_publish_plot_rows(fit, report = .np.empty.report,
+          row.labels = row.names(exdat)))
       }
 
       fit <- .np_plot_with_local_compiled_eval(.np_regression_direct(
@@ -13256,7 +13259,7 @@ plotFactor <- function(f, y, ...){
         exdat = exdat,
         gradients = gradients,
         gradient.order = gradient.order,
-        local.mode = identical(bws$type, "generalized_nn")
+        local.mode = identical(bws$type, "generalized_nn"), allow.empty.rows = TRUE
       ))
 
       neval <- length(fit$mean)
@@ -13264,7 +13267,8 @@ plotFactor <- function(f, y, ...){
       if (isTRUE(gradients))
         fit$gerr <- matrix(NA_real_, nrow = neval, ncol = NCOL(fit$grad))
 
-      fit
+      .npreg_publish_plot_rows(fit, report = .np.empty.report,
+        row.labels = row.names(exdat))
     }
   )
 }
@@ -13298,7 +13302,7 @@ plotFactor <- function(f, y, ...){
   )
 }
 
-.np_plot_singleindex_hat_apply_index <- function(bws, idx.train, idx.eval, y) {
+.np_plot_singleindex_hat_apply_index <- function(bws, idx.train, idx.eval, y, allow.empty.rows = FALSE) {
   if (identical(bws$type, "fixed")) {
     return(.np_indexhat_core(
       bws = bws,
@@ -13316,7 +13320,7 @@ plotFactor <- function(f, y, ...){
     idx.eval = idx.eval,
     y = y,
     output = "apply",
-    s = 0L
+    s = 0L, allow.empty.rows = allow.empty.rows
   )
 }
 
@@ -13376,7 +13380,8 @@ plotFactor <- function(f, y, ...){
                                             idx.train,
                                             idx.eval,
                                             ydat,
-                                            gradients = FALSE) {
+                                            gradients = FALSE,
+                                            .np.empty.report = NULL) {
   .np_plot_activity_run(
     label = "Computing single-index plot fit",
     {
@@ -13390,22 +13395,26 @@ plotFactor <- function(f, y, ...){
           tydat = ydat,
           exdat = idx.eval,
           gradients = TRUE,
-          gradient.order = 1L
+          gradient.order = 1L, allow.empty.rows = TRUE
         ))
         grad.index <- as.vector(fit.grad$grad[, 1L])
         out$mean <- as.vector(fit.grad$mean)
         out$grad.index <- grad.index
         out$grad <- grad.index %o% as.vector(bws$beta)
-        return(out)
+        return(.npreg_publish_plot_rows(out,
+          attr(fit.grad, ".np.empty.rows", exact = TRUE), report = .np.empty.report,
+          row.labels = row.names(idx.eval)))
       }
 
-      out$mean <- as.vector(.np_plot_singleindex_hat_apply_index(
+      mean <- .np_plot_singleindex_hat_apply_index(
         bws = bws,
         idx.train = idx.train,
         idx.eval = idx.eval,
-        y = ydat
-      ))
-      out
+        y = ydat, allow.empty.rows = TRUE
+      )
+      out$mean <- as.vector(mean)
+      .npreg_publish_plot_rows(out, attr(mean, ".np.empty.rows", exact = TRUE),
+        report = .np.empty.report, row.labels = row.names(idx.eval))
     }
   )
 }
@@ -13415,7 +13424,8 @@ plotFactor <- function(f, y, ...){
                                                  tydat,
                                                  exdat = NULL,
                                                  gradients = FALSE,
-                                                 index.eval = NULL) {
+                                                 index.eval = NULL,
+                                                 .np.empty.report = NULL) {
   .np_plot_activity_run(
     label = "Computing single-index plot asymptotic fit",
     {
@@ -13468,7 +13478,7 @@ plotFactor <- function(f, y, ...){
         regtype = regtype,
         gradients = gradients,
         se = TRUE,
-        warn.glp.gradient = FALSE
+        warn.glp.gradient = FALSE, .np.defer.empty.rows = TRUE
       )
       if (identical(regtype, "lp")) {
         npreg.args$basis <- spec$basis.engine
@@ -13494,7 +13504,8 @@ plotFactor <- function(f, y, ...){
         out$gerr <- uncertainty$gerr
       }
 
-      out
+      .npreg_publish_plot_rows(out, attr(fit, ".np.empty.rows", exact = TRUE),
+        report = .np.empty.report)
     }
   )
 }
@@ -13505,7 +13516,8 @@ plotFactor <- function(f, y, ...){
            ydat,
            zdat,
            exdat,
-           ezdat) {
+           ezdat,
+           .np.empty.report = NULL) {
     activity <- .np_plot_activity_begin("Computing partially linear plot asymptotic fit")
     on.exit(.np_plot_activity_end(activity), add = TRUE)
 
@@ -13589,7 +13601,7 @@ plotFactor <- function(f, y, ...){
 
     beta.vcov.term <- rowSums((resx.eval %*% fit$xcoefvcov) * resx.eval)
     fit$merr <- sqrt(pmax(as.double(yfit$merr)^2 + x.err.sq + beta.vcov.term, 0.0))
-    .npreg_finish_empty_rows(fit, empty.rows,
+    .npreg_publish_plot_rows(fit, empty.rows, report = .np.empty.report,
       omitted = which(!keep.eval), owner = "plot.npplreg", row.labels = row.names(exdat))
   }
 
@@ -14452,6 +14464,7 @@ plotFactor <- function(f, y, ...){
                                    tol = 1.490116e-04,
                                    small = 1.490116e-05,
                                    itmax = 10000,
+                                   .np.empty.report = NULL,
                                    ...) {
   if (inherits(bws, "lsqregressionbandwidth")) {
     return(.np_plot_lsqregression_eval(
@@ -14462,7 +14475,8 @@ plotFactor <- function(f, y, ...){
       tau = tau,
       gradients = gradients,
       need.errors = need.errors,
-      ...
+      ...,
+      .np.empty.report = .np.empty.report
     ))
   }
   tau <- .npqreg_validate_tau(tau)

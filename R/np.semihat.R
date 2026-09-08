@@ -550,7 +550,7 @@
                                idx.eval,
                                y = NULL,
                                output = c("matrix", "apply"),
-                               s = 0L) {
+                               s = 0L, allow.empty.rows = FALSE) {
   output <- match.arg(output)
   spec <- .npindex_resolve_spec(bws, where = "npindexhat")
   regtype.engine <- spec$regtype.engine
@@ -663,14 +663,18 @@
     return(H)
   }
 
+  empty.rows <- NULL
   fit_one <- function(ycol) {
     fit <- .npRmpi_with_local_regression(.np_regression_direct(
       bws = rbw,
       txdat = idx.train,
       tydat = ycol,
       exdat = idx.eval,
-      gradients = FALSE
+      gradients = FALSE,
+      allow.empty.rows = isTRUE(allow.empty.rows) && identical(output, "apply")
     ))
+    empty.rows <<- .npreg_merge_empty_rows(empty.rows,
+      attr(fit, ".np.empty.rows", exact = TRUE))
     fit$mean
   }
 
@@ -697,7 +701,9 @@
   for (j in seq_len(ncol(y)))
     out[, j] <- fit_one(y[, j])
 
-  if (ncol(out) == 1L) as.vector(out) else out
+  value <- if (ncol(out) == 1L) as.vector(out) else out
+  if(!is.null(empty.rows)) attr(value, ".np.empty.rows") <- empty.rows
+  value
 }
 
 .npscoef_make_regbw <- function(bws, zdat, bw = bws$bw) {
