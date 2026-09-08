@@ -1,5 +1,10 @@
 # npRmpi 0.80-1
 
+* External local-linear and local-polynomial fits now report exactly empty
+  computed kernel rows as NA in the undefined output components, with one
+  warning after the caller finishes. Supported components and required
+  training, covariance and bootstrap computations keep their existing policy.
+
 * The root-owned generalized-nearest-neighbor scale pilot for least-squares
   quantile regression now broadcasts cooperative local failures before raising
   the original error, allowing the worker pool to be reused.

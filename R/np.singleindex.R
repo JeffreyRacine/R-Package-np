@@ -439,7 +439,7 @@ npindex.default <- function(bws, txdat, tydat, nomad = FALSE,
                                           ydat,
                                           idx.eval = NULL,
                                           gradients = FALSE,
-                                          gradient.order = 1L) {
+                                          gradient.order = 1L, allow.empty.rows = FALSE) {
   rbw <- .np_semihat_make_regbw_state(
     source = source,
     xdat = idx.train,
@@ -453,7 +453,8 @@ npindex.default <- function(bws, txdat, tydat, nomad = FALSE,
     tydat = ydat,
     exdat = idx.eval,
     gradients = gradients,
-    gradient.order = gradient.order
+    gradient.order = gradient.order,
+    allow.empty.rows = allow.empty.rows
   )
 
   if (isTRUE(gradients) && identical(source$type, "generalized_nn")) {
@@ -526,6 +527,7 @@ npindex.default <- function(bws, txdat, tydat, nomad = FALSE,
 
   out <- matrix(NA_real_, nrow = neval, ncol = ncol.out)
   seen <- integer(neval)
+  empty.rows <- NULL
   if (!is.list(gathered) || !length(gathered))
     stop(sprintf("%s failed to gather worker chunks", what), call. = FALSE)
   for (wrapped in gathered) {
@@ -549,12 +551,20 @@ npindex.default <- function(bws, txdat, tydat, nomad = FALSE,
         ncol.out,
         what
       )
+      flags <- attr(part.value, ".np.empty.rows", exact = TRUE)
+      if(!is.null(flags)) {
+        if(length(flags) != length(part.rows))
+          stop("invalid index external-row metadata length", call. = FALSE)
+        if(is.null(empty.rows)) empty.rows <- integer(neval)
+        empty.rows[part.rows] <- flags
+      }
       out[part.rows, ] <- part.value
       seen[part.rows] <- seen[part.rows] + 1L
     }
   }
   if (any(seen != 1L))
     stop(sprintf("%s row ownership was incomplete or duplicated", what), call. = FALSE)
+  if(!is.null(empty.rows)) attr(out, ".np.empty.rows") <- empty.rows
   out
 }
 
@@ -679,8 +689,10 @@ npindex.sibandwidth <-
           (fit.progress.allow || fit.progress.handoff)) {
         dispatch.call$.np_lc_fixed_progress_route <- TRUE
       }
+      dispatch.call$.np.defer.empty.rows <- TRUE
       result <- .npRmpi_autodispatch_call(dispatch.call, parent.frame())
-      return(.npRmpi_restore_nomad_fit_bws_metadata(result, bws))
+      return(.npreg_finish_empty_rows(.npRmpi_restore_nomad_fit_bws_metadata(result, bws),
+        defer = isTRUE(dots[[".np.defer.empty.rows", exact = TRUE]]), owner = "npindex"))
     }
 
     fit.activity <- .np_progress_activity_begin(
@@ -827,7 +839,9 @@ npindex.sibandwidth <-
     } else {
       NULL
     }
-    next_npreg_fit_args <- function(exdat = NULL, gradients = FALSE, se = FALSE) {
+    empty.eval.rows <- NULL
+    next_npreg_fit_args <- function(exdat = NULL, gradients = FALSE, se = FALSE,
+                                    allow.empty.rows = FALSE) {
       args <- if (identical(regtype, "lp") || lc.fixed.progress.route) {
         c(
           list(
@@ -851,10 +865,15 @@ npindex.sibandwidth <-
         fit.progress.handoff <<- FALSE
       }
       args$se <- se
+      args$.np.require.complete <- !isTRUE(allow.empty.rows)
+      args$.np.defer.empty.rows <- TRUE
       args
     }
 
     run_npreg_fit <- function(args) {
+      if(is.null(args[[".np.require.complete", exact = TRUE]]))
+        args$.np.require.complete <- TRUE
+      args$.np.defer.empty.rows <- TRUE
       if (isTRUE(lc.fixed.progress.route) ||
           isTRUE(.npRmpi_autodispatch_called_from_bcast()) ||
           isTRUE(.npRmpi_autodispatch_in_context()))
@@ -911,7 +930,8 @@ npindex.sibandwidth <-
       as.vector(out[, 1L])
     }
 
-    eval_npreg_scalar <- function(eval.df, gradients.flag, label, se.flag = FALSE) {
+    eval_npreg_scalar <- function(eval.df, gradients.flag, label, se.flag = FALSE,
+                                    allow.empty.rows = FALSE) {
       gradients.flag <- isTRUE(gradients.flag)
       ncol.base <- if (gradients.flag) 2L else 1L
       ncol.out <- ncol.base * if (se.flag) 2L else 1L
@@ -924,7 +944,7 @@ npindex.sibandwidth <-
             return(matrix(numeric(0L), nrow = 0L, ncol = ncol.out))
           model <- run_npreg_fit(next_npreg_fit_args(
             exdat = eval.df[rows, , drop = FALSE],
-            gradients = gradients.flag, se = se.flag
+            gradients = gradients.flag, se = se.flag, allow.empty.rows = allow.empty.rows
           ))
           values <- if (gradients.flag) {
             cbind(as.numeric(model$mean), as.numeric(as.matrix(model$grad)[, 1L]))
@@ -936,9 +956,13 @@ npindex.sibandwidth <-
             if (gradients.flag)
               values <- cbind(values, as.numeric(as.matrix(model$gerr)[, 1L]))
           }
+          flags <- attr(model, ".np.empty.rows", exact = TRUE)
+          if(!is.null(flags)) attr(values, ".np.empty.rows") <- flags
           values
         }
       )
+      empty.eval.rows <<- .npreg_merge_empty_rows(empty.eval.rows,
+        attr(out, ".np.empty.rows", exact = TRUE))
       list(
         mean = as.vector(out[, 1L]),
         grad = if (gradients.flag) matrix(out[, 2L], ncol = 1L) else NULL,
@@ -947,7 +971,7 @@ npindex.sibandwidth <-
       )
     }
 
-    eval_index_gradient <- function(eval.df, label) {
+    eval_index_gradient <- function(eval.df, label, allow.empty.rows = FALSE) {
       if (identical(bws$type, "generalized_nn")) {
         out <- .npindex_spmd_eval_rows(
           neval = nrow(eval.df),
@@ -962,14 +986,19 @@ npindex.sibandwidth <-
               ydat = tydat,
               idx.eval = eval.df[rows, , drop = FALSE],
               gradients = TRUE,
-              gradient.order = 1L
+              gradient.order = 1L, allow.empty.rows = allow.empty.rows
             )
-            cbind(as.numeric(model$mean), as.numeric(as.matrix(model$grad)[, 1L]))
+            values <- cbind(as.numeric(model$mean), as.numeric(as.matrix(model$grad)[, 1L]))
+            flags <- attr(model, ".np.empty.rows", exact = TRUE)
+            if(!is.null(flags)) attr(values, ".np.empty.rows") <- flags
+            values
           }
         )
+        empty.eval.rows <<- .npreg_merge_empty_rows(empty.eval.rows,
+          attr(out, ".np.empty.rows", exact = TRUE))
         list(mean = as.vector(out[, 1L]), grad = matrix(out[, 2L], ncol = 1L))
       } else {
-        eval_npreg_scalar(eval.df = eval.df, gradients.flag = TRUE, label = label)
+        eval_npreg_scalar(eval.df = eval.df, gradients.flag = TRUE, label = label, allow.empty.rows = allow.empty.rows)
       }
     }
 
@@ -1026,7 +1055,7 @@ npindex.sibandwidth <-
       model <- eval_npreg_scalar(
         eval.df = index.eval.df,
         gradients.flag = gradients || (no.ex && ncol(txdat) > 1L),
-        label = "npindex asymptotic evaluation", se.flag = TRUE
+        label = "npindex asymptotic evaluation", se.flag = TRUE, allow.empty.rows = !no.ex
       )
       index.mean <- model$mean
       uncertainty <- .np_index_asymptotic_outputs(model, bws$beta, gradients)
@@ -1083,7 +1112,7 @@ npindex.sibandwidth <-
         model <- eval_npreg_scalar(
           eval.df = index.eval.df,
           gradients.flag = FALSE,
-          label = "npindex scalar npreg evaluation mean"
+          label = "npindex scalar npreg evaluation mean", allow.empty.rows = !no.ex
         )
         index.mean <- model$mean
 
@@ -1101,7 +1130,7 @@ npindex.sibandwidth <-
     } else if(gradients==TRUE) {
       model <- eval_index_gradient(
         eval.df = index.eval.df,
-        label = "npindex scalar gradient evaluation"
+        label = "npindex scalar gradient evaluation", allow.empty.rows = !no.ex
       )
 
       index.mean <- model$mean
@@ -1573,5 +1602,8 @@ npindex.sibandwidth <-
     ev$fit.time <- fit.elapsed
     ev$nomad.time <- if (!is.null(bws$nomad.time) && is.finite(bws$nomad.time)) as.double(bws$nomad.time) else NA_real_
     ev$powell.time <- if (!is.null(bws$powell.time) && is.finite(bws$powell.time)) as.double(bws$powell.time) else NA_real_
-    ev
+    .npreg_finish_empty_rows(ev, empty.eval.rows,
+      omitted = if(no.ex) integer(0) else which(!keep.eval),
+      defer = isTRUE(dots[[".np.defer.empty.rows", exact = TRUE]]),
+      owner = "npindex", row.labels = if(no.ex) NULL else row.names(exdat))
   }

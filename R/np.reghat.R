@@ -1559,7 +1559,7 @@ npreghat <-
                                   se = FALSE,
                                   gradients = FALSE,
                                   gradient.order = 1L,
-                                  local.mode = FALSE) {
+                                  local.mode = FALSE, allow.empty.rows = FALSE) {
   no.ex <- is.null(exdat)
   se <- npValidateScalarLogical(se, "se")
   gradients <- npValidateScalarLogical(gradients, "gradients")
@@ -1818,10 +1818,8 @@ npreghat <-
     as.integer(npLpBasisCode(reg.spec$basis.engine)),
     as.integer(enrow),
     as.integer(ncol.x),
-    .np_regression_output_request(
-      se = se,
-      gradients = do.compiled.gradients
-    ),
+    c(.np_regression_output_request(se = se, gradients = do.compiled.gradients),
+      as.integer(isTRUE(allow.empty.rows) && !no.ex && regtype.engine %in% c("ll", "lp"))),
     as.double(cker.bounds.c$lb),
     as.double(cker.bounds.c$ub),
     PACKAGE = "npRmpi"
@@ -1873,6 +1871,8 @@ npreghat <-
     }
   }
 
+  flags <- attr(myout, ".np.empty.rows", exact = TRUE)
+  if(!is.null(flags)) attr(out, ".np.empty.rows") <- flags
   out
 }
 

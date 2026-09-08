@@ -61,7 +61,7 @@ if (getRversion() >= "2.15.1")
 }
 
 .npRmpi_npsig_npreg_local <- function(...) {
-  .npRmpi_with_local_regression(npreg(...))
+  .npRmpi_with_local_regression(.npreg_complete(...))
 }
 
 .npRmpi_npsig_do_local <- function(extra.args = NULL, ...) {

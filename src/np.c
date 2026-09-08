@@ -8432,7 +8432,8 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
                    double * ckerlb, double * ckerub,
                    const NPContinuousKernelRoute *kernel_route,
                    NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
-                   int categorical_compress);
+                   int categorical_compress,
+                   NPRegressionLPEmptyRows *empty_rows);
 
 void np_density(double * tuno, double * tord, double * tcon,
                 double * euno, double * eord, double * econ,
@@ -8937,6 +8938,10 @@ SEXP C_np_regression(SEXP tuno,
   int en = asInteger(enrow);
   int nc = asInteger(ncol);
   int request = asInteger(output_request);
+  SEXP empty_flags = R_NilValue;
+  NPRegressionLPEmptyRows empty_rows = {NULL, 0, NULL};
+  NPRegressionLPEmptyRows *empty_rows_ptr = NULL;
+  int extra_protect = 0;
   int do_merr;
   int do_grad;
   int do_gerr;
@@ -9084,6 +9089,15 @@ SEXP C_np_regression(SEXP tuno,
     active_diagnostics = &beta_diagnostics;
   }
 
+  if(TYPEOF(output_request) == INTSXP && XLENGTH(output_request) == 2 &&
+     INTEGER(output_request)[1] == 1 && !train_is_eval) {
+    PROTECT(empty_flags = allocVector(INTSXP, en));
+    ++extra_protect;
+    memset(INTEGER(empty_flags), 0, (size_t)en*sizeof(int));
+    empty_rows.flags = INTEGER(empty_flags);
+    empty_rows_ptr = &empty_rows;
+  }
+
   np_regression(REAL(tuno_r), REAL(tord_r), REAL(tcon_r), REAL(ty_r),
                 REAL(euno_r), REAL(eord_r), REAL(econ_r), REAL(ey_r),
                 REAL(rbw_r), REAL(mcv_r), REAL(padnum_r),
@@ -9094,7 +9108,7 @@ SEXP C_np_regression(SEXP tuno,
                 do_grad ? REAL(out_g) : NULL,
                 do_gerr ? REAL(out_gerr) : NULL,
                 REAL(out_xtra), ckerlb_p, ckerub_p,
-                active_route, active_diagnostics, categorical_compress);
+                active_route, active_diagnostics, categorical_compress, empty_rows_ptr);
 
   PROTECT(out = allocVector(VECSXP, 5));
   SET_VECTOR_ELT(out, 0, out_mean);
@@ -9111,7 +9125,9 @@ SEXP C_np_regression(SEXP tuno,
   SET_STRING_ELT(out_names, 4, mkChar("xtra"));
   setAttrib(out, R_NamesSymbol, out_names);
 
-  UNPROTECT(26);
+  if(empty_rows.count > 0)
+    setAttrib(out, install(".np.empty.rows"), empty_flags);
+  UNPROTECT(26 + extra_protect);
   return out;
 }
 
@@ -19673,7 +19689,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                                                                    NP_REGRESSION_STDERR_LOCAL_RESIDUAL,
                                                                  prepared_x_bandwidth_ptr,
                                                                  row_nn_geometry_context_ptr,
-                                                                 NULL);
+                                                                 NULL, NULL);
         if(status == NP_REGRESSION_FIT_ERR_ZERO_NN_RADIUS) {
           lp_zero_radius_side = 1;
           lp_error = "conditional density/distribution fit encountered a zero literal explanatory radius after occurrence exclusion";
@@ -21621,6 +21637,7 @@ typedef struct {
   const NPContinuousKernelRoute *kernel_route;
   NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics;
   int categorical_compress;
+  NPRegressionLPEmptyRows *empty_rows;
 } NPRegressionFittedCall;
 
 static SEXP np_regression_fitted_execute(void *data)
@@ -22015,7 +22032,7 @@ static SEXP np_regression_fitted_execute(void *data)
       NP_REGRESSION_STDERR_LOCAL_RESIDUAL,
       NULL,
       &training_geometry_context,
-      &residual_preparation_context);
+      &residual_preparation_context, NULL);
 
     if(regression_fit_status != NP_REGRESSION_FIT_OK) {
       if(regression_fit_status == NP_REGRESSION_FIT_ERR_ZERO_NN_RADIUS)
@@ -22122,6 +22139,8 @@ static SEXP np_regression_fitted_execute(void *data)
     np_progress_fit_set_offset(num_obs_train_extern);
   }
 
+  if(call->empty_rows != NULL)
+    call->empty_rows->row_map = ipe;
   regression_fit_status = kernel_estimate_regression_categorical_tree_np(np_lp_engine_extern,
                                                    KERNEL_reg_extern,
                                                    KERNEL_reg_unordered_extern,
@@ -22162,7 +22181,8 @@ static SEXP np_regression_fitted_execute(void *data)
                                                    NULL,
                                                    &nn_geometry_context,
                                                    ordinary_hc0_active ?
-                                                     &ordinary_hc0_context : NULL);
+                                                     &ordinary_hc0_context : NULL,
+                                                   call->empty_rows);
   if(regression_fit_status != NP_REGRESSION_FIT_OK) {
     if(regression_fit_status == NP_REGRESSION_FIT_ERR_ZERO_NN_RADIUS) {
       zero_radius_info = np_nn_zero_radius_info(
@@ -22258,7 +22278,8 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
                    double * ckerlb, double * ckerub,
                    const NPContinuousKernelRoute *kernel_route,
                    NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
-                   int categorical_compress){
+                   int categorical_compress,
+                   NPRegressionLPEmptyRows *empty_rows){
   NPRegressionFittedCall call = {0};
   call.tuno = tuno;
   call.tord = tord;
@@ -22289,6 +22310,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
   call.kernel_route = kernel_route;
   call.kernel_route_diagnostics = kernel_route_diagnostics;
   call.categorical_compress = categorical_compress;
+  call.empty_rows = empty_rows;
   call.owner.x_columns[0] = myopti[REG_NUNOI];
   call.owner.x_columns[1] = myopti[REG_NORDI];
   call.owner.x_columns[2] = myopti[REG_NCONI];
@@ -22298,6 +22320,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
   R_UnwindProtect(np_regression_fitted_execute, &call,
                   np_regression_fitted_unwind, &call.owner, NULL);
   np_regression_fitted_clear(&call.owner);
+  if(empty_rows != NULL) empty_rows->row_map = NULL;
   if(call.owner.fit_status == NP_REGRESSION_FIT_ERR_ZERO_NN_RADIUS)
     np_nn_zero_radius_error(&call.owner.zero_radius_info);
   if(call.owner.fit_status != NP_REGRESSION_FIT_OK)

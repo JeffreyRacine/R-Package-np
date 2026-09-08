@@ -1899,15 +1899,20 @@ nplsqreg.lsqregressionbandwidth <-
       if (is.null(bws$tau.bws) || length(bws$tau.bws) != length(tau))
         stop("vector nplsqreg bandwidth object lacks per-tau bandwidth state",
              call. = FALSE)
+      fit.dots <- list(...)
+      defer.empty <- isTRUE(fit.dots[[".np.defer.empty.rows", exact = TRUE]])
+      fit.dots$.np.defer.empty.rows <- TRUE
+      empty.rows <- NULL
       fit.list <- lapply(seq_along(tau), function(j) {
         one.bws <- bws$tau.bws[[j]]
         one.bws$formula <- bws$formula
-        nplsqreg.default(bws = one.bws,
-                         txdat = txdat,
-                         tydat = tydat,
-                         tau = tau[[j]],
-                         se = se,
-                         ...)
+        fit <- do.call(nplsqreg.default, c(list(bws = one.bws,
+                         txdat = txdat, tydat = tydat,
+                         tau = tau[[j]], se = se), fit.dots))
+        flags <- attr(fit, ".np.empty.rows", exact = TRUE)
+        empty.rows <<- .npreg_merge_empty_rows(empty.rows, flags)
+        if(!is.null(flags)) attr(fit, ".np.empty.rows") <- NULL
+        fit
       })
       out <- .nplsqreg_combine_fits(
         fit.list = fit.list,
@@ -1916,7 +1921,8 @@ nplsqreg.lsqregressionbandwidth <-
         tau.search = if (is.null(bws$tau.search)) "full" else bws$tau.search,
         call = match.call(expand.dots = FALSE))
       environment(out$call) <- parent.frame()
-      return(out)
+      return(.npreg_finish_empty_rows(out, empty.rows, defer = defer.empty,
+        owner = "nplsqreg", row.labels = row.names(out$xeval)))
     }
     nplsqreg.default(bws = bws, txdat = txdat, tydat = tydat, tau = tau,
                      se = se, ...)
@@ -1946,14 +1952,20 @@ nplsqreg.default <-
                         silent = TRUE)
     if (.npRmpi_nplsqreg_should_autodispatch(mc.dispatch) &&
         !inherits(tau.dispatch, "try-error") &&
-        length(tau.dispatch) == 1L)
-      return(.npRmpi_autodispatch_call(mc.dispatch, environment()))
+        length(tau.dispatch) == 1L) {
+      mc.dispatch$.np.defer.empty.rows <- TRUE
+      result <- .npRmpi_autodispatch_call(mc.dispatch, environment())
+      return(.npreg_finish_empty_rows(result,
+        defer = isTRUE(dots.dispatch[[".np.defer.empty.rows", exact = TRUE]]), owner = "nplsqreg"))
+    }
 
     tau.raw <- .nplsqreg_validate_tau_values(tau)
     gradients <- npValidateScalarLogical(gradients, "gradients")
     residuals <- npValidateScalarLogical(residuals, "residuals")
     se <- npValidateScalarLogical(se, "se")
     dots <- dots.dispatch
+    defer.empty <- isTRUE(dots[[".np.defer.empty.rows", exact = TRUE]])
+    dots$.np.defer.empty.rows <- NULL
     native.newdata <- dots$newdata
     dots$newdata <- NULL
     dots$exdat <- NULL
@@ -1970,6 +1982,7 @@ nplsqreg.default <-
         fit.args$exdat <- exdat
       else if (!is.null(native.newdata))
         fit.args$exdat <- native.newdata
+      fit.args$.np.defer.empty.rows <- defer.empty
       return(do.call("nplsqreg.lsqregressionbandwidth", fit.args))
     }
 
@@ -1986,6 +1999,7 @@ nplsqreg.default <-
         reuse.args$exdat <- exdat
       else if (!is.null(native.newdata))
         reuse.args$newdata <- native.newdata
+      reuse.args$.np.defer.empty.rows <- defer.empty
       return(do.call(nplsqreg.lsqregressionbandwidth,
                      c(reuse.args, dots)))
     }
@@ -2016,7 +2030,10 @@ nplsqreg.default <-
       fit.args$exdat <- eval.prepared$exdat
       eval.omit <- eval.prepared$omit
     }
+    fit.args$.np.defer.empty.rows <- TRUE
     fit <- do.call(npreg, c(fit.args, dots))
+    empty.rows <- attr(fit, ".np.empty.rows", exact = TRUE)
+    if(!is.null(empty.rows)) attr(fit, ".np.empty.rows") <- NULL
 
     quant <- fitted(fit)
     qerr <- if (se) se(fit) else NA
@@ -2067,5 +2084,6 @@ nplsqreg.default <-
       out <- .nplsqreg_pad_fit_outputs(out, eval.omit)
     }
     environment(out$call) <- parent.frame()
-    out
+    .npreg_finish_empty_rows(out, empty.rows, omitted = eval.omit,
+      defer = defer.empty, owner = "nplsqreg", row.labels = row.names(fit$eval))
   }

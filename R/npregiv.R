@@ -645,7 +645,7 @@ npregiv.default <- function(y,
 
       mhat <- tww[2,]/NZD(tww[1,])
 
-      grad <- gradients(npreg(tydat=tydat,
+      grad <- gradients(.npreg_complete(tydat=tydat,
                               txdat=txdat,
                               exdat = exdat,
                               bws = bws,

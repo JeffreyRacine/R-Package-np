@@ -1,3 +1,54 @@
+# Required inference/refit consumers must not publish partial external fits.
+.npreg_complete <- function(...) {
+  args <- list(...)
+  args[[".np.require.complete"]] <- TRUE
+  do.call(npreg, args)
+}
+
+.npreg_merge_empty_rows <- function(current, incoming) {
+  if(is.null(incoming)) return(current)
+  if(is.null(current)) return(incoming)
+  if(length(current) != length(incoming))
+    stop("internal external-row metadata length mismatch", call. = FALSE)
+  out <- as.integer(current == 1L | incoming == 1L)
+  names(out) <- if(!is.null(names(current))) names(current) else names(incoming)
+  out
+}
+
+.npreg_finish_empty_rows <- function(value, flags = NULL,
+                                     omitted = integer(0), defer = FALSE,
+                                     owner = "npreg", row.labels = NULL) {
+  if(is.null(flags)) flags <- attr(value, ".np.empty.rows", exact = TRUE)
+  if(is.null(flags)) return(value)
+  attr(value, ".np.empty.rows") <- NULL
+  # Preserve caller row labels through the existing distributed return.
+  if(length(row.labels) == length(flags)) names(flags) <- row.labels
+  labels <- if(!is.null(names(flags))) names(flags)[flags == 1L] else NULL
+  if(length(omitted)) {
+    complete <- setdiff(seq_len(length(flags) + length(omitted)), omitted)
+    expanded <- integer(length(flags) + length(omitted))
+    expanded[complete] <- flags
+    if(!is.null(names(flags))) {
+      names(expanded) <- as.character(seq_along(expanded))
+      names(expanded)[complete] <- names(flags)
+    }
+    flags <- expanded
+  }
+  if(defer) {
+    attr(value, ".np.empty.rows") <- flags
+    return(value)
+  }
+  comm <- if(mpi.comm.size(1L) > 0L) 1L else 0L
+  if(mpi.comm.rank(comm) != 0L) return(value)
+  rows <- which(flags == 1L)
+  if(is.null(labels)) labels <- rows
+  .np_warning(sprintf(
+    "%s: all computed kernel weights are zero for a fit or contrast at %d external evaluation row(s) (%s%s); returning NA for undefined output components",
+    owner, length(rows), paste(utils::head(labels, 8L), collapse = ", "),
+    if(length(rows) > 8L) ", ..." else ""), call. = FALSE)
+  value
+}
+
 npreg <-
   function(bws, ...){
     mc <- match.call(expand.dots = FALSE)
@@ -444,7 +495,9 @@ npreg.rbandwidth <-
       return(.npRmpi_autodispatch_tag_result(result, mode = "auto"))
     }
     if (.npRmpi_autodispatch_active()) {
-      result <- .npRmpi_autodispatch_call(match.call(), parent.frame())
+      dispatch.call <- match.call()
+      dispatch.call$.np.defer.empty.rows <- TRUE
+      result <- .npRmpi_autodispatch_call(dispatch.call, parent.frame())
       if (is.list(result) && is.list(bws)) {
         has.nomad.optim <- (!is.null(bws$nomad.time) && is.finite(bws$nomad.time)) ||
           (!is.null(bws$powell.time) && is.finite(bws$powell.time))
@@ -475,7 +528,8 @@ npreg.rbandwidth <-
         }
         result <- .npRmpi_restore_nomad_fit_bws_metadata(result, bws)
       }
-      return(result)
+      return(.npreg_finish_empty_rows(result,
+        defer = isTRUE(dots[[".np.defer.empty.rows", exact = TRUE]])))
     }
 
     no.ex = missing(exdat)
@@ -884,10 +938,10 @@ npreg.rbandwidth <-
             as.integer(npLpBasisCode(reg.spec$basis.engine)),
             as.integer(enrow),
             as.integer(ncol),
-            .np_regression_output_request(
-              se = se,
-              gradients = do.compiled.gradients
-            ),
+            c(.np_regression_output_request(
+              se = se, gradients = do.compiled.gradients),
+              as.integer(!no.ex && !isTRUE(dots[[".np.require.complete", exact = TRUE]]) &&
+                reg.spec$regtype.engine %in% c("ll", "lp"))),
             as.double(cker.bounds.c$lb),
             as.double(cker.bounds.c$ub),
             PACKAGE = "npRmpi")
@@ -945,6 +999,8 @@ npreg.rbandwidth <-
       myout$mean <- override$value
       invalid.rows <- override$invalid
     }
+
+    empty.eval.rows <- attr(myout, ".np.empty.rows", exact = TRUE)
 
     if (gradients){
       myout$g = matrix(data=myout$g, nrow = enrow, ncol = ncol, byrow = FALSE) 
@@ -1034,7 +1090,10 @@ npreg.rbandwidth <-
     if (length(invalid.rows))
       .np_undefined_fit_rows(invalid.rows, "npreg()", external = !no.ex,
                              reason = "kernel weight sum is zero")
-    return(ev)
+    return(.npreg_finish_empty_rows(ev, empty.eval.rows,
+      omitted = if(no.ex) integer(0) else eval.rows.omit,
+      defer = isTRUE(dots[[".np.defer.empty.rows", exact = TRUE]]),
+      row.labels = row.names(teval)))
   }
 
 npreg.default <- function(bws, txdat, tydat, nomad = FALSE,

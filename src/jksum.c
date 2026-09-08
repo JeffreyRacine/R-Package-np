@@ -29348,6 +29348,7 @@ typedef struct {
   NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics;
   const NPRegressionHC0Context *hc0_context;
   NPRegressionFitOwner *enclosing_owner;
+  NPRegressionLPEmptyRows *empty_rows;
 } NPRegressionGeneralLPFitCall;
 
 typedef struct {
@@ -29470,6 +29471,87 @@ static void np_regression_general_lp_fit_owner_cleanup(
     np_regression_fit_owner_clear(call->enclosing_owner);
 }
 
+/* T4 and fitted rows use the same exact complete-row fact. */
+static int np_lp_failed_system_is_finite(const NPLPSolveWorkspace *, int, int);
+static int np_lp_complete_weights_are_zero(const double *weights, int ntrain)
+{
+  for(int i = 0; i < ntrain; ++i)
+    if(weights[i] != 0.0) /* Rejects NaN, Inf and signed cancellation. */
+      return 0;
+  return 1;
+}
+
+/* Only called after the incumbent solve fails, never on a successful row. */
+static int np_regression_general_lp_empty_row(
+  const NPRegressionGeneralLPFitCall *call,
+  NPRegressionGeneralLPFitOwner *owner,
+  int row, int categorical, int moment_stride, int divide_weights,
+  const double *computed_weights)
+{
+  double row_sum = 0.0;
+  int status;
+  double **bandwidth = categorical ? call->categorical_matrix_bandwidth :
+    call->matrix_bandwidth;
+  if(call->empty_rows == NULL ||
+     !np_lp_failed_system_is_finite(&owner->solve_workspace, owner->nterms, 1))
+    return 0;
+  if(computed_weights == NULL) {
+    if(owner->retained_kernel_row == NULL)
+      owner->retained_kernel_row = (double *)malloc(
+        (size_t)call->num_obs_train*sizeof(double));
+    if(owner->retained_kernel_row == NULL)
+      return 0;
+    if(call->kernel_route != NULL) {
+      /* Preserve the canonical response/basis scale used by the failed row. */
+      status = np_beta_regression_lp_moment_row_canonical(
+        call->bandwidth_mode, call->num_obs_train, call->num_reg_unordered,
+        call->num_reg_ordered, call->num_reg_continuous, owner->nterms,
+        moment_stride, call->operator, call->kernel_u, call->kernel_o,
+        call->matrix_X_unordered_train, call->matrix_X_ordered_train,
+        call->matrix_X_continuous_train, owner->eval_unordered,
+        owner->eval_ordered, owner->eval_continuous, owner->response_columns,
+        owner->basis, call->vector_scale_factor, bandwidth,
+        call->bandwidth_mode == BW_GEN_NN ? owner->matrix_bandwidth_eval : bandwidth,
+        call->lambda, call->num_categories, call->matrix_categorical_vals,
+        call->categorical_compress, owner->moments, NULL, NULL,
+        owner->retained_kernel_row, call->kernel_route,
+        call->kernel_route_diagnostics);
+    } else {
+      status = kernel_weighted_sum_np_ctx_ex(
+        call->kernel_c, call->kernel_u, call->kernel_o, call->bandwidth_mode,
+        call->num_obs_train, 1, call->num_reg_unordered, call->num_reg_ordered,
+        call->num_reg_continuous, 0, 0, 1, 1, divide_weights, 0, 0, 0, 0,
+        call->operator, OP_NOOP, 0, 0, NULL, 1, 0, 0,
+        call->bandwidth_mode == BW_ADAP_NN ? NP_TREE_FALSE : call->tree_enabled,
+        0, call->bandwidth_mode == BW_ADAP_NN ? NULL : kdt_extern_X,
+        NULL, NULL, NULL, call->matrix_X_unordered_train,
+        call->matrix_X_ordered_train, call->matrix_X_continuous_train,
+        owner->eval_unordered, owner->eval_ordered, owner->eval_continuous,
+        NULL, NULL, NULL, call->vector_scale_factor, 1, bandwidth,
+        call->bandwidth_mode == BW_GEN_NN ? owner->matrix_bandwidth_eval : bandwidth,
+        call->lambda, call->num_categories, call->matrix_categorical_vals,
+        NULL, &row_sum, NULL, owner->retained_kernel_row,
+        call->gate_context, NULL, NULL, NULL, NULL,
+#ifdef MPI2
+        0,
+#endif
+        NULL);
+    }
+    if(status != 0)
+      return 0;
+    computed_weights = owner->retained_kernel_row;
+  }
+  if(!np_lp_complete_weights_are_zero(computed_weights, call->num_obs_train))
+    return 0;
+  const int caller_row = call->empty_rows->row_map != NULL ?
+    call->empty_rows->row_map[row] : row;
+  if(!call->empty_rows->flags[caller_row]) {
+    call->empty_rows->flags[caller_row] = 1;
+    ++call->empty_rows->count;
+  }
+  return 1;
+}
+
 /* Evaluate one already-materialized categorical frame with the common
  * general-LP moment and solve policy.  This point-only adapter deliberately
  * requests neither a kernel row nor a power-two meat.  Its solve workspace is
@@ -29481,6 +29563,7 @@ static int np_regression_general_lp_point_at_frame(
   const int response_y_offset,
   const int response_basis_offset,
   const double epsilon,
+  const int row,
   double *point,
   double *kernel_row,
   double *projection)
@@ -29600,8 +29683,14 @@ static int np_regression_general_lp_point_at_frame(
        1,
        epsilon,
        NP_LP_RANK_UPPER_BOUND_UNKNOWN,
-       &solve_diagnostics) != NP_LP_SOLVE_POLICY_OK)
+       &solve_diagnostics) != NP_LP_SOLVE_POLICY_OK) {
+    if(np_regression_general_lp_empty_row(call, owner, row, 1,
+         moment_stride, kernel_row != NULL, kernel_row)) {
+      *point = NA_REAL;
+      return 1;
+    }
     return 0;
+  }
 
   *point = 0.0;
   for(i = 0; i < owner->nterms; ++i)
@@ -29639,6 +29728,7 @@ static int np_regression_general_lp_categorical_points(
   const int response_basis_offset,
   const double epsilon,
   const double fitted_point,
+  const int row,
   const int compute_hc0)
 {
   double base_point = fitted_point;
@@ -29658,7 +29748,7 @@ static int np_regression_general_lp_categorical_points(
   if(call->categorical_base_requires_refit &&
      !np_regression_general_lp_point_at_frame(
        call, owner, moment_stride, response_y_offset,
-       response_basis_offset, epsilon, &base_point,
+       response_basis_offset, epsilon, row, &base_point,
        compute_hc0 ? owner->categorical_base_kernel_row : NULL,
        compute_hc0 ? owner->power2_projection : NULL))
     return 0;
@@ -29677,7 +29767,7 @@ static int np_regression_general_lp_categorical_points(
     owner->eval_unordered[coordinate][0] = alternate;
     if(!np_regression_general_lp_point_at_frame(
          call, owner, moment_stride, response_y_offset,
-         response_basis_offset, epsilon, &alternate_point,
+         response_basis_offset, epsilon, row, &alternate_point,
          compute_hc0 ? owner->categorical_alternate_kernel_row : NULL,
          compute_hc0 ? owner->coefficient : NULL)) {
       owner->eval_unordered[coordinate][0] = current;
@@ -29685,6 +29775,10 @@ static int np_regression_general_lp_categorical_points(
     }
     owner->eval_unordered[coordinate][0] = current;
     owner->categorical_point[coordinate] = base_point - alternate_point;
+    if(ISNA(alternate_point)) {
+      if(compute_hc0) owner->categorical_stderr[coordinate] = NA_REAL;
+      continue;
+    }
     if(compute_hc0 &&
        !np_regression_hc0_lp_categorical_standard_error(
          owner->basis,
@@ -29733,7 +29827,7 @@ static int np_regression_general_lp_categorical_points(
     owner->eval_ordered[coordinate][0] = alternate;
     if(!np_regression_general_lp_point_at_frame(
          call, owner, moment_stride, response_y_offset,
-         response_basis_offset, epsilon, &alternate_point,
+         response_basis_offset, epsilon, row, &alternate_point,
          compute_hc0 ? owner->categorical_alternate_kernel_row : NULL,
          compute_hc0 ? owner->coefficient : NULL)) {
       owner->eval_ordered[coordinate][0] = current;
@@ -29742,6 +29836,10 @@ static int np_regression_general_lp_categorical_points(
     owner->eval_ordered[coordinate][0] = current;
     owner->categorical_point[category] =
       sign*(base_point - alternate_point);
+    if(ISNA(alternate_point)) {
+      if(compute_hc0) owner->categorical_stderr[category] = NA_REAL;
+      continue;
+    }
     if(compute_hc0 &&
        !np_regression_hc0_lp_categorical_standard_error(
          owner->basis,
@@ -30002,7 +30100,9 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	      if(use_mpi_owner_reduce_lp && ((j % owner_chunk_rows_lp) == 0)){
 	        const int chunk_start = j;
 	        const int chunk_end = MIN(num_obs_eval, chunk_start + owner_chunk_rows_lp);
-	        const int owner_row_width_lp = 1 + call->do_merr +
+	        /* Last cell: 0=complete, 1=empty fit, 2=empty contrast, -1=failure.
+	         * Chunk ownership/size retains the incumbent numeric-width policy. */
+	        const int owner_row_width_lp = 2 + call->do_merr +
 	          (call->do_grad ?
 	           num_reg_continuous*(1 + (call->do_gerr ? 1 : 0)) +
 	           (num_reg_unordered + num_reg_ordered)*
@@ -30178,6 +30278,16 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	               epsilon,
 	               NP_LP_RANK_UPPER_BOUND_UNKNOWN,
 	               &solve_diagnostics_owner) != NP_LP_SOLVE_POLICY_OK){
+	            if(np_regression_general_lp_empty_row(call, owner, jj, 0,
+	                 moment_stride, 1,
+	                 categorical_hc0 ? owner->categorical_base_kernel_row :
+	                   (call->do_merr && call->kernel_route == NULL ? owner->mpi_kernel_row : NULL))) {
+	              for(int col = 0; col < owner_row_width_lp - 1; ++col)
+	                out_owner[col] = NA_REAL;
+	              out_owner[owner_row_width_lp - 1] = 1.0;
+	              ++local_pos;
+	              continue;
+	            }
 	            owner_solve_failed = 1;
 	            break;
 	          }
@@ -30433,6 +30543,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	                     response_basis_offset,
 	                     epsilon,
 	                     out_owner[0],
+	                     jj,
 	                     categorical_hc0)) {
 	                  owner_solve_failed = 1;
 	                  break;
@@ -30455,6 +30566,10 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	              }
 	            }
 	          }
+	          const int caller_row = call->empty_rows != NULL && call->empty_rows->row_map != NULL ?
+	            call->empty_rows->row_map[jj] : jj;
+	          out_owner[owner_row_width_lp - 1] = call->empty_rows != NULL &&
+	            call->empty_rows->flags[caller_row] ? 2.0 : 0.0;
 	          local_pos++;
 	        }
 
@@ -30465,19 +30580,21 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	            for(int col = 0; col < owner_row_width_lp; col++)
 	              failed_row[col] = 0.0;
 	          }
-	          owner->mpi_owner_chunk.sendbuf[0] = NAN;
+	          owner->mpi_owner_chunk.sendbuf[owner_row_width_lp - 1] = -1.0;
 	        }
 
 	        np_reg_mpi_owner_chunk_allgather(&owner->mpi_owner_chunk);
 
 	        owner_solve_failed = 0;
-	        for(i = 0; i < iNum_Processors; i++)
-	          if((owner->mpi_owner_chunk.recvcounts[i] > 0) &&
-	             !isfinite(np_reg_mpi_owner_chunk_recv_ptr(
-	               &owner->mpi_owner_chunk,
-	               i,
-	               0)[0]))
-	            owner_solve_failed = 1;
+	        for(i = 0; i < iNum_Processors; i++) {
+	          if(owner->mpi_owner_chunk.recvcounts[i] > 0) {
+	            const double *first = np_reg_mpi_owner_chunk_recv_ptr(&owner->mpi_owner_chunk, i, 0);
+	            const double status = first[owner_row_width_lp - 1];
+	            if(status < 0.0 || (!isfinite(first[0]) &&
+	               !(status == 1.0 && ISNA(first[0]))))
+	              owner_solve_failed = 1;
+	          }
+	        }
 
 	        if(!owner_solve_failed){
 	          for(i = 0; i < iNum_Processors; i++){
@@ -30485,6 +30602,14 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	            for(int jj = chunk_start + i; jj < chunk_end; jj += iNum_Processors){
 	              const double * const in =
 	                np_reg_mpi_owner_chunk_recv_ptr(&owner->mpi_owner_chunk, i, pos_i);
+	              if(call->empty_rows != NULL && in[owner_row_width_lp - 1] > 0.0) {
+	                const int caller_row = call->empty_rows->row_map != NULL ?
+	                  call->empty_rows->row_map[jj] : jj;
+	                if(!call->empty_rows->flags[caller_row]) {
+	                  call->empty_rows->flags[caller_row] = 1;
+	                  ++call->empty_rows->count;
+	                }
+	              }
 	              int ipos = 0;
 	              call->mean[jj] = in[ipos++];
 	              if(call->do_merr)
@@ -30655,6 +30780,23 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
          NP_LP_RANK_UPPER_BOUND_UNKNOWN,
          &solve_diagnostics) !=
        NP_LP_SOLVE_POLICY_OK) {
+      if(np_regression_general_lp_empty_row(call, owner, j, 0,
+           moment_stride, categorical_hc0,
+           categorical_hc0 ? owner->categorical_base_kernel_row :
+             ((call->do_merr && reuse_fit_kernel_row) ? owner->retained_kernel_row : NULL))) {
+        call->mean[j] = NA_REAL;
+        if(call->do_merr) call->mean_stderr[j] = NA_REAL;
+        if(call->do_grad)
+          for(l = 0; l < num_reg_continuous + num_reg_unordered + num_reg_ordered; ++l) {
+            call->gradient[l][j] = NA_REAL;
+            if(call->do_gerr) call->gradient_stderr[l][j] = NA_REAL;
+          }
+#ifdef MPI2
+        if(call->fit_progress_active)
+#endif
+          np_progress_fit_loop_step(j + 1, call->fit_progress_total);
+        continue;
+      }
       execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_SOLVE;
       return R_NilValue;
     }
@@ -30915,6 +31057,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
              response_basis_offset,
              epsilon,
              call->mean[j],
+             j,
              categorical_hc0)) {
           execution->status = categorical_hc0 ?
             NP_REGRESSION_GENERAL_LP_FIT_ERR_HC0 :
@@ -31084,7 +31227,8 @@ int categorical_compress,
 NPRegressionStandardErrorMode standard_error_mode,
 const NPContinuousPreparedBandwidthView *prepared_bandwidth,
 const NPNNGeometryContext *nn_geometry_context,
-const NPRegressionHC0Context *hc0_context){
+const NPRegressionHC0Context *hc0_context,
+NPRegressionLPEmptyRows *empty_rows){
 
   // note that mean has 2*num_obs allocated for npksum
   int i, j, l;
@@ -32258,7 +32402,8 @@ const NPRegressionHC0Context *hc0_context){
       .kernel_route = kernel_route,
       .kernel_route_diagnostics = kernel_route_diagnostics,
       .hc0_context = effective_hc0_context,
-      .enclosing_owner = &fit_owner
+      .enclosing_owner = &fit_owner,
+      .empty_rows = empty_rows
     };
 
     general_lp_fit_status = np_regression_general_lp_fit(&general_lp_call);
@@ -32628,9 +32773,8 @@ static int np_lp_record_empty_row(const double *weights, int ntrain,
 {
   if(empty_rows == NULL)
     return 0;
-  for(int i = 0; i < ntrain; ++i)
-    if(weights[i] != 0.0) /* Also rejects NaN, Inf and signed cancellation. */
-      return 0;
+  if(!np_lp_complete_weights_are_zero(weights, ntrain))
+    return 0;
   empty_rows->flags[row] = 1;
   ++empty_rows->count;
   for(int i = 0; i < ncol; ++i)

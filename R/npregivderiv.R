@@ -129,7 +129,7 @@ npregivderiv.default <- function(y,
   iv.npreg <- function(...) {
     args <- list(...)
     if(is.null(args$bws)) args$random.seed <- random.seed
-    do.call(npreg, c(args, .np_iv_deriv_stage_args(smoothing.spec, args$txdat)))
+    do.call(.npreg_complete, c(args, .np_iv_deriv_stage_args(smoothing.spec, args$txdat)))
   }
 
   ## Basic error checking
