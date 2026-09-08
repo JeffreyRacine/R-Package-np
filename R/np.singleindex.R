@@ -537,17 +537,8 @@ npindex.default <- function(bws, txdat, tydat, nomad = FALSE,
     }
     if (!is.list(part) || is.null(part$rows) || is.null(part$value))
       stop(sprintf("%s gathered a malformed worker payload", what), call. = FALSE)
-    if (inherits(part$value, "npRmpi_index_row_failure")) {
-      cause <- part$value[["condition", exact = TRUE]]
-      if (!.npRmpi_autodispatch_in_context())
-        stop(cause)
-      # Every participant has completed the existing row gather. Keep this
-      # evidence private until the outer opcode ACK completes; the public
-      # boundary then raises the original condition without modifying it.
-      stop(structure(list(message = conditionMessage(cause), call = NULL,
-                          cause = cause),
-                     class = c("npRmpi_index_rows_error", "error", "condition")))
-    }
+    if (inherits(part$value, "npRmpi_local_failure"))
+      .npRmpi_raise_completed_failure(part$value)
     part.rows <- as.integer(part$rows)
     if (length(part.rows)) {
       if (any(is.na(part.rows)) || any(part.rows < 1L) || any(part.rows > neval))
@@ -582,8 +573,7 @@ npindex.default <- function(bws, txdat, tydat, nomad = FALSE,
   # than letting one rank leave peers waiting for its chunk. Successful wire
   # payloads and row ownership are unchanged.
   local <- if (isTRUE(task$active)) {
-    tryCatch(evaluate(), error = function(e)
-      structure(list(condition = e), class = "npRmpi_index_row_failure"))
+    .npRmpi_capture_local_work(evaluate())
   } else {
     evaluate()
   }

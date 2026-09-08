@@ -441,7 +441,7 @@ nplsqregbw <-
       mpi.size > 1L) {
     rank <- tryCatch(as.integer(mpi.comm.rank(1L)), error = function(e) 0L)
     if (isTRUE(rank == 0L)) {
-      out <- .npRmpi_with_local_regression(
+      out <- .npRmpi_capture_local_work(.npRmpi_with_local_regression(
         .nplsqreg_scale_pilot_fit(
           xdat = xdat,
           ydat = ydat,
@@ -449,11 +449,14 @@ nplsqregbw <-
           regtype.pilot = regtype.pilot,
           nomad.pilot = nomad.pilot
         )
-      )
+      ))
       mpi.bcast.Robj(out, rank = 0L, comm = 1L)
-      return(out)
+    } else {
+      out <- mpi.bcast.Robj(rank = 0L, comm = 1L)
     }
-    return(mpi.bcast.Robj(rank = 0L, comm = 1L))
+    if (inherits(out, "npRmpi_local_failure"))
+      .npRmpi_raise_completed_failure(out)
+    return(out)
   }
 
   .nplsqreg_scale_pilot_fit(

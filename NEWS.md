@@ -1,5 +1,9 @@
 # npRmpi 0.80-1
 
+* The root-owned generalized-nearest-neighbor scale pilot for least-squares
+  quantile regression now broadcasts cooperative local failures before raising
+  the original error, allowing the worker pool to be reused.
+
 * Single-index fits, predictions and bootstrap row calculations now complete
   their MPI result exchange before reporting a cooperative local fitting
   error. The original error is preserved and the worker pool remains reusable.

@@ -1,3 +1,21 @@
+# These helpers are only for owned local work whose peers can all reach an
+# already-scheduled result exchange. They do not recover a native collective
+# unwind, interruption, allocation exhaustion or MPI transport failure.
+.npRmpi_capture_local_work <- function(expr) {
+  tryCatch(expr, error = function(e)
+    structure(list(condition = e), class = "npRmpi_local_failure"))
+}
+
+# Call only after that result exchange has completed on every participant.
+.npRmpi_raise_completed_failure <- function(failure) {
+  cause <- failure[["condition", exact = TRUE]]
+  if (!.npRmpi_autodispatch_in_context())
+    stop(cause)
+  stop(structure(list(message = conditionMessage(cause), call = NULL,
+                      cause = cause),
+                 class = c("npRmpi_coordinated_error", "error", "condition")))
+}
+
 .npRmpi_autodispatch_option_keys <- function() {
   c("np.messages", "np.tree", "np.categorical.compress", "np.largeh",
     "np.objective.cache", "np.largelambda", "np.extendednn", "np.largeh.rel.tol",
@@ -1490,7 +1508,7 @@
     handler(payload, envelope),
     error = function(e) {
       if (inherits(e, "np_nn_zero_radius") ||
-          inherits(e, "npRmpi_index_rows_error"))
+          inherits(e, "npRmpi_coordinated_error"))
         stop(e)
       stop(
         sprintf("%s opcode failure [opcode=%s seq_id=%d]: %s",
@@ -1663,13 +1681,13 @@
     if (isTRUE(unanimous.nn.radius))
       stop(local$condition)
 
-    unanimous.index.rows <- !is.na(rank) && rank == 0L &&
-      inherits(local$condition, "npRmpi_index_rows_error") &&
+    unanimous.coordinated <- !is.na(rank) && rank == 0L &&
+      inherits(local$condition, "npRmpi_coordinated_error") &&
       all(status.vec == "ERR") &&
       all(seq.vec == as.integer(envelope$seq_id)) &&
       all(opcode.vec == as.character(envelope$opcode)[1L]) &&
       all(ack.mat["error", ] == conditionMessage(local$condition))
-    if (isTRUE(unanimous.index.rows))
+    if (isTRUE(unanimous.coordinated))
       stop(local$condition)
 
     detail.index <- unique(c(1L, bad))
@@ -2828,7 +2846,7 @@
     }
     if (inherits(eval.condition, "np_nn_zero_radius"))
       stop(eval.condition)
-    if (inherits(eval.condition, "npRmpi_index_rows_error"))
+    if (inherits(eval.condition, "npRmpi_coordinated_error"))
       stop(eval.condition[["cause", exact = TRUE]])
     stop(paste(as.character(eval.out), collapse = " "), call. = FALSE)
   }

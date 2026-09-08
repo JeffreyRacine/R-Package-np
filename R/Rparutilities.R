@@ -376,7 +376,7 @@ mpi.remote.exec <- function(cmd, ...,  simplify=TRUE, comm=1, ret=TRUE){
     if (isTRUE(out$ok))
         return(out$value)
     if (inherits(out$error, "np_nn_zero_radius") ||
-        inherits(out$error, "npRmpi_index_rows_error"))
+        inherits(out$error, "npRmpi_coordinated_error"))
         stop(out$error)
     if (inherits(out$error, "error"))
         stop(conditionMessage(out$error), call. = FALSE)
