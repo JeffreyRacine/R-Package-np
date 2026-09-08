@@ -155,7 +155,7 @@ test_that("MPI LP owner failures remain collective and fully owned", {
   source <- paste(readLines(jksum.file, warn = FALSE), collapse = "\n")
 
   expect_true(grepl(
-    "owner->mpi_owner_chunk.sendbuf[0] = NAN;",
+    "owner->mpi_owner_chunk.sendbuf[owner_row_width_lp - 1] = -1.0;",
     source,
     fixed = TRUE
   ))
@@ -165,8 +165,15 @@ test_that("MPI LP owner failures remain collective and fully owned", {
     fixed = TRUE
   ))
   expect_true(grepl(
-    "!isfinite(np_reg_mpi_owner_chunk_recv_ptr(",
-    source,
+    paste0(
+      "constdouble*first=np_reg_mpi_owner_chunk_recv_ptr(&owner->mpi_owner_chunk,i,0);",
+      "constdoublestatus=first[owner_row_width_lp-1];",
+      "if(status<0.0||(!isfinite(first[0])&&",
+      "!(status==1.0&&ISNA(first[0]))))owner_solve_failed=1;"
+    ),
+    # Certified empty fits may be NA; real failure and other nonfinite
+    # results must still be rejected after the existing allgather.
+    gsub("[[:space:]]+", "", source),
     fixed = TRUE
   ))
   free.pos <- regexpr(
