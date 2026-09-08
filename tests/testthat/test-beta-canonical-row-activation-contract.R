@@ -666,7 +666,7 @@ test_that("scalar beta regression fits enter the canonical row engine", {
   )
   expect_match(
     public_regression,
-    "active_route, active_diagnostics, categorical_compress);",
+    "active_route, active_diagnostics, categorical_compress, empty_rows_ptr);",
     fixed = TRUE
   )
   expect_false(grepl("np_beta_regression_lc(", public_regression,
@@ -698,7 +698,8 @@ test_that("scalar beta regression fits enter the canonical row engine", {
       "                                                   NULL,\n",
       "                                                   &nn_geometry_context,\n",
       "                                                   ordinary_hc0_active ?\n",
-      "                                                     &ordinary_hc0_context : NULL);"
+      "                                                     &ordinary_hc0_context : NULL,\n",
+      "                                                   call->empty_rows);"
     ),
     fixed = TRUE
   )
@@ -1510,7 +1511,7 @@ test_that("every beta side enters the common conditional regression owner", {
     paste0(
       "prepared_x_bandwidth_ptr,\n",
       "                                                                 row_nn_geometry_context_ptr,\n",
-      "                                                                 NULL);"
+      "                                                                 NULL, NULL);"
     ),
     fixed = TRUE
   )
