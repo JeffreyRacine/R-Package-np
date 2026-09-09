@@ -27,3 +27,40 @@ test_that("conditional leading SE uses separate X and Y kernel moments", {
       expect_equal(as.double(se(fit)),sqrt(variance),tolerance=2e-12)
     }
 })
+
+test_that("conditional analytic derivative SE uses derivative kernel energy", {
+  x <- data.frame(x = seq(-.8, .8, length.out = 47L))
+  y <- data.frame(y = .3*sin(seq_len(nrow(x))))
+  ex <- data.frame(x = c(-.037, .021))
+  ey <- data.frame(y = c(.01, -.02))
+  for (family in c("gaussian", "epanechnikov")) for (order in c(2L,4L)) {
+    radius <- if(family == "gaussian") Inf else sqrt(5)
+    kernel <- if(family == "gaussian") {
+      if(order == 2L) dnorm else function(u) dnorm(u)*(1.5-.5*u^2)
+    } else {
+      if(order == 2L) function(u) 3/(4*sqrt(5))*(1-u^2/5) else
+        function(u) 15/(32*sqrt(5))*(3-2*u^2+.28*u^4)
+    }
+    deriv <- if(family == "gaussian") {
+      if(order == 2L) function(u) -u*dnorm(u) else
+        function(u) u*dnorm(u)*(-2.5+.5*u^2)
+    } else {
+      if(order == 2L) function(u) -3/(10*sqrt(5))*u else
+        function(u) 15/(32*sqrt(5))*(-4*u+1.12*u^3)
+    }
+    ratio <- sqrt(integrate(function(u) deriv(u)^2,-radius,radius)$value /
+      integrate(function(u) kernel(u)^2,-radius,radius)$value)
+    for (cdf in c(FALSE,TRUE)) for (type in c("fixed","generalized_nn")) {
+      bwfun <- if(cdf) npcdistbw else npcdensbw
+      fitfun <- if(cdf) npcdist else npcdens
+      bw <- bwfun(xdat=x,ydat=y,bws=if(type=="fixed") c(.8,.8) else c(15,15),
+        bandwidth.compute=FALSE,bwtype=type,regtype="lc",
+        cxkertype=family,cxkerorder=order)
+      fit <- fitfun(bws=bw,txdat=x,tydat=y,exdat=ex,eydat=ey,gradients=TRUE)
+      h <- if(type=="fixed") rep(.8,nrow(ex)) else
+        vapply(ex$x,function(q) sort(abs(x$x-q))[15L],numeric(1))
+      expect_equal(as.double(fit$congerr),as.double(se(fit))*ratio/h,
+                   tolerance=3e-8)
+    }
+  }
+})

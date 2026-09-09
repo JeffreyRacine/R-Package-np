@@ -10,6 +10,12 @@
   denominators remain invalid; estimates and existing valid derivatives are
   unchanged.
 
+* Scalar conditional Gaussian and Epanechnikov gradient standard errors with
+  fixed/generalized-nearest-neighbour bandwidths now use the squared analytic
+  derivative moment, not a finite-shift convolution constant. This changes
+  uncertainty only; uniform derivative inference and broader adaptive-NN
+  variance questions are not resolved by this correction.
+
 * Scalar conditional density and distribution standard errors now use the
   squared-kernel moments of the chosen explanatory kernels and, for density,
   response kernels separately. Mixed kernel families/orders no longer inherit

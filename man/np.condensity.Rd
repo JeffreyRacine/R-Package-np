@@ -297,6 +297,15 @@ Further arguments are passed to \code{\link{npcdensbw}} when bandwidths are comp
   \code{congerr} are \code{NA}. Use bootstrap intervals when inference
   on higher-order derivatives is required.
 
+  For ordinary scalar fits, leading interior standard errors use the squared
+  X-kernel moment; conditional density errors additionally use the independent
+  Y-kernel moment. Analytic first-derivative errors for fixed and generalized
+  nearest-neighbour bandwidths with Gaussian or Epanechnikov kernels use the
+  squared derivative-kernel moment and the X bandwidth. These formulas do not
+  establish uniform-kernel derivative inference or full adaptive-NN inference
+  with estimated random radii. Positive-degree local-polynomial fits use
+  their separate covariance calculation.
+
 }
 \value{
 
