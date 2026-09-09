@@ -471,20 +471,42 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
     if (!miss.ex)
       W <- as.matrix(data.frame(1,exdat))
 
-    safe_chol2inv <- function(a, ridge0, eps, maxiter = 1000L){
+    accepted_moment_covariance <- function(a, ridge0, s){
       nc.local <- ncol(a)
       I.local <- diag(rep(1.0, nc.local))
       ridge.local <- max(as.double(ridge0), 0.0)
-      for (iter in seq_len(maxiter)) {
+      a.ridge <- a + ridge.local * I.local
+      chol.inverse <- TRUE
+      cm <- tryCatch(
+        chol2inv(chol(a.ridge)),
+        error = function(e) NULL
+      )
+      if (is.null(cm)) {
+        # Signed kernels may yield an accepted nonsingular indefinite system.
+        # Change the factorization, never the ridge or the fitted operator.
+        chol.inverse <- FALSE
         cm <- tryCatch(
-          chol2inv(chol(a + ridge.local * I.local)),
+          solve(a.ridge),
           error = function(e) NULL
         )
-        if (!is.null(cm))
-          return(cm)
-        ridge.local <- ridge.local + eps
       }
-      NULL
+      if (is.null(cm))
+        return(NULL)
+
+      if (ridge.local > 0.0) {
+        # The point solve corrects the intercept RHS: theta = C D b.
+        # Apply its established overflow-safe correction to C's first column.
+        cm[, 1L] <- cm[, 1L] + npRidgeInterceptCorrection(
+          ridge = ridge.local, intercept = cm[, 1L],
+          pristine.anchor = a[1L, 1L])
+        if (any(!is.finite(cm[, 1L])))
+          return(NULL)
+        return(cm %*% s %*% t(cm))
+      }
+      if (chol.inverse)
+        cm %*% s %*% cm
+      else
+        cm %*% s %*% t(cm)
     }
 
     fast_moment_solve <- function(tww.slice, tyw.slice, ridge.add, ridge.val) {
@@ -1035,12 +1057,11 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
           )$s
           if (!is.null(fit.progress.step))
             fit.progress.step("estimating standard errors")
-          cm.fast <- if (length(invalid.rows)) NULL else
-            safe_chol2inv(fast.eval$tww, fast.solve$ridge, 1.0 / nrow(txdat))
+          vcv.beta.fast <- if (length(invalid.rows)) NULL else
+            accepted_moment_covariance(fast.eval$tww, fast.solve$ridge, s.fast)
           merr <- rep(NA_real_, enrow)
           beta.se <- matrix(NA_real_, nrow = enrow, ncol = nrow(coef.mat))
-          if (!is.null(cm.fast)) {
-            vcv.beta.fast <- cm.fast %*% s.fast %*% cm.fast
+          if (!is.null(vcv.beta.fast)) {
             merr <- sqrt(pmax(rowSums((W %*% vcv.beta.fast) * W), 0.0))
             beta.se[] <- rep(sqrt(pmax(diag(vcv.beta.fast), 0.0)), each = enrow)
           }
@@ -1076,12 +1097,11 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
           )$s
           if (!is.null(fit.progress.step))
             fit.progress.step("estimating standard errors")
-          cm.fast <- if (length(invalid.rows)) NULL else
-            safe_chol2inv(fast.eval$tww, fast.eval$ridge, 1.0 / nrow(txdat))
+          vcv.theta.fast <- if (length(invalid.rows)) NULL else
+            accepted_moment_covariance(fast.eval$tww, fast.eval$ridge, s.fast)
           merr <- rep(NA_real_, enrow)
           beta.se <- matrix(NA_real_, nrow = enrow, ncol = nrow(coef.mat))
-          if (!is.null(cm.fast)) {
-            vcv.theta.fast <- cm.fast %*% s.fast %*% cm.fast
+          if (!is.null(vcv.theta.fast)) {
             for (i in seq_len(enrow)) {
               trans.i <- kronecker(diag(ncol(W)), matrix(fast.eval$lp_state$W.eval[i,], nrow = 1L))
               vcv.beta.fast <- trans.i %*% vcv.theta.fast %*% t(trans.i)
@@ -1151,15 +1171,14 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
       if (length(invalid.rows))
         valid.rows <- valid.rows[-invalid.rows]
       for (i in valid.rows) {
-        cm <- safe_chol2inv(moments$tww[,,i], ridge[i], 1.0 / nrow(txdat))
-        if (is.null(cm))
+        vcv.theta <- accepted_moment_covariance(
+          moments$tww[,,i], ridge[i], moments$s[,,i])
+        if (is.null(vcv.theta))
           next
-        s.mat <- moments$s[,,i]
 
         if (identical(reg.engine, "lc")) {
-          vcv.beta <- cm %*% s.mat %*% cm
+          vcv.beta <- vcv.theta
         } else {
-          vcv.theta <- cm %*% s.mat %*% cm
           trans.i <- kronecker(diag(ncol(W)), matrix(lp_state$W.eval[i,], nrow = 1L))
           vcv.beta <- trans.i %*% vcv.theta %*% t(trans.i)
         }

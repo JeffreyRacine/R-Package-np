@@ -1,5 +1,11 @@
 # np 0.80-1
 
+* Requested smooth-coefficient standard errors now use the same accepted
+  moment system and intercept ridge correction as the returned point fit.
+  Supported signed kernels no longer receive a separate covariance-only
+  ridge. Fitted values, coefficient effects, search and `se=FALSE` work are
+  unchanged; unavailable covariance retains its existing `NA` output policy.
+
 * Copula fitting accepts named `se=FALSE/TRUE`, defaulting to FALSE.
   Requested asymptotic errors are stored at fitting time; `se()` only reads
   stored results and explains how to refit with the bandwidth object when
