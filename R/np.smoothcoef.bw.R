@@ -889,7 +889,7 @@ npscoefbw.NULL <-
       return(list(objective = penalty, num.feval = 1L, num.feval.fast = 0L,
                   raw.valid = FALSE))
     }
-    unknown <- .npscoefbw_nomad_unknown_nn_error(e, bws)
+    unknown <- .npscoefbw_nomad_unknown_nn_error(e, bws, preserve.eval.error = TRUE)
     if (!is.null(unknown)) stop(unknown)
     list(objective = penalty, num.feval = 1L, num.feval.fast = 0L,
          raw.valid = FALSE)
@@ -1612,8 +1612,7 @@ npscoefbw.NULL <-
       remin = isTRUE(opt.args$nomad.remin),
       nomad.opts = if (is.null(opt.args$nomad.opts)) list() else opt.args$nomad.opts,
       native.r.bridge = TRUE,
-      preserve.eval.error = collective.owner ||
-        isTRUE(pool[["preserve.eval.error", exact = TRUE]]),
+      preserve.eval.error = TRUE,
       .native.callback.transaction = callback.transaction,
       source = source,
       reason = reason,

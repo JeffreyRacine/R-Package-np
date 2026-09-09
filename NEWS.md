@@ -1,5 +1,9 @@
 # npRmpi 0.80-1
 
+* Local smooth-coefficient NOMAD searches now propagate unexpected fixed-bandwidth
+  preparation errors instead of accepting a surviving candidate. Legitimate
+  typed candidate rejection and the distributed preparation protocol are unchanged.
+
 * Conditional-density and conditional-distribution fallback probes now retain
   the intended physical categorical bandwidths when `bwscaling = TRUE`.
   Valid initial candidates and the existing penalty/restart rules are unchanged.
