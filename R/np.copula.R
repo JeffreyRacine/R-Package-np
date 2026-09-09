@@ -904,6 +904,13 @@ predict.npcopula <- function(object,
   se.fit <- npValidateScalarLogical(se.fit, "se.fit")
   output <- match.arg(output)
   dots <- list(...)
+  if ("se" %in% names(dots)) {
+    requested.se <- npValidateScalarLogical(dots[["se"]], "se")
+    if (!identical(requested.se, se.fit))
+      stop("conflicting 'se' and 'se.fit' requests; use se.fit to request prediction standard errors",
+           call. = FALSE)
+    dots[["se"]] <- NULL
+  }
 
   if (is.null(u) && !is.null(newdata)) {
     u <- .npcopula_predict_newdata_to_u(object, newdata, allow.xnames = FALSE)
@@ -920,28 +927,30 @@ predict.npcopula <- function(object,
       data <- object$data
     if (is.null(data))
       stop("npcopula object does not retain the training data needed for prediction; refit with npcopula()")
-    args <- c(list(bws = object$bws, data = data),
+    args <- c(list(bws = object$bws, data = data, se = se.fit),
               if (is.null(u)) list() else list(u = u),
               dots)
     ev <- do.call(npcopula, args)
   }
 
+  prediction.se <- if (se.fit) se(ev) else NULL
   if (identical(output, "object"))
     return(ev)
   if (identical(output, "data"))
     return(as.data.frame(ev))
   if (se.fit)
-    return(list(fit = fitted(ev), se.fit = se(ev), df = ev$ntrain))
+    return(list(fit = fitted(ev), se.fit = prediction.se, df = ev$ntrain))
   fitted(ev)
 }
 
 se.npcopula <- function(x) {
-  if (!is.null(x$copulaerr) && length(x$copulaerr) == length(x$copula))
-    return(x$copulaerr)
-  .npcopula_asymptotic_se(
-    x = x,
-    data = .npcopula_training_data(x),
-    xgrid = .npcopula_eval_xgrid(x)
+  value <- x[["copulaerr", exact = TRUE]]
+  if (length(value) != length(x[["copula", exact = TRUE]]))
+    value <- NULL
+  .np_require_stored_se(
+    x, value, "npcopula", what = "copula standard errors",
+    expr = substitute(x),
+    data.hint = "data = training.data, u = evaluation.grid"
   )
 }
 
@@ -1296,7 +1305,8 @@ npcopula.formula <- function(bws,
                              neval = 30,
                              n.quasi.inv = 1000,
                              er.quasi.inv = 1,
-                             ...) {
+                             ..., se = FALSE) {
+  se <- npValidateScalarLogical(se, "se")
   .npRmpi_require_active_slave_pool(where = "npcopula()")
   target <- .npcopula_validate_target(target)
   evaluation <- .npcopula_validate_evaluation(evaluation)
@@ -1334,7 +1344,8 @@ npcopula.formula <- function(bws,
     neval = neval,
     n.quasi.inv = n.quasi.inv,
     er.quasi.inv = er.quasi.inv,
-    u.auto = u.auto
+    u.auto = u.auto,
+    se = se
   )
 }
 
@@ -1346,7 +1357,8 @@ npcopula.default <- function(bws,
                              neval = 30,
                              n.quasi.inv = 1000,
                              er.quasi.inv = 1,
-                             ...) {
+                             ..., se = FALSE) {
+  se <- npValidateScalarLogical(se, "se")
   dots <- list(...)
   u.auto <- isTRUE(dots$u.auto)
   dots$u.auto <- NULL
@@ -1416,7 +1428,8 @@ npcopula.default <- function(bws,
            neval = neval.formula,
            n.quasi.inv = n.quasi.inv,
            er.quasi.inv = er.quasi.inv,
-           u.auto = auto.grid)
+           u.auto = auto.grid,
+           se = se)
     )
     return(do.call(npcopula.default, args))
   }
@@ -1451,7 +1464,8 @@ npcopula.default <- function(bws,
     neval = neval,
     n.quasi.inv = n.quasi.inv,
     er.quasi.inv = er.quasi.inv,
-    u.auto = u.auto
+    u.auto = u.auto,
+    se = se
   )
   result$timing <- proc.time()[3] - start.time
   result
@@ -1465,7 +1479,8 @@ npcopula.default <- function(bws,
                            neval,
                            n.quasi.inv,
                            er.quasi.inv,
-                           u.auto = FALSE) {
+                           u.auto = FALSE,
+                           se = FALSE) {
   # Keep npcopula as a local orchestrator in session mode.
   # Dispatching the full routine can deadlock because it nests many estimator
   # calls; those inner calls are already MPI-aware and dispatch independently.
@@ -1484,7 +1499,7 @@ npcopula.default <- function(bws,
 
   progress.total <- .npcopula_progress_total(density = density,
                                              u.provided = u.provided,
-                                             num.var = num.var)
+                                             num.var = num.var) + as.integer(se)
   progress <- .npcopula_progress_begin(target = target,
                                        evaluation = if (u.provided) "grid" else "sample",
                                        total = progress.total)
@@ -1596,7 +1611,7 @@ npcopula.default <- function(bws,
     out <- data.frame(copula,u,x.u)
   }
 
-  .npcopula_object(
+  result <- .npcopula_object(
     result = out,
     bws = bws,
     data = data,
@@ -1611,4 +1626,16 @@ npcopula.default <- function(bws,
     n.quasi.inv = n.quasi.inv,
     er.quasi.inv = er.quasi.inv
   )
+  result[["se"]] <- se
+  if (se) {
+    progress <- .npcopula_progress_step(
+      progress, stage + 1L, "asymptotic standard errors"
+    )
+    # Preserve the established external-query uncertainty geometry, which
+    # need not match the sample point fit's training-identity NN geometry.
+    result[["copulaerr"]] <- .npcopula_asymptotic_se(
+      result, data = data, xgrid = .npcopula_eval_xgrid(result)
+    )
+  }
+  result
 }

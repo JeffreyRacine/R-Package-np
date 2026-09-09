@@ -229,6 +229,8 @@ test_that("predict.npcopula evaluates stored bandwidths on probability grids", {
                as.data.frame(expected),
                ignore_attr = TRUE)
 
+  fit <- npcopula(bws = fit$bws, data = faithful, u = u,
+                  n.quasi.inv = 40, se = TRUE)
   pred.se <- predict(fit, se.fit = TRUE)
   expect_equal(pred.se$fit, fitted(fit))
   expect_equal(pred.se$se.fit, se(fit))

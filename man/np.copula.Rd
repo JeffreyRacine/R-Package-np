@@ -29,7 +29,7 @@ npcopula(bws, \dots)
          neval = 30,
          n.quasi.inv = 1000,
          er.quasi.inv = 1,
-         \dots)
+         \dots, se = FALSE)
 
 \method{npcopula}{default}(bws,
          data,
@@ -39,7 +39,7 @@ npcopula(bws, \dots)
          neval = 30,
          n.quasi.inv = 1000,
          er.quasi.inv = 1,
-         \dots)
+         \dots, se = FALSE)
 
 \method{predict}{npcopula}(object,
         newdata = NULL,
@@ -163,9 +163,18 @@ estimated and where it is evaluated.
     an object of class \code{"npcopula"} returned by \code{npcopula}.
   }
 
+  \item{se}{
+    logical value; default \code{FALSE}. Compute and retain asymptotic
+    standard errors only when \code{TRUE}. This is a named fitting
+    control, not a bandwidth-selection option.
+  }
+
   \item{se.fit}{
-    logical value. If \code{TRUE}, \code{predict.npcopula} returns a
-    list with fitted values and the stored standard-error slot.
+    logical value. With vector output, \code{TRUE} returns a list of
+    fitted values and standard errors. New evaluation requests compute
+    the required errors; prediction without new evaluation arguments
+    reads the stored results and requires a fit made with \code{se=TRUE}.
+    Object and data output retain their existing return shapes.
   }
 
 \subsection{Plot Display Controls}{
@@ -387,6 +396,14 @@ prediction/evaluation route, or graphics renderer as appropriate.
   \code{"empirical"} view plots empirical copula coordinates, and
   \code{"all"} gives a base-graphics four-panel diagnostic display.
 
+  Standard-error extraction with \code{se(object)} only reads stored
+  results; it does not silently refit the model. To add errors without
+  repeating bandwidth selection, use
+  \code{npcopula(bws=object$bws, data=object$data, u=object$u.input, se=TRUE,
+  n.quasi.inv=object$n.quasi.inv, er.quasi.inv=object$er.quasi.inv)}.
+  The default skips uncertainty-only work. Explicit asymptotic plot
+  requests obtain their needed errors even if the original fit omitted them.
+
   For grid surfaces, \code{plot.npcopula} can add asymptotic or
   bootstrap intervals. Distribution-copula asymptotic intervals use the
   joint distribution standard error evaluated at the marginal
@@ -428,9 +445,10 @@ prediction/evaluation route, or graphics renderer as appropriate.
   }
 
   \item{copulaerr}{
-    asymptotic or bootstrap standard-error slot. The fitted object stores
-    \code{NA} unless an interval-producing plotting route constructs
-    evaluation-specific intervals.
+    stored asymptotic standard errors when \code{se=TRUE}; absent when
+    they were not requested. Requested unavailable values retain their
+    existing \code{NA} representation. The separate logical \code{se}
+    component records the fitting request.
   }
 
   The source data, target, evaluation route, grid dimensions, and timing

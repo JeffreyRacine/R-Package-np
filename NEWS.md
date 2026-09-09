@@ -1,5 +1,11 @@
 # npRmpi 0.80-1
 
+* Copula fitting accepts named `se=FALSE/TRUE`, defaulting to FALSE.
+  Requested asymptotic errors are stored at fitting time; `se()` only reads
+  stored results and explains how to refit with the bandwidth object when
+  errors are absent. Explicit prediction/plot inference requests retain their
+  existing uncertainty target; point estimates and NN geometry are unchanged.
+
 * Unconditional density and distribution fitting now accept named
   `se=FALSE` by default, skipping uncertainty-only computation while preserving
   point estimates. Use `se=TRUE` to retain asymptotic standard errors or
