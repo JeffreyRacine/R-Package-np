@@ -1,5 +1,10 @@
 # np 0.80-1
 
+* Scalar conditional beta-response derivative standard errors now allow a
+  legitimate zero derivative of the explanatory weight sum. Zero endpoint
+  denominators remain invalid; estimates and existing valid derivatives are
+  unchanged.
+
 * Single-index mean hats and affected bootstrap ratio helpers now normalize
   finite signed and positive-small weight sums directly instead of flooring
   them at machine epsilon. Empty external LC/degree-zero index and adaptive

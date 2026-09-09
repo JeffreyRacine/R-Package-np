@@ -24521,7 +24521,10 @@ static int NP_NOINLINE np_regression_conditional_influence_finish(
 
     influence_scale = 0.0;
     influence_sum_squares = 1.0;
-    if(!R_FINITE(alternate_denominator) || alternate_denominator == 0.0)
+    /* Continuous rows contain D', which may legitimately be zero.
+       Categorical rows contain a distinct endpoint denominator. */
+    if(!R_FINITE(alternate_denominator) ||
+       (predictor >= num_continuous && alternate_denominator == 0.0))
       return 0;
     if(predictor < num_continuous) {
       const double denominator_ratio = alternate_denominator / denominator;
