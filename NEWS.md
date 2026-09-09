@@ -1,5 +1,13 @@
 # np 0.80-1
 
+* Unconditional density and distribution fits now default to `se=FALSE`,
+  skipping uncertainty-only computation while retaining the same point
+  estimates. Use `se=TRUE` to retain asymptotic standard errors, or
+  `predict(..., se.fit=TRUE)` for prediction errors. `se()` only extracts
+  stored results and explains how to reuse the bandwidth object for a refit
+  without repeating bandwidth selection. Explicit asymptotic plot and copula
+  inference continue to request their required errors.
+
 * Ordinary scalar conditional categorical-gradient standard errors now use
   complete paired same-observation influences, including endpoint covariance.
   Requested errors use an additional streamed inference pass and can increase

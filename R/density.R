@@ -6,7 +6,7 @@ npdensity <-
              train.rows.omit = rows.omit,
              eval.rows.omit = if (trainiseval) rows.omit else NA,
              timing = NA, total.time = NA,
-             optim.time = NA, fit.time = NA){
+             optim.time = NA, fit.time = NA, se = TRUE){
 
         if (missing(bws) || missing(eval) || missing(dens) || missing(ntrain))
             stop("improper invocation of density constructor")
@@ -36,6 +36,7 @@ npdensity <-
             eval = eval,
             dens = dens,
             derr = derr,
+            se = se,
             log_likelihood = ll,
             ntrain = ntrain,
             trainiseval = trainiseval,
@@ -77,11 +78,23 @@ print.npdensity <- function(x, digits=NULL, ...){
 fitted.npdensity <- function(object, ...){
  object$dens 
 }
-se.npdensity <- function(x){ x$derr }
+se.npdensity <- function(x) {
+  .np_require_stored_se(
+    x, x[["derr", exact = TRUE]], "npudens", expr = substitute(x),
+    data.hint = if (is.null(x[["bws", exact = TRUE]][["call", exact = TRUE]]))
+      "tdat = training_data" else NULL)
+}
 
 predict.npdensity <- function(object, se.fit = FALSE, ...) {
   se.fit <- npValidateScalarLogical(se.fit, "se.fit")
   dots <- list(...)
+  if ("se" %in% names(dots)) {
+    requested.se <- npValidateScalarLogical(dots[["se"]], "se")
+    if (!identical(requested.se, se.fit))
+      stop("conflicting 'se' and 'se.fit' requests; use se.fit to request prediction standard errors",
+           call. = FALSE)
+    dots[["se"]] <- NULL
+  }
   has.formula.route <- !is.null(object$bws$formula)
 
   if (!is.null(dots$edat) && !is.null(dots$newdata)) {
@@ -91,7 +104,7 @@ predict.npdensity <- function(object, se.fit = FALSE, ...) {
     dots$newdata <- NULL
   }
 
-  tr <- do.call(npudens, c(list(bws = object$bws), dots))
+  tr <- do.call(npudens, c(list(bws = object$bws, se = se.fit), dots))
   if(se.fit)
     return(list(fit = fitted(tr), se.fit = se(tr), 
                 df = tr$nobs, log.likelihood = tr$log_likelihood))

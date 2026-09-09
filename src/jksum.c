@@ -2169,6 +2169,7 @@ static int np_density_categorical_profile_fit_body(
   double ** const matrix_categorical_vals = call->matrix_categorical_vals;
   double * const pdf = call->pdf;
   double * const pdf_stderr = call->pdf_stderr;
+  const int compute_se = pdf_stderr != NULL;
   double * const log_likelihood = call->log_likelihood;
 
   int i, j, g, status;
@@ -2190,7 +2191,6 @@ static int np_density_categorical_profile_fit_body(
      (lambda == NULL) ||
      (operator == NULL) ||
      (pdf == NULL) ||
-     (pdf_stderr == NULL) ||
      (log_likelihood == NULL))
     return 0;
 
@@ -2246,7 +2246,7 @@ static int np_density_categorical_profile_fit_body(
   np_categorical_profile_owner_take_vector(owner, counts);
   profile_pdf_sum = alloc_vecd(nprof_eval);
   np_categorical_profile_owner_take_vector(owner, profile_pdf_sum);
-  const int compute_moments = np_categorical_density_moments_required(
+  const int compute_moments = compute_se && np_categorical_density_moments_required(
     0, num_reg_unordered, num_reg_ordered, operator_kind, lambda);
   if(compute_moments) {
     profile_m2 = alloc_vecd(nprof_eval);
@@ -2352,12 +2352,12 @@ static int np_density_categorical_profile_fit_body(
     const double p = profile_pdf_sum[eval_prof_id[i]]/(double)num_obs_train;
     pdf[i] = p;
     if(operator_kind == OP_NORMAL){
-      pdf_stderr[i] = compute_moments ?
+      if(compute_se) pdf_stderr[i] = compute_moments ?
         sqrt(profile_m2[eval_prof_id[i]])/(double)num_obs_train :
         sqrt(p/(double)num_obs_train);
       *log_likelihood += np_fitted_log_likelihood_contribution(p);
     } else {
-      pdf_stderr[i] = compute_moments ?
+      if(compute_se) pdf_stderr[i] = compute_moments ?
         sqrt(profile_m2[eval_prof_id[i]])/(double)num_obs_train :
         sqrt(p*(1.0-p)/(double)num_obs_train);
     }
@@ -10698,6 +10698,8 @@ static int np_beta_absolute_route_body(
         }
       }
     }
+    if(progress != NULL)
+      progress(evaluation + 1, num_obs_eval);
     if((evaluation & 31) == 0)
       R_CheckUserInterrupt();
   }
@@ -11184,6 +11186,15 @@ NPPermutationWeightOutput * const pkw_output){
     const int beta_dual_power =
       dual_power_ctx != NULL && dual_power_ctx->weighted_sum != NULL &&
       dual_power_ctx->kernel_pow == 2;
+    /* A fit can retain progress while declining the optional second moment. */
+    const int beta_point_request =
+      dual_power_ctx != NULL && dual_power_ctx->weighted_sum == NULL &&
+      dual_power_ctx->kernel_pow == 2 &&
+      dual_power_ctx->matrix_Y == NULL && dual_power_ctx->matrix_W == NULL &&
+      dual_power_ctx->ncol_Y == 0 && dual_power_ctx->ncol_W == 0 &&
+      !dual_power_ctx->retain_common_scale &&
+      dual_power_ctx->observation_scale == NULL &&
+      dual_power_ctx->regression_derivative == NULL;
     const int beta_retain_common_scale =
       beta_scaled_outer;
     const int beta_centered_moment =
@@ -11249,11 +11260,11 @@ NPPermutationWeightOutput * const pkw_output){
       ((!beta_has_categories && lambda_pre == NULL) ||
        beta_has_categories) &&
       (dual_power_ctx == NULL ||
-       ((beta_dual_power || beta_scaled_outer) &&
+       ((beta_dual_power || beta_scaled_outer || beta_point_request) &&
         kernel_pow == 1 && !route_has_derivative &&
         (kw == NULL || beta_retain_common_scale))) &&
       (centered_moment_ctx == NULL ||
-       (beta_centered_moment && dual_power_ctx == NULL &&
+       (dual_power_ctx == NULL &&
         kernel_pow == 1 && !route_has_derivative && kw == NULL &&
         ncol_Y == 0 && ncol_W == 0)) &&
       outer_pack_ctx == NULL &&
@@ -11321,8 +11332,8 @@ NPPermutationWeightOutput * const pkw_output){
         .kw = kw,
         .regression_moment_context = NULL,
         .route_diagnostics = kernel_route_diagnostics,
-        .progress = beta_dual_power ? dual_power_ctx->progress :
-          (beta_centered_moment ? centered_moment_ctx->progress : NULL)
+        .progress = dual_power_ctx != NULL ? dual_power_ctx->progress :
+          (centered_moment_ctx != NULL ? centered_moment_ctx->progress : NULL)
       };
 
       route_status = np_beta_absolute_route(&route_call);
@@ -14009,7 +14020,7 @@ NPContinuousKernelProgressFunction progress)
     weighted_sum, NULL, NULL, NULL,
     NULL, NULL,
     kernel_route == NULL ? NULL : &kernel_execution_context,
-    centered_m2 == NULL ? NULL : &centered_moment_ctx,
+    &centered_moment_ctx,
     NULL);
 }
 
@@ -43064,7 +43075,8 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
   /* R owns this optional O(neval) scratch before any call-local native
    * allocations are acquired, including on interruption or allocation error. */
   double *categorical_scratch = NULL;
-  if(BANDWIDTH_den == BW_ADAP_NN &&
+  const int compute_se = pdf_stderr != NULL;
+  if(compute_se && BANDWIDTH_den == BW_ADAP_NN &&
      np_categorical_density_moments_required(
        num_reg_continuous, num_reg_unordered, num_reg_ordered,
        dop, vector_scale_factor))
@@ -43154,7 +43166,7 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
   if(exact_beta_route) {
     INT_KERNEL_P = 0.0;
     K_INT_KERNEL_P = 0.0;
-  } else if(num_reg_continuous != 0) {
+  } else if(compute_se && num_reg_continuous != 0) {
     initialize_kernel_regression_asymptotic_constants(KERNEL_den,
                                                       num_reg_continuous,
                                                       &INT_KERNEL_P,
@@ -43382,7 +43394,7 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
         beta_fixed_bandwidth[l] = vector_scale_factor[l];
     }
     if(dop == OP_NORMAL) {
-      beta_kernel_square_sum = alloc_vecd(num_obs_eval);
+      beta_kernel_square_sum = compute_se ? alloc_vecd(num_obs_eval) : NULL;
       beta_route_status = kernel_weighted_sum_np_route_power12(
         NULL, kernel_u, kernel_o,
         BANDWIDTH_den, num_obs_train, num_obs_eval,
@@ -43401,7 +43413,7 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
         categorical_compress, pdf, beta_kernel_square_sum,
         kernel_route, kernel_route_diagnostics, np_progress_fit_loop_step);
     } else {
-      beta_centered_m2 = alloc_vecd(num_obs_eval);
+      beta_centered_m2 = compute_se ? alloc_vecd(num_obs_eval) : NULL;
       beta_route_status = kernel_weighted_sum_np_route_centered_m2(
         NULL, kernel_u, kernel_o,
         BANDWIDTH_den, num_obs_train, num_obs_eval,
@@ -43424,14 +43436,14 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
 
     for(i = 0, *log_likelihood = 0.0; i < num_obs_eval; ++i) {
       const double estimate = pdf[i] / (double)num_obs_train;
-      double variance;
+      double variance = 0.0;
 
-      if(dop == OP_NORMAL) {
+      if(compute_se && dop == OP_NORMAL) {
         const double second_moment =
           beta_kernel_square_sum[i] / (double)num_obs_train;
 
         variance = fma(-estimate, estimate, second_moment);
-      } else {
+      } else if(compute_se) {
         variance = beta_centered_m2[i] / (double)num_obs_train;
       }
 
@@ -43442,14 +43454,15 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
       if(variance < 0.0)
         variance = 0.0;
       pdf[i] = estimate;
-      pdf_stderr[i] = num_obs_train > 1 ?
-        sqrt(variance / (double)(num_obs_train - 1)) : 0.0;
+      if(compute_se)
+        pdf_stderr[i] = num_obs_train > 1 ?
+          sqrt(variance / (double)(num_obs_train - 1)) : 0.0;
       if(dop == OP_NORMAL)
         *log_likelihood +=
           np_fitted_log_likelihood_contribution(estimate);
     }
   } else {
-    const int compute_categorical_moments =
+    const int compute_categorical_moments = compute_se &&
       np_categorical_density_moments_required(
         num_reg_continuous, num_reg_unordered, num_reg_ordered, dop, lambda);
     NPCategoricalDensityMomentCtx categorical_moments = {
@@ -43520,7 +43533,7 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
       goto cleanup_density_fit;
     categorical_moment_status = 0;
 
-    if((BANDWIDTH_den == BW_FIXED) && (dop == OP_NORMAL)){
+    if(compute_se && (BANDWIDTH_den == BW_FIXED) && (dop == OP_NORMAL)){
       for(l = 0, pnh = num_obs_train; l < num_reg_continuous; l++){
         pnh *= matrix_bandwidth[l][0];
       }
@@ -43532,20 +43545,20 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
         *log_likelihood +=
           np_fitted_log_likelihood_contribution(pdf[i]);
 
-        if((BANDWIDTH_den == BW_GEN_NN) && (dop == OP_NORMAL)){
+        if(compute_se && (BANDWIDTH_den == BW_GEN_NN) && (dop == OP_NORMAL)){
           for(l = 0, pnh = num_obs_train; l < num_reg_continuous; l++){
             pnh *= matrix_bandwidth[l][i];
           }
         }
 
-        pdf_stderr[i] = compute_categorical_moments ?
+        if(compute_se) pdf_stderr[i] = compute_categorical_moments ?
           sqrt(pdf_stderr[i])/(double)num_obs_train :
           sqrt(pdf[i]*K_INT_KERNEL_P/pnh);
       }
     } else {
       for(i = 0, *log_likelihood = 0.0; i < num_obs_eval; i++){
         pdf[i] /= (double)num_obs_train;
-        pdf_stderr[i] = compute_categorical_moments ?
+        if(compute_se) pdf_stderr[i] = compute_categorical_moments ?
           sqrt(pdf_stderr[i])/(double)num_obs_train :
           sqrt(pdf[i]*(1.0-pdf[i])/(double)num_obs_train);
       }

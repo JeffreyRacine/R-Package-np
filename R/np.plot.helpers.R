@@ -8885,9 +8885,9 @@ plotFactor <- function(f, y, ...){
     expr = {
       if (isTRUE(need.asymptotic)) {
         return(if (isTRUE(cdf)) {
-          npudist(tdat = xdat, edat = exdat, bws = bws)
+          npudist(tdat = xdat, edat = exdat, bws = bws, se = TRUE)
         } else {
-          npudens(tdat = xdat, edat = exdat, bws = bws)
+          npudens(tdat = xdat, edat = exdat, bws = bws, se = TRUE)
         })
       }
 

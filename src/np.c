@@ -8503,7 +8503,8 @@ SEXP C_np_density(SEXP tuno,
                   SEXP myopti,
                   SEXP enrow,
                   SEXP ckerlb,
-                  SEXP ckerub)
+                  SEXP ckerub,
+                  SEXP se_request)
 {
   SEXP tuno_r=R_NilValue, tord_r=R_NilValue, tcon_r=R_NilValue;
   SEXP euno_r=R_NilValue, eord_r=R_NilValue, econ_r=R_NilValue;
@@ -8512,6 +8513,10 @@ SEXP C_np_density(SEXP tuno,
   SEXP ckerlb_r=R_NilValue, ckerub_r=R_NilValue;
   SEXP out=R_NilValue, out_names=R_NilValue, out_dens=R_NilValue, out_derr=R_NilValue, out_ll=R_NilValue;
   int en = asInteger(enrow);
+  if(TYPEOF(se_request) != LGLSXP || XLENGTH(se_request) != 1 ||
+     LOGICAL(se_request)[0] == NA_LOGICAL)
+    error("C_np_density: se must be TRUE or FALSE");
+  const int compute_se = LOGICAL(se_request)[0];
   int ncon = 0;
   int categorical_compress = 0;
   double * ckerlb_p = NULL;
@@ -8555,7 +8560,7 @@ SEXP C_np_density(SEXP tuno,
     error("C_np_density: categorical compression must be TRUE or FALSE");
 
   PROTECT(out_dens = allocVector(REALSXP, en));
-  PROTECT(out_derr = allocVector(REALSXP, en));
+  PROTECT(out_derr = allocVector(REALSXP, compute_se ? en : 0));
   PROTECT(out_ll = allocVector(REALSXP, 1));
 
   if(descriptor.family == NP_CKERNEL_FAMILY_BETA) {
@@ -8624,7 +8629,7 @@ SEXP C_np_density(SEXP tuno,
              REAL(mcv_r), REAL(padnum_r),
              REAL(nconfac_r), REAL(ncatfac_r), REAL(mysd_r),
              INTEGER(myopti_i),
-             REAL(out_dens), REAL(out_derr), REAL(out_ll),
+             REAL(out_dens), compute_se ? REAL(out_derr) : NULL, REAL(out_ll),
              ckerlb_p, ckerub_p,
              active_route, active_diagnostics, categorical_compress);
 
@@ -19227,6 +19232,7 @@ void np_density(double * tuno, double * tord, double * tcon,
   int i,j;
   int num_var, num_obs_eval_alloc, max_lev, train_is_eval, dens_or_dist;
   const int canonical_beta_views = kernel_route != NULL;
+  const int compute_se = myderr != NULL;
 
   int * ipt = NULL, * ipe = NULL;
   
@@ -19333,7 +19339,7 @@ void np_density(double * tuno, double * tord, double * tcon,
 
   /* note use of num_obs_eval_alloc */
   pdf = alloc_vecd(num_obs_eval_alloc);
-  pdf_stderr = alloc_vecd(num_obs_eval_alloc);
+  pdf_stderr = compute_se ? alloc_vecd(num_obs_eval_alloc) : NULL;
   
   vector_continuous_stddev_extern = mysd;
 
@@ -19504,7 +19510,8 @@ void np_density(double * tuno, double * tord, double * tcon,
     const int output_index = canonical_beta_views ? i : ipe[i];
 
     mydens[output_index] = pdf[i];
-    myderr[output_index] = pdf_stderr[i];
+    if(compute_se)
+      myderr[output_index] = pdf_stderr[i];
   }
   *ll = log_likelihood;
 

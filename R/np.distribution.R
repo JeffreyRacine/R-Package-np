@@ -60,7 +60,8 @@ npudist.formula <-
     ev$nobs.omit <- length(ev$rows.omit)
 
     ev$dist <- napredict(ev$omit, ev$dist)
-    ev$derr <- napredict(ev$omit, ev$derr)
+    if (isTRUE(ev[["se", exact = TRUE]]))
+      ev$derr <- napredict(ev$omit, ev$derr)
 
     return(ev)
   }
@@ -74,8 +75,9 @@ npudist.call <-
 npudist.dbandwidth <-
   function(bws,
            tdat = stop("invoked without training data 'tdat'"),
-           edat, ...){
+           edat, ..., se = FALSE){
 
+    se <- npValidateScalarLogical(se, "se")
     dots <- list(...)
     fit.start <- proc.time()[3]
     fit.progress.handoff <- isTRUE(dots$.np_fit_progress_handoff)
@@ -236,6 +238,7 @@ npudist.dbandwidth <-
             as.integer(enrow),
             as.double(cker.bounds.c$lb),
             as.double(cker.bounds.c$ub),
+            se,
             PACKAGE = "np")
     ), continuous.names = bws[["xnames", exact = TRUE]][bws[["icon", exact = TRUE]]])
     names(myout)[1] <- "dist"
@@ -250,11 +253,12 @@ npudist.dbandwidth <-
                          train.rows.omit = train.rows.omit,
                          eval.rows.omit = eval.rows.omit,
                          timing = bws$timing, total.time = total.time,
-                         optim.time = optim.time, fit.time = fit.elapsed)
+                         optim.time = optim.time, fit.time = fit.elapsed, se = se)
     return(ev)
   }
 
-npudist.default <- function(bws, tdat, ...){
+npudist.default <- function(bws, tdat, ..., se = FALSE){
+  se <- npValidateScalarLogical(se, "se")
   sc <- sys.call()
   sc.names <- names(sc)
 
@@ -312,7 +316,7 @@ npudist.default <- function(bws, tdat, ...){
   }
 
   ## convention: first argument is always dropped, second, if present, propagated
-  call.args <- list(bws = tbw)
+  call.args <- list(bws = tbw, se = se)
   if (!no.tdat && !direct.formula.tdat) {
     if (tdat.named) {
       call.args$tdat <- tdat

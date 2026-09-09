@@ -528,10 +528,10 @@ npcopula <- function(bws, ...) {
   target <- x$target
   density <- identical(target, "density")
   if (density) {
-    joint <- npudens(tdat = data, edat = xgrid, bws = bws)
+    joint <- npudens(tdat = data, edat = xgrid, bws = bws, se = TRUE)
     return(se(joint) / .npcopula_marginal_density_product(bws, data, xgrid))
   }
-  joint <- npudist(tdat = data, edat = xgrid, bws = bws)
+  joint <- npudist(tdat = data, edat = xgrid, bws = bws, se = TRUE)
   se(joint)
 }
 

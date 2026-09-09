@@ -22,13 +22,17 @@ npudist(bws, \dots)
 \method{npudist}{dbandwidth}(bws,
         tdat = stop("invoked without training data 'tdat'"),
         edat,
-        \dots)
+        \dots,
+        se = FALSE)
 
 
-\method{npudist}{default}(bws, tdat, \dots)
+\method{npudist}{default}(bws, tdat, \dots, se = FALSE)
 }
 
 \arguments{
+  \item{se}{Logical; compute and retain asymptotic standard errors when
+    \code{TRUE}. The default \code{FALSE} skips uncertainty-only computation
+    without changing the point estimates.}
 \subsection{Data, Bandwidth Inputs And Formula Interface}{
 These arguments identify the bandwidth specification, formula/data interface, and training data.
 }
@@ -217,6 +221,14 @@ Further arguments are passed to \code{\link{npudistbw}} when bandwidths are comp
 
 }
 \value{
+  Standard errors are opt-in. To add them to an existing fit without
+  repeating bandwidth selection, use
+  \code{fit <- npudist(bws=fit$bws, se=TRUE)}, supplying the original
+  training data and desired evaluation data again when these cannot be
+  recovered from the bandwidth object's call. The \code{se()} extractor
+  reads retained errors only and gives a helpful refit message when they
+  were not requested. Use \code{predict(fit, se.fit=TRUE, ...)} for
+  prediction with standard errors.
 
   \code{\link{npudist}} returns a \code{npdistribution} object. The
   generic accessor functions \code{\link{fitted}} and \code{\link{se}}
@@ -228,7 +240,9 @@ Further arguments are passed to \code{\link{npudistbw}} when bandwidths are comp
 
   \item{eval}{ the evaluation points. }
   \item{dist}{ estimate of the cumulative distribution at the evaluation points }
-  \item{derr}{ standard errors of the cumulative distribution estimates }
+  \item{derr}{ Standard errors of the cumulative distribution estimates when
+    \code{se=TRUE}, otherwise an empty numeric vector. }
+  \item{se}{ Whether standard-error computation was requested. }
 
 }
 \section{Book And Method Pointers}{
