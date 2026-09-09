@@ -1,5 +1,13 @@
 # np 0.80-1
 
+* Single-index mean hats and affected bootstrap ratio helpers now normalize
+  finite signed and positive-small weight sums directly instead of flooring
+  them at machine epsilon. Empty external LC/degree-zero index and adaptive
+  conditional-hat rows return NA with one notice; undefined required ratios
+  fail without discarding or replacing bootstrap replications. LL/LP solves,
+  resampling laws, inference formulas and already-correct conditional ratios
+  are unchanged. Weights that underflow before summation are not recovered.
+
 * Conditional-density and conditional-distribution fallback probes now retain
   the intended physical categorical bandwidths when `bwscaling = TRUE`.
   Valid initial candidates and the existing penalty/restart rules are unchanged.

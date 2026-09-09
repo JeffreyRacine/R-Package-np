@@ -568,7 +568,8 @@
                                   exdat,
                                   eydat,
                                   operator,
-                                  train.is.eval = FALSE) {
+                                  train.is.eval = FALSE,
+                                  allow.empty.rows = FALSE) {
   xkbw <- .npcdhat_make_xkbw(bws = bws, txdat = txdat)
   ybw <- .npcdhat_make_ybw(bws = bws, tydat = tydat)
   Kx <- .npcdhat_make_kernel_matrix(
@@ -594,10 +595,12 @@
       !any(denom == 0.0))
     return(sweep((Kx * Ky) / nrow(txdat), 1L, denom, "/"))
 
-  finite.nonzero <- is.finite(denom) & denom != 0.0
-  divisor <- pmax(denom, .Machine$double.eps)
-  divisor[finite.nonzero] <- denom[finite.nonzero]
-  sweep((Kx * Ky) / nrow(txdat), 1L, divisor, "/")
+  divisor <- .np_normalization_denominator(
+    denom, "conditional hat", allow.empty.rows = allow.empty.rows,
+    zero.rows = rowSums(abs(Kx)) == 0.0)
+  .np_normalization_finish(
+    sweep((Kx * Ky) / nrow(txdat), 1L, divisor, "/"),
+    divisor, "conditional hat", TRUE)
 }
 
 .npcdhat_exact_matrix <- function(bws,
@@ -607,7 +610,8 @@
                                   eydat,
                                   operator,
                                   x.s = NULL,
-                                  train.is.eval = FALSE) {
+                                  train.is.eval = FALSE,
+                                  allow.empty.rows = FALSE) {
   if (.npcdhat_use_adaptive_ratio(bws = bws, x.s = x.s)) {
     return(.npcdhat_ratio_matrix(
       bws = bws,
@@ -616,7 +620,8 @@
       exdat = exdat,
       eydat = eydat,
       operator = operator,
-      train.is.eval = train.is.eval
+      train.is.eval = train.is.eval,
+      allow.empty.rows = allow.empty.rows
     ))
   }
 
@@ -647,7 +652,8 @@
                                  rhs,
                                  operator,
                                  x.s = NULL,
-                                 train.is.eval = FALSE) {
+                                 train.is.eval = FALSE,
+                                 allow.empty.rows = FALSE) {
   if (.npcdhat_use_adaptive_ratio(bws = bws, x.s = x.s)) {
     H <- .npcdhat_ratio_matrix(
       bws = bws,
@@ -656,9 +662,14 @@
       exdat = exdat,
       eydat = eydat,
       operator = operator,
-      train.is.eval = train.is.eval
+      train.is.eval = train.is.eval,
+      allow.empty.rows = allow.empty.rows
     )
-    return(H %*% rhs)
+    out <- H %*% rhs
+    empty.rows <- attr(H, ".np.empty.rows", exact = TRUE)
+    if (!is.null(empty.rows))
+      attr(out, ".np.empty.rows") <- empty.rows
+    return(out)
   }
 
   ybw <- .npcdhat_make_ybw(bws = bws, tydat = tydat)
@@ -781,8 +792,16 @@
       rhs = y,
       operator = operator,
       x.s = x.s,
-      train.is.eval = no.exy
+      train.is.eval = no.exy,
+      allow.empty.rows = !no.exy
     )
+    empty.rows <- attr(out, ".np.empty.rows", exact = TRUE)
+    if (!is.null(empty.rows)) {
+      attr(out, ".np.empty.rows") <- NULL
+      den <- rep.int(1.0, length(empty.rows))
+      den[empty.rows == 1L] <- NA_real_
+      out <- .np_normalization_finish(out, den, where)
+    }
     if (ncol(out) == 1L)
       return(as.vector(out))
     return(out)
@@ -796,8 +815,16 @@
     eydat = eydat,
     operator = operator,
     x.s = x.s,
-    train.is.eval = no.exy
+    train.is.eval = no.exy,
+    allow.empty.rows = !no.exy
   )
+  empty.rows <- attr(H, ".np.empty.rows", exact = TRUE)
+  if (!is.null(empty.rows)) {
+    attr(H, ".np.empty.rows") <- NULL
+    den <- rep.int(1.0, length(empty.rows))
+    den[empty.rows == 1L] <- NA_real_
+    H <- .np_normalization_finish(H, den, where)
+  }
 
   class(H) <- c(class_name, "matrix")
   attr(H, "bws") <- bws
