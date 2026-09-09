@@ -102,9 +102,13 @@ test_that("ordered-profile and dense CDF-CV share the empirical finalizer", {
   dat <- data.frame(x = value)
   lambda <- 0.31
   ordered_cdf <- function(evaluation, donor, coordinate) {
-    if (evaluation == donor) return(1 - 0.5 * lambda)
-    distance <- abs(evaluation - donor)
-    if (evaluation < donor) 0.5 * lambda^distance else 1 - lambda^distance
+    pmf <- function(z) ifelse(z == donor, 1 - lambda,
+                             0.5 * (1 - lambda) * lambda^abs(z - donor))
+    anchor <- 0.5 + 0.5 * pmf(donor)
+    if (evaluation == donor) return(anchor)
+    if (evaluation > donor)
+      return(anchor + sum(pmf(seq.int(donor + 1L, evaluation))))
+    anchor - sum(pmf(seq.int(evaluation + 1L, donor)))
   }
   expected <- udist_literal_training_grid(
     matrix(numeric_value, ncol = 1L), ordered_cdf)

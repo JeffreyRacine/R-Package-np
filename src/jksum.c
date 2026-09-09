@@ -4546,7 +4546,8 @@ double np_cdf_owang_van_ryzin(const double y, const double x, const double lambd
   if(x == y) return 1.0 - 0.5*lambda;
   const int cxy = (int)fabs(x-y);
   const double gee = R_pow_di(lambda, cxy);
-  return (x < y) ? 0.5*gee : (1.0 - gee);
+  /* Above the center, subtract the PMF tail starting at the next integer. */
+  return (x < y) ? 0.5*gee : (1.0 - 0.5*lambda*gee);
 }
 
 static inline double np_geom_sum_nonneg_lambda(const int n, const double lambda){

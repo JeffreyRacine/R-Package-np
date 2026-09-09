@@ -40,6 +40,10 @@
   convention, distribution estimates, and continuous-variable formulas
   are unchanged.
 
+* Wang–van Ryzin ordered distribution estimates now use the correct cumulative
+  probability above each training category. This corrects potentially decreasing
+  distribution estimates and affected distribution cross-validation criteria.
+
 * Single-index mean hats and affected bootstrap ratio helpers now normalize
   finite signed and positive-small weight sums directly instead of flooring
   them at machine epsilon. Empty external LC/degree-zero index and adaptive
