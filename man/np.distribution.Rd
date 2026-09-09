@@ -142,6 +142,17 @@ Further arguments are passed to \code{\link{npudistbw}} when bandwidths are comp
   overshoot \eqn{[0,1]} or be locally nonmonotone in any bandwidth mode.
   Returned values are not silently clipped or monotonized.
 
+  For purely ordered data, let \eqn{Z_i(x)} be the complete multivariate CDF
+  contribution and \eqn{\bar Z(x)=n^{-1}\sum_i Z_i(x)}. Standard errors use
+  the empirical-population variance of these contributions divided by
+  sample size,
+  \deqn{\widehat{\mathrm{se}}\{\hat F(x)\}=
+    \frac{1}{n}\sqrt{\sum_{i=1}^n\{Z_i(x)-\bar Z(x)\}^2}.}
+  At zero smoothing this retains the usual
+  \eqn{\sqrt{\hat F(x)(1-\hat F(x))/n}}. At finite smoothing a contribution
+  need not be an indicator, so the Bernoulli expression does not generally
+  apply. Profile compression retains original observation multiplicities.
+
   Argument groups for bandwidth selection are documented on
   \code{\link{npudistbw}}. The most common workflow is to choose data
   and bandwidth inputs first, then bandwidth criterion and

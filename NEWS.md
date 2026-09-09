@@ -34,6 +34,12 @@
   and mixed/continuous density uncertainty are unchanged. The correction
   reuses existing kernel rows with bounded moment storage.
 
+* Pure-ordered distribution standard errors now also use the empirical
+  variance of complete joint CDF contributions. Finite smoothing no longer
+  treats each contribution as a Bernoulli indicator; the zero-smoothing
+  convention, distribution estimates, and continuous-variable formulas
+  are unchanged.
+
 * Single-index mean hats and affected bootstrap ratio helpers now normalize
   finite signed and positive-small weight sums directly instead of flooring
   them at machine epsilon. Empty external LC/degree-zero index and adaptive
