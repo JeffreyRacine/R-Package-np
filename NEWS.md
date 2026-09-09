@@ -1,5 +1,10 @@
 # npRmpi 0.80-1
 
+* Scalar conditional beta-response derivative standard errors now allow a
+  legitimate zero derivative of the explanatory weight sum. Zero endpoint
+  denominators remain invalid; estimates and existing valid derivatives are
+  unchanged.
+
 * Master-local bootstrap and hat fanout computation errors now use the same
   per-chunk condition handling as workers. Scheduled replies are drained before
   failure is reported, allowing reuse of a healthy pool without publishing an
