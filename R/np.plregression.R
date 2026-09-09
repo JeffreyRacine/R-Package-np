@@ -767,8 +767,11 @@ npplreg.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ..., se = F
   if (.npRmpi_autodispatch_active() &&
       !formula.forwarded &&
       (explicit.plbandwidth || identical(degree.select.value, "manual")) &&
-      !isTRUE(.npRmpi_autodispatch_called_from_bcast()))
-    return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+      !isTRUE(.npRmpi_autodispatch_called_from_bcast())) {
+    dispatch.call <- match.call()
+    dispatch.call$se <- se
+    return(.npRmpi_autodispatch_call(dispatch.call, parent.frame()))
+  }
 
   sc <- sys.call()
   sc.names <- names(sc)
