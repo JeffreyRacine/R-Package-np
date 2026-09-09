@@ -13,7 +13,7 @@ condensity <-
              train.rows.omit = NULL,
              eval.rows.omit = NULL,
              timing = NA, total.time = NA,
-             optim.time = NA, fit.time = NA){
+             optim.time = NA, fit.time = NA, se = TRUE){
 
         if (missing(bws) || missing(xeval) || missing(yeval) || missing(condens) || missing(ntrain))
             stop("improper invocation of condensity constructor")
@@ -58,6 +58,7 @@ condensity <-
             ntrain = ntrain,
             trainiseval = trainiseval,
             gradients = gradients,
+            se = se,
             gradient.order = gradient.order,
             proper.requested = proper.requested,
             proper.applied = proper.applied,
@@ -120,16 +121,19 @@ se.condensity <- function(x){
   if (isTRUE(x$proper.applied)) {
     stop("standard errors are unavailable for repaired conditional densities in tranche 1")
   }
-  if (is.null(x$conderr) || !length(x$conderr))
-    stop("standard errors were not computed for this conditional density", call. = FALSE)
-  x$conderr
+  .np_require_stored_se(x, x[["conderr", exact = TRUE]], "npcdens",
+                        expr = substitute(x))
 }
 gradients.condensity <- function(x, se = FALSE, gradient.order = NULL, ...) {
   .np_reject_gradient_order_alias(substitute(list(...))[-1L],
                                   "gradients.condensity", suggest = TRUE)
   npRejectLegacyBooleanErrors(list(...), "gradients.condensity")
   se <- npValidateScalarLogical(se, "se")
-  gout <- if (!se) x$congrad else x$congerr
+  gout <- if (!se) x$congrad else .np_require_stored_se(
+    x, if (identical(x[["congerr", exact = TRUE]], NA)) NULL else
+      x[["congerr", exact = TRUE]], "npcdens",
+    what = "gradient standard errors", expr = substitute(x),
+    switches = "gradients = TRUE, se = TRUE")
   if (is.null(gout) || (length(gout) == 1L && is.logical(gout) && is.na(gout)))
     stop(if (!se)
       "gradients are not available: fit the model with gradients=TRUE"
@@ -208,6 +212,13 @@ gradients.condensity <- function(x, se = FALSE, gradient.order = NULL, ...) {
 predict.condensity <- function(object, se.fit = FALSE, ...) {
   se.fit <- npValidateScalarLogical(se.fit, "se.fit")
   dots <- list(...)
+  if ("se" %in% names(dots)) {
+    supplied.se <- npValidateScalarLogical(dots[["se", exact = TRUE]], "se")
+    if (!identical(supplied.se, se.fit))
+      stop("conflicting 'se' and 'se.fit' requests; use se.fit to request prediction standard errors",
+           call. = FALSE)
+  }
+  dots[["se"]] <- se.fit
   has.formula.route <- !is.null(object$bws$formula)
   proper_arg <- dots[["proper", exact = TRUE]]
 

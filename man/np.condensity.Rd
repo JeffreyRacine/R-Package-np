@@ -32,7 +32,8 @@ npcdens(bws, \dots)
         proper = FALSE,
         proper.method = c("project"),
         proper.control = list(),
-        \dots)
+        \dots,
+        se = FALSE)
 
 \method{npcdens}{default}(bws, txdat, tydat, nomad = FALSE, \dots)
 
@@ -120,6 +121,19 @@ These arguments control where the fitted conditional density is evaluated and wh
     evaluation takes place on the data provided by \code{tydat}.
   }
 
+
+  \item{se}{
+    logical scalar, default \code{FALSE}. If \code{TRUE}, compute and retain
+    available asymptotic standard errors of fitted values and, when
+    \code{gradients = TRUE}, of the requested gradients. If \code{FALSE},
+    skip uncertainty-only computation; point estimates and gradients are
+    unchanged. Unavailable derivative errors remain \code{NA} when requested.
+    To obtain errors without repeating bandwidth selection, refit using
+    \code{npcdens(bws = fit$bws, se = TRUE)}; also supply
+    \code{gradients = TRUE} for gradient errors. Explicit training data may
+    be supplied if they are no longer recoverable from the bandwidth object.
+    The argument must be named.
+  }
 
   \item{gradients}{
     a logical value specifying whether to return estimates of the
@@ -308,6 +322,12 @@ Further arguments are passed to \code{\link{npcdensbw}} when bandwidths are comp
 
 }
 \value{
+  The \code{se} component records whether uncertainty was requested.
+  \code{conderr} and \code{congerr} are \code{NULL} when \code{se = FALSE}.
+  \code{se()} and \code{gradients(..., se = TRUE)} only extract stored
+  results and give a no-search refit message when the errors were omitted.
+  \code{predict(..., se.fit = TRUE)} explicitly requests the needed errors.
+
 
   \code{npcdens} returns a \code{condensity} object. The generic
   accessor functions \code{\link{fitted}}, \code{\link{se}}, and
@@ -327,14 +347,15 @@ Further arguments are passed to \code{\link{npcdensbw}} when bandwidths are comp
     points. An evaluation row whose required explanatory normalization is
     exactly zero or non-finite is returned as \code{NA}; other rows remain
     available. }
-  \item{conderr}{ standard errors of the conditional density
+  \item{conderr}{ when \code{se = TRUE}, standard errors of the conditional density
     estimates. Undefined normalization rows are returned as \code{NA}. }
   \item{congrad}{ if invoked with \code{gradients = TRUE}, estimates of
     the gradients at the evaluation points. For local-polynomial fits,
     continuous-coordinate derivative orders are controlled by
     \code{gradient.order}. Undefined normalization rows are returned as
     \code{NA}. }
-  \item{congerr}{ if invoked with \code{gradients = TRUE}, standard
+  \item{congerr}{ if invoked with \code{gradients = TRUE} and
+    \code{se = TRUE}, standard
     errors of the gradients at the evaluation points. Higher-order
     continuous-coordinate derivative standard errors are currently
     returned as \code{NA}; bootstrap inference is preferred for those
@@ -355,7 +376,7 @@ Further arguments are passed to \code{\link{npcdensbw}} when bandwidths are comp
   mixed-data density of \eqn{(Y,X)} and normalizing by the marginal
   density of \eqn{X}, with local-polynomial routes using the selected
   continuous-coordinate polynomial degree in the conditional fit. The
-  returned standard errors are asymptotic standard errors for the fitted
+  requested standard errors are asymptotic standard errors for the fitted
   conditional density values, and gradient standard errors are returned
   when gradients are requested and defined.
 

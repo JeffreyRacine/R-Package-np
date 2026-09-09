@@ -36,7 +36,8 @@ npcdist(bws,
         proper = FALSE,
         proper.method = c("isotonic"),
         proper.control = list(),
-        \dots)
+        \dots,
+        se = FALSE)
 
 \method{npcdist}{default}(bws, 
         txdat, 
@@ -129,6 +130,19 @@ These arguments control where the fitted conditional distribution is evaluated a
     evaluation takes place on the data provided by \code{tydat}.
   }
 
+
+  \item{se}{
+    logical scalar, default \code{FALSE}. If \code{TRUE}, compute and retain
+    available asymptotic standard errors of fitted values and, when
+    \code{gradients = TRUE}, of the requested gradients. If \code{FALSE},
+    skip uncertainty-only computation; point estimates and gradients are
+    unchanged. Unavailable derivative errors remain \code{NA} when requested.
+    To obtain errors without repeating bandwidth selection, refit using
+    \code{npcdist(bws = fit$bws, se = TRUE)}; also supply
+    \code{gradients = TRUE} for gradient errors. Explicit training data may
+    be supplied if they are no longer recoverable from the bandwidth object.
+    The argument must be named.
+  }
 
   \item{gradients}{
     a logical value specifying whether to return estimates of the
@@ -321,6 +335,12 @@ Further arguments are passed to \code{\link{npcdistbw}} when bandwidths are comp
 
 }
 \value{
+  The \code{se} component records whether uncertainty was requested.
+  \code{conderr} and \code{congerr} are \code{NULL} when \code{se = FALSE}.
+  \code{se()} and \code{gradients(..., se = TRUE)} only extract stored
+  results and give a no-search refit message when the errors were omitted.
+  \code{predict(..., se.fit = TRUE)} explicitly requests the needed errors.
+
   \code{npcdist} returns a \code{condistribution} object. The generic
   accessor functions \code{\link{fitted}}, \code{\link{se}}, and
   \code{\link{gradients}}, extract estimated values, asymptotic standard
@@ -340,14 +360,15 @@ Further arguments are passed to \code{\link{npcdistbw}} when bandwidths are comp
     distribution at the evaluation points. An evaluation row whose required
     explanatory normalization is exactly zero or non-finite is returned as
     \code{NA}; other rows remain available. }
-  \item{conderr}{ standard errors of the cumulative conditional distribution
+  \item{conderr}{ when \code{se = TRUE}, standard errors of the cumulative conditional distribution
     estimates. Undefined normalization rows are returned as \code{NA}. }
   \item{congrad}{ if invoked with \code{gradients = TRUE}, estimates of
     the gradients at the evaluation points. For local-polynomial fits,
     continuous-coordinate derivative orders are controlled by
     \code{gradient.order}. Undefined normalization rows are returned as
     \code{NA}. }
-  \item{congerr}{ if invoked with \code{gradients = TRUE}, standard
+  \item{congerr}{ if invoked with \code{gradients = TRUE} and
+    \code{se = TRUE}, standard
     errors of the gradients at the evaluation points. Higher-order
     continuous-coordinate derivative standard errors are currently
     returned as \code{NA}; bootstrap inference is preferred for those

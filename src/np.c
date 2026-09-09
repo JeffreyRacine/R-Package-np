@@ -9987,7 +9987,8 @@ SEXP C_np_density_conditional(SEXP tyuno,
                               SEXP glp_bernstein,
                               SEXP glp_basis,
                               SEXP first_se,
-                              SEXP cat_se_request)
+                              SEXP cat_se_request,
+                              SEXP se_request)
 {
   SEXP tyuno_r=R_NilValue, tyord_r=R_NilValue, tycon_r=R_NilValue;
   SEXP txuno_r=R_NilValue, txord_r=R_NilValue, txcon_r=R_NilValue;
@@ -10024,6 +10025,14 @@ SEXP C_np_density_conditional(SEXP tyuno,
   const NPConditionalLPFirstSERequest *first_se_request_ptr = NULL;
   int first_se_protected = 0;
   const int *cat_se_mask = NULL;
+
+  if ((TYPEOF(se_request) != LGLSXP && TYPEOF(se_request) != INTSXP) ||
+      XLENGTH(se_request) != 1 ||
+      (asInteger(se_request) != 0 && asInteger(se_request) != 1))
+    error("C_np_density_conditional: invalid SE request");
+  const int do_merr = asInteger(se_request);
+  if (!do_merr && (first_se != R_NilValue || cat_se_request != R_NilValue))
+    error("C_np_density_conditional: derivative-SE request requires SEs");
 
   if (en < 0) en = 0;
   if (xd < 0) xd = 0;
@@ -10187,9 +10196,9 @@ SEXP C_np_density_conditional(SEXP tyuno,
   }
 
   PROTECT(out_cond = allocVector(REALSXP, en));
-  PROTECT(out_cderr = allocVector(REALSXP, en));
+  PROTECT(out_cderr = do_merr ? allocVector(REALSXP, en) : R_NilValue);
   PROTECT(out_grad = allocVector(REALSXP, gsize));
-  PROTECT(out_gerr = allocVector(REALSXP, gsize));
+  PROTECT(out_gerr = do_merr ? allocVector(REALSXP, gsize) : R_NilValue);
   PROTECT(out_ll = allocVector(REALSXP, 1));
 
   np_density_conditional(REAL(tyuno_r), REAL(tyord_r), REAL(tycon_r),
@@ -10200,7 +10209,8 @@ SEXP C_np_density_conditional(SEXP tyuno,
                            REAL(ymcv_r), REAL(ypadnum_r), REAL(xmcv_r), REAL(xpadnum_r),
                            REAL(nconfac_r), REAL(ncatfac_r), REAL(mysd_r),
                            INTEGER(myopti_i),
-                           REAL(out_cond), REAL(out_cderr), REAL(out_grad), REAL(out_gerr), REAL(out_ll),
+                           REAL(out_cond), do_merr ? REAL(out_cderr) : NULL,
+                           REAL(out_grad), do_merr ? REAL(out_gerr) : NULL, REAL(out_ll),
                            cxkerlb_p, cxkerub_p, cykerlb_p, cykerub_p,
                            active_x_route, active_x_diagnostics,
                            active_y_route, active_y_diagnostics,
@@ -19044,7 +19054,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
   }
   int_MINIMIZE_IO = myopti[CD_MINIOI];
   do_grad = myopti[CD_GRAD];
-  do_gerr = do_grad || first_se_request != NULL;
+  do_gerr = cderr != NULL && (do_grad || first_se_request != NULL);
 
   ymax_lev = myopti[CD_YMLEVI];
   xmax_lev = myopti[CD_XMLEVI];
@@ -19113,7 +19123,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
 
   /* notice use of num_obs_eval_alloc for MPI compatibility */
   pdf = alloc_vecd(num_obs_eval_alloc);
-  pdf_stderr = alloc_vecd(num_obs_eval_alloc);
+  pdf_stderr = cderr != NULL ? alloc_vecd(num_obs_eval_alloc) : NULL;
 
   if (do_grad)
     pdf_deriv = alloc_matd(num_obs_eval_alloc, num_var);
@@ -19442,12 +19452,13 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
       lp_loop_stop = MIN(num_obs_eval_extern, lp_loop_start + lp_stride);
       for(i = 0; i < num_obs_eval_extern; i++){
         pdf[i] = 0.0;
-        pdf_stderr[i] = 0.0;
+        if(cderr != NULL) pdf_stderr[i] = 0.0;
       }
       if(do_grad){
         for(i = 0; i < num_x_vars; i++){
           memset(pdf_deriv[i], 0, (size_t)num_obs_eval_extern * sizeof(double));
-          memset(pdf_deriv_stderr[i], 0, (size_t)num_obs_eval_extern * sizeof(double));
+          if(do_gerr)
+            memset(pdf_deriv_stderr[i], 0, (size_t)num_obs_eval_extern * sizeof(double));
         }
       }
       if(first_se_request != NULL)
@@ -19472,7 +19483,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
     ykw = alloc_vecd(MAX(1, num_obs_train_extern));
     y_eval_one = alloc_vecd(1);
     mean_one = alloc_vecd(MAX(1, lp_eval_alloc));
-    stderr_one = alloc_vecd(MAX(1, lp_eval_alloc));
+    stderr_one = cderr != NULL ? alloc_vecd(MAX(1, lp_eval_alloc)) : NULL;
     if(beta_y_active || ordinary_y_gnn) {
       lambda_y = alloc_vecd(MAX(
         1, num_var_unordered_extern + num_var_ordered_extern));
@@ -19502,7 +19513,8 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
     operator_y = (int *)calloc((size_t)MAX(1, num_y_vars), sizeof(int));
 
     if((vsf_x == NULL) || (vsf_y == NULL) || (ykw == NULL) ||
-       (y_eval_one == NULL) || (mean_one == NULL) || (stderr_one == NULL) ||
+       (y_eval_one == NULL) || (mean_one == NULL) ||
+       (cderr != NULL && stderr_one == NULL) ||
        (kernel_cy == NULL) || (kernel_uy == NULL) || (kernel_oy == NULL) ||
        (operator_y == NULL) ||
        ((beta_y_active || ordinary_y_gnn) &&
@@ -19855,7 +19867,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
           np_continuous_kernel_scaled_restore(
             mean_one[0], beta_y_log_scale, 1, &pdf[j]);
 
-        if(restore_status == NP_CONTINUOUS_ROW_OK)
+        if(restore_status == NP_CONTINUOUS_ROW_OK && cderr != NULL)
           restore_status = np_continuous_kernel_scaled_restore(
             stderr_one[0], beta_y_log_scale, 1, &pdf_stderr[j]);
         if(restore_status != NP_CONTINUOUS_ROW_OK) {
@@ -19866,7 +19878,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
         }
       } else {
         pdf[j] = mean_one[0];
-        pdf_stderr[j] = stderr_one[0];
+        if(cderr != NULL) pdf_stderr[j] = stderr_one[0];
       }
 
       if(dens_or_dist == NP_DO_DENS){
@@ -19886,7 +19898,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                 scaled_gradient, beta_y_log_scale,
                 &pdf_deriv[i][j]);
 
-            if(restore_status == NP_CONTINUOUS_ROW_OK)
+            if(restore_status == NP_CONTINUOUS_ROW_OK && do_gerr)
               restore_status = np_continuous_kernel_scaled_derivative_restore(
                 scaled_gradient_stderr, beta_y_log_scale,
                 &pdf_deriv_stderr[i][j]);
@@ -19898,7 +19910,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
             }
           } else {
             pdf_deriv[i][j] = scaled_gradient;
-            pdf_deriv_stderr[i][j] = scaled_gradient_stderr;
+            if(do_gerr) pdf_deriv_stderr[i][j] = scaled_gradient_stderr;
           }
         }
       }
@@ -19948,11 +19960,13 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
           error("np_density_conditional: another rank failed in conditional LP owner-block path");
       } else {
         MPI_Allreduce(MPI_IN_PLACE, pdf, num_obs_eval_extern, MPI_DOUBLE, MPI_SUM, comm[1]);
-        MPI_Allreduce(MPI_IN_PLACE, pdf_stderr, num_obs_eval_extern, MPI_DOUBLE, MPI_SUM, comm[1]);
+        if(cderr != NULL)
+          MPI_Allreduce(MPI_IN_PLACE, pdf_stderr, num_obs_eval_extern, MPI_DOUBLE, MPI_SUM, comm[1]);
         if(do_grad){
           for(i = 0; i < num_x_vars; i++){
             MPI_Allreduce(MPI_IN_PLACE, pdf_deriv[i], num_obs_eval_extern, MPI_DOUBLE, MPI_SUM, comm[1]);
-            MPI_Allreduce(MPI_IN_PLACE, pdf_deriv_stderr[i], num_obs_eval_extern, MPI_DOUBLE, MPI_SUM, comm[1]);
+            if(do_gerr)
+              MPI_Allreduce(MPI_IN_PLACE, pdf_deriv_stderr[i], num_obs_eval_extern, MPI_DOUBLE, MPI_SUM, comm[1]);
           }
         }
         if(first_se_request != NULL)
@@ -20025,8 +20039,9 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
   for( i=0; i<num_obs_eval_extern; i++ )
     cdens[ipe_XY[i]]=pdf[i];
 
-  for( i=0; i<num_obs_eval_extern; i++ )
-    cderr[ipe_XY[i]]=pdf_stderr[i];
+  if(cderr != NULL)
+    for( i=0; i<num_obs_eval_extern; i++ )
+      cderr[ipe_XY[i]]=pdf_stderr[i];
   
   if (do_gerr) {
     for(j=0;j<num_var;j++)

@@ -13852,7 +13852,7 @@ NPPermutationWeightOutput * const pkw_output){
 
     if (!(drop_one_train && do_psum && (j == drop_which_train))){
       if(!nws){
-        np_outer_weighted_sum(matrix_W, sgn, ncol_W, 
+        np_outer_weighted_sum(matrix_W, sgn, ncol_W,
                               matrix_Y, ncol_Y,
                               tprod, num_xt,
                               leave_or_drop, lod,
@@ -28862,6 +28862,7 @@ static SEXP np_regression_scalar_fit_execute(void *data)
   NPRegressionScalarFitOwner * const owner = &execution->owner;
   const int conditional_influence =
     call->standard_error_mode == NP_REGRESSION_STDERR_CONDITIONAL_INFLUENCE;
+  const int conditional_se = conditional_influence && call->do_merr;
   const int hc0_residual_preparing = call->hc0_context != NULL &&
     call->hc0_context->status == NP_REGRESSION_HC0_RESIDUAL_PREPARING;
   const int ordinary_hc0 = call->hc0_context != NULL &&
@@ -28897,7 +28898,7 @@ static SEXP np_regression_scalar_fit_execute(void *data)
   }
   owner->mean_columns = (double *)malloc(allocation_bytes);
 
-  if(conditional_influence) {
+  if(conditional_se) {
     owner->conditional_weights = (double *)malloc(
       (size_t)call->num_obs_train * sizeof(double));
     if(p_nvar > 0 &&
@@ -29021,7 +29022,7 @@ static SEXP np_regression_scalar_fit_execute(void *data)
       call->num_obs_train, call->num_obs_eval,
       call->num_reg_unordered, call->num_reg_ordered,
       call->num_reg_continuous,
-      0, 0, 1, 1, conditional_influence, 0, 0, 0, 0,
+      0, 0, 1, 1, conditional_se, 0, 0, 0, 0,
       call->operator, permutation_operator,
       0, call->do_grad, NULL, 0,
       response_column_count, 0,
@@ -29371,7 +29372,7 @@ static SEXP np_regression_scalar_fit_execute(void *data)
     }
   }
 
-  if(conditional_influence && call->do_merr) {
+  if(conditional_se) {
     if(!R_FINITE(call->mean[0])) {
       call->mean_stderr[0] = NA_REAL;
       if(call->do_gerr)
@@ -31658,9 +31659,6 @@ const NPConditionalLPFirstSERequest *first_se_request){
     for(l = 0; l < num_reg_continuous + num_reg_unordered + num_reg_ordered; ++l)
       gradient_stderr[l][0] = NA_REAL;
   }
-  if(standard_error_mode == NP_REGRESSION_STDERR_CONDITIONAL_INFLUENCE &&
-     !do_merr)
-    error("conditional influence standard errors require an output buffer");
   if(lp_engine_est != NP_LP_ENGINE_SCALAR &&
      standard_error_mode == NP_REGRESSION_STDERR_CONDITIONAL_INFLUENCE)
     error("conditional influence standard errors require the scalar regression engine");
@@ -51520,7 +51518,6 @@ static int np_conditional_categorical_profile_fit_body(
      (num_X <= 0) ||
      (num_obs_train < 128) ||
      (kdf == NULL) ||
-     (kdf_stderr == NULL) ||
      (log_likelihood == NULL))
     return 0;
 
@@ -51772,9 +51769,9 @@ static int np_conditional_categorical_profile_fit_body(
     kdf[i] = val;
     if(is_cpdf){
       *log_likelihood += np_fitted_log_likelihood_contribution(val);
-      kdf_stderr[i] = sqrt(val*K_INT_KERNEL_P/sk);
+      if(kdf_stderr != NULL) kdf_stderr[i] = sqrt(val*K_INT_KERNEL_P/sk);
     } else {
-      kdf_stderr[i] = sqrt(val*(1.0-val)*K_INT_KERNEL_P/sk);
+      if(kdf_stderr != NULL) kdf_stderr[i] = sqrt(val*(1.0-val)*K_INT_KERNEL_P/sk);
     }
   }
 
@@ -52266,6 +52263,7 @@ int *cat_se_status
   const int ordinary_x_gnn_prepared =
     (BANDWIDTH_den == BW_GEN_NN) && (num_X_continuous > 0);
 
+  const int do_merr = (kdf_stderr != NULL);
   const int do_grad = (kdf_deriv != NULL); 
   const int do_gerr = (kdf_deriv_stderr != NULL);
   NPConditionalCategorySECall cat_se_call = {0};
@@ -52315,7 +52313,7 @@ int *cat_se_status
 
   const int p = is_cpdf ? num_cXY : num_X_continuous;
 
-  if(p != 0) {
+  if(do_merr && p != 0) {
     initialize_kernel_regression_asymptotic_constants(KERNEL_Y,
                                                       p,
                                                       &INT_KERNEL_P,
@@ -52329,8 +52327,9 @@ int *cat_se_status
 
 
   double gfac = sqrt(DIFF_KER_PPM/INT_KERNEL_P);
-  K_INT_KERNEL_P = np_conditional_kernel_square_product(
-    KERNEL_X, KERNEL_Y, num_X_continuous, num_Y_continuous, is_cpdf);
+  if(do_merr)
+    K_INT_KERNEL_P = np_conditional_kernel_square_product(
+      KERNEL_X, KERNEL_Y, num_X_continuous, num_Y_continuous, is_cpdf);
   if(do_gerr && num_X_continuous > 0 && KERNEL_X >= 0 && KERNEL_X < 8 &&
      BANDWIDTH_den != BW_ADAP_NN) {
     const double x_moment = np_conditional_kernel_square_product(
@@ -52708,7 +52707,7 @@ int *cat_se_status
 
   
   if (is_cpdf) {
-    if(BANDWIDTH_den == BW_FIXED){
+    if(do_merr && BANDWIDTH_den == BW_FIXED){
       for(l = 0, pnh = 1.0; l < num_X_continuous; l++){      
         pnh *= matrix_bandwidth_X[l][0];
       }
@@ -52723,20 +52722,20 @@ int *cat_se_status
 
       if(!R_FINITE(sk) || sk == 0.0) {
         kdf[i] = NA_REAL;
-        kdf_stderr[i] = NA_REAL;
+        if(do_merr) kdf_stderr[i] = NA_REAL;
         *log_likelihood = NA_REAL;
         continue;
       }
       kdf[i] = ksn[i]/sk;
       if(!R_FINITE(kdf[i])) {
         kdf[i] = NA_REAL;
-        kdf_stderr[i] = NA_REAL;
+        if(do_merr) kdf_stderr[i] = NA_REAL;
         *log_likelihood = NA_REAL;
         continue;
       }
       *log_likelihood += np_fitted_log_likelihood_contribution(kdf[i]);
 
-      if(BANDWIDTH_den == BW_GEN_NN){
+      if(do_merr && BANDWIDTH_den == BW_GEN_NN){
         for(l = 0, pnh = 1.0; l < num_X_continuous; l++){      
           pnh *= matrix_bandwidth_X[l][i];
         }
@@ -52746,14 +52745,16 @@ int *cat_se_status
         }
       }
 
-      kdf_stderr[i] = sqrt(kdf[i]*K_INT_KERNEL_P/(pnh*sk));
-      if(!R_FINITE(kdf_stderr[i]))
-        kdf_stderr[i] = NA_REAL;
+      if(do_merr) {
+        kdf_stderr[i] = sqrt(kdf[i]*K_INT_KERNEL_P/(pnh*sk));
+        if(!R_FINITE(kdf_stderr[i]))
+          kdf_stderr[i] = NA_REAL;
+      }
    
     }
   } else {
 
-    if(BANDWIDTH_den == BW_FIXED){
+    if(do_merr && BANDWIDTH_den == BW_FIXED){
       for(l = 0, pnh = 1.0; l < num_X_continuous; l++){      
         pnh *= matrix_bandwidth_X[l][0];
       }
@@ -52764,25 +52765,27 @@ int *cat_se_status
 
       if(!R_FINITE(sk) || sk == 0.0) {
         kdf[i] = NA_REAL;
-        kdf_stderr[i] = NA_REAL;
+        if(do_merr) kdf_stderr[i] = NA_REAL;
         continue;
       }
       kdf[i] = ksn[i]/sk;
       if(!R_FINITE(kdf[i])) {
         kdf[i] = NA_REAL;
-        kdf_stderr[i] = NA_REAL;
+        if(do_merr) kdf_stderr[i] = NA_REAL;
         continue;
       }
 
-      if(BANDWIDTH_den == BW_GEN_NN){
+      if(do_merr && BANDWIDTH_den == BW_GEN_NN){
         for(l = 0, pnh = 1.0; l < num_X_continuous; l++){
           pnh *= matrix_bandwidth_X[l][i];
         }
       }
 
-      kdf_stderr[i] = sqrt(kdf[i]*(1.0-kdf[i])*K_INT_KERNEL_P/(pnh*sk));
-      if(!R_FINITE(kdf_stderr[i]))
-        kdf_stderr[i] = NA_REAL;
+      if(do_merr) {
+        kdf_stderr[i] = sqrt(kdf[i]*(1.0-kdf[i])*K_INT_KERNEL_P/(pnh*sk));
+        if(!R_FINITE(kdf_stderr[i]))
+          kdf_stderr[i] = NA_REAL;
+      }
     }
 
   }
@@ -53043,6 +53046,7 @@ const int *cat_se_mask
   double *kdf_local = NULL, *stderr_local = NULL;
   double local_log_likelihood = 0.0;
   const int num_X = num_X_continuous + num_X_unordered + num_X_ordered;
+  const int do_merr = (kdf_stderr != NULL);
   const int do_deriv = (kdf_deriv != NULL);
   const int do_gerr = (kdf_deriv_stderr != NULL);
   int start, stop, nloc, r, l, status = 1;
@@ -53072,8 +53076,9 @@ const int *cat_se_mask
   (void)stop;
 
   kdf_local = (double *)calloc((size_t)MAX(1, nloc), sizeof(double));
-  stderr_local = (double *)calloc((size_t)MAX(1, nloc), sizeof(double));
-  if((kdf_local == NULL) || (stderr_local == NULL))
+  if(do_merr)
+    stderr_local = (double *)calloc((size_t)MAX(1, nloc), sizeof(double));
+  if((kdf_local == NULL) || (do_merr && stderr_local == NULL))
     goto cleanup_owner_blocks;
   if(do_deriv){
     deriv_local = alloc_matd(MAX(1, nloc), num_X);
@@ -53159,7 +53164,8 @@ const int *cat_se_mask
                  displs,
                  MPI_DOUBLE,
                  comm[1]);
-  MPI_Allgatherv(stderr_local,
+  if(do_merr)
+    MPI_Allgatherv(stderr_local,
                  nloc,
                  MPI_DOUBLE,
                  kdf_stderr,

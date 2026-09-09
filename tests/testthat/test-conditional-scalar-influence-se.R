@@ -7,7 +7,7 @@ test_that("conditional beta response allows a zero explanatory derivative total"
     b <- constructor(xdat = x, ydat = y, bws = c(.15, 2),
       bandwidth.compute = FALSE, regtype = "lc", cxkertype = "uniform",
       cykertype = "beta", cykerbound = "fixed", cykerlb = 0, cykerub = 1)
-    fit <- estimator(bws = b, txdat = x, tydat = y, exdat = data.frame(x = .5),
+    fit <- estimator(se = TRUE, bws = b, txdat = x, tydat = y, exdat = data.frame(x = .5),
       eydat = data.frame(y = .43), gradients = TRUE)
     z <- as.vector(npksum(bws = .15, txdat = y, exdat = data.frame(y = .43),
       ckertype = "beta", ckerbound = "fixed", ckerlb = 0, ckerub = 1,
@@ -35,7 +35,7 @@ test_that("scalar conditional categorical errors pair same-sample influences", {
     args <- c(args,if(beta.x) list(cxkerbound="fixed",cxkerlb=0,cxkerub=1)
       else list(cykerbound="fixed",cykerlb=0,cykerub=1))
     bw <- do.call(npcdensbw,args)
-    fit <- npcdens(bws=bw,txdat=x,tydat=y,exdat=ex,eydat=ey,gradients=TRUE)
+    fit <- npcdens(se = TRUE, bws=bw,txdat=x,tydat=y,exdat=ex,eydat=ey,gradients=TRUE)
     beta.row <- function(train,point,h) as.vector(npksum(bws=h,
       txdat=data.frame(v=train),exdat=data.frame(v=point),ckertype="beta",
       ckerbound="fixed",ckerlb=0,ckerub=1,return.kernel.weights=TRUE)$kw)
@@ -79,7 +79,7 @@ test_that("scalar conditional beta influence errors use sample covariance scalin
     a <- c(a, if(beta.x) list(cxkerbound="fixed",cxkerlb=0,cxkerub=1)
       else list(cykerbound="fixed",cykerlb=0,cykerub=1))
     b <- do.call(npcdensbw, a)
-    fit <- npcdens(bws=b, txdat=x, tydat=y, exdat=data.frame(x=ex),
+    fit <- npcdens(se = TRUE, bws=b, txdat=x, tydat=y, exdat=data.frame(x=ex),
       eydat=data.frame(y=ey), gradients=TRUE)
     w <- side(x$x, ex, hx, beta.x); z <- side(y$y, ey, hy, !beta.x)
     alpha <- w/sum(w); m <- sum(alpha*z)

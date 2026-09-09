@@ -212,7 +212,8 @@
       tydat = target.context$tydat,
       exdat = grid.eval$exdat,
       eydat = grid.eval$eydat,
-      proper = FALSE
+      proper = FALSE,
+      se = FALSE
     ),
     error = function(e) e
   )

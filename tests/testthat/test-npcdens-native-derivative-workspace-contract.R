@@ -25,7 +25,7 @@ test_that("npcdens categorical-response gradients preserve native derivative wor
   )
 
   fit_level <- function(level, gradients) {
-    npcdens(
+    npcdens(se = TRUE,
       txdat = dat[c("x", "z")],
       tydat = dat["cls"],
       exdat = dat[c("x", "z")],
