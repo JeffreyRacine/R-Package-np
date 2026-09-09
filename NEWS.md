@@ -1,5 +1,12 @@
 # np 0.80-1
 
+* Conditional generalized-nearest-neighbor training fits with ordinary
+  explanatory kernels and a beta response kernel now exclude the identified
+  training occurrence when selecting explanatory radii, retaining it in the
+  estimation sum. Affected fitted values, derivatives and standard errors use
+  the corrected geometry; explicit evaluation queries and beta explanatory
+  kernels retain their existing behavior.
+
 * Partially linear coefficient standard errors and covariance now allow
   conditional heteroskedasticity through a residual-score sandwich, retaining
   the existing finite-sample multiplier. Coefficients, fitted values, bandwidth
