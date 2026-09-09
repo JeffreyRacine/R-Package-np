@@ -26003,6 +26003,7 @@ typedef struct {
   const NPRegressionHC0Context *hc0_context;
   NPRegressionFitOwner *enclosing_owner;
   NPRegressionLPEmptyRows *empty_rows;
+  const NPConditionalLPFirstSERequest *first_se_request;
 } NPRegressionGeneralLPFitCall;
 
 typedef struct {
@@ -26560,6 +26561,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
     NULL, 2, NULL, NULL, 0, 0, NULL, 0, NULL, NULL
   };
   int variance_nrhs = 1;
+  int first_se_nrhs = 0;
   int response_y_offset;
   int response_basis_offset;
   int moment_stride;
@@ -26588,13 +26590,16 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
     for(l = 0; l < num_reg_continuous; ++l)
       if(np_glp_gradient_direction_active(l))
         ++variance_nrhs;
+  if(call->first_se_request != NULL)
+    for(l = 0; l < num_reg_continuous; ++l)
+      first_se_nrhs += call->first_se_request->se[l];
   if(variance_nrhs > owner->nterms) {
     execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_DIMENSION;
     return R_NilValue;
   }
   if(!np_lp_solve_workspace_reserve(&owner->solve_workspace,
                                     owner->nterms,
-                                    variance_nrhs)) {
+                                    MAX(variance_nrhs, first_se_nrhs))) {
     execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_SOLVE_ALLOC;
     return R_NilValue;
   }
@@ -27329,9 +27334,9 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
              ((call->do_merr && reuse_fit_kernel_row) ? owner->retained_kernel_row : NULL))) {
         call->mean[j] = NA_REAL;
         if(call->do_merr) call->mean_stderr[j] = NA_REAL;
-        if(call->do_grad)
+        if(call->do_grad || call->do_gerr)
           for(l = 0; l < num_reg_continuous + num_reg_unordered + num_reg_ordered; ++l) {
-            call->gradient[l][j] = NA_REAL;
+            if(call->do_grad) call->gradient[l][j] = NA_REAL;
             if(call->do_gerr) call->gradient_stderr[l][j] = NA_REAL;
           }
 #ifdef MPI2
@@ -27572,6 +27577,48 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
         }
       }
 
+      if(first_se_nrhs > 0) {
+        int rhs = 0;
+        /* Keep the level-only solve, status and quadratic above unchanged.
+         * The supplement reuses its factorization, never its success flag. */
+        for(l = 0; l < num_reg_continuous; ++l) {
+          double *direction;
+          if(!call->first_se_request->se[l])
+            continue;
+          call->gradient_stderr[l][j] = NA_REAL;
+          direction = owner->solve_workspace.rhs_source +
+            (size_t)rhs*(size_t)owner->nterms;
+          if(use_bernstein)
+            np_glp_fill_basis_eval_deriv(
+              l, call->first_se_request->order[l], num_reg_continuous,
+              owner->terms, owner->nterms, call->matrix_X_continuous_eval,
+              j, owner->basis_context, direction);
+          else
+            np_glp_fill_basis_eval_deriv_raw(
+              l, call->first_se_request->order[l], num_reg_continuous,
+              owner->terms, owner->nterms, call->matrix_X_continuous_eval,
+              j, direction);
+          ++rhs;
+        }
+        if(np_lp_solve_workspace_solve_factored(
+             &owner->solve_workspace, owner->nterms, first_se_nrhs)) {
+          rhs = 0;
+          for(l = 0; l < num_reg_continuous; ++l) {
+            double gv;
+            if(!call->first_se_request->se[l])
+              continue;
+            call->gradient_stderr[l][j] = 0.0;
+            gv = sigma2hat*np_lp_variance_quadratic(
+              owner->solve_workspace.rhs_work +
+                (size_t)rhs*(size_t)owner->nterms,
+              owner->power2_moments, owner->power2_projection, owner->nterms);
+            if(gv > 0.0 && isfinite(gv))
+              call->gradient_stderr[l][j] = sqrt(gv);
+            ++rhs;
+          }
+        }
+      }
+
       if(categorical_hc0 && !call->categorical_base_requires_refit)
         memcpy(owner->power2_projection,
                owner->solve_workspace.rhs_work,
@@ -27771,7 +27818,8 @@ NPRegressionStandardErrorMode standard_error_mode,
 const NPContinuousPreparedBandwidthView *prepared_bandwidth,
 const NPNNGeometryContext *nn_geometry_context,
 const NPRegressionHC0Context *hc0_context,
-NPRegressionLPEmptyRows *empty_rows){
+NPRegressionLPEmptyRows *empty_rows,
+const NPConditionalLPFirstSERequest *first_se_request){
 
   // note that mean has 2*num_obs allocated for npksum
   int i, j, l;
@@ -27823,8 +27871,35 @@ NPRegressionLPEmptyRows *empty_rows){
   if(standard_error_mode != NP_REGRESSION_STDERR_LOCAL_RESIDUAL &&
      standard_error_mode != NP_REGRESSION_STDERR_CONDITIONAL_INFLUENCE)
     error("invalid internal regression standard-error mode");
-  if(do_gerr && (!do_merr || !do_grad))
+  if(do_gerr && (!do_merr || (!do_grad && first_se_request == NULL)))
     error("gradient standard errors require gradients and mean standard errors");
+  if(first_se_request != NULL) {
+    int selected = 0;
+    if(lp_engine_est != NP_LP_ENGINE_GENERAL ||
+       standard_error_mode != NP_REGRESSION_STDERR_LOCAL_RESIDUAL ||
+       num_obs_eval != 1 || !do_merr || !do_gerr || do_grad ||
+       hc0_context != NULL || num_reg_continuous <= 0 ||
+       first_se_request->ncon != num_reg_continuous ||
+       first_se_request->order == NULL || first_se_request->se == NULL ||
+       vector_glp_degree_extern == NULL)
+      error("invalid internal conditional first-SE owner request");
+#ifdef MPI2
+    if(iNum_Processors > 1 && !np_mpi_local_regression_active())
+      error("conditional first-SE supplement requires a local row owner");
+#endif
+    for(l = 0; l < num_reg_continuous; ++l) {
+      const int demand = first_se_request->se[l];
+      if(first_se_request->order[l] < 1 || (demand != 0 && demand != 1) ||
+         (demand && (first_se_request->order[l] != 1 ||
+                     vector_glp_degree_extern[l] < 1)))
+        error("invalid internal conditional first-SE direction");
+      selected += demand;
+    }
+    if(selected == 0)
+      error("empty internal conditional first-SE owner request");
+    for(l = 0; l < num_reg_continuous + num_reg_unordered + num_reg_ordered; ++l)
+      gradient_stderr[l][0] = NA_REAL;
+  }
   if(standard_error_mode == NP_REGRESSION_STDERR_CONDITIONAL_INFLUENCE &&
      !do_merr)
     error("conditional influence standard errors require an output buffer");
@@ -28445,14 +28520,14 @@ NPRegressionLPEmptyRows *empty_rows){
             &inverse_workspace, glp_nterms, 1);
           beta = (double *)malloc((size_t)glp_nterms*sizeof(double));
           eval_basis = (double *)malloc((size_t)glp_nterms*sizeof(double));
-          if(do_grad)
+          if(do_grad || first_se_request != NULL)
             eval_deriv = (double *)malloc((size_t)glp_nterms*sizeof(double));
           if(use_bernstein)
             basis_ctx = (NPGLPBasisCtx *)calloc(
               (size_t)num_reg_continuous, sizeof(NPGLPBasisCtx));
           fast_ok = fast_ok && (basis != NULL) && (beta != NULL) &&
             (eval_basis != NULL) &&
-            ((!do_grad) || (eval_deriv != NULL)) &&
+            ((!do_grad && first_se_request == NULL) || (eval_deriv != NULL)) &&
             (!use_bernstein || (basis_ctx != NULL));
           all_large_owner.terms = glp_terms;
           all_large_owner.nterms = glp_nterms;
@@ -28720,18 +28795,20 @@ NPRegressionLPEmptyRows *empty_rows){
                     sqrt(mv) : se_default;
                 }
 
-                if(do_grad){
+                if(do_grad || first_se_request != NULL){
                   const int nvars = num_reg_continuous + num_reg_unordered + num_reg_ordered;
                   for(l = 0; l < num_reg_continuous; l++){
                     const int grad_order =
-                      (vector_glp_gradient_order_extern != NULL) ?
-                      MAX(1, vector_glp_gradient_order_extern[l]) : 1;
-                    const int active = np_glp_gradient_direction_active(l);
+                      first_se_request != NULL ? first_se_request->order[l] :
+                      ((vector_glp_gradient_order_extern != NULL) ?
+                       MAX(1, vector_glp_gradient_order_extern[l]) : 1);
+                    const int active = first_se_request != NULL ?
+                      first_se_request->se[l] : np_glp_gradient_direction_active(l);
                     double qg = 0.0;
                     double dg = 0.0;
 
                     if(!active) {
-                      gradient[l][i] = NA_REAL;
+                      if(do_grad) gradient[l][i] = NA_REAL;
                       if(shortcut_do_gerr)
                         gradient_stderr[l][i] = NA_REAL;
                       continue;
@@ -28758,9 +28835,11 @@ NPRegressionLPEmptyRows *empty_rows){
                                                        eval_deriv);
                     }
 
-                    for(j = 0; j < glp_nterms; j++)
-                      dg += eval_deriv[j]*beta[j];
-                    gradient[l][i] = dg;
+                    if(do_grad) {
+                      for(j = 0; j < glp_nterms; j++)
+                        dg += eval_deriv[j]*beta[j];
+                      gradient[l][i] = dg;
+                    }
 
                     if(shortcut_do_gerr){
                       for(j = 0; j < glp_nterms; j++){
@@ -28779,7 +28858,7 @@ NPRegressionLPEmptyRows *empty_rows){
                     }
                   }
 
-                  for(l = num_reg_continuous; l < nvars; l++){
+                  for(l = num_reg_continuous; do_grad && l < nvars; l++){
                     /* The all-large gate's accepted point map is invariant
                      * to every categorical endpoint. */
                     gradient[l][i] = 0.0;
@@ -28929,7 +29008,8 @@ NPRegressionLPEmptyRows *empty_rows){
       .kernel_route_diagnostics = kernel_route_diagnostics,
       .hc0_context = effective_hc0_context,
       .enclosing_owner = &fit_owner,
-      .empty_rows = empty_rows
+      .empty_rows = empty_rows,
+      .first_se_request = first_se_request
     };
 
     general_lp_fit_status = np_regression_general_lp_fit(&general_lp_call);

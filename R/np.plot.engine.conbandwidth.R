@@ -704,6 +704,7 @@
             tydat = ydat,
             exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
             gradients = gradients,
+            lp.first.se.demand = if (plot.behavior != "plot") NULL else FALSE,
             tau = tau,
             bws = bws
           )
@@ -716,6 +717,7 @@
             eydat = eydat[seq_len(xi.neval),, drop = FALSE],
             cdf = cdf,
             gradients = gradients,
+            lp.first.se.demand = if (plot.behavior != "plot" || plot.errors.method == "asymptotic") NULL else FALSE,
             gradient.order = gradient.order
           )
         }
@@ -990,6 +992,7 @@
               tydat = ydat,
               eydat = subcol(eydat,ei,i)[seq_len(xi.neval),, drop = FALSE],
               gradients = gradients,
+              lp.first.se.demand = if (plot.behavior != "plot") NULL else FALSE,
               tau = tau,
               bws = bws
             )
@@ -1002,6 +1005,7 @@
               eydat = subcol(eydat,ei,i)[seq_len(xi.neval),, drop = FALSE],
               cdf = cdf,
               gradients = gradients,
+              lp.first.se.demand = if (plot.behavior != "plot" || plot.errors.method == "asymptotic") NULL else FALSE,
               gradient.order = gradient.order,
               proper = isTRUE(proper.args$proper.requested),
               proper.method = proper.args$proper.method,

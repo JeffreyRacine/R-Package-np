@@ -1,5 +1,10 @@
 # np 0.80-1
 
+* Conditional local-polynomial fits now retain available first-derivative
+  standard errors when other requested derivatives exceed their fitted
+  degrees. Existing point gradients, higher-order availability and computational
+  owners are unchanged; point-only internal consumers request no extra errors.
+
 * Conditional generalized-nearest-neighbor training fits with ordinary
   explanatory kernels and a beta response kernel now exclude the identified
   training occurrence when selecting explanatory radii, retaining it in the

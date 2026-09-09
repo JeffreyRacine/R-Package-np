@@ -100,6 +100,8 @@ npcdist.condbandwidth <-
            ...){
 
     dots <- list(...)
+    lp.first.se.demand <- .np_conditional_first_se_demand(
+      dots[[".np_lp_first_se_demand", exact = TRUE]], bws$xncon)
     fit.start <- proc.time()[3]
     fit.progress.handoff <- isTRUE(dots$.np_fit_progress_handoff)
     gradients <- npValidateScalarLogical(gradients, "gradients")
@@ -344,6 +346,9 @@ npcdist.condbandwidth <-
     }
     basis.code <- as.integer(npLpBasisCode(basis.engine))
     do.compiled.gradients <- isTRUE(gradients) && !glp.gradient.partial
+    first.se.request <- .np_conditional_first_se_request(
+      gradients, glp.gradient.partial, degree.engine, glp.gradient.order,
+      glp.gradient.available, lp.first.se.demand)
 
     myopti <- list(
         num_obs_train = tnrow,
@@ -427,10 +432,12 @@ npcdist.condbandwidth <-
             as.integer(degree.c),
             as.integer(bernstein.engine),
             basis.code,
+            first.se.request,
             PACKAGE = "np")
     ), continuous.names = c(bws[["xnames", exact = TRUE]][bws[["ixcon", exact = TRUE]]], bws[["ynames", exact = TRUE]][bws[["iycon", exact = TRUE]]]))
     names(myout)[1] <- "condist"
 
+    first.se.native <- if (is.null(first.se.request)) NULL else myout$congerr
     if(gradients){
       if (!glp.gradient.partial) {
         myout$congrad = matrix(data=myout$congrad, nrow = enrow, ncol = bws$xndim, byrow = FALSE)
@@ -496,6 +503,8 @@ npcdist.condbandwidth <-
     }
 
 
+    myout <- .np_conditional_merge_first_se(
+      myout, first.se.native, first.se.request, bws, enrow)
     fit.elapsed <- proc.time()[3] - fit.start
     optim.time <- if (!is.null(bws$total.time) && is.finite(bws$total.time)) as.double(bws$total.time) else NA_real_
     total.time <- fit.elapsed + (if (is.na(optim.time)) 0.0 else optim.time)

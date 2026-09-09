@@ -187,7 +187,8 @@ npqreg <-
                                                     tol = 1.490116e-04,
                                                     small = 1.490116e-05,
                                                     itmax = 10000L,
-                                                    cdf.cache = NULL) {
+                                                    cdf.cache = NULL,
+                                                    lp.first.se.demand = NULL) {
   xdat <- toFrame(xdat)
   ydat <- toFrame(ydat)
   exdat <- toFrame(exdat)
@@ -223,7 +224,8 @@ npqreg <-
     eydat = eydat,
     cdf = TRUE,
     gradients = gradients,
-    categorical.effects = !glp.categorical.effects
+    categorical.effects = !glp.categorical.effects,
+    lp.first.se.demand = lp.first.se.demand
   )
   dens.obj <- .np_conditional_eval_selected(
     bws = bws,

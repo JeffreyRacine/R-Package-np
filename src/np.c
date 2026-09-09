@@ -7136,7 +7136,8 @@ void np_density_conditional(double * tyuno, double * tyord, double * tycon,
                             NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
                             const NPContinuousKernelRoute *response_kernel_route,
                             NPContinuousKernelDerivativeDiagnostics *response_kernel_route_diagnostics,
-                            int categorical_compress);
+                            int categorical_compress,
+                            const NPConditionalLPFirstSERequest *first_se_request);
 void np_density_bw(double * myuno, double * myord, double * mycon,
                    double * mysd, int * myopti, double * myoptd, double * myans, double * fval,
                    double * objective_function_values, double * objective_function_evals,
@@ -9222,7 +9223,8 @@ SEXP C_np_density_conditional(SEXP tyuno,
                               SEXP regtype,
                               SEXP glp_degree,
                               SEXP glp_bernstein,
-                              SEXP glp_basis)
+                              SEXP glp_basis,
+                              SEXP first_se)
 {
   SEXP tyuno_r=R_NilValue, tyord_r=R_NilValue, tycon_r=R_NilValue;
   SEXP txuno_r=R_NilValue, txord_r=R_NilValue, txcon_r=R_NilValue;
@@ -9255,6 +9257,9 @@ SEXP C_np_density_conditional(SEXP tyuno,
   int has_kernel_descriptors = 0;
   int categorical_compress = 0;
   R_xlen_t gsize;
+  NPConditionalLPFirstSERequest first_se_request = {0, NULL, NULL};
+  const NPConditionalLPFirstSERequest *first_se_request_ptr = NULL;
+  int first_se_protected = 0;
 
   if (en < 0) en = 0;
   if (xd < 0) xd = 0;
@@ -9362,6 +9367,42 @@ SEXP C_np_density_conditional(SEXP tyuno,
     int_glp_basis_extern = 1;
   }
 
+  if(first_se != R_NilValue) {
+    SEXP names = getAttrib(first_se, R_NamesSymbol);
+    SEXP order, mask;
+    int selected = 0;
+    if(TYPEOF(first_se) != VECSXP || XLENGTH(first_se) != 2 ||
+       TYPEOF(names) != STRSXP || XLENGTH(names) != 2 ||
+       strcmp(CHAR(STRING_ELT(names, 0)), "order") != 0 ||
+       strcmp(CHAR(STRING_ELT(names, 1)), "se") != 0)
+      error("C_np_density_conditional: invalid first-SE request");
+    order = VECTOR_ELT(first_se, 0);
+    mask = VECTOR_ELT(first_se, 1);
+    if(np_lp_engine_extern != NP_LP_ENGINE_GENERAL || ncon_x <= 0 ||
+       INTEGER(myopti_i)[CD_GRAD] != 0 ||
+       TYPEOF(order) != INTSXP || TYPEOF(mask) != INTSXP ||
+       XLENGTH(order) != ncon_x || XLENGTH(mask) != ncon_x)
+      error("C_np_density_conditional: incoherent first-SE request");
+    for(int coordinate = 0; coordinate < ncon_x; ++coordinate) {
+      const int demand = INTEGER(mask)[coordinate];
+      const int requested_order = INTEGER(order)[coordinate];
+      if(requested_order < 1 || (demand != 0 && demand != 1) ||
+         (demand && (requested_order != 1 ||
+                     INTEGER(glp_degree_i)[coordinate] < 1)))
+        error("C_np_density_conditional: invalid first-SE direction");
+      selected += demand;
+    }
+    if(selected == 0)
+      error("C_np_density_conditional: empty first-SE request");
+    PROTECT(order);
+    PROTECT(mask);
+    first_se_protected = 2;
+    first_se_request.ncon = ncon_x;
+    first_se_request.order = INTEGER(order);
+    first_se_request.se = INTEGER(mask);
+    first_se_request_ptr = &first_se_request;
+  }
+
   PROTECT(out_cond = allocVector(REALSXP, en));
   PROTECT(out_cderr = allocVector(REALSXP, en));
   PROTECT(out_grad = allocVector(REALSXP, gsize));
@@ -9380,7 +9421,7 @@ SEXP C_np_density_conditional(SEXP tyuno,
                            cxkerlb_p, cxkerub_p, cykerlb_p, cykerub_p,
                            active_x_route, active_x_diagnostics,
                            active_y_route, active_y_diagnostics,
-                           categorical_compress);
+                           categorical_compress, first_se_request_ptr);
 
   PROTECT(out = allocVector(VECSXP, 5));
   SET_VECTOR_ELT(out, 0, out_cond);
@@ -9402,7 +9443,7 @@ SEXP C_np_density_conditional(SEXP tyuno,
   int_glp_basis_extern = 1;
   np_lp_engine_extern = NP_LP_ENGINE_SCALAR;
 
-  UNPROTECT(36);
+  UNPROTECT(36 + first_se_protected);
   return out;
 }
 
@@ -18056,7 +18097,8 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                             NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
                             const NPContinuousKernelRoute *response_kernel_route,
                             NPContinuousKernelDerivativeDiagnostics *response_kernel_route_diagnostics,
-                            int categorical_compress){
+                            int categorical_compress,
+                            const NPConditionalLPFirstSERequest *first_se_request){
   /* Likelihood bandwidth selection for density estimation */
 
   double *vector_scale_factor, *pdf, *pdf_stderr, log_likelihood = 0.0;
@@ -18068,7 +18110,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
   int i,j;
   int num_var;
 
-  int num_all_var, num_var_var, train_is_eval, do_grad, num_obs_eval_alloc;
+  int num_all_var, num_var_var, train_is_eval, do_grad, do_gerr, num_obs_eval_alloc;
   int num_all_cvar, num_all_uvar, num_all_ovar, num_all_catvar;
   int xmax_lev, ymax_lev, dens_or_dist, t_num;
 
@@ -18160,6 +18202,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
   }
   int_MINIMIZE_IO = myopti[CD_MINIOI];
   do_grad = myopti[CD_GRAD];
+  do_gerr = do_grad || first_se_request != NULL;
 
   ymax_lev = myopti[CD_YMLEVI];
   xmax_lev = myopti[CD_XMLEVI];
@@ -18228,9 +18271,14 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
   pdf = alloc_vecd(num_obs_eval_alloc);
   pdf_stderr = alloc_vecd(num_obs_eval_alloc);
 
-  if (do_grad){
+  if (do_grad)
     pdf_deriv = alloc_matd(num_obs_eval_alloc, num_var);
+  if (do_gerr)
     pdf_deriv_stderr = alloc_matd(num_obs_eval_alloc, num_var);
+  if(first_se_request != NULL) {
+    for(j = 0; j < num_var; ++j)
+      for(i = 0; i < num_obs_eval_alloc; ++i)
+        pdf_deriv_stderr[j][i] = NA_REAL;
   }
 
   /* in v_s_f order is creg, cvar, uvar, ovar, ureg, oreg  */
@@ -18513,10 +18561,10 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
     if(num_var_ordered_extern > 0) yord_eval_one = alloc_matd(1, num_var_ordered_extern);
     if(num_var_continuous_extern > 0) ycon_eval_one = alloc_matd(1, num_var_continuous_extern);
 
-    if(do_grad && (num_x_vars > 0)){
+    if(do_grad && (num_x_vars > 0))
       grad_one = alloc_matd(1, num_x_vars);
+    if(do_gerr && (num_x_vars > 0))
       graderr_one = alloc_matd(1, num_x_vars);
-    }
 
     kernel_cy = (int *)calloc((size_t)MAX(1, num_var_continuous_extern), sizeof(int));
     kernel_uy = (int *)calloc((size_t)MAX(1, num_var_unordered_extern), sizeof(int));
@@ -18536,7 +18584,8 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
        ((num_var_unordered_extern > 0) && (yuno_eval_one == NULL)) ||
        ((num_var_ordered_extern > 0) && (yord_eval_one == NULL)) ||
        ((num_var_continuous_extern > 0) && (ycon_eval_one == NULL)) ||
-       (do_grad && (num_x_vars > 0) && ((grad_one == NULL) || (graderr_one == NULL))))
+       (do_grad && (num_x_vars > 0) && grad_one == NULL) ||
+       (do_gerr && (num_x_vars > 0) && graderr_one == NULL))
       error("np_density_conditional: memory allocation failed in conditional LP path");
 
     for(i = 0; i < num_var_continuous_extern; i++) kernel_cy[i] = KERNEL_den_extern;
@@ -18858,7 +18907,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                                                                  NP_REGRESSION_STDERR_LOCAL_RESIDUAL,
                                                                prepared_x_bandwidth_ptr,
                                                                row_nn_geometry_context_ptr,
-                                                               NULL, NULL);
+                                                               NULL, NULL, first_se_request);
 
       if(status == NP_REGRESSION_FIT_ERR_ZERO_NN_RADIUS)
         error("conditional density/distribution fit encountered a zero literal explanatory radius after occurrence exclusion");
@@ -18916,6 +18965,25 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
         }
       }
 
+      if(first_se_request != NULL) {
+        for(i = 0; i < first_se_request->ncon; ++i) {
+          if(!first_se_request->se[i])
+            continue;
+          if(beta_y_active) {
+            const NPContinuousKernelRowStatus restore_status =
+              np_continuous_kernel_scaled_derivative_restore(
+                graderr_one[i][0], beta_y_log_scale,
+                &pdf_deriv_stderr[i][j]);
+            if(restore_status != NP_CONTINUOUS_ROW_OK) {
+              np_beta_scaled_row_context_clear(&beta_y_row_context);
+              error("np_density_conditional: canonical beta first-SE restoration failed: %s",
+                    np_continuous_kernel_row_status_message(restore_status));
+            }
+          } else {
+            pdf_deriv_stderr[i][j] = graderr_one[i][0];
+          }
+        }
+      }
       np_progress_fit_step(j + 1);
     }
 
@@ -18960,11 +19028,12 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
   for( i=0; i<num_obs_eval_extern; i++ )
     cderr[ipe_XY[i]]=pdf_stderr[i];
   
-  if (do_grad) {
+  if (do_gerr) {
     for(j=0;j<num_var;j++)
       for(i=0;i<num_obs_eval_extern;i++)
         cgerr[j*num_obs_eval_extern+ipe_XY[i]]=pdf_deriv_stderr[j][i];
-
+  }
+  if (do_grad) {
     for(j=0;j<num_var;j++)
       for(i=0;i<num_obs_eval_extern;i++)
         cg[j*num_obs_eval_extern+ipe_XY[i]]=pdf_deriv[j][i];
@@ -18991,10 +19060,10 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
     free_mat(matrix_XY_continuous_eval_extern, num_all_cvar);
   }
 
-  if (do_grad){
+  if (do_grad)
     free_mat(pdf_deriv, num_var);
+  if (do_gerr)
     free_mat(pdf_deriv_stderr, num_var);
-  }
 
   vector_continuous_stddev_extern = NULL;
 
@@ -21139,7 +21208,7 @@ static SEXP np_regression_fitted_execute(void *data)
       NP_REGRESSION_STDERR_LOCAL_RESIDUAL,
       NULL,
       &training_geometry_context,
-      &residual_preparation_context, NULL);
+      &residual_preparation_context, NULL, NULL);
 
     if(temporary_training_tree) {
       kdt_extern_X = outer_evaluation_kdt;
@@ -21275,7 +21344,7 @@ static SEXP np_regression_fitted_execute(void *data)
                                                    &nn_geometry_context,
                                                    ordinary_hc0_active ?
                                                      &ordinary_hc0_context : NULL,
-                                                   call->empty_rows);
+                                                   call->empty_rows, NULL);
 
 
   for(i=0;i<num_obs_eval_extern;i++)

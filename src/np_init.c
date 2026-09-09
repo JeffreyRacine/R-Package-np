@@ -16,7 +16,7 @@ extern SEXP C_np_density_conditional_prepared_eval_raw(SEXP, SEXP);
 extern SEXP C_np_density_conditional_prepared_native_search(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_density_conditional_prepared_fixed_native_search(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_density_conditional_prepared_destroy(void);
-extern SEXP C_np_density_conditional(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP C_np_density_conditional(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_conditional_count_levels(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_regression_lp_apply_conditional(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_regression_lp_apply_conditional_ctx(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
@@ -70,7 +70,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"C_np_density_conditional_prepared_native_search",(DL_FUNC) &C_np_density_conditional_prepared_native_search,12},
     {"C_np_density_conditional_prepared_fixed_native_search",(DL_FUNC) &C_np_density_conditional_prepared_fixed_native_search,12},
     {"C_np_density_conditional_prepared_destroy",(DL_FUNC) &C_np_density_conditional_prepared_destroy,0},
-    {"C_np_density_conditional",       (DL_FUNC) &C_np_density_conditional,       31},
+    {"C_np_density_conditional",       (DL_FUNC) &C_np_density_conditional,       32},
     {"C_np_conditional_count_levels",  (DL_FUNC) &C_np_conditional_count_levels,  22},
     {"C_np_regression_lp_apply_conditional",(DL_FUNC) &C_np_regression_lp_apply_conditional,23},
     {"C_np_regression_lp_apply_conditional_ctx",(DL_FUNC) &C_np_regression_lp_apply_conditional_ctx,26},
