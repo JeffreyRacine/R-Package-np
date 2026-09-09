@@ -10,6 +10,11 @@
   denominators remain invalid; estimates and existing valid derivatives are
   unchanged.
 
+* Scalar conditional density and distribution standard errors now use the
+  squared-kernel moments of the chosen explanatory kernels and, for density,
+  response kernels separately. Mixed kernel families/orders no longer inherit
+  the response-kernel moment in every dimension. Point estimates are unchanged.
+
 * Master-local bootstrap and hat fanout computation errors now use the same
   per-chunk condition handling as workers. Scheduled replies are drained before
   failure is reported, allowing reuse of a healthy pool without publishing an

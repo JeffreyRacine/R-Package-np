@@ -27,6 +27,7 @@
 #endif
 
 #include "headers.h"
+#include "conditional_kernel_moments.h"
 #include "nn_radius_error.h"
 #include "gsl_bspline.h"
 #include "jksum_gaussian_density.h"
@@ -51591,6 +51592,8 @@ const NPNNGeometryContext *nn_geometry_context
 
 
   const double gfac = sqrt(DIFF_KER_PPM/INT_KERNEL_P);
+  K_INT_KERNEL_P = np_conditional_kernel_square_product(
+    KERNEL_X, KERNEL_Y, num_X_continuous, num_Y_continuous, is_cpdf);
 
   if(do_grad && (num_X_ordered > 0)){
     otabs = (struct th_table *)np_jksum_malloc_array_or_die((size_t)num_X_ordered, sizeof(struct th_table), "np_kernel_estimate_con_dens_dist_categorical otabs");
