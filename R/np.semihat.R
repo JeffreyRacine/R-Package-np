@@ -295,7 +295,7 @@
                               idx.eval,
                               y = NULL,
                               output = c("matrix", "apply"),
-                              ridge = 0.0) {
+                              ridge = 0.0, allow.empty.rows = FALSE) {
   output <- match.arg(output)
   kbw <- .np_indexhat_kbw(bws = bws, idx.train = idx.train)
   spec <- .npindex_resolve_spec(bws, where = "npindexhat")
@@ -309,7 +309,7 @@
       args <- .np_indexhat_lc_kernel_args(bws, idx.train, idx.eval, kernel.bws = kbw)
       # The core/plot matrix owner divides fixed-bandwidth weights too.
       args$bandwidth.divide <- TRUE
-      return(.np_indexhat_lc_moment_apply(y, args))
+      return(.np_indexhat_lc_moment_apply(y, args, allow.empty.rows))
     }
   }
 
@@ -336,12 +336,16 @@
   }
 
   if (identical(regtype, "lc")) {
-    den <- pmax(colSums(kw), .Machine$double.eps)
+    den <- .np_normalization_denominator(
+      colSums(kw), "single-index hat", allow.empty.rows = allow.empty.rows,
+      zero.rows = colSums(abs(kw)) == 0.0)
     if (identical(output, "matrix"))
-      return(.np_lc_hat_normalize(kw, den))
+      return(.np_normalization_finish(.np_lc_hat_normalize(kw, den), den,
+                                      "single-index hat", TRUE))
 
     out <- .np_lc_hat_normalize(kw, den) %*% y
-    return(if (ncol(out) == 1L) as.vector(out) else out)
+    return(.np_normalization_finish(
+      if (ncol(out) == 1L) as.vector(out) else out, den, "single-index hat", TRUE))
   }
 
   degree <- spec$degree.engine
@@ -452,19 +456,47 @@
     all(is.finite(as.matrix(idx.train))) && all(is.finite(as.matrix(idx.eval)))
 }
 
-.np_indexhat_lc_moment_apply <- function(y, args) {
+.np_indexhat_zero_moment_rows <- function(args, denominator) {
+  # Exceptional rows only: preserve the lean healthy owner and O(n) workspace.
+  empty <- rep.int(FALSE, length(denominator))
+  rows <- which(is.finite(denominator) & denominator == 0.0)
+  nonnegative <- args$ckertype %in% c("uniform", "beta") ||
+    (identical(as.integer(args$ckerorder), 2L) &&
+       args$ckertype %in% c("gaussian", "epanechnikov", "truncated gaussian"))
+  if (nonnegative) {
+    # A finite zero sum of nonnegative computed weights certifies all-zero
+    # arithmetic, not geometric absence. No diagnostic kernel pass is needed.
+    empty[rows] <- TRUE
+    return(empty)
+  }
+  for (i in rows) {
+    probe <- args
+    probe$exdat <- args$exdat[i, , drop = FALSE]
+    probe$return.kernel.weights <- TRUE
+    kw <- .npRmpi_with_local_regression(do.call(.np_index_kernel_sum, probe))$kw
+    empty[i] <- length(kw) > 0L && all(is.finite(kw)) && all(kw == 0.0)
+  }
+  empty
+}
+
+.np_indexhat_lc_moment_apply <- function(y, args, allow.empty.rows = FALSE) {
   moments <- .npRmpi_with_local_regression(do.call(.np_index_kernel_moments, c(list(y = y), args)))
+  den <- .np_normalization_denominator(
+    moments$denominator, "single-index hat", allow.empty.rows = allow.empty.rows,
+    zero.rows = .np_indexhat_zero_moment_rows(args, moments$denominator))
   out <- t(sweep(moments$numerator, 2L,
-                 pmax(moments$denominator, .Machine$double.eps), "/"))
+                 den, "/"))
   colnames(out) <- colnames(y)
-  if (ncol(out) == 1L) as.vector(out) else out
+  .np_normalization_finish(if (ncol(out) == 1L) as.vector(out) else out,
+                            den, "single-index hat", TRUE)
 }
 
 .np_indexhat_lc_mean <- function(bws,
                                  idx.train,
                                  idx.eval,
                                  y = NULL,
-                                 output = c("matrix", "apply")) {
+                                 output = c("matrix", "apply"),
+                                 allow.empty.rows = FALSE) {
   output <- match.arg(output)
   if (identical(output, "apply")) {
     if (is.null(y))
@@ -474,15 +506,19 @@
       stop("number of rows in 'y' must equal number of training rows")
     if (.np_indexhat_lc_moment_candidate(y, idx.train, idx.eval))
       return(.np_indexhat_lc_moment_apply(
-        y, .np_indexhat_lc_kernel_args(bws, idx.train, idx.eval)))
+        y, .np_indexhat_lc_kernel_args(bws, idx.train, idx.eval), allow.empty.rows))
   }
 
   kw <- .np_indexhat_lc_kernel_weights(bws, idx.train, idx.eval)
-  H <- .np_lc_hat_normalize(kw, pmax(colSums(kw), .Machine$double.eps))
+  den <- .np_normalization_denominator(
+    colSums(kw), "single-index hat", allow.empty.rows = allow.empty.rows,
+    zero.rows = colSums(abs(kw)) == 0.0)
+  H <- .np_lc_hat_normalize(kw, den)
   if (identical(output, "matrix"))
-    return(H)
+    return(.np_normalization_finish(H, den, "single-index hat", TRUE))
   out <- H %*% y
-  if (ncol(out) == 1L) as.vector(out) else out
+  .np_normalization_finish(if (ncol(out) == 1L) as.vector(out) else out,
+                            den, "single-index hat", TRUE)
 }
 
 .np_indexhat_lc_derivative <- function(bws,
@@ -571,7 +607,8 @@
       idx.train = idx.train,
       idx.eval = idx.eval,
       y = y,
-      output = output
+      output = output,
+      allow.empty.rows = allow.empty.rows
     ))
   }
 
@@ -970,6 +1007,7 @@ npindexhat <-
            ...){
 
     .np_reject_unused_dots(list(...), "npindexhat")
+    allow.empty.rows <- !missing(exdat)
     output <- match.arg(output)
     constraint.output <- identical(output, "constraint")
     operator.output <- if (constraint.output) "matrix" else output
@@ -1010,8 +1048,15 @@ npindexhat <-
         idx.eval = idx.eval,
         y = y,
         output = operator.output,
-        s = s
+        s = s, allow.empty.rows = allow.empty.rows && s == 0L
       )
+      empty.rows <- attr(H, ".np.empty.rows", exact = TRUE)
+      if (!is.null(empty.rows)) {
+        attr(H, ".np.empty.rows") <- NULL
+        den <- rep.int(1.0, length(empty.rows))
+        den[empty.rows == 1L] <- NA_real_
+        H <- .np_normalization_finish(H, den, "npindexhat")
+      }
       if (constraint.output)
         return(.np_hat_constraint_from_matrix(H, y, "npindexhat"))
       return(H)

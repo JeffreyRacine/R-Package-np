@@ -45,26 +45,19 @@ test_that("conditional-hat ratios use every finite nonzero denominator", {
   numerator <- (Kx * Ky) / ncol(Kx)
   finite.nonzero <- is.finite(denom) & denom != 0.0
 
-  mixed <- .t4_ratio_owner(Kx, Ky)
+  # Invalid required rows are now terminal; this original T4 assertion still
+  # protects every valid signed/small row's exact arithmetic.
+  expect_error(.t4_ratio_owner(Kx, Ky), "normalizing weight sum")
+  mixed <- .t4_ratio_owner(
+    Kx[finite.nonzero, , drop = FALSE], Ky[finite.nonzero, , drop = FALSE])
   direct <- sweep(
     numerator[finite.nonzero, , drop = FALSE],
     1L, denom[finite.nonzero], "/"
   )
-  incumbent.exceptional <- sweep(
-    numerator[!finite.nonzero, , drop = FALSE],
-    1L,
-    pmax(denom[!finite.nonzero], .Machine$double.eps),
-    "/"
-  )
-
   expect_true(is.matrix(mixed))
   expect_identical(
-    as.vector(mixed[finite.nonzero, , drop = FALSE]),
+    as.vector(mixed),
     as.vector(direct)
-  )
-  expect_identical(
-    as.vector(mixed[!finite.nonzero, , drop = FALSE]),
-    as.vector(incumbent.exceptional)
   )
 
   fast <- .t4_ratio_owner(

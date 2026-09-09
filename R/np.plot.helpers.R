@@ -2683,7 +2683,7 @@
     den <- crossprod(counts.mat, W)
     num <- crossprod(counts.mat, Wy)
     return(list(
-      t = num / pmax(den, .Machine$double.eps),
+      t = .np_bootstrap_ratio(num, den, "LC bootstrap"),
       t0 = t0
     ))
   }
@@ -2714,7 +2714,7 @@
         )
         den <- crossprod(counts.chunk, W.local)
         num <- crossprod(counts.chunk, Wy.local)
-        num / pmax(den, .Machine$double.eps)
+        .np_bootstrap_ratio(num, den, "LC bootstrap", first.replication = start)
       }
 
       tmat <- .npRmpi_bootstrap_run_fanout(
@@ -2764,7 +2764,7 @@
     counts.chunk <- .npRmpi_bootstrap_task_rmultinom(task = task, n = n, prob = prob)
     den <- crossprod(counts.chunk, W)
     num <- crossprod(counts.chunk, Wy)
-    num / pmax(den, .Machine$double.eps)
+    .np_bootstrap_ratio(num, den, "LC bootstrap", first.replication = task$start)
   }
 
   t.mpi <- .npRmpi_bootstrap_run_fanout(
@@ -2878,7 +2878,7 @@
   if (npIsCanonicalLp0Spec(spec, ncon = 1L)) {
     H <- .np_lc_hat_normalize(
       kw,
-      pmax(colSums(kw), .Machine$double.eps)
+      .np_normalization_denominator(colSums(kw), "single-index bootstrap operator")
     )
     return(.np_inid_lc_boot_from_hat(
       H = H,
@@ -3923,7 +3923,8 @@
                                  setup$G)
     den <- tcrossprod(t(Cg), setup$L.eval)
     num <- tcrossprod(t(Sg), setup$L.eval)
-    prof <- num / pmax(den, .Machine$double.eps)
+    prof <- .np_bootstrap_ratio(
+      num, den, "categorical regression bootstrap", first.replication = start)
     tmat[start:stopi, ] <- prof[, setup$eval.id, drop = FALSE]
     progress <- .np_plot_progress_tick(state = progress, done = stopi)
     chunk.controller <- .np_plot_progress_chunk_observe(
@@ -5257,8 +5258,9 @@
       }
       den <- L.eval %*% cw.profile
       num <- L.eval %*% cwy.profile
-      tmat[bb, ] <- colSums(V * t(num)) /
-        pmax(colSums(V * t(den)), .Machine$double.eps)
+      tmat[bb, ] <- .np_bootstrap_ratio(
+        colSums(V * t(num)), colSums(V * t(den)),
+        "smooth-coefficient profile bootstrap", first.replication = bb)
     }
     return(list(t = tmat, t0 = t0))
   }
@@ -5303,8 +5305,9 @@
       }
       den <- L.eval %*% cw.profile
       num <- L.eval %*% cwy.profile
-      tmat[bb, ] <- colSums(V * t(num)) /
-        pmax(colSums(V * t(den)), .Machine$double.eps)
+      tmat[bb, ] <- .np_bootstrap_ratio(
+        colSums(V * t(num)), colSums(V * t(den)),
+        "smooth-coefficient profile bootstrap", first.replication = bb)
     }
     progress <- .np_plot_progress_tick(state = progress, done = stopi)
     chunk.controller <- .np_plot_progress_chunk_observe(
@@ -6558,7 +6561,8 @@
   W <- t(H)
   den <- crossprod(counts.chunk, W)
   num <- crossprod(counts.chunk, W * ydat)
-  num / pmax(den, .Machine$double.eps)
+  .np_bootstrap_ratio(num, den, "partial-linear bootstrap chunk",
+                      first.replication = NULL)
 }
 
 .np_plreg_lc_predict_t0 <- function(xdat, exdat, bws, ydat) {
@@ -6647,7 +6651,8 @@
   if (identical(state$type, "lc")) {
     den <- crossprod(counts.chunk, state$W)
     num <- crossprod(counts.chunk, state$W * state$ydat)
-    return(num / pmax(den, .Machine$double.eps))
+    return(.np_bootstrap_ratio(num, den, "partial-linear bootstrap chunk",
+                                first.replication = NULL))
   }
 
   .np_regression_localpoly_fixed_counts_from_state(
@@ -8854,7 +8859,8 @@
 
   den.op <- Kx / n
   num.op <- (Kx * Ky) / n
-  t0 <- rowSums(num.op) / pmax(rowSums(den.op), .Machine$double.eps)
+  t0 <- rowSums(num.op) / .np_normalization_denominator(
+    rowSums(den.op), "frozen conditional bootstrap original sample")
 
   chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
   tmat <- matrix(NA_real_, nrow = B, ncol = neval)
@@ -8868,7 +8874,8 @@
     counts.chunk <- as.matrix(counts.chunk)
     den <- t(den.op %*% counts.chunk)
     num <- t(num.op %*% counts.chunk)
-    num / pmax(den, .Machine$double.eps)
+    .np_bootstrap_ratio(num, den, "frozen conditional bootstrap chunk",
+                        first.replication = NULL)
   }
 
   use.mpi <- isTRUE(getOption("npRmpi.mpi.initialized", FALSE)) &&
@@ -9302,7 +9309,7 @@
     )$ksum
   )) / n.total
 
-  num / pmax(den, .Machine$double.eps)
+  num / .np_normalization_denominator(den, "exact conditional bootstrap")
 }
 
 .np_ksum_conditional_eval_exact_oracle <- function(xdat,
@@ -9358,7 +9365,7 @@
     )$ksum
   )) / n.total
 
-  num / pmax(den, .Machine$double.eps)
+  num / .np_normalization_denominator(den, "exact conditional bootstrap oracle")
 }
 
 .np_conditional_exact_fit_or_stop <- function(fit.expr,
@@ -10316,7 +10323,8 @@
   evaluator <- function(counts.mat) {
     den <- t(ops$den %*% counts.mat)
     num <- t(ops$num %*% counts.mat)
-    num / NZD(den)
+    .np_bootstrap_ratio(num, den, "side-conditional bootstrap chunk",
+                        first.replication = NULL)
   }
 
   .np_inid_boot_from_conditional_count_evaluator(
@@ -10588,7 +10596,8 @@
           bws = bws,
           cdf = cdf
         )
-        rowSums(ops.local$num) / NZD(rowSums(ops.local$den))
+        rowSums(ops.local$num) / .np_normalization_denominator(
+          rowSums(ops.local$den), "exact side-conditional bootstrap")
       }
       if (identical(bws$type, "adaptive_nn")) {
         return(.np_conditional_exact_fit_or_stop(
@@ -10711,7 +10720,8 @@
                                                                counts.chunk) {
   den <- t(ops$den %*% counts.chunk)
   num <- t(ops$num %*% counts.chunk)
-  num / pmax(den, .Machine$double.eps)
+  .np_bootstrap_ratio(num, den, "conditional bootstrap chunk",
+                      first.replication = NULL)
 }
 
 .npRmpi_project_conditional_proper_values <- function(values,
@@ -10896,7 +10906,8 @@
   )
   if (is.null(ops))
     return(NULL)
-  t0 <- rowSums(ops$num) / pmax(rowSums(ops$den), .Machine$double.eps)
+  t0 <- rowSums(ops$num) / .np_normalization_denominator(
+    rowSums(ops$den), "conditional bootstrap original sample")
 
   use.mpi <- isTRUE(getOption("npRmpi.mpi.initialized", FALSE)) &&
     isTRUE(.npRmpi_has_active_slave_pool(comm = 1L))
@@ -10947,7 +10958,7 @@
     }
     den <- t(ops$den %*% counts.mat)
     num <- t(ops$num %*% counts.mat)
-    return(list(t = num / pmax(den, .Machine$double.eps), t0 = t0))
+    return(list(t = .np_bootstrap_ratio(num, den, "conditional bootstrap"), t0 = t0))
   }
 
   chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = !is.null(counts.drawer))
@@ -13315,7 +13326,7 @@ plotFactor <- function(f, y, ...){
       idx.eval = idx.eval,
       y = y,
       output = "apply",
-      ridge = 0.0
+      ridge = 0.0, allow.empty.rows = allow.empty.rows
     ))
   }
 

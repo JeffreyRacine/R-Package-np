@@ -56,6 +56,14 @@ These arguments request derivative hat operators with respect to continuous cond
 
 }
 \details{
+For the adaptive-nearest-neighbour local-constant (including degree-zero
+local-polynomial) ratio, every finite nonzero conditioning-weight sum is used
+without an epsilon floor. If all computed conditioning weights at an external
+evaluation row are zero, that row is returned as \code{NA} with a warning.
+This describes computed weights, not necessarily absence of geometric support.
+Zero response weights still give a valid zero numerator when the conditioning
+denominator is defined. Required internal and bootstrap ratios remain strict.
+
 For \code{output = "matrix"}, the return value is a matrix with class
 \code{c("npcdisthat", "matrix")} and attributes storing the bandwidth object,
 training data, evaluation data, and call metadata.

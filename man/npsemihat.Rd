@@ -107,6 +107,15 @@ constraint design matrix \eqn{\operatorname{diag}(y)H'} as represented in R by
 \code{t(H) * y}.
 }
 \details{
+For local-constant and degree-zero local-polynomial \code{npindexhat} means,
+every finite nonzero kernel-weight sum is used without an epsilon floor.
+An explicitly supplied external evaluation row with all computed weights zero
+returns \code{NA} with a warning, preserving its position in matrix and applied
+outputs. This does not distinguish geometric absence from weights that have
+underflowed. Signed cancellation and nonfinite normalizing sums are errors.
+Required internal and bootstrap computations do not omit undefined rows or
+replications.
+
 These operators are intended for fixed-\eqn{X} workflows such as one-shot wild
 bootstrap calculations where many response draws are projected through the same
 operator. The implementation is intentionally conservative: class and scalar

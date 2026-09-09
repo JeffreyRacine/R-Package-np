@@ -5,6 +5,14 @@
   failure is reported, allowing reuse of a healthy pool without publishing an
   incomplete result. Scheduling, task seeds and healthy computations are unchanged.
 
+* Single-index mean hats and affected bootstrap ratio helpers now normalize
+  finite signed and positive-small weight sums directly instead of flooring
+  them at machine epsilon. Empty external LC/degree-zero index and adaptive
+  conditional-hat rows return NA with one notice; undefined required ratios
+  fail without discarding or replacing bootstrap replications. LL/LP solves,
+  resampling laws, inference formulas and already-correct conditional ratios
+  are unchanged. Weights that underflow before summation are not recovered.
+
 * Local smooth-coefficient NOMAD searches now propagate unexpected fixed-bandwidth
   preparation errors instead of accepting a surviving candidate. Legitimate
   typed candidate rejection and the distributed preparation protocol are unchanged.
