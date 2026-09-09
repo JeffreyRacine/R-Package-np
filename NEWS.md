@@ -10,6 +10,11 @@
   denominators remain invalid; estimates and existing valid derivatives are
   unchanged.
 
+* Scalar conditional density and distribution standard errors now use the
+  squared-kernel moments of the chosen explanatory kernels and, for density,
+  response kernels separately. Mixed kernel families/orders no longer inherit
+  the response-kernel moment in every dimension. Point estimates are unchanged.
+
 * Single-index mean hats and affected bootstrap ratio helpers now normalize
   finite signed and positive-small weight sums directly instead of flooring
   them at machine epsilon. Empty external LC/degree-zero index and adaptive
