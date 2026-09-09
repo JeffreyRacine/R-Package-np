@@ -61,7 +61,8 @@ npconmode(bws, \dots)
 \method{npconmode}{formula}(bws, 
           data = NULL, 
           newdata = NULL, 
-          \dots)
+          \dots,
+          se = FALSE)
 
 \method{npconmode}{default}(bws, 
           txdat, 
@@ -72,7 +73,8 @@ npconmode(bws, \dots)
           probabilities = FALSE,
           gradients = FALSE,
           level = NULL,
-          \dots)
+          \dots,
+          se = FALSE)
 
 \method{npconmode}{conbandwidth}(bws,
           txdat = stop("invoked without training data 'txdat'"),
@@ -84,7 +86,8 @@ npconmode(bws, \dots)
           probabilities = FALSE,
           gradients = FALSE,
           level = NULL,
-          \dots)
+          \dots,
+          se = FALSE)
 
 \method{predict}{conmode}(object,
           newdata = NULL,
@@ -179,6 +182,21 @@ These arguments control where the conditional mode is evaluated.
     \code{se.fit}, containing the class-probability matrix and matching
     asymptotic standard-error matrix. Standard errors are for the smooth
     class-probability target, not for the discrete modal class label.
+  }
+
+  \item{se}{
+    a scalar logical controlling raw class-probability asymptotic
+    standard errors. Defaults to \code{FALSE}; class selection, fitted
+    probabilities and requested probability gradients are unchanged.
+    With \code{TRUE}, selected-probability errors are stored, together with
+    the full error matrix when probabilities are retained. This does not
+    add standard errors for the modal class label or probability gradients,
+    or change the existing unavailable-error treatment after projection.
+    To add uncertainty without repeating bandwidth search, use
+    \code{npconmode(bws=fit$bws, probabilities=TRUE, se=TRUE)}, supplying
+    the original training/evaluation data if needed. Prediction with new
+    evaluation rows and \code{se.fit=TRUE} requests this work explicitly;
+    prediction without evaluation rows only extracts stored results.
   }
 
 
@@ -330,6 +348,7 @@ prediction/evaluation route, or plot route as appropriate.
     estimates at each evaluation point}
   \item{conderr}{ a vector of numeric type containing asymptotic
     standard errors for the modal density estimates at each evaluation point.
+    This component is \code{NULL} when \code{se=FALSE}.
     If a row is materially properized by probability projection, this value is
     set to \code{NA} for that row rather than reporting a standard error for
     the unrepaired raw probability.}
@@ -353,7 +372,9 @@ prediction/evaluation route, or plot route as appropriate.
   \item{probability.errors}{ if \code{probabilities} are stored, a matrix of
     asymptotic standard errors for the raw selected-level conditional
     probability estimates, with rows set to \code{NA} where simplex projection
-    materially repaired the fitted probability vector }
+    materially repaired the fitted probability vector; omitted when
+    \code{se=FALSE} }
+  \item{se}{ whether probability uncertainty was requested }
   \item{probability.repaired.rows}{ if \code{probabilities} are stored, a
     logical vector identifying rows whose fitted probability vector was
     materially repaired by proper probability projection }

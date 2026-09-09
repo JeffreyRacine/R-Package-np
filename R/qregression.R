@@ -1,6 +1,6 @@
 qregression <- 
     function(bws, xeval, tau, quantile, quanterr = NA, quantgrad = NA, quantgerr = NA, ntrain, trainiseval = FALSE, gradients = FALSE,
-             timing = NA, total.time = NA, optim.time = NA, fit.time = NA){
+             timing = NA, total.time = NA, optim.time = NA, fit.time = NA, se = TRUE){
 
         if (missing(bws) || missing(xeval) || missing(tau) || missing(quantile) || missing(ntrain))
             stop("improper invocation of qregression constructor")
@@ -37,6 +37,7 @@ qregression <-
             ntrain = ntrain,
             trainiseval = trainiseval,
             gradients = gradients,
+            se = se,
             timing = timing, total.time = total.time,
             optim.time = optim.time, fit.time = fit.time)
 
@@ -102,6 +103,11 @@ quantile.qregression <- function(x, ...){ x$quantile }
 predict.qregression <- function(object, se.fit = FALSE, ...) {
   se.fit <- npValidateScalarLogical(se.fit, "se.fit")
   dots <- list(...)
+  if ("se" %in% names(dots) &&
+      !identical(npValidateScalarLogical(dots[["se"]], "se"), se.fit))
+    stop("conflicting 'se' and 'se.fit' requests; use se.fit to request prediction standard errors",
+         call. = FALSE)
+  dots[["se"]] <- se.fit
   has.formula.route <- !is.null(object$bws$formula)
 
   if (!is.null(dots$exdat) && !is.null(dots$newdata))
@@ -132,22 +138,39 @@ predict.qregression <- function(object, se.fit = FALSE, ...) {
     return(fitted(tr))
 }
 
+.npqreg_refit_tau <- function(x) {
+  tau <- x[["tau", exact = TRUE]]
+  if (!is.null(tau))
+    paste0("tau = ", paste(deparse(tau), collapse = ""))
+}
+
 se.qregression <- function(x) {
-  if (is.null(x$quanterr) || !length(x$quanterr))
-    stop("standard errors were not computed for this quantile regression", call. = FALSE)
-  x$quanterr
+  .np_require_stored_se(x, x[["quanterr", exact = TRUE]], "npqreg",
+                       what = "quantile standard errors", expr = substitute(x),
+                       data.hint = .npqreg_refit_tau(x))
 }
 gradients.qregression <- function(x, se = FALSE, ...) {
   .np_reject_gradient_order_alias(substitute(list(...))[-1L],
                                   "gradients.qregression")
   npRejectLegacyBooleanErrors(list(...), "gradients.qregression")
   se <- npValidateScalarLogical(se, "se")
-  gout <- if (!se) x$quantgrad else x$quantgerr
+  if (se) {
+    value <- x[["quantgerr", exact = TRUE]]
+    if (length(value) == 1L && is.logical(value) && is.na(value))
+      value <- NULL
+    return(.np_require_stored_se(
+      x, value, "npqreg",
+      what = "quantile gradient standard errors", expr = substitute(x),
+      switches = "gradients = TRUE, se = TRUE",
+      data.hint = .npqreg_refit_tau(x)
+    ))
+  }
+  gout <- x[["quantgrad", exact = TRUE]]
   if (is.null(gout) || (length(gout) == 1L && is.logical(gout) && is.na(gout)))
-    stop(if (!se)
-      "gradients are not available: fit the model with gradients=TRUE"
-    else
-      "gradient standard errors were not computed: fit the model with gradients=TRUE and se=TRUE")
+    stop(paste("gradients are not available.",
+               .np_se_refit_hint(substitute(x), "npqreg", "gradients = TRUE",
+                                 data.hint = .npqreg_refit_tau(x))),
+         call. = FALSE)
   gout
 }
 

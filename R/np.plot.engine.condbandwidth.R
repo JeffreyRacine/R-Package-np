@@ -308,6 +308,7 @@
 
       if (quantreg) {
         tobj <- .np_plot_quantile_eval(
+          need.errors = plot.behavior != "plot" || plot.errors.method == "asymptotic",
           txdat = xdat,
           tydat = ydat,
           exdat = x.eval,
@@ -824,6 +825,7 @@
 
         if (quantreg) {
           tobj <- .np_plot_quantile_eval(
+            need.errors = plot.behavior != "plot" || plot.errors.method == "asymptotic",
             txdat = xdat,
             tydat = ydat,
             exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
@@ -1236,6 +1238,7 @@
 
           if (quantreg) {
             tobj <- .np_plot_quantile_eval(
+              need.errors = plot.behavior != "plot" || plot.errors.method == "asymptotic",
               txdat = xdat,
               tydat = ydat,
               eydat = subcol(eydat,ei,i)[seq_len(xi.neval),, drop = FALSE],

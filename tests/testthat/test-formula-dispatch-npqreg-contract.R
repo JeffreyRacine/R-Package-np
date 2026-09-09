@@ -10,8 +10,8 @@ test_that("named bws formula dispatch matches explicit npqreg bandwidth route", 
   nd <- data.frame(x = c(0.2, 0.5, 0.8))
 
   bw <- npcdistbw(y ~ x, data = d)
-  fit.pos <- npqreg(bws = bw, data = d, newdata = nd, tau = 0.4)
-  fit.named <- npqreg(bws = y ~ x, data = d, newdata = nd, tau = 0.4)
+  fit.pos <- npqreg(bws = bw, data = d, newdata = nd, tau = 0.4, se = TRUE)
+  fit.named <- npqreg(bws = y ~ x, data = d, newdata = nd, tau = 0.4, se = TRUE)
 
   expect_s3_class(fit.named, "qregression")
   expect_equal(length(fit.named$quantile), nrow(nd), tolerance = 0)

@@ -13977,6 +13977,7 @@ plotFactor <- function(f, y, ...){
       exdat = exdat,
       tau = tau,
       gradients = TRUE,
+      need.errors = FALSE,
       lp.first.se.demand = FALSE,
       cat.se.demand = FALSE
     )$quantgrad
@@ -14520,6 +14521,7 @@ plotFactor <- function(f, y, ...){
                                    lp.first.se.demand = NULL,
                                    cat.se.demand = NULL,
                                    ...) {
+  need.errors <- npValidateScalarLogical(need.errors, "need.errors")
   if (inherits(bws, "lsqregressionbandwidth")) {
     return(.np_plot_lsqregression_eval(
       bws = bws,
@@ -14636,12 +14638,15 @@ plotFactor <- function(f, y, ...){
           itmax = itmax,
           comm = 1L,
           lp.first.se.demand = lp.first.se.demand,
-          cat.se.demand = if (isTRUE(need.errors)) cat.se.demand else FALSE
+          cat.se.demand = if (isTRUE(need.errors)) cat.se.demand else FALSE,
+          se = need.errors
         )
         myout <- .npqreg_fit_tau_vector_from_parallel_matrix(
           mat,
           tau = tau,
-          gradients = gradients
+          gradients = gradients,
+          se = need.errors,
+          expected.grad.cols = bws$xndim
         )
       } else {
         cdf.cache <- .npqreg_selected_cdf_cache_new(
@@ -14669,9 +14674,9 @@ plotFactor <- function(f, y, ...){
         if (!isTRUE(need.errors) && !isTRUE(gradients)) {
           return(list(
             yq = yq,
-            yqerr = rep.int(NA_real_, length(yq)),
+            yqerr = NULL,
             yqgrad = NA,
-            yqgerr = NA
+            yqgerr = NULL
           ))
         }
         qdelta <- .npqreg_quantile_delta_from_conditional(
@@ -14687,14 +14692,15 @@ plotFactor <- function(f, y, ...){
           itmax = itmax,
           cdf.cache = cdf.cache,
           lp.first.se.demand = lp.first.se.demand,
-          cat.se.demand = if (isTRUE(need.errors)) cat.se.demand else FALSE
+          cat.se.demand = if (isTRUE(need.errors)) cat.se.demand else FALSE,
+          se = need.errors
         )
         qdelta <- .npqreg_mark_clamped_delta(qdelta, qclamp)
         list(
           yq = yq,
           yqerr = qdelta$quanterr,
           yqgrad = if (gradients) qdelta$quantgrad else NA,
-          yqgerr = if (gradients) qdelta$quantgerr else NA
+          yqgerr = if (need.errors) { if (gradients) qdelta$quantgerr else NA } else NULL
         )
       }
 
@@ -14704,12 +14710,12 @@ plotFactor <- function(f, y, ...){
       } else {
         myout <- list(
           yq = do.call(cbind, lapply(tau.out, `[[`, "yq")),
-          yqerr = do.call(cbind, lapply(tau.out, `[[`, "yqerr")),
+          yqerr = if (need.errors) do.call(cbind, lapply(tau.out, `[[`, "yqerr")) else NULL,
           yqgrad = NA,
-          yqgerr = NA
+          yqgerr = if (need.errors) NA else NULL
         )
         colnames(myout$yq) <- tau.labels
-        colnames(myout$yqerr) <- tau.labels
+        if (need.errors) colnames(myout$yqerr) <- tau.labels
         if (gradients) {
           p <- ncol(tau.out[[1L]]$yqgrad)
           grad.names <- colnames(tau.out[[1L]]$yqgrad)
@@ -14718,14 +14724,14 @@ plotFactor <- function(f, y, ...){
             dim = c(enrow, p, ntau),
             dimnames = list(NULL, grad.names, tau.labels)
           )
-          myout$yqgerr <- array(
+          if (need.errors) myout$yqgerr <- array(
             NA_real_,
             dim = c(enrow, p, ntau),
             dimnames = list(NULL, grad.names, tau.labels)
           )
           for (j in seq_len(ntau)) {
             myout$yqgrad[, , j] <- tau.out[[j]]$yqgrad
-            myout$yqgerr[, , j] <- tau.out[[j]]$yqgerr
+            if (need.errors) myout$yqgerr[, , j] <- tau.out[[j]]$yqgerr
           }
         }
       }
@@ -14756,6 +14762,7 @@ plotFactor <- function(f, y, ...){
         ntrain = tnrow,
         trainiseval = no.ex,
         gradients = gradients,
+        se = need.errors,
         timing = bws$timing,
         total.time = total.time,
         optim.time = optim.time,

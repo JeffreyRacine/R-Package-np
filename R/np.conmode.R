@@ -46,7 +46,8 @@ npconmode <-
 }
 
 npconmode.formula <-
-  function(bws, data = NULL, newdata = NULL, ...){
+  function(bws, data = NULL, newdata = NULL, ..., se = FALSE){
+    se <- npValidateScalarLogical(se, "se")
 
     tt <- terms(bws)
     m <- match(c("formula", "data", "subset", "na.action"),
@@ -87,7 +88,7 @@ npconmode.formula <-
       eval.omit <- NULL
     }
     
-    cm.args <- list(txdat = txdat, tydat = tydat)
+    cm.args <- list(txdat = txdat, tydat = tydat, se = se)
     if (has.eval) {
       cm.args$exdat <- exdat
       if (has.ey)
@@ -247,18 +248,20 @@ npconmode.condbandwidth <-
   enrow <- nrow(pmat)
   nlev <- ncol(pmat)
   mdens <- rep(-Inf, enrow)
-  mderr <- rep(NA_real_, enrow)
+  mderr <- if (is.null(perr)) NULL else rep(NA_real_, enrow)
   indices <- integer(enrow)
   for (i in seq_len(nlev)) {
     tf <- is.finite(pmat[, i]) & pmat[, i] > 0 & pmat[, i] > mdens
     tf[is.na(tf)] <- FALSE
     indices[tf] <- i
     mdens[tf] <- pmat[tf, i]
-    mderr[tf] <- perr[tf, i]
+    if (!is.null(perr))
+      mderr[tf] <- perr[tf, i]
   }
   invalid <- indices == 0L
   mdens[invalid] <- NA_real_
-  mderr[invalid] <- NA_real_
+  if (!is.null(perr))
+    mderr[invalid] <- NA_real_
   list(indices = indices, condens = mdens, conderr = mderr)
 }
 
@@ -390,7 +393,9 @@ npconmode.condbandwidth <-
                                       efac,
                                       gradients,
                                       gradient.level.index,
-                                      direct.categorical.effects = FALSE) {
+                                      direct.categorical.effects = FALSE,
+                                      se = TRUE) {
+  se <- npValidateScalarLogical(se, "se")
   enrow <- nrow(xeval)
   nlev <- nlevels(efac)
   block.width <- .npConmodeLevelBlockWidth(
@@ -400,8 +405,8 @@ npconmode.condbandwidth <-
   )
   pmat <- matrix(NA_real_, enrow, nlev,
                  dimnames = list(NULL, levels(efac)))
-  perr <- matrix(NA_real_, enrow, nlev,
-                 dimnames = list(NULL, levels(efac)))
+  perr <- if (se) matrix(NA_real_, enrow, nlev,
+                         dimnames = list(NULL, levels(efac))) else NULL
   pgrad <- if (isTRUE(gradients)) {
     matrix(NA_real_, nrow = enrow, ncol = bws$xndim,
            dimnames = list(NULL, bws$xnames))
@@ -439,7 +444,7 @@ npconmode.condbandwidth <-
       eydat = rep(efac[block], each = enrow),
       bws = bws,
       gradients = block.gradients,
-      se = TRUE,
+      se = se,
       .np_lp_first_se_demand = FALSE,
       .np_conditional_cat_se_demand = FALSE,
       .np_categorical_effects = !isTRUE(direct.categorical.effects)
@@ -447,10 +452,11 @@ npconmode.condbandwidth <-
 
     expected <- as.double(enrow) * length(block)
     if (length(dens.obj$condens) != expected ||
-        length(dens.obj$conderr) != expected)
+        (se && length(dens.obj$conderr) != expected))
       stop("internal error: conditional-mode density block has invalid size")
     pmat[, block] <- matrix(dens.obj$condens, nrow = enrow)
-    perr[, block] <- matrix(dens.obj$conderr, nrow = enrow)
+    if (se)
+      perr[, block] <- matrix(dens.obj$conderr, nrow = enrow)
 
     if (block.gradients) {
       if (is.null(dens.obj$congrad))
@@ -473,7 +479,9 @@ npconmode.conbandwidth <-
             probabilities = FALSE,
             gradients = FALSE,
             level = NULL,
-            ...){
+            ..., se = FALSE){
+
+    se <- npValidateScalarLogical(se, "se")
     .npRmpi_require_active_slave_pool(where = "npconmode()")
 
     probabilities <- npValidateScalarLogical(probabilities, "probabilities")
@@ -572,7 +580,8 @@ npconmode.conbandwidth <-
       efac = efac,
       gradients = gradients,
       gradient.level.index = gradient.level.index,
-      direct.categorical.effects = direct.categorical.effects
+      direct.categorical.effects = direct.categorical.effects,
+      se = se
     )
     pmat <- level.fit$probabilities
     perr <- level.fit$errors
@@ -594,7 +603,8 @@ npconmode.conbandwidth <-
           xeval = z,
           efac = efac,
           gradients = FALSE,
-          gradient.level.index = gradient.level.index
+          gradient.level.index = gradient.level.index,
+          se = FALSE
         )
         endpoint.proper <- .npConmodeProperProbabilities(
           endpoint.fit$probabilities,
@@ -619,7 +629,8 @@ npconmode.conbandwidth <-
     indices <- select$indices
     mdens <- select$condens
     mderr <- select$conderr
-    mderr[proper.out$repaired.rows] <- NA_real_
+    if (se)
+      mderr[proper.out$repaired.rows] <- NA_real_
     cm.args <- list(
       bws = bws,
       xeval = if (no.ex) txdat else exdat,
@@ -631,13 +642,15 @@ npconmode.conbandwidth <-
       proper.requested = proper.out$proper.requested,
       proper.applied = proper.out$proper.applied,
       proper.info = proper.out$proper.info,
+      se = se,
       gradients = gradients
     )
     if (isTRUE(probabilities) || isTRUE(gradients)) {
       cm.args$probabilities <- proper.out$probabilities
       cm.args$probability.levels <- efac
       cm.args$probability.errors <- perr
-      cm.args$probability.errors[proper.out$repaired.rows, ] <- NA_real_
+      if (se)
+        cm.args$probability.errors[proper.out$repaired.rows, ] <- NA_real_
       cm.args$probability.repaired.rows <- proper.out$repaired.rows
       if (!no.ex) {
         cm.args$xtrain <- txdat
@@ -704,7 +717,8 @@ npconmode.default <- function(bws, txdat, tydat,
                               probabilities = FALSE,
                               gradients = FALSE,
                               level = NULL,
-                              ...){
+                              ..., se = FALSE){
+  se <- npValidateScalarLogical(se, "se")
   nomad <- npValidateNomadControl(nomad, "nomad")
   probabilities <- npValidateScalarLogical(probabilities, "probabilities")
   gradients <- npValidateScalarLogical(gradients, "gradients")
@@ -747,6 +761,7 @@ npconmode.default <- function(bws, txdat, tydat,
   sc.bw$proper.control <- NULL
   sc.bw$probabilities <- NULL
   sc.bw$gradients <- NULL
+  sc.bw$se <- NULL
   sc.bw$level <- NULL
   sc.bw$newdata <- NULL
   sc.bw$exdat <- NULL
@@ -821,6 +836,7 @@ npconmode.default <- function(bws, txdat, tydat,
   call.args$proper.control <- proper.control
   call.args$probabilities <- probabilities
   call.args$gradients <- gradients
+  call.args$se <- se
   call.args$level <- level
   do.call(npconmode, c(call.args, list(...)))
 }

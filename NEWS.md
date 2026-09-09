@@ -27,6 +27,13 @@
   object to obtain them without repeating search. Prediction with
   `se.fit=TRUE` requests the needed work explicitly.
 
+* Quantile and conditional-mode fits now accept named-only `se=FALSE`.
+  Uncertainty-only evaluation and storage are skipped by default, independently
+  of the existing gradient controls. Explicit prediction or asymptotic plot
+  requests enable their required errors; stored-result extractors give a
+  bandwidth-reusing refit instruction when uncertainty was omitted. Point
+  quantiles, class selection, probabilities and requested gradients are unchanged.
+
 * Ordinary scalar conditional categorical-gradient standard errors now use
   complete paired same-observation influences, including endpoint covariance.
   Requested errors use an additional streamed inference pass and can increase

@@ -233,7 +233,8 @@ test_that("npconmode binary class-probability gradients are stored and plotted",
       bwmethod = "cv.ls",
       nmulti = 1L,
       probabilities = TRUE,
-      gradients = TRUE
+      gradients = TRUE,
+      se = TRUE
     )
   )
 

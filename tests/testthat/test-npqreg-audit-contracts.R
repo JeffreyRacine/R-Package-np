@@ -95,7 +95,8 @@ test_that("npRmpi npqreg direct evaluation preserves NA rows for vector tau grad
     tydat = ydat,
     exdat = exdat,
     tau = c(0.25, 0.5),
-    gradients = TRUE
+    gradients = TRUE,
+    se = TRUE
   )
 
   expect_equal(dim(fit$quantile), c(3L, 2L))

@@ -15,8 +15,8 @@ test_that("npqreg basic functionality works", {
   expect_type(predict(model), "double")
   expect_equal(length(predict(model)), 50)
   expect_equal(model$tau, 0.5)
-  expect_error(gradients(model), "fit the model with gradients=TRUE", fixed = TRUE)
-  expect_error(gradients(model, se = TRUE), "fit the model with gradients=TRUE", fixed = TRUE)
+  expect_error(gradients(model), "gradients = TRUE", fixed = TRUE)
+  expect_error(gradients(model, se = TRUE), "gradients = TRUE, se = TRUE", fixed = TRUE)
   
   expect_output(summary(model))
 })
@@ -213,7 +213,7 @@ test_that("npqreg gradients populate qregression objects", {
   )
 
   fit <- npqreg(bws = bw, txdat = xdat, tydat = ydat, exdat = exdat,
-                tau = 0.45, gradients = TRUE, tol = 1e-6, small = 1e-7)
+                tau = 0.45, gradients = TRUE, se = TRUE, tol = 1e-6, small = 1e-7)
   ref <- getFromNamespace(".np_plot_quantile_eval", "npRmpi")(
     bws = bw,
     txdat = xdat,

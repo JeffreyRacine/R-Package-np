@@ -58,7 +58,8 @@ conmode =
            probability.gradient.info = NULL,
            xtrain = NULL,
            ytrain = NULL,
-           gradients = FALSE){
+           gradients = FALSE,
+           se = TRUE){
 
     if (missing(bws) || missing(xeval) || missing(conmode) || missing(condens) || missing(ntrain))
       stop("improper invocation of conmode constructor")
@@ -100,7 +101,8 @@ conmode =
       fit.mcfadden = fit.mcfadden,
       ntrain = ntrain,
       trainiseval = trainiseval,
-      gradients = gradients)
+      gradients = gradients,
+      se = se)
 
     if (!is.null(probabilities)) {
       d$probabilities <- probabilities
@@ -211,6 +213,11 @@ predict.conmode <- function(object,
     stop("predict.conmode(se.fit=TRUE) is available only for type=\"prob\"",
          call. = FALSE)
   dots <- list(...)
+  if ("se" %in% names(dots) &&
+      !identical(npValidateScalarLogical(dots[["se"]], "se"), se.fit))
+    stop("conflicting 'se' and 'se.fit' requests; use se.fit to request prediction standard errors",
+         call. = FALSE)
+  dots[["se"]] <- se.fit
   has.native.eval <- .npConmodePredictHasNativeEvalArgs(dots)
   has.native.ey <- "eydat" %in% names(dots) && !is.null(dots$eydat)
   if (isTRUE(has.native.ey) && !isTRUE(has.native.eval) && is.null(newdata))
@@ -223,12 +230,17 @@ predict.conmode <- function(object,
       return(object$conmode)
     probs <- object$probabilities
     if (is.null(probs))
-      stop("class probabilities are not stored: fit with probabilities=TRUE")
+      stop(paste0("class probabilities are not stored; ",
+                  .np_se_refit_hint(substitute(object), "npconmode",
+                                    switches = if (se.fit) "probabilities = TRUE, se = TRUE" else "probabilities = TRUE")),
+           call. = FALSE)
     if (isTRUE(se.fit)) {
-      se <- object$probability.errors
-      if (is.null(se))
-        stop("class-probability standard errors are not stored: refit with probabilities=TRUE")
-      return(list(fit = probs, se.fit = se))
+      errors <- .np_require_stored_se(
+        object, object[["probability.errors", exact = TRUE]], "npconmode",
+        what = "class-probability standard errors", expr = substitute(object),
+        switches = "probabilities = TRUE, se = TRUE"
+      )
+      return(list(fit = probs, se.fit = errors))
     }
     return(probs)
   }
