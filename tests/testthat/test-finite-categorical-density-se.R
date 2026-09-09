@@ -44,7 +44,7 @@ test_that("finite-category density SE uses complete contribution variance", {
     h <- c(.2,.35)
     bw <- npudensbw(dat=dat,bws=h,bandwidth.compute=FALSE,
                     bwtype=type,ukertype=uk,okertype=ok)
-    f <- npudens(bws=bw,tdat=dat,edat=edat)
+    f <- npudens(bws=bw,tdat=dat,edat=edat,se=TRUE)
     ref <- oracle(dat,edat,h,uk,ok)
     expect_equal(as.numeric(fitted(f)),ref$mean,tolerance=1e-12)
     expect_equal(as.numeric(se(f)),ref$se,tolerance=1e-12)
@@ -57,7 +57,7 @@ test_that("finite-category density SE uses complete contribution variance", {
     dat <- data.frame(a=factor(rep(c("a","a","b"),length.out=257L)))
     edat <- dat[rep(1:3,4L),,drop=FALSE]
     bw <- npudensbw(dat=dat,bws=h,bandwidth.compute=FALSE,bwtype=type)
-    f <- npudens(bws=bw,tdat=dat,edat=edat)
+    f <- npudens(bws=bw,tdat=dat,edat=edat,se=TRUE)
     ref <- oracle(dat,edat,h,"aitchisonaitken","racineliyan")
     expect_equal(as.numeric(se(f)),ref$se,tolerance=1e-12)
     if(h==.5) expect_true(all(se(f)==0))
@@ -71,7 +71,7 @@ for(tree in c(FALSE,TRUE))
     edat <- dat[rep(1:4,3L),,drop=FALSE]
     bw <- npudensbw(dat=dat,bws=1,bandwidth.compute=FALSE,
                     bwtype=type,okertype="racineliyan")
-    f <- npudens(bws=bw,tdat=dat,edat=edat)
+    f <- npudens(bws=bw,tdat=dat,edat=edat,se=TRUE)
     expect_true(all(se(f)==0))
     expect_equal(as.numeric(fitted(f)),rep(1/3,nrow(edat)),tolerance=1e-13)
   }

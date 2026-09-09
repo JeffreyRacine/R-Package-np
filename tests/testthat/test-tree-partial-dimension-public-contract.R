@@ -36,9 +36,9 @@ test_that("exact partial-dimension tree plan preserves public descendants", {
     bwtype = "fixed", ckertype = "epanechnikov"
   )
   options(np.tree = FALSE)
-  density_dense <- npudens(bws = density_bw)
+  density_dense <- npudens(bws = density_bw, se = TRUE)
   options(np.tree = TRUE)
-  density_tree <- npudens(bws = density_bw)
+  density_tree <- npudens(bws = density_bw, se = TRUE)
   for (field in c("dens", "derr", "log_likelihood"))
     expect_equal(density_tree[[field]], density_dense[[field]],
                  tolerance = 2e-11, info = paste("npudens", field))
@@ -49,9 +49,9 @@ test_that("exact partial-dimension tree plan preserves public descendants", {
     bwtype = "fixed", ckertype = "epanechnikov"
   )
   options(np.tree = FALSE)
-  distribution_dense <- npudist(bws = distribution_bw)
+  distribution_dense <- npudist(bws = distribution_bw, se = TRUE)
   options(np.tree = TRUE)
-  distribution_tree <- npudist(bws = distribution_bw)
+  distribution_tree <- npudist(bws = distribution_bw, se = TRUE)
   for (field in c("dist", "derr"))
     expect_equal(distribution_tree[[field]], distribution_dense[[field]],
                  tolerance = 2e-11, info = paste("npudist", field))

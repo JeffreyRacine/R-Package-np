@@ -5,7 +5,7 @@ test_that("manual order-2 beta distribution matches exact CDF contributions", {
   tau <- (1 / h)^2
 
   fit <- npudist(
-    bws = h, tdat = training, edat = evaluation,
+    bws = h, tdat = training, edat = evaluation, se = TRUE,
     ckertype = "beta", ckerorder = 2,
     ckerbound = "fixed", ckerlb = 0, ckerub = 1
   )
@@ -39,7 +39,7 @@ test_that("beta distribution supports dimensions, formulas, objects, and predict
     bws = c(0.14, 1.1), ckertype = "beta", ckerorder = 2,
     ckerbound = "fixed", ckerlb = c(0, -3), ckerub = c(1, 7)
   )
-  direct <- do.call(npudist, c(list(tdat = training, edat = evaluation), args))
+  direct <- do.call(npudist, c(list(tdat = training, edat = evaluation, se = TRUE), args))
   sums <- do.call(npksum, c(list(
     txdat = training, exdat = evaluation, operator = "integral",
     return.kernel.weights = TRUE
@@ -47,7 +47,7 @@ test_that("beta distribution supports dimensions, formulas, objects, and predict
   bw <- do.call(npudistbw, c(list(
     dat = training, bandwidth.compute = FALSE
   ), args))
-  object_fit <- npudist(bws = bw, tdat = training, edat = evaluation)
+  object_fit <- npudist(bws = bw, tdat = training, edat = evaluation, se = TRUE)
   formula_fit <- do.call(npudist, c(list(
     ~ x + y, data = training, newdata = evaluation
   ), args))

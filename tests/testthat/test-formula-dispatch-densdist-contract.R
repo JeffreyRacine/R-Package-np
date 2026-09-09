@@ -8,14 +8,14 @@ test_that("named bws formula dispatch matches positional density/distribution ro
   nd.c <- data.frame(x = c(0.2, 0.5, 0.8), y = c(0.25, 0.55, 0.85))
 
   bw.ud <- npudensbw(~ x, data = d)
-  ud.pos <- npudens(bws = bw.ud, newdata = nd.u)
-  ud.named <- npudens(bws = ~ x, data = d, newdata = nd.u)
+  ud.pos <- npudens(bws = bw.ud, newdata = nd.u, se = TRUE)
+  ud.named <- npudens(bws = ~ x, data = d, newdata = nd.u, se = TRUE)
   expect_equal(as.numeric(ud.named$dens), as.numeric(ud.pos$dens), tolerance = 0)
   expect_equal(as.numeric(ud.named$derr), as.numeric(ud.pos$derr), tolerance = 0)
 
   bw.udist <- npudistbw(~ x, data = d)
-  udist.pos <- npudist(bws = bw.udist, newdata = nd.u)
-  udist.named <- npudist(bws = ~ x, data = d, newdata = nd.u)
+  udist.pos <- npudist(bws = bw.udist, newdata = nd.u, se = TRUE)
+  udist.named <- npudist(bws = ~ x, data = d, newdata = nd.u, se = TRUE)
   expect_equal(as.numeric(udist.named$dist), as.numeric(udist.pos$dist), tolerance = 0)
   expect_equal(as.numeric(udist.named$derr), as.numeric(udist.pos$derr), tolerance = 0)
 

@@ -1,0 +1,32 @@
+test_that("unconditional SE requests preserve fits and no-search prediction", {
+  old <- options(np.messages = FALSE)
+  on.exit(options(old), add = TRUE)
+  dat <- data.frame(x = seq(-1, 1, length.out = 24L))
+  edat <- data.frame(x = c(-.7, .1, .8))
+  for (family in c("npudens", "npudist")) {
+    fun <- get(family, mode = "function")
+    bwfun <- get(paste0(family, "bw"), mode = "function")
+    bw <- bwfun(~ x, data = dat, bws = .3, bandwidth.compute = FALSE)
+    method <- getS3method(family, if (family == "npudens") "bandwidth" else "dbandwidth")
+    matched <- match.call(method, quote(f(bw, dat, edat, TRUE)), expand.dots = FALSE)
+    expect_identical(matched[["..."]][[1L]], TRUE)
+    expect_null(matched[["se"]])
+    off <- fun(bws = bw, newdata = edat)
+    on <- fun(bws = bw, newdata = edat, se = TRUE)
+    expect_identical(fitted(off), fitted(on))
+    expect_identical(off[["se", exact = TRUE]], FALSE)
+    expect_length(off[["derr", exact = TRUE]], 0L)
+    expect_length(se(on), nrow(edat))
+    expect_error(se(off), "without repeating bandwidth search", fixed = TRUE)
+    legacy <- on
+    legacy$se <- NULL
+    expect_identical(se(legacy), se(on))
+    predicted <- predict(off, newdata = edat, se.fit = TRUE)
+    expect_identical(predicted$fit, fitted(on))
+    expect_identical(predicted$se.fit, se(on))
+    expect_error(predict(off, se.fit = TRUE, se = FALSE), "conflicting")
+    expect_error(fun(bws = bw, se = NA), "se")
+    expect_error(fun(bws = bw, se = c(TRUE, FALSE)), "se")
+    expect_error(fun(bws = bw, se = "yes"), "se")
+  }
+})

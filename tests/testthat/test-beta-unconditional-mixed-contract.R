@@ -22,7 +22,7 @@ test_that("mixed beta density uses the canonical categorical row", {
         ckertype = "beta", ckerorder = order,
         ckerbound = "fixed", ckerlb = 0, ckerub = 1
       )
-      dense <- npudens(bws = bw, tdat = training, edat = evaluation)
+      dense <- npudens(bws = bw, tdat = training, edat = evaluation, se = TRUE)
       ## Density/distribution routes use the normalized ordered Li--Racine
       ## kernel.  npksum() names that explicit low-level variant nliracine.
       oracle_bw <- bw
@@ -35,7 +35,7 @@ test_that("mixed beta density uses the canonical categorical row", {
         kernel.pow = 2L
       )$ksum
       options(np.categorical.compress = TRUE)
-      compressed <- npudens(bws = bw, tdat = training, edat = evaluation)
+      compressed <- npudens(bws = bw, tdat = training, edat = evaluation, se = TRUE)
       options(np.categorical.compress = FALSE)
 
       expected <- as.vector(sum_one) / nrow(training)
@@ -73,7 +73,7 @@ test_that("mixed beta distribution uses the canonical categorical row", {
         ckertype = "beta", ckerorder = order,
         ckerbound = "fixed", ckerlb = 0, ckerub = 1
       )
-      dense <- npudist(bws = bw, tdat = training, edat = evaluation)
+      dense <- npudist(bws = bw, tdat = training, edat = evaluation, se = TRUE)
       oracle_bw <- bw
       oracle_bw[["okertype"]] <- "nliracine"
       weights <- npksum(
@@ -82,7 +82,7 @@ test_that("mixed beta distribution uses the canonical categorical row", {
         return.kernel.weights = TRUE
       )$kw
       options(np.categorical.compress = TRUE)
-      compressed <- npudist(bws = bw, tdat = training, edat = evaluation)
+      compressed <- npudist(bws = bw, tdat = training, edat = evaluation, se = TRUE)
       options(np.categorical.compress = FALSE)
 
       expected <- colMeans(weights)

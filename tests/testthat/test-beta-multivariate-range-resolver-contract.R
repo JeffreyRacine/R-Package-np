@@ -48,8 +48,8 @@ test_that("beta range resolves multiple coordinates independently", {
                    unname(expected$upper))
 
   evaluation <- training[c(1L, 3L, 5L, 7L, 8L), , drop = FALSE]
-  range.fit <- npudens(bws = range.bw, tdat = training, edat = evaluation)
-  fixed.fit <- npudens(bws = fixed.bw, tdat = training, edat = evaluation)
+  range.fit <- npudens(bws = range.bw, tdat = training, edat = evaluation, se = TRUE)
+  fixed.fit <- npudens(bws = fixed.bw, tdat = training, edat = evaluation, se = TRUE)
   expect_identical(fitted(range.fit), fitted(fixed.fit))
   expect_identical(se(range.fit), se(fixed.fit))
 
@@ -141,10 +141,10 @@ test_that("multivariate beta range matches padded fixed bounds unconditionally",
     ckerlb = expected$lower, ckerub = expected$upper
   )
   distribution.range <- npudist(
-    bws = distribution.range.bw, tdat = training, edat = evaluation
+    bws = distribution.range.bw, tdat = training, edat = evaluation, se = TRUE
   )
   distribution.fixed <- npudist(
-    bws = distribution.fixed.bw, tdat = training, edat = evaluation
+    bws = distribution.fixed.bw, tdat = training, edat = evaluation, se = TRUE
   )
   expect_identical(fitted(distribution.range), fitted(distribution.fixed))
   expect_identical(se(distribution.range), se(distribution.fixed))

@@ -4,7 +4,7 @@ test_that("nearest-neighbor beta density matches its kernel-sum contributions", 
 
   for (bwtype in c("generalized_nn", "adaptive_nn")) {
     fit <- npudens(
-      bws = 3, tdat = training, edat = evaluation,
+      bws = 3, tdat = training, edat = evaluation, se = TRUE,
       bwtype = bwtype, ckertype = "beta", ckerorder = 2,
       ckerbound = "fixed", ckerlb = 0, ckerub = 1
     )
@@ -31,7 +31,7 @@ test_that("nearest-neighbor beta distribution matches its CDF contributions", {
 
   for (bwtype in c("generalized_nn", "adaptive_nn")) {
     fit <- npudist(
-      bws = 3, tdat = training, edat = evaluation,
+      bws = 3, tdat = training, edat = evaluation, se = TRUE,
       bwtype = bwtype, ckertype = "beta", ckerorder = 2,
       ckerbound = "fixed", ckerlb = 0, ckerub = 1
     )

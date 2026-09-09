@@ -51,7 +51,7 @@ test_that("npudens direct formula numeric bws keeps formula out of data reentry"
     p <- as.numeric(prop.table(table(X)))
     avar.p <- p * (1 - p) / n
 
-    fit <- npudens(~ factor(X), bws = 0, ukertype = "aitchisonaitken")
+    fit <- npudens(~ factor(X), bws = 0, ukertype = "aitchisonaitken", se = TRUE)
     expect_equal(unique(fitted(fit)), p, tolerance = 1e-8)
     expect_equal(unique(se(fit))^2, avar.p, tolerance = 1e-8)
 
@@ -126,7 +126,7 @@ test_that("npudens categorical exact-zero standard errors use binomial proportio
     for (dat in list(unordered, ordered, mixed)) {
       bw <- npudensbw(dat = dat, bws = rep(0, ncol(dat)),
                       bandwidth.compute = FALSE)
-      fit <- npudens(bws = bw, tdat = dat)
+      fit <- npudens(bws = bw, tdat = dat, se = TRUE)
       expect_equal(fit$derr, cat_se_oracle(dat), tolerance = 1e-14)
     }
   })

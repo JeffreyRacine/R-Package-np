@@ -18,7 +18,7 @@ test_that("npudist all-ordered profile route preserves fitted distribution", {
       bandwidth.compute = FALSE,
       okertype = okertype
     )
-    dense <- npudist(bws = dense_bw)
+    dense <- npudist(bws = dense_bw, se = TRUE)
     options(old)
 
     old <- options(np.tree = FALSE, np.categorical.compress = TRUE)
@@ -29,7 +29,7 @@ test_that("npudist all-ordered profile route preserves fitted distribution", {
       bandwidth.compute = FALSE,
       okertype = okertype
     )
-    profile <- npudist(bws = profile_bw)
+    profile <- npudist(bws = profile_bw, se = TRUE)
     options(old)
 
     expect_equal(fitted(profile), fitted(dense), tolerance = 1e-12)
