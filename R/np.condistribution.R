@@ -102,6 +102,9 @@ npcdist.condbandwidth <-
     dots <- list(...)
     lp.first.se.demand <- .np_conditional_first_se_demand(
       dots[[".np_lp_first_se_demand", exact = TRUE]], bws$xncon)
+    cat.se.demand <- .np_conditional_cat_se_demand(
+      dots[[".np_conditional_cat_se_demand", exact = TRUE]],
+      bws$xnuno + bws$xnord)
     fit.start <- proc.time()[3]
     fit.progress.handoff <- isTRUE(dots$.np_fit_progress_handoff)
     gradients <- npValidateScalarLogical(gradients, "gradients")
@@ -349,6 +352,9 @@ npcdist.condbandwidth <-
     first.se.request <- .np_conditional_first_se_request(
       gradients, glp.gradient.partial, degree.engine, glp.gradient.order,
       glp.gradient.available, lp.first.se.demand)
+    cat.se.request <- .np_conditional_cat_se_request(
+      gradients, glp.gradient.partial, glp.categorical.effects,
+      bws, cat.se.demand)
 
     myopti <- list(
         num_obs_train = tnrow,
@@ -433,6 +439,7 @@ npcdist.condbandwidth <-
             as.integer(bernstein.engine),
             basis.code,
             first.se.request,
+            cat.se.request,
             PACKAGE = "np")
     ), continuous.names = c(bws[["xnames", exact = TRUE]][bws[["ixcon", exact = TRUE]]], bws[["ynames", exact = TRUE]][bws[["iycon", exact = TRUE]]]))
     names(myout)[1] <- "condist"

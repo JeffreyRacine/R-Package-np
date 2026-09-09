@@ -705,6 +705,7 @@
             exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
             gradients = gradients,
             lp.first.se.demand = if (plot.behavior != "plot") NULL else FALSE,
+            cat.se.demand = if (plot.behavior != "plot") NULL else FALSE,
             tau = tau,
             bws = bws
           )
@@ -718,6 +719,7 @@
             cdf = cdf,
             gradients = gradients,
             lp.first.se.demand = if (plot.behavior != "plot" || plot.errors.method == "asymptotic") NULL else FALSE,
+            cat.se.demand = if (plot.behavior != "plot" || plot.errors.method == "asymptotic") NULL else FALSE,
             gradient.order = gradient.order
           )
         }
@@ -994,6 +996,7 @@
               gradients = gradients,
               lp.first.se.demand = if (plot.behavior != "plot") NULL else FALSE,
               tau = tau,
+              cat.se.demand = if (plot.behavior != "plot") NULL else FALSE,
               bws = bws
             )
           } else {
@@ -1007,6 +1010,7 @@
               gradients = gradients,
               lp.first.se.demand = if (plot.behavior != "plot" || plot.errors.method == "asymptotic") NULL else FALSE,
               gradient.order = gradient.order,
+              cat.se.demand = if (plot.behavior != "plot" || plot.errors.method == "asymptotic") NULL else FALSE,
               proper = isTRUE(proper.args$proper.requested),
               proper.method = proper.args$proper.method,
               proper.control = proper.args$proper.control

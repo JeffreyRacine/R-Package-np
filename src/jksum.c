@@ -44939,6 +44939,323 @@ double *log_likelihood)
   return execution.status;
 }
 
+/* Complete paired conditional-category influences.  This invocation-local
+   post-pass never replaces point sums or reselects their computational owner. */
+typedef struct {
+  int n, m, bw, nc[2], nu[2], no[2], selected, distributed, status;
+  int *kc, *ku, *ko, *op[2], *categories[2], **ordered;
+  const int *mask;
+  double **train[3], **eval[3], **bandwidth_x, **bandwidth_y;
+  double *lambda, *vsf[2], **catvals[2];
+  double *den, *alt_den, *alt_num, *mean, **error;
+  NL *nodes;
+  int *dimensions;
+  double *weights[4], *sum, *psum, *scale, *ssq, *global_scale;
+  int *bad, *bpso[2], *gate_codes[2], *gate_ok[2];
+  double *gate_hmin[2], *gate_k0[2], **bw_view[2], *lambda_view[2];
+  double **train_view[3], **eval_view[3];
+  int **ordered_view;
+  NP_GateOverrideCtx gate[2];
+  NPConditionalSEProgressScope progress;
+} NPConditionalCategorySECall;
+
+static void np_conditional_category_se_cleanup(void *data, Rboolean jump)
+{
+  NPConditionalCategorySECall *call = (NPConditionalCategorySECall *)data;
+  (void)jump;
+  np_progress_conditional_se_end(&call->progress);
+  for(int i = 0; i < 4; ++i) {
+    free(call->weights[i]);
+    call->weights[i] = NULL;
+  }
+  for(int i = 0; i < 3; ++i) {
+    free(call->train_view[i]);
+    free(call->eval_view[i]);
+    call->train_view[i] = call->eval_view[i] = NULL;
+  }
+  for(int side = 0; side < 2; ++side) {
+    free(call->bpso[side]);
+    free(call->gate_codes[side]);
+    free(call->gate_ok[side]);
+    free(call->gate_hmin[side]);
+    free(call->gate_k0[side]);
+    free(call->bw_view[side]);
+    free(call->lambda_view[side]);
+    call->bpso[side] = call->gate_codes[side] = call->gate_ok[side] = NULL;
+    call->gate_hmin[side] = call->gate_k0[side] = NULL;
+    call->bw_view[side] = NULL;
+    call->lambda_view[side] = NULL;
+  }
+  free(call->ordered_view); call->ordered_view = NULL;
+  free(call->sum); call->sum = NULL;
+  free(call->psum); call->psum = NULL;
+  free(call->scale); call->scale = NULL;
+  free(call->ssq); call->ssq = NULL;
+  free(call->global_scale); call->global_scale = NULL;
+  free(call->bad); call->bad = NULL;
+}
+
+static int np_conditional_category_se_status(NPConditionalCategorySECall *call)
+{
+#ifdef MPI2
+  if(call->distributed)
+    MPI_Allreduce(MPI_IN_PLACE, &call->status, 1, MPI_INT, MPI_MAX, comm[1]);
+#endif
+  return call->status;
+}
+
+static void *np_conditional_category_se_alloc(NPConditionalCategorySECall *call,
+                                             size_t count, size_t size)
+{
+  void *out;
+  if(count == 0) count = 1;
+  if(size == 0 || count > SIZE_MAX / size) {
+    call->status = 1;
+    return NULL;
+  }
+  out = calloc(count, size);
+  if(out == NULL)
+    call->status = 1;
+  return out;
+}
+
+static int np_conditional_category_se_gate(NPConditionalCategorySECall *call,
+                                           const int side)
+{
+  const int nc = call->nc[side], nu = call->nu[side], no = call->no[side];
+  int *codes = call->gate_codes[side];
+  const NP_GateOverrideCtx *current = &np_gate_override_ctx;
+  for(int l = 0; l < nc; ++l)
+    codes[l] = call->kc[l] + OP_CFUN_OFFSETS[call->op[side][l]];
+  for(int l = 0; l < nu; ++l)
+    codes[nc+l] = call->ku[l] + OP_UFUN_OFFSETS[call->op[side][nc+l]];
+  for(int l = 0; l < no; ++l)
+    codes[nc+nu+l] = call->ko[l] + OP_OFUN_OFFSETS[call->op[side][nc+nu+l]];
+  if(np_gate_ctx_is_sane(current) &&
+     current->active == NP_GATE_CTX_OVERRIDE &&
+     np_gate_ctx_signature_matches(current, nc, nu, no,
+                                    codes, codes+nc, codes+nc+nu,
+                                    call->op[side])) {
+    call->gate[side] = *current;
+    return 0;
+  }
+  if(current->active == NP_GATE_CTX_DISABLE ||
+     (!np_partial_gate_features_enabled &&
+      current->active != NP_GATE_CTX_OVERRIDE)) {
+    call->gate[side].active = NP_GATE_CTX_DISABLE;
+    return 0;
+  }
+  if(nc > 0 && np_largeh_enabled() &&
+     !np_cont_largeh_build_params(call->n, call->m, nc, codes,
+                                  call->train[2], call->eval[2],
+                                  np_cont_largeh_rel_tol(),
+                                  &call->gate_ok[side],
+                                  &call->gate_hmin[side],
+                                  &call->gate_k0[side]))
+    return 1;
+  np_gate_ctx_set(&call->gate[side], nc, nu, no,
+                  codes, codes+nc, codes+nc+nu, call->op[side],
+                  call->gate_ok[side], call->gate_hmin[side],
+                  call->gate_k0[side], NULL, NULL, NULL, NULL);
+  return 0;
+}
+
+static SEXP np_conditional_category_se_body(void *data)
+{
+  NPConditionalCategorySECall *call = (NPConditionalCategorySECall *)data;
+  const int adaptive = call->bw == BW_ADAP_NN;
+  const int natural = adaptive ? call->n : call->m;
+  int start = 0, stop = natural, done = 0;
+  int capacity;
+  size_t plane;
+  const int dimensions[3] = {call->nu[0], call->no[0], call->nc[0]};
+  int total;
+#ifdef MPI2
+  call->distributed = call->distributed && iNum_Processors > 1 &&
+    !np_mpi_local_regression_active();
+  if(call->distributed) {
+    start = (int)(((int64_t)natural * my_rank) / iNum_Processors);
+    stop = (int)(((int64_t)natural * (my_rank+1)) / iNum_Processors);
+  }
+#else
+  call->distributed = 0;
+#endif
+  if(call->n <= 0 || call->m <= 0 || call->selected <= 0 ||
+     call->selected > INT_MAX / 3 ||
+     stop-start > (INT_MAX-1) / (3*call->selected))
+    call->status = 1;
+  if(np_conditional_category_se_status(call))
+    return R_NilValue;
+  capacity = adaptive ? MAX(1, call->n / call->m) : 1;
+  plane = adaptive ? (size_t)capacity*(size_t)call->m : (size_t)call->n;
+  total = 3*call->selected*(stop-start) + 1;
+  for(int i = 0; i < 4; ++i)
+    call->weights[i] = np_conditional_category_se_alloc(call, plane, sizeof(double));
+  for(int i = 0; i < 3; ++i) {
+    call->train_view[i] = np_conditional_category_se_alloc(
+      call, (size_t)dimensions[i], sizeof(double *));
+    call->eval_view[i] = np_conditional_category_se_alloc(
+      call, (size_t)dimensions[i], sizeof(double *));
+  }
+  call->ordered_view = np_conditional_category_se_alloc(
+    call, (size_t)call->no[0], sizeof(int *));
+  call->sum = np_conditional_category_se_alloc(call, (size_t)call->m, sizeof(double));
+  call->psum = np_conditional_category_se_alloc(call, (size_t)call->m, sizeof(double));
+  call->scale = np_conditional_category_se_alloc(call, (size_t)call->m, sizeof(double));
+  call->ssq = np_conditional_category_se_alloc(call, (size_t)call->m, sizeof(double));
+  call->global_scale = np_conditional_category_se_alloc(call, (size_t)call->m, sizeof(double));
+  call->bad = np_conditional_category_se_alloc(call, (size_t)call->m, sizeof(int));
+  for(int side = 0; side < 2; ++side) {
+    const int nvar = call->nc[side] + call->nu[side] + call->no[side];
+    call->bpso[side] = np_conditional_category_se_alloc(call, (size_t)nvar, sizeof(int));
+    call->gate_codes[side] = np_conditional_category_se_alloc(call, (size_t)nvar, sizeof(int));
+    call->bw_view[side] = np_conditional_category_se_alloc(
+      call, (size_t)call->nc[side], sizeof(double *));
+    call->lambda_view[side] = np_conditional_category_se_alloc(
+      call, (size_t)(call->nu[side]+call->no[side]), sizeof(double));
+  }
+  if(np_conditional_category_se_status(call))
+    return R_NilValue;
+  for(int side = 0; side < 2; ++side) {
+    const int yu = call->nu[0]-call->nu[1], yo = call->no[0]-call->no[1];
+    for(int l = 0; l < call->nu[side]; ++l)
+      call->lambda_view[side][l] = l < call->nu[1] ?
+        call->lambda[yu+yo+l] : call->lambda[l-call->nu[1]];
+    for(int l = 0; l < call->no[side]; ++l)
+      call->lambda_view[side][call->nu[side]+l] = l < call->no[1] ?
+        call->lambda[yu+yo+call->nu[1]+l] : call->lambda[yu+l-call->no[1]];
+    if(np_conditional_category_se_gate(call, side))
+      call->status = 1;
+  }
+  if(np_conditional_category_se_status(call))
+    return R_NilValue;
+  /* The final unit covers reductions/output, including empty MPI owners. */
+  for(int category = 0; category < call->nu[1]+call->no[1]; ++category) {
+    const int grad = call->nc[1]+category;
+    if(!call->mask[category]) continue;
+    memset(call->scale, 0, (size_t)call->m*sizeof(double));
+    memset(call->ssq, 0, (size_t)call->m*sizeof(double));
+    memset(call->bad, 0, (size_t)call->m*sizeof(int));
+    for(int j = 0; j < call->m; ++j) {
+      const size_t endpoint = (size_t)grad*call->m+j;
+      call->bad[j] = !R_FINITE(call->mean[j]) ||
+        !R_FINITE(call->den[j]) || call->den[j] == 0.0 ||
+        !R_FINITE(call->alt_den[endpoint]) || call->alt_den[endpoint] == 0.0 ||
+        !R_FINITE(call->alt_num[endpoint]/call->alt_den[endpoint]);
+    }
+    for(int first = start; first < stop; first += capacity) {
+      const int count = MIN(capacity, stop-first);
+      const int nt = adaptive ? count : call->n;
+      const int ne = adaptive ? call->m : 1;
+      for(int i = 0; i < 3; ++i)
+        for(int l = 0; l < dimensions[i]; ++l) {
+          call->train_view[i][l] = call->train[i][l] + (adaptive ? first : 0);
+          call->eval_view[i][l] = call->eval[i][l] + (adaptive ? 0 : first);
+        }
+      for(int l = 0; l < call->no[0]; ++l)
+        call->ordered_view[l] = call->ordered == NULL ? NULL :
+          call->ordered[l] + (adaptive ? 0 : first);
+      for(int side = 0; side < 2; ++side) {
+        const int nc = call->nc[side], nu = call->nu[side], no = call->no[side];
+        const int coordinate = category < call->nu[1] ?
+          nc+category : nc+nu+category-call->nu[1];
+        NPPermutationWeightOutput permutation =
+          np_pkw_output_make(call->weights[2*side+1], 1);
+        memset(call->bpso[side], 0, (size_t)(nc+nu+no)*sizeof(int));
+        call->bpso[side][coordinate] = 1;
+        for(int l = 0; l < nc; ++l) {
+          double *full = l < call->nc[1] ? call->bandwidth_x[l] :
+            call->bandwidth_y[l-call->nc[1]];
+          call->bw_view[side][l] = full + (call->bw == BW_FIXED ? 0 : first);
+        }
+        np_progress_conditional_se_offset(&call->progress, done);
+        if(kernel_weighted_sum_np_ctx_ex(
+             call->kc, call->ku, call->ko, call->bw, nt, ne, nu, no, nc,
+             0, 0, 1, 1, 1, 0, 0, 0, 0, call->op[side], OP_NOOP,
+             0, 1, call->bpso[side], 1, 0, 0, int_TREE_XY, side,
+             kdt_extern_XY, side ? call->nodes : NULL,
+             side ? call->dimensions : NULL, NULL,
+             call->train_view[0], call->train_view[1], call->train_view[2],
+             call->eval_view[0], call->eval_view[1], call->eval_view[2],
+             NULL, NULL, NULL, call->vsf[side], 1,
+             call->bw_view[side], call->bw_view[side], call->lambda_view[side],
+             call->categories[side], call->catvals[side], call->ordered_view,
+             call->sum, call->psum, call->weights[2*side], &call->gate[side],
+             NULL, NULL, NULL, NULL,
+
+             &permutation) != 0) {
+          call->status = 2;
+          break;
+        }
+        done += count;
+        if(call->progress.active)
+          np_progress_fit_step(call->progress.base + done);
+      }
+      if(call->status) break;
+      for(int row = 0; row < count; ++row) {
+        const int je = adaptive ? call->m : 1;
+        for(int j = 0; j < je; ++j) {
+          const int evaluation = adaptive ? j : first;
+          const size_t endpoint = (size_t)grad*call->m+evaluation;
+          const double d = call->den[evaluation], da = call->alt_den[endpoint];
+          const double ma = call->alt_num[endpoint]/da;
+          const int donors = adaptive ? 1 : call->n;
+          if(call->bad[evaluation]) continue;
+          for(int i = 0; i < donors; ++i) {
+            const size_t index = adaptive ? (size_t)row*call->m+j : (size_t)i;
+            const double q =
+              (call->weights[0][index]-call->mean[evaluation]*call->weights[2][index])/d -
+              (call->weights[1][index]-ma*call->weights[3][index])/da;
+            const double a = fabs(q);
+            if(!R_FINITE(q)) {
+              call->bad[evaluation] = 1;
+              break;
+            }
+            if(a == 0.0) continue;
+            if(call->scale[evaluation] < a) {
+              const double ratio = call->scale[evaluation]/a;
+              call->ssq[evaluation] = 1.0 + call->ssq[evaluation]*ratio*ratio;
+              call->scale[evaluation] = a;
+            } else {
+              const double ratio = a/call->scale[evaluation];
+              call->ssq[evaluation] += ratio*ratio;
+            }
+          }
+        }
+        ++done;
+        if(call->progress.active)
+          np_progress_fit_step(call->progress.base + done);
+      }
+    }
+    if(np_conditional_category_se_status(call))
+      return R_NilValue;
+#ifdef MPI2
+    if(call->distributed) {
+      MPI_Allreduce(call->scale, call->global_scale, call->m,
+                    MPI_DOUBLE, MPI_MAX, comm[1]);
+      for(int j = 0; j < call->m; ++j) {
+        const double ratio = call->global_scale[j] > 0.0 ?
+          call->scale[j]/call->global_scale[j] : 0.0;
+        call->ssq[j] *= ratio*ratio;
+        call->scale[j] = call->global_scale[j];
+      }
+      MPI_Allreduce(MPI_IN_PLACE, call->ssq, call->m,
+                    MPI_DOUBLE, MPI_SUM, comm[1]);
+      MPI_Allreduce(MPI_IN_PLACE, call->bad, call->m,
+                    MPI_INT, MPI_MAX, comm[1]);
+    }
+#endif
+    for(int j = 0; j < call->m; ++j) {
+      const double se = call->n <= 1 ? 0.0 :
+        call->scale[j]*sqrt(((double)call->n/(call->n-1))*call->ssq[j]);
+      call->error[grad][j] = !call->bad[j] && R_FINITE(se) ? se : NA_REAL;
+    }
+  }
+  if(call->progress.active)
+    np_progress_fit_step(call->progress.base + total);
+  return R_NilValue;
+}
+
 void np_kernel_estimate_con_dens_dist_categorical(
 int KERNEL_Y,
 int KERNEL_unordered_Y,
@@ -44975,7 +45292,10 @@ double * log_likelihood,
 const NPContinuousKernelRoute *kernel_route,
 NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
 int categorical_compress,
-const NPNNGeometryContext *nn_geometry_context
+const NPNNGeometryContext *nn_geometry_context,
+const int *cat_se_mask,
+int cat_se_distributed,
+int *cat_se_status
 ){
 
   /* Ordinary generalized-NN callers supply explicit query identity; fixed,
@@ -45014,6 +45334,12 @@ const NPNNGeometryContext *nn_geometry_context
 
   const int do_grad = (kdf_deriv != NULL); 
   const int do_gerr = (kdf_deriv_stderr != NULL);
+  NPConditionalCategorySECall cat_se_call = {0};
+  int cat_se_selected = 0;
+  if(cat_se_status != NULL) *cat_se_status = 0;
+  if(cat_se_mask != NULL && do_grad && do_gerr)
+    for(int category = 0; category < num_X_unordered+num_X_ordered; ++category)
+      cat_se_selected += cat_se_mask[category] != 0;
 
   struct th_table * otabs = NULL;
   struct th_entry * ret = NULL;
@@ -45318,6 +45644,21 @@ const NPNNGeometryContext *nn_geometry_context
                                             kdf_stderr,
                                             log_likelihood))
     goto cleanup_con_dens_dist_categorical;
+
+  if(cat_se_selected > 0) {
+    const int natural = BANDWIDTH_den == BW_ADAP_NN ? num_obs_train : num_obs_eval;
+    int owned = natural;
+#ifdef MPI2
+    if(cat_se_distributed && iNum_Processors > 1 &&
+       !np_mpi_local_regression_active())
+      owned = (int)(((int64_t)natural*(my_rank+1))/iNum_Processors) -
+        (int)(((int64_t)natural*my_rank)/iNum_Processors);
+#endif
+    if(cat_se_selected <= INT_MAX/3 &&
+       owned <= (INT_MAX-1)/(3*cat_se_selected))
+      np_progress_conditional_se_begin(&cat_se_call.progress,
+                                       3*cat_se_selected*owned + 1);
+  }
 
   // xy
   np_progress_fit_set_offset(0);
@@ -45636,6 +45977,35 @@ const NPNNGeometryContext *nn_geometry_context
     }
 
 
+  }
+
+  if(cat_se_selected > 0) {
+    const NPConditionalSEProgressScope saved_progress = cat_se_call.progress;
+    cat_se_call = (NPConditionalCategorySECall){
+      .n = num_obs_train, .m = num_obs_eval, .bw = BANDWIDTH_den,
+      .nc = {num_cXY, num_X_continuous},
+      .nu = {num_uXY, num_X_unordered}, .no = {num_oXY, num_X_ordered},
+      .selected = cat_se_selected, .distributed = cat_se_distributed,
+      .kc = kernel_cXY, .ku = kernel_uXY, .ko = kernel_oXY,
+      .op = {operator_XY, operator_X},
+      .categories = {num_categories_XY,
+                      num_categories+num_Y_unordered+num_Y_ordered},
+      .ordered = matrix_ordered_indices, .mask = cat_se_mask,
+      .train = {matrix_XY_unordered_train, matrix_XY_ordered_train,
+                matrix_XY_continuous_train},
+      .eval = {matrix_XY_unordered_eval, matrix_XY_ordered_eval,
+               matrix_XY_continuous_eval},
+      .bandwidth_x = matrix_bandwidth_X, .bandwidth_y = matrix_bandwidth_Y,
+      .lambda = lambda, .vsf = {vsf_XY, vsf_X},
+      .catvals = {matrix_categorical_vals_XY,
+                   matrix_categorical_vals+num_Y_unordered+num_Y_ordered},
+      .den = ksd, .alt_den = permd, .alt_num = permn, .mean = kdf,
+      .error = kdf_deriv_stderr, .nodes = &nls, .dimensions = icX,
+      .progress = saved_progress
+    };
+    R_UnwindProtect(np_conditional_category_se_body, &cat_se_call,
+                     np_conditional_category_se_cleanup, &cat_se_call, NULL);
+    if(cat_se_status != NULL) *cat_se_status = cat_se_call.status;
   }
 
 cleanup_con_dens_dist_categorical:

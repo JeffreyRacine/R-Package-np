@@ -1,5 +1,13 @@
 # np 0.80-1
 
+* Ordinary scalar conditional categorical-gradient standard errors now use
+  complete paired same-observation influences, including endpoint covariance.
+  Requested errors use an additional streamed inference pass and can increase
+  fit time when categorical uncertainty is retained with `gradients=TRUE`.
+  Point estimates, gradients, bandwidth selection and computational selectors
+  are unchanged. The default `gradients=FALSE` and internal point-only and
+  bootstrap consumers do not request this additional work.
+
 * Conditional local-polynomial fits now retain available first-derivative
   standard errors when other requested derivatives exceed their fitted
   degrees. Existing point gradients, higher-order availability and computational

@@ -244,6 +244,7 @@ predict.condistribution <- function(object, se.fit = FALSE, ...) {
   }
 
   dots[[".np_lp_first_se_demand"]] <- FALSE
+  dots[[".np_conditional_cat_se_demand"]] <- FALSE
   tr <- do.call(npcdist, c(list(bws = object$bws), dots))
   if(se.fit)
     return(list(fit = fitted(tr), se.fit = se(tr), 

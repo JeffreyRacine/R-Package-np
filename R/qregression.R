@@ -116,6 +116,7 @@ predict.qregression <- function(object, se.fit = FALSE, ...) {
   }
   if (is.null(dots$tau))
     dots$tau <- object$tau
+  dots[[".np_conditional_cat_se_demand"]] <- FALSE
   tr <- do.call(npqreg, c(list(bws = object$bws), dots))
   if(se.fit)
     return(list(fit = fitted(tr), se.fit = se(tr), 

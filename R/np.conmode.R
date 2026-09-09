@@ -440,6 +440,7 @@ npconmode.condbandwidth <-
       bws = bws,
       gradients = block.gradients,
       .np_lp_first_se_demand = FALSE,
+      .np_conditional_cat_se_demand = FALSE,
       .np_categorical_effects = !isTRUE(direct.categorical.effects)
     )
 
