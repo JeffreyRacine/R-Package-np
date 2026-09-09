@@ -281,7 +281,8 @@
 
       if (plot.behavior != "plot"){
         d1 <- npdistribution(bws = bws, eval = x.eval,
-                             dist = tobj$dist, derr = terr[,1:2], ntrain = nrow(xdat))
+                             dist = tobj$dist, derr = terr[,1:2],
+                             ntrain = nrow(xdat), se = plot.errors)
         d1$bias = NA
         d1$bias.corrected = NA
 
@@ -673,7 +674,7 @@
             eval = eval.slice,
             dist = na.omit(temp.dens),
             derr = na.omit(cbind(-temp.err[,1], temp.err[,2])),
-            ntrain = bws$nobs
+            ntrain = bws$nobs, se = plot.errors
           )
           plot.out[[i]]$bias = NA
           plot.out[[i]]$bias.corrected = NA

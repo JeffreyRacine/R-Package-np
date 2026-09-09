@@ -69,7 +69,8 @@ npudens.formula <-
     ev$neval.omit <- if (length(eval.omit)) length(eval.omit) else 0L
 
     ev$dens <- napredict(ev$omit, ev$dens)
-    ev$derr <- napredict(ev$omit, ev$derr)
+    if (isTRUE(ev[["se", exact = TRUE]]))
+      ev$derr <- napredict(ev$omit, ev$derr)
 
     return(ev)
   }
@@ -83,8 +84,9 @@ npudens.call <-
 npudens.bandwidth <-
   function(bws,
            tdat = stop("invoked without training data 'tdat'"),
-           edat, ...){
+           edat, ..., se = FALSE){
 
+  se <- npValidateScalarLogical(se, "se")
   dots <- list(...)
   fit.start <- proc.time()[3]
   fit.progress.handoff <- isTRUE(dots$.np_fit_progress_handoff)
@@ -253,19 +255,22 @@ npudens.bandwidth <-
           as.integer(enrow),
           as.double(cker.bounds.c$lb),
           as.double(cker.bounds.c$ub),
+          se,
           PACKAGE = "npRmpi")
   ), continuous.names = bws[["xnames", exact = TRUE]][bws[["icon", exact = TRUE]]])
 
   ## For purely categorical density with zero bandwidths, the variance of
   ## the sample proportion is p(1-p)/n. The C routine returns p/n; fix here.
-  cat.mask <- rep(FALSE, length(bws$bw))
-  if (isTRUE(bws$nuno > 0L))
-    cat.mask <- cat.mask | bws$iuno
-  if (isTRUE(bws$nord > 0L))
-    cat.mask <- cat.mask | bws$iord
-  if (bws$ncon == 0 && any(cat.mask) && all(bws$bw[cat.mask] == 0)) {
-    p <- pmin(pmax(myout$dens, 0), 1)
-    myout$derr <- sqrt(p * (1 - p) / tnrow)
+  if (se) {
+    cat.mask <- rep(FALSE, length(bws$bw))
+    if (isTRUE(bws$nuno > 0L))
+      cat.mask <- cat.mask | bws$iuno
+    if (isTRUE(bws$nord > 0L))
+      cat.mask <- cat.mask | bws$iord
+    if (bws$ncon == 0 && any(cat.mask) && all(bws$bw[cat.mask] == 0)) {
+      p <- pmin(pmax(myout$dens, 0), 1)
+      myout$derr <- sqrt(p * (1 - p) / tnrow)
+    }
   }
 
   fit.elapsed <- proc.time()[3] - fit.start
@@ -279,11 +284,12 @@ npudens.bandwidth <-
                   train.rows.omit = train.rows.omit,
                   eval.rows.omit = if (no.e) integer(0) else eval.rows.omit,
                   timing = bws$timing, total.time = total.time,
-                  optim.time = optim.time, fit.time = fit.elapsed)
+                  optim.time = optim.time, fit.time = fit.elapsed, se = se)
   return(ev)
 }
 
-npudens.default <- function(bws, tdat, ...){
+npudens.default <- function(bws, tdat, ..., se = FALSE){
+  se <- npValidateScalarLogical(se, "se")
   .npRmpi_require_active_slave_pool(where = "npudens()")
   bws.formula.early <- (!missing(bws)) && inherits(bws, "formula")
   tdat.formula.early <- (!missing(tdat)) && inherits(tdat, "formula")
@@ -349,7 +355,7 @@ npudens.default <- function(bws, tdat, ...){
   }
 
   ## convention: first argument is always dropped, second, if present, propagated
-  call.args <- list(bws = tbw)
+  call.args <- list(bws = tbw, se = se)
   if (!no.tdat && !direct.formula.tdat) {
     if (tdat.named) {
       call.args$tdat <- tdat

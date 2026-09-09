@@ -27,14 +27,19 @@ npudens(bws,
 \method{npudens}{bandwidth}(bws,
         tdat = stop("invoked without training data 'tdat'"),
         edat,
-        \dots)
+        \dots,
+        se = FALSE)
 
 \method{npudens}{default}(bws, 
         tdat, 
-        \dots)
+        \dots,
+        se = FALSE)
 }
 
 \arguments{
+  \item{se}{Logical; compute and retain asymptotic standard errors when
+    \code{TRUE}. The default \code{FALSE} skips uncertainty-only computation
+    without changing the point estimates.}
 \subsection{Data, Bandwidth Inputs And Formula Interface}{
 These arguments identify the bandwidth specification, formula/data interface, and training data.
 }
@@ -253,6 +258,13 @@ Further arguments are passed to \code{\link{npudensbw}} when bandwidths are comp
 
 }
 \value{
+  Standard errors are retained only when \code{se = TRUE}. They can be added
+  later without repeating bandwidth selection, for example
+  \code{npudens(bws = object$bws, se = TRUE)}. Supply the original training
+  and evaluation data as needed if they cannot be recovered from the bandwidth
+  object's call. The \code{se()} extractor never recomputes results and gives
+  this refit guidance when errors were not retained.
+  Prediction with \code{se.fit = TRUE} requests the required computation.
 
   \code{npudens} returns a \code{npdensity} object. The generic accessor
   functions \code{\link{fitted}}, and \code{\link{se}}, extract
@@ -264,7 +276,9 @@ Further arguments are passed to \code{\link{npudensbw}} when bandwidths are comp
 
   \item{eval}{ the evaluation points. }
   \item{dens}{ estimation of the density at the evaluation points }
-  \item{derr}{ standard errors of the density estimates }
+  \item{derr}{Standard errors of the density estimates when
+    \code{se = TRUE}, otherwise an empty numeric vector.}
+  \item{se}{Whether standard errors were requested for this fit.}
   \item{log_likelihood}{ aggregate fitted-density log likelihood. Every
     represented strictly positive density estimate, including a positive
     subnormal value, contributes its literal logarithm. An exact zero or

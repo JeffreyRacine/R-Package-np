@@ -1,5 +1,13 @@
 # npRmpi 0.80-1
 
+* Unconditional density and distribution fitting now accept named
+  `se=FALSE` by default, skipping uncertainty-only computation while preserving
+  point estimates. Use `se=TRUE` to retain asymptotic standard errors or
+  `predict(..., se.fit=TRUE)` to request prediction errors. Extracting absent
+  errors gives guidance for refitting with the existing bandwidth object,
+  without repeating bandwidth search. Asymptotic plot and copula consumers
+  continue to request the uncertainty they need.
+
 * Ordinary scalar conditional categorical-gradient standard errors now use
   complete paired same-observation influences, including endpoint covariance.
   Requested errors use an additional streamed inference pass and can increase
