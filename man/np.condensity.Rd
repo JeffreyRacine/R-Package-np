@@ -364,7 +364,10 @@ Further arguments are passed to \code{\link{npcdensbw}} when bandwidths are comp
   \eqn{m}, the level variance is
   \eqn{\{n/(n-1)\}\sum_i [a_i(z_i-m)]^2}, using the full training count
   \eqn{n}. Supported continuous-derivative errors use the corresponding
-  differentiated influence. These calculations hold the selected bandwidth
+  differentiated influence. Categorical contrasts use the difference of the
+  two endpoints' observation influences inside the same squared norm, thereby
+  retaining their covariance; self-contrasts have zero variance.
+  These calculations hold the selected bandwidth
   state fixed; they do not add bandwidth-selection or random-NN-radius
   uncertainty, and do not replace positive-degree LP covariance.
 

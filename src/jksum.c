@@ -9342,6 +9342,94 @@ np_beta_regression_moment_rows_dispatch(
  * already-prepared training-profile context.  Additional workspace is
  * O(n_eval + number of categorical coordinates).
  */
+/* The conditional public caller owns one response-evaluation row. Its
+ * primary signed-log workspace is complete before and after each existing
+ * categorical endpoint dispatch. Retain the first endpoint's influence in
+ * the already-owned coefficient buffer, then form the paired norm without
+ * another kernel row, factor division, or covariance-matrix allocation. */
+static NPContinuousKernelRowStatus
+np_beta_conditional_categorical_influence_row(
+  const NPContinuousKernelRowWorkspace *workspace,
+  const NPContinuousKernelRowResult *row_result,
+  const double *response,
+  const int num_train,
+  const int omitted_observation,
+  const double mean,
+  double *level_influence,
+  double *paired_stderr)
+{
+  double total = 0.0;
+  double scale = 0.0;
+  double sum_squares = 1.0;
+  double *weights;
+  const int count = num_train - (omitted_observation >= 0 ? 1 : 0);
+  int observation;
+
+  if(workspace == NULL || row_result == NULL || response == NULL ||
+     level_influence == NULL || num_train <= 0 ||
+     omitted_observation < -1 || omitted_observation >= num_train ||
+     workspace->capacity < (size_t)num_train ||
+     workspace->primary_log_absolute == NULL ||
+     workspace->primary_sign == NULL || !R_FINITE(mean) ||
+     !R_FINITE(row_result->total_log_scale) ||
+     (paired_stderr != NULL && row_result->row == NULL))
+    return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+  /* The categorical provider overwrites this row scratch on its next call.
+   * Its complete signed-log channels are separate and remain unchanged. */
+  weights = paired_stderr == NULL ? level_influence : row_result->row;
+  for(observation = 0; observation < num_train; ++observation) {
+    const double weight = observation == omitted_observation ||
+      workspace->primary_sign[observation] == 0 ? 0.0 :
+      (double)workspace->primary_sign[observation] * exp(
+        workspace->primary_log_absolute[observation] -
+        row_result->total_log_scale);
+
+    if(!R_FINITE(weight))
+      return NP_CONTINUOUS_ROW_ERR_NUMERIC;
+    total += weight;
+    weights[observation] = weight;
+  }
+  if(!R_FINITE(total) || total == 0.0)
+    return total == 0.0 ? NP_CONTINUOUS_ROW_ERR_ZERO_WEIGHT :
+      NP_CONTINUOUS_ROW_ERR_NUMERIC;
+  if(paired_stderr == NULL) {
+    for(observation = 0; observation < num_train; ++observation) {
+      level_influence[observation] =
+        (level_influence[observation] / total) *
+        (response[observation] - mean);
+      if(!R_FINITE(level_influence[observation]))
+        return NP_CONTINUOUS_ROW_ERR_NUMERIC;
+    }
+    return NP_CONTINUOUS_ROW_OK;
+  }
+  if(count <= 1) {
+    *paired_stderr = 0.0;
+    return NP_CONTINUOUS_ROW_OK;
+  }
+  for(observation = 0; observation < num_train; ++observation) {
+    const double influence = level_influence[observation] -
+      (weights[observation] / total) * (response[observation] - mean);
+    const double absolute = fabs(influence);
+
+    if(!R_FINITE(absolute))
+      return NP_CONTINUOUS_ROW_ERR_NUMERIC;
+    if(absolute != 0.0) {
+      if(scale < absolute) {
+        const double ratio = scale / absolute;
+        sum_squares = 1.0 + sum_squares * ratio * ratio;
+        scale = absolute;
+      } else {
+        const double ratio = absolute / scale;
+        sum_squares += ratio * ratio;
+      }
+    }
+  }
+  *paired_stderr = scale * sqrt(sum_squares *
+    ((double)count / (double)(count - 1)));
+  return R_FINITE(*paired_stderr) ? NP_CONTINUOUS_ROW_OK :
+    NP_CONTINUOUS_ROW_ERR_NUMERIC;
+}
+
 static NPContinuousKernelRowStatus
 np_beta_regression_categorical_gradients_validated(
   const NPContinuousKernelRowPlan *plan,
@@ -9367,6 +9455,8 @@ np_beta_regression_categorical_gradients_validated(
   NPContinuousKernelRowStatus status = NP_CONTINUOUS_ROW_OK;
   const int do_gerr = gradient_stderr != NULL;
   const int ordinary_hc0 = hc0_scaled_residual != NULL;
+  const int paired_influence = do_gerr && standard_error_mode ==
+    NP_REGRESSION_STDERR_CONDITIONAL_INFLUENCE;
   NPContinuousKernelLogFactorProvider provider;
   NPContinuousKernelLogFactorProvider level_provider;
   NPBetaScaledRowCategoricalContext level_context;
@@ -9393,6 +9483,7 @@ np_beta_regression_categorical_gradients_validated(
      (nunordered + nordered) <= 0 ||
      context == NULL || response == NULL || workspace == NULL ||
      row_result == NULL || mean == NULL || gradient == NULL ||
+     (paired_influence && plan->num_eval != 1) ||
      (preserve_gradient != 0 && preserve_gradient != 1) ||
      (ordinary_hc0 &&
       (!do_gerr || !R_FINITE(hc0_residual_scale) ||
@@ -9444,6 +9535,15 @@ np_beta_regression_categorical_gradients_validated(
   level_provider.function = np_beta_categorical_log_factor;
   level_provider.context = &level_context;
 
+  if(paired_influence) {
+    status = np_beta_conditional_categorical_influence_row(
+      workspace, row_result, response, plan->num_train,
+      leave_one_out ? leave_one_out_offset : -1, mean[0],
+      level_coefficient, NULL);
+    if(status != NP_CONTINUOUS_ROW_OK)
+      goto cleanup;
+  }
+
   for(coordinate = 0; coordinate < nunordered; ++coordinate) {
     const int output_coordinate = plan->num_continuous + coordinate;
 
@@ -9472,6 +9572,11 @@ np_beta_regression_categorical_gradients_validated(
           hc0_residual_scale, workspace, row_result,
           level_coefficient, (size_t)plan->num_train,
           gradient_stderr[output_coordinate], diagnostics);
+    if(status == NP_CONTINUOUS_ROW_OK && paired_influence)
+      status = np_beta_conditional_categorical_influence_row(
+        workspace, row_result, response, plan->num_train,
+        leave_one_out ? leave_one_out_offset : -1, alternate_mean[0],
+        level_coefficient, gradient_stderr[output_coordinate]);
     context->dense_spec.eval_unordered = eval_unordered;
     if(context->use_compressed)
       context->compressed_spec.eval_unordered = eval_unordered;
@@ -9482,7 +9587,7 @@ np_beta_regression_categorical_gradients_validated(
       if(!preserve_gradient)
         gradient[output_coordinate][evaluation] =
           mean[evaluation] - alternate_mean[evaluation];
-      if(do_gerr && !ordinary_hc0)
+      if(do_gerr && !ordinary_hc0 && !paired_influence)
         gradient_stderr[output_coordinate][evaluation] = sqrt(
           mean_stderr[evaluation] * mean_stderr[evaluation] +
           alternate_stderr[evaluation] * alternate_stderr[evaluation]);
@@ -9546,6 +9651,11 @@ np_beta_regression_categorical_gradients_validated(
           hc0_residual_scale, workspace, row_result,
           level_coefficient, (size_t)plan->num_train,
           gradient_stderr[output_coordinate], diagnostics);
+    if(status == NP_CONTINUOUS_ROW_OK && paired_influence)
+      status = np_beta_conditional_categorical_influence_row(
+        workspace, row_result, response, plan->num_train,
+        leave_one_out ? leave_one_out_offset : -1, alternate_mean[0],
+        level_coefficient, gradient_stderr[output_coordinate]);
     context->dense_spec.eval_ordered = eval_ordered;
     if(context->use_compressed)
       context->compressed_spec.eval_ordered = eval_ordered;
@@ -9557,7 +9667,7 @@ np_beta_regression_categorical_gradients_validated(
         gradient[output_coordinate][evaluation] =
           (double)direction[evaluation] *
           (mean[evaluation] - alternate_mean[evaluation]);
-      if(do_gerr && !ordinary_hc0)
+      if(do_gerr && !ordinary_hc0 && !paired_influence)
         gradient_stderr[output_coordinate][evaluation] = sqrt(
           mean_stderr[evaluation] * mean_stderr[evaluation] +
           alternate_stderr[evaluation] * alternate_stderr[evaluation]);
@@ -24712,18 +24822,17 @@ static int NP_NOINLINE np_regression_conditional_influence_finish(
       const double alternate_mean =
         permuted_weighted_sums[(size_t)predictor * 3U] /
         alternate_denominator;
-      double alternate_stderr;
-
       if(!R_FINITE(alternate_mean))
         return 0;
       for(observation = 0; observation < num_obs_train; ++observation)
         NP_ACCUMULATE_SQUARE(
-          alternate_weights[observation] *
+          (kernel_weights[observation] / denominator) *
+          (response[observation] - mean[0]) -
+          (alternate_weights[observation] / alternate_denominator) *
           (response[observation] - alternate_mean));
-      alternate_stderr = influence_scale * sqrt(influence_sum_squares *
-        ((double)num_obs_train / (double)(num_obs_train - 1))) /
-        fabs(alternate_denominator);
-      gradient_stderr[predictor][0] = hypot(mean_stderr[0], alternate_stderr);
+      gradient_stderr[predictor][0] = influence_scale *
+        sqrt(influence_sum_squares *
+             ((double)num_obs_train / (double)(num_obs_train - 1)));
     }
     if(!R_FINITE(gradient_stderr[predictor][0]))
       return 0;
