@@ -21,6 +21,14 @@
   response kernels separately. Mixed kernel families/orders no longer inherit
   the response-kernel moment in every dimension. Point estimates are unchanged.
 
+* Pure-categorical density standard errors now use the empirical variance
+  of the complete joint-category kernel contributions, instead of the
+  continuous-density approximation. Constant contributions have zero
+  standard error, and zero-smoothing probabilities retain the existing
+  binomial convention. Density estimates, search, categorical shortcuts,
+  and mixed/continuous density uncertainty are unchanged. The correction
+  reuses existing kernel rows with bounded moment storage.
+
 * Master-local bootstrap and hat fanout computation errors now use the same
   per-chunk condition handling as workers. Scheduled replies are drained before
   failure is reported, allowing reuse of a healthy pool without publishing an

@@ -153,6 +153,17 @@ Further arguments are passed to \code{\link{npudensbw}} when bandwidths are comp
   with zero reported when \eqn{n=1}. This contribution-based expression
   automatically respects the changing boundary shape.
 
+  When all variables are categorical, uncertainty uses the complete
+  joint-category contributions \eqn{Z_i(x)} produced by the selected kernel
+  computation. With \eqn{\bar Z(x)=n^{-1}\sum_i Z_i(x)}, the empirical-population
+  convention is
+  \deqn{\widehat{\mathrm{se}}\{\hat f(x)\}=
+    \frac{1}{n}\sqrt{\sum_{i=1}^n\{Z_i(x)-\bar Z(x)\}^2}.}
+  Thus zero smoothing retains \eqn{\sqrt{\hat p(x)(1-\hat p(x))/n}},
+  while exactly constant contributions have zero standard error.
+  Category-profile compression includes the original observation counts;
+  it does not treat distinct profiles as equally frequent observations.
+
   Argument groups for bandwidth selection are documented on
   \code{\link{npudensbw}}. The most common workflow is to choose data
   and bandwidth inputs first, then bandwidth criterion and
