@@ -1,5 +1,10 @@
 # npRmpi 0.80-1
 
+* Scalar conditional categorical-gradient standard errors involving beta
+  kernels now use paired same-observation influences at the two endpoints,
+  including their covariance. Self-contrasts have zero error by construction;
+  point effects, level errors and positive-degree LP covariance are unchanged.
+
 * Scalar conditional beta-kernel influence standard errors now use the global
   sample-covariance factor n/(n-1), correcting an extra division by n in level
   and supported derivative variances. Conditional point estimates, ordinary

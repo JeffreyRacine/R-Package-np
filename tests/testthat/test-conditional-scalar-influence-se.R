@@ -19,6 +19,48 @@ test_that("conditional beta response allows a zero explanatory derivative total"
     # Do not exercise the separately deferred native-unwind pool cleanup here.
   }
 })
+test_that("scalar conditional categorical errors pair same-sample influences", {
+  n <- 25L
+  for (beta.x in c(FALSE, TRUE)) for (ordered in c(FALSE, TRUE)) {
+    group <- factor(rep(c("a","b","c"), length.out=n), ordered=ordered)
+    x <- if(beta.x) data.frame(x=seq(.05,.95,length.out=n),u=group) else data.frame(u=group)
+    y <- data.frame(y=.03+.94*((seq_len(n)*7L) %% (n+1L))/(n+1L))
+    ex <- if(beta.x) data.frame(x=rep(.37,3L),u=factor(c("a","b","c"),levels=levels(group),ordered=ordered))
+      else data.frame(u=factor(c("a","b","c"),levels=levels(group),ordered=ordered))
+    ey <- data.frame(y=rep(.43,3L))
+    lambda <- if(ordered) .25 else 0
+    args <- list(xdat=x,ydat=y,bws=c(.15,if(beta.x) .2,lambda),
+      bandwidth.compute=FALSE,regtype="lc",oxkertype="wangvanryzin",
+      cxkertype=if(beta.x) "beta" else "gaussian",cykertype=if(beta.x) "gaussian" else "beta")
+    args <- c(args,if(beta.x) list(cxkerbound="fixed",cxkerlb=0,cxkerub=1)
+      else list(cykerbound="fixed",cykerlb=0,cykerub=1))
+    bw <- do.call(npcdensbw,args)
+    fit <- npcdens(bws=bw,txdat=x,tydat=y,exdat=ex,eydat=ey,gradients=TRUE)
+    beta.row <- function(train,point,h) as.vector(npksum(bws=h,
+      txdat=data.frame(v=train),exdat=data.frame(v=point),ckertype="beta",
+      ckerbound="fixed",ckerlb=0,ckerub=1,return.kernel.weights=TRUE)$kw)
+    continuous <- if(beta.x) beta.row(x$x,.37,.2) else rep(1,n)
+    z <- if(beta.x) dnorm((.43-y$y)/.15)/.15 else beta.row(y$y,.43,.15)
+    endpoint <- function(level) {
+      distance <- abs(as.integer(group)-level)
+      category <- if(ordered) ifelse(distance==0,1-lambda,.5*(1-lambda)*lambda^distance)
+        else ifelse(distance==0,1-lambda,lambda/2)
+      w <- continuous*category
+      a <- w/sum(w); m <- sum(a*z)
+      list(m=m,u=a*(z-m))
+    }
+    for (level in 1:3) {
+      alternate <- if(ordered) if(level==1L) 2L else level-1L else 1L
+      a <- endpoint(level); b <- endpoint(alternate)
+      expected <- sqrt(n/(n-1)*sum((a$u-b$u)^2))
+      direction <- if(ordered && level==1L) -1 else 1
+      expect_equal(fit$congrad[level,ncol(x)],direction*(a$m-b$m),tolerance=3e-10)
+      expect_equal(fit$congerr[level,ncol(x)],expected,tolerance=3e-10)
+    }
+    if(!ordered) expect_equal(unname(fit$congerr[1L,ncol(x)]),0,tolerance=3e-10)
+    else expect_equal(fit$congerr[1L,ncol(x)],fit$congerr[2L,ncol(x)],tolerance=3e-10)
+  }
+})
 
 test_that("scalar conditional beta influence errors use sample covariance scaling", {
   for (n in c(12L, 25L)) for (beta.x in c(FALSE, TRUE)) {
