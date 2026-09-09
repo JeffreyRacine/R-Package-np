@@ -4,11 +4,17 @@ test_that("pure-ordered CDF SE uses joint contribution variance", {
   on.exit(options(old),add=TRUE)
   contribution <- function(tr,ev,h,kind,nlevels) {
     if(kind=="wangvanryzin") {
-      # This freezes the incumbent CDF contribution, not a claim that its
-      # upper-tail formula is the integral of the WVR probability mass.
-      d <- abs(outer(tr,ev,"-"))
-      return(ifelse(outer(tr,ev,"=="),1-.5*h,
-                    ifelse(outer(tr,ev,">"),.5*h^d,1-h^d)))
+      # Independent PMF addition around the symmetry anchor. The assembled
+      # W1 producer corrects the formerly decreasing upper-tail contribution.
+      return(vapply(ev,function(threshold) vapply(tr,function(center) {
+        pmf <- function(z) ifelse(z==center,1-h,
+                                 .5*(1-h)*h^abs(z-center))
+        anchor <- .5+.5*pmf(center)
+        if(threshold==center) return(anchor)
+        if(threshold>center)
+          return(anchor+sum(pmf(seq.int(center+1L,threshold))))
+        anchor-sum(pmf(seq.int(threshold+1L,center)))
+      },0.),numeric(length(tr))))
     }
     vapply(ev,function(e) vapply(tr,function(t) {
       support <- if(kind=="racineliyan") seq_len(nlevels) else (-120L):120L
