@@ -19546,7 +19546,11 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
         .eval_to_train = train_is_eval ? &mapped_train_index : NULL
       };
       const NPNNGeometryContext * const row_nn_geometry_context_ptr =
-        (BANDWIDTH_den_extern == BW_GEN_NN) && !beta_y_active ?
+        /* Ordinary X occurrence identity does not depend on the Y kernel.
+         * Beta X retains its prepared geometry; categorical-only X has no radius. */
+        (BANDWIDTH_den_extern == BW_GEN_NN) &&
+        (!beta_y_active ||
+         (kernel_route == NULL && num_reg_continuous_extern > 0)) ?
           &row_nn_geometry_context : NULL;
       if(prepared_x_bandwidth_ptr != NULL)
         prepared_x_bandwidth.evaluation_offset = j;

@@ -31784,7 +31784,8 @@ NPRegressionLPEmptyRows *empty_rows){
   }
 
   categorical_matrix_bandwidth = matrix_bandwidth;
-  if(kernel_route == NULL && BANDWIDTH_reg == BW_GEN_NN && do_grad &&
+  if(lp_engine_est == NP_LP_ENGINE_GENERAL &&
+     kernel_route == NULL && BANDWIDTH_reg == BW_GEN_NN && do_grad &&
      (num_reg_unordered + num_reg_ordered > 0) &&
      nn_geometry_context != NULL &&
      nn_geometry_context->mode != NP_NN_QUERY_EXTERNAL) {

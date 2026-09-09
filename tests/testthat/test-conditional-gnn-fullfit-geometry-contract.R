@@ -92,3 +92,60 @@ test_that("conditional generalized-NN full fits use exact query geometry", {
   expect_equal(result$status, 0L, info=info)
   expect_true(any(grepl(ok_tag, result$output, fixed=TRUE)), info=info)
 })
+
+test_that("beta response does not erase ordinary-X training occurrence identity", {
+  if (!spawn_mpi_slaves(1L)) skip("MPI slaves unavailable")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  old <- options(np.messages = FALSE, np.tree = FALSE)
+  on.exit(options(old), add = TRUE)
+  n <- 17L
+  i <- seq_len(n)
+  x <- data.frame(x = .05 + .9*(i/18)^1.2,
+                  z = .04 + .92*((i*7L) %% 23L)/23)
+  y <- .03 + .94*((i*11L) %% 23L)/23
+  radius <- function(v, target, k, omitted = integer()) {
+    sort(abs(v[setdiff(seq_along(v), omitted)] - target),
+         method = "radix")[[k]]
+  }
+  for (distribution in c(FALSE, TRUE)) {
+    for (kind in c("lc", "ll", "partial")) {
+      args <- list(xdat = x, ydat = data.frame(y = y),
+        bws = c(8, 6, 7), bandwidth.compute = FALSE,
+        bwtype = "generalized_nn", bwscaling = FALSE,
+        cxkertype = "gaussian", cykertype = "beta",
+        cykerbound = "fixed", cykerlb = 0, cykerub = 1,
+        regtype = if (kind == "partial") "lp" else kind)
+      if (kind == "partial")
+        args <- c(args, list(degree = c(1L, 0L), basis = "additive"))
+      bw <- do.call(if (distribution) npcdistbw else npcdensbw, args)
+      for (external in c(FALSE, TRUE)) {
+        expected <- vapply(i, function(j) {
+          omitted <- if (external) integer() else j
+          hx <- c(radius(x$x, x$x[j], 6L, omitted),
+                  radius(x$z, x$z[j], 7L, omitted))
+          # The beta-response radius retains its own full-support convention.
+          hy <- radius(y, y[j], 8L)
+          tau <- 1/hy^2
+          response <- if (distribution)
+            pbeta(y[j], 1+y*tau, 1+(1-y)*tau) else
+            dbeta(y, 1+y[j]*tau, 1+(1-y[j])*tau)
+          w <- dnorm((x$x-x$x[j])/hx[1L])/hx[1L] *
+            dnorm((x$z-x$z[j])/hx[2L])/hx[2L]
+          design <- matrix(1, n, 1L)
+          if (kind != "lc")
+            design <- cbind(design, x$x-x$x[j])
+          if (kind == "ll")
+            design <- cbind(design, x$z-x$z[j])
+          coefficient <- solve(crossprod(design, w*design),
+                               crossprod(design, w*response))
+          coefficient[1L]
+        }, numeric(1L))
+        fit.args <- list(bws = bw, txdat = x, tydat = data.frame(y = y))
+        if (external)
+          fit.args <- c(fit.args, list(exdat = x, eydat = data.frame(y = y)))
+        fit <- do.call(if (distribution) npcdist else npcdens, fit.args)
+        expect_equal(as.double(fitted(fit)), expected, tolerance = 2e-10)
+      }
+    }
+  }
+})
