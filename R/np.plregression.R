@@ -202,8 +202,10 @@ npplreg.call <-
   XtX.inv <- matrix(0.0, nrow = p, ncol = p)
   XtX.inv[qrX$pivot, qrX$pivot] <- XtX.inv.pivoted
 
-  sigma2 <- sum((response - train.fit)^2) / (nrow(X) - p - as.integer(zdim))
-  vcov <- sigma2 * XtX.inv
+  # Factor the heteroskedastic sandwich as a crossproduct of coefficient
+  # influences, preserving the existing residuals and finite-sample factor.
+  scores <- (X %*% XtX.inv) * (response - train.fit)
+  vcov <- crossprod(scores) * (nrow(X) / (nrow(X) - p - as.integer(zdim)))
 
   list(
     coef = beta,
