@@ -27,4 +27,21 @@ static double np_conditional_kernel_square_product(
   return product_x * product_y;
 }
 
+/* Integral of the square of the analytic derivative implemented by
+ * np_deriv_gauss{2,4,6,8}/np_deriv_epan{2,4,6,8}. Values use the actual
+ * polynomial coefficients and Epanechnikov support (-sqrt(5),sqrt(5)).
+ * Independent polynomial/quadrature checks are in the SE theory packet.
+ * Uniform has no ordinary smooth-kernel derivative theorem and is excluded.
+ */
+static double np_conditional_kernel_derivative_square_integral(const int kernel)
+{
+  static const double moment[8] = {
+    0.14104739588693907, 0.48485042336135320,
+    0.97865405056318600, 1.5972429562844692,
+    0.13416407864998742, 0.83852549282614142,
+    2.5679843227599548, 5.7779647262104845
+  };
+  return kernel >= 0 && kernel < 8 ? moment[kernel] : NAN;
+}
+
 #endif
