@@ -65,7 +65,7 @@ beta_conditional_oracle <- function(x_weights, y_weights) {
   denominator <- colSums(x_weights)
   estimate <- colSums(x_weights * y_weights) / denominator
   influence <- x_weights * sweep(y_weights, 2L, estimate, "-")
-  stderr <- sqrt(colSums(influence^2) / (nrow(x_weights) - 1L)) /
+  stderr <- sqrt(nrow(x_weights) * colSums(influence^2) / (nrow(x_weights) - 1L)) /
     abs(denominator)
   list(estimate = estimate, stderr = stderr)
 }
@@ -655,7 +655,7 @@ test_that("beta Y uses the canonical conditional scalar and LP engine", {
         sweep(y_weights, 2L, scalar_expected$estimate, "-") -
       sweep(normalized, 2L, scalar_gradient, "*")
     scalar_gradient_stderr <- sqrt(
-      colSums(gradient_influence^2) / (nrow(x_weights) - 1L)
+      nrow(x_weights) * colSums(gradient_influence^2) / (nrow(x_weights) - 1L)
     )
     expect_equal(fitted(scalar), scalar_expected$estimate, tolerance = 2e-8)
     expect_equal(se(scalar), scalar_expected$stderr, tolerance = 2e-8)
@@ -853,7 +853,7 @@ test_that("adaptive beta-Y gradients preserve independent predictor planes", {
       derivative_normalized * sweep(response, 2L, expected$estimate, "-") -
       sweep(normalized, 2L, expected_gradient[, dimension], "*")
     expected_gradient_stderr[, dimension] <- sqrt(
-      colSums(influence^2) / (nrow(training_x) - 1L)
+      nrow(training_x) * colSums(influence^2) / (nrow(training_x) - 1L)
     )
   }
 

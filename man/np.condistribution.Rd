@@ -356,6 +356,16 @@ Further arguments are passed to \code{\link{npcdistbw}} when bandwidths are comp
   conditional CDFs are also the object inverted by \code{\link{npqreg}}
   when computing conditional quantiles.
 
+  Scalar conditional fits involving beta kernels use the empirical
+  observation-influence covariance. For normalized explanatory weights
+  \eqn{a_i}, response-kernel contributions \eqn{z_i}, and fitted value
+  \eqn{m}, the level variance is
+  \eqn{\{n/(n-1)\}\sum_i [a_i(z_i-m)]^2}, using the full training count
+  \eqn{n}. Supported continuous-derivative errors use the corresponding
+  differentiated influence. These calculations hold the selected bandwidth
+  state fixed; they do not add bandwidth-selection or random-NN-radius
+  uncertainty, and do not replace positive-degree LP covariance.
+
   For book-length derivations, see Li and Racine (2007), Chapter 6
   \emph{Conditional CDF and Quantile Estimation}, especially Sections 6.1,
   6.2, and 6.5, together with Chapter 5 \emph{Conditional Density
