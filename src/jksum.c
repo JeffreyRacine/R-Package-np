@@ -2411,9 +2411,12 @@ typedef struct {
 } NPCategoricalDensityMomentCtx;
 
 static int np_categorical_density_moments_required(
-  const int ncon, const int ncat, const int op, const double *lambda)
+  const int ncon, const int nuno, const int nord,
+  const int op, const double *lambda)
 {
-  if(ncon != 0 || ncat <= 0 || op != OP_NORMAL || lambda == NULL)
+  const int ncat = nuno + nord;
+  if(ncon != 0 || ncat <= 0 || lambda == NULL ||
+     (op != OP_NORMAL && !(op == OP_INTEGRAL && nuno == 0)))
     return 0;
   /* Preserve the exact, existing Bernoulli convention at zero smoothing. */
   for(int i = 0; i < ncat; ++i)
@@ -2538,7 +2541,7 @@ static int np_density_categorical_profile_fit_body(
   profile_pdf_sum = alloc_vecd(nprof_eval);
   np_categorical_profile_owner_take_vector(owner, profile_pdf_sum);
   const int compute_moments = np_categorical_density_moments_required(
-    0, num_reg_unordered + num_reg_ordered, operator_kind, lambda);
+    0, num_reg_unordered, num_reg_ordered, operator_kind, lambda);
   if(compute_moments) {
     profile_m2 = alloc_vecd(nprof_eval);
     np_categorical_profile_owner_take_vector(owner, profile_m2);
@@ -2648,7 +2651,9 @@ static int np_density_categorical_profile_fit_body(
         sqrt(p/(double)num_obs_train);
       *log_likelihood += np_fitted_log_likelihood_contribution(p);
     } else {
-      pdf_stderr[i] = sqrt(p*(1.0-p)/(double)num_obs_train);
+      pdf_stderr[i] = compute_moments ?
+        sqrt(profile_m2[eval_prof_id[i]])/(double)num_obs_train :
+        sqrt(p*(1.0-p)/(double)num_obs_train);
     }
   }
 
@@ -49900,7 +49905,7 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
   double *categorical_scratch = NULL;
   if(BANDWIDTH_den == BW_ADAP_NN &&
      np_categorical_density_moments_required(
-       num_reg_continuous, num_reg_unordered + num_reg_ordered,
+       num_reg_continuous, num_reg_unordered, num_reg_ordered,
        dop, vector_scale_factor))
     categorical_scratch = (double *)R_alloc(
       np_jksum_size_mul_or_die((size_t)num_obs_eval, 3U,
@@ -50281,7 +50286,7 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
   } else {
     const int compute_categorical_moments =
       np_categorical_density_moments_required(
-        num_reg_continuous, num_reg_unordered + num_reg_ordered, dop, lambda);
+        num_reg_continuous, num_reg_unordered, num_reg_ordered, dop, lambda);
     NPCategoricalDensityMomentCtx categorical_moments = {
       .m2 = pdf_stderr,
       .anchor = categorical_scratch,
@@ -50375,7 +50380,9 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
     } else {
       for(i = 0, *log_likelihood = 0.0; i < num_obs_eval; i++){
         pdf[i] /= (double)num_obs_train;
-        pdf_stderr[i] = sqrt(pdf[i]*(1.0-pdf[i])/(double)num_obs_train);
+        pdf_stderr[i] = compute_categorical_moments ?
+          sqrt(pdf_stderr[i])/(double)num_obs_train :
+          sqrt(pdf[i]*(1.0-pdf[i])/(double)num_obs_train);
       }
     }
   }

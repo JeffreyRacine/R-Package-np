@@ -34,6 +34,12 @@
   and mixed/continuous density uncertainty are unchanged. The correction
   reuses existing kernel rows with bounded moment storage.
 
+* Pure-ordered distribution standard errors now also use the empirical
+  variance of complete joint CDF contributions. Finite smoothing no longer
+  treats each contribution as a Bernoulli indicator; the zero-smoothing
+  convention, distribution estimates, and continuous-variable formulas
+  are unchanged.
+
 * Master-local bootstrap and hat fanout computation errors now use the same
   per-chunk condition handling as workers. Scheduled replies are drained before
   failure is reported, allowing reuse of a healthy pool without publishing an
