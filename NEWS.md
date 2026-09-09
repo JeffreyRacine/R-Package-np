@@ -1,5 +1,9 @@
 # npRmpi 0.80-1
 
+* Conditional-density and conditional-distribution fallback probes now retain
+  the intended physical categorical bandwidths when `bwscaling = TRUE`.
+  Valid initial candidates and the existing penalty/restart rules are unchanged.
+
 * Collective smooth-coefficient NOMAD objectives coordinate R preparation and
   callback-result failures before reporting the original error on every rank.
   Declared candidate rejection is unchanged; unexpected errors cannot publish
