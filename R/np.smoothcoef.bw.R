@@ -677,12 +677,128 @@ npscoefbw.NULL <-
   }
 }
 
+.npscoefbw_collective_state <- function(comm = 1L) {
+  state <- new.env(parent = emptyenv())
+  state$comm <- as.integer(comm)
+  state$rank <- as.integer(mpi.comm.rank(state$comm))
+  state$size <- as.integer(mpi.comm.size(state$comm))
+  state$guard <- NULL
+  state$terminal <- NULL
+  state
+}
+
+# Only R preparation and R work after a normal native return are cooperative.
+# A native unwind, interruption or failed MPI exchange has no recovery phase.
+.npscoefbw_collective_transaction <- function(state, evaluate,
+                                             allow.typed.rejection = FALSE) {
+  if (!is.null(state$terminal))
+    .npRmpi_raise_completed_failure(list(condition = state$terminal))
+  if (!is.null(state$guard))
+    return(evaluate())
+
+  guard <- new.env(parent = emptyenv())
+  guard$phase <- "preparing"
+  guard$error <- NULL
+  guard$rejection <- NULL
+  state$guard <- guard
+  on.exit(state$guard <- NULL, add = TRUE)
+  shared.error <- function(error) {
+    source <- mpi.allreduce(if (is.null(error)) state$size else state$rank,
+                            type = 1L, op = "min", comm = state$comm)
+    received <- mpi.bcast.Robj(if (state$rank == source) error else NULL,
+                               rank = source, comm = state$comm)
+    if (state$rank == source) error else received
+  }
+  guard$enter <- function(native, error = NULL, invalid = FALSE) {
+    if (isTRUE(getOption("npRmpi.local.regression.mode", FALSE))) {
+      # ANN locality temporarily replaces comm[1] with SELF. Restore the
+      # actual communicator only for agreement, then restore native locality.
+      old.mode <- .Call("C_np_set_local_regression_mode", FALSE, PACKAGE = "npRmpi")
+      on.exit(.Call("C_np_set_local_regression_mode", old.mode, PACKAGE = "npRmpi"),
+              add = TRUE)
+    }
+    guard$phase <- "agreement"
+    rejected <- inherits(error, "np_nn_candidate_invalid")
+    failed <- !is.null(error) && !rejected
+    counts <- mpi.allreduce(c(as.integer(failed), as.integer(rejected),
+                              as.integer(invalid), as.integer(native)),
+                            type = 1L, op = "sum", comm = state$comm)
+    if (counts[1L] > 0L) {
+      guard$error <- shared.error(if (failed) error else NULL)
+      guard$phase <- "agreed.error"
+      stop(guard$error)
+    }
+    if (counts[2L] > 0L) {
+      guard$rejection <- shared.error(if (rejected) error else NULL)
+      guard$phase <- "rejected"
+      stop(guard$rejection)
+    }
+    if (counts[3L] > 0L) {
+      guard$invalid <- structure(list(
+        message = "agreed smooth-coefficient candidate rejection", call = NULL),
+        class = c("np_scoef_collective_invalid", "error", "condition"))
+      guard$phase <- "skipped"
+      return(FALSE)
+    }
+    if (!(counts[4L] %in% c(0L, state$size))) {
+      guard$error <- simpleError("smooth-coefficient ranks disagree on native entry")
+      guard$phase <- "agreed.error"
+      stop(guard$error)
+    }
+    guard$phase <- if (native) "native" else "skipped"
+    TRUE
+  }
+  capture <- function(expr) tryCatch(list(value = force(expr)),
+                                    error = function(e) list(error = e))
+  result <- capture(evaluate())
+  if (identical(guard$phase, "preparing")) {
+    ready <- capture(guard$enter(native = FALSE, error = result$error))
+    if (!is.null(ready$error)) result <- ready
+  }
+  if (guard$phase %in% c("returned", "skipped", "rejected")) {
+    # Only raw recovery permits a typed rejection to escape as control flow.
+    # The generic callback has already recorded all legitimate rejections;
+    # any error escaping its result/recording phase remains terminal.
+    rejected <- isTRUE(allow.typed.rejection) &&
+      inherits(result$error, "np_nn_candidate_invalid") &&
+      (identical(result$error, guard$rejection) || isTRUE(guard$raw.invalid))
+    failure <- if (!is.null(guard$error)) guard$error else if (rejected) NULL else result$error
+    guard$phase <- "completion"
+    counts <- mpi.allreduce(c(as.integer(!is.null(failure)), as.integer(rejected)),
+                            type = 1L, op = "sum", comm = state$comm)
+    if (counts[1L] > 0L) {
+      guard$error <- shared.error(failure)
+      guard$phase <- "agreed.error"
+    } else if (counts[2L] > 0L) {
+      result$error <- shared.error(if (rejected) result$error else NULL)
+    }
+  }
+  if (identical(guard$phase, "agreed.error")) {
+    state$terminal <- guard$error
+    .npRmpi_raise_completed_failure(list(condition = guard$error))
+  }
+  # A native condition must not become an exploratory rejection if the
+  # generic callback caught its class. This is propagation, not recovery.
+  if (identical(guard$phase, "native") && !is.null(guard$error))
+    stop(guard$error)
+  if (!is.null(result$error)) stop(result$error)
+  result$value
+}
+
 .npscoefbw_nomad_eval_direct <- function(ctx,
                                          bws,
                                          invalid.penalty = c("baseline", "large"),
                                          penalty.multiplier = 10,
                                          invalid.objective = NULL,
-                                         localize = TRUE) {
+                                         localize = TRUE,
+                                         .entry.guard = NULL) {
+  if (!isTRUE(localize) && is.null(.entry.guard)) {
+    state <- .npscoefbw_collective_state()
+    return(.npscoefbw_collective_transaction(state, function()
+      .npscoefbw_nomad_eval_direct(ctx, bws, invalid.penalty,
+        penalty.multiplier, invalid.objective, localize = FALSE,
+        .entry.guard = state$guard)))
+  }
   penalty <- .npscoefbw_nomad_invalid_objective(
     bws = bws,
     invalid.penalty = invalid.penalty,
@@ -693,13 +809,16 @@ npscoefbw.NULL <-
   if (!is.list(ctx) || is.null(ctx$W) || is.null(ctx$ydat) || is.null(ctx$zdat.df))
     stop("invalid NOMAD smooth-coefficient context")
 
-  if (!validateBandwidthTF(bws))
+  if (!validateBandwidthTF(bws)) {
+    if (!is.null(.entry.guard))
+      .entry.guard$enter(native = FALSE, invalid = TRUE)
     return(list(
       objective = penalty,
       num.feval = 1L,
       num.feval.fast = 0L,
       raw.valid = FALSE
     ))
+  }
 
   maxPenalty <- sqrt(.Machine$double.xmax)
 
@@ -719,7 +838,8 @@ npscoefbw.NULL <-
         weights = moment.state$ytensor,
         bws = moment.state$kernel.bws,
         leave.one.out = TRUE,
-        bandwidth.divide = moment.state$bandwidth.divide
+        bandwidth.divide = moment.state$bandwidth.divide,
+        .np.internal.entry.guard = .entry.guard
       ),
       localize = localize
     )$ksum
@@ -751,6 +871,24 @@ npscoefbw.NULL <-
       )
     }
   }, error = function(e) {
+    if (!is.null(.entry.guard)) {
+      if (!is.null(.entry.guard$reentry.error))
+        e <- .entry.guard$reentry.error
+      if (identical(.entry.guard$phase, "preparing")) {
+        if (inherits(e, "np_nn_candidate_invalid")) {
+          .entry.guard$enter(native = FALSE, invalid = TRUE)
+        } else {
+          .entry.guard$enter(native = FALSE, error = e)
+        }
+      } else if (!inherits(e, "np_scoef_collective_invalid") ||
+                 !identical(.entry.guard$phase, "skipped")) {
+        if (.entry.guard$phase %in% c("native", "returned"))
+          .entry.guard$error <- e
+        stop(e)
+      }
+      return(list(objective = penalty, num.feval = 1L, num.feval.fast = 0L,
+                  raw.valid = FALSE))
+    }
     unknown <- .npscoefbw_nomad_unknown_nn_error(e, bws)
     if (!is.null(unknown)) stop(unknown)
     list(objective = penalty, num.feval = 1L, num.feval.fast = 0L,
@@ -1223,6 +1361,7 @@ npscoefbw.NULL <-
     tryCatch(as.integer(mpi.comm.rank(1L)), error = function(e) 0L)
   else
     0L
+  collective.state <- if (collective.owner) .npscoefbw_collective_state() else NULL
   pool <- NULL
   on.exit({
     if (!is.null(pool))
@@ -1259,14 +1398,16 @@ npscoefbw.NULL <-
                                  invalid.objective = invalid.objective.override) {
     penalty.multiplier <- if (is.null(opt.args$penalty.multiplier)) 10 else opt.args$penalty.multiplier
     if (collective.owner) {
-      .npscoefbw_nomad_eval_direct(
-        ctx = ctx,
-        bws = tbw,
-        invalid.penalty = invalid.penalty,
-        penalty.multiplier = penalty.multiplier,
-        invalid.objective = invalid.objective,
-        localize = FALSE
-      )
+      .npscoefbw_collective_transaction(collective.state, function()
+        .npscoefbw_nomad_eval_direct(
+          ctx = ctx,
+          bws = tbw,
+          invalid.penalty = invalid.penalty,
+          penalty.multiplier = penalty.multiplier,
+          invalid.objective = invalid.objective,
+          localize = FALSE,
+          .entry.guard = collective.state$guard
+        ))
     } else {
       start_pool_if_needed()
       .npscoefbw_eval_pool(
@@ -1336,12 +1477,23 @@ npscoefbw.NULL <-
     tryCatch(
       evaluate.point(point),
       error = function(e) {
+        if (collective.owner &&
+            identical(collective.state$guard$phase, "preparing"))
+          collective.state$guard$enter(native = FALSE, error = e)
         if (!inherits(e, "np_nn_candidate_invalid"))
           evaluator.error <<- e
         stop(e)
       }
     )
   }
+  if (collective.owner) {
+    eval_fun.local <- eval_fun
+    eval_fun <- function(point)
+      .npscoefbw_collective_transaction(collective.state,
+        function() eval_fun.local(point), allow.typed.rejection = TRUE)
+  }
+  callback.transaction <- if (collective.owner) function(evaluate, point)
+    .npscoefbw_collective_transaction(collective.state, evaluate) else NULL
 
   powell.payload.raw.valid <- FALSE
   build_payload <- function(point, best_record, solution, interrupted) {
@@ -1460,7 +1612,9 @@ npscoefbw.NULL <-
       remin = isTRUE(opt.args$nomad.remin),
       nomad.opts = if (is.null(opt.args$nomad.opts)) list() else opt.args$nomad.opts,
       native.r.bridge = TRUE,
-      preserve.eval.error = isTRUE(pool[["preserve.eval.error", exact = TRUE]]),
+      preserve.eval.error = collective.owner ||
+        isTRUE(pool[["preserve.eval.error", exact = TRUE]]),
+      .native.callback.transaction = callback.transaction,
       source = source,
       reason = reason,
       progress_label = progress_label,
@@ -1477,10 +1631,14 @@ npscoefbw.NULL <-
         user_supplied = isTRUE(preserve.start.degree) || degree.search$start.user
       )
     ), error = function(e) {
+      if (collective.owner && !is.null(collective.state$terminal))
+        .npRmpi_raise_completed_failure(list(condition = collective.state$terminal))
       if (!is.null(evaluator.error))
         stop(evaluator.error)
       stop(e)
     })
+    if (collective.owner && !is.null(collective.state$terminal))
+      .npRmpi_raise_completed_failure(list(condition = collective.state$terminal))
     if (!is.null(evaluator.error))
       stop(evaluator.error)
     result
@@ -1559,6 +1717,8 @@ npscoefbw.NULL <-
     recovery.raw.eval <- function(point) {
       out <- eval_fun(point)
       if (!isTRUE(out$raw.valid)) {
+        if (collective.owner)
+          collective.state$guard$raw.invalid <- TRUE
         .np_nn_abort_candidate_invalid(
           "npscoefbw NOMAD degree objective returned an invalid raw objective",
           owner = "npscoefbw NOMAD degree objective",
@@ -1567,6 +1727,12 @@ npscoefbw.NULL <-
         )
       }
       as.double(out$objective)
+    }
+    if (collective.owner) {
+      recovery.raw.eval.local <- recovery.raw.eval
+      recovery.raw.eval <- function(point)
+        .npscoefbw_collective_transaction(collective.state,
+          function() recovery.raw.eval.local(point), allow.typed.rejection = TRUE)
     }
     ordinary.caps <- rep.int(NROW(eval.zdat) - 1L, ncon)
     ordinary.start <- recovery.start[seq_len(ncon)]
@@ -1606,14 +1772,20 @@ npscoefbw.NULL <-
     bw = search.result$best_payload$bw
   )
   if (!isTRUE(powell.payload.raw.valid)) {
-    final.raw <- evaluate.bandwidth(
-      tbw = search.result$best_payload,
-      invalid.penalty = "large",
-      invalid.objective = sqrt(.Machine$double.xmax)
-    )
-    reported.objective <- as.numeric(search.result$best_payload$fval[1L])
-    if (!isTRUE(final.raw$raw.valid) ||
-        !identical(as.numeric(final.raw$objective), reported.objective)) {
+    certify.raw <- function() {
+      final.raw <- evaluate.bandwidth(
+        tbw = search.result$best_payload,
+        invalid.penalty = "large",
+        invalid.objective = sqrt(.Machine$double.xmax)
+      )
+      reported.objective <- as.numeric(search.result$best_payload$fval[1L])
+      isTRUE(final.raw$raw.valid) &&
+        identical(as.numeric(final.raw$objective), reported.objective)
+    }
+    certified <- if (collective.owner)
+      .npscoefbw_collective_transaction(collective.state, certify.raw) else
+      certify.raw()
+    if (!certified) {
       message <- "npscoefbw NOMAD degree search failed final raw-objective certification"
       if (collective.owner)
         return(.npRmpi_nomad_collective_failure(message, collective.rank))

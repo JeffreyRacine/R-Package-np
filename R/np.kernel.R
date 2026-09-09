@@ -170,6 +170,8 @@ npksum.default <-
     dots$.np.internal.eval.train.index <- NULL
     internal.tree.outer.blas <- isTRUE(dots$.np.internal.tree.outer.blas)
     dots$.np.internal.tree.outer.blas <- NULL
+    internal.entry.guard <- dots$.np.internal.entry.guard
+    dots$.np.internal.entry.guard <- NULL
     return.derivative.kernel.weights <- isTRUE(dots$return.derivative.kernel.weights)
 
     bandwidth.divide <- npValidateScalarLogical(bandwidth.divide, "bandwidth.divide")
@@ -188,8 +190,31 @@ npksum.default <-
 
     .npRmpi_require_active_slave_pool(where = "npksum()")
     if (.npRmpi_npksum_should_localize(bws, dots) &&
-        !isTRUE(getOption("npRmpi.local.regression.mode", FALSE)))
-      return(.npRmpi_with_local_regression(.npRmpi_eval_without_dispatch(match.call(), parent.frame())))
+        !isTRUE(getOption("npRmpi.local.regression.mode", FALSE))) {
+      if (is.null(internal.entry.guard))
+        return(.npRmpi_with_local_regression(.npRmpi_eval_without_dispatch(match.call(), parent.frame())))
+      reentry.call <- match.call()
+      reentry.env <- parent.frame()
+      return(.npRmpi_with_local_regression({
+        # Preserve the existing invocation and lookup precedence. The guard
+        # retains only an error escaping re-entry, before command evaluation
+        # can simplify an ordinary condition to its message.
+        if (is.symbol(reentry.call[[1L]])) {
+          name <- as.character(reentry.call[[1L]])
+          target <- get0(name, envir = reentry.env, mode = "function", inherits = TRUE)
+          if (is.null(target))
+            target <- get0(name, envir = asNamespace("npRmpi"),
+                           mode = "function", inherits = FALSE)
+          if (!is.null(target)) reentry.call[[1L]] <- target
+        }
+        retain <- function(expr) tryCatch(force(expr), error = function(e) {
+          if (is.null(internal.entry.guard$reentry.error))
+            internal.entry.guard$reentry.error <- e
+          stop(e)
+        })
+        .npRmpi_eval_without_dispatch(as.call(list(retain, reentry.call)), reentry.env)
+      }))
+    }
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
@@ -525,8 +550,18 @@ npksum.default <-
               as.double(cker.bounds.c$ub),
               PACKAGE="npRmpi"), continuous.names = bws[["xnames", exact = TRUE]][bws[["icon", exact = TRUE]]])[return.names]
     } else {
+      eval.native <- if (is.null(internal.entry.guard)) .Call else function(...) {
+        # Force every existing R argument before collective readiness. The
+        # captured guard retains its original communicator through ANN locality.
+        args <- list(...)
+        if (!internal.entry.guard$enter(native = TRUE))
+          stop(internal.entry.guard$invalid)
+        value <- do.call(.Call, args)
+        internal.entry.guard$phase <- "returned"
+        value
+      }
       myout <-
-        .np_with_nn_radius_context(.Call("C_np_kernelsum",
+        .np_with_nn_radius_context(eval.native("C_np_kernelsum",
               asDouble(tuno), asDouble(tord), asDouble(tcon),
               asDouble(tydat), asDouble(weights),
               asDouble(euno), asDouble(eord), asDouble(econ),

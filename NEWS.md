@@ -1,5 +1,12 @@
 # npRmpi 0.80-1
 
+* Collective smooth-coefficient NOMAD objectives coordinate R preparation and
+  callback-result failures before reporting the original error on every rank.
+  Declared candidate rejection is unchanged; unexpected errors cannot publish
+  a surviving candidate. Native collective unwinds and rank loss are outside
+  this cooperative R-error boundary. Owned-pool evaluation, objectives, trees
+  and the existing adaptive-NN computational owner are unchanged.
+
 * External local-linear and local-polynomial fits now report exactly empty
   computed kernel rows as NA in the undefined output components, with one
   warning after the caller finishes. Supported components and required

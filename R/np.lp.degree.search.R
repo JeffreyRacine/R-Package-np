@@ -2625,13 +2625,17 @@
                              progress_label = NULL,
                              recover_start = NULL,
                              prepare_starts = NULL,
-                             preserve.eval.error = FALSE) {
+                             preserve.eval.error = FALSE,
+                             .native.callback.transaction = NULL) {
   engine <- match.arg(engine)
   direction <- match.arg(direction)
   if (!is.null(recover_start) && !is.function(recover_start))
     stop("'recover_start' must be NULL or a function", call. = FALSE)
   if (!is.null(prepare_starts) && !is.function(prepare_starts))
     stop("'prepare_starts' must be NULL or a function", call. = FALSE)
+  if (!is.null(.native.callback.transaction) &&
+      !is.function(.native.callback.transaction))
+    stop("'.native.callback.transaction' must be NULL or a function", call. = FALSE)
   .np_nomad_require_crs()
 
   state <- new.env(parent = emptyenv())
@@ -2933,6 +2937,25 @@
       native.eval <- function(point) {
         value <- as.numeric(wrapped_eval(point)[1L])
         if (!is.finite(value)) .Machine$double.xmax else value
+      }
+      if (!is.null(.native.callback.transaction)) {
+        # Select once per native solve. Other families keep the original
+        # callback, including its scalar conversion, without a hot-path hook.
+        native.eval.original <- native.eval
+        native.eval <- function(point) {
+          if (!is.null(state$evaluator.error))
+            stop(state$evaluator.error)
+          tryCatch(
+            .native.callback.transaction(
+              function() native.eval.original(point), point),
+            error = function(e) {
+              # Completion may choose a peer's original cause. Replace a
+              # rank-local latch with that agreed cause on every participant.
+              state$evaluator.error <- e
+              stop(e)
+            }
+          )
+        }
       }
       native.option.vectors <- .np_nomad_native_option_vectors(solver.opts)
       run.native <- function() {
