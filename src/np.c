@@ -1766,11 +1766,15 @@ static double bwm_unordered_transform_maximum(const int i)
 static void bwm_set_categorical_midpoints(double * const p)
 {
   int i;
-  for (i = 0; i < bwm_num_reg_unordered; ++i)
+  for (i = 0; i < bwm_num_reg_unordered; ++i) {
+    const double midpoint = 0.5 * bwm_unordered_maximum(i);
+    /* Raw probes use scale factors, not transformed or physical lambda. */
     p[bwm_num_reg_continuous + 1 + bwm_unordered_category_index(i)] =
-      0.5 * bwm_unordered_maximum(i);
+      int_LARGE_SF == SF_NORMAL ? midpoint / ncatfac_extern : midpoint;
+  }
   for (i = 0; i < bwm_num_reg_ordered; ++i)
-    p[bwm_num_reg_continuous + 1 + bwm_ordered_category_index(i)] = 0.5;
+    p[bwm_num_reg_continuous + 1 + bwm_ordered_category_index(i)] =
+      int_LARGE_SF == SF_NORMAL ? 0.5 / ncatfac_extern : 0.5;
 }
 
 static int bwm_reserve_transform_buf(int needed_len)

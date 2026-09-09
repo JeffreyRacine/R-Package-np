@@ -1,5 +1,9 @@
 # np 0.80-1
 
+* Conditional-density and conditional-distribution fallback probes now retain
+  the intended physical categorical bandwidths when `bwscaling = TRUE`.
+  Valid initial candidates and the existing penalty/restart rules are unchanged.
+
 * External local-linear and local-polynomial fits now report exactly empty
   computed kernel rows as NA in the undefined output components, with one
   warning after the caller finishes. Supported components and required
