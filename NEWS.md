@@ -1,5 +1,10 @@
 # npRmpi 0.80-1
 
+* Master-local bootstrap and hat fanout computation errors now use the same
+  per-chunk condition handling as workers. Scheduled replies are drained before
+  failure is reported, allowing reuse of a healthy pool without publishing an
+  incomplete result. Scheduling, task seeds and healthy computations are unchanged.
+
 * Local smooth-coefficient NOMAD searches now propagate unexpected fixed-bandwidth
   preparation errors instead of accepting a surviving candidate. Legitimate
   typed candidate rejection and the distributed preparation protocol are unchanged.

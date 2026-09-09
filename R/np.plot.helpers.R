@@ -2159,7 +2159,12 @@
             event = "fanout.master_local_chunk.start",
             fields = list(task_idx = task.local.idx)
           )
-          parts.out[[task.local.idx]] <- do.call(worker.exec, c(list(tasks[[task.local.idx]]), list(...)))
+          # Match worker-bundle error ownership: drain scheduled replies before
+          # the collector rejects a failed required chunk.
+          parts.out[[task.local.idx]] <- tryCatch(
+            do.call(worker.exec, c(list(tasks[[task.local.idx]]), list(...))),
+            error = function(e) structure(conditionMessage(e), class = "try-error", condition = e)
+          )
           done.boot <- done.boot + as.integer(tasks[[task.local.idx]]$bsz)
           progress <- progress.tick(state = progress, done = done.boot)
           local.done <- local.done + 1L
