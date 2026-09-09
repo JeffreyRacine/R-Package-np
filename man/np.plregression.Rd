@@ -279,6 +279,19 @@ Further arguments are passed to \code{\link{npplregbw}} and its component \code{
   computed from the partially linear fitted-value linear operator and
   the squared residuals from the training fit.
 
+  Coefficient covariance allows conditional heteroskedasticity. Let
+  \eqn{\widetilde X} be the residualized linear design, \eqn{u} the residuals
+  from the training fit, and \eqn{A=\widetilde X'\widetilde X}. The returned
+  covariance is
+  \eqn{\{n/(n-p-q)\} A^{-1}\widetilde X'\mathrm{diag}(u^2)\widetilde X A^{-1}},
+  where \eqn{n} is the number of complete training observations, \eqn{p} is
+  the number of linear regressors and \eqn{q} the number of smoothing
+  variables. The multiplier retains the package's finite-sample convention;
+  it is not an estimate of a smoother's effective degrees of freedom.
+  Coefficient standard errors are square roots of its diagonal. This
+  coefficient covariance and the fitted-value prediction errors above are
+  different targets; neither changes the coefficient or bandwidth estimates.
+
   \item{evalx}{ evaluation points }
   \item{evalz}{ evaluation points }
   \item{mean}{ estimation of the regression, or conditional mean, at the

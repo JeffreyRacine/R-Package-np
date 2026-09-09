@@ -1,5 +1,12 @@
 # npRmpi 0.80-1
 
+* Partially linear coefficient standard errors and covariance now allow
+  conditional heteroskedasticity through a residual-score sandwich, retaining
+  the existing finite-sample multiplier. Coefficients, fitted values, bandwidth
+  selection and the separate fitted-value prediction-error calculation are
+  unchanged. Coefficient intervals and dependent asymptotic plot terms use the
+  corrected covariance.
+
 * Scalar conditional categorical-gradient standard errors involving beta
   kernels now use paired same-observation influences at the two endpoints,
   including their covariance. Self-contrasts have zero error by construction;
