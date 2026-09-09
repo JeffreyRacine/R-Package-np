@@ -23,7 +23,8 @@ npplreg <-
   }
 
 npplreg.formula <-
-  function(bws, data = NULL, newdata = NULL, y.eval = FALSE, ...){
+  function(bws, data = NULL, newdata = NULL, y.eval = FALSE, ..., se = FALSE){
+    se <- npValidateScalarLogical(se, "se")
     
     tt <- terms(bws)
     tt.xf <- bws$xterms
@@ -102,7 +103,7 @@ npplreg.formula <-
       ezdat <- emf[, bws$chromoly[[3]], drop = FALSE]
     }
 
-    pl.args <- list(txdat = txdat, tydat = tydat, tzdat = tzdat)
+    pl.args <- list(txdat = txdat, tydat = tydat, tzdat = tzdat, se = se)
     if (has.eval) {
       pl.args$exdat <- exdat
       pl.args$ezdat <- ezdat
@@ -183,7 +184,8 @@ npplreg.call <-
                                    response,
                                    yhat.train,
                                    zdim,
-                                   where = "npplreg") {
+                                   where = "npplreg",
+                                   se = TRUE) {
   X <- as.matrix(resx)
   y <- as.double(resy)
   response <- as.double(response)
@@ -197,20 +199,24 @@ npplreg.call <-
   linear.fit <- as.vector(X %*% beta)
   train.fit <- as.vector(yhat.train + linear.fit)
 
-  R <- qr.R(qrX)[seq_len(p), seq_len(p), drop = FALSE]
-  XtX.inv.pivoted <- chol2inv(R)
-  XtX.inv <- matrix(0.0, nrow = p, ncol = p)
-  XtX.inv[qrX$pivot, qrX$pivot] <- XtX.inv.pivoted
+  vcov <- stderr <- NULL
+  if (se) {
+    R <- qr.R(qrX)[seq_len(p), seq_len(p), drop = FALSE]
+    XtX.inv.pivoted <- chol2inv(R)
+    XtX.inv <- matrix(0.0, nrow = p, ncol = p)
+    XtX.inv[qrX$pivot, qrX$pivot] <- XtX.inv.pivoted
 
-  # Factor the heteroskedastic sandwich as a crossproduct of coefficient
-  # influences, preserving the existing residuals and finite-sample factor.
-  scores <- (X %*% XtX.inv) * (response - train.fit)
-  vcov <- crossprod(scores) * (nrow(X) / (nrow(X) - p - as.integer(zdim)))
+    # Factor the heteroskedastic sandwich as a crossproduct of coefficient
+    # influences, preserving the existing residuals and finite-sample factor.
+    scores <- (X %*% XtX.inv) * (response - train.fit)
+    vcov <- crossprod(scores) * (nrow(X) / (nrow(X) - p - as.integer(zdim)))
+    stderr <- sqrt(diag(vcov))
+  }
 
   list(
     coef = beta,
     vcov = vcov,
-    se = sqrt(diag(vcov)),
+    se = stderr,
     train.fit = train.fit,
     qr = qrX
   )
@@ -229,7 +235,9 @@ npplreg.call <-
            zdat,
            exdat,
            ezdat,
-           .np.empty.report = NULL) {
+           .np.empty.report = NULL,
+           se = TRUE) {
+    se <- npValidateScalarLogical(se, "se")
     activity <- .np_plot_activity_begin("Computing partially linear plot fit")
     on.exit(.np_plot_activity_end(activity), add = TRUE)
 
@@ -455,7 +463,8 @@ npplreg.call <-
       response = tmp.ty,
       yhat.train = yhat.train,
       zdim = ncol(zdat),
-      where = ".np_plot_plreg_local_fit"
+      where = ".np_plot_plreg_local_fit",
+      se = se
     )
     B <- solved$coef
     train.fit <- solved$train.fit
@@ -480,6 +489,7 @@ npplreg.call <-
       xcoef = B,
       xcoeferr = Berr,
       xcoefvcov = Bvcov,
+      se = se,
       evalx = if (no.exz) xdat else exdat,
       evalz = if (no.exz) zdat else ezdat,
       mean = ply,
@@ -499,10 +509,11 @@ npplreg.plbandwidth <-
            txdat = stop("training data txdat missing"),
            tydat = stop("training data tydat missing"),
            tzdat = stop("training data tzdat missing"),
-           exdat, eydat, ezdat, residuals = FALSE, ...){
+           exdat, eydat, ezdat, residuals = FALSE, ..., se = FALSE){
 
     fit.start <- proc.time()[3]
     residuals <- npValidateScalarLogical(residuals, "residuals")
+    se <- npValidateScalarLogical(se, "se")
     dots <- list(...)
     fit.progress.handoff <- isTRUE(dots$.np_fit_progress_handoff)
 
@@ -650,7 +661,8 @@ npplreg.plbandwidth <-
       response = tmp.ty,
       yhat.train = yhat.train,
       zdim = dim(tzdat)[2],
-      where = "npplreg"
+      where = "npplreg",
+      se = se
     )
     B <- solved$coef
     Bvcov <- solved$vcov
@@ -684,6 +696,7 @@ npplreg.plbandwidth <-
       xcoef = B,
       xcoeferr = Berr,
       xcoefvcov = Bvcov,
+      se = se,
       evalx = if (no.exz) txdat else exdat.full,
       evalz = if (no.exz) tzdat else ezdat.full,
       mean = ply,
@@ -722,10 +735,11 @@ npplreg.plbandwidth <-
   }
 
 
-npplreg.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
+npplreg.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ..., se = FALSE) {
   sc <- sys.call()
   sc.names <- names(sc)
   nomad <- npValidateNomadControl(nomad, "nomad")
+  se <- npValidateScalarLogical(se, "se")
 
   ## here we check to see if the function was called with tdat =
   ## if it was, we need to catch that and map it to dat =
@@ -792,7 +806,7 @@ npplreg.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ...) {
     .np_eval_bw_call(sc.bw, caller_env = parent.frame())
   }
   
-  call.args <- list(bws = tbw)
+  call.args <- list(bws = tbw, se = se)
   if (no.bws) {
     call.args$txdat <- txdat
     call.args$tydat <- tydat

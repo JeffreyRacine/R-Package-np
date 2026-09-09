@@ -8,6 +8,12 @@
   without repeating bandwidth selection. Explicit asymptotic plot and copula
   inference continue to request their required errors.
 
+* Partially linear fitting now defaults to `se=FALSE`, avoiding coefficient
+  covariance work unless requested. Use `npplreg(..., se=TRUE)` for
+  `coef(..., se=TRUE)` and `vcov()`; missing-output messages show how to
+  reuse the bandwidth object without repeating search. Explicit prediction
+  standard errors and asymptotic plots continue to request their needed work.
+
 * Ordinary scalar conditional categorical-gradient standard errors now use
   complete paired same-observation influences, including endpoint covariance.
   Requested errors use an additional streamed inference pass and can increase

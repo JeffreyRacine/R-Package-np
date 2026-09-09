@@ -8817,6 +8817,7 @@ plotFactor <- function(f, y, ...){
       tzdat = zdat,
       exdat = exdat,
       ezdat = ezdat,
+      se = TRUE,
       .np.defer.empty.rows = TRUE
     )
 

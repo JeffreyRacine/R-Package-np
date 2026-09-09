@@ -38,7 +38,7 @@ test_that("public partial-linear covariance matches the known-error witness", {
     u <- if(hetero) g$r*g$e else sqrt(2.5)*g$e
     y <- 2*g$r+ifelse(g$z=="a",1,3)+u
     bw <- npplregbw(xdat=X,ydat=y,zdat=Z,bws=matrix(0,2,1),bandwidth.compute=FALSE)
-    fit <- npplreg(bws=bw,txdat=X,tydat=y,tzdat=Z,residuals=TRUE)
+    fit <- npplreg(bws=bw,txdat=X,tydat=y,tzdat=Z,residuals=TRUE,se=TRUE)
     target <- n/(n-2)*sum(g$r^2*u^2)/sum(g$r^2)^2
     expect_equal(as.double(coef(fit)),2,tolerance=3e-12)
     expect_equal(as.double(residuals(fit)),u,tolerance=3e-12)
