@@ -243,6 +243,7 @@ predict.condensity <- function(object, se.fit = FALSE, ...) {
     dots$proper.control <- proper.control
   }
 
+  dots[[".np_lp_first_se_demand"]] <- FALSE
   tr <- do.call(npcdens, c(list(bws = object$bws), dots))
   if(se.fit)
     return(list(fit = fitted(tr), se.fit = se(tr), 

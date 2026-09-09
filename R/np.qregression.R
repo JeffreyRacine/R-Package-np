@@ -187,7 +187,8 @@ npqreg <-
                                                     tol = 1.490116e-04,
                                                     small = 1.490116e-05,
                                                     itmax = 10000L,
-                                                    cdf.cache = NULL) {
+                                                    cdf.cache = NULL,
+                                                    lp.first.se.demand = NULL) {
   xdat <- toFrame(xdat)
   ydat <- toFrame(ydat)
   exdat <- toFrame(exdat)
@@ -223,7 +224,8 @@ npqreg <-
     eydat = eydat,
     cdf = TRUE,
     gradients = gradients,
-    categorical.effects = !glp.categorical.effects
+    categorical.effects = !glp.categorical.effects,
+    lp.first.se.demand = lp.first.se.demand
   )
   dens.obj <- .np_conditional_eval_selected(
     bws = bws,
@@ -620,11 +622,14 @@ npqreg <-
                                                    small,
                                                    itmax,
                                                    comm = 1L,
-                                                   force.parallel = FALSE) {
+                                                   force.parallel = FALSE,
+                                                   lp.first.se.demand = NULL) {
   exdat <- toFrame(exdat)
   n.eval <- nrow(exdat)
   tau <- .npqreg_validate_tau(tau)
   gradients <- npValidateScalarLogical(gradients, "gradients")
+  lp.first.se.demand <- .np_conditional_first_se_demand(
+    lp.first.se.demand, bws$xncon)
   grad.cols <- if (isTRUE(gradients)) as.integer(bws$xndim) else 0L
   if (is.na(grad.cols) || grad.cols < 0L)
     grad.cols <- 0L
@@ -655,7 +660,8 @@ npqreg <-
         tau = tau[[j]],
         tol = tol,
         small = small,
-        itmax = itmax
+        itmax = itmax,
+        lp.first.se.demand = lp.first.se.demand
       ))
       delta <- .npqreg_mark_clamped_delta(delta, qclamp)
       pieces[[j]] <- cbind(yq, .npqreg_quantile_delta_matrix(delta, gradients = gradients))
@@ -678,7 +684,8 @@ npqreg <-
     B = n.eval,
     chunk.size = .npRmpi_npqreg_chunk_size(n.eval = n.eval, comm = comm)
   )
-  worker <- function(task, bws, xdat, ydat, exdat, tau, gradients, tol, small, itmax) {
+  worker <- function(task, bws, xdat, ydat, exdat, tau, gradients, tol, small, itmax,
+                     lp.first.se.demand) {
     idx <- seq.int(as.integer(task$start),
                    length.out = as.integer(task$bsz))
     ex.chunk <- exdat[idx, , drop = FALSE]
@@ -706,7 +713,8 @@ npqreg <-
         tau = tau[[j]],
         tol = tol,
         small = small,
-        itmax = itmax
+        itmax = itmax,
+        lp.first.se.demand = lp.first.se.demand
       ))
       delta <- .npqreg_mark_clamped_delta(delta, qclamp)
       pieces[[j]] <- cbind(yq, .npqreg_quantile_delta_matrix(delta, gradients = gradients))
@@ -731,7 +739,8 @@ npqreg <-
     gradients = gradients,
     tol = tol,
     small = small,
-    itmax = itmax
+    itmax = itmax,
+    lp.first.se.demand = lp.first.se.demand
   )
 }
 

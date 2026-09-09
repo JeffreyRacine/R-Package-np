@@ -1336,6 +1336,39 @@ npValidatedConditionalRegSpec <- function(bws,
   spec
 }
 
+# Private demand for newly available partial-LP first-derivative errors only.
+# Existing fully requested uncertainty and all point owners are unchanged.
+.np_conditional_first_se_demand <- function(demand, ncon) {
+  if (is.null(demand))
+    return(rep.int(TRUE, ncon))
+  if (identical(demand, FALSE))
+    return(rep.int(FALSE, ncon))
+  if (!is.logical(demand) || length(demand) != ncon || anyNA(demand))
+    stop("invalid internal conditional first-SE demand", call. = FALSE)
+  demand
+}
+
+.np_conditional_first_se_request <- function(gradients, partial, degree,
+                                               order, available, demand) {
+  if (!isTRUE(gradients) || !isTRUE(partial))
+    return(NULL)
+  mask <- available & order == 1L & demand
+  if (!any(mask))
+    return(NULL)
+  if (length(degree) != length(order) || any(order[mask] > degree[mask]))
+    stop("incoherent internal conditional first-SE request", call. = FALSE)
+  list(order = as.integer(order), se = as.integer(mask))
+}
+
+.np_conditional_merge_first_se <- function(out, native.se, request, bws, enrow) {
+  if (is.null(request))
+    return(out)
+  selected <- which(request[["se", exact = TRUE]] == 1L)
+  native.se <- matrix(native.se, nrow = enrow, ncol = bws$xndim)
+  out$congerr[, which(bws$ixcon)[selected]] <- native.se[, selected, drop = FALSE]
+  out
+}
+
 npConditionalGradientOrder <- function(bws,
                                        reg.engine,
                                        gradient.order,

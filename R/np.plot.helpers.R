@@ -11367,7 +11367,8 @@ plotFactor <- function(f, y, ...){
                                       gradient.order = 1L,
                                       proper = FALSE,
                                       proper.method = NULL,
-                                      proper.control = list()) {
+                                      proper.control = list(),
+                                      lp.first.se.demand = NULL) {
   activity <- .np_plot_activity_begin(
     if (isTRUE(cdf)) {
       "Computing conditional distribution plot fit"
@@ -11387,7 +11388,8 @@ plotFactor <- function(f, y, ...){
     gradient.order = gradient.order,
     proper = proper,
     proper.method = proper.method,
-    proper.control = proper.control
+    proper.control = proper.control,
+    lp.first.se.demand = lp.first.se.demand
   )
 }
 
@@ -11402,8 +11404,11 @@ plotFactor <- function(f, y, ...){
                                           gradient.order = 1L,
                                           proper = FALSE,
                                           proper.method = NULL,
-                                          proper.control = list()) {
+                                          proper.control = list(),
+                                          lp.first.se.demand = NULL) {
   fit.start <- proc.time()[3]
+  lp.first.se.demand <- .np_conditional_first_se_demand(
+    lp.first.se.demand, bws$xncon)
   proper <- npValidateScalarLogical(proper, "proper")
   categorical.effects <- npValidateScalarLogical(
     categorical.effects,
@@ -11536,6 +11541,9 @@ plotFactor <- function(f, y, ...){
   }
   basis.code <- as.integer(npLpBasisCode(basis.engine))
   do.compiled.gradients <- isTRUE(gradients) && !glp.gradient.partial
+  first.se.request <- .np_conditional_first_se_request(
+    gradients, glp.gradient.partial, degree.engine, glp.gradient.order,
+    glp.gradient.available, lp.first.se.demand)
   beta.kernel <- identical(bws$cxkertype, "beta") ||
     identical(bws$cykertype, "beta")
 
@@ -11627,9 +11635,11 @@ plotFactor <- function(f, y, ...){
     as.integer(degree.c),
     as.integer(bernstein.engine),
     basis.code,
+    first.se.request,
     PACKAGE = "npRmpi"
   ))
 
+  first.se.native <- if (is.null(first.se.request)) NULL else myout$congerr
   if (isTRUE(cdf))
     names(myout)[1L] <- "condist"
 
@@ -11712,6 +11722,8 @@ plotFactor <- function(f, y, ...){
     myout$congerr[, cat.idx] <- NA_real_
   }
 
+  myout <- .np_conditional_merge_first_se(
+    myout, first.se.native, first.se.request, bws, enrow)
   fit.elapsed <- proc.time()[3] - fit.start
   optim.time <- if (!is.null(bws$total.time) && is.finite(bws$total.time)) as.double(bws$total.time) else NA_real_
   total.time <- fit.elapsed + if (is.na(optim.time)) 0.0 else optim.time
@@ -13776,7 +13788,8 @@ plotFactor <- function(f, y, ...){
       eydat = eydat,
       cdf = cdf,
       gradients = TRUE,
-      gradient.order = gradient.order
+      gradient.order = gradient.order,
+      lp.first.se.demand = FALSE
     )
     .np_plot_extract_conditional_gradient(
       fit = fit,
@@ -13942,7 +13955,8 @@ plotFactor <- function(f, y, ...){
       tydat = y.train,
       exdat = exdat,
       tau = tau,
-      gradients = TRUE
+      gradients = TRUE,
+      lp.first.se.demand = FALSE
     )$quantgrad
     if (length(dim(g)) == 3L) {
       as.vector(g[, gradient.index, , drop = TRUE])
@@ -14481,6 +14495,7 @@ plotFactor <- function(f, y, ...){
                                    small = 1.490116e-05,
                                    itmax = 10000,
                                    .np.empty.report = NULL,
+                                   lp.first.se.demand = NULL,
                                    ...) {
   if (inherits(bws, "lsqregressionbandwidth")) {
     return(.np_plot_lsqregression_eval(
@@ -14596,7 +14611,8 @@ plotFactor <- function(f, y, ...){
           tol = tol,
           small = small,
           itmax = itmax,
-          comm = 1L
+          comm = 1L,
+          lp.first.se.demand = lp.first.se.demand
         )
         myout <- .npqreg_fit_tau_vector_from_parallel_matrix(
           mat,
@@ -14645,7 +14661,8 @@ plotFactor <- function(f, y, ...){
           tol = tol,
           small = small,
           itmax = itmax,
-          cdf.cache = cdf.cache
+          cdf.cache = cdf.cache,
+          lp.first.se.demand = lp.first.se.demand
         )
         qdelta <- .npqreg_mark_clamped_delta(qdelta, qclamp)
         list(
@@ -16479,7 +16496,8 @@ compute.default.error.range <- function(center, err) {
       eydat = eydat,
       cdf = cdf,
       gradients = TRUE,
-      gradient.order = gradient.order
+      gradient.order = gradient.order,
+      lp.first.se.demand = FALSE
     )
     .np_plot_extract_conditional_gradient(
       fit = fit,
