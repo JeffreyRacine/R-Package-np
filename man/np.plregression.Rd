@@ -24,14 +24,16 @@ npplreg(bws, \dots)
         data = NULL, 
         newdata = NULL, 
         y.eval = FALSE, 
-        \dots)
+        \dots,
+        se = FALSE)
 
 \method{npplreg}{default}(bws,
         txdat,
         tydat,
         tzdat,
         nomad = FALSE,
-        \dots)
+        \dots,
+        se = FALSE)
 
 \method{npplreg}{plbandwidth}(bws,
         txdat = stop("training data txdat missing"),
@@ -41,7 +43,8 @@ npplreg(bws, \dots)
         eydat,
         ezdat,
         residuals = FALSE,
-        \dots)
+        \dots,
+        se = FALSE)
 }
 \arguments{
 \subsection{Data, Bandwidth Inputs And Formula Interface}{
@@ -154,6 +157,18 @@ These arguments control where the partially linear regression is evaluated and w
     omitted, the training data are used.
   }
 
+
+  \item{se}{
+    a scalar logical value indicating whether to compute and retain
+    coefficient standard errors and their asymptotic covariance matrix.
+    Defaults to \code{FALSE}; coefficients, fitted values, residuals and
+    bandwidth selection do not depend on this switch. Use \code{TRUE}
+    before extracting \code{coef(object, se = TRUE)} or \code{vcov(object)}.
+    These extractors do not refit the model. If uncertainty was omitted,
+    \code{npplreg(bws = object$bws, se = TRUE)} reuses the bandwidths
+    without repeating search; supply the original training data if they
+    are no longer recoverable from the bandwidth object.
+  }
 
   \item{residuals}{
     a logical value indicating that you want residuals computed and
@@ -277,9 +292,12 @@ Further arguments are passed to \code{\link{npplregbw}} and its component \code{
   returns a list with components \code{fit} and \code{se.fit}. The
   \code{se.fit} component contains asymptotic prediction standard errors
   computed from the partially linear fitted-value linear operator and
-  the squared residuals from the training fit.
+  the squared residuals from the training fit. This explicit prediction
+  request works even when the original model used \code{se = FALSE};
+  it does not require coefficient covariance or alter the original object.
 
-  Coefficient covariance allows conditional heteroskedasticity. Let
+  With \code{se = TRUE}, coefficient covariance allows conditional
+  heteroskedasticity. Let
   \eqn{\widetilde X} be the residualized linear design, \eqn{u} the residuals
   from the training fit, and \eqn{A=\widetilde X'\widetilde X}. The returned
   covariance is
@@ -298,8 +316,11 @@ Further arguments are passed to \code{\link{npplregbw}} and its component \code{
     evaluation points }
   \item{xcoef}{ coefficient(s) corresponding to the components
     \eqn{\beta_i}{B[i]} in the model }
-  \item{xcoeferr}{ standard errors of the coefficients }
-  \item{xcoefvcov}{ covariance matrix of the coefficients }
+  \item{xcoeferr}{ standard errors of the coefficients, or \code{NULL}
+    when \code{se = FALSE} }
+  \item{xcoefvcov}{ covariance matrix of the coefficients, or \code{NULL}
+    when \code{se = FALSE} }
+  \item{se}{ whether coefficient uncertainty was requested }
   \item{bws}{ the canonical bandwidth object, stored as a
     \code{plbandwidth} object }
   \item{bw}{ backward-compatible alias for \code{bws} }
@@ -434,7 +455,7 @@ z1 <- factor(z1)
 
 bw <- npplregbw(formula=y~x1+x2|z1+z2)
 
-pl <- npplreg(bws=bw)
+pl <- npplreg(bws=bw, se=TRUE)
 
 summary(pl)
 

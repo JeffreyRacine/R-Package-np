@@ -16,7 +16,7 @@ plregression =
            ntrain, trainiseval = FALSE, residuals = FALSE,
            xtra = double(6),
            timing = NA, total.time = NA,
-           optim.time = NA, fit.time = NA){
+           optim.time = NA, fit.time = NA, se = TRUE){
 
     if (missing(bws) || missing(evalx) || missing(evalz) || missing(mean) || missing(ntrain) || missing(xcoef))
       stop("improper invocation of plregression constructor")
@@ -27,6 +27,7 @@ plregression =
       xcoef = xcoef,
       xcoeferr = xcoeferr,
       xcoefvcov = xcoefvcov,      
+      se = se,
       pregtype = bws$pregtype,
       data.znames = names(evalz),
       data.xnames = names(evalx),
@@ -58,8 +59,11 @@ plregression =
       fit.time = fit.time
       )
 
-    names(d$xcoeferr) <- names(d$xcoef) <- d$data.xnames
-    dimnames(d$xcoefvcov) <- list(d$data.xnames, d$data.xnames)
+    names(d$xcoef) <- d$data.xnames
+    if (length(d$xcoeferr))
+      names(d$xcoeferr) <- d$data.xnames
+    if (length(d$xcoefvcov))
+      dimnames(d$xcoefvcov) <- list(d$data.xnames, d$data.xnames)
     
     class(d) = "plregression"
     
@@ -108,15 +112,21 @@ coef.plregression <- function(object, se = FALSE, ...) {
   se <- npValidateScalarLogical(se, "se")
   if(!se)
     return(object$xcoef)
-  if (is.null(object$xcoeferr) || !length(object$xcoeferr))
-    stop("coefficient standard errors were not computed", call. = FALSE)
-  object$xcoeferr
+  .np_require_stored_se(
+    object, object[["xcoeferr", exact = TRUE]], family = "npplreg",
+    what = "coefficient standard errors", expr = substitute(object),
+    bws.field = if (is.null(object[["bws", exact = TRUE]]) &&
+      inherits(object[["bw", exact = TRUE]], "plbandwidth")) "bw" else "bws"
+  )
 }
 
 vcov.plregression <- function(object,...) {
-  if (is.null(object$xcoefvcov) || !length(object$xcoefvcov))
-    stop("coefficient covariance was not computed", call. = FALSE)
-  object$xcoefvcov
+  .np_require_stored_se(
+    object, object[["xcoefvcov", exact = TRUE]], family = "npplreg",
+    what = "coefficient covariance estimates", expr = substitute(object),
+    bws.field = if (is.null(object[["bws", exact = TRUE]]) &&
+      inherits(object[["bw", exact = TRUE]], "plbandwidth")) "bw" else "bws"
+  )
 }
 
 fitted.plregression <- function(object, ...){
@@ -196,7 +206,7 @@ residuals.plregression <- function(object, ...) {
 
 .np_plreg_predict_se <- function(bws, fit) {
   dat <- .np_plreg_predict_se_data(bws = bws, fit = fit)
-  train.fit <- npplreg(bws = bws, residuals = TRUE)
+  train.fit <- npplreg(bws = bws, residuals = TRUE, se = FALSE)
   u <- as.numeric(residuals(train.fit))
   if (length(u) != nrow(dat$txdat))
     stop("internal error: residual length does not match training rows")

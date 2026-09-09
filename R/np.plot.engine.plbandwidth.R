@@ -221,7 +221,8 @@
           bws = bws,
           txdat = xdat,
           tydat = ydat,
-          tzdat = zdat
+          tzdat = zdat,
+          se = TRUE
         )
       } else {
         .np_plot_plreg_local_fit(
@@ -229,7 +230,8 @@
           xdat = xdat,
           ydat = ydat,
           zdat = zdat,
-          .np.empty.report = .np.empty.report
+          .np.empty.report = .np.empty.report,
+          se = plot.errors || plot.behavior != "plot"
         )
       }
       cf <- as.double(fit.coef$xcoef)
@@ -353,7 +355,8 @@
           zdat = zdat,
           exdat = x.eval[,1, drop = FALSE],
           ezdat = x.eval[,2, drop = FALSE],
-          .np.empty.report = .np.empty.report
+          .np.empty.report = .np.empty.report,
+          se = plot.behavior != "plot"
         )
       }
 
@@ -740,7 +743,8 @@
             zdat = zdat,
             exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
             ezdat = ezdat[seq_len(xi.neval),, drop = FALSE],
-            .np.empty.report = .np.empty.report
+            .np.empty.report = .np.empty.report,
+            se = plot.behavior != "plot"
           )
         }
 
@@ -1047,7 +1051,8 @@
             zdat = zdat,
             exdat = exdat[seq_len(xi.neval),, drop = FALSE],
             ezdat = subcol(ezdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
-            .np.empty.report = .np.empty.report
+            .np.empty.report = .np.empty.report,
+            se = plot.behavior != "plot"
           )
         }
 

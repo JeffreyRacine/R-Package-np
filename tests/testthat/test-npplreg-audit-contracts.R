@@ -53,7 +53,8 @@ test_that("npplreg direct default route preserves vector response and explicit-b
     txdat = dat$xdat,
     tydat = dat$ydat,
     tzdat = dat$zdat,
-    bandwidth.compute = FALSE
+    bandwidth.compute = FALSE,
+    se = TRUE
   )
   bw <- npplregbw(
     xdat = dat$xdat,
@@ -62,7 +63,7 @@ test_that("npplreg direct default route preserves vector response and explicit-b
     bws = bw.mat,
     bandwidth.compute = FALSE
   )
-  explicit <- npplreg(bws = bw)
+  explicit <- npplreg(bws = bw, se = TRUE)
   auto <- npplreg(
     txdat = dat$xdat,
     tydat = dat$ydat,
@@ -184,7 +185,7 @@ test_that("npplreg plot-center local fit stays parity-clean across bandwidth typ
   for (bwtype in c("fixed", "adaptive_nn", "generalized_nn")) {
     bw.value <- if (identical(bwtype, "fixed")) 0.55 else 5
     bw <- npplreg_audit_bw(dat, bw = bw.value, bwtype = bwtype)
-    fit <- npplreg(bws = bw, exdat = ex, ezdat = ez)
+    fit <- npplreg(bws = bw, exdat = ex, ezdat = ez, se = TRUE)
     plotfit <- local_fit(
       bws = bw,
       xdat = dat$xdat,

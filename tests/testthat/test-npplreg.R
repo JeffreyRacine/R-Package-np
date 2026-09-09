@@ -73,9 +73,9 @@ test_that("npplreg all-categorical z profile route preserves fitted values", {
   )
 
   options(np.tree = FALSE, np.categorical.compress = FALSE)
-  dense <- npplreg(bws = bw)
+  dense <- npplreg(bws = bw, se = TRUE)
   options(np.tree = FALSE, np.categorical.compress = TRUE)
-  profile <- npplreg(bws = bw)
+  profile <- npplreg(bws = bw, se = TRUE)
 
   expect_equal(coef(profile), coef(dense), tolerance = 1e-8)
   expect_equal(fitted(profile), fitted(dense), tolerance = 1e-7)
