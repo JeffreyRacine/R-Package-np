@@ -318,6 +318,7 @@
         )
       } else {
         tobj <- .np_plot_conditional_eval(
+          se = plot.behavior != "plot" || plot.errors.method == "asymptotic",
           bws = bws,
           xdat = xdat,
           ydat = ydat,
@@ -335,6 +336,7 @@
                       "dist" = tobj$condist,
                       "dens" = tobj$condens)
       tcerr <- if (quantreg) tobj$quanterr else tobj$conderr
+      if (is.null(tcerr)) tcerr <- rep.int(NA_real_, length(tcomp))
       tex <- if (quantreg) x.eval else x.eval[,1]
       tey <- if (quantreg) NA else x.eval[,2]
 
@@ -836,6 +838,7 @@
           )
         } else {
           tobj <- .np_plot_conditional_eval(
+            se = plot.behavior != "plot" || plot.errors.method == "asymptotic",
             bws = bws,
             xdat = xdat,
             ydat = ydat,
@@ -873,6 +876,8 @@
           }
         }
         err.extract <- function(obj, jj){
+          if (!quantreg && is.null(obj[["conderr", exact = TRUE]]))
+            return(rep.int(NA_real_, length(eval.extract(obj, jj))))
           if (gradients) {
             if (quantreg) quantile_error_extract(obj, jj) else obj$congerr[,jj]
           } else if (quantreg) {
@@ -1244,6 +1249,7 @@
             )
           } else {
             tobj <- .np_plot_conditional_eval(
+              se = plot.behavior != "plot" || plot.errors.method == "asymptotic",
               bws = bws,
               xdat = xdat,
               ydat = ydat,
@@ -1275,6 +1281,8 @@
             }
           }
           err.extract <- function(obj, jj){
+            if (!quantreg && is.null(obj[["conderr", exact = TRUE]]))
+              return(rep.int(NA_real_, length(eval.extract(obj, jj))))
             if (gradients) {
               if (quantreg) rep(NA_real_, length(eval.extract(obj, jj))) else obj$congerr[,jj]
             } else if (quantreg) {

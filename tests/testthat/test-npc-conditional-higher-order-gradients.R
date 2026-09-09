@@ -22,7 +22,7 @@ test_that("npcdens exposes lp higher-order continuous gradients via hat operator
       bandwidth.compute = FALSE
     )
 
-    fit <- npcdens(
+    fit <- npcdens(se = TRUE,
       bws = bw,
       txdat = x,
       tydat = y,
@@ -66,7 +66,7 @@ test_that("npcdist exposes lp higher-order continuous gradients via hat operator
       bandwidth.compute = FALSE
     )
 
-    fit <- npcdist(
+    fit <- npcdist(se = TRUE,
       bws = bw,
       txdat = x,
       tydat = y,
@@ -101,7 +101,7 @@ test_that("conditional higher-order gradient requests validate scope", {
     bandwidth.compute = FALSE
   )
   expect_error(
-    npcdens(bws = bw.ll, txdat = x, tydat = y, gradients = TRUE,
+    npcdens(se = TRUE, bws = bw.ll, txdat = x, tydat = y, gradients = TRUE,
             gradient.order = 2L),
     "no available derivative components"
   )
@@ -115,7 +115,7 @@ test_that("conditional higher-order gradient requests validate scope", {
     bandwidth.compute = FALSE
   )
   expect_error(
-    npcdist(bws = bw.lp1, txdat = x, tydat = y, gradients = TRUE,
+    npcdist(se = TRUE, bws = bw.lp1, txdat = x, tydat = y, gradients = TRUE,
             gradient.order = 2L),
     "no available derivative components"
   )
@@ -128,7 +128,7 @@ test_that("formula routes keep gradient.order out of bandwidth selection", {
     y = seq(0, 1, length.out = 28)^2 + rnorm(28, sd = 0.02)
   )
 
-  fit.dens <- npcdens(
+  fit.dens <- npcdens(se = TRUE,
     y ~ x,
     data = dat,
     regtype = "lp",
@@ -139,7 +139,7 @@ test_that("formula routes keep gradient.order out of bandwidth selection", {
   )
   expect_equal(fit.dens$gradient.order, 2L)
 
-  fit.dist <- npcdist(
+  fit.dist <- npcdist(se = TRUE,
     y ~ x,
     data = dat,
     regtype = "lp",
@@ -186,7 +186,7 @@ test_that("conditional plot data honors higher-order gradient requests", {
 
     slice <- plot.out[[1L]]
     eval.fun <- if (inherits(bw, "condbandwidth")) npcdist else npcdens
-    fit <- eval.fun(
+    fit <- eval.fun(se = TRUE,
       bws = bw,
       txdat = x,
       tydat = y,

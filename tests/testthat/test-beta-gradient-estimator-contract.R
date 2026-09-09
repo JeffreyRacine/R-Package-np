@@ -106,16 +106,16 @@ test_that("conditional beta gradients match finite differences", {
       cykertype = "beta", cykerorder = 8,
       cykerbound = "fixed", cykerlb = 0, cykerub = 1
     )
-    fit <- fitfun(bws = bw, txdat = training_x, tydat = training_y,
+    fit <- fitfun(se = TRUE, bws = bw, txdat = training_x, tydat = training_y,
                   exdat = evaluation_x, eydat = evaluation_y,
                   gradients = TRUE)
     plus <- minus <- evaluation_x
     plus$x <- plus$x + step
     minus$x <- minus$x - step
     oracle <- (
-      fitted(fitfun(bws = bw, txdat = training_x, tydat = training_y,
+      fitted(fitfun(se = TRUE, bws = bw, txdat = training_x, tydat = training_y,
                     exdat = plus, eydat = evaluation_y)) -
-      fitted(fitfun(bws = bw, txdat = training_x, tydat = training_y,
+      fitted(fitfun(se = TRUE, bws = bw, txdat = training_x, tydat = training_y,
                     exdat = minus, eydat = evaluation_y))
     ) / (2 * step)
     expect_equal(as.double(gradients(fit)), oracle, tolerance = 5e-6)
@@ -146,7 +146,7 @@ test_that("conditional beta endpoint gradient limits survive response scaling", 
       fit <- NULL
       endpoint_warnings <- character()
       fit <- withCallingHandlers(
-        fitfun(
+        fitfun(se = TRUE,
           bws = bw, txdat = training_x, tydat = training_y,
           exdat = evaluation_x, eydat = evaluation_y,
           gradients = TRUE
@@ -162,7 +162,7 @@ test_that("conditional beta endpoint gradient limits survive response scaling", 
       expect_true(length(endpoint_warnings) > 0L)
       expect_true(all(grepl("infinite endpoint", endpoint_warnings)))
 
-      evaluate <- function(x, y) fitted(fitfun(
+      evaluate <- function(x, y) fitted(fitfun(se = TRUE,
         bws = bw, txdat = training_x, tydat = training_y,
         exdat = data.frame(x = x), eydat = data.frame(y = y)
       ))
@@ -210,11 +210,11 @@ test_that("conditional beta endpoint gradients have finite one-sided limits", {
       cykertype = "beta", cykerorder = 8,
       cykerbound = "fixed", cykerlb = 0, cykerub = 1
     )
-    evaluate <- function(x, y) fitted(fitfun(
+    evaluate <- function(x, y) fitted(fitfun(se = TRUE,
       bws = bw, txdat = training_x, tydat = training_y,
       exdat = data.frame(x = x), eydat = data.frame(y = y)
     ))
-    fit <- fitfun(
+    fit <- fitfun(se = TRUE,
       bws = bw, txdat = training_x, tydat = training_y,
       exdat = data.frame(x = c(0, 1)), eydat = evaluation_y,
       gradients = TRUE

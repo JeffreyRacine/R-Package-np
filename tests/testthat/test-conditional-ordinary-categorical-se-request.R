@@ -11,7 +11,7 @@ test_that("ordinary categorical errors use complete paired endpoint influences",
   b <- npcdensbw(xdat=x,ydat=y,bws=c(.16,.25,.3,.2),
     bandwidth.compute=FALSE,bwscaling=FALSE,regtype="lc",
     oxkertype="wangvanryzin",uxkertype="aitchisonaitken")
-  run <- function(demand=NULL) npcdens(bws=b,txdat=x,tydat=y,
+  run <- function(demand=NULL) npcdens(se = TRUE, bws=b,txdat=x,tydat=y,
     exdat=ex,eydat=ey,gradients=TRUE,.np_conditional_cat_se_demand=demand)
   fit <- run(); none <- run(FALSE); subset <- run(c(TRUE,FALSE))
   expected <- matrix(0,3L,2L)
@@ -39,7 +39,7 @@ test_that("ordinary categorical errors use complete paired endpoint influences",
   expect_identical(fit$congerr[,2L],none$congerr[,2L])
   expect_identical(unname(fit$congerr[1L,3L]),0)
   expect_error(run(c(TRUE,NA)),"demand")
-  expect_error(npcdens(bws=b,txdat=x,tydat=y,gradients=TRUE,
+  expect_error(npcdens(se = TRUE, bws=b,txdat=x,tydat=y,gradients=TRUE,
     .np_conditional_cat_se_demnad=FALSE),"unrecognized|unused|unknown")
 })
 
@@ -48,7 +48,7 @@ test_that("ordinary categorical inference retains legitimate zero variance", {
   y <- data.frame(y=seq(.1,.9,length.out=20L))
   b <- npcdensbw(xdat=x,ydat=y,bws=c(.2,.2),bandwidth.compute=FALSE,
     regtype="lc",cykertype="uniform")
-  fit <- npcdens(bws=b,txdat=x,tydat=y,exdat=x[1:2,,drop=FALSE],
+  fit <- npcdens(se = TRUE, bws=b,txdat=x,tydat=y,exdat=x[1:2,,drop=FALSE],
     eydat=data.frame(y=c(10,10)),gradients=TRUE)
   expect_identical(as.vector(fitted(fit)),c(0,0))
   expect_identical(as.vector(fit$congerr),c(0,0))

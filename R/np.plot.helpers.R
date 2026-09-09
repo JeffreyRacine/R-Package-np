@@ -9023,7 +9023,8 @@ plotFactor <- function(f, y, ...){
       gradients = TRUE,
       gradient.order = gradient.order,
       lp.first.se.demand = FALSE,
-      cat.se.demand = FALSE
+      cat.se.demand = FALSE,
+      se = FALSE
     )
     .np_plot_extract_conditional_gradient(
       fit = fit,
@@ -9507,7 +9508,8 @@ plotFactor <- function(f, y, ...){
                                       proper.method = NULL,
                                       proper.control = list(),
                                       lp.first.se.demand = NULL,
-                                      cat.se.demand = NULL) {
+                                      cat.se.demand = NULL,
+                                      se = TRUE) {
   activity <- .np_plot_activity_begin(
     if (isTRUE(cdf)) {
       "Computing conditional distribution plot fit"
@@ -9529,7 +9531,8 @@ plotFactor <- function(f, y, ...){
     proper.method = proper.method,
     proper.control = proper.control,
     lp.first.se.demand = lp.first.se.demand,
-    cat.se.demand = cat.se.demand
+    cat.se.demand = cat.se.demand,
+    se = se
   )
 }
 
@@ -9546,7 +9549,9 @@ plotFactor <- function(f, y, ...){
                                           proper.method = NULL,
                                           proper.control = list(),
                                           lp.first.se.demand = NULL,
-                                          cat.se.demand = NULL) {
+                                          cat.se.demand = NULL,
+                                          se = TRUE) {
+  se <- npValidateScalarLogical(se, "se")
   fit.start <- proc.time()[3]
   lp.first.se.demand <- .np_conditional_first_se_demand(
     lp.first.se.demand, bws$xncon)
@@ -9684,10 +9689,10 @@ plotFactor <- function(f, y, ...){
   }
   basis.code <- as.integer(npLpBasisCode(basis.engine))
   do.compiled.gradients <- isTRUE(gradients) && !glp.gradient.partial
-  first.se.request <- .np_conditional_first_se_request(
+  first.se.request <- if (!se) NULL else .np_conditional_first_se_request(
     gradients, glp.gradient.partial, degree.engine, glp.gradient.order,
     glp.gradient.available, lp.first.se.demand)
-  cat.se.request <- .np_conditional_cat_se_request(
+  cat.se.request <- if (!se) NULL else .np_conditional_cat_se_request(
     gradients, glp.gradient.partial, glp.categorical.effects,
     bws, cat.se.demand)
   beta.kernel <- identical(bws$cxkertype, "beta") ||
@@ -9783,6 +9788,7 @@ plotFactor <- function(f, y, ...){
     basis.code,
     first.se.request,
     cat.se.request,
+    se,
     PACKAGE = "np"
   )
 
@@ -9796,8 +9802,10 @@ plotFactor <- function(f, y, ...){
     rorder[c(xidx[bws$ixcon], xidx[bws$ixuno], xidx[bws$ixord])] <- xidx
     myout$congrad <- matrix(data = myout$congrad, nrow = enrow, ncol = bws$xndim, byrow = FALSE)
     myout$congrad <- myout$congrad[, rorder, drop = FALSE]
-    myout$congerr <- matrix(data = myout$congerr, nrow = enrow, ncol = bws$xndim, byrow = FALSE)
-    myout$congerr <- myout$congerr[, rorder, drop = FALSE]
+    if (se) {
+      myout$congerr <- matrix(data = myout$congerr, nrow = enrow, ncol = bws$xndim, byrow = FALSE)
+      myout$congerr <- myout$congerr[, rorder, drop = FALSE]
+    }
 
     if (identical(reg.engine, "lp") && bws$xncon > 0L && !lp.degree0.lc.gradient) {
       cont.idx <- which(bws$ixcon)
@@ -9818,13 +9826,13 @@ plotFactor <- function(f, y, ...){
             output = "apply",
             s = svec
           ))
-          myout$congerr[, cont.idx[jj]] <- NA_real_
+          if (se) myout$congerr[, cont.idx[jj]] <- NA_real_
         }
       }
     }
   } else if (isTRUE(gradients)) {
     myout$congrad <- matrix(NA_real_, nrow = enrow, ncol = bws$xndim)
-    myout$congerr <- matrix(NA_real_, nrow = enrow, ncol = bws$xndim)
+    if (se) myout$congerr <- matrix(NA_real_, nrow = enrow, ncol = bws$xndim)
     cont.idx <- which(bws$ixcon)
     if (any(glp.gradient.available)) {
       rhs <- rep.int(1.0, nrow(hat.context$xdat))
@@ -9846,7 +9854,7 @@ plotFactor <- function(f, y, ...){
     }
   } else {
     myout$congrad <- NA
-    myout$congerr <- NA
+    myout$congerr <- if (se) NA else NULL
   }
 
   if (isTRUE(gradients) &&
@@ -9864,7 +9872,7 @@ plotFactor <- function(f, y, ...){
     )
     cat.idx <- which(bws$ixuno | bws$ixord)
     myout$congrad[, cat.idx] <- cat.grad[, cat.idx, drop = FALSE]
-    myout$congerr[, cat.idx] <- NA_real_
+    if (se) myout$congerr[, cat.idx] <- NA_real_
   }
 
   myout <- .np_conditional_merge_first_se(
@@ -9890,7 +9898,8 @@ plotFactor <- function(f, y, ...){
       timing = bws$timing,
       total.time = total.time,
       optim.time = optim.time,
-      fit.time = fit.elapsed
+      fit.time = fit.elapsed,
+      se = se
     )
 
     if (isTRUE(proper)) {
@@ -9922,7 +9931,8 @@ plotFactor <- function(f, y, ...){
       timing = bws$timing,
       total.time = total.time,
       optim.time = optim.time,
-      fit.time = fit.elapsed
+      fit.time = fit.elapsed,
+      se = se
     )
 
     if (isTRUE(proper)) {
@@ -11420,7 +11430,8 @@ compute.default.error.range <- function(center, err) {
       gradients = TRUE,
       gradient.order = gradient.order,
       lp.first.se.demand = FALSE,
-      cat.se.demand = FALSE
+      cat.se.demand = FALSE,
+      se = FALSE
     )
     .np_plot_extract_conditional_gradient(
       fit = fit,

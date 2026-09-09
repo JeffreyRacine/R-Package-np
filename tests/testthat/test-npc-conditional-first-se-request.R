@@ -17,7 +17,7 @@ test_that("partial conditional LP restores only requested first derivative error
   for(cdf in c(FALSE,TRUE)) {
     d <- l1_conditional_fixture(cdf)
     fun <- if(cdf)npcdist else npcdens
-    a <- list(bws=d$b,txdat=d$x,tydat=d$y,exdat=d$ex,eydat=d$ey,gradients=TRUE)
+    a <- list(bws=d$b,txdat=d$x,tydat=d$y,exdat=d$ex,eydat=d$ey,gradients=TRUE,se=TRUE)
     none <- suppressWarnings(do.call(fun,c(a,list(.np_lp_first_se_demand=FALSE))))
     fit <- suppressWarnings(do.call(fun,a))
     expected <- vapply(seq_len(nrow(d$ex)),function(j) {
@@ -66,7 +66,7 @@ test_that("partial conditional LP masks two directions in original column order"
     bandwidth.compute=FALSE,bwscaling=FALSE,regtype="lp",
     degree=c(1L,0L,1L),basis="additive")
   args <- list(bws=b,txdat=x,tydat=d$y,exdat=x[e,,drop=FALSE],
-    eydat=d$ey,gradients=TRUE)
+    eydat=d$ey,gradients=TRUE,se=TRUE)
   full <- suppressWarnings(do.call(npcdist,args))
   subset <- suppressWarnings(do.call(npcdist,c(args,list(
     .np_lp_first_se_demand=c(FALSE,FALSE,TRUE)))))

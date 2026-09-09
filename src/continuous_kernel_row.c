@@ -3636,7 +3636,7 @@ np_continuous_kernel_beta_conditional_moment_rows_validated(
      leave_one_out_offset < 0 ||
      (positive_weights != 0 && positive_weights != 1) ||
      plan->operator == NULL || response == NULL || workspace == NULL ||
-     row_result == NULL || mean == NULL || mean_stderr == NULL ||
+     row_result == NULL || mean == NULL ||
      (leave_one_out &&
       (plan->num_eval > plan->num_train ||
        leave_one_out_offset > plan->num_train - plan->num_eval)))
@@ -3725,15 +3725,17 @@ np_continuous_kernel_beta_conditional_moment_rows_validated(
       return NP_CONTINUOUS_ROW_ERR_NUMERIC;
 
     mean[evaluation] = weighted_mean;
-    status = np_continuous_kernel_beta_conditional_influence_stderr(
-      workspace, response, plan->num_train, omitted_observation,
-      row_result->total_log_scale, weighted_mean, total_weight,
-      &validation_m2,
-      &mean_stderr[evaluation]);
-    if(status != NP_CONTINUOUS_ROW_OK)
-      return status;
-    if(!R_FINITE(mean_stderr[evaluation]))
-      return NP_CONTINUOUS_ROW_ERR_NUMERIC;
+    if(mean_stderr != NULL) {
+      status = np_continuous_kernel_beta_conditional_influence_stderr(
+        workspace, response, plan->num_train, omitted_observation,
+        row_result->total_log_scale, weighted_mean, total_weight,
+        &validation_m2,
+        &mean_stderr[evaluation]);
+      if(status != NP_CONTINUOUS_ROW_OK)
+        return status;
+      if(!R_FINITE(mean_stderr[evaluation]))
+        return NP_CONTINUOUS_ROW_ERR_NUMERIC;
+    }
     if(progress != NULL)
       progress(evaluation + 1, plan->num_eval);
     if((evaluation & 31) == 0)

@@ -133,7 +133,8 @@ test_that("conditional generalized-NN fit uncertainty surfaces retain tree parit
     fits <- lapply(c(FALSE, TRUE), function(tree) {
       options(np.tree = tree)
       do.call(if (distribution) npcdist else npcdens, list(
-        bws = bw, txdat = x, tydat = data.frame(y = y), gradients = TRUE
+        bws = bw, txdat = x, tydat = data.frame(y = y), gradients = TRUE,
+        se = TRUE
       ))
     })
     fields <- c(if (distribution) "condist" else "condens",

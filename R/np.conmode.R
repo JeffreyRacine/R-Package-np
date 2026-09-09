@@ -439,6 +439,7 @@ npconmode.condbandwidth <-
       eydat = rep(efac[block], each = enrow),
       bws = bws,
       gradients = block.gradients,
+      se = TRUE,
       .np_lp_first_se_demand = FALSE,
       .np_conditional_cat_se_demand = FALSE,
       .np_categorical_effects = !isTRUE(direct.categorical.effects)

@@ -20,6 +20,13 @@
   reuse the bandwidth object without repeating search. Explicit prediction
   standard errors and asymptotic plots continue to request their needed work.
 
+* Conditional density and distribution fitting now have a named-only
+  `se=FALSE` default. Disabled errors skip uncertainty-only native work and
+  are stored as `NULL`; fitted values and requested gradients are unchanged.
+  Use `se=TRUE` for available asymptotic errors, or refit a retained bandwidth
+  object to obtain them without repeating search. Prediction with
+  `se.fit=TRUE` requests the needed work explicitly.
+
 * Ordinary scalar conditional categorical-gradient standard errors now use
   complete paired same-observation influences, including endpoint covariance.
   Requested errors use an additional streamed inference pass and can increase

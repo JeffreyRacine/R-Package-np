@@ -136,11 +136,11 @@ test_that("conditional beta X and Y kernels match side-weight ratios", {
     )
     density_bw <- do.call(npcdensbw, common)
     distribution_bw <- do.call(npcdistbw, common)
-    density <- npcdens(
+    density <- npcdens(se = TRUE,
       bws = density_bw, txdat = training_x, tydat = training_y,
       exdat = evaluation_x, eydat = evaluation_y
     )
-    distribution <- npcdist(
+    distribution <- npcdist(se = TRUE,
       bws = distribution_bw, txdat = training_x, tydat = training_y,
       exdat = evaluation_x, eydat = evaluation_y
     )
@@ -208,7 +208,7 @@ test_that("simultaneous beta X and Y uses the canonical conditional LP engine", 
         list(regtype = "lp", degree = specification$degree,
              basis = "glp", bernstein.basis = specification$bernstein)
       ))
-      fit <- estimator(
+      fit <- estimator(se = TRUE,
         bws = bw, txdat = training_x, tydat = training_y,
         exdat = evaluation_x, eydat = evaluation_y, gradients = TRUE
       )
@@ -238,11 +238,11 @@ test_that("simultaneous beta X and Y uses the canonical conditional LP engine", 
     list(regtype = "lp", degree = 1L, basis = "glp",
          bernstein.basis = FALSE)
   ))
-  ll_fit <- npcdens(
+  ll_fit <- npcdens(se = TRUE,
     bws = ll_bw, txdat = training_x, tydat = training_y,
     exdat = evaluation_x, eydat = evaluation_y, gradients = TRUE
   )
-  lp1_fit <- npcdens(
+  lp1_fit <- npcdens(se = TRUE,
     bws = lp1_bw, txdat = training_x, tydat = training_y,
     exdat = evaluation_x, eydat = evaluation_y, gradients = TRUE
   )
@@ -296,11 +296,11 @@ test_that("beta and legacy conditional kernels can be mixed by side", {
     }
     density_bw <- do.call(npcdensbw, common)
     distribution_bw <- do.call(npcdistbw, common)
-    density <- npcdens(
+    density <- npcdens(se = TRUE,
       bws = density_bw, txdat = x_train, tydat = y_train,
       exdat = x_eval, eydat = y_eval
     )
-    distribution <- npcdist(
+    distribution <- npcdist(se = TRUE,
       bws = distribution_bw, txdat = x_train, tydat = y_train,
       exdat = x_eval, eydat = y_eval
     )
@@ -350,11 +350,11 @@ test_that("conditional influence keeps optional derivative weights independent",
     constructor <- if (identical(kind, "density")) npcdensbw else npcdistbw
     estimator <- if (identical(kind, "density")) npcdens else npcdist
     bandwidth <- do.call(constructor, common)
-    fit_without_derivatives <- estimator(
+    fit_without_derivatives <- estimator(se = TRUE,
       bws = bandwidth, txdat = training_x, tydat = training_y,
       exdat = evaluation_x, eydat = evaluation_y, gradients = FALSE
     )
-    fit_with_derivatives <- estimator(
+    fit_with_derivatives <- estimator(se = TRUE,
       bws = bandwidth, txdat = training_x, tydat = training_y,
       exdat = evaluation_x, eydat = evaluation_y, gradients = TRUE
     )
@@ -381,7 +381,7 @@ test_that("beta conditional distribution is exact at dependent support endpoints
     cykertype = "beta", cykerorder = 8,
     cykerbound = "fixed", cykerlb = 0, cykerub = 1
   )
-  fit <- npcdist(
+  fit <- npcdist(se = TRUE,
     bws = bw, txdat = training_x, tydat = training_y,
     exdat = evaluation_x, eydat = evaluation_y
   )
@@ -408,16 +408,16 @@ test_that("conditional beta supports formula objects and prediction", {
   )
   density_bw <- do.call(npcdensbw, common)
   distribution_bw <- do.call(npcdistbw, common)
-  density_formula <- npcdens(bws = density_bw, data = training,
+  density_formula <- npcdens(se = TRUE, bws = density_bw, data = training,
                              newdata = evaluation)
-  distribution_formula <- npcdist(bws = distribution_bw, data = training,
+  distribution_formula <- npcdist(se = TRUE, bws = distribution_bw, data = training,
                                    newdata = evaluation)
-  density_native <- npcdens(
+  density_native <- npcdens(se = TRUE,
     bws = density_bw,
     txdat = training["x"], tydat = training["y"],
     exdat = evaluation["x"], eydat = evaluation["y"]
   )
-  distribution_native <- npcdist(
+  distribution_native <- npcdist(se = TRUE,
     bws = distribution_bw,
     txdat = training["x"], tydat = training["y"],
     exdat = evaluation["x"], eydat = evaluation["y"]
@@ -455,7 +455,7 @@ test_that("conditional beta supports local-constant gradient routes", {
     cxkertype = "beta", cxkerbound = "fixed",
     cxkerlb = 0, cxkerub = 1
   )
-  fit <- npcdens(bws = bw, txdat = training_x, tydat = training_y,
+  fit <- npcdens(se = TRUE, bws = bw, txdat = training_x, tydat = training_y,
                  gradients = TRUE)
   expect_equal(dim(gradients(fit)), c(nrow(training_x), 1L))
   expect_true(all(is.finite(gradients(fit))))
@@ -492,7 +492,7 @@ test_that("beta X uses the canonical conditional LP engine", {
       cxkerbound = "fixed", cxkerlb = 0, cxkerub = 1,
       cykertype = "gaussian", cykerorder = 4L
     )
-    fit <- npcdens(
+    fit <- npcdens(se = TRUE,
       bws = bw, txdat = training_x, tydat = training_y,
       exdat = evaluation_x, eydat = evaluation_y, gradients = TRUE
     )
@@ -522,11 +522,11 @@ test_that("beta X uses the canonical conditional LP engine", {
     cxkerbound = "fixed", cxkerlb = 0, cxkerub = 1,
     cykertype = "gaussian", cykerorder = 4L
   )
-  ll_fit <- npcdens(
+  ll_fit <- npcdens(se = TRUE,
     bws = ll_bw, txdat = training_x, tydat = training_y,
     exdat = evaluation_x, eydat = evaluation_y, gradients = TRUE
   )
-  lp1_fit <- npcdens(
+  lp1_fit <- npcdens(se = TRUE,
     bws = lp1_bw, txdat = training_x, tydat = training_y,
     exdat = evaluation_x, eydat = evaluation_y, gradients = TRUE
   )
@@ -572,7 +572,7 @@ test_that("beta X prepared NN bandwidths preserve scalar and LP algebra", {
       )
 
       scalar_bw <- do.call(constructor, c(common, list(regtype = "lc")))
-      scalar <- estimator(
+      scalar <- estimator(se = TRUE,
         bws = scalar_bw, txdat = training_x, tydat = training_y,
         exdat = evaluation_x, eydat = evaluation_y
       )
@@ -586,7 +586,7 @@ test_that("beta X prepared NN bandwidths preserve scalar and LP algebra", {
         list(regtype = "lp", degree = 2L, basis = "glp",
              bernstein.basis = FALSE)
       ))
-      lp <- estimator(
+      lp <- estimator(se = TRUE,
         bws = lp_bw, txdat = training_x, tydat = training_y,
         exdat = evaluation_x, eydat = evaluation_y, gradients = TRUE
       )
@@ -636,7 +636,7 @@ test_that("beta Y uses the canonical conditional scalar and LP engine", {
     )
 
     scalar_bw <- do.call(constructor, c(common, list(regtype = "lc")))
-    scalar <- estimator(
+    scalar <- estimator(se = TRUE,
       bws = scalar_bw, txdat = training_x, tydat = training_y,
       exdat = evaluation_x, eydat = evaluation_y, gradients = TRUE
     )
@@ -672,7 +672,7 @@ test_that("beta Y uses the canonical conditional scalar and LP engine", {
         list(regtype = "lp", degree = specification$degree,
              basis = "glp", bernstein.basis = specification$bernstein)
       ))
-      lp <- estimator(
+      lp <- estimator(se = TRUE,
         bws = lp_bw, txdat = training_x, tydat = training_y,
         exdat = evaluation_x, eydat = evaluation_y, gradients = TRUE
       )
@@ -701,11 +701,11 @@ test_that("beta Y uses the canonical conditional scalar and LP engine", {
     list(regtype = "lp", degree = 1L, basis = "glp",
          bernstein.basis = FALSE)
   ))
-  ll_fit <- npcdens(
+  ll_fit <- npcdens(se = TRUE,
     bws = ll_bw, txdat = training_x, tydat = training_y,
     exdat = evaluation_x, eydat = evaluation_y, gradients = TRUE
   )
-  lp1_fit <- npcdens(
+  lp1_fit <- npcdens(se = TRUE,
     bws = lp1_bw, txdat = training_x, tydat = training_y,
     exdat = evaluation_x, eydat = evaluation_y, gradients = TRUE
   )
@@ -750,7 +750,7 @@ test_that("beta Y prepared NN bandwidths preserve scalar and LP algebra", {
         cykerbound = "fixed", cykerlb = 0, cykerub = 1
       )
       scalar_bw <- do.call(constructor, c(common, list(regtype = "lc")))
-      scalar <- estimator(
+      scalar <- estimator(se = TRUE,
         bws = scalar_bw, txdat = training_x, tydat = training_y,
         exdat = evaluation_x, eydat = evaluation_y
       )
@@ -764,7 +764,7 @@ test_that("beta Y prepared NN bandwidths preserve scalar and LP algebra", {
         list(regtype = "lp", degree = 2L, basis = "glp",
              bernstein.basis = FALSE)
       ))
-      lp <- estimator(
+      lp <- estimator(se = TRUE,
         bws = lp_bw, txdat = training_x, tydat = training_y,
         exdat = evaluation_x, eydat = evaluation_y, gradients = TRUE
       )
@@ -803,7 +803,7 @@ test_that("adaptive beta-Y gradients preserve independent predictor planes", {
     cykertype = "beta", cykerorder = 6L,
     cykerbound = "fixed", cykerlb = 0, cykerub = 1
   )
-  fits <- replicate(3L, npcdens(
+  fits <- replicate(3L, npcdens(se = TRUE,
     bws = bandwidth, txdat = training_x, tydat = training_y,
     exdat = evaluation_x, eydat = evaluation_y, gradients = TRUE
   ), simplify = FALSE)
@@ -912,7 +912,7 @@ test_that("beta-Y mixed conditional fits honor categorical compression", {
         arguments$bernstein.basis <- FALSE
       }
       bw <- do.call(npcdensbw, arguments)
-      results[[paste(regtype, compress)]] <- npcdens(
+      results[[paste(regtype, compress)]] <- npcdens(se = TRUE,
         bws = bw, txdat = training_x, tydat = training_y,
         exdat = evaluation_x, eydat = evaluation_y, gradients = TRUE
       )
@@ -965,7 +965,7 @@ test_that("beta-X mixed conditional fits honor categorical compression", {
         arguments$bernstein.basis <- FALSE
       }
       bw <- do.call(npcdensbw, arguments)
-      results[[paste(regtype, compress)]] <- npcdens(
+      results[[paste(regtype, compress)]] <- npcdens(se = TRUE,
         bws = bw, txdat = training_x, tydat = training_y,
         exdat = evaluation_x, eydat = evaluation_y, gradients = TRUE
       )
@@ -1033,7 +1033,7 @@ test_that("simultaneous beta sides honor categorical compression", {
       cykertype = "beta", cykerorder = 8L,
       cykerbound = "fixed", cykerlb = 0, cykerub = 1
     )
-    fits[[as.character(compress)]] <- npcdens(
+    fits[[as.character(compress)]] <- npcdens(se = TRUE,
       bws = bw, txdat = training_x, tydat = training_y,
       exdat = evaluation_x, eydat = evaluation_y, gradients = TRUE
     )

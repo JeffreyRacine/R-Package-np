@@ -69,13 +69,15 @@ npcdens.formula <-
     ev$eval.nobs.omit <- length(eval.omit)
 
     ev$condens <- napredict(ev$omit, ev$condens)
-    ev$conderr <- napredict(ev$omit, ev$conderr)
+    if (!is.null(ev$conderr))
+      ev$conderr <- napredict(ev$omit, ev$conderr)
     if (!is.null(ev$condens.raw))
       ev$condens.raw <- napredict(ev$omit, ev$condens.raw)
 
     if(ev$gradients){
         ev$congrad <- napredict(ev$omit, ev$congrad)
-        ev$congerr <- napredict(ev$omit, ev$congerr)
+        if (!is.null(ev$congerr))
+          ev$congerr <- napredict(ev$omit, ev$congerr)
     }
 
     return(ev)
@@ -97,8 +99,9 @@ npcdens.conbandwidth <- function(bws,
                                  proper = FALSE,
                                  proper.method = c("project"),
                                  proper.control = list(),
-                                 ...){
+                                 ..., se = FALSE){
 
+  se <- npValidateScalarLogical(se, "se")
   dots <- list(...)
   lp.first.se.demand <- .np_conditional_first_se_demand(
     dots[[".np_lp_first_se_demand", exact = TRUE]], bws$xncon)
@@ -357,10 +360,10 @@ npcdens.conbandwidth <- function(bws,
   }
   basis.code <- as.integer(npLpBasisCode(basis.engine))
   do.compiled.gradients <- isTRUE(gradients) && !glp.gradient.partial
-  first.se.request <- .np_conditional_first_se_request(
+  first.se.request <- if (!se) NULL else .np_conditional_first_se_request(
     gradients, glp.gradient.partial, degree.engine, glp.gradient.order,
     glp.gradient.available, lp.first.se.demand)
-  cat.se.request <- .np_conditional_cat_se_request(
+  cat.se.request <- if (!se) NULL else .np_conditional_cat_se_request(
     gradients, glp.gradient.partial, glp.categorical.effects,
     bws, cat.se.demand)
 
@@ -448,6 +451,7 @@ npcdens.conbandwidth <- function(bws,
           basis.code,
           first.se.request,
           cat.se.request,
+          se,
           PACKAGE = "np")
   ), continuous.names = c(bws[["xnames", exact = TRUE]][bws[["ixcon", exact = TRUE]]], bws[["ynames", exact = TRUE]][bws[["iycon", exact = TRUE]]]))
 
@@ -460,11 +464,13 @@ npcdens.conbandwidth <- function(bws,
       rorder[c(xidx[bws$ixcon], xidx[bws$ixuno], xidx[bws$ixord])] <- xidx
       myout$congrad = myout$congrad[, rorder, drop = FALSE]
 
-      myout$congerr = matrix(data=myout$congerr, nrow = enrow, ncol = bws$xndim, byrow = FALSE)
-      myout$congerr = myout$congerr[, rorder, drop = FALSE]
+      if (se) {
+        myout$congerr = matrix(data=myout$congerr, nrow = enrow, ncol = bws$xndim, byrow = FALSE)
+        myout$congerr = myout$congerr[, rorder, drop = FALSE]
+      }
     } else {
       myout$congrad <- matrix(NA_real_, nrow = enrow, ncol = bws$xndim)
-      myout$congerr <- matrix(NA_real_, nrow = enrow, ncol = bws$xndim)
+      if (se) myout$congerr <- matrix(NA_real_, nrow = enrow, ncol = bws$xndim)
     }
 
     if (identical(reg.engine, "lp") && bws$xncon > 0L && !lp.degree0.lc.gradient) {
@@ -492,7 +498,7 @@ npcdens.conbandwidth <- function(bws,
             hat.args$eydat <- proper.slice.context$eydat
           }
           myout$congrad[, cont.idx[jj]] <- as.vector(do.call(npcdenshat, hat.args))
-          myout$congerr[, cont.idx[jj]] <- NA_real_
+          if (se) myout$congerr[, cont.idx[jj]] <- NA_real_
         }
       }
     }
@@ -510,11 +516,11 @@ npcdens.conbandwidth <- function(bws,
       )
       cat.idx <- which(bws$ixuno | bws$ixord)
       myout$congrad[, cat.idx] <- cat.grad[, cat.idx, drop = FALSE]
-      myout$congerr[, cat.idx] <- NA_real_
+      if (se) myout$congerr[, cat.idx] <- NA_real_
     }
   } else {
     myout$congrad = NA
-    myout$congerr = NA
+    myout$congerr = if (se) NA else NULL
   }
 
 
@@ -536,7 +542,7 @@ npcdens.conbandwidth <- function(bws,
                     train.rows.omit = train.rows.omit,
                     eval.rows.omit = if (no.exy) integer(0) else eval.rows.omit,
                     timing = bws$timing, total.time = total.time,
-                    optim.time = optim.time, fit.time = fit.elapsed)
+                    optim.time = optim.time, fit.time = fit.elapsed, se = se)
   out$nomad.time <- if (!is.null(bws$nomad.time) && is.finite(bws$nomad.time)) as.double(bws$nomad.time) else NA_real_
   out$powell.time <- if (!is.null(bws$powell.time) && is.finite(bws$powell.time)) as.double(bws$powell.time) else NA_real_
 
@@ -607,6 +613,7 @@ npcdens.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   sc.bw$eydat <- NULL
   sc.bw$gradients <- NULL
   sc.bw$gradient.order <- NULL
+  sc.bw$se <- NULL
   sc.bw$proper <- NULL
   sc.bw$proper.method <- NULL
   sc.bw$proper.control <- NULL

@@ -1065,7 +1065,8 @@ np_render_control <- function(style = c("band", "bar"),
     tydat = ytrain,
     exdat = exdat,
     eydat = .np_plot_conmode_level_factor(ytrain, level, nrow(exdat)),
-    bws = object$bws
+    bws = object$bws,
+    se = TRUE
   )
   as.vector(dens.obj$conderr)
 }

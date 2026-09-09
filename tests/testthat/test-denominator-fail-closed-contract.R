@@ -49,7 +49,7 @@ test_that("conditional fits and hats inherit row-local zero-mass missingness", {
     bandwidth.compute = FALSE, bwmethod = "cv.ml",
     cxkertype = "epanechnikov", cykertype = "epanechnikov"
   )
-  dens <- npcdens(
+  dens <- npcdens(se = TRUE,
     bws = dbw, txdat = x, tydat = y, exdat = ex, eydat = ey,
     gradients = TRUE
   )
@@ -69,7 +69,7 @@ test_that("conditional fits and hats inherit row-local zero-mass missingness", {
     bandwidth.compute = FALSE, bwmethod = "cv.ls",
     cxkertype = "epanechnikov", cykertype = "epanechnikov"
   )
-  dist <- npcdist(
+  dist <- npcdist(se = TRUE,
     bws = cbw, txdat = x, tydat = y, exdat = ex, eydat = ey,
     gradients = FALSE
   )
@@ -112,7 +112,7 @@ test_that("positive-small required mass remains valid and unperturbed", {
     uxkertype = "aitchisonaitken", cykertype = "epanechnikov",
     bwmethod = "cv.ml", regtype = "lc"
   )
-  fit <- npcdens(
+  fit <- npcdens(se = TRUE,
     bws = cbw, txdat = x, tydat = y, exdat = ex,
     eydat = data.frame(y = 0), gradients = FALSE
   )
@@ -138,7 +138,7 @@ test_that("zero numerators remain legitimate when required mass is positive", {
     bandwidth.compute = FALSE, bwmethod = "cv.ml",
     cxkertype = "epanechnikov", cykertype = "epanechnikov"
   )
-  fit <- npcdens(
+  fit <- npcdens(se = TRUE,
     bws = bw, txdat = x, tydat = y,
     exdat = data.frame(x = 0), eydat = data.frame(y = 10),
     gradients = FALSE

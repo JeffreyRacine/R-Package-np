@@ -140,7 +140,7 @@ test_that("general-LP conditional and quantile effects use target endpoints", {
   )
 
   dbw <- do.call(npcdensbw, common)
-  dens <- suppressWarnings(npcdens(
+  dens <- suppressWarnings(npcdens(se = TRUE,
     bws = dbw,
     txdat = dat$x,
     tydat = yframe,
@@ -148,14 +148,14 @@ test_that("general-LP conditional and quantile effects use target endpoints", {
     eydat = ey,
     gradients = TRUE
   ))
-  dens.oracle <- npcdens(
+  dens.oracle <- npcdens(se = TRUE,
     bws = dbw,
     txdat = dat$x,
     tydat = yframe,
     exdat = dat$frames$upper,
     eydat = ey,
     gradients = FALSE
-  )$condens - npcdens(
+  )$condens - npcdens(se = TRUE,
     bws = dbw,
     txdat = dat$x,
     tydat = yframe,
@@ -167,7 +167,7 @@ test_that("general-LP conditional and quantile effects use target endpoints", {
   expect_true(all(is.na(dens$congerr[, 2L])))
 
   fbw <- do.call(npcdistbw, common)
-  dist <- suppressWarnings(npcdist(
+  dist <- suppressWarnings(npcdist(se = TRUE,
     bws = fbw,
     txdat = dat$x,
     tydat = yframe,
@@ -175,14 +175,14 @@ test_that("general-LP conditional and quantile effects use target endpoints", {
     eydat = ey,
     gradients = TRUE
   ))
-  dist.oracle <- npcdist(
+  dist.oracle <- npcdist(se = TRUE,
     bws = fbw,
     txdat = dat$x,
     tydat = yframe,
     exdat = dat$frames$upper,
     eydat = ey,
     gradients = FALSE
-  )$condist - npcdist(
+  )$condist - npcdist(se = TRUE,
     bws = fbw,
     txdat = dat$x,
     tydat = yframe,

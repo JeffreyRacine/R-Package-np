@@ -13,7 +13,7 @@ test_that("conditional leading SE uses separate X and Y kernel moments", {
       bw <- bwfun(xdat=x, ydat=y, bws=rep(.8,3),
                   bandwidth.compute=FALSE, regtype="lc",
                   cxkertype=kx, cykertype=ky)
-      fit <- fitfun(bws=bw,txdat=x,tydat=y,exdat=ex,eydat=ey)
+      fit <- fitfun(se = TRUE, bws=bw,txdat=x,tydat=y,exdat=ex,eydat=ey)
       wx <- vapply(seq_len(nrow(ex)), function(q) {
         products <- lapply(seq_len(ncol(x)), function(j) {
           u <- (x[[j]]-ex[[j]][q])/.8
@@ -56,7 +56,7 @@ test_that("conditional analytic derivative SE uses derivative kernel energy", {
       bw <- bwfun(xdat=x,ydat=y,bws=if(type=="fixed") c(.8,.8) else c(15,15),
         bandwidth.compute=FALSE,bwtype=type,regtype="lc",
         cxkertype=family,cxkerorder=order)
-      fit <- fitfun(bws=bw,txdat=x,tydat=y,exdat=ex,eydat=ey,gradients=TRUE)
+      fit <- fitfun(se = TRUE, bws=bw,txdat=x,tydat=y,exdat=ex,eydat=ey,gradients=TRUE)
       h <- if(type=="fixed") rep(.8,nrow(ex)) else
         vapply(ex$x,function(q) sort(abs(x$x-q))[15L],numeric(1))
       expect_equal(as.double(fit$congerr),as.double(se(fit))*ratio/h,

@@ -102,11 +102,11 @@ test_that("fixed estimator descendants preserve prepared-order scatter", {
     list(
       udens = npudens(bws = udens_bw, tdat = x, se = TRUE),
       udist = npudist(bws = udist_bw, tdat = x, se = TRUE),
-      cdens = npcdens(
+      cdens = npcdens(se = TRUE,
         bws = cdens_bw, txdat = x, tydat = y,
         gradients = TRUE
       ),
-      cdist = npcdist(
+      cdist = npcdist(se = TRUE,
         bws = cdist_bw, txdat = x, tydat = y,
         gradients = TRUE
       ),
