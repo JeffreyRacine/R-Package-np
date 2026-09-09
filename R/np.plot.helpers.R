@@ -11368,7 +11368,8 @@ plotFactor <- function(f, y, ...){
                                       proper = FALSE,
                                       proper.method = NULL,
                                       proper.control = list(),
-                                      lp.first.se.demand = NULL) {
+                                      lp.first.se.demand = NULL,
+                                      cat.se.demand = NULL) {
   activity <- .np_plot_activity_begin(
     if (isTRUE(cdf)) {
       "Computing conditional distribution plot fit"
@@ -11389,7 +11390,8 @@ plotFactor <- function(f, y, ...){
     proper = proper,
     proper.method = proper.method,
     proper.control = proper.control,
-    lp.first.se.demand = lp.first.se.demand
+    lp.first.se.demand = lp.first.se.demand,
+    cat.se.demand = cat.se.demand
   )
 }
 
@@ -11405,10 +11407,13 @@ plotFactor <- function(f, y, ...){
                                           proper = FALSE,
                                           proper.method = NULL,
                                           proper.control = list(),
-                                          lp.first.se.demand = NULL) {
+                                          lp.first.se.demand = NULL,
+                                          cat.se.demand = NULL) {
   fit.start <- proc.time()[3]
   lp.first.se.demand <- .np_conditional_first_se_demand(
     lp.first.se.demand, bws$xncon)
+  cat.se.demand <- .np_conditional_cat_se_demand(
+    cat.se.demand, bws$xnuno + bws$xnord)
   proper <- npValidateScalarLogical(proper, "proper")
   categorical.effects <- npValidateScalarLogical(
     categorical.effects,
@@ -11544,6 +11549,9 @@ plotFactor <- function(f, y, ...){
   first.se.request <- .np_conditional_first_se_request(
     gradients, glp.gradient.partial, degree.engine, glp.gradient.order,
     glp.gradient.available, lp.first.se.demand)
+  cat.se.request <- .np_conditional_cat_se_request(
+    gradients, glp.gradient.partial, glp.categorical.effects,
+    bws, cat.se.demand)
   beta.kernel <- identical(bws$cxkertype, "beta") ||
     identical(bws$cykertype, "beta")
 
@@ -11636,6 +11644,7 @@ plotFactor <- function(f, y, ...){
     as.integer(bernstein.engine),
     basis.code,
     first.se.request,
+    cat.se.request,
     PACKAGE = "npRmpi"
   ))
 
@@ -13789,7 +13798,8 @@ plotFactor <- function(f, y, ...){
       cdf = cdf,
       gradients = TRUE,
       gradient.order = gradient.order,
-      lp.first.se.demand = FALSE
+      lp.first.se.demand = FALSE,
+      cat.se.demand = FALSE
     )
     .np_plot_extract_conditional_gradient(
       fit = fit,
@@ -13956,7 +13966,8 @@ plotFactor <- function(f, y, ...){
       exdat = exdat,
       tau = tau,
       gradients = TRUE,
-      lp.first.se.demand = FALSE
+      lp.first.se.demand = FALSE,
+      cat.se.demand = FALSE
     )$quantgrad
     if (length(dim(g)) == 3L) {
       as.vector(g[, gradient.index, , drop = TRUE])
@@ -14496,6 +14507,7 @@ plotFactor <- function(f, y, ...){
                                    itmax = 10000,
                                    .np.empty.report = NULL,
                                    lp.first.se.demand = NULL,
+                                   cat.se.demand = NULL,
                                    ...) {
   if (inherits(bws, "lsqregressionbandwidth")) {
     return(.np_plot_lsqregression_eval(
@@ -14612,7 +14624,8 @@ plotFactor <- function(f, y, ...){
           small = small,
           itmax = itmax,
           comm = 1L,
-          lp.first.se.demand = lp.first.se.demand
+          lp.first.se.demand = lp.first.se.demand,
+          cat.se.demand = if (isTRUE(need.errors)) cat.se.demand else FALSE
         )
         myout <- .npqreg_fit_tau_vector_from_parallel_matrix(
           mat,
@@ -14662,7 +14675,8 @@ plotFactor <- function(f, y, ...){
           small = small,
           itmax = itmax,
           cdf.cache = cdf.cache,
-          lp.first.se.demand = lp.first.se.demand
+          lp.first.se.demand = lp.first.se.demand,
+          cat.se.demand = if (isTRUE(need.errors)) cat.se.demand else FALSE
         )
         qdelta <- .npqreg_mark_clamped_delta(qdelta, qclamp)
         list(
@@ -16497,7 +16511,8 @@ compute.default.error.range <- function(center, err) {
       cdf = cdf,
       gradients = TRUE,
       gradient.order = gradient.order,
-      lp.first.se.demand = FALSE
+      lp.first.se.demand = FALSE,
+      cat.se.demand = FALSE
     )
     .np_plot_extract_conditional_gradient(
       fit = fit,

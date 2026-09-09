@@ -303,6 +303,7 @@ void np_check_user_interrupt(void)
 }
 static int fit_progress_active = 0;
 static int fit_progress_total = 0;
+static int fit_progress_supplement_display_total = 0;
 static int fit_progress_offset = 0;
 static clock_t fit_progress_last_signal_clock = 0;
 static int fit_progress_last_signal_eval = 0;
@@ -1132,6 +1133,7 @@ static void np_progress_fit_clear_state(void)
 {
   fit_progress_active = 0;
   fit_progress_total = 0;
+  fit_progress_supplement_display_total = 0;
   fit_progress_offset = 0;
   fit_progress_last_signal_clock = 0;
   fit_progress_last_signal_eval = 0;
@@ -1156,6 +1158,47 @@ void np_progress_fit_set_offset(const int offset)
   fit_progress_offset = MAX(0, offset);
   fit_progress_last_signal_clock = 0;
   fit_progress_last_signal_eval = fit_progress_offset;
+}
+
+/* A requested inference pass extends only this invocation's progress.  Unlike
+   a new fit stage, replay offsets must preserve the existing throttle state. */
+void np_progress_conditional_se_begin(NPConditionalSEProgressScope *scope,
+                                      const int additional)
+{
+  memset(scope, 0, sizeof(*scope));
+  if(!fit_progress_active || additional <= 0 ||
+     additional > INT_MAX - fit_progress_total)
+    return;
+  scope->active = 1;
+  scope->total = fit_progress_total;
+  scope->offset = fit_progress_offset;
+  scope->last_eval = fit_progress_last_signal_eval;
+  scope->last_clock = fit_progress_last_signal_clock;
+  scope->display_total = fit_progress_supplement_display_total;
+  scope->base = fit_progress_total;
+  if(fit_progress_supplement_display_total == 0)
+    fit_progress_supplement_display_total = fit_progress_total;
+  fit_progress_total += additional;
+  fit_progress_offset = scope->base;
+}
+
+void np_progress_conditional_se_offset(const NPConditionalSEProgressScope *scope,
+                                       const int done)
+{
+  if(scope->active)
+    fit_progress_offset = scope->base + done;
+}
+
+void np_progress_conditional_se_end(NPConditionalSEProgressScope *scope)
+{
+  if(!scope->active)
+    return;
+  fit_progress_total = scope->total;
+  fit_progress_offset = scope->offset;
+  fit_progress_last_signal_eval = scope->last_eval;
+  fit_progress_last_signal_clock = scope->last_clock;
+  fit_progress_supplement_display_total = scope->display_total;
+  scope->active = 0;
 }
 
 typedef struct {
@@ -1204,18 +1247,26 @@ static void np_progress_fit_maybe_signal_owned(
     }
   }
 
+  /* R retains its original display total. Only a requested supplement maps
+     the extended work counter back to that display; throttle state stays in
+     work units. The existing R fit-finish owns global completion: fixed MPI
+     peers and output collectives may still be active after a local pass. */
+  const int signal_total = fit_progress_supplement_display_total > 0 ?
+    fit_progress_supplement_display_total : fit_progress_total;
+  const int signal_done = fit_progress_supplement_display_total > 0 ?
+    MIN(signal_total-1,
+        (int)(((int64_t)bounded_done*signal_total)/fit_progress_total)) : bounded_done;
   if(cleanup != NULL) {
     const NPProgressFitSignalCall call = {
-      .current = bounded_done,
-      .total = fit_progress_total
+      .current = signal_done,
+      .total = signal_total
     };
 
     R_UnwindProtect(
       np_progress_fit_signal_execute, (void *)&call,
       cleanup, cleanup_data, NULL);
   } else {
-    np_progress_signal("fit_step", "bandwidth", bounded_done,
-                       fit_progress_total);
+    np_progress_signal("fit_step", "bandwidth", signal_done, signal_total);
   }
   fit_progress_last_signal_eval = bounded_done;
   fit_progress_last_signal_clock = now;
@@ -8468,7 +8519,8 @@ void np_density_conditional(double * tyuno, double * tyord, double * tycon,
                             const NPContinuousKernelRoute *response_kernel_route,
                             NPContinuousKernelDerivativeDiagnostics *response_kernel_route_diagnostics,
                             int categorical_compress,
-                            const NPConditionalLPFirstSERequest *first_se_request);
+                            const NPConditionalLPFirstSERequest *first_se_request,
+                            const int *cat_se_mask);
 void np_density_bw(double * myuno, double * myord, double * mycon,
                    double * mysd, int * myopti, double * myoptd, double * myans, double * fval,
                    double * objective_function_values, double * objective_function_evals,
@@ -9929,7 +9981,8 @@ SEXP C_np_density_conditional(SEXP tyuno,
                               SEXP glp_degree,
                               SEXP glp_bernstein,
                               SEXP glp_basis,
-                              SEXP first_se)
+                              SEXP first_se,
+                              SEXP cat_se_request)
 {
   SEXP tyuno_r=R_NilValue, tyord_r=R_NilValue, tycon_r=R_NilValue;
   SEXP txuno_r=R_NilValue, txord_r=R_NilValue, txcon_r=R_NilValue;
@@ -9965,6 +10018,7 @@ SEXP C_np_density_conditional(SEXP tyuno,
   NPConditionalLPFirstSERequest first_se_request = {0, NULL, NULL};
   const NPConditionalLPFirstSERequest *first_se_request_ptr = NULL;
   int first_se_protected = 0;
+  const int *cat_se_mask = NULL;
 
   if (en < 0) en = 0;
   if (xd < 0) xd = 0;
@@ -10108,6 +10162,25 @@ SEXP C_np_density_conditional(SEXP tyuno,
     first_se_request_ptr = &first_se_request;
   }
 
+  if(cat_se_request != R_NilValue) {
+    const int ncat = INTEGER(myopti_i)[CD_UNUNOI] +
+      INTEGER(myopti_i)[CD_UNORDI];
+    int selected = 0;
+    if(ncat <= 0 || INTEGER(myopti_i)[CD_GRAD] != 1 ||
+       TYPEOF(cat_se_request) != INTSXP ||
+       XLENGTH(cat_se_request) != ncat)
+      error("C_np_density_conditional: invalid categorical-SE request");
+    for(int coordinate = 0; coordinate < ncat; ++coordinate) {
+      const int demand = INTEGER(cat_se_request)[coordinate];
+      if(demand != 0 && demand != 1)
+        error("C_np_density_conditional: invalid categorical-SE direction");
+      selected += demand;
+    }
+    if(selected == 0)
+      error("C_np_density_conditional: empty categorical-SE request");
+    cat_se_mask = INTEGER(cat_se_request);
+  }
+
   PROTECT(out_cond = allocVector(REALSXP, en));
   PROTECT(out_cderr = allocVector(REALSXP, en));
   PROTECT(out_grad = allocVector(REALSXP, gsize));
@@ -10126,7 +10199,8 @@ SEXP C_np_density_conditional(SEXP tyuno,
                            cxkerlb_p, cxkerub_p, cykerlb_p, cykerub_p,
                            active_x_route, active_x_diagnostics,
                            active_y_route, active_y_diagnostics,
-                           categorical_compress, first_se_request_ptr);
+                           categorical_compress, first_se_request_ptr,
+                           cat_se_mask);
 
   PROTECT(out = allocVector(VECSXP, 5));
   SET_VECTOR_ELT(out, 0, out_cond);
@@ -18859,8 +18933,10 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                             const NPContinuousKernelRoute *response_kernel_route,
                             NPContinuousKernelDerivativeDiagnostics *response_kernel_route_diagnostics,
                             int categorical_compress,
-                            const NPConditionalLPFirstSERequest *first_se_request){
+                            const NPConditionalLPFirstSERequest *first_se_request,
+                            const int *cat_se_mask){
   /* Likelihood bandwidth selection for density estimation */
+  int cat_se_status = 0;
 
   double *vector_scale_factor, *pdf, *pdf_stderr, log_likelihood = 0.0;
 
@@ -19236,7 +19312,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
        (BANDWIDTH_den_extern == BW_FIXED) &&
        (iNum_Processors > 1) &&
        !np_mpi_local_regression_active()){
-      if(np_kernel_estimate_con_dens_dist_categorical_owner_blocks(KERNEL_den_extern,
+      const int lc_owner_status = np_kernel_estimate_con_dens_dist_categorical_owner_blocks(KERNEL_den_extern,
                                                                    KERNEL_den_unordered_extern,
                                                                    KERNEL_den_ordered_extern,
                                                                    KERNEL_reg_extern,
@@ -19267,7 +19343,13 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                                                                    pdf_stderr,
                                                                    pdf_deriv,
                                                                    pdf_deriv_stderr,
-                                                                   &log_likelihood) != 0)
+                                                                   &log_likelihood,
+                                                                   cat_se_mask);
+      if(lc_owner_status == 2) {
+        cat_se_status = 2;
+        goto cleanup_np_density_conditional;
+      }
+      if(lc_owner_status != 0)
         error("np_density_conditional: conditional LC owner-block helper failed");
       lc_owner_done = 1;
     }
@@ -19308,7 +19390,8 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                                                    NULL,
                                                    NULL,
                                                    0,
-                                                   full_fit_nn_geometry_context_ptr);
+                                                   full_fit_nn_geometry_context_ptr,
+                                                   cat_se_mask, 1, &cat_se_status);
   } else {
     int status = 0;
     int lp_eval_alloc = 1;
@@ -19956,6 +20039,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
   *ll = log_likelihood;
   /* end return data */
 
+cleanup_np_density_conditional:
   /* Free data objects */
 
   free_mat(matrix_XY_unordered_train_extern, num_all_uvar);
@@ -20016,6 +20100,9 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
   num_obs_train_extern = 0;
   num_obs_eval_extern = 0;
 
+  if(cat_se_status != 0)
+    error("np_density_conditional: categorical-SE contribution pass failed (status %d)",
+          cat_se_status);
   return;
 }
 

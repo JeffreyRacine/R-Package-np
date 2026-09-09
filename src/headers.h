@@ -213,6 +213,15 @@ void np_progress_fit_set_offset(const int offset);
 void np_progress_fit_step(const int done);
 void np_progress_fit_loop_step(const int done, const int natural_total);
 typedef void (*NPProgressUnwindCleanup)(void *, Rboolean);
+typedef struct {
+  int active, total, offset, last_eval, base, display_total;
+  clock_t last_clock;
+} NPConditionalSEProgressScope;
+void np_progress_conditional_se_begin(NPConditionalSEProgressScope *scope,
+                                      const int additional);
+void np_progress_conditional_se_offset(const NPConditionalSEProgressScope *scope,
+                                       const int done);
+void np_progress_conditional_se_end(NPConditionalSEProgressScope *scope);
 void np_progress_fit_loop_step_owned(
   const int done,
   const int natural_total,
@@ -566,9 +575,9 @@ int np_conditional_distribution_cvls_lp_stream_ctx(
   double *cv);
 
 
-void np_kernel_estimate_con_dens_dist_categorical(int KERNEL_Y,int KERNEL_unordered_Y,int KERNEL_ordered_Y,int KERNEL_X,int KERNEL_unordered_X,int KERNEL_ordered_X,int BANDWIDTH_den,int yop,int num_obs_train,int num_obs_eval,int num_Y_unordered,int num_Y_ordered,int num_Y_continuous,int num_X_unordered,int num_X_ordered,int num_X_continuous,double **matrix_XY_unordered_train, double **matrix_XY_ordered_train, double **matrix_XY_continuous_train, double **matrix_XY_unordered_eval, double **matrix_XY_ordered_eval, double **matrix_XY_continuous_eval, double *vector_scale_factor,int *num_categories,int *num_categories_XY, double ** matrix_categorical_vals, double ** matrix_categorical_vals_XY, double * kdf,double * kdf_stderr,double ** kdf_deriv,double ** kdf_deriv_stderr,double * log_likelihood,const NPContinuousKernelRoute *kernel_route,NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,int categorical_compress,const NPNNGeometryContext *nn_geometry_context);
+void np_kernel_estimate_con_dens_dist_categorical(int KERNEL_Y,int KERNEL_unordered_Y,int KERNEL_ordered_Y,int KERNEL_X,int KERNEL_unordered_X,int KERNEL_ordered_X,int BANDWIDTH_den,int yop,int num_obs_train,int num_obs_eval,int num_Y_unordered,int num_Y_ordered,int num_Y_continuous,int num_X_unordered,int num_X_ordered,int num_X_continuous,double **matrix_XY_unordered_train, double **matrix_XY_ordered_train, double **matrix_XY_continuous_train, double **matrix_XY_unordered_eval, double **matrix_XY_ordered_eval, double **matrix_XY_continuous_eval, double *vector_scale_factor,int *num_categories,int *num_categories_XY, double ** matrix_categorical_vals, double ** matrix_categorical_vals_XY, double * kdf,double * kdf_stderr,double ** kdf_deriv,double ** kdf_deriv_stderr,double * log_likelihood,const NPContinuousKernelRoute *kernel_route,NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,int categorical_compress,const NPNNGeometryContext *nn_geometry_context, const int *cat_se_mask, int cat_se_distributed, int *cat_se_status);
 
-int np_kernel_estimate_con_dens_dist_categorical_owner_blocks(int KERNEL_Y,int KERNEL_unordered_Y,int KERNEL_ordered_Y,int KERNEL_X,int KERNEL_unordered_X,int KERNEL_ordered_X,int BANDWIDTH_den,int yop,int num_obs_train,int num_obs_eval,int num_Y_unordered,int num_Y_ordered,int num_Y_continuous,int num_X_unordered,int num_X_ordered,int num_X_continuous,double **matrix_XY_unordered_train, double **matrix_XY_ordered_train, double **matrix_XY_continuous_train, double **matrix_XY_unordered_eval, double **matrix_XY_ordered_eval, double **matrix_XY_continuous_eval, double *vector_scale_factor,int *num_categories,int *num_categories_XY, double ** matrix_categorical_vals, double ** matrix_categorical_vals_XY, double * kdf,double * kdf_stderr,double ** kdf_deriv,double ** kdf_deriv_stderr,double * log_likelihood);
+int np_kernel_estimate_con_dens_dist_categorical_owner_blocks(int KERNEL_Y,int KERNEL_unordered_Y,int KERNEL_ordered_Y,int KERNEL_X,int KERNEL_unordered_X,int KERNEL_ordered_X,int BANDWIDTH_den,int yop,int num_obs_train,int num_obs_eval,int num_Y_unordered,int num_Y_ordered,int num_Y_continuous,int num_X_unordered,int num_X_ordered,int num_X_continuous,double **matrix_XY_unordered_train, double **matrix_XY_ordered_train, double **matrix_XY_continuous_train, double **matrix_XY_unordered_eval, double **matrix_XY_ordered_eval, double **matrix_XY_continuous_eval, double *vector_scale_factor,int *num_categories,int *num_categories_XY, double ** matrix_categorical_vals, double ** matrix_categorical_vals_XY, double * kdf,double * kdf_stderr,double ** kdf_deriv,double ** kdf_deriv_stderr,double * log_likelihood, const int *cat_se_mask);
 
 void np_splitxy_vsf_mcv_nc(const int num_var_unordered, const int num_var_ordered, const int num_var_continuous, const int num_reg_unordered, const int num_reg_ordered, const int num_reg_continuous, const double * const vector_scale_factor, const int * const num_categories, double ** matrix_categorical_vals, double * vsf_x, double * vsf_y, double * vsf_xy, int * nc_x, int * nc_y, int * nc_xy, double ** mcv_x, double ** mcv_y, double ** mcv_xy);
 

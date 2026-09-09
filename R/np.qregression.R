@@ -22,7 +22,8 @@ npqreg <-
     }
   }
 
-.npqreg.fit.control.names <- c("data", "newdata", "exdat", "tau", "gradients", "tol", "small", "itmax")
+.npqreg.fit.control.names <- c("data", "newdata", "exdat", "tau", "gradients", "tol", "small", "itmax",
+                             ".np_conditional_cat_se_demand")
 .npqreg.removed.solver.controls <- c("ftol",
                                      "lbc.dir", "dfc.dir", "cfac.dir", "initc.dir",
                                      "lbd.dir", "hbd.dir", "dfac.dir", "initd.dir")
@@ -170,7 +171,8 @@ npqreg <-
 }
 
 .npqreg_strip_fit_controls_from_bw_call <- function(call) {
-  for (nm in c("tau", "gradients", "tol", "small", "itmax", "newdata", "exdat")) {
+  for (nm in c("tau", "gradients", "tol", "small", "itmax", "newdata", "exdat",
+               ".np_conditional_cat_se_demand")) {
     if (nm %in% names(call))
       call[[nm]] <- NULL
   }
@@ -188,10 +190,16 @@ npqreg <-
                                                     small = 1.490116e-05,
                                                     itmax = 10000L,
                                                     cdf.cache = NULL,
-                                                    lp.first.se.demand = NULL) {
+                                                    lp.first.se.demand = NULL,
+                                                    cat.se.demand = NULL) {
   xdat <- toFrame(xdat)
   ydat <- toFrame(ydat)
   exdat <- toFrame(exdat)
+  cat.se.demand <- .np_conditional_cat_se_demand(
+    cat.se.demand, bws$xnuno + bws$xnord)
+  qclamp <- .npqreg_quantile_clamp(quantile)
+  if (all(!is.na(qclamp) & qclamp != "none"))
+    cat.se.demand[] <- FALSE
   quantile <- as.double(quantile)
   gradients <- npValidateScalarLogical(gradients, "gradients")
 
@@ -225,7 +233,8 @@ npqreg <-
     cdf = TRUE,
     gradients = gradients,
     categorical.effects = !glp.categorical.effects,
-    lp.first.se.demand = lp.first.se.demand
+    lp.first.se.demand = lp.first.se.demand,
+    cat.se.demand = if (glp.categorical.effects) FALSE else cat.se.demand
   )
   dens.obj <- .np_conditional_eval_selected(
     bws = bws,
@@ -623,13 +632,16 @@ npqreg <-
                                                    itmax,
                                                    comm = 1L,
                                                    force.parallel = FALSE,
-                                                   lp.first.se.demand = NULL) {
+                                                   lp.first.se.demand = NULL,
+                                                   cat.se.demand = NULL) {
   exdat <- toFrame(exdat)
   n.eval <- nrow(exdat)
   tau <- .npqreg_validate_tau(tau)
   gradients <- npValidateScalarLogical(gradients, "gradients")
   lp.first.se.demand <- .np_conditional_first_se_demand(
     lp.first.se.demand, bws$xncon)
+  cat.se.demand <- .np_conditional_cat_se_demand(
+    cat.se.demand, bws$xnuno + bws$xnord)
   grad.cols <- if (isTRUE(gradients)) as.integer(bws$xndim) else 0L
   if (is.na(grad.cols) || grad.cols < 0L)
     grad.cols <- 0L
@@ -661,7 +673,8 @@ npqreg <-
         tol = tol,
         small = small,
         itmax = itmax,
-        lp.first.se.demand = lp.first.se.demand
+        lp.first.se.demand = lp.first.se.demand,
+        cat.se.demand = cat.se.demand
       ))
       delta <- .npqreg_mark_clamped_delta(delta, qclamp)
       pieces[[j]] <- cbind(yq, .npqreg_quantile_delta_matrix(delta, gradients = gradients))
@@ -685,7 +698,7 @@ npqreg <-
     chunk.size = .npRmpi_npqreg_chunk_size(n.eval = n.eval, comm = comm)
   )
   worker <- function(task, bws, xdat, ydat, exdat, tau, gradients, tol, small, itmax,
-                     lp.first.se.demand) {
+                     lp.first.se.demand, cat.se.demand) {
     idx <- seq.int(as.integer(task$start),
                    length.out = as.integer(task$bsz))
     ex.chunk <- exdat[idx, , drop = FALSE]
@@ -714,7 +727,8 @@ npqreg <-
         tol = tol,
         small = small,
         itmax = itmax,
-        lp.first.se.demand = lp.first.se.demand
+        lp.first.se.demand = lp.first.se.demand,
+        cat.se.demand = cat.se.demand
       ))
       delta <- .npqreg_mark_clamped_delta(delta, qclamp)
       pieces[[j]] <- cbind(yq, .npqreg_quantile_delta_matrix(delta, gradients = gradients))
@@ -740,7 +754,8 @@ npqreg <-
     tol = tol,
     small = small,
     itmax = itmax,
-    lp.first.se.demand = lp.first.se.demand
+    lp.first.se.demand = lp.first.se.demand,
+    cat.se.demand = cat.se.demand
   )
 }
 
@@ -1042,7 +1057,12 @@ npqreg.condbandwidth <-
 
     fit.start <- proc.time()[3]
     tau <- .npqreg_validate_tau(tau)
-    fit.dots <- .npqreg_fit_dots(list(...))
+    fit.dots <- list(...)
+    cat.se.demand <- .np_conditional_cat_se_demand(
+      fit.dots[[".np_conditional_cat_se_demand", exact = TRUE]],
+      bws$xnuno + bws$xnord)
+    fit.dots[[".np_conditional_cat_se_demand"]] <- NULL
+    fit.dots <- .npqreg_fit_dots(fit.dots)
     if (length(fit.dots))
       stop(sprintf("unused npqreg fit argument '%s'", names(fit.dots)[1L]))
     gradients <- npValidateScalarLogical(gradients, "gradients")
@@ -1068,15 +1088,17 @@ npqreg.condbandwidth <-
     }
     if (isTRUE(parallel.cond))
       on.exit(.npRmpi_npqreg_reset_worker_comm_state(comm = 1L), add = TRUE)
+    dispatch.call <- match.call()
+    dispatch.call$.np_conditional_cat_se_demand <- cat.se.demand
     if (.npRmpi_npqreg_should_localize(bws) &&
         !isTRUE(getOption("npRmpi.local.regression.mode", FALSE)) &&
         !isTRUE(.npRmpi_autodispatch_in_context()) &&
         !isTRUE(parallel.cond))
       return(.npRmpi_npqreg_eval_local_no_dispatch(
-        .npRmpi_eval_without_dispatch(match.call(), parent.frame())
+        .npRmpi_eval_without_dispatch(dispatch.call, parent.frame())
       ))
     if (.npRmpi_autodispatch_active() && !isTRUE(parallel.cond))
-      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+      return(.npRmpi_autodispatch_call(dispatch.call, parent.frame()))
 
     no.ex = missing(exdat)
 
@@ -1170,7 +1192,8 @@ npqreg.condbandwidth <-
         small = small,
         itmax = itmax,
         comm = 1L,
-        force.parallel = TRUE
+        force.parallel = TRUE,
+        cat.se.demand = cat.se.demand
       )
       myout <- .npqreg_fit_tau_vector_from_parallel_matrix(
         mat,
@@ -1212,7 +1235,8 @@ npqreg.condbandwidth <-
             tol = tol,
             small = small,
             itmax = itmax,
-            cdf.cache = cdf.cache
+            cdf.cache = cdf.cache,
+            cat.se.demand = cat.se.demand
           )
         )
         qdelta <- .npqreg_mark_clamped_delta(qdelta, qclamp)
@@ -1296,7 +1320,8 @@ npqreg.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
     dot.names <- names(dots)
     if (is.null(dot.names))
       dot.names <- rep("", length(dots))
-    fit.names <- c("newdata", "exdat", "tau", "gradients", "tol", "small", "itmax")
+    fit.names <- c("newdata", "exdat", "tau", "gradients", "tol", "small", "itmax",
+                   ".np_conditional_cat_se_demand")
     fit.dots <- .npqreg_fit_dots(dots[nzchar(dot.names) & dot.names %in% fit.names])
     bw.dots <- dots[!(nzchar(dot.names) & dot.names %in% fit.names)]
     bw.args <- c(list(formula = bws, nomad = nomad), bw.dots)
@@ -1322,7 +1347,8 @@ npqreg.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
     dot.names <- names(dots)
     if (is.null(dot.names))
       dot.names <- rep("", length(dots))
-    fit.names <- c("newdata", "exdat", "tau", "gradients", "tol", "small", "itmax")
+    fit.names <- c("newdata", "exdat", "tau", "gradients", "tol", "small", "itmax",
+                   ".np_conditional_cat_se_demand")
     fit.dots <- .npqreg_fit_dots(dots[nzchar(dot.names) & dot.names %in% fit.names])
     bw.dots <- dots[!(nzchar(dot.names) & dot.names %in% fit.names)]
     bw.args <- c(list(formula = txdat, bws = bws, nomad = nomad), bw.dots)
@@ -1357,16 +1383,19 @@ npqreg.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   }
   if (isTRUE(parallel.cond))
     on.exit(.npRmpi_npqreg_reset_worker_comm_state(comm = 1L), add = TRUE)
+  dispatch.call <- match.call()
+  dispatch.call$.np_conditional_cat_se_demand <-
+    early.dots[[".np_conditional_cat_se_demand", exact = TRUE]]
   if (!missing(bws) &&
       .npRmpi_npqreg_should_localize(bws) &&
       !isTRUE(getOption("npRmpi.local.regression.mode", FALSE)) &&
       !isTRUE(.npRmpi_autodispatch_in_context()) &&
       !isTRUE(parallel.cond))
     return(.npRmpi_npqreg_eval_local_no_dispatch(
-      .npRmpi_eval_without_dispatch(match.call(), parent.frame())
+      .npRmpi_eval_without_dispatch(dispatch.call, parent.frame())
     ))
   if (.npRmpi_autodispatch_active() && !isTRUE(parallel.cond))
-    return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+    return(.npRmpi_autodispatch_call(dispatch.call, parent.frame()))
 
   sc <- sys.call()
   sc.names <- names(sc)

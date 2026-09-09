@@ -827,6 +827,7 @@
             exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
             gradients = gradients,
             lp.first.se.demand = if (plot.behavior != "plot") NULL else if (plot.errors.method != "asymptotic") FALSE else which(bws$ixcon) %in% vapply(seq_len(dsf), function(jj) gradient_component_index(i, jj), integer(1L)),
+            cat.se.demand = if (plot.behavior != "plot") NULL else if (plot.errors.method != "asymptotic") FALSE else which(bws$ixuno | bws$ixord) %in% vapply(seq_len(dsf), function(jj) gradient_component_index(i, jj), integer(1L)),
             gradient.order = gradient.order,
             tau = tau,
             bws = bws,
@@ -842,6 +843,7 @@
             cdf = cdf,
             gradients = gradients,
             lp.first.se.demand = if (plot.behavior != "plot" || plot.errors.method == "asymptotic") NULL else FALSE,
+            cat.se.demand = if (plot.behavior != "plot" || plot.errors.method == "asymptotic") NULL else FALSE,
             gradient.order = gradient.order
           )
         }
@@ -1234,6 +1236,7 @@
               eydat = subcol(eydat,ei,i)[seq_len(xi.neval),, drop = FALSE],
               gradients = gradients,
               lp.first.se.demand = if (plot.behavior != "plot") NULL else FALSE,
+              cat.se.demand = if (plot.behavior != "plot") NULL else FALSE,
               tau = tau,
               bws = bws,
               .np.empty.report = .np.empty.report
@@ -1249,6 +1252,7 @@
               gradients = gradients,
               lp.first.se.demand = if (plot.behavior != "plot" || plot.errors.method == "asymptotic") NULL else FALSE,
               gradient.order = gradient.order,
+              cat.se.demand = if (plot.behavior != "plot" || plot.errors.method == "asymptotic") NULL else FALSE,
               proper = isTRUE(proper.args$proper.requested),
               proper.method = proper.args$proper.method,
               proper.control = proper.args$proper.control

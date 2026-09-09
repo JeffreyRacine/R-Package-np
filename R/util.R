@@ -1336,6 +1336,27 @@ npValidatedConditionalRegSpec <- function(bws,
   spec
 }
 
+# Private demand for the ordinary scalar categorical influence post-pass only.
+.np_conditional_cat_se_demand <- function(demand, ncat) {
+  if (is.null(demand))
+    return(rep.int(TRUE, ncat))
+  if (identical(demand, FALSE))
+    return(rep.int(FALSE, ncat))
+  if (!is.logical(demand) || length(demand) != ncat || anyNA(demand))
+    stop("invalid internal conditional categorical-SE demand", call. = FALSE)
+  demand
+}
+
+.np_conditional_cat_se_request <- function(gradients, partial,
+                                          categorical.effects, bws, demand) {
+  if (!isTRUE(gradients) || isTRUE(partial) ||
+      isTRUE(categorical.effects) || !any(demand))
+    return(NULL)
+  public.index <- which(bws$ixuno | bws$ixord)
+  native.index <- c(which(bws$ixuno), which(bws$ixord))
+  as.integer(demand[match(native.index, public.index)])
+}
+
 # Private demand for newly available partial-LP first-derivative errors only.
 # Existing fully requested uncertainty and all point owners are unchanged.
 .np_conditional_first_se_demand <- function(demand, ncon) {
