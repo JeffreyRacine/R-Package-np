@@ -1822,7 +1822,7 @@ test_that("centered moments have one activated fail-closed route boundary", {
   expect_match(engine, "} NPCenteredMomentCtx;", fixed = TRUE)
   expect_match(
     engine,
-    "beta_centered_moment && dual_power_ctx == NULL",
+    "(centered_moment_ctx == NULL ||\n       (dual_power_ctx == NULL &&",
     fixed = TRUE
   )
   expect_match(
@@ -1832,9 +1832,19 @@ test_that("centered moments have one activated fail-closed route boundary", {
   )
   expect_match(
     engine,
-    "centered_m2 == NULL ? NULL : &centered_moment_ctx",
+    "&centered_moment_ctx,\n    0,\n    NULL);",
     fixed = TRUE
   )
+  expect_match(engine, "beta_point_request", fixed = TRUE)
+  expect_match(engine,
+    "dual_power_ctx->matrix_Y == NULL && dual_power_ctx->matrix_W == NULL",
+    fixed = TRUE)
+  expect_match(engine,
+    "dual_power_ctx->ncol_Y == 0 && dual_power_ctx->ncol_W == 0",
+    fixed = TRUE)
+  expect_match(engine, "!dual_power_ctx->retain_common_scale", fixed = TRUE)
+  expect_match(engine, "dual_power_ctx->observation_scale == NULL", fixed = TRUE)
+  expect_match(engine, "dual_power_ctx->regression_derivative == NULL", fixed = TRUE)
   occurrences <- gregexpr(
     "kernel_weighted_sum_np_route_centered_m2(", engine, fixed = TRUE
   )[[1L]]

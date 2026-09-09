@@ -10,7 +10,7 @@ test_that("manual order-2 beta density matches npksum and exact contribution SE"
     ckerub = 1
   )
 
-  fit <- do.call(npudens, c(list(tdat = training, edat = evaluation), args))
+  fit <- do.call(npudens, c(list(tdat = training, edat = evaluation, se = TRUE), args))
   sums <- do.call(npksum, c(list(
     txdat = training,
     exdat = evaluation,
@@ -47,7 +47,7 @@ test_that("manual beta density supports formulas, objects, and dimensions", {
     ckerub = c(1, 7)
   )
 
-  direct <- do.call(npudens, c(list(tdat = training, edat = evaluation), args))
+  direct <- do.call(npudens, c(list(tdat = training, edat = evaluation, se = TRUE), args))
   formula <- do.call(npudens, c(list(
     ~ x1 + x2,
     data = training,
@@ -57,7 +57,7 @@ test_that("manual beta density supports formulas, objects, and dimensions", {
     dat = training,
     bandwidth.compute = FALSE
   ), args))
-  object_fit <- npudens(bws = bw, tdat = training, edat = evaluation)
+  object_fit <- npudens(bws = bw, tdat = training, edat = evaluation, se = TRUE)
 
   expect_s3_class(bw, "bandwidth")
   expect_identical(bw$pmethod, "Manual")

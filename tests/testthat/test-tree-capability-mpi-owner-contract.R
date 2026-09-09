@@ -115,7 +115,7 @@ test_that("MPI fixed tree capability is rank-symmetric", {
         "cdens_bw <- npcdensbw(xdat=x,ydat=y,bws=c(1.25*yr/sqrt(5),full),bandwidth.compute=FALSE,bwmethod='cv.ml',regtype='lc',cxkertype='epanechnikov',cykertype='epanechnikov')",
         "public <- function(tree) {",
         "  options(np.tree=tree)",
-        "  list(reg=npreg(bws=reg_bw,se=TRUE,gradients=FALSE),udens_objective=npudensbw(dat=x,bws=udens_bw,bandwidth.compute=TRUE,eval.only=TRUE)$fval,udens=npudens(bws=udens_bw),udist=npudist(bws=udist_bw),cdens=npRmpi:::.npcdensbw_eval_only(x,y,cdens_bw)$objective,fit=npcdens(bws=cdens_bw,txdat=x,tydat=y,gradients=TRUE))",
+        "  list(reg=npreg(bws=reg_bw,se=TRUE,gradients=FALSE),udens_objective=npudensbw(dat=x,bws=udens_bw,bandwidth.compute=TRUE,eval.only=TRUE)$fval,udens=npudens(bws=udens_bw,se=TRUE),udist=npudist(bws=udist_bw,se=TRUE),cdens=npRmpi:::.npcdensbw_eval_only(x,y,cdens_bw)$objective,fit=npcdens(bws=cdens_bw,txdat=x,tydat=y,gradients=TRUE))",
         "}",
         "dense_public <- public(FALSE); tree_public <- public(TRUE)",
         "for (field in c('mean','merr','resid')) stopifnot(isTRUE(all.equal(tree_public$reg[[field]],dense_public$reg[[field]],tolerance=2e-11)))",

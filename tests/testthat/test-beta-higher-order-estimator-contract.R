@@ -11,7 +11,7 @@ test_that("higher-order beta densities match kernel-sum contributions", {
         ckerbound = "fixed", ckerlb = 0, ckerub = 1
       )
       fit <- do.call(npudens, c(list(
-        tdat = training, edat = evaluation
+        tdat = training, edat = evaluation, se = TRUE
       ), common))
       sums <- do.call(npksum, c(list(
         txdat = training, exdat = evaluation,
@@ -39,7 +39,7 @@ test_that("higher-order beta distributions match kernel-sum contributions", {
         ckerbound = "fixed", ckerlb = 0, ckerub = 1
       )
       fit <- do.call(npudist, c(list(
-        tdat = training, edat = evaluation
+        tdat = training, edat = evaluation, se = TRUE
       ), common))
       sums <- do.call(npksum, c(list(
         txdat = training, exdat = evaluation,

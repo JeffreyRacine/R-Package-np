@@ -53,7 +53,7 @@ test_that("npudens all-categorical tree profile fit matches dense fit", {
       ukertype = ukertype,
       okertype = okertype
     )
-    fit.dense <- npudens(bws = bw.dense)
+    fit.dense <- npudens(bws = bw.dense, se = TRUE)
 
     options(np.tree = FALSE, np.categorical.compress = TRUE)
     bw.profile <- npudensbw(
@@ -64,7 +64,7 @@ test_that("npudens all-categorical tree profile fit matches dense fit", {
       ukertype = ukertype,
       okertype = okertype
     )
-    fit.profile <- npudens(bws = bw.profile)
+    fit.profile <- npudens(bws = bw.profile, se = TRUE)
 
     expect_equal(
       fitted(fit.profile),
@@ -124,21 +124,21 @@ test_that("one-coordinate categorical tree profiles match dense density and dist
     options(np.tree = FALSE, np.categorical.compress = FALSE)
     dens.bw.dense <- npudensbw(~ x, data = dat,
                                bws = bws, bandwidth.compute = FALSE)
-    dens.dense <- npudens(bws = dens.bw.dense)
+    dens.dense <- npudens(bws = dens.bw.dense, se = TRUE)
     if (identical(kind, "ordered")) {
       dist.bw.dense <- npudistbw(~ x, data = dat,
                                  bws = bws, bandwidth.compute = FALSE)
-      dist.dense <- npudist(bws = dist.bw.dense)
+      dist.dense <- npudist(bws = dist.bw.dense, se = TRUE)
     }
 
     options(np.tree = FALSE, np.categorical.compress = TRUE)
     dens.bw.profile <- npudensbw(~ x, data = dat,
                                  bws = bws, bandwidth.compute = FALSE)
-    dens.profile <- npudens(bws = dens.bw.profile)
+    dens.profile <- npudens(bws = dens.bw.profile, se = TRUE)
     if (identical(kind, "ordered")) {
       dist.bw.profile <- npudistbw(~ x, data = dat,
                                    bws = bws, bandwidth.compute = FALSE)
-      dist.profile <- npudist(bws = dist.bw.profile)
+      dist.profile <- npudist(bws = dist.bw.profile, se = TRUE)
     }
 
     expect_equal(fitted(dens.profile), fitted(dens.dense),
