@@ -21,7 +21,7 @@ test_that("npconmode level batching matches independent density evaluations", {
   legacy <- lapply(seq_along(efac), function(i) {
     npcdens(
       bws = bw, txdat = xdat, tydat = ydat, exdat = xdat,
-      eydat = rep(efac[i], n), gradients = i == 2L
+      eydat = rep(efac[i], n), gradients = i == 2L, se = TRUE
     )
   })
   legacy.p <- do.call(cbind, lapply(legacy, `[[`, "condens"))

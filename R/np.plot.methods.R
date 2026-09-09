@@ -878,10 +878,11 @@ np_render_control <- function(style = c("band", "bar"),
     if (!isTRUE(gradients) && !identical(errors, "none")) {
       se <- rep(NA_real_, nrow(out[[j]]))
       if (identical(errors, "asymptotic")) {
-        se <- object$probability.errors
-        if (is.null(se))
-          stop("class-probability standard errors are not available: refit with probabilities=TRUE",
-               call. = FALSE)
+        se <- .np_require_stored_se(
+          object, object[["probability.errors", exact = TRUE]], "npconmode",
+          what = "class-probability standard errors", expr = substitute(object),
+          switches = "probabilities = TRUE, se = TRUE"
+        )
         se <- as.matrix(se)[, level.idx]
         repaired <- object$probability.repaired.rows
         if (!is.null(repaired)) {

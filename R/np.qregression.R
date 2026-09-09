@@ -22,7 +22,7 @@ npqreg <-
     }
   }
 
-.npqreg.fit.control.names <- c("data", "newdata", "exdat", "tau", "gradients", "tol", "small", "itmax",
+.npqreg.fit.control.names <- c("data", "newdata", "exdat", "tau", "gradients", "se", "tol", "small", "itmax",
                              ".np_conditional_cat_se_demand")
 .npqreg.removed.solver.controls <- c("ftol",
                                      "lbc.dir", "dfc.dir", "cfac.dir", "initc.dir",
@@ -40,7 +40,7 @@ npqreg <-
 }
 
 .npqreg_napredict_eval <- function(omit, x) {
-  if (!length(omit))
+  if (is.null(x) || !length(omit))
     return(x)
   omit <- as.integer(omit)
   keep <- seq_len(NROW(x) + length(omit))[-omit]
@@ -171,7 +171,7 @@ npqreg <-
 }
 
 .npqreg_strip_fit_controls_from_bw_call <- function(call) {
-  for (nm in c("tau", "gradients", "tol", "small", "itmax", "newdata", "exdat",
+  for (nm in c("tau", "gradients", "se", "tol", "small", "itmax", "newdata", "exdat",
                ".np_conditional_cat_se_demand")) {
     if (nm %in% names(call))
       call[[nm]] <- NULL
@@ -191,7 +191,9 @@ npqreg <-
                                                     itmax = 10000L,
                                                     cdf.cache = NULL,
                                                     lp.first.se.demand = NULL,
-                                                    cat.se.demand = NULL) {
+                                                    cat.se.demand = NULL,
+                                                    se = TRUE) {
+  se <- npValidateScalarLogical(se, "se")
   xdat <- toFrame(xdat)
   ydat <- toFrame(ydat)
   exdat <- toFrame(exdat)
@@ -232,6 +234,7 @@ npqreg <-
     eydat = eydat,
     cdf = TRUE,
     gradients = gradients,
+    se = se,
     categorical.effects = !glp.categorical.effects,
     lp.first.se.demand = lp.first.se.demand,
     cat.se.demand = if (glp.categorical.effects) FALSE else cat.se.demand
@@ -243,18 +246,22 @@ npqreg <-
     exdat = exdat,
     eydat = eydat,
     cdf = FALSE,
-    gradients = FALSE
+    gradients = FALSE,
+    se = FALSE
   )
 
   dens <- as.double(dens.obj$condens)
-  quanterr <- as.double(cdf.obj$conderr) / NZD(dens)
-  quanterr[!is.finite(quanterr) | quanterr < 0.0] <- NA_real_
+  quanterr <- NULL
+  if (se) {
+    quanterr <- as.double(cdf.obj$conderr) / NZD(dens)
+    quanterr[!is.finite(quanterr) | quanterr < 0.0] <- NA_real_
+  }
 
   if (!gradients) {
     return(list(
       quanterr = quanterr,
       quantgrad = NA,
-      quantgerr = NA,
+      quantgerr = if (se) NA else NULL,
       cdf = cdf.obj,
       dens = dens.obj
     ))
@@ -266,8 +273,11 @@ npqreg <-
   grad <- -cdf.obj$congrad / dens.mat
   grad[!is.finite(grad)] <- NA_real_
 
-  gerr <- cdf.obj$congerr / dens.mat
-  gerr[!is.finite(gerr) | gerr < 0.0] <- NA_real_
+  gerr <- NULL
+  if (se) {
+    gerr <- cdf.obj$congerr / dens.mat
+    gerr[!is.finite(gerr) | gerr < 0.0] <- NA_real_
+  }
 
   if (glp.categorical.effects) {
     cat.grad <- .npqreg_categorical_first_differences(
@@ -283,7 +293,8 @@ npqreg <-
     )
     cat.idx <- which(bws$ixuno | bws$ixord)
     grad[, cat.idx] <- cat.grad[, cat.idx, drop = FALSE]
-    gerr[, cat.idx] <- NA_real_
+    if (se)
+      gerr[, cat.idx] <- NA_real_
   }
 
   list(
@@ -310,7 +321,8 @@ npqreg <-
     exdat = exdat,
     eydat = eydat,
     cdf = TRUE,
-    gradients = FALSE
+    gradients = FALSE,
+    se = FALSE
   )$condist)
 }
 
@@ -576,7 +588,8 @@ npqreg <-
 }
 
 npqreg.formula <-
-  function(bws, data = NULL, newdata = NULL, ...){
+  function(bws, data = NULL, newdata = NULL, ..., se = FALSE){
+    se <- npValidateScalarLogical(se, "se")
 
     tt <- terms(bws)
     m <- match(c("formula", "data", "subset", "na.action"),
@@ -602,7 +615,7 @@ npqreg.formula <-
       exdat <- emf[, bws$variableNames[["terms"]], drop = FALSE]
     }
 
-    q.args <- list(txdat = txdat, tydat = tydat)
+    q.args <- list(txdat = txdat, tydat = tydat, se = se)
     if (has.eval)
       q.args$exdat <- exdat
     q.args$bws <- bws
@@ -644,9 +657,10 @@ npqreg.condbandwidth <-
            gradients = FALSE,
            tol = 1.490116e-04,
            small = 1.490116e-05, itmax = 10000,
-           ...){
+           ..., se = FALSE){
 
     fit.start <- proc.time()[3]
+    se <- npValidateScalarLogical(se, "se")
     fit.dots <- list(...)
     cat.se.demand <- .np_conditional_cat_se_demand(
       fit.dots[[".np_conditional_cat_se_demand", exact = TRUE]],
@@ -769,6 +783,8 @@ npqreg.condbandwidth <-
         cdf.row.keys = cdf.row.keys
       )
       qclamp <- .npqreg_quantile_clamp(yq)
+      if (!gradients && !se)
+        return(list(yq = yq, yqerr = NULL, yqgrad = NA, yqgerr = NULL))
       qdelta <- .npqreg_quantile_delta_from_conditional(
         bws = bws,
         xdat = txdat.df,
@@ -781,14 +797,15 @@ npqreg.condbandwidth <-
         small = small,
         itmax = itmax,
         cdf.cache = cdf.cache,
-        cat.se.demand = cat.se.demand
+        cat.se.demand = cat.se.demand,
+        se = se
       )
       qdelta <- .npqreg_mark_clamped_delta(qdelta, qclamp)
       list(
         yq = yq,
         yqerr = qdelta$quanterr,
         yqgrad = if (gradients) qdelta$quantgrad else NA,
-        yqgerr = if (gradients) qdelta$quantgerr else NA
+        yqgerr = if (se) { if (gradients) qdelta$quantgerr else NA } else NULL
       )
     }
 
@@ -799,24 +816,25 @@ npqreg.condbandwidth <-
     } else {
       myout <- list(
         yq = do.call(cbind, lapply(tau.out, `[[`, "yq")),
-        yqerr = do.call(cbind, lapply(tau.out, `[[`, "yqerr")),
+        yqerr = if (se) do.call(cbind, lapply(tau.out, `[[`, "yqerr")) else NULL,
         yqgrad = NA,
-        yqgerr = NA
+        yqgerr = if (se) NA else NULL
       )
       colnames(myout$yq) <- tau.labels
-      colnames(myout$yqerr) <- tau.labels
+      if (se)
+        colnames(myout$yqerr) <- tau.labels
       if (gradients) {
         p <- ncol(tau.out[[1L]]$yqgrad)
         grad.names <- colnames(tau.out[[1L]]$yqgrad)
         myout$yqgrad <- array(NA_real_,
                               dim = c(enrow, p, ntau),
                               dimnames = list(NULL, grad.names, tau.labels))
-        myout$yqgerr <- array(NA_real_,
+        if (se) myout$yqgerr <- array(NA_real_,
                               dim = c(enrow, p, ntau),
                               dimnames = list(NULL, grad.names, tau.labels))
         for (j in seq_len(ntau)) {
           myout$yqgrad[, , j] <- tau.out[[j]]$yqgrad
-          myout$yqgerr[, , j] <- tau.out[[j]]$yqgerr
+          if (se) myout$yqgerr[, , j] <- tau.out[[j]]$yqgerr
         }
       }
     }
@@ -846,12 +864,14 @@ npqreg.condbandwidth <-
                 ntrain = tnrow,
                 trainiseval = no.ex,
                 gradients = gradients,
+                se = se,
                 timing = bws$timing, total.time = total.time,
                 optim.time = optim.time, fit.time = fit.elapsed)
   }
 
 
-npqreg.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
+npqreg.default <- function(bws, txdat, tydat, nomad = FALSE, ..., se = FALSE){
+  se <- npValidateScalarLogical(se, "se")
   nomad <- npValidateNomadControl(nomad, "nomad")
   early.dots <- list(...)
   .npqreg_reject_gradient_order_dots(early.dots)
@@ -931,7 +951,7 @@ npqreg.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
     .np_eval_bw_call(sc.bw, caller_env = parent.frame())
   }
 
-  call.args <- list(bws = tbw)
+  call.args <- list(bws = tbw, se = se)
   if (no.bws) {
     call.args$txdat <- txdat
     call.args$tydat <- tydat

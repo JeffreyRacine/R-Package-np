@@ -21,7 +21,8 @@
 \usage{
 npqreg(bws, \dots)
 
-\method{npqreg}{formula}(bws, data = NULL, newdata = NULL, \dots)
+\method{npqreg}{formula}(bws, data = NULL, newdata = NULL, \dots,
+       se = FALSE)
 
 
 \method{npqreg}{condbandwidth}(bws,
@@ -33,9 +34,11 @@ npqreg(bws, \dots)
        tol = 1.490116e-04,
        small = 1.490116e-05,
        itmax = 10000,
-       \dots)
+       \dots,
+       se = FALSE)
 
-\method{npqreg}{default}(bws, txdat, tydat, nomad = FALSE, \dots)
+\method{npqreg}{default}(bws, txdat, tydat, nomad = FALSE, \dots,
+       se = FALSE)
 
 \method{predict}{qregression}(object, se.fit = FALSE, \dots)
 
@@ -140,6 +143,20 @@ These arguments control where the quantile regression is evaluated and which fit
     logical value. If \code{TRUE}, \code{predict.qregression} returns a
     list with components \code{fit} and \code{se.fit}; otherwise it
     returns fitted conditional quantiles.
+  }
+
+  \item{se}{
+    a scalar logical controlling asymptotic standard-error computation.
+    Defaults to \code{FALSE}. With \code{TRUE}, quantile standard errors
+    are computed, and available gradient standard errors are computed when
+    \code{gradients=TRUE}. Point quantiles and gradients do not depend on
+    this switch. \code{se(fit)} and \code{gradients(fit, se=TRUE)} only
+    extract stored results; they never initiate search or refitting. To add
+    omitted uncertainty, use \code{npqreg(bws=fit$bws, tau=fit$tau,
+    se=TRUE)} (also \code{gradients=TRUE} for gradient errors), with the
+    original training/evaluation data if needed. The bandwidth object avoids
+    repeating search. \code{predict(..., se.fit=TRUE)} explicitly requests
+    its required uncertainty during the existing prediction fit.
   }
 
 
@@ -320,9 +337,9 @@ prediction/evaluation route, or plot route as appropriate.
   \code{npqreg} returns a \code{qregression} object.  The generic
   functions \code{\link{fitted}} (or \code{\link{quantile}}),
   \code{\link{se}}, \code{\link{predict}}, and \code{\link{gradients}}
-  extract (or generate) estimated values, asymptotic standard errors on
-  estimates, predictions, and gradients, respectively, from the returned
-  object. \code{\link{predict}} uses the object's stored \code{tau}
+  extract stored estimated values, asymptotic standard errors, and
+  gradients, or compute predictions from the retained bandwidth object.
+  \code{\link{predict}} uses the object's stored \code{tau}
   value by default; supply \code{tau=} to override it. Furthermore, the functions
   \code{\link{summary}} and \code{\link{plot}} support objects of this
   type. The returned object has the following components:
@@ -335,14 +352,17 @@ prediction/evaluation route, or plot route as appropriate.
     regression estimates, obtained from the conditional distribution
     standard error and the estimated conditional density at the fitted
     quantile. If \code{tau} has length greater than one this is an
-    evaluation-by-\code{tau} matrix. }
+    evaluation-by-\code{tau} matrix. This component is \code{NULL}
+    when \code{se=FALSE}. }
   \item{quantgrad}{ gradients of the conditional quantile with respect
     to the conditioning variables at each evaluation point, when
     \code{gradients=TRUE}. If \code{tau} has length greater than one
     this is an evaluation-by-gradient-by-\code{tau} array. }
   \item{quantgerr}{ asymptotic standard errors for gradients, when
-    \code{gradients=TRUE}. If \code{tau} has length greater than one
-    this is an evaluation-by-gradient-by-\code{tau} array. }
+    \code{gradients=TRUE} and \code{se=TRUE}. If \code{tau} has length
+    greater than one this is an evaluation-by-gradient-by-\code{tau} array.
+    This component is \code{NULL} when \code{se=FALSE}. }
+  \item{se}{ whether asymptotic uncertainty was requested }
   \item{tau}{ the quantile probability or probabilities computed }
 
 
