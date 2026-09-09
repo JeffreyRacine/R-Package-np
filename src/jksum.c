@@ -9801,8 +9801,8 @@ np_beta_regression_gradient_rows_validated(
             }
           }
           gradient_stderr[derivative_coordinate][evaluation] =
-            influence_scale * sqrt(influence_sum_squares /
-                                   (double)(plan->num_train - 1));
+            influence_scale * sqrt(influence_sum_squares *
+              ((double)plan->num_train / (double)(plan->num_train - 1)));
         }
       } else {
         for(observation = 0; observation < plan->num_train; ++observation) {
@@ -24507,8 +24507,9 @@ static int NP_NOINLINE np_regression_conditional_influence_finish(
   for(observation = 0; observation < num_obs_train; ++observation)
     NP_ACCUMULATE_SQUARE(
       kernel_weights[observation] * (response[observation] - mean[0]));
-  mean_stderr[0] = influence_scale * sqrt(influence_sum_squares) /
-    (fabs(denominator) * sqrt((double)(num_obs_train - 1)));
+  mean_stderr[0] = influence_scale * sqrt(influence_sum_squares *
+    ((double)num_obs_train / (double)(num_obs_train - 1))) /
+    fabs(denominator);
   if(!R_FINITE(mean_stderr[0]))
     return 0;
 
@@ -24542,7 +24543,8 @@ static int NP_NOINLINE np_regression_conditional_influence_finish(
         NP_ACCUMULATE_SQUARE(influence);
       }
       gradient_stderr[predictor][0] = influence_scale *
-        sqrt(influence_sum_squares / (double)(num_obs_train - 1));
+        sqrt(influence_sum_squares *
+             ((double)num_obs_train / (double)(num_obs_train - 1)));
     } else {
       const double alternate_mean =
         permuted_weighted_sums[(size_t)predictor * 3U] /
@@ -24555,8 +24557,9 @@ static int NP_NOINLINE np_regression_conditional_influence_finish(
         NP_ACCUMULATE_SQUARE(
           alternate_weights[observation] *
           (response[observation] - alternate_mean));
-      alternate_stderr = influence_scale * sqrt(influence_sum_squares) /
-        (fabs(alternate_denominator) * sqrt((double)(num_obs_train - 1)));
+      alternate_stderr = influence_scale * sqrt(influence_sum_squares *
+        ((double)num_obs_train / (double)(num_obs_train - 1))) /
+        fabs(alternate_denominator);
       gradient_stderr[predictor][0] = hypot(mean_stderr[0], alternate_stderr);
     }
     if(!R_FINITE(gradient_stderr[predictor][0]))

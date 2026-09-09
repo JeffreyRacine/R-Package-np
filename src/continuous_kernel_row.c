@@ -3595,8 +3595,9 @@ np_continuous_kernel_beta_conditional_influence_stderr(
   }
   if(!R_FINITE(*validation_m2))
     return NP_CONTINUOUS_ROW_ERR_NUMERIC;
-  *mean_stderr = influence_scale * sqrt(influence_sum_squares) /
-    (fabs(total_weight) * sqrt((double)(variance_count - 1)));
+  *mean_stderr = influence_scale * sqrt(influence_sum_squares *
+    ((double)variance_count / (double)(variance_count - 1))) /
+    fabs(total_weight);
   return R_FINITE(*mean_stderr) ? NP_CONTINUOUS_ROW_OK :
     NP_CONTINUOUS_ROW_ERR_NUMERIC;
 }

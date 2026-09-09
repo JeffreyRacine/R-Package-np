@@ -349,6 +349,16 @@ Further arguments are passed to \code{\link{npcdensbw}} when bandwidths are comp
   conditional density values, and gradient standard errors are returned
   when gradients are requested and defined.
 
+  Scalar conditional fits involving beta kernels use the empirical
+  observation-influence covariance. For normalized explanatory weights
+  \eqn{a_i}, response-kernel contributions \eqn{z_i}, and fitted value
+  \eqn{m}, the level variance is
+  \eqn{\{n/(n-1)\}\sum_i [a_i(z_i-m)]^2}, using the full training count
+  \eqn{n}. Supported continuous-derivative errors use the corresponding
+  differentiated influence. These calculations hold the selected bandwidth
+  state fixed; they do not add bandwidth-selection or random-NN-radius
+  uncertainty, and do not replace positive-degree LP covariance.
+
   For book-length derivations, see Li and Racine (2007), Chapter 5
   \emph{Conditional Density Estimation}, especially Sections 5.1-5.4, and
   Chapter 4 \emph{Kernel Estimation with Mixed Data}. The later workflow

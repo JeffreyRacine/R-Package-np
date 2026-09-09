@@ -1,5 +1,10 @@
 # np 0.80-1
 
+* Scalar conditional beta-kernel influence standard errors now use the global
+  sample-covariance factor n/(n-1), correcting an extra division by n in level
+  and supported derivative variances. Conditional point estimates, ordinary
+  regression and positive-degree local-polynomial covariance are unchanged.
+
 * Scalar conditional beta-response derivative standard errors now allow a
   legitimate zero derivative of the explanatory weight sum. Zero endpoint
   denominators remain invalid; estimates and existing valid derivatives are
