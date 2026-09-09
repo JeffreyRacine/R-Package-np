@@ -147,12 +147,15 @@ profile_ordered_convolution <- function(train, eval, lambda, support, kernel,
 
 profile_ordered_integral <- function(train, eval, lambda, support, kernel) {
   if (kernel == 0L) {
-    distance <- as.integer(abs(eval - train))
-    return(ifelse(
-      eval == train,
-      1 - 0.5 * lambda,
-      ifelse(eval < train, 0.5 * lambda^distance, 1 - lambda^distance)
-    ))
+    return(vapply(train, function(center) {
+      pmf <- function(z) ifelse(z == center, 1 - lambda,
+        0.5 * (1 - lambda) * lambda^abs(z - center))
+      anchor <- 0.5 + 0.5 * pmf(center)
+      if (eval == center) return(anchor)
+      if (eval > center)
+        return(anchor + sum(pmf(seq.int(center + 1L, eval))))
+      anchor - sum(pmf(seq.int(eval + 1L, center)))
+    }, numeric(1L)))
   }
   if (kernel == 1L) {
     return(vapply(train, function(value) {

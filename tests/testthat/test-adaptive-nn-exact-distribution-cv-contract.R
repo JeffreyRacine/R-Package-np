@@ -42,13 +42,15 @@ adaptive_distribution_literal_objective <- function(value, k, kernel,
         } else {
           evaluation_level <- as.integer(ordered[[evaluation]])
           donor_level <- as.integer(ordered[[donor]])
-          distance <- abs(evaluation_level - donor_level)
+          pmf <- function(z) ifelse(z == donor_level, 1 - lambda,
+            0.5 * (1 - lambda) * lambda^abs(z - donor_level))
+          anchor <- 0.5 + 0.5 * pmf(donor_level)
           if (evaluation_level == donor_level) {
-            1 - 0.5 * lambda
+            anchor
           } else if (evaluation_level < donor_level) {
-            0.5 * lambda^distance
+            anchor - sum(pmf(seq.int(evaluation_level + 1L, donor_level)))
           } else {
-            1 - lambda^distance
+            anchor + sum(pmf(seq.int(donor_level + 1L, evaluation_level)))
           }
         }
         continuous * categorical

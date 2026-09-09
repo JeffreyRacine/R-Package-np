@@ -40,6 +40,10 @@
   convention, distribution estimates, and continuous-variable formulas
   are unchanged.
 
+* Wang–van Ryzin ordered distribution estimates now use the correct cumulative
+  probability above each training category. This corrects potentially decreasing
+  distribution estimates and affected distribution cross-validation criteria.
+
 * Master-local bootstrap and hat fanout computation errors now use the same
   per-chunk condition handling as workers. Scheduled replies are drained before
   failure is reported, allowing reuse of a healthy pool without publishing an
