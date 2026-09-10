@@ -632,8 +632,15 @@
 
 * Density likelihood cross-validation now takes the true logarithm of every
   represented strictly positive contribution, including positive subnormal
-  values and positive values retained only in signed-log form. Exact zero and
-  negative contributions retain the established guarded mapping.
+  values and positive values retained only in signed-log form. Zero, negative,
+  or non-finite density contributions now invalidate the entire raw CVML
+  candidate instead of contributing a finite surrogate that could incorrectly
+  improve its ranking. This includes unresolved arithmetic underflow to zero.
+  Existing finite optimizer guidance remains separate from raw validity;
+  invalid candidates cannot pass final raw certification. Completed
+  categorical-profile candidates retain their owner, and invalid raw values
+  retain the existing cache representation. Fitted log-likelihood reporting,
+  least-squares criteria and Klein-Spady's Bernoulli loss are unchanged.
 
 * Leave-one-out regression and conditional objective shortcuts now preserve
   every finite nonzero `1 - h_ii` leverage denominator exactly. Near-saturated

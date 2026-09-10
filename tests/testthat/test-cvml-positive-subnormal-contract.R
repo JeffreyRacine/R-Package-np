@@ -39,9 +39,8 @@ test_that("CVML compositors distinguish positive range from invalid sign", {
   expect_match(header,
                "if\\(sign > 0 && log_fit > -INFINITY\\)\\n    return -log_fit;",
                perl = TRUE)
-  expect_match(header,
-               "if\\(fit < -DBL_MIN\\)\\n    return log\\(-fit\\) - 2\\.0\\*log\\(DBL_MIN\\);",
-               perl = TRUE)
+  expect_match(header, "return INFINITY;", fixed = TRUE)
+  expect_match(header, "np_cvml_raw_objective", fixed = TRUE)
 })
 
 test_that("represented positive subnormal CVML values use their true logs", {
@@ -57,7 +56,7 @@ test_that("represented positive subnormal CVML values use their true logs", {
   expect_lt(result$fval, 2 * log(.Machine$double.xmin))
 })
 
-test_that("underflowed zero CVML values retain the guarded mapping", {
+test_that("underflowed zero CVML values invalidate the raw candidate", {
   package <- if ("npRmpi" %in% loadedNamespaces()) "npRmpi" else "np"
   old <- options(np.messages = FALSE, np.tree = FALSE, np.largeh = FALSE)
   on.exit(options(old), add = TRUE)
@@ -65,5 +64,6 @@ test_that("underflowed zero CVML values retain the guarded mapping", {
   result <- cvml_subnormal_eval(package, 40)
 
   expect_identical(as.numeric(result$num.feval.guarded), 1)
-  expect_identical(as.numeric(result$fval), 2 * log(.Machine$double.xmin))
+  expect_identical(as.numeric(result$fval), -.Machine$double.xmax)
+  expect_identical(as.numeric(result$invalid.history), 1)
 })

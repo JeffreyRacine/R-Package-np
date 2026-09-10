@@ -1,10 +1,8 @@
 beta_cvml_guard <- function(fit) {
   vapply(fit, function(value) {
-    if (value > .Machine$double.xmin)
+    if (is.finite(value) && value > 0)
       return(-log(value))
-    if (value < -.Machine$double.xmin)
-      return(log(-value) - 2 * log(.Machine$double.xmin))
-    -log(.Machine$double.xmin)
+    Inf
   }, numeric(1L))
 }
 
@@ -72,7 +70,9 @@ beta_cvml_ratio_oracle <- function(x, y, bandwidth, type,
 
   # The public eval-only wrapper reports the maximized sign of the native
   # negative-log CVML loss.
-  -sum(beta_cvml_guard(fit))
+  contributions <- beta_cvml_guard(fit)
+  if (any(!is.finite(contributions))) -.Machine$double.xmax else
+    -sum(contributions)
 }
 
 beta_cvml_native_objective <- function(x, y, bandwidth, type,
@@ -104,7 +104,8 @@ beta_cvml_native_objective <- function(x, y, bandwidth, type,
   }
   bandwidth_object <- do.call(npcdensbw, arguments)
   evaluator <- getFromNamespace(".npcdensbw_eval_only", "npRmpi")
-  as.numeric(evaluator(x, y, bandwidth_object)$objective[[1L]])
+  as.numeric(evaluator(x, y, bandwidth_object,
+                       invalid.penalty = "dbmax")$objective[[1L]])
 }
 
 .beta_cvml_test_env <- new.env(parent = emptyenv())
