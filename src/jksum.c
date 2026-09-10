@@ -26304,6 +26304,33 @@ static double np_conditional_lp_standard_error(
   return variance > 0.0 ? sqrt(variance) : 0.0;
 }
 
+/* The all-large point map is C B'y, without GENERAL's intercept correction.
+ * After accepted ridging its covariance uses C A0 C', not C alone.  The
+ * projection reuses the old point RHS only after coefficients were copied. */
+static double np_conditional_alllarge_standard_error(
+  const double *inverse_rows,
+  const double *direction,
+  const int direction_stride,
+  const double *pristine_gram,
+  double *projection,
+  double *quadratic_work,
+  const int nterms,
+  const double sigma2)
+{
+  if(pristine_gram == NULL)
+    return NA_REAL;
+  for(int i = 0; i < nterms; ++i) {
+    double value = 0.0;
+    for(int j = 0; j < nterms; ++j)
+      value += inverse_rows[(size_t)j*(size_t)nterms + i] *
+        direction[(size_t)j*(size_t)direction_stride];
+    projection[i] = value;
+  }
+  return np_conditional_lp_standard_error(sigma2,
+    np_lp_variance_quadratic(projection, pristine_gram,
+                             quadratic_work, nterms));
+}
+
 /* Evaluate the HC0 sandwich quadratic without forming an influence row.  A
  * long-double reduction supplies a scale-aware cancellation bound.  The
  * absolute pairwise quadratic, rather than the already-cancelled B*a result,
@@ -28216,6 +28243,7 @@ typedef struct {
   double *eval_basis_block;
   double *projection_block;
   double *fitted_block;
+  double *covariance_workspace;
   NPLPFullRowWorkspace *inverse_workspace;
   NPRegressionFitOwner *enclosing_owner;
 } NPRegressionAllLargeLPFitOwner;
@@ -28263,6 +28291,7 @@ static void np_regression_alllarge_lp_fit_cleanup(
   free(owner->eval_basis_block);
   free(owner->projection_block);
   free(owner->fitted_block);
+  free(owner->covariance_workspace);
   free(owner->eval_basis);
   free(owner->eval_derivative);
   free(owner->coefficient);
@@ -28991,6 +29020,9 @@ double *conditional_variance){
         int eval_block_rows = 0;
         int basis_is_contiguous = 0;
         int use_fit_projection_blas = 0;
+        int covariance_ridged = 0;
+        double *covariance_workspace = NULL;
+        double *covariance_work = NULL;
         int fast_ok;
         NPRegressionAllLargeLPFitOwner all_large_owner = {
           .num_reg_continuous = num_reg_continuous,
@@ -29005,6 +29037,7 @@ double *conditional_variance){
           .eval_basis_block = NULL,
           .projection_block = NULL,
           .fitted_block = NULL,
+          .covariance_workspace = NULL,
           .inverse_workspace = &inverse_workspace,
           .enclosing_owner = &fit_owner
         };
@@ -29175,8 +29208,37 @@ double *conditional_variance){
             }
           }
 
+          /* eval_basis is not yet an evaluation vector. The inverse retry
+           * changes only source diagonals, before packing destroys A0. */
+          if(shortcut_do_merr)
+            for(i = 0; i < glp_nterms; ++i)
+              eval_basis[i] = inverse_workspace.matrix_copy[i + i*glp_nterms];
           fast_ok = np_lp_full_row_workspace_invert_retryable(
             &inverse_workspace, glp_nterms, ridge_eps, 64);
+          if(fast_ok && shortcut_do_merr) {
+            for(i = 0; i < glp_nterms; ++i)
+              if(inverse_workspace.matrix_copy[i + i*glp_nterms] != eval_basis[i])
+                covariance_ridged = 1;
+            if(covariance_ridged) {
+              size_t gram_elements, work_elements, work_bytes;
+              if(np_size_mul_checked((size_t)glp_nterms, (size_t)glp_nterms,
+                                     &gram_elements) &&
+                 np_size_add_checked(gram_elements, (size_t)glp_nterms,
+                                     &work_elements) &&
+                 np_size_mul_checked(work_elements, sizeof(double), &work_bytes)) {
+                covariance_workspace = (double *)malloc(work_bytes);
+                all_large_owner.covariance_workspace = covariance_workspace;
+                if(covariance_workspace != NULL) {
+                  memcpy(covariance_workspace, inverse_workspace.matrix_copy,
+                         gram_elements*sizeof(double));
+                  for(i = 0; i < glp_nterms; ++i)
+                    covariance_workspace[i + i*glp_nterms] = eval_basis[i];
+                  covariance_work = covariance_workspace + gram_elements;
+                }
+              }
+              /* Unavailable covariance never changes fast_ok or its point owner. */
+            }
+          }
           if(fast_ok)
             fast_ok = np_lp_full_row_workspace_pack_inverse_rows(
               &inverse_workspace, glp_nterms);
@@ -29236,7 +29298,7 @@ double *conditional_variance){
                                     eval_block_rows,
                                     beta,
                                     yhat_block);
-                if(shortcut_do_merr)
+                if(shortcut_do_merr && !covariance_ridged)
                   np_blas_project_inverse_block_int(
                     nblock,
                     glp_nterms,
@@ -29247,14 +29309,19 @@ double *conditional_variance){
 
                 for(int row = 0; row < nblock; row++){
                   double q = 0.0;
-                  if(shortcut_do_merr)
+                  if(shortcut_do_merr && !covariance_ridged)
                     for(j = 0; j < glp_nterms; j++)
                       q += eval_basis_block[j*eval_block_rows + row] *
                         projection_block[j*nblock + row];
                   mean[i + row] = yhat_block[row];
                   if(shortcut_do_merr) {
                     const double mv = sigma2hat*q;
-                    mean_stderr[i + row] =
+                    mean_stderr[i + row] = covariance_ridged ?
+                      np_conditional_alllarge_standard_error(
+                        inverse_workspace.matrix_copy, eval_basis_block + row,
+                        eval_block_rows, covariance_workspace,
+                        inverse_workspace.rhs, covariance_work, glp_nterms,
+                        sigma2hat) :
                       (mv > 0.0 && isfinite(mv)) ?
                       sqrt(mv) : se_default;
                   }
@@ -29289,7 +29356,7 @@ double *conditional_variance){
 
                 for(j = 0; j < glp_nterms; j++)
                   yhat += eval_basis[j]*beta[j];
-                if(shortcut_do_merr)
+                if(shortcut_do_merr && !covariance_ridged)
                   for(j = 0; j < glp_nterms; j++){
                     const double zj = eval_basis[j];
                     for(int b = 0; b < glp_nterms; b++)
@@ -29301,7 +29368,12 @@ double *conditional_variance){
                 mean[i] = yhat;
                 if(shortcut_do_merr) {
                   const double mv = sigma2hat*q;
-                  mean_stderr[i] = (mv > 0.0 && isfinite(mv)) ?
+                  mean_stderr[i] = covariance_ridged ?
+                    np_conditional_alllarge_standard_error(
+                      inverse_workspace.matrix_copy, eval_basis, 1,
+                      covariance_workspace, inverse_workspace.rhs,
+                      covariance_work, glp_nterms, sigma2hat) :
+                    (mv > 0.0 && isfinite(mv)) ?
                     sqrt(mv) : se_default;
                 }
 
@@ -29352,7 +29424,7 @@ double *conditional_variance){
                     }
 
                     if(shortcut_do_gerr){
-                      for(j = 0; j < glp_nterms; j++){
+                      for(j = 0; !covariance_ridged && j < glp_nterms; j++){
                         const double dj = eval_deriv[j];
                         for(int b = 0; b < glp_nterms; b++)
                           qg += dj *
@@ -29361,7 +29433,11 @@ double *conditional_variance){
                       }
                       {
                         const double gv = sigma2hat*qg;
-                        gradient_stderr[l][i] =
+                        gradient_stderr[l][i] = covariance_ridged ?
+                          np_conditional_alllarge_standard_error(
+                            inverse_workspace.matrix_copy, eval_deriv, 1,
+                            covariance_workspace, inverse_workspace.rhs,
+                            covariance_work, glp_nterms, sigma2hat) :
                           (gv > 0.0 && isfinite(gv)) ?
                           sqrt(gv) : 0.0;
                       }
@@ -29394,6 +29470,7 @@ double *conditional_variance){
         free(eval_basis_block);
         free(projection_block);
         free(yhat_block);
+        free(covariance_workspace);
         if(eval_basis != NULL) free(eval_basis);
         if(eval_deriv != NULL) free(eval_deriv);
         free(beta);

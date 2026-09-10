@@ -1,5 +1,10 @@
 # np 0.80-1
 
+* Requested conditional density/distribution LP standard errors now follow
+  the fitted regularized operator when explanatory-kernel weights are
+  constant. This corrects level and native first-derivative uncertainty
+  after ridging; fitted values and point gradients are unchanged.
+
 * Requested scalar conditional adaptive-NN standard errors with continuous
   explanatory variables and exclusively categorical responses now use the
   complete empirical ratio influence for levels and existing continuous
