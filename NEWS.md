@@ -1,5 +1,12 @@
 # np 0.80-1
 
+* Public single-index fitting and prediction now return `NA` with one notice
+  for external rows whose computed kernel weights are all zero, consistently
+  across point-only, asymptotic and bootstrap requests. A bootstrap draw that
+  loses support makes the affected uncertainty unavailable without replacing
+  a supported original point estimate. Required training ratios remain strict;
+  supported values, resampling and computational owners are unchanged.
+
 * Requested higher-order conditional density/distribution LP derivative
   standard errors now use the existing local working variance and the actual
   derivative weighting row, including its accepted ridge. Fixed and adaptive-NN

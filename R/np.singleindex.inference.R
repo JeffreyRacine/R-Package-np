@@ -26,6 +26,43 @@
                   bandwidth.divide = bandwidth.divide))
 }
 
+# Preserve the raw kernel-sum owner and its arithmetic; only exceptional
+# external rows need computed-weight evidence. Training ratios stay strict.
+.np_index_normalized_mean <- function(sums, txdat, exdat, bws,
+                                       allow.empty.rows = FALSE) {
+  denominator <- sums[2L, 2L, ]
+  denominator <- .np_normalization_denominator(
+    denominator, "npindex", allow.empty.rows = allow.empty.rows,
+    zero.rows = .np_indexhat_zero_moment_rows(list(
+      txdat = toFrame(txdat), exdat = toFrame(exdat), bws = bws$bw,
+      bwtype = bws$type, ckertype = bws$ckertype,
+      ckerorder = bws$ckerorder, ckerbound = bws$ckerbound), denominator))
+  .np_normalization_finish(sums[1L, 2L, ] / denominator, denominator,
+                           "npindex", defer.empty.rows = TRUE)
+}
+
+# The LC regression owner predates explicit empty-row metadata. Retain that
+# owner and collect evidence only when it actually returned missing means.
+.np_index_fit_rows <- function(fit, txdat, exdat, bws, allow.empty.rows) {
+  if (!isTRUE(allow.empty.rows) ||
+      !is.null(attr(fit, ".np.empty.rows", exact = TRUE)) || !anyNA(fit$mean))
+    return(fit)
+  rows <- which(is.na(fit$mean))
+  args <- list(txdat = toFrame(txdat),
+    exdat = toFrame(exdat)[rows, , drop = FALSE], bws = bws$bw,
+    bwtype = bws$type, ckertype = bws$ckertype,
+    ckerorder = bws$ckerorder, ckerbound = bws$ckerbound)
+  moments <- do.call(.np_index_kernel_moments,
+    c(list(y = rep.int(1.0, NROW(txdat))), args))
+  empty <- .np_indexhat_zero_moment_rows(args, moments$denominator)
+  if (any(empty)) {
+    flags <- integer(length(fit$mean))
+    flags[rows[empty]] <- 1L
+    attr(fit, ".np.empty.rows") <- flags
+  }
+  fit
+}
+
 .np_index_asymptotic_outputs <- function(fit, beta, gradients = FALSE) {
   out <- list(merr = as.double(fit$merr))
   if (gradients) {
