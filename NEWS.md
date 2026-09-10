@@ -1,5 +1,9 @@
 # npRmpi 0.80-1
 
+* Unconditional distribution fitting through a named formula now preserves
+  an explicit `se = TRUE` request, matching the bandwidth-object route and
+  serial np. Omitted or false requests still avoid uncertainty computation.
+
 * Requested higher-order conditional density/distribution LP derivative
   standard errors now use the existing local working variance and the actual
   derivative weighting row, including its accepted ridge. Fixed and adaptive-NN

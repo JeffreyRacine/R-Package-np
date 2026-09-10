@@ -287,7 +287,7 @@ npudist.default <- function(bws, tdat, ..., se = FALSE){
         "npudistbw"
       )
     )
-    return(npudist(bws = tbw, ...))
+    return(npudist(bws = tbw, se = se, ...))
   }
 
   sc <- sys.call()

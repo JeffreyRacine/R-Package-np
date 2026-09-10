@@ -21,6 +21,17 @@ test_that("named bws formula dispatch matches positional density/distribution ro
   udist.named <- npudist(bws = ~ x, data = d, newdata = nd.u, se = TRUE)
   expect_equal(as.numeric(udist.named$dist), as.numeric(udist.pos$dist), tolerance = 0)
   expect_equal(as.numeric(udist.named$derr), as.numeric(udist.pos$derr), tolerance = 0)
+  expect_true(udist.named[["se", exact = TRUE]])
+  expect_length(udist.named$derr, nrow(nd.u))
+  for (fit.args in list(list(), list(se = FALSE))) {
+    udist.off <- do.call(npudist, c(
+      list(bws = ~ x, data = d, newdata = nd.u), fit.args
+    ))
+    expect_false(udist.off[["se", exact = TRUE]])
+    expect_length(udist.off$derr, 0L)
+    expect_equal(as.numeric(udist.off$dist), as.numeric(udist.pos$dist), tolerance = 0)
+    expect_error(se(udist.off), "Refit without repeating bandwidth search", fixed = TRUE)
+  }
 
   bw.cd <- npcdensbw(y ~ x, data = d, nmulti = 1, tol = 1, ftol = 1)
   cd.pos <- npcdens(se = TRUE, bws = bw.cd, data = d, newdata = nd.c)
