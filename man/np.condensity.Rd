@@ -333,9 +333,22 @@ Further arguments are passed to \code{\link{npcdensbw}} when bandwidths are comp
   a constant response-kernel contribution has zero conditional variance.
   Purely categorical fits use this ratio covariance without a continuous
   bandwidth factor, including nearest-neighbour-labelled bandwidth objects.
-  This correction does not supply a new adaptive-NN variance formula when
-  continuous variables are present. Beta-kernel and positive-degree
-  local-polynomial covariance calculations retain their separate targets.
+  Beta-kernel and positive-degree local-polynomial covariance calculations
+  retain their separate targets.
+
+  For scalar adaptive nearest-neighbour fits with continuous explanatory
+  variables and exclusively categorical responses, requested level and
+  continuous first-derivative standard errors instead use the complete
+  empirical influence of the conditional ratio. They retain the actual
+  normalized X weights and categorical Y operator, including both
+  numerator and denominator derivatives. This calculation conditions on
+  the observed X geometry and specified response smoothing; it does not
+  supply a full random-radius covariance for continuous responses or
+  account for bandwidth-selection uncertainty. Local-constant-equivalent
+  degree-zero fits share this calculation. Positive-degree local-polynomial,
+  beta-kernel and paired categorical-contrast errors retain their separate
+  covariance calculations. With \code{se = FALSE}, the additional
+  uncertainty pass is not performed.
 
 }
 \value{

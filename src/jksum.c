@@ -28,6 +28,7 @@
 
 #include "headers.h"
 #include "conditional_kernel_moments.h"
+#include "conditional_ann_direct.h"
 #include "nn_radius_error.h"
 #include "gsl_bspline.h"
 #include "jksum_gaussian_density.h"
@@ -9522,6 +9523,116 @@ static double np_conditional_leading_category_se(
   return np_conditional_leading_se(sum,1.0,denominator);
 }
 
+/* Direct empirical conditional influence after the original point totals.
+ * Only the additional ANN/category-Y replay receives this context. */
+typedef struct {
+  int n, m, directions;
+  const NPConditionalLeadingRatioCtx *response;
+  const double *denominator, *mean, *derivative_denominator;
+  double * const *gradient;
+  NPANNConditionalNorm *level, *derivative;
+  double *response_value;
+  int *response_donor;
+#ifdef NP_ANN_DIRECT_DIAGNOSTIC
+  size_t entries, rows, traversals, retained, primary, derivative_only, updates;
+  int tree_selected, partial_tree;
+#endif
+} NPConditionalANNDirectCtx;
+
+#ifdef NP_ANN_DIRECT_DIAGNOSTIC
+/* Ephemeral first-X preparation oracle, absent from normal builds. */
+static double **np_ann_direct_expected_radius = NULL;
+static int np_ann_direct_radius_columns, np_ann_direct_radius_rows;
+static int np_ann_direct_radius_equal;
+#endif
+
+typedef struct {
+  const XL *nodes;
+  int block, index, end, limit;
+} NPConditionalANNDirectRange;
+
+/* The admitted conditional root-only, left-first traversal produces sorted
+ * disjoint ranges. This does not assert that property for generic XL input. */
+static NPConditionalANNDirectRange np_conditional_ann_direct_range(
+  const XL *nodes,int n)
+{
+  NPConditionalANNDirectRange it={nodes,0,n,n,n};
+  if(nodes == NULL) { it.index=0;it.end=n; }
+  else if(nodes->n > 0) {
+    it.index=nodes->istart[0];it.end=it.index+nodes->nlev[0];
+  }
+  return it;
+}
+
+static void np_conditional_ann_direct_next(NPConditionalANNDirectRange *it)
+{
+  if(++it->index < it->end) return;
+  if(it->nodes != NULL && ++it->block < it->nodes->n) {
+    it->index=it->nodes->istart[it->block];
+    it->end=it->index+it->nodes->nlev[it->block];
+  } else it->index=it->limit;
+}
+
+static double np_conditional_ann_direct_response(
+  NPConditionalANNDirectCtx *ctx,int donor,int evaluation)
+{
+  if(ctx->response_donor[evaluation] != donor) {
+    ctx->response_value[evaluation]=
+      np_conditional_leading_response_category(ctx->response,donor,evaluation);
+    ctx->response_donor[evaluation]=donor;
+  }
+  return ctx->response_value[evaluation];
+}
+
+static void np_conditional_ann_direct_row(
+  NPConditionalANNDirectCtx *ctx,int donor,const double *row,double bandwidth,
+  const double *permutation,const double *permutation_bandwidth,
+  const XL *primary,const XL *permuted)
+{
+  NPConditionalANNDirectRange it=np_conditional_ann_direct_range(primary,ctx->m);
+#ifdef NP_ANN_DIRECT_DIAGNOSTIC
+  ++ctx->rows;
+  if(primary == NULL) ctx->retained+=(size_t)ctx->m;
+  else for(int b=0;b<primary->n;++b) ctx->retained+=(size_t)primary->nlev[b];
+#endif
+  while(it.index < ctx->m) {
+    const int i=it.index;
+    const double w=row[i]/bandwidth;
+    if(w != 0.0) {
+      const double residual=np_conditional_ann_direct_response(ctx,donor,i)-ctx->mean[i];
+      np_ann_direct_append(ctx->level+i,(w/ctx->denominator[i])*residual);
+#ifdef NP_ANN_DIRECT_DIAGNOSTIC
+      ++ctx->primary;++ctx->updates;
+#endif
+    }
+    np_conditional_ann_direct_next(&it);
+  }
+  for(int d=0;d<ctx->directions;++d) {
+    NPConditionalANNDirectRange a=np_conditional_ann_direct_range(primary,ctx->m);
+    NPConditionalANNDirectRange b=np_conditional_ann_direct_range(
+      permuted == NULL ? NULL : permuted+d,ctx->m);
+    while(a.index < ctx->m || b.index < ctx->m) {
+      const int i=MIN(a.index,b.index);
+      const size_t di=(size_t)d*ctx->m+i;
+      const double w=a.index == i ? row[i]/bandwidth : 0.0;
+      const double dw=b.index == i ? permutation[di]/permutation_bandwidth[d] : 0.0;
+      if(w != 0.0 || dw != 0.0) {
+        const double den=ctx->denominator[i];
+        const double residual=np_conditional_ann_direct_response(ctx,donor,i)-ctx->mean[i];
+        np_ann_direct_append(ctx->derivative+di,np_ann_direct_derivative(
+          w/den,dw/den,residual,ctx->derivative_denominator[di]/den,
+          ctx->gradient[d][i]));
+#ifdef NP_ANN_DIRECT_DIAGNOSTIC
+        ctx->derivative_only+=w == 0.0 && dw != 0.0;
+        ++ctx->updates;
+#endif
+      }
+      if(a.index == i) np_conditional_ann_direct_next(&a);
+      if(b.index == i) np_conditional_ann_direct_next(&b);
+    }
+  }
+}
+
 typedef struct {
   const double *data;
   double * const *matrix_W;
@@ -9535,6 +9646,7 @@ typedef struct {
   NPCategoricalDensityMomentCtx *categorical_density_moments;
   NPCategoricalLeadingMomentCtx *categorical_leading_moments;
   NPConditionalLeadingRatioCtx *conditional_leading_ratio;
+  NPConditionalANNDirectCtx *conditional_ann_direct;
 } NP_OuterPackCtx;
 
 /* Keep means as anchor + offset: near-constant contributions must not lose
@@ -12347,6 +12459,39 @@ NPPermutationWeightOutput * const pkw_output){
     return KWSNP_ERR_BADINVOC;
   NPConditionalLeadingRatioCtx * const conditional_ratio =
     outer_pack_ctx != NULL ? outer_pack_ctx->conditional_leading_ratio : NULL;
+  NPConditionalANNDirectCtx * const conditional_ann =
+    outer_pack_ctx != NULL ? outer_pack_ctx->conditional_ann_direct : NULL;
+  if(conditional_ann != NULL) {
+    if(BANDWIDTH_reg != BW_ADAP_NN || num_reg_continuous <= 0 ||
+       leave_one_out || drop_one_train || gather_scatter || symmetric ||
+       do_score || kernel_pow != 1 || bandwidth_divide != 1 ||
+       ncol_W != 0 || ncol_Y != 0 || weighted_sum == NULL || kw != NULL ||
+       do_dual_power || categorical_leading != NULL || conditional_ratio != NULL ||
+       outer_pack_ctx->categorical_density_moments != NULL ||
+       outer_pack_ctx->row_tile_sink != NULL ||
+       conditional_ann->n != num_obs_train || conditional_ann->m != num_obs_eval ||
+       conditional_ann->response == NULL || conditional_ann->level == NULL ||
+       conditional_ann->denominator == NULL || conditional_ann->mean == NULL ||
+       conditional_ann->response->yncon != 0 ||
+       conditional_ann->response->ynuno+conditional_ann->response->ynord <= 0 ||
+       conditional_ann->response_value == NULL ||
+       conditional_ann->response_donor == NULL ||
+       (permutation_operator != OP_NOOP && permutation_operator != OP_DERIVATIVE) ||
+       (conditional_ann->directions != 0 &&
+        (conditional_ann->directions != num_reg_continuous ||
+         conditional_ann->derivative == NULL || !do_perm ||
+         conditional_ann->derivative_denominator == NULL ||
+         conditional_ann->gradient == NULL ||
+         p_nvar < num_reg_continuous || weighted_permutation_sum == NULL)))
+      return KWSNP_ERR_BADINVOC;
+    for(i=0;i<num_reg_continuous;++i)
+      if(operator[i] != OP_NORMAL ||
+         (conditional_ann->directions > 0 && !bpso[i]))
+        return KWSNP_ERR_BADINVOC;
+#ifdef NP_ANN_DIRECT_DIAGNOSTIC
+    ++conditional_ann->entries;
+#endif
+  }
   if(conditional_ratio != NULL &&
      (BANDWIDTH_reg == BW_ADAP_NN || leave_one_out || drop_one_train ||
       gather_scatter || symmetric || do_score || kernel_pow != 1 ||
@@ -12679,6 +12824,19 @@ NPPermutationWeightOutput * const pkw_output){
       goto cleanup;
     }
   }
+
+#ifdef NP_ANN_DIRECT_DIAGNOSTIC
+  if(np_ann_direct_expected_radius != NULL && BANDWIDTH_reg == BW_ADAP_NN) {
+    np_ann_direct_radius_equal=
+      num_reg_continuous == np_ann_direct_radius_columns &&
+      num_obs_train == np_ann_direct_radius_rows;
+    if(np_ann_direct_radius_equal)
+      for(i=0;i<num_reg_continuous;++i)
+        np_ann_direct_radius_equal &= memcmp(matrix_bandwidth[i],
+          np_ann_direct_expected_radius[i],(size_t)num_obs_train*sizeof(double)) == 0;
+    np_ann_direct_expected_radius=NULL;
+  }
+#endif
 
   if(!bandwidth_provided && any_convolution &&
      (num_reg_continuous > 0) &&
@@ -13574,6 +13732,9 @@ NPPermutationWeightOutput * const pkw_output){
         /* Global large-h: all continuous kernels are effectively K(0), so support is full. */
         merge_end_xl(pxl, &kdt->kdn[0]);
       } else {
+#ifdef NP_ANN_DIRECT_DIAGNOSTIC
+        if(conditional_ann != NULL) ++conditional_ann->traversals;
+#endif
         if(!do_partial_tree){
           if(tree_use_active_dims && (tree_active_n < num_reg_continuous)){
             for(kk = 0; kk < tree_active_n; kk++){
@@ -14181,6 +14342,14 @@ NPPermutationWeightOutput * const pkw_output){
                                 outer_pack_ctx != NULL && outer_pack_ctx->tree_outer_blas,
                                 blas_Apack,
                                 &tree_outer_workspace);
+        }
+        if(conditional_ann != NULL) {
+#ifdef NP_ANN_DIRECT_DIAGNOSTIC
+          conditional_ann->tree_selected=np_ks_tree_use;
+          conditional_ann->partial_tree=do_partial_tree;
+#endif
+          np_conditional_ann_direct_row(conditional_ann,j,tprod,dband,
+                                        tprod_mp,p_dband,pxl,p_pxl);
         }
         if(do_hc0_derivative &&
            !np_regression_hc0_derivative_moments_accumulate(
@@ -52629,6 +52798,11 @@ int *cat_se_status
   const int do_merr = (kdf_stderr != NULL);
   const int do_grad = (kdf_deriv != NULL); 
   const int do_gerr = (kdf_deriv_stderr != NULL);
+  const int ann_uncertainty = do_merr && BANDWIDTH_den == BW_ADAP_NN &&
+    num_X_continuous > 0 && num_Y_continuous == 0 &&
+    num_Y_unordered+num_Y_ordered > 0;
+  if(ann_uncertainty && cat_se_status == NULL)
+    error("conditional ANN uncertainty requires a status output");
   NPConditionalCategorySECall cat_se_call = {0};
   int cat_se_selected = 0;
   if(cat_se_status != NULL) *cat_se_status = 0;
@@ -52933,6 +53107,9 @@ int *cat_se_status
     .bandwidth = matrix_bandwidth_Y, .lambda = lambda,
     .numerator = ksn, .sum = kdf_stderr
   };
+#ifdef NP_ANN_DIRECT_DIAGNOSTIC
+  int ann_radius_equal=0;
+#endif
 
   if((!do_grad) &&
      np_conditional_categorical_profile_fit(kernel_uXY,
@@ -52969,19 +53146,25 @@ int *cat_se_status
                                             &ratio_moment))
     goto cleanup_con_dens_dist_categorical;
 
-  if(cat_se_selected > 0) {
+  if(cat_se_selected > 0 || ann_uncertainty) {
     const int natural = BANDWIDTH_den == BW_ADAP_NN ? num_obs_train : num_obs_eval;
     int owned = natural;
+    int64_t additional=ann_uncertainty ? num_obs_train : 0;
 #ifdef MPI2
     if(cat_se_distributed && iNum_Processors > 1 &&
        !np_mpi_local_regression_active())
       owned = (int)(((int64_t)natural*(my_rank+1))/iNum_Processors) -
         (int)(((int64_t)natural*my_rank)/iNum_Processors);
 #endif
-    if(cat_se_selected <= INT_MAX/3 &&
-       owned <= (INT_MAX-1)/(3*cat_se_selected))
-      np_progress_conditional_se_begin(&cat_se_call.progress,
-                                       3*cat_se_selected*owned + 1);
+    if(cat_se_selected > 0) {
+      if(cat_se_selected <= INT_MAX/3 &&
+         owned <= (INT_MAX-1)/(3*cat_se_selected))
+        additional+=(int64_t)(3*cat_se_selected*owned+1);
+      else
+        additional=(int64_t)INT_MAX+1;
+    }
+    if(additional > 0 && additional <= INT_MAX)
+      np_progress_conditional_se_begin(&cat_se_call.progress,(int)additional);
   }
 
   // xy
@@ -53058,6 +53241,14 @@ int *cat_se_status
     .tree_outer_blas = int_TREE_OUTER_BLAS,
     .conditional_leading_ratio = leading_ratio ? &ratio_moment : NULL
   };
+#ifdef NP_ANN_DIRECT_DIAGNOSTIC
+  if(ann_uncertainty) {
+    np_ann_direct_expected_radius=matrix_bandwidth_X;
+    np_ann_direct_radius_columns=num_X_continuous;
+    np_ann_direct_radius_rows=num_obs_train;
+    np_ann_direct_radius_equal=0;
+  }
+#endif
   int_TREE_OUTER_BLAS = 0;
   kernel_weighted_sum_np_ctx_ex(kernel_cXY,
                          kernel_uXY,
@@ -53115,6 +53306,9 @@ int *cat_se_status
                          NULL, NULL,
                          0, // preserve the wrapper's kernel-weight ownership
                          NULL);
+#ifdef NP_ANN_DIRECT_DIAGNOSTIC
+  if(ann_uncertainty) ann_radius_equal=np_ann_direct_radius_equal;
+#endif
 
   
   if (is_cpdf) {
@@ -53358,6 +53552,104 @@ int *cat_se_status
     }
 
 
+  }
+
+  if(ann_uncertainty) {
+    const int directions=do_grad && do_gerr ? num_X_continuous : 0;
+    const size_t mbytes=np_jksum_size_mul_or_die(
+      (size_t)num_obs_eval,sizeof(double),"conditional ANN replay sum");
+    const size_t gradient_count=np_jksum_size_mul_or_die(
+      (size_t)num_obs_eval,(size_t)(do_grad ? num_X : 0),
+      "conditional ANN replay permutation count");
+    double * const replay_sum=(double *)R_alloc(mbytes,1);
+    double * const replay_permutation=do_grad ? (double *)R_alloc(
+      np_jksum_size_mul_or_die(gradient_count,sizeof(double),
+        "conditional ANN replay permutations"),1) : NULL;
+    const size_t level_bytes=np_jksum_size_mul_or_die(
+      (size_t)num_obs_eval,sizeof(NPANNConditionalNorm),
+      "conditional ANN level norms");
+    const size_t derivative_bytes=np_jksum_size_mul_or_die(
+      (size_t)directions,level_bytes,"conditional ANN derivative norms");
+    NPConditionalANNDirectCtx direct = {
+      .n=num_obs_train,.m=num_obs_eval,.directions=directions,
+      .response=&ratio_moment,.denominator=ksd,.mean=kdf,
+      .derivative_denominator=permd,.gradient=kdf_deriv,
+      .level=(NPANNConditionalNorm *)R_alloc(level_bytes,1),
+      .derivative=directions ? (NPANNConditionalNorm *)R_alloc(derivative_bytes,1) : NULL,
+      .response_value=(double *)R_alloc(mbytes,1),
+      .response_donor=(int *)R_alloc(np_jksum_size_mul_or_die(
+        (size_t)num_obs_eval,sizeof(int),"conditional ANN response tags"),1)
+    };
+    memset(direct.level,0,level_bytes);
+    if(directions) memset(direct.derivative,0,derivative_bytes);
+    for(i=0;i<num_obs_eval;++i) direct.response_donor[i]=-1;
+    const NP_OuterPackCtx replay_execution = {
+      .tree_outer_blas=x_execution.tree_outer_blas,
+      .conditional_ann_direct=&direct
+    };
+    np_progress_conditional_se_offset(&cat_se_call.progress,0);
+    np_activate_bounds_xy();
+    const int replay_status=kernel_weighted_sum_np_ctx_ex(
+      kernel_cXY,kernel_uXY,kernel_oXY,BANDWIDTH_den,
+      num_obs_train,num_obs_eval,num_X_unordered,num_X_ordered,num_X_continuous,
+      0,0,1,1,0,0,0,0,0,operator_X,
+      do_grad ? OP_DERIVATIVE : OP_NOOP,0,do_grad,NULL,
+#ifdef MPI2
+      1,
+#else
+      0,
+#endif
+      0,0,int_TREE_XY,1,kdt_extern_XY,&nls,icX,NULL,
+      matrix_XY_unordered_train,matrix_XY_ordered_train,matrix_XY_continuous_train,
+      matrix_XY_unordered_eval,matrix_XY_ordered_eval,matrix_XY_continuous_eval,
+      NULL,NULL,NULL,vsf_X,1,matrix_bandwidth_X,NULL,
+      lambda+num_Y_unordered+num_Y_ordered,
+      num_categories+num_Y_unordered+num_Y_ordered,
+      matrix_categorical_vals+num_Y_unordered+num_Y_ordered,
+      matrix_ordered_indices,replay_sum,replay_permutation,NULL,
+      NULL,NULL,&replay_execution,NULL,NULL,
+#ifdef MPI2
+      0,
+#endif
+      NULL);
+    if(replay_status != 0) {
+      np_progress_conditional_se_end(&cat_se_call.progress);
+      *cat_se_status=replay_status;
+      goto cleanup_con_dens_dist_categorical;
+    }
+    for(i=0;i<num_obs_eval;++i) {
+      double value;
+      const int point_valid=R_FINITE(kdf[i]) && R_FINITE(ksd[i]) && ksd[i] != 0.0;
+      const int valid=point_valid &&
+        np_ann_direct_finish(direct.level+i,(size_t)num_obs_train,&value);
+      kdf_stderr[i]=valid ? value : NA_REAL;
+      for(l=0;l<directions;++l) {
+        const size_t li=(size_t)l*num_obs_eval+i;
+        const int derivative_valid=point_valid && R_FINITE(kdf_deriv[l][i]) &&
+          np_ann_direct_finish(direct.derivative+li,(size_t)num_obs_train,&value);
+        kdf_deriv_stderr[l][i]=derivative_valid ? value : NA_REAL;
+      }
+    }
+#ifdef NP_ANN_DIRECT_DIAGNOSTIC
+    const int sum_equal=memcmp(replay_sum,ksd,mbytes) == 0;
+    const int permutation_equal=!do_grad || memcmp(replay_permutation,permd,
+      gradient_count*sizeof(double)) == 0;
+    Rprintf("NP_ANN_DIRECT_OWNER rank=%d n=%d m=%d directions=%d radius_equal=%d sum_equal=%d permutation_equal=%d entries=%zu rows=%zu tree=%d partial=%d traversals=%zu retained=%zu primary=%zu derivative_only=%zu updates=%zu\n",
+#ifdef MPI2
+      my_rank,
+#else
+      0,
+#endif
+      direct.n,direct.m,direct.directions,ann_radius_equal,sum_equal,permutation_equal,
+      direct.entries,direct.rows,direct.tree_selected,direct.partial_tree,
+      direct.traversals,direct.retained,direct.primary,direct.derivative_only,direct.updates);
+#endif
+    if(cat_se_call.progress.active) {
+      np_progress_fit_step(cat_se_call.progress.base+num_obs_train);
+      cat_se_call.progress.base+=num_obs_train;
+    }
+    if(cat_se_selected == 0)
+      np_progress_conditional_se_end(&cat_se_call.progress);
   }
 
   if(cat_se_selected > 0) {
