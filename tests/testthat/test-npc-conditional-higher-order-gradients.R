@@ -35,7 +35,8 @@ test_that("npcdens exposes lp higher-order continuous gradients via hat operator
 
     expect_equal(as.vector(fit$congrad[, 1L]), as.vector(H2 %*% rhs),
                  tolerance = 1e-9, info = basis)
-    expect_true(all(is.na(fit$congerr[, 1L])), info = basis)
+    expect_true(all(is.finite(fit$congerr[, 1L])), info = basis)
+    expect_true(all(fit$congerr[, 1L] >= 0), info = basis)
     expect_equal(gradients(fit, gradient.order = 2L), fit$congrad,
                  tolerance = 0, info = basis)
     expect_error(gradients(fit, gradient.order = 1L),
@@ -79,7 +80,8 @@ test_that("npcdist exposes lp higher-order continuous gradients via hat operator
 
     expect_equal(as.vector(fit$congrad[, 1L]), as.vector(H2 %*% rhs),
                  tolerance = 1e-9, info = basis)
-    expect_true(all(is.na(fit$congerr[, 1L])), info = basis)
+    expect_true(all(is.finite(fit$congerr[, 1L])), info = basis)
+    expect_true(all(fit$congerr[, 1L] >= 0), info = basis)
     expect_equal(gradients(fit, gradient.order = 2L), fit$congrad,
                  tolerance = 0, info = basis)
     expect_error(gradients(fit, gradient.order = 1L),
@@ -199,6 +201,7 @@ test_that("conditional plot data honors higher-order gradient requests", {
     expect_equal(slice$gradient.order, 2L)
     expect_equal(as.vector(slice$congrad[, 1L]), as.vector(fit$congrad[, 1L]),
                  tolerance = 1e-10)
-    expect_true(all(is.na(slice$congerr[, 1L])))
+    expect_equal(as.vector(slice$congerr[, 1L]), as.vector(fit$congerr[, 1L]),
+                 tolerance = 1e-10)
   }
 })

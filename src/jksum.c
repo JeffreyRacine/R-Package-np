@@ -26046,6 +26046,7 @@ typedef struct {
   NPRegressionFitOwner *enclosing_owner;
   NPRegressionLPEmptyRows *empty_rows;
   const NPConditionalLPFirstSERequest *first_se_request;
+  double *conditional_variance;
 } NPRegressionGeneralLPFitCall;
 
 typedef struct {
@@ -27430,6 +27431,8 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
         sqrt(sigma2hat*call->kernel_squared_integral/
              (sk*call->bandwidth_product));
       sigma2hat = sigma2hat <= 0.0 ? 0.0 : sigma2hat;
+      if(call->conditional_variance != NULL)
+        call->conditional_variance[j] = sigma2hat;
     } else if(call->do_merr) {
       call->mean_stderr[j] = 0.0;
     }
@@ -27873,7 +27876,8 @@ const NPContinuousPreparedBandwidthView *prepared_bandwidth,
 const NPNNGeometryContext *nn_geometry_context,
 const NPRegressionHC0Context *hc0_context,
 NPRegressionLPEmptyRows *empty_rows,
-const NPConditionalLPFirstSERequest *first_se_request){
+const NPConditionalLPFirstSERequest *first_se_request,
+double *conditional_variance){
 
   // note that mean has 2*num_obs allocated for npksum
   int i, j, l;
@@ -27927,6 +27931,17 @@ const NPConditionalLPFirstSERequest *first_se_request){
     error("invalid internal regression standard-error mode");
   if(do_gerr && (!do_merr || (!do_grad && first_se_request == NULL)))
     error("gradient standard errors require gradients and mean standard errors");
+  if(conditional_variance != NULL) {
+    if(lp_engine_est != NP_LP_ENGINE_GENERAL || !do_merr ||
+       standard_error_mode != NP_REGRESSION_STDERR_LOCAL_RESIDUAL ||
+       num_obs_eval != 1 || hc0_context != NULL)
+      error("invalid internal conditional variance owner request");
+#ifdef MPI2
+    if(iNum_Processors > 1 && !np_mpi_local_regression_active())
+      error("conditional variance export requires a local row owner");
+#endif
+    conditional_variance[0] = NA_REAL;
+  }
   if(first_se_request != NULL) {
     int selected = 0;
     if(lp_engine_est != NP_LP_ENGINE_GENERAL ||
@@ -28477,6 +28492,8 @@ const NPConditionalLPFirstSERequest *first_se_request){
           sigma2hat += dy*dy;
         }
         sigma2hat /= (double)MAX(1, num_obs_train);
+        if(conditional_variance != NULL)
+          conditional_variance[0] = sigma2hat;
       }
 
       for(i = 0; i < num_reg_continuous; i++){
@@ -29060,7 +29077,8 @@ const NPConditionalLPFirstSERequest *first_se_request){
       .hc0_context = effective_hc0_context,
       .enclosing_owner = &fit_owner,
       .empty_rows = empty_rows,
-      .first_se_request = first_se_request
+      .first_se_request = first_se_request,
+      .conditional_variance = conditional_variance
     };
 
     general_lp_fit_status = np_regression_general_lp_fit(&general_lp_call);

@@ -132,7 +132,8 @@
                                       txdat,
                                       exdat,
                                       s = NULL,
-                                      train.is.eval = FALSE) {
+                                      train.is.eval = FALSE,
+                                      return.norm = FALSE) {
   train.is.eval <- npValidateScalarLogical(train.is.eval, "train.is.eval")
   if (train.is.eval && nrow(exdat) != nrow(txdat))
     stop("conditional X hat received inconsistent training-identity rows")
@@ -220,7 +221,8 @@
       s = s,
       basis = basis,
       degree = degree,
-      bernstein.basis = bernstein
+      bernstein.basis = bernstein,
+      return.norm = return.norm
     ))
   }
 
@@ -653,7 +655,8 @@
                                  operator,
                                  x.s = NULL,
                                  train.is.eval = FALSE,
-                                 allow.empty.rows = FALSE) {
+                                 allow.empty.rows = FALSE,
+                                 return.norm = FALSE) {
   if (.npcdhat_use_adaptive_ratio(bws = bws, x.s = x.s)) {
     H <- .npcdhat_ratio_matrix(
       bws = bws,
@@ -678,8 +681,11 @@
     txdat = txdat,
     exdat = exdat,
     s = x.s,
-    train.is.eval = train.is.eval
+    train.is.eval = train.is.eval,
+    return.norm = return.norm
   )
+  norms <- if (return.norm) Hx[["norm", exact = TRUE]] else NULL
+  if (return.norm) Hx <- Hx[["hat", exact = TRUE]]
   Gy <- .npcdhat_make_kernel_matrix(
     kbw = ybw,
     txdat = tydat,
@@ -688,7 +694,9 @@
     train.is.eval = train.is.eval
   )
 
-  (Hx * Gy) %*% rhs
+  if (return.norm)
+    list(value = (Hx * Gy) %*% rhs, norm = norms)
+  else (Hx * Gy) %*% rhs
 }
 
 .npcdhat_core <- function(bws,
@@ -702,7 +710,8 @@
                           x.deriv = NULL,
                           x.s = NULL,
                           class_name,
-                          where) {
+                          where,
+                          return.norm = FALSE) {
   output <- match.arg(output, c("matrix", "apply"))
 
   if (xor(is.null(exdat), is.null(eydat)))
@@ -793,8 +802,11 @@
       operator = operator,
       x.s = x.s,
       train.is.eval = no.exy,
-      allow.empty.rows = !no.exy
+      allow.empty.rows = !no.exy,
+      return.norm = return.norm
     )
+    norms <- if (return.norm) out[["norm", exact = TRUE]] else NULL
+    if (return.norm) out <- out[["value", exact = TRUE]]
     empty.rows <- attr(out, ".np.empty.rows", exact = TRUE)
     if (!is.null(empty.rows)) {
       attr(out, ".np.empty.rows") <- NULL
@@ -802,6 +814,9 @@
       den[empty.rows == 1L] <- NA_real_
       out <- .np_normalization_finish(out, den, where)
     }
+    if (return.norm)
+      return(list(value = if (ncol(out) == 1L) as.vector(out) else out,
+                  norm = norms))
     if (ncol(out) == 1L)
       return(as.vector(out))
     return(out)

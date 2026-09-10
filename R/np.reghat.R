@@ -827,7 +827,8 @@ npreghat <-
                                                           s = NULL,
                                                           basis = "glp",
                                                           degree = integer(0),
-                                                          bernstein.basis = FALSE) {
+                                                          bernstein.basis = FALSE,
+                                                          return.norm = FALSE) {
   miss.ex <- is.null(exdat)
   eval.data <- if (miss.ex) txdat else exdat
   ntrain <- nrow(txdat)
@@ -874,13 +875,12 @@ npreghat <-
   H.fast <- if (ncol(W.train) == 1L ||
                 identical(matprod.mode, "default") ||
                 identical(matprod.mode, "blas")) {
-    .Call(
-      "C_np_reghat_lp_matrix_fast",
-      as.matrix(kw),
-      as.matrix(W.train),
-      as.matrix(W.eval),
-      PACKAGE = "np"
-    )
+    if (return.norm)
+      .Call("C_np_reghat_lp_matrix_norm", as.matrix(kw),
+            as.matrix(W.train), as.matrix(W.eval), PACKAGE = "np")
+    else
+      .Call("C_np_reghat_lp_matrix_fast", as.matrix(kw),
+            as.matrix(W.train), as.matrix(W.eval), PACKAGE = "np")
   } else {
     NULL
   }
@@ -888,6 +888,7 @@ npreghat <-
     return(H.fast)
 
   H <- matrix(NA_real_, nrow = neval, ncol = ntrain)
+  norms <- if (return.norm) matrix(NA_real_, neval, 3L) else NULL
   eps <- 1.0 / max(1L, ntrain)
 
   for (j in seq_len(neval)) {
@@ -927,10 +928,16 @@ npreghat <-
       solved[1L] <- corrected
     }
 
-    H[j, ] <- w * drop(W.train %*% solved)
+    if (return.norm) {
+      row <- w * drop(W.train %*% solved)
+      H[j, ] <- row
+      norms[j, ] <- .Call("C_np_reghat_row_norm", row, PACKAGE = "np")
+    } else {
+      H[j, ] <- w * drop(W.train %*% solved)
+    }
   }
 
-  H
+  if (return.norm) list(hat = H, norm = norms) else H
 }
 
 .npreghat_exact_lp_apply_chunked_from_kernel_weights <- function(bws,

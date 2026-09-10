@@ -1,5 +1,12 @@
 # np 0.80-1
 
+* Requested higher-order conditional density/distribution LP derivative
+  standard errors now use the existing local working variance and the actual
+  derivative weighting row, including its accepted ridge. Fixed and adaptive-NN
+  point owners are preserved; generalized-NN higher-point restrictions remain.
+  These errors condition on the selected bandwidths, radii and local map.
+  No supplementary uncertainty work is requested with `se = FALSE`.
+
 * Missing stored gradients or standard errors now consistently explain how to
   refit with the retained bandwidth object without repeating bandwidth search.
   Unsupported uncertainty targets retain their separate diagnostic messages.

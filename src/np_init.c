@@ -17,6 +17,7 @@ extern SEXP C_np_density_conditional_prepared_native_search(SEXP, SEXP, SEXP, SE
 extern SEXP C_np_density_conditional_prepared_fixed_native_search(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_density_conditional_prepared_destroy(void);
 extern SEXP C_np_density_conditional(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP C_np_density_conditional_variance(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_conditional_count_levels(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_regression_lp_apply_conditional(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_regression_lp_apply_conditional_ctx(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
@@ -24,6 +25,8 @@ extern SEXP C_np_regression_lp_sigtest_conditional_ctx(SEXP, SEXP, SEXP, SEXP, S
 extern SEXP C_np_lc_hat_normalize(SEXP, SEXP);
 extern SEXP C_np_lp_batch_project(SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_reghat_lp_matrix_fast(SEXP, SEXP, SEXP);
+extern SEXP C_np_reghat_lp_matrix_norm(SEXP, SEXP, SEXP);
+extern SEXP C_np_reghat_row_norm(SEXP);
 extern SEXP C_np_npscoef_batch_zero_solve(SEXP, SEXP);
 extern SEXP C_np_npscoef_batch_project(SEXP, SEXP);
 extern SEXP C_np_entropy_gaussian_integrand(SEXP, SEXP, SEXP, SEXP);
@@ -71,6 +74,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"C_np_density_conditional_prepared_fixed_native_search",(DL_FUNC) &C_np_density_conditional_prepared_fixed_native_search,12},
     {"C_np_density_conditional_prepared_destroy",(DL_FUNC) &C_np_density_conditional_prepared_destroy,0},
     {"C_np_density_conditional",       (DL_FUNC) &C_np_density_conditional,       34},
+    {"C_np_density_conditional_variance",(DL_FUNC) &C_np_density_conditional_variance,34},
     {"C_np_conditional_count_levels",  (DL_FUNC) &C_np_conditional_count_levels,  22},
     {"C_np_regression_lp_apply_conditional",(DL_FUNC) &C_np_regression_lp_apply_conditional,23},
     {"C_np_regression_lp_apply_conditional_ctx",(DL_FUNC) &C_np_regression_lp_apply_conditional_ctx,26},
@@ -78,6 +82,8 @@ static const R_CallMethodDef CallEntries[] = {
     {"C_np_lc_hat_normalize",             (DL_FUNC) &C_np_lc_hat_normalize,              2},
     {"C_np_lp_batch_project",             (DL_FUNC) &C_np_lp_batch_project,              5},
     {"C_np_reghat_lp_matrix_fast",       (DL_FUNC) &C_np_reghat_lp_matrix_fast,        3},
+    {"C_np_reghat_lp_matrix_norm",       (DL_FUNC) &C_np_reghat_lp_matrix_norm,        3},
+    {"C_np_reghat_row_norm",             (DL_FUNC) &C_np_reghat_row_norm,              1},
     {"C_np_npscoef_batch_zero_solve",    (DL_FUNC) &C_np_npscoef_batch_zero_solve,     2},
     {"C_np_npscoef_batch_project",       (DL_FUNC) &C_np_npscoef_batch_project,        2},
     {"C_np_entropy_gaussian_integrand",  (DL_FUNC) &C_np_entropy_gaussian_integrand,   4},

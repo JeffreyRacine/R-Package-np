@@ -360,6 +360,8 @@ npcdens.conbandwidth <- function(bws,
   }
   basis.code <- as.integer(npLpBasisCode(basis.engine))
   do.compiled.gradients <- isTRUE(gradients) && !glp.gradient.partial
+  higher.se.request <- .np_conditional_higher_se_request(
+    se, gradients, reg.engine, glp.gradient.order, glp.gradient.available)
   first.se.request <- if (!se) NULL else .np_conditional_first_se_request(
     gradients, glp.gradient.partial, degree.engine, glp.gradient.order,
     glp.gradient.available, lp.first.se.demand)
@@ -427,7 +429,7 @@ npcdens.conbandwidth <- function(bws,
     total = .np_condensdist_fit_total(bws = bws, tnrow = tnrow, enrow = enrow),
     handoff = fit.progress.handoff,
     handoff.detail = if (fit.progress.handoff) "starting" else NULL,
-    .Call("C_np_density_conditional",
+    .np_conditional_native_call(higher.se.request,
           as.double(tyuno), as.double(tyord), as.double(tycon),
           as.double(txuno), as.double(txord), as.double(txcon),
           as.double(eyuno), as.double(eyord), as.double(eycon),
@@ -451,8 +453,7 @@ npcdens.conbandwidth <- function(bws,
           basis.code,
           first.se.request,
           cat.se.request,
-          se,
-          PACKAGE = "np")
+          se)
   ), continuous.names = c(bws[["xnames", exact = TRUE]][bws[["ixcon", exact = TRUE]]], bws[["ynames", exact = TRUE]][bws[["iycon", exact = TRUE]]]))
 
   first.se.native <- if (is.null(first.se.request)) NULL else myout$congerr
@@ -497,8 +498,15 @@ npcdens.conbandwidth <- function(bws,
             hat.args$exdat <- proper.slice.context$exdat
             hat.args$eydat <- proper.slice.context$eydat
           }
-          myout$congrad[, cont.idx[jj]] <- as.vector(do.call(npcdenshat, hat.args))
-          if (se) myout$congerr[, cont.idx[jj]] <- NA_real_
+          if (!is.null(higher.se.request) && higher.se.request[jj]) {
+            higher <- .np_conditional_higher_hat(hat.args, cdf = FALSE)
+            myout$congrad[, cont.idx[jj]] <- as.vector(higher$value)
+            myout$congerr[, cont.idx[jj]] <- .np_conditional_higher_se(
+              myout[["variance_metadata", exact = TRUE]], higher$norm, enrow)
+          } else {
+            myout$congrad[, cont.idx[jj]] <- as.vector(do.call(npcdenshat, hat.args))
+            if (se) myout$congerr[, cont.idx[jj]] <- NA_real_
+          }
         }
       }
     }
