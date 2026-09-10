@@ -1,5 +1,13 @@
 # np 0.80-1
 
+* Missing stored gradients or standard errors now consistently explain how to
+  refit with the retained bandwidth object without repeating bandwidth search.
+  Unsupported uncertainty targets retain their separate diagnostic messages.
+
+* Model-specification testing now uses the shared bandwidth progress owner,
+  clearing its transient line at completion instead of leaving a permanent
+  "Computing bandwidths" message. Test calculations are unchanged.
+
 * Requested conditional local-polynomial standard errors in the general
   fitting path now use the accepted fit's intercept ridge correction.
   Failed covariance blocks or invalid variance calculations return `NA`

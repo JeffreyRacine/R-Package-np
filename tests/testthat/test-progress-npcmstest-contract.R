@@ -64,6 +64,11 @@ test_that("npcmstest single-line bootstrap progress matches legacy semantics", {
   lines <- shadow_lines(single_line)
 
   expect_s3_class(single_line$value, "cmstest")
+  bandwidth <- Filter(function(event) grepl("Bandwidth selection", event$line, fixed = TRUE),
+                      single_line$trace)
+  expect_gt(length(bandwidth), 0L)
+  expect_length(unique(vapply(bandwidth, `[[`, character(1L), "id")), 1L)
+  expect_identical(tail(bandwidth, 1L)[[1L]]$event, "finish")
   expect_equal(shadow_bootstrap_signature(single_line), shadow_bootstrap_signature(legacy))
   expect_true(any(grepl("^\\[np\\] Bootstrap replications [0-9]+/9 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
   expect_true(any(grepl("^\\[np\\] Bootstrap replications 9/9 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))

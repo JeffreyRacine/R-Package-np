@@ -141,9 +141,9 @@ npcmstest <- function(formula,
 
   ##  bw <- npregbw(xdat=xdat,ydat=model.resid)
 
-  .np_progress_note("Computing bandwidths")
-
-  bw <- .np_progress_with_legacy_suppressed(npregbw(xdat=xdat, ydat=model$y, ...))
+  bw <- .np_progress_select_bandwidth_enhanced(
+    "Computing bandwidths",
+    npregbw(xdat=xdat, ydat=model$y, ...))
   
   ## Now define the Jn test statistic that takes arguments xdat, the
   ## residual vector, the bandwidth object, and the number of bootstrap

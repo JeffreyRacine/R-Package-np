@@ -110,9 +110,10 @@ test_that("npcmstest no longer uses legacy console helpers", {
   src <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
 
   expect_false(grepl("printPush\\(|printPop\\(|printClear\\(|newLineConsole\\(", src))
-  expect_true(grepl("\\.np_progress_note\\(\"Computing bandwidths\"\\)", src))
+  expect_false(grepl("\\.np_progress_note\\(\"Computing bandwidths\"\\)", src))
+  expect_true(grepl("\\.np_progress_select_bandwidth_enhanced\\(", src))
   expect_true(grepl("\\.np_progress_begin\\(\"Bootstrap replications\"", src))
-  expect_true(grepl("\\.np_progress_with_legacy_suppressed\\(", src))
+  expect_false(grepl("\\.np_progress_with_legacy_suppressed\\(", src))
 })
 
 test_that("npqcmstest no longer uses legacy console helpers", {
