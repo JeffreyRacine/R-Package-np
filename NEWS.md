@@ -1,5 +1,13 @@
 # np 0.80-1
 
+* Requested scalar conditional adaptive-NN standard errors with continuous
+  explanatory variables and exclusively categorical responses now use the
+  complete empirical ratio influence for levels and existing continuous
+  first derivatives. Point estimates, gradients, search and SE-off inference
+  work are unchanged. Existing positive-degree LP, beta and categorical-
+  contrast covariance owners are preserved. This conditional-on-X correction
+  does not resolve unconditional or continuous-response random-radius theory.
+
 * Fixed/generalized-NN conditional density and distribution standard errors
   with categorical variables now retain their joint categorical second
   moments. Conditional CDFs and densities without continuous responses also
@@ -7,7 +15,7 @@
   contribution has zero variance. Pure-category profile and ordinary paths
   agree. Point values, point gradients, likelihoods, SE-off work and existing
   beta/positive-degree LP/paired categorical-contrast owners are unchanged.
-  Continuous adaptive-NN variance limitations remain deferred.
+  Broader adaptive-NN variance limitations remain deferred.
 
 * Fixed/generalized-NN unconditional density and distribution standard errors
   with mixed data now retain squared joint categorical factors within their
