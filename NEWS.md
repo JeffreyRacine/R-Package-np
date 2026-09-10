@@ -925,19 +925,29 @@
   density, distribution, conditional, semiparametric, conditional-mode, and
   copula plot families; estimator and plot-data arithmetic are unchanged.
 
-* Fit and evaluation uncertainty now use one request vocabulary: `se = FALSE`
-  for `npreg()`, `npscoef()`, `npindex()`, and `nplsqreg()`;
-  `se.fit = FALSE` for
-  prediction; and `gradients(..., se = FALSE)` for gradient standard errors.
-  The former Boolean estimation argument `errors` is intentionally rejected
-  with a migration message, while plot methods retain their method-valued
-  `errors` control. Explicit `se = TRUE` reproduces the previous uncertainty
-  arithmetic; the default avoids unrequested moments, bootstrap work,
-  covariance assembly, and native output vectors. `se()`, `vcov()`, and
-  gradient-SE extraction fail helpfully when the required state was not
-  computed. Single-index gradient requests retain their asymptotic coefficient
-  covariance independently of `se`. Bandwidth objectives and plot interval
-  semantics are unchanged.
+* Uncertainty migration: `npudens()`, `npudist()`, `npcdens()`,
+  `npcdist()`, `npplreg()`, `npqreg()`, `npconmode()`, and `npcopula()`
+  now default to `se = FALSE`, joining the existing opt-in controls in
+  `npreg()`, `npscoef()`, and `nplsqreg()`. This is intentionally
+  backward-incompatible for scripts that assumed these uncertainty fields
+  were always populated in earlier releases or candidate builds. The
+  exception is `npindex()`: its default `se = TRUE` includes asymptotic
+  coefficient covariance; explicit `se = FALSE` omits it. Gradients and
+  uncertainty remain separate requests where supported. For example,
+  `npreg(bws = model$bws, gradients = TRUE, se = TRUE)` adds requested
+  outputs without repeating bandwidth selection; supply the original training
+  data if it cannot be recovered from the bandwidth object. Here `model`
+  is an illustrative object name. `se()`, `vcov()`, `coef(..., se = TRUE)`
+  and `gradients(..., se = TRUE)`, where supported, only extract stored
+  results and give a no-search refit message when those results are absent.
+  Explicit inference requests such as `predict(..., se.fit = TRUE)` and
+  `plot(..., errors = "asymptotic")` request their needed computation.
+  Omitted internal uncertainty fields can be `NULL` or length-zero vectors
+  (for example, `derr = numeric(0)`); use the public extractors rather than
+  relying on one internal empty-field shape. The former Boolean estimation
+  argument `errors` remains rejected; plot methods retain their method-valued
+  `errors` control. No bandwidth search is repeated merely to extract stored
+  results.
 
 * Conditional density and distribution kernel summaries now identify
   explanatory and dependent kernels separately for continuous, unordered, and
