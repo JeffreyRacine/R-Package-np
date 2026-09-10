@@ -1,5 +1,11 @@
 # npRmpi 0.80-1
 
+* Partial-linear fitting and plot/bootstrap helpers now consistently reject
+  numerically unidentified residualized linear regressors across BLAS
+  implementations. The shared check accounts for column scale and residual
+  formation precision while retaining the existing QR, accepted coefficient
+  solve and covariance calculation.
+
 * Public single-index fitting and prediction now return `NA` with one notice
   for external rows whose computed kernel weights are all zero, consistently
   across point-only, asymptotic and bootstrap requests. A bootstrap draw that

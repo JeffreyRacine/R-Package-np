@@ -170,8 +170,28 @@ npplreg.call <-
   as.double(y)
 }
 
-.np_plreg_check_residualized_rank <- function(qrX, p, where) {
-  if (qrX$rank < p) {
+.np_plreg_residual_formation_error <- function(x, xhat) {
+  .Machine$double.eps * sqrt(length(x)) * (max(abs(x)) + max(abs(xhat)))
+}
+
+.np_plreg_check_residualized_rank <- function(qrX, p, where,
+                                              formation.error = NULL) {
+  deficient <- qrX[["rank"]] < p
+  if (!deficient) {
+    # Inspect only the existing small factor; do not refactor or change the
+    # pivot/solve. Column scaling makes the guard independent of other units.
+    R <- qrX[["qr"]][seq_len(p), seq_len(p), drop = FALSE]
+    R[lower.tri(R)] <- 0
+    scale <- vapply(seq_len(p), function(j) norm(R[, j, drop = FALSE], "F"),
+                    numeric(1L))
+    precision <- min(max(dim(qrX[["qr"]])) * .Machine$double.eps,
+                     sqrt(.Machine$double.eps))
+    tolerance <- precision * scale
+    if (!is.null(formation.error))
+      tolerance <- tolerance + formation.error[qrX[["pivot"]]]
+    deficient <- any(abs(diag(R)) <= tolerance)
+  }
+  if (deficient) {
     stop(sprintf(
       "%s: residualized linear regressors are rank deficient after smoothing on z; the parametric component is not identified",
       where
@@ -185,7 +205,8 @@ npplreg.call <-
                                    yhat.train,
                                    zdim,
                                    where = "npplreg",
-                                   se = TRUE) {
+                                   se = TRUE,
+                                   formation.error = NULL) {
   X <- as.matrix(resx)
   y <- as.double(resy)
   response <- as.double(response)
@@ -193,7 +214,8 @@ npplreg.call <-
   p <- ncol(X)
   qrX <- qr(X, tol = .Machine$double.eps)
 
-  .np_plreg_check_residualized_rank(qrX = qrX, p = p, where = where)
+  .np_plreg_check_residualized_rank(qrX = qrX, p = p, where = where,
+                                    formation.error = formation.error)
 
   beta <- as.double(qr.coef(qrX, y))
   linear.fit <- as.vector(X %*% beta)
@@ -433,6 +455,7 @@ npplreg.call <-
     p <- ncol(xdat)
     resx <- matrix(0.0, nrow = ntrain, ncol = p)
     resx.eval <- matrix(0.0, nrow = neval, ncol = p)
+    formation.error <- numeric(p)
 
     for (j in seq_len(p)) {
       xhat.train <- reg_mean(regbw = bws$bw[[j + 1L]], ytrain = xdat[, j])
@@ -444,6 +467,8 @@ npplreg.call <-
         x.num.train <- as.double(xdat[, j])
       }
       resx[, j] <- x.num.train - xhat.train
+      formation.error[j] <- .np_plreg_residual_formation_error(x.num.train,
+                                                               xhat.train)
 
       if (!no.exz) {
         xhat.eval <- reg_mean(regbw = bws$bw[[j + 1L]], ytrain = xdat[, j], zeval = ezdat)
@@ -464,7 +489,8 @@ npplreg.call <-
       yhat.train = yhat.train,
       zdim = ncol(zdat),
       where = ".np_plot_plreg_local_fit",
-      se = se
+      se = se,
+      formation.error = formation.error
     )
     B <- solved$coef
     train.fit <- solved$train.fit
@@ -621,6 +647,7 @@ npplreg.plbandwidth <-
     B = double(ncol)
     resx = matrix(data = 0, nrow = nrow, ncol = ncol)
     resx.eval = matrix(data = 0, nrow = nrow.eval, ncol = ncol)
+    formation.error <- numeric(ncol)
     fit.progress.targets <- .np_plreg_fit_progress_targets(names(txdat))
     fit.progress <- .np_plreg_fit_progress_begin(
       xnames = names(txdat),
@@ -642,10 +669,14 @@ npplreg.plbandwidth <-
 
       if (is.factor(txdat[1,i])){
         tmp.dat <- adjustLevels(txdat[,i, drop=FALSE], bws$bw[[i+1]]$ydati)
-        resx[,i] <- (bws$bw[[i+1]]$ydati$all.dlev[[1]])[as.integer(tmp.dat[,1])] - xhat.train
+        x.num.train <- (bws$bw[[i+1]]$ydati$all.dlev[[1]])[as.integer(tmp.dat[,1])]
+        resx[,i] <- x.num.train - xhat.train
       } else {
-        resx[,i] <- txdat[,i] - xhat.train
+        x.num.train <- txdat[,i]
+        resx[,i] <- x.num.train - xhat.train
       }
+      formation.error[i] <- .np_plreg_residual_formation_error(x.num.train,
+                                                               xhat.train)
 
       if(!no.exz) {
         xhat.eval <- reg_mean(regbw = bws$bw[[i+1]], ytrain = txdat[, i], zeval = ezdat)
@@ -678,7 +709,8 @@ npplreg.plbandwidth <-
       yhat.train = yhat.train,
       zdim = dim(tzdat)[2],
       where = "npplreg",
-      se = se
+      se = se,
+      formation.error = formation.error
     )
     B <- solved$coef
     Bvcov <- solved$vcov
