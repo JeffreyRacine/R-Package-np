@@ -476,19 +476,19 @@ or standard-deviation factors.
   For \code{bwmethod="cv.ml"}, the ordinary contribution is based on
   \eqn{\log(\hat f_i)}{log(fhat_i)}. Compact-support kernels can yield
   zero leave-one-out density estimates, and higher-order kernels can
-  yield negative estimates. Every represented finite strictly positive
-  fitted value, including a positive subnormal value, uses the ordinary
-  contribution \eqn{-\log(\hat f_i)}{-log(fhat_i)}. Existing positive
-  signed-log representations retain their finite log values directly,
-  including values outside scalar density range.
-  A zero, negative, or non-finite density contribution makes the entire
-  raw CVML candidate numerically inadmissible. This includes an unresolved
-  arithmetic underflow to zero; a computed zero does not necessarily mean
-  genuinely absent kernel support. The existing \code{invalid.penalty}
-  setting supplies optimizer guidance for invalid candidates, not a finite
-  statistical row loss or a valid final likelihood.
+  yield negative estimates. In those cases the package optimizes a
+  guarded CVML criterion rather than the literal log likelihood. Every
+  represented strictly positive fitted value, including a positive
+  subnormal value, uses the ordinary branch
+  \eqn{-\log(\hat f_i)}{-log(fhat_i)}. Let
+  \eqn{\epsilon}{epsilon} denote the positive machine floor used only to
+  encode an invalid nonpositive contribution. Exact zero and negative values
+  with magnitude no greater than \eqn{\epsilon}{epsilon} use
+  \eqn{-\log(\epsilon)}{-log(epsilon)}; negative values of larger magnitude
+  use the smooth penalty
+  \eqn{\log(-\hat f_i)-2\log(\epsilon)}{log(-fhat_i)-2*log(epsilon)}.
   The \code{guarded} count reported in bandwidth summaries records
-  actual objective evaluations entering the nonpositive/undefined row guard; a
+  objective evaluations containing an invalid nonpositive contribution; a
   positive value is not guarded merely because it is small. The
   \code{bwmethod="cv.ls"} criterion remains well defined for negative
   kernel density estimates and is not modified by this CVML guard.
