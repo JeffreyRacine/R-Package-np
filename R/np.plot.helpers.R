@@ -4416,6 +4416,7 @@
   x.num <- .np_plreg_numeric_x_matrix(txdat = txdat, exdat = txdat, bws = bws)
   x.train.num <- x.num$train
   resx.train <- matrix(0.0, nrow = n, ncol = p)
+  formation.error <- numeric(p)
 
   for (j in seq_len(p)) {
     xhat.train <- .np_plot_plreg_npreghat_apply_chunked(
@@ -4426,6 +4427,8 @@
       where = where
     )
     resx.train[, j] <- x.train.num[, j] - as.vector(xhat.train)
+    formation.error[j] <- .np_plreg_residual_formation_error(x.train.num[, j],
+                                                             xhat.train)
   }
 
   list(
@@ -4435,7 +4438,8 @@
     n = n,
     p = p,
     x.train.num = x.train.num,
-    qrR = qr(resx.train, tol = .Machine$double.eps)
+    qrR = qr(resx.train, tol = .Machine$double.eps),
+    formation.error = formation.error
   )
 }
 
@@ -4504,7 +4508,8 @@
   )
   .np_plreg_check_residualized_rank(qrX = common$qrR,
                                     p = common$p,
-                                    where = where)
+                                    where = where,
+                                    formation.error = common[["formation.error"]])
   beta <- qr.coef(common$qrR, yy - Hy.train)
 
   out <- Hy.eval + state$resx.eval %*% beta
