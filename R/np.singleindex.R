@@ -841,6 +841,20 @@ npindex.sibandwidth <-
     }
     empty.state <- new.env(hash = FALSE, parent = emptyenv())
     empty.state$rows <- NULL
+    empty.state$bootstrap <- NULL
+    record_empty_rows <- function(value, bootstrap = FALSE) {
+      key <- if (bootstrap) "bootstrap" else "rows"
+      empty.state[[key]] <- .npreg_merge_empty_rows(
+        empty.state[[key]], attr(value, ".np.empty.rows", exact = TRUE))
+      attr(value, ".np.empty.rows") <- NULL
+      value
+    }
+    row_matrix <- function(value) {
+      out <- matrix(as.numeric(value), ncol = 1L)
+      flags <- attr(value, ".np.empty.rows", exact = TRUE)
+      if (!is.null(flags)) attr(out, ".np.empty.rows") <- flags
+      out
+    }
     next_npreg_fit_args <- function(exdat = NULL, gradients = FALSE, se = FALSE,
                                     allow.empty.rows = FALSE) {
       args <- if (identical(regtype, "lp") || lc.fixed.progress.route) {
@@ -875,15 +889,18 @@ npindex.sibandwidth <-
       if(is.null(args[[".np.require.complete", exact = TRUE]]))
         args$.np.require.complete <- TRUE
       args$.np.defer.empty.rows <- TRUE
+      fit.once <- function() .np_index_fit_rows(do.call(npreg, args),
+        args$txdat, args$exdat, bws,
+        allow.empty.rows = identical(args$.np.require.complete, FALSE))
       if (isTRUE(lc.fixed.progress.route) ||
           isTRUE(.npRmpi_autodispatch_called_from_bcast()) ||
           isTRUE(.npRmpi_autodispatch_in_context()))
-        .npRmpi_with_local_regression(do.call(npreg, args))
+        .npRmpi_with_local_regression(fit.once())
       else
-        do.call(npreg, args)
+        fit.once()
     }
 
-    eval_fixed_lc_mean <- function(eval.df, label) {
+    eval_fixed_lc_mean <- function(eval.df, label, allow.empty.rows = FALSE) {
       out <- .npindex_spmd_eval_rows(
         neval = nrow(eval.df),
         ncol.out = 1L,
@@ -902,14 +919,16 @@ npindex.sibandwidth <-
             ckerorder = bws$ckerorder,
             ckerbound = bws$ckerbound
           ))$ksum
-          matrix(as.numeric(tww[1, 2, ] / NZD(tww[2, 2, ])),
-                 ncol = 1L)
+          row_matrix(.npRmpi_with_local_regression(.np_index_normalized_mean(
+            tww, index.df, eval.df[rows, , drop = FALSE], bws,
+            allow.empty.rows = allow.empty.rows)))
         }
       )
+      out <- record_empty_rows(out)
       as.vector(out[, 1L])
     }
 
-    eval_exact_mean <- function(eval.df, label) {
+    eval_exact_mean <- function(eval.df, label, allow.empty.rows = FALSE) {
       out <- .npindex_spmd_eval_rows(
         neval = nrow(eval.df),
         ncol.out = 1L,
@@ -923,11 +942,12 @@ npindex.sibandwidth <-
             idx.eval = eval.df[rows, , drop = FALSE],
             y = tydat,
             output = "apply",
-            s = 0L
+            s = 0L, allow.empty.rows = allow.empty.rows
           ))
-          matrix(as.numeric(val), ncol = 1L)
+          row_matrix(val)
         }
       )
+      out <- record_empty_rows(out)
       as.vector(out[, 1L])
     }
 
@@ -1028,7 +1048,8 @@ npindex.sibandwidth <-
             ckerorder = bws$ckerorder,
             ckerbound = bws$ckerbound
           )$ksum
-          as.double(tww.fast[1, 2, 1L] / NZD(tww.fast[2, 2, 1L]))
+          as.double(.np_index_normalized_mean(
+            tww.fast, index.df, index.eval.df[1L, , drop = FALSE], bws))
         }
 
         if (!no.ex && (no.ey || residuals)) {
@@ -1044,7 +1065,8 @@ npindex.sibandwidth <-
               ckerorder = bws$ckerorder,
               ckerbound = bws$ckerbound
             )$ksum
-            as.double(tww.fast[1, 2, 1L] / NZD(tww.fast[2, 2, 1L]))
+            as.double(.np_index_normalized_mean(
+              tww.fast, index.df, index.df[1L, , drop = FALSE], bws))
           }
         }
       }
@@ -1079,12 +1101,12 @@ npindex.sibandwidth <-
         } else if (identical(bws$type, "fixed")) {
           index.mean <- eval_fixed_lc_mean(
             eval.df = index.eval.df,
-            label = "npindex fixed LC evaluation mean"
+            label = "npindex fixed LC evaluation mean", allow.empty.rows = !no.ex
           )
         } else {
           index.mean <- eval_exact_mean(
             eval.df = index.eval.df,
-            label = "npindex exact evaluation mean"
+            label = "npindex exact evaluation mean", allow.empty.rows = !no.ex
           )
         }
 
@@ -1307,14 +1329,16 @@ npindex.sibandwidth <-
           ckerbound = bws$ckerbound,
           regtype = regtype,
           gradients = TRUE,
-          warn.glp.gradient = FALSE
+          warn.glp.gradient = FALSE,
+          .np.require.complete = FALSE
         )
         if (identical(regtype, "lp")) {
           boot.args$basis <- spec$basis.engine
           boot.args$degree <- spec$degree.engine
           boot.args$bernstein.basis <- spec$bernstein.basis.engine
         }
-        model <- run_npreg_fit(boot.args)[c('mean','grad')]
+        model <- record_empty_rows(run_npreg_fit(boot.args),
+          bootstrap = TRUE)[c('mean','grad')]
         
         c(model$mean, model$grad, mean(model$grad))
       }
@@ -1333,7 +1357,9 @@ npindex.sibandwidth <-
                         ckerorder = bws$ckerorder,
                         ckerbound = bws$ckerbound)$ksum
 
-          tww[1,2,]/NZD(tww[2,2,])
+          record_empty_rows(.np_index_normalized_mean(
+            tww, rindex, index.eval, bws, allow.empty.rows = TRUE),
+            bootstrap = TRUE)
         } else {
           boot.args <- list(
             txdat = rindex,
@@ -1346,14 +1372,15 @@ npindex.sibandwidth <-
             ckerbound = bws$ckerbound,
             regtype = regtype,
             gradients = FALSE,
-            warn.glp.gradient = FALSE
+            warn.glp.gradient = FALSE,
+            .np.require.complete = FALSE
           )
           if (identical(regtype, "lp")) {
             boot.args$basis <- spec$basis.engine
             boot.args$degree <- spec$degree.engine
             boot.args$bernstein.basis <- spec$bernstein.basis.engine
           }
-          run_npreg_fit(boot.args)$mean
+          record_empty_rows(run_npreg_fit(boot.args), bootstrap = TRUE)$mean
         }
         
       }
@@ -1413,17 +1440,22 @@ npindex.sibandwidth <-
                 ckerbound = bws$ckerbound,
                 regtype = regtype,
                 gradients = TRUE,
-                warn.glp.gradient = FALSE
+                warn.glp.gradient = FALSE,
+                .np.require.complete = FALSE
               )
               if (identical(regtype, "lp")) {
                 boot.args$basis <- spec$basis.engine
                 boot.args$degree <- spec$degree.engine
                 boot.args$bernstein.basis <- spec$bernstein.basis.engine
               }
-              model <- run_npreg_fit(boot.args)[c("mean", "grad")]
-              cbind(as.numeric(model$mean), as.numeric(as.matrix(model$grad)[, 1L]))
+              model <- run_npreg_fit(boot.args)
+              value <- cbind(as.numeric(model$mean), as.numeric(as.matrix(model$grad)[, 1L]))
+              flags <- attr(model, ".np.empty.rows", exact = TRUE)
+              if (!is.null(flags)) attr(value, ".np.empty.rows") <- flags
+              value
             }
           )
+          out <- record_empty_rows(out, bootstrap = TRUE)
           boot.t[bb, ] <- c(out[, 1L], out[, 2L], mean(out[, 2L]))
         } else if (identical(regtype, "lc")) {
           out <- .npindex_spmd_eval_rows(
@@ -1444,9 +1476,12 @@ npindex.sibandwidth <-
                 ckerorder = bws$ckerorder,
                 ckerbound = bws$ckerbound
               ))$ksum
-              matrix(as.numeric(tww[1, 2, ] / NZD(tww[2, 2, ])), ncol = 1L)
+              row_matrix(.npRmpi_with_local_regression(.np_index_normalized_mean(
+                tww, rindex.df, index.eval.df[rows, , drop = FALSE], bws,
+                allow.empty.rows = TRUE)))
             }
           )
+          out <- record_empty_rows(out, bootstrap = TRUE)
           boot.t[bb, ] <- out[, 1L]
         } else {
           out <- .npindex_spmd_eval_rows(
@@ -1467,16 +1502,22 @@ npindex.sibandwidth <-
                 ckerbound = bws$ckerbound,
                 regtype = regtype,
                 gradients = FALSE,
-                warn.glp.gradient = FALSE
+                warn.glp.gradient = FALSE,
+                .np.require.complete = FALSE
               )
               if (identical(regtype, "lp")) {
                 boot.args$basis <- spec$basis.engine
                 boot.args$degree <- spec$degree.engine
                 boot.args$bernstein.basis <- spec$bernstein.basis.engine
               }
-              matrix(as.numeric(run_npreg_fit(boot.args)$mean), ncol = 1L)
+              model <- run_npreg_fit(boot.args)
+              value <- matrix(as.numeric(model$mean), ncol = 1L)
+              flags <- attr(model, ".np.empty.rows", exact = TRUE)
+              if (!is.null(flags)) attr(value, ".np.empty.rows") <- flags
+              value
             }
           )
+          out <- record_empty_rows(out, bootstrap = TRUE)
           boot.t[bb, ] <- out[, 1L]
         }
         if (!is.null(progress))
@@ -1501,6 +1542,9 @@ npindex.sibandwidth <-
 
       index.merr = matrix(data = 0, ncol = 1, nrow = length(index.eval))
       index.merr[,] = .np_plot_bootstrap_col_sds(boot.t[, seq_len(length(index.eval)), drop = FALSE])
+      missing.bootstrap <- which(empty.state$bootstrap == 1L)
+      if (length(missing.bootstrap))
+        index.merr[missing.bootstrap, ] <- NA_real_
 
       if (gradients) {
         index.gerr = matrix(data = 0, ncol = ncol(txdat), nrow = length(index.eval))
@@ -1510,6 +1554,8 @@ npindex.sibandwidth <-
 
         for (i in seq_len(ncol(txdat)))
           index.gerr[,i] = abs(bws$beta[i])*index.gerr[,i]
+        if (length(missing.bootstrap))
+          index.gerr[missing.bootstrap, ] <- NA_real_
 
         index.mgerr = sd(boot.t[,2*length(index.eval)+1])
         index.mgerr = abs(bws$beta)*index.mgerr
@@ -1603,8 +1649,11 @@ npindex.sibandwidth <-
     ev$fit.time <- fit.elapsed
     ev$nomad.time <- if (!is.null(bws$nomad.time) && is.finite(bws$nomad.time)) as.double(bws$nomad.time) else NA_real_
     ev$powell.time <- if (!is.null(bws$powell.time) && is.finite(bws$powell.time)) as.double(bws$powell.time) else NA_real_
-    .npreg_finish_empty_rows(ev, empty.state$rows,
+    .npreg_finish_empty_rows(ev,
+      .npreg_merge_empty_rows(empty.state$rows, empty.state$bootstrap),
       omitted = if(no.ex) integer(0) else which(!keep.eval),
       defer = isTRUE(dots[[".np.defer.empty.rows", exact = TRUE]]),
-      owner = "npindex", row.labels = if(no.ex) NULL else row.names(exdat))
+      owner = if (is.null(empty.state$bootstrap)) "npindex" else
+        "npindex (including bootstrap draws)",
+      row.labels = if(no.ex) NULL else row.names(exdat))
   }

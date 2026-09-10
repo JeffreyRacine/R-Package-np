@@ -1,5 +1,12 @@
 # npRmpi 0.80-1
 
+* Public single-index fitting and prediction now return `NA` with one notice
+  for external rows whose computed kernel weights are all zero, consistently
+  across point-only, asymptotic and bootstrap requests. A bootstrap draw that
+  loses support makes the affected uncertainty unavailable without replacing
+  a supported original point estimate. Required training ratios remain strict;
+  supported values, resampling and computational owners are unchanged.
+
 * Unconditional distribution fitting through a named formula now preserves
   an explicit `se = TRUE` request, matching the bandwidth-object route and
   serial np. Omitted or false requests still avoid uncertainty computation.

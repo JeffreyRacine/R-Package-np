@@ -119,6 +119,13 @@ These arguments control where the single-index fit is evaluated and which evalua
     a \eqn{p}-variate data frame of points on which the regression will be
     estimated (evaluation data). By default,
     evaluation takes place on the data provided by \code{txdat}.
+    If all computed kernel weights are zero at an external evaluation row,
+    the undefined fitted quantities are returned as \code{NA}, with one
+    notice per call. This policy is independent of the \code{se} and
+    \code{gradients} switches; required training computations remain strict.
+    If a bootstrap resample has no support at a requested row, its bootstrap
+    standard error is \code{NA}; a supported original point estimate is
+    retained. Replications are not dropped or redrawn.
   }
 
 
