@@ -338,6 +338,18 @@ Further arguments are passed to \code{\link{npcdistbw}} when bandwidths are comp
   with estimated random radii. Positive-degree local-polynomial fits use
   their separate covariance calculation.
 
+  For fixed and generalized nearest-neighbour scalar fits with categorical
+  variables, these leading moments retain squared categorical kernel factors
+  and the joint training-category frequencies. Conditional distributions,
+  and conditional densities with no continuous response, retain the
+  numerator--denominator covariance of the ratio estimator. In particular,
+  a constant response-kernel contribution has zero conditional variance.
+  Purely categorical fits use this ratio covariance without a continuous
+  bandwidth factor, including nearest-neighbour-labelled bandwidth objects.
+  This correction does not supply a new adaptive-NN variance formula when
+  continuous variables are present. Beta-kernel and positive-degree
+  local-polynomial covariance calculations retain their separate targets.
+
 }
 \value{
   The \code{se} component records whether uncertainty was requested.
