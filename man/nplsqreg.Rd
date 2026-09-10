@@ -201,8 +201,10 @@ selection, prediction, or plotting route.
   Standard errors are the asymptotic standard errors from that final
   transformed-response regression, conditional on the selected
   bandwidths, pilot scale, and \eqn{\delta}{delta}. For vector
-  \code{tau}, per-quantile fits are independent, so estimated quantile
-  curves are not monotonized and may cross in finite samples.
+  \code{tau}, quantiles are fitted separately, so estimated quantile
+  curves are not monotonized and may cross in finite samples. Separate
+  fits on the same observations do not imply zero cross-quantile
+  sampling covariance.
 }
 \value{
   \code{nplsqreg} returns an object of class \code{lsqregression}. The
