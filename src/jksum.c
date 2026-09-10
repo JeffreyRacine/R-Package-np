@@ -8953,6 +8953,7 @@ typedef struct {
 typedef struct {
   double *sum;
   int cdf;
+  int conditional_base_row;
 } NPCategoricalLeadingMomentCtx;
 
 static double np_categorical_leading_factor(
@@ -8962,7 +8963,8 @@ static double np_categorical_leading_factor(
   const double *lambda, const int *categories,
   double **catvals, const int *uno_constant, const double *uno_value,
   const int *ord_constant, const double *ord_value,
-  const int use_profiles, const int *profile_id, const double *profile_value)
+  const int use_profiles, const int *profile_id, const double *profile_value,
+  const int unordered_offset, const int ordered_offset)
 {
   double factor = use_profiles ? profile_value[profile_id[observation]] : 1.0;
   double constant = 1.0;
@@ -8981,14 +8983,14 @@ static double np_categorical_leading_factor(
     if(uno_constant != NULL && uno_constant[k])
       constant *= uno_value[k];
     else if(!use_profiles)
-      factor *= uk[ku[k]](tu[k][observation] == eu[k][evaluation],
+      factor *= uk[ku[k]+unordered_offset](tu[k][observation] == eu[k][evaluation],
                            lambda[k], categories[k]);
   }
   for(int k = 0; k < no; ++k) {
     if(ord_constant != NULL && ord_constant[k])
       constant *= ord_value[k];
     else if(!use_profiles)
-      factor *= ok[ko[k]](to[k][observation], eo[k][evaluation], lambda[nu+k],
+      factor *= ok[ko[k]+ordered_offset](to[k][observation], eo[k][evaluation], lambda[nu+k],
                            catvals[nu+k][0], catvals[nu+k][categories[nu+k]-1]);
   }
   return factor * constant;
@@ -9016,7 +9018,7 @@ static void np_categorical_leading_moment_row(
       const double factor = np_categorical_leading_factor(
         i, evaluation, nu, no, ku, ko, tu, to, eu, eo, lambda, categories,
         catvals, uno_constant, uno_value, ord_constant, ord_value,
-        use_profiles, profile_id, profile_value);
+        use_profiles, profile_id, profile_value, 0, 0);
       if(!ctx->cdf) {
         sum += value * factor;
       } else {
@@ -9043,6 +9045,126 @@ static void np_categorical_leading_moment_row(
   ctx->sum[evaluation] = R_FINITE(sum) && sum >= 0.0 ? sum : NA_REAL;
 }
 
+/* The finite-category ratio retains numerator/denominator covariance. Its
+ * response metadata is readonly; original XY/X point rows are never altered. */
+typedef struct {
+  int bw, xncon, yncon, ynuno, ynord, yop;
+  const int *ykc, *yku, *yko, *categories;
+  double * const *train_u, * const *train_o, * const *train_c;
+  double * const *eval_u, * const *eval_o, * const *eval_c;
+  double **catvals, **bandwidth;
+  const double *lambda, *numerator;
+  double *sum;
+} NPConditionalLeadingRatioCtx;
+
+static double np_conditional_leading_response_category(
+  const NPConditionalLeadingRatioCtx *ctx, int observation, int evaluation)
+{
+  return np_categorical_leading_factor(
+    observation, evaluation, ctx->ynuno, ctx->ynord, ctx->yku, ctx->yko,
+    ctx->train_u, ctx->train_o, ctx->eval_u, ctx->eval_o,
+    ctx->lambda, ctx->categories, ctx->catvals,
+    NULL, NULL, NULL, NULL, 0, NULL, NULL,
+    OP_UFUN_OFFSETS[ctx->yop], OP_OFUN_OFFSETS[ctx->yop]);
+}
+
+static double np_conditional_leading_response_integral(
+  const NPConditionalLeadingRatioCtx *ctx, int observation, int evaluation)
+{
+  double product = 1.0;
+  for(int l = 0; l < ctx->yncon; ++l) {
+    const int coordinate = ctx->xncon+l;
+    const int bounded = int_cker_bound_extern &&
+      vector_ckerlb_extern != NULL && vector_ckerub_extern != NULL &&
+      ((isfinite(vector_ckerlb_extern[coordinate]) &&
+        fabs(vector_ckerlb_extern[coordinate]) < .5*DBL_MAX) ||
+       (isfinite(vector_ckerub_extern[coordinate]) &&
+        fabs(vector_ckerub_extern[coordinate]) < .5*DBL_MAX));
+    double value;
+    np_ckernelv(ctx->ykc[l]+OP_CFUN_OFFSETS[OP_INTEGRAL],
+      ctx->train_c[l]+observation, 1, 0, ctx->eval_c[l][evaluation],
+      ctx->bandwidth[l][ctx->bw == BW_FIXED ? 0 : evaluation],
+      &value, NULL, 0, 1, 1.0, bounded,
+      bounded ? vector_ckerlb_extern[coordinate] : R_NegInf,
+      bounded ? vector_ckerub_extern[coordinate] : R_PosInf, NULL, NULL);
+    product *= value;
+  }
+  return product;
+}
+
+static double np_conditional_leading_ratio_term(
+  const double event, const double category, const double mean)
+{
+  const double delta = fma(event, category, -mean);
+  return delta*delta + event*(1.0-event)*category*category;
+}
+
+static double np_conditional_leading_se(
+  const double sum, const double constant, const double denominator)
+{
+  const double result = sqrt(sum)*sqrt(constant)/fabs(denominator);
+  return R_FINITE(sum) && sum >= 0.0 && R_FINITE(result) ? result : NA_REAL;
+}
+
+static void np_conditional_leading_ratio_row(
+  NPConditionalLeadingRatioCtx *ctx, const double *row, const int n,
+  const int evaluation, const double bandwidth, const double denominator,
+  const XL *nodes, const int nu, const int no, const int *ku, const int *ko,
+  double * const *tu, double * const *to,
+  double * const *eu, double * const *eo,
+  const double *lambda, const int *categories, double **catvals,
+  const int *uno_constant, const double *uno_value,
+  const int *ord_constant, const double *ord_value,
+  const int use_profiles, const int *profile_id, const double *profile_value)
+{
+  const double mean = ctx->numerator[evaluation]/denominator;
+  double sum = 0.0;
+  if(!R_FINITE(mean) || !R_FINITE(denominator) || denominator == 0.0) {
+    ctx->sum[evaluation] = NA_REAL;
+    return;
+  }
+  const int blocks = nodes == NULL ? 1 : nodes->n;
+  for(int block = 0; block < blocks; ++block) {
+    const int first = nodes == NULL ? 0 : nodes->istart[block];
+    const int last = nodes == NULL ? n : first+nodes->nlev[block];
+    for(int i = first; i < last; ++i) {
+      const double value = row[i]/bandwidth;
+      if(value == 0.0) continue;
+      const double factor = np_categorical_leading_factor(
+        i, evaluation, nu, no, ku, ko, tu, to, eu, eo, lambda, categories,
+        catvals, uno_constant, uno_value, ord_constant, ord_value,
+        use_profiles, profile_id, profile_value, 0, 0);
+      const double response = np_conditional_leading_response_category(ctx,i,evaluation);
+      const double event = np_conditional_leading_response_integral(ctx,i,evaluation);
+      sum += value*factor*np_conditional_leading_ratio_term(event,response,mean);
+    }
+  }
+  ctx->sum[evaluation] = R_FINITE(sum) && sum >= 0.0 ? sum : NA_REAL;
+}
+
+static double np_conditional_leading_category_se(
+  const NPConditionalLeadingRatioCtx *ctx, int n, int evaluation,
+  double mean, double denominator, int nu, int no, const int *ku, const int *ko,
+  double * const *tu, double * const *to, double * const *eu, double * const *eo,
+  const double *lambda, const int *categories, double **catvals,
+  const int *representative, const double *frequency)
+{
+  double sum = 0.0;
+  if(!R_FINITE(mean) || !R_FINITE(denominator) || denominator == 0.0)
+    return NA_REAL;
+  for(int g = 0; g < n; ++g) {
+    const int i = representative == NULL ? g : representative[g];
+    const double factor = np_categorical_leading_factor(
+      i, evaluation, nu, no, ku, ko, tu, to, eu, eo, lambda, categories,
+      catvals, NULL, NULL, NULL, NULL, 0, NULL, NULL, 0, 0);
+    if(factor == 0.0) continue;
+    const double response = np_conditional_leading_response_category(ctx,i,evaluation);
+    const double weight = frequency == NULL ? 1.0 : frequency[g];
+    sum += weight*factor*factor*np_conditional_leading_ratio_term(1.0,response,mean);
+  }
+  return np_conditional_leading_se(sum,1.0,denominator);
+}
+
 typedef struct {
   const double *data;
   double * const *matrix_W;
@@ -9055,6 +9177,7 @@ typedef struct {
   NP_KernelRowTileSink *row_tile_sink;
   NPCategoricalDensityMomentCtx *categorical_density_moments;
   NPCategoricalLeadingMomentCtx *categorical_leading_moments;
+  NPConditionalLeadingRatioCtx *conditional_leading_ratio;
 } NP_OuterPackCtx;
 
 /* Keep means as anchor + offset: near-constant contributions must not lose
@@ -11533,9 +11656,22 @@ NPPermutationWeightOutput * const pkw_output){
   if(categorical_leading != NULL &&
      (BANDWIDTH_reg == BW_ADAP_NN || num_reg_continuous <= 0 ||
       num_reg_unordered + num_reg_ordered <= 0 || leave_one_out ||
-      drop_one_train || gather_scatter || symmetric || do_score || do_ocg ||
-      permutation_operator != OP_NOOP || kernel_pow != 1 || ncol_W != 0 ||
+      drop_one_train || gather_scatter || symmetric || do_score ||
+      (!categorical_leading->conditional_base_row &&
+       (do_ocg || permutation_operator != OP_NOOP)) ||
+      (categorical_leading->conditional_base_row &&
+       permutation_operator != OP_NOOP && permutation_operator != OP_DERIVATIVE) ||
+      kernel_pow != 1 || ncol_W != 0 ||
       ncol_Y != 0 || weighted_sum == NULL || categorical_leading->sum == NULL))
+    return KWSNP_ERR_BADINVOC;
+  NPConditionalLeadingRatioCtx * const conditional_ratio =
+    outer_pack_ctx != NULL ? outer_pack_ctx->conditional_leading_ratio : NULL;
+  if(conditional_ratio != NULL &&
+     (BANDWIDTH_reg == BW_ADAP_NN || leave_one_out || drop_one_train ||
+      gather_scatter || symmetric || do_score || kernel_pow != 1 ||
+      ncol_W != 0 || ncol_Y != 0 || weighted_sum == NULL ||
+      conditional_ratio->sum == NULL || conditional_ratio->numerator == NULL ||
+      (permutation_operator != OP_NOOP && permutation_operator != OP_DERIVATIVE)))
     return KWSNP_ERR_BADINVOC;
   NPCategoricalDensityMomentCtx * const categorical_moments =
     outer_pack_ctx != NULL ? outer_pack_ctx->categorical_density_moments : NULL;
@@ -12358,6 +12494,9 @@ NPPermutationWeightOutput * const pkw_output){
 
   if(categorical_leading != NULL)
     memset(categorical_leading->sum, 0,
+           (size_t)num_obs_eval_alloc * sizeof(double));
+  if(conditional_ratio != NULL)
+    memset(conditional_ratio->sum, 0,
            (size_t)num_obs_eval_alloc * sizeof(double));
 
   if(categorical_moments != NULL) {
@@ -13294,6 +13433,15 @@ NPPermutationWeightOutput * const pkw_output){
           disc_ord_const_ok, disc_ord_const, use_disc_profile_cache,
           disc_prof_id, disc_prof_val);
 
+      if(conditional_ratio != NULL)
+        np_conditional_leading_ratio_row(
+          conditional_ratio, tprod, num_xt, j, dband, *ws, pxl,
+          num_reg_unordered, num_reg_ordered, KERNEL_unordered_reg_np,
+          KERNEL_ordered_reg_np, xtu, xto, xu, xo, lambda, num_categories,
+          matrix_categorical_vals, disc_uno_const_ok, disc_uno_const,
+          disc_ord_const_ok, disc_ord_const, use_disc_profile_cache,
+          disc_prof_id, disc_prof_val);
+
       if(do_dual_power){
         if(dual_power_ctx->observation_scale != NULL) {
           if(dual_power_ctx->kernel_pow != 2 || sgn != NULL ||
@@ -13455,6 +13603,9 @@ NPPermutationWeightOutput * const pkw_output){
     if(categorical_leading != NULL)
       MPI_Allgather(MPI_IN_PLACE, stride, MPI_DOUBLE,
                     categorical_leading->sum, stride, MPI_DOUBLE, comm[1]);
+    if(conditional_ratio != NULL)
+      MPI_Allgather(MPI_IN_PLACE, stride, MPI_DOUBLE,
+                    conditional_ratio->sum, stride, MPI_DOUBLE, comm[1]);
 
     if(categorical_moments != NULL) {
       if(!is_adaptive) {
@@ -44717,6 +44868,7 @@ typedef struct {
   double *kdf;
   double *kdf_stderr;
   double *log_likelihood;
+  const NPConditionalLeadingRatioCtx *ratio;
 } NPConditionalCategoricalProfileFitCall;
 
 typedef struct {
@@ -44758,7 +44910,6 @@ static int np_conditional_categorical_profile_fit_body(
   int * const operator_XY = call->operator_XY;
   int * const operator_X = call->operator_X;
   const int yop = call->yop;
-  const double K_INT_KERNEL_P = call->kernel_squared_integral;
   const int int_tree_profile = call->tree_profile;
   double * const kdf = call->kdf;
   double * const kdf_stderr = call->kdf_stderr;
@@ -45037,6 +45188,21 @@ static int np_conditional_categorical_profile_fit_body(
                             NULL) != 0)
     goto cleanup;
 
+  if(kdf_stderr != NULL) {
+    for(g = 0; g < nprof_eval_xy; ++g) {
+      const int evaluation = eval_xy_rep[g];
+      const double den = profile_den[eval_x_id[evaluation]];
+      const double sk = copysign(DBL_MIN,den)+den;
+      kdf_stderr[evaluation] = np_conditional_leading_category_se(
+        call->ratio, nprof_train_xy, evaluation, profile_num[g]/sk, sk,
+        num_X_unordered, num_X_ordered, kernel_uX, kernel_oX,
+        matrix_XY_unordered_train, matrix_XY_ordered_train,
+        matrix_XY_unordered_eval, matrix_XY_ordered_eval,
+        call->ratio->lambda+num_Y, num_categories+num_Y,
+        matrix_categorical_vals+num_Y, train_xy_rep, counts_xy);
+    }
+  }
+
   *log_likelihood = 0.0;
   for(i = 0; i < num_obs_eval; i++){
     const double sk = copysign(DBL_MIN, profile_den[eval_x_id[i]]) + profile_den[eval_x_id[i]];
@@ -45044,10 +45210,9 @@ static int np_conditional_categorical_profile_fit_body(
     kdf[i] = val;
     if(is_cpdf){
       *log_likelihood += np_fitted_log_likelihood_contribution(val);
-      if(kdf_stderr != NULL) kdf_stderr[i] = sqrt(val*K_INT_KERNEL_P/sk);
-    } else {
-      if(kdf_stderr != NULL) kdf_stderr[i] = sqrt(val*(1.0-val)*K_INT_KERNEL_P/sk);
     }
+    if(kdf_stderr != NULL)
+      kdf_stderr[i] = kdf_stderr[eval_xy_rep[eval_xy_id[i]]];
   }
 
   ok = 1;
@@ -45099,7 +45264,8 @@ double K_INT_KERNEL_P,
 int int_tree_profile,
 double *kdf,
 double *kdf_stderr,
-double *log_likelihood)
+double *log_likelihood,
+const NPConditionalLeadingRatioCtx *ratio)
 {
   const NPConditionalCategoricalProfileFitCall call = {
     .kernel_uXY = kernel_uXY,
@@ -45132,7 +45298,8 @@ double *log_likelihood)
     .tree_profile = int_tree_profile,
     .kdf = kdf,
     .kdf_stderr = kdf_stderr,
-    .log_likelihood = log_likelihood
+    .log_likelihood = log_likelihood,
+    .ratio = ratio
   };
   NPConditionalCategoricalProfileFitExecution execution;
 
@@ -45819,6 +45986,33 @@ int *cat_se_status
                         NULL, NULL, NULL,
                         NULL, NULL, NULL);
 
+  const int categorical_uncertainty = do_merr && num_uXY+num_oXY > 0 &&
+    (BANDWIDTH_den != BW_ADAP_NN || num_cXY == 0);
+  const int leading_density = categorical_uncertainty && is_cpdf &&
+    num_Y_continuous > 0;
+  const int leading_ratio = categorical_uncertainty && !leading_density &&
+    BANDWIDTH_den != BW_ADAP_NN;
+  NPCategoricalLeadingMomentCtx leading_moment = {
+    .sum = kdf_stderr, .cdf = 0, .conditional_base_row = 1
+  };
+  NPConditionalLeadingRatioCtx ratio_moment = {
+    .bw = BANDWIDTH_den, .xncon = num_X_continuous,
+    .yncon = num_Y_continuous, .ynuno = num_Y_unordered,
+    .ynord = num_Y_ordered, .yop = yop,
+    .ykc = num_Y_continuous ? kernel_cXY+num_X_continuous : NULL,
+    .yku = num_Y_unordered ? kernel_uXY+num_X_unordered : NULL,
+    .yko = num_Y_ordered ? kernel_oXY+num_X_ordered : NULL,
+    .categories = num_categories, .catvals = matrix_categorical_vals,
+    .train_u = num_Y_unordered ? matrix_XY_unordered_train+num_X_unordered : NULL,
+    .train_o = num_Y_ordered ? matrix_XY_ordered_train+num_X_ordered : NULL,
+    .train_c = num_Y_continuous ? matrix_XY_continuous_train+num_X_continuous : NULL,
+    .eval_u = num_Y_unordered ? matrix_XY_unordered_eval+num_X_unordered : NULL,
+    .eval_o = num_Y_ordered ? matrix_XY_ordered_eval+num_X_ordered : NULL,
+    .eval_c = num_Y_continuous ? matrix_XY_continuous_eval+num_X_continuous : NULL,
+    .bandwidth = matrix_bandwidth_Y, .lambda = lambda,
+    .numerator = ksn, .sum = kdf_stderr
+  };
+
   if((!do_grad) &&
      np_conditional_categorical_profile_fit(kernel_uXY,
                                             kernel_oXY,
@@ -45850,7 +46044,8 @@ int *cat_se_status
                                             int_TREE_PROFILE_X,
                                             kdf,
                                             kdf_stderr,
-                                            log_likelihood))
+                                            log_likelihood,
+                                            &ratio_moment))
     goto cleanup_con_dens_dist_categorical;
 
   if(cat_se_selected > 0) {
@@ -45871,7 +46066,12 @@ int *cat_se_status
   // xy
   np_progress_fit_set_offset(0);
   np_activate_bounds_xy();
-  kernel_weighted_sum_np(kernel_cXY,
+  const NP_OuterPackCtx xy_execution = {
+    .tree_outer_blas = int_TREE_OUTER_BLAS,
+    .categorical_leading_moments = leading_density ? &leading_moment : NULL
+  };
+  int_TREE_OUTER_BLAS = 0;
+  kernel_weighted_sum_np_ctx_ex(kernel_cXY,
                          kernel_uXY,
                          kernel_oXY,
                          BANDWIDTH_den,
@@ -45921,6 +46121,10 @@ int *cat_se_status
                          ksn,  // weighted sum
                          permn, // permutations
                          NULL, // do not return kernel weights
+                         NULL, NULL,
+                         leading_density || xy_execution.tree_outer_blas ?
+                           &xy_execution : NULL,
+                         NULL, NULL,
                          NULL); // no permutation kernel weights
 
   //x - we assume x is in xy tree order
@@ -45928,7 +46132,12 @@ int *cat_se_status
 
   np_progress_fit_set_offset((BANDWIDTH_den == BW_ADAP_NN) ? num_obs_train : num_obs_eval);
   np_activate_bounds_xy();
-  kernel_weighted_sum_np(kernel_cXY,
+  const NP_OuterPackCtx x_execution = {
+    .tree_outer_blas = int_TREE_OUTER_BLAS,
+    .conditional_leading_ratio = leading_ratio ? &ratio_moment : NULL
+  };
+  int_TREE_OUTER_BLAS = 0;
+  kernel_weighted_sum_np_ctx_ex(kernel_cXY,
                          kernel_uXY,
                          kernel_oXY,
                          BANDWIDTH_den,
@@ -45978,6 +46187,10 @@ int *cat_se_status
                          ksd,  // weighted sum
                          permd, // no permutations
                          NULL, // do not return kernel weights
+                         NULL, NULL,
+                         leading_ratio || x_execution.tree_outer_blas ?
+                           &x_execution : NULL,
+                         NULL, NULL,
                          NULL); // no permutation kernel weights
 
   
@@ -46021,7 +46234,9 @@ int *cat_se_status
       }
 
       if(do_merr) {
-        kdf_stderr[i] = sqrt(kdf[i]*K_INT_KERNEL_P/(pnh*sk));
+        kdf_stderr[i] = leading_density || leading_ratio ?
+          np_conditional_leading_se(kdf_stderr[i],K_INT_KERNEL_P/pnh,sk) :
+          sqrt(kdf[i]*K_INT_KERNEL_P/(pnh*sk));
         if(!R_FINITE(kdf_stderr[i]))
           kdf_stderr[i] = NA_REAL;
       }
@@ -46057,12 +46272,43 @@ int *cat_se_status
       }
 
       if(do_merr) {
-        kdf_stderr[i] = sqrt(kdf[i]*(1.0-kdf[i])*K_INT_KERNEL_P/(pnh*sk));
+        kdf_stderr[i] = leading_ratio ?
+          np_conditional_leading_se(kdf_stderr[i],K_INT_KERNEL_P/pnh,sk) :
+          sqrt(kdf[i]*(1.0-kdf[i])*K_INT_KERNEL_P/(pnh*sk));
         if(!R_FINITE(kdf_stderr[i]))
           kdf_stderr[i] = NA_REAL;
       }
     }
 
+  }
+
+  if(categorical_uncertainty && BANDWIDTH_den == BW_ADAP_NN && num_cXY == 0) {
+    int first = 0, last = num_obs_eval;
+#ifdef MPI2
+    const int distributed = iNum_Processors > 1 && !np_mpi_local_regression_active();
+    if(distributed) {
+      first = MIN(num_obs_eval,stride_t*my_rank);
+      last = MIN(num_obs_eval,first+stride_t);
+    }
+#endif
+    for(i = first; i < last; ++i)
+      kdf_stderr[i] = np_conditional_leading_category_se(
+        &ratio_moment, num_obs_train, i, kdf[i], ksd[i],
+        num_X_unordered, num_X_ordered, kernel_uXY, kernel_oXY,
+        matrix_XY_unordered_train, matrix_XY_ordered_train,
+        matrix_XY_unordered_eval, matrix_XY_ordered_eval,
+        lambda+num_Y_unordered+num_Y_ordered,
+        num_categories+num_Y_unordered+num_Y_ordered,
+        matrix_categorical_vals+num_Y_unordered+num_Y_ordered, NULL, NULL);
+#ifdef MPI2
+    if(distributed) {
+      for(i = MAX(num_obs_eval,stride_t*my_rank);
+          i < stride_t*(my_rank+1); ++i)
+        kdf_stderr[i] = 0.0;
+      MPI_Allgather(MPI_IN_PLACE,stride_t,MPI_DOUBLE,
+                    kdf_stderr,stride_t,MPI_DOUBLE,comm[1]);
+    }
+#endif
   }
 
   if(do_grad) {

@@ -1,5 +1,14 @@
 # np 0.80-1
 
+* Fixed/generalized-NN conditional density and distribution standard errors
+  with categorical variables now retain their joint categorical second
+  moments. Conditional CDFs and densities without continuous responses also
+  retain numerator--denominator covariance, so a constant response-kernel
+  contribution has zero variance. Pure-category profile and ordinary paths
+  agree. Point values, point gradients, likelihoods, SE-off work and existing
+  beta/positive-degree LP/paired categorical-contrast owners are unchanged.
+  Continuous adaptive-NN variance limitations remain deferred.
+
 * Fixed/generalized-NN unconditional density and distribution standard errors
   with mixed data now retain squared joint categorical factors within their
   existing leading continuous-bandwidth approximation. Constant categorical
