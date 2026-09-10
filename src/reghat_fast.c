@@ -368,9 +368,10 @@ static SEXP np_reghat_matrix_execution_run(void *data)
   const int nterms = execution->nterms;
   NPReghatLPWorkspace * const workspace = &execution->workspace;
   SEXP out = PROTECT(allocMatrix(REALSXP, neval, ntrain));
-  SEXP norms = R_NilValue;
-  if(execution->return_norm)
-    PROTECT(norms = allocMatrix(REALSXP, neval, 3));
+  /* Keep both return paths at a fixed protection depth; the unused slot
+   * protects R_NilValue without allocating an unrequested norm matrix. */
+  SEXP norms = PROTECT(execution->return_norm ?
+                       allocMatrix(REALSXP, neval, 3) : R_NilValue);
 
   for(int j = 0; j < neval; j++){
     const double * const weights =
@@ -420,7 +421,7 @@ static SEXP np_reghat_matrix_execution_run(void *data)
     UNPROTECT(4);
     return result;
   }
-  UNPROTECT(1);
+  UNPROTECT(2);
   return out;
 }
 
