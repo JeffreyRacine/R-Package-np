@@ -19867,9 +19867,13 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
           np_continuous_kernel_scaled_restore(
             mean_one[0], beta_y_log_scale, 1, &pdf[j]);
 
-        if(restore_status == NP_CONTINUOUS_ROW_OK && cderr != NULL)
-          restore_status = np_continuous_kernel_scaled_restore(
-            stderr_one[0], beta_y_log_scale, 1, &pdf_stderr[j]);
+        if(restore_status == NP_CONTINUOUS_ROW_OK && cderr != NULL) {
+          if(ISNA(stderr_one[0]))
+            pdf_stderr[j] = NA_REAL;
+          else
+            restore_status = np_continuous_kernel_scaled_restore(
+              stderr_one[0], beta_y_log_scale, 1, &pdf_stderr[j]);
+        }
         if(restore_status != NP_CONTINUOUS_ROW_OK) {
           status = 1;
           lp_error =
