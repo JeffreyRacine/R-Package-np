@@ -8948,6 +8948,101 @@ typedef struct {
   int eval_start;
 } NP_KernelRowTileSink;
 
+/* Leading continuous-bandwidth moments retain the finite categorical
+ * factors. This optional owner never changes the point row or its traversal. */
+typedef struct {
+  double *sum;
+  int cdf;
+} NPCategoricalLeadingMomentCtx;
+
+static double np_categorical_leading_factor(
+  const int observation, const int evaluation, const int nu, const int no,
+  const int *ku, const int *ko, double * const *tu, double * const *to,
+  double * const *eu, double * const *eo,
+  const double *lambda, const int *categories,
+  double **catvals, const int *uno_constant, const double *uno_value,
+  const int *ord_constant, const double *ord_value,
+  const int use_profiles, const int *profile_id, const double *profile_value)
+{
+  double factor = use_profiles ? profile_value[profile_id[observation]] : 1.0;
+  double constant = 1.0;
+  double (* const uk[])(int, double, int) = {
+    np_uaa, np_unli_racine, np_econvol_uaa, np_econvol_unli_racine,
+    np_score_uaa, np_score_unli_racine
+  };
+  double (* const ok[])(double, double, double, double, double) = {
+    np_owang_van_ryzin, np_oli_racine, np_onli_racine, np_oracine_li_yan,
+    np_econvol_owang_van_ryzin, np_onull, np_econvol_onli_racine,
+    np_econvol_oracine_li_yan, np_score_owang_van_ryzin, np_score_oli_racine,
+    np_score_onli_racine, np_score_oracine_li_yan, np_cdf_owang_van_ryzin,
+    np_cdf_oli_racine, np_cdf_onli_racine, np_cdf_oracine_li_yan
+  };
+  for(int k = 0; k < nu; ++k) {
+    if(uno_constant != NULL && uno_constant[k])
+      constant *= uno_value[k];
+    else if(!use_profiles)
+      factor *= uk[ku[k]](tu[k][observation] == eu[k][evaluation],
+                           lambda[k], categories[k]);
+  }
+  for(int k = 0; k < no; ++k) {
+    if(ord_constant != NULL && ord_constant[k])
+      constant *= ord_value[k];
+    else if(!use_profiles)
+      factor *= ok[ko[k]](to[k][observation], eo[k][evaluation], lambda[nu+k],
+                           catvals[nu+k][0], catvals[nu+k][categories[nu+k]-1]);
+  }
+  return factor * constant;
+}
+
+static void np_categorical_leading_moment_row(
+  NPCategoricalLeadingMomentCtx *ctx, const double *row, const int n,
+  const int evaluation, const double bandwidth, const XL *nodes,
+  const int nu, const int no, const int *ku, const int *ko,
+  double * const *tu, double * const *to,
+  double * const *eu, double * const *eo,
+  const double *lambda, const int *categories, double **catvals,
+  const int *uno_constant, const double *uno_value,
+  const int *ord_constant, const double *ord_value,
+  const int use_profiles, const int *profile_id, const double *profile_value)
+{
+  double sum = 0.0, anchor = 0.0, mean_delta = 0.0, m2 = 0.0, count = 0.0;
+  const int blocks = nodes == NULL ? 1 : nodes->n;
+  for(int block = 0; block < blocks; ++block) {
+    const int start = nodes == NULL ? 0 : nodes->istart[block];
+    const int end = nodes == NULL ? n : start + nodes->nlev[block];
+    for(int i = start; i < end; ++i) {
+      const double value = row[i] / bandwidth;
+      if(value == 0.0) continue;
+      const double factor = np_categorical_leading_factor(
+        i, evaluation, nu, no, ku, ko, tu, to, eu, eo, lambda, categories,
+        catvals, uno_constant, uno_value, ord_constant, ord_value,
+        use_profiles, profile_id, profile_value);
+      if(!ctx->cdf) {
+        sum += value * factor;
+      } else {
+        /* Centered between-donor variation plus the leading indicator's
+         * within-donor contribution. Signed kernels retain the algebra,
+         * not a probability interpretation or a clipped variance. */
+        const double next_count = count + 1.0;
+        if(count == 0.0) anchor = value;
+        const double delta = (value - anchor) - mean_delta;
+        mean_delta += delta / next_count;
+        m2 += delta * delta * (count / next_count);
+        count = next_count;
+        sum += value * (factor - value);
+      }
+    }
+  }
+  if(ctx->cdf) {
+    const double mean = anchor + mean_delta;
+    /* Pruned/zero donors still belong to the original sample. */
+    if(count > 0.0 && count < (double)n)
+      m2 += mean * mean * (count * (((double)n-count)/(double)n));
+    sum += m2;
+  }
+  ctx->sum[evaluation] = R_FINITE(sum) && sum >= 0.0 ? sum : NA_REAL;
+}
+
 typedef struct {
   const double *data;
   double * const *matrix_W;
@@ -8959,6 +9054,7 @@ typedef struct {
   int tree_outer_blas;
   NP_KernelRowTileSink *row_tile_sink;
   NPCategoricalDensityMomentCtx *categorical_density_moments;
+  NPCategoricalLeadingMomentCtx *categorical_leading_moments;
 } NP_OuterPackCtx;
 
 /* Keep means as anchor + offset: near-constant contributions must not lose
@@ -11432,6 +11528,15 @@ NPPermutationWeightOutput * const pkw_output){
   const NPRegressionHC0DerivativeMomentCtx * const hc0_derivative_ctx =
     dual_power_ctx != NULL ? dual_power_ctx->regression_derivative : NULL;
   const int do_hc0_derivative = hc0_derivative_ctx != NULL;
+  NPCategoricalLeadingMomentCtx * const categorical_leading =
+    outer_pack_ctx != NULL ? outer_pack_ctx->categorical_leading_moments : NULL;
+  if(categorical_leading != NULL &&
+     (BANDWIDTH_reg == BW_ADAP_NN || num_reg_continuous <= 0 ||
+      num_reg_unordered + num_reg_ordered <= 0 || leave_one_out ||
+      drop_one_train || gather_scatter || symmetric || do_score || do_ocg ||
+      permutation_operator != OP_NOOP || kernel_pow != 1 || ncol_W != 0 ||
+      ncol_Y != 0 || weighted_sum == NULL || categorical_leading->sum == NULL))
+    return KWSNP_ERR_BADINVOC;
   NPCategoricalDensityMomentCtx * const categorical_moments =
     outer_pack_ctx != NULL ? outer_pack_ctx->categorical_density_moments : NULL;
   if(categorical_moments != NULL &&
@@ -12250,6 +12355,10 @@ NPPermutationWeightOutput * const pkw_output){
     for(i = 0; i < num_obs_eval_alloc*dual_sum_element_length; i++){
       dual_power_ctx->weighted_sum[i] = 0.0;
     }
+
+  if(categorical_leading != NULL)
+    memset(categorical_leading->sum, 0,
+           (size_t)num_obs_eval_alloc * sizeof(double));
 
   if(categorical_moments != NULL) {
     memset(categorical_moments->m2, 0,
@@ -13176,6 +13285,15 @@ NPPermutationWeightOutput * const pkw_output){
         np_categorical_density_moment_row(
           categorical_moments, tprod, num_xt, j, is_adaptive);
 
+      if(categorical_leading != NULL)
+        np_categorical_leading_moment_row(
+          categorical_leading, tprod, num_xt, j, dband, pxl,
+          num_reg_unordered, num_reg_ordered, KERNEL_unordered_reg_np,
+          KERNEL_ordered_reg_np, xtu, xto, xu, xo, lambda, num_categories,
+          matrix_categorical_vals, disc_uno_const_ok, disc_uno_const,
+          disc_ord_const_ok, disc_ord_const, use_disc_profile_cache,
+          disc_prof_id, disc_prof_val);
+
       if(do_dual_power){
         if(dual_power_ctx->observation_scale != NULL) {
           if(dual_power_ctx->kernel_pow != 2 || sgn != NULL ||
@@ -13333,6 +13451,10 @@ NPPermutationWeightOutput * const pkw_output){
         MPI_Allreduce(MPI_IN_PLACE, weighted_sum, num_obs_eval*sum_element_length, MPI_DOUBLE, MPI_SUM, comm[1]);
       }
     }
+
+    if(categorical_leading != NULL)
+      MPI_Allgather(MPI_IN_PLACE, stride, MPI_DOUBLE,
+                    categorical_leading->sum, stride, MPI_DOUBLE, comm[1]);
 
     if(categorical_moments != NULL) {
       if(!is_adaptive) {
@@ -43523,6 +43645,12 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
     const int compute_categorical_moments = compute_se &&
       np_categorical_density_moments_required(
         num_reg_continuous, num_reg_unordered, num_reg_ordered, dop, lambda);
+    const int compute_leading_moments = compute_se &&
+      BANDWIDTH_den != BW_ADAP_NN && num_reg_continuous > 0 &&
+      num_reg_unordered + num_reg_ordered > 0;
+    NPCategoricalLeadingMomentCtx leading_moments = {
+      .sum = pdf_stderr, .cdf = dop == OP_INTEGRAL
+    };
     NPCategoricalDensityMomentCtx categorical_moments = {
       .m2 = pdf_stderr,
       .anchor = categorical_scratch,
@@ -43532,7 +43660,10 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
         categorical_scratch + 2*(size_t)num_obs_eval
     };
     const NP_OuterPackCtx categorical_execution = {
-      .categorical_density_moments = &categorical_moments
+      .categorical_density_moments = compute_categorical_moments ?
+        &categorical_moments : NULL,
+      .categorical_leading_moments = compute_leading_moments ?
+        &leading_moments : NULL
     };
     categorical_moment_status = kernel_weighted_sum_np_ctx_ex(kernel_c,
                                kernel_u,
@@ -43583,11 +43714,13 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
                                NULL, // do not return kernel weights
                                &gate_ctx_local,
                                NULL,
-                               compute_categorical_moments ? &categorical_execution : NULL,
+                               (compute_categorical_moments || compute_leading_moments) ?
+                                 &categorical_execution : NULL,
                                NULL, NULL,
                                NULL); // no permutation kernel weights
 
-    if(compute_categorical_moments && categorical_moment_status != 0)
+    if((compute_categorical_moments || compute_leading_moments) &&
+       categorical_moment_status != 0)
       goto cleanup_density_fit;
     categorical_moment_status = 0;
 
@@ -43611,12 +43744,15 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
 
         if(compute_se) pdf_stderr[i] = compute_categorical_moments ?
           sqrt(pdf_stderr[i])/(double)num_obs_train :
-          sqrt(pdf[i]*K_INT_KERNEL_P/pnh);
+          (compute_leading_moments ?
+             sqrt((pdf_stderr[i]/(double)num_obs_train)*K_INT_KERNEL_P/pnh) :
+             sqrt(pdf[i]*K_INT_KERNEL_P/pnh));
       }
     } else {
       for(i = 0, *log_likelihood = 0.0; i < num_obs_eval; i++){
         pdf[i] /= (double)num_obs_train;
-        if(compute_se) pdf_stderr[i] = compute_categorical_moments ?
+        if(compute_se) pdf_stderr[i] =
+          (compute_categorical_moments || compute_leading_moments) ?
           sqrt(pdf_stderr[i])/(double)num_obs_train :
           sqrt(pdf[i]*(1.0-pdf[i])/(double)num_obs_train);
       }

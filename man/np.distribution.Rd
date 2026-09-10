@@ -101,6 +101,15 @@ Further arguments are passed to \code{\link{npudistbw}} when bandwidths are comp
   }
 }
 \details{
+  For ordinary kernels with mixed continuous and ordered categorical data,
+  fixed and generalized-nearest-neighbour standard errors retain the leading
+  continuous-indicator approximation and the squared integrated categorical
+  kernel product. The continuous integrated kernel remains to power one in
+  that second moment; this is not a finite-smoothing sample-contribution
+  variance. Purely continuous and purely categorical conventions are unchanged.
+  Generalized-NN errors condition on the current query radii; adaptive-NN
+  variance approximations are not changed by this correction.
+
   Documentation guide: see \code{\link{npudistbw}} for bandwidth
   selection and search controls, \code{\link{np.kernels}} for kernels,
   \code{\link{np.options}} for global options, and \code{\link{plot}},

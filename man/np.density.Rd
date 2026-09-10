@@ -159,6 +159,15 @@ Further arguments are passed to \code{\link{npudensbw}} when bandwidths are comp
   Category-profile compression includes the original observation counts;
   it does not treat distinct profiles as equally frequent observations.
 
+  For ordinary kernels with mixed continuous and categorical data, fixed and
+  generalized-nearest-neighbour standard errors retain the leading continuous-
+  bandwidth approximation while using the squared joint categorical kernel
+  product. Thus a categorical factor that multiplies the density by a constant
+  also multiplies its standard error by that constant. This is not the sample
+  variance of finite-bandwidth continuous kernel contributions. Generalized-NN
+  errors use the existing frozen-query-radius approximation; this correction
+  does not establish adaptive-NN variance theory or alter its current errors.
+
   Argument groups for bandwidth selection are documented on
   \code{\link{npudensbw}}. The most common workflow is to choose data
   and bandwidth inputs first, then bandwidth criterion and

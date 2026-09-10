@@ -1,5 +1,12 @@
 # np 0.80-1
 
+* Fixed/generalized-NN unconditional density and distribution standard errors
+  with mixed data now retain squared joint categorical factors within their
+  existing leading continuous-bandwidth approximation. Constant categorical
+  factors consequently scale uncertainty consistently with the estimate.
+  Point estimates, likelihoods, SE-off work, pure-continuous/pure-categorical
+  conventions, beta kernels and adaptive-NN errors are unchanged.
+
 * Partial-linear fitting and plot/bootstrap helpers now consistently reject
   numerically unidentified residualized linear regressors across BLAS
   implementations. The shared check accounts for column scale and residual
