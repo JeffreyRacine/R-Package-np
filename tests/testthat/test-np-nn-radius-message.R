@@ -20,17 +20,28 @@ test_that("shared NN errors name the variable without rejecting all ties", {
     expect_match(conditionMessage(e), "zero literal radius", fixed = TRUE)
     expect_match(conditionMessage(e), 'bwtype="fixed", the default', fixed = TRUE)
   }
-  check(npreg(bws = bw, txdat = x, tydat = y, gradients = TRUE, se = FALSE))
+  # Training queries exclude their own occurrence: k=4 has positive radius.
+  # The same coordinates supplied as external queries include all four ties.
+  training.grad <- npreg(bws = bw, txdat = x, tydat = y,
+                        gradients = TRUE, se = FALSE)
+  expect_true(all(is.finite(training.grad$grad)))
+  # The fused mean/gradient accumulator can round one ulp differently.
+  expect_equal(training.grad$mean, fit$mean, tolerance = 16 * .Machine$double.eps)
   check(predict(fit, newdata = x))
   check(np:::.np_regression_direct(bw, x, y, exdat = x, gradients = TRUE))
   check(npreghat(bws = bw, txdat = x, exdat = x, y = y, output = "apply"))
   check(npksum(txdat = x, exdat = x, bws = c(.2, 8, 4),
                bwtype = "generalized_nn"))
 
+  invalid.training.bw <- npregbw(xdat = x, ydat = y, bws = c(.2, 8, 3),
+    bwtype = "generalized_nn", regtype = "lc", bandwidth.compute = FALSE)
+  check(npreg(bws = invalid.training.bw, txdat = x, tydat = y,
+              gradients = TRUE, se = FALSE), excluded = 1L, k = 3L)
   for (joint in c(FALSE, TRUE)) {
     set.seed(527)
     seed <- .Random.seed
-    e <- tryCatch(npsigtest(fit, B = 9L, joint = joint), np_nn_zero_radius = identity)
+    e <- tryCatch(npsigtest(bws = invalid.training.bw, xdat = x, ydat = y,
+                           B = 9L, joint = joint), np_nn_zero_radius = identity)
     expect_identical(e$variable, "tied")
     expect_match(e$stage, "unrestricted gradient evaluation", fixed = TRUE)
     expect_identical(.Random.seed, seed)

@@ -18,34 +18,39 @@ test_that("core estimator methods reject non-scalar logical control flags", {
   tx <- data.frame(x = c(0.1, 0.2))
   ty <- c(0.3, 0.4)
   tydf <- data.frame(y = ty)
+  # Test one invalid control at a time on genuine supported bandwidth objects.
+  density.bw <- npcdensbw(xdat = tx, ydat = tydf, bws = c(.5, .5),
+                         bandwidth.compute = FALSE)
+  distribution.bw <- npcdistbw(xdat = tx, ydat = tydf, bws = c(.5, .5),
+                              bandwidth.compute = FALSE)
 
   expect_error(
-    npcdens_conbandwidth(structure(list(), class = "conbandwidth"),
+    npcdens_conbandwidth(density.bw,
                          txdat = tx, tydat = tydf, gradients = c(TRUE, FALSE)),
     "'gradients' must be TRUE or FALSE"
   )
   expect_error(
-    npcdist_condbandwidth(structure(list(), class = "condbandwidth"),
+    npcdist_condbandwidth(distribution.bw,
                           txdat = tx, tydat = tydf, gradients = c(TRUE, FALSE)),
     "'gradients' must be TRUE or FALSE"
   )
   expect_error(
-    npqreg_condbandwidth(structure(list(), class = "condbandwidth"),
+    npqreg_condbandwidth(distribution.bw,
                          txdat = tx, tydat = ty, gradients = c(TRUE, FALSE)),
     "'gradients' must be TRUE or FALSE"
   )
   expect_error(
-    npqreg_condbandwidth(structure(list(), class = "condbandwidth"),
+    npqreg_condbandwidth(distribution.bw,
                          txdat = tx, tydat = ty, itmax = 0),
     "'itmax' must be a positive integer"
   )
   expect_error(
-    npqreg_condbandwidth(structure(list(), class = "condbandwidth"),
+    npqreg_condbandwidth(distribution.bw,
                          txdat = tx, tydat = ty, ftol = 0),
     "'ftol' is no longer accepted by npqreg"
   )
   expect_error(
-    npqreg_condbandwidth(structure(list(), class = "condbandwidth"),
+    npqreg_condbandwidth(distribution.bw,
                          txdat = tx, tydat = ty, foo = TRUE),
     "unused argument in npqreg: 'foo'"
   )

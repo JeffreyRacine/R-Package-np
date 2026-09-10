@@ -180,19 +180,19 @@ test_that("empirical-range conditional beta resolves X and Y independently", {
 
     density.range <- npcdens(
       bws = density.range.bw, txdat = training.x, tydat = training.y,
-      exdat = evaluation.x, eydat = evaluation.y
+      exdat = evaluation.x, eydat = evaluation.y, se = TRUE
     )
     density.fixed <- npcdens(
       bws = density.fixed.bw, txdat = training.x, tydat = training.y,
-      exdat = evaluation.x, eydat = evaluation.y
+      exdat = evaluation.x, eydat = evaluation.y, se = TRUE
     )
     distribution.range <- npcdist(
       bws = distribution.range.bw, txdat = training.x, tydat = training.y,
-      exdat = evaluation.x, eydat = evaluation.y
+      exdat = evaluation.x, eydat = evaluation.y, se = TRUE
     )
     distribution.fixed <- npcdist(
       bws = distribution.fixed.bw, txdat = training.x, tydat = training.y,
-      exdat = evaluation.x, eydat = evaluation.y
+      exdat = evaluation.x, eydat = evaluation.y, se = TRUE
     )
 
     expect_equal(fitted(density.range), fitted(density.fixed),

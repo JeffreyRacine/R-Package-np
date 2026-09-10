@@ -260,7 +260,8 @@ test_that("npqreg gradient plots support asymptotic errors", {
     cxkerbound = "range",
     cykerbound = "range"
   )
-  fit <- npqreg(bws = bw, tau = c(0.25, 0.5, 0.75), gradients = TRUE)
+  fit <- npqreg(bws = bw, tau = c(0.25, 0.5, 0.75), gradients = TRUE,
+               se = TRUE)
 
   out <- plot(
     fit,

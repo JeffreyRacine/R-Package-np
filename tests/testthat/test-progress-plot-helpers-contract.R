@@ -494,7 +494,9 @@ test_that("ordinary inid plot bootstrap emits intermediate progress updates", {
 
   actual <- capture_progress_shadow_trace(
     helper(
-      H = diag(4L),
+      # All resamples retain positive support; this test concerns progress,
+      # not the separately tested undefined bootstrap-denominator contract.
+      H = matrix(1 / 4, 4L, 4L),
       ydat = c(1, 2, 3, 4),
       B = 9L
     ),

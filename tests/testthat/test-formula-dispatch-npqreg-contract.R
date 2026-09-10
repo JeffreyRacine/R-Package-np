@@ -93,6 +93,7 @@ test_that("npqreg NOMAD fit metadata propagates through prediction, gradients, a
       newdata = nd,
       tau = 0.5,
       gradients = TRUE,
+      se = TRUE,
       nomad = TRUE,
       nmulti = 1L,
       nomad.nmulti = 1L,

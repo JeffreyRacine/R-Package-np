@@ -88,7 +88,7 @@ test_that("adaptive-nn conditional distribution lp propagates into npqreg", {
     tydat = dat$tydat,
     exdat = dat$exdat,
     tau = 0.5,
-    gradients = TRUE
+    gradients = TRUE, se = TRUE
   )
   q.lp1 <- npqreg(
     bws = make_adaptive_nn_conditional_bw("dist", dat, "lp", 1L),
@@ -96,7 +96,7 @@ test_that("adaptive-nn conditional distribution lp propagates into npqreg", {
     tydat = dat$tydat,
     exdat = dat$exdat,
     tau = 0.5,
-    gradients = TRUE
+    gradients = TRUE, se = TRUE
   )
   q.lp2 <- npqreg(
     bws = make_adaptive_nn_conditional_bw("dist", dat, "lp", 2L),
@@ -104,7 +104,7 @@ test_that("adaptive-nn conditional distribution lp propagates into npqreg", {
     tydat = dat$tydat,
     exdat = dat$exdat,
     tau = 0.5,
-    gradients = TRUE
+    gradients = TRUE, se = TRUE
   )
 
   expect_equal(q.ll$quantile, q.lp1$quantile, tolerance = 1e-10)

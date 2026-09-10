@@ -345,7 +345,7 @@ test_that("canonical LP fit and evaluation avoid legacy solve marshalling", {
     fixed = TRUE
   ))
   expect_true(grepl(
-    "np_lp_solve_workspace_solve_factored(",
+    "np_lp_solve_workspace_solve_adjoint_factored(",
     helper_body,
     fixed = TRUE
   ))

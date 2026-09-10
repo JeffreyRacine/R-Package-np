@@ -27,7 +27,7 @@ test_that("npreg request states preserve retained scalar and LP outputs", {
   expect_identical(lean0$mean, full0$mean)
   expect_null(lean0$merr)
   expect_false(lean0$se)
-  expect_error(se(lean0), "se=TRUE", fixed = TRUE)
+    expect_error(se(lean0), "se = TRUE", fixed = TRUE)
 
   bw <- npregbw(
     xdat = x, ydat = y, bws = c(0.32, 0.36),
@@ -54,7 +54,7 @@ test_that("npreg request states preserve retained scalar and LP outputs", {
   expect_null(mean.grad$merr)
   expect_null(mean.grad$gerr)
   expect_error(gradients(mean.grad, se = TRUE),
-               "gradients=TRUE and se=TRUE", fixed = TRUE)
+               "gradients = TRUE, se = TRUE", fixed = TRUE)
 })
 
 test_that("se preserves generic and positional dispatch while defaulting off", {

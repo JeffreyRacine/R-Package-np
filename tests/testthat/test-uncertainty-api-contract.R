@@ -91,10 +91,10 @@ test_that("valid uncertainty extraction remains controlled only by se", {
 
 test_that("missing uncertainty state fails helpfully", {
   reg <- structure(list(se = FALSE, merr = NULL), class = "npregression")
-  expect_error(se(reg), "se=TRUE", fixed = TRUE)
+  expect_error(se(reg), "se = TRUE", fixed = TRUE)
 
   sc <- structure(list(se = FALSE, merr = NA_real_), class = "smoothcoefficient")
-  expect_error(se(sc), "se=TRUE", fixed = TRUE)
+  expect_error(se(sc), "se = TRUE", fixed = TRUE)
 
   si <- structure(list(merr = NULL), class = "singleindex")
   expect_error(

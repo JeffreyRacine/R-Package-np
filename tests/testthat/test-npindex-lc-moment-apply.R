@@ -26,7 +26,7 @@ test_that("LC single-index apply preserves its matrix oracle without materializi
                      tolerance = 1e-10)
       }
     }
-    # Signed kernels, range bounds and an empty-support evaluation retain the floor.
+    # Signed kernels and range bounds retain the supported-row matrix oracle.
     for (kernel in c("gaussian", "epanechnikov")) {
       b <- npindexbw(xdat = x, ydat = y[, 1L], bws = c(1, .3, .8),
                      bandwidth.compute = FALSE, ckertype = kernel,
@@ -41,7 +41,10 @@ test_that("LC single-index apply preserves its matrix oracle without materializi
                    bandwidth.compute = FALSE, ckertype = "epanechnikov")
     far <- data.frame(index = 10)
     for (owner in list(.np_indexhat_lc_mean, .np_indexhat_core)) {
-      expect_identical(as.numeric(owner(b, z, far, y, "apply")), c(0, 0))
+      expect_error(owner(b, z, far, y, "apply"),
+                   "single-index hat: zero normalizing weight sum", fixed = TRUE)
+      expect_error(owner(b, z, far, output = "matrix"),
+                   "single-index hat: zero normalizing weight sum", fixed = TRUE)
       for (value in c(NA_real_, Inf)) {
         yy <- y; yy[1, 1] <- value
         H <- owner(b, z, z[1:4, , drop = FALSE], output = "matrix")
