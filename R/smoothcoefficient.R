@@ -91,7 +91,7 @@ residuals.smoothcoefficient <- function(object, ...) {
 se.smoothcoefficient <- function(x){
   if (!isTRUE(x$se) || is.null(x$merr) ||
       (length(x$merr) == 1L && is.na(x$merr)))
-    stop("standard errors were not computed: refit or predict/evaluate with se=TRUE", call. = FALSE)
+    .np_stop_missing_output(substitute(x), "npscoef")
   x$merr
 }
 predict.smoothcoefficient <- function(object, se.fit = FALSE, ...) {

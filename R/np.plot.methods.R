@@ -856,8 +856,10 @@ np_render_control <- function(style = c("band", "bar"),
     )
     values <- object$probability.gradients
     if (is.null(values))
-      stop("class-probability gradients/effects are not available: fit with gradients=TRUE",
-           call. = FALSE)
+      .np_stop_missing_output(
+        quote(NULL), "npconmode",
+        message = "class-probability gradients/effects are not available.",
+        switches = "gradients = TRUE")
     stored.level <- object$probability.gradient.level
     if (!identical(as.character(level), as.character(stored.level)))
       stop(sprintf("stored class-probability gradients are for level %s; refit with level=%s to plot that level",
@@ -1417,8 +1419,10 @@ np_render_control <- function(style = c("band", "bar"),
     stop("class probabilities are not available: fit with probabilities=TRUE or gradients=TRUE",
          call. = FALSE)
   if (isTRUE(gradients) && is.null(object$probability.gradients))
-    stop("class-probability gradients/effects are not available: fit with gradients=TRUE",
-         call. = FALSE)
+    .np_stop_missing_output(
+      quote(NULL), "npconmode",
+      message = "class-probability gradients/effects are not available.",
+      switches = "gradients = TRUE")
 
   training <- .np_plot_conmode_training_data(object)
   xtrain <- training$xtrain

@@ -135,10 +135,11 @@ gradients.condistribution <- function(x, se = FALSE, gradient.order = NULL, ...)
     what = "gradient standard errors", expr = substitute(x),
     switches = "gradients = TRUE, se = TRUE")
   if (is.null(gout) || (length(gout) == 1L && is.logical(gout) && is.na(gout)))
-    stop(if (!se)
-      "gradients are not available: fit the model with gradients=TRUE"
-    else
-      "gradient standard errors were not computed: fit the model with gradients=TRUE and se=TRUE")
+    .np_stop_missing_output(
+      substitute(x), "npcdist",
+      message = if (!se) "gradients are not available." else
+        "gradient standard errors were not computed.",
+      switches = if (!se) "gradients = TRUE" else "gradients = TRUE, se = TRUE")
 
   reg.spec <- npConditionalRegEngineSpec(x$bws, where = "gradients.condistribution")
   if (isTRUE(x$bws$xncon == 0L)) {
