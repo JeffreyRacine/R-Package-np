@@ -306,10 +306,15 @@ Further arguments are passed to \code{\link{npcdensbw}} when bandwidths are comp
   option, bandwidths, and kernels as the fitted conditional density. See
   \code{\link{npreg}} for the complete heterogeneous GLP multi-index and
   Bernstein-representation definitions shared by these routes.
-  Asymptotic standard errors for these higher-order derivative columns
-  are not currently reported; the corresponding entries of
-  \code{congerr} are \code{NA}. Use bootstrap intervals when inference
-  on higher-order derivatives is required.
+  With \code{se = TRUE}, available higher-order derivative columns for
+  fixed and adaptive nearest-neighbour bandwidths also have standard
+  errors. These combine the existing local pseudo-response variance with
+  the squared norm of the actual derivative weighting row, including its
+  accepted ridge adjustment. They condition on the selected bandwidths,
+  neighbour radii and local-polynomial map; they do not account for their
+  selection uncertainty. Generalized nearest-neighbour higher-order point
+  derivatives remain subject to the existing hat-operator restriction.
+  Bootstrap inference remains recommended.
 
   For ordinary scalar fits, leading interior standard errors use the squared
   X-kernel moment; conditional density errors additionally use the independent
@@ -356,10 +361,10 @@ Further arguments are passed to \code{\link{npcdensbw}} when bandwidths are comp
     \code{NA}. }
   \item{congerr}{ if invoked with \code{gradients = TRUE} and
     \code{se = TRUE}, standard
-    errors of the gradients at the evaluation points. Higher-order
-    continuous-coordinate derivative standard errors are currently
-    returned as \code{NA}; bootstrap inference is preferred for those
-    targets. Undefined normalization rows are returned as \code{NA}. }
+    errors of the gradients at the evaluation points, including available
+    higher-order continuous derivatives under the working-covariance
+    assumptions described above. Undefined normalization or uncertainty
+    rows are returned as \code{NA}. }
   \item{log_likelihood}{ aggregate fitted conditional-density log likelihood.
     Every represented strictly positive estimate, including a positive
     subnormal value, contributes its literal logarithm. An exact zero or

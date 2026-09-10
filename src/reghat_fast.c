@@ -306,11 +306,50 @@ NPReghatLPRowStatus np_reghat_lp_workspace_influence_row(
 typedef struct {
   SEXP kw;
   SEXP weval;
+  int return_norm;
   int ntrain;
   int neval;
   int nterms;
   NPReghatLPWorkspace workspace;
 } NPReghatMatrixExecution;
+
+/* Requested-only scaled Euclidean norm. Keep response values out of this
+ * X-hat calculation; the conditional variance producer owns their variance. */
+typedef struct {
+  double scale;
+  double sumsq;
+  int invalid;
+} NPReghatRowNorm;
+
+static void np_reghat_row_norm_add(NPReghatRowNorm *norm, double value)
+{
+  const double absolute = fabs(value);
+  if(!R_FINITE(value)) {
+    norm->invalid = 1;
+  } else if(absolute > norm->scale) {
+    const double ratio = norm->scale / absolute;
+    norm->sumsq = 1.0 + norm->sumsq * ratio * ratio;
+    norm->scale = absolute;
+  } else if(absolute != 0.0) {
+    const double ratio = absolute / norm->scale;
+    norm->sumsq += ratio * ratio;
+  }
+}
+
+SEXP C_np_reghat_row_norm(SEXP row)
+{
+  NPReghatRowNorm norm = {0.0, 1.0, 0};
+  if(TYPEOF(row) != REALSXP)
+    error("hat row norm requires a numeric row");
+  for(R_xlen_t i = 0; i < XLENGTH(row); ++i)
+    np_reghat_row_norm_add(&norm, REAL(row)[i]);
+  SEXP out = PROTECT(allocVector(REALSXP, 3));
+  REAL(out)[0] = norm.scale;
+  REAL(out)[1] = norm.sumsq;
+  REAL(out)[2] = norm.invalid;
+  UNPROTECT(1);
+  return out;
+}
 
 static void np_reghat_matrix_execution_cleanup(void *data, Rboolean jump)
 {
@@ -329,6 +368,9 @@ static SEXP np_reghat_matrix_execution_run(void *data)
   const int nterms = execution->nterms;
   NPReghatLPWorkspace * const workspace = &execution->workspace;
   SEXP out = PROTECT(allocMatrix(REALSXP, neval, ntrain));
+  SEXP norms = R_NilValue;
+  if(execution->return_norm)
+    PROTECT(norms = allocMatrix(REALSXP, neval, 3));
 
   for(int j = 0; j < neval; j++){
     const double * const weights =
@@ -350,16 +392,40 @@ static SEXP np_reghat_matrix_execution_run(void *data)
       error("LP solve failed in compiled hat-matrix path after bounded ridging");
     if(row_status != NP_REGHAT_LP_ROW_OK)
       error("invalid wider-LP compiled hat-matrix input");
-    for(int i = 0; i < ntrain; i++)
-      REAL(out)[j + (size_t)neval*(size_t)i] =
-        weights[i]*workspace->prediction[i];
+    if(execution->return_norm) {
+      NPReghatRowNorm norm = {0.0, 1.0, 0};
+      for(int i = 0; i < ntrain; ++i) {
+        const double value = weights[i]*workspace->prediction[i];
+        REAL(out)[j + (size_t)neval*(size_t)i] = value;
+        np_reghat_row_norm_add(&norm, value);
+      }
+      REAL(norms)[j] = norm.scale;
+      REAL(norms)[j + neval] = norm.sumsq;
+      REAL(norms)[j + 2*neval] = norm.invalid;
+    } else {
+      for(int i = 0; i < ntrain; i++)
+        REAL(out)[j + (size_t)neval*(size_t)i] =
+          weights[i]*workspace->prediction[i];
+    }
   }
 
+  if(execution->return_norm) {
+    SEXP result = PROTECT(allocVector(VECSXP, 2));
+    SEXP names = PROTECT(allocVector(STRSXP, 2));
+    SET_VECTOR_ELT(result, 0, out);
+    SET_VECTOR_ELT(result, 1, norms);
+    SET_STRING_ELT(names, 0, mkChar("hat"));
+    SET_STRING_ELT(names, 1, mkChar("norm"));
+    setAttrib(result, R_NamesSymbol, names);
+    UNPROTECT(4);
+    return result;
+  }
   UNPROTECT(1);
   return out;
 }
 
-SEXP C_np_reghat_lp_matrix_fast(SEXP kw, SEXP wtrain, SEXP weval)
+static SEXP np_reghat_lp_matrix_call(SEXP kw, SEXP wtrain, SEXP weval,
+                                    int return_norm)
 {
   int ntrain = 0, neval = 0, kw_neval = 0;
   int wtrain_n = 0, nterms = 0, weval_n = 0, weval_p = 0;
@@ -379,6 +445,8 @@ SEXP C_np_reghat_lp_matrix_fast(SEXP kw, SEXP wtrain, SEXP weval)
     return R_NilValue;
 
   neval = kw_neval;
+  if(return_norm && nterms <= 1)
+    error("higher-derivative hat norm requires a positive-degree LP basis");
   if(nterms == 1)
     return np_reghat_width_one_matrix(kw, wtrain, weval, ntrain, neval);
 
@@ -391,10 +459,24 @@ SEXP C_np_reghat_lp_matrix_fast(SEXP kw, SEXP wtrain, SEXP weval)
          (size_t)ntrain*(size_t)nterms*sizeof(double));
   execution.kw = kw;
   execution.weval = weval;
+  execution.return_norm = return_norm;
   execution.ntrain = ntrain;
   execution.neval = neval;
   execution.nterms = nterms;
   return R_UnwindProtect(
     np_reghat_matrix_execution_run, &execution,
     np_reghat_matrix_execution_cleanup, &execution, NULL);
+}
+
+SEXP C_np_reghat_lp_matrix_fast(SEXP kw, SEXP wtrain, SEXP weval)
+{
+  return np_reghat_lp_matrix_call(kw, wtrain, weval, 0);
+}
+
+SEXP C_np_reghat_lp_matrix_norm(SEXP kw, SEXP wtrain, SEXP weval)
+{
+  SEXP result = np_reghat_lp_matrix_call(kw, wtrain, weval, 1);
+  if(result == R_NilValue)
+    error("requested LP hat norm could not use the selected native owner");
+  return result;
 }

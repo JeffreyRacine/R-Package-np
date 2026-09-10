@@ -11370,7 +11370,8 @@ plotFactor <- function(f, y, ...){
                                       proper.control = list(),
                                       lp.first.se.demand = NULL,
                                       cat.se.demand = NULL,
-                                      se = TRUE) {
+                                      se = TRUE,
+                                      lp.higher.se.demand = NULL) {
   activity <- .np_plot_activity_begin(
     if (isTRUE(cdf)) {
       "Computing conditional distribution plot fit"
@@ -11393,7 +11394,8 @@ plotFactor <- function(f, y, ...){
     proper.control = proper.control,
     lp.first.se.demand = lp.first.se.demand,
     cat.se.demand = cat.se.demand,
-    se = se
+    se = se,
+    lp.higher.se.demand = lp.higher.se.demand
   )
 }
 
@@ -11411,7 +11413,8 @@ plotFactor <- function(f, y, ...){
                                           proper.control = list(),
                                           lp.first.se.demand = NULL,
                                           cat.se.demand = NULL,
-                                          se = TRUE) {
+                                          se = TRUE,
+                                          lp.higher.se.demand = NULL) {
   se <- npValidateScalarLogical(se, "se")
   fit.start <- proc.time()[3]
   lp.first.se.demand <- .np_conditional_first_se_demand(
@@ -11550,6 +11553,9 @@ plotFactor <- function(f, y, ...){
   }
   basis.code <- as.integer(npLpBasisCode(basis.engine))
   do.compiled.gradients <- isTRUE(gradients) && !glp.gradient.partial
+  higher.se.request <- .np_conditional_higher_se_request(
+    se, gradients, reg.engine, glp.gradient.order, glp.gradient.available,
+    lp.higher.se.demand)
   first.se.request <- if (!se) NULL else .np_conditional_first_se_request(
     gradients, glp.gradient.partial, degree.engine, glp.gradient.order,
     glp.gradient.available, lp.first.se.demand)
@@ -11622,8 +11628,8 @@ plotFactor <- function(f, y, ...){
   cxker.bounds.c <- npKernelBoundsMarshal(bws$cxkerlb[bws$ixcon], bws$cxkerub[bws$ixcon])
   cyker.bounds.c <- npKernelBoundsMarshal(bws$cykerlb[bws$iycon], bws$cykerub[bws$iycon])
 
-  myout <- .np_plot_with_local_compiled_eval(.Call(
-    "C_np_density_conditional",
+  myout <- .np_plot_with_local_compiled_eval(.np_conditional_native_call(
+    higher.se.request,
     as.double(tyuno), as.double(tyord), as.double(tycon),
     as.double(txuno), as.double(txord), as.double(txcon),
     as.double(eyuno), as.double(eyord), as.double(eycon),
@@ -11649,8 +11655,7 @@ plotFactor <- function(f, y, ...){
     basis.code,
     first.se.request,
     cat.se.request,
-    se,
-    PACKAGE = "npRmpi"
+    se
   ))
 
   first.se.native <- if (is.null(first.se.request)) NULL else myout$congerr
@@ -11677,7 +11682,7 @@ plotFactor <- function(f, y, ...){
         for (jj in which(higher.order)) {
           svec <- integer(bws$xncon)
           svec[jj] <- glp.gradient.order[jj]
-          myout$congrad[, cont.idx[jj]] <- as.vector(.npRmpi_with_local_bootstrap(hat.fun(
+          hat.args <- list(
             bws = bws,
             txdat = hat.context$xdat,
             tydat = hat.context$ydat,
@@ -11686,8 +11691,17 @@ plotFactor <- function(f, y, ...){
             y = rhs,
             output = "apply",
             s = svec
-          )))
-          if (se) myout$congerr[, cont.idx[jj]] <- NA_real_
+          )
+          if (!is.null(higher.se.request) && higher.se.request[jj]) {
+            higher <- .npRmpi_with_local_bootstrap(
+              .np_conditional_higher_hat(hat.args, cdf = cdf))
+            myout$congrad[, cont.idx[jj]] <- as.vector(higher$value)
+            myout$congerr[, cont.idx[jj]] <- .np_conditional_higher_se(
+              myout[["variance_metadata", exact = TRUE]], higher$norm, enrow)
+          } else {
+            myout$congrad[, cont.idx[jj]] <- as.vector(.npRmpi_with_local_bootstrap(do.call(hat.fun, hat.args)))
+            if (se) myout$congerr[, cont.idx[jj]] <- NA_real_
+          }
         }
       }
     }
@@ -11701,7 +11715,7 @@ plotFactor <- function(f, y, ...){
       for (jj in which(glp.gradient.available)) {
         svec <- integer(bws$xncon)
         svec[jj] <- glp.gradient.order[jj]
-        myout$congrad[, cont.idx[jj]] <- as.vector(.npRmpi_with_local_bootstrap(hat.fun(
+        hat.args <- list(
           bws = bws,
           txdat = hat.context$xdat,
           tydat = hat.context$ydat,
@@ -11710,7 +11724,16 @@ plotFactor <- function(f, y, ...){
           y = rhs,
           output = "apply",
           s = svec
-        )))
+        )
+        if (!is.null(higher.se.request) && higher.se.request[jj]) {
+          higher <- .npRmpi_with_local_bootstrap(
+            .np_conditional_higher_hat(hat.args, cdf = cdf))
+          myout$congrad[, cont.idx[jj]] <- as.vector(higher$value)
+          myout$congerr[, cont.idx[jj]] <- .np_conditional_higher_se(
+            myout[["variance_metadata", exact = TRUE]], higher$norm, enrow)
+        } else {
+          myout$congrad[, cont.idx[jj]] <- as.vector(.npRmpi_with_local_bootstrap(do.call(hat.fun, hat.args)))
+        }
       }
     }
   } else {

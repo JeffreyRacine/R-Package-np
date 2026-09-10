@@ -132,7 +132,8 @@
                                       txdat,
                                       exdat,
                                       s = NULL,
-                                      train.is.eval = FALSE) {
+                                      train.is.eval = FALSE,
+                                      return.norm = FALSE) {
   train.is.eval <- npValidateScalarLogical(train.is.eval, "train.is.eval")
   if (train.is.eval && nrow(exdat) != nrow(txdat))
     stop("conditional X hat received inconsistent training-identity rows")
@@ -220,7 +221,8 @@
       s = s,
       basis = basis,
       degree = degree,
-      bernstein.basis = bernstein
+      bernstein.basis = bernstein,
+      return.norm = return.norm
     ))
   }
 
@@ -791,7 +793,8 @@
                                  operator,
                                  x.s = NULL,
                                  train.is.eval = FALSE,
-                                 allow.empty.rows = FALSE) {
+                                 allow.empty.rows = FALSE,
+                                 return.norm = FALSE) {
   if (.npcdhat_use_adaptive_ratio(bws = bws, x.s = x.s)) {
     H <- .npcdhat_ratio_matrix(
       bws = bws,
@@ -816,8 +819,11 @@
     txdat = txdat,
     exdat = exdat,
     s = x.s,
-    train.is.eval = train.is.eval
+    train.is.eval = train.is.eval,
+    return.norm = return.norm
   )
+  norms <- if (return.norm) Hx[["norm", exact = TRUE]] else NULL
+  if (return.norm) Hx <- Hx[["hat", exact = TRUE]]
   Gy <- .npcdhat_make_kernel_matrix(
     kbw = ybw,
     txdat = tydat,
@@ -826,7 +832,9 @@
     train.is.eval = train.is.eval
   )
 
-  (Hx * Gy) %*% rhs
+  if (return.norm)
+    list(value = (Hx * Gy) %*% rhs, norm = norms)
+  else (Hx * Gy) %*% rhs
 }
 
 .npRmpi_cdhat_apply_row_tasks <- function(neval, workers, ntrain) {
@@ -864,7 +872,8 @@
                                         operator,
                                         x.s = NULL,
                                         what = "conditional hat apply",
-                                        comm = 1L) {
+                                        comm = 1L,
+                                        return.norm = FALSE) {
   if (!isTRUE(getOption("npRmpi.cdhat.apply.fanout", TRUE)) ||
       !isTRUE(getOption("npRmpi.mpi.initialized", FALSE)) ||
       isTRUE(getOption("npRmpi.autodispatch.context", FALSE)) ||
@@ -882,8 +891,9 @@
 
   neval <- nrow(exdat)
   ntrain <- nrow(txdat)
-  ncol.out <- ncol(as.matrix(rhs))
-  work.size <- as.double(ntrain) * as.double(neval) * as.double(ncol.out)
+  point.ncol <- ncol(as.matrix(rhs))
+  ncol.out <- point.ncol + if (return.norm) 3L else 0L
+  work.size <- as.double(ntrain) * as.double(neval) * as.double(point.ncol)
   min.work <- suppressWarnings(as.numeric(getOption("npRmpi.cdhat.apply.fanout.min.work", 5e7))[1L])
   if (!is.finite(min.work) || is.na(min.work) || min.work < 0)
     min.work <- 5e7
@@ -913,8 +923,17 @@
       rhs = rhs,
       operator = operator,
       x.s = x.s.worker,
-      allow.empty.rows = TRUE
+      allow.empty.rows = TRUE,
+      return.norm = return.norm
     )
+    if (return.norm) {
+      value <- as.matrix(out[["value", exact = TRUE]])
+      norm <- out[["norm", exact = TRUE]]
+      if (!identical(dim(value), c(length(rows), as.integer(point.ncol))) ||
+          !is.matrix(norm) || !identical(dim(norm), c(length(rows), 3L)))
+        stop("internal conditional hat-norm worker payload mismatch")
+      out <- cbind(value, norm)
+    }
     out <- as.matrix(out)
     if (!identical(dim(out), c(length(rows), as.integer(ncol.out))))
       out <- matrix(as.numeric(out), nrow = length(rows), ncol = as.integer(ncol.out))
@@ -940,9 +959,17 @@
       rhs = rhs,
       operator = operator,
       x.s = if (is.null(x.s)) integer(0L) else x.s,
-      ncol.out = ncol.out
+      ncol.out = ncol.out,
+      point.ncol = point.ncol,
+      return.norm = return.norm
     )
   )
+  if (return.norm) {
+    if (!is.matrix(result) || !identical(dim(result), c(neval, as.integer(ncol.out))))
+      stop("internal conditional hat-norm fanout payload mismatch")
+    return(list(value = result[, seq_len(point.ncol), drop = FALSE],
+                norm = result[, point.ncol + seq_len(3L), drop = FALSE]))
+  }
   if (anyNA(result) && .npcdhat_use_adaptive_ratio(bws, x.s)) {
     # Numeric fanout preserves values, not attributes. Classify exceptional
     # rows locally without enlarging ordinary worker payloads.
@@ -973,7 +1000,8 @@
                           x.deriv = NULL,
                           x.s = NULL,
                           class_name,
-                          where) {
+                          where,
+                          return.norm = FALSE) {
   output <- match.arg(output, c("matrix", "apply"))
 
   if (xor(is.null(exdat), is.null(eydat)))
@@ -1063,7 +1091,8 @@
       rhs = y,
       operator = operator,
       x.s = x.s,
-      what = paste0(where, " apply")
+      what = paste0(where, " apply"),
+      return.norm = return.norm
     )
     if (is.null(out)) {
       out <- .npcdhat_exact_apply(
@@ -1076,9 +1105,12 @@
         operator = operator,
         x.s = x.s,
         train.is.eval = no.exy,
-        allow.empty.rows = !no.exy
+        allow.empty.rows = !no.exy,
+        return.norm = return.norm
       )
     }
+    norms <- if (return.norm) out[["norm", exact = TRUE]] else NULL
+    if (return.norm) out <- out[["value", exact = TRUE]]
     empty.rows <- attr(out, ".np.empty.rows", exact = TRUE)
     if (!is.null(empty.rows)) {
       attr(out, ".np.empty.rows") <- NULL
@@ -1086,6 +1118,9 @@
       den[empty.rows == 1L] <- NA_real_
       out <- .np_normalization_finish(out, den, where)
     }
+    if (return.norm)
+      return(list(value = if (ncol(out) == 1L) as.vector(out) else out,
+                  norm = norms))
     if (ncol(out) == 1L)
       return(as.vector(out))
     return(out)

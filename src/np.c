@@ -8520,7 +8520,8 @@ void np_density_conditional(double * tyuno, double * tyord, double * tycon,
                             NPContinuousKernelDerivativeDiagnostics *response_kernel_route_diagnostics,
                             int categorical_compress,
                             const NPConditionalLPFirstSERequest *first_se_request,
-                            const int *cat_se_mask);
+                            const int *cat_se_mask,
+                            double *variance_metadata);
 void np_density_bw(double * myuno, double * myord, double * mycon,
                    double * mysd, int * myopti, double * myoptd, double * myans, double * fval,
                    double * objective_function_values, double * objective_function_evals,
@@ -9955,7 +9956,7 @@ SEXP C_np_conditional_count_levels(SEXP txcon,
   return out;
 }
 
-SEXP C_np_density_conditional(SEXP tyuno,
+static SEXP np_density_conditional_call(SEXP tyuno,
                               SEXP tyord,
                               SEXP tycon,
                               SEXP txuno,
@@ -9988,7 +9989,8 @@ SEXP C_np_density_conditional(SEXP tyuno,
                               SEXP glp_basis,
                               SEXP first_se,
                               SEXP cat_se_request,
-                              SEXP se_request)
+                              SEXP se_request,
+                              int export_variance)
 {
   SEXP tyuno_r=R_NilValue, tyord_r=R_NilValue, tycon_r=R_NilValue;
   SEXP txuno_r=R_NilValue, txord_r=R_NilValue, txcon_r=R_NilValue;
@@ -10000,6 +10002,7 @@ SEXP C_np_density_conditional(SEXP tyuno,
   SEXP regtype_i=R_NilValue, glp_degree_i=R_NilValue, glp_bernstein_i=R_NilValue, glp_basis_i=R_NilValue;
   SEXP out=R_NilValue, out_names=R_NilValue;
   SEXP out_cond=R_NilValue, out_cderr=R_NilValue, out_grad=R_NilValue, out_gerr=R_NilValue, out_ll=R_NilValue;
+  SEXP out_variance=R_NilValue;
   int en = asInteger(enrow);
   int xd = asInteger(xndim);
   int ncon_x = 0;
@@ -10031,7 +10034,8 @@ SEXP C_np_density_conditional(SEXP tyuno,
       (asInteger(se_request) != 0 && asInteger(se_request) != 1))
     error("C_np_density_conditional: invalid SE request");
   const int do_merr = asInteger(se_request);
-  if (!do_merr && (first_se != R_NilValue || cat_se_request != R_NilValue))
+  if (!do_merr && (first_se != R_NilValue || cat_se_request != R_NilValue ||
+                  export_variance))
     error("C_np_density_conditional: derivative-SE request requires SEs");
 
   if (en < 0) en = 0;
@@ -10200,6 +10204,13 @@ SEXP C_np_density_conditional(SEXP tyuno,
   PROTECT(out_grad = allocVector(REALSXP, gsize));
   PROTECT(out_gerr = do_merr ? allocVector(REALSXP, gsize) : R_NilValue);
   PROTECT(out_ll = allocVector(REALSXP, 1));
+  if(export_variance) {
+    if(np_lp_engine_extern != NP_LP_ENGINE_GENERAL || ncon_x <= 0 ||
+       en > INT_MAX / 4)
+      error("C_np_density_conditional: invalid variance export request");
+    PROTECT(out_variance = allocMatrix(REALSXP, en, 4));
+    memset(REAL(out_variance), 0, (size_t)en * 4 * sizeof(double));
+  }
 
   np_density_conditional(REAL(tyuno_r), REAL(tyord_r), REAL(tycon_r),
                            REAL(txuno_r), REAL(txord_r), REAL(txcon_r),
@@ -10215,21 +10226,25 @@ SEXP C_np_density_conditional(SEXP tyuno,
                            active_x_route, active_x_diagnostics,
                            active_y_route, active_y_diagnostics,
                            categorical_compress, first_se_request_ptr,
-                           cat_se_mask);
+                           cat_se_mask,
+                           export_variance ? REAL(out_variance) : NULL);
 
-  PROTECT(out = allocVector(VECSXP, 5));
+  PROTECT(out = allocVector(VECSXP, export_variance ? 6 : 5));
   SET_VECTOR_ELT(out, 0, out_cond);
   SET_VECTOR_ELT(out, 1, out_cderr);
   SET_VECTOR_ELT(out, 2, out_grad);
   SET_VECTOR_ELT(out, 3, out_gerr);
   SET_VECTOR_ELT(out, 4, out_ll);
+  if(export_variance) SET_VECTOR_ELT(out, 5, out_variance);
 
-  PROTECT(out_names = allocVector(STRSXP, 5));
+  PROTECT(out_names = allocVector(STRSXP, export_variance ? 6 : 5));
   SET_STRING_ELT(out_names, 0, mkChar("condens"));
   SET_STRING_ELT(out_names, 1, mkChar("conderr"));
   SET_STRING_ELT(out_names, 2, mkChar("congrad"));
   SET_STRING_ELT(out_names, 3, mkChar("congerr"));
   SET_STRING_ELT(out_names, 4, mkChar("log_likelihood"));
+  if(export_variance)
+    SET_STRING_ELT(out_names, 5, mkChar("variance_metadata"));
   setAttrib(out, R_NamesSymbol, out_names);
   vector_glp_degree_extern = NULL;
   vector_glp_gradient_order_extern = NULL;
@@ -10237,8 +10252,94 @@ SEXP C_np_density_conditional(SEXP tyuno,
   int_glp_basis_extern = 1;
   np_lp_engine_extern = NP_LP_ENGINE_SCALAR;
 
-  UNPROTECT(36 + first_se_protected);
+  UNPROTECT(36 + first_se_protected + export_variance);
   return out;
+}
+
+SEXP C_np_density_conditional(SEXP tyuno,
+                              SEXP tyord,
+                              SEXP tycon,
+                              SEXP txuno,
+                              SEXP txord,
+                              SEXP txcon,
+                              SEXP eyuno,
+                              SEXP eyord,
+                              SEXP eycon,
+                              SEXP exuno,
+                              SEXP exord,
+                              SEXP excon,
+                              SEXP rbw,
+                              SEXP ymcv,
+                              SEXP ypadnum,
+                              SEXP xmcv,
+                              SEXP xpadnum,
+                              SEXP nconfac,
+                              SEXP ncatfac,
+                              SEXP mysd,
+                              SEXP myopti,
+                              SEXP enrow,
+                              SEXP xndim,
+                              SEXP ckerlbx,
+                              SEXP ckerubx,
+                              SEXP ckerlby,
+                              SEXP ckeruby,
+                              SEXP regtype,
+                              SEXP glp_degree,
+                              SEXP glp_bernstein,
+                              SEXP glp_basis,
+                              SEXP first_se,
+                              SEXP cat_se_request,
+                              SEXP se_request)
+{
+  return np_density_conditional_call(
+    tyuno, tyord, tycon, txuno, txord, txcon, eyuno, eyord, eycon,
+    exuno, exord, excon, rbw, ymcv, ypadnum, xmcv, xpadnum,
+    nconfac, ncatfac, mysd, myopti, enrow, xndim,
+    ckerlbx, ckerubx, ckerlby, ckeruby, regtype, glp_degree,
+    glp_bernstein, glp_basis, first_se, cat_se_request, se_request, 0);
+}
+
+SEXP C_np_density_conditional_variance(SEXP tyuno,
+                              SEXP tyord,
+                              SEXP tycon,
+                              SEXP txuno,
+                              SEXP txord,
+                              SEXP txcon,
+                              SEXP eyuno,
+                              SEXP eyord,
+                              SEXP eycon,
+                              SEXP exuno,
+                              SEXP exord,
+                              SEXP excon,
+                              SEXP rbw,
+                              SEXP ymcv,
+                              SEXP ypadnum,
+                              SEXP xmcv,
+                              SEXP xpadnum,
+                              SEXP nconfac,
+                              SEXP ncatfac,
+                              SEXP mysd,
+                              SEXP myopti,
+                              SEXP enrow,
+                              SEXP xndim,
+                              SEXP ckerlbx,
+                              SEXP ckerubx,
+                              SEXP ckerlby,
+                              SEXP ckeruby,
+                              SEXP regtype,
+                              SEXP glp_degree,
+                              SEXP glp_bernstein,
+                              SEXP glp_basis,
+                              SEXP first_se,
+                              SEXP cat_se_request,
+                              SEXP se_request)
+{
+  return np_density_conditional_call(
+    tyuno, tyord, tycon, txuno, txord, txcon, eyuno, eyord, eycon,
+    exuno, exord, excon, rbw, ymcv, ypadnum, xmcv, xpadnum,
+    nconfac, ncatfac, mysd, myopti, enrow, xndim,
+    ckerlbx, ckerubx, ckerlby, ckeruby, regtype, glp_degree,
+    glp_bernstein, glp_basis, first_se, cat_se_request, se_request, 1);
 }
 
 static SEXP np_regression_lp_apply_conditional_impl(SEXP txuno,
@@ -18949,7 +19050,8 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                             NPContinuousKernelDerivativeDiagnostics *response_kernel_route_diagnostics,
                             int categorical_compress,
                             const NPConditionalLPFirstSERequest *first_se_request,
-                            const int *cat_se_mask){
+                            const int *cat_se_mask,
+                            double *variance_metadata){
   /* Likelihood bandwidth selection for density estimation */
   int cat_se_status = 0;
 
@@ -19693,6 +19795,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
     status = 0;
     for(j = lp_loop_start; j < lp_loop_stop; j++){
       double beta_y_log_scale = 0.0;
+      double variance_one = NA_REAL;
       const int mapped_train_index = j;
       const NPNNGeometryContext row_nn_geometry_context = {
         .mode = train_is_eval ?
@@ -19851,7 +19954,8 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                                                                    NP_REGRESSION_STDERR_LOCAL_RESIDUAL,
                                                                  prepared_x_bandwidth_ptr,
                                                                  row_nn_geometry_context_ptr,
-                                                                 NULL, NULL, first_se_request);
+                                                                 NULL, NULL, first_se_request,
+                                                                 variance_metadata != NULL ? &variance_one : NULL);
         if(status == NP_REGRESSION_FIT_ERR_ZERO_NN_RADIUS) {
           lp_zero_radius_side = 1;
           lp_error = "conditional density/distribution fit encountered a zero literal explanatory radius after occurrence exclusion";
@@ -19861,6 +19965,19 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
 
       if(status != 0)
         break;
+
+      if(variance_metadata != NULL) {
+        const int row = ipe_XY[j];
+        const int valid = R_FINITE(variance_one) && variance_one >= 0.0 &&
+          (R_FINITE(beta_y_log_scale) || beta_y_log_scale == -INFINITY);
+        /* Match scaled_restore: an all-zero beta response has log scale -Inf. */
+        variance_metadata[row] =
+          valid && beta_y_log_scale != -INFINITY ? variance_one : 0.0;
+        variance_metadata[row + num_obs_eval_extern] =
+          valid && R_FINITE(beta_y_log_scale) ? beta_y_log_scale : 0.0;
+        variance_metadata[row + 2*num_obs_eval_extern] = valid ? 0.0 : 1.0;
+        variance_metadata[row + 3*num_obs_eval_extern] = 1.0;
+      }
 
       if(beta_y_active) {
         NPContinuousKernelRowStatus restore_status =
@@ -19963,6 +20080,9 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
         else
           error("np_density_conditional: another rank failed in conditional LP owner-block path");
       } else {
+        if(variance_metadata != NULL)
+          MPI_Allreduce(MPI_IN_PLACE, variance_metadata,
+                        4*num_obs_eval_extern, MPI_DOUBLE, MPI_SUM, comm[1]);
         MPI_Allreduce(MPI_IN_PLACE, pdf, num_obs_eval_extern, MPI_DOUBLE, MPI_SUM, comm[1]);
         if(cderr != NULL)
           MPI_Allreduce(MPI_IN_PLACE, pdf_stderr, num_obs_eval_extern, MPI_DOUBLE, MPI_SUM, comm[1]);
@@ -22232,7 +22352,7 @@ static SEXP np_regression_fitted_execute(void *data)
       NP_REGRESSION_STDERR_LOCAL_RESIDUAL,
       NULL,
       &training_geometry_context,
-      &residual_preparation_context, NULL, NULL);
+      &residual_preparation_context, NULL, NULL, NULL);
 
     if(regression_fit_status != NP_REGRESSION_FIT_OK) {
       if(regression_fit_status == NP_REGRESSION_FIT_ERR_ZERO_NN_RADIUS)
@@ -22382,7 +22502,7 @@ static SEXP np_regression_fitted_execute(void *data)
                                                    &nn_geometry_context,
                                                    ordinary_hc0_active ?
                                                      &ordinary_hc0_context : NULL,
-                                                   call->empty_rows, NULL);
+                                                   call->empty_rows, NULL, NULL);
   if(regression_fit_status != NP_REGRESSION_FIT_OK) {
     if(regression_fit_status == NP_REGRESSION_FIT_ERR_ZERO_NN_RADIUS) {
       zero_radius_info = np_nn_zero_radius_info(
