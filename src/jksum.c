@@ -25832,6 +25832,36 @@ static double np_lp_variance_quadratic(
   return quadratic;
 }
 
+/* Conditional GENERAL covariance follows the accepted response map C D.
+ * Preserve the historical plain solve when no ridge was accepted. */
+static int np_conditional_lp_project_accepted(
+  NPLPSolveWorkspace *workspace,
+  const int nterms,
+  const int nrhs,
+  const double pristine_anchor,
+  const NPLPSolvePolicyDiagnostics *diagnostics)
+{
+  if(diagnostics->ridge_total > 0.0)
+    return np_lp_solve_workspace_solve_adjoint_factored(
+      workspace, nterms, nrhs, pristine_anchor, diagnostics) ==
+      NP_LP_SOLVE_POLICY_OK;
+  return np_lp_solve_workspace_solve_factored(workspace, nterms, nrhs);
+}
+
+/* Keep the incumbent positive product/sqrt arithmetic. Unavailable
+ * uncertainty is not a leading approximation or a successful zero. */
+static double np_conditional_lp_standard_error(
+  const double sigma2,
+  const double quadratic)
+{
+  const double variance = sigma2*quadratic;
+  if(!isfinite(sigma2) || sigma2 < 0.0 ||
+     !isfinite(quadratic) || quadratic < 0.0 ||
+     !isfinite(variance) || variance < 0.0)
+    return NA_REAL;
+  return variance > 0.0 ? sqrt(variance) : 0.0;
+}
+
 /* Evaluate the HC0 sandwich quadratic without forming an influence row.  A
  * long-double reduction supplies a scale-aware cancellation bound.  The
  * absolute pairwise quadratic, rather than the already-cancelled B*a result,
@@ -27075,11 +27105,19 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	                  break;
 	                }
 	                have_vcov_owner = 1;
-	              } else if(np_lp_solve_workspace_solve_factored(
+	              } else if(np_conditional_lp_project_accepted(
 	                          &owner->solve_workspace,
 	                          owner->nterms,
-	                          variance_rhs)) {
+	                          variance_rhs,
+	                          pristine_anchor_owner,
+	                          &solve_diagnostics_owner)) {
 	                have_vcov_owner = 1;
+	              } else {
+	                out_owner[1] = NA_REAL;
+	                if(call->do_grad && call->do_gerr)
+	                  for(l = 0; l < num_reg_continuous; ++l)
+	                    if(np_glp_gradient_direction_active(l))
+	                      out_owner[2 + call->do_merr + l*2] = NA_REAL;
 	              }
 	            }
 
@@ -27100,9 +27138,8 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	                  owner->power2_moments,
 	                  owner->power2_projection,
 	                  owner->nterms);
-	                const double mv = sigma2_owner*q;
-	                if((mv > 0.0) && isfinite(mv))
-	                  out_owner[1] = sqrt(mv);
+	                out_owner[1] =
+	                  np_conditional_lp_standard_error(sigma2_owner, q);
 	              }
 
 	              if(call->do_grad && call->do_gerr){
@@ -27128,9 +27165,8 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	                        owner->power2_moments,
 	                        owner->power2_projection,
 	                        owner->nterms);
-	                      const double gv = sigma2_owner*grad_q;
-	                      if((gv > 0.0) && isfinite(gv))
-	                        out_owner[2 + call->do_merr + l*2] = sqrt(gv);
+	                      out_owner[2 + call->do_merr + l*2] =
+	                        np_conditional_lp_standard_error(sigma2_owner, grad_q);
 	                    }
 	                    rhs++;
 	                  }
@@ -27526,11 +27562,19 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
             return R_NilValue;
           }
           have_vcov = 1;
-        } else if(np_lp_solve_workspace_solve_factored(
+        } else if(np_conditional_lp_project_accepted(
                     &owner->solve_workspace,
                     owner->nterms,
-                    variance_rhs)) {
+                    variance_rhs,
+                    pristine_anchor,
+                    &solve_diagnostics)) {
           have_vcov = 1;
+        } else {
+          call->mean_stderr[j] = NA_REAL;
+          if(call->do_grad && call->do_gerr)
+            for(l = 0; l < num_reg_continuous; ++l)
+              if(np_glp_gradient_direction_active(l))
+                call->gradient_stderr[l][j] = NA_REAL;
         }
       }
 
@@ -27551,9 +27595,8 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
             owner->power2_moments,
             owner->power2_projection,
             owner->nterms);
-          const double mv = sigma2hat*q;
-          if(mv > 0.0 && isfinite(mv))
-            call->mean_stderr[j] = sqrt(mv);
+          call->mean_stderr[j] =
+            np_conditional_lp_standard_error(sigma2hat, q);
         }
 
         if(call->do_grad && call->do_gerr) {
@@ -27579,9 +27622,8 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
                   owner->power2_moments,
                   owner->power2_projection,
                   owner->nterms);
-                const double gv = sigma2hat*grad_q;
-                if(gv > 0.0 && isfinite(gv))
-                  call->gradient_stderr[l][j] = sqrt(gv);
+                call->gradient_stderr[l][j] =
+                  np_conditional_lp_standard_error(sigma2hat, grad_q);
               }
               ++rhs;
             }
@@ -27591,8 +27633,8 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 
       if(first_se_nrhs > 0) {
         int rhs = 0;
-        /* Keep the level-only solve, status and quadratic above unchanged.
-         * The supplement reuses its factorization, never its success flag. */
+        /* This independent block reuses the accepted factorization, never
+         * the level block's success flag or partially solved RHS. */
         for(l = 0; l < num_reg_continuous; ++l) {
           double *direction;
           if(!call->first_se_request->se[l])
@@ -27612,20 +27654,20 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
               j, direction);
           ++rhs;
         }
-        if(np_lp_solve_workspace_solve_factored(
-             &owner->solve_workspace, owner->nterms, first_se_nrhs)) {
+        if(np_conditional_lp_project_accepted(
+             &owner->solve_workspace, owner->nterms, first_se_nrhs,
+             pristine_anchor, &solve_diagnostics)) {
           rhs = 0;
           for(l = 0; l < num_reg_continuous; ++l) {
-            double gv;
+            double q;
             if(!call->first_se_request->se[l])
               continue;
-            call->gradient_stderr[l][j] = 0.0;
-            gv = sigma2hat*np_lp_variance_quadratic(
+            q = np_lp_variance_quadratic(
               owner->solve_workspace.rhs_work +
                 (size_t)rhs*(size_t)owner->nterms,
               owner->power2_moments, owner->power2_projection, owner->nterms);
-            if(gv > 0.0 && isfinite(gv))
-              call->gradient_stderr[l][j] = sqrt(gv);
+            call->gradient_stderr[l][j] =
+              np_conditional_lp_standard_error(sigma2hat, q);
             ++rhs;
           }
         }

@@ -1,5 +1,12 @@
 # np 0.80-1
 
+* Requested conditional local-polynomial standard errors in the general
+  fitting path now use the accepted fit's intercept ridge correction.
+  Failed covariance blocks or invalid variance calculations return `NA`
+  only for affected uncertainty outputs, including beta-response level errors.
+  Point estimates, search, `se=FALSE` work and derivative availability
+  are unchanged.
+
 * Requested smooth-coefficient standard errors now use the same accepted
   moment system and intercept ridge correction as the returned point fit.
   Supported signed kernels no longer receive a separate covariance-only
