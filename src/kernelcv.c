@@ -252,7 +252,7 @@ np_beta_conditional_density_bw_objective_ctx(double *vector_scale_factor)
        &execution_context,
        &cv) == 1)
     return DBL_MAX;
-  return np_cvml_raw_objective(cv);
+  return cv;
 }
 
 /*
@@ -642,7 +642,7 @@ double np_cv_func_density_categorical_ml(double *vector_scale_factor)
     diff = clock() - start;
     timing_extern = ((double)diff)/((double)CLOCKS_PER_SEC);
 
-    return np_cvml_raw_objective(cv);
+    return(cv);
 
 }
 
@@ -838,7 +838,7 @@ double np_cv_func_con_density_categorical_ml(double *vector_scale_factor){
     //            Rprintf("\n");
 
 
-    return np_cvml_raw_objective(cv);
+    return(cv);
 
 }
 

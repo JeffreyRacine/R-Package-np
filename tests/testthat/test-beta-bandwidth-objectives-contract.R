@@ -62,11 +62,12 @@ test_that("beta CVML and local-constant regression objectives match kernel weigh
     )$kw
     density_loo <- colSums(weights_loo) / (nrow(x) - 1L)
     expected_ml <- sum(vapply(density_loo, function(fit) {
-      if (is.finite(fit) && fit > 0)
+      if (fit > .Machine$double.xmin)
         return(-log(fit))
-      Inf
+      if (fit < -.Machine$double.xmin)
+        return(log(-fit) - 2 * log(.Machine$double.xmin))
+      -log(.Machine$double.xmin)
     }, numeric(1L)))
-    if (!is.finite(expected_ml)) expected_ml <- .Machine$double.xmax
     fitted_loo <- colSums(weights_loo * y) / colSums(weights_loo)
     expected_ls <- mean((y - fitted_loo)^2)
 
@@ -163,9 +164,11 @@ test_that("mixed beta density objectives match independent kernel-weight oracles
     times = nlevels(training$u) * nlevels(training$o)
   )
   guarded_log <- function(fit) {
-    if (is.finite(fit) && fit > 0)
+    if (fit > .Machine$double.xmin)
       return(-log(fit))
-    Inf
+    if (fit < -.Machine$double.xmin)
+      return(log(-fit) - 2 * log(.Machine$double.xmin))
+    -log(.Machine$double.xmin)
   }
 
   for (order in c(2L, 4L, 6L, 8L)) {
@@ -193,7 +196,6 @@ test_that("mixed beta density objectives match independent kernel-weight oracles
       expected_ml <- sum(vapply(
         loo_density, guarded_log, numeric(1L)
       ))
-      if (!is.finite(expected_ml)) expected_ml <- .Machine$double.xmax
       grid_weights <- npksum(
         bws = oracle_bw, txdat = training, exdat = grid,
         return.kernel.weights = TRUE
