@@ -100,8 +100,7 @@ residuals.npregression <- function(object, ...) {
 }
 se.npregression <- function(x) {
   if (!isTRUE(x$se) || is.null(x$merr))
-    stop("standard errors were not computed: refit or predict/evaluate with se=TRUE",
-         call. = FALSE)
+    .np_stop_missing_output(substitute(x), "npreg")
   x$merr
 }
 gradients.npregression <- function(x, se = FALSE, gradient.order = NULL, ...) {
@@ -111,11 +110,11 @@ gradients.npregression <- function(x, se = FALSE, gradient.order = NULL, ...) {
   se <- npValidateScalarLogical(se, "se")
   gout <- if (!se) x$grad else x$gerr
   if (is.null(gout) || (length(gout) == 1L && is.logical(gout) && is.na(gout)))
-    stop(if (!se)
-      "gradients are not available: fit the model with gradients=TRUE"
-    else
-      "gradient standard errors were not computed: refit or predict/evaluate with gradients=TRUE and se=TRUE",
-      call. = FALSE)
+    .np_stop_missing_output(
+      substitute(x), "npreg",
+      message = if (!se) "gradients are not available." else
+        "gradient standard errors were not computed.",
+      switches = if (!se) "gradients = TRUE" else "gradients = TRUE, se = TRUE")
 
   if (identical(x$bws$regtype, "lc") && !is.null(gradient.order)) {
     npValidateLcGradientOrder(

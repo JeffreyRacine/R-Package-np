@@ -518,8 +518,7 @@ quantile.lsqregression <- function(x, ...) {
 se.lsqregression <- function(x) {
   if (!isTRUE(x$se) || is.null(x$quanterr) || !length(x$quanterr) ||
       (length(x$quanterr) == 1L && is.na(x$quanterr)))
-    stop("standard errors were not computed for this location-scale quantile regression",
-         call. = FALSE)
+    .np_stop_missing_output(substitute(x), "nplsqreg")
   x$quanterr
 }
 
@@ -557,10 +556,11 @@ gradients.lsqregression <- function(x, se = FALSE,
   se <- npValidateScalarLogical(se, "se")
   gout <- if (!se) x$quantgrad else x$quantgerr
   if (is.null(gout) || (length(gout) == 1L && is.logical(gout) && is.na(gout)))
-    stop(if (!se)
-      "gradients are not available: fit the model with gradients=TRUE"
-    else
-      "gradient standard errors are not available: fit the model with gradients=TRUE")
+    .np_stop_missing_output(
+      substitute(x), "nplsqreg",
+      message = if (!se) "gradients are not available." else
+        "gradient standard errors were not computed.",
+      switches = if (!se) "gradients = TRUE" else "gradients = TRUE, se = TRUE")
   if (!is.null(gradient.order)) {
     fit.list <- if (inherits(x$fit, "npregression")) list(x$fit) else x$fit
     if (!is.list(fit.list) || !length(fit.list) ||

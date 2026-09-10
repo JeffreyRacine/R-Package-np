@@ -281,7 +281,10 @@ gradients.conmode <- function(x, level = NULL, se = FALSE, ...) {
     stop("gradient standard errors are not available for conmode objects")
   gout <- x$probability.gradients
   if (is.null(gout))
-    stop("class-probability gradients/effects are not available: fit with gradients=TRUE")
+    .np_stop_missing_output(
+      substitute(x), "npconmode",
+      message = "class-probability gradients/effects are not available.",
+      switches = "gradients = TRUE")
   stored.level <- x$probability.gradient.level
   if (!is.null(level) && !identical(as.character(level), as.character(stored.level)))
     stop(sprintf("stored class-probability gradients are for level %s; refit with level=%s to obtain that level",

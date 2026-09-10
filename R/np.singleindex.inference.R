@@ -46,14 +46,8 @@
 }
 
 .np_index_refit_hint <- function(expr, gradients = FALSE, se = FALSE) {
-  object <- if (is.symbol(expr) && nzchar(as.character(expr))) {
-    paste(deparse(expr, backtick = TRUE), collapse = "")
-  } else {
-    "object"
-  }
-  paste0("Refit without repeating bandwidth search: npindex(bws = ",
-         object, "$bws, gradients = ", if (gradients) "TRUE" else "FALSE",
-         ", se = ", if (se) "TRUE" else "FALSE", ").",
-         if (identical(object, "object"))
-           " Replace 'object' with your fitted model." else "")
+  .np_se_refit_hint(
+    expr, "npindex",
+    switches = paste0("gradients = ", if (gradients) "TRUE" else "FALSE",
+                      ", se = ", if (se) "TRUE" else "FALSE"))
 }
