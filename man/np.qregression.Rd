@@ -297,6 +297,14 @@ prediction/evaluation route, or plot route as appropriate.
          {\hat f(\hat q_\tau(x)|x)} .
   }
 
+  For continuous conditioning variables, these gradient standard errors are
+  componentwise leading asymptotic approximations. They propagate the
+  conditional CDF-gradient uncertainty but do not jointly propagate
+  fluctuations of the density denominator and estimated quantile location.
+  Their use requires appropriate smoothness, positive-density and relative
+  bandwidth-rate conditions. They are not a full finite-smoothing covariance
+  or a joint covariance across coordinates or \code{tau} values.
+
   In a heterogeneous fitted local-polynomial degree vector, a degree-zero
   coordinate has no available first-derivative estimate and is returned as
   \code{NA}; the established all-degree-zero compatibility route is unchanged.
