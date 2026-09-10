@@ -93,9 +93,24 @@ test_that("MPI public kernel weights use one plane and typed collectives", {
     fixed = TRUE
   )
 
-  ## This owner must not bypass the progress-aware typed wrappers. Raw
-  ## collectives remain valid only inside the wrapper fallback definitions.
-  expect_false(grepl("MPI_Allgather[[:space:]]*\\(", owner, perl = TRUE))
-  expect_false(grepl("MPI_Allgatherv[[:space:]]*\\(", owner, perl = TRUE))
-  expect_false(grepl("MPI_Allreduce[[:space:]]*\\(", owner, perl = TRUE))
+  ## Public weight transport must not bypass the progress-aware wrappers.
+  ## The preceding categorical-moment merge is a different output owner.
+  expect_length(grep("^    if\\(do_hc0_derivative\\) \\{", lines), 1L)
+  transport <- mpi_public_kw_source_region(
+    lines,
+    "^    if\\(\\(kw_work != NULL\\) && \\(!keep_kw_owner_local\\)\\)\\{",
+    "^    if\\(do_hc0_derivative\\) \\{"
+  )
+  for (collective in c("allgather", "allgatherv", "allreduce")) {
+    raw <- paste0("MPI_A", substring(collective, 2L))
+    pattern <- paste0(raw, "[[:space:]]*\\(")
+    expect_false(grepl(pattern, transport, perl = TRUE))
+
+    ## If one public-weight wrapper is replaced by a raw collective,
+    ## this same scoped assertion must reject it rather than pass vacuously.
+    wrapper <- paste0("np_mpi_", collective, "_in_place_double")
+    expect_true(grepl(wrapper, transport, fixed = TRUE))
+    mutated <- sub(wrapper, raw, transport, fixed = TRUE)
+    expect_true(grepl(pattern, mutated, perl = TRUE))
+  }
 })
