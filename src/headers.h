@@ -180,23 +180,23 @@ static inline double np_guarded_cvml_contribution(const double fit){
   if(fit > 0.0)
     return -log(fit);
   np_guarded_cvml_hit();
-  if(fit < -DBL_MIN)
-    return log(-fit) - 2.0*log(DBL_MIN);
-  return -log(DBL_MIN);
+  return INFINITY;
 }
 static inline double np_guarded_cvml_log_contribution(
   const double log_absolute_sum,
   const int sign,
   const int denominator){
-  const double log_dbl_min = log(DBL_MIN);
   const double log_fit = log_absolute_sum - log((double)denominator);
 
   if(sign > 0 && log_fit > -INFINITY)
     return -log_fit;
   np_guarded_cvml_hit();
-  if(sign < 0 && log_fit > log_dbl_min)
-    return log_fit - 2.0*log_dbl_min;
-  return -log_dbl_min;
+  return INFINITY;
+}
+/* Canonicalize a completed raw CVML total before caching or guidance.
+ * DBL_MAX is candidate invalidity here, never an additive row loss. */
+static inline double np_cvml_raw_objective(const double value){
+  return R_FINITE(value) ? value : DBL_MAX;
 }
 static inline double np_fitted_log_likelihood_contribution(const double fit){
   if(fit > 0.0 || ISNAN(fit))

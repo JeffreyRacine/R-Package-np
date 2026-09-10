@@ -68,12 +68,11 @@ adaptive_cvml_signed_wls_oracle <- function(xdat, ydat, bw) {
   }, numeric(1L))
 
   contribution <- vapply(fit, function(value) {
-    if (value > .Machine$double.xmin) return(-log(value))
-    if (value < - .Machine$double.xmin)
-      return(log(-value) - 2 * log(.Machine$double.xmin))
-    -log(.Machine$double.xmin)
+    if (is.finite(value) && value > 0) return(-log(value))
+    Inf
   }, numeric(1L))
-  -sum(contribution)
+  if (any(!is.finite(contribution))) -.Machine$double.xmax else
+    -sum(contribution)
 }
 
 adaptive_cdist_signed_wls_oracle <- function(xdat, ydat, bw) {
@@ -220,7 +219,8 @@ test_that("admitted adaptive Gaussian CVML retains the signed-WLS objective orac
     cykertype = "gaussian",
     cykerorder = 2L
   )
-  objective <- np:::.npcdensbw_eval_only(xdat, ydat, bw)$objective
+  objective <- np:::.npcdensbw_eval_only(
+    xdat, ydat, bw, invalid.penalty = "dbmax")$objective
   oracle <- adaptive_cvml_signed_wls_oracle(xdat, ydat, bw)
 
   expect_true(is.finite(objective))

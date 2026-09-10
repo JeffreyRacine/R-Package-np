@@ -18,20 +18,6 @@ bounded_gaussian_kernel <- function(x0, X, h, lower, upper) {
   dnorm((x0 - X) / h) / denom
 }
 
-smooth_cv_loglik <- function(fit_values, cutoff = .Machine$double.xmin) {
-  out <- numeric(length(fit_values))
-  log_cutoff <- log(cutoff)
-
-  pos <- fit_values > cutoff
-  neg <- fit_values < -cutoff
-  mid <- !(pos | neg)
-
-  out[pos] <- log(fit_values[pos])
-  out[neg] <- -log(abs(fit_values[neg])) + 2 * log_cutoff
-  out[mid] <- log_cutoff
-  out
-}
-
 test_that("npcdensbw cv.ml LP degree-0 bounded objective matches delete-one reconstruction", {
   old_opts <- options(np.messages = FALSE, np.tree = FALSE)
   on.exit(options(old_opts), add = TRUE)
@@ -78,7 +64,7 @@ test_that("npcdensbw cv.ml LP degree-0 bounded objective matches delete-one reco
   expect_equal(np_objective, manual_objective, tolerance = 1e-5)
 })
 
-test_that("npcdensbw cv.ml LP objective uses smooth penalty for negative delete-one fits", {
+test_that("npcdensbw cv.ml LP rejects negative delete-one fits as raw invalid", {
   old_opts <- options(np.messages = FALSE, np.tree = FALSE)
   on.exit(options(old_opts), add = TRUE)
 
@@ -118,13 +104,11 @@ test_that("npcdensbw cv.ml LP objective uses smooth penalty for negative delete-
 
   expect_gt(sum(manual_rows < 0), 0L)
 
-  smooth_objective <- sum(smooth_cv_loglik(manual_rows))
-  constant_terms <- rep.int(log(.Machine$double.xmin), length(manual_rows))
-  pos <- manual_rows > .Machine$double.xmin
-  constant_terms[pos] <- log(manual_rows[pos])
-  constant_objective <- sum(constant_terms)
-  np_objective <- np:::.npcdensbw_eval_only(xdat, ydat, bw)$objective
-
-  expect_lt(abs(np_objective - smooth_objective), 20)
-  expect_gt(abs(np_objective - constant_objective), 1000)
+  raw <- np:::.npcdensbw_eval_only(
+    xdat, ydat, bw, invalid.penalty = "dbmax")
+  guided <- np:::.npcdensbw_eval_only(
+    xdat, ydat, bw, invalid.penalty = "baseline")
+  expect_identical(as.numeric(raw$objective), -.Machine$double.xmax)
+  expect_true(is.finite(guided$objective))
+  expect_lt(abs(guided$objective), .Machine$double.xmax)
 })

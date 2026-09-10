@@ -2711,7 +2711,9 @@ static int np_density_categorical_profile_cv_body(
     *cv = cv1 - 2.0*cv2;
   }
 
-  ok = R_FINITE(*cv);
+  /* A completed invalid CVML total is handled, not a reason to recompute
+   * the same candidate through the dense owner. CVLS is unchanged. */
+  ok = !do_convolution_cv || R_FINITE(*cv);
 
 cleanup:
   np_categorical_profile_owner_clear(owner);
