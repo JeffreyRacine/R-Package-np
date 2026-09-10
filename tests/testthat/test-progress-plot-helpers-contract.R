@@ -438,7 +438,8 @@ test_that("ordinary inid plot bootstrap emits intermediate progress updates in n
         }
       ),
       helper(
-        H = diag(4L),
+        # Positive support in every resample isolates the progress contract.
+        H = matrix(1 / 4, 4L, 4L),
         ydat = c(1, 2, 3, 4),
         B = 9L,
         progress.label = "Plot bootstrap inid"

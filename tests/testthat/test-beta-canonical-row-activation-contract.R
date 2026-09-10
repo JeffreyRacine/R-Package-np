@@ -699,7 +699,7 @@ test_that("scalar beta regression fits enter the canonical row engine", {
       "                                                   &nn_geometry_context,\n",
       "                                                   ordinary_hc0_active ?\n",
       "                                                     &ordinary_hc0_context : NULL,\n",
-      "                                                   call->empty_rows);"
+      "                                                   call->empty_rows, NULL, NULL);"
     ),
     fixed = TRUE
   )
@@ -898,7 +898,7 @@ test_that("legacy conditional scalar owner retains dormant route plumbing", {
   conditional <- substr(ingress, conditional_start, conditional_end - 1L)
   expect_match(
     gsub("[[:space:]]+", " ", conditional),
-    "pdf_deriv_stderr, &log_likelihood, NULL, NULL, 0, full_fit_nn_geometry_context_ptr);",
+    "pdf_deriv_stderr, &log_likelihood, NULL, NULL, 0, full_fit_nn_geometry_context_ptr, cat_se_mask, 1, &cat_se_status);",
     fixed = TRUE
   )
 })
@@ -1405,13 +1405,18 @@ test_that("every beta side enters the common conditional regression owner", {
     readLines(file.path(root, "src", "np.c"), warn = FALSE),
     collapse = "\n"
   )
-  public_start <- regexpr("SEXP C_np_density_conditional(", ingress,
+  public_start <- regexpr("static SEXP np_density_conditional_call(", ingress,
                           fixed = TRUE)[[1L]]
   public_end <- regexpr("SEXP C_np_density_bw(", ingress,
                         fixed = TRUE)[[1L]]
   expect_gt(public_start, 0L)
   expect_gt(public_end, public_start)
   public_owner <- substr(ingress, public_start, public_end - 1L)
+  # Both registered entry points delegate to the same descriptor/route owner.
+  expect_match(public_owner, "SEXP C_np_density_conditional(", fixed = TRUE)
+  expect_match(public_owner, "SEXP C_np_density_conditional_variance(", fixed = TRUE)
+  expect_equal(sum(gregexpr("return np_density_conditional_call(",
+                           public_owner, fixed = TRUE)[[1L]] > 0L), 2L)
   expect_match(
     public_owner,
     "x_descriptor.family == NP_CKERNEL_FAMILY_BETA) {",
@@ -1511,7 +1516,8 @@ test_that("every beta side enters the common conditional regression owner", {
     paste0(
       "prepared_x_bandwidth_ptr,\n",
       "                                                                 row_nn_geometry_context_ptr,\n",
-      "                                                                 NULL, NULL);"
+      "                                                                 NULL, NULL, first_se_request,\n",
+      "                                                                 variance_metadata != NULL ? &variance_one : NULL);"
     ),
     fixed = TRUE
   )
@@ -1672,7 +1678,9 @@ test_that("canonical beta regression moments preserve the sidecar transcript", {
   )
   expect_match(
     influence_owner,
-    "fabs(total_weight) * sqrt((double)(variance_count - 1))",
+    paste0("*mean_stderr = influence_scale * sqrt(influence_sum_squares *\n",
+           "    ((double)variance_count / (double)(variance_count - 1))) /\n",
+           "    fabs(total_weight);"),
     fixed = TRUE
   )
   expect_match(
@@ -1801,7 +1809,10 @@ test_that("conditional derivative restoration has one typed extended-real contra
     conditional,
     fixed = TRUE
   )[[1L]]
-  expect_equal(sum(calls > 0L), 2L)
+  # Point gradient, ordinary gradient SE, and separately requested LP first SE.
+  expect_equal(sum(calls > 0L), 3L)
+  expect_match(conditional, "if(first_se_request != NULL)", fixed = TRUE)
+  expect_match(conditional, "if(!first_se_request->se[i])", fixed = TRUE)
 })
 
 test_that("centered moments have one activated fail-closed route boundary", {

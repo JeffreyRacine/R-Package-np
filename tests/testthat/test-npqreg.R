@@ -295,7 +295,7 @@ test_that("npqreg vector-tau gradient fanout matches local evaluator", {
     txdat = xdat,
     tydat = ydat,
     tau = c(0.25, 0.5, 0.75),
-    gradients = TRUE
+    gradients = TRUE, se = TRUE
   )
 
   options(npRmpi.local.regression.mode = FALSE,
@@ -306,7 +306,7 @@ test_that("npqreg vector-tau gradient fanout matches local evaluator", {
     txdat = xdat,
     tydat = ydat,
     tau = c(0.25, 0.5, 0.75),
-    gradients = TRUE
+    gradients = TRUE, se = TRUE
   )
 
   expect_equal(fitted(fit), fitted(ref), tolerance = 0)
@@ -394,7 +394,8 @@ test_that("npqreg gradient plots support asymptotic errors", {
     cxkerbound = "range",
     cykerbound = "range"
   )
-  fit <- npqreg(bws = bw, tau = c(0.25, 0.5, 0.75), gradients = TRUE)
+  fit <- npqreg(bws = bw, tau = c(0.25, 0.5, 0.75), gradients = TRUE,
+               se = TRUE)
 
   out <- plot(
     fit,

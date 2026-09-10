@@ -31,7 +31,14 @@ test_that("response and adjoint LP owners retain validated factorizations", {
 
   expect_equal(
     sum(grepl("np_lp_solve_workspace_solve_factored\\(", jksum_lines)),
-    2L
+    1L
+  )
+  # Accepted-fit covariance uses retained adjoint factors; the shared
+  # conditional projector preserves the response-factor branch separately.
+  expect_equal(
+    sum(grepl("np_lp_solve_workspace_solve_adjoint_factored(", jksum_lines,
+              fixed = TRUE)),
+    4L
   )
   expect_true(any(grepl("int factor_ready;", header_lines, fixed = TRUE)))
   expect_true(any(grepl("int factor_p;", header_lines, fixed = TRUE)))

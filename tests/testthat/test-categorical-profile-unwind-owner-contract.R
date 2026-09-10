@@ -72,7 +72,7 @@ test_that("five categorical-profile helpers share one complete owner", {
     regression_categorical_profile_fit = c(index = 4L, matrix = 4L,
                                            vector = 6L, kernel = 1L),
     density_categorical_profile_fit = c(index = 4L, matrix = 4L,
-                                        vector = 2L, kernel = 1L),
+                                        vector = 3L, kernel = 1L),
     density_categorical_profile_cv = c(index = 3L, matrix = 2L,
                                        vector = 3L, kernel = 2L),
     conditional_categorical_profile_fit = c(index = 8L, matrix = 8L,
@@ -82,6 +82,12 @@ test_that("five categorical-profile helpers share one complete owner", {
   for (helper in helpers) {
     body <- categorical_profile_body(source, helper)
     counts <- expected[[helper]]
+    if (helper == "density_categorical_profile_fit") {
+      expect_match(body, "if(compute_moments)", fixed = TRUE)
+      expect_match(body,
+        "np_categorical_profile_owner_take_vector(owner, profile_m2);",
+        fixed = TRUE)
+    }
     expect_equal(
       fixed_count(body, "np_categorical_profile_owner_take_index("),
       unname(counts[["index"]]),
@@ -163,4 +169,3 @@ test_that("categorical-profile owner capacity failures cannot fall back", {
     fixed = TRUE
   )
 })
-

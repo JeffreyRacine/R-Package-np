@@ -212,19 +212,19 @@ test_that("multivariate beta range resolves conditional X and Y vectors", {
     rows <- c(1L, 3L, 5L, 8L)
     density.range <- npcdens(
       bws = density.range.bw, txdat = x, tydat = y,
-      exdat = x[rows, , drop = FALSE], eydat = y[rows, , drop = FALSE]
+      exdat = x[rows, , drop = FALSE], eydat = y[rows, , drop = FALSE], se = TRUE
     )
     density.fixed <- npcdens(
       bws = density.fixed.bw, txdat = x, tydat = y,
-      exdat = x[rows, , drop = FALSE], eydat = y[rows, , drop = FALSE]
+      exdat = x[rows, , drop = FALSE], eydat = y[rows, , drop = FALSE], se = TRUE
     )
     distribution.range <- npcdist(
       bws = distribution.range.bw, txdat = x, tydat = y,
-      exdat = x[rows, , drop = FALSE], eydat = y[rows, , drop = FALSE]
+      exdat = x[rows, , drop = FALSE], eydat = y[rows, , drop = FALSE], se = TRUE
     )
     distribution.fixed <- npcdist(
       bws = distribution.fixed.bw, txdat = x, tydat = y,
-      exdat = x[rows, , drop = FALSE], eydat = y[rows, , drop = FALSE]
+      exdat = x[rows, , drop = FALSE], eydat = y[rows, , drop = FALSE], se = TRUE
     )
 
     expect_identical(fitted(density.range), fitted(density.fixed))
