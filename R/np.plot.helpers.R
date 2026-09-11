@@ -9196,7 +9196,9 @@ plotFactor <- function(f, y, ...){
       gradients = TRUE,
       need.errors = FALSE,
       lp.first.se.demand = FALSE,
-      cat.se.demand = FALSE
+      cat.se.demand = FALSE,
+      gradient.target = if (!inherits(bws, "lsqregressionbandwidth"))
+        gradient.index else NULL
     )$quantgrad
     if (length(dim(g)) == 3L) {
       as.vector(g[, gradient.index, , drop = TRUE])
@@ -9267,7 +9269,8 @@ plotFactor <- function(f, y, ...){
                                    lp.first.se.demand = NULL,
                                    cat.se.demand = NULL,
                                    allow.external = FALSE,
-                                   ...) {
+                                   ...,
+                                   gradient.target = NULL) {
   need.errors <- npValidateScalarLogical(need.errors, "need.errors")
   if (inherits(bws, "lsqregressionbandwidth")) {
     return(.np_plot_lsqregression_eval(
@@ -9281,6 +9284,12 @@ plotFactor <- function(f, y, ...){
       ...,
       .np.empty.report = .np.empty.report
     ))
+  }
+  if (!is.null(gradient.target)) {
+    if (!isTRUE(gradients) || need.errors)
+      stop("quantile plot gradient target requires gradients=TRUE and need.errors=FALSE")
+    gradient.target <- .np_plot_resolve_conditional_gradient_index(
+      bws, gradient.target, "quantile plot gradient target")
   }
   tau <- .npqreg_validate_tau(tau)
   .npqreg_assert_selected_cdf_metadata(bws)
@@ -9421,7 +9430,8 @@ plotFactor <- function(f, y, ...){
           lp.first.se.demand = lp.first.se.demand,
           cat.se.demand = if (isTRUE(need.errors)) cat.se.demand else FALSE,
           se = need.errors,
-          allow.external = allow.external && !no.ex
+          allow.external = allow.external && !no.ex,
+          gradient.target = gradient.target
         )
         empty.flags <<- .npreg_merge_empty_rows(empty.flags,
           .npqreg_empty_rows(qdelta, nrow(txeval)))

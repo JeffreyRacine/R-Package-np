@@ -211,12 +211,19 @@ npqreg <-
                                                     lp.first.se.demand = NULL,
                                                     cat.se.demand = NULL,
                                                     se = TRUE,
-                                                    allow.external = FALSE) {
+                                                    allow.external = FALSE,
+                                                    gradient.target = NULL) {
   se <- npValidateScalarLogical(se, "se")
   xdat <- toFrame(xdat)
   ydat <- toFrame(ydat)
   exdat <- toFrame(exdat)
   gradients <- npValidateScalarLogical(gradients, "gradients")
+  if (!is.null(gradient.target)) {
+    if (!gradients || se)
+      stop("quantile gradient target requires gradients=TRUE and se=FALSE")
+    gradient.target <- .np_plot_resolve_conditional_gradient_index(
+      bws, gradient.target, "quantile gradient target")
+  }
   if (length(quantile) != nrow(exdat))
     stop("quantile delta helper requires one quantile per evaluation row")
   if (ncol(ydat) != 1L)
@@ -238,7 +245,8 @@ npqreg <-
         gradients = gradients, tau = tau, tol = tol, small = small,
         itmax = itmax, cdf.cache = cdf.cache,
         lp.first.se.demand = lp.first.se.demand, cat.se.demand = cat.se.demand,
-        se = se, allow.external = allow.external)
+        se = se, allow.external = allow.external,
+        gradient.target = gradient.target)
       flags <- .npqreg_empty_rows(out, length(keep))
       if (!is.null(flags)) {
         full.flags <- integer(nrow(exdat))
@@ -303,7 +311,10 @@ npqreg <-
     lp.first.se.demand = lp.first.se.demand,
     cat.se.demand = if (glp.categorical.effects) FALSE else cat.se.demand,
     allow.external = allow.external,
-    .np.defer.empty.rows = TRUE
+    .np.defer.empty.rows = TRUE,
+    gradient.target = if (!is.null(gradient.target) &&
+                           isTRUE(bws$ixcon[[gradient.target]]))
+      gradient.target else NULL
   )
   dens.obj <- .np_conditional_eval_selected(
     bws = bws,
@@ -353,7 +364,8 @@ npqreg <-
     gerr[!is.finite(gerr) | gerr < 0.0] <- NA_real_
   }
 
-  if (glp.categorical.effects) {
+  if (glp.categorical.effects &&
+      (is.null(gradient.target) || !isTRUE(bws$ixcon[[gradient.target]]))) {
     cat.grad <- .npqreg_categorical_first_differences(
       bws = bws,
       xdat = xdat,
@@ -364,10 +376,13 @@ npqreg <-
       small = small,
       itmax = itmax,
       cdf.cache = cdf.cache,
-      allow.external = allow.external
+      allow.external = allow.external,
+      gradient.target = gradient.target
     )
     flags <- .npreg_merge_empty_rows(flags, .npqreg_empty_rows(cat.grad, nrow(exdat)))
     cat.idx <- which(bws$ixuno | bws$ixord)
+    if (!is.null(gradient.target))
+      cat.idx <- cat.idx[cat.idx == gradient.target]
     grad[, cat.idx] <- cat.grad[, cat.idx, drop = FALSE]
     if (se)
       gerr[, cat.idx] <- NA_real_
@@ -469,8 +484,14 @@ npqreg <-
                                                    small,
                                                    itmax,
                                                    cdf.cache = NULL,
-                                                   allow.external = FALSE) {
+                                                   allow.external = FALSE,
+                                                   gradient.target = NULL) {
   cat.idx <- which(bws$ixuno | bws$ixord)
+  if (!is.null(gradient.target)) {
+    gradient.target <- .np_plot_resolve_conditional_gradient_index(
+      bws, gradient.target, "quantile categorical gradient target")
+    cat.idx <- cat.idx[cat.idx == gradient.target]
+  }
   out <- matrix(NA_real_, nrow = nrow(exdat), ncol = bws$xndim)
   if (!length(cat.idx))
     return(out)
