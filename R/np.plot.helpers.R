@@ -13831,6 +13831,65 @@ plotFactor <- function(f, y, ...){
   as.vector(congrad[, gradient.index, drop = TRUE])
 }
 
+.np_plot_bootstrap_supplied_center <- function(center, nout, where) {
+  if (!is.numeric(center) || is.complex(center) || !is.null(dim(center)) ||
+      length(center) != nout) {
+    stop(sprintf("%s received an invalid private bootstrap center", where),
+         call. = FALSE)
+  }
+  center
+}
+
+.np_plot_conditional_gradient_bootstrap_fit <- function(bws, xdat, ydat,
+    exdat, eydat, cdf, gradient.index, gradient.order, where) {
+  fit <- .np_plot_conditional_eval(
+    bws = bws,
+    xdat = xdat,
+    ydat = ydat,
+    exdat = exdat,
+    eydat = eydat,
+    cdf = cdf,
+    gradients = TRUE,
+    gradient.order = gradient.order,
+    lp.first.se.demand = FALSE,
+    cat.se.demand = FALSE,
+    se = FALSE,
+    gradient.target = gradient.index
+  )
+  .np_plot_extract_conditional_gradient(
+    fit = fit, gradient.index = gradient.index, neval = nrow(exdat), where = where
+  )
+}
+
+.np_plot_quantile_bootstrap_fit <- function(bws, xdat, ydat, exdat, tau,
+                                             gradients = FALSE,
+                                             gradient.index = NULL) {
+  if (!gradients) {
+    return(as.vector(.np_plot_quantile_eval(
+      bws = bws, txdat = xdat, tydat = ydat, exdat = exdat, tau = tau,
+      gradients = FALSE, need.errors = FALSE
+    )$quantile))
+  }
+  g <- .np_plot_quantile_eval(
+    bws = bws,
+    txdat = xdat,
+    tydat = ydat,
+    exdat = exdat,
+    tau = tau,
+    gradients = TRUE,
+    need.errors = FALSE,
+    lp.first.se.demand = FALSE,
+    cat.se.demand = FALSE,
+    gradient.target = if (!inherits(bws, "lsqregressionbandwidth"))
+      gradient.index else NULL
+  )$quantgrad
+  if (length(dim(g)) == 3L) {
+    as.vector(g[, gradient.index, , drop = TRUE])
+  } else {
+    as.vector(g[, gradient.index, drop = TRUE])
+  }
+}
+
 .np_inid_boot_from_conditional_gradient_local <- function(xdat,
                                                           ydat,
                                                           exdat,
@@ -13842,7 +13901,8 @@ plotFactor <- function(f, y, ...){
                                                           gradient.order = 1L,
                                                           counts = NULL,
                                                           counts.drawer = NULL,
-                                                          progress.label = NULL) {
+                                                          progress.label = NULL,
+                                                          center = NULL) {
   xdat <- toFrame(xdat)
   ydat <- toFrame(ydat)
   exdat <- toFrame(exdat)
@@ -13868,29 +13928,15 @@ plotFactor <- function(f, y, ...){
   neval <- nrow(exdat)
 
   fit.fun <- function(x.train, y.train) {
-    fit <- .np_plot_conditional_eval(
-      bws = bws,
-      xdat = x.train,
-      ydat = y.train,
-      exdat = exdat,
-      eydat = eydat,
-      cdf = cdf,
-      gradients = TRUE,
-      gradient.order = gradient.order,
-      lp.first.se.demand = FALSE,
-      cat.se.demand = FALSE,
-      se = FALSE,
-      gradient.target = gradient.index
-    )
-    .np_plot_extract_conditional_gradient(
-      fit = fit,
-      gradient.index = gradient.index,
-      neval = neval,
-      where = where
+    .np_plot_conditional_gradient_bootstrap_fit(
+      bws = bws, xdat = x.train, ydat = y.train, exdat = exdat,
+      eydat = eydat, cdf = cdf, gradient.index = gradient.index,
+      gradient.order = gradient.order, where = where
     )
   }
 
-  t0 <- fit.fun(x.train = xdat, y.train = ydat)
+  t0 <- if (is.null(center)) fit.fun(x.train = xdat, y.train = ydat) else
+    .np_plot_bootstrap_supplied_center(center, neval, where)
   tmat <- matrix(NA_real_, nrow = B, ncol = length(t0))
   counts.mat <- if (!is.null(counts)) .np_inid_counts_matrix(n = n, B = B, counts = counts) else NULL
   progress.label <- if (is.null(progress.label)) {
@@ -13946,7 +13992,8 @@ plotFactor <- function(f, y, ...){
                                                     tau,
                                                     counts = NULL,
                                                     counts.drawer = NULL,
-                                                    progress.label = NULL) {
+                                                    progress.label = NULL,
+                                                    center = NULL) {
   xdat <- toFrame(xdat)
   ydat <- as.double(ydat)
   exdat <- toFrame(exdat)
@@ -13959,18 +14006,14 @@ plotFactor <- function(f, y, ...){
     stop("invalid quantile level bootstrap dimensions")
 
   fit.fun <- function(x.train, y.train) {
-    as.vector(.np_plot_quantile_eval(
-      bws = bws,
-      txdat = x.train,
-      tydat = y.train,
-      exdat = exdat,
-      tau = tau,
-      gradients = FALSE,
-      need.errors = FALSE
-    )$quantile)
+    .np_plot_quantile_bootstrap_fit(
+      bws = bws, xdat = x.train, ydat = y.train, exdat = exdat, tau = tau
+    )
   }
 
-  t0 <- fit.fun(x.train = xdat, y.train = ydat)
+  t0 <- if (is.null(center)) fit.fun(x.train = xdat, y.train = ydat) else
+    .np_plot_bootstrap_supplied_center(center, nrow(exdat) * length(tau),
+                                      "quantile level bootstrap")
   tmat <- matrix(NA_real_, nrow = B, ncol = length(t0))
   counts.mat <- if (!is.null(counts)) .np_inid_counts_matrix(n = n, B = B, counts = counts) else NULL
   progress.label <- if (is.null(progress.label)) {
@@ -14027,7 +14070,8 @@ plotFactor <- function(f, y, ...){
                                                        gradient.index,
                                                        counts = NULL,
                                                        counts.drawer = NULL,
-                                                       progress.label = NULL) {
+                                                       progress.label = NULL,
+                                                       center = NULL) {
   xdat <- toFrame(xdat)
   ydat <- as.double(ydat)
   exdat <- toFrame(exdat)
@@ -14040,27 +14084,15 @@ plotFactor <- function(f, y, ...){
     stop("invalid quantile gradient bootstrap dimensions")
 
   fit.fun <- function(x.train, y.train) {
-    g <- .np_plot_quantile_eval(
-      bws = bws,
-      txdat = x.train,
-      tydat = y.train,
-      exdat = exdat,
-      tau = tau,
-      gradients = TRUE,
-      need.errors = FALSE,
-      lp.first.se.demand = FALSE,
-      cat.se.demand = FALSE,
-      gradient.target = if (!inherits(bws, "lsqregressionbandwidth"))
-        gradient.index else NULL
-    )$quantgrad
-    if (length(dim(g)) == 3L) {
-      as.vector(g[, gradient.index, , drop = TRUE])
-    } else {
-      as.vector(g[, gradient.index, drop = TRUE])
-    }
+    .np_plot_quantile_bootstrap_fit(
+      bws = bws, xdat = x.train, ydat = y.train, exdat = exdat, tau = tau,
+      gradients = TRUE, gradient.index = gradient.index
+    )
   }
 
-  t0 <- fit.fun(x.train = xdat, y.train = ydat)
+  t0 <- if (is.null(center)) fit.fun(x.train = xdat, y.train = ydat) else
+    .np_plot_bootstrap_supplied_center(center, nrow(exdat) * length(tau),
+                                      "quantile gradient bootstrap")
   tmat <- matrix(NA_real_, nrow = B, ncol = length(t0))
   counts.mat <- if (!is.null(counts)) .np_inid_counts_matrix(n = n, B = B, counts = counts) else NULL
   progress.label <- if (is.null(progress.label)) {
@@ -14151,20 +14183,23 @@ plotFactor <- function(f, y, ...){
   if (n < 1L || B < 1L)
     stop("invalid conditional gradient bootstrap dimensions")
 
+  where <- if (isTRUE(cdf)) "conditional distribution gradient bootstrap" else
+    "conditional density gradient bootstrap"
+  gradient.index <- .np_plot_resolve_conditional_gradient_index(
+    bws, gradient.index, where
+  )
   t0 <- .npRmpi_with_local_bootstrap(
-    .np_inid_boot_from_conditional_gradient_local(
+    .np_plot_conditional_gradient_bootstrap_fit(
       xdat = xdat,
       ydat = ydat,
       exdat = exdat,
       eydat = eydat,
       bws = bws,
-      B = 1L,
       cdf = cdf,
       gradient.index = gradient.index,
       gradient.order = gradient.order,
-      counts = matrix(1, nrow = n, ncol = 1L),
-      progress.label = NULL
-    )$t0
+      where = where
+    )
   )
   neval <- length(t0)
   chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
@@ -14231,7 +14266,8 @@ plotFactor <- function(f, y, ...){
         gradient.index = gradient.index,
         gradient.order = gradient.order,
         counts = counts.chunk,
-        progress.label = NULL
+        progress.label = NULL,
+        center = t0
       )$t
     )
   }
@@ -14256,11 +14292,15 @@ plotFactor <- function(f, y, ...){
           cdf = cdf,
           gradient.index = gradient.index,
           gradient.order = gradient.order,
+          t0 = t0,
           n = n,
           prob = prob,
           counts.mode = counts.mode,
           .np_inid_boot_from_conditional_gradient_local =
             .np_inid_boot_from_conditional_gradient_local,
+          .np_plot_conditional_gradient_bootstrap_fit =
+            .np_plot_conditional_gradient_bootstrap_fit,
+          .np_plot_bootstrap_supplied_center = .np_plot_bootstrap_supplied_center,
           .np_plot_resolve_conditional_gradient_index =
             .np_plot_resolve_conditional_gradient_index,
           .np_plot_validate_conditional_gradient_target =
@@ -14315,16 +14355,13 @@ plotFactor <- function(f, y, ...){
     stop("invalid quantile level bootstrap dimensions")
 
   t0 <- .npRmpi_with_local_bootstrap(
-    .np_inid_boot_from_quantile_level_local(
+    .np_plot_quantile_bootstrap_fit(
       xdat = xdat,
       ydat = ydat,
       exdat = exdat,
       bws = bws,
-      B = 1L,
-      tau = tau,
-      counts = matrix(1, nrow = n, ncol = 1L),
-      progress.label = NULL
-    )$t0
+      tau = tau
+    )
   )
   neval <- length(t0)
   chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
@@ -14388,7 +14425,8 @@ plotFactor <- function(f, y, ...){
         B = as.integer(task$bsz),
         tau = tau,
         counts = counts.chunk,
-        progress.label = NULL
+        progress.label = NULL,
+        center = t0
       )$t
     )
   }
@@ -14410,11 +14448,14 @@ plotFactor <- function(f, y, ...){
           exdat = exdat,
           bws = bws,
           tau = tau,
+          t0 = t0,
           n = n,
           prob = prob,
           counts.mode = counts.mode,
           .np_inid_boot_from_quantile_level_local =
             .np_inid_boot_from_quantile_level_local,
+          .np_plot_quantile_bootstrap_fit = .np_plot_quantile_bootstrap_fit,
+          .np_plot_bootstrap_supplied_center = .np_plot_bootstrap_supplied_center,
           .np_inid_counts_matrix = .np_inid_counts_matrix,
           .npRmpi_with_local_bootstrap = .npRmpi_with_local_bootstrap
         ),
@@ -14465,17 +14506,15 @@ plotFactor <- function(f, y, ...){
     stop("invalid quantile gradient bootstrap dimensions")
 
   t0 <- .npRmpi_with_local_bootstrap(
-    .np_inid_boot_from_quantile_gradient_local(
+    .np_plot_quantile_bootstrap_fit(
       xdat = xdat,
       ydat = ydat,
       exdat = exdat,
       bws = bws,
-      B = 1L,
       tau = tau,
-      gradient.index = gradient.index,
-      counts = matrix(1, nrow = n, ncol = 1L),
-      progress.label = NULL
-    )$t0
+      gradients = TRUE,
+      gradient.index = gradient.index
+    )
   )
   neval <- length(t0)
   chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
@@ -14540,7 +14579,8 @@ plotFactor <- function(f, y, ...){
         tau = tau,
         gradient.index = gradient.index,
         counts = counts.chunk,
-        progress.label = NULL
+        progress.label = NULL,
+        center = t0
       )$t
     )
   }
@@ -14563,11 +14603,14 @@ plotFactor <- function(f, y, ...){
           bws = bws,
           tau = tau,
           gradient.index = gradient.index,
+          t0 = t0,
           n = n,
           prob = prob,
           counts.mode = counts.mode,
           .np_inid_boot_from_quantile_gradient_local =
             .np_inid_boot_from_quantile_gradient_local,
+          .np_plot_quantile_bootstrap_fit = .np_plot_quantile_bootstrap_fit,
+          .np_plot_bootstrap_supplied_center = .np_plot_bootstrap_supplied_center,
           .np_inid_counts_matrix = .np_inid_counts_matrix,
           .npRmpi_with_local_bootstrap = .npRmpi_with_local_bootstrap
         ),
