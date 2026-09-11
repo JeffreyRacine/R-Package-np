@@ -633,6 +633,9 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   the conditional regression-style pilot, and categorical conditioning
   lambdas are moved toward their admissible upper bounds as in the
   corresponding level route.
+  Ordinary paired/block bootstrap intervals support categorical first
+  differences, but smooth-bootstrap bias-corrected conditional-gradient
+  centers currently require a continuous conditioning-variable target.
   These are practical, evidence-backed rules-of-thumb guided by the
   smoothed-bootstrap and regression two-bandwidth literatures, not claims
   of universal optimality.

@@ -13760,32 +13760,18 @@ plotFactor <- function(f, y, ...){
                                                         gradient.index,
                                                         where) {
   xicon <- bws$xdati$icon
-  gradient.index <- as.integer(gradient.index)[1L]
-  if (is.null(xicon) || !length(xicon) || is.na(gradient.index) ||
-      gradient.index < 1L) {
+  if (!is.logical(xicon) || !length(xicon) || anyNA(xicon) ||
+      !is.numeric(gradient.index) || is.complex(gradient.index) ||
+      length(gradient.index) != 1L || !is.finite(gradient.index) ||
+      gradient.index != floor(gradient.index) ||
+      gradient.index < 1L || gradient.index > length(xicon)) {
     stop(sprintf("%s requested an invalid conditional gradient coordinate",
                  where),
          call. = FALSE)
   }
-  xicon <- as.logical(xicon)
-  cont.index <- which(xicon)
-  if (!length(cont.index)) {
-    stop(sprintf("%s can compute bootstrap gradient bias correction only for continuous conditioning variables",
-                 where),
-         call. = FALSE)
-  }
-  if (gradient.index <= length(xicon) && isTRUE(xicon[gradient.index])) {
-    return(gradient.index)
-  }
-  if (gradient.index <= length(cont.index)) {
-    return(cont.index[[gradient.index]])
-  }
-  if (gradient.index <= length(xicon) && length(cont.index) == 1L) {
-    return(cont.index[[1L]])
-  }
-  stop(sprintf("%s requested an invalid conditional gradient coordinate",
-               where),
-       call. = FALSE)
+  # Plot callers supply physical X columns, including categorical contrasts.
+  # Reinterpreting an index as a continuous ordinal changes the estimand.
+  as.integer(gradient.index)
 }
 
 .np_plot_validate_conditional_gradient_target <- function(bws,
@@ -13798,7 +13784,7 @@ plotFactor <- function(f, y, ...){
   )
   xicon <- as.logical(bws$xdati$icon)
   if (!isTRUE(xicon[gradient.index])) {
-    stop(sprintf("%s can compute bootstrap gradient bias correction only for continuous conditioning variables",
+    stop(sprintf("%s supports smooth-bootstrap gradient bias correction only for continuous conditioning variables",
                  where),
          call. = FALSE)
   }
@@ -13853,7 +13839,7 @@ plotFactor <- function(f, y, ...){
   } else {
     "conditional density gradient bootstrap"
   }
-  gradient.index <- .np_plot_validate_conditional_gradient_target(
+  gradient.index <- .np_plot_resolve_conditional_gradient_index(
     bws = bws,
     gradient.index = gradient.index,
     where = where
@@ -16044,7 +16030,7 @@ compute.default.error.range <- function(center, err) {
 .np_plot_require_conditional_gradient_bootstrap_supported <- function(bws,
                                                                       gradient.index,
                                                                       where) {
-  .np_plot_validate_conditional_gradient_target(
+  .np_plot_resolve_conditional_gradient_index(
     bws = bws,
     gradient.index = gradient.index,
     where = where
@@ -18609,6 +18595,13 @@ compute.bootstrap.errors.conbandwidth =
         where = sprintf("%s conditional density/distribution bootstrap gradients",
                         if (is.block) plot.errors.boot.method else "inid")
       )
+      if (.np_plot_center_is_oversmoothed(plot.errors.center, plot.errors.boot.method)) {
+        .np_plot_validate_conditional_gradient_target(
+          bws = bws,
+          gradient.index = gradient.index,
+          where = "conditional bootstrap bias-corrected center"
+        )
+      }
     }
 
     if (is.inid && !isTRUE(fast.inid) && !isTRUE(gradient.local.ok) && !isTRUE(quantile.level.local.ok) && !isTRUE(quantile.gradient.local.ok))
