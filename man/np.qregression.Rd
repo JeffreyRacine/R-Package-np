@@ -266,6 +266,22 @@ prediction/evaluation route, or plot route as appropriate.
   \code{npqreg} supports \code{cykerorder = 2} for this route and rejects
   higher-order dependent-variable CDF kernels, which can be nonmonotone.
 
+  During this inversion, an external predictor row identified by the selected
+  CDF as having no kernel support returns \code{NA} for its quantiles and
+  requested standard errors and gradients. Supported rows retain their
+  original order, including repeated evaluation points and vector-\code{tau}
+  requests. An unavailable categorical counterfactual affects only the
+  corresponding contrast, not an otherwise supported base quantile. One
+  warning summarizes affected external rows after the public evaluation or
+  plot call completes. Other numerical failures, and required training or
+  bootstrap evaluations, retain their strict error behavior.
+
+  The existing point-only shortcut for an exactly constant response is
+  unchanged: it returns that response value without evaluating the conditional
+  CDF. External predictor support is not checked by this shortcut; requests
+  for standard errors or gradients still enter the conditional evaluation
+  machinery.
+
   Let \eqn{f(y|x) = \partial F(y|x)/\partial y} denote the conditional
   density. The asymptotic standard error of the conditional quantile is
   computed by the first-order delta method,

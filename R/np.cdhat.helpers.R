@@ -133,7 +133,8 @@
                                       exdat,
                                       s = NULL,
                                       train.is.eval = FALSE,
-                                      return.norm = FALSE) {
+                                      return.norm = FALSE,
+                                      allow.empty.rows = FALSE) {
   train.is.eval <- npValidateScalarLogical(train.is.eval, "train.is.eval")
   if (train.is.eval && nrow(exdat) != nrow(txdat))
     stop("conditional X hat received inconsistent training-identity rows")
@@ -179,7 +180,8 @@
     return(.npreghat_exact_lc_matrix_from_kernel_weights(
       bws = xbw,
       txdat = txdat,
-      exdat = eval.arg
+      exdat = eval.arg,
+      allow.empty.rows = allow.empty.rows
     ))
   }
 
@@ -197,20 +199,30 @@
         bws = xbw,
         txdat = txdat,
         exdat = NULL,
-        s = s
+        s = s,
+        allow.empty.rows = allow.empty.rows
       ))
     }
 
     if (identical(xbw$type, "generalized_nn") && any(degree > 1L)) {
       H <- matrix(NA_real_, nrow = nrow(exdat), ncol = nrow(txdat))
+      empty.rows <- NULL
       for (i in seq_len(nrow(exdat))) {
-        H[i, ] <- .npreghat_exact_matrix_from_core(
+        row <- .npreghat_exact_matrix_from_core(
           bws = xbw,
           txdat = txdat,
           exdat = exdat[i, , drop = FALSE],
-          s = s
-        )[1L, ]
+          s = s,
+          allow.empty.rows = allow.empty.rows
+        )
+        H[i, ] <- row[1L, ]
+        flags <- attr(row, ".np.empty.rows", exact = TRUE)
+        if (!is.null(flags)) {
+          if (is.null(empty.rows)) empty.rows <- integer(nrow(exdat))
+          empty.rows[i] <- flags[1L]
+        }
       }
+      if (!is.null(empty.rows)) attr(H, ".np.empty.rows") <- empty.rows
       return(H)
     }
 
@@ -222,7 +234,8 @@
       basis = basis,
       degree = degree,
       bernstein.basis = bernstein,
-      return.norm = return.norm
+      return.norm = return.norm,
+      allow.empty.rows = allow.empty.rows
     ))
   }
 
@@ -230,7 +243,8 @@
     bws = xbw,
     txdat = txdat,
     exdat = eval.arg,
-    s = s
+    s = s,
+    allow.empty.rows = allow.empty.rows
   )
 }
 
@@ -743,6 +757,12 @@
     divisor, "conditional hat", TRUE)
 }
 
+.npcdhat_copy_empty_rows <- function(value, source) {
+  flags <- attr(source, ".np.empty.rows", exact = TRUE)
+  if (!is.null(flags)) attr(value, ".np.empty.rows") <- flags
+  value
+}
+
 .npcdhat_exact_matrix <- function(bws,
                                   txdat,
                                   tydat,
@@ -771,7 +791,8 @@
     txdat = txdat,
     exdat = exdat,
     s = x.s,
-    train.is.eval = train.is.eval
+    train.is.eval = train.is.eval,
+    allow.empty.rows = allow.empty.rows
   )
   Gy <- .npcdhat_make_kernel_matrix(
     kbw = ybw,
@@ -781,7 +802,7 @@
     train.is.eval = train.is.eval
   )
 
-  Hx * Gy
+  .npcdhat_copy_empty_rows(Hx * Gy, Hx)
 }
 
 .npcdhat_exact_apply <- function(bws,
@@ -820,7 +841,8 @@
     exdat = exdat,
     s = x.s,
     train.is.eval = train.is.eval,
-    return.norm = return.norm
+    return.norm = return.norm,
+    allow.empty.rows = allow.empty.rows
   )
   norms <- if (return.norm) Hx[["norm", exact = TRUE]] else NULL
   if (return.norm) Hx <- Hx[["hat", exact = TRUE]]
@@ -832,9 +854,8 @@
     train.is.eval = train.is.eval
   )
 
-  if (return.norm)
-    list(value = (Hx * Gy) %*% rhs, norm = norms)
-  else (Hx * Gy) %*% rhs
+  out <- .npcdhat_copy_empty_rows((Hx * Gy) %*% rhs, Hx)
+  if (return.norm) list(value = out, norm = norms) else out
 }
 
 .npRmpi_cdhat_apply_row_tasks <- function(neval, workers, ntrain) {
@@ -863,6 +884,29 @@
   })
 }
 
+.npRmpi_cdhat_collect_empty_rows <- function(out, parts, tasks) {
+  if (length(parts) != length(tasks))
+    stop("conditional hat received malformed chunk metadata", call. = FALSE)
+  flags <- lapply(parts, attr, which = ".np.empty.rows", exact = TRUE)
+  if (all(vapply(flags, is.null, logical(1L)))) return(out)
+  full <- integer(nrow(out))
+  seen <- logical(nrow(out))
+  for (i in seq_along(tasks)) {
+    rows <- tasks[[i]][["rows", exact = TRUE]]
+    flag <- flags[[i]]
+    if (!is.integer(rows) || anyNA(rows) || any(rows < 1L | rows > nrow(out)) ||
+        anyDuplicated(rows) || any(seen[rows]) || nrow(parts[[i]]) != length(rows) ||
+        (!is.null(flag) && (!is.integer(flag) || length(flag) != length(rows) ||
+                           anyNA(flag) || any(!flag %in% 0:1))))
+      stop("conditional hat received malformed empty-row metadata", call. = FALSE)
+    seen[rows] <- TRUE
+    if (!is.null(flag)) full[rows] <- flag
+  }
+  if (!all(seen)) stop("conditional hat received incomplete chunk metadata", call. = FALSE)
+  if (any(full)) attr(out, ".np.empty.rows") <- full
+  out
+}
+
 .npRmpi_cdhat_apply_fanout <- function(bws,
                                         txdat,
                                         tydat,
@@ -873,7 +917,8 @@
                                         x.s = NULL,
                                         what = "conditional hat apply",
                                         comm = 1L,
-                                        return.norm = FALSE) {
+                                        return.norm = FALSE,
+                                        allow.empty.rows = TRUE) {
   if (!isTRUE(getOption("npRmpi.cdhat.apply.fanout", TRUE)) ||
       !isTRUE(getOption("npRmpi.mpi.initialized", FALSE)) ||
       isTRUE(getOption("npRmpi.autodispatch.context", FALSE)) ||
@@ -923,7 +968,7 @@
       rhs = rhs,
       operator = operator,
       x.s = x.s.worker,
-      allow.empty.rows = TRUE,
+      allow.empty.rows = allow.empty.rows,
       return.norm = return.norm
     )
     if (return.norm) {
@@ -932,7 +977,7 @@
       if (!identical(dim(value), c(length(rows), as.integer(point.ncol))) ||
           !is.matrix(norm) || !identical(dim(norm), c(length(rows), 3L)))
         stop("internal conditional hat-norm worker payload mismatch")
-      out <- cbind(value, norm)
+      out <- .npcdhat_copy_empty_rows(cbind(value, norm), value)
     }
     out <- as.matrix(out)
     if (!identical(dim(out), c(length(rows), as.integer(ncol.out))))
@@ -961,31 +1006,19 @@
       x.s = if (is.null(x.s)) integer(0L) else x.s,
       ncol.out = ncol.out,
       point.ncol = point.ncol,
-      return.norm = return.norm
-    )
+      return.norm = return.norm,
+      allow.empty.rows = allow.empty.rows
+    ),
+    metadata.reducer = if (allow.empty.rows) .npRmpi_cdhat_collect_empty_rows else NULL
   )
   if (return.norm) {
     if (!is.matrix(result) || !identical(dim(result), c(neval, as.integer(ncol.out))))
       stop("internal conditional hat-norm fanout payload mismatch")
-    return(list(value = result[, seq_len(point.ncol), drop = FALSE],
+    return(list(value = .npcdhat_copy_empty_rows(
+                  result[, seq_len(point.ncol), drop = FALSE], result),
                 norm = result[, point.ncol + seq_len(3L), drop = FALSE]))
   }
-  if (anyNA(result) && .npcdhat_use_adaptive_ratio(bws, x.s)) {
-    # Numeric fanout preserves values, not attributes. Classify exceptional
-    # rows locally without enlarging ordinary worker payloads.
-    rows <- which(rowSums(is.na(result)) == ncol(result))
-    empty.rows <- integer(nrow(result))
-    xkbw <- .npcdhat_make_xkbw(bws = bws, txdat = txdat)
-    for (i in rows) {
-      Kx <- .npRmpi_with_local_regression(.npcdhat_make_kernel_matrix(
-        xkbw, txdat, exdat[i, , drop = FALSE],
-        rep.int("normal", ncol(txdat))))
-      empty.rows[i] <- as.integer(length(Kx) > 0L &&
-        all(is.finite(Kx)) && all(Kx == 0.0))
-    }
-    if (any(empty.rows == 1L))
-      attr(result, ".np.empty.rows") <- empty.rows
-  }
+
   result
 }
 
@@ -1001,13 +1034,18 @@
                           x.s = NULL,
                           class_name,
                           where,
-                          return.norm = FALSE) {
+                          return.norm = FALSE,
+                          allow.external = NULL,
+                          .np.defer.empty.rows = FALSE) {
   output <- match.arg(output, c("matrix", "apply"))
 
   if (xor(is.null(exdat), is.null(eydat)))
     stop("evaluation data must be supplied for both 'exdat' and 'eydat'")
 
   no.exy <- is.null(exdat)
+  if (is.null(allow.external)) allow.external <- !no.exy
+  allow.external <- npValidateScalarLogical(allow.external, "allow.external") && !no.exy
+  .np.defer.empty.rows <- npValidateScalarLogical(.np.defer.empty.rows, ".np.defer.empty.rows")
 
   txdat <- toFrame(txdat)
   tydat <- toFrame(tydat)
@@ -1092,6 +1130,7 @@
       operator = operator,
       x.s = x.s,
       what = paste0(where, " apply"),
+      allow.empty.rows = allow.external,
       return.norm = return.norm
     )
     if (is.null(out)) {
@@ -1105,7 +1144,7 @@
         operator = operator,
         x.s = x.s,
         train.is.eval = no.exy,
-        allow.empty.rows = !no.exy,
+        allow.empty.rows = allow.external,
         return.norm = return.norm
       )
     }
@@ -1116,13 +1155,11 @@
       attr(out, ".np.empty.rows") <- NULL
       den <- rep.int(1.0, length(empty.rows))
       den[empty.rows == 1L] <- NA_real_
-      out <- .np_normalization_finish(out, den, where)
+      out <- .np_normalization_finish(out, den, where, .np.defer.empty.rows)
     }
-    if (return.norm)
-      return(list(value = if (ncol(out) == 1L) as.vector(out) else out,
-                  norm = norms))
     if (ncol(out) == 1L)
-      return(as.vector(out))
+      out <- .npcdhat_copy_empty_rows(as.vector(out), out)
+    if (return.norm) return(list(value = out, norm = norms))
     return(out)
   }
 
@@ -1135,14 +1172,14 @@
     operator = operator,
     x.s = x.s,
     train.is.eval = no.exy,
-    allow.empty.rows = !no.exy
+    allow.empty.rows = allow.external
   )
   empty.rows <- attr(H, ".np.empty.rows", exact = TRUE)
   if (!is.null(empty.rows)) {
     attr(H, ".np.empty.rows") <- NULL
     den <- rep.int(1.0, length(empty.rows))
     den[empty.rows == 1L] <- NA_real_
-    H <- .np_normalization_finish(H, den, where)
+    H <- .np_normalization_finish(H, den, where, .np.defer.empty.rows)
   }
 
   class(H) <- c(class_name, "matrix")
@@ -1171,7 +1208,10 @@ npConditionalCategoricalFirstDifferences <- function(hat.fun,
                                                       tydat,
                                                       exdat = NULL,
                                                       eydat = NULL,
-                                                      where) {
+                                                      where,
+                                                      allow.external = NULL,
+                                                      base.rows = NULL,
+                                                      .np.defer.empty.rows = FALSE) {
   if (!is.function(hat.fun))
     stop(sprintf("%s received an invalid conditional hat evaluator", where),
          call. = FALSE)
@@ -1184,7 +1224,18 @@ npConditionalCategoricalFirstDifferences <- function(hat.fun,
     return(out)
 
   rhs <- rep.int(1.0, nrow(txdat))
+  empty.rows <- NULL
   eval.hat <- function(z) {
+    if (!is.null(allow.external)) {
+      value <- .np_conditional_higher_hat(list(
+        bws = bws, txdat = txdat, tydat = tydat, exdat = z,
+        eydat = eval.y, y = rhs), cdf = identical(hat.fun, npcdisthat),
+        base.rows = base.rows, allow.external = allow.external, return.norm = FALSE)
+      flags <- attr(value, ".np.empty.rows", exact = TRUE)
+      if (!is.null(flags))
+        empty.rows <<- if (is.null(empty.rows)) flags else pmax(empty.rows, flags)
+      return(as.vector(value))
+    }
     as.vector(hat.fun(
       bws = bws,
       txdat = txdat,
@@ -1204,5 +1255,5 @@ npConditionalCategoricalFirstDifferences <- function(hat.fun,
     )
     out[, jj] <- eval.hat(frames$upper) - eval.hat(frames$lower)
   }
-  out
+  .npreg_finish_empty_rows(out, empty.rows, defer = .np.defer.empty.rows, owner = where)
 }

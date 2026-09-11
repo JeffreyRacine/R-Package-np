@@ -364,7 +364,7 @@ npreghat <-
   list(v = v, ridge = ridge)
 }
 
-.npreghat_exact_matrix_from_core <- function(bws, txdat, exdat = NULL, s = NULL) {
+.npreghat_exact_matrix_from_core <- function(bws, txdat, exdat = NULL, s = NULL, allow.empty.rows = FALSE) {
   miss.ex <- is.null(exdat)
   neval <- if (miss.ex) nrow(txdat) else nrow(exdat)
   ntrain <- nrow(txdat)
@@ -381,6 +381,7 @@ npreghat <-
     target.col <- which(bws$icon)[target.cont]
   }
 
+  empty.rows <- NULL
   fit_one <- function(ycol) {
     direct.args <- list(
       bws = bws,
@@ -388,9 +389,13 @@ npreghat <-
       tydat = ycol,
       exdat = exdat,
       gradients = want.grad,
-      gradient.order = 1L
+      gradient.order = 1L,
+      allow.empty.rows = allow.empty.rows
     )
     fit <- .npRmpi_with_local_regression(do.call(.np_regression_direct, direct.args))
+    flags <- attr(fit, ".np.empty.rows", exact = TRUE)
+    if (!is.null(flags))
+      empty.rows <<- if (is.null(empty.rows)) flags else pmax(empty.rows, flags)
     if (is.null(target.col)) {
       fit$mean
     } else {
@@ -404,6 +409,7 @@ npreghat <-
     H[, j] <- fit_one(yj)
   }
 
+  if (!is.null(empty.rows)) attr(H, ".np.empty.rows") <- empty.rows
   H
 }
 
@@ -416,7 +422,8 @@ npreghat <-
   )
 }
 
-.npreghat_exact_lc_matrix_from_kernel_weights <- function(bws, txdat, exdat = NULL) {
+.npreghat_exact_lc_matrix_from_kernel_weights <- function(bws, txdat, exdat = NULL,
+                                                               allow.empty.rows = FALSE) {
   beta.kernel <- identical(bws[["ckertype", exact = TRUE]], "beta")
   kw <- .np_kernel_weights_direct(
     bws = bws,
@@ -428,8 +435,20 @@ npreghat <-
   )
 
   denom <- colSums(kw)
+  empty.rows <- NULL
+  if (allow.empty.rows) {
+    zero <- which(is.finite(denom) & denom == 0.0)
+    if (length(zero)) {
+      empty.rows <- integer(length(denom))
+      empty.rows[zero] <- vapply(zero, function(j)
+        as.integer(all(is.finite(kw[, j])) && all(kw[, j] == 0.0)), integer(1L))
+      if (!any(empty.rows)) empty.rows <- NULL
+    }
+  }
   denom[!is.finite(denom) | denom == 0.0] <- NA_real_
-  .np_lc_hat_normalize(kw, denom)
+  out <- .np_lc_hat_normalize(kw, denom)
+  if (!is.null(empty.rows)) attr(out, ".np.empty.rows") <- empty.rows
+  out
 }
 
 .npreghat_exact_lc_derivative_matrix_from_npksum_chunked <- function(bws,
@@ -948,7 +967,8 @@ npreghat <-
                                                           basis = "glp",
                                                           degree = integer(0),
                                                           bernstein.basis = FALSE,
-                                                          return.norm = FALSE) {
+                                                          return.norm = FALSE,
+                                                          allow.empty.rows = FALSE) {
   miss.ex <- is.null(exdat)
   eval.data <- if (miss.ex) txdat else exdat
   ntrain <- nrow(txdat)
@@ -962,7 +982,8 @@ npreghat <-
       bws = bws,
       txdat = txdat,
       exdat = if (miss.ex) NULL else exdat,
-      s = s
+      s = s,
+      allow.empty.rows = allow.empty.rows
     ))
   }
 
@@ -995,7 +1016,10 @@ npreghat <-
   H.fast <- if (ncol(W.train) == 1L ||
                 identical(matprod.mode, "default") ||
                 identical(matprod.mode, "blas")) {
-    if (return.norm)
+    if (allow.empty.rows)
+      .Call("C_np_reghat_lp_matrix_external", as.matrix(kw),
+            as.matrix(W.train), as.matrix(W.eval), return.norm, PACKAGE = "npRmpi")
+    else if (return.norm)
       .Call("C_np_reghat_lp_matrix_norm", as.matrix(kw),
             as.matrix(W.train), as.matrix(W.eval), PACKAGE = "npRmpi")
     else
@@ -1009,6 +1033,7 @@ npreghat <-
 
   H <- matrix(NA_real_, nrow = neval, ncol = ntrain)
   norms <- if (return.norm) matrix(NA_real_, neval, 3L) else NULL
+  empty.rows <- NULL
   eps <- 1.0 / max(1L, ntrain)
 
   for (j in seq_len(neval)) {
@@ -1020,6 +1045,11 @@ npreghat <-
     if (is.null(solved) || !all(is.finite(solved))) {
       if (any(!is.finite(A.base)) || any(!is.finite(rhs)))
         stop("LP solve failed in R hat-matrix path: non-finite system")
+      if (allow.empty.rows && all(is.finite(w)) && all(w == 0.0)) {
+        if (is.null(empty.rows)) empty.rows <- integer(neval)
+        empty.rows[j] <- 1L
+        next
+      }
       A.try <- A.base
       nepsilon <- 0.0
 
@@ -1057,6 +1087,7 @@ npreghat <-
     }
   }
 
+  if (!is.null(empty.rows)) attr(H, ".np.empty.rows") <- empty.rows
   if (return.norm) list(hat = H, norm = norms) else H
 }
 

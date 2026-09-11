@@ -43,7 +43,7 @@ test_that("scalar beta fit owner partitions only complete evaluation rows", {
   skip_if(is.null(source), "package C source unavailable")
   owner <- npreg_beta_scalar_fit_owner_region(
     source,
-    "static NP_NOINLINE void np_beta_scalar_regression_fit_canonical(",
+    "static NP_NOINLINE int np_beta_scalar_regression_fit_canonical(",
     "NP_NOINLINE NP_COLD int np_beta_continuous_bandwidth_prepare_canonical("
   )
 
@@ -67,7 +67,7 @@ test_that("nearest-neighbor realization is hoisted before rank slicing", {
   skip_if(is.null(source), "package C source unavailable")
   owner <- npreg_beta_scalar_fit_owner_region(
     source,
-    "static NP_NOINLINE void np_beta_scalar_regression_fit_canonical(",
+    "static NP_NOINLINE int np_beta_scalar_regression_fit_canonical(",
     "NP_NOINLINE NP_COLD int np_beta_continuous_bandwidth_prepare_canonical("
   )
 
@@ -101,7 +101,7 @@ test_that("scalar beta fit rendezvous precedes column-wise transport", {
   skip_if(is.null(source), "package C source unavailable")
   owner <- npreg_beta_scalar_fit_owner_region(
     source,
-    "static NP_NOINLINE void np_beta_scalar_regression_fit_canonical(",
+    "static NP_NOINLINE int np_beta_scalar_regression_fit_canonical(",
     "NP_NOINLINE NP_COLD int np_beta_continuous_bandwidth_prepare_canonical("
   )
 

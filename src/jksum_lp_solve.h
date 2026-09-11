@@ -228,4 +228,12 @@ int np_lp_full_row_workspace_pack_inverse_rows(
   NPLPFullRowWorkspace *workspace,
   int p);
 
+static inline int np_lp_complete_weights_are_zero(const double *weights, int ntrain)
+{
+  for(int i = 0; i < ntrain; ++i)
+    if(weights[i] != 0.0) /* Rejects NaN, Inf and signed cancellation. */
+      return 0;
+  return 1;
+}
+
 #endif

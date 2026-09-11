@@ -179,6 +179,24 @@ npqreg <-
   call
 }
 
+.npqreg_empty_rows <- function(value, n, base = FALSE) {
+  key <- if (base) ".np.empty.base.rows" else ".np.empty.rows"
+  flags <- attr(value, key, exact = TRUE)
+  if (is.null(flags)) return(NULL)
+  if (!is.integer(flags) || length(flags) != n ||
+      anyNA(flags) || any(flags != 0L & flags != 1L))
+    stop("npqreg received malformed empty-row status", call. = FALSE)
+  if (any(flags == 1L)) flags else NULL
+}
+
+.npqreg_copy_empty_rows <- function(value, source, n) {
+  for (base in c(FALSE, TRUE)) {
+    key <- if (base) ".np.empty.base.rows" else ".np.empty.rows"
+    attr(value, key) <- .npqreg_empty_rows(source, n, base)
+  }
+  value
+}
+
 .npqreg_quantile_delta_from_conditional <- function(bws,
                                                     xdat,
                                                     ydat,
@@ -192,23 +210,69 @@ npqreg <-
                                                     cdf.cache = NULL,
                                                     lp.first.se.demand = NULL,
                                                     cat.se.demand = NULL,
-                                                    se = TRUE) {
+                                                    se = TRUE,
+                                                    allow.external = FALSE) {
   se <- npValidateScalarLogical(se, "se")
   xdat <- toFrame(xdat)
   ydat <- toFrame(ydat)
   exdat <- toFrame(exdat)
+  gradients <- npValidateScalarLogical(gradients, "gradients")
+  if (length(quantile) != nrow(exdat))
+    stop("quantile delta helper requires one quantile per evaluation row")
+  if (ncol(ydat) != 1L)
+    stop("quantile delta helper requires a single response")
+  empty <- .npqreg_empty_rows(quantile, nrow(exdat), base = TRUE)
+  if (!is.null(empty)) {
+    if (!isTRUE(allow.external))
+      stop("npqreg received empty rows during a required delta evaluation", call. = FALSE)
+    omit <- which(empty == 1L)
+    keep <- which(empty == 0L)
+    if (any(!is.na(quantile[omit])))
+      stop("npqreg received finite quantiles for empty rows", call. = FALSE)
+    if (length(keep)) {
+      q.keep <- as.double(quantile[keep])
+      attr(q.keep, .npqreg_quantile_clamp_attr) <-
+        .npqreg_quantile_clamp(quantile)[keep]
+      out <- .npqreg_quantile_delta_from_conditional(
+        bws, xdat, ydat, exdat[keep, , drop = FALSE], q.keep,
+        gradients = gradients, tau = tau, tol = tol, small = small,
+        itmax = itmax, cdf.cache = cdf.cache,
+        lp.first.se.demand = lp.first.se.demand, cat.se.demand = cat.se.demand,
+        se = se, allow.external = allow.external)
+      flags <- .npqreg_empty_rows(out, length(keep))
+      if (!is.null(flags)) {
+        full.flags <- integer(nrow(exdat))
+        full.flags[keep] <- flags
+        attr(out, ".np.empty.rows") <- full.flags
+      }
+      if (se) out$quanterr <- .npqreg_napredict_eval(omit, out$quanterr)
+      if (gradients) {
+        out$quantgrad <- .npqreg_napredict_eval(omit, out$quantgrad)
+        if (se) out$quantgerr <- .npqreg_napredict_eval(omit, out$quantgerr)
+      }
+      # Private diagnostics remain genuine subset fits; the public delta
+      # arrays above retain the complete query layout.
+      out$evaluated.rows <- keep
+    } else {
+      grad <- if (gradients) matrix(NA_real_, nrow(exdat), ncol(exdat),
+                                   dimnames = list(NULL, names(exdat))) else NULL
+      out <- list(quanterr = if (se) rep.int(NA_real_, nrow(exdat)) else NULL,
+                  quantgrad = if (gradients) grad else NA,
+                  quantgerr = if (se) { if (gradients) grad else NA } else NULL,
+                  cdf = NULL, dens = NULL, evaluated.rows = integer(0L))
+    }
+    attr(out, ".np.empty.rows") <- .npreg_merge_empty_rows(
+      .npqreg_empty_rows(out, nrow(exdat)),
+      .npreg_merge_empty_rows(.npqreg_empty_rows(quantile, nrow(exdat)), empty))
+    attr(out, ".np.empty.base.rows") <- empty
+    return(out)
+  }
   cat.se.demand <- .np_conditional_cat_se_demand(
     cat.se.demand, bws$xnuno + bws$xnord)
   qclamp <- .npqreg_quantile_clamp(quantile)
   if (all(!is.na(qclamp) & qclamp != "none"))
     cat.se.demand[] <- FALSE
   quantile <- as.double(quantile)
-  gradients <- npValidateScalarLogical(gradients, "gradients")
-
-  if (length(quantile) != nrow(exdat))
-    stop("quantile delta helper requires one quantile per evaluation row")
-  if (ncol(ydat) != 1L)
-    stop("quantile delta helper requires a single response")
 
   reg.spec <- npConditionalRegEngineSpec(
     bws,
@@ -237,7 +301,9 @@ npqreg <-
     se = se,
     categorical.effects = !glp.categorical.effects,
     lp.first.se.demand = lp.first.se.demand,
-    cat.se.demand = if (glp.categorical.effects) FALSE else cat.se.demand
+    cat.se.demand = if (glp.categorical.effects) FALSE else cat.se.demand,
+    allow.external = allow.external,
+    .np.defer.empty.rows = TRUE
   )
   dens.obj <- .np_conditional_eval_selected(
     bws = bws,
@@ -247,8 +313,14 @@ npqreg <-
     eydat = eydat,
     cdf = FALSE,
     gradients = FALSE,
-    se = FALSE
+    se = FALSE,
+    allow.external = allow.external,
+    .np.defer.empty.rows = TRUE
   )
+
+  flags <- .npreg_merge_empty_rows(
+    .npqreg_empty_rows(cdf.obj, nrow(exdat)),
+    .npqreg_empty_rows(dens.obj, nrow(exdat)))
 
   dens <- as.double(dens.obj$condens)
   quanterr <- NULL
@@ -258,13 +330,15 @@ npqreg <-
   }
 
   if (!gradients) {
-    return(list(
+    out <- list(
       quanterr = quanterr,
       quantgrad = NA,
       quantgerr = if (se) NA else NULL,
       cdf = cdf.obj,
       dens = dens.obj
-    ))
+    )
+    if (!is.null(flags)) attr(out, ".np.empty.rows") <- flags
+    return(out)
   }
 
   dens.mat <- matrix(NZD(dens),
@@ -289,32 +363,37 @@ npqreg <-
       tol = tol,
       small = small,
       itmax = itmax,
-      cdf.cache = cdf.cache
+      cdf.cache = cdf.cache,
+      allow.external = allow.external
     )
+    flags <- .npreg_merge_empty_rows(flags, .npqreg_empty_rows(cat.grad, nrow(exdat)))
     cat.idx <- which(bws$ixuno | bws$ixord)
     grad[, cat.idx] <- cat.grad[, cat.idx, drop = FALSE]
     if (se)
       gerr[, cat.idx] <- NA_real_
   }
 
-  list(
+  out <- list(
     quanterr = quanterr,
     quantgrad = grad,
     quantgerr = gerr,
     cdf = cdf.obj,
     dens = dens.obj
   )
+  if (!is.null(flags)) attr(out, ".np.empty.rows") <- flags
+  out
 }
 
 .npqreg_selected_cdf_values <- function(bws,
                                         xdat,
                                         ydat,
                                         exdat,
-                                        ycand) {
+                                        ycand,
+                                        allow.external = FALSE) {
   ydat <- toFrame(ydat)
   yname <- names(ydat)[1L]
   eydat <- stats::setNames(data.frame(as.double(ycand)), yname)
-  as.double(.np_conditional_eval_selected(
+  fit <- .np_conditional_eval_selected(
     bws = bws,
     xdat = xdat,
     ydat = ydat,
@@ -322,8 +401,11 @@ npqreg <-
     eydat = eydat,
     cdf = TRUE,
     gradients = FALSE,
-    se = FALSE
-  )$condist)
+    se = FALSE,
+    allow.external = allow.external,
+    .np.defer.empty.rows = TRUE
+  )
+  .npqreg_copy_empty_rows(as.double(fit$condist), fit, nrow(exdat))
 }
 
 .npqreg_selected_cdf_cache_atom <- function(x) {
@@ -368,6 +450,7 @@ npqreg <-
   if (is.environment(cache)) {
     cache$enabled <- FALSE
     cache$store <- new.env(parent = emptyenv(), hash = TRUE)
+    cache$empty.store <- NULL
   }
   invisible(NULL)
 }
@@ -385,7 +468,8 @@ npqreg <-
                                                    tol,
                                                    small,
                                                    itmax,
-                                                   cdf.cache = NULL) {
+                                                   cdf.cache = NULL,
+                                                   allow.external = FALSE) {
   cat.idx <- which(bws$ixuno | bws$ixord)
   out <- matrix(NA_real_, nrow = nrow(exdat), ncol = bws$xndim)
   if (!length(cat.idx))
@@ -397,7 +481,7 @@ npqreg <-
     } else {
       NULL
     }
-    as.vector(.npqreg_invert_selected_cdf(
+    .npqreg_invert_selected_cdf(
       bws = bws,
       xdat = xdat,
       ydat = ydat,
@@ -407,20 +491,27 @@ npqreg <-
       small = small,
       itmax = itmax,
       cdf.cache = cdf.cache,
-      cdf.row.keys = row.keys
-    ))
+      cdf.row.keys = row.keys,
+      allow.external = allow.external
+    )
   }
 
+  flags <- NULL
   for (jj in cat.idx) {
     frames <- npCategoricalFirstDifferenceFrames(
       exdat = exdat,
       index = jj,
       where = "npqreg"
     )
-    out[, jj] <- eval.quantile(frames$upper) -
-      eval.quantile(frames$lower)
+    upper <- eval.quantile(frames$upper)
+    lower <- eval.quantile(frames$lower)
+    flags <- .npreg_merge_empty_rows(flags, .npreg_merge_empty_rows(
+      .npqreg_empty_rows(upper, nrow(exdat)),
+      .npqreg_empty_rows(lower, nrow(exdat))))
+    out[, jj] <- as.vector(upper) - as.vector(lower)
   }
 
+  if (!is.null(flags)) attr(out, ".np.empty.rows") <- flags
   out
 }
 
@@ -480,12 +571,117 @@ npqreg <-
       assign(miss.keys[[j]], values[[j]], envir = cdf.cache$store)
       cdf.cache$unique <- cdf.cache$unique + 1L
     }
+    flags <- .npqreg_empty_rows(values, length(miss.first))
+    base.flags <- .npqreg_empty_rows(values, length(miss.first), base = TRUE)
+    if (!is.null(flags) || !is.null(base.flags)) {
+      if (!is.environment(cdf.cache$empty.store))
+        cdf.cache$empty.store <- new.env(parent = emptyenv(), hash = TRUE)
+      for (j in seq_along(miss.first))
+        assign(miss.keys[[j]], c(
+          if (is.null(flags)) 0L else flags[[j]],
+          if (is.null(base.flags)) 0L else base.flags[[j]]
+        ), envir = cdf.cache$empty.store)
+    }
   }
 
   missing.out <- which(!is.finite(out) & is.na(out))
   if (length(missing.out)) {
     for (i in missing.out)
       out[[i]] <- get(keys[[i]], envir = cdf.cache$store, inherits = FALSE)
+  }
+  if (is.environment(cdf.cache$empty.store)) {
+    flags <- base.flags <- integer(n.eval)
+    for (i in seq_len(n.eval)) {
+      if (exists(keys[[i]], envir = cdf.cache$empty.store, inherits = FALSE)) {
+        row.flags <- get(keys[[i]], envir = cdf.cache$empty.store, inherits = FALSE)
+        flags[[i]] <- row.flags[[1L]]
+        base.flags[[i]] <- row.flags[[2L]]
+      }
+    }
+    if (any(flags == 1L)) attr(out, ".np.empty.rows") <- flags
+    if (any(base.flags == 1L)) attr(out, ".np.empty.base.rows") <- base.flags
+  }
+  out
+}
+
+.npqreg_tau_empty_rows <- function(value, n, ntau, base = FALSE) {
+  key <- if (base) ".npqreg.empty.tau.base.rows" else ".npqreg.empty.tau.rows"
+  flags <- attr(value, key, exact = TRUE)
+  if (is.null(flags)) return(NULL)
+  if (!is.integer(flags) || !identical(dim(flags), c(as.integer(n), as.integer(ntau))) ||
+      anyNA(flags) || any(flags != 0L & flags != 1L))
+    stop("npqreg received malformed tau empty-row status", call. = FALSE)
+  if (any(flags == 1L)) flags else NULL
+}
+
+.npqreg_copy_tau_empty_rows <- function(value, source, n, ntau) {
+  value <- .npqreg_copy_empty_rows(value, source, n)
+  for (base in c(FALSE, TRUE)) {
+    key <- if (base) ".npqreg.empty.tau.base.rows" else ".npqreg.empty.tau.rows"
+    attr(value, key) <- .npqreg_tau_empty_rows(source, n, ntau, base)
+  }
+  value
+}
+
+.npqreg_bind_tau_pieces <- function(pieces) {
+  out <- do.call(cbind, pieces)
+  n <- nrow(out)
+  for (base in c(FALSE, TRUE)) {
+    flags <- lapply(pieces, .npqreg_empty_rows, n = n, base = base)
+    if (all(vapply(flags, is.null, logical(1L)))) next
+    flags <- do.call(cbind, lapply(flags, function(x) if (is.null(x)) integer(n) else x))
+    key <- if (base) ".npqreg.empty.tau.base.rows" else ".npqreg.empty.tau.rows"
+    attr(out, key) <- flags
+    row.key <- if (base) ".np.empty.base.rows" else ".np.empty.rows"
+    attr(out, row.key) <- as.integer(rowSums(flags) > 0L)
+  }
+  base <- attr(out, ".npqreg.empty.tau.base.rows", exact = TRUE)
+  if (!is.null(base) && any(base != base[, 1L]))
+    stop("npqreg base-support status differs across tau values", call. = FALSE)
+  out
+}
+
+.npqreg_collect_empty_rows <- function(out, parts, tasks, ntau = NULL) {
+  n <- nrow(out)
+  starts <- vapply(tasks, function(x) as.integer(x$start), integer(1L))
+  sizes <- vapply(tasks, function(x) as.integer(x$bsz), integer(1L))
+  expected <- cumsum(c(1L, head(sizes, -1L)))
+  if (anyNA(starts) || anyNA(sizes) || any(sizes < 1L) ||
+      !identical(starts, as.integer(expected)) || sum(sizes) != n ||
+      length(parts) != length(tasks))
+    stop("npqreg received malformed chunk row identity", call. = FALSE)
+  for (base in c(FALSE, TRUE)) {
+    flags <- lapply(seq_along(parts), function(i) {
+      if (is.null(ntau)) .npqreg_empty_rows(parts[[i]], sizes[[i]], base)
+      else .npqreg_tau_empty_rows(parts[[i]], sizes[[i]], ntau, base)
+    })
+    if (all(vapply(flags, is.null, logical(1L)))) next
+    full <- if (is.null(ntau)) integer(n) else matrix(0L, n, ntau)
+    for (i in seq_along(parts)) {
+      if (is.null(flags[[i]])) next
+      idx <- seq.int(starts[[i]], length.out = sizes[[i]])
+      if (is.null(ntau)) full[idx] <- flags[[i]] else full[idx, ] <- flags[[i]]
+    }
+    key <- if (base) ".np.empty.base.rows" else ".np.empty.rows"
+    if (is.null(ntau)) {
+      if (base && any(!is.na(out[full == 1L, 1L])))
+        stop("npqreg received finite values for empty CDF rows", call. = FALSE)
+      attr(out, key) <- full
+    } else {
+      if (base && any(full != full[, 1L]))
+        stop("npqreg base-support status differs across tau values", call. = FALSE)
+      if (base) {
+        width <- ncol(out)/ntau
+        if (!is.finite(width) || width < 1L || width != floor(width))
+          stop("npqreg received malformed tau numeric layout", call. = FALSE)
+        points <- out[, 1L + (seq_len(ntau) - 1L)*width, drop = FALSE]
+        if (any(!is.na(points[full == 1L])))
+          stop("npqreg received finite quantiles for empty rows", call. = FALSE)
+      }
+      tau.key <- if (base) ".npqreg.empty.tau.base.rows" else ".npqreg.empty.tau.rows"
+      attr(out, tau.key) <- full
+      attr(out, key) <- as.integer(rowSums(full) > 0L)
+    }
   }
   out
 }
@@ -566,7 +762,8 @@ npqreg <-
                                                  ydat,
                                                  exdat,
                                                  ycand,
-                                                 comm = 1L) {
+                                                  comm = 1L,
+                                                  allow.external = FALSE) {
   exdat <- toFrame(exdat)
   n.eval <- nrow(exdat)
   if (!.npRmpi_npqreg_parallel_ready(
@@ -580,7 +777,8 @@ npqreg <-
       xdat = xdat,
       ydat = ydat,
       exdat = exdat,
-      ycand = ycand
+      ycand = ycand,
+      allow.external = allow.external
     )))
   }
 
@@ -590,7 +788,7 @@ npqreg <-
     B = n.eval,
     chunk.size = .npRmpi_npqreg_chunk_size(n.eval = n.eval, comm = comm)
   )
-  worker <- function(task, bws, xdat, ydat, exdat, ycand) {
+  worker <- function(task, bws, xdat, ydat, exdat, ycand, allow.external) {
     idx <- seq.int(as.integer(task$start),
                    length.out = as.integer(task$bsz))
     .npRmpi_with_local_cdist_eval(.npqreg_selected_cdf_values(
@@ -598,7 +796,8 @@ npqreg <-
       xdat = xdat,
       ydat = ydat,
       exdat = exdat[idx, , drop = FALSE],
-      ycand = ycand[idx]
+      ycand = ycand[idx],
+      allow.external = allow.external
     ))
   }
 
@@ -615,10 +814,12 @@ npqreg <-
     xdat = xdat,
     ydat = ydat,
     exdat = exdat,
-    ycand = ycand
+    ycand = ycand,
+    allow.external = allow.external,
+    metadata.reducer = if (isTRUE(allow.external)) .npqreg_collect_empty_rows else NULL
   )
 
-  as.double(out[, 1L])
+  .npqreg_copy_empty_rows(as.double(out[, 1L]), out, n.eval)
 }
 
 .npqreg_tau_layout <- function(grad.cols = 0L, gradients = FALSE, se = TRUE) {
@@ -644,6 +845,16 @@ npqreg <-
   do.call(cbind, pieces)
 }
 
+.npqreg_tau_piece <- function(yq, delta = NULL, gradients = FALSE, se = TRUE) {
+  out <- if (is.null(delta)) matrix(yq, ncol = 1L) else
+    cbind(yq, .npqreg_quantile_delta_matrix(delta, gradients = gradients, se = se))
+  out <- .npqreg_copy_empty_rows(out, yq, length(yq))
+  flags <- .npreg_merge_empty_rows(.npqreg_empty_rows(out, length(yq)),
+    .npqreg_empty_rows(delta, length(yq)))
+  if (!is.null(flags)) attr(out, ".np.empty.rows") <- flags
+  out
+}
+
 .npqreg_fit_tau_vector_parallel_matrix <- function(bws,
                                                    xdat,
                                                    ydat,
@@ -657,7 +868,8 @@ npqreg <-
                                                    force.parallel = FALSE,
                                                    lp.first.se.demand = NULL,
                                                    cat.se.demand = NULL,
-                                                   se = TRUE) {
+                                                   se = TRUE,
+                                                   allow.external = FALSE) {
   exdat <- toFrame(exdat)
   n.eval <- nrow(exdat)
   tau <- .npqreg_validate_tau(tau)
@@ -684,11 +896,12 @@ npqreg <-
         tol = tol,
         small = small,
         itmax = itmax,
-        parallel = FALSE
+        parallel = FALSE,
+        allow.external = allow.external
       ))
       qclamp <- .npqreg_quantile_clamp(yq)
       if (!gradients && !se) {
-        pieces[[j]] <- matrix(yq, ncol = 1L)
+        pieces[[j]] <- .npqreg_tau_piece(yq)
         next
       }
       delta <- .npRmpi_with_local_cdist_eval(.npqreg_quantile_delta_from_conditional(
@@ -704,12 +917,13 @@ npqreg <-
         itmax = itmax,
         lp.first.se.demand = lp.first.se.demand,
         cat.se.demand = cat.se.demand,
-        se = se
+        se = se,
+        allow.external = allow.external
       ))
       delta <- .npqreg_mark_clamped_delta(delta, qclamp)
-      pieces[[j]] <- cbind(yq, .npqreg_quantile_delta_matrix(delta, gradients = gradients, se = se))
+      pieces[[j]] <- .npqreg_tau_piece(yq, delta, gradients, se)
     }
-    do.call(cbind, pieces)
+    .npqreg_bind_tau_pieces(pieces)
   }
 
   if (!.npRmpi_npqreg_parallel_ready(
@@ -728,7 +942,7 @@ npqreg <-
     chunk.size = .npRmpi_npqreg_chunk_size(n.eval = n.eval, comm = comm)
   )
   worker <- function(task, bws, xdat, ydat, exdat, tau, gradients, tol, small, itmax,
-                     lp.first.se.demand, cat.se.demand, se) {
+                     lp.first.se.demand, cat.se.demand, se, allow.external) {
     idx <- seq.int(as.integer(task$start),
                    length.out = as.integer(task$bsz))
     ex.chunk <- exdat[idx, , drop = FALSE]
@@ -743,11 +957,12 @@ npqreg <-
         tol = tol,
         small = small,
         itmax = itmax,
-        parallel = FALSE
+        parallel = FALSE,
+        allow.external = allow.external
       ))
       qclamp <- .npqreg_quantile_clamp(yq)
       if (!gradients && !se) {
-        pieces[[j]] <- matrix(yq, ncol = 1L)
+        pieces[[j]] <- .npqreg_tau_piece(yq)
         next
       }
       delta <- .npRmpi_with_local_cdist_eval(.npqreg_quantile_delta_from_conditional(
@@ -763,12 +978,13 @@ npqreg <-
         itmax = itmax,
         lp.first.se.demand = lp.first.se.demand,
         cat.se.demand = cat.se.demand,
-        se = se
+        se = se,
+        allow.external = allow.external
       ))
       delta <- .npqreg_mark_clamped_delta(delta, qclamp)
-      pieces[[j]] <- cbind(yq, .npqreg_quantile_delta_matrix(delta, gradients = gradients, se = se))
+      pieces[[j]] <- .npqreg_tau_piece(yq, delta, gradients, se)
     }
-    do.call(cbind, pieces)
+    .npqreg_bind_tau_pieces(pieces)
   }
 
   .npRmpi_bootstrap_run_fanout(
@@ -791,7 +1007,12 @@ npqreg <-
     itmax = itmax,
     lp.first.se.demand = lp.first.se.demand,
     cat.se.demand = cat.se.demand,
-    se = se
+    se = se,
+    allow.external = allow.external,
+    metadata.reducer = if (isTRUE(allow.external))
+      function(out, parts, tasks)
+        .npqreg_collect_empty_rows(out, parts, tasks, ntau = length(tau))
+    else NULL
   )
 }
 
@@ -843,7 +1064,7 @@ npqreg <-
 
   tau.labels <- .npqreg_tau_labels(tau)
   if (length(tau) == 1L) {
-    return(list(
+    return(.npqreg_copy_tau_empty_rows(list(
       yq = as.double(yq[, 1L]),
       yqerr = if (se) as.double(yqerr[, 1L]) else NULL,
       yqgrad = if (isTRUE(gradients)) {
@@ -860,7 +1081,7 @@ npqreg <-
           colnames(out) <- grad.names
         out
       } else if (se) NA else NULL
-    ))
+    ), mat, n.eval, length(tau)))
   }
 
   colnames(yq) <- tau.labels
@@ -873,12 +1094,12 @@ npqreg <-
       if (se) dimnames(yqgerr)[[2L]] <- grad.names
     }
   }
-  list(
+  .npqreg_copy_tau_empty_rows(list(
     yq = yq,
     yqerr = yqerr,
     yqgrad = if (isTRUE(gradients)) yqgrad else NA,
     yqgerr = if (isTRUE(gradients) && se) yqgerr else if (se) NA else NULL
-  )
+  ), mat, n.eval, length(tau))
 }
 
 .npqreg_assert_selected_cdf_metadata <- function(bws) {
@@ -902,7 +1123,8 @@ npqreg <-
                                         comm = 1L,
                                         cdf.cache = NULL,
                                         cdf.row.keys = NULL,
-                                        cdf.values = NULL) {
+                                        cdf.values = NULL,
+                                        allow.external = FALSE) {
   .npqreg_assert_selected_cdf_metadata(bws)
 
   xdat <- toFrame(xdat)
@@ -935,7 +1157,8 @@ npqreg <-
         ydat = ydat,
         exdat = exdat,
         ycand = ycand,
-        comm = comm
+        comm = comm,
+        allow.external = allow.external
       )
     }
   } else {
@@ -945,7 +1168,8 @@ npqreg <-
         xdat = xdat,
         ydat = ydat,
         exdat = exdat,
-        ycand = ycand
+        ycand = ycand,
+        allow.external = allow.external
       ))
     }
   }
@@ -966,12 +1190,32 @@ npqreg <-
 
   flo <- cdf_values_cached(bws, xdat, ydat, exdat, lo, row.keys = cdf.row.keys)
   fhi <- cdf_values_cached(bws, xdat, ydat, exdat, hi, row.keys = cdf.row.keys)
-  if (any(!is.finite(flo)) || any(!is.finite(fhi)))
+  empty <- .npqreg_empty_rows(flo, n.eval, base = TRUE)
+  empty.hi <- .npqreg_empty_rows(fhi, n.eval, base = TRUE)
+  if (!identical(empty, empty.hi))
+    stop("npqreg received inconsistent base-support status across CDF brackets", call. = FALSE)
+  if (!is.null(empty) && !isTRUE(allow.external))
+    stop("npqreg received empty rows during a required CDF evaluation", call. = FALSE)
+  empty.idx <- if (is.null(empty)) integer(0L) else which(empty == 1L)
+  if (length(empty.idx) &&
+      (any(!is.na(flo[empty.idx])) || any(!is.na(fhi[empty.idx]))))
+    stop("npqreg received finite values for empty CDF rows", call. = FALSE)
+  flags <- .npreg_merge_empty_rows(
+    .npqreg_empty_rows(flo, n.eval), .npqreg_empty_rows(fhi, n.eval))
+  flags <- .npreg_merge_empty_rows(flags, empty)
+  invalid.bracket <- if (is.null(empty)) {
+    any(!is.finite(flo)) || any(!is.finite(fhi))
+  } else {
+    any(!is.finite(flo[empty == 0L])) || any(!is.finite(fhi[empty == 0L]))
+  }
+  if (invalid.bracket)
     stop("npqreg selected-CDF inversion encountered non-finite bracket values")
 
   done.low <- flo >= tau
   done.high <- fhi < tau
+  done.low[empty.idx] <- done.high[empty.idx] <- FALSE
   active <- !(done.low | done.high)
+  active[empty.idx] <- FALSE
 
   maxiter <- itmax
   iter <- 0L
@@ -986,6 +1230,14 @@ npqreg <-
       ycand = mid,
       row.keys = if (is.null(cdf.row.keys)) NULL else cdf.row.keys[active]
     )
+    if (!is.null(.npqreg_empty_rows(fmid, sum(active), base = TRUE)))
+      stop("npqreg base-support status changed during CDF refinement", call. = FALSE)
+    mid.flags <- .npqreg_empty_rows(fmid, sum(active))
+    if (!is.null(mid.flags)) {
+      expanded <- integer(n.eval)
+      expanded[active] <- mid.flags
+      flags <- .npreg_merge_empty_rows(flags, expanded)
+    }
     if (any(!is.finite(fmid)))
       stop("npqreg selected-CDF inversion encountered non-finite refinement values")
 
@@ -1005,10 +1257,13 @@ npqreg <-
   out <- (lo + hi) / 2.0
   out[done.low] <- y.min
   out[done.high] <- y.max
+  out[empty.idx] <- NA_real_
   clamp <- rep.int("none", n.eval)
   clamp[done.low] <- "lower"
   clamp[done.high] <- "upper"
   attr(out, .npqreg_quantile_clamp_attr) <- clamp
+  if (!is.null(flags)) attr(out, ".np.empty.rows") <- flags
+  if (!is.null(empty)) attr(out, ".np.empty.base.rows") <- empty
   out
 }
 
@@ -1223,6 +1478,8 @@ npqreg.condbandwidth <-
     }
     txdat.df <- txdat
     tydat.df <- tydat
+    empty.flags <- NULL
+    empty.row.labels <- rownames(txeval)
     if (!no.ex)
       exdat.df <- exdat
 
@@ -1240,8 +1497,10 @@ npqreg.condbandwidth <-
         comm = 1L,
         force.parallel = TRUE,
         cat.se.demand = cat.se.demand,
-        se = se
+        se = se,
+        allow.external = !no.ex
       )
+      empty.flags <- .npqreg_empty_rows(mat, nrow(txeval))
       myout <- .npqreg_fit_tau_vector_from_parallel_matrix(
         mat,
         tau = tau,
@@ -1269,8 +1528,11 @@ npqreg.condbandwidth <-
           small = small,
           itmax = itmax,
           cdf.cache = cdf.cache,
-          cdf.row.keys = cdf.row.keys
+          cdf.row.keys = cdf.row.keys,
+          allow.external = !no.ex
         )
+        empty.flags <<- .npreg_merge_empty_rows(empty.flags,
+          .npqreg_empty_rows(yq, nrow(txeval)))
         qclamp <- .npqreg_quantile_clamp(yq)
         if (!gradients && !se)
           return(list(yq = yq, yqerr = NULL, yqgrad = NA, yqgerr = NULL))
@@ -1288,9 +1550,12 @@ npqreg.condbandwidth <-
             itmax = itmax,
             cdf.cache = cdf.cache,
             cat.se.demand = cat.se.demand,
-            se = se
+            se = se,
+            allow.external = !no.ex
           )
         )
+        empty.flags <<- .npreg_merge_empty_rows(empty.flags,
+          .npqreg_empty_rows(qdelta, nrow(txeval)))
         qdelta <- .npqreg_mark_clamped_delta(qdelta, qclamp)
         list(
           yq = yq,
@@ -1346,7 +1611,7 @@ npqreg.condbandwidth <-
     optim.time <- if (!is.null(bws$total.time) && is.finite(bws$total.time)) as.double(bws$total.time) else NA_real_
     total.time <- fit.elapsed + (if (is.na(optim.time)) 0.0 else optim.time)
 
-    qregression(bws = bws,
+    fit <- qregression(bws = bws,
                 xeval = txeval,
                 tau = tau,
                 quantile = myout$yq,
@@ -1359,6 +1624,8 @@ npqreg.condbandwidth <-
                 se = se,
                 timing = bws$timing, total.time = total.time,
                 optim.time = optim.time, fit.time = fit.elapsed)
+    .npreg_finish_empty_rows(fit, empty.flags, omitted = eval.omit,
+                             row.labels = empty.row.labels, owner = "npqreg")
   }
 
 

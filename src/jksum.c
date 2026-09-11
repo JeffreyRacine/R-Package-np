@@ -9824,6 +9824,7 @@ typedef struct {
   NPRegressionStandardErrorMode standard_error_mode;
   NPContinuousKernelRowStatus *status;
   NPContinuousKernelProgressFunction progress;
+  NPRegressionLPEmptyRows *empty_rows; /* conditional one-row external owner only */
 } NPBetaRegressionMomentCtx;
 
 static void np_beta_categorical_factor_context_init_empty(
@@ -10226,7 +10227,8 @@ np_beta_regression_categorical_gradients_validated(
   const double *mean_stderr,
   double **gradient,
   double **gradient_stderr,
-  NPContinuousKernelDerivativeDiagnostics *diagnostics)
+  NPContinuousKernelDerivativeDiagnostics *diagnostics,
+  NPRegressionLPEmptyRows *empty_rows)
 {
   NPContinuousKernelRowStatus status = NP_CONTINUOUS_ROW_OK;
   const int do_gerr = gradient_stderr != NULL;
@@ -10357,6 +10359,17 @@ np_beta_regression_categorical_gradients_validated(
     if(context->use_compressed)
       context->compressed_spec.eval_unordered = eval_unordered;
     alternate_unordered[coordinate] = eval_unordered[coordinate];
+    if(empty_rows != NULL && plan->num_eval == 1 &&
+       status == NP_CONTINUOUS_ROW_ERR_ZERO_WEIGHT &&
+       row_result->total_log_scale == -INFINITY) {
+      np_regression_empty_row_mark(empty_rows, 0, 1);
+      if(empty_rows->component_flags != NULL)
+        empty_rows->component_flags[output_coordinate] = 1;
+      gradient[output_coordinate][0] = NA_REAL;
+      if(do_gerr) gradient_stderr[output_coordinate][0] = NA_REAL;
+      status = NP_CONTINUOUS_ROW_OK;
+      continue;
+    }
     if(status != NP_CONTINUOUS_ROW_OK)
       goto cleanup;
     for(evaluation = 0; evaluation < plan->num_eval; ++evaluation) {
@@ -10436,6 +10449,17 @@ np_beta_regression_categorical_gradients_validated(
     if(context->use_compressed)
       context->compressed_spec.eval_ordered = eval_ordered;
     alternate_ordered[coordinate] = eval_ordered[coordinate];
+    if(empty_rows != NULL && plan->num_eval == 1 &&
+       status == NP_CONTINUOUS_ROW_ERR_ZERO_WEIGHT &&
+       row_result->total_log_scale == -INFINITY) {
+      np_regression_empty_row_mark(empty_rows, 0, 1);
+      if(empty_rows->component_flags != NULL)
+        empty_rows->component_flags[output_coordinate] = 1;
+      gradient[output_coordinate][0] = NA_REAL;
+      if(do_gerr) gradient_stderr[output_coordinate][0] = NA_REAL;
+      status = NP_CONTINUOUS_ROW_OK;
+      continue;
+    }
     if(status != NP_CONTINUOUS_ROW_OK)
       goto cleanup;
     for(evaluation = 0; evaluation < plan->num_eval; ++evaluation) {
@@ -11240,6 +11264,25 @@ static int np_beta_absolute_route_body(
         regression_moment_context->mean_stderr,
         route_diagnostics, regression_moment_context->progress);
 
+    if(regression_moment_context->empty_rows != NULL && plan.num_eval == 1 &&
+       row_status == NP_CONTINUOUS_ROW_ERR_ZERO_WEIGHT &&
+       row_result.total_log_scale == -INFINITY) {
+      /* Complete zero X factors, not a finite-scale signed cancellation. */
+      np_regression_empty_row_mark(regression_moment_context->empty_rows, 0, 0);
+      regression_moment_context->mean[0] = NA_REAL;
+      if(regression_moment_context->mean_stderr != NULL)
+        regression_moment_context->mean_stderr[0] = NA_REAL;
+      if(regression_moment_context->compute_gradient)
+        for(int coordinate = 0; coordinate < num_reg_continuous +
+            num_reg_unordered + num_reg_ordered; ++coordinate) {
+          regression_moment_context->gradient[coordinate][0] = NA_REAL;
+          if(regression_moment_context->gradient_stderr != NULL)
+            regression_moment_context->gradient_stderr[coordinate][0] = NA_REAL;
+        }
+      *regression_moment_context->status = NP_CONTINUOUS_ROW_OK;
+      status = 0;
+      goto cleanup;
+    }
     *regression_moment_context->status = row_status;
     if(row_status != NP_CONTINUOUS_ROW_OK)
       goto cleanup;
@@ -11281,7 +11324,7 @@ static int np_beta_absolute_route_body(
             regression_moment_context->mean_stderr,
             regression_moment_context->gradient,
             regression_moment_context->gradient_stderr,
-            route_diagnostics);
+            route_diagnostics, regression_moment_context->empty_rows);
         *regression_moment_context->status = row_status;
         if(row_status != NP_CONTINUOUS_ROW_OK)
           goto cleanup;
@@ -27606,7 +27649,8 @@ static NP_NOINLINE int np_beta_scalar_regression_fit_block_canonical(
   const int original_train_is_eval,
   const NPRegressionHC0Context *hc0_context,
   np_beta_bandwidth_prepare_status *bandwidth_status_out,
-  NPContinuousKernelRowStatus *row_status_out)
+  NPContinuousKernelRowStatus *row_status_out,
+  NPRegressionLPEmptyRows *empty_rows)
 {
   const int num_categorical = num_reg_unordered + num_reg_ordered;
   const int num_predictors = num_reg_continuous + num_categorical;
@@ -27735,6 +27779,9 @@ static NP_NOINLINE int np_beta_scalar_regression_fit_block_canonical(
     kernel_route->segment[0].descriptor.order == 2;
   regression_moment_context.standard_error_mode = standard_error_mode;
   regression_moment_context.status = &regression_row_status;
+  regression_moment_context.empty_rows =
+    standard_error_mode == NP_REGRESSION_STDERR_CONDITIONAL_INFLUENCE &&
+    num_obs_eval == 1 ? empty_rows : NULL;
   regression_moment_context.progress = np_progress_fit_loop_step;
   {
     const NPBetaAbsoluteRouteCall route_call = {
@@ -27886,7 +27933,8 @@ static NP_NOINLINE int np_beta_scalar_regression_fit_canonical(
   const NPRegressionStandardErrorMode standard_error_mode,
   const NPContinuousPreparedBandwidthView *prepared_bandwidth,
   const NPRegressionHC0Context *hc0_context,
-  NPRegressionFailure *failure)
+  NPRegressionFailure *failure,
+  NPRegressionLPEmptyRows *empty_rows)
 {
   const int original_train_is_eval =
     matrix_X_continuous_train == matrix_X_continuous_eval;
@@ -28043,7 +28091,7 @@ static NP_NOINLINE int np_beta_scalar_regression_fit_canonical(
           kernel_route, &local_diagnostics, categorical_compress,
           standard_error_mode, prepared_view, original_train_is_eval,
           hc0_context,
-          &bandwidth_status, &row_status);
+          &bandwidth_status, &row_status, NULL);
     }
     if(owned_prepared_matrix != NULL)
       free_tmat(owned_prepared_matrix);
@@ -28136,7 +28184,7 @@ static NP_NOINLINE int np_beta_scalar_regression_fit_canonical(
     kernel_route, kernel_route_diagnostics, categorical_compress,
     standard_error_mode, prepared_bandwidth, original_train_is_eval,
     hc0_context,
-    &bandwidth_status, &row_status);
+    &bandwidth_status, &row_status, empty_rows);
   if(status == NP_BETA_SCALAR_REGRESSION_FIT_ERR_BANDWIDTH &&
      bandwidth_status == NP_BETA_BANDWIDTH_PREPARE_ERR_ZERO_RADIUS) {
     const NPNNZeroRadiusInfo info = np_nn_zero_radius_info(
@@ -28916,7 +28964,8 @@ static int NP_NOINLINE np_regression_conditional_influence_finish(
   const double *mean,
   double * const *gradient,
   double *mean_stderr,
-  double **gradient_stderr)
+  double **gradient_stderr,
+  const int *empty_components)
 {
   double denominator;
   double influence_scale = 0.0;
@@ -28939,7 +28988,8 @@ static int NP_NOINLINE np_regression_conditional_influence_finish(
   if(num_obs_train <= 1) {
     mean_stderr[0] = 0.0;
     for(predictor = 0; predictor < num_predictors; ++predictor)
-      gradient_stderr[predictor][0] = 0.0;
+      gradient_stderr[predictor][0] =
+        empty_components != NULL && empty_components[predictor] ? NA_REAL : 0.0;
     return 1;
   }
 
@@ -28970,6 +29020,10 @@ static int NP_NOINLINE np_regression_conditional_influence_finish(
     return 0;
 
   for(predictor = 0; predictor < num_predictors; ++predictor) {
+    if(empty_components != NULL && empty_components[predictor]) {
+      gradient_stderr[predictor][0] = NA_REAL;
+      continue;
+    }
     const double * const alternate_weights =
       permuted_kernel_weights +
       (size_t)predictor * (size_t)num_obs_train;
@@ -29273,6 +29327,90 @@ enum {
   NP_REGRESSION_SCALAR_FIT_ERR_HC0 = -7
 };
 
+/* Failure-only complete-X classification. This reuses realized geometry and
+ * the un-divided product row; positive products and signed cancellation are
+ * never reclassified by a zero denominator alone. */
+typedef struct {
+  int n, bw, nu, no, nc;
+  int *kc, *ku, *ko, *op;
+  double **train[3], **eval[3]; /* unordered, ordered, continuous */
+  double **bandwidth;
+  double *lambda, *vsf;
+  int *categories;
+  double **catvals;
+} NPEmptyXRowContext;
+
+static int np_empty_x_row_mark(const NPEmptyXRowContext *ctx, int row,
+                              int contrast, NPRegressionLPEmptyRows *rows)
+{
+  if(rows == NULL) return 0;
+  const int dims[3] = {ctx->nu, ctx->no, ctx->nc};
+  const size_t nptr = (size_t)ctx->nu + ctx->no + 2*(size_t)ctx->nc;
+  double **storage = nptr > 0 ? (double **)malloc(nptr*sizeof(double *)) : NULL;
+  double *weights = (double *)malloc((size_t)ctx->n*sizeof(double));
+  double **eval[3] = {NULL, NULL, NULL}, **bandwidth_eval = NULL;
+  double alternate = 0.0, sum = 0.0;
+  size_t offset = 0;
+  int empty = 0;
+  if((nptr > 0 && storage == NULL) || weights == NULL) goto cleanup;
+  for(int kind = 0; kind < 3; ++kind) {
+    if(dims[kind]) eval[kind] = storage + offset;
+    for(int j = 0; j < dims[kind]; ++j)
+      eval[kind][j] = ctx->eval[kind][j] + row;
+    offset += dims[kind];
+  }
+  if(ctx->nc) {
+    bandwidth_eval = storage + offset;
+    for(int j = 0; j < ctx->nc; ++j)
+      bandwidth_eval[j] = ctx->bandwidth[j] +
+        (ctx->bw == BW_GEN_NN ? row : 0);
+  }
+  if(contrast >= 0) {
+    const int cat = contrast - ctx->nc;
+    if(cat < 0 || cat >= ctx->nu + ctx->no || ctx->categories[cat] <= 0)
+      goto cleanup;
+    if(cat < ctx->nu) {
+      alternate = ctx->catvals[cat][0];
+      eval[0][cat] = &alternate;
+    } else {
+      const int ordered = cat - ctx->nu;
+      const double current = *eval[1][ordered];
+      int index = 0;
+      while(index < ctx->categories[cat] && ctx->catvals[cat][index] != current)
+        ++index;
+      if(index == ctx->categories[cat]) goto cleanup;
+      alternate = ctx->catvals[cat][index == 0 ?
+        (ctx->categories[cat] > 1 ? 1 : 0) : index-1];
+      eval[1][ordered] = &alternate;
+    }
+  }
+  const int status = kernel_weighted_sum_np_ctx_ex(
+    ctx->kc, ctx->ku, ctx->ko, ctx->bw, ctx->n, 1,
+    ctx->nu, ctx->no, ctx->nc, 0, 0, 1, 1, 0, 0, 0, 0, 0,
+    ctx->op, OP_NOOP, 0, 0, NULL, 1, 0, 0,
+    NP_TREE_FALSE, 0, NULL, NULL, NULL, NULL,
+    ctx->train[0], ctx->train[1], ctx->train[2],
+    eval[0], eval[1], eval[2], NULL, NULL, NULL,
+    ctx->vsf, 1, ctx->bandwidth, bandwidth_eval,
+    ctx->lambda, ctx->categories, ctx->catvals, NULL,
+    &sum, NULL, weights, NULL, NULL, NULL, NULL, NULL,
+#ifdef MPI2
+    0,
+#endif
+    NULL);
+  if(status == 0 && np_lp_complete_weights_are_zero(weights, ctx->n)) {
+    np_regression_empty_row_mark(rows, row, contrast >= 0);
+    if(contrast >= 0 && rows->component_flags != NULL)
+      rows->component_flags[contrast] = 1;
+    empty = 1;
+  }
+cleanup:
+  free(weights);
+  free(storage);
+  return empty;
+}
+
+
 enum { NP_REGRESSION_SCALAR_RESPONSE_COLUMNS_MAX = 3 };
 
 typedef struct {
@@ -29316,6 +29454,7 @@ typedef struct {
   double kernel_squared_integral;
   double bandwidth_product;
   double gradient_stderr_factor;
+  NPRegressionLPEmptyRows *empty_rows;
 } NPRegressionScalarFitCall;
 
 typedef struct {
@@ -29424,6 +29563,15 @@ static SEXP np_regression_scalar_fit_execute(void *data)
   size_t allocation_bytes;
   int i;
   int predictor;
+  const NPEmptyXRowContext empty_context = {
+    .n = call->num_obs_train, .bw = call->bandwidth_mode,
+    .nu = call->num_reg_unordered, .no = call->num_reg_ordered, .nc = call->num_reg_continuous,
+    .kc = call->kernel_c, .ku = call->kernel_u, .ko = call->kernel_o, .op = call->operator,
+    .train = {call->matrix_X_unordered_train, call->matrix_X_ordered_train, call->matrix_X_continuous_train},
+    .eval = {call->matrix_X_unordered_eval, call->matrix_X_ordered_eval, call->matrix_X_continuous_eval},
+    .bandwidth = call->matrix_bandwidth, .lambda = call->lambda, .vsf = call->vector_scale_factor,
+    .categories = call->num_categories, .catvals = call->matrix_categorical_vals
+  };
 
   allocation_count =
     (size_t)response_column_count *
@@ -29597,6 +29745,8 @@ static SEXP np_regression_scalar_fit_execute(void *data)
       owner->mean_columns[response_offset + denominator_column];
 
     if(!R_FINITE(denominator) || denominator == 0.0) {
+      if(call->empty_rows != NULL && denominator == 0.0)
+        np_empty_x_row_mark(&empty_context, i, -1, call->empty_rows);
       call->mean[i] = NA_REAL;
       if(call->do_merr)
         call->mean_stderr[i] = NA_REAL;
@@ -29727,6 +29877,9 @@ static SEXP np_regression_scalar_fit_execute(void *data)
            level_denominator == 0.0 ||
            !R_FINITE(alternate_denominator) ||
            alternate_denominator == 0.0) {
+          if(call->empty_rows != NULL && R_FINITE(call->mean[i]) &&
+             alternate_denominator == 0.0)
+            np_empty_x_row_mark(&empty_context, i, predictor, call->empty_rows);
           call->gradient[predictor][i] = NA_REAL;
           if(call->do_gerr)
             call->gradient_stderr[predictor][i] = NA_REAL;
@@ -29822,6 +29975,9 @@ static SEXP np_regression_scalar_fit_execute(void *data)
            level_denominator == 0.0 ||
            !R_FINITE(alternate_denominator) ||
            alternate_denominator == 0.0) {
+          if(call->empty_rows != NULL && R_FINITE(call->mean[i]) &&
+             alternate_denominator == 0.0)
+            np_empty_x_row_mark(&empty_context, i, predictor, call->empty_rows);
           call->gradient[predictor][i] = NA_REAL;
           if(call->do_gerr)
             call->gradient_stderr[predictor][i] = NA_REAL;
@@ -29923,7 +30079,8 @@ static SEXP np_regression_scalar_fit_execute(void *data)
                 owner->conditional_permutation_weights,
                 owner->mean_columns, owner->permutation_columns,
                 call->mean, call->gradient,
-                call->mean_stderr, call->gradient_stderr)) {
+                call->mean_stderr, call->gradient_stderr,
+                call->empty_rows != NULL ? call->empty_rows->component_flags : NULL)) {
       execution->status = NP_REGRESSION_SCALAR_FIT_ERR_INFLUENCE;
       return R_NilValue;
     }
@@ -30365,13 +30522,6 @@ static void np_regression_general_lp_fit_owner_cleanup(
 
 /* T4 and fitted rows use the same exact complete-row fact. */
 static int np_lp_failed_system_is_finite(const NPLPSolveWorkspace *, int, int);
-static int np_lp_complete_weights_are_zero(const double *weights, int ntrain)
-{
-  for(int i = 0; i < ntrain; ++i)
-    if(weights[i] != 0.0) /* Rejects NaN, Inf and signed cancellation. */
-      return 0;
-  return 1;
-}
 
 /* Only called after the incumbent solve fails, never on a successful row. */
 static int np_regression_general_lp_empty_row(
@@ -30435,12 +30585,7 @@ static int np_regression_general_lp_empty_row(
   }
   if(!np_lp_complete_weights_are_zero(computed_weights, call->num_obs_train))
     return 0;
-  const int caller_row = call->empty_rows->row_map != NULL ?
-    call->empty_rows->row_map[row] : row;
-  if(!call->empty_rows->flags[caller_row]) {
-    call->empty_rows->flags[caller_row] = 1;
-    ++call->empty_rows->count;
-  }
+  np_regression_empty_row_mark(call->empty_rows, row, categorical);
   return 1;
 }
 
@@ -30456,6 +30601,7 @@ static int np_regression_general_lp_point_at_frame(
   const int response_basis_offset,
   const double epsilon,
   const int row,
+  const int empty_component,
   double *point,
   double *kernel_row,
   double *projection)
@@ -30578,6 +30724,8 @@ static int np_regression_general_lp_point_at_frame(
        &solve_diagnostics) != NP_LP_SOLVE_POLICY_OK) {
     if(np_regression_general_lp_empty_row(call, owner, row, 1,
          moment_stride, kernel_row != NULL, kernel_row)) {
+      if(empty_component >= 0 && call->empty_rows->component_flags != NULL)
+        call->empty_rows->component_flags[empty_component] = 1;
       *point = NA_REAL;
       return 1;
     }
@@ -30640,7 +30788,7 @@ static int np_regression_general_lp_categorical_points(
   if(call->categorical_base_requires_refit &&
      !np_regression_general_lp_point_at_frame(
        call, owner, moment_stride, response_y_offset,
-       response_basis_offset, epsilon, row, &base_point,
+       response_basis_offset, epsilon, row, -1, &base_point,
        compute_hc0 ? owner->categorical_base_kernel_row : NULL,
        compute_hc0 ? owner->power2_projection : NULL))
     return 0;
@@ -30659,7 +30807,8 @@ static int np_regression_general_lp_categorical_points(
     owner->eval_unordered[coordinate][0] = alternate;
     if(!np_regression_general_lp_point_at_frame(
          call, owner, moment_stride, response_y_offset,
-         response_basis_offset, epsilon, row, &alternate_point,
+         response_basis_offset, epsilon, row,
+         call->num_reg_continuous + coordinate, &alternate_point,
          compute_hc0 ? owner->categorical_alternate_kernel_row : NULL,
          compute_hc0 ? owner->coefficient : NULL)) {
       owner->eval_unordered[coordinate][0] = current;
@@ -30719,7 +30868,8 @@ static int np_regression_general_lp_categorical_points(
     owner->eval_ordered[coordinate][0] = alternate;
     if(!np_regression_general_lp_point_at_frame(
          call, owner, moment_stride, response_y_offset,
-         response_basis_offset, epsilon, row, &alternate_point,
+         response_basis_offset, epsilon, row,
+         call->num_reg_continuous + category, &alternate_point,
          compute_hc0 ? owner->categorical_alternate_kernel_row : NULL,
          compute_hc0 ? owner->coefficient : NULL)) {
       owner->eval_ordered[coordinate][0] = current;
@@ -32340,7 +32490,8 @@ NPRegressionFailure *failure){
       num_categories, matrix_categorical_vals,
       mean, gradient, mean_stderr, gradient_stderr,
       kernel_route, kernel_route_diagnostics, categorical_compress,
-      standard_error_mode, prepared_bandwidth, hc0_context, failure);
+      standard_error_mode, prepared_bandwidth, hc0_context, failure,
+      failure != NULL ? empty_rows : NULL);
     if(beta_status != 0)
       return beta_status;
     np_regression_fit_statistics(
@@ -33396,7 +33547,8 @@ NPRegressionFailure *failure){
       .enclosing_owner = &fit_owner,
       .kernel_squared_integral = K_INT_KERNEL_P,
       .bandwidth_product = hprod,
-      .gradient_stderr_factor = gfac
+      .gradient_stderr_factor = gfac,
+      .empty_rows = failure != NULL ? empty_rows : NULL
     };
     scalar_fit_status = np_regression_scalar_fit(&scalar_call);
 
@@ -52138,6 +52290,8 @@ typedef struct {
   double *kdf_stderr;
   double *log_likelihood;
   const NPConditionalLeadingRatioCtx *ratio;
+  const NPEmptyXRowContext *empty_context;
+  NPRegressionLPEmptyRows *empty_rows;
 } NPConditionalCategoricalProfileFitCall;
 
 typedef struct {
@@ -52474,6 +52628,13 @@ static int np_conditional_categorical_profile_fit_body(
 
   *log_likelihood = 0.0;
   for(i = 0; i < num_obs_eval; i++){
+    if(call->empty_rows != NULL && profile_den[eval_x_id[i]] == 0.0 &&
+       np_empty_x_row_mark(call->empty_context, i, -1, call->empty_rows)) {
+      kdf[i] = NA_REAL;
+      if(kdf_stderr != NULL) kdf_stderr[i] = NA_REAL;
+      if(is_cpdf) *log_likelihood = NA_REAL;
+      continue;
+    }
     const double sk = copysign(DBL_MIN, profile_den[eval_x_id[i]]) + profile_den[eval_x_id[i]];
     const double val = profile_num[eval_xy_id[i]]/sk;
     kdf[i] = val;
@@ -52534,7 +52695,9 @@ int int_tree_profile,
 double *kdf,
 double *kdf_stderr,
 double *log_likelihood,
-const NPConditionalLeadingRatioCtx *ratio)
+const NPConditionalLeadingRatioCtx *ratio,
+const NPEmptyXRowContext *empty_context,
+NPRegressionLPEmptyRows *empty_rows)
 {
   const NPConditionalCategoricalProfileFitCall call = {
     .kernel_uXY = kernel_uXY,
@@ -52568,7 +52731,7 @@ const NPConditionalLeadingRatioCtx *ratio)
     .kdf = kdf,
     .kdf_stderr = kdf_stderr,
     .log_likelihood = log_likelihood,
-    .ratio = ratio
+    .ratio = ratio, .empty_context = empty_context, .empty_rows = empty_rows
   };
   NPConditionalCategoricalProfileFitExecution execution;
 
@@ -52937,7 +53100,8 @@ int categorical_compress,
 const NPNNGeometryContext *nn_geometry_context,
 const int *cat_se_mask,
 int cat_se_distributed,
-int *cat_se_status
+int *cat_se_status,
+NPRegressionLPEmptyRows *empty_rows
 ){
 
   /* Ordinary generalized-NN callers supply explicit query identity; fixed,
@@ -53289,6 +53453,18 @@ int *cat_se_status
   int ann_radius_equal=0;
 #endif
 
+  const NPEmptyXRowContext empty_context = {
+    .n = num_obs_train, .bw = BANDWIDTH_den,
+    .nu = num_X_unordered, .no = num_X_ordered, .nc = num_X_continuous,
+    .kc = kernel_cXY, .ku = kernel_uXY, .ko = kernel_oXY, .op = operator_X,
+    .train = {matrix_XY_unordered_train, matrix_XY_ordered_train, matrix_XY_continuous_train},
+    .eval = {matrix_XY_unordered_eval, matrix_XY_ordered_eval, matrix_XY_continuous_eval},
+    .bandwidth = matrix_bandwidth_X,
+    .lambda = lambda + num_Y_unordered + num_Y_ordered, .vsf = vsf_X,
+    .categories = num_categories + num_Y_unordered + num_Y_ordered,
+    .catvals = matrix_categorical_vals + num_Y_unordered + num_Y_ordered
+  };
+
   if((!do_grad) &&
      np_conditional_categorical_profile_fit(kernel_uXY,
                                             kernel_oXY,
@@ -53321,7 +53497,7 @@ int *cat_se_status
                                             kdf,
                                             kdf_stderr,
                                             log_likelihood,
-                                            &ratio_moment))
+                                            &ratio_moment, &empty_context, empty_rows))
     goto cleanup_con_dens_dist_categorical;
 
   if(cat_se_selected > 0 || ann_uncertainty) {
@@ -53504,6 +53680,8 @@ int *cat_se_status
       const double sk = ksd[i];
 
       if(!R_FINITE(sk) || sk == 0.0) {
+        if(empty_rows != NULL && sk == 0.0)
+          np_empty_x_row_mark(&empty_context, i, -1, empty_rows);
         kdf[i] = NA_REAL;
         if(do_merr) kdf_stderr[i] = NA_REAL;
         *log_likelihood = NA_REAL;
@@ -53549,6 +53727,8 @@ int *cat_se_status
       const double sk = ksd[i];
 
       if(!R_FINITE(sk) || sk == 0.0) {
+        if(empty_rows != NULL && sk == 0.0)
+          np_empty_x_row_mark(&empty_context, i, -1, empty_rows);
         kdf[i] = NA_REAL;
         if(do_merr) kdf_stderr[i] = NA_REAL;
         continue;
@@ -53612,6 +53792,9 @@ int *cat_se_status
         const double sk = ksd[i];
 
         if(!R_FINITE(kdf[i]) || !R_FINITE(sk) || sk == 0.0) {
+          if(empty_rows != NULL && l >= num_X_continuous &&
+             R_FINITE(kdf[i]) && sk == 0.0)
+            np_empty_x_row_mark(&empty_context, i, l, empty_rows);
           kdf_deriv[l][i] = NA_REAL;
           if(do_gerr)
             kdf_deriv_stderr[l][i] = NA_REAL;
@@ -53639,6 +53822,9 @@ int *cat_se_status
         double s1;
 
         if(!R_FINITE(kdf[i]) || !R_FINITE(sk) || sk == 0.0) {
+          if(empty_rows != NULL && l >= num_X_continuous &&
+             R_FINITE(kdf[i]) && sk == 0.0)
+            np_empty_x_row_mark(&empty_context, i, l, empty_rows);
           kdf_deriv[l][i] = NA_REAL;
           if(do_gerr)
             kdf_deriv_stderr[l][i] = NA_REAL;
@@ -53688,6 +53874,9 @@ int *cat_se_status
         double s1;
 
         if(!R_FINITE(kdf[i]) || !R_FINITE(sk) || sk == 0.0) {
+          if(empty_rows != NULL && l >= num_X_continuous &&
+             R_FINITE(kdf[i]) && sk == 0.0)
+            np_empty_x_row_mark(&empty_context, i, l, empty_rows);
           kdf_deriv[l][i] = NA_REAL;
           if(do_gerr)
             kdf_deriv_stderr[l][i] = NA_REAL;
@@ -53951,7 +54140,8 @@ double * kdf_stderr,
 double ** kdf_deriv,
 double ** kdf_deriv_stderr,
 double * log_likelihood,
-const int *cat_se_mask
+const int *cat_se_mask,
+NPRegressionLPEmptyRows *empty_rows
 ){
 #ifdef MPI2
   int *counts = NULL, *displs = NULL;
@@ -54022,6 +54212,11 @@ const int *cat_se_mask
      ((num_X_continuous + num_Y_continuous) > 0 && eval_con == NULL))
     goto cleanup_owner_blocks;
 
+  NPRegressionLPEmptyRows local_empty = {NULL, 0, NULL, NULL};
+  if(empty_rows != NULL) {
+    local_empty = *empty_rows;
+    local_empty.row_map = empty_rows->row_map + start;
+  }
   if(nloc > 0){
     np_kernel_estimate_con_dens_dist_categorical(KERNEL_Y,
                                                  KERNEL_unordered_Y,
@@ -54059,7 +54254,8 @@ const int *cat_se_mask
                                                  NULL,
                                                  0,
                                                  NULL,
-                                                 cat_se_mask, 0, &cat_se_status);
+                                                 cat_se_mask, 0, &cat_se_status,
+                                                 empty_rows != NULL ? &local_empty : NULL);
   }
 
   if(cat_se_mask != NULL) {
@@ -54087,12 +54283,22 @@ const int *cat_se_mask
                  displs,
                  MPI_DOUBLE,
                  comm[1]);
+  if(empty_rows != NULL) {
+    double packet[2] = {local_log_likelihood, local_empty.count > 0};
+    MPI_Allreduce(MPI_IN_PLACE, packet, 2, MPI_DOUBLE, MPI_SUM, comm[1]);
+    *log_likelihood = packet[0];
+    if(packet[1] > 0.0) {
+      MPI_Allreduce(MPI_IN_PLACE, empty_rows->flags, num_obs_eval, MPI_INT, MPI_MAX, comm[1]);
+      MPI_Allreduce(MPI_IN_PLACE, empty_rows->base_flags, num_obs_eval, MPI_INT, MPI_MAX, comm[1]);
+    }
+  } else {
   MPI_Allreduce(&local_log_likelihood,
                 log_likelihood,
                 1,
                 MPI_DOUBLE,
                 MPI_SUM,
                 comm[1]);
+  }
   if(do_deriv){
     for(l = 0; l < num_X; l++)
       MPI_Allgatherv(deriv_local[l],

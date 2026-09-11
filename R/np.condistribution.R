@@ -199,6 +199,8 @@ npcdist.condbandwidth <-
       stop("evaluation data must be supplied for both 'exdat' and 'eydat'")
 
     no.exy = missing(exdat)
+  allow.external <- !no.exy && !isTRUE(dots[[".np.require.complete", exact = TRUE]])
+  defer.empty <- isTRUE(dots[[".np.defer.empty.rows", exact = TRUE]])
 
     txdat = toFrame(txdat)
     tydat = toFrame(tydat)
@@ -285,7 +287,8 @@ npcdist.condbandwidth <-
       npKernelBoundsCheckEval(eydat, bws$iycon, bws$cykerlb, bws$cykerub, argprefix = "cyker")
     }
 
-    proper.slice.context <- list(
+  proper.slice.context <- list(
+    allow.external = allow.external,
       txdat = txdat,
       tydat = tydat,
       exdat = if (no.exy) NULL else exdat,
@@ -523,9 +526,13 @@ npcdist.condbandwidth <-
             basis.code,
             first.se.request,
             cat.se.request,
-            se)
+            se, allow.external)
     ), continuous.names = c(bws[["xnames", exact = TRUE]][bws[["ixcon", exact = TRUE]]], bws[["ynames", exact = TRUE]][bws[["iycon", exact = TRUE]]]))
     names(myout)[1] <- "condist"
+
+    empty.rows <- attr(myout, ".np.empty.rows", exact = TRUE)
+
+    base.rows <- attr(myout, ".np.empty.base.rows", exact = TRUE)
 
     first.se.native <- if (is.null(first.se.request)) NULL else myout$congerr
     if(gradients){
@@ -570,12 +577,14 @@ npcdist.condbandwidth <-
               hat.args$eydat <- proper.slice.context$eydat
             }
           if (!is.null(higher.se.request) && higher.se.request[jj]) {
-            higher <- .np_conditional_higher_hat(hat.args, cdf = TRUE)
+            higher <- .np_conditional_higher_hat(hat.args, cdf = TRUE,
+              base.rows = base.rows, allow.external = allow.external)
             myout$congrad[, cont.idx[jj]] <- as.vector(higher$value)
             myout$congerr[, cont.idx[jj]] <- .np_conditional_higher_se(
-              myout[["variance_metadata", exact = TRUE]], higher$norm, enrow)
+              myout[["variance_metadata", exact = TRUE]], higher$norm, enrow, base.rows)
           } else {
-            myout$congrad[, cont.idx[jj]] <- as.vector(do.call(npcdisthat, hat.args))
+            myout$congrad[, cont.idx[jj]] <- as.vector(.np_conditional_higher_hat(hat.args, cdf = TRUE,
+              base.rows = base.rows, allow.external = allow.external, return.norm = FALSE))
             if (se) myout$congerr[, cont.idx[jj]] <- NA_real_
           }
           }
@@ -590,8 +599,13 @@ npcdist.condbandwidth <-
           tydat = proper.slice.context$tydat,
           exdat = proper.slice.context$exdat,
           eydat = proper.slice.context$eydat,
-          where = "npcdist"
+          where = "npcdist",
+          allow.external = allow.external, base.rows = base.rows,
+          .np.defer.empty.rows = TRUE
         )
+        cat.rows <- attr(cat.grad, ".np.empty.rows", exact = TRUE)
+        if (!is.null(cat.rows))
+          empty.rows <- if (is.null(empty.rows)) cat.rows else pmax(empty.rows, cat.rows)
         cat.idx <- which(bws$ixuno | bws$ixord)
         myout$congrad[, cat.idx] <- cat.grad[, cat.idx, drop = FALSE]
         if (se) myout$congerr[, cat.idx] <- NA_real_
@@ -623,7 +637,8 @@ npcdist.condbandwidth <-
     out$nomad.time <- if (!is.null(bws$nomad.time) && is.finite(bws$nomad.time)) as.double(bws$nomad.time) else NA_real_
     out$powell.time <- if (!is.null(bws$powell.time) && is.finite(bws$powell.time)) as.double(bws$powell.time) else NA_real_
 
-    .np_condist_finalize_proper_object(
+  if (!is.null(base.rows)) attr(out, ".np.empty.base.rows") <- base.rows
+  out <- .np_condist_finalize_proper_object(
       object = out,
       proper = proper.args$proper.requested,
       proper.method = proper.args$proper.method,
@@ -631,6 +646,13 @@ npcdist.condbandwidth <-
       slice.context = proper.slice.context,
       where = "npcdist()"
     )
+  if (!is.null(base.rows)) attr(out, ".np.empty.base.rows") <- base.rows
+  empty.rows <- .npreg_merge_empty_rows(empty.rows,
+    attr(out, ".np.empty.rows", exact = TRUE))
+  .npreg_finish_empty_rows(out, empty.rows,
+    omitted = if (no.exy) integer(0) else eval.rows.omit,
+    defer = defer.empty, owner = "npcdist")
+
 
   }
 
