@@ -211,6 +211,16 @@ Further arguments are passed to \code{\link{npcdensbw}} when bandwidths are comp
 
 }
 \details{
+  For explicit external evaluation rows, a completed explanatory-kernel row
+  whose weights are all zero has no conditional estimate. Such rows return
+  \code{NA} for the fitted value and requested uncertainty or derivatives,
+  with one notice. A missing categorical counterfactual affects only its
+  contrast; it does not invalidate an otherwise supported base estimate.
+  A zero response-kernel contribution is not a missing explanatory row.
+  Supported rows retain their usual computation. Required internal evaluations
+  remain strict. With \code{proper = TRUE}, complete unsupported fixed-X
+  slices retain \code{NA}; projection still applies to supported slices.
+
   Documentation guide: see \code{\link{npcdensbw}} for bandwidth selection and search controls, \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{plot}}, \code{\link{plot.np}} for plotting options.
 
   When \code{bws} is omitted, the formula and default methods call

@@ -9279,6 +9279,7 @@ plotFactor <- function(f, y, ...){
                                    .np.empty.report = NULL,
                                    lp.first.se.demand = NULL,
                                    cat.se.demand = NULL,
+                                   allow.external = FALSE,
                                    ...) {
   need.errors <- npValidateScalarLogical(need.errors, "need.errors")
   if (inherits(bws, "lsqregressionbandwidth")) {
@@ -9380,6 +9381,8 @@ plotFactor <- function(f, y, ...){
       txeval <- if (no.ex) xdat else exdat
       xdat.df <- xdat
       ydat.df <- ydat
+      empty.flags <- NULL
+      empty.row.labels <- rownames(txeval)
       if (!no.ex)
         exdat.df <- exdat
 
@@ -9402,8 +9405,11 @@ plotFactor <- function(f, y, ...){
           small = small,
           itmax = itmax,
           cdf.cache = cdf.cache,
-          cdf.row.keys = cdf.row.keys
+          cdf.row.keys = cdf.row.keys,
+          allow.external = allow.external && !no.ex
         )
+        empty.flags <<- .npreg_merge_empty_rows(empty.flags,
+          .npqreg_empty_rows(yq, nrow(txeval)))
         qclamp <- .npqreg_quantile_clamp(yq)
         if (!isTRUE(need.errors) && !isTRUE(gradients)) {
           return(list(
@@ -9427,8 +9433,11 @@ plotFactor <- function(f, y, ...){
           cdf.cache = cdf.cache,
           lp.first.se.demand = lp.first.se.demand,
           cat.se.demand = if (isTRUE(need.errors)) cat.se.demand else FALSE,
-          se = need.errors
+          se = need.errors,
+          allow.external = allow.external && !no.ex
         )
+        empty.flags <<- .npreg_merge_empty_rows(empty.flags,
+          .npqreg_empty_rows(qdelta, nrow(txeval)))
         qdelta <- .npqreg_mark_clamped_delta(qdelta, qclamp)
         list(
           yq = yq,
@@ -9484,7 +9493,7 @@ plotFactor <- function(f, y, ...){
       optim.time <- if (!is.null(bws$total.time) && is.finite(bws$total.time)) as.double(bws$total.time) else NA_real_
       total.time <- fit.elapsed + if (is.na(optim.time)) 0.0 else optim.time
 
-      qregression(
+      fit <- qregression(
         bws = bws,
         xeval = txeval,
         tau = tau,
@@ -9501,6 +9510,8 @@ plotFactor <- function(f, y, ...){
         optim.time = optim.time,
         fit.time = fit.elapsed
       )
+      .npreg_publish_plot_rows(fit, empty.flags, report = .np.empty.report,
+        omitted = eval.omit, row.labels = empty.row.labels, owner = "plot(npqreg)")
     }
   )
 }
@@ -9519,7 +9530,10 @@ plotFactor <- function(f, y, ...){
                                       lp.first.se.demand = NULL,
                                       cat.se.demand = NULL,
                                       se = TRUE,
-                                      lp.higher.se.demand = NULL) {
+                                      lp.higher.se.demand = NULL,
+                                      allow.external = FALSE,
+                                      .np.defer.empty.rows = TRUE,
+                                      .np.empty.report = NULL) {
   activity <- .np_plot_activity_begin(
     if (isTRUE(cdf)) {
       "Computing conditional distribution plot fit"
@@ -9528,7 +9542,7 @@ plotFactor <- function(f, y, ...){
     }
   )
   on.exit(.np_plot_activity_end(activity), add = TRUE)
-  .np_conditional_eval_selected(
+  value <- .np_conditional_eval_selected(
     bws = bws,
     xdat = xdat,
     ydat = ydat,
@@ -9543,8 +9557,12 @@ plotFactor <- function(f, y, ...){
     lp.first.se.demand = lp.first.se.demand,
     cat.se.demand = cat.se.demand,
     se = se,
-    lp.higher.se.demand = lp.higher.se.demand
+    lp.higher.se.demand = lp.higher.se.demand,
+    allow.external = allow.external,
+    .np.defer.empty.rows = .np.defer.empty.rows
   )
+  .npreg_publish_plot_rows(value, report = .np.empty.report,
+    owner = if (cdf) "plot(npcdist)" else "plot(npcdens)")
 }
 
 .np_conditional_eval_selected <- function(bws,
@@ -9562,7 +9580,11 @@ plotFactor <- function(f, y, ...){
                                           lp.first.se.demand = NULL,
                                           cat.se.demand = NULL,
                                           se = TRUE,
-                                          lp.higher.se.demand = NULL) {
+                                          lp.higher.se.demand = NULL,
+                                      allow.external = FALSE,
+                                      .np.defer.empty.rows = TRUE) {
+  allow.external <- npValidateScalarLogical(allow.external, "allow.external")
+  .np.defer.empty.rows <- npValidateScalarLogical(.np.defer.empty.rows, ".np.defer.empty.rows")
   se <- npValidateScalarLogical(se, "se")
   fit.start <- proc.time()[3]
   lp.first.se.demand <- .np_conditional_first_se_demand(
@@ -9803,9 +9825,11 @@ plotFactor <- function(f, y, ...){
     basis.code,
     first.se.request,
     cat.se.request,
-    se
+    se, allow.external
   )
 
+  empty.rows <- attr(myout, ".np.empty.rows", exact = TRUE)
+  base.rows <- attr(myout, ".np.empty.base.rows", exact = TRUE)
   first.se.native <- if (is.null(first.se.request)) NULL else myout$congerr
   if (isTRUE(cdf))
     names(myout)[1L] <- "condist"
@@ -9841,12 +9865,14 @@ plotFactor <- function(f, y, ...){
             s = svec
           )
           if (!is.null(higher.se.request) && higher.se.request[jj]) {
-            higher <- .np_conditional_higher_hat(hat.args, cdf = cdf)
+            higher <- .np_conditional_higher_hat(hat.args, cdf = cdf,
+              base.rows = base.rows, allow.external = allow.external)
             myout$congrad[, cont.idx[jj]] <- as.vector(higher$value)
             myout$congerr[, cont.idx[jj]] <- .np_conditional_higher_se(
-              myout[["variance_metadata", exact = TRUE]], higher$norm, enrow)
+              myout[["variance_metadata", exact = TRUE]], higher$norm, enrow, base.rows)
           } else {
-            myout$congrad[, cont.idx[jj]] <- as.vector(do.call(hat.fun, hat.args))
+            myout$congrad[, cont.idx[jj]] <- as.vector(.np_conditional_higher_hat(hat.args, cdf = cdf,
+              base.rows = base.rows, allow.external = allow.external, return.norm = FALSE))
             if (se) myout$congerr[, cont.idx[jj]] <- NA_real_
           }
         }
@@ -9873,12 +9899,14 @@ plotFactor <- function(f, y, ...){
           s = svec
         )
         if (!is.null(higher.se.request) && higher.se.request[jj]) {
-          higher <- .np_conditional_higher_hat(hat.args, cdf = cdf)
+          higher <- .np_conditional_higher_hat(hat.args, cdf = cdf,
+              base.rows = base.rows, allow.external = allow.external)
           myout$congrad[, cont.idx[jj]] <- as.vector(higher$value)
           myout$congerr[, cont.idx[jj]] <- .np_conditional_higher_se(
-            myout[["variance_metadata", exact = TRUE]], higher$norm, enrow)
+            myout[["variance_metadata", exact = TRUE]], higher$norm, enrow, base.rows)
         } else {
-          myout$congrad[, cont.idx[jj]] <- as.vector(do.call(hat.fun, hat.args))
+          myout$congrad[, cont.idx[jj]] <- as.vector(.np_conditional_higher_hat(hat.args, cdf = cdf,
+              base.rows = base.rows, allow.external = allow.external, return.norm = FALSE))
         }
       }
     }
@@ -9898,8 +9926,13 @@ plotFactor <- function(f, y, ...){
       tydat = hat.context$ydat,
       exdat = hat.context$exdat,
       eydat = hat.context$eydat,
-      where = "plot conditional"
+      where = "plot conditional",
+          allow.external = allow.external, base.rows = base.rows,
+          .np.defer.empty.rows = TRUE
     )
+    cat.rows <- attr(cat.grad, ".np.empty.rows", exact = TRUE)
+    if (!is.null(cat.rows))
+      empty.rows <- if (is.null(empty.rows)) cat.rows else pmax(empty.rows, cat.rows)
     cat.idx <- which(bws$ixuno | bws$ixord)
     myout$congrad[, cat.idx] <- cat.grad[, cat.idx, drop = FALSE]
     if (se) myout$congerr[, cat.idx] <- NA_real_
@@ -9933,7 +9966,8 @@ plotFactor <- function(f, y, ...){
     )
 
     if (isTRUE(proper)) {
-      .np_condist_finalize_proper_object(
+      if (!is.null(base.rows)) attr(out, ".np.empty.base.rows") <- base.rows
+      out <- .np_condist_finalize_proper_object(
         object = out,
         proper = TRUE,
         proper.method = proper.method,
@@ -9966,7 +10000,8 @@ plotFactor <- function(f, y, ...){
     )
 
     if (isTRUE(proper)) {
-      .np_condens_finalize_proper_object(
+      if (!is.null(base.rows)) attr(out, ".np.empty.base.rows") <- base.rows
+      out <- .np_condens_finalize_proper_object(
         object = out,
         proper = TRUE,
         proper.method = proper.method,
@@ -9977,6 +10012,12 @@ plotFactor <- function(f, y, ...){
       out
     }
   }
+  if (!is.null(base.rows)) attr(out, ".np.empty.base.rows") <- base.rows
+  empty.rows <- .npreg_merge_empty_rows(empty.rows,
+    attr(out, ".np.empty.rows", exact = TRUE))
+  .npreg_finish_empty_rows(out, empty.rows, defer = .np.defer.empty.rows,
+    owner = if (cdf) "npcdist" else "npcdens")
+
 }
 
 ## Rank-based simultaneous confidence set helper, vendored from

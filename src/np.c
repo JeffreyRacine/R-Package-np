@@ -7190,7 +7190,8 @@ void np_density_conditional(double * tyuno, double * tyord, double * tycon,
                             int categorical_compress,
                             const NPConditionalLPFirstSERequest *first_se_request,
                             const int *cat_se_mask,
-                            double *variance_metadata);
+                            double *variance_metadata,
+                            NPRegressionLPEmptyRows *empty_rows);
 void np_density_bw(double * myuno, double * myord, double * mycon,
                    double * mysd, int * myopti, double * myoptd, double * myans, double * fval,
                    double * objective_function_values, double * objective_function_evals,
@@ -8290,7 +8291,7 @@ SEXP C_np_regression(SEXP tuno,
   int nc = asInteger(ncol);
   int request = asInteger(output_request);
   SEXP empty_flags = R_NilValue;
-  NPRegressionLPEmptyRows empty_rows = {NULL, 0, NULL};
+  NPRegressionLPEmptyRows empty_rows = {NULL, 0, NULL, NULL, NULL};
   NPRegressionLPEmptyRows *empty_rows_ptr = NULL;
   int extra_protect = 0;
   int do_merr;
@@ -9285,6 +9286,7 @@ static SEXP np_density_conditional_call(SEXP tyuno,
                               SEXP first_se,
                               SEXP cat_se_request,
                               SEXP se_request,
+                              SEXP allow_external,
                               int export_variance)
 {
   SEXP tyuno_r=R_NilValue, tyord_r=R_NilValue, tycon_r=R_NilValue;
@@ -9298,6 +9300,12 @@ static SEXP np_density_conditional_call(SEXP tyuno,
   SEXP out=R_NilValue, out_names=R_NilValue;
   SEXP out_cond=R_NilValue, out_cderr=R_NilValue, out_grad=R_NilValue, out_gerr=R_NilValue, out_ll=R_NilValue;
   SEXP out_variance=R_NilValue;
+  SEXP empty_flags=R_NilValue, empty_base=R_NilValue;
+  NPRegressionLPEmptyRows external_rows = {NULL, 0, NULL, NULL, NULL};
+  const int allow_empty = asLogical(allow_external);
+  if(TYPEOF(allow_external) != LGLSXP || XLENGTH(allow_external) != 1 ||
+     allow_empty == NA_LOGICAL)
+    error("C_np_density_conditional: invalid external-row permission");
   int en = asInteger(enrow);
   int xd = asInteger(xndim);
   int ncon_x = 0;
@@ -9494,6 +9502,17 @@ static SEXP np_density_conditional_call(SEXP tyuno,
     cat_se_mask = INTEGER(cat_se_request);
   }
 
+  if(allow_empty) {
+    if(INTEGER(myopti_i)[CD_TISEI])
+      error("C_np_density_conditional: external-row permission requires external evaluation");
+    PROTECT(empty_flags = allocVector(INTSXP, en));
+    PROTECT(empty_base = allocVector(INTSXP, en));
+    memset(INTEGER(empty_flags), 0, (size_t)en*sizeof(int));
+    memset(INTEGER(empty_base), 0, (size_t)en*sizeof(int));
+    external_rows.flags = INTEGER(empty_flags);
+    external_rows.base_flags = INTEGER(empty_base);
+  }
+
   PROTECT(out_cond = allocVector(REALSXP, en));
   PROTECT(out_cderr = do_merr ? allocVector(REALSXP, en) : R_NilValue);
   PROTECT(out_grad = allocVector(REALSXP, gsize));
@@ -9522,7 +9541,8 @@ static SEXP np_density_conditional_call(SEXP tyuno,
                            active_y_route, active_y_diagnostics,
                            categorical_compress, first_se_request_ptr,
                            cat_se_mask,
-                           export_variance ? REAL(out_variance) : NULL);
+                           export_variance ? REAL(out_variance) : NULL,
+                           allow_empty ? &external_rows : NULL);
 
   PROTECT(out = allocVector(VECSXP, export_variance ? 6 : 5));
   SET_VECTOR_ELT(out, 0, out_cond);
@@ -9547,7 +9567,16 @@ static SEXP np_density_conditional_call(SEXP tyuno,
   int_glp_basis_extern = 1;
   np_lp_engine_extern = NP_LP_ENGINE_SCALAR;
 
-  UNPROTECT(36 + first_se_protected + export_variance);
+  if(allow_empty) {
+    int any_empty = 0, any_base = 0;
+    for(int row = 0; row < en; ++row) {
+      any_empty |= external_rows.flags[row];
+      any_base |= external_rows.base_flags[row];
+    }
+    if(any_empty) setAttrib(out, install(".np.empty.rows"), empty_flags);
+    if(any_base) setAttrib(out, install(".np.empty.base.rows"), empty_base);
+  }
+  UNPROTECT(36 + first_se_protected + export_variance + 2*allow_empty);
   return out;
 }
 
@@ -9584,14 +9613,15 @@ SEXP C_np_density_conditional(SEXP tyuno,
                               SEXP glp_basis,
                               SEXP first_se,
                               SEXP cat_se_request,
-                              SEXP se_request)
+                              SEXP se_request,
+                              SEXP allow_external)
 {
   return np_density_conditional_call(
     tyuno, tyord, tycon, txuno, txord, txcon, eyuno, eyord, eycon,
     exuno, exord, excon, rbw, ymcv, ypadnum, xmcv, xpadnum,
     nconfac, ncatfac, mysd, myopti, enrow, xndim,
     ckerlbx, ckerubx, ckerlby, ckeruby, regtype, glp_degree,
-    glp_bernstein, glp_basis, first_se, cat_se_request, se_request, 0);
+    glp_bernstein, glp_basis, first_se, cat_se_request, se_request, allow_external, 0);
 }
 
 SEXP C_np_density_conditional_variance(SEXP tyuno,
@@ -9627,14 +9657,15 @@ SEXP C_np_density_conditional_variance(SEXP tyuno,
                               SEXP glp_basis,
                               SEXP first_se,
                               SEXP cat_se_request,
-                              SEXP se_request)
+                              SEXP se_request,
+                              SEXP allow_external)
 {
   return np_density_conditional_call(
     tyuno, tyord, tycon, txuno, txord, txcon, eyuno, eyord, eycon,
     exuno, exord, excon, rbw, ymcv, ypadnum, xmcv, xpadnum,
     nconfac, ncatfac, mysd, myopti, enrow, xndim,
     ckerlbx, ckerubx, ckerlby, ckeruby, regtype, glp_degree,
-    glp_bernstein, glp_basis, first_se, cat_se_request, se_request, 1);
+    glp_bernstein, glp_basis, first_se, cat_se_request, se_request, allow_external, 1);
 }
 
 static SEXP np_regression_lp_apply_conditional_impl(SEXP txuno,
@@ -9678,7 +9709,7 @@ static SEXP np_regression_lp_apply_conditional_impl(SEXP txuno,
   SEXP sigtest_residual_pool_r = R_NilValue;
   SEXP out = R_NilValue, ridge_used = R_NilValue;
   SEXP empty_flags = R_NilValue;
-  NPRegressionLPEmptyRows empty_rows = {NULL, 0};
+  NPRegressionLPEmptyRows empty_rows = {NULL, 0, NULL, NULL, NULL};
   NPRegressionLPEmptyRows *empty_rows_ptr = NULL;
   const int allow_empty_flag = allow_empty_rows != R_NilValue ?
     asLogical(allow_empty_rows) : FALSE;
@@ -18290,7 +18321,8 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                             int categorical_compress,
                             const NPConditionalLPFirstSERequest *first_se_request,
                             const int *cat_se_mask,
-                            double *variance_metadata){
+                            double *variance_metadata,
+                            NPRegressionLPEmptyRows *empty_rows){
   /* Likelihood bandwidth selection for density estimation */
   int cat_se_status = 0;
   NPRegressionFailure row_failure = {0};
@@ -18655,6 +18687,8 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
     }
   }
 
+  if(empty_rows != NULL) empty_rows->row_map = ipe_XY;
+
   lp_engine_eff = np_lp_engine_extern;
   if((lp_engine_eff == NP_LP_ENGINE_GENERAL) && (num_reg_continuous_extern == 0))
     lp_engine_eff = NP_LP_ENGINE_SCALAR;
@@ -18697,7 +18731,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                                                  NULL,
                                                  0,
                                                  full_fit_nn_geometry_context_ptr,
-                                                 cat_se_mask, 0, &cat_se_status);
+                                                 cat_se_mask, 0, &cat_se_status, empty_rows);
   } else {
     int status = 0;
     double *vsf_x = NULL, *vsf_y = NULL, *ykw = NULL, *y_eval_one = NULL;
@@ -18706,6 +18740,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
     double **xuno_eval_one = NULL, **xord_eval_one = NULL, **xcon_eval_one = NULL;
     double **yuno_eval_one = NULL, **yord_eval_one = NULL, **ycon_eval_one = NULL;
     double **grad_one = NULL, **graderr_one = NULL;
+    int *empty_components = NULL;
     int *kernel_cy = NULL, *kernel_uy = NULL, *kernel_oy = NULL, *operator_y = NULL;
     double **matrix_bandwidth_y = NULL;
     double **y_bandwidth_eval_one = NULL;
@@ -18761,6 +18796,8 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
     if(do_gerr && (num_x_vars > 0))
       graderr_one = alloc_matd(1, num_x_vars);
 
+    if(empty_rows != NULL && do_grad && num_x_vars > 0)
+      empty_components = (int *)calloc((size_t)num_x_vars, sizeof(int));
     kernel_cy = (int *)calloc((size_t)MAX(1, num_var_continuous_extern), sizeof(int));
     kernel_uy = (int *)calloc((size_t)MAX(1, num_var_unordered_extern), sizeof(int));
     kernel_oy = (int *)calloc((size_t)MAX(1, num_var_ordered_extern), sizeof(int));
@@ -18780,6 +18817,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
        ((num_var_unordered_extern > 0) && (yuno_eval_one == NULL)) ||
        ((num_var_ordered_extern > 0) && (yord_eval_one == NULL)) ||
        ((num_var_continuous_extern > 0) && (ycon_eval_one == NULL)) ||
+       (empty_rows != NULL && do_grad && num_x_vars > 0 && empty_components == NULL) ||
        (do_grad && (num_x_vars > 0) && grad_one == NULL) ||
        (do_gerr && (num_x_vars > 0) && graderr_one == NULL))
       error("np_density_conditional: memory allocation failed in conditional LP path");
@@ -19083,6 +19121,12 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
       vector_ckerlb_extern = vector_cxkerlb_extern;
       vector_ckerub_extern = vector_cxkerub_extern;
 
+      NPRegressionLPEmptyRows row_empty = {NULL, 0, NULL, NULL, NULL};
+      if(empty_rows != NULL) {
+        row_empty = *empty_rows;
+        row_empty.row_map = ipe_XY + j;
+        row_empty.component_flags = empty_components;
+      }
       status = kernel_estimate_regression_categorical_tree_np(lp_engine_eff,
                                                                KERNEL_reg_extern,
                                                                KERNEL_reg_unordered_extern,
@@ -19122,7 +19166,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                                                                  NP_REGRESSION_STDERR_LOCAL_RESIDUAL,
                                                                prepared_x_bandwidth_ptr,
                                                                row_nn_geometry_context_ptr,
-                                                               NULL, NULL, first_se_request,
+                                                               NULL, empty_rows != NULL ? &row_empty : NULL, first_se_request,
                                                                variance_metadata != NULL ? &variance_one : NULL,
                                                                  &row_failure);
 
@@ -19143,6 +19187,13 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
           goto cleanup_conditional_lp;
         } while(0);
 
+      if(empty_rows != NULL && row_empty.count > empty_rows->count)
+        empty_rows->count = row_empty.count;
+      const int base_empty = empty_rows != NULL &&
+        empty_rows->base_flags[ipe_XY[j]];
+      const int component_empty = empty_rows != NULL &&
+        empty_rows->flags[ipe_XY[j]];
+
       if(variance_metadata != NULL) {
         const int row = ipe_XY[j];
         const int valid = R_FINITE(variance_one) && variance_one >= 0.0 &&
@@ -19156,7 +19207,10 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
         variance_metadata[row + 3*num_obs_eval_extern] = 1.0;
       }
 
-      if(beta_y_active) {
+      if(base_empty) {
+        pdf[j] = NA_REAL;
+        if(cderr != NULL) pdf_stderr[j] = NA_REAL;
+      } else if(beta_y_active) {
         NPContinuousKernelRowStatus restore_status =
           np_continuous_kernel_scaled_restore(
             mean_one[0], beta_y_log_scale, 1, &pdf[j]);
@@ -19194,7 +19248,10 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
           const double scaled_gradient_stderr =
             (graderr_one != NULL) ? graderr_one[i][0] : 0.0;
 
-          if(beta_y_active) {
+          if(base_empty || (empty_components != NULL && empty_components[i])) {
+            pdf_deriv[i][j] = NA_REAL;
+            if(do_gerr) pdf_deriv_stderr[i][j] = NA_REAL;
+          } else if(beta_y_active) {
             NPContinuousKernelRowStatus restore_status =
               np_continuous_kernel_scaled_derivative_restore(
                 scaled_gradient, beta_y_log_scale,
@@ -19225,7 +19282,9 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
         for(i = 0; i < first_se_request->ncon; ++i) {
           if(!first_se_request->se[i])
             continue;
-          if(beta_y_active) {
+          if(base_empty) {
+            pdf_deriv_stderr[i][j] = NA_REAL;
+          } else if(beta_y_active) {
             const NPContinuousKernelRowStatus restore_status =
               np_continuous_kernel_scaled_derivative_restore(
                 graderr_one[i][0], beta_y_log_scale,
@@ -19245,6 +19304,8 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
           }
         }
       }
+      if(component_empty && empty_components != NULL)
+        memset(empty_components, 0, (size_t)num_x_vars*sizeof(int));
       np_progress_fit_step(j + 1);
     }
 
@@ -19271,6 +19332,7 @@ cleanup_conditional_lp:
 
     if(grad_one != NULL) free_mat(grad_one, num_x_vars);
     if(graderr_one != NULL) free_mat(graderr_one, num_x_vars);
+    safe_free(empty_components);
 
     safe_free(kernel_cy);
     safe_free(kernel_uy);

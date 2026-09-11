@@ -309,6 +309,7 @@
 
       if (quantreg) {
         tobj <- .np_plot_quantile_eval(
+          allow.external = TRUE,
           need.errors = plot.behavior != "plot" || plot.errors.method == "asymptotic",
           txdat = xdat,
           tydat = ydat,
@@ -319,6 +320,7 @@
         )
       } else {
         tobj <- .np_plot_conditional_eval(
+          allow.external = TRUE, .np.empty.report = .np.empty.report,
           se = plot.behavior != "plot" || plot.errors.method == "asymptotic",
           bws = bws,
           xdat = xdat,
@@ -826,6 +828,7 @@
 
         if (quantreg) {
           tobj <- .np_plot_quantile_eval(
+            allow.external = TRUE,
             need.errors = plot.behavior != "plot" || plot.errors.method == "asymptotic",
             txdat = xdat,
             tydat = ydat,
@@ -840,6 +843,7 @@
           )
         } else {
           tobj <- .np_plot_conditional_eval(
+          allow.external = TRUE, .np.empty.report = .np.empty.report,
             se = plot.behavior != "plot" || plot.errors.method == "asymptotic",
             bws = bws,
             xdat = xdat,
@@ -1239,6 +1243,7 @@
 
           if (quantreg) {
             tobj <- .np_plot_quantile_eval(
+              allow.external = TRUE,
               need.errors = plot.behavior != "plot" || plot.errors.method == "asymptotic",
               txdat = xdat,
               tydat = ydat,
@@ -1252,6 +1257,7 @@
             )
           } else {
             tobj <- .np_plot_conditional_eval(
+          allow.external = TRUE, .np.empty.report = .np.empty.report,
               se = plot.behavior != "plot" || plot.errors.method == "asymptotic",
               bws = bws,
               xdat = xdat,

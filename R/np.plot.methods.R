@@ -494,10 +494,13 @@ np_render_control <- function(style = c("band", "bar"),
   }
 
   owns.empty.rows <- identical(method, .np_plot_rbandwidth_engine) ||
+    identical(method, .np_plot_conbandwidth_engine) ||
+    identical(method, .np_plot_condbandwidth_engine) ||
     identical(method, .np_plot_plbandwidth_engine) ||
     identical(method, .np_plot_sibandwidth_engine) ||
     (identical(method, .np_plot_compat_dispatch) &&
-     any(c("rbandwidth", "plbandwidth", "sibandwidth") %in% class(bws)))
+     any(c("rbandwidth", "plbandwidth", "sibandwidth",
+           "conbandwidth", "condbandwidth") %in% class(bws)))
   if(!owns.empty.rows)
     return(.np_with_seed(random.seed, do.call(method, c(list(bws = bws), dots))))
   publisher <- .npreg_plot_empty_publisher(.plot_context)

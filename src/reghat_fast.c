@@ -307,6 +307,7 @@ typedef struct {
   SEXP kw;
   SEXP weval;
   int return_norm;
+  int allow_empty;
   int ntrain;
   int neval;
   int nterms;
@@ -372,6 +373,10 @@ static SEXP np_reghat_matrix_execution_run(void *data)
    * protects R_NilValue without allocating an unrequested norm matrix. */
   SEXP norms = PROTECT(execution->return_norm ?
                        allocMatrix(REALSXP, neval, 3) : R_NilValue);
+  SEXP empty_flags = R_NilValue;
+  PROTECT_INDEX empty_index;
+  PROTECT_WITH_INDEX(empty_flags, &empty_index);
+
 
   for(int j = 0; j < neval; j++){
     const double * const weights =
@@ -387,6 +392,29 @@ static SEXP np_reghat_matrix_execution_run(void *data)
       ntrain, nterms, workspace->design, weights,
       workspace->solve_workspace.rhs_work, workspace->weighted_design,
       &workspace->solve_workspace, workspace->prediction, 0);
+    if(execution->allow_empty && row_status != NP_REGHAT_LP_ROW_OK &&
+       row_status != NP_REGHAT_LP_ROW_NONFINITE &&
+       np_lp_complete_weights_are_zero(weights, ntrain)) {
+      int finite = 1;
+      for(size_t k = 0; k < (size_t)ntrain*(size_t)nterms; ++k)
+        if(!R_FINITE(workspace->design[k])) { finite = 0; break; }
+      for(int k = 0; k < nterms && finite; ++k)
+        if(!R_FINITE(workspace->solve_workspace.rhs_source[k])) finite = 0;
+      for(size_t k = 0; k < (size_t)nterms*(size_t)nterms && finite; ++k)
+        if(!R_FINITE(workspace->solve_workspace.gram_source[k])) finite = 0;
+      if(finite) {
+        if(empty_flags == R_NilValue) {
+          REPROTECT(empty_flags = allocVector(INTSXP, neval), empty_index);
+          memset(INTEGER(empty_flags), 0, (size_t)neval*sizeof(int));
+        }
+        INTEGER(empty_flags)[j] = 1;
+        for(int k = 0; k < ntrain; ++k)
+          REAL(out)[j + (size_t)neval*(size_t)k] = NA_REAL;
+        if(execution->return_norm)
+          for(int k = 0; k < 3; ++k) REAL(norms)[j + (size_t)neval*(size_t)k] = NA_REAL;
+        continue;
+      }
+    }
     if(row_status == NP_REGHAT_LP_ROW_NONFINITE)
       error("LP solve failed in compiled hat-matrix path: non-finite system");
     if(row_status == NP_REGHAT_LP_ROW_RIDGE_FAILED)
@@ -410,6 +438,8 @@ static SEXP np_reghat_matrix_execution_run(void *data)
     }
   }
 
+  if(empty_flags != R_NilValue)
+    setAttrib(out, install(".np.empty.rows"), empty_flags);
   if(execution->return_norm) {
     SEXP result = PROTECT(allocVector(VECSXP, 2));
     SEXP names = PROTECT(allocVector(STRSXP, 2));
@@ -418,15 +448,15 @@ static SEXP np_reghat_matrix_execution_run(void *data)
     SET_STRING_ELT(names, 0, mkChar("hat"));
     SET_STRING_ELT(names, 1, mkChar("norm"));
     setAttrib(result, R_NamesSymbol, names);
-    UNPROTECT(4);
+    UNPROTECT(5);
     return result;
   }
-  UNPROTECT(2);
+  UNPROTECT(3);
   return out;
 }
 
 static SEXP np_reghat_lp_matrix_call(SEXP kw, SEXP wtrain, SEXP weval,
-                                    int return_norm)
+                                    int return_norm, int allow_empty)
 {
   int ntrain = 0, neval = 0, kw_neval = 0;
   int wtrain_n = 0, nterms = 0, weval_n = 0, weval_p = 0;
@@ -461,6 +491,7 @@ static SEXP np_reghat_lp_matrix_call(SEXP kw, SEXP wtrain, SEXP weval,
   execution.kw = kw;
   execution.weval = weval;
   execution.return_norm = return_norm;
+  execution.allow_empty = allow_empty;
   execution.ntrain = ntrain;
   execution.neval = neval;
   execution.nterms = nterms;
@@ -471,13 +502,27 @@ static SEXP np_reghat_lp_matrix_call(SEXP kw, SEXP wtrain, SEXP weval,
 
 SEXP C_np_reghat_lp_matrix_fast(SEXP kw, SEXP wtrain, SEXP weval)
 {
-  return np_reghat_lp_matrix_call(kw, wtrain, weval, 0);
+  return np_reghat_lp_matrix_call(kw, wtrain, weval, 0, 0);
 }
 
 SEXP C_np_reghat_lp_matrix_norm(SEXP kw, SEXP wtrain, SEXP weval)
 {
-  SEXP result = np_reghat_lp_matrix_call(kw, wtrain, weval, 1);
+  SEXP result = np_reghat_lp_matrix_call(kw, wtrain, weval, 1, 0);
   if(result == R_NilValue)
+    error("requested LP hat norm could not use the selected native owner");
+  return result;
+}
+
+/* Explicit conditional external-row policy, same incumbent matrix owner.
+ * The strict three-argument entries and workspace API remain unchanged. */
+SEXP C_np_reghat_lp_matrix_external(SEXP kw, SEXP wtrain, SEXP weval, SEXP want_norm)
+{
+  if(TYPEOF(want_norm) != LGLSXP || XLENGTH(want_norm) != 1 ||
+     LOGICAL(want_norm)[0] == NA_LOGICAL)
+    error("invalid conditional external hat norm request");
+  SEXP result = np_reghat_lp_matrix_call(kw, wtrain, weval,
+                                       LOGICAL(want_norm)[0], 1);
+  if(result == R_NilValue && LOGICAL(want_norm)[0])
     error("requested LP hat norm could not use the selected native owner");
   return result;
 }

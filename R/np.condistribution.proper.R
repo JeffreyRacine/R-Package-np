@@ -236,7 +236,8 @@
 
 .np_condist_project_values_with_plan <- function(values,
                                                  plan,
-                                                 progress.label = NULL) {
+                                                 progress.label = NULL,
+                                                 empty.slices = NULL) {
   if (!isTRUE(plan$supported))
     stop("proper projection plan is not supported")
 
@@ -250,6 +251,9 @@
   if (ncol(values.mat) != sum(lengths(plan$slices)))
     stop("value length mismatch for proper distribution projection")
 
+  slices <- plan$slices
+  if (!is.null(empty.slices))
+    slices <- .np_conditional_proper_projection_slices(values, plan, empty.slices)
   out <- values.mat
   progress <- NULL
   if (!is.vector.input && !is.null(progress.label) && nrow(values.mat) > 1L) {
@@ -260,7 +264,7 @@
     on.exit(.np_plot_progress_end(progress), add = TRUE)
   }
   for (row in seq_len(nrow(values.mat))) {
-    for (idx in plan$slices) {
+    for (idx in slices) {
       out[row, idx] <- .np_condist_project_bounded_isotonic(
         f = values.mat[row, idx],
         w = plan$weights,
@@ -295,13 +299,19 @@
   }
 
   raw <- as.double(object$condist)
-  repaired <- .np_condist_project_values_with_plan(raw, plan)
+  empty.slices <- .np_conditional_proper_empty_slices(object, plan$slices, length(raw))
+  repaired <- .np_condist_project_values_with_plan(raw, plan, empty.slices = empty.slices)
   monotone.violations.raw <- integer(length(plan$slices))
   range.raw <- matrix(NA_real_, nrow = length(plan$slices), ncol = 2L,
                       dimnames = list(NULL, c("min", "max")))
   projection.distance <- numeric(length(plan$slices))
 
   for (i in seq_along(plan$slices)) {
+    if (!is.null(empty.slices) && empty.slices[[i]] == 1L) {
+      monotone.violations.raw[i] <- NA_integer_
+      projection.distance[i] <- NA_real_
+      next
+    }
     idx <- plan$slices[[i]]
     f.slice <- raw[idx]
     g.slice <- repaired[idx]
@@ -310,8 +320,9 @@
     projection.distance[i] <- sqrt(sum(plan$weights * (g.slice - f.slice)^2))
   }
 
+  all.empty <- !is.null(empty.slices) && all(empty.slices == 1L)
   info <- .np_condist_make_reason_info(
-    reason = "applied",
+    reason = if (all.empty) "all_slices_empty" else "applied",
     supported = TRUE,
     slice.count = length(plan$slices),
     grid.common = TRUE,
@@ -319,6 +330,10 @@
     range.raw = range.raw,
     projection.distance.l2 = projection.distance
   )
+  if (!is.null(empty.slices))
+    info$empty.slice.count <- sum(empty.slices)
+  if (all.empty)
+    return(list(applied = FALSE, reason = "all_slices_empty", proper.info = info))
 
   list(
     applied = TRUE,
@@ -350,7 +365,7 @@
     proper.method = proper.method,
     proper.control = proper.control
   )
-  if (isTRUE(grid.out$applied))
+  if (isTRUE(grid.out$applied) || identical(grid.out$reason, "all_slices_empty"))
     return(grid.out)
 
   if (!identical(proper.control$mode, "slice"))
@@ -411,6 +426,11 @@
     proper.control = args$proper.control,
     slice.context = slice.context
   )
+  for (key in c(".np.empty.base.rows", ".np.empty.rows")) {
+    incoming <- attr(proper.out, key, exact = TRUE)
+    if (!is.null(incoming))
+      attr(object, key) <- .npreg_merge_empty_rows(attr(object, key, exact = TRUE), incoming)
+  }
 
   if (!isTRUE(proper.out$applied)) {
     object$proper.info <- proper.out$proper.info

@@ -1,5 +1,20 @@
 # np 0.80-1
 
+* Conditional density/distribution fitting now consistently retains explicit
+  external rows with all computed explanatory-kernel weights zero as NA, with
+  one notice. The policy covers LC/LL/LP, requested inference and categorical
+  counterfactuals without changing supported estimates or valid zero response
+  contributions. Proper projection retains unsupported fixed-X slices while
+  projecting supported slices; prediction and plot consumers preserve status.
+
+* Conditional quantile inversion now preserves explicit base-support status
+  for external rows across scalar/vector tau, prediction, inference and MPI
+  tau blocks. Unsupported outputs are NA with one notice; genuine numerical
+  and required internal-evaluation failures remain errors. The point-only
+  constant-response shortcut is unchanged and does not preflight X support.
+  Conditional-mode evaluation likewise preserves one final notice without
+  changing supported class/probability calculations.
+
 * Requested unconditional adaptive-NN density/distribution standard errors now
   include the same-sample influence of donor-specific radii, with a two-sided
   NN rank-spacing pilot. The joint influence retains cross-coordinate and

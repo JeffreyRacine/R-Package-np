@@ -699,7 +699,7 @@ test_that("scalar beta regression fits enter the canonical row engine", {
       "                                                   &nn_geometry_context,\n",
       "                                                   ordinary_hc0_active ?\n",
       "                                                     &ordinary_hc0_context : NULL,\n",
-      "                                                   call->empty_rows, NULL, NULL);"
+      "                                                   call->empty_rows, NULL, NULL, NULL);"
     ),
     fixed = TRUE
   )
@@ -715,7 +715,7 @@ test_that("scalar beta regression fits enter the canonical row engine", {
   expect_gt(engine_end, engine_start)
   regression_engine <- substr(engine, engine_start, engine_end - 1L)
   sibling_start <- regexpr(
-    "static NP_NOINLINE void np_beta_scalar_regression_fit_canonical(",
+    "static NP_NOINLINE int np_beta_scalar_regression_fit_canonical(",
     engine, fixed = TRUE
   )[[1L]]
   expect_gt(sibling_start, 0L)
@@ -762,7 +762,7 @@ test_that("scalar beta regression fits enter the canonical row engine", {
     fixed = TRUE
   )
   expect_match(
-    regression_sibling, "error(\"canonical beta regression row failed:",
+    regression_sibling, "NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_BETA, 7, \"canonical beta regression row failed:",
     fixed = TRUE
   )
   expect_false(grepl("NPBetaRegressionMomentCtx", regression_engine,
@@ -899,7 +899,7 @@ test_that("legacy conditional scalar owner retains dormant route plumbing", {
       "                                                 NULL,\n",
       "                                                 0,\n",
       "                                                 full_fit_nn_geometry_context_ptr,\n",
-      "                                                 cat_se_mask, 0, &cat_se_status);"
+      "                                                 cat_se_mask, 0, &cat_se_status, empty_rows);"
     ),
     fixed = TRUE
   )
@@ -1503,8 +1503,9 @@ test_that("every beta side enters the common conditional regression owner", {
     paste0(
       "prepared_x_bandwidth_ptr,\n",
       "                                                               row_nn_geometry_context_ptr,\n",
-      "                                                               NULL, NULL, first_se_request,\n",
-      "                                                               variance_metadata != NULL ? &variance_one : NULL);"
+      "                                                               NULL, empty_rows != NULL ? &row_empty : NULL, first_se_request,\n",
+      "                                                               variance_metadata != NULL ? &variance_one : NULL,\n",
+      "                                                                 &row_failure);"
     ),
     fixed = TRUE
   )
@@ -1562,7 +1563,7 @@ test_that("every beta side enters the common conditional regression owner", {
   ))
   expect_match(
     engine,
-    "if(prepared_status < 0) {\n      free_tmat(matrix_bandwidth);\n      error(",
+    "if(prepared_status < 0) {\n      free_tmat(matrix_bandwidth);\n      NP_REGRESSION_RETURN_FAILURE(",
     fixed = TRUE
   )
   expect_match(

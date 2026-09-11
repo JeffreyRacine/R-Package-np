@@ -394,8 +394,10 @@ npconmode.condbandwidth <-
                                       gradients,
                                       gradient.level.index,
                                       direct.categorical.effects = FALSE,
-                                      se = TRUE) {
+                                      se = TRUE,
+                                      allow.external = FALSE) {
   se <- npValidateScalarLogical(se, "se")
+  allow.external <- npValidateScalarLogical(allow.external, "allow.external")
   enrow <- nrow(xeval)
   nlev <- nlevels(efac)
   block.width <- .npConmodeLevelBlockWidth(
@@ -432,6 +434,7 @@ npconmode.condbandwidth <-
   } else {
     ordinary.blocks
   }
+  empty.rows <- NULL
 
   for (block in blocks) {
     block.gradients <- isTRUE(gradients) &&
@@ -447,13 +450,27 @@ npconmode.condbandwidth <-
       se = se,
       .np_lp_first_se_demand = FALSE,
       .np_conditional_cat_se_demand = FALSE,
-      .np_categorical_effects = !isTRUE(direct.categorical.effects)
+      .np_categorical_effects = !isTRUE(direct.categorical.effects),
+      .np.require.complete = !allow.external,
+      .np.defer.empty.rows = TRUE
     )
 
     expected <- as.double(enrow) * length(block)
     if (length(dens.obj$condens) != expected ||
         (se && length(dens.obj$conderr) != expected))
       stop("internal error: conditional-mode density block has invalid size")
+    flags <- attr(dens.obj, ".np.empty.rows", exact = TRUE)
+    if (!is.null(flags)) {
+      if (!is.integer(flags) || length(flags) != expected ||
+          anyNA(flags) || any(!flags %in% 0:1))
+        stop("internal error: conditional-mode empty-row metadata is invalid",
+             call. = FALSE)
+      if (any(flags == 1L)) {
+        block.empty <- integer(enrow)
+        block.empty[eval.index[flags == 1L]] <- 1L
+        empty.rows <- .npreg_merge_empty_rows(empty.rows, block.empty)
+      }
+    }
     pmat[, block] <- matrix(dens.obj$condens, nrow = enrow)
     if (se)
       perr[, block] <- matrix(dens.obj$conderr, nrow = enrow)
@@ -465,7 +482,9 @@ npconmode.condbandwidth <-
     }
   }
 
-  list(probabilities = pmat, errors = perr, gradients = pgrad)
+  out <- list(probabilities = pmat, errors = perr, gradients = pgrad)
+  if (!is.null(empty.rows)) attr(out, ".np.empty.rows") <- empty.rows
+  out
 }
 
 
@@ -579,8 +598,10 @@ npconmode.conbandwidth <-
       gradients = gradients,
       gradient.level.index = gradient.level.index,
       direct.categorical.effects = direct.categorical.effects,
-      se = se
+      se = se,
+      allow.external = !no.ex
     )
+    empty.rows <- attr(level.fit, ".np.empty.rows", exact = TRUE)
     pmat <- level.fit$probabilities
     perr <- level.fit$errors
     pgrad <- level.fit$gradients
@@ -602,8 +623,11 @@ npconmode.conbandwidth <-
           efac = efac,
           gradients = FALSE,
           gradient.level.index = gradient.level.index,
-          se = FALSE
+          se = FALSE,
+          allow.external = !no.ex
         )
+        empty.rows <<- .npreg_merge_empty_rows(
+          empty.rows, attr(endpoint.fit, ".np.empty.rows", exact = TRUE))
         endpoint.proper <- .npConmodeProperProbabilities(
           endpoint.fit$probabilities,
           levels = levels(efac),
@@ -705,7 +729,9 @@ npconmode.conbandwidth <-
       con.mode <- .npConmodeRecordEvalOmit(con.mode, eval.omit)
       con.mode <- .npConmodePadRowOutputs(con.mode, eval.omit)
     }
-    con.mode
+    .npreg_finish_empty_rows(con.mode, empty.rows,
+      omitted = if (no.ex) train.omit else eval.omit,
+      owner = "npconmode", row.labels = rownames(xeval))
   }
 
 npconmode.default <- function(bws, txdat, tydat,

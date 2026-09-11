@@ -55,7 +55,21 @@ typedef struct {
   int *flags;
   int count;
   const int *row_map; /* optional internal-to-caller evaluation order */
+  int *base_flags; /* optional base-X support; flags also includes contrasts */
+  int *component_flags; /* optional one-row categorical output causes */
 } NPRegressionLPEmptyRows;
+
+static inline void np_regression_empty_row_mark(
+  NPRegressionLPEmptyRows *rows, int row, int categorical)
+{
+  const int target = rows->row_map != NULL ? rows->row_map[row] : row;
+  if(!rows->flags[target]) {
+    rows->flags[target] = 1;
+    ++rows->count;
+  }
+  if(!categorical && rows->base_flags != NULL)
+    rows->base_flags[target] = 1;
+}
 
 /* Borrowed, invocation-local partial conditional-LP first-SE supplement. */
 typedef struct {
@@ -612,7 +626,7 @@ int np_conditional_distribution_cvls_lp_stream_ctx(
   double *cv);
 
 
-void np_kernel_estimate_con_dens_dist_categorical(int KERNEL_Y,int KERNEL_unordered_Y,int KERNEL_ordered_Y,int KERNEL_X,int KERNEL_unordered_X,int KERNEL_ordered_X,int BANDWIDTH_den,int yop,int num_obs_train,int num_obs_eval,int num_Y_unordered,int num_Y_ordered,int num_Y_continuous,int num_X_unordered,int num_X_ordered,int num_X_continuous,double **matrix_XY_unordered_train, double **matrix_XY_ordered_train, double **matrix_XY_continuous_train, double **matrix_XY_unordered_eval, double **matrix_XY_ordered_eval, double **matrix_XY_continuous_eval, double *vector_scale_factor,int *num_categories,int *num_categories_XY, double ** matrix_categorical_vals, double ** matrix_categorical_vals_XY, double * kdf,double * kdf_stderr,double ** kdf_deriv,double ** kdf_deriv_stderr,double * log_likelihood,const NPContinuousKernelRoute *kernel_route,NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,int categorical_compress,const NPNNGeometryContext *nn_geometry_context, const int *cat_se_mask, int cat_se_distributed, int *cat_se_status);
+void np_kernel_estimate_con_dens_dist_categorical(int KERNEL_Y,int KERNEL_unordered_Y,int KERNEL_ordered_Y,int KERNEL_X,int KERNEL_unordered_X,int KERNEL_ordered_X,int BANDWIDTH_den,int yop,int num_obs_train,int num_obs_eval,int num_Y_unordered,int num_Y_ordered,int num_Y_continuous,int num_X_unordered,int num_X_ordered,int num_X_continuous,double **matrix_XY_unordered_train, double **matrix_XY_ordered_train, double **matrix_XY_continuous_train, double **matrix_XY_unordered_eval, double **matrix_XY_ordered_eval, double **matrix_XY_continuous_eval, double *vector_scale_factor,int *num_categories,int *num_categories_XY, double ** matrix_categorical_vals, double ** matrix_categorical_vals_XY, double * kdf,double * kdf_stderr,double ** kdf_deriv,double ** kdf_deriv_stderr,double * log_likelihood,const NPContinuousKernelRoute *kernel_route,NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,int categorical_compress,const NPNNGeometryContext *nn_geometry_context, const int *cat_se_mask, int cat_se_distributed, int *cat_se_status, NPRegressionLPEmptyRows *empty_rows);
 
 void np_splitxy_vsf_mcv_nc(const int num_var_unordered, const int num_var_ordered, const int num_var_continuous, const int num_reg_unordered, const int num_reg_ordered, const int num_reg_continuous, const double * const vector_scale_factor, const int * const num_categories, double ** matrix_categorical_vals, double * vsf_x, double * vsf_y, double * vsf_xy, int * nc_x, int * nc_y, int * nc_xy, double ** mcv_x, double ** mcv_y, double ** mcv_xy);
 
