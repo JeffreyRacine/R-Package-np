@@ -19054,6 +19054,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                             double *variance_metadata){
   /* Likelihood bandwidth selection for density estimation */
   int cat_se_status = 0;
+  NPRegressionFailure row_failure = {0};
 
   double *vector_scale_factor, *pdf, *pdf_stderr, log_likelihood = 0.0;
 
@@ -19955,7 +19956,8 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                                                                  prepared_x_bandwidth_ptr,
                                                                  row_nn_geometry_context_ptr,
                                                                  NULL, NULL, first_se_request,
-                                                                 variance_metadata != NULL ? &variance_one : NULL);
+                                                                 variance_metadata != NULL ? &variance_one : NULL,
+                                                                 &row_failure);
         if(status == NP_REGRESSION_FIT_ERR_ZERO_NN_RADIUS) {
           lp_zero_radius_side = 1;
           lp_error = "conditional density/distribution fit encountered a zero literal explanatory radius after occurrence exclusion";
@@ -20061,6 +20063,24 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
       np_progress_fit_step(j + 1);
     }
 
+    if(status != 0 && row_failure.family == NP_REGRESSION_FAILURE_NONE) {
+      if(lp_zero_radius_side != 0) {
+        const int y_side = lp_zero_radius_side == 2;
+        const int offset = y_side ? num_reg_continuous_extern : 0;
+        const NPNNZeroRadiusInfo info = np_nn_zero_radius_info(
+          BANDWIDTH_den_extern, num_obs_train_extern, num_obs_eval_extern,
+          y_side ? num_var_continuous_extern : num_reg_continuous_extern,
+          matrix_XY_continuous_train_extern + offset,
+          matrix_XY_continuous_eval_extern + offset,
+          y_side ? vsf_y : vsf_x, full_fit_nn_geometry_context_ptr, offset);
+        np_regression_failure_zero_radius(&row_failure, &info);
+      } else {
+        np_regression_failure_message(&row_failure,
+          NP_REGRESSION_FAILURE_CONDITIONAL, status, "%s",
+          lp_error != NULL ? lp_error : "np_density_conditional: conditional LP path failed");
+      }
+    }
+
 #ifdef MPI2
     if(lp_owner_blocks){
       int lp_local_fail = (status != 0);
@@ -20072,13 +20092,36 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
       MPI_Allreduce(&lp_zero_radius_side, &lp_any_zero_radius_side,
                     1, MPI_INT, MPI_MAX, comm[1]);
       if(lp_any_fail){
-        if(lp_any_zero_radius_side != 0) {
-          status = 1;
-          lp_zero_radius_side = lp_any_zero_radius_side;
-        } else if(lp_local_fail)
-          error("%s", (lp_error != NULL) ? lp_error : "np_density_conditional: conditional LP owner-block path failed");
-        else
-          error("np_density_conditional: another rank failed in conditional LP owner-block path");
+        /* Failure-only transport: explicit fields, never struct padding. */
+        int source = lp_local_fail ? my_rank : iNum_Processors;
+        int payload[7] = {0};
+        double nn_values[2] = {0.0, 0.0};
+        MPI_Allreduce(MPI_IN_PLACE, &source, 1, MPI_INT, MPI_MIN, comm[1]);
+        if(my_rank == source) {
+          payload[0] = row_failure.family;
+          payload[1] = row_failure.code;
+          payload[2] = row_failure.nn_bandwidth_type;
+          payload[3] = row_failure.nn_coordinate;
+          payload[4] = row_failure.nn_lookup_k;
+          payload[5] = row_failure.nn_matching_donors;
+          payload[6] = row_failure.nn_excluded;
+          nn_values[0] = row_failure.nn_query_value;
+          nn_values[1] = row_failure.nn_index;
+        }
+        MPI_Bcast(payload, 7, MPI_INT, source, comm[1]);
+        MPI_Bcast(nn_values, 2, MPI_DOUBLE, source, comm[1]);
+        MPI_Bcast(row_failure.message, sizeof(row_failure.message), MPI_CHAR, source, comm[1]);
+        row_failure.family = payload[0];
+        row_failure.code = payload[1];
+        row_failure.nn_bandwidth_type = payload[2];
+        row_failure.nn_coordinate = payload[3];
+        row_failure.nn_lookup_k = payload[4];
+        row_failure.nn_matching_donors = payload[5];
+        row_failure.nn_excluded = payload[6];
+        row_failure.nn_query_value = nn_values[0];
+        row_failure.nn_index = nn_values[1];
+        row_failure.message[sizeof(row_failure.message) - 1] = '\0';
+        status = NP_REGRESSION_FIT_ERR_DEFERRED;
       } else {
         if(variance_metadata != NULL)
           MPI_Allreduce(MPI_IN_PLACE, variance_metadata,
@@ -20101,28 +20144,6 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
         MPI_Allreduce(MPI_IN_PLACE, &log_likelihood, 1, MPI_DOUBLE, MPI_SUM, comm[1]);
       }
     }
-#endif
-
-    if(status != 0 && lp_zero_radius_side != 0) {
-      const int y_side = lp_zero_radius_side == 2;
-      const int coordinate_offset = y_side ? num_reg_continuous_extern : 0;
-      const int ncon = y_side ? num_var_continuous_extern : num_reg_continuous_extern;
-      double ** const train = matrix_XY_continuous_train_extern + coordinate_offset;
-      double ** const eval = matrix_XY_continuous_eval_extern + coordinate_offset;
-      double * const scale = y_side ? vsf_y : vsf_x;
-      const NPNNZeroRadiusInfo info = np_nn_zero_radius_info(
-        BANDWIDTH_den_extern, num_obs_train_extern, num_obs_eval_extern,
-        ncon, train, eval, scale, full_fit_nn_geometry_context_ptr,
-        coordinate_offset);
-      np_nn_zero_radius_error(&info);
-    }
-
-#ifdef MPI2
-    if((!lp_owner_blocks) && (status != 0))
-      error("%s", (lp_error != NULL) ? lp_error : "np_density_conditional: conditional LP path failed");
-#else
-    if(status != 0)
-      error("%s", (lp_error != NULL) ? lp_error : "np_density_conditional: conditional LP path failed");
 #endif
 
     int_cker_bound_extern = saved_cker_bound;
@@ -20156,6 +20177,8 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
     if(matrix_bandwidth_y != NULL)
       free_tmat(matrix_bandwidth_y);
     np_beta_scaled_row_context_clear(&beta_y_row_context);
+    if(status != 0)
+      goto cleanup_np_density_conditional;
   }
 
 
@@ -20243,6 +20266,9 @@ cleanup_np_density_conditional:
   np_clear_estimator_extern_aliases();
   num_obs_train_extern = 0;
   num_obs_eval_extern = 0;
+
+  if(row_failure.family != NP_REGRESSION_FAILURE_NONE)
+    np_regression_failure_publish(&row_failure);
 
   if(cat_se_status != 0)
     error("np_density_conditional: categorical-SE contribution pass failed (status %d)",
@@ -22352,7 +22378,7 @@ static SEXP np_regression_fitted_execute(void *data)
       NP_REGRESSION_STDERR_LOCAL_RESIDUAL,
       NULL,
       &training_geometry_context,
-      &residual_preparation_context, NULL, NULL, NULL);
+      &residual_preparation_context, NULL, NULL, NULL, NULL);
 
     if(regression_fit_status != NP_REGRESSION_FIT_OK) {
       if(regression_fit_status == NP_REGRESSION_FIT_ERR_ZERO_NN_RADIUS)
@@ -22502,7 +22528,7 @@ static SEXP np_regression_fitted_execute(void *data)
                                                    &nn_geometry_context,
                                                    ordinary_hc0_active ?
                                                      &ordinary_hc0_context : NULL,
-                                                   call->empty_rows, NULL, NULL);
+                                                   call->empty_rows, NULL, NULL, NULL);
   if(regression_fit_status != NP_REGRESSION_FIT_OK) {
     if(regression_fit_status == NP_REGRESSION_FIT_ERR_ZERO_NN_RADIUS) {
       zero_radius_info = np_nn_zero_radius_info(

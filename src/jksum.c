@@ -1,6 +1,7 @@
 /* Copyright (C) J. Racine, 1995-2001 */
 
 #include <stdio.h>
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <math.h>
@@ -52,6 +53,64 @@
 #include <assert.h>
 
 #include <inttypes.h>
+
+/* Failure-only copying keeps the successful row path allocation-free. */
+void np_regression_failure_message(NPRegressionFailure *failure,
+                                  int family, int code,
+                                  const char *format, ...)
+{
+  va_list args;
+  int written;
+  memset(failure, 0, sizeof(*failure));
+  failure->family = family;
+  failure->code = code;
+  va_start(args, format);
+  written = vsnprintf(failure->message, sizeof(failure->message), format, args);
+  va_end(args);
+  if(written < 0)
+    failure->message[0] = '\0';
+  failure->message[sizeof(failure->message) - 1] = '\0';
+}
+
+void np_regression_failure_zero_radius(NPRegressionFailure *failure,
+                                              const NPNNZeroRadiusInfo *info)
+{
+  memset(failure, 0, sizeof(*failure));
+  failure->family = NP_REGRESSION_FAILURE_ZERO_RADIUS;
+  failure->code = NP_REGRESSION_FIT_ERR_ZERO_NN_RADIUS;
+  failure->nn_bandwidth_type = info->bandwidth_type;
+  failure->nn_coordinate = info->coordinate;
+  failure->nn_lookup_k = info->lookup_k;
+  failure->nn_matching_donors = info->matching_donors;
+  failure->nn_excluded = info->excluded;
+  failure->nn_query_value = info->query_value;
+  failure->nn_index = info->nn_index;
+}
+
+void np_regression_failure_publish(const NPRegressionFailure *failure)
+{
+  if(failure->family == NP_REGRESSION_FAILURE_ZERO_RADIUS) {
+    const NPNNZeroRadiusInfo info = {
+      failure->nn_bandwidth_type, failure->nn_coordinate,
+      failure->nn_lookup_k, failure->nn_matching_donors,
+      failure->nn_excluded, failure->nn_query_value, failure->nn_index
+    };
+    np_nn_zero_radius_error(&info);
+  }
+  if(failure->family >= NP_REGRESSION_FAILURE_VALIDATION &&
+     failure->family <= NP_REGRESSION_FAILURE_CONDITIONAL &&
+     failure->message[0] != '\0')
+    error("%s", failure->message);
+  error("native regression failure (family %d, status %d)",
+        failure->family, failure->code);
+}
+
+/* Used only at explicit failure sites. NULL preserves the original message. */
+#define NP_REGRESSION_RETURN_FAILURE(family_, code_, ...) do { \
+  if(failure == NULL) error(__VA_ARGS__); \
+  np_regression_failure_message(failure, family_, code_, __VA_ARGS__); \
+  return NP_REGRESSION_FIT_ERR_DEFERRED; \
+} while(0)
 
 #if defined(NP_USE_ACCELERATE_GAUSS) && defined(__APPLE__) && defined(__arm64__)
 #define NP_ACCEL_GAUSS_COMPILED 1
@@ -27477,35 +27536,36 @@ enum {
   NP_BETA_SCALAR_REGRESSION_FIT_ERR_MPI_LAYOUT = 6
 };
 
-static void np_beta_scalar_regression_fit_error(
+static int np_beta_scalar_regression_fit_error(
   const int status,
   const np_beta_bandwidth_prepare_status bandwidth_status,
   const NPContinuousKernelRowStatus row_status,
-  const NPContinuousKernelDerivativeDiagnostics *diagnostics)
+  const NPContinuousKernelDerivativeDiagnostics *diagnostics,
+  NPRegressionFailure *failure)
 {
   switch(status) {
   case NP_BETA_SCALAR_REGRESSION_FIT_ERR_LAYOUT:
-    error("canonical beta regression route has an invalid layout");
+    NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_BETA, status, "canonical beta regression route has an invalid layout");
   case NP_BETA_SCALAR_REGRESSION_FIT_ERR_CATEGORICAL_BANDWIDTH:
-    error("\n** Error: invalid categorical bandwidth.");
+    NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_BETA, status, "\n** Error: invalid categorical bandwidth.");
   case NP_BETA_SCALAR_REGRESSION_FIT_ERR_PREPARED_BANDWIDTH:
-    error("canonical beta regression route has an invalid prepared bandwidth view");
+    NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_BETA, status, "canonical beta regression route has an invalid prepared bandwidth view");
   case NP_BETA_SCALAR_REGRESSION_FIT_ERR_BANDWIDTH:
-    error("\n** Error: %s.",
+    NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_BETA, status, "\n** Error: %s.",
           np_beta_bandwidth_prepare_status_message(bandwidth_status));
   case NP_BETA_SCALAR_REGRESSION_FIT_ERR_ROUTE:
     if(diagnostics != NULL && diagnostics->beta_status != NP_BETA_OK)
-      error("canonical beta regression row failed in continuous dimension %d: %s",
+      NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_BETA, status, "canonical beta regression row failed in continuous dimension %d: %s",
             diagnostics->bad_coordinate + 1,
             np_beta_status_message(diagnostics->beta_status));
     if(row_status == NP_CONTINUOUS_ROW_ERR_ZERO_WEIGHT)
-      error("all beta regression weights are zero at an evaluation point");
-    error("canonical beta regression row failed: %s",
+      NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_BETA, status, "all beta regression weights are zero at an evaluation point");
+    NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_BETA, status, "canonical beta regression row failed: %s",
           np_continuous_kernel_row_status_message(row_status));
   case NP_BETA_SCALAR_REGRESSION_FIT_ERR_MPI_LAYOUT:
-    error("canonical beta regression MPI owner has an invalid layout");
+    NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_BETA, status, "canonical beta regression MPI owner has an invalid layout");
   default:
-    error("canonical beta regression route failed with an invalid status");
+    NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_BETA, status, "canonical beta regression route failed with an invalid status");
   }
 }
 
@@ -27797,7 +27857,7 @@ static int np_beta_scalar_regression_prepared_view_slice(
  * view, and transports each requested result column once.  Nested conditional
  * owners remain local so collectives are never entered recursively.
  */
-static NP_NOINLINE void np_beta_scalar_regression_fit_canonical(
+static NP_NOINLINE int np_beta_scalar_regression_fit_canonical(
   const int BANDWIDTH_reg,
   const int KERNEL_unordered_reg,
   const int KERNEL_ordered_reg,
@@ -27825,7 +27885,8 @@ static NP_NOINLINE void np_beta_scalar_regression_fit_canonical(
   const int categorical_compress,
   const NPRegressionStandardErrorMode standard_error_mode,
   const NPContinuousPreparedBandwidthView *prepared_bandwidth,
-  const NPRegressionHC0Context *hc0_context)
+  const NPRegressionHC0Context *hc0_context,
+  NPRegressionFailure *failure)
 {
   const int original_train_is_eval =
     matrix_X_continuous_train == matrix_X_continuous_eval;
@@ -27871,7 +27932,7 @@ static NP_NOINLINE void np_beta_scalar_regression_fit_canonical(
     if(num_obs_eval <= 0 || stride <= 0 || num_predictors < 0) {
       np_beta_scalar_regression_fit_error(
         NP_BETA_SCALAR_REGRESSION_FIT_ERR_MPI_LAYOUT,
-        bandwidth_status, row_status, kernel_route_diagnostics);
+        bandwidth_status, row_status, kernel_route_diagnostics, NULL);
     }
     evaluation_start_size = MIN(
       (size_t)my_rank*(size_t)stride, (size_t)num_obs_eval);
@@ -27885,7 +27946,7 @@ static NP_NOINLINE void np_beta_scalar_regression_fit_canonical(
          num_obs_eval, stride, 1, recvcounts, displs, &equal_counts)) {
       np_beta_scalar_regression_fit_error(
         NP_BETA_SCALAR_REGRESSION_FIT_ERR_MPI_LAYOUT,
-        bandwidth_status, row_status, kernel_route_diagnostics);
+        bandwidth_status, row_status, kernel_route_diagnostics, NULL);
     }
     (void)equal_counts;
 
@@ -28018,7 +28079,7 @@ static NP_NOINLINE void np_beta_scalar_regression_fit_canonical(
       }
       np_beta_scalar_regression_fit_error(
         payload[0], (np_beta_bandwidth_prepare_status)payload[1],
-        (NPContinuousKernelRowStatus)payload[2], kernel_route_diagnostics);
+        (NPContinuousKernelRowStatus)payload[2], kernel_route_diagnostics, NULL);
     }
 
     np_mpi_allgatherv_in_place_double(
@@ -28057,7 +28118,7 @@ static NP_NOINLINE void np_beta_scalar_regression_fit_canonical(
       }
     }
     np_progress_fit_loop_step(num_obs_eval, num_obs_eval);
-    return;
+    return 0;
   }
 #endif
 
@@ -28082,11 +28143,16 @@ static NP_NOINLINE void np_beta_scalar_regression_fit_canonical(
       BANDWIDTH_reg, num_obs_train, num_obs_eval, num_reg_continuous,
       matrix_X_continuous_train, matrix_X_continuous_eval,
       vector_scale_factor, NULL, 0);
+    if(failure != NULL) {
+      np_regression_failure_zero_radius(failure, &info);
+      return NP_REGRESSION_FIT_ERR_ZERO_NN_RADIUS;
+    }
     np_nn_zero_radius_error(&info);
   }
   if(status != NP_BETA_SCALAR_REGRESSION_FIT_OK)
-    np_beta_scalar_regression_fit_error(
-      status, bandwidth_status, row_status, kernel_route_diagnostics);
+    return np_beta_scalar_regression_fit_error(
+      status, bandwidth_status, row_status, kernel_route_diagnostics, failure);
+  return 0;
 }
 
 /*
@@ -32118,7 +32184,8 @@ const NPNNGeometryContext *nn_geometry_context,
 const NPRegressionHC0Context *hc0_context,
 NPRegressionLPEmptyRows *empty_rows,
 const NPConditionalLPFirstSERequest *first_se_request,
-double *conditional_variance){
+double *conditional_variance,
+NPRegressionFailure *failure){
 
   // note that mean has 2*num_obs allocated for npksum
   int i, j, l;
@@ -32161,7 +32228,7 @@ double *conditional_variance){
                                       1,
                                       &stride_e,
                                       &num_obs_eval_alloc))
-    error("regression evaluation partition exceeds native integer limits");
+    NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_VALIDATION, 1, "regression evaluation partition exceeds native integer limits");
 
 #else
   int num_obs_eval_alloc = num_obs_eval;
@@ -32172,20 +32239,20 @@ double *conditional_variance){
   const int do_gerr = (gradient_stderr != NULL);
   const int lp_engine_est = lp_engine;
   if((lp_engine_est != NP_LP_ENGINE_SCALAR) && (lp_engine_est != NP_LP_ENGINE_GENERAL))
-    error("invalid internal regression engine");
+    NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_VALIDATION, 2, "invalid internal regression engine");
   if(standard_error_mode != NP_REGRESSION_STDERR_LOCAL_RESIDUAL &&
      standard_error_mode != NP_REGRESSION_STDERR_CONDITIONAL_INFLUENCE)
-    error("invalid internal regression standard-error mode");
+    NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_VALIDATION, 3, "invalid internal regression standard-error mode");
   if(do_gerr && (!do_merr || (!do_grad && first_se_request == NULL)))
-    error("gradient standard errors require gradients and mean standard errors");
+    NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_VALIDATION, 4, "gradient standard errors require gradients and mean standard errors");
   if(conditional_variance != NULL) {
     if(lp_engine_est != NP_LP_ENGINE_GENERAL || !do_merr ||
        standard_error_mode != NP_REGRESSION_STDERR_LOCAL_RESIDUAL ||
        num_obs_eval != 1 || hc0_context != NULL)
-      error("invalid internal conditional variance owner request");
+      NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_VALIDATION, 5, "invalid internal conditional variance owner request");
 #ifdef MPI2
     if(iNum_Processors > 1 && !np_mpi_local_regression_active())
-      error("conditional variance export requires a local row owner");
+      NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_VALIDATION, 6, "conditional variance export requires a local row owner");
 #endif
     conditional_variance[0] = NA_REAL;
   }
@@ -32198,27 +32265,27 @@ double *conditional_variance){
        first_se_request->ncon != num_reg_continuous ||
        first_se_request->order == NULL || first_se_request->se == NULL ||
        vector_glp_degree_extern == NULL)
-      error("invalid internal conditional first-SE owner request");
+      NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_VALIDATION, 7, "invalid internal conditional first-SE owner request");
 #ifdef MPI2
     if(iNum_Processors > 1 && !np_mpi_local_regression_active())
-      error("conditional first-SE supplement requires a local row owner");
+      NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_VALIDATION, 8, "conditional first-SE supplement requires a local row owner");
 #endif
     for(l = 0; l < num_reg_continuous; ++l) {
       const int demand = first_se_request->se[l];
       if(first_se_request->order[l] < 1 || (demand != 0 && demand != 1) ||
          (demand && (first_se_request->order[l] != 1 ||
                      vector_glp_degree_extern[l] < 1)))
-        error("invalid internal conditional first-SE direction");
+        NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_VALIDATION, 9, "invalid internal conditional first-SE direction");
       selected += demand;
     }
     if(selected == 0)
-      error("empty internal conditional first-SE owner request");
+      NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_VALIDATION, 10, "empty internal conditional first-SE owner request");
     for(l = 0; l < num_reg_continuous + num_reg_unordered + num_reg_ordered; ++l)
       gradient_stderr[l][0] = NA_REAL;
   }
   if(lp_engine_est != NP_LP_ENGINE_SCALAR &&
      standard_error_mode == NP_REGRESSION_STDERR_CONDITIONAL_INFLUENCE)
-    error("conditional influence standard errors require the scalar regression engine");
+    NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_VALIDATION, 11, "conditional influence standard errors require the scalar regression engine");
   if(hc0_context != NULL) {
     const int residual_preparing =
       hc0_context->status == NP_REGRESSION_HC0_RESIDUAL_PREPARING;
@@ -32244,24 +32311,24 @@ double *conditional_variance){
         hc0_context->residual_scale != 0.0) ||
        (hc0_context->point_already_computed != 0 &&
         hc0_context->point_already_computed != 1))
-      error("invalid internal ordinary-regression HC0 context");
+      NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_VALIDATION, 12, "invalid internal ordinary-regression HC0 context");
     for(i = 0; i < num_obs_train; i++) {
       if(hc0_context->donor_to_canonical[i] < 0 ||
          hc0_context->donor_to_canonical[i] >= num_obs_train ||
          (!residual_preparing &&
           !R_FINITE(hc0_context->scaled_residual[i])))
-        error("invalid internal ordinary-regression HC0 donor alignment");
+        NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_VALIDATION, 13, "invalid internal ordinary-regression HC0 donor alignment");
     }
   }
   if(kernel_route == NULL &&
      standard_error_mode == NP_REGRESSION_STDERR_CONDITIONAL_INFLUENCE &&
      num_obs_eval != 1)
-    error("legacy conditional influence standard errors require one evaluation row");
+    NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_VALIDATION, 14, "legacy conditional influence standard errors require one evaluation row");
   if(prepared_bandwidth != NULL && kernel_route == NULL)
-    error("prepared regression bandwidths require a canonical kernel route");
+    NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_VALIDATION, 15, "prepared regression bandwidths require a canonical kernel route");
   if(NP_UNLIKELY(kernel_route != NULL) &&
      lp_engine_est == NP_LP_ENGINE_SCALAR) {
-    np_beta_scalar_regression_fit_canonical(
+    const int beta_status = np_beta_scalar_regression_fit_canonical(
       BANDWIDTH_reg, KERNEL_unordered_reg, KERNEL_ordered_reg,
       num_obs_train, num_obs_eval,
       num_reg_unordered, num_reg_ordered, num_reg_continuous,
@@ -32273,7 +32340,9 @@ double *conditional_variance){
       num_categories, matrix_categorical_vals,
       mean, gradient, mean_stderr, gradient_stderr,
       kernel_route, kernel_route_diagnostics, categorical_compress,
-      standard_error_mode, prepared_bandwidth, hc0_context);
+      standard_error_mode, prepared_bandwidth, hc0_context, failure);
+    if(beta_status != 0)
+      return beta_status;
     np_regression_fit_statistics(
       num_obs_eval, vector_Y_eval, mean,
       R_squared, MSE, MAE, MAPE, CORR, SIGN);
@@ -32289,7 +32358,7 @@ double *conditional_variance){
       kernel_route->segment[0].coordinate_count != num_reg_continuous ||
       kernel_route_diagnostics == NULL ||
       categorical_compress < 0 || categorical_compress > 1))
-    error("canonical beta regression route has an invalid layout");
+    NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_VALIDATION, 16, "canonical beta regression route has an invalid layout");
 
   /* Option reads can longjmp; perform them before malloc-backed state exists. */
   np_refresh_runtime_tolerances();
@@ -33395,15 +33464,15 @@ finish_regression_estimation:
   np_regression_fit_owner_clear(&fit_owner);
 
   if(regression_fit_status == NP_REGRESSION_FIT_ERR_ALLOC)
-    error("\n** Error: memory allocation failed.");
+    NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_FIT, regression_fit_status, "\n** Error: memory allocation failed.");
   if(regression_fit_status == NP_REGRESSION_FIT_ERR_BANDWIDTH)
-    error("\n** Error: invalid bandwidth.");
+    NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_FIT, regression_fit_status, "\n** Error: invalid bandwidth.");
   if(regression_fit_status == NP_REGRESSION_FIT_ERR_ZERO_NN_RADIUS) {
 #ifdef MPI2
     /* A conditional-density owner may invoke this fit on one rank-local
      * evaluation block. Return the typed status to that owner so every rank
      * reaches its existing failure Allreduce before any R condition is raised. */
-    if(np_mpi_local_regression_active())
+    if(failure == NULL && np_mpi_local_regression_active())
       return NP_REGRESSION_FIT_ERR_ZERO_NN_RADIUS;
 #endif
     const NPNNGeometryContext external_geometry = {.mode = NP_NN_QUERY_EXTERNAL};
@@ -33412,63 +33481,67 @@ finish_regression_estimation:
       matrix_X_continuous_train, matrix_X_continuous_eval, vector_scale_factor,
       kernel_route != NULL ? NULL :
         (zero_radius_external_query ? &external_geometry : nn_geometry_context), 0);
+    if(failure != NULL) {
+      np_regression_failure_zero_radius(failure, &info);
+      return NP_REGRESSION_FIT_ERR_ZERO_NN_RADIUS;
+    }
     np_nn_zero_radius_error(&info);
   }
   if(regression_fit_status == NP_REGRESSION_FIT_ERR_HASH_CREATE)
-    error("hash table creation failed");
+    NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_FIT, regression_fit_status, "hash table creation failed");
   if(regression_fit_status == NP_REGRESSION_FIT_ERR_HASH_INSERT)
-    error("insertion into hash table failed");
+    NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_FIT, regression_fit_status, "insertion into hash table failed");
   if(regression_fit_status == NP_REGRESSION_FIT_ERR_HASH_LOOKUP)
-    error("hash table lookup failed (which should be impossible)");
+    NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_FIT, regression_fit_status, "hash table lookup failed (which should be impossible)");
   if(regression_fit_status != NP_REGRESSION_FIT_OK)
-    error("invalid internal regression fit status");
+    NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_FIT, regression_fit_status, "invalid internal regression fit status");
 
   if(scalar_fit_status == NP_REGRESSION_SCALAR_FIT_ERR_DIMENSION)
-    error("conditional influence kernel-weight dimensions overflow");
+    NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_SCALAR, scalar_fit_status, "conditional influence kernel-weight dimensions overflow");
   if(scalar_fit_status == NP_REGRESSION_SCALAR_FIT_ERR_CONDITIONAL_ALLOC)
-    error("memory allocation failed in conditional influence workspace");
+    NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_SCALAR, scalar_fit_status, "memory allocation failed in conditional influence workspace");
   if(scalar_fit_status == NP_REGRESSION_SCALAR_FIT_ERR_ALLOC)
-    error("\n** Error: memory allocation failed.");
+    NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_SCALAR, scalar_fit_status, "\n** Error: memory allocation failed.");
   if(scalar_fit_status == NP_REGRESSION_SCALAR_FIT_ERR_TRAVERSAL)
-    error("conditional regression kernel traversal failed");
+    NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_SCALAR, scalar_fit_status, "conditional regression kernel traversal failed");
   if(scalar_fit_status == NP_REGRESSION_SCALAR_FIT_ERR_INFLUENCE)
-    error("conditional influence variance construction failed");
+    NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_SCALAR, scalar_fit_status, "conditional influence variance construction failed");
   if(scalar_fit_status == NP_REGRESSION_SCALAR_FIT_ERR_WORKSPACE_DIMENSION)
-    error("scalar regression workspace dimensions overflow");
+    NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_SCALAR, scalar_fit_status, "scalar regression workspace dimensions overflow");
   if(scalar_fit_status == NP_REGRESSION_SCALAR_FIT_ERR_HC0)
-    error("ordinary-regression HC0 variance construction failed");
+    NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_SCALAR, scalar_fit_status, "ordinary-regression HC0 variance construction failed");
   if(scalar_fit_status != NP_REGRESSION_SCALAR_FIT_OK &&
      scalar_fit_status != NP_REGRESSION_SCALAR_FIT_PROFILE)
-    error("invalid internal scalar regression fit status");
+    NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_SCALAR, scalar_fit_status, "invalid internal scalar regression fit status");
 
   if(general_lp_fit_status == NP_REGRESSION_GENERAL_LP_FIT_ERR_ROUTE) {
     if(kernel_route_diagnostics != NULL &&
        kernel_route_diagnostics->beta_status != NP_BETA_OK)
-      error("canonical beta LP row failed in continuous dimension %d: %s",
+      NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_GENERAL, general_lp_fit_status, "canonical beta LP row failed in continuous dimension %d: %s",
             kernel_route_diagnostics->bad_coordinate + 1,
             np_beta_status_message(kernel_route_diagnostics->beta_status));
-    error("canonical beta LP row failed");
+    NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_GENERAL, general_lp_fit_status, "canonical beta LP row failed");
   }
   if(general_lp_fit_status == NP_REGRESSION_GENERAL_LP_FIT_ERR_DEGREE)
-    error("glp degree vector unavailable");
+    NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_GENERAL, general_lp_fit_status, "glp degree vector unavailable");
   if(general_lp_fit_status == NP_REGRESSION_GENERAL_LP_FIT_ERR_TERMS)
-    error("failed to build glp basis terms");
+    NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_GENERAL, general_lp_fit_status, "failed to build glp basis terms");
   if(general_lp_fit_status == NP_REGRESSION_GENERAL_LP_FIT_ERR_DIMENSION)
-    error("invalid glp basis dimension");
+    NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_GENERAL, general_lp_fit_status, "invalid glp basis dimension");
   if(general_lp_fit_status == NP_REGRESSION_GENERAL_LP_FIT_ERR_SOLVE_ALLOC)
-    error("memory allocation failed in glp solve workspace");
+    NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_GENERAL, general_lp_fit_status, "memory allocation failed in glp solve workspace");
   if(general_lp_fit_status == NP_REGRESSION_GENERAL_LP_FIT_ERR_ALLOC)
-    error("memory allocation failed in glp path");
+    NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_GENERAL, general_lp_fit_status, "memory allocation failed in glp path");
   if(general_lp_fit_status == NP_REGRESSION_GENERAL_LP_FIT_ERR_BASIS)
-    error("failed to initialize glp Bernstein basis");
+    NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_GENERAL, general_lp_fit_status, "failed to initialize glp Bernstein basis");
   if(general_lp_fit_status == NP_REGRESSION_GENERAL_LP_FIT_ERR_SOLVE)
-    error("LP solve failed in glp path");
+    NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_GENERAL, general_lp_fit_status, "LP solve failed in glp path");
   if(general_lp_fit_status == NP_REGRESSION_GENERAL_LP_FIT_ERR_OWNER_SOLVE)
-    error("LP solve failed in MPI owner-row path");
+    NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_GENERAL, general_lp_fit_status, "LP solve failed in MPI owner-row path");
   if(general_lp_fit_status == NP_REGRESSION_GENERAL_LP_FIT_ERR_HC0)
-    error("ordinary-regression HC0 variance construction failed in glp path");
+    NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_GENERAL, general_lp_fit_status, "ordinary-regression HC0 variance construction failed in glp path");
   if(general_lp_fit_status != NP_REGRESSION_GENERAL_LP_FIT_OK)
-    error("invalid internal general LP fit status");
+    NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_GENERAL, general_lp_fit_status, "invalid internal general LP fit status");
 
   np_regression_fit_statistics(
     num_obs_eval, vector_Y_eval, mean,
