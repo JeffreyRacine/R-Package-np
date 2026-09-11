@@ -611,14 +611,16 @@ npcdens.conbandwidth <- function(bws,
         eydat = proper.slice.context$eydat,
         where = "npcdens",
           allow.external = allow.external, base.rows = base.rows,
-          .np.defer.empty.rows = TRUE
+          .np.defer.empty.rows = TRUE,
+          se.demand = if (se) cat.se.demand else FALSE
       )
       cat.rows <- attr(cat.grad, ".np.empty.rows", exact = TRUE)
       if (!is.null(cat.rows))
         empty.rows <- if (is.null(empty.rows)) cat.rows else pmax(empty.rows, cat.rows)
       cat.idx <- which(bws$ixuno | bws$ixord)
       myout$congrad[, cat.idx] <- cat.grad[, cat.idx, drop = FALSE]
-      if (se) myout$congerr[, cat.idx] <- NA_real_
+      if (se) myout$congerr[, cat.idx] <- if (any(cat.se.demand))
+        attr(cat.grad, ".np.categorical.se", exact = TRUE)[, cat.idx, drop = FALSE] else NA_real_
     }
   } else {
     myout$congrad = NA

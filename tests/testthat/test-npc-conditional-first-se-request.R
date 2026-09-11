@@ -74,8 +74,10 @@ test_that("partial conditional LP masks two directions in original column order"
   subset <- suppressWarnings(do.call(npcdist,c(args,list(
     .np_lp_first_se_demand=c(FALSE,FALSE,TRUE)))))
   expect_true(all(is.finite(full$congerr[,c(1L,4L)])))
-  expect_true(all(is.na(full$congerr[,c(2L,3L)])))
-  expect_true(all(is.na(subset$congerr[,1L:3L])))
+  expect_true(all(is.finite(full$congerr[,2L])))
+  expect_true(all(is.na(full$congerr[,3L])))
+  expect_true(all(is.na(subset$congerr[,c(1L,3L)])))
+  expect_identical(full$congerr[,2L],subset$congerr[,2L])
   expect_identical(full$congerr[,4L],subset$congerr[,4L])
   expect_identical(fitted(full),fitted(subset))
   expect_identical(se(full),se(subset))
@@ -83,5 +85,6 @@ test_that("partial conditional LP masks two directions in original column order"
   args$eydat$y <- 10
   zero <- suppressWarnings(do.call(npcdist,args))
   expect_identical(unname(zero$congerr[,c(1L,4L)]),matrix(0,nrow(d$ey),2L))
-  expect_true(all(is.na(zero$congerr[,c(2L,3L)])))
+  expect_true(all(is.finite(zero$congerr[,2L])))
+  expect_true(all(is.na(zero$congerr[,3L])))
 })

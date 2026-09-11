@@ -377,15 +377,16 @@ npqreg <-
       itmax = itmax,
       cdf.cache = cdf.cache,
       allow.external = allow.external,
-      gradient.target = gradient.target
+      gradient.target = gradient.target,
+      se.demand = if (se) cat.se.demand else FALSE
     )
     flags <- .npreg_merge_empty_rows(flags, .npqreg_empty_rows(cat.grad, nrow(exdat)))
     cat.idx <- which(bws$ixuno | bws$ixord)
     if (!is.null(gradient.target))
       cat.idx <- cat.idx[cat.idx == gradient.target]
     grad[, cat.idx] <- cat.grad[, cat.idx, drop = FALSE]
-    if (se)
-      gerr[, cat.idx] <- NA_real_
+    if (se) gerr[, cat.idx] <- if (any(cat.se.demand))
+      attr(cat.grad, ".np.categorical.se", exact = TRUE)[, cat.idx, drop = FALSE] else NA_real_
   }
 
   out <- list(
@@ -485,14 +486,18 @@ npqreg <-
                                                    itmax,
                                                    cdf.cache = NULL,
                                                    allow.external = FALSE,
-                                                   gradient.target = NULL) {
+                                                   gradient.target = NULL,
+                                                   se.demand = FALSE) {
   cat.idx <- which(bws$ixuno | bws$ixord)
+  se.idx <- cat.idx[.np_conditional_cat_se_demand(se.demand, length(cat.idx))]
   if (!is.null(gradient.target)) {
     gradient.target <- .np_plot_resolve_conditional_gradient_index(
       bws, gradient.target, "quantile categorical gradient target")
     cat.idx <- cat.idx[cat.idx == gradient.target]
   }
   out <- matrix(NA_real_, nrow = nrow(exdat), ncol = bws$xndim)
+  errors <- if (length(se.idx)) out else NULL
+  unavailable <- 0L
   if (!length(cat.idx))
     return(out)
 
@@ -530,9 +535,26 @@ npqreg <-
       .npqreg_empty_rows(upper, nrow(exdat)),
       .npqreg_empty_rows(lower, nrow(exdat))))
     out[, jj] <- as.vector(upper) - as.vector(lower)
+    if (jj %in% se.idx) {
+      keep <- which(is.finite(upper) & is.finite(lower))
+      if (length(keep)) {
+        pair <- .np_conditional_lp_pair_se(bws, xdat, ydat,
+          frames$upper[keep, , drop = FALSE], frames$lower[keep, , drop = FALSE],
+          setNames(toFrame(as.vector(upper)[keep]), names(ydat)),
+          setNames(toFrame(as.vector(lower)[keep]), names(ydat)),
+          cdf = TRUE, quantile = TRUE)
+        errors[keep, jj] <- pair[, 1L]
+        unavailable <- unavailable + sum(pair[, 6L] != 0)
+      }
+    }
   }
 
   if (!is.null(flags)) attr(out, ".np.empty.rows") <- flags
+  if (unavailable) .np_warning(paste0("npqreg: categorical contrast standard errors ",
+    "are unavailable at ", unavailable, " endpoint pair(s): the accepted local ",
+    "fit has a nonsmooth/nonfinite influence or nonpositive density. ",
+    "These standard errors are NA."), call. = FALSE)
+  attr(out, ".np.categorical.se") <- errors
   out
 }
 

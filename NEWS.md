@@ -1,5 +1,13 @@
 # npRmpi 0.80-1
 
+* Local-linear and positive-degree local-polynomial conditional density,
+  distribution and quantile fits now provide requested categorical-contrast
+  standard errors. Paired endpoint influences retain their covariance;
+  quantiles use each endpoint's own quantile and density. This includes
+  fixed, generalized-NN and adaptive-NN bandwidths conditional on the realized
+  geometry. Existing point estimates, continuous errors and SE-off computation
+  are unchanged. Nonsmooth or nonfinite influences remain explicitly unavailable.
+
 * Conditional-mode fitting with MPI autodispatch no longer fails with
   `object 'allow.external' not found`. Internal row-availability controls now
   retain their values across distributed conditional fits and proper slices.

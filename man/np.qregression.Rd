@@ -319,6 +319,16 @@ prediction/evaluation route, or plot route as appropriate.
          {\hat f(\hat q_\tau(x)|x)} .
   }
 
+  For categorical conditioning variables in positive-degree local-polynomial
+  fits (including local-linear fits), first-difference standard errors retain
+  the paired covariance between the two category endpoints. Each endpoint uses
+  its own fitted quantile and positive conditional-density slope in the
+  implicit-CDF calculation. The selected basis, smoothing parameters and
+  realized neighbour radii are held fixed. This requested-only calculation
+  supports fixed, generalized nearest-neighbour and adaptive nearest-neighbour
+  bandwidths; a nonpositive density slope or nonsmooth/nonfinite influence
+  produces \code{NA} uncertainty with a notice.
+
   For continuous conditioning variables, these gradient standard errors are
   componentwise leading asymptotic approximations. They propagate the
   conditional CDF-gradient uncertainty but do not jointly propagate
