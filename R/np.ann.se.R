@@ -33,6 +33,10 @@
   n <- nrow(data)
   m <- nrow(evaluation)
   if (!m) return(numeric(0L))
+  # The public owner already omitted rows and retains their external mapping.
+  # Nested npksum must not interpret that marker as another omission request.
+  attr(data, "na.action") <- NULL
+  attr(evaluation, "na.action") <- NULL
   state <- .np_ann_se_geometry(bws, data)
   if (!state$valid) return(rep.int(NA_real_, m))
   p <- ncol(state$x)

@@ -77,6 +77,25 @@ local({
         expect_equal(se(on),oracle(bw,density),tolerance=2e-11)
       })
     }
+    for (density in c(TRUE, FALSE)) for (kernel in c("gaussian", "uniform")) {
+      test_that(paste("ANN omits missing rows only once",density,kernel), {
+        d <- x; e <- at
+        d$a[7L] <- NA_real_; d$b[31L] <- NA_real_; e$a[2L] <- NA_real_
+        clean.d <- na.omit(d); clean.e <- na.omit(e)
+        attr(clean.d,"na.action") <- NULL
+        attr(clean.e,"na.action") <- NULL
+        bf <- if (density) npudensbw else npudistbw
+        ff <- if (density) npudens else npudist
+        bw <- bf(dat=clean.d,bws=c(11,15,.3),bwtype="adaptive_nn",
+                 ckertype=kernel,bandwidth.compute=FALSE)
+        on <- suppressWarnings(ff(bws=bw,tdat=d,edat=e,se=TRUE))
+        off <- ff(bws=bw,tdat=d,edat=e,se=FALSE)
+        ref <- suppressWarnings(ff(bws=bw,tdat=clean.d,edat=clean.e,se=TRUE))
+        expect_identical(fitted(on),fitted(off))
+        expect_identical(fitted(on),fitted(ref))
+        expect_identical(se(on),se(ref))
+      })
+    }
   }
   if (exists(".npRmpi_with_local_regression", mode="function"))
     .npRmpi_with_local_regression(run())
