@@ -18293,6 +18293,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                             double *variance_metadata){
   /* Likelihood bandwidth selection for density estimation */
   int cat_se_status = 0;
+  NPRegressionFailure row_failure = {0};
 
   double *vector_scale_factor, *pdf, *pdf_stderr, log_likelihood = 0.0;
 
@@ -18982,14 +18983,25 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
             &beta_y_row_context, j, NULL, &beta_y_log_scale);
 
         if(row_status != NP_CONTINUOUS_ROW_OK) {
-          np_beta_scaled_row_context_clear(&beta_y_row_context);
           if(response_kernel_route_diagnostics->beta_status != NP_BETA_OK)
-            error("np_density_conditional: canonical beta response row failed in continuous dimension %d: %s",
+            do {
+          if(row_failure.family == NP_REGRESSION_FAILURE_NONE)
+            np_regression_failure_message(&row_failure,
+              NP_REGRESSION_FAILURE_CONDITIONAL, 1, "np_density_conditional: canonical beta response row failed in continuous dimension %d: %s",
                   response_kernel_route_diagnostics->bad_coordinate + 1,
                   np_beta_status_message(
                     response_kernel_route_diagnostics->beta_status));
-          error("np_density_conditional: canonical beta response row failed: %s",
+          status = NP_REGRESSION_FIT_ERR_DEFERRED;
+          goto cleanup_conditional_lp;
+        } while(0);
+          do {
+          if(row_failure.family == NP_REGRESSION_FAILURE_NONE)
+            np_regression_failure_message(&row_failure,
+              NP_REGRESSION_FAILURE_CONDITIONAL, 1, "np_density_conditional: canonical beta response row failed: %s",
                 np_continuous_kernel_row_status_message(row_status));
+          status = NP_REGRESSION_FIT_ERR_DEFERRED;
+          goto cleanup_conditional_lp;
+        } while(0);
         }
         status = 0;
       } else {
@@ -19053,10 +19065,17 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
           num_var_continuous_extern,
           matrix_XY_continuous_train_extern + num_reg_continuous_extern,
           ycon_eval_one, vsf_y, NULL, num_reg_continuous_extern);
-        np_nn_zero_radius_error(&info);
+        np_regression_failure_zero_radius(&row_failure, &info);
+        goto cleanup_conditional_lp;
       }
       if(status != 0)
-        error("np_density_conditional: y-kernel response construction failed in LP path");
+        do {
+          if(row_failure.family == NP_REGRESSION_FAILURE_NONE)
+            np_regression_failure_message(&row_failure,
+              NP_REGRESSION_FAILURE_CONDITIONAL, 1, "np_density_conditional: y-kernel response construction failed in LP path");
+          status = NP_REGRESSION_FIT_ERR_DEFERRED;
+          goto cleanup_conditional_lp;
+        } while(0);
 
       y_eval_one[0] = ykw[0];
 
@@ -19104,12 +19123,25 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                                                                prepared_x_bandwidth_ptr,
                                                                row_nn_geometry_context_ptr,
                                                                NULL, NULL, first_se_request,
-                                                               variance_metadata != NULL ? &variance_one : NULL);
+                                                               variance_metadata != NULL ? &variance_one : NULL,
+                                                                 &row_failure);
 
       if(status == NP_REGRESSION_FIT_ERR_ZERO_NN_RADIUS)
-        error("conditional density/distribution fit encountered a zero literal explanatory radius after occurrence exclusion");
+        do {
+          if(row_failure.family == NP_REGRESSION_FAILURE_NONE)
+            np_regression_failure_message(&row_failure,
+              NP_REGRESSION_FAILURE_CONDITIONAL, 1, "conditional density/distribution fit encountered a zero literal explanatory radius after occurrence exclusion");
+          status = NP_REGRESSION_FIT_ERR_DEFERRED;
+          goto cleanup_conditional_lp;
+        } while(0);
       if(status != NP_REGRESSION_FIT_OK)
-        error("np_density_conditional: regression LP solve failed in conditional LP path");
+        do {
+          if(row_failure.family == NP_REGRESSION_FAILURE_NONE)
+            np_regression_failure_message(&row_failure,
+              NP_REGRESSION_FAILURE_CONDITIONAL, 1, "np_density_conditional: regression LP solve failed in conditional LP path");
+          status = NP_REGRESSION_FIT_ERR_DEFERRED;
+          goto cleanup_conditional_lp;
+        } while(0);
 
       if(variance_metadata != NULL) {
         const int row = ipe_XY[j];
@@ -19137,9 +19169,14 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
               stderr_one[0], beta_y_log_scale, 1, &pdf_stderr[j]);
         }
         if(restore_status != NP_CONTINUOUS_ROW_OK) {
-          np_beta_scaled_row_context_clear(&beta_y_row_context);
-          error("np_density_conditional: canonical beta response-unit restoration failed: %s",
+          do {
+          if(row_failure.family == NP_REGRESSION_FAILURE_NONE)
+            np_regression_failure_message(&row_failure,
+              NP_REGRESSION_FAILURE_CONDITIONAL, 1, "np_density_conditional: canonical beta response-unit restoration failed: %s",
                 np_continuous_kernel_row_status_message(restore_status));
+          status = NP_REGRESSION_FIT_ERR_DEFERRED;
+          goto cleanup_conditional_lp;
+        } while(0);
         }
       } else {
         pdf[j] = mean_one[0];
@@ -19168,9 +19205,14 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                 scaled_gradient_stderr, beta_y_log_scale,
                 &pdf_deriv_stderr[i][j]);
             if(restore_status != NP_CONTINUOUS_ROW_OK) {
-              np_beta_scaled_row_context_clear(&beta_y_row_context);
-              error("np_density_conditional: canonical beta gradient-unit restoration failed: %s",
+                  do {
+          if(row_failure.family == NP_REGRESSION_FAILURE_NONE)
+            np_regression_failure_message(&row_failure,
+              NP_REGRESSION_FAILURE_CONDITIONAL, 1, "np_density_conditional: canonical beta gradient-unit restoration failed: %s",
                     np_continuous_kernel_row_status_message(restore_status));
+          status = NP_REGRESSION_FIT_ERR_DEFERRED;
+          goto cleanup_conditional_lp;
+        } while(0);
             }
           } else {
             pdf_deriv[i][j] = scaled_gradient;
@@ -19189,9 +19231,14 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                 graderr_one[i][0], beta_y_log_scale,
                 &pdf_deriv_stderr[i][j]);
             if(restore_status != NP_CONTINUOUS_ROW_OK) {
-              np_beta_scaled_row_context_clear(&beta_y_row_context);
-              error("np_density_conditional: canonical beta first-SE restoration failed: %s",
+                  do {
+          if(row_failure.family == NP_REGRESSION_FAILURE_NONE)
+            np_regression_failure_message(&row_failure,
+              NP_REGRESSION_FAILURE_CONDITIONAL, 1, "np_density_conditional: canonical beta first-SE restoration failed: %s",
                     np_continuous_kernel_row_status_message(restore_status));
+          status = NP_REGRESSION_FIT_ERR_DEFERRED;
+          goto cleanup_conditional_lp;
+        } while(0);
             }
           } else {
             pdf_deriv_stderr[i][j] = graderr_one[i][0];
@@ -19201,6 +19248,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
       np_progress_fit_step(j + 1);
     }
 
+cleanup_conditional_lp:
     int_cker_bound_extern = saved_cker_bound;
     vector_ckerlb_extern = saved_ckerlb;
     vector_ckerub_extern = saved_ckerub;
@@ -19232,6 +19280,8 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
     if(matrix_bandwidth_y != NULL)
       free_tmat(matrix_bandwidth_y);
     np_beta_scaled_row_context_clear(&beta_y_row_context);
+    if(status != 0)
+      goto cleanup_np_density_conditional;
   }
 
 
@@ -19259,6 +19309,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
   *ll = log_likelihood;
   /* end return data */
 
+cleanup_np_density_conditional:
   /* Free data objects */
 
   free_mat(matrix_XY_unordered_train_extern, num_all_uvar);
@@ -19318,6 +19369,9 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
   np_clear_estimator_extern_aliases();
   num_obs_train_extern = 0;
   num_obs_eval_extern = 0;
+
+  if(row_failure.family != NP_REGRESSION_FAILURE_NONE)
+    np_regression_failure_publish(&row_failure);
 
   if(cat_se_status != 0)
     error("np_density_conditional: categorical-SE contribution pass failed (status %d)",
@@ -21428,7 +21482,7 @@ static SEXP np_regression_fitted_execute(void *data)
       NP_REGRESSION_STDERR_LOCAL_RESIDUAL,
       NULL,
       &training_geometry_context,
-      &residual_preparation_context, NULL, NULL, NULL);
+      &residual_preparation_context, NULL, NULL, NULL, NULL);
 
     if(temporary_training_tree) {
       kdt_extern_X = outer_evaluation_kdt;
@@ -21564,7 +21618,7 @@ static SEXP np_regression_fitted_execute(void *data)
                                                    &nn_geometry_context,
                                                    ordinary_hc0_active ?
                                                      &ordinary_hc0_context : NULL,
-                                                   call->empty_rows, NULL, NULL);
+                                                   call->empty_rows, NULL, NULL, NULL);
 
 
   for(i=0;i<num_obs_eval_extern;i++)

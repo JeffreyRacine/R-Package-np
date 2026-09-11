@@ -41,6 +41,8 @@ typedef struct {
   double **adaptive_full;
 } NPNNGeometryContext;
 
+#include "nn_radius_error.h"
+
 typedef enum {
   NP_REGRESSION_LP_MATRIX_OK = 0,
   NP_REGRESSION_LP_MATRIX_ERROR = 1,
@@ -69,8 +71,42 @@ typedef enum {
   NP_REGRESSION_FIT_ERR_HASH_CREATE = -3,
   NP_REGRESSION_FIT_ERR_HASH_INSERT = -4,
   NP_REGRESSION_FIT_ERR_HASH_LOOKUP = -5,
-  NP_REGRESSION_FIT_ERR_ZERO_NN_RADIUS = -6
+  NP_REGRESSION_FIT_ERR_ZERO_NN_RADIUS = -6,
+  NP_REGRESSION_FIT_ERR_DEFERRED = -7
 } NPRegressionFitStatus;
+
+/* Copied invocation-owned failure, never a borrowed owner or R object.
+ * Ordinary callers pass NULL and retain their incumbent strict publisher. */
+typedef enum {
+  NP_REGRESSION_FAILURE_NONE = 0,
+  NP_REGRESSION_FAILURE_VALIDATION = 1,
+  NP_REGRESSION_FAILURE_FIT = 2,
+  NP_REGRESSION_FAILURE_SCALAR = 3,
+  NP_REGRESSION_FAILURE_GENERAL = 4,
+  NP_REGRESSION_FAILURE_BETA = 5,
+  NP_REGRESSION_FAILURE_CONDITIONAL = 6,
+  NP_REGRESSION_FAILURE_ZERO_RADIUS = 7
+} NPRegressionFailureFamily;
+
+typedef struct {
+  int family;
+  int code;
+  int nn_bandwidth_type;
+  int nn_coordinate;
+  int nn_lookup_k;
+  int nn_matching_donors;
+  int nn_excluded;
+  double nn_query_value;
+  double nn_index;
+  char message[256];
+} NPRegressionFailure;
+
+void np_regression_failure_message(NPRegressionFailure *failure,
+                                  int family, int code,
+                                  const char *format, ...);
+void np_regression_failure_publish(const NPRegressionFailure *failure);
+void np_regression_failure_zero_radius(NPRegressionFailure *failure,
+                                      const NPNNZeroRadiusInfo *info);
 
 typedef struct {
   const NPContinuousKernelRoute *x_route;
@@ -434,7 +470,7 @@ void initialize_nr_vector_scale_factor(int BANDWIDTH,int RANDOM,int seed,int int
 
 int check_valid_scale_factor_cv(int KERNEL, int KERNEL_var_unordered_liracine, int KERNEL_reg_unordered_liracine, int BANDWIDTH, int BANDWIDTH_den_ml, int REGRESSION_ML, int num_obs, int num_var_continuous, int num_var_unordered, int num_var_ordered, int num_reg_continuous, int num_reg_unordered, int num_reg_ordered, int *num_categories, double *vector_scale_factor);
 
-int kernel_estimate_regression_categorical_tree_np(int lp_engine,int KERNEL_reg,int KERNEL_unordered_reg,int KERNEL_ordered_reg,int BANDWIDTH_reg,int num_obs_train,int num_obs_eval,int num_reg_unordered,int num_reg_ordered,int num_reg_continuous,double **matrix_X_unordered_train,double **matrix_X_ordered_train,double **matrix_X_continuous_train,double **matrix_X_unordered_eval,double **matrix_X_ordered_eval,double **matrix_X_continuous_eval,double *vector_Y,double *vector_Y_eval,double *vector_scale_factor,int *num_categories, double ** matrix_categorical_vals, double *mean,double **gradient,double *mean_stderr,double **gradient_stderr,double *R_squared,double *MSE,double *MAE,double *MAPE,double *CORR,double *SIGN,const NPContinuousKernelRoute *kernel_route,NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,int categorical_compress,NPRegressionStandardErrorMode standard_error_mode,const NPContinuousPreparedBandwidthView *prepared_bandwidth,const NPNNGeometryContext *nn_geometry_context,const NPRegressionHC0Context *hc0_context, NPRegressionLPEmptyRows *empty_rows, const NPConditionalLPFirstSERequest *first_se_request, double *conditional_variance);
+int kernel_estimate_regression_categorical_tree_np(int lp_engine,int KERNEL_reg,int KERNEL_unordered_reg,int KERNEL_ordered_reg,int BANDWIDTH_reg,int num_obs_train,int num_obs_eval,int num_reg_unordered,int num_reg_ordered,int num_reg_continuous,double **matrix_X_unordered_train,double **matrix_X_ordered_train,double **matrix_X_continuous_train,double **matrix_X_unordered_eval,double **matrix_X_ordered_eval,double **matrix_X_continuous_eval,double *vector_Y,double *vector_Y_eval,double *vector_scale_factor,int *num_categories, double ** matrix_categorical_vals, double *mean,double **gradient,double *mean_stderr,double **gradient_stderr,double *R_squared,double *MSE,double *MAE,double *MAPE,double *CORR,double *SIGN,const NPContinuousKernelRoute *kernel_route,NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,int categorical_compress,NPRegressionStandardErrorMode standard_error_mode,const NPContinuousPreparedBandwidthView *prepared_bandwidth,const NPNNGeometryContext *nn_geometry_context,const NPRegressionHC0Context *hc0_context, NPRegressionLPEmptyRows *empty_rows, const NPConditionalLPFirstSERequest *first_se_request, double *conditional_variance,NPRegressionFailure *failure);
 
 double func_con_density_quantile(double *quantile);
 
