@@ -16,6 +16,59 @@ test_that("autodispatch materialization preserves explicit argument expressions"
   expect_false(identical(prepared$tmpvals[[bws.ref]], bws))
 })
 
+test_that("row-purpose controls are values, not escaped caller expressions", {
+  materialize <- getFromNamespace(".npRmpi_autodispatch_materialize_call", "npRmpi")
+  flags <- c(".np.require.complete", ".np.defer.empty.rows")
+  for (family in c("npcdens", "npcdist", "npreg")) {
+    for (allow in c(FALSE, TRUE)) {
+      owner <- new.env(parent = baseenv())
+      owner$allow.external <- allow
+      owner$defer <- !allow
+      mc <- as.call(c(list(as.name(family)), setNames(
+        list(quote(!allow.external), quote(defer)), flags)))
+      prepared <- materialize(mc, owner)
+      # A receiving frame must not require the originating owner's locals.
+      receiver <- list2env(prepared$tmpvals, parent = baseenv())
+      expect_identical(eval(prepared$call[[flags[1L]]], receiver), !allow)
+      expect_identical(eval(prepared$call[[flags[2L]]], receiver), !allow)
+      expect_length(prepared$prepublish, 0L)
+      expect_length(prepared$lease.bindings, 0L)
+    }
+    omitted <- as.call(list(as.name(family)))
+    expect_identical(materialize(omitted, environment())$call, omitted)
+  }
+  explicit.null <- materialize(
+    quote(npcdens(.np.require.complete = NULL, .np.defer.empty.rows = NULL)),
+    environment())
+  expect_true(all(flags %in% names(explicit.null$call)))
+  expect_null(explicit.null$call[[flags[1L]]])
+  expect_null(explicit.null$call[[flags[2L]]])
+  expect_error(materialize(quote(npcdens(.np.require.complete = absent.policy)),
+                           new.env(parent = baseenv())), "absent.policy")
+})
+
+test_that("row-purpose dots preserve promise ownership and single evaluation", {
+  materialize <- getFromNamespace(".npRmpi_autodispatch_materialize_call", "npRmpi")
+  owner <- function(...) {
+    .np.require.complete <- FALSE
+    .np.defer.empty.rows <- FALSE
+    mc <- match.call()
+    mc[[1L]] <- as.name("npcdens")
+    materialize(mc, environment())
+  }
+  forward <- function(...) owner(...)
+  state <- new.env(parent = emptyenv())
+  state$count <- 0L
+  prepared <- forward(.np.require.complete = {
+    state$count <- state$count + 1L
+    TRUE
+  }, .np.defer.empty.rows = TRUE)
+  expect_identical(state$count, 1L)
+  receiver <- list2env(prepared$tmpvals, parent = baseenv())
+  expect_true(eval(prepared$call$.np.require.complete, receiver))
+  expect_true(eval(prepared$call$.np.defer.empty.rows, receiver))
+})
+
 test_that("autodispatch remote references are reused only while value-current", {
   reset <- getFromNamespace(".npRmpi_lease_reset_local", "npRmpi")
   plan <- getFromNamespace(".npRmpi_lease_publication_plan", "npRmpi")

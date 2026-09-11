@@ -1,5 +1,9 @@
 # npRmpi 0.80-1
 
+* Conditional-mode fitting with MPI autodispatch no longer fails with
+  `object 'allow.external' not found`. Internal row-availability controls now
+  retain their values across distributed conditional fits and proper slices.
+
 * Conditional density/distribution bootstrap gradient plots now retain the
   requested physical predictor column. Categorical panels previously could
   receive a continuous derivative's bootstrap draws, or fail when predictors

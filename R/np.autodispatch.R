@@ -2094,6 +2094,7 @@
      "scale.init.categorical.sample", "memfac", "eval.only",
      "backfit.iterate", "backfit.maxiter", "backfit.tol", "cv.iterate", "cv.num.iterations",
      "gradients", "residuals", "se", "se.type", "errors", "gradient.order",
+     ".np.require.complete", ".np.defer.empty.rows",
      "probabilities", "level", "y.eval", "na.action",
      "proper", "proper.method", "proper.control",
      "alpha", "alpha.iter", "alpha.max", "alpha.min", "alpha.tol",
