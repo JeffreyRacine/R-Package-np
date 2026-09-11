@@ -1,5 +1,21 @@
 # np 0.80-1
 
+* Conditional density/distribution bootstrap gradient plots now retain the
+  requested physical predictor column. Categorical panels previously could
+  receive a continuous derivative's bootstrap draws, or fail when predictors
+  were interleaved. Their intervals now target the displayed first difference.
+  Smooth-bootstrap gradient bias correction remains continuous-target only.
+
+* Conditional bootstrap gradients reuse the existing evaluator with a private
+  single-target demand, avoiding unrequested R-side categorical differences
+  and higher-derivative restoration. Native computation, exact NN resampling,
+  random draws, public fitting and asymptotic-error behavior are unchanged.
+
+* Conditional-quantile bootstrap gradients likewise compute only the requested
+  R-side categorical quantile contrast. The original selected-CDF inversion,
+  density evaluation, native derivatives and requested endpoint inversions are
+  retained; full-output fits, tau layouts and LSQ quantile owners are unchanged.
+
 * Conditional density/distribution fitting now consistently retains explicit
   external rows with all computed explanatory-kernel weights zero as NA, with
   one notice. The policy covers LC/LL/LP, requested inference and categorical
