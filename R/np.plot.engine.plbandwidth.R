@@ -309,6 +309,7 @@
     )
 
     if (surface.supported && perspective && !gradients){
+      .np_plot_progress_plan(1L)
 
       view = match.arg(view)
       rotate = (view == "rotate")
@@ -653,6 +654,7 @@
         plot.par.mfrow = plot.par.mfrow,
         mfrow = n2mfrow(bws$xndim + bws$zndim)
       )
+      .np_plot_progress_plan(bws$xndim + bws$zndim)
 
       x.ev = xdat[1,,drop = FALSE]
       z.ev = zdat[1,,drop = FALSE]

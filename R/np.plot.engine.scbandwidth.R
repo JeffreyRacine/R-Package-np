@@ -289,6 +289,7 @@
     )
 
     if (surface.supported && perspective && !gradients){
+      .np_plot_progress_plan(1L)
 
       view = match.arg(view)
       rotate = (view == "rotate")
@@ -659,6 +660,7 @@
     } else {
 
       tot.dim <- (bws$xndim <- length(bws$xdati$icon)) + (bws$zndim <- length(bws$zdati$icon))
+      .np_plot_progress_plan(tot.dim)
 
       plot.layout <- .np_plot_layout_begin(
         plot.behavior = plot.behavior,

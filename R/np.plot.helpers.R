@@ -134,6 +134,125 @@
   controller
 }
 
+# A display-only scope. Bootstrap chunk controllers continue to use their own
+# local progress state; no plot context is carried into numerical/MPI payloads.
+.np_plot_progress_runtime <- new.env(parent = emptyenv())
+.np_plot_progress_runtime$context <- NULL
+
+.np_plot_progress_run <- function(expr, enabled = FALSE) {
+  if (!isTRUE(enabled) || !.np_plot_progress_enabled())
+    return(force(expr))
+  previous <- .np_plot_progress_runtime$context
+  if (!is.null(previous)) {
+    # A nested plot is not part of the outer target schedule. Its native fit
+    # heartbeat still forwards to the current owner; it cannot replace totals.
+    .np_plot_progress_runtime$context <- NULL
+    on.exit(.np_plot_progress_runtime$context <- previous, add = TRUE)
+    return(force(expr))
+  }
+  context <- new.env(parent = emptyenv())
+  context$total <- NULL
+  context$target <- 0L
+  context$completed <- 0L
+  context$fraction <- 0
+  context$rep <- NULL
+  context$stage <- "preparing"
+  context$finished <- FALSE
+  context$state <- .np_progress_begin("Boot", domain = "plot",
+                                       surface = "plot_bounded")
+  if (!isTRUE(context$state$visible))
+    return(force(expr))
+  context$state$throttle_sec <- .np_plot_progress_interval_sec()
+  context$state$unknown_total_fields <- function(state, done, detail, now) {
+    elapsed <- max(0, now - state$started)
+    work <- context$completed + context$fraction
+    eta <- if (context$finished) "0s" else if (is.null(context$total) || work <= 0) "estimating" else
+      if (work >= context$total) "finishing" else
+      paste0("~", .np_progress_fmt_num(elapsed *
+        max(0, context$total - work) / work), "s")
+    fields <- c(if (is.null(context$total)) "targets pending" else
+        sprintf("%d/%d", context$target, context$total),
+      context$rep, paste0("elap ", .np_progress_fmt_num(elapsed), "s"),
+      paste("eta", eta))
+    # Keep work/time fields ahead of verbose target names at narrow widths.
+    used <- nchar(paste0(state$pkg_prefix, " ", state$label, " (",
+                        paste(fields, collapse = ", "), ")"), type = "width")
+    remaining <- .np_progress_output_width() - used - 2L
+    if (remaining > 4L) {
+      stage <- context$stage
+      if (nchar(stage, type = "width") > remaining)
+        stage <- paste0(substr(stage, 1L, remaining - 3L), "...")
+      fields <- c(fields, stage)
+    }
+    fields
+  }
+  old.forward <- .np_progress_runtime$fit_forward
+  complete <- FALSE
+  on.exit({
+    .np_progress_runtime$fit_forward <- old.forward
+    .np_plot_progress_runtime$context <- previous
+    if (complete) .np_progress_end(context$state) else
+      .np_progress_abort(context$state)
+  }, add = TRUE)
+  .np_plot_progress_runtime$context <- context
+  .np_progress_runtime$fit_forward <- function() .np_plot_progress_notify()
+  context$state <- .np_progress_show_now(context$state)
+  value <- withVisible(force(expr))
+  context$finished <- TRUE
+  context$stage <- "complete"
+  context$rep <- NULL
+  .np_plot_progress_notify(force = TRUE)
+  complete <- TRUE
+  if (value$visible) value$value else invisible(value$value)
+}
+
+.np_plot_progress_plan <- function(total) {
+  context <- .np_plot_progress_runtime$context
+  if (!is.null(context))
+    context$total <- as.integer(total)
+  invisible(NULL)
+}
+
+.np_plot_progress_target_begin <- function() {
+  context <- .np_plot_progress_runtime$context
+  if (is.null(context))
+    return(NULL)
+  context$target <- context$target + 1L
+  context$fraction <- 0
+  context$rep <- NULL
+  context$stage <- "preparing"
+  .np_plot_progress_notify()
+  context
+}
+
+.np_plot_progress_target_end <- function(context) {
+  if (!is.null(context)) {
+    context$completed <- context$target
+    context$fraction <- 0
+    context$rep <- NULL
+  }
+  # Do not emit here: on.exit also runs on failure. Only the outer normal return
+  # may announce success; its error path releases the owner without doing so.
+  invisible(NULL)
+}
+
+.np_plot_progress_notify <- function(stage = NULL, done = NULL, total = NULL,
+                                      force = FALSE) {
+  context <- .np_plot_progress_runtime$context
+  if (is.null(context))
+    return(invisible(NULL))
+  if (!is.null(stage)) context$stage <- stage
+  if (!is.null(done) && !is.null(total) && total > 0) {
+    context$rep <- sprintf("b%d/%d", done, total)
+    # A bias bootstrap can reset the local counter within the same target.
+    # Do not claim completion of the outer call from a local B/B endpoint.
+    context$fraction <- max(context$fraction, done / total)
+  }
+  context$state <- .np_progress_step_at(context$state, .np_progress_now(),
+                                        force = force)
+  invisible(NULL)
+}
+
 .np_plot_progress_checkpoints <- function(total) {
   total <- as.integer(total)
   max_intermediate <- .np_plot_progress_max_intermediate()
@@ -158,6 +277,7 @@
   state$start_note_consumes_throttle <- TRUE
   state$checkpoints <- .np_plot_progress_checkpoints(total = total)
   state$next_checkpoint_idx <- 1L
+  state$plot_context <- .np_plot_progress_runtime$context
   state
 }
 
@@ -166,6 +286,13 @@
   if (is.null(state))
     return(NULL)
 
+  if (!is.null(state$plot_context)) {
+    state$start_note_pending <- FALSE
+    state$last_emit <- state$started
+    state$last_emitted_done <- 0L
+    .np_plot_progress_notify(stage = "resampling", done = 0L, total = total)
+    return(state)
+  }
   .np_progress_show_now(state = state, done = 0L)
 }
 
@@ -209,14 +336,20 @@
   if (isTRUE(force))
     state$last_emit <- -Inf
 
-  .np_progress_step(state = state, done = done)
+  state <- .np_progress_step(state = state, done = done)
+  if (!is.null(state$plot_context))
+    .np_plot_progress_notify(stage = state$plot_stage, done =
+      if (is.null(state$plot_stage)) done else NULL, total = state$total,
+      force = force)
+  state
 }
 
 .np_plot_progress_end <- function(state) {
   if (is.null(state))
     return(invisible(NULL))
 
-  .np_progress_end(state)
+  if (is.null(state$plot_context))
+    .np_progress_end(state)
   invisible(NULL)
 }
 
@@ -225,6 +358,14 @@
   if (is.null(state))
     return(NULL)
 
+  if (!is.null(state$plot_context)) {
+    state$plot_stage <- label
+    state$start_note_pending <- FALSE
+    state$last_emit <- state$started
+    state$last_emitted_done <- 0L
+    .np_plot_progress_notify(stage = label)
+    return(state)
+  }
   .np_progress_show_now(state = state, done = 0L)
 }
 
@@ -233,6 +374,11 @@
     return(NULL)
 
   label <- as.character(label)[1L]
+  context <- .np_plot_progress_runtime$context
+  if (!is.null(context)) {
+    .np_plot_progress_notify(stage = label)
+    return(list(plot_context = context))
+  }
   state <- .np_progress_begin(label = label, domain = "plot", surface = "plot_activity")
   state$enabled <- isTRUE(.np_plot_progress_enabled())
   state$throttle_sec <- Inf
@@ -247,6 +393,8 @@
   if (is.null(state))
     return(invisible(NULL))
 
+  if (!is.null(state$plot_context))
+    return(invisible(NULL))
   state <- .np_progress_maybe_emit_start_note(state = state, now = .np_progress_now())
   .np_progress_end(state)
   invisible(NULL)
@@ -11968,6 +12116,8 @@ compute.default.error.range <- function(center, err) {
 
 
 compute.bootstrap.errors = function(...,bws){
+  progress.target <- .np_plot_progress_target_begin()
+  on.exit(.np_plot_progress_target_end(progress.target), add = TRUE)
   UseMethod("compute.bootstrap.errors",bws)
 }
 

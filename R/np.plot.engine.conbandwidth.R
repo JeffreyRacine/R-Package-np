@@ -241,6 +241,7 @@
     )
 
     if (surface.supported && perspective && !gradients){
+      .np_plot_progress_plan(1L)
       view = match.arg(view)
       rotate = (view == "rotate")
       
@@ -615,6 +616,7 @@
 
       dsf = if (gradients) bws$xndim else 1
       tot.dim = bws$xndim + bws$yndim - quantreg
+      .np_plot_progress_plan(tot.dim * if (gradients) sum(plot.gradient.available) else 1L)
 
       plot.layout <- .np_plot_layout_begin(
         plot.behavior = plot.behavior,

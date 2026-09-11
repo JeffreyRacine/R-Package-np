@@ -121,6 +121,7 @@
     )
 
     plot.out = list()
+    .np_plot_progress_plan(1L)
 
     scalar_default <- function(value, default) {
       if (is.null(value)) default else value

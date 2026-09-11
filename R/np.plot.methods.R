@@ -501,12 +501,17 @@ np_render_control <- function(style = c("band", "bar"),
     (identical(method, .np_plot_compat_dispatch) &&
      any(c("rbandwidth", "plbandwidth", "sibandwidth",
            "conbandwidth", "condbandwidth") %in% class(bws)))
+  progress.enabled <- identical(dots$plot.errors.method, "bootstrap") &&
+    !identical(dots$plot.errors.boot.nonfixed, "frozen")
   if(!owns.empty.rows)
-    return(.np_with_seed(random.seed, do.call(method, c(list(bws = bws), dots))))
+    return(.np_plot_progress_run(
+      .np_with_seed(random.seed, do.call(method, c(list(bws = bws), dots))),
+      enabled = progress.enabled))
   publisher <- .npreg_plot_empty_publisher(.plot_context)
   dots$.np.empty.report <- publisher$record
-  .npreg_finish_plot_call(
-    .np_with_seed(random.seed, do.call(method, c(list(bws = bws), dots))), publisher)
+  .np_plot_progress_run(.npreg_finish_plot_call(
+    .np_with_seed(random.seed, do.call(method, c(list(bws = bws), dots))), publisher),
+    enabled = progress.enabled)
 }
 
 .np_plot_compat_dispatch <- function(bws, ...) {
