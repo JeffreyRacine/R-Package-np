@@ -1,4 +1,6 @@
 test_that("plot bootstrap display owns one clock without changing local clocks", {
+  old.options <- options(np.messages = TRUE, np.plot.progress = TRUE)
+  on.exit(options(old.options), add = TRUE)
   now <- 0
   trace <- capture_progress_shadow_trace({
     result <- np:::.np_plot_progress_run({
@@ -38,6 +40,8 @@ test_that("plot bootstrap display owns one clock without changing local clocks",
 })
 
 test_that("nested and failed plots restore progress scope without false completion", {
+  old.options <- options(np.messages = TRUE, np.plot.progress = TRUE)
+  on.exit(options(old.options), add = TRUE)
   now <- 0
   result <- capture_progress_shadow_trace({
     expect_error(np:::.np_plot_progress_run({
@@ -61,6 +65,8 @@ test_that("nested and failed plots restore progress scope without false completi
 })
 
 test_that("display aggregation leaves chunk-controller decisions unchanged", {
+  old.options <- options(np.messages = TRUE, np.plot.progress = TRUE)
+  on.exit(options(old.options), add = TRUE)
   sizes <- list()
   capture_progress_shadow_trace({
     for (aggregate in c(FALSE, TRUE)) {
@@ -83,6 +89,8 @@ test_that("display aggregation leaves chunk-controller decisions unchanged", {
 })
 
 test_that("quiet and standalone bootstrap helpers retain their local ownership", {
+  old.options <- options(np.messages = TRUE, np.plot.progress = TRUE)
+  on.exit(options(old.options), add = TRUE)
   trace <- capture_progress_shadow_trace({
     np:::.np_plot_progress_run({
       expect_null(np:::.np_plot_progress_runtime$context)
@@ -100,6 +108,8 @@ test_that("quiet and standalone bootstrap helpers retain their local ownership",
 })
 
 test_that("plot display scope preserves visibility and narrow-width work fields", {
+  old.options <- options(np.messages = TRUE, np.plot.progress = TRUE)
+  on.exit(options(old.options), add = TRUE)
   now <- 0
   trace <- capture_progress_shadow_trace({
     value <- withVisible(np:::.np_plot_progress_run({
@@ -119,6 +129,8 @@ test_that("plot display scope preserves visibility and narrow-width work fields"
 })
 
 test_that("verbose target labels cannot displace progress counters at narrow widths", {
+  old.options <- options(np.messages = TRUE, np.plot.progress = TRUE)
+  on.exit(options(old.options), add = TRUE)
   for (width in c(60L, 80L, 120L)) {
     now <- 0
     result <- with_np_progress_bindings(
