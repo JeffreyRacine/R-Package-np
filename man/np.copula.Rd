@@ -407,9 +407,16 @@ prediction/evaluation route, or graphics renderer as appropriate.
   For grid surfaces, \code{plot.npcopula} can add asymptotic or
   bootstrap intervals. Distribution-copula asymptotic intervals use the
   joint distribution standard error evaluated at the marginal
-  quasi-inverse grid. Density-copula asymptotic intervals use the
-  plug-in delta-method denominator correction corresponding to
-  \eqn{c(u)=f(x_u)/\prod_j f_j(x_{u,j})}. Bootstrap intervals resample
+  quasi-inverse grid. For fixed bandwidths, density-copula standard errors
+  use the centered empirical influence of
+  \eqn{c(u)=f(x_u)/\prod_j f_j(x_{u,j})}, including the same-sample
+  covariance of the joint density and all marginal densities. Query
+  coordinates and selected bandwidths are held fixed. A zero marginal
+  density or nonfinite influence produces an unavailable row standard
+  error (\code{NA}) and a notice. Nearest-neighbor density-copula errors
+  retain the existing joint-density error divided by the marginal-density
+  product; their complete ratio and random-radius covariance is not covered
+  by the fixed-bandwidth correction. Bootstrap intervals resample
   rows and recompute the plotted copula surface on the same probability
   grid. These interval conventions do not fully propagate uncertainty
   from the marginal quasi-inverse transform; \code{band="all"} overlays transparent pointwise,
