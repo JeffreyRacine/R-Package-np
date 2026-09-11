@@ -10,6 +10,8 @@
   single-target demand, avoiding unrequested R-side categorical differences
   and higher-derivative restoration. Native computation, exact NN resampling,
   random draws, public fitting and asymptotic-error behavior are unchanged.
+  Smooth-bootstrap gradient bias correction likewise avoids restoring
+  unrequested gradient components without changing its pilot or random draws.
 
 * Conditional-quantile bootstrap gradients likewise compute only the requested
   R-side categorical quantile contrast. The original selected-CDF inversion,

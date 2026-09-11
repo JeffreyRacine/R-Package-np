@@ -87,3 +87,43 @@ test_that("private conditional demand preserves native target and rejects uncert
     c(args, list(categorical.effects = FALSE, gradient.target = 2L))),
     "categorical.effects = TRUE")
 })
+
+test_that("smooth bootstrap forwards its physical continuous gradient demand", {
+  pkg <- "npRmpi"
+  helper <- getFromNamespace(".np_plot_conditional_gradient_smooth_boot", pkg)
+  x <- data.frame(u = factor(c("a", "b", "a")), x = c(-.2, .1, .3),
+                  o = ordered(c("low", "middle", "high")))
+  y <- data.frame(y = 1:3)
+  bws <- list(type = "fixed", bandwidth = list(x = c(.2, .8, .2), y = .8),
+              xdati = list(icon = c(FALSE, TRUE, FALSE)),
+              ydati = list(icon = TRUE), cxkertype = "gaussian", cxkerorder = 2L,
+              cykertype = "gaussian", cykerorder = 2L)
+  calls <- 0L
+  local_mocked_bindings(
+    .np_plot_oversmooth_conditional_bws = function(bws, cdf) bws,
+    .np_plot_smooth_resample_frame = function(dat, idx, ...) dat[idx, , drop = FALSE],
+    .np_plot_conditional_eval = function(exdat, gradients, gradient.order,
+      lp.first.se.demand, cat.se.demand, se, gradient.target, ...) {
+      calls <<- calls + 1L
+      expect_true(gradients)
+      expect_identical(gradient.order, 2L)
+      expect_false(lp.first.se.demand)
+      expect_false(cat.se.demand)
+      expect_false(se)
+      expect_identical(gradient.target, 2L)
+      list(congrad = matrix(rep(c(10, 20, 30), each = nrow(exdat)),
+                            nrow = nrow(exdat)))
+    }, .package = pkg)
+  withr::local_options(np.messages = FALSE, np.plot.progress = FALSE)
+  args <- list(xdat = x, ydat = y, exdat = x[1:2, , drop = FALSE],
+    eydat = y[1:2, , drop = FALSE], bws = bws, cdf = FALSE,
+    gradient.index = 2L, gradient.order = 2L, plot.errors.boot.method = "inid",
+    plot.errors.boot.blocklen = 2L, plot.errors.boot.num = 1L, progress.label = NULL)
+  out <- do.call(helper, args)
+  expect_identical(calls, 2L)
+  expect_identical(out$t0, c(20, 20))
+  expect_identical(out$t, matrix(20, nrow = 1L, ncol = 2L))
+  args$gradient.index <- 1L
+  expect_error(do.call(helper, args), "only for continuous conditioning variables")
+  expect_identical(calls, 2L)
+})
