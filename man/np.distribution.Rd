@@ -108,9 +108,14 @@ Further arguments are passed to \code{\link{npudistbw}} when bandwidths are comp
   are retained in the joint observation influence. The selected NN ranks
   are treated as fixed; bandwidth-selection uncertainty is not included.
   This calculation supports Gaussian and Epanechnikov kernels of orders
-  2, 4, 6 and 8, and uniform distribution kernels, without finite kernel
-  bounds. Uniform density support-boundary terms, finite kernel bounds,
-  extended or saturated NN ranks, and degenerate pilot spacings are not
+  2, 4, 6 and 8, and uniform kernels, without finite kernel bounds.
+  Uniform density errors additionally include moving-support boundary
+  influences with joint other-coordinate and categorical kernel marks.
+  These use type-7 sample-quantile endpoints and deterministic two-sided
+  rank-spacing pilots whose interior window grows as the two-thirds power
+  of sample size. A strictly absent support face contributes zero; an exact
+  probability endpoint or undefined finite-face pilot is unavailable.
+  Finite kernel bounds, extended or saturated NN ranks, and degenerate pilot spacings are not
   currently qualified: point estimates are retained and standard errors
   are \code{NA}, with one availability notice. No additional uncertainty
   computation is performed for \code{se=FALSE}.

@@ -8,6 +8,7 @@
 extern SEXP C_np_copula_density_se(SEXP);
 extern SEXP C_np_ann_geometry(SEXP, SEXP);
 extern SEXP C_np_ann_variance(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP C_np_ann_variance_faces(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_dim_basis(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_density(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_density_bw(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
@@ -107,6 +108,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"C_np_copula_density_se",          (DL_FUNC) &C_np_copula_density_se,           1},
     {"C_np_ann_geometry",               (DL_FUNC) &C_np_ann_geometry,                2},
     {"C_np_ann_variance",               (DL_FUNC) &C_np_ann_variance,                7},
+    {"C_np_ann_variance_faces",         (DL_FUNC) &C_np_ann_variance_faces,          8},
     {"C_np_regression_k1_geometry_validate",(DL_FUNC) &C_np_regression_k1_geometry_validate,3},
     {"C_np_kernelsum_power12",         (DL_FUNC) &C_np_kernelsum_power12,         19},
     {"C_np_progress_fit_begin",        (DL_FUNC) &C_np_progress_fit_begin,         1},

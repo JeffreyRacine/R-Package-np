@@ -4,8 +4,10 @@
   include the same-sample influence of donor-specific radii, with a two-sided
   NN rank-spacing pilot. The joint influence retains cross-coordinate and
   categorical-kernel covariance. Gaussian/Epanechnikov density and distribution
-  kernels, and uniform distribution kernels, are supported on regular interior
-  NN ranks without finite kernel bounds. Unqualified support-boundary, bounded,
+  kernels, and uniform kernels, are supported on regular interior
+  NN ranks without finite kernel bounds. Uniform density errors include the
+  joint marked moving-support faces using sample-quantile/spacing pilots;
+  strictly absent faces have zero motion. Unqualified boundary-pilot, bounded,
   extended/saturated-rank or degenerate-spacing cases retain point estimates
   and return NA standard errors with one availability notice. This changes
   previously incomplete ANN uncertainty, not point estimates, bandwidth search
