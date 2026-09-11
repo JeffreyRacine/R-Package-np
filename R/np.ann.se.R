@@ -39,7 +39,13 @@
   p <- ncol(state$x)
   e <- as.matrix(evaluation[, bws[["icon", exact = TRUE]], drop = FALSE])
   storage.mode(e) <- "double"
-  kbw <- kbandwidth(bws)
+  # Reuse the density-family adapter: its normalized ordered Li-Racine
+  # spelling differs from the generic kernel-sum spelling. Use raw ranks
+  # even when the public bandwidth object displays scale factors.
+  kernel.spec <- bws
+  kernel.spec[["bw"]] <- as.double(unlist(bws[["bandwidth", exact = TRUE]],
+                                        use.names = FALSE))
+  kbw <- .np_make_kbandwidth_unconditional(kernel.spec, data)
   # Bound the entire resident normal + permutation tensor, not each separately.
   tile <- max(1L, min(64L, floor(1048576 / (as.double(n) * (1L + p)))))
   out <- numeric(m)
