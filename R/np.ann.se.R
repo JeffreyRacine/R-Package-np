@@ -7,8 +7,7 @@
   if (!identical(bws[["ckerbound", exact = TRUE]], "none"))
     return("ANN uncertainty with finite kernel bounds is not yet implemented")
   kernel <- bws[["ckertype", exact = TRUE]]
-  if (!kernel %in% c("gaussian", "epanechnikov", "uniform") ||
-      (density && identical(kernel, "uniform")))
+  if (!kernel %in% c("gaussian", "epanechnikov", "uniform"))
     return("the kernel's ANN support-boundary influence is not yet implemented")
   k <- as.double(unlist(bws[["bandwidth", exact = TRUE]], use.names = FALSE))[bws[["icon", exact = TRUE]]]
   if (!length(k) || any(!is.finite(k)) || any(k != floor(k)) ||
@@ -46,8 +45,10 @@
   kernel.spec[["bw"]] <- as.double(unlist(bws[["bandwidth", exact = TRUE]],
                                         use.names = FALSE))
   kbw <- .np_make_kbandwidth_unconditional(kernel.spec, data)
+  uniform <- density && identical(bws[["ckertype", exact = TRUE]], "uniform")
+  if (uniform) state$uniform <- .np_ann_uniform_prepare(kbw, data)
   # Bound the entire resident normal + permutation tensor, not each separately.
-  tile <- max(1L, min(64L, floor(1048576 / (as.double(n) * (1L + p)))))
+  tile <- max(1L, min(64L, floor(1048576 / (as.double(n) * (1L + p + as.integer(uniform))))))
   out <- numeric(m)
   for (start in seq.int(1L, m, by = tile)) {
     rows <- seq.int(start, min(m, start + tile - 1L))
@@ -58,9 +59,17 @@
       bandwidth.divide = TRUE, return.kernel.weights = TRUE,
       return.derivative.kernel.weights = TRUE,
       .np.internal.bandwidth.divide.weights = TRUE)
-    out[rows] <- .Call("C_np_ann_variance", state$geometry, state$order,
-      state$x, e[rows, , drop = FALSE], weights[["kw", exact = TRUE]],
-      weights[["p.kw", exact = TRUE]], density, PACKAGE = "npRmpi")
+    if (uniform) {
+      faces <- .np_ann_uniform_faces(state, data,
+        evaluation[rows, , drop = FALSE], e[rows, , drop = FALSE])
+      out[rows] <- .Call("C_np_ann_variance_faces", state$geometry, state$order,
+        state$x, e[rows, , drop = FALSE], weights[["kw", exact = TRUE]],
+        weights[["p.kw", exact = TRUE]], density, faces, PACKAGE = "npRmpi")
+    } else {
+      out[rows] <- .Call("C_np_ann_variance", state$geometry, state$order,
+        state$x, e[rows, , drop = FALSE], weights[["kw", exact = TRUE]],
+        weights[["p.kw", exact = TRUE]], density, PACKAGE = "npRmpi")
+    }
     weights <- NULL
     if (!is.null(progress.context))
       progress.context$state <- .np_progress_step_at(
@@ -85,8 +94,8 @@
   out <- .npRmpi_ann_unconditional_se(bws, data, evaluation, density, progress.context)
   if (anyNA(out))
     .np_warning(paste0("Adaptive-NN standard errors are unavailable for ",
-      sum(is.na(out)), " evaluation row(s): a NN spacing pilot is degenerate ",
-      "or the estimated influence is nonfinite. Point estimates are retained; ",
+      sum(is.na(out)), " evaluation row(s): a NN or boundary spacing pilot is ",
+      "non-interior or degenerate, or the estimated influence is nonfinite. Point estimates are retained; ",
       "these standard errors are NA."), call. = FALSE)
   out
 }

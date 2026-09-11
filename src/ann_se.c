@@ -114,9 +114,9 @@ static void ann_matrix(SEXP x, int *nr, int *nc)
     *nr = INTEGER(dim)[0]; *nc = INTEGER(dim)[1];
 }
 
-SEXP C_np_ann_variance(SEXP geometry, SEXP order, SEXP training,
+static SEXP ann_variance(SEXP geometry, SEXP order, SEXP training,
                        SEXP evaluation, SEXP weights, SEXP derivative,
-                       SEXP density)
+                       SEXP density, SEXP faces)
 {
     int n, p, ne, pe, nw, m;
     ann_matrix(training, &n, &p);
@@ -137,6 +137,19 @@ SEXP C_np_ann_variance(SEXP geometry, SEXP order, SEXP training,
         INTEGER(dd)[0] != n || INTEGER(dd)[1] != m ||
         (XLENGTH(dd) == 3 && INTEGER(dd)[2] != p))
         error("ANN standard-error derivative tensor does not conform");
+    const double *face_cut = NULL, *face_coef = NULL;
+    if (faces != R_NilValue) {
+        int nf, pf, nc, pc;
+        if (TYPEOF(faces) != VECSXP || XLENGTH(faces) != 2 ||
+            !LOGICAL(density)[0] || p > INT_MAX/2)
+            error("ANN standard-error boundary payload is invalid");
+        ann_matrix(VECTOR_ELT(faces,0), &nf, &pf);
+        ann_matrix(VECTOR_ELT(faces,1), &nc, &pc);
+        if (nf != m || nc != m || pf != 2*p || pc != 2*p)
+            error("ANN standard-error boundary dimensions do not conform");
+        face_cut = REAL(VECTOR_ELT(faces,0));
+        face_coef = REAL(VECTOR_ELT(faces,1));
+    }
     int *seen = (int *)R_alloc(n, sizeof(int));
     for (int j = 0; j < p; ++j) {
         SEXP g = VECTOR_ELT(geometry,j), ord = VECTOR_ELT(order,j);
@@ -196,6 +209,20 @@ SEXP C_np_ann_variance(SEXP geometry, SEXP order, SEXP training,
                 phi[ord[s]-1] += prefix/n;
             }
         }
+        if (face_cut && valid) {
+            for (int j = 0; j < p && valid; ++j) {
+                const double at = e[q+(R_xlen_t)m*j];
+                for (int h = 0; h < 2; ++h) {
+                    const R_xlen_t slot = q+(R_xlen_t)m*(2*j+h);
+                    const double cut = face_cut[slot], coef = face_coef[slot];
+                    if (!R_FINITE(cut) || !R_FINITE(coef)) { valid = 0; break; }
+                    for (int i = 0; i < n; ++i) {
+                        const double z = x[i+(R_xlen_t)n*j];
+                        phi[i] += (long double)coef*((z <= at)-(z <= cut));
+                    }
+                }
+            }
+        }
         long double mean = 0;
         NPANNConditionalNorm norm = {0.0, 0.0, 0};
         if (valid) {
@@ -211,4 +238,16 @@ SEXP C_np_ann_variance(SEXP geometry, SEXP order, SEXP training,
     }
     UNPROTECT(1);
     return out;
+}
+
+SEXP C_np_ann_variance(SEXP geometry, SEXP order, SEXP training,
+                       SEXP evaluation, SEXP weights, SEXP derivative, SEXP density)
+{
+    return ann_variance(geometry,order,training,evaluation,weights,derivative,density,R_NilValue);
+}
+
+SEXP C_np_ann_variance_faces(SEXP geometry, SEXP order, SEXP training,
+                       SEXP evaluation, SEXP weights, SEXP derivative, SEXP density, SEXP faces)
+{
+    return ann_variance(geometry,order,training,evaluation,weights,derivative,density,faces);
 }
