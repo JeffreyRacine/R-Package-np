@@ -349,19 +349,18 @@ Further arguments are passed to \code{\link{npcdistbw}} when bandwidths are comp
   Beta-kernel and positive-degree local-polynomial covariance calculations
   retain their separate targets.
 
-  For scalar adaptive nearest-neighbour fits with continuous explanatory
-  variables and exclusively categorical responses, requested level and
-  continuous first-derivative standard errors instead use the complete
-  empirical influence of the conditional ratio. They retain the actual
-  normalized X weights and categorical Y operator, including both
-  numerator and denominator derivatives. This calculation conditions on
-  the observed X geometry and specified response smoothing; it does not
-  supply a full random-radius covariance for continuous responses or
-  account for bandwidth-selection uncertainty. Local-constant-equivalent
-  degree-zero fits share this calculation. Positive-degree local-polynomial,
-  beta-kernel and paired categorical-contrast errors retain their separate
-  covariance calculations. With \code{se = FALSE}, the additional
-  uncertainty pass is not performed.
+  For scalar adaptive nearest-neighbour fits with any continuous variable,
+  requested level and available continuous first-derivative standard errors
+  use the complete empirical influence of the conditional ratio. They retain
+  the actual normalized X weights and continuous/categorical Y contributions,
+  including numerator and denominator derivatives. This working covariance
+  holds the selected model, observed X geometry and realized response
+  nearest-neighbour radii fixed; it does not account for their sampling or
+  selection uncertainty. Local-constant-equivalent degree-zero fits share
+  this calculation, including continuous responses with categorical-only X.
+  Positive-degree local-polynomial, beta-kernel and paired categorical-
+  contrast errors retain their separate covariance calculations. With
+  \code{se = FALSE}, the additional uncertainty pass is not performed.
 
 }
 \value{

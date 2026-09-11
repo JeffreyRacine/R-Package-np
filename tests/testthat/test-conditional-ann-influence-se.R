@@ -137,3 +137,69 @@ local({
   else
     run()
 })
+local({
+  run <- function() {
+    test_that("continuous-response ANN errors retain donor-radius units and influences", {
+      old <- options(np.messages = FALSE, np.tree = FALSE)
+      on.exit(options(old), add = TRUE)
+      n <- 25L
+      x <- data.frame(x = seq(.08, .92, length.out = n))
+      group <- factor(rep(c("a", "b", "c"), length.out = n))
+      y <- data.frame(y = .5 + .28*sin(seq_len(n)*1.37))
+      ey <- data.frame(y = c(.35, .6))
+      for (cdf in c(FALSE, TRUE)) for (categorical.x in c(FALSE, TRUE)) {
+        tx <- if (categorical.x) data.frame(g = group) else x
+        ex <- tx[c(7L, 19L), , drop = FALSE]
+        hx <- if (categorical.x) .2 else 11L
+        bwfun <- if (cdf) npcdistbw else npcdensbw
+        fun <- if (cdf) npcdist else npcdens
+        bw <- bwfun(xdat = tx, ydat = y, bws = c(9L, hx),
+          bandwidth.compute = FALSE, bwtype = "adaptive_nn", regtype = "lc")
+        args <- list(bws = bw, txdat = tx, tydat = y,
+                     exdat = ex, eydat = ey, gradients = TRUE)
+        on <- do.call(fun, c(args, list(se = TRUE)))
+        off <- do.call(fun, c(args, list(se = FALSE)))
+        expect_identical(fitted(on), fitted(off))
+        expect_identical(gradients(on), gradients(off))
+        w <- t(npksum(bws = hx, txdat = tx, exdat = ex, tydat = diag(n),
+          bwtype = "adaptive_nn", bandwidth.divide = TRUE)$ksum)
+        z <- t(npksum(bws = 9L, txdat = y, exdat = ey, tydat = diag(n),
+          bwtype = "adaptive_nn", bandwidth.divide = TRUE,
+          operator = if (cdf) "integral" else "normal")$ksum)
+        den <- colSums(w)
+        a <- sweep(w, 2L, den, "/")
+        m <- colSums(a*z)
+        residual <- sweep(z, 2L, m, "-")
+        expect_equal(as.numeric(fitted(on)), m, tolerance = 3e-11)
+        expect_equal(as.numeric(se(on)),
+          sqrt(n/(n-1L)*colSums((a*residual)^2)), tolerance = 3e-11)
+        if (!categorical.x) {
+          dw <- t(npksum(bws = hx, txdat = tx, exdat = ex, tydat = diag(n),
+            bwtype = "adaptive_nn", bandwidth.divide = TRUE,
+            operator = "derivative")$ksum)
+          da <- sweep(dw, 2L, den, "/") -
+            sweep(a, 2L, colSums(dw)/den, "*")
+          g <- colSums(da*z)
+          u <- da*residual-sweep(a, 2L, g, "*")
+          expect_equal(as.numeric(gradients(on)), g, tolerance = 3e-11)
+          expect_equal(as.numeric(gradients(on, se = TRUE)),
+            sqrt(n/(n-1L)*colSums(u^2)), tolerance = 3e-11)
+        }
+        scaled.y <- data.frame(y = 10*y$y)
+        scaled.bw <- bwfun(xdat = tx, ydat = scaled.y, bws = c(9L, hx),
+          bandwidth.compute = FALSE, bwtype = "adaptive_nn", regtype = "lc")
+        scaled <- fun(bws = scaled.bw, txdat = tx, tydat = scaled.y,
+          exdat = ex, eydat = data.frame(y = 10*ey$y), se = TRUE)
+        multiplier <- if (cdf) 1 else 10
+        expect_equal(as.numeric(fitted(scaled))*multiplier,
+                     as.numeric(fitted(on)), tolerance = 3e-11)
+        expect_equal(as.numeric(se(scaled))*multiplier,
+                     as.numeric(se(on)), tolerance = 3e-11)
+      }
+    })
+  }
+  package <- getNamespaceName(environment(npcdens))
+  if (package == "npRmpi")
+    getFromNamespace(".npRmpi_with_local_regression", package)(run())
+  else run()
+})

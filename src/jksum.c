@@ -9524,7 +9524,7 @@ static double np_conditional_leading_category_se(
 }
 
 /* Direct empirical conditional influence after the original point totals.
- * Only the additional ANN/category-Y replay receives this context. */
+ * Only the additional scalar conditional ANN replay receives this context. */
 typedef struct {
   int n, m, directions;
   const NPConditionalLeadingRatioCtx *response;
@@ -9577,8 +9577,31 @@ static double np_conditional_ann_direct_response(
   NPConditionalANNDirectCtx *ctx,int donor,int evaluation)
 {
   if(ctx->response_donor[evaluation] != donor) {
-    ctx->response_value[evaluation]=
-      np_conditional_leading_response_category(ctx->response,donor,evaluation);
+    const NPConditionalLeadingRatioCtx * const response=ctx->response;
+    double product=np_conditional_leading_response_category(response,donor,evaluation);
+    for(int l=0;l<response->yncon;++l) {
+      const int coordinate=response->xncon+l;
+      const int kernel=response->ykc[l]+OP_CFUN_OFFSETS[response->yop];
+      const double h=response->bandwidth[l][donor];
+      const double centre=response->train_c[l][donor];
+      const int bounded=int_cker_bound_extern &&
+        vector_ckerlb_extern != NULL && vector_ckerub_extern != NULL &&
+        ((isfinite(vector_ckerlb_extern[coordinate]) &&
+          fabs(vector_ckerlb_extern[coordinate]) < .5*DBL_MAX) ||
+         (isfinite(vector_ckerub_extern[coordinate]) &&
+          fabs(vector_ckerub_extern[coordinate]) < .5*DBL_MAX));
+      const int integral=response->yop == OP_INTEGRAL;
+      const double lower=bounded ? vector_ckerlb_extern[coordinate] : R_NegInf;
+      const double upper=bounded ? vector_ckerub_extern[coordinate] : R_PosInf;
+      const double invnorm=bounded && !integral ?
+        np_cker_bounded_norm(kernel,centre,h,lower,upper).inverse_mass : 1.0;
+      double value;
+      /* ANN kernels are centred at the donor, including bound normalization. */
+      np_ckernelv(kernel,response->eval_c[l]+evaluation,1,0,centre,h,
+        &value,NULL,1,1,invnorm,bounded && integral,lower,upper,NULL,NULL);
+      product*=integral ? value : value/h;
+    }
+    ctx->response_value[evaluation]=product;
     ctx->response_donor[evaluation]=donor;
   }
   return ctx->response_value[evaluation];
@@ -12462,7 +12485,8 @@ NPPermutationWeightOutput * const pkw_output){
   NPConditionalANNDirectCtx * const conditional_ann =
     outer_pack_ctx != NULL ? outer_pack_ctx->conditional_ann_direct : NULL;
   if(conditional_ann != NULL) {
-    if(BANDWIDTH_reg != BW_ADAP_NN || num_reg_continuous <= 0 ||
+    if(BANDWIDTH_reg != BW_ADAP_NN ||
+       num_reg_continuous+num_reg_unordered+num_reg_ordered <= 0 ||
        leave_one_out || drop_one_train || gather_scatter || symmetric ||
        do_score || kernel_pow != 1 || bandwidth_divide != 1 ||
        ncol_W != 0 || ncol_Y != 0 || weighted_sum == NULL || kw != NULL ||
@@ -12472,8 +12496,13 @@ NPPermutationWeightOutput * const pkw_output){
        conditional_ann->n != num_obs_train || conditional_ann->m != num_obs_eval ||
        conditional_ann->response == NULL || conditional_ann->level == NULL ||
        conditional_ann->denominator == NULL || conditional_ann->mean == NULL ||
-       conditional_ann->response->yncon != 0 ||
-       conditional_ann->response->ynuno+conditional_ann->response->ynord <= 0 ||
+       conditional_ann->response->yncon+conditional_ann->response->ynuno+
+         conditional_ann->response->ynord <= 0 ||
+       (conditional_ann->response->yncon > 0 &&
+        (conditional_ann->response->ykc == NULL ||
+         conditional_ann->response->train_c == NULL ||
+         conditional_ann->response->eval_c == NULL ||
+         conditional_ann->response->bandwidth == NULL)) ||
        conditional_ann->response_value == NULL ||
        conditional_ann->response_donor == NULL ||
        (permutation_operator != OP_NOOP && permutation_operator != OP_DERIVATIVE) ||
@@ -52876,8 +52905,7 @@ int *cat_se_status
   const int do_grad = (kdf_deriv != NULL); 
   const int do_gerr = (kdf_deriv_stderr != NULL);
   const int ann_uncertainty = do_merr && BANDWIDTH_den == BW_ADAP_NN &&
-    num_X_continuous > 0 && num_Y_continuous == 0 &&
-    num_Y_unordered+num_Y_ordered > 0;
+    num_X_continuous+num_Y_continuous > 0 && num_X > 0;
   if(ann_uncertainty && cat_se_status == NULL)
     error("conditional ANN uncertainty requires a status output");
   NPConditionalCategorySECall cat_se_call = {0};
