@@ -125,3 +125,31 @@ test_that("conditional density/distribution categorical bootstrap gradients work
     }
   }
 })
+test_that("conditional gradient coordinates retain physical columns", {
+  resolve <- getFromNamespace(".np_plot_resolve_conditional_gradient_index", "np")
+  ordinary <- getFromNamespace(".np_plot_require_conditional_gradient_bootstrap_supported", "np")
+  bias <- getFromNamespace(".np_plot_validate_conditional_gradient_target", "np")
+  label <- getFromNamespace(".np_plot_conditional_bootstrap_target_label", "np")
+  layouts <- list(c(FALSE, FALSE, TRUE, TRUE), c(TRUE, FALSE, TRUE, FALSE),
+                  c(FALSE, TRUE), c(TRUE, TRUE), c(FALSE, FALSE))
+  for (icon in layouts) {
+    bw <- list(xdati = list(icon = icon), xndim = length(icon), yndim = 1L,
+               xnames = paste0("x", seq_along(icon)), ynames = "y")
+    for (j in seq_along(icon)) {
+      expect_identical(resolve(bw, j, "test"), j)
+      expect_true(ordinary(bw, j, "test"))
+      expect_match(label(bw, 1L, TRUE, j), paste0("grad x", j, " on x1"), fixed = TRUE)
+      if (icon[j])
+        expect_identical(bias(bw, j, "test"), j)
+      else
+        expect_error(bias(bw, j, "test"), "smooth-bootstrap gradient bias correction", fixed = TRUE)
+    }
+  }
+  bw <- list(xdati = list(icon = c(FALSE, TRUE)))
+  for (j in list(NULL, numeric(), NA_real_, NaN, Inf, -Inf, 0L, -1L,
+                 3L, 1.5, c(1L, 2L), "1", TRUE, 1 + 1i)) {
+    expect_error(resolve(bw, j, "test"), "invalid conditional gradient coordinate", fixed = TRUE)
+  }
+  expect_error(resolve(list(xdati = list(icon = c(TRUE, NA))), 1L, "test"),
+               "invalid conditional gradient coordinate", fixed = TRUE)
+})
