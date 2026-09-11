@@ -1,5 +1,13 @@
 # np 0.80-1
 
+* Requested fixed-bandwidth copula density standard errors now include the
+  same-sample covariance of the joint and all marginal density estimates.
+  The centered ratio influence is reduced in bounded query tiles; MPI keeps
+  marginal kernel weights on their owning rank and communicates only SEs.
+  Point estimates, bandwidth search, SE-off work, distribution copulas and
+  NN uncertainty are unchanged. This correction holds marginal evaluation
+  coordinates fixed; it does not include quasi-inverse or bandwidth uncertainty.
+
 * Requested conditional density/distribution LP standard errors now follow
   the fitted regularized operator when explanatory-kernel weights are
   constant. This corrects level and native first-derivative uncertainty

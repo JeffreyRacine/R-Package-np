@@ -523,11 +523,13 @@ npcopula <- function(bws, ...) {
   NZD(out)
 }
 
-.npcopula_asymptotic_se <- function(x, data, xgrid) {
+.npcopula_asymptotic_se <- function(x, data, xgrid, progress.context = NULL) {
   bws <- x$bws
   target <- x$target
   density <- identical(target, "density")
   if (density) {
+    if (identical(bws[["type", exact = TRUE]], "fixed"))
+      return(.npcopula_density_se_fixed(bws, data, xgrid, progress.context))
     joint <- npudens(tdat = data, edat = xgrid, bws = bws, se = TRUE)
     return(se(joint) / .npcopula_marginal_density_product(bws, data, xgrid))
   }
@@ -1402,7 +1404,9 @@ npcopula.default <- function(bws,
   progress <- .npcopula_progress_begin(target = target,
                                        evaluation = if (u.provided) "grid" else "sample",
                                        total = progress.total)
-  on.exit(.np_progress_end(progress), add = TRUE)
+  se.progress <- NULL
+  on.exit(.np_progress_end(if (is.null(se.progress)) progress else se.progress$state),
+          add = TRUE)
   stage <- 0L
 
   if(is.null(u)) {
@@ -1534,8 +1538,12 @@ npcopula.default <- function(bws,
     )
     # Preserve the established external-query uncertainty geometry, which
     # need not match the sample point fit's training-identity NN geometry.
+    se.progress <- new.env(parent = emptyenv())
+    se.progress$state <- progress
+    se.progress$done <- stage + 1L
     result[["copulaerr"]] <- .npcopula_asymptotic_se(
-      result, data = data, xgrid = .npcopula_eval_xgrid(result)
+      result, data = data, xgrid = .npcopula_eval_xgrid(result),
+      progress.context = se.progress
     )
   }
   result
