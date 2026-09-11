@@ -8,12 +8,19 @@ local({
   # Dense diagnostic only: independent rank geometry and explicit interval
   # matrix. Canonical kernel weights distinguish geometry from kernel tests.
   oracle <- function(bw, density) {
-    kw <- npksum(bws=kbandwidth(bw), txdat=x, exdat=at,
+    kbw <- kbandwidth(bw)
+    # Independent explicit density-family kernel mapping, checked below
+    # against the actual public point, not just the SE producer's adapter.
+    if (identical(bw$okertype, "liracine")) kbw$okertype <- "nliracine"
+    kw <- npksum(bws=kbw, txdat=x, exdat=at,
       operator=if(density) "normal" else "integral",
       permutation.operator=if(density) "derivative" else "normal",
       bandwidth.divide=TRUE, return.kernel.weights=TRUE,
       return.derivative.kernel.weights=TRUE,
       .np.internal.bandwidth.divide.weights=TRUE)
+    ff <- if (density) npudens else npudist
+    expect_equal(colMeans(kw$kw), fitted(ff(bws=bw,tdat=x,edat=at,se=FALSE)),
+                 tolerance=2e-12)
     k <- c(11L, 15L)
     phi <- kw$kw
     for (j in seq_len(2L)) {
@@ -60,6 +67,16 @@ local({
       off <- npudens(bws=bw,tdat=x,edat=at,se=FALSE)
       expect_identical(fitted(on),fitted(off))
     })
+    for (density in c(TRUE, FALSE)) for (ordered in c("wangvanryzin", "liracine", "racineliyan")) {
+      test_that(paste("ANN covariance matches actual ordered kernel",density,ordered), {
+        bf <- if(density) npudensbw else npudistbw
+        ff <- if(density) npudens else npudist
+        bw <- bf(dat=x,bws=c(11,15,.3),bwtype="adaptive_nn",okertype=ordered,
+                 bandwidth.compute=FALSE)
+        on <- ff(bws=bw,tdat=x,edat=at,se=TRUE)
+        expect_equal(se(on),oracle(bw,density),tolerance=2e-11)
+      })
+    }
   }
   if (exists(".npRmpi_with_local_regression", mode="function"))
     .npRmpi_with_local_regression(run())
