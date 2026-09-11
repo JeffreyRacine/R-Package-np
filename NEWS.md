@@ -26,13 +26,14 @@
   constant. This corrects level and native first-derivative uncertainty
   after ridging; fitted values and point gradients are unchanged.
 
-* Requested scalar conditional adaptive-NN standard errors with continuous
-  explanatory variables and exclusively categorical responses now use the
+* Requested scalar conditional adaptive-NN standard errors now use the
   complete empirical ratio influence for levels and existing continuous
-  first derivatives. Point estimates, gradients, search and SE-off inference
-  work are unchanged. Existing positive-degree LP, beta and categorical-
-  contrast covariance owners are preserved. This conditional-on-X correction
-  does not resolve unconditional or continuous-response random-radius theory.
+  first derivatives, including continuous/mixed responses and categorical-only
+  predictors. This corrects their physical bandwidth scaling while holding
+  the selected model, predictor geometry and realized response radii fixed;
+  sampling or selection uncertainty in these quantities is not included.
+  Point estimates and gradients are unchanged. Local-polynomial, beta-kernel
+  and paired categorical-contrast errors retain their separate targets.
 
 * Fixed/generalized-NN conditional density and distribution standard errors
   with categorical variables now retain their joint categorical second
