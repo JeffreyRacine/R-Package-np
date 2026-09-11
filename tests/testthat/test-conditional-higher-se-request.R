@@ -53,8 +53,12 @@ test_that("higher conditional uncertainty has a separate optional demand", {
 
 test_that("unused higher uncertainty never reaches the supplementary hat owner", {
   d <- higher_se_fixture(FALSE, 2L, "fixed")
+  point.owner <- getFromNamespace(".np_conditional_higher_hat", "npRmpi")
   testthat::local_mocked_bindings(
-    .np_conditional_higher_hat = function(...) stop("unrequested higher hat"),
+    .np_conditional_higher_hat = function(..., return.norm = TRUE) {
+      if (return.norm) stop("unrequested higher hat norm")
+      point.owner(..., return.norm = FALSE)
+    },
     .package = "npRmpi")
   off <- do.call(npcdens, c(d$call, list(se = FALSE)))
   expect_null(off$congerr)
