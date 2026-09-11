@@ -161,6 +161,7 @@
     if (surface.supported && perspective &&
         !any(xor(bws$xdati$iord, bws$xdati$inumord))){
       view = match.arg(view)
+      .np_plot_progress_plan(1L)
       rotate = (view == "rotate")
 
       
@@ -455,6 +456,7 @@
         plot.par.mfrow = plot.par.mfrow,
         mfrow = n2mfrow(bws$ndim)
       )
+      .np_plot_progress_plan(bws$ndim)
 
       ev = xdat[1,,drop = FALSE]
 

@@ -755,6 +755,9 @@ npcopula <- function(bws, ...) {
                                        plot.errors.boot.method,
                                        plot.errors.boot.num,
                                        plot.errors.boot.blocklen) {
+  .np_plot_progress_plan(1L)
+  progress.target <- .np_plot_progress_target_begin()
+  on.exit(.np_plot_progress_target_end(progress.target), add = TRUE)
   if (identical(plot.errors.method, "none"))
     return(NULL)
   if (!identical(x$evaluation, "grid"))
@@ -1107,7 +1110,7 @@ plot.npcopula <- function(x,
   u2 <- grid$u2
   z <- grid$z
   z.display <- .npcopula_clip_z_for_display(z, zlim)
-  payload <- .npcopula_interval_payload(
+  payload <- .np_plot_progress_run(.npcopula_interval_payload(
     x = x,
     plot.errors.method = errors,
     plot.errors.alpha = alpha,
@@ -1116,7 +1119,7 @@ plot.npcopula <- function(x,
     plot.errors.boot.method = bootstrap,
     plot.errors.boot.num = as.integer(B),
     plot.errors.boot.blocklen = boot.control$blocklen
-  )
+  ), enabled = identical(errors, "bootstrap"))
   plot.data <- .npcopula_add_interval_columns(x, payload)
   if (identical(output, "data"))
     return(plot.data)

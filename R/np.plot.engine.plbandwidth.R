@@ -309,6 +309,7 @@
         !any(xor(bws$zdati$iord, bws$zdati$inumord))){
 
       view = match.arg(view)
+      .np_plot_progress_plan(1L)
       rotate = (view == "rotate")
       
       if (is.ordered(xdat[,1])){
@@ -648,6 +649,7 @@
         plot.par.mfrow = plot.par.mfrow,
         mfrow = n2mfrow(bws$xndim + bws$zndim)
       )
+      .np_plot_progress_plan(bws$xndim + bws$zndim)
 
       x.ev = xdat[1,,drop = FALSE]
       z.ev = zdat[1,,drop = FALSE]

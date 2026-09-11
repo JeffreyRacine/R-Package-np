@@ -8,6 +8,13 @@
   geometry. Existing point estimates, continuous errors and SE-off computation
   are unchanged. Nonsmooth or nonfinite influences remain explicitly unavailable.
 
+* Bootstrap plots using the shared estimator dispatcher
+  now retain one display owner and elapsed clock across their scheduled targets,
+  with an approximate overall ETA. Copula bootstrap interval preparation uses
+  the same scope. Numerical work and standalone-helper behavior are unchanged;
+  conditional-mode and LSQ-quantile displays and the frozen bootstrap shortcut retain their
+  existing behavior.
+
 * Conditional-mode fitting with MPI autodispatch no longer fails with
   `object 'allow.external' not found`. Internal row-availability controls now
   retain their values across distributed conditional fits and proper slices.

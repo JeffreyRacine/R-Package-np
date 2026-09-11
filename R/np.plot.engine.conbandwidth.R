@@ -241,6 +241,7 @@
         (bws$xnuno + bws$ynuno == 0) & perspective & !gradients &
         !any(xor(bws$xdati$iord, bws$xdati$inumord))){
       view = match.arg(view)
+      .np_plot_progress_plan(1L)
       rotate = (view == "rotate")
       
       if (is.ordered(xdat[,1])){
@@ -614,6 +615,7 @@
 
       dsf = if (gradients) bws$xndim else 1
       tot.dim = bws$xndim + bws$yndim - quantreg
+      .np_plot_progress_plan(tot.dim * if (gradients) sum(plot.gradient.available) else 1L)
 
       plot.layout <- .np_plot_layout_begin(
         plot.behavior = plot.behavior,

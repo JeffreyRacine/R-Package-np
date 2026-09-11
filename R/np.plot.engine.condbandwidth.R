@@ -256,6 +256,7 @@
         (bws$xnuno + bws$ynuno == 0) & perspective & !gradients &
         !any(xor(bws$xdati$iord, bws$xdati$inumord))){
       view = match.arg(view)
+      .np_plot_progress_plan(1L)
       rotate = (view == "rotate")
       
       if (is.ordered(xdat[,1])){
@@ -633,6 +634,8 @@
       quantreg.gradient.diagonal <- isTRUE(quantreg) && isTRUE(gradients)
       dsf <- if (gradients && !quantreg.gradient.diagonal) bws$xndim else 1L
       tot.dim = bws$xndim + bws$yndim - quantreg
+      .np_plot_progress_plan(if (!gradients) tot.dim else
+        sum(plot.gradient.available) * if (quantreg) 1L else tot.dim)
 
       gradient_component_index <- function(slice.index, component.index) {
         if (quantreg.gradient.diagonal) slice.index else component.index

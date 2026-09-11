@@ -291,6 +291,7 @@
         !any(xor(c(bws$xdati$iord, bws$zdati$iord), c(bws$xdati$inumord, bws$zdati$inumord)))){
 
       view = match.arg(view)
+      .np_plot_progress_plan(1L)
       rotate = (view == "rotate")
 
       
@@ -659,6 +660,7 @@
     } else {
 
       tot.dim <- (bws$xndim <- length(bws$xdati$icon)) + (bws$zndim <- length(bws$zdati$icon))
+      .np_plot_progress_plan(tot.dim)
 
       plot.layout <- .np_plot_layout_begin(
         plot.behavior = plot.behavior,
