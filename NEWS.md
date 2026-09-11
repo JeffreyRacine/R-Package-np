@@ -1,5 +1,13 @@
 # np 0.80-1
 
+* Local-linear and positive-degree local-polynomial conditional density,
+  distribution and quantile fits now provide requested categorical-contrast
+  standard errors. Paired endpoint influences retain their covariance;
+  quantiles use each endpoint's own quantile and density. This includes
+  fixed, generalized-NN and adaptive-NN bandwidths conditional on the realized
+  geometry. Existing point estimates, continuous errors and SE-off computation
+  are unchanged. Nonsmooth or nonfinite influences remain explicitly unavailable.
+
 * Conditional density/distribution bootstrap gradient plots now retain the
   requested physical predictor column. Categorical panels previously could
   receive a continuous derivative's bootstrap draws, or fail when predictors

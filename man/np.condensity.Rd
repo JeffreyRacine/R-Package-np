@@ -325,6 +325,16 @@ Further arguments are passed to \code{\link{npcdensbw}} when bandwidths are comp
   derivatives remain subject to the existing hat-operator restriction.
   Bootstrap inference remains recommended.
 
+  With positive-degree local-polynomial fits (including local-linear fits),
+  categorical first-difference standard errors use paired endpoint influence
+  calculations. The covariance between the two category endpoints is retained,
+  not replaced by the sum of their marginal variances. These calculations
+  condition on the selected basis, smoothing parameters and realized neighbour
+  radii for all three bandwidth types. They run only when both
+  \code{gradients = TRUE} and \code{se = TRUE} request them. A nonsmooth
+  regularization boundary or nonfinite influence gives \code{NA} uncertainty
+  with a notice, without changing the point contrast.
+
   For ordinary scalar fits, leading interior standard errors use the squared
   X-kernel moment; conditional density errors additionally use the independent
   Y-kernel moment. Analytic first-derivative errors for fixed and generalized

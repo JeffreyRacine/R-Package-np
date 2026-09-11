@@ -315,6 +315,13 @@ static int np_lp_solve_workspace_solve_factored_with_trans(
   return 1;
 }
 
+int np_lp_solve_workspace_solve_transpose_factored(NPLPSolveWorkspace *workspace,
+                                                   int p,
+                                                   int nrhs)
+{
+  return np_lp_solve_workspace_solve_factored_with_trans(workspace, p, nrhs, 'T');
+}
+
 int np_lp_solve_workspace_solve_factored(NPLPSolveWorkspace *workspace,
                                          int p,
                                          int nrhs)

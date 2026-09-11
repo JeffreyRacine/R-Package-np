@@ -895,7 +895,8 @@ npConditionalCategoricalFirstDifferences <- function(hat.fun,
                                                       allow.external = NULL,
                                                       base.rows = NULL,
                                                       .np.defer.empty.rows = FALSE,
-                                                      gradient.target = NULL) {
+                                                      gradient.target = NULL,
+                                                      se.demand = FALSE) {
   if (!is.function(hat.fun))
     stop(sprintf("%s received an invalid conditional hat evaluator", where),
          call. = FALSE)
@@ -904,6 +905,9 @@ npConditionalCategoricalFirstDifferences <- function(hat.fun,
   eval.y <- if (is.null(eydat)) tydat else eydat
   out <- matrix(NA_real_, nrow = nrow(eval.x), ncol = bws$xndim)
   cat.idx <- which(bws$ixuno | bws$ixord)
+  se.idx <- cat.idx[.np_conditional_cat_se_demand(se.demand, length(cat.idx))]
+  errors <- if (length(se.idx)) out else NULL
+  unavailable <- 0L
   if (!is.null(gradient.target)) {
     gradient.target <- .np_plot_resolve_conditional_gradient_index(
       bws, gradient.target, where)
@@ -945,7 +949,25 @@ npConditionalCategoricalFirstDifferences <- function(hat.fun,
       index = jj,
       where = where
     )
-    out[, jj] <- eval.hat(frames$upper) - eval.hat(frames$lower)
+    upper <- eval.hat(frames$upper)
+    lower <- eval.hat(frames$lower)
+    out[, jj] <- upper - lower
+    if (jj %in% se.idx) {
+      keep <- which(is.finite(upper) & is.finite(lower))
+      if (length(keep)) {
+        pair <- .np_conditional_lp_pair_se(bws, txdat, tydat,
+          frames$upper[keep, , drop = FALSE], frames$lower[keep, , drop = FALSE],
+          eval.y[keep, , drop = FALSE], cdf = identical(hat.fun, npcdisthat))
+        errors[keep, jj] <- pair[, 1L]
+        unavailable <- unavailable + sum(pair[, 6L] != 0)
+      }
+    }
   }
-  .npreg_finish_empty_rows(out, empty.rows, defer = .np.defer.empty.rows, owner = where)
+  out <- .npreg_finish_empty_rows(out, empty.rows, defer = .np.defer.empty.rows, owner = where)
+  if (unavailable) .np_warning(paste0(where, ": categorical contrast standard errors ",
+    "are unavailable at ", unavailable, " endpoint pair(s): the accepted local ",
+    "fit has a nonsmooth or nonfinite influence. These standard errors are NA."),
+    call. = FALSE)
+  attr(out, ".np.categorical.se") <- errors
+  out
 }

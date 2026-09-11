@@ -9945,7 +9945,8 @@ plotFactor <- function(f, y, ...){
       where = "plot conditional",
           allow.external = allow.external, base.rows = base.rows,
           .np.defer.empty.rows = TRUE,
-          gradient.target = gradient.target
+          gradient.target = gradient.target,
+          se.demand = if (se) cat.se.demand else FALSE
     )
     cat.rows <- attr(cat.grad, ".np.empty.rows", exact = TRUE)
     if (!is.null(cat.rows))
@@ -9953,7 +9954,8 @@ plotFactor <- function(f, y, ...){
     cat.idx <- which(bws$ixuno | bws$ixord)
     if (!is.null(gradient.target)) cat.idx <- gradient.target
     myout$congrad[, cat.idx] <- cat.grad[, cat.idx, drop = FALSE]
-    if (se) myout$congerr[, cat.idx] <- NA_real_
+    if (se) myout$congerr[, cat.idx] <- if (any(cat.se.demand))
+      attr(cat.grad, ".np.categorical.se", exact = TRUE)[, cat.idx, drop = FALSE] else NA_real_
   }
 
   myout <- .np_conditional_merge_first_se(

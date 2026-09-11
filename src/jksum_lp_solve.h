@@ -119,6 +119,11 @@ int np_lp_solve_workspace_solve_factored(NPLPSolveWorkspace *workspace,
                                          int p,
                                          int nrhs);
 
+/* Uncorrected transposed retained solve for empirical moment derivatives. */
+int np_lp_solve_workspace_solve_transpose_factored(NPLPSolveWorkspace *workspace,
+                                                   int p,
+                                                   int nrhs);
+
 /*
  * Canonical rank/admission primitives.  They are internal C interfaces, not
  * registered R entry points.  rank_upper_bound may be UNKNOWN; otherwise it

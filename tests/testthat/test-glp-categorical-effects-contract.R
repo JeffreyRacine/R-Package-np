@@ -164,7 +164,7 @@ test_that("general-LP conditional and quantile effects use target endpoints", {
     gradients = FALSE
   )$condens
   expect_equal(dens$congrad[, 2L], dens.oracle, tolerance = 1e-10)
-  expect_true(all(is.na(dens$congerr[, 2L])))
+  expect_true(all(is.finite(dens$congerr[, 2L])))
 
   fbw <- do.call(npcdistbw, common)
   dist <- suppressWarnings(npcdist(se = TRUE,
@@ -191,7 +191,7 @@ test_that("general-LP conditional and quantile effects use target endpoints", {
     gradients = FALSE
   )$condist
   expect_equal(dist$congrad[, 2L], dist.oracle, tolerance = 1e-10)
-  expect_true(all(is.na(dist$congerr[, 2L])))
+  expect_true(all(is.finite(dist$congerr[, 2L])))
 
   qfit <- suppressWarnings(npqreg(
     bws = fbw,
