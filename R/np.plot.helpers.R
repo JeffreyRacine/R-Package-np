@@ -11384,7 +11384,8 @@ plotFactor <- function(f, y, ...){
                                       lp.higher.se.demand = NULL,
                                       allow.external = FALSE,
                                       .np.defer.empty.rows = TRUE,
-                                      .np.empty.report = NULL) {
+                                      .np.empty.report = NULL,
+                                      gradient.target = NULL) {
   activity <- .np_plot_activity_begin(
     if (isTRUE(cdf)) {
       "Computing conditional distribution plot fit"
@@ -11410,7 +11411,8 @@ plotFactor <- function(f, y, ...){
     se = se,
     lp.higher.se.demand = lp.higher.se.demand,
     allow.external = allow.external,
-    .np.defer.empty.rows = .np.defer.empty.rows
+    .np.defer.empty.rows = .np.defer.empty.rows,
+    gradient.target = gradient.target
   )
   .npreg_publish_plot_rows(value, report = .np.empty.report,
     owner = if (cdf) "plot(npcdist)" else "plot(npcdens)")
@@ -11433,7 +11435,8 @@ plotFactor <- function(f, y, ...){
                                           se = TRUE,
                                           lp.higher.se.demand = NULL,
                                       allow.external = FALSE,
-                                      .np.defer.empty.rows = TRUE) {
+                                      .np.defer.empty.rows = TRUE,
+                                      gradient.target = NULL) {
   allow.external <- npValidateScalarLogical(allow.external, "allow.external")
   .np.defer.empty.rows <- npValidateScalarLogical(.np.defer.empty.rows, ".np.defer.empty.rows")
   se <- npValidateScalarLogical(se, "se")
@@ -11447,6 +11450,16 @@ plotFactor <- function(f, y, ...){
     categorical.effects,
     "categorical.effects"
   )
+  if (!is.null(gradient.target)) {
+    if (!isTRUE(gradients) || se || proper)
+      stop("a private conditional gradient target requires gradients = TRUE, se = FALSE and proper = FALSE",
+           call. = FALSE)
+    gradient.target <- .np_plot_resolve_conditional_gradient_index(
+      bws, gradient.target, "plot conditional")
+    if (!isTRUE(bws$ixcon[gradient.target]) && !categorical.effects)
+      stop("a categorical gradient target requires categorical.effects = TRUE",
+           call. = FALSE)
+  }
 
   xdat <- toFrame(xdat)
   ydat <- toFrame(ydat)
@@ -11699,6 +11712,8 @@ plotFactor <- function(f, y, ...){
     if (identical(reg.engine, "lp") && bws$xncon > 0L && !lp.degree0.lc.gradient) {
       cont.idx <- which(bws$ixcon)
       higher.order <- glp.gradient.order > 1L
+      if (!is.null(gradient.target))
+        higher.order <- higher.order & cont.idx == gradient.target
       if (any(higher.order)) {
         rhs <- rep.int(1.0, nrow(hat.context$xdat))
         hat.fun <- if (isTRUE(cdf)) npcdisthat else npcdenshat
@@ -11737,7 +11752,10 @@ plotFactor <- function(f, y, ...){
     if (any(glp.gradient.available)) {
       rhs <- rep.int(1.0, nrow(hat.context$xdat))
       hat.fun <- if (isTRUE(cdf)) npcdisthat else npcdenshat
-      for (jj in which(glp.gradient.available)) {
+      available.idx <- which(glp.gradient.available)
+      if (!is.null(gradient.target))
+        available.idx <- available.idx[cont.idx[available.idx] == gradient.target]
+      for (jj in available.idx) {
         svec <- integer(bws$xncon)
         svec[jj] <- glp.gradient.order[jj]
         hat.args <- list(
@@ -11771,7 +11789,8 @@ plotFactor <- function(f, y, ...){
   if (isTRUE(gradients) &&
       isTRUE(categorical.effects) &&
       (glp.gradient.partial || glp.categorical.effects) &&
-      (bws$xnuno + bws$xnord > 0L)) {
+      (bws$xnuno + bws$xnord > 0L) &&
+      (is.null(gradient.target) || !bws$ixcon[gradient.target])) {
     cat.grad <- .npRmpi_with_local_bootstrap(
       npConditionalCategoricalFirstDifferences(
         hat.fun = if (isTRUE(cdf)) npcdisthat else npcdenshat,
@@ -11782,13 +11801,15 @@ plotFactor <- function(f, y, ...){
         eydat = hat.context$eydat,
         where = "plot conditional",
           allow.external = allow.external, base.rows = base.rows,
-          .np.defer.empty.rows = TRUE
+          .np.defer.empty.rows = TRUE,
+          gradient.target = gradient.target
       )
     )
     cat.rows <- attr(cat.grad, ".np.empty.rows", exact = TRUE)
     if (!is.null(cat.rows))
       empty.rows <- if (is.null(empty.rows)) cat.rows else pmax(empty.rows, cat.rows)
     cat.idx <- which(bws$ixuno | bws$ixord)
+    if (!is.null(gradient.target)) cat.idx <- gradient.target
     myout$congrad[, cat.idx] <- cat.grad[, cat.idx, drop = FALSE]
     if (se) myout$congerr[, cat.idx] <- NA_real_
   }
@@ -13858,7 +13879,8 @@ plotFactor <- function(f, y, ...){
       gradient.order = gradient.order,
       lp.first.se.demand = FALSE,
       cat.se.demand = FALSE,
-      se = FALSE
+      se = FALSE,
+      gradient.target = gradient.index
     )
     .np_plot_extract_conditional_gradient(
       fit = fit,
