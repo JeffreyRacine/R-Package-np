@@ -1,5 +1,16 @@
 # np 0.80-1
 
+* Requested unconditional adaptive-NN density/distribution standard errors now
+  include the same-sample influence of donor-specific radii, with a two-sided
+  NN rank-spacing pilot. The joint influence retains cross-coordinate and
+  categorical-kernel covariance. Gaussian/Epanechnikov density and distribution
+  kernels, and uniform distribution kernels, are supported on regular interior
+  NN ranks without finite kernel bounds. Unqualified support-boundary, bounded,
+  extended/saturated-rank or degenerate-spacing cases retain point estimates
+  and return NA standard errors with one availability notice. This changes
+  previously incomplete ANN uncertainty, not point estimates, bandwidth search
+  or SE-off work. Bandwidth selection uncertainty is not included.
+
 * Requested fixed-bandwidth copula density standard errors now include the
   same-sample covariance of the joint and all marginal density estimates.
   The centered ratio influence is reduced in bounded query tiles; MPI keeps

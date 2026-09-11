@@ -87,6 +87,8 @@ npudens.bandwidth <-
            edat, ..., se = FALSE){
 
   se <- npValidateScalarLogical(se, "se")
+  ann.se <- se && identical(bws[["type", exact = TRUE]], "adaptive_nn") &&
+    bws[["ncon", exact = TRUE]] > 0L
   dots <- list(...)
   fit.start <- proc.time()[3]
   fit.progress.handoff <- isTRUE(dots$.np_fit_progress_handoff)
@@ -167,6 +169,7 @@ npudens.bandwidth <-
   ## put the unordered, ordered, and continuous data in their own objects
   ## data that is not a factor is continuous.
   
+  if (ann.se) ann.training <- tdat
   tdat = toMatrix(tdat)
 
   tuno = tdat[, bws$iuno, drop = FALSE]
@@ -244,7 +247,7 @@ npudens.bandwidth <-
           as.integer(enrow),
           as.double(cker.bounds.c$lb),
           as.double(cker.bounds.c$ub),
-          se,
+          se && !ann.se,
           PACKAGE = "np")
   ), continuous.names = bws[["xnames", exact = TRUE]][bws[["icon", exact = TRUE]]])
 
@@ -262,6 +265,8 @@ npudens.bandwidth <-
     }
   }
 
+  if (ann.se)
+    myout$derr <- .np_ann_unconditional_se(bws, ann.training, teval, density = TRUE)
   fit.elapsed <- proc.time()[3] - fit.start
   optim.time <- if (!is.null(bws$total.time) && is.finite(bws$total.time)) as.double(bws$total.time) else NA_real_
   total.time <- fit.elapsed + (if (is.na(optim.time)) 0.0 else optim.time)
