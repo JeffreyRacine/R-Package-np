@@ -11520,7 +11520,8 @@ compute.default.error.range <- function(center, err) {
       gradient.order = gradient.order,
       lp.first.se.demand = FALSE,
       cat.se.demand = FALSE,
-      se = FALSE
+      se = FALSE,
+      gradient.target = gradient.index
     )
     .np_plot_extract_conditional_gradient(
       fit = fit,
