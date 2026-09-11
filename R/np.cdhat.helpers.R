@@ -894,7 +894,8 @@ npConditionalCategoricalFirstDifferences <- function(hat.fun,
                                                       where,
                                                       allow.external = NULL,
                                                       base.rows = NULL,
-                                                      .np.defer.empty.rows = FALSE) {
+                                                      .np.defer.empty.rows = FALSE,
+                                                      gradient.target = NULL) {
   if (!is.function(hat.fun))
     stop(sprintf("%s received an invalid conditional hat evaluator", where),
          call. = FALSE)
@@ -903,6 +904,14 @@ npConditionalCategoricalFirstDifferences <- function(hat.fun,
   eval.y <- if (is.null(eydat)) tydat else eydat
   out <- matrix(NA_real_, nrow = nrow(eval.x), ncol = bws$xndim)
   cat.idx <- which(bws$ixuno | bws$ixord)
+  if (!is.null(gradient.target)) {
+    gradient.target <- .np_plot_resolve_conditional_gradient_index(
+      bws, gradient.target, where)
+    if (!gradient.target %in% cat.idx)
+      stop(sprintf("%s requires a categorical gradient target", where),
+           call. = FALSE)
+    cat.idx <- gradient.target
+  }
   if (!length(cat.idx))
     return(out)
 
