@@ -107,6 +107,20 @@ Further arguments are passed to \code{\link{npudensbw}} when bandwidths are comp
   }
 }
 \details{
+  With \code{bwtype="adaptive_nn"} and \code{se=TRUE}, standard errors
+  include the same-sample influence of each donor-centred nearest-neighbour
+  radius. A two-sided rank-spacing pilot estimates the marginal density sum
+  at the radius endpoints. Cross-coordinate and categorical-kernel covariance
+  are retained in the joint observation influence. The selected NN ranks
+  are treated as fixed; bandwidth-selection uncertainty is not included.
+  This calculation supports Gaussian and Epanechnikov kernels of orders
+  2, 4, 6 and 8, and uniform distribution kernels, without finite kernel
+  bounds. Uniform density support-boundary terms, finite kernel bounds,
+  extended or saturated NN ranks, and degenerate pilot spacings are not
+  currently qualified: point estimates are retained and standard errors
+  are \code{NA}, with one availability notice. No additional uncertainty
+  computation is performed for \code{se=FALSE}.
+
   Documentation guide: see \code{\link{npudensbw}} for bandwidth
   selection and search controls, \code{\link{np.kernels}} for kernels,
   \code{\link{np.options}} for global options, \code{\link{plot}},
@@ -175,8 +189,8 @@ Further arguments are passed to \code{\link{npudensbw}} when bandwidths are comp
   product. Thus a categorical factor that multiplies the density by a constant
   also multiplies its standard error by that constant. This is not the sample
   variance of finite-bandwidth continuous kernel contributions. Generalized-NN
-  errors use the existing frozen-query-radius approximation; this correction
-  does not establish adaptive-NN variance theory or alter its current errors.
+  errors use the existing frozen-query-radius approximation. The separate
+  adaptive-NN influence calculation is described above.
 
   Argument groups for bandwidth selection are documented on
   \code{\link{npudensbw}}. The most common workflow is to choose data

@@ -106,14 +106,28 @@ Further arguments are passed to \code{\link{npudistbw}} when bandwidths are comp
   }
 }
 \details{
+  With \code{bwtype="adaptive_nn"} and \code{se=TRUE}, standard errors
+  include the same-sample influence of each donor-centred nearest-neighbour
+  radius. A two-sided rank-spacing pilot estimates the marginal density sum
+  at the radius endpoints. Cross-coordinate and categorical-kernel covariance
+  are retained in the joint observation influence. The selected NN ranks
+  are treated as fixed; bandwidth-selection uncertainty is not included.
+  This calculation supports Gaussian and Epanechnikov kernels of orders
+  2, 4, 6 and 8, and uniform distribution kernels, without finite kernel
+  bounds. Uniform density support-boundary terms, finite kernel bounds,
+  extended or saturated NN ranks, and degenerate pilot spacings are not
+  currently qualified: point estimates are retained and standard errors
+  are \code{NA}, with one availability notice. No additional uncertainty
+  computation is performed for \code{se=FALSE}.
+
   For ordinary kernels with mixed continuous and ordered categorical data,
   fixed and generalized-nearest-neighbour standard errors retain the leading
   continuous-indicator approximation and the squared integrated categorical
   kernel product. The continuous integrated kernel remains to power one in
   that second moment; this is not a finite-smoothing sample-contribution
   variance. Purely continuous and purely categorical conventions are unchanged.
-  Generalized-NN errors condition on the current query radii; adaptive-NN
-  variance approximations are not changed by this correction.
+  Generalized-NN errors condition on the current query radii. The separate
+  adaptive-NN influence calculation is described above.
 
   Documentation guide: see \code{\link{npudistbw}} for bandwidth
   selection and search controls, \code{\link{np.kernels}} for kernels,
