@@ -645,7 +645,7 @@ npqreg <-
   n <- nrow(out)
   starts <- vapply(tasks, function(x) as.integer(x$start), integer(1L))
   sizes <- vapply(tasks, function(x) as.integer(x$bsz), integer(1L))
-  expected <- cumsum(c(1L, head(sizes, -1L)))
+  expected <- cumsum(c(1L, utils::head(sizes, -1L)))
   if (anyNA(starts) || anyNA(sizes) || any(sizes < 1L) ||
       !identical(starts, as.integer(expected)) || sum(sizes) != n ||
       length(parts) != length(tasks))
