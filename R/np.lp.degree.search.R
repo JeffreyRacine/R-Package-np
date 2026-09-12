@@ -1980,14 +1980,14 @@
                                              elapsed = NULL) {
   fields <- .np_degree_progress_context_fields()
 
-  if (is.finite(elapsed) && !is.na(elapsed) && elapsed >= 0)
-    fields <- c(fields, sprintf("elapsed %ss", .np_progress_fmt_num(elapsed)))
-
   if (!is.null(iteration)) {
     iteration <- suppressWarnings(as.integer(iteration)[1L])
     if (!is.na(iteration) && iteration >= 1L)
-      fields <- c(fields, sprintf("iter %s", format(iteration)))
+      fields <- c(fields, sprintf("iteration %s", format(iteration)))
   }
+
+  if (is.finite(elapsed) && !is.na(elapsed) && elapsed >= 0)
+    fields <- c(fields, sprintf("elapsed %ss", .np_progress_fmt_num(elapsed)))
 
   if (!is.null(current_degree) && length(current_degree))
     fields <- c(fields, sprintf("deg %s", .np_degree_format_degree(current_degree)))

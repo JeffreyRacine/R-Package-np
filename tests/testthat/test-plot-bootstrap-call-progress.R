@@ -34,7 +34,7 @@ test_that("plot bootstrap display owns one clock without changing local clocks",
   expect_true(all(vapply(events, `[[`, 0, "started_at") == 0))
   expect_equal(sum(vapply(events, function(x) x$event == "finish", TRUE)), 1L)
   expect_match(events[[1]]$line, "eta estimating")
-  expect_true(any(vapply(events, function(x) grepl("2/2.*elap 12.0s", x$line), TRUE)))
+  expect_true(any(vapply(events, function(x) grepl("2/2.*elapsed 12.0s", x$line), TRUE)))
   expect_null(npRmpi:::.np_plot_progress_runtime$context)
   expect_null(npRmpi:::.np_progress_runtime$fit_forward)
 })
@@ -124,7 +124,7 @@ test_that("plot display scope preserves visibility and narrow-width work fields"
     expect_identical(value$value, 7L)
   }, force_renderer = "single_line", now = function() now)
   lines <- vapply(trace$trace, `[[`, "", "line")
-  expect_true(any(grepl("b50/99.*elap 12.0s.*eta", lines)))
+  expect_true(any(grepl("rep 50/99.*elapsed 12.0s.*eta", lines)))
   expect_null(npRmpi:::.np_plot_progress_runtime$context)
 })
 
@@ -143,8 +143,8 @@ test_that("verbose target labels cannot displace progress counters at narrow wid
           stage = paste(rep("long target label", 10L), collapse = " "),
           done = 50L, total = 99L, force = TRUE)
       }, enabled = TRUE), force_renderer = "single_line", now = function() now))
-    lines <- vapply(result$trace, `[[`, "", "line")
+    lines <- vapply(result$trace, `[[`, "", "render_line")
     expect_true(all(nchar(lines, type = "width") <= width))
-    expect_true(any(grepl("1/42.*b50/99.*elap 12.0s.*eta", lines)))
+    expect_true(any(grepl("1/42.*rep 50/99.*elap(sed)? 12.0s.*eta", lines)))
   }
 })

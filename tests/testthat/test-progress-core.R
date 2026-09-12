@@ -93,6 +93,21 @@ capture_single_line_output <- function(pkg, bindings, code) {
   readChar(path, nchars = file.info(path)$size, useBytes = TRUE)
 }
 
+test_that("progress presentation retains atomic counters and respects display columns", {
+  fit <- getFromNamespace(".np_progress_fit_single_line", "npRmpi")
+  wide <- paste0("[npRmpi] Fitting ", strrep("\\u6e29\\u5ea6", 20L),
+                 " 123/999 (12.3%, elapsed 12.3s, eta 87.7s)")
+  for (width in c(20L, 40L, 60L, 80L, 120L)) {
+    line <- fit(wide, width)
+    expect_lte(nchar(line, type = "width"), width)
+    expect_match(line, "123/999", fixed = TRUE)
+  }
+  line <- fit(paste0("[npRmpi] Plot bootstrap (target 18/42, rep 64/99, ",
+                    "elapsed 15.2s, eta 21.0s)"), 60L)
+  expect_match(line, "18/42.*64/99.*elap.*eta")
+  expect_lte(nchar(line, type = "width"), 60L)
+})
+
 test_that("progress begin returns disabled state when messages are off", {
   begin <- getFromNamespace(".np_progress_begin", "npRmpi")
 
@@ -504,7 +519,7 @@ test_that("single-line fit drops detail before truncating", {
   expect_true(endsWith(fitted, "eta 7.2s)"))
 })
 
-test_that("single-line fit preserves both ends when truncation is still required", {
+test_that("narrow known-total output preserves whole counters before optional ETA", {
   fit <- getFromNamespace(".np_progress_fit_single_line", "npRmpi")
 
   line <- "[npRmpi] Bootstrap replications 123/999 (12.3%, elapsed 12.3s, eta 87.7s)"
@@ -512,8 +527,8 @@ test_that("single-line fit preserves both ends when truncation is still required
 
   expect_lte(nchar(fitted, type = "width"), 40L)
   expect_true(startsWith(fitted, "[npRmpi]"))
-  expect_true(endsWith(fitted, "eta 87.7s)"))
-  expect_true(grepl("\\.\\.\\.", fitted))
+  expect_true(grepl("123/999", fitted, fixed = TRUE))
+  expect_false(grepl("...", fitted, fixed = TRUE))
 })
 
 test_that("RStudio capability keeps single-line viable at the boundary", {
@@ -652,14 +667,13 @@ test_that("plot bootstrap lines compact semantically before ellipsizing", {
   fit_line <- getFromNamespace(".np_progress_fit_single_line", "npRmpi")
   line <- paste0(
     "[npRmpi] Plot bootstrap (grad index 1/2) 5887/7500 ",
-    "(elapsed 31.0s, 78.5%, eta 8.5s)"
+    "(78.5%, elapsed 31.0s, eta 8.5s)"
   )
 
   fitted <- fit_line(line, max_width = 72L)
 
   expect_true(
-    startsWith(fitted, "[npRmpi] Plot bootstrap (grad idx 1/2)") ||
-      startsWith(fitted, "[npRmpi] Plot boot (grad idx 1/2)")
+    grepl("^\\[npRmpi\\] (Plot bootstrap|Plot boot|Boot) \\(grad (index|idx) 1/2\\)", fitted)
   )
   expect_match(fitted, "5887/7500", fixed = TRUE)
   expect_false(grepl("\\.\\.\\.7/7500", fitted, fixed = TRUE))
@@ -680,14 +694,14 @@ test_that("bootstrap band counters keep the live fraction intact under width pre
 
 test_that("bandwidth lines compact semantically before ellipsizing", {
   fit_line <- getFromNamespace(".np_progress_fit_single_line", "npRmpi")
-  line <- "[npRmpi] Bandwidth selection (multistart 2/2, iteration 32, elapsed 11.2s, 62.3%, eta 6.8s)"
+  line <- "[npRmpi] Bandwidth selection (multistart 2/2, iteration 32, 62.3%, elapsed 11.2s, eta 6.8s)"
 
   fitted <- fit_line(line, max_width = 80L)
 
   expect_lte(nchar(fitted, type = "width"), 80L)
   expect_identical(
     fitted,
-    "[npRmpi] Bandwidth selection (2/2, iter 32, elapsed 11.2s, 62.3%, eta 6.8s)"
+    "[npRmpi] Bandwidth selection (ms 2/2, iter 32, 62.3%, elap 11.2s, eta 6.8s)"
   )
 })
 
@@ -700,7 +714,7 @@ test_that("NOMAD bandwidth lines preserve restart and cumulative iteration", {
   expect_lte(nchar(fitted, type = "width"), 84L)
   expect_identical(
     fitted,
-    "[npRmpi] Bandwidth selection (2/2, iter 32 (188), elapsed 11.2s, deg (1), best (0))"
+    "[npRmpi] Bandwidth selection (ms 2/2, iter 32 (188), elap 11.2s, deg (1), best (0))"
   )
 })
 

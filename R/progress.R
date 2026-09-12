@@ -461,11 +461,14 @@
 
   keep_right <- max(1L, floor((max_width - 3L) / 2L))
   keep_left <- max_width - 3L - keep_right
-  paste0(
-    substr(text, 1L, keep_left),
-    "...",
-    substr(text, nchar(text, type = "chars") - keep_right + 1L, nchar(text, type = "chars"))
-  )
+  left <- substr(text, 1L, keep_left)
+  right <- substr(text, nchar(text) - keep_right + 1L, nchar(text))
+  # Character counts differ from console columns for wide Unicode labels.
+  while (nchar(left, type = "width") > keep_left)
+    left <- substr(left, 1L, nchar(left) - 1L)
+  while (nchar(right, type = "width") > keep_right)
+    right <- substr(right, 2L, nchar(right))
+  paste0(left, "...", right)
 }
 
 .np_progress_compact_single_line <- function(line, max_width) {
@@ -507,150 +510,78 @@
   compacted
 }
 
-.np_progress_compact_bandwidth_line <- function(line, max_width) {
-  if (!is.character(line) || length(line) != 1L || is.na(line)) {
-    return(line)
+# Pure presentation policy: abbreviate labels, then omit optional whole fields.
+# Counters are atomic; this helper never reads or mutates progress state.
+.np_progress_fit_fields <- function(prefix, fields, max_width,
+                                     short_prefix = prefix, counter = NULL) {
+  render <- function(label, parts) {
+    head <- paste(c(if (nzchar(label)) label, counter), collapse = " ")
+    if (length(parts)) paste0(head, " (", paste(parts, collapse = ", "), ")") else head
+  }
+  fits <- function(line) nchar(line, type = "width") <= max_width
+  line <- render(prefix, fields)
+  if (fits(line)) return(line)
+
+  fields <- fields[!grepl("^detail ", fields)]
+  line <- render(prefix, fields)
+  if (fits(line)) return(line)
+
+  fields <- sub("^multistart ", "ms ", fields)
+  fields <- sub("^iteration ", "iter ", fields)
+  fields <- sub("^elapsed ", "elap ", fields)
+  line <- render(prefix, fields)
+  if (fits(line)) return(line)
+  short_prefix <- sub("Bandwidth selection", "BW search", short_prefix, fixed = TRUE)
+  short_prefix <- sub("Plot bootstrap", "Plot boot", short_prefix, fixed = TRUE)
+  short_prefix <- sub("Bootstrap replications", "Bootstrap", short_prefix, fixed = TRUE)
+  short_prefix <- sub("Bootstrap all bands", "Boot bands", short_prefix, fixed = TRUE)
+  short_prefix <- sub("Bootstrap pmzsd", "Boot pmzsd", short_prefix, fixed = TRUE)
+  line <- render(short_prefix, fields)
+  if (fits(line)) return(line)
+
+  fields <- sub("^target ", "tgt ", fields)
+  short_prefix <- sub("Plot boot", "Boot", short_prefix, fixed = TRUE)
+  line <- render(short_prefix, fields)
+  if (fits(line)) return(line)
+
+  # Verbose context and redundant diagnostics yield before work and time.
+  for (pattern in c("^detail ", "^best ", "^deg ", "^[0-9.]+%$",
+                    "^eta ", "^elap ")) {
+    fields <- fields[!grepl(pattern, fields)]
+    line <- render(short_prefix, fields)
+    if (fits(line)) return(line)
   }
 
-  max_width <- suppressWarnings(as.integer(max_width)[1L])
-  if (is.na(max_width) || max_width < 1L) {
-    return(line)
-  }
-
-  if (nchar(line, type = "width") <= max_width) {
-    return(line)
-  }
-
-  matches <- regexec("^(.+Bandwidth selection) \\((.+)\\)$", line)
-  capture <- regmatches(line, matches)[[1L]]
-  if (length(capture) != 3L) {
-    return(line)
-  }
-
-  prefix <- capture[[2L]]
-  fields <- strsplit(capture[[3L]], ", ", fixed = TRUE)[[1L]]
-  if (!length(fields)) {
-    return(line)
-  }
-
-  render <- function(parts) {
-    sprintf("%s (%s)", prefix, paste(parts, collapse = ", "))
-  }
-
-  abbreviate_fields <- function(parts) {
-    compacted <- parts
-    compacted <- sub("^multistart ([0-9]+/[0-9]+)$", "\\1", compacted)
-    compacted <- sub("^iteration ", "iter ", compacted)
-    compacted
-  }
-
-  drop_last_field <- function(parts) {
-    if (length(parts) <= 1L) {
-      parts
-    } else {
-      parts[seq_len(length(parts) - 1L)]
-    }
-  }
-
-  fields_abbrev <- abbreviate_fields(fields)
-
-  candidates <- list(
-    render(fields),
-    render(fields_abbrev)
-  )
-
-  for (candidate in candidates) {
-    if (nchar(candidate, type = "width") <= max_width) {
-      return(candidate)
-    }
-  }
-
+  # At a very narrow console shorten only the activity, never half a counter.
+  if (nchar(render("", fields), type = "width") > max_width - 8L)
+    fields <- fields[!grepl("^rep |^iter ", fields)]
+  suffix <- render("", fields)
+  if (!is.null(counter)) suffix <- paste0(" ", suffix)
+  room <- max_width - nchar(suffix, type = "width")
+  if (room >= 8L)
+    return(paste0(.np_progress_ellipsize_middle(short_prefix, room), suffix))
   line
 }
 
+.np_progress_compact_bandwidth_line <- function(line, max_width) {
+  match <- regexec("^(.+(?:Bandwidth selection|Plot bootstrap)) \\((.+)\\)$", line)
+  parts <- regmatches(line, match)[[1L]]
+  if (length(parts) != 3L) return(line)
+  fields <- strsplit(parts[[3L]], ", ", fixed = TRUE)[[1L]]
+  .np_progress_fit_fields(parts[[2L]], fields, max_width)
+}
+
 .np_progress_compact_plot_bootstrap_line <- function(line, max_width) {
-  if (!is.character(line) || length(line) != 1L || is.na(line)) {
-    return(line)
-  }
-
-  max_width <- suppressWarnings(as.integer(max_width)[1L])
-  if (is.na(max_width) || max_width < 1L) {
-    return(line)
-  }
-
-  if (nchar(line, type = "width") <= max_width) {
-    return(line)
-  }
-
-  matches <- regexec(
-    "^(.+(?:Plot bootstrap(?: \\([^)]+\\))?|Bootstrap (?:all bands|pmzsd)(?: \\([^)]+\\))?)) ([0-9]+/[0-9]+) \\((.+)\\)$",
-    line
-  )
-  capture <- regmatches(line, matches)[[1L]]
-  if (length(capture) != 4L) {
-    return(line)
-  }
-
-  prefix <- capture[[2L]]
-  counter <- capture[[3L]]
-  fields <- strsplit(capture[[4L]], ", ", fixed = TRUE)[[1L]]
-  if (!length(fields)) {
-    return(line)
-  }
-
-  render <- function(prefix_text, parts) {
-    sprintf("%s %s (%s)", prefix_text, counter, paste(parts, collapse = ", "))
-  }
-
-  compact_prefix <- prefix
-  compact_prefix <- sub("\\(grad index ", "(grad idx ", compact_prefix)
-  compact_prefix <- sub("\\(index ", "(idx ", compact_prefix)
-  short_prefix <- compact_prefix
-  short_prefix <- sub("Plot bootstrap", "Plot boot", short_prefix, fixed = TRUE)
-  short_prefix <- sub("Bootstrap all bands", "Boot all bands", short_prefix, fixed = TRUE)
-  short_prefix <- sub("Bootstrap pmzsd", "Boot pmzsd", short_prefix, fixed = TRUE)
-  short_prefix <- sub("\\(surf ", "(s ", short_prefix)
-  very_short_prefix <- short_prefix
-  very_short_prefix <- sub("Boot all bands", "Bands", very_short_prefix, fixed = TRUE)
-  very_short_prefix <- sub("Boot pmzsd", "Pmzsd", very_short_prefix, fixed = TRUE)
-
-  compact_fields <- function(parts) {
-    compacted <- parts
-    compacted <- sub("^elapsed ", "elap ", compacted)
-    compacted
-  }
-
-  drop_last_field <- function(parts) {
-    if (length(parts) <= 1L) {
-      parts
-    } else {
-      parts[seq_len(length(parts) - 1L)]
-    }
-  }
-
-  fields_compact <- compact_fields(fields)
-  fields_drop_eta <- drop_last_field(fields_compact)
-  fields_drop_eta_pct <- drop_last_field(fields_drop_eta)
-
-  candidates <- list(
-    render(prefix, fields),
-    render(compact_prefix, fields),
-    render(compact_prefix, fields_compact),
-    render(short_prefix, fields_compact),
-    render(short_prefix, fields_drop_eta),
-    render(short_prefix, fields_drop_eta_pct),
-    render(very_short_prefix, fields_drop_eta),
-    render(very_short_prefix, fields_drop_eta_pct),
-    sprintf("%s %s", very_short_prefix, counter)
-  )
-
-  for (candidate in candidates) {
-    if (nchar(candidate, type = "width") <= max_width) {
-      return(candidate)
-    }
-  }
-
-  line
+  # Known-total package output, including standalone fit/bootstrap owners.
+  match <- regexec("^(.+) ([0-9]+/[0-9]+) \\((.+)\\)$", line)
+  parts <- regmatches(line, match)[[1L]]
+  if (length(parts) != 4L) return(line)
+  fields <- strsplit(parts[[4L]], ", ", fixed = TRUE)[[1L]]
+  if (!all(grepl("^[0-9.]+%$|^elapsed |^eta ", fields))) return(line)
+  prefix <- sub("\\(grad index ", "(grad idx ", parts[[2L]])
+  prefix <- sub("\\(index ", "(idx ", prefix)
+  .np_progress_fit_fields(parts[[2L]], fields, max_width,
+                          short_prefix = prefix, counter = parts[[3L]])
 }
 
 .np_progress_compact_degree_line <- function(line, max_width) {
@@ -671,7 +602,8 @@
       !grepl("Exhaustive degree/bw", line, fixed = TRUE) &&
       !grepl("Auto:NOMAD degree/bw", line, fixed = TRUE) &&
       !grepl("Auto:exhaustive degree/bw", line, fixed = TRUE) &&
-      !grepl("Refining bandwidth", line, fixed = TRUE)) {
+      !grepl("Refining bandwidth", line, fixed = TRUE) &&
+      !grepl("Refining bw", line, fixed = TRUE)) {
     return(line)
   }
 
@@ -724,7 +656,6 @@
 
     out <- character(0L)
     drop_sets <- list(
-      grep("^ms ", parts),
       grep("^best ", parts),
       grep("^deg ", parts)
     )
@@ -756,6 +687,13 @@
     }
   }
 
+  open <- regexpr(" (", compacted_fields, fixed = TRUE)[1L]
+  if (open > 0L && endsWith(compacted_fields, ")")) {
+    prefix <- substr(compacted_fields, 1L, open - 1L)
+    fields <- substr(compacted_fields, open + 2L, nchar(compacted_fields) - 1L)
+    return(.np_progress_fit_fields(prefix,
+      strsplit(fields, ", ", fixed = TRUE)[[1L]], max_width))
+  }
   line
 }
 
@@ -1247,8 +1185,8 @@
 
   fields <- c(
     fields,
-    sprintf("elapsed %ss", .np_progress_fmt_num(elapsed)),
     sprintf("%s%%", .np_progress_fmt_num(pct)),
+    sprintf("elapsed %ss", .np_progress_fmt_num(elapsed)),
     sprintf("eta %ss", .np_progress_fmt_num(eta))
   )
 
@@ -1277,7 +1215,8 @@
   total <- state$total
   pct <- if (isTRUE(total > 0)) 100 * done / total else 0
   elapsed <- max(0, now - state$started)
-  eta <- if (isTRUE(done > 0) && isTRUE(total >= done)) elapsed * (total - done) / done else 0
+  eta <- if (isTRUE(done > 0) && isTRUE(total >= done))
+    paste0(.np_progress_fmt_num(elapsed * (total - done) / done), "s") else "estimating"
 
   progress_token <- if (isTRUE(state$bandwidth_multistart)) {
     sprintf("multistart %s/%s", format(done), format(total))
@@ -1286,13 +1225,13 @@
   }
 
   line <- sprintf(
-    "%s %s %s (%s%%, elapsed %ss, eta %ss)",
+    "%s %s %s (%s%%, elapsed %ss, eta %s)",
     state$pkg_prefix,
     state$label,
     progress_token,
     .np_progress_fmt_num(pct),
     .np_progress_fmt_num(elapsed),
-    .np_progress_fmt_num(eta)
+    eta
   )
 
   if (!is.null(detail)) {
