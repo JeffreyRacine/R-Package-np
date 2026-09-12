@@ -88,13 +88,13 @@
         function(ii) tabulate(plan[ii, ], nbins = support.length),
         integer(support.length)
       )
-      local.Srho[chunk] <- .Call(
+      local.Srho[chunk] <- .np_entropy_compute(expr = .Call(
         "C_np_entropy_symmetric_summation_counts",
         as.double(fast.data.null),
         matrix(as.double(counts), nrow = support.length),
         as.double(fast.bandwidth),
         PACKAGE = "npRmpi"
-      )
+      ))
     }
   } else {
     local.Srho <- numeric(length(local.idx))

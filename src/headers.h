@@ -261,6 +261,7 @@ SEXP C_np_progress_fit_begin(SEXP total);
 SEXP C_np_progress_fit_end(void);
 void np_progress_fit_set_offset(const int offset);
 void np_progress_fit_step(const int done);
+void np_progress_fit_heartbeat(void);
 void np_progress_fit_loop_step(const int done, const int natural_total);
 typedef void (*NPProgressUnwindCleanup)(void *, Rboolean);
 typedef struct {

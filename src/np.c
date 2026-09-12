@@ -1282,6 +1282,24 @@ void np_progress_fit_step(const int done)
   np_progress_fit_maybe_signal(done);
 }
 
+/* Activity during an entropy block is not completed fit/replication work.
+   Reuse the active compiled scope and dispatcher without advancing counters.
+   Call only from existing interrupt checkpoints, never each kernel pair. */
+void np_progress_fit_heartbeat(void)
+{
+  clock_t now;
+  if (!fit_progress_active || fit_progress_total < 1)
+    return;
+  now = clock();
+  if (fit_progress_last_signal_clock > 0 &&
+      now >= fit_progress_last_signal_clock &&
+      (double)(now - fit_progress_last_signal_clock) / CLOCKS_PER_SEC < 0.5)
+    return;
+  np_progress_signal("fit_step", "bandwidth",
+                     fit_progress_last_signal_eval, fit_progress_total);
+  fit_progress_last_signal_clock = now;
+}
+
 void np_progress_fit_loop_step(const int done, const int natural_total)
 {
   if (!fit_progress_active || natural_total <= 1)

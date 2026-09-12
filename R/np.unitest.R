@@ -91,14 +91,14 @@
         function(b) tabulate(plan$y[b, ], nbins = support.length),
         integer(support.length)
       )
-      local.Srho[chunk] <- .Call(
+      local.Srho[chunk] <- .np_entropy_compute(expr = .Call(
         "C_np_entropy_univariate_summation_counts",
         as.double(data.null),
         matrix(as.double(counts.x), nrow = support.length),
         matrix(as.double(counts.y), nrow = support.length),
         as.double(c(bw.x, bw.y)),
         PACKAGE = "npRmpi"
-      )
+      ))
     }
   } else {
     local.Srho <- numeric(length(local.idx))
