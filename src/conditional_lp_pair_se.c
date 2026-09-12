@@ -193,8 +193,8 @@ static SEXP np_lp_pair_run(void *data)
 SEXP C_np_conditional_lp_pair_se(SEXP basis, SEXP evaluation, SEXP weights,
                                 SEXP response, SEXP slope)
 {
-  SEXP d = getAttrib(basis, R_DimSymbol);
-  SEXP e = getAttrib(evaluation, R_DimSymbol);
+  SEXP d = PROTECT(getAttrib(basis, R_DimSymbol));
+  SEXP e = PROTECT(getAttrib(evaluation, R_DimSymbol));
   if(TYPEOF(basis) != REALSXP || TYPEOF(evaluation) != REALSXP ||
      TYPEOF(d) != INTSXP || XLENGTH(d) != 2 ||
      TYPEOF(e) != INTSXP || XLENGTH(e) != 2)
@@ -206,6 +206,7 @@ SEXP C_np_conditional_lp_pair_se(SEXP basis, SEXP evaluation, SEXP weights,
      (slope != R_NilValue && !np_lp_pair_dims(slope, n, ne)) ||
      (size_t)n > SIZE_MAX/sizeof(double)/(size_t)p)
     error("conditional LP contrast covariance has inconsistent dimensions");
+  UNPROTECT(2);
   SEXP inputs[5] = {basis, evaluation, weights, response, slope};
   for(int j = 0; j < (slope == R_NilValue ? 4 : 5); ++j)
     for(R_xlen_t i = 0; i < XLENGTH(inputs[j]); ++i)
