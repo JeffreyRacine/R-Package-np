@@ -26,6 +26,26 @@ test_that("LP categorical covariance differentiates the paired accepted maps", {
   expect_error(.Call("C_np_conditional_lp_pair_se", z, d, w[-1,], r, NULL), "dimensions")
 })
 
+test_that("paired covariance dimension validation preserves native entry state", {
+  x <- seq(-1, 1, length.out = 8L)
+  z <- cbind(1, x)
+  d <- rbind(c(1, .2), c(1, .4))
+  w <- cbind(dnorm(x-.2), dnorm(x-.4))
+  r <- cbind(sin(x), sin(x))
+  call <- function(a=z, b=d, c=w, e=r, f=NULL)
+    .Call("C_np_conditional_lp_pair_se", a, b, c, e, f, PACKAGE="np")
+  expected <- call()
+  for (invalid in list(function() call(a=as.vector(z)),
+                       function() call(b=as.vector(d)),
+                       function() call(c=w[-1L,]),
+                       function() call(f=r[-1L,]))) {
+    expect_error(invalid(), "matrix inputs|inconsistent dimensions")
+    expect_identical(call(), expected)
+  }
+  expect_error(call(e=replace(r, 1L, NA_real_)), "non-finite input")
+  expect_identical(call(), expected)
+})
+
 test_that("unrequested conditional contrast uncertainty never enters its producer", {
   x <- data.frame(x=seq(.05,.95,length.out=24L),g=factor(rep(0:1,12L)))
   y <- data.frame(y=sin(x$x)+.1*as.integer(x$g))
