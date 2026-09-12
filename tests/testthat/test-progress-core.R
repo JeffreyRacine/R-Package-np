@@ -571,12 +571,12 @@ test_that("compiled progress bridge feeds fit updates on the bandwidth surface",
 test_that("single-line fit drops detail before truncating", {
   fit <- getFromNamespace(".np_progress_fit_single_line", "np")
 
-  line <- "[np] Constructing metric entropy by lag 1/2 (50.0%, elapsed 7.2s, eta 7.2s): lag 1"
+  line <- "[np] Computing entropy statistics by lag 1/2 (50.0%, elapsed 7.2s, eta 7.2s): lag 1"
   fitted <- fit(line, max_width = 78)
 
   expect_identical(
     fitted,
-    "[np] Constructing metric entropy by lag 1/2 (50.0%, elapsed 7.2s, eta 7.2s)"
+    "[np] Computing entropy statistics by lag 1/2 (50.0%, elapsed 7.2s, eta 7.2s)"
   )
 })
 

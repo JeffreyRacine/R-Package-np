@@ -9,7 +9,7 @@ progress_time_counter <- function(start = 0, by = 0.6) {
 shadow_surface_signature <- function(shadow) {
   lines <- vapply(shadow$trace, `[[`, character(1L), "line")
   events <- vapply(shadow$trace, `[[`, character(1L), "event")
-  keep <- grepl("^\\[np\\] Constructing metric entropy by lag", lines) |
+  keep <- grepl("^\\[np\\] Computing entropy statistics by lag", lines) |
     grepl("^\\[np\\] Bootstrap replications", lines)
 
   data.frame(
@@ -54,8 +54,8 @@ test_that("npsdeptest single-line lag and bootstrap progress match legacy semant
 
   expect_s3_class(single_line$value, "sdeptest")
   expect_equal(shadow_surface_signature(single_line), shadow_surface_signature(legacy))
-  expect_true(any(grepl("^\\[np\\] Constructing metric entropy by lag 1/2 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\): lag 1$", lines)))
-  expect_true(any(grepl("^\\[np\\] Constructing metric entropy by lag 2/2 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\): lag 2$", lines)))
+  expect_true(any(grepl("^\\[np\\] Computing entropy statistics by lag 1/2 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\): lag 1$", lines)))
+  expect_true(any(grepl("^\\[np\\] Computing entropy statistics by lag 2/2 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\): lag 2$", lines)))
   expect_true(any(grepl("^\\[np\\] Bootstrap replications [0-9]+/9 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
   expect_true(any(grepl("^\\[np\\] Bootstrap replications 9/9 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
 })

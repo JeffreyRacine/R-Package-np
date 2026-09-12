@@ -91,7 +91,7 @@ npdeptest <- function(data.x = NULL,
   bw.data.y <- .np_progress_select_bandwidth_enhanced("Computing bandwidths", npudensbw(~data.y))$bw
   bw.joint <- .np_progress_select_bandwidth_enhanced("Computing bandwidths", npudensbw(~data.x+data.y))$bw
 
-  .np_progress_note("Constructing metric entropy")
+  .np_progress_note("Computing entropy statistic")
   
   Srho.vec <- Srho.bivar(data.x,data.y,bw.data.x,bw.data.y,bw.joint,method=method)
 
