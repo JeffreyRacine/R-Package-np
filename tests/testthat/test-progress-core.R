@@ -93,6 +93,21 @@ capture_single_line_output <- function(pkg, bindings, code) {
   readChar(path, nchars = file.info(path)$size, useBytes = TRUE)
 }
 
+test_that("progress presentation retains atomic counters and respects display columns", {
+  fit <- getFromNamespace(".np_progress_fit_single_line", "np")
+  wide <- paste0("[np] Fitting ", strrep("\\u6e29\\u5ea6", 20L),
+                 " 123/999 (12.3%, elapsed 12.3s, eta 87.7s)")
+  for (width in c(20L, 40L, 60L, 80L, 120L)) {
+    line <- fit(wide, width)
+    expect_lte(nchar(line, type = "width"), width)
+    expect_match(line, "123/999", fixed = TRUE)
+  }
+  line <- fit(paste0("[np] Plot bootstrap (target 18/42, rep 64/99, ",
+                    "elapsed 15.2s, eta 21.0s)"), 60L)
+  expect_match(line, "18/42.*64/99.*elap.*eta")
+  expect_lte(nchar(line, type = "width"), 60L)
+})
+
 test_that("progress begin returns disabled state when messages are off", {
   begin <- getFromNamespace(".np_progress_begin", "np")
 
@@ -502,7 +517,7 @@ test_that("compiled progress bridge feeds fit updates on the bandwidth surface",
   lines <- vapply(actual$trace, `[[`, character(1L), "line")
 
   expect_true(any(grepl(
-    "^\\[np\\] Fitting density 0/3 \\(0\\.0%, elapsed 0\\.0s, eta 0\\.0s\\): starting$",
+    "^\\[np\\] Fitting density 0/3 \\(0\\.0%, elapsed 0\\.0s, eta estimating\\): starting$",
     lines
   )))
   expect_true(any(grepl(
@@ -556,26 +571,26 @@ test_that("single-line fit keeps smooth coefficient bandwidth lines readable at 
 test_that("single-line fit preserves readable bandwidth fields at 80 columns", {
   fit <- getFromNamespace(".np_progress_fit_single_line", "np")
 
-  line <- "[np] Bandwidth selection (multistart 2/2, iteration 31, elapsed 10.6s, 62.4%, eta 6.4s)"
+  line <- "[np] Bandwidth selection (multistart 2/2, iteration 31, 62.4%, elapsed 10.6s, eta 6.4s)"
   fitted <- fit(line, max_width = 80)
 
   expect_lte(nchar(fitted, type = "width"), 80L)
   expect_identical(
     fitted,
-    "[np] Bandwidth selection (2/2, iter 31, elapsed 10.6s, 62.4%, eta 6.4s)"
+    "[np] Bandwidth selection (ms 2/2, iter 31, 62.4%, elap 10.6s, eta 6.4s)"
   )
 })
 
 test_that("single-line fit preserves readable coordinator bandwidth fields at 80 columns", {
   fit <- getFromNamespace(".np_progress_fit_single_line", "np")
 
-  line <- "[np] Bandwidth selection (y~z, multistart 2/2, iteration 31, elapsed 10.6s, 62.4%, eta 6.4s)"
+  line <- "[np] Bandwidth selection (y~z, multistart 2/2, iteration 31, 62.4%, elapsed 10.6s, eta 6.4s)"
   fitted <- fit(line, max_width = 80)
 
   expect_lte(nchar(fitted, type = "width"), 80L)
   expect_identical(
     fitted,
-    "[np] Bandwidth selection (y~z, 2/2, iter 31, elapsed 10.6s, 62.4%, eta 6.4s)"
+    "[np] Bandwidth selection (y~z, ms 2/2, iter 31, 62.4%, elap 10.6s, eta 6.4s)"
   )
 })
 
@@ -588,7 +603,7 @@ test_that("single-line fit preserves restart and cumulative iteration in NOMAD l
   expect_lte(nchar(fitted, type = "width"), 80L)
   expect_identical(
     fitted,
-    "[np] Bandwidth selection (2/2, iter 31 (128), elapsed 10.6s, deg (1), best (0))"
+    "[np] Bandwidth selection (ms 2/2, iter 31 (128), elap 10.6s, deg (1), best (0))"
   )
 })
 
@@ -614,11 +629,11 @@ test_that("single-line fit preserves readable plot bootstrap counters at 80 colu
   expect_lte(nchar(fitted, type = "width"), 80L)
   expect_identical(
     fitted,
-    "[np] Plot bootstrap (grad idx 1/1) 12345/80000 (15.4%, elapsed 8.7s, eta 44.9s)"
+    "[np] Plot bootstrap (grad index 1/1) 12345/80000 (15.4%, elap 8.7s, eta 44.9s)"
   )
 })
 
-test_that("single-line fit preserves both ends when truncation is still required", {
+test_that("narrow known-total output preserves whole counters before optional ETA", {
   fit <- getFromNamespace(".np_progress_fit_single_line", "np")
 
   line <- "[np] Bootstrap replications 123/999 (12.3%, elapsed 12.3s, eta 87.7s)"
@@ -626,8 +641,8 @@ test_that("single-line fit preserves both ends when truncation is still required
 
   expect_lte(nchar(fitted, type = "width"), 40L)
   expect_true(startsWith(fitted, "[np]"))
-  expect_true(endsWith(fitted, "eta 87.7s)"))
-  expect_true(grepl("\\.\\.\\.", fitted))
+  expect_true(grepl("123/999", fitted, fixed = TRUE))
+  expect_false(grepl("...", fitted, fixed = TRUE))
 })
 
 test_that("RStudio capability keeps single-line viable at the boundary", {

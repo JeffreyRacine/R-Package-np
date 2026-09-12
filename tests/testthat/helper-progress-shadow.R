@@ -53,6 +53,7 @@ capture_progress_shadow_trace <- function(expr,
       total = snapshot$total,
       detail = snapshot$detail,
       line = snapshot$line,
+      render_line = snapshot$render_line,
       started_at = snapshot$started_at,
       now = snapshot$now,
       last_width = snapshot$last_width

@@ -15,7 +15,7 @@ test_that("bandwidth compaction never abbreviates the Bandwidth selection prefix
   compact_bandwidth <- getFromNamespace(".np_progress_compact_bandwidth_line", "np")
 
   compacted <- compact_bandwidth(
-    "[np] Bandwidth selection (multistart 2/2, iteration 84, elapsed 10.0s, 99.9%, eta 0.0s)",
+    "[np] Bandwidth selection (multistart 2/2, iteration 84, 99.9%, elapsed 10.0s, eta 0.0s)",
     max_width = 74L
   )
 
@@ -78,7 +78,7 @@ test_that("NOMAD progress fuses component context with dynamic fields", {
   expect_true(startsWith(compact, "[np] Degree/bw search (E[y|z] (1/3),"))
   expect_true(grepl("iter 77", compact, fixed = TRUE))
   expect_true(grepl("elap 18.8s", compact, fixed = TRUE))
-  expect_true(grepl("deg (5)", compact, fixed = TRUE))
+  expect_true(grepl("ms 2/2", compact, fixed = TRUE))
   expect_false(identical(compact, "[np] E[y|z] (1/3)"))
 
   powell <- powell_detail(
@@ -90,7 +90,7 @@ test_that("NOMAD progress fuses component context with dynamic fields", {
 
   expect_identical(
     powell,
-    "E[y|z] (1/3), elapsed 2.5s, iter 9, deg (5), best (1)"
+    "E[y|z] (1/3), iteration 9, elapsed 2.5s, deg (5), best (1)"
   )
 
   expect_identical(
@@ -103,7 +103,7 @@ test_that("NOMAD progress fuses component context with dynamic fields", {
       done = 9L,
       now = 2.5
     ),
-    "E[y|z] (1/3), elapsed 2.5s, iter 9, deg (5), best (1)"
+    "E[y|z] (1/3), iteration 9, elapsed 2.5s, deg (5), best (1)"
   )
 
   expect_identical(
@@ -113,7 +113,7 @@ test_that("NOMAD progress fuses component context with dynamic fields", {
       iteration = 9L,
       elapsed = 2.5
     ),
-    "E[y|z] (1/3), elapsed 2.5s, iter 9"
+    "E[y|z] (1/3), iteration 9, elapsed 2.5s"
   )
 })
 
@@ -213,7 +213,7 @@ test_that("Powell wrapper replaces a released NOMAD owner instead of leaking chi
   powell <- lines[grepl("^\\[np\\] Refining bandwidth \\(", lines)]
 
   expect_true(length(powell) >= 1L)
-  expect_true(any(grepl("iter 3", powell, fixed = TRUE)))
+  expect_true(any(grepl("iteration 3", powell, fixed = TRUE)))
   expect_false(any(grepl("deg \\(\\)|best \\(\\)", powell)))
   expect_false(any(grepl("^\\[np\\] Bandwidth selection", lines)))
 })
@@ -359,10 +359,10 @@ test_that("dark-launched bandwidth engine switches from iteration to estimate mo
   lines <- shadow_lines(actual)
 
   expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 1/2, iteration 28, elapsed [0-9]+\\.[0-9]s\\)$", lines)))
-  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 2/2, elapsed 4\\.0s, 50\\.0%, eta 4\\.0s\\)$", lines)))
-  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 2/2, iteration 56, elapsed 7\\.0s, 87\\.5%, eta 1\\.0s\\)$", lines)))
-  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 2/2, iteration 84, elapsed 10\\.0s, 99\\.9%, eta 0\\.0s\\)$", lines)))
-  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 2/2, elapsed 12\\.0s, 100\\.0%, eta 0\\.0s\\)$", lines)))
+  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 2/2, 50\\.0%, elapsed 4\\.0s, eta 4\\.0s\\)$", lines)))
+  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 2/2, iteration 56, 87\\.5%, elapsed 7\\.0s, eta 1\\.0s\\)$", lines)))
+  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 2/2, iteration 84, 99\\.9%, elapsed 10\\.0s, eta 0\\.0s\\)$", lines)))
+  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 2/2, 100\\.0%, elapsed 12\\.0s, eta 0\\.0s\\)$", lines)))
 })
 
 test_that("dark-launched completion-estimate heartbeats keep the unknown-total throttle cadence", {
@@ -397,9 +397,9 @@ test_that("dark-launched completion-estimate heartbeats keep the unknown-total t
   complete_lines <- vapply(complete_trace, `[[`, character(1L), "line")
   complete_times <- vapply(complete_trace, `[[`, numeric(1L), "now")
 
-  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 2/2, elapsed 4\\.0s, 50\\.0%, eta 4\\.0s\\)$", complete_lines)))
+  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 2/2, 50\\.0%, elapsed 4\\.0s, eta 4\\.0s\\)$", complete_lines)))
   expect_false(any(grepl("elapsed 5\\.0s", complete_lines)))
-  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 2/2, iteration 22, elapsed 6\\.2s, 77\\.5%, eta 1\\.8s\\)$", complete_lines)))
+  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 2/2, iteration 22, 77\\.5%, elapsed 6\\.2s, eta 1\\.8s\\)$", complete_lines)))
   expect_true(all(diff(complete_times[seq_len(min(2L, length(complete_times)))]) >= 2.0))
 })
 
@@ -437,7 +437,7 @@ test_that("bandwidth progress can carry a coordinator context label such as degr
 
   expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(deg \\(1,0\\)\\)$", lines)))
   expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(deg \\(1,0\\), multistart 1/2, iteration 20, elapsed [0-9]+\\.[0-9]s\\)$", lines)))
-  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(deg \\(1,0\\), multistart 2/2, elapsed [0-9]+\\.[0-9]s, [0-9]+\\.[0-9]%, eta [0-9]+\\.[0-9]s\\)$", lines)))
-  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(deg \\(1,0\\), multistart 2/2, iteration 21, elapsed [0-9]+\\.[0-9]s, [0-9]+\\.[0-9]%, eta [0-9]+\\.[0-9]s\\)$", lines)))
-  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(deg \\(1,0\\), multistart 2/2, elapsed [0-9]+\\.[0-9]s, 100\\.0%, eta 0\\.0s\\)$", lines)))
+  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(deg \\(1,0\\), multistart 2/2, [0-9]+\\.[0-9]%, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(deg \\(1,0\\), multistart 2/2, iteration 21, [0-9]+\\.[0-9]%, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(deg \\(1,0\\), multistart 2/2, 100\\.0%, elapsed [0-9]+\\.[0-9]s, eta 0\\.0s\\)$", lines)))
 })

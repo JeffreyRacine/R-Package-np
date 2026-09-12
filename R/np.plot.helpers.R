@@ -158,7 +158,7 @@
   context$rep <- NULL
   context$stage <- "preparing"
   context$finished <- FALSE
-  context$state <- .np_progress_begin("Boot", domain = "plot",
+  context$state <- .np_progress_begin("Plot bootstrap", domain = "plot",
                                        surface = "plot_bounded")
   if (!isTRUE(context$state$visible))
     return(force(expr))
@@ -168,23 +168,15 @@
     work <- context$completed + context$fraction
     eta <- if (context$finished) "0s" else if (is.null(context$total) || work <= 0) "estimating" else
       if (work >= context$total) "finishing" else
-      paste0("~", .np_progress_fmt_num(elapsed *
+      paste0(.np_progress_fmt_num(elapsed *
         max(0, context$total - work) / work), "s")
     fields <- c(if (is.null(context$total)) "targets pending" else
-        sprintf("%d/%d", context$target, context$total),
-      context$rep, paste0("elap ", .np_progress_fmt_num(elapsed), "s"),
+        sprintf("target %d/%d", context$target, context$total),
+      context$rep, paste0("elapsed ", .np_progress_fmt_num(elapsed), "s"),
       paste("eta", eta))
-    # Keep work/time fields ahead of verbose target names at narrow widths.
-    used <- nchar(paste0(state$pkg_prefix, " ", state$label, " (",
-                        paste(fields, collapse = ", "), ")"), type = "width")
-    remaining <- .np_progress_output_width() - used - 2L
-    if (remaining > 4L) {
-      stage <- context$stage
-      if (nchar(stage, type = "width") > remaining)
-        stage <- paste0(substr(stage, 1L, remaining - 3L), "...")
-      fields <- c(fields, stage)
-    }
-    fields
+    # Width fitting belongs to the shared renderer, not the work coordinator.
+    stage <- sub("^Plot bootstrap[ :]*", "", context$stage)
+    c(fields, paste("detail", stage))
   }
   old.forward <- .np_progress_runtime$fit_forward
   complete <- FALSE
@@ -243,7 +235,7 @@
     return(invisible(NULL))
   if (!is.null(stage)) context$stage <- stage
   if (!is.null(done) && !is.null(total) && total > 0) {
-    context$rep <- sprintf("b%d/%d", done, total)
+    context$rep <- sprintf("rep %d/%d", done, total)
     # A bias bootstrap can reset the local counter within the same target.
     # Do not claim completion of the outer call from a local B/B endpoint.
     context$fraction <- max(context$fraction, done / total)

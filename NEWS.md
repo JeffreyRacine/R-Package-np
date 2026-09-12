@@ -1,5 +1,9 @@
 # np 0.80-1
 
+* Progress displays use consistent work counts, elapsed-time and ETA wording.
+  Narrow consoles preserve complete counters before optional detail, and
+  wide-character labels are shortened by their displayed width.
+
 * Explicit fixed-bandwidth conditional bootstrap bias-corrected plot centers
   now use one mixed-data donor-mixture pilot and its matching PDF/CDF or
   derivative/contrast reference. Categorical conditioning pilot lambdas
