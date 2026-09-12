@@ -293,7 +293,7 @@ npunitest <- function(data.x = NULL,
   
   ## Compute the test statistic
 
-  .np_progress_note("Computing test statistic")
+  .np_progress_note("Computing entropy statistic")
 
   test.stat <- Srho.univar(data.x,data.y,bw.x,bw.y,method=method)
 

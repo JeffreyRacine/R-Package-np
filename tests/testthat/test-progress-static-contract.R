@@ -77,7 +77,8 @@ test_that("npunitest no longer uses legacy console helpers", {
   src <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
 
   expect_false(grepl("printPush\\(|printPop\\(|printClear\\(|newLineConsole\\(", src))
-  expect_true(grepl("\\.np_progress_note\\(\"Computing bandwidths\"\\)", src))
+  expect_false(grepl("\\.np_progress_note\\(\"Computing bandwidths\"\\)", src))
+  expect_true(grepl(".np_progress_activity_run(", src, fixed = TRUE))
   expect_true(grepl("\\.np_progress_begin\\(\"Bootstrap replications\"", src))
 })
 
@@ -87,9 +88,10 @@ test_that("npdeneqtest no longer uses legacy console helpers", {
   src <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
 
   expect_false(grepl("printPush\\(|printPop\\(|printClear\\(|newLineConsole\\(", src))
-  expect_true(grepl("\\.np_progress_note\\(\"Computing bandwidths\"\\)", src))
+  expect_false(grepl("\\.np_progress_note\\(\"Computing bandwidths\"\\)", src))
+  expect_true(grepl(".np_progress_select_bandwidth_enhanced(", src, fixed = TRUE))
   expect_true(grepl("\\.np_progress_begin\\(\"Bootstrap replications\"", src))
-  expect_true(grepl("\\.np_progress_with_legacy_suppressed\\(", src))
+  expect_false(grepl("\\.np_progress_with_legacy_suppressed\\(", src))
 })
 
 test_that("npdeptest no longer uses legacy console helpers", {
@@ -98,10 +100,11 @@ test_that("npdeptest no longer uses legacy console helpers", {
   src <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
 
   expect_false(grepl("printPush\\(|printPop\\(|printClear\\(|newLineConsole\\(", src))
-  expect_true(grepl("\\.np_progress_note\\(\"Computing bandwidths\"\\)", src))
-  expect_true(grepl("\\.np_progress_note\\(\"Constructing metric entropy\"\\)", src))
+  expect_false(grepl("\\.np_progress_note\\(\"Computing bandwidths\"\\)", src))
+  expect_true(grepl(".np_progress_select_bandwidth_enhanced(", src, fixed = TRUE))
+  expect_true(grepl("\\.np_progress_note\\(\"Computing entropy statistic\"\\)", src))
   expect_true(grepl("\\.np_progress_begin\\(\"Bootstrap replications\"", src))
-  expect_true(grepl("\\.np_progress_with_legacy_suppressed\\(", src))
+  expect_false(grepl("\\.np_progress_with_legacy_suppressed\\(", src))
 })
 
 test_that("npcmstest no longer uses legacy console helpers", {
@@ -123,9 +126,10 @@ test_that("npqcmstest no longer uses legacy console helpers", {
 
   expect_false(grepl("printPush\\(|printPop\\(|printClear\\(|newLineConsole\\(", src))
   expect_false(grepl("\\bcat\\(", src))
-  expect_true(grepl("\\.np_progress_note\\(\"Computing bandwidths\"\\)", src))
+  expect_false(grepl("\\.np_progress_note\\(\"Computing bandwidths\"\\)", src))
+  expect_true(grepl(".np_progress_select_bandwidth_enhanced(", src, fixed = TRUE))
   expect_true(grepl("\\.np_progress_begin\\(\"Bootstrap replications\"", src))
-  expect_true(grepl("\\.np_progress_with_legacy_suppressed\\(", src))
+  expect_false(grepl("\\.np_progress_with_legacy_suppressed\\(", src))
 })
 
 test_that("npsymtest no longer uses legacy console helpers", {
@@ -134,7 +138,8 @@ test_that("npsymtest no longer uses legacy console helpers", {
   src <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
 
   expect_false(grepl("printPush\\(|printPop\\(|printClear\\(|newLineConsole\\(", src))
-  expect_true(grepl("\\.np_progress_note\\(\"Computing bandwidths\"\\)", src))
+  expect_false(grepl("\\.np_progress_note\\(\"Computing bandwidths\"\\)", src))
+  expect_true(grepl(".np_progress_activity_run(", src, fixed = TRUE))
   expect_true(grepl("\\.np_progress_begin\\(\"Bootstrap replications\"", src))
 })
 
@@ -144,10 +149,11 @@ test_that("npsdeptest no longer uses legacy console helpers", {
   src <- paste(readLines(src_path, warn = FALSE), collapse = "\n")
 
   expect_false(grepl("printPush\\(|printPop\\(|printClear\\(|newLineConsole\\(", src))
-  expect_true(grepl("\\.np_progress_note\\(\"Computing bandwidths\"\\)", src))
-  expect_true(grepl("\\.np_progress_begin\\(\"Constructing metric entropy by lag\"", src))
+  expect_false(grepl("\\.np_progress_note\\(\"Computing bandwidths\"\\)", src))
+  expect_true(grepl(".np_progress_select_bandwidth_enhanced(", src, fixed = TRUE))
+  expect_true(grepl("\\.np_progress_begin\\(\"Computing entropy statistics by lag\"", src))
   expect_true(grepl("\\.np_progress_begin\\(\"Bootstrap replications\"", src))
-  expect_true(grepl("\\.np_progress_with_legacy_suppressed\\(", src))
+  expect_false(grepl("\\.np_progress_with_legacy_suppressed\\(", src))
 })
 
 test_that("npsigtest no longer uses legacy console helpers", {

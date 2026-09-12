@@ -548,7 +548,7 @@ test_that("compiled progress bridge feeds unknown-total bandwidth activity updat
 test_that("single-line fit drops detail before truncating", {
   fit <- getFromNamespace(".np_progress_fit_single_line", "npRmpi")
 
-  line <- "[npRmpi] Constructing metric entropy by lag 1/2 (50.0%, elapsed 7.2s, eta 7.2s): lag 1"
+  line <- "[npRmpi] Computing entropy statistics by lag 1/2 (50.0%, elapsed 7.2s, eta 7.2s): lag 1"
   fitted <- fit(line, max_width = 78)
 
   expect_lte(nchar(fitted, type = "width"), 78L)
