@@ -58,8 +58,60 @@ bw <- npregbw(y ~ x, regtype = "ll", bwmethod = "cv.ls")
 fit <- npreg(bws = bw)
 summary(fit)
 
+new_points <- data.frame(x = c(0.25, 0.5, 0.75))
+predict(fit, newdata = new_points)
+
+# Reuse the bandwidth: no second bandwidth search is performed.
+fit_inference <- npreg(bws = fit$bws, gradients = TRUE, se = TRUE)
+head(se(fit_inference))
+head(gradients(fit_inference))
+head(gradients(fit_inference, se = TRUE))
+prediction <- predict(fit, newdata = new_points, se.fit = TRUE)
+prediction$fit
+prediction$se.fit
+
 npRmpi.quit()
 ```
+
+The examples in this vignette are alternative session layouts, not one script
+to concatenate after MPI has finalized. Keep the original training data
+available when refitting or predicting with a retained bandwidth object.
+
+## Uncertainty and migration from 0.70-5
+
+Statistical requests follow the same conventions as `np`:
+
+| Request | Purpose |
+| --- | --- |
+| `se = TRUE` in an estimator call | Compute its supported fit-time uncertainty. |
+| `gradients = TRUE` in an estimator call | Compute supported derivatives or categorical contrasts. Add `se = TRUE` for their standard errors. |
+| `se(fit)` or `gradients(fit, se = TRUE)` | Read stored standard errors; do not refit or repeat search. |
+| `predict(fit, newdata = ..., se.fit = TRUE)` | Evaluate predictions and their supported standard errors. |
+| `vcov(fit)` | Read coefficient covariance for families such as `npindex` and `npplreg`, not a universal covariance of the fitted surface. |
+| `plot(fit, errors = "bootstrap")` or `errors = "asymptotic"` | Request plot-time uncertainty through that family's plot method. |
+
+Fit-time standard errors are opt-in across the principal families. The
+intentional exception is `npindex`, whose default
+`se = TRUE, se.type = "asymptotic"` includes coefficient covariance;
+`se = FALSE` requests a point-only fit. Gradients remain a separate request.
+The example above shows the no-search refit used when stored results are absent.
+
+Consult each estimator's help for supported kernels, bandwidth types and
+derivative orders. Missing stored uncertainty, unsupported inference and an
+undefined evaluation row are different conditions; do not interpret `NA` as
+zero uncertainty. Asymptotic results condition on the selected smoothing
+settings, without bandwidth or polynomial-degree selection uncertainty.
+Plot bands apply within a panel, not jointly across all panels; asymptotic
+simultaneous bands are not available. See `?np.plot` for details.
+
+Use current dotted names such as `gradient.order`, `data.overlay` and
+`data.rug`, and `B` for bootstrap replication counts where documented.
+Unknown named arguments are rejected with a spelling hint where available.
+The full package NEWS (`news(package = "npRmpi")`) lists the replacements
+and family-specific changes. The [Gallery FAQ](https://jeffreyracine.github.io/gallery/faq.html)
+provides further troubleshooting guidance.
+
+## Joint polynomial-order and bandwidth selection
 
 The same joint polynomial-order and bandwidth selection route is also available
 here for local-polynomial-capable methods via

@@ -28,13 +28,17 @@ remotes::install_github(
 Set `build_vignettes = TRUE` only when the required vignette toolchain is
 available.
 
-## Supported MPI backend for 0.70-5
+## MPI backend and installation notes
 
-The 0.70-5 release protocol is validated with MPICH. Open MPI runtime
-validation is explicitly waived for this release because its ordinary
-singleton-spawn and prelaunched-master finalization behavior did not satisfy
-the release gates. Do not assume that an Open-MPI-linked build has the same
-supported runtime contract.
+MPICH is the documented macOS build route below; see [BUILD.md](BUILD.md)
+for linkage checks and session, attach and profile-mode validation.
+Backend qualification is specific to the platform, runtime version and launch
+mode, not established by a successful package installation alone.
+
+Historical note: the 0.70-5 release protocol qualified MPICH and waived Open MPI
+runtime validation because the tested singleton-spawn and prelaunched-master
+finalization routes did not satisfy its gates. That disposition refers to
+0.70-5, not a blanket statement about every backend/version combination.
 
 ### MPICH via MacPorts
 
@@ -76,6 +80,13 @@ See [BUILD_MPICH.md](BUILD_MPICH.md) for the complete public MPICH recipe and
 [BUILD.md](BUILD.md) for release-validation expectations.
 
 ## Quick start
+
+For prediction, no-search refitting with standard errors or gradients, and
+the 0.70-5 migration guide, use
+`vignette("npRmpi_getting_started", package = "npRmpi")`.
+The [Gallery FAQ](https://jeffreyracine.github.io/gallery/faq.html)
+and [runnable quickstarts](https://jeffreyracine.github.io/gallery/quickstarts.html)
+provide further examples.
 
 Interactive session/spawn mode:
 

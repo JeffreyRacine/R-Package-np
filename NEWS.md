@@ -1,5 +1,11 @@
 # npRmpi 0.80-1
 
+* The getting-started guide demonstrates prediction and no-search refitting
+  for uncertainty and gradients, distinguishes computation from extraction,
+  and summarizes migration from 0.70-5. Package help clarifies practical
+  computational limits; build notes distinguish historical backend evidence
+  from current installation guidance. No estimator behavior or defaults change.
+
 * Entropy tests refresh elapsed-time progress during native summation and
   quadrature using the shared transient owner. Original-statistic, lag and
   bootstrap phases clear on completion or failure; bootstrap counts advance

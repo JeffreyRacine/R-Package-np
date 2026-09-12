@@ -1,12 +1,13 @@
 # Building npRmpi with MPICH on macOS
 
-This is the authoritative public build recipe for the supported npRmpi 0.70-5
-backend on macOS. It was validated with MacPorts MPICH 4.3.2 on Apple Silicon.
+This is the public macOS/MacPorts MPICH build recipe. Its original 0.70-5
+qualification used MPICH 4.3.2 on Apple Silicon.
 A future MPICH major-version upgrade requires fresh installed-tarball runtime,
 parity, lifecycle, and scaling validation.
 
-Open MPI is not a supported release backend for 0.70-5; its runtime validation
-is explicitly waived.
+The Open MPI runtime waiver belongs to that historical 0.70-5 qualification.
+It should not be read as a qualification or rejection of every other
+backend/version combination; see [BUILD.md](BUILD.md) for runtime checks.
 
 ## 1. Install and select MPICH
 

@@ -1,8 +1,10 @@
 # Building and validating npRmpi
 
-The supported 0.70-5 release backend is MPICH. For macOS with MacPorts, follow
-[BUILD_MPICH.md](BUILD_MPICH.md). Open MPI runtime validation is explicitly
-waived for this release.
+For the documented macOS/MacPorts MPICH build route, follow
+[BUILD_MPICH.md](BUILD_MPICH.md). Verify linkage, launch mode and teardown for
+the actual installed runtime; successful compilation alone does not qualify
+a backend. The MPICH qualification and Open MPI waiver recorded for 0.70-5
+are historical release dispositions, not a universal backend/version claim.
 
 ## Portable source-tarball workflow
 
