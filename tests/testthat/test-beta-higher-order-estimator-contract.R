@@ -10,9 +10,9 @@ test_that("higher-order beta densities match kernel-sum contributions", {
         ckertype = "beta", ckerorder = order,
         ckerbound = "fixed", ckerlb = 0, ckerub = 1
       )
-      fit <- do.call(npudens, c(list(
+      fit <- expect_beta_se_fit(bwtype, do.call(npudens, c(list(
         tdat = training, edat = evaluation, se = TRUE
-      ), common))
+      ), common)))
       sums <- do.call(npksum, c(list(
         txdat = training, exdat = evaluation,
         return.kernel.weights = TRUE
@@ -21,7 +21,7 @@ test_that("higher-order beta densities match kernel-sum contributions", {
       expected_se <- sqrt(apply(sums$kw, 2L, var) / nrow(training))
 
       expect_equal(fitted(fit), expected, tolerance = 4e-12)
-      expect_equal(se(fit), expected_se, tolerance = 4e-12)
+      expect_beta_se(fit, bwtype, expected_se, tolerance = 4e-12)
     }
   }
 })
@@ -38,9 +38,9 @@ test_that("higher-order beta distributions match kernel-sum contributions", {
         ckertype = "beta", ckerorder = order,
         ckerbound = "fixed", ckerlb = 0, ckerub = 1
       )
-      fit <- do.call(npudist, c(list(
+      fit <- expect_beta_se_fit(bwtype, do.call(npudist, c(list(
         tdat = training, edat = evaluation, se = TRUE
-      ), common))
+      ), common)))
       sums <- do.call(npksum, c(list(
         txdat = training, exdat = evaluation,
         operator = "integral", return.kernel.weights = TRUE
@@ -50,7 +50,7 @@ test_that("higher-order beta distributions match kernel-sum contributions", {
                             (nrow(training) * (nrow(training) - 1L)))
 
       expect_equal(fitted(fit), expected, tolerance = 4e-12)
-      expect_equal(se(fit), expected_se, tolerance = 4e-12)
+      expect_beta_se(fit, bwtype, expected_se, tolerance = 4e-12)
       expect_identical(fitted(fit)[c(1L, nrow(evaluation))], c(0, 1))
     }
   }

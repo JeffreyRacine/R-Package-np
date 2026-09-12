@@ -131,7 +131,8 @@ test_that("generic regression fit has one complete enclosing owner", {
   expect_gt(bandwidth, owner_init)
 
   owned_region <- substr(before, owner_init, nchar(before))
-  expect_false(grepl("error(", owned_region, fixed = TRUE))
+  # Match a raising call, not status getters such as np_bwm_get_deferred_error.
+  expect_false(grepl("\\b(?:Rf_)?error\\s*\\(", owned_region, perl = TRUE))
   expect_false(grepl("alloc_vecd(", owned_region, fixed = TRUE))
   expect_false(grepl("alloc_tmatd(", owned_region, fixed = TRUE))
   expect_false(grepl("alloc_matd(", owned_region, fixed = TRUE))
@@ -145,7 +146,7 @@ test_that("generic regression fit has one complete enclosing owner", {
   cleanup <- regexpr(
     "np_regression_fit_owner_clear(&fit_owner);", after, fixed = TRUE
   )[[1L]]
-  first_error <- regexpr("error(", after, fixed = TRUE)[[1L]]
+  first_error <- regexpr("NP_REGRESSION_RETURN_FAILURE(", after, fixed = TRUE)[[1L]]
   expect_gt(cleanup, 0L)
   expect_gt(first_error, cleanup)
 })
@@ -162,7 +163,7 @@ test_that("MPI owner-row solve exhaustion is not a beta-row failure", {
   )
   expect_match(
     source,
-    'error("LP solve failed in MPI owner-row path")',
+    'NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_GENERAL, general_lp_fit_status, "LP solve failed in MPI owner-row path")',
     fixed = TRUE
   )
   if (grepl("#define MPI2", source, fixed = TRUE) ||
@@ -174,4 +175,3 @@ test_that("MPI owner-row solve exhaustion is not a beta-row failure", {
     )
   }
 })
-

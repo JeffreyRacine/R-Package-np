@@ -164,9 +164,16 @@ test_that("compiled width-one hats reuse the scalar influence primitive", {
   hat_start <- regexpr("static SEXP np_reghat_lp_matrix_call(", source, fixed = TRUE)
   expect_gt(hat_start, 0L)
   hat <- substr(source, hat_start, nchar(source))
-  # The public strict/normalization wrappers share this width-one selector.
-  expect_equal(sum(gregexpr("np_reghat_lp_matrix_call(kw, wtrain, weval,",
-                           hat, fixed = TRUE)[[1L]] > 0L), 2L)
+  # Strict, norm and explicit external-row entries share this selector;
+  # pin their distinct policies rather than a historical wrapper count.
+  compact_hat <- gsub("[[:space:]]+", " ", hat)
+  expect_match(compact_hat,
+    "np_reghat_lp_matrix_call(kw, wtrain, weval, 0, 0)", fixed=TRUE)
+  expect_match(compact_hat,
+    "np_reghat_lp_matrix_call(kw, wtrain, weval, 1, 0)", fixed=TRUE)
+  expect_match(compact_hat,
+    "np_reghat_lp_matrix_call(kw, wtrain, weval, LOGICAL(want_norm)[0], 1)",
+    fixed=TRUE)
 
   expect_true(grepl("np_lp_width_one_influence_row(", scalar_hat,
                     fixed = TRUE))

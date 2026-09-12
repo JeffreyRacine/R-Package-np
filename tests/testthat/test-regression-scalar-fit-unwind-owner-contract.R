@@ -91,12 +91,12 @@ test_that("the generic scalar branch delegates without duplicate ownership", {
   )
   expect_match(
     engine,
-    "error(\"conditional regression kernel traversal failed\");",
+    "NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_SCALAR, scalar_fit_status, \"conditional regression kernel traversal failed\");",
     fixed = TRUE
   )
   expect_match(
     engine,
-    "error(\"conditional influence variance construction failed\");",
+    "NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_SCALAR, scalar_fit_status, \"conditional influence variance construction failed\");",
     fixed = TRUE
   )
 })

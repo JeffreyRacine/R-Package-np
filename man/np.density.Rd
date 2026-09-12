@@ -115,10 +115,14 @@ Further arguments are passed to \code{\link{npudensbw}} when bandwidths are comp
   rank-spacing pilots whose interior window grows as the two-thirds power
   of sample size. A strictly absent support face contributes zero; an exact
   probability endpoint or undefined finite-face pilot is unavailable.
-  Finite kernel bounds, extended or saturated NN ranks, and degenerate pilot spacings are not
+  Finite kernel bounds (including beta kernels), extended or saturated NN
+  ranks, and degenerate pilot spacings are not
   currently qualified: point estimates are retained and standard errors
   are \code{NA}, with one availability notice. No additional uncertainty
-  computation is performed for \code{se=FALSE}.
+  computation is performed for \code{se=FALSE}. Requested adaptive-NN
+  standard errors can take several times as long as the point fit because
+  they include the donor-radius influence calculation; this cost is incurred
+  only when standard errors are requested.
 
   Documentation guide: see \code{\link{npudensbw}} for bandwidth
   selection and search controls, \code{\link{np.kernels}} for kernels,

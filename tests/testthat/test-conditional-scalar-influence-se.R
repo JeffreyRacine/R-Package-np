@@ -15,9 +15,13 @@ test_that("conditional beta response allows a zero explanatory derivative total"
     expect_equal(as.vector(fitted(fit)), mean(z), tolerance = 2e-12)
     expect_identical(as.vector(gradients(fit)), 0)
     expect_identical(as.vector(fit$congerr), 0)
-    expect_error(suppressWarnings(estimator(se = TRUE, bws = b, txdat = x, tydat = y,
-      exdat = data.frame(x = 10), eydat = data.frame(y = .43), gradients = TRUE)),
-      "canonical beta response-unit restoration failed")
+    expect_warning(unsupported <- estimator(se = TRUE, bws = b, txdat = x, tydat = y,
+      exdat = data.frame(x = 10), eydat = data.frame(y = .43), gradients = TRUE),
+      "NA")
+    expect_true(all(is.na(fitted(unsupported))))
+    expect_true(all(is.na(se(unsupported))))
+    expect_true(all(is.na(gradients(unsupported))))
+    expect_true(all(is.na(unsupported$congerr)))
   }
 })
 test_that("scalar conditional categorical errors pair same-sample influences", {
