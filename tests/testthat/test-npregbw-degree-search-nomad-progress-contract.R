@@ -8,9 +8,9 @@ expect_npregbw_powell_progress_surface <- function(lines) {
     lines
   )), info = info)
   expect_true(any(grepl("best (", powell.lines, fixed = TRUE)), info = info)
-  powell.iter.lines <- powell.lines[grepl("iter [0-9]+", powell.lines)]
+  powell.iter.lines <- powell.lines[grepl("iteration [0-9]+", powell.lines)]
   expect_true(length(powell.iter.lines) > 0L, info = info)
-  expect_true(any(grepl("^\\[(np|npRmpi)\\] Refining bandwidth \\(elapsed ", powell.iter.lines)), info = info)
+  expect_true(any(grepl("^\\[(np|npRmpi)\\] Refining bandwidth \\(iteration [0-9]+, elapsed ", powell.iter.lines)), info = info)
   expect_true(any(grepl(", deg \\(", powell.iter.lines)), info = info)
 }
 

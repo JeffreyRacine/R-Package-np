@@ -214,7 +214,7 @@ test_that("npplreg formula bw to fit route hands off immediately into fit progre
 
   lines <- npplreg_fit_progress_lines(actual)
   fit.zero.pos <- grep(
-    "^\\[npRmpi\\] Fitting partially linear regression 0/3 \\(0\\.0%, elapsed 0\\.0s, eta 0\\.0s\\): starting E\\[y\\|z\\]$",
+    "^\\[npRmpi\\] Fitting partially linear regression 0/3 \\(0\\.0%, elapsed 0\\.0s, eta estimating\\): starting E\\[y\\|z\\]$",
     lines
   )
   fit.one.pos <- grep(
@@ -275,7 +275,7 @@ test_that("npplreg nomad to powell to fit route preserves single-line fit handof
 
   lines <- npplreg_fit_progress_lines(actual)
   fit.zero.pos <- grep(
-    "^\\[npRmpi\\] Fitting partially linear regression 0/3 \\(0\\.0%, elapsed 0\\.0s, eta 0\\.0s\\): starting E\\[y\\|z\\]$",
+    "^\\[npRmpi\\] Fitting partially linear regression 0/3 \\(0\\.0%, elapsed 0\\.0s, eta estimating\\): starting E\\[y\\|z\\]$",
     lines
   )
   fit.one.pos <- grep(

@@ -55,8 +55,8 @@ test_that("npsdeptest single-line lag and bootstrap progress match legacy semant
 
   expect_s3_class(single_line$value, "sdeptest")
   expect_equal(shadow_surface_signature(single_line), shadow_surface_signature(legacy))
-  expect_true(any(grepl("^\\[npRmpi\\] Computing entropy statistics by lag 1/2 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\): lag 1$", lines)))
-  expect_true(any(grepl("^\\[npRmpi\\] Computing entropy statistics by lag 2/2 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\): lag 2$", lines)))
+  expect_true(any(grepl("^\\[npRmpi\\] Computing entropy statistics by lag 1/2 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_true(any(grepl("^\\[npRmpi\\] Computing entropy statistics by lag 2/2 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
   expect_true(any(grepl("^\\[npRmpi\\] Bootstrap replications [0-9]+/9 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
   expect_true(any(grepl("^\\[npRmpi\\] Bootstrap replications 9/9 \\([0-9]+\\.[0-9]%.*, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
 })
@@ -101,8 +101,8 @@ test_that("npsdeptest progress respects suppressMessages", {
   expect_length(res$trace, 0)
 })
 
-test_that("npsdeptest source routes use canonical lag and bootstrap surface tags", {
+test_that("npsdeptest source routes use canonical lag and bootstrap activity owners", {
   src <- installed_function_text("npsdeptest")
-  expect_true(grepl('surface = "lag"', src, fixed = TRUE))
-  expect_true(grepl('surface = "bootstrap"', src, fixed = TRUE))
+  expect_true(grepl('.np_progress_activity_begin(lag.num,', src, fixed = TRUE))
+  expect_true(grepl('.np_progress_activity_begin(B,', src, fixed = TRUE))
 })

@@ -113,9 +113,9 @@ test_that("npindexbw adopts the generic bandwidth selection line", {
   expect_s3_class(res$value, "sibandwidth")
   expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 1/3\\)$", messages)))
   expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 1/3, iteration [0-9]+, elapsed [0-9]+\\.[0-9]s\\)$", messages)))
-  expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 2/3, elapsed [0-9]+\\.[0-9]s, [0-9]+\\.[0-9]%, eta [0-9]+\\.[0-9]s\\)$", messages)))
-  expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(2/3, iter [0-9]+, elapsed [0-9]+\\.[0-9]s, [0-9]+\\.[0-9]%, eta [0-9]+\\.[0-9]s\\)", messages)))
-  expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 3/3, elapsed [0-9]+\\.[0-9]s, 100\\.0%, eta 0\\.0s\\)$", messages)))
+  expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 2/3, [0-9]+\\.[0-9]%, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", messages)))
+  expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(ms 2/3, iter [0-9]+, [0-9]+\\.[0-9]%, elap [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", messages)))
+  expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 3/3, 100\\.0%, elapsed [0-9]+\\.[0-9]s, eta 0\\.0s\\)$", messages)))
 })
 
 test_that("npindexbw progress respects np.messages FALSE", {

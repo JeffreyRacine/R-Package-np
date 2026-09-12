@@ -91,8 +91,8 @@ test_that("npscoefbw adopts the generic bandwidth selection line", {
   expect_s3_class(actual$value, "scbandwidth")
   expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 1/2\\)$", lines)))
   expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 1/2, iteration [0-9]+, elapsed [0-9]+\\.[0-9]s\\)$", lines)))
-  expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 2/2, elapsed [0-9]+\\.[0-9]s, 50\\.0%, eta [0-9]+\\.[0-9]s\\)$", lines)))
-  expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 2/2, elapsed [0-9]+\\.[0-9]s, 100\\.0%, eta 0\\.0s\\)$", lines)))
+  expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 2/2, 50\\.0%, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", lines)))
+  expect_true(any(grepl("^\\[npRmpi\\] Bandwidth selection \\(multistart 2/2, 100\\.0%, elapsed [0-9]+\\.[0-9]s, eta 0\\.0s\\)$", lines)))
 })
 
 test_that("npscoefbw progress respects np.messages FALSE", {

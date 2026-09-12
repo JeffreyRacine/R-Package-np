@@ -149,7 +149,7 @@ test_that("bootstrap execution stage surfaces immediately on begin in npRmpi", {
   lines <- vapply(actual$trace, `[[`, character(1L), "line")
   expect_identical(
     lines[[1L]],
-    "[npRmpi] Plot bootstrap (index 1/1) 0/12 (0.0%, elapsed 0.0s, eta 0.0s)"
+    "[npRmpi] Plot bootstrap (index 1/1) 0/12 (0.0%, elapsed 0.0s, eta estimating)"
   )
   expect_true(vapply(actual$trace, `[[`, character(1L), "event")[[1L]] == "render")
 })

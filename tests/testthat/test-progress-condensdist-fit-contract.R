@@ -17,7 +17,7 @@ expect_condensdist_clean_powell_surface <- function(lines, pkg_pattern = "npRmpi
   expect_true(length(powell.lines) > 0L, info = detail.info)
   expect_true(
     any(grepl(
-      sprintf("^\\[%s\\] Refining bandwidth \\(elapsed [0-9]+\\.[0-9]s, iter [0-9]+, deg \\([0-9]+\\), best \\([0-9]+\\)\\)$", pkg_pattern),
+      sprintf("^\\[%s\\] Refining bandwidth \\(iteration [0-9]+, elapsed [0-9]+\\.[0-9]s, deg \\([0-9]+\\), best \\([0-9]+\\)\\)$", pkg_pattern),
       powell.lines
     )),
     info = paste(c(detail.info, powell.lines), collapse = "\n")
@@ -510,7 +510,7 @@ test_that("npcdens bw to fit route hands off immediately into single-line fit pr
   lines <- condensdist_fit_progress_lines(actual)
   bandwidth.pos <- grep("^\\[npRmpi\\] Bandwidth selection \\(", lines)
   fit.start.pos <- grep(
-    sprintf("^\\[npRmpi\\] Fitting conditional density 0/%d \\(0\\.0%%, elapsed 0\\.0s, eta 0\\.0s\\): starting$", total),
+    sprintf("^\\[npRmpi\\] Fitting conditional density 0/%d \\(0\\.0%%, elapsed 0\\.0s, eta estimating\\): starting$", total),
     lines
   )
   fit.finish.pos <- grep(
@@ -554,7 +554,7 @@ test_that("npcdens nomad to powell to fit route preserves single-line fit handof
 
   lines <- condensdist_fit_progress_lines(actual)
   fit.start.pos <- grep(
-    sprintf("^\\[npRmpi\\] Fitting conditional density 0/%d \\(0\\.0%%, elapsed 0\\.0s, eta 0\\.0s\\): starting$", fixture$n),
+    sprintf("^\\[npRmpi\\] Fitting conditional density 0/%d \\(0\\.0%%, elapsed 0\\.0s, eta estimating\\): starting$", fixture$n),
     lines
   )
   fit.finish.pos <- grep(
@@ -637,7 +637,7 @@ test_that("npcdist bw to fit route hands off immediately into single-line fit pr
   lines <- condensdist_fit_progress_lines(actual)
   bandwidth.pos <- grep("^\\[npRmpi\\] Bandwidth selection \\(", lines)
   fit.start.pos <- grep(
-    sprintf("^\\[npRmpi\\] Fitting conditional distribution 0/%d \\(0\\.0%%, elapsed 0\\.0s, eta 0\\.0s\\): starting$", total),
+    sprintf("^\\[npRmpi\\] Fitting conditional distribution 0/%d \\(0\\.0%%, elapsed 0\\.0s, eta estimating\\): starting$", total),
     lines
   )
   fit.finish.pos <- grep(
@@ -681,7 +681,7 @@ test_that("npcdist nomad to powell to fit route preserves single-line fit handof
 
   lines <- condensdist_fit_progress_lines(actual)
   fit.start.pos <- grep(
-    sprintf("^\\[npRmpi\\] Fitting conditional distribution 0/%d \\(0\\.0%%, elapsed 0\\.0s, eta 0\\.0s\\): starting$", fixture$n),
+    sprintf("^\\[npRmpi\\] Fitting conditional distribution 0/%d \\(0\\.0%%, elapsed 0\\.0s, eta estimating\\): starting$", fixture$n),
     lines
   )
   fit.finish.pos <- grep(
@@ -709,7 +709,7 @@ test_that("session npcdens nomad route keeps visible powell handoff in subproces
   bandwidth.pos <- grep("^\\[npRmpi\\] (Selecting degree and bandwidth|NOMAD degree/bw|Exhaustive degree/bw|Auto:NOMAD degree/bw|Auto:exhaustive degree/bw)", block)
   powell.pos <- grep("^\\[npRmpi\\] Refining bandwidth \\(", block)
   fit.start.pos <- grep(
-    "^\\[npRmpi\\] Fitting conditional dens(?:ity)? 0/12 \\(0\\.0%, elapsed 0\\.0s, eta 0\\.0s\\): starting$",
+    "^\\[npRmpi\\] Fitting conditional dens 0/12 \\(0\\.0%, elapsed 0\\.0s, eta estimating\\)$",
     block,
     perl = TRUE
   )
@@ -735,7 +735,7 @@ test_that("session npcdist nomad route keeps visible powell handoff in subproces
   bandwidth.pos <- grep("^\\[npRmpi\\] (Selecting degree and bandwidth|NOMAD degree/bw|Exhaustive degree/bw|Auto:NOMAD degree/bw|Auto:exhaustive degree/bw)", block)
   powell.pos <- grep("^\\[npRmpi\\] Refining bandwidth \\(", block)
   fit.start.pos <- grep(
-    "^\\[npRmpi\\] Fitting conditional dist(?:ribution)? 0/12 \\(0\\.0%, elapsed 0\\.0s, eta 0\\.0s\\): starting$",
+    "^\\[npRmpi\\] Fitting conditional dist 0/12 \\(0\\.0%, elapsed 0\\.0s, eta estimating\\)$",
     block,
     perl = TRUE
   )
@@ -761,7 +761,7 @@ test_that("attach npcdens nomad route keeps visible powell handoff in subprocess
   bandwidth.pos <- grep("^\\[npRmpi\\] (Selecting degree and bandwidth|NOMAD degree/bw|Exhaustive degree/bw|Auto:NOMAD degree/bw|Auto:exhaustive degree/bw)", block)
   powell.pos <- grep("^\\[npRmpi\\] Refining bandwidth \\(", block)
   fit.start.pos <- grep(
-    "^\\[npRmpi\\] Fitting conditional density 0/12 \\(0\\.0%, elapsed 0\\.0s, eta 0\\.0s\\): starting$",
+    "^\\[npRmpi\\] Fitting conditional density 0/12 \\(0\\.0%, elapsed 0\\.0s, eta estimating\\): starting$",
     block
   )
 
@@ -785,7 +785,7 @@ test_that("attach npcdens nomad route does not duplicate fit-start lines in subp
   actual <- run_condensdist_attach_progress_contract()
   block <- condensdist_case_progress_lines(actual$lines, "npcdens")
   fit.start.pos <- grep(
-    "^\\[npRmpi\\] Fitting conditional density 0/12 \\(0\\.0%, elapsed 0\\.0s, eta 0\\.0s\\): starting$",
+    "^\\[npRmpi\\] Fitting conditional density 0/12 \\(0\\.0%, elapsed 0\\.0s, eta estimating\\): starting$",
     block
   )
 
@@ -802,7 +802,7 @@ test_that("profile npcdens nomad route keeps visible powell handoff in subproces
   bandwidth.pos <- grep("^\\[npRmpi\\] (Selecting degree and bandwidth|NOMAD degree/bw|Exhaustive degree/bw|Auto:NOMAD degree/bw|Auto:exhaustive degree/bw)", block)
   powell.pos <- grep("^\\[npRmpi\\] Refining bandwidth \\(", block)
   fit.start.pos <- grep(
-    "^\\[npRmpi\\] Fitting conditional density 0/12 \\(0\\.0%, elapsed 0\\.0s, eta 0\\.0s\\): starting$",
+    "^\\[npRmpi\\] Fitting conditional density 0/12 \\(0\\.0%, elapsed 0\\.0s, eta estimating\\): starting$",
     block
   )
 

@@ -153,7 +153,7 @@ test_that("npudens bw to fit route hands off immediately into single-line fit pr
   lines <- densdist_fit_progress_lines(actual)
   bandwidth.pos <- grep("^\\[npRmpi\\] Bandwidth selection \\(", lines)
   fit.start.pos <- grep(
-    sprintf("^\\[npRmpi\\] Fitting density 0/%d \\(0\\.0%%, elapsed 0\\.0s, eta 0\\.0s\\): starting$", fixture$n),
+    sprintf("^\\[npRmpi\\] Fitting density 0/%d \\(0\\.0%%, elapsed 0\\.0s, eta estimating\\): starting$", fixture$n),
     lines
   )
   fit.finish.pos <- grep(
@@ -229,7 +229,7 @@ test_that("npudist bw to fit route hands off immediately into single-line fit pr
   lines <- densdist_fit_progress_lines(actual)
   bandwidth.pos <- grep("^\\[npRmpi\\] Bandwidth selection \\(", lines)
   fit.start.pos <- grep(
-    sprintf("^\\[npRmpi\\] Fitting distribution 0/%d \\(0\\.0%%, elapsed 0\\.0s, eta 0\\.0s\\): starting$", fixture$n),
+    sprintf("^\\[npRmpi\\] Fitting distribution 0/%d \\(0\\.0%%, elapsed 0\\.0s, eta estimating\\): starting$", fixture$n),
     lines
   )
   fit.finish.pos <- grep(
