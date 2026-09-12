@@ -11,7 +11,9 @@
 	referred to as \sQuote{nominal} and \sQuote{ordinal} categorical
 	variables respectively). A getting-started vignette containing a
 	short introduction to the \pkg{np} package can be accessed via
-	\code{vignette("np_getting_started", package = "np")}. An installed
+	\code{vignette("np_getting_started", package = "np")}. It includes
+  prediction, no-search uncertainty/gradient refitting, and a migration guide
+  for users updating from 0.70-5. An installed
 	vignette for the entropy-based test family can be accessed via
 	\code{vignette("np_entropy_tests", package = "np")}.
 
@@ -78,11 +80,12 @@
 	the type and use the appropriate kernel function and method where
 	appropriate.
 
-	All estimation methods are fully multivariate, i.e., there are no
-	limitations on the number of variables one can model (or number of
-	observations for that matter). Execution time for most routines is,
-	however, exponentially increasing in the number of observations and
-	increases with the number of variables involved.
+  Estimators support multivariate data subject to each method's documented
+  requirements and available computational resources. Runtime and memory
+  depend on sample size, evaluation points, dimension, polynomial basis,
+  kernel support, bandwidth type and search settings. Large datasets and
+  high-dimensional fits can be expensive; there is no single exponential
+  sample-size cost rule shared by all routines.
 
 	Nonparametric methods include unconditional density (distribution),
 	conditional density (distribution), regression, mode, and quantile

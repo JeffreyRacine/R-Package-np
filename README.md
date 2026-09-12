@@ -59,6 +59,13 @@ summary(fit)
 plot(fit)
 ```
 
+For prediction, no-search refitting with standard errors or gradients, and
+the 0.70-5 migration guide, use
+`vignette("np_getting_started", package = "np")`.
+The [Gallery FAQ](https://jeffreyracine.github.io/gallery/faq.html)
+and [runnable quickstarts](https://jeffreyracine.github.io/gallery/quickstarts.html)
+provide further examples.
+
 For more information on this project please visit the maintainer's website (https://experts.mcmaster.ca/people/racinej).
 
 ## Canonical Implementation Directive (2026-03-05)
