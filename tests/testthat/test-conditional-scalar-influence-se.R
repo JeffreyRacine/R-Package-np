@@ -15,8 +15,13 @@ test_that("conditional beta response allows a zero explanatory derivative total"
     expect_equal(as.vector(fitted(fit)), mean(z), tolerance = 2e-12)
     expect_identical(as.vector(gradients(fit)), 0)
     expect_identical(as.vector(fit$congerr), 0)
-    # Invalid base normalization is checked in the serial counterpart.
-    # Do not exercise the separately deferred native-unwind pool cleanup here.
+    expect_warning(unsupported <- estimator(se = TRUE, bws = b, txdat = x, tydat = y,
+      exdat = data.frame(x = 10), eydat = data.frame(y = .43), gradients = TRUE),
+      "NA")
+    expect_true(all(is.na(fitted(unsupported))))
+    expect_true(all(is.na(se(unsupported))))
+    expect_true(all(is.na(gradients(unsupported))))
+    expect_true(all(is.na(unsupported$congerr)))
   }
 })
 test_that("scalar conditional categorical errors pair same-sample influences", {

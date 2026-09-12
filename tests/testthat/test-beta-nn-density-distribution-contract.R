@@ -3,11 +3,11 @@ test_that("nearest-neighbor beta density matches its kernel-sum contributions", 
   evaluation <- data.frame(x = c(0.01, 0.13, 0.38, 0.74, 0.99))
 
   for (bwtype in c("generalized_nn", "adaptive_nn")) {
-    fit <- npudens(
+    fit <- expect_beta_se_fit(bwtype, npudens(
       bws = 3, tdat = training, edat = evaluation, se = TRUE,
       bwtype = bwtype, ckertype = "beta", ckerorder = 2,
       ckerbound = "fixed", ckerlb = 0, ckerub = 1
-    )
+    ))
     sums <- npksum(
       bws = 3, txdat = training, exdat = evaluation,
       bwtype = bwtype, ckertype = "beta", ckerorder = 2,
@@ -18,7 +18,7 @@ test_that("nearest-neighbor beta density matches its kernel-sum contributions", 
     expected_se <- sqrt(apply(sums$kw, 2L, var) / nrow(training))
 
     expect_equal(fitted(fit), expected, tolerance = 3e-13)
-    expect_equal(se(fit), expected_se, tolerance = 3e-13)
+    expect_beta_se(fit, bwtype, expected_se, tolerance = 3e-13)
     expect_equal(fit$log_likelihood,
                  sum(log(pmax(expected, .Machine$double.xmin))),
                  tolerance = 3e-13)
@@ -30,11 +30,11 @@ test_that("nearest-neighbor beta distribution matches its CDF contributions", {
   evaluation <- data.frame(x = c(0, 0.01, 0.13, 0.38, 0.74, 0.99, 1))
 
   for (bwtype in c("generalized_nn", "adaptive_nn")) {
-    fit <- npudist(
+    fit <- expect_beta_se_fit(bwtype, npudist(
       bws = 3, tdat = training, edat = evaluation, se = TRUE,
       bwtype = bwtype, ckertype = "beta", ckerorder = 2,
       ckerbound = "fixed", ckerlb = 0, ckerub = 1
-    )
+    ))
     sums <- npksum(
       bws = 3, txdat = training, exdat = evaluation,
       bwtype = bwtype, ckertype = "beta", ckerorder = 2,
@@ -46,7 +46,7 @@ test_that("nearest-neighbor beta distribution matches its CDF contributions", {
                           (nrow(training) * (nrow(training) - 1L)))
 
     expect_equal(fitted(fit), expected, tolerance = 3e-13)
-    expect_equal(se(fit), expected_se, tolerance = 3e-13)
+    expect_beta_se(fit, bwtype, expected_se, tolerance = 3e-13)
     expect_identical(fitted(fit)[c(1L, nrow(evaluation))], c(0, 1))
   }
 })

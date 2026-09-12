@@ -22,7 +22,8 @@ test_that("mixed beta density uses the canonical categorical row", {
         ckertype = "beta", ckerorder = order,
         ckerbound = "fixed", ckerlb = 0, ckerub = 1
       )
-      dense <- npudens(bws = bw, tdat = training, edat = evaluation, se = TRUE)
+      dense <- expect_beta_se_fit(bwtype,
+        npudens(bws = bw, tdat = training, edat = evaluation, se = TRUE))
       ## Density/distribution routes use the normalized ordered Li--Racine
       ## kernel.  npksum() names that explicit low-level variant nliracine.
       oracle_bw <- bw
@@ -35,7 +36,8 @@ test_that("mixed beta density uses the canonical categorical row", {
         kernel.pow = 2L
       )$ksum
       options(np.categorical.compress = TRUE)
-      compressed <- npudens(bws = bw, tdat = training, edat = evaluation, se = TRUE)
+      compressed <- expect_beta_se_fit(bwtype,
+        npudens(bws = bw, tdat = training, edat = evaluation, se = TRUE))
       options(np.categorical.compress = FALSE)
 
       expected <- as.vector(sum_one) / nrow(training)
@@ -43,7 +45,7 @@ test_that("mixed beta density uses the canonical categorical row", {
       expected_se <- sqrt(pmax(expected_variance, 0) /
                             (nrow(training) - 1L))
       expect_equal(fitted(dense), expected, tolerance = 3e-13)
-      expect_equal(se(dense), expected_se, tolerance = 3e-13)
+      expect_beta_se(dense, bwtype, expected_se, tolerance = 3e-13)
       expect_identical(fitted(dense), fitted(compressed))
       expect_identical(se(dense), se(compressed))
     }
@@ -73,7 +75,8 @@ test_that("mixed beta distribution uses the canonical categorical row", {
         ckertype = "beta", ckerorder = order,
         ckerbound = "fixed", ckerlb = 0, ckerub = 1
       )
-      dense <- npudist(bws = bw, tdat = training, edat = evaluation, se = TRUE)
+      dense <- expect_beta_se_fit(bwtype,
+        npudist(bws = bw, tdat = training, edat = evaluation, se = TRUE))
       oracle_bw <- bw
       oracle_bw[["okertype"]] <- "nliracine"
       weights <- npksum(
@@ -82,7 +85,8 @@ test_that("mixed beta distribution uses the canonical categorical row", {
         return.kernel.weights = TRUE
       )$kw
       options(np.categorical.compress = TRUE)
-      compressed <- npudist(bws = bw, tdat = training, edat = evaluation, se = TRUE)
+      compressed <- expect_beta_se_fit(bwtype,
+        npudist(bws = bw, tdat = training, edat = evaluation, se = TRUE))
       options(np.categorical.compress = FALSE)
 
       expected <- colMeans(weights)
@@ -91,7 +95,7 @@ test_that("mixed beta distribution uses the canonical categorical row", {
           (nrow(training) * (nrow(training) - 1L))
       )
       expect_equal(fitted(dense), expected, tolerance = 3e-13)
-      expect_equal(se(dense), expected_se, tolerance = 3e-13)
+      expect_beta_se(dense, bwtype, expected_se, tolerance = 3e-13)
       expect_identical(fitted(dense), fitted(compressed))
       expect_identical(se(dense), se(compressed))
     }

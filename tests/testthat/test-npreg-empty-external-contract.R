@@ -121,7 +121,7 @@ test_that("beta and computed-zero Gaussian rows use facts without a numerical fa
   expect_false(grepl("underflow|outside.*support|ties",r$warnings))
 })
 
-test_that("composite callers publish once and required bootstrap errors remain terminal", {
+test_that("composite callers publish unsupported external rows once, including bootstrap", {
   old<-options(np.messages=FALSE,np.tree=FALSE);on.exit(options(old),add=TRUE)
   set.seed(642)
   x<-data.frame(x=runif(64,-1,1));z<-data.frame(z=seq(-1,1,length.out=64))
@@ -132,14 +132,14 @@ test_that("composite callers publish once and required bootstrap errors remain t
   index<-a_capture_empty(npindex(bi,txdat=z,tydat=y,exdat=ez,se=TRUE,gradients=TRUE))
   expect_length(index$warnings,1L)
   expect_true(is.na(index$value$mean[2L]))
-  # A later required replicate must not publish the initial permissive fit.
-  warning.state <- new.env(hash = FALSE, parent = emptyenv())
-  warning.state$messages <- character()
-  err<-withCallingHandlers(tryCatch(npindex(bi,txdat=z,tydat=y,exdat=ez,
-    se=TRUE,gradients=TRUE,se.type="bootstrap",B=3L),error=identity),
-    warning=function(w){warning.state$messages<-c(warning.state$messages,conditionMessage(w));invokeRestart("muffleWarning")})
-  expect_s3_class(err,"error")
-  expect_false(any(grepl("all computed kernel weights",warning.state$messages)))
+  # External rows use the same NA policy in the public bootstrap route.
+  boot<-a_capture_empty(npindex(bi,txdat=z,tydat=y,exdat=ez,
+    se=TRUE,gradients=TRUE,se.type="bootstrap",B=3L))
+  expect_length(boot$warnings,1L)
+  expect_identical(fitted(boot$value),fitted(index$value))
+  expect_true(is.na(boot$value$mean[2L]))
+  expect_true(is.na(boot$value$merr[2L]))
+  expect_true(is.finite(boot$value$merr[1L]))
   bp<-npplregbw(xdat=x,zdat=z,ydat=y,bws=matrix(.4,2,1),bandwidth.compute=FALSE,
     regtype="lp",degree=3L,ckertype="epanechnikov")
   p<-a_capture_empty(npplreg(bp,txdat=x,tydat=y,tzdat=z,exdat=ex,ezdat=ez))
