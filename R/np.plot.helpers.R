@@ -11079,7 +11079,7 @@ compute.default.error.range <- function(center, err) {
   out <- switch(policy$family,
                 gaussian = stats::rnorm(n),
                 uniform = stats::runif(n, -1, 1),
-                epanechnikov = .np_plot_repan2(n))
+                epanechnikov = sqrt(5) * .np_plot_repan2(n))
   if (length(out) != n || anyNA(out) || !all(is.finite(out)))
     stop(sprintf("%s produced invalid kernel perturbation draws", context), call. = FALSE)
   out
@@ -11490,267 +11490,28 @@ compute.default.error.range <- function(center, err) {
   )
 }
 
-.np_plot_conditional_smooth_boot <- function(xdat, ydat,
-                                             exdat, eydat,
-                                             bws,
-                                             cdf,
+.np_plot_conditional_smooth_boot <- function(xdat, ydat, exdat, eydat,
+                                             bws, cdf,
                                              plot.errors.boot.method,
                                              plot.errors.boot.blocklen,
                                              plot.errors.boot.num,
                                              progress.label) {
-  xdat <- toFrame(xdat)
-  ydat <- toFrame(ydat)
-  exdat <- toFrame(exdat)
-  eydat <- toFrame(eydat)
-  B <- as.integer(plot.errors.boot.num)
-  n <- nrow(xdat)
-  neval <- nrow(exdat)
-
-  if (nrow(ydat) != n || nrow(eydat) != neval)
-    stop("conditional smooth-bootstrap helper requires aligned x/y training and evaluation rows")
-  if (n < 1L || neval < 1L || B < 1L)
-    stop("invalid conditional smooth-bootstrap dimensions")
-
-  bws.pilot <- .np_plot_oversmooth_conditional_bws(bws, cdf = cdf)
-  gx <- as.numeric(bws.pilot$bandwidth$x)
-  gy <- as.numeric(bws.pilot$bandwidth$y)
-  xicon <- as.logical(bws$xdati$icon)
-  yicon <- as.logical(bws$ydati$icon)
-  if (length(gx) != ncol(xdat) || length(gy) != ncol(ydat) ||
-      length(xicon) != ncol(xdat) || length(yicon) != ncol(ydat) ||
-      anyNA(gx[xicon]) || anyNA(gy[yicon]) ||
-      !all(is.finite(gx[xicon])) || !all(is.finite(gy[yicon])) ||
-      any(gx[xicon] <= 0) || any(gy[yicon] <= 0)) {
-    stop("invalid smooth-bootstrap pilot bandwidth vectors for conditional plot bias correction", call. = FALSE)
-  }
-
-  fit_one <- function(x.train, y.train) {
-    kbx <- .np_con_make_kbandwidth_x(bws = bws, xdat = x.train)
-    kbxy <- .np_con_make_kbandwidth_xy(bws = bws, xdat = x.train, ydat = y.train)
-    .np_ksum_conditional_eval_exact(
-      xdat = x.train,
-      ydat = y.train,
-      exdat = exdat,
-      eydat = eydat,
-      kbx = kbx,
-      kbxy = kbxy,
-      cdf = cdf
-    )
-  }
-
-  t0 <- fit_one(x.train = xdat, y.train = ydat)
-  tmat <- matrix(NA_real_, nrow = B, ncol = length(t0))
-
-  is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
-  index.drawer <- if (is.block) {
-    .np_block_indices_drawer(
-      n = n,
-      B = B,
-      blocklen = plot.errors.boot.blocklen,
-      sim = plot.errors.boot.method
-    )
-  } else {
-    NULL
-  }
-
-  smooth_one <- function(idx) {
-    xstar <- .np_plot_smooth_resample_frame(
-      dat = xdat,
-      idx = idx,
-      icon = xicon,
-      g = gx,
-      ckertype = bws$cxkertype,
-      ckerorder = bws$cxkerorder,
-      context = "conditional density/distribution x-side smooth bootstrap"
-    )
-    ystar <- .np_plot_smooth_resample_frame(
-      dat = ydat,
-      idx = idx,
-      icon = yicon,
-      g = gy,
-      ckertype = bws$cykertype,
-      ckerorder = bws$cykerorder,
-      context = "conditional density/distribution y-side smooth bootstrap"
-    )
-    fit_one(x.train = xstar, y.train = ystar)
-  }
-
-  chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = is.block)
-  progress <- .np_plot_bootstrap_progress_begin(
-    total = B,
-    label = if (is.null(progress.label)) "Plot bootstrap smooth" else progress.label
-  )
-  on.exit({
-    .np_plot_progress_end(progress)
-  }, add = TRUE)
-  chunk.controller <- .np_plot_progress_chunk_controller(chunk.size = chunk.size, progress = progress)
-
-  start <- 1L
-  while (start <= B) {
-    stopi <- min(B, start + chunk.controller$chunk.size - 1L)
-    bsz <- stopi - start + 1L
-    chunk.started <- .np_progress_now()
-    idx.chunk <- if (!is.null(index.drawer)) {
-      index.drawer(start, stopi)
-    } else {
-      matrix(sample.int(n = n, size = n * bsz, replace = TRUE), nrow = n)
-    }
-    for (jj in seq_len(bsz))
-      tmat[start + jj - 1L, ] <- smooth_one(idx.chunk[, jj])
-
-    progress <- .np_plot_progress_tick(state = progress, done = stopi)
-    chunk.controller <- .np_plot_progress_chunk_observe(
-      controller = chunk.controller,
-      bsz = bsz,
-      elapsed.sec = .np_progress_now() - chunk.started
-    )
-    start <- stopi + 1L
-  }
-
-  list(t = tmat, t0 = t0)
+  .np_plot_conditional_pilot_boot(xdat, ydat, exdat, eydat, bws, cdf,
+    plot.errors.boot.method, plot.errors.boot.blocklen, plot.errors.boot.num,
+    progress.label)
 }
 
-.np_plot_conditional_gradient_smooth_boot <- function(xdat, ydat,
-                                                      exdat, eydat,
-                                                      bws,
-                                                      cdf,
+.np_plot_conditional_gradient_smooth_boot <- function(xdat, ydat, exdat, eydat,
+                                                      bws, cdf,
                                                       gradient.index,
                                                       gradient.order,
                                                       plot.errors.boot.method,
                                                       plot.errors.boot.blocklen,
                                                       plot.errors.boot.num,
                                                       progress.label) {
-  xdat <- toFrame(xdat)
-  ydat <- toFrame(ydat)
-  exdat <- toFrame(exdat)
-  eydat <- toFrame(eydat)
-  B <- as.integer(plot.errors.boot.num)
-  n <- nrow(xdat)
-  neval <- nrow(exdat)
-  where <- if (isTRUE(cdf)) {
-    "conditional distribution gradient smooth bootstrap"
-  } else {
-    "conditional density gradient smooth bootstrap"
-  }
-
-  if (nrow(ydat) != n || nrow(eydat) != neval)
-    stop("conditional gradient smooth-bootstrap helper requires aligned x/y training and evaluation rows")
-  if (n < 1L || neval < 1L || B < 1L)
-    stop("invalid conditional gradient smooth-bootstrap dimensions")
-
-  gradient.index <- .np_plot_validate_conditional_gradient_target(
-    bws = bws,
-    gradient.index = gradient.index,
-    where = where
-  )
-
-  bws.pilot <- .np_plot_oversmooth_conditional_bws(bws, cdf = cdf)
-  gx <- as.numeric(bws.pilot$bandwidth$x)
-  gy <- as.numeric(bws.pilot$bandwidth$y)
-  xicon <- as.logical(bws$xdati$icon)
-  yicon <- as.logical(bws$ydati$icon)
-  if (length(gx) != ncol(xdat) || length(gy) != ncol(ydat) ||
-      length(xicon) != ncol(xdat) || length(yicon) != ncol(ydat) ||
-      anyNA(gx[xicon]) || anyNA(gy[yicon]) ||
-      !all(is.finite(gx[xicon])) || !all(is.finite(gy[yicon])) ||
-      any(gx[xicon] <= 0) || any(gy[yicon] <= 0)) {
-    stop("invalid smooth-bootstrap pilot bandwidth vectors for conditional gradient plot bias correction",
-         call. = FALSE)
-  }
-
-  fit_one <- function(x.train, y.train) {
-    fit <- .np_plot_conditional_eval(
-      bws = bws,
-      xdat = x.train,
-      ydat = y.train,
-      exdat = exdat,
-      eydat = eydat,
-      cdf = cdf,
-      gradients = TRUE,
-      gradient.order = gradient.order,
-      lp.first.se.demand = FALSE,
-      cat.se.demand = FALSE,
-      se = FALSE,
-      gradient.target = gradient.index
-    )
-    .np_plot_extract_conditional_gradient(
-      fit = fit,
-      gradient.index = gradient.index,
-      neval = neval,
-      where = where
-    )
-  }
-
-  t0 <- fit_one(x.train = xdat, y.train = ydat)
-  tmat <- matrix(NA_real_, nrow = B, ncol = length(t0))
-
-  is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
-  index.drawer <- if (is.block) {
-    .np_block_indices_drawer(
-      n = n,
-      B = B,
-      blocklen = plot.errors.boot.blocklen,
-      sim = plot.errors.boot.method
-    )
-  } else {
-    NULL
-  }
-
-  smooth_one <- function(idx) {
-    xstar <- .np_plot_smooth_resample_frame(
-      dat = xdat,
-      idx = idx,
-      icon = xicon,
-      g = gx,
-      ckertype = bws$cxkertype,
-      ckerorder = bws$cxkerorder,
-      context = "conditional density/distribution gradient x-side smooth bootstrap"
-    )
-    ystar <- .np_plot_smooth_resample_frame(
-      dat = ydat,
-      idx = idx,
-      icon = yicon,
-      g = gy,
-      ckertype = bws$cykertype,
-      ckerorder = bws$cykerorder,
-      context = "conditional density/distribution gradient y-side smooth bootstrap"
-    )
-    fit_one(x.train = xstar, y.train = ystar)
-  }
-
-  chunk.size <- .np_inid_chunk_size(n = n, B = B, progress_cap = is.block)
-  progress <- .np_plot_bootstrap_progress_begin(
-    total = B,
-    label = if (is.null(progress.label)) "Plot bootstrap gradient smooth" else progress.label
-  )
-  on.exit({
-    .np_plot_progress_end(progress)
-  }, add = TRUE)
-  chunk.controller <- .np_plot_progress_chunk_controller(chunk.size = chunk.size, progress = progress)
-
-  start <- 1L
-  while (start <= B) {
-    stopi <- min(B, start + chunk.controller$chunk.size - 1L)
-    bsz <- stopi - start + 1L
-    chunk.started <- .np_progress_now()
-    idx.chunk <- if (!is.null(index.drawer)) {
-      index.drawer(start, stopi)
-    } else {
-      matrix(sample.int(n = n, size = n * bsz, replace = TRUE), nrow = n)
-    }
-    for (jj in seq_len(bsz))
-      tmat[start + jj - 1L, ] <- smooth_one(idx.chunk[, jj])
-
-    progress <- .np_plot_progress_tick(state = progress, done = stopi)
-    chunk.controller <- .np_plot_progress_chunk_observe(
-      controller = chunk.controller,
-      bsz = bsz,
-      elapsed.sec = .np_progress_now() - chunk.started
-    )
-    start <- stopi + 1L
-  }
-
-  list(t = tmat, t0 = t0)
+  .np_plot_conditional_pilot_boot(xdat, ydat, exdat, eydat, bws, cdf,
+    plot.errors.boot.method, plot.errors.boot.blocklen, plot.errors.boot.num,
+    progress.label, gradient.index=gradient.index, gradient.order=gradient.order)
 }
 
 .np_plot_conditional_oversmoothed_boot <- function(xdat, ydat,
@@ -13236,7 +12997,7 @@ compute.bootstrap.errors.conbandwidth =
                         if (is.block) plot.errors.boot.method else "inid")
       )
       if (.np_plot_center_is_oversmoothed(plot.errors.center, plot.errors.boot.method)) {
-        .np_plot_validate_conditional_gradient_target(
+        .np_plot_resolve_conditional_gradient_index(
           bws = bws,
           gradient.index = gradient.index,
           where = "conditional bootstrap bias-corrected center"

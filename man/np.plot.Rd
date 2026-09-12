@@ -605,7 +605,9 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   perturbation. The smooth perturbation law is drawn from the selected
   ordinary continuous kernel when that kernel defines a probability law:
   second-order Gaussian, uniform, and second-order Epanechnikov kernels
-  are supported. Higher-order Gaussian and Epanechnikov kernels remain
+  are supported. Epanechnikov perturbations use the package's standardized
+  support \eqn{[-\sqrt{5},\sqrt{5}]} before multiplication by the pilot
+  bandwidth. Higher-order Gaussian and Epanechnikov kernels remain
   valid estimation kernels, but their signed equivalent-kernel forms do
   not define ordinary random perturbations, so
   \code{center="bias-corrected"} with pair/block/geometric bootstrap
@@ -616,7 +618,10 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   without perturbation. The conditioning-variable side uses a full
   regression-style pilot: continuous conditioning bandwidths are
   enlarged, and categorical conditioning lambdas are moved toward their
-  admissible upper bounds without crossing them. For
+  admissible upper bounds without crossing them. Categorical conditioning
+  values are drawn independently given the selected donor, using the selected
+  categorical kernel normalized over the declared possible levels for that
+  donor. Factor levels and their ordering are retained. For
   conditional density this is
   \deqn{g_{xj} = h_{xj} n^{2r / ((p + 2r)(p + 4r))},}
   and for conditional distribution this is
@@ -630,10 +635,21 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
   row-wise without perturbation, continuous conditioning variables use
   the conditional regression-style pilot, and categorical conditioning
   lambdas are moved toward their admissible upper bounds as in the
-  corresponding level route.
-  Ordinary paired/block bootstrap intervals support categorical first
-  differences, but smooth-bootstrap bias-corrected conditional-gradient
-  centers currently require a continuous conditioning-variable target.
+  corresponding level route and actually used in the categorical draws.
+  The conditional pilot uses donor-truncated continuous probability laws
+  when finite domain bounds are supplied, with the same normalization in
+  its reference calculation.
+
+  Each conditional pilot resample is refitted at the original estimation
+  bandwidths and the selected LC/LL/LP specification. The bias estimate
+  subtracts the known conditional target of the generating pilot law from
+  the mean pilot-bootstrap estimate, not the original fitted estimate.
+  Conditional PDF/CDF levels, continuous derivatives and categorical first
+  differences use this same reference contract; the endpoints of a
+  categorical contrast share each resampled dataset. Ordinary bootstrap
+  draws still determine variability widths. A pilot reference without
+  support, or a derivative at a nonsmooth compact-kernel knot, fails
+  explicitly rather than silently changing the requested centering method.
   These are practical, evidence-backed rules-of-thumb guided by the
   smoothed-bootstrap and regression two-bandwidth literatures, not claims
   of universal optimality.
