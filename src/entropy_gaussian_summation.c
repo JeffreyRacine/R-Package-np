@@ -3,6 +3,8 @@
 #include <limits.h>
 #include <math.h>
 
+#include "headers.h"
+
 #define NP_ENTROPY_SUMMATION_INTERRUPT_INTERVAL 65536
 
 /*
@@ -92,6 +94,7 @@ SEXP C_np_entropy_symmetric_summation_counts(SEXP support,
 
           if (--interrupt_countdown == 0) {
             R_CheckUserInterrupt();
+            np_progress_fit_heartbeat();
             interrupt_countdown = NP_ENTROPY_SUMMATION_INTERRUPT_INTERVAL;
           }
         }
@@ -166,6 +169,7 @@ SEXP C_np_entropy_bivariate_summation(SEXP x,
 
       if (--interrupt_countdown == 0) {
         R_CheckUserInterrupt();
+        np_progress_fit_heartbeat();
         interrupt_countdown = NP_ENTROPY_SUMMATION_INTERRUPT_INTERVAL;
       }
     }
@@ -277,6 +281,7 @@ SEXP C_np_entropy_bivariate_summation_xindex(SEXP x,
 
         if (--interrupt_countdown == 0) {
           R_CheckUserInterrupt();
+          np_progress_fit_heartbeat();
           interrupt_countdown = NP_ENTROPY_SUMMATION_INTERRUPT_INTERVAL;
         }
       }
@@ -392,6 +397,7 @@ SEXP C_np_entropy_univariate_summation_counts(SEXP support,
 
         if (--interrupt_countdown == 0) {
           R_CheckUserInterrupt();
+          np_progress_fit_heartbeat();
           interrupt_countdown = NP_ENTROPY_SUMMATION_INTERRUPT_INTERVAL;
         }
       }

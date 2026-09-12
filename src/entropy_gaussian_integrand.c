@@ -117,6 +117,7 @@ SEXP C_np_entropy_gaussian_integrand(SEXP xy,
 
           if (--interrupt_countdown == 0) {
             R_CheckUserInterrupt();
+            np_progress_fit_heartbeat();
             interrupt_countdown = NP_ENTROPY_INTERRUPT_INTERVAL;
           }
         }
@@ -141,6 +142,7 @@ SEXP C_np_entropy_gaussian_integrand(SEXP xy,
 
       if (--interrupt_countdown == 0) {
         R_CheckUserInterrupt();
+        np_progress_fit_heartbeat();
         interrupt_countdown = NP_ENTROPY_INTERRUPT_INTERVAL;
       }
       }

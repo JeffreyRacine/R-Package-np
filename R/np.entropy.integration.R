@@ -2,6 +2,14 @@
 .np_entropy_tail_bandwidths <- 8
 .np_entropy_workspace_bytes <- 16 * 1024^2
 
+# Borrow the existing outer statistic/bootstrap owner. Native activity must
+# not be mistaken for completed statistical replications.
+.np_entropy_compute <- function(total = 1L, expr) {
+  .np_with_compiled_fit_progress(
+    label = "Computing entropy statistic", total = total, expr = expr
+  )
+}
+
 .np_entropy_count_chunk_size <- function(support.length,
                                          bytes.per.support,
                                          max.chunk) {
@@ -111,12 +119,12 @@
 }
 
 .np_entropy_univariate_density <- function(grid, data, bandwidth) {
-  as.numeric(npksum(
+  as.numeric(.np_entropy_compute(length(grid), npksum(
     txdat = data,
     exdat = grid,
     bws = bandwidth,
     bandwidth.divide = TRUE
-  )$ksum / length(data))
+  )$ksum) / length(data))
 }
 
 .np_entropy_univariate_gaussian_summation <- function(data.x,
@@ -162,13 +170,13 @@
                                         counts,
                                         bandwidth,
                                         sample.size) {
-  value <- npksum(
+  value <- .np_entropy_compute(length(grid), npksum(
     txdat = support,
     tydat = counts,
     exdat = grid,
     bws = bandwidth,
     bandwidth.divide = TRUE
-  )$ksum
+  )$ksum)
   matrix(value, nrow = length(grid), ncol = ncol(counts)) / sample.size
 }
 
@@ -253,14 +261,14 @@
       )
     }
 
-    values[index] <- .Call(
+    values[index] <- .np_entropy_compute(expr = .Call(
       "C_np_entropy_univariate_summation_counts",
       as.double(data.null),
       counts.x,
       counts.y,
       as.double(c(bw.x, bw.y)),
       PACKAGE = "np"
-    )
+    ))
   }
 
   list(values = values, progress = progress)
@@ -381,13 +389,13 @@
   for (start in seq.int(1L, boot.num, by = chunk.size)) {
     index <- start:min(boot.num, start + chunk.size - 1L)
     counts <- draw.counts(index[1L], index[length(index)])
-    values[index] <- .Call(
+    values[index] <- .np_entropy_compute(expr = .Call(
       "C_np_entropy_symmetric_summation_counts",
       as.double(data.null),
       counts,
       as.double(bandwidth),
       PACKAGE = "np"
-    )
+    ))
     for (done in index)
       progress <- .np_progress_step(progress, done = done)
   }
@@ -400,13 +408,13 @@
                                                       bw.x,
                                                       bw.y,
                                                       bw.joint) {
-  value <- .Call(
+  value <- .np_entropy_compute(expr = .Call(
     "C_np_entropy_bivariate_summation",
     as.double(x.dat),
     as.double(y.dat),
     as.double(c(bw.x, bw.y, bw.joint)),
     PACKAGE = "np"
-  )
+  ))
   if (!is.finite(value)) {
     .np_warning(
       " non-finite value in summation-based statistic: integration recommended"
@@ -421,14 +429,14 @@
                                                              bw.x,
                                                              bw.y,
                                                              bw.joint) {
-  value <- .Call(
+  value <- .np_entropy_compute(expr = .Call(
     "C_np_entropy_bivariate_summation_xindex",
     as.double(x.dat),
     as.double(y.dat),
     index,
     as.double(c(bw.x, bw.y, bw.joint)),
     PACKAGE = "np"
-  )
+  ))
   if (any(!is.finite(value))) {
     .np_warning(
       " non-finite value in summation-based statistic: integration recommended"
@@ -501,14 +509,14 @@
       weights <-
         rep(axis.x$weights[x.index], times = length(y.index)) *
         rep(axis.y$weights[y.index], each = length(x.index))
-      values <- .Call(
+      values <- .np_entropy_compute(expr = .Call(
         "C_np_entropy_gaussian_integrand",
         points,
         x.dat,
         y.dat,
         bandwidths,
         PACKAGE = "np"
-      )
+      ))
       block.value <- sum(weights * values)
       adjusted <- block.value - compensation
       next.total <- total + adjusted
