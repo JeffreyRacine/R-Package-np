@@ -1,5 +1,21 @@
 # npRmpi 0.80-1
 
+* Explicit fixed-bandwidth conditional bootstrap bias-corrected plot centers
+  now use one mixed-data donor-mixture pilot and its matching PDF/CDF or
+  derivative/contrast reference. Categorical conditioning pilot lambdas
+  generate normalized transitions on the declared levels; paired contrasts
+  share each resample. Level refits now retain the selected LC/LL/LP estimator
+  instead of substituting an LC ratio for LL/LP. These corrections can change
+  explicitly requested bias centers, including continuous-only panels.
+  Ordinary fitted values, estimate-centered variability draws and search are
+  unchanged. NN, proper-projection and quantile bias-center exclusions remain.
+
+* Smooth-bootstrap Epanechnikov perturbations now use the same standardized
+  kernel scale as estimation. This corrects explicitly requested unconditional
+  and conditional density/distribution bias centers; Gaussian/uniform draws
+  and RNG consumption are unchanged. It does not change ordinary bootstrap
+  variability draws.
+
 * Uniform nearest-neighbour kernels now apply their documented strict support
   boundary to the unstandardized distance. This corrects adaptive- and
   generalized-NN results that could depend on evaluation batching, tree

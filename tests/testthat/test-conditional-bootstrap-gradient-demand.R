@@ -99,9 +99,15 @@ test_that("smooth bootstrap forwards its physical continuous gradient demand", {
               ydati = list(icon = TRUE), cxkertype = "gaussian", cxkerorder = 2L,
               cykertype = "gaussian", cykerorder = 2L)
   calls <- 0L
+  target <- 2L
   local_mocked_bindings(
-    .np_plot_oversmooth_conditional_bws = function(bws, cdf) bws,
-    .np_plot_smooth_resample_frame = function(dat, idx, ...) dat[idx, , drop = FALSE],
+    .np_plot_conditional_pilot_prepare = function(xdat, ydat, ...)
+      list(x=xdat, y=ydat),
+    .np_plot_pilot_draw_side = function(side, idx) side[idx, , drop = FALSE],
+    .np_plot_conditional_pilot_reference = function(pilot, exdat, ...)
+      rep(0, nrow(exdat)),
+    npConditionalRegEngineSpec = function(...) list(reg.engine="lp"),
+    npConditionalGradientOrder = function(...) 2L,
     .np_plot_conditional_eval = function(exdat, gradients, gradient.order,
       lp.first.se.demand, cat.se.demand, se, gradient.target, ...) {
       calls <<- calls + 1L
@@ -110,7 +116,7 @@ test_that("smooth bootstrap forwards its physical continuous gradient demand", {
       expect_false(lp.first.se.demand)
       expect_false(cat.se.demand)
       expect_false(se)
-      expect_identical(gradient.target, 2L)
+      expect_identical(gradient.target, target)
       list(congrad = matrix(rep(c(10, 20, 30), each = nrow(exdat)),
                             nrow = nrow(exdat)))
     }, .package = pkg)
@@ -123,7 +129,12 @@ test_that("smooth bootstrap forwards its physical continuous gradient demand", {
   expect_identical(calls, 2L)
   expect_identical(out$t0, c(20, 20))
   expect_identical(out$t, matrix(20, nrow = 1L, ncol = 2L))
-  args$gradient.index <- 1L
-  expect_error(do.call(helper, args), "only for continuous conditioning variables")
-  expect_identical(calls, 2L)
+  args$gradient.index <- target <- 1L
+  out <- do.call(helper, args)
+  expect_identical(out$t0, c(10, 10))
+  expect_identical(out$t, matrix(10, nrow = 1L, ncol = 2L))
+  expect_identical(calls, 4L)
+  args$gradient.index <- 0L
+  expect_error(do.call(helper, args), "invalid conditional gradient coordinate")
+  expect_identical(calls, 4L)
 })
