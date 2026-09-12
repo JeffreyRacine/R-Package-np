@@ -1,5 +1,10 @@
 # np 0.80-1
 
+* Entropy tests refresh elapsed-time progress during native summation and
+  quadrature using the shared transient owner. Original-statistic, lag and
+  bootstrap phases clear on completion or failure; bootstrap counts advance
+  after their statistics finish, without changing resamples or calculations.
+
 * Progress displays use consistent work counts, elapsed-time and ETA wording.
   Narrow consoles preserve complete counters before optional detail, and
   wide-character labels are shortened by their displayed width.

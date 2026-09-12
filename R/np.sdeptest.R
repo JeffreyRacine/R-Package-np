@@ -93,7 +93,9 @@ npsdeptest <- function(data = NULL,
   bw.joint.y.lag <- numeric()      
   
   ## Save the bandwidths for resampling exercise...
-  lag.progress <- .np_progress_begin("Computing entropy statistics by lag", total = lag.num, surface = "lag")
+  lag.progress <- .np_progress_activity_begin(lag.num,
+    "Computing entropy statistics by lag", detail = NULL)
+  on.exit(.np_progress_activity_end(lag.progress), add = TRUE)
   
   for (k in seq_len(lag.num)) {
     ## Create y and y.lag
@@ -113,11 +115,11 @@ npsdeptest <- function(data = NULL,
     bw.joint.y.lag[k] <- bw.joint[2]
     
     Srho.vec[k] <- Srho.bivar(y,y.lag,bw.y[k],bw.y.lag[k],bw.joint,method=method)
-    lag.progress <- .np_progress_step(lag.progress, done = k, detail = paste("lag", k))
+    .np_progress_activity_step(lag.progress, done = k)
 
   }
 
-  lag.progress <- .np_progress_end(lag.progress, detail = paste("lag", lag.num))
+  .np_progress_activity_end(lag.progress, completed = TRUE)
 
   for (k in seq_len(lag.num)) Srho.cumulant.vec[k] <- sum(Srho.vec[seq_len(k)])
 
@@ -134,7 +136,8 @@ npsdeptest <- function(data = NULL,
 
     Srho.bootstrap.mat <- matrix(NA,B,(lag.num))
 		Srho.cumulant.bootstrap.mat <- matrix(NA,B,(lag.num))
-    progress <- .np_progress_begin("Bootstrap replications", total = B, surface = "bootstrap")
+    progress <- .np_progress_activity_begin(B, "Bootstrap replications", detail = NULL)
+    on.exit(.np_progress_activity_end(progress), add = TRUE)
 
     for (b in seq_len(B)) {
 
@@ -153,11 +156,11 @@ npsdeptest <- function(data = NULL,
         Srho.cumulant.bootstrap.mat[b,k] <- Srho.cumulant.vec.boot[k]
       }
 
-      progress <- .np_progress_step(progress, done = b)
+      .np_progress_activity_step(progress, done = b)
 
     }
 
-    progress <- .np_progress_end(progress)
+    .np_progress_activity_end(progress, completed = TRUE)
 
     ## Compute P-values
 

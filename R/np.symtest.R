@@ -150,7 +150,8 @@ npsymtest <- function(data = NULL,
   
   ## Compute the test statistic
 
-  test.stat <- Srho.sym(data,data.rotate,bw,method=method)
+  test.stat <- .np_progress_activity_run("Computing entropy statistic",
+    Srho.sym(data,data.rotate,bw,method=method))
 
   ## Function to be fed to boot - accepts data that gets
   ## permuted/rearranged to define resampled data. The sole difference
@@ -158,8 +159,9 @@ npsymtest <- function(data = NULL,
   ## arguments.
 
   boot.state <- new.env(parent = emptyenv())
-  boot.state$counter <- 0L
-  boot.state$progress <- .np_progress_begin("Bootstrap replications", total = B, surface = "bootstrap")
+  boot.state$counter <- -1L
+  boot.state$progress <- .np_progress_activity_begin(B, "Bootstrap replications", detail = NULL)
+  on.exit(.np_progress_activity_end(boot.state$progress), add = TRUE)
 
   ## Function to be fed to tsboot - accepts a vector of integers
   ## corresponding to all observations in the sample (1,2,...) that
@@ -167,7 +169,6 @@ npsymtest <- function(data = NULL,
 
 	boot.fun <- function(ii,data.null,bw) {
     boot.state$counter <- boot.state$counter + 1L
-    boot.state$progress <- .np_progress_step(boot.state$progress, done = boot.state$counter)
     null.sample1 <- data.null[ii]
     if(is.numeric(data.null)) {
       null.sample2 <- -(null.sample1-mean(null.sample1))+mean(null.sample1)
@@ -186,7 +187,9 @@ npsymtest <- function(data = NULL,
         null.sample2 <- factor(-(tmp-location)+location,levels=data.levels)
       }
     }
-    return(Srho.sym(null.sample1,null.sample2,bw,method=method))
+    value <- Srho.sym(null.sample1,null.sample2,bw,method=method)
+    .np_progress_activity_step(boot.state$progress, done = boot.state$counter)
+    value
 	}
 
   ## Need to bootstrap integers for data.null to accommodate both
@@ -242,7 +245,7 @@ npsymtest <- function(data = NULL,
                              bw = bw)$t
   }
 
-  boot.state$progress <- .np_progress_end(boot.state$progress)
+  .np_progress_activity_end(boot.state$progress, completed = TRUE)
 
   p.value <- mean(resampled.stat > test.stat)
 
