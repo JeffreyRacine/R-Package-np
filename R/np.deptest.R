@@ -116,7 +116,7 @@
     }
 
     if (!is.null(progress))
-      progress <- .np_progress_step(progress, done = boot.num)
+      .np_progress_activity_step(progress, done = boot.num)
     .npRmpi_bootstrap_transport_trace(
       what = "npdeptest",
       event = "fanout.collective.done",
@@ -224,16 +224,17 @@ npdeptest <- function(data.x = NULL,
   bw.data.y <- .np_progress_select_bandwidth_enhanced("Computing bandwidths", npudensbw(~data.y))$bw
   bw.joint <- .np_progress_select_bandwidth_enhanced("Computing bandwidths", npudensbw(~data.x+data.y))$bw
 
-  .np_progress_note("Computing entropy statistic")
   
-  Srho.vec <- Srho.bivar(data.x,data.y,bw.data.x,bw.data.y,bw.joint,method=method)
+  Srho.vec <- .np_progress_activity_run("Computing entropy statistic",
+    Srho.bivar(data.x,data.y,bw.data.x,bw.data.y,bw.joint,method=method))
 
   ## Bootstrap if requested - null is independence so simple iid
   ## index resampling under replacement is sufficient
 
   if(bootstrap) {
 
-    progress <- .np_progress_begin("Bootstrap replications", total = B, surface = "bootstrap")
+    progress <- .np_progress_activity_begin(B, "Bootstrap replications", detail = NULL)
+    on.exit(.np_progress_activity_end(progress), add = TRUE)
 
     if (.npRmpi_dept_collective_context()) {
       plan <- .npRmpi_dept_bootstrap_index_plan(length(data.x), B)
@@ -273,7 +274,7 @@ npdeptest <- function(data.x = NULL,
               bw.data.x, bw.data.y, bw.joint
             )
           for (done in index)
-            progress <- .np_progress_step(progress, done = done)
+            .np_progress_activity_step(progress, done = done)
         }
       } else {
         for (b in seq_len(B)) {
@@ -282,12 +283,12 @@ npdeptest <- function(data.x = NULL,
           data.x.boot <- data.x[sample.int(length(data.x), replace = TRUE)]
 
           Srho.vec.boot[b] <- Srho.bivar(data.x.boot,data.y,bw.data.x,bw.data.y,bw.joint,method=method)
-          progress <- .np_progress_step(progress, done = b)
+          .np_progress_activity_step(progress, done = b)
         }
       }
     }
 
-    progress <- .np_progress_end(progress)
+    .np_progress_activity_end(progress, completed = TRUE)
 
     ## Compute P-values
 

@@ -205,7 +205,6 @@
     counts.y <- matrix(0, nrow = support.length, ncol = length(index))
 
     for (column in seq_along(index)) {
-      progress <- .np_progress_step(progress, done = index[column])
       counts.x[, column] <- tabulate(
         sample.int(support.length, size.x, replace = TRUE),
         nbins = support.length
@@ -226,6 +225,8 @@
       axis$weights,
       0.5 * (sqrt(density.x) - sqrt(density.y))^2
     ))
+    for (done in index)
+      .np_progress_activity_step(progress, done = done)
   }
 
   list(values = values, progress = progress)
@@ -250,7 +251,6 @@
     counts.y <- matrix(0, nrow = support.length, ncol = length(index))
 
     for (column in seq_along(index)) {
-      progress <- .np_progress_step(progress, done = index[column])
       counts.x[, column] <- tabulate(
         sample.int(support.length, size.x, replace = TRUE),
         nbins = support.length
@@ -269,6 +269,8 @@
       as.double(c(bw.x, bw.y)),
       PACKAGE = "npRmpi"
     ))
+    for (done in index)
+      .np_progress_activity_step(progress, done = done)
   }
 
   list(values = values, progress = progress)
@@ -397,7 +399,7 @@
       PACKAGE = "npRmpi"
     ))
     for (done in index)
-      progress <- .np_progress_step(progress, done = done)
+      .np_progress_activity_step(progress, done = done)
   }
 
   list(values = values, progress = progress)

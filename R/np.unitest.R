@@ -133,7 +133,7 @@
     }
 
     if (!is.null(progress))
-      progress <- .np_progress_step(progress, done = boot.num)
+      .np_progress_activity_step(progress, done = boot.num)
     .npRmpi_bootstrap_transport_trace(
       what = "npunitest",
       event = "fanout.collective.done",
@@ -293,9 +293,9 @@ npunitest <- function(data.x = NULL,
   
   ## Compute the test statistic
 
-  .np_progress_note("Computing entropy statistic")
 
-  test.stat <- Srho.univar(data.x,data.y,bw.x,bw.y,method=method)
+  test.stat <- .np_progress_activity_run("Computing entropy statistic",
+    Srho.univar(data.x,data.y,bw.x,bw.y,method=method))
 
   if(bootstrap) {
     
@@ -323,7 +323,8 @@ npunitest <- function(data.x = NULL,
       
     }
     
-    progress <- .np_progress_begin("Bootstrap replications", total = B, surface = "bootstrap")
+    progress <- .np_progress_activity_begin(B, "Bootstrap replications", detail = NULL)
+    on.exit(.np_progress_activity_end(progress), add = TRUE)
 
     if (.npRmpi_unit_collective_context()) {
       plan <- .npRmpi_unit_bootstrap_index_plan(
@@ -374,7 +375,6 @@ npunitest <- function(data.x = NULL,
     } else {
       resampled.stat <- numeric(B)
       for (b in seq_len(B)) {
-        progress <- .np_progress_step(progress, done = b)
 
         ## Need to think this through... is the null one density? If so
         ## resample from that density for both x and y?
@@ -385,10 +385,11 @@ npunitest <- function(data.x = NULL,
         data.null.y <- data.null[sample.int(length(data.null), size = length(data.y), replace = TRUE)]
 
         resampled.stat[b] <- Srho.univar(data.null.x,data.null.y,bw.x,bw.y,method=method)
+        .np_progress_activity_step(progress, done = b)
       }
     }
 
-    progress <- .np_progress_end(progress)
+    .np_progress_activity_end(progress, completed = TRUE)
     
     p.value <- mean(resampled.stat > test.stat)
     
