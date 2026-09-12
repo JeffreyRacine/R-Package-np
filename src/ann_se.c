@@ -175,8 +175,10 @@ static SEXP ann_variance(SEXP geometry, SEXP order, SEXP training,
         }
     }
     SEXP out = PROTECT(allocVector(REALSXP,m));
-    long double *phi = (long double *)R_alloc(n, sizeof(long double));
-    long double *delta = (long double *)R_alloc((size_t)n+1, sizeof(long double));
+    /* R_alloc only guarantees double alignment; keep long-double storage
+     * aligned without changing its transient lifetime or arithmetic. */
+    long double *phi = R_allocLD((size_t)n);
+    long double *delta = R_allocLD((size_t)n+1);
     const double *x = REAL(training), *e = REAL(evaluation);
     const double *a = REAL(weights), *d = REAL(derivative);
     for (int q = 0; q < m; ++q) {
