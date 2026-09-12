@@ -151,7 +151,7 @@ test_that("bootstrap execution stage surfaces immediately on begin", {
   lines <- vapply(actual$trace, `[[`, character(1L), "line")
   expect_identical(
     lines[[1L]],
-    "[np] Plot bootstrap (surf 1/1) 0/12 (0.0%, elapsed 0.0s, eta 0.0s)"
+    "[np] Plot bootstrap (surf 1/1) 0/12 (0.0%, elapsed 0.0s, eta estimating)"
   )
   expect_identical(vapply(actual$trace, `[[`, character(1L), "event")[[1L]], "render")
 })

@@ -166,7 +166,7 @@ test_that("npplreg formula bw to fit route hands off immediately into fit progre
   total <- length(targets)
   fit.zero.pos <- grep(
     sprintf(
-      "^\\[np\\] Fitting partially linear regression 0/%d \\(0\\.0%%, elapsed 0\\.0s, eta 0\\.0s\\): starting %s$",
+      "^\\[np\\] Fitting partially linear regression 0/%d \\(0\\.0%%, elapsed 0\\.0s, eta estimating\\): starting %s$",
       total,
       npplreg_fit_progress_escape(targets[1L])
     ),
@@ -220,7 +220,7 @@ test_that("npplreg nomad to powell to fit route preserves single-line fit handof
   total <- length(targets)
   fit.zero.pos <- grep(
     sprintf(
-      "^\\[np\\] Fitting partially linear regression 0/%d \\(0\\.0%%, elapsed 0\\.0s, eta 0\\.0s\\): starting %s$",
+      "^\\[np\\] Fitting partially linear regression 0/%d \\(0\\.0%%, elapsed 0\\.0s, eta estimating\\): starting %s$",
       total,
       npplreg_fit_progress_escape(targets[1L])
     ),

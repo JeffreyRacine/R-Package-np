@@ -45,6 +45,6 @@ test_that("distribution and conditional public routes use the generic bandwidth 
     info <- paste(deparse(expr), collapse = "")
 
     expect_true(any(grepl("^\\[np\\] Bandwidth selection", lines)), info = info)
-    expect_true(any(grepl("100\\.0%, eta 0\\.0s\\)$", lines)), info = info)
+    expect_true(any(grepl("100\\.0%, elapsed [0-9]+\\.[0-9]s, eta 0\\.0s\\)$", lines)), info = info)
   }
 })

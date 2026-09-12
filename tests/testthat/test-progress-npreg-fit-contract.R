@@ -30,7 +30,7 @@ expect_np_npreg_powell_progress_surface <- function(lines) {
   )), info = info)
   expect_true(any(grepl("best (", powell.lines, fixed = TRUE)), info = info)
   expect_true(any(grepl(
-    "^\\[np\\] Refining bandwidth \\(elapsed [0-9]+\\.[0-9]s, iter [0-9]+, deg \\([^)]*\\), best \\([^)]*\\)\\)$",
+    "^\\[np\\] Refining bandwidth \\(iteration [0-9]+, elapsed [0-9]+\\.[0-9]s, deg \\([^)]*\\), best \\([^)]*\\)\\)$",
     powell.lines
   )), info = info)
 }
@@ -133,7 +133,7 @@ test_that("npreg bw to fit route hands off immediately into single-line fit prog
   lines <- npreg_fit_progress_lines(actual)
   bandwidth.pos <- grep("^\\[np\\] Bandwidth selection", lines)
   fit.start.pos <- grep(
-    "^\\[np\\] Fitting regression 0/24 \\(0\\.0%, elapsed 0\\.0s, eta 0\\.0s\\): starting$",
+    "^\\[np\\] Fitting regression 0/24 \\(0\\.0%, elapsed 0\\.0s, eta estimating\\): starting$",
     lines
   )
   fit.finish.pos <- grep(
@@ -180,7 +180,7 @@ test_that("npreg nomad to powell to fit route preserves single-line fit handoff"
   bandwidth.pos <- grep("^\\[np\\] (Selecting degree and bandwidth|NOMAD degree/bw|Exhaustive degree/bw|Auto:NOMAD degree/bw|Auto:exhaustive degree/bw)", lines)
   powell.pos <- grep("^\\[np\\] Refining bandwidth \\(", lines)
   fit.start.pos <- grep(
-    "^\\[np\\] Fitting regression 0/24 \\(0\\.0%, elapsed 0\\.0s, eta 0\\.0s\\): starting$",
+    "^\\[np\\] Fitting regression 0/24 \\(0\\.0%, elapsed 0\\.0s, eta estimating\\): starting$",
     lines
   )
   fit.finish.pos <- grep(

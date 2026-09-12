@@ -65,9 +65,9 @@ test_that("npscoefbw adopts the generic bandwidth selection line", {
   expect_equal(render_bandwidth_lines, legacy_bandwidth_lines)
   expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 1/2\\)$", bandwidth_lines)))
   expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 1/2, iteration [0-9]+, elapsed [0-9]+\\.[0-9]s\\)$", bandwidth_lines)))
-  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 2/2, elapsed [0-9]+\\.[0-9]s, 50\\.0%, eta [0-9]+\\.[0-9]s\\)$", bandwidth_lines)))
-  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 2/2, iteration [0-9]+, elapsed [0-9]+\\.[0-9]s, [0-9]+\\.[0-9]%, eta [0-9]+\\.[0-9]s\\)$", bandwidth_lines)))
-  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 2/2, elapsed [0-9]+\\.[0-9]s, 100\\.0%, eta 0\\.0s\\)$", bandwidth_lines)))
+  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 2/2, 50\\.0%, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", bandwidth_lines)))
+  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 2/2, iteration [0-9]+, [0-9]+\\.[0-9]%, elapsed [0-9]+\\.[0-9]s, eta [0-9]+\\.[0-9]s\\)$", bandwidth_lines)))
+  expect_true(any(grepl("^\\[np\\] Bandwidth selection \\(multistart 2/2, 100\\.0%, elapsed [0-9]+\\.[0-9]s, eta 0\\.0s\\)$", bandwidth_lines)))
 })
 
 test_that("npscoefbw progress respects np.messages FALSE", {
