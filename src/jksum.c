@@ -1432,6 +1432,24 @@ double np_rect(const double z){
   return (z*z < 1.0)?0.5:0.0;
 }
 
+/* NN radii are distances. Standardizing an exact boundary distance by a
+ * rounded reciprocal can move it inside the documented open support. */
+static inline double np_nn_rect(const double difference, const double radius)
+{
+  return fabs(difference) < radius ? 0.5 : 0.0;
+}
+
+/* The tree is only a candidate filter. Rounded coordinate endpoints must
+ * not prune a point accepted by the distance predicate above. */
+static inline void np_nn_rect_box(const int kernel, const int nn_bandwidth,
+                                  double *lower, double *upper)
+{
+  if(nn_bandwidth && kernel == 8) {
+    *lower = nextafter(*lower, -INFINITY);
+    *upper = nextafter(*upper, INFINITY);
+  }
+}
+
 double np_uaa(const int same_cat,const double lambda, const int c){
   if(c < 2)
     return same_cat ? 1.0 : 0.0;
@@ -6205,6 +6223,7 @@ void np_p_ckernelv(const int KERNEL,
                    const XL * const xl,
                    const XL * const p_xl,
                    const int swap_xxt,
+                   const int nn_bandwidth,
                    const int do_perm,
                    const int do_score,
                    double * const scratch_kbuf,
@@ -6248,6 +6267,11 @@ void np_p_ckernelv(const int KERNEL,
                                    np_cdf_rect, np_reserved_ckernel };
   double bounded_lower = 0.0, bounded_denominator = 0.0;
   double p_bounded_lower = 0.0, p_bounded_denominator = 0.0;
+  const int uniform_nn = nn_bandwidth && KERNEL == 8;
+  const int p_uniform_nn = nn_bandwidth && P_KERNEL == 8;
+#define NP_P_CKERNEL_VALUE(kind, uniform, observation) \
+  ((uniform) ? np_nn_rect(x-xt[observation], h) : \
+   k[kind]((x-xt[observation])*zscale))
 
   if(swap_xxt && bounded_integral){
     const int k0 = KERNEL % 10;
@@ -6291,14 +6315,14 @@ void np_p_ckernelv(const int KERNEL,
       } else {
         if(p_xl == NULL){
           for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
-            p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*p_invnorm*k[P_KERNEL]((x-xt[i])*zscale)*(do_score ? ((xt[i]-x)*zscale) : 1.0);
+            p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*p_invnorm*NP_P_CKERNEL_VALUE(P_KERNEL, p_uniform_nn, i)*(do_score ? ((xt[i]-x)*zscale) : 1.0);
           }
         } else {
           for (int m = 0; m < p_xl->n; m++){
             const int istart = p_xl->istart[m];
             const int nlev = p_xl->nlev[m];
             for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw){
-              p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*p_invnorm*k[P_KERNEL]((x-xt[i])*zscale)*(do_score ? ((xt[i]-x)*zscale) : 1.0);
+              p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*p_invnorm*NP_P_CKERNEL_VALUE(P_KERNEL, p_uniform_nn, i)*(do_score ? ((xt[i]-x)*zscale) : 1.0);
             }
           }
         }
@@ -6354,7 +6378,7 @@ void np_p_ckernelv(const int KERNEL,
           swap_xxt ? bounded_lower : bounded_lower_vec[i],
           swap_xxt ? bounded_denominator : bounded_den_vec[i]) :
          np_cker_bounded_cdf(KERNEL, eval, train, h, bound_lb, bound_ub)) :
-        invnorm*k[KERNEL]((x-xt[i])*zscale);
+        invnorm*NP_P_CKERNEL_VALUE(KERNEL, uniform_nn, i);
 
       result[i] = xw[j]*kn;
       kbuf[i] = kn;
@@ -6367,7 +6391,7 @@ void np_p_ckernelv(const int KERNEL,
             swap_xxt ? p_bounded_lower : bounded_lower_vec[i],
             swap_xxt ? p_bounded_denominator : bounded_den_vec[i]) :
            np_cker_bounded_cdf(P_KERNEL, eval, train, h, bound_lb, bound_ub)) :
-          p_invnorm*k[P_KERNEL]((x-xt[i])*zscale);
+          p_invnorm*NP_P_CKERNEL_VALUE(P_KERNEL, p_uniform_nn, i);
         p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*
           pkn*(do_score ? ((xt[i]-x)*zscale) : 1.0);
       }
@@ -6396,7 +6420,7 @@ void np_p_ckernelv(const int KERNEL,
             swap_xxt ? bounded_lower : bounded_lower_vec[i],
             swap_xxt ? bounded_denominator : bounded_den_vec[i]) :
            np_cker_bounded_cdf(KERNEL, eval, train, h, bound_lb, bound_ub)) :
-          invnorm*k[KERNEL]((x-xt[i])*zscale);
+          invnorm*NP_P_CKERNEL_VALUE(KERNEL, uniform_nn, i);
 
         result[i] = xw[j]*kn;
         kbuf[i] = kn;
@@ -6417,7 +6441,7 @@ void np_p_ckernelv(const int KERNEL,
               swap_xxt ? p_bounded_lower : bounded_lower_vec[i],
               swap_xxt ? p_bounded_denominator : bounded_den_vec[i]) :
              np_cker_bounded_cdf(P_KERNEL, eval, train, h, bound_lb, bound_ub)) :
-            p_invnorm*k[P_KERNEL]((x-xt[i])*zscale);
+            p_invnorm*NP_P_CKERNEL_VALUE(P_KERNEL, p_uniform_nn, i);
           p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*
             pkn*(do_score ? ((xt[i]-x)*zscale) : 1.0);
         }
@@ -6438,6 +6462,7 @@ void np_p_ckernelv(const int KERNEL,
 
   if(own_kbuf)
     free(kbuf);
+#undef NP_P_CKERNEL_VALUE
 }
 
 #if NP_ACCEL_GAUSS_COMPILED
@@ -7713,6 +7738,7 @@ void np_ckernelv(const int KERNEL,
                  double * const result,
                  const XL * const xl,
                  const int swap_xxt,
+                 const int nn_bandwidth,
                  const int skip_largeh_check,
                  const double invnorm,
                  const int bounded_integral,
@@ -7804,17 +7830,17 @@ void np_ckernelv(const int KERNEL,
     without changing the numerical kernel functions.
   */
 
-#define NP_CKERNELV_APPLY(fn)                                                      \
+#define NP_CKERNELV_APPLY_VALUE(value)                                               \
   do {                                                                             \
     if(xl == NULL){                                                                \
       if(!bin_do_xw){                                                              \
         for(i = 0; i < num_xt; i++){                                               \
-          result[i] = invnorm*fn((x-xt[i])*zscale);                                 \
+          result[i] = invnorm*(value);                                             \
         }                                                                          \
       } else {                                                                     \
         for(i = 0; i < num_xt; i++){                                               \
           if(xw[i] == 0.0) continue;                                               \
-          result[i] = xw[i]*invnorm*fn((x-xt[i])*zscale);                           \
+          result[i] = xw[i]*invnorm*(value);                                       \
         }                                                                          \
       }                                                                            \
     } else {                                                                       \
@@ -7823,7 +7849,7 @@ void np_ckernelv(const int KERNEL,
           const int istart = xl->istart[m];                                        \
           const int nlev = xl->nlev[m];                                            \
           for(i = istart; i < istart+nlev; i++){                                   \
-            result[i] = invnorm*fn((x-xt[i])*zscale);                               \
+            result[i] = invnorm*(value);                                           \
           }                                                                        \
         }                                                                          \
       } else {                                                                     \
@@ -7832,12 +7858,14 @@ void np_ckernelv(const int KERNEL,
           const int nlev = xl->nlev[m];                                            \
           for(i = istart; i < istart+nlev; i++){                                   \
             if(xw[i] == 0.0) continue;                                             \
-            result[i] = xw[i]*invnorm*fn((x-xt[i])*zscale);                         \
+            result[i] = xw[i]*invnorm*(value);                                     \
           }                                                                        \
         }                                                                          \
       }                                                                            \
     }                                                                              \
   } while(0)
+
+#define NP_CKERNELV_APPLY(fn) NP_CKERNELV_APPLY_VALUE(fn((x-xt[i])*zscale))
 
 #define NP_CKERNELV_APPLY_GAUSS2()                                                  \
   do {                                                                              \
@@ -7889,7 +7917,10 @@ void np_ckernelv(const int KERNEL,
     case 6: NP_CKERNELV_APPLY(np_epan6); break;
     case 7: NP_CKERNELV_APPLY(np_epan8); break;
 
-    case 8: NP_CKERNELV_APPLY(np_rect); break;
+    case 8:
+      if(nn_bandwidth) NP_CKERNELV_APPLY_VALUE(np_nn_rect(x-xt[i], h));
+      else NP_CKERNELV_APPLY(np_rect);
+      break;
     case 9: NP_CKERNELV_APPLY(np_reserved_ckernel); break;
 
     case 10: NP_CKERNELV_APPLY(np_econvol_gauss2); break;
@@ -7976,6 +8007,7 @@ void np_ckernelv(const int KERNEL,
   }
 
 #undef NP_CKERNELV_APPLY
+#undef NP_CKERNELV_APPLY_VALUE
 
 }
 
@@ -9501,7 +9533,7 @@ static double np_conditional_leading_response_integral(
     np_ckernelv(ctx->ykc[l]+OP_CFUN_OFFSETS[OP_INTEGRAL],
       ctx->train_c[l]+observation, 1, 0, ctx->eval_c[l][evaluation],
       ctx->bandwidth[l][ctx->bw == BW_FIXED ? 0 : evaluation],
-      &value, NULL, 0, 1, 1.0, bounded,
+      &value, NULL, 0, ctx->bw != BW_FIXED, 1, 1.0, bounded,
       bounded ? vector_ckerlb_extern[coordinate] : R_NegInf,
       bounded ? vector_ckerub_extern[coordinate] : R_PosInf, NULL, NULL);
     product *= value;
@@ -9657,7 +9689,7 @@ static double np_conditional_ann_direct_response(
       double value;
       /* ANN kernels are centred at the donor, including bound normalization. */
       np_ckernelv(kernel,response->eval_c[l]+evaluation,1,0,centre,h,
-        &value,NULL,1,1,invnorm,bounded && integral,lower,upper,NULL,NULL);
+        &value,NULL,1,1,1,invnorm,bounded && integral,lower,upper,NULL,NULL);
       product*=integral ? value : value/h;
     }
     ctx->response_value[evaluation]=product;
@@ -13880,6 +13912,8 @@ NPPermutationWeightOutput * const pkw_output){
               }
               bb[2*id] = (fabs(bb[2*id]) == DBL_MAX) ? bb[2*id] : (xc[id][j] + bb[2*id]*sf);
               bb[2*id+1] = (fabs(bb[2*id+1]) == DBL_MAX) ? bb[2*id+1] : (xc[id][j] + bb[2*id+1]*sf);
+              np_nn_rect_box(KERNEL_reg_np[id], BANDWIDTH_reg != BW_FIXED,
+                             &bb[2*id], &bb[2*id+1]);
             }
 
             boxSearchNLPartial(kdt, &nls, bb, NULL, pxl, tree_active_dims, tree_active_n);
@@ -13895,6 +13929,8 @@ NPPermutationWeightOutput * const pkw_output){
               }
               bb[2*i] = (fabs(bb[2*i]) == DBL_MAX) ? bb[2*i] : (xc[i][j] + bb[2*i]*sf);
               bb[2*i+1] = (fabs(bb[2*i+1]) == DBL_MAX) ? bb[2*i+1] : (xc[i][j] + bb[2*i+1]*sf);
+              np_nn_rect_box(KERNEL_reg_np[i], BANDWIDTH_reg != BW_FIXED,
+                             &bb[2*i], &bb[2*i+1]);
             }
 
             boxSearchNL(kdt, &nls, bb, NULL, pxl);
@@ -13912,6 +13948,8 @@ NPPermutationWeightOutput * const pkw_output){
 
             bb[2*nld[i]] = (fabs(bb[2*nld[i]]) == DBL_MAX) ? bb[2*nld[i]] : (xc[i][j] + bb[2*nld[i]]*sf);
             bb[2*nld[i]+1] = (fabs(bb[2*nld[i]+1]) == DBL_MAX) ? bb[2*nld[i]+1] : (xc[i][j] + bb[2*nld[i]+1]*sf);
+            np_nn_rect_box(KERNEL_reg_np[i], BANDWIDTH_reg != BW_FIXED,
+                           &bb[2*nld[i]], &bb[2*nld[i]+1]);
           }
           if(idx == NULL)
             boxSearchNLPartial(kdt, inl, bb, NULL, pxl, nld, num_reg_continuous);
@@ -13942,6 +13980,8 @@ NPPermutationWeightOutput * const pkw_output){
                 const double sf = m[i][jbw];
                 bb[2*i] = (fabs(bb[2*i]) == DBL_MAX) ? bb[2*i] : (xc[i][j] + bb[2*i]*sf);
                 bb[2*i+1] = (fabs(bb[2*i+1]) == DBL_MAX) ? bb[2*i+1] : (xc[i][j] + bb[2*i+1]*sf);
+                np_nn_rect_box(knp, BANDWIDTH_reg != BW_FIXED,
+                               &bb[2*i], &bb[2*i+1]);
               }
 
               boxSearchNL(kdt, &nls, bb, NULL, p_pxl + k);
@@ -13958,6 +13998,8 @@ NPPermutationWeightOutput * const pkw_output){
                 const double sf = m[i][jbw];
                 bb[2*nld[i]] = (fabs(bb[2*nld[i]]) == DBL_MAX) ? bb[2*nld[i]] : (xc[i][j] + bb[2*nld[i]]*sf);
                 bb[2*nld[i]+1] = (fabs(bb[2*nld[i]+1]) == DBL_MAX) ? bb[2*nld[i]+1] : (xc[i][j] + bb[2*nld[i]+1]*sf);
+                np_nn_rect_box(knp, BANDWIDTH_reg != BW_FIXED,
+                               &bb[2*nld[i]], &bb[2*nld[i]+1]);
               }
               if(idx == NULL)
                 boxSearchNLPartial(kdt, inl, bb, NULL, p_pxl + k, nld, num_reg_continuous);
@@ -14038,7 +14080,8 @@ NPPermutationWeightOutput * const pkw_output){
             deferred_const_active = 1;
           } else {
             np_ckernelv(KERNEL_reg_np[i], xtc[i], num_xt, tprod_has_vals,
-                        xc[i][j], m[i][jbw], tprod, pxl, swap_xxt, 1, 1.0,
+                        xc[i][j], m[i][jbw], tprod, pxl, swap_xxt,
+                        BANDWIDTH_reg != BW_FIXED, 1, 1.0,
                         0, R_NegInf, R_PosInf, NULL, NULL);
             tprod_has_vals = 1;
           }
@@ -14121,8 +14164,8 @@ NPPermutationWeightOutput * const pkw_output){
               deferred_const_active = 1;
             } else {
               np_ckernelv(KERNEL_reg_np[i], xtc[i], num_xt, tprod_has_vals,
-                          xc[i][j], m[i][jbw], tprod, pxl, swap_xxt, 1,
-                          invnorm, bounded_integral,
+                          xc[i][j], m[i][jbw], tprod, pxl, swap_xxt,
+                          BANDWIDTH_reg != BW_FIXED, 1, invnorm, bounded_integral,
                           vector_ckerlb_extern[i], vector_ckerub_extern[i],
                           bounded_cdf_lower_fixed == NULL ? NULL :
                             bounded_cdf_lower_fixed[i],
@@ -14137,7 +14180,8 @@ NPPermutationWeightOutput * const pkw_output){
                           (do_perm ? permutation_kernel[i] : KERNEL_reg_np[i]),
                           k, p_nvar, xtc[i], num_xt, l, xc[i][j], m[i][jbw],
                           tprod, tprod_mp, pxl,
-                          (p_pxl==NULL?NULL : p_pxl+k), swap_xxt, bpso[l],
+                          (p_pxl==NULL?NULL : p_pxl+k), swap_xxt,
+                          BANDWIDTH_reg != BW_FIXED, bpso[l],
                           do_score, perm_kbuf, use_largeh,
                           (use_largeh ? cont_largeh_k0[i] : 0.0),
                           invnorm, p_invnorm, bounded_integral,
@@ -37735,7 +37779,7 @@ static int np_conditional_y_eval_univariate_direct(
     np_ckernelv(kernel,
                 matrix_Y_continuous_train_extern[0],
                 num_train, 0, eval_y, bandwidth,
-                ctx->kw, NULL, 0, 1, 1.0, 0,
+                ctx->kw, NULL, 0, 1, 1, 1.0, 0,
                 R_NegInf, R_PosInf, NULL, NULL);
     for(j = 0; j < num_train; ++j)
       row_out[ipt_extern_Y[j]] = ctx->kw[j];
@@ -37743,7 +37787,7 @@ static int np_conditional_y_eval_univariate_direct(
     np_ckernelv(kernel,
                 matrix_Y_continuous_train_extern[0],
                 num_train, 0, eval_y, bandwidth,
-                row_out, NULL, 0, 1, 1.0, 0,
+                row_out, NULL, 0, 1, 1, 1.0, 0,
                 R_NegInf, R_PosInf, NULL, NULL);
   }
   return 0;

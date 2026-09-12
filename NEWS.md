@@ -1,5 +1,14 @@
 # npRmpi 0.80-1
 
+* Uniform nearest-neighbour kernels now apply their documented strict support
+  boundary to the unstandardized distance. This corrects adaptive- and
+  generalized-NN results that could depend on evaluation batching, tree
+  partitioning or affine rescaling. Dense and tree consumers share the same
+  membership decision, including normal factors in gradient and integral
+  products. Fixed-bandwidth arithmetic, other kernels and tree eligibility
+  are unchanged; affected uniform-NN fitted values and search objectives may
+  change where reciprocal rounding previously admitted a boundary point.
+
 * Unconditional adaptive-nearest-neighbour standard errors use correctly
   aligned transient workspaces on platforms where extended precision requires
   stricter alignment. The formula, precision and SE-off computation are unchanged.
