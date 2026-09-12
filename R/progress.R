@@ -299,7 +299,7 @@
 
 .np_progress_single_line_surfaces <- function() {
   c("bandwidth", "plot_activity", "plot_bounded", "bootstrap", "lag", "iv_solve",
-    "copula")
+    "copula", "fit")
 }
 
 .np_progress_renderer_for_surface <- function(surface, capability) {
@@ -1955,6 +1955,23 @@
     .np_progress_activity_step(context, context$done, context$detail)
   }
   context
+}
+
+# Scope a one-off phase with the same owner and native-fit forwarding as
+# existing bootstrap preparation. The promise keeps the caller's evaluation
+# environment, and quiet calls take the existing no-context fast path.
+.np_progress_activity_run <- function(label, expr) {
+  context <- .np_progress_activity_begin(label = label, detail = NULL)
+  if (is.null(context)) return(force(expr))
+  if (!isTRUE(context$state$visible)) {
+    .np_progress_activity_end(context)
+    return(force(expr))
+  }
+  completed <- FALSE
+  on.exit(.np_progress_activity_end(context, completed), add = TRUE)
+  value <- withVisible(force(expr))
+  completed <- TRUE
+  if (value$visible) value$value else invisible(value$value)
 }
 
 .np_progress_activity_step <- function(context, done = NULL, detail = NULL) {
