@@ -108,6 +108,44 @@ test_that("progress presentation retains atomic counters and respects display co
   expect_lte(nchar(line, type = "width"), 60L)
 })
 
+test_that("one-off progress phases retain scope, visibility and the outer owner", {
+  run <- getFromNamespace(".np_progress_activity_run", "np")
+  runtime <- getFromNamespace(".np_progress_runtime", "np")
+  registry <- getFromNamespace(".np_progress_registry", "np")
+  old <- options(np.messages = TRUE)
+  on.exit(options(old), add = TRUE)
+  x <- 0L
+  trace <- capture_progress_shadow_trace({
+    value <- withVisible(run("Outer phase", {
+      owner <- registry$active_id
+      forward <- runtime$fit_forward
+      run("Inner phase", {
+        expect_identical(registry$active_id, owner)
+        expect_identical(runtime$fit_forward, forward)
+        x <- 17L
+      })
+      invisible(9L)
+    }))
+    expect_identical(x, 17L)
+    expect_identical(value, list(value = 9L, visible = FALSE))
+    expect_null(registry$active_id)
+    expect_null(runtime$fit_forward)
+    expect_error(run("Failed phase", stop("retained phase error")),
+                 "retained phase error")
+    expect_null(registry$active_id)
+    expect_null(runtime$fit_forward)
+  }, force_renderer = "single_line")
+  expect_false(any(vapply(trace$trace, function(x)
+    grepl("Inner phase", x$line, fixed = TRUE), TRUE)))
+})
+
+test_that("ANN SE fit surface uses the shared single-line renderer", {
+  renderer <- getFromNamespace(".np_progress_renderer_for_surface", "np")
+  expect_identical(renderer("fit", list(single_line_viable = TRUE)), "single_line")
+  expect_identical(renderer("fit", list(single_line_viable = FALSE)), "legacy")
+  expect_identical(renderer("general", list(single_line_viable = TRUE)), "legacy")
+})
+
 test_that("progress begin returns disabled state when messages are off", {
   begin <- getFromNamespace(".np_progress_begin", "np")
 

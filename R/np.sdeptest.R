@@ -24,7 +24,6 @@ npsdeptest <- function(data = NULL,
 
   seed.state <- .np_seed_enter(random.seed)
   on.exit(.np_seed_exit(seed.state, remove_if_absent = TRUE), add = TRUE)
-  .np_progress_note("Computing bandwidths")
 
 
   ## If the variable is a time series convert to type numeric
@@ -107,9 +106,9 @@ npsdeptest <- function(data = NULL,
     ## Compute and save bandwidths (save for bootstrapping if
     ## requested)
 
-    bw.y[k] <- .np_progress_with_legacy_suppressed(npudensbw(~y))$bw
-    bw.y.lag[k] <- .np_progress_with_legacy_suppressed(npudensbw(~y.lag))$bw
-    bw.joint <- .np_progress_with_legacy_suppressed(npudensbw(~y+y.lag))$bw
+    bw.y[k] <- .np_progress_select_bandwidth_enhanced("Computing bandwidths", npudensbw(~y))$bw
+    bw.y.lag[k] <- .np_progress_select_bandwidth_enhanced("Computing bandwidths", npudensbw(~y.lag))$bw
+    bw.joint <- .np_progress_select_bandwidth_enhanced("Computing bandwidths", npudensbw(~y+y.lag))$bw
     bw.joint.y[k] <- bw.joint[1]
     bw.joint.y.lag[k] <- bw.joint[2]
     

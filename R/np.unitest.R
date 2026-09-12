@@ -30,7 +30,6 @@ npunitest <- function(data.x = NULL,
 
   seed.state <- .np_seed_enter(random.seed)
   on.exit(.np_seed_exit(seed.state, remove_if_absent = TRUE), add = TRUE)
-  .np_progress_note("Computing bandwidths")
 
   ## If of type ts convert to numeric to handle time series data
 
@@ -46,8 +45,8 @@ npunitest <- function(data.x = NULL,
   ## however, factors must be integers.
 
   if(is.numeric(data.x)) {
-    if(is.null(bw.x)) bw.x <- bw.SJ(data.x)
-    if(is.null(bw.y)) bw.y <- bw.SJ(data.y)
+    if(is.null(bw.x)) bw.x <- .np_progress_activity_run("Computing bandwidths", bw.SJ(data.x))
+    if(is.null(bw.y)) bw.y <- .np_progress_activity_run("Computing bandwidths", bw.SJ(data.y))
   } else {
     ## Optimal bandwidth for factor (unordered) used for both
     ## (plug-in).
@@ -56,7 +55,8 @@ npunitest <- function(data.x = NULL,
       c <- length(unique(data.x))
       if(c <= 1) stop("data.x must contain at least two distinct factor levels")
       xeval <- unique(data.x)
-      p <- fitted(npudens(tdat=data.x,edat=xeval,bws=0,...))
+      p <- .np_progress_activity_run("Computing bandwidths",
+        fitted(npudens(tdat=data.x,edat=xeval,bws=0,...)))
       sum.Lambda3 <- c/(c-1)*sum(p*(1-p))
       sum.Lambda2.minus.Lambda1.sq <- c^2/((c-1)^2)*sum(p*(1-p))
       n.sum.Lambda1.sq <- n*sum(((1-c*p)/(c-1))^2)
@@ -67,7 +67,8 @@ npunitest <- function(data.x = NULL,
       c <- length(unique(data.y))
       if(c <= 1) stop("data.y must contain at least two distinct factor levels")
       yeval <- unique(data.y)
-      p <- fitted(npudens(tdat=data.y,edat=xeval,bws=0,...))
+      p <- .np_progress_activity_run("Computing bandwidths",
+        fitted(npudens(tdat=data.y,edat=xeval,bws=0,...)))
       sum.Lambda3 <- c/(c-1)*sum(p*(1-p))
       sum.Lambda2.minus.Lambda1.sq <- c^2/((c-1)^2)*sum(p*(1-p))
       n.sum.Lambda1.sq <- n*sum(((1-c*p)/(c-1))^2)

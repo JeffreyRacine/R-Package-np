@@ -28,7 +28,6 @@ npsymtest <- function(data = NULL,
 
   seed.state <- .np_seed_enter(random.seed)
   on.exit(.np_seed_exit(seed.state, remove_if_absent = TRUE), add = TRUE)
-  .np_progress_note("Computing bandwidths")
 
   ## If of type ts convert to numeric to handle time series data
 
@@ -46,7 +45,7 @@ npsymtest <- function(data = NULL,
     ## so standardize numeric data - this affects nothing else.
     data <- (data-mean(data))/sd(data)
     data.rotate <- -(data-mean(data))+mean(data)
-    if(is.null(bw)) bw <- bw.SJ(data)
+    if(is.null(bw)) bw <- .np_progress_activity_run("Computing bandwidths", bw.SJ(data))
   } else {
     if(is.ordered(data)) {
       ## Rotate around the median, ordered case.
@@ -68,7 +67,8 @@ npsymtest <- function(data = NULL,
       c <- length(unique(data))
       if(c <= 1) stop("data must contain at least two distinct factor levels")
       xeval <- unique(data)
-      p <- fitted(npudens(tdat=data,edat=xeval,bws=0,...))
+      p <- .np_progress_activity_run("Computing bandwidths",
+        fitted(npudens(tdat=data,edat=xeval,bws=0,...)))
       sum.Lambda3 <- c/(c-1)*sum(p*(1-p))
       sum.Lambda2.minus.Lambda1.sq <- c^2/((c-1)^2)*sum(p*(1-p))
       n.sum.Lambda1.sq <- n*sum(((1-c*p)/(c-1))^2)

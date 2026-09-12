@@ -46,11 +46,10 @@ npdeneqtest <- function(x = NULL,
   if(!identical(names(data.frame(x)),names(data.frame(y)))) stop(" data frames x and y must have identical variable names")
   if(B < 9) stop(" number of bootstrap replications must be >= 9")
 
-  .np_progress_note("Computing bandwidths")
 
   if(is.null(bw.x) || is.null(bw.y)) {
-    bw.x <- .np_progress_with_legacy_suppressed(npudensbw(dat=x,...))
-    bw.y <- .np_progress_with_legacy_suppressed(npudensbw(dat=y,...))
+    bw.x <- .np_progress_select_bandwidth_enhanced("Computing bandwidths", npudensbw(dat=x,...))
+    bw.y <- .np_progress_select_bandwidth_enhanced("Computing bandwidths", npudensbw(dat=y,...))
   }
 
   ## Save seed prior to setting

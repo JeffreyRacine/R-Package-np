@@ -99,17 +99,16 @@ npqcmstest <- function(formula,
 
   ## ydat is model's residuals, xdat all regressors with types
 
-  .np_progress_note("Computing bandwidths")
 
   ## What are the optimal bandwidths? We could proceed to use those
   ## for the conditional expectation with raw y, or along the lines of
   ## Zheng (1998) does GCV where the dep var is varepsilon...
 
   if(bwydat == "y") {
-    bw <- .np_progress_with_legacy_suppressed(npregbw(xdat=xdat, ydat=model$y, ...))
+    bw <- .np_progress_select_bandwidth_enhanced("Computing bandwidths", npregbw(xdat=xdat, ydat=model$y, ...))
   } else if(bwydat == "varepsilon"){
     varepsilon <- qresidual(model.resid, tau)
-    bw <- .np_progress_with_legacy_suppressed(npregbw(xdat=xdat, ydat=varepsilon, ...))
+    bw <- .np_progress_select_bandwidth_enhanced("Computing bandwidths", npregbw(xdat=xdat, ydat=varepsilon, ...))
   }
 
   ## Now define the Jn test statistic that takes arguments xdat, the

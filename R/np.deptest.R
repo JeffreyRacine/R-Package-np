@@ -26,7 +26,6 @@ npdeptest <- function(data.x = NULL,
   seed.state <- .np_seed_enter(random.seed)
   on.exit(.np_seed_exit(seed.state, remove_if_absent = TRUE), add = TRUE)
 
-  .np_progress_note("Computing bandwidths")
 
   ## If the variable is a time series convert to type numeric
 
@@ -88,9 +87,9 @@ npdeptest <- function(data.x = NULL,
   
   ## Compute and save bandwidths (save for bootstrapping if requested)
 
-  bw.data.x <- .np_progress_with_legacy_suppressed(npudensbw(~data.x))$bw
-  bw.data.y <- .np_progress_with_legacy_suppressed(npudensbw(~data.y))$bw
-  bw.joint <- .np_progress_with_legacy_suppressed(npudensbw(~data.x+data.y))$bw
+  bw.data.x <- .np_progress_select_bandwidth_enhanced("Computing bandwidths", npudensbw(~data.x))$bw
+  bw.data.y <- .np_progress_select_bandwidth_enhanced("Computing bandwidths", npudensbw(~data.y))$bw
+  bw.joint <- .np_progress_select_bandwidth_enhanced("Computing bandwidths", npudensbw(~data.x+data.y))$bw
 
   .np_progress_note("Constructing metric entropy")
   

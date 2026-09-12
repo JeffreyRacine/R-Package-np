@@ -4,6 +4,10 @@
   Narrow consoles preserve complete counters before optional detail, and
   wide-character labels are shortened by their displayed width.
 
+* Requested adaptive-NN standard errors and statistical-test bandwidth phases
+  use the existing transient progress owners. Supplied bandwidths no longer
+  produce a misleading standalone bandwidth-computation notice.
+
 * Explicit fixed-bandwidth conditional bootstrap bias-corrected plot centers
   now use one mixed-data donor-mixture pilot and its matching PDF/CDF or
   derivative/contrast reference. Categorical conditioning pilot lambdas
