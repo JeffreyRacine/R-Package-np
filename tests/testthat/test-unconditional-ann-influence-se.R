@@ -43,6 +43,23 @@ local({
     old <- options(np.messages=FALSE, np.tree=getOption("np.tree", "auto"),
                    np.extendednn=TRUE)
     on.exit(options(old), add=TRUE)
+    test_that("ANN transient long-double workspaces handle varied allocation sizes", {
+      # Tiny odd sizes exercise allocator alignment states under UBSan on
+      # platforms where long double requires stricter alignment than double.
+      for (size in c(9L, 17L, 33L)) {
+        dat <- data.frame(x = sin(seq_len(size)*.714)+seq_len(size)/300)
+        for (density in c(TRUE, FALSE)) {
+          bf <- if (density) npudensbw else npudistbw
+          ff <- if (density) npudens else npudist
+          bw <- bf(dat=dat, bws=3L, bandwidth.compute=FALSE,
+                   bwtype="adaptive_nn")
+          off <- ff(bws=bw, tdat=dat, se=FALSE)
+          on <- ff(bws=bw, tdat=dat, se=TRUE)
+          expect_identical(fitted(on), fitted(off))
+          expect_true(all(is.finite(se(on))))
+        }
+      }
+    })
     for (density in c(TRUE,FALSE)) for (kernel in c("gaussian","epanechnikov")) {
       test_that(paste("unconditional ANN joint influence",density,kernel), {
         bf <- if(density) npudensbw else npudistbw

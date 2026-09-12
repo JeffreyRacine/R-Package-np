@@ -1,5 +1,9 @@
 # npRmpi 0.80-1
 
+* Unconditional adaptive-nearest-neighbour standard errors use correctly
+  aligned transient workspaces on platforms where extended precision requires
+  stricter alignment. The formula, precision and SE-off computation are unchanged.
+
 * Local-linear and positive-degree local-polynomial conditional density,
   distribution and quantile fits now provide requested categorical-contrast
   standard errors. Paired endpoint influences retain their covariance;
