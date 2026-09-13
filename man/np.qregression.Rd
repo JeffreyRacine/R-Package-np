@@ -229,6 +229,10 @@ prediction/evaluation route, or plot route as appropriate.
   }
 }
 \details{
+  Local-polynomial calculations inherit numerical ridging from
+  \code{\link{npcdist}}. See that estimator's help for the solve
+  policy and its distinct conditional uncertainty formula.
+
   Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{plot}}, \code{\link{plot.np}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup. See \code{\link{npRmpi.init}} details for performance tradeoffs (message passing/startup mode) and the \code{inst/Rprofile} manual-broadcast template.
 
 

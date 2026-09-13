@@ -1,5 +1,6 @@
 %
 \name{npreg}
+\encoding{UTF-8}
 \alias{npreg}
 \alias{npreg.default}
 \alias{npreg.formula}
@@ -113,8 +114,9 @@ These arguments control where the regression is evaluated and which fitted quant
 }
 
   \item{se}{
-    a logical value indicating whether fitted-residual HC0 standard errors are
-    computed and retained. Defaults to \code{FALSE}.
+    a logical value indicating whether the residual-normalized sandwich
+    standard errors described below are computed and retained.
+    Defaults to \code{FALSE}.
     With \code{se = FALSE}, fitted values and any requested
     gradients are still computed, but the returned \code{merr} and
     \code{gerr} components are \code{NULL}; \code{se()} and
@@ -163,8 +165,7 @@ These arguments control where the regression is evaluated and which fitted quant
     continuous derivative is shown as an empty, correctly labelled panel when
     another continuous derivative or categorical effect is available. A
     request for which no component is available is rejected with the affected
-    orders and degrees reported. Gradients are not currently available with
-    \code{ckertype="beta"}.
+    orders and degrees reported.
   }
 
 
@@ -321,15 +322,16 @@ Further arguments are passed to \code{\link{npregbw}} when bandwidths are comput
   regression results are retained even when every unscaled product would
   underflow to zero. In the local-constant case,
   \eqn{\ell_i(x)=K_i(x)/\sum_r K_r(x)}. The reported standard error uses
-  the fitted-residual HC0 formula below, also for beta kernels; it is not a
-  local residual-variance estimate multiplied by an effective-sample factor.
+  the residual-normalized sandwich formula below, also for beta kernels;
+  it is not a local residual-variance estimate multiplied by an
+  effective-sample factor.
 
   The beta regression route requires \code{ckerorder} in
   \code{c(2,4,6,8)} and finite fixed or sample-range bounds for each continuous
   predictor. It supports local-constant, local-linear and local-polynomial
   fits, including mixed continuous and categorical predictors. Local-constant
   first derivatives requested with \code{gradients=TRUE} are analytic C
-  implementations; their HC0 errors use the derivative of the normalized
+  implementations; their standard errors use the derivative of the normalized
   weights. At exact support endpoints,
   normalized numerator/denominator jumps are cancelled first. A genuine
   estimator jump is returned as a signed infinity with \code{gerr=NA}; an
@@ -349,28 +351,71 @@ Further arguments are passed to \code{\link{npregbw}} when bandwidths are comput
   internal computations that require these fits do not silently omit them.
 
   \subsection{Standard Errors}{
-  Ordinary regression standard errors use the uncorrected fitted-residual
-  HC0 sandwich for the actual fitted linear map, conditional on the selected
-  bandwidths and polynomial specification. Let
-  \eqn{e_i=Y_i-\widehat m(X_i)} be the training fitted residual, and let
-  \eqn{\ell_i(x)} be the influence of response \eqn{Y_i} on the fitted mean
-  at \eqn{x}. Then
+  Ordinary regression standard errors use a residual-normalized sandwich
+  for the actual fitted linear map, conditional on the selected bandwidths,
+  polynomial specification and realized predictor geometry. Let \eqn{S}
+  map training responses to their fitted values, let \eqn{e=(I-S)Y}, and
+  define
+  \deqn{q_i=\sum_j(\delta_{ij}-S_{ij})^2.}
+  For \eqn{q_i>0}, the normalized training residual is
+  \eqn{z_i=e_i/\sqrt{q_i}}. This is the pre-smoothing residual normalization
+  in Ruppert, Wand, Holst, and \enc{Hössjer}{Hossjer}
+  (1997, Section 1.1, equation (3)),
+  not their separate variance-function smoothing procedure. If
+  \eqn{\ell_i(x)} is the influence of response \eqn{Y_i} on the fitted mean
+  at \eqn{x}, the reported standard error is
   \deqn{\operatorname{se}\{\widehat m(x)\}
-    =\left\{\sum_i \ell_i(x)^2 e_i^2\right\}^{1/2}.}
-  The same rule applies to a derivative's influence row. For a categorical
-  finite difference, it uses the difference between the two influence rows,
-  thereby retaining their covariance. Local-polynomial influence rows use
-  the fitted basis and the accepted regularized solve when regularization
-  is required. No leverage or degrees-of-freedom correction is applied.
+    =\left\{\sum_i \ell_i(x)^2 z_i^2\right\}^{1/2}.}
+  A derivative uses its corresponding influence row. A categorical finite
+  difference uses the difference between the two endpoint influence rows,
+  retaining their covariance. Its estimate and error use the same paired
+  influence calculation rather than subtracting nearly equal fitted values.
+  Requesting or omitting standard errors does not change the computation
+  of a requested categorical effect.
+
+  The training smoother and influence rows use the actual fitted basis
+  and accepted regularized solve where needed. The residual-row norm is
+  not generally \eqn{1-S_{ii}}; that identity requires a symmetric,
+  idempotent projection. Nor is \eqn{q_i} necessarily at most one.
+  No additional degrees-of-freedom multiplier or positive variance floor
+  is applied. The corresponding influence representation is used without
+  retaining a full training-by-training matrix.
+
+  Treating the smoother as fixed, under independent homoskedastic errors
+  and a mean reproduced by that smoother,
+  \eqn{E(e_i^2\mid X)=\sigma^2q_i}. The normalization corrects fitted
+  residual noise contraction in that setting, not smoothing bias.
+  With a general mean, squared residual bias also contributes.
+  Under heteroskedasticity, \eqn{e_i^2/q_i} mixes donor variances and need
+  not be unbiased for the variance of observation \eqn{i}. Finite-sample
+  calibration under arbitrary bias, heteroskedasticity or model selection
+  is not guaranteed.
+
+  A zero residual-row norm leaves no residual information for that donor.
+  Requested errors depending on such unidentified information are
+  \code{NA}, with a warning; finite point estimates remain available.
+  A separately certified zero influence does not require that donor's
+  variance. Small positive residual norms are not replaced by zero or
+  by a numerical variance floor.
 
   This convention applies to fixed, generalized-NN and adaptive-NN
-  bandwidths and to beta kernels. Evaluation-point errors continue to use
-  training fitted residuals, not residuals centred on that evaluation-point
-  mean. These errors do not incorporate bandwidth-selection uncertainty.
+  bandwidths and beta kernels on supported regression routes.
+  External evaluation errors use the training smoother's normalized
+  residuals, not residuals centred on each external evaluation mean.
+  Bandwidth- and degree-selection uncertainty is not incorporated.
   \code{se()}, derivative-error accessors, prediction standard errors and
   asymptotic plot intervals consume the corresponding retained errors.
-  Continuous pivotal \code{\link{npsigtest}} statistics use gradient HC0
+  Pivotal \code{\link{npsigtest}} statistics use these gradient
   errors, recomputed from each bootstrap response when bootstrapping.
+  }
+
+  \subsection{Numerical Ridging}{
+  Local-linear and local-polynomial moment solves use numerical ridging
+  when needed, motivated by Seifert and Gasser (2000). The package uses
+  bounded implementation-specific ridge policies, not that paper's complete
+  data-adaptive ridge selector. Ridging stabilizes the fit; it is distinct
+  from the residual normalization above, which uses the actual accepted
+  smoother, including any ridge adjustment.
   }
 
   When bandwidths are obtained with \code{regtype="lp"}, C-level
@@ -464,12 +509,16 @@ Further arguments are passed to \code{\link{npregbw}} when bandwidths are comput
   available. }
   \item{merr}{ standard errors of the regression function estimates, or
     \code{NULL} when \code{se = FALSE}. Undefined normalization rows are
-    returned as \code{NA}. }
+    returned as \code{NA}. Requested errors depending on unidentified
+    training residual information are also \code{NA}; finite point
+    estimates are retained. See the Standard Errors subsection. }
   \item{grad}{ estimates of the gradients at each evaluation point. Undefined
     normalization rows are returned as \code{NA}. }
   \item{gerr}{ standard errors of the gradient estimates, or \code{NULL}
     when \code{se = FALSE}. Undefined normalization rows are returned as
-    \code{NA}. }
+    \code{NA}. Requested errors depending on unidentified training
+    residual information are also \code{NA}, separately from certified
+    zero effects. See the Standard Errors subsection. }
   \item{resid}{ if \code{residuals = TRUE}, in-sample or out-of-sample
     residuals where appropriate (or possible) }
   \item{R2}{ coefficient of determination (Doksum and Samarov (1995))}
@@ -564,6 +613,16 @@ Further arguments are passed to \code{\link{npregbw}} when bandwidths are comput
 
   Ruppert, D. and M.P. Wand (1994), \dQuote{Multivariate locally weighted
   least squares regression,} The Annals of Statistics, 22, 1346-1370.
+
+  Ruppert, D., M.P. Wand, U. Holst, and O. \enc{Hössjer}{Hossjer} (1997),
+  \dQuote{Local Polynomial Variance-Function Estimation,}
+  Technometrics, 39(3), 262-273.
+  \doi{10.1080/00401706.1997.10485117}.
+
+  Seifert, B. and T. Gasser (2000),
+  \dQuote{Data Adaptive Ridging in Local Polynomial Regression,}
+  Journal of Computational and Graphical Statistics, 9(2), 338-360.
+  \doi{10.1080/10618600.2000.10474884}.
 
   Wang, M.C. and J. van Ryzin (1981), \dQuote{A class of smooth
     estimators for discrete distributions,} Biometrika, 68, 301-309.

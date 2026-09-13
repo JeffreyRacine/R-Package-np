@@ -272,6 +272,12 @@ Further arguments are passed to \code{\link{npreg}} and \code{\link{npksum}}.
 
 }
 \details{
+  Local-polynomial nuisance fits may use numerical diagonal ridging.
+  For its Seifert--Gasser motivation, see \code{\link{npreg}}.
+  This is distinct from regularization of the instrumental-variable
+  inverse problem and does not apply the ordinary-regression residual
+  uncertainty correction to IV inference.
+
   Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{plot}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup. See \code{\link{npRmpi.init}} details for performance tradeoffs (message passing/startup mode) and the \code{inst/Rprofile} manual-broadcast template.
 
   The formula interface uses explicit role order:

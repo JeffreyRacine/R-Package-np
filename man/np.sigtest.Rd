@@ -191,19 +191,23 @@ Further arguments are passed to the bandwidth-selection routines used by the tes
   studentized effects over observations and tested predictors; it is not
   an inverse-covariance Wald statistic.
 
-  Studentized statistics use the fitted-residual HC0 gradient
-  standard errors described in \code{\link{npreg}}. Each bootstrap response
-  is fitted and its own training residuals are used in its HC0 quadratic;
-  the original-response standard errors are not held fixed across
-  replications. The admitted streamed implementation computes this same
-  statistic without retaining a full influence matrix. Categorical
-  standard errors include covariance between the two contrast endpoints.
-  Their bootstrap calculations reuse the canonical regression fit and
-  covariance producer for each response, rather than freezing the
-  original-response standard errors.
+  Studentized statistics use the residual-normalized gradient sandwich
+  described in \code{\link{npreg}}, including its Ruppert et al. (1997)
+  residual correction. Each bootstrap response supplies its own normalized
+  training residuals; original-response errors are not held fixed across
+  replications. Categorical errors use paired endpoint influence
+  differences and retain endpoint covariance. Observed and bootstrap
+  calculations use the same producer and information-availability rules.
+  Eligible streamed calculations use the equivalent shared influence
+  calculation without retaining a full influence matrix. This does not
+  account for bandwidth or degree-selection uncertainty, or guarantee size
+  calibration for every sample and configuration.
 
   Identical categorical endpoints contribute zero without changing the
-  number of observations in the statistic's denominator. Unordered
+  number of observations in the statistic's denominator. A native
+  certificate of identically zero paired influence has the same
+  interpretation; unavailable donor variance alone is not such a
+  certificate. Unordered
   first-level reference rows have this property; ordered first-level rows
   instead use a forward difference. An entire finite observed effect vector
   that is exactly zero has statistic zero under the degenerate-zero
@@ -213,13 +217,21 @@ Further arguments are passed to the bandwidth-selection routines used by the tes
   to an individual test, or a joint test only when every tested observed
   effect vanishes. A zero component of a mixed joint test stays in the
   original denominator; it does not suppress the other components.
-  No bandwidth-based full-smoothing detection is used. Random draws are
+  The test has no separate bandwidth-based full-smoothing detector. However,
+  the regression estimator's existing large-categorical-bandwidth
+  approximation can make a categorical contrast exactly zero near the
+  kernel's upper bandwidth bound, thereby triggering this convention.
+  This can produce a discontinuity in the P-value at that approximation's
+  cutoff; it is not evidence that the unapproximated contrast has vanished.
+  The test respects the estimator option \code{np.largelambda}, including
+  when the caller explicitly disables the approximation. Random draws are
   advanced to preserve later tests' random-number streams.
 
   Otherwise a required zero, negative, non-finite or unavailable standard
   error does not define studentization. An isolated zero effect with zero
   standard error within a nonzero effect vector is not covered by the
-  degenerate-zero convention. The test stops with an informative diagnostic;
+  degenerate-zero convention unless its influence is separately certified
+  as identically zero. The test stops with an informative diagnostic;
   it does not insert
   a variance floor, discard rows or failed replications, or substitute an
   unstandardized statistic. This rule applies equally to continuous and

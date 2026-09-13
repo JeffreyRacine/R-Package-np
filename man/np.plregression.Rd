@@ -208,6 +208,10 @@ Further arguments are passed to \code{\link{npplregbw}} and its component \code{
   }
 }
 \details{
+  Nuisance regressions inherit numerical ridging from \code{\link{npreg}}.
+  Their point fits do not apply its residual uncertainty correction to the
+  separate partially linear coefficient covariance described below.
+
   Documentation guide: see \code{\link{npplregbw}} for partially linear
   bandwidth selection, \code{\link{npregbw}} for the component
   nonparametric regression search controls, \code{\link{np.kernels}}

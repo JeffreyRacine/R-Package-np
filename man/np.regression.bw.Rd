@@ -828,6 +828,10 @@ The \code{scale.factor.*} controls are dimensionless search controls. The packag
 }
 
 \section{Book And Method Pointers}{
+  Local-polynomial search uses the numerical-ridging policies described in
+  \code{\link{npreg}} (Seifert and Gasser, 2000). This is solve
+  stabilization, not the fitted-residual uncertainty correction.
+
   \code{npregbw} selects bandwidths and, when requested, local-polynomial
   degree/search metadata for estimating the conditional mean
   \eqn{m(x)=E[Y\mid X=x]}. For the estimator target and local-polynomial

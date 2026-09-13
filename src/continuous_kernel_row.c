@@ -9,6 +9,7 @@
 #include <Rmath.h>
 
 #include "headers.h"
+#include "regression_contrast.h"
 #include "continuous_kernel_row.h"
 
 #if defined(__clang__) || defined(__GNUC__)
@@ -3197,6 +3198,7 @@ np_continuous_kernel_beta_regression_moment_rows_validated(
   const double *hc0_scaled_residual,
   double hc0_residual_scale,
   int preserve_mean,
+  const NPRegressionHC0Context *hc0_context,
   NPContinuousKernelRowWorkspace *workspace,
   NPContinuousKernelRowResult *row_result,
   double *mean,
@@ -3207,6 +3209,10 @@ np_continuous_kernel_beta_regression_moment_rows_validated(
   NPContinuousKernelRowStatus status;
   const int compute_errors = mean_stderr != NULL;
   const int ordinary_hc0 = hc0_scaled_residual != NULL;
+  NPRegressionResidualPreparation * const preparation =
+    hc0_context != NULL &&
+    hc0_context->status == NP_REGRESSION_HC0_RESIDUAL_PREPARING ?
+      hc0_context->preparation : NULL;
   int evaluation;
   int coordinate;
   int observation;
@@ -3267,6 +3273,41 @@ np_continuous_kernel_beta_regression_moment_rows_validated(
     }
     if(row_result->total_log_scale == -INFINITY)
       return NP_CONTINUOUS_ROW_ERR_ZERO_WEIGHT;
+
+    /* Consume the incumbent common-scaled row, without changing its point
+     * accumulation or restoring an absolute kernel scale. */
+    if(preparation != NULL) {
+      const int self = preparation->evaluation_to_donor[evaluation];
+      NPResidualOffDiagonal summary = {0};
+      long double residual = 0.0L;
+      long double denominator = 0.0L;
+      for(observation = 0; observation < plan->num_train; ++observation) {
+        const double weight = workspace->primary_sign[observation] == 0 ?
+          0.0 : (double)workspace->primary_sign[observation] * exp(
+            workspace->primary_log_absolute[observation] -
+            row_result->total_log_scale);
+        denominator += weight;
+        if(observation != self)
+          np_residual_offdiag_add(&summary, weight,
+            (long double)response[self] - response[observation]);
+      }
+      const NPResidualInformation information = np_residual_offdiag_finish(
+        &summary, denominator, &residual);
+      preparation->information[self] = information;
+      preparation->normalized_residual[self] = (double)residual;
+      if(information == NP_RESIDUAL_INVALID ||
+         !R_FINITE(preparation->normalized_residual[self]))
+        return NP_CONTINUOUS_ROW_ERR_NUMERIC;
+    }
+    if(ordinary_hc0 && hc0_context != NULL &&
+       hc0_context->unknown_count > 0) {
+      for(observation = 0; observation < plan->num_train; ++observation)
+        if(observation != omitted_observation &&
+           hc0_context->residual_information[observation] ==
+             NP_RESIDUAL_UNIDENTIFIED &&
+           workspace->primary_sign[observation] != 0)
+          hc0_context->mean_unavailable[evaluation] = 1;
+    }
 
     if(positive_weights) {
       for(observation = 0; observation < plan->num_train; ++observation) {
@@ -3387,18 +3428,25 @@ np_continuous_kernel_beta_regression_paired_hc0_rows_validated(
   int leave_one_out_offset,
   const NPContinuousKernelLogFactorProvider *level_provider,
   const NPContinuousKernelLogFactorProvider *alternate_provider,
+  const double *response,
   const double *hc0_scaled_residual,
   double hc0_residual_scale,
+  const NPRegressionHC0Context *hc0_context,
+  int output_coordinate,
+  const double *level_values,
+  const double *alternate_values,
   NPContinuousKernelRowWorkspace *workspace,
   NPContinuousKernelRowResult *row_result,
   double *level_coefficient,
   size_t level_coefficient_capacity,
+  double *contrast,
   double *contrast_stderr,
   NPContinuousKernelDerivativeDiagnostics *diagnostics)
 {
   NPContinuousKernelRowStatus status = NP_CONTINUOUS_ROW_ERR_LAYOUT;
-  int evaluation;
-  int observation;
+  const int want_variance = contrast_stderr != NULL;
+  int *level_support = NULL;
+  NPContrastExactSum *exact_total = NULL;
 
   if(diagnostics != NULL) {
     diagnostics->bad_coordinate = -1;
@@ -3412,108 +3460,199 @@ np_continuous_kernel_beta_regression_paired_hc0_rows_validated(
      plan->route->segment[0].descriptor.family != NP_CKERNEL_FAMILY_BETA ||
      (leave_one_out != 0 && leave_one_out != 1) ||
      leave_one_out_offset < 0 || level_provider == NULL ||
-     alternate_provider == NULL || hc0_scaled_residual == NULL ||
-     !R_FINITE(hc0_residual_scale) || hc0_residual_scale < 0.0 ||
-     workspace == NULL || row_result == NULL ||
-     level_coefficient == NULL ||
+     alternate_provider == NULL || response == NULL ||
+     (want_variance && (hc0_scaled_residual == NULL ||
+       !R_FINITE(hc0_residual_scale) || hc0_residual_scale < 0.0)) ||
+     workspace == NULL || row_result == NULL || row_result->row == NULL ||
+     level_coefficient == NULL || row_result->row == level_coefficient ||
      level_coefficient_capacity < (size_t)plan->num_train ||
-     contrast_stderr == NULL ||
+     (contrast == NULL && !want_variance) ||
      (leave_one_out &&
       (plan->num_eval > plan->num_train ||
        leave_one_out_offset > plan->num_train - plan->num_eval)))
     return NP_CONTINUOUS_ROW_ERR_LAYOUT;
-  for(observation = 0; observation < plan->num_train; ++observation)
-    if(!R_FINITE(hc0_scaled_residual[observation])) {
-      if(diagnostics != NULL)
-        diagnostics->bad_observation = observation;
+  for(int observation = 0; observation < plan->num_train; ++observation)
+    if(!R_FINITE(response[observation]) ||
+       (want_variance && !R_FINITE(hc0_scaled_residual[observation]))) {
+      if(diagnostics != NULL) diagnostics->bad_observation = observation;
       return NP_CONTINUOUS_ROW_ERR_NUMERIC;
     }
+  const int unknown = want_variance && hc0_context != NULL &&
+    hc0_context->unknown_count > 0;
+  if(unknown) {
+    if(hc0_context->residual_information == NULL || output_coordinate < 0 ||
+       hc0_context->gradient_unavailable == NULL ||
+       hc0_context->gradient_unavailable[output_coordinate] == NULL)
+      return NP_CONTINUOUS_ROW_ERR_LAYOUT;
+    level_support = (int *)R_alloc((size_t)plan->num_train, sizeof(int));
+    exact_total = (NPContrastExactSum *)R_alloc(2, sizeof(NPContrastExactSum));
+  }
 
-  for(evaluation = 0; evaluation < plan->num_eval; ++evaluation) {
-    const int omitted_observation = leave_one_out ?
-      evaluation + leave_one_out_offset : -1;
-    double level_total = 0.0;
-    double alternate_total = 0.0;
-    long double quadratic = 0.0L;
+  for(int evaluation = 0; evaluation < plan->num_eval; ++evaluation) {
+    const int omitted = leave_one_out ? evaluation + leave_one_out_offset : -1;
+    NPContrastNumber level_total = np_contrast_number(0.0);
+    NPContrastNumber alternate_total = np_contrast_number(0.0);
+    double * const alternate_weight = row_result->row;
+    int level_count = 0, alternate_count = 0;
+    int level_singleton = -1, alternate_singleton = -1;
+    int identical = 1, anchor = -1;
+    double anchor_weight = -1.0;
+    const int same_frame = level_values != NULL && alternate_values != NULL &&
+      level_values[evaluation] == alternate_values[evaluation];
+    if(unknown) {
+      exact_total[0] = (NPContrastExactSum){0};
+      exact_total[1] = (NPContrastExactSum){0};
+    }
 
     status = np_continuous_kernel_beta_log_factor_row(
-      plan, evaluation, omitted_observation, level_provider,
-      workspace, row_result);
-    if(status != NP_CONTINUOUS_ROW_OK)
-      goto row_failure;
+      plan, evaluation, omitted, level_provider, workspace, row_result);
+    if(status != NP_CONTINUOUS_ROW_OK) goto row_failure;
     if(row_result->total_log_scale == -INFINITY) {
       status = NP_CONTINUOUS_ROW_ERR_ZERO_WEIGHT;
       goto cleanup;
     }
-    for(observation = 0; observation < plan->num_train; ++observation) {
-      const double weight = workspace->primary_sign[observation] == 0 ?
-        0.0 : (double)workspace->primary_sign[observation] * exp(
+    for(int observation = 0; observation < plan->num_train; ++observation) {
+      const int supported = observation != omitted &&
+        workspace->primary_sign[observation] != 0;
+      const double weight = supported ?
+        (double)workspace->primary_sign[observation] * exp(
           workspace->primary_log_absolute[observation] -
-          row_result->total_log_scale);
-
-      level_coefficient[observation] =
-        observation == omitted_observation ? 0.0 : weight;
-      level_total += level_coefficient[observation];
+          row_result->total_log_scale) : 0.0;
+      if(!R_FINITE(weight)) {
+        status = NP_CONTINUOUS_ROW_ERR_NUMERIC;
+        goto cleanup;
+      }
+      level_coefficient[observation] = weight;
+      level_total = np_contrast_add(level_total,np_contrast_number(weight));
+      if(unknown) {
+        level_support[observation] = supported;
+        np_contrast_exact_add(&exact_total[0],weight);
+      }
+      if(supported) { ++level_count; level_singleton = observation; }
     }
-    if(!R_FINITE(level_total) || level_total == 0.0) {
-      status = level_total == 0.0 ? NP_CONTINUOUS_ROW_ERR_ZERO_WEIGHT :
+    if(!np_contrast_finite(level_total) || level_total.hi == 0.0) {
+      status = level_total.hi == 0.0 ? NP_CONTINUOUS_ROW_ERR_ZERO_WEIGHT :
         NP_CONTINUOUS_ROW_ERR_NUMERIC;
       goto cleanup;
     }
-    for(observation = 0; observation < plan->num_train; ++observation)
-      level_coefficient[observation] /= level_total;
 
     status = np_continuous_kernel_beta_log_factor_row(
-      plan, evaluation, omitted_observation, alternate_provider,
-      workspace, row_result);
-    if(status != NP_CONTINUOUS_ROW_OK)
-      goto row_failure;
+      plan, evaluation, omitted, alternate_provider, workspace, row_result);
+    if(status != NP_CONTINUOUS_ROW_OK) goto row_failure;
     if(row_result->total_log_scale == -INFINITY) {
       status = NP_CONTINUOUS_ROW_ERR_ZERO_WEIGHT;
       goto cleanup;
     }
-    for(observation = 0; observation < plan->num_train; ++observation) {
-      const double weight = workspace->primary_sign[observation] == 0 ?
-        0.0 : (double)workspace->primary_sign[observation] * exp(
+    for(int observation = 0; observation < plan->num_train; ++observation) {
+      const int supported = observation != omitted &&
+        workspace->primary_sign[observation] != 0;
+      const double weight = supported ?
+        (double)workspace->primary_sign[observation] * exp(
           workspace->primary_log_absolute[observation] -
-          row_result->total_log_scale);
-
-      if(observation != omitted_observation)
-        alternate_total += weight;
+          row_result->total_log_scale) : 0.0;
+      if(!R_FINITE(weight)) {
+        status = NP_CONTINUOUS_ROW_ERR_NUMERIC;
+        goto cleanup;
+      }
+      alternate_weight[observation] = weight;
+      alternate_total = np_contrast_add(alternate_total,np_contrast_number(weight));
+      if(unknown) np_contrast_exact_add(&exact_total[1],weight);
+      identical &= level_coefficient[observation] == weight;
+      if(supported) { ++alternate_count; alternate_singleton = observation; }
     }
-    if(!R_FINITE(alternate_total) || alternate_total == 0.0) {
-      status = alternate_total == 0.0 ? NP_CONTINUOUS_ROW_ERR_ZERO_WEIGHT :
+    if(!np_contrast_finite(alternate_total) || alternate_total.hi == 0.0) {
+      status = alternate_total.hi == 0.0 ? NP_CONTINUOUS_ROW_ERR_ZERO_WEIGHT :
         NP_CONTINUOUS_ROW_ERR_NUMERIC;
       goto cleanup;
     }
-    for(observation = 0; observation < plan->num_train; ++observation) {
-      const double weight = workspace->primary_sign[observation] == 0 ?
-        0.0 : (double)workspace->primary_sign[observation] * exp(
-          workspace->primary_log_absolute[observation] -
-          row_result->total_log_scale);
-      const double alternate_coefficient =
-        observation == omitted_observation ? 0.0 :
-        weight / alternate_total;
-      const long double influence =
-        (long double)level_coefficient[observation] -
-        (long double)alternate_coefficient;
-      const long double residual =
-        (long double)hc0_scaled_residual[observation];
-
-      quadratic += influence * influence * residual * residual;
+    const int structural_zero = same_frame || identical ||
+      (level_count == 1 && alternate_count == 1 &&
+       level_singleton == alternate_singleton);
+    /* Deterministic geometry-only anchor: first largest combined normalized
+     * magnitude. Its coefficient is reconstructed, never 1 minus rounded
+     * normalized diagonal entries. */
+    for(int observation = 0; observation < plan->num_train; ++observation) {
+      if(observation == omitted) continue;
+      const double magnitude =
+        fabs(level_coefficient[observation]/level_total.hi) +
+        fabs(alternate_weight[observation]/alternate_total.hi);
+      if(!R_FINITE(magnitude)) {
+        status = NP_CONTINUOUS_ROW_ERR_NUMERIC;
+        goto cleanup;
+      }
+      if(magnitude > anchor_weight) {
+        anchor_weight = magnitude;
+        anchor = observation;
+      }
     }
-    if(quadratic < 0.0L || quadratic > (long double)DBL_MAX) {
+    if(anchor < 0) { status = NP_CONTINUOUS_ROW_ERR_LAYOUT; goto cleanup; }
+    const NPContrastRatio paired_ratio =
+      np_contrast_ratio_prepare(level_total, alternate_total);
+    NPRegressionContrastAccumulator accumulator =
+      np_regression_contrast_begin(response[anchor],want_variance);
+    for(int observation = 0; observation < plan->num_train; ++observation) {
+      if(observation == anchor) continue;
+      const int absent = unknown ?
+        (!level_support[observation] &&
+         (observation == omitted || workspace->primary_sign[observation] == 0)) :
+        (level_coefficient[observation] == 0.0 &&
+         alternate_weight[observation] == 0.0);
+      /* Exact equality of represented normalized weights proves donor
+       * independence. A supported log weight rounded to zero does not. */
+      const int preserved = unknown &&
+        (!level_support[observation] || level_coefficient[observation] != 0.0) &&
+        (observation == omitted || workspace->primary_sign[observation] == 0 ||
+         alternate_weight[observation] != 0.0);
+      const int equal_unknown = unknown && preserved &&
+        hc0_context->residual_information[observation] == NP_RESIDUAL_UNIDENTIFIED &&
+        np_contrast_exact_products_equal(
+          level_coefficient[observation],&exact_total[1],
+          alternate_weight[observation],&exact_total[0]);
+      const int zero = structural_zero || absent || equal_unknown;
+      const NPContrastNumber coefficient = zero ?
+        np_contrast_number(0.0) : np_contrast_ratio_apply(
+          &paired_ratio,level_coefficient[observation],alternate_weight[observation]);
+      np_regression_contrast_add(&accumulator,coefficient,response[observation],
+        zero,unknown ? (NPResidualInformation)hc0_context->residual_information[observation] :
+          NP_RESIDUAL_IDENTIFIED,
+        want_variance ? hc0_scaled_residual[observation] : 0.0);
+    }
+    const int anchor_preserved = unknown &&
+      (!level_support[anchor] || level_coefficient[anchor] != 0.0) &&
+      (workspace->primary_sign[anchor] == 0 || alternate_weight[anchor] != 0.0);
+    const int anchor_zero = structural_zero ||
+      (unknown && anchor_preserved &&
+       hc0_context->residual_information[anchor] == NP_RESIDUAL_UNIDENTIFIED &&
+       np_contrast_exact_products_equal(
+         level_coefficient[anchor],&exact_total[1],
+         alternate_weight[anchor],&exact_total[0]));
+    NPRegressionContrastResult result = np_regression_contrast_finish(
+      &accumulator,unknown ?
+        (NPResidualInformation)hc0_context->residual_information[anchor] :
+        NP_RESIDUAL_IDENTIFIED,
+      want_variance ? hc0_scaled_residual[anchor] : 0.0,anchor_zero);
+    if(result.information == NP_RESIDUAL_INVALID) {
       status = NP_CONTINUOUS_ROW_ERR_NUMERIC;
       goto cleanup;
     }
-    contrast_stderr[evaluation] = hc0_residual_scale *
-      sqrt((double)quadratic);
-    if(!R_FINITE(contrast_stderr[evaluation])) {
-      status = NP_CONTINUOUS_ROW_ERR_NUMERIC;
-      goto cleanup;
+    if(contrast != NULL) contrast[evaluation] = result.contrast;
+    if(want_variance) {
+      if(result.information == NP_RESIDUAL_UNIDENTIFIED) {
+        hc0_context->gradient_unavailable[output_coordinate][evaluation] = 1;
+        contrast_stderr[evaluation] = 0.0; /* masked at public boundary */
+      } else {
+        contrast_stderr[evaluation] = hc0_residual_scale*result.standard_error;
+      }
+      if(unknown && result.structural_zero &&
+         hc0_context->gradient_structural_zero != NULL &&
+         hc0_context->gradient_structural_zero[output_coordinate] != NULL)
+        hc0_context->gradient_structural_zero[output_coordinate][evaluation] = 1;
+      if(!R_FINITE(contrast_stderr[evaluation])) {
+        status = NP_CONTINUOUS_ROW_ERR_NUMERIC;
+        goto cleanup;
+      }
     }
-    if((evaluation & 31) == 0)
-      R_CheckUserInterrupt();
+    if((evaluation & 31) == 0) R_CheckUserInterrupt();
   }
   status = NP_CONTINUOUS_ROW_OK;
   goto cleanup;

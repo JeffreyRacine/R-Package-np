@@ -19,6 +19,7 @@
 #include <R_ext/Applic.h>
 #include <R_ext/BLAS.h>
 #include <R_ext/Lapack.h>
+#include <R_ext/Memory.h>
 #include <R_ext/Utils.h>
 #include <Rmath.h>
 #include <Rinternals.h>
@@ -28,6 +29,9 @@
 #endif
 
 #include "headers.h"
+#include "regression_contrast.h"
+#include "regression_alllarge_residual.h"
+#include "regression_inference_reuse.h"
 #include "conditional_kernel_moments.h"
 #include "conditional_ann_direct.h"
 #include "nn_radius_error.h"
@@ -1792,6 +1796,52 @@ static void np_categorical_profile_owner_take_vector(
   owner->vectors[owner->vector_count++] = vector;
 }
 
+/* Uncertainty-only consumer of an incumbent scalar kernel row. The optional
+ * profile metadata retains compressed accumulation; ordinary rows retain
+ * their existing fixed/GNN evaluation or ANN donor ownership. */
+typedef struct {
+  NPRegressionResidualPreparation *output;
+  NPResidualOffDiagonal *state;
+  int num_rows;
+  int visited_rows;
+  const int *profile_eval_to_train;
+  const double *profile_count;
+  const long double *profile_anchor;
+  const long double *profile_centered_sum;
+  long double *profile_self_weight;
+} NPRegressionResidualKernelContext;
+
+static NPResidualOffDiagonal *np_regression_residual_states(const int n)
+{
+  size_t bytes;
+  if(n <= 0 || !np_size_array_bytes_checked(
+       (size_t)n, sizeof(NPResidualOffDiagonal), &bytes))
+    error("regression residual preparation has an invalid row count");
+  const size_t units = bytes / sizeof(long double) +
+    (bytes % sizeof(long double) != 0U);
+  NPResidualOffDiagonal * const state =
+    (NPResidualOffDiagonal *)R_allocLD(units);
+  memset(state, 0, bytes);
+  return state;
+}
+
+static int np_regression_residual_preparation_valid(
+  const NPRegressionResidualPreparation *preparation)
+{
+  if(preparation == NULL || preparation->num_obs_train <= 0 ||
+     preparation->num_obs_eval != preparation->num_obs_train ||
+     preparation->response == NULL ||
+     preparation->evaluation_to_donor == NULL ||
+     preparation->normalized_residual == NULL ||
+     preparation->information == NULL)
+    return 0;
+  for(int i = 0; i < preparation->num_obs_eval; ++i)
+    if(preparation->evaluation_to_donor[i] < 0 ||
+       preparation->evaluation_to_donor[i] >= preparation->num_obs_train)
+      return 0;
+  return 1;
+}
+
 typedef struct {
   int *kernel_c;
   int *kernel_u;
@@ -2121,7 +2171,15 @@ typedef struct {
   double *mean;
   double *mean_stderr;
   int emit_fit_progress;
+  NPRegressionResidualPreparation *residual_preparation;
 } NPRegressionCategoricalProfileFitCall;
+
+static int np_regression_profile_residual_kernel_sum(
+  const NPRegressionCategoricalProfileFitCall *call,
+  int ntrain, int neval, double **train_u, double **train_o,
+  double **eval_u, double **eval_o, double **response_columns,
+  int response_column_count, double *weighted_sum,
+  NPRegressionResidualKernelContext *residual_context);
 
 typedef struct {
   const NPRegressionCategoricalProfileFitCall *call;
@@ -2169,6 +2227,9 @@ static int np_regression_categorical_profile_fit_body(
   double *counts = NULL, *sums = NULL, *sums2 = NULL, *weighted_sum = NULL;
   double *profile_y[3];
   double *profile_mean = NULL, *profile_stderr = NULL;
+  NPRegressionResidualKernelContext residual_context = {0};
+  long double *profile_anchor = NULL, *profile_centered_sum = NULL;
+  int *profile_eval_to_train = NULL;
   int ok = 0;
 
   if((int_TREE_PROFILE_X != NP_TREE_TRUE) ||
@@ -2227,6 +2288,24 @@ static int np_regression_categorical_profile_fit_body(
      (4*nprof_eval > 3*num_obs_eval))
     goto cleanup;
 
+  if(call->residual_preparation != NULL) {
+    if(!np_regression_residual_preparation_valid(call->residual_preparation))
+      error("regression profile residual preparation has an invalid identity map");
+    profile_anchor = R_allocLD((size_t)nprof_train);
+    profile_centered_sum = R_allocLD((size_t)nprof_train);
+    profile_eval_to_train = (int *)R_alloc((size_t)nprof_eval, sizeof(int));
+    memset(profile_centered_sum, 0, (size_t)nprof_train*sizeof(long double));
+    residual_context.output = call->residual_preparation;
+    residual_context.state = np_regression_residual_states(nprof_eval);
+    residual_context.num_rows = nprof_eval;
+    residual_context.profile_eval_to_train = profile_eval_to_train;
+    residual_context.profile_anchor = profile_anchor;
+    residual_context.profile_centered_sum = profile_centered_sum;
+    residual_context.profile_self_weight = R_allocLD((size_t)nprof_eval);
+    memset(residual_context.profile_self_weight, 0,
+           (size_t)nprof_eval*sizeof(long double));
+  }
+
   profile_unordered_train = alloc_tmatd(nprof_train, num_reg_unordered);
   np_categorical_profile_owner_take_matrix(owner, profile_unordered_train);
   profile_ordered_train = alloc_tmatd(nprof_train, num_reg_ordered);
@@ -2265,6 +2344,8 @@ static int np_regression_categorical_profile_fit_body(
     const int rep = train_prof_rep[g];
     counts[g] = 0.0;
     sums[g] = 0.0;
+    if(profile_anchor != NULL)
+      profile_anchor[g] = (long double)vector_Y[rep];
     if(do_merr)
       sums2[g] = 0.0;
     for(j = 0; j < num_reg_unordered; j++)
@@ -2275,6 +2356,9 @@ static int np_regression_categorical_profile_fit_body(
 
   for(g = 0; g < nprof_eval; g++){
     const int rep = eval_prof_rep[g];
+    if(profile_eval_to_train != NULL)
+      profile_eval_to_train[g] = train_prof_id[
+        call->residual_preparation->evaluation_to_donor[rep]];
     for(j = 0; j < num_reg_unordered; j++)
       profile_unordered_eval[j][g] = matrix_X_unordered_eval[j][rep];
     for(j = 0; j < num_reg_ordered; j++)
@@ -2285,6 +2369,8 @@ static int np_regression_categorical_profile_fit_body(
     g = train_prof_id[i];
     counts[g] += 1.0;
     sums[g] += vector_Y[i];
+    if(profile_centered_sum != NULL)
+      profile_centered_sum[g] += (long double)vector_Y[i] - profile_anchor[g];
     if(do_merr)
       sums2[g] += vector_Y[i]*vector_Y[i];
     if(emit_fit_progress)
@@ -2295,7 +2381,15 @@ static int np_regression_categorical_profile_fit_body(
   profile_y[1] = counts;
   profile_y[2] = sums2;
 
-  status = kernel_weighted_sum_np(kernel_c,
+  if(call->residual_preparation != NULL) {
+    residual_context.profile_count = counts;
+    status = np_regression_profile_residual_kernel_sum(
+      call, nprof_train, nprof_eval,
+      profile_unordered_train, profile_ordered_train,
+      profile_unordered_eval, profile_ordered_eval,
+      profile_y, response_column_count, weighted_sum, &residual_context);
+  } else {
+    status = kernel_weighted_sum_np(kernel_c,
                                   kernel_u,
                                   kernel_o,
                                   BANDWIDTH_reg,
@@ -2348,6 +2442,7 @@ static int np_regression_categorical_profile_fit_body(
                                   NULL,
                                   NULL,
                                   NULL);
+  }
 
   if(status != 0)
     goto cleanup;
@@ -2372,6 +2467,29 @@ static int np_regression_categorical_profile_fit_body(
     mean[i] = profile_mean[g];
     if(do_merr)
       mean_stderr[i] = profile_stderr[g];
+    if(call->residual_preparation != NULL) {
+      NPRegressionResidualPreparation * const preparation =
+        call->residual_preparation;
+      const int donor = preparation->evaluation_to_donor[i];
+      const int self_profile = profile_eval_to_train[g];
+      NPResidualOffDiagonal state = residual_context.state[g];
+      long double residual = 0.0L;
+      if(state.scale > 0.0L) {
+        const long double normalized_total = state.sum +
+          residual_context.profile_self_weight[g] / state.scale;
+        state.numerator += normalized_total *
+          ((long double)preparation->response[donor] -
+           profile_anchor[self_profile]);
+      }
+      NPResidualInformation information = np_residual_offdiag_finish(
+        &state, (long double)weighted_sum[response_column_count*g + 1],
+        &residual);
+      if(information != NP_RESIDUAL_INVALID &&
+         !R_FINITE((double)residual))
+        information = NP_RESIDUAL_INVALID;
+      preparation->normalized_residual[donor] = (double)residual;
+      preparation->information[donor] = (int)information;
+    }
   }
 
   ok = 1;
@@ -2415,7 +2533,8 @@ int *operator,
 double **matrix_categorical_vals,
 double *mean,
 double *mean_stderr,
-const int emit_fit_progress)
+const int emit_fit_progress,
+NPRegressionResidualPreparation *residual_preparation)
 {
   const NPRegressionCategoricalProfileFitCall call = {
     .kernel_c = kernel_c,
@@ -2440,7 +2559,8 @@ const int emit_fit_progress)
     .matrix_categorical_vals = matrix_categorical_vals,
     .mean = mean,
     .mean_stderr = mean_stderr,
-    .emit_fit_progress = emit_fit_progress
+    .emit_fit_progress = emit_fit_progress,
+    .residual_preparation = residual_preparation
   };
   NPRegressionCategoricalProfileFitExecution execution;
 
@@ -9359,7 +9479,43 @@ typedef struct {
   int denominator_column;
   NPRegressionGradientRange continuous_range;
   NPRegressionGradientRange categorical_range;
+  const NPRegressionHC0Context *uncertainty_context;
 } NPRegressionHC0DerivativeMomentCtx;
+
+typedef struct {
+  const NPRegressionHC0DerivativeMomentCtx *derivative;
+  const double *level_denominator;
+  const double *alternate_denominator;
+  long double *certificate;
+} NPRegressionScalarANNInformation;
+
+typedef struct {
+  double magnitude;
+  double left,right;
+  int donor;
+} NPRegressionContrastMaximum;
+
+typedef struct {
+  int stage,cells;
+  NPContrastNumber *total;
+  NPContrastRatio *ratio;
+  NPRegressionContrastMaximum *maximum;
+  int *count,*mismatch,*anchor,*structural;
+  NPContrastExactSum *exact;
+  NPRegressionContrastAccumulator *sum;
+} NPRegressionScalarANNContrast;
+
+typedef struct {
+  const double *response;
+  double **gradient;
+  double **gradient_stderr;
+  const NPRegressionHC0Context *uncertainty;
+  NPRegressionGradientRange categorical_range;
+  int num_eval;
+  int num_eval_alloc;
+  int want_variance;
+  NPRegressionScalarANNContrast *adaptive;
+} NPRegressionScalarContrastContext;
 
 typedef struct {
   double *weighted_sum;
@@ -9372,7 +9528,121 @@ typedef struct {
   int retain_common_scale;
   const NPRegressionHC0DerivativeMomentCtx *regression_derivative;
   const double *observation_scale;
+  NPRegressionResidualKernelContext *residual_preparation;
+  const NPRegressionHC0Context *uncertainty_context;
+  NPRegressionScalarANNInformation *ann_information;
+  const NPRegressionScalarContrastContext *scalar_contrast;
 } NP_DualPowerCtx;
+
+/* Consume the row already constructed by the ordinary scalar owner. No
+ * kernel, geometry, support box or point moment is recomputed here. */
+static void np_regression_residual_kernel_row(
+  NPRegressionResidualKernelContext *context, const int bandwidth_mode,
+  const int row, const double *weights, const int num_weights,
+  const double bandwidth_divisor, const XL *support)
+{
+  const int adaptive = bandwidth_mode == BW_ADAP_NN;
+  NPRegressionResidualPreparation * const output = context->output;
+  ++context->visited_rows;
+  if(context->profile_eval_to_train != NULL) {
+    for(int index = 0; index < num_weights; ++index) {
+      const int evaluation = adaptive ? index : row;
+      const int donor = adaptive ? row : index;
+      const int self = context->profile_eval_to_train[evaluation];
+      NPResidualOffDiagonal * const state = context->state + evaluation;
+      const long double weight =
+        (long double)weights[index] / (long double)bandwidth_divisor;
+      const long double count = (long double)context->profile_count[donor];
+      const long double difference = count *
+        (context->profile_anchor[self] - context->profile_anchor[donor]) -
+        context->profile_centered_sum[donor];
+      np_residual_offdiag_add_group(state, weight,
+        count - (donor == self ? 1.0L : 0.0L), difference);
+      if(donor == self) context->profile_self_weight[evaluation] = weight;
+    }
+    return;
+  }
+  const int ranges = support == NULL ? 1 : support->n;
+  for(int range = 0; range < ranges; ++range) {
+    const int start = support == NULL ? 0 : support->istart[range];
+    const int end = support == NULL ? num_weights :
+      start + support->nlev[range];
+    for(int index = start; index < end; ++index) {
+      const int evaluation = adaptive ? index : row;
+      const int donor = adaptive ? row : index;
+      const int self = output->evaluation_to_donor[evaluation];
+      if(donor == self) continue;
+      np_residual_offdiag_add(context->state + evaluation,
+        (long double)weights[index] / (long double)bandwidth_divisor,
+        (long double)output->response[self] -
+        (long double)output->response[donor]);
+    }
+  }
+}
+
+/* Whole-row fixed/GNN owners sum disjoint records. ANN donor owners first
+ * agree on the scale, then sum rescaled summaries. Never average separately
+ * normalized residuals or transmit NA through a numerical reduction. */
+static int np_regression_residual_kernel_reduce(
+  NPRegressionResidualKernelContext *context, const int bandwidth_mode,
+  const int suppress_parallel)
+{
+#ifdef MPI2
+  if(!suppress_parallel) {
+    const int n = context->num_rows;
+    const int adaptive = bandwidth_mode == BW_ADAP_NN;
+    const int width = adaptive ? 4 : 5;
+    if(n <= 0 || n > (INT_MAX - 1) / width)
+      return 0;
+    const int count = width*n + 1;
+    long double * const packed = R_allocLD((size_t)count);
+    long double *scale = NULL;
+    if(adaptive) {
+      scale = R_allocLD((size_t)n);
+      for(int i = 0; i < n; ++i) scale[i] = context->state[i].scale;
+      MPI_Allreduce(MPI_IN_PLACE, scale, n, MPI_LONG_DOUBLE, MPI_MAX, comm[1]);
+    }
+    for(int i = 0; i < n; ++i) {
+      NPResidualOffDiagonal * const state = context->state + i;
+      const size_t offset = (size_t)width*(size_t)i;
+      if(adaptive) {
+        const long double ratio = scale[i] == 0.0L ? 0.0L :
+          state->scale / scale[i];
+        packed[offset] = state->sum * ratio;
+        packed[offset + 1] = state->sumsq * ratio * ratio;
+        packed[offset + 2] = state->numerator * ratio;
+        packed[offset + 3] = state->invalid ? 1.0L : 0.0L;
+      } else {
+        packed[offset] = state->scale;
+        packed[offset + 1] = state->sum;
+        packed[offset + 2] = state->sumsq;
+        packed[offset + 3] = state->numerator;
+        packed[offset + 4] = state->invalid ? 1.0L : 0.0L;
+      }
+    }
+    packed[count - 1] = (long double)context->visited_rows;
+    MPI_Allreduce(MPI_IN_PLACE, packed, count, MPI_LONG_DOUBLE, MPI_SUM, comm[1]);
+    for(int i = 0; i < n; ++i) {
+      NPResidualOffDiagonal * const state = context->state + i;
+      const size_t offset = (size_t)width*(size_t)i;
+      const int shift = adaptive ? 0 : 1;
+      state->scale = adaptive ? scale[i] : packed[offset];
+      state->sum = packed[offset + (size_t)shift];
+      state->sumsq = packed[offset + (size_t)shift + 1U];
+      state->numerator = packed[offset + (size_t)shift + 2U];
+      state->invalid = packed[offset + (size_t)shift + 3U] != 0.0L;
+    }
+    if(!isfinite(packed[count - 1]) || packed[count - 1] > INT_MAX ||
+       packed[count - 1] < 0.0L)
+      return 0;
+    context->visited_rows = (int)packed[count - 1];
+  }
+#else
+  (void)bandwidth_mode;
+  (void)suppress_parallel;
+#endif
+  return context->visited_rows == context->num_rows;
+}
 
 typedef int (*NP_KernelRowTileConsumerFn)(
   void *state,
@@ -9856,9 +10126,11 @@ typedef struct {
   int compute_gradient;
   int positive_weights;
   NPRegressionStandardErrorMode standard_error_mode;
+  int ordinary_response;
   NPContinuousKernelRowStatus *status;
   NPContinuousKernelProgressFunction progress;
   NPRegressionLPEmptyRows *empty_rows; /* conditional one-row external owner only */
+  const NPRegressionHC0Context *hc0_context;
 } NPBetaRegressionMomentCtx;
 
 static void np_beta_categorical_factor_context_init_empty(
@@ -10121,6 +10393,7 @@ np_beta_regression_moment_rows_dispatch(
   const double hc0_residual_scale,
   const int preserve_mean,
   const NPRegressionStandardErrorMode standard_error_mode,
+  const NPRegressionHC0Context *hc0_context,
   NPContinuousKernelRowWorkspace *workspace,
   NPContinuousKernelRowResult *row_result,
   double *mean,
@@ -10138,7 +10411,7 @@ np_beta_regression_moment_rows_dispatch(
   return np_continuous_kernel_beta_regression_moment_rows_validated(
     plan, leave_one_out, leave_one_out_offset, provider,
     response, positive_weights,
-    hc0_scaled_residual, hc0_residual_scale, preserve_mean,
+    hc0_scaled_residual, hc0_residual_scale, preserve_mean, hc0_context,
     workspace, row_result,
     mean, mean_stderr, diagnostics, progress);
 }
@@ -10255,6 +10528,8 @@ np_beta_regression_categorical_gradients_validated(
   int positive_weights,
   int preserve_gradient,
   NPRegressionStandardErrorMode standard_error_mode,
+  int ordinary_response,
+  const NPRegressionHC0Context *hc0_context,
   NPContinuousKernelRowWorkspace *workspace,
   NPContinuousKernelRowResult *row_result,
   const double *mean,
@@ -10295,6 +10570,8 @@ np_beta_regression_categorical_gradients_validated(
      (nunordered + nordered) <= 0 ||
      context == NULL || response == NULL || workspace == NULL ||
      row_result == NULL || mean == NULL || gradient == NULL ||
+     (ordinary_response != 0 && ordinary_response != 1) ||
+     (ordinary_response && do_gerr && !ordinary_hc0) ||
      (paired_influence && plan->num_eval != 1) ||
      (preserve_gradient != 0 && preserve_gradient != 1) ||
      (ordinary_hc0 &&
@@ -10370,20 +10647,23 @@ np_beta_regression_categorical_gradients_validated(
     context->dense_spec.eval_unordered = alternate_unordered;
     if(context->use_compressed)
       context->compressed_spec.eval_unordered = alternate_unordered;
-    status = np_beta_regression_moment_rows_dispatch(
-      plan, leave_one_out, leave_one_out_offset, &provider,
-      response, positive_weights, NULL, 0.0, 0, standard_error_mode,
-      workspace, row_result,
-      alternate_mean, (do_gerr && !ordinary_hc0) ? alternate_stderr : NULL,
-      diagnostics, NULL);
-    if(status == NP_CONTINUOUS_ROW_OK && do_gerr && ordinary_hc0)
+    if(ordinary_response) {
       status =
         np_continuous_kernel_beta_regression_paired_hc0_rows_validated(
           plan, leave_one_out, leave_one_out_offset,
-          &level_provider, &provider, hc0_scaled_residual,
-          hc0_residual_scale, workspace, row_result,
+          &level_provider, &provider, response, hc0_scaled_residual,
+          hc0_residual_scale, hc0_context, output_coordinate,
+          eval_unordered[coordinate], alternate_value, workspace, row_result,
           level_coefficient, (size_t)plan->num_train,
-          gradient_stderr[output_coordinate], diagnostics);
+          preserve_gradient ? NULL : gradient[output_coordinate],
+          do_gerr ? gradient_stderr[output_coordinate] : NULL, diagnostics);
+    } else {
+      status = np_beta_regression_moment_rows_dispatch(
+        plan, leave_one_out, leave_one_out_offset, &provider,
+        response, positive_weights, NULL, 0.0, 0, standard_error_mode,
+        NULL, workspace, row_result,
+        alternate_mean, do_gerr ? alternate_stderr : NULL, diagnostics, NULL);
+    }
     if(status == NP_CONTINUOUS_ROW_OK && paired_influence)
       status = np_beta_conditional_categorical_influence_row(
         workspace, row_result, response, plan->num_train,
@@ -10407,7 +10687,7 @@ np_beta_regression_categorical_gradients_validated(
     if(status != NP_CONTINUOUS_ROW_OK)
       goto cleanup;
     for(evaluation = 0; evaluation < plan->num_eval; ++evaluation) {
-      if(!preserve_gradient)
+      if(!preserve_gradient && !ordinary_response)
         gradient[output_coordinate][evaluation] =
           mean[evaluation] - alternate_mean[evaluation];
       if(do_gerr && !ordinary_hc0 && !paired_influence)
@@ -10460,20 +10740,23 @@ np_beta_regression_categorical_gradients_validated(
     context->dense_spec.eval_ordered = alternate_ordered;
     if(context->use_compressed)
       context->compressed_spec.eval_ordered = alternate_ordered;
-    status = np_beta_regression_moment_rows_dispatch(
-      plan, leave_one_out, leave_one_out_offset, &provider,
-      response, positive_weights, NULL, 0.0, 0, standard_error_mode,
-      workspace, row_result,
-      alternate_mean, (do_gerr && !ordinary_hc0) ? alternate_stderr : NULL,
-      diagnostics, NULL);
-    if(status == NP_CONTINUOUS_ROW_OK && do_gerr && ordinary_hc0)
+    if(ordinary_response) {
       status =
         np_continuous_kernel_beta_regression_paired_hc0_rows_validated(
           plan, leave_one_out, leave_one_out_offset,
-          &level_provider, &provider, hc0_scaled_residual,
-          hc0_residual_scale, workspace, row_result,
+          &level_provider, &provider, response, hc0_scaled_residual,
+          hc0_residual_scale, hc0_context, output_coordinate,
+          eval_ordered[coordinate], alternate_value, workspace, row_result,
           level_coefficient, (size_t)plan->num_train,
-          gradient_stderr[output_coordinate], diagnostics);
+          preserve_gradient ? NULL : gradient[output_coordinate],
+          do_gerr ? gradient_stderr[output_coordinate] : NULL, diagnostics);
+    } else {
+      status = np_beta_regression_moment_rows_dispatch(
+        plan, leave_one_out, leave_one_out_offset, &provider,
+        response, positive_weights, NULL, 0.0, 0, standard_error_mode,
+        NULL, workspace, row_result,
+        alternate_mean, do_gerr ? alternate_stderr : NULL, diagnostics, NULL);
+    }
     if(status == NP_CONTINUOUS_ROW_OK && paired_influence)
       status = np_beta_conditional_categorical_influence_row(
         workspace, row_result, response, plan->num_train,
@@ -10500,7 +10783,8 @@ np_beta_regression_categorical_gradients_validated(
       if(!preserve_gradient)
         gradient[output_coordinate][evaluation] =
           (double)direction[evaluation] *
-          (mean[evaluation] - alternate_mean[evaluation]);
+          (ordinary_response ? gradient[output_coordinate][evaluation] :
+           mean[evaluation] - alternate_mean[evaluation]);
       if(do_gerr && !ordinary_hc0 && !paired_influence)
         gradient_stderr[output_coordinate][evaluation] = sqrt(
           mean_stderr[evaluation] * mean_stderr[evaluation] +
@@ -10521,6 +10805,7 @@ np_beta_regression_gradient_rows_validated(
   double hc0_residual_scale,
   int preserve_gradient,
   NPRegressionStandardErrorMode standard_error_mode,
+  const NPRegressionHC0Context *hc0_context,
   NPContinuousKernelLevelDerivativeWorkspace *workspace,
   double **gradient,
   double **gradient_stderr,
@@ -10578,7 +10863,8 @@ np_beta_regression_gradient_rows_validated(
     if(observation > 0 && response[observation] != response[0])
       response_is_constant = 0;
   }
-  if(response_is_constant) {
+  if(response_is_constant &&
+     !(ordinary_hc0 && hc0_context != NULL && hc0_context->unknown_count > 0)) {
     for(derivative_coordinate = 0;
         derivative_coordinate < plan->num_continuous;
         ++derivative_coordinate)
@@ -10627,6 +10913,7 @@ np_beta_regression_gradient_rows_validated(
       int constant_active = 1;
       int have_active = 0;
       double first_response = 0.0;
+      int derivative_support_count = 0;
 
       status = np_continuous_kernel_beta_level_derivative_log_row_validated(
         plan, evaluation, -1, derivative_coordinate, provider,
@@ -10645,6 +10932,10 @@ np_beta_regression_gradient_rows_validated(
       }
 
       for(observation = 0; observation < plan->num_train; ++observation) {
+        if(workspace->level_sign[observation] != 0 ||
+           workspace->regular_sign[observation] != 0 ||
+           workspace->jump_sign[observation] != 0)
+          ++derivative_support_count;
         const double y = response[observation];
         const double w = workspace->level_sign[observation] == 0 ? 0.0 :
           (double)workspace->level_sign[observation] * exp(
@@ -10718,6 +11009,19 @@ np_beta_regression_gradient_rows_validated(
             gradient[derivative_coordinate][evaluation] = 0.0;
           if(do_gerr)
             gradient_stderr[derivative_coordinate][evaluation] = 0.0;
+          /* A realized constant response does not identify missing donor
+           * variance. Preserve the point result, but retain the dependency
+           * mask unless the whole direction is the same singleton map. */
+          if(ordinary_hc0 && hc0_context != NULL &&
+             hc0_context->unknown_count > 0 && derivative_support_count != 1 &&
+             hc0_context->gradient_unavailable[derivative_coordinate] != NULL)
+            for(observation = 0; observation < plan->num_train; ++observation)
+              if(hc0_context->residual_information[observation] ==
+                   NP_RESIDUAL_UNIDENTIFIED &&
+                 (workspace->level_sign[observation] != 0 ||
+                  workspace->regular_sign[observation] != 0 ||
+                  workspace->jump_sign[observation] != 0))
+                hc0_context->gradient_unavailable[derivative_coordinate][evaluation] = 1;
         } else if(fabs(jump_in_ratio) <= tolerance) {
           if(!preserve_gradient)
             gradient[derivative_coordinate][evaluation] = NA_REAL;
@@ -10768,6 +11072,17 @@ np_beta_regression_gradient_rows_validated(
             d - side_w * (regular_total / side_weight);
           const double residual = hc0_scaled_residual[observation];
 
+          if(hc0_context != NULL && hc0_context->unknown_count > 0 &&
+             hc0_context->residual_information[observation] ==
+               NP_RESIDUAL_UNIDENTIFIED) {
+            const int no_support = workspace->level_sign[observation] == 0 &&
+              workspace->regular_sign[observation] == 0 &&
+              workspace->jump_sign[observation] == 0;
+            if(!no_support && derivative_support_count != 1 &&
+               hc0_context->gradient_unavailable[derivative_coordinate] != NULL)
+              hc0_context->gradient_unavailable[derivative_coordinate][evaluation] = 1;
+          }
+
           quadratic += (long double)influence * (long double)influence *
             (long double)residual * (long double)residual;
         }
@@ -10777,6 +11092,12 @@ np_beta_regression_gradient_rows_validated(
         }
         gradient_stderr[derivative_coordinate][evaluation] =
           hc0_residual_scale * sqrt((double)quadratic) / fabs(side_weight);
+        if(hc0_context != NULL && hc0_context->unknown_count > 0 &&
+           derivative_support_count == 1) {
+          gradient_stderr[derivative_coordinate][evaluation] = 0.0;
+          if(hc0_context->gradient_structural_zero[derivative_coordinate] != NULL)
+            hc0_context->gradient_structural_zero[derivative_coordinate][evaluation] = 1;
+        }
       } else if(standard_error_mode ==
          NP_REGRESSION_STDERR_CONDITIONAL_INFLUENCE) {
         if(plan->num_train <= 1) {
@@ -11293,6 +11614,7 @@ static int np_beta_absolute_route_body(
         regression_moment_context->hc0_residual_scale,
         regression_moment_context->preserve_mean,
         regression_moment_context->standard_error_mode,
+        regression_moment_context->hc0_context,
         workspace, &row_result,
         regression_moment_context->mean,
         regression_moment_context->mean_stderr,
@@ -11331,6 +11653,7 @@ static int np_beta_absolute_route_body(
         regression_moment_context->hc0_residual_scale,
         regression_moment_context->preserve_mean,
         regression_moment_context->standard_error_mode,
+        regression_moment_context->hc0_context,
         regression_gradient_workspace,
         regression_moment_context->gradient,
         regression_moment_context->gradient_stderr,
@@ -11353,6 +11676,8 @@ static int np_beta_absolute_route_body(
             regression_moment_context->positive_weights,
             regression_moment_context->preserve_mean,
             regression_moment_context->standard_error_mode,
+            regression_moment_context->ordinary_response,
+            regression_moment_context->hc0_context,
             workspace, &row_result,
             regression_moment_context->mean,
             regression_moment_context->mean_stderr,
@@ -11940,6 +12265,582 @@ static int np_regression_hc0_power2_outer_sum(
           output[a*ncol_B + b] += za * matrix_B[b][observation] *
             scaled_weight_square;
       }
+    }
+  }
+  return 1;
+}
+
+static int np_regression_scalar_level_information(
+  const NPRegressionHC0Context *context, const int adaptive,
+  const int evaluation_or_donor, const int num_weights,
+  const double *weights, const XL *support)
+{
+  const int ranges = support == NULL ? 1 : support->n;
+  for(int range = 0; range < ranges; ++range) {
+    const int start = support == NULL ? 0 : support->istart[range];
+    const int end = support == NULL ? num_weights : start + support->nlev[range];
+    if(start < 0 || end < start || end > num_weights) return 0;
+    for(int index = start; index < end; ++index) {
+      const int donor = adaptive ? evaluation_or_donor : index;
+      const int evaluation = adaptive ? index : evaluation_or_donor;
+      if(context->residual_information[donor] == NP_RESIDUAL_INVALID ||
+         !R_FINITE(weights[index])) return 0;
+      if(context->residual_information[donor] == NP_RESIDUAL_UNIDENTIFIED &&
+         weights[index] != 0.0 && context->mean_unavailable != NULL)
+        context->mean_unavailable[evaluation] = 1;
+    }
+  }
+  return 1;
+}
+
+/* Fixed/GNN paired rows provide their complete dependency and structural
+ * zero certificates at the incumbent row owner. This does not alter point
+ * gradients. In particular two singleton rows with the same donor both
+ * represent that response exactly, whatever their rounded means contain. */
+static int np_regression_scalar_direction_information(
+  const NPRegressionHC0DerivativeMomentCtx *context,
+  const int evaluation, const int num_weights,
+  const double *level_weight, const double *derivative_weight,
+  const double level_bandwidth_divisor,
+  const double *derivative_bandwidth_divisor,
+  const double *weighted_sum, const double *weighted_permutation_sum,
+  const XL *support)
+{
+  const NPRegressionHC0Context * const uncertainty = context->uncertainty_context;
+  const int ranges = support == NULL ? 1 : support->n;
+  for(int kind = 0; kind < 2; ++kind) {
+    const NPRegressionGradientRange selected = kind == 0 ?
+      context->continuous_range : context->categorical_range;
+    for(int coordinate = selected.begin; coordinate < selected.end; ++coordinate) {
+      int level_count = 0, alternate_count = 0, level_donor = -1, alternate_donor = -1;
+      int identical = 1, unavailable = 0;
+      const size_t row_offset = (size_t)coordinate*(size_t)num_weights;
+      const size_t output_offset = (size_t)coordinate*(size_t)context->num_eval*
+        (size_t)context->response_column_count;
+      const double derivative_denominator = weighted_permutation_sum[
+        output_offset + (size_t)context->denominator_column];
+      const double level_denominator = weighted_sum[context->denominator_column];
+      const int normalizers_valid = R_FINITE(level_denominator) &&
+        level_denominator != 0.0 && R_FINITE(derivative_denominator) &&
+        (kind == 0 || derivative_denominator != 0.0);
+      for(int range = 0; range < ranges; ++range) {
+        const int start = support == NULL ? 0 : support->istart[range];
+        const int end = support == NULL ? num_weights : start + support->nlev[range];
+        if(start < 0 || end < start || end > num_weights) return 0;
+        for(int donor = start; donor < end; ++donor) {
+          const double level = level_weight[donor];
+          const double alternate = derivative_weight[row_offset + (size_t)donor];
+          if(!R_FINITE(level) || !R_FINITE(alternate) ||
+             uncertainty->residual_information[donor] == NP_RESIDUAL_INVALID)
+            return 0;
+          if(level != 0.0) { ++level_count; level_donor = donor; }
+          if(alternate != 0.0) { ++alternate_count; alternate_donor = donor; }
+          identical &= level == alternate;
+          if(uncertainty->residual_information[donor] == NP_RESIDUAL_UNIDENTIFIED) {
+            const double normalized_level = level/level_bandwidth_divisor;
+            const double normalized_alternate =
+              alternate/derivative_bandwidth_divisor[coordinate];
+            const int preserved_nonzero =
+              (level == 0.0 || normalized_level != 0.0) &&
+              (alternate == 0.0 || normalized_alternate != 0.0);
+            const int certified_zero = preserved_nonzero &&
+              np_residual_products_equal(normalized_alternate, level_denominator,
+                                         normalized_level, derivative_denominator);
+            if(!certified_zero) unavailable = 1;
+          }
+        }
+      }
+      const int structural_zero = normalizers_valid && (kind == 0 ?
+        alternate_count == 0 && derivative_denominator == 0.0 :
+        level_count > 0 && alternate_count > 0 &&
+        (identical || (level_count == 1 && alternate_count == 1 &&
+                       level_donor == alternate_donor)));
+      if(structural_zero) {
+        unavailable = 0;
+        if(uncertainty->gradient_structural_zero != NULL)
+          uncertainty->gradient_structural_zero[coordinate][evaluation] = 1;
+      }
+      if(uncertainty->gradient_unavailable != NULL)
+        uncertainty->gradient_unavailable[coordinate][evaluation] = unavailable;
+    }
+  }
+  return 1;
+}
+
+/* Cold ANN replay: completed normalizers are retained separately while the
+ * identical donor-major owner reconstructs its rows. Five bounded summary
+ * planes certify a COMPLETE paired direction after one coarse reduction;
+ * no rank-local singleton is published as a global certificate. */
+static int np_regression_scalar_ann_information_row(
+  NPRegressionScalarANNInformation *replay, const int donor,
+  const int num_weights, const double *level_weight,
+  const double *alternate_weight, const double level_divisor,
+  const double *alternate_divisor, const XL *support)
+{
+  const NPRegressionHC0DerivativeMomentCtx * const derivative = replay->derivative;
+  const NPRegressionHC0Context * const uncertainty = derivative->uncertainty_context;
+  const int ranges = support == NULL ? 1 : support->n;
+  for(int kind = 0; kind < 2; ++kind) {
+    const NPRegressionGradientRange selected = kind == 0 ?
+      derivative->continuous_range : derivative->categorical_range;
+    for(int coordinate = selected.begin; coordinate < selected.end; ++coordinate) {
+      for(int range = 0; range < ranges; ++range) {
+        const int start = support == NULL ? 0 : support->istart[range];
+        const int end = support == NULL ? num_weights : start + support->nlev[range];
+        if(start < 0 || end < start || end > num_weights) return 0;
+        for(int evaluation = start; evaluation < end; ++evaluation) {
+          const size_t cell = (size_t)coordinate*(size_t)derivative->num_eval +
+            (size_t)evaluation;
+          long double * const certificate = replay->certificate + 5U*cell;
+          const double level = level_weight[evaluation];
+          const double alternate = alternate_weight[
+            (size_t)coordinate*(size_t)num_weights + (size_t)evaluation];
+          if(!R_FINITE(level) || !R_FINITE(alternate) ||
+             uncertainty->residual_information[donor] == NP_RESIDUAL_INVALID)
+            return 0;
+          if(level != 0.0) {
+            certificate[0] = fminl(certificate[0]+1.0L,2.0L);
+            certificate[2] = certificate[0] == 1.0L ? (long double)donor+1.0L : 0.0L;
+          }
+          if(alternate != 0.0) {
+            certificate[1] = fminl(certificate[1]+1.0L,2.0L);
+            certificate[3] = certificate[1] == 1.0L ? (long double)donor+1.0L : 0.0L;
+          }
+          if(level != alternate || level_divisor != alternate_divisor[coordinate])
+            certificate[4] = 1.0L;
+          if(uncertainty->residual_information[donor] == NP_RESIDUAL_UNIDENTIFIED) {
+            const double normalized_level = level/level_divisor;
+            const double normalized_alternate = alternate/alternate_divisor[coordinate];
+            const int preserved_nonzero =
+              (level == 0.0 || normalized_level != 0.0) &&
+              (alternate == 0.0 || normalized_alternate != 0.0);
+            const int certified_zero = preserved_nonzero &&
+              np_residual_products_equal(
+                normalized_alternate, replay->level_denominator[evaluation],
+                normalized_level, replay->alternate_denominator[cell]);
+            if(!certified_zero)
+              uncertainty->gradient_unavailable[coordinate][evaluation] = 1;
+          }
+        }
+      }
+    }
+  }
+  return 1;
+}
+
+static int np_regression_scalar_ann_information_finish(
+  NPRegressionScalarANNInformation *replay, const int suppress_parallel)
+{
+  const NPRegressionHC0DerivativeMomentCtx * const derivative = replay->derivative;
+  const NPRegressionHC0Context * const uncertainty = derivative->uncertainty_context;
+  const size_t count = 5U*(size_t)derivative->num_predictors*(size_t)derivative->num_eval;
+  if(count > (size_t)INT_MAX) return 0;
+#ifdef MPI2
+  if(!suppress_parallel)
+    MPI_Allreduce(MPI_IN_PLACE,replay->certificate,(int)count,
+                  MPI_LONG_DOUBLE,MPI_SUM,comm[1]);
+#else
+  (void)suppress_parallel;
+#endif
+  for(int kind = 0; kind < 2; ++kind) {
+    const NPRegressionGradientRange selected = kind == 0 ?
+      derivative->continuous_range : derivative->categorical_range;
+    for(int coordinate = selected.begin; coordinate < selected.end; ++coordinate) {
+      for(int evaluation = 0; evaluation < derivative->num_eval; ++evaluation) {
+        const size_t cell = (size_t)coordinate*(size_t)derivative->num_eval +
+          (size_t)evaluation;
+        const long double * const certificate = replay->certificate+5U*cell;
+        const int normalizers_valid = R_FINITE(replay->level_denominator[evaluation]) &&
+          replay->level_denominator[evaluation] != 0.0 &&
+          R_FINITE(replay->alternate_denominator[cell]) &&
+          (kind == 0 || replay->alternate_denominator[cell] != 0.0);
+        const int structural_zero = normalizers_valid && (kind == 0 ?
+          certificate[1] == 0.0L && replay->alternate_denominator[cell] == 0.0 :
+          certificate[0] > 0.0L && certificate[1] > 0.0L &&
+          (certificate[4] == 0.0L ||
+           (certificate[0] == 1.0L && certificate[1] == 1.0L &&
+            certificate[2] == certificate[3])));
+        if(structural_zero) {
+          uncertainty->gradient_unavailable[coordinate][evaluation] = 0;
+          if(uncertainty->gradient_structural_zero != NULL)
+            uncertainty->gradient_structural_zero[coordinate][evaluation] = 1;
+        }
+      }
+    }
+  }
+  return 1;
+}
+
+/* ANN remains donor-owned. The first incumbent traversal collects exact
+ * normalizer provenance (only when needed), compensated totals and dominant
+ * endpoint candidates. One replay uses the completed GLOBAL anchor and
+ * normalizers. No full pairwise row matrix or per-row collective is used. */
+static int np_regression_scalar_ann_contrast_allocate(
+  NPRegressionScalarContrastContext *context,
+  NPRegressionScalarANNContrast *state)
+{
+  size_t cells;
+  if(!np_size_mul_checked((size_t)context->num_eval,
+      (size_t)(context->categorical_range.end-context->categorical_range.begin),&cells) ||
+     cells==0 || cells>(size_t)INT_MAX/(2U*(8U+66U))) return 0;
+  state->cells=(int)cells;
+  state->total=(NPContrastNumber *)R_alloc(2U*cells,sizeof(NPContrastNumber));
+  state->ratio=(NPContrastRatio *)R_alloc(cells,sizeof(NPContrastRatio));
+  state->maximum=(NPRegressionContrastMaximum *)R_alloc(2U*cells,sizeof(NPRegressionContrastMaximum));
+  state->count=(int *)R_alloc(2U*cells,sizeof(int));
+  state->mismatch=(int *)R_alloc(cells,sizeof(int));
+  state->anchor=(int *)R_alloc(cells,sizeof(int));
+  state->structural=(int *)R_alloc(cells,sizeof(int));
+  const size_t sum_bytes=cells*sizeof(NPRegressionContrastAccumulator);
+  state->sum=(NPRegressionContrastAccumulator *)R_allocLD(
+    (sum_bytes+sizeof(long double)-1U)/sizeof(long double));
+  memset(state->sum,0,sum_bytes);
+  memset(state->total,0,2U*cells*sizeof(NPContrastNumber));
+  memset(state->maximum,0,2U*cells*sizeof(NPRegressionContrastMaximum));
+  memset(state->count,0,2U*cells*sizeof(int));
+  memset(state->mismatch,0,cells*sizeof(int));
+  for(size_t k=0;k<2U*cells;++k) state->maximum[k].donor=-1;
+  if(context->want_variance && context->uncertainty->unknown_count>0) {
+    state->exact=(NPContrastExactSum *)R_alloc(2U*cells,sizeof(NPContrastExactSum));
+    memset(state->exact,0,2U*cells*sizeof(NPContrastExactSum));
+  }
+  context->adaptive=state;
+  return 1;
+}
+
+static int np_regression_scalar_ann_contrast_row(
+  const NPRegressionScalarContrastContext *context,const int donor,
+  const int num_weights,const double *left,const double *right,
+  const double divisor,const double *alternate_divisor,const XL *support)
+{
+  NPRegressionScalarANNContrast *state=context->adaptive;
+  if(!R_FINITE(divisor) || divisor==0.0) return 0;
+  const int ranges=support==NULL ? 1 : support->n;
+  for(int coordinate=context->categorical_range.begin;
+      coordinate<context->categorical_range.end;++coordinate) {
+    if(!R_FINITE(alternate_divisor[coordinate]) || alternate_divisor[coordinate]==0.0)
+      return 0;
+    for(int range=0;range<ranges;++range) {
+      const int start=support==NULL ? 0 : support->istart[range];
+      const int end=support==NULL ? num_weights : start+support->nlev[range];
+      if(start<0 || end<start || end>context->num_eval) return 0;
+      for(int evaluation=start;evaluation<end;++evaluation) {
+        const int cell=(coordinate-context->categorical_range.begin)*context->num_eval+evaluation;
+        const double l=left[evaluation]/divisor;
+        const double r=right[(size_t)coordinate*(size_t)num_weights+(size_t)evaluation]/
+          alternate_divisor[coordinate];
+        if(!R_FINITE(l) || !R_FINITE(r)) return 0;
+        if(state->stage==0) {
+          state->mismatch[cell] |= l!=r;
+          for(int side=0;side<2;++side) {
+            const int index=2*cell+side;
+            const double weight=side==0 ? l : r;
+            state->total[index]=np_contrast_add(state->total[index],np_contrast_number(weight));
+            if(state->exact!=NULL) np_contrast_exact_add(state->exact+index,weight);
+            if(weight!=0.0) ++state->count[index];
+            NPRegressionContrastMaximum *maximum=state->maximum+index;
+            if(maximum->donor<0 || fabs(weight)>maximum->magnitude ||
+               (fabs(weight)==maximum->magnitude && donor<maximum->donor)) {
+              maximum->magnitude=fabs(weight);maximum->donor=donor;
+              maximum->left=l;maximum->right=r;
+            }
+          }
+        } else if(state->anchor[cell]>=0 && donor!=state->anchor[cell]) {
+          const int certified_zero=state->structural[cell] || (l==0.0 && r==0.0) ||
+            (state->exact!=NULL &&
+             context->uncertainty->residual_information[donor]==NP_RESIDUAL_UNIDENTIFIED &&
+             np_contrast_exact_products_equal(l,state->exact+2*cell+1,
+                                               r,state->exact+2*cell));
+          const NPContrastNumber coefficient=certified_zero ? np_contrast_number(0.0) :
+            np_contrast_ratio_apply(state->ratio+cell,l,r);
+          np_regression_contrast_add(state->sum+cell,coefficient,context->response[donor],
+            certified_zero,context->want_variance ?
+              (NPResidualInformation)context->uncertainty->residual_information[donor] :
+              NP_RESIDUAL_IDENTIFIED,
+            context->want_variance ? context->uncertainty->scaled_residual[donor] : 0.0);
+        }
+      }
+    }
+  }
+  return 1;
+}
+
+static int np_regression_scalar_ann_contrast_finish(
+  const NPRegressionScalarContrastContext *context,const int suppress_parallel)
+{
+  NPRegressionScalarANNContrast *state=context->adaptive;
+#ifdef MPI2
+  if(!suppress_parallel) {
+    int ranks,rank;
+    MPI_Comm_size(comm[1],&ranks);MPI_Comm_rank(comm[1],&rank);
+    if(state->stage==0) {
+      /* Fold coarse rank summaries with compensated addition. MPI_SUM on
+       * just the high components would discard the normalizer correction. */
+      const int width=state->exact==NULL ? 8 : 74;
+      const int count=2*state->cells*width;
+      double *local=(double *)R_alloc((size_t)count,sizeof(double));
+      double *incoming=(double *)R_alloc((size_t)count,sizeof(double));
+      memset(local,0,(size_t)count*sizeof(double));
+      for(int k=0;k<2*state->cells;++k) {
+        double *v=local+(size_t)k*(size_t)width;
+        v[0]=state->total[k].hi;v[1]=state->total[k].lo;v[2]=state->count[k];
+        v[3]=state->maximum[k].magnitude;v[4]=state->maximum[k].donor;
+        v[5]=state->maximum[k].left;v[6]=state->maximum[k].right;
+        v[7]=state->mismatch[k/2];
+        if(state->exact!=NULL) {
+          v[8]=state->exact[k].size;v[9]=state->exact[k].invalid;
+          for(int z=0;z<state->exact[k].size;++z) v[10+z]=state->exact[k].component[z];
+        }
+      }
+      memset(state->total,0,2U*(size_t)state->cells*sizeof(NPContrastNumber));
+      memset(state->count,0,2U*(size_t)state->cells*sizeof(int));
+      memset(state->mismatch,0,(size_t)state->cells*sizeof(int));
+      if(state->exact!=NULL) memset(state->exact,0,2U*(size_t)state->cells*sizeof(NPContrastExactSum));
+      for(int k=0;k<2*state->cells;++k) state->maximum[k].donor=-1;
+      for(int source=0;source<ranks;++source) {
+        if(source==rank) memcpy(incoming,local,(size_t)count*sizeof(double));
+        MPI_Bcast(incoming,count,MPI_DOUBLE,source,comm[1]);
+        for(int k=0;k<2*state->cells;++k) {
+          const double *v=incoming+(size_t)k*(size_t)width;
+          const NPContrastNumber total={v[0],v[1]};
+          state->total[k]=np_contrast_add(state->total[k],total);
+          state->count[k]+=(int)v[2];state->mismatch[k/2]|=(int)v[7];
+          NPRegressionContrastMaximum *maximum=state->maximum+k;
+          if((int)v[4]>=0 && (maximum->donor<0 || v[3]>maximum->magnitude ||
+             (v[3]==maximum->magnitude && (int)v[4]<maximum->donor))) {
+            maximum->magnitude=v[3];maximum->donor=(int)v[4];
+            maximum->left=v[5];maximum->right=v[6];
+          }
+          if(state->exact!=NULL) {
+            state->exact[k].invalid|=(int)v[9];
+            for(int z=0;z<(int)v[8];++z) np_contrast_exact_add(state->exact+k,v[10+z]);
+          }
+        }
+      }
+    } else {
+      const int width=9,count=state->cells*width;
+      long double *local=R_allocLD((size_t)count),*incoming=R_allocLD((size_t)count);
+      for(int k=0;k<state->cells;++k) {
+        NPRegressionContrastAccumulator *sum=state->sum+k;
+        long double *v=local+(size_t)k*(size_t)width;
+        v[0]=sum->off_sum.hi;v[1]=sum->off_sum.lo;
+        v[2]=sum->centered_response.hi;v[3]=sum->centered_response.lo;
+        v[4]=sum->variance.scale;v[5]=sum->variance.sumsq;
+        v[6]=sum->variance.unavailable;
+        v[7]=sum->invalid || sum->variance.invalid;
+        v[8]=sum->all_off_certified_zero;
+        *sum=np_regression_contrast_begin(sum->anchor_response,context->want_variance);
+      }
+      for(int source=0;source<ranks;++source) {
+        if(source==rank) memcpy(incoming,local,(size_t)count*sizeof(long double));
+        MPI_Bcast(incoming,count,MPI_LONG_DOUBLE,source,comm[1]);
+        for(int k=0;k<state->cells;++k) {
+          NPRegressionContrastAccumulator *sum=state->sum+k;
+          const long double *v=incoming+(size_t)k*(size_t)width;
+          const NPContrastNumber off={(double)v[0],(double)v[1]},response={(double)v[2],(double)v[3]};
+          sum->off_sum=np_contrast_add(sum->off_sum,off);
+          sum->centered_response=np_contrast_add(sum->centered_response,response);
+          if(v[4]>sum->variance.scale) {
+            const long double ratio=sum->variance.scale/v[4];
+            sum->variance.sumsq*=ratio*ratio;sum->variance.scale=v[4];
+          }
+          if(sum->variance.scale>0.0L) {
+            const long double ratio=v[4]/sum->variance.scale;
+            sum->variance.sumsq+=v[5]*ratio*ratio;
+          }
+          sum->variance.unavailable|=(int)v[6];sum->invalid|=(int)v[7];
+          sum->all_off_certified_zero&=(int)v[8];
+        }
+      }
+    }
+  }
+#else
+  (void)suppress_parallel;
+#endif
+  int valid=1;
+  for(int cell=0;cell<state->cells;++cell) {
+    if(state->stage==0) {
+      const NPContrastNumber l=state->total[2*cell],r=state->total[2*cell+1];
+      state->anchor[cell]=-1;
+      if(!np_contrast_finite(l) || !np_contrast_finite(r)) {valid=0;continue;}
+      if(l.hi==0.0 || r.hi==0.0) continue;
+      state->ratio[cell]=np_contrast_ratio_prepare(l,r);
+      const NPRegressionContrastMaximum *a=state->maximum+2*cell;
+      const NPRegressionContrastMaximum *b=a+1;
+      const double left_score=a->magnitude/fabs(l.hi),right_score=b->magnitude/fabs(r.hi);
+      const int side=right_score>left_score ||
+        (right_score==left_score && b->donor<a->donor);
+      state->anchor[cell]=state->maximum[2*cell+side].donor;
+      if(state->anchor[cell]<0) {valid=0;continue;}
+      state->structural[cell]=!state->mismatch[cell] ||
+        (state->count[2*cell]==1 && state->count[2*cell+1]==1 && a->donor==b->donor);
+      state->sum[cell]=np_regression_contrast_begin(
+        context->response[state->anchor[cell]],context->want_variance);
+    } else {
+      const int coordinate=context->categorical_range.begin+cell/context->num_eval;
+      const int evaluation=cell%context->num_eval,anchor=state->anchor[cell];
+      if(anchor<0) {
+        context->gradient[coordinate][evaluation]=NA_REAL;
+        if(context->want_variance) context->gradient_stderr[coordinate][evaluation]=0.0;
+        continue;
+      }
+      const NPRegressionContrastMaximum *a=state->maximum+2*cell;
+      if(a->donor!=anchor) ++a;
+      const int anchor_zero=state->structural[cell] ||
+        (state->exact!=NULL &&
+         context->uncertainty->residual_information[anchor]==NP_RESIDUAL_UNIDENTIFIED &&
+         np_contrast_exact_products_equal(a->left,state->exact+2*cell+1,
+                                           a->right,state->exact+2*cell));
+      const NPRegressionContrastResult result=np_regression_contrast_finish(state->sum+cell,
+        context->want_variance ? (NPResidualInformation)context->uncertainty->residual_information[anchor] :
+          NP_RESIDUAL_IDENTIFIED,
+        context->want_variance ? context->uncertainty->scaled_residual[anchor] : 0.0,anchor_zero);
+      if(result.information==NP_RESIDUAL_INVALID) {valid=0;continue;}
+      context->gradient[coordinate][evaluation]=result.contrast;
+      if(context->want_variance) {
+        context->gradient_stderr[coordinate][evaluation]=
+          result.information==NP_RESIDUAL_UNIDENTIFIED ? 0.0 : result.standard_error;
+        if(context->uncertainty->gradient_unavailable!=NULL)
+          context->uncertainty->gradient_unavailable[coordinate][evaluation]=
+            result.information==NP_RESIDUAL_UNIDENTIFIED;
+        if(context->uncertainty->gradient_structural_zero!=NULL)
+          context->uncertainty->gradient_structural_zero[coordinate][evaluation]=result.structural_zero;
+      }
+    }
+  }
+  return valid;
+}
+
+/* Scalar fixed/GNN rows reproduce constants. Use the two resident endpoint
+ * rows for both the centered categorical effect and its complete influence
+ * covariance; never subtract their already rounded fitted responses. */
+static int np_regression_scalar_contrast_row(
+  const NPRegressionScalarContrastContext *context, const int evaluation,
+  const int num_weights, const double *left, const double *alternates,
+  const XL *support)
+{
+  const int ranges=support == NULL ? 1 : support->n;
+  NPContrastNumber left_sum=np_contrast_number(0.0);
+  const int need_certificates=context->want_variance &&
+    context->uncertainty->unknown_count>0;
+  NPContrastExactSum left_exact={0};
+  int left_count=0, left_donor=-1;
+  for(int range=0;range<ranges;++range) {
+    const int start=support == NULL ? 0 : support->istart[range];
+    const int end=support == NULL ? num_weights : start+support->nlev[range];
+    if(start<0 || end<start || end>num_weights) return 0;
+    for(int donor=start;donor<end;++donor) {
+      np_contrast_accumulate(&left_sum,np_contrast_number(left[donor]));
+      if(need_certificates) np_contrast_exact_add(&left_exact,left[donor]);
+      if(left[donor] != 0.0) { ++left_count; left_donor=donor; }
+    }
+  }
+  left_sum=np_contrast_two_sum(left_sum.hi,left_sum.lo);
+  if(!np_contrast_finite(left_sum)) return 0;
+  if(left_sum.hi == 0.0) {
+    for(int coordinate=context->categorical_range.begin;
+        coordinate<context->categorical_range.end;++coordinate) {
+      context->gradient[coordinate][evaluation]=NA_REAL;
+      if(context->want_variance) context->gradient_stderr[coordinate][evaluation]=0.0;
+    }
+    return 1;
+  }
+  for(int coordinate=context->categorical_range.begin;
+      coordinate<context->categorical_range.end;++coordinate) {
+    const double * const right=alternates+(size_t)coordinate*(size_t)num_weights;
+    NPContrastNumber right_sum=np_contrast_number(0.0);
+    NPContrastExactSum right_exact={0};
+    int right_count=0, right_donor=-1, identical=1;
+    for(int range=0;range<ranges;++range) {
+      const int start=support == NULL ? 0 : support->istart[range];
+      const int end=support == NULL ? num_weights : start+support->nlev[range];
+      for(int donor=start;donor<end;++donor) {
+        np_contrast_accumulate(&right_sum,np_contrast_number(right[donor]));
+        if(need_certificates) np_contrast_exact_add(&right_exact,right[donor]);
+        if(right[donor] != 0.0) { ++right_count; right_donor=donor; }
+        identical &= left[donor] == right[donor];
+      }
+    }
+    right_sum=np_contrast_two_sum(right_sum.hi,right_sum.lo);
+    if(!np_contrast_finite(right_sum)) return 0;
+    if(right_sum.hi == 0.0) {
+      context->gradient[coordinate][evaluation]=NA_REAL;
+      if(context->want_variance) context->gradient_stderr[coordinate][evaluation]=0.0;
+      continue;
+    }
+    const int structural_zero=identical ||
+      (left_count == 1 && right_count == 1 && left_donor == right_donor);
+    if(structural_zero) {
+      context->gradient[coordinate][evaluation]=0.0;
+      if(context->want_variance) {
+        context->gradient_stderr[coordinate][evaluation]=0.0;
+        if(context->uncertainty->gradient_unavailable!=NULL)
+          context->uncertainty->gradient_unavailable[coordinate][evaluation]=0;
+        if(context->uncertainty->gradient_structural_zero!=NULL)
+          context->uncertainty->gradient_structural_zero[coordinate][evaluation]=1;
+      }
+      continue;
+    }
+    int anchor=-1;
+    double anchor_score=-1.0;
+    const double inverse_left=1.0/left_sum.hi,inverse_right=1.0/right_sum.hi;
+    const int finite_inverses=isfinite(inverse_left) && isfinite(inverse_right);
+    for(int range=0;range<ranges;++range) {
+      const int start=support == NULL ? 0 : support->istart[range];
+      const int end=support == NULL ? num_weights : start+support->nlev[range];
+      for(int donor=start;donor<end;++donor) {
+        const double score=finite_inverses ?
+          fabs(left[donor]*inverse_left)+fabs(right[donor]*inverse_right) :
+          fabs(left[donor]/left_sum.hi)+fabs(right[donor]/right_sum.hi);
+        if(score>anchor_score) { anchor=donor; anchor_score=score; }
+      }
+    }
+    if(anchor<0 || !R_FINITE(anchor_score)) return 0;
+    const NPContrastRatio ratio=np_contrast_ratio_prepare(left_sum,right_sum);
+    NPRegressionContrastAccumulator sum=np_regression_contrast_begin(
+      context->response[anchor],context->want_variance);
+    for(int range=0;range<ranges;++range) {
+      const int start=support == NULL ? 0 : support->istart[range];
+      const int end=support == NULL ? num_weights : start+support->nlev[range];
+      for(int donor=start;donor<end;++donor) {
+        if(donor == anchor) continue;
+        const int certified_zero=structural_zero ||
+          (left[donor] == 0.0 && right[donor] == 0.0) ||
+          (need_certificates &&
+           context->uncertainty->residual_information[donor]==NP_RESIDUAL_UNIDENTIFIED &&
+           np_contrast_exact_products_equal(left[donor],&right_exact,
+                                             right[donor],&left_exact));
+        const NPContrastNumber coefficient=certified_zero ? np_contrast_number(0.0) :
+          np_contrast_ratio_apply(&ratio,left[donor],right[donor]);
+        np_regression_contrast_add(&sum,coefficient,context->response[donor],
+          certified_zero,
+          context->want_variance ?
+            (NPResidualInformation)context->uncertainty->residual_information[donor] :
+            NP_RESIDUAL_IDENTIFIED,
+          context->want_variance ? context->uncertainty->scaled_residual[donor] : 0.0);
+      }
+    }
+    NPRegressionContrastResult result=np_regression_contrast_finish(&sum,
+      context->want_variance ?
+        (NPResidualInformation)context->uncertainty->residual_information[anchor] :
+        NP_RESIDUAL_IDENTIFIED,
+      context->want_variance ? context->uncertainty->scaled_residual[anchor] : 0.0,
+      structural_zero ||
+      (need_certificates &&
+       context->uncertainty->residual_information[anchor]==NP_RESIDUAL_UNIDENTIFIED &&
+       np_contrast_exact_products_equal(left[anchor],&right_exact,
+                                         right[anchor],&left_exact)));
+    if(result.information == NP_RESIDUAL_INVALID) return 0;
+    context->gradient[coordinate][evaluation]=result.contrast;
+    if(context->want_variance) {
+      context->gradient_stderr[coordinate][evaluation]=
+        result.information == NP_RESIDUAL_UNIDENTIFIED ? 0.0 : result.standard_error;
+      if(context->uncertainty->gradient_unavailable != NULL)
+        context->uncertainty->gradient_unavailable[coordinate][evaluation]=
+          result.information == NP_RESIDUAL_UNIDENTIFIED;
+      if(context->uncertainty->gradient_structural_zero != NULL)
+        context->uncertainty->gradient_structural_zero[coordinate][evaluation]=
+          result.structural_zero;
     }
   }
   return 1;
@@ -12605,6 +13506,58 @@ NPPermutationWeightOutput * const pkw_output){
   const NPRegressionHC0DerivativeMomentCtx * const hc0_derivative_ctx =
     dual_power_ctx != NULL ? dual_power_ctx->regression_derivative : NULL;
   const int do_hc0_derivative = hc0_derivative_ctx != NULL;
+  NPRegressionResidualKernelContext * const residual_preparation =
+    dual_power_ctx != NULL ? dual_power_ctx->residual_preparation : NULL;
+  const NPRegressionHC0Context * const uncertainty_context =
+    dual_power_ctx != NULL ? dual_power_ctx->uncertainty_context : NULL;
+  NPRegressionScalarANNInformation * const ann_information =
+    dual_power_ctx != NULL ? dual_power_ctx->ann_information : NULL;
+  const NPRegressionScalarContrastContext * const scalar_contrast =
+    dual_power_ctx != NULL ? dual_power_ctx->scalar_contrast : NULL;
+  int information_invalid = 0;
+  if(scalar_contrast != NULL &&
+     (((BANDWIDTH_reg == BW_ADAP_NN) != (scalar_contrast->adaptive != NULL)) ||
+      permutation_operator != OP_DERIVATIVE ||
+      scalar_contrast->num_eval != num_obs_eval ||
+      scalar_contrast->num_eval_alloc < num_obs_eval ||
+      scalar_contrast->response == NULL || scalar_contrast->gradient == NULL ||
+      (scalar_contrast->want_variance &&
+       (scalar_contrast->uncertainty == NULL || scalar_contrast->gradient_stderr == NULL))))
+    return KWSNP_ERR_BADINVOC;
+  if(ann_information != NULL &&
+     (BANDWIDTH_reg != BW_ADAP_NN ||
+      permutation_operator != OP_DERIVATIVE ||
+      ann_information->derivative == NULL ||
+      ann_information->derivative->num_eval != num_obs_eval ||
+      ann_information->derivative->num_predictors != p_nvar ||
+      ann_information->derivative->uncertainty_context == NULL ||
+      ann_information->derivative->uncertainty_context->gradient_unavailable == NULL ||
+      ann_information->level_denominator == NULL ||
+      ann_information->alternate_denominator == NULL ||
+      ann_information->certificate == NULL || do_dual_power || do_hc0_derivative))
+    return KWSNP_ERR_BADINVOC;
+  if(residual_preparation != NULL) {
+    const int profile = residual_preparation->profile_eval_to_train != NULL;
+    if(residual_preparation->output == NULL ||
+       residual_preparation->state == NULL ||
+       residual_preparation->num_rows != num_obs_eval ||
+       leave_one_out || drop_one_train || gather_scatter || symmetric ||
+       do_score || (permutation_operator != OP_NOOP &&
+                    permutation_operator != OP_DERIVATIVE) ||
+       kernel_pow != 1 || bandwidth_divide != 1 || ncol_W != 0 ||
+       ncol_Y != 2 || weighted_sum == NULL || do_dual_power ||
+       (!profile &&
+        (residual_preparation->output->num_obs_train != num_obs_train ||
+         residual_preparation->output->num_obs_eval != num_obs_eval)) ||
+       (profile && (num_reg_continuous != 0 ||
+                    residual_preparation->profile_count == NULL ||
+                    residual_preparation->profile_anchor == NULL ||
+                    residual_preparation->profile_centered_sum == NULL ||
+                    residual_preparation->profile_self_weight == NULL)))
+      return KWSNP_ERR_BADINVOC;
+    for(i = 0; i < num_reg_continuous + num_reg_unordered + num_reg_ordered; ++i)
+      if(operator[i] != OP_NORMAL) return KWSNP_ERR_BADINVOC;
+  }
   NPCategoricalLeadingMomentCtx * const categorical_leading =
     outer_pack_ctx != NULL ? outer_pack_ctx->categorical_leading_moments : NULL;
   if(categorical_leading != NULL &&
@@ -14455,6 +15408,14 @@ NPPermutationWeightOutput * const pkw_output){
                               &tree_outer_workspace);
       }
 
+      if(residual_preparation != NULL)
+        np_regression_residual_kernel_row(
+          residual_preparation, BANDWIDTH_reg, j, tprod, num_xt, dband, pxl);
+      if(uncertainty_context != NULL && uncertainty_context->unknown_count > 0 &&
+         !np_regression_scalar_level_information(
+           uncertainty_context, is_adaptive, j, num_xt, tprod, pxl))
+        information_invalid = 1;
+
       if(categorical_moments != NULL)
         np_categorical_density_moment_row(
           categorical_moments, tprod, num_xt, j, is_adaptive);
@@ -14529,6 +15490,23 @@ NPPermutationWeightOutput * const pkw_output){
 #endif
           np_conditional_ann_direct_row(conditional_ann,j,tprod,dband,
                                         tprod_mp,p_dband,pxl,p_pxl);
+        }
+        if(do_hc0_derivative && !is_adaptive &&
+           hc0_derivative_ctx->uncertainty_context != NULL &&
+           hc0_derivative_ctx->uncertainty_context->unknown_count > 0 &&
+           !np_regression_scalar_direction_information(
+             hc0_derivative_ctx,j,num_xt,tprod,tprod_mp,dband,p_dband,ws,p_ws,pxl))
+          information_invalid = 1;
+        if(ann_information != NULL &&
+           !np_regression_scalar_ann_information_row(
+             ann_information,j,num_xt,tprod,tprod_mp,dband,p_dband,pxl))
+          information_invalid = 1;
+        if(scalar_contrast != NULL) {
+          const int contrast_ok=is_adaptive ?
+            np_regression_scalar_ann_contrast_row(scalar_contrast,j,num_xt,
+              tprod,tprod_mp,dband,p_dband,pxl) :
+            np_regression_scalar_contrast_row(scalar_contrast,j,num_xt,tprod,tprod_mp,pxl);
+          if(!contrast_ok) information_invalid = 1;
         }
         if(do_hc0_derivative &&
            !np_regression_hc0_derivative_moments_accumulate(
@@ -14843,7 +15821,32 @@ NPPermutationWeightOutput * const pkw_output){
         }
       }
     }
+    if(scalar_contrast != NULL && !is_adaptive) {
+      for(ii=scalar_contrast->categorical_range.begin;
+          ii<scalar_contrast->categorical_range.end;++ii)
+        np_mpi_allgather_in_place_double(stride,scalar_contrast->gradient[ii],stride,
+          "regression categorical contrast MPI_Allgather");
+    }
 #endif
+  }
+
+  if(residual_preparation != NULL &&
+     !np_regression_residual_kernel_reduce(
+       residual_preparation, BANDWIDTH_reg, suppress_parallel))
+    status = KWSNP_ERR_BADINVOC;
+  if(ann_information != NULL &&
+     !np_regression_scalar_ann_information_finish(ann_information,suppress_parallel))
+    information_invalid = 1;
+  if(scalar_contrast != NULL && is_adaptive &&
+     !np_regression_scalar_ann_contrast_finish(scalar_contrast,suppress_parallel))
+    information_invalid = 1;
+  if(ann_information != NULL || scalar_contrast != NULL ||
+     (uncertainty_context != NULL && uncertainty_context->unknown_count > 0)) {
+#ifdef MPI2
+    if(!suppress_parallel)
+      MPI_Allreduce(MPI_IN_PLACE,&information_invalid,1,MPI_INT,MPI_MAX,comm[1]);
+#endif
+    if(information_invalid) status = KWSNP_ERR_BADINVOC;
   }
 
 cleanup:
@@ -14932,6 +15935,31 @@ cleanup:
 
 
   return(status);
+}
+
+/* The compressed categorical owner keeps its exact point-moment call and
+ * feeds the resident profile weights to residual preparation in that pass. */
+static int np_regression_profile_residual_kernel_sum(
+  const NPRegressionCategoricalProfileFitCall *call,
+  int ntrain, int neval, double **train_u, double **train_o,
+  double **eval_u, double **eval_o, double **response_columns,
+  int response_column_count, double *weighted_sum,
+  NPRegressionResidualKernelContext *residual_context)
+{
+  NP_DualPowerCtx preparation = {0};
+  preparation.residual_preparation = residual_context;
+  return kernel_weighted_sum_np_ctx_ex(
+    call->kernel_c, call->kernel_u, call->kernel_o,
+    call->bandwidth_mode, ntrain, neval,
+    call->num_reg_unordered, call->num_reg_ordered, 0,
+    0, 0, 1, 1, 0, 0, 0, 0, 0,
+    call->operator, OP_NOOP, 0, 0, NULL, 1,
+    response_column_count, 0, NP_TREE_FALSE, 0, NULL, NULL, NULL, NULL,
+    train_u, train_o, NULL, eval_u, eval_o, NULL,
+    response_columns, NULL, NULL, call->vector_scale_factor, 1,
+    NULL, NULL, call->lambda, call->num_categories,
+    call->matrix_categorical_vals, NULL, weighted_sum, NULL, NULL,
+    NULL, &preparation, NULL, NULL, NULL, 0, NULL);
 }
 
 /*
@@ -15238,7 +16266,7 @@ double * const pkw){
   NPPermutationWeightOutput * const pkw_output =
     pkw == NULL ? NULL : &pkw_storage;
   const NP_DualPowerCtx dual_power_ctx = {
-    weighted_sum_power2, 2, NULL, NULL, 0, 0, NULL, 0, NULL, NULL
+    weighted_sum_power2, 2, NULL, NULL, 0, 0, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL
   };
 
   status = kernel_weighted_sum_np_ctx_ex(
@@ -15344,7 +16372,7 @@ NPContinuousKernelDerivativeDiagnostics * const kernel_route_diagnostics,
 NPContinuousKernelProgressFunction progress)
 {
   const NP_DualPowerCtx dual_power_ctx = {
-    weighted_sum_power2, 2, NULL, NULL, 0, 0, progress, 0, NULL, NULL
+    weighted_sum_power2, 2, NULL, NULL, 0, 0, progress, 0, NULL, NULL, NULL, NULL, NULL, NULL
   };
   const NPContinuousKernelExecutionContext kernel_execution_context = {
     kernel_route, kernel_route_diagnostics, categorical_compress
@@ -27693,6 +28721,7 @@ static NP_NOINLINE int np_beta_scalar_regression_fit_block_canonical(
   NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
   const int categorical_compress,
   const NPRegressionStandardErrorMode standard_error_mode,
+  const int ordinary_response,
   const NPContinuousPreparedBandwidthView *prepared_bandwidth,
   const int original_train_is_eval,
   const NPRegressionHC0Context *hc0_context,
@@ -27826,6 +28855,8 @@ static NP_NOINLINE int np_beta_scalar_regression_fit_block_canonical(
   regression_moment_context.positive_weights =
     kernel_route->segment[0].descriptor.order == 2;
   regression_moment_context.standard_error_mode = standard_error_mode;
+  regression_moment_context.ordinary_response = ordinary_response;
+  regression_moment_context.hc0_context = hc0_context;
   regression_moment_context.status = &regression_row_status;
   regression_moment_context.empty_rows =
     standard_error_mode == NP_REGRESSION_STDERR_CONDITIONAL_INFLUENCE &&
@@ -27944,6 +28975,19 @@ static int np_beta_scalar_regression_prepared_view_slice(
   slice->evaluation_count = evaluation_count;
   return 1;
 }
+
+static int **np_beta_scalar_regression_mask_view(
+  int ** const matrix, const int columns, const int offset)
+{
+  int **view;
+  int column;
+  if(matrix == NULL || columns <= 0 || offset < 0)
+    return NULL;
+  view = (int **)R_alloc((size_t)columns, (int)sizeof(*view));
+  for(column = 0; column < columns; ++column)
+    view[column] = matrix[column] == NULL ? NULL : matrix[column] + offset;
+  return view;
+}
 #endif
 
 /*
@@ -27979,6 +29023,7 @@ static NP_NOINLINE int np_beta_scalar_regression_fit_canonical(
   NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
   const int categorical_compress,
   const NPRegressionStandardErrorMode standard_error_mode,
+  const int ordinary_response,
   const NPContinuousPreparedBandwidthView *prepared_bandwidth,
   const NPRegressionHC0Context *hc0_context,
   NPRegressionFailure *failure,
@@ -28015,6 +29060,15 @@ static NP_NOINLINE int np_beta_scalar_regression_fit_canonical(
     const NPContinuousPreparedBandwidthView *prepared_source =
       prepared_bandwidth;
     const NPContinuousPreparedBandwidthView *prepared_view = NULL;
+    NPRegressionHC0Context hc0_slice;
+    NPRegressionResidualPreparation preparation_slice;
+    const NPRegressionHC0Context *hc0_view = hc0_context;
+    NPRegressionResidualPreparation * const preparation =
+      hc0_context != NULL &&
+      hc0_context->status == NP_REGRESSION_HC0_RESIDUAL_PREPARING ?
+        hc0_context->preparation : NULL;
+    double *preparation_values = NULL;
+    int *preparation_information = NULL;
     NPContinuousKernelDerivativeDiagnostics local_diagnostics = {
       .bad_coordinate = -1,
       .bad_observation = -1,
@@ -28045,6 +29099,30 @@ static NP_NOINLINE int np_beta_scalar_regression_fit_canonical(
         bandwidth_status, row_status, kernel_route_diagnostics, NULL);
     }
     (void)equal_counts;
+
+    if(preparation != NULL) {
+      /* The source is a validated whole-training map.  Rank-local beta rows
+       * consume a slice of that map, but write by global donor identity. */
+      preparation_slice = *preparation;
+      preparation_slice.evaluation_to_donor += evaluation_start;
+      preparation_slice.num_obs_eval = evaluation_count;
+      preparation_values = (double *)R_alloc(
+        (size_t)num_obs_eval, (int)sizeof(*preparation_values));
+      preparation_information = (int *)R_alloc(
+        (size_t)num_obs_eval, (int)sizeof(*preparation_information));
+    }
+    if(hc0_context != NULL) {
+      hc0_slice = *hc0_context;
+      if(preparation != NULL)
+        hc0_slice.preparation = &preparation_slice;
+      if(hc0_context->mean_unavailable != NULL)
+        hc0_slice.mean_unavailable += evaluation_start;
+      hc0_slice.gradient_unavailable = np_beta_scalar_regression_mask_view(
+        hc0_context->gradient_unavailable, num_predictors, evaluation_start);
+      hc0_slice.gradient_structural_zero = np_beta_scalar_regression_mask_view(
+        hc0_context->gradient_structural_zero, num_predictors, evaluation_start);
+      hc0_view = &hc0_slice;
+    }
 
     /*
      * Nearest-neighbour realization contains legacy rank-symmetric MPI
@@ -28137,8 +29215,8 @@ static NP_NOINLINE int np_beta_scalar_regression_fit_canonical(
           mean_stderr == NULL ? NULL : mean_stderr + evaluation_start,
           gradient_stderr_view,
           kernel_route, &local_diagnostics, categorical_compress,
-          standard_error_mode, prepared_view, original_train_is_eval,
-          hc0_context,
+          standard_error_mode, ordinary_response, prepared_view, original_train_is_eval,
+          hc0_view,
           &bandwidth_status, &row_status, NULL);
     }
     if(owned_prepared_matrix != NULL)
@@ -28178,6 +29256,27 @@ static NP_NOINLINE int np_beta_scalar_regression_fit_canonical(
         (NPContinuousKernelRowStatus)payload[2], kernel_route_diagnostics, NULL);
     }
 
+    if(preparation != NULL) {
+      /* Gather in evaluation order, then restore the explicit donor order.
+       * This remains valid for non-identity maps and empty rank chunks. */
+      int evaluation;
+      for(evaluation = evaluation_start;
+          evaluation < evaluation_start + evaluation_count; ++evaluation) {
+        const int donor = preparation->evaluation_to_donor[evaluation];
+        preparation_values[evaluation] = preparation->normalized_residual[donor];
+        preparation_information[evaluation] = preparation->information[donor];
+      }
+      np_mpi_allgatherv_in_place_double(
+        evaluation_count, preparation_values, recvcounts, displs,
+        "beta scalar regression residual preparation MPI_Allgatherv");
+      MPI_Allgatherv(MPI_IN_PLACE, evaluation_count, MPI_INT,
+        preparation_information, recvcounts, displs, MPI_INT, comm[1]);
+      for(evaluation = 0; evaluation < num_obs_eval; ++evaluation) {
+        const int donor = preparation->evaluation_to_donor[evaluation];
+        preparation->normalized_residual[donor] = preparation_values[evaluation];
+        preparation->information[donor] = preparation_information[evaluation];
+      }
+    }
     np_mpi_allgatherv_in_place_double(
       evaluation_count, mean, recvcounts, displs,
       "beta scalar regression mean MPI_Allgatherv");
@@ -28185,6 +29284,9 @@ static NP_NOINLINE int np_beta_scalar_regression_fit_canonical(
       np_mpi_allgatherv_in_place_double(
         evaluation_count, mean_stderr, recvcounts, displs,
         "beta scalar regression standard error MPI_Allgatherv");
+    if(hc0_context != NULL && hc0_context->mean_unavailable != NULL)
+      MPI_Allgatherv(MPI_IN_PLACE, evaluation_count, MPI_INT,
+        hc0_context->mean_unavailable, recvcounts, displs, MPI_INT, comm[1]);
     for(coordinate = 0; coordinate < num_predictors; ++coordinate) {
       if(gradient != NULL)
         np_mpi_allgatherv_in_place_double(
@@ -28194,6 +29296,18 @@ static NP_NOINLINE int np_beta_scalar_regression_fit_canonical(
         np_mpi_allgatherv_in_place_double(
           evaluation_count, gradient_stderr[coordinate], recvcounts, displs,
           "beta scalar regression gradient standard error MPI_Allgatherv");
+      if(hc0_context != NULL &&
+         hc0_context->gradient_unavailable != NULL &&
+         hc0_context->gradient_unavailable[coordinate] != NULL)
+        MPI_Allgatherv(MPI_IN_PLACE, evaluation_count, MPI_INT,
+          hc0_context->gradient_unavailable[coordinate], recvcounts, displs,
+          MPI_INT, comm[1]);
+      if(hc0_context != NULL &&
+         hc0_context->gradient_structural_zero != NULL &&
+         hc0_context->gradient_structural_zero[coordinate] != NULL)
+        MPI_Allgatherv(MPI_IN_PLACE, evaluation_count, MPI_INT,
+          hc0_context->gradient_structural_zero[coordinate], recvcounts, displs,
+          MPI_INT, comm[1]);
     }
 
     {
@@ -28230,7 +29344,7 @@ static NP_NOINLINE int np_beta_scalar_regression_fit_canonical(
     num_categories, matrix_categorical_vals,
     mean, gradient, mean_stderr, gradient_stderr,
     kernel_route, kernel_route_diagnostics, categorical_compress,
-    standard_error_mode, prepared_bandwidth, original_train_is_eval,
+    standard_error_mode, ordinary_response, prepared_bandwidth, original_train_is_eval,
     hc0_context,
     &bandwidth_status, &row_status, empty_rows);
   if(status == NP_BETA_SCALAR_REGRESSION_FIT_ERR_BANDWIDTH &&
@@ -29498,6 +30612,7 @@ typedef struct {
   NPRegressionStandardErrorMode standard_error_mode;
   const NPRegressionHC0Context *hc0_context;
   const NP_GateOverrideCtx *gate_context;
+  int ordinary_response;
   NPRegressionFitOwner *enclosing_owner;
   double kernel_squared_integral;
   double bandwidth_product;
@@ -29609,11 +30724,20 @@ static SEXP np_regression_scalar_fit_execute(void *data)
     call->num_reg_continuous + call->num_reg_unordered);
   const NPRegressionGradientRange ordered_range = np_regression_gradient_range(
     gradient_request, call->num_reg_continuous + call->num_reg_unordered, p_nvar);
+  const NPRegressionGradientRange categorical_range = np_regression_gradient_range(
+    gradient_request,call->num_reg_continuous,p_nvar);
+  const int stable_scalar_contrast = call->ordinary_response && call->do_grad &&
+    categorical_range.begin < categorical_range.end;
   double *response_columns[NP_REGRESSION_SCALAR_RESPONSE_COLUMNS_MAX] = {
     NULL, NULL, NULL
   };
   double *hc0_residual_columns[1] = {NULL};
   NP_DualPowerCtx hc0_dual_power_ctx = {0};
+  NP_DualPowerCtx residual_dual_power_ctx = {0};
+  NP_DualPowerCtx contrast_dual_power_ctx = {0};
+  NPRegressionScalarContrastContext scalar_contrast_context = {0};
+  NPRegressionScalarANNContrast scalar_ann_contrast = {0};
+  NPRegressionResidualKernelContext residual_kernel_context = {0};
   NPRegressionHC0DerivativeMomentCtx hc0_derivative_ctx = {0};
   int permutation_operator = OP_NOOP;
   size_t allocation_count;
@@ -29722,6 +30846,7 @@ static SEXP np_regression_scalar_fit_execute(void *data)
     hc0_dual_power_ctx.ncol_W = 1;
     hc0_dual_power_ctx.progress = NULL;
     hc0_dual_power_ctx.retain_common_scale = 0;
+    hc0_dual_power_ctx.uncertainty_context = call->hc0_context;
     if(call->do_gerr && p_nvar > 0) {
       hc0_derivative_ctx.scaled_residual =
         call->hc0_context->scaled_residual;
@@ -29737,6 +30862,9 @@ static SEXP np_regression_scalar_fit_execute(void *data)
       hc0_derivative_ctx.continuous_range = continuous_range;
       hc0_derivative_ctx.categorical_range = np_regression_gradient_range(
         gradient_request, call->num_reg_continuous, p_nvar);
+      if(stable_scalar_contrast)
+        hc0_derivative_ctx.categorical_range.end = hc0_derivative_ctx.categorical_range.begin;
+      hc0_derivative_ctx.uncertainty_context = call->hc0_context;
       hc0_dual_power_ctx.regression_derivative = &hc0_derivative_ctx;
     }
   }
@@ -29753,14 +30881,90 @@ static SEXP np_regression_scalar_fit_execute(void *data)
        call->vector_Y, call->vector_scale_factor, call->lambda,
        call->num_categories, call->operator,
        call->matrix_categorical_vals, call->mean, call->mean_stderr,
-       hc0_residual_preparing)) {
+       hc0_residual_preparing,
+       hc0_residual_preparing ? call->hc0_context->preparation : NULL)) {
     execution->status = NP_REGRESSION_SCALAR_FIT_PROFILE;
     return R_NilValue;
+  }
+
+  if(hc0_residual_preparing) {
+    NPRegressionResidualPreparation * const preparation =
+      call->hc0_context->preparation;
+    if(!np_regression_residual_preparation_valid(preparation) ||
+       preparation->num_obs_train != call->num_obs_train ||
+       preparation->num_obs_eval != call->num_obs_eval ||
+       call->do_merr || conditional_influence) {
+      execution->status = NP_REGRESSION_SCALAR_FIT_ERR_HC0;
+      return R_NilValue;
+    }
+    residual_kernel_context.output = preparation;
+    residual_kernel_context.state =
+      np_regression_residual_states(call->num_obs_eval);
+    residual_kernel_context.num_rows = call->num_obs_eval;
+    residual_dual_power_ctx.residual_preparation = &residual_kernel_context;
+  }
+
+  if(stable_scalar_contrast) {
+    scalar_contrast_context.response = call->vector_Y;
+    scalar_contrast_context.gradient = call->gradient;
+    scalar_contrast_context.gradient_stderr = call->gradient_stderr;
+    scalar_contrast_context.uncertainty = ordinary_hc0 ? call->hc0_context : NULL;
+    scalar_contrast_context.categorical_range = np_regression_gradient_range(
+      gradient_request,call->num_reg_continuous,p_nvar);
+    scalar_contrast_context.num_eval = call->num_obs_eval;
+    scalar_contrast_context.num_eval_alloc = call->num_obs_eval_alloc;
+    scalar_contrast_context.want_variance = ordinary_hc0 && call->do_gerr;
+    if(call->bandwidth_mode==BW_ADAP_NN &&
+       !np_regression_scalar_ann_contrast_allocate(&scalar_contrast_context,&scalar_ann_contrast)) {
+      execution->status=NP_REGRESSION_SCALAR_FIT_ERR_WORKSPACE_DIMENSION;
+      return R_NilValue;
+    }
+    hc0_dual_power_ctx.scalar_contrast = &scalar_contrast_context;
+    residual_dual_power_ctx.scalar_contrast = &scalar_contrast_context;
+    contrast_dual_power_ctx.scalar_contrast = &scalar_contrast_context;
   }
 
   {
     NPPermutationWeightOutput conditional_pkw_output = np_pkw_output_make(
       owner->conditional_permutation_weights, p_nvar);
+    const int replay_information = ordinary_hc0 && call->do_gerr && p_nvar > 0 &&
+      call->bandwidth_mode == BW_ADAP_NN && call->hc0_context->unknown_count > 0;
+    const int replay_contrast=stable_scalar_contrast && call->bandwidth_mode==BW_ADAP_NN;
+    for(int information_pass = 0;
+        information_pass <= (replay_information || replay_contrast); ++information_pass) {
+    NPRegressionScalarANNInformation information = {0};
+    NP_DualPowerCtx information_dual = {0};
+    if(replay_contrast) {
+      scalar_ann_contrast.stage=information_pass;
+      information_dual.scalar_contrast=&scalar_contrast_context;
+    }
+    if(information_pass && replay_information) {
+      size_t cells;
+      if(!np_size_mul_checked((size_t)p_nvar,(size_t)call->num_obs_eval,&cells) ||
+         cells > (size_t)INT_MAX/5U) {
+        execution->status = NP_REGRESSION_SCALAR_FIT_ERR_WORKSPACE_DIMENSION;
+        return R_NilValue;
+      }
+      double * const denominators = (double *)R_alloc(
+        (size_t)call->num_obs_eval,sizeof(double));
+      double * const alternate_denominators = (double *)R_alloc(cells,sizeof(double));
+      information.derivative = &hc0_derivative_ctx;
+      information.level_denominator = denominators;
+      information.alternate_denominator = alternate_denominators;
+      information.certificate = R_allocLD(5U*cells);
+      memset(information.certificate,0,5U*cells*sizeof(long double));
+      const int denominator_column = point_already_computed ? 0 : 1;
+      for(i = 0; i < call->num_obs_eval; ++i) {
+        denominators[i] = owner->mean_columns[response_column_count*i+denominator_column];
+        for(predictor = 0; predictor < p_nvar; ++predictor) {
+          const size_t cell = (size_t)predictor*(size_t)call->num_obs_eval+(size_t)i;
+          alternate_denominators[cell] =
+            owner->permutation_columns[(size_t)response_column_count*cell+
+                                       (size_t)denominator_column];
+        }
+      }
+      information_dual.ann_information = &information;
+    }
     const int weighted_sum_status = kernel_weighted_sum_np_ctx_ex(
       call->kernel_c, call->kernel_u, call->kernel_o,
       call->bandwidth_mode,
@@ -29786,7 +30990,9 @@ static SEXP np_regression_scalar_fit_execute(void *data)
       call->matrix_categorical_vals, call->matrix_ordered_indices,
       owner->mean_columns, owner->permutation_columns,
       owner->conditional_weights, call->gate_context,
-      ordinary_hc0 ? &hc0_dual_power_ctx : NULL,
+      information_pass ? &information_dual : ordinary_hc0 ? &hc0_dual_power_ctx :
+        (hc0_residual_preparing ? &residual_dual_power_ctx :
+         stable_scalar_contrast ? &contrast_dual_power_ctx : NULL),
       NULL, NULL, NULL,
       0,
       owner->conditional_permutation_weights != NULL ?
@@ -29795,6 +31001,24 @@ static SEXP np_regression_scalar_fit_execute(void *data)
     if(weighted_sum_status != 0) {
       execution->status = NP_REGRESSION_SCALAR_FIT_ERR_TRAVERSAL;
       return R_NilValue;
+    }
+    }
+  }
+
+  if(hc0_residual_preparing) {
+    NPRegressionResidualPreparation * const preparation =
+      call->hc0_context->preparation;
+    for(i = 0; i < call->num_obs_eval; ++i) {
+      const int donor = preparation->evaluation_to_donor[i];
+      long double residual = 0.0L;
+      NPResidualInformation information = np_residual_offdiag_finish(
+        residual_kernel_context.state + i,
+        (long double)owner->mean_columns[response_column_count*i + 1],
+        &residual);
+      if(information != NP_RESIDUAL_INVALID && !R_FINITE((double)residual))
+        information = NP_RESIDUAL_INVALID;
+      preparation->normalized_residual[donor] = (double)residual;
+      preparation->information[donor] = (int)information;
     }
   }
 
@@ -29887,7 +31111,10 @@ static SEXP np_regression_scalar_fit_execute(void *data)
         if(call->do_gerr && ordinary_hc0) {
           double quadratic = call->gradient_stderr[predictor][i];
 
-          if(call->bandwidth_mode == BW_ADAP_NN &&
+          if(call->hc0_context->gradient_structural_zero != NULL &&
+             call->hc0_context->gradient_structural_zero[predictor][i]) {
+            quadratic = 0.0;
+          } else if(call->bandwidth_mode == BW_ADAP_NN &&
              !np_regression_hc0_derivative_quadratic(
                call->mean_stderr[i], quadratic, hc0_cross_moment,
                derivative_denominator / denominator, &quadratic)) {
@@ -29948,7 +31175,7 @@ static SEXP np_regression_scalar_fit_execute(void *data)
         }
         if(ordinary_hc0 && call->bandwidth_mode == BW_ADAP_NN)
           hc0_cross_moment = call->gradient[predictor][i];
-        if(!point_already_computed)
+        if(!point_already_computed && !stable_scalar_contrast)
           call->gradient[predictor][i] = call->mean[i] -
             owner->permutation_columns[permutation_offset] /
               alternate_denominator;
@@ -29958,10 +31185,19 @@ static SEXP np_regression_scalar_fit_execute(void *data)
             call->gradient_stderr[predictor][i] = NA_REAL;
           continue;
         }
-        if(call->do_gerr && ordinary_hc0) {
+        if(call->do_gerr && ordinary_hc0 && stable_scalar_contrast) {
+          call->gradient_stderr[predictor][i] *= call->hc0_context->residual_scale;
+          if(!R_FINITE(call->gradient_stderr[predictor][i])) {
+            execution->status = NP_REGRESSION_SCALAR_FIT_ERR_HC0;
+            return R_NilValue;
+          }
+        } else if(call->do_gerr && ordinary_hc0) {
           double quadratic = call->gradient_stderr[predictor][i];
 
-          if(call->bandwidth_mode == BW_ADAP_NN &&
+          if(call->hc0_context->gradient_structural_zero != NULL &&
+             call->hc0_context->gradient_structural_zero[predictor][i]) {
+            quadratic = 0.0;
+          } else if(call->bandwidth_mode == BW_ADAP_NN &&
              !np_regression_hc0_derivative_quadratic(
                quadratic, call->mean_stderr[i], hc0_cross_moment,
                level_denominator / alternate_denominator, &quadratic)) {
@@ -30046,7 +31282,10 @@ static SEXP np_regression_scalar_fit_execute(void *data)
         }
         if(ordinary_hc0 && call->bandwidth_mode == BW_ADAP_NN)
           hc0_cross_moment = call->gradient[predictor][i];
-        if(!point_already_computed)
+        if(stable_scalar_contrast)
+          call->gradient[predictor][i] *=
+            call->matrix_ordered_indices[ordered_coordinate][i] != 0 ? 1.0 : -1.0;
+        else if(!point_already_computed)
           call->gradient[predictor][i] =
             (call->mean[i] -
              owner->permutation_columns[permutation_offset] /
@@ -30059,10 +31298,19 @@ static SEXP np_regression_scalar_fit_execute(void *data)
             call->gradient_stderr[predictor][i] = NA_REAL;
           continue;
         }
-        if(call->do_gerr && ordinary_hc0) {
+        if(call->do_gerr && ordinary_hc0 && stable_scalar_contrast) {
+          call->gradient_stderr[predictor][i] *= call->hc0_context->residual_scale;
+          if(!R_FINITE(call->gradient_stderr[predictor][i])) {
+            execution->status = NP_REGRESSION_SCALAR_FIT_ERR_HC0;
+            return R_NilValue;
+          }
+        } else if(call->do_gerr && ordinary_hc0) {
           double quadratic = call->gradient_stderr[predictor][i];
 
-          if(call->bandwidth_mode == BW_ADAP_NN &&
+          if(call->hc0_context->gradient_structural_zero != NULL &&
+             call->hc0_context->gradient_structural_zero[predictor][i]) {
+            quadratic = 0.0;
+          } else if(call->bandwidth_mode == BW_ADAP_NN &&
              !np_regression_hc0_derivative_quadratic(
                quadratic, call->mean_stderr[i], hc0_cross_moment,
                level_denominator / alternate_denominator, &quadratic)) {
@@ -30274,77 +31522,309 @@ static double np_conditional_alllarge_standard_error(
                              quadratic_work, nterms));
 }
 
-/* Evaluate the HC0 sandwich quadratic without forming an influence row.  A
- * long-double reduction supplies a scale-aware cancellation bound.  The
- * absolute pairwise quadratic, rather than the already-cancelled B*a result,
- * retains the input scale needed when a direction is nearly orthogonal to a
- * low-rank meat matrix.  Only a negative value beyond that bound is a
- * construction failure. */
-static int np_regression_hc0_lp_standard_error(
-  const double *projection,
-  const double *power2_moments,
-  const int nterms,
-  const double residual_scale,
-  double *standard_error)
+/* Contract the accepted adjoint before applying the kernel weight. Two-double
+ * products retain cancellation terms even where long double equals double.
+ * This uncertainty-only helper never changes the forward point solve. */
+static int np_regression_lp_projected_weight(
+  double **basis, const int nterms, const double *projection,
+  const double weight, const int donor, long double *influence)
 {
-  long double quadratic = 0.0L;
-  long double absolute_sum = 0.0L;
-  int i;
-
-  if(projection == NULL || power2_moments == NULL || nterms <= 0 ||
-     standard_error == NULL || !R_FINITE(residual_scale) ||
-     residual_scale < 0.0)
+  NPContrastNumber score = {0.0, 0.0};
+  if(basis == NULL || projection == NULL || nterms <= 0 ||
+     influence == NULL || !isfinite(weight))
     return 0;
-  for(i = 0; i < nterms; ++i) {
-    long double projected_meat = 0.0L;
-    int ii;
-
-    if(!R_FINITE(projection[i]))
-      return 0;
-    for(ii = 0; ii < nterms; ++ii) {
-      const double meat = power2_moments[i*nterms + ii];
-
-      if(!R_FINITE(meat) || !R_FINITE(projection[ii]))
-        return 0;
-      projected_meat +=
-        (long double)meat * (long double)projection[ii];
-      absolute_sum +=
-        fabsl((long double)projection[i]) *
-        fabsl((long double)meat) *
-        fabsl((long double)projection[ii]);
-    }
-    {
-      const long double term =
-        (long double)projection[i] * projected_meat;
-
-      quadratic += term;
-    }
+  /* A retained exact support zero is independent of every basis direction. */
+  if(weight == 0.0) {
+    *influence = 0.0L;
+    return 1;
   }
-  {
-    const long double error_bound =
-      256.0L * (long double)DBL_EPSILON * absolute_sum;
-    long double value;
-
-    if(!isfinite(quadratic) || !isfinite(absolute_sum) ||
-       quadratic < -error_bound)
+  for(int term = 0; term < nterms; ++term) {
+    if(!isfinite(basis[term][donor]) || !isfinite(projection[term]))
       return 0;
-    if(quadratic <= 0.0L || residual_scale == 0.0) {
-      *standard_error = 0.0;
-      return 1;
-    }
-    value = (long double)residual_scale * sqrtl(quadratic);
-    if(!isfinite(value) || value > (long double)DBL_MAX)
-      return 0;
-    *standard_error = (double)value;
+    score = np_contrast_add(score, np_contrast_two_product(
+      basis[term][donor], projection[term]));
   }
-  return R_FINITE(*standard_error);
+  const NPContrastNumber value = np_contrast_scale(score, weight);
+  if(!np_contrast_finite(value)) return 0;
+  *influence = (long double)value.hi + (long double)value.lo;
+  return isfinite(*influence);
 }
 
-/* Reduce one paired-endpoint HC0 influence difference without retaining an
- * influence matrix.  Each kernel row and projection uses the scale of its own
- * accepted local system, so their product is the literal estimator map even
- * when beta rows use different common logarithmic scales. */
-static int np_regression_hc0_lp_categorical_standard_error(
+/* The preparation owner supplies its accepted mean adjoint and actual kernel
+ * row.  Only off-diagonal donors enter the stable residual identity; donor
+ * identity is explicit even when training coordinates are duplicated. */
+static int np_regression_hc0_lp_prepare_row(
+  double **basis, const int nterms, const double *projection,
+  const double *kernel_row, NPRegressionResidualPreparation *preparation,
+  const int evaluation)
+{
+  NPResidualOffDiagonal state = {0};
+  long double normalized = 0.0L;
+  const int self = preparation->evaluation_to_donor[evaluation];
+  for(int donor = 0; donor < preparation->num_obs_train; ++donor) {
+    long double influence;
+    if(donor == self) continue;
+    if(!np_regression_lp_projected_weight(
+         basis, nterms, projection, kernel_row[donor], donor, &influence))
+      return 0;
+    np_residual_offdiag_add(&state, influence,
+      (long double)preparation->response[self] -
+        (long double)preparation->response[donor]);
+  }
+  const NPResidualInformation information =
+    np_residual_offdiag_finish(&state, 1.0L, &normalized);
+  if(information == NP_RESIDUAL_INVALID ||
+     fabsl(normalized) > (long double)DBL_MAX)
+    return 0;
+  preparation->normalized_residual[self] = (double)normalized;
+  preparation->information[self] = (int)information;
+  return 1;
+}
+
+/* Zero support or individually zero basis/projection factors establish donor
+ * independence. A dot product that merely cancels to zero does not. */
+static int np_regression_hc0_lp_donor_zero(
+  double **basis, const int nterms, const double *projection,
+  const double kernel_weight, const int donor, int *certified_zero)
+{
+  if(!R_FINITE(kernel_weight)) return 0;
+  *certified_zero = 1;
+  if(kernel_weight == 0.0) return 1;
+  for(int term = 0; term < nterms; ++term) {
+    if(!R_FINITE(basis[term][donor]) || !R_FINITE(projection[term]))
+      return 0;
+    if(basis[term][donor] != 0.0 && projection[term] != 0.0)
+      *certified_zero = 0;
+  }
+  return 1;
+}
+
+static int np_regression_hc0_lp_direction_available(
+  double **basis, const int nterms, const double *projection,
+  const double *kernel_row, const NPRegressionHC0Context *context,
+  int *available)
+{
+  *available = 1;
+  if(context->unknown_count == 0) return 1;
+  if(context->residual_information == NULL || kernel_row == NULL)
+    return 0;
+  for(int donor = 0; donor < context->num_obs_train; ++donor) {
+    const int information = context->residual_information[donor];
+    if(information == NP_RESIDUAL_IDENTIFIED) continue;
+    int certified_zero;
+    if(information != NP_RESIDUAL_UNIDENTIFIED ||
+       !np_regression_hc0_lp_donor_zero(basis, nterms, projection,
+         kernel_row[donor], donor, &certified_zero))
+      return 0;
+    if(!certified_zero) *available = 0;
+  }
+  return 1;
+}
+
+static int np_regression_hc0_lp_standard_error_with_information(
+  const double *projection, double **basis, const int nterms,
+  const double *kernel_row, const double kernel_divisor,
+  const NPRegressionHC0Context *context, double *standard_error,
+  int *unavailable)
+{
+  int available;
+  NPResidualVariance variance = {0};
+  long double normalized = 0.0L;
+  if(context == NULL || context->scaled_residual == NULL ||
+     kernel_row == NULL || !isfinite(kernel_divisor) ||
+     kernel_divisor <= 0.0 || !isfinite(context->residual_scale) ||
+     context->residual_scale < 0.0)
+    return 0;
+  if(!np_regression_hc0_lp_direction_available(
+       basis, nterms, projection, kernel_row, context, &available))
+    return 0;
+  if(!available) {
+    *standard_error = NA_REAL;
+    if(unavailable != NULL) *unavailable = 1;
+    return 1;
+  }
+  /* Sum nonnegative donor squares instead of a cancellation-prone a'Pa.
+   * Retained rows share the accepted moment scale; only the legacy fixed
+   * raw-row owner needs its explicit bandwidth-product divisor. */
+  for(int donor = 0; donor < context->num_obs_train; ++donor) {
+    long double influence;
+    const double weight = kernel_divisor == 1.0 ? kernel_row[donor] :
+      kernel_row[donor] / kernel_divisor;
+    if(!np_regression_lp_projected_weight(
+         basis, nterms, projection, weight, donor, &influence))
+      return 0;
+    const int information = context->residual_information != NULL ?
+      context->residual_information[donor] : NP_RESIDUAL_IDENTIFIED;
+    int certified_zero = 0;
+    if(information == NP_RESIDUAL_UNIDENTIFIED &&
+       !np_regression_hc0_lp_donor_zero(
+         basis, nterms, projection, kernel_row[donor], donor, &certified_zero))
+      return 0;
+    np_residual_variance_add(&variance,
+      certified_zero ? 0.0L : influence, certified_zero,
+      (NPResidualInformation)information, context->scaled_residual[donor]);
+  }
+  if(np_residual_variance_finish(&variance, &normalized) !=
+       NP_RESIDUAL_IDENTIFIED)
+    return 0;
+  const long double result = (long double)context->residual_scale * normalized;
+  if(!isfinite(result) || result > (long double)DBL_MAX) return 0;
+  *standard_error = (double)result;
+  return isfinite(*standard_error);
+}
+
+/* Cache only successful results for identical accepted inputs. A cache miss
+ * or unavailable optional workspace uses the same donor calculation. */
+static int np_regression_hc0_lp_standard_error_reuse(
+  NPInferenceReuse *reuse, const int direction,
+  const double *projection, double **basis, const int nterms,
+  const double *kernel_row, const double kernel_divisor,
+  const NPRegressionHC0Context *context, double *standard_error,
+  int *unavailable)
+{
+  int missing = 0;
+  if(reuse->entry == NULL)
+    return np_regression_hc0_lp_standard_error_with_information(
+      projection, basis, nterms, kernel_row, kernel_divisor, context,
+      standard_error, unavailable);
+  if(!np_inference_reuse_get(reuse, direction, projection,
+                            standard_error, &missing)) {
+    if(!np_regression_hc0_lp_standard_error_with_information(
+         projection, basis, nterms, kernel_row, kernel_divisor, context,
+         standard_error, &missing))
+      return 0;
+    np_inference_reuse_put(reuse, direction, projection,
+                           *standard_error, missing);
+  }
+  if(unavailable != NULL && missing) *unavailable = 1;
+  return 1;
+}
+
+/* Return the sole support donor, or -1. Constant reproduction certifies that
+ * two such mean rows selecting the same donor have an exactly zero contrast,
+ * including accepted ridge corrections. */
+static int np_regression_hc0_lp_singleton_donor(
+  const double *kernel_row, const int n)
+{
+  int singleton = -1;
+  for(int donor = 0; donor < n; ++donor) {
+    if(!R_FINITE(kernel_row[donor])) return -1;
+    if(kernel_row[donor] == 0.0) continue;
+    if(singleton >= 0) return -1;
+    singleton = donor;
+  }
+  return singleton;
+}
+
+/* Cold dependency certificate for an unidentified anchor. The canonical
+ * anchor is minus the sum of off-anchor influences, not its rounded raw
+ * endpoint coefficient. Expand the input-double triple products exactly;
+ * unrepresentable components or exhausted capacity decline the certificate. */
+static int np_regression_lp_anchor_zero(
+  double **basis, const int nterms, const int n,
+  const double *left_projection, const double *right_projection,
+  const double *left_row, const double *right_row, const int anchor)
+{
+  int minimum = 0, maximum = 0, any = 0;
+  for(int donor = 0; donor < n; ++donor) {
+    if(donor == anchor) continue;
+    for(int term = 0; term < nterms; ++term) {
+      if(basis[term][donor] == 0.0 ||
+         np_residual_products_equal(left_row[donor], left_projection[term],
+                                    right_row[donor], right_projection[term]))
+        continue;
+      for(int side = 0; side < 2; ++side) {
+        const double w = side == 0 ? left_row[donor] : right_row[donor];
+        const double a = side == 0 ? left_projection[term] : right_projection[term];
+        if(w == 0.0 || a == 0.0) continue;
+        int ew, ea, ez;
+        (void)frexp(w, &ew);
+        (void)frexp(a, &ea);
+        (void)frexp(basis[term][donor], &ez);
+        const int exponent = ew + ea + ez;
+        if(!any || exponent < minimum) minimum = exponent;
+        if(!any || exponent > maximum) maximum = exponent;
+        any = 1;
+      }
+    }
+  }
+  if(!any) return 1;
+  const int origin = minimum + (maximum - minimum)/2;
+  NPContrastExactSum total = {0};
+  for(int donor = 0; donor < n; ++donor) {
+    if(donor == anchor) continue;
+    for(int term = 0; term < nterms; ++term) {
+      if(basis[term][donor] == 0.0 ||
+         np_residual_products_equal(left_row[donor], left_projection[term],
+                                    right_row[donor], right_projection[term]))
+        continue;
+      for(int side = 0; side < 2; ++side) {
+        const double w = side == 0 ? left_row[donor] : right_row[donor];
+        const double a = side == 0 ? left_projection[term] : right_projection[term];
+        if(w == 0.0 || a == 0.0) continue;
+        int ew, ea, ez;
+        const double mw = frexp(w, &ew), ma = frexp(a, &ea);
+        const double mz = frexp(basis[term][donor], &ez);
+        const double product = mw*ma;
+        const double pieces[2] = {product, fma(mw, ma, -product)};
+        const int shift = ew + ea + ez - origin;
+        for(int p = 0; p < 2; ++p) {
+          const double high = pieces[p]*mz;
+          const double parts[2] = {high, fma(pieces[p], mz, -high)};
+          for(int q = 0; q < 2; ++q) {
+            if(parts[q] == 0.0) continue;
+            const double scaled = ldexp(parts[q], shift);
+            if(!isfinite(scaled) || scaled == 0.0 ||
+               ldexp(scaled, -shift) != parts[q]) return 0;
+            np_contrast_exact_add(&total, side == 0 ? scaled : -scaled);
+            if(total.invalid) return 0;
+          }
+        }
+      }
+    }
+  }
+  return total.size == 0;
+}
+
+/* Ordinary paired means reproduce constants. Use one complete paired map for
+ * the centered contrast and HC0 covariance, with a geometry-only anchor.
+ * Each endpoint retains its own accepted adjoint and kernel normalization;
+ * neither a new factorization nor an influence matrix is needed. */
+/* Exact equality of the complete endpoint maps. The projections must share
+ * one ratio and the raw rows its reciprocal; checking products avoids both
+ * division roundoff and an O(n*p) expansion. Finite inputs are caller-checked. */
+static int np_regression_lp_equal_endpoint_maps(
+  const int nterms, const int n,
+  const double *left_projection, const double *right_projection,
+  const double *left_row, const double *right_row)
+{
+  int pivot = -1, left_zero = 1, right_zero = 1;
+  for(int term = 0; term < nterms; ++term) {
+    if(left_projection[term] != 0.0) left_zero = 0;
+    if(right_projection[term] != 0.0) right_zero = 0;
+    if(pivot < 0 && left_projection[term] != 0.0 &&
+       right_projection[term] != 0.0) pivot = term;
+  }
+  if(pivot >= 0) {
+    for(int term = 0; term < nterms; ++term)
+      if(!np_residual_products_equal(left_projection[term], right_projection[pivot],
+                                     right_projection[term], left_projection[pivot]))
+        return 0;
+    for(int donor = 0; donor < n; ++donor)
+      if(!np_residual_products_equal(left_row[donor], left_projection[pivot],
+                                     right_row[donor], right_projection[pivot]))
+        return 0;
+    return 1;
+  }
+  /* Disjoint nonzero projection terms can agree only when both complete
+   * maps vanish. This also covers identically zero projection vectors. */
+  for(int donor = 0; donor < n; ++donor)
+    if((!left_zero && left_row[donor] != 0.0) ||
+       (!right_zero && right_row[donor] != 0.0)) return 0;
+  return 1;
+}
+
+static int np_regression_lp_categorical_contrast(
   double **basis,
   const int nterms,
   const int num_obs_train,
@@ -30352,62 +31832,142 @@ static int np_regression_hc0_lp_categorical_standard_error(
   const double *alternate_projection,
   const double *base_kernel_row,
   const double *alternate_kernel_row,
-  const double *scaled_residual,
-  const double residual_scale,
-  double *standard_error)
+  const double *response,
+  double *contrast,
+  double *standard_error,
+  const NPRegressionHC0Context *context,
+  int *unavailable,
+  int *structural_zero)
 {
-  long double quadratic = 0.0L;
-  int observation;
+  const int want_variance = standard_error != NULL;
+  int same_projection = 1, same_row = 1, anchor = 0;
+  long double anchor_score = -1.0L;
 
   if(basis == NULL || nterms <= 0 || num_obs_train <= 0 ||
      base_projection == NULL || alternate_projection == NULL ||
      base_kernel_row == NULL || alternate_kernel_row == NULL ||
-     scaled_residual == NULL || standard_error == NULL ||
-     !R_FINITE(residual_scale) || residual_scale < 0.0)
+     response == NULL || contrast == NULL ||
+     (want_variance && (context == NULL || context->scaled_residual == NULL ||
+      !isfinite(context->residual_scale) || context->residual_scale < 0.0 ||
+      (context->unknown_count > 0 && context->residual_information == NULL))))
     return 0;
 
-  for(observation = 0; observation < num_obs_train; ++observation) {
-    long double base_score = 0.0L;
-    long double alternate_score = 0.0L;
-    long double influence;
-    long double residual;
-    int term;
-
-    if(!R_FINITE(base_kernel_row[observation]) ||
-       !R_FINITE(alternate_kernel_row[observation]) ||
-       !R_FINITE(scaled_residual[observation]))
-      return 0;
-    for(term = 0; term < nterms; ++term) {
-      if(basis[term] == NULL || !R_FINITE(basis[term][observation]) ||
-         !R_FINITE(base_projection[term]) ||
-         !R_FINITE(alternate_projection[term]))
-        return 0;
-      base_score += (long double)basis[term][observation] *
-        (long double)base_projection[term];
-      alternate_score += (long double)basis[term][observation] *
-        (long double)alternate_projection[term];
-    }
-    influence = (long double)base_kernel_row[observation] * base_score -
-      (long double)alternate_kernel_row[observation] * alternate_score;
-    residual = (long double)scaled_residual[observation];
-    quadratic += influence * influence * residual * residual;
+  for(int term = 0; term < nterms; ++term) {
+    if(basis[term] == NULL || !isfinite(base_projection[term]) ||
+       !isfinite(alternate_projection[term])) return 0;
+    if(base_projection[term] != alternate_projection[term])
+      same_projection = 0;
   }
-
-  if(!isfinite(quadratic) || quadratic < 0.0L)
-    return 0;
-  if(quadratic == 0.0L || residual_scale == 0.0) {
-    *standard_error = 0.0;
+  /* This first pass only chooses an anchor. The arithmetic below, not these
+   * approximate scores, defines every off-anchor influence coefficient. */
+  for(int donor = 0; donor < num_obs_train; ++donor) {
+    long double left = 0.0L, right = 0.0L;
+    if(!isfinite(base_kernel_row[donor]) ||
+       !isfinite(alternate_kernel_row[donor])) return 0;
+    if(base_kernel_row[donor] != alternate_kernel_row[donor]) same_row = 0;
+    for(int term = 0; term < nterms; ++term) {
+      if(!isfinite(basis[term][donor])) return 0;
+      left += (long double)basis[term][donor]*base_projection[term];
+      right += (long double)basis[term][donor]*alternate_projection[term];
+    }
+    const long double score = fabsl(left*base_kernel_row[donor]) +
+      fabsl(right*alternate_kernel_row[donor]);
+    if(!isfinite(score)) return 0;
+    if(score > anchor_score) {
+      anchor_score = score;
+      anchor = donor;
+    }
+  }
+  const int singleton = np_regression_hc0_lp_singleton_donor(
+    base_kernel_row, num_obs_train);
+  if((same_projection && same_row) ||
+     (singleton >= 0 && singleton == np_regression_hc0_lp_singleton_donor(
+       alternate_kernel_row, num_obs_train)) ||
+     np_regression_lp_equal_endpoint_maps(nterms, num_obs_train,
+       base_projection, alternate_projection, base_kernel_row, alternate_kernel_row)) {
+    *contrast = 0.0;
+    if(want_variance) *standard_error = 0.0;
+    if(structural_zero != NULL) *structural_zero = 1;
     return 1;
   }
-  {
-    const long double value =
-      (long double)residual_scale * sqrtl(quadratic);
 
-    if(!isfinite(value) || value > (long double)DBL_MAX)
-      return 0;
-    *standard_error = (double)value;
+  NPRegressionContrastAccumulator sum = np_regression_contrast_begin(
+    response[anchor], want_variance);
+  const int need_zero_certificate = structural_zero != NULL ||
+    (want_variance && context->unknown_count > 0);
+  /* The reconstructed anchor is -sum(off coefficients). Equality of rounded
+   * endpoint anchor products alone cannot certify it: near-self fits can
+   * round both anchor products to one while retaining distinct small tails. */
+  const int anchor_certified_zero = want_variance &&
+    context->residual_information != NULL &&
+    context->residual_information[anchor] == NP_RESIDUAL_UNIDENTIFIED &&
+    np_regression_lp_anchor_zero(basis, nterms, num_obs_train,
+      base_projection, alternate_projection, base_kernel_row, alternate_kernel_row, anchor);
+  for(int donor = 0; donor < num_obs_train; ++donor) {
+    if(donor == anchor) continue;
+    NPContrastNumber left = np_contrast_number(0.0);
+    NPContrastNumber right = np_contrast_number(0.0);
+    int certified_zero = 1;
+    for(int term = 0; term < nterms; ++term) {
+      const double value = basis[term][donor];
+      if(value == 0.0) continue;
+      np_contrast_accumulate(&left,
+        np_contrast_two_product(value, base_projection[term]));
+      np_contrast_accumulate(&right,
+        np_contrast_two_product(value, alternate_projection[term]));
+      if(!(((base_kernel_row[donor] == 0.0 || base_projection[term] == 0.0) &&
+            (alternate_kernel_row[donor] == 0.0 || alternate_projection[term] == 0.0)) ||
+           (base_kernel_row[donor] == alternate_kernel_row[donor] &&
+            base_projection[term] == alternate_projection[term])))
+        certified_zero = 0;
+    }
+    /* Preserve the retained influence w*(B'a), including its operation order:
+     * multiplying w*a before B can lose a representable projected influence.
+     * One paired subtraction per donor replaces one per basis term. */
+    NPContrastNumber coefficient = np_contrast_subtract(
+      np_contrast_scale(np_contrast_two_sum(left.hi, left.lo), base_kernel_row[donor]),
+      np_contrast_scale(np_contrast_two_sum(right.hi, right.lo), alternate_kernel_row[donor]));
+    /* A variance-only certificate never changes a nonzero point coefficient.
+     * Complete proportional maps were certified above independently of SE;
+     * an individual unproved dependency remains unavailable. */
+    if(!certified_zero && need_zero_certificate &&
+       coefficient.hi == 0.0 && coefficient.lo == 0.0) {
+      certified_zero = 1;
+      for(int term = 0; term < nterms; ++term) {
+        if(basis[term][donor] != 0.0 &&
+           !np_residual_products_equal(base_kernel_row[donor], base_projection[term],
+                                      alternate_kernel_row[donor], alternate_projection[term])) {
+          certified_zero = 0;
+          break;
+        }
+      }
+    }
+    if(certified_zero) coefficient = np_contrast_number(0.0);
+    np_regression_contrast_add(&sum, coefficient, response[donor], certified_zero,
+      want_variance && context->residual_information != NULL ?
+        (NPResidualInformation)context->residual_information[donor] :
+        NP_RESIDUAL_IDENTIFIED,
+      want_variance ? context->scaled_residual[donor] : 0.0);
   }
-  return R_FINITE(*standard_error);
+  const NPRegressionContrastResult result = np_regression_contrast_finish(
+    &sum, want_variance && context->residual_information != NULL ?
+      (NPResidualInformation)context->residual_information[anchor] : NP_RESIDUAL_IDENTIFIED,
+    want_variance ? context->scaled_residual[anchor] : 0.0, anchor_certified_zero);
+  if(result.information == NP_RESIDUAL_INVALID) return 0;
+  *contrast = result.contrast;
+  if(structural_zero != NULL) *structural_zero = result.structural_zero;
+  if(want_variance) {
+    if(result.information == NP_RESIDUAL_UNIDENTIFIED) {
+      *standard_error = NA_REAL;
+      if(unavailable != NULL) *unavailable = 1;
+    } else {
+      const long double value =
+        (long double)context->residual_scale*result.standard_error;
+      if(!isfinite(value) || value > DBL_MAX) return 0;
+      *standard_error = (double)value;
+    }
+  }
+  return 1;
 }
 
 typedef struct {
@@ -30436,6 +31996,8 @@ typedef struct {
   double **categorical_matrix_bandwidth;
   int categorical_base_requires_refit;
   int categorical_point_invariant;
+  int all_large_kernel_rows;
+  int ordinary_response;
   double *mean;
   double **gradient;
   double *mean_stderr;
@@ -30489,6 +32051,7 @@ typedef struct {
   double *categorical_base_kernel_row;
   double *categorical_alternate_kernel_row;
   NPLPSolveWorkspace solve_workspace;
+  NPInferenceReuse inference_reuse;
 #ifdef MPI2
   NPRegMpiOwnerChunk mpi_owner_chunk;
   double *mpi_kernel_row;
@@ -30527,6 +32090,7 @@ static void np_regression_general_lp_fit_owner_init(
   owner->categorical_base_kernel_row = NULL;
   owner->categorical_alternate_kernel_row = NULL;
   np_lp_solve_workspace_init(&owner->solve_workspace);
+  memset(&owner->inference_reuse, 0, sizeof(owner->inference_reuse));
 #ifdef MPI2
   owner->mpi_owner_chunk.recvcounts = NULL;
   owner->mpi_owner_chunk.displs = NULL;
@@ -30548,6 +32112,7 @@ static void np_regression_general_lp_fit_owner_cleanup(
 
   (void)jump;
   np_lp_solve_workspace_clear(&owner->solve_workspace);
+  np_inference_reuse_clear(&owner->inference_reuse);
   free_mat(owner->basis, owner->nterms);
   if(owner->matrix_bandwidth_eval != NULL)
     free_tmat(owner->matrix_bandwidth_eval);
@@ -30841,6 +32406,7 @@ static int np_regression_general_lp_categorical_points(
 
   if(call == NULL || owner == NULL || owner->categorical_point == NULL)
     return 0;
+  const int compute_pair = call->ordinary_response;
 
   if(call->categorical_point_invariant) {
     for(coordinate = call->categorical_range.begin - call->num_reg_continuous;
@@ -30854,8 +32420,8 @@ static int np_regression_general_lp_categorical_points(
      !np_regression_general_lp_point_at_frame(
        call, owner, moment_stride, response_y_offset,
        response_basis_offset, epsilon, row, -1, &base_point,
-       compute_hc0 ? owner->categorical_base_kernel_row : NULL,
-       compute_hc0 ? owner->power2_projection : NULL))
+       compute_pair ? owner->categorical_base_kernel_row : NULL,
+       compute_pair ? owner->power2_projection : NULL))
     return 0;
 
   for(coordinate = call->unordered_range.begin - call->num_reg_continuous;
@@ -30867,8 +32433,12 @@ static int np_regression_general_lp_categorical_points(
 
     if(current == alternate) {
       owner->categorical_point[coordinate] = 0.0;
-      if(compute_hc0)
+      if(compute_hc0) {
         owner->categorical_stderr[coordinate] = 0.0;
+        if(call->hc0_context->gradient_structural_zero != NULL)
+          call->hc0_context->gradient_structural_zero[
+            call->num_reg_continuous + coordinate][row] = 1;
+      }
       continue;
     }
     owner->eval_unordered[coordinate][0] = alternate;
@@ -30876,8 +32446,8 @@ static int np_regression_general_lp_categorical_points(
          call, owner, moment_stride, response_y_offset,
          response_basis_offset, epsilon, row,
          call->num_reg_continuous + coordinate, &alternate_point,
-         compute_hc0 ? owner->categorical_alternate_kernel_row : NULL,
-         compute_hc0 ? owner->coefficient : NULL)) {
+         compute_pair ? owner->categorical_alternate_kernel_row : NULL,
+         compute_pair ? owner->coefficient : NULL)) {
       owner->eval_unordered[coordinate][0] = current;
       return 0;
     }
@@ -30887,8 +32457,8 @@ static int np_regression_general_lp_categorical_points(
       if(compute_hc0) owner->categorical_stderr[coordinate] = NA_REAL;
       continue;
     }
-    if(compute_hc0 &&
-       !np_regression_hc0_lp_categorical_standard_error(
+    if(compute_pair &&
+       !np_regression_lp_categorical_contrast(
          owner->basis,
          owner->nterms,
          call->num_obs_train,
@@ -30896,9 +32466,15 @@ static int np_regression_general_lp_categorical_points(
          owner->coefficient,
          owner->categorical_base_kernel_row,
          owner->categorical_alternate_kernel_row,
-         call->hc0_context->scaled_residual,
-         call->hc0_context->residual_scale,
-         &owner->categorical_stderr[coordinate]))
+         call->vector_Y, &owner->categorical_point[coordinate],
+         compute_hc0 ? &owner->categorical_stderr[coordinate] : NULL,
+         compute_hc0 ? call->hc0_context : NULL,
+         compute_hc0 && call->hc0_context->gradient_unavailable != NULL ?
+           &call->hc0_context->gradient_unavailable[
+             call->num_reg_continuous + coordinate][row] : NULL,
+         compute_hc0 && call->hc0_context->gradient_structural_zero != NULL ?
+           &call->hc0_context->gradient_structural_zero[
+             call->num_reg_continuous + coordinate][row] : NULL))
       return 0;
   }
 
@@ -30916,8 +32492,12 @@ static int np_regression_general_lp_categorical_points(
 
     if(count <= 1) {
       owner->categorical_point[category] = 0.0;
-      if(compute_hc0)
+      if(compute_hc0) {
         owner->categorical_stderr[category] = 0.0;
+        if(call->hc0_context->gradient_structural_zero != NULL)
+          call->hc0_context->gradient_structural_zero[
+            call->num_reg_continuous + category][row] = 1;
+      }
       continue;
     }
     for(index = 0; index < count; ++index)
@@ -30939,8 +32519,8 @@ static int np_regression_general_lp_categorical_points(
          call, owner, moment_stride, response_y_offset,
          response_basis_offset, epsilon, row,
          call->num_reg_continuous + category, &alternate_point,
-         compute_hc0 ? owner->categorical_alternate_kernel_row : NULL,
-         compute_hc0 ? owner->coefficient : NULL)) {
+         compute_pair ? owner->categorical_alternate_kernel_row : NULL,
+         compute_pair ? owner->coefficient : NULL)) {
       owner->eval_ordered[coordinate][0] = current;
       return 0;
     }
@@ -30951,8 +32531,8 @@ static int np_regression_general_lp_categorical_points(
       if(compute_hc0) owner->categorical_stderr[category] = NA_REAL;
       continue;
     }
-    if(compute_hc0 &&
-       !np_regression_hc0_lp_categorical_standard_error(
+    if(compute_pair &&
+       !np_regression_lp_categorical_contrast(
          owner->basis,
          owner->nterms,
          call->num_obs_train,
@@ -30960,10 +32540,17 @@ static int np_regression_general_lp_categorical_points(
          owner->coefficient,
          owner->categorical_base_kernel_row,
          owner->categorical_alternate_kernel_row,
-         call->hc0_context->scaled_residual,
-         call->hc0_context->residual_scale,
-         &owner->categorical_stderr[category]))
+         call->vector_Y, &owner->categorical_point[category],
+         compute_hc0 ? &owner->categorical_stderr[category] : NULL,
+         compute_hc0 ? call->hc0_context : NULL,
+         compute_hc0 && call->hc0_context->gradient_unavailable != NULL ?
+           &call->hc0_context->gradient_unavailable[
+             call->num_reg_continuous + category][row] : NULL,
+         compute_hc0 && call->hc0_context->gradient_structural_zero != NULL ?
+           &call->hc0_context->gradient_structural_zero[
+             call->num_reg_continuous + category][row] : NULL))
       return 0;
+    if(compute_pair) owner->categorical_point[category] *= sign;
   }
   return 1;
 }
@@ -30988,9 +32575,17 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
     !hc0_residual_preparing;
   const int preserve_point = ordinary_hc0 &&
     call->hc0_context->point_already_computed;
+  const int categorical_pair = call->ordinary_response && call->do_grad &&
+    (num_reg_unordered + num_reg_ordered > 0) &&
+    !call->categorical_point_invariant;
   const int categorical_hc0 = ordinary_hc0 && call->do_gerr &&
     (num_reg_unordered + num_reg_ordered > 0) &&
     !call->categorical_point_invariant;
+  const int hc0_information_row = hc0_residual_preparing || ordinary_hc0;
+  /* Only conditional variance consumers retain the squared-moment matrix. */
+  const int moment_errors = call->do_merr && !ordinary_hc0;
+  NPRegressionResidualPreparation * const preparation =
+    hc0_residual_preparing ? call->hc0_context->preparation : NULL;
   const int reuse_fit_kernel_row =
     (BANDWIDTH_reg == BW_FIXED) &&
     (call->tree_enabled != NP_TREE_TRUE) &&
@@ -31011,10 +32606,9 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
   const int include_response_square = call->kernel_route != NULL ||
     (!ordinary_hc0 && call->do_merr);
   const int reuse_fit_dual_power =
-    call->do_merr && (!reuse_fit_kernel_row) &&
-    (!fit_tree_active || ordinary_hc0);
+    moment_errors && (!reuse_fit_kernel_row) && (!fit_tree_active);
   NP_DualPowerCtx fit_dual_power_ctx = {
-    NULL, 2, NULL, NULL, 0, 0, NULL, 0, NULL, NULL
+    NULL, 2, NULL, NULL, 0, 0, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL
   };
   int variance_nrhs = 1;
   int first_se_nrhs = 0;
@@ -31023,6 +32617,14 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
   int moment_stride;
   int i, j, l;
 
+  if(hc0_residual_preparing &&
+     (!np_regression_residual_preparation_valid(preparation) ||
+      preparation->num_obs_train != num_obs_train ||
+      preparation->num_obs_eval != num_obs_eval ||
+      call->do_merr || call->do_gerr || call->first_se_request != NULL)) {
+    execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_HC0;
+    return R_NilValue;
+  }
   if((vector_glp_degree_extern == NULL) || (num_reg_continuous <= 0)) {
     execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_DEGREE;
     return R_NilValue;
@@ -31079,15 +32681,16 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
       (size_t)num_obs_train*sizeof(double));
   owner->moments = (double *)malloc(
     (size_t)moment_stride*(size_t)owner->nterms*sizeof(double));
-  if(call->do_merr)
+  if(moment_errors)
     owner->power2_moments = (double *)malloc(
       (size_t)owner->nterms*(size_t)owner->nterms*sizeof(double));
-  if(call->do_merr && reuse_fit_kernel_row)
+  if((moment_errors && reuse_fit_kernel_row) ||
+     (hc0_information_row && !categorical_pair))
     owner->retained_kernel_row = (double *)malloc(
       (size_t)num_obs_train*sizeof(double));
   owner->coefficient = (double *)malloc(
     (size_t)owner->nterms*sizeof(double));
-  if(call->do_merr)
+  if(call->do_merr || categorical_pair)
     owner->power2_projection = (double *)malloc(
       (size_t)owner->nterms*sizeof(double));
   owner->eval_basis = (double *)malloc(
@@ -31097,9 +32700,10 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
   if(call->do_grad && (num_reg_unordered + num_reg_ordered > 0))
     owner->categorical_point = (double *)malloc(
       (size_t)(num_reg_unordered + num_reg_ordered)*sizeof(double));
-  if(categorical_hc0) {
+  if(categorical_hc0)
     owner->categorical_stderr = (double *)malloc(
       (size_t)(num_reg_unordered + num_reg_ordered)*sizeof(double));
+  if(categorical_pair) {
     owner->categorical_base_kernel_row = (double *)malloc(
       (size_t)num_obs_train*sizeof(double));
     owner->categorical_alternate_kernel_row = (double *)malloc(
@@ -31122,33 +32726,42 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
      owner->response_columns == NULL || owner->basis_columns == NULL ||
      (include_response_square && owner->squared_response == NULL) ||
      owner->moments == NULL ||
-     (call->do_merr && owner->power2_moments == NULL) ||
-     (call->do_merr && reuse_fit_kernel_row &&
+     (moment_errors && owner->power2_moments == NULL) ||
+     (((moment_errors && reuse_fit_kernel_row) ||
+       (hc0_information_row && !categorical_pair)) &&
       owner->retained_kernel_row == NULL) ||
      owner->coefficient == NULL ||
-     (call->do_merr && owner->power2_projection == NULL) ||
+     ((call->do_merr || categorical_pair) && owner->power2_projection == NULL) ||
      owner->eval_basis == NULL ||
      owner->eval_derivative == NULL ||
      (call->do_grad && (num_reg_unordered + num_reg_ordered > 0) &&
       owner->categorical_point == NULL) ||
-     (categorical_hc0 &&
-      (owner->categorical_stderr == NULL ||
-       owner->categorical_base_kernel_row == NULL ||
+     (categorical_hc0 && owner->categorical_stderr == NULL) ||
+     (categorical_pair &&
+      (owner->categorical_base_kernel_row == NULL ||
        owner->categorical_alternate_kernel_row == NULL)) ||
      (use_bernstein && owner->basis_context == NULL)) {
     execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_ALLOC;
     return R_NilValue;
   }
 
-  if(call->do_merr) {
+  if(moment_errors) {
     fit_dual_power_ctx.weighted_sum = owner->power2_moments;
     fit_dual_power_ctx.matrix_Y = owner->basis;
     fit_dual_power_ctx.matrix_W = owner->basis;
     fit_dual_power_ctx.ncol_Y = owner->nterms;
     fit_dual_power_ctx.ncol_W = owner->nterms;
-    fit_dual_power_ctx.observation_scale = ordinary_hc0 ?
-      call->hc0_context->scaled_residual : NULL;
+    fit_dual_power_ctx.observation_scale = NULL;
   }
+
+  /* Optional exact-result reuse; failure to allocate it must not make a
+   * valid incumbent donor calculation fail. Required workspaces above retain
+   * their existing failure policy. The basis is filled once before the row
+   * loop; the residual inputs remain immutable throughout this invocation. */
+  if(ordinary_hc0 && call->do_merr && call->all_large_kernel_rows)
+    (void)np_inference_reuse_reserve(
+      &owner->inference_reuse, owner->nterms, variance_nrhs, num_obs_train,
+      owner->basis, call->hc0_context);
 
   if(include_response_square)
     for(i = 0; i < num_obs_train; ++i)
@@ -31198,7 +32811,10 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	       (BANDWIDTH_reg == BW_ADAP_NN));
 	    const int owner_chunk_rows_lp =
 	      np_reg_mpi_owner_chunk_rows(num_obs_eval,
-	                                  1 + call->do_merr +
+	                                  1 + call->do_merr + 2*hc0_residual_preparing +
+	                                  ((ordinary_hc0 && call->do_gerr &&
+	                                    call->hc0_context->gradient_structural_zero != NULL) ?
+	                                   num_reg_continuous + num_reg_unordered + num_reg_ordered : 0) +
 	                                  (call->do_grad ?
 	                                   num_reg_continuous*(1 + (call->do_gerr ? 1 : 0)) +
 	                                   (num_reg_unordered + num_reg_ordered)*
@@ -31210,6 +32826,13 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
     double pristine_anchor = 0.0;
     NPLPSolvePolicyDiagnostics solve_diagnostics = {0, 0.0};
     int have_vcov = 0;
+    double * const hc0_kernel_row = categorical_pair ?
+      owner->categorical_base_kernel_row :
+      (hc0_information_row ? owner->retained_kernel_row : NULL);
+    const int divide_retained_weights = categorical_pair ||
+      (hc0_information_row && !reuse_fit_kernel_row);
+    const double hc0_kernel_divisor =
+      reuse_fit_kernel_row && !categorical_pair ? call->bandwidth_product : 1.0;
 
 #ifdef MPI2
 	      if(use_mpi_owner_reduce_lp && ((j % owner_chunk_rows_lp) == 0)){
@@ -31217,7 +32840,11 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	        const int chunk_end = MIN(num_obs_eval, chunk_start + owner_chunk_rows_lp);
 	        /* Last cell: 0=complete, 1=empty fit, 2=empty contrast, -1=failure.
 	         * Chunk ownership/size retains the incumbent numeric-width policy. */
+	        const int structural_width = ordinary_hc0 && call->do_gerr &&
+	          call->hc0_context->gradient_structural_zero != NULL ?
+	          num_reg_continuous + num_reg_unordered + num_reg_ordered : 0;
 	        const int owner_row_width_lp = 2 + call->do_merr +
+	          2*hc0_residual_preparing + structural_width +
 	          (call->do_grad ?
 	           num_reg_continuous*(1 + (call->do_gerr ? 1 : 0)) +
 	           (num_reg_unordered + num_reg_ordered)*
@@ -31230,14 +32857,14 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	                                    chunk_end,
 	                                    owner_row_width_lp,
 	                                    "npreg LP");
-	        /* The beta row provider returns its power-two moments directly. */
-	        if(call->do_merr && call->kernel_route == NULL &&
-	           !categorical_hc0)
+	        /* Beta needs a retained row only for residual preparation/availability;
+	         * its ordinary power-two moments still come from the native provider. */
+	        const int need_mpi_kernel_row = !categorical_pair &&
+	          ((call->do_merr && call->kernel_route == NULL) || hc0_information_row);
+	        if(need_mpi_kernel_row)
 	          owner->mpi_kernel_row = (double *)malloc(
 	            (size_t)num_obs_train*sizeof(double));
-	        if(call->do_merr && call->kernel_route == NULL &&
-	           !categorical_hc0 &&
-	           owner->mpi_kernel_row == NULL)
+	        if(need_mpi_kernel_row && owner->mpi_kernel_row == NULL)
 	          error("\n** Error: memory allocation failed.");
 
 	        local_pos = 0;
@@ -31247,6 +32874,8 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	          NPLPSolvePolicyDiagnostics solve_diagnostics_owner = {0, 0.0};
 	          int have_vcov_owner = 0;
 	          double * const out_owner = owner->mpi_owner_chunk.sendbuf + (size_t)local_pos*(size_t)owner_row_width_lp;
+	          double * const owner_kernel_row = categorical_pair ?
+	            owner->categorical_base_kernel_row : owner->mpi_kernel_row;
 
 	          for(l = 0; l < num_reg_continuous; l++){
 	            owner->eval_continuous[l][0] =
@@ -31324,9 +32953,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	                                   NULL,
 	                                   owner->moments,
 	                                   NULL,
-	                                   categorical_hc0 ?
-	                                     owner->categorical_base_kernel_row :
-	                                     owner->mpi_kernel_row,
+	                                   owner_kernel_row,
 	                                   call->gate_context,
 	                                   NULL);
 	          else {
@@ -31365,11 +32992,10 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	                 call->matrix_categorical_vals,
 	                 call->categorical_compress,
 	                 owner->moments,
-	                 call->do_merr ? owner->power2_moments : NULL,
+	                 moment_errors ? owner->power2_moments : NULL,
 	                 ordinary_hc0 ?
 	                   call->hc0_context->scaled_residual : NULL,
-	                 categorical_hc0 ?
-	                   owner->categorical_base_kernel_row : NULL,
+	                 owner_kernel_row,
 	                 call->kernel_route,
 	                 call->kernel_route_diagnostics) != 0) {
 	              owner_solve_failed = 1;
@@ -31395,8 +33021,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	               &solve_diagnostics_owner) != NP_LP_SOLVE_POLICY_OK){
 	            if(np_regression_general_lp_empty_row(call, owner, jj, 0,
 	                 moment_stride, 1,
-	                 categorical_hc0 ? owner->categorical_base_kernel_row :
-	                   (call->do_merr && call->kernel_route == NULL ? owner->mpi_kernel_row : NULL))) {
+	                 owner_kernel_row)) {
 	              for(int col = 0; col < owner_row_width_lp - 1; ++col)
 	                out_owner[col] = NA_REAL;
 	              out_owner[owner_row_width_lp - 1] = 1.0;
@@ -31429,6 +33054,21 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	          if(!preserve_point)
 	            for(i = 0; i < owner->nterms; i++)
 	              out_owner[0] += owner->eval_basis[i]*owner->coefficient[i];
+	          if(hc0_residual_preparing) {
+	            for(i = 0; i < owner->nterms; ++i)
+	              owner->solve_workspace.rhs_source[i] = owner->eval_basis[i];
+	            if(np_lp_solve_workspace_solve_adjoint_factored(
+	                 &owner->solve_workspace, owner->nterms, 1,
+	                 pristine_anchor_owner, &solve_diagnostics_owner) != NP_LP_SOLVE_POLICY_OK ||
+	               !np_regression_hc0_lp_prepare_row(owner->basis, owner->nterms,
+	                 owner->solve_workspace.rhs_work, owner_kernel_row, preparation, jj)) {
+	              owner_solve_failed = 1;
+	              break;
+	            }
+	            const int donor = preparation->evaluation_to_donor[jj];
+	            out_owner[1 + call->do_merr] = preparation->normalized_residual[donor];
+	            out_owner[2 + call->do_merr] = preparation->information[donor];
+	          }
 
 	          sigma2_owner = 0.0;
 	          if(call->do_merr && !ordinary_hc0) {
@@ -31452,30 +33092,12 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	            out_owner[1] = 0.0;
 	          }
 
-	          if(call->do_merr && call->kernel_route == NULL) {
+	          if(moment_errors && call->kernel_route == NULL) {
 	            for(i = 0; i < owner->nterms*owner->nterms; i++)
 	              owner->power2_moments[i] = 0.0;
 
-	            if(ordinary_hc0) {
-	              /* The fixed MPI owner retains already-normalized weights. */
-	              if(!np_regression_hc0_power2_outer_sum(
-	                   owner->basis, owner->nterms,
-	                   owner->basis, owner->nterms,
-	                   categorical_hc0 ?
-	                     owner->categorical_base_kernel_row :
-	                     owner->mpi_kernel_row,
-	                   num_obs_train,
-	                   0, 0, 1.0,
-	                   call->hc0_context->scaled_residual,
-	                   owner->power2_moments, NULL)) {
-	                owner_solve_failed = 1;
-	                break;
-	              }
-	            } else {
 	              for(i = 0; i < num_obs_train; i++){
-	                const double w = categorical_hc0 ?
-	                  owner->categorical_base_kernel_row[i] :
-	                  owner->mpi_kernel_row[i];
+	                const double w = owner_kernel_row[i];
 	                const double w2 = w*w;
 	                if(w2 == 0.0)
 	                  continue;
@@ -31486,7 +33108,6 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	                      za*owner->basis[b][i]*w2;
 	                }
 	              }
-	            }
 	          }
 	          {
 	            int variance_rhs = 1;
@@ -31507,7 +33128,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	                  owner->eval_derivative;
 	                double grad_value = 0.0;
 	                const int output_offset =
-	                  1 + call->do_merr +
+	                  1 + call->do_merr + 2*hc0_residual_preparing +
 	                  l*(1 + (call->do_gerr ? 1 : 0));
 
 	                if(use_bernstein)
@@ -31578,12 +33199,16 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 
 	            if(have_vcov_owner){
 	              if(ordinary_hc0) {
-	                if(!np_regression_hc0_lp_standard_error(
+	                if(owner->inference_reuse.entry != NULL)
+	                  np_inference_reuse_begin_row(
+	                    &owner->inference_reuse, owner->basis, call->hc0_context,
+	                    owner_kernel_row, num_obs_train, 1.0,
+	                    np_progress_fit_heartbeat);
+	                if(!np_regression_hc0_lp_standard_error_reuse(
+	                     &owner->inference_reuse, 0,
 	                     owner->solve_workspace.rhs_work,
-	                     owner->power2_moments,
-	                     owner->nterms,
-	                     call->hc0_context->residual_scale,
-	                     &out_owner[1])) {
+	                     owner->basis, owner->nterms, owner_kernel_row, 1.0,
+	                     call->hc0_context, &out_owner[1], NULL)) {
 	                  owner_solve_failed = 1;
 	                  break;
 	                }
@@ -31605,12 +33230,12 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	                      owner->solve_workspace.rhs_work +
 	                        (size_t)rhs*(size_t)owner->nterms;
 	                    if(ordinary_hc0) {
-	                      if(!np_regression_hc0_lp_standard_error(
+	                      if(!np_regression_hc0_lp_standard_error_reuse(
+	                           &owner->inference_reuse, rhs,
 	                           projection,
-	                           owner->power2_moments,
-	                           owner->nterms,
-	                           call->hc0_context->residual_scale,
-	                           &out_owner[2 + call->do_merr + l*2])) {
+	                           owner->basis, owner->nterms, owner_kernel_row, 1.0,
+	                           call->hc0_context,
+	                           &out_owner[2 + call->do_merr + l*2], NULL)) {
 	                        owner_solve_failed = 1;
 	                        break;
 	                      }
@@ -31631,19 +33256,29 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	              }
 	            }
 
-	            if(categorical_hc0 &&
-	               !call->categorical_base_requires_refit)
+	            if(categorical_pair && !call->categorical_base_requires_refit) {
+	              if(!ordinary_hc0 && !hc0_residual_preparing) {
+	                for(i = 0; i < owner->nterms; ++i)
+	                  owner->solve_workspace.rhs_source[i] = owner->eval_basis[i];
+	                if(np_lp_solve_workspace_solve_adjoint_factored(
+	                     &owner->solve_workspace, owner->nterms, 1,
+	                     pristine_anchor_owner, &solve_diagnostics_owner) != NP_LP_SOLVE_POLICY_OK) {
+	                  owner_solve_failed = 1;
+	                  break;
+	                }
+	              }
 	              memcpy(owner->power2_projection,
 	                     owner->solve_workspace.rhs_work,
 	                     (size_t)owner->nterms*sizeof(double));
+	            }
 
 	            if(call->do_grad &&
 	               (num_reg_unordered + num_reg_ordered > 0)) {
 	              const int categorical_output_offset =
-	                1 + call->do_merr +
+	                1 + call->do_merr + 2*hc0_residual_preparing +
 	                num_reg_continuous*(1 + (call->do_gerr ? 1 : 0));
 
-	              if(!preserve_point || categorical_hc0) {
+	              if(!preserve_point || categorical_pair) {
 	                if(include_response_square)
 	                  owner->response_columns[0] = owner->squared_response;
 	                owner->response_columns[response_y_offset] = call->vector_Y;
@@ -31676,7 +33311,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	                const int output = categorical_output_offset +
 	                  l*(1 + (call->do_gerr ? 1 : 0));
 
-	                out_owner[output] = preserve_point ?
+	                out_owner[output] = preserve_point && !categorical_pair ?
 	                  call->gradient[num_reg_continuous + l][jj] :
 	                  owner->categorical_point[l];
 	                if(call->do_gerr)
@@ -31687,6 +33322,9 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	              }
 	            }
 	          }
+	          for(l = 0; l < structural_width; ++l)
+	            out_owner[owner_row_width_lp - 1 - structural_width + l] =
+	              call->hc0_context->gradient_structural_zero[l][jj];
 	          const int caller_row = call->empty_rows != NULL && call->empty_rows->row_map != NULL ?
 	            call->empty_rows->row_map[jj] : jj;
 	          out_owner[owner_row_width_lp - 1] = call->empty_rows != NULL &&
@@ -31733,21 +33371,50 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 	              }
 	              int ipos = 0;
 	              call->mean[jj] = in[ipos++];
-	              if(call->do_merr)
+	              if(call->do_merr) {
 	                call->mean_stderr[jj] = in[ipos++];
+	                if(ordinary_hc0 && call->hc0_context->mean_unavailable != NULL &&
+	                   ISNA(call->mean_stderr[jj]))
+	                  call->hc0_context->mean_unavailable[jj] = 1;
+	              }
+	              if(hc0_residual_preparing) {
+	                const int donor = preparation->evaluation_to_donor[jj];
+	                if(!R_FINITE(in[ipos]) ||
+	                   (in[ipos + 1] != NP_RESIDUAL_IDENTIFIED &&
+	                    in[ipos + 1] != NP_RESIDUAL_UNIDENTIFIED)) {
+	                  owner_solve_failed = 1;
+	                  break;
+	                }
+	                preparation->normalized_residual[donor] = in[ipos++];
+	                preparation->information[donor] = (int)in[ipos++];
+	              }
 	              if(call->do_grad){
 	                for(l = 0; l < num_reg_continuous; l++){
 	                  call->gradient[l][jj] = in[ipos++];
-	                  if(call->do_gerr)
+	                  if(call->do_gerr) {
 	                    call->gradient_stderr[l][jj] = in[ipos++];
+	                    if(ordinary_hc0 && np_glp_gradient_direction_active(l) &&
+	                       call->hc0_context->gradient_unavailable != NULL &&
+	                       ISNA(call->gradient_stderr[l][jj]))
+	                      call->hc0_context->gradient_unavailable[l][jj] = 1;
+	                  }
 	                }
 	                for(l = num_reg_continuous;
 	                    l < (num_reg_continuous + num_reg_unordered + num_reg_ordered);
 	                    l++){
 	                  call->gradient[l][jj] = in[ipos++];
-	                  if(call->do_gerr)
+	                  if(call->do_gerr) {
 	                    call->gradient_stderr[l][jj] = in[ipos++];
+	                    if(ordinary_hc0 && call->hc0_context->gradient_unavailable != NULL &&
+	                       ISNA(call->gradient_stderr[l][jj]))
+	                      call->hc0_context->gradient_unavailable[l][jj] = 1;
+	                  }
 	                }
+	              }
+	              for(l = 0; l < structural_width; ++l) {
+	                call->hc0_context->gradient_structural_zero[l][jj] =
+	                  ISNA(in[ipos]) ? 0 : (int)in[ipos];
+	                ++ipos;
 	              }
 	              pos_i++;
 	            }
@@ -31817,9 +33484,9 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
            call->matrix_categorical_vals,
 	           call->categorical_compress,
 	           owner->moments,
-	           call->do_merr ? owner->power2_moments : NULL,
+	           moment_errors ? owner->power2_moments : NULL,
            ordinary_hc0 ? call->hc0_context->scaled_residual : NULL,
-           categorical_hc0 ? owner->categorical_base_kernel_row : NULL,
+           hc0_kernel_row,
            call->kernel_route,
            call->kernel_route_diagnostics) != 0) {
         execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_ROUTE;
@@ -31835,7 +33502,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
                          num_reg_unordered,
                          num_reg_ordered,
                          num_reg_continuous,
-                         0, 0, 1, 1, categorical_hc0, 0, 0, 0, 0,
+                         0, 0, 1, 1, divide_retained_weights, 0, 0, 0, 0,
                          call->operator,
                          OP_NOOP,
                          0, 0, NULL, 1,
@@ -31866,9 +33533,8 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
                          NULL,
                          owner->moments,
                          NULL,
-                         categorical_hc0 ?
-                           owner->categorical_base_kernel_row :
-                           ((call->do_merr && reuse_fit_kernel_row) ?
+                         hc0_kernel_row != NULL ? hc0_kernel_row :
+                           ((moment_errors && reuse_fit_kernel_row) ?
                             owner->retained_kernel_row : NULL),
                          call->gate_context,
                          reuse_fit_dual_power ? &fit_dual_power_ctx : NULL,
@@ -31877,7 +33543,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
                          0,
 #endif
                          NULL);
-      if(ordinary_hc0 && moment_status != 0) {
+      if((ordinary_hc0 || hc0_residual_preparing) && moment_status != 0) {
         execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_HC0;
         return R_NilValue;
       }
@@ -31902,9 +33568,9 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
          &solve_diagnostics) !=
        NP_LP_SOLVE_POLICY_OK) {
       if(np_regression_general_lp_empty_row(call, owner, j, 0,
-           moment_stride, categorical_hc0,
-           categorical_hc0 ? owner->categorical_base_kernel_row :
-             ((call->do_merr && reuse_fit_kernel_row) ? owner->retained_kernel_row : NULL))) {
+           moment_stride, divide_retained_weights,
+           hc0_kernel_row != NULL ? hc0_kernel_row :
+             ((moment_errors && reuse_fit_kernel_row) ? owner->retained_kernel_row : NULL))) {
         call->mean[j] = NA_REAL;
         if(call->do_merr) call->mean_stderr[j] = NA_REAL;
         if(call->do_grad || call->do_gerr)
@@ -31944,6 +33610,19 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
       for(i = 0; i < owner->nterms; ++i)
         call->mean[j] += owner->eval_basis[i]*owner->coefficient[i];
     }
+    if(hc0_residual_preparing) {
+      for(i = 0; i < owner->nterms; ++i)
+        owner->solve_workspace.rhs_source[i] = owner->eval_basis[i];
+      if(np_lp_solve_workspace_solve_adjoint_factored(
+           &owner->solve_workspace, owner->nterms, 1,
+           pristine_anchor, &solve_diagnostics) != NP_LP_SOLVE_POLICY_OK ||
+         !np_regression_hc0_lp_prepare_row(
+           owner->basis, owner->nterms, owner->solve_workspace.rhs_work,
+           hc0_kernel_row, preparation, j)) {
+        execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_HC0;
+        return R_NilValue;
+      }
+    }
     sigma2hat = 0.0;
     if(call->do_merr && !ordinary_hc0) {
       sk = copysign(DBL_MIN, owner->moments[response_basis_offset]) +
@@ -31966,7 +33645,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
       owner->basis_columns[l] = owner->basis[l];
     }
 
-    if(call->do_merr && reuse_fit_kernel_row) {
+    if(moment_errors && reuse_fit_kernel_row) {
       if(!np_lp_power2_moments_from_kernel_row(
            owner->basis,
            owner->nterms,
@@ -31978,7 +33657,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
         execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_HC0;
         return R_NilValue;
       }
-    } else if(call->do_merr && !reuse_fit_dual_power) {
+    } else if(moment_errors && !reuse_fit_dual_power) {
       kernel_weighted_sum_np_ctx(call->kernel_c,
                          call->kernel_u,
                          call->kernel_o,
@@ -32107,12 +33786,18 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 
       if(have_vcov) {
         if(ordinary_hc0) {
-          if(!np_regression_hc0_lp_standard_error(
+          if(owner->inference_reuse.entry != NULL)
+            np_inference_reuse_begin_row(
+              &owner->inference_reuse, owner->basis, call->hc0_context,
+              hc0_kernel_row, num_obs_train, hc0_kernel_divisor,
+              np_progress_fit_heartbeat);
+          if(!np_regression_hc0_lp_standard_error_reuse(
+               &owner->inference_reuse, 0,
                owner->solve_workspace.rhs_work,
-               owner->power2_moments,
-               owner->nterms,
-               call->hc0_context->residual_scale,
-               &call->mean_stderr[j])) {
+               owner->basis, owner->nterms, hc0_kernel_row, hc0_kernel_divisor,
+               call->hc0_context, &call->mean_stderr[j],
+               call->hc0_context->mean_unavailable != NULL ?
+                 &call->hc0_context->mean_unavailable[j] : NULL)) {
             execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_HC0;
             return R_NilValue;
           }
@@ -32135,12 +33820,13 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
                 owner->solve_workspace.rhs_work +
                   (size_t)rhs*(size_t)owner->nterms;
               if(ordinary_hc0) {
-                if(!np_regression_hc0_lp_standard_error(
+                if(!np_regression_hc0_lp_standard_error_reuse(
+                     &owner->inference_reuse, rhs,
                      projection,
-                     owner->power2_moments,
-                     owner->nterms,
-                     call->hc0_context->residual_scale,
-                     &call->gradient_stderr[l][j])) {
+                     owner->basis, owner->nterms, hc0_kernel_row, hc0_kernel_divisor,
+                     call->hc0_context, &call->gradient_stderr[l][j],
+                     call->hc0_context->gradient_unavailable != NULL ?
+                       &call->hc0_context->gradient_unavailable[l][j] : NULL)) {
                   execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_HC0;
                   return R_NilValue;
                 }
@@ -32201,13 +33887,27 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
         }
       }
 
-      if(categorical_hc0 && !call->categorical_base_requires_refit)
+      if(categorical_pair && !call->categorical_base_requires_refit) {
+        /* Mean/continuous coefficients above remain untouched. Reuse an
+         * existing accepted mean adjoint whenever SEs or preparation needed
+         * it; a point-only categorical request adds only this back-solve. */
+        if(!ordinary_hc0 && !hc0_residual_preparing) {
+          for(i = 0; i < owner->nterms; ++i)
+            owner->solve_workspace.rhs_source[i] = owner->eval_basis[i];
+          if(np_lp_solve_workspace_solve_adjoint_factored(
+               &owner->solve_workspace, owner->nterms, 1,
+               pristine_anchor, &solve_diagnostics) != NP_LP_SOLVE_POLICY_OK) {
+            execution->status = NP_REGRESSION_GENERAL_LP_FIT_ERR_SOLVE;
+            return R_NilValue;
+          }
+        }
         memcpy(owner->power2_projection,
                owner->solve_workspace.rhs_work,
                (size_t)owner->nterms*sizeof(double));
+      }
 
       if(call->do_grad &&
-         (!preserve_point || categorical_hc0) &&
+         (!preserve_point || categorical_pair) &&
          (num_reg_unordered + num_reg_ordered > 0)) {
         if(include_response_square)
           owner->response_columns[0] = owner->squared_response;
@@ -32242,7 +33942,7 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
         for(l = call->categorical_range.begin;
             l < call->categorical_range.end;
             ++l) {
-          if(!preserve_point)
+          if(!preserve_point || categorical_pair)
             call->gradient[l][j] =
               owner->categorical_point[l - num_reg_continuous];
           if(call->do_gerr)
@@ -32300,6 +34000,8 @@ typedef struct {
   double *projection_block;
   double *fitted_block;
   double *covariance_workspace;
+  double *residual_gram;
+  NPAllLargeResidualWorkspace *residual_workspace;
   NPLPFullRowWorkspace *inverse_workspace;
   NPRegressionFitOwner *enclosing_owner;
 } NPRegressionAllLargeLPFitOwner;
@@ -32348,6 +34050,9 @@ static void np_regression_alllarge_lp_fit_cleanup(
   free(owner->projection_block);
   free(owner->fitted_block);
   free(owner->covariance_workspace);
+  free(owner->residual_gram);
+  np_alllarge_residual_workspace_clear(owner->residual_workspace);
+  free(owner->residual_workspace);
   free(owner->eval_basis);
   free(owner->eval_derivative);
   free(owner->coefficient);
@@ -32361,6 +34066,102 @@ static void np_regression_alllarge_lp_fit_cleanup(
   free(owner->terms);
   if(owner->enclosing_owner != NULL)
     np_regression_fit_owner_clear(owner->enclosing_owner);
+}
+
+/* Accurate uncertainty moments for the incumbent all-large polynomial map.
+ * The ordinary and cold exponent-tagged arithmetic evaluate the same admitted
+ * canonical off-diagonal completion; neither changes the retained solve.
+ * The enclosing owner protects every allocation across activity callbacks.
+ */
+static int np_regression_alllarge_lp_residual_prepare(
+  NPRegressionResidualPreparation *output, int p, double **basis,
+  const double *inverse, const double *gram, NPContrastNumber intercept_ridge,
+  int unregularized, NPAllLargeResidualWorkspace *workspace,
+  void (*activity)(void))
+{
+  if(!np_regression_residual_preparation_valid(output)) return -1;
+  const int n = output->num_obs_train;
+  for(int i = 0; i < n; ++i) {
+    output->information[i] = NP_RESIDUAL_INVALID;
+    output->normalized_residual[i] = 0.0;
+  }
+  if(p <= 0 || basis == NULL || inverse == NULL || gram == NULL ||
+     workspace == NULL || !np_contrast_finite(intercept_ridge) ||
+     intercept_ridge.hi < 0.0 ||
+     (intercept_ridge.hi == 0.0 && intercept_ridge.lo < 0.0))
+    return -1;
+  if(unregularized && p > n) return -1;
+  for(int k = 0; k < p; ++k)
+    if(basis[k] == NULL) return -1;
+  for(int i = 0; i < n; ++i)
+    if(basis[0][i] != 1.0 || !isfinite(output->response[i])) return -1;
+  for(size_t k = 0; k < (size_t)p * (size_t)p; ++k)
+    if(!isfinite(inverse[k]) || !isfinite(gram[k])) return -1;
+  /* Preserve the established rank/dimension interpolation certificate. */
+  if(unregularized && p == n) {
+    for(int i = 0; i < n; ++i)
+      output->information[i] = NP_RESIDUAL_UNIDENTIFIED;
+    return 0;
+  }
+  int status = np_alllarge_narrow_prepare(
+    &workspace->narrow, n, p, basis, output->response, inverse,
+    intercept_ridge, activity);
+  if(status == NP_ALLLARGE_OK) {
+    for(int row = 0; row < output->num_obs_eval; ++row) {
+      const int self = output->evaluation_to_donor[row];
+      status = np_alllarge_narrow_row(
+        &workspace->narrow, basis, self, output->response[self], inverse,
+        &output->normalized_residual[self], &output->information[self], activity);
+      if(status != NP_ALLLARGE_OK) break;
+      if(activity != NULL && (row & 63) == 0) activity();
+    }
+  }
+  if(status == NP_ALLLARGE_EXPONENT) {
+    /* A deterministic representation retry, not a new statistical method.
+     * Ordinary calls never allocate tagged components or replay donors. */
+    np_alllarge_narrow_clear(&workspace->narrow);
+    status = np_alllarge_wide_prepare(
+      &workspace->wide, n, p, basis, output->response, inverse,
+      intercept_ridge, activity);
+    if(status == NP_ALLLARGE_OK) {
+      for(int row = 0; row < output->num_obs_eval; ++row) {
+        const int self = output->evaluation_to_donor[row];
+        status = np_alllarge_wide_row(
+          &workspace->wide, basis, self, output->response[self], inverse,
+          &output->normalized_residual[self], &output->information[self], activity);
+        if(status != NP_ALLLARGE_OK) break;
+        if(activity != NULL && (row & 63) == 0) activity();
+      }
+    }
+  }
+  if(status == NP_ALLLARGE_OK) return 0;
+  for(int i = 0; i < n; ++i) {
+    output->information[i] = NP_RESIDUAL_INVALID;
+    output->normalized_residual[i] = 0.0;
+  }
+  return -1;
+}
+
+typedef struct {
+  NPRegressionResidualPreparation *output;
+  int nterms;
+  double **basis;
+  const double *inverse;
+  const double *gram;
+  NPContrastNumber intercept_ridge;
+  int unregularized;
+  NPAllLargeResidualWorkspace *workspace;
+} NPRegressionAllLargeResidualCall;
+
+static SEXP np_regression_alllarge_residual_execute(void *data)
+{
+  const NPRegressionAllLargeResidualCall * const call =
+    (const NPRegressionAllLargeResidualCall *)data;
+  np_regression_alllarge_lp_residual_prepare(
+    call->output, call->nterms, call->basis, call->inverse, call->gram,
+    call->intercept_ridge, call->unregularized, call->workspace,
+    np_progress_fit_heartbeat);
+  return R_NilValue;
 }
 
 int kernel_estimate_regression_categorical_tree_np(
@@ -32399,6 +34200,7 @@ const NPContinuousKernelRoute *kernel_route,
 NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
 int categorical_compress,
 NPRegressionStandardErrorMode standard_error_mode,
+int ordinary_response,
 const NPContinuousPreparedBandwidthView *prepared_bandwidth,
 const NPNNGeometryContext *nn_geometry_context,
 const NPRegressionHC0Context *hc0_context,
@@ -32432,6 +34234,7 @@ NPRegressionFailure *failure){
   int estimation_shortcut_done = 0;
   int hc0_point_shortcut_done = 0;
   int categorical_point_invariant = 0;
+  int all_large_kernel_rows = 0;
   NPRegressionHC0Context hc0_point_context;
   const NPRegressionHC0Context *effective_hc0_context = hc0_context;
   int regression_fit_status = NP_REGRESSION_FIT_OK;
@@ -32458,6 +34261,8 @@ NPRegressionFailure *failure){
   const int do_grad = (gradient != NULL);
   const int do_gerr = (gradient_stderr != NULL);
   const int lp_engine_est = lp_engine;
+  if(ordinary_response != 0 && ordinary_response != 1)
+    NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_VALIDATION, 3, "invalid internal regression response owner");
   if((lp_engine_est != NP_LP_ENGINE_SCALAR) && (lp_engine_est != NP_LP_ENGINE_GENERAL))
     NP_REGRESSION_RETURN_FAILURE(NP_REGRESSION_FAILURE_VALIDATION, 2, "invalid internal regression engine");
   if(standard_error_mode != NP_REGRESSION_STDERR_LOCAL_RESIDUAL &&
@@ -32560,7 +34365,7 @@ NPRegressionFailure *failure){
       num_categories, matrix_categorical_vals,
       mean, gradient, mean_stderr, gradient_stderr,
       kernel_route, kernel_route_diagnostics, categorical_compress,
-      standard_error_mode, prepared_bandwidth, hc0_context, failure,
+      standard_error_mode, ordinary_response, prepared_bandwidth, hc0_context, failure,
       failure != NULL ? empty_rows : NULL);
     if(beta_status != 0)
       return beta_status;
@@ -33000,8 +34805,9 @@ NPRegressionFailure *failure){
       }
     }
 
-    categorical_point_invariant =
+    all_large_kernel_rows =
       all_large_gate && lp_engine_est == NP_LP_ENGINE_GENERAL;
+    categorical_point_invariant = all_large_kernel_rows;
 
     if(all_large_gate &&
        (hc0_context == NULL ||
@@ -33059,6 +34865,27 @@ NPRegressionFailure *failure){
         const double sefac = (sk*hprod > 0.0) ?
           sqrt(MAX(0.0, sigma2hat) * K_INT_KERNEL_P / (sk*hprod)) : 0.0;
 
+        if(hc0_context != NULL &&
+           hc0_context->status == NP_REGRESSION_HC0_RESIDUAL_PREPARING) {
+          NPRegressionResidualPreparation * const preparation =
+            hc0_context->preparation;
+          const long double anchor = vector_Y[0];
+          long double centered_mean = 0.0L;
+          for(i = 0; i < num_obs_train; ++i)
+            centered_mean += (long double)vector_Y[i] - anchor;
+          centered_mean /= num_obs_train;
+          const long double norm = sqrtl(
+            (long double)(num_obs_train - 1) / num_obs_train);
+          for(i = 0; i < num_obs_eval; ++i) {
+            const int self = preparation->evaluation_to_donor[i];
+            preparation->information[self] = num_obs_train > 1 ?
+              NP_RESIDUAL_IDENTIFIED : NP_RESIDUAL_UNIDENTIFIED;
+            preparation->normalized_residual[self] = num_obs_train > 1 ?
+              (double)(((long double)vector_Y[self] - anchor - centered_mean) /
+                       norm) : 0.0;
+          }
+        }
+
         if (fit_progress_active) {
           for(i = 0; i < num_obs_eval; i++){
             mean[i] = ymean;
@@ -33099,6 +34926,12 @@ NPRegressionFailure *failure){
         int covariance_ridged = 0;
         double *covariance_workspace = NULL;
         double *covariance_work = NULL;
+        const int residual_preparing = hc0_context != NULL &&
+          hc0_context->status == NP_REGRESSION_HC0_RESIDUAL_PREPARING;
+        double *residual_gram = NULL;
+        NPAllLargeResidualWorkspace *residual_workspace = NULL;
+        NPContrastNumber residual_intercept_ridge = {0};
+        int residual_unregularized = 1;
         int fast_ok;
         NPRegressionAllLargeLPFitOwner all_large_owner = {
           .num_reg_continuous = num_reg_continuous,
@@ -33114,6 +34947,8 @@ NPRegressionFailure *failure){
           .projection_block = NULL,
           .fitted_block = NULL,
           .covariance_workspace = NULL,
+          .residual_gram = NULL,
+          .residual_workspace = NULL,
           .inverse_workspace = &inverse_workspace,
           .enclosing_owner = &fit_owner
         };
@@ -33289,8 +35124,32 @@ NPRegressionFailure *failure){
           if(shortcut_do_merr)
             for(i = 0; i < glp_nterms; ++i)
               eval_basis[i] = inverse_workspace.matrix_copy[i + i*glp_nterms];
+          if(residual_preparing) {
+            size_t elements, gram_bytes;
+            if(np_size_mul_checked((size_t)glp_nterms, (size_t)glp_nterms,
+                                   &elements) &&
+               np_size_mul_checked(elements, sizeof(double), &gram_bytes)) {
+              residual_gram = (double *)malloc(gram_bytes);
+              residual_workspace = (NPAllLargeResidualWorkspace *)calloc(
+                1, sizeof(NPAllLargeResidualWorkspace));
+              all_large_owner.residual_gram = residual_gram;
+              all_large_owner.residual_workspace = residual_workspace;
+              if(residual_gram != NULL)
+                memcpy(residual_gram, inverse_workspace.matrix_copy, gram_bytes);
+            }
+            /* An unavailable preparation remains INVALID. Allocation failure
+             * does not change fast_ok, point ownership or the BLAS decision. */
+          }
           fast_ok = np_lp_full_row_workspace_invert_retryable(
             &inverse_workspace, glp_nterms, ridge_eps, 64);
+          if(fast_ok && residual_gram != NULL) {
+            residual_intercept_ridge = np_contrast_two_sum(
+              inverse_workspace.matrix_copy[0], -residual_gram[0]);
+            for(i = 0; i < glp_nterms; ++i)
+              if(inverse_workspace.matrix_copy[i + i*glp_nterms] !=
+                 residual_gram[i + i*glp_nterms])
+                residual_unregularized = 0;
+          }
           if(fast_ok && shortcut_do_merr) {
             for(i = 0; i < glp_nterms; ++i)
               if(inverse_workspace.matrix_copy[i + i*glp_nterms] != eval_basis[i])
@@ -33335,6 +35194,24 @@ NPRegressionFailure *failure){
                     inverse_workspace.rhs[j];
                 beta[i] = s;
               }
+            }
+
+            if(residual_preparing && residual_gram != NULL &&
+               residual_workspace != NULL) {
+              const NPRegressionAllLargeResidualCall residual_call = {
+                .output = hc0_context->preparation,
+                .nterms = glp_nterms,
+                .basis = basis,
+                .inverse = inverse_workspace.gram,
+                .gram = residual_gram,
+                .intercept_ridge = residual_intercept_ridge,
+                .unregularized = residual_unregularized,
+                .workspace = residual_workspace
+              };
+              R_UnwindProtect(
+                np_regression_alllarge_residual_execute, (void *)&residual_call,
+                np_regression_alllarge_lp_fit_cleanup, (void *)&all_large_owner,
+                NULL);
             }
 
             if(use_fit_projection_blas){
@@ -33549,6 +35426,9 @@ NPRegressionFailure *failure){
         free(projection_block);
         free(yhat_block);
         free(covariance_workspace);
+        free(residual_gram);
+        np_alllarge_residual_workspace_clear(residual_workspace);
+        free(residual_workspace);
         if(eval_basis != NULL) free(eval_basis);
         if(eval_deriv != NULL) free(eval_deriv);
         free(beta);
@@ -33612,6 +35492,7 @@ NPRegressionFailure *failure){
       .do_grad = do_grad,
       .do_gerr = do_gerr,
       .standard_error_mode = standard_error_mode,
+      .ordinary_response = ordinary_response,
       .hc0_context = hc0_context,
       .gate_context = est_gate_ctx_ptr,
       .enclosing_owner = &fit_owner,
@@ -33654,6 +35535,8 @@ NPRegressionFailure *failure){
       .categorical_base_requires_refit =
         categorical_base_requires_refit,
       .categorical_point_invariant = categorical_point_invariant,
+      .all_large_kernel_rows = all_large_kernel_rows,
+      .ordinary_response = ordinary_response,
       .mean = mean,
       .gradient = gradient,
       .mean_stderr = mean_stderr,
@@ -35633,6 +37516,20 @@ enum {
   NP_NPSIGTEST_STAT_ORDERED = 3
 };
 
+typedef struct {
+  double denominator;
+  double derivative_denominator;
+  int structural_zero;
+} NPNpsigScalarDerivativeProof;
+
+static int np_npsig_scalar_derivative_donor_zero(
+  const NPNpsigScalarDerivativeProof *proof,
+  const double level_weight, const double derivative_weight)
+{
+  return np_residual_products_equal(derivative_weight, proof->denominator,
+    level_weight, proof->derivative_denominator);
+}
+
 /*
  * Fill one fixed-bandwidth regression influence row at either the observed
  * frame or the established categorical alternate.  This is deliberately a
@@ -35651,7 +37548,8 @@ static int np_npsigtest_fixed_influence_row(
   double *scalar_derivative_weight,
   int *scalar_derivative_mask,
   double *eval_basis,
-  double *row_out)
+  double *row_out,
+  NPNpsigScalarDerivativeProof *scalar_proof)
 {
   const int num_train = num_obs_train_extern;
   const int num_unordered = num_reg_unordered_extern;
@@ -35660,6 +37558,8 @@ static int np_npsigtest_fixed_influence_row(
   NPConditionalBoundState bounds_state;
   int observation;
   int coordinate;
+
+  if(scalar_proof != NULL) memset(scalar_proof, 0, sizeof(*scalar_proof));
 
   if(ctx == NULL || !ctx->ready || row_out == NULL ||
      eval_idx < 0 || eval_idx >= num_train ||
@@ -35729,6 +37629,7 @@ static int np_npsigtest_fixed_influence_row(
     double denominator = 0.0;
     double derivative_denominator = 0.0;
     double derivative_sum_output[1] = {0.0};
+    int all_derivative_weights_zero = 1;
     int row_status;
     NPPermutationWeightOutput derivative_output;
 
@@ -35770,10 +37671,18 @@ static int np_npsigtest_fixed_influence_row(
         return 1;
       denominator += ctx->kw[observation];
       derivative_denominator += scalar_derivative_weight[observation];
+      if(scalar_derivative_weight[observation] != 0.0)
+        all_derivative_weights_zero = 0;
     }
     if(!R_FINITE(denominator) || !R_FINITE(derivative_denominator) ||
        fabs(denominator) <= DBL_MIN)
       return 1;
+    if(scalar_proof != NULL) {
+      scalar_proof->denominator = denominator;
+      scalar_proof->derivative_denominator = derivative_denominator;
+      scalar_proof->structural_zero = all_derivative_weights_zero &&
+        derivative_denominator == 0.0;
+    }
     for(observation = 0; observation < num_train; ++observation)
       row_out[observation] =
         scalar_derivative_weight[observation]/denominator -
@@ -35891,6 +37800,7 @@ int np_regression_lp_sigtest_iid(
   double *row = NULL;
   double *scalar_derivative_weight = NULL;
   double *residual_tile = NULL;
+  int *residual_information = NULL;
   double *eval_basis = NULL;
   double *base_fit = NULL;
   double *residual_scale = NULL;
@@ -36023,7 +37933,7 @@ int np_regression_lp_sigtest_iid(
       if(np_npsigtest_fixed_influence_row(
            &xctx, &lp_workspace, eval_idx, -1, statistic_mode,
            statistic_coordinate, 0, scalar_derivative_weight,
-           scalar_derivative_mask, eval_basis, row) != 0)
+           scalar_derivative_mask, eval_basis, row, NULL) != 0)
         goto cleanup_sigtest_iid;
       for(rhs = 0; rhs < n_rhs; ++rhs) {
         double fit = 0.0;
@@ -36048,7 +37958,7 @@ int np_regression_lp_sigtest_iid(
       if(np_npsigtest_fixed_influence_row(
            &xctx, &lp_workspace, eval_idx, -1, statistic_mode,
            statistic_coordinate, 1, scalar_derivative_weight,
-           scalar_derivative_mask, eval_basis, row) != 0)
+           scalar_derivative_mask, eval_basis, row, NULL) != 0)
         goto cleanup_sigtest_iid;
       for(rhs = 0; rhs < n_rhs; ++rhs) {
         double alternate_fit = 0.0;
@@ -36072,7 +37982,7 @@ int np_regression_lp_sigtest_iid(
       if(np_npsigtest_fixed_influence_row(
            &xctx, &lp_workspace, eval_idx, statistic_coordinate,
            0, 0, 0, scalar_derivative_weight,
-           scalar_derivative_mask, eval_basis, row) != 0)
+           scalar_derivative_mask, eval_basis, row, NULL) != 0)
         goto cleanup_sigtest_iid;
       for(rhs = 0; rhs < n_rhs; ++rhs) {
         double gradient = 0.0;
@@ -36092,6 +38002,7 @@ int np_regression_lp_sigtest_iid(
     size_t residual_count;
     int gradient_nonzero[8] = {0};
     int gradient_se_invalid[8] = {0};
+    int has_unidentified_information = 0;
 
     if((size_t)num_train > SIZE_MAX/(size_t)n_rhs)
       goto cleanup_sigtest_iid;
@@ -36099,8 +38010,10 @@ int np_regression_lp_sigtest_iid(
     if(residual_count > SIZE_MAX/sizeof(double))
       goto cleanup_sigtest_iid;
     residual_tile = (double *)malloc(residual_count*sizeof(double));
+    residual_information = (int *)malloc((size_t)num_train*sizeof(int));
     residual_scale = alloc_vecd(n_rhs);
-    if(residual_tile == NULL || residual_scale == NULL)
+    if(residual_tile == NULL || residual_scale == NULL ||
+       residual_information == NULL)
       goto cleanup_sigtest_iid;
     memset(residual_scale, 0, (size_t)n_rhs*sizeof(double));
 
@@ -36108,20 +38021,41 @@ int np_regression_lp_sigtest_iid(
       if(np_npsigtest_fixed_influence_row(
            &xctx, &lp_workspace, eval_idx, -1, 0, 0, 0,
            scalar_derivative_weight, scalar_derivative_mask,
-           eval_basis, row) != 0)
+           eval_basis, row, NULL) != 0)
         goto cleanup_sigtest_iid;
+      NPResidualOffDiagonal geometry = {0};
+      NPResidualNormalization normalization;
+      for(int observation = 0; observation < num_train; ++observation)
+        if(observation != eval_idx)
+          np_residual_offdiag_add(&geometry, row[observation], 0.0L);
+      const NPResidualInformation information =
+        np_residual_offdiag_normalization(&geometry, 1.0L, &normalization);
+      if(information == NP_RESIDUAL_INVALID)
+        goto cleanup_sigtest_iid;
+      residual_information[eval_idx] = information;
+      if(information == NP_RESIDUAL_UNIDENTIFIED)
+        has_unidentified_information = 1;
+      /* The row is dead after this residual pass. Reuse it for the shared
+       * response-independent coefficients rather than recomputing q for
+       * every bootstrap response in the tile. */
+      for(int observation = 0; observation < num_train; ++observation)
+        row[observation] = observation == eval_idx ||
+          information == NP_RESIDUAL_UNIDENTIFIED ? 0.0 :
+          (double)np_residual_normalized_weight(&normalization, row[observation]);
       for(rhs = 0; rhs < n_rhs; ++rhs) {
         const double own_response = response_tile[
           (size_t)eval_idx + (size_t)num_train*(size_t)rhs];
-        double fitted = 0.0;
+        long double normalized_residual = 0.0L;
         double residual;
         int observation;
 
         for(observation = 0; observation < num_train; ++observation) {
-          fitted += row[observation] * response_tile[
-            (size_t)observation + (size_t)num_train*(size_t)rhs];
+          if(observation != eval_idx)
+            normalized_residual += (long double)row[observation] *
+              ((long double)own_response - (long double)response_tile[
+                (size_t)observation + (size_t)num_train*(size_t)rhs]);
         }
-        residual = own_response - fitted;
+        residual = (double)normalized_residual;
         if(!R_FINITE(residual))
           goto cleanup_sigtest_iid;
         residual_tile[(size_t)eval_idx +
@@ -36134,14 +38068,24 @@ int np_regression_lp_sigtest_iid(
     }
 
     for(eval_idx = 0; eval_idx < num_train; ++eval_idx) {
+      NPNpsigScalarDerivativeProof scalar_proof = {0};
       if(np_npsigtest_fixed_influence_row(
            &xctx, &lp_workspace, eval_idx, statistic_coordinate,
            0, 0, 0, scalar_derivative_weight,
-           scalar_derivative_mask, eval_basis, row) != 0)
+           scalar_derivative_mask, eval_basis, row,
+           has_unidentified_information ? &scalar_proof : NULL) != 0)
         goto cleanup_sigtest_iid;
+      /* Match the public LC producer's complete direction certificate.
+       * This row contributes exactly zero to every response, but retains
+       * its share of the original num_train statistic denominator. */
+      if(has_unidentified_information && scalar_proof.structural_zero) {
+        if((eval_idx & 31) == 0)
+          R_CheckUserInterrupt();
+        continue;
+      }
       for(rhs = 0; rhs < n_rhs; ++rhs) {
         double gradient = 0.0;
-        long double quadratic = 0.0L;
+        NPResidualVariance variance = {0};
         const double scale = residual_scale[rhs];
         double gradient_se;
         double ratio;
@@ -36155,20 +38099,42 @@ int np_regression_lp_sigtest_iid(
 
           gradient += influence * response_tile[
             (size_t)observation + (size_t)num_train*(size_t)rhs];
-          quadratic += (long double)influence*(long double)influence *
-            (long double)scaled_residual*(long double)scaled_residual;
+          /* Reuse the public ordinary producer's dependency proofs. A
+           * rounded zero derivative alone never excuses unknown variance.
+           * Certifying a covariance zero does not alter point arithmetic. */
+          int certified_zero = 0;
+          if(residual_information[observation] == NP_RESIDUAL_UNIDENTIFIED) {
+            if(np_lp_engine_extern == NP_LP_ENGINE_SCALAR) {
+              certified_zero = np_npsig_scalar_derivative_donor_zero(
+                &scalar_proof, xctx.kw[observation],
+                scalar_derivative_weight[observation]);
+            } else if(!np_regression_hc0_lp_donor_zero(
+                np_glp_cv_cache.basis, lp_workspace.nterms,
+                lp_workspace.solve_workspace.rhs_work, xctx.kw[observation],
+                observation, &certified_zero)) {
+              goto cleanup_sigtest_iid;
+            }
+          }
+          np_residual_variance_add(
+            &variance, certified_zero ? 0.0L : (long double)influence, certified_zero,
+            (NPResidualInformation)residual_information[observation],
+            (long double)scaled_residual);
         }
         if(!R_FINITE(gradient))
           goto cleanup_sigtest_iid;
         if(gradient != 0.0)
           gradient_nonzero[rhs] = 1;
-        if(!isfinite(quadratic) || quadratic <= 0.0L || scale <= 0.0) {
-          gradient_se_invalid[rhs] = 1;
-          continue;
-        }
         {
-          const long double stderr_ld =
-            (long double)scale*sqrtl(quadratic);
+          long double normalized_stderr = 0.0L;
+          const NPResidualInformation information =
+            np_residual_variance_finish(&variance, &normalized_stderr);
+          if(information == NP_RESIDUAL_INVALID)
+            goto cleanup_sigtest_iid;
+          if(information == NP_RESIDUAL_UNIDENTIFIED) {
+            gradient_se_invalid[rhs] = 1;
+            continue;
+          }
+          const long double stderr_ld = (long double)scale*normalized_stderr;
 
           if(!isfinite(stderr_ld) || stderr_ld > (long double)DBL_MAX) {
             gradient_se_invalid[rhs] = 1;
@@ -36213,6 +38179,7 @@ cleanup_sigtest_iid:
   free(row);
   free(scalar_derivative_weight);
   free(residual_tile);
+  free(residual_information);
   free(eval_basis);
   free(base_fit);
   free(residual_scale);

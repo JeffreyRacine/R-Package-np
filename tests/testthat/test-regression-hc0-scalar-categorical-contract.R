@@ -55,7 +55,7 @@ h4_expect_categorical_hc0 <- function(bws, xdat, ydat, exdat = NULL,
     txdat = xdat,
     output = "matrix"
   )))
-  residual <- as.double(ydat) - drop(training.hat %*% as.double(ydat))
+  residual <- hc0_normalized_training_residual(training.hat, ydat)
   influence <- h4_actual_categorical_influence(bws, xdat, exdat)
   expected <- vapply(
     seq_len(dim(influence)[3L]),
@@ -174,7 +174,7 @@ test_that("paired endpoint covariance reduces correctly at zero overlap", {
     bw <- h4_explicit_lc_bw(xdat, ydat, lambda)
     training.hat <- unclass(npreghat(bws = bw, txdat = xdat,
                                      output = "matrix"))
-    residual <- ydat - drop(training.hat %*% ydat)
+    residual <- hc0_normalized_training_residual(training.hat, ydat)
     upper <- unclass(npreghat(
       bws = bw, txdat = xdat, exdat = exdat, output = "matrix"
     ))

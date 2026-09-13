@@ -17,6 +17,10 @@
   accuracy.
 }
 \details{
+  Local-polynomial calculations inherit numerical ridging from
+  \code{\link{npcdens}}. See that estimator's help for the solve
+  policy and its distinct conditional uncertainty formula.
+
   For MPI startup/performance guidance (including message-passing tradeoffs and the manual-broadcast template), see \code{\link{npRmpi.init}} details and \code{inst/Rprofile}.
   Documentation guide: see \code{\link{np.kernels}} for kernels,
   \code{\link{np.options}} for global options, and

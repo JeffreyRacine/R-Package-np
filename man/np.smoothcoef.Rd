@@ -285,6 +285,11 @@ Further arguments are passed to the bandwidth-selection counterpart when bandwid
 
 }
 \section{Book And Method Pointers}{
+  Smooth-coefficient moment solves use their own bounded numerical ridging;
+  see \code{\link{npreg}} for its Seifert--Gasser motivation.
+  The smooth-coefficient covariance is a separate moment calculation, not
+  the ordinary-regression residual-normalized sandwich.
+
   The smooth-coefficient model lets slopes vary with conditioning
   variables, typically written
   \eqn{Y=X^\prime\beta(Z)+\epsilon}. The functions estimate the

@@ -377,7 +377,15 @@ Further arguments are passed to the bandwidth-selection counterpart when bandwid
   bandwidths have already been selected. Use \code{se=FALSE} to omit that work.
   Asymptotic fitted-value and gradient standard errors use the same scalar-index
   regression calculation as the asymptotic plot intervals, treating the fitted
-  index coefficients as fixed. Asymptotic standard errors of average gradients
+  index coefficients as fixed. They inherit the residual normalization of
+  Ruppert et al. (1997) described under Standard Errors in
+  \code{\link{npreg}}. This is not the separate coefficient covariance
+  returned by \code{vcov()}. Missing training residual information can
+  therefore make individual fitted-value or gradient errors unavailable
+  without removing their point estimates.
+  Local-polynomial index fits also inherit the numerical-ridging policy
+  described in \code{\link{npreg}}.
+  Asymptotic standard errors of average gradients
   are not supplied; \code{mean.gerr} is available only in bootstrap mode.
 
   Missing quantities can be computed without repeating bandwidth search.

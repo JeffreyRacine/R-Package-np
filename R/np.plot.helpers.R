@@ -1818,6 +1818,24 @@
                    prob = prob)
 }
 
+.npRmpi_bootstrap_counts_drawer_tasks <- function(B, chunk.size, counts.drawer) {
+  tasks <- .npRmpi_bootstrap_chunk_tasks(
+    B = B, chunk.size = chunk.size, with.seeds = FALSE
+  )
+  ## Advance the master stream with only one count chunk resident at a time.
+  ## Workers replay these states; no rank-owned RNG stream supplies the draws.
+  .npRmpi_bootstrap_attach_rng_stream(tasks, function(task) {
+    start <- as.integer(task$start)
+    invisible(counts.drawer(start, start + as.integer(task$bsz) - 1L))
+  })
+}
+
+.npRmpi_bootstrap_task_counts_drawer <- function(task, counts.drawer) {
+  .npRmpi_bootstrap_use_task_rng(task)
+  start <- as.integer(task$start)
+  counts.drawer(start, start + as.integer(task$bsz) - 1L)
+}
+
 .npRmpi_bootstrap_rmultinom_tasks <- function(B, chunk.size, size, prob) {
   tasks <- .npRmpi_bootstrap_chunk_tasks(
     B = B,
@@ -2851,14 +2869,14 @@
       chunk.size = chunk.size,
       what = "inid-lc-block"
     )) {
-      tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+      tasks <- .npRmpi_bootstrap_counts_drawer_tasks(B, chunk.size, counts.drawer)
       worker <- function(task) {
         start <- as.integer(task$start)
         stopi <- start + as.integer(task$bsz) - 1L
         counts.chunk <- .np_inid_counts_matrix(
           n = n.local,
           B = as.integer(task$bsz),
-          counts = counts.drawer.local(start, stopi)
+          counts = .npRmpi_bootstrap_task_counts_drawer(task, counts.drawer.local)
         )
         den <- crossprod(counts.chunk, W.local)
         num <- crossprod(counts.chunk, Wy.local)
@@ -3170,14 +3188,14 @@
           chunk.size = chunk.size,
           what = "inid-index-localpoly-block"
         )) {
-      tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+      tasks <- .npRmpi_bootstrap_counts_drawer_tasks(B, chunk.size, counts.drawer)
       worker <- function(task) {
         start <- as.integer(task$start)
         stopi <- start + as.integer(task$bsz) - 1L
         counts.chunk <- .np_inid_counts_matrix(
           n = n,
           B = as.integer(task$bsz),
-          counts = counts.drawer(start, stopi)
+          counts = .npRmpi_bootstrap_task_counts_drawer(task, counts.drawer)
         )
         compute_chunk(
           counts.chunk = counts.chunk,
@@ -3454,14 +3472,14 @@
           chunk.size = chunk.size,
           what = "inid-index-exact-block"
         )
-        tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+        tasks <- .npRmpi_bootstrap_counts_drawer_tasks(B, chunk.size, counts.drawer)
         worker <- function(task) {
           start <- as.integer(task$start)
           stopi <- start + as.integer(task$bsz) - 1L
           compute_chunk(.np_inid_counts_matrix(
             n = n,
             B = as.integer(task$bsz),
-            counts = counts.drawer(start, stopi)
+            counts = .npRmpi_bootstrap_task_counts_drawer(task, counts.drawer)
           ))
         }
         tmat <- .npRmpi_bootstrap_run_fanout(
@@ -4371,14 +4389,14 @@
           chunk.size = chunk.size,
           what = "inid-regression-exact-block"
         )) {
-      tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+      tasks <- .npRmpi_bootstrap_counts_drawer_tasks(B, chunk.size, counts.drawer)
       worker <- function(task) {
         start <- as.integer(task$start)
         stopi <- start + as.integer(task$bsz) - 1L
         counts.chunk <- .np_inid_counts_matrix(
           n = n,
           B = as.integer(task$bsz),
-          counts = counts.drawer(start, stopi)
+          counts = .npRmpi_bootstrap_task_counts_drawer(task, counts.drawer)
         )
         compute_chunk(counts.chunk = counts.chunk)
       }
@@ -4801,14 +4819,14 @@
           chunk.size = chunk.size,
           what = paste0(what.base, "-block")
         )) {
-      tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+      tasks <- .npRmpi_bootstrap_counts_drawer_tasks(B, chunk.size, counts.drawer)
       worker <- function(task) {
         start <- as.integer(task$start)
         stopi <- start + as.integer(task$bsz) - 1L
         counts.chunk <- .np_inid_counts_matrix(
           n = n,
           B = as.integer(task$bsz),
-          counts = counts.drawer(start, stopi)
+          counts = .npRmpi_bootstrap_task_counts_drawer(task, counts.drawer)
         )
         compute_chunk(
           counts.chunk = counts.chunk,
@@ -5682,14 +5700,14 @@
           chunk.size = chunk.size,
           what = "inid-scoef-localpoly-block"
         )) {
-      tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+      tasks <- .npRmpi_bootstrap_counts_drawer_tasks(B, chunk.size, counts.drawer)
       worker <- function(task) {
         start <- as.integer(task$start)
         stopi <- start + as.integer(task$bsz) - 1L
         counts.chunk <- .np_inid_counts_matrix(
           n = n,
           B = as.integer(task$bsz),
-          counts = counts.drawer(start, stopi)
+          counts = .npRmpi_bootstrap_task_counts_drawer(task, counts.drawer)
         )
         compute_chunk(
           counts.chunk = counts.chunk,
@@ -5919,14 +5937,14 @@
           chunk.size = chunk.size,
           what = "inid-scoef-exact-block"
         )) {
-      tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+      tasks <- .npRmpi_bootstrap_counts_drawer_tasks(B, chunk.size, counts.drawer)
       worker <- function(task) {
         start <- as.integer(task$start)
         stopi <- start + as.integer(task$bsz) - 1L
         counts.chunk <- .np_inid_counts_matrix(
           n = n,
           B = as.integer(task$bsz),
-          counts = counts.drawer(start, stopi)
+          counts = .npRmpi_bootstrap_task_counts_drawer(task, counts.drawer)
         )
         compute_chunk(counts.chunk = counts.chunk)
       }
@@ -7065,6 +7083,8 @@
   }
   tasks <- if (!isTRUE(has.counts.mat.local) && !isTRUE(has.counts.drawer.local)) {
     .npRmpi_bootstrap_rmultinom_tasks(B = B, chunk.size = chunk.size, size = n, prob = prob.local)
+  } else if (!isTRUE(has.counts.mat.local)) {
+    .npRmpi_bootstrap_counts_drawer_tasks(B, chunk.size, counts.drawer.local)
   } else {
     .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
   }
@@ -7079,7 +7099,7 @@
       .np_inid_counts_matrix(
         n = n,
         B = bsz,
-        counts = counts.drawer.local(start, stopi)
+        counts = .npRmpi_bootstrap_task_counts_drawer(task, counts.drawer.local)
       )
     } else {
       .npRmpi_bootstrap_task_rmultinom(task = task, n = n, prob = prob.local)
@@ -7238,6 +7258,8 @@
   }
   tasks <- if (!isTRUE(has.counts.mat.local) && !isTRUE(has.counts.drawer.local)) {
     .npRmpi_bootstrap_rmultinom_tasks(B = B, chunk.size = chunk.size, size = n, prob = prob.local)
+  } else if (!isTRUE(has.counts.mat.local)) {
+    .npRmpi_bootstrap_counts_drawer_tasks(B, chunk.size, counts.drawer.local)
   } else {
     .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
   }
@@ -7252,7 +7274,7 @@
       .np_inid_counts_matrix(
         n = n,
         B = bsz,
-        counts = counts.drawer.local(start, stopi)
+        counts = .npRmpi_bootstrap_task_counts_drawer(task, counts.drawer.local)
       )
     } else {
       .npRmpi_bootstrap_task_rmultinom(task = task, n = n, prob = prob.local)
@@ -8091,7 +8113,7 @@
     asDouble(euno), asDouble(eord), asDouble(econ),
     as.double(c(bws$bw[bws$icon], bws$bw[bws$iuno], bws$bw[bws$iord])),
     as.double(bws$xmcv), as.double(attr(bws$xmcv, "pad.num")),
-    as.integer(op.int),
+    as.integer(c(op.int[bws$icon], op.int[bws$iuno], op.int[bws$iord])),
     as.integer(myopti), as.double(1.0),
     as.integer(enrow),
     as.integer(0L),
@@ -8292,14 +8314,14 @@
           chunk.size = chunk.size,
           what = "inid-ksum-unconditional-exact-block"
         )) {
-      tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+      tasks <- .npRmpi_bootstrap_counts_drawer_tasks(B, chunk.size, counts.drawer)
       worker <- function(task) {
         start <- as.integer(task$start)
         stopi <- start + as.integer(task$bsz) - 1L
         counts.chunk <- .np_inid_counts_matrix(
           n = n,
           B = as.integer(task$bsz),
-          counts = counts.drawer(start, stopi)
+          counts = .npRmpi_bootstrap_task_counts_drawer(task, counts.drawer)
         )
         bsz <- ncol(counts.chunk)
         out <- matrix(NA_real_, nrow = bsz, ncol = nout)
@@ -8468,14 +8490,14 @@
         chunk.size = chunk.size,
         what = paste0(what.base, "-block")
       )) {
-    tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+    tasks <- .npRmpi_bootstrap_counts_drawer_tasks(B, chunk.size, counts.drawer)
     worker <- function(task) {
       start <- as.integer(task$start)
       stopi <- start + as.integer(task$bsz) - 1L
       counts.chunk <- .np_inid_counts_matrix(
         n = n.local,
         B = as.integer(task$bsz),
-        counts = counts.drawer.local(start, stopi)
+        counts = .npRmpi_bootstrap_task_counts_drawer(task, counts.drawer.local)
       )
       crossprod(counts.chunk, HT.local)
     }
@@ -8727,14 +8749,14 @@
           chunk.size = chunk.size,
           what = "inid-ksum-unconditional-block"
         )) {
-      tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+      tasks <- .npRmpi_bootstrap_counts_drawer_tasks(B, chunk.size, counts.drawer)
       worker <- function(task) {
         start <- as.integer(task$start)
         stopi <- start + as.integer(task$bsz) - 1L
         counts.chunk <- .np_inid_counts_matrix(
           n = n.local,
           B = as.integer(task$bsz),
-          counts = counts.drawer.local(start, stopi)
+          counts = .npRmpi_bootstrap_task_counts_drawer(task, counts.drawer.local)
         )
         crossprod(counts.chunk, kw.local) / n.local
       }
@@ -8859,14 +8881,14 @@
         chunk.size = chunk.size,
         what = "inid-ksum-unconditional-block"
       )) {
-    tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+    tasks <- .npRmpi_bootstrap_counts_drawer_tasks(B, chunk.size, counts.drawer)
     worker <- function(task) {
       start <- as.integer(task$start)
       stopi <- start + as.integer(task$bsz) - 1L
       counts.chunk <- .np_inid_counts_matrix(
         n = n.local,
         B = as.integer(task$bsz),
-        counts = counts.drawer.local(start, stopi)
+        counts = .npRmpi_bootstrap_task_counts_drawer(task, counts.drawer.local)
       )
       t(K.local %*% counts.chunk)
     }
@@ -9077,14 +9099,14 @@
           chunk.size = chunk.size,
           what = "inid-hat-frozen-conditional-block"
         )
-        tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+        tasks <- .npRmpi_bootstrap_counts_drawer_tasks(B, chunk.size, counts.drawer)
         worker <- function(task) {
           start <- as.integer(task$start)
           stopi <- start + as.integer(task$bsz) - 1L
           compute_chunk(.np_inid_counts_matrix(
             n = n,
             B = as.integer(task$bsz),
-            counts = counts.drawer(start, stopi)
+            counts = .npRmpi_bootstrap_task_counts_drawer(task, counts.drawer)
           ))
         }
         tmat <- .npRmpi_bootstrap_run_fanout(
@@ -9888,9 +9910,11 @@
     tasks <- .npRmpi_bootstrap_chunk_tasks(
       B = B,
       chunk.size = chunk.size,
-      with.seeds = !identical(counts.mode, "random")
+      with.seeds = identical(counts.mode, "matrix")
     )
-    if (identical(counts.mode, "random")) {
+    if (identical(counts.mode, "drawer")) {
+      tasks <- .npRmpi_bootstrap_counts_drawer_tasks(B, chunk.size, counts.drawer)
+    } else if (identical(counts.mode, "random")) {
       prob.local <- rep.int(1 / state$n, state$n)
       tasks <- .npRmpi_bootstrap_attach_rng_stream(
         tasks,
@@ -9913,7 +9937,7 @@
         .np_inid_counts_matrix(
           n = state$n,
           B = as.integer(task$bsz),
-          counts = counts.drawer(start, stopi)
+          counts = .npRmpi_bootstrap_task_counts_drawer(task, counts.drawer)
         )
       } else {
         .npRmpi_bootstrap_task_rmultinom(
@@ -10281,10 +10305,12 @@
     tasks <- .npRmpi_bootstrap_chunk_tasks(
       B = B,
       chunk.size = chunk.size,
-      with.seeds = !identical(counts.mode, "random")
+      with.seeds = identical(counts.mode, "matrix")
     )
     prob <- rep.int(1 / n, n)
-    if (identical(counts.mode, "random")) {
+    if (identical(counts.mode, "drawer")) {
+      tasks <- .npRmpi_bootstrap_counts_drawer_tasks(B, chunk.size, counts.drawer)
+    } else if (identical(counts.mode, "random")) {
       tasks <- .npRmpi_bootstrap_attach_rng_stream(
         tasks,
         function(task) {
@@ -10305,7 +10331,7 @@
         .np_inid_counts_matrix(
           n = n,
           B = as.integer(task$bsz),
-          counts = counts.drawer(start, stopi)
+          counts = .npRmpi_bootstrap_task_counts_drawer(task, counts.drawer)
         )
       } else {
         .npRmpi_bootstrap_task_rmultinom(
@@ -11132,10 +11158,12 @@
     tasks <- .npRmpi_bootstrap_chunk_tasks(
       B = B,
       chunk.size = chunk.size,
-      with.seeds = !is.null(counts.drawer)
+      with.seeds = FALSE
     )
     counts.mode <- if (!is.null(counts.drawer)) "drawer" else "random"
-    if (identical(counts.mode, "random")) {
+    if (identical(counts.mode, "drawer")) {
+      tasks <- .npRmpi_bootstrap_counts_drawer_tasks(B, chunk.size, counts.drawer)
+    } else if (identical(counts.mode, "random")) {
       prob.local <- rep.int(1 / n, n)
       tasks <- .npRmpi_bootstrap_attach_rng_stream(
         tasks,
@@ -11152,7 +11180,8 @@
       start <- as.integer(task$start)
       stopi <- start + as.integer(task$bsz) - 1L
       counts.chunk <- if (identical(counts.mode, "drawer")) {
-        .np_inid_counts_matrix(n = n, B = as.integer(task$bsz), counts = counts.drawer(start, stopi))
+        .np_inid_counts_matrix(n = n, B = as.integer(task$bsz),
+                              counts = .npRmpi_bootstrap_task_counts_drawer(task, counts.drawer))
       } else {
         .npRmpi_bootstrap_task_rmultinom(
           task = task,
@@ -14380,6 +14409,8 @@ plotFactor <- function(f, y, ...){
       size = n,
       prob = prob
     )
+  } else if (identical(counts.mode, "drawer")) {
+    .npRmpi_bootstrap_counts_drawer_tasks(B, chunk.size, counts.drawer)
   } else {
     .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size, with.seeds = FALSE)
   }
@@ -14393,7 +14424,7 @@ plotFactor <- function(f, y, ...){
       .np_inid_counts_matrix(
         n = n,
         B = as.integer(task$bsz),
-        counts = counts.drawer(start, stopi)
+        counts = .npRmpi_bootstrap_task_counts_drawer(task, counts.drawer)
       )
     } else {
       .npRmpi_bootstrap_task_rmultinom(task = task, n = n, prob = prob)
@@ -14542,6 +14573,8 @@ plotFactor <- function(f, y, ...){
       size = n,
       prob = prob
     )
+  } else if (identical(counts.mode, "drawer")) {
+    .npRmpi_bootstrap_counts_drawer_tasks(B, chunk.size, counts.drawer)
   } else {
     .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size, with.seeds = FALSE)
   }
@@ -14555,7 +14588,7 @@ plotFactor <- function(f, y, ...){
       .np_inid_counts_matrix(
         n = n,
         B = as.integer(task$bsz),
-        counts = counts.drawer(start, stopi)
+        counts = .npRmpi_bootstrap_task_counts_drawer(task, counts.drawer)
       )
     } else {
       .npRmpi_bootstrap_task_rmultinom(task = task, n = n, prob = prob)
@@ -14695,6 +14728,8 @@ plotFactor <- function(f, y, ...){
       size = n,
       prob = prob
     )
+  } else if (identical(counts.mode, "drawer")) {
+    .npRmpi_bootstrap_counts_drawer_tasks(B, chunk.size, counts.drawer)
   } else {
     .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size, with.seeds = FALSE)
   }
@@ -14708,7 +14743,7 @@ plotFactor <- function(f, y, ...){
       .np_inid_counts_matrix(
         n = n,
         B = as.integer(task$bsz),
-        counts = counts.drawer(start, stopi)
+        counts = .npRmpi_bootstrap_task_counts_drawer(task, counts.drawer)
       )
     } else {
       .npRmpi_bootstrap_task_rmultinom(task = task, n = n, prob = prob)

@@ -1,6 +1,8 @@
 #ifndef NP_REGRESSION_CONTRACT_H
 #define NP_REGRESSION_CONTRACT_H
 
+#include "regression_residual.h"
+
 /*
  * Standard-error algebra belongs to the regression response consumer, not to
  * a continuous-kernel family.  Ordinary regression retains its local-
@@ -36,6 +38,19 @@ typedef struct {
   int end;
 } NPRegressionGradientRange;
 
+/* Preparation writes one normalized residual/information record per training
+ * donor in the active traversal order. Self identity is explicit, never
+ * inferred from coordinate equality (duplicate observations are distinct).
+ * Every training donor occurs once in evaluation_to_donor. */
+typedef struct {
+  const double *response;
+  const int *evaluation_to_donor;
+  int num_obs_train;
+  int num_obs_eval;
+  double *normalized_residual;
+  int *information;
+} NPRegressionResidualPreparation;
+
 static inline NPRegressionGradientRange np_regression_gradient_range(
   const NPRegressionGradientRequest *request, const int begin, const int end)
 {
@@ -59,6 +74,12 @@ typedef struct {
   NPRegressionHC0ResidualStatus status;
   int point_already_computed;
   const NPRegressionGradientRequest *gradient_request;
+  NPRegressionResidualPreparation *preparation;
+  const int *residual_information;
+  int unknown_count;
+  int *mean_unavailable;
+  int **gradient_unavailable;
+  int **gradient_structural_zero;
 } NPRegressionHC0Context;
 
 /*

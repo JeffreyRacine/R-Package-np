@@ -363,6 +363,7 @@ np_continuous_kernel_beta_regression_moment_rows_validated(
   const double *hc0_scaled_residual,
   double hc0_residual_scale,
   int preserve_mean,
+  const NPRegressionHC0Context *hc0_context,
   NPContinuousKernelRowWorkspace *workspace,
   NPContinuousKernelRowResult *row_result,
   double *mean,
@@ -370,9 +371,10 @@ np_continuous_kernel_beta_regression_moment_rows_validated(
   NPContinuousKernelDerivativeDiagnostics *diagnostics,
   NPContinuousKernelProgressFunction progress);
 
-/* Reduce the HC0 variance of a normalized difference between two beta-row
- * providers.  Only one normalized endpoint row is retained, so incremental
- * storage is O(n_train) rather than O(n_train * n_eval). */
+/* Reduce an ordinary regression contrast and its optional HC0 variance from
+ * the same constant-preserving paired influence. One raw endpoint row is
+ * retained, so storage is O(n_train), not O(n_train * n_eval). SE-off calls
+ * never prepare or consume residual uncertainty. */
 NPContinuousKernelRowStatus
 np_continuous_kernel_beta_regression_paired_hc0_rows_validated(
   const NPContinuousKernelRowPlan *plan,
@@ -380,12 +382,18 @@ np_continuous_kernel_beta_regression_paired_hc0_rows_validated(
   int leave_one_out_offset,
   const NPContinuousKernelLogFactorProvider *level_provider,
   const NPContinuousKernelLogFactorProvider *alternate_provider,
+  const double *response,
   const double *hc0_scaled_residual,
   double hc0_residual_scale,
+  const NPRegressionHC0Context *hc0_context,
+  int output_coordinate,
+  const double *level_values,
+  const double *alternate_values,
   NPContinuousKernelRowWorkspace *workspace,
   NPContinuousKernelRowResult *row_result,
   double *level_coefficient,
   size_t level_coefficient_capacity,
+  double *contrast,
   double *contrast_stderr,
   NPContinuousKernelDerivativeDiagnostics *diagnostics);
 

@@ -1,17 +1,53 @@
 # npRmpi 0.80-1
 
+* Fixed-block and geometric-block bootstrap plot calculations now receive
+  master-owned random-number states instead of drawing on unseeded worker
+  streams. Repeating a seeded call with the same worker/chunk configuration
+  is reproducible. The sampling law is unchanged; different worker counts
+  or chunk partitions need not produce identical draws.
+
+* Conditional-distribution bootstrap plot kernel operators now follow the
+  native continuous/unordered/ordered data layout. This corrects bands and
+  bias-corrected centres for mixed-data models whose input-column order
+  differs from that native layout.
+
+* Ordinary regression inference now normalizes training fitted residuals by
+  the norms of their actual residual-smoother rows before forming level,
+  derivative and paired categorical-contrast sandwich errors. This can also
+  change continuous and categorical studentized test statistics and
+  P-values, not just reported standard errors. It uses
+  the pre-smoothing residual correction of Ruppert et al. (1997), not a
+  separate variance-function smoothing estimator. Requested errors that
+  genuinely lack donor residual information are reported as unavailable,
+  separately from certified zero influences. No variance floor, row deletion
+  or bootstrap-draw filtering is introduced. The correction does not remove
+  smoothing bias or guarantee finite-sample calibration under arbitrary
+  heteroskedasticity or model selection.
+
+* Requested categorical regression effects use stable paired-influence
+  arithmetic with and without standard errors. This can change previously
+  cancellation-dominated gradients and downstream test statistics.
+  Mean-only fitting and bandwidth search are unchanged. Residual preparation
+  is confined to requested inference, but explicit categorical-gradient
+  requests also incur more careful arithmetic when SEs are off. The
+  correctness changes can increase these requested computations.
+  Single-index mean/gradient errors and transformed-response least-squares
+  quantile errors inherit the shared correction; separate coefficient
+  covariance formulas do not. Help distinguishes this residual correction
+  from numerical ridging motivated by Seifert and Gasser (2000).
+
 * Studentized joint `npsigtest()` calls reuse each bootstrap regression fit
   across tested categorical predictors within each worker's existing bounded
   response tile. Statistics, resamples and random-number consumption are
   unchanged. Individual studentized categorical bootstrap fits use the same
-  worker-local native contrast and response-specific HC0 calculations but
+  worker-local native contrast and response-specific sandwich calculations but
   omit unrequested gradient and contrast-SE consumers. Default full regression
   output and unstandardized tests retain their existing computational paths.
 
 * `npsigtest()` now defaults to `pivot = TRUE` for continuous and
   categorical predictors, including joint tests. Explicit FALSE retains
   unstandardized statistics; NULL is no longer an input mode. Categorical
-  studentization uses response-specific paired-contrast HC0 standard errors,
+  studentization uses response-specific paired-contrast sandwich errors,
   with additional computation confined to requested inference. An entirely
   zero observed effect gives analytic non-rejection without bootstrap fits;
   skipped columns and executed counts are explicit. Unexplained undefined
@@ -627,11 +663,10 @@
   after an explicit request-capacity increase; default completion paths and
   estimator arithmetic are unchanged.
 
-* Regression uncertainty documentation now describes the already implemented
-  fitted-residual HC0 standard errors, including derivatives, categorical
-  contrasts, beta kernels and continuous pivotal npsigtest statistics. The
-  stale beta local-variance formula and capability restrictions were corrected;
-  this documentation update does not change numerical results.
+* Earlier regression uncertainty documentation clarified the then-current
+  fitted-residual HC0 calculation, derivatives, contrasts and beta kernels.
+  The residual-normalized correction described above supersedes that
+  uncorrected formula.
 
 * Formula estimators and regression inference helpers now retain explicitly
   supplied data values in wrapper calls, instead of looking up their argument

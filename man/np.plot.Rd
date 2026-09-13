@@ -664,7 +664,10 @@ Further plotting controls are passed through \code{\dots} to the relevant plot m
 
   Asymptotic standard errors are taken from fitted-object components such as
   \code{merr}, \code{gerr}, \code{derr}, \code{conderr}, and
-  \code{congerr} where implemented.
+  \code{congerr} where implemented. Ordinary regression, single-index
+  mean/gradient and transformed-response least-squares quantile errors
+  inherit the residual normalization described in \code{\link{npreg}}.
+  This does not replace other families' covariance formulas.
 
   Bootstrap resampling is conducted pairwise on \eqn{(y,X,Z)} (i.e., by
   resampling rows of \eqn{(y,X)} or \eqn{(y,X,Z)} as appropriate).

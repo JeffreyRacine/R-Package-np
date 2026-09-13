@@ -340,6 +340,11 @@ Further arguments are passed to \code{\link{npcdistbw}} when bandwidths are comp
   Bootstrap inference remains recommended.
 
   With positive-degree local-polynomial fits (including local-linear fits),
+  numerical ridging follows the policies described in \code{\link{npreg}}
+  (Seifert and Gasser, 2000). The conditional pseudo-response uncertainty
+  formulas here are distinct from ordinary regression's residual normalization.
+
+  With positive-degree local-polynomial fits (including local-linear fits),
   categorical first-difference standard errors use paired endpoint influence
   calculations. The covariance between the two category endpoints is retained,
   not replaced by the sum of their marginal variances. These calculations
