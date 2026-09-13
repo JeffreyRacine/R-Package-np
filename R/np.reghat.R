@@ -1670,6 +1670,7 @@ npreghat <-
     PACKAGE = "np"
   ), continuous.names = bws[["xnames", exact = TRUE]][bws[["icon", exact = TRUE]]])
 
+  .npreg_report_variance_unavailable(myout)
   out <- list(mean = as.double(myout$mean))
 
   if (se)
@@ -1699,6 +1700,10 @@ npreghat <-
 
   flags <- attr(myout, ".np.empty.rows", exact = TRUE)
   if(!is.null(flags)) attr(out, ".np.empty.rows") <- flags
+  certificate <- attr(myout, ".np.gradient.structural.zero", exact = TRUE)
+  if (gradients && se && !is.null(certificate))
+    attr(out, ".np.gradient.structural.zero") <-
+      matrix(certificate, enrow, ncol.x)[, rorder, drop = FALSE]
   out
 }
 

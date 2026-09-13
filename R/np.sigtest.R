@@ -99,6 +99,19 @@ npsigtest.npregression <-
   rows
 }
 
+.np_npsig_merge_structure <- function(fit, index, structural) {
+  certificate <- attr(fit, ".np.gradient.structural.zero", exact = TRUE)
+  if (is.null(certificate))
+    return(structural)
+  if (!is.logical(certificate) ||
+      !identical(dim(certificate), dim(fit$grad)))
+    stop("invalid native npsigtest structural-zero certificate", call. = FALSE)
+  certificate <- certificate[, index, drop = FALSE]
+  # Missing evaluation rows are never certified.
+  certificate[is.na(certificate)] <- FALSE
+  structural | certificate
+}
+
 .np_npsig_zero_effects <- function(fit, index, structural = NULL) {
   gradient <- fit$grad[, index, drop = FALSE]
   if (is.null(structural))
@@ -106,6 +119,7 @@ npsigtest.npregression <-
   if (!is.logical(structural) || anyNA(structural) ||
       !identical(dim(structural), dim(gradient)))
     stop("invalid npsigtest structural-zero mask", call. = FALSE)
+  structural <- .np_npsig_merge_structure(fit, index, structural)
   vapply(seq_len(ncol(gradient)), function(column) {
     values <- gradient[!structural[, column], column]
     all(is.finite(values)) && all(values == 0)
@@ -132,6 +146,8 @@ npsigtest.npregression <-
   if (!is.logical(structural) || anyNA(structural) ||
       !identical(dim(structural), dim(gradient)))
     stop("invalid npsigtest structural-zero mask", call. = FALSE)
+  if (pivot)
+    structural <- .np_npsig_merge_structure(fit, index, structural)
   required <- !structural
   if (any(!is.finite(if (pivot) gradient[required] else gradient)))
     stop("npsigtest cannot construct a statistic from non-finite gradient estimates", call. = FALSE)

@@ -33,8 +33,7 @@ h5a_hc0_mean_oracle <- function(bws, txdat, tydat, exdat = NULL) {
       output = "matrix"
     )))
   }
-  residual <- as.double(tydat) -
-    drop(training_hat %*% as.double(tydat))
+  residual <- hc0_normalized_training_residual(training_hat, tydat)
 
   sqrt(drop((evaluation_hat^2) %*% (residual^2)))
 }

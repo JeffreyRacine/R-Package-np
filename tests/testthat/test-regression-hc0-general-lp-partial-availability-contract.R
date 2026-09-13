@@ -29,7 +29,16 @@ h7c_available_hc0_oracle <- function(bw, x, y, eval, order, column) {
   training <- suppressWarnings(h7c_fit(
     bw, x, y, se = FALSE, order = order
   ))
-  residual <- y - training$mean
+  training.hat <- vapply(seq_len(nrow(x)), function(donor) {
+    unit <- numeric(nrow(x))
+    unit[donor] <- 1
+    suppressWarnings(h7c_fit(
+      bw, x, unit, se = FALSE, order = order
+    ))$mean
+  }, numeric(nrow(x)))
+  residual <- hc0_normalized_training_residual(
+    training.hat, y, training.mean = training$mean
+  )
   n.eval <- if (is.null(eval)) nrow(x) else nrow(eval)
   influence <- vapply(seq_len(nrow(x)), function(donor) {
     unit <- numeric(nrow(x))

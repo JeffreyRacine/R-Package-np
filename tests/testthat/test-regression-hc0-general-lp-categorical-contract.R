@@ -27,7 +27,14 @@ h7b_fit <- function(bw, x, y, eval = NULL, se = FALSE) {
 
 h7b_unit_response_categorical_se <- function(bw, x, y, eval = NULL) {
   training <- h7b_fit(bw, x, y, se = FALSE)
-  residual <- y - training$mean
+  training.hat <- vapply(seq_len(nrow(x)), function(donor) {
+    unit <- numeric(nrow(x))
+    unit[donor] <- 1
+    h7b_fit(bw, x, unit, se = FALSE)$mean
+  }, numeric(nrow(x)))
+  residual <- hc0_normalized_training_residual(
+    training.hat, y, training.mean = training$mean
+  )
   n.eval <- if (is.null(eval)) nrow(x) else nrow(eval)
   cat.index <- which(bw$iuno | bw$iord)
   out <- matrix(NA_real_, nrow = n.eval, ncol = length(cat.index))
@@ -139,10 +146,10 @@ test_that("H7B retains two bounded rows and removes estimator helper re-entry", 
   expect_match(c.source, "categorical_base_kernel_row", fixed = TRUE)
   expect_match(c.source, "categorical_alternate_kernel_row", fixed = TRUE)
   expect_match(c.source,
-               "np_regression_hc0_lp_categorical_standard_error",
+               "np_regression_lp_categorical_contrast",
                fixed = TRUE)
   c.start <- regexpr(
-    "static int np_regression_hc0_lp_categorical_standard_error",
+    "static int np_regression_lp_categorical_contrast",
     c.source, fixed = TRUE
   )[[1L]]
   c.tail <- substr(c.source, c.start, nchar(c.source))

@@ -81,21 +81,24 @@ npsig_native_zero_contract <- function(package, expect.zero = TRUE, smoke = FALS
   oversized <- attempt(call.tile(bw, x, matrix(rep(y, 9L), ncol = 9L)))
   stopifnot(failed(nonfinite), failed(oversized))
 
-  # A genuine zero derivative/SE at an isolated evaluation row does not
-  # forgive a nonzero gradient elsewhere in the same response column.
+  # The public LC owner certifies the complete zero derivative direction at
+  # an isolated row. The stream keeps that zero row in the n-row denominator.
   isolated.x <- data.frame(x = c(seq(-1, 1, length.out = 39L), 10))
   isolated.y <- sin(2 * isolated.x$x) + .2 * cos(seq_len(n))
   isolated.bw <- bwfun(xdat = isolated.x, ydat = isolated.y, bws = .35,
     bandwidth.compute = FALSE, regtype = "lc", ckertype = "epanechnikov")
-  isolated.fit <- fitfun(bws = isolated.bw, txdat = isolated.x,
-    tydat = isolated.y, gradients = TRUE, se = FALSE)
+  isolated.fit <- suppressWarnings(fitfun(bws = isolated.bw, txdat = isolated.x,
+    tydat = isolated.y, gradients = TRUE, se = TRUE))
   stopifnot(all(is.finite(isolated.fit$grad)), any(isolated.fit$grad != 0),
             isolated.fit$grad[n, 1L] == 0)
   isolated <- attempt(call.tile(isolated.bw, isolated.x,
                                 matrix(isolated.y, ncol = 1L)))
   isolated.mixed <- attempt(call.tile(isolated.bw, isolated.x,
     cbind(0, isolated.y, 0, isolated.y, 0, isolated.y, 0, isolated.y)))
-  stopifnot(failed(isolated), failed(isolated.mixed))
+  isolated.direct <- statistic(isolated.fit, 1L, TRUE)
+  stopifnot(!failed(isolated), !failed(isolated.mixed),
+    isTRUE(all.equal(isolated, isolated.direct, tolerance = 2e-12)),
+    identical(isolated.mixed, rep(c(0, isolated), 4L)))
 
   # Zero responses do not convert an invalid nearest-neighbor radius to zero.
   tied.x <- data.frame(x = c(0, 0, 0, 1:5))
@@ -104,13 +107,14 @@ npsig_native_zero_contract <- function(package, expect.zero = TRUE, smoke = FALS
   geometry <- attempt(call.tile(tied.bw, tied.x, matrix(0, 8L, 1L)))
   stopifnot(failed(geometry))
   list(input = inputs, ordinary = ordinary, outcomes = outcomes,
+       certified = list(isolated = isolated, isolated.mixed = isolated.mixed),
        invalid = list(nonfinite = nonfinite, oversized = oversized,
-                      isolated = isolated, isolated.mixed = isolated.mixed,
                       geometry = geometry))
 }
 
 test_that("native pivotal response columns use complete finite zero effects", {
   result <- npsig_native_zero_contract("np")
   expect_length(result$ordinary, 9L)
-  expect_length(result$invalid, 5L)
+  expect_length(result$certified, 2L)
+  expect_length(result$invalid, 3L)
 })

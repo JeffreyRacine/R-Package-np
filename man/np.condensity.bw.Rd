@@ -1000,6 +1000,9 @@ or standard-deviation factors.
 }
 
 \section{Book And Method Pointers}{
+  Local-polynomial search uses the numerical-ridging policies described in
+  \code{\link{npreg}}; see Seifert and Gasser (2000) there.
+
   \code{npcdensbw} selects response and conditioning bandwidths, and
   when requested local-polynomial degree/search metadata, for the
   conditional density target \eqn{f(y\mid x)} estimated by

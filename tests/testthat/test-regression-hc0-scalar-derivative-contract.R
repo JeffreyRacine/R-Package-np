@@ -17,7 +17,7 @@ h3_hc0_derivative_oracle <- function(bws, txdat, tydat, exdat = NULL) {
     txdat = txdat,
     output = "matrix"
   )))
-  residual <- as.double(tydat) - drop(H0 %*% as.double(tydat))
+  residual <- hc0_normalized_training_residual(H0, tydat)
   eval <- if (is.null(exdat)) txdat else exdat
   H.eval <- if (is.null(exdat)) {
     H0

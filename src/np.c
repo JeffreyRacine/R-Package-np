@@ -7176,7 +7176,8 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
                    NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
                    int categorical_compress,
                    NPRegressionLPEmptyRows *empty_rows,
-                   const NPRegressionGradientRequest *gradient_request);
+                   const NPRegressionGradientRequest *gradient_request,
+                   int *variance_unavailable, int **gradient_zero_out);
 
 void np_density(double * tuno, double * tord, double * tcon,
                 double * euno, double * eord, double * econ,
@@ -8312,6 +8313,8 @@ SEXP C_np_regression(SEXP tuno,
   SEXP gradient_coordinate = PROTECT(getAttrib(output_request, install(".np.gradient.coordinate")));
   NPRegressionGradientRequest gradient_request;
   const NPRegressionGradientRequest *gradient_request_ptr = NULL;
+  int variance_unavailable = 0;
+  int *gradient_zero_out = NULL;
   SEXP empty_flags = R_NilValue;
   NPRegressionLPEmptyRows empty_rows = {NULL, 0, NULL, NULL, NULL};
   NPRegressionLPEmptyRows *empty_rows_ptr = NULL;
@@ -8501,7 +8504,7 @@ SEXP C_np_regression(SEXP tuno,
                 do_gerr ? REAL(out_gerr) : NULL,
                 REAL(out_xtra), ckerlb_p, ckerub_p,
                 active_route, active_diagnostics, categorical_compress, empty_rows_ptr,
-                gradient_request_ptr);
+                gradient_request_ptr, &variance_unavailable, &gradient_zero_out);
 
   if(gradient_request_ptr != NULL) {
     for(int column = 0; column < nc; ++column)
@@ -8529,6 +8532,14 @@ SEXP C_np_regression(SEXP tuno,
 
   if(empty_rows.count > 0)
     setAttrib(out, install(".np.empty.rows"), empty_flags);
+  if(variance_unavailable)
+    setAttrib(out, install(".np.variance.unavailable"), ScalarLogical(TRUE));
+  if(gradient_zero_out != NULL) {
+    SEXP certificate = PROTECT(allocVector(LGLSXP, gsize));
+    ++extra_protect;
+    memcpy(LOGICAL(certificate), gradient_zero_out, (size_t)gsize*sizeof(int));
+    setAttrib(out, install(".np.gradient.structural.zero"), certificate);
+  }
   UNPROTECT(27 + extra_protect);
   return out;
 }
@@ -19207,6 +19218,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                                                                (lp_engine_eff == NP_LP_ENGINE_SCALAR) ?
                                                                  NP_REGRESSION_STDERR_CONDITIONAL_INFLUENCE :
                                                                  NP_REGRESSION_STDERR_LOCAL_RESIDUAL,
+                                                               0, /* conditional kernel-response target */
                                                                prepared_x_bandwidth_ptr,
                                                                row_nn_geometry_context_ptr,
                                                                NULL, empty_rows != NULL ? &row_empty : NULL, first_se_request,
@@ -21197,6 +21209,8 @@ typedef struct {
   int categorical_compress;
   NPRegressionLPEmptyRows *empty_rows;
   const NPRegressionGradientRequest *gradient_request;
+  int *variance_unavailable;
+  int **gradient_zero_out;
 } NPRegressionFittedCall;
 
 static SEXP np_regression_fitted_execute(void *data)
@@ -21244,6 +21258,7 @@ static SEXP np_regression_fitted_execute(void *data)
   int train_is_eval, num_obs_eval_alloc, max_lev;
   int ordinary_hc0_active = 0;
   double *ordinary_hc0_residual = NULL;
+  int *ordinary_hc0_information = NULL;
   NPRegressionHC0Context ordinary_hc0_context;
 
   int * ipt = NULL, * ipe = NULL;  // point permutation, see tree.c
@@ -21508,13 +21523,15 @@ static SEXP np_regression_fitted_execute(void *data)
     double *training_mean = NULL;
     double ** const training_gradient = train_is_eval ? eg : NULL;
     long double residual_scale = 0.0L;
-    int constant_response = 1;
+    int invalid_preparation = 0;
     const int temporary_training_tree =
       int_TREE_X == NP_TREE_TRUE &&
       BANDWIDTH_reg_extern == BW_ADAP_NN &&
       !train_is_eval && kernel_route == NULL;
     KDT *outer_evaluation_kdt = NULL;
     NPRegressionHC0Context residual_preparation_context;
+    NPRegressionResidualPreparation residual_preparation;
+    int *training_identity = NULL;
 
     if(temporary_training_tree) {
       outer_evaluation_kdt = kdt_extern_X;
@@ -21544,7 +21561,23 @@ static SEXP np_regression_fitted_execute(void *data)
 
     ordinary_hc0_residual =
       (double *)R_alloc((size_t)num_obs_train_extern, sizeof(double));
-    training_mean = train_is_eval ? ecm : ordinary_hc0_residual;
+    ordinary_hc0_information =
+      (int *)R_alloc((size_t)num_obs_train_extern, sizeof(int));
+    training_identity =
+      (int *)R_alloc((size_t)num_obs_train_extern, sizeof(int));
+    training_mean = train_is_eval ? ecm :
+      (double *)R_alloc((size_t)num_obs_train_extern, sizeof(double));
+    for(i = 0; i < num_obs_train_extern; ++i) {
+      training_identity[i] = i;
+      ordinary_hc0_residual[i] = 0.0;
+      ordinary_hc0_information[i] = NP_RESIDUAL_INVALID;
+    }
+    residual_preparation.response = vector_Y_extern;
+    residual_preparation.evaluation_to_donor = training_identity;
+    residual_preparation.num_obs_train = num_obs_train_extern;
+    residual_preparation.num_obs_eval = num_obs_train_extern;
+    residual_preparation.normalized_residual = ordinary_hc0_residual;
+    residual_preparation.information = ordinary_hc0_information;
     memset(&residual_preparation_context, 0,
            sizeof(residual_preparation_context));
     residual_preparation_context.donor_to_canonical = ipt;
@@ -21552,6 +21585,7 @@ static SEXP np_regression_fitted_execute(void *data)
     residual_preparation_context.status =
       NP_REGRESSION_HC0_RESIDUAL_PREPARING;
     residual_preparation_context.gradient_request = call->gradient_request;
+    residual_preparation_context.preparation = &residual_preparation;
 
     kernel_estimate_regression_categorical_tree_np(
       np_lp_engine_extern,
@@ -21589,6 +21623,7 @@ static SEXP np_regression_fitted_execute(void *data)
       kernel_route_diagnostics,
       categorical_compress,
       NP_REGRESSION_STDERR_LOCAL_RESIDUAL,
+      1, /* ordinary regression response, including SE preparation */
       NULL,
       &training_geometry_context,
       &residual_preparation_context, NULL, NULL, NULL, NULL);
@@ -21599,26 +21634,37 @@ static SEXP np_regression_fitted_execute(void *data)
     }
 
     for(i = 0; i < num_obs_train_extern; i++) {
-      const long double residual =
-        (long double)vector_Y_extern[i] - (long double)training_mean[i];
+      const long double residual = (long double)ordinary_hc0_residual[i];
       const long double magnitude = fabsl(residual);
 
       if(!isfinite((double)vector_Y_extern[i]) ||
-         !isfinite((double)training_mean[i]) || !isfinite(magnitude))
-        error("ordinary-regression HC0 training residual is not finite");
-      if(i > 0 && vector_Y_extern[i] != vector_Y_extern[0])
-        constant_response = 0;
+         !isfinite((double)training_mean[i]) || !isfinite(magnitude) ||
+         (ordinary_hc0_information[i] != NP_RESIDUAL_IDENTIFIED &&
+          ordinary_hc0_information[i] != NP_RESIDUAL_UNIDENTIFIED))
+        invalid_preparation = 1;
       if(magnitude > residual_scale)
         residual_scale = magnitude;
     }
 
-    if(constant_response)
-      residual_scale = 0.0L;
+    /* A failed/incomplete producer must not strand a peer in the subsequent
+     * covariance traversal. Local fanout work does not enter collectives. */
+#ifdef MPI2
+    if(!np_mpi_local_regression_active() && comm != NULL &&
+       comm[1] != MPI_COMM_NULL && iNum_Processors > 1)
+      MPI_Allreduce(MPI_IN_PLACE, &invalid_preparation, 1, MPI_INT,
+                    MPI_MAX, comm[1]);
+#endif
+    if(invalid_preparation)
+      error("ordinary-regression normalized residual preparation is invalid or incomplete");
 
     if(residual_scale > (long double)DBL_MAX)
       error("ordinary-regression HC0 residual scale exceeds double range");
 
     ordinary_hc0_context.scaled_residual = ordinary_hc0_residual;
+    ordinary_hc0_context.residual_information = ordinary_hc0_information;
+    for(i = 0; i < num_obs_train_extern; ++i)
+      if(ordinary_hc0_information[i] == NP_RESIDUAL_UNIDENTIFIED)
+        ++ordinary_hc0_context.unknown_count;
     ordinary_hc0_context.donor_to_canonical = ipt;
     ordinary_hc0_context.num_obs_train = num_obs_train_extern;
     ordinary_hc0_context.residual_scale = (double)residual_scale;
@@ -21632,9 +21678,8 @@ static SEXP np_regression_fitted_execute(void *data)
     } else {
       ordinary_hc0_context.status = NP_REGRESSION_HC0_RESIDUAL_READY;
       for(i = 0; i < num_obs_train_extern; i++) {
-        ordinary_hc0_residual[i] = (double)(
-          ((long double)vector_Y_extern[i] -
-           (long double)training_mean[i]) / residual_scale);
+        ordinary_hc0_residual[i] =
+          (double)((long double)ordinary_hc0_residual[i] / residual_scale);
         if(!R_FINITE(ordinary_hc0_residual[i]))
           error("ordinary-regression HC0 scaled residual is not finite");
       }
@@ -21645,11 +21690,15 @@ static SEXP np_regression_fitted_execute(void *data)
         while(ipt[i] != i) {
           const int destination = ipt[i];
           const double residual = ordinary_hc0_residual[i];
+          const int information = ordinary_hc0_information[i];
           const int permutation = ipt[i];
 
           ordinary_hc0_residual[i] =
             ordinary_hc0_residual[destination];
           ordinary_hc0_residual[destination] = residual;
+          ordinary_hc0_information[i] =
+            ordinary_hc0_information[destination];
+          ordinary_hc0_information[destination] = information;
           ipt[i] = ipt[destination];
           ipt[destination] = permutation;
         }
@@ -21683,6 +21732,40 @@ static SEXP np_regression_fitted_execute(void *data)
           g[j*num_obs_eval_extern + ipe[i]] = eg[j][i];
 
     np_progress_fit_set_offset(num_obs_train_extern);
+  }
+
+  /* Dependency flags are separate from the finite partial covariance sums.
+   * They exist only when a requested covariance can encounter unknown donor
+   * variance; never allocate them on the uncertainty-off/common known path. */
+  if(ordinary_hc0_active && ordinary_hc0_context.unknown_count > 0) {
+    ordinary_hc0_context.mean_unavailable =
+      (int *)R_alloc((size_t)num_obs_eval_extern, sizeof(int));
+    memset(ordinary_hc0_context.mean_unavailable, 0,
+           (size_t)num_obs_eval_extern * sizeof(int));
+    if(do_gerr) {
+      ordinary_hc0_context.gradient_unavailable =
+        (int **)R_alloc((size_t)num_var, sizeof(int *));
+      ordinary_hc0_context.gradient_structural_zero =
+        (int **)R_alloc((size_t)num_var, sizeof(int *));
+      memset(ordinary_hc0_context.gradient_unavailable, 0,
+             (size_t)num_var * sizeof(int *));
+      memset(ordinary_hc0_context.gradient_structural_zero, 0,
+             (size_t)num_var * sizeof(int *));
+      *call->gradient_zero_out = (int *)R_alloc(
+        (size_t)num_var * num_obs_eval_extern, sizeof(int));
+      memset(*call->gradient_zero_out, 0,
+             (size_t)num_var * num_obs_eval_extern * sizeof(int));
+      for(j = gradient_range.begin; j < gradient_range.end; ++j) {
+        ordinary_hc0_context.gradient_unavailable[j] =
+          (int *)R_alloc((size_t)num_obs_eval_extern, sizeof(int));
+        memset(ordinary_hc0_context.gradient_unavailable[j], 0,
+               (size_t)num_obs_eval_extern * sizeof(int));
+        ordinary_hc0_context.gradient_structural_zero[j] =
+          (int *)R_alloc((size_t)num_obs_eval_extern, sizeof(int));
+        memset(ordinary_hc0_context.gradient_structural_zero[j], 0,
+               (size_t)num_obs_eval_extern * sizeof(int));
+      }
+    }
   }
 
   if(call->empty_rows != NULL)
@@ -21724,12 +21807,48 @@ static SEXP np_regression_fitted_execute(void *data)
                                                    kernel_route_diagnostics,
                                                    categorical_compress,
                                                    NP_REGRESSION_STDERR_LOCAL_RESIDUAL,
+                                                   1, /* ordinary regression response */
                                                    NULL,
                                                    &nn_geometry_context,
                                                    ordinary_hc0_active ?
                                                      &ordinary_hc0_context : NULL,
                                                    call->empty_rows, NULL, NULL, NULL);
 
+
+  if(ordinary_hc0_active && ordinary_hc0_context.unknown_count > 0) {
+#ifdef MPI2
+    const int distributed = !np_mpi_local_regression_active() &&
+      comm != NULL && comm[1] != MPI_COMM_NULL && iNum_Processors > 1;
+    if(distributed) {
+      MPI_Allreduce(MPI_IN_PLACE, ordinary_hc0_context.mean_unavailable,
+                    num_obs_eval_extern, MPI_INT, MPI_MAX, comm[1]);
+      if(do_gerr)
+        for(j = gradient_range.begin; j < gradient_range.end; ++j) {
+          MPI_Allreduce(MPI_IN_PLACE,
+                        ordinary_hc0_context.gradient_unavailable[j],
+                        num_obs_eval_extern, MPI_INT, MPI_MAX, comm[1]);
+          MPI_Allreduce(MPI_IN_PLACE,
+                        ordinary_hc0_context.gradient_structural_zero[j],
+                        num_obs_eval_extern, MPI_INT, MPI_MAX, comm[1]);
+        }
+    }
+#endif
+    for(i = 0; i < num_obs_eval_extern; ++i) {
+      if(ordinary_hc0_context.mean_unavailable[i]) {
+        ecmerr[i] = NA_REAL;
+        *call->variance_unavailable = 1;
+      }
+      if(do_gerr)
+        for(j = gradient_range.begin; j < gradient_range.end; ++j) {
+          (*call->gradient_zero_out)[j*num_obs_eval_extern + ipe[i]] =
+            ordinary_hc0_context.gradient_structural_zero[j][i];
+          if(ordinary_hc0_context.gradient_unavailable[j][i]) {
+            egerr[j][i] = NA_REAL;
+            *call->variance_unavailable = 1;
+          }
+        }
+    }
+  }
 
   for(i=0;i<num_obs_eval_extern;i++)
     cm[ipe[i]] = ecm[i];
@@ -21795,7 +21914,8 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
                    NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
                    int categorical_compress,
                    NPRegressionLPEmptyRows *empty_rows,
-                   const NPRegressionGradientRequest *gradient_request){
+                   const NPRegressionGradientRequest *gradient_request,
+                   int *variance_unavailable, int **gradient_zero_out){
   NPRegressionFittedCall call = {0};
   call.tuno = tuno;
   call.tord = tord;
@@ -21828,6 +21948,8 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
   call.categorical_compress = categorical_compress;
   call.empty_rows = empty_rows;
   call.gradient_request = gradient_request;
+  call.variance_unavailable = variance_unavailable;
+  call.gradient_zero_out = gradient_zero_out;
   call.owner.x_columns[0] = myopti[REG_NUNOI];
   call.owner.x_columns[1] = myopti[REG_NORDI];
   call.owner.x_columns[2] = myopti[REG_NCONI];

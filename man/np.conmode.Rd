@@ -17,6 +17,10 @@
   accuracy.
 }
 \details{
+  Local-polynomial calculations inherit numerical ridging from
+  \code{\link{npcdens}}. See that estimator's help for the solve
+  policy and its distinct conditional uncertainty formula.
+
   Documentation guide: see \code{\link{np.kernels}} for kernels,
   \code{\link{np.options}} for global options, and
   \code{\link{plot}} for plotting options.

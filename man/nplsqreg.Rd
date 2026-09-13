@@ -200,7 +200,12 @@ selection, prediction, or plotting route.
 
   Standard errors are the asymptotic standard errors from that final
   transformed-response regression, conditional on the selected
-  bandwidths, pilot scale, and \eqn{\delta}{delta}. For vector
+  bandwidths, pilot scale, and \eqn{\delta}{delta}. They inherit the
+  residual normalization described under Standard Errors in
+  \code{\link{npreg}} (Ruppert et al., 1997), applied to the transformed
+  response. This does not add uncertainty from estimating the pilot scale
+  or transformation. Local-polynomial fits inherit the numerical-ridging
+  policy documented there. For vector
   \code{tau}, quantiles are fitted separately, so estimated quantile
   curves are not monotonized and may cross in finite samples. Separate
   fits on the same observations do not imply zero cross-quantile

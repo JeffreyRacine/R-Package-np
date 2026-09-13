@@ -191,6 +191,9 @@ These arguments control the main check-loss bandwidth and
   }
 }
 \details{
+  Regression searches and pilot fits inherit numerical ridging from
+  \code{\link{npregbw}} and \code{\link{npreg}}.
+
   For a requested quantile probability \eqn{\tau}{tau},
   \code{nplsqregbw} chooses bandwidths and \code{delta} for the
   transformed response

@@ -118,6 +118,11 @@ Further arguments are passed to methods.
 
 }
 \details{
+Local-polynomial operators retain the fitted solve's numerical ridge
+adjustment; see Numerical Ridging in \code{\link{npreg}} and its
+Seifert--Gasser reference. A hat operator alone does not estimate residual
+variance or apply the residual normalization used by regression inference.
+
 For \code{output = "matrix"}, the return value is a matrix with class
 \code{c("npreghat", "matrix")} so it can be used directly in matrix products,
 e.g. \code{H \%*\% y}. Attributes on the matrix store metadata used by

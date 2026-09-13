@@ -252,6 +252,24 @@ gradients.npregression <- function(x, se = FALSE, gradient.order = NULL, ...) {
            call. = FALSE)
     object[[field]] <- stats::napredict(action, value)
   }
+  # The certificate follows gradient rows, not a mean-only prediction
+  # extraction whose gradients remain compact.
+  if ("grad" %in% fields) {
+    certificate <- attr(object, ".np.gradient.structural.zero", exact = TRUE)
+    if (!is.null(certificate)) {
+      gradient <- object[["grad", exact = TRUE]]
+      if (!is.matrix(certificate) || !is.logical(certificate) ||
+          is.null(gradient) || NCOL(certificate) != NCOL(gradient))
+        stop("invalid regression structural-zero certificate", call. = FALSE)
+      if (NROW(certificate) != full.rows) {
+        if (NROW(certificate) != compact.rows)
+          stop("inconsistent regression evaluation rows in structural-zero certificate",
+               call. = FALSE)
+        attr(object, ".np.gradient.structural.zero") <-
+          stats::napredict(action, certificate)
+      }
+    }
+  }
   object
 }
 

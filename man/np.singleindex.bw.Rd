@@ -712,6 +712,9 @@ or standard-deviation factors.
 }
 
 \section{Book And Method Pointers}{
+  Local-polynomial index search inherits the numerical-ridging policies
+  described in \code{\link{npreg}}; see Seifert and Gasser (2000) there.
+
   \code{npindexbw} selects the index direction, bandwidth, and when
   requested local-polynomial degree/search metadata for the single-index
   model. The continuous-outcome target is typically written

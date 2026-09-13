@@ -14,7 +14,7 @@ hc0_hat_oracle <- function(bws, txdat, tydat, exdat = NULL) {
       output = "matrix"
     ))
   }
-  residual <- as.double(tydat) - drop(H.train %*% as.double(tydat))
+  residual <- hc0_normalized_training_residual(H.train, tydat)
 
   sqrt(drop((H.eval^2) %*% (residual^2)))
 }
@@ -556,7 +556,9 @@ test_that("HC0 activation remains private and linear-memory", {
   expect_gt(hc0.end, 0L)
   expect_false(grepl("npreghat", hc0.source, fixed = TRUE))
   expect_false(grepl("np_regression_lp_hat_matrix", hc0.source, fixed = TRUE))
-  expect_match(reducer, "ordinary_hc0 ? &hc0_dual_power_ctx : NULL", fixed = TRUE)
+  expect_match(reducer, "ordinary_hc0 ? &hc0_dual_power_ctx :", fixed = TRUE)
+  expect_match(reducer, "hc0_residual_preparing ? &residual_dual_power_ctx :", fixed = TRUE)
+  expect_match(reducer, "stable_scalar_contrast ? &contrast_dual_power_ctx : NULL", fixed = TRUE)
   expect_match(
     reducer,
     "regression_moment_context.hc0_scaled_residual",

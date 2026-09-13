@@ -783,6 +783,11 @@ or standard-deviation factors.
 }
 
 \section{Book And Method Pointers}{
+  The smooth-coefficient moment solves use their own bounded additive
+  numerical-ridge policy. For the Seifert--Gasser motivation for ridging,
+  see \code{\link{npreg}}; this does not impose its ordinary-regression
+  uncertainty formula on smooth-coefficient estimation.
+
   \code{npscoefbw} selects bandwidths for the smooth-coefficient model
   \eqn{Y=X^\prime\beta(Z)+\epsilon}. The selected bandwidths control
   the mixed-data smoothing over \eqn{Z} used to estimate the coefficient

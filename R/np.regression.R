@@ -1,4 +1,13 @@
 # Required inference/refit consumers must not publish partial external fits.
+.npreg_report_variance_unavailable <- function(native.output) {
+  if (isTRUE(attr(native.output, ".np.variance.unavailable", exact = TRUE)))
+    .np_warning(paste0(
+      "Some standard errors are unavailable because the fitted smoother ",
+      "leaves no residual information for observations used by those estimates. ",
+      "Point estimates are unchanged."))
+  invisible(NULL)
+}
+
 .npreg_complete <- function(...) {
   args <- list(...)
   args[[".np.require.complete"]] <- TRUE
@@ -341,6 +350,10 @@ npreg.formula <-
         ev$grad <- napredict(ev$omit, ev$grad)
         if (!is.null(ev$gerr))
           ev$gerr <- napredict(ev$omit, ev$gerr)
+        certificate <- attr(ev, ".np.gradient.structural.zero", exact = TRUE)
+        if (!is.null(certificate))
+          attr(ev, ".np.gradient.structural.zero") <-
+            napredict(ev$omit, certificate)
     }
 
     if(ev$residuals){
@@ -800,6 +813,7 @@ npreg.rbandwidth <-
     ), continuous.names = bws[["xnames", exact = TRUE]][bws[["icon", exact = TRUE]]])
 
     empty.rows <- attr(myout, ".np.empty.rows", exact = TRUE)
+    .npreg_report_variance_unavailable(myout)
 
     if (gradients){
       myout$g = matrix(data=myout$g, nrow = enrow, ncol = ncol, byrow = FALSE) 
@@ -857,6 +871,10 @@ npreg.rbandwidth <-
     if (identical(bws$regtype, "lp"))
       ev.args$gradient.order <- glp.gradient.order
     ev <- do.call(npregression, ev.args)
+    certificate <- attr(myout, ".np.gradient.structural.zero", exact = TRUE)
+    if (gradients && se && !is.null(certificate))
+      attr(ev, ".np.gradient.structural.zero") <-
+        matrix(certificate, enrow, ncol)[, rorder, drop = FALSE]
     ev$nomad.time <- if (!is.null(bws$nomad.time) && is.finite(bws$nomad.time)) as.double(bws$nomad.time) else NA_real_
     ev$powell.time <- if (!is.null(bws$powell.time) && is.finite(bws$powell.time)) as.double(bws$powell.time) else NA_real_
 

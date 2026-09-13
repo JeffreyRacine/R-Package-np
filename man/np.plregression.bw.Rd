@@ -518,6 +518,9 @@ or standard-deviation factors.
 }
 
 \section{Book And Method Pointers}{
+  The component regression searches inherit numerical ridging from
+  \code{\link{npregbw}}; its motivation is described in \code{\link{npreg}}.
+
   \code{npplregbw} selects the bandwidths and, for local-polynomial
   routes, child-specific degree/search metadata used by
   \code{\link{npplreg}}. The target model is
