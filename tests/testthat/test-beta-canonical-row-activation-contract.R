@@ -666,9 +666,12 @@ test_that("scalar beta regression fits enter the canonical row engine", {
   )
   expect_match(
     public_regression,
-    "active_route, active_diagnostics, categorical_compress, empty_rows_ptr);",
-    fixed = TRUE
+    paste0("active_route, active_diagnostics, categorical_compress, empty_rows_ptr,",
+           "[[:space:]]*gradient_request_ptr\\);")
   )
+  expect_match(public_regression,
+               "const NPRegressionGradientRequest *gradient_request_ptr = NULL;",
+               fixed = TRUE)
   expect_false(grepl("np_beta_regression_lc(", public_regression,
                      fixed = TRUE))
   expect_false(grepl("beta_regression.h", ingress, fixed = TRUE))
