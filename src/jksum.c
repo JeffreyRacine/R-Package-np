@@ -32241,6 +32241,8 @@ int np_regression_lp_sigtest_iid(
     }
   } else {
     size_t residual_count;
+    int gradient_nonzero[8] = {0};
+    int gradient_se_invalid[8] = {0};
 
     if((size_t)num_train > SIZE_MAX/(size_t)n_rhs)
       goto cleanup_sigtest_iid;
@@ -32307,19 +32309,28 @@ int np_regression_lp_sigtest_iid(
           quadratic += (long double)influence*(long double)influence *
             (long double)scaled_residual*(long double)scaled_residual;
         }
-        if(!R_FINITE(gradient) || !isfinite(quadratic) ||
-           quadratic <= 0.0L || scale <= 0.0)
+        if(!R_FINITE(gradient))
           goto cleanup_sigtest_iid;
+        if(gradient != 0.0)
+          gradient_nonzero[rhs] = 1;
+        if(!isfinite(quadratic) || quadratic <= 0.0L || scale <= 0.0) {
+          gradient_se_invalid[rhs] = 1;
+          continue;
+        }
         {
           const long double stderr_ld =
             (long double)scale*sqrtl(quadratic);
 
-          if(!isfinite(stderr_ld) || stderr_ld > (long double)DBL_MAX)
-            goto cleanup_sigtest_iid;
+          if(!isfinite(stderr_ld) || stderr_ld > (long double)DBL_MAX) {
+            gradient_se_invalid[rhs] = 1;
+            continue;
+          }
           gradient_se = (double)stderr_ld;
         }
-        if(!R_FINITE(gradient_se) || gradient_se <= 0.0)
-          goto cleanup_sigtest_iid;
+        if(!R_FINITE(gradient_se) || gradient_se <= 0.0) {
+          gradient_se_invalid[rhs] = 1;
+          continue;
+        }
         ratio = gradient/gradient_se;
         if(!R_FINITE(ratio))
           goto cleanup_sigtest_iid;
@@ -32327,6 +32338,14 @@ int np_regression_lp_sigtest_iid(
       }
       if((eval_idx & 31) == 0)
         R_CheckUserInterrupt();
+    }
+    /* Only a complete finite zero gradient column can forgive undefined
+       standard errors. An isolated 0/0 in a nonzero column remains an error. */
+    for(rhs = 0; rhs < n_rhs; ++rhs) {
+      if(gradient_nonzero[rhs] && gradient_se_invalid[rhs])
+        goto cleanup_sigtest_iid;
+      if(!gradient_nonzero[rhs])
+        statistic_sum[rhs] = 0.0L;
     }
   }
 

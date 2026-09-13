@@ -73,57 +73,102 @@ npsigtest.npregression <-
   }
 
 .np_npsig_pivot_plan <- function(pivot, xdat, index, joint) {
-  categorical <- vapply(
-    xdat[index],
-    function(variable) is.factor(variable) || is.ordered(variable),
-    logical(1L)
-  )
-
-  if (!is.null(pivot)) {
-    pivot <- npValidateScalarLogical(pivot, "pivot")
-    if (pivot && any(categorical)) {
-      stop(sprintf(
-        paste0(
-          "pivot = TRUE is supported only when every tested predictor is ",
-          "continuous; the published categorical test is unstandardized ",
-          "(categorical predictor%s: %s). Use pivot = NULL (the ",
-          "method-aware default) or pivot = FALSE."
-        ),
-        if (sum(categorical) == 1L) "" else "s",
-        paste(names(xdat)[index][categorical], collapse = ", ")
-      ), call. = FALSE)
-    }
-    effective <- rep.int(pivot, length(index))
-  } else if (joint == TRUE) {
-    effective <- rep.int(!any(categorical), length(index))
-  } else {
-    effective <- !categorical
-  }
-
+  if (!is.logical(pivot))
+    stop("'pivot' must be a non-missing logical scalar", call. = FALSE)
+  pivot <- npValidateScalarLogical(pivot, "pivot")
+  effective <- rep.int(pivot, length(index))
   names(effective) <- names(xdat)[index]
   list(requested = pivot, effective = effective)
 }
 
-.np_npsig_statistic <- function(fit, index, pivot) {
+.np_npsig_structure <- function(bws, xdat, index) {
+  # Match the fitting owner's factor levels/reference order before masking.
+  xdat <- adjustLevels(xdat, bws[["xdati", exact = TRUE]])
+  rows <- matrix(FALSE, nrow(xdat), length(index),
+                 dimnames = list(NULL, names(xdat)[index]))
+  for (column in seq_along(index)) {
+    i <- index[[column]]
+    variable <- xdat[[i]]
+    if (!is.factor(variable))
+      next
+    endpoints <- npCategoricalFirstDifferenceFrames(
+      xdat[, i, drop = FALSE], index = 1L, where = "npsigtest")
+    rows[, column] <- as.integer(endpoints$lower[[1L]]) ==
+      as.integer(endpoints$upper[[1L]])
+  }
+  rows
+}
+
+.np_npsig_zero_effects <- function(fit, index, structural = NULL) {
   gradient <- fit$grad[, index, drop = FALSE]
-  if (any(!is.finite(gradient)))
+  if (is.null(structural))
+    structural <- matrix(FALSE, nrow(gradient), ncol(gradient))
+  if (!is.logical(structural) || anyNA(structural) ||
+      !identical(dim(structural), dim(gradient)))
+    stop("invalid npsigtest structural-zero mask", call. = FALSE)
+  vapply(seq_len(ncol(gradient)), function(column) {
+    values <- gradient[!structural[, column], column]
+    all(is.finite(values)) && all(values == 0)
+  }, logical(1L))
+}
+
+.np_npsig_advance_bootstrap_rng <- function(num.obs, boot.num, boot.method) {
+  # Preserve later predictors' donor/multiplier draws without fitting any
+  # bootstrap model. Both wild laws consume the same runif vector.
+  for (unused in seq_len(boot.num)) {
+    if (boot.method %in% c("iid", "pairwise"))
+      sample.int(num.obs, replace = TRUE)
+    else
+      stats::runif(num.obs)
+  }
+  invisible(NULL)
+}
+
+.np_npsig_statistic <- function(fit, index, pivot, structural = NULL,
+                                 context = "observed statistic") {
+  gradient <- fit$grad[, index, drop = FALSE]
+  if (is.null(structural))
+    structural <- matrix(FALSE, nrow(gradient), ncol(gradient))
+  if (!is.logical(structural) || anyNA(structural) ||
+      !identical(dim(structural), dim(gradient)))
+    stop("invalid npsigtest structural-zero mask", call. = FALSE)
+  required <- !structural
+  if (any(!is.finite(if (pivot) gradient[required] else gradient)))
     stop("npsigtest cannot construct a statistic from non-finite gradient estimates", call. = FALSE)
 
   if (!pivot)
     return(mean(gradient^2))
 
+  # A whole finite zero contrast contributes zero, including its share of
+  # the joint n-by-p denominator. An isolated unexplained 0/0 does not.
+  zero.effects <- .np_npsig_zero_effects(fit, index, structural)
+  required[, zero.effects] <- FALSE
+  if (!any(required))
+    return(0)
+
   if (is.null(fit$gerr))
     stop("npsigtest cannot construct a pivotal statistic because gradient standard errors are unavailable", call. = FALSE)
 
-  gradient.stderr <- fit$gerr[, index, drop = FALSE]
-  if (any(!is.finite(gradient.stderr)) || any(gradient.stderr <= 0.0)) {
-    stop(paste0(
-      "npsigtest cannot construct a pivotal statistic because a required ",
-      "gradient standard error is non-positive or non-finite"
-    ), call. = FALSE)
+  gradient.stderr <- matrix(NA_real_, nrow(gradient), ncol(gradient))
+  needed <- which(colSums(required) > 0L)
+  gradient.stderr[, needed] <- fit$gerr[, index[needed], drop = FALSE]
+  invalid <- required & (!is.finite(gradient.stderr) | gradient.stderr <= 0)
+  if (any(invalid)) {
+    first <- which(invalid, arr.ind = TRUE)[1L, ]
+    bad <- gradient.stderr[first[[1L]], first[[2L]]]
+    kind <- if (!is.finite(bad)) "non-finite" else if (bad < 0) "negative" else "zero"
+    predictor <- colnames(gradient)[first[[2L]]]
+    if (is.null(predictor)) predictor <- as.character(index[[first[[2L]]]])
+    stop(sprintf(paste0("npsigtest %s: %s standard error for predictor '%s' ",
+      "at row %d (%d undefined row/component%s). No structural-zero ",
+      "certificate applies; a studentized P-value cannot be computed."),
+      context, kind, predictor, first[[1L]], sum(invalid),
+      if (sum(invalid) == 1L) "" else "s"), call. = FALSE)
   }
 
-  statistic <- mean((gradient / gradient.stderr)^2)
+  ratio <- matrix(0, nrow(gradient), ncol(gradient))
+  ratio[required] <- gradient[required] / gradient.stderr[required]
+  statistic <- mean(ratio^2)
   if (!is.finite(statistic))
     stop("npsigtest pivotal statistic is non-finite", call. = FALSE)
   statistic
@@ -164,14 +209,8 @@ npsigtest.npregression <-
     function(variable) is.factor(variable) || is.ordered(variable),
     logical(1L)
   )
-  equivalent.pivot <- if (joint) {
-    is.null(pivot) || identical(pivot, FALSE) ||
-      (identical(pivot, TRUE) && !any(categorical))
-  } else {
-    is.null(pivot) ||
-      (identical(pivot, FALSE) && all(categorical)) ||
-      (identical(pivot, TRUE) && !any(categorical))
-  }
+  equivalent.pivot <- identical(pivot, TRUE) ||
+    (identical(pivot, FALSE) && (joint || all(categorical)))
 
   regression.engine <- bws[["regtype.engine", exact = TRUE]]
   engine.supported <- regression.engine %in% c("lc", "lp")
@@ -212,7 +251,9 @@ npsigtest.npregression <-
                                          response.matrix = NULL,
                                          null.mean,
                                          residual.pool,
-                                         pivotal = NULL) {
+                                         pivotal = NULL,
+                                         structural = NULL,
+                                         context = "bootstrap statistic") {
   continuous <- which(bws[["icon", exact = TRUE]])
   unordered <- which(bws[["iuno", exact = TRUE]])
   ordered <- which(bws[["iord", exact = TRUE]])
@@ -235,12 +276,37 @@ npsigtest.npregression <-
   if (is.null(pivotal))
     pivotal <- identical(mode, 1L)
   pivotal <- npValidateScalarLogical(pivotal, "pivotal")
-  if (pivotal && !identical(mode, 1L))
-    stop("private npsigtest categorical tiles cannot be pivotal", call. = FALSE)
-
   response.ready <- !is.null(response.matrix)
   if (response.ready == !is.null(donor.index))
     stop("private npsigtest tile requires exactly one response payload", call. = FALSE)
+
+  if (pivotal && !identical(mode, 1L)) {
+    payload <- if (response.ready) response.matrix else donor.index
+    n <- nrow(xdat)
+    if (!is.matrix(payload) || !is.numeric(payload) || nrow(payload) != n ||
+        ncol(payload) < 1L || ncol(payload) > 8L || any(!is.finite(payload)))
+      stop("npsigtest response tile requires a finite n-by-at-most-8 payload", call. = FALSE)
+    if (!response.ready) {
+      if (any(payload != floor(payload)) || any(payload < 1) || any(payload > n) ||
+          length(null.mean) != n || length(residual.pool) != n ||
+          any(!is.finite(null.mean)) || any(!is.finite(residual.pool)))
+        stop("npsigtest donor tile has invalid indices or null responses", call. = FALSE)
+      payload <- null.mean + matrix(residual.pool[payload], nrow = n)
+    }
+    if (is.null(structural))
+      structural <- .np_npsig_structure(bws, xdat, tested.index)
+    if (all(structural))
+      return(numeric(ncol(payload)))
+    result <- numeric(ncol(payload))
+    for (column in seq_len(ncol(payload))) {
+      fit <- .npreg_complete(bws = bws, txdat = xdat,
+        tydat = payload[, column], gradients = TRUE, se = TRUE)
+      result[[column]] <- .np_npsig_statistic(fit, tested.index, TRUE,
+        structural = structural,
+        context = sprintf("%s (tile column %d)", context, column))
+    }
+    return(result)
+  }
 
   as.numeric(.npreghat_exact_lp_apply_from_regression_core(
     bws = bws,
@@ -265,10 +331,13 @@ npsigtest.npregression <-
                                                     xdat,
                                                     index,
                                                     response.matrix,
-                                                    pivotal) {
+                                                    pivotal,
+                                                    structural = NULL,
+                                                    context = "bootstrap statistic") {
   statistic <- numeric(ncol(response.matrix))
   placeholder <- response.matrix[, 1L]
-  for (tested.index in index) {
+  for (column in seq_along(index)) {
+    tested.index <- index[[column]]
     statistic <- statistic + .np_npsig_streamed_iid_tile(
       bws = bws,
       xdat = xdat,
@@ -276,7 +345,9 @@ npsigtest.npregression <-
       response.matrix = response.matrix,
       null.mean = placeholder,
       residual.pool = placeholder,
-      pivotal = pivotal
+      pivotal = pivotal,
+      structural = if (is.null(structural)) NULL else structural[, column, drop = FALSE],
+      context = context
     ) / length(index)
   }
   statistic
@@ -343,7 +414,7 @@ npsigtest.rbandwidth <- function(bws,
                                  B = 399,
                                  boot.method = c("iid","wild","wild-rademacher","pairwise"),
                                  boot.type = c("I","II"),
-                                 pivot = NULL,
+                                 pivot = TRUE,
                                  joint = FALSE,
                                  index = seq_len(ncol(xdat)),
                                  random.seed = 42,
@@ -388,6 +459,9 @@ npsigtest.rbandwidth <- function(bws,
 
   boot.type <- match.arg(boot.type)
   boot.method <- match.arg(boot.method)
+  structural <- .np_npsig_structure(bws, xdat, index)
+  bootstrap.executed <- rep.int(as.integer(B), if (joint) 1L else length(index))
+  bootstrap.reason <- rep.int(NA_character_, length(bootstrap.executed))
 
   direct.statistic <- .np_npsig_streamed_iid_eligible(
     bws = bws,
@@ -492,8 +566,22 @@ npsigtest.rbandwidth <- function(bws,
                        se = pivot.use,
                        ...)
 
-    In <- .np_npsig_statistic(npreg.out, index = index, pivot = pivot.use)
+    In <- .np_npsig_statistic(npreg.out, index = index, pivot = pivot.use,
+                              structural = structural)
     progress <- .np_progress_step(progress)
+
+    if (all(.np_npsig_zero_effects(npreg.out, index,
+          if (pivot.use) structural else NULL))) {
+      .np_npsig_advance_bootstrap_rng(num.obs, B, boot.method)
+      progress <- .np_progress_end(progress)
+      progress.active <- FALSE
+      return(sigtest(In = In, In.bootstrap = matrix(NA_real_, B, 1L),
+        P = 1, bws = bws, ixvar = index, boot.method = boot.method,
+        pivot = pivot, pivot.effective = pivot.plan$effective,
+        joint = joint, boot.type = boot.type, boot.num = B,
+        bootstrap.executed = 0L,
+        bootstrap.reason = "all observed contrasts identically zero"))
+    }
 
     if(boot.method != "pairwise") {
 
@@ -582,7 +670,10 @@ npsigtest.rbandwidth <- function(bws,
           xdat = xdat,
           index = index,
           response.matrix = response.matrix,
-          pivotal = pivot.use
+          pivotal = pivot.use,
+          structural = structural,
+          context = sprintf("bootstrap replications %d-%d", tile.start,
+                            tile.start + tile.count - 1L)
         )
         tile.rows <- tile.start:(tile.start + tile.count - 1L)
         In.vec[tile.rows] <- tile.statistic
@@ -679,7 +770,8 @@ npsigtest.rbandwidth <- function(bws,
           xdat = if (identical(boot.method, "pairwise")) xdat.star else xdat,
           index = index,
           response.matrix = matrix(ydat.star, ncol = 1L),
-          pivotal = pivot.use
+          pivotal = pivot.use,
+          context = sprintf("bootstrap replication %d", i.star)
         )
 
       } else if(boot.method == "pairwise") {
@@ -706,7 +798,10 @@ npsigtest.rbandwidth <- function(bws,
         In.vec[i.star] <- .np_npsig_statistic(
           npreg.boot,
           index = index,
-          pivot = pivot.use
+          pivot = pivot.use,
+          structural = if (pivot.use) .np_npsig_structure(bws,
+            if (identical(boot.method, "pairwise")) xdat.star else xdat, index) else NULL,
+          context = sprintf("bootstrap replication %d", i.star)
         )
       if (!isTRUE(progress$known_total)) {
         progress <- .np_npsig_progress_promote(
@@ -733,6 +828,7 @@ npsigtest.rbandwidth <- function(bws,
 
     ii <- 0
 
+    streamed.residual.ready <- FALSE
     if (streamed.iid) {
       progress <- .np_progress_step(progress)
       nn.stage <- "unrestricted gradient evaluation"
@@ -744,13 +840,6 @@ npsigtest.rbandwidth <- function(bws,
         se = any(pivot.plan$effective),
         ...
       )
-      progress <- .np_progress_step(progress)
-      progress <- .np_progress_step(progress)
-      nn.stage <- "unrestricted residual fit"
-      streamed.ei.unres <- scale(residuals(.npreg_complete(bws = bws)))
-      streamed.ei.unres.scale <- attr(streamed.ei.unres, "scaled:scale")
-      streamed.ei.unres.center <- attr(streamed.ei.unres, "scaled:center")
-      streamed.ei.unres <- NULL
       progress <- .np_progress_step(progress)
     }
 
@@ -771,7 +860,7 @@ npsigtest.rbandwidth <- function(bws,
         bws <- bws.original
         
       }
-      
+
       ## Note - xdat must be a data frame
       
       ## Construct In, the average value of the squared derivatives of
@@ -790,14 +879,37 @@ npsigtest.rbandwidth <- function(bws,
                            ...)
       }
 
-      In[ii] <- .np_npsig_statistic(npreg.out, index = i, pivot = pivot.use)
+      In[ii] <- .np_npsig_statistic(npreg.out, index = i, pivot = pivot.use,
+                                    structural = structural[, ii, drop = FALSE])
       progress <- .np_progress_step(progress)
+
+      if (.np_npsig_zero_effects(npreg.out, i,
+            if (pivot.use) structural[, ii, drop = FALSE] else NULL)) {
+        .np_npsig_advance_bootstrap_rng(num.obs, B, boot.method)
+        P[[ii]] <- 1
+        In.mat[, ii] <- NA_real_
+        bootstrap.executed[[ii]] <- 0L
+        bootstrap.reason[[ii]] <- "observed contrast identically zero"
+        progress <- .np_npsig_progress_promote(
+          progress, total = length(index), done = ii)
+        next
+      }
       
       if(boot.method != "pairwise") {
 
         ## Compute scale and mean of unrestricted residuals
 
         if (streamed.iid) {
+          if (!streamed.residual.ready) {
+            progress <- .np_progress_step(progress)
+            nn.stage <- "unrestricted residual fit"
+            streamed.ei.unres <- scale(residuals(.npreg_complete(bws = bws)))
+            streamed.ei.unres.scale <- attr(streamed.ei.unres, "scaled:scale")
+            streamed.ei.unres.center <- attr(streamed.ei.unres, "scaled:center")
+            streamed.ei.unres <- NULL
+            streamed.residual.ready <- TRUE
+            progress <- .np_progress_step(progress)
+          }
           ei.unres.scale <- streamed.ei.unres.scale
           ei.unres.center <- streamed.ei.unres.center
         } else {
@@ -882,7 +994,11 @@ npsigtest.rbandwidth <- function(bws,
             donor.index = donor.index,
             response.matrix = response.matrix,
             null.mean = mhat.xi,
-            residual.pool = ei
+            residual.pool = ei,
+            pivotal = pivot.use,
+            structural = structural[, ii, drop = FALSE],
+            context = sprintf("bootstrap replications %d-%d", tile.start,
+                              tile.start + tile.count - 1L)
           )
           tile.rows <- tile.start:(tile.start + tile.count - 1L)
           In.vec[tile.rows] <- tile.statistic
@@ -980,7 +1096,8 @@ npsigtest.rbandwidth <- function(bws,
             xdat = if (identical(boot.method, "pairwise")) xdat.star else xdat,
             index = i,
             response.matrix = matrix(ydat.star, ncol = 1L),
-            pivotal = pivot.use
+            pivotal = pivot.use,
+            context = sprintf("bootstrap replication %d", i.star)
           )
 
         } else if(boot.method == "pairwise") {
@@ -1007,7 +1124,10 @@ npsigtest.rbandwidth <- function(bws,
           In.vec[i.star] <- .np_npsig_statistic(
             npreg.boot,
             index = i,
-            pivot = pivot.use
+            pivot = pivot.use,
+            structural = if (pivot.use) .np_npsig_structure(bws,
+              if (identical(boot.method, "pairwise")) xdat.star else xdat, i) else NULL,
+            context = sprintf("bootstrap replication %d", i.star)
           )
         if (length(index) == 1L && !isTRUE(progress$known_total)) {
           progress <- .np_npsig_progress_promote(
@@ -1059,7 +1179,9 @@ npsigtest.rbandwidth <- function(bws,
           pivot.effective = pivot.plan$effective,
           joint = joint,
           boot.type = boot.type,
-          boot.num = B)
+          boot.num = B,
+          bootstrap.executed = bootstrap.executed,
+          bootstrap.reason = bootstrap.reason)
   }, continuous.names = names(xdat)[bws[["icon", exact = TRUE]]], context = {
     if (identical(nn.stage, "bootstrap")) {
       if (streamed.iid)

@@ -1,113 +1,59 @@
-test_that("npsigtest pivot policy is method-aware", {
+test_that("npsigtest has one logical pivot policy for all tested predictors", {
   plan <- getFromNamespace(".np_npsig_pivot_plan", "np")
-  xdat <- data.frame(
-    category = factor(c("a", "b", "a")),
-    ordered = ordered(c("low", "high", "low")),
-    continuous = c(0.1, 0.4, 0.9)
-  )
-
-  individual <- plan(NULL, xdat, 1:3, joint = FALSE)
-  expect_null(individual$requested)
-  expect_identical(
-    individual$effective,
-    c(category = FALSE, ordered = FALSE, continuous = TRUE)
-  )
-  expect_identical(
-    plan(NULL, xdat, c(1L, 3L), joint = TRUE)$effective,
-    c(category = FALSE, continuous = FALSE)
-  )
-  expect_identical(
-    plan(FALSE, xdat, c(1L, 3L), joint = FALSE)$effective,
-    c(category = FALSE, continuous = FALSE)
-  )
-  expect_identical(
-    plan(TRUE, xdat, 3L, joint = FALSE)$effective,
-    c(continuous = TRUE)
-  )
-  expect_error(
-    plan(TRUE, xdat, c(1L, 3L), joint = FALSE),
-    "published categorical test is unstandardized",
-    fixed = TRUE
-  )
+  x <- data.frame(u = factor(c("a", "b", "a")),
+    o = ordered(c("low", "high", "low")), x = c(.1, .4, .9))
+  for (joint in c(FALSE, TRUE)) for (pivot in c(FALSE, TRUE)) {
+    p <- plan(pivot, x, 1:3, joint)
+    expect_identical(p$requested, pivot)
+    expect_identical(p$effective, c(u = pivot, o = pivot, x = pivot))
+  }
+  for (bad in list(NULL, NA, 1, "TRUE", c(TRUE, FALSE)))
+    expect_error(plan(bad, x, 1:3, FALSE), "pivot")
 })
 
-test_that("npsigtest statistic helper implements literal defined arithmetic", {
+test_that("npsigtest statistic retains its denominator and rejects undefined SEs", {
   statistic <- getFromNamespace(".np_npsig_statistic", "np")
-  fit <- list(
-    grad = matrix(c(1, 2, 3, 4), nrow = 2L),
-    gerr = matrix(c(0.5, 1, 1.5, 2), nrow = 2L)
-  )
-
-  expect_identical(statistic(fit, 1L, FALSE), mean(fit$grad[, 1L]^2))
-  expect_identical(
-    statistic(fit, 2L, TRUE),
-    mean((fit$grad[, 2L] / fit$gerr[, 2L])^2)
-  )
-
-  fit$gerr[1L, 2L] <- 0
-  expect_error(statistic(fit, 2L, TRUE), "non-positive or non-finite")
-  fit$gerr[1L, 2L] <- NA_real_
-  expect_error(statistic(fit, 2L, TRUE), "non-positive or non-finite")
+  fit <- list(grad = matrix(c(0, 2, 3, 4), 2L,
+                            dimnames = list(NULL, c("u", "x"))),
+              gerr = matrix(c(0, 1, 1.5, 2), 2L))
+  structural <- matrix(c(TRUE, FALSE, FALSE, FALSE), 2L)
+  expect_identical(statistic(fit, 1:2, FALSE), mean(fit$grad^2))
+  expect_identical(statistic(fit, 1:2, TRUE, structural), mean(c(0, 2, 2, 2)^2))
+  expect_identical(statistic(fit, 2L, TRUE), mean((fit$grad[, 2L]/fit$gerr[, 2L])^2))
+  expect_error(statistic(fit, 1L, TRUE), "zero standard error.*'u'.*row 1")
+  for (bad in c(0, -1, NA_real_, Inf)) {
+    fit$gerr[2L, 1L] <- bad
+    expect_error(statistic(fit, 1:2, TRUE, structural, "bootstrap replication 7"),
+                 "bootstrap replication 7.*standard error.*'u'.*row 2")
+  }
   fit$gerr <- NULL
-  expect_error(statistic(fit, 2L, TRUE), "standard errors are unavailable")
-  fit$grad[1L, 2L] <- Inf
-  expect_error(statistic(fit, 2L, FALSE), "non-finite gradient estimates")
+  expect_error(statistic(fit, 1:2, TRUE, structural), "standard errors are unavailable")
+  fit$grad[2L, 1L] <- Inf
+  expect_error(statistic(fit, 1:2, FALSE), "non-finite gradient estimates")
 })
 
-test_that("npsigtest public pivot modes agree with explicit counterparts", {
-  old_options <- options(np.messages = FALSE)
-  on.exit(options(old_options), add = TRUE)
-
+test_that("omitted pivot is TRUE for unordered, ordered, continuous and joint tests", {
+  old <- options(np.messages = FALSE)
+  on.exit(options(old), add = TRUE)
   set.seed(270827)
-  n <- 45L
-  z <- factor(rep(c("a", "b", "c"), length.out = n))
-  x <- seq(-1, 1, length.out = n)
-  y <- 0.4 * (z == "b") + x^2 + rnorm(n, sd = 0.15)
-  bw <- npregbw(
-    xdat = data.frame(z, x),
-    ydat = y,
-    bws = c(0.35, 0.3),
-    bandwidth.compute = FALSE,
-    regtype = "ll"
-  )
-
-  categorical.auto <- npsigtest(bw, B = 9, index = 1L, random.seed = 81)
-  categorical.raw <- npsigtest(
-    bw, B = 9, index = 1L, pivot = FALSE, random.seed = 81
-  )
-  expect_identical(categorical.auto$In, categorical.raw$In)
-  expect_identical(categorical.auto$In.bootstrap, categorical.raw$In.bootstrap)
-  expect_identical(categorical.auto$pivot.effective, c(z = FALSE))
-
-  continuous.auto <- npsigtest(bw, B = 9, index = 2L, random.seed = 82)
-  continuous.pivot <- npsigtest(
-    bw, B = 9, index = 2L, pivot = TRUE, random.seed = 82
-  )
-  expect_identical(continuous.auto$In, continuous.pivot$In)
-  expect_identical(continuous.auto$In.bootstrap, continuous.pivot$In.bootstrap)
-  expect_identical(continuous.auto$pivot.effective, c(x = TRUE))
-
-  joint.auto <- npsigtest(
-    bw, B = 9, index = 1:2, joint = TRUE, random.seed = 83
-  )
-  joint.raw <- npsigtest(
-    bw, B = 9, index = 1:2, joint = TRUE,
-    pivot = FALSE, random.seed = 83
-  )
-  expect_identical(joint.auto$In, joint.raw$In)
-  expect_identical(joint.auto$In.bootstrap, joint.raw$In.bootstrap)
-  expect_identical(joint.auto$pivot.effective, c(z = FALSE, x = FALSE))
-
-  expect_error(
-    npsigtest(bw, B = 9, index = 1L, pivot = TRUE),
-    "published categorical test is unstandardized",
-    fixed = TRUE
-  )
-  expect_output(print(joint.auto), "automatic -> FALSE", fixed = TRUE)
-
-  legacy <- continuous.pivot
-  legacy$pivot.effective <- NULL
-  legacy.output <- capture.output(print(legacy))
-  expect_true(any(grepl("Pivot = TRUE", legacy.output, fixed = TRUE)))
-  expect_false(any(grepl("automatic", legacy.output, fixed = TRUE)))
+  n <- 48L
+  x <- data.frame(u = factor(rep(letters[1:3], length.out = n)),
+    o = ordered(rep(1:4, each = 12L)), x = seq(-1, 1, length.out = n))
+  y <- .4 * (x$u == "b") + x$x^2 + rnorm(n, sd = .2)
+  bw <- npregbw(xdat = x, ydat = y, bws = c(.3, .3, .6),
+    bandwidth.compute = FALSE, regtype = "ll")
+  for (joint in c(FALSE, TRUE)) {
+    implicit <- npsigtest(bw, B = 9L, joint = joint, random.seed = 81)
+    explicit <- npsigtest(bw, B = 9L, joint = joint, pivot = TRUE, random.seed = 81)
+    expect_identical(implicit$In, explicit$In)
+    expect_identical(implicit$In.bootstrap, explicit$In.bootstrap)
+    expect_identical(implicit$pivot.effective, c(u = TRUE, o = TRUE, x = TRUE))
+    expect_output(print(implicit), "Pivot = TRUE", fixed = TRUE)
+  }
+  expect_error(npsigtest(bw, B = 9L, pivot = NULL), "pivot")
+  raw <- npsigtest(bw, B = 9L, pivot = FALSE)
+  expect_identical(raw$pivot.effective, c(u = FALSE, o = FALSE, x = FALSE))
+  legacy <- raw
+  legacy$pivot <- NULL
+  expect_output(print(legacy), "automatic -> FALSE", fixed = TRUE)
 })
