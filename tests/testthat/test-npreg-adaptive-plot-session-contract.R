@@ -187,11 +187,11 @@ test_that("session adaptive-nn lc exact geom plot-data completes and reports boo
               info = paste(res$output, collapse = "\n"))
   # The whole plot now shares one progress owner, elapsed clock and ETA.
   # Intermediate heartbeat counts depend on timing; stage coverage does not.
-  progress <- res$output[grepl("[npRmpi] Boot (", res$output, fixed = TRUE)]
-  expect_true(any(grepl("targets pending, elap .*s, eta estimating, preparing", progress)),
+  progress <- res$output[grepl("[npRmpi] Plot bootstrap (", res$output, fixed = TRUE)]
+  expect_true(any(grepl("targets pending, elapsed .*s, eta estimating, detail preparing", progress)),
               info = paste(res$output, collapse = "\n"))
-  expect_true(any(grepl("1/1, b19/19, elap .*s, eta finishing, resampling", progress)),
+  expect_true(any(grepl("target 1/1, rep 19/19, elapsed .*s, eta finishing, detail resampling", progress)),
               info = paste(res$output, collapse = "\n"))
-  expect_true(any(grepl("1/1, elap .*s, eta 0s, complete", progress)),
+  expect_true(any(grepl("target 1/1, elapsed .*s, eta 0s, detail complete", progress)),
               info = paste(res$output, collapse = "\n"))
 })

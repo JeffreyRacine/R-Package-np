@@ -100,7 +100,7 @@ test_that("npsymtest progress respects suppressMessages", {
   expect_length(res$trace, 0)
 })
 
-test_that("npsymtest source routes use canonical bootstrap surface tags", {
+test_that("npsymtest source routes use canonical bootstrap activity owners", {
   src <- installed_function_text("npsymtest")
-  expect_true(grepl('surface = "bootstrap"', src, fixed = TRUE))
+  expect_true(grepl('.np_progress_activity_begin(B,', src, fixed = TRUE))
 })
