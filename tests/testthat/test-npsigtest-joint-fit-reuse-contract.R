@@ -177,6 +177,13 @@ test_that("public MPI joint smoke retains reproducibility, metadata and RNG", {
         expect_identical(after, before)
         actual <- npsigtest(bw, xdat = x, ydat = y, index = index, joint = TRUE,
           B = 9L, pivot = pivot, boot.method = method, random.seed = 727)
+        for (value in list(expected, actual))
+          expect_true(is.numeric(value$bws$total.time) &&
+            length(value$bws$total.time) == 1L &&
+            is.finite(value$bws$total.time) && value$bws$total.time >= 0)
+        # MPI bandwidth marshalling records invocation timing, not science.
+        # Require its contract above; compare every remaining field exactly.
+        expected$bws$total.time <- actual$bws$total.time
         expect_identical(actual, expected)
         expect_identical(.Random.seed, after)
       }
