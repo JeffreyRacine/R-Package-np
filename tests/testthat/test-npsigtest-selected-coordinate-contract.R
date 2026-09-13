@@ -12,6 +12,25 @@ n1_selected_fixture <- function(regtype = "lc", bwtype = "fixed") {
   list(x = x, y = y, response = response, bw = bw)
 }
 
+test_that("selected-coordinate attribute is protected across allocating native calls", {
+  source <- test_path("..", "..", "src", "np.c")
+  if (!file.exists(source)) skip("native source is not available in installed context")
+  lines <- readLines(source, warn = FALSE)
+  first <- grep("^SEXP C_np_regression\\(", lines)
+  last <- grep("^SEXP C_np_density\\(", lines)
+  expect_length(first, 1L)
+  expect_length(last, 1L)
+  wrapper <- lines[seq.int(first, last - 1L)]
+  protected <- grep('SEXP gradient_coordinate = PROTECT(getAttrib(output_request, install(".np.gradient.coordinate")));',
+                    wrapper, fixed = TRUE)
+  expect_length(protected, 1L)
+  expect_lt(protected, min(grep("coerceVector(", wrapper, fixed = TRUE)))
+  expect_length(grep("  PROTECT(", wrapper, fixed = TRUE), 27L)
+  expect_length(grep("++extra_protect;", wrapper, fixed = TRUE), 1L)
+  expect_length(grep("UNPROTECT(27 + extra_protect);", wrapper, fixed = TRUE), 1L)
+  expect_length(grep("return out;", wrapper, fixed = TRUE), 1L)
+})
+
 test_that("private selected coordinates retain canonical full layout and arithmetic", {
   old <- options(np.messages = FALSE)
   on.exit(options(old), add = TRUE)

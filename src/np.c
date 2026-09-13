@@ -8309,7 +8309,7 @@ SEXP C_np_regression(SEXP tuno,
   int en = asInteger(enrow);
   int nc = asInteger(ncol);
   int request = asInteger(output_request);
-  SEXP gradient_coordinate = getAttrib(output_request, install(".np.gradient.coordinate"));
+  SEXP gradient_coordinate = PROTECT(getAttrib(output_request, install(".np.gradient.coordinate")));
   NPRegressionGradientRequest gradient_request;
   const NPRegressionGradientRequest *gradient_request_ptr = NULL;
   SEXP empty_flags = R_NilValue;
@@ -8529,7 +8529,7 @@ SEXP C_np_regression(SEXP tuno,
 
   if(empty_rows.count > 0)
     setAttrib(out, install(".np.empty.rows"), empty_flags);
-  UNPROTECT(26 + extra_protect);
+  UNPROTECT(27 + extra_protect);
   return out;
 }
 
