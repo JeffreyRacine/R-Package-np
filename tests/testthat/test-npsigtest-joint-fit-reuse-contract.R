@@ -2,13 +2,28 @@
 j1_uncached <- function(bws, xdat, index, response.matrix, pivotal,
                         structural = NULL, context = "bootstrap statistic") {
   tile <- getFromNamespace(".np_npsig_streamed_iid_tile", "np")
+  complete <- getFromNamespace(".npreg_complete", "np")
+  statistic <- getFromNamespace(".np_npsig_statistic", "np")
+  structure <- getFromNamespace(".np_npsig_structure", "np")
   value <- numeric(ncol(response.matrix))
-  for (j in seq_along(index))
-    value <- value + tile(bws, xdat, index[[j]],
-      response.matrix = response.matrix, null.mean = response.matrix[, 1L],
-      residual.pool = response.matrix[, 1L], pivotal = pivotal,
-      structural = if (is.null(structural)) NULL else structural[, j, drop = FALSE],
-      context = context) / length(index)
+  for (j in seq_along(index)) {
+    mask <- if (is.null(structural)) NULL else structural[, j, drop = FALSE]
+    component <- if (pivotal && (bws$iuno | bws$iord)[index[[j]]]) {
+      if (is.null(mask)) mask <- structure(bws, xdat, index[[j]])
+      if (all(mask)) numeric(ncol(response.matrix)) else
+        vapply(seq_len(ncol(response.matrix)), function(column) {
+          fit <- complete(bws = bws, txdat = xdat,
+            tydat = response.matrix[, column], gradients = TRUE, se = TRUE)
+          statistic(fit, index[[j]], TRUE, mask,
+            sprintf("%s (tile column %d)", context, column))
+        }, numeric(1L))
+    } else {
+      tile(bws, xdat, index[[j]], response.matrix = response.matrix,
+        null.mean = response.matrix[, 1L], residual.pool = response.matrix[, 1L],
+        pivotal = pivotal, structural = mask, context = context)
+    }
+    value <- value + component / length(index)
+  }
   value
 }
 
@@ -99,13 +114,19 @@ test_that("actual joint tiles fit once per response and preserve exact component
   joint <- getFromNamespace(".np_npsig_streamed_response_statistic", "np")
   tile <- getFromNamespace(".np_npsig_streamed_iid_tile", "np")
   owner <- getFromNamespace(".npreg_complete", "np")
+  direct <- getFromNamespace(".np_regression_direct", "np")
   count <- new.env(parent = emptyenv())
   count$n <- 0L
+  count$direct <- 0L
   wrapped <- function(...) {
     count$n <- count$n + 1L
     owner(...)
   }
-  local_mocked_bindings(.npreg_complete = wrapped, .package = "np")
+  local_mocked_bindings(.npreg_complete = wrapped,
+    .np_regression_direct = function(...) {
+      count$direct <- count$direct + 1L
+      direct(...)
+    }, .package = "np")
   for (regtype in c("lc", "ll", "lp")) {
     bw <- npregbw(xdat = x, ydat = y, bws = c(.25, .3, .65),
       bandwidth.compute = FALSE, regtype = regtype,
@@ -114,21 +135,26 @@ test_that("actual joint tiles fit once per response and preserve exact component
       response <- responses[, seq_len(width), drop = FALSE]
       for (index in list(1:3, c(2L, 3L, 1L), c(3L, 1L, 2L), c(2L, 1L, 2L))) {
         count$n <- 0L
+        count$direct <- 0L
         expected <- j1_uncached(bw, x, index, response, TRUE)
         expect_identical(count$n, as.integer(sum(index != 3L) * width))
+        expect_identical(count$direct, 0L)
         count$n <- 0L
         actual <- joint(bw, x, index, response, TRUE)
         expect_identical(actual, expected)
         expect_identical(count$n, width)
+        expect_identical(count$direct, 0L)
       }
     }
     for (index in list(1L, c(3L, 1L), 3L)) {
       count$n <- 0L
       expected <- j1_uncached(bw, x, index, responses, TRUE)
-      before <- count$n
+      expect_identical(count$n, as.integer(sum(index != 3L) * ncol(responses)))
       count$n <- 0L
+      count$direct <- 0L
       expect_identical(joint(bw, x, index, responses, TRUE), expected)
-      expect_identical(count$n, before)
+      expect_identical(count$n, 0L)
+      expect_identical(count$direct, as.integer(sum(index != 3L) * ncol(responses)))
     }
     count$n <- 0L
     expect_identical(joint(bw, x, c(2L, 3L, 1L), responses, FALSE),

@@ -1399,7 +1399,8 @@ npreghat <-
                                   se = FALSE,
                                   gradients = FALSE,
                                   gradient.order = 1L,
-                                  local.mode = FALSE, allow.empty.rows = FALSE) {
+                                  local.mode = FALSE, allow.empty.rows = FALSE,
+                                  gradient.coordinate = NULL) {
   no.ex <- is.null(exdat)
   se <- npValidateScalarLogical(se, "se")
   gradients <- npValidateScalarLogical(gradients, "gradients")
@@ -1414,6 +1415,18 @@ npreghat <-
 
   if (length(bws$bw) != length(txdat))
     stop("length of bandwidth vector does not match number of columns of 'txdat'")
+
+  if (!is.null(gradient.coordinate)) {
+    if (!is.numeric(gradient.coordinate) || length(gradient.coordinate) != 1L ||
+        !is.finite(gradient.coordinate) ||
+        gradient.coordinate != floor(gradient.coordinate) ||
+        !(gradient.coordinate %in% which(bws[["iuno", exact = TRUE]] |
+                                         bws[["iord", exact = TRUE]])) ||
+        !se || !gradients)
+      stop("private regression gradient coordinate requires one categorical column and gradients=TRUE, se=TRUE",
+           call. = FALSE)
+    gradient.coordinate <- as.integer(gradient.coordinate)
+  }
 
   beta.kernel <- identical(bws[["ckertype", exact = TRUE]], "beta")
   npValidateBetaKernelSpecification(
@@ -1629,6 +1642,14 @@ npreghat <-
     integer(1L)
   }
 
+  output.request <- c(
+    .np_regression_output_request(se = se, gradients = do.compiled.gradients),
+    as.integer(isTRUE(allow.empty.rows) && !no.ex && regtype.engine %in% c("ll", "lp")))
+  if (!is.null(gradient.coordinate))
+    attr(output.request, ".np.gradient.coordinate") <- as.integer(match(
+      gradient.coordinate, c(which(bws[["icon", exact = TRUE]]),
+        which(bws[["iuno", exact = TRUE]]), which(bws[["iord", exact = TRUE]]))))
+
   myout <- .np_with_nn_radius_context(.Call(
     "C_np_regression",
     asDouble(tuno), asDouble(tord), asDouble(tcon), as.double(tydat),
@@ -1643,8 +1664,7 @@ npreghat <-
     as.integer(npLpBasisCode(reg.spec$basis.engine)),
     as.integer(enrow),
     as.integer(ncol.x),
-    c(.np_regression_output_request(se = se, gradients = do.compiled.gradients),
-      as.integer(isTRUE(allow.empty.rows) && !no.ex && regtype.engine %in% c("ll", "lp"))),
+    output.request,
     as.double(cker.bounds.c$lb),
     as.double(cker.bounds.c$ub),
     PACKAGE = "np"

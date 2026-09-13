@@ -7175,7 +7175,8 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
                    const NPContinuousKernelRoute *kernel_route,
                    NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
                    int categorical_compress,
-                   NPRegressionLPEmptyRows *empty_rows);
+                   NPRegressionLPEmptyRows *empty_rows,
+                   const NPRegressionGradientRequest *gradient_request);
 
 void np_density(double * tuno, double * tord, double * tcon,
                 double * euno, double * eord, double * econ,
@@ -8308,6 +8309,9 @@ SEXP C_np_regression(SEXP tuno,
   int en = asInteger(enrow);
   int nc = asInteger(ncol);
   int request = asInteger(output_request);
+  SEXP gradient_coordinate = getAttrib(output_request, install(".np.gradient.coordinate"));
+  NPRegressionGradientRequest gradient_request;
+  const NPRegressionGradientRequest *gradient_request_ptr = NULL;
   SEXP empty_flags = R_NilValue;
   NPRegressionLPEmptyRows empty_rows = {NULL, 0, NULL, NULL, NULL};
   NPRegressionLPEmptyRows *empty_rows_ptr = NULL;
@@ -8374,6 +8378,17 @@ SEXP C_np_regression(SEXP tuno,
   ncon = (int)INTEGER(myopti_i)[REG_NCONI];
   nunordered = (int)INTEGER(myopti_i)[REG_NUNOI];
   nordered = (int)INTEGER(myopti_i)[REG_NORDI];
+  if(gradient_coordinate != R_NilValue) {
+    if(TYPEOF(gradient_coordinate) != INTSXP || XLENGTH(gradient_coordinate) != 1 ||
+       request != NP_REGRESSION_OUTPUT_FULL || ncon < 0 ||
+       nunordered < 0 || nordered < 0 ||
+       (R_xlen_t)ncon + nunordered + nordered != nc ||
+       INTEGER(gradient_coordinate)[0] <= ncon ||
+       INTEGER(gradient_coordinate)[0] > nc)
+      error("C_np_regression: invalid categorical gradient coordinate request");
+    gradient_request.coordinate = INTEGER(gradient_coordinate)[0] - 1;
+    gradient_request_ptr = &gradient_request;
+  }
   num_train = (int)INTEGER(myopti_i)[REG_TNOBSI];
   num_eval = (int)INTEGER(myopti_i)[REG_ENOBSI];
   train_is_eval = (int)INTEGER(myopti_i)[REG_TISEI];
@@ -8485,7 +8500,17 @@ SEXP C_np_regression(SEXP tuno,
                 do_grad ? REAL(out_g) : NULL,
                 do_gerr ? REAL(out_gerr) : NULL,
                 REAL(out_xtra), ckerlb_p, ckerub_p,
-                active_route, active_diagnostics, categorical_compress, empty_rows_ptr);
+                active_route, active_diagnostics, categorical_compress, empty_rows_ptr,
+                gradient_request_ptr);
+
+  if(gradient_request_ptr != NULL) {
+    for(int column = 0; column < nc; ++column)
+      if(column != gradient_request.coordinate)
+        for(int row = 0; row < en; ++row) {
+          REAL(out_g)[(R_xlen_t)column*en + row] = NA_REAL;
+          REAL(out_gerr)[(R_xlen_t)column*en + row] = NA_REAL;
+        }
+  }
 
   PROTECT(out = allocVector(VECSXP, 5));
   SET_VECTOR_ELT(out, 0, out_mean);
@@ -21171,6 +21196,7 @@ typedef struct {
   NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics;
   int categorical_compress;
   NPRegressionLPEmptyRows *empty_rows;
+  const NPRegressionGradientRequest *gradient_request;
 } NPRegressionFittedCall;
 
 static SEXP np_regression_fitted_execute(void *data)
@@ -21229,6 +21255,8 @@ static SEXP np_regression_fitted_execute(void *data)
   np_reset_y_side_extern();
 
   num_var = num_reg_ordered_extern + num_reg_continuous_extern + num_reg_unordered_extern;
+  const NPRegressionGradientRange gradient_range =
+    np_regression_gradient_range(call->gradient_request, 0, num_var);
 
   train_is_eval = myopti[REG_TISEI];
   ey_is_ty = myopti[REG_EY];
@@ -21523,6 +21551,7 @@ static SEXP np_regression_fitted_execute(void *data)
     residual_preparation_context.num_obs_train = num_obs_train_extern;
     residual_preparation_context.status =
       NP_REGRESSION_HC0_RESIDUAL_PREPARING;
+    residual_preparation_context.gradient_request = call->gradient_request;
 
     kernel_estimate_regression_categorical_tree_np(
       np_lp_engine_extern,
@@ -21594,6 +21623,7 @@ static SEXP np_regression_fitted_execute(void *data)
     ordinary_hc0_context.num_obs_train = num_obs_train_extern;
     ordinary_hc0_context.residual_scale = (double)residual_scale;
     ordinary_hc0_context.point_already_computed = train_is_eval;
+    ordinary_hc0_context.gradient_request = call->gradient_request;
 
     if(residual_scale == 0.0L) {
       ordinary_hc0_context.status = NP_REGRESSION_HC0_RESIDUAL_ALL_ZERO;
@@ -21648,7 +21678,7 @@ static SEXP np_regression_fitted_execute(void *data)
      * O(n p) workspace.
      */
     if(train_is_eval && do_grad && do_gerr)
-      for(j = 0; j < num_var; ++j)
+      for(j = gradient_range.begin; j < gradient_range.end; ++j)
         for(i = 0; i < num_obs_eval_extern; ++i)
           g[j*num_obs_eval_extern + ipe[i]] = eg[j][i];
 
@@ -21711,7 +21741,7 @@ static SEXP np_regression_fitted_execute(void *data)
 
   if(do_grad){
     if(!(ordinary_hc0_active && train_is_eval && do_gerr))
-      for(j=0;j<num_var;j++)
+      for(j=gradient_range.begin;j<gradient_range.end;j++)
         for(i=0;i<num_obs_eval_extern;i++)
           g[j*num_obs_eval_extern+ipe[i]]=eg[j][i];
 
@@ -21720,7 +21750,7 @@ static SEXP np_regression_fitted_execute(void *data)
        its narrower copy contract is tracked as separate legacy debt. */
     if(do_gerr) {
       if(ordinary_hc0_active) {
-        for(j=0;j<num_var;j++)
+        for(j=gradient_range.begin;j<gradient_range.end;j++)
           for(i=0;i<num_obs_eval_extern;i++)
             gerr[j*num_obs_eval_extern+ipe[i]] = egerr[j][i];
       } else {
@@ -21764,7 +21794,8 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
                    const NPContinuousKernelRoute *kernel_route,
                    NPContinuousKernelDerivativeDiagnostics *kernel_route_diagnostics,
                    int categorical_compress,
-                   NPRegressionLPEmptyRows *empty_rows){
+                   NPRegressionLPEmptyRows *empty_rows,
+                   const NPRegressionGradientRequest *gradient_request){
   NPRegressionFittedCall call = {0};
   call.tuno = tuno;
   call.tord = tord;
@@ -21796,6 +21827,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
   call.kernel_route_diagnostics = kernel_route_diagnostics;
   call.categorical_compress = categorical_compress;
   call.empty_rows = empty_rows;
+  call.gradient_request = gradient_request;
   call.owner.x_columns[0] = myopti[REG_NUNOI];
   call.owner.x_columns[1] = myopti[REG_NORDI];
   call.owner.x_columns[2] = myopti[REG_NCONI];
