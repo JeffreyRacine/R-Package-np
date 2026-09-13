@@ -38,7 +38,7 @@ npsigtest(bws,
           B = 399,
           boot.method = c("iid","wild","wild-rademacher","pairwise"),
           boot.type = c("I","II"),
-          pivot=NULL,
+          pivot=TRUE,
           joint=FALSE,
           index = seq_len(ncol(xdat)),
           random.seed = 42,
@@ -137,18 +137,12 @@ These arguments control bootstrap execution, tested effects, and reproducibility
 
 
   \item{pivot}{
-    \code{NULL} or a logical value specifying whether to bootstrap a
-    pivotal statistic. With the method-aware default, \code{NULL}, an
-    individual test is pivotal for a continuous predictor and
-    unstandardized for a categorical predictor. A joint test is pivotal
-    only when every tested predictor is continuous; if any tested
-    predictor is categorical, the entire joint statistic is
-    unstandardized. \code{FALSE} requests the unstandardized statistic
-    for every tested predictor. \code{TRUE} requests the pivotal
-    statistic and is supported only when every tested predictor is
-    continuous; otherwise the function stops with an error. For
-    continuous predictors, pivoting divides gradient estimates by their
-    asymptotic standard errors.
+    a logical value specifying whether to studentize the statistic.
+    The default, \code{TRUE}, divides continuous derivatives and
+    categorical finite differences by their asymptotic standard errors.
+    This applies to individual and joint tests. \code{FALSE} requests
+    the unstandardized statistic for every tested predictor.
+    \code{NULL} is no longer accepted.
   }
 
 
@@ -190,22 +184,46 @@ Further arguments are passed to the bandwidth-selection routines used by the tes
   bootstrap loop.
 
   The categorical statistic of Racine, Hart, and Li (2006) is the
-  unstandardized mean of squared finite-difference estimates. It is not
-  divided by the asymptotic standard errors used for continuous
-  gradients. Therefore \code{pivot=NULL} selects the statistically
-  defined statistic by predictor type, while explicit \code{pivot=TRUE}
-  fails for any test containing a categorical predictor. A requested
-  continuous pivotal statistic also fails if a required gradient
-  standard error is unavailable, non-positive, or non-finite; such a
-  value does not define the pivotal statistic.
+  unstandardized mean of squared finite-difference estimates, available
+  with \code{pivot=FALSE}. The default extends this construction by
+  studentizing categorical effects as well as continuous derivatives.
+  For a joint test, the statistic is the mean of squared componentwise
+  studentized effects over observations and tested predictors; it is not
+  an inverse-covariance Wald statistic.
 
-  Continuous pivotal statistics use the fitted-residual HC0 gradient
+  Studentized statistics use the fitted-residual HC0 gradient
   standard errors described in \code{\link{npreg}}. Each bootstrap response
   is fitted and its own training residuals are used in its HC0 quadratic;
   the original-response standard errors are not held fixed across
   replications. The admitted streamed implementation computes this same
   statistic without retaining a full influence matrix. Categorical
-  statistics remain unstandardized.
+  standard errors include covariance between the two contrast endpoints.
+  Their bootstrap calculations reuse the canonical regression fit and
+  covariance producer for each response, rather than freezing the
+  original-response standard errors.
+
+  Identical categorical endpoints contribute zero without changing the
+  number of observations in the statistic's denominator. Unordered
+  first-level reference rows have this property; ordered first-level rows
+  instead use a forward difference. An entire finite observed effect vector
+  that is exactly zero has statistic zero under the degenerate-zero
+  convention. Because bootstrap statistics are nonnegative, the inclusive
+  upper-tail P-value is one, without bootstrap fitting or bandwidth
+  reselection. The bootstrap statistics need not also be zero. This applies
+  to an individual test, or a joint test only when every tested observed
+  effect vanishes. A zero component of a mixed joint test stays in the
+  original denominator; it does not suppress the other components.
+  No bandwidth-based full-smoothing detection is used. Random draws are
+  advanced to preserve later tests' random-number streams.
+
+  Otherwise a required zero, negative, non-finite or unavailable standard
+  error does not define studentization. An isolated zero effect with zero
+  standard error within a nonzero effect vector is not covered by the
+  degenerate-zero convention. The test stops with an informative diagnostic;
+  it does not insert
+  a variance floor, discard rows or failed replications, or substitute an
+  unstandardized statistic. This rule applies equally to continuous and
+  categorical effects and to observed and bootstrap responses.
 
   When the supplied bandwidth object has \code{regtype="lp"}, every
   tested continuous coordinate must have polynomial degree at least one.
@@ -272,12 +290,17 @@ Further arguments are passed to the bandwidth-selection routines used by the tes
     indexed by \code{index} (e.g., if you selected \code{index = c(1,4)}
     then In.bootstrap will have two columns, the first being the
     bootstrap replications of \code{In} associated with variable
-    \code{1}, the second with variable \code{4}).}
-  \item{pivot}{the requested pivot mode: \code{NULL}, \code{TRUE}, or
-    \code{FALSE}.}
+    \code{1}, the second with variable \code{4}). An analytically skipped
+    test has an \code{NA} column, not manufactured bootstrap draws.}
+  \item{pivot}{the requested logical pivot mode, \code{TRUE} or \code{FALSE}.}
   \item{pivot.effective}{a named logical vector recording the statistic
     actually used for each tested predictor. For a joint test all entries
     are identical.}
+  \item{bootstrap.executed}{the number of bootstrap statistics actually
+    computed for each test (zero for analytic non-rejection).}
+  \item{bootstrap.reason}{the structural reason for skipping bootstrap
+    computation, or \code{NA} when it was performed. The requested
+    number of replications remains in \code{boot.num}.}
 
 }
 \section{Book And Method Pointers}{

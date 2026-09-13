@@ -112,7 +112,7 @@ test_that("streamed IID tiles preserve general LP basis and degree semantics", {
       bernstein.basis = specification$shifted
     )
     expect_true(npRmpi:::.np_npsig_streamed_iid_eligible(
-      bw, xdat, seq_len(ncol(xdat)), FALSE, "I", "iid", NULL, list()
+      bw, xdat, seq_len(ncol(xdat)), FALSE, "I", "iid", TRUE, list()
     ))
     unrestricted <- npreg(
       txdat = xdat, tydat = ydat, bws = bw,
@@ -188,7 +188,7 @@ test_that("streamed IID tiles preserve generalized and adaptive NN geometry", {
       regtype = "ll", bwtype = bwtype
     )
     expect_true(npRmpi:::.np_npsig_streamed_iid_eligible(
-      bw, xdat, seq_len(ncol(xdat)), FALSE, "I", "iid", NULL, list()
+      bw, xdat, seq_len(ncol(xdat)), FALSE, "I", "iid", TRUE, list()
     ))
     unrestricted <- npreg(
       txdat = xdat, tydat = ydat, bws = bw,
@@ -265,7 +265,7 @@ test_that("streamed IID tiles reproduce mixed local-constant statistics", {
   )
 
   expect_true(npRmpi:::.np_npsig_streamed_iid_eligible(
-    bw, xdat, seq_len(ncol(xdat)), FALSE, "I", "iid", NULL, list()
+    bw, xdat, seq_len(ncol(xdat)), FALSE, "I", "iid", TRUE, list()
   ))
 
   unrestricted <- npreg(
@@ -433,30 +433,30 @@ test_that("streamed IID capability is deterministic and semantics-exact", {
   )
   eligible <- function(...) npRmpi:::.np_npsig_streamed_iid_eligible(
     bws = bw, xdat = xdat, index = 1:2, joint = FALSE,
-    boot.type = "I", boot.method = "iid", pivot = NULL,
+    boot.type = "I", boot.method = "iid", pivot = TRUE,
     extra.args = list(), ...
   )
 
   expect_true(eligible())
   expect_true(npRmpi:::.np_npsig_streamed_iid_eligible(
-    bw, xdat, 1:2, FALSE, "I", "wild", NULL, list()
+    bw, xdat, 1:2, FALSE, "I", "wild", TRUE, list()
   ))
   expect_true(npRmpi:::.np_npsig_streamed_iid_eligible(
-    bw, xdat, 1:2, FALSE, "I", "wild-rademacher", NULL, list()
+    bw, xdat, 1:2, FALSE, "I", "wild-rademacher", TRUE, list()
   ))
   expect_false(npRmpi:::.np_npsig_streamed_iid_eligible(
-    bw, xdat, 1:2, FALSE, "I", "pairwise", NULL, list()
+    bw, xdat, 1:2, FALSE, "I", "pairwise", TRUE, list()
   ))
   expect_false(npRmpi:::.np_npsig_streamed_iid_eligible(
     bw, xdat, 2L, FALSE, "I", "iid", FALSE, list()
   ))
   expect_true(npRmpi:::.np_npsig_streamed_iid_eligible(
-    bw, xdat, 1:2, TRUE, "I", "iid", NULL, list()
+    bw, xdat, 1:2, TRUE, "I", "iid", TRUE, list()
   ))
   expect_true(npRmpi:::.np_npsig_streamed_iid_eligible(
     bw, xdat, 1:2, TRUE, "I", "wild", FALSE, list()
   ))
-  expect_false(npRmpi:::.np_npsig_streamed_iid_eligible(
+  expect_true(npRmpi:::.np_npsig_streamed_iid_eligible(
     bw, xdat, 1:2, TRUE, "I", "iid", TRUE, list()
   ))
 
@@ -503,10 +503,11 @@ test_that("direct individual pairwise statistics reproduce public fits", {
       xstar[, -tested.index] <- xdat[donor, -tested.index, drop = FALSE]
       fit <- npreg(
         txdat = xstar, tydat = ydat[donor], bws = bw,
-        gradients = TRUE, se = !categorical
+        gradients = TRUE, se = TRUE
       )
       oracle[replication, tested.index] <- npRmpi:::.np_npsig_statistic(
-        fit, index = tested.index, pivot = !categorical
+        fit, index = tested.index, pivot = TRUE,
+        structural = npRmpi:::.np_npsig_structure(bw, xstar, tested.index)
       )
     }
   }

@@ -8,11 +8,17 @@ sigtest <- function(In,
                     joint,
                     boot.type,
                     boot.num,
-                    pivot.effective = NULL){
+                    pivot.effective = NULL,
+                    bootstrap.executed = NULL,
+                    bootstrap.reason = NULL){
 
   if (is.null(pivot.effective))
     pivot.effective <- rep.int(isTRUE(pivot), length(ixvar))
   names(pivot.effective) <- bws$xnames[ixvar]
+  if (is.null(bootstrap.executed))
+    bootstrap.executed <- rep.int(as.integer(boot.num), length(In))
+  if (is.null(bootstrap.reason))
+    bootstrap.reason <- rep.int(NA_character_, length(In))
 
   tsig <- list(In = In,
                In.bootstrap = In.bootstrap,
@@ -28,7 +34,9 @@ sigtest <- function(In,
                joint = joint,
                ptype = boot.type,
                boot.num = boot.num,
-               pivot.effective = pivot.effective)
+               pivot.effective = pivot.effective,
+               bootstrap.executed = bootstrap.executed,
+               bootstrap.reason = bootstrap.reason)
   
   tsig$reject <- rep('', length(In))
   tsig$rejectNum <- rep(NA, length(In))
@@ -69,11 +77,21 @@ print.sigtest <- function(x, ...){
   cat("\nKernel Regression Significance Test",
       "\nType ", x$ptype,
       " Test with ", x$pmethod,
-      " Bootstrap (",x$boot.num," replications,",
+      " Bootstrap (",x$boot.num," requested replications,",
       " Pivot = ", pivot.label,", joint = ",x$joint,")",
       "\nExplanatory variables tested for significance:\n",
       paste(paste(x$bws$xnames[x$ixvar]," (",x$ixvar,")", sep=""), collapse=", "),"\n\n",
       sep="")
+
+  executed <- x[["bootstrap.executed", exact = TRUE]]
+  skipped <- which(!is.na(executed) & executed == 0L)
+  if (length(skipped)) {
+    labels <- if (isTRUE(x$joint)) "joint test" else x$bws$xnames[x$ixvar][skipped]
+    cat("Analytic non-rejection; no bootstrap fits: ",
+        paste(labels, collapse = ", "), ".\n",
+        "Skipped bootstrap-statistic columns contain NA, not simulated draws.\n\n",
+        sep = "")
+  }
 
   if (is.null(pivot.requested) && has.effective &&
       length(unique(pivot.effective)) > 1L) {

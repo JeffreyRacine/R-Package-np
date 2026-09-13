@@ -1,5 +1,14 @@
 # npRmpi 0.80-1
 
+* `npsigtest()` now defaults to `pivot = TRUE` for continuous and
+  categorical predictors, including joint tests. Explicit FALSE retains
+  unstandardized statistics; NULL is no longer an input mode. Categorical
+  studentization uses response-specific paired-contrast HC0 standard errors,
+  with additional computation confined to requested inference. An entirely
+  zero observed effect gives analytic non-rejection without bootstrap fits;
+  skipped columns and executed counts are explicit. Unexplained undefined
+  standard errors produce a diagnostic, never a variance floor or fallback.
+
 * The getting-started guide demonstrates prediction and no-search refitting
   for uncertainty and gradients, distinguishes computation from extraction,
   and summarizes migration from 0.70-5. Package help clarifies practical

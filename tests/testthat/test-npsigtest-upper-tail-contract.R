@@ -46,7 +46,9 @@ test_that("npsigtest reports a smoothed-out categorical point mass as nonrejecti
   )
 
   expect_identical(unname(result$In), 0)
-  expect_true(all(result$In.bootstrap == 0))
+  expect_true(all(is.na(result$In.bootstrap)))
+  expect_identical(result$bootstrap.executed, 0L)
+  expect_match(result$bootstrap.reason, "observed contrast identically zero")
   expect_identical(unname(result$P), 1)
   expect_identical(unname(result$reject), "")
   expect_true(is.na(unname(result$rejectNum)))
