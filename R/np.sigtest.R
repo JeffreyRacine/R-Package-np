@@ -520,7 +520,8 @@ npsigtest.npregression <-
                                          residual.pool,
                                          pivotal = NULL,
                                          structural = NULL,
-                                         context = "bootstrap statistic") {
+                                         context = "bootstrap statistic",
+                                         .fit.cache = NULL) {
   continuous <- which(bws[["icon", exact = TRUE]])
   unordered <- which(bws[["iuno", exact = TRUE]])
   ordered <- which(bws[["iord", exact = TRUE]])
@@ -566,8 +567,13 @@ npsigtest.npregression <-
       return(numeric(ncol(payload)))
     result <- numeric(ncol(payload))
     for (column in seq_len(ncol(payload))) {
-      fit <- .npRmpi_npsig_npreg_local(bws = bws, txdat = xdat,
-        tydat = payload[, column], gradients = TRUE, se = TRUE)
+      fit <- if (is.null(.fit.cache)) NULL else .fit.cache[["fits"]][[column]]
+      if (is.null(fit)) {
+        fit <- .npRmpi_npsig_npreg_local(bws = bws, txdat = xdat,
+          tydat = payload[, column], gradients = TRUE, se = TRUE)
+        if (!is.null(.fit.cache))
+          .fit.cache[["fits"]][[column]] <- fit
+      }
       result[[column]] <- .np_npsig_statistic(fit, tested.index, TRUE,
         structural = structural,
         context = sprintf("%s (tile column %d)", context, column))
@@ -659,6 +665,14 @@ npsigtest.npregression <-
                                                     context = "bootstrap statistic") {
   statistic <- numeric(ncol(response.matrix))
   placeholder <- response.matrix[, 1L]
+  fit.cache <- NULL
+  categorical <- which(bws[["iuno", exact = TRUE]] | bws[["iord", exact = TRUE]])
+  if (isTRUE(pivotal) && sum(index %in% categorical) > 1L) {
+    # Cache only within this identical-input tile. Fill lazily so component
+    # order, response order and the first diagnostic remain unchanged.
+    fit.cache <- new.env(parent = emptyenv())
+    fit.cache[["fits"]] <- vector("list", 8L)
+  }
   for (column in seq_along(index)) {
     tested.index <- index[[column]]
     statistic <- statistic + .np_npsig_streamed_iid_tile(
@@ -670,7 +684,8 @@ npsigtest.npregression <-
       residual.pool = placeholder,
       pivotal = pivotal,
       structural = if (is.null(structural)) NULL else structural[, column, drop = FALSE],
-      context = context
+      context = context,
+      .fit.cache = fit.cache
     ) / length(index)
   }
   statistic

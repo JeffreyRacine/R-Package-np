@@ -1,5 +1,11 @@
 # npRmpi 0.80-1
 
+* Studentized joint `npsigtest()` calls reuse each bootstrap regression fit
+  across tested categorical predictors within each worker's existing bounded
+  response tile. Statistics, resamples and random-number consumption are
+  unchanged. Individual categorical tests and unstandardized tests retain
+  their existing computational paths.
+
 * `npsigtest()` now defaults to `pivot = TRUE` for continuous and
   categorical predictors, including joint tests. Explicit FALSE retains
   unstandardized statistics; NULL is no longer an input mode. Categorical
