@@ -9357,6 +9357,8 @@ typedef struct {
   int num_eval_alloc;
   int response_column_count;
   int denominator_column;
+  NPRegressionGradientRange continuous_range;
+  NPRegressionGradientRange categorical_range;
 } NPRegressionHC0DerivativeMomentCtx;
 
 typedef struct {
@@ -11993,7 +11995,8 @@ static int np_regression_hc0_derivative_moments_accumulate(
 
     if(!R_FINITE(residual_square))
       return 0;
-    for(coordinate = 0; coordinate < context->num_continuous; ++coordinate) {
+    for(coordinate = context->continuous_range.begin;
+        coordinate < context->continuous_range.end; ++coordinate) {
       const double derivative_divisor =
         derivative_bandwidth_divisor[coordinate];
       const size_t derivative_offset =
@@ -12042,8 +12045,8 @@ static int np_regression_hc0_derivative_moments_accumulate(
         }
       }
     }
-    for(coordinate = context->num_continuous;
-        coordinate < context->num_predictors;
+    for(coordinate = context->categorical_range.begin;
+        coordinate < context->categorical_range.end;
         ++coordinate) {
       const double alternate_divisor =
         derivative_bandwidth_divisor[coordinate];
@@ -12096,7 +12099,8 @@ static int np_regression_hc0_derivative_moments_accumulate(
     return 1;
   }
 
-  for(coordinate = 0; coordinate < context->num_continuous; ++coordinate) {
+  for(coordinate = context->continuous_range.begin;
+      coordinate < context->continuous_range.end; ++coordinate) {
     const double derivative_divisor =
       derivative_bandwidth_divisor[coordinate];
     const size_t derivative_output_offset =
@@ -12161,8 +12165,8 @@ static int np_regression_hc0_derivative_moments_accumulate(
     context->gradient_stderr[coordinate][evaluation_or_donor] =
       (double)quadratic;
   }
-  for(coordinate = context->num_continuous;
-      coordinate < context->num_predictors;
+  for(coordinate = context->categorical_range.begin;
+      coordinate < context->categorical_range.end;
       ++coordinate) {
     const double alternate_divisor =
       derivative_bandwidth_divisor[coordinate];
@@ -29596,6 +29600,15 @@ static SEXP np_regression_scalar_fit_execute(void *data)
   const int p_nvar = call->do_grad ?
     (call->num_reg_continuous + call->num_reg_unordered +
      call->num_reg_ordered) : 0;
+  const NPRegressionGradientRequest *gradient_request =
+    call->hc0_context != NULL ? call->hc0_context->gradient_request : NULL;
+  const NPRegressionGradientRange continuous_range =
+    np_regression_gradient_range(gradient_request, 0, call->num_reg_continuous);
+  const NPRegressionGradientRange unordered_range = np_regression_gradient_range(
+    gradient_request, call->num_reg_continuous,
+    call->num_reg_continuous + call->num_reg_unordered);
+  const NPRegressionGradientRange ordered_range = np_regression_gradient_range(
+    gradient_request, call->num_reg_continuous + call->num_reg_unordered, p_nvar);
   double *response_columns[NP_REGRESSION_SCALAR_RESPONSE_COLUMNS_MAX] = {
     NULL, NULL, NULL
   };
@@ -29721,6 +29734,9 @@ static SEXP np_regression_scalar_fit_execute(void *data)
       hc0_derivative_ctx.response_column_count = response_column_count;
       hc0_derivative_ctx.denominator_column =
         point_already_computed ? 0 : 1;
+      hc0_derivative_ctx.continuous_range = continuous_range;
+      hc0_derivative_ctx.categorical_range = np_regression_gradient_range(
+        gradient_request, call->num_reg_continuous, p_nvar);
       hc0_dual_power_ctx.regression_derivative = &hc0_derivative_ctx;
     }
   }
@@ -29829,7 +29845,8 @@ static SEXP np_regression_scalar_fit_execute(void *data)
   }
 
   if(call->do_grad) {
-    for(predictor = 0; predictor < call->num_reg_continuous; predictor++) {
+    for(predictor = continuous_range.begin;
+        predictor < continuous_range.end; predictor++) {
       for(i = 0; i < call->num_obs_eval; i++) {
         const int response_offset =
           response_column_count * i;
@@ -29900,8 +29917,8 @@ static SEXP np_regression_scalar_fit_execute(void *data)
       }
     }
 
-    for(predictor = call->num_reg_continuous;
-        predictor < call->num_reg_continuous + call->num_reg_unordered;
+    for(predictor = unordered_range.begin;
+        predictor < unordered_range.end;
         predictor++) {
       for(i = 0; i < call->num_obs_eval; i++) {
         const int response_offset =
@@ -29981,8 +29998,8 @@ static SEXP np_regression_scalar_fit_execute(void *data)
       }
     }
 
-    for(predictor = call->num_reg_continuous + call->num_reg_unordered;
-        predictor < p_nvar; predictor++) {
+    for(predictor = ordered_range.begin;
+        predictor < ordered_range.end; predictor++) {
       const int ordered_coordinate = predictor -
         call->num_reg_continuous - call->num_reg_unordered;
 
@@ -30442,6 +30459,10 @@ typedef struct {
   NPRegressionLPEmptyRows *empty_rows;
   const NPConditionalLPFirstSERequest *first_se_request;
   double *conditional_variance;
+  NPRegressionGradientRange continuous_range;
+  NPRegressionGradientRange unordered_range;
+  NPRegressionGradientRange ordered_range;
+  NPRegressionGradientRange categorical_range;
 } NPRegressionGeneralLPFitCall;
 
 typedef struct {
@@ -30822,8 +30843,8 @@ static int np_regression_general_lp_categorical_points(
     return 0;
 
   if(call->categorical_point_invariant) {
-    for(coordinate = 0;
-        coordinate < call->num_reg_unordered + call->num_reg_ordered;
+    for(coordinate = call->categorical_range.begin - call->num_reg_continuous;
+        coordinate < call->categorical_range.end - call->num_reg_continuous;
         ++coordinate)
       owner->categorical_point[coordinate] = 0.0;
     return 1;
@@ -30837,7 +30858,9 @@ static int np_regression_general_lp_categorical_points(
        compute_hc0 ? owner->power2_projection : NULL))
     return 0;
 
-  for(coordinate = 0; coordinate < call->num_reg_unordered; ++coordinate) {
+  for(coordinate = call->unordered_range.begin - call->num_reg_continuous;
+      coordinate < call->unordered_range.end - call->num_reg_continuous;
+      ++coordinate) {
     const double current = owner->eval_unordered[coordinate][0];
     const double alternate = call->matrix_categorical_vals[coordinate][0];
     double alternate_point;
@@ -30879,7 +30902,9 @@ static int np_regression_general_lp_categorical_points(
       return 0;
   }
 
-  for(coordinate = 0; coordinate < call->num_reg_ordered; ++coordinate) {
+  for(coordinate = call->ordered_range.begin - call->num_reg_continuous - call->num_reg_unordered;
+      coordinate < call->ordered_range.end - call->num_reg_continuous - call->num_reg_unordered;
+      ++coordinate) {
     const int category = call->num_reg_unordered + coordinate;
     const int count = call->num_categories[category];
     const double current = owner->eval_ordered[coordinate][0];
@@ -32103,7 +32128,8 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
 
         if(call->do_grad && call->do_gerr) {
           int rhs = 1;
-          for(l = 0; l < num_reg_continuous; ++l) {
+          for(l = call->continuous_range.begin;
+              l < call->continuous_range.end; ++l) {
             if(np_glp_gradient_direction_active(l)) {
               const double * const projection =
                 owner->solve_workspace.rhs_work +
@@ -32213,8 +32239,8 @@ static SEXP np_regression_general_lp_fit_execute(void *data)
       }
 
       if(call->do_grad) {
-        for(l = num_reg_continuous;
-            l < num_reg_continuous + num_reg_unordered + num_reg_ordered;
+        for(l = call->categorical_range.begin;
+            l < call->categorical_range.end;
             ++l) {
           if(!preserve_point)
             call->gradient[l][j] =
@@ -33650,7 +33676,21 @@ NPRegressionFailure *failure){
       .enclosing_owner = &fit_owner,
       .empty_rows = empty_rows,
       .first_se_request = first_se_request,
-      .conditional_variance = conditional_variance
+      .conditional_variance = conditional_variance,
+      .continuous_range = np_regression_gradient_range(
+        hc0_context != NULL ? hc0_context->gradient_request : NULL,
+        0, num_reg_continuous),
+      .unordered_range = np_regression_gradient_range(
+        hc0_context != NULL ? hc0_context->gradient_request : NULL,
+        num_reg_continuous, num_reg_continuous + num_reg_unordered),
+      .ordered_range = np_regression_gradient_range(
+        hc0_context != NULL ? hc0_context->gradient_request : NULL,
+        num_reg_continuous + num_reg_unordered,
+        num_reg_continuous + num_reg_unordered + num_reg_ordered),
+      .categorical_range = np_regression_gradient_range(
+        hc0_context != NULL ? hc0_context->gradient_request : NULL,
+        num_reg_continuous,
+        num_reg_continuous + num_reg_unordered + num_reg_ordered)
     };
 
     general_lp_fit_status = np_regression_general_lp_fit(&general_lp_call);

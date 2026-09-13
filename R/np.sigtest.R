@@ -565,12 +565,30 @@ npsigtest.npregression <-
       structural <- .np_npsig_structure(bws, xdat, tested.index)
     if (all(structural))
       return(numeric(ncol(payload)))
+    fit.total <- if (is.null(.fit.cache)) {
+      reg.spec <- npValidatedConditionalRegSpec(bws,
+        where = ".np_regression_direct", ncon.field = "ncon")
+      reg.c <- npRegtypeToC(regtype = reg.spec[["regtype.engine"]],
+        degree = reg.spec[["degree.engine"]], ncon = bws[["ncon", exact = TRUE]],
+        context = ".np_regression_direct")
+      .np_reg_fit_total(bws, tnrow = n, enrow = n, se = TRUE,
+        reg.code = reg.c[["code"]])
+    } else NULL
     result <- numeric(ncol(payload))
     for (column in seq_len(ncol(payload))) {
       fit <- if (is.null(.fit.cache)) NULL else .fit.cache[["fits"]][[column]]
       if (is.null(fit)) {
-        fit <- .npRmpi_npsig_npreg_local(bws = bws, txdat = xdat,
-          tydat = payload[, column], gradients = TRUE, se = TRUE)
+        fit <- if (is.null(.fit.cache)) {
+          # Retain the canonical training/residual fit progress owner.
+          .npRmpi_with_local_regression(.np_with_compiled_fit_progress(
+            label = "Fitting regression", total = fit.total,
+            expr = .np_regression_direct(bws = bws, txdat = xdat,
+              tydat = payload[, column], gradients = TRUE, se = TRUE,
+              gradient.coordinate = tested.index)))
+        } else {
+          .npRmpi_npsig_npreg_local(bws = bws, txdat = xdat,
+            tydat = payload[, column], gradients = TRUE, se = TRUE)
+        }
         if (!is.null(.fit.cache))
           .fit.cache[["fits"]][[column]] <- fit
       }

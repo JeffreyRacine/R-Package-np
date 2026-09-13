@@ -25,6 +25,32 @@ typedef enum {
   NP_REGRESSION_HC0_RESIDUAL_ALL_ZERO = 2
 } NPRegressionHC0ResidualStatus;
 
+/* Private selected categorical output, in the unchanged native column order.
+ * NULL requests every column. Resolve ranges before entering donor loops. */
+typedef struct {
+  int coordinate;
+} NPRegressionGradientRequest;
+
+typedef struct {
+  int begin;
+  int end;
+} NPRegressionGradientRange;
+
+static inline NPRegressionGradientRange np_regression_gradient_range(
+  const NPRegressionGradientRequest *request, const int begin, const int end)
+{
+  NPRegressionGradientRange range = {begin, end};
+  if(request != NULL) {
+    if(request->coordinate >= begin && request->coordinate < end) {
+      range.begin = request->coordinate;
+      range.end = request->coordinate + 1;
+    } else {
+      range.end = begin;
+    }
+  }
+  return range;
+}
+
 typedef struct {
   const double *scaled_residual;
   const int *donor_to_canonical;
@@ -32,6 +58,7 @@ typedef struct {
   double residual_scale;
   NPRegressionHC0ResidualStatus status;
   int point_already_computed;
+  const NPRegressionGradientRequest *gradient_request;
 } NPRegressionHC0Context;
 
 /*

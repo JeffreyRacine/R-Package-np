@@ -3,8 +3,10 @@
 * Studentized joint `npsigtest()` calls reuse each bootstrap regression fit
   across tested categorical predictors within each worker's existing bounded
   response tile. Statistics, resamples and random-number consumption are
-  unchanged. Individual categorical tests and unstandardized tests retain
-  their existing computational paths.
+  unchanged. Individual studentized categorical bootstrap fits use the same
+  worker-local native contrast and response-specific HC0 calculations but
+  omit unrequested gradient and contrast-SE consumers. Default full regression
+  output and unstandardized tests retain their existing computational paths.
 
 * `npsigtest()` now defaults to `pivot = TRUE` for continuous and
   categorical predictors, including joint tests. Explicit FALSE retains
