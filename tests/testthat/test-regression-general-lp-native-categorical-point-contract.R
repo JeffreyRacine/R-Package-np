@@ -50,8 +50,7 @@ h7a_expect_native_point <- function(bw,
                                     tydat,
                                     exdat = NULL,
                                     se = FALSE,
-                                    tolerance = 5e-12,
-                                    exact = FALSE) {
+                                    tolerance = 5e-12) {
   native <- h7a_native_fit(bw, txdat, tydat, exdat = exdat, se = se)
   oracle <- native
   oracle$grad <- getFromNamespace(
@@ -69,14 +68,12 @@ h7a_expect_native_point <- function(bw,
   expect_identical(native$mean, oracle$mean)
   expect_identical(native$grad[, bw$icon, drop = FALSE],
                    oracle$grad[, bw$icon, drop = FALSE])
-  if (exact) {
-    expect_identical(native$grad[, cat.index, drop = FALSE],
-                     oracle$grad[, cat.index, drop = FALSE])
-  } else {
-    expect_equal(native$grad[, cat.index, drop = FALSE],
-                 oracle$grad[, cat.index, drop = FALSE],
-                 tolerance = tolerance)
-  }
+  # R10 evaluates a stable paired influence rather than subtracting two rounded
+  # fitted values. This legacy hat subtraction is a numerical, not bitwise,
+  # oracle; retain exact mean/continuous controls and the existing tolerance.
+  expect_equal(native$grad[, cat.index, drop = FALSE],
+               oracle$grad[, cat.index, drop = FALSE],
+               tolerance = tolerance)
   invisible(list(oracle = oracle, native = native))
 }
 
@@ -102,15 +99,14 @@ test_that("native general-LP categorical points match fixed/GNN/ANN oracles", {
       c(9, 0.3, 0.3)
     bw <- h7a_explicit_lp_bw(txdat, tydat, bws, bwtype = bwtype)
 
-    exact <- !identical(bwtype, "adaptive_nn")
-    h7a_expect_native_point(bw, txdat, tydat, exact = exact)
-    h7a_expect_native_point(bw, txdat, tydat, se = TRUE, exact = exact)
-    h7a_expect_native_point(
-      bw, txdat, tydat, exdat = exdat, exact = exact
+    training.off <- h7a_expect_native_point(bw, txdat, tydat)
+    training.on <- h7a_expect_native_point(bw, txdat, tydat, se = TRUE)
+    external.off <- h7a_expect_native_point(bw, txdat, tydat, exdat = exdat)
+    external.on <- h7a_expect_native_point(
+      bw, txdat, tydat, exdat = exdat, se = TRUE
     )
-    h7a_expect_native_point(
-      bw, txdat, tydat, exdat = exdat, se = TRUE, exact = exact
-    )
+    expect_identical(training.off$native$grad, training.on$native$grad)
+    expect_identical(external.off$native$grad, external.on$native$grad)
   }
 })
 

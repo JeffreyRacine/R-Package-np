@@ -208,7 +208,11 @@ test_that("all-large fit BLAS agrees with scalar fallback and dense WLS", {
   oracle_mean <- as.numeric(b %*% beta)
   residual <- y - oracle_mean
   projection <- b %*% gram_inverse
-  meat <- crossprod(b, b * residual^2)
+  # This full-rank OLS map is symmetric/idempotent, so ||e_i-H_i||^2=1-H_ii.
+  # Compute its diagonal without a quadratic-memory hat matrix.
+  residual.information <- 1 - rowSums(projection * b)
+  expect_true(all(is.finite(residual.information) & residual.information > 0))
+  meat <- crossprod(b, b * (residual^2 / residual.information))
   oracle_merr <- sqrt(
     pmax(0, rowSums((projection %*% meat) * projection))
   )

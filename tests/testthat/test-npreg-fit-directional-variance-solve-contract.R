@@ -107,7 +107,22 @@ test_that("directional LP variances agree with independent fixed-bandwidth WLS",
           bernstein.basis = bernstein
         )
       ))
-      residual <- response - fitted(training.fit)
+      # Reconstruct the training influence independently from the full WLS
+      # basis. The evaluation covariance uses residuals normalized by I-H.
+      training.weights <- do.call(npksum, c(
+        training.common, list(return.kernel.weights = TRUE)
+      ))$kw
+      training.hat <- t(vapply(seq_len(n), function(row) {
+        weight <- training.weights[, row]
+        gram <- crossprod(design, design * weight)
+        weight * drop(design %*% solve(gram, design[row, ]))
+      }, numeric(n)))
+      expect_equal(drop(training.hat %*% response),
+                   unname(fitted(training.fit)), tolerance = 2e-8)
+      residual <- hc0_normalized_training_residual(
+        training.hat, response, training.mean = fitted(training.fit),
+        constant.reproduction = identical(kernel, "beta")
+      )
 
       expected_se <- numeric(nrow(evaluation))
       expected_gerr <- matrix(0, nrow(evaluation), length(degree))
