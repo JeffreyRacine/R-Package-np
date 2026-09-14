@@ -57,7 +57,9 @@ test_that("sibandwidth bootstrap helpers honor bounded neval in session mode", {
   y <- cos(tx$x1 - tx$x2) + rnorm(n, sd = 0.06)
 
   for (bt in c("fixed", "adaptive_nn")) {
-    h <- if (identical(bt, "fixed")) 0.25 else 5L
+    # Bootstrap rows are discrete: keep this success fixture inside the
+    # literal ANN-radius domain; zero-radius errors have dedicated contracts.
+    h <- if (identical(bt, "fixed")) 0.25 else n - 1L
     bw <- do.call(npindexbw, list(
       xdat = tx,
       ydat = y,
