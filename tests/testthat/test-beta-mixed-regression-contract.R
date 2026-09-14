@@ -109,7 +109,11 @@ test_that("mixed beta scalar regression matches canonical kernel-weight oracles"
       training.hat <- unclass(npreghat(
         bws = bws, txdat = training, output = "matrix"
       ))
-      hc0.residual <- response - drop(training.hat %*% response)
+      # LC normalized rows retain constants; center before normalizing the
+      # residual influence so near-interpolation is not a subtraction oracle.
+      hc0.residual <- hc0_normalized_training_residual(
+        training.hat, response, constant.reproduction = TRUE
+      )
       expected <- beta_mixed_regression_moments(
         weights, response, hc0.residual
       )

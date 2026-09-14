@@ -11,8 +11,11 @@ beta_regression_hc0_oracle <- function(training, response, evaluation, args) {
   evaluation.hat <- unclass(npreghat(
     bws = bw, txdat = training, exdat = evaluation, output = "matrix"
   ))
-  residual <- as.double(response) -
-    drop(training.hat %*% as.double(response))
+  # LC normalized kernel rows reproduce constants, including signed beta rows.
+  # The variance contract uses e_i / ||e_i - H_i||, not shrunken fit residuals.
+  residual <- hc0_normalized_training_residual(
+    training.hat, response, constant.reproduction = TRUE
+  )
 
   sqrt(drop((evaluation.hat^2) %*% (residual^2)))
 }

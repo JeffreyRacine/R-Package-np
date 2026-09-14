@@ -667,7 +667,7 @@ test_that("scalar beta regression fits enter the canonical row engine", {
   expect_match(
     public_regression,
     paste0("active_route, active_diagnostics, categorical_compress, empty_rows_ptr,",
-           "[[:space:]]*gradient_request_ptr\\);")
+           "[[:space:]]*gradient_request_ptr, &variance_unavailable, &gradient_zero_out\\);")
   )
   expect_match(public_regression,
                "const NPRegressionGradientRequest *gradient_request_ptr = NULL;",
@@ -698,6 +698,7 @@ test_that("scalar beta regression fits enter the canonical row engine", {
       "                                                   kernel_route_diagnostics,\n",
       "                                                   categorical_compress,\n",
       "                                                   NP_REGRESSION_STDERR_LOCAL_RESIDUAL,\n",
+      "                                                   1,\n",
       "                                                   NULL,\n",
       "                                                   &nn_geometry_context,\n",
       "                                                   ordinary_hc0_active ?\n",

@@ -459,9 +459,40 @@ test_that("H6 batches adjoint directions without another covariance owner", {
   )
   expect_match(
     owner,
-    "np_regression_hc0_lp_standard_error_with_information(",
+    "np_regression_hc0_lp_standard_error_reuse(",
     fixed = TRUE
   )
+  # Exact-input reuse is only a computational wrapper. No-cache and miss
+  # paths must still use the same donor-square calculation and propagate its
+  # failures before publishing a reusable result.
+  source.lines <- strsplit(source, "\n", fixed = TRUE)[[1L]]
+  reuse <- npRmpi_test_extract_c_function(
+    source.lines, "np_regression_hc0_lp_standard_error_reuse")
+  donor <- gregexpr("np_regression_hc0_lp_standard_error_with_information(",
+                   reuse, fixed = TRUE)[[1L]]
+  expect_length(donor[donor > 0L], 2L)
+  compact.reuse <- gsub("[[:space:]]+", " ", reuse)
+  expect_match(compact.reuse,
+    paste0("if(reuse->entry == NULL) return ",
+           "np_regression_hc0_lp_standard_error_with_information("),
+    fixed = TRUE)
+  expect_match(compact.reuse,
+    "standard_error, &missing)) return 0; np_inference_reuse_put(",
+    fixed = TRUE)
+  expect_match(reuse, "if(!np_inference_reuse_get(", fixed = TRUE)
+  expect_match(reuse, "if(unavailable != NULL && missing) *unavailable = 1;",
+               fixed = TRUE)
+  expect_lt(regexpr("np_inference_reuse_get(", reuse, fixed = TRUE)[[1L]],
+            donor[[2L]])
+  expect_lt(donor[[2L]],
+            regexpr("np_inference_reuse_put(", reuse, fixed = TRUE)[[1L]])
+  expect_match(gsub("[[:space:]]+", " ", owner),
+    paste0("if(ordinary_hc0 && call->do_merr && call->all_large_kernel_rows) ",
+           "(void)np_inference_reuse_reserve("), fixed = TRUE)
+  cleanup <- npRmpi_test_extract_c_function(
+    source.lines, "np_regression_general_lp_fit_owner_cleanup")
+  expect_match(cleanup, "np_inference_reuse_clear(&owner->inference_reuse);",
+               fixed = TRUE)
   expect_false(grepl(
     "!ordinary_hc0 && call->do_grad && call->do_gerr",
     owner,

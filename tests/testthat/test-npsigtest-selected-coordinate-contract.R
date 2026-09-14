@@ -25,8 +25,27 @@ test_that("selected-coordinate attribute is protected across allocating native c
                     wrapper, fixed = TRUE)
   expect_length(protected, 1L)
   expect_lt(protected, min(grep("coerceVector(", wrapper, fixed = TRUE)))
-  expect_length(grep("  PROTECT(", wrapper, fixed = TRUE), 27L)
-  expect_length(grep("++extra_protect;", wrapper, fixed = TRUE), 1L)
+  # Count actual PROTECT tokens, including inline assignments but excluding
+  # UNPROTECT. There are 27 unconditional protections and two guarded outputs.
+  expect_length(grep("\\bPROTECT\\(", wrapper, perl = TRUE), 29L)
+  empty.start <- grep("PROTECT(empty_flags = allocVector(INTSXP, en));",
+                      wrapper, fixed = TRUE)
+  certificate.start <- grep("SEXP certificate = PROTECT(allocVector(LGLSXP, gsize));",
+                            wrapper, fixed = TRUE)
+  expect_length(empty.start, 1L)
+  expect_length(certificate.start, 1L)
+  expect_identical(trimws(wrapper[empty.start + 1L]), "++extra_protect;")
+  expect_identical(trimws(wrapper[certificate.start + 1L]), "++extra_protect;")
+  expect_match(paste(wrapper[seq.int(empty.start - 2L, empty.start)], collapse = " "),
+               "INTEGER(output_request)[1] == 1 && !train_is_eval)", fixed = TRUE)
+  expect_identical(trimws(wrapper[certificate.start - 1L]),
+                   "if(gradient_zero_out != NULL) {")
+  expect_lt(empty.start, grep("empty_rows.flags = INTEGER(empty_flags);",
+                              wrapper, fixed = TRUE))
+  expect_lt(certificate.start,
+    grep('setAttrib(out, install(".np.gradient.structural.zero"), certificate);',
+         wrapper, fixed = TRUE))
+  expect_length(grep("++extra_protect;", wrapper, fixed = TRUE), 2L)
   expect_length(grep("UNPROTECT(27 + extra_protect);", wrapper, fixed = TRUE), 1L)
   expect_length(grep("return out;", wrapper, fixed = TRUE), 1L)
 })
