@@ -759,9 +759,10 @@ gradients.lsqregression <- function(x, se = FALSE,
 
 .nplsqreg_predict_formula_newdata_to_exdat <- function(object, newdata) {
   tt <- stats::terms(object$bws$formula)
-  rhs <- stats::delete.response(tt)
+  rhs <- .np_formula_aligned_terms(stats::delete.response(tt))
   npValidateNewdataFormula(newdata, rhs, include.response = FALSE)
-  mf <- stats::model.frame(formula = rhs, data = newdata)
+  mf <- do.call(stats::model.frame, list(formula = rhs, data = newdata),
+                envir = environment(tt))
   mf[, attr(attr(mf, "terms"), "term.labels"), drop = FALSE]
 }
 

@@ -133,7 +133,7 @@
                 nomatch = 0L)
   mf.call <- method.call[c(1L, keep)]
   mf.call[[1L]] <- quote(stats::model.frame)
-  mf.call$formula <- parsed$combined
+  mf.call$formula <- .np_formula_aligned_terms(terms(parsed$combined))
   if (!is.null(data))
     mf.call$data <- data
   eval(mf.call, envir = eval.env)
@@ -172,7 +172,7 @@
   )
   npValidateNewdataFormula(newdata, eval.formula, include.response = FALSE,
                            argname = "newdata")
-  args <- list(formula = eval.formula, data = newdata)
+  args <- list(formula = .np_formula_aligned_terms(terms(eval.formula)), data = newdata)
   if (!is.null(na.action))
     args$na.action <- na.action
   do.call(stats::model.frame, args, envir = parsed$environment)

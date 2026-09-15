@@ -1290,7 +1290,7 @@ nplsqregbw.formula <-
   function(bws, data = NULL, tau = 0.5, subset, na.action, ...) {
     .npRmpi_require_active_slave_pool(where = "nplsqregbw()")
 
-    tt <- terms(bws)
+    tt <- .np_formula_aligned_terms(terms(bws))
     mc <- match.call(expand.dots = FALSE)
     m <- match(c("bws", "data", "subset", "na.action"),
                names(mc), nomatch = 0)
@@ -1803,7 +1803,7 @@ nplsqreg.formula <-
 
     .npRmpi_require_active_slave_pool(where = "nplsqreg()")
 
-    tt <- terms(bws)
+    tt <- .np_formula_aligned_terms(terms(bws))
     dots <- list(...)
     response.name <- .nplsqreg_formula_response_name(bws)
     native.exdat <- dots$exdat
@@ -1829,7 +1829,7 @@ nplsqreg.formula <-
       npValidateNewdataFormula(native.exdat, delete.response(tt),
                                include.response = FALSE)
       emf <- do.call(stats::model.frame,
-                     list(formula = delete.response(tt), data = native.exdat),
+                     list(formula = .np_formula_aligned_terms(delete.response(tt)), data = native.exdat),
                      envir = parent.frame())
       eval.omit <- attr(emf, "na.action")
       exdat <- emf[, attr(attr(emf, "terms"), "term.labels"), drop = FALSE]
@@ -1837,7 +1837,7 @@ nplsqreg.formula <-
       npValidateNewdataFormula(newdata, delete.response(tt),
                                include.response = FALSE)
       emf <- do.call(stats::model.frame,
-                     list(formula = delete.response(tt), data = newdata),
+                     list(formula = .np_formula_aligned_terms(delete.response(tt)), data = newdata),
                      envir = parent.frame())
       eval.omit <- attr(emf, "na.action")
       exdat <- emf[, attr(attr(emf, "terms"), "term.labels"), drop = FALSE]

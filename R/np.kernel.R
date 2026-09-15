@@ -38,6 +38,8 @@ npksum.formula <-
     mf <- mf[c(1,m)]
     mf[[1]] <- as.name("model.frame")
     mf.args <- as.list(mf[-1L])
+    mf.args$formula <- .np_formula_aligned_terms(
+      if (missing(data)) terms(formula) else terms(formula, data = data))
     if (!missing(subset))
       mf.args[c("data", "subset")] <- .np_formula_subset_inputs(
         if (missing(data)) NULL else data, substitute(subset), parent.frame())
@@ -48,7 +50,8 @@ npksum.formula <-
 
     miss.new <- missing(newdata)
     if (!miss.new){
-      tt <- delete.response(attr(mf,"terms"))
+      tt <- .np_formula_aligned_terms(delete.response(attr(mf,"terms")))
+      npValidateNewdataFormula(newdata, tt, include.response = FALSE)
       umf.args <- list(formula = tt, data = newdata)
       umf <- do.call(stats::model.frame, umf.args, envir = parent.frame())
       exdat <- umf[, attr(attr(umf, "terms"),"term.labels"), drop = FALSE]
