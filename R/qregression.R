@@ -85,6 +85,11 @@ fitted.qregression <- function(object, ...){
 }
 quantile.qregression <- function(x, ...){ x$quantile }
 .npqreg_predict_newdata_to_exdat <- function(object, newdata) {
+  if (!is.null(object$bws$formula)) {
+    npValidateNewdataFormula(newdata, .np_formula_conditional_rhs_terms(object$bws),
+                            include.response = FALSE)
+    return(newdata)
+  }
   if (is.data.frame(newdata) && !is.null(names(newdata))) {
     xnames <- object$bws$xnames
     if (length(xnames)) {

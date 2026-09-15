@@ -1958,8 +1958,10 @@ npreghat.formula <-
 
     has.eval <- !is.null(newdata)
     if (has.eval) {
-      et <- delete.response(tt)
-      emf <- model.frame(et, data = newdata)
+      npValidateNewdataFormula(newdata, tt, include.response = FALSE)
+      et <- .np_formula_aligned_terms(delete.response(tt))
+      emf <- do.call(stats::model.frame, list(formula = et, data = newdata),
+                     envir = environment(tt))
       exdat <- emf[, attr(attr(emf, "terms"), "term.labels"), drop = FALSE]
     }
 
