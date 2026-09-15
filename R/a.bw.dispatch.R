@@ -306,3 +306,12 @@
     list(VARIABLES = attr(tt, "variables")))
   tt
 }
+
+# Conditional bandwidths retain expanded, one-sided joint terms, not ordinary
+# response-bearing terms. Drop their response before rebuilding prediction
+# expressions; reparsing the original formula would lose a fitted `.` expansion.
+.np_formula_conditional_rhs_terms <- function(bws) {
+  tt <- bws$terms
+  response <- match(bws$variableNames[["response"]], attr(tt, "term.labels"))
+  .np_formula_aligned_terms(drop.terms(tt, response))
+}

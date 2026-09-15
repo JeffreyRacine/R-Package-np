@@ -22,17 +22,6 @@ npconmode <-
     }
   }
 
-.npConmodeValidateNewdataTerms <- function(newdata, xnames) {
-  nd <- toFrame(newdata)
-  missing.names <- setdiff(xnames, names(nd))
-  if (length(missing.names))
-    stop(sprintf(
-      "newdata must contain columns: %s",
-      paste(shQuote(xnames), collapse = ", ")
-    ), call. = FALSE)
-  invisible(TRUE)
-}
-
 .npConmodeValidateCategoricalResponse <- function(tydat) {
   tydat <- toFrame(tydat)
   if (NCOL(tydat) != 1L)
@@ -67,8 +56,9 @@ npconmode.formula <-
 
     has.eval <- !is.null(newdata)
     if (has.eval) {
-      .npConmodeValidateNewdataTerms(newdata, bws$variableNames[["terms"]])
       has.ey <- bws$variableNames[["response"]] %in% names(newdata)
+      eval.tt <- if (has.ey) tt else .np_formula_conditional_rhs_terms(bws)
+      npValidateNewdataFormula(newdata, eval.tt, include.response = has.ey)
 
       if (has.ey){
         umf.args <- list(formula = tt, data = newdata)
@@ -77,7 +67,7 @@ npconmode.formula <-
         eval.omit <- attr(emf, "na.action")
         eydat <- emf[, bws$variableNames[["response"]], drop = FALSE]
       } else {
-        umf.args <- list(formula = formula(bws)[-2], data = newdata)
+        umf.args <- list(formula = eval.tt, data = newdata)
         umf <- do.call(stats::model.frame, umf.args, envir = parent.frame())
         emf <- umf
         eval.omit <- attr(emf, "na.action")
@@ -817,6 +807,12 @@ npconmode.default <- function(bws, txdat, tydat,
     mf.call <- mf.call[c(1L, keep)]
     if (!("formula" %in% names(mf.call)))
       mf.call$formula <- bws
+    if ("data" %in% names(mf.call)) {
+      mf.call$data <- eval(mf.call$data, parent.frame())
+      mf.call$formula <- .np_formula_aligned_terms(terms(bws, data = mf.call$data))
+    } else {
+      mf.call$formula <- .np_formula_aligned_terms(terms(bws))
+    }
     mf <- eval(mf.call, parent.frame())
     y <- stats::model.response(mf)
     if (is.null(y))
