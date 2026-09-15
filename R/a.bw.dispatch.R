@@ -301,8 +301,8 @@
   # A namespace-qualified prediction expression survives saved-bandwidth
   # refits/newdata without capturing a caller frame or the training data.
   attr(tt, "predvars") <- substitute(
-    npRmpi:::.np_formula_align_values(VARIABLES),
-    list(VARIABLES = attr(tt, "variables")))
+    utils::getFromNamespace(".np_formula_align_values", PACKAGE)(VARIABLES),
+    list(PACKAGE = "npRmpi", VARIABLES = attr(tt, "variables")))
   tt
 }
 
