@@ -1,5 +1,10 @@
 # npRmpi 0.80-1
 
+* Qualified Apple Silicon builds accelerate compensated local-polynomial
+  regression influence calculations used by requested standard errors and
+  studentized tests. The calculation, defaults and bootstrap random-number
+  sequence are unchanged; other builds retain the existing scalar path.
+
 * Copula standard errors and plots recover physical evaluation coordinates
   independently of sanitized output column names. Transformed, lagged and
   reserved predictor names no longer cause plotting failures or substitute

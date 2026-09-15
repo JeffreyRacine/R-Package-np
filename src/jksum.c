@@ -31550,6 +31550,141 @@ static int np_regression_lp_projected_weight(
   return isfinite(*influence);
 }
 
+/* Begin projected-pair implementation: the scalar owner above is unchanged. */
+#if defined(NP_USE_ACCELERATE_GAUSS) && defined(__APPLE__) && \
+    defined(__arm64__) && defined(__ARM_NEON) && \
+    defined(__clang__) && __clang_major__ == 21 && \
+    __clang_minor__ == 0 && __clang_patchlevel__ == 0 && \
+    defined(__apple_build_version__) && \
+    (__apple_build_version__ == 21000101 || __apple_build_version__ == 21000334) && \
+    FLT_RADIX == 2 && DBL_MANT_DIG == 53 && \
+    DBL_MIN_EXP == (-1021) && DBL_MAX_EXP == 1024 && \
+    LDBL_MANT_DIG == DBL_MANT_DIG && LDBL_MIN_EXP == DBL_MIN_EXP && \
+    LDBL_MAX_EXP == DBL_MAX_EXP && \
+    defined(__SIZEOF_DOUBLE__) && __SIZEOF_DOUBLE__ == 8 && \
+    defined(__SIZEOF_LONG_DOUBLE__) && __SIZEOF_LONG_DOUBLE__ == 8 && \
+    !defined(__FAST_MATH__) && \
+    (!defined(__FINITE_MATH_ONLY__) || __FINITE_MATH_ONLY__ == 0)
+# define NP_REGRESSION_PROJECTED_PAIR 1
+#else
+# define NP_REGRESSION_PROJECTED_PAIR 0
+#endif
+
+#if NP_REGRESSION_PROJECTED_PAIR
+/* Each lane keeps the scalar ascending-term two-double arithmetic. The final
+ * multiply/add expression follows the same compiler contraction policy as
+ * np_contrast_scale; it is deliberately not an unconditional second FMA. */
+typedef struct { float64x2_t hi, lo; } NPRegressionProjectedNumber2;
+
+static inline NPRegressionProjectedNumber2 np_regression_projected_two_sum(
+  float64x2_t a, float64x2_t b)
+{
+  const float64x2_t sum = vaddq_f64(a, b);
+  const float64x2_t bv = vsubq_f64(sum, a);
+  const NPRegressionProjectedNumber2 out = {sum,
+    vaddq_f64(vsubq_f64(a, vsubq_f64(sum, bv)), vsubq_f64(b, bv))};
+  return out;
+}
+
+static inline NPRegressionProjectedNumber2 np_regression_projected_add(
+  NPRegressionProjectedNumber2 a, NPRegressionProjectedNumber2 b)
+{
+  NPRegressionProjectedNumber2 high = np_regression_projected_two_sum(a.hi, b.hi);
+  const NPRegressionProjectedNumber2 low =
+    np_regression_projected_two_sum(a.lo, b.lo);
+  high = np_regression_projected_two_sum(high.hi, vaddq_f64(high.lo, low.hi));
+  return np_regression_projected_two_sum(high.hi, vaddq_f64(high.lo, low.lo));
+}
+
+__attribute__((noinline))
+static void np_regression_projected_pair_compute(
+  double **basis, int nterms, const double *projection,
+  const double *weights, int donor, long double output[2], int status[2])
+{
+  NPRegressionProjectedNumber2 score = {vdupq_n_f64(0.0), vdupq_n_f64(0.0)};
+  status[0] = status[1] = 1;
+  for(int term = 0; term < nterms; ++term) {
+    const double p = projection[term];
+    if(!isfinite(p)) { status[0] = status[1] = 0; return; }
+    double values[2] = {0.0, 0.0};
+    if(status[0]) {
+      values[0] = basis[term][donor];
+      if(!isfinite(values[0])) { status[0] = 0; values[0] = 0.0; }
+    }
+    if(status[1]) {
+      values[1] = basis[term][donor+1];
+      if(!isfinite(values[1])) { status[1] = 0; values[1] = 0.0; }
+    }
+    if(!status[0] && !status[1]) return;
+    const float64x2_t a = vld1q_f64(values), b = vdupq_n_f64(p);
+    const float64x2_t product = vmulq_f64(a, b);
+    const NPRegressionProjectedNumber2 term_value = {
+      product, vfmaq_f64(vnegq_f64(product), a, b)};
+    score = np_regression_projected_add(score, term_value);
+  }
+  const float64x2_t weight = vld1q_f64(weights);
+  const float64x2_t product = vmulq_f64(score.hi, weight);
+  float64x2_t remainder = vfmaq_f64(vnegq_f64(product), score.hi, weight);
+  remainder = remainder + score.lo * weight;
+  const NPRegressionProjectedNumber2 value =
+    np_regression_projected_two_sum(product, remainder);
+  double high[2], low[2];
+  vst1q_f64(high, value.hi);
+  vst1q_f64(low, value.lo);
+  for(int lane = 0; lane < 2; ++lane) {
+    if(!status[lane]) continue;
+    if(!isfinite(high[lane]) || !isfinite(low[lane])) {
+      status[lane] = 0;
+      continue;
+    }
+    output[lane] = (long double)high[lane] + (long double)low[lane];
+    status[lane] = isfinite(output[lane]);
+  }
+}
+
+/* One stack-owned pending donor, consumed only in incumbent donor order.
+ * Failed lanes are returned at their own demand point and are never retried.
+ * Zero support, a self boundary and an odd tail retain the scalar helper. */
+typedef struct {
+  int pending, donor, status;
+  long double value;
+} NPRegressionProjectedCursor;
+
+static int np_regression_projected_next(
+  double **basis, int nterms, const double *projection,
+  double weight, int donor, long double *out,
+  const double *row, double divisor, int n, int self,
+  NPRegressionProjectedCursor *cursor)
+{
+  if(cursor->pending) {
+    cursor->pending = 0;
+    if(cursor->donor != donor) return 0;
+    if(cursor->status) *out = cursor->value;
+    return cursor->status;
+  }
+  if(donor+1 < n && donor+1 != self && basis != NULL &&
+     projection != NULL && nterms > 0 && isfinite(weight) && weight != 0.0) {
+    const double next = divisor == 1.0 ? row[donor+1] : row[donor+1] / divisor;
+    if(isfinite(next) && next != 0.0) {
+      const double weights[2] = {weight, next};
+      long double values[2] = {0.0L, 0.0L};
+      int status[2] = {0, 0};
+      np_regression_projected_pair_compute(
+        basis, nterms, projection, weights, donor, values, status);
+      cursor->pending = 1;
+      cursor->donor = donor+1;
+      cursor->status = status[1];
+      cursor->value = values[1];
+      if(status[0]) *out = values[0];
+      return status[0];
+    }
+  }
+  return np_regression_lp_projected_weight(
+    basis, nterms, projection, weight, donor, out);
+}
+#endif
+/* End projected-pair implementation. */
+
 /* The preparation owner supplies its accepted mean adjoint and actual kernel
  * row.  Only off-diagonal donors enter the stable residual identity; donor
  * identity is explicit even when training coordinates are duplicated. */
@@ -31561,11 +31696,20 @@ static int np_regression_hc0_lp_prepare_row(
   NPResidualOffDiagonal state = {0};
   long double normalized = 0.0L;
   const int self = preparation->evaluation_to_donor[evaluation];
+#if NP_REGRESSION_PROJECTED_PAIR
+  NPRegressionProjectedCursor cursor = {0};
+#endif
   for(int donor = 0; donor < preparation->num_obs_train; ++donor) {
     long double influence;
     if(donor == self) continue;
+#if NP_REGRESSION_PROJECTED_PAIR
+    if(!np_regression_projected_next(
+         basis, nterms, projection, kernel_row[donor], donor, &influence,
+         kernel_row, 1.0, preparation->num_obs_train, self, &cursor))
+#else
     if(!np_regression_lp_projected_weight(
          basis, nterms, projection, kernel_row[donor], donor, &influence))
+#endif
       return 0;
     np_residual_offdiag_add(&state, influence,
       (long double)preparation->response[self] -
@@ -31646,12 +31790,21 @@ static int np_regression_hc0_lp_standard_error_with_information(
   /* Sum nonnegative donor squares instead of a cancellation-prone a'Pa.
    * Retained rows share the accepted moment scale; only the legacy fixed
    * raw-row owner needs its explicit bandwidth-product divisor. */
+#if NP_REGRESSION_PROJECTED_PAIR
+  NPRegressionProjectedCursor cursor = {0};
+#endif
   for(int donor = 0; donor < context->num_obs_train; ++donor) {
     long double influence;
     const double weight = kernel_divisor == 1.0 ? kernel_row[donor] :
       kernel_row[donor] / kernel_divisor;
+#if NP_REGRESSION_PROJECTED_PAIR
+    if(!np_regression_projected_next(
+         basis, nterms, projection, weight, donor, &influence,
+         kernel_row, kernel_divisor, context->num_obs_train, -1, &cursor))
+#else
     if(!np_regression_lp_projected_weight(
          basis, nterms, projection, weight, donor, &influence))
+#endif
       return 0;
     const int information = context->residual_information != NULL ?
       context->residual_information[donor] : NP_RESIDUAL_IDENTIFIED;
