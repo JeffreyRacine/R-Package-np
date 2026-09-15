@@ -90,6 +90,19 @@ test_that("npplreg core smoke stays alive", {
   expect_true(all(is.finite(predict(fit))))
 })
 
+test_that("npindex raw formulas align lagged time series", {
+  set.seed(42)
+  y <- ts(rnorm(28), frequency = 4)
+  f <- y ~ lag(y, -1) + lag(y, -2)
+  h <- c(1, .5, .8)
+  direct <- npindex(f, bws = h, bandwidth.compute = FALSE)
+  bw <- npindexbw(f, bws = h, bandwidth.compute = FALSE)
+  control <- npindex(bws = bw)
+  expect_identical(direct$nobs, 26L)
+  expect_equal(fitted(direct), fitted(control), tolerance = 1e-14)
+  expect_equal(vcov(direct), vcov(control), tolerance = 1e-14)
+})
+
 test_that("npindex core smoke stays alive", {
   set.seed(7)
   n <- 24L

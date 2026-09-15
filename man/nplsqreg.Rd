@@ -149,6 +149,11 @@ selection, prediction, or plotting route.
   }
 }
 \details{
+  Formula variables of class \code{ts}, including lagged variables, are
+  aligned on their common time support before fitting. Other variables
+  must already have the length of that intersection. Supply explicitly
+  aligned rows when using native data arguments instead of a formula.
+
   The estimator follows the locally weighted quantile-kernel approach of
   Racine and Li (2017). Given a conditional scale pilot
   \eqn{\hat\sigma(X_i)}, define

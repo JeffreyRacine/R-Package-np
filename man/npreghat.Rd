@@ -118,6 +118,11 @@ Further arguments are passed to methods.
 
 }
 \details{
+  Formula variables of class \code{ts}, including lagged variables, are
+  aligned on their common time support before fitting. Other variables
+  must already have the length of that intersection. Supply explicitly
+  aligned rows when using native data arguments instead of a formula.
+
 Local-polynomial operators retain the fitted solve's numerical ridge
 adjustment; see Numerical Ridging in \code{\link{npreg}} and its
 Seifert--Gasser reference. A hat operator alone does not estimate residual

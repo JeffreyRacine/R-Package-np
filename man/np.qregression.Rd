@@ -223,6 +223,11 @@ prediction/evaluation route, or plot route as appropriate.
   }
 }
 \details{
+  Formula variables of class \code{ts}, including lagged variables, are
+  aligned on their common time support before fitting. Other variables
+  must already have the length of that intersection. Supply explicitly
+  aligned rows when using native data arguments instead of a formula.
+
   Local-polynomial calculations inherit numerical ridging from
   \code{\link{npcdist}}. See that estimator's help for the solve
   policy and its distinct conditional uncertainty formula.

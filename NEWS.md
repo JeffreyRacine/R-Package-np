@@ -6,6 +6,13 @@
   columns, or reject them as collinear, and affect subsequent inference and
   plots. LC, LL and LP use the same restored formula-constructor route.
 
+* Lagged time-series formula alignment is also applied to single-index,
+  least-squares quantile, kernel-sum, copula and IV formula preparation.
+  Quantile, conditional-mode and regression-hat evaluation reconstruct the
+  aligned predictors from the supplied new data, including transformed
+  terms, without requiring columns named after the expressions. Ordinary
+  data and explicit native-array alignment conventions are unchanged.
+
 * Ordinary regression inference now normalizes training fitted residuals by
   the norms of their actual residual-smoother rows before forming level,
   derivative and paired categorical-contrast sandwich errors. This can also
