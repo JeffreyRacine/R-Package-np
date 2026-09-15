@@ -1,5 +1,11 @@
 # np 0.80-1
 
+* Copula standard errors and plots recover physical evaluation coordinates
+  independently of sanitized output column names. Transformed, lagged and
+  reserved predictor names no longer cause plotting failures or substitute
+  training/probability coordinates for a requested grid. Public output columns
+  and the underlying estimation and uncertainty formulas are unchanged.
+
 * One-call `npreg()` formulas again align lagged time-series variables before
   bandwidth selection, matching `npregbw()` followed by `npreg(bws = ...)`.
   This repairs a 0.70-1 regression that could silently fit unaligned lag

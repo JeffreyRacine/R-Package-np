@@ -146,3 +146,17 @@ test_that("npscoef core smoke stays alive", {
   expect_equal(length(predict(fit)), n)
   expect_true(all(is.finite(predict(fit))))
 })
+test_that("copula grid coordinates cannot fall back to equal-length training data", {
+  ns <- asNamespace(getNamespaceName(environment(npcopula)))
+  coordinates <- get(".npcopula_eval_xgrid", ns)
+  x <- structure(list(evaluation = "grid", xnames = c("x", "log(y)"),
+    copula = c(.2, .4, .6, .8), grid.dim = c(2L, 2L),
+    data = data.frame(x = 1:4, check.names = FALSE, "log(y)" = 5:8),
+    eval = data.frame(copula = c(.2, .4, .6, .8), u1 = c(.2, .8, .2, .8),
+      u2 = c(.2, .2, .8, .8), x = 9:12, log.y. = 13:16)),
+    class = "npcopula")
+  expect_identical(coordinates(x)[[1L]], 9:12)
+  expect_identical(names(coordinates(x)), x$xnames)
+  x$evaluation <- "sample"
+  expect_identical(coordinates(x)[[1L]], 1:4)
+})
