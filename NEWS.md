@@ -1,5 +1,11 @@
 # np 0.80-1
 
+* One-call `npreg()` formulas again align lagged time-series variables before
+  bandwidth selection, matching `npregbw()` followed by `npreg(bws = ...)`.
+  This repairs a 0.70-1 regression that could silently fit unaligned lag
+  columns, or reject them as collinear, and affect subsequent inference and
+  plots. LC, LL and LP use the same restored formula-constructor route.
+
 * Ordinary regression inference now normalizes training fitted residuals by
   the norms of their actual residual-smoother rows before forming level,
   derivative and paired categorical-contrast sandwich errors. This can also

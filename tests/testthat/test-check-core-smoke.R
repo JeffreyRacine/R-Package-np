@@ -22,17 +22,25 @@ test_that("npudist core smoke stays alive", {
   expect_true(all(predict(fit) >= 0 & predict(fit) <= 1))
 })
 
-test_that("npreg core smoke stays alive", {
-  set.seed(3)
-  x <- data.frame(x = seq(0.1, 1.0, length.out = 28L))
-  y <- sin(2 * pi * x$x)
+test_that("npreg core smoke aligns lagged time series before fitting", {
+  set.seed(20260915)
+  y <- stats::ts(rnorm(28), start = c(2001, 1), frequency = 4)
+  form <- y ~ stats::lag(y, -1) + stats::lag(y, -2)
+  set.seed(42)
+  bw <- npregbw(form, nmulti = 1L, regtype = "ll")
+  set.seed(42)
+  direct <- npreg(form, nmulti = 1L, regtype = "ll")
+  two_step <- npreg(bws = bw)
+  manual <- npreg(bws = bw,
+    txdat = data.frame(lag1 = as.numeric(y)[2:27], lag2 = as.numeric(y)[1:26]),
+    tydat = as.numeric(y)[3:28])
 
-  bw <- npregbw(xdat = x, ydat = y, bws = 0.25, bandwidth.compute = FALSE)
-  fit <- npreg(bws = bw)
-
-  expect_s3_class(fit, "npregression")
-  expect_equal(length(predict(fit)), nrow(x))
-  expect_true(all(is.finite(predict(fit))))
+  expect_s3_class(direct, "npregression")
+  expect_equal(direct$nobs, 26L)
+  expect_true(all(is.finite(predict(direct))))
+  expect_equal(direct$bws$bw, bw$bw, tolerance = 0)
+  expect_equal(fitted(direct), fitted(two_step), tolerance = 0)
+  expect_equal(fitted(direct), fitted(manual), tolerance = 0)
 })
 
 test_that("npcdens core smoke stays alive", {
