@@ -64,6 +64,8 @@ npindex.formula <-
 
         mc <- match.call(expand.dots = FALSE)
         tt <- terms(bws)
+        if (inherits(bws, "formula"))
+          tt <- .np_formula_aligned_terms(tt)
         tmf <- if (!is.null(bws$call)) {
           m <- match(c("formula", "data", "subset", "na.action"),
                      names(bws$call), nomatch = 0)
@@ -153,7 +155,10 @@ npindex.formula <-
           if (y.eval)
             si.args$eydat <- eydat
         }
-        si.args$bws <- si.bws
+        # Raw formula variables above are already prepared. Do not apply the
+        # formula again through the explicit-native formula reentry interface.
+        if (!inherits(si.bws, "formula"))
+          si.args$bws <- si.bws
         ev <- do.call(npindex, c(si.args, list(se = se, se.type = se.type), dots))
         ev$call <- mc
         environment(ev$call) <- parent.frame()

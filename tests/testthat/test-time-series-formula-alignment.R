@@ -1,0 +1,66 @@
+test_that("aligned formula terms preserve one evaluation and the time intersection", {
+  aligned <- getFromNamespace(".np_formula_aligned_terms", "npRmpi")
+  frame <- function(f, data = environment(f), ...) {
+    model.frame(aligned(terms(f, data = data)), data = data, ...)
+  }
+  values <- function(x) lapply(seq_along(x), function(i) x[[i]])
+  set.seed(42)
+  y <- ts(rnorm(28), start = c(2000, 1), frequency = 4)
+  f <- y ~ lag(y, -1) + lag(y, -2)
+  expected <- cbind(as.numeric(y)[3:28], as.numeric(y)[2:27], as.numeric(y)[1:26])
+  actual <- frame(f)
+  expect_identical(unname(as.matrix(actual)), expected)
+  z <- ordered(rep(1:2, 13))
+  mixed <- frame(y ~ z + lag(y, -2))
+  expect_identical(mixed[[2L]], z)
+  expect_identical(mixed[[1L]], expected[, 1L])
+  expect_identical(mixed[[3L]], expected[, 3L])
+  expect_identical(unname(as.matrix(frame(f, subset = seq_len(26) > 2L))),
+    expected[3:26, , drop = FALSE])
+  calls <- 0L
+  transform <- function(x) {calls <<- calls + 1L; x + runif(length(x))}
+  x <- seq_len(10)
+  set.seed(81)
+  plain <- model.frame(~transform(x))
+  rng <- .Random.seed
+  calls <- 0L
+  set.seed(81)
+  wrapped <- frame(~transform(x))
+  expect_identical(calls, 1L)
+  expect_identical(values(wrapped), values(plain))
+  expect_identical(.Random.seed, rng)
+  tt <- unserialize(serialize(attr(actual, "terms"), NULL))
+  new <- list(y = ts(rnorm(18), start = c(2001, 1), frequency = 4))
+  eval <- model.frame(aligned(delete.response(tt)), data = new)
+  expect_identical(eval[[1L]], as.numeric(new$y)[2:18])
+  expect_identical(eval[[2L]], as.numeric(new$y)[1:17])
+  expect_error(frame(y ~ lag(y, -2) + seq_len(28)), "lengths differ")
+})
+
+test_that("single-index raw formulas align before one native-data handoff", {
+  skip_if_not(spawn_mpi_slaves())
+  on.exit(close_mpi_slaves(), add = TRUE)
+  old <- options(np.messages = FALSE)
+  on.exit(options(old), add = TRUE)
+  set.seed(42)
+  y <- ts(rnorm(28), frequency = 4)
+  f <- y ~ lag(y, -1) + lag(y, -2)
+  h <- c(1, .5, .8)
+  bw <- npindexbw(f, bws = h, bandwidth.compute = FALSE)
+  control <- npindex(bws = bw, se = FALSE)
+  direct <- npindex(f, bws = h, bandwidth.compute = FALSE, se = FALSE)
+  expect_identical(direct$nobs, 26L)
+  expect_equal(direct$mean, control$mean, tolerance = 1e-14)
+  expect_equal(npindex(bws = direct$bws, se = FALSE)$mean, control$mean,
+    tolerance = 1e-14)
+  set.seed(43)
+  direct <- npindex(f, nmulti = 1L, se = FALSE)
+  direct.rng <- .Random.seed
+  set.seed(43)
+  bw <- npindexbw(f, nmulti = 1L)
+  control <- npindex(bws = bw, se = FALSE)
+  expect_identical(direct$nobs, 26L)
+  expect_identical(direct$bws$beta, control$bws$beta)
+  expect_equal(direct$mean, control$mean, tolerance = 1e-14)
+  expect_identical(.Random.seed, direct.rng)
+})
