@@ -276,3 +276,33 @@
 
   vapply(vals, inherits, logical(1), "ts")
 }
+
+# Used inside model.frame's predvars: formula expressions are evaluated once.
+# Ordinary columns already belong to the intersection; model.frame checks their
+# lengths and applies subset/na.action after the time-series alignment.
+.np_formula_align_values <- function(values) {
+  is.ts <- vapply(values, inherits, logical(1), "ts")
+  if (!any(is.ts)) return(values)
+  series <- values[is.ts]
+  if (length(series) > 1L) {
+    names(series) <- paste0(".series", seq_along(series))
+    series <- do.call(stats::ts.intersect, c(series, list(dframe = TRUE)))
+    if (is.null(series))
+      stop("time-series formula variables have no common observations", call. = FALSE)
+  }
+  values[is.ts] <- lapply(series, function(x) {
+    attr(x, "tsp") <- NULL
+    class(x) <- setdiff(class(x), c("ts", "mts"))
+    x
+  })
+  values
+}
+
+.np_formula_aligned_terms <- function(tt) {
+  # A namespace-qualified prediction expression survives saved-bandwidth
+  # refits/newdata without capturing a caller frame or the training data.
+  attr(tt, "predvars") <- substitute(
+    np:::.np_formula_align_values(VARIABLES),
+    list(VARIABLES = attr(tt, "variables")))
+  tt
+}
