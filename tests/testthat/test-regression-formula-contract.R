@@ -1,3 +1,27 @@
+test_that("one-call regression aligns lagged time series before fitting", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(), add = TRUE)
+  old.opts <- options(npRmpi.autodispatch = TRUE)
+  on.exit(options(old.opts), add = TRUE)
+
+  set.seed(20260915)
+  y <- stats::ts(rnorm(28), start = c(2001, 1), frequency = 4)
+  form <- y ~ stats::lag(y, -1) + stats::lag(y, -2)
+  set.seed(42)
+  bw <- npRmpi::npregbw(form, nmulti = 1L, regtype = "ll")
+  set.seed(42)
+  direct <- npRmpi::npreg(form, nmulti = 1L, regtype = "ll")
+  two_step <- npRmpi::npreg(bws = bw)
+  manual <- npRmpi::npreg(bws = bw,
+    txdat = data.frame(lag1 = as.numeric(y)[2:27], lag2 = as.numeric(y)[1:26]),
+    tydat = as.numeric(y)[3:28])
+
+  expect_equal(direct$nobs, 26L)
+  expect_equal(direct$bws$bw, bw$bw, tolerance = 0)
+  expect_equal(fitted(direct), fitted(two_step), tolerance = 0)
+  expect_equal(fitted(direct), fitted(manual), tolerance = 0)
+})
+
 test_that("npreg formula newdata path matches explicit data path", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(), add = TRUE)

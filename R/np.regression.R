@@ -111,9 +111,9 @@ npreg <-
     args <- list(...)
     npRejectLegacyBooleanErrors(args, "npreg")
 
+    # Raw formulas must reach npregbw.formula before a fitting frame is made:
+    # the constructor records the time alignment for lagged ts variables.
     if (!missing(bws)){
-      if (inherits(bws, "formula") && is.null(args$txdat))
-        UseMethod("npreg", bws)
       if (is.recursive(bws)){
         if (!is.null(bws$formula) && is.null(args$txdat))
           UseMethod("npreg",bws$formula)
