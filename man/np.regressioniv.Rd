@@ -417,6 +417,11 @@ Further arguments are passed to lower-level kernel-sum and estimation routines.
 
 }
 \details{
+  Formula variables of class \code{ts}, including lagged variables, are
+  aligned on their common time support before fitting. Other variables
+  must already have the length of that intersection. Supply explicitly
+  aligned rows when using native data arguments instead of a formula.
+
   Local-polynomial nuisance fits may use numerical diagonal ridging.
   For its Seifert--Gasser motivation, see \code{\link{npreg}}.
   This is distinct from regularization of the instrumental-variable

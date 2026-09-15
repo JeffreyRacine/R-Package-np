@@ -138,6 +138,23 @@ test_that("npplreg core smoke stays alive", {
   expect_check_core_smoke_marker(res, "CHECK_CORE_SMOKE_NPPLREG_OK")
 })
 
+test_that("npindex raw formulas align lagged time series", {
+  res <- run_check_core_smoke(c(
+    "set.seed(42)",
+    "y <- ts(rnorm(28), frequency = 4)",
+    "f <- y ~ lag(y, -1) + lag(y, -2)",
+    "h <- c(1, .5, .8)",
+    "direct <- npindex(f, bws = h, bandwidth.compute = FALSE)",
+    "bw <- npindexbw(f, bws = h, bandwidth.compute = FALSE)",
+    "control <- npindex(bws = bw)",
+    "stopifnot(direct$nobs == 26L)",
+    "stopifnot(isTRUE(all.equal(fitted(direct), fitted(control), tolerance = 1e-14)))",
+    "stopifnot(isTRUE(all.equal(vcov(direct), vcov(control), tolerance = 1e-14)))",
+    "cat('CHECK_CORE_SMOKE_NPINDEX_TS_OK\\n')"
+  ))
+  expect_check_core_smoke_marker(res, "CHECK_CORE_SMOKE_NPINDEX_TS_OK")
+})
+
 test_that("npindex core smoke stays alive", {
   res <- run_check_core_smoke(
     c(
