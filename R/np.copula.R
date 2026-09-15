@@ -1221,7 +1221,7 @@ npcopula.formula <- function(bws,
   evaluation <- .npcopula_validate_evaluation(evaluation)
   neval <- .npcopula_validate_neval(neval)
 
-  mf <- stats::model.frame(bws, data = data)
+  mf <- stats::model.frame(.np_formula_aligned_terms(terms(bws, data = data)), data = data)
   dat <- mf[, attr(attr(mf, "terms"), "term.labels"), drop = FALSE]
   num.var <- ncol(dat)
 
@@ -1303,9 +1303,9 @@ npcopula.default <- function(bws,
     )
     neval.formula <- .npcopula_validate_neval(if (!missing(neval)) neval else 30)
     mf <- if (missing(data)) {
-      stats::model.frame(formula.arg)
+      stats::model.frame(.np_formula_aligned_terms(terms(formula.arg)))
     } else {
-      stats::model.frame(formula.arg, data = data)
+      stats::model.frame(.np_formula_aligned_terms(terms(formula.arg, data = data)), data = data)
     }
     dat <- mf[, attr(attr(mf, "terms"), "term.labels"), drop = FALSE]
     u.formula <- if (formula.from.u || missing(u)) NULL else u
