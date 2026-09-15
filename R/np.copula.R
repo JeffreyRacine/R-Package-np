@@ -302,7 +302,7 @@ npcopula <- function(bws, ...) {
   }
   if (length(u1) != grid.dim[1L] || length(u2) != grid.dim[2L])
     stop("npcopula grid output is not rectangular")
-  xgrid <- as.data.frame(dat[, xnames, drop = FALSE])
+  xgrid <- .npcopula_eval_xgrid(x)
   list(
     u1 = u1,
     u2 = u2,
@@ -541,13 +541,37 @@ npcopula <- function(bws, ...) {
 
 .npcopula_eval_xgrid <- function(x) {
   dat <- as.data.frame(x)
-  xnames <- x$xnames
-  if (length(xnames) && all(xnames %in% names(dat)))
-    return(as.data.frame(dat[, xnames, drop = FALSE]))
-  data <- .npcopula_training_data(x)
-  if (nrow(data) != length(x$copula))
-    stop("npcopula object does not retain evaluation coordinates needed for standard errors")
-  as.data.frame(data[, xnames, drop = FALSE])
+  xnames <- x[["xnames", exact = TRUE]]
+  p <- length(xnames)
+  invalid <- function() stop(
+    "npcopula object does not retain valid evaluation coordinates; refit with npcopula()",
+    call. = FALSE)
+  if (!p || !is.character(xnames) || anyNA(xnames) ||
+      nrow(dat) != length(x[["copula", exact = TRUE]]))
+    invalid()
+  evaluation <- x[["evaluation", exact = TRUE]]
+  if (identical(evaluation, "sample")) {
+    data <- .npcopula_training_data(x)
+    if (nrow(data) != nrow(dat) || !all(xnames %in% names(data)))
+      invalid()
+    return(data[, xnames, drop = FALSE])
+  }
+  if (!identical(evaluation, "grid"))
+    invalid()
+  grid.dim <- x[["grid.dim", exact = TRUE]]
+  prefix <- c("copula", paste0("u", seq_len(p)))
+  if (!is.numeric(grid.dim) || length(grid.dim) != p ||
+      anyNA(grid.dim) || any(!is.finite(grid.dim)) ||
+      any(grid.dim < 1 | grid.dim != floor(grid.dim)) ||
+      prod(grid.dim) != nrow(dat) || ncol(dat) != 1L + 2L * p ||
+      !identical(names(dat)[seq_along(prefix)], prefix))
+    invalid()
+  # .npcopula_eval publishes (copula, probability coordinates, physical
+  # coordinates). Public names may be sanitized or collide with the prefix;
+  # recover the physical block without confusing it with training geometry.
+  out <- dat[, 1L + p + seq_len(p), drop = FALSE]
+  names(out) <- xnames
+  out
 }
 
 .npcopula_boot_counts <- function(n, B, method, blocklen) {
