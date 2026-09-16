@@ -875,20 +875,23 @@ npreg.default <- function(bws, txdat, tydat, nomad = FALSE,
                           se = FALSE, ...){
   sc <- sys.call()
   sc.names <- names(sc)
-  npRejectLegacyBooleanErrors(list(...), "npreg")
+  dots <- list(...)
+  npRejectLegacyBooleanErrors(dots, "npreg")
   se <- npValidateScalarLogical(se, "se")
   nomad <- npValidateNomadControl(nomad, "nomad")
 
-  if (!missing(bws) &&
+  named.formula <- missing(bws) && missing(txdat) && missing(tydat) &&
+    inherits(dots[["formula", exact = TRUE]], "formula")
+  if (named.formula || (!missing(bws) &&
       !isa(bws, "rbandwidth") &&
-      (inherits(bws, "formula") || is.call(bws))) {
-    dots <- list(...)
+      (inherits(bws, "formula") || is.call(bws)))) {
     dots$nomad <- nomad
     bw.args <- if (missing(txdat) && missing(tydat)) {
-      list(formula = bws)
+      list(formula = if (named.formula) dots[["formula", exact = TRUE]] else bws)
     } else {
       list(xdat = txdat, ydat = tydat)
     }
+    if (named.formula) dots$formula <- NULL
     frame.state <- if ("formula" %in% names(bw.args)) new.env(parent = emptyenv()) else NULL
     if (!is.null(frame.state)) {
       dots$.np.formula.state <- frame.state

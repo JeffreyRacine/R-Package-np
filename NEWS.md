@@ -13,6 +13,8 @@
   without loading the package that created them.
   Unconditional refits, predictions and plots resolve function-local data
   through the retained bandwidth call, including after MPI fitting.
+  Automatic regression calls using `formula =` follow the same preparation
+  and fitting path as positional formulas.
 
 * Qualified Apple Silicon builds accelerate compensated local-polynomial
   regression influence calculations used by requested standard errors and
