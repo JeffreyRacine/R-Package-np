@@ -1,5 +1,10 @@
 # np 0.80-1
 
+* Single-index formula construction and prediction now use the shared
+  single-evaluation preparation route and portable trained prediction terms.
+  Named formula calls no longer depend on argument order or fail after
+  bandwidth construction.
+
 * Quantile and conditional-mode one-call formula fits also reuse their prepared
   training sample. Conditional-mode response validation still occurs before
   bandwidth selection, and independent refits evaluate their formulas afresh.
