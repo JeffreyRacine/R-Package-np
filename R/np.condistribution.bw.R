@@ -11,16 +11,6 @@ npcdistbw <-
 
 npcdistbw.formula <-
   function(formula, data, subset, na.action, call, gdata = NULL, ...){
-    orig.ts <- tryCatch({
-        if (missing(data))
-            .np_terms_ts_mask(terms_obj = terms(formula),
-                              data = environment(formula),
-                              eval_env = environment(formula))
-        else .np_terms_ts_mask(terms_obj = terms(formula, data = data),
-                               data = data,
-                               eval_env = environment(formula))
-    }, error = function(e) FALSE)
-
     has.gval <- !is.null(gdata)
     
     gmf <- mf <- match.call(expand.dots = FALSE)
@@ -58,20 +48,8 @@ npcdistbw.formula <-
     gmf[["formula"]] <- mf[["formula"]]
 
     mf[["formula"]] <- terms(mf[["formula"]])
-    if(all(orig.ts)){
-      args <- (as.list(attr(mf[["formula"]], "variables"))[-1])
-      attr(mf[["formula"]], "predvars") <- as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), args))))
-    }else if(any(orig.ts)){
-      arguments <- (as.list(attr(mf[["formula"]], "variables"))[-1])
-      arguments.normal <- arguments[which(!orig.ts)]
-      arguments.timeseries <- arguments[which(orig.ts)]
-
-      ix <- sort(c(which(orig.ts),which(!orig.ts)),index.return = TRUE)$ix
-      attr(mf[["formula"]], "predvars") <- bquote(.(as.call(c(quote(cbind),as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments.timeseries)))),arguments.normal,check.rows = TRUE)))[,.(ix)])
-    }
-    
     mf.args <- as.list(mf[-1L])
-    mf <- do.call(stats::model.frame, mf.args, envir = parent.frame())
+    mf <- do.call(.np_formula_model_frame, mf.args, envir = parent.frame())
     
     ydat <- mf[, variableNames[[1]], drop = FALSE]
     xdat <- mf[, variableNames[[2]], drop = FALSE]
@@ -79,17 +57,21 @@ npcdistbw.formula <-
     if (has.gval) {
       gmf.args <- as.list(gmf[-1L])
       names(gmf.args)[names(gmf.args) == "gdata"] <- "data"
-      gmf <- do.call(stats::model.frame, gmf.args, envir = parent.frame())
+      gmf.args$formula <- attr(mf, "terms")
+      gmf <- do.call(.np_formula_model_frame, gmf.args, envir = parent.frame())
       gydat <- gmf[, variableNames[[1]], drop = FALSE]
     }
     
     bw.args <- list(xdat = xdat, ydat = ydat)
     if (has.gval)
       bw.args$gydat <- gydat
-    tbw <- do.call(npcdistbw, c(bw.args, list(...)))
+    dots <- list(...)
+    .np_formula_frame_store(dots[[".np.formula.state", exact = TRUE]], mf)
+    dots$.np.formula.state <- NULL
+    tbw <- do.call(npcdistbw, c(bw.args, dots))
 
     ## clean up (possible) inconsistencies due to recursion ...
-    tbw$call <- match.call(expand.dots = FALSE)
+    tbw$call <- .np_formula_call_public(match.call(expand.dots = FALSE))
     environment(tbw$call) <- parent.frame()
     tbw$formula <- formula
     tbw$rows.omit <- as.vector(attr(mf,"na.action"))

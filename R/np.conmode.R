@@ -47,7 +47,9 @@ npconmode.formula <-
     if (!is.null(data))
       tmf[["data"]] <- data
     mf.args <- as.list(tmf)[-1L]
-    umf <- tmf <- do.call(stats::model.frame, mf.args, envir = environment(tt))
+    umf <- tmf <- .np_bws_formula_model_frame(bws, mf.args,
+      data.override = !is.null(data))
+    tt <- attr(tmf, "terms")
     train.omit <- attr(tmf, "na.action")
 
     tydat <- tmf[, bws$variableNames[["response"]], drop = FALSE]
@@ -62,13 +64,13 @@ npconmode.formula <-
 
       if (has.ey){
         umf.args <- list(formula = tt, data = newdata)
-        umf <- do.call(stats::model.frame, umf.args, envir = parent.frame())
+        umf <- do.call(.np_formula_model_frame, umf.args, envir = parent.frame())
         emf <- umf
         eval.omit <- attr(emf, "na.action")
         eydat <- emf[, bws$variableNames[["response"]], drop = FALSE]
       } else {
         umf.args <- list(formula = eval.tt, data = newdata)
-        umf <- do.call(stats::model.frame, umf.args, envir = parent.frame())
+        umf <- do.call(.np_formula_model_frame, umf.args, envir = parent.frame())
         emf <- umf
         eval.omit <- attr(emf, "na.action")
       }

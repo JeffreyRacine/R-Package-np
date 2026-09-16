@@ -24,6 +24,10 @@ npcdist <-
 
 npcdist.formula <-
   function(bws, data = NULL, newdata = NULL, ...){
+    dots <- list(...)
+    frame.state <- dots[[".np.formula.state", exact = TRUE]]
+    dots$.np.formula.state <- NULL
+    dots$formula <- NULL
     tt <- terms(bws)
     m <- match(c("formula", "data", "subset", "na.action"),
                names(bws$call), nomatch = 0)
@@ -33,7 +37,11 @@ npcdist.formula <-
     if (!missing(data) && !is.null(data))
           tmf[["data"]] <- data
     mf.args <- as.list(tmf)[-1L]
-    umf <- tmf <- do.call(stats::model.frame, mf.args, envir = environment(tt))
+    umf <- tmf <- if (is.null(frame.state))
+      .np_bws_formula_model_frame(bws, mf.args,
+        data.override = !missing(data) && !is.null(data)) else
+        .np_formula_frame_take(frame.state)
+    tt <- attr(tmf, "terms")
 
     tydat <- tmf[, bws$variableNames[["response"]], drop = FALSE]
     txdat <- tmf[, bws$variableNames[["terms"]], drop = FALSE]
@@ -42,7 +50,7 @@ npcdist.formula <-
     if (has.eval) {
       npValidateNewdataFormula(newdata, tt, include.response = TRUE)
       umf.args <- list(formula = tt, data = newdata)
-      umf <- do.call(stats::model.frame, umf.args, envir = parent.frame())
+      umf <- do.call(.np_formula_model_frame, umf.args, envir = parent.frame())
       emf <- umf
       
       eydat <- emf[, bws$variableNames[["response"]], drop = FALSE]
@@ -55,7 +63,7 @@ npcdist.formula <-
       cd.args$eydat <- eydat
     }
     cd.args$bws <- bws
-    ev <- do.call(npcdist, c(cd.args, list(...)))
+    ev <- do.call(npcdist, c(cd.args, dots))
 
     ev$omit <- attr(umf,"na.action")
     ev$rows.omit <- as.vector(ev$omit)
@@ -640,6 +648,14 @@ npcdist.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   sc.bw$proper.method <- NULL
   sc.bw$proper.control <- NULL
   sc.bw <- .np_public_dots_filter_call(sc.bw, "npcdistbw")
+  formula.input <- list(...)[["formula", exact = TRUE]]
+  frame.state <- if (!has.explicit.bws &&
+      (bws.formula || (!no.txdat && inherits(txdat, "formula")) ||
+       inherits(formula.input, "formula"))) new.env(parent = emptyenv()) else NULL
+  if (!is.null(frame.state)) {
+    sc.bw$.np.formula.state <- frame.state
+    on.exit(rm(list = ls(frame.state, all.names = TRUE), envir = frame.state), add = TRUE)
+  }
     
   use.outer.bandwidth.progress <- !.np_bw_call_uses_nomad_degree_search(
     sc.bw,
@@ -660,9 +676,12 @@ npcdist.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   }
 
   call.args <- list(bws = tbw)
+  if (!is.null(frame.state)) call.args$.np.formula.state <- frame.state
   if (no.bws) {
-    call.args$txdat <- txdat
-    call.args$tydat <- tydat
+    if (is.null(frame.state)) {
+      call.args$txdat <- txdat
+      call.args$tydat <- tydat
+    }
   } else {
     if (txdat.named) call.args$txdat <- txdat
     if (tydat.named) call.args$tydat <- tydat

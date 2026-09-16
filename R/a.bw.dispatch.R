@@ -330,6 +330,7 @@
 # expressions; reparsing the original formula would lose a fitted `.` expansion.
 .np_formula_conditional_rhs_terms <- function(bws) {
   tt <- bws$terms
+  attr(tt, "predvars") <- .np_formula_unwrap_prediction(tt)$prediction
   response <- match(bws$variableNames[["response"]], attr(tt, "term.labels"))
-  .np_formula_aligned_terms(drop.terms(tt, response))
+  drop.terms(tt, response)
 }

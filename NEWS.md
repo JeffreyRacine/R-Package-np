@@ -1,5 +1,10 @@
 # np 0.80-1
 
+* Conditional density/distribution formula fitting now reuses its prepared
+  training sample, avoiding repeated evaluation of predictor expressions.
+  Saved conditional formula terms retain portable prediction metadata for
+  refitting, quantile/mode evaluation and plotting.
+
 * Fixed/geometric plot-bootstrap draws now use a replicate-ordered random
   stream, independent of processing chunk size and MPI worker count. The
   block law is unchanged, but historical seeded bands may change. The stream
