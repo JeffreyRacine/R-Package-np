@@ -32538,11 +32538,10 @@ static int np_regression_general_lp_point_at_frame(
   return 1;
 }
 
-/* Construct the incumbent unordered-baseline and ordered-neighbor frames.
- * A generalized-NN training fit is the sole case in which the public
- * npreghat oracle uses an external-query current endpoint rather than the
- * already-computed identity-query point.  That current endpoint is therefore
- * refit once per evaluation row, not once per categorical coordinate. */
+/* Construct unordered-baseline and ordered-neighbor frames. Ordinary
+ * regression retains the fitted row's NN identity at both endpoints.
+ * Conditional kernel-response targets retain their external-query convention;
+ * any required current-endpoint refit is shared by categorical coordinates. */
 static int np_regression_general_lp_categorical_points(
   const NPRegressionGeneralLPFitCall *call,
   NPRegressionGeneralLPFitOwner *owner,
@@ -34673,7 +34672,9 @@ NPRegressionFailure *failure){
   }
 
   categorical_matrix_bandwidth = matrix_bandwidth;
-  if(lp_engine_est == NP_LP_ENGINE_GENERAL &&
+  /* Identity selects the radius, not which responses enter the fit. Do not
+   * replace ordinary fitted-row geometry with an external-query radius. */
+  if(!ordinary_response && lp_engine_est == NP_LP_ENGINE_GENERAL &&
      kernel_route == NULL && BANDWIDTH_reg == BW_GEN_NN && do_grad &&
      (num_reg_unordered + num_reg_ordered > 0) &&
      nn_geometry_context != NULL &&

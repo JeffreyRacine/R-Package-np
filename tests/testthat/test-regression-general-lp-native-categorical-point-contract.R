@@ -53,16 +53,26 @@ h7a_expect_native_point <- function(bw,
                                     tolerance = 5e-12) {
   native <- h7a_native_fit(bw, txdat, tydat, exdat = exdat, se = se)
   oracle <- native
-  oracle$grad <- getFromNamespace(
-    ".npreg_glp_categorical_gradients_from_npreghat", "npRmpi"
-  )(
-    bws = bw,
-    txdat = txdat,
-    tydat = tydat,
-    exdat = exdat,
-    grad = oracle$grad,
-    where = "H7A oracle"
-  )
+  endpoint.oracle <- getFromNamespace(
+    ".npreg_glp_categorical_gradients_from_npreghat", "npRmpi")
+  if (is.null(exdat) && identical(bw$type, "generalized_nn")) {
+    # Freeze the identity-selected radius explicitly before evaluating both
+    # endpoint frames. An external GNN hat query would select a different
+    # radius; that was the old contract, not the fitted-row effect.
+    for (i in seq_len(nrow(txdat))) {
+      widths <- bw$bw
+      for (j in which(bw$icon))
+        widths[j] <- sort(abs(txdat[-i, j] - txdat[i, j]))[bw$bw[j]]
+      fixed <- h7a_explicit_lp_bw(txdat, tydat, widths,
+        basis = bw$basis, bernstein = bw$bernstein.basis,
+        ckertype = bw$ckertype, ckerorder = bw$ckerorder)
+      oracle$grad[i, ] <- endpoint.oracle(fixed, txdat, tydat,
+        txdat[i, , drop = FALSE], oracle$grad[i, , drop = FALSE], "H7A oracle")
+    }
+  } else {
+    oracle$grad <- endpoint.oracle(bw, txdat, tydat, exdat,
+                                  oracle$grad, "H7A oracle")
+  }
   cat.index <- which(bw$iuno | bw$iord)
 
   expect_identical(native$mean, oracle$mean)
