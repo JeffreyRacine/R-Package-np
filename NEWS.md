@@ -1,5 +1,10 @@
 # npRmpi 0.80-1
 
+* Local-polynomial calculations now retain the same native polynomial-term
+  order as np. This removes avoidable serial/MPI discrepancies that can be
+  amplified in poorly conditioned fits; the solver and ridge policy are
+  unchanged. This is not a new stabilization method for ill-conditioned data.
+
 * Fixed/geometric plot-bootstrap draws now use a replicate-ordered random
   stream, independent of processing chunk size and MPI worker count. The
   block law is unchanged, but historical seeded bands may change. The stream

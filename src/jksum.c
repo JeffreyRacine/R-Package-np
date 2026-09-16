@@ -16783,8 +16783,6 @@ static int np_glp_enum_terms_rec(const int idx,
   return 1;
 }
 
-static void np_glp_sort_terms(const int ncon, int *terms, const int nterms);
-
 static int np_glp_build_terms(const int ncon,
                               const int *deg,
                               const int basis_mode,
@@ -16840,54 +16838,9 @@ static int np_glp_build_terms(const int ncon,
   }
 
   free(cur);
-  np_glp_sort_terms(ncon, terms, nterms);
   *terms_out = terms;
   *nterms_out = nterms;
   return 1;
-}
-
-static int np_glp_term_total_degree(const int ncon, const int *term){
-  int j, s = 0;
-  for(j = 0; j < ncon; j++)
-    s += term[j];
-  return s;
-}
-
-static int np_glp_term_precedes(const int ncon, const int *a, const int *b){
-  int j;
-  const int sa = np_glp_term_total_degree(ncon, a);
-  const int sb = np_glp_term_total_degree(ncon, b);
-
-  if(sa != sb)
-    return sa < sb;
-
-  for(j = 0; j < ncon; j++){
-    if(a[j] != b[j])
-      return a[j] > b[j];
-  }
-
-  return 0;
-}
-
-static void np_glp_sort_terms(const int ncon, int *terms, const int nterms){
-  int i, j, k;
-  int tmp[MAX(1, ncon)];
-
-  if((ncon <= 0) || (terms == NULL) || (nterms <= 1))
-    return;
-
-  for(i = 1; i < nterms; i++){
-    for(k = 0; k < ncon; k++)
-      tmp[k] = terms[i*ncon + k];
-    j = i - 1;
-    while((j >= 0) && np_glp_term_precedes(ncon, tmp, terms + j*ncon)){
-      for(k = 0; k < ncon; k++)
-        terms[(j + 1)*ncon + k] = terms[j*ncon + k];
-      j--;
-    }
-    for(k = 0; k < ncon; k++)
-      terms[(j + 1)*ncon + k] = tmp[k];
-  }
 }
 
 static void np_glp_fill_basis_raw_train(const int ncon,

@@ -11,6 +11,25 @@
        envir = parent.frame())
 }
 
+test_that("native term preparation retains its canonical enumeration", {
+  # Complements the functional raw/conditioned fit checks below. Reordering
+  # the same span can alter solve roundoff and ridge admission (CF-87).
+  paths <- c(test_path("..", "..", "src", "jksum.c"),
+             file.path(Sys.getenv("R_PACKAGE_SOURCE"), "src", "jksum.c"))
+  paths <- paths[file.exists(paths)]
+  skip_if(!length(paths), "package C source unavailable")
+  lines <- readLines(paths[[1L]], warn = FALSE)
+  first <- grep("^static int np_glp_build_terms\\(", lines)
+  last <- grep("^static void np_glp_fill_basis_raw_train\\(", lines)
+  expect_length(first, 1L)
+  expect_length(last, 1L)
+  expect_lt(first, last)
+  body <- paste(lines[first:(last - 1L)], collapse = "\n")
+  expect_match(body, "np_glp_enum_terms_rec(", fixed = TRUE)
+  expect_false(grepl("np_glp_sort_terms", body, fixed = TRUE))
+  expect_match(body, "*terms_out = terms;", fixed = TRUE)
+})
+
 test_that("complete GLP terms and dimensions are pinned", {
   build <- .glp_complete_nsfun("npBuildLpTerms")
   ncol_basis <- .glp_complete_nsfun("npLpBasisNcol")
