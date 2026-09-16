@@ -28,22 +28,6 @@ npscoefbw.formula <-
     chromoly <- explodePipe(formula.obj, env = environment(formula))
 
     bronze <- sapply(chromoly, paste, collapse = " + ")
-    formula.all <- if (missing(data)) {
-      terms(as.formula(paste(" ~ ", paste(bronze, collapse = " + ")),
-                       env = environment(formula)))
-    } else {
-      terms(as.formula(paste(" ~ ", paste(bronze, collapse = " + ")),
-                       env = environment(formula)), data = data)
-    }
-
-    orig.ts <- if (missing(data))
-      .np_terms_ts_mask(terms_obj = formula.all,
-                        data = environment(formula.all),
-                        eval_env = environment(formula.all))
-    else .np_terms_ts_mask(terms_obj = formula.all,
-                           data = data,
-                           eval_env = environment(formula.all))
-
     mf[["formula"]] <-
       as.formula(paste(bronze[1]," ~ ",
                        paste(bronze[2:length(bronze)],
@@ -51,20 +35,9 @@ npscoefbw.formula <-
                  env = environment(formula))
 
     mf[["formula"]] <- terms(mf[["formula"]])
-    if(all(orig.ts)){
-      args <- (as.list(attr(mf[["formula"]], "variables"))[-1])
-      attr(mf[["formula"]], "predvars") <- as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), args))))
-    }else if(any(orig.ts)){
-      arguments <- (as.list(attr(mf[["formula"]], "variables"))[-1])
-      arguments.normal <- arguments[which(!orig.ts)]
-      arguments.timeseries <- arguments[which(orig.ts)]
-
-      ix <- sort(c(which(orig.ts),which(!orig.ts)),index.return = TRUE)$ix
-      attr(mf[["formula"]], "predvars") <- bquote(.(as.call(c(quote(cbind),as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments.timeseries)))),arguments.normal,check.rows = TRUE)))[,.(ix)])
-    }
     
     mf.args <- as.list(mf[-1L])
-    mf <- do.call(stats::model.frame, mf.args, envir = parent.frame())
+    mf <- do.call(.np_formula_model_frame, mf.args, envir = parent.frame())
     
     ydat <- model.response(mf)
     xdat <- mf[, chromoly[[2]], drop = FALSE]
@@ -75,10 +48,13 @@ npscoefbw.formula <-
     bw.args <- list(xdat = xdat, ydat = ydat)
     if (!miss.z)
       bw.args$zdat <- zdat
-    tbw <- do.call(npscoefbw, c(bw.args, list(...)))
+    dots <- list(...)
+    .np_formula_frame_store(dots[[".np.formula.state", exact = TRUE]], mf)
+    dots$.np.formula.state <- NULL
+    tbw <- do.call(npscoefbw, c(bw.args, dots))
 
     ## clean up (possible) inconsistencies due to recursion ...
-    tbw$call <- match.call(expand.dots = FALSE)
+    tbw$call <- .np_formula_call_public(match.call(expand.dots = FALSE))
     environment(tbw$call) <- parent.frame()
     tbw$formula <- formula
     tbw$rows.omit <- as.vector(attr(mf,"na.action"))

@@ -40,7 +40,12 @@ npscoef.formula <-
     if (!is.null(data))
       tmf[["data"]] <- data
     mf.args <- as.list(tmf)[-1L]
-    umf <- tmf <- do.call(stats::model.frame, mf.args, envir = environment(tt))
+    frame.state <- dots[[".np.formula.state", exact = TRUE]]
+    dots$.np.formula.state <- NULL
+    umf <- tmf <- if (is.null(frame.state)) .np_bws_formula_model_frame(
+      bws, mf.args, data.override = !missing(data) && !is.null(data)) else
+        .np_formula_frame_take(frame.state)
+    tt <- attr(tmf, "terms")
 
     response.name <- attr(tmf, "names")[attr(attr(tmf, "terms"), "response")]
     tydat <- model.response(tmf)
@@ -55,30 +60,12 @@ npscoef.formula <-
         npValidateNewdataFormula(newdata, tt, include.response = FALSE)
         tt <- delete.response(tt)
 
-        orig.ts <- .np_terms_ts_mask(terms_obj = tt, data = newdata)
-        
-        ## delete.response clobbers predvars, which is used for timeseries objects
-        ## so we need to reconstruct it
-
-        if(all(orig.ts)){
-          args <- (as.list(attr(tt, "variables"))[-1])
-          attr(tt, "predvars") <- as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), args))))
-        }else if(any(orig.ts)){
-          arguments <- (as.list(attr(tt, "variables"))[-1])
-          arguments.normal <- arguments[which(!orig.ts)]
-          arguments.timeseries <- arguments[which(orig.ts)]
-
-          ix <- sort(c(which(orig.ts),which(!orig.ts)),index.return = TRUE)$ix
-          attr(tt, "predvars") <- bquote(.(as.call(c(quote(cbind),as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments.timeseries)))),arguments.normal,check.rows = TRUE)))[,.(ix)])
-        }else{
-          attr(tt, "predvars") <- attr(tt, "variables")
-        }
       }
       
       if (y.eval)
         npValidateNewdataFormula(newdata, tt, include.response = TRUE)
       umf.args <- list(formula = tt, data = newdata)
-      umf <- do.call(stats::model.frame, umf.args, envir = parent.frame())
+      umf <- do.call(.np_formula_model_frame, umf.args, envir = parent.frame())
       emf <- umf
 
       if (y.eval)
@@ -207,6 +194,17 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
     names(sc.bw)[m.txy] <- nstxy[m.txy > 0]
   }
   sc.bw <- .np_public_dots_filter_call(sc.bw, "npscoefbw")
+  formula.input <- list(...)[["formula", exact = TRUE]]
+  frame.state <- if (!has.explicit.bws &&
+      (bws.formula || inherits(formula.input, "formula") ||
+       (!no.txdat && inherits(txdat, "formula"))) &&
+      no.tydat && no.tzdat &&
+      (no.txdat || inherits(txdat, "formula")))
+    new.env(parent = emptyenv()) else NULL
+  if (!is.null(frame.state)) {
+    sc.bw$.np.formula.state <- frame.state
+    on.exit(rm(list = ls(frame.state, all.names = TRUE), envir = frame.state), add = TRUE)
+  }
     
   use.outer.bandwidth.progress <- !.np_bw_call_uses_nomad_degree_search(
     sc.bw,
@@ -233,7 +231,9 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
   ## or unnamed, and t[xyz]dat collectively either named or unnamed
 
   call.args <- list(bws = tbw)
-  if (no.bws) {
+  if (!is.null(frame.state)) {
+    call.args$.np.formula.state <- frame.state
+  } else if (no.bws) {
     call.args$txdat <- txdat
     call.args$tydat <- tydat
     if (!no.tzdat) call.args$tzdat <- tzdat

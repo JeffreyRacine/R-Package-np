@@ -1,5 +1,8 @@
 # np 0.80-1
 
+* Smooth-coefficient formula construction, fitting and evaluation reuse a
+  single prepared sample per transaction and retain portable trained terms.
+
 * Single-index formula construction and prediction now use the shared
   single-evaluation preparation route and portable trained prediction terms.
   Named formula calls no longer depend on argument order or fail after
