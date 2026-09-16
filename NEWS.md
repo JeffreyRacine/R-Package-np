@@ -1,5 +1,12 @@
 # npRmpi 0.80-1
 
+* Quantile and conditional-mode one-call formula fits also reuse their prepared
+  training sample. Conditional-mode response validation still occurs before
+  bandwidth selection, and independent refits evaluate their formulas afresh.
+  Positional quantile formula calls with supplied numeric bandwidths no longer
+  start an unintended bandwidth search; an explicit positional
+  `bandwidth.compute = TRUE` request retains its existing search behavior.
+
 * Conditional density/distribution formula fitting now reuses its prepared
   training sample, avoiding repeated evaluation of predictor expressions.
   Saved conditional formula terms retain portable prediction metadata for

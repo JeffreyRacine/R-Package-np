@@ -50,9 +50,9 @@
   npplregbw = c("random.seed", "remin"),
   npplreg = c("random.seed", "remin", ".np_fit_progress_handoff", ".np.defer.empty.rows"),
   npqreg = c("random.seed", "mads.nmulti", ".np_fit_progress_handoff",
-            ".np_conditional_cat_se_demand"),
+            ".np_conditional_cat_se_demand", ".np.formula.state"),
   npconmode = c("random.seed", "mads.nmulti", ".np_fit_progress_handoff",
-                ".np_categorical_effects"),
+                ".np_categorical_effects", ".np.formula.state"),
   npcopula = c("mads.nmulti", "nomad.nmulti", "nomad.remin",
                ".beta.range.certify", "u.auto")
 )

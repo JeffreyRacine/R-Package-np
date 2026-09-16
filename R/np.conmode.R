@@ -37,6 +37,10 @@ npconmode <-
 npconmode.formula <-
   function(bws, data = NULL, newdata = NULL, ..., se = FALSE){
     se <- npValidateScalarLogical(se, "se")
+    dots <- list(...)
+    frame.state <- dots[[".np.formula.state", exact = TRUE]]
+    dots$.np.formula.state <- NULL
+    dots$formula <- NULL
 
     tt <- terms(bws)
     m <- match(c("formula", "data", "subset", "na.action"),
@@ -47,8 +51,9 @@ npconmode.formula <-
     if (!is.null(data))
       tmf[["data"]] <- data
     mf.args <- as.list(tmf)[-1L]
-    umf <- tmf <- .np_bws_formula_model_frame(bws, mf.args,
-      data.override = !is.null(data))
+    umf <- tmf <- if (is.null(frame.state))
+      .np_bws_formula_model_frame(bws, mf.args, data.override = !is.null(data)) else
+        .np_formula_frame_take(frame.state)
     tt <- attr(tmf, "terms")
     train.omit <- attr(tmf, "na.action")
 
@@ -87,7 +92,7 @@ npconmode.formula <-
         cm.args$eydat <- eydat
     }
     cm.args$bws <- bws
-    ev <- do.call(npconmode, c(cm.args, list(...)))
+    ev <- do.call(npconmode, c(cm.args, dots))
 
     ev <- .npConmodeRecordOmit(ev, train.omit)
     if (has.eval) {
@@ -805,26 +810,20 @@ npconmode.default <- function(bws, txdat, tydat,
   }
   sc.bw <- .np_public_dots_filter_call(sc.bw, "npcdensbw")
 
-  if (bws.formula && no.tydat) {
-    mf.call <- sc.bw
-    mf.call[[1]] <- quote(stats::model.frame)
-    keep <- match(c("formula", "data", "subset", "na.action"),
-                  names(mf.call), nomatch = 0L)
-    mf.call <- mf.call[c(1L, keep)]
-    if (!("formula" %in% names(mf.call)))
-      mf.call$formula <- bws
-    if ("data" %in% names(mf.call)) {
-      mf.call$data <- eval(mf.call$data, parent.frame())
-      mf.call$formula <- .np_formula_aligned_terms(terms(bws, data = mf.call$data))
-    } else {
-      mf.call$formula <- .np_formula_aligned_terms(terms(bws))
-    }
-    mf <- eval(mf.call, parent.frame())
-    y <- stats::model.response(mf)
-    if (is.null(y))
+  formula.input <- list(...)[["formula", exact = TRUE]]
+  training.formula <- if (bws.formula) bws else
+    if (!no.txdat && inherits(txdat, "formula")) txdat else formula.input
+  frame.state <- if (!has.explicit.bws && inherits(training.formula, "formula"))
+    new.env(parent = emptyenv()) else NULL
+  if (!is.null(frame.state)) {
+    if (length(training.formula) < 3L)
       stop("npconmode requires a categorical response in the formula",
            call. = FALSE)
-    .npConmodeValidateCategoricalResponse(data.frame(y))
+    response.names <- all.vars(training.formula[[2L]])
+    frame.state$validate.training <- function(frame)
+      .npConmodeValidateCategoricalResponse(frame[, response.names, drop = FALSE])
+    sc.bw$.np.formula.state <- frame.state
+    on.exit(rm(list = ls(frame.state, all.names = TRUE), envir = frame.state), add = TRUE)
   }
 
   use.outer.bandwidth.progress <- !.np_bw_call_uses_nomad_degree_search(
@@ -846,9 +845,12 @@ npconmode.default <- function(bws, txdat, tydat,
   }
 
   call.args <- list(bws = tbw)
+  if (!is.null(frame.state)) call.args$.np.formula.state <- frame.state
   if (no.bws) {
-    call.args$txdat <- txdat
-    call.args$tydat <- tydat
+    if (is.null(frame.state)) {
+      call.args$txdat <- txdat
+      call.args$tydat <- tydat
+    }
   } else {
     if (txdat.named) call.args$txdat <- txdat
     if (tydat.named) call.args$tydat <- tydat

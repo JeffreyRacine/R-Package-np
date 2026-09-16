@@ -1313,6 +1313,9 @@ npqreg <-
 npqreg.formula <-
   function(bws, data = NULL, newdata = NULL, ..., se = FALSE){
     se <- npValidateScalarLogical(se, "se")
+    dots <- list(...)
+    frame.state <- dots[[".np.formula.state", exact = TRUE]]
+    dots$.np.formula.state <- NULL
 
     tt <- terms(bws)
     m <- match(c("formula", "data", "subset", "na.action"),
@@ -1323,8 +1326,9 @@ npqreg.formula <-
     if (!is.null(data))
       tmf[["data"]] <- data
     mf.args <- as.list(tmf)[-1L]
-    umf <- tmf <- .np_bws_formula_model_frame(bws, mf.args,
-      data.override = !is.null(data))
+    umf <- tmf <- if (is.null(frame.state))
+      .np_bws_formula_model_frame(bws, mf.args, data.override = !is.null(data)) else
+        .np_formula_frame_take(frame.state)
     tt <- attr(tmf, "terms")
 
     tydat <- tmf[, bws$variableNames[["response"]], drop = FALSE]
@@ -1344,7 +1348,7 @@ npqreg.formula <-
     if (has.eval)
       q.args$exdat <- exdat
     q.args$bws <- bws
-    tbw <- do.call(npqreg, c(q.args, .npqreg_fit_dots(list(...))))
+    tbw <- do.call(npqreg, c(q.args, .npqreg_fit_dots(dots)))
 
     tbw$omit <- attr(umf,"na.action")
     tbw$rows.omit <- as.vector(tbw$omit)
@@ -1692,6 +1696,9 @@ npqreg.default <- function(bws, txdat, tydat, nomad = FALSE, ..., se = FALSE){
     fit.dots <- .npqreg_fit_dots(dots[nzchar(dot.names) & dot.names %in% fit.names])
     bw.dots <- dots[!(nzchar(dot.names) & dot.names %in% fit.names)]
     bw.args <- c(list(formula = bws, nomad = nomad), bw.dots)
+    frame.state <- new.env(parent = emptyenv())
+    bw.args$.np.formula.state <- frame.state
+    on.exit(rm(list = ls(frame.state, all.names = TRUE), envir = frame.state), add = TRUE)
     bw.call <- as.call(c(list(quote(npcdistbw)), bw.args))
     use.outer.bandwidth.progress <- !.np_bw_call_uses_nomad_degree_search(
       bw.call,
@@ -1705,12 +1712,17 @@ npqreg.default <- function(bws, txdat, tydat, nomad = FALSE, ..., se = FALSE){
     } else {
       do.call(npcdistbw, bw.args)
     }
-    return(do.call(npqreg, c(list(bws = tbw, se = se), fit.dots)))
+    return(do.call(npqreg, c(list(bws = tbw, se = se, .np.formula.state = frame.state), fit.dots)))
   }
 
-  if (!missing(txdat) && inherits(txdat, "formula") &&
-      !missing(bws) && !isa(bws, "condbandwidth")) {
+  named.formula <- missing(txdat) &&
+    inherits(early.dots[["formula", exact = TRUE]], "formula") &&
+    (missing(bws) || !isa(bws, "condbandwidth"))
+  if ((!missing(txdat) && inherits(txdat, "formula") &&
+       !missing(bws) && !isa(bws, "condbandwidth")) || named.formula) {
     dots <- list(...)
+    formula.input <- if (named.formula) dots[["formula", exact = TRUE]] else txdat
+    dots$formula <- NULL
     dot.names <- names(dots)
     if (is.null(dot.names))
       dot.names <- rep("", length(dots))
@@ -1718,7 +1730,14 @@ npqreg.default <- function(bws, txdat, tydat, nomad = FALSE, ..., se = FALSE){
                    ".np_conditional_cat_se_demand")
     fit.dots <- .npqreg_fit_dots(dots[nzchar(dot.names) & dot.names %in% fit.names])
     bw.dots <- dots[!(nzchar(dot.names) & dot.names %in% fit.names)]
-    bw.args <- c(list(formula = txdat, bws = bws, nomad = nomad), bw.dots)
+    bw.args <- c(list(formula = formula.input, nomad = nomad), bw.dots)
+    if (!missing(bws)) bw.args$bws <- bws
+    if (!missing(bws) &&
+        (named.formula || !("bandwidth.compute" %in% names(bw.args))))
+      bw.args$bandwidth.compute <- FALSE
+    frame.state <- new.env(parent = emptyenv())
+    bw.args$.np.formula.state <- frame.state
+    on.exit(rm(list = ls(frame.state, all.names = TRUE), envir = frame.state), add = TRUE)
     bw.call <- as.call(c(list(quote(npcdistbw)), bw.args))
     use.outer.bandwidth.progress <- !.np_bw_call_uses_nomad_degree_search(
       bw.call,
@@ -1732,7 +1751,7 @@ npqreg.default <- function(bws, txdat, tydat, nomad = FALSE, ..., se = FALSE){
     } else {
       do.call(npcdistbw, bw.args)
     }
-    return(do.call(npqreg, c(list(bws = tbw, se = se), fit.dots)))
+    return(do.call(npqreg, c(list(bws = tbw, se = se, .np.formula.state = frame.state), fit.dots)))
   }
 
   .npRmpi_require_active_slave_pool(where = "npqreg()")
@@ -1813,6 +1832,15 @@ npqreg.default <- function(bws, txdat, tydat, nomad = FALSE, ..., se = FALSE){
   }
   sc.bw <- .np_public_dots_filter_call(sc.bw, "npcdistbw")
 
+  formula.input <- early.dots[["formula", exact = TRUE]]
+  frame.state <- if (!has.explicit.bws &&
+      (bws.formula || (!no.txdat && inherits(txdat, "formula")) ||
+       inherits(formula.input, "formula"))) new.env(parent = emptyenv()) else NULL
+  if (!is.null(frame.state)) {
+    sc.bw$.np.formula.state <- frame.state
+    on.exit(rm(list = ls(frame.state, all.names = TRUE), envir = frame.state), add = TRUE)
+  }
+
   use.outer.bandwidth.progress <- !.np_bw_call_uses_nomad_degree_search(
     sc.bw,
     caller_env = parent.frame()
@@ -1832,9 +1860,12 @@ npqreg.default <- function(bws, txdat, tydat, nomad = FALSE, ..., se = FALSE){
   }
 
   call.args <- list(bws = tbw, se = se)
+  if (!is.null(frame.state)) call.args$.np.formula.state <- frame.state
   if (no.bws) {
-    call.args$txdat <- txdat
-    call.args$tydat <- tydat
+    if (is.null(frame.state)) {
+      call.args$txdat <- txdat
+      call.args$tydat <- tydat
+    }
   } else {
     if (txdat.named) call.args$txdat <- txdat
     if (tydat.named) call.args$tydat <- tydat
