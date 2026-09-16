@@ -1,5 +1,19 @@
 # np 0.80-1
 
+* Time-series formula alignment preserves the columns belonging to each
+  matrix-valued expression, preventing a later formula variable from being
+  replaced by a column of an earlier expression. Existing restrictions on
+  matrix predictors are unchanged.
+
+* Regression and unconditional density/distribution formula fits evaluate
+  each training expression once per constructor/fit operation. This avoids
+  inconsistent samples from random or stateful expressions and retains
+  prediction-transform metadata. Later refits still evaluate their inputs.
+  Stored formula objects for these families can be used by either package
+  without loading the package that created them.
+  Unconditional refits, predictions and plots resolve function-local data
+  through the retained bandwidth call, including after MPI fitting.
+
 * Qualified Apple Silicon builds accelerate compensated local-polynomial
   regression influence calculations used by requested standard errors and
   studentized tests. The calculation, defaults and bootstrap random-number
