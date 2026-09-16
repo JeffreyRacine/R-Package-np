@@ -1,5 +1,9 @@
 # npRmpi 0.80-1
 
+* Copula formula construction and fitting now share the same prepared sample,
+  including transformed, subsetted and time-aligned inputs. Automatic grid
+  dimension validation still precedes bandwidth search.
+
 * Smooth-coefficient formula construction, fitting and evaluation reuse a
   single prepared sample per transaction and retain portable trained terms.
   Named MPI formula calls are prepared before worker dispatch.
