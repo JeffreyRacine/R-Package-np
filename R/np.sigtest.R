@@ -41,7 +41,7 @@ npsigtest.formula <-
     if (!is.null(data))
       tmf[["data"]] <- data
     mf.args <- as.list(tmf)[-1L]
-    umf <- tmf <- do.call(stats::model.frame, mf.args, envir = environment(tt))
+    umf <- tmf <- do.call(.np_formula_model_frame, mf.args, envir = environment(tt))
 
     ydat <- model.response(tmf)
     xdat <- tmf[, attr(attr(tmf, "terms"),"term.labels"), drop = FALSE]

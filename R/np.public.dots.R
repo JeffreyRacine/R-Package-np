@@ -23,9 +23,9 @@
 )
 
 .np_public_dots_extras <- list(
-  npregbw = c("remin", "random.seed"),
+  npregbw = c("remin", "random.seed", ".np.formula.state"),
   npreg = c("remin", "random.seed", "warn.glp.gradient",
-            "bandwidth.divide", ".np_fit_progress_handoff", ".np.require.complete", ".np.defer.empty.rows"),
+            "bandwidth.divide", ".np_fit_progress_handoff", ".np.require.complete", ".np.defer.empty.rows", ".np.formula.state"),
   npudensbw = c("mads.nmulti", "nomad.nmulti", "nomad.remin",
                 ".beta.range.certify"),
   npudens = c("mads.nmulti", "nomad.nmulti", "nomad.remin",

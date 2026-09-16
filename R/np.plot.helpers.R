@@ -8601,7 +8601,7 @@ plotFactor <- function(f, y, ...){
     tmf[[1]] <- as.name("model.frame")
     tmf[["formula"]] <- tt
     mf.args <- as.list(tmf)[-1L]
-    tmf <- do.call(stats::model.frame, mf.args, envir = environment(tt))
+    tmf <- do.call(.np_formula_model_frame, mf.args, envir = environment(tt))
 
     ydat <- model.response(tmf)
     xdat <- tmf[, attr(attr(tmf, "terms"), "term.labels"), drop = FALSE]
