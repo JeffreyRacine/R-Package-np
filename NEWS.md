@@ -1,5 +1,9 @@
 # np 0.80-1
 
+* Quantile and conditional-mode one-call formula fits also reuse their prepared
+  training sample. Conditional-mode response validation still occurs before
+  bandwidth selection, and independent refits evaluate their formulas afresh.
+
 * Conditional density/distribution formula fitting now reuses its prepared
   training sample, avoiding repeated evaluation of predictor expressions.
   Saved conditional formula terms retain portable prediction metadata for

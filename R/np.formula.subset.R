@@ -78,6 +78,13 @@
   if (!is.environment(state) || !identical(parent.env(state), emptyenv()) ||
       exists("frame", envir = state, inherits = FALSE))
     stop("invalid formula preparation context", call. = FALSE)
+  validate <- state[["validate.training"]]
+  if (!is.null(validate)) {
+    if (!is.function(validate))
+      stop("invalid formula training validator", call. = FALSE)
+    rm("validate.training", envir = state)
+    validate(frame)
+  }
   state$frame <- frame
   invisible(NULL)
 }
