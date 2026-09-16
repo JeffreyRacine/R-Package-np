@@ -17239,14 +17239,17 @@ compute.bootstrap.errors.rbandwidth =
             output = "apply"
           )))
         } else {
-          fit.train <- .npRmpi_with_local_regression(suppressWarnings(npreg.rbandwidth(
-            txdat = xdat,
-            tydat = ydat,
+          # Match the serial missing-pilot owner. Explicit evaluation at xdat
+          # is intentional: GNN training identities use different NN radii.
+          # Preserve the existing coordinator-local preparation and apply
+          # directly without materializing a training hat matrix.
+          fit.mean.train <- as.double(.npRmpi_with_local_regression(suppressWarnings(.npreghat_complete(
             bws = bws,
-            gradients = FALSE,
-            warn.glp.gradient = FALSE
-          )))
-          fit.mean.train <- as.double(fit.train$mean)
+            txdat = xdat,
+            exdat = xdat,
+            y = ydat,
+            output = "apply"
+          ))))
         }
       }
       .npRmpi_bootstrap_transport_trace(

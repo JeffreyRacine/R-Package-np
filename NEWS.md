@@ -1,5 +1,9 @@
 # npRmpi 0.80-1
 
+* Regression wild-bootstrap plots use the same explicit-evaluation residual
+  pilot as np when no pilot is supplied. This corrects generalized-NN bands;
+  supplied pilots and bootstrap random-number sequences are unchanged.
+
 * Rank-local regression corrections retain their R and native execution
   context together, repairing adaptive-NN local-constant bootstrap-gradient
   plots; nested contexts restore the preceding option and communicator state.
