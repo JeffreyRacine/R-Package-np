@@ -1,5 +1,10 @@
 # npRmpi 0.80-1
 
+* Fixed/geometric plot-bootstrap draws now use a replicate-ordered random
+  stream, independent of processing chunk size and MPI worker count. The
+  block law is unchanged, but historical seeded bands may change. The stream
+  follows the previous single-replicate ordering; IID/wild draws are unchanged.
+
 * Regression wild-bootstrap plots use the same explicit-evaluation residual
   pilot as np when no pilot is supplied. This corrects generalized-NN bands;
   supplied pilots and bootstrap random-number sequences are unchanged.

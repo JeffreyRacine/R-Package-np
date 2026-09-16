@@ -251,13 +251,13 @@
     stopi <- min(B, start + chunk.controller$chunk.size - 1L)
     bsz <- stopi - start + 1L
     chunk.started <- .np_progress_now()
-    idx.chunk <- if (!is.null(index.drawer)) {
-      index.drawer(start, stopi)
-    } else {
+    idx.chunk <- if (is.null(index.drawer))
       matrix(sample.int(n = n, size = n * bsz, replace = TRUE), nrow = n)
-    }
     for (jj in seq_len(bsz)) {
-      tmat[start + jj - 1L, ] <- smooth_one(idx.chunk[, jj])
+      replicate <- start + jj - 1L
+      idx <- if (is.null(index.drawer)) idx.chunk[, jj] else
+        index.drawer(replicate, replicate)[, 1L]
+      tmat[replicate, ] <- smooth_one(idx)
     }
     progress <- .np_plot_progress_tick(state = progress, done = stopi)
     chunk.controller <- .np_plot_progress_chunk_observe(
