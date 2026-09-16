@@ -1,5 +1,9 @@
 # npRmpi 0.80-1
 
+* Rank-local regression corrections retain their R and native execution
+  context together, repairing adaptive-NN local-constant bootstrap-gradient
+  plots; nested contexts restore the preceding option and communicator state.
+
 * Generalized-NN fitted-row categorical effects and their standard errors now
   retain training identity for local-linear and local-polynomial regression,
   as local-constant regression already does. Explicit evaluation effects keep

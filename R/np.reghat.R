@@ -1850,11 +1850,10 @@ npreghat <-
     integer(1L)
   }
 
-  if (isTRUE(local.mode)) {
-    old.mode <- .Call("C_np_set_local_regression_mode", TRUE, PACKAGE = "npRmpi")
-    on.exit(.Call("C_np_set_local_regression_mode", old.mode, PACKAGE = "npRmpi"), add = TRUE)
-  }
-
+  # Native local mode temporarily selects MPI_COMM_SELF. Keep its downstream
+  # R corrections in the same canonical local scope, so kernel-sum helpers
+  # neither require a new pool nor dispatch into the saved communicator.
+  evaluate <- function() {
   output.request <- c(
     .np_regression_output_request(se = se, gradients = do.compiled.gradients),
     as.integer(isTRUE(allow.empty.rows) && !no.ex && regtype.engine %in% c("ll", "lp")))
@@ -1937,6 +1936,8 @@ npreghat <-
     attr(out, ".np.gradient.structural.zero") <-
       matrix(certificate, enrow, ncol.x)[, rorder, drop = FALSE]
   out
+  }
+  if (isTRUE(local.mode)) .npRmpi_with_local_regression(evaluate()) else evaluate()
 }
 
 npreghat.formula <-

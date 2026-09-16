@@ -46,9 +46,9 @@ if (getRversion() >= "2.15.1")
 }
 
 .npRmpi_with_local_regression <- function(expr) {
-  old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
-  old.ctx <- getOption("npRmpi.autodispatch.context", FALSE)
-  old.local <- getOption("npRmpi.local.regression.mode", FALSE)
+  old.disable <- getOption("npRmpi.autodispatch.disable")
+  old.ctx <- getOption("npRmpi.autodispatch.context")
+  old.local <- getOption("npRmpi.local.regression.mode")
   options(npRmpi.autodispatch.disable = TRUE)
   options(npRmpi.autodispatch.context = TRUE)
   options(npRmpi.local.regression.mode = TRUE)
