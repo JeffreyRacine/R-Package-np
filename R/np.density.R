@@ -25,6 +25,10 @@ npudens <-
 npudens.formula <-
   function(bws, data = NULL, newdata = NULL, ...){
 
+    dots <- list(...)
+    frame.state <- dots[[".np.formula.state", exact = TRUE]]
+    dots$.np.formula.state <- NULL
+    dots$formula <- NULL
     tt <- terms(bws)
 
     m <- match(c("formula", "data", "subset", "na.action"),
@@ -36,7 +40,11 @@ npudens.formula <-
     if (!missing(data) && !is.null(data))
       tmf[["data"]] <- data
     mf.args <- as.list(tmf)[-1L]
-    umf <- tmf <- do.call(stats::model.frame, mf.args, envir = environment(tt))
+    umf <- tmf <- if (is.null(frame.state))
+      .np_bws_formula_model_frame(bws, mf.args,
+        data.override = !missing(data) && !is.null(data)) else
+        .np_formula_frame_take(frame.state)
+    tt <- attr(tmf, "terms")
     train.omit <- attr(tmf, "na.action")
 
     tdat <- tmf[, attr(attr(tmf, "terms"),"term.labels"), drop = FALSE]
@@ -45,7 +53,7 @@ npudens.formula <-
     if (has.eval) {
       npValidateNewdataFormula(newdata, tt, include.response = TRUE)
       umf.args <- list(formula = tt, data = newdata)
-      umf <- do.call(stats::model.frame, umf.args, envir = parent.frame())
+      umf <- do.call(.np_formula_model_frame, umf.args, envir = parent.frame())
       emf <- umf
       eval.omit <- attr(umf, "na.action")
 
@@ -58,7 +66,7 @@ npudens.formula <-
     if (has.eval)
       ud.args$edat <- edat
     ud.args$bws <- bws
-    ev <- do.call(npudens, c(ud.args, list(...)))
+    ev <- do.call(npudens, c(ud.args, dots))
 
     ev$omit <- attr(umf,"na.action")
     ev$rows.omit <- as.vector(ev$omit)
@@ -103,7 +111,8 @@ npudens.bandwidth <-
       if (anyNA(edat.preflight) && !any(stats::complete.cases(edat.preflight)))
         stop("Evaluation data has no rows without NAs")
     }
-    return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+    result <- .npRmpi_autodispatch_call(match.call(), parent.frame())
+    return(.npRmpi_restore_nomad_fit_bws_metadata(result, bws))
   }
 
   tdat = toFrame(tdat)
@@ -298,9 +307,10 @@ npudens.default <- function(bws, tdat, ..., se = FALSE){
   .npRmpi_require_active_slave_pool(where = "npudens()")
   bws.formula.early <- (!missing(bws)) && inherits(bws, "formula")
   tdat.formula.early <- (!missing(tdat)) && inherits(tdat, "formula")
+  formula.input <- list(...)[["formula", exact = TRUE]]
   if (.npRmpi_autodispatch_active() &&
       !bws.formula.early &&
-      !tdat.formula.early)
+      !tdat.formula.early && !inherits(formula.input, "formula"))
     return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
   sc <- sys.call()
@@ -349,6 +359,13 @@ npudens.default <- function(bws, tdat, ..., se = FALSE){
     names(sc.bw)[m.txy] <- nstxy[m.txy > 0]
   }
   sc.bw <- .np_public_dots_filter_call(sc.bw, "npudensbw")
+  frame.state <- if (!has.explicit.bws &&
+      ((!no.bws && inherits(bws, "formula")) || direct.formula.tdat ||
+       inherits(formula.input, "formula"))) new.env(parent = emptyenv()) else NULL
+  if (!is.null(frame.state)) {
+    sc.bw$.np.formula.state <- frame.state
+    on.exit(rm(list = ls(frame.state, all.names = TRUE), envir = frame.state), add = TRUE)
+  }
     
   tbw <- if (!has.explicit.bws) {
     .np_progress_select_bandwidth_enhanced(
@@ -361,6 +378,7 @@ npudens.default <- function(bws, tdat, ..., se = FALSE){
 
   ## convention: first argument is always dropped, second, if present, propagated
   call.args <- list(bws = tbw, se = se)
+  if (!is.null(frame.state)) call.args$.np.formula.state <- frame.state
   if (!no.tdat && !direct.formula.tdat) {
     if (tdat.named) {
       call.args$tdat <- tdat
