@@ -2,6 +2,7 @@
 # prediction expressions (including makepredictcall metadata), never the data.
 .np_formula_unwrap_prediction <- function(tt) {
   prediction <- attr(tt, "predvars")
+  variables <- attr(tt, "variables")
   owned <- is.call(prediction) && length(prediction) == 2L &&
     is.call(prediction[[1L]]) && length(prediction[[1L]]) == 3L &&
     identical(prediction[[1L]][[1L]], quote(utils::getFromNamespace)) &&
@@ -9,8 +10,40 @@
     is.character(prediction[[1L]][[3L]]) &&
     prediction[[1L]][[3L]] %in% c("np", "npRmpi")
   if (owned) prediction <- prediction[[2L]]
+  # Older conditional objects used base-R alignment scaffolding. Recognize
+  # only exact reconstructions from the stored variable expressions: arbitrary
+  # user prediction calls and their trained metadata are not ours to replace.
+  legacy <- FALSE
+  if (is.call(prediction) && identical(prediction[[1L]], quote(as.data.frame))) {
+    expected <- as.call(list(quote(as.data.frame),
+      as.call(c(list(quote(ts.intersect)), as.list(variables)[-1L]))))
+    legacy <- identical(prediction, expected)
+  } else if (is.call(prediction) && identical(prediction[[1L]], quote(`[`)) &&
+             length(prediction) == 4L && is.call(prediction[[2L]]) &&
+             identical(prediction[[2L]][[1L]], quote(cbind)) &&
+             length(prediction[[2L]]) >= 2L) {
+    frame <- prediction[[2L]][[2L]]
+    if (is.call(frame) && identical(frame[[1L]], quote(as.data.frame)) &&
+        length(frame) == 2L && is.call(frame[[2L]]) &&
+        identical(frame[[2L]][[1L]], quote(ts.intersect))) {
+      arguments <- as.list(variables)[-1L]
+      series <- as.list(frame[[2L]])[-1L]
+      is.ts <- vapply(arguments, function(x)
+        any(vapply(series, identical, logical(1L), x)), logical(1L))
+      if (any(is.ts) && any(!is.ts) && sum(is.ts) == length(series)) {
+        combined <- as.call(c(list(quote(cbind),
+          as.call(list(quote(as.data.frame),
+            as.call(c(list(quote(ts.intersect)), arguments[is.ts]))))),
+          arguments[!is.ts], list(check.rows = TRUE)))
+        index <- order(c(which(is.ts), which(!is.ts)))
+        expected <- substitute(COMBINED[, INDEX], list(COMBINED = combined, INDEX = index))
+        legacy <- identical(prediction, expected)
+      }
+    }
+  }
+  if (legacy) prediction <- variables
   list(prediction = if (is.null(prediction)) attr(tt, "variables") else prediction,
-       makepredictcall = is.null(attr(tt, "predvars")) || owned)
+       makepredictcall = is.null(attr(tt, "predvars")) || owned || legacy)
 }
 
 .np_formula_model_frame <- function(formula, data = NULL, subset, na.action,

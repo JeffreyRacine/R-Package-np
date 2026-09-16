@@ -1323,7 +1323,9 @@ npqreg.formula <-
     if (!is.null(data))
       tmf[["data"]] <- data
     mf.args <- as.list(tmf)[-1L]
-    umf <- tmf <- do.call(stats::model.frame, mf.args, envir = environment(tt))
+    umf <- tmf <- .np_bws_formula_model_frame(bws, mf.args,
+      data.override = !is.null(data))
+    tt <- attr(tmf, "terms")
 
     tydat <- tmf[, bws$variableNames[["response"]], drop = FALSE]
     txdat <- tmf[, bws$variableNames[["terms"]], drop = FALSE]
@@ -1333,7 +1335,7 @@ npqreg.formula <-
       tt <- .np_formula_conditional_rhs_terms(bws)
       npValidateNewdataFormula(newdata, tt, include.response = FALSE)
       umf.args <- list(formula = tt, data = newdata)
-      umf <- do.call(stats::model.frame, umf.args, envir = parent.frame())
+      umf <- do.call(.np_formula_model_frame, umf.args, envir = parent.frame())
       emf <- umf
       exdat <- emf[, bws$variableNames[["terms"]], drop = FALSE]
     }

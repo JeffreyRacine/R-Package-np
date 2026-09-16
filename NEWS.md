@@ -1,5 +1,10 @@
 # npRmpi 0.80-1
 
+* Conditional density/distribution formula fitting now reuses its prepared
+  training sample, avoiding repeated evaluation of predictor expressions.
+  Saved conditional formula terms retain portable prediction metadata for
+  refitting, quantile/mode evaluation and plotting.
+
 * Local-polynomial calculations now retain the same native polynomial-term
   order as np. This removes avoidable serial/MPI discrepancies that can be
   amplified in poorly conditioned fits; the solver and ridge policy are
