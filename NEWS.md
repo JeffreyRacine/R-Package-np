@@ -1,5 +1,10 @@
 # np 0.80-1
 
+* Fixed/geometric plot-bootstrap draws now use a replicate-ordered random
+  stream, independent of processing chunk size and MPI worker count. The
+  block law is unchanged, but historical seeded bands may change. The stream
+  follows the previous single-replicate ordering; IID/wild draws are unchanged.
+
 * Generalized-NN fitted-row categorical effects and their standard errors now
   retain training identity for local-linear and local-polynomial regression,
   as local-constant regression already does. Explicit evaluation effects keep

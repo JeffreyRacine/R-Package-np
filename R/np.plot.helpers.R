@@ -1706,6 +1706,39 @@
   )
 }
 
+.np_block_replicate_drawer <- function(n, n.sim, blocklen, sim, endcorr) {
+  ts.array <- utils::getFromNamespace("ts.array", "boot")
+  make.ends <- utils::getFromNamespace("make.ends", "boot")
+  function() {
+    # Complete a replicate before drawing the next: task/chunk size must not
+    # select the mapping from the caller's RNG stream to bootstrap samples.
+    if (identical(sim, "geom")) {
+      # Specialize boot::ts.array(R=1) without growing a matrix per block.
+      # Every block has at least one row, so n.sim bounds temporary storage.
+      # Preserve its rgeom calls, truncation and subsequent start draws.
+      lengths <- numeric(n.sim)
+      used <- 0L
+      total <- 0
+      while (total < n.sim) {
+        block.length <- min(1 + stats::rgeom(1L, 1 / blocklen), n.sim - total)
+        used <- used + 1L
+        lengths[used] <- block.length
+        total <- total + block.length
+      }
+      ends <- cbind(sample.int(if (isTRUE(endcorr)) n else n - blocklen + 1,
+                               used, replace = TRUE),
+                    lengths[seq_len(used)])
+    } else {
+      draw <- ts.array(n = n, n.sim = n.sim, R = 1L, l = blocklen,
+                       sim = sim, endcorr = isTRUE(endcorr))
+      ends <- cbind(as.vector(draw$starts), as.vector(draw$lengths))
+    }
+    inds <- apply(ends, 1L, make.ends, n)
+    if (is.list(inds)) inds <- unlist(inds)
+    as.integer(inds)[seq_len(n.sim)]
+  }
+}
+
 .np_block_counts_drawer <- function(n,
                                     B,
                                     blocklen,
@@ -1736,8 +1769,7 @@
     })
   }
 
-  ts.array <- utils::getFromNamespace("ts.array", "boot")
-  make.ends <- utils::getFromNamespace("make.ends", "boot")
+  draw.one <- .np_block_replicate_drawer(n, n.sim, blocklen, sim, endcorr)
 
   function(start, stopi) {
     start <- as.integer(start)
@@ -1746,36 +1778,9 @@
       stop("invalid block bootstrap chunk bounds")
 
     bsz <- stopi - start + 1L
-    ts.draws <- ts.array(
-      n = n,
-      n.sim = n.sim,
-      R = bsz,
-      l = blocklen,
-      sim = sim,
-      endcorr = isTRUE(endcorr)
-    )
-
-    starts <- as.matrix(ts.draws$starts)
-    lengths <- ts.draws$lengths
-    idx <- seq_len(bsz)
-    out <- matrix(0.0, nrow = n, ncol = length(idx))
-
-    for (jj in seq_along(idx)) {
-      rr <- idx[jj]
-      ends <- if (identical(sim, "geom")) {
-        cbind(starts[rr, ], lengths[rr, ])
-      } else {
-        cbind(starts[rr, ], lengths)
-      }
-
-      inds <- apply(ends, 1L, make.ends, n)
-      inds <- if (is.list(inds)) {
-        as.integer(unlist(inds)[seq_len(n.sim)])
-      } else {
-        as.integer(inds)[seq_len(n.sim)]
-      }
-      out[, jj] <- tabulate(inds, nbins = n)
-    }
+    out <- matrix(0.0, nrow = n, ncol = bsz)
+    for (jj in seq_len(bsz))
+      out[, jj] <- tabulate(draw.one(), nbins = n)
 
     out
   }
@@ -1811,8 +1816,7 @@
     })
   }
 
-  ts.array <- utils::getFromNamespace("ts.array", "boot")
-  make.ends <- utils::getFromNamespace("make.ends", "boot")
+  draw.one <- .np_block_replicate_drawer(n, n.sim, blocklen, sim, endcorr)
 
   function(start, stopi) {
     start <- as.integer(start)
@@ -1821,34 +1825,9 @@
       stop("invalid block bootstrap chunk bounds")
 
     bsz <- stopi - start + 1L
-    ts.draws <- ts.array(
-      n = n,
-      n.sim = n.sim,
-      R = bsz,
-      l = blocklen,
-      sim = sim,
-      endcorr = isTRUE(endcorr)
-    )
-
-    starts <- as.matrix(ts.draws$starts)
-    lengths <- ts.draws$lengths
     out <- matrix(NA_integer_, nrow = n.sim, ncol = bsz)
-
-    for (rr in seq_len(bsz)) {
-      ends <- if (identical(sim, "geom")) {
-        cbind(starts[rr, ], lengths[rr, ])
-      } else {
-        cbind(starts[rr, ], lengths)
-      }
-
-      inds <- apply(ends, 1L, make.ends, n)
-      inds <- if (is.list(inds)) {
-        as.integer(unlist(inds)[seq_len(n.sim)])
-      } else {
-        as.integer(inds)[seq_len(n.sim)]
-      }
-      out[, rr] <- inds
-    }
+    for (rr in seq_len(bsz))
+      out[, rr] <- draw.one()
 
     out
   }
@@ -11276,13 +11255,14 @@ compute.default.error.range <- function(center, err) {
     stopi <- min(B, start + chunk.controller$chunk.size - 1L)
     bsz <- stopi - start + 1L
     chunk.started <- .np_progress_now()
-    idx.chunk <- if (!is.null(index.drawer)) {
-      index.drawer(start, stopi)
-    } else {
+    idx.chunk <- if (is.null(index.drawer))
       matrix(sample.int(n = n, size = n * bsz, replace = TRUE), nrow = n)
+    for (jj in seq_len(bsz)) {
+      replicate <- start + jj - 1L
+      idx <- if (is.null(index.drawer)) idx.chunk[, jj] else
+        index.drawer(replicate, replicate)[, 1L]
+      tmat[replicate, ] <- fit_one(idx)
     }
-    for (jj in seq_len(bsz))
-      tmat[start + jj - 1L, ] <- fit_one(idx.chunk[, jj])
 
     progress <- .np_plot_progress_tick(state = progress, done = stopi)
     chunk.controller <- .np_plot_progress_chunk_observe(
