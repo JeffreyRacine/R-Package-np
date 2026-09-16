@@ -22,6 +22,16 @@ npindex <-
     npRejectLegacyBootstrapCount(names(args), "npindex")
     .np_singleindex_reject_higher_gradient_order(args, where = "npindex")
 
+    formula.input <- args[["formula", exact = TRUE]]
+    if (inherits(formula.input, "formula") && is.null(args$txdat)) {
+      args$formula <- NULL
+      if (!missing(bws)) args$.np_index_explicit_bws <- bws
+      args$B <- B
+      return(do.call(npindex.formula,
+                     c(list(bws = formula.input), args),
+                     envir = parent.frame()))
+    }
+
     if (!missing(bws)){
       if (length(args) > 0L &&
           inherits(args[[1L]], "formula") &&
@@ -63,9 +73,7 @@ npindex.formula <-
         se.type <- match.arg(se.type)
 
         mc <- match.call(expand.dots = FALSE)
-        tt <- terms(bws)
-        if (inherits(bws, "formula"))
-          tt <- .np_formula_aligned_terms(tt)
+        tt <- if (inherits(bws, "formula")) terms(bws, data = data) else terms(bws)
         tmf <- if (!is.null(bws$call)) {
           m <- match(c("formula", "data", "subset", "na.action"),
                      names(bws$call), nomatch = 0)
@@ -92,8 +100,11 @@ npindex.formula <-
           tydat <- .np_eval_bws_call_arg(bws, "ydat")
           response.name <- bws[["ynames"]]
           umf <- tmf <- NULL
+          attr(tt, "predvars") <- .np_formula_unwrap_prediction(tt)$prediction
         } else {
-          umf <- tmf <- do.call(stats::model.frame, mf.args, envir = environment(tt))
+          umf <- tmf <- .np_bws_formula_model_frame(bws, mf.args,
+            data.override = !missing(data) && !is.null(data))
+          tt <- attr(tmf, "terms")
           response.name <- attr(tmf, "names")[attr(attr(tmf, "terms"), "response")]
           tydat <- model.response(tmf)
           txdat <- tmf[, attr(attr(tmf, "terms"),"term.labels"), drop = FALSE]
@@ -103,31 +114,12 @@ npindex.formula <-
           if (!y.eval){
             npValidateNewdataFormula(newdata, tt, include.response = FALSE)
             tt <- delete.response(tt)
-
-            orig.ts <- .np_terms_ts_mask(terms_obj = tt, data = newdata)
-            
-            ## delete.response clobbers predvars, which is used for timeseries objects
-            ## so we need to reconstruct it
-
-            if(all(orig.ts)){
-              args <- (as.list(attr(tt, "variables"))[-1])
-              attr(tt, "predvars") <- as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), args))))
-            }else if(any(orig.ts)){
-              arguments <- (as.list(attr(tt, "variables"))[-1])
-              arguments.normal <- arguments[which(!orig.ts)]
-              arguments.timeseries <- arguments[which(orig.ts)]
-
-              ix <- sort(c(which(orig.ts),which(!orig.ts)),index.return = TRUE)$ix
-              attr(tt, "predvars") <- bquote(.(as.call(c(quote(cbind),as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments.timeseries)))),arguments.normal,check.rows = TRUE)))[,.(ix)])
-            }else{
-              attr(tt, "predvars") <- attr(tt, "variables")
-            }
           }
           
           if (y.eval)
             npValidateNewdataFormula(newdata, tt, include.response = TRUE)
           umf.args <- list(formula = tt, data = newdata)
-          umf <- do.call(stats::model.frame, umf.args, envir = parent.frame())
+          umf <- do.call(.np_formula_model_frame, umf.args, envir = parent.frame())
           emf <- umf
 
           if (y.eval)
