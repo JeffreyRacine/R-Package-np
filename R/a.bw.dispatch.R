@@ -284,10 +284,28 @@
   if (!any(is.ts)) return(values)
   series <- values[is.ts]
   if (length(series) > 1L) {
-    names(series) <- paste0(".series", seq_along(series))
-    series <- do.call(stats::ts.intersect, c(series, list(dframe = TRUE)))
-    if (is.null(series))
+    widths <- vapply(series, NCOL, integer(1))
+    # ts.intersect expands mts columns. Reassemble the original expressions
+    # before model.frame assigns its variable names; never recycle columns
+    # back into expression slots.
+    inputs <- series
+    names(inputs) <- paste0(".series", seq_along(inputs))
+    aligned <- do.call(stats::ts.intersect, inputs)
+    if (is.null(aligned))
       stop("time-series formula variables have no common observations", call. = FALSE)
+    if (NCOL(aligned) != sum(widths))
+      stop("time-series formula alignment changed the number of columns", call. = FALSE)
+    offsets <- c(0L, cumsum(widths))
+    series <- lapply(seq_along(series), function(i) {
+      columns <- offsets[[i]] + seq_len(widths[[i]])
+      if (is.matrix(series[[i]])) {
+        value <- aligned[, columns, drop = FALSE]
+        colnames(value) <- colnames(series[[i]])
+      } else {
+        value <- aligned[, columns]
+      }
+      value
+    })
   }
   values[is.ts] <- lapply(series, function(x) {
     attr(x, "tsp") <- NULL
