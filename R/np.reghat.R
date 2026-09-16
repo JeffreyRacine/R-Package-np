@@ -1951,7 +1951,8 @@ npreghat.formula <-
     if (!is.null(data))
       tmf[["data"]] <- data
     mf.args <- as.list(tmf)[-1L]
-    mf <- do.call(stats::model.frame, mf.args, envir = environment(tt))
+    mf <- do.call(.np_formula_model_frame, mf.args, envir = environment(tt))
+    tt <- attr(mf, "terms")
 
     y <- model.response(mf)
     txdat <- mf[, attr(attr(mf, "terms"), "term.labels"), drop = FALSE]
@@ -1959,8 +1960,8 @@ npreghat.formula <-
     has.eval <- !is.null(newdata)
     if (has.eval) {
       npValidateNewdataFormula(newdata, tt, include.response = FALSE)
-      et <- .np_formula_aligned_terms(delete.response(tt))
-      emf <- do.call(stats::model.frame, list(formula = et, data = newdata),
+      et <- delete.response(tt)
+      emf <- do.call(.np_formula_model_frame, list(formula = et, data = newdata),
                      envir = environment(tt))
       exdat <- emf[, attr(attr(emf, "terms"), "term.labels"), drop = FALSE]
     }

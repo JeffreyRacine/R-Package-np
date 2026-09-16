@@ -253,8 +253,12 @@ npreg.formula <-
     if (!missing(data) && !is.null(data))
       tmf[["data"]] <- data
     mf.args <- as.list(tmf)[-1L]
-    umf <- tmf <- .np_bws_formula_model_frame(
-      bws, mf.args, data.override = !missing(data) && !is.null(data))
+    frame.state <- dots[[".np.formula.state", exact = TRUE]]
+    dots$.np.formula.state <- NULL
+    umf <- tmf <- if (is.null(frame.state)) .np_bws_formula_model_frame(
+      bws, mf.args, data.override = !missing(data) && !is.null(data)) else
+        .np_formula_frame_take(frame.state)
+    tt <- attr(tmf, "terms")
 
     response.name <- attr(tmf, "names")[attr(attr(tmf, "terms"), "response")]
     tydat <- model.response(tmf)
@@ -264,25 +268,6 @@ npreg.formula <-
       if (!y.eval){
         npValidateNewdataFormula(newdata, tt, include.response = FALSE)
         tt <- delete.response(tt)
-
-        orig.ts <- .np_terms_ts_mask(terms_obj = tt, data = newdata)
-        
-        ## delete.response clobbers predvars, which is used for timeseries objects
-        ## so we need to reconstruct it
-
-        if(all(orig.ts)){
-          args <- (as.list(attr(tt, "variables"))[-1])
-          attr(tt, "predvars") <- as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), args))))
-        }else if(any(orig.ts)){
-          arguments <- (as.list(attr(tt, "variables"))[-1])
-          arguments.normal <- arguments[which(!orig.ts)]
-          arguments.timeseries <- arguments[which(orig.ts)]
-
-          ix <- sort(c(which(orig.ts),which(!orig.ts)),index.return = TRUE)$ix
-          attr(tt, "predvars") <- bquote(.(as.call(c(quote(cbind),as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments.timeseries)))),arguments.normal,check.rows = TRUE)))[,.(ix)])
-        }else{
-          attr(tt, "predvars") <- attr(tt, "variables")
-        }
       }
       
       if (y.eval)
@@ -290,7 +275,7 @@ npreg.formula <-
       umf.args <- list(formula = tt, data = newdata)
       if (explicit.eval.exclude)
         umf.args$na.action <- stats::na.exclude
-      umf <- do.call(stats::model.frame, umf.args, envir = parent.frame())
+      umf <- do.call(.np_formula_model_frame, umf.args, envir = parent.frame())
       emf <- umf
 
       if (y.eval)
@@ -308,6 +293,7 @@ npreg.formula <-
     } else {
       bws
     }
+    dots$.np.formula.state <- NULL
 
     reg.args <- list(txdat = txdat, tydat = tydat, bws = reg.bws)
     if (has.eval) {
@@ -330,7 +316,7 @@ npreg.formula <-
       ev$bws$rows.omit <- as.vector(attr(tmf, "na.action"))
       ev$bws$nobs.omit <- length(ev$bws$rows.omit)
     }
-    ev$call <- match.call(expand.dots = FALSE)
+    ev$call <- .np_formula_call_public(match.call(expand.dots = FALSE))
     environment(ev$call) <- parent.frame()
 
     if (length(response.name) == 1L && !is.na(response.name) && nzchar(response.name)) {
@@ -1180,6 +1166,11 @@ npreg.default <- function(bws, txdat, tydat, nomad = FALSE,
     } else {
       list(xdat = txdat, ydat = tydat)
     }
+    frame.state <- if ("formula" %in% names(bw.args)) new.env(parent = emptyenv()) else NULL
+    if (!is.null(frame.state)) {
+      dots$.np.formula.state <- frame.state
+      on.exit(rm(list = ls(frame.state, all.names = TRUE), envir = frame.state), add = TRUE)
+    }
     tbw <- do.call(
       npregbw,
       .np_public_dots_filter_args(c(bw.args, dots), "npregbw")
@@ -1248,6 +1239,15 @@ npreg.default <- function(bws, txdat, tydat, nomad = FALSE,
     names(sc.bw)[m.txy] <- nstxy[m.txy > 0]
   }
   sc.bw <- .np_public_dots_filter_call(sc.bw, "npregbw")
+  formula.input <- list(...)[["formula", exact = TRUE]]
+  frame.state <- if (!has.explicit.bws &&
+      (inherits(formula.input, "formula") ||
+       (!no.txdat && inherits(txdat, "formula"))))
+    new.env(parent = emptyenv()) else NULL
+  if (!is.null(frame.state)) {
+    sc.bw$.np.formula.state <- frame.state
+    on.exit(rm(list = ls(frame.state, all.names = TRUE), envir = frame.state), add = TRUE)
+  }
     
   use.outer.bandwidth.progress <- !.np_bw_call_uses_nomad_degree_search(
     sc.bw,
@@ -1268,6 +1268,8 @@ npreg.default <- function(bws, txdat, tydat, nomad = FALSE,
   }
   
   call.args <- list(bws = tbw)
+  if (!is.null(frame.state))
+    call.args$.np.formula.state <- frame.state
   if (no.bws) {
     call.args$txdat <- txdat
     call.args$tydat <- tydat
