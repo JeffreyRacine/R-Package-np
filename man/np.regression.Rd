@@ -363,6 +363,14 @@ Further arguments are passed to \code{\link{npregbw}} when bandwidths are comput
   Requesting or omitting standard errors does not change the computation
   of a requested categorical effect.
 
+  For generalized nearest-neighbor bandwidths, categorical effects at fitted
+  training rows retain that row's training identity when selecting the radius
+  for both endpoints, for all regression types, polynomial degrees and bases.
+  The identity is excluded only from radius selection, not from the fitted
+  response weights. Explicit evaluation data use external-query radii, even
+  when their coordinates equal training observations. Consequently fitted-row
+  and explicitly evaluated effects can differ under this bandwidth type.
+
   The training smoother and influence rows use the actual fitted basis
   and accepted regularized solve where needed. The residual-row norm is
   not generally \eqn{1-S_{ii}}; that identity requires a symmetric,

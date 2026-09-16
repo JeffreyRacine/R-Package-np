@@ -1,5 +1,10 @@
 # np 0.80-1
 
+* Generalized-NN fitted-row categorical effects and their standard errors now
+  retain training identity for local-linear and local-polynomial regression,
+  as local-constant regression already does. Explicit evaluation effects keep
+  external-query radii. Fitted means and continuous derivatives are unchanged.
+
 * Time-series formula alignment preserves the columns belonging to each
   matrix-valued expression, preventing a later formula variable from being
   replaced by a column of an earlier expression. Existing restrictions on
