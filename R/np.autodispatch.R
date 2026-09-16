@@ -1005,6 +1005,18 @@
   if (!is.null(lease.bindings) && length(lease.bindings))
     on.exit(get(".npRmpi_rm_existing", envir = asNamespace("npRmpi"), inherits = FALSE)(names(lease.bindings), envir = .GlobalEnv), add = TRUE)
 
+  # npksum's prepared inputs can share one existing object publication. Keep
+  # the individual bindings so evaluation and returned-call sanitization use
+  # exactly the same names as the unbundled route.
+  bundle.name <- payload[["prepublish.bundle", exact = TRUE]]
+  if (!is.null(bundle.name)) {
+    bundle <- get(bundle.name, envir = .GlobalEnv, inherits = FALSE)
+    if (!is.list(bundle) || !identical(names(bundle), prepublish.names))
+      stop("invalid npksum prepared-input bundle", call. = FALSE)
+    for (nm in prepublish.names)
+      .GlobalEnv[[nm]] <- bundle[[nm]]
+  }
+
   res <- .npRmpi_eval_scmd(call.obj, envir = .GlobalEnv)
   tmpreplace <- tmpvals
   if (!is.null(prepublish.names) && length(prepublish.names)) {
@@ -2759,6 +2771,12 @@
   rec.comm(.npRmpi_lease_drain_pending(comm = comm),
            note = "autodispatch.lease.drain")
   prepared <- .npRmpi_autodispatch_materialize_call(mc = mc, caller_env = caller_env, comm = comm)
+  bundle.name <- NULL
+  if (identical(sub("\\..*$", "", .npRmpi_autodispatch_call_name(mc)), "npksum") &&
+      length(prepared$prepublish) > 1L) {
+    bundle.name <- ".__npRmpi_autod_npksum_bundle"
+    prepared$tmpnames <- c(prepared$tmpnames, bundle.name)
+  }
   cleaned <- FALSE
   if (length(prepared$tmpnames))
     on.exit({
@@ -2774,8 +2792,10 @@
         prepared$prepublish[[nm]] <- .npRmpi_autodispatch_untag(prepared$prepublish[[nm]])
 
   if (length(prepared$prepublish)) {
-    for (nm in names(prepared$prepublish)) {
-      .GlobalEnv[[nm]] <- prepared$prepublish[[nm]]
+    publications <- if (is.null(bundle.name)) prepared$prepublish else
+      setNames(list(prepared$prepublish), bundle.name)
+    for (nm in names(publications)) {
+      .GlobalEnv[[nm]] <- publications[[nm]]
       rec.comm(.npRmpi_bcast_robj_by_name(nm, caller_env = .GlobalEnv),
                note = "mpi.bcast.Robj2slave")
     }
@@ -2806,6 +2826,7 @@
     tmpvals = prepared$tmpvals,
     tmpnames = prepared$tmpnames,
     prepublish.names = names(prepared$prepublish),
+    prepublish.bundle = bundle.name,
     opt.keys = opt.keys,
     opt.vals = opt.vals,
     opt.verify = opt.verify,

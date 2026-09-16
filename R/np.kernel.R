@@ -24,14 +24,6 @@ npksum.formula <-
     if (.npRmpi_npksum_should_localize(NULL, list(...)) &&
         !isTRUE(getOption("npRmpi.local.regression.mode", FALSE)))
       return(.npRmpi_with_local_regression(.npRmpi_eval_without_dispatch(match.call(), parent.frame())))
-    if (.npRmpi_autodispatch_active()) {
-      dispatch.call <- match.call()
-      if (!missing(subset))
-        dispatch.call[c("data", "subset")] <- .np_formula_subset_inputs(
-          if (missing(data)) NULL else data, substitute(subset), parent.frame())
-      return(.npRmpi_autodispatch_call(dispatch.call, parent.frame()))
-    }
-
     mf <- match.call(expand.dots = FALSE)
     m <- match(c("formula", "data", "subset", "na.action"),
                names(mf), nomatch = 0)
