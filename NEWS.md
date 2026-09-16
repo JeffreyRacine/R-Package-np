@@ -13,6 +13,8 @@
   without loading the package that created them.
   Unconditional refits, predictions and plots resolve function-local data
   through the retained bandwidth call, including after MPI fitting.
+  Automatic regression calls using `formula =` follow the same preparation
+  and fitting path as positional formulas.
 
 * Kernel-sum formulas and named unconditional density/distribution formulas
   prepare their inputs before worker dispatch. Caller-local variables and
