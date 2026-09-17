@@ -3,13 +3,13 @@
 # This protocol does not recover a lost rank or a failed native MPI primitive.
 .npRmpi_fanout_state <- new.env(parent = emptyenv())
 
-.npRmpi_fanout_native <- function(action, comm, ...) {
+.npRmpi_fanout_native <- function(action, comm, arg1 = NULL, arg2 = NULL) {
   comm <- as.integer(comm)
   # Literal entry points keep registration/arity checking visible to R CMD
   # check. This dispatcher accepts only the five private protocol actions.
   switch(action,
-    begin = .Call("np_mpi_fanout_begin", comm, ..., PACKAGE = "npRmpi"),
-    send = .Call("np_mpi_fanout_send", comm, ..., PACKAGE = "npRmpi"),
+    begin = .Call("np_mpi_fanout_begin", comm, arg1, PACKAGE = "npRmpi"),
+    send = .Call("np_mpi_fanout_send", comm, arg1, arg2, PACKAGE = "npRmpi"),
     poll = .Call("np_mpi_fanout_poll", comm, PACKAGE = "npRmpi"),
     finish = .Call("np_mpi_fanout_finish", comm, PACKAGE = "npRmpi"),
     owner = .Call("np_mpi_fanout_owner", comm, PACKAGE = "npRmpi"),
