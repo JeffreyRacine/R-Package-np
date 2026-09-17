@@ -1719,7 +1719,8 @@ npreghat.formula <-
     if (!is.null(data))
       tmf[["data"]] <- data
     mf.args <- as.list(tmf)[-1L]
-    mf <- do.call(.np_formula_model_frame, mf.args, envir = environment(tt))
+    mf <- .np_bws_formula_model_frame(bws, mf.args,
+      data.override = !missing(data) && !is.null(data))
     tt <- attr(mf, "terms")
 
     y <- model.response(mf)
