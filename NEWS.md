@@ -1,5 +1,9 @@
 # npRmpi 0.80-1
 
+* Regression hat/significance helpers and smooth-coefficient plots now resolve
+  saved training-data expressions in their original call owner, including
+  bandwidth objects constructed inside wrappers.
+
 * Copula formula construction and fitting now share the same prepared sample,
   including transformed, subsetted and time-aligned inputs. Automatic grid
   dimension validation still precedes bandwidth search.
