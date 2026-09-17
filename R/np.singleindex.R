@@ -251,7 +251,7 @@ npindex.call <-
 }
 
 .np_index_formula_reentry_rhs_terms <- function(formula, xdat) {
-  delete.response(terms(formula, data = toFrame(xdat)))
+  .np_formula_validate_terms(delete.response(terms(formula, data = toFrame(xdat))))
 }
 
 .np_index_formula_reentry_response_name <- function(formula) {

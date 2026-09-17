@@ -317,6 +317,7 @@
 }
 
 .np_formula_aligned_terms <- function(tt) {
+  .np_formula_validate_terms(tt)
   # A namespace-qualified prediction expression survives saved-bandwidth
   # refits/newdata without capturing a caller frame or the training data.
   attr(tt, "predvars") <- substitute(
@@ -329,6 +330,7 @@
 # response-bearing terms. Drop their response before rebuilding prediction
 # expressions; reparsing the original formula would lose a fitted `.` expansion.
 .np_formula_conditional_rhs_terms <- function(bws) {
+  .np_formula_validate_syntax(bws$formula, conditional.response = TRUE)
   tt <- bws$terms
   attr(tt, "predvars") <- .np_formula_unwrap_prediction(tt)$prediction
   response <- match(bws$variableNames[["response"]], attr(tt, "term.labels"))

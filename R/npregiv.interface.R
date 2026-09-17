@@ -97,7 +97,7 @@
       ), call. = FALSE)
     }
     role.formula <- .np_iv_make_formula(rhs = expr, env = env)
-    role.terms <- terms(role.formula)
+    role.terms <- .np_formula_validate_terms(terms(role.formula))
     labels <- attr(role.terms, "term.labels")
     if (!length(labels)) {
       stop(sprintf("%s formula partition '%s' is empty", where, role.names[[i]]),

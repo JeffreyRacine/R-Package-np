@@ -863,6 +863,15 @@ or standard-deviation factors.
   \code{y1} and \code{y2} conditioned on \code{x1} and \code{x2} are to
   be estimated. See below for further examples. 
 
+  Response expressions such as \code{log(y)} or \code{I(y^2)} are not
+  supported on the left-hand side and are rejected. Instead create, for
+  example, \code{data$log_y <- log(data$y)} and use \code{log_y ~ x}, or
+  supply the transformed response through \code{ydat}. Right-hand-side
+  \code{offset()} special terms are also unsupported and are rejected rather
+  than omitted. These checks do not evaluate response expressions, alter
+  stored/dynamically constructed formulas, or change supported explanatory
+  transformations.
+
   A variety of kernels may be specified by the user. Kernels implemented
   for continuous data types include the second, fourth, sixth, and eighth
   order Gaussian and Epanechnikov kernels, and the uniform
