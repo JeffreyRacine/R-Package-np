@@ -1,5 +1,8 @@
 # npRmpi 0.80-1
 
+* Vector-quantile least-squares predictions prepare formula newdata once and
+  share that same evaluation sample across quantiles.
+
 * Regression hat/significance helpers and smooth-coefficient plots now resolve
   saved training-data expressions in their original call owner, including
   bandwidth objects constructed inside wrappers.
