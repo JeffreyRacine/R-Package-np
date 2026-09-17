@@ -600,7 +600,7 @@ npcdens.conbandwidth <- function(bws,
 
 
 npcdens.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
-  sc <- sys.call()
+  sc <- .np_formula_expand_call(sys.call(), parent.frame())
   sc.names <- names(sc)
   nomad <- npValidateNomadControl(nomad, "nomad")
 
@@ -678,13 +678,16 @@ npcdens.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
     if (use.outer.bandwidth.progress) {
       .np_progress_select_bandwidth_enhanced(
         "Selecting conditional density bandwidth",
-        .np_eval_bw_call(sc.bw, caller_env = parent.frame())
+        .np_eval_bw_call(sc.bw, caller_env = parent.frame(),
+                        formula.value = .np_formula_value(formula.input, bws, txdat))
       )
     } else {
-      .np_eval_bw_call(sc.bw, caller_env = parent.frame())
+        .np_eval_bw_call(sc.bw, caller_env = parent.frame(),
+                        formula.value = .np_formula_value(formula.input, bws, txdat))
     }
   } else {
-    .np_eval_bw_call(sc.bw, caller_env = parent.frame())
+        .np_eval_bw_call(sc.bw, caller_env = parent.frame(),
+                        formula.value = .np_formula_value(formula.input, bws, txdat))
   }
 
   call.args <- list(bws = tbw)

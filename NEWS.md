@@ -1,5 +1,10 @@
 # np 0.80-1
 
+* Formula constructors supplied inline are evaluated once per invocation,
+  including the one-call bandwidth/fit route. Existing formula values and
+  literal formulas remain supported; callers need not construct a formula
+  in a separate statement. Forwarded calls retain lazy subset evaluation.
+
 * Streamed non-studentized categorical significance-test bootstrap statistics
   now use the same generalized-nearest-neighbour training-row geometry as
   the observed statistic and public regression refits. This can change

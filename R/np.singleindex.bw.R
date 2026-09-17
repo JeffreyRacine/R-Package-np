@@ -6,7 +6,8 @@ npindexbw <-
     .np_validate_public_dots(mc[["..."]], "npindexbw")
     target <- .np_bw_dispatch_target(dots = mc$...,
                                      data_arg_names = c("xdat", "ydat"),
-                                     eval_env = parent.frame())
+                                     eval_env = parent.frame(),
+                                     promise.frame = environment())
     UseMethod("npindexbw", target)
   }
 
@@ -20,6 +21,7 @@ npindexbw.formula <-
     mf[[1]] <- as.name("model.frame")
 
     mf.args <- as.list(mf[-1L])
+    mf.args[["formula"]] <- substitute(quote(VALUE), list(VALUE = formula))
     mf <- do.call(.np_formula_model_frame, mf.args, envir = parent.frame())
 
     ydat <- model.response(mf)

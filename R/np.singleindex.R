@@ -305,7 +305,7 @@ npindex.call <-
 
 npindex.default <- function(bws, txdat, tydat, nomad = FALSE,
                             se = TRUE, ..., se.type = c("asymptotic", "bootstrap")){
-  sc <- sys.call()
+  sc <- .np_formula_expand_call(sys.call(), parent.frame())
   sc.names <- names(sc)
   nomad <- npValidateNomadControl(nomad, "nomad")
   dots <- if (!missing(bws) && inherits(bws, "formula"))
@@ -411,10 +411,12 @@ npindex.default <- function(bws, txdat, tydat, nomad = FALSE,
     if (use.outer.bandwidth.progress) {
       .np_progress_select_bandwidth_enhanced(
         "Selecting single-index bandwidth",
-        .np_eval_bw_call(sc.bw, caller_env = parent.frame())
+        .np_eval_bw_call(sc.bw, caller_env = parent.frame(),
+                        formula.value = .np_formula_value(dots[["formula", exact = TRUE]], bws, txdat))
       )
     } else {
-      .np_eval_bw_call(sc.bw, caller_env = parent.frame())
+        .np_eval_bw_call(sc.bw, caller_env = parent.frame(),
+                        formula.value = .np_formula_value(dots[["formula", exact = TRUE]], bws, txdat))
     }
   } else {
     bws
