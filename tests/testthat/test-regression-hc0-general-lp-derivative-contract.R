@@ -1,3 +1,20 @@
+h6_extract_lp_owner <- function(source) {
+  start <- gregexpr(
+    "static SEXP np_regression_general_lp_fit_execute(void *data)",
+    source, fixed = TRUE
+  )[[1L]]
+  finish <- gregexpr(
+    "static int np_regression_general_lp_fit(\n",
+    source, fixed = TRUE
+  )[[1L]]
+  if (length(start) != 1L || start[[1L]] < 1L ||
+      length(finish) != 1L || finish[[1L]] < 1L)
+    stop("H6 owner requires unique start and finish anchors", call. = FALSE)
+  if (finish[[1L]] <= start[[1L]])
+    stop("H6 owner anchors are out of order", call. = FALSE)
+  substr(source, start[[1L]], finish[[1L]] - 1L)
+}
+
 h6_explicit_lp_bw <- function(xdat, ydat, bws, bwtype = "fixed",
                               degree = 2L, basis = "glp",
                               bernstein = FALSE, ...) {
@@ -433,19 +450,7 @@ test_that("H6 batches adjoint directions without another covariance owner", {
     readLines(test_path("..", "..", "src", "jksum.c"), warn = FALSE),
     collapse = "\n"
   )
-  start <- regexpr(
-    "static SEXP np_regression_general_lp_fit_execute(void *data)",
-    source,
-    fixed = TRUE
-  )[[1L]]
-  finish <- regexpr(
-    "static int np_regression_general_lp_fit(\n",
-    substring(source, start),
-    fixed = TRUE
-  )[[1L]]
-  expect_gt(start, 0L)
-  expect_gt(finish, 0L)
-  owner <- substr(source, start, start + finish - 2L)
+  owner <- h6_extract_lp_owner(source)
 
   expect_match(
     owner,

@@ -190,7 +190,7 @@ test_that("distribution degree search owns automatic beta placeholders", {
     fixed = TRUE
   )[[1L]]
   expect_gt(search_start, 0L)
-  search_text <- substring(distribution_r, search_start)
+  search_text <- substring(distribution_r, search_start, nchar(distribution_r))
   expect_match(
     search_text,
     paste0(

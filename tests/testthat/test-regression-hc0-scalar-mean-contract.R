@@ -530,7 +530,7 @@ test_that("HC0 activation remains private and linear-memory", {
     source,
     fixed = TRUE
   )
-  hc0.tail <- substring(source, hc0.start)
+  hc0.tail <- substring(source, hc0.start, nchar(source))
   hc0.end <- regexpr(
     "np_progress_fit_set_offset(num_obs_train_extern);",
     hc0.tail,

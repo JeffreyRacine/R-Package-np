@@ -13,12 +13,14 @@ np_conditional_density_owner_source <- function() {
 }
 
 np_conditional_density_owner_function <- function(source, name) {
-  start <- regexpr(
+  start <- gregexpr(
     paste0("static void\\s+", name, "\\s*\\([^;]*\\)\\s*\\{"),
     source, perl = TRUE
-  )
+  )[[1L]]
+  if (length(start) != 1L || start[[1L]] < 1L)
+    stop("expected one C function definition for ", name, call. = FALSE)
   expect_gt(start[[1L]], 0L)
-  tail <- substring(source, start[[1L]])
+  tail <- substring(source, start[[1L]], nchar(source))
   open <- regexpr("\\{", tail, perl = TRUE)[[1L]]
   expect_gt(open, 0L)
   chars <- strsplit(tail, "", fixed = TRUE)[[1L]]
@@ -104,7 +106,7 @@ test_that("ordinary and resident conditional-density paths share preparation", {
     source, perl = TRUE
   )
   expect_gt(evaluator_start[[1L]], 0L)
-  evaluator_tail <- substring(source, evaluator_start[[1L]])
+  evaluator_tail <- substring(source, evaluator_start[[1L]], nchar(source))
   evaluator_end <- regexpr(
     "\\n}\\n\\nSEXP C_np_density_conditional_prepared_eval",
     evaluator_tail, perl = TRUE

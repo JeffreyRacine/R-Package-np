@@ -253,6 +253,7 @@ test_that("H3 keeps derivative HC0 streamed and scalar-only", {
   )
   expect_false(grepl("npreghat", substring(
     source,
-    regexpr("void np_regression(", source, fixed = TRUE)
+    regexpr("void np_regression(", source, fixed = TRUE),
+    nchar(source)
   ), fixed = TRUE))
 })

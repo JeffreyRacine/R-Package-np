@@ -22,7 +22,7 @@ test_that("npcdist categorical profile CVLS owns a bounded tri-state workspace",
   )[[1L]]
   start <- tail(starts[starts > 0L], 1L)
   expect_gt(start, 0L)
-  tail <- substring(source, start)
+  tail <- substring(source, start, nchar(source))
   finish <- regexpr(
     "\\nint np_conditional_distribution_cvls_lp_stream\\(",
     tail

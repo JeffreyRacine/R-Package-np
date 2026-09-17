@@ -11,22 +11,24 @@ np_regression_prepared_function <- function(source, name, return_type = "void") 
     perl = TRUE
   )[[1L]]
   expect_false(identical(markers, -1L))
-  marker <- NA_integer_
-  open <- NA_integer_
+  definitions <- integer()
+  openings <- integer()
   for (candidate in markers) {
-    tail <- substring(source, candidate)
+    tail <- substring(source, candidate, nchar(source))
     candidate_open <- regexpr("\\{", tail, perl = TRUE)[[1L]]
     candidate_semi <- regexpr(";", tail, fixed = TRUE)[[1L]]
     if (candidate_open > 0L &&
         (candidate_semi <= 0L || candidate_open < candidate_semi)) {
-      marker <- candidate
-      open <- candidate_open
-      break
+      definitions <- c(definitions, candidate)
+      openings <- c(openings, candidate_open)
     }
   }
-  expect_false(is.na(marker))
-  tail <- substring(source, marker)
-  chars <- strsplit(substring(tail, open), "", fixed = TRUE)[[1L]]
+  if (length(definitions) != 1L || definitions[[1L]] < 1L)
+    stop("expected one C function definition for ", name, call. = FALSE)
+  marker <- definitions[[1L]]
+  open <- openings[[1L]]
+  tail <- substring(source, marker, nchar(source))
+  chars <- strsplit(substring(tail, open, nchar(tail)), "", fixed = TRUE)[[1L]]
   depth <- 0L
   for (i in seq_along(chars)) {
     if (chars[[i]] == "{")

@@ -49,7 +49,7 @@ test_that("the generic scalar fit has one complete unwind owner", {
   expect_gt(replay.end, replay.start)
   replay <- substr(owner, replay.start, replay.end - 1L)
   outside.replay <- paste(substr(owner, 1L, replay.start - 1L),
-                           substring(owner, replay.end))
+                           substring(owner, replay.end, nchar(owner)))
   expect_false(grepl("R_alloc(", outside.replay, fixed = TRUE))
   expect_false(grepl("R_allocLD(", outside.replay, fixed = TRUE))
   expect_identical(fixed_occurrences(replay, "R_alloc("), 2L)
