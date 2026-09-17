@@ -58,7 +58,9 @@ MPI startup, shutdown, worker-count, and worker-status controls.
   \item{sleep}{Polling sleep interval (seconds) for nonblocking attach-mode
     worker-loop receives.}
   \item{quiet}{Logical; suppress host-info printing when \code{FALSE}.}
-  \item{force}{Logical; when \code{TRUE}, force a hard shutdown of slave daemons.}
+  \item{force}{Logical; when \code{TRUE}, close slave daemons instead of keeping
+    them for reuse, resuming pending cooperative cleanup if necessary. This is
+    not a process kill or an MPI abort; see Details.}
   \item{dellog}{Logical; when \code{TRUE}, remove slave log files (if applicable).}
   \item{\dots}{Additional arguments passed to \code{mpi.spawn.Rslaves()}.}
 }
@@ -203,9 +205,30 @@ caught, the existing pool remains available for subsequent MPI-backed work.
 Consequently, interrupt delivery may not be immediate during a long objective
 evaluation or solve. This coordination adds no MPI commands or payloads.
 
-If an MPI-fanned bootstrap dispatch fails or times out, the current MPI
-session may no longer be usable. Restart R before performing further
-MPI-backed computations.
+Bootstrap fan-out and MPI apply collectors use a separate cooperative
+cancellation protocol. After a master-side error, interrupt or dispatch
+timeout, workers stop at their existing task or bootstrap-chunk boundaries;
+the current task may finish first. Outstanding replies are drained, no partial
+result is returned, and the original condition is signalled. Once cleanup
+completes, the existing pool can be reused.
+
+A second interrupt during cleanup returns control with the pool explicitly
+quarantined. The existing \code{npRmpi.session.recv.timeout} option (or
+\code{NP_RMPI_SESSION_RECV_TIMEOUT_SEC} environment setting) also limits each
+cleanup attempt when positive. The unchanged zero default specifies no
+automatic deadline, not uninterruptible cleanup. The cleanup clock starts
+afresh for each explicit attempt and is not reset by incoming replies.
+
+A quarantined pool rejects new work. An explicit
+\code{npRmpi.quit(force=TRUE)} can resume cooperative cleanup and close the pool
+only after pending communication is retired. An active call cannot close its
+own pool, and exit/unload finalizers do not silently resume quarantined work.
+Cancellation and quarantine notices are shown even when \code{np.messages=FALSE}.
+No automatic MPI abort or process termination is performed. These safeguards
+do not recover a lost rank, a failed native MPI primitive or an unmatched
+collective inside a user task; an actual native transport failure makes the
+session unusable. Interrupts and cleanup budgets are serviced between native
+calls, not inside an MPI call that does not return.
 
 Advanced diagnostic option: setting environment variable
 \code{NP_RMPI_SKIP_INIT} to a non-empty value before loading \pkg{npRmpi}

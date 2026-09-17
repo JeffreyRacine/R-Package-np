@@ -2678,6 +2678,7 @@
                                           caller_env = parent.frame(),
                                           comm = 1L,
                                           warn_nested = FALSE) {
+  .npRmpi_fanout_assert_idle(comm)
   mc <- .npRmpi_autodispatch_expand_dots_call(mc)
   t.start <- proc.time()
   start.wall <- Sys.time()

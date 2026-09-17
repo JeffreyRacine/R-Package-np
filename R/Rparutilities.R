@@ -460,6 +460,7 @@ mpi.remote.exec <- function(cmd, ...,  simplify=TRUE, comm=1, ret=TRUE){
 }
 
 mpi.close.Rslaves <- function(dellog=TRUE, comm=1, force=FALSE){
+    .npRmpi_fanout_quiesce(comm, resume = isTRUE(force))
     if (mpi.comm.size(comm) < 2){
     err <-paste("It seems no slaves running on comm", comm)
     stop(err)

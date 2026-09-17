@@ -12,10 +12,18 @@
 * Bootstrap fan-out and the MPI apply collectors drain outstanding worker
   replies before rethrowing supported master-side errors, interrupts or
   dispatch timeouts. Operation identities prevent stale replies from being
-  published by a later call, and shutdown waits for transport to become
-  quiescent. Recovery can wait for already-running finite tasks to finish;
-  it does not recover lost ranks or failed native MPI operations. An existing
-  visible progress owner reports cleanup without implying completed inference.
+  published by a later call. Cancellation now stops workers at existing task
+  or bootstrap-chunk boundaries; an already-running task may finish first.
+  A second interrupt during cleanup returns control with the pool explicitly
+  quarantined, without returning partial results or dispatching new work.
+  The existing positive session receive timeout also bounds each cleanup
+  attempt; its zero default remains unchanged. Explicit
+  `npRmpi.quit(force=TRUE)` can resume an abandoned cooperative cleanup and
+  close the pool once all pending communication is retired. Finalizers do
+  not silently resume quarantined work, and no automatic abort is used.
+  Lost ranks and failed native MPI operations remain outside this recovery
+  guarantee. An existing visible progress owner reports cleanup without
+  implying completed inference.
 
 * Streamed non-studentized categorical significance-test bootstrap statistics
   now use the same generalized-nearest-neighbour training-row geometry as

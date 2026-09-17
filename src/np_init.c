@@ -154,7 +154,18 @@ extern SEXP mpi_testall(SEXP);
 extern SEXP mpi_testsome(SEXP);
 extern SEXP mpi_waitsome(SEXP);
 
+extern SEXP np_mpi_fanout_begin(SEXP, SEXP);
+extern SEXP np_mpi_fanout_send(SEXP, SEXP, SEXP);
+extern SEXP np_mpi_fanout_poll(SEXP);
+extern SEXP np_mpi_fanout_finish(SEXP);
+extern SEXP np_mpi_fanout_owner(SEXP);
+
 static const R_CallMethodDef CallEntries[] = {
+    {"np_mpi_fanout_begin", (DL_FUNC) &np_mpi_fanout_begin, 2},
+    {"np_mpi_fanout_send", (DL_FUNC) &np_mpi_fanout_send, 3},
+    {"np_mpi_fanout_poll", (DL_FUNC) &np_mpi_fanout_poll, 1},
+    {"np_mpi_fanout_finish", (DL_FUNC) &np_mpi_fanout_finish, 1},
+    {"np_mpi_fanout_owner", (DL_FUNC) &np_mpi_fanout_owner, 1},
     {"C_np_nomad_r_callback_native_search",(DL_FUNC) &C_np_nomad_r_callback_native_search,11},
     {"C_np_dim_basis",                 (DL_FUNC) &C_np_dim_basis,                  6},
     {"C_np_density",                   (DL_FUNC) &C_np_density,                   17},

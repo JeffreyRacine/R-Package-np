@@ -16,6 +16,7 @@
  */
 
 #include "Rmpi.h"
+#include "fanout_control.h"
 #include <R_ext/Memory.h>
 #include <limits.h>
 
@@ -232,8 +233,10 @@ SEXP mpi_finalize(void){
 		return AsInt(0);
 	if (initialized && MPI_Finalized(&finalized) != MPI_SUCCESS)
 		return AsInt(0);
-	if (initialized && !finalized)
+	if (initialized && !finalized) {
+		np_fanout_control_finalize();
 		finalize_status=MPI_Finalize();
+	}
 	if (finalize_status != MPI_SUCCESS)
 		return AsInt(0);
 
@@ -1123,8 +1126,31 @@ SEXP mpi_comm_c2f(SEXP sexp_comm){
   return AsInt(MPI_Comm_c2f(comm[c]));
 }
 
+/* Private fixed-size control bridge; never accepts an R buffer for MPI use. */
+SEXP np_mpi_fanout_begin(SEXP sexp_comm, SEXP owner) {
+  int c = rmpi_require_comm_index(sexp_comm, "communicator");
+  return np_fanout_control_begin(comm[c], owner);
+}
+SEXP np_mpi_fanout_send(SEXP sexp_comm, SEXP rank, SEXP command) {
+  int c = rmpi_require_comm_index(sexp_comm, "communicator");
+  return np_fanout_control_send(comm[c], Rf_asInteger(rank), Rf_asInteger(command));
+}
+SEXP np_mpi_fanout_poll(SEXP sexp_comm) {
+  int c = rmpi_require_comm_index(sexp_comm, "communicator");
+  return np_fanout_control_poll(comm[c]);
+}
+SEXP np_mpi_fanout_finish(SEXP sexp_comm) {
+  int c = rmpi_require_comm_index(sexp_comm, "communicator");
+  return np_fanout_control_finish(comm[c]);
+}
+SEXP np_mpi_fanout_owner(SEXP sexp_comm) {
+  int c = rmpi_require_comm_index(sexp_comm, "communicator");
+  return np_fanout_control_owner(comm[c]);
+}
+
 SEXP mpi_comm_free(SEXP sexp_comm){
 	int commn = rmpi_require_comm_index(sexp_comm, "communicator");
+	np_fanout_control_close(comm[commn]);
 	return AsInt(erreturn(mpi_errhandler(MPI_Comm_free(&comm[commn]))));
 }
 
@@ -1208,6 +1234,7 @@ SEXP mpi_is_master(void){
 
 SEXP mpi_comm_disconnect(SEXP sexp_comm){
 	int commn = rmpi_require_comm_index(sexp_comm, "communicator");
+	np_fanout_control_close(comm[commn]);
 	return AsInt(erreturn(mpi_errhandler(MPI_Comm_disconnect(&comm[commn]))));
 }
 #endif

@@ -288,6 +288,7 @@ mpi.bcast <- function (x, type, rank = 0, comm = 1, buffunit=100) {
 #}
 
 mpi.bcast.cmd <- function (cmd=NULL, ..., rank=0, comm=1, nonblock=FALSE, sleep=0.1, caller.execute = FALSE){
+	.npRmpi_fanout_assert_idle(comm, activation = TRUE)
 	myrank=mpi.comm.rank(comm)
     if(myrank == rank){
       scmd <- substitute(cmd)

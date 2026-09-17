@@ -10,6 +10,14 @@ fanout_contract_tx <- function(scheduler = "dynamic", n = 3L) {
   tx
 }
 
+fanout_contract_accept <- function() {
+  accept <- getFromNamespace(".npRmpi_fanout_accept", "npRmpi")
+  env <- new.env(parent = environment(accept))
+  env$.npRmpi_fanout_native <- function(...) NULL
+  environment(accept) <- env
+  accept
+}
+
 test_that("a real fanout SIGINT is not swallowed by ordinary error handlers", {
   skip_on_cran()
   skip_if(Sys.getenv("NP_RMPI_RUN_FANOUT_SIGINT_TESTS") != "TRUE",
@@ -61,8 +69,66 @@ test_that("a real fanout SIGINT is not swallowed by ordinary error handlers", {
               info = paste(result$output, collapse = "\n"))
 })
 
+test_that("private native actions expose literal registered calls", {
+  bridge <- getFromNamespace(".npRmpi_fanout_native", "npRmpi")
+  env <- new.env(parent = environment(bridge))
+  env$.Call <- function(name, ...) list(name = name, args = list(...))
+  environment(bridge) <- env
+  for (action in c("begin", "send", "poll", "finish", "owner")) {
+    args <- switch(action, begin = list(new.env()), send = list(1L, 2L), list())
+    value <- do.call(bridge, c(list(action, 7), args))
+    expect_identical(value$name, paste0("np_mpi_fanout_", action))
+    expect_identical(value$args, c(list(7L), args, list(PACKAGE = "npRmpi")))
+  }
+  expect_error(bridge("unknown", 7L), "unknown private")
+})
+
+test_that("an abandoned cooperative cleanup is retained and explicitly closable", {
+  skip_on_cran()
+  skip_if(Sys.getenv("NP_RMPI_RUN_FANOUT_SIGINT_TESTS") != "TRUE",
+          "opt-in cancellation subprocess")
+  env <- npRmpi_subprocess_env()
+  skip_if(is.null(env), "installed npRmpi unavailable")
+  result <- npRmpi_run_rscript_subprocess(c(
+    "suppressPackageStartupMessages(library(npRmpi))",
+    "npRmpi.init(nslaves=1, quiet=TRUE)",
+    "ns <- asNamespace('npRmpi')",
+    "bind <- function(n, x) { unlockBinding(n, ns); assign(n, x, ns); lockBinding(n, ns) }",
+    "mpi.bcast.cmd(local({",
+    "  ns <- asNamespace('npRmpi')",
+    "  original <- get('.npRmpi_fanout_worker_terminal', ns)",
+    "  delayed <- function(...) { Sys.sleep(.4); original(...) }",
+    "  unlockBinding('.npRmpi_fanout_worker_terminal', ns)",
+    "  assign('.npRmpi_fanout_worker_terminal', delayed, ns)",
+    "  lockBinding('.npRmpi_fanout_worker_terminal', ns)",
+    "}))",
+    "receive <- get('.npRmpi_fanout_receive', ns)",
+    "bind('.npRmpi_fanout_receive', function(tx, ...) {",
+    "  if (tx$phase == 'active') stop('collector witness')",
+    "  receive(tx, ...)",
+    "})",
+    "options(npRmpi.session.recv.timeout=.01, np.messages=FALSE)",
+    "e <- tryCatch(npRmpi:::mpi.iapplyLB(1:8, identity), error=identity)",
+    "stopifnot(identical(conditionMessage(e), 'collector witness'))",
+    "bind('.npRmpi_fanout_receive', receive)",
+    "tx <- get('.npRmpi_fanout_retained', ns)(1L)",
+    "stopifnot(tx$phase == 'quarantined', !tx$owner.active)",
+    "gc(FALSE)",
+    "stopifnot(identical(.Call('np_mpi_fanout_owner', 1L, PACKAGE='npRmpi'), tx))",
+    "e <- tryCatch(npRmpi:::mpi.iapplyLB(1:8, identity), error=identity)",
+    "stopifnot(inherits(e, 'error'))",
+    "options(npRmpi.session.recv.timeout=3)",
+    "npRmpi.quit(force=TRUE)",
+    "stopifnot(is.null(get('.npRmpi_fanout_retained', ns)(1L)))",
+    "cat('COOPERATIVE_QUARANTINE_EXPLICIT_CLOSE_OK\\n')"
+  ), timeout = 20L, env = env, cleanup = FALSE)
+  expect_identical(result$status, 0L, info = paste(result$output, collapse = "\n"))
+  expect_true(any(grepl("COOPERATIVE_QUARANTINE_EXPLICIT_CLOSE_OK", result$output, fixed = TRUE)),
+              info = paste(result$output, collapse = "\n"))
+})
+
 test_that("fanout results and receipts have distinct identity and state duties", {
-  accept <- getFromNamespace(".npRmpi_fanout_accept", "npRmpi")
+  accept <- fanout_contract_accept()
   envelope <- getFromNamespace(".npRmpi_fanout_envelope", "npRmpi")
   header <- getFromNamespace(".npRmpi_fanout_header", "npRmpi")
   tx <- fanout_contract_tx()
@@ -79,10 +145,13 @@ test_that("fanout results and receipts have distinct identity and state duties",
   expect_identical(accept(tx, envelope(header(tx), "terminal"), 1L, tx$control)$kind, "terminal")
   expect_identical(tx$rank, "terminal")
   expect_error(accept(tx, envelope(header(tx), "terminal"), 1L, tx$control), "unexpected")
+  expect_identical(accept(tx, envelope(header(tx), "closed"), 1L, tx$control)$kind, "closed")
+  expect_identical(tx$rank, "closed")
+  expect_error(accept(tx, envelope(header(tx), "closed"), 1L, tx$control), "unexpected")
 })
 
 test_that("foreign, malformed and task-tag-colliding replies cannot publish", {
-  accept <- getFromNamespace(".npRmpi_fanout_accept", "npRmpi")
+  accept <- fanout_contract_accept()
   envelope <- getFromNamespace(".npRmpi_fanout_envelope", "npRmpi")
   header <- getFromNamespace(".npRmpi_fanout_header", "npRmpi")
   tx <- fanout_contract_tx(n = 18432L)
@@ -110,7 +179,7 @@ test_that("foreign, malformed and task-tag-colliding replies cannot publish", {
 })
 
 test_that("consumed control receipts remain committed after collector failure", {
-  accept <- getFromNamespace(".npRmpi_fanout_accept", "npRmpi")
+  accept <- fanout_contract_accept()
   envelope <- getFromNamespace(".npRmpi_fanout_envelope", "npRmpi")
   header <- getFromNamespace(".npRmpi_fanout_header", "npRmpi")
   tx <- fanout_contract_tx()
@@ -126,7 +195,7 @@ test_that("consumed control receipts remain committed after collector failure", 
 
 test_that("dynamic next-task ownership follows result order not READY order", {
   make <- getFromNamespace(".npRmpi_fanout_metadata", "npRmpi")
-  accept <- getFromNamespace(".npRmpi_fanout_accept", "npRmpi")
+  accept <- fanout_contract_accept()
   envelope <- getFromNamespace(".npRmpi_fanout_envelope", "npRmpi")
   header <- getFromNamespace(".npRmpi_fanout_header", "npRmpi")
   tx <- make(101L, 2L, 6L, "dynamic", NULL, "session", "operation", 18432L)
@@ -274,7 +343,7 @@ test_that("scatter preparation retains classed padding and forwarded RNG order",
   expect_identical(.Random.seed, seed)
 })
 
-test_that("a repeated interrupt at recovery sleep cannot abandon the receipt", {
+test_that("a repeated interrupt escapes recovery without consuming the receipt", {
   receive <- getFromNamespace(".npRmpi_fanout_receive", "npRmpi")
   # Local transport doubles do not alter the namespace or any global binding.
   env <- new.env(parent = environment(receive))
@@ -294,6 +363,11 @@ test_that("a repeated interrupt at recovery sleep cannot abandon the receipt", {
   env$mpi.get.sourcetag <- function() c(1L, tx$control)
   env$.npRmpi_recv_raw_probed <- function(...) serialize(list(session = tx$session,
     operation = tx$id, kind = "terminal", tasks = integer(), value = NULL), NULL)
+  env$.npRmpi_fanout_accept <- fanout_contract_accept()
+  interrupted <- tryCatch(receive(tx, discard = TRUE), interrupt = identity)
+  expect_s3_class(interrupted, "interrupt")
+  expect_identical(tx$rank, "stopping")
+  expect_identical(tx$raw.messages, 0L)
   expect_identical(receive(tx, discard = TRUE)$kind, "terminal")
   expect_identical(tx$rank, "terminal")
   expect_identical(env$sleeps, 1L)
@@ -315,6 +389,46 @@ test_that("recovery descriptors are restored across nested normal and error exit
     expect_identical(scope(b, current(1L)), b)
   })
   expect_null(current(1L))
+})
+
+test_that("quarantined work requires explicit cleanup and cannot reenter close", {
+  quiesce <- getFromNamespace(".npRmpi_fanout_quiesce", "npRmpi")
+  registry <- getFromNamespace(".npRmpi_fanout_state", "npRmpi")
+  tx <- fanout_contract_tx()
+  tx$phase <- "quarantined"
+  assign(tx$key, tx, registry)
+  withr::defer(if (exists(tx$key, registry, inherits = FALSE)) rm(list = tx$key, envir = registry))
+  tx$owner.active <- TRUE
+  expect_error(quiesce(tx$comm, resume = TRUE), "active fan-out")
+  tx$owner.active <- FALSE
+  expect_error(quiesce(tx$comm), "implicit cleanup")
+  local_mocked_bindings(.npRmpi_fanout_drain = function(tx, recovery = NULL) {
+    tx$phase <- "quiescent"
+    tx$rank[] <- "closed"
+    invisible(TRUE)
+  }, .package = "npRmpi")
+  expect_true(quiesce(tx$comm, resume = TRUE))
+  expect_false(exists(tx$key, registry, inherits = FALSE))
+})
+
+test_that("a second interrupt quarantines once without an on-exit retry", {
+  run <- getFromNamespace(".npRmpi_fanout_run", "npRmpi")
+  registry <- getFromNamespace(".npRmpi_fanout_state", "npRmpi")
+  tx <- fanout_contract_tx()
+  withr::defer(rm(list = tx$key, envir = registry))
+  state <- new.env(parent = emptyenv())
+  state$count <- 0L
+  interrupt <- structure(list(), class = c("interrupt", "condition"))
+  local_mocked_bindings(.npRmpi_fanout_drain = function(tx, recovery = NULL) {
+    state$count <- state$count + 1L
+    signalCondition(interrupt)
+  }, .npRmpi_fanout_notice = function(...) NULL, .package = "npRmpi")
+  original <- simpleError("original")
+  expect_identical(tryCatch(run(tx, stop(original)), error = identity), original)
+  expect_identical(state$count, 1L)
+  expect_identical(tx$phase, "quarantined")
+  expect_false(tx$owner.active)
+  expect_true(exists(tx$key, registry, inherits = FALSE))
 })
 
 test_that("recovery reuses only its visible owner and never advances estimator counts", {

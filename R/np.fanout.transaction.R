@@ -1,7 +1,44 @@
 # An active entry owns metadata only, never result payloads or worker closures.
-# Healthy rank-local work is allowed to finish before an abandoned call returns.
+# Cancellation is cooperative at existing rank-local task/chunk boundaries.
 # This protocol does not recover a lost rank or a failed native MPI primitive.
 .npRmpi_fanout_state <- new.env(parent = emptyenv())
+
+.npRmpi_fanout_native <- function(action, comm, ...) {
+  comm <- as.integer(comm)
+  # Literal entry points keep registration/arity checking visible to R CMD
+  # check. This dispatcher accepts only the five private protocol actions.
+  switch(action,
+    begin = .Call("np_mpi_fanout_begin", comm, ..., PACKAGE = "npRmpi"),
+    send = .Call("np_mpi_fanout_send", comm, ..., PACKAGE = "npRmpi"),
+    poll = .Call("np_mpi_fanout_poll", comm, PACKAGE = "npRmpi"),
+    finish = .Call("np_mpi_fanout_finish", comm, PACKAGE = "npRmpi"),
+    owner = .Call("np_mpi_fanout_owner", comm, PACKAGE = "npRmpi"),
+    stop("unknown private MPI fan-out control action", call. = FALSE))
+}
+
+.npRmpi_fanout_retained <- function(comm) {
+  key <- as.character(comm)
+  if (exists(key, envir = .npRmpi_fanout_state, inherits = FALSE))
+    return(get(key, envir = .npRmpi_fanout_state, inherits = FALSE))
+  if (!isTRUE(getOption("npRmpi.mpi.initialized", FALSE))) return(NULL)
+  .npRmpi_fanout_native("owner", comm)
+}
+
+.npRmpi_fanout_assert_idle <- function(comm, activation = FALSE) {
+  tx <- .npRmpi_fanout_retained(comm)
+  if (is.null(tx) || tx$phase %in% c("prepared", "quiescent")) return(invisible(TRUE))
+  if (activation && isTRUE(tx$owner.active) && identical(tx$phase, "activating"))
+    return(invisible(TRUE))
+  stop("MPI pool has active or quarantined fan-out work; no new work was dispatched. For an abandoned call, retry npRmpi.quit(force = TRUE) to complete cooperative cleanup.",
+       call. = FALSE)
+}
+
+.npRmpi_fanout_notice <- function(text) {
+  # Safety disposition is not ordinary estimator progress, and warn=2 or a
+  # user message handler must not replace the original condition.
+  tryCatch(.np_message(text), error = function(e) NULL, interrupt = function(e) NULL)
+  invisible(NULL)
+}
 
 # Only the canonical bootstrap caller supplies this data-only, call-scoped
 # owner reference. It is never part of a transaction or a worker payload.
@@ -58,7 +95,7 @@
 
 .npRmpi_fanout_new <- function(comm, workers, n, scheduler, weights = NULL) {
   key <- as.character(comm)
-  if (exists(key, envir = .npRmpi_fanout_state, inherits = FALSE))
+  if (!is.null(.npRmpi_fanout_retained(comm)))
     stop("an earlier MPI fan-out has not reached quiescence", call. = FALSE)
   .npRmpi_protocol_rank_tag("manual_bcast_base", as.integer(workers),
                            where = "MPI fan-out")
@@ -80,6 +117,11 @@
   tx$n <- as.integer(n)
   tx$workers <- as.integer(workers)
   tx$phase <- "prepared"
+  tx$owner.active <- FALSE
+  tx$native <- FALSE
+  tx$cancelled <- FALSE
+  tx$cleanup.started <- NA_real_
+  tx$cleanup.budget <- 0
   tx$rank <- rep.int("initial", workers)
   tx$assigned <- rep(list(integer()), workers)
   tx$tags <- integer(workers)
@@ -123,15 +165,24 @@
   kind <- message[["kind"]]
   tasks <- message[["tasks"]]
   assigned <- tx$assigned[[source]]
+  if (identical(kind, "closed")) {
+    if (!identical(as.integer(tag), tx$control) || length(tasks) ||
+        tx$rank[[source]] != "terminal") .npRmpi_fanout_protocol_error()
+    tx$rank[[source]] <- "closed"
+    return(list(kind = kind, source = source))
+  }
   if (identical(kind, "terminal")) {
     if (!identical(as.integer(tag), tx$control) || length(tasks) ||
-        tx$rank[[source]] %in% c("initial", "terminal") ||
-        (identical(tx$scheduler, "dynamic") && tx$rank[[source]] != "stopping"))
+        tx$rank[[source]] %in% c("initial", "terminal", "closed"))
       .npRmpi_fanout_protocol_error()
     # A valid terminal receipt discharges transport even if the result is
     # incomplete and must now raise a collector error.
+    was.stopping <- tx$rank[[source]] == "stopping"
     tx$rank[[source]] <- "terminal"
-    if (!discard && any(!tx$seen[assigned])) .npRmpi_fanout_protocol_error()
+    .npRmpi_fanout_native("send", tx$comm, as.integer(source), 2L)
+    if (!discard && (any(!tx$seen[assigned]) ||
+        (identical(tx$scheduler, "dynamic") && !was.stopping)))
+      .npRmpi_fanout_protocol_error()
     return(list(kind = kind, source = source))
   }
   if (identical(kind, "ready")) {
@@ -175,15 +226,13 @@
                                   recovery = NULL) {
   if (poll) {
     while (!isTRUE(mpi.iprobe(mpi.any.source(), mpi.any.tag(), tx$comm))) {
+      if (discard) .npRmpi_fanout_cleanup_boundary(tx)
       if (!discard && timeout > 0 &&
           unname(proc.time()[["elapsed"]]) - started > timeout)
         stop(sprintf("MPI %s dispatch timeout waiting on worker results (timeout=%.3fs)",
                      what, timeout), call. = FALSE)
       if (discard) .npRmpi_fanout_recovery_step(recovery)
-      # Sys.sleep can deliver an interrupt even within suspendInterrupts on
-      # supported R builds. A repeated interrupt must not unwind recovery.
-      if (discard) tryCatch(Sys.sleep(sleep), interrupt = function(e) NULL)
-      else Sys.sleep(sleep)
+      Sys.sleep(sleep)
     }
   } else {
     mpi.probe(mpi.any.source(), mpi.any.tag(), tx$comm)
@@ -231,18 +280,55 @@
   # A failed native activation/collective cannot be repaired by an R handler.
   if (tx$phase %in% c("activating", "uncertain"))
     stop("MPI fan-out activation did not complete; session is not reusable", call. = FALSE)
+  tx$phase <- "draining"
+  tx$cleanup.started <- unname(proc.time()[["elapsed"]])
+  tx$cleanup.budget <- .npRmpi_session_recv_timeout()
+  .npRmpi_fanout_notice("Cancelling MPI work at task boundaries; draining replies. Interrupt again to return with this pool quarantined.")
+  .npRmpi_fanout_recovery_step(recovery, first = TRUE)
   suspendInterrupts({
-    tx$phase <- "draining"
-    .npRmpi_fanout_recovery_step(recovery, first = TRUE)
+    tx$cancelled <- TRUE
+    for (rank in which(!(tx$rank %in% c("terminal", "closed"))))
+      .npRmpi_fanout_native("send", tx$comm, as.integer(rank), 1L)
+  })
+  .npRmpi_fanout_stop_ready(tx)
+  while (any(tx$rank != "closed")) {
+    .npRmpi_fanout_cleanup_boundary(tx)
+    .npRmpi_fanout_receive(tx, discard = TRUE, recovery = recovery)
     .npRmpi_fanout_stop_ready(tx)
-    while (any(tx$rank != "terminal")) {
-      .npRmpi_fanout_receive(tx, discard = TRUE, recovery = recovery)
-      .npRmpi_fanout_stop_ready(tx)
-      .npRmpi_fanout_recovery_step(recovery)
-    }
+    .npRmpi_fanout_recovery_step(recovery)
+  }
+  while (!identical(.npRmpi_fanout_native("poll", tx$comm), 1L)) {
+    .npRmpi_fanout_cleanup_boundary(tx)
+    Sys.sleep(0.0005)
+  }
+  suspendInterrupts({
+    .npRmpi_fanout_native("finish", tx$comm)
+    tx$native <- FALSE
     tx$phase <- "quiescent"
   })
   invisible(TRUE)
+}
+
+.npRmpi_fanout_cleanup_boundary <- function(tx) {
+  # Serviced under both idle polling and continuous incoming traffic.
+  if (tx$cleanup.budget > 0 &&
+      unname(proc.time()[["elapsed"]]) - tx$cleanup.started >= tx$cleanup.budget)
+    stop(structure(list(message = "MPI cooperative cleanup budget exhausted",
+                        call = NULL),
+                   class = c("npRmpi_cleanup_pending", "error", "condition")))
+  invisible(NULL)
+}
+
+.npRmpi_fanout_cleanup_attempt <- function(tx, recovery = NULL) {
+  failure <- tryCatch({ .npRmpi_fanout_drain(tx, recovery); NULL },
+                      error = identity, interrupt = identity)
+  if (!is.null(failure)) {
+    tx$phase <- if (inherits(failure, c("interrupt", "npRmpi_cleanup_pending")))
+      "quarantined" else "uncertain"
+    if (identical(tx$phase, "uncertain")) .npRmpi_lease_poison()
+    .npRmpi_fanout_notice("MPI cleanup is incomplete; this pool is quarantined, not closed. No partial result was returned. An explicit npRmpi.quit(force = TRUE) may resume cooperative cleanup; native transport failures cannot be retried safely.")
+  }
+  failure
 }
 
 .npRmpi_fanout_forget <- function(tx) {
@@ -255,9 +341,11 @@
 .npRmpi_fanout_run <- function(tx, code, recovery = .npRmpi_fanout_recovery_owner(tx$comm)) {
   force(recovery)
   assign(tx$key, tx, envir = .npRmpi_fanout_state)
+  tx$owner.active <- TRUE
   on.exit({
-    if (!(tx$phase %in% c("prepared", "quiescent", "uncertain")))
-      .npRmpi_fanout_drain(tx, recovery)
+    tx$owner.active <- FALSE
+    if (!(tx$phase %in% c("prepared", "quiescent", "uncertain", "quarantined")))
+      .npRmpi_fanout_cleanup_attempt(tx, recovery)
     .npRmpi_fanout_forget(tx)
   }, add = TRUE)
   failure <- new.env(parent = emptyenv())
@@ -270,15 +358,8 @@
     NULL
   })
   if (!is.null(failure$condition)) {
+    .npRmpi_fanout_cleanup_attempt(tx, recovery)
     suspendInterrupts({
-      cleanup <- tryCatch(.npRmpi_fanout_drain(tx, recovery), error = identity)
-      if (inherits(cleanup, "error")) {
-        tx$phase <- "uncertain"
-        .npRmpi_lease_poison()
-        # Even warn=2 must not replace the original failure being rethrown.
-        tryCatch(warning("MPI fan-out transport recovery could not establish quiescence; the session is not reusable",
-                         call. = FALSE), error = function(e) invisible(NULL))
-      }
       .npRmpi_fanout_forget(tx)
       if (inherits(failure$condition, "interrupt")) {
         # A real interrupt need not have a message. stop() would turn its
@@ -289,32 +370,66 @@
       stop(failure$condition)
     })
   }
-  if (any(tx$rank != "terminal"))
+  if (any(tx$rank != "closed"))
     stop("MPI fan-out returned before worker quiescence", call. = FALSE)
-  tx$phase <- "quiescent"
+  while (!identical(.npRmpi_fanout_native("poll", tx$comm), 1L)) Sys.sleep(0.0005)
+  suspendInterrupts({
+    .npRmpi_fanout_native("finish", tx$comm)
+    tx$native <- FALSE
+    tx$phase <- "quiescent"
+  })
   value
 }
 
-.npRmpi_fanout_quiesce <- function(comm = 1L) {
-  key <- as.character(comm)
-  if (!exists(key, envir = .npRmpi_fanout_state, inherits = FALSE))
-    return(invisible(TRUE))
-  tx <- get(key, envir = .npRmpi_fanout_state, inherits = FALSE)
+.npRmpi_fanout_quiesce <- function(comm = 1L, resume = FALSE) {
+  tx <- .npRmpi_fanout_retained(comm)
+  if (is.null(tx)) return(invisible(TRUE))
   # Ordinary reentrant lifecycle calls must unwind the active owner rather
-  # than close its communicator and resume its R frame. The process-exit
-  # finalizer cannot resume that frame and may discharge it directly.
-  if (!(tx$phase %in% c("prepared", "quiescent")) &&
-      !isTRUE(.npRmpi_exit_finalizer_state$running))
+  # than close its communicator and resume its R frame. Finalizers likewise
+  # must not start a blocking cleanup behind the caller's back.
+  if (isTRUE(tx$owner.active))
     stop("MPI lifecycle cannot begin inside an active fan-out", call. = FALSE)
-  .npRmpi_fanout_drain(tx)
+  if (!(tx$phase %in% c("prepared", "quiescent"))) {
+    if (!resume || isTRUE(.npRmpi_exit_finalizer_state$running))
+      stop("MPI pool is quarantined; implicit cleanup was not attempted. Use npRmpi.quit(force = TRUE) explicitly.", call. = FALSE)
+    failure <- .npRmpi_fanout_cleanup_attempt(tx)
+    if (!is.null(failure)) {
+      if (inherits(failure, "interrupt")) {
+        signalCondition(failure)
+        invokeRestart("abort")
+      }
+      stop(failure)
+    }
+  }
   .npRmpi_fanout_forget(tx)
   invisible(TRUE)
 }
 
-.npRmpi_fanout_worker_terminal <- function(header) {
-  mpi.send.Robj(.npRmpi_fanout_envelope(header, "terminal"), 0L,
-                 header$control, header$comm)
+.npRmpi_fanout_worker_terminal <- function(header, terminal, closed) {
+  suspendInterrupts({
+    mpi.send(terminal, type = 4L, dest = 0L, tag = header$control, comm = header$comm)
+    while (.npRmpi_fanout_native("poll", header$comm) < 2L)
+      tryCatch(Sys.sleep(0.0005), interrupt = function(e) NULL)
+    .npRmpi_fanout_native("finish", header$comm)
+    mpi.send(closed, type = 4L, dest = 0L, tag = header$control, comm = header$comm)
+  })
   invisible(NULL)
+}
+
+.npRmpi_fanout_worker_owner <- function(header, code) {
+  # Allocate retirement payloads before entering task code. The outer owner
+  # covers ordinary failures in serialization/progress as well as FUN.
+  terminal <- serialize(.npRmpi_fanout_envelope(header, "terminal"), NULL)
+  closed <- serialize(.npRmpi_fanout_envelope(header, "closed"), NULL)
+  suspendInterrupts(.npRmpi_fanout_native("begin", header$comm, NULL))
+  on.exit(.npRmpi_fanout_worker_terminal(header, terminal, closed), add = TRUE)
+  tryCatch(force(code), error = function(e) invisible(NULL),
+           interrupt = function(e) invisible(NULL))
+  invisible(NULL)
+}
+
+.npRmpi_fanout_worker_cancelled <- function(header) {
+  .npRmpi_fanout_native("poll", header$comm) %% 2L == 1L
 }
 
 .npRmpi_fanout_worker_result <- function(header, tasks, parts, tag) {
@@ -349,39 +464,46 @@
 
 .npRmpi_fanout_worker_apply <- function(tmpfunarg, n, tag, comm) {
   header <- tmpfunarg[["transaction"]]
+  .npRmpi_fanout_worker_owner(header, {
   x <- mpi.scatter.Robj(root = 0L, comm = comm)
   rank <- mpi.comm.rank(comm)
-  if (rank <= n) {
+  if (rank <= n && !.npRmpi_fanout_worker_cancelled(header)) {
     value <- .npRmpi_fanout_worker_call(tmpfunarg$FUN, c(list(x), tmpfunarg$dot.arg))
     .npRmpi_fanout_worker_result(header, as.integer(rank), list(value), tag)
   }
-  .npRmpi_fanout_worker_terminal(header)
+  })
 }
 
 .npRmpi_fanout_worker_dynamic <- function(tmpfunarg, n, comm) {
   header <- tmpfunarg[["transaction"]]
+  .npRmpi_fanout_worker_owner(header, {
   repeat {
     request <- mpi.recv.Robj(0L, mpi.any.tag(), comm)
     tag <- mpi.get.sourcetag()[[2L]]
-    if (tag > n) break
+    # Consume the incumbent request/stop handshake before cancellation. A
+    # task already sent by the master must not remain queued for a later call.
+    if (tag > n || .npRmpi_fanout_worker_cancelled(header)) break
     args <- if (is.list(request)) request$data.arg else NULL
     value <- if (is.null(args)) {
       structure("mpi.applyLB worker received malformed task payload", class = "try-error")
     } else .npRmpi_fanout_worker_call(tmpfunarg$FUN, c(args, tmpfunarg$dot.arg))
     .npRmpi_fanout_worker_result(header, as.integer(tag), list(value), tag)
   }
-  .npRmpi_fanout_worker_terminal(header)
+  })
 }
 
 .npRmpi_fanout_worker_bundle <- function(tmpfunarg, n, comm) {
   header <- tmpfunarg[["transaction"]]
+  .npRmpi_fanout_worker_owner(header, {
   request <- mpi.recv.Robj(0L, mpi.any.tag(), comm)
   tag <- mpi.get.sourcetag()[[2L]]
-  if (tag > n) return(.npRmpi_fanout_worker_terminal(header))
+  if (tag <= n) {
   tasks <- request$task_indices
   parts <- vector("list", length(tasks))
   boot <- 0L
+  completed <- 0L
   for (i in seq_along(tasks)) {
+    if (.npRmpi_fanout_worker_cancelled(header)) break
     value <- .npRmpi_fanout_worker_call(tmpfunarg$FUN,
       c(list(request$tasks[[i]]), tmpfunarg$dot.arg))
     if (isTRUE(tmpfunarg$stream.results)) {
@@ -397,10 +519,12 @@
         }
       }
     }
+    completed <- i
   }
-  if (!isTRUE(tmpfunarg$stream.results))
+  if (!isTRUE(tmpfunarg$stream.results) && completed == length(tasks))
     .npRmpi_fanout_worker_result(header, tasks, parts, tag)
-  .npRmpi_fanout_worker_terminal(header)
+  }
+  })
 }
 
 .npRmpi_fanout_apply <- function(X, FUN, dot.arg, comm, dynamic = FALSE,
@@ -430,6 +554,8 @@
       if (dynamic) mpi.bcast.cmd(.mpi.worker.applyLB, n = n, comm = comm)
       else mpi.bcast.cmd(.mpi.worker.apply, n = n, tag = tag, comm = comm)
       .npRmpi_bcast_prepared(shared, rank = 0L, comm = comm)
+      .npRmpi_fanout_native("begin", comm, tx)
+      tx$native <- TRUE
       if (!dynamic) {
         .npRmpi_scatter_prepared(scatter, root = 0L, comm = comm)
         for (rank in seq_len(workers)) {
@@ -446,7 +572,7 @@
         .npRmpi_fanout_send(tx, rank, list(data.arg = list(X[[sent]])), sent, sent)
       }
     }
-    while (any(tx$rank != "terminal")) {
+    while (any(tx$rank != "closed")) {
       message <- .npRmpi_fanout_receive(tx, poll = poll, sleep = sleep)
       if (identical(message$kind, "result"))
         out[[message$tasks]] <- message$value[[1L]]
@@ -516,6 +642,8 @@
       if (master.local) mpi.bcast.cmd(.npRmpi_bootstrap_worker_bundle, n = workers, comm = comm)
       else mpi.bcast.cmd(.mpi.worker.applyLB, n = n, comm = comm)
       .npRmpi_bcast_prepared(shared, rank = 0L, comm = comm)
+      .npRmpi_fanout_native("begin", comm, tx)
+      tx$native <- TRUE
       tx$phase <- "active"
     })
     .npRmpi_bootstrap_transport_trace(what, "fanout.master_assist.start",
@@ -547,11 +675,11 @@
       progress.step(state$done)
       .npRmpi_bootstrap_transport_trace(what, "fanout.master_local_chunk.done",
         list(task_idx = task.local.idx, bsz = weights[[task.local.idx]]))
-      while (any(tx$rank != "terminal") && isTRUE(mpi.iprobe(mpi.any.source(), mpi.any.tag(), comm))) receive()
+      while (any(tx$rank != "closed") && isTRUE(mpi.iprobe(mpi.any.source(), mpi.any.tag(), comm))) receive()
     }
-    while (any(tx$rank != "terminal")) receive()
+    while (any(tx$rank != "closed")) receive()
     .npRmpi_bootstrap_transport_trace(what, "fanout.master_assist.done",
-      list(done = sum(tx$rank == "terminal"), n_remote = workers, local_done = length(local.idx)))
+      list(done = sum(tx$rank == "closed"), n_remote = workers, local_done = length(local.idx)))
     state$out
   })
 }

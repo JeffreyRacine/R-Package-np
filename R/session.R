@@ -461,6 +461,7 @@ npRmpi.init <- function(...,
     )
   }
   comm <- npValidatePositiveInteger(comm, "comm")
+  .npRmpi_fanout_assert_idle(comm)
   autodispatch <- npValidateScalarLogical(autodispatch, "autodispatch")
   autodispatch.verify.options <- npValidateScalarLogical(autodispatch.verify.options, "autodispatch.verify.options")
   if (!is.null(np.messages))
@@ -608,7 +609,7 @@ npRmpi.quit <- function(force = FALSE,
   }
 
   drain.leases <- function(comm) {
-    .npRmpi_fanout_quiesce(comm)
+    .npRmpi_fanout_quiesce(comm, resume = force)
     lease.drain <- try(.npRmpi_lease_session_drain(comm = comm), silent = TRUE)
     ok <- !inherits(lease.drain, "try-error")
     if (!ok) {
