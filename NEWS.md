@@ -1,5 +1,13 @@
 # npRmpi 0.80-1
 
+* Bootstrap fan-out and the MPI apply collectors drain outstanding worker
+  replies before rethrowing supported master-side errors, interrupts or
+  dispatch timeouts. Operation identities prevent stale replies from being
+  published by a later call, and shutdown waits for transport to become
+  quiescent. Recovery can wait for already-running finite tasks to finish;
+  it does not recover lost ranks or failed native MPI operations. An existing
+  visible progress owner reports cleanup without implying completed inference.
+
 * Streamed non-studentized categorical significance-test bootstrap statistics
   now use the same generalized-nearest-neighbour training-row geometry as
   the observed statistic and public regression refits. This can change
@@ -80,10 +88,6 @@
   stream, independent of processing chunk size and MPI worker count. The
   block law is unchanged, but historical seeded bands may change. The stream
   follows the previous single-replicate ordering; IID/wild draws are unchanged.
-
-* Regression wild-bootstrap plots use the same explicit-evaluation residual
-  pilot as np when no pilot is supplied. This corrects generalized-NN bands;
-  supplied pilots and bootstrap random-number sequences are unchanged.
 
 * Rank-local regression corrections retain their R and native execution
   context together, repairing adaptive-NN local-constant bootstrap-gradient
