@@ -1,14 +1,14 @@
 npRmpi_extract_c_function_body <- function(source_text, name) {
   pattern <- paste0("(?m)^\\s*static\\s+[^\\n;{]*\\b", name, "\\s*\\(")
   locs <- gregexpr(pattern, source_text, perl = TRUE)[[1L]]
-  if (identical(locs, -1L))
+  if (!any(locs > 0L))
     stop("missing C function ", name, call. = FALSE)
 
   chars <- strsplit(source_text, "", fixed = TRUE)[[1L]]
   definition_locs <- integer()
   for (loc in locs) {
-    open_try <- regexpr("\\{", substring(source_text, loc), perl = TRUE)[[1L]]
-    semi_try <- regexpr(";", substring(source_text, loc), perl = TRUE)[[1L]]
+    open_try <- regexpr("\\{", substring(source_text, loc, nchar(source_text)), perl = TRUE)[[1L]]
+    semi_try <- regexpr(";", substring(source_text, loc, nchar(source_text)), perl = TRUE)[[1L]]
     if (open_try > 0L && (semi_try <= 0L || open_try < semi_try))
       definition_locs <- c(definition_locs, loc)
   }

@@ -596,7 +596,7 @@ test_that("categorical profile implementation and native sink are bounded", {
     fixed = TRUE
   )[[1L]]
   expect_gt(ordered_profile_start, 0L)
-  ordered_profile_tail <- substring(jksum, ordered_profile_start)
+  ordered_profile_tail <- substring(jksum, ordered_profile_start, nchar(jksum))
   ordered_profile_end <- regexpr(
     "\n#ifdef MPI2\n#if NP_ACCEL_GAUSS_COMPILED",
     ordered_profile_tail,

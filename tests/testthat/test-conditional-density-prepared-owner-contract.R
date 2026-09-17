@@ -11,13 +11,21 @@ np_conditional_density_prepared_function <- function(source, name,
     source, perl = TRUE
   )[[1L]]
   expect_false(identical(markers, -1L))
+  definitions <- integer()
   for (marker in markers) {
-    tail <- substring(source, marker)
+    tail <- substring(source, marker, nchar(source))
     open <- regexpr("\\{", tail, perl = TRUE)[[1L]]
     semi <- regexpr(";", tail, fixed = TRUE)[[1L]]
     if (open <= 0L || (semi > 0L && semi < open))
       next
-    chars <- strsplit(substring(tail, open), "", fixed = TRUE)[[1L]]
+    definitions <- c(definitions, marker)
+  }
+  if (length(definitions) != 1L || definitions[[1L]] < 1L)
+    stop("expected one C function definition for ", name, call. = FALSE)
+  for (marker in definitions) {
+    tail <- substring(source, marker, nchar(source))
+    open <- regexpr("\\{", tail, perl = TRUE)[[1L]]
+    chars <- strsplit(substring(tail, open, nchar(tail)), "", fixed = TRUE)[[1L]]
     depth <- 0L
     for (i in seq_along(chars)) {
       if (chars[[i]] == "{")

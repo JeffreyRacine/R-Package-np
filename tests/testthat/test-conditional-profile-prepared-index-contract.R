@@ -14,11 +14,21 @@ locate_conditional_profile_source_root <- function() {
 
 extract_profile_implementation <- function(source, start_pattern, end_pattern) {
   starts <- gregexpr(start_pattern, source, fixed = TRUE)[[1L]]
-  start <- tail(starts[starts > 0L], 1L)
-  if (!length(start)) return(NULL)
-  remainder <- substring(source, start)
-  finish <- regexpr(end_pattern, remainder, fixed = TRUE)[[1L]]
-  if (finish <= 0L) return(NULL)
+  starts <- starts[starts > 0L]
+  definitions <- starts[vapply(starts, function(start) {
+    tail <- substring(source, start, nchar(source))
+    open <- regexpr("{", tail, fixed = TRUE)[[1L]]
+    semi <- regexpr(";", tail, fixed = TRUE)[[1L]]
+    open > 0L && (semi <= 0L || open < semi)
+  }, logical(1L))]
+  if (length(definitions) != 1L)
+    stop("profile region requires one start definition", call. = FALSE)
+  start <- definitions[[1L]]
+  remainder <- substring(source, start, nchar(source))
+  finish <- gregexpr(end_pattern, remainder, fixed = TRUE)[[1L]]
+  if (length(finish) != 1L || finish[[1L]] <= 1L)
+    stop("profile region requires one ordered finish anchor", call. = FALSE)
+  finish <- finish[[1L]]
   substring(remainder, 1L, finish - 1L)
 }
 
@@ -105,7 +115,7 @@ test_that("conditional profile indexes belong to prepared objective state", {
     fixed = TRUE
   )[[1L]]
   density_start <- tail(density_starts[density_starts > 0L], 1L)
-  density_tail <- substring(np, density_start)
+  density_tail <- substring(np, density_start, nchar(np))
   density_clear <- regexpr(
     "np_conditional_profile_index_cache_clear_extern();",
     density_tail,
@@ -129,7 +139,7 @@ test_that("conditional profile indexes belong to prepared objective state", {
     distribution_starts[distribution_starts > 0L],
     1L
   )
-  distribution_tail <- substring(np, distribution_start)
+  distribution_tail <- substring(np, distribution_start, nchar(np))
   distribution_clear <- regexpr(
     "np_conditional_profile_index_cache_clear_extern();",
     distribution_tail,

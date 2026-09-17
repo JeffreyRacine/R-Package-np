@@ -1,8 +1,11 @@
 npRmpi_collective_source_region <- function(source, start_marker, stop_marker) {
-  start <- regexpr(start_marker, source, fixed = TRUE)[[1L]]
-  if (start < 1L)
-    stop("collective wrapper start marker is missing: ", start_marker)
-  remainder <- substring(source, start)
+  starts <- gregexpr(start_marker, source, fixed = TRUE)[[1L]]
+  if (length(starts) != 1L || starts[[1L]] < 1L)
+    stop("collective wrapper requires one start marker: ", start_marker)
+  start <- starts[[1L]]
+  remainder <- substring(source, start, nchar(source))
+  # The final wrapper uses the next generic typedef as its boundary;
+  # later typedefs are legitimate and are not competing owner definitions.
   stop <- regexpr(stop_marker, remainder, fixed = TRUE)[[1L]]
   if (stop < 2L)
     stop("collective wrapper stop marker is missing: ", stop_marker)

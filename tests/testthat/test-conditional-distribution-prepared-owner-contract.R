@@ -4,12 +4,14 @@ np_conditional_distribution_owner_source <- function() {
 }
 
 np_conditional_distribution_owner_function <- function(source, name) {
-  start <- regexpr(
+  start <- gregexpr(
     paste0("static void\\s+", name, "\\s*\\([^;]*\\)\\s*\\{"),
     source, perl = TRUE
-  )
+  )[[1L]]
+  if (length(start) != 1L || start[[1L]] < 1L)
+    stop("expected one C function definition for ", name, call. = FALSE)
   expect_gt(start[[1L]], 0L)
-  tail <- substring(source, start[[1L]])
+  tail <- substring(source, start[[1L]], nchar(source))
   open <- regexpr("\\{", tail, perl = TRUE)[[1L]]
   chars <- strsplit(tail, "", fixed = TRUE)[[1L]]
   depth <- 0L

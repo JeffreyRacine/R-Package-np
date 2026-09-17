@@ -26,7 +26,7 @@ test_that("npcdens categorical profile CVLS owns a bounded MPI tri-state workspa
   )[[1L]]
   start <- tail(starts[starts > 0L], 1L)
   expect_gt(start, 0L)
-  tail <- substring(source, start)
+  tail <- substring(source, start, nchar(source))
   finish <- regexpr(
     paste0(
       "\\nstatic NPConditionalProfileCvStatus\\n",

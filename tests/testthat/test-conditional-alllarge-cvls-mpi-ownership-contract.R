@@ -14,9 +14,15 @@ locate_conditional_alllarge_source <- function() {
 }
 
 extract_conditional_alllarge_region <- function(source, start, finish) {
-  first <- regexpr(start, source, fixed = TRUE)[[1L]]
-  tail <- substring(source, first)
-  last <- regexpr(finish, tail, fixed = TRUE)[[1L]]
+  starts <- gregexpr(start, source, fixed = TRUE)[[1L]]
+  if (length(starts) != 1L || starts[[1L]] < 1L)
+    stop("all-large region requires one start anchor", call. = FALSE)
+  first <- starts[[1L]]
+  tail <- substring(source, first, nchar(source))
+  finishes <- gregexpr(finish, tail, fixed = TRUE)[[1L]]
+  if (length(finishes) != 1L || finishes[[1L]] <= 1L)
+    stop("all-large region requires one ordered finish anchor", call. = FALSE)
+  last <- finishes[[1L]]
 
   expect_gt(first, 0L)
   expect_gt(last, 0L)
@@ -167,7 +173,10 @@ test_that("distribution all-large dispatcher isolates local and MPI owners", {
       "static NPConditionalAllLargeCvStatus\n",
       "np_conditional_distribution_cvls_lp_all_large_dispatch("
     ),
-    "static int np_conditional_density_cvml_lp_block_stream("
+    paste0(
+      "static int np_conditional_density_cvml_lp_block_stream(double *vector_scale_factor,\n",
+      "                                                       double *cv);"
+    )
   )
 
   expect_match(dispatch, "np_objective_outer_rows_enabled(", fixed = TRUE)
