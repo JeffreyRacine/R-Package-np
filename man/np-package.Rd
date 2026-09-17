@@ -68,6 +68,17 @@
   a number of dummy variables for a factor.  Every function in npRmpi
   supports both interfaces, where appropriate.
 
+  Estimator formulas do not support right-hand-side \code{offset()} special
+  terms; these are rejected rather than silently omitted. A variable named
+  \code{offset} is not an offset special. This restriction does not change
+  offset handling by a separately supplied parametric model in a specification
+  test. Conditional density/distribution formulas require response variable
+  names (separated by \code{+} for multiple responses). To transform a
+  conditional response, first create an explicit transformed variable in
+  \code{data}, or supply the transformed values through the native data
+  interface. Supported response transformations in other estimator families,
+  such as \code{npreg(log(y) ~ x)}, retain their existing meaning.
+
   Note that if your factor is in fact a character string such as, say,
 	\code{X} being either \code{"MALE"} or \code{"FEMALE"}, npRmpi will handle
 	this directly, i.e., there is no need to map the string values into

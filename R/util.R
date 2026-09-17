@@ -3058,6 +3058,7 @@ npValidateRegressionNnLowerBound <- function(bws,
 }
 
 explodeFormula <- function(formula, data=NULL){
+  .np_formula_validate_syntax(formula, conditional.response = TRUE)
   formula.terms <- if (is.null(data)) terms(formula) else terms(formula, data = data)
   response <- if (length(formula) == 3L) all.vars(formula[[2L]]) else character(0)
   term.labels.raw <- attr(formula.terms, "term.labels")
@@ -3109,6 +3110,7 @@ explodePipe <- function(formula, env = parent.frame()){
     if (inherits(formula, "error"))
       stop(conditionMessage(formula), call. = FALSE)
   }
+  .np_formula_validate_syntax(formula)
   tf <- as.character(formula)  
   tf <- tf[length(tf)]
   lhs <- if (length(as.character(formula)) == 3) {

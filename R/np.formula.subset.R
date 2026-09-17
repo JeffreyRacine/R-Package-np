@@ -1,3 +1,44 @@
+# Inspect terms, not text: offset as a variable/response or inside an ordinary
+# transformation is not an offset special and retains its existing semantics.
+.np_formula_validate_terms <- function(tt) {
+  if (length(attr(tt, "offset")))
+    stop("offset() terms are not supported in this estimator formula; remove the offset term or use explicitly prepared data",
+         call. = FALSE)
+  tt
+}
+
+# Call only after the existing owner has resolved its formula promise. Never
+# evaluate a construction call or a response/covariate expression here.
+.np_formula_validate_syntax <- function(formula, conditional.response = FALSE) {
+  if (conditional.response && length(formula) == 3L) {
+    named.response <- function(expr) {
+      if (is.symbol(expr)) return(TRUE)
+      if (!is.call(expr)) return(FALSE)
+      if (identical(expr[[1L]], quote(`(`)) && length(expr) == 2L)
+        return(named.response(expr[[2L]]))
+      if (identical(expr[[1L]], quote(`+`)) && length(expr) %in% c(2L, 3L))
+        return(all(vapply(as.list(expr)[-1L], named.response, logical(1L))))
+      FALSE
+    }
+    if (!named.response(formula[[2L]]))
+      stop("conditional formula responses must be variable names separated by '+'; create an explicit transformed variable in data or use the native data interface",
+           call. = FALSE)
+  }
+  parts <- function(expr) {
+    if (is.call(expr) && identical(expr[[1L]], quote(`|`)) &&
+        length(expr) == 3L)
+      return(c(parts(expr[[2L]]), parts(expr[[3L]])))
+    list(expr)
+  }
+  for (rhs in parts(formula[[length(formula)]])) {
+    role <- as.call(list(quote(`~`), rhs))
+    class(role) <- "formula"
+    environment(role) <- environment(formula)
+    .np_formula_validate_terms(terms(role, allowDotAsName = TRUE))
+  }
+  invisible(formula)
+}
+
 # Formula-owned subset is non-standard evaluation: dispatch must inspect other
 # arguments without forcing it outside the data mask. Read retained arguments
 # from their original promises, never by re-evaluating substituted expressions.
@@ -93,6 +134,7 @@
   if (!is.data.frame(data) && !is.environment(data) && !is.null(attr(data, "class")))
     data <- as.data.frame(data)
   tt <- if (inherits(formula, "terms")) formula else terms(formula, data = data)
+  .np_formula_validate_terms(tt)
   prepared <- .np_formula_unwrap_prediction(tt)
   prediction <- prepared$prediction
   values <- eval(prediction, data, environment(tt))
@@ -156,6 +198,8 @@
 }
 
 .np_bws_formula_model_frame <- function(bws, mf.args, data.override = FALSE) {
+  if (inherits(bws, c("conbandwidth", "condbandwidth")))
+    .np_formula_validate_syntax(bws$formula, conditional.response = TRUE)
   call.env <- environment(bws$call)
   if (!data.override && is.environment(call.env) &&
       "data" %in% names(mf.args) && is.language(mf.args[["data"]])) {
