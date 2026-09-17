@@ -2,7 +2,8 @@ npscoef <-
   function(bws, ...){
     mc <- match.call(expand.dots = FALSE)
     .np_validate_public_dots(mc[["..."]], "npscoef")
-    args <- list(...)
+    args <- .np_formula_dispatch_args(
+      NULL, substitute(list(...))[-1L], environment())
     npRejectLegacyBooleanErrors(args, "npscoef")
 
     if (!missing(bws)){
@@ -145,13 +146,15 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
   .npRmpi_require_active_slave_pool(where = "npscoef()")
   explicit.scbandwidth <- (!missing(bws)) && inherits(bws, "scbandwidth")
   formula.forwarded <- (!missing(txdat)) && inherits(txdat, "formula")
-  formula.input <- list(...)[["formula", exact = TRUE]]
+  formula.input <- .np_formula_dispatch_args(
+    NULL, substitute(list(...))[-1L], environment())[["formula", exact = TRUE]]
   formula.only <- missing(tydat) && missing(tzdat) &&
     (missing(txdat) || formula.forwarded) &&
     (formula.forwarded || inherits(formula.input, "formula") ||
      (!missing(bws) && inherits(bws, "formula")))
   nomad <- npValidateNomadControl(nomad, "nomad")
-  npRejectLegacyBooleanErrors(list(...), "npscoef")
+  npRejectLegacyBooleanErrors(.np_formula_dispatch_args(
+    NULL, substitute(list(...))[-1L], environment()), "npscoef")
   se <- npValidateScalarLogical(se, "se")
   degree.select.value <- if (npNomadControlRequested(nomad)) {
     "coordinate"
@@ -278,7 +281,10 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
   }
   if (!has.explicit.bws)
     call.args$.np_fit_progress_handoff <- TRUE
-  do.call(npscoef, c(call.args, list(se = se), list(...)))
+  fit.dots <- if (!is.null(tbw[["formula", exact = TRUE]]))
+    .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment())
+  else list(...)
+  do.call(npscoef, c(call.args, list(se = se), fit.dots))
 
 }
 

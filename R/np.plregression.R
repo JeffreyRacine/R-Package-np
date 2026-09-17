@@ -2,7 +2,8 @@ npplreg <-
   function(bws, ...){
     mc <- match.call(expand.dots = FALSE)
     .np_validate_public_dots(mc[["..."]], "npplreg")
-    args <- list(...)
+    args <- .np_formula_dispatch_args(
+      NULL, substitute(list(...))[-1L], environment())
 
     if (!missing(bws)){
       if (is.recursive(bws)){
@@ -733,7 +734,8 @@ npplreg.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ..., se = F
   .npRmpi_require_active_slave_pool(where = "npplreg()")
   explicit.plbandwidth <- (!missing(bws)) && inherits(bws, "plbandwidth")
   formula.forwarded <- (!missing(txdat)) && inherits(txdat, "formula")
-  formula.input <- list(...)[["formula", exact = TRUE]]
+  formula.input <- .np_formula_dispatch_args(
+    NULL, substitute(list(...))[-1L], environment())[["formula", exact = TRUE]]
   formula.only <- missing(tydat) && missing(tzdat) &&
     (missing(txdat) || formula.forwarded) &&
     (formula.forwarded || inherits(formula.input, "formula") ||
@@ -852,5 +854,8 @@ npplreg.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ..., se = F
   }
   if (!has.explicit.bws)
     call.args$.np_fit_progress_handoff <- TRUE
-  do.call(npplreg, c(call.args, list(...)))
+  fit.dots <- if (!is.null(tbw[["formula", exact = TRUE]]))
+    .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment())
+  else list(...)
+  do.call(npplreg, c(call.args, fit.dots))
 }

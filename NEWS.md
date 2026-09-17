@@ -1,5 +1,13 @@
 # npRmpi 0.80-1
 
+* Formula fitting defers data-dependent subset expressions to the model-frame
+  owner rather than forcing them during argument dispatch. One-call fits and
+  constructor-first fits now use the same selected rows.
+
+* Partially linear prediction standard errors use the prediction's actual
+  retained training rows, including data overrides, and preserve na.exclude
+  padding of evaluation rows. Public residual padding is unchanged.
+
 * Vector-quantile least-squares predictions prepare formula newdata once and
   share that same evaluation sample across quantiles.
 

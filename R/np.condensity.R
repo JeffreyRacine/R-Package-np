@@ -2,7 +2,8 @@ npcdens <-
   function(bws, ...){
     mc <- match.call(expand.dots = FALSE)
     .np_validate_public_dots(mc[["..."]], "npcdens")
-    args <- list(...)
+    args <- .np_formula_dispatch_args(
+      NULL, substitute(list(...))[-1L], environment())
 
     if (!missing(bws)){
       if (is.recursive(bws)){
@@ -805,7 +806,8 @@ npcdens.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   sc.bw$proper.method <- NULL
   sc.bw$proper.control <- NULL
   sc.bw <- .np_public_dots_filter_call(sc.bw, "npcdensbw")
-  formula.input <- list(...)[["formula", exact = TRUE]]
+  formula.input <- .np_formula_dispatch_args(
+    NULL, substitute(list(...))[-1L], environment())[["formula", exact = TRUE]]
   frame.state <- if (!has.explicit.bws &&
       (bws.formula || (!no.txdat && inherits(txdat, "formula")) ||
        inherits(formula.input, "formula"))) new.env(parent = emptyenv()) else NULL
@@ -848,5 +850,8 @@ npcdens.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   }
   if (!has.explicit.bws)
     call.args$.np_fit_progress_handoff <- TRUE
-  do.call(npcdens, c(call.args, list(...)))
+  fit.dots <- if (!is.null(tbw[["formula", exact = TRUE]]))
+    .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment())
+  else list(...)
+  do.call(npcdens, c(call.args, fit.dots))
 }

@@ -1326,7 +1326,8 @@ plot.npcopula <- function(x,
   invisible(x)
 }
 
-.npcopula_formula_bandwidth <- function(bw.args, target, u, evaluation, neval) {
+.npcopula_formula_bandwidth <- function(bw.args, target, u, evaluation, neval,
+                                       expressions, envir) {
   frame.state <- new.env(parent = emptyenv())
   on.exit(rm(list = ls(frame.state, all.names = TRUE), envir = frame.state),
           add = TRUE)
@@ -1340,7 +1341,7 @@ plot.npcopula <- function(x,
   bw.fun <- if (identical(target, "density")) npudensbw else npudistbw
   bw <- .np_progress_select_bandwidth_enhanced(
     if (identical(target, "density")) "Selecting copula density bandwidth" else "Selecting copula distribution bandwidth",
-    do.call(bw.fun, bw.args)
+    .np_formula_dispatch_call(bw.fun, bw.args, expressions, envir)
   )
   mf <- .np_formula_frame_take(frame.state)
   dat <- mf[, attr(attr(mf, "terms"), "term.labels"), drop = FALSE]
@@ -1366,9 +1367,10 @@ npcopula.formula <- function(bws,
   bw.args <- c(
     list(formula = bws),
     if (is.null(data)) list() else list(data = data),
-    list(...)
+    .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment())
   )
-  prepared <- .npcopula_formula_bandwidth(bw.args, target, u, evaluation, neval)
+  prepared <- .npcopula_formula_bandwidth(bw.args, target, u, evaluation, neval,
+    substitute(list(...))[-1L], environment())
 
   npcopula.default(
     bws = prepared$bws,
@@ -1394,7 +1396,8 @@ npcopula.default <- function(bws,
                              er.quasi.inv = 1,
                              ..., se = FALSE) {
   se <- npValidateScalarLogical(se, "se")
-  dots <- list(...)
+  dots <- .np_formula_dispatch_args(
+    NULL, substitute(list(...))[-1L], environment())
   u.auto <- isTRUE(dots$u.auto)
   dots$u.auto <- NULL
   formula.from.target <- !missing(target) && inherits(target, "formula")
@@ -1437,7 +1440,8 @@ npcopula.default <- function(bws,
       dots
     )
     prepared <- .npcopula_formula_bandwidth(bw.args, target.formula,
-      u.formula, evaluation.formula, neval.formula)
+      u.formula, evaluation.formula, neval.formula,
+      substitute(list(...))[-1L], environment())
     args <- c(
       list(bws = prepared$bws,
            data = prepared$data,
@@ -1454,6 +1458,8 @@ npcopula.default <- function(bws,
   }
 
   .npRmpi_require_active_slave_pool(where = "npcopula()")
+  # Preserve ordinary native-dot forcing when no formula owns subset.
+  list(...)
   evaluation <- .npcopula_validate_evaluation(evaluation)
   neval <- .npcopula_validate_neval(neval)
   start.time <- proc.time()[3]

@@ -274,7 +274,8 @@ if (getRversion() >= "2.15.1")
 
 npsigtest <-
   function(bws, ..., B = 399){
-    args <- list(...)
+    args <- .np_formula_dispatch_args(
+      NULL, substitute(list(...))[-1L], environment())
     npRejectLegacyBootstrapCount(names(args), "npsigtest")
 
     if (!missing(bws)){
@@ -299,6 +300,9 @@ npsigtest <-
 npsigtest.formula <-
   function(bws, data = NULL, ...){
 
+    state.index <- match(".np.formula.state",
+                         names(substitute(list(...))[-1L]), nomatch = 0L)
+    frame.state <- if (state.index > 0L) ...elt(state.index) else NULL
     tt <- terms(bws)
     m <- match(c("formula", "data", "subset", "na.action"),
                names(bws$call), nomatch = 0)
@@ -308,14 +312,22 @@ npsigtest.formula <-
     if (!is.null(data))
       tmf[["data"]] <- data
     mf.args <- as.list(tmf)[-1L]
-    umf <- tmf <- .np_bws_formula_model_frame(bws, mf.args,
-      data.override = !missing(data) && !is.null(data))
+    umf <- tmf <- if (is.null(frame.state))
+      .np_bws_formula_model_frame(bws, mf.args,
+        data.override = !missing(data) && !is.null(data))
+    else .np_formula_frame_take(frame.state)
 
     ydat <- model.response(tmf)
     xdat <- tmf[, attr(attr(tmf, "terms"),"term.labels"), drop = FALSE]
 
-    ev <- npsigtest(xdat = xdat, ydat = ydat, bws = bws, ...)
-    ev$call <- match.call(expand.dots = FALSE)
+    ev <- if (is.null(frame.state)) {
+      npsigtest(xdat = xdat, ydat = ydat, bws = bws, ...)
+    } else {
+      dots <- list(...)
+      dots$.np.formula.state <- NULL
+      do.call(npsigtest, c(list(xdat = xdat, ydat = ydat, bws = bws), dots))
+    }
+    ev$call <- .np_formula_call_public(match.call(expand.dots = FALSE))
     environment(ev$call) <- parent.frame()
     ev$rows.omit <- as.vector(attr(umf,"na.action"))
     ev$nobs.omit <- length(ev$rows.omit)
@@ -1740,15 +1752,31 @@ npsigtest.default <- function(bws, xdat, ydat, ...){
     sc.bw$bandwidth.compute <- FALSE
   }
 
+  formula.index <- match("formula", names(substitute(list(...))[-1L]),
+                         nomatch = 0L)
+  formula.input <- if (formula.index > 0L) ...elt(formula.index) else NULL
+  frame.state <- if (no.xdat && no.ydat &&
+      (inherits(formula.input, "formula") ||
+       (!no.bws && inherits(bws, "formula"))))
+    new.env(parent = emptyenv()) else NULL
+  if (!is.null(frame.state)) {
+    sc.bw$.np.formula.state <- frame.state
+    on.exit(rm(list = ls(frame.state, all.names = TRUE), envir = frame.state),
+            add = TRUE)
+  }
+
   tbw <- .np_eval_bw_call(sc.bw, caller_env = parent.frame())
   
   call.args <- list(bws = tbw)
+  if (!is.null(frame.state))
+    call.args$.np.formula.state <- frame.state
   if(!no.xdat)
     call.args$xdat <- xdat
   if(!no.ydat)
     call.args$ydat <- ydat
 
-  dots <- list(...)
+  dots <- if (is.null(frame.state)) list(...) else
+    .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment())
   dots[c("bws", "bandwidth.compute", "formula", "data", "xdat", "ydat")] <- NULL
 
   ev <- do.call(npsigtest, c(call.args, dots))

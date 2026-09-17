@@ -2,7 +2,8 @@ npudens <-
   function(bws, ...){
     mc <- match.call(expand.dots = FALSE)
     .np_validate_public_dots(mc[["..."]], "npudens")
-    args <- list(...)
+    args <- .np_formula_dispatch_args(
+      NULL, substitute(list(...))[-1L], environment())
 
     if (!missing(bws)){
       if (is.recursive(bws)){
@@ -307,7 +308,8 @@ npudens.default <- function(bws, tdat, ..., se = FALSE){
   .npRmpi_require_active_slave_pool(where = "npudens()")
   bws.formula.early <- (!missing(bws)) && inherits(bws, "formula")
   tdat.formula.early <- (!missing(tdat)) && inherits(tdat, "formula")
-  formula.input <- list(...)[["formula", exact = TRUE]]
+  formula.input <- .np_formula_dispatch_args(
+    NULL, substitute(list(...))[-1L], environment())[["formula", exact = TRUE]]
   if (.npRmpi_autodispatch_active() &&
       !bws.formula.early &&
       !tdat.formula.early && !inherits(formula.input, "formula"))
@@ -388,5 +390,8 @@ npudens.default <- function(bws, tdat, ..., se = FALSE){
   }
   if (!has.explicit.bws)
     call.args$.np_fit_progress_handoff <- TRUE
-  do.call(npudens, c(call.args, list(...)))
+  fit.dots <- if (!is.null(tbw[["formula", exact = TRUE]]))
+    .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment())
+  else list(...)
+  do.call(npudens, c(call.args, fit.dots))
 }
