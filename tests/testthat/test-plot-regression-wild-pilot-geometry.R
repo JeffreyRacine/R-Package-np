@@ -14,8 +14,12 @@ b1_wild_case <- function(type, regtype, degree = NULL, basis = "glp",
     bandwidth.compute = FALSE, bwtype = type, regtype = regtype,
     degree = degree, basis = basis, bernstein.basis = bernstein)
   get <- function(name) getFromNamespace(name, "npRmpi")
-  pilot <- get(".npreghat_complete")(bws = bw, txdat = x, exdat = x,
-    y = y, output = "apply")
+  # Independent public fitted-row target, without an external self-query.
+  pilot <- fitted(npreg(bws = bw, txdat = x, tydat = y))
+  if (identical(type, "generalized_nn")) {
+    external <- fitted(npreg(bws = bw, txdat = x, tydat = y, exdat = x))
+    expect_gt(max(abs(pilot - external)), 1e-4)
+  }
   compute <- get("compute.bootstrap.errors.rbandwidth")
   ex <- x[c(7,20,40),,drop = FALSE]
   # A categorical panel is a common frame with exactly one row per level.
@@ -89,7 +93,7 @@ b1_supplied_pilot_case <- function(type,
   expect_false(identical(errors[[1L]], errors[[2L]]))
 }
 
-test_that("wild regression missing pilots use explicit evaluation geometry", {
+test_that("wild regression automatic pilots use fitted training geometry", {
   for (tree in c(FALSE,TRUE))
     for (type in c("fixed","generalized_nn","adaptive_nn"))
       for (regtype in c("lc","ll"))
@@ -106,4 +110,34 @@ test_that("wild regression pilot contract covers higher-degree bases", {
 test_that("supplied wild pilots determine the independent residual transform", {
   for (type in c("fixed", "generalized_nn"))
     b1_supplied_pilot_case(type)
+})
+
+test_that("public fit and bandwidth plots share an automatic training pilot", {
+  withr::local_preserve_seed()
+  withr::local_options(list(np.messages = FALSE, np.tree = FALSE))
+  set.seed(719)
+  x <- data.frame(x = runif(40), u = factor(rep(letters[1:2], 20)),
+                  o = ordered(rep(1:2, each = 20)))
+  y <- sin(3*x$x) + .2*(x$u == "b") + rnorm(40, sd = .2)
+  fields <- c("mean", "grad", "merr", "gerr", "bxp")
+  for (regtype in c("lc", "ll", "lp")) {
+    bw <- npregbw(xdat = x, ydat = y, bws = c(16, .25, .3),
+      bandwidth.compute = FALSE, bwtype = "generalized_nn",
+      regtype = regtype, degree = if (regtype == "lp") 2L else NULL)
+    model <- npreg(bws = bw, txdat = x, tydat = y)
+    for (grad in c(FALSE, TRUE)) {
+      set.seed(981)
+      from.fit <- plot(model, output = "data", errors = "bootstrap",
+        plot.errors.boot.method = "wild", B = 7L, neval = 5L,
+        gradients = grad)
+      fit.rng <- .Random.seed
+      set.seed(981)
+      from.bw <- plot(bw, xdat = x, ydat = y, output = "data",
+        errors = "bootstrap", plot.errors.boot.method = "wild",
+        B = 7L, neval = 5L, gradients = grad)
+      expect_identical(.Random.seed, fit.rng)
+      expect_equal(lapply(from.fit, function(z) z[fields]),
+                   lapply(from.bw, function(z) z[fields]), tolerance = 5e-10)
+    }
+  }
 })

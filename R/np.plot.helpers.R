@@ -4487,11 +4487,11 @@
   use.local.direct <- TRUE
 
   if (is.null(fit.mean.train)) {
+    # Automatic pilots are fitted training means, not external self-queries.
     fit.mean.train <- as.vector(.np_regression_direct(
       bws = bws,
       txdat = xdat,
       tydat = ydat,
-      exdat = xdat,
       gradients = FALSE,
       gradient.order = gradient.order,
       local.mode = use.local.direct
@@ -17215,19 +17215,17 @@ compute.bootstrap.errors.rbandwidth =
           fit.mean.train <- as.double(suppressWarnings(npreghat.rbandwidth(
             bws = bws,
             txdat = xdat,
-            exdat = xdat,
             y = ydat,
             output = "apply"
           )))
         } else {
-          # Match the serial missing-pilot owner. Explicit evaluation at xdat
-          # is intentional: GNN training identities use different NN radii.
+          # Match the serial automatic training pilot. Omit exdat so GNN
+          # radii retain training identity rather than external self-queries.
           # Preserve the existing coordinator-local preparation and apply
           # directly without materializing a training hat matrix.
           fit.mean.train <- as.double(.npRmpi_with_local_regression(suppressWarnings(.npreghat_complete(
             bws = bws,
             txdat = xdat,
-            exdat = xdat,
             y = ydat,
             output = "apply"
           ))))
