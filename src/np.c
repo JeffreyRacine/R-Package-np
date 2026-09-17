@@ -10906,9 +10906,6 @@ cleanup_lp_apply_wrapper:
 
   if(compute_status == NP_REGRESSION_LP_MATRIX_ZERO_RADIUS) {
     zero_radius_geometry = nn_geometry_context_ptr;
-    if(sigtest_mode_flag != 0 && sigtest_mode_flag != 1 &&
-       BANDWIDTH_den_extern == BW_GEN_NN)
-      zero_radius_geometry = NULL;
     zero_radius_info = np_nn_zero_radius_info(
       BANDWIDTH_den_extern, num_obs_train, num_obs_eval, ncol_txcon,
       matrix_X_continuous_train_extern, matrix_X_continuous_eval_extern,
