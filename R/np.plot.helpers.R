@@ -4551,7 +4551,9 @@
         chunk.size = chunk.size,
         what = "wild-regression-exact"
       )) {
-    tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+    # Multipliers were drawn once on the master; these workers need no RNG.
+    tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size,
+                                           with.seeds = FALSE)
     worker <- function(task) {
       start <- as.integer(task$start)
       stopi <- start + as.integer(task$bsz) - 1L
