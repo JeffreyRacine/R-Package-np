@@ -1,7 +1,8 @@
 npksum <-
   function(...){
     mc <- match.call(expand.dots = FALSE)
-    target <- .np_bw_dispatch_target(dots = mc$..., eval_env = parent.frame())
+    target <- .np_bw_dispatch_target(dots = mc$..., eval_env = parent.frame(),
+                                     promise.frame = environment())
     UseMethod("npksum", target)
   }
 

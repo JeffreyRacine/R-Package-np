@@ -5,7 +5,8 @@ npcdensbw <-
     .np_validate_public_dots(mc[["..."]], "npcdensbw")
     target <- .np_bw_dispatch_target(dots = mc$...,
                                      data_arg_names = c("xdat", "ydat"),
-                                     eval_env = parent.frame())
+                                     eval_env = parent.frame(),
+                                     promise.frame = environment())
     UseMethod("npcdensbw", target)
   }
 

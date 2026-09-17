@@ -1718,7 +1718,7 @@ npsigtest.rbandwidth <- function(bws,
 npsigtest.default <- function(bws, xdat, ydat, ...){
   .npRmpi_require_active_slave_pool(where = "npsigtest()")
 
-  sc <- sys.call()
+  sc <- .np_formula_expand_call(sys.call(), parent.frame())
   sc.names <- names(sc)
 
   ## here we check to see if the function was called with tdat = if it
@@ -1770,7 +1770,8 @@ npsigtest.default <- function(bws, xdat, ydat, ...){
             add = TRUE)
   }
 
-  tbw <- .np_eval_bw_call(sc.bw, caller_env = parent.frame())
+  tbw <- .np_eval_bw_call(sc.bw, caller_env = parent.frame(),
+                         formula.value = .np_formula_value(formula.input, bws, xdat))
   
   call.args <- list(bws = tbw)
   if (!is.null(frame.state))

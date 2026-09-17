@@ -5,7 +5,8 @@ npscoefbw <-
     .np_validate_public_dots(mc[["..."]], "npscoefbw")
     target <- .np_bw_dispatch_target(dots = mc$...,
                                      data_arg_names = c("xdat", "ydat", "zdat"),
-                                     eval_env = parent.frame())
+                                     eval_env = parent.frame(),
+                                     promise.frame = environment())
     UseMethod("npscoefbw", target)
   }
 

@@ -99,7 +99,41 @@
   list(ok = FALSE, value = NULL, error = first_error)
 }
 
-.np_eval_bw_call <- function(call_obj, caller_env = parent.frame()) {
+.np_formula_expand_call <- function(call_obj, caller_env = parent.frame()) {
+  if (any(vapply(as.list(call_obj)[-1L], identical, logical(1L), quote(...)))) {
+    call_obj <- match.call(definition = function(...) NULL, call = call_obj,
+                           expand.dots = TRUE, envir = caller_env)
+    # Keep ordinary arguments as references to the original dot promises.
+    # subset alone is syntax evaluated in the model-frame data mask; ..n is
+    # not meaningful in that mask or in a separately constructed formula env.
+    subset <- match("subset", names(call_obj), nomatch = 0L)
+    if (subset) call_obj[[subset]] <-
+      .np_formula_dot_expression(call_obj[[subset]], caller_env)
+  }
+  call_obj
+}
+
+.np_formula_dot_expression <- function(expr, caller_env) {
+  if (is.symbol(expr) && grepl("^\\.\\.[0-9]+$", as.character(expr))) {
+    index <- as.integer(substring(as.character(expr), 3L))
+    expressions <- eval(quote(substitute(list(...))), envir = caller_env)
+    if (index > 0L && index < length(expressions)) return(expressions[[index + 1L]])
+  }
+  expr
+}
+
+.np_formula_value <- function(formula = NULL, bws, data, data.name = "xdat") {
+  if (inherits(formula, "formula"))
+    return(list(formal = "formula", value = formula, data.name = data.name))
+  if (!missing(bws) && inherits(bws, "formula"))
+    return(list(formal = "bws", value = bws, data.name = data.name))
+  if (!missing(data) && inherits(data, "formula"))
+    return(list(formal = data.name, value = data, data.name = data.name))
+  NULL
+}
+
+.np_eval_bw_call <- function(call_obj, caller_env = parent.frame(),
+                             formula.value = NULL) {
   if (!is.call(call_obj))
     stop("bandwidth selector call is malformed", call. = FALSE)
 
@@ -113,7 +147,34 @@
       as.character(selector) %in% getNamespaceExports("npRmpi"))
     call_obj[[1L]] <- call("::", as.name("npRmpi"), selector)
 
-  eval(call_obj, envir = caller_env)
+  formula.expression <- NULL
+  if (!is.null(formula.value)) {
+    if (!inherits(formula.value$value, "formula"))
+      stop("invalid resolved formula handoff", call. = FALSE)
+    # Match positions without evaluating expressions. The selector handoff
+    # retains the fitter's bws/data positions, including a positional formula
+    # beside named numeric bws. Do not guess from the first unnamed argument:
+    # an owner can intentionally discard its formula for explicit native data.
+    tagged <- call_obj
+    for (i in seq.int(2L, length(tagged))) tagged[[i]] <- i
+    matcher <- function(bws, xdat, ...) NULL
+    names(formals(matcher))[2L] <- formula.value$data.name
+    matched <- match.call(matcher, tagged, expand.dots = TRUE)
+    source <- formula.value$formal
+    if (source == "bws" && "formula" %in% names(matched)) source <- "formula"
+    index <- matched[[source]]
+    if (!is.null(index)) {
+      formula.expression <- .np_formula_dot_expression(call_obj[[index]], caller_env)
+      call_obj[[index]] <- substitute(quote(VALUE), list(VALUE = formula.value$value))
+    }
+  }
+  result <- eval(call_obj, envir = caller_env)
+  # Execute with the already-resolved value, but preserve the user's formula
+  # expression in the existing call metadata. No handoff state is retained.
+  if (!is.null(formula.expression) && !is.null(result[["formula"]]) &&
+      is.call(result[["call"]]))
+    result[["call"]][["formula"]] <- formula.expression
+  result
 }
 
 .np_bw_call_uses_nomad_degree_search <- function(call_obj, caller_env = parent.frame()) {
@@ -192,20 +253,31 @@
   search.engine %in% c("nomad", "nomad+powell")
 }
 
-.np_bw_dispatch_target <- function(dots, data_arg_names = character(), eval_env = parent.frame()) {
+.np_bw_dispatch_target <- function(dots, data_arg_names = character(), eval_env = parent.frame(),
+                                   promise.frame = NULL) {
   if (length(dots) == 0L)
     stop("invoked without arguments")
 
   dot.names <- names(dots)
   has.named.bws <- !is.null(dot.names) && any(dot.names == "bws")
 
+  value <- function(i) {
+    if (is.null(promise.frame))
+      return(.np_try_eval_in_frames(dots[[i]], eval_env = eval_env))
+    # Force the original dot promise, not its captured syntax. UseMethod
+    # forwards this same promise to the selected method. In particular an
+    # error must propagate here, not cause the formula factory to be retried.
+    list(ok = TRUE, value = eval(substitute(...elt(INDEX), list(INDEX = i)),
+                                envir = promise.frame))
+  }
+
   if (!is.null(dot.names) && any(dot.names == "formula")) {
-    fval <- .np_try_eval_in_frames(dots[[which(dot.names == "formula")[1L]]], eval_env = eval_env)
+    fval <- value(which(dot.names == "formula")[1L])
     if (isTRUE(fval$ok))
       return(fval$value)
   }
 
-  first.eval <- .np_try_eval_in_frames(dots[[1L]], eval_env = eval_env)
+  first.eval <- value(1L)
   if (!isTRUE(first.eval$ok))
     return(NULL)
   first.val <- first.eval$value
@@ -216,7 +288,7 @@
     return(NULL)
 
   if (has.named.bws) {
-    bval <- .np_try_eval_in_frames(dots[[which(dot.names == "bws")[1L]]], eval_env = eval_env)
+    bval <- value(which(dot.names == "bws")[1L])
     if (isTRUE(bval$ok))
       return(bval$value)
   }

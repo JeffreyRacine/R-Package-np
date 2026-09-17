@@ -312,7 +312,7 @@ npudist.default <- function(bws, tdat, ..., se = FALSE){
     return(do.call(npudist, c(list(bws = tbw, se = se), dots)))
   }
 
-  sc <- sys.call()
+  sc <- .np_formula_expand_call(sys.call(), parent.frame())
   sc.names <- names(sc)
 
   ## here we check to see if the function was called with tdat =
@@ -361,10 +361,12 @@ npudist.default <- function(bws, tdat, ..., se = FALSE){
   tbw <- if (!has.explicit.bws) {
     .np_progress_select_bandwidth_enhanced(
       "Selecting distribution bandwidth",
-      .np_eval_bw_call(sc.bw, caller_env = parent.frame())
+      .np_eval_bw_call(sc.bw, caller_env = parent.frame(),
+                         formula.value = .np_formula_value(formula.input, bws, tdat, "dat"))
     )
   } else {
-    .np_eval_bw_call(sc.bw, caller_env = parent.frame())
+    .np_eval_bw_call(sc.bw, caller_env = parent.frame(),
+                         formula.value = .np_formula_value(formula.input, bws, tdat, "dat"))
   }
 
   ## convention: first argument is always dropped, second, if present, propagated

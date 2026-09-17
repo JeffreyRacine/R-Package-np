@@ -1,5 +1,10 @@
 # npRmpi 0.80-1
 
+* Formula constructors supplied inline are evaluated once per invocation,
+  including the one-call bandwidth/fit route. Existing formula values and
+  literal formulas remain supported; callers need not construct a formula
+  in a separate statement. Forwarded calls retain lazy subset evaluation.
+
 * Bootstrap fan-out and the MPI apply collectors drain outstanding worker
   replies before rethrowing supported master-side errors, interrupts or
   dispatch timeouts. Operation identities prevent stale replies from being

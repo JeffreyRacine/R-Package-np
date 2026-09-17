@@ -683,7 +683,7 @@ npcdens.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   .npRmpi_require_active_slave_pool(where = "npcdens()")
   .npRmpi_guard_no_auto_object_in_manual_bcast(bws, where = "npcdens()")
   nomad <- npValidateNomadControl(nomad, "nomad")
-  sc <- sys.call()
+  sc <- .np_formula_expand_call(sys.call(), parent.frame())
   sc.names <- names(sc)
 
   ## here we check to see if the function was called with tdat =
@@ -826,13 +826,16 @@ npcdens.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
     if (use.outer.bandwidth.progress) {
       .np_progress_select_bandwidth_enhanced(
         "Selecting conditional density bandwidth",
-        .np_eval_bw_call(sc.bw, caller_env = parent.frame())
+        .np_eval_bw_call(sc.bw, caller_env = parent.frame(),
+                         formula.value = .np_formula_value(formula.input, bws, txdat))
       )
     } else {
-      .np_eval_bw_call(sc.bw, caller_env = parent.frame())
+      .np_eval_bw_call(sc.bw, caller_env = parent.frame(),
+                         formula.value = .np_formula_value(formula.input, bws, txdat))
     }
   } else {
-    .np_eval_bw_call(sc.bw, caller_env = parent.frame())
+    .np_eval_bw_call(sc.bw, caller_env = parent.frame(),
+                         formula.value = .np_formula_value(formula.input, bws, txdat))
   }
 
   call.args <- list(bws = tbw)

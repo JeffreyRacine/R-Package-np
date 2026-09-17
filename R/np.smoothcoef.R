@@ -172,7 +172,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
       (explicit.scbandwidth || identical(degree.select.value, "manual")))
     return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
-  sc <- sys.call()
+  sc <- .np_formula_expand_call(sys.call(), parent.frame())
   sc.names <- names(sc)
 
   ## here we check to see if the function was called with tdat =
@@ -246,13 +246,16 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
     if (use.outer.bandwidth.progress) {
       .np_progress_select_bandwidth_enhanced(
         "Selecting smooth coefficient bandwidth",
-        .np_eval_bw_call(sc.bw, caller_env = parent.frame())
+        .np_eval_bw_call(sc.bw, caller_env = parent.frame(),
+                         formula.value = .np_formula_value(formula.input, bws, txdat))
       )
     } else {
-      .np_eval_bw_call(sc.bw, caller_env = parent.frame())
+      .np_eval_bw_call(sc.bw, caller_env = parent.frame(),
+                         formula.value = .np_formula_value(formula.input, bws, txdat))
     }
   } else {
-    .np_eval_bw_call(sc.bw, caller_env = parent.frame())
+    .np_eval_bw_call(sc.bw, caller_env = parent.frame(),
+                         formula.value = .np_formula_value(formula.input, bws, txdat))
   }
 
   ## because of some ambiguities in how the function might be called
