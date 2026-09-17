@@ -763,6 +763,9 @@ predict.lsqregression <- function(object, se.fit = FALSE, ...) {
   dots <- list(...)
   defer.empty <- isTRUE(dots[[".np.defer.empty.rows", exact = TRUE]])
   dots$.np.defer.empty.rows <- NULL
+  npRejectLegacyBooleanErrors(dots, "predict.lsqregression")
+  if ("se" %in% names(dots))
+    stop("predict.lsqregression() uses se.fit=, not se=", call. = FALSE)
   if (length(object$tau) > 1L) {
     if (is.null(object$tau.fits) || length(object$tau.fits) != length(object$tau))
       stop("vector nplsqreg object lacks per-tau fit state", call. = FALSE)
@@ -770,6 +773,11 @@ predict.lsqregression <- function(object, se.fit = FALSE, ...) {
     empty.state <- new.env(hash = FALSE, parent = emptyenv())
     empty.state$rows <- NULL
     child.dots <- dots
+    if (is.null(child.dots$exdat) && !is.null(child.dots$newdata) &&
+        !is.null(object$bws$formula)) {
+      child.dots$exdat <- .nplsqreg_predict_formula_newdata_to_exdat(object, child.dots$newdata)
+      child.dots$newdata <- NULL
+    }
     child.dots$.np.defer.empty.rows <- TRUE
     pred <- lapply(object$tau.fits, function(one) {
       value <- do.call(predict.lsqregression,
@@ -794,9 +802,6 @@ predict.lsqregression <- function(object, se.fit = FALSE, ...) {
     return(.npreg_finish_empty_rows(out, empty.state$rows, defer = defer.empty,
       owner = "predict.nplsqreg"))
   }
-  npRejectLegacyBooleanErrors(dots, "predict.lsqregression")
-  if ("se" %in% names(dots))
-    stop("predict.lsqregression() uses se.fit=, not se=", call. = FALSE)
   has.formula.route <- !is.null(object$bws$formula)
 
   if (!is.null(dots$exdat) && !is.null(dots$newdata))
