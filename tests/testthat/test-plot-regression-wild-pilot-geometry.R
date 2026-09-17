@@ -112,6 +112,37 @@ test_that("supplied wild pilots determine the independent residual transform", {
     b1_supplied_pilot_case(type)
 })
 
+test_that("exact wild derivative defaults match each public response refit", {
+  withr::local_preserve_seed()
+  withr::local_options(list(np.messages = FALSE, np.tree = FALSE))
+  set.seed(711)
+  n <- 32L
+  x <- data.frame(x = runif(n), u = factor(rep(letters[1:2], n/2)))
+  y <- sin(3*x$x) + .2*(x$u == "b") + rnorm(n, sd = .2)
+  ex <- x[c(4L, 15L, 26L), , drop = FALSE]
+  helper <- getFromNamespace(".np_wild_boot_from_regression_exact", "npRmpi")
+  for (type in c("fixed", "generalized_nn", "adaptive_nn")) {
+    bw <- npregbw(xdat = x, ydat = y,
+      bws = c(if (type == "fixed") .3 else 14L, .25),
+      bandwidth.compute = FALSE, bwtype = type, regtype = "lc")
+    pilot <- fitted(npreg(bws = bw, txdat = x, tydat = y))
+    set.seed(123)
+    signs <- matrix(ifelse(runif(n*7L) <= .5, -1, 1), n, 7L)
+    expected.rng <- .Random.seed
+    expected <- t(vapply(seq_len(7L), function(j) {
+      response <- pilot + (y-pilot)*signs[,j]
+      gradients(npreg(bws = bw, txdat = x, tydat = response,
+                      exdat = ex, gradients = TRUE))[,1L]
+    }, numeric(nrow(ex))))
+    set.seed(123)
+    actual <- helper(xdat = x, exdat = ex, bws = bw, ydat = y,
+                     B = 7L, wild = "rademacher", gradients = TRUE,
+                     slice.index = 1L)
+    expect_equal(actual$t, expected, tolerance = 5e-10)
+    expect_identical(.Random.seed, expected.rng)
+  }
+})
+
 test_that("public fit and bandwidth plots share an automatic training pilot", {
   withr::local_preserve_seed()
   withr::local_options(list(np.messages = FALSE, np.tree = FALSE))
