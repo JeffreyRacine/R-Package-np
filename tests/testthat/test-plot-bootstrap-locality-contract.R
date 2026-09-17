@@ -50,7 +50,7 @@ test_that("wild regression bootstrap preserves adaptive hat-owner and exact LC d
   expect_match(fn.body, "npreghat\\.rbandwidth\\(")
   expect_match(fn.body, "output = \"apply\"")
   expect_match(fn.body, "output = \"matrix\"")
-  expect_match(fn.body, "\\.npRmpi_with_local_regression\\(suppressWarnings\\(npreg\\.rbandwidth\\(")
+  expect_match(fn.body, "\\.npRmpi_with_local_regression\\(suppressWarnings\\(\\.npreghat_complete\\(")
   expect_match(fn.body, "\\.npRmpi_with_local_regression\\(suppressWarnings\\(npreghat\\.rbandwidth\\(")
   expect_match(fn.body, "use\\.exact\\.degree0\\.derivative")
   expect_match(fn.body, "\\.np_plot_regression_exact_lc_derivative_requested\\(")

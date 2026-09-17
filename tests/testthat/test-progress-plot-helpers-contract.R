@@ -478,40 +478,42 @@ test_that("block bootstrap drawer uses iid fast path when block length is one", 
   expect_true(all(out >= 0))
 })
 
-test_that("block bootstrap drawer defers ts.array setup until chunk demand in npRmpi", {
+test_that("block drawer is lazy and matches replicate-wise block draws in npRmpi", {
+  withr::local_preserve_seed()
   drawer_factory <- getFromNamespace(".np_block_counts_drawer", "npRmpi")
-  boot.ns <- asNamespace("boot")
-  assign(".npRmpi_test_ts_array_calls", 0L, envir = .GlobalEnv)
+  ts_array <- getFromNamespace("ts.array", "boot")
+  n <- 12L
+  n.sim <- 17L
+  for (sim in c("fixed", "geom")) for (endcorr in c(FALSE, TRUE)) {
+    set.seed(20260313)
+    before <- .Random.seed
+    drawer <- drawer_factory(n = n, B = 4L, blocklen = 3L, sim = sim,
+                             n.sim = n.sim, endcorr = endcorr)
+    expect_identical(.Random.seed, before)
+    actual <- cbind(drawer(1L, 2L), drawer(3L, 4L))
+    actual.rng <- .Random.seed
 
-  trace(
-    what = "ts.array",
-    where = boot.ns,
-    tracer = quote(assign(
-      ".npRmpi_test_ts_array_calls",
-      get(".npRmpi_test_ts_array_calls", envir = .GlobalEnv) + 1L,
-      envir = .GlobalEnv
-    )),
-    print = FALSE
-  )
-  on.exit({
-    untrace("ts.array", where = boot.ns)
-    rm(".npRmpi_test_ts_array_calls", envir = .GlobalEnv)
-  }, add = TRUE)
+    set.seed(20260313)
+    expected <- vapply(seq_len(4L), function(i) {
+      draw <- ts_array(n = n, n.sim = n.sim, R = 1L, l = 3L,
+                       sim = sim, endcorr = endcorr)
+      starts <- as.vector(draw$starts)
+      lengths <- as.vector(draw$lengths)
+      # Independent wrapping/count oracle; no package block-drawer helper.
+      indices <- unlist(lapply(seq_along(starts), function(j) {
+        ((starts[j] - 1L + seq_len(lengths[j]) - 1L) %% n) + 1L
+      }), use.names = FALSE)[seq_len(n.sim)]
+      as.double(tabulate(indices, nbins = n))
+    }, numeric(n))
+    expect_identical(actual, expected)
+    expect_identical(actual.rng, .Random.seed)
+    expect_true(all(colSums(actual) == n.sim))
 
-  set.seed(20260313)
-  drawer <- drawer_factory(n = 12L, B = 9L, blocklen = 3L, sim = "geom", n.sim = 12L)
-
-  expect_identical(get(".npRmpi_test_ts_array_calls", envir = .GlobalEnv), 0L)
-
-  out1 <- drawer(1L, 2L)
-  expect_identical(get(".npRmpi_test_ts_array_calls", envir = .GlobalEnv), 1L)
-  expect_identical(dim(out1), c(12L, 2L))
-  expect_true(all(colSums(out1) == 12L))
-
-  out2 <- drawer(3L, 4L)
-  expect_identical(get(".npRmpi_test_ts_array_calls", envir = .GlobalEnv), 2L)
-  expect_identical(dim(out2), c(12L, 2L))
-  expect_true(all(colSums(out2) == 12L))
+    set.seed(20260313)
+    whole <- drawer_factory(n, 4L, 3L, sim, n.sim, endcorr)(1L, 4L)
+    expect_identical(whole, actual)
+    expect_identical(.Random.seed, actual.rng)
+  }
 })
 
 test_that("plot progress chunk controller adapts chunk size toward throttle interval in npRmpi", {

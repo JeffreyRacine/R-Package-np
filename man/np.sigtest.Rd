@@ -203,6 +203,13 @@ Further arguments are passed to the bandwidth-selection routines used by the tes
   account for bandwidth or degree-selection uncertainty, or guarantee size
   calibration for every sample and configuration.
 
+  Studentization can reduce size distortion, but does not uniformly improve
+  finite-sample calibration or power. In sparse designs it can be
+  conservative and have lower power than the unstandardized statistic;
+  rejection frequencies from an oversized unstandardized test are not
+  size-adjusted power comparisons. The choice of pivot does not replace
+  assessment of the fitted model and available local information.
+
   Identical categorical endpoints contribute zero without changing the
   number of observations in the statistic's denominator. A native
   certificate of identically zero paired influence has the same
