@@ -127,3 +127,122 @@
   do.call(.np_formula_model_frame, mf.args,
           envir = environment(mf.args[["formula"]]))
 }
+
+# Partially linear formulas have two retained role terms but one observation
+# set. Keep the joint frame invocation-local and project trained metadata back
+# into the existing terms/xterms fields.
+.np_plreg_formula_spec <- function(formula, chromoly = NULL) {
+  if (is.null(chromoly))
+    chromoly <- explodePipe(formula, env = environment(formula))
+  if (length(chromoly) != 3L)
+    stop("invoked with improper formula, please see npplregbw documentation for proper use")
+  bronze <- vapply(chromoly, paste, character(1L), collapse = " + ")
+  make <- function(text) terms(as.formula(text, env = environment(formula)))
+  list(chromoly = chromoly,
+       terms = make(paste(bronze[[1L]], "~", bronze[[3L]])),
+       xterms = make(paste("~", bronze[[2L]])),
+       joint = make(paste(bronze[[1L]], "~", bronze[[2L]], "+", bronze[[3L]])))
+}
+
+.np_plreg_formula_indices <- function(role, joint) {
+  variables <- as.list(attr(role, "variables"))[-1L]
+  combined <- as.list(attr(joint, "variables"))[-1L]
+  vapply(variables, function(variable) {
+    index <- which(vapply(combined, identical, logical(1L), variable))
+    if (length(index) != 1L)
+      stop("inconsistent partially linear formula variables", call. = FALSE)
+    index
+  }, integer(1L))
+}
+
+.np_plreg_formula_prediction <- function(role, joint) {
+  prediction <- .np_formula_unwrap_prediction(role)$prediction
+  variables <- attr(role, "variables")
+  if (is.call(prediction) && identical(prediction[[1L]], quote(list)) &&
+      length(prediction) == length(variables))
+    return(list(prediction = prediction, scaffold = NULL))
+
+  # Old plreg objects wrapped the full joint alignment in an exact role
+  # subset. Recognize that package-owned shape only; user prediction calls
+  # and trained transform expressions are never stripped heuristically.
+  if (is.call(prediction) && length(prediction) == 5L &&
+      identical(prediction[[1L]], quote(`[`))) {
+    inner <- prediction[[2L]]
+    indices <- .np_plreg_formula_indices(role, joint)
+    expected <- substitute(INNER[, INDEX, drop = FALSE],
+                           list(INNER = inner, INDEX = indices))
+    if (identical(prediction, expected)) {
+      aligned <- inner
+      if (is.call(aligned) && length(aligned) == 2L &&
+          identical(aligned[[1L]], quote(`(`)))
+        aligned <- aligned[[2L]]
+      temporary <- joint
+      attr(temporary, "predvars") <- aligned
+      unwrapped <- .np_formula_unwrap_prediction(temporary)$prediction
+      if (!identical(aligned, unwrapped) &&
+          identical(unwrapped, attr(joint, "variables")))
+        return(list(prediction = variables, scaffold = inner))
+    }
+  }
+  stop("unsupported partially linear prediction metadata", call. = FALSE)
+}
+
+.np_plreg_formula_terms <- function(bws) {
+  spec <- .np_plreg_formula_spec(bws$formula, bws$chromoly)
+  joint <- spec$joint
+  roles <- list(bws$terms, bws$xterms)
+  predictions <- lapply(roles, .np_plreg_formula_prediction, joint = joint)
+  if (!is.null(predictions[[1L]]$scaffold) &&
+      !is.null(predictions[[2L]]$scaffold) &&
+      !identical(predictions[[1L]]$scaffold, predictions[[2L]]$scaffold))
+    stop("inconsistent partially linear alignment metadata", call. = FALSE)
+  combined <- attr(joint, "variables")
+  seen <- rep_len(FALSE, length(combined) - 1L)
+  for (i in seq_along(roles)) {
+    indices <- .np_plreg_formula_indices(roles[[i]], joint)
+    prediction <- predictions[[i]]$prediction
+    for (j in seq_along(indices)) {
+      index <- indices[[j]]
+      if (seen[[index]] && !identical(combined[[index + 1L]], prediction[[j + 1L]]))
+        stop("inconsistent partially linear trained prediction terms", call. = FALSE)
+      combined[[index + 1L]] <- prediction[[j + 1L]]
+      seen[[index]] <- TRUE
+    }
+  }
+  if (!all(seen))
+    stop("incomplete partially linear formula metadata", call. = FALSE)
+  attr(joint, "predvars") <- combined
+  joint
+}
+
+.np_plreg_formula_split <- function(frame, terms, xterms) {
+  joint <- attr(frame, "terms")
+  split.role <- function(role) {
+    indices <- .np_plreg_formula_indices(role, joint)
+    out <- frame[, indices, drop = FALSE]
+    attr(role, "predvars") <- as.call(c(list(quote(list)),
+      as.list(attr(joint, "predvars"))[indices + 1L]))
+    classes <- attr(joint, "dataClasses")
+    if (!is.null(classes)) attr(role, "dataClasses") <- classes[indices]
+    attr(out, "terms") <- role
+    attr(out, "na.action") <- attr(frame, "na.action")
+    out
+  }
+  list(yz = split.role(terms), x = split.role(xterms))
+}
+
+.np_plreg_formula_frame <- function(bws, data = NULL) {
+  m <- match(c("formula", "data", "subset", "na.action"),
+             names(bws$call), nomatch = 0L)
+  args <- as.list(bws$call[c(1L, m)])[-1L]
+  args$formula <- .np_plreg_formula_terms(bws)
+  if (!is.null(data)) args$data <- data
+  .np_bws_formula_model_frame(bws, args, data.override = !is.null(data))
+}
+
+.np_plreg_formula_training <- function(bws, data = NULL) {
+  frame <- .np_plreg_formula_frame(bws, data)
+  roles <- .np_plreg_formula_split(frame, bws$terms, bws$xterms)
+  list(txdat = roles$x, tydat = model.response(roles$yz),
+       tzdat = roles$yz[, bws$chromoly[[3L]], drop = FALSE])
+}

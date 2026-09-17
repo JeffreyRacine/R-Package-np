@@ -15,99 +15,33 @@ npplregbw.formula <-
     m <- match(c("formula", "data", "subset", "na.action"),
                names(mf), nomatch = 0)
     mf <- mf[c(1,m)]
-
     formula.call <- .np_bw_formula_from_call(call_obj = call, eval_env = parent.frame())
-    if (!is.null(formula.call))
-      mf[[2]] <- formula.call
-
-    mf.xf <- mf
-    
-    mf[[1]] <- as.name("model.frame")
-    mf.xf[[1]] <- as.name("model.frame")
-    
-    ## mangle formula ...
     formula.obj <- .np_bw_resolve_formula(formula_obj = formula,
                                         formula_call = formula.call,
                                         eval_env = parent.frame())
-    chromoly <- explodePipe(formula.obj, env = environment(formula))
-
-    if (length(chromoly) != 3) ## stop if malformed formula
-      stop("invoked with improper formula, please see npplregbw documentation for proper use")
-
-    ## make formula evaluable, then eval
-    bronze <- lapply(chromoly, paste, collapse = " + ")
-
-    mf.xf[["formula"]] <- as.formula(paste(" ~ ", bronze[[2]]),
-                                    env = environment(formula))
-
-    mf[["formula"]] <- as.formula(paste(bronze[[1]]," ~ ", bronze[[3]]),
-                                  env = environment(formula))
-
-    formula.all <- if(missing(data)) {
-        terms(as.formula(paste(" ~ ",bronze[[1]]," + ",bronze[[2]], " + ",bronze[[3]]),
-                                  env = environment(formula)))
-    } else {
-        terms(as.formula(paste(" ~ ",bronze[[1]]," + ",bronze[[2]], " + ",bronze[[3]]),
-                                  env = environment(formula)), data = data)
-    }
-
-    orig.ts <- if (missing(data))
-      .np_terms_ts_mask(terms_obj = formula.all,
-                        data = environment(formula.all),
-                        eval_env = environment(formula.all))
-    else .np_terms_ts_mask(terms_obj = formula.all,
-                           data = data,
-                           eval_env = environment(formula.all))
-
-    arguments.mfx <- chromoly[[2]]
-    arguments.mf <- c(chromoly[[1]],chromoly[[3]])
-
-    mf[["formula"]] <- terms(mf[["formula"]])
-    mf.xf[["formula"]] <- terms(mf.xf[["formula"]])
-    
-    if(all(orig.ts)){
-      arguments <- (as.list(attr(formula.all, "variables"))[-1])
-      attr(mf[["formula"]], "predvars") <- bquote(.(as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments)))))[,.(match(arguments.mf,arguments)),drop = FALSE])
-      attr(mf.xf[["formula"]], "predvars") <- bquote(.(as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments)))))[,.(match(arguments.mfx,arguments)),drop = FALSE])
-    }else if(any(orig.ts)){
-      arguments <- (as.list(attr(formula.all, "variables"))[-1])
-      arguments.normal <- arguments[which(!orig.ts)]
-      arguments.timeseries <- arguments[which(orig.ts)]
-
-      ix <- sort(c(which(orig.ts),which(!orig.ts)),index.return = TRUE)$ix
-      attr(mf[["formula"]], "predvars") <- bquote((.(as.call(c(quote(cbind),as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments.timeseries)))),arguments.normal,check.rows = TRUE)))[,.(ix)])[,.(match(arguments.mf,arguments)),drop = FALSE])
-      attr(mf.xf[["formula"]], "predvars") <- bquote((.(as.call(c(quote(cbind),as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments.timeseries)))),arguments.normal,check.rows = TRUE)))[,.(ix)])[,.(match(arguments.mfx,arguments)),drop = FALSE])
-    }
-    
-    mf.args <- as.list(mf[-1L])
-    mf.xf.args <- as.list(mf.xf[-1L])
-    mf <- do.call(stats::model.frame, mf.args, envir = parent.frame())
-    mf.xf <- do.call(stats::model.frame, mf.xf.args, envir = parent.frame())
-
-    ydat <- model.response(mf)
-    xdat <- mf.xf
-    zdat <- mf[, chromoly[[3]], drop = FALSE]
-
+    spec <- .np_plreg_formula_spec(formula.obj)
+    mf[["formula"]] <- spec$joint
+    frame <- do.call(.np_formula_model_frame, as.list(mf[-1L]),
+                     envir = parent.frame())
+    roles <- .np_plreg_formula_split(frame, spec$terms, spec$xterms)
+    dots <- list(...)
+    .np_formula_frame_store(dots[[".np.formula.state", exact = TRUE]], frame)
+    dots$.np.formula.state <- NULL
     tbw <- do.call(npplregbw,
-                   c(list(xdat = xdat, ydat = ydat, zdat = zdat), list(...)))
+                  c(list(xdat = roles$x, ydat = model.response(roles$yz),
+                         zdat = roles$yz[, spec$chromoly[[3L]], drop = FALSE]),
+                    dots))
 
-    ## clean up (possible) inconsistencies due to recursion ...
-    tbw$call <- match.call(expand.dots = FALSE)
+    tbw$call <- .np_formula_call_public(match.call(expand.dots = FALSE))
     environment(tbw$call) <- parent.frame()
     tbw$formula <- formula
-    tbw$rows.omit <- as.vector(attr(mf,"na.action"))
+    tbw$rows.omit <- as.vector(attr(frame, "na.action"))
     tbw$nobs.omit <- length(tbw$rows.omit)
-    tbw$terms <- attr(mf,"terms")
-    tbw$xterms <- attr(mf.xf,"terms")
-    tbw$chromoly <- chromoly
-
-    tbw <-
-      updateBwNameMetadata(nameList =
-                           list(ynames =
-                                attr(mf, "names")[attr(tbw$terms, "response")]),
-                           bws = tbw)
-
-    tbw
+    tbw$terms <- attr(roles$yz, "terms")
+    tbw$xterms <- attr(roles$x, "terms")
+    tbw$chromoly <- spec$chromoly
+    updateBwNameMetadata(nameList = list(ynames =
+      names(roles$yz)[attr(tbw$terms, "response")]), bws = tbw)
   }
 
 

@@ -100,27 +100,10 @@
     if (any(miss.xyz) && !all(miss.xyz))
       stop("one of, but not both, xdat and ydat was specified")
     else if(all(miss.xyz) && !is.null(bws$formula)){
-      tt <- terms(bws)
-      m <- match(c("formula", "data", "subset", "na.action"),
-               names(bws$call), nomatch = 0)
-
-      tmf.xf <- tmf.x <- tmf <- bws$call[c(1,m)]
-      tmf.xf[[1]] <- tmf[[1]] <- as.name("model.frame")
-      tmf[["formula"]] <- tt
-      mf.args <- as.list(tmf)[-1L]
-      umf <- tmf <- do.call(stats::model.frame, mf.args, envir = environment(tt))
-
-      bronze <- lapply(bws$chromoly, paste, collapse = " + ")
-
-      tmf.xf[["formula"]] <- as.formula(paste(" ~ ", bronze[[2]]),
-                                      env = environment(tt))
-      mf.xf.args <- as.list(tmf.xf)[-1L]
-      tmf.xf <- do.call(stats::model.frame, mf.xf.args, envir = environment(tt))
-      
-      ydat <- model.response(tmf)
-      xdat <- tmf.xf
-
-      zdat <- tmf[, bws$chromoly[[3]], drop = FALSE]
+      training <- .np_plreg_formula_training(bws, data)
+      xdat <- training$txdat
+      ydat <- training$tydat
+      zdat <- training$tzdat
     } else {
       if(all(miss.xyz) && !is.null(bws$call)){
         xdat <- data.frame(.np_eval_bws_call_arg(bws, "xdat"))

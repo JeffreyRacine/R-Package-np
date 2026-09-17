@@ -25,110 +25,56 @@ npplreg <-
 npplreg.formula <-
   function(bws, data = NULL, newdata = NULL, y.eval = FALSE, ..., se = FALSE){
     se <- npValidateScalarLogical(se, "se")
-    
-    tt <- terms(bws)
-    tt.xf <- bws$xterms
-    
-    m <- match(c("formula", "data", "subset", "na.action"),
-               names(bws$call), nomatch = 0)
-    tmf.xf <- tmf <- bws$call[c(1,m)]
-    
-    tmf[[1]] <- as.name("model.frame")
-    tmf.xf[[1]] <- as.name("model.frame")
-
-    tmf.xf[["formula"]] <- tt.xf
-    tmf[["formula"]] <- tt
-    if (!is.null(data)) {
-      tmf[["data"]] <- data
-      tmf.xf[["data"]] <- data
-    }
-
-    mf.args <- as.list(tmf)[-1L]
-    mf.xf.args <- as.list(tmf.xf)[-1L]
-    umf <- tmf <- do.call(stats::model.frame, mf.args, envir = environment(tt))
-    tmf.xf <- do.call(stats::model.frame, mf.xf.args, envir = environment(tt.xf))
-    
-    response.name <- attr(tmf, "names")[attr(attr(tmf, "terms"), "response")]
-    tydat <- model.response(tmf)
-    txdat <- tmf.xf
-    tzdat <- tmf[, bws$chromoly[[3]], drop = FALSE]
-
-    has.eval <- !is.null(newdata)
+    dots <- list(...)
+    frame.state <- dots[[".np.formula.state", exact = TRUE]]
+    dots$.np.formula.state <- NULL
+    frame <- if (is.null(frame.state)) .np_plreg_formula_frame(bws, data)
+             else .np_formula_frame_take(frame.state)
+    roles <- .np_plreg_formula_split(frame, bws$terms, bws$xterms)
+    response.name <- names(roles$yz)[attr(bws$terms, "response")]
+    pl.args <- list(txdat = roles$x, tydat = model.response(roles$yz),
+                    tzdat = roles$yz[, bws$chromoly[[3L]], drop = FALSE],
+                    se = se)
+    umf <- frame
+    native.eval <- !is.null(dots[["exdat", exact = TRUE]]) ||
+      !is.null(dots[["ezdat", exact = TRUE]])
+    has.eval <- !is.null(newdata) && !native.eval
     if (has.eval) {
-      npValidateNewdataFormula(newdata, tt.xf, include.response = FALSE)
-      if (!y.eval){
-        npValidateNewdataFormula(newdata, tt, include.response = FALSE)
+      tt <- attr(frame, "terms")
+      response.eval <- y.eval && is.null(dots[["eydat", exact = TRUE]])
+      npValidateNewdataFormula(newdata, tt, include.response = response.eval)
+      yzterms <- bws$terms
+      if (!response.eval) {
         tt <- delete.response(tt)
-        
-        bronze <- lapply(bws$chromoly, paste, collapse = " + ")
-        formula.xz <- terms(as.formula(paste(" ~ ",bronze[[2]], " + ",bronze[[3]]),
-                                       env = environment(bws$formula)))
-
-        orig.ts <- .np_terms_ts_mask(terms_obj = formula.xz, data = newdata)
-
-        arguments.mfx <- bws$chromoly[[2]]
-        arguments.mf <- bws$chromoly[[3]]
-
-        if(all(orig.ts)){
-          arguments <- (as.list(attr(formula.xz, "variables"))[-1])
-          attr(tt, "predvars") <- bquote(.(as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments)))))[,.(match(arguments.mf,arguments)),drop = FALSE])
-          attr(tt.xf, "predvars") <- bquote(.(as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments)))))[,.(match(arguments.mfx,arguments)),drop = FALSE])
-        }else if(any(orig.ts)){
-          arguments <- (as.list(attr(formula.xz, "variables"))[-1])
-          arguments.normal <- arguments[which(!orig.ts)]
-          arguments.timeseries <- arguments[which(orig.ts)]
-
-          ix <- sort(c(which(orig.ts),which(!orig.ts)),index.return = TRUE)$ix
-          attr(tt, "predvars") <- bquote((.(as.call(c(quote(cbind),as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments.timeseries)))),arguments.normal,check.rows = TRUE)))[,.(ix)])[,.(match(arguments.mf,arguments)),drop = FALSE])
-          attr(tt.xf, "predvars") <- bquote((.(as.call(c(quote(cbind),as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments.timeseries)))),arguments.normal,check.rows = TRUE)))[,.(ix)])[,.(match(arguments.mfx,arguments)),drop = FALSE])
-        }else{
-          attr(tt, "predvars") <- attr(tt, "variables")
-          attr(tt.xf, "predvars") <- attr(tt.xf, "variables")
-        }
-          
+        yzterms <- delete.response(yzterms)
       }
-      
-      if (y.eval)
-        npValidateNewdataFormula(newdata, tt, include.response = TRUE)
-      umf.args <- list(formula = tt, data = newdata)
-      umf <- do.call(stats::model.frame, umf.args, envir = parent.frame())
-      emf <- umf
-      emf.xf.args <- list(formula = tt.xf, data = newdata)
-      emf.xf <- do.call(stats::model.frame, emf.xf.args, envir = parent.frame())
-      
-      if (y.eval)
-        eydat <- model.response(emf)
-
-      exdat <- emf.xf
-      ezdat <- emf[, bws$chromoly[[3]], drop = FALSE]
-    }
-
-    pl.args <- list(txdat = txdat, tydat = tydat, tzdat = tzdat, se = se)
-    if (has.eval) {
-      pl.args$exdat <- exdat
-      pl.args$ezdat <- ezdat
-      if (y.eval)
-        pl.args$eydat <- eydat
+      umf <- .np_formula_model_frame(tt, data = newdata)
+      evaluation <- .np_plreg_formula_split(umf, yzterms, bws$xterms)
+      pl.args$exdat <- evaluation$x
+      pl.args$ezdat <- evaluation$yz[, bws$chromoly[[3L]], drop = FALSE]
+      if (response.eval)
+        pl.args$eydat <- model.response(evaluation$yz)
     }
     pl.args$bws <- bws
-    ev <- do.call(npplreg, c(pl.args, list(...)))
+    ev <- do.call(npplreg, c(pl.args, dots))
 
     if (length(response.name) == 1L && !is.na(response.name) && nzchar(response.name)) {
       if (!is.null(ev$bws))
         ev$bws$ynames <- response.name
     }
 
-    ev$omit <- attr(umf,"na.action")
+    # Residuals always index the training sample, independently of evaluation.
+    if (ev$residuals)
+      ev$resid <- naresid(attr(frame, "na.action"), ev$resid)
+    # Native evaluation already owns its row omissions and padding.
+    if (native.eval)
+      return(ev)
+    ev$omit <- attr(umf, "na.action")
     ev$rows.omit <- as.vector(ev$omit)
     ev$nobs.omit <- length(ev$rows.omit)
-
     ev$mean <- napredict(ev$omit, ev$mean)
     ev$merr <- napredict(ev$omit, ev$merr)
-
-    if(ev$residuals){
-        ev$resid <- naresid(ev$omit, ev$resid)
-    }    
-    return(ev)
+    ev
   }
 
 npplreg.call <-
@@ -819,6 +765,17 @@ npplreg.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ..., se = F
     names(sc.bw)[m.txy] <- nstxy[m.txy > 0]
   }
   sc.bw <- .np_public_dots_filter_call(sc.bw, "npplregbw")
+  formula.input <- list(...)[["formula", exact = TRUE]]
+  frame.state <- if (!has.explicit.bws &&
+      (bws.formula || inherits(formula.input, "formula") ||
+       (!no.txdat && inherits(txdat, "formula"))) &&
+      no.tydat && no.tzdat &&
+      (no.txdat || inherits(txdat, "formula")))
+    new.env(parent = emptyenv()) else NULL
+  if (!is.null(frame.state)) {
+    sc.bw$.np.formula.state <- frame.state
+    on.exit(rm(list = ls(frame.state, all.names = TRUE), envir = frame.state), add = TRUE)
+  }
     
   use.outer.bandwidth.progress <- !.np_bw_call_uses_nomad_degree_search(
     sc.bw,
@@ -839,7 +796,9 @@ npplreg.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ..., se = F
   }
   
   call.args <- list(bws = tbw, se = se)
-  if (no.bws) {
+  if (!is.null(frame.state)) {
+    call.args$.np.formula.state <- frame.state
+  } else if (no.bws) {
     call.args$txdat <- txdat
     call.args$tydat <- tydat
     call.args$tzdat <- tzdat

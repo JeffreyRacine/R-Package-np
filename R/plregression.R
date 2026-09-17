@@ -147,29 +147,7 @@ residuals.plregression <- function(object, ...) {
 
 .np_plreg_predict_train_data <- function(bws) {
   if (!is.null(bws$formula)) {
-    tt <- terms(bws)
-    tt.xf <- bws$xterms
-
-    m <- match(c("formula", "data", "subset", "na.action"),
-               names(bws$call), nomatch = 0)
-    tmf <- bws$call[c(1, m)]
-    tmf.xf <- bws$call[c(1, m)]
-
-    tmf[[1L]] <- as.name("model.frame")
-    tmf.xf[[1L]] <- as.name("model.frame")
-    tmf[["formula"]] <- tt
-    tmf.xf[["formula"]] <- tt.xf
-
-    mf.args <- as.list(tmf)[-1L]
-    mf.xf.args <- as.list(tmf.xf)[-1L]
-    train.mf <- do.call(stats::model.frame, mf.args, envir = environment(tt))
-    train.xf <- do.call(stats::model.frame, mf.xf.args, envir = environment(tt.xf))
-
-    list(
-      txdat = train.xf,
-      tydat = model.response(train.mf),
-      tzdat = train.mf[, bws$chromoly[[3L]], drop = FALSE]
-    )
+    .np_plreg_formula_training(bws)
   } else {
     list(
       txdat = toFrame(.np_eval_bws_call_arg(bws, "xdat")),
