@@ -201,14 +201,18 @@
   if (inherits(bws, c("conbandwidth", "condbandwidth")))
     .np_formula_validate_syntax(bws$formula, conditional.response = TRUE)
   call.env <- environment(bws$call)
-  if (!data.override && is.environment(call.env) &&
-      "data" %in% names(mf.args) && is.language(mf.args[["data"]])) {
-    # Resolve only the saved data expression in its existing owner, when
-    # model.frame forces it. Formula variables and subset retain their lexical
-    # data-mask semantics; neither the stored call nor its environment changes.
-    mf.args[["data"]] <- substitute(base::eval(quote(EXPR), envir = OWNER),
-                                    list(EXPR = mf.args[["data"]],
-                                         OWNER = call.env))
+  if (is.environment(call.env)) {
+    # These are the value arguments extracted from the saved model-frame call.
+    # Resolve them lazily in their original owner, including forwarded ..n
+    # promises. Formula variables and subset still use the formula/data mask.
+    # eval is necessary because do.call below runs in the formula environment,
+    # which need not contain the constructor's data or NA-action bindings.
+    owned <- intersect(c(if (!data.override) "data", "na.action"), names(mf.args))
+    for (name in owned) {
+      if (is.language(mf.args[[name]]))
+        mf.args[[name]] <- substitute(base::eval(quote(EXPR), envir = OWNER),
+                                     list(EXPR = mf.args[[name]], OWNER = call.env))
+    }
   }
   do.call(.np_formula_model_frame, mf.args,
           envir = environment(mf.args[["formula"]]))

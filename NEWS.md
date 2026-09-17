@@ -1,5 +1,10 @@
 # np 0.80-1
 
+* Arguments forwarded through `...` wrappers are honored as in direct calls:
+  an explicit `bws` is no longer ignored in favor of bandwidth search.
+  Saved formula objects also retain forwarded or caller-local `na.action`
+  settings when refitting, predicting, plotting or running significance tests.
+
 * Formula constructors supplied inline are evaluated once per invocation,
   including the one-call bandwidth/fit route. Existing formula values and
   literal formulas remain supported; callers need not construct a formula
