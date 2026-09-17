@@ -3094,11 +3094,11 @@
     (isTRUE(bws$xdati$iord[slice.index]) || isTRUE(bws$xdati$iuno[slice.index]))
 
   if (is.null(fit.mean.train)) {
+    # Automatic pilots are fitted training means, not external self-queries.
     fit.mean.train <- as.vector(.np_regression_direct(
       bws = bws,
       txdat = xdat,
       tydat = ydat,
-      exdat = xdat,
       gradients = FALSE,
       gradient.order = gradient.order
     )$mean)
@@ -12015,10 +12015,10 @@ compute.bootstrap.errors.rbandwidth =
           }
           fit.mean <- fit.mean.train
         } else {
+          # Omit exdat to retain training identity under generalized NN.
           fit.mean <- as.vector(suppressWarnings(.npreghat_complete(
             bws = bws,
             txdat = xdat,
-            exdat = xdat,
             y = ydat,
             output = "apply"
           )))
