@@ -111,3 +111,48 @@ test_that("private MPI extraction respects saved data ownership", {
   expect_identical(.npRmpi_npsig_extract_xy_from_bws(bw),
     list(xdat = mf["x"], ydat = model.response(mf)))
 })
+
+test_that("saved formula readers retain forwarded and caller-local NA policies", {
+  if (!spawn_mpi_slaves()) skip("MPI test pool unavailable")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  old <- options(np.messages = FALSE); on.exit(options(old), add = TRUE)
+  d <- data.frame(y = sin(1:24), x = seq(.1, .9, length.out = 24))
+  d$y[4L] <- NA_real_
+  f <- y ~ x
+  wrapper <- function(...) npreg(...)
+  outer <- function(...) wrapper(...)
+  model <- outer(f, data = d, na.action = na.exclude, bws = .4,
+                 bandwidth.compute = FALSE)
+  direct <- npreg(f, data = d, na.action = na.exclude, bws = .4,
+                  bandwidth.compute = FALSE)
+  expect_identical(fitted(npreg(model$bws)), fitted(direct))
+  expect_identical(predict(model, newdata = d[1:3, ]),
+                   predict(direct, newdata = d[1:3, ]))
+  a <- plot(model$bws, output = "data", errors = "none", neval = 3L)
+  b <- plot(direct$bws, output = "data", errors = "none", neval = 3L)
+  expect_identical(a[[1L]]$mean, b[[1L]]$mean)
+  expect_identical(a[[1L]]$eval, b[[1L]]$eval)
+  fields <- c("In", "In.bootstrap", "P")
+  a <- npsigtest(model$bws, B = 9L, random.seed = 1028L)
+  rng <- .Random.seed
+  b <- npsigtest(direct$bws, B = 9L, random.seed = 1028L)
+  expect_identical(a[fields], b[fields])
+  expect_identical(.Random.seed, rng)
+  # A formula environment is not the constructor's local argument owner.
+  na.policy <- function(x) stop("wrong NA-policy owner")
+  build <- function(data, policy) {
+    na.policy <- policy
+    npregbw(f, data = data, na.action = na.policy, bws = .4,
+            bandwidth.compute = FALSE)
+  }
+  for (policy in list(na.exclude, "na.exclude", function(x) na.exclude(x))) {
+    bw <- build(d, policy)
+    expect_identical(fitted(npreg(bw)), fitted(direct))
+    restored <- unserialize(serialize(bw, NULL))
+    expect_identical(fitted(npreg(restored)), fitted(direct))
+  }
+  clean <- d[complete.cases(d), ]
+  bw <- build(clean, NULL)
+  expect_identical(fitted(npreg(bw)),
+    fitted(npreg(f, data = clean, bws = .4, bandwidth.compute = FALSE)))
+})

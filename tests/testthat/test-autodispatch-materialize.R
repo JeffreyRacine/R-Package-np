@@ -575,3 +575,34 @@ test_that("autodispatch materialization expands deferred dots before shipping at
   expect_identical(prepared$tmpvals[[method.ref]], "kleinspady")
   expect_identical(prepared$tmpvals[[regtype.ref]], "ll")
 })
+test_that("positional and aliased dots use their supplied owner exactly once", {
+  materialize <- getFromNamespace(".npRmpi_autodispatch_materialize_call", "npRmpi")
+  state <- new.env(parent = emptyenv()); state$n <- 0L
+  owner <- function(...) {
+    mc <- quote(npregbw(xdat = ..1, ydat = ..2, bws = .4,
+                       bandwidth.compute = FALSE))
+    materialize(mc, environment())
+  }
+  x <- data.frame(x = 1:4); y <- 4:1
+  # A misleading binding outside the specified owner must not be selected.
+  xdat <- data.frame(x = rep(99, 4))
+  for (named in c(FALSE, TRUE)) {
+    state$n <- 0L
+    prepared <- if (named) owner(txdat = { state$n <- state$n + 1L; x },
+                                tydat = y) else
+      owner({ state$n <- state$n + 1L; x }, y)
+    expect_identical(state$n, 1L)
+    expect_identical(prepared$tmpvals[[as.character(prepared$call$xdat)]], x)
+    expect_identical(prepared$tmpvals[[as.character(prepared$call$ydat)]], y)
+  }
+  state$n <- 0L
+  expect_error(owner({ state$n <- state$n + 1L; stop("owned failure") }, y),
+               "owned failure")
+  expect_identical(state$n, 1L)
+  state$n <- 0L
+  expect_error(owner(xdat = { state$n <- state$n + 1L; stop("named owned failure") },
+                     ydat = y), "named owned failure")
+  expect_identical(state$n, 1L)
+  expect_error(materialize(quote(npregbw(xdat = ..9)), new.env(parent = baseenv())),
+               "cannot resolve forwarded argument")
+})

@@ -1,5 +1,12 @@
 # npRmpi 0.80-1
 
+* Arguments forwarded through `...` wrappers are honored as in direct calls:
+  an explicit `bws` is no longer ignored in favor of bandwidth search.
+  Saved formula objects also retain forwarded or caller-local `na.action`
+  settings when refitting, predicting, plotting or running significance tests.
+  Native-data wrappers can forward positional data or the `txdat`/`tydat`
+  aliases without requiring caller-local argument names on workers.
+
 * Ctrl-C during MPI fan-out remains an interrupt after worker cleanup, rather
   than becoming a "bad error message" error that ordinary error handlers
   could swallow and continue past.

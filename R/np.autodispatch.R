@@ -2165,9 +2165,11 @@
          call. = FALSE)
 
   dot.expr <- as.name(sprintf("..%d", idx[[1L]]))
+  # This is an owned promise, not an unresolved command. Direct evaluation
+  # preserves its condition and must not retry an interrupted/failed promise.
   list(
     found = TRUE,
-    value = .npRmpi_autodispatch_eval_arg(dot.expr, caller_env = caller_env)
+    value = eval(dot.expr, envir = caller_env)
   )
 }
 
@@ -2202,10 +2204,18 @@
       argname,
       caller_env = caller_env
     )
-    if (!isTRUE(binding.res$found))
-      stop(sprintf("autodispatch cannot resolve forwarded argument '%s' in its owner frame",
-                   argname), call. = FALSE)
-    return(binding.res$value)
+    if (isTRUE(binding.res$found))
+      return(binding.res$value)
+    # A dots-only wrapper has no matched formal binding. Its positional dots
+    # can also have a different public name (txdat -> xdat). Force that original
+    # promise in the supplied owner, never search another frame or re-evaluate
+    # its substituted expression. Bound formals above take precedence because
+    # matching can renumber a method's remaining dots.
+    index <- as.integer(substring(as.character(expr), 3L))
+    if (!is.na(index) && index > 0L && index <= length(dot.names))
+      return(eval(expr, envir = caller_env))
+    stop(sprintf("autodispatch cannot resolve forwarded argument '%s' in its owner frame",
+                 argname), call. = FALSE)
   }
 
   eval.res <- tryCatch(
