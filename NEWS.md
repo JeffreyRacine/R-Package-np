@@ -1,5 +1,15 @@
 # np 0.80-1
 
+* Automatic regression wild-bootstrap pilots now use fitted training-row
+  geometry whether plotting starts from a fitted model or its bandwidth
+  object. This corrects generalized-nearest-neighbour bands that previously
+  depended on that entry route. Explicitly supplied pilots and external
+  evaluation geometry are unchanged.
+
+* The significance-test documentation now notes that studentization can
+  improve size behavior without uniformly improving finite-sample calibration
+  or power. The default remains pivot=TRUE.
+
 * Formula fitting defers data-dependent subset expressions to the model-frame
   owner rather than forcing them during argument dispatch. One-call fits and
   constructor-first fits now use the same selected rows.
