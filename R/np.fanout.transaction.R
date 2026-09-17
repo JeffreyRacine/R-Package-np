@@ -280,6 +280,12 @@
                          call. = FALSE), error = function(e) invisible(NULL))
       }
       .npRmpi_fanout_forget(tx)
+      if (inherits(failure$condition, "interrupt")) {
+        # A real interrupt need not have a message. stop() would turn its
+        # unhandled default action into an ordinary, catchable error.
+        signalCondition(failure$condition)
+        invokeRestart("abort")
+      }
       stop(failure$condition)
     })
   }

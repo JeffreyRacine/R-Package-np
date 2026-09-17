@@ -1,5 +1,9 @@
 # npRmpi 0.80-1
 
+* Ctrl-C during MPI fan-out remains an interrupt after worker cleanup, rather
+  than becoming a "bad error message" error that ordinary error handlers
+  could swallow and continue past.
+
 * Formula constructors supplied inline are evaluated once per invocation,
   including the one-call bandwidth/fit route. Existing formula values and
   literal formulas remain supported; callers need not construct a formula

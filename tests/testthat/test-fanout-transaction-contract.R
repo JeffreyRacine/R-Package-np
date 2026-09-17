@@ -1,4 +1,4 @@
-# Pure protocol tests: no MPI initialization or worker launch is required.
+# Pure protocol tests except for the explicitly opted-in real SIGINT subprocess.
 fanout_contract_tx <- function(scheduler = "dynamic", n = 3L) {
   make <- getFromNamespace(".npRmpi_fanout_metadata", "npRmpi")
   tx <- make(101L, 1L, n, scheduler, NULL, "test-session", "test-operation", 18432L)
@@ -9,6 +9,57 @@ fanout_contract_tx <- function(scheduler = "dynamic", n = 3L) {
   tx$stop.tag <- n + 1L
   tx
 }
+
+test_that("a real fanout SIGINT is not swallowed by ordinary error handlers", {
+  skip_on_cran()
+  skip_if(Sys.getenv("NP_RMPI_RUN_FANOUT_SIGINT_TESTS") != "TRUE",
+          "opt-in real SIGINT subprocess")
+  skip_on_os("windows")
+  env <- npRmpi_subprocess_env()
+  skip_if(is.null(env), "installed npRmpi unavailable")
+  result <- npRmpi_run_rscript_subprocess(c(
+    "suppressPackageStartupMessages(library(npRmpi))",
+    "main <- function() {",
+    "  npRmpi.init(nslaves=1, quiet=TRUE)",
+    "  on.exit(npRmpi.quit(force=TRUE), add=TRUE)",
+    "  ns <- asNamespace('npRmpi')",
+    "  original <- get('.npRmpi_fanout_receive', ns)",
+    "  state <- new.env(parent=emptyenv())",
+    "  replacement <- function(tx, ...) {",
+    "    value <- original(tx, ...)",
+    "    if (!state$sent && identical(value$kind, 'result')) {",
+    "      state$sent <- TRUE",
+    "      tools::pskill(Sys.getpid(), 2L)",
+    "      Sys.sleep(0.01)",
+    "    }",
+    "    value",
+    "  }",
+    "  unlockBinding('.npRmpi_fanout_receive', ns)",
+    "  assign('.npRmpi_fanout_receive', replacement, ns)",
+    "  lockBinding('.npRmpi_fanout_receive', ns)",
+    "  for (wrapper in c('try', 'error')) {",
+    "    state$sent <- state$aborted <- state$resumed <- FALSE",
+    "    run <- function() mpi.iapplyLB(1:3, function(x) { Sys.sleep(0.02); x }, sleep=0.001)",
+    "    withRestarts({",
+    "      if (wrapper == 'try') try(run(), silent=TRUE)",
+    "      else tryCatch(run(), error=function(e) NULL)",
+    "      state$resumed <- TRUE",
+    "    }, abort=function() { state$aborted <- TRUE; NULL })",
+    "    stopifnot(state$sent, state$aborted, !state$resumed,",
+    "      length(ls(get('.npRmpi_fanout_state', ns))) == 0L)",
+    "    stopifnot(identical(mpi.iapplyLB(1:3, identity, sleep=0.001), as.list(1:3)))",
+    "  }",
+    "  unlockBinding('.npRmpi_fanout_receive', ns)",
+    "  assign('.npRmpi_fanout_receive', original, ns)",
+    "  lockBinding('.npRmpi_fanout_receive', ns)",
+    "}",
+    "main()",
+    "cat('REAL_SIGINT_REUSE_QUIT_OK\\n')"
+  ), timeout = 20L, env = env, cleanup = FALSE)
+  expect_identical(result$status, 0L, info = paste(result$output, collapse = "\n"))
+  expect_true(any(grepl("REAL_SIGINT_REUSE_QUIT_OK", result$output, fixed = TRUE)),
+              info = paste(result$output, collapse = "\n"))
+})
 
 test_that("fanout results and receipts have distinct identity and state duties", {
   accept <- getFromNamespace(".npRmpi_fanout_accept", "npRmpi")
@@ -106,6 +157,7 @@ test_that("transaction cleanup preserves errors and interrupts and bounds metada
   set.seed(441L)
   seed <- .Random.seed
   for (condition in list(simpleError("original collector failure"),
+      structure(list(), class = c("interrupt", "condition")),
       structure(list(message = "original interrupt", call = NULL), class = c("interrupt", "condition")))) {
     tx <- fanout_contract_tx()
     caught <- tryCatch(run(tx, stop(condition)), error = identity, interrupt = identity)
@@ -113,9 +165,74 @@ test_that("transaction cleanup preserves errors and interrupts and bounds metada
     expect_false(exists(tx$key, registry, inherits = FALSE))
     expect_identical(tx$phase, "quiescent")
   }
-  expect_identical(state$drained, 2L)
+  expect_identical(state$drained, 3L)
   expect_identical(.Random.seed, seed)
   expect_false(any(c("FUN", "results", "payload") %in% ls(tx)))
+})
+
+test_that("unhandled interrupts abort after cleanup rather than becoming errors", {
+  run <- getFromNamespace(".npRmpi_fanout_run", "npRmpi")
+  registry <- getFromNamespace(".npRmpi_fanout_state", "npRmpi")
+  state <- new.env(parent = emptyenv())
+  local_mocked_bindings(.npRmpi_fanout_drain = function(tx, recovery = NULL) {
+    state$drained <- state$drained + 1L
+    tx$rank[] <- "terminal"
+    tx$phase <- "quiescent"
+    invisible(TRUE)
+  }, .package = "npRmpi")
+  condition <- structure(list(), class = c("interrupt", "condition"))
+  for (wrapper in c("none", "try", "error", "calling")) {
+    state$drained <- 0L
+    state$resumed <- FALSE
+    state$aborted <- FALSE
+    state$unwound <- FALSE
+    state$caught <- NULL
+    tx <- fanout_contract_tx()
+    invoke <- function() {
+      on.exit({ state$unwound <- TRUE }, add = TRUE)
+      run(tx, signalCondition(condition))
+    }
+    withRestarts({
+      switch(wrapper,
+        none = invoke(),
+        try = try(invoke(), silent = TRUE),
+        error = tryCatch(invoke(), error = function(e) { state$caught <- e; NULL }),
+        calling = withCallingHandlers(invoke(), interrupt = function(e) {
+          state$caught <- e
+        }))
+      state$resumed <- TRUE
+    }, abort = function() { state$aborted <- TRUE; NULL })
+    expect_true(state$aborted, info = wrapper)
+    expect_false(state$resumed, info = wrapper)
+    expect_true(state$unwound, info = wrapper)
+    expect_identical(state$drained, 1L)
+    expect_identical(state$caught, if (wrapper == "calling") condition else NULL)
+    expect_identical(tx$phase, "quiescent")
+    expect_false(exists(tx$key, registry, inherits = FALSE))
+  }
+})
+
+test_that("a failed drain retains the original message-less interrupt under warn two", {
+  run <- getFromNamespace(".npRmpi_fanout_run", "npRmpi")
+  registry <- getFromNamespace(".npRmpi_fanout_state", "npRmpi")
+  tx <- fanout_contract_tx()
+  withr::defer(rm(list = tx$key, envir = registry))
+  withr::local_options(warn = 2L)
+  state <- new.env(parent = emptyenv())
+  state$drained <- 0L
+  state$poisoned <- FALSE
+  local_mocked_bindings(.npRmpi_fanout_drain = function(tx, recovery = NULL) {
+    state$drained <- state$drained + 1L
+    stop("transport failure")
+  }, .npRmpi_lease_poison = function() { state$poisoned <- TRUE; NULL },
+  .package = "npRmpi")
+  condition <- structure(list(), class = c("interrupt", "condition"))
+  expect_identical(tryCatch(run(tx, signalCondition(condition)),
+                            interrupt = identity), condition)
+  expect_identical(state$drained, 1L)
+  expect_true(state$poisoned)
+  expect_identical(tx$phase, "uncertain")
+  expect_true(exists(tx$key, registry, inherits = FALSE))
 })
 
 test_that("uncertain cleanup cannot replace the first error under warn equals two", {
