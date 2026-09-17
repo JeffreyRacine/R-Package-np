@@ -158,10 +158,12 @@ residuals.plregression <- function(object, ...) {
 }
 
 .np_plreg_predict_se_data <- function(bws, fit) {
-  train <- .np_plreg_predict_train_data(bws)
-  txdat <- toFrame(train$txdat)
-  tydat <- train$tydat
-  tzdat <- toFrame(train$tzdat)
+  # Use this prediction's training arguments, including any data override.
+  # Formula calls already contain the jointly prepared x/y/z roles here.
+  fit.call <- fit[["call", exact = TRUE]]
+  txdat <- toFrame(.np_eval_call_arg(fit.call, "txdat"))
+  tydat <- .np_eval_call_arg(fit.call, "tydat")
+  tzdat <- toFrame(.np_eval_call_arg(fit.call, "tzdat"))
 
   keep.rows <- rep_len(TRUE, nrow(txdat))
   rows.omit <- attr(na.omit(data.frame(txdat, tydat, tzdat)), "na.action")
@@ -183,7 +185,10 @@ residuals.plregression <- function(object, ...) {
 
 .np_plreg_predict_se <- function(bws, fit) {
   dat <- .np_plreg_predict_se_data(bws = bws, fit = fit)
-  train.fit <- npplreg(bws = bws, residuals = TRUE, se = FALSE)
+  # Residuals and H must use the same retained training rows; public formula
+  # residuals may be na.exclude-padded and are not an inference row map.
+  train.fit <- npplreg(bws = bws, txdat = dat$txdat, tydat = dat$tydat,
+                      tzdat = dat$tzdat, residuals = TRUE, se = FALSE)
   u <- as.numeric(residuals(train.fit))
   if (length(u) != nrow(dat$txdat))
     stop("internal error: residual length does not match training rows")
@@ -196,7 +201,8 @@ residuals.plregression <- function(object, ...) {
   if (length(keep.eval) != nrow(dat$exdat))
     stop("internal error: evaluation row map does not match evaluation data")
   if (!any(keep.eval))
-    return(rep(NA_real_, nrow(dat$exdat)))
+    return(napredict(fit[["omit", exact = TRUE]],
+                     rep(NA_real_, nrow(dat$exdat))))
 
   exdat.work <- dat$exdat[keep.eval, , drop = FALSE]
   ezdat.work <- dat$ezdat[keep.eval, , drop = FALSE]
@@ -221,7 +227,7 @@ residuals.plregression <- function(object, ...) {
 
   se.fit <- rep(NA_real_, nrow(dat$exdat))
   se.fit[keep.eval] <- se.work
-  se.fit
+  napredict(fit[["omit", exact = TRUE]], se.fit)
 }
 
 predict.plregression <- function(object, se.fit = FALSE, ...) {
