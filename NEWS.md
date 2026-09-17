@@ -1,5 +1,17 @@
 # npRmpi 0.80-1
 
+* Streamed non-studentized categorical significance-test bootstrap statistics
+  now use the same generalized-nearest-neighbour training-row geometry as
+  the observed statistic and public regression refits. This can change
+  affected bootstrap statistics and p-values; pivot=TRUE is unchanged.
+
+* Conditional density/distribution formulas reject unsupported transformed
+  responses instead of silently discarding their transformations. Prepare the
+  transformed response in the data, or use the native data interface. Formula
+  routes also reject unsupported RHS offset specials before evaluation;
+  supported response/predictor transformations and ordinary variable names
+  remain unchanged.
+
 * Local-constant wild-bootstrap gradient plots no longer draw unused task
   seeds after generating master-owned multipliers. Later panels now use the
   same draws across worker counts and chunk sizes as the serial package;
