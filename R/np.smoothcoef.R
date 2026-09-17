@@ -2,7 +2,8 @@ npscoef <-
   function(bws, ...){
     mc <- match.call(expand.dots = FALSE)
     .np_validate_public_dots(mc[["..."]], "npscoef")
-    args <- list(...)
+    args <- .np_formula_dispatch_args(
+      NULL, substitute(list(...))[-1L], environment())
     npRejectLegacyBooleanErrors(args, "npscoef")
 
     if (!missing(bws)){
@@ -141,7 +142,8 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
   sc <- sys.call()
   sc.names <- names(sc)
   nomad <- npValidateNomadControl(nomad, "nomad")
-  npRejectLegacyBooleanErrors(list(...), "npscoef")
+  npRejectLegacyBooleanErrors(.np_formula_dispatch_args(
+    NULL, substitute(list(...))[-1L], environment()), "npscoef")
   se <- npValidateScalarLogical(se, "se")
 
   ## here we check to see if the function was called with tdat =
@@ -194,7 +196,8 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
     names(sc.bw)[m.txy] <- nstxy[m.txy > 0]
   }
   sc.bw <- .np_public_dots_filter_call(sc.bw, "npscoefbw")
-  formula.input <- list(...)[["formula", exact = TRUE]]
+  formula.input <- .np_formula_dispatch_args(
+    NULL, substitute(list(...))[-1L], environment())[["formula", exact = TRUE]]
   frame.state <- if (!has.explicit.bws &&
       (bws.formula || inherits(formula.input, "formula") ||
        (!no.txdat && inherits(txdat, "formula"))) &&
@@ -250,7 +253,10 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
   }
   if (!has.explicit.bws)
     call.args$.np_fit_progress_handoff <- TRUE
-  do.call(npscoef, c(call.args, list(se = se), list(...)))
+  fit.dots <- if (!is.null(tbw[["formula", exact = TRUE]]))
+    .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment())
+  else list(...)
+  do.call(npscoef, c(call.args, list(se = se), fit.dots))
 
 }
 

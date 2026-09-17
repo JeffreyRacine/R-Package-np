@@ -2,7 +2,8 @@ npudist <-
   function(bws, ...){
     mc <- match.call(expand.dots = FALSE)
     .np_validate_public_dots(mc[["..."]], "npudist")
-    args <- list(...)
+    args <- .np_formula_dispatch_args(
+      NULL, substitute(list(...))[-1L], environment())
 
     if (!missing(bws)){
       if (is.recursive(bws)){
@@ -318,7 +319,8 @@ npudist.default <- function(bws, tdat, ..., se = FALSE){
     names(sc.bw)[m.txy] <- nstxy[m.txy > 0]
   }
   sc.bw <- .np_public_dots_filter_call(sc.bw, "npudistbw")
-  formula.input <- list(...)[["formula", exact = TRUE]]
+  formula.input <- .np_formula_dispatch_args(
+    NULL, substitute(list(...))[-1L], environment())[["formula", exact = TRUE]]
   frame.state <- if (!has.explicit.bws &&
       ((!no.bws && inherits(bws, "formula")) || direct.formula.tdat ||
        inherits(formula.input, "formula"))) new.env(parent = emptyenv()) else NULL
@@ -348,5 +350,8 @@ npudist.default <- function(bws, tdat, ..., se = FALSE){
   }
   if (!has.explicit.bws)
     call.args$.np_fit_progress_handoff <- TRUE
-  do.call(npudist, c(call.args, list(...)))
+  fit.dots <- if (!is.null(tbw[["formula", exact = TRUE]]))
+    .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment())
+  else list(...)
+  do.call(npudist, c(call.args, fit.dots))
 }

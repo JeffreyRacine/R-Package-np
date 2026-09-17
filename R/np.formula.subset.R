@@ -1,3 +1,45 @@
+# Formula-owned subset is non-standard evaluation: dispatch must inspect other
+# arguments without forcing it outside the data mask. Read retained arguments
+# from their original promises, never by re-evaluating substituted expressions.
+.np_formula_subset_indices <- function(method, expressions) {
+  dot.names <- names(expressions)
+  indices <- if (is.null(dot.names)) integer() else
+    which(!is.na(pmatch(dot.names, "subset")))
+  if (!is.null(method) && length(expressions)) {
+    markers <- lapply(seq_along(expressions), function(i)
+      as.name(paste0(".np_formula_dispatch_dot_", i)))
+    names(markers) <- dot.names
+    synthetic <- as.call(c(list(as.name(".np_formula_dispatch")),
+      list(bws = as.name(".np_formula_dispatch_bws")), markers))
+    matched <- tryCatch(match.call(definition = method, call = synthetic,
+                                  expand.dots = FALSE),
+                        error = function(e) NULL)
+    if (!is.null(matched) && "subset" %in% names(matched))
+      indices <- union(indices, which(vapply(markers, identical, logical(1L),
+                                             matched[["subset"]])))
+  }
+  indices
+}
+
+.np_formula_dispatch_args <- function(method, expressions, promise.frame) {
+  omitted <- .np_formula_subset_indices(method, expressions)
+  if (!length(omitted))
+    return(eval(quote(list(...)), envir = promise.frame))
+  indices <- setdiff(seq_along(expressions), omitted)
+  args <- lapply(indices, function(i)
+    eval(substitute(...elt(index), list(index = i)), envir = promise.frame))
+  if (!is.null(names(expressions)))
+    names(args) <- names(expressions)[indices]
+  args
+}
+
+# Existing value-list constructor calls still need the original subset syntax.
+# The constructor's model.frame, not this helper, evaluates that expression.
+.np_formula_dispatch_call <- function(fun, args, expressions, envir) {
+  indices <- .np_formula_subset_indices(NULL, expressions)
+  do.call(fun, c(args, as.list(expressions)[indices]), envir = envir)
+}
+
 # Evaluate expression values once, align them transiently, and retain portable
 # prediction expressions (including makepredictcall metadata), never the data.
 .np_formula_unwrap_prediction <- function(tt) {

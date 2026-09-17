@@ -1,29 +1,5 @@
 .nplsqreg_formula_dispatch_args <- function(method, expressions, promise.frame) {
-  indices <- seq_along(expressions)
-  dot.names <- names(expressions)
-  if (!is.null(dot.names))
-    indices <- indices[is.na(pmatch(dot.names, "subset"))]
-
-  markers <- lapply(seq_along(expressions), function(i)
-    as.name(paste0(".np_lsq_dispatch_dot_", i)))
-  names(markers) <- dot.names
-  synthetic <- as.call(c(list(as.name(".nplsqreg_dispatch")),
-                         list(bws = as.name(".np_lsq_dispatch_bws")), markers))
-  # This classifies syntax only. An invalid match stays with the original
-  # generic/method condition path and its original argument forcing order.
-  matched <- tryCatch(match.call(definition = method, call = synthetic,
-                                expand.dots = FALSE),
-                      error = function(e) NULL)
-  if (!is.null(matched) && "subset" %in% names(matched)) {
-    subset.index <- which(vapply(markers, identical, logical(1L),
-                                 matched[["subset"]]))
-    indices <- indices[!indices %in% subset.index]
-  }
-  args <- lapply(indices, function(i)
-    eval(substitute(...elt(index), list(index = i)), envir = promise.frame))
-  if (!is.null(dot.names))
-    names(args) <- dot.names[indices]
-  args
+  .np_formula_dispatch_args(method, expressions, promise.frame)
 }
 
 nplsqreg <-

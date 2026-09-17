@@ -2,7 +2,8 @@ npqreg <-
   function(bws, ...){
     mc <- match.call(expand.dots = FALSE)
     .np_validate_public_dots(mc[["..."]], "npqreg")
-    args <- list(...)
+    args <- .np_formula_dispatch_args(
+      NULL, substitute(list(...))[-1L], environment())
 
     if (!missing(bws)){
       if (is.recursive(bws)){
@@ -1072,7 +1073,8 @@ npqreg.condbandwidth <-
 npqreg.default <- function(bws, txdat, tydat, nomad = FALSE, ..., se = FALSE){
   se <- npValidateScalarLogical(se, "se")
   nomad <- npValidateNomadControl(nomad, "nomad")
-  early.dots <- list(...)
+  early.dots <- .np_formula_dispatch_args(
+    NULL, substitute(list(...))[-1L], environment())
   .npqreg_reject_gradient_order_dots(early.dots)
   sc <- sys.call()
   sc.names <- names(sc)
@@ -1173,7 +1175,7 @@ npqreg.default <- function(bws, txdat, tydat, nomad = FALSE, ..., se = FALSE){
       call.args <- c(call.args, list(tydat))
     }
   }
-  dots <- list(...)
+  dots <- if (!is.null(tbw[["formula", exact = TRUE]])) early.dots else list(...)
   if (has.explicit.bws)
     fit.dots <- .npqreg_fit_dots(dots)
   else

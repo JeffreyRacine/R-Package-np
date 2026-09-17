@@ -2,7 +2,8 @@ npconmode <-
   function(bws, ...){
     mc <- match.call(expand.dots = FALSE)
     .np_validate_public_dots(mc[["..."]], "npconmode")
-    args <- list(...)
+    args <- .np_formula_dispatch_args(
+      NULL, substitute(list(...))[-1L], environment())
 
     if (!missing(bws)){
       if (is.recursive(bws)){
@@ -806,7 +807,8 @@ npconmode.default <- function(bws, txdat, tydat,
   }
   sc.bw <- .np_public_dots_filter_call(sc.bw, "npcdensbw")
 
-  formula.input <- list(...)[["formula", exact = TRUE]]
+  formula.input <- .np_formula_dispatch_args(
+    NULL, substitute(list(...))[-1L], environment())[["formula", exact = TRUE]]
   training.formula <- if (bws.formula) bws else
     if (!no.txdat && inherits(txdat, "formula")) txdat else formula.input
   frame.state <- if (!has.explicit.bws && inherits(training.formula, "formula"))
@@ -860,5 +862,8 @@ npconmode.default <- function(bws, txdat, tydat,
   call.args$gradients <- gradients
   call.args$se <- se
   call.args$level <- level
-  do.call(npconmode, c(call.args, list(...)))
+  fit.dots <- if (!is.null(tbw[["formula", exact = TRUE]]))
+    .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment())
+  else list(...)
+  do.call(npconmode, c(call.args, fit.dots))
 }

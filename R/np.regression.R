@@ -102,7 +102,8 @@ npreg <-
   function(bws, ...){
     mc <- match.call(expand.dots = FALSE)
     .np_validate_public_dots(mc[["..."]], "npreg")
-    args <- list(...)
+    args <- .np_formula_dispatch_args(
+      NULL, substitute(list(...))[-1L], environment())
     npRejectLegacyBooleanErrors(args, "npreg")
 
     # Raw formulas must reach npregbw.formula before a fitting frame is made:
@@ -875,7 +876,8 @@ npreg.default <- function(bws, txdat, tydat, nomad = FALSE,
                           se = FALSE, ...){
   sc <- sys.call()
   sc.names <- names(sc)
-  dots <- list(...)
+  dots <- .np_formula_dispatch_args(
+    NULL, substitute(list(...))[-1L], environment())
   npRejectLegacyBooleanErrors(dots, "npreg")
   se <- npValidateScalarLogical(se, "se")
   nomad <- npValidateNomadControl(nomad, "nomad")
@@ -897,9 +899,10 @@ npreg.default <- function(bws, txdat, tydat, nomad = FALSE,
       dots$.np.formula.state <- frame.state
       on.exit(rm(list = ls(frame.state, all.names = TRUE), envir = frame.state), add = TRUE)
     }
-    tbw <- do.call(
+    tbw <- .np_formula_dispatch_call(
       npregbw,
-      .np_public_dots_filter_args(c(bw.args, dots), "npregbw")
+      .np_public_dots_filter_args(c(bw.args, dots), "npregbw"),
+      substitute(list(...))[-1L], environment()
     )
     reg.args <- list(bws = tbw)
     if (!missing(txdat))
@@ -958,7 +961,8 @@ npreg.default <- function(bws, txdat, tydat, nomad = FALSE,
     names(sc.bw)[m.txy] <- nstxy[m.txy > 0]
   }
   sc.bw <- .np_public_dots_filter_call(sc.bw, "npregbw")
-  formula.input <- list(...)[["formula", exact = TRUE]]
+  formula.input <- .np_formula_dispatch_args(
+    NULL, substitute(list(...))[-1L], environment())[["formula", exact = TRUE]]
   frame.state <- if (!has.explicit.bws &&
       (inherits(formula.input, "formula") ||
        (!no.txdat && inherits(txdat, "formula"))))
@@ -1001,7 +1005,10 @@ npreg.default <- function(bws, txdat, tydat, nomad = FALSE,
   }
   if (!has.explicit.bws)
     call.args$.np_fit_progress_handoff <- TRUE
-  ev <- do.call(npreg, c(call.args, list(se = se), list(...)))
+  fit.dots <- if (!is.null(tbw[["formula", exact = TRUE]]))
+    .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment())
+  else list(...)
+  ev <- do.call(npreg, c(call.args, list(se = se), fit.dots))
 
   ev$call <- match.call(expand.dots = FALSE)
   environment(ev$call) <- parent.frame()

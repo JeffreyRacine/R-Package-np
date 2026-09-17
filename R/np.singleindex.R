@@ -17,7 +17,8 @@ npindex <-
   function(bws, ..., B = 399){
     mc <- match.call(expand.dots = FALSE)
     .np_validate_public_dots(mc[["..."]], "npindex")
-    args <- list(...)
+    args <- .np_formula_dispatch_args(
+      NULL, substitute(list(...))[-1L], environment())
     npRejectLegacyBooleanErrors(args, "npindex")
     npRejectLegacyBootstrapCount(names(args), "npindex")
     .np_singleindex_reject_higher_gradient_order(args, where = "npindex")
@@ -27,9 +28,9 @@ npindex <-
       args$formula <- NULL
       if (!missing(bws)) args$.np_index_explicit_bws <- bws
       args$B <- B
-      return(do.call(npindex.formula,
+      return(.np_formula_dispatch_call(npindex.formula,
                      c(list(bws = formula.input), args),
-                     envir = parent.frame()))
+                     substitute(list(...))[-1L], envir = parent.frame()))
     }
 
     if (!missing(bws)){
@@ -40,9 +41,9 @@ npindex <-
         args <- args[-1L]
         args$.np_index_explicit_bws <- bws
         args$B <- B
-        return(do.call(npindex.formula,
+        return(.np_formula_dispatch_call(npindex.formula,
                        c(list(bws = formula), args),
-                       envir = parent.frame()))
+                       substitute(list(...))[-1L], envir = parent.frame()))
       }
       if (inherits(bws, "formula") && is.null(args$txdat))
         UseMethod("npindex", bws)
@@ -67,7 +68,10 @@ npindex.formula <-
     function(bws, data = NULL, newdata = NULL, y.eval = FALSE,
              se = TRUE, ..., se.type = c("asymptotic", "bootstrap")){
 
-        dots <- list(...)
+        raw.formula <- inherits(bws, "formula")
+        dots <- if (raw.formula)
+          .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment())
+        else list(...)
         npRejectLegacyBooleanErrors(dots, "npindex")
         se <- npValidateScalarLogical(se, "se")
         se.type <- match.arg(se.type)
@@ -79,9 +83,10 @@ npindex.formula <-
                      names(bws$call), nomatch = 0)
           bws$call[c(1, m)]
         } else {
+          frame.call <- match.call()
           m <- match(c("bws", "data", "subset", "na.action"),
-                     names(mc), nomatch = 0)
-          tmf <- mc[c(1, m)]
+                     names(frame.call), nomatch = 0)
+          tmf <- frame.call[c(1, m)]
           if ("bws" %in% names(tmf))
             names(tmf)[names(tmf) == "bws"] <- "formula"
           tmf
@@ -128,7 +133,6 @@ npindex.formula <-
           exdat <- emf[, attr(attr(emf, "terms"),"term.labels"), drop = FALSE]
         }
 
-        dots <- list(...)
         si.bws <- if (!is.null(dots$.np_index_explicit_bws)) {
             out <- dots$.np_index_explicit_bws
             dots$.np_index_explicit_bws <- NULL
@@ -304,7 +308,10 @@ npindex.default <- function(bws, txdat, tydat, nomad = FALSE,
   sc <- sys.call()
   sc.names <- names(sc)
   nomad <- npValidateNomadControl(nomad, "nomad")
-  npRejectLegacyBooleanErrors(list(...), "npindex")
+  dots <- if (!missing(bws) && inherits(bws, "formula"))
+    .np_formula_dispatch_args(NULL, substitute(list(...))[-1L], environment())
+  else list(...)
+  npRejectLegacyBooleanErrors(dots, "npindex")
   se <- npValidateScalarLogical(se, "se")
   se.type <- match.arg(se.type)
 
@@ -337,7 +344,6 @@ npindex.default <- function(bws, txdat, tydat, nomad = FALSE,
       tydat <- model.response(mf)
     }
 
-    dots <- list(...)
     bw.dots <- dots
     bw.dots$.np_fit_progress_handoff <- NULL
     if (bws.formula)
@@ -427,7 +433,7 @@ npindex.default <- function(bws, txdat, tydat, nomad = FALSE,
   }
   if (no.bws || bws.formula || is.call(bws))
     call.args$.np_fit_progress_handoff <- TRUE
-  do.call(npindex, c(call.args, list(se = se, se.type = se.type), list(...)))
+  do.call(npindex, c(call.args, list(se = se, se.type = se.type), dots))
 }
 
 npindex.sibandwidth <-
