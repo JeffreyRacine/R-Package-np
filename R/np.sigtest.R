@@ -647,10 +647,10 @@ npsigtest.npregression <-
   ))
 }
 
-# The streamed categorical statistic evaluates generalized-NN radii at external
-# query points even when the earlier unrestricted gradient uses training points.
-# This cheap screen decides only whether to invoke the existing native tile;
-# that tile remains the sole authority allowed to raise the typed condition.
+# Streamed statistics retain training-row identity for generalized-NN radii.
+# This conservative screen can also admit multiplicity equal to k, where the
+# training radius is positive but a later external null-model query can fail.
+# The native tile alone decides whether this training probe raises a condition.
 .np_npsig_streamed_gnn_zero_radius_candidate <- function(bws, xdat, index) {
   if (!identical(bws[["type", exact = TRUE]], "generalized_nn"))
     return(FALSE)

@@ -95,7 +95,7 @@ test_that("adaptive literal-zero status is rank symmetric", {
         "gnn <- npregbw(xdat=z,ydat=response,bwtype='generalized_nn',bws=c(.2,8,4),regtype='lc',bandwidth.compute=FALSE)",
         "gnn.fit <- npreg(bws=gnn,txdat=z,tydat=response,se=FALSE)",
         "set.seed(527); seed <- .Random.seed; sig.condition <- tryCatch(npsigtest(gnn.fit,B=9L,joint=FALSE),error=identity)",
-        "stopifnot(inherits(sig.condition,'np_nn_zero_radius'),identical(sig.condition$variable,'tied'),grepl('bootstrap geometry preflight',sig.condition$stage,fixed=TRUE),identical(.Random.seed,seed))",
+        "stopifnot(inherits(sig.condition,'np_nn_zero_radius'),identical(sig.condition$variable,'tied'),identical(sig.condition$lookup.k,4L),identical(sig.condition$excluded,0L),identical(sig.condition$stage,'npsigtest during null-model evaluation'),identical(.Random.seed,seed))",
         "smoke <- npRmpi:::.npRmpi_spmd_tiny_smoke('after-npsig-radius-error',comm=1L)",
         "stopifnot(is.list(smoke),isTRUE(smoke$ok))",
         sprintf("cat('%s\\n')", marker)

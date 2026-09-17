@@ -37989,11 +37989,11 @@ int np_regression_lp_sigtest_iid(
       }
   }
 
+  /* All statistics are fitted at training rows. Categorical contrasts change
+     no continuous coordinate, so retain training identity for NN radii. */
   prepare_status = np_regression_xrow_ctx_prepare(
     vector_scale_factor,
-    (statistic_mode != NP_NPSIGTEST_STAT_CONTINUOUS &&
-     BANDWIDTH_den_extern == BW_GEN_NN) ?
-      NULL : &np_conditional_training_identity_geometry,
+    &np_conditional_training_identity_geometry,
     &xctx);
   if(prepare_status != 0) {
     if(prepare_status == 2)
