@@ -3,6 +3,10 @@
 * Vector-quantile least-squares predictions prepare formula newdata once and
   share that same evaluation sample across quantiles.
 
+* Partially linear formulas now prepare their response, linear regressors and
+  smoothing variables together once, retaining trained transforms and a common
+  subset/time-aligned sample through fitting, prediction and plot preparation.
+
 * Regression hat/significance helpers and smooth-coefficient plots now resolve
   saved training-data expressions in their original call owner, including
   bandwidth objects constructed inside wrappers.

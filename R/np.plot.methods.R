@@ -630,26 +630,10 @@ np_render_control <- function(style = c("band", "bar"),
     return(out)
 
   if (!is.null(bws$formula) && !is.null(bws$call)) {
-    tt <- terms(bws)
-    m <- match(c("formula", "data", "subset", "na.action"),
-               names(bws$call), nomatch = 0)
-
-    tmf.xf <- tmf <- bws$call[c(1, m)]
-    tmf[[1]] <- tmf.xf[[1]] <- as.name("model.frame")
-    tmf[["formula"]] <- tt
-
-    mf.args <- as.list(tmf)[-1L]
-    tmf <- do.call(stats::model.frame, mf.args, envir = environment(tt))
-
-    bronze <- lapply(bws$chromoly, paste, collapse = " + ")
-    tmf.xf[["formula"]] <- as.formula(paste(" ~ ", bronze[[2]]),
-                                      env = environment(tt))
-    mf.xf.args <- as.list(tmf.xf)[-1L]
-    tmf.xf <- do.call(stats::model.frame, mf.xf.args, envir = environment(tt))
-
-    out$ydat <- model.response(tmf)
-    out$xdat <- tmf.xf
-    out$zdat <- tmf[, bws$chromoly[[3]], drop = FALSE]
+    training <- .np_plreg_formula_training(bws)
+    out$ydat <- training$tydat
+    out$xdat <- training$txdat
+    out$zdat <- training$tzdat
     return(out)
   }
 
