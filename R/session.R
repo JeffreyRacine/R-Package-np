@@ -608,6 +608,7 @@ npRmpi.quit <- function(force = FALSE,
   }
 
   drain.leases <- function(comm) {
+    .npRmpi_fanout_quiesce(comm)
     lease.drain <- try(.npRmpi_lease_session_drain(comm = comm), silent = TRUE)
     ok <- !inherits(lease.drain, "try-error")
     if (!ok) {

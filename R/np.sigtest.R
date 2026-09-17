@@ -858,8 +858,13 @@ npsigtest.rbandwidth <- function(bws,
   progress.active <- TRUE
   progress.context <- new.env(parent = emptyenv())
   on.exit({
-    if (isTRUE(progress.active))
-      .np_progress_abort(progress)
+    if (isTRUE(progress.active)) {
+      current <- progress.context[["state"]]
+      if (!is.list(current) || !identical(current[["id"]], progress[["id"]]))
+        current <- progress
+      tryCatch(.np_progress_abort(current),
+               error = function(e) NULL, interrupt = function(e) NULL)
+    }
   }, add = TRUE)
 
   ## Save seed prior to setting.  The computational owner is selected before

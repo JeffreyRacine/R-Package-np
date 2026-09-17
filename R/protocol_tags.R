@@ -10,7 +10,8 @@
     scoef_res_base = 10240L,
     scoef_ack_base = 12288L,
     attach_ack_base = 14336L,
-    attach_release_base = 16384L
+    attach_release_base = 16384L,
+    fanout_control = 18432L
   )
 }
 

@@ -82,15 +82,16 @@ mpi.scatterv <- function(x, scounts, type, rdata, root=0, comm=1){
 
 
 
-mpi.scatter.Robj <- function(obj=NULL, root=0, comm=1){
+.npRmpi_scatter_prepare <- function(obj, comm) {
+    size <- mpi.comm.size(comm)
+    parts <- lapply(seq_len(size), function(i) serialize(obj[[i]], NULL))
+    list(lengths = unlist(lapply(parts, length)), bytes = c(parts, recursive = TRUE))
+}
+
+.npRmpi_scatter_prepared <- function(prepared = NULL, root = 0, comm = 1) {
     if (mpi.comm.rank(comm) == root){
-			size<-mpi.comm.size(comm)
-        #subobj<-lapply(obj,serialize, connection=NULL)
-			subobj<-lapply(seq_len(size), function(i) serialize(obj[[i]], NULL))
-	
-			sublen<-unlist(lapply(subobj,length))
-        #newsubobj<-strings.link(subobj,string(sum(sublen)+1))
-			newsubobj<-c(subobj,recursive=TRUE)
+            sublen <- prepared$lengths
+            newsubobj <- prepared$bytes
         strnum <- .npRmpi_validate_raw_length(
             mpi.scatter(sublen,type=1,rdata=integer(1),root=root,comm=comm),
             "mpi.scatter.Robj")
@@ -106,6 +107,12 @@ mpi.scatter.Robj <- function(obj=NULL, root=0, comm=1){
     }
 	gc()
     return(outobj)
+}
+
+mpi.scatter.Robj <- function(obj=NULL, root=0, comm=1){
+    prepared <- if (mpi.comm.rank(comm) == root)
+        .npRmpi_scatter_prepare(obj, comm) else NULL
+    .npRmpi_scatter_prepared(prepared, root, comm)
 }
 
 mpi.scatter.Robj2slave=function (obj, comm = 1) {
@@ -375,8 +382,12 @@ mpi.bcast.cmd <- function (cmd=NULL, ..., rank=0, comm=1, nonblock=FALSE, sleep=
 }
 
 mpi.bcast.Robj <- function(obj=NULL, rank=0, comm=1){
+    tmp <- if (mpi.comm.rank(comm) == rank) serialize(obj, NULL) else NULL
+    .npRmpi_bcast_prepared(tmp, rank, comm)
+}
+
+.npRmpi_bcast_prepared <- function(tmp = NULL, rank = 0, comm = 1) {
     if (mpi.comm.rank(comm) == rank){
-    tmp <- serialize(obj, NULL)
     mpi.bcast(as.integer(length(tmp)), 1, rank, comm)
     mpi.bcast(tmp, 4, rank, comm)
 	invisible(NULL)
@@ -494,8 +505,7 @@ mpi.send.Robj <- function(obj, dest, tag, comm=1){
 mpi.recv.Robj <- function(source, tag, comm=1, status=0){
     mpi.probe(source, tag, comm, status)
     srctag <- mpi.get.sourcetag(status)
-    charlen <- mpi.get.count(type=4, status)
-    out<-unserialize(mpi.recv(x=raw(charlen), type=4,srctag[1],srctag[2], comm, status))
+    out <- unserialize(.npRmpi_recv_raw_probed(srctag, comm, status))
 	#gc()
 	out
 }
@@ -546,6 +556,11 @@ mpi.allreduce <- function(x,type=2,
 
 mpi.isend <- function (x, type,  dest, tag, comm=1, request=0){
     stop("mpi.isend is temporarily unsupported in npRmpi; use blocking mpi.send() or mpi.send.Robj() instead")
+}
+
+.npRmpi_recv_raw_probed <- function(srctag, comm = 1, status = 0) {
+    charlen <- mpi.get.count(type = 4, status)
+    mpi.recv(x = raw(charlen), type = 4, srctag[1], srctag[2], comm, status)
 }
 
 mpi.irecv <- function (x, type, source, tag, comm=1, request=0){

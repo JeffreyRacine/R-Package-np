@@ -2400,6 +2400,7 @@
 }
 
 .npRmpi_lease_run_lifecycle <- function(opcode, payload, comm = 1L, where = opcode) {
+  .npRmpi_fanout_quiesce(comm)
   envelope <- .npRmpi_spmd_make_envelope(
     opcode = opcode,
     args_ref = if (is.list(payload)) payload$ids else NULL,

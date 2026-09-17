@@ -1928,90 +1928,12 @@
 .npRmpi_bootstrap_worker_bundle <- function(n) {
   .comm <- 1L
   .npRmpi_bootstrap_transport_trace(
-    what = "bundle",
-    event = "fanout.worker_bundle.start",
+    what = "bundle", event = "fanout.worker_bundle.start",
     fields = list(n = n, comm = .comm)
   )
   tmpfunarg <- mpi.bcast.Robj(rank = 0, comm = .comm)
-  .tmpfun <- tmpfunarg$FUN
-  dotarg <- tmpfunarg$dot.arg
-  mpi.anytag <- mpi.any.tag()
-  tmpmsg <- mpi.recv.Robj(source = 0, tag = mpi.anytag, comm = .comm)
-  tag <- mpi.get.sourcetag()[2L]
-  if (tag > n) {
-    .npRmpi_bootstrap_transport_trace(
-      what = "bundle",
-      event = "fanout.worker_bundle.stop",
-      fields = list(tag = tag)
-    )
-    return(invisible(NULL))
-  }
-  task.indices <- tmpmsg$task_indices
-  bundle.tasks <- tmpmsg$tasks
-  stream.results <- isTRUE(tmpfunarg$stream.results)
-  progress.enabled <- isTRUE(tmpfunarg$progress.enabled) && !isTRUE(stream.results)
-  progress.stride <- suppressWarnings(as.integer(tmpfunarg$progress.stride)[1L])
-  if (is.na(progress.stride) || progress.stride < 1L)
-    progress.stride <- 1L
-  if (!is.integer(task.indices) || !is.list(bundle.tasks) ||
-      length(task.indices) != length(bundle.tasks)) {
-    out <- structure(
-      "bootstrap bundle worker received malformed task payload",
-      class = "try-error"
-    )
-    mpi.send.Robj(list(task_indices = task.indices, parts = list(out)), 0, tag, .comm)
-    return(invisible(NULL))
-  }
-  out.parts <- vector("list", length(bundle.tasks))
-  progress.boot <- 0L
-  for (ii in seq_along(bundle.tasks)) {
-    out.part <- tryCatch(
-      do.call(.tmpfun, c(list(bundle.tasks[[ii]]), dotarg)),
-      error = function(e) structure(conditionMessage(e), class = "try-error", condition = e)
-    )
-    if (isTRUE(stream.results)) {
-      mpi.send.Robj(
-        list(
-          bundle_done = FALSE,
-          task_indices = as.integer(task.indices[[ii]]),
-          parts = list(out.part)
-        ),
-        0,
-        tag,
-        .comm
-      )
-    } else {
-      out.parts[[ii]] <- out.part
-      if (isTRUE(progress.enabled)) {
-        progress.boot <- progress.boot + as.integer(bundle.tasks[[ii]]$bsz)
-        if ((ii %% progress.stride) == 0L || ii == length(bundle.tasks)) {
-          mpi.send.Robj(
-            list(progress_only = TRUE, boot = as.integer(progress.boot)),
-            0,
-            tag,
-            .comm
-          )
-          progress.boot <- 0L
-        }
-      }
-    }
-  }
-  if (isTRUE(stream.results)) {
-    mpi.send.Robj(
-      list(bundle_done = TRUE, task_indices = integer(0), parts = list()),
-      0,
-      tag,
-      .comm
-    )
-  } else {
-    mpi.send.Robj(list(task_indices = task.indices, parts = out.parts), 0, tag, .comm)
-  }
-  .npRmpi_bootstrap_transport_trace(
-    what = "bundle",
-    event = "fanout.worker_bundle.done",
-    fields = list(tag = tag, tasks = length(bundle.tasks), stream_results = stream.results)
-  )
-  invisible(NULL)
+  .npRmpi_fanout_worker_header(tmpfunarg, "bundle", .comm)
+  .npRmpi_fanout_worker_bundle(tmpfunarg, n, .comm)
 }
 
 .npRmpi_bootstrap_stream_bundle_results <- function(worker.idx,
@@ -2113,10 +2035,23 @@
     )
     progress.tick <- .np_plot_progress_tick
     on.exit({
-      .np_plot_progress_end(progress)
+      if (isTRUE(progress.state$complete)) {
+        .np_plot_progress_end(progress.state$value)
+      } else if (is.null(progress.state$value[["plot_context"]])) {
+        tryCatch(.np_progress_abort(progress.state$value),
+                 error = function(e) NULL, interrupt = function(e) NULL)
+      }
     }, add = TRUE)
   }
 
+  progress.state <- new.env(parent = emptyenv())
+  progress.state$value <- progress
+  progress.state$complete <- FALSE
+  recovery.owner <- if (!is.null(progress[["plot_context"]])) {
+    list(ref = progress[["plot_context"]], slot = "state", comm = comm)
+  } else if (external.progress) {
+    list(ref = progress.context, slot = "state", comm = comm)
+  } else list(ref = progress.state, slot = "value", comm = comm)
   .npRmpi_bootstrap_phase_mark(
     what = what,
     phase = "preflight",
@@ -2158,7 +2093,7 @@
     )
   )
   t.comm <- proc.time()
-  parts <- if (isTRUE(use.master.local)) {
+  parts <- .npRmpi_with_fanout_recovery(recovery.owner, if (isTRUE(use.master.local)) {
     tryCatch({
       parts.local <- vector("list", length(tasks))
       done.boot <- 0L
@@ -2171,7 +2106,7 @@
         task <- tasks[[ii]]
         parts.local[[ii]] <- do.call(worker.exec, c(list(task), list(...)))
         done.boot <- done.boot + as.integer(task$bsz)
-        progress <- progress.tick(state = progress, done = done.boot)
+        progress.state$value <- progress.tick(state = progress.state$value, done = done.boot)
       }
       .npRmpi_bootstrap_transport_trace(
         what = what,
@@ -2181,314 +2116,14 @@
       parts.local
     }, error = function(e) e)
   } else if (workers >= 1L && length(tasks) >= 2L) {
-    tryCatch({
-      n.tasks <- length(tasks)
-      local.idx <- integer(0)
-      if (master_local_chunk) {
-        local.idx <- seq.int(1L, n.tasks, by = workers + 1L)
-        if (!length(local.idx))
-          local.idx <- which.max(vapply(tasks, function(tt) as.integer(tt$bsz), integer(1L)))[1L]
-      }
-      remote.idx <- setdiff(seq_len(n.tasks), local.idx)
-      parts.out <- vector("list", n.tasks)
-
-      if (isTRUE(master_local_chunk)) {
-        rank.slot <- ((seq_len(n.tasks) - 1L) %% (workers + 1L))
-        local.idx <- which(rank.slot == 0L)
-        worker.idx <- lapply(seq_len(workers), function(ii) which(rank.slot == ii))
-        active.workers <- which(lengths(worker.idx) > 0L)
-        n.remote <- length(active.workers)
-        stream.bundle.results <- .npRmpi_bootstrap_stream_bundle_results(
-          worker.idx = worker.idx,
-          tasks = tasks,
-          ncol.out = ncol.out
-        )
-        progress.bundle.enabled <- !isTRUE(stream.bundle.results) && !is.null(progress)
-        progress.bundle.stride <- if (isTRUE(progress.bundle.enabled)) {
-          .npRmpi_bootstrap_bundle_progress_stride(worker.idx)
-        } else {
-          0L
-        }
-        slave.num <- workers
-        mpi.anysource <- mpi.any.source()
-        mpi.anytag <- mpi.any.tag()
-        dispatch.timeout <- .npRmpi_bootstrap_dispatch_timeout_sec()
-        dispatch.started <- unname(as.double(proc.time()[["elapsed"]]))
-        done.boot <- 0L
-        local.done <- 0L
-        done <- 0L
-
-        receive.remote.result <- function() {
-          srctag <- mpi.get.sourcetag()
-          src <- srctag[1L]
-          tag <- srctag[2L]
-          res <- mpi.recv.Robj(source = src, tag = tag, comm = comm)
-          if (is.list(res) && isTRUE(res$progress_only)) {
-            boot <- suppressWarnings(as.integer(res$boot)[1L])
-            if (!is.na(boot) && boot > 0L) {
-              done.boot <<- done.boot + boot
-              progress <<- progress.tick(state = progress, done = done.boot)
-            }
-            return(invisible(TRUE))
-          }
-          .npRmpi_bootstrap_transport_trace(
-            what = what,
-            event = "fanout.recv",
-            fields = list(src = src, tag = tag, done_next = done + 1L, n_remote = n.remote)
-          )
-          done <<- done + 1L
-          if (!is.list(res) || is.null(res$task_indices) || is.null(res$parts)) {
-            parts.out[[worker.idx[[src]][[1L]]]] <<- structure(
-              "bootstrap bundle worker returned malformed result",
-              class = "try-error"
-            )
-          } else {
-            if (isTRUE(stream.bundle.results) && !isTRUE(res$bundle_done)) {
-              done <<- done - 1L
-            }
-            if (!isTRUE(res$bundle_done)) {
-              for (jj in seq_along(res$task_indices)) {
-                task.idx <- as.integer(res$task_indices[[jj]])
-                parts.out[[task.idx]] <<- res$parts[[jj]]
-              }
-              if (!isTRUE(progress.bundle.enabled)) {
-                done.boot <<- done.boot + sum(vapply(tasks[res$task_indices], function(tt) as.integer(tt$bsz), integer(1L)))
-              }
-            }
-          }
-          progress <<- progress.tick(state = progress, done = done.boot)
-          invisible(TRUE)
-        }
-
-        mpi.bcast.cmd(.npRmpi_bootstrap_worker_bundle, n = slave.num, comm = comm)
-        mpi.bcast.Robj(
-          list(
-            FUN = worker.exec,
-            dot.arg = list(...),
-            stream.results = stream.bundle.results,
-            progress.enabled = progress.bundle.enabled,
-            progress.stride = progress.bundle.stride
-          ),
-          rank = 0,
-          comm = comm
-        )
-        .npRmpi_bootstrap_transport_trace(
-          what = what,
-          event = "fanout.master_assist.start",
-          fields = list(
-            n_remote = n.remote,
-            slave_num = slave.num,
-            local_n = length(local.idx),
-            scheduler = "static_bundle",
-            stream_results = stream.bundle.results,
-            progress_beacons = progress.bundle.enabled,
-            progress_stride = progress.bundle.stride
-          )
-        )
-
-        stop.tag <- as.integer(slave.num + 1L)
-        for (i in seq_len(slave.num)) {
-          idx <- worker.idx[[i]]
-          if (length(idx)) {
-            mpi.send.Robj(
-              list(task_indices = as.integer(idx), tasks = tasks[idx]),
-              dest = i,
-              tag = i,
-              comm = comm
-            )
-            .npRmpi_bootstrap_transport_trace(
-              what = what,
-              event = "fanout.send.initial",
-              fields = list(
-                dest = i,
-                tag = i,
-                task_count = length(idx),
-                task_first = idx[[1L]],
-                task_last = idx[[length(idx)]]
-              )
-            )
-          } else {
-            mpi.send.Robj(as.integer(0), dest = i, tag = stop.tag, comm = comm)
-            .npRmpi_bootstrap_transport_trace(
-              what = what,
-              event = "fanout.send.stop.initial",
-              fields = list(dest = i, tag = stop.tag)
-            )
-          }
-        }
-
-        for (task.local.idx in local.idx) {
-          .npRmpi_bootstrap_transport_trace(
-            what = what,
-            event = "fanout.master_local_chunk.start",
-            fields = list(task_idx = task.local.idx)
-          )
-          # Match worker-bundle error ownership: drain scheduled replies before
-          # the collector rejects a failed required chunk.
-          parts.out[[task.local.idx]] <- tryCatch(
-            do.call(worker.exec, c(list(tasks[[task.local.idx]]), list(...))),
-            error = function(e) structure(conditionMessage(e), class = "try-error", condition = e)
-          )
-          done.boot <- done.boot + as.integer(tasks[[task.local.idx]]$bsz)
-          progress <- progress.tick(state = progress, done = done.boot)
-          local.done <- local.done + 1L
-          .npRmpi_bootstrap_transport_trace(
-            what = what,
-            event = "fanout.master_local_chunk.done",
-            fields = list(task_idx = task.local.idx, bsz = as.integer(tasks[[task.local.idx]]$bsz))
-          )
-          while (done < n.remote && isTRUE(mpi.iprobe(mpi.anysource, mpi.anytag, comm))) {
-            receive.remote.result()
-          }
-        }
-
-        while (done < n.remote) {
-          if (isTRUE(mpi.iprobe(mpi.anysource, mpi.anytag, comm))) {
-            receive.remote.result()
-          } else {
-            if (dispatch.timeout > 0) {
-              elapsed.wait <- unname(as.double(proc.time()[["elapsed"]])) - dispatch.started
-              if (is.finite(elapsed.wait) && elapsed.wait > dispatch.timeout) {
-                .npRmpi_bootstrap_fail_or_fallback(
-                  msg = sprintf(
-                    "dispatch timeout waiting on worker results (done=%d/%d, timeout=%.3fs)",
-                    done,
-                    n.remote,
-                    dispatch.timeout
-                  ),
-                  what = what
-                )
-              }
-            }
-            Sys.sleep(0.0005)
-          }
-        }
-        .npRmpi_bootstrap_transport_trace(
-          what = what,
-          event = "fanout.master_assist.done",
-          fields = list(
-            done = done,
-            n_remote = n.remote,
-            local_done = local.done
-          )
-        )
-      } else if (length(remote.idx) == 0L) {
-        parts.out
-      } else {
-        n.remote <- length(remote.idx)
-        slave.num <- workers
-        mpi.anysource <- mpi.any.source()
-        mpi.anytag <- mpi.any.tag()
-        dispatch.timeout <- .npRmpi_bootstrap_dispatch_timeout_sec()
-        dispatch.started <- unname(as.double(proc.time()[["elapsed"]]))
-
-        mpi.bcast.cmd(.mpi.worker.applyLB, n = n.remote, comm = comm)
-        mpi.bcast.Robj(list(FUN = worker.exec, dot.arg = list(...)), rank = 0, comm = comm)
-        .npRmpi_bootstrap_transport_trace(
-          what = what,
-          event = "fanout.master_assist.start",
-          fields = list(
-            n_remote = n.remote,
-            slave_num = slave.num,
-            local_n = 0L,
-            scheduler = "dynamic_worker_only"
-          )
-        )
-
-        init <- min(slave.num, n.remote)
-        if (init > 0L) {
-          for (i in seq_len(init)) {
-            task.idx <- remote.idx[i]
-            mpi.send.Robj(list(data.arg = list(tasks[[task.idx]])), dest = i, tag = i, comm = comm)
-            .npRmpi_bootstrap_transport_trace(
-              what = what,
-              event = "fanout.send.initial",
-              fields = list(dest = i, tag = i, task_idx = task.idx)
-            )
-          }
-        }
-
-        if (init < slave.num) {
-          stop.tag <- as.integer(n.remote + 1L)
-          for (i in seq.int(init + 1L, slave.num)) {
-            mpi.send.Robj(as.integer(0), dest = i, tag = stop.tag, comm = comm)
-            .npRmpi_bootstrap_transport_trace(
-              what = what,
-              event = "fanout.send.stop.initial",
-              fields = list(dest = i, tag = stop.tag)
-            )
-          }
-        }
-
-        done.boot <- 0L
-        sent <- init
-        done <- 0L
-
-        while (done < n.remote) {
-          if (isTRUE(mpi.iprobe(mpi.anysource, mpi.anytag, comm))) {
-            srctag <- mpi.get.sourcetag()
-            src <- srctag[1L]
-            tag <- srctag[2L]
-            res <- mpi.recv.Robj(source = src, tag = tag, comm = comm)
-            .npRmpi_bootstrap_transport_trace(
-              what = what,
-              event = "fanout.recv",
-              fields = list(src = src, tag = tag, done_next = done + 1L, n_remote = n.remote)
-            )
-            done <- done + 1L
-            task.idx <- remote.idx[tag]
-            parts.out[[task.idx]] <- res
-            done.boot <- done.boot + as.integer(tasks[[task.idx]]$bsz)
-            progress <- progress.tick(state = progress, done = done.boot)
-
-            sent <- sent + 1L
-            if (sent <= n.remote) {
-              next.idx <- remote.idx[sent]
-              mpi.send.Robj(list(data.arg = list(tasks[[next.idx]])), dest = src, tag = sent, comm = comm)
-              .npRmpi_bootstrap_transport_trace(
-                what = what,
-                event = "fanout.send.next",
-                fields = list(dest = src, tag = sent, task_idx = next.idx)
-              )
-            } else {
-              mpi.send.Robj(as.integer(0), dest = src, tag = as.integer(n.remote + 1L), comm = comm)
-              .npRmpi_bootstrap_transport_trace(
-                what = what,
-                event = "fanout.send.stop",
-                fields = list(dest = src, tag = as.integer(n.remote + 1L))
-              )
-            }
-          } else {
-            if (dispatch.timeout > 0) {
-              elapsed.wait <- unname(as.double(proc.time()[["elapsed"]])) - dispatch.started
-              if (is.finite(elapsed.wait) && elapsed.wait > dispatch.timeout) {
-                .npRmpi_bootstrap_fail_or_fallback(
-                  msg = sprintf(
-                    "dispatch timeout waiting on worker results (done=%d/%d, timeout=%.3fs)",
-                    done,
-                    n.remote,
-                    dispatch.timeout
-                  ),
-                  what = what
-                )
-              }
-            }
-            Sys.sleep(0.0005)
-          }
-        }
-        .npRmpi_bootstrap_transport_trace(
-          what = what,
-          event = "fanout.master_assist.done",
-          fields = list(
-            done = done,
-            n_remote = n.remote,
-            local_done = 0L
-          )
-        )
-      }
-
-      parts.out
-    }, error = function(e) e)
+    tryCatch(.npRmpi_fanout_bootstrap(
+      tasks = tasks, worker = worker.exec, dot.arg = list(...),
+      workers = workers, comm = comm, master.local = master_local_chunk,
+      ncol.out = ncol.out, progress.enabled = !is.null(progress),
+      progress.step = function(done) {
+        progress.state$value <- progress.tick(progress.state$value, done)
+        invisible(NULL)
+      }, what = what), error = function(e) e)
   } else {
     .npRmpi_bootstrap_transport_trace(
       what = what,
@@ -2499,7 +2134,7 @@
       mpi.applyLB(tasks, worker.exec, ..., comm = comm),
       error = function(e) e
     )
-  }
+  })
   .npRmpi_profile_add_comm_elapsed(
     elapsed_sec = unname(as.double((proc.time() - t.comm)[["elapsed"]])),
     where = if (!is.na(profile.where) && nzchar(profile.where))
@@ -2527,16 +2162,10 @@
       phase = "dispatch_error",
       where = profile.where
     )
-    .npRmpi_bootstrap_fail_or_fallback(
-      msg = sprintf(
-        "fan-out failed (%s). Restart R before performing further MPI-backed computation.",
-        conditionMessage(parts)
-      ),
-      what = what
-    )
+    stop(parts)
   }
 
-  progress <- progress.tick(state = progress, done = total.boot, force = TRUE)
+  progress.state$value <- progress.tick(state = progress.state$value, done = total.boot, force = TRUE)
 
   .npRmpi_bootstrap_phase_mark(
     what = what,
@@ -2561,6 +2190,7 @@
     event = "fanout.done",
     fields = list(parts = length(parts), total_boot = total.boot)
   )
+  progress.state$complete <- TRUE
   out
 }
 

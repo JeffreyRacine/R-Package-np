@@ -19,6 +19,7 @@ test_that("npRmpi protocol tags are portable and collision-free", {
       integer(1L)),
     tag.fun("plreg_task"),
     tag.fun("plreg_result"),
+    tag.fun("fanout_control"),
     vapply(ranks1, function(rank)
       rank.tag.fun("scoef_req_base", rank, min_rank = 1L),
       integer(1L)),
