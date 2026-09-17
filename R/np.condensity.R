@@ -700,7 +700,8 @@ npcdens.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   has.explicit.bws <- (!no.bws) && isa(bws, "conbandwidth")
   bws.formula <- (!no.bws) && inherits(bws, "formula")
   txdat.formula <- (!no.txdat) && inherits(txdat, "formula")
-  dots <- list(...)
+  dots <- .np_formula_dispatch_args(
+    NULL, substitute(list(...))[-1L], environment())
   dots.formula <- (length(dots) > 0L && inherits(dots[[1L]], "formula")) ||
     (!is.null(dots$formula) && inherits(dots$formula, "formula"))
   regtype.request <- if (has.explicit.bws) {

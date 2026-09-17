@@ -6,6 +6,28 @@ p2_subset_fixture <- function() {
   d
 }
 
+test_that("MPI unconditional distribution raw bandwidth-formula branch owns subset", {
+  if (!spawn_mpi_slaves(2L)) skip("MPI pool unavailable")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  withr::local_options(np.messages = FALSE)
+  d <- data.frame(f = ordered(rep(1:4, 9)), keep = rep(c(TRUE, FALSE, TRUE), 12))
+  # For ordered data, the default unsearched zero width is an exact
+  # categorical limit. Supplying numeric bws would bypass this MPI branch.
+  bw <- npudistbw(~ f, data = d, subset = keep, bandwidth.compute = FALSE)
+  first <- npudist(bw)
+  native <- npudist(bw, tdat = d[d$keep, "f", drop = FALSE])
+  probe <- new.env(parent = emptyenv())
+  probe$n <- 0L
+  actual <- npudist(bws = ~ f, data = d,
+    subset = { probe$n <- probe$n + 1L; keep }, bandwidth.compute = FALSE)
+  expect_identical(probe$n, 1L)
+  expect_identical(fitted(actual), fitted(first))
+  expect_identical(fitted(actual), fitted(native))
+  expect_identical(actual$bws$bw, bw$bw)
+  expect_true(all(is.finite(fitted(actual))))
+  expect_identical(actual$ntrain, native$ntrain)
+})
+
 p2_subset_specs <- function() {
   list(
     npudens = list(formula = quote(~ x), constructor = "npudensbw", widths = .5, kind = "unconditional"),

@@ -146,20 +146,20 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
   .npRmpi_require_active_slave_pool(where = "npscoef()")
   explicit.scbandwidth <- (!missing(bws)) && inherits(bws, "scbandwidth")
   formula.forwarded <- (!missing(txdat)) && inherits(txdat, "formula")
-  formula.input <- .np_formula_dispatch_args(
-    NULL, substitute(list(...))[-1L], environment())[["formula", exact = TRUE]]
+  early.dots <- .np_formula_dispatch_args(
+    NULL, substitute(list(...))[-1L], environment())
+  formula.input <- early.dots[["formula", exact = TRUE]]
   formula.only <- missing(tydat) && missing(tzdat) &&
     (missing(txdat) || formula.forwarded) &&
     (formula.forwarded || inherits(formula.input, "formula") ||
      (!missing(bws) && inherits(bws, "formula")))
   nomad <- npValidateNomadControl(nomad, "nomad")
-  npRejectLegacyBooleanErrors(.np_formula_dispatch_args(
-    NULL, substitute(list(...))[-1L], environment()), "npscoef")
+  npRejectLegacyBooleanErrors(early.dots, "npscoef")
   se <- npValidateScalarLogical(se, "se")
   degree.select.value <- if (npNomadControlRequested(nomad)) {
     "coordinate"
-  } else if ("degree.select" %in% names(list(...))) {
-    match.arg(list(...)$degree.select, c("manual", "coordinate", "exhaustive"))
+  } else if ("degree.select" %in% names(early.dots)) {
+    match.arg(early.dots$degree.select, c("manual", "coordinate", "exhaustive"))
   } else {
     "manual"
   }
@@ -225,7 +225,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
     names(sc.bw)[m.txy] <- nstxy[m.txy > 0]
   }
   sc.bw <- .np_public_dots_filter_call(sc.bw, "npscoefbw")
-  formula.input <- list(...)[["formula", exact = TRUE]]
+  formula.input <- early.dots[["formula", exact = TRUE]]
   frame.state <- if (!has.explicit.bws &&
       (bws.formula || inherits(formula.input, "formula") ||
        (!no.txdat && inherits(txdat, "formula"))) &&

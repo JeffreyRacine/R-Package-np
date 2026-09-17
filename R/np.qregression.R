@@ -1689,7 +1689,7 @@ npqreg.default <- function(bws, txdat, tydat, nomad = FALSE, ..., se = FALSE){
     .npqreg_validate_tau(early.dots$tau)
 
   if (!missing(bws) && inherits(bws, "formula")) {
-    dots <- list(...)
+    dots <- early.dots
     dot.names <- names(dots)
     if (is.null(dot.names))
       dot.names <- rep("", length(dots))
@@ -1709,10 +1709,12 @@ npqreg.default <- function(bws, txdat, tydat, nomad = FALSE, ..., se = FALSE){
     tbw <- if (use.outer.bandwidth.progress) {
       .np_progress_select_bandwidth_enhanced(
         "Selecting conditional distribution bandwidth",
-        do.call(npcdistbw, bw.args)
+        .np_formula_dispatch_call(npcdistbw, bw.args,
+          substitute(list(...))[-1L], environment())
       )
     } else {
-      do.call(npcdistbw, bw.args)
+      .np_formula_dispatch_call(npcdistbw, bw.args,
+        substitute(list(...))[-1L], environment())
     }
     return(do.call(npqreg, c(list(bws = tbw, se = se, .np.formula.state = frame.state), fit.dots)))
   }
@@ -1722,7 +1724,7 @@ npqreg.default <- function(bws, txdat, tydat, nomad = FALSE, ..., se = FALSE){
     (missing(bws) || !isa(bws, "condbandwidth"))
   if ((!missing(txdat) && inherits(txdat, "formula") &&
        !missing(bws) && !isa(bws, "condbandwidth")) || named.formula) {
-    dots <- list(...)
+    dots <- early.dots
     formula.input <- if (named.formula) dots[["formula", exact = TRUE]] else txdat
     dots$formula <- NULL
     dot.names <- names(dots)
@@ -1748,10 +1750,12 @@ npqreg.default <- function(bws, txdat, tydat, nomad = FALSE, ..., se = FALSE){
     tbw <- if (use.outer.bandwidth.progress) {
       .np_progress_select_bandwidth_enhanced(
         "Selecting conditional distribution bandwidth",
-        do.call(npcdistbw, bw.args)
+        .np_formula_dispatch_call(npcdistbw, bw.args,
+          substitute(list(...))[-1L], environment())
       )
     } else {
-      do.call(npcdistbw, bw.args)
+      .np_formula_dispatch_call(npcdistbw, bw.args,
+        substitute(list(...))[-1L], environment())
     }
     return(do.call(npqreg, c(list(bws = tbw, se = se, .np.formula.state = frame.state), fit.dots)))
   }

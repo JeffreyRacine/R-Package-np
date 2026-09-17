@@ -296,16 +296,18 @@ npudist.default <- function(bws, tdat, ..., se = FALSE){
     return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
   if (!missing(bws) && inherits(bws, "formula")) {
-    dots <- list(...)
+    dots <- .np_formula_dispatch_args(
+      NULL, substitute(list(...))[-1L], environment())
     frame.state <- new.env(parent = emptyenv())
     dots$.np.formula.state <- frame.state
     on.exit(rm(list = ls(frame.state, all.names = TRUE), envir = frame.state), add = TRUE)
-    tbw <- do.call(
+    tbw <- .np_formula_dispatch_call(
       npudistbw,
       .np_public_dots_filter_args(
         c(list(formula = bws), dots),
         "npudistbw"
-      )
+      ),
+      substitute(list(...))[-1L], environment()
     )
     return(do.call(npudist, c(list(bws = tbw, se = se), dots)))
   }
