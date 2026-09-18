@@ -383,6 +383,11 @@ Further arguments passed to the default kernel-sum method.
   \code{p.ksum} member. This option can be set simultaneously with
   \code{permutation.operator}.
 
+  Ordered evaluation values used with \code{compute.ocg=TRUE} must belong
+  to the bandwidth object's retained category table, because this operation
+  requires an adjacent reference category. Other ordered kernel evaluations
+  retain their usual numeric extrapolation behavior.
+
   When a permutation, score, or OCG operation selects only a subset of
   variables, the corresponding blocks in \code{p.ksum} and, when requested
   internally, derivative kernel weights are packed without empty coordinates
