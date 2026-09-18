@@ -280,6 +280,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
            residuals = FALSE,
            tol = .Machine$double.eps,
            .np_allow_undefined = FALSE,
+           .np_coefficient_projection = NULL,
            ...){
 
     fit.start <- proc.time()[3]
@@ -972,6 +973,34 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
     invalid.rows <- if (!fast.largeh) solver[["invalid"]] else {
       invalid <- if (fast.largeh.lc) fast.solve[["invalid"]] else fast.eval[["invalid"]]
       if (length(invalid)) seq_len(enrow) else integer()
+    }
+
+    # Plot-only demand: retain the canonical full-geometry moment/ridge owner.
+    # Ordinary fits never construct or retain a response projection.
+    if (!is.null(.np_coefficient_projection)) {
+      j <- .np_coefficient_projection
+      if (iterate || se || leave.one.out || length(j) != 1L ||
+          !is.numeric(j) || !is.finite(j) || j != floor(j) ||
+          j < 1L || j >= nrow(coef.mat))
+        stop("invalid private smooth coefficient projection request", call. = FALSE)
+      if (isTRUE(fit.progress.active)) {
+        fit.progress <- .np_progress_end(fit.progress)
+        fit.progress.active <- FALSE
+      }
+      return(list(
+        bws = if (is.null(lp_state)) bws else lp_state$rbw,
+        z.train = if (is.null(lp_state)) tzdat else lp_state$z.train,
+        z.eval = if (is.null(lp_state)) {
+          if (miss.ex) tzdat else ezdat
+        } else lp_state$z.eval,
+        design = if (is.null(lp_state)) W.train else
+          .npscoef_row_tensor_design(W.train, lp_state$W.train),
+        basis.eval = if (is.null(lp_state)) matrix(1, enrow, 1L) else lp_state$W.eval,
+        tww = if (fast.largeh) array(fast.eval$tww,
+          c(nrow(fast.eval$tww), ncol(fast.eval$tww), 1L)) else moments$tww,
+        ridge = ridge, invalid = invalid.rows, global = fast.largeh,
+        index = as.integer(j), t0 = as.double(coef.mat[j + 1L, ])
+      ))
     }
 
     if (iterate && !is.null(bws$bw.fitted) && miss.ex && !identical(reg.engine, "lc"))

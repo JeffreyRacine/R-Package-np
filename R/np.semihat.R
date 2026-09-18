@@ -909,6 +909,37 @@
   out
 }
 
+.npscoef_coefficient_projection_block <- function(state, first, last) {
+  rows <- seq.int(first, last)
+  # Unlike generic returned kernel weights, these share the normalized moment
+  # units for fixed, generalized-NN and adaptive-NN bandwidths. This matters
+  # whenever the accepted solve has a positive ridge.
+  eval.rows <- if (state$global) 1L else rows
+  kw <- .npscoef_npksum(bws = state$bws, txdat = state$z.train,
+    exdat = state$z.eval[eval.rows, , drop = FALSE],
+    bandwidth.divide = TRUE, return.kernel.weights = TRUE,
+    .np.internal.bandwidth.divide.weights = TRUE)$kw
+  H <- matrix(NA_real_, length(rows), nrow(state$design))
+  q <- ncol(state$basis.eval)
+  p <- ncol(state$design)
+  for (ii in seq_along(rows)) {
+    row <- rows[ii]
+    if (row %in% state$invalid)
+      next
+    a <- state$tww[, , if (state$global) 1L else row]
+    ridge <- state$ridge[row]
+    projection <- numeric(p)
+    projection[state$index * q + seq_len(q)] <- state$basis.eval[row, ]
+    v <- as.vector(solve(t(a + diag(ridge, p)), projection))
+    # Transpose the fitter's intercept RHS correction as well as its solve.
+    if (ridge > 0)
+      v[1L] <- v[1L] + npRidgeInterceptCorrection(ridge, v[1L], a[1L, 1L])
+    H[ii, ] <- kw[, if (state$global) 1L else ii] *
+      as.vector(state$design %*% v)
+  }
+  H
+}
+
 .npscoef_effective_weight_state <- function(bws, tzdat, ezdat, leave.one.out = FALSE) {
   state <- .npscoef_lp_state(
     bws = bws,

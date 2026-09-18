@@ -1,5 +1,12 @@
 # np 0.80-1
 
+* Smooth-coefficient wild-bootstrap coefficient-gradient plots now reuse a
+  direct, blocked coefficient projection across bootstrap responses. The
+  projection retains the fitter's normalized moments, accepted ridge and
+  intercept correction for LC/LL/LP and fixed/generalized/adaptive NN
+  bandwidths. Pilots, draws, RNG order and intervals are preserved to numerical
+  rounding. Mean plots and pairs/block resampling retain their existing owners.
+
 * Local-constant and degree-zero local-polynomial continuous-gradient wild
   bootstrap plots with Gaussian, Epanechnikov and uniform kernels now reuse
   the exact derivative operator across responses,
