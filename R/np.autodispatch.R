@@ -2942,6 +2942,25 @@
   .npRmpi_autodispatch_tag_result(result, mode = "auto", publication = publication)
 }
 
+.npRmpi_autodispatch_bind_data_promises <- function(mc, owner, owner.call,
+                                                    definition, caller) {
+  if (!is.function(definition) ||
+      !identical(environment(definition), asNamespace("npRmpi"))) return(mc)
+  original <- match.call(definition = definition, call = owner.call,
+                         expand.dots = FALSE, envir = caller)
+  data.names <- c("xdat", "ydat", "zdat", "dat", "txdat", "tydat", "tzdat",
+                  "tdat", "exdat", "eydat", "ezdat", "edat")
+  owned <- intersect(names(mc), intersect(data.names,
+    intersect(names(formals(definition)), names(original))))
+  for (name in owned) {
+    # A method can deliberately replace an argument for its dispatched leaf.
+    # Only its unchanged original argument denotes the owned formal promise.
+    if (identical(mc[[name]], original[[name]]))
+      mc[name] <- list(get(name, envir = owner, inherits = FALSE))
+  }
+  mc
+}
+
 .npRmpi_autodispatch_call <- function(mc, caller_env = parent.frame(), comm = 1L) {
   .npRmpi_warn_pkg_conflict_once()
   .npRmpi_warn_rmpi_conflict_once()
@@ -2950,6 +2969,11 @@
   if (!.npRmpi_autodispatch_active())
     return(.npRmpi_eval_without_dispatch(mc, caller_env))
 
+  method <- sys.parent()
+  mc <- .npRmpi_autodispatch_bind_data_promises(mc, owner = parent.frame(),
+    owner.call = sys.call(method),
+    definition = if (method > 0L) sys.function(method) else NULL,
+    caller = if (method > 0L) sys.frame(sys.parents()[[method]]) else globalenv())
   .npRmpi_distributed_call_impl(mc = mc, caller_env = caller_env, comm = comm, warn_nested = TRUE)
 }
 

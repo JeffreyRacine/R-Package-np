@@ -1,5 +1,10 @@
 # npRmpi 0.80-1
 
+* Native autodispatch now consumes the actual method's already-owned data
+  promises. A side-effecting data expression is no longer evaluated again
+  after generic dispatch has forced it. Deliberately rewritten leaf inputs
+  and unrelated wrapper locals remain separate from those argument owners.
+
 * Formula training now resolves character NA policies through the same owner
   as `stats::model.frame`, so an unrelated caller-local `na.omit` no longer
   changes the sample. Explicit NA function objects retain their own behavior.
