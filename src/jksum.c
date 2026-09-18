@@ -34730,7 +34730,8 @@ NPRegressionFailure *failure){
       ret = &te;
 
       for(i = 0; i < num_obs_eval; i++){
-        if(ret->key.dkey != matrix_X_ordered_eval[l][i]){
+        /* The placeholder key is not a cached category until the first lookup. */
+        if(i == 0 || ret->key.dkey != matrix_X_ordered_eval[l][i]){
           te.key.dkey = matrix_X_ordered_eval[l][i];
           if(thsearch_r(&te, TH_SEARCH, &ret, otabs+l) == TH_FAILURE) {
             regression_fit_status = NP_REGRESSION_FIT_ERR_HASH_LOOKUP;
@@ -55427,7 +55428,8 @@ NPRegressionLPEmptyRows *empty_rows
       ret = &te;
 
       for(i = 0; i < num_obs_eval; i++){
-        if(ret->key.dkey != matrix_XY_ordered_eval[l][i]){
+        /* Zero is a valid category: always initialize the cached index. */
+        if(i == 0 || ret->key.dkey != matrix_XY_ordered_eval[l][i]){
           te.key.dkey = matrix_XY_ordered_eval[l][i];
           if(thsearch_r(&te, TH_SEARCH, &ret, otabs+l) == TH_FAILURE)
             error("hash table lookup failed (which should be impossible)");
