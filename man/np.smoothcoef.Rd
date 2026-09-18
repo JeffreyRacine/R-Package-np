@@ -238,6 +238,14 @@ Further arguments are passed to the bandwidth-selection counterpart when bandwid
 
   }
 }
+\details{
+  For a native bandwidth object, \code{newdata} is split into
+  \code{exdat} and \code{ezdat} using the retained predictor and smoothing
+  variable names. Names must identify both roles unambiguously;
+  explicitly supplied native evaluation arguments take precedence. This
+  evaluates at the requested rows without repeating bandwidth selection.
+
+}
 \value{
   When an external evaluation row has no usable kernel support or its
   kernel-weighted system cannot be solved, the corresponding fitted value,
@@ -348,6 +356,14 @@ Further arguments are passed to the bandwidth-selection counterpart when bandwid
   \code{\link{cbind}}, since \code{\link{cbind}} will typically not work as
   intended on mixed data types and will coerce the data to the same
   type.
+
+  For formula fits, character-valued missing-data policies are resolved
+  through the \code{stats} model-frame owner; pass a caller-local policy as
+  a function object rather than its name. With replacement training data,
+  an explicit \code{na.action}, including \code{NULL}, takes precedence
+  over the saved policy. Native fitting still requires complete rows, so
+  a permissive policy does not guarantee the same retained sample as
+  \code{stats::model.frame}.
 
   When reusing a bandwidth object without explicit training or evaluation
   data, newly constructed bandwidth objects use retained training values.
