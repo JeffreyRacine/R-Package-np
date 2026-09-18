@@ -1,5 +1,26 @@
 # np 0.80-1
 
+* Fits with replacement training data now retain that fitted sample for later
+  refits, prediction, plotting and inference. Native bandwidth constructors for
+  regression, density/distribution and semiparametric methods also retain their
+  training values, so rebinding caller variables does not change later results.
+  Formula and native sample ownership no longer compete in LSQ scale-pilot
+  children. Objects saved without retained samples still need their original
+  data or explicit replacement inputs.
+
+* Positional numeric bandwidths in one-call fitting are now honored like named
+  bandwidths, without unintended bandwidth selection. Existing inline formula
+  and wrapper syntax is unchanged.
+
+* Ordered categorical contrasts correctly initialize the category lookup when
+  the first evaluation category is zero. This corrects affected local-constant
+  gradients, standard errors and their downstream bootstrap/test consumers.
+
+* Interval-cap widths now use display geometry consistently across response
+  scales, including singleton evaluation points.
+  Partially linear independent-scale plots with data overlays now use the
+  correct panel-local fitted values and bootstrap summaries.
+
 * Partially linear child bandwidths retain their own native training samples
   without serializing internal package call frames. Extracted children remain
   usable. Retained formula bandwidths likewise no longer keep intermediate
