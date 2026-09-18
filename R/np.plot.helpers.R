@@ -5816,6 +5816,20 @@
   if (length(fit.mean.train) != n || any(!is.finite(fit.mean.train)))
     stop("internal fit.mean.train payload is invalid for exact wild smooth coefficient bootstrap", call. = FALSE)
 
+  if (identical(target, "grad") && !leave.one.out) {
+    state <- .np_plot_with_local_compiled_eval(
+      .np_scoef_fit_internal(bws = bws, txdat = txdat, tydat = ydat,
+        tzdat = tzdat, exdat = exdat, ezdat = ezdat, iterate = FALSE, se = FALSE,
+        .np_coefficient_projection = gradient.index))
+    out <- .np_plot_boot_from_hat_blocks_wild(
+      hat.block.fun = function(first, last) .np_plot_with_local_compiled_eval(
+        .npscoef_coefficient_projection_block(state, first, last)),
+      neval = nrow(exdat), ntrain = n, ydat = ydat, fit.mean = fit.mean.train,
+      B = B, wild = wild, progress.label = progress.label, distributed = TRUE)
+    out$t0 <- state$t0
+    return(out)
+  }
+
   t0 <- fit.fun(tx.eval = exdat, y.train = ydat, tz.eval = ezdat)
   tmat <- matrix(NA_real_, nrow = B, ncol = length(t0))
   residuals <- ydat - fit.mean.train
