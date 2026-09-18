@@ -55,3 +55,20 @@ test_that("child sample retention does not strip user formula environments", {
   expect_equal(predict(a, newdata = owner$d[1:3, , drop = FALSE]),
                fitted(npreg(b, newdata = owner$d[1:3, , drop = FALSE])))
 })
+
+test_that("formula sample retention releases only internal call owners", {
+  owner <- getFromNamespace(".np_bws_retain_formula_training", "npRmpi")
+  user <- new.env(parent = globalenv())
+  formula <- y ~ x; environment(formula) <- user
+  frame <- data.frame(y = 1:4, x = 4:1)
+  b <- list(call = quote(npregbw(y ~ x)), formula = formula)
+  internal <- new.env(parent = environment(owner))
+  for (call.owner in list(user, internal, emptyenv())) {
+    environment(b$call) <- call.owner
+    out <- owner(b, frame, stats::na.exclude)
+    expect_identical(environment(out$call),
+      if (identical(call.owner, internal)) user else call.owner)
+    expect_identical(environment(out$formula), user)
+    expect_identical(out[[".np.formula.training"]]$frame, frame)
+  }
+})

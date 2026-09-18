@@ -213,6 +213,18 @@
   list(data = data, subset = eval(subset.expr, envir = data, enclos = caller))
 }
 
+.np_bws_retain_formula_training <- function(bws, frame, na.action) {
+  bws[[".np.formula.training"]] <- list(frame = frame, na.action = na.action)
+  call.env <- environment(bws$call)
+  # An internal constructor activation is not the owner of a user's formula.
+  # Retained training values make this transient frame unnecessary; preserve
+  # the original formula environment for transforms and explicit-data refits.
+  if (is.environment(call.env) && !identical(call.env, emptyenv()) &&
+      identical(parent.env(call.env), environment(.np_bws_retain_formula_training)))
+    environment(bws$call) <- environment(bws$formula)
+  bws
+}
+
 .np_bws_formula_model_frame <- function(bws, mf.args, data.override = FALSE) {
   if (inherits(bws, c("conbandwidth", "condbandwidth")))
     .np_formula_validate_syntax(bws$formula, conditional.response = TRUE)

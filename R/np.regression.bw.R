@@ -40,7 +40,7 @@ npregbw.formula <-
     tbw$rows.omit <- as.vector(attr(mf,"na.action"))
     tbw$nobs.omit <- length(tbw$rows.omit)
     tbw$terms <- attr(mf,"terms")
-    tbw[[".np.formula.training"]] <- list(frame = mf, na.action = capture$na.action)
+    tbw <- .np_bws_retain_formula_training(tbw, mf, capture$na.action)
 
     tbw <-
       updateBwNameMetadata(nameList =

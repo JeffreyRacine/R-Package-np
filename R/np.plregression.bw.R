@@ -43,7 +43,7 @@ npplregbw.formula <-
     tbw$nobs.omit <- length(tbw$rows.omit)
     tbw$terms <- attr(roles$yz, "terms")
     tbw$xterms <- attr(roles$x, "terms")
-    tbw[[".np.formula.training"]] <- list(frame = frame, na.action = capture$na.action)
+    tbw <- .np_bws_retain_formula_training(tbw, frame, capture$na.action)
     tbw$chromoly <- spec$chromoly
     updateBwNameMetadata(nameList = list(ynames =
       names(roles$yz)[attr(tbw$terms, "response")]), bws = tbw)
