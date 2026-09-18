@@ -11065,8 +11065,9 @@ draw.all.error.types <- function(ex, center, all.err,
 
   draw_one <- function(err, col) {
     if (is.null(err)) return(invisible(FALSE))
-    lower <- center - err[,1]
-    upper <- center + err[,2]
+    panel.center <- .np_plot_range_center(center, list(err))
+    lower <- panel.center - err[,1]
+    upper <- panel.center + err[,2]
     n <- min(length(ex), length(lower), length(upper))
     if (!n) return(invisible(FALSE))
     idx <- seq_len(n)
