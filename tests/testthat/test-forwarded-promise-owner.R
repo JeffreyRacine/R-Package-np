@@ -8,6 +8,9 @@ test_that("only an exact activation's formals own matched forwarded arguments", 
     # ..1 has been consumed by S3 matching; the original formal now owns it.
     resolve(quote(..1), "ydat", environment(), "")
   }
+  environment(formal) <- asNamespace("npRmpi")
+  body(formal) <- quote(.npRmpi_autodispatch_resolve_owned_arg(
+    quote(..1), "ydat", environment(), ""))
   named <- function(...) {
     ydat <- 11
     resolve(quote(..1), "ydat", environment(), "ydat")
@@ -15,6 +18,14 @@ test_that("only an exact activation's formals own matched forwarded arguments", 
   expect_identical(dots.only(1:3), 1:3)
   expect_identical(formal(1:3, 88), 1:3)
   expect_identical(named(ydat = 1:3), 1:3)
+  unrelated.formal <- function(ydat, ...) {
+    resolve(quote(..1), "ydat", environment(), "")
+  }
+  expect_identical(unrelated.formal(11, 1:3), 1:3)
+  explicit <- function(...) {
+    resolve(quote(FALSE), "se", environment(), "se")
+  }
+  expect_identical(explicit(se = TRUE), FALSE)
   n <- 0L
   expect_identical(dots.only({ n <- n + 1L; 1:3 }), 1:3)
   expect_identical(n, 1L)

@@ -2133,6 +2133,8 @@
 }
 
 .npRmpi_autodispatch_owner_dot_names <- function(caller_env) {
+  if (!exists("...", envir = caller_env, inherits = FALSE))
+    return(character(0))
   dots.call <- tryCatch(
     evalq(substitute(list(...)), envir = caller_env),
     error = function(e) NULL
@@ -2179,12 +2181,14 @@
       !exists(argname, envir = caller_env, inherits = FALSE))
     return(list(found = FALSE, value = NULL))
 
-  # A local variable with the same spelling is not an argument owner. Locate
+  # An arbitrary wrapper local or formal is not a matched package argument.
+  # Only package activations perform the S3 rematching handled here. Locate
   # the activation of this exact environment, never a same-named binding in
   # another dynamic frame. Later eval frames can reuse this environment.
   frames <- sys.frames()
   owner <- which(vapply(frames, identical, logical(1L), caller_env))
   if (!length(owner) ||
+      !identical(environment(sys.function(owner[[1L]])), asNamespace("npRmpi")) ||
       !(argname %in% names(formals(sys.function(owner[[1L]])))))
     return(list(found = FALSE, value = NULL))
 
@@ -2198,17 +2202,16 @@
                                                     argname,
                                                     caller_env,
                                                     dot.names) {
-  dot.res <- .npRmpi_autodispatch_owner_dot_value(
-    argname = argname,
-    caller_env = caller_env,
-    dot.names = dot.names
-  )
-  if (isTRUE(dot.res$found))
-    return(dot.res$value)
-
   forwarded <- is.symbol(expr) &&
     grepl("^\\.\\.[0-9]+$", as.character(expr))
   if (forwarded) {
+    dot.res <- .npRmpi_autodispatch_owner_dot_value(
+      argname = argname,
+      caller_env = caller_env,
+      dot.names = dot.names
+    )
+    if (isTRUE(dot.res$found))
+      return(dot.res$value)
     binding.res <- .npRmpi_autodispatch_owner_binding(
       argname,
       caller_env = caller_env

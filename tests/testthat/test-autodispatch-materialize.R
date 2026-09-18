@@ -89,7 +89,7 @@ test_that("autodispatch remote references are reused only while value-current", 
   expect_false(current(value))
 })
 
-test_that("autodispatch materialization resolves ..n placeholders by argument name", {
+test_that("autodispatch materialization requires an actual dots owner", {
   materialize <- getFromNamespace(".npRmpi_autodispatch_materialize_call", "npRmpi")
 
   dat <- c(3, 1, 4)
@@ -101,7 +101,10 @@ test_that("autodispatch materialization resolves ..n placeholders by argument na
     bandwidth.compute = FALSE
   ))
 
-  prepared <- materialize(mc = mc, caller_env = environment(), comm = 1L)
+  expect_error(materialize(mc = mc, caller_env = environment(), comm = 1L),
+               "cannot resolve forwarded argument")
+  owner <- function(...) materialize(mc = mc, caller_env = environment(), comm = 1L)
+  prepared <- owner(dat)
   dat.ref <- as.character(prepared$call$dat)
   bws.ref <- as.character(prepared$call$bws)
 
@@ -190,8 +193,9 @@ test_that("bootstrap-count ownership survives nested formals and ..n forwarding"
   owner <- function(B, ...) {
     mc <- match.call()
     mc[[1L]] <- as.name("npdeptest")
-    materialize(mc = mc, caller_env = environment(), comm = 1L)
+    .npRmpi_autodispatch_materialize_call(mc = mc, caller_env = environment(), comm = 1L)
   }
+  environment(owner) <- asNamespace("npRmpi")
   forward <- function(...) owner(...)
 
   requested_B <- 9L
@@ -207,8 +211,9 @@ test_that("autodispatch materializes forwarded formals and named dots from one o
   owner <- function(dat, bws, ...) {
     mc <- match.call()
     mc[[1L]] <- as.name("npudistbw")
-    materialize(mc = mc, caller_env = environment(), comm = 1L)
+    .npRmpi_autodispatch_materialize_call(mc = mc, caller_env = environment(), comm = 1L)
   }
+  environment(owner) <- asNamespace("npRmpi")
   forward <- function(...) owner(...)
 
   dat.value <- c(2, 7, 1, 8)
