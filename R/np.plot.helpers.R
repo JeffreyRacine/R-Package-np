@@ -1307,6 +1307,10 @@
 .np_plot_wild_apply_operator_enabled <- function(ntrain, neval, bwtype = "fixed") {
   if (!identical(as.character(bwtype)[1L], "fixed"))
     return(FALSE)
+  .np_plot_wild_operator_exceeds_budget(ntrain, neval)
+}
+
+.np_plot_wild_operator_exceeds_budget <- function(ntrain, neval) {
   threshold <- getOption("np.plot.wild.apply.operator.threshold.bytes",
                          128 * 1024^2)
   threshold <- suppressWarnings(as.numeric(threshold)[1L])
@@ -3079,6 +3083,14 @@
                                             gradient.order = 1L,
                                             slice.index = 1L,
                                             progress.label = NULL) {
+  # Beta endpoint cancellation is response-dependent in the incumbent owner.
+  # Keep that calculation; reuse the exact operator for the qualified kernels.
+  if (!identical(bws[["ckertype", exact = TRUE]], "beta"))
+    return(.np_wild_boot_from_reghat_operator(
+      xdat = xdat, exdat = exdat, bws = bws, ydat = ydat, B = B,
+      wild = wild, fit.mean.train = fit.mean.train, gradients = gradients,
+      gradient.order = gradient.order, slice.index = slice.index,
+      progress.label = progress.label))
   xdat <- toFrame(xdat)
   exdat <- toFrame(exdat)
   ydat <- as.double(ydat)
@@ -3143,6 +3155,69 @@
   }
 
   list(t = tmat, t0 = t0)
+}
+
+.np_wild_boot_from_reghat_operator <- function(xdat,
+                                            exdat,
+                                            bws,
+                                            ydat,
+                                            B,
+                                            wild = c("rademacher", "mammen"),
+                                            fit.mean.train = NULL,
+                                            gradients = FALSE,
+                                            gradient.order = 1L,
+                                            slice.index = 1L,
+                                            progress.label = NULL) {
+  xdat <- toFrame(xdat)
+  exdat <- toFrame(exdat)
+  ydat <- as.double(ydat)
+  B <- as.integer(B)
+
+  n <- nrow(xdat)
+  if (length(ydat) != n)
+    stop("length of ydat must match training rows in exact wild regression bootstrap helper")
+  if (n < 1L || nrow(exdat) < 1L || B < 1L)
+    stop("invalid exact wild regression bootstrap dimensions")
+  xi.factor <- isTRUE(slice.index > 0L) &&
+    !is.null(bws$xdati) &&
+    (isTRUE(bws$xdati$iord[slice.index]) || isTRUE(bws$xdati$iuno[slice.index]))
+
+  if (is.null(fit.mean.train)) {
+    # Automatic pilots are fitted training means, not external self-queries.
+    fit.mean.train <- as.vector(.np_regression_direct(
+      bws = bws,
+      txdat = xdat,
+      tydat = ydat,
+      gradients = FALSE,
+      gradient.order = gradient.order
+    )$mean)
+  } else {
+    fit.mean.train <- as.double(fit.mean.train)
+  }
+  if (length(fit.mean.train) != n || any(!is.finite(fit.mean.train)))
+    stop("internal fit.mean.train payload is invalid for exact wild regression bootstrap", call. = FALSE)
+
+  s <- NULL
+  if (isTRUE(gradients)) {
+    if (xi.factor)
+      stop("exact wild derivative operator requires a continuous coordinate", call. = FALSE)
+    continuous <- which(bws$icon)
+    coordinate <- match(slice.index, continuous)
+    if (is.na(coordinate)) stop("invalid continuous gradient coordinate", call. = FALSE)
+    s <- integer(length(continuous))
+    s[coordinate] <- rep_len(as.integer(gradient.order), length(continuous))[coordinate]
+  }
+  # The public plot preparation owns kernel notices, as in the LP hat route.
+  hat.block <- function(start, stopi) suppressWarnings(npreghat(
+    bws = bws, txdat = xdat, exdat = exdat[start:stopi, , drop = FALSE],
+    s = s, output = "matrix", .np.defer.empty.rows = TRUE))
+  if (.np_plot_wild_operator_exceeds_budget(n, nrow(exdat))) {
+    return(.np_plot_boot_from_hat_blocks_wild(hat.block.fun = hat.block,
+      neval = nrow(exdat), ntrain = n, ydat = ydat, fit.mean = fit.mean.train,
+      B = B, wild = wild, progress.label = progress.label))
+  }
+  .np_plot_boot_from_hat_wild(H = hat.block(1L, nrow(exdat)), ydat = ydat,
+    fit.mean = fit.mean.train, B = B, wild = wild, progress.label = progress.label)
 }
 
 .np_inid_boot_from_reghat_frozen <- function(xdat,

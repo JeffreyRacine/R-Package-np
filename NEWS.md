@@ -1,5 +1,18 @@
 # np 0.80-1
 
+* Local-constant and degree-zero local-polynomial continuous-gradient wild
+  bootstrap plots with Gaussian, Epanechnikov and uniform kernels now reuse
+  the exact derivative operator across responses,
+  including local-smoothing quantile plots. Operator rows are blocked for
+  large grids. Bootstrap draws, pilots, intervals and RNG ordering are unchanged
+  to numerical rounding; pairs/block resampling retains its own geometry.
+  Beta kernels retain their per-response calculation because endpoint
+  derivative cancellation can depend on the response.
+  The canonical LC derivative operator now returns NA at external rows whose
+  computed kernel weights are all zero, matching direct fitting; complete-row
+  internal consumers still reject them. Invalid radii and other nonfinite
+  results are not converted into partial results.
+
 * Plot interval ranges now align NA-padded categorical panels with their actual
   interval rows. Unequal partially linear panel sizes no longer generate a
   recycling warning with `band="all"`; interval values and axis ranges are

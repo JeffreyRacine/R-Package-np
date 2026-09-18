@@ -32525,8 +32525,14 @@ int np_regression_lp_hat_matrix(double *vector_scale_factor,
           sum += kw[j];
           derivative_sum += pkw[j];
         }
-        if(!R_FINITE(sum) || !R_FINITE(derivative_sum) || sum == 0.0)
+        if(!R_FINITE(sum) || !R_FINITE(derivative_sum))
           goto cleanup_lp_hat;
+        if(sum == 0.0) {
+          if(np_lp_record_empty_row(kw, num_train, i, num_eval, num_train,
+                                    weights_out, ridge_used_out, empty_rows))
+            continue;
+          goto cleanup_lp_hat;
+        }
 
         for(j = 0; j < num_train; ++j) {
           const int orig_j = (int_TREE_X == NP_TREE_TRUE) ?
