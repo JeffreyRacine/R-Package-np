@@ -154,7 +154,8 @@
       ydat <- model.response(tmf)
       xdat <- tmf[, attr(attr(tmf, "terms"),"term.labels"), drop = FALSE]
     } else {
-      if(all(miss.xy) && !is.null(bws$call)){
+      if(all(miss.xy) && (!is.null(bws$call) ||
+         !is.null(bws[[".np.native.training", exact = TRUE]]))){
         xdat <- data.frame(.np_eval_bws_call_arg(bws, "xdat"))
         ydat = .np_eval_bws_call_arg(bws, "ydat")
       }

@@ -6,6 +6,8 @@ npreghat <-
       if (is.recursive(bws)){
         if (!is.null(bws$formula) && is.null(args$txdat))
           UseMethod("npreghat", bws$formula)
+        else if (is.null(bws$call) && !is.null(bws[[".np.native.training", exact = TRUE]]) && is.null(args$txdat))
+          return(npreghat.call(bws, ...))
         else if (!is.null(bws$call) && is.null(args$txdat))
           UseMethod("npreghat", bws$call)
         else if (!is.call(bws))

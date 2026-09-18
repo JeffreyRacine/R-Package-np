@@ -112,6 +112,8 @@ npreg <-
       if (is.recursive(bws)){
         if (!is.null(bws$formula) && is.null(args$txdat))
           UseMethod("npreg",bws$formula)
+        else if (is.null(bws$call) && !is.null(bws[[".np.native.training", exact = TRUE]]) && is.null(args$txdat))
+          return(npreg.call(bws, ...))
         else if (!is.null(bws$call) && is.null(args$txdat))
           UseMethod("npreg",bws$call)
         else if (!is.call(bws))
