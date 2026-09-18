@@ -625,6 +625,10 @@ unrelated caller objects, so serialized file size may be much larger than
 \code{object.size()} suggests. Sample ownership does not guarantee compact
 serialization of arbitrary user environments.
 
+MPI materialization can also retain concrete training values in an object's
+stored call, in addition to its retained sample. This can increase both in-memory
+and serialized size; retained-data ownership is not a promise of one physical copy.
+
 
 The \code{scale.factor.*} controls are dimensionless search controls. The package converts scale factors to bandwidths using the estimator-specific scaling already encoded in the bandwidth object, including the kernel order and the number of continuous variables relevant for that estimator. Users should not pre-multiply these controls by sample-size or standard-deviation factors. \code{scale.factor.init} controls the deterministic first search start, \code{scale.factor.init.lower} and \code{scale.factor.init.upper} control the random multistart interval, and \code{scale.factor.search.lower} is the lower admissibility bound for continuous fixed-bandwidth search candidates. Categorical search-start controls such as \code{dfac.init}, \code{lbd.init}, and \code{hbd.init} have separate semantics and are not affected by \code{scale.factor.search.lower}.
 

@@ -219,6 +219,12 @@ Further arguments are passed to \code{\link{npcdistbw}} when bandwidths are comp
 
 }
 \details{
+  For a native bandwidth object, \code{newdata} is split into
+  \code{exdat} and \code{eydat} using the retained predictor and response
+  column names. Names must identify both roles unambiguously;
+  explicitly supplied native evaluation arguments take precedence. This
+  evaluates at the requested rows without repeating bandwidth selection.
+
   For explicit external evaluation rows, a completed explanatory-kernel row
   whose weights are all zero has no conditional estimate. Such rows return
   \code{NA} for the fitted value and requested uncertainty or derivatives,
@@ -519,6 +525,14 @@ Further arguments are passed to \code{\link{npcdistbw}} when bandwidths are comp
   \code{\link{cbind}}, since \code{\link{cbind}} will typically not work as
   intended on mixed data types and will coerce the data to the same
   type.
+
+  For formula fits, character-valued missing-data policies are resolved
+  through the \code{stats} model-frame owner; pass a caller-local policy as
+  a function object rather than its name. With replacement training data,
+  an explicit \code{na.action}, including \code{NULL}, takes precedence
+  over the saved policy. Native fitting still requires complete rows, so
+  a permissive policy does not guarantee the same retained sample as
+  \code{stats::model.frame}.
 
   When reusing a bandwidth object without explicit training or evaluation
   data, newly constructed bandwidth objects use retained training values.

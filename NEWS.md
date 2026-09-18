@@ -1,5 +1,30 @@
 # npRmpi 0.80-1
 
+* The retained-sample storage documentation now notes that MPI materialized
+  stored calls can contain another copy of training values. No storage or
+  argument-ownership policy changes in this follow-up.
+
+* Conditional gradient bootstrap preparation reuses the canonical internal
+  bandwidth builder and finalizer instead of repeating public constructor setup.
+  Each resample still uses its own geometry and the same numerical fit.
+
+* Bootstrap plot summaries now align categorical draw columns with their
+  actual evaluation labels, including declared but unobserved factor levels.
+  This fixes unused-level plots across regression, conditional and
+  unconditional, partially linear and smooth-coefficient families without
+  dropping levels or changing kernels, draws or intervals.
+
+* Native bandwidth-object fits now honor `newdata` using the corresponding
+  prediction interface's evaluation roles instead of silently returning the
+  training fit. Conditional and semiparametric frames must identify their
+  roles by retained column names; explicit native evaluation arguments keep
+  precedence.
+
+* Exact wild regression bootstrap helpers restrict LC derivative-operator
+  reuse to its intended continuous LC/LP0 first-derivative requests, and align
+  missing evaluation rows before blocking. Other derivative requests retain
+  their per-response estimator, including the existing beta-kernel path.
+
 * Ordered kernel-sum contrasts validate evaluation category indices before
   native work and initialize the cached lookup on the first row. Invalid
   contrast categories now give a clear error instead of an invalid memory
