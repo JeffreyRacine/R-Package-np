@@ -1,5 +1,10 @@
 # npRmpi 0.80-1
 
+* Partially linear child bandwidths retain their own native training samples
+  without serializing internal package call frames. Extracted children remain
+  usable, and newly saved formula bandwidths no longer load the originating
+  package merely because these internal frames referred to its namespace.
+
 * Native arguments forwarded positionally through wrappers now retain their
   actual promise owner. An unrelated same-named wrapper local can no longer
   silently replace the supplied training data.

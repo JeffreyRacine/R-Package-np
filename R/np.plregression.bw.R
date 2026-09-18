@@ -212,10 +212,25 @@ npplregbw.plbandwidth =
                        num.feval.fast = num.feval.fast,
                        rows.omit = rows.omit,
                        total.time = total.time)
+    bws$bw <- .npplregbw_retain_child_training(bws$bw, xdat, ydat, zdat)
     bws$degree.policy <- if (isTRUE(bws$child.degree.common)) "common-child-degree" else "child-specific"
     bws
 
   }
+
+.npplregbw_retain_child_training <- function(children, xdat, ydat, zdat) {
+  # These calls were made inside package activations, not user formula frames.
+  # Keep the native samples needed by an extracted child without serializing
+  # an enclosing namespace and the constructor's transient search state.
+  for (i in seq_along(children)) {
+    children[[i]][[".np.native.training"]] <- list(
+      xdat = zdat, ydat = if (i == 1L) ydat else xdat[, i - 1L])
+    if (is.null(children[[i]]$call))
+      children[[i]]$call <- quote(npregbw(xdat = xdat, ydat = ydat))
+    environment(children[[i]]$call) <- NULL
+  }
+  children
+}
 
 .npplregbw_sanitize_yname <- function(yname) {
   yname <- paste(yname, collapse = " ")
@@ -255,7 +270,7 @@ npplregbw.plbandwidth =
 
   plbw.args <- c(
     list(
-      bws = plband,
+      bws = .npplregbw_retain_child_training(plband, xdat, ydat, zdat),
       nobs = dim(xdat)[1],
       fval = {
         fv <- unlist(lapply(plband, function(bwi) bwi$fval))
@@ -473,7 +488,7 @@ npplregbw.plbandwidth =
 
   plbw.args <- c(
     list(
-      bws = child.list,
+      bws = .npplregbw_retain_child_training(child.list, xdat, ydat, zdat),
       nobs = dim(xdat)[1],
       fval = if (all(!is.finite(child.fval))) NA_real_ else sum(child.fval[is.finite(child.fval)]),
       num.feval = sum(child.feval),
