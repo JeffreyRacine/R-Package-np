@@ -508,6 +508,14 @@ npplreg.plbandwidth <-
     tydat <- tydat[keep.rows]
     tzdat <- tzdat[keep.rows,,drop = FALSE]
 
+    native.newdata <- dots[["newdata", exact = TRUE]]
+    if (missing(exdat) && missing(ezdat) && !is.null(native.newdata)) {
+      native.eval <- .np_native_newdata_parts(
+        native.newdata, list(exdat = bws$xnames, ezdat = bws$znames), "npplreg")
+      exdat <- native.eval$exdat
+      ezdat <- native.eval$ezdat
+    }
+
     no.exz = missing(exdat)
     no.ey = missing(eydat)
 

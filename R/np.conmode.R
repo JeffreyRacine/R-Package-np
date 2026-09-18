@@ -506,6 +506,13 @@ npconmode.conbandwidth <-
     tydat = toFrame(tydat)
     bws <- .np_bws_retain_native_training(bws, xdat = txdat, ydat = tydat)
 
+    native.newdata <- list(...)[["newdata", exact = TRUE]]
+    if (missing(exdat) && !is.null(native.newdata)) {
+      native.eval <- .np_native_newdata_parts(
+        native.newdata, list(exdat = NULL), "npconmode")
+      exdat <- native.eval$exdat
+    }
+
     no.ex = missing(exdat)
     no.ey = missing(eydat)
 

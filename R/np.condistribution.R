@@ -127,6 +127,14 @@ npcdist.condbandwidth <-
       proper.control = proper.control
     )
 
+    native.newdata <- dots[["newdata", exact = TRUE]]
+    if (missing(exdat) && missing(eydat) && !is.null(native.newdata)) {
+      native.eval <- .np_native_newdata_parts(
+        native.newdata, list(exdat = bws$xnames, eydat = bws$ynames), "npcdist")
+      exdat <- native.eval$exdat
+      eydat <- native.eval$eydat
+    }
+
     if (xor(missing(exdat),missing(eydat)))
       stop("evaluation data must be supplied for both 'exdat' and 'eydat'")
 

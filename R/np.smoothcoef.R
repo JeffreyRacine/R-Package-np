@@ -329,6 +329,14 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
 
     miss.z <- missing(tzdat) || is.null(tzdat)
 
+    native.newdata <- dots[["newdata", exact = TRUE]]
+    if (missing(exdat) && missing(ezdat) && !is.null(native.newdata)) {
+      native.eval <- .np_native_newdata_parts(
+        native.newdata, if (is.null(bws$znames)) list(exdat = NULL) else list(exdat = bws$xnames, ezdat = bws$znames), "npscoef")
+      exdat <- native.eval$exdat
+      if (!is.null(native.eval$ezdat)) ezdat <- native.eval$ezdat
+    }
+
     miss.ex = missing(exdat)
     miss.ey = missing(eydat)
 

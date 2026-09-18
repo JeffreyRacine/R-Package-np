@@ -383,9 +383,16 @@ npreg.rbandwidth <-
            ...){
     fit.start <- proc.time()[3]
 
+    dots <- list(...)
+    native.newdata <- dots[["newdata", exact = TRUE]]
+    if (missing(exdat) && !is.null(native.newdata)) {
+      native.eval <- .np_native_newdata_parts(
+        native.newdata, list(exdat = NULL), "npreg")
+      exdat <- native.eval$exdat
+    }
+
     no.ex = missing(exdat)
     no.ey = missing(eydat)
-    dots <- list(...)
     npRejectLegacyBooleanErrors(dots, "npreg")
     fit.progress.handoff <- isTRUE(dots$.np_fit_progress_handoff)
     if ("remin" %in% names(dots)) {
