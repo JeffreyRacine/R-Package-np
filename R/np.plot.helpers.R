@@ -13059,6 +13059,10 @@ plotFactor <- function(f, y, ...){
 }
 
 .np_plot_resolve_native_xydat_from_bws_call <- function(bws, allow.failure = FALSE) {
+  training <- bws[[".np.native.training", exact = TRUE]]
+  if (!is.null(training) && all(c("xdat", "ydat") %in% names(training)))
+    return(list(xdat = data.frame(training[["xdat", exact = TRUE]]),
+                ydat = training[["ydat", exact = TRUE]]))
   if (is.null(bws$call))
     return(NULL)
 

@@ -5190,9 +5190,9 @@ QFAC <- qnorm(.25,lower.tail=FALSE)*2
     return(.np_bws_retain_formula_roles(bws, training))
   bws[[".np.native.training"]] <- training
   bws[[".np.formula.training"]] <- NULL
-  if (is.null(bws$call))
-    bws$call <- quote(npregbw(xdat = xdat, ydat = ydat))
-  environment(bws$call) <- NULL
+  # A call-less internal child has no user-authored replay. Fabricating one
+  # with xdat/ydat symbols would let update.default use unrelated caller data.
+  if (!is.null(bws$call)) environment(bws$call) <- NULL
   bws
 }
 

@@ -5,7 +5,7 @@ test_that("partially linear child bandwidths own their native samples", {
   check <- function(parent) {
     for (i in seq_along(parent$bw)) {
       child <- parent$bw[[i]]
-      expect_null(environment(child$call))
+      if (!is.null(child$call)) expect_null(environment(child$call))
       values <- child[[".np.native.training", exact = TRUE]]
       expect_named(values, c("xdat", "ydat"))
       expect_equal(values$xdat, d["z"], ignore_attr = TRUE)
@@ -64,11 +64,41 @@ test_that("local-smoothing quantile children retain distinct pilot responses", {
     }
     for (child in children) {
       expect_null(environment(child$call))
-      expect_null(environment(child$bws$call))
+      if (!is.null(child$bws$call)) expect_null(environment(child$bws$call))
       restored <- unserialize(serialize(child$bws, NULL))
       expect_equal(fitted(npreg(restored)), fitted(child), tolerance = 1e-14)
+      # Internal native bandwidths without an original call cannot be updated
+      # by evaluating package-invented symbols in the user's frame.
+      if (is.null(child$bws$call)) {
+        xdat <- data.frame(x = seq(1000, 2000, length.out = 24))
+        ydat <- seq_len(24)
+        expect_error(update(restored), "need an object with call component")
+        expect_equal(fitted(npreg(restored)), fitted(child), tolerance = 1e-14)
+        values <- restored[[".np.native.training"]]
+        expect_equal(as.numeric(npreghat(restored)),
+                     as.numeric(npreghat(restored, txdat = values$xdat)),
+                     tolerance = 1e-14)
+        expect_equal(plot(restored, errors = "none", output = "data", neval = 3L),
+          plot(restored, xdat = values$xdat, ydat = values$ydat,
+               errors = "none", output = "data", neval = 3L))
+        set.seed(7301)
+        actual <- npsigtest(restored, B = 9L)
+        set.seed(7301)
+        expected <- npsigtest(restored, xdat = values$xdat, ydat = values$ydat, B = 9L)
+        expect_identical(actual$P, expected$P)
+      }
     }
   }
+})
+
+test_that("retaining a call-less native child never fabricates executable provenance", {
+  retain <- getFromNamespace(".np_bws_retain_native_training", "npRmpi")
+  xdat <- data.frame(x = seq_len(6))
+  ydat <- 6:1
+  b <- retain(list(), xdat = xdat, ydat = ydat)
+  expect_null(b$call)
+  expect_identical(b[[".np.native.training"]], list(xdat = xdat, ydat = ydat))
+  expect_error(update(b), "need an object with call component")
 })
 
 test_that("child sample retention does not strip user formula environments", {

@@ -1,5 +1,11 @@
 # npRmpi 0.80-1
 
+* Internal native bandwidth children without an original construction call no
+  longer acquire an executable placeholder call. Their retained-sample refits,
+  predictions and plots remain supported; `update()` on a call-less child now
+  fails instead of potentially using unrelated caller data and selecting new
+  bandwidths.
+
 * Fits with replacement training data now retain that fitted sample for later
   refits, prediction, plotting and inference. Native bandwidth constructors for
   regression, density/distribution and semiparametric methods also retain their
