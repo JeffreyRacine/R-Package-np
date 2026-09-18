@@ -31,6 +31,7 @@ npplreg.formula <-
     dots$.np.formula.state <- NULL
     frame <- if (is.null(frame.state)) .np_plreg_formula_frame(bws, data)
              else .np_formula_frame_take(frame.state)
+    bws <- .np_bws_retain_fit_frame(bws, frame)
     roles <- .np_plreg_formula_split(frame, bws$terms, bws$xterms)
     response.name <- names(roles$yz)[attr(bws$terms, "response")]
     pl.args <- list(txdat = roles$x, tydat = model.response(roles$yz),
@@ -508,6 +509,7 @@ npplreg.plbandwidth <-
 
     txdat = toFrame(txdat)
     tzdat = toFrame(tzdat)
+    bws <- .np_bws_retain_native_training(bws, xdat = txdat, ydat = tydat, zdat = tzdat)
     
     ## catch and destroy NA's, part 1
     keep.rows <- rep_len(TRUE, nrow(txdat))
@@ -759,7 +761,7 @@ npplreg.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE, ..., se = F
     return(.npRmpi_autodispatch_call(dispatch.call, parent.frame()))
   }
 
-  sc <- .np_formula_expand_call(sys.call(), parent.frame())
+  sc <- .np_formula_default_call(sys.call(), sys.function(), parent.frame())
   sc.names <- names(sc)
 
   ## here we check to see if the function was called with tdat =

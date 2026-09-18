@@ -1350,5 +1350,5 @@ npudistbw.default <-
     environment(mc) <- parent.frame()
     tbw$call <- mc
 
-    return(tbw)
+    return(.np_bws_retain_native_training(tbw, dat = dat))
   }

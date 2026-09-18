@@ -46,6 +46,7 @@ npudens.formula <-
         data.override = !missing(data) && !is.null(data)) else
         .np_formula_frame_take(frame.state)
     tt <- attr(tmf, "terms")
+    bws <- .np_bws_retain_fit_frame(bws, tmf)
     train.omit <- attr(tmf, "na.action")
 
     tdat <- tmf[, attr(attr(tmf, "terms"),"term.labels"), drop = FALSE]
@@ -117,6 +118,7 @@ npudens.bandwidth <-
   }
 
   tdat = toFrame(tdat)
+  bws <- .np_bws_retain_native_training(bws, dat = tdat)
 
   if (!no.e)
     edat = toFrame(edat)
@@ -315,7 +317,7 @@ npudens.default <- function(bws, tdat, ..., se = FALSE){
       !tdat.formula.early && !inherits(formula.input, "formula"))
     return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
-  sc <- .np_formula_expand_call(sys.call(), parent.frame())
+  sc <- .np_formula_default_call(sys.call(), sys.function(), parent.frame())
   sc.names <- names(sc)
 
   ## here we check to see if the function was called with tdat =

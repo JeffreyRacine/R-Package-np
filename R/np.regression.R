@@ -260,6 +260,7 @@ npreg.formula <-
       bws, mf.args, data.override = !missing(data) && !is.null(data)) else
         .np_formula_frame_take(frame.state)
     tt <- attr(tmf, "terms")
+    bws <- .np_bws_retain_fit_frame(bws, tmf)
 
     response.name <- attr(tmf, "names")[attr(attr(tmf, "terms"), "response")]
     tydat <- model.response(tmf)
@@ -584,6 +585,7 @@ npreg.rbandwidth <-
     warn.glp.gradient <- if (is.null(dots$warn.glp.gradient)) TRUE else isTRUE(dots$warn.glp.gradient)
 
     txdat = toFrame(txdat)
+    bws <- .np_bws_retain_native_training(bws, xdat = txdat, ydat = tydat)
 
     if (!(is.vector(tydat) || is.factor(tydat)))
       stop("'tydat' must be a vector or a factor")
@@ -1151,7 +1153,7 @@ npreg.default <- function(bws, txdat, tydat, nomad = FALSE,
                           se = FALSE, ...){
   .npRmpi_require_active_slave_pool(where = "npreg()")
   .npRmpi_guard_no_auto_object_in_manual_bcast(bws, where = "npreg()")
-  sc <- .np_formula_expand_call(sys.call(), parent.frame())
+  sc <- .np_formula_default_call(sys.call(), sys.function(), parent.frame())
   sc.names <- names(sc)
   dots <- .np_formula_dispatch_args(
     NULL, substitute(list(...))[-1L], environment())
@@ -1196,7 +1198,7 @@ npreg.default <- function(bws, txdat, tydat, nomad = FALSE,
   if (.npRmpi_autodispatch_active() && !npNomadControlRequested(nomad) && !isTRUE(has.fixed.bws.value))
     return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
-  sc <- .np_formula_expand_call(sys.call(), parent.frame())
+  sc <- .np_formula_default_call(sys.call(), sys.function(), parent.frame())
   sc.names <- names(sc)
 
   ## here we check to see if the function was called with tdat =

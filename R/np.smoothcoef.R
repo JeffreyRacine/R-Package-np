@@ -47,6 +47,7 @@ npscoef.formula <-
       bws, mf.args, data.override = !missing(data) && !is.null(data)) else
         .np_formula_frame_take(frame.state)
     tt <- attr(tmf, "terms")
+    bws <- .np_bws_retain_fit_frame(bws, tmf)
 
     response.name <- attr(tmf, "names")[attr(attr(tmf, "terms"), "response")]
     tydat <- model.response(tmf)
@@ -172,7 +173,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
       (explicit.scbandwidth || identical(degree.select.value, "manual")))
     return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
-  sc <- .np_formula_expand_call(sys.call(), parent.frame())
+  sc <- .np_formula_default_call(sys.call(), sys.function(), parent.frame())
   sc.names <- names(sc)
 
   ## here we check to see if the function was called with tdat =
@@ -371,6 +372,9 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, nomad = FALSE,
 
     if (!miss.z)
       tzdat <- toFrame(tzdat)
+
+    bws <- .np_bws_retain_native_training(bws, xdat = txdat, ydat = tydat,
+      zdat = if (miss.z) NULL else tzdat)
 
     if (!miss.ex){
       exdat <- toFrame(exdat)

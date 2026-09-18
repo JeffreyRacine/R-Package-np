@@ -56,6 +56,7 @@ npconmode.formula <-
       .np_bws_formula_model_frame(bws, mf.args, data.override = !is.null(data)) else
         .np_formula_frame_take(frame.state)
     tt <- attr(tmf, "terms")
+    bws <- .np_bws_retain_fit_frame(bws, tmf)
     train.omit <- attr(tmf, "na.action")
 
     tydat <- tmf[, bws$variableNames[["response"]], drop = FALSE]
@@ -505,6 +506,7 @@ npconmode.conbandwidth <-
     gradients <- npValidateScalarLogical(gradients, "gradients")
     txdat = toFrame(txdat)
     tydat = toFrame(tydat)
+    bws <- .np_bws_retain_native_training(bws, xdat = txdat, ydat = tydat)
 
     no.ex = missing(exdat)
     no.ey = missing(eydat)

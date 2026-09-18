@@ -44,6 +44,7 @@ npcdens.formula <-
         data.override = !missing(data) && !is.null(data)) else
         .np_formula_frame_take(frame.state)
     tt <- attr(tmf, "terms")
+    bws <- .np_bws_retain_fit_frame(bws, tmf)
 
     tydat <- tmf[, bws$variableNames[["response"]], drop = FALSE]
     txdat <- tmf[, bws$variableNames[["terms"]], drop = FALSE]
@@ -223,6 +224,7 @@ npcdens.conbandwidth <- function(bws,
 
   txdat = toFrame(txdat)
   tydat = toFrame(tydat)
+  bws <- .np_bws_retain_native_training(bws, xdat = txdat, ydat = tydat)
 
   if (!no.exy){
     exdat = toFrame(exdat)
@@ -683,7 +685,7 @@ npcdens.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
   .npRmpi_require_active_slave_pool(where = "npcdens()")
   .npRmpi_guard_no_auto_object_in_manual_bcast(bws, where = "npcdens()")
   nomad <- npValidateNomadControl(nomad, "nomad")
-  sc <- .np_formula_expand_call(sys.call(), parent.frame())
+  sc <- .np_formula_default_call(sys.call(), sys.function(), parent.frame())
   sc.names <- names(sc)
 
   ## here we check to see if the function was called with tdat =

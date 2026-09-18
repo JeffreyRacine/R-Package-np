@@ -215,6 +215,7 @@
 
 .np_bws_retain_formula_training <- function(bws, frame, na.action) {
   bws[[".np.formula.training"]] <- list(frame = frame, na.action = na.action)
+  bws[[".np.native.training"]] <- NULL
   call.env <- environment(bws$call)
   # An internal constructor activation is not the owner of a user's formula.
   # Retained training values make this transient frame unnecessary; preserve
@@ -222,6 +223,95 @@
   environment(bws$call) <- .np_call_owner_environment(
     call.env, replacement = environment(bws$formula))
   bws
+}
+
+# Project stored formula metadata, never formula expressions, into native roles.
+.np_bws_formula_roles <- function(bws) {
+  tt <- bws[["terms", exact = TRUE]]
+  if (inherits(bws, c("bandwidth", "dbandwidth")))
+    return(list(dat = attr(tt, "term.labels")))
+  if (inherits(bws, c("conbandwidth", "condbandwidth")))
+    return(list(xdat = bws$variableNames[["terms"]],
+                ydat = bws$variableNames[["response"]]))
+  # A transformed scalar response has its full term label, not all.vars().
+  variable <- attr(tt, "variables")[[2L]]
+  response <- if (is.symbol(variable)) as.character(variable) else
+    paste(deparse(variable, width.cutoff = 500L), collapse = "")
+  chromoly <- bws[["chromoly", exact = TRUE]]
+  if (inherits(bws, c("plbandwidth", "scbandwidth"))) {
+    out <- list(xdat = chromoly[[2L]], ydat = response)
+    if (length(chromoly) == 3L) out$zdat <- chromoly[[3L]]
+    return(out)
+  }
+  list(xdat = attr(tt, "term.labels"), ydat = response)
+}
+
+.np_bws_retain_formula_roles <- function(bws, training) {
+  roles <- .np_bws_formula_roles(bws)
+  if (!setequal(names(roles), names(training)))
+    stop("incomplete retained formula training roles", call. = FALSE)
+  retained <- bws[[".np.formula.training", exact = TRUE]]
+  old <- retained[["frame", exact = TRUE]]
+  columns <- list()
+  rows <- NULL
+  for (role in names(roles)) {
+    values <- toFrame(training[[role]])
+    if (ncol(values) != length(roles[[role]]))
+      stop("retained formula training role has incompatible columns", call. = FALSE)
+    if (is.null(rows)) rows <- row.names(values)
+    if (nrow(values) != length(rows))
+      stop("retained formula training roles have incompatible rows", call. = FALSE)
+    for (j in seq_along(roles[[role]])) {
+      name <- roles[[role]][[j]]
+      if (name %in% names(columns) && !identical(columns[[name]], values[[j]]))
+        stop("overlapping formula training roles disagree", call. = FALSE)
+      columns[[name]] <- values[[j]]
+    }
+  }
+  if (!is.null(old) && setequal(names(old), names(columns)) &&
+      identical(row.names(old), rows) &&
+      all(vapply(names(old), function(name) identical(old[[name]], columns[[name]]), logical(1L)))) {
+    bws[[".np.native.training"]] <- NULL
+    return(bws)
+  }
+  tt <- if (inherits(bws, "plbandwidth")) .np_plreg_formula_terms(bws) else bws$terms
+  column.order <- if (!is.null(old)) names(old) else
+    vapply(as.list(attr(tt, "variables"))[-1L], function(x)
+      paste(deparse(x, width.cutoff = 500L), collapse = ""), character(1L))
+  if (!setequal(column.order, names(columns)))
+    stop("retained formula training columns do not match terms", call. = FALSE)
+  columns <- columns[column.order]
+  frame <- as.data.frame(columns, optional = TRUE, row.names = rows)
+  # Native replacement inputs already represent the formula's evaluated terms.
+  # Retain their complete cases without replaying old subset/NA expressions.
+  attr(frame, "terms") <- tt
+  frame <- stats::na.omit(frame)
+  policy <- if (is.null(retained)) stats::na.omit else retained[["na.action", exact = TRUE]]
+  .np_bws_retain_formula_training(bws, frame, policy)
+}
+
+.np_bws_retain_fit_frame <- function(bws, frame) {
+  retained <- bws[[".np.formula.training", exact = TRUE]]
+  policy <- if (is.null(retained)) getOption("na.action", stats::na.omit) else
+    retained[["na.action", exact = TRUE]]
+  .np_bws_retain_formula_training(bws, frame, policy)
+}
+
+.np_formula_default_call <- function(call, definition, caller) {
+  # Name the bandwidth before changing the callee. Keep the remaining call
+  # shape: an unnamed formula beside bws= belongs to the formula dispatcher,
+  # not to an explicitly named native training argument.
+  call <- .np_formula_expand_call(call, caller)
+  matched <- match.call(definition = definition, call = call, expand.dots = TRUE)
+  if (!"bws" %in% names(matched) || "bws" %in% names(call)) return(call)
+  labels <- names(call)
+  if (is.null(labels)) labels <- rep.int("", length(call))
+  labels[is.na(labels)] <- ""
+  partial <- which(nzchar(labels) & startsWith("bws", labels))
+  index <- if (length(partial)) partial[[1L]] else which(labels[-1L] == "")[[1L]] + 1L
+  labels[[index]] <- "bws"
+  names(call) <- labels
+  call
 }
 
 .np_bws_formula_model_frame <- function(bws, mf.args, data.override = FALSE) {
