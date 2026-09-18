@@ -81,11 +81,20 @@ test_that("local-smoothing quantile children retain distinct pilot responses", {
         expect_equal(plot(restored, errors = "none", output = "data", neval = 3L),
           plot(restored, xdat = values$xdat, ydat = values$ydat,
                errors = "none", output = "data", neval = 3L))
-        set.seed(7301)
-        actual <- npsigtest(restored, B = 9L)
-        set.seed(7301)
-        expected <- npsigtest(restored, xdat = values$xdat, ydat = values$ydat, B = 9L)
-        expect_identical(actual$P, expected$P)
+        if (identical(restored$method, "cv.check")) {
+          # Inherited MPI restriction, reproduced on the pre-repair archive:
+          # npsigtest revalidates regression CV metadata and does not admit
+          # check-loss children. Sample-retention repair does not broaden it.
+          expect_error(npsigtest(restored, B = 9L), "cv.ls.*cv.aic")
+          expect_error(npsigtest(restored, xdat = values$xdat,
+                                ydat = values$ydat, B = 9L), "cv.ls.*cv.aic")
+        } else {
+          set.seed(7301)
+          actual <- npsigtest(restored, B = 9L)
+          set.seed(7301)
+          expected <- npsigtest(restored, xdat = values$xdat, ydat = values$ydat, B = 9L)
+          expect_identical(actual$P, expected$P)
+        }
       }
     }
   }
@@ -116,7 +125,8 @@ test_that("child sample retention does not strip user formula environments", {
                fitted(npreg(b, newdata = owner$d[1:3, , drop = FALSE])))
 })
 
-test_that("formula sample retention releases only internal call owners", {
+test_that("synthetic internal call owner normalization preserves user environments", {
+  # This helper branch is not evidence of public constructor-frame compaction.
   owner <- getFromNamespace(".np_bws_retain_formula_training", "npRmpi")
   user <- new.env(parent = globalenv())
   formula <- y ~ x; environment(formula) <- user
