@@ -5172,6 +5172,22 @@ int.kernels <- c(0.28209479177387814348, 0.47603496111841936711, 0.6239694368826
 
 QFAC <- qnorm(.25,lower.tail=FALSE)*2
 
+.np_call_owner_environment <- function(owner, replacement = NULL) {
+  if (is.environment(owner) && !identical(owner, emptyenv()) &&
+      identical(parent.env(owner), environment(.np_call_owner_environment)))
+    return(replacement)
+  owner
+}
+
+.np_bws_retain_native_training <- function(bws, xdat, ydat) {
+  # For package-created native children: values, never an activation frame.
+  bws[[".np.native.training"]] <- list(xdat = xdat, ydat = ydat)
+  if (is.null(bws$call))
+    bws$call <- quote(npregbw(xdat = xdat, ydat = ydat))
+  environment(bws$call) <- NULL
+  bws
+}
+
 .np_eval_bws_call_arg <- function(bws, arg) {
   training <- bws[[".np.native.training", exact = TRUE]]
   if (!is.null(training) && arg %in% names(training))

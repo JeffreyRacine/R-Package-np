@@ -219,9 +219,8 @@
   # An internal constructor activation is not the owner of a user's formula.
   # Retained training values make this transient frame unnecessary; preserve
   # the original formula environment for transforms and explicit-data refits.
-  if (is.environment(call.env) && !identical(call.env, emptyenv()) &&
-      identical(parent.env(call.env), environment(.np_bws_retain_formula_training)))
-    environment(bws$call) <- environment(bws$formula)
+  environment(bws$call) <- .np_call_owner_environment(
+    call.env, replacement = environment(bws$formula))
   bws
 }
 

@@ -6,6 +6,9 @@
   package constructor frames as their call environments; their user formula
   environments are preserved. Newly saved objects therefore avoid these
   unnecessary references to the originating package's namespace.
+  The same ownership cleanup covers scalar/vector-tau local-smoothing quantile
+  fits and their mean/scale pilots. Each native child retains its own response;
+  generated internal calls no longer serialize method closures.
 
 * Native arguments forwarded positionally through wrappers now retain their
   actual promise owner. An unrelated same-named wrapper local can no longer
