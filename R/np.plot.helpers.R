@@ -3088,9 +3088,16 @@
                                             gradient.order = 1L,
                                             slice.index = 1L,
                                             progress.label = NULL) {
-  # Beta endpoint cancellation is response-dependent in the incumbent owner.
-  # Keep that calculation; reuse the exact operator for the qualified kernels.
-  if (!identical(bws[["ckertype", exact = TRUE]], "beta"))
+  # Only analytic LC/LP0 continuous first derivatives use this operator.
+  # Other requests retain the exact per-response owner; in particular, LP
+  # coefficient derivatives are not derivatives of the LC quotient operator.
+  reg.spec <- npValidatedConditionalRegSpec(
+    bws, where = "exact wild regression bootstrap", ncon.field = "ncon")
+  operator.ok <- isTRUE(gradients) &&
+    isTRUE(slice.index %in% which(bws$icon)) &&
+    !identical(bws[["ckertype", exact = TRUE]], "beta") &&
+    .np_plot_regression_exact_lc_derivative_requested(reg.spec, gradient.order)
+  if (operator.ok)
     return(.np_wild_boot_from_reghat_operator(
       xdat = xdat, exdat = exdat, bws = bws, ydat = ydat, B = B,
       wild = wild, fit.mean.train = fit.mean.train, gradients = gradients,
@@ -3174,7 +3181,10 @@
                                             slice.index = 1L,
                                             progress.label = NULL) {
   xdat <- toFrame(xdat)
+  # Match npreghat row omission before splitting blocks or certifying rows.
   exdat <- toFrame(exdat)
+  exdat <- exdat[stats::complete.cases(exdat), , drop = FALSE]
+  attr(exdat, "na.action") <- NULL
   ydat <- as.double(ydat)
   B <- as.integer(B)
 
