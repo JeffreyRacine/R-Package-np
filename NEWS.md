@@ -1,5 +1,10 @@
 # np 0.80-1
 
+* Plot interval ranges now align NA-padded categorical panels with their actual
+  interval rows. Unequal partially linear panel sizes no longer generate a
+  recycling warning with `band="all"`; interval values and axis ranges are
+  unchanged. Inconsistent finite panel data are rejected rather than recycled.
+
 * Formula training now resolves character NA policies through the same owner
   as `stats::model.frame`, so an unrelated caller-local `na.omit` no longer
   changes the sample. Explicit NA function objects retain their own behavior.

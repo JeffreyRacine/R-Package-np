@@ -10627,10 +10627,30 @@ compute.bootstrap.quantile.bounds <- function(boot.t,
   list(err = make_err(mult), all.err = NULL)
 }
 
+.np_plot_range_center <- function(center, errors) {
+  rows <- vapply(errors, function(err) {
+    if (!is.matrix(err) || ncol(err) < 2L)
+      stop("plot interval range requires two-column error matrices", call. = FALSE)
+    nrow(err)
+  }, integer(1L))
+  if (!length(rows) || length(unique(rows)) != 1L)
+    stop("plot interval families have incompatible row counts", call. = FALSE)
+  n <- rows[[1L]]
+  # Ragged categorical panels may occupy an NA-padded column of a common
+  # plot matrix. Only that trailing padding may be removed, never real data.
+  if (length(center) > n && all(is.na(center[seq.int(n + 1L, length(center))])))
+    center <- center[seq_len(n)]
+  if (length(center) != n)
+    stop("plot centre and interval rows do not match", call. = FALSE)
+  center
+}
+
 compute.all.error.range <- function(center, all.err) {
   if (is.null(all.err)) {
     return(c(NA_real_, NA_real_))
   }
+  center <- .np_plot_range_center(center,
+    all.err[c("pointwise", "simultaneous", "bonferroni")])
   lower <- c(center - all.err$pointwise[,1],
              center - all.err$simultaneous[,1],
              center - all.err$bonferroni[,1])
@@ -10649,6 +10669,7 @@ compute.all.error.range <- function(center, all.err) {
 }
 
 compute.default.error.range <- function(center, err) {
+  center <- .np_plot_range_center(center, list(err))
   lower <- c(center - err[,1], err[,3] - err[,1])
   upper <- c(center + err[,2], err[,3] + err[,2])
   lower <- lower[is.finite(lower)]
