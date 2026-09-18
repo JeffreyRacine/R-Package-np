@@ -236,7 +236,9 @@
                       col = scalar_default(col, .np_plot_color("component_context")),
                       border = scalar_default(border, par("fg")))
         if (plot.errors && length(se) == length(cf) && all(is.finite(se))) {
-          arrows(bp, cf - se, bp, cf + se, angle = 90, code = 3, length = 0.05, lwd = .np_plot_lwd("component_context"))
+          draw.error.bars(as.vector(bp), cf - se, cf + se,
+                          lty = par("lty"), col = par("fg"),
+                          lwd = .np_plot_lwd("component_context"))
         }
       }
 

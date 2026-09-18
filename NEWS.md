@@ -1,5 +1,19 @@
 # np 0.80-1
 
+* Ordered kernel-sum contrasts validate evaluation category indices before
+  native work and initialize the cached lookup on the first row. Invalid
+  contrast categories now give a clear error instead of an invalid memory
+  read; ordinary ordered-kernel extrapolation is unchanged.
+
+* Adaptive nearest-neighbor leave-one-out regression hats now supply matching
+  single-evaluation-point tree geometry to compact-kernel traversal, avoiding
+  an out-of-bounds read without disabling tree evaluation or changing radii.
+
+* Interval cap widths now use horizontal display spacing consistently for
+  level, gradient and partially-linear coefficient plots, independent of the
+  response-axis range. Exact-zero intervals, interval endpoints and bootstrap
+  draws are unchanged.
+
 * Smooth-coefficient wild-bootstrap coefficient-gradient plots now reuse a
   direct, blocked coefficient projection across bootstrap responses. The
   projection retains the fitter's normalized moments, accepted ridge and
