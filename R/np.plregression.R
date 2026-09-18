@@ -29,7 +29,7 @@ npplreg.formula <-
     dots <- list(...)
     frame.state <- dots[[".np.formula.state", exact = TRUE]]
     dots$.np.formula.state <- NULL
-    frame <- if (is.null(frame.state)) .np_plreg_formula_frame(bws, data)
+    frame <- if (is.null(frame.state)) .np_plreg_formula_frame(bws, data, overrides = dots)
              else .np_formula_frame_take(frame.state)
     bws <- .np_bws_retain_fit_frame(bws, frame)
     roles <- .np_plreg_formula_split(frame, bws$terms, bws$xterms)

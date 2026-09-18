@@ -108,7 +108,7 @@ npindex.formula <-
           attr(tt, "predvars") <- .np_formula_unwrap_prediction(tt)$prediction
         } else {
           umf <- tmf <- .np_bws_formula_model_frame(bws, mf.args,
-            data.override = !missing(data) && !is.null(data))
+            data.override = !missing(data) && !is.null(data), overrides = dots)
           tt <- attr(tmf, "terms")
           if (!raw.formula) bws <- .np_bws_retain_fit_frame(bws, tmf)
           response.name <- attr(tmf, "names")[attr(attr(tmf, "terms"), "response")]

@@ -39,6 +39,8 @@ npsigtest.formula <-
     state.index <- match(".np.formula.state",
                          names(substitute(list(...))[-1L]), nomatch = 0L)
     frame.state <- if (state.index > 0L) ...elt(state.index) else NULL
+    policy.index <- match("na.action", names(substitute(list(...))[-1L]), nomatch = 0L)
+    policy.override <- if (policy.index > 0L) list(na.action = ...elt(policy.index)) else list()
     tt <- terms(bws)
     m <- match(c("formula", "data", "subset", "na.action"),
                names(bws$call), nomatch = 0)
@@ -50,7 +52,7 @@ npsigtest.formula <-
     mf.args <- as.list(tmf)[-1L]
     umf <- tmf <- if (is.null(frame.state))
       .np_bws_formula_model_frame(bws, mf.args,
-        data.override = !missing(data) && !is.null(data))
+        data.override = !missing(data) && !is.null(data), overrides = policy.override)
     else .np_formula_frame_take(frame.state)
 
     ydat <- model.response(tmf)

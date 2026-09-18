@@ -1,5 +1,14 @@
 # np 0.80-1
 
+* Formula training now resolves character NA policies through the same owner
+  as `stats::model.frame`, so an unrelated caller-local `na.omit` no longer
+  changes the sample. Explicit NA function objects retain their own behavior.
+  With replacement training data, an explicitly supplied `na.action` takes
+  precedence over the saved policy, including `NULL`, and the fitted object
+  retains the effective policy. Native complete-case exclusions remaining
+  after a permissive policy are now recorded with the retained sample rather
+  than lost from formula omission bookkeeping.
+
 * Internal native bandwidth children without an original construction call no
   longer acquire an executable placeholder call. Their retained-sample refits,
   predictions and plots remain supported; `update()` on a call-less child now

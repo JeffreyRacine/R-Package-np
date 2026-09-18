@@ -41,7 +41,7 @@ npcdens.formula <-
     mf.args <- as.list(tmf)[-1L]
     umf <- tmf <- if (is.null(frame.state))
       .np_bws_formula_model_frame(bws, mf.args,
-        data.override = !missing(data) && !is.null(data)) else
+        data.override = !missing(data) && !is.null(data), overrides = dots) else
         .np_formula_frame_take(frame.state)
     tt <- attr(tmf, "terms")
     bws <- .np_bws_retain_fit_frame(bws, tmf)
