@@ -10980,19 +10980,20 @@ draw.error.bars = function(ex, ely, ehy, hbar = TRUE, hbarscale = 0.3, lty = .np
   lines(xx,yy,lty=lty,col=col)
 
   if (hbar){
-    ## hbars look silly if they are too wide in relation to their height
-    ## this only matters in the limit of few points, since that is when
-    ## hbardist may get relatively large
-
+    ## Compare lengths in display units, not unrelated x and y data units.
+    ## This keeps cap proportions invariant to response scaling and log axes.
     golden = (1+sqrt(5))/2
-    hbardist = abs(max(ex) - min(ex))/length(ex)*hbarscale
-
-    yg = abs(yy[jj-2]-yy[jj-1])/golden
-    htest = (hbardist >= yg)
-    
-    hdelta = pmin(yg, hbardist)/2
-    xx[jj-2] = ex - hdelta
-    xx[jj-1] = ex + hdelta
+    xp <- graphics::grconvertX(ex, from = "user", to = "inches")
+    finite.x <- xp[is.finite(xp)]
+    if (!length(finite.x)) return(invisible(NULL))
+    span <- diff(range(finite.x))
+    if (span == 0) span <- par("pin")[[1L]]
+    hbardist <- span / max(2L, length(finite.x)) * hbarscale
+    yg <- abs(graphics::grconvertY(ely, from = "user", to = "inches") -
+              graphics::grconvertY(ehy, from = "user", to = "inches")) / golden
+    hdelta <- pmin(yg, hbardist) / 2
+    xx[jj-2] <- graphics::grconvertX(xp - hdelta, from = "inches", to = "user")
+    xx[jj-1] <- graphics::grconvertX(xp + hdelta, from = "inches", to = "user")
     
     ty = yy[jj-1]
     yy[jj-1] = yy[jj-2]
