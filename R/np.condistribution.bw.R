@@ -3017,5 +3017,5 @@ npcdistbw.default <-
       tbw$bernstein.basis.engine <- public.spec$bernstein.basis.engine
     }
 
-    return(tbw)
+    return(.np_bws_retain_native_training(tbw, xdat = xdat, ydat = ydat))
   }

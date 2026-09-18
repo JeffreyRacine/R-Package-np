@@ -791,6 +791,7 @@ npqreg.formula <-
       .np_bws_formula_model_frame(bws, mf.args, data.override = !is.null(data)) else
         .np_formula_frame_take(frame.state)
     tt <- attr(tmf, "terms")
+    bws <- .np_bws_retain_fit_frame(bws, tmf)
 
     tydat <- tmf[, bws$variableNames[["response"]], drop = FALSE]
     txdat <- tmf[, bws$variableNames[["terms"]], drop = FALSE]
@@ -874,6 +875,7 @@ npqreg.condbandwidth <-
 
     txdat = toFrame(txdat)
     tydat = toFrame(tydat)
+    bws <- .np_bws_retain_native_training(bws, xdat = txdat, ydat = tydat)
 
     tau <- .npqreg_validate_tau(tau)
     ntau <- length(tau)

@@ -2868,7 +2868,7 @@ npregbw.default <-
       mc <- match.call(expand.dots = FALSE)
       environment(mc) <- parent.frame()
       tbw$call <- mc
-      return(tbw)
+      return(.np_bws_retain_native_training(tbw, xdat = xdat, ydat = ydat))
     }
 
     tbw <- .npregbw_build_rbandwidth(
@@ -2890,6 +2890,6 @@ npregbw.default <-
     environment(mc) <- parent.frame()
     tbw$call <- mc
 
-    return(tbw)
+    return(.np_bws_retain_native_training(tbw, xdat = xdat, ydat = ydat))
     
   }

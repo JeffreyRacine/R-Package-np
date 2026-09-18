@@ -110,6 +110,7 @@ npindex.formula <-
           umf <- tmf <- .np_bws_formula_model_frame(bws, mf.args,
             data.override = !missing(data) && !is.null(data))
           tt <- attr(tmf, "terms")
+          if (!raw.formula) bws <- .np_bws_retain_fit_frame(bws, tmf)
           response.name <- attr(tmf, "names")[attr(attr(tmf, "terms"), "response")]
           tydat <- model.response(tmf)
           txdat <- tmf[, attr(attr(tmf, "terms"),"term.labels"), drop = FALSE]
@@ -166,6 +167,7 @@ npindex.formula <-
         if (!is.null(ev$bws) && inherits(bws, "formula")) {
             ev$bws$formula <- bws
             ev$bws$terms <- attr(tmf, "terms")
+            ev$bws <- .np_bws_retain_fit_frame(ev$bws, tmf)
         }
 
         ev$omit <- attr(umf,"na.action")
@@ -305,7 +307,7 @@ npindex.call <-
 
 npindex.default <- function(bws, txdat, tydat, nomad = FALSE,
                             se = TRUE, ..., se.type = c("asymptotic", "bootstrap")){
-  sc <- .np_formula_expand_call(sys.call(), parent.frame())
+  sc <- .np_formula_default_call(sys.call(), sys.function(), parent.frame())
   sc.names <- names(sc)
   nomad <- npValidateNomadControl(nomad, "nomad")
   dots <- if (!missing(bws) && inherits(bws, "formula"))
@@ -480,6 +482,7 @@ npindex.sibandwidth <-
     ## don't evaluate on the training data
 
     txdat = toFrame(txdat)
+    bws <- .np_bws_retain_native_training(bws, xdat = txdat, ydat = tydat)
 
     if (!(is.vector(tydat) || is.factor(tydat)))
       stop("'tydat' must be a vector or a factor")

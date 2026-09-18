@@ -4883,9 +4883,17 @@ QFAC <- qnorm(.25,lower.tail=FALSE)*2
   owner
 }
 
-.np_bws_retain_native_training <- function(bws, xdat, ydat) {
-  # For package-created native children: values, never an activation frame.
-  bws[[".np.native.training"]] <- list(xdat = xdat, ydat = ydat)
+.np_bws_retain_native_training <- function(bws, xdat, ydat, dat, zdat) {
+  # Retain values, never the producer's activation or an evaluation grid.
+  training <- list()
+  if (!missing(dat)) training$dat <- dat
+  if (!missing(xdat)) training$xdat <- xdat
+  if (!missing(ydat)) training$ydat <- ydat
+  if (!missing(zdat) && !is.null(zdat)) training$zdat <- zdat
+  if (!is.null(bws[["formula", exact = TRUE]]))
+    return(.np_bws_retain_formula_roles(bws, training))
+  bws[[".np.native.training"]] <- training
+  bws[[".np.formula.training"]] <- NULL
   if (is.null(bws$call))
     bws$call <- quote(npregbw(xdat = xdat, ydat = ydat))
   environment(bws$call) <- NULL
@@ -4896,6 +4904,17 @@ QFAC <- qnorm(.25,lower.tail=FALSE)*2
   training <- bws[[".np.native.training", exact = TRUE]]
   if (!is.null(training) && arg %in% names(training))
     return(training[[arg, exact = TRUE]])
+
+  formula.training <- bws[[".np.formula.training", exact = TRUE]]
+  if (!is.null(formula.training)) {
+    roles <- .np_bws_formula_roles(bws)
+    if (arg %in% names(roles)) {
+      frame <- formula.training[["frame", exact = TRUE]]
+      if (arg == "ydat" && !inherits(bws, c("conbandwidth", "condbandwidth")))
+        return(model.response(frame))
+      return(frame[, roles[[arg]], drop = FALSE])
+    }
+  }
 
   if (is.null(bws$call))
     stop("bandwidth object does not contain a call component")

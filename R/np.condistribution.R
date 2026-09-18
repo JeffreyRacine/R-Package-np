@@ -43,6 +43,7 @@ npcdist.formula <-
         data.override = !missing(data) && !is.null(data)) else
         .np_formula_frame_take(frame.state)
     tt <- attr(tmf, "terms")
+    bws <- .np_bws_retain_fit_frame(bws, tmf)
 
     tydat <- tmf[, bws$variableNames[["response"]], drop = FALSE]
     txdat <- tmf[, bws$variableNames[["terms"]], drop = FALSE]
@@ -135,6 +136,7 @@ npcdist.condbandwidth <-
 
     txdat = toFrame(txdat)
     tydat = toFrame(tydat)
+    bws <- .np_bws_retain_native_training(bws, xdat = txdat, ydat = tydat)
 
     if (!no.exy){
       exdat = toFrame(exdat)
@@ -590,7 +592,7 @@ npcdist.condbandwidth <-
   }
 
 npcdist.default <- function(bws, txdat, tydat, nomad = FALSE, ...){
-  sc <- .np_formula_expand_call(sys.call(), parent.frame())
+  sc <- .np_formula_default_call(sys.call(), sys.function(), parent.frame())
   sc.names <- names(sc)
   nomad <- npValidateNomadControl(nomad, "nomad")
 

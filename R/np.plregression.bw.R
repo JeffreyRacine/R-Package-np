@@ -989,7 +989,7 @@ npplregbw.default =
         environment(mc) <- parent.frame()
         tbw$call <- mc
         tbw <- .np_attach_nomad_shortcut(tbw, nomad.shortcut$metadata)
-        return(tbw)
+        return(.np_bws_retain_native_training(tbw, xdat = xdat, ydat = ydat, zdat = zdat))
       }
     }
 
@@ -1016,5 +1016,5 @@ npplregbw.default =
     tbw$call <- mc
     tbw <- .np_attach_nomad_shortcut(tbw, nomad.shortcut$metadata)
 
-    return(tbw)
+    return(.np_bws_retain_native_training(tbw, xdat = xdat, ydat = ydat, zdat = zdat))
   }
