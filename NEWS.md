@@ -2,8 +2,10 @@
 
 * Partially linear child bandwidths retain their own native training samples
   without serializing internal package call frames. Extracted children remain
-  usable, and newly saved formula bandwidths no longer load the originating
-  package merely because these internal frames referred to its namespace.
+  usable. Retained formula bandwidths likewise no longer keep intermediate
+  package constructor frames as their call environments; their user formula
+  environments are preserved. Newly saved objects therefore avoid these
+  unnecessary references to the originating package's namespace.
 
 * Formula bandwidth objects now retain their prepared training sample and NA
   policy. Rebinding constructor variables (for example in a model-building
