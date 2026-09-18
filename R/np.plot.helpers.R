@@ -1240,6 +1240,10 @@
 .np_plot_wild_apply_operator_enabled <- function(ntrain, neval, bwtype = "fixed") {
   if (!identical(as.character(bwtype)[1L], "fixed"))
     return(FALSE)
+  .np_plot_wild_operator_exceeds_budget(ntrain, neval)
+}
+
+.np_plot_wild_operator_exceeds_budget <- function(ntrain, neval) {
   threshold <- getOption("np.plot.wild.apply.operator.threshold.bytes",
                          128 * 1024^2)
   threshold <- suppressWarnings(as.numeric(threshold)[1L])
@@ -1309,7 +1313,10 @@
                                                fit.mean,
                                                B,
                                                wild,
-                                               progress.label = NULL) {
+                                               progress.label = NULL,
+                                               distributed = FALSE,
+                                               prefer.local.single_worker = FALSE,
+                                               master_local_chunk = TRUE) {
   fit.mean <- as.vector(fit.mean)
   neval <- as.integer(neval)
   ntrain <- as.integer(ntrain)
@@ -1327,6 +1334,19 @@
   ystar <- residuals * draws
   ystar <- ystar + fit.mean
 
+  # Opt-in for the exact LC derivative owner: the geometry is blocked here,
+  # while the existing fan-out partitions responses. Draws stay master-owned.
+  if (isTRUE(distributed)) {
+    chunk.size <- .npRmpi_bootstrap_tune_chunk_size(B = B,
+      chunk.size = .np_wild_chunk_size(n = ntrain, B = B),
+      comm = 1L, include.master = TRUE)
+    distributed <- .npRmpi_bootstrap_fanout_enabled(comm = 1L, n = ntrain,
+      B = B, chunk.size = chunk.size, what = "wild-regression-exact")
+    if (isTRUE(distributed))
+      tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size,
+                                            with.seeds = FALSE)
+  }
+
   t0 <- numeric(neval)
   tmat <- matrix(NA_real_, nrow = B, ncol = neval)
   block.rows <- .np_plot_wild_hat_block_rows(ntrain = ntrain, neval = neval)
@@ -1342,7 +1362,22 @@
     stopi <- min(neval, start + block.rows - 1L)
     H <- hat.block.fun(start, stopi)
     t0[start:stopi] <- as.vector(H %*% as.double(ydat))
-    tmat[, start:stopi] <- t(H %*% ystar)
+    if (isTRUE(distributed)) {
+      worker <- function(task) {
+        first <- as.integer(task$start)
+        last <- first + as.integer(task$bsz) - 1L
+        t(H %*% ystar[, first:last, drop = FALSE])
+      }
+      tmat[, start:stopi] <- .npRmpi_bootstrap_run_fanout(
+        tasks = tasks, worker = worker, ncol.out = nrow(H),
+        what = "wild-regression-exact", progress.label = progress.label,
+        profile.where = "mpi.applyLB:wild-regression-exact",
+        comm = 1L, prefer.local.single_worker = prefer.local.single_worker,
+        master_local_chunk = master_local_chunk,
+        required.bindings = list(H = H, ystar = ystar))
+    } else {
+      tmat[, start:stopi] <- t(H %*% ystar)
+    }
     done <- done + 1L
     progress <- .np_plot_progress_tick(state = progress, done = done)
     start <- stopi + 1L
@@ -4099,6 +4134,16 @@
                                                 progress.label = NULL,
                                                 prefer.local.single_worker = FALSE,
                                                 master_local_chunk = TRUE) {
+  # Beta endpoint cancellation is response-dependent in the incumbent owner.
+  # Keep that calculation; reuse the exact operator for the qualified kernels.
+  if (!identical(bws[["ckertype", exact = TRUE]], "beta"))
+    return(.np_wild_boot_from_regression_operator(
+      xdat = xdat, exdat = exdat, bws = bws, ydat = ydat, B = B,
+      wild = wild, fit.mean.train = fit.mean.train, gradients = gradients,
+      gradient.order = gradient.order, slice.index = slice.index,
+      progress.label = progress.label,
+      prefer.local.single_worker = prefer.local.single_worker,
+      master_local_chunk = master_local_chunk))
   xdat <- toFrame(xdat)
   exdat <- toFrame(exdat)
   ydat <- as.double(ydat)
@@ -4220,6 +4265,88 @@
     stop("wild regression exact helper path produced non-finite values")
 
   list(t = tmat, t0 = t0)
+}
+
+.np_wild_boot_from_regression_operator <- function(xdat,
+                                            exdat,
+                                            bws,
+                                            ydat,
+                                            B,
+                                            wild = c("rademacher", "mammen"),
+                                            fit.mean.train = NULL,
+                                            gradients = FALSE,
+                                            gradient.order = 1L,
+                                            slice.index = 1L,
+                                            progress.label = NULL,
+                                                prefer.local.single_worker = FALSE,
+                                                master_local_chunk = TRUE) {
+  xdat <- toFrame(xdat)
+  exdat <- toFrame(exdat)
+  ydat <- as.double(ydat)
+  B <- as.integer(B)
+
+  n <- nrow(xdat)
+  if (length(ydat) != n)
+    stop("length of ydat must match training rows in exact wild regression bootstrap helper")
+  if (n < 1L || nrow(exdat) < 1L || B < 1L)
+    stop("invalid exact wild regression bootstrap dimensions")
+  xi.factor <- isTRUE(slice.index > 0L) &&
+    !is.null(bws$xdati) &&
+    (isTRUE(bws$xdati$iord[slice.index]) || isTRUE(bws$xdati$iuno[slice.index]))
+
+  if (is.null(fit.mean.train)) {
+    # Automatic pilots are fitted training means, not external self-queries.
+    fit.mean.train <- as.vector(.np_regression_direct(
+      bws = bws,
+      txdat = xdat,
+      tydat = ydat,
+      gradients = FALSE,
+      gradient.order = gradient.order,
+      local.mode = TRUE
+    )$mean)
+  } else {
+    fit.mean.train <- as.double(fit.mean.train)
+  }
+  if (length(fit.mean.train) != n || any(!is.finite(fit.mean.train)))
+    stop("internal fit.mean.train payload is invalid for exact wild regression bootstrap", call. = FALSE)
+
+  s <- NULL
+  if (isTRUE(gradients)) {
+    if (xi.factor)
+      stop("exact wild derivative operator requires a continuous coordinate", call. = FALSE)
+    continuous <- which(bws$icon)
+    coordinate <- match(slice.index, continuous)
+    if (is.na(coordinate)) stop("invalid continuous gradient coordinate", call. = FALSE)
+    s <- integer(length(continuous))
+    s[coordinate] <- rep_len(as.integer(gradient.order), length(continuous))[coordinate]
+  }
+  # The public plot preparation owns kernel notices, as in the LP hat route.
+  empty.rows <- rep.int(FALSE, nrow(exdat))
+  hat.block <- function(start, stopi) {
+    H <- .npRmpi_with_local_regression(suppressWarnings(npreghat(
+      bws = bws, txdat = xdat, exdat = exdat[start:stopi, , drop = FALSE],
+      s = s, output = "matrix", .np.defer.empty.rows = TRUE)))
+    flags <- attr(H, ".np.empty.rows", exact = TRUE)
+    if (!is.null(flags)) empty.rows[start:stopi] <<- flags == 1L
+    H
+  }
+  if (.np_plot_wild_operator_exceeds_budget(n, nrow(exdat))) {
+    out <- .np_plot_boot_from_hat_blocks_wild(hat.block.fun = hat.block,
+      neval = nrow(exdat), ntrain = n, ydat = ydat, fit.mean = fit.mean.train,
+      B = B, wild = wild, progress.label = progress.label, distributed = TRUE,
+      prefer.local.single_worker = prefer.local.single_worker,
+      master_local_chunk = master_local_chunk)
+  } else {
+    out <- .np_plot_boot_from_hat_wild(H = hat.block(1L, nrow(exdat)), ydat = ydat,
+    fit.mean = fit.mean.train, B = B, wild = wild, progress.label = progress.label,
+      prefer.local.single_worker = prefer.local.single_worker)
+  }
+  if (any(!is.finite(out$t0[!empty.rows])) ||
+      any(!is.finite(out$t[, !empty.rows, drop = FALSE])) ||
+      any(!is.na(out$t0[empty.rows])) ||
+      any(!is.na(out$t[, empty.rows, drop = FALSE])))
+    stop("wild regression exact helper path produced non-finite values")
+  out
 }
 
 .np_inid_boot_from_regression_localpoly_frozen <- function(xdat,

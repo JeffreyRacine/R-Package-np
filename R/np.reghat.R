@@ -2463,7 +2463,8 @@ npreghat.rbandwidth <-
           degree = reg.spec$degree.engine,
           bernstein.basis = reg.spec$bernstein.basis.engine,
           leave.one.out = native.loo.route,
-          allow.empty.rows = allow.empty.rows && native.lp.mean.matrix.route
+          allow.empty.rows = allow.empty.rows &&
+            (native.lp.mean.matrix.route || (lc.derivative.exact.route && !beta.kernel))
         ))
       } else if (lc.derivative.exact.route) {
         .npRmpi_with_local_regression(.npreghat_exact_lc_derivative_matrix_from_npksum_chunked(

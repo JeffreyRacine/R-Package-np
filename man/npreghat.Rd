@@ -151,6 +151,14 @@ constraint output has the corresponding undefined columns. Other solve failures
 and zero nearest-neighbor radii remain errors. Training, leave-one-out and
 internal complete-operator consumers retain strict failure behavior.
 
+The same all-zero-weight certificate is used for external non-beta
+local-constant (including degree-zero local-polynomial) first-derivative
+operators with fixed, generalized-nearest-neighbor or adaptive-nearest-neighbor
+bandwidths. Unsupported rows become \code{NA}, while supported derivative
+rows keep their usual values. A zero sum formed by cancellation of nonzero
+weights, non-finite arithmetic, and invalid nearest-neighbor radii remain
+errors; they are not classified as empty rows.
+
 For local-constant beta kernels, one first derivative is evaluated by the
 same analytic C kernel used by \code{npreg(..., gradients=TRUE)}. If an exact
 support endpoint creates a raw-kernel jump, the hat operator cannot know
