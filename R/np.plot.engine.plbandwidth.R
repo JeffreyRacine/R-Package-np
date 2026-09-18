@@ -1158,9 +1158,9 @@
                     c(list(x = overlay.x, y = ydat),
                       overlay.points.args))
             if (!identical(type.val, "n")) {
-              ok.line <- is.finite(allei[,plot.index]) & is.finite(data.eval[,plot.index])
-              line.args <- list(x = allei[ok.line, plot.index],
-                                y = data.eval[ok.line, plot.index],
+              ok.line <- is.finite(ei) & is.finite(temp.mean)
+              line.args <- list(x = ei[ok.line],
+                                y = temp.mean[ok.line],
                                 type = type.val,
                                 lty = plot.args$lty,
                                 lwd = plot.args$lwd,
@@ -1170,11 +1170,11 @@
             if (plot.rug)
               .np_plot_draw_rug_1d(overlay.x)
           } else if (overlay.ok && xi.factor) {
-            axis.labels <- levels(allei[,plot.index])
+            axis.labels <- levels(ei)
             axis.at <- seq_along(axis.labels)
             add.axis <- is.null(plot.user.args$xaxt)
-            base.args <- list(x = as.numeric(allei[,plot.index]),
-                              y = data.eval[,plot.index],
+            base.args <- list(x = as.numeric(ei),
+                              y = temp.mean,
                               type = "n",
                               xlab = plot.args$xlab,
                               ylab = plot.args$ylab,
@@ -1201,13 +1201,13 @@
                     c(list(x = overlay.x, y = ydat),
                       overlay.points.args))
             if (plot.bootstrap && plot.bxp) {
-              do.call(bxp, c(list(z = all.bxp[[plot.index]], add = TRUE), bxp.args))
+              do.call(bxp, c(list(z = temp.boot, add = TRUE), bxp.args))
             } else {
-              l.f <- rep(allei[,plot.index], each = 3)
-              l.f[3 * seq_along(allei[,plot.index])] <- NA
-              l.y <- unlist(lapply(data.eval[,plot.index], function(p) c(0, p, NA)))
+              l.f <- rep(ei, each = 3)
+              l.f[3 * seq_along(ei)] <- NA
+              l.y <- unlist(lapply(temp.mean, function(p) c(0, p, NA)))
               lines(x = l.f, y = l.y, lty = .np_plot_lty("interval"))
-              point.args <- list(x = allei[,plot.index], y = data.eval[,plot.index])
+              point.args <- list(x = ei, y = temp.mean)
               if (!is.null(col)) point.args$col <- col
               if (!is.null(points.user.args$pch)) point.args$pch <- points.user.args$pch
               if (!is.null(points.user.args$cex)) point.args$cex <- points.user.args$cex
