@@ -652,7 +652,20 @@ to the sample size times the number of variables, not a pairwise weight matrix.
 Older saved objects without this retained state still rely on their original
 data bindings; rebuild their bandwidth object from the intended data before
 changing those bindings. User-defined transformation and missing-value
-functions should not rely on subsequently modified closure state.
+functions should not rely on subsequently modified closure state. The resolved
+NA policy is retained rather than re-read from later option settings. With
+explicit replacement training data, an explicitly supplied \code{na.action}
+overrides that policy, including \code{NULL}. Any remaining incomplete native
+training rows are omitted and recorded; this does not make incomplete rows
+valid estimator inputs. Character NA policies use the lookup owner of
+\code{stats::model.frame}; pass a custom function object explicitly.
+
+Retaining samples increases object size, and derived models can contain
+separate retained samples in their child bandwidth objects. User formula and
+custom-function environments are not generally pruned. They can retain
+unrelated caller objects, so serialized file size may be much larger than
+\code{object.size()} suggests. Sample ownership does not guarantee compact
+serialization of arbitrary user environments.
 
 
 The \code{scale.factor.*} controls are dimensionless search

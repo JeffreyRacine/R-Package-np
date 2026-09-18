@@ -645,7 +645,13 @@ Further arguments are passed to \code{\link{npregbw}} when bandwidths are comput
   Older objects without retained samples use their stored call environment
   when available and may require explicit training inputs after
   \code{saveRDS()} and \code{readRDS()}. Custom formula transformations used
-  on new evaluation data must still be available.
+  on new evaluation data must still be available. With explicit replacement
+  training data, an explicit \code{na.action} overrides the retained policy,
+  including \code{NULL}; any incomplete rows subsequently excluded by native
+  fitting are recorded in the effective training sample. User formula and
+  custom-function environments remain available and can retain unrelated
+  caller objects in serialized files. See \code{\link{npregbw}} for storage
+  and missing-value policy details.
 }
 
 \seealso{

@@ -116,7 +116,8 @@ test_that("child sample retention does not strip user formula environments", {
                fitted(npreg(b, newdata = owner$d[1:3, , drop = FALSE])))
 })
 
-test_that("formula sample retention releases only internal call owners", {
+test_that("synthetic internal call owner normalization preserves user environments", {
+  # This helper branch is not evidence of public constructor-frame compaction.
   owner <- getFromNamespace(".np_bws_retain_formula_training", "np")
   user <- new.env(parent = globalenv())
   formula <- y ~ x; environment(formula) <- user
